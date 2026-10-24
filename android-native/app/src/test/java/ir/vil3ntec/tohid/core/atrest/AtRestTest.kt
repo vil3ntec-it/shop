@@ -35,32 +35,42 @@ class AtRestTest {
 
   /* ----------------------------- ابزار ----------------------------- */
 
-  private class TestKek(override val id: String = "test:kek") : AtRestKek {
+  private class TestKek(initial: String = "test:kek") : AtRestKek {
     private val random = SecureRandom()
-    private val key = SecretKeySpec(ByteArray(32).also { random.nextBytes(it) }, "AES")
+    private val keys = LinkedHashMap<String, SecretKeySpec>()
+    /** KEKِ امروز — عوض کردنش همان «نامِ تازه»ِ اندروید است پس از شکستِ همیشگی */
+    var current = initial
+    override val id: String get() = current
     var gone = false
+    /** این شناسه‌ها KEY_MISSING می‌دهند (و برداشتنشان یعنی «گذرا بود») */
+    val broken = HashSet<String>()
     var flaky = false
     var wrapFails = false
 
-    private fun check() {
-      if (gone) throw AtRestException(AtRestException.Kind.KEY_MISSING, "gone")
+    private fun key(id: String) = keys.getOrPut(id) { SecretKeySpec(ByteArray(32).also { random.nextBytes(it) }, "AES") }
+
+    init { key(initial) }
+
+    private fun check(kekId: String) {
+      if (gone || kekId in broken) throw AtRestException(AtRestException.Kind.KEY_MISSING, "gone")
       if (flaky) throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, "flaky")
     }
 
     override fun wrap(dek: ByteArray): ByteArray {
-      check()
+      check(current)
       if (wrapFails) throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, "wrap")
       val iv = ByteArray(12).also { random.nextBytes(it) }
       val c = Cipher.getInstance("AES/GCM/NoPadding")
-      c.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
+      c.init(Cipher.ENCRYPT_MODE, key(current), GCMParameterSpec(128, iv))
       return iv + c.doFinal(dek)
     }
 
-    override fun unwrap(blob: ByteArray): ByteArray {
-      check()
+    override fun unwrap(blob: ByteArray, kekId: String): ByteArray {
+      check(kekId)
+      val k = keys[kekId] ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, "unknown kek $kekId")
       return try {
         val c = Cipher.getInstance("AES/GCM/NoPadding")
-        c.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, blob, 0, 12))
+        c.init(Cipher.DECRYPT_MODE, k, GCMParameterSpec(128, blob, 0, 12))
         c.doFinal(blob, 12, blob.size - 12)
       } catch (e: AEADBadTagException) {
         throw AtRestException(AtRestException.Kind.KEY_MISSING, "bad tag", e)
@@ -110,6 +120,12 @@ class AtRestTest {
   private val io = JvmFiles()
 
   private fun ring(dir: File = tmp.root, kek: AtRestKek = TestKek()) = AtRestKeyring(File(dir, "keyring"), kek, io)
+
+  /** «اجرای دوم»: `Lost` فقط وقتی اعلام می‌شود که اجرای پیشین هم همان شکست را دیده باشد */
+  private fun secondLaunch(make: () -> AtRestKeyring): AtRestKeyring {
+    make().state()
+    return make()
+  }
 
   private fun kinds(block: () -> Unit): AtRestException.Kind {
     try {
@@ -213,13 +229,14 @@ class AtRestTest {
     val before = keyring.readBytes()
 
     kek.gone = true
-    val r = ring(kek = kek)
+    val r = secondLaunch { ring(kek = kek) }
     assertTrue(r.state() is AtRestKeyring.State.Lost)
     assertEquals(AtRestException.Kind.KEY_MISSING, kinds { AtRestCodec(r).open(sealed) })
     assertArrayEquals("خواندن کلیددان را عوض نمی‌کند", before, keyring.readBytes())
 
     kek.gone = false // KEKِ تازه (مثلِ نصبِ دوباره)؛ کلیددانِ قبلی با آن باز نمی‌شود
-    val fresh = AtRestKeyring(keyring, TestKek(), io)
+    val newKek = TestKek()
+    val fresh = secondLaunch { AtRestKeyring(keyring, newKek, io) }
     assertTrue(fresh.state() is AtRestKeyring.State.Lost)
     val (newKid, _) = fresh.forWrite()!!
     val aside = fresh.setAsideAs!!
@@ -352,7 +369,7 @@ class AtRestTest {
     val f = File(tmp.root, "shop-data.json").apply { writeBytes(codec.seal(ledgerJson.toByteArray())) }
     val before = f.readBytes()
     kek.gone = true
-    val lost = AtRestCodec(ring(kek = kek))
+    val lost = AtRestCodec(secondLaunch { ring(kek = kek) })
     assertEquals(AtRestException.Kind.KEY_MISSING, kinds { AtRestMigration.convert(f, false, lost, io) })
     assertArrayEquals(before, f.readBytes())
     assertFalse(AtRestMigration.sidecarOf(f).exists())
@@ -388,7 +405,8 @@ class AtRestTest {
     AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
     val keyring = File(tmp.root, "keyring")
     val before = keyring.readBytes()
-    val fresh = AtRestKeyring(keyring, TestKek(), io) // KEKِ دیگر ⇒ Lost
+    val other = TestKek()
+    val fresh = secondLaunch { AtRestKeyring(keyring, other, io) } // KEKِ دیگر ⇒ Lost در اجرای دوم
     assertTrue(fresh.state() is AtRestKeyring.State.Lost)
 
     io.failReplaceTo = ".lost-"
@@ -449,7 +467,7 @@ class AtRestTest {
     AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
     File(tmp.root, "keyring").writeText("x")
     File(tmp.root, "keyring" + AtRestKeyring.BACKUP_SUFFIX).writeText("y")
-    val r = ring(kek = kek)
+    val r = secondLaunch { ring(kek = kek) }
     assertTrue(r.state() is AtRestKeyring.State.Lost)
     assertNotNull(r.forWrite())
     val names = tmp.root.listFiles().orEmpty().map { it.name }
@@ -457,14 +475,51 @@ class AtRestTest {
     assertTrue(names.any { it.startsWith("keyring.bak.lost-") })
   }
 
-  @Test fun `شکستِ همیشگیِ Keystore از گذرا جداست`() {
-    assertTrue(AtRestKeyFailure.isPermanent(java.security.UnrecoverableKeyException("x")))
-    assertTrue(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("wrapped", java.security.UnrecoverableKeyException())))
+  @Test fun `شکستِ همیشگیِ Keystore از گذرا جداست — UnrecoverableKey و «keyblob» ِ کلی گذرایند`() {
     assertTrue(AtRestKeyFailure.isPermanent(java.security.KeyStoreException("Invalid key blob (internal Keystore code: -33)")))
+    assertTrue(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("x", java.security.KeyStoreException("Invalid key blob"))))
     assertTrue(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("Key permanently invalidated")))
+    //  AndroidKeyStore همین را برای SYSTEM_ERROR ِ گذرا هم می‌دهد
+    assertFalse(AtRestKeyFailure.isPermanent(java.security.UnrecoverableKeyException("Failed to obtain information about key")))
+    assertFalse(AtRestKeyFailure.isPermanent(java.security.InvalidKeyException("wrapped", java.security.UnrecoverableKeyException())))
+    assertFalse(AtRestKeyFailure.isPermanent(java.security.KeyStoreException("Failed to load keyblob")))
     assertFalse(AtRestKeyFailure.isPermanent(java.security.KeyStoreException("System error")))
     assertFalse(AtRestKeyFailure.isPermanent(java.security.ProviderException("Keystore operation failed")))
     assertFalse(AtRestKeyFailure.isPermanent(IllegalStateException("busy")))
+  }
+
+  @Test fun `شکستِ همیشگی‌نما در اجرای نخست — هیچ چیزی کنار نمی‌رود و کلیدِ تازه ساخته نمی‌شود؛ گذرا بود ⇒ همان کلید`() {
+    val kek = TestKek()
+    val sealed = AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    val before = File(tmp.root, "keyring").readBytes()
+    kek.gone = true
+    val first = ring(kek = kek)
+    assertTrue(first.state() is AtRestKeyring.State.Unavailable)
+    assertNull("اجرای نخست کلیدِ تازه نمی‌سازد", first.forWrite())
+    assertEquals(AtRestException.Kind.KEY_UNAVAILABLE, kinds { AtRestCodec(first).open(sealed) })
+    assertArrayEquals(before, File(tmp.root, "keyring").readBytes())
+    assertTrue(tmp.root.listFiles().orEmpty().none { it.name.contains(".lost-") })
+
+    kek.gone = false // اجرای دوم: گذرا بود
+    val second = ring(kek = kek)
+    assertArrayEquals(ledgerJson.toByteArray(), AtRestCodec(second).open(sealed))
+    assertFalse("نشانِ «مشکوک» پاک شد", File(tmp.root, "keyring" + AtRestKeyring.SUSPECT_SUFFIX).exists())
+  }
+
+  @Test fun `Lost اعلام شد ولی KEKِ قدیمی برگشت — فایلِ رمزشده با کلیددانِ کنارگذاشته هنوز باز می‌شود`() {
+    val kek = TestKek("kek-a")
+    val old = AtRestCodec(ring(kek = kek)).seal(ledgerJson.toByteArray())
+    kek.broken += "kek-a"
+    kek.current = "kek-b" // اندروید: نامِ تازه، کلیدِ قدیمی پاک نمی‌شود
+    val lost = secondLaunch { ring(kek = kek) }
+    assertTrue(lost.state() is AtRestKeyring.State.Lost)
+    val fresh = AtRestCodec(lost).seal("{}".toByteArray())
+    assertNotEquals(AtRestEnvelope.keyIdOf(old), AtRestEnvelope.keyIdOf(fresh))
+
+    kek.broken -= "kek-a" // گذرا بود
+    val later = ring(kek = kek)
+    assertArrayEquals("از keyring.lost-*", ledgerJson.toByteArray(), AtRestCodec(later).open(old))
+    assertArrayEquals("{}".toByteArray(), AtRestCodec(later).open(fresh))
   }
 
   @Test fun `صفِ opها و ژورنال‌ها رمز نمی‌شوند؛ با رمزِ روشن، دفتر و حالِ همگام‌سازی با هم از پشتیبانِ اندروید بیرون`() {
@@ -482,9 +537,10 @@ class AtRestTest {
     for (n in listOf("sale-draft.json", "product-photos/p1.jpg", "chat-outbox/1.json")) assertFalse(n, AtRestScope.skipInDeviceBackup(n))
     assertTrue("tohid-sync-v1.xml" in AtRestScope.SYNC_PREFS)
     //  خاموش و بی فایلِ رمزدار ⇒ همان قاعدهٔ XML
-    assertFalse(AtRestScope.activeForBackup(wanted = false, anySealed = false, keyringPresent = false))
-    assertTrue(AtRestScope.activeForBackup(wanted = false, anySealed = true, keyringPresent = false))
-    assertTrue(AtRestScope.activeForBackup(wanted = true, anySealed = false, keyringPresent = false))
+    assertFalse(AtRestScope.activeForBackup(wanted = false, anySealed = false))
+    assertTrue(AtRestScope.activeForBackup(wanted = false, anySealed = true))
+    assertTrue(AtRestScope.activeForBackup(wanted = true, anySealed = false))
+    assertTrue(AtRestScope.leftover("shop-data.json.rebuild-pending"))
   }
 
   @Test fun `پاکت در یک بافر — اندازهٔ دقیق و همان قالب`() {

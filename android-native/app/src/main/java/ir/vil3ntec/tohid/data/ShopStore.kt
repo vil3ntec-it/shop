@@ -52,6 +52,8 @@ class ShopStore(private val context: Context) {
 
   suspend fun load() {
     withContext(Dispatchers.IO) {
+      //  SEC-01: بازسازیِ نیمه‌کاره پیش از خواندنِ دفتر تمام یا دور ریخته می‌شود (`SyncRebuild.atLoad`)
+      runCatching { recoverRebuild() }
       if (file.exists()) {
         //  SEC-01: دفترِ ساده همان‌طور خوانده می‌شود؛ رمزدار با کلیدِ همین دستگاه
         val text = try {
@@ -186,8 +188,9 @@ class ShopStore(private val context: Context) {
    *  ۳) دفترِ خوانده‌نشده کنار می‌رود (`.unreadable-<زمان>`)، پاک نمی‌شود.
    *
    *  @param backup پشتیبانی که در همین حال بازیابی می‌شود (ابری، پوشه، فایل، نسخهٔ ایمنی):
-   *  تنظیماتش می‌ماند و فقط ردیف‌هایی که سرور ندارد افزوده می‌شوند (INSERT) — هرگز DELETE یا
-   *  برگرداندنِ ردیفِ تازه‌ترِ سرور به نسخهٔ کهنهٔ پشتیبان.
+   *  تنظیماتش می‌ماند و فقط ردیف‌هایی افزوده می‌شوند (INSERT) که هرگز در سایهٔ پیشین نبودند
+   *  (`SyncRebuild.withBackupRows`) — هرگز DELETE، برگرداندنِ ردیفِ تازه‌ترِ سرور، یا زنده کردنِ
+   *  ردیفی که پس از پشتیبان حذف شد. حسابِ همگام‌شده بی ورود: بازیابی رد می‌شود.
    */
   suspend fun rebuildFromServer(backup: ShopData? = null): Rebuilt = withContext(Dispatchers.IO) {
     if (_unreadable.value == null) return@withContext Rebuilt(false, "دفترِ این دستگاه باز است؛ بازسازی لازم نیست.")
@@ -198,15 +201,17 @@ class ShopStore(private val context: Context) {
     engine.rebind()
     if (!Backend.isReady(context)) {
       if (backup == null) return@withContext Rebuilt(false, NEED_SIGN_IN)
-      //  بی سرور: پشتیبان خودش سایه می‌شود ⇐ هیچ op؛ پس از ورود `prepare` هم‌تراز می‌کند
-      return@withContext runCatching { synchronized(engine) { engine.resetTo(backup); place(backup) } }.fold(
-        { Rebuilt(true, "پشتیبان بازیابی شد. پس از ورود به حساب، فقط ردیف‌هایی که سرور ندارد فرستاده می‌شوند.") },
+      //  ⛔ حسابی که روزی همگام شده: ردیفِ پشتیبان که سرور ندارد شاید حذف‌شده باشد ⇒ اول ورود
+      if (engine.everSynced()) return@withContext Rebuilt(false, NEED_SIGN_IN_SYNCED)
+      //  هرگز همگام‌نشده: پشتیبان خودش سایه می‌شود ⇐ هیچ op
+      return@withContext runCatching { engine.resetTo(backup, staging) }.fold(
+        { Rebuilt(true, "پشتیبان بازیابی شد.") },
         { Rebuilt(false, "بازیابی انجام نشد (${it.message}). هیچ چیزی پاک نشده.") },
       )
     }
     if (!Backend.isOnline(context)) return@withContext Rebuilt(false, NEED_NET)
     val out = try {
-      engine.rebuildFromServer(backup ?: ShopData()) { next -> place(next) }
+      engine.rebuildFromServer(backup ?: ShopData(), staging)
     } catch (e: kotlinx.coroutines.CancellationException) {
       throw e
     } catch (e: Exception) {
@@ -218,13 +223,17 @@ class ShopStore(private val context: Context) {
         "${out.count} تغییرِ این دستگاه هنوز به سرور نرسیده؛ اول باید برسند تا گم نشوند. به اینترنت وصل شوید و دوباره امتحان کنید.",
       )
       is SyncRebuild.Outcome.Done -> {
-        val merged = backup?.let { SyncRebuild.withBackupRows(out.ledger, it) }
-        if (merged == null || merged == out.ledger) {
-          Rebuilt(true, "دفتر از سرور بازسازی شد (${out.rows} ردیف).")
-        } else if (writeInternal(merged)) {
-          Rebuilt(true, "دفتر از سرور بازسازی شد و ${backupSize(merged) - backupSize(out.ledger)} ردیفی که فقط در پشتیبان بود افزوده شد.")
-        } else {
-          Rebuilt(false, "دفتر از سرور بازسازی شد ولی ردیف‌های پشتیبان نوشته نشدند؛ دوباره بازیابی کنید.")
+        val merged = backup?.let { SyncRebuild.withBackupRows(out.ledger, it, out.before) } ?: out.ledger
+        val done = "دفتر از سرور بازسازی شد (${out.rows} ردیف)."
+        when {
+          backup == null -> Rebuilt(true, done)
+          merged == out.ledger -> Rebuilt(
+            true,
+            done + if (out.before == null) " ردیف‌هایی که فقط در پشتیبان بودند افزوده نشدند: معلوم نیست پس از پشتیبان حذف شده‌اند یا نه." else "",
+          )
+          writeInternal(merged) ->
+            Rebuilt(true, "$done ${backupSize(merged) - backupSize(out.ledger)} ردیفی که هرگز به سرور نرفته بود از پشتیبان افزوده شد.")
+          else -> Rebuilt(false, "$done ولی ردیف‌های پشتیبان نوشته نشدند؛ دوباره بازیابی کنید.")
         }
       }
     }
@@ -237,9 +246,57 @@ class ShopStore(private val context: Context) {
     return r.ok
   }
 
-  /** دفترِ بازسازی‌شده جای دفترِ خوانده‌نشده، بی op — زیرِ قفلِ موتور */
-  private fun place(next: ShopData) {
-    if (!writeToDisk(next, replacing = true)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+  /** کناری و نشانِ «بازسازیِ نیمه‌کاره» — شرح سرِ `SyncRebuild` */
+  private val rebuildSide: File get() = File(file.absoluteFile.parentFile, file.name + ".rebuild")
+  private val rebuildMark: File get() = File(file.absoluteFile.parentFile, file.name + ".rebuild-pending")
+
+  /** دو گامِ فایلیِ بازسازی، زیرِ قفلِ موتور: کناری + نشان، و جابه‌جایی */
+  private val staging = object : SyncRebuild.Staging {
+    override fun stage(next: ShopData, shadowSha: String) {
+      AtRest.writeText(context, rebuildSide, json.encodeToString(next))
+      DiskWrite.text(rebuildMark, shadowSha)
+    }
+
+    override fun swap() {
+      if (!finishRebuild()) throw java.io.IOException("دفترِ بازسازی‌شده جا نیفتاد؛ با باز شدنِ دوبارهٔ برنامه تمام می‌شود")
+    }
+  }
+
+  /**
+   *  کناری جای دفتر — بی op. دفترِ قبلی (خوانده‌نشده، یا خواندنیِ کهنه) کنار می‌رود
+   *  (`.unreadable-<زمان>`)، پاک نمی‌شود؛ نشان آخر از همه پاک می‌شود.
+   */
+  private fun finishRebuild(): Boolean {
+    val side = rebuildSide
+    if (!side.isFile) return false
+    val next = runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, side)) }.getOrElse { return false }
+    if (file.exists()) {
+      val keep = File(file.absoluteFile.parentFile, "${file.name}.unreadable-${System.currentTimeMillis()}")
+      if (runCatching { DiskWrite.move(file, keep) }.isFailure) return false
+    }
+    if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
+    rebuildMark.delete()
+    _unreadable.value = null
+    _data.value = next
+    runCatching { LedgerSummary.write(context, next) }
+    return true
+  }
+
+  /** هنگامِ باز شدن: بازسازی‌ای که میانِ سایه و جابه‌جایی بسته شد تمام می‌شود؛ پیش از سایه، دور ریخته */
+  private fun recoverRebuild() {
+    val mark = rebuildMark
+    val side = rebuildSide
+    if (!mark.exists() && !side.exists()) return
+    val engine = SyncV1Engine.of(context)
+    val marker = if (mark.exists()) runCatching { mark.readText().trim() }.getOrNull() else null
+    synchronized(engine) {
+      //  Sync v3 بازسازی ندارد ⇒ نشان هرگز نمی‌خواند ⇒ دور ریخته
+      when (SyncRebuild.atLoad(marker, side.isFile, if (SyncChoice.isV3(context)) "" else engine.shadowSha())) {
+        SyncRebuild.AtLoad.FINISH -> finishRebuild()
+        SyncRebuild.AtLoad.DISCARD -> { side.delete(); mark.delete() }
+        SyncRebuild.AtLoad.NONE -> Unit
+      }
+    }
   }
 
   /**
@@ -333,30 +390,18 @@ class ShopStore(private val context: Context) {
    *  ⚠️ دفترِ حافظه (`data`) فقط **پس از** نشستن روی دیسک عوض می‌شود: آنچه
    *  صفحه نشان می‌دهد همان است که پس از بستن و باز کردن می‌ماند.
    */
-  private fun writeToDisk(next: ShopData, replacing: Boolean = false): Boolean {
-    //  SEC-01: دفترِ رمزدارِ خوانده‌نشده فقط با بازیابی جایگزین می‌شود — شرح سرِ `unreadable`
-    var aside: File? = null
+  private fun writeToDisk(next: ShopData): Boolean {
+    //  SEC-01: دفترِ رمزدارِ خوانده‌نشده فقط با «بازسازی از سرور» جایگزین می‌شود (`finishRebuild`)
+    //  — شرح سرِ `unreadable`
     if (_unreadable.value != null) {
-      if (!replacing) {
-        _diskError.tryEmit(UNREADABLE)
-        return false
-      }
-      val keep = File(file.absoluteFile.parentFile, "${file.name}.unreadable-${System.currentTimeMillis()}")
-      if (file.exists()) {
-        if (runCatching { DiskWrite.move(file, keep) }.isFailure) {
-          _diskError.tryEmit("دفترِ قبلی کنار گذاشته نشد؛ بازیابی انجام نشد")
-          return false
-        }
-        aside = keep
-      }
+      _diskError.tryEmit(UNREADABLE)
+      return false
     }
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
     //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
     //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
     val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next)) }
     saved.exceptionOrNull()?.let {
-      //  بازیابی ننشست ⇒ دفترِ کنارگذاشته سرِ جایش برمی‌گردد
-      aside?.let { a -> if (!file.exists()) runCatching { DiskWrite.move(a, file) } }
       _diskError.tryEmit(it.message ?: "خطای نامشخص")
       return false
     }
@@ -529,6 +574,9 @@ class ShopStore(private val context: Context) {
 
     const val NEED_SIGN_IN =
       "برای بازسازی از سرور اول وارد حساب شوید؛ یا از «داده‌ها» یک پشتیبان را بازیابی کنید. هیچ چیزی پاک نشده."
+
+    const val NEED_SIGN_IN_SYNCED =
+      "این دفتر پیش‌تر با سرور همگام شده؛ برای بازیابیِ پشتیبان اول وارد حساب شوید تا دفتر از سرور ساخته شود و ردیف‌های حذف‌شده زنده نشوند. هیچ چیزی پاک نشده."
 
     const val NEED_NET =
       "برای بازسازی از سرور اینترنت لازم است؛ دفترِ خوانده‌نشده با پشتیبانِ کهنه جایگزین نمی‌شود تا ردیف‌های تازه‌ترِ سرور حذف نشوند. هیچ چیزی پاک نشده."

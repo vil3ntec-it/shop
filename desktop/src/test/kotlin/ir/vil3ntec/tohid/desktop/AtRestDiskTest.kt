@@ -46,6 +46,17 @@ class AtRestDiskTest {
     AtRest.keyring(ctx).forget()
   }
 
+  /**
+   *  کلید نیامد (نصبِ دوباره / انتقال): دو «اجرای برنامه»، چون `Lost` فقط وقتی اعلام می‌شود
+   *  که شکست در اجرای دوم هم تکرار شود — اجرای نخست فقط `KEY_UNAVAILABLE` می‌گوید.
+   */
+  private fun loseKey() {
+    assertTrue(kekFile.delete())
+    AtRest.keyring(ctx).forget()
+    assertEquals(AtRestException.Kind.KEY_UNAVAILABLE, open().unreadable.value)
+    AtRest.keyring(ctx).forget()
+  }
+
   @Before fun before() = clean()
   @After fun after() = clean()
 
@@ -99,8 +110,7 @@ class AtRestDiskTest {
     val before = ledger.readBytes()
 
     //  نصبِ دوباره / انتقال: کلیدِ اصلی نیست
-    assertTrue(kekFile.delete())
-    AtRest.keyring(ctx).forget()
+    loseKey()
 
     val store = open()
     assertEquals(AtRestException.Kind.KEY_MISSING, store.unreadable.value)
@@ -127,8 +137,7 @@ class AtRestDiskTest {
     assertTrue(queued > 0)
 
     //  کلید نیامد (انتقال/نصبِ دوباره): دفتر باز نمی‌شود، سایه و صف سرِ جایشان
-    assertTrue(kekFile.delete())
-    AtRest.keyring(ctx).forget()
+    loseKey()
     val store = open()
     assertEquals(AtRestException.Kind.KEY_MISSING, store.unreadable.value)
 
@@ -146,8 +155,7 @@ class AtRestDiskTest {
     AtRest.setWanted(ctx, true)
     assertTrue(runBlocking { open().save(first) })
     val before = ledger.readBytes()
-    assertTrue(kekFile.delete())
-    AtRest.keyring(ctx).forget()
+    loseKey()
     val store = open()
     val r = runBlocking { store.rebuildFromServer() }
     assertFalse(r.ok)
@@ -156,14 +164,15 @@ class AtRestDiskTest {
     assertEquals(AtRestException.Kind.KEY_MISSING, store.unreadable.value)
   }
 
-  @Test fun `ویندوز — فایلِ کلید فقط برای صاحبش (ACL)`() {
+  @Test fun `ویندوز — فایلِ کلید فقط برای صاحبش، SYSTEM و Administrators (ACL)`() {
     Assume.assumeTrue(System.getProperty("os.name").orEmpty().startsWith("Windows"))
     AtRest.setWanted(ctx, true)
     assertTrue(runBlocking { open().save(first) })
     assertTrue(kekFile.exists())
     assertEquals(true, AtRestKeys.windowsAcl)
     val view = Files.getFileAttributeView(kekFile.toPath(), AclFileAttributeView::class.java)
-    assertEquals(1, view.acl.size)
-    assertEquals(view.owner, view.acl[0].principal())
+    val who = view.acl.map { it.principal().name }
+    assertTrue(view.acl.any { it.principal() == view.owner })
+    assertTrue("فقط صاحب، SYSTEM و Administrators: $who", who.all { it == view.owner.name || it.endsWith("\\SYSTEM") || it.endsWith("\\Administrators") })
   }
 }

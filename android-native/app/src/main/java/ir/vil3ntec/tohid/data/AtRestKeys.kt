@@ -51,17 +51,24 @@ object AtRestKeys {
   fun kek(@Suppress("UNUSED_PARAMETER") context: Context): AtRestKek = Keystore
 
   private object Keystore : AtRestKek {
-    override val id: String = "android-keystore:$ALIAS"
+    private const val PREFIX = "android-keystore:"
+
+    /** KEKِ امروز: تازه‌ترین نام (`ALIAS`، یا `ALIAS_r<زمان>` پس از جایگزینی) */
+    override val id: String get() = PREFIX + current()
 
     private fun keystore(): KeyStore = KeyStore.getInstance(PROVIDER).apply { load(null) }
 
-    private fun existing(): SecretKey? =
-      (keystore().getEntry(ALIAS, null) as? KeyStore.SecretKeyEntry)?.secretKey
+    private fun current(): String =
+      keystore().aliases().toList().filter { it == ALIAS || it.startsWith("${ALIAS}_r") }
+        .maxByOrNull { it.removePrefix(ALIAS).removePrefix("_r").toLongOrNull() ?: 0L } ?: ALIAS
 
-    private fun create(): SecretKey =
+    private fun existing(alias: String): SecretKey? =
+      (keystore().getEntry(alias, null) as? KeyStore.SecretKeyEntry)?.secretKey
+
+    private fun create(alias: String): SecretKey =
       KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, PROVIDER).apply {
         init(
-          KeyGenParameterSpec.Builder(ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+          KeyGenParameterSpec.Builder(alias, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
             .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
             .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
             .setKeySize(256)
@@ -77,23 +84,24 @@ object AtRestKeys {
     }
 
     override fun wrap(dek: ByteArray): ByteArray = guard {
+      val alias = current()
       try {
-        seal(existing() ?: create(), dek)
+        seal(existing(alias) ?: create(alias), dek)
       } catch (e: Exception) {
         if (!permanent(e)) throw e
         /*
-         *  ⛔ `wrap` فقط هنگامِ ساختنِ کلیددانِ **تازه** صدا زده می‌شود (کلیددانِ قبلی کنار
-         *  رفته است). KEKی که برای همیشه از کار افتاده دیگر هیچ چیزی را باز نمی‌کند؛ اگر
-         *  همین‌جا نمی‌ماند، رمز تا ابد «در دسترس نیست» می‌ماند. جایش کلیدِ تازه می‌نشیند.
+         *  ⛔ هیچ کلیدی پاک نمی‌شود (بازبینیِ #331): کلیدِ همیشه‌ازکارافتاده سرِ جایش می‌ماند —
+         *  اگر معلوم شود گذرا بود، کلیددان‌های کنارگذاشته هنوز با آن باز می‌شوند — و کلیدِ تازه
+         *  با **نامِ تازه** ساخته می‌شود. `wrap` فقط هنگامِ ساختنِ کلیددانِ تازه صدا زده می‌شود.
          */
-        runCatching { keystore().deleteEntry(ALIAS) }
-        seal(create(), dek)
+        seal(create("${ALIAS}_r${System.currentTimeMillis()}"), dek)
       }
     }
 
-    override fun unwrap(blob: ByteArray): ByteArray = guard {
+    override fun unwrap(blob: ByteArray, kekId: String): ByteArray = guard {
+      if (!kekId.startsWith(PREFIX)) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ اصلیِ دستگاه عوض شده ($kekId)")
       if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ پیچیده بریده است")
-      val key = existing()
+      val key = existing(kekId.removePrefix(PREFIX))
         ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ Keystore روی این دستگاه نیست")
       val c = Cipher.getInstance("AES/GCM/NoPadding")
       c.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, blob, 0, IV))
@@ -102,10 +110,10 @@ object AtRestKeys {
 
     /**
      *  رده‌بندیِ شکست: برچسبِ نخورده یعنی این کلیدِ پیچیده مالِ این KEK نیست؛
-     *  `KeyPermanentlyInvalidatedException`، `UnrecoverableKeyException` و «invalid key blob»
-     *  یعنی KEK برای همیشه از کار افتاده (بازبینیِ #331) — هر سه `KEY_MISSING`، تا صفحه راهِ
-     *  «بازسازی از سرور» را پیشنهاد کند. هر خطای دیگرِ Keystore گذرا شمرده می‌شود و هرگز
-     *  کلیدِ تازه نمی‌سازد.
+     *  `KeyPermanentlyInvalidatedException` و «Invalid key blob» یعنی KEK برای همیشه از کار
+     *  افتاده (`AtRestKeyFailure`) — `KEY_MISSING`؛ کلیددان با این حال فقط پس از تکرار در اجرای
+     *  دوم `Lost` می‌شود. هر خطای دیگرِ Keystore (از جمله `UnrecoverableKeyException`) گذرا
+     *  شمرده می‌شود و هرگز کلیدِ تازه نمی‌سازد.
      */
     private fun permanent(e: Throwable): Boolean =
       e is KeyPermanentlyInvalidatedException || AtRestKeyFailure.isPermanent(e)

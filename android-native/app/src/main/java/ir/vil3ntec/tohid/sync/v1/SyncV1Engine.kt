@@ -291,13 +291,13 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   /**
-   *  «بازسازی از سرور»: صف اول، بعد Snapshot؛ سایه و cursor پیش از دفتر — شرح سرِ `SyncRebuild`.
+   *  «بازسازی از سرور»: صف اول، بعد Snapshot؛ کناری ⇐ سایه و cursor ⇐ جابه‌جایی — شرح سرِ `SyncRebuild`.
    *
    *  @param base از آن فقط بخش‌های بیرون از همگام‌سازی (تنظیمات) برمی‌دارد
-   *  @param place دفترِ تازه جای دفترِ خوانده‌نشده، **بی op**؛ ننشست ⇒ پرتاب
+   *  @param files کناری و جابه‌جاییِ دفتر (`ShopStore`)؛ زیرِ قفلِ همین موتور صدا زده می‌شوند
    *  @throws Exception شبکه یا دیسک؛ تا پیش از `commitShadow` هیچ چیزی عوض نشده است
    */
-  internal suspend fun rebuildFromServer(base: ShopData, place: (ShopData) -> Unit): SyncRebuild.Outcome = gate.withLock {
+  internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
     busy = true
     publish()
     try {
@@ -307,11 +307,13 @@ class SyncV1Engine private constructor(context: Context) {
       val out = SyncRebuild(object : SyncRebuild.Io {
         override fun queued(): Int = queue.size()
         override suspend fun push() = pushQueue(client, device)
+        override fun shadow(): String = state.shadow
         override suspend fun snapshot(): JsonObject = client.snapshot()
+        override fun stage(next: ShopData, shadowSha: String) = synchronized(this@SyncV1Engine) { files.stage(next, shadowSha) }
         override fun commitShadow(shadow: String, cursor: Long) {
           if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
         }
-        override fun writeLedger(next: ShopData) = synchronized(this@SyncV1Engine) { place(next) }
+        override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
       }).run(base)
       if (out is SyncRebuild.Outcome.Done) {
         val now = System.currentTimeMillis()
@@ -329,15 +331,26 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   /**
-   *  بی سرور (هنوز وارد نشده یا حسابی نیست): دفترِ بازیابی‌شده خودش سایه می‌شود ⇐ هیچ op؛
-   *  cursor صفر و «هم‌ترازی» از نو، تا پس از ورود `prepare` فقط ردیف‌هایی را بفرستد که سرور
-   *  ندارد (INSERT) و ردیف‌های سرور را بیفزاید — هرگز DELETE. سایه پیش از دفتر می‌نشیند.
+   *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
+   *  ردیفی که در پشتیبان هست و سرور ندارد شاید حذف‌شده باشد و `prepare` زنده‌اش می‌کرد.
+   */
+  fun everSynced(): Boolean = state.cursor > 0 || state.reconciledAt > 0 || state.snapshotAt > 0
+
+  /** اثرِ سایهٔ همین حالا — برای `SyncRebuild.atLoad` */
+  fun shadowSha(): String = SyncRebuild.sha(state.shadow)
+
+  /**
+   *  بی سرور و **هرگز همگام‌نشده**: دفترِ بازیابی‌شده خودش سایه می‌شود ⇐ هیچ op؛ cursor صفر و
+   *  «هم‌ترازی» از نو. کناری و نشان پیش از سایه، جابه‌جایی پس از آن — همان ترتیبِ بازسازی.
    */
   @Synchronized
-  fun resetTo(ledger: ShopData) {
-    if (!state.commitShadow(SyncRebuild.shadowFor(ledger), 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+  internal fun resetTo(ledger: ShopData, files: SyncRebuild.Staging) {
+    val shadow = SyncRebuild.shadowFor(ledger)
+    files.stage(ledger, SyncRebuild.sha(shadow))
+    if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
     state.reconciledAt = 0L
     state.snapshotAt = 0L
+    files.swap()
     publish()
   }
 

@@ -153,18 +153,16 @@ object AtRest {
   }
 
   /**
-   *  آیا رمز در کار است (روشن، یا هنوز فایلِ رمزدار یا کلیددانی هست) — تصمیمِ
-   *  `TohidBackupAgent`. فقط تنظیم و سرآیندها؛ Keystore لمس نمی‌شود.
+   *  آیا رمز در کار است (روشن، یا هنوز فایلِ رمزداری هست) — تصمیمِ `TohidBackupAgent`.
+   *  فقط تنظیم و سرآیندها؛ Keystore لمس نمی‌شود.
+   *
+   *  ⚠️ سرآیندها خوانده نشدند (خطای دیسک) ⇒ «در کار است»: سوی امن همین است، چون آن‌وقت دفتر
+   *  و حالِ همگام‌سازی **با هم** بیرون می‌مانند و گوشیِ تازه دفتر را از سرور می‌گیرد؛ سوی
+   *  دیگر شاید دفترِ رمزدارِ بی‌کلید را کنارِ سایهٔ پُر می‌فرستاد (همان BLOCKERِ #331).
    */
   fun activeForBackup(context: Context): Boolean {
-    val dir = context.applicationContext.filesDir
-    val ring = File(File(dir, "atrest"), "keyring")
     val anySealed = runCatching { files(context).any { AtRestEnvelope.isSealed(it) } }.getOrDefault(true)
-    return AtRestScope.activeForBackup(
-      wanted = wanted(context),
-      anySealed = anySealed,
-      keyringPresent = ring.exists() || File(ring.parentFile, ring.name + AtRestKeyring.BACKUP_SUFFIX).exists(),
-    )
+    return AtRestScope.activeForBackup(wanted = wanted(context), anySealed = anySealed)
   }
 
   /** نوشتن روی دیسک با همان `DiskWrite` (fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین می‌کند) */

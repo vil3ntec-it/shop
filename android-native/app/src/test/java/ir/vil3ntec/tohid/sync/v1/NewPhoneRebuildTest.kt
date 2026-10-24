@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v1
 
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -35,6 +36,9 @@ class NewPhoneRebuildTest {
     var shadow = ""
     var cursor = 0L
     val queue = ArrayList<SyncOp>()
+    /** کناری و نشانِ «بازسازیِ نیمه‌کاره» */
+    var sidecar: ShopData? = null
+    var marker: String? = null
   }
 
   private class Parts(private val disk: Disk) : SyncCommit.Parts {
@@ -104,7 +108,9 @@ class NewPhoneRebuildTest {
     it.queue += old.queue
   }
 
-  private fun io(disk: Disk, server: Server, events: MutableList<String>) = object : SyncRebuild.Io {
+  private class Kill : RuntimeException("برنامه بسته شد")
+
+  private fun io(disk: Disk, server: Server, events: MutableList<String>, killAt: String = "") = object : SyncRebuild.Io {
     override fun queued(): Int = disk.queue.size
     override suspend fun push() {
       if (server.offline) throw java.io.IOException("offline")
@@ -112,16 +118,31 @@ class NewPhoneRebuildTest {
       disk.queue.clear()
       events += "push"
     }
+    override fun shadow(): String = disk.shadow
     override suspend fun snapshot(): JsonObject = server.snapshot().also { events += "snapshot" }
+    override fun stage(next: ShopData, shadowSha: String) {
+      disk.sidecar = next
+      disk.marker = shadowSha
+      events += "stage"
+    }
     override fun commitShadow(shadow: String, cursor: Long) {
+      if (killAt == "shadow") throw Kill()
       disk.shadow = shadow
       disk.cursor = cursor
       events += "shadow"
     }
-    override fun writeLedger(next: ShopData) {
-      disk.ledger = next
-      events += "ledger"
+    override fun swap() {
+      if (killAt == "swap") throw Kill()
+      finish(disk)
+      events += "swap"
     }
+  }
+
+  /** کارِ `ShopStore.finishRebuild` */
+  private fun finish(disk: Disk) {
+    disk.ledger = disk.sidecar!!
+    disk.sidecar = null
+    disk.marker = null
   }
 
   @Test fun `راهِ پیشین — پشتیبانِ کهنه روی سایهٔ تازه‌تر DELETE و برگرداندن می‌ساخت`() {
@@ -140,7 +161,7 @@ class NewPhoneRebuildTest {
 
     val out = runBlocking { SyncRebuild(io(phone, server, events)).run(ShopData()) }
 
-    assertEquals(listOf("push", "snapshot", "shadow", "ledger"), events)
+    assertEquals(listOf("push", "snapshot", "stage", "shadow", "swap"), events)
     assertTrue(out is SyncRebuild.Outcome.Done)
     assertTrue("INSERTِ در صف به سرور رسید", (server.tree["products"] as JsonArray).any { (it as JsonObject)["id"] == JsonPrimitive("p3") })
     assertEquals(listOf("p1", "p2", "p3"), phone.ledger.products.map { it.id })
@@ -158,7 +179,7 @@ class NewPhoneRebuildTest {
     val out = runBlocking { SyncRebuild(io(phone, server, ArrayList())).run(backup) } as SyncRebuild.Outcome.Done
     assertEquals("تنظیمِ بیرون از همگام‌سازی از پشتیبان", 42, out.ledger.nextInvoiceNo)
 
-    val merged = SyncRebuild.withBackupRows(out.ledger, backup)
+    val merged = SyncRebuild.withBackupRows(out.ledger, backup, out.before)
     session(phone).record(merged)
     assertTrue(phone.queue.isNotEmpty())
     assertTrue("فقط INSERT", phone.queue.all { it.type == SyncOp.INSERT })
@@ -199,5 +220,64 @@ class NewPhoneRebuildTest {
     phone.ledger = backup
     assertEquals(0, session(phone).record(backup))
     assertEquals("INSERTِ p3 هنوز در صف است تا پس از ورود برود", listOf("p3"), phone.queue.map { it.rowId })
+  }
+
+  @Test fun `ردیفی که پس از پشتیبان حذف شد با بازیابی زنده نمی‌شود — سایهٔ پیشین داشتش، سرور ندارد`() {
+    val (old, server, backup) = oldPhone()
+    //  دستگاهِ دیگر p2 را پس از پشتیبان حذف کرد
+    server.apply(listOf(SyncOp("del-p2", 1L, "products", "p2", SyncOp.DELETE, null)))
+    val phone = newPhone(old)
+    val out = runBlocking { SyncRebuild(io(phone, server, ArrayList())).run(backup) } as SyncRebuild.Outcome.Done
+    assertTrue(out.ledger.products.none { it.id == "p2" })
+
+    val merged = SyncRebuild.withBackupRows(out.ledger, backup, out.before)
+    assertTrue("p2 زنده نشد", merged.products.none { it.id == "p2" })
+    session(phone).record(merged)
+    assertTrue("هیچ INSERTی برای p2", phone.queue.none { it.rowId == "p2" })
+    assertEquals("فقط p0 (هرگز همگام‌نشده)", listOf("p0"), phone.queue.map { it.rowId })
+  }
+
+  @Test fun `سایهٔ پیشین نیست — نمی‌دانیم کدام حذف شده، پس هیچ ردیفی از پشتیبان افزوده نمی‌شود`() {
+    val (_, server, backup) = oldPhone()
+    val phone = Disk() // گوشیِ تازه بی سایه (پشتیبانِ اندروید حالِ همگام‌سازی را نمی‌برد)
+    val out = runBlocking { SyncRebuild(io(phone, server, ArrayList())).run(backup) } as SyncRebuild.Outcome.Done
+    assertEquals(null, out.before)
+    assertEquals(out.ledger, SyncRebuild.withBackupRows(out.ledger, backup, out.before))
+  }
+
+  @Test fun `شمارندهٔ فاکتور پس از بازسازی از بلندترین شمارهٔ سرور جلوتر است`() {
+    val (old, server, _) = oldPhone()
+    server.tree = LedgerDiff.toJson(LedgerDiff.fromJson(server.tree).copy(sales = listOf(Sale(id = "s1", invoiceNumber = 7))))
+    val phone = newPhone(old)
+    val out = runBlocking { SyncRebuild(io(phone, server, ArrayList())).run(ShopData()) } as SyncRebuild.Outcome.Done
+    assertEquals(8, out.ledger.nextInvoiceNo)
+    assertEquals(8, phone.ledger.nextInvoiceNo)
+  }
+
+  @Test fun `بسته شدن میانِ سایه و جابه‌جایی — هنگامِ باز شدن جابه‌جایی تمام می‌شود، نه تفاضلِ دفترِ کهنه`() {
+    val (old, server, _) = oldPhone()
+    val phone = newPhone(old)
+    phone.ledger = old.ledger // دفترِ کهنه، که شاید با برگشتنِ کلید خواندنی شود
+    runCatching { runBlocking { SyncRebuild(io(phone, server, ArrayList(), killAt = "swap")).run(ShopData()) } }
+      .exceptionOrNull().let { assertTrue(it is Kill) }
+
+    assertEquals(SyncRebuild.AtLoad.FINISH, SyncRebuild.atLoad(phone.marker, phone.sidecar != null, SyncRebuild.sha(phone.shadow)))
+    finish(phone)
+    assertEquals(0, session(phone).record(phone.ledger))
+    assertTrue(phone.ledger.products.any { it.id == "p3" })
+  }
+
+  @Test fun `بسته شدن پیش از سایه — کناری دور ریخته می‌شود و هیچ چیزی عوض نشده`() {
+    val (old, server, _) = oldPhone()
+    //  دستگاهِ دیگر p4 را افزوده: سایهٔ تازه با سایهٔ کهنه فرق دارد
+    server.apply(listOf(SyncOp("ins-p4", 1L, "products", "p4", SyncOp.INSERT, buildJsonObject { put("name", "کالا p4"); put("salePrice", 4) })))
+    val phone = newPhone(old)
+    val shadowBefore = phone.shadow
+    runCatching { runBlocking { SyncRebuild(io(phone, server, ArrayList(), killAt = "shadow")).run(ShopData()) } }
+      .exceptionOrNull().let { assertTrue(it is Kill) }
+    assertEquals(shadowBefore, phone.shadow)
+    assertEquals(SyncRebuild.AtLoad.DISCARD, SyncRebuild.atLoad(phone.marker, phone.sidecar != null, SyncRebuild.sha(phone.shadow)))
+    assertEquals(SyncRebuild.AtLoad.DISCARD, SyncRebuild.atLoad(null, true, SyncRebuild.sha(phone.shadow)))
+    assertEquals(SyncRebuild.AtLoad.NONE, SyncRebuild.atLoad(null, false, SyncRebuild.sha(phone.shadow)))
   }
 }

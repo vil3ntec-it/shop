@@ -31,8 +31,8 @@ import javax.crypto.spec.SecretKeySpec
  *  ⛔ فایلِ کلید فقط هنگامِ **ساختنِ** کلیددان ساخته می‌شود؛ نبودنش هنگامِ
  *  باز کردن یعنی `KEY_MISSING` — هرگز کلیدِ تازه‌ای که دفترِ قبلی را باز نمی‌کند.
  *
- *  اجازه‌ها (بازبینیِ #331): مک/لینوکس `600` (پوشه `700`)؛ ویندوز ACLِ «فقط صاحبِ فایل»
- *  بی ارث از پوشهٔ بالا (`AclFileAttributeView`). نشد ⇒ صفحه راستش را می‌گوید (`note`).
+ *  اجازه‌ها (بازبینیِ #331): مک/لینوکس `600` (پوشه `700`)؛ ویندوز ACLِ «صاحب + SYSTEM +
+ *  Administrators» بی ارث از پوشهٔ بالا (`AclFileAttributeView`). نشد ⇒ صفحه راستش را می‌گوید.
  */
 object AtRestKeys {
 
@@ -50,7 +50,7 @@ object AtRestKeys {
     append("هر کس کلِ پوشهٔ داده یا دیسک را داشته باشد، کلید را هم دارد. ")
     append(
       when (windowsAcl) {
-        true -> "روی ویندوز فایلِ کلید فقط برای حسابِ ویندوزِ خودتان خواندنی است (ACL)."
+        true -> "روی ویندوز فایلِ کلید فقط برای حسابِ ویندوزِ خودتان، SYSTEM و مدیرانِ دستگاه خواندنی است (ACL)."
         false -> "روی ویندوز اجازهٔ فایلِ کلید محدود **نشد**؛ هر حسابی که پوشه را می‌خواند، کلید را هم می‌خواند."
         null -> if (isWindows) "اجازهٔ فایلِ کلید روی ویندوز هنوز سنجیده نشده." else "فایلِ کلید فقط برای حسابِ خودتان خواندنی است (۶۰۰)."
       },
@@ -60,20 +60,27 @@ object AtRestKeys {
   private val isWindows: Boolean = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
 
   /**
-   *  ویندوز: DACLِ تازه با یک ورودی — صاحبِ فایل، همهٔ اجازه‌ها — جای ورودی‌های ارث‌برده.
+   *  ویندوز: DACLِ تازه — صاحبِ فایل، SYSTEM و Administrators، همهٔ اجازه‌ها — جای ورودی‌های
+   *  ارث‌برده (حساب‌های عادیِ دیگر و Users بیرون می‌مانند).
    *  @return `null` اگر این سیستم ACL ندارد
    */
   internal fun ownerOnlyAcl(p: Path): Boolean? {
     val view = Files.getFileAttributeView(p, AclFileAttributeView::class.java) ?: return null
     return runCatching {
-      val entry = AclEntry.newBuilder()
-        .setType(AclEntryType.ALLOW)
-        .setPrincipal(view.owner)
-        .setPermissions(java.util.EnumSet.allOf(AclEntryPermission::class.java))
-        .apply { if (Files.isDirectory(p)) setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT) }
-        .build()
-      view.acl = listOf(entry)
-      view.acl.size == 1
+      val lookup = p.fileSystem.userPrincipalLookupService
+      //  صاحب، و SYSTEM و Administrators تا پشتیبانِ فایلیِ ویندوز (و مدیرِ دستگاه) کلید را هم ببرند
+      val principals = listOf(view.owner) + listOf("NT AUTHORITY\\SYSTEM", "BUILTIN\\Administrators")
+        .mapNotNull { runCatching { lookup.lookupPrincipalByName(it) }.getOrNull() }
+      val entries = principals.distinct().map { who ->
+        AclEntry.newBuilder()
+          .setType(AclEntryType.ALLOW)
+          .setPrincipal(who)
+          .setPermissions(java.util.EnumSet.allOf(AclEntryPermission::class.java))
+          .apply { if (Files.isDirectory(p)) setFlags(AclEntryFlag.FILE_INHERIT, AclEntryFlag.DIRECTORY_INHERIT) }
+          .build()
+      }
+      view.acl = entries
+      view.acl.size == entries.size
     }.getOrDefault(false)
   }
 
@@ -131,7 +138,8 @@ object AtRestKeys {
       iv + c.doFinal(dek)
     }
 
-    override fun unwrap(blob: ByteArray): ByteArray = guard {
+    override fun unwrap(blob: ByteArray, kekId: String): ByteArray = guard {
+      if (kekId != id) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ اصلیِ کامپیوتر عوض شده ($kekId)")
       if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ پیچیده بریده است")
       val key = existing()
         ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, "فایلِ کلیدِ رمز روی این کامپیوتر نیست")

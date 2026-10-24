@@ -13,7 +13,11 @@ import javax.crypto.spec.SecretKeySpec
  *  (`AtRestKeysDesk.kt`) — PARTIAL؛ DPAPI/Keychain در فاز ۲.
  */
 interface AtRestKek {
-  /** شناسهٔ پایدار، در کلیددان نوشته می‌شود تا عوض شدنِ KEK دیده شود */
+  /**
+   *  شناسهٔ KEKی که `wrap` همین حالا با آن می‌پیچد؛ کنارِ کلیدِ پیچیده در کلیددان نوشته
+   *  می‌شود. ممکن است عوض شود (اندروید: نامِ تازه به‌جای کلیدِ همیشه‌ازکارافتاده)؛ کلیدِ
+   *  قبلی هرگز پاک نمی‌شود و `unwrap` با شناسهٔ خودِ کلیددان سراغش می‌رود.
+   */
   val id: String
 
   /**
@@ -22,8 +26,11 @@ interface AtRestKek {
    */
   fun wrap(dek: ByteArray): ByteArray
 
-  /** همان دو نوعِ شکستِ `wrap`؛ برچسبِ نخورده ⇒ `KEY_MISSING` */
-  fun unwrap(blob: ByteArray): ByteArray
+  /**
+   *  همان دو نوعِ شکستِ `wrap`؛ برچسبِ نخورده یا KEKِ ناشناختهٔ `kekId` ⇒ `KEY_MISSING`
+   *  @param kekId شناسه‌ای که کنارِ همین کلیدِ پیچیده نوشته شده بود
+   */
+  fun unwrap(blob: ByteArray, kekId: String = id): ByteArray
 }
 
 /**
@@ -86,9 +93,35 @@ class AtRestKeyring(
   private val lock = Any()
   @Volatile private var cached: Loaded? = null
 
+  /** کلیدهای کلیددان‌های قدیمی‌تر (`.lost-*`، `.corrupt-*`) که هنوز باز می‌شوند — شرح سرِ `keyFor` */
+  private val older = HashMap<String, SecretKey>()
+
+  /**
+   *  نشانِ «این اجرای برنامه» (بازبینیِ #331): `Lost` فقط وقتی اعلام می‌شود که همان شکست در
+   *  **اجرای دوم** هم تکرار شود (`keyring.suspect`). خطای گذرای Keystore که خودش را
+   *  همیشگی نشان داد، کلیددان را کنار نمی‌گذارد و کلیدِ تازه نمی‌سازد.
+   */
+  @Volatile private var launch: String = newLaunch()
+
+  private fun newLaunch(): String = hex(ByteArray(8).also { random.nextBytes(it) })
+
+  private val suspect: File get() = File(dir, file.name + SUSPECT_SUFFIX)
+
   fun state(): State = synchronized(lock) {
     cached?.let { return State.Ready(it.kid) }
-    load()
+    when (val s = load()) {
+      is State.Lost -> confirmLost(s)
+      is State.Ready -> { runCatching { if (suspect.exists()) io.delete(suspect) }; s }
+      else -> s
+    }
+  }
+
+  /** نخستین بار در این اجرا ⇒ نشان و `Unavailable`؛ نشانِ اجرای پیشین ⇒ `Lost` */
+  private fun confirmLost(s: State.Lost): State {
+    val seen = runCatching { if (suspect.exists()) String(io.read(suspect), Charsets.UTF_8).trim() else "" }.getOrDefault("")
+    if (seen.isNotEmpty() && seen != launch) return s
+    if (seen.isEmpty()) runCatching { dir.mkdirs(); io.writeSynced(suspect, launch.toByteArray(Charsets.UTF_8)) }
+    return State.Unavailable("${s.reason} — در اجرای بعدیِ برنامه دوباره سنجیده می‌شود")
   }
 
   /**
@@ -98,10 +131,31 @@ class AtRestKeyring(
    */
   fun keyFor(kid: String): SecretKey? = synchronized(lock) {
     when (val s = state()) {
-      is State.Ready -> if (s.kid == kid) cached?.key else null
+      is State.Ready -> if (s.kid == kid) return cached?.key
       is State.Unavailable -> throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, s.reason)
-      else -> null
+      else -> Unit
     }
+    olderKey(kid)
+  }
+
+  /**
+   *  فایلی که با کلیددانِ قدیمی‌تری رمز شده (پس از `Lost`ی که بعد معلوم شد گذرا بود، یا
+   *  پیش از درمانِ نسخهٔ دوم): کلیددان‌های کنارگذاشته هم گشته می‌شوند. هیچ‌کدام پاک نمی‌شوند،
+   *  پس تا KEKشان زنده است فایل‌هایشان هم باز می‌شوند.
+   */
+  private fun olderKey(kid: String): SecretKey? {
+    older[kid]?.let { return it }
+    val prefix = file.name + "."
+    val copies = dir.listFiles().orEmpty().filter {
+      it.isFile && it.name.startsWith(prefix) &&
+        (it.name == second.name || it.name.contains(".lost-") || it.name.contains(".corrupt-"))
+    }
+    for (f in copies.sortedByDescending { it.name }) {
+      val c = readCopy(f) as? Copy.Good ?: continue
+      older[c.kid] = SecretKeySpec(c.dek, "AES")
+      if (c.kid == kid) return older[kid]
+    }
+    return null
   }
 
   /**
@@ -157,10 +211,9 @@ class AtRestKeyring(
     val kid = fields["kid"].orEmpty()
     val kekId = fields["kek"].orEmpty()
     val wrapped = fields["wrapped"]?.let { runCatching { unhex(it) }.getOrNull() }
-    if (kid.isEmpty() || wrapped == null) return Copy.Bad("کلیددان ناقص است")
-    if (kekId != kek.id) return Copy.Bad("کلیدِ اصلیِ دستگاه عوض شده ($kekId ⇐ ${kek.id})")
+    if (kid.isEmpty() || kekId.isEmpty() || wrapped == null) return Copy.Bad("کلیددان ناقص است")
     val dek = try {
-      kek.unwrap(wrapped)
+      kek.unwrap(wrapped, kekId)
     } catch (e: AtRestException) {
       return if (e.kind == AtRestException.Kind.KEY_UNAVAILABLE) Copy.Busy(e.message ?: "")
       else Copy.Bad(e.message ?: "کلیدِ اصلیِ دستگاه نیست")
@@ -223,10 +276,12 @@ class AtRestKeyring(
     val dek = ByteArray(DEK_LEN).also { random.nextBytes(it) }
     val kid = "k" + hex(ByteArray(8).also { random.nextBytes(it) })
     val wrapped = runCatching { kek.wrap(dek) }.getOrElse { return null }
-    val body = "$HEADER\nkid=$kid\nkek=${kek.id}\nwrapped=${hex(wrapped)}\n".toByteArray(Charsets.UTF_8)
+    //  پس از `wrap`: اگر KEK نامِ تازه گرفت، همان نوشته می‌شود
+    val kekId = kek.id
+    val body = "$HEADER\nkid=$kid\nkek=$kekId\nwrapped=${hex(wrapped)}\n".toByteArray(Charsets.UTF_8)
     return try {
       //  ⛔ کلیددانِ روی دیسک باید خودش باز شود، پیش از اینکه کلیدی بکار برود
-      if (!kek.unwrap(wrapped).contentEquals(dek)) error("کلیدِ پیچیده باز نشد")
+      if (!kek.unwrap(wrapped, kekId).contentEquals(dek)) error("کلیدِ پیچیده باز نشد")
       writeCopy(file, body)
       //  نسخهٔ دوم: شکستش ساختن را نمی‌شکند؛ `load` بارِ بعد از روی نسخهٔ اصلی می‌سازدش
       runCatching { writeCopy(second, body) }
@@ -251,15 +306,21 @@ class AtRestKeyring(
       if (f == file) setAsideAs = aside
     }
     cached = null
+    runCatching { if (suspect.exists()) io.delete(suspect) }
     return true
   }
 
   /** فقط برای آزمون و «بستن و باز کردنِ» برنامه: کلیدِ درونِ حافظه فراموش شود */
-  fun forget() = synchronized(lock) { cached = null }
+  fun forget() = synchronized(lock) {
+    cached = null
+    older.clear()
+    launch = newLaunch()
+  }
 
   companion object {
     const val HEADER = "tohid-atrest-keyring 1"
     const val BACKUP_SUFFIX = ".bak"
+    const val SUSPECT_SUFFIX = ".suspect"
     const val DEK_LEN = 32
 
     fun hex(b: ByteArray): String {
