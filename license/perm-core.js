@@ -78,6 +78,11 @@
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
       edit: 'full', approvable: false, caps: [], display: true,
     },
+    //  HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286
+    'drawer.open': {
+      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      edit: 'restrict', approvable: true, caps: [], display: false,
+    },
     //  گاوصندوق (PAY-18): شمارش، ورود، خروج، به بانک و به دخل؛ «از دخل» فقط نوشتن می‌خواهد
     'safe.move': {
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },

@@ -43,8 +43,8 @@ class OwnerExportTest {
     productCategories = listOf("خوراکه"),
     productUnits = listOf("عدد", "کیلوگرم"),
     warehouseEntries = listOf(
-      WarehouseEntry("w1", "p1", 4.0, 25.0, 100.0, "کیلوگرم", 200.0, "2026-08-02", "", false, "pu1", 1_700_000_000_000, "2027-01-01", "B7", "2026-07-01"),
-      WarehouseEntry("w2", "p1", 0.0, 0.0, -3.0, "کیلوگرم", 0.0, "2026-08-10", "خراب شد", true, null, 1_700_000_000_000),
+      WarehouseEntry("w1", "p1", 4.0, 25.0, 100.0, "کیلوگرم", 200.0, "2026-08-02", "", false, "pu1", null, 1_700_000_000_000, "2027-01-01", "B7", "2026-07-01"),
+      WarehouseEntry("w2", "p1", 0.0, 0.0, -3.0, "کیلوگرم", 0.0, "2026-08-10", "خراب شد", true, null, null, 1_700_000_000_000),
     ),
     sales = listOf(
       Sale("s1", 1, 600.0, "percent", 10.0, 60.0, 540.0, "credit", "d1", 40.0, 500.0, "completed", 500.0, 0.0, 1_700_000_000_000, "2026-08-28", "pending", "", "علی", series = "B1"),

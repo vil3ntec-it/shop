@@ -190,7 +190,7 @@ const openTab = async (name) => {
 // ── ۲) هر تب باز می‌شود و خطای جاوااسکریپت نمی‌دهد ────────────────
 await step('هر تب بی خطا باز می‌شود', async () => {
   for (const t of ['shops', 'pump', 'users', 'subs', 'sales', 'payments', 'discounts', 'notices',
-    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'audit']) {
+    'requests', 'plans', 'support', 'delivery', 'backups', 'health', 'ops', 'audit']) {
     await openTab(t);
   }
   assert.deepEqual(consoleErrors, [], `خطای صفحه: ${consoleErrors.join(' | ')}`);
@@ -739,6 +739,53 @@ await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاه�
   assert.ok(!/postgres(ql)?:\/\//i.test(cardsText), 'نشانیِ دیتابیس در کارت‌ها');
   const csp = await page.evaluate(async () => (await fetch('/admin/')).headers.get('content-security-policy'));
   assert.match(csp || '', /script-src 'self'/);
+});
+
+// ── OPS-04@29: سرویسِ آزمایشی «زنده» معرفی نمی‌شود — روشن و تاریک ──
+await step('عملیات: سرویس‌های بیرونی با برچسبِ «آزمایشی»، نه «زنده» (روشن و تاریک)', async () => {
+  const badgeOf = (id) => page.locator(`#ops-providers tr[data-provider="${id}"] .badge`).textContent();
+  const look = () => page.evaluate(() => {
+    const b = document.querySelector('#ops-providers tr[data-provider="sms"] .badge');
+    return { badge: getComputedStyle(b).backgroundColor, body: getComputedStyle(document.body).backgroundColor };
+  });
+  await openTab('ops');
+  await page.waitForFunction(() => document.querySelectorAll('#ops-providers tr').length === 5, null, { timeout: 10_000 });
+  //  هر ردیف همان حالتِ سرور را می‌گوید؛ راهِ «لاگ» همیشه «آزمایشی»
+  const FA = { live: 'زنده', mock: 'آزمایشی', incomplete: 'ناقص', off: 'خاموش', none: 'ندارد', unknown: 'نامعلوم' };
+  const api = await page.evaluate(async () => (await fetch('/api/admin/system/providers', {
+    headers: { Authorization: `Bearer ${sessionStorage.getItem('shop-admin-token')}` },
+  })).json());
+  for (const p of api.providers) {
+    const shown = (await badgeOf(p.id)).trim();
+    assert.equal(shown, FA[p.state], `${p.id}`);
+    if (p.mode === 'log') assert.equal(shown, 'آزمایشی', `${p.id}: راهِ لاگ`);
+  }
+  //  پیامکِ آزمون فقط لاگ است؛ پوش خاموش؛ پرداختِ آنلاین ندارد
+  assert.equal((await badgeOf('sms')).trim(), 'آزمایشی');
+  assert.equal((await badgeOf('push')).trim(), 'خاموش');
+  assert.equal((await badgeOf('payment')).trim(), 'ندارد');
+  assert.match(await page.locator('#ops-prov-msg').textContent(), /آزمایشی/);
+  const light = await look();
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-29-light.png` });
+  await page.emulateMedia({ colorScheme: 'dark' });
+  try {
+    const dark = await look();
+    assert.notEqual(dark.badge, light.badge, 'برچسب در حالتِ تاریک همان رنگِ روشن ماند');
+    assert.notEqual(dark.body, light.body, 'زمینه در حالتِ تاریک عوض نشد');
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-29-dark.png` });
+  } finally {
+    await page.emulateMedia({ colorScheme: 'light' });
+  }
+  //  پیامکِ واقعی که تنظیم شود ⇒ «زنده»؛ و برمی‌گردد
+  const smsSettings = require('../src/lib/sms-settings');
+  await smsSettings.save({ provider: 'sms', url: 'https://sms.panel.test/{to}' });
+  try {
+    await openTab('ops');
+    await page.waitForFunction(() => /زنده/.test(document.querySelector('#ops-providers tr[data-provider="sms"] .badge')?.textContent || ''), null, { timeout: 10_000 });
+    assert.ok(!(await page.locator('#ops-providers').textContent()).includes('sms.panel.test'), 'نشانیِ سرویس در پنل');
+  } finally {
+    await smsSettings.save({ provider: 'log', url: '' });
+  }
 });
 
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
