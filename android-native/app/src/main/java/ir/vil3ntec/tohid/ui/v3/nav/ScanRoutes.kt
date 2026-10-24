@@ -65,7 +65,7 @@ val ScanModule = AppModule(
   modes = setOf(AppMode.SHOP, AppMode.COURIER, AppMode.SHOPPER),
   routes = listOf(
     V3Route(ScanPaths.QR, RouteKind.SHEET, { StrKit.scanQr }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) {
+      if (desk) {
         V3Sheet(onDismiss = { back() }) {
           V3EmptyState(Icons.Outlined.QrCodeScanner, StrKit.noCameraTitle, body = StrKit.noCameraBody)
         }

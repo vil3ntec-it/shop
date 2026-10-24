@@ -64,6 +64,8 @@ fun ProductPhoto(
   modifier: Modifier = Modifier,
   /** صفحهٔ خودِ کالا عکس را همیشه نشان می‌دهد — جای گذاشتنِ عکس همان‌جاست */
   force: Boolean = false,
+  /** کالای بی‌عکس: به‌جای آیکنِ خاکستریِ «عکس» این کشیده می‌شود (کارتِ صندوق: حرفِ اولِ نام) */
+  fallback: (@Composable () -> Unit)? = null,
 ) {
   val context = LocalContext.current
   //  عکس‌ها خاموش‌اند ⇒ هیچ جایی گرفته نمی‌شود و فایلی خوانده نمی‌شود
@@ -81,7 +83,8 @@ fun ProductPhoto(
     modifier
       .size(size)
       .clip(RoundedCornerShape(Radius.sm))
-      .background(Shop.colors.surface2),
+      //  جای خالیِ خاکستری فقط برای آیکنِ «عکس»؛ با `fallback` زمینه مالِ خودِ جانشین است
+      .background(if (bitmap == null && fallback != null) androidx.compose.ui.graphics.Color.Transparent else Shop.colors.surface2),
     contentAlignment = Alignment.Center,
   ) {
     val image = bitmap
@@ -92,6 +95,8 @@ fun ProductPhoto(
         contentScale = ContentScale.Crop,
         modifier = Modifier.size(size),
       )
+    } else if (fallback != null) {
+      fallback()
     } else {
       Icon(
         Icons.Filled.Image,

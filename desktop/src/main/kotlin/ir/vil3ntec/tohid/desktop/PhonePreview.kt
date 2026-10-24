@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -113,6 +114,8 @@ fun PhonePreviewWindow(store: ShopStore, context: android.content.Context) {
       LocalContext provides context,
       LocalView provides remember { android.view.View(context) },
       LocalConfiguration provides Configuration(390, 844),
+      //  پیش‌نمایشِ گوشی: نسخهٔ گوشیِ صفحه‌ها، نه Desk* (AUDIT-NAV N11)
+      ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false,
     ) {
       TohidTheme(if (dark) ThemeChoice.DARK else ThemeChoice.LIGHT) {
         CompositionLocalProvider(LocalLayoutDirection provides if (en) LayoutDirection.Ltr else LayoutDirection.Rtl) {
@@ -192,7 +195,8 @@ private fun PhonePreviewContent(screen: String, store: ShopStore, dark: Boolean)
           MoreShot.scrollToEnd.value = screen == "v3-more-bottom"
           onDispose { MoreShot.scrollToEnd.value = false }
         }
-        key(screen) { PhoneMoreScreen(data, bottomReserve = PhoneNav.RESERVE) {} }
+        //  همان پوستهٔ برنامه: «بیشتر» بی `bottomReserve`، پوسته جای نوار را پایینِ صفحه نگه می‌دارد
+        key(screen) { Box(Modifier.fillMaxSize().padding(bottom = PhoneNav.RESERVE)) { PhoneMoreScreen(data) {} } }
         PhoneNavBar(NavLayouts.DEFAULT, "more", onPick = {}, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth())
       }
       //  «حساب من»: کارتِ عکس، نقش، آمار و گروه‌ها

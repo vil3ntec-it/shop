@@ -95,6 +95,17 @@ object NavCatalog {
     val base = route?.substringBefore('?') ?: return null
     return layout.ids.firstOrNull { of(it)?.route?.substringBefore('?') == base }
   }
+
+  /**
+   *  موردِ فعالِ نوار از **ریشهٔ پشته** — تبی که صفحه درونش باز شده (AUDIT-NAV N1)، نه
+   *  بالای پشته: `[products, products/42]` ⇐ «محصولات»، `[more, reports]` ⇐ «بیشتر»، برگه روی
+   *  صفحه همان. ریشه‌ای که در نوار نیست (بخشی که از «بیشتر» یا پیوندِ سرد باز شده) ⇐ «بیشتر».
+   *  @param canonical نامِ قدیمی ⇐ مسیرِ امروز (`RouteTable.canonical`)
+   */
+  fun activeForStack(layout: NavLayout, entries: List<String>, canonical: (String) -> String = { it }): String? {
+    val root = entries.firstOrNull() ?: return null
+    return activeFor(layout, canonical(root)) ?: MORE.takeIf { it in layout.ids }
+  }
 }
 
 object NavLayouts {
