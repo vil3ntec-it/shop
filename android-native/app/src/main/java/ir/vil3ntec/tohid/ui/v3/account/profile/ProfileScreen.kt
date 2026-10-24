@@ -43,6 +43,8 @@ import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.SUBSCRIPTION_WARN_DAYS
 import ir.vil3ntec.tohid.ui.screens.SubscriptionPulse
+import ir.vil3ntec.tohid.ui.screens.frosted
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.screens.rememberAlerts
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Card
@@ -86,6 +88,8 @@ internal fun ProfileContent(
   val stagger = rememberV3Stagger()
   V3Scaffold(
     title = Str.myAccount,
+    //  زمینهٔ مه‌گرفتهٔ r4 زیرِ عنوانِ درشت هم (سربرگِ شفاف)
+    backdrop = Modifier.frosted(PhoneV3.colors),
     actions = listOf(V3Action(Icons.Outlined.Notifications, StrKit.notifications, dot = ui.alerts) { onOpen(AccountLinks.NOTIFICATIONS) }),
     bottomReserve = bottomReserve,
   ) { pad ->

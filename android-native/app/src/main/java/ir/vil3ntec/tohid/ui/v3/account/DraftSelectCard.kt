@@ -81,7 +81,8 @@ internal fun DraftSelectCard(
             color = PhoneV3Roles.brandText(c),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(bottom = 4.dp),
+            //  جا برای تیکِ گوشه تا برچسب زیرش نرود
+            modifier = Modifier.padding(bottom = 4.dp, end = 22.dp),
           )
         }
         content()

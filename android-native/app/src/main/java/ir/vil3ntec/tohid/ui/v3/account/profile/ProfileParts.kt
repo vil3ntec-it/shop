@@ -182,7 +182,7 @@ private fun PlanBanner(b: ProfileHomeModel.Banner, onClick: () -> Unit) {
     Icon(Icons.Filled.Star, contentDescription = null, tint = c.onBlack, modifier = Modifier.size(22.dp))
     Spacer(Modifier.width(12.dp))
     Column(Modifier.weight(1f)) {
-      Text(b.title, style = V3Type.callout, color = c.onBlack, maxLines = 1, overflow = TextOverflow.Ellipsis)
+      Text(b.title, style = V3Type.callout, color = c.onBlack, maxLines = 2, overflow = TextOverflow.Ellipsis)
       Text(b.subtitle, style = V3Type.caption, color = c.onBlackMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
     Spacer(Modifier.width(8.dp))

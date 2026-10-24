@@ -212,7 +212,7 @@ private fun Plans(signedIn: Boolean = true, license: License.State? = License.St
   PlansContent(
     PlansUi(
       state = PlansModel.state(license, 12, System.currentTimeMillis() + 12 * DAY, "۶ ماهه", false, 0, false, 7, 7),
-      options = options, picked = PlansModel.pick(options, null), currency = "افغانی", signedIn = signedIn, salesNumber = "",
+      options = options, picked = PlansModel.pick(options, null), currency = ir.vil3ntec.tohid.core.i18n.I18n.currencyWord(ir.vil3ntec.tohid.core.i18n.I18n.lang), signedIn = signedIn, salesNumber = "",
       storeBuild = false,
     ),
     PlansActions({}, {}, {}, {}, {}),

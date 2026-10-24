@@ -124,7 +124,8 @@ internal fun RouteScope.NewCodeRoute() {
 @Composable
 internal fun RevealContent(code: String, onCopy: () -> Unit, onClose: () -> Unit, onDismiss: () -> Unit) {
   val c = PhoneV3.colors
-  V3Sheet(onDismiss = onDismiss, title = StrAccount.revealTitle) { closer ->
+  //  کد فقط همین یک بار دیده می‌شود ⇒ زدنِ بیرون/کشیدن نمی‌بندد؛ فقط «بستن»
+  V3Sheet(onDismiss = onDismiss, title = StrAccount.revealTitle, dismissible = false) { closer ->
     Spacer(Modifier.height(4.dp))
     DraftCodeReveal(code)
     Spacer(Modifier.height(12.dp))
