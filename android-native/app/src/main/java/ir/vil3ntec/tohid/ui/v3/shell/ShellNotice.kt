@@ -5,7 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.Platform
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 
 /**
@@ -18,8 +18,9 @@ import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 fun ShellNotice() {
   val nav = LocalV3Nav.current
   val home = nav?.current?.let(RoutePaths::base) == ShellPaths.HOME
+  val desk = LocalDeskLayout.current
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-    if (Platform.DESKTOP || !home) SubscriptionNotice()
-    if (!Platform.DESKTOP) UpdateNotice()
+    if (desk || !home) SubscriptionNotice()
+    if (!desk) UpdateNotice()
   }
 }

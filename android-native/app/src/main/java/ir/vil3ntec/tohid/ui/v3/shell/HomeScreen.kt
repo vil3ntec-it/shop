@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.ui.Platform
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.PhoneStatsPage
@@ -78,7 +78,7 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
   val view = (if (shot.big) live.big() else live).let { v -> shot.alerts?.let { v.copy(alerts = it, bellDot = it.any { a -> a.urgent }) } ?: v }
   val pages = if (view.canSeeMoney) 2 else 1
   BoxWithConstraints(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
-    if (maxWidth >= TABLET_SPLIT && !Platform.DESKTOP) {
+    if (maxWidth >= TABLET_SPLIT && !LocalDeskLayout.current) {
       HomeTablet(d, view, onOpen, bottomReserve, pages)
       return@BoxWithConstraints
     }
