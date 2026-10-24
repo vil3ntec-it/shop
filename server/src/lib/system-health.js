@@ -361,7 +361,107 @@ async function chainReport({ rows = true, chains = [] } = {}) {
   };
 }
 
+/*
+ *  ── تطبیقِ فروشِ آنلاین برای پنلِ VILL3N — E2E-ADM-15 (§۲۴.۶) ─────────
+ *  هر دکانِ فعال در بازه: فروشِ تحویل‌شده/برداشته‌شده، بازپرداخت و خالص و
+ *  صفِ اختلاف **همان `order-refunds.report`** (همان عددی که خودِ دکان می‌بیند —
+ *  «دادهٔ مرجع»)، به‌اضافهٔ لغوها، نقدِ گرفته‌شده به دستِ پیک، نقدِ تسویه‌نشده و
+ *  تسویه‌های بازه (کسری/اضافه). کارمزد تعریف نشده است (تصمیمِ صاحبِ محصول) ⇒
+ *  `commission: null`، نه صفرِ ساختگی. سفارشِ آزمایشی (`is_test`) هیچ‌جا نیست.
+ *  ⛔ فقط‌خواندنی؛ پول همه به واحدِ خُرد (AFN).
+ */
+const RECON_LIMITS = Object.freeze({ defDays: 30, maxDays: 92, maxShops: 200 });
+const CANCELLED = Object.freeze(['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled']);
+
+function reconWindow({ from, to } = {}, at = now()) {
+  const bad = () => require('../middleware/errors').badRequest('بازه معتبر نیست (حداکثر ۹۲ روز)', 'bad_window');
+  const num = (v) => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    if (!Number.isSafeInteger(n) || n < 0) throw bad();
+    return n;
+  };
+  const end = num(to) ?? at;
+  const start = num(from) ?? end - RECON_LIMITS.defDays * DAY;
+  if (start >= end || end - start > RECON_LIMITS.maxDays * DAY) throw bad();
+  return { from: start, to: end };
+}
+
+async function reconciliation(query = {}) {
+  const w = reconWindow(query);
+  const refunds = require('./order-refunds');
+  const args = [w.from, w.to];
+  const shops = await many(
+    `SELECT a.shop_id, COALESCE(s.name, '') AS name FROM (
+        SELECT e.shop_id FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
+         WHERE e.kind = 'status' AND e.created_at >= $1 AND e.created_at < $2 AND o.is_test = false
+        UNION SELECT r.shop_id FROM online_order_refunds r WHERE r.created_at >= $1 AND r.created_at < $2
+        UNION SELECT d.shop_id FROM delivery_assignments d WHERE d.delivered_at >= $1 AND d.delivered_at < $2
+        UNION SELECT c.shop_id FROM courier_settlements c WHERE c.created_at >= $1 AND c.created_at < $2
+      ) a LEFT JOIN shops s ON s.id = a.shop_id
+      ORDER BY a.shop_id LIMIT ${RECON_LIMITS.maxShops + 1}`,
+    args
+  );
+  const ids = shops.slice(0, RECON_LIMITS.maxShops).map((r) => r.shop_id);
+  const by = async (sql, params = [...args, ids]) => new Map((ids.length ? await many(sql, params) : []).map((r) => [r.shop_id, r]));
+  const [cancels, courier, held, settled] = await Promise.all([
+    by(`SELECT e.shop_id, COUNT(*)::int AS n FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
+         WHERE e.kind = 'status' AND e.to_status = ANY('{${CANCELLED.join(',')}}'::text[])
+           AND e.created_at >= $1 AND e.created_at < $2 AND o.is_test = false AND e.shop_id = ANY($3::text[])
+         GROUP BY e.shop_id`),
+    by(`SELECT d.shop_id, COUNT(*)::int AS n, COALESCE(SUM(d.cash_collected_minor), 0)::bigint AS s
+          FROM delivery_assignments d JOIN online_orders o ON o.id = d.order_id
+         WHERE d.status = 'delivered' AND d.delivered_at >= $1 AND d.delivered_at < $2 AND o.is_test = false
+           AND d.shop_id = ANY($3::text[])
+         GROUP BY d.shop_id`),
+    //  نقدِ تسویه‌نشدهٔ همین لحظه (بی بازه) — همان «نقدِ در دستِ پیک» (DLV-11)
+    by(`SELECT d.shop_id, COALESCE(SUM(d.cash_collected_minor), 0)::bigint AS s
+          FROM delivery_assignments d JOIN online_orders o ON o.id = d.order_id
+         WHERE d.status = 'delivered' AND d.settlement_id = '' AND o.is_test = false AND d.shop_id = ANY($1::text[])
+         GROUP BY d.shop_id`, [ids]),
+    by(`SELECT c.shop_id, COUNT(*)::int AS n, COALESCE(SUM(c.handover_due_minor), 0)::bigint AS due,
+               COALESCE(SUM(c.received_minor), 0)::bigint AS received, COALESCE(SUM(c.shortage_minor), 0)::bigint AS shortage,
+               COALESCE(SUM(c.excess_minor), 0)::bigint AS excess
+          FROM courier_settlements c
+         WHERE c.created_at >= $1 AND c.created_at < $2 AND c.shop_id = ANY($3::text[])
+         GROUP BY c.shop_id`),
+  ]);
+  const N = (v) => Number(v) || 0;
+  const rows = [];
+  for (const id of ids) {
+    const rep = await refunds.report(id, w);
+    const c = courier.get(id);
+    const st = settled.get(id);
+    rows.push({
+      shopId: id, shopName: shops.find((x) => x.shop_id === id).name,
+      sales: rep.collected, refunds: rep.refunds, netMinor: rep.netMinor,
+      cancellations: N(cancels.get(id)?.n),
+      courier: {
+        deliveries: N(c?.n), collectedMinor: N(c?.s), heldMinor: N(held.get(id)?.s),
+        settlements: N(st?.n), handoverDueMinor: N(st?.due), receivedMinor: N(st?.received),
+        shortageMinor: N(st?.shortage), excessMinor: N(st?.excess),
+      },
+      commission: null,
+      issues: rep.issues.map((i) => ({ orderNo: i.orderNo, code: i.code, totalMinor: i.totalMinor, refundedMinor: i.refundedMinor })),
+    });
+  }
+  const sum = (f) => rows.reduce((a, r) => a + f(r), 0);
+  return {
+    window: w, currency: 'AFN', checkedAt: now(), truncated: shops.length > RECON_LIMITS.maxShops,
+    commission: { defined: false },
+    totals: {
+      salesCount: sum((r) => r.sales.count), salesMinor: sum((r) => r.sales.totalMinor),
+      refundsCount: sum((r) => r.refunds.count), refundsMinor: sum((r) => r.refunds.totalMinor),
+      netMinor: sum((r) => r.netMinor), cancellations: sum((r) => r.cancellations),
+      courierCollectedMinor: sum((r) => r.courier.collectedMinor), courierHeldMinor: sum((r) => r.courier.heldMinor),
+      receivedMinor: sum((r) => r.courier.receivedMinor), shortageMinor: sum((r) => r.courier.shortageMinor),
+      excessMinor: sum((r) => r.courier.excessMinor), issues: sum((r) => r.issues.length),
+    },
+    shops: rows,
+  };
+}
+
 module.exports = {
-  LIMITS, PROVIDER_STATES, VERSION_LIMITS, CHAIN_LIMITS, worst, snapshot, providers, versions, versionReport,
-  chainReport, smsState, emailState, pushState,
+  LIMITS, PROVIDER_STATES, VERSION_LIMITS, CHAIN_LIMITS, RECON_LIMITS, worst, snapshot, providers, versions,
+  versionReport, chainReport, reconciliation, smsState, emailState, pushState,
 };
