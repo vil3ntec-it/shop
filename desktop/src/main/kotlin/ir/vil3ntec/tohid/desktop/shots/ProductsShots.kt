@@ -14,7 +14,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.StockMovement
 import ir.vil3ntec.tohid.data.WarehouseEntry
-import ir.vil3ntec.tohid.ui.components.common.PhoneNav
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
 import ir.vil3ntec.tohid.ui.v3.products.EditProductScreen
@@ -115,7 +114,7 @@ private val noFormNav = ProductFormNav({}, {}, { _, _ -> })
 
 @Composable
 private fun ListShot(store: ShopStore, data: ShopData, selected: Set<String> = emptySet()) = Toasted { toasts ->
-  ProductsListScreen(store, data, toasts, ProductsListModel.Query(), PhoneNav.RESERVE, noListNav, initialSelection = selected)
+  ProductsListScreen(store, data, toasts, ProductsListModel.Query(), noListNav, initialSelection = selected)
 }
 
 @Composable

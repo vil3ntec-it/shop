@@ -62,7 +62,7 @@ val ProductsModule = AppModule(
         onOpenWarehouse = { id -> nav.open(if (id == null) StockPaths.LIST else StockPaths.item(id)) },
         onOpenProduct = { id -> nav.open(ProductsPaths.item(id)) },
       ) else ProductsListScreen(
-        store = store, data = data, toasts = toasts, bottomReserve = bottomReserve,
+        store = store, data = data, toasts = toasts,
         initial = ProductsListModel.fromArgs(args.query("q"), args.query("category"), args.query("filter"), args.query("sort")),
         nav = listNav(),
         initialLayout = args.query("view")?.let(ProductsListModel.Layout::parse),

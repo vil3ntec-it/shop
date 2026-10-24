@@ -32,7 +32,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
@@ -80,7 +79,6 @@ internal fun ProductsListScreen(
   data: ShopData,
   toasts: V3Toasts,
   initial: Query,
-  bottomReserve: Dp,
   nav: ProductsListNav,
   /** `products?view=grid|list` — وگرنه ترجیحِ همین دستگاه */
   initialLayout: Layout? = null,
@@ -121,7 +119,6 @@ internal fun ProductsListScreen(
       else V3Action(Icons.Outlined.ViewAgenda, StrProducts.viewList) { layout = Layout.LIST; saveLayout(context, Layout.LIST) },
     ),
     search = { V3SearchField(query.text, { query = query.copy(text = it) }, StrProducts.searchHint, onVoice = voice) },
-    bottomReserve = bottomReserve,
     fab = if (selecting) null else ({ expanded ->
       V3Fab(Icons.Outlined.Add, StrProducts.newProduct, expanded, onClick = nav.new)
     }),
