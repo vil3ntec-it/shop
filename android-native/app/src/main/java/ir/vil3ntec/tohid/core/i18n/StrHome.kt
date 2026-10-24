@@ -235,5 +235,17 @@ object StrHome {
   val drawer: String get() = t("صندوق", "Drawer", "صندوق")
   val safe: String get() = t("گاوصندوق", "Safe", "سېف")
   val safeSoon: String get() = t("شمارش و موجودیِ دقیقِ گاوصندوق به‌زودی همین‌جا", "Count your safe and see its exact balance here — coming soon", "د سېف شمېرنه او دقیقه موجودي ژر دلته")
-  val soon: String get() = t("به‌زودی", "Coming soon", "ژر")
+  //  HOME-V2: کادرِ پنهانِ کششی، مقایسهٔ فروش، «امروز»
+  val pullHint: String get() = t("برای صندوق پایین بکشید", "Pull down for the drawer", "د صندوق لپاره ښکته یې کش کړئ")
+  val showDrawer: String get() = t("نشان دادنِ صندوق", "Show the drawer", "صندوق ښکاره کړئ")
+  val hideDrawer: String get() = t("بستنِ صندوق", "Hide the drawer", "صندوق پټ کړئ")
+  val openStats: String get() = t("دیدنِ آمار", "Open stats", "احصایې وګورئ")
+  val sameAsYesterday: String get() = t("مثلِ دیروز تا همین ساعت", "Same as yesterday so far", "تر اوسه لکه پرون")
+  /** «+۱۲٪ از دیروز» — همین ساعتِ دیروز (`HomeTrend`) */
+  fun vsYesterday(pct: Int): String {
+    if (pct == 0) return sameAsYesterday
+    val n = (if (pct > 0) "+" else "−") + kotlin.math.abs(pct)
+    return t("$n٪ از دیروز", "$n% vs yesterday", "له پرون $n٪")
+  }
+  val txEmptyToday: String get() = t("امروز هنوز تراکنشی ثبت نشده", "No transactions yet today", "نن تر اوسه هېڅ راکړه ورکړه نه ده ثبت شوې")
 }
