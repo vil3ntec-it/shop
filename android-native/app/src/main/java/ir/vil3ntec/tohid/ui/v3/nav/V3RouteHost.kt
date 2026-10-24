@@ -75,8 +75,10 @@ private fun RouteContent(path: String, nav: V3Nav, shell: ShellContext) {
     }
     else -> {
       val scope = RouteScope(r.args, nav, shell)
-      if (r.route.chrome == Chrome.SHELL && !shell.wide && r.route.kind != RouteKind.SHEET) {
-        V3Scaffold(title = r.route.title(), onBack = if (nav.canBack) ({ nav.back() }) else null) { pad ->
+      //  هر جا که سربرگِ کامپیوتر (DeskHeader) نیست — گوشی و تبلت، باریک یا پهن (AUDIT-NAV N9) —
+      //  صفحهٔ قدیم سربرگِ نسخهٔ ۳ می‌گیرد؛ برگشت فقط وقتی چیزی زیرش است (N8)
+      if (r.route.chrome == Chrome.SHELL && !LocalDeskLayout.current && r.route.kind != RouteKind.SHEET) {
+        V3Scaffold(title = r.route.title(), onBack = scope.backOrNull) { pad ->
           Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { r.route.content(scope) }
         }
       } else r.route.content(scope)

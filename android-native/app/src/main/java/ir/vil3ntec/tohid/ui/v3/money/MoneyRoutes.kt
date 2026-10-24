@@ -59,7 +59,7 @@ val MoneyModule = AppModule(
   routes = listOf(
     V3Route(MoneyPaths.DEBTORS, RouteKind.TAB, { Str.debtors }, chrome = Chrome.OWN) {
       VipGate(Str.debtors) {
-        if (Platform.DESKTOP) DeskCustomersScreen(store, data, snackbar)
+        if (desk) DeskCustomersScreen(store, data, snackbar)
         else DebtorsScreen(store, data, snackbar, showHeader = true, onBack = if (nav.stack.canPop) ({ back() }) else null)
       }
     },
@@ -72,7 +72,7 @@ val MoneyModule = AppModule(
     V3Route("debtors/{id}/delete", RouteKind.SHEET, { Str.debtor }, parent = "debtors/{id}") { LandOn(MoneyPaths.DEBTORS) },
     V3Route(MoneyPaths.RECEIPTS, RouteKind.PAGE, { Str.receipts }) { ReceiptsScreen(data) },
     V3Route(MoneyPaths.PURCHASING, RouteKind.TAB, { Str.purchasing }) {
-      if (Platform.DESKTOP) DeskPurchasingScreen(store, data, snackbar) else PurchasingScreen(store, data, snackbar)
+      if (desk) DeskPurchasingScreen(store, data, snackbar) else PurchasingScreen(store, data, snackbar)
     },
     V3Route("purchasing/suppliers/new", RouteKind.SHEET, { Str.purchasing }, parent = MoneyPaths.PURCHASING) { LandOn(MoneyPaths.PURCHASING) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING) { LandOn(MoneyPaths.PURCHASING) },

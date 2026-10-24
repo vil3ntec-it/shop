@@ -63,7 +63,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.SALE, RouteKind.TAB, { Str.sale }, chrome = Chrome.OWN) {
       if (args.flag("scan")) LaunchedEffect(args.path) { PhoneNav.scanRequest.value = true }
       VipGate(Str.saleRegister) {
-        if (Platform.DESKTOP) DeskSaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar) { code ->
+        if (desk) DeskSaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar) { code ->
           nav.open(ProductsPaths.new(barcode = code))
         } else SaleScreen(store = store, cartStore = cart, d = data, snackbar = snackbar, onQuickSale = { nav.open(SalesPaths.QUICK) }) { code ->
           nav.open(ProductsPaths.new(barcode = code))
@@ -85,7 +85,7 @@ val SalesModule = AppModule(
       BarcodeScanSheet(onDismiss = { if (!got) back() }, onCode = { code -> got = true; nav.finish(code) })
     },
     V3Route(SalesPaths.HISTORY, RouteKind.TAB, { Str.salesHistory }) {
-      if (Platform.DESKTOP) DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
+      if (desk) DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
       else SalesHistoryScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
     },
     //  فاکتور، چاپ، مرجوعی، لغو و صندوقِ نقد امروز درونِ تاریخچه‌اند

@@ -103,7 +103,7 @@ fun V3RoutePreview(path: String, store: ShopStore, dark: Boolean) {
   val page = RoutePaths.normalize(nav.page.substringBefore('?'))
   val navVisible = mode == AppMode.SHOP && ShellFrame.navVisible(phone = true, page = page, barTabs = navRoutes, gate = nav.gate != null, cartOpen = false)
   val pageBottom = if (mode == AppMode.SHOP) ShellFrame.pageBottom(true, navVisible, page, PhoneNav.RESERVE, 0.dp) else 0.dp
-  CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp) {
+  CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false) {
     Box(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
       V3RouteHost(nav, shell, Modifier.fillMaxSize().padding(bottom = pageBottom))
       if (navVisible) {
