@@ -1,0 +1,230 @@
+{
+  "at": "2026-10-19T18:56:16.174Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v139",
+    "node": "v22.22.0",
+    "driver": "pglite"
+  },
+  "scale": 1,
+  "reps": 30,
+  "dataset": {
+    "products": 20000,
+    "sales": 200000,
+    "saleItems": 300000,
+    "customers": 5000,
+    "activeDebtors": 2000,
+    "suppliers": 500,
+    "expenses": 3000,
+    "days": 365,
+    "transactions": 25628,
+    "warehouseEntries": 41159,
+    "returns": 430,
+    "genMs": 3891,
+    "syncRows": 595717
+  },
+  "seed": {
+    "ms": 269625,
+    "rowsPerSec": 2209,
+    "maintenance": {
+      "kind": "pglite-stats.analyzeNow",
+      "ms": 11299
+    }
+  },
+  "sync": {
+    "pullFirstPage": {
+      "n": 30,
+      "p50": 116.2,
+      "p95": 187,
+      "p99": 213.9,
+      "max": 213.9,
+      "errors": 0,
+      "bytes": 210775
+    },
+    "pullMiddle": {
+      "n": 30,
+      "p50": 137.4,
+      "p95": 241.6,
+      "p99": 276.4,
+      "max": 276.4,
+      "errors": 0,
+      "bytes": 331731
+    },
+    "pullIncremental": {
+      "n": 30,
+      "p50": 34.6,
+      "p95": 68.2,
+      "p99": 167.7,
+      "max": 167.7,
+      "errors": 0,
+      "bytes": 6024
+    },
+    "pushSale": {
+      "n": 30,
+      "p50": 81.1,
+      "p95": 131.6,
+      "p99": 134.2,
+      "max": 134.2,
+      "errors": 0,
+      "bytes": 666
+    },
+    "pushBatch200": {
+      "n": 10,
+      "p50": 1858.1,
+      "p95": 2436.5,
+      "p99": 2436.5,
+      "max": 2436.5,
+      "errors": 0,
+      "bytes": 22752
+    },
+    "catchUp": {
+      "ops": 598277,
+      "pages": 599,
+      "totalMs": 96203,
+      "page": {
+        "n": 599,
+        "p50": 134.5,
+        "p95": 240.7,
+        "p99": 365.5,
+        "max": 1617.6
+      }
+    }
+  },
+  "burst": {
+    "devices": 10,
+    "requests": 100,
+    "errors": 0,
+    "totalMs": 9848,
+    "rps": 10,
+    "n": 100,
+    "p50": 806.6,
+    "p95": 1965.7,
+    "p99": 2564.2,
+    "max": 2565.9
+  },
+  "catalog": {
+    "storeHome": {
+      "n": 30,
+      "p50": 186.7,
+      "p95": 267.8,
+      "p99": 300.4,
+      "max": 300.4,
+      "errors": 0,
+      "bytes": 729
+    },
+    "publicFirstPage": {
+      "n": 30,
+      "p50": 23.1,
+      "p95": 49.6,
+      "p99": 53.1,
+      "max": 53.1,
+      "errors": 0,
+      "bytes": 9156
+    },
+    "publicSearch": {
+      "n": 30,
+      "p50": 429.8,
+      "p95": 655.8,
+      "p99": 691.1,
+      "max": 691.1,
+      "errors": 0,
+      "bytes": 8748
+    },
+    "publicCategory": {
+      "n": 30,
+      "p50": 168,
+      "p95": 337.5,
+      "p99": 367.5,
+      "max": 367.5,
+      "errors": 0,
+      "bytes": 9070
+    },
+    "publicPage51": {
+      "n": 30,
+      "p50": 29.3,
+      "p95": 111.8,
+      "p99": 185.5,
+      "max": 185.5,
+      "errors": 0,
+      "bytes": 21323
+    },
+    "ownerFirstPage": {
+      "n": 30,
+      "p50": 40.5,
+      "p95": 77.3,
+      "p99": 121.3,
+      "max": 121.3,
+      "errors": 0,
+      "bytes": 26830
+    },
+    "ownerMiddlePage": {
+      "n": 30,
+      "p50": 56.2,
+      "p95": 82.9,
+      "p99": 84.4,
+      "max": 84.4,
+      "errors": 0,
+      "bytes": 27211
+    }
+  },
+  "orders": {
+    "create": {
+      "n": 500,
+      "p50": 75.3,
+      "p95": 135.2,
+      "p99": 221.9,
+      "max": 5474.9,
+      "errors": 0,
+      "bytes": 1297
+    },
+    "list_new": {
+      "n": 30,
+      "p50": 47.2,
+      "p95": 241.4,
+      "p99": 991.1,
+      "max": 991.1,
+      "errors": 0,
+      "bytes": 25527
+    },
+    "list_preparing": {
+      "n": 30,
+      "p50": 31.6,
+      "p95": 54.9,
+      "p99": 74.7,
+      "max": 74.7,
+      "errors": 0,
+      "bytes": 48
+    },
+    "list_done": {
+      "n": 30,
+      "p50": 25.4,
+      "p95": 49.3,
+      "p99": 67.2,
+      "max": 67.2,
+      "errors": 0,
+      "bytes": 43
+    },
+    "summary": {
+      "n": 30,
+      "p50": 21.9,
+      "p95": 35.8,
+      "p99": 57.4,
+      "max": 57.4,
+      "errors": 0,
+      "bytes": 150
+    },
+    "detail": {
+      "n": 30,
+      "p50": 29,
+      "p95": 56.3,
+      "p99": 68.8,
+      "max": 68.8,
+      "errors": 0,
+      "bytes": 1434
+    }
+  },
+  "plans": {},
+  "memory": {}
+}

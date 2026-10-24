@@ -114,7 +114,8 @@ data class LedgerSummary(
       val store = ShopStore(context)
       store.load()
       val fresh = of(store.data.value)
-      runCatching { file(context).writeText(json.encodeToString(fresh)) }
+      //  SEC-01: دفترِ رمزدارِ خوانده‌نشده خلاصهٔ «صفر» روی دیسک نمی‌گذارد
+      if (store.unreadable.value == null) runCatching { file(context).writeText(json.encodeToString(fresh)) }
       return fresh
     }
 

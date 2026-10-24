@@ -94,7 +94,10 @@ object UpdateManager {
             download(app, andInstall = false)
           }
         }
-        kotlinx.coroutines.delay(6 * 60 * 60 * 1000L)
+        //  پیش‌نمایش هر ۲۰ دقیقه (برای دیدنِ لحظه‌به‌لحظهٔ کار)؛ بقیه مثلِ پیش هر ۶ ساعت
+        kotlinx.coroutines.delay(
+          if (ir.vil3ntec.tohid.BuildConfig.PREVIEW) 20 * 60 * 1000L else 6 * 60 * 60 * 1000L
+        )
       }
     }
   }

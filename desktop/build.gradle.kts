@@ -75,6 +75,10 @@ val replaced = listOf(
   "MainActivity.kt",
   "core/net/TokenStore.kt",
   "data/Fingerprint.kt",
+  //  SEC-01: کلیدِ اصلیِ رمزِ دفتر — اندروید Keystore، این‌جا فایلِ فقط-صاحب (‎data/AtRestKeysDesk.kt‎)
+  "data/AtRestKeys.kt",
+  //  SEC-01: عاملِ پشتیبانِ خودکارِ اندروید — کامپیوتر پشتیبانِ سیستمی ندارد (جایگزین ندارد)
+  "data/TohidBackupAgent.kt",
   "data/GoogleSignIn.kt",
   "data/Migration.kt",
   "scan/BarcodeScanner.kt",
@@ -83,10 +87,15 @@ val replaced = listOf(
   //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
   //  نه مرورگر (برنامهٔ کامپیوتر سایت نیست)
   "print/ReportPrint.kt",
+  //  برگهٔ A4ِ برچسب (HW-04): اندروید PDFِ چاپ، این‌جا `PrinterJob`
+  "print/LabelSheetPrint.kt",
   //  کلیکِ راست = منوی کارها (گوشی: لمسِ طولانی)
   "ui/PressMenu.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
   "ui/Platform.kt",
+  //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
+  "scan/GuidedCapture.kt",
+  "data/FileName.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")
@@ -122,6 +131,8 @@ val generateConfig by tasks.registering {
       |  const val LICENSE_PUBLIC_KEY: String = ${q(if (dev) "" else licenseKey)}
       |  const val UPDATE_PUBLIC_KEY: String = ${q(if (dev) "" else updateKey)}
       |  const val SIGNING_SHA256: String = ""
+      |  /** نسخهٔ پیش‌نمایش فقط اندروید است (buildTypeِ `preview`) */
+      |  const val PREVIEW: Boolean = false
       |  /** این نسخه روی کامپیوتر است — برای جاهایی که باید بدانند. */
       |  const val DESKTOP: Boolean = true
       |}

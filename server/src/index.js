@@ -70,6 +70,8 @@ async function main() {
   live.attach(server);
 
   const backupTimer = backup.schedule();
+  //  PGlite autovacuum ندارد ⇒ آمارِ planner را خودمان تازه می‌کنیم (PERF-03)؛ روی PostgreSQL هیچ
+  const pgliteStats = require('./lib/pglite-stats').schedule();
   //  زمان‌بندِ مرکزِ اعلان: هر دقیقه اعلان‌های وقت‌رسیده، و روزی یک بار
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
@@ -87,6 +89,7 @@ async function main() {
     closing = true;
     console.log(`[${signal}] در حال خاموش شدن…`);
     if (backupTimer) clearInterval(backupTimer);
+    if (pgliteStats) pgliteStats.stop();
     outbox.stop();
     orderNotify.stop();
     notices.stopRunner();

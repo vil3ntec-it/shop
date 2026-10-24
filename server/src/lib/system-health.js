@@ -144,4 +144,88 @@ async function snapshot() {
   return { status: worst(statuses), checkedAt: t, limits: LIMITS, ...parts };
 }
 
-module.exports = { LIMITS, worst, snapshot };
+/*
+ *  ── سرویس‌های بیرونی — OPS-04@29 (§۲۹.۸) ────────────────────────────
+ *  «provider ِ آزمایشی به‌عنوانِ سرویسِ زنده معرفی نشود.» هر راهی که سرور با
+ *  آن چیزی به آدم می‌رساند یا پول می‌گیرد، با حالتِ واقعی‌اش:
+ *    live        راهِ واقعی انتخاب و کامل است
+ *    mock        آزمایشی: فقط لاگِ سرور (`log`) — به هیچ گوشی یا صندوقی نمی‌رسد
+ *    incomplete  راهِ واقعی انتخاب شده ولی چیزی کم است ⇒ ارسال شکست می‌خورد
+ *    off         مدیر خاموشش کرده
+ *    none        این سرویس اصلاً provider ندارد (پرداختِ آنلاین D-08، مدل‌های عکس)
+ *    unknown     خواندنِ تنظیم شکست خورد
+ *  ⛔ هرگز «live» برای `log` یا راهِ ناشناخته. ⛔ فقط نام، راه و حالت؛ نه نشانی،
+ *     نه کلید، نه فرستنده، نه میزبان — `missing` فقط نامِ فیلدِ کم است.
+ */
+const PROVIDER_STATES = Object.freeze(['live', 'mock', 'incomplete', 'off', 'none', 'unknown']);
+
+/** کدِ ورودِ شماره — همان انتخابِ `otp.sender()`: log | sms | webhook | whatsapp. */
+function smsState(s) {
+  const mode = String(s.provider || 'log');
+  const missing = [];
+  if (mode === 'log') return { mode, state: 'mock', missing };
+  if (mode === 'sms') {
+    if (!s.url) missing.push('نشانیِ سرویسِ پیامک');
+  } else if (mode === 'webhook') {
+    if (!config.otp.webhookUrl) missing.push('OTP_WEBHOOK_URL');
+  } else if (mode === 'whatsapp') {
+    if (!config.whatsapp.token) missing.push('WHATSAPP_TOKEN');
+    if (!config.whatsapp.phoneId) missing.push('WHATSAPP_PHONE_ID');
+  } else {
+    missing.push('راهِ ارسالِ شناخته‌شده (log، sms، webhook، whatsapp)');
+  }
+  return { mode, state: missing.length ? 'incomplete' : 'live', missing };
+}
+
+/** ایمیل (کدِ ورود، فراموشیِ رمز، اعلان) — `mailer.send()`: log | smtp | api. */
+function emailState(s, readiness) {
+  const mode = String(s.provider || 'log');
+  if (mode === 'log') return { mode, state: 'mock', missing: [] };
+  if (mode !== 'smtp' && mode !== 'api') {
+    return { mode, state: 'incomplete', missing: ['راهِ ارسالِ شناخته‌شده (log، smtp، api)'] };
+  }
+  const r = readiness(s);
+  return { mode, state: r.ok ? 'live' : 'incomplete', missing: r.missing };
+}
+
+/** پوش — `push.sendTo()` بی `enabled` یا بی حسابِ سرویس هیچ نمی‌فرستد. */
+function pushState(s) {
+  if (!s.enabled) return { mode: 'fcm', state: 'off', missing: [] };
+  if (!s.serviceAccount) return { mode: 'fcm', state: 'incomplete', missing: ['فایلِ حسابِ سرویسِ FCM'] };
+  return { mode: 'fcm', state: 'live', missing: [] };
+}
+
+async function providerSafe(id, fn) {
+  try { return { id, ...(await fn()) }; } catch { return { id, mode: '', state: 'unknown', missing: [] }; }
+}
+
+/** فهرستِ همهٔ سرویس‌های بیرونی با حالتِ واقعی — فقط‌خواندنی. */
+async function providers() {
+  const list = await Promise.all([
+    providerSafe('sms', async () => smsState(await require('./sms-settings').current())),
+    providerSafe('email', async () => {
+      const mailer = require('./mailer');
+      return emailState(await mailer.current(), mailer.readiness);
+    }),
+    providerSafe('push', async () => pushState(await require('./push').current())),
+    //  پرداختِ آنلاین نیست (D-08): `orders.create` و ویترین جز `cod` را ۴۰۰ می‌کنند
+    //  و ویترین دکمهٔ پرداخت ندارد (#244). «none» است، نه «mock».
+    providerSafe('payment', async () => ({ mode: 'cod', state: 'none', missing: [], decision: 'D-08' })),
+    //  مرحله‌های بیرونیِ عکس ۵۰۳ `step_unavailable` می‌دهند و هیچ چیزی نمی‌فرستند
+    providerSafe('image_ai', async () => ({
+      mode: '', state: 'none', missing: [],
+      steps: require('./image-pipeline').STEPS.filter((x) => x.status === 'blocked_external').map((x) => x.id),
+    })),
+  ]);
+  const counts = Object.fromEntries(PROVIDER_STATES.map((k) => [k, 0]));
+  for (const p of list) counts[p.state] += 1;
+  return {
+    checkedAt: now(),
+    //  بیرون از production کدِ راهِ `log` در خودِ پاسخ برمی‌گردد (`devCode`)
+    production: config.env === 'production',
+    counts,
+    providers: list,
+  };
+}
+
+module.exports = { LIMITS, PROVIDER_STATES, worst, snapshot, providers, smsState, emailState, pushState };
