@@ -57,4 +57,10 @@ class RouteScope(val args: RouteArgs, val nav: V3Nav, val shell: ShellContext) {
    *  صدازننده هم بسته می‌شد.
    */
   fun back() { nav.backFrom(args.path) }
+
+  /** دکمهٔ برگشتِ سربرگ فقط وقتی چیزی زیرِ این صفحه است — ریشهٔ تب بی برگشت (AUDIT-NAV N8) */
+  val backOrNull: (() -> Unit)? get() = if (nav.stack.canPop) ({ back() }) else null
+
+  /** چیدمانِ کامپیوتری؟ (`LocalDeskLayout`؛ پیش‌نمایشِ گوشی false) — جای `Platform.DESKTOP` در مسیرها */
+  val desk: Boolean @androidx.compose.runtime.Composable get() = LocalDeskLayout.current
 }

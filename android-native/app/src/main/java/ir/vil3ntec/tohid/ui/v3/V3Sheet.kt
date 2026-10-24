@@ -42,6 +42,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import ir.vil3ntec.tohid.ui.screens.isDark
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -69,6 +72,11 @@ fun V3Sheet(
   onDismiss: () -> Unit,
   title: String? = null,
   dismissible: Boolean = true,
+  /**
+   *  محتوا در برگه پیمایش می‌شود (پنجرهٔ کوتاه، نوشتهٔ درشت — AUDIT-NAV S5). فهرستِ Lazy درونِ
+   *  برگه `heightIn(max = …)` می‌خواهد؛ برگه‌ای که خودش تمام‌قد Lazy دارد `scroll = false` بدهد.
+   */
+  scroll: Boolean = true,
   content: @Composable ColumnScope.(V3SheetCloser) -> Unit,
 ) {
   val c = PhoneV3.colors
@@ -102,7 +110,12 @@ fun V3Sheet(
       Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 38.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(c.hairline))
     },
   ) {
-    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+    ) {
       if (title != null) {
         Text(
           title,
@@ -184,7 +197,7 @@ fun V3PickerSheet(
     }
     val shown = if (adding) emptyList() else options.filter { query.isBlank() || it.contains(query.trim(), ignoreCase = true) }
     if (shown.isNotEmpty()) {
-      LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp).clip(RoundedCornerShape(16.dp)).background(if (c.isDark) c.tile else c.bg)) {
+      LazyColumn(Modifier.fillMaxWidth().heightIn(max = (LocalConfiguration.current.screenHeightDp * 0.5f).dp).clip(RoundedCornerShape(16.dp)).background(if (c.isDark) c.tile else c.bg)) {
         itemsIndexed(shown, key = { _, o -> o }) { i, o ->
           if (i > 0) V3Divider(start = 16.dp)
           V3ListRow(

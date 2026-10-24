@@ -16,7 +16,6 @@ import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.ShopRole
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.shell.ShellPaths
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
@@ -25,7 +24,6 @@ import ir.vil3ntec.tohid.ui.v3.nav.HomePager
 import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
-import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
 
 /** مسیرهای گروهِ گزارش و آمار (G6) */
@@ -44,8 +42,6 @@ private fun canSeeMoney(): Boolean {
   return remember { ShopRole.canSeeMoney(context) }
 }
 
-private fun RouteScope.backOrNull(): (() -> Unit)? = if (nav.canBack) ({ back() }) else null
-
 /** گروهِ گزارش‌ها (G6، `analytics.md`): گزارش‌ها، آمار، سابقهٔ عملیات و مرکزِ مدیریت؛ آمار را در ورقِ خانه هم می‌گذارد */
 val AnalyticsModule = AppModule(
   id = "analytics",
@@ -58,15 +54,15 @@ val AnalyticsModule = AppModule(
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reports }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP && wide) ReportsDesk(data, snackbar)
+      if (desk) ReportsDesk(data, snackbar)
       else ReportsScreen(
         d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
-        onBack = backOrNull(), bottomReserve = bottomReserve, onOpen = { nav.open(it) },
+        onBack = backOrNull, bottomReserve = bottomReserve, onOpen = { nav.open(it) },
       )
     },
     //  گوشی: صفحهٔ دومِ ورقِ خانه (`HomePager.page = 1`) با همان دوره؛ کامپیوتر ورقِ خانه ندارد ⇒ صفحهٔ خودش
     V3Route("stats", RouteKind.PAGE, { StrReports.statsTitle }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP && wide) StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = { back() })
+      if (desk) StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = backOrNull)
       else {
         LaunchedEffect(args.path) {
           StatsRequest.period.value = args.query("period")
@@ -76,12 +72,12 @@ val AnalyticsModule = AppModule(
       }
     },
     V3Route("audit", RouteKind.PAGE, { StrReports.auditTitle }, needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
-      AuditScreen(data, args.query("kind"), onBack = { back() }, onOpen = { nav.open(it) })
+      AuditScreen(data, args.query("kind"), onBack = backOrNull, onOpen = { nav.open(it) })
     },
     V3Route(AnalyticsPaths.ADMIN, RouteKind.PAGE, { Str.adminCenter }, chrome = Chrome.OWN) {
       AdminScreen(
         d = data, canSeeMoney = canSeeMoney(), canManage = Need.MANAGE in access.granted, canAudit = Need.AUDIT in access.granted,
-        members = rememberAdminMembers(), onBack = { back() }, onOpen = { nav.open(it) }, wide = wide,
+        members = rememberAdminMembers(), onBack = backOrNull, onOpen = { nav.open(it) }, wide = desk,
       )
     },
     V3Route("reports/export", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.nav
 
+import ir.vil3ntec.tohid.core.nav.RoutePaths
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import ir.vil3ntec.tohid.core.nav.Access
@@ -31,6 +32,7 @@ object V3Modules {
     listOf(
       FoundationModule,
       ScanModule,
+      PromosModule,
       ShellModule,
       OnboardingModule,
       SalesModule,
@@ -84,6 +86,16 @@ object V3Modules {
     ALL.filter { access.allows(it.needs, it.flag) }.flatMap { it.shopper }.sortedBy { it.order }
 
   /** شناسهٔ قدیمیِ یک مسیر (منوی کناری و سربرگِ کامپیوتر هنوز با آن کار می‌کنند) */
+  /**
+   *  شناسهٔ منوی کناریِ کامپیوتر برای هر مسیر (AUDIT-NAV N2): نامِ قدیمیِ **ریشهٔ زنجیره**،
+   *  نه خودِ مسیر — `products/42` ⇐ `products`، `stock/…` ⇐ `warehouse`، `sale/quick` ⇐ `sale`.
+   */
+  fun railId(path: String): String {
+    val root = table.chain(path).firstOrNull() ?: path
+    val head = RoutePaths.normalize(root.substringBefore('?'))
+    return legacyId(if ('/' in head) head.substringBefore('/') else head)
+  }
+
   fun legacyId(path: String): String {
     val r = table.resolve(path) ?: return path.substringBefore('?')
     return r.route.aliases.firstOrNull() ?: r.route.pattern.substringBefore('/')
