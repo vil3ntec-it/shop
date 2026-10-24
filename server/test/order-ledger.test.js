@@ -50,7 +50,7 @@ async function setFlag(scope, key, value) {
 }
 
 /** دکان + صاحب با توکنِ دستگاه، پرچم‌های سفارش و کاتالوگ روشن، یک کالا و ۱۰ کیلو ورودِ انبار از دستگاهِ A */
-async function shopWithStock(name, { catalogOn = true, claim = true } = {}) {
+async function shopWithStock(name, { catalogOn = true, claim = true, ledgerOn = true } = {}) {
   let u = await h.newUser(name, 'shop');
   const made = await h.post('/api/shop', { name: `دکانِ ${name}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -60,7 +60,7 @@ async function shopWithStock(name, { catalogOn = true, claim = true } = {}) {
   })).body };
   await setFlag(shopId, 'shop.orders', true);
   //  پرچمِ بازنشستهٔ فاکتورِ W هم روشن: دیگر هیچ اثری ندارد
-  await setFlag(shopId, 'shop.orders.ledger', true);
+  if (ledgerOn) await setFlag(shopId, 'shop.orders.ledger', true);
   if (catalogOn) await setFlag(shopId, 'shop.catalog', true);
   const ops = [
     { op_id: opId(), ts: Date.now(), table: 'products', row_id: 'p-rice', type: 'insert',
@@ -353,8 +353,8 @@ test('config: سرور «فروشِ تحویل» و کفش را می‌گوید�
   assert.deepEqual([cancel.body.results[0].status, cancel.body.results[0].reason], ['rejected', 'cancel_not_allowed']);
 });
 
-test('handover: سفارشِ در راه (ارسال پیش از since، «رسید» پس از آن) می‌آید؛ تحویلِ کاملاً پیش از since نه؛ orderId فقط همان', async () => {
-  const a = await shopWithStock('در راه');
+test('handover: نخستین گذارِ تحویل باید پس از کف باشد — «ارسال» پیش از کف و «رسید» پس از آن ⇒ نه فروشِ خودکار، در review با دلیل', async () => {
+  const a = await shopWithStock('در راه', { claim: false });
   const send = async () => {
     const r = await h.post('/api/shop/orders', { source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod',
       customer: { name: 'احمد', phone: '0791234567' }, address: { landmark: 'کنارِ مسجد' }, lines: riceLine(1000) },
@@ -367,15 +367,35 @@ test('handover: سفارشِ در راه (ارسال پیش از since، «رس�
   await walk(a, flying.id, ['accepted', 'picking', 'packed', 'out_for_delivery']);
   await walk(a, old.id, TO_PICKED_UP);
   await tick();
-  const since = Date.now();
+  const floor = (await appConfig(a.token)).body.handoverSince;
   await tick();
   await walk(a, flying.id, ['delivered']);
-  const r = await handover(a, since);
-  assert.deepEqual(r.body.items.map((x) => x.id), [flying.id], 'در راه می‌آید؛ تحویلِ پیش از since نه');
-  assert.ok(r.body.items[0].handedOverAt >= since);
-  assert.equal(r.body.since, since);
-  const one1 = (await h.get(`/api/shop/orders/handover?since=0&orderId=${old.id}`, { token: a.token })).body;
-  assert.deepEqual(one1.items.map((x) => x.id), [old.id]);
+  //  در راه هنگامِ کف: دستگاهِ کهنه شاید پیش‌تر دستی فروخته باشد ⇒ هرگز خودکار نه
+  let r = (await handover(a)).body;
+  assert.deepEqual(r.items, [], 'نخستین گذار پیش از کف ⇒ فروشِ خودکار نه');
+  assert.deepEqual(r.review.map((x) => [x.id, x.action, x.reviewCode]), [[flying.id, 'review', 'before_floor']]);
+  assert.ok(r.review[0].handedOverAt < floor);
+  //  سفارشی که همه‌اش پیش از کف بود (بی گذارِ تحویلِ پس از کف) ⇒ نه فهرست، نه review
+  assert.ok(!r.review.some((x) => x.id === old.id));
+  const one1 = (await h.get(`/api/shop/orders/handover?since=0&orderId=${flying.id}`, { token: a.token })).body;
+  assert.deepEqual([one1.items, one1.review.map((x) => x.id)], [[], [flying.id]]);
+  const one2 = (await h.get(`/api/shop/orders/handover?since=0&orderId=${old.id}`, { token: a.token })).body;
+  assert.deepEqual([one2.items, one2.review], [[], []]);
+
+  //  since ِ برنامه پس از کف: نخستین گذارِ پیش از since ⇒ نه؛ پس از آن ⇒ بله
+  const mid = await send();
+  await walk(a, mid.id, ['accepted', 'picking', 'packed', 'out_for_delivery']);
+  await tick();
+  const since = Date.now();
+  await tick();
+  await walk(a, mid.id, ['delivered']);
+  const late = await newOrder(a);
+  await walk(a, late.id, TO_PICKED_UP);
+  r = (await handover(a, since)).body;
+  assert.deepEqual(r.items.map((x) => x.id), [late.id], 'نخستین گذارِ پس از since');
+  assert.ok(r.items[0].handedOverAt >= since);
+  assert.equal(r.since, since);
+  assert.deepEqual((await handover(a)).body.items.map((x) => x.id).sort(), [mid.id, late.id].sort());
   assert.equal((await h.get('/api/shop/orders/handover?after=bad', { token: a.token })).status, 400);
 });
 
@@ -621,4 +641,100 @@ test('بازپرداختِ جزئی (کالا پیشِ مشتری ماند) بی
   const full = (await h.get(`/api/shop/orders/${order.id}`, { token: a.token })).body.order;
   assert.equal((await push(a.token, DEV_A, appSaleOps(full))).status, 200);
   assert.deepEqual((await handover(a)).body.items, []);
+});
+
+/* ══════════════════════ بازبینیِ سومِ #340: کفِ راه‌اندازی، اشتراکِ شاگرد، کلیدِ رزرو، ممیزیِ گم‌شده ══════════════════════ */
+
+test('راه‌اندازیِ سرور: دکانِ دارای shop.orders.ledger یا shop.catalog و بی کف ⇒ کف = لحظهٔ راه‌اندازی؛ بقیه و کفِ موجود دست نمی‌خورند', async () => {
+  const both = await shopWithStock('آغاز-دوپرچم', { claim: false });
+  const cat = await shopWithStock('آغاز-کاتالوگ', { claim: false, ledgerOn: false });
+  const led = await shopWithStock('آغاز-دفتر', { claim: false, catalogOn: false });
+  const plain = await shopWithStock('آغاز-ساده', { claim: false, catalogOn: false, ledgerOn: false });
+  const had = await shopWithStock('آغاز-کف‌دار');
+  const kept = await ledger.floorOf(had.shopId);
+  //  پرچمِ خاموشِ صریح هم «روشن» نیست
+  const off = await shopWithStock('آغاز-خاموش', { claim: false, catalogOn: false, ledgerOn: false });
+  await setFlag(off.shopId, 'shop.catalog', false);
+  //  سفارشی که پیش از راه‌اندازیِ این نسخه (پیش از کف) تحویل شده بود
+  const early = await newOrder(both);
+  await walk(both, early.id, TO_PICKED_UP);
+  await tick();
+  const t0 = Date.now();
+  const n = await ledger.claimFloorsAtStart();
+  assert.ok(n >= 3, `${n}`);
+  for (const s of [both, cat, led]) {
+    const f = await ledger.floorOf(s.shopId);
+    assert.ok(f >= t0 && f <= Date.now(), `${s.shopId}: ${f}`);
+  }
+  assert.equal(await ledger.floorOf(plain.shopId), null, 'بی کسرِ سفارشیِ پیشین ⇒ کف با نخستین config');
+  assert.equal(await ledger.floorOf(off.shopId), null);
+  assert.equal(await ledger.floorOf(had.shopId), kept, 'کفِ موجود جابه‌جا نمی‌شود');
+  //  config ِ برنامه همان کفِ راه‌اندازی را می‌گوید؛ تحویلِ پیش از آن هرگز خودکار نه
+  assert.equal((await appConfig(both.token)).body.handoverSince, await ledger.floorOf(both.shopId));
+  assert.deepEqual((await handover(both)).body.items, []);
+  const late = await newOrder(both);
+  await walk(both, late.id, TO_PICKED_UP);
+  assert.deepEqual((await handover(both)).body.items.map((x) => x.id), [late.id], 'پنجرهٔ «فروشِ گم‌شده» بسته است');
+  //  دورِ دوم: هیچ
+  const f1 = await ledger.floorOf(both.shopId);
+  assert.equal(await ledger.claimFloorsAtStart(), 0);
+  assert.equal(await ledger.floorOf(both.shopId), f1);
+});
+
+test('شاگردِ بی اشتراکِ چنددستگاهی (multi_device) ⇒ recordSale و recordable نه — همان requireSyncWrite ِ push', async () => {
+  const a = await shopWithStock('بی‌اشتراک');
+  const s = await staffOf(a, 'شاگردِ بی‌اشتراک');
+  const order = await newOrder(a, { discountMinor: 0 });
+  await walk(a, order.id, TO_PICKED_UP);
+  const flag = async (u) => (await handover(u)).body.items.find((x) => x.id === order.id).recordable;
+  assert.equal(await flag(s), true, 'با دورهٔ آزمایشی');
+  assert.equal((await appConfig(s.token)).body.permissions.recordSale, true);
+  //  اشتراک و دورهٔ آزمایشی تمام ⇒ push ِ شاگرد ۴۰۳ ⇒ برنامه نباید بنویسد
+  await query('UPDATE shops SET created_at=$2 WHERE id=$1', [a.shopId, Date.now() - 400 * 24 * 3600 * 1000]);
+  const full = (await h.get(`/api/shop/orders/${order.id}`, { token: a.token })).body.order;
+  const pushed = await push(s.token, 'dev-ledger-noent', appSaleOps(full));
+  assert.deepEqual([pushed.status, pushed.body.error && pushed.body.error.code], [403, 'subscription_required']);
+  assert.equal(await flag(s), false);
+  assert.equal((await appConfig(s.token)).body.permissions.recordSale, false);
+  assert.equal(await flag(a), true, 'صاحب بی اشتراک هم می‌نویسد');
+});
+
+test('کلیدِ کف (shop.orders.handover_floor) از پنلِ «تنظیماتِ زنده» نوشته یا پاک نمی‌شود', async () => {
+  const a = await shopWithStock('کلیدِ رزرو');
+  const kept = await ledger.floorOf(a.shopId);
+  const put = await h.put('/api/admin/pump/live-config', { scope: a.shopId, key: ledger.FLOOR_KEY, value: 1 }, { token: admin });
+  assert.deepEqual([put.status, put.body.error.code], [409, 'reserved_key']);
+  const del = await h.api('DELETE', '/api/admin/pump/live-config', { token: admin, body: { scope: a.shopId, key: ledger.FLOOR_KEY } });
+  assert.deepEqual([del.status, del.body.error.code], [409, 'reserved_key']);
+  assert.equal(await ledger.floorOf(a.shopId), kept);
+});
+
+test('ممیزیِ کنار گذاشتن که نوشته نشد (خطا پس از کامیت) ⇒ دورِ بعد همان سطر را با شمارش‌های دفتر می‌نویسد، یک بار', async () => {
+  const a = await shopWithStock('ممیزیِ گم‌شده');
+  const stock = require('../src/lib/stock');
+  const catalog = require('../src/lib/catalog');
+  const t = now();
+  await tx((c) => stock.postMove(c, a.shopId, {
+    productId: 'p-rice', location: 'shop_floor', type: 'sale', qtyMilli: 600, mode: 'recorded', source: 'order',
+    sourceKey: 'res:legacy-lost:sale:shop_floor', refType: 'order', refId: 'ord-legacy-lost', actorType: 'user', actorId: '',
+    reason: 'order_fulfilled', at: t,
+  }, t));
+  //  دورِ نخست در تراکنش، بی سطرِ ممیزی (همان «سرور پس از کامیت افتاد»)
+  const first = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
+  assert.equal(first.changed, true);
+  const audits = () => many(`SELECT detail FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId]);
+  assert.equal((await audits()).length, 0);
+  //  راه‌اندازیِ دوباره: دورِ دوم چیزی جبران نمی‌کند ولی سطرِ گم‌شده را می‌خواهد
+  const again = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
+  assert.equal(again.changed, false);
+  assert.equal(again.needsAudit, true);
+  await catalog.afterIngest(a.shopId, { retired: again });
+  const rows = await audits();
+  assert.equal(rows.length, 1);
+  const det = typeof rows[0].detail === 'string' ? JSON.parse(rows[0].detail) : rows[0].detail;
+  assert.deepEqual([det.undoneMoves, det.undoneMilli, det.recovered], [1, 600, true]);
+  //  سوم: سطر هست ⇒ هیچ
+  const third = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
+  assert.deepEqual([third.changed, Boolean(third.needsAudit)], [false, false]);
+  assert.equal((await audits()).length, 1);
 });

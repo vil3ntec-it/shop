@@ -317,6 +317,8 @@ class OrderFulfillmentTest {
     val d = ok(OrderFulfillment.fulfill(ledger(), order(), "2026-10-19", 1L)).data
     val cancel = SalesEngine.cancel(d, "o-01ORDER", "2026-10-19", 2L, { "c" }, reason = "x")
     assertEquals(SalesEngine.Result.Failed(SalesEngine.ONLINE_ORDER_LOCKED), cancel)
+    //  پیامِ صندوق: کالای پیک ⇒ «برگشت به دکان» ِ سفارش، نه «مرجوعی» (مرجوعی دخل را کم می‌کرد و لغو هم می‌آمد)
+    assertTrue(SalesEngine.ONLINE_ORDER_LOCKED, SalesEngine.ONLINE_ORDER_LOCKED.contains("«برگشت به دکان»"))
     var seq = 0
     val back = SalesEngine.recordReturn(d, "o-01ORDER", mapOf("o-01ORDER-1" to 1.5), "", "2026-10-19", 3L, { "r${seq++}" })
     assertTrue("$back", back is SalesEngine.Result.Ok)
@@ -398,5 +400,42 @@ class OrderFulfillmentTest {
     assertFalse(OrderFulfillment.allowed(o.copy(action = "reverse"), clerk))
     assertFalse(OrderFulfillment.allowed(o.copy(action = "reverse", reversible = false), all))
     assertTrue(OrderFulfillment.allowed(o.copy(action = "reverse", reversible = true), clerk))
+  }
+
+  @Test
+  fun `برگشت به دکان پس از مرجوعیِ دستی ⇒ لغوِ خاموش نه؛ بررسیِ صاحب با دلیل`() {
+    //  پیک نقدِ سفارش را نگرفت و کالا را برگرداند؛ صندوق‌دار به‌اشتباه «مرجوعی» زد ⇒ دخل −کل
+    val base = ok(OrderFulfillment.fulfill(ledger(), sent(), "2026-10-19", 5_000L)).data
+    var seq = 0
+    val returned = (SalesEngine.recordReturn(base, "o-01ORDER", mapOf("o-01ORDER-1" to 1.5), "", "2026-10-19", 6_000L, { "r${seq++}" })
+      as SalesEngine.Result.Ok).data
+    assertEquals(10.0, ShopStore.stock(returned, "p1"), 1e-9)
+    val back = sent(status = "returned_to_store")
+    assertTrue(OrderFulfillment.needsReverse(returned, back))
+    val why = OrderFulfillment.reverseBlock(returned, back)
+    assertTrue("$why", why != null && why.contains("مرجوعی"))
+    val r = OrderFulfillment.reverse(returned, back, "2026-10-20", 9_000L)
+    assertTrue("$r", r is OrderFulfillment.Result.Review)
+    assertEquals(why, (r as OrderFulfillment.Result.Review).message)
+    //  هیچ تغییری: نه لغو، نه حرکتِ دوم (موجودی دو بار برنمی‌گردد)
+    assertEquals("completed", returned.sales.single().status)
+    assertEquals(10.0, ShopStore.stock(returned, "p1"), 1e-9)
+    //  بی مرجوعی ⇒ همان لغوِ همیشگی
+    assertNull(OrderFulfillment.reverseBlock(base, back))
+    assertTrue(OrderFulfillment.reverse(base, back, "2026-10-20", 9_000L) is OrderFulfillment.Result.Ok)
+  }
+
+  @Test
+  fun `بنرهای «ثبت نشد» و «کمبود» وقتی دستگاهِ دیگر ثبت کرد یا موجودی درست شد می‌روند`() {
+    val d0 = ledger(riceUnits = 1.0)
+    assertFalse(OrderFulfillment.settled(d0, "01ORDER"))
+    val r = ok(OrderFulfillment.fulfill(d0, order(), "2026-10-19", 1L, allowShortage = true))
+    assertEquals(listOf("p1"), r.shortIds)
+    //  فروش (از هر دستگاه) در دفتر ⇒ «ثبت نشد» دیگر نیست
+    assertTrue(OrderFulfillment.settled(r.data, "01ORDER"))
+    assertTrue(OrderFulfillment.stillShort(r.data, r.shortIds))
+    //  ورودِ انبار (این دستگاه یا دیگری) ⇒ «کمبود» دیگر نیست
+    val fixed = r.data.copy(warehouseEntries = r.data.warehouseEntries + WarehouseEntry(id = "we9", productId = "p1", units = 5.0))
+    assertFalse(OrderFulfillment.stillShort(fixed, r.shortIds))
   }
 }
