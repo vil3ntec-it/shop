@@ -10,6 +10,8 @@
  *                                      زیرِ حداقل (OPS-04)
  *   POST /api/admin/system/chain-verify ⇐ بررسیِ زنجیرهٔ هشِ سابقه (SEC-02)؛
  *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
+ *   GET /api/admin/system/reconciliation ⇐ تطبیقِ فروشِ آنلاین، لغو، بازپرداخت، نقدِ
+ *                                      پیک و تسویه به‌ازای هر دکان (E2E-ADM-15)؛ فقط ارشد
  *
  * زیرِ `requireAdmin`ِ `routes/admin.js` سوار است. فقط عدد و وضعیت؛ هیچ
  * راز، نشانی یا دادهٔ مشتری (شرح در `lib/system-health.js`).
@@ -57,6 +59,14 @@ router.post('/chain-verify', requireSuperAdmin, async (req, res, next) => {
     });
     res.set('Cache-Control', 'no-store');
     res.json(out);
+  } catch (err) { next(err); }
+});
+
+/** ⛔ پولِ همهٔ دکان‌ها ⇒ فقط مدیرِ ارشد؛ فقط‌خواندنی (همان `order-refunds.report`). */
+router.get('/reconciliation', requireSuperAdmin, async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(await health.reconciliation({ from: req.query?.from, to: req.query?.to }));
   } catch (err) { next(err); }
 });
 
