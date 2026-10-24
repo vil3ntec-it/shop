@@ -36,6 +36,8 @@ import ir.vil3ntec.tohid.ui.v3.V3FormBar
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /** ناوبریِ صفحهٔ کالا */
 internal class ProductDetailNav(
@@ -73,6 +75,7 @@ internal fun ProductDetailScreen(
   val context = LocalContext.current
   val ops = rememberProductOps(store, toasts)
   var confirmDelete by remember { mutableStateOf(false) }
+  val stagger = rememberV3Stagger(productId)
   val figures = remember(data, product) { ProductDetailModel.figures(data, product) }
   val moves = remember(data, productId) { ProductDetailModel.recentMoves(data, productId) }
   val moveCount = remember(data, productId) { ProductDetailModel.moveCount(data, productId) }
@@ -91,12 +94,13 @@ internal fun ProductDetailScreen(
     bottomBar = { V3FormBar(StrProducts.entryCta, nav.entry) },
   ) { pad ->
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding())) {
-      ProductHero(product, figures.status, onPhoto = nav.photo)
+      //  ورودِ پلکانیِ بخش‌ها (بارِ اول)؛ عددها با شمارنده
+      Box(Modifier.v3Stagger(stagger, "hero", 0)) { ProductHero(product, figures.status, onPhoto = nav.photo) }
       Spacer(Modifier.height(8.dp))
-      FiguresCard(product, figures, onStock = nav.stock)
-      ProfitCard(product, figures)
-      MovesSection(product, moves, moveCount, onAll = nav.movements)
-      if (history.isNotEmpty()) HistorySection(history)
+      Box(Modifier.v3Stagger(stagger, "figures", 1)) { FiguresCard(product, figures, onStock = nav.stock) }
+      Box(Modifier.v3Stagger(stagger, "profit", 2)) { ProfitCard(product, figures) }
+      Box(Modifier.v3Stagger(stagger, "moves", 3)) { MovesSection(product, moves, moveCount, onAll = nav.movements) }
+      if (history.isNotEmpty()) Box(Modifier.v3Stagger(stagger, "history", 4)) { HistorySection(history) }
       Spacer(Modifier.height(8.dp))
     }
   }

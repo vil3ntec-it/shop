@@ -1,8 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.keyframes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -11,7 +8,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -21,7 +17,6 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,13 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.money
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Space
@@ -50,13 +41,12 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
-import kotlin.math.roundToInt
 
 /**
  *  کارتِ یک کالا در فرمِ چندردیفی (r16). باز = همهٔ کادرها؛ بسته = یک خط
  *  «۱ · بیسکویت شکلاتی · ۲۰ ؋» با قرصِ «آماده/ناقص». فقط یک کارت باز است.
  *  «…» ⇐ تکثیر یا حذفِ ردیف. `shake` که بالا برود کارت یک بار می‌لرزد (نخستین
- *  ردیفِ خراب پس از «ذخیره»؛ با «کاهشِ حرکت» نه).
+ *  ردیفِ خراب پس از «ذخیره»، `draftShake`؛ با «کاهشِ حرکت» فقط لرزشِ گوشی).
  */
 @Composable
 internal fun ProductRowCard(
@@ -74,21 +64,15 @@ internal fun ProductRowCard(
 ) {
   val c = PhoneV3.colors
   var menu by remember { mutableStateOf(false) }
-  val dx = remember { Animatable(0f) }
-  LaunchedEffect(shake) {
-    if (shake > 0 && Motion.enabled) {
-      dx.animateTo(0f, keyframes { durationMillis = MotionTokens.EMPHASIZED; 0f at 0; -10f at 50; 10f at 120; -6f at 190; 4f at 260; 0f at MotionTokens.EMPHASIZED })
-    }
-  }
   val shape = RoundedCornerShape(V3Space.featuredRadius)
   Column(
     modifier
-      .offset { IntOffset(dx.value.dp.roundToPx(), 0) }
+      .draftShake(shake)
       .fillMaxWidth()
       .clip(shape)
       .background(c.card)
       .border(if (expanded) 1.5.dp else 1.dp, if (expanded) PhoneV3Roles.focus(c).copy(alpha = 0.55f) else c.hairline, shape)
-      .animateContentSize(MotionSpec.tweenOf(MotionTokens.MEDIUM)),
+      .draftSize(),
   ) {
     Row(
       Modifier.fillMaxWidth().then(if (expanded) Modifier else Modifier.v3Pressable(label = row.name.ifBlank { StrProducts.untitled }, onClick = onExpand))

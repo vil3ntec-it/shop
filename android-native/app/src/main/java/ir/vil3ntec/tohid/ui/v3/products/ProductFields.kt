@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -30,14 +28,12 @@ import androidx.compose.ui.composed
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.Supplier
 import ir.vil3ntec.tohid.money
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Status
@@ -179,13 +175,12 @@ internal fun ColumnScope.MoreFields(
 @Composable
 internal fun CollapsibleHeader(title: String, open: Boolean, onToggle: () -> Unit) {
   val c = PhoneV3.colors
-  val turn by animateFloatAsState(if (open) 180f else 0f, MotionSpec.indicator(), label = "moreTurn")
   Row(
     Modifier.fillMaxWidth().v3Pressable(label = title, onClick = onToggle).padding(vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(title, style = V3Type.headline, color = c.ink, modifier = Modifier.weight(1f))
-    Icon(Icons.Outlined.ExpandMore, contentDescription = null, tint = c.icon, modifier = Modifier.graphicsLayer { rotationZ = turn })
+    Icon(Icons.Outlined.ExpandMore, contentDescription = null, tint = c.icon, modifier = Modifier.draftFlip(open))
   }
 }
 
@@ -200,7 +195,7 @@ private fun ChipGroup(label: String, error: Problem?, required: Boolean = true, 
       if (required) Text(" *", style = V3Type.subhead.copy(fontWeight = FontWeight.SemiBold), color = PhoneV3Roles.errorText(c))
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { chips() }
-    AnimatedVisibility(error != null) {
+    DraftReveal(error != null) {
       Row(Modifier.padding(start = 2.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = PhoneV3Roles.errorText(c), modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(4.dp))
@@ -213,8 +208,13 @@ private fun ChipGroup(label: String, error: Problem?, required: Boolean = true, 
 /** «سودِ هر عدد: ۲۰ ؋» — زیان با برچسبِ «زیان» و رنگِ خطا (رنگ تنها نیست) */
 @Composable
 private fun ProfitLine(row: ProductRowDraft) {
+  val profit = ProductFormModel.unitProfit(row)
+  DraftReveal(profit != null) { ProfitText(row, profit ?: 0.0) }
+}
+
+@Composable
+private fun ProfitText(row: ProductRowDraft, profit: Double) {
   val c = PhoneV3.colors
-  val profit = ProductFormModel.unitProfit(row) ?: return
   val loss = profit < 0
   Row(Modifier.padding(top = 10.dp, start = 2.dp), verticalAlignment = Alignment.CenterVertically) {
     if (loss) { V3StatusPill(V3Status.CANCELLED, StrProducts.loss); Spacer(Modifier.width(8.dp)) }

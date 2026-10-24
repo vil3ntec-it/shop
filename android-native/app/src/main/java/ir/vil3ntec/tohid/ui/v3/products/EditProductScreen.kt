@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -39,6 +39,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.products.ProductFormModel.Mode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -79,6 +81,8 @@ internal fun EditProductScreen(
   var banner by remember { mutableStateOf<String?>(null) }
   var more by remember(productId) { mutableStateOf(hasMore(initial)) }
   var done by remember { mutableStateOf(false) }
+  var shake by remember { mutableIntStateOf(0) }
+  val stagger = rememberV3Stagger(productId)
   val focus = remember { HashMap<String, FocusRequester>() }
   val errors = ProductFormModel.errors(row, Mode.EDIT)
 
@@ -94,13 +98,14 @@ internal fun EditProductScreen(
     val first = ProductFormModel.firstField(errors)
     if (first != null) {
       touched = touched.copy(all = true)
+      shake++
       if (first == ProductFormModel.Field.UNIT_FACTOR) more = true
       scope.launch { delay(120); runCatching { focus[first.name]?.requestFocus() } }
       return
     }
     val now = System.currentTimeMillis()
     when (val r = WarehouseEngine.editProduct(store.data.value, productId, ProductFormModel.draftEdit(row), todayIso(), now, ::newId)) {
-      is WarehouseEngine.Result.Failed -> banner = r.message
+      is WarehouseEngine.Result.Failed -> { banner = r.message; shake++ }
       is WarehouseEngine.Result.Ok -> {
         banner = null
         persist(scope, store, r.data)
@@ -124,12 +129,16 @@ internal fun EditProductScreen(
       primaryEnabled = !done,
       dirty = row != initial && !done,
     ) {
-      banner?.let { V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp), body = it) }
+      DraftReveal(banner != null) {
+        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).draftShake(shake), body = banner.orEmpty())
+      }
       val visible = touched.visible(0, errors)
-      ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT)
-      Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+      Column(Modifier.draftShake(shake).v3Stagger(stagger, "fields", 0)) {
+        ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT)
+      }
+      Column(Modifier.fillMaxWidth().padding(top = 8.dp).v3Stagger(stagger, "more", 1)) {
         CollapsibleHeader(StrProducts.groupMore, more) { more = !more }
-        AnimatedVisibility(more) {
+        DraftReveal(more) {
           V3Section(null, padding = PaddingValues(16.dp)) { MoreFields(row, visible, data.suppliers, hooks) }
         }
       }

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.products
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +40,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Form
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.products.ProductFormModel.Mode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -83,6 +87,9 @@ internal fun NewProductsScreen(
   var shake by remember { mutableStateOf(0 to -1) }
   var saving by remember { mutableStateOf(false) }
   var done by remember { mutableStateOf(false) }
+  var errorShake by remember { mutableIntStateOf(0) }
+  val stagger = rememberV3Stagger()
+  val firstKeys = remember { initial.map { it.key }.toSet() }
   val views = remember { HashMap<Int, BringIntoViewRequester>() }
   val focus = remember { HashMap<String, FocusRequester>() }
   val readyCount = ProductFormModel.readyCount(rows)
@@ -115,7 +122,7 @@ internal fun NewProductsScreen(
       is ProductFormModel.Check.Ok -> {
         val before = store.data.value
         when (val r = WarehouseEngine.addProducts(before, check.drafts, System.currentTimeMillis(), ::newId)) {
-          is WarehouseEngine.Result.Failed -> banner = r.message
+          is WarehouseEngine.Result.Failed -> { banner = r.message; errorShake++ }
           is WarehouseEngine.Result.Ok -> {
             banner = null
             saving = true
@@ -146,52 +153,57 @@ internal fun NewProductsScreen(
       summary = StrProducts.readySummary(readyCount, rows.size),
       dirty = rows != initial && !done,
     ) {
-      banner?.let { V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp), body = it) }
-      rows.forEachIndexed { index, row ->
-        val req = views.getOrPut(row.key) { BringIntoViewRequester() }
-        val hooks = FieldHooks(
-          onChange = { change -> update(row.key, change) },
-          onBlur = { f -> touched = touched.touch(row.key, f) },
-          onScan = { nav.scan { code -> update(row.key) { it.copy(barcode = code) }; Haptics.confirm(context) } },
-          onNewCategory = { nav.pickCategory(row.category) { cat -> update(row.key) { it.copy(category = cat) } } },
-          focus = { f -> focus.getOrPut("${row.key}:${f.name}") { FocusRequester() } },
-        )
-        Spacer(Modifier.height(12.dp))
-        ProductRowCard(
-          number = index + 1,
-          row = row,
-          expanded = expanded == row.key,
-          ready = ProductFormModel.ready(row),
-          canRemove = rows.size > 1,
-          shake = if (shake.second == row.key) shake.first else 0,
-          onExpand = { expanded = row.key },
-          onDuplicate = {
-            val copy = ProductFormModel.duplicate(row, seq++)
-            rows = rows.toMutableList().also { it.add(index + 1, copy) }
-            expanded = copy.key
-          },
-          onRemove = {
-            val at = index
-            rows = rows.filterNot { it.key == row.key }
-            if (expanded == row.key) expanded = rows.getOrNull((at - 1).coerceAtLeast(0))?.key ?: -1
-            toasts.undo(StrProducts.rowRemoved) {
-              rows = rows.toMutableList().also { it.add(at.coerceAtMost(it.size), row) }
-              expanded = row.key
-            }
-          },
-          modifier = Modifier.bringIntoViewRequester(req),
-        ) {
-          ProductFieldGroups(
-            row = row,
-            errors = touched.visible(row.key, ProductFormModel.errors(row, Mode.NEW).takeUnless { ProductFormModel.untouched(row) && rows.size > 1 }.orEmpty()),
-            categories = data.productCategories,
-            units = data.productUnits,
-            hooks = hooks,
-            section = CardSection,
-            mode = Mode.NEW,
-            nameHelper = if (index == 0 && rows.size == 1 && row.name.isBlank()) StrProducts.firstRowHint else null,
+      DraftReveal(banner != null) {
+        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).draftShake(errorShake), body = banner.orEmpty())
+      }
+      Column(Modifier.draftSize()) {
+        rows.forEachIndexed { index, row -> key(row.key) {
+          val req = views.getOrPut(row.key) { BringIntoViewRequester() }
+          val hooks = FieldHooks(
+            onChange = { change -> update(row.key, change) },
+            onBlur = { f -> touched = touched.touch(row.key, f) },
+            onScan = { nav.scan { code -> update(row.key) { it.copy(barcode = code) }; Haptics.confirm(context) } },
+            onNewCategory = { nav.pickCategory(row.category) { cat -> update(row.key) { it.copy(category = cat) } } },
+            focus = { f -> focus.getOrPut("${row.key}:${f.name}") { FocusRequester() } },
           )
-        }
+          Spacer(Modifier.height(12.dp))
+          ProductRowCard(
+            number = index + 1,
+            row = row,
+            expanded = expanded == row.key,
+            ready = ProductFormModel.ready(row),
+            canRemove = rows.size > 1,
+            shake = if (shake.second == row.key) shake.first else 0,
+            onExpand = { expanded = row.key },
+            onDuplicate = {
+              val copy = ProductFormModel.duplicate(row, seq++)
+              rows = rows.toMutableList().also { it.add(index + 1, copy) }
+              expanded = copy.key
+            },
+            onRemove = {
+              val at = index
+              rows = rows.filterNot { it.key == row.key }
+              if (expanded == row.key) expanded = rows.getOrNull((at - 1).coerceAtLeast(0))?.key ?: -1
+              toasts.undo(StrProducts.rowRemoved) {
+                rows = rows.toMutableList().also { it.add(at.coerceAtMost(it.size), row) }
+                expanded = row.key
+              }
+            },
+            //  ورودِ پلکانیِ کارت‌های آغازین؛ کارتِ تازه (افزودن/تکثیر) همان لحظه بالا می‌آید
+            modifier = Modifier.bringIntoViewRequester(req).v3Stagger(stagger, row.key, if (row.key in firstKeys) index else 0),
+          ) {
+            ProductFieldGroups(
+              row = row,
+              errors = touched.visible(row.key, ProductFormModel.errors(row, Mode.NEW).takeUnless { ProductFormModel.untouched(row) && rows.size > 1 }.orEmpty()),
+              categories = data.productCategories,
+              units = data.productUnits,
+              hooks = hooks,
+              section = CardSection,
+              mode = Mode.NEW,
+              nameHelper = if (index == 0 && rows.size == 1 && row.name.isBlank()) StrProducts.firstRowHint else null,
+            )
+          }
+        } }
       }
       Spacer(Modifier.height(12.dp))
       V3Button(

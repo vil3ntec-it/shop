@@ -85,14 +85,14 @@ class ProductsListModelTest {
   }
 
   @Test
-  fun `فهرستِ خالی: بی کالا یا بی نتیجه`() {
+  fun `فهرستِ خالی — بی کالا یا بی نتیجه`() {
     assertEquals(Empty.NO_PRODUCTS, ProductsListModel.empty(0, 0))
     assertEquals(Empty.NO_MATCH, ProductsListModel.empty(4, 0))
     assertEquals(Empty.NONE, ProductsListModel.empty(4, 2))
   }
 
   @Test
-  fun `اسکن: شناخته ⇐ صفحهٔ کالا؛ ناشناس ⇐ کالای تازه با همان بارکد`() {
+  fun `اسکن — شناخته ⇐ صفحهٔ کالا؛ ناشناس ⇐ کالای تازه با همان بارکد`() {
     val index = mapOf("6260001" to "m")
     assertEquals("products/m", ProductsListModel.scanTarget(index, " 6260001 "))
     assertEquals("products/new?barcode=999", ProductsListModel.scanTarget(index, "999"))

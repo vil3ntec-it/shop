@@ -27,7 +27,7 @@ class ProductFormModelTest {
   }
 
   @Test
-  fun `ذخیرهٔ همه: ردیفِ نیمه‌پر، هیچ ردیفِ کامل، یا پیش‌نویس‌ها`() {
+  fun `ذخیرهٔ همه — ردیفِ نیمه‌پر، هیچ ردیفِ کامل، یا پیش‌نویس‌ها`() {
     val blank = ProductRowDraft(key = 2)
     val half = ProductRowDraft(key = 3, name = "چای")
     assertEquals(Check.Broken(1), ProductFormModel.check(listOf(full, half, blank)))

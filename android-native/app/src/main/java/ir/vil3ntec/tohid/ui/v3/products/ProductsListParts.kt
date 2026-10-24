@@ -1,14 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -29,8 +22,6 @@ import androidx.compose.material.icons.outlined.MoveToInbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,8 +34,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -56,8 +45,6 @@ import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -115,7 +102,7 @@ internal fun ProductRow(
   onLongClick: (() -> Unit)?,
 ) {
   val c = PhoneV3.colors
-  Box(Modifier.flash(flash)) {
+  Box(Modifier.draftFlash(flash)) {
     V3ListRow(
       title = p.name,
       subtitle = stockLine(p, stock),
@@ -143,7 +130,6 @@ internal fun ProductRow(
 }
 
 /** کاشیِ شبکهٔ دوستونه: کارتِ r16، عکسِ مربع، قیمتِ پررنگ، نامِ دوخطی و موجودیِ خاکستری */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ProductCell(
   p: Product,
@@ -156,24 +142,15 @@ internal fun ProductCell(
   modifier: Modifier = Modifier,
 ) {
   val c = PhoneV3.colors
-  val haptic = LocalHapticFeedback.current
   val shape = RoundedCornerShape(V3Space.featuredRadius)
-  val src = remember { MutableInteractionSource() }
-  val down by src.collectIsPressedAsState()
-  val scale by animateFloatAsState(if (down && Motion.enabled) 0.97f else 1f, MotionSpec.press(), label = "cellPress")
   val edge = if (selected == true) PhoneV3Roles.focus(c) else c.hairline
   Column(
     modifier
-      .graphicsLayer { scaleX = scale; scaleY = scale }
-      .flash(flash, shape)
+      .draftPressable(p.name, onClick, onLongClick)
+      .draftFlash(flash, shape)
       .clip(shape)
       .background(if (selected == true) PhoneV3Palette.selected(c) else c.card)
       .border(if (selected == true) 2.dp else 1.dp, edge, shape)
-      .combinedClickable(
-        interactionSource = src, indication = null, role = Role.Button, onClickLabel = p.name,
-        onLongClick = onLongClick?.let { l -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); l() } },
-        onClick = onClick,
-      )
       .semantics { if (selected != null) this.selected = selected },
   ) {
     Box {
@@ -182,7 +159,7 @@ internal fun ProductCell(
         Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer { alpha = if (p.active) 1f else 0.55f },
         radius = 0.dp,
       )
-      if (selected != null) Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { CheckDot(selected) }
+      Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { DraftPop(selected != null) { CheckDot(selected == true) } }
       badgeStatus(badge)?.let { (s, label) -> Box(Modifier.align(Alignment.BottomStart).padding(8.dp)) { V3StatusPill(s, label) } }
     }
     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
@@ -229,23 +206,6 @@ private fun StatCell(label: String, value: String, caption: String?, modifier: M
   }
 }
 
-/** درخششِ کوتاهِ ردیفِ تازه‌ثبت (surfaceSelected که در ۱٫۲ ثانیه محو می‌شود) */
-private fun Modifier.flash(on: Boolean, shape: androidx.compose.ui.graphics.Shape = androidx.compose.ui.graphics.RectangleShape): Modifier = composed {
-  val c = PhoneV3.colors
-  val a = remember { Animatable(0f) }
-  LaunchedEffect(on) {
-    if (on && Motion.enabled) {
-      a.snapTo(0.7f)
-      a.animateTo(0f, MotionSpec.tweenOf(FLASH_MS))
-    }
-  }
-  drawWithContent {
-    drawContent()
-    if (a.value > 0f) drawOutline(shape.createOutline(size, layoutDirection, this), PhoneV3Palette.selected(c).copy(alpha = a.value))
-  }
-}
-
-private const val FLASH_MS = 1200
 
 /**
  *  یک تکه از کارتِ گروهیِ فهرستِ تنبل: ردیفِ اول گوشه‌های بالا و ردیفِ آخر گوشه‌های

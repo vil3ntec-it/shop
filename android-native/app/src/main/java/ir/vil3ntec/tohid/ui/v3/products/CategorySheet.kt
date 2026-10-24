@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.products
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,6 +45,9 @@ import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.screens.Motion
 
 /** کارِ برگهٔ دسته‌ها: انتخابِ یک دسته (فرم، فروشِ سریع)، مدیریت، یا دستهٔ گروهی */
 internal sealed interface CategoryUse {
@@ -67,6 +71,7 @@ internal fun CategorySheet(store: ShopStore, data: ShopData, toasts: V3Toasts, u
   val ops = rememberProductOps(store, toasts)
   var name by remember { mutableStateOf("") }
   var confirm by remember { mutableStateOf<String?>(null) }
+  val stagger = rememberV3Stagger()
   val title = when (use) {
     is CategoryUse.Pick -> StrProducts.pickCategory
     CategoryUse.Manage -> StrProducts.categoriesTitle
@@ -99,6 +104,8 @@ internal fun CategorySheet(store: ShopStore, data: ShopData, toasts: V3Toasts, u
     } else {
       LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp).clip(RoundedCornerShape(16.dp)).background(if (c.isDark) c.tile else c.bg)) {
         itemsIndexed(list, key = { _, s -> s }) { i, cat ->
+          //  ورودِ پلکانی و جابه‌جاییِ نرم وقتی دسته‌ای اضافه یا حذف می‌شود
+          Column(if (Motion.enabled) Modifier.animateItem().v3Stagger(stagger, cat, i) else Modifier) {
           if (i > 0) V3Divider(start = 64.dp)
           val current = (use as? CategoryUse.Pick)?.selected == cat
           V3ListRow(
@@ -110,6 +117,7 @@ internal fun CategorySheet(store: ShopStore, data: ShopData, toasts: V3Toasts, u
             endActions = listOf(V3SwipeAction(Icons.Outlined.DeleteOutline, StrProducts.delete, V3ButtonKind.DANGER) { confirm = cat }),
             onClick = if (use is CategoryUse.Manage) null else ({ choose(closer, cat) }),
           )
+          }
         }
       }
     }

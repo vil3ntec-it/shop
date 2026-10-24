@@ -3,11 +3,6 @@ package ir.vil3ntec.tohid.ui.v3.products
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -42,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -50,7 +44,6 @@ import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.PhotoStudio
-import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -66,6 +59,10 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -172,22 +169,16 @@ internal fun PhotoStudioScreen(source: Uri, onBack: () -> Unit, onSave: (Bitmap)
 private const val PREVIEW = 400
 private const val DEBOUNCE_MS = 150L
 
-/** کارتِ پیش‌نمایشِ مربع؛ هنگامِ ساختن، درخششِ آرام روی عکس و «در حالِ ساختن…» */
+/** کارتِ پیش‌نمایشِ مربع؛ عکس‌ها با محو جابه‌جا می‌شوند و هنگامِ ساختن پوششِ «در حالِ ساختن…» */
 @Composable
 private fun PreviewCard(image: ImageBitmap?, busy: Boolean) {
   val c = PhoneV3.colors
-  val pulse = if (Motion.enabled && (busy || image == null)) {
-    rememberInfiniteTransition(label = "studioBusy").animateFloat(0.15f, 0.45f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "pulse").value
-  } else if (busy || image == null) 0.3f else 0f
   V3Card(radius = V3Space.featuredRadius, padding = PaddingValues(0.dp)) {
     Box(Modifier.fillMaxWidth().aspectRatio(1f).background(c.tile), contentAlignment = Alignment.Center) {
-      Crossfade(image, label = "studioImage") { img ->
+      Crossfade(image, animationSpec = MotionSpec.tweenOf(MotionTokens.MEDIUM), label = "studioImage") { img ->
         if (img != null) Image(img, contentDescription = null, contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize())
       }
-      if (pulse > 0f) {
-        Box(Modifier.fillMaxSize().graphicsLayer { alpha = pulse }.background(c.card))
-        Text(StrProducts.processing, style = V3Type.callout, color = c.ink)
-      }
+      DraftBusyVeil(busy || image == null, StrProducts.processing)
     }
   }
 }
@@ -195,26 +186,29 @@ private fun PreviewCard(image: ImageBitmap?, busy: Boolean) {
 /** کلیدها و لغزنده‌ها در سه گروه + چرخش و «پیش‌فرض» */
 @Composable
 private fun StudioControls(opts: PhotoStudio.Options, onChange: (PhotoStudio.Options) -> Unit) {
-  V3Section(StrProducts.groupBackground) {
+  val stagger = rememberV3Stagger()
+  V3Section(StrProducts.groupBackground, Modifier.v3Stagger(stagger, "bg", 0)) {
     V3ToggleRow(StrProducts.whiteBackground, opts.removeBackground, { onChange(opts.copy(removeBackground = it)) })
-    if (opts.removeBackground) {
-      V3Divider(start = 16.dp)
-      SliderRow(StrProducts.tolerance, opts.tolerance, 5f..80f) { onChange(opts.copy(tolerance = it)) }
+    DraftReveal(opts.removeBackground) {
+      Column {
+        V3Divider(start = 16.dp)
+        SliderRow(StrProducts.tolerance, opts.tolerance, 5f..80f) { onChange(opts.copy(tolerance = it)) }
+      }
     }
   }
-  V3Section(StrProducts.groupCrop) {
+  V3Section(StrProducts.groupCrop, Modifier.v3Stagger(stagger, "crop", 1)) {
     V3ToggleRow(StrProducts.autoCrop, opts.autoCrop, { onChange(opts.copy(autoCrop = it)) })
     V3Divider(start = 16.dp)
     SliderRow(StrProducts.margin, opts.margin, 0f..25f) { onChange(opts.copy(margin = it)) }
   }
-  V3Section(StrProducts.groupQuality) {
+  V3Section(StrProducts.groupQuality, Modifier.v3Stagger(stagger, "quality", 2)) {
     V3ToggleRow(StrProducts.enhance, opts.enhance, { onChange(opts.copy(enhance = it)) })
     V3Divider(start = 16.dp)
     SliderRow(StrProducts.sharpen, opts.sharpen, 0f..100f) { onChange(opts.copy(sharpen = it)) }
     V3Divider(start = 16.dp)
     SliderRow(StrProducts.brightness, opts.brightness, -50f..50f) { onChange(opts.copy(brightness = it)) }
   }
-  Row(Modifier.padding(top = 16.dp, bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+  Row(Modifier.padding(top = 16.dp, bottom = 8.dp).v3Stagger(stagger, "tools", 3), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
     V3Button(StrProducts.rotate, { onChange(opts.copy(rotate = (opts.rotate + 90) % 360)) }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.RotateRight)
     V3Button(StrProducts.reset, { onChange(PhotoStudio.Options()) }, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.RestartAlt)
   }
