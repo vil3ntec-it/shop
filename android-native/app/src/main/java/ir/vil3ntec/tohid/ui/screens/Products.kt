@@ -106,7 +106,8 @@ fun ProductsScreen(
           scope.launch {
             store.save(d.copy(products = d.products.map { if (it.id == id) it.copy(photo = true) else it }))
           }
-          ir.vil3ntec.tohid.sync.PhotoSync.changed(context, id)
+          //  همگام‌سازیِ امروز + بانکِ تصاویرِ روشن ⇒ عکسِ خودِ دکان به بانکِ همین دکان (در صف)
+          ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, id, own = true, scope = scope)
           photoVersion++
           scope.launch { snackbar.showSnackbar("عکس محصول ثبت شد") }
         }
