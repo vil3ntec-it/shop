@@ -34,6 +34,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
+import ir.vil3ntec.tohid.ui.v3.settings.draftResize
 
 /** چند میلی‌ثانیه کارتِ خواسته‌شده (`?tab=`) با حاشیهٔ برند دیده می‌شود */
 private const val HIGHLIGHT_MS = 1400L
@@ -83,7 +84,7 @@ internal fun DeviceCard(
   val ring by animateColorAsState(if (highlight) PhoneV3Roles.focus(c) else Color.Transparent, MotionSpec.tweenOf(MotionTokens.LONG), label = "deviceRing")
   Column(Modifier.fillMaxWidth().padding(top = 16.dp)) {
     V3GroupTitle(title)
-    V3Card(Modifier.border(2.dp, ring, RoundedCornerShape(PhoneV3.groupRadius)), padding = padding, content = content)
+    V3Card(Modifier.draftResize().border(2.dp, ring, RoundedCornerShape(PhoneV3.groupRadius)), padding = padding, content = content)
     if (caption != null) Text(caption, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(start = 6.dp, end = 6.dp, top = 6.dp))
   }
 }

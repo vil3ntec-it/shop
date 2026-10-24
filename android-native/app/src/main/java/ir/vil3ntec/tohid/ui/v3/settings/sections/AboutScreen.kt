@@ -27,6 +27,7 @@ import ir.vil3ntec.tohid.ui.v3.V3IconTile
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 
 /**
@@ -56,16 +57,17 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
     }
     item(key = "status") {
       V3Section(StrNav.status) {
+        V3ListRow(StrNav.versionLabel, value = BuildConfig.VERSION_NAME, tile = false, chevron = false)
         listOf(
-          StrNav.versionLabel to BuildConfig.VERSION_NAME,
-          StrNav.goods to data.products.size.toString(),
-          Str.invoices to data.sales.size.toString(),
-          Str.debtors to data.debtors.size.toString(),
-          Str.expenses to data.expenses.size.toString(),
-          StrNav.suppliers to data.suppliers.size.toString(),
-        ).forEachIndexed { i, (label, value) ->
-          if (i > 0) V3Divider(start = 22.dp)
-          V3ListRow(label, value = value, tile = false, chevron = false)
+          StrNav.goods to data.products.size,
+          Str.invoices to data.sales.size,
+          Str.debtors to data.debtors.size,
+          Str.expenses to data.expenses.size,
+          StrNav.suppliers to data.suppliers.size,
+        ).forEach { (label, n) ->
+          V3Divider(start = 22.dp)
+          //  شمارهٔ دفتر بالا می‌شمارد (کیت: `rememberCountUp`)، عددِ پایانی دقیق
+          V3ListRow(label, value = rememberCountUp(n.toDouble()).toLong().toString(), tile = false, chevron = false)
         }
       }
     }

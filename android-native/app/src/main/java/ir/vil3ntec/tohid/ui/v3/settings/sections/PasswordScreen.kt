@@ -10,6 +10,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
+import ir.vil3ntec.tohid.ui.v3.settings.draftShake
 import kotlinx.coroutines.launch
 
 /**
@@ -58,6 +60,7 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
   var fresh by remember { mutableStateOf("") }
   var repeat by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
+  var failed by remember { mutableIntStateOf(0) }
   val check = PasswordModel.check(current, fresh, repeat)
   V3Form(
     title = title,
@@ -72,7 +75,7 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
             toasts.show(StrSettings.passwordChanged)
             onBack?.invoke()
           }
-          .onFailure { toasts.show(it.userMessage) }
+          .onFailure { failed++; Haptics.confirm(context); toasts.show(it.userMessage) }
         busy = false
       }
     },
@@ -82,7 +85,8 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
     dirty = current.isNotEmpty() || fresh.isNotEmpty() || repeat.isNotEmpty(),
   ) {
     SettingsNote(StrSettings.serverPassword)
-    V3Section(null, padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+    //  رمزِ نادرست: لرزشِ کوتاهِ فرم (MOTION-APPLE) کنارِ پیام
+    V3Section(null, Modifier.draftShake(failed), padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
       V3TextField(current, { current = it }, StrSettings.currentPassword, Modifier.fillMaxWidth(), kind = V3FieldKind.PASSWORD, required = true)
       Spacer(Modifier.height(14.dp))
       V3TextField(fresh, { fresh = it }, Str.newPassword, Modifier.fillMaxWidth(), kind = V3FieldKind.PASSWORD, helper = StrSettings.pwdMin8, error = check.freshError, required = true)

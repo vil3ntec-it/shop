@@ -2,8 +2,6 @@ package ir.vil3ntec.tohid.ui.v3.settings.sections
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -32,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
@@ -52,7 +49,10 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
+import ir.vil3ntec.tohid.ui.v3.settings.draftShake
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import kotlinx.coroutines.delay
 
 /**
  *  برگهٔ رمزِ برنامه (`settings/security/app-lock/pin`): شش خانهٔ نقطه، صفحه‌کلیدِ
@@ -65,19 +65,15 @@ internal fun PinSheet(onDone: () -> Unit) {
   val toasts = LocalV3Toasts.current
   val had = remember { LockStore(context).enabled }
   var entry by remember { mutableStateOf(PinEntry()) }
-  val shake = remember { Animatable(0f) }
-  LaunchedEffect(entry.mismatch) {
-    if (entry.mismatch > 0) {
-      Haptics.confirm(context)
-      if (Motion.enabled) shake.animateTo(0f, keyframes { durationMillis = 360; -14f at 60; 12f at 120; -8f at 180; 6f at 240; 0f at 300 })
-    }
-  }
+  LaunchedEffect(entry.mismatch) { if (entry.mismatch > 0) Haptics.confirm(context) }
   V3Sheet(onDismiss = onDone, title = StrSettings.appPin) { closer ->
     LaunchedEffect(entry.done) {
       val pin = entry.done ?: return@LaunchedEffect
       LockStore(context).set(pin)
       LockSignal.version++
       Haptics.success(context)
+      //  تیکِ موفقیت کشیده می‌شود، بعد برگه با فنر پایین می‌رود
+      if (Motion.enabled) delay(MotionTokens.EMPHASIZED + 250L)
       toasts?.show(if (had) StrSettings.pinChanged else StrSettings.lockTurnedOn)
       closer.close()
     }
@@ -96,7 +92,10 @@ internal fun PinSheet(onDone: () -> Unit) {
       )
     }
     Spacer(Modifier.height(20.dp))
-    PinDots(entry.typed.length, Modifier.align(Alignment.CenterHorizontally).graphicsLayer { translationX = shake.value * density })
+    Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+      if (entry.done != null) V3SuccessCheck(visible = true, size = 28.dp)
+      else PinDots(entry.typed.length, Modifier.draftShake(entry.mismatch))
+    }
     Spacer(Modifier.height(24.dp))
     DraftPinPad(onDigit = { entry = PinModel.type(entry, it) }, onErase = { entry = PinModel.erase(entry) })
   }

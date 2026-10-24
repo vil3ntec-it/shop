@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
+import ir.vil3ntec.tohid.ui.v3.settings.draftResize
 import kotlinx.coroutines.launch
 
 /**
@@ -84,7 +85,7 @@ internal fun RouteScope.SessionsScreen(onBack: (() -> Unit)?) {
         V3EmptyState(Icons.Outlined.Devices, failed ?: StrSettings.noDevices, action = if (failed != null) Str.again else null, onAction = { reload++ })
       }
       else -> item(key = "list") {
-        V3Section(null, footer = StrSettings.lostPhone) {
+        V3Section(null, Modifier.draftResize(), footer = StrSettings.lostPhone) {
           list.forEachIndexed { i, d ->
             if (i > 0) V3Divider(start = 64.dp)
             //  «همین دستگاه» از روی شناسهٔ دستگاه شناخته می‌شود، نه از روی نام
