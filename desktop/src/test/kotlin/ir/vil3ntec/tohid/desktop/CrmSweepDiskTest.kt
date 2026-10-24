@@ -145,7 +145,7 @@ class CrmSweepDiskTest {
     assertEquals("crm9-c2", open().data.value.transactions.first { it.id == "crm9-late" }.debtorId)
   }
 
-  @Test fun `دفترِ خوانده‌نشده (SEC-01، #331) — نوشتن بسته: sweep هیچ چیزی نمی‌نویسد و هیچ op نمی‌سازد`() {
+  @Test fun `دفترِ خوانده‌نشده (SEC-01، #331) — نوشتن بسته، sweep هیچ چیزی نمی‌نویسد و هیچ op نمی‌سازد`() {
     ShopPolicy.setCrmReports(ctx, true)
     AtRest.setWanted(ctx, true)
     val merged = (CustomerMerge.merge(base, "crm9-c2", "crm9-c1", "2026-10-19", 1, ::newId) as CustomerMerge.Result.Ok).data
