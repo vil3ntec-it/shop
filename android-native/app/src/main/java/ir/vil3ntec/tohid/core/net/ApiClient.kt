@@ -45,11 +45,24 @@ class ApiClient(
 
   /* ------------------------ درخواست‌های بی‌نیاز به ورود ------------------------ */
 
-  suspend fun getPublic(path: String): JsonObject =
-    engine.send("GET", path, token = null)
+  /**
+   *  @param headers سرآیندهای همین درخواست — مثلِ بلیتِ شمارهٔ خریدار (`X-Store-Ticket`)؛
+   *         توکن و هویتِ برنامه را عوض نمی‌کنند (`HttpEngine.PROTECTED_HEADERS`)
+   *  @param anonymous بی شناسهٔ دستگاه — همهٔ درخواست‌های حالتِ «خرید»
+   */
+  suspend fun getPublic(path: String, headers: Map<String, String> = emptyMap(), anonymous: Boolean = false): JsonObject =
+    engine.send("GET", path, token = null, headers = headers, anonymous = anonymous)
 
-  suspend fun postPublic(path: String, body: JsonObject): JsonObject =
-    engine.send("POST", path, body = body, token = null)
+  suspend fun postPublic(
+    path: String,
+    body: JsonObject,
+    headers: Map<String, String> = emptyMap(),
+    anonymous: Boolean = false,
+  ): JsonObject = engine.send("POST", path, body = body, token = null, headers = headers, anonymous = anonymous)
+
+  /** بایت‌های خامِ بی‌توکن (عکسِ کالای ویترین) */
+  suspend fun getPublicBytes(path: String, anonymous: Boolean = false): ByteArray =
+    engine.fetchBytes(path, token = null, anonymous = anonymous)
 
   /* ------------------------ درخواست‌های حساب‌دار ------------------------ */
 

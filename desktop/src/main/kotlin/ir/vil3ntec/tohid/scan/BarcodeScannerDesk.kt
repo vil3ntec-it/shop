@@ -67,6 +67,7 @@ fun CameraScanner(
   onStatus: (String, Boolean) -> Unit,
   modifier: Modifier = Modifier,
   isKnown: (String) -> Boolean = { false },
+  @Suppress("UNUSED_PARAMETER") qr: Boolean = false,
 ) {
   val latest by rememberUpdatedState(onCode)
   val status by rememberUpdatedState(onStatus)

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.nav
 
+import ir.vil3ntec.tohid.core.nav.Move
+import ir.vil3ntec.tohid.ui.v3.v3BehindSheet
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,8 +49,10 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
   CompositionLocalProvider(LocalV3Nav provides nav) {
     AnimatedContent(
       targetState = base,
-      modifier = modifier,
-      transitionSpec = { V3Transitions.page(nav.move, dir) },
+      //  صفحهٔ زیرِ برگه تا ۰٫۹۶ کوچک می‌شود (`V3Sheet` خودش را می‌شمارد)
+      modifier = modifier.v3BehindSheet(),
+      //  کامپیوتر/پهن: صفحه‌ها هم‌سطح‌اند ⇐ محو، نه لغزشِ تمام‌عرض
+      transitionSpec = { V3Transitions.page(if (nav.wide) Move.SWITCH else nav.move, dir) },
       label = "route",
     ) { path ->
       saved.SaveableStateProvider(path) { RouteContent(path, nav, shell) }
@@ -67,7 +71,7 @@ private fun RouteContent(path: String, nav: V3Nav, shell: ShellContext) {
       val serverFlag = (r.module.needs + r.route.needs).any { it != Need.MANAGE && it != Need.AUDIT && it !in shell.access.granted }
       val moduleOff = (r.module.flag != null && r.module.flag !in shell.access.flags) || (r.route.flag != null && r.route.flag !in shell.access.flags)
       if (serverFlag || moduleOff) Blocked(StrKit.notOnTitle, r.route.title(), Icons.Outlined.ToggleOff, nav)
-      else Blocked(StrKit.noAccessTitle, r.route.title(), Icons.Outlined.Lock, nav, StrKit.noAccessBody)
+      else Blocked(StrKit.noAccessTitle, r.route.title(), Icons.Outlined.Lock, nav, r.route.deniedBody?.invoke() ?: StrKit.noAccessBody)
     }
     else -> {
       val scope = RouteScope(r.args, nav, shell)

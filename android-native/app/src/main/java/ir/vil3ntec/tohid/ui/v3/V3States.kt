@@ -12,7 +12,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -41,13 +40,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -106,27 +107,35 @@ fun V3EmptyState(
   }
 }
 
-/** چند ردیفِ اسکلت (کاشی + دو خط) در یک کارت */
+/**
+ *  چند ردیفِ اسکلت (کاشی + دو خط) در یک کارت، با درخششِ روان. فقط رسم عوض می‌شود:
+ *  یک قلمِ ثابت (`remember`) که در هر فریم جابه‌جا رسم می‌شود — بی ساختنِ دوباره و بی
+ *  بازترکیبِ ردیف‌ها.
+ */
 @Composable
 fun V3Skeleton(rows: Int = 5, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   val base = c.tile
   val shine = if (c.isDark) c.hairline else c.card
-  val x = if (Motion.enabled) {
-    val t = rememberInfiniteTransition(label = "shimmer")
-    t.animateFloat(-1f, 2f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "shimmerX").value
-  } else 0.5f
-  val brush = Brush.linearGradient(listOf(base, shine, base), start = Offset(x * 600f - 300f, 0f), end = Offset(x * 600f, 0f))
+  val shimmer = if (Motion.enabled) {
+    rememberInfiniteTransition(label = "shimmer")
+      .animateFloat(-1f, 2f, infiniteRepeatable(tween(1200, easing = LinearEasing), RepeatMode.Restart), label = "shimmerX")
+  } else null
+  val brush = remember(base, shine) { Brush.linearGradient(listOf(base, shine, base), start = Offset(-300f, 0f), end = Offset(0f, 0f)) }
+  val bone = Modifier.drawBehind {
+    val dx = (shimmer?.value ?: 0.5f) * 600f
+    translate(left = dx) { drawRect(brush, topLeft = Offset(-dx, 0f), size = size) }
+  }
   V3Card(modifier.semantics { contentDescription = StrKit.working }, padding = PaddingValues(vertical = 6.dp)) {
     repeat(rows) { i ->
       if (i > 0) V3Divider(start = 64.dp)
       Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).background(brush))
+        Box(Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)).then(bone))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-          Box(Modifier.fillMaxWidth(0.6f).height(12.dp).clip(RoundedCornerShape(6.dp)).background(brush))
+          Box(Modifier.fillMaxWidth(0.6f).height(12.dp).clip(RoundedCornerShape(6.dp)).then(bone))
           Spacer(Modifier.height(8.dp))
-          Box(Modifier.fillMaxWidth(0.35f).height(10.dp).clip(RoundedCornerShape(5.dp)).background(brush))
+          Box(Modifier.fillMaxWidth(0.35f).height(10.dp).clip(RoundedCornerShape(5.dp)).then(bone))
         }
       }
     }
@@ -183,33 +192,47 @@ fun V3StatusPill(status: V3Status, label: String, modifier: Modifier = Modifier)
   }
 }
 
-/** تیکِ موفقیت: دایره پُر می‌شود و تیک کشیده می‌شود (۳۵۰ms) */
+/**
+ *  تیکِ موفقیت: دایره با فنرِ شاد بزرگ می‌شود و تیک کشیده می‌شود (۳۵۰ms) + لرزشِ نرم.
+ *  مسیرِ تیک یک بار ساخته می‌شود (`drawWithCache`)؛ هر فریم فقط تکه‌ای از آن رسم می‌شود.
+ *  @param haptic اگر صفحه خودش لرزشِ «ثبت شد» (`Haptics.success`) را می‌زند، false
+ */
 @Composable
-fun V3SuccessCheck(visible: Boolean, modifier: Modifier = Modifier, size: Dp = 64.dp) {
+fun V3SuccessCheck(visible: Boolean, modifier: Modifier = Modifier, size: Dp = 64.dp, haptic: Boolean = true) {
   val c = PhoneV3.colors
   val ok = PhoneV3Roles.tone(c, V3Tone.SUCCESS)
+  val context = androidx.compose.ui.platform.LocalContext.current
   AnimatedVisibility(
     visible = visible,
     modifier = modifier,
-    enter = fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)) + scaleIn(MotionSpec.morph(), initialScale = 0.6f),
+    enter = fadeIn(MotionSpec.tweenOf(MotionTokens.SHORT)) + scaleIn(V3Springs.playful(), initialScale = 0.6f),
     exit = fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)),
   ) {
     val draw = remember { Animatable(if (Motion.enabled) 0f else 1f) }
-    LaunchedEffect(Unit) { draw.animateTo(1f, MotionSpec.tweenOf(MotionTokens.EMPHASIZED, MotionTokens.EmphasizedDecelerate)) }
+    LaunchedEffect(Unit) {
+      if (haptic) ir.vil3ntec.tohid.ui.screens.Haptics.confirm(context)
+      draw.animateTo(1f, MotionSpec.tweenOf(MotionTokens.EMPHASIZED, MotionTokens.EmphasizedDecelerate))
+    }
     Box(Modifier.size(size).clip(CircleShape).background(ok.bg), contentAlignment = Alignment.Center) {
-      Canvas(Modifier.size(size * 0.5f).graphicsLayer { alpha = 0.99f }) {
-        val w = this.size.width
-        val h = this.size.height
-        val path = Path().apply {
-          moveTo(w * 0.12f, h * 0.52f)
-          lineTo(w * 0.40f, h * 0.78f)
-          lineTo(w * 0.90f, h * 0.24f)
-        }
-        val measure = androidx.compose.ui.graphics.PathMeasure().apply { setPath(path, false) }
-        val part = Path()
-        measure.getSegment(0f, measure.length * draw.value, part, true)
-        drawPath(part, ok.fg, style = Stroke(width = w * 0.12f, cap = StrokeCap.Round))
-      }
+      Box(
+        Modifier.size(size * 0.5f).drawWithCache {
+          val w = this.size.width
+          val h = this.size.height
+          val path = Path().apply {
+            moveTo(w * 0.12f, h * 0.52f)
+            lineTo(w * 0.40f, h * 0.78f)
+            lineTo(w * 0.90f, h * 0.24f)
+          }
+          val measure = androidx.compose.ui.graphics.PathMeasure().apply { setPath(path, false) }
+          val part = Path()
+          val stroke = Stroke(width = w * 0.12f, cap = StrokeCap.Round)
+          onDrawBehind {
+            part.reset()
+            measure.getSegment(0f, measure.length * draw.value, part, true)
+            drawPath(part, ok.fg, style = stroke)
+          }
+        },
+      )
     }
   }
 }

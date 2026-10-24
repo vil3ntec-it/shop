@@ -23,9 +23,12 @@ import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,7 +58,8 @@ class V3SheetCloser internal constructor(private val close: (after: () -> Unit) 
 
 /**
  *  برگهٔ پایینِ نسخهٔ ۳: کارتِ سفید (شب: سطحِ یک) با گوشهٔ بالای ۲۸، دستگیرهٔ
- *  کوچک، عنوانِ وسط و محتوا. با کشیدن، زدنِ بیرون یا «برگشت» بسته می‌شود.
+ *  کوچک، عنوانِ وسط و محتوا. با کشیدن، زدنِ بیرون یا «برگشت» بسته می‌شود —
+ *  مگر `dismissible = false` (مثلاً نمایشِ یک‌بارهٔ کد): آن‌وقت فقط `closer` می‌بندد.
  *  محتوا `V3SheetCloser` می‌گیرد تا پس از انتخاب، برگه **با حرکت** برود و
  *  بعد کار انجام شود (نه پرشِ ناگهانی).
  */
@@ -64,18 +68,31 @@ class V3SheetCloser internal constructor(private val close: (after: () -> Unit) 
 fun V3Sheet(
   onDismiss: () -> Unit,
   title: String? = null,
+  dismissible: Boolean = true,
   content: @Composable ColumnScope.(V3SheetCloser) -> Unit,
 ) {
   val c = PhoneV3.colors
-  val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  //  `closer` همیشه می‌بندد؛ زدنِ بیرون، کشیدن و «برگشت» فقط وقتی `dismissible`
+  val allowHide = remember { booleanArrayOf(false) }
+  val canHide by rememberUpdatedState(dismissible)
+  val state = rememberModalBottomSheetState(
+    skipPartiallyExpanded = true,
+    confirmValueChange = { it != SheetValue.Hidden || canHide || allowHide[0] },
+  )
   val scope = rememberCoroutineScope()
+  //  صفحهٔ پشتِ برگه تا ۰٫۹۶ کوچک می‌شود (`v3BehindSheet` ِ پوسته)
+  DisposableEffect(Unit) {
+    V3Depth.sheets.intValue++
+    onDispose { V3Depth.sheets.intValue-- }
+  }
   val closer = remember(state) {
     V3SheetCloser { after ->
+      allowHide[0] = true
       scope.launch { state.hide() }.invokeOnCompletion { onDismiss(); after() }
     }
   }
   ModalBottomSheet(
-    onDismissRequest = onDismiss,
+    onDismissRequest = { if (canHide || allowHide[0]) onDismiss() },
     sheetState = state,
     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
     containerColor = c.card,
