@@ -45,6 +45,11 @@ import ir.vil3ntec.tohid.ui.components.common.*
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.softCard
+import ir.vil3ntec.tohid.ui.components.pos.ProductThumb
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.focus.onFocusChanged
 import kotlinx.coroutines.launch
 
 /**
@@ -151,10 +156,8 @@ fun DeskProductsScreen(
   ) {
     /* ─────────── ۱. عنوان، توضیح و کارها ─────────── */
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Column(Modifier.weight(1f)) {
-        Text("محصولات", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text("موجودی، قیمت و وضعیتِ کالاهای دکان — جست‌وجو، فیلتر و کارِ گروهی", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-      }
+      //  نسخهٔ ۲: عنوانِ «محصولات» فقط در سربرگ است (نقدِ «همه‌چیز دو جا»)؛ این‌جا یک جملهٔ توضیح
+      Text("موجودی، قیمت و وضعیتِ کالاهای دکان — جست‌وجو، فیلتر و کارِ گروهی", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
       OutlinedButton(onClick = { onOpenWarehouse(null) }) { Text("ورودِ انبار") }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = {
@@ -397,8 +400,10 @@ private fun ProductTable(
 ) {
   val c = Shop.colors
   val ids = remember(rows) { rows.map { it.id } }
-  Column(Modifier.fillMaxSize().clip(Shape.card).border(1.dp, c.border, Shape.card).background(c.surfaceSolid)) {
-    Row(Modifier.fillMaxWidth().background(c.bg).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+  val photos = PhotoPrefs.show.value
+  //  نسخهٔ ۲: یک کارتِ نرم؛ بی خطِ میانِ ردیف‌ها — ردیف‌ها را زمینهٔ یک‌درمیان جدا می‌کند
+  Column(Modifier.fillMaxSize().padding(2.dp).softCard(c, Shape.card)) {
+    Row(Modifier.fillMaxWidth().background(c.surface2).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
       TriStateCheckbox(
         state = when {
           Selection.allSelected(selected, ids) -> ToggleableState.On
@@ -420,16 +425,16 @@ private fun ProductTable(
         H("نام", ProductListModel.Sort.NAME, Modifier)
         H("/ دسته", ProductListModel.Sort.CATEGORY, Modifier)
       }
-      H("بارکد · تاریخ", ProductListModel.Sort.CODE, Modifier.width(150.dp))
-      H("خرید (؋)", ProductListModel.Sort.BUY, Modifier.width(100.dp), end = true)
-      H("فروش (؋)", ProductListModel.Sort.SELL, Modifier.width(100.dp), end = true)
-      H("موجودی", ProductListModel.Sort.STOCK, Modifier.width(110.dp), end = true)
+      //  ستونِ نام اولویت دارد (بازبینیِ ۱۴۰۵/۰۷/۲۷: نامِ بلند با «…» بریده می‌شد و بارکد جا داشت)
+      H("بارکد · تاریخ", ProductListModel.Sort.CODE, Modifier.width(COL_CODE))
+      H("خرید (؋)", ProductListModel.Sort.BUY, Modifier.width(COL_PRICE), end = true)
+      H("فروش (؋)", ProductListModel.Sort.SELL, Modifier.width(COL_PRICE), end = true)
+      H("موجودی", ProductListModel.Sort.STOCK, Modifier.width(COL_STOCK), end = true)
       Spacer(Modifier.width(12.dp))
-      H("وضعیت", ProductListModel.Sort.STATUS, Modifier.width(110.dp))
+      H("وضعیت", ProductListModel.Sort.STATUS, Modifier.width(COL_STATUS))
     }
-    HorizontalDivider(color = c.border)
     LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = bottomSpace)) {
-      items(rows, key = { it.id }) { p ->
+      itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
         val stock = stockOf(p.id)
         val status = ProductListModel.status(p, stock)
         val isSel = p.id in selected
@@ -440,42 +445,49 @@ private fun ProductTable(
               when {
                 p.id == openId -> c.primaryTint
                 isSel -> c.primary.copy(alpha = 0.06f)
-                else -> c.surfaceSolid
+                i % 2 == 1 -> c.surface2
+                else -> c.surface
               }
             )
             .clickable { onOpen(p.id) }
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = 8.dp, vertical = 7.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Checkbox(
             checked = isSel, onCheckedChange = { onToggle(p.id) },
             modifier = Modifier.semantics { contentDescription = "انتخابِ ${p.name}" },
           )
-          Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductPhoto(productId = p.id, size = 36.dp) }
+          Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductThumb(p.id, p.name, 36.dp, photos, tintKey = p.category) }
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
-            Text(p.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
+            //  نام تا دو خط می‌شکند، بریده نمی‌شود
+            Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
             Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
-          Column(Modifier.width(150.dp).padding(horizontal = 4.dp)) {
+          Column(Modifier.width(COL_CODE).padding(horizontal = 4.dp)) {
             Text(p.barcodes.firstOrNull().orEmpty().ifEmpty { "—" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = c.text)
             if (p.createdAt > 0) Text(ir.vil3ntec.tohid.formatMillis(p.createdAt), maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
-          Cell(money(p.purchasePrice), 100.dp, end = true)
-          Cell(money(p.salePrice), 100.dp, end = true, bold = true)
+          Cell(money(p.purchasePrice), COL_PRICE, end = true)
+          Cell(money(p.salePrice), COL_PRICE, end = true, bold = true)
           Text(
             "${qty(stock)} ${p.unit}",
-            Modifier.width(110.dp), textAlign = TextAlign.End, maxLines = 1,
+            Modifier.width(COL_STOCK), textAlign = TextAlign.End, maxLines = 1,
             style = MaterialTheme.typography.bodyMedium, color = c.text,
           )
           Spacer(Modifier.width(12.dp))
-          Box(Modifier.width(110.dp)) { val (t, tone) = pill(status); StatusPill(t, tone) }
+          Box(Modifier.width(COL_STATUS)) { val (t, tone) = pill(status); StatusPill(t, tone) }
         }
-        HorizontalDivider(color = c.border)
       }
     }
   }
 }
+
+/** پهنای ستون‌های ثابتِ جدولِ کالا — به‌اندازهٔ محتوا، تا باقیِ جا مالِ نام باشد */
+private val COL_CODE = 116.dp
+private val COL_PRICE = 84.dp
+private val COL_STOCK = 100.dp
+private val COL_STATUS = 100.dp
 
 /** نمای کارتی — همان داده، همان نشان و همان چک‌باکسِ انتخاب */
 @Composable
@@ -492,9 +504,9 @@ private fun ProductGrid(
   LazyVerticalGrid(
     columns = GridCells.Adaptive(minSize = 200.dp),
     modifier = Modifier.fillMaxSize(),
-    contentPadding = PaddingValues(bottom = bottomSpace),
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
-    verticalArrangement = Arrangement.spacedBy(10.dp),
+    contentPadding = PaddingValues(start = 4.dp, end = 4.dp, top = 4.dp, bottom = bottomSpace + 8.dp),
+    horizontalArrangement = Arrangement.spacedBy(12.dp),
+    verticalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     gridItems(rows, key = { it.id }) { p ->
       val stock = stockOf(p.id)
@@ -502,9 +514,8 @@ private fun ProductGrid(
       val highlighted = isSel || p.id == openId
       Column(
         Modifier
-          .clip(Shape.card)
-          .background(if (p.id == openId) c.primaryTint else c.surfaceSolid)
-          .border(if (highlighted) 2.dp else 1.dp, if (highlighted) c.primary else c.border, Shape.card)
+          .softCard(c, Shape.card, fill = if (p.id == openId) c.primaryTint.compositeOver(c.surface) else c.surface)
+          .then(if (highlighted) Modifier.border(2.dp, c.focus, Shape.card) else Modifier)
           .clickable { onOpen(p.id) }
           .padding(10.dp),
       ) {
@@ -517,10 +528,15 @@ private fun ProductGrid(
           val (t, tone) = pill(ProductListModel.status(p, stock))
           StatusPill(t, tone)
         }
-        Box(Modifier.fillMaxWidth().height(76.dp), contentAlignment = Alignment.Center) { ProductPhoto(productId = p.id, size = 72.dp) }
-        Spacer(Modifier.height(6.dp))
-        Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
-        Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
+        //  همان دایرهٔ کوچکِ عکس/حرفِ اولِ صندوق کنارِ نام — نه جای عکسِ بزرگِ خاکستری
+        Row(verticalAlignment = Alignment.Top) {
+          ProductThumb(p.id, p.name, 44.dp, PhotoPrefs.show.value, tintKey = p.category)
+          Spacer(Modifier.width(10.dp))
+          Column(Modifier.weight(1f)) {
+            Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
+            Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
+          }
+        }
         Spacer(Modifier.height(6.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text("${money(p.salePrice)} ؋", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
@@ -553,16 +569,34 @@ private fun QuickField(
   onEnter: () -> Unit,
   numeric: Boolean = false,
 ) {
-  OutlinedTextField(
-    value = value,
-    onValueChange = { onChange(if (numeric) ir.vil3ntec.tohid.numericInput(it) else it) },
-    label = { Text(label, maxLines = 1) },
-    singleLine = true,
-    textStyle = MaterialTheme.typography.bodyMedium,
-    modifier = modifier.onPreviewKeyEvent { e ->
-      if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { onEnter(); true } else false
-    },
-  )
+  //  نسخهٔ ۲: کادرِ کوچکِ پرشده (۴۰) با برچسبِ درون — نه کادرِ ۵۶ پیکسلیِ خط‌دار
+  val c = Shop.colors
+  var focused by remember { mutableStateOf(false) }
+  Box(
+    modifier
+      .height(40.dp)
+      .clip(Shape.field)
+      .background(c.fieldBg)
+      .border(1.dp, if (focused) c.focus else c.fieldBorder, Shape.field)
+      .padding(horizontal = 10.dp),
+    contentAlignment = Alignment.CenterStart,
+  ) {
+    if (value.isEmpty()) Text(label, style = MaterialTheme.typography.bodyMedium, color = c.muted, maxLines = 1)
+    androidx.compose.foundation.text.BasicTextField(
+      value = value,
+      onValueChange = { onChange(if (numeric) ir.vil3ntec.tohid.numericInput(it) else it) },
+      singleLine = true,
+      textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.text),
+      cursorBrush = androidx.compose.ui.graphics.SolidColor(c.focus),
+      modifier = Modifier
+        .fillMaxWidth()
+        .onFocusChanged { focused = it.isFocused }
+        .semantics { contentDescription = label }
+        .onPreviewKeyEvent { e ->
+          if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { onEnter(); true } else false
+        },
+    )
+  }
 }
 
 @Composable
@@ -610,10 +644,11 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
     }
   }
 
+  //  نسخهٔ ۲: ردیفِ «کالای تازه» یک کارتِ نرم با تهِ رنگِ اصلی — نه قابِ بنفشِ خط‌دار
   Surface(
-    color = Shop.colors.surfaceSolid,
-    shape = RoundedCornerShape(8.dp),
-    modifier = Modifier.fillMaxWidth().border(1.dp, Shop.colors.primary.copy(alpha = 0.35f), RoundedCornerShape(8.dp)),
+    color = Shop.colors.surface,
+    shape = Shape.card,
+    modifier = Modifier.fillMaxWidth().padding(2.dp).softCard(Shop.colors, Shape.card),
   ) {
     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
       QuickField(name, { name = it }, "کالای تازه", Modifier.weight(1f).focusRequester(nameFocus), ::save)

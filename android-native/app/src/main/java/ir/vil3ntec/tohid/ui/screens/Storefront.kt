@@ -522,19 +522,13 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
 
 @Composable
 private fun StatusPill(published: Boolean, active: Boolean) {
-  val colors = Shop.colors
-  val (text, tint, fill) = when {
-    !active -> Triple("غیرفعال در دفتر", colors.muted, colors.surfaceSolid)
-    published -> Triple("در ویترین", colors.success, colors.successTint)
-    else -> Triple("بیرون از ویترین", colors.muted, colors.surfaceSolid)
+  //  همان نشانِ مشترک و هفت توکنِ وضعیتِ VILL3N: در ویترین = موفق، بقیه = غیرفعال
+  val (text, tone) = when {
+    !active -> "غیرفعال در دفتر" to ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL
+    published -> "در ویترین" to ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS
+    else -> "بیرون از ویترین" to ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL
   }
-  Row(
-    Modifier.clip(Shape.badge).background(fill).border(1.dp, colors.border, Shape.badge).padding(horizontal = 8.dp, vertical = 2.dp),
-    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
-  ) {
-    Box(Modifier.size(7.dp).clip(Shape.badge).background(tint))
-    Text(text, color = tint, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-  }
+  ir.vil3ntec.tohid.ui.components.common.StatusPill(text, tone)
 }
 
 private fun priceText(p: StorefrontProductDto): String {
