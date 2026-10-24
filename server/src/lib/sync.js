@@ -44,6 +44,12 @@ const TABLES = {
   safeEntries:       'shop_safe_entries',
 };
 const COLLECTIONS = Object.keys(TABLES);
+/**
+ * مجموعه‌هایی که فقط Sync v1/v3 می‌نویسد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`).
+ * راهِ قدیم آن‌ها را فقط می‌خواند (همیشه خالی)؛ نوشتنش با کدِ `sync_v1_only` رد می‌شود —
+ * درِ نوشتنِ بی‌سنجش نمی‌ماند، حتی اگر برنامه‌ها از این جدول نخوانند.
+ */
+const V1_ONLY = new Set(['safeEntries']);
 
 const MAX_BATCH = 2000;
 const MAX_RECORD_BYTES = 64 * 1024;
@@ -97,6 +103,11 @@ async function pushChanges(ctx, changes) {
       const table = TABLES[collection];
       const recordId = String(raw?.id || '');
       if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
+      if (V1_ONLY.has(collection)) {
+        conflicts.push({ collection, id: recordId, reason: 'sync_v1_only' });
+        skipped++;
+        continue;
+      }
 
       const updatedAt = Number(raw.updatedAt) || t;
       const deleted = raw.deleted === true;
@@ -235,6 +246,6 @@ async function runIdempotent({ shopId, userId, deviceId, operationId }, fn) {
 }
 
 module.exports = {
-  TABLES, COLLECTIONS, MAX_BATCH, MAX_LIMIT,
+  TABLES, COLLECTIONS, V1_ONLY, MAX_BATCH, MAX_LIMIT,
   pushChanges, pullChanges, currentRev, runIdempotent,
 };

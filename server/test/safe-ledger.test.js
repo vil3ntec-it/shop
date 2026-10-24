@@ -176,6 +176,33 @@ test('v3: همان داوری روی opِ بومی', async () => {
   assert.equal(good.body.results[0].status, 'applied', JSON.stringify(good.body));
 });
 
+test('راهِ قدیمِ /api/sync در گاوصندوق نمی‌نویسد (sync_v1_only)؛ بقیهٔ همان دسته می‌نشیند', async (t) => {
+  t.mock.method(console, 'warn', () => {});
+  const row = { kind: 'count', amountMinor: 999, createdAt: at(), expectedMinor: 0 };
+  for (const [url, who, dev] of [['/api/sync', owner, 'legacy-own'], ['/api/v1/shop/sync/push', staff, 'legacy-stf']]) {
+    const r = await h.api('POST', url, {
+      token: who.accessToken,
+      headers: { 'X-App': 'shop' },
+      body: {
+        deviceId: dev,
+        changes: [
+          { collection: 'safeEntries', id: `leg-${dev}`, updatedAt: Date.now(), data: row },
+          { collection: 'safeEntries', id: `leg-del-${dev}`, updatedAt: Date.now(), deleted: true },
+          { collection: 'products', id: `leg-p-${dev}`, updatedAt: Date.now(), data: { name: 'چای' } },
+        ],
+      },
+    });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.applied, 1, url);
+    assert.equal(r.body.skipped, 2, url);
+    assert.deepEqual(r.body.conflicts.map((c) => [c.collection, c.id, c.reason]), [
+      ['safeEntries', `leg-${dev}`, 'sync_v1_only'],
+      ['safeEntries', `leg-del-${dev}`, 'sync_v1_only'],
+    ], url);
+  }
+  assert.equal(Number((await one('SELECT count(*) AS n FROM shop_safe_entries WHERE shop_id=$1', [shopId])).n), 0);
+});
+
 test('میان‌افزار فقط دکان است: پمپ و بی‌حساب بی هیچ کاری رد می‌شوند', async () => {
   const body = () => ({ ops: [{ op_id: oid(), table: 'safeEntries', row_id: 'x', type: 'delete' }] });
   for (const sync of [
