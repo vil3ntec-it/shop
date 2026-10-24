@@ -124,7 +124,8 @@ test('سرور: سه فهرست در TABLES هستند و هر کدام جدول
 
 test('برنامه: ساختنِ دسته یک opِ insert با شناسهٔ sha256ِ نام می‌سازد؛ حذفش یک delete', () => {
   for (const key of LISTS) assert.ok(core.LIST_COLLECTIONS.includes(key), key);
-  assert.equal(core.SCHEMA_VERSION, 3, 'جدولِ تازه = یک پله بالاتر، این‌جا و روی سرور');
+  assert.ok(core.SCHEMA_VERSION >= 3, 'جدولِ تازه = یک پله بالاتر، این‌جا و روی سرور');
+  assert.equal(core.SCHEMA_VERSION, require('../src/lib/sync-v1-migrations').currentVersion('shop'), 'وب و سرور یک پله');
   assert.equal(core.listRowId('نوشیدنی'), idOf('نوشیدنی'));
 
   const shadow = core.shadowOf({ productCategories: ['لبنیات'], productUnits: [], expenseCategories: [] });
