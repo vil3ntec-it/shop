@@ -314,6 +314,7 @@ fun AppRoot(
   val navLayout = NavLayouts.normalize(PhoneNav.layout.value, navAllowed)
   val navRoutes = navLayout.ids.mapNotNull { NavCatalog.of(it)?.route?.substringBefore('?') }.toSet() + "home"
   nav.wide = wide
+  nav.sectionsRoot = if (phoneNav) NavCatalog.MORE else "home"
   nav.isTab = { base -> if (phoneNav) base in navRoutes else base in DESK_TABS }
   BackHandler(enabled = nav.canBack) { nav.back() }
 
@@ -370,7 +371,8 @@ fun AppRoot(
   val navRequest = AppNav.request.value
   LaunchedEffect(navRequest) {
     if (navRequest != null) {
-      nav.open(navRequest)
+      //  پهن: بخشِ سرِ زنجیره (میان‌برِ Ctrl+…) هم‌سطح باز می‌شود، جزئیات روی پشته (AUDIT-NAV N3)
+      if (wide && V3Modules.table.chain(navRequest).size <= 1) nav.openFromRail(navRequest) else nav.open(navRequest)
       AppNav.request.value = null
     }
   }
@@ -454,7 +456,7 @@ fun AppRoot(
       if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = V3Modules.legacyId(current), onPick = { nav.open(it) }, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
+          current = V3Modules.railId(current), onPick = { nav.openFromRail(it) }, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -472,7 +474,7 @@ fun AppRoot(
           when (hit.kind) {
             "product" -> nav.open(ProductsPaths.item(hit.id))
             "debtor" -> nav.open(ir.vil3ntec.tohid.ui.v3.money.MoneyPaths.debtor(hit.id))
-            else -> nav.open(hit.id)
+            else -> nav.openFromRail(hit.id)
           }
         }
       }
@@ -483,7 +485,7 @@ fun AppRoot(
         ) {
           Box(Modifier.fillMaxSize().clickable { railOverlay = false }) {
             Box(Modifier.align(Alignment.CenterStart).fillMaxHeight()) {
-              DeskRail(current = V3Modules.legacyId(current), onPick = { nav.open(it); railOverlay = false }, mode = shownRail, onMode = ::setShownRail)
+              DeskRail(current = V3Modules.railId(current), onPick = { nav.openFromRail(it); railOverlay = false }, mode = shownRail, onMode = ::setShownRail)
             }
           }
         }
@@ -510,7 +512,8 @@ fun AppRoot(
       //  نوارِ شناورِ r10 — دایرهٔ شروع، قرص، دایرهٔ پایان؛ نگه‌داشتن = ویرایشگر
       if (navVisible) PhoneNavBar(
         layout = navLayout,
-        current = base,
+        //  فعال از ریشهٔ پشته (تبی که صفحه درونش است)، نه بالای پشته (AUDIT-NAV N1)
+        current = NavCatalog.of(NavCatalog.activeForStack(navLayout, nav.stack.entries, V3Modules.table::canonical) ?: NavCatalog.MORE)?.route,
         onPick = { item -> nav.open(item.route) },
         onEdit = { nav.open("settings/general/navbar") },
         modifier = Modifier.align(Alignment.BottomCenter),

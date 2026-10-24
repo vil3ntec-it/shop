@@ -43,7 +43,7 @@ val ShellModule = AppModule(
   ),
   routes = listOf(
     V3Route(ShellPaths.HOME, RouteKind.TAB, { Str.home }, aliases = listOf("dashboard"), chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) DeskDashboardScreen(data, { nav.open(it) }) { id -> nav.open(ProductsPaths.item(id)) }
+      if (desk) DeskDashboardScreen(data, { nav.open(it) }) { id -> nav.open(ProductsPaths.item(id)) }
       else DashboardScreen(data, bottomReserve = bottomReserve) { nav.open(it) }
     },
     V3Route("notifications", RouteKind.PAGE, { StrKit.notifications }, chrome = Chrome.OWN) { NotificationsStub() },

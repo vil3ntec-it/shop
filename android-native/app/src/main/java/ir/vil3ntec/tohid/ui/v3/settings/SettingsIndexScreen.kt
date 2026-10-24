@@ -34,7 +34,7 @@ private const val PROFILE_EDIT = "profile/edit"
  *  ردیف‌هایی که هر کدام صفحهٔ خودشان را باز می‌کنند، و پانویسِ «حساب من».
  */
 @Composable
-internal fun RouteScope.SettingsIndexScreen(onBack: () -> Unit) {
+internal fun RouteScope.SettingsIndexScreen(onBack: (() -> Unit)?) {
   val facts = rememberSettingsFacts(theme)
   val extra = remember(access) { V3Modules.settingsEntries(access) }
   val stagger = rememberV3Stagger()
@@ -59,7 +59,7 @@ internal fun RouteScope.SettingsIndexScreen(onBack: () -> Unit) {
  *  یک‌راست این‌جا می‌آید: عنوانِ درشت = نامِ گروه و همان یک کارت.
  */
 @Composable
-internal fun RouteScope.SettingsGroupScreen(group: String, onBack: () -> Unit) {
+internal fun RouteScope.SettingsGroupScreen(group: String, onBack: (() -> Unit)?) {
   val facts = rememberSettingsFacts(theme)
   val extra = remember(access) { V3Modules.settingsEntries(access).filter { it.group == group } }
   val lockToggle = rememberLockToggle()

@@ -64,7 +64,7 @@ object SettingsPaths {
 /** یک بخش روی گوشی صفحهٔ خودش است؛ روی صفحهٔ پهن (کامپیوتر، تبلتِ افقی) همان صفحه در ستونِ پایانِ دوستونه */
 @Composable
 private fun RouteScope.SettingsSection(key: String) {
-  if (wide) DeskSettingsScreen(selected = key) else SettingsPages.of(key)?.content?.invoke(this) { back() }
+  if (desk) DeskSettingsScreen(selected = key) else SettingsPages.of(key)?.content?.invoke(this, backOrNull)
 }
 
 /**
@@ -83,25 +83,25 @@ val SettingsModule = AppModule(
   ),
   routes = listOf(
     V3Route(SettingsPaths.ROOT, RouteKind.PAGE, { Str.settings }, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
-      if (wide) DeskSettingsScreen(selected = null) else SettingsIndexScreen(onBack = { back() })
+      if (desk) DeskSettingsScreen(selected = null) else SettingsIndexScreen(onBack = backOrNull)
     },
     V3Route(SettingsPaths.NAVBAR, RouteKind.PAGE, { SettingsLayout.labelOf(SettingsLayout.NAV_BAR) }, parent = SettingsPaths.group(SettingsLayout.GENERAL), aliases = listOf("nav-editor"), chrome = Chrome.OWN) {
-      NavBarScreen(allowed = shell.navAllowed, onBack = { back() })
+      NavBarScreen(allowed = shell.navAllowed, onBack = backOrNull)
     },
     V3Route(SettingsPaths.ABOUT, RouteKind.PAGE, { SettingsLayout.labelOf(SettingsLayout.ABOUT_APP) }, chrome = Chrome.OWN) {
-      if (wide && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = SettingsLayout.ABOUT_APP)
-      else AboutScreen(data, onBack = { back() })
+      if (desk && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = SettingsLayout.ABOUT_APP)
+      else AboutScreen(data, onBack = backOrNull)
     },
     //  وضعیتِ همگام‌سازی فقط‌خواندنی و مالِ همه است (کارمند هم) — هشدارِ «همگام‌سازی خطا دارد» این‌جا را باز می‌کند
     V3Route(SettingsPaths.SYNC, RouteKind.PAGE, { SettingsLayout.labelOf("همگام‌سازی") }, chrome = Chrome.OWN) {
-      if (wide && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی") else SyncScreen(onBack = { back() })
+      if (desk && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی") else SyncScreen(onBack = backOrNull)
     },
     V3Route("settings/{group}", RouteKind.PAGE, { Str.settings }, parent = SettingsPaths.ROOT, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       val group = SettingsPaths.groupOfSlug(args["group"].orEmpty())
       when {
         group == null -> LandOn(SettingsPaths.ROOT)
-        wide -> DeskSettingsScreen(selected = SettingsLayout.GROUPS.first { it.title == group }.sections.firstOrNull { !SettingsLayout.isLink(it) })
-        else -> SettingsGroupScreen(group, onBack = { back() })
+        desk -> DeskSettingsScreen(selected = SettingsLayout.GROUPS.first { it.title == group }.sections.firstOrNull { !SettingsLayout.isLink(it) })
+        else -> SettingsGroupScreen(group, onBack = backOrNull)
       }
     },
     V3Route("settings/{group}/{section}", RouteKind.PAGE, { Str.settings }, parent = "settings/{group}", needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
@@ -113,7 +113,7 @@ val SettingsModule = AppModule(
       PinSheet(onDone = { back() })
     },
     V3Route(SettingsPaths.DEVICES, RouteKind.PAGE, { Str.devices }, chrome = Chrome.OWN) {
-      DevicesScreen(data, tab = args.query("tab"), onBack = if (nav.canBack) ({ back() }) else null)
+      DevicesScreen(data, tab = args.query("tab"), onBack = backOrNull)
     },
   ),
 )

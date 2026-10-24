@@ -152,7 +152,7 @@ fun V3Toggle(checked: Boolean, label: String, onToggle: ((Boolean) -> Unit)?) {
   ) {
     Box(
       Modifier
-        .offset(x = x)
+        .offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }
         .size(27.dp)
         .shadow(2.dp, CircleShape, clip = false)
         .clip(CircleShape)
