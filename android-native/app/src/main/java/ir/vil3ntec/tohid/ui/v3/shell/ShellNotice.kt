@@ -1,22 +1,26 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.Platform
-import ir.vil3ntec.tohid.ui.UpdateBanner
-import ir.vil3ntec.tohid.ui.screens.SubscriptionBanner
+import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 
 /**
- *  نوارِ پیامِ پوسته (اشتراک، نسخهٔ تازه) — جای `notice` ِ `V3Scaffold` در گوشی و زیرِ
- *  سربرگِ کامپیوتر. **مالِ G10**: این فقط جای‌نگهدارِ پایه است (همان دو نوارِ امروز)
- *  تا AppRoot از حالا یک جا صدا بزند؛ G10 محتوایش را می‌سازد.
+ *  نوارِ پیامِ پوسته — جای `notice` ِ `V3Scaffold` در گوشی و زیرِ سربرگِ کامپیوتر (AppRoot
+ *  همین را صدا می‌زند): اشتراک (`SubscriptionNotice`) و نسخهٔ تازه (`UpdateNotice`)، هر دو در
+ *  `ShellNotices.kt`، زیرِ هم و نه روی هم (ممیزیِ ناوبری S7). خانهٔ گوشی اشتراک را در کارت‌های
+ *  «هشدارها و پیام‌ها» دارد؛ کامپیوتر نسخهٔ تازه را در تراشهٔ سربرگ (`UpdateChip`).
  */
 @Composable
 fun ShellNotice() {
   val nav = LocalV3Nav.current
-  //  خانهٔ گوشی همین را در کارت‌های «هشدارها و پیام‌ها» دارد
-  if (Platform.DESKTOP || nav?.current?.let(RoutePaths::base) != "home") SubscriptionBanner { nav?.open("subscription") }
-  //  نسخهٔ تازه: کامپیوتر تراشهٔ کوچکِ سربرگ دارد (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
-  if (!Platform.DESKTOP) UpdateBanner()
+  val home = nav?.current?.let(RoutePaths::base) == ShellPaths.HOME
+  val desk = LocalDeskLayout.current
+  Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    if (desk || !home) SubscriptionNotice()
+    if (!desk) UpdateNotice()
+  }
 }
