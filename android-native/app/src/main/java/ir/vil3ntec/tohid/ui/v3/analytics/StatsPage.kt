@@ -28,6 +28,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +67,11 @@ import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import java.util.Calendar
+
+/** دورهٔ خواسته‌شده از پیوندِ `stats?period=` برای ورقِ خانه — صفحهٔ آمار برمی‌دارد و پاک می‌کند */
+object StatsRequest {
+  val period = mutableStateOf<String?>(null)
+}
 
 /**
  *  «آمار» — صفحهٔ دومِ خانه (`stats?period=`) به شکلِ stats-chart-ref با رنگ‌های VILL3N:
@@ -106,6 +112,10 @@ private fun StatsBody(d: ShopData, periodArg: String?, onOpen: (String) -> Unit,
   val c = PhoneV3.colors
   val context = LocalContext.current
   var periodId by rememberSaveable(periodArg) { mutableStateOf(StatsPeriod.of(periodArg).id) }
+  val requested = StatsRequest.period.value
+  LaunchedEffect(requested) {
+    if (requested != null) { periodId = StatsPeriod.of(requested).id; StatsRequest.period.value = null }
+  }
   val period = StatsPeriod.of(periodId)
   val live = remember(d, period, today) { StatsModel.bars(d, period, today) }
   //  عکسِ «عددِ بلند» ِ خانه (PhoneHomeShot.big) — همان ستون‌ها با عددِ میلیاردی

@@ -5,6 +5,7 @@ import androidx.compose.material.icons.automirrored.outlined.ManageSearch
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.InsertChart
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -17,8 +18,10 @@ import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.shell.ShellPaths
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
+import ir.vil3ntec.tohid.ui.v3.nav.HomePager
 import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
@@ -61,11 +64,18 @@ val AnalyticsModule = AppModule(
         onBack = backOrNull(), bottomReserve = bottomReserve, onOpen = { nav.open(it) },
       )
     },
-    //  همان محتوای صفحهٔ دومِ خانه؛ تا `HomePager` ِ پایه برسد، صفحهٔ خودش با برگشت
+    //  گوشی: صفحهٔ دومِ ورقِ خانه (`HomePager.page = 1`) با همان دوره؛ کامپیوتر ورقِ خانه ندارد ⇒ صفحهٔ خودش
     V3Route("stats", RouteKind.PAGE, { StrReports.statsTitle }, chrome = Chrome.OWN) {
-      StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = { back() })
+      if (Platform.DESKTOP) StatsPage(data, canSeeMoney(), args.query("period"), { nav.open(it) }, bottomReserve = 0.dp, embedded = false, onBack = { back() })
+      else {
+        LaunchedEffect(args.path) {
+          StatsRequest.period.value = args.query("period")
+          HomePager.page.value = 1
+        }
+        LandOn(ShellPaths.HOME)
+      }
     },
-    V3Route("audit", RouteKind.PAGE, { StrReports.auditTitle }, needs = setOf(Need.AUDIT), chrome = Chrome.OWN) {
+    V3Route("audit", RouteKind.PAGE, { StrReports.auditTitle }, needs = setOf(Need.AUDIT), chrome = Chrome.OWN, deniedBody = { StrReports.auditDenied }) {
       AuditScreen(data, args.query("kind"), onBack = { back() }, onOpen = { nav.open(it) })
     },
     V3Route(AnalyticsPaths.ADMIN, RouteKind.PAGE, { Str.adminCenter }, chrome = Chrome.OWN) {
