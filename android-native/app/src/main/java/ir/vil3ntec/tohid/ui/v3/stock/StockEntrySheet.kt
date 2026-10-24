@@ -20,6 +20,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Form
+import ir.vil3ntec.tohid.ui.v3.V3FormSheet
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import kotlinx.coroutines.delay
@@ -46,7 +47,7 @@ fun StockEntrySheet(
 ) {
   val flow = rememberEntryFlow(data, product, barcode, start)
   //  کادرها خودشان پیمایش دارند و «ثبت ورود» زیرشان چسبان می‌ماند ⇒ برگه پیمایش نمی‌کند
-  DraftFormSheet(title = flow.title, dirty = flow.dirty, onClose = onClose, scroll = false) { sheet ->
+  V3FormSheet(title = flow.title, dirty = flow.dirty, onClose = onClose, scroll = false) { sheet ->
     if (flow.saved) LaunchedEffect(Unit) { delay(ENTRY_CLOSE_DELAY); sheet.finish(onClose) }
     val onNew = { sheet.finish { onNewProduct(flow.unknown) } }
     V3PageSwitch(flow.step, depth = { if (it == EntryStep.PICK) 1 else 0 }) { s ->
