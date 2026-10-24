@@ -1166,7 +1166,7 @@
   </section>
 
   <section id="tab-ops" class="hidden">
-    <!-- ماژولِ ops.js — نسخهٔ دستگاه‌ها (OPS-04)، سرویس‌های بیرونی (OPS-04@29) ، زنجیرهٔ هش (SEC-02) ، تطبیقِ فروش (E2E-ADM-15) و سوءاستفاده (OPS-09) -->
+    <!-- ماژولِ ops.js — نسخهٔ دستگاه‌ها (OPS-04)، سرویس‌های بیرونی (OPS-04@29) ، زنجیرهٔ هش (SEC-02) ، تطبیقِ فروش (E2E-ADM-15) ، سوءاستفاده و پیامک (OPS-09) -->
     <div class="panel">
       <h2>نسخهٔ دستگاه‌ها</h2>
       <div class="row"><span class="muted" id="ops-ver-checked"></span></div>
@@ -1243,6 +1243,32 @@
         <table>
           <thead><tr><th>دکان</th><th>پرونده</th><th>در جریان</th><th>واردشده</th><th>ردشده</th><th>شدید</th><th>نشان و جریمه</th><th>آخرین</th></tr></thead>
           <tbody id="ops-abuse"></tbody>
+        </table>
+      </div>
+    </div>
+      <div class="panel">
+      <h2>مصرف و هزینهٔ پیامک (OPS-09)</h2>
+      <div class="muted">هر تلاشِ فرستادن یک ردیف؛ هزینه با بهای همان لحظه نوشته می‌شود و راهِ «لاگ» (آزمایشی) و ناموفق هزینه ندارند.</div>
+      <div class="hidden" id="ops-sms-tools">
+        <div class="row" style="margin-top:10px;">
+          <label for="ops-sms-unit" style="margin:0;">بهای هر تکه (واحدِ خُرد)</label>
+          <input type="number" id="ops-sms-unit" min="0" step="1" style="width:140px;">
+          <button class="btn btn-sm btn-ghost" id="btn-ops-sms-cost">ذخیرهٔ بها</button>
+          <span class="muted" id="ops-sms-unit-note"></span>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <select id="ops-sms-days" style="width:auto;"><option value="7">۷ روز</option><option value="30" selected>۳۰ روز</option><option value="90">۹۰ روز</option></select>
+          <button class="btn btn-sm" id="btn-ops-sms">نمایش</button>
+          <span class="muted" id="ops-sms-checked"></span>
+        </div>
+      </div>
+      <div class="muted hidden" id="ops-sms-super" style="margin-top:10px;">مصرف و هزینهٔ پیامک فقط با مدیرِ ارشد است.</div>
+      <div id="ops-sms-msg"></div>
+      <div class="stats" id="ops-sms-totals" style="margin-top:10px;"></div>
+      <div class="table-scroll" style="margin-top:12px;">
+        <table>
+          <thead><tr><th>دکان</th><th>تلاش</th><th>فرستاده</th><th>ناموفق</th><th>آزمایشی</th><th>راهِ دیگر</th><th>هزینه</th><th>آخرین</th></tr></thead>
+          <tbody id="ops-sms"></tbody>
         </table>
       </div>
     </div>

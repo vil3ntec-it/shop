@@ -160,6 +160,59 @@
     $('ops-recon-super').classList.toggle('hidden', sup);
     $('ops-abuse-tools').classList.toggle('hidden', !sup);
     $('ops-abuse-super').classList.toggle('hidden', sup);
+    $('ops-sms-tools').classList.toggle('hidden', !sup);
+    $('ops-sms-super').classList.toggle('hidden', sup);
+  }
+
+  // ---------- مصرف و هزینهٔ پیامک — OPS-09 ----------
+  async function loadSms() {
+    const out = await call('GET', `/admin/system/sms-usage?days=${encodeURIComponent($('ops-sms-days').value)}`);
+    $('ops-sms-unit').value = String(out.unitCostMinor);
+    $('ops-sms-unit-note').textContent = out.unitCostMinor ? `= ${afn(out.unitCostMinor)} برای هر تکه` : 'بها ثبت نشده — هزینه ۰ حساب می‌شود';
+    const t = out.total;
+    const cards = $('ops-sms-totals');
+    cards.innerHTML = '';
+    for (const [label, value] of [
+      ['تلاش', fa(t.attempts)], ['فرستاده', fa(t.sent)], ['ناموفق', fa(t.failed)], ['آزمایشی (لاگ)', fa(t.mock)],
+      ['راهِ دیگر', fa(t.other)], ['تکه', fa(t.parts)], ['هزینه', afn(t.costMinor)],
+    ]) {
+      const c = el('div', 'stat');
+      c.appendChild(el('div', 'l', label));
+      c.appendChild(el('div', 'v', value));
+      cards.appendChild(c);
+    }
+    const body = $('ops-sms');
+    body.innerHTML = '';
+    if (!out.shops.length) {
+      const tr = el('tr');
+      const c = el('td', 'muted', 'در این بازه پیامکی ثبت نشده است');
+      c.colSpan = 8;
+      tr.appendChild(c);
+      body.appendChild(tr);
+    }
+    for (const r of out.shops) {
+      const tr = el('tr');
+      tr.dataset.shop = r.shopId;
+      tr.appendChild(el('td', '', r.shopId ? (r.shopName || r.shopId) : 'بی دکان (ورود، ثبت‌نام، …)'));
+      tr.appendChild(el('td', '', fa(r.attempts)));
+      tr.appendChild(el('td', '', fa(r.sent)));
+      tr.appendChild(el('td', '', fa(r.failed)));
+      tr.appendChild(el('td', '', fa(r.mock)));
+      tr.appendChild(el('td', '', fa(r.other)));
+      tr.appendChild(el('td', '', afn(r.costMinor)));
+      tr.appendChild(el('td', '', dateTime(r.lastAt)));
+      body.appendChild(tr);
+    }
+    $('ops-sms-checked').textContent = `${fa(out.days)} روزِ گذشته${out.truncated ? ' · فهرست بریده شد' : ''}`;
+  }
+
+  async function saveSmsCost() {
+    const raw = $('ops-sms-unit').value.trim();
+    if (!/^\d+$/.test(raw)) { msg($('ops-sms-msg'), 'بها باید عددِ صحیح به واحدِ خُرد باشد (۱۰۰ = یک افغانی)', 'bad'); return; }
+    if (!confirm(`بهای هر تکهٔ پیامک ${afn(Number(raw))} شود؟ (گذشته عوض نمی‌شود)`)) return;
+    const out = await call('PUT', '/admin/system/sms-cost', { unitCostMinor: Number(raw) });
+    msg($('ops-sms-msg'), `ذخیره شد: ${afn(out.before)} ⇐ ${afn(out.unitCostMinor)}`, 'ok');
+    await loadSms();
   }
 
   // ---------- گزارشِ سوءاستفاده — OPS-09 ----------
@@ -286,6 +339,8 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     $('btn-ops-chain').onclick = () => verifyChain().catch((err) => msg($('ops-chain-msg'), err.message, 'bad'));
+    $('btn-ops-sms').onclick = () => { msg($('ops-sms-msg'), ''); loadSms().catch((err) => msg($('ops-sms-msg'), err.message, 'bad')); };
+    $('btn-ops-sms-cost').onclick = () => saveSmsCost().catch((err) => msg($('ops-sms-msg'), err.message, 'bad'));
     $('btn-ops-abuse').onclick = () => { msg($('ops-abuse-msg'), ''); loadAbuse().catch((err) => msg($('ops-abuse-msg'), err.message, 'bad')); };
     $('btn-ops-recon').onclick = () => { msg($('ops-recon-msg'), ''); loadRecon().catch((err) => msg($('ops-recon-msg'), err.message, 'bad')); };
   });

@@ -1054,6 +1054,31 @@ await step('عملیات: گزارشِ سوءاستفادهٔ هر دکان، ف
   await query('DELETE FROM trust_cases WHERE id=$1', [id]);
 });
 
+// ── OPS-09: مصرف و هزینهٔ پیامکِ هر دکان، با بهای ذخیره‌شده از پنل ──
+await step('عملیات: بهای پیامک از پنل ذخیره می‌شود و مصرف و هزینهٔ هر دکان دیده می‌شود', async () => {
+  const usage = require('../src/lib/sms-usage');
+  await openTab('ops');
+  await page.waitForSelector('#ops-sms-tools:not(.hidden)', { timeout: 10_000 });
+  await page.fill('#ops-sms-unit', '300');
+  page.once('dialog', (d) => d.accept());
+  await page.click('#btn-ops-sms-cost');
+  await page.waitForFunction(() => /ذخیره شد/.test(document.getElementById('ops-sms-msg').textContent), null, { timeout: 10_000 });
+  assert.equal(await usage.unitCost(), 300);
+  await usage.record({ shopId: owner.shopId, purpose: 'store_phone', via: 'sms', ok: true });
+  await usage.record({ shopId: owner.shopId, purpose: 'store_phone', via: 'log', ok: true });
+  await page.click('#btn-ops-sms');
+  const row = `#ops-sms tr[data-shop="${owner.shopId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  const cells = await page.locator(`${row} td`).allTextContents();
+  assert.deepEqual(cells.slice(1, 7), ['۲', '۱', '۰', '۱', '۰', `${(3).toLocaleString('fa-AF')} افغانی`]);
+  //  بهای نادرست در خودِ صفحه رد می‌شود و چیزی نمی‌رود
+  await page.fill('#ops-sms-unit', '2.5');
+  await page.click('#btn-ops-sms-cost');
+  await page.waitForFunction(() => /عددِ صحیح/.test(document.getElementById('ops-sms-msg').textContent), null, { timeout: 10_000 });
+  assert.equal(await usage.unitCost(), 300);
+  await query('DELETE FROM sms_usage');
+});
+
 // ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────
 await step('عملیات: بررسیِ زنجیرهٔ هش؛ دست‌کاری با نخستین حلقهٔ شکسته و دلیل دیده می‌شود', async () => {
   const store = require('../src/lib/hash-chain-store');
