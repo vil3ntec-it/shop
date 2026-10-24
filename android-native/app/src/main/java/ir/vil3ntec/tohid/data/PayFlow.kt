@@ -334,6 +334,9 @@ object PayFlow {
    *  هسته ترتیبِ زمانی نمی‌خواهد؛ این ترتیب فقط نمی‌گذارد خروجی که در لحظهٔ خودش سنجیده و
    *  پذیرفته شده، این‌جا به‌خاطرِ رویدادِ دیرتر رد شود. همان `ledgerEvents`ِ JS.
    */
+  /** جدولِ روش‌های شیفتی که [replay] باز می‌کند (`OpenShiftInput` بی `methods` ⇒ پیش‌فرض) */
+  private val SHIFT_TABLE = (Pay.table(null) as PayResult.Ok).value
+
   fun ledgerEvents(d: ShopData, open: AuditEntry, to: Long): List<ShiftEventInput> {
     val from = open.createdAt
     fun inWindow(at: Long) = at in from..to
@@ -364,7 +367,15 @@ object PayFlow {
     }
     d.saleReturns.forEach { r ->
       if (!inWindow(r.createdAt) || minor(r.amount) <= 0 || CashShift.isOnlineReturn(r, online)) return@forEach
-      ev += 2 to ShiftEventInput(id = "ret:${r.id}", type = "refund", at = r.createdAt, rows = listOf(ShiftRow(CASH, minor(r.amount))))
+      //  نقدِ دخل همان `CashShift` است ([ReturnFlow.drawerAmount]؛ سهمِ حساب و اعتبار را رسیدِ
+      //  `customer_return` خنثی می‌کند). بازپرداخت به کیف پول/کارت/حواله (`toMethods`) ردیفِ همان
+      //  روش است؛ روشی که جدولِ شیفت ندارد پولِ دخل نیست و ردیف نمی‌گیرد، تا کلِ رویداد رد نشود.
+      val rows = buildList {
+        val cash = minor(ReturnFlow.drawerAmount(r))
+        if (cash > 0) add(ShiftRow(CASH, cash))
+        r.toMethods?.forEach { (m, a) -> if (minor(a) > 0 && SHIFT_TABLE.kindOf(m) != null) add(ShiftRow(m, minor(a))) }
+      }
+      if (rows.isNotEmpty()) ev += 2 to ShiftEventInput(id = "ret:${r.id}", type = "refund", at = r.createdAt, rows = rows)
     }
     fun out(id: String, at: Long, amount: Double, reason: String, note: String?) {
       if (!inWindow(at) || minor(amount) <= 0) return
