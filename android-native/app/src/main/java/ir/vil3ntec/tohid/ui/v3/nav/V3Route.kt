@@ -29,7 +29,8 @@ enum class Chrome {
  *  یک مسیرِ نوع‌دار: الگو (`stock/{id}`)، گونه، عنوان، پدر (برای ساختنِ پشته در
  *  پیوندِ سرد: `products/42` ⇐ `products` ⇐ `home`)، نام‌های قدیمی (`warehouse`)،
  *  نیازها و پرچمِ ماژول، و محتوا. پرسش (`?filter=low`) جزوِ الگو نیست و در
- *  `RouteArgs` خوانده می‌شود.
+ *  `RouteArgs` خوانده می‌شود — مگر پرسشِ ثابتی که خودش گونهٔ دیگری است
+ *  (`scan?kind=qr`، شرحش سرِ `RoutePattern`).
  *
  *  `parent` خودش یک مسیر است و می‌تواند پارامترهای همین مسیر را بگیرد
  *  (`stock/{id}/adjust` ⇐ `stock/{id}`).
@@ -43,6 +44,8 @@ class V3Route(
   val needs: Set<Need> = emptySet(),
   val flag: String? = null,
   val chrome: Chrome = Chrome.SHELL,
+  /** متنِ صفحهٔ «دسترسی ندارید» برای همین مسیر (پیش‌فرض: `StrKit.noAccessBody`) */
+  val deniedBody: (() -> String)? = null,
   val content: @Composable RouteScope.() -> Unit,
 ) {
   val matcher = RoutePattern(pattern)

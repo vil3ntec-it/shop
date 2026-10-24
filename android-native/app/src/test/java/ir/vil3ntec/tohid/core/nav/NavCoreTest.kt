@@ -58,6 +58,19 @@ class NavCoreTest {
   }
 
   @Test
+  fun `پرسشِ ثابتِ الگو شرط است و الگو را دقیق‌تر می‌کند`() {
+    val qr = RoutePattern("scan?kind=qr")
+    val scan = RoutePattern("scan")
+    assertEquals(mapOf("kind" to "qr"), qr.required)
+    assertEquals("qr", qr.match("scan?kind=qr&from=shop")!!["kind"])
+    assertNull(qr.match("scan"))
+    assertNull(qr.match("scan?kind=barcode"))
+    assertTrue(qr.literals > scan.literals)
+    assertEquals("qr", scan.match("scan?kind=qr")!!["kind"])
+    assertEquals("scan?kind=qr", qr.build())
+  }
+
+  @Test
   fun `پشته از اندازه نمی‌گذرد و ریشه می‌ماند؛ پرشِ هم‌سطحِ کامپیوتر`() {
     var s = NavStack.of("home")
     repeat(40) { s = s.push("p/$it") }

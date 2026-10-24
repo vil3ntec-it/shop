@@ -190,6 +190,15 @@ private fun Lists() {
     V3Divider(start = 64.dp)
     V3ListRow("انتخاب‌شده", subtitle = "حالتِ انتخابِ گروهی", icon = Icons.Outlined.Search, selected = true, onClick = {})
   }
+  ir.vil3ntec.tohid.ui.v3.V3InvoiceItems(
+    listOf(
+      ir.vil3ntec.tohid.ui.v3.V3InvoiceLine("شیرِ پاکتی ۱ لیتری", "۲ عدد × ۶۵ ؋", "۱۳۰ ؋"),
+      ir.vil3ntec.tohid.ui.v3.V3InvoiceLine("برنج", "۵ کیلو × ۹۰ ؋", "۴۵۰ ؋", note = "مرجوعی ۱"),
+    ),
+    title = "اقلام · فاکتور ۱۲۴",
+    footer = "تخفیف ۲۰ ؋ · پرداختِ همان لحظه ۲۰۰ ؋",
+    modifier = Modifier.padding(top = 16.dp),
+  )
   V3Skeleton(rows = 3, modifier = Modifier.padding(top = 16.dp))
 }
 
