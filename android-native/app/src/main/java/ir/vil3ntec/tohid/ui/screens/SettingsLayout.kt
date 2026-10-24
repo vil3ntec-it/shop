@@ -1,21 +1,20 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+
 /**
- *  گروه‌بندیِ تنظیماتِ گوشی (گوشی نسخهٔ ۳، تصویرِ مرجعِ r5) — خالص، بی Compose.
+ *  فهرستِ بخش‌های تنظیمات (VILL3N، G9) — خالص، بی Compose.
  *
- *  هر بخشِ موجودِ `SettingsScreen` (عنوانِ `SettingsSection`ش) دقیقاً در یک گروه
- *  است؛ **هیچ تنظیمی برداشته نشده** و کارِ هیچ‌کدام عوض نشده — فقط زیرِ سرخطِ
- *  گروه کنارِ هم نشسته‌اند و روی گوشی هر کدام یک ردیفِ کوتاه است که صفحهٔ خودش
- *  را باز می‌کند. `SettingsLayoutTest` همین را از رویِ متنِ `Settings.kt` و
- *  `LocaleSection.kt` می‌سنجد: بخشِ تازه‌ای که گروه نگیرد یا گروهِ بی‌بخش، آزمون
- *  را قرمز می‌کند.
- *
- *  عنوانِ بخش «کلید» است (کامپیوتر با همان بخش را انتخاب می‌کند)؛ نامی که روی
- *  گوشی دیده می‌شود از `labelOf` می‌آید.
+ *  هر بخش (کلیدش همان عنوانِ پیشینِ بخش است و عوض نمی‌شود) دقیقاً در یک گروه
+ *  است، نامِ نشانیِ خودش را دارد (`settings/<گروه>/<بخش>`) و صفحه‌اش در
+ *  `ui/v3/settings/SettingsPages.kt` است. ردیفِ گروه در «بیشتر» یک‌راست صفحهٔ
+ *  همان گروه را باز می‌کند و ردیفِ بخش صفحهٔ همان بخش را — بی پیمایشِ ریشه.
+ *  `SettingsLayoutTest` همین را از رویِ **متنِ** این فایل و `SettingsPages.kt`
+ *  می‌سنجد: بخشی بی گروه، بی نشانی یا بی صفحه آزمون را قرمز می‌کند.
  *
  *  ردیف‌های «پیوند» (`LINKS`) بخشِ تنظیمات نیستند: صفحهٔ دیگری از برنامه را باز
- *  می‌کنند (چاپگرها در «دستگاه‌های جانبی»، ویرایشگرِ نوارِ پایین). کامپیوتر آن‌ها
- *  را نمی‌بیند.
+ *  می‌کنند (چاپگرها و دستگاه‌های جانبی).
  */
 object SettingsLayout {
   data class Group(val title: String, val sections: List<String>)
@@ -33,38 +32,88 @@ object SettingsLayout {
    */
   const val CAMERA = "دوربین بارکدخوان"
 
-  /** پیوند به ویرایشگرِ نوارِ پایین (مسیرش را بخشِ نوار می‌سازد) */
+  /** ویرایشگرِ نوارِ پایین (فقط گوشی) */
   const val NAV_BAR = "نوار پایین"
   /** پیوند به چاپگرها در صفحهٔ «دستگاه‌های جانبی» */
   const val PRINTER = "چاپگر و رسید"
+  /** پیوند به خودِ صفحهٔ «دستگاه‌های جانبی» */
+  const val PERIPHERALS = "دستگاه‌های جانبی"
+  const val ABOUT_APP = "درباره برنامه"
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
-    NAV_BAR to "settings/general/navbar",
     PRINTER to "devices?tab=printers",
+    PERIPHERALS to "devices",
   )
 
   val GROUPS: List<Group> = listOf(
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
     Group(SECURITY, listOf("قفل برنامه", "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
     Group(SALES, listOf("کالای منقضی", PRINTER)),
-    Group(DEVICES, listOf(CAMERA)),
+    Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها")),
-    Group(ABOUT, listOf("درباره برنامه")),
+    Group(ABOUT, listOf(ABOUT_APP)),
   )
 
-  /** نامِ کوتاهِ ردیف روی گوشی (r5) — کلید عوض نمی‌شود */
-  private val LABELS: Map<String, String> = mapOf(
-    NAV_BAR to "نوارِ پایین",
-    "قفل برنامه" to "قفلِ برنامه",
-    "کد شاگرد" to "کدِ شاگرد",
-    "دستگاه‌های وارد شده" to "دستگاه‌های وصل",
-    "تغییر رمز حساب" to "رمزِ حساب",
-    CAMERA to "بارکدخوان",
-    "داده‌ها" to "پشتیبان و بازگردانی",
+  /** نامِ نشانیِ هر گروه — ثابت (`vill3n://app/settings/security`) */
+  val GROUP_SLUGS: Map<String, String> = mapOf(
+    GENERAL to "general",
+    SECURITY to "security",
+    SALES to "sales",
+    DEVICES to "devices",
+    DATA to "data",
+    ABOUT to "about",
   )
 
-  fun labelOf(row: String): String = LABELS[row] ?: row
+  /** نامِ نشانیِ هر بخش زیرِ گروهِ خودش — ثابت (`settings/security/app-lock`) */
+  val SECTION_SLUGS: Map<String, String> = mapOf(
+    "هشدارها" to "alerts",
+    "ظاهر" to "appearance",
+    NAV_BAR to "navbar",
+    "زبان" to "language",
+    "تاریخ و رقم" to "digits",
+    "قفل برنامه" to "app-lock",
+    "کد شاگرد" to "staff-code",
+    "دستگاه‌های وارد شده" to "sessions",
+    "تغییر رمز حساب" to "password",
+    "کالای منقضی" to "expiry",
+    CAMERA to "camera",
+    "همگام‌سازی" to "sync",
+    "داده‌ها" to "backup",
+    ABOUT_APP to "app",
+  )
+
+  /** نامِ ردیف به زبانِ صفحه — کلید عوض نمی‌شود */
+  fun labelOf(row: String): String = when (row) {
+    "هشدارها" -> Str.alerts
+    "ظاهر" -> Str.appearance
+    NAV_BAR -> StrSettings.navBar
+    "زبان" -> StrSettings.language
+    "تاریخ و رقم" -> Str.dateAndDigits
+    "قفل برنامه" -> StrSettings.appLockRow
+    "کد شاگرد" -> StrSettings.staffCodeRow
+    "دستگاه‌های وارد شده" -> StrSettings.sessionsRow
+    "تغییر رمز حساب" -> StrSettings.passwordRow
+    "کالای منقضی" -> Str.expiredGoods
+    PRINTER -> StrSettings.printerRow
+    CAMERA -> StrSettings.scannerRow
+    PERIPHERALS -> StrSettings.peripheralsRow
+    "همگام‌سازی" -> StrSettings.syncRow
+    "داده‌ها" -> StrSettings.backupRow
+    ABOUT_APP -> StrSettings.versionRow
+    else -> row
+  }
+
+  /** نامِ گروه به زبانِ صفحه (سرخطِ کارت، ردیفِ «بیشتر»، عنوانِ صفحهٔ گروه) */
+  fun groupLabel(group: String): String = when (group) {
+    GENERAL -> StrSettings.groupGeneral
+    SECURITY -> StrSettings.groupSecurity
+    SALES -> StrSettings.groupSales
+    DEVICES -> StrSettings.groupDevices
+    DATA -> StrSettings.groupData
+    ABOUT -> StrSettings.groupAbout
+    else -> group
+  }
 
   /** گروهِ یک بخش یا پیوند؛ null یعنی ناشناس (آزمون جلویش را می‌گیرد) */
   fun groupOf(row: String): String? = GROUPS.firstOrNull { row in it.sections }?.title
@@ -74,17 +123,16 @@ object SettingsLayout {
   /** همهٔ بخش‌های واقعیِ تنظیمات (بی پیوندها) به ترتیبِ نمایش */
   val sections: List<String> get() = GROUPS.flatMap { it.sections }.filterNot(::isLink)
 
-  /** جایِ گروه در فهرستِ گوشی — برای «بیشتر ⇐ تنظیمات ⇐ گروه» */
+  /** جایِ گروه در فهرست */
   fun groupIndex(title: String): Int = GROUPS.indexOfFirst { it.title == title }
 
-  /** بخش‌هایی که کامپیوتر عمداً ندارد (دوربینِ گوشی؛ کامپیوتر بارکدخوانِ خودش را دارد) */
-  val DESK_HIDDEN: Set<String> = setOf(CAMERA)
+  /** بخش‌هایی که کامپیوتر عمداً ندارد: دوربینِ گوشی و نوارِ پایینِ گوشی */
+  val DESK_HIDDEN: Set<String> = setOf(CAMERA, NAV_BAR)
 
   /**
-   *  فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر: همان‌هایی که `AppRoot` داده، به
-   *  همان ترتیب، و هر بخشی که آن‌جا نیست (مثلِ «زبان» و «همگام‌سازی» که تازه
-   *  آمده‌اند) درست پیش از نزدیک‌ترین بخشِ پسینش در همین گروه‌بندی — تا هیچ
-   *  بخشی روی کامپیوتر بی‌راه نماند.
+   *  فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر: ترتیبِ دادهٔ `given` می‌ماند و هر بخشی
+   *  که آن‌جا نیست درست پیش از نزدیک‌ترین بخشِ پسینش در همین گروه‌بندی می‌نشیند —
+   *  تا هیچ بخشی روی کامپیوتر بی‌راه نماند.
    */
   fun deskOrder(given: List<String>): List<String> {
     val out = given.filter { it in sections }.toMutableList()
@@ -100,4 +148,7 @@ object SettingsLayout {
     }
     return out
   }
+
+  /** ستونِ کناریِ کامپیوتر: همهٔ بخش‌ها به ترتیبِ گروه‌ها، بی بخش‌های فقط‌گوشی */
+  val deskSections: List<String> get() = deskOrder(sections)
 }
