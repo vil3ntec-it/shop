@@ -138,21 +138,21 @@
      می‌دهد و صفحه را تودرتو می‌کند.
      ========================================================== */
   :root{
-    /* THEME-V2 (۱۴۰۵/۰۸/۰۲): تمِ پیش‌فرضِ «آسمان» — همان `SkyLight`/`SkyDark`ِ برنامه (`ShopThemes.kt`،
-       WebPaletteParityTest). پایه آبی و سفید؛ زمینه ≠ کارت ≠ سطحِ درونی با خطِ دورِ دیدنی. */
-    --bg:#f5f8ff;
+    /* سیستمِ رنگِ VILL3N (۱۴۰۵/۰۷/۲۸) — همان عددهای `Theme.kt`/`Tokens.kt`ِ برنامه (WebPaletteParityTest).
+       زمینه ≠ کارت ≠ سطحِ درونی با خطِ دورِ دیدنی، سبزآبیِ برند به‌جای بنفش. */
+    --bg:#f3f6fa;
     --surface:#ffffff;
-    --surface-2:#eef3ff;
+    --surface-2:#f8fafc;
     --surface-solid:#ffffff;
     --border:#d5dee9;
-    --field-border:#c8d2e0;
-    --text:#0f172a;
-    --muted:#5b6a80;
-    --muted-2:#5b6a80;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه و ناحیه‌ها */
-    --primary:#1d4ed8;
-    --primary-dark:#1d4ed8;
-    --primary-tint:#e5ecfd;
-    --accent:#2563eb;
+    --field-border:#c5d0de;
+    --text:#17212b;
+    --muted:#5b687a;
+    --muted-2:#5b687a;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه و ناحیه‌ها */
+    --primary:#08665f;
+    --primary-dark:#08665f;
+    --primary-tint:#e0f2ef;
+    --accent:#108b81;
     --success:#15803d;
     --success-tint:#dcfce7;
     --warning:#92400e;
@@ -162,12 +162,12 @@
     --info:#1d4ed8;
     --info-tint:#dbeafe;
     /* ناحیه‌ها: منو (سرد) و سبد (تهِ رنگِ اصلی)؛ کاتالوگ همان --bg */
-    --zone-nav:#ecf0f8;
-    --zone-cart:#eef3ff;
+    --zone-nav:#eaf0f6;
+    --zone-cart:#f8fafc;
     /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا (فقط صفحهٔ آغاز) */
-    --aurora-1:rgba(37,99,235,0.3);
-    --aurora-2:rgba(79,70,229,0.24);
-    --aurora-3:rgba(124,58,237,0.2);
+    --aurora-1:rgba(16,139,129,.30);
+    --aurora-2:rgba(37,99,235,.24);
+    --aurora-3:rgba(20,184,166,.20);
     /* گِردی: کنترل ۱۲، کارت ۱۶، پنل/پنجره ۲۰، تراشه قرصی */
     --radius-sm:10px;
     --radius-md:12px;
@@ -186,24 +186,24 @@
     --bottomnav-space:calc(var(--bottomnav-h) + var(--bottomnav-gap) + env(safe-area-inset-bottom));
   }
   /*
-     شبِ برنامه (THEME-V2، «آسمان»ِ تیره): سرمه‌ایِ تیره، کارتی که فقط یک پله از
-     زمینه روشن‌تر است با لبهٔ مویی و منوی تیره‌تر.
+     شبِ برنامه (نسخهٔ ۲): خاکستریِ تیرهٔ سرد، کارتی که فقط یک پله از زمینه
+     روشن‌تر است با لبهٔ مویی، منوی تیره‌تر و سبدِ تهِ بنفش.
      رنگ برای چیزهایی می‌ماند که معنی دارند: پول، هشدار، دکمه.
   */
   html[data-theme="dark"]{
-    --bg:#0b1020;
-    --surface:#121a2e;
-    --surface-2:#1a2440;
-    --surface-solid:#121a2e;
-    --border:#2e3547;
-    --field-border:#3d4354;
-    --text:#e6ecff;
-    --muted:#94a3b8;
-    --muted-2:#94a3b8;
-    --primary:#60a5fa;
-    --primary-dark:#60a5fa;
-    --primary-tint:#1d2d4b;
-    --accent:#60a5fa;
+    --bg:#0b1220;
+    --surface:#162235;
+    --surface-2:#203149;
+    --surface-solid:#162235;
+    --border:#34445a;
+    --field-border:#40516a;
+    --text:#f1f5f9;
+    --muted:#b6c2d2;
+    --muted-2:#b6c2d2;
+    --primary:#19a985;
+    --primary-dark:#6ee7d1;
+    --primary-tint:#123c3a;
+    --accent:#6ee7d1;
     --success:#86efac;
     --success-tint:#123c2b;
     --warning:#fcd34d;
@@ -212,11 +212,11 @@
     --danger-tint:#451a1e;
     --info:#93c5fd;
     --info-tint:#172f57;
-    --zone-nav:#070a15;
-    --zone-cart:#1a2440;
-    --aurora-1:rgba(30,58,138,0.55);
-    --aurora-2:rgba(49,46,129,0.38);
-    --aurora-3:rgba(76,29,149,0.34);
+    --zone-nav:#050a14;
+    --zone-cart:#203149;
+    --aurora-1:rgba(16,139,129,.55);
+    --aurora-2:rgba(37,99,235,.38);
+    --aurora-3:rgba(20,184,166,.34);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --shadow-md:0 12px 32px -12px rgba(0,0,0,.7);
   }

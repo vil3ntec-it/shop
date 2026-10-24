@@ -119,6 +119,68 @@ class ThemeV2PaletteTest {
     assertEquals(emptyList<String>(), bad)
   }
 
+  /** رنگِ گرادیانِ کادرِ بزرگ در جای `t` (۰ = سرِ آغاز) با پردهٔ خوانایی، همان‌طور که `V3HeroCard` می‌کشد */
+  private fun heroAt(c: ShopColors, t: Float): Color {
+    val stops = c.heroGradient
+    val span = t * (stops.size - 1)
+    val i = span.toInt().coerceAtMost(stops.size - 2)
+    val f = span - i
+    val a = stops[i]
+    val b = stops[i + 1]
+    val base = Color(a.red + (b.red - a.red) * f, a.green + (b.green - a.green) * f, a.blue + (b.blue - a.blue) * f)
+    return Color.Black.copy(alpha = c.heroScrim * t).compositeOver(base)
+  }
+
+  @Test
+  fun `برچسبِ تراشه‌های کادرِ بزرگ همه‌جا AA است — شیشهٔ سفید روی سایهٔ تم`() {
+    val bad = mutableListOf<String>()
+    for (t in ShopTheme.entries) for (dark in listOf(false, true)) {
+      val c = shopColors(t, dark)
+      //  تراشه‌ها پایینِ کادر از سرِ آغاز تا حدودِ ۷۵٪ِ پهنا ⇒ t تا ~۰٫۸۲ روی خطِ ۱۳۵°
+      var worst = 99f
+      var x = 0f
+      while (x <= 0.84f) {
+        val under = Color.Black.copy(alpha = c.heroChipShade).compositeOver(heroAt(c, x))
+        val chip = Color.White.copy(alpha = 0.16f).compositeOver(under)
+        worst = minOf(worst, contrast(Color.White, chip))
+        x += 0.02f
+      }
+      if (worst < 4.5f) bad += "${t.id}${if (dark) "-شب" else ""}: ${"%.2f".format(worst)}"
+    }
+    assertEquals(emptyList<String>(), bad)
+  }
+
+  @Test
+  fun `برچسب و زیرنویسِ سفیدِ کادرِ بزرگ — AA جز «اقیانوس» ِ روز (انحرافِ ثبت‌شده)`() {
+    //  «اقیانوس» ِ روز: گرادیانِ فایل (#0EA5E9 ⇐ #22D3EE) برای متنِ سفیدِ کوچک روشن است؛ با پردهٔ ۰٫۳ حدودِ
+    //  ۳٫۷:۱ می‌ماند (عددِ درشت و برچسبِ سرِ کادر AA‌اند). رساندنش به ۴٫۵ پردهٔ ~۰٫۵ می‌خواهد که فیروزه‌ایِ
+    //  کادر را تیره می‌کند — تصمیمِ صاحب‌کار؛ این‌جا فقط کفِ ۳٫۵ سنجیده می‌شود تا بدتر نشود.
+    val bad = mutableListOf<String>()
+    for (t in ShopTheme.entries) for (dark in listOf(false, true)) {
+      val c = shopColors(t, dark)
+      val min = if (t == ShopTheme.OCEAN && !dark) 3.5f else 4.5f
+      var worst = 99f
+      var x = 0f
+      while (x <= 0.66f) { worst = minOf(worst, contrast(Color.White, heroAt(c, x))); x += 0.02f }
+      if (worst < min) bad += "${t.id}${if (dark) "-شب" else ""}: ${"%.2f".format(worst)} < $min"
+    }
+    assertEquals(emptyList<String>(), bad)
+  }
+
+  @Test
+  fun `«در انتظارِ تأیید» بنفش و هشدار کهربایی — در هر شش پالت`() {
+    for (c in all) {
+      assertEquals(c.status.needsReview, c.status.awaitingApproval)
+      assertTrue(c.status.warning != c.status.awaitingApproval)
+      assertEquals(c.status.warning.fg, c.warning)
+      assertTrue("سایهٔ تراشه ۰ تا ۰٫۳", c.heroChipShade in 0f..0.3f)
+    }
+    assertEquals("#6D28D9", hex(LightColors.status.awaitingApproval.fg))
+    assertEquals("#92400E", hex(LightColors.status.warning.fg))
+    assertEquals("#C4B5FD", hex(DarkColors.status.awaitingApproval.fg))
+    assertEquals("#FCD34D", hex(DarkColors.status.warning.fg))
+  }
+
   @Test
   fun `لایه‌های گوشی از ShopColors ِ همان تم ساخته می‌شوند`() {
     for (s in all) {

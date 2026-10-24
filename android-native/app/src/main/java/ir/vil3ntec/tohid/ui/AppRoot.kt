@@ -128,6 +128,7 @@ fun AppRoot(
         needsShop = !state.hasShop
         state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
+        if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberShopId(context, state.shop?.id)
         //  حساب از دکانی به دکانِ دیگر رفته ⇒ دفترِ روی گوشی هم همین‌جا جابه‌جا می‌شود
         if (state.hasShop) {
           runCatching { ir.vil3ntec.tohid.data.LedgerOwner.shopChanged(context, store, state.shop?.id.orEmpty()) }
@@ -231,6 +232,12 @@ fun AppRoot(
   LaunchedEffect(migration) { migration?.let { toasts.show(it) } }
   //  POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن
   DraftRecoveryPrompt(cartStore, data, loaded, snackbar)
+  //  HW-02/03: کشوی بی فروش (`no_sale`) و چاپِ دوباره (`reprint`) از صفِ چاپ ⇐ سابقهٔ دکان.
+  //  `appendAudit` روی دفترِ همان لحظه و زیرِ قفلِ نوشتن می‌سازد (نه تصویرِ کهنهٔ `data.value`)
+  //  تا فروشِ هم‌زمان گم نشود؛ پس از بارِ دفتر، و مثلِ هر نوشتنی همگام می‌شود
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
     store.blocked.collect {
@@ -244,6 +251,28 @@ fun AppRoot(
     store.diskError.collect { reason ->
       snackbar.currentSnackbarData?.dismiss()
       snackbar.showSnackbar(StrNav.diskError(reason), duration = SnackbarDuration.Long)
+    }
+  }
+
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛ پنجره با
+  //  «بازسازی از سرور» و راهِ «تنظیمات ← امنیت» (بازبینیِ #331). با دفترِ ساده هرگز پیش نمی‌آید.
+  val unreadable by store.unreadable.collectAsState()
+  var unreadableOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(unreadable) { unreadableOpen = unreadable != null }
+  //  پشتِ قفلِ برنامه نه: پنجره رویِ صفحهٔ قفل باز نمی‌شود
+  if (unreadableOpen && unreadable != null && !(lockStore.enabled && !unlocked)) {
+    ir.vil3ntec.tohid.ui.screens.UnreadableLedgerDialog(
+      store = store,
+      onOpenSecurity = { unreadableOpen = false; AppNav.go("settings") },
+      onDismiss = { unreadableOpen = false },
+      toast = { msg -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
+    )
+  }
+  //  نتیجهٔ بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود (`ShopStore.notice`)
+  LaunchedEffect(store) {
+    store.notice.collect { msg ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
     }
   }
 

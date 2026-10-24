@@ -141,7 +141,7 @@ private fun HeroCard(h: SubscriptionModel.Hero) {
   //  رنگ‌های روشنِ شب تا روی سطحِ وارونه خوانا باشند (مثلِ نقطهٔ پیامِ کوتاه)
   val tone = PhoneV3Roles.status(PhoneV3Dark, when (h.tone) {
     SubscriptionModel.Tone.GREEN -> V3Status.DELIVERED
-    SubscriptionModel.Tone.YELLOW -> V3Status.AWAITING
+    SubscriptionModel.Tone.YELLOW -> V3Status.WARNING
     SubscriptionModel.Tone.RED -> V3Status.CANCELLED
     SubscriptionModel.Tone.GREY -> V3Status.INACTIVE
   }).fg

@@ -114,11 +114,12 @@ class Vill3nPaletteTest {
     assertEquals(listOf("#60A5FA", "#0B1020"), b(d.primary).take(2))
     assertEquals(listOf("#121A2E", "#60A5FA"), b(d.secondary).take(2))
     assertEquals(listOf("#DC2626", "#FFFFFF"), b(d.danger).take(2))
-    //  هفت وضعیت ثابت‌اند و به تم بستگی ندارند (THEME-V2 «رنگ‌های معنایی»)
+    //  وضعیت‌ها ثابت‌اند و به تم بستگی ندارند (THEME-V2 «رنگ‌های معنایی»): «در انتظارِ تأیید» بنفش
+    //  (همان بنفشِ «نیازِ بررسی»)، هشدار کهربایی
     assertEquals(
       listOf(
-        "#15803D/#DCFCE7", "#1D4ED8/#DBEAFE", "#92400E/#FEF3C7", "#B91C1C/#FEE2E2",
-        "#6D28D9/#EDE9FE", "#0E7490/#CFFAFE", "#475569/#E2E8F0",
+        "#15803D/#DCFCE7", "#1D4ED8/#DBEAFE", "#6D28D9/#EDE9FE", "#B91C1C/#FEE2E2",
+        "#6D28D9/#EDE9FE", "#0E7490/#CFFAFE", "#475569/#E2E8F0", "#92400E/#FEF3C7",
       ),
       LightColors.status.all.map { (_, t) -> "${hex(t.fg)}/${hex(t.bg)}" },
     )
@@ -215,7 +216,7 @@ class Vill3nPaletteTest {
       assertEquals(background, bg); assertEquals(textPrimary, text); assertEquals(textSecondary, muted)
       assertEquals(borderCard, border); assertEquals(surfaceElevated, surface2); assertEquals(brandText, primary)
       assertEquals(surfaceSelected, primaryTint); assertEquals(status.delivered.fg, success); assertEquals(status.cancelled.fg, danger)
-      assertEquals(status.awaitingApproval.fg, warning)
+      assertEquals(status.warning.fg, warning)
       assertEquals(backgroundSubtle, zoneNav); assertEquals(borderInput, fieldBorder)
     }
   }
@@ -227,7 +228,7 @@ class Vill3nPaletteTest {
 
   /** همهٔ وضعیت‌های سفارش ⇐ نشان؛ تازه شدنِ وضعیت در هسته این‌جا تصمیمِ رنگ می‌خواهد */
   private val orderTable = mapOf(
-    "new" to PillTone.WARNING, "return_requested" to PillTone.WARNING,
+    "new" to PillTone.AWAITING, "return_requested" to PillTone.AWAITING,
     "accepted" to PillTone.PREPARING, "picking" to PillTone.PREPARING, "packed" to PillTone.PREPARING,
     "ready_for_pickup" to PillTone.PREPARING,
     "out_for_delivery" to PillTone.INFO, "retry_scheduled" to PillTone.INFO,
@@ -248,11 +249,15 @@ class Vill3nPaletteTest {
     assertEquals(OrderStatusTone.order("delivery_failed"), OrderStatusTone.courier("failed"))
     assertEquals(OrderStatusTone.order("rejected"), OrderStatusTone.courier("rejected"))
     assertEquals(OrderStatusTone.order("new"), OrderStatusTone.courier("requested"))
-    //  هر نشان یکی از هفت توکنِ وضعیت است و هفت نشان هفت رنگِ جدا دارند
+    //  هر نشان یکی از توکن‌های وضعیت است: هشت نشان، هفت رنگ — «در انتظارِ تأیید» و «نیازِ بررسی»
+    //  هر دو بنفش‌اند، هشدار کهربایی و جدا از هر دو
     for (c in listOf(LightColors, DarkColors)) {
       val pairs = PillTone.entries.map { pillColors(c, it) }
       assertEquals(7, pairs.toSet().size)
       assertEquals(c.status.all.map { (_, t) -> t.fg to t.bg }.toSet(), pairs.toSet())
+      assertEquals(pillColors(c, PillTone.AWAITING), pillColors(c, PillTone.REVIEW))
+      assertTrue(pillColors(c, PillTone.WARNING) != pillColors(c, PillTone.AWAITING))
+      assertEquals(c.status.warning.fg to c.status.warning.bg, pillColors(c, PillTone.WARNING))
     }
     //  قرمز فقط برای لغو و رد
     val red = orderTable.filterValues { it == PillTone.DANGER }.keys

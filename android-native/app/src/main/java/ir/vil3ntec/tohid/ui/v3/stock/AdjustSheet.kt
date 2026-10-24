@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
+import ir.vil3ntec.tohid.ui.v3.V3FormSheet
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
@@ -60,7 +61,7 @@ fun AdjustSheet(
   val errors = if (showErrors) form.errors() else emptyMap()
   val unit = product.unit.ifBlank { null }
 
-  DraftFormSheet(if (form.choice == AdjustChoice.RETURN) StrStock.returnTitle(product.name) else StrStock.adjustTitle(product.name), dirty = form.dirty && !saved, onClose = onClose) { sheet ->
+  V3FormSheet(if (form.choice == AdjustChoice.RETURN) StrStock.returnTitle(product.name) else StrStock.adjustTitle(product.name), dirty = form.dirty && !saved, onClose = onClose) { sheet ->
     if (saved) LaunchedEffect(Unit) { delay(MotionTokens.EMPHASIZED + 150L); sheet.finish(onClose) }
     V3Segmented(
       listOf(StrStock.kindUp, StrStock.kindDown, StrStock.kindReturnShort),
