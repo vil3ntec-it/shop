@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import androidx.compose.ui.graphics.graphicsLayer
+import ir.vil3ntec.tohid.ui.screens.MotionSpec
+import androidx.compose.animation.core.animateFloatAsState
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -175,12 +179,13 @@ internal fun ColumnScope.MoreFields(
 @Composable
 internal fun CollapsibleHeader(title: String, open: Boolean, onToggle: () -> Unit) {
   val c = PhoneV3.colors
+  val turn by animateFloatAsState(if (open) 180f else 0f, MotionSpec.indicator(), label = "moreTurn")
   Row(
     Modifier.fillMaxWidth().v3Pressable(label = title, onClick = onToggle).padding(vertical = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(title, style = V3Type.headline, color = c.ink, modifier = Modifier.weight(1f))
-    Icon(Icons.Outlined.ExpandMore, contentDescription = null, tint = c.icon, modifier = Modifier.draftFlip(open))
+    Icon(Icons.Outlined.ExpandMore, contentDescription = null, tint = c.icon, modifier = Modifier.graphicsLayer { rotationZ = turn })
   }
 }
 
@@ -195,7 +200,7 @@ private fun ChipGroup(label: String, error: Problem?, required: Boolean = true, 
       if (required) Text(" *", style = V3Type.subhead.copy(fontWeight = FontWeight.SemiBold), color = PhoneV3Roles.errorText(c))
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { chips() }
-    DraftReveal(error != null) {
+    V3Collapse(error != null) {
       Row(Modifier.padding(start = 2.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.ErrorOutline, contentDescription = null, tint = PhoneV3Roles.errorText(c), modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(4.dp))
@@ -209,7 +214,7 @@ private fun ChipGroup(label: String, error: Problem?, required: Boolean = true, 
 @Composable
 private fun ProfitLine(row: ProductRowDraft) {
   val profit = ProductFormModel.unitProfit(row)
-  DraftReveal(profit != null) { ProfitText(row, profit ?: 0.0) }
+  V3Collapse(profit != null) { ProfitText(row, profit ?: 0.0) }
 }
 
 @Composable

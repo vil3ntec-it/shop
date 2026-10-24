@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.animation.Crossfade
@@ -189,7 +190,7 @@ private fun StudioControls(opts: PhotoStudio.Options, onChange: (PhotoStudio.Opt
   val stagger = rememberV3Stagger()
   V3Section(StrProducts.groupBackground, Modifier.v3Stagger(stagger, "bg", 0)) {
     V3ToggleRow(StrProducts.whiteBackground, opts.removeBackground, { onChange(opts.copy(removeBackground = it)) })
-    DraftReveal(opts.removeBackground) {
+    V3Collapse(opts.removeBackground) {
       Column {
         V3Divider(start = 16.dp)
         SliderRow(StrProducts.tolerance, opts.tolerance, 5f..80f) { onChange(opts.copy(tolerance = it)) }

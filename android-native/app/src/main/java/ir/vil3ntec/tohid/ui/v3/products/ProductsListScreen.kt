@@ -9,7 +9,6 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.LazyGridItemScope
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -42,7 +41,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.components.common.Selection
-import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.rememberVoiceSearch
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3ActionBar
@@ -176,7 +174,7 @@ internal fun ProductsListScreen(
           val sel = if (selecting) p.id in picked else null
           val click = { if (selecting) toggle(p.id) else nav.open(p.id) }
           val long = { toggle(p.id) }
-          val m = Modifier.placement(this).v3Stagger(stagger, p.id, i)
+          val m = Modifier.draftAnimateGridItem(this).v3Stagger(stagger, p.id, i)
           if (layout == Layout.GRID) {
             ProductCell(p, s, badge, sel, p.id in flash, click, long, m)
           } else {
@@ -238,10 +236,6 @@ internal object RecentlyAdded {
 
 /** جای خالیِ زیرِ آخرین ردیف تا دکمهٔ شناور رویش ننشیند */
 private val FAB_SPACE = 80.dp
-
-/** جابه‌جاییِ نرمِ ردیف‌ها با عوض شدنِ فیلتر، مرتب‌سازی یا نما (بی‌حرکت ⇐ هیچ) */
-private fun Modifier.placement(scope: LazyGridItemScope): Modifier =
-  if (Motion.enabled) with(scope) { this@placement.animateItem() } else this
 
 private const val PREFS = "tohid-ui"
 private const val LAYOUT_KEY = "products_layout"

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -153,10 +155,10 @@ internal fun NewProductsScreen(
       summary = StrProducts.readySummary(readyCount, rows.size),
       dirty = rows != initial && !done,
     ) {
-      DraftReveal(banner != null) {
-        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).draftShake(errorShake), body = banner.orEmpty())
+      V3Collapse(banner != null) {
+        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).v3Shake(errorShake.takeIf { it > 0 }), body = banner.orEmpty())
       }
-      Column(Modifier.draftSize()) {
+      Column {
         rows.forEachIndexed { index, row -> key(row.key) {
           val req = views.getOrPut(row.key) { BringIntoViewRequester() }
           val hooks = FieldHooks(
@@ -220,7 +222,7 @@ internal fun NewProductsScreen(
       )
       Spacer(Modifier.height(16.dp))
     }
-    V3SuccessCheck(done, Modifier.align(Alignment.Center))
+    V3SuccessCheck(done, Modifier.align(Alignment.Center), haptic = false)
   }
 }
 

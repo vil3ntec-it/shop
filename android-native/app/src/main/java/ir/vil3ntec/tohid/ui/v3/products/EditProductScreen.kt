@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -129,22 +131,22 @@ internal fun EditProductScreen(
       primaryEnabled = !done,
       dirty = row != initial && !done,
     ) {
-      DraftReveal(banner != null) {
-        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).draftShake(shake), body = banner.orEmpty())
+      V3Collapse(banner != null) {
+        V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).v3Shake(shake.takeIf { it > 0 }), body = banner.orEmpty())
       }
       val visible = touched.visible(0, errors)
-      Column(Modifier.draftShake(shake).v3Stagger(stagger, "fields", 0)) {
+      Column(Modifier.v3Shake(shake.takeIf { it > 0 }).v3Stagger(stagger, "fields", 0)) {
         ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT)
       }
       Column(Modifier.fillMaxWidth().padding(top = 8.dp).v3Stagger(stagger, "more", 1)) {
         CollapsibleHeader(StrProducts.groupMore, more) { more = !more }
-        DraftReveal(more) {
+        V3Collapse(more) {
           V3Section(null, padding = PaddingValues(16.dp)) { MoreFields(row, visible, data.suppliers, hooks) }
         }
       }
       Spacer(Modifier.height(16.dp))
     }
-    V3SuccessCheck(done, Modifier.align(Alignment.Center))
+    V3SuccessCheck(done, Modifier.align(Alignment.Center), haptic = false)
   }
 }
 

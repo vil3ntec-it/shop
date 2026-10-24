@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -159,7 +160,7 @@ internal fun ProductCell(
         Modifier.fillMaxWidth().aspectRatio(1f).graphicsLayer { alpha = if (p.active) 1f else 0.55f },
         radius = 0.dp,
       )
-      Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { DraftPop(selected != null) { CheckDot(selected == true) } }
+      Box(Modifier.align(Alignment.TopStart).padding(8.dp)) { V3Collapse(selected != null) { CheckDot(selected == true) } }
       badgeStatus(badge)?.let { (s, label) -> Box(Modifier.align(Alignment.BottomStart).padding(8.dp)) { V3StatusPill(s, label) } }
     }
     Column(Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
@@ -46,7 +48,7 @@ import ir.vil3ntec.tohid.ui.v3.v3Pressable
  *  کارتِ یک کالا در فرمِ چندردیفی (r16). باز = همهٔ کادرها؛ بسته = یک خط
  *  «۱ · بیسکویت شکلاتی · ۲۰ ؋» با قرصِ «آماده/ناقص». فقط یک کارت باز است.
  *  «…» ⇐ تکثیر یا حذفِ ردیف. `shake` که بالا برود کارت یک بار می‌لرزد (نخستین
- *  ردیفِ خراب پس از «ذخیره»، `draftShake`؛ با «کاهشِ حرکت» فقط لرزشِ گوشی).
+ *  ردیفِ خراب پس از «ذخیره»، `v3Shake`؛ با «کاهشِ حرکت» فقط لرزشِ گوشی).
  */
 @Composable
 internal fun ProductRowCard(
@@ -67,12 +69,11 @@ internal fun ProductRowCard(
   val shape = RoundedCornerShape(V3Space.featuredRadius)
   Column(
     modifier
-      .draftShake(shake)
+      .v3Shake(shake.takeIf { it > 0 })
       .fillMaxWidth()
       .clip(shape)
       .background(c.card)
-      .border(if (expanded) 1.5.dp else 1.dp, if (expanded) PhoneV3Roles.focus(c).copy(alpha = 0.55f) else c.hairline, shape)
-      .draftSize(),
+      .border(if (expanded) 1.5.dp else 1.dp, if (expanded) PhoneV3Roles.focus(c).copy(alpha = 0.55f) else c.hairline, shape),
   ) {
     Row(
       Modifier.fillMaxWidth().then(if (expanded) Modifier else Modifier.v3Pressable(label = row.name.ifBlank { StrProducts.untitled }, onClick = onExpand))
@@ -85,9 +86,11 @@ internal fun ProductRowCard(
       Spacer(Modifier.width(6.dp))
       V3IconButton(Icons.Outlined.MoreHoriz, StrProducts.rowActions, size = 36.dp, iconSize = 20.dp) { menu = true }
     }
-    if (expanded) {
-      V3Divider()
-      Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp), content = fields)
+    V3Collapse(expanded) {
+      Column(Modifier.fillMaxWidth()) {
+        V3Divider()
+        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp), content = fields)
+      }
     }
   }
   if (menu) {

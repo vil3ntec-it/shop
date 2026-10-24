@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -47,7 +48,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
-import ir.vil3ntec.tohid.ui.screens.Motion
 
 /** کارِ برگهٔ دسته‌ها: انتخابِ یک دسته (فرم، فروشِ سریع)، مدیریت، یا دستهٔ گروهی */
 internal sealed interface CategoryUse {
@@ -105,7 +105,7 @@ internal fun CategorySheet(store: ShopStore, data: ShopData, toasts: V3Toasts, u
       LazyColumn(Modifier.fillMaxWidth().heightIn(max = 380.dp).clip(RoundedCornerShape(16.dp)).background(if (c.isDark) c.tile else c.bg)) {
         itemsIndexed(list, key = { _, s -> s }) { i, cat ->
           //  ورودِ پلکانی و جابه‌جاییِ نرم وقتی دسته‌ای اضافه یا حذف می‌شود
-          Column(if (Motion.enabled) Modifier.animateItem().v3Stagger(stagger, cat, i) else Modifier) {
+          Column(Modifier.v3AnimateItem(this).v3Stagger(stagger, cat, i)) {
           if (i > 0) V3Divider(start = 64.dp)
           val current = (use as? CategoryUse.Pick)?.selected == cat
           V3ListRow(
