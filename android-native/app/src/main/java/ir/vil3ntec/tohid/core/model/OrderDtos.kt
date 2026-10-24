@@ -14,6 +14,13 @@ data class OrderPermsDto(
   val manage: Boolean = false,
   val contact: Boolean = false,
   val refund: Boolean = false,
+  /**
+   *  همان سنجشِ Sync v1 برای فروشِ تحویل (`order-ledger.capsOf`): نقشی که این‌ها را ندارد
+   *  فروش را فقط روی دستگاهِ خودش نگه می‌داشت ⇒ ثبت را به دستگاهِ توانا می‌سپارد.
+   */
+  val recordSale: Boolean = false,
+  val saleDiscount: Boolean = false,
+  val saleCancel: Boolean = false,
 )
 
 /** `GET /shop/orders/config` — بخش فقط وقتی `enabled` است دیده می‌شود */
@@ -26,6 +33,13 @@ data class OrdersConfigDto(
   val reasons: Map<String, List<String>> = emptyMap(),
   val sources: List<String> = emptyList(),
   val permissions: OrderPermsDto = OrderPermsDto(),
+  /** سرور «فروشِ تحویل در برنامه» را دارد — بی این (سرورِ کهنه) برنامه هیچ فروشی نمی‌سازد */
+  val saleOnHandover: Boolean = false,
+  /**
+   *  کفِ همین دکان روی سرور: تحویلِ پیش از این لحظه هرگز فروشِ برنامه نمی‌گیرد. سرور آن را با
+   *  نخستین `config?caps=saleOnHandover` می‌گذارد؛ null ⇒ هنوز نه ⇒ هیچ فروشی.
+   */
+  val handoverSince: Long? = null,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -115,6 +129,35 @@ data class OrderDto(
   val deliveryFeeMinor: Long = 0,
   val lines: List<OrderLineDto> = emptyList(),
   val events: List<OrderEventDto> = emptyList(),
+  /** فقط در `GET /shop/orders/handover`: لحظهٔ نخستین تحویل (زمانِ سرور) */
+  val handedOverAt: Long? = null,
+  /** فقط در `handover`: `sale` (فروش بساز) یا `reverse` (فروش را لغو کن) */
+  val action: String = "",
+  /** فقط در `handover` برای `reverse`: لحظهٔ برگشت به دکان */
+  val returnedAt: Long? = null,
+  /**
+   *  فقط در `handover` برای `sale`: همین کاربر (اجازهٔ مؤثرش، با سقفِ درصد/مبلغِ تخفیفِ **همین**
+   *  سفارش) فروش را می‌تواند بنویسد. null (سرورِ کهنه) ⇒ اجازهٔ کلیِ نقش.
+   */
+  val recordable: Boolean? = null,
+  /** فقط در `handover` برای `reverse`: همین کاربر لغوِ فروش را می‌تواند بنویسد */
+  val reversible: Boolean? = null,
+  /** فقط در `handover` برای `review`: چرا خودکار نه (`before_floor`: نخستین تحویل پیش از کفِ دکان) */
+  val reviewCode: String? = null,
+)
+
+/** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
+@Serializable
+data class HandoverPageDto(
+  val items: List<OrderDto> = emptyList(),
+  /** برگشته به دکان با فروشِ لغونشده */
+  val reversals: List<OrderDto> = emptyList(),
+  /** بررسیِ صاحب: پیش از کف بیرون رفت و پس از آن تحویل شد — هرگز خودکار */
+  val review: List<OrderDto> = emptyList(),
+  /** صفحهٔ بعد (`after`) — سفارشِ گیرکرده جلوی بقیه را نمی‌گیرد */
+  val nextAfter: String? = null,
+  val since: Long = 0,
+  val serverTime: Long = 0,
 )
 
 @Serializable

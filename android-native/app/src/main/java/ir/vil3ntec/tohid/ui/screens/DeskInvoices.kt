@@ -65,7 +65,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
     val q = search.trim()
     d.sales
       .filter { it.date in from..to }
-      .filter { pay == "all" || (pay == "credit") == (it.paymentMethod == "credit") }
+      .filter { pay == "all" || ir.vil3ntec.tohid.data.PayFlow.payGroup(it) == pay }
       .filter { state == "all" || (state == "cancelled") == (it.status == "cancelled") }
       .filter { q.isEmpty() || (it.invoiceNumber?.toString() == q || it.invoiceLabel().equals(q, ignoreCase = true)) || (it.debtorId?.let(names::get)?.contains(q, true) == true) || it.seller.contains(q, true) }
       .sortedWith(compareByDescending<Sale> { it.date }.thenByDescending { it.createdAt })
@@ -78,7 +78,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
       rows += listOf(s.invoiceLabel().orEmpty(), s.date, s.debtorId?.let(names::get).orEmpty(), (counts[s.id] ?: 0).toString(),
         Math.round(s.total).toString(), Math.round(s.discount).toString(), Math.round(s.finalTotal).toString(),
         Math.round(s.paidAmount).toString(), Math.round(s.remaining).toString(),
-        if (s.paymentMethod == "credit") "نسیه" else "نقد", s.seller, if (s.status == "cancelled") "لغوشده" else "ثبت‌شده")
+        ir.vil3ntec.tohid.data.PayFlow.payLabel(s), s.seller, if (s.status == "cancelled") "لغوشده" else "ثبت‌شده")
     }
     return ReportCsv.Sheet("فاکتورهای-فروش-$from-تا-$to", rows)
   }
@@ -114,7 +114,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
           FilterChip(selected = range == r, onClick = { range = r }, label = { Text(t) }); Spacer(Modifier.width(4.dp))
         }
         Spacer(Modifier.width(10.dp))
-        listOf("all" to "نقد و نسیه", "cash" to "نقد", "credit" to "نسیه").forEach { (k, t) ->
+        listOf("all" to "همهٔ روش‌ها", "cash" to "نقد", "credit" to "نسیه", ir.vil3ntec.tohid.data.PayFlow.NON_CASH to "غیرنقد").forEach { (k, t) ->
           FilterChip(selected = pay == k, onClick = { pay = k }, label = { Text(t) }); Spacer(Modifier.width(4.dp))
         }
         Spacer(Modifier.width(10.dp))
@@ -147,7 +147,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
             4 -> TCell(money(s.finalTotal), if (off) Shop.colors.muted else Shop.colors.text, bold = true)
             5 -> TCell(money(s.paidAmount), Shop.colors.success)
             6 -> TCell(if (s.remaining > 0.5) money(s.remaining) else "", Shop.colors.danger)
-            7 -> TCell(if (s.paymentMethod == "credit") "نسیه" else "نقد")
+            7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(s))
             8 -> TCell(s.seller.ifBlank { "—" }, Shop.colors.muted)
             else -> TCell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
           }

@@ -150,6 +150,10 @@ class SalesEngineTest {
     assertEquals(500.0, tx.amount, 0.0001)
     assertEquals("d1", tx.debtorId)
     assertEquals("فروش نسیه — فاکتور #1", tx.notes)
+    //  ساختهٔ سیستم: سرور اگر فاکتور را رد کند این «برد» را هم با آن برمی‌گرداند
+    assertEquals(sale.id, tx.refId)
+    assertEquals(SalesEngine.SALE_CREDIT, tx.kind)
+    assertEquals("sale_credit", tx.kind)
 
     // و همان عدد از حسابِ قرض‌دار هم درمی‌آید
     assertEquals(500.0, ShopStore.debt(r.data, "d1"), 0.0001)

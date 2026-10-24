@@ -86,6 +86,11 @@ object Updater {
   ): Result<Release?> =
     withContext(Dispatchers.IO) {
       runCatching {
+        //  پیش‌نمایش: فقط برچسبِ `tohid-native-preview` روی GitHub — نه سرور، نه پایدار
+        if (ir.vil3ntec.tohid.BuildConfig.PREVIEW) {
+          return@runCatching fromPreview()
+            ?.takeIf { ReleaseFeed.previewBuild(it.version) > ReleaseFeed.previewBuild(currentVersion) }
+        }
         //  راهِ اصلی: سرورِ خودمان (`/api/releases`) — برنامه به github.com وصل
         //  نمی‌شود و نامِ مخزن لازم نیست. GitHub فقط وقتی پرسیده می‌شود که
         //  سرور هنوز این مسیر را ندارد (سرورِ به‌روزنشده).
@@ -147,6 +152,25 @@ object Updater {
       apkUrl = pick.apk.url,
       size = pick.apk.size,
       sumsUrl = pick.sumsUrl,
+    )
+  }
+
+  /**
+   *  نسخهٔ پیش‌نمایش (`BuildConfig.PREVIEW`): نامِ نصبی ثابت، نسخه از `label`ِ آن
+   *  (`ReleaseFeed.previewPick`). دانلود همان `ResumableDownload` و سنجش همان
+   *  `verify` با `SHA256SUMS.txt` (و امضایش، اگر کلید سنجاق شده باشد).
+   */
+  private fun fromPreview(): Release? {
+    val p = ReleaseFeed.previewPick(
+      get("https://api.github.com/repos/vil3ntec-it/shop/releases/tags/${ReleaseFeed.PREVIEW_TAG}")
+    ) ?: return null
+    val apk = p.assets.first { it.name == ReleaseFeed.PREVIEW_ASSET }
+    return Release(
+      version = p.version,
+      notes = p.notes,
+      apkUrl = apk.url,
+      size = apk.size,
+      sumsUrl = p.assets.first { it.name == ReleaseFeed.SUMS }.url,
     )
   }
 

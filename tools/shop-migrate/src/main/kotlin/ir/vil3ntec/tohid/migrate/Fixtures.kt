@@ -130,7 +130,7 @@ object Fixtures {
       val qty = if (weighted) (20_000 + rnd.nextInt(80_000)) / 1000.0 else (20 + rnd.nextInt(80)).toDouble()
       purchase(p, qty, 0, 40 + i)
       if (i % 4 == 0) {
-        val e = WarehouseEntry(id(t), p.id, 0.0, 0.0, -1.0, p.unit, cost, date(0), "شمارش", true, null, t + 1)
+        val e = WarehouseEntry(id(t), p.id, 0.0, 0.0, -1.0, p.unit, cost, date(0), "شمارش", true, null, null, t + 1)
         entries += e
         stock.merge(p.id, -1.0, Double::plus)
         movements += StockMovement(id(t), p.id, "adjustment", -1.0, date(0), "شمارش", e.id, t + 1)
@@ -143,7 +143,7 @@ object Fixtures {
       val total = Math.round(qty * p.purchasePrice * 100) / 100.0
       val paid = if (rnd.nextInt(3) == 0) total else Math.floor(total / 2)
       val purchaseId = id(t)
-      val entry = WarehouseEntry(id(t), p.id, 0.0, 0.0, qty, p.unit, p.purchasePrice, date(day), "", false, purchaseId, t)
+      val entry = WarehouseEntry(id(t), p.id, 0.0, 0.0, qty, p.unit, p.purchasePrice, date(day), "", false, purchaseId, null, t)
       entries += entry
       purchases += Purchase(purchaseId, p.id, supplier.id, qty, p.unit, p.purchasePrice, total, date(day), "",
         paid, total - paid, entry.id, t, 0)
@@ -339,9 +339,9 @@ object Fixtures {
         DebtTransaction("tiny-2", d.debtors[0].id, "give", 10.004, day, "", at) +
         DebtTransaction("negative-give", d.debtors[1].id, "give", -20.0, day, "", at),
       warehouseEntries = d.warehouseEntries +
-        WarehouseEntry("tiny-entry-1", p1.id, 0.0, 0.0, 1.0004, p1.unit, p1.purchasePrice, day, "", false, null, at) +
-        WarehouseEntry("tiny-entry-2", p1.id, 0.0, 0.0, 1.0004, p1.unit, p1.purchasePrice, day, "", false, null, at) +
-        WarehouseEntry("ghost-entry", "gone-product", 0.0, 0.0, 5.0, "عدد", 10.0, day, "", false, null, at),
+        WarehouseEntry("tiny-entry-1", p1.id, 0.0, 0.0, 1.0004, p1.unit, p1.purchasePrice, day, "", false, null, null, at) +
+        WarehouseEntry("tiny-entry-2", p1.id, 0.0, 0.0, 1.0004, p1.unit, p1.purchasePrice, day, "", false, null, null, at) +
+        WarehouseEntry("ghost-entry", "gone-product", 0.0, 0.0, 5.0, "عدد", 10.0, day, "", false, null, null, at),
       sales = if (cancelled < 0) d.sales else d.sales.mapIndexed { i, s -> if (i == cancelled) s.copy(cancelReason = "") else s },
     )
   }

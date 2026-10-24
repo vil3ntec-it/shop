@@ -8,7 +8,8 @@
  * ⛔ shop_id فقط از `slug` ِ ویترینِ روشن می‌آید، هرگز از بدنه.
  * ⛔ سقفِ درخواست: خواندن سطلِ خودش را با `generalMax` دارد (مثلِ کیو‌آرِ
  * پمپ)، ثبتِ سفارش و فرستادنِ کد `storeCheckoutMax`، زدنِ کد `verifyMax` —
- * همه به‌ازای IP، مثلِ بقیهٔ مسیرهای عمومی.
+ * همه به‌ازای IP، مثلِ بقیهٔ مسیرهای عمومی. ثبتِ سفارش افزون بر آن سقفِ
+ * شمارهٔ تأییدشده را هم دارد (RSK-07، `lib/order-rate`).
  *
  * پیشوندِ تازهٔ `apiRouter` است ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی باید
  * `/store` را هم بگیرد (ریپوی دیگر؛ دستورالعمل در PR).
@@ -19,6 +20,7 @@ const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
+const orderTimeout = require('../lib/order-timeout');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -128,11 +130,22 @@ router.post('/:slug/verify/check', codeLimit, store, wrap(async (req, res) => {
 //  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
 router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
   const key = orders.clientKeyOf(req);
-  const out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
+  let out;
+  try {
+    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
+  } catch (err) {
+    //  RSK-07: سقفِ شماره (lib/order-rate) — کِی دوباره
+    if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));
+    throw err;
+  }
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });
   }
+  //  ORD-05: زمان‌سنجِ قبول — فقط اگر دکان همین لحظه می‌پذیرد (سفارشِ «بعداً» نه).
+  //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
+  await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
+    .catch((err) => console.error('[order-timeout] arm', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,

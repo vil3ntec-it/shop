@@ -70,6 +70,13 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
   val weOwe = remember(d) { d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id).coerceAtLeast(0.0) } }
   val expiry = remember(d, today) { ExpiryEngine.alerts(d, today) }
   val shift = remember(d) { CashShift.current(d) }
+  //  PAY (v3 A4): با پرچم نقدِ مورد انتظار از هستهٔ pay-core (`PayFlow`)؛ خاموش ⇒ همان `CashShift`
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  //  شمارشِ کور (PAY-13): با پرچم، شاگرد مبلغِ مورد انتظار را این‌جا هم نمی‌بیند
+  val blind = remember { payV2 && ir.vil3ntec.tohid.data.ShopRole.isStaff(context) }
+  fun expectedCash(s: CashShift.Shift): Double =
+    if (payV2) ir.vil3ntec.tohid.data.PayFlow.expectedCash(d, s.open, System.currentTimeMillis())
+    else CashShift.totalsOf(d, s, System.currentTimeMillis()).expected
   val sellers = remember(d, today) { ReportEngine.bySeller(d, monthFrom, today) }
   val recent = remember(d) { d.auditLog.sortedByDescending { it.createdAt }.take(8) }
   val canAdmin = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
@@ -103,7 +110,7 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
       if (canMoney) add(Triple("ارزشِ انبار", "${money(stock.value)} ؋", "${plain(stock.products)} قلم کالا"))
       add(Triple("طلب از قرض‌داران", "${money(owed)} ؋", "${plain(d.debtors.count { ShopStore.debt(d, it.id) > 0 })} نفر"))
       if (canMoney) add(Triple("بدهی به تأمین‌کننده", "${money(weOwe)} ؋", "${plain(d.suppliers.size)} تأمین‌کننده"))
-      add(Triple("نقدِ مورد انتظار در دخل", shift?.let { "${money(CashShift.totalsOf(d, it, System.currentTimeMillis()).expected)} ؋" } ?: "صندوق بسته", shift?.let { "باز از ${formatMillis(it.open.createdAt)}" } ?: "از «تاریخچهٔ فروش» باز کنید"))
+      add(Triple("نقدِ مورد انتظار در دخل", shift?.let { if (blind) "شمارشِ کور" else "${money(expectedCash(it))} ؋" } ?: "صندوق بسته", shift?.let { "باز از ${formatMillis(it.open.createdAt)}" } ?: "از «تاریخچهٔ فروش» باز کنید"))
       add(Triple("هشدارِ انبار", "${plain(stock.out + stock.low)}", "${plain(stock.out)} تمام‌شده · ${plain(stock.low)} کم"))
     }
     val perRow = when (size) { Screen.WIDE -> 4; Screen.TABLET -> 3; else -> 2 }
@@ -132,12 +139,17 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
         HubCard("صندوق", Icons.Filled.PointOfSale, "صندوق و فاکتورها", { onOpen("sales") }) {
           if (shift == null) {
             Text("صندوق بسته است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+          } else if (payV2) {
+            //  PAY (v3 A4): همان عددِ هسته — کیف پول و کارت نقدِ دخل نیستند
+            HubLine("اول صندوق", money(shift.open.amount))
+            HubLine("مورد انتظار (نقد)", if (blind) "شمارشِ کور" else money(expectedCash(shift)), Shop.colors.primary)
           } else {
             val t = CashShift.totalsOf(d, shift, System.currentTimeMillis())
             HubLine("اول صندوق", money(t.opening))
             HubLine("فروشِ نقدی", money(t.sales))
             HubLine("رسیدِ قرض‌داران", money(t.receipts))
             HubLine("مرجوعی و مصارف", "−" + money(t.returns + t.expenses + t.suppliers))
+            if (t.cashIn > 0 || t.cashOut > 0) HubLine("ورود و خروجِ نقد", (if (t.cashIn - t.cashOut < 0) "−" else "") + money(kotlin.math.abs(t.cashIn - t.cashOut)))
             HubLine("مورد انتظار", money(t.expected), Shop.colors.primary)
           }
         }

@@ -279,6 +279,32 @@ test('امضای خامِ WebCrypto (۶۴ بایت) هم پذیرفته است',
   assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
 });
 
+test('امضای خامِ ۶۴ بایتی که با 0x30 آغاز می‌شود (۱ در ۲۵۶) هم پذیرفته است، نه «DER ِ خراب»', async () => {
+  const approvals = require('../src/lib/staff-approval');
+  //  بردارِ ثابت: کلیدِ عمومی، متن و امضای IEEE P1363 ِ معتبری که بایتِ اولش 0x30 است
+  const spki = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAECKVAe+GZdauGSn4TtiCKieNJcXalPH0LF3QvwKKCtEyoppSkebfAA+QPwD19EQ7YngZnz2JOyvTnjyDn/Tb+cQ==';
+  const text = 'tohid-approval-v1|p1363-0x30';
+  const sig = 'MIJQGUP7M4zulHmGfdkk447K72jouGelMY5fjkr92XGUlb/HigMVwATQHWbhdJVO8F8mbeHduQn7DCcbZWB+6w==';
+  assert.equal(Buffer.from(sig, 'base64')[0], 0x30);
+  assert.equal(Buffer.from(sig, 'base64').length, 64);
+  assert.equal(approvals.verifySignature(spki, text, sig), true);
+  assert.equal(approvals.verifySignature(spki, text + '!', sig), false);
+  //  DER همچنان پذیرفته است
+  const { privateKey, publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const der = crypto.sign('sha256', Buffer.from(text, 'utf8'), { key: privateKey, dsaEncoding: 'der' }).toString('base64');
+  assert.equal(approvals.verifySignature(publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), text, der), true);
+
+  //  سرتاسری: برگهٔ امضاشده با WebCrypto که امضایش با 0x30 آغاز می‌شود
+  let s;
+  for (let i = 0; i < 20000; i++) {
+    const c = slip(ownerKey, { doc: 'sales/s-web-30', perm: 'sales.discount', pct_bp: 2000, amount: 2000, encoding: 'ieee-p1363' });
+    if (Buffer.from(c.sig, 'base64')[0] === 0x30) { s = c; break; }
+  }
+  assert.ok(s, 'امضای 0x30 پیدا نشد');
+  const r = await push3(manager, 'm-web', [sale('s-web-30', 10000, 2000, { approval: s })]);
+  assert.equal(r.body.results[0].status, 'applied', JSON.stringify(r.body));
+});
+
 test('tx: فروشِ بیش از سقف بی برگه ⇒ کلِ tx برمی‌گردد ولی صندوق می‌ماند', async () => {
   const tx = 'tx-ap-1';
   const s = sale('s-tx-ap', 10000, 3000, { tx });
@@ -310,14 +336,18 @@ test('لغوِ فاکتور با «نیازمند تأیید»: بی برگه ر
 });
 
 test('برگشت با سقفِ مبلغ: بیش از سقف بی برگه رد، زیرِ سقف و با برگه می‌نشیند', async () => {
+  //  فاکتورِ خودش: سقفِ برگشت تجمعیِ هر فاکتور است (staff-guard-companions.test.js)، و روی
+  //  s-ref-m پیش‌تر ۹۰۰۰ برگشته
   const ret = (id, amount, extra = {}) => ({ op_id: oid(), hlc: H('s'), table: 'returns', row_id: id, kind: 'insert',
-    fields: { amountMinor: amount, saleId: 's-ref-m' }, ...extra });
+    fields: { amountMinor: amount, saleId: 's-ret-cap' }, ...extra });
   const over = ret('r-over', 60000);
   assert.equal((await push3(staff, 's-r', [over])).body.results[0].reason, 'approval_required');
   assert.equal((await boxOf(over.op_id)).detail.perm, 'returns.create');
   assert.equal((await push3(staff, 's-r', [ret('r-under', 40000)])).body.results[0].status, 'applied');
   const s = slip(ownerKey, { doc: 'returns/r-ap', perm: 'returns.create', amount: 60000, reason: 'کالای خراب' });
   assert.equal((await push3(staff, 's-r', [ret('r-ap', 60000, { approval: s })])).body.results[0].status, 'applied');
+  //  حالا ۱۰۰۰ روی این فاکتور برگشته ⇒ برگشتِ کوچکِ بعدی هم تأیید می‌خواهد
+  assert.equal((await push3(staff, 's-r', [ret('r-more', 5000)])).body.results[0].reason, 'approval_required');
 });
 
 /* ------------------------------------------------------- v2 و v1 */
@@ -490,4 +520,43 @@ test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خود�
     v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 1 }),
   ]);
   assert.deepEqual(ok.body.results.map((x) => x.status), ['applied', 'applied', 'applied'], JSON.stringify(ok.body));
+});
+
+/* ------------------------- v1: opِ نادرستی که «پالایشِ null ِ قدیمی» درستش می‌کند */
+
+//  `shopNewerFields` کلیدِ null ِ ناشناخته را برمی‌دارد و hash را دوباره می‌سازد. نگهبان اگر پیش
+//  از آن بیاید، opِ نادرست را بی داوری رها می‌کند («خودِ v1 ردش می‌کند») و پالایش آن را درست می‌کند
+//  ⇒ تخفیف/لغو/برگشتِ بیش از سقف بی برگه می‌نشست. فرستنده با نفرستادنِ `caps` خودش این را تعیین می‌کند.
+test('Sync v1: کلیدِ null ِ نادرست («$x» یا بیش از ۶۴KB) تخفیف، لغو و برگشتِ بیش از سقف را از نگهبان رد نمی‌کند', async () => {
+  assert.equal((await setRole('manager', { 'sales.discount': { caps: { maxPct: 10 } }, 'sales.cancel': { mode: 'approve' } })).status, 200);
+  assert.equal((await setRole('staff', { 'returns.create': { caps: { maxAmount: 50000 } } })).status, 200);
+  const big = {};
+  for (let i = 0; JSON.stringify(big).length < 70 * 1024; i++) big[`n${String(i).padStart(56, '0')}`] = null;
+  const cases = [
+    [manager, v1op('sales', 's-nl-1', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', $x: null })],
+    [manager, v1op('sales', 's-nl-2', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', ...big })],
+    [manager, v1op('sales', 's-nl-1', 'update', { status: 'cancelled', finalTotal: 70, $x: null })],
+    [staff, v1op('returns', 'r-nl-1', 'insert', { saleId: 's-nl-1', quantity: 1, amount: 600, $x: null })],
+  ];
+  for (const [who, op] of cases) {
+    const r = await push1(who, 'nl-1', [op]);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.results[0].status, 'rejected', `${op.table}/${op.type}: ${JSON.stringify(r.body.results[0])}`);
+    assert.equal(r.body.results[0].reason, 'approval_required');
+    assert.equal(await inOplog(op.op_id), false);
+  }
+  //  دستهٔ آمیخته: پاسخ‌ها با ترتیبِ دستهٔ اصلی (پالایش یکی را کامل برمی‌دارد، نگهبان یکی را رد می‌کند)
+  const gone = v1op('products', 'p-nl-1', 'update', { junk: null });
+  const over = v1op('sales', 's-nl-4', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', $x: null });
+  const fine = v1op('products', 'p-nl-2', 'insert', { name: 'نبات' });
+  const mix = await push1(manager, 'nl-1', [gone, over, fine]);
+  assert.deepEqual(mix.body.results.map((x) => [x.op_id, x.reason || x.status]),
+    [[gone.op_id, 'stale_null_ignored'], [over.op_id, 'approval_required'], [fine.op_id, 'applied']]);
+  //  op ِ نادرستی که پالایش هم درستش نمی‌کند، روی جدولِ زیرِ نگهبان صریحاً رد می‌شود
+  const bad = v1op('sales', 's-nl-3', 'insert', { total: 100, discount: 30, finalTotal: 70, $x: 1 });
+  const rb = await push1(manager, 'nl-1', [bad]);
+  assert.equal(rb.body.results[0].status, 'rejected');
+  assert.equal(rb.body.results[0].reason, 'bad_field_name');
+  assert.equal(await inOplog(bad.op_id), false);
+  assert.equal((await setRole('manager', {})).status, 200);
 });
