@@ -142,8 +142,8 @@ object Receipt {
     }.getOrDefault("")
     val kind = when {
       sale.status == "cancelled" -> "لغوشده"
-      sale.paymentMethod == "credit" -> "نسیه"
-      else -> "نقدی"
+      //  PAY (v3 A4): از `payments` اگر هست (کارت، حواله، کیف پول، ترکیبی…)؛ وگرنه همان امروز
+      else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
     }
     line("${LocaleText.date(sale.date, digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
 
@@ -170,6 +170,8 @@ object Receipt {
     row("مبلغ نهایی", afn(sale.finalTotal), head)
     row("پرداختی", afn(sale.paidAmount), body)
     row("باقی‌مانده", afn(sale.remaining), body)
+    //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
+    ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> row(label, afn(amount), body) }
     if (debtor != null) row("قرض‌دار", debtor.name, body)
 
     rule(thick = true)
