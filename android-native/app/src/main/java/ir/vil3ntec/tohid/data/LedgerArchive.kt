@@ -123,16 +123,19 @@ object LedgerArchive {
         //  بایگانیِ قبلی خوانده و با تازه‌ها یکی می‌شود؛ هیچ ردیفی از بایگانی
         //  بیرون نمی‌رود. ردیفی که از تلاشِ نیمه‌کارهٔ پیشین آن‌جا نشسته،
         //  دوباره اضافه نمی‌شود.
-        val existing = readArchive(context)
-        val merged = Archive(
-          stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
-          priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },
-          auditLog = union(existing.auditLog, fresh.auditLog) { it.id },
-        )
-        //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
-        //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
-        //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
-        DiskWrite.text(file(context), json.encodeToString(merged))
+        //  زیرِ قفلِ کوچِ رمز (SEC-01): کوچ میانِ خواندن و نوشتن نمی‌نشیند
+        synchronized(AtRest.lock) {
+          val existing = readArchive(context)
+          val merged = Archive(
+            stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
+            priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },
+            auditLog = union(existing.auditLog, fresh.auditLog) { it.id },
+          )
+          //  ⛔ اگر بایگانی به دیسک نرسد همین‌جا شکست می‌خورد و دفتر کوتاه نمی‌شود
+          //  — پیش‌تر نتیجهٔ `renameTo` دیده نمی‌شد و روی ویندوز ردیف‌ها از دفتر
+          //  می‌رفتند بی آنکه در بایگانی نشسته باشند (F0-01)
+          AtRest.writeText(context, file(context), json.encodeToString(merged))
+        }
       },
       forget = { gone ->
         //  ⛔ سایهٔ Sync v1 — شکستش پرتاب می‌شود و دفتر کوتاه نمی‌شود. پیش‌تر
@@ -184,10 +187,22 @@ object LedgerArchive {
     return old + fresh.filter { id(it) !in have }
   }
 
+  /**
+   *  ⛔ بایگانیِ **رمزداری** که باز نشد پرتاب می‌کند (`AtRestException`)، نه
+   *  «بایگانیِ خالی»: وگرنه فشرده‌سازیِ بعدی بایگانیِ واقعی را با همان چند
+   *  ردیفِ تازه رونویسی می‌کرد. بایگانیِ ساده همان رفتارِ همیشه را دارد.
+   */
   fun readArchive(context: Context): Archive {
     val f = file(context)
     if (!f.exists()) return Archive()
-    return runCatching { json.decodeFromString<Archive>(f.readText()) }.getOrDefault(Archive())
+    val text = try {
+      AtRest.readText(context, f)
+    } catch (e: ir.vil3ntec.tohid.core.atrest.AtRestException) {
+      throw e
+    } catch (e: Exception) {
+      return Archive()
+    }
+    return runCatching { json.decodeFromString<Archive>(text) }.getOrDefault(Archive())
   }
 
   /**

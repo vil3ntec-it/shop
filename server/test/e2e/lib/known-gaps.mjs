@@ -15,10 +15,6 @@ export const KNOWN_GAPS = [
     scenario: 'return', step: 'S13.waste', match: /مقصدِ «ضایعات»/,
     ref: 'RET-07 (STATUS: ناقص) — SalesEngine.recordReturn مقصدِ برگشت (موجودی/ضایعات) ندارد؛ کالای «خراب» به موجودیِ فروختنی برمی‌گردد',
   },
-  {
-    scenario: 'stock', step: 'E2E-STK.pos-view', match: /فروشِ اینترنتی به دفترِ دستگاه برنمی‌گردد/,
-    ref: '§۳۲.۲ بندهای ۱ و ۴ — MISSING: کسرِ سفارشِ اینترنتی فقط در دفترِ سرور (#263) است و به دفترِ برنامهٔ دکان (ShopStore.stock) برنمی‌گردد',
-  },
 ];
 
 /**

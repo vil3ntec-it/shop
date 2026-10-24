@@ -100,20 +100,20 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
    *  را می‌شمرد.
    *  ⚠️ اگر خودِ یک op از سقف بزرگ‌تر باشد باز هم تنها می‌رود؛ دستهٔ
    *  خالی یعنی صفی که تا ابد گیر کرده.
+   *  ⚠️ یک ثبت (همهٔ opهای یک `LedgerDiff.diff`، یک `ts`) وسطِ دو دسته بریده
+   *  نمی‌شود ([cut])، مگر کلِ دسته همان یک ثبت باشد.
    */
   @Synchronized
   fun batch(maxOps: Int = MAX_OPS, maxBytes: Int = MAX_BYTES): List<SyncOp> {
-    val out = ArrayList<SyncOp>(maxOps)
-    var size = 2
+    val ops = ArrayList<SyncOp>()
+    val sizes = ArrayList<Int>()
     for (raw in read(file)) {
-      if (out.size >= maxOps) break
+      if (ops.size > maxOps) break                 //  یکی بیشتر: تا ببینیم ثبتِ آخر بریده شد یا نه
       val op = SyncOp.fromJson(raw) ?: continue
-      val bytes = raw.toString().toByteArray(Charsets.UTF_8).size + 1
-      if (out.isNotEmpty() && size + bytes > maxBytes) break
-      size += bytes
-      out += op
+      ops += op
+      sizes += raw.toString().toByteArray(Charsets.UTF_8).size + 1
     }
-    return out
+    return cut(ops, sizes, maxOps, maxBytes)
   }
 
   /** فقط opهای پذیرفته‌شده بیرون می‌روند. */
@@ -187,5 +187,30 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
     const val MAX = 50_000
     const val MAX_OPS = 200
     const val MAX_BYTES = 256 * 1024
+
+    /**
+     *  دسته از سرِ صف: تا [maxOps] op و [maxBytes] بایت (`sizes` اندازهٔ هر op).
+     *
+     *  سرِ سند (فاکتور، برگشت) و همراه‌هایش (قلم، حرکتِ انبار، تراکنش) در یک ثبت‌اند.
+     *  اگر سقف وسطِ یک ثبت بیفتد، سرور ممکن بود سند را در این دسته رد کند و همراهِ بی‌نشانیِ
+     *  دستهٔ بعد را بپذیرد (یا برعکس)؛ پس آن ثبت کامل به دستهٔ بعد می‌رود — مگر کلِ دسته
+     *  همان یک ثبت باشد (ثبتِ بزرگ‌تر از سقف ناچار بریده می‌شود؛ دستهٔ خالی یعنی صفِ قفل).
+     */
+    fun cut(ops: List<SyncOp>, sizes: List<Int>, maxOps: Int = MAX_OPS, maxBytes: Int = MAX_BYTES): List<SyncOp> {
+      var size = 2
+      var n = 0
+      while (n < ops.size && n < maxOps) {
+        if (n > 0 && size + sizes[n] > maxBytes) break
+        size += sizes[n]
+        n++
+      }
+      if (n in 1 until ops.size && ops[n].ts == ops[n - 1].ts) {
+        val ts = ops[n - 1].ts
+        var start = n - 1
+        while (start > 0 && ops[start - 1].ts == ts) start--
+        if (start > 0) n = start
+      }
+      return ops.subList(0, n).toList()
+    }
   }
 }

@@ -41,7 +41,12 @@ object ReportTables {
     "hour" to "نامعلوم", "payment" to "نامعلوم", "channel" to "نامعلوم",
   )
   private val KNOWN = mapOf(
-    "payment" to mapOf("cash" to "نقد", "credit" to "نسیه"),
+    //  PAY (v3 A4): مقدارهای تازهٔ `paymentMethod` (`PayFlow.legacyMethod`) — همان `KNOWN`ِ report-core.js
+    "payment" to mapOf(
+      "cash" to "نقد", "credit" to "نسیه", "card" to "کارت", "wallet" to "کیف پول", "transfer" to "حواله",
+      "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", "mixed" to "ترکیبی",
+      "online" to "پرداختِ آنلاین", "cod" to "نقد هنگامِ تحویل",
+    ),
     "channel" to mapOf("pos" to "حضوری", "online" to "اینترنتی"),
   )
   private val SALES_COLS = listOf(

@@ -87,12 +87,6 @@ router.get('/report', needFlag, requirePermission('reports.view'), wrap(async (r
   res.json(await stock.reconcile(req.shopId, { productId: String(req.query.productId || '') }));
 }));
 
-router.get('/reservations', needFlag, requirePermission('orders.view'), wrap(async (req, res) => {
-  const orderId = String(req.query.orderId || '');
-  if (!orderId) throw badRequest('شناسهٔ سفارش لازم است', 'order_required');
-  res.json({ reservations: await catalog.reservationsOf(req.shopId, orderId) });
-}));
-
 router.get('/tasks', needFlag, wrap(async (req, res) => {
   res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit }) });
 }));

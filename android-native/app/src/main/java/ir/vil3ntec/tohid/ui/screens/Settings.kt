@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.ChevronLeft
@@ -466,6 +467,34 @@ fun SettingsScreen(
       }
     }
 
+    /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
+    item { ReturnSettingsSection() }
+    /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
+    item {
+      var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
+      SettingsSection(
+        icon = Icons.Filled.PointOfSale,
+        title = "پرداخت و صندوق",
+        subtitle = if (payV2) "ترکیبی و شیفت" else "نقد و نسیه (امروز)",
+        tint = if (payV2) Shop.colors.primary else Shop.colors.muted,
+      ) {
+        Text(
+          "«ترکیبی» یعنی: نقد و کیف پول/کارت/حواله در یک فاکتور (با شمارهٔ مرجع، به‌صورتِ «ثبتِ دستی، در انتظار»)، پولِ پس فقط از نقد، باقی‌مانده به حسابِ مشتری؛ و صندوقِ شیفت با ورود/خروجِ نقد، کشو بی فروش، گزارش X و بستن با شمارشِ اسکناس. فقط روی همین دستگاه. برنامه‌های قدیمی فاکتورِ تازه را می‌خوانند، ولی پرداختِ کیف‌پولی را در صندوقِ خودشان نقد می‌شمارند.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("legacy" to "نقد و نسیه (امروز)", "v2" to "ترکیبی و شیفت"),
+          selected = if (payV2) "v2" else "legacy",
+          onSelect = {
+            payV2 = it == "v2"
+            ir.vil3ntec.tohid.data.ShopPolicy.setPayV2(context, payV2)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(
@@ -540,6 +569,9 @@ fun SettingsScreen(
         }
       }
     }
+
+    /* ===================== امنیت (SEC-01) ===================== */
+    item { SecuritySection(store, ::toast) }
 
     /* ========================= رمز حساب ========================= */
     if (signedIn) {
@@ -680,7 +712,8 @@ fun SettingsScreen(
               onClick = {
                 scope.launch {
                   val opened = withContext(Dispatchers.IO) {
-                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                    //  نسخهٔ خودکار رونوشتِ دفتر است؛ اگر دفتر رمزدار بود، این هم (SEC-01)
+                    runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() }
                   }
                   opened
                     .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }

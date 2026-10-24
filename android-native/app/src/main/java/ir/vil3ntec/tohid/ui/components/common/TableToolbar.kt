@@ -88,14 +88,15 @@ fun SearchBox(
   focus: FocusRequester? = null,
 ) {
   val c = Shop.colors
-  val h = if (Platform.DESKTOP) 38.dp else 48.dp
+  val h = if (Platform.DESKTOP) 40.dp else 48.dp
+  //  نسخهٔ ۲: کادرِ سفید با گوشهٔ ۱۲ و لبهٔ نرمِ ۱۴٪ — پیدا، ولی نه خطِ تیره
   Row(
     modifier
       .height(h)
       .clip(Shape.field)
-      .background(c.surfaceSolid)
+      .background(c.fieldBg)
       .border(1.dp, c.fieldBorder, Shape.field)
-      .padding(horizontal = 10.dp),
+      .padding(horizontal = 12.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Icon(Icons.Filled.Search, null, tint = c.muted, modifier = Modifier.size(18.dp))
@@ -109,7 +110,7 @@ fun SearchBox(
         onValueChange = onQuery,
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.copy(color = c.text),
-        cursorBrush = SolidColor(c.primary),
+        cursorBrush = SolidColor(c.focus),
         modifier = Modifier.fillMaxWidth().then(if (focus != null) Modifier.focusRequester(focus) else Modifier),
       )
     }
@@ -137,24 +138,24 @@ fun <T> FilterMenu(
 ) {
   val c = Shop.colors
   var open by remember { mutableStateOf(false) }
-  val h = if (Platform.DESKTOP) 38.dp else 48.dp
+  val h = if (Platform.DESKTOP) 40.dp else 48.dp
   Box(modifier) {
     Row(
       Modifier
         .height(h)
         .clip(Shape.button)
-        .background(if (selected != null) c.primaryTint else c.surfaceSolid)
-        .border(1.dp, c.border, Shape.button)
+        .background(if (selected != null) c.primaryTint else c.fieldBg)
+        .border(1.dp, if (selected != null) c.focus else c.fieldBorder, Shape.button)
         .clickable(role = Role.DropdownList) { open = true }
-        .padding(horizontal = 10.dp),
+        .padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Icon(Icons.Filled.FilterList, null, tint = c.muted, modifier = Modifier.size(18.dp))
+      Icon(Icons.Filled.FilterList, null, tint = if (selected != null) c.primaryDark else c.muted, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
       val current = options.firstOrNull { it.first == selected }?.second
       Text(
         if (current != null) "$label: $current" else label,
-        style = MaterialTheme.typography.labelLarge, color = c.text,
+        style = MaterialTheme.typography.labelLarge, color = if (current != null) c.primaryDark else c.text,
         fontWeight = if (current != null) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1,
       )
     }

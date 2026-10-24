@@ -200,7 +200,11 @@ class SyncV1Engine private constructor(context: Context) {
         synchronized(this) { restore.check(epoch) }
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
-        pushAll(client, device)?.let { return@withLock Result.failure(it) }
+        try {
+          pushQueue(client, device)
+        } catch (upgrade: SyncV1Client.UpgradeRequired) {
+          return@withLock Result.failure(upgrade)
+        }
 
         /*
          *  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، ردیف‌های تنهای همین دستگاه
@@ -225,7 +229,11 @@ class SyncV1Engine private constructor(context: Context) {
           if (built) {
             state.snapshotAt = System.currentTimeMillis()
             //  ردیف‌های تنها (اگر بود) همین حالا بروند
-            pushAll(client, device)?.let { return@withLock Result.failure(it) }
+            try {
+              pushQueue(client, device)
+            } catch (upgrade: SyncV1Client.UpgradeRequired) {
+              return@withLock Result.failure(upgrade)
+            }
           }
         }
 
@@ -260,12 +268,15 @@ class SyncV1Engine private constructor(context: Context) {
     }
 
   /**
-   *  صف تا ته، دسته‌دسته. ۴۲۶ ⇒ هیچ opی پاک نمی‌شود و همان خطا برمی‌گردد؛ وگرنه null.
+   *  فرستادنِ صف تا ته، دسته‌دسته — همان حلقهٔ همیشگیِ `runOnce`، جدا تا دفترِ رمزدارِ
+   *  خوانده‌نشده هم بتواند صفش را بفرستد (`pushPending`، `rebuildFromServer`). صدازننده `gate` را دارد.
    *
-   *  ⛔ پذیرفته‌شده‌ها با server_seq کنارِ صف (`V1Restore.accepted`) **پیش از** بیرون رفتن از آن —
-   *  تا اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند (§۹.۵).
+   *  ⛔ §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف (`V1Restore.accepted`) **پیش از** بیرون رفتن
+   *  از آن — تا اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند؛ ردِ opِ دوباره‌فرستاده بی‌صدا.
+   *
+   *  @throws SyncV1Client.UpgradeRequired سرور عقب‌تر است: هیچ opی پاک نمی‌شود
    */
-  private suspend fun pushAll(client: SyncV1Client, device: String): Throwable? {
+  private suspend fun pushQueue(client: SyncV1Client, device: String) {
     var guard = 0
     while (queue.size() > 0 && guard < 500) {
       guard++
@@ -283,7 +294,7 @@ class SyncV1Engine private constructor(context: Context) {
         state.holding = true
         state.lastError = upgrade.reason
         publish()
-        return upgrade
+        throw upgrade
       }
       state.holding = false
       state.serverSchema = out.serverSchema
@@ -307,7 +318,117 @@ class SyncV1Engine private constructor(context: Context) {
       }
       state.lastPushAt = System.currentTimeMillis()
     }
-    return null
+  }
+
+  /* ==========================================================
+     SEC-01 — دفترِ رمزداری که این دستگاه باز نمی‌کند (بازبینیِ #331)
+     ========================================================== */
+
+  /**
+   *  فقط فرستادنِ صف — بی Pull، بی تفاضل، بی نشاندن.
+   *
+   *  دفترِ رمزدار باز نشد (کلید نیست یا گذرا در دسترس نیست) ولی صفِ opها رمزدار نیست
+   *  (`AtRestScope.syncState`): تغییرهایی که پیش از آن ثبت شده بودند باید به سرور برسند —
+   *  هم برای خودشان، هم چون «بازسازی از سرور» فقط با صفِ خالی انجام می‌شود. pull نه، چون
+   *  نشاندنِ opها روی دفترِ خالیِ حافظه یعنی رونویسیِ دفترِ واقعی.
+   *
+   *  @return چند op هنوز در صف مانده
+   */
+  suspend fun pushPending(): Result<Int> = gate.withLock {
+    if (!Backend.isReady(app) || !Backend.isOnline(app)) { publish(); return@withLock Result.success(queue.size()) }
+    busy = true
+    publish()
+    try {
+      //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
+      synchronized(this) { commit.queueRecorded() }
+      pushQueue(SyncV1Client(Backend.api(app)), store.deviceUid)
+      Result.success(queue.size())
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (error: Throwable) {
+      attempt++
+      state.lastError = error.message ?: "خطای نامشخص"
+      Result.failure(error)
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  «بازسازی از سرور»: صف اول، بعد Snapshot؛ کناری ⇐ سایه و cursor ⇐ جابه‌جایی — شرح سرِ `SyncRebuild`.
+   *
+   *  @param base از آن فقط بخش‌های بیرون از همگام‌سازی (تنظیمات) برمی‌دارد
+   *  @param files کناری و جابه‌جاییِ دفتر (`ShopStore`)؛ زیرِ قفلِ همین موتور صدا زده می‌شوند
+   *  @throws Exception شبکه یا دیسک؛ تا پیش از `commitShadow` هیچ چیزی عوض نشده است
+   */
+  internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
+    busy = true
+    publish()
+    try {
+      synchronized(this) { commit.queueRecorded() }
+      val client = SyncV1Client(Backend.api(app))
+      val device = store.deviceUid
+      //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
+      //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد
+      val epoch = try {
+        client.epoch()
+      } catch (cancelled: kotlinx.coroutines.CancellationException) {
+        throw cancelled
+      } catch (_: Throwable) {
+        null
+      }
+      synchronized(this) { restore.check(epoch) }
+      val out = SyncRebuild(object : SyncRebuild.Io {
+        override fun queued(): Int = queue.size()
+        override suspend fun push() = pushQueue(client, device)
+        override fun shadow(): String = state.shadow
+        override suspend fun snapshot(): JsonObject = client.snapshot()
+        override fun stage(next: ShopData, shadowSha: String) = synchronized(this@SyncV1Engine) { files.stage(next, shadowSha) }
+        override fun commitShadow(shadow: String, cursor: Long) {
+          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+        }
+        override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
+      }).run(base)
+      if (out is SyncRebuild.Outcome.Done) {
+        val now = System.currentTimeMillis()
+        //  دفتر حالا همان سرور است (با opهای دوباره‌رفته) ⇒ ساختنِ دوبارهٔ §۹.۵ دیگر لازم نیست
+        if (state.restorePending) state.commitRestore(state.epoch, false)
+        state.snapshotAt = now
+        state.reconciledAt = now
+        state.lastOkAt = now
+        state.lastError = ""
+        attempt = 0
+      }
+      out
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /**
+   *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
+   *  ردیفی که در پشتیبان هست و سرور ندارد شاید حذف‌شده باشد و `prepare` زنده‌اش می‌کرد.
+   */
+  fun everSynced(): Boolean = state.cursor > 0 || state.reconciledAt > 0 || state.snapshotAt > 0
+
+  /** اثرِ سایهٔ همین حالا — برای `SyncRebuild.atLoad` */
+  fun shadowSha(): String = SyncRebuild.sha(state.shadow)
+
+  /**
+   *  بی سرور و **هرگز همگام‌نشده**: دفترِ بازیابی‌شده خودش سایه می‌شود ⇐ هیچ op؛ cursor صفر و
+   *  «هم‌ترازی» از نو. کناری و نشان پیش از سایه، جابه‌جایی پس از آن — همان ترتیبِ بازسازی.
+   */
+  @Synchronized
+  internal fun resetTo(ledger: ShopData, files: SyncRebuild.Staging) {
+    val shadow = SyncRebuild.shadowFor(ledger)
+    files.stage(ledger, SyncRebuild.sha(shadow))
+    if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+    state.reconciledAt = 0L
+    state.snapshotAt = 0L
+    files.swap()
+    publish()
   }
 
   /**

@@ -326,6 +326,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
+    //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
+    //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
+    api.use('/shop/receipt-profile', require('./routes/shop-receipt'));
+    api.use('/receipt', require('./routes/receipt-public'));
     //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
     //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
     api.use('/shop/market', require('./routes/market-admin'));
@@ -456,7 +460,7 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Cache-Control', 'no-cache').type('application/manifest+json').send(JSON.stringify({
       name: sf.title, short_name: String(sf.title).slice(0, 12), lang: 'fa', dir: 'rtl',
       start_url: start, scope: onHost ? '/' : `/store/${sf.slug}`, display: 'standalone',
-      background_color: '#F4F5F8', theme_color: '#5B45E0',
+      background_color: '#F3F6FA', theme_color: '#108B81',
       icons: [
         { src: '/kit/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: '/kit/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -480,6 +484,15 @@ async function createApp({ runMigrations = true } = {}) {
     res.status(on ? 200 : 404).set('Cache-Control', 'no-cache').sendFile('index.html', { root: marketDir });
   }).catch(next));
   app.use('/market', storeHeaders, express.static(marketDir, { index: false, maxAge: 0, etag: true }));
+
+  // ---- فاکتورِ عمومی (QRِ هر فاکتور، `/r/<نشانِ دکان>/<توکن>`) ----
+  //  همان CSP ِ سختِ ویترین، به‌علاوهٔ noindex و بی کش. پوسته همیشه همان است و
+  //  هیچ پرسشی نمی‌زند؛ داده و ۴۰۴ ِ یکسان از `/api/receipt` می‌آید.
+  const receiptDir = path.join(__dirname, '..', 'public', 'receipt');
+  const { privateHeaders } = require('./routes/receipt-public');
+  const receiptHeaders = (req, res, next) => storeHeaders(req, res, () => privateHeaders(req, res, next));
+  app.use('/r', receiptHeaders, express.static(receiptDir, { index: false, maxAge: 0, etag: true }));
+  app.get('/r/:tag/:token', receiptHeaders, (req, res) => res.sendFile('index.html', { root: receiptDir }));
 
   app.get('/', (req, res) => res.redirect('/admin/'));
 
