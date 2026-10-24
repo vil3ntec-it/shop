@@ -81,7 +81,8 @@
       const td = el('td');
       td.colSpan = 5;
       td.appendChild(el('strong', '', `${name} — ${fa(a.devices)} دستگاهِ فعال`));
-      td.appendChild(el('span', 'muted', ` · آخرین نسخه: ${a.latest || 'ثبت نشده'} · حداقل: ${a.minVersion || 'ندارد'} `));
+      td.appendChild(el('span', 'muted', ` · آخرین نسخه: ${a.latest || 'ثبت نشده'} · حداقل: ${a.minVersion || 'ندارد'}`
+        + `${a.versionsTruncated ? ` · فقط ${fa(a.versions.length)} نسخهٔ پرشمار` : ''} `));
       td.appendChild(el('span', `badge ${HEALTH_CLS[a.status] || 'b-mute'}`, `● ${APP_STATUS_FA[a.status] || '—'}`));
       head.appendChild(td);
       body.appendChild(head);
@@ -107,7 +108,8 @@
       }
     }
     if (alerts.length) msg(note, `⚠️ ${alerts.join(' · ')}`, out.status === 'down' ? 'bad' : 'warn');
-    $('ops-ver-checked').textContent = `دستگاه‌های همگام‌شده در ${fa(out.activeDays)} روزِ گذشته · بررسی: ${dateTime(out.checkedAt)}`;
+    $('ops-ver-checked').textContent = `دستگاه‌های همگام‌شده در ${fa(out.activeDays)} روزِ گذشته · بررسی: ${dateTime(out.checkedAt)}`
+      + (out.truncated ? ' · فهرست بریده شد (پرشمارترین‌ها)' : '');
   }
 
   // ---------- بارِ زبانه ----------

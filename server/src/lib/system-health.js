@@ -242,7 +242,7 @@ async function providers() {
  *  آخرین نسخه ثبت نشده ⇒ «کهنه» سنجیده نمی‌شود (`outdated: null`)، نه حدس.
  *  ⛔ فقط شمار و نسخه؛ نه شناسهٔ حساب، نه دستگاه.
  */
-const VERSION_LIMITS = Object.freeze({ activeDays: 30, maxVersionsPerApp: 50 });
+const VERSION_LIMITS = Object.freeze({ activeDays: 30, maxVersionsPerApp: 50, maxGroups: 1000 });
 const BASE_APPS = Object.freeze(['shop', 'pump']);
 const APP_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
 
@@ -277,35 +277,54 @@ function versionReport(rows, cfg) {
       if (state === 'outdated') outdated += g.devices;
       versions.push({ version, devices: g.devices, lastSeenAt: g.lastSeenAt || null, state });
     }
-    versions.sort((a, b) => (!a.version ? 1 : !b.version ? -1 : compat.compare(b.version, a.version)));
+    //  سقفِ نمایش: پرشمارترین نسخه‌ها می‌مانند (نه تازه‌ترین‌ها — وگرنه همان نسخه‌های
+    //  کهنهٔ زیرِ حداقل بریده می‌شدند)، بعد از تازه به کهنه؛ شمارها از همه است
+    const shown = versions.length > VERSION_LIMITS.maxVersionsPerApp
+      ? [...versions].sort((a, b) => b.devices - a.devices).slice(0, VERSION_LIMITS.maxVersionsPerApp)
+      : versions;
+    shown.sort((a, b) => (!a.version ? 1 : !b.version ? -1 : compat.compare(b.version, a.version)));
     out.push({
       app, latest, minVersion, devices, unknown, belowMin,
       outdated: latest ? outdated : null,
       status: belowMin ? 'down' : latest && outdated ? 'warn' : 'ok',
-      versions: versions.slice(0, VERSION_LIMITS.maxVersionsPerApp),
+      versions: shown,
+      versionsTruncated: shown.length < versions.length,
     });
   }
   return out;
 }
 
 /** داشبوردِ نسخه‌ها: دستگاه‌های دیده‌شده در `activeDays` روزِ گذشته. */
+/*
+ *  هر دستگاه (برنامه، حساب، دستگاه) یک بار: نسخه از تازه‌ترین ردیفی که نسخه
+ *  دارد — ردیفِ تازه‌ترِ بی‌نسخه به ردیفِ دیگرِ همان دستگاه برمی‌گردد — و
+ *  «آخرین دیده‌شدن» بیشینهٔ هر دو جدول. فعال = دیده‌شده در `activeDays`.
+ *  `v2.14.4` همان `2.14.4` است (در خودِ پرس‌وجو، تا گروه‌بندی و سقف درست باشد).
+ *  گروه‌ها پرشمار به کم‌شمار؛ بیش از `maxGroups` ⇒ `truncated`.
+ */
 async function versions() {
   const t = now();
+  const lim = VERSION_LIMITS.maxGroups;
   const rows = await many(
-    `SELECT app, app_version, COUNT(*)::int AS n, MAX(last_seen_at) AS last_seen
-       FROM (SELECT DISTINCT ON (app, account_kind, account_id, device_id) app, app_version, last_seen_at
-               FROM (SELECT app, account_kind, account_id, device_id, app_version, last_seen_at
-                       FROM sync_devices WHERE last_seen_at > $1
+    `SELECT app, app_version, COUNT(*)::int AS n, MAX(seen) AS last_seen
+       FROM (SELECT DISTINCT ON (app, account_kind, account_id, device_id)
+                    app, regexp_replace(btrim(app_version), '^[vV]', '') AS app_version, MAX(last_seen_at) OVER w AS seen
+               FROM (SELECT app, account_kind, account_id, device_id, app_version, last_seen_at FROM sync_devices
                      UNION ALL
-                     SELECT app, account_kind, account_id, device_id, app_version, last_seen_at
-                       FROM sync_v3_devices WHERE last_seen_at > $1) u
-              ORDER BY app, account_kind, account_id, device_id, last_seen_at DESC) d
+                     SELECT app, account_kind, account_id, device_id, app_version, last_seen_at FROM sync_v3_devices) u
+             WINDOW w AS (PARTITION BY app, account_kind, account_id, device_id)
+              ORDER BY app, account_kind, account_id, device_id, (btrim(app_version) <> '') DESC, last_seen_at DESC) d
+      WHERE seen > $1
       GROUP BY app, app_version
-      LIMIT 1000`,
+      ORDER BY n DESC, app, app_version
+      LIMIT ${lim + 1}`,
     [t - VERSION_LIMITS.activeDays * DAY]
   );
-  const apps = versionReport(rows, await require('./plans').allConfig());
-  return { checkedAt: t, activeDays: VERSION_LIMITS.activeDays, status: worst(apps.map((a) => a.status)), apps };
+  const apps = versionReport(rows.slice(0, lim), await require('./plans').allConfig());
+  return {
+    checkedAt: t, activeDays: VERSION_LIMITS.activeDays, truncated: rows.length > lim,
+    status: worst(apps.map((a) => a.status)), apps,
+  };
 }
 
 module.exports = {

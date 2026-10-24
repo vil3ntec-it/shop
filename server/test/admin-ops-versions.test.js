@@ -56,6 +56,9 @@ test.before(async () => {
   //  یک دستگاه در هر دو جدول: v1 کهنه‌تر (2.13.0)، v3 تازه‌تر (2.14.4) ⇒ یک بار، 2.14.4
   await v1('shop', 'acc-secret-d', 'dev-secret-6', '2.13.0', 5 * DAY);
   await v3('shop', 'acc-secret-d', 'dev-secret-6', '2.14.4', 1 * DAY);
+  //  ردیفِ تازه‌ترِ بی‌نسخه (v3) ⇒ نسخهٔ ردیفِ دیگرِ همان دستگاه (v1: 2.13.0)
+  await v1('shop', 'acc-secret-e', 'dev-secret-7', '2.13.0', 6 * DAY);
+  await v3('shop', 'acc-secret-e', 'dev-secret-7', '', 1 * DAY);
   //  پمپ: ۲ × 1.4.0
   await v1('pump', 'st-secret-1', 'pc-secret-1', '1.4.0', 1 * DAY);
   await v3('pump', 'st-secret-2', 'pc-secret-2', '1.4.0', 1 * DAY);
@@ -75,9 +78,13 @@ test('OPS-04: هر دستگاهِ فعال یک بار، بر پایهٔ تاز�
   assert.equal(r.headers.get('cache-control'), 'no-store');
   assert.equal(r.body.activeDays, 30);
   const shop = appOf(r.body, 'shop');
-  assert.equal(shop.devices, 5, JSON.stringify(shop));
+  assert.equal(shop.devices, 6, JSON.stringify(shop));
+  assert.equal(r.body.truncated, false);
+  assert.equal(shop.versionsTruncated, false);
   assert.equal(vOf(shop, '2.14.4').devices, 3);
-  assert.equal(vOf(shop, '2.13.0').devices, 1);
+  assert.equal(vOf(shop, '2.13.0').devices, 2);
+  //  «آخرین دیده‌شدن» از ردیفِ تازه‌تر (۱ روز پیش)، نه از ردیفِ نسخه‌دارِ ۶ روزه
+  assert.ok(vOf(shop, '2.13.0').lastSeenAt > now() - 2 * DAY);
   assert.equal(vOf(shop, '').devices, 1);
   assert.equal(shop.unknown, 1);
   assert.ok(!vOf(shop, '2.9.0'), 'دستگاهِ خاموشِ ۴۰ روزه شمرده شد');
@@ -98,7 +105,7 @@ test('هشدار: زیرِ حداقل ⇒ down؛ فقط کهنه ⇒ warn؛ هر
     let b = (await get(admin)).body;
     let shop = appOf(b, 'shop');
     assert.deepEqual([shop.latest, shop.minVersion], ['2.14.4', '2.14.0']);
-    assert.equal(shop.belowMin, 1);
+    assert.equal(shop.belowMin, 2);
     assert.equal(vOf(shop, '2.13.0').state, 'below_min');
     assert.equal(vOf(shop, '2.14.4').state, 'current');
     assert.equal(vOf(shop, '').state, 'unknown');
@@ -111,18 +118,38 @@ test('هشدار: زیرِ حداقل ⇒ down؛ فقط کهنه ⇒ warn؛ هر
     b = (await get(admin)).body;
     shop = appOf(b, 'shop');
     assert.equal(shop.belowMin, 0);
-    assert.equal(shop.outdated, 1);
+    assert.equal(shop.outdated, 2);
     assert.equal(vOf(shop, '2.13.0').state, 'outdated');
     assert.equal(shop.status, 'warn');
     assert.equal(b.status, 'warn');
 
     //  حداقلِ سراسریِ قدیمی (`min_app_version`) پشتوانه است
     await plans.setConfig('min_app_version', '2.14.0');
-    assert.equal(appOf((await get(admin)).body, 'shop').belowMin, 1);
+    assert.equal(appOf((await get(admin)).body, 'shop').belowMin, 2);
   } finally {
     for (const k of ['latest_version_shop', 'min_app_version_shop', 'latest_version_pump', 'min_app_version']) {
       await plans.setConfig(k, '');
     }
+  }
+});
+
+test('بیش از سقفِ گروه ⇒ truncated، پرشمارها می‌مانند', async () => {
+  await query(
+    `INSERT INTO sync_devices (app, account_kind, account_id, device_id, app_version, last_seen_at)
+     SELECT 'shop', 'shop', 'acc-many', 'd' || g, '9.' || g || '.0', $1 FROM generate_series(1, $2::int) g`,
+    [now() - DAY, health.VERSION_LIMITS.maxGroups + 5]
+  );
+  try {
+    const b = (await get(admin)).body;
+    assert.equal(b.truncated, true);
+    //  پرشمارها (2.14.4 با ۳، 2.13.0 با ۲) نه در سقفِ گروه بریده می‌شوند نه در سقفِ نمایش
+    const shop = appOf(b, 'shop');
+    assert.equal(vOf(shop, '2.14.4').devices, 3);
+    assert.equal(vOf(shop, '2.13.0').devices, 2);
+    assert.equal(shop.versionsTruncated, true);
+    assert.equal(shop.versions.length, health.VERSION_LIMITS.maxVersionsPerApp);
+  } finally {
+    await query(`DELETE FROM sync_devices WHERE account_id='acc-many'`);
   }
 });
 
