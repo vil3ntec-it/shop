@@ -44,7 +44,7 @@ import kotlin.math.sin
 enum class AuroraTone { Brand, Debt, Cash, Stock }
 
 /** نارنجیِ کمکی — برای حال‌هایی که پرامپت طراحی نارنجی خواسته */
-private val AuroraWarm = Color(0x59FF9A3D)
+private val AuroraWarm = Brand.orange.copy(alpha = 0.35f)
 
 @Composable
 private fun tonePalette(tone: AuroraTone): List<Color> {
@@ -196,7 +196,7 @@ fun Modifier.glassSurface(
   sheen: Color,
   border: Color,
   strong: Boolean = false,
-  glow: Color = Color(0x1F7C5CFF),
+  glow: Color = LightColors.glow,
   /** شیشهٔ واقعی فقط برای صفحهٔ آغاز/ورود؛ صفحه‌های کار کارتِ توپر می‌گیرند */
   decorative: Boolean = false,
 ): Modifier {
@@ -212,12 +212,14 @@ fun Modifier.glassSurface(
   //  ۱۴۰۵/۰۷/۲۵ صفحه‌های کارِ گوشی هم (VISUAL-DIRECTION §۱). شیشه، درخشش و
   //  لبهٔ نورانی فقط با `decorative = true`
   if (ir.vil3ntec.tohid.ui.Platform.DESKTOP || !decorative) {
+    //  VILL3N: همان `softCard` — سایهٔ سبک و خطِ دورِ دیدنیِ `borderCard`ِ تم
+    val light = tint.luminance() > 0.5f
+    val shadowColor = if (light) LightColors.shadow else DarkColors.shadow
     return this
-      .shadow(elevation = if (strong) 3.dp else 1.dp, shape = shape)
+      .shadow(elevation = if (strong) Elevation.lifted else Elevation.card, shape = shape, ambientColor = shadowColor, spotColor = shadowColor)
       .clip(shape)
       .background(color = if (tint.alpha < 0.98f) tint.copy(alpha = 1f) else tint, shape = shape)
-      //  خطِ دورِ کارت روی کامپیوتر دیده می‌شود (روی گوشی لبهٔ سفیدِ شیشه بود)
-      .border(1.dp, if (tint.luminance() > 0.5f) Color(0x1F1E1B2E) else Color(0x24FFFFFF), shape)
+      .border(1.dp, border, shape)
   }
   val solid = tint.alpha > 0.98f
   return this

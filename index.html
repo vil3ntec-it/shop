@@ -138,33 +138,44 @@
      می‌دهد و صفحه را تودرتو می‌کند.
      ========================================================== */
   :root{
-    --bg:#f5f5f8;
+    /* THEME-V2 (۱۴۰۵/۰۸/۰۲): تمِ پیش‌فرضِ «آسمان» — همان `SkyLight`/`SkyDark`ِ برنامه (`ShopThemes.kt`،
+       WebPaletteParityTest). پایه آبی و سفید؛ زمینه ≠ کارت ≠ سطحِ درونی با خطِ دورِ دیدنی. */
+    --bg:#f5f8ff;
     --surface:#ffffff;
-    --surface-2:rgba(255,255,255,.98);
+    --surface-2:#eef3ff;
     --surface-solid:#ffffff;
-    --border:rgba(25,22,39,.10);
-    --text:#191627;
-    --muted:#635c86;
-    --muted-2:#6a6390;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه (بررسیِ axe، ۱۴۰۵/۰۷/۲۰) */
-    --primary:#6f50f0;
-    --primary-dark:#5b3fe0;
-    --primary-tint:rgba(124,92,255,.08);   /* ۱۴۰۵/۰۷/۲۵: ۱۲٪ زیرِ ۴٫۵:۱ِ رنگِ اصلی روی کارتِ سفید بود */
-    --accent:#00c39a;
-    --success:#08745e;
-    --success-tint:rgba(15,169,138,.12);
-    --warning:#8f5a00;
-    --warning-tint:rgba(184,119,8,.12);
-    --danger:#bf2c2c;
-    --danger-tint:rgba(217,59,59,.12);
-    /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا */
-    --aurora-1:rgba(124,92,255,.30);
-    --aurora-2:rgba(0,195,154,.24);
-    --aurora-3:rgba(255,95,162,.20);
-    --radius-sm:16px;
-    --radius-md:20px;
-    --radius-lg:24px;
-    --shadow-sm:0 1px 2px rgba(25,22,39,.05);
-    --shadow-md:0 10px 30px -12px rgba(124,92,255,.35);
+    --border:#d5dee9;
+    --field-border:#c8d2e0;
+    --text:#0f172a;
+    --muted:#5b6a80;
+    --muted-2:#5b6a80;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه و ناحیه‌ها */
+    --primary:#1d4ed8;
+    --primary-dark:#1d4ed8;
+    --primary-tint:#e5ecfd;
+    --accent:#2563eb;
+    --success:#15803d;
+    --success-tint:#dcfce7;
+    --warning:#92400e;
+    --warning-tint:#fef3c7;
+    --danger:#b91c1c;
+    --danger-tint:#fee2e2;
+    --info:#1d4ed8;
+    --info-tint:#dbeafe;
+    /* ناحیه‌ها: منو (سرد) و سبد (تهِ رنگِ اصلی)؛ کاتالوگ همان --bg */
+    --zone-nav:#ecf0f8;
+    --zone-cart:#eef3ff;
+    /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا (فقط صفحهٔ آغاز) */
+    --aurora-1:rgba(37,99,235,0.3);
+    --aurora-2:rgba(79,70,229,0.24);
+    --aurora-3:rgba(124,58,237,0.2);
+    /* گِردی: کنترل ۱۲، کارت ۱۶، پنل/پنجره ۲۰، تراشه قرصی */
+    --radius-sm:10px;
+    --radius-md:12px;
+    --radius-lg:16px;
+    --radius-chip:999px;
+    /* سایهٔ نرم به‌جای خطِ تیره */
+    --shadow-sm:0 1px 2px rgba(16,24,40,.05), 0 4px 12px -4px rgba(16,24,40,.08);
+    --shadow-md:0 12px 32px -12px rgba(16,24,40,.22);
     --sidebar-w:220px;
     --header-h:64px;
     --bottomnav-h:66px;
@@ -175,34 +186,39 @@
     --bottomnav-space:calc(var(--bottomnav-h) + var(--bottomnav-gap) + env(safe-area-inset-bottom));
   }
   /*
-     شبِ برنامه: زمینه‌ی بنفشِ بسیار تیره (نه سیاهِ خالص، که با نور
-     لکه‌دار می‌شود)، و کارتی که فقط چند درصد از زمینه روشن‌تر است.
+     شبِ برنامه (THEME-V2، «آسمان»ِ تیره): سرمه‌ایِ تیره، کارتی که فقط یک پله از
+     زمینه روشن‌تر است با لبهٔ مویی و منوی تیره‌تر.
      رنگ برای چیزهایی می‌ماند که معنی دارند: پول، هشدار، دکمه.
   */
   html[data-theme="dark"]{
-    --bg:#0b0a14;
-    --surface:rgba(20,18,33,.94);
-    --surface-2:rgba(28,25,48,.96);
-    --surface-solid:#171526;
-    --border:rgba(255,255,255,.10);
-    --text:#f0eef8;
-    --muted:#a8a3bc;
-    --muted-2:#7e7995;
-    --primary:#a78bff;
-    --primary-dark:#7c5cff;
-    --primary-tint:rgba(167,139,255,.20);
-    --accent:#5ce0bc;
-    --success:#5ce0bc;
-    --success-tint:rgba(92,224,188,.18);
-    --warning:#f5b54a;
-    --warning-tint:rgba(245,181,74,.18);
-    --danger:#ff7a7a;
-    --danger-tint:rgba(255,122,122,.18);
-    --aurora-1:rgba(124,92,255,.55);
-    --aurora-2:rgba(0,195,154,.38);
-    --aurora-3:rgba(255,95,162,.34);
+    --bg:#0b1020;
+    --surface:#121a2e;
+    --surface-2:#1a2440;
+    --surface-solid:#121a2e;
+    --border:#2e3547;
+    --field-border:#3d4354;
+    --text:#e6ecff;
+    --muted:#94a3b8;
+    --muted-2:#94a3b8;
+    --primary:#60a5fa;
+    --primary-dark:#60a5fa;
+    --primary-tint:#1d2d4b;
+    --accent:#60a5fa;
+    --success:#86efac;
+    --success-tint:#123c2b;
+    --warning:#fcd34d;
+    --warning-tint:#3d2e0e;
+    --danger:#fca5a5;
+    --danger-tint:#451a1e;
+    --info:#93c5fd;
+    --info-tint:#172f57;
+    --zone-nav:#070a15;
+    --zone-cart:#1a2440;
+    --aurora-1:rgba(30,58,138,0.55);
+    --aurora-2:rgba(49,46,129,0.38);
+    --aurora-3:rgba(76,29,149,0.34);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
-    --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
+    --shadow-md:0 12px 32px -12px rgba(0,0,0,.7);
   }
   /* ==========================================================
      زمینه‌ی آرورا — سه لکه‌ی نور، ساکن.

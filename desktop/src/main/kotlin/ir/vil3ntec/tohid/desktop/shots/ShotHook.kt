@@ -3,6 +3,10 @@ package ir.vil3ntec.tohid.desktop.shots
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
+import ir.vil3ntec.tohid.ui.v3.nav.ShellFrame
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -94,12 +98,16 @@ fun V3RoutePreview(path: String, store: ShopStore, dark: Boolean) {
     access = Access.all(mode, setOf(EXAMPLE_FLAG, KIT_GALLERY_FLAG)),
     navAllowed = NavCatalog.allowed(canManage = true, ordersLive = true),
   )
-  val base = RoutePaths.normalize(nav.current.substringBefore('?'))
-  CompositionLocalProvider(LocalV3Toasts provides toasts) {
+  //  همان قراردادِ پوسته (`ShellFrame`): نوار فقط روی ریشهٔ تب‌ها و پایینِ هر صفحه نگه‌داشته —
+  //  عکس همان چیزی را نشان می‌دهد که گوشی (AUDIT-NAV S1/N11)
+  val page = RoutePaths.normalize(nav.page.substringBefore('?'))
+  val navVisible = mode == AppMode.SHOP && ShellFrame.navVisible(phone = true, page = page, barTabs = navRoutes, gate = nav.gate != null, cartOpen = false)
+  val pageBottom = if (mode == AppMode.SHOP) ShellFrame.pageBottom(true, navVisible, page, PhoneNav.RESERVE, 0.dp) else 0.dp
+  CompositionLocalProvider(LocalV3Toasts provides toasts, LocalV3SystemBottom provides 0.dp, ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout provides false) {
     Box(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
-      V3RouteHost(nav, shell, Modifier.fillMaxSize())
-      if (mode == AppMode.SHOP && base in navRoutes) {
-        PhoneNavBar(NavLayouts.DEFAULT, base, onPick = { nav.open(it.route) }, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter))
+      V3RouteHost(nav, shell, Modifier.fillMaxSize().padding(bottom = pageBottom))
+      if (navVisible) {
+        PhoneNavBar(NavLayouts.DEFAULT, page, onPick = { nav.open(it.route) }, onEdit = null, modifier = Modifier.align(Alignment.BottomCenter))
       }
       V3SnackbarHost(snackbar, Modifier.align(Alignment.TopCenter))
     }

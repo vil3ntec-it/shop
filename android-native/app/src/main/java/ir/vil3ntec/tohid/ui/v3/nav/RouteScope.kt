@@ -51,6 +51,16 @@ class RouteScope(val args: RouteArgs, val nav: V3Nav, val shell: ShellContext) {
   val wide: Boolean get() = shell.wide
   val access: Access get() = shell.access
 
-  /** برگشت به صفحهٔ پیشین (همان دکمهٔ سربرگ) */
-  fun back() { nav.back() }
+  /**
+   *  برگشت از **همین** مسیر. اگر مسیر دیگر بالای پشته نیست (مثلاً `nav.finish` آن را
+   *  برداشته و برگه پس از آن `onDismiss` هم صدا زده)، کاری نمی‌کند — وگرنه صفحهٔ
+   *  صدازننده هم بسته می‌شد.
+   */
+  fun back() { nav.backFrom(args.path) }
+
+  /** دکمهٔ برگشتِ سربرگ فقط وقتی چیزی زیرِ این صفحه است — ریشهٔ تب بی برگشت (AUDIT-NAV N8) */
+  val backOrNull: (() -> Unit)? get() = if (nav.stack.canPop) ({ back() }) else null
+
+  /** چیدمانِ کامپیوتری؟ (`LocalDeskLayout`؛ پیش‌نمایشِ گوشی false) — جای `Platform.DESKTOP` در مسیرها */
+  val desk: Boolean @androidx.compose.runtime.Composable get() = LocalDeskLayout.current
 }

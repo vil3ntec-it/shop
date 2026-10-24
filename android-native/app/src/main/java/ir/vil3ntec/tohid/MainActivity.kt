@@ -12,9 +12,6 @@ import ir.vil3ntec.tohid.ui.v3.modes.ShopperRoot
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.lifecycleScope
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.AppRoot
@@ -62,6 +59,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
 
     /*
@@ -135,12 +133,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
       }
 
       TohidTheme(theme) {
-        // کلِ برنامه راست‌به‌چپ است
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
+        ir.vil3ntec.tohid.ui.ProvideLang {
           //  عوض شدنِ حالت (سوییچرِ «حساب من»، پیوند) با محو و بزرگ‌شدنِ نرم
           AnimatedContent(
             targetState = screen,
-            transitionSpec = { V3Transitions.page(Move.SWITCH, LayoutDirection.Rtl) },
+            transitionSpec = { V3Transitions.page(Move.NONE, ir.vil3ntec.tohid.ui.directionOf(LocaleChoice.lang)) },
             label = "mode",
           ) { s ->
             when (s) {

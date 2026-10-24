@@ -33,7 +33,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `پشته: رفتن، برگشت، تب و برگشت به صفحه‌ای که پایین‌تر هست`() {
+  fun `پشته — رفتن، برگشت، تب و برگشت به صفحه‌ای که پایین‌تر هست`() {
     var s = NavStack.of("home")
     s = s.push("more"); assertEquals(Move.PUSH, s.move)
     s = s.push("settings/security"); assertEquals(listOf("home", "more", "settings/security"), s.entries)
@@ -44,6 +44,30 @@ class NavCoreTest {
     assertEquals(Move.NONE, s.push("more").move)
     s = s.switchTab("products"); assertEquals(listOf("products"), s.entries); assertEquals(Move.SWITCH, s.move)
     assertFalse(s.pop().canPop)
+  }
+
+  @Test
+  fun `برگشت از مسیری که نتیجه داد و برداشته شد هیچ نمی‌کند — صفحهٔ صدازننده می‌ماند`() {
+    //  فرمِ کالا ⇐ برگهٔ اسکن ⇐ `finish(code)` (برداشته شد) ⇐ برگه `onDismiss` هم می‌زند
+    var s = NavStack.of("home").push("products/new").push("scan")
+    assertTrue(s.isTop("scan"))
+    s = s.pop()
+    assertFalse("برگهٔ اسکن دیگر بالا نیست", s.isTop("scan"))
+    assertTrue(s.isTop("/products/new/"))
+    assertEquals(listOf("home", "products/new"), s.entries)
+  }
+
+  @Test
+  fun `پرسشِ ثابتِ الگو شرط است و الگو را دقیق‌تر می‌کند`() {
+    val qr = RoutePattern("scan?kind=qr")
+    val scan = RoutePattern("scan")
+    assertEquals(mapOf("kind" to "qr"), qr.required)
+    assertEquals("qr", qr.match("scan?kind=qr&from=shop")!!["kind"])
+    assertNull(qr.match("scan"))
+    assertNull(qr.match("scan?kind=barcode"))
+    assertTrue(qr.literals > scan.literals)
+    assertEquals("qr", scan.match("scan?kind=qr")!!["kind"])
+    assertEquals("scan?kind=qr", qr.build())
   }
 
   @Test
@@ -60,7 +84,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `پیوندِ برنامه: vill3n__app با حالتِ درست`() {
+  fun `پیوندِ برنامه — vill3n__app با حالتِ درست`() {
     assertEquals(DeepLink(AppMode.SHOP, "settings/security"), DeepLinks.parse("vill3n://app/settings/security"))
     assertEquals(DeepLink(AppMode.SHOP, "products?filter=out"), DeepLinks.parse("vill3n://app/products?filter=out"))
     assertEquals(AppMode.SHOPPER, DeepLinks.parse("vill3n://app/shopper/home")!!.mode)
@@ -73,27 +97,27 @@ class NavCoreTest {
   }
 
   @Test
-  fun `ویترین: همان دو شکلی که سرور می‌سازد ⇐ حالتِ خرید`() {
+  fun `ویترین — پیوندِ وب را هستهٔ خرید می‌خواند ⇐ حالتِ خرید`() {
+    //  قاعده‌های کامل در `ShopperLinksTest`؛ این‌جا فقط سپردن و حالت
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://karim-store.vill3n.top/"))
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://vill3n.top/store/karim-store"))
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://api.vill3n.top/store/Karim-Store?x=1"))
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/order/karim-store/01HX.abc"), DeepLinks.parse("https://vill3n.top/store/karim-store#/o/01HX.abc"))
+    val token = "01HX" + "0".repeat(22) + "." + "a".repeat(32)
+    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/order/karim-store/$token"), DeepLinks.parse("https://vill3n.top/store/karim-store#/o/$token"))
+    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/cart/karim-store"), DeepLinks.parse("https://karim-store.vill3n.top/#/cart"))
     //  میزبانِ سرورِ همین ساخت (`API_BASE`)
     assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/abc"), DeepLinks.parse("https://shop.example.af/store/abc", setOf("shop.example.af")))
     assertNull(DeepLinks.parse("https://shop.example.af/store/abc"))
-    //  نام‌های رزرو، نشانی‌های دیگرِ سایت، کوتاه/بلندِ نادرست و `vill3n.top/<slug>` (سرور نمی‌سازد)
+    //  نام‌های رزرو و نشانی‌های دیگرِ سایت در مرورگر می‌مانند
     assertNull(DeepLinks.parse("https://api.vill3n.top/"))
     assertNull(DeepLinks.parse("https://admin.vill3n.top/"))
     assertNull(DeepLinks.parse("https://vill3n.top/market"))
-    assertNull(DeepLinks.parse("https://vill3n.top/karim-store"))
-    assertNull(DeepLinks.parse("https://vill3n.top/store/a"))
     assertNull(DeepLinks.parse("https://vill3n.top/store/admin"))
     assertNull(DeepLinks.parse("https://evil.example/store/karim"))
-    assertNull(DeepLinks.parse("https://karim.vill3n.top/admin"))
+    assertNull(DeepLinks.parse("ftp://vill3n.top/store/abc"))
   }
 
   @Test
-  fun `حالت‌ها: خرید همیشه؛ نصبِ پیشین همان رفتارِ امروز`() {
+  fun `حالت‌ها — خرید همیشه؛ نصبِ پیشین همان رفتارِ امروز`() {
     val shop = ModeFacts(shopMember = true, courier = false)
     val courier = ModeFacts(shopMember = false, courier = true)
     val none = ModeFacts(shopMember = false, courier = false)
@@ -110,7 +134,7 @@ class NavCoreTest {
   }
 
   @Test
-  fun `دسترسی: نیاز و پرچم با هم`() {
+  fun `دسترسی — نیاز و پرچم با هم`() {
     val a = Access(granted = setOf(Need.MANAGE), flags = setOf("module.x"))
     assertTrue(a.allows(setOf(Need.MANAGE), "module.x"))
     assertFalse(a.allows(setOf(Need.MANAGE, Need.CHAT)))

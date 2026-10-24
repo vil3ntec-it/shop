@@ -76,4 +76,16 @@ object StrKit {
   // ماژولِ نمونه (پشتِ پرچمِ خاموش؛ `docs/MODULES-fa.md`)
   val exampleTitle: String get() = t("ماژولِ نمونه", "Example module", "بېلګه ماډیول")
   val exampleBody: String get() = t("این صفحه نشان می‌دهد ماژولِ تازه چطور با یک فایل و یک خط به برنامه وصل می‌شود.", "This page shows how a new module plugs in with one file and one line.", "دا پاڼه ښيي چې نوی ماډیول څنګه په یوه فایل او یوه کرښه وصلېږي.")
+
+  // تخفیف‌های دکان (PRM)
+  val promos: String get() = t("تخفیف‌ها", "Discounts", "تخفیفونه")
+
+  // اسکنِ QR (`scan?kind=qr`، همهٔ حالت‌ها)
+  val scanQr: String get() = t("اسکنِ QR", "Scan QR code", "QR سکن کړئ")
+  val scanQrHint: String get() = t("کدِ QR را درونِ کادر بگیرید", "Hold the QR code inside the frame", "QR کوډ چوکاټ ته دننه ونیسئ")
+  val cameraNeeded: String get() = t("برای اسکن، به دوربین اجازه بدهید", "Allow the camera to scan", "د سکن لپاره کامرې ته اجازه ورکړئ")
+  val cameraAllow: String get() = t("اجازهٔ دوربین", "Allow camera", "کامرې ته اجازه")
+  val cameraDenied: String get() = t("اجازهٔ دوربین داده نشد — از تنظیماتِ گوشی اجازه دهید", "Camera permission was denied — allow it in the phone's settings", "د کامرې اجازه ورنکړل شوه — د تلیفون له تنظیماتو یې ورکړئ")
+  val noCameraTitle: String get() = t("این‌جا دوربین نیست", "No camera here", "دلته کامره نشته")
+  val noCameraBody: String get() = t("اسکنِ QR فقط در گوشی کار می‌کند.", "QR scanning works on the phone only.", "د QR سکن یوازې په تلیفون کې کار کوي.")
 }

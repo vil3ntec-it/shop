@@ -78,27 +78,20 @@ fun TohidButton(
     shape = Shape.button,
     interactionSource = interaction,
     contentPadding = PaddingValues(horizontal = Space.lg, vertical = Space.sm),
+    //  VILL3N §۷: دکمهٔ اصلی و غیرفعالش از جفتِ توکنِ دکمه (پیش‌تر گرادیانِ بنفش با متنِ تیره)
     colors = ButtonDefaults.buttonColors(
-      containerColor = Color.Transparent,
-      contentColor = Color(0xFF04121F),
-      disabledContainerColor = Color.Transparent,
-      disabledContentColor = colors.muted2,
+      containerColor = colors.button.primary.bg,
+      contentColor = colors.button.primary.text,
+      disabledContainerColor = colors.button.disabled.bg,
+      disabledContentColor = colors.button.disabled.text,
     ),
     modifier = modifier
       .heightIn(min = 52.dp)
       .pressScale(pressed)
-      .then(if (enabled && !busy) Modifier.softGlow(Shape.button, colors.glow) else Modifier)
-      .background(
-        brush = if (enabled && !busy) {
-          Brush.horizontalGradient(listOf(colors.primaryDark, colors.primary))
-        } else {
-          Brush.horizontalGradient(listOf(colors.surface2, colors.surface2))
-        },
-        shape = Shape.button,
-      ),
+      .then(if (enabled && !busy) Modifier.softGlow(Shape.button, colors.glow) else Modifier),
   ) {
     if (busy) {
-      CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+      CircularProgressIndicator(color = colors.button.primary.text, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
     } else {
       if (icon != null) {
         Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -122,11 +115,12 @@ fun TohidSecondaryButton(
     onClick = onClick,
     enabled = enabled,
     shape = Shape.button,
+    //  VILL3N §۷: دکمهٔ دوم — زمینهٔ کارت، متنِ برند، خطِ سبزآبیِ کم‌رنگ
     colors = ButtonDefaults.outlinedButtonColors(
-      containerColor = Shop.colors.surface2.copy(alpha = 0.6f),
-      contentColor = Shop.colors.text,
+      containerColor = Shop.colors.button.secondary.bg,
+      contentColor = Shop.colors.button.secondary.text,
     ),
-    border = androidx.compose.foundation.BorderStroke(0.8.dp, Shop.colors.border),
+    border = androidx.compose.foundation.BorderStroke(1.dp, Shop.colors.button.secondary.border),
     modifier = modifier.heightIn(min = 52.dp),
   ) {
     if (icon != null) {

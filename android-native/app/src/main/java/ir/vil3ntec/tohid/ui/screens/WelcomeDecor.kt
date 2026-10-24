@@ -26,6 +26,9 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import ir.vil3ntec.tohid.ui.theme.LightColors
+import ir.vil3ntec.tohid.ui.theme.Brand
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -48,10 +51,10 @@ import kotlin.math.sin
  *  زنده به نظر برسد ولی چشم را به خودش نکشد.
  */
 
-/** آبیِ اصلیِ این صفحه — روشن، تمیز، نه نئون */
-private val SKY_TOP = Color(0xFFF7FAFF)
-private val SKY_MID = Color(0xFFEDF3FD)
-private val SKY_LOW = Color(0xFFE3ECFB)
+/** زمینهٔ این صفحه — روشن، تمیز، نه نئون؛ از ۱۴۰۵/۰۷/۲۸ همان سه سطحِ روشنِ VILL3N */
+private val SKY_TOP = LightColors.surfaceElevated
+private val SKY_MID = LightColors.background
+private val SKY_LOW = LightColors.backgroundSubtle
 
 /*
  *  موج‌ها.
@@ -60,16 +63,17 @@ private val SKY_LOW = Color(0xFFE3ECFB)
  *  کمی روشن‌تر» دیده می‌شد. حالا آبیِ سیرتری دارند و داخلشان یک بازتابِ
  *  سفید می‌افتد — همان چیزی که به سطح، حجم می‌دهد.
  */
-private val WAVE_SOFT = Color(0xFFC3D8F5)
-private val WAVE_DEEP = Color(0xFF9DBCEC)
-private val WAVE_EDGE = Color(0xFF7FA6E3)
+//  VILL3N: موج‌ها تهِ سبزآبیِ برندند (پیش‌تر آبی) — آمیزهٔ سفید و برند، نه عددِ تازه
+private val WAVE_SOFT = lerp(Color.White, Brand.primary, 0.22f)
+private val WAVE_DEEP = lerp(Color.White, Brand.primary, 0.38f)
+private val WAVE_EDGE = lerp(Color.White, Brand.primary, 0.52f)
 
 /** بازتابِ نورِ سفید روی موج */
 private val SHEEN = Color(0xFFFFFFFF)
 
 /** لهجهٔ گرم — فقط چند نقطه، به‌اندازه‌ای که چشم را گرم کند */
-private val ACCENT_AMBER = Color(0xFFF5C33B)
-private val ACCENT_BLUE = Color(0xFF2563C9)
+private val ACCENT_AMBER = Brand.orange
+private val ACCENT_BLUE = Brand.primary
 
 /*
  *  رنگِ حباب‌ها.
@@ -79,11 +83,11 @@ private val ACCENT_BLUE = Color(0xFF2563C9)
  *  هم چند برابر شده تا واقعاً «شناور» باشند، نه ساکن.
  */
 private val BUBBLE_TINTS = listOf(
-  Color(0xFF2563C9),   // آبیِ خودِ برنامه
-  Color(0xFF3FA9D8),   // فیروزه‌ای
-  Color(0xFF7B6BE0),   // بنفشِ ملایم
-  Color(0xFFF5C33B),   // طلایی
-  Color(0xFF4CC3A5),   // سبزِ آبی
+  Brand.primary,   // سبزآبیِ خودِ برنامه
+  Brand.blue,      // آبی
+  Brand.purple,    // بنفشِ پشتیبان
+  Brand.orange,    // نارنجی
+  Brand.teal,      // فیروزه‌ای
 )
 
 /**

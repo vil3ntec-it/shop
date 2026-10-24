@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
@@ -43,7 +44,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
   //  گوشی نسخهٔ ۳ (بندِ F): کارت‌های گروهیِ r5 و «تنظیمات» در ته — `PhoneMoreScreen`.
   //  کامپیوتر همین صفحهٔ پیشین را نگه می‌دارد.
-  if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+  if (!ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
     PhoneMoreScreen(d, onOpen = onOpen)
     return
   }
@@ -161,6 +162,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.accent,
         subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
         onClick = { onOpen("team") },
+      )
+      //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان پیش‌فرض خاموش است
+      if (canManage) MoreCard(
+        title = "تخفیف‌ها",
+        icon = Icons.Filled.LocalOffer,
+        tint = Shop.colors.success,
+        subtitle = "تخفیفِ خودکار، بخر X بگیر Y، بسته، ساعتِ خوش و کدِ تخفیف",
+        onClick = { onOpen("promos") },
       )
       /*
        *  پشتیبانی — برای همه، نه فقط صاحب دکان.

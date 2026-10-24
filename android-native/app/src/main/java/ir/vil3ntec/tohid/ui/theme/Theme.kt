@@ -8,6 +8,7 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.CompositionLocalProvider
@@ -17,201 +18,254 @@ import androidx.compose.ui.graphics.Color
 import ir.vil3ntec.tohid.ui.screens.Springs
 import androidx.compose.ui.unit.dp
 
-/**
- *  رنگ‌ها — «شیشه روی نورِ آرورا».
+/*
+ *  رنگ‌ها — THEME-V2 (دستورِ صاحب‌کار، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N ِ ۱۴۰۵/۰۷/۲۸).
  *
- *  ⚠️ از ۱۴۰۵/۰۷/۲۵ جایش را «Professional Retail OS» گرفته
- *  (`docs/VISUAL-DIRECTION-fa.md` §۱): صفحه‌های کار سطحِ توپر و تمیز دارند
- *  و شیشه/آرورا فقط برای صفحهٔ آغاز و ورود می‌ماند (`decorative = true`).
- *  شرحِ پایین تاریخچهٔ همان تصمیمِ پیشین است.
+ *  پایه آبی و سفید، سه تم («آسمان» پیش‌فرض، «اقیانوس»، «غروب») × روز و شب در `ShopThemes.kt`
+ *  (`shopColors(theme, dark)`، `ThemeStore`). زمینه، کارت و سطحِ درونی سه رنگِ جدا با خطِ دورِ دیدنی در روز و
+ *  شب دارند. هر رنگ یک **نامِ معنایی** دارد (`background`، `surface`، `textPrimary`،
+ *  `brandPrimary`، `status.delivered`…) و صفحه‌ها فقط همین نام‌ها را می‌خوانند —
+ *  عوض‌شدنِ روز و شب بی بازنویسیِ صفحه (`HardcodedColorsTest`).
  *
- *  سه لایه، و ترتیبشان تمامِ ظاهرِ برنامه است:
+ *  ── سه قاعده ──────────────────────────────────────────────────────
+ *   • **زمینه ≠ کارت ≠ سطحِ درونی.** سطحِ ۰ زمینهٔ صفحه، ۱ کارت و پنل، ۲ بخشِ
+ *     درونی. کارتِ سفید روی زمینهٔ روشن همیشه خطِ دورِ `borderCard` دارد؛ سایه
+ *     کم است و جای خط را نمی‌گیرد.
+ *   • **رنگ معنا دارد.** سبز: تحویل و موفق · آبی: در راه و اطلاع · کهربایی: در
+ *     انتظار و هشدار · قرمز: لغو و خطا (و فقط هشدارِ واقعی) · بنفش: نیازِ بررسی ·
+ *     فیروزه‌ای: در آماده‌سازی · خاکستری: غیرفعال. هرگز رنگِ تنها؛ همیشه با متن.
+ *   • **متنِ کوچک ≥ ۴٫۵:۱ (WCAG AA).** primaryِ تم برای پُرکردن، آیکن، نشانگر و عددِ درشت
+ *     است؛ متنِ کوچک و دکمهٔ پُر از `brandDeep` (دکمهٔ اصلیِ تم، مثلاً «آسمان» #1D4ED8) می‌آیند.
+ *     جدولِ کاملِ کنتراستِ هر شش پالت در `Vill3nPaletteTest`، عددهای تم در `ThemeV2PaletteTest`.
  *
- *      نورِ آرورا (سه لکهٔ رنگ، پشتِ همه‌چیز)
- *          ↓
- *      پنل‌های شیشه‌ای (سفیدِ نیمه‌شفاف + لبهٔ روشن)
- *          ↓
- *      محتوا، بدونِ زمینهٔ خودش
- *
- *  ── چرا عوض شد ─────────────────────────────────────────────────────
- *  پالتِ پیشین «آبیِ یخ» بود: کارتِ خاکستری-آبیِ توپر روی زمینهٔ سفید.
- *  ظاهرش سالمِ متریالِ پیش‌فرض بود و همین ایرادش بود — از هر برنامهٔ
- *  دیگری قابلِ تشخیص نبود. قرارِ صاحب مخزن این شد که ظاهر در سطحِ
- *  برنامه‌های مالیِ امروز باشد، نه متریالِ خام.
- *
- *  سه قاعده که شکسته نمی‌شوند:
- *
- *   • **سطح‌ها شیشه‌اند، نه رنگِ توپر.** `surface` یک سفیدِ نیمه‌شفاف
- *     است؛ چیزی که پنل را جدا می‌کند، نورِ پشتش و لبهٔ روشنش است.
- *     پنجره‌ها ولی توپرند (`surfaceSolid`) — متنِ پنجره نباید روی
- *     محتوای پشتش بیفتد.
- *
- *   • **بنفش نشانِ برنامه است، نعنایی و صورتی و نارنجی معنا دارند.**
- *     نعنایی: دخل و موفقیت · قرمز: خرج و قرض · نارنجی: هشدار. رنگ
- *     هیچ‌جا تزیین نیست.
- *
- *   • **در هر صفحه فقط یک المانِ گرادینتی** — دکمهٔ اصلی یا FAB. دو
- *     گرادینت در یک صفحه یعنی هیچ‌کدام مهم نیست.
+ *  نام‌های قدیمی (`bg`، `text`، `muted`، `primary`…) هنوز هستند تا صدها صفحهٔ
+ *  موجود بی دست‌خوردن رنگِ تازه بگیرند؛ هر کدام فقط **نامِ دیگرِ** یک توکنِ
+ *  معنایی است (پایینِ `ShopColors`) و مقدارِ جدا ندارد.
  */
+
+/** جفتِ دکمه: زمینه، متن و خطِ دور (VILL3N §۷) */
+@Immutable
+data class ButtonTone(val bg: Color, val text: Color, val border: Color)
+
+/** دکمه‌ها — اصلی، دوم، خنثی، خطر و غیرفعال */
+@Immutable
+data class ButtonColorSet(
+  val primary: ButtonTone,
+  val secondary: ButtonTone,
+  val neutral: ButtonTone,
+  val danger: ButtonTone,
+  val disabled: ButtonTone,
+)
+
+/** نشانِ وضعیت: متن/نقطه روی زمینهٔ کم‌رنگِ همان رنگ */
+@Immutable
+data class StatusTone(val fg: Color, val bg: Color)
+
+/**
+ *  هفت وضعیتِ سفارش — **یک معنا در همه‌جا** (مشتری، دکان، پیک، مدیر؛ VILL3N §۸).
+ *  نگاشتِ وضعیت به این هفت در `ui/components/common/OrderStatusTone.kt` است.
+ */
+@Immutable
+data class StatusColors(
+  /** تحویل‌شده / موفق */
+  val delivered: StatusTone,
+  /** در مسیر */
+  val inDelivery: StatusTone,
+  /** در انتظارِ تأیید */
+  val awaitingApproval: StatusTone,
+  /** لغو و رد */
+  val cancelled: StatusTone,
+  /** نیاز به بررسی */
+  val needsReview: StatusTone,
+  /** در آماده‌سازی */
+  val preparing: StatusTone,
+  /** غیرفعال / بسته‌شده */
+  val inactive: StatusTone,
+) {
+  val all: List<Pair<String, StatusTone>>
+    get() = listOf(
+      "delivered" to delivered, "inDelivery" to inDelivery, "awaitingApproval" to awaitingApproval,
+      "cancelled" to cancelled, "needsReview" to needsReview, "preparing" to preparing, "inactive" to inactive,
+    )
+}
+
+/** پیام (نوار، کادرِ هشدار، اعلان): متن، زمینه، آیکن و خطِ دور */
+@Immutable
+data class MessageTone(val text: Color, val bg: Color, val icon: Color, val border: Color)
+
+@Immutable
+data class MessageColors(
+  val success: MessageTone,
+  val info: MessageTone,
+  val warning: MessageTone,
+  val error: MessageTone,
+) {
+  val all: List<Pair<String, MessageTone>>
+    get() = listOf("success" to success, "info" to info, "warning" to warning, "error" to error)
+}
+
+/**
+ *  نمودار — ترتیبِ سری‌ها ثابت است (VILL3N §۱۰): ۱ فروش، ۲ مقایسه/روند، ۳ هزینه،
+ *  ۴ تخفیف/هدف، ۵ افتِ مهم/خطا، ۶ موجودی/تکمیلی، ۷ خنثی. قرمز برای دادهٔ عادی نه.
+ *  همیشه با نامِ سری یا برچسبِ عدد (نارنجی، فیروزه‌ای و خاکستری روی سفید زیرِ ۳:۱اند).
+ */
+@Immutable
+data class ChartColors(
+  val sales: Color,
+  val comparison: Color,
+  val costs: Color,
+  val discount: Color,
+  val drop: Color,
+  val stock: Color,
+  val neutral: Color,
+  val grid: Color,
+) {
+  /** سری‌ها به ترتیبِ ۱ تا ۷ — برای دسته‌های نمودارِ دایره‌ای و ستونیِ چندتایی */
+  val series: List<Color> get() = listOf(sales, comparison, costs, discount, drop, stock, neutral)
+}
+
+@Immutable
 data class ShopColors(
-  val bg: Color,
+  //  ── سطح‌ها (VILL3N §۴–۶) ──
+  /** سطحِ ۰ — زمینهٔ صفحه */
+  val background: Color,
+  /** زمینهٔ فرعی: منوی کناری، شیارِ کنترلِ قطعه‌ای، نوارِ وضعیت */
+  val backgroundSubtle: Color,
+  /** سطحِ ۱ — کارت و پنل */
   val surface: Color,
-  val surface2: Color,
-  val border: Color,
-  val text: Color,
-  val muted: Color,
-  val muted2: Color,
-  val primary: Color,
-  val primaryDark: Color,
-  val primaryTint: Color,
-  val success: Color,
-  val successTint: Color,
-  val warning: Color,
-  val warningTint: Color,
-  val danger: Color,
-  val dangerTint: Color,
-  /** فیروزه‌ای — تأکیدِ دوم، کنارِ آبیِ اصلی */
-  val accent: Color,
-  /** هالهٔ آبیِ ملایمی که زیرِ کارت‌ها و دکمه‌ها می‌نشیند */
+  /** سطحِ ۲ — بخشِ درونیِ کارت، ردیفِ یک‌درمیان، جای عکس */
+  val surfaceElevated: Color,
+  /** ردیف/گزینه/منوی انتخاب‌شده */
+  val surfaceSelected: Color,
+  //  ── متن و آیکن ──
+  val textPrimary: Color,
+  val textSecondary: Color,
+  /** کم‌رنگ‌ترین: راهنمای داخلِ کادر، غیرفعال، متنِ درشت. روی سفید ۳٫۶:۱ ⇒ نه برای متنِ کوچکِ مهم */
+  val textMuted: Color,
+  val icon: Color,
+  val iconActive: Color,
+  //  ── خط‌ها ──
+  val borderCard: Color,
+  val borderInput: Color,
+  val divider: Color,
+  //  ── برند ──
+  /** سبزآبیِ برند — پُرکردن، نشانگر، آیکنِ فعال، سریِ ۱ِ نمودار، عددِ درشت */
+  val brandPrimary: Color,
+  /** سبزآبیِ پررنگ — تأکید، کارتِ پُرِ فروش، فشرده */
+  val brandDeep: Color,
+  /** برند برای **متنِ کوچک** و پیوندِ کار روی سطح‌ها (≥ ۴٫۵:۱) */
+  val brandText: Color,
+  /** پیوند و اطلاع (آبی) */
+  val link: Color,
+  /** حلقهٔ تمرکز و خطِ گزینهٔ فعال */
+  val focus: Color,
+  //  ── سطحِ وارونه (نوارِ سبد، شیتِ تیره) ──
+  val inverse: Color,
+  val inverseRaised: Color,
+  val onInverse: Color,
+  val onInverseMuted: Color,
+  //  ── گروه‌ها ──
+  val button: ButtonColorSet,
+  val status: StatusColors,
+  val message: MessageColors,
+  val chart: ChartColors,
+  //  ── سایه و تزیین ──
+  /** رنگِ سایهٔ سبکِ کارت (`softCard`) — Compose آن را در آلفای سایهٔ سامانه ضرب می‌کند */
+  val shadow: Color,
+  val scrim: Color,
+  /** هالهٔ ملایمِ زیرِ دکمهٔ اصلی */
   val glow: Color,
-  /** لبهٔ روشنِ بالای کارت‌های شیشه‌ای */
+  /** لبهٔ روشنِ بالای سطحِ شیشه‌ای — فقط صفحهٔ آغاز و ورود */
   val sheen: Color,
-  /*
-   *  خطِ دورِ کارت‌ها.
-   *
-   *  یک بار کاملاً بی‌رنگ شد تا کارت «فقط با رنگش» دیده شود. نتیجه‌اش
-   *  این بود که چند کارتِ پشتِ سرِ هم یک تودهٔ یکدست می‌شدند و معلوم
-   *  نبود هرکدام تا کجاست. حالا هست، ولی نازک و کم‌رنگ: به‌اندازه‌ای که
-   *  لبه فهمیده شود، نه آن‌قدر که خط به چشم بیاید.
-   */
-  /** لکه‌های نورِ زمینه — سه لکه، به ترتیبِ غلبه */
+  /** لکه‌های نورِ زمینه — فقط صفحهٔ آغاز و ورود (`decorative = true`) */
   val auroraOne: Color,
   val auroraTwo: Color,
   val auroraThree: Color,
+  //  ── THEME-V2 ──
+  /** گرادیانِ کادرِ بزرگ (۱۳۵°، سه رنگ) — متن رویش همیشه سفید */
+  val heroGradient: List<Color> = listOf(brandPrimary, brandDeep),
+  /** هفت رنگِ همراه (آیکونِ بخش‌ها، کاشی‌ها، سری‌های نمودار) — در هر سه تم یکی */
+  val accents: List<Color> = ThemeAccents.ALL,
+  /** پردهٔ سیاهِ خوانایی روی کادرِ بزرگ (۰ تا این عدد در جهتِ گرادیان) تا متنِ سفید AA بماند */
+  val heroScrim: Float = 0f,
+  /** رنگِ برند روی سطحِ وارونه (کارِ اسنک‌بار، `inversePrimary`ِ متریالِ روز): primaryِ تیرهٔ همان تم */
+  val brandOnInverse: Color = brandPrimary,
+) {
+  /** رنگِ همراهِ i (چرخشی) */
+  fun accent(i: Int): Color = accents[i.mod(accents.size)]
+
+  /** پس‌زمینهٔ نرمِ همان رنگ: ۱۲٪ در روشن، ۲۰٪ در تیره */
+  fun accentSoft(i: Int): Color = accent(i).copy(alpha = if (isDark) 0.20f else 0.12f)
+
+  /** شب؟ — برای پالت‌هایی که به روز/شب جدا نیاز دارند */
+  val isDark: Boolean get() = background.red + background.green + background.blue < 1.5f
+
+  /*
+   *  ── نام‌های قدیمی ⇐ توکنِ معنایی ──────────────────────────────────
+   *  صفحه‌های موجود این نام‌ها را می‌خوانند. هیچ‌کدام مقدارِ خودش را ندارد.
+   */
+  val bg: Color get() = background
+  val surface2: Color get() = surfaceElevated
+  /** پنجره، منو، کشو — توپر (`surface` هم دیگر شیشه نیست) */
+  val surfaceSolid: Color get() = surface
+  val border: Color get() = borderCard
+  val text: Color get() = textPrimary
+  val muted: Color get() = textSecondary
   /**
-   *  سطحِ **توپر** — برای پنجره‌ها، کشوها و منوها.
-   *
-   *  `surface` از این پس شیشه است: سفیدِ کم‌رنگی که زمینهٔ آرورا از پشتش
-   *  پیداست. برای کارت درست است و برای پنجره فاجعه — متنِ پنجره روی
-   *  محتوای پشتش می‌افتد و هیچ‌کدام خوانده نمی‌شود. پس هرجا که چیزی
-   *  **روی** برنامه می‌نشیند، این یکی به کار می‌رود.
+   *  متنِ فرعیِ سوم. `textMuted`ِ VILL3N در روز روی سفید ۳٫۶:۱ است و این نام در
+   *  صفحه‌ها برای متنِ کوچک (تاریخ، واحد، زیرنویس) به کار رفته ⇒ همان `textSecondary`.
    */
-  val surfaceSolid: Color,
-  /*
-   *  کادرهای ورودی، جدا از کارت‌ها.
-   *
-   *  این سه رنگ عمداً از `border` جدا شده‌اند. `border` حاشیهٔ کارت است و
-   *  نامرئی است — کارت باید با رنگش دیده شود نه با خطش. ولی کادرِ ورودی
-   *  دقیقاً برعکس: کاربر باید ببیند کجا می‌شود نوشت.
-   *
-   *  یک بار این دو را یکی کردم و نتیجه‌اش این شد که حاشیهٔ همهٔ کادرهای
-   *  متن در تمام برنامه نامرئی شد. دیگر یکی نمی‌شوند.
-   */
-  val fieldBg: Color,
-  val fieldBorder: Color,
-  val fieldFocus: Color,
-)
+  val muted2: Color get() = textSecondary
+  /** رنگِ «اصلیِ» صفحه‌ها بیشتر متن و پیوند است ⇒ برندِ خوانا، نه `brandPrimary` */
+  val primary: Color get() = brandText
+  val primaryDark: Color get() = brandText
+  val primaryTint: Color get() = surfaceSelected
+  val accent: Color get() = iconActive
+  val success: Color get() = status.delivered.fg
+  val successTint: Color get() = status.delivered.bg
+  val warning: Color get() = status.awaitingApproval.fg
+  val warningTint: Color get() = status.awaitingApproval.bg
+  val danger: Color get() = status.cancelled.fg
+  val dangerTint: Color get() = status.cancelled.bg
+  val info: Color get() = status.inDelivery.fg
+  val infoTint: Color get() = status.inDelivery.bg
+  val fieldBg: Color get() = surface
+  val fieldBorder: Color get() = borderInput
+  val fieldFocus: Color get() = focus
+  /** ناحیهٔ منو (کامپیوتر): زمینهٔ فرعی، جدا از محتوا */
+  val zoneNav: Color get() = backgroundSubtle
+  /** ناحیهٔ سبد: سطحِ درونی — جدا از کاتالوگ (زمینه) و از کارت‌ها */
+  val zoneCart: Color get() = surfaceElevated
+}
+
+/*
+ *  مقدارهای VILL3N — عینِ فایلِ صاحب محصول (`COLOR-SYSTEM.md`). هر جا عدد عوض شده،
+ *  دلیلش کنارش نوشته و در `Vill3nPaletteTest` ثبت است.
+ */
 
 /**
- *  روز — «Professional Retail OS» (VISUAL-DIRECTION §۱، ۱۴۰۵/۰۷/۲۵).
- *
- *  صفحه‌های کار سطحِ تمیز و روشن دارند: زمینهٔ خنثیِ ملایم، کارتِ سفیدِ
- *  توپر، خطِ دورِ نازکِ تیره (همان `--border`ِ وب) و سایهٔ بسیار کم. شیشه و
- *  آرورا دیگر پشتِ صفحه‌های کار نیستند (`AuroraBackground`/`glassSurface`).
- *  پیش از این: زمینهٔ بنفشِ کم‌رنگ #F2F0FA، سطحِ نیمه‌شفافِ ۹۵٪ و لبهٔ
- *  سفیدِ ۹۰٪ِ شیشه.
+ *  رنگ‌های ثابتِ برند برای چند صفحهٔ قدیمی که هنوز از `Shop.colors` نمی‌خوانند (خوش‌آمد، نوارِ بالا، VIP) —
+ *  از THEME-V2 همان «آسمان» (پیش‌فرض)؛ جای سبزآبیِ VILL3N. صفحه‌های تازه از `Shop.colors` می‌خوانند.
  */
-val LightColors = ShopColors(
-  //  زمینهٔ روز: خاکستریِ خنثیِ بسیار روشن — کارتِ سفید رویش با خطِ نازک جدا می‌شود
-  bg = Color(0xFFF5F5F8),
-  //  کارت: سفیدِ توپر
-  surface = Color(0xFFFFFFFF),
-  surface2 = Color(0xFAFFFFFF),
-  //  خطِ دورِ کارت: تیرهٔ ۱۰٪ — برابرِ وب (پیش‌تر لبهٔ سفیدِ شیشه و در drift)
-  border = Color(0x1A191627),
-  text = Color(0xFF191627),
-  //  تمِ روشن: رنگِ متن‌ها ≥ ۴٫۵:۱ (WCAG AA) — همان رنگ‌های وب پس از بررسیِ axe
-  muted = Color(0xFF635C86),
-  muted2 = Color(0xFF6A6390),
-  primary = Color(0xFF6F50F0),
-  primaryDark = Color(0xFF5B3FE0),
-  primaryTint = Color(0x147C5CFF),   //  ۸٪ — با ۱۲٪ رنگِ اصلی روی آن ۴٫۴:۱ بود (کارتِ سفید)
-  success = Color(0xFF08745E),
-  successTint = Color(0x1F0FA98A),
-  warning = Color(0xFF8F5A00),
-  warningTint = Color(0x1FF0A32B),
-  danger = Color(0xFFBF2C2C),
-  dangerTint = Color(0x1FD93B3B),
-  accent = Color(0xFF0FA98A),
-  glow = Color(0x1F7C5CFF),
-  sheen = Color(0x59FFFFFF),
-  auroraOne = Color(0x4D7C5CFF),
-  auroraTwo = Color(0x3D00C39A),
-  auroraThree = Color(0x33FF5FA2),
-  surfaceSolid = Color(0xFFFFFFFF),
-  fieldBg = Color(0xCCFFFFFF),
-  fieldBorder = Color(0x1F191627),
-  fieldFocus = Color(0xFF7C5CFF),
-)
+object Brand {
+  val primary = Color(0xFF2563EB)
+  val deep = Color(0xFF1D4ED8)
+  val successSurface = Color(0xFFDDF5EF)
+  val blue = Color(0xFF2563EB)
+  val blueSurface = Color(0xFFDBEAFE)
+  val teal = Color(0xFF14B8A6)
+  val orange = Color(0xFFF59E0B)
+  val purple = Color(0xFF8B5CF6)
+  val red = Color(0xFFEF4444)
+  val neutral = Color(0xFF94A3B8)
+}
 
-/**
- *  شب — بنفشِ تیره، نه سیاه.
- *
- *  سیاهِ خالص با لکه‌های نور، لکه‌دار و کثیف دیده می‌شود؛ یک بنفشِ بسیار
- *  تیره همان عمق را می‌دهد و نور رویش تمیز می‌نشیند.
- *
- *  درسی که از پالتِ قبلی نگه داشته شد: متن‌های فرعی نباید تیره باشند.
- *  هر سه پلهٔ متن آن‌قدر روشن‌اند که روی شیشهٔ کم‌رنگ هم خوانده شوند.
- */
-val DarkColors = ShopColors(
-  //  شبِ بنفش‌فام، نه سیاهِ خالص: سیاهِ خالص با نورِ آرورا لکه‌دار
-  //  می‌شود و شیشه رویش کثیف به نظر می‌رسد
-  bg = Color(0xFF0B0A14),
-  /*
-   *  ── کارت در شب: یک پله روشن‌تر، نه یک رنگِ دیگر ────────────────────
-   *  کارتِ بنفشِ پررنگ، کارت را «رنگی» نشان می‌دهد نه «بالاتر». برنامه‌های
-   *  گران در تمِ شب همه یک کار می‌کنند: سطحِ کارت فقط چند درصد از زمینه
-   *  روشن‌تر است و تقریباً بی‌رنگ؛ عمق از همان اختلافِ کم و یک لبه‌ی
-   *  بسیار کم‌رنگ می‌آید، نه از رنگ. رنگ برای چیزهایی می‌ماند که معنی
-   *  دارند: پول، هشدار، دکمه.
-   *
-   *  مات هم هست (۹۴٪) تا نورِ زمینه از داخلِ کارت خوانده نشود.
-   *  ──────────────────────────────────────────────────────────────────
-   */
-  surface = Color(0xF0141221),
-  surface2 = Color(0xF61C1930),
-  //  لبه‌ی کم‌رنگ‌تر: خطِ پررنگ دورِ کارت، جعبه می‌سازد نه سطح
-  border = Color(0x1AFFFFFF),
-  text = Color(0xFFF0EEF8),
-  muted = Color(0xFFA8A3BC),
-  muted2 = Color(0xFF7E7995),
-  primary = Color(0xFFA78BFF),
-  primaryDark = Color(0xFF7C5CFF),
-  primaryTint = Color(0x33A78BFF),
-  success = Color(0xFF5CE0BC),
-  successTint = Color(0x335CE0BC),
-  warning = Color(0xFFF5B54A),
-  warningTint = Color(0x33F5B54A),
-  danger = Color(0xFFFF7A7A),
-  dangerTint = Color(0x33FF7A7A),
-  accent = Color(0xFF5CE0BC),
-  glow = Color(0x4D7C5CFF),
-  sheen = Color(0x1FFFFFFF),
-  auroraOne = Color(0x8C7C5CFF),
-  auroraTwo = Color(0x6600C39A),
-  auroraThree = Color(0x59FF5FA2),
-  surfaceSolid = Color(0xFF171526),
-  fieldBg = Color(0x14FFFFFF),
-  fieldBorder = Color(0x26FFFFFF),
-  fieldFocus = Color(0xFFA78BFF),
-)
+/** روزِ پیش‌فرض = «آسمان»ِ روشن (THEME-V2، ۱۴۰۵/۰۸/۰۲؛ جای سبزِ VILL3N). سه تم در `ShopThemes.kt`. */
+val LightColors: ShopColors = SkyLight
 
-/**
- *  گِردیِ گوشه‌ها — بزرگ و نرم.
- *
- *  گوشهٔ تیز، عنصر را «جعبه» نشان می‌دهد. گِردیِ زیاد همان عنصر را روی
- *  زمینه شناور می‌کند، که همان حسی است که می‌خواهیم.
- */
+/** شبِ پیش‌فرض = «آسمان»ِ تیره */
+val DarkColors: ShopColors = SkyDark
+
 /**
  *  گِردیِ اجزای آماده‌ی متریال.
  *
@@ -225,10 +279,11 @@ val DarkColors = ShopColors(
  *  متریال در تمامِ برنامه گِرد می‌شوند.
  */
 val ShopShapes = Shapes(
-  //  کامپیوتر: گوشه‌های کم‌گرد، مثلِ نرم‌افزارهای رومیزی — گردیِ ۲۰ پیکسلی
-  //  روی مانیتور «برنامهٔ گوشیِ بزرگ‌شده» به نظر می‌رسید. عددها در `Corner` (Tokens.kt).
+  //  VILL3N: کادرِ ورودی و دکمه ۱۰، کارت ۱۲، کارتِ ویژه و پنجره ۱۶.
+  //  عددها فقط در `Corner` (Tokens.kt).
   extraSmall = RoundedCornerShape(Corner.extraSmall.current),
-  small = RoundedCornerShape(Corner.small.current),
+  //  تراشه‌های متریال (FilterChip، AssistChip…) از `small` می‌خوانند ⇒ قرصیِ کامل
+  small = Shape.chip,
   medium = RoundedCornerShape(Corner.medium.current),
   large = RoundedCornerShape(Corner.large.current),
   extraLarge = RoundedCornerShape(Corner.extraLarge.current),
@@ -258,6 +313,89 @@ object Shop {
 /** انتخابِ کاربر برای ظاهر — همان `theme` در تنظیماتِ نسخهٔ وب */
 enum class ThemeChoice { SYSTEM, LIGHT, DARK }
 
+/**
+ *  طرحِ رنگِ متریال از توکن‌های VILL3N.
+ *
+ *  `primary`ِ متریال هم پُرِ `Button` است و هم متنِ `TextButton`/`OutlinedButton`
+ *  و برچسبِ کادرِ متنِ فعال (بیش از ۲۰۰ جا). پس باید هم با متنِ رویش و هم به‌عنوانِ
+ *  متن روی سطح ≥ ۴٫۵:۱ باشد ⇒ همان دکمهٔ اصلیِ تم (مثلاً «آسمان»: روز #1D4ED8، شب #60A5FA).
+ *  کلید، نشانگر و حلقهٔ تمرکز از همین می‌خوانند.
+ */
+fun materialScheme(c: ShopColors) = if (c.isDark) {
+  darkColorScheme(
+    primary = c.button.primary.bg,
+    onPrimary = c.button.primary.text,
+    primaryContainer = c.surfaceSelected,
+    onPrimaryContainer = c.brandText,
+    inversePrimary = c.brandDeep,
+    secondary = c.brandText,
+    onSecondary = c.button.primary.text,
+    secondaryContainer = c.surfaceSelected,
+    onSecondaryContainer = c.brandText,
+    tertiary = c.link,
+    onTertiary = c.inverse,
+    background = c.background,
+    onBackground = c.textPrimary,
+    //  پنجره، کشو و منو سطحِ توپرِ کارت را می‌گیرند
+    surface = c.surface,
+    onSurface = c.textPrimary,
+    surfaceVariant = c.surfaceElevated,
+    onSurfaceVariant = c.textSecondary,
+    surfaceTint = c.surface,
+    surfaceContainerLowest = c.surface,
+    surfaceContainerLow = c.surface,
+    surfaceContainer = c.surface,
+    surfaceContainerHigh = c.surface,
+    surfaceContainerHighest = c.surface,
+    inverseSurface = c.textPrimary,
+    inverseOnSurface = c.background,
+    //  خطِ دورِ کادرِ متن، تراشه و دکمهٔ خطی؛ جداکننده از `outlineVariant`
+    outline = c.borderInput,
+    outlineVariant = c.divider,
+    error = c.message.error.icon,
+    onError = Color(0xFF2A0B09),
+    errorContainer = c.message.error.bg,
+    onErrorContainer = c.message.error.text,
+    scrim = c.scrim,
+  )
+} else {
+  lightColorScheme(
+    primary = c.button.primary.bg,
+    onPrimary = c.button.primary.text,
+    primaryContainer = c.surfaceSelected,
+    onPrimaryContainer = c.brandText,
+    inversePrimary = c.brandOnInverse,
+    secondary = c.brandText,
+    onSecondary = c.button.primary.text,
+    secondaryContainer = c.surfaceSelected,
+    onSecondaryContainer = c.brandText,
+    tertiary = c.link,
+    onTertiary = Color.White,
+    background = c.background,
+    onBackground = c.textPrimary,
+    surface = c.surface,
+    onSurface = c.textPrimary,
+    surfaceVariant = c.surfaceElevated,
+    onSurfaceVariant = c.textSecondary,
+    surfaceTint = c.surface,
+    surfaceContainerLowest = c.surface,
+    surfaceContainerLow = c.surface,
+    surfaceContainer = c.surface,
+    surfaceContainerHigh = c.surface,
+    surfaceContainerHighest = c.surface,
+    inverseSurface = c.inverse,
+    inverseOnSurface = c.onInverse,
+    outline = c.borderInput,
+    outlineVariant = c.divider,
+    //  دکمهٔ خطر و متنِ خطا: #DC2626 روی سفید ۴٫۸:۱ و سفید رویش ۴٫۸:۱
+    error = c.button.danger.bg,
+    onError = c.button.danger.text,
+    errorContainer = c.message.error.bg,
+    onErrorContainer = c.message.error.text,
+    scrim = c.scrim,
+  )
+}
+
 @Composable
 fun TohidTheme(
   choice: ThemeChoice = ThemeChoice.SYSTEM,
@@ -268,84 +406,36 @@ fun TohidTheme(
     ThemeChoice.DARK -> true
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
-  val target = if (dark) DarkColors else LightColors
-  //  عوض‌شدنِ روز و شب نباید مثل خاموش‌وروشنِ چراغ باشد: سه رنگِ اصلی
-  //  نرم جابه‌جا می‌شوند و بقیه دنبالشان می‌آیند
-  val bg by animateColorAsState(target.bg, Springs.effect, label = "themeBg")
-  val surface by animateColorAsState(target.surface, Springs.effect, label = "themeSurface")
-  val text by animateColorAsState(target.text, Springs.effect, label = "themeText")
-  val colors = target.copy(bg = bg, surface = surface, text = text)
+  //  تمِ همین دستگاه (`ThemeStore`، پیش‌فرض «آسمان») × روز/شب
+  val target = shopColors(ThemeStore.theme, dark)
+  //  عوض‌شدنِ روز/شب یا تم مثلِ خاموش‌وروشنِ چراغ نیست: رنگ‌های اصلی در ۲۵۰ms نرم جابه‌جا می‌شوند
+  //  و بقیه دنبالشان می‌آیند (THEME-V2)
+  val spec = remember { androidx.compose.animation.core.tween<Color>(250) }
+  val bg by animateColorAsState(target.background, spec, label = "themeBg")
+  val surface by animateColorAsState(target.surface, spec, label = "themeSurface")
+  val surface2 by animateColorAsState(target.surfaceElevated, spec, label = "themeSurface2")
+  val text by animateColorAsState(target.textPrimary, spec, label = "themeText")
+  val brand by animateColorAsState(target.brandPrimary, spec, label = "themeBrand")
+  val brandText by animateColorAsState(target.brandText, spec, label = "themeBrandText")
+  val selected by animateColorAsState(target.surfaceSelected, spec, label = "themeSelected")
+  val button by animateColorAsState(target.button.primary.bg, spec, label = "themeButton")
+  val hero0 by animateColorAsState(target.heroGradient[0], spec, label = "themeHero0")
+  val hero1 by animateColorAsState(target.heroGradient[1], spec, label = "themeHero1")
+  val hero2 by animateColorAsState(target.heroGradient.last(), spec, label = "themeHero2")
+  val colors = target.copy(
+    background = bg, surface = surface, surfaceElevated = surface2, textPrimary = text,
+    brandPrimary = brand, iconActive = brand, focus = brand, brandText = brandText, surfaceSelected = selected,
+    button = target.button.copy(primary = target.button.primary.copy(bg = button, border = button)),
+    heroGradient = listOf(hero0, hero1, hero2),
+  )
   /*
    *  اجزای آمادهٔ متریال — تراشه، دکمه، کادرِ متن — رنگشان را از همین
    *  طرح می‌گیرند. تا وقتی این‌ها را ننویسیم، متریال رنگ‌های پیش‌فرضِ
-   *  بنفشِ خودش را می‌گذارد و خطِ خاکستری دورِ تراشه‌ها می‌کشد؛ همان
-   *  چیزی که در صفحهٔ گزارش‌ها دیده می‌شد.
+   *  خودش را می‌گذارد و خطِ خاکستری دورِ تراشه‌ها می‌کشد. طرح از `target`
+   *  ساخته می‌شود (نه رنگِ در حالِ جابه‌جایی) تا `isDark` وسطِ جابه‌جایی نلرزد.
    */
-  val scheme = if (dark) {
-    darkColorScheme(
-      primary = colors.primary,
-      onPrimary = Color(0xFF04121F),
-      primaryContainer = colors.primaryTint,
-      onPrimaryContainer = colors.primaryDark,
-      secondary = colors.accent,
-      onSecondary = Color(0xFF04121F),
-      secondaryContainer = colors.primaryTint,
-      onSecondaryContainer = colors.primary,
-      background = colors.bg,
-      onBackground = colors.text,
-      //  پنجره و کشو و منو، سطحِ **توپر** می‌گیرند نه شیشه: متنِ پنجره
-      //  نباید روی محتوای پشتش بیفتد
-      surface = colors.surfaceSolid,
-      onSurface = colors.text,
-      surfaceVariant = colors.surfaceSolid,
-      onSurfaceVariant = colors.muted,
-      surfaceContainer = colors.surfaceSolid,
-      surfaceContainerHigh = colors.surfaceSolid,
-      surfaceContainerHighest = colors.surfaceSolid,
-      // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
-      // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
-      // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.
-      outline = colors.fieldBorder,
-      outlineVariant = colors.fieldBorder,
-      error = colors.danger,
-      onError = Color(0xFF2A0B09),
-      errorContainer = colors.dangerTint,
-      onErrorContainer = colors.danger,
-      scrim = Color(0xCC020509),
-    )
-  } else {
-    lightColorScheme(
-      primary = colors.primary,
-      onPrimary = Color.White,
-      primaryContainer = colors.primaryTint,
-      onPrimaryContainer = colors.primaryDark,
-      secondary = colors.accent,
-      onSecondary = Color.White,
-      secondaryContainer = colors.primaryTint,
-      onSecondaryContainer = colors.primaryDark,
-      background = colors.bg,
-      onBackground = colors.text,
-      //  پنجره و کشو و منو، سطحِ **توپر** می‌گیرند نه شیشه: متنِ پنجره
-      //  نباید روی محتوای پشتش بیفتد
-      surface = colors.surfaceSolid,
-      onSurface = colors.text,
-      surfaceVariant = colors.surfaceSolid,
-      onSurfaceVariant = colors.muted,
-      surfaceContainer = colors.surfaceSolid,
-      surfaceContainerHigh = colors.surfaceSolid,
-      surfaceContainerHighest = colors.surfaceSolid,
-      // خطِ دورِ اجزای آمادهٔ متریال (کادر متن، تراشه، دکمهٔ خطی).
-      // این را نباید با حاشیهٔ کارت یکی کرد: حاشیهٔ کارت نامرئی است و
-      // اگر اینجا هم بنشیند، کادرِ متن در کلِ برنامه بی‌خط می‌شود.
-      outline = colors.fieldBorder,
-      outlineVariant = colors.fieldBorder,
-      error = colors.danger,
-      onError = Color.White,
-      errorContainer = colors.dangerTint,
-      onErrorContainer = colors.danger,
-      scrim = Color(0x990C1626),
-    )
-  }
+  val scheme = remember(target) { materialScheme(target) }
+    .copy(background = colors.background, surface = colors.surface, onSurface = colors.textPrimary, onBackground = colors.textPrimary)
 
   CompositionLocalProvider(LocalShopColors provides colors) {
     // متن روی تبلت بزرگ‌تر می‌شود. یک جا حساب می‌شود و همهٔ صفحه‌ها را
