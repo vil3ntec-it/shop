@@ -48,7 +48,7 @@ const TRANSITIONS = Object.freeze({
 /**
  * وضعیت اشتراک با ساعت سرور. برای هر دو بخش یکی است، پس بیرونِ build.
  *
- * SUB-01: `phase` مرحلهٔ رفتاری است — جدولِ `docs/spec/SUB-STATES.md`:
+ * SUB-01: `phase` مرحلهٔ رفتاری است — جدولِ `docs/SUB-STATES-fa.md`:
  * none · pending · active · grace · expired · cancelled · suspended · scheduled.
  * `status` همان ستونِ دفتر می‌ماند (سازگاری)؛ تنها فرقِ `phase` جدا کردنِ
  * «مهلت» (پس از `ends_at` و تا `graceEndsAt`) از «فعال» است، و «هنوز
