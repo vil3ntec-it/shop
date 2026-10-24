@@ -20,10 +20,12 @@ class FileHeldDisk(private val file: File) : HeldDisk {
 object HeldInvoices {
   @Volatile private var store: HeldInvoiceStore? = null
 
+  /** ساختن چیزی نمی‌خواند؛ فایل و سریِ دستگاه با نخستین کار روی `Dispatchers.IO` خوانده می‌شوند */
   fun of(context: Context): HeldInvoiceStore = store ?: synchronized(this) {
+    val app = context.applicationContext ?: context
     store ?: HeldInvoiceStore(
-      FileHeldDisk(File(context.filesDir, HeldInvoiceStore.FILE)),
-      device = runCatching { ir.vil3ntec.tohid.sync.DocSeries.current(context) }.getOrDefault(""),
+      FileHeldDisk(File(app.filesDir, HeldInvoiceStore.FILE)),
+      device = { ir.vil3ntec.tohid.sync.DocSeries.current(app) },
     ).also { store = it }
   }
 }

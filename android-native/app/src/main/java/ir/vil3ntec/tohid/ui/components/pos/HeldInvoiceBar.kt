@@ -82,14 +82,14 @@ import kotlinx.coroutines.launch
  *
  *  یک تکهٔ خودبسنده تا در طراحی‌های تازهٔ صندوق (گوشی و کامپیوتر) هم همین را
  *  جابه‌جا کنند: صفحه فقط سه کار می‌کند —
- *   ۱) `val held = rememberHeldInvoices(cartStore, d, snackbar, extras, onSwitched)`
+ *   ۱) `val held = rememberHeldInvoices(cartStore, d, snackbar, loaded, extras, onSwitched)`
  *   ۲) `HeldInvoiceBar(held)` جایی بالای سبد
  *   ۳) کامپیوتر: `if (held.onKey(e)) return true` اولِ `onPreviewKeyEvent`ِ صفحه
+ *      (پیش از هر شرطی: وسطِ جابه‌جایی همهٔ کلیدها را می‌خورد)
  *
  *  پشتِ تنظیمِ «چند فاکتورِ هم‌زمان» که پیش‌فرض **خاموش** است. خاموش و بی
- *  نگه‌داشته ⇒ نه نواری کشیده می‌شود نه کلیدی خورده می‌شود (F6 فقط می‌گوید کجا
- *  روشنش کنند). خاموش ولی با نگه‌داشته‌ای که مانده ⇒ نوار می‌ماند تا هیچ
- *  فاکتوری پشتِ تنظیم گیر نکند.
+ *  نگه‌داشته ⇒ نه نواری کشیده می‌شود نه کلیدی خورده می‌شود. خاموش ولی با
+ *  نگه‌داشته‌ای که مانده ⇒ نوار می‌ماند تا هیچ فاکتوری پشتِ تنظیم گیر نکند.
  */
 object HeldInvoicePrefs {
   val on = mutableStateOf(false)
@@ -108,7 +108,6 @@ object HeldInvoicePrefs {
   }
 
   const val SECTION = "چند فاکتورِ هم‌زمان"
-  const val OFF_HINT = "نگه‌داشتنِ فاکتور خاموش است — تنظیمات ← «$SECTION»"
 }
 
 internal sealed interface HeldDialog {
@@ -132,18 +131,31 @@ class HeldInvoicesUi internal constructor(
   internal var onSwitched: (HeldExtras) -> Unit = {}
   internal var onFocusBack: () -> Unit = {}
   internal var data: ShopData = ShopData()
+  /** دادهٔ دکان بار شده — بی آن `fit` همهٔ ردیف‌های کالا را «ناموجود» می‌دید */
+  internal var loaded: Boolean = true
   internal var dialog by mutableStateOf<HeldDialog?>(null)
+
+  private var pending by mutableStateOf(0)
+  private var warned = false
+  /** جابه‌جاییِ فاکتور در جریان است: سبد قفل است و صفحه ورودی نمی‌گیرد */
+  val switching: Boolean get() = pending > 0
 
   /** نوار دیده می‌شود: تنظیم روشن است یا نگه‌داشته‌ای مانده */
   val visible: Boolean get() = HeldInvoicePrefs.on.value || store.book.value.items.isNotEmpty()
 
   private fun toast(text: String) { scope.launch { snackbar.showSnackbar(text) } }
 
-  private fun run(op: suspend () -> HeldInvoiceStore.Outcome) {
+  /** `switches` ⇒ سبد عوض می‌شود: از همین لحظه تا پایان ورودیِ صفحه خورده می‌شود */
+  private fun run(switches: Boolean = false, op: suspend () -> HeldInvoiceStore.Outcome) {
+    if (switches) pending++
     scope.launch {
-      val message = when (val o = op()) {
-        is HeldInvoiceStore.Outcome.Done -> { o.extras?.let(onSwitched); o.message }
-        is HeldInvoiceStore.Outcome.Refused -> o.message
+      val message = try {
+        when (val o = op()) {
+          is HeldInvoiceStore.Outcome.Done -> { o.extras?.let(onSwitched); o.message }
+          is HeldInvoiceStore.Outcome.Refused -> o.message
+        }
+      } finally {
+        if (switches && --pending == 0) warned = false
       }
       //  پیش از پیام: `showSnackbar` تا بسته شدنِ پیام صبر می‌کند
       onFocusBack()
@@ -162,11 +174,16 @@ class HeldInvoicesUi internal constructor(
     dialog = HeldDialog.Hold(tag?.label?.ifBlank { null } ?: customer, tag?.note.orEmpty())
   }
 
-  fun hold(label: String?, note: String?) { dialog = null; run { store.hold(cart, extras(), label, note) } }
+  fun hold(label: String?, note: String?) { dialog = null; run(switches = true) { store.hold(cart, extras(), label, note) } }
   /** «+ تازه» — نگه‌داشتن بی پرسیدنِ نام و صندوقِ خالی برای مشتریِ بعدی */
   fun newInvoice() = hold(null, null)
-  fun resume(id: String) { dialog = null; run { store.resume(cart, id, extras(), data) } }
-  fun step(dir: Int) = run { store.step(cart, dir, extras(), data) }
+  fun resume(id: String) { dialog = null; if (ready()) run(switches = true) { store.resume(cart, id, extras(), data) } }
+  fun step(dir: Int) { if (ready()) run(switches = true) { store.step(cart, dir, extras(), data) } }
+
+  private fun ready(): Boolean {
+    if (!loaded) toast(NOT_LOADED)
+    return loaded
+  }
   fun discard(h: HeldInvoice) { dialog = null; run { store.discard(h.id) } }
   fun dropStale() { dialog = null; run { store.dropStale() } }
 
@@ -175,9 +192,15 @@ class HeldInvoicesUi internal constructor(
    *  پنجره‌ای باز است ⇒ کلید مالِ همان پنجره است.
    */
   fun onKey(e: KeyEvent): Boolean {
+    //  وسطِ جابه‌جایی: اسکن، F9/F12 و ویرایش به سبدی که دارد عوض می‌شود نرسند
+    if (switching) {
+      if (!warned && e.type == KeyEventType.KeyDown) { warned = true; toast(SWITCHING) }
+      return true
+    }
     if (e.type != KeyEventType.KeyDown || dialog != null) return false
     val hit = listOf(KeyMap.SALE_HOLD, KeyMap.SALE_HELD_LIST, KeyMap.SALE_NEXT_OPEN, KeyMap.SALE_PREV_OPEN).firstOrNull { e.matches(it) } ?: return false
-    if (!visible) { toast(HeldInvoicePrefs.OFF_HINT); return true }
+    //  تنظیم خاموش و نگه‌داشته‌ای نیست ⇒ کلید مالِ صفحه است، همان رفتارِ پیش
+    if (!visible) return false
     when (hit) {
       KeyMap.SALE_HOLD -> askHold()
       KeyMap.SALE_HELD_LIST -> dialog = HeldDialog.List
@@ -186,9 +209,15 @@ class HeldInvoicesUi internal constructor(
     }
     return true
   }
+
+  internal companion object {
+    const val SWITCHING = "فاکتور در حالِ جابه‌جایی است — لحظه‌ای بعد دوباره بزنید"
+    const val NOT_LOADED = "دادهٔ دکان هنوز بار نشده — لحظه‌ای بعد"
+  }
 }
 
 /**
+ *  @param loaded دادهٔ دکان بار شده (`ShopStore.loaded`) — تا آن، بازگرداندن نه
  *  @param extras حالتی از صفحه که با فاکتور می‌رود و در `CartStore` نیست (تخفیفِ نوشته‌شده)
  *  @param onSwitched فاکتورِ صندوق عوض شد ⇒ صفحه همین‌ها را بگذارد (و انتخاب/پرداختِ نیمه‌کاره را خالی کند)
  *  @param onFocusBack پس از هر کار — کامپیوتر فوکوس را به کادرِ اسکن برمی‌گرداند
@@ -198,6 +227,7 @@ fun rememberHeldInvoices(
   cartStore: CartStore,
   d: ShopData,
   snackbar: SnackbarHostState,
+  loaded: Boolean,
   extras: () -> HeldExtras = { HeldExtras() },
   onSwitched: (HeldExtras) -> Unit = {},
   onFocusBack: () -> Unit = {},
@@ -212,8 +242,11 @@ fun rememberHeldInvoices(
   ui.onSwitched = onSwitched
   ui.onFocusBack = onFocusBack
   ui.data = d
-  //  بالا آمدن پس از قطعِ برق وسطِ جابه‌جایی (شرحِ `HeldRules.reconcile`)
-  LaunchedEffect(ui) { ui.store.reconcile(cartStore) }
+  ui.loaded = loaded
+  //  بالا آمدن پس از قطعِ برق وسطِ جابه‌جایی (شرحِ `HeldRules.reconcile`)؛ پرسشِ
+  //  بازیابیِ پیش‌نویس بی‌پاسخ ⇒ پس از پاسخ، تا «دور انداختن» نگه‌داشته را نبرد
+  val recovering by cartStore.recovered.collectAsState()
+  LaunchedEffect(ui, recovering == null) { ui.store.reconcile(cartStore) }
   //  فاکتورِ فروش‌شده از فهرست می‌رود
   LaunchedEffect(ui, d.sales.size) { ui.store.prune(d) }
   return ui
@@ -229,7 +262,8 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
   if (!HeldInvoicePrefs.on.value && book.items.isEmpty()) return
 
   val d = ui.data
-  val active = SaleDraft(key = if (lines.isEmpty()) null else ui.cart.saleKey(), lines = lines.map { SaleDraft.Line(it.productId, it.quantity, it.unitPrice, it.label) }, debtorId = debtorId)
+  //  `lines`/`debtorId` بالا فقط برای دوباره کشیدن‌اند؛ خواندن بی ساختنِ کلید
+  val active = ui.cart.snapshot()
   val activeNo = HeldRules.activeNumber(book, active)
   val tag = HeldRules.activeTag(book, active)
   val target = PosLayout.minTarget(touch = !ir.vil3ntec.tohid.ui.Platform.DESKTOP).dp

@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.data
 
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -29,8 +32,11 @@ class HeldInvoicesTest {
 
   class MemDisk(val power: Power = Power(), var text: String? = null) : HeldDisk {
     var fail = false
+    /** پیش از هر نوشتن — «کاربر» وسطِ جابه‌جایی کاری می‌کند */
+    var onWrite: (() -> Unit)? = null
     override fun read(): String? = text
     override fun write(text: String) {
+      onWrite?.invoke()
       if (fail) throw IOException("دیسک پر است")
       if (power.lands()) this.text = text
     }
@@ -41,8 +47,16 @@ class HeldInvoicesTest {
     var mem: SaleDraft? = disk
     var fail = false
     override var busy = false
+    override var recovering = false
+    /** همان قفلِ `CartStore`: `scan`/`post` وسطِ جابه‌جایی رد می‌شوند */
+    var frozen = false
+    val sold = mutableListOf<String>()
+    /** پیش از هر `replace` (می‌تواند معلق بماند) */
+    var onReplace: (suspend () -> Unit)? = null
+    override fun freeze(on: Boolean) { frozen = on }
     override fun snapshot(): SaleDraft = mem ?: SaleDraft()
     override suspend fun replace(draft: SaleDraft?): Boolean {
+      onReplace?.invoke()
       mem = draft?.takeIf { it.lines.isNotEmpty() }
       if (fail) return false
       if (power.lands()) disk = mem
@@ -53,10 +67,24 @@ class HeldInvoicesTest {
       mem = SaleDraft(key = key, lines = lines.map { SaleDraft.Line(it.first, it.second) }, debtorId = debtor)
       disk = mem
     }
+    /** اسکن — مثلِ `CartStore.set`؛ قفل ⇒ رد */
+    fun scan(productId: String): Boolean {
+      if (frozen) return false
+      val now = mem ?: SaleDraft(key = "NEW")
+      mem = now.copy(lines = now.lines + SaleDraft.Line(productId, 1.0)); disk = mem
+      return true
+    }
+    /** F12 — مثلِ `CartStore.post`؛ قفل ⇒ رد */
+    fun post(): Boolean {
+      val key = mem?.key
+      if (frozen || key == null) return false
+      sold += key; mem = null; disk = null
+      return true
+    }
   }
 
   private var now = 1_700_000_000_000L
-  private fun store(disk: HeldDisk) = HeldInvoiceStore(disk, device = "A", clock = { now })
+  private fun store(disk: HeldDisk) = HeldInvoiceStore(disk, device = { "A" }, clock = { now })
 
   private val rice = Product(id = "p1", name = "برنج", salePrice = 300.0)
   private val oil = Product(id = "p2", name = "روغن", salePrice = 150.0)
@@ -292,6 +320,9 @@ class HeldInvoicesTest {
       done(s.resume(cart, "A", HeldExtras("3")))
       //  «باز کردنِ دوباره»: نمونهٔ تازه از همان فایل
       val again = store(FileHeldDisk(file))
+      //  ساختن چیزی نمی‌خواند (نه هنگامِ کشیدنِ صفحه)؛ نخستین کار می‌خواند
+      assertTrue(again.book.value.items.isEmpty())
+      again.load()
       assertEquals(s.book.value, again.book.value)
       val c = again.book.value.items.first { it.id == "C" }
       assertEquals("3", c.discount)
@@ -301,12 +332,13 @@ class HeldInvoicesTest {
   }
 
   @Test
-  fun `فایلِ خراب کنار گذاشته می‌شود، پاک نه`() {
+  fun `فایلِ خراب کنار گذاشته می‌شود، پاک نه`() = runBlocking<Unit> {
     val dir = Files.createTempDirectory("held").toFile()
     try {
       val file = File(dir, HeldInvoiceStore.FILE)
       file.writeText("{نیمه")
       val s = store(FileHeldDisk(file))
+      s.load()
       assertTrue(s.book.value.items.isEmpty())
       assertTrue("نسخهٔ خراب ماند", dir.listFiles()!!.any { it.name.startsWith("${HeldInvoiceStore.FILE}.bad-") && it.readText() == "{نیمه" })
     } finally { dir.deleteRecursively() }
@@ -324,9 +356,97 @@ class HeldInvoicesTest {
     //  سبد نوشته نشد ⇒ همه سرِ جای خود
     cart.fail = true
     assertEquals(HeldInvoiceStore.NOT_SAVED, refused(s.resume(cart, "A", HeldExtras())))
+    assertFalse("قفلِ سبد پس از شکست هم باز می‌شود", cart.frozen)
     assertEquals("B", keyOf(cart))
     assertEquals(listOf("A"), s.book.value.items.map { it.id })
     assertEquals(listOf("A"), HeldInvoiceCodec.decode(disk.text)!!.items.map { it.id })
+  }
+
+  @Test
+  fun `روشِ پرداخت و دریافتی با فاکتور می‌روند و برمی‌گردند`() = runBlocking<Unit> {
+    val cart = MemCart(); val s = store(MemDisk())
+    cart.put("A", "p1" to 2.0, debtor = "d1")
+    done(s.hold(cart, HeldExtras("5", SalesEngine.Payment.CREDIT, " 200 ")))
+    cart.put("B", "p2" to 1.0)
+    val back = done(s.resume(cart, "A", HeldExtras("", SalesEngine.Payment.CASH, "")))
+    assertEquals(HeldExtras("5", SalesEngine.Payment.CREDIT, "200"), back.extras)
+    assertEquals(HeldExtras("", SalesEngine.Payment.CASH, ""), done(s.resume(cart, "B", HeldExtras())).extras)
+    //  نگه‌داشتهٔ نسخهٔ پیش (بی روشِ پرداخت) ⇒ `null`: صفحه از مشتری می‌سازد
+    val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}],"debtorId":"d1"}]}""")!!
+    assertNull(HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A").let { (it as HeldRules.Result.Ok).extras.payment })
+  }
+
+  /** اسکن و F12 که وسطِ جابه‌جایی (هنگامِ هر نوشتن و عوض کردنِ سبد) می‌رسند به هیچ فاکتوری نمی‌رسند */
+  @Test
+  fun `اسکن و F12 وسطِ جابه‌جایی رد می‌شوند و هیچ فاکتوری خراب نمی‌شود`() = runBlocking<Unit> {
+    for (op in listOf("hold", "resume")) {
+      val disk = MemDisk(); val cart = MemCart(); val s = store(disk)
+      cart.put("T", "p1" to 1.0); done(s.hold(cart, HeldExtras()))
+      cart.put("A", "p2" to 2.0)
+      val tries = mutableListOf<Boolean>()
+      val user = { tries += cart.scan("p3"); tries += cart.post(); Unit }
+      disk.onWrite = user
+      cart.onReplace = { user() }
+      if (op == "hold") done(s.hold(cart, HeldExtras())) else done(s.resume(cart, "T", HeldExtras()))
+      disk.onWrite = null; cart.onReplace = null
+      assertTrue(op, tries.size >= 4)
+      assertTrue("$op: همه رد شدند", tries.none { it })
+      assertTrue(op, cart.sold.isEmpty())
+      val a = s.book.value.items.single { it.id == "A" }
+      assertEquals(op, listOf(SaleDraft.Line("p2", 2.0)), a.lines)
+      if (op == "resume") {
+        assertEquals(op, "T", keyOf(cart))
+        assertEquals(op, listOf(SaleDraft.Line("p1", 1.0)), cart.snapshot().lines)
+      } else assertTrue(op, cart.snapshot().lines.isEmpty())
+      //  پس از جابه‌جایی قفل باز است
+      assertTrue(op, cart.scan("p3")); assertTrue(op, cart.post())
+    }
+  }
+
+  /** صفحه وسطِ جابه‌جایی بسته شد (رفتن به صفحهٔ دیگر، چرخشِ گوشی): کار تا آخر می‌رود */
+  @Test
+  fun `لغوِ صفحه وسطِ جابه‌جایی فاکتورِ جاری را گم نمی‌کند`() = runBlocking<Unit> {
+    val disk = MemDisk(); val cart = MemCart(); val s = store(disk)
+    cart.put("T", "p1" to 1.0); done(s.hold(cart, HeldExtras()))
+    cart.put("A", "p2" to 2.0)
+    val entered = CompletableDeferred<Unit>(); val gate = CompletableDeferred<Unit>()
+    cart.onReplace = { entered.complete(Unit); gate.await() }
+    val job = launch { s.resume(cart, "T", HeldExtras()) }
+    entered.await(); job.cancel(); gate.complete(Unit); job.join()
+    cart.onReplace = null
+    assertEquals("T", keyOf(cart))
+    assertFalse(cart.frozen)
+    assertEquals(listOf("A"), s.book.value.items.map { it.id })
+    assertEquals(listOf("A"), HeldInvoiceCodec.decode(disk.text)!!.items.map { it.id })
+    //  نوشتنِ بعدی از حافظه «الف» را نگه می‌دارد
+    done(s.hold(cart, HeldExtras()))
+    assertEquals(listOf("A", "T"), HeldInvoiceCodec.decode(disk.text)!!.items.map { it.id }.sorted())
+  }
+
+  /** پرسشِ بازیابیِ پیش‌نویس بی‌پاسخ: «دور انداختن» نباید فاکتوری را ببرد که نگه‌داشته هم هست */
+  @Test
+  fun `reconcile تا پاسخِ پرسشِ بازیابی صبر می‌کند`() = runBlocking<Unit> {
+    val twin = HeldBook(items = listOf(HeldInvoice("X", 1, "ایکس", listOf(SaleDraft.Line("p1", 1.0)))))
+    //  دور انداختن: سبد خالی می‌شود و X نگه‌داشته می‌ماند
+    run {
+      val disk = MemDisk(text = HeldInvoiceCodec.encode(twin)); val s = store(disk)
+      val cart = MemCart().apply { put("X", "p1" to 1.0); recovering = true }
+      s.reconcile(cart)
+      assertEquals(listOf("X"), s.book.value.items.map { it.id })
+      cart.mem = null; cart.recovering = false
+      s.reconcile(cart)
+      assertEquals(listOf("X"), s.book.value.items.map { it.id })
+    }
+    //  ادامهٔ همان: X فقط در سبد، با همان شماره و نام
+    run {
+      val s = store(MemDisk(text = HeldInvoiceCodec.encode(twin)))
+      val cart = MemCart().apply { put("X", "p1" to 1.0); recovering = true }
+      s.reconcile(cart)
+      cart.recovering = false
+      s.reconcile(cart)
+      assertTrue(s.book.value.items.isEmpty())
+      assertEquals(HeldTag("X", 1, "ایکس"), s.book.value.current)
+    }
   }
 
   /**

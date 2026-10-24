@@ -1,10 +1,14 @@
 package ir.vil3ntec.tohid.data
 
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -53,12 +57,19 @@ data class HeldInvoice(
   val heldAt: Long = 0,
   /** دستگاهی که نگهش داشت (سریِ سند) — برای بازیابی روی دستگاهِ دیگر (S09) */
   val device: String = "",
+  /** روشِ پرداختی که فروشنده برگزیده بود (`SalesEngine.Payment.name`)؛ خالی ⇒ صفحه از مشتری می‌سازد */
+  val payment: String = "",
+  /** «دریافتیِ همین حالا» همان‌طور که در کادر نوشته شده بود */
+  val paid: String = "",
 ) {
   fun draft(): SaleDraft = SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt)
 }
 
-/** حالتِ صفحه که با هر فاکتور جابه‌جا می‌شود ولی در `CartStore` نیست */
-data class HeldExtras(val discount: String = "")
+/**
+ *  حالتِ صفحه که با هر فاکتور جابه‌جا می‌شود ولی در `CartStore` نیست.
+ *  `payment` `null` ⇒ فاکتورِ تازه یا نگه‌داشتهٔ نسخهٔ پیش: صفحه از مشتری می‌سازد (مشتری ⇒ نسیه).
+ */
+data class HeldExtras(val discount: String = "", val payment: SalesEngine.Payment? = null, val paid: String = "")
 
 /** شماره، نام و یادداشتِ فاکتورِ **جاری** — تا با هر جابه‌جایی عوض نشوند */
 @Serializable
@@ -123,7 +134,12 @@ object HeldRules {
       note = clean(note ?: activeTag(book, active)?.note, NOTE_MAX),
       heldAt = now,
       device = device,
+      payment = extras.payment?.name.orEmpty(),
+      paid = extras.paid.trim(),
     )
+
+  private fun extrasOf(h: HeldInvoice) =
+    HeldExtras(h.discount, SalesEngine.Payment.values().firstOrNull { it.name == h.payment }, h.paid)
 
   /** F6 — فاکتورِ جاری نگه داشته می‌شود و صندوق خالی. `label`/`note` `null` ⇒ همان قبلی. */
   fun hold(book: HeldBook, active: SaleDraft, extras: HeldExtras, label: String?, note: String?, now: Long, device: String): Result {
@@ -167,7 +183,7 @@ object HeldRules {
       rest = rest.filter { it.id != active.key } + park(book, active, extras, null, null, now, device, number)
     }
     val tag = HeldTag(target.id, target.number, target.label, target.note)
-    return Result.Ok(HeldBook(items = rest.sortedBy { it.number }, current = tag), target.draft(), HeldExtras(target.discount), target.number, held.lines.size - target.lines.size)
+    return Result.Ok(HeldBook(items = rest.sortedBy { it.number }, current = tag), target.draft(), extrasOf(target), target.number, held.lines.size - target.lines.size)
   }
 
   /** Ctrl+PgDn / Ctrl+PgUp — فاکتورِ باز بعدی/قبلی به ترتیبِ شماره؛ `null` = جای رفتن نیست */
@@ -234,20 +250,31 @@ interface HeldCart {
   suspend fun replace(draft: SaleDraft?): Boolean
   /** «ثبتِ فروش» در جریان است ⇒ جابه‌جایی نه */
   val busy: Boolean
+  /**
+   *  قفلِ سبد در طولِ یک جابه‌جایی: `true` ⇒ افزودن، ویرایش، پاک کردن و ثبتِ
+   *  فروش رد می‌شوند تا اسکن یا F12ِ وسطِ جابه‌جایی به فاکتورِ نیمه‌جابه‌جاشده نرسد.
+   */
+  fun freeze(on: Boolean)
+  /** پرسشِ بازیابیِ پیش‌نویس هنوز پاسخ نگرفته (`DraftRecoveryPrompt`) */
+  val recovering: Boolean get() = false
 }
 
 /**
  *  نگه‌داشته‌های همین دستگاه با نوشتنِ همگام. همهٔ کارها پشتِ یک قفل‌اند
- *  تا دو ضربهٔ پشتِ‌سرِهم دو جابه‌جاییِ درهم نسازند.
+ *  تا دو ضربهٔ پشتِ‌سرِهم دو جابه‌جاییِ درهم نسازند. خواندن و نوشتنِ فایل روی
+ *  `io` است، نه رشتهٔ صفحه؛ فایل با نخستین کار (`load`) خوانده می‌شود، نه هنگامِ ساختن.
  */
 class HeldInvoiceStore(
   private val disk: HeldDisk,
-  private val device: String = "",
+  private val device: () -> String = { "" },
   private val clock: () -> Long = { System.currentTimeMillis() },
+  private val io: CoroutineDispatcher = Dispatchers.IO,
 ) {
   private val lock = Mutex()
-  private val _book = MutableStateFlow(load())
+  private val _book = MutableStateFlow(HeldBook())
   val book: StateFlow<HeldBook> = _book.asStateFlow()
+  @Volatile private var loaded = false
+  private var deviceId = ""
 
   sealed interface Outcome {
     /** `extras` ناتهی ⇒ صفحه آن‌ها را برای فاکتورِ تازهٔ صندوق بگذارد */
@@ -255,69 +282,103 @@ class HeldInvoiceStore(
     data class Refused(val message: String) : Outcome
   }
 
-  private fun load(): HeldBook {
+  /** یک بار خواندنِ فایل (و سریِ دستگاه)؛ بارِ دوم کاری نمی‌کند */
+  suspend fun load() = lock.withLock { ensureLoaded() }
+
+  private suspend fun ensureLoaded() {
+    if (loaded) return
+    val (b, dev) = withContext(io) { read() to runCatching(device).getOrDefault("") }
+    _book.value = b
+    deviceId = dev
+    loaded = true
+  }
+
+  private fun read(): HeldBook {
     val raw = runCatching { disk.read() }.getOrElse { return HeldBook() }
     return HeldInvoiceCodec.decode(raw) ?: run { runCatching { disk.quarantine() }; HeldBook() }
   }
 
-  private fun write(next: HeldBook): Boolean = runCatching { disk.write(HeldInvoiceCodec.encode(next)) }.isSuccess
+  private suspend fun write(next: HeldBook): Boolean =
+    withContext(io) { runCatching { disk.write(HeldInvoiceCodec.encode(next)) }.isSuccess }
 
-  private fun commit(next: HeldBook): Boolean = write(next).also { if (it) _book.value = next }
+  private suspend fun commit(next: HeldBook): Boolean = write(next).also { if (it) _book.value = next }
 
   private fun title(number: Int, label: String) = if (label.isBlank()) "فاکتورِ #$number" else "فاکتورِ #$number «$label»"
 
+  /**
+   *  هستهٔ هر جابه‌جایی: سبد تا پایان قفل است و لغوِ صفحه (رفتن به صفحهٔ دیگر،
+   *  چرخشِ گوشی) آن را نیمه‌کاره نمی‌گذارد — نیمه‌کاره یعنی دفترِ حافظه عقب‌تر از
+   *  دیسک و نوشتنِ بعدی فاکتوری را جا می‌انداخت.
+   */
+  private suspend fun <T> switching(cart: HeldCart, block: suspend () -> T): T = withContext(NonCancellable) {
+    cart.freeze(true)
+    try { block() } finally { cart.freeze(false) }
+  }
+
   suspend fun hold(cart: HeldCart, extras: HeldExtras, label: String? = null, note: String? = null): Outcome = lock.withLock {
+    ensureLoaded()
     if (cart.busy) return Outcome.Refused(BUSY)
-    when (val r = HeldRules.hold(_book.value, cart.snapshot(), extras, label, note, clock(), device)) {
-      is HeldRules.Result.Refused -> Outcome.Refused(r.message)
-      is HeldRules.Result.Ok -> {
-        //  ۱) اول در دفترِ نگه‌داشته‌ها ۲) بعد سبد خالی. برق میانِ این دو ⇒ فاکتور در سبد می‌ماند (`reconcile`)
-        if (!commit(r.book)) return Outcome.Refused(NOT_SAVED)
-        cart.replace(null)
-        val h = r.book.items.first { it.number == r.number }
-        Outcome.Done("${title(h.number, h.label)} نگه داشته شد", HeldExtras())
+    switching(cart) {
+      when (val r = HeldRules.hold(_book.value, cart.snapshot(), extras, label, note, clock(), deviceId)) {
+        is HeldRules.Result.Refused -> Outcome.Refused(r.message)
+        is HeldRules.Result.Ok -> {
+          //  ۱) اول در دفترِ نگه‌داشته‌ها ۲) بعد سبد خالی. برق میانِ این دو ⇒ فاکتور در سبد می‌ماند (`reconcile`)
+          if (!commit(r.book)) return@switching Outcome.Refused(NOT_SAVED)
+          cart.replace(null)
+          val h = r.book.items.first { it.number == r.number }
+          Outcome.Done("${title(h.number, h.label)} نگه داشته شد", HeldExtras())
+        }
       }
     }
   }
 
   suspend fun resume(cart: HeldCart, id: String, extras: HeldExtras, d: ShopData? = null): Outcome = lock.withLock {
+    ensureLoaded()
     if (cart.busy) return Outcome.Refused(BUSY)
-    val before = _book.value
-    val active = cart.snapshot()
-    val r = HeldRules.resume(before, id, active, extras, clock(), device, d)
-    if (r is HeldRules.Result.Refused) return Outcome.Refused(r.message)
-    r as HeldRules.Result.Ok
-    val target = before.items.first { it.id == id }
-    //  ۱) فاکتورِ جاری به دفتر — هدف هنوز همان‌جاست (برق ⇒ تکراری، نه گم)
-    val staged = r.book.copy(items = (r.book.items + target).sortedBy { it.number })
-    if (!write(staged)) return Outcome.Refused(NOT_SAVED)
-    //  ۲) هدف به سبد، تا روی دیسک
-    if (!cart.replace(r.cart)) {
-      cart.replace(active.takeIf { it.lines.isNotEmpty() })
-      write(before)
-      return Outcome.Refused(NOT_SAVED)
+    switching(cart) {
+      val before = _book.value
+      val active = cart.snapshot()
+      val r = HeldRules.resume(before, id, active, extras, clock(), deviceId, d)
+      if (r is HeldRules.Result.Refused) return@switching Outcome.Refused(r.message)
+      r as HeldRules.Result.Ok
+      val target = before.items.first { it.id == id }
+      //  ۱) فاکتورِ جاری به دفتر — هدف هنوز همان‌جاست (برق ⇒ تکراری، نه گم)
+      val staged = r.book.copy(items = (r.book.items + target).sortedBy { it.number })
+      if (!write(staged)) return@switching Outcome.Refused(NOT_SAVED)
+      //  حافظه همان دیسک: هر نوشتنِ بعدی فاکتورِ جاریِ نگه‌داشته را با خود دارد
+      _book.value = staged
+      //  ۲) هدف به سبد، تا روی دیسک
+      if (!cart.replace(r.cart)) {
+        cart.replace(active.takeIf { it.lines.isNotEmpty() })
+        //  نرسید ⇒ دیسک همان `staged` می‌ماند (هم‌کلیدِ سبد؛ `reconcile` یکی‌اش می‌کند)
+        if (write(before)) _book.value = before
+        return@switching Outcome.Refused(NOT_SAVED)
+      }
+      //  ۳) هدف از دفتر بیرون. نرسید ⇒ `reconcile` در بالا آمدنِ بعدی
+      write(r.book)
+      _book.value = r.book
+      val dropped = if (r.dropped > 0) " — ${r.dropped} ردیف که کالایش دیگر فروختنی نیست کنار رفت" else ""
+      Outcome.Done("${title(target.number, target.label)} باز شد$dropped", r.extras)
     }
-    //  ۳) هدف از دفتر بیرون. نرسید ⇒ `reconcile` در بالا آمدنِ بعدی
-    write(r.book)
-    _book.value = r.book
-    val dropped = if (r.dropped > 0) " — ${r.dropped} ردیف که کالایش دیگر فروختنی نیست کنار رفت" else ""
-    Outcome.Done("${title(target.number, target.label)} باز شد$dropped", r.extras)
   }
 
   /** فاکتورِ باز بعدی (`dir` > ۰) یا قبلی */
   suspend fun step(cart: HeldCart, dir: Int, extras: HeldExtras, d: ShopData? = null): Outcome {
+    load()
     val id = HeldRules.neighbour(_book.value, cart.snapshot(), dir) ?: return Outcome.Refused("فاکتورِ نگه‌داشته‌ای نیست")
     return resume(cart, id, extras, d)
   }
 
   /** دور انداختن — صفحه پیش از آن تأیید می‌گیرد */
   suspend fun discard(id: String): Outcome = lock.withLock {
+    ensureLoaded()
     val h = _book.value.items.firstOrNull { it.id == id } ?: return Outcome.Refused(HeldRules.GONE)
     if (!commit(HeldRules.discard(_book.value, id))) return Outcome.Refused(NOT_SAVED)
     Outcome.Done("${title(h.number, h.label)} دور انداخته شد")
   }
 
   suspend fun rename(id: String, label: String, note: String): Outcome = lock.withLock {
+    ensureLoaded()
     if (_book.value.items.none { it.id == id }) return Outcome.Refused(HeldRules.GONE)
     if (!commit(HeldRules.rename(_book.value, id, label, note))) return Outcome.Refused(NOT_SAVED)
     Outcome.Done("ذخیره شد")
@@ -325,6 +386,7 @@ class HeldInvoiceStore(
 
   /** پاک کردنِ نگه‌داشته‌های کهنه — صفحه مجوز و تأیید را می‌گیرد */
   suspend fun dropStale(hours: Int = HeldRules.STALE_HOURS): Outcome = lock.withLock {
+    ensureLoaded()
     val n = HeldRules.stale(_book.value, clock(), hours).size
     if (n == 0) return Outcome.Refused("فاکتورِ کهنه‌ای نیست")
     if (!commit(HeldRules.dropStale(_book.value, clock(), hours))) return Outcome.Refused(NOT_SAVED)
@@ -333,12 +395,19 @@ class HeldInvoiceStore(
 
   /** پس از تغییرِ دفتر (فروش، حذفِ کالا یا مشتری) */
   suspend fun prune(d: ShopData) = lock.withLock {
+    ensureLoaded()
     val next = HeldRules.prune(_book.value, d)
     if (next != _book.value) { write(next); _book.value = next }
   }
 
-  /** بالا آمدنِ برنامه — یک بار، پیش از هر کارِ دیگر */
+  /**
+   *  بالا آمدنِ برنامه — پیش از هر کارِ دیگر، و دوباره پس از پاسخِ پرسشِ
+   *  بازیابی. تا آن پاسخ هم‌کلیدِ نگه‌داشته دست نمی‌خورد: «دور انداختنِ»
+   *  پیش‌نویس نباید فاکتوری را ببرد که در فهرستِ نگه‌داشته‌ها هم هست.
+   */
   suspend fun reconcile(cart: HeldCart) = lock.withLock {
+    ensureLoaded()
+    if (cart.recovering) return@withLock
     val next = HeldRules.reconcile(_book.value, cart.snapshot())
     if (next != _book.value) { write(next); _book.value = next }
   }

@@ -80,7 +80,11 @@ class CartStore(context: Context) : HeldCart {
     }
   }
 
+  /** POS-12: جابه‌جاییِ فاکتور در جریان است ⇒ سبد دست نمی‌خورد (`HeldCart.freeze`) */
+  @Volatile private var frozen = false
+
   fun set(lines: List<SalesEngine.CartLine>) {
+    if (frozen) return
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
@@ -88,11 +92,17 @@ class CartStore(context: Context) : HeldCart {
   }
 
   fun setDebtor(id: String?) {
+    if (frozen) return
     _debtorId.value = id
     persist()
   }
 
   fun clear() {
+    if (frozen) return
+    wipe()
+  }
+
+  private fun wipe() {
     key = null
     _lines.value = emptyList()
     _debtorId.value = null
@@ -108,8 +118,9 @@ class CartStore(context: Context) : HeldCart {
    */
   suspend fun post(store: ShopStore, record: (key: String) -> SalesEngine.Result): SalePost.Outcome {
     //  ضربه‌ای که پس از پایانِ ثبتِ قبلی رسید سبدِ کهنهٔ صفحه را در دست دارد، نه سبدِ تازه را
-    if (_lines.value.isEmpty()) return SalePost.Outcome.Busy
-    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) clear() }
+    //  POS-12: F9/F12ِ وسطِ جابه‌جاییِ فاکتور ثبت نمی‌شود (سبد نیمه‌جابه‌جا است)
+    if (frozen || _lines.value.isEmpty()) return SalePost.Outcome.Busy
+    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) wipe() }
     //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
     if (out is SalePost.Outcome.Done) {
       runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }
@@ -120,7 +131,7 @@ class CartStore(context: Context) : HeldCart {
   /** پاسخِ پرسشِ بازیابی: `keep` = ادامه با همین ردیف‌ها؛ `null` = دور انداختن */
   fun resolveRecovery(keep: SaleDraft?) {
     _recovered.value = null
-    if (keep == null) { clear(); return }
+    if (keep == null) { wipe(); return }
     key = keep.key ?: key
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
@@ -130,6 +141,10 @@ class CartStore(context: Context) : HeldCart {
   /* ── POS-12: فاکتورهای نگه‌داشته (`HeldInvoiceStore`) ─────────────────── */
 
   override val busy: Boolean get() = posting.value
+
+  override fun freeze(on: Boolean) { frozen = on }
+
+  override val recovering: Boolean get() = _recovered.value != null
 
   override fun snapshot(): SaleDraft =
     SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis())

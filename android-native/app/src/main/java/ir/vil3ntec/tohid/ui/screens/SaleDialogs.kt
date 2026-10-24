@@ -65,6 +65,8 @@ fun CheckoutDialog(
   onConfirm: (SalesEngine.Checkout) -> Unit,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
+  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  presetDiscount: String = "",
 ) {
   val context = LocalContext.current
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
@@ -74,7 +76,7 @@ fun CheckoutDialog(
 
   var discountType by remember { mutableStateOf(SalesEngine.DiscountType.PERCENT) }
   var payment by remember { mutableStateOf(if (preset != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH) }
-  var discountText by remember { mutableStateOf("0") }
+  var discountText by remember { mutableStateOf(presetDiscount.ifBlank { "0" }) }
   var debtorId by remember { mutableStateOf(preset) }
   var paidText by remember { mutableStateOf(if (preset != null) "0" else "") }
   var debtorMenu by remember { mutableStateOf(false) }

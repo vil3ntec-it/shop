@@ -116,6 +116,8 @@ fun DeskSaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  //  POS-12: همان سبدی که `priced` از آن ساخته شد — `finish` با سبدِ عوض‌شده ثبت نمی‌کند
+  val pricedFrom = cart
   val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
 
   var query by remember { mutableStateOf("") }
@@ -148,7 +150,13 @@ fun DeskSaleScreen(
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
   var paidText by remember { mutableStateOf("") }
-  LaunchedEffect(cartDebtorId) { if (cartDebtorId != null) payment = SalesEngine.Payment.CREDIT }
+  //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
+  var switchedDebtor by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(cartDebtorId) {
+    val fromSwitch = cartDebtorId != null && cartDebtorId == switchedDebtor
+    switchedDebtor = null
+    if (cartDebtorId != null && !fromSwitch) payment = SalesEngine.Payment.CREDIT
+  }
 
   val searchFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
@@ -261,12 +269,20 @@ fun DeskSaleScreen(
     blockExpired = blockExpired,
   )
   val totals = SalesEngine.totals(d, priced, checkout)
+  //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
+  val inputsFrom = listOf<Any?>(discountText, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
   /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast("سبد خالی است"); return }
+    //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
+    if (pricedFrom !== cartStore.lines.value || checkout.debtorId != cartStore.debtorId.value ||
+      inputsFrom != listOf<Any?>(discountText, paidText, payment)
+    ) {
+      toast("سبد همین حالا عوض شد — دوباره بزنید"); return
+    }
     if (discountBad || (!payV2 && paidBad)) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
     if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
     val st = if (!payV2) null else settled ?: when (
@@ -344,10 +360,20 @@ fun DeskSaleScreen(
   val c = Shop.colors
 
   //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش)
+  val dataLoaded by store.loaded.collectAsState()
   val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
-    cartStore, d, snackbar,
-    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText) },
-    onSwitched = { x -> discountText = x.discount; paidText = ""; payment = SalesEngine.Payment.CASH; selected = null },
+    cartStore, d, snackbar, dataLoaded,
+    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText) },
+    onSwitched = { x ->
+      discountText = x.discount; paidText = x.paid; selected = null
+      //  پنلِ پرداخت مالِ فاکتورِ قبلی بود
+      payOpen = false
+      //  روشِ پرداخت با فاکتور برمی‌گردد؛ نبود (فاکتورِ تازه، نسخهٔ پیش) یا نسیهٔ بی‌مشتری ⇒ قاعدهٔ صفحه: مشتری ⇒ نسیه
+      val debtorNow = cartStore.debtorId.value
+      payment = x.payment?.takeUnless { it == SalesEngine.Payment.CREDIT && debtorNow == null }
+        ?: if (debtorNow != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH
+      switchedDebtor = debtorNow
+    },
     onFocusBack = { refocus() },
   )
 
@@ -526,8 +552,9 @@ fun DeskSaleScreen(
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
-        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        //  POS-12: پیش از هر شرطی — وسطِ جابه‌جاییِ فاکتور همهٔ کلیدها خورده می‌شوند
         if (held.onKey(e)) return@onPreviewKeyEvent true
+        if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }

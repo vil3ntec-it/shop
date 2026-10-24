@@ -83,11 +83,11 @@ fun SaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
+  val pricedFrom = cart
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
-  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش)؛ تخفیفِ گوشی در پنجرهٔ پرداخت است
-  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(cartStore, d, snackbar)
 
   var cameraOn by rememberSaveable { mutableStateOf(true) }
   var granted by remember {
@@ -142,6 +142,23 @@ fun SaleScreen(
   //  ردیفی که کادرِ تعداد و قیمتش باز است، و پنجرهٔ قلمِ آزاد
   var editLine by remember { mutableStateOf<String?>(null) }
   var freeLine by rememberSaveable { mutableStateOf(false) }
+
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش). تخفیف و
+  //  پرداختِ گوشی در پنجرهٔ پرداخت است؛ آنچه با فاکتور آمد (مثلاً از کامپیوتر) فقط
+  //  برای همان فاکتور می‌ماند — با نگه‌داشتنِ دوباره گم نمی‌شود و تخفیفِ پنجره از آن پر می‌شود
+  var keptExtras by remember { mutableStateOf<Pair<String, ir.vil3ntec.tohid.data.HeldExtras>?>(null) }
+  fun extrasNow() = keptExtras?.takeIf { it.first == cartStore.snapshot().key }?.second ?: ir.vil3ntec.tohid.data.HeldExtras()
+  val dataLoaded by store.loaded.collectAsState()
+  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
+    cartStore, d, snackbar, dataLoaded,
+    extras = { extrasNow() },
+    onSwitched = { x ->
+      keptExtras = cartStore.snapshot().key?.let { it to x }
+      selectedId = null; multiplier = 1
+      //  پنجرهٔ پرداخت مالِ فاکتورِ قبلی بود
+      checkout = false
+    },
+  )
 
   val gate = remember { ScanGate() }
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
@@ -603,12 +620,15 @@ fun SaleScreen(
       //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
       cart = priced,
       presetDebtorId = cartDebtorId,
+      presetDiscount = extrasNow().discount,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
       onConfirm = { options ->
         //  دو ضربهٔ پشتِ سرِ هم پیش از بسته شدنِ پنجره: دومی همان سبدِ قبلی
         //  را دوباره ثبت می‌کرد. `checkout` همان لحظه خوانده می‌شود.
         if (!checkout) return@CheckoutDialog
+        //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
+        if (pricedFrom !== cartStore.lines.value) return@CheckoutDialog
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         scope.launch { when (val posted = cartStore.post(store) { key ->
           SalesEngine.record(
