@@ -67,6 +67,15 @@ data class WarehouseEntry(
   val isAdjustment: Boolean = false,
   /** اگر این ورودی از ثبتِ یک خرید آمده باشد، شناسهٔ همان خرید */
   val purchaseId: String? = null,
+  /**
+   *  ردیفِ ساختهٔ سیستم از یک سند (مثلاً اصلاحِ انبارِ برگشتِ ضایعات یا بی رسید): شناسهٔ
+   *  همان سند (`docId` ِ برگشت). سرور با آن می‌داند اگر سند رد شد این ردیف هم با آن برگردد
+   *  (`staff-approval.js`، `companionOf`). ورودِ دستیِ کالا `null` است و نوشته نمی‌شود —
+   *  ردیفِ قدیمی بایت‌به‌بایت همان می‌ماند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refId: String? = null,
   val createdAt: Long = 0,
   /**
    *  تاریخِ انقضای همین محموله (`yyyy-MM-dd`)؛ خالی یعنی «انقضا ندارد یا
@@ -288,6 +297,23 @@ data class DebtTransaction(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /**
+   *  ردیفِ ساختهٔ سیستم (نه دستِ کاربر): سندی که آن را ساخت — برای لغو و مرجوعی شناسهٔ
+   *  فاکتور. همان نامِ `refId`ِ `StockMovement`. ردیفِ دستی `null` است و نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refId: String? = null,
+  /**
+   *  چرا سیستم ساختش — همان واژه‌های `StockMovement.type`:
+   *  `sale_cancel` (لغوِ فروشِ نسیه؛ بدهی بسته می‌شود، پولی به دخل نیامده)،
+   *  `customer_return` (مرجوعیِ فروشِ نسیه؛ کنارِ کمِ کلِ مرجوعی از دخل)،
+   *  `store_credit` (برای آینده: پرداخت با اعتبارِ فروشگاه). `null` = ردیفِ دستی.
+   *  صندوق `sale_cancel` و `store_credit` را نقد نمی‌شمارد (`CashShift.isCashReceipt`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val kind: String? = null,
 )
 
 @Serializable
@@ -380,6 +406,28 @@ data class AuditEntry(
   val createdAt: Long = 0,
   /** مبلغِ ردیف — فعلاً فقط صندوق (`shift_open`/`shift_close`)؛ بقیه صفر */
   val amount: Double = 0.0,
+  /*
+   *  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و
+   *  `shift_close`ِ با شمارش). همان نام‌های رویدادِ pay-core و `ReportLedger`؛
+   *  `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approvedBy: String? = null,
+  /** دلیل: `deposit`/`owner_withdrawal`/`petty_expense`/`other`، دلیلِ کشو بی فروش، یا دلیلِ اختلاف */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val note: String? = null,
+  /** گزارشِ Zِ هسته در لحظهٔ بستن (به پول، همان شکلِ JS) — لغوِ بعدی عوضش نمی‌کند */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val z: kotlinx.serialization.json.JsonObject? = null,
 )
 
 /**

@@ -347,6 +347,12 @@ fun AppRoot(
   }
   //  POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن
   DraftRecoveryPrompt(cartStore, data, loaded, snackbar)
+  //  HW-02/03: کشوی بی فروش (`no_sale`) و چاپِ دوباره (`reprint`) از صفِ چاپ ⇐ سابقهٔ دکان.
+  //  `appendAudit` روی دفترِ همان لحظه و زیرِ قفلِ نوشتن می‌سازد (نه تصویرِ کهنهٔ `data.value`)
+  //  تا فروشِ هم‌زمان گم نشود؛ پس از بارِ دفتر، و مثلِ هر نوشتنی همگام می‌شود
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
