@@ -9,7 +9,6 @@ import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
@@ -62,10 +61,10 @@ object SettingsPaths {
     SECTION_SLUGS.entries.firstOrNull { it.value == slug && SettingsLayout.groupOf(it.key) == group }?.key
 }
 
-/** یک بخش روی گوشی صفحهٔ خودش است؛ روی کامپیوتر همان صفحه در ستونِ پایانِ دوستونه */
+/** یک بخش روی گوشی صفحهٔ خودش است؛ روی صفحهٔ پهن (کامپیوتر، تبلتِ افقی) همان صفحه در ستونِ پایانِ دوستونه */
 @Composable
 private fun RouteScope.SettingsSection(key: String) {
-  if (Platform.DESKTOP) DeskSettingsScreen(selected = key) else SettingsPages.of(key)?.content?.invoke(this) { back() }
+  if (wide) DeskSettingsScreen(selected = key) else SettingsPages.of(key)?.content?.invoke(this) { back() }
 }
 
 /**
@@ -84,24 +83,24 @@ val SettingsModule = AppModule(
   ),
   routes = listOf(
     V3Route(SettingsPaths.ROOT, RouteKind.PAGE, { Str.settings }, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) DeskSettingsScreen(selected = null) else SettingsIndexScreen(onBack = { back() })
+      if (wide) DeskSettingsScreen(selected = null) else SettingsIndexScreen(onBack = { back() })
     },
     V3Route(SettingsPaths.NAVBAR, RouteKind.PAGE, { SettingsLayout.labelOf(SettingsLayout.NAV_BAR) }, parent = SettingsPaths.group(SettingsLayout.GENERAL), aliases = listOf("nav-editor"), chrome = Chrome.OWN) {
       NavBarScreen(allowed = shell.navAllowed, onBack = { back() })
     },
     V3Route(SettingsPaths.ABOUT, RouteKind.PAGE, { SettingsLayout.labelOf(SettingsLayout.ABOUT_APP) }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = SettingsLayout.ABOUT_APP)
+      if (wide && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = SettingsLayout.ABOUT_APP)
       else AboutScreen(data, onBack = { back() })
     },
     //  وضعیتِ همگام‌سازی فقط‌خواندنی و مالِ همه است (کارمند هم) — هشدارِ «همگام‌سازی خطا دارد» این‌جا را باز می‌کند
     V3Route(SettingsPaths.SYNC, RouteKind.PAGE, { SettingsLayout.labelOf("همگام‌سازی") }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی") else SyncScreen(onBack = { back() })
+      if (wide && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی") else SyncScreen(onBack = { back() })
     },
     V3Route("settings/{group}", RouteKind.PAGE, { Str.settings }, parent = SettingsPaths.ROOT, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       val group = SettingsPaths.groupOfSlug(args["group"].orEmpty())
       when {
         group == null -> LandOn(SettingsPaths.ROOT)
-        Platform.DESKTOP -> DeskSettingsScreen(selected = SettingsLayout.GROUPS.first { it.title == group }.sections.firstOrNull { it in SettingsLayout.deskSections })
+        wide -> DeskSettingsScreen(selected = SettingsLayout.GROUPS.first { it.title == group }.sections.firstOrNull { !SettingsLayout.isLink(it) })
         else -> SettingsGroupScreen(group, onBack = { back() })
       }
     },

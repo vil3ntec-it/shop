@@ -21,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
@@ -34,14 +35,15 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 
 /**
- *  تنظیماتِ کامپیوتر: فهرستِ بخش‌ها در ستونِ آغاز (همان گروه‌ها، بی بخش‌های فقط‌گوشی —
+ *  تنظیماتِ صفحهٔ پهن (کامپیوتر، تبلتِ افقی — `shell.wide`): فهرستِ بخش‌ها در ستونِ آغاز (همان گروه‌ها، بی بخش‌های فقط‌گوشی —
  *  `SettingsLayout.deskSections`) و صفحهٔ همان بخش در ستونِ پایان — **همان** صفحه‌های
  *  گوشی (`SettingsPages`)، بی دکمهٔ برگشت. پیوندِ هر بخش (`settings/security/app-lock`)
  *  همان بخش را باز انتخاب می‌کند.
  */
 @Composable
 internal fun RouteScope.DeskSettingsScreen(selected: String?) {
-  val desk = SettingsLayout.deskSections
+  //  کامپیوتر دوربین و نوارِ پایینِ گوشی را ندارد؛ تبلتِ پهن دارد
+  val desk = if (Platform.DESKTOP) SettingsLayout.deskSections else SettingsLayout.sections
   var pick by rememberSaveable(selected) { mutableStateOf(selected?.takeIf { it in desk } ?: desk.first()) }
   val facts = rememberSettingsFacts(theme)
   val extra = remember(access) { V3Modules.settingsEntries(access) }
