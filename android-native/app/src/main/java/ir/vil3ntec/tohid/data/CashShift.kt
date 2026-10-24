@@ -86,7 +86,9 @@ object CashShift {
       sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && inWindow(it.createdAt) }
         .sumOf { (it.finalTotal - it.debtGiven).coerceAtLeast(0.0) },
       receipts = d.transactions.filter { it.type == "receive" && inWindow(it.createdAt) }.sumOf { it.amount },
-      returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { it.amount },
+      //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛
+      //  ردیفِ قدیمی آن را ندارد ⇒ همان `amount`ِ امروز
+      returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { ReturnFlow.drawerAmount(it) },
       expenses = d.expenses.filter { inWindow(it.createdAt) }.sumOf { it.amount },
       suppliers = d.supplierPayments.filter { inWindow(it.createdAt) }.sumOf { it.amount } +
         d.purchases.filter { inWindow(it.createdAt) }.sumOf { it.paidAmount },
