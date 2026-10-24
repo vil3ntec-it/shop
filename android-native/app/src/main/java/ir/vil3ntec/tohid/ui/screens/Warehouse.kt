@@ -721,5 +721,6 @@ private fun movementLabel(type: String): String = when (type) {
   "sale_cancel" -> "لغو فروش"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
+  "damage" -> "ضایعات"
   else -> type
 }

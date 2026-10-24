@@ -121,6 +121,9 @@ object ShopRole {
   /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
   fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
 
+  /** لایه‌های `policy` برای تصمیمِ عددی (RET-10: `ReturnFlow.permDecision`) */
+  fun layers(context: Context): List<Any?> = PermPolicy.layers(prefs(context).getString(POLICY, null))
+
   /**
    *  باز کردنِ دستیِ کشو بی فروش (`no_sale`) — `drawer.open`ِ هسته. شاگرد
    *  پیش‌فرض نه؛ «نیازمندِ تأیید» هم این‌جا یعنی نه (برگهٔ تأیید هنوز در
