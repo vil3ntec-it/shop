@@ -36,6 +36,8 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
+import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
+import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.Platform
@@ -183,24 +185,13 @@ fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
 
 /* ============================ نشان‌ها ============================ */
 
-/** وضعیت: متن + رنگ + نقطه، هرگز رنگِ تنها (VISUAL-DIRECTION §۱) */
+/**
+ *  وضعیت: متن + رنگ + نقطه، هرگز رنگِ تنها (VISUAL-DIRECTION §۱). رنگ از هفت توکنِ
+ *  وضعیتِ VILL3N و همان نگاشتِ پیک و میزِ تحویل (`OrderStatusTone`) — «در مسیر» همه‌جا آبی.
+ */
 @Composable
 fun OrderStatusPill(status: String) {
-  val c = Shop.colors
-  val (dot, fill) = when (status) {
-    "new" -> c.danger to c.dangerTint
-    "delivered", "picked_up" -> c.success to c.successTint
-    "rejected", "cancelled", "auto_rejected", "cancelled_by_customer", "delivery_failed" -> c.warning to c.warningTint
-    else -> c.primary to c.primaryTint
-  }
-  Row(
-    Modifier.clip(RoundedCornerShape(50)).background(fill).padding(horizontal = 9.dp, vertical = 3.dp),
-    verticalAlignment = Alignment.CenterVertically,
-  ) {
-    Box(Modifier.size(7.dp).clip(CircleShape).background(dot))
-    Spacer(Modifier.width(6.dp))
-    Text(OrderText.status(status), style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = c.text)
-  }
+  StatusPill(OrderText.status(status), OrderStatusTone.order(status))
 }
 
 @Composable

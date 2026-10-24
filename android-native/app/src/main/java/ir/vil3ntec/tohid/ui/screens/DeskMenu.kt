@@ -80,11 +80,13 @@ object DeskMenu {
     ),
     Group(
       "کانال‌های فروش",
-      listOf(
-        page("sale", "فروش (صندوق)"),
-        if (storefrontLive) Item("storefront", "ویترین و بازارچه") else soon("storefront", "ویترین و بازارچه"),
-        if (deliveryLive) Item("delivery", "میزِ تحویل و پیک") else soon("delivery", "پیک و مناطق تحویل"),
-      ),
+      buildList {
+        add(page("sale", "فروش (صندوق)"))
+        //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان درونِ همان صفحه است
+        if (canAdmin) add(Item("promos", "تخفیف‌ها"))
+        add(if (storefrontLive) Item("storefront", "ویترین و بازارچه") else soon("storefront", "ویترین و بازارچه"))
+        add(if (deliveryLive) Item("delivery", "میزِ تحویل و پیک") else soon("delivery", "پیک و مناطق تحویل"))
+      },
     ),
     Group(
       "مدیریت و سامانه",

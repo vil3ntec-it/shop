@@ -168,7 +168,7 @@ fun V3Scaffold(
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
       V3HeaderBar(title, onBack, headerActions, showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f, transparent = backdrop != null)
       if (largeTitle) V3LargeTitle(title, subtitle, state, transparent = backdrop != null)
-      if (notice != null) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) { notice() }
+      if (notice != null) V3NoticeSlot(notice)
       if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
       if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
       Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -215,6 +215,27 @@ val LocalV3Notice = androidx.compose.runtime.compositionLocalOf<(@Composable () 
  *  `V3Scaffold`/`V3FormBar` دوباره حسابش نکنند؛ null ⇒ خودشان می‌سنجند.
  */
 val LocalV3SystemBottom = androidx.compose.runtime.compositionLocalOf<Dp?> { null }
+
+/**
+ *  جای نوارهای پیام (AUDIT-NAV S7): چند نوار **زیرِ هم** با فاصلهٔ ۸، و وقتی هیچ‌کدام چیزی
+ *  نشان نمی‌دهد هیچ جایی نمی‌گیرد (پیش‌تر روی هم می‌افتادند و ۸dp ِ خالی همیشه بود).
+ */
+@Composable
+private fun V3NoticeSlot(notice: @Composable () -> Unit) {
+  androidx.compose.ui.layout.Layout(content = notice, modifier = Modifier.fillMaxWidth()) { measurables, constraints ->
+    val side = 16.dp.roundToPx()
+    val edge = 4.dp.roundToPx()
+    val gap = 8.dp.roundToPx()
+    val inner = constraints.copy(minWidth = 0, minHeight = 0, maxWidth = (constraints.maxWidth - 2 * side).coerceAtLeast(0))
+    val shown = measurables.map { it.measure(inner) }.filter { it.height > 0 }
+    if (shown.isEmpty()) return@Layout layout(constraints.maxWidth, 0) {}
+    val height = 2 * edge + shown.sumOf { it.height } + gap * (shown.size - 1)
+    layout(constraints.maxWidth, height) {
+      var y = edge
+      shown.forEach { it.placeRelative(side, y); y += it.height + gap }
+    }
+  }
+}
 
 private val LARGE = 52.dp
 private val LARGE_WITH_SUB = 74.dp

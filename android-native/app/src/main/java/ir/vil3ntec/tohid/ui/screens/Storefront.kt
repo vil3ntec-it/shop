@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
+import ir.vil3ntec.tohid.core.storefront.StorefrontSpecs
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner.Tone
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PresenceStatusDto
@@ -67,9 +68,10 @@ private const val PENDING_KEY = "pending-presence"
 /**
  *  ویترینِ اینترنتی — صفحهٔ صاحب دکان (WEB-01/03، PRD-27، §۳۱ PRES).
  *
- *  چهار برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
- *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، گروهی) و
- *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`).
+ *  پنج برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
+ *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، توضیح و مشخصات، گروهی)،
+ *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`)
+ *  و «ارسال و زمان» (ناحیه‌ها و بازه‌ها — `StorefrontDelivery.kt`).
  *  هر کار فقط پس از پاسخِ سرور «ثبت شد» می‌گوید (PRES-09).
  */
 @Composable
@@ -105,7 +107,9 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
           Text("اشتراکِ این دکان ویترین را در بر ندارد؛ تغییرها ذخیره نمی‌شوند.", color = Shop.colors.warning, style = MaterialTheme.typography.bodySmall)
         }
         TohidFilterRow(
-          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه"),
+          //  «ارسال و زمان» فقط وقتی سرور پرچمِ جدای `shop.storefront.zones` را روشن گفته
+          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه") +
+            (if (c.zones) listOf("delivery" to "ارسال و زمان") else emptyList()),
           selected = tab,
           onSelect = { tab = it },
         )
@@ -113,6 +117,11 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
         when (tab) {
           "status" -> PresencePane(settings, repo, snackbar) { tab = "settings" }
           "settings" -> SettingsPane(settings, repo, snackbar)
+          "delivery" -> if (!c.zones) {
+            TohidEmptyState("ناحیه و زمان‌بندی روشن نیست", "این بخش پس از روشن شدن از طرفِ سامانه دیده می‌شود.", icon = Icons.Filled.Storefront)
+          } else if (settings == null) {
+            TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
+          } else StorefrontDeliveryPane(snackbar)
           //  «نمایش در بازارچه» — دادهٔ جدا و ذخیرهٔ جدا (`StorefrontMarket.kt`)
           "market" -> MarketPane(c, snackbar)
           else -> if (settings == null) {
@@ -419,10 +428,20 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
   }
   LaunchedEffect(Unit) { load() }
 
-  suspend fun saveOne(p: StorefrontProductDto, published: Boolean, online: Long?, max: Long?): String? {
+  suspend fun saveOne(
+    p: StorefrontProductDto, published: Boolean, online: Long?, max: Long?,
+    description: String? = null, specs: List<Pair<String, String>>? = null,
+  ): String? {
     var err: String? = null
-    repo.setProduct(p.id, published, online, max).onFailure { err = it.userMessage }
-    if (err == null) items = items?.map { if (it.id == p.id) it.copy(published = published, onlinePriceMinor = online, maxQtyMilli = max) else it }
+    repo.setProduct(p.id, published, online, max, description, specs).onFailure { err = it.userMessage }
+    if (err == null) items = items?.map {
+      if (it.id != p.id) it
+      else it.copy(
+        published = published, onlinePriceMinor = online, maxQtyMilli = max,
+        description = description ?: it.description,
+        specs = specs?.map { s -> ir.vil3ntec.tohid.data.repo.StorefrontSpecDto(s.first, s.second) } ?: it.specs,
+      )
+    }
     return err
   }
 
@@ -492,9 +511,9 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
   }
 
   editing?.let { p ->
-    ProductEditDialog(p, onDismiss = { editing = null }) { online, max ->
+    ProductEditDialog(p, onDismiss = { editing = null }) { online, max, description, specs ->
       scope.launch {
-        val err = saveOne(p, p.published, online, max)
+        val err = saveOne(p, p.published, online, max, description, specs)
         if (err == null) { editing = null; snackbar.showSnackbar("ذخیره شد") } else snackbar.showSnackbar(err)
       }
     }
@@ -503,19 +522,13 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
 
 @Composable
 private fun StatusPill(published: Boolean, active: Boolean) {
-  val colors = Shop.colors
-  val (text, tint, fill) = when {
-    !active -> Triple("غیرفعال در دفتر", colors.muted, colors.surfaceSolid)
-    published -> Triple("در ویترین", colors.success, colors.successTint)
-    else -> Triple("بیرون از ویترین", colors.muted, colors.surfaceSolid)
+  //  همان نشانِ مشترک و هفت توکنِ وضعیتِ VILL3N: در ویترین = موفق، بقیه = غیرفعال
+  val (text, tone) = when {
+    !active -> "غیرفعال در دفتر" to ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL
+    published -> "در ویترین" to ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS
+    else -> "بیرون از ویترین" to ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL
   }
-  Row(
-    Modifier.clip(Shape.badge).background(fill).border(1.dp, colors.border, Shape.badge).padding(horizontal = 8.dp, vertical = 2.dp),
-    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp),
-  ) {
-    Box(Modifier.size(7.dp).clip(Shape.badge).background(tint))
-    Text(text, color = tint, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-  }
+  ir.vil3ntec.tohid.ui.components.common.StatusPill(text, tone)
 }
 
 private fun priceText(p: StorefrontProductDto): String {
@@ -579,9 +592,16 @@ private fun ProductRow(p: StorefrontProductDto, selected: Boolean, onSelect: () 
 }
 
 @Composable
-private fun ProductEditDialog(p: StorefrontProductDto, onDismiss: () -> Unit, onSave: (Long?, Long?) -> Unit) {
+private fun ProductEditDialog(
+  p: StorefrontProductDto,
+  onDismiss: () -> Unit,
+  onSave: (Long?, Long?, String, List<Pair<String, String>>) -> Unit,
+) {
   var online by remember { mutableStateOf(p.onlinePriceMinor?.let { StorefrontOwner.formatMinor(it) } ?: "") }
   var max by remember { mutableStateOf(p.maxQtyMilli?.let { StorefrontOwner.formatQtyMilli(it) } ?: "") }
+  //  WEB-08: توضیح و مشخصاتِ عمومی — یادداشتِ داخلیِ دفتر هرگز به ویترین نمی‌رود
+  var description by remember { mutableStateOf(p.description) }
+  var specs by remember { mutableStateOf(StorefrontSpecs.format(p.specs.map { it.name to it.value })) }
   var err by remember { mutableStateOf<String?>(null) }
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -591,6 +611,8 @@ private fun ProductEditDialog(p: StorefrontProductDto, onDismiss: () -> Unit, on
         Text("قیمتِ دفتر: " + (p.priceMinor?.let { "${money(it / 100.0)} ؋" } ?: "ندارد"), style = MaterialTheme.typography.bodySmall)
         TohidTextField(online, { online = it; err = null }, "قیمتِ آنلاین (خالی = قیمتِ دفتر)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         TohidTextField(max, { max = it; err = null }, "سقفِ هر سفارش (${p.unit.ifBlank { "واحد" }}، خالی = بی سقف)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+        TohidTextField(description, { description = it.take(StorefrontSpecs.MAX_DESCRIPTION); err = null }, "توضیح برای مشتری (اختیاری)", singleLine = false)
+        TohidTextField(specs, { specs = it; err = null }, "مشخصات — هر خط «نام: مقدار» (اختیاری)", placeholder = "وزن: ۱ کیلو", singleLine = false)
         err?.let { Text(it, color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall) }
       }
     },
@@ -598,8 +620,9 @@ private fun ProductEditDialog(p: StorefrontProductDto, onDismiss: () -> Unit, on
       TextButton(onClick = {
         val o = runCatching { StorefrontOwner.parseMinor(online) }
         val m = runCatching { StorefrontOwner.parseQtyMilli(max) }
-        err = o.exceptionOrNull()?.message ?: m.exceptionOrNull()?.message
-        if (err == null) onSave(o.getOrNull(), m.getOrNull())
+        val (sp, spErr) = StorefrontSpecs.parse(specs)
+        err = o.exceptionOrNull()?.message ?: m.exceptionOrNull()?.message ?: spErr
+        if (err == null) onSave(o.getOrNull(), m.getOrNull(), description.trim(), sp.orEmpty())
       }) { Text("ذخیره") }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },

@@ -102,6 +102,9 @@ fun QuickSaleScreen(
 
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
+  //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
 
   var category by rememberSaveable { mutableStateOf<String?>(null) }
   var scanning by remember { mutableStateOf(false) }
@@ -342,13 +345,15 @@ fun QuickSaleScreen(
                 )
                 Spacer(Modifier.height(8.dp))
               }
+              //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش
+              promo?.let { ir.vil3ntec.tohid.ui.components.pos.PromoLines(it.applied) }
             }
           }
         }
 
         Box(Modifier.clickable { cartOpen = !cartOpen }) {
           CartBar(
-            total = SalesEngine.cartTotal(d, cart),
+            total = SalesEngine.cartTotal(d, priced),
             debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
             debtorNote = cartDebtorId?.let { id -> debtStateText(d, id) },
             onPickDebtor = { pickDebtor = true },
@@ -437,7 +442,8 @@ fun QuickSaleScreen(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      cart = cart,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
+      cart = priced,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
@@ -446,7 +452,7 @@ fun QuickSaleScreen(
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         scope.launch { when (val posted = cartStore.post(store) { key ->
           SalesEngine.record(
-          d, cart, options,
+          d, priced, options,
           today = todayIso(),
           now = System.currentTimeMillis(),
           newId = ::newId,
@@ -550,13 +556,13 @@ private fun QuickTile(
       Box(
         Modifier
           .clip(RoundedCornerShape(8.dp))
-          .background(Shop.colors.primary)
+          .background(Shop.colors.button.primary.bg)
           .padding(horizontal = 8.dp, vertical = 3.dp),
       ) {
         Text(
           "${qty(inCart)}${if (unit.isNotBlank()) " $unit" else ""} در سبد",
           style = MaterialTheme.typography.labelSmall,
-          color = Color.White,
+          color = Shop.colors.button.primary.text,
           fontWeight = FontWeight.Bold,
         )
       }

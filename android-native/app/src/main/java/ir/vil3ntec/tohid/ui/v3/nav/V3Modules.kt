@@ -31,6 +31,7 @@ object V3Modules {
     listOf(
       FoundationModule,
       ScanModule,
+      PromosModule,
       ShellModule,
       OnboardingModule,
       SalesModule,

@@ -285,7 +285,8 @@ fun PhoneSaleFrame(
   val motion = Motion.enabled
   val scope = rememberCoroutineScope()
   val density = LocalDensity.current
-  val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+  //  پوسته‌ای که خودش نوارِ سیستم را گرفته `LocalV3SystemBottom = 0.dp` می‌دهد (بی دوباره‌شماری)
+  val navBottom = ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   //  فاصلهٔ نوار/دکمه تا لبهٔ پایین: نوارِ سیستم + ۱۶، ولی نه کمتر از r3
   val bottomSpace = maxOf(BOTTOM_MIN, navBottom + STRIP_BOTTOM)
   val stripShown = model.visible
