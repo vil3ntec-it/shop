@@ -92,6 +92,7 @@
     <button class="tab" data-tab="delivery">ایمیل و پوش</button>
     <button class="tab" data-tab="backups">پشتیبان‌ها</button>
     <button class="tab" data-tab="health">همگام‌سازی و امنیت</button>
+    <button class="tab" data-tab="ops">عملیات</button>
     <button class="tab" data-tab="audit">سابقه</button>
   </nav>
 
@@ -1163,6 +1164,21 @@
     </div>
   </section>
 
+  <section id="tab-ops" class="hidden">
+    <!-- ماژولِ ops.js — سرویس‌های بیرونی (OPS-04@29) -->
+    <div class="panel">
+      <h2>سرویس‌های بیرونی</h2>
+      <div class="row"><span class="muted" id="ops-prov-checked"></span></div>
+      <div id="ops-prov-msg"></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>سرویس</th><th>راه</th><th>وضعیت</th><th>توضیح</th></tr></thead>
+          <tbody id="ops-providers"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section id="tab-audit" class="hidden">
     <div class="panel">
       <h2>سابقه عملیات</h2>
@@ -1177,5 +1193,6 @@
 </div>
 
 <script src="app.js"></script>
+<script src="ops.js"></script>
 </body>
 </html>

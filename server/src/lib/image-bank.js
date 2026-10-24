@@ -1203,7 +1203,7 @@ async function reportsList({ status = 'open', limit = 50 } = {}) {
 
 module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
-  shopEnabled, centralEnabled, imageRow, readFile, fileUrl,
+  shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
   productInput, insertProduct, updateProduct, productOut,
   search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
