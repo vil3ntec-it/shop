@@ -170,12 +170,15 @@ private fun PlanBanner(b: ProfileHomeModel.Banner, onClick: () -> Unit) {
   val c = PhoneV3.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
   val stops = if (rtl) listOf(c.blackRaised, c.black) else listOf(c.black, c.blackRaised)
+  val shape = RoundedCornerShape(PhoneV3.groupRadius)
   Row(
     Modifier
       .fillMaxWidth()
       .heightIn(min = 60.dp)
-      .clip(RoundedCornerShape(PhoneV3.groupRadius))
+      .clip(shape)
       .background(Brush.horizontalGradient(stops))
+      //  شب: سرِ روشنِ شیب همان سطحِ کارت است ⇒ مرزِ مویی تا نوار در کارت گم نشود (§۶)
+      .then(if (c.isDark) Modifier.border(1.dp, c.hairline, shape) else Modifier)
       .padding(start = 16.dp, end = 10.dp, top = 10.dp, bottom = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
