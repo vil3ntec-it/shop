@@ -31,25 +31,26 @@ class WebPaletteParityTest {
     "bg" to { it.bg }, "surface" to { it.surface }, "surface-2" to { it.surface2 },
     "surface-solid" to { it.surfaceSolid }, "border" to { it.border },
     "text" to { it.text }, "muted" to { it.muted }, "muted-2" to { it.muted2 },
-    "primary" to { it.primary }, "primary-dark" to { it.primaryDark }, "primary-tint" to { it.primaryTint },
+    //  VILL3N: `--primary`ِ وب بیشتر **پُرکردن** است با متنِ سفید (دکمه، گزینهٔ فعال) ⇒ همان
+    //  دکمهٔ اصلیِ برنامه؛ `--primary-dark` متن روی تینت است ⇒ برندِ خوانا (`primaryDark`).
+    //  در روز هر دو #08665F‌اند؛ در شب #19A985 و #6EE7D1.
+    "primary" to { it.button.primary.bg }, "primary-dark" to { it.primaryDark }, "primary-tint" to { it.primaryTint },
     "accent" to { it.accent },
     "success" to { it.success }, "success-tint" to { it.successTint },
     "warning" to { it.warning }, "warning-tint" to { it.warningTint },
     "danger" to { it.danger }, "danger-tint" to { it.dangerTint },
     "aurora-1" to { it.auroraOne }, "aurora-2" to { it.auroraTwo }, "aurora-3" to { it.auroraThree },
+    //  نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷): رنگِ اطلاع و سه ناحیه؛ از ۱۴۰۵/۰۷/۲۸ با عددهای VILL3N
+    "info" to { it.info }, "info-tint" to { it.infoTint },
+    "zone-nav" to { it.zoneNav }, "zone-cart" to { it.zoneCart },
+    "field-border" to { it.fieldBorder },
   )
 
-  /** ناهم‌خوانیِ امروز (۱۴۰۵/۰۷/۲۲) — فقط کم شود */
-  private val drift = setOf(
-    "light:accent",        //  وب #00c39a؛ برنامه #0FA98A
-    "light:warning-tint",  //  وب از warningِ تیره؛ برنامه از نارنجیِ روشن
-    "dark:success-tint",   //  وب ۱۸٪؛ برنامه ۲۰٪
-    "dark:warning-tint",
-    "dark:danger-tint",
-    "dark:aurora-2",       //  وب ۳۸٪؛ برنامه ۴۰٪
-    "dark:aurora-3",       //  وب ۳۴٪؛ برنامه ۳۵٪
-    "radius-lg",           //  وب ۲۴؛ برنامه ۲۸
-  )
+  /**
+   *  ناهم‌خوانیِ امروز — فقط کم شود. نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷) هر هشت موردِ پیشین را یکی
+   *  کرد (accent، تینت‌ها، آرورا و `radius-lg`)؛ فهرست خالی است و خالی می‌ماند.
+   */
+  private val drift = emptySet<String>()
 
   private fun block(src: String, selector: String): Map<String, String> {
     val body = src.substringAfter(selector, "").substringBefore("}")

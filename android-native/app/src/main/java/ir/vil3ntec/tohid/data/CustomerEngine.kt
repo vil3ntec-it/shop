@@ -161,7 +161,7 @@ object CustomerEngine {
       rows += listOf(
         s.invoiceLabel().orEmpty(), s.date, items[s.id].orEmpty().size.toString(),
         r(s.total), r(s.discount), r(s.finalTotal), r(s.paidAmount), r(s.remaining),
-        if (s.paymentMethod == "credit") "نسیه" else "نقد",
+        PayFlow.payLabel(s),
         if (s.status == "cancelled") "لغوشده" else "ثبت‌شده",
       )
     }

@@ -163,7 +163,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     // پایینِ فهرست می‌نشست و زیرش قابلِ زدن نبود
     AddFab(
       label = "مصرف تازه",
-      containerColor = Shop.colors.success,
+      containerColor = Shop.colors.button.primary.bg,
       onClick = { form = ExpenseFormState(date = todayIso()) },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
     )
@@ -290,7 +290,7 @@ private fun CategoryBar(
           .fillMaxWidth(share.coerceIn(0f, 1f))
           .height(5.dp)
           .clip(RoundedCornerShape(999.dp))
-          .background(Shop.colors.primary)
+          .background(Shop.colors.chart.costs)
       )
     }
   }

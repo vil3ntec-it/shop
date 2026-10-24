@@ -148,6 +148,12 @@ const config = {
     subject: process.env.EMAIL_SUBJECT || '',
   },
 
+  //  هشدارِ ورود از دستگاه/شبکهٔ تازه (بندِ ۲۱.۱) — `lib/login-alerts.js`؛
+  //  `LOGIN_ALERTS=off` کلیدِ بازگشت است
+  loginAlerts: bool(process.env.LOGIN_ALERTS, true),
+  //  حسابِ تازه‌ساخته در این چند دقیقه دستگاه‌هایش را راه می‌اندازد — هشدار نه
+  loginAlertGraceMs: num(process.env.LOGIN_ALERT_GRACE_MIN, 10) * 60 * 1000,
+
   google: {
     //  همه‌ی شناسه‌های پذیرفته‌شده — سنجشِ توکن هر کدام را قبول می‌کند.
     //  شناسه‌ی Desktop هم این‌جاست، وگرنه توکنی که خودِ ما خواستیم
@@ -298,9 +304,15 @@ const config = {
     storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
     //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
     //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
-    //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
-    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
-    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
+    //  بازبینیِ امنیتی سقفِ ضربه‌ای در دقیقه گذاشت. ⚠️ اپراتورهای موبایل (CGNAT) صدها
+    //  مشتری را پشتِ یک IP می‌برند؛ ۱۰ در دقیقه و ۶۰ در ربع ساعت یعنی مشتریِ عادی ۴۲۹ می‌گرفت.
+    //  حالا ۳۰ در دقیقه و ۳۰۰ در ربع ساعت (میانگینِ ۲۰ در دقیقه). سپرِ دیتابیس فقط این سقف
+    //  نیست: برشِ یک‌پروازِ دکان‌ها (eligibleCacheMs)، نمایهٔ باریکِ market_search، دست‌کم دو
+    //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
+    //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
+    marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
   },
 
   /**
@@ -335,6 +347,8 @@ const config = {
     //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
     //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
+    //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
+    feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
