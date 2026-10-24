@@ -17,8 +17,10 @@ import androidx.compose.ui.graphics.Color
  *   • خطِ کادرِ ورودیِ روز #C8D2E0 به‌جای #CBD5E1 — #CBD5E1 روی سفید ۱٫۴۸:۱ است (کفِ ما ۱٫۵).
  *   • متنِ کم‌رنگ‌ترِ شب (`textMuted`) #8897AC به‌جای #7C8BA1 — در شب متنِ عادی است و باید ≥ ۴٫۵:۱ بماند.
  *   • زمینهٔ گزینهٔ فعالِ شب ۱۴٪ِ برند (نه ۱۸٪) تا متنِ برند و کم‌رنگ رویش ≥ ۴٫۵:۱ بماند.
- *   • «در انتظارِ تأیید» (#7C3AED ِ فایل) هنوز با هشدارها کهربایی است: `PillTone.WARNING` هم «سفارشِ تازه» است
- *     و هم «کم‌موجود/اختلاف/سقف». بنفش شدنش جدا کردنِ `PillTone.AWAITING` می‌خواهد (فایل‌های گروه‌ها).
+ *   • «در انتظارِ تأیید» بنفش است (`status.awaitingApproval`، همان بنفشِ «نیازِ بررسی»)؛ هشدار کهربایی
+ *     (`status.warning`). نشان‌ها: `PillTone.AWAITING` / `WARNING`، کیت: `V3Status.AWAITING` / `WARNING`.
+ *   • `heroChipShade`: سایهٔ سیاهِ زیرِ شیشهٔ سفیدِ تراشه‌های کادرِ بزرگ تا برچسبِ ۱۲sp روی هر جای
+ *     گرادیان ≥ ۴٫۵:۱ بماند (روز: آسمان و غروب ۱۰٪، اقیانوس ۳۰٪؛ شب لازم نیست).
  *  `PhoneV3Colors`، `PhoneV3Roles`، `PhoneV3Palette` و `PhoneV3Ui` همه از همین `ShopColors` می‌گیرند.
  */
 
@@ -109,11 +111,12 @@ internal val SkyLight = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF15803D), bg = Color(0xFFDCFCE7)),
     inDelivery = StatusTone(fg = Color(0xFF1D4ED8), bg = Color(0xFFDBEAFE)),
-    awaitingApproval = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
+    awaitingApproval = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     cancelled = StatusTone(fg = Color(0xFFB91C1C), bg = Color(0xFFFEE2E2)),
     needsReview = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     preparing = StatusTone(fg = Color(0xFF0E7490), bg = Color(0xFFCFFAFE)),
     inactive = StatusTone(fg = Color(0xFF475569), bg = Color(0xFFE2E8F0)),
+    warning = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF166534), bg = Color(0xFFF0FDF4), icon = Color(0xFF16A34A), border = Color(0xFFBBF7D0)),
@@ -134,6 +137,7 @@ internal val SkyLight = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF60A5FA),
   heroScrim = 0.04f,
+  heroChipShade = 0.1f,
 )
 
 internal val SkyDark = ShopColors(
@@ -169,11 +173,12 @@ internal val SkyDark = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF86EFAC), bg = Color(0xFF123C2B)),
     inDelivery = StatusTone(fg = Color(0xFF93C5FD), bg = Color(0xFF172F57)),
-    awaitingApproval = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
+    awaitingApproval = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     cancelled = StatusTone(fg = Color(0xFFFCA5A5), bg = Color(0xFF451A1E)),
     needsReview = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     preparing = StatusTone(fg = Color(0xFF67E8F9), bg = Color(0xFF0E3A45)),
     inactive = StatusTone(fg = Color(0xFFCBD5E1), bg = Color(0xFF273548)),
+    warning = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF86EFAC), bg = Color(0xFF0F2A1E), icon = Color(0xFF4ADE80), border = Color(0xFF1F5135)),
@@ -194,6 +199,7 @@ internal val SkyDark = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF1D4ED8),
   heroScrim = 0.0f,
+  heroChipShade = 0.0f,
 )
 
 internal val OceanLight = ShopColors(
@@ -229,11 +235,12 @@ internal val OceanLight = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF15803D), bg = Color(0xFFDCFCE7)),
     inDelivery = StatusTone(fg = Color(0xFF1D4ED8), bg = Color(0xFFDBEAFE)),
-    awaitingApproval = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
+    awaitingApproval = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     cancelled = StatusTone(fg = Color(0xFFB91C1C), bg = Color(0xFFFEE2E2)),
     needsReview = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     preparing = StatusTone(fg = Color(0xFF0E7490), bg = Color(0xFFCFFAFE)),
     inactive = StatusTone(fg = Color(0xFF475569), bg = Color(0xFFE2E8F0)),
+    warning = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF166534), bg = Color(0xFFF0FDF4), icon = Color(0xFF16A34A), border = Color(0xFFBBF7D0)),
@@ -254,6 +261,7 @@ internal val OceanLight = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF38BDF8),
   heroScrim = 0.3f,
+  heroChipShade = 0.3f,
 )
 
 internal val OceanDark = ShopColors(
@@ -289,11 +297,12 @@ internal val OceanDark = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF86EFAC), bg = Color(0xFF123C2B)),
     inDelivery = StatusTone(fg = Color(0xFF93C5FD), bg = Color(0xFF172F57)),
-    awaitingApproval = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
+    awaitingApproval = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     cancelled = StatusTone(fg = Color(0xFFFCA5A5), bg = Color(0xFF451A1E)),
     needsReview = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     preparing = StatusTone(fg = Color(0xFF67E8F9), bg = Color(0xFF0E3A45)),
     inactive = StatusTone(fg = Color(0xFFCBD5E1), bg = Color(0xFF273548)),
+    warning = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF86EFAC), bg = Color(0xFF0F2A1E), icon = Color(0xFF4ADE80), border = Color(0xFF1F5135)),
@@ -314,6 +323,7 @@ internal val OceanDark = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF0369A1),
   heroScrim = 0.0f,
+  heroChipShade = 0.0f,
 )
 
 internal val DuskLight = ShopColors(
@@ -349,11 +359,12 @@ internal val DuskLight = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF15803D), bg = Color(0xFFDCFCE7)),
     inDelivery = StatusTone(fg = Color(0xFF1D4ED8), bg = Color(0xFFDBEAFE)),
-    awaitingApproval = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
+    awaitingApproval = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     cancelled = StatusTone(fg = Color(0xFFB91C1C), bg = Color(0xFFFEE2E2)),
     needsReview = StatusTone(fg = Color(0xFF6D28D9), bg = Color(0xFFEDE9FE)),
     preparing = StatusTone(fg = Color(0xFF0E7490), bg = Color(0xFFCFFAFE)),
     inactive = StatusTone(fg = Color(0xFF475569), bg = Color(0xFFE2E8F0)),
+    warning = StatusTone(fg = Color(0xFF92400E), bg = Color(0xFFFEF3C7)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF166534), bg = Color(0xFFF0FDF4), icon = Color(0xFF16A34A), border = Color(0xFFBBF7D0)),
@@ -374,6 +385,7 @@ internal val DuskLight = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF818CF8),
   heroScrim = 0.3f,
+  heroChipShade = 0.1f,
 )
 
 internal val DuskDark = ShopColors(
@@ -409,11 +421,12 @@ internal val DuskDark = ShopColors(
   status = StatusColors(
     delivered = StatusTone(fg = Color(0xFF86EFAC), bg = Color(0xFF123C2B)),
     inDelivery = StatusTone(fg = Color(0xFF93C5FD), bg = Color(0xFF172F57)),
-    awaitingApproval = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
+    awaitingApproval = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     cancelled = StatusTone(fg = Color(0xFFFCA5A5), bg = Color(0xFF451A1E)),
     needsReview = StatusTone(fg = Color(0xFFC4B5FD), bg = Color(0xFF2E2357)),
     preparing = StatusTone(fg = Color(0xFF67E8F9), bg = Color(0xFF0E3A45)),
     inactive = StatusTone(fg = Color(0xFFCBD5E1), bg = Color(0xFF273548)),
+    warning = StatusTone(fg = Color(0xFFFCD34D), bg = Color(0xFF3D2E0E)),
   ),
   message = MessageColors(
     success = MessageTone(text = Color(0xFF86EFAC), bg = Color(0xFF0F2A1E), icon = Color(0xFF4ADE80), border = Color(0xFF1F5135)),
@@ -434,4 +447,5 @@ internal val DuskDark = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF4338CA),
   heroScrim = 0.0f,
+  heroChipShade = 0.0f,
 )

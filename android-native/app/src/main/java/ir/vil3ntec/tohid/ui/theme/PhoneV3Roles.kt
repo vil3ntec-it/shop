@@ -18,7 +18,7 @@ data class V3Pair(val fg: Color, val bg: Color, val border: Color = bg)
 enum class V3ButtonKind { PRIMARY, SECONDARY, NEUTRAL, DANGER }
 
 /** §۸: هفت وضعیتِ سفارش — یک معنی در همه‌جا (مشتری، دکان، پیک، مدیر) */
-enum class V3Status { DELIVERED, IN_DELIVERY, AWAITING, CANCELLED, REVIEW, PREPARING, INACTIVE }
+enum class V3Status { DELIVERED, IN_DELIVERY, AWAITING, CANCELLED, REVIEW, PREPARING, INACTIVE, WARNING }
 
 /** §۹: چهار گونهٔ پیام */
 enum class V3Tone { SUCCESS, INFO, WARNING, ERROR }
@@ -54,6 +54,7 @@ object PhoneV3Roles {
       V3Status.DELIVERED -> pair(t.delivered)
       V3Status.IN_DELIVERY -> pair(t.inDelivery)
       V3Status.AWAITING -> pair(t.awaitingApproval)
+      V3Status.WARNING -> pair(t.warning)
       V3Status.CANCELLED -> pair(t.cancelled)
       V3Status.REVIEW -> pair(t.needsReview)
       V3Status.PREPARING -> pair(t.preparing)

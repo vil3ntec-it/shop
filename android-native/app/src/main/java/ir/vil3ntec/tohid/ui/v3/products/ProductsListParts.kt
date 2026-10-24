@@ -65,7 +65,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 
 /** برچسب و رنگِ §۸ ِ نشانِ ردیف — رنگ هرگز تنها نیست */
 internal fun badgeStatus(b: ProductsListModel.Badge): Pair<V3Status, String>? = when (b) {
-  ProductsListModel.Badge.LOW -> V3Status.AWAITING to StrProducts.filterLow
+  ProductsListModel.Badge.LOW -> V3Status.WARNING to StrProducts.filterLow
   ProductsListModel.Badge.OUT -> V3Status.CANCELLED to StrProducts.filterOut
   ProductsListModel.Badge.INACTIVE -> V3Status.INACTIVE to StrProducts.filterInactive
   ProductsListModel.Badge.NONE -> null

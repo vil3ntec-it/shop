@@ -66,6 +66,8 @@ class HardcodedColorsTest {
     "ui/screens/ScanSheet.kt" to 1,
     "ui/screens/Sale.kt" to 1,
     "scan/BarcodeScanner.kt" to 1,
+    //  بازبینیِ عکسِ تازه‌گرفته (دوربینِ راهنما) — بومِ عکس همیشه تیره، متنِ سفید رویش
+    "scan/GuidedCapture.kt" to 1,
     "desk:scan/BarcodeScannerDesk.kt" to 6,
     //  چاپ — کاغذ همیشه سفید است
     "desk:print/ReportPrintDesk.kt" to 1,
