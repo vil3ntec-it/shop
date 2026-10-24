@@ -310,14 +310,18 @@ test('لغوِ فاکتور با «نیازمند تأیید»: بی برگه ر
 });
 
 test('برگشت با سقفِ مبلغ: بیش از سقف بی برگه رد، زیرِ سقف و با برگه می‌نشیند', async () => {
+  //  فاکتورِ خودش: سقفِ برگشت تجمعیِ هر فاکتور است (staff-guard-companions.test.js)، و روی
+  //  s-ref-m پیش‌تر ۹۰۰۰ برگشته
   const ret = (id, amount, extra = {}) => ({ op_id: oid(), hlc: H('s'), table: 'returns', row_id: id, kind: 'insert',
-    fields: { amountMinor: amount, saleId: 's-ref-m' }, ...extra });
+    fields: { amountMinor: amount, saleId: 's-ret-cap' }, ...extra });
   const over = ret('r-over', 60000);
   assert.equal((await push3(staff, 's-r', [over])).body.results[0].reason, 'approval_required');
   assert.equal((await boxOf(over.op_id)).detail.perm, 'returns.create');
   assert.equal((await push3(staff, 's-r', [ret('r-under', 40000)])).body.results[0].status, 'applied');
   const s = slip(ownerKey, { doc: 'returns/r-ap', perm: 'returns.create', amount: 60000, reason: 'کالای خراب' });
   assert.equal((await push3(staff, 's-r', [ret('r-ap', 60000, { approval: s })])).body.results[0].status, 'applied');
+  //  حالا ۱۰۰۰ روی این فاکتور برگشته ⇒ برگشتِ کوچکِ بعدی هم تأیید می‌خواهد
+  assert.equal((await push3(staff, 's-r', [ret('r-more', 5000)])).body.results[0].reason, 'approval_required');
 });
 
 /* ------------------------------------------------------- v2 و v1 */

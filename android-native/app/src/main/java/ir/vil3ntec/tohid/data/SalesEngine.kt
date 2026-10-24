@@ -92,6 +92,8 @@ object SalesEngine {
     val debtorId: String? = null,
     /** سیاستِ دکان: کالای منقضی فروخته نشود (`ShopPolicy.blockExpired`) */
     val blockExpired: Boolean = false,
+    /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
+    val approval: kotlinx.serialization.json.JsonObject? = null,
   )
 
   data class Totals(
@@ -115,6 +117,9 @@ object SalesEngine {
    * کیلویی ۰٫۲۵ نمی‌پذیرفت و ۲۵۰ گرم فروختنی نبود. نسخهٔ وب هم‌زمان عوض شد.
    */
   const val ALREADY_POSTED = "این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود"
+
+  /** `DebtTransaction.kind` ِ «برد»ی که فروشِ نسیه می‌سازد (کنارِ `sale_cancel`/`customer_return`) */
+  const val SALE_CREDIT = "sale_credit"
 
   private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
 
@@ -362,6 +367,7 @@ object SalesEngine {
       date = today,
       syncStatus = "pending",
       seller = checkout.seller.trim(),
+      approval = checkout.approval,
     )
 
     val items = mutableListOf<SaleItem>()
@@ -427,6 +433,9 @@ object SalesEngine {
         date = today,
         notes = "فروش نسیه — فاکتور #${sale.invoiceLabel()}",
         createdAt = now,
+        //  ساختهٔ سیستم: اگر سرور این فاکتور را (سقفِ تخفیف) رد کند، این «برد» هم با آن برمی‌گردد
+        refId = saleId,
+        kind = SALE_CREDIT,
       )
     }
 
