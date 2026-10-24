@@ -12,7 +12,8 @@
      کنار گذاشته شده.
 
      `tohid-session*` جای توکنِ امروز است (`TokenStore`)؛ `tohid-sync`
-     جای قدیمی‌اش. هر سه بیرون می‌مانند.
+     جای قدیمی‌اش. هر سه بیرون می‌مانند. `tohid-staff-pins` هم (اثرِ PIN و
+     کلیدِ تأییدِ بسته — STF-02/04): مالِ همین دستگاه است و هرگز جابه‌جا نمی‌شود.
 -->
 <data-extraction-rules>
   <cloud-backup>
@@ -21,6 +22,7 @@
     <exclude domain="sharedpref" path="tohid-sync.xml" />
     <exclude domain="sharedpref" path="tohid-session.xml" />
     <exclude domain="sharedpref" path="tohid-session-secure.xml" />
+    <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
   </cloud-backup>
   <device-transfer>
     <include domain="file" path="." />
@@ -28,5 +30,6 @@
     <exclude domain="sharedpref" path="tohid-sync.xml" />
     <exclude domain="sharedpref" path="tohid-session.xml" />
     <exclude domain="sharedpref" path="tohid-session-secure.xml" />
+    <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
   </device-transfer>
 </data-extraction-rules>
