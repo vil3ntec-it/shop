@@ -33,6 +33,8 @@ internal fun DraftFormSheet(
   title: String,
   dirty: Boolean,
   onClose: () -> Unit,
+  /** false ⇒ محتوا خودش پیمایش دارد (بخشِ پیمایش‌پذیرِ فرم + دکمهٔ چسبان) */
+  scroll: Boolean = true,
   content: @Composable ColumnScope.(FormSheetScope) -> Unit,
 ) {
   var open by remember { mutableStateOf(true) }
@@ -49,6 +51,7 @@ internal fun DraftFormSheet(
         }
       },
       title = title,
+      scroll = scroll,
     ) { closer ->
       val scope = remember(closer) { FormSheetScope(closer) { done = true } }
       content(scope)

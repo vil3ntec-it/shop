@@ -45,7 +45,8 @@ fun StockEntrySheet(
   start: EntryForm? = null,
 ) {
   val flow = rememberEntryFlow(data, product, barcode, start)
-  DraftFormSheet(title = flow.title, dirty = flow.dirty, onClose = onClose) { sheet ->
+  //  کادرها خودشان پیمایش دارند و «ثبت ورود» زیرشان چسبان می‌ماند ⇒ برگه پیمایش نمی‌کند
+  DraftFormSheet(title = flow.title, dirty = flow.dirty, onClose = onClose, scroll = false) { sheet ->
     if (flow.saved) LaunchedEffect(Unit) { delay(ENTRY_CLOSE_DELAY); sheet.finish(onClose) }
     val onNew = { sheet.finish { onNewProduct(flow.unknown) } }
     V3PageSwitch(flow.step, depth = { if (it == EntryStep.PICK) 1 else 0 }) { s ->

@@ -153,15 +153,17 @@ val StockModule = AppModule(
 )
 
 /**
- *  «انبار» و «یک کالا» با هم: گوشی ⇐ فهرست یا صفحهٔ کالا؛ پهن (کامپیوتر) ⇐ فهرست | کالا
+ *  «انبار» و «یک کالا» با هم: گوشی ⇐ فهرست یا صفحهٔ کالا؛ چیدمانِ کامپیوتری (`desk`) ⇐ فهرست | کالا
  *  در دو ستون، و کارهای «…» دکمهٔ زیرِ جست‌وجو.
  */
 @Composable
 private fun RouteScope.StockHome(selected: String?) {
+  val twoPane = desk
   val writer = rememberStockWriter()
   val today = writer.today
   val listActions = StockListActions(
-    open = { nav.open(StockPaths.item(it)) },
+    //  کامپیوتر (دو ستون): کالای دیگر جای همین ستون می‌نشیند، نه پلهٔ تازه در پشته
+    open = { id -> if (twoPane && selected != null) nav.replace(StockPaths.item(id)) else nav.open(StockPaths.item(id)) },
     entry = { nav.open(StockPaths.entry(product = it)) },
     adjust = { nav.open(StockPaths.adjust(it)) },
     scan = { nav.openForResult(SalesPaths.scan("stock")) { code -> code?.let { nav.open(StockListModel.scanTarget(data, it)) } } },
@@ -176,7 +178,7 @@ private fun RouteScope.StockHome(selected: String?) {
     view = { nav.open(ProductsPaths.item(it)) },
     deleteProduct = { id ->
       val failed = writer.commit(WarehouseEngine.deleteProduct(data, id, today, writer.now, writer.newId), StrStock.deleted)
-      if (failed != null) writer.fail(failed) else if (wide) nav.replace(StockPaths.LIST) else back()
+      if (failed != null) writer.fail(failed) else if (twoPane) nav.replace(StockPaths.LIST) else back()
     },
     entry = { nav.open(StockPaths.entry(product = it)) },
     adjust = { nav.open(StockPaths.adjust(it)) },
@@ -184,7 +186,6 @@ private fun RouteScope.StockHome(selected: String?) {
     movements = { nav.open(StockPaths.movements(it)) },
     copied = { writer.info(StrStock.barcodeCopied) },
   )
-  val canPop = nav.stack.canPop
   val list = @Composable {
     StockListScreen(
       data = data,
@@ -192,17 +193,17 @@ private fun RouteScope.StockHome(selected: String?) {
       actions = listActions,
       initialFilter = StockFilter.of(args.query("filter")),
       initialQuery = args.query("q").orEmpty(),
-      onBack = if (canPop && selected == null) ({ back() }) else null,
-      wide = wide,
+      onBack = if (selected == null) backOrNull else null,
+      wide = twoPane,
       selectedId = selected,
     )
   }
   when {
-    wide -> V3TwoPane(list = list, detail = {
+    twoPane -> V3TwoPane(list = list, detail = {
       if (selected != null) StockItemScreen(data, today, selected, itemActions, onBack = null)
       else V3EmptyState(Icons.Outlined.Inventory2, StrStock.pickOne)
     })
     selected == null -> list()
-    else -> StockItemScreen(data, today, selected, itemActions, onBack = { back() })
+    else -> StockItemScreen(data, today, selected, itemActions, onBack = backOrNull)
   }
 }
