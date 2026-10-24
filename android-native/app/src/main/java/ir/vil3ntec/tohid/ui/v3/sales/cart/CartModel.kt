@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 
 /**
  *  کارهای کوچکِ سبد که صندوق، فروشِ سریع و صفحه‌کلید هر سه می‌کنند — خالص، روی همان
@@ -43,6 +44,23 @@ object CartModel {
     return SalesEngine.setCartQty(lines, p.id, now - SalesEngine.cartStep(p.unit))
   }
 
+  /**
+   *  −/+ ِ یک ردیفِ سبدِ باز (r2): «+» ِ کالا از موجودی جلو نمی‌زند؛ ردیفِ آزاد موجودی ندارد؛
+   *  «−» ِ پلهٔ آخر ردیف را برمی‌دارد — همان قاعدهٔ صندوقِ پیشین.
+   */
+  fun step(d: ShopData, lines: List<SalesEngine.CartLine>, row: CartSummary.Row, sign: Int): Step {
+    if (sign > 0 && row.hasProduct) {
+      val p = d.products.find { it.id == row.id } ?: return Step(null, null, false)
+      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ShopStore.stock(d, p.id))
+      val note = if (added.capped) StrSale.onlyLeftOf(p.name, stockLeft(p, added.available)) else null
+      return Step(added.cart.takeIf { it !== lines }, note, added.capped)
+    }
+    return Step(SalesEngine.setCartQty(lines, row.id, row.quantity + sign * row.step), null, false)
+  }
+
+  /** شمارهٔ ردیفِ یک کالا (یا قلمِ آزاد) در سبد — برای `sale/line/{i}`؛ نبود ⇒ null */
+  fun lineIndex(lines: List<SalesEngine.CartLine>, id: String): Int? = lines.indexOfFirst { it.productId == id }.takeIf { it >= 0 }
+
   /** مقدارِ هر کالا در سبد (برای نشانِ «۵ در سبد» روی کاشی) */
   fun inCart(lines: List<SalesEngine.CartLine>): Map<String, Double> =
     lines.groupBy { it.productId }.mapValues { (_, l) -> l.sumOf { it.quantity } }
@@ -50,7 +68,15 @@ object CartModel {
   /** نتیجهٔ خواندنِ یک بارکد برای سبد */
   sealed interface Scan {
     /** کالا افزوده شد (یا تا موجودی)؛ `whole` = بارکدِ کامل خوانده شد، نه نیمه‌اش */
-    data class Added(val lines: List<SalesEngine.CartLine>, val product: Product, val whole: Boolean, val capped: Boolean, val available: Double) : Scan
+    data class Added(
+      val lines: List<SalesEngine.CartLine>,
+      val product: Product,
+      val whole: Boolean,
+      val capped: Boolean,
+      val available: Double,
+      /** برچسبِ ترازو: مقدارِ وزن‌شده (null ⇒ بارکدِ کالا) */
+      val weighed: Double? = null,
+    ) : Scan
 
     /** هیچ کالایی این بارکد را ندارد ⇒ «ثبتِ کالا» با همین کد */
     data class Unknown(val code: String) : Scan
@@ -86,9 +112,19 @@ object CartModel {
     }
   }
 
+  /**
+   *  برچسبِ ترازو (`ScaleLabels.Match.Weighed`) ⇒ همان وزن به سبد، تا موجودی. شناختنِ برچسب و
+   *  قاعده‌هایش با `ScaleLabels` است؛ این‌جا فقط افزودن.
+   */
+  fun weighed(d: ShopData, lines: List<SalesEngine.CartLine>, product: Product, quantity: Double): Scan.Added {
+    val added = SalesEngine.addToCartCapped(lines, product.id, quantity, ShopStore.stock(d, product.id))
+    return Scan.Added(added.cart, product, whole = true, capped = added.capped, available = added.available, weighed = quantity)
+  }
+
   /** جملهٔ کوتاهِ همان خواندن — پس از «Added» */
   fun scanNote(s: Scan.Added): String = when {
     s.capped -> StrSale.onlyLeftOf(s.product.name, stockLeft(s.product, s.available))
+    s.weighed != null -> StrSale.weighedAdded(s.product.name, stockLeft(s.product, s.weighed))
     s.whole -> StrSale.addedToCart(s.product.name)
     else -> StrSale.halfBarcode(s.product.name)
   }

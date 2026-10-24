@@ -37,6 +37,8 @@ import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3AddChip
 import ir.vil3ntec.tohid.ui.v3.sales.cart.CartModel
+import ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogEmpty
+import ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -83,11 +85,11 @@ fun QuickSaleScreen(
   val c = PhoneV3.colors
   var query by rememberSaveable { mutableStateOf(initialQuery) }
   var picked by rememberSaveable { mutableStateOf(initialCategory) }
-  val category = QuickSaleModel.keepCategory(picked, d.productCategories)
-  val index = remember(d.products, d.sales, d.saleItems) { QuickSaleModel.index(d) }
+  val category = CatalogModel.keepCategory(picked, d.productCategories)
+  val index = remember(d.products, d.sales, d.saleItems) { CatalogModel.index(d) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
-  val items = remember(index, query, category, inCart, d) { QuickSaleModel.items(d, index, query, category, inCart) }
-  val empty = QuickSaleModel.empty(index, items.size, query)
+  val items = remember(index, query, category, inCart, d) { CatalogModel.items(d, index, query, category, inCart) }
+  val empty = CatalogModel.empty(index, items.size, query)
   val strip = remember(cart, d.products, total) { CartSummary.of(cart, d.products, total) }
   val stagger = rememberV3Stagger(category, query.isBlank())
 
@@ -116,13 +118,13 @@ fun QuickSaleScreen(
     },
   ) { pad ->
     when (empty) {
-      QuickEmpty.NO_PRODUCTS -> V3EmptyState(
+      CatalogEmpty.NO_PRODUCTS -> V3EmptyState(
         Icons.Outlined.Inventory2, StrSale.noProductsYet, Modifier.fillMaxSize(),
         action = StrSale.registerItemAlt, onAction = actions.newProduct,
       )
-      QuickEmpty.NO_MATCH -> V3EmptyState(Icons.Outlined.SearchOff, StrSale.noItemFor(query.trim()), Modifier.fillMaxSize())
-      QuickEmpty.EMPTY_CATEGORY -> V3EmptyState(Icons.Outlined.Category, StrSale.emptyCategory, Modifier.fillMaxSize())
-      QuickEmpty.NONE -> LazyVerticalGrid(
+      CatalogEmpty.NO_MATCH -> V3EmptyState(Icons.Outlined.SearchOff, StrSale.noItemFor(query.trim()), Modifier.fillMaxSize())
+      CatalogEmpty.EMPTY_CATEGORY -> V3EmptyState(Icons.Outlined.Category, StrSale.emptyCategory, Modifier.fillMaxSize())
+      CatalogEmpty.NONE -> LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = TILE_MIN),
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),

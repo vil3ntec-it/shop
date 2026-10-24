@@ -453,7 +453,8 @@ fun PhoneCartRow(
   onToggle: () -> Unit,
   onMinus: () -> Unit,
   onPlus: () -> Unit,
-  onRemove: () -> Unit,
+  /** نگه داشتنِ ردیف (نسخهٔ ۳: «تعداد و قیمتِ این ردیف») */
+  onHold: () -> Unit,
   onEdit: (() -> Unit)?,
 ) {
   val v = PhoneV3.colors
@@ -465,8 +466,8 @@ fun PhoneCartRow(
       .clip(RoundedCornerShape(18.dp))
       .combinedClickable(
         onClickLabel = if (expanded) StrSale.closeQty else StrSale.adjustQty,
-        onLongClickLabel = StrSale.removeFromCart,
-        onLongClick = onRemove,
+        onLongClickLabel = StrSale.lineDetails,
+        onLongClick = onHold,
         onClick = onToggle,
       )
       .then(if (motion) Modifier.animateContentSize(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)) else Modifier)

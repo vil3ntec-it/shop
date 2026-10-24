@@ -5,8 +5,8 @@ import ir.vil3ntec.tohid.ui.v3.sales.SalesTestLedger.ledger
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.BalanceTone
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerPickerModel
 import ir.vil3ntec.tohid.ui.v3.sales.draft.DraftModel
-import ir.vil3ntec.tohid.ui.v3.sales.quick.QuickEmpty
-import ir.vil3ntec.tohid.ui.v3.sales.quick.QuickSaleModel
+import ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogEmpty
+import ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel
 import ir.vil3ntec.tohid.ui.v3.sales.scan.CameraAccess
 import ir.vil3ntec.tohid.ui.v3.sales.scan.ScanModel
 import org.junit.Assert.assertEquals
@@ -42,8 +42,8 @@ class SalesPickersModelTest {
 
   @Test
   fun `فقط کالای فعال پرفروش ترین اول`() {
-    val index = QuickSaleModel.index(ledger)
-    val items = QuickSaleModel.items(ledger, index, "", null, mapOf("soap" to 2.0))
+    val index = CatalogModel.index(ledger)
+    val items = CatalogModel.items(ledger, index, "", null, mapOf("soap" to 2.0))
     assertEquals("tea", items.first().id)
     assertFalse(items.any { it.id == "old" })
     assertEquals(2.0, items.first { it.id == "soap" }.inCart, 0.0)
@@ -53,13 +53,13 @@ class SalesPickersModelTest {
 
   @Test
   fun `پیامِ خالیِ درست`() {
-    val index = QuickSaleModel.index(ledger)
-    assertEquals(QuickEmpty.NONE, QuickSaleModel.empty(index, 3, ""))
-    assertEquals(QuickEmpty.NO_MATCH, QuickSaleModel.empty(index, 0, "zzz"))
-    assertEquals(QuickEmpty.EMPTY_CATEGORY, QuickSaleModel.empty(index, 0, ""))
-    assertEquals(QuickEmpty.NO_PRODUCTS, QuickSaleModel.empty(QuickSaleModel.index(ShopData()), 0, ""))
-    assertNull(QuickSaleModel.keepCategory("رفته", listOf("نوشیدنی")))
-    assertEquals("نوشیدنی", QuickSaleModel.keepCategory("نوشیدنی", listOf("نوشیدنی")))
+    val index = CatalogModel.index(ledger)
+    assertEquals(CatalogEmpty.NONE, CatalogModel.empty(index, 3, ""))
+    assertEquals(CatalogEmpty.NO_MATCH, CatalogModel.empty(index, 0, "zzz"))
+    assertEquals(CatalogEmpty.EMPTY_CATEGORY, CatalogModel.empty(index, 0, ""))
+    assertEquals(CatalogEmpty.NO_PRODUCTS, CatalogModel.empty(CatalogModel.index(ShopData()), 0, ""))
+    assertNull(CatalogModel.keepCategory("رفته", listOf("نوشیدنی")))
+    assertEquals("نوشیدنی", CatalogModel.keepCategory("نوشیدنی", listOf("نوشیدنی")))
   }
 
   /* ------------------------------ اسکن ------------------------------ */

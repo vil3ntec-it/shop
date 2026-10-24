@@ -53,6 +53,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Search
@@ -142,7 +143,8 @@ fun PhoneCatalog(
   onSearch: (String) -> Unit,
   listMode: Boolean,
   onToggleMode: () -> Unit,
-  onBack: () -> Unit,
+  /** null ⇒ بی دکمهٔ برگشت */
+  onBack: (() -> Unit)?,
   onScan: () -> Unit,
   scanning: Boolean,
   scanPanel: @Composable () -> Unit,
@@ -151,6 +153,8 @@ fun PhoneCatalog(
   onTap: (PhoneCatalogItem) -> Unit,
   onHold: (PhoneCatalogItem) -> Unit,
   onMinus: (PhoneCatalogItem) -> Unit,
+  /** «…» سربرگ (نسخهٔ ۳: قلمِ آزاد، فروشِ سریع، تاریخچه)؛ null ⇒ بی دکمه */
+  onMenu: (() -> Unit)? = null,
 ) {
   val v = PhoneV3.colors
   //  زیرِ نوارِ وضعیت؛ کمینهٔ ۲۴ (بلندیِ نوارِ وضعیتِ گوشی) تا در پنجرهٔ بی‌نوار هم همان‌جا بنشیند
@@ -167,8 +171,10 @@ fun PhoneCatalog(
       Modifier.fillMaxWidth().padding(top = top + 6.dp, start = 4.dp, end = 12.dp).height(44.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      RoundButton(StrKit.back, onBack, 40.dp, null) { BackChevron(v.icon) }
-      Spacer(Modifier.width(2.dp))
+      if (onBack != null) {
+        RoundButton(StrKit.back, onBack, 40.dp, null) { BackChevron(v.icon) }
+        Spacer(Modifier.width(2.dp))
+      } else Spacer(Modifier.width(8.dp))
       SearchField(search, onSearch, Modifier.weight(1f))
       Spacer(Modifier.width(8.dp))
       RoundButton(if (scanning) StrSale.closeScan else StrKit.scanBarcode, onScan, 44.dp, v.card) {
@@ -177,6 +183,12 @@ fun PhoneCatalog(
       Spacer(Modifier.width(6.dp))
       RoundButton(if (listMode) StrSale.gridView else StrSale.listView, onToggleMode, 44.dp, v.card) {
         Icon(if (listMode) Icons.Outlined.GridView else Icons.Outlined.ViewList, null, tint = v.icon, modifier = Modifier.size(22.dp))
+      }
+      if (onMenu != null) {
+        Spacer(Modifier.width(6.dp))
+        RoundButton(StrKit.more, onMenu, 44.dp, v.card) {
+          Icon(Icons.Outlined.MoreHoriz, null, tint = v.icon, modifier = Modifier.size(22.dp))
+        }
       }
     }
 

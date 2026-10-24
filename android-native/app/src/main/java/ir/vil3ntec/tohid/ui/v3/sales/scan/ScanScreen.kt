@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -38,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,6 +79,9 @@ import kotlinx.coroutines.delay
  *  @param camera false ⇒ بی تصویرِ دوربین (عکس‌های پیش‌نمایش)
  *  @param overlay false ⇒ بی کادر و پرده (کامپیوتر: بارکدخوانِ سخت‌افزاری کادرِ خودش را دارد)
  *  @param start حالتِ آغازِ دلخواه (عکس‌ها)؛ null ⇒ اجازهٔ واقعیِ دستگاه
+ *  @param continuous پیوسته (صندوق): هر خواندن ⇒ `onCode` و کادر لحظه‌ای رنگ می‌گیرد، برگه
+ *    باز می‌ماند؛ `bottom` کنترل‌های همان صفحه (بارکدِ دستی، «هر اسکن»، پاسخِ آخر)
+ *  @param qr QRِ رسید هم خوانده شود (RET-01، فقط اسکنِ رسید؛ فروش همان قالب‌های بارکد)
  */
 @Composable
 fun ScanScreen(
@@ -86,12 +91,24 @@ fun ScanScreen(
   camera: Boolean = true,
   overlay: Boolean = true,
   start: CameraAccess? = null,
+  continuous: Boolean = false,
+  bottom: (@Composable ColumnScope.() -> Unit)? = null,
+  qr: Boolean = false,
 ) {
   val context = LocalContext.current
   val c = PhoneV3.colors
   var access by remember { mutableStateOf(start ?: ScanModel.start(granted(context))) }
   var failure by remember { mutableStateOf<String?>(null) }
   var read by remember { mutableStateOf<String?>(null) }
+  //  پیوسته: هر خواندن یک بار کادر را رنگ می‌کند
+  var flashes by remember { mutableIntStateOf(0) }
+  var flashing by remember { mutableStateOf(false) }
+  LaunchedEffect(flashes) {
+    if (flashes == 0) return@LaunchedEffect
+    flashing = true
+    delay(MotionTokens.ms(FLASH_MS).toLong())
+    flashing = false
+  }
   var leaving by remember { mutableStateOf(false) }
   val shown = remember { MutableTransitionState(false) }
   shown.targetState = !leaving
@@ -136,16 +153,20 @@ fun ScanScreen(
             if (camera) {
               CameraScanner(
                 onCode = { raw ->
-                  if (read == null) ScanModel.code(raw)?.let { code ->
-                    read = code
-                    ScanFeedback.ok(context)
+                  val code = ScanModel.code(raw)
+                  when {
+                    code == null -> Unit
+                    //  صدا و پیام را صندوق می‌دهد (خواند یا ناشناس)
+                    continuous -> { flashes++; onCode(code) }
+                    read == null -> { read = code; ScanFeedback.ok(context) }
                   }
                 },
                 onStatus = { text, error -> failure = if (error) text else null },
                 modifier = Modifier.fillMaxSize(),
+                qr = qr,
               )
             }
-            if (overlay) ScanViewfinder(read = read != null, modifier = Modifier.fillMaxSize())
+            if (overlay) ScanViewfinder(read = read != null || flashing, modifier = Modifier.fillMaxSize())
           }
           CameraAccess.ASK -> Prompt(Icons.Outlined.PhotoCamera, StrKit.cameraNeeded, StrKit.cameraAllow) {
             ask.launch(Manifest.permission.CAMERA)
@@ -182,7 +203,17 @@ fun ScanScreen(
               Spacer(Modifier.height(6.dp))
               Text(it, style = V3Type.footnote, color = PhoneV3Roles.dangerOnInverse, textAlign = TextAlign.Center)
             }
+            if (bottom != null) {
+              Spacer(Modifier.height(16.dp))
+              bottom()
+            }
           }
+        } else if (bottom != null) {
+          //  بی دوربین هم بارکدِ دستی کار می‌کند
+          Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+              .padding(start = 24.dp, end = 24.dp, bottom = bars.calculateBottomPadding() + 24.dp),
+          ) { bottom() }
         }
       }
     }

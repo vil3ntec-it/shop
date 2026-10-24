@@ -1,4 +1,4 @@
-package ir.vil3ntec.tohid.ui.v3.sales.quick
+package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -8,7 +8,7 @@ import ir.vil3ntec.tohid.ui.components.pos.CatalogSearch
 import ir.vil3ntec.tohid.ui.components.pos.PhoneCatalogItem
 
 /** چه چیزی جای کاشی‌ها دیده شود */
-enum class QuickEmpty {
+enum class CatalogEmpty {
   /** کاشی هست */
   NONE,
 
@@ -23,11 +23,11 @@ enum class QuickEmpty {
 }
 
 /**
- *  حالتِ خالصِ «فروشِ سریع» (`sale/quick`): کاشی‌ها از همان نمایهٔ جست‌وجوی صندوق
- *  (`CatalogSearch`: پرفروش‌ترین اول، «ي/ی» و رقم‌ها یکی، بارکدِ کامل پیش از همه) و
- *  همان دادهٔ کاشیِ صندوق (`PhoneCatalogItem`). موجودی از `ShopStore.stock`.
+ *  کاتالوگِ صندوق و «فروشِ سریع» — یک قاعده برای هر دو: نمایهٔ جست‌وجو (`CatalogSearch`:
+ *  پرفروش‌ترین اول، «ي/ی» و رقم‌ها یکی، بارکدِ کامل پیش از همه)، دادهٔ کاشی
+ *  (`PhoneCatalogItem`) با موجودیِ `ShopStore.stock`، «پرفروش‌ها» و پیامِ خالی.
  */
-object QuickSaleModel {
+object CatalogModel {
 
   /** نمایه — یک بار با هر تغییرِ کالاها یا فروش‌ها، نه با هر حرف */
   fun index(d: ShopData): CatalogSearch.Index = CatalogSearch.index(d.products, CatalogSearch.popularity(d.sales, d.saleItems))
@@ -56,12 +56,18 @@ object QuickSaleModel {
     return CatalogSearch.search(index, query, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
   }
 
+  /** «پرفروش‌ها» ِ سرِ کاتالوگ — کالایی که هرگز فروخته نشده نه */
+  fun bestsellers(d: ShopData, index: CatalogSearch.Index, inCart: Map<String, Double>): List<PhoneCatalogItem> {
+    val byId = d.products.associateBy { it.id }
+    return CatalogSearch.top(index).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
+  }
+
   /** کاشی‌ای نیست ⇒ کدام پیام */
-  fun empty(index: CatalogSearch.Index, shown: Int, query: String): QuickEmpty = when {
-    shown > 0 -> QuickEmpty.NONE
-    index.size == 0 -> QuickEmpty.NO_PRODUCTS
-    query.isNotBlank() -> QuickEmpty.NO_MATCH
-    else -> QuickEmpty.EMPTY_CATEGORY
+  fun empty(index: CatalogSearch.Index, shown: Int, query: String): CatalogEmpty = when {
+    shown > 0 -> CatalogEmpty.NONE
+    index.size == 0 -> CatalogEmpty.NO_PRODUCTS
+    query.isNotBlank() -> CatalogEmpty.NO_MATCH
+    else -> CatalogEmpty.EMPTY_CATEGORY
   }
 
   /** دستهٔ انتخاب‌شده‌ای که دیگر نیست (پاک شد) انتخاب نمی‌ماند */

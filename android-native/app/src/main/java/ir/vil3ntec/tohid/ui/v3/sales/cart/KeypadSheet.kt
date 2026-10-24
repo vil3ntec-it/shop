@@ -4,24 +4,15 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.outlined.Backspace
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -29,20 +20,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.qty
-import ir.vil3ntec.tohid.ui.components.pos.KeypadInput
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
@@ -53,7 +39,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Type
-import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 /**
@@ -116,15 +101,7 @@ fun KeypadSheet(
     }
     Spacer(Modifier.height(12.dp))
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        KeypadModel.keys(item).chunked(3).forEach { row ->
-          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            row.forEach { k -> Key(k, Modifier.weight(1f)) { text = KeypadModel.press(text, k, item) } }
-          }
-        }
-      }
-    }
+    SaleKeyGrid(KeypadModel.keys(item), { k -> text = KeypadModel.press(text, k, item) })
     Spacer(Modifier.height(16.dp))
     V3Button(
       when (action) {
@@ -140,24 +117,3 @@ fun KeypadSheet(
     )
   }
 }
-
-/** یک کلیدِ گرد (۱۴) روی سطحِ درونی؛ کلیدِ خالیِ کالای دانه‌ای جایش را نگه می‌دارد */
-@Composable
-private fun Key(k: Char, modifier: Modifier, onPress: () -> Unit) {
-  val c = PhoneV3.colors
-  val shape = RoundedCornerShape(PhoneV3.tileRadius)
-  if (k == ' ') { Spacer(modifier.height(KEY_HEIGHT)); return }
-  val label = if (k == KeypadInput.BACKSPACE) StrSale.backspace else k.toString()
-  Box(
-    modifier.height(KEY_HEIGHT).clip(shape).background(c.tile).v3Pressable(label = label, scale = 0.94f, onClick = onPress),
-    contentAlignment = Alignment.Center,
-  ) {
-    if (k == KeypadInput.BACKSPACE) {
-      Icon(Icons.AutoMirrored.Outlined.Backspace, contentDescription = null, tint = c.icon, modifier = Modifier.size(22.dp))
-    } else {
-      Text(k.toString(), style = V3Type.title.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold), color = c.ink)
-    }
-  }
-}
-
-private val KEY_HEIGHT = 54.dp

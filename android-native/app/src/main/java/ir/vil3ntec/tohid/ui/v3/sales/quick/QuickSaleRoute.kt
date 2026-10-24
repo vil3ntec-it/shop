@@ -14,6 +14,7 @@ import ir.vil3ntec.tohid.ui.PromoLive
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutSession
 import ir.vil3ntec.tohid.ui.v3.sales.cart.CartFeedback
 
 /**
@@ -43,10 +44,10 @@ fun RouteScope.QuickSaleRoute() {
       tap = { id, weighed -> if (weighed) nav.open(SalesPaths.keypad(id)) else feedback.addOne(data, id) },
       minus = { id -> feedback.minusOne(data, id) },
       hold = { id -> nav.open(SalesPaths.keypad(id)) },
-      scan = { nav.openForResult(SalesPaths.scan(SalesPaths.SCAN_QUICK)) { code -> code?.let { feedback.scan(data, index, it) } } },
+      scan = { nav.openForResult(SalesPaths.scan(SalesPaths.SCAN_QUICK)) { code -> code?.let { feedback.scan(data, index, it)?.let(feedback::show) } } },
       categories = { nav.open(ProductsPaths.categories()) },
       newProduct = { nav.open(ProductsPaths.new()) },
-      pay = { nav.open(SalesPaths.CHECKOUT) },
+      pay = { CheckoutSession.reset(); nav.open(SalesPaths.checkout(quick = true)) },
       openCart = { nav.switchTab(SalesPaths.SALE) },
     ),
   )
