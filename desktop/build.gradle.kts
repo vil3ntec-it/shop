@@ -127,6 +127,8 @@ val generateConfig by tasks.registering {
       |  const val LICENSE_PUBLIC_KEY: String = ${q(if (dev) "" else licenseKey)}
       |  const val UPDATE_PUBLIC_KEY: String = ${q(if (dev) "" else updateKey)}
       |  const val SIGNING_SHA256: String = ""
+      |  /** نسخهٔ پیش‌نمایش فقط اندروید است (buildTypeِ `preview`) */
+      |  const val PREVIEW: Boolean = false
       |  /** این نسخه روی کامپیوتر است — برای جاهایی که باید بدانند. */
       |  const val DESKTOP: Boolean = true
       |}

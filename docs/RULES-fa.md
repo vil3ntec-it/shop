@@ -254,6 +254,7 @@
 ### v3 · به‌روزرسانی و انتشار
 
 - کانالِ آزمایشیِ وب، اندروید و کامپیوتر: بخشِ «⛔ مرج دیگر یعنی آزمایشی» (F0-27، #221).
+- ⏳ پیش‌نمایشِ موقتِ اندروید (`tohid-native-preview.yml`): buildTypeِ `preview` با بستهٔ `ir.vil3ntec.tohid.preview`، فقط از push به شاخه‌های بازسازی (`ccr-3a0d593c-ac0jpj-phone-v3`، `…-v3-foundation`) یا Run workflow؛ PR فقط می‌سازد. برچسبِ `tohid-native-preview` (prerelease، هرگز latest): `tohid-preview.apk.preview` (نسخه در `label`)، `tohid-preview.zip` و `SHA256SUMS.txt` — ⛔ هیچ `.apk`ی، و دست به `tohid-native`/`-beta` نمی‌زند. برنامهٔ پیش‌نمایش فقط همین برچسب را از api.github.com می‌خواند، نه سرور.
 - کشِ آزمایشیِ `sw.js` پیشوندِ `beta-` دارد و هر کانال فقط کشِ کهنهٔ خودش را پاک می‌کند؛ پایدار به `/beta/` دست نمی‌زند (#221).
 - پایدار و آزمایشیِ وب یک `localStorage` دارند؛ پس تغییرِ قالبِ دادهٔ وب هم پشتِ پرچمِ خاموش (#221).
 - نبودنِ برچسبِ `tohid-web` ساخت را قرمز نمی‌کند؛ فقط notice و بی انتشار (#235).
