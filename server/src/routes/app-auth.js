@@ -29,6 +29,8 @@ const codes = require('../lib/login-codes');
 const outbox = require('../lib/login-outbox');
 const tokens = require('../lib/tokens');
 const audit = require('../lib/audit');
+const loginAlerts = require('../lib/login-alerts');
+const reauth = require('../lib/reauth');
 const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const entitlement = require('../lib/entitlement');
 const { sectionOf } = require('../lib/tenancy');
@@ -217,9 +219,13 @@ router.post('/verify', edgeLimit, async (req, res, next) => {
     }
 
     const deviceId = deviceOf(req) || result.request.device_id;
-    const dev = await upsertDevice(user.id, deviceId, req.body?.device_name || result.request.device_name, clientIp(req));
-
     const section = sectionOf(app) || 'shop';
+    //  هشدارِ ورود از دستگاه/شبکهٔ تازه (بندِ ۲۱.۱) — همان دو پلهٔ `issueSession`:
+    //  عکسِ وضعیت **پیش از** ثبتِ دستگاه، اعلان پس از آن. هیچ‌وقت جلوی ورود را نمی‌گیرد.
+    const seen = await loginAlerts.before(user, deviceId, clientIp(req), section);
+    const dev = await upsertDevice(user.id, deviceId, req.body?.device_name || result.request.device_name, clientIp(req));
+    await loginAlerts.after(seen, { user, device: dev, ip: clientIp(req), app: section, method: 'email_code' });
+
     const access = await tokens.issue({
       kind: 'access', subjectId: user.id, deviceId: dev?.id || null,
       ttlMs: config.tokens.accessTtlMs, app: section, appVersion: versionOf(req),
@@ -229,6 +235,10 @@ router.post('/verify', edgeLimit, async (req, res, next) => {
       ttlMs: config.tokens.refreshTtlMs, app: section, appVersion: versionOf(req),
     });
     await query('UPDATE users SET last_login_at=$2 WHERE id=$1', [user.id, now()]).catch(() => {});
+    //  ورود با کد هم «ورود» است: مثلِ `issueSession` همین نشست چند دقیقه تازه است،
+    //  وگرنه کارِ حساس (گذاشتنِ رمز، افزودنِ شماره…) بلافاصله پس از ورود ۴۰۳ می‌گرفت.
+    //  شکستش ورود را نمی‌بندد — فقط یعنی برنامه همان پنجرهٔ تأییدِ دوباره را نشان می‌دهد.
+    await reauth.markFresh({ accessToken: access.token, ip: clientIp(req) }).catch(() => {});
 
     await audit.log({
       actorType: 'user', userId: user.id, action: 'auth.login', ip: clientIp(req),

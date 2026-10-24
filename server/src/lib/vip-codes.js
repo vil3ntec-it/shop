@@ -27,7 +27,7 @@
  */
 const { createHmac, randomInt } = require('crypto');
 const { query, one, many, tx, newId, now } = require('../db');
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const plans = require('./plans');
 const mailer = require('./mailer');
 const otp = require('./otp');
@@ -38,7 +38,7 @@ const { badRequest, notFound, forbidden, conflict } = require('../middleware/err
 const DIGITS = 6;
 
 function pepper() {
-  return config.secrets.api || config.secrets.otp || config.secrets.jwt || 'shop-vip-code';
+  return serverSecret(['api', 'otp', 'jwt'], 'shop-vip-code');
 }
 
 function normalize(raw) {

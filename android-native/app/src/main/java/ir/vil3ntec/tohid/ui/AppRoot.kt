@@ -91,6 +91,9 @@ private val PAGE_TITLES = mapOf(
   "orders" to "سفارش‌ها",
   "storefront" to "ویترینِ اینترنتی",
   "stockbook" to "دفترِ موجودی",
+  "promos" to "تخفیف‌ها",
+  //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
+  "delivery" to "میزِ تحویل",
 )
 
 /**
@@ -136,6 +139,10 @@ fun AppRoot(
   var sub by rememberSaveable { mutableStateOf<String?>(null) }
   // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
   var authOpen by rememberSaveable { mutableStateOf(false) }
+
+  //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱):
+  //  یک پنجره برای همهٔ صفحه‌ها؛ `ApiClient` پس از تأیید همان درخواست را دوباره می‌فرستد
+  ReauthHost()
 
   /*
    *  دکانِ حساب — پرسیدنش فقط وقتی معلوم شود که ندارد.
@@ -258,6 +265,8 @@ fun AppRoot(
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
   OrdersLive.Host()
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
+  PromoLive.Host()
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -339,6 +348,12 @@ fun AppRoot(
   }
   //  POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن
   DraftRecoveryPrompt(cartStore, data, loaded, snackbar)
+  //  HW-02/03: کشوی بی فروش (`no_sale`) و چاپِ دوباره (`reprint`) از صفِ چاپ ⇐ سابقهٔ دکان.
+  //  `appendAudit` روی دفترِ همان لحظه و زیرِ قفلِ نوشتن می‌سازد (نه تصویرِ کهنهٔ `data.value`)
+  //  تا فروشِ هم‌زمان گم نشود؛ پس از بارِ دفتر، و مثلِ هر نوشتنی همگام می‌شود
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
@@ -438,11 +453,28 @@ fun AppRoot(
   LaunchedEffect(railRequest) {
     if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null }
   }
-  /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
+  /*
+   *  نسخهٔ ۲ — منو در صندوق (تصمیم، بازبینیِ ۱۴۰۵/۰۷/۲۷): صندوق حالتِ منوی **خودش** را
+   *  دارد (`desk_rail_pos`، پیش‌فرض «فقط آیکن») تا کاتالوگ جا بگیرد؛ بقیهٔ صفحه‌ها همان
+   *  انتخابِ کاربر (`desk_rail`، پیش‌فرض «کامل»). همان آیکن‌ها به همان ترتیب، نامِ هر بخش در
+   *  راهنمای هاور، و کلیدِ بازکردن/جمع‌کردنِ بالای منو (و ☰) انتخاب را برای همان صفحه نگه می‌دارد.
+   *  «پنهان» در همه‌جا پنهان است.
+   */
+  val onSale = Platform.DESKTOP && (sub ?: tab) == "sale"
+  var posRail by remember { mutableStateOf(uiPrefs.getString("desk_rail_pos", RailMode.COMPACT) ?: RailMode.COMPACT) }
+  fun setPosRail(m: String) {
+    posRail = m
+    railOverlay = false
+    uiPrefs.edit().putString("desk_rail_pos", m).apply()
+  }
+  val shownRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  /** حالتِ منوی همین صفحه را عوض می‌کند (صندوق: `desk_rail_pos`؛ بقیه: `desk_rail`) */
+  fun setShownRail(m: String) { if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m) }
+  /** ☰: ثابت ⇄ آیکن (برای همین صفحه)؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
-    when (railMode) {
-      RailMode.FULL -> setRail(RailMode.COMPACT)
-      RailMode.COMPACT -> setRail(RailMode.FULL)
+    when (shownRail) {
+      RailMode.FULL -> setShownRail(RailMode.COMPACT)
+      RailMode.COMPACT -> setShownRail(RailMode.FULL)
       else -> railOverlay = !railOverlay
     }
   }
@@ -453,6 +485,7 @@ fun AppRoot(
 
   //  ویترین (فاز ۴): فقط وقتی سرور می‌گوید روشن است، بخشش دیده می‌شود
   LaunchedEffect(Unit) { runCatching { StorefrontGate.refresh(context) } }
+  LaunchedEffect(Unit) { runCatching { DeliveryGate.refresh(context) } }
 
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صفحهٔ فروش باز می‌شود و کالا به سبد می‌رود
   LaunchedEffect(Unit) {
@@ -539,6 +572,7 @@ fun AppRoot(
         onMenu = { onMenuPress() },
         onSearch = { AppNav.palette.value = true },
         onOpen = ::open,
+        page = sub ?: tab,
       ) else
       TohidTopBar(
         title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
@@ -564,8 +598,9 @@ fun AppRoot(
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
       SubscriptionBanner { sub = "myplan" }
-      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
-      UpdateBanner()
+      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
+      //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
+      if (!Platform.DESKTOP) UpdateBanner()
       }
     },
     /*
@@ -642,10 +677,10 @@ fun AppRoot(
         return@Box
       }
 
-      if (wide && railMode != RailMode.HIDDEN) {
+      if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          current = sub ?: tab, onPick = ::open, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -682,8 +717,8 @@ fun AppRoot(
       }
       val railPad = when {
         !wide -> 0.dp
-        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
-        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
       PageWidth(Modifier.padding(start = railPad)) {
@@ -719,6 +754,7 @@ fun AppRoot(
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
                 ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
@@ -814,6 +850,11 @@ fun AppRoot(
         "team" -> TeamScreen(snackbar)
         "orders" -> OrdersScreen(snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
+        //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
+        "promos" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) PromosScreen(data, snackbar)
+          else LaunchedEffect(Unit) { open("more") }
+        "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)
       }

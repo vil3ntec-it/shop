@@ -293,6 +293,9 @@
       schema_version: core.SCHEMA_VERSION,
       ops: batch,
       queued: q.size(),
+      //  A00: وب ردیفِ JSON ِ خام را نگه می‌دارد و null اش پاک کردنِ واقعی است — سرور
+      //  تورِ «ساختِ پیش از A00» را برایش کنار می‌گذارد (server/src/lib/newer-fields.js)
+      client: 'web',
     };
     var r;
     try {

@@ -270,7 +270,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
       AddFab(
         label = "قرض‌دار تازه",
-        containerColor = Shop.colors.primary,
+        containerColor = Shop.colors.button.primary.bg,
         onClick = { form = DebtorFormState() },
         modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
       )
@@ -998,10 +998,10 @@ private fun AccountView(
     horizontalArrangement = Arrangement.spacedBy(12.dp),
   ) {
     Box(
-      Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Shop.colors.primary),
+      Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Shop.colors.button.primary.bg),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(Icons.Filled.Add, contentDescription = null, tint = Color.White)
+      Icon(Icons.Filled.Add, contentDescription = null, tint = Shop.colors.button.primary.text)
     }
     Column(Modifier.weight(1f)) {
       Text(

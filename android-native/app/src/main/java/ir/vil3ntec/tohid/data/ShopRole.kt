@@ -58,6 +58,7 @@ object ShopRole {
     if (p.getString(KEY, null) != clean) edit.remove(POLICY)
     edit.apply()
     courierMode.value = clean == COURIER
+    policyVersion.value++
   }
 
   /** `policy`ِ پاسخِ `GET /api/shop`؛ null یعنی «بی لایه» = همان رفتارِ امروزِ نقش */
@@ -65,11 +66,13 @@ object ShopRole {
     val e = prefs(context).edit()
     if (policyJson.isNullOrBlank()) e.remove(POLICY) else e.putString(POLICY, policyJson)
     e.apply()
+    policyVersion.value++
   }
 
   fun forget(context: Context) {
     prefs(context).edit().remove(KEY).remove(POLICY).apply()
     courierMode.value = false
+    policyVersion.value++
   }
 
   /**
@@ -89,6 +92,9 @@ object ShopRole {
    *  حالتِ پیک برود یا از آن بیرون بیاید.
    */
   val courierMode = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+  /** هر بار نقش یا `policy` عوض شد یک بالا می‌رود — صفحه‌ای که مجوز را `remember` کرده دوباره می‌سنجد */
+  val policyVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
 
   /** شاگرد است — نه صاحب، نه مدیر */
   fun isStaff(context: Context): Boolean = current(context) == STAFF
@@ -114,4 +120,14 @@ object ShopRole {
 
   /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
   fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
+
+  /** لایه‌های `policy` برای تصمیمِ عددی (RET-10: `ReturnFlow.permDecision`) */
+  fun layers(context: Context): List<Any?> = PermPolicy.layers(prefs(context).getString(POLICY, null))
+
+  /**
+   *  باز کردنِ دستیِ کشو بی فروش (`no_sale`) — `drawer.open`ِ هسته. شاگرد
+   *  پیش‌فرض نه؛ «نیازمندِ تأیید» هم این‌جا یعنی نه (برگهٔ تأیید هنوز در
+   *  برنامه نیست)، همان کشوی بی فروشِ #286.
+   */
+  fun canOpenDrawer(context: Context): Boolean = allows(context, "drawer.open")
 }

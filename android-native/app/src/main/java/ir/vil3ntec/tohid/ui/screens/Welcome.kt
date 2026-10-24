@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.theme.LightColors
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -133,14 +134,16 @@ import kotlinx.coroutines.launch
  *  صفحهٔ ورودِ برنامه‌های بانکی. رنگِ تمِ برنامه بعد از ورود شروع می‌شود.
  *  در تمِ تاریک، خودِ پس‌زمینه تیره کشیده می‌شود و این‌ها روی آن می‌نشینند.
  */
-private val INK_LIGHT = Color(0xFF17255A)
-private val INK_SOFT_LIGHT = Color(0xFF5C6B90)
-//  رنگِ کادرها و دکمه‌های صفحه‌ی ورود، هم‌رنگِ تمِ تازه.
-//  پس‌زمینه‌ی این صفحه (`WelcomeDecor.kt`) رنگِ خودش را جدا دارد و یک
-//  نقطه هم عوض نشده.
-private val BLUE = Color(0xFF7C5CFF)
-private val BLUE_DEEP = Color(0xFF5B3FE0)
-private val FIELD_LINE_LIGHT = Color(0xFFE1E8F5)
+private val INK_LIGHT = LightColors.textPrimary
+private val INK_SOFT_LIGHT = LightColors.textSecondary
+//  رنگِ کادرها و دکمه‌های صفحه‌ی ورود — از ۱۴۰۵/۰۷/۲۸ سبزآبیِ برندِ VILL3N به‌جای بنفش.
+//  `BLUE` (نامِ تاریخی) متن، پیوند و خطِ فعال است ⇒ برندِ خوانا (روز #08665F، شب #6EE7D1)؛
+//  `BLUE_DEEP` پُرِ دکمهٔ اصلی است ⇒ همان جفتِ دکمهٔ اصلیِ برنامه.
+private val BLUE: Color
+  @Composable get() = Shop.colors.brandText
+private val BLUE_DEEP: Color
+  @Composable get() = Shop.colors.button.primary.bg
+private val FIELD_LINE_LIGHT = LightColors.borderInput
 
 /*
  *  متنِ روی پس‌زمینه — نه روی کادرها.
@@ -223,6 +226,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   var note by remember { mutableStateOf<String?>(null) }
+  //  گوگلی که باید به حسابِ موجود وصل شود — شرحش سرِ `GoogleLinkDialog`
+  var googleLink by remember { mutableStateOf<GoogleLinkAsk?>(null) }
 
   /*
    *  خطای هر کادر، چسبیده به خودِ کادر.
@@ -913,7 +918,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                     } else {
                       auth.loginWithGoogle(account.idToken)
                         .onSuccess { finish(account.email, it) }
-                        .onFailure { fail(it) }
+                        .onFailure {
+                          if (it is ApiFailure.Conflict && it.code == "google_link_required") {
+                            googleLink = GoogleLinkAsk(account.idToken, account.email, it.message.orEmpty())
+                          } else {
+                            fail(it)
+                          }
+                        }
                     }
                   }
                   .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
@@ -921,6 +932,32 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               }
             }
           }
+        }
+
+        googleLink?.let { ask ->
+          GoogleLinkDialog(
+            ask = ask,
+            busy = busy,
+            onDismiss = { googleLink = null },
+            onSendCode = {
+              busy = true
+              scope.launch {
+                auth.requestGoogleLinkCode(ask.idToken)
+                  .onSuccess { googleLink = ask.copy(codeSent = true, problem = null) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText("کد فرستاده نشد")) }
+                busy = false
+              }
+            },
+            onProve = { secret, isCode ->
+              busy = true
+              scope.launch {
+                auth.loginWithGoogle(ask.idToken, password = secret.takeUnless { isCode }, code = secret.takeIf { isCode })
+                  .onSuccess { googleLink = null; finish(ask.email, it) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText("وصل نشد")) }
+                busy = false
+              }
+            },
+          )
         }
 
         /*
@@ -2187,7 +2224,7 @@ private fun GradientButton(
       )
       .clip(shape)
       .background(
-        if (live) Brush.horizontalGradient(listOf(BLUE_DEEP, BLUE, Color(0xFF00C39A)))
+        if (live) SolidColor(BLUE_DEEP)
         else Brush.horizontalGradient(listOf(disabledFace, disabledFace))
       )
       .clickable(
@@ -2220,12 +2257,12 @@ private fun GradientButton(
       )
     }
     if (busy) {
-      CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
+      CircularProgressIndicator(color = Shop.colors.button.primary.text, strokeWidth = 2.dp, modifier = Modifier.size(22.dp))
     } else {
       Text(
         text,
         style = MaterialTheme.typography.titleMedium,
-        color = if (live) Color.White else inkSoft,
+        color = if (live) Shop.colors.button.primary.text else inkSoft,
         fontWeight = FontWeight.Bold,
       )
     }
@@ -2331,6 +2368,74 @@ private fun GoogleMark() {
  */
 private const val GOOGLE_LOGIN = false
 
+/** گوگلی که منتظرِ اثباتِ روشِ قبلیِ حساب است (۴۰۹ `google_link_required`). */
+private data class GoogleLinkAsk(
+  val idToken: String,
+  val email: String,
+  val message: String,
+  val codeSent: Boolean = false,
+  val problem: String? = null,
+)
+
+/**
+ *  «این ایمیل از قبل حساب دارد» — وصل کردنِ گوگل به همان حساب.
+ *
+ *  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: برابر بودنِ ایمیل به‌تنهایی کافی نیست. کاربر رمزِ
+ *  همان حساب را می‌زند، یا کدی که به ایمیلِ حساب می‌رود. بستن یعنی «وصل
+ *  نکن» — هیچ حسابِ تازه‌ای ساخته نمی‌شود و حسابِ قبلی دست نمی‌خورد.
+ */
+@Composable
+private fun GoogleLinkDialog(
+  ask: GoogleLinkAsk,
+  busy: Boolean,
+  onDismiss: () -> Unit,
+  onSendCode: () -> Unit,
+  onProve: (secret: String, isCode: Boolean) -> Unit,
+) {
+  var secret by remember(ask.codeSent) { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = { if (!busy) onDismiss() },
+    title = { Text("وصل کردنِ گوگل به حسابِ موجود") },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(
+          ask.message.ifBlank {
+            "این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید."
+          },
+          style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(ask.email, style = MaterialTheme.typography.labelLarge)
+        OutlinedTextField(
+          value = secret,
+          onValueChange = { secret = it },
+          singleLine = true,
+          enabled = !busy,
+          label = { Text(if (ask.codeSent) "کدِ ایمیل" else "رمزِ همین حساب") },
+          visualTransformation = if (ask.codeSent) VisualTransformation.None else PasswordVisualTransformation(),
+          keyboardOptions = KeyboardOptions(
+            keyboardType = if (ask.codeSent) KeyboardType.NumberPassword else KeyboardType.Password,
+          ),
+          modifier = Modifier.fillMaxWidth(),
+        )
+        if (!ask.codeSent) {
+          TextButton(onClick = onSendCode, enabled = !busy) { Text("رمز را نمی‌دانم — کد به ایمیل بفرست") }
+        } else {
+          Text("کد به همین ایمیل رفت.", style = MaterialTheme.typography.labelMedium)
+        }
+        ask.problem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = { onProve(secret, ask.codeSent) }, enabled = !busy && secret.isNotBlank()) {
+        Text("وصل و ورود")
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss, enabled = !busy) { Text("وصل نکن") }
+    },
+  )
+}
+
 private const val G_BLUE =
   "M45.12 24.5c0-1.56-.14-3.06-.4-4.5H24v8.51h11.84c-.51 2.75-2.06 5.08-4.39 6.64v5.52h7.11" +
     "c4.16-3.83 6.56-9.47 6.56-16.17z"
@@ -2376,7 +2481,7 @@ private fun BrandMark() {
         .size(72.dp)
         .alpha(breathe * 0.4f)
         .clip(RoundedCornerShape(24.dp))
-        .background(colors.primary)
+        .background(colors.brandPrimary)
     )
     Canvas(Modifier.size(78.dp).graphicsLayer { rotationZ = spin }) {
       // یک کمانِ طلایی، نه یک حلقهٔ کامل: حلقهٔ کامل که بچرخد، دیده

@@ -105,12 +105,8 @@ private val STATUS_LABEL = mapOf(
   "delivered" to "تحویل شد", "rejected" to "رد شد", "withdrawn" to "پس گرفته شد", "returned" to "برگشت به دکان",
 )
 
-private fun statusTone(s: String): PillTone = when (s) {
-  "requested" -> PillTone.WARNING
-  "failed" -> PillTone.DANGER
-  "delivered" -> PillTone.SUCCESS
-  else -> PillTone.NEUTRAL
-}
+/** همان هفت نشانِ وضعیتِ سفارش، با نام‌های پیک (`OrderStatusTone`) */
+private fun statusTone(s: String): PillTone = ir.vil3ntec.tohid.ui.components.common.OrderStatusTone.courier(s)
 
 private fun actionLabel(from: String, to: String): String = when (to) {
   "assigned" -> "قبول"
