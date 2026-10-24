@@ -856,6 +856,68 @@ await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ ج�
   await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
 });
 
+// ── IMG-02 / IMG-PRO-07 / IMG-BANK-17 / IMG-09: صفِ بررسی — مبهم فقط با انتخابِ انسانی ──
+await step('بانکِ تصاویر: تطبیقِ مبهم با دلیل و اندازهٔ هر کالا؛ انتخابِ انسانی وصل می‌کند و ارشد منتشر می‌کند', async () => {
+  const F = require('./image-fixtures');
+  const tok = await page.evaluate(() => sessionStorage.getItem('shop-admin-token'));
+  const api = async (method, path, body, raw) => {
+    const r = await fetch(`${base}/api/admin/image-bank${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+      body: raw || (body === undefined ? undefined : JSON.stringify(body)),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const ids = {};
+  for (const size of ['1', '5']) {
+    const p = await api('POST', '/products', { name: 'روغن آفتاب', brand: 'زر', size_value: size, size_unit: 'l', sku: `PANEL-OIL-${size}` });
+    assert.equal(p.status, 201, JSON.stringify(p.body));
+    ids[size] = p.body.id;
+  }
+  const b = await api('POST', '/batches', { license_source: 'کاتالوگ', license_status: 'licensed', commercial_use: true });
+  assert.equal((await api('PUT', `/batches/${b.body.id}/files/oil.jpg`, undefined, F.jpeg(800, 600, { seed: 951 }))).body.status, 'ok');
+  const run = await api('POST', `/batches/${b.body.id}/rows`, { csv: 'sku,barcode,name,brand,size,unit,image_path\n,,روغن آفتاب,زر,,,oil.jpg' });
+  const imageId = run.body.rows[0].image_id;
+  assert.equal(run.body.rows[0].status, 'ambiguous');
+
+  await openTab('imgbank');
+  const row = `#ib-review tr[data-image="${imageId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  assert.match(await page.locator(`${row} td:nth-child(4)`).textContent(), /مبهم/);
+  assert.match(await page.locator(`${row} td:nth-child(5)`).textContent(), /چند کالای هم‌نام/);
+  assert.match(await page.locator(`${row} td:nth-child(2)`).textContent(), /۲ کالای ممکن/);
+  await page.click(`${row} button`);
+  await page.waitForSelector('#ib-detail:not(.hidden)', { timeout: 10_000 });
+  await page.waitForFunction(() => (document.getElementById('ib-dt-img').getAttribute('src') || '').startsWith('data:image/jpeg'), null, { timeout: 10_000 });
+  //  کالاهای ممکن کنارِ هم با اندازه و SKU (IMG-09، IMG-PRO-07)
+  assert.match(await page.locator(`#ib-dt-cands tr[data-product="${ids['1']}"]`).textContent(), /1 l.*PANEL-OIL-1/);
+  assert.match(await page.locator(`#ib-dt-cands tr[data-product="${ids['5']}"]`).textContent(), /5 l.*PANEL-OIL-5/);
+  //  هنوز وصل نیست و انتشار رد می‌شود (۴۰۹ ِ سرور، پیامِ قرمز؛ ۴۰۹ خطای صفحه نیست)
+  const errorsBefore = consoleErrors.length;
+  page.once('dialog', (d) => d.accept('مجوزِ تأمین‌کننده بررسی شد'));
+  await page.click('#btn-ib-approve');
+  await page.waitForFunction(() => /وصل نیست/.test(document.getElementById('ib-dt-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one('SELECT status FROM images WHERE id=$1', [imageId])).status, 'NEEDS_REVIEW');
+  assert.deepEqual(consoleErrors.splice(errorsBefore).filter((m) => !/status of 409/.test(m)), []);
+
+  //  انتخابِ انسانی: «همین کالاست» برای ۵ لیتری
+  page.once('dialog', (d) => d.accept());
+  await page.click(`#ib-dt-cands tr[data-product="${ids['5']}"] button`);
+  await page.waitForFunction(() => /وصل به دستِ مدیر/.test(document.getElementById('ib-dt-reasons').textContent), null, { timeout: 10_000 });
+  const linked = await one('SELECT bank_product_id, match_status, match_reasons FROM images WHERE id=$1', [imageId]);
+  assert.deepEqual([linked.bank_product_id, linked.match_status], [ids['5'], 'exact']);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-review.png`, fullPage: true });
+
+  //  انتشار با دلیل ⇒ بانکِ عمومی، با سابقه
+  page.once('dialog', (d) => d.accept('مجوزِ تأمین‌کننده بررسی شد'));
+  await page.click('#btn-ib-approve');
+  await page.waitForSelector('#ib-detail.hidden', { state: 'attached', timeout: 10_000 });
+  const done = await one('SELECT space, status FROM images WHERE id=$1', [imageId]);
+  assert.deepEqual([done.space, done.status], ['central', 'APPROVED']);
+  const audit = await one(`SELECT detail FROM audit_logs WHERE action='admin.bank_image_approved' AND target_id=$1`, [imageId]);
+  assert.ok(audit, 'انتشار سابقه نداشت');
+});
+
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
 await step('کانالِ آزمایشی: ذخیره در live_config و سابقه؛ شناسهٔ ناجور پیامِ قرمز و بی‌تغییر', async () => {
   await openTab('plans');
