@@ -105,6 +105,8 @@ test('مهلت (grace): پس از ends_at تا graceEndsAt همان دسترسی
 
   let ent = await entitlementOf(s.shopId, endsAt);
   assert.equal(ent.subscription.phase, 'active', 'خودِ لحظهٔ پایان هنوز فعال است');
+  ent = await entitlementOf(s.shopId, endsAt + 1);
+  assert.deepEqual([ent.subscription.phase, ent.subscription.active], ['grace', true], 'یک میلی‌ثانیه پس از پایان ⇒ مهلت');
   ent = await entitlementOf(s.shopId, endsAt + DAY);
   assert.deepEqual([ent.subscription.status, ent.subscription.phase, ent.subscription.active], ['active', 'grace', true]);
   assert.equal(ent.source, 'subscription', 'در مهلت دسترسی بسته نمی‌شود');
