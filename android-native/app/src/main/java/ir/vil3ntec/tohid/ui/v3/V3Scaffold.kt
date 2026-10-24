@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -128,6 +129,8 @@ fun V3Scaffold(
   state: V3HeaderState = rememberV3HeaderState(),
   fab: (@Composable BoxScope.(expanded: Boolean) -> Unit)? = null,
   bottomBar: (@Composable () -> Unit)? = null,
+  /** زمینهٔ ویژه به‌جای `bg` (مثلاً `Modifier.frosted(PhoneV3.colors)` در «حساب من»)؛ سربرگ و عنوانِ درشت شفاف می‌شوند */
+  backdrop: Modifier? = null,
   content: @Composable (PaddingValues) -> Unit,
 ) {
   val c = PhoneV3.colors
@@ -161,10 +164,10 @@ fun V3Scaffold(
   val bottomBarHeight = with(density) { barHeight.toDp() }
   val headerActions = actions.take(2) + if (overflow.isEmpty()) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrKit.more) { menuOpen = true })
 
-  Box(modifier.fillMaxSize().background(c.bg)) {
+  Box(if (backdrop != null) modifier.fillMaxSize().then(backdrop) else modifier.fillMaxSize().background(c.bg)) {
     Column(Modifier.fillMaxSize().nestedScroll(connection)) {
-      V3HeaderBar(title, onBack, headerActions, showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f)
-      if (largeTitle) V3LargeTitle(title, subtitle, state)
+      V3HeaderBar(title, onBack, headerActions, showTitle = !largeTitle || state.fraction > 0.65f, divider = if (largeTitle) state.fraction else 1f, transparent = backdrop != null)
+      if (largeTitle) V3LargeTitle(title, subtitle, state, transparent = backdrop != null)
       if (notice != null) Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)) { notice() }
       if (search != null) Box(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 8.dp)) { search() }
       if (chips != null) Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) { chips() }
@@ -225,10 +228,12 @@ internal fun V3HeaderBar(
   showTitle: Boolean,
   /** پیدا شدنِ خطِ مویی زیرِ سربرگ (۰ تا ۱) */
   divider: Float,
+  /** روی `backdrop` ِ صفحه: بی زمینه */
+  transparent: Boolean = false,
 ) {
   val c = PhoneV3.colors
   val alpha by animateFloatAsState(if (showTitle) 1f else 0f, MotionSpec.tweenOf(150), label = "barTitle")
-  Column(Modifier.fillMaxWidth().background(c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
+  Column(Modifier.fillMaxWidth().background(if (transparent) Color.Transparent else c.bg).windowInsetsPadding(WindowInsets.statusBars)) {
     Box(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
       if (onBack != null) Box(Modifier.align(Alignment.CenterStart)) { V3BackButton(onBack) }
       Text(
@@ -255,12 +260,12 @@ internal fun V3HeaderBar(
 
 /** عنوانِ درشتِ جمع‌شونده (و زیرعنوانِ اختیاری) */
 @Composable
-private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState) {
+private fun V3LargeTitle(title: String, subtitle: String?, state: V3HeaderState, transparent: Boolean = false) {
   val c = PhoneV3.colors
   val density = LocalDensity.current
   val full = if (subtitle != null) LARGE_WITH_SUB else LARGE
   val visible = with(density) { (full.toPx() + state.offset).coerceAtLeast(0f).toDp() }
-  Box(Modifier.fillMaxWidth().height(visible).background(c.bg)) {
+  Box(Modifier.fillMaxWidth().height(visible).background(if (transparent) Color.Transparent else c.bg)) {
     Column(
       Modifier
         .fillMaxWidth()

@@ -222,6 +222,8 @@ internal fun DueDateField(value: String, onValueChange: (String) -> Unit) {
     if (Jalali.parseTyped(text) != value.ifBlank { null }) text = if (value.isBlank()) "" else formatDate(value)
   }
   val broken = text.isNotBlank() && Jalali.parseTyped(text) == null
+  //  نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد)
+  val sample = remember { formatDate(plusDays(todayIso(), 7)) }
   Text("سررسید (اختیاری)", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
   OutlinedTextField(
@@ -230,12 +232,12 @@ internal fun DueDateField(value: String, onValueChange: (String) -> Unit) {
       text = latinDigits(raw).filter { c -> c.isDigit() || c == '/' || c == '-' }
       if (text.isBlank()) onValueChange("") else Jalali.parseTyped(text)?.let(onValueChange)
     },
-    placeholder = { Text("۱۴۰۵/۰۸/۰۱") },
+    placeholder = { Text(sample) },
     singleLine = true,
     isError = broken,
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     supportingText = {
-      Text(if (broken) "تاریخ خوانده نشد — مثل ۱۴۰۵/۰۸/۰۱ بنویسید" else "خالی یعنی سررسید ندارد", style = MaterialTheme.typography.labelSmall)
+      Text(if (broken) "تاریخ خوانده نشد — مثل $sample بنویسید" else "خالی یعنی سررسید ندارد", style = MaterialTheme.typography.labelSmall)
     },
     modifier = Modifier.fillMaxWidth(),
   )
