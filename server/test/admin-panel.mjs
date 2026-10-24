@@ -905,7 +905,9 @@ await step('کانالِ آزمایشی: ذخیره در live_config و سابق
   const d = typeof a.detail === 'string' ? JSON.parse(a.detail) : a.detail;
   assert.equal(d.reason, 'آزمونِ پنل');
   assert.equal(d.shops.added, 'shop_panel_1, shop_panel_2');
-  assert.match(await page.textContent('#beta-shops-meta'), /relroot|admin/);
+  //  ⚠️ پیامِ «ذخیره شد» پیش از `loadBeta()` می‌نشیند؛ «آخرین تغییر» پس از GET ِ دوم پر
+  //  می‌شود ⇒ خواندنِ فوری گاهی متنِ کهنه را می‌دید (همان مسابقهٔ زمانی، نه لرزش)
+  await page.waitForFunction(() => /relroot|admin/.test(document.getElementById('beta-shops-meta').textContent), null, { timeout: 10_000 });
 
   await page.fill('#beta-shops', 'bad id!');
   await page.click('#btn-beta-save');
@@ -915,6 +917,10 @@ await step('کانالِ آزمایشی: ذخیره در live_config و سابق
 
 await step('کانالِ آزمایشی: دکمهٔ صفحهٔ دکان همان دکان را می‌افزاید', async () => {
   await openTab('shops');
+  //  ⚠️ صفحهٔ دکانِ گامِ پیش هنوز در DOM است. بی این دو خط، waitForSelector همان دکمهٔ
+  //  کهنه را پیش از رسیدنِ پاسخِ GET ِ دکان می‌گرفت؛ کلیک روی کهنه می‌نشست و رندرِ تازه
+  //  دکمهٔ «به کانالِ آزمایشی» را جایش می‌گذاشت ⇒ انتظار تا ۱۰ ثانیه و قرمز (CIِ #381).
+  await page.evaluate(() => { document.getElementById('shop-detail').classList.add('hidden'); document.getElementById('btn-shop-beta')?.remove(); });
   await page.click('#shops-body tr:first-child button');
   await page.waitForSelector('#shop-detail:not(.hidden) #btn-shop-beta', { timeout: 10_000 });
   const id = (await page.textContent('#shop-id')).trim();
