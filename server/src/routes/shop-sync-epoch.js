@@ -25,6 +25,7 @@ const { rateLimit } = require('../middleware/ratelimit');
 const { notFound, forbidden, badRequest } = require('../middleware/errors');
 const { requireUser, requireShop } = require('../middleware/auth');
 const { resolveToken, tokenOf } = require('../lib/sync-v1-auth');
+const { SHOP } = require('../lib/tenancy');
 const epoch = require('../lib/sync-epoch');
 
 const router = express.Router();
@@ -35,7 +36,8 @@ router.use(async (req, res, next) => {
   try {
     if (!config.syncEpoch.enabled) return next(notFound());
     const ctx = await resolveToken(tokenOf(req));
-    if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) {
+    //  حسابِ دکان: `app` و `accountKind` هر دو همان نامِ بخشِ دکان (`tenancy.SHOP.app`)
+    if (!ctx || ctx.app !== SHOP.app || ctx.accountKind !== SHOP.app || !ctx.accountId) {
       return next(forbidden('برای این حساب دکانی ثبت نشده است', (ctx && ctx.missing) || 'no_account'));
     }
     req.syncAccount = { app: ctx.app, accountKind: ctx.accountKind, accountId: ctx.accountId };

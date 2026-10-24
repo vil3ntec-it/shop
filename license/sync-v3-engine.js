@@ -894,12 +894,8 @@
     var now = this.now();
     var patch = { cursor: cursor, lastPullAt: now, lastOkAt: now, attempt: 0, lastError: '', lastErrorAt: 0,
       pullBytes: Math.min(MAX_BYTES, budget * 2) };
-    /*
-     *  §۹.۵: «دورانِ بازیابیِ» سرور (`server/src/lib/sync-epoch.js`) عوض شده و این دستگاه پس از
-     *  پایه چیزی دیده ⇒ «در انتظار»؛ این صفحه (از cursor ِ کهنه) نشانده نمی‌شود. وب دفترچهٔ
-     *  opهای فرستاده ندارد: opهای گم‌شدهٔ خودش دوباره نمی‌روند، فقط دو بار نشاندن بسته است.
-     */
-    //  وب دفترچهٔ opهای فرستاده ندارد: «نگه‌دارِ محلی» در `rebuild` ردیف‌های تازهٔ همین دستگاه را نگه می‌دارد
+    //  §۹.۵: دورانِ سرور (`lib/sync-epoch.js`) عوض شده و این دستگاه پس از پایه چیزی دیده ⇒ «در انتظار»؛
+    //  این صفحه (از cursor ِ کهنه) نشانده نمی‌شود — `rebuild` («نگه‌دارِ محلی»؛ وب دفترچهٔ op ندارد)
     var ep = r.body.epoch;
     if (ep && typeof ep.id === 'string' && ep.id && Number.isFinite(Number(ep.base)) && Number.isFinite(Number(ep.head))) {
       var known = this.meta.epoch || '';
@@ -1037,15 +1033,9 @@
   var INCOMPLETE = 'سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند.';
 
   /**
-   *  §۹.۵ — «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): دفتر = Snapshot + ردیف‌هایی
-   *  که فقط این‌جا هستند (جز آنچه سرور حذف‌شده می‌داند — `POST /deleted`)؛ سایه = Snapshot ⇒
-   *  تنهاها «درج» می‌روند. پیش‌تر دفتر همان Snapshot می‌شد و فروشِ پس از پشتیبانِ همین دستگاه
-   *  پاک می‌شد.
-   *  ⛔ فقط با صفِ خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه، زیرِ همان قفل): تغییرِ ثبت‌نشده زیرِ
-   *     Snapshot نمی‌رود.
-   *  ⛔ اول سایه و cursor، بعد دفتر: نوشتنِ دفتر شکست ⇒ سایه و cursor ِ پیشین برمی‌گردند.
-   *  Snapshot ِ ناقص ⇒ دورِ بعد، با خطای دیدنی.
-   *  @returns null یا همان قدمِ شکست
+   *  §۹.۵ «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): Snapshot + تنهاهای این‌جا (جز حذف‌شده‌های
+   *  سرور، `POST /deleted`)؛ سایه = Snapshot ⇒ تنهاها «درج». فقط با صفِ خالی و تفاضلِ هیچ؛ اول سایه و cursor،
+   *  بعد دفتر (شکست ⇒ پیشین برمی‌گردد)؛ Snapshot ِ ناقص ⇒ دورِ بعد با خطای دیدنی. @returns null یا قدمِ شکست
    */
   Engine.prototype.rebuild = async function () {
     var r = await this.call('GET', '/snapshot');

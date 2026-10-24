@@ -573,105 +573,36 @@
     return out;
   }
 
-  /* ==========================================================
-     §۹.۵ — «نگه‌دارِ محلی» پس از بازیابیِ سرور از پشتیبان
-     ----------------------------------------------------------
-     قرینهٔ `RestoreMerge` در `android-native/.../sync/v1/V1Restore.kt`: دفترِ تازه = ردیف‌های
-     Snapshot (جز بایگانی‌شده‌ها) + ردیف‌هایی که **فقط این‌جا** هستند (جز آنچه سرور حذف‌شده
-     می‌داند)؛ سایه = همان بی ردیف‌های تنها ⇒ تفاضلِ بعدی فقط «درج»ِ همان‌هاست. پیش‌تر دفتر
-     همان Snapshot می‌شد و فروشِ پس از پشتیبانِ همین دستگاه (یا دستگاهی که برنگشت) پاک می‌شد.
-     ========================================================== */
-  function snapshotRows(tables, key) {
-    var rows = Array.isArray(tables[key]) ? tables[key] : [];
-    var out = [];
-    for (var i = 0; i < rows.length; i++) {
-      var r = rows[i];
-      if (!isPlainObject(r) || r.id == null) continue;
-      out.push(Object.assign({}, isPlainObject(r.data) ? r.data : {}, { id: String(r.id) }));
-    }
-    return out;
-  }
-
-  function snapshotNames(tables, key) {
-    if (!Array.isArray(tables[key])) return null;
-    var out = [];
-    for (var i = 0; i < tables[key].length; i++) {
-      var nm = listName(isPlainObject(tables[key][i]) ? tables[key][i].data : null);
-      if (nm && out.indexOf(nm) === -1) out.push(nm);
-    }
-    return out;
-  }
-
-  function idSet(list) {
-    var out = Object.create(null);
-    (list || []).forEach(function (x) { out[String(x)] = true; });
-    return out;
-  }
-
-  /**
-   *  ردیف‌های دفترِ محلی که Snapshot ندارد (بایگانی‌شده‌ها نه) — پیش از ساختنِ دوباره از سرور
-   *  پرسیده می‌شود کدام حذف‌شده است (`POST /api/shop/sync-epoch/deleted`، v3: `/api/sync/v3/deleted`).
-   *  @param archived {مجموعه: [شناسه…]} اختیاری
-   *  @returns [{table, row_id}]
-   */
-  function restoreLocalOnly(snapshot, local, archived) {
-    var tables = (snapshot && snapshot.tables) || {};
-    var out = [];
-    COLLECTIONS.forEach(function (key) {
-      var server = idSet(snapshotRows(tables, key).map(function (r) { return r.id; }));
-      var skip = idSet(archived && archived[key]);
-      (Array.isArray(local && local[key]) ? local[key] : []).forEach(function (r) {
-        if (!isPlainObject(r) || r.id == null) return;
-        var id = String(r.id);
-        if (!server[id] && !skip[id]) out.push({ table: key, row_id: id });
-      });
-    });
-    LIST_COLLECTIONS.forEach(function (key) {
-      var server = snapshotNames(tables, key) || [];
-      listRows(local && local[key]).forEach(function (r) {
-        if (server.indexOf(r.name) === -1) out.push({ table: key, row_id: r.id });
-      });
-    });
-    return out;
-  }
-
-  /**
-   *  @param gone [{table, row_id}] — ردیف‌های تنهایی که سرور حذف‌شده می‌داند (درجِ دوباره زنده‌شان می‌کرد)
-   *  @returns {ledger, shadow}
-   */
+  /* §۹.۵ «نگه‌دارِ محلی» پس از بازیابی — قرینهٔ `RestoreMerge` ِ `V1Restore.kt`: دفتر = Snapshot (جز بایگانی) + تنهاهای این‌جا (جز حذف‌شده‌های سرور)؛ سایه = بی تنهاها ⇒ تفاضل = «درج»ِ آن‌ها */
+  function idSet(list) { var o = Object.create(null); (list || []).forEach(function (x) { o[String(x)] = true; }); return o; }
+  function restoreLocalOnly(snapshot, local, archived) { return restoreMerge(snapshot, local, [], archived).alone; } // سرور می‌سنجد کدام حذف‌شده است
   function restoreMerge(snapshot, local, gone, archived) {
-    var tables = (snapshot && snapshot.tables) || {};
-    var dead = Object.create(null);
-    (gone || []).forEach(function (g) { if (g && g.table) dead[g.table + ' ' + g.row_id] = true; });
-    var ledger = cloneLedger(local || {});
-    var shadow = {};
+    var t = (snapshot && snapshot.tables) || {};
+    var dead = idSet((gone || []).map(function (g) { return g.table + '\u0000' + g.row_id; }));
+    var out = { ledger: cloneLedger(local || {}), shadow: {}, alone: [] };
+    var lone = function (key, id) { out.alone.push({ table: key, row_id: id }); return !dead[key + '\u0000' + id]; };
     COLLECTIONS.forEach(function (key) {
       var skip = idSet(archived && archived[key]);
-      var server = snapshotRows(tables, key).filter(function (r) { return !skip[r.id]; });
+      var server = (Array.isArray(t[key]) ? t[key] : []).filter(function (r) { return isPlainObject(r) && r.id != null && !skip[r.id]; })
+        .map(function (r) { return Object.assign({}, isPlainObject(r.data) ? r.data : {}, { id: String(r.id) }); });
       var ids = idSet(server.map(function (r) { return r.id; }));
       var mine = (Array.isArray(local && local[key]) ? local[key] : []).filter(function (r) {
-        if (!isPlainObject(r) || r.id == null) return false;
-        var id = String(r.id);
-        return !ids[id] && !skip[id] && !dead[key + ' ' + id];
+        return isPlainObject(r) && r.id != null && !ids[r.id] && !skip[r.id] && lone(key, String(r.id));
       });
-      ledger[key] = server.concat(mine.map(function (r) { return JSON.parse(JSON.stringify(r)); }));
-      shadow[key] = JSON.parse(JSON.stringify(server));
+      out.ledger[key] = server.concat(JSON.parse(JSON.stringify(mine)));
+      out.shadow[key] = JSON.parse(JSON.stringify(server));
     });
     LIST_COLLECTIONS.forEach(function (key) {
-      var server = snapshotNames(tables, key);
-      var hadKey = Array.isArray(local && local[key]);
-      if (!server && !hadKey) { delete ledger[key]; return; }
-      var srv = server || [];
-      var mine = listRows(local && local[key]).map(function (r) { return r.name; });
-      var keep = mine.filter(function (n) { return srv.indexOf(n) !== -1; });
-      var names = keep.concat(srv.filter(function (n) { return keep.indexOf(n) === -1; }))
-        .concat(mine.filter(function (n) { return srv.indexOf(n) === -1 && !dead[key + ' ' + listRowId(n)]; }));
-      ledger[key] = names;
-      shadow[key] = names.filter(function (n) { return srv.indexOf(n) !== -1; });
+      if (!Array.isArray(t[key]) && !Array.isArray(local && local[key])) { delete out.ledger[key]; return; }
+      var srv = listRows((t[key] || []).map(function (r) { return isPlainObject(r) ? r.data : null; })).map(function (r) { return r.name; });
+      var names = listRows(local && local[key]).map(function (r) { return r.name; });
+      var keep = names.filter(function (n) { return srv.indexOf(n) !== -1; });
+      var mine = names.filter(function (n) { return srv.indexOf(n) === -1 && lone(key, listRowId(n)); });
+      out.ledger[key] = keep.concat(srv.filter(function (n) { return keep.indexOf(n) === -1; }), mine);
+      out.shadow[key] = out.ledger[key].filter(function (n) { return srv.indexOf(n) !== -1; });
     });
-    return { ledger: ledger, shadow: shadow };
+    return out;
   }
-
   /** فقط مجموعه‌های همگام‌شدنی — سایه چیزِ دیگری لازم ندارد. */
   function shadowOf(data) {
     var out = {};
