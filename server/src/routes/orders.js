@@ -49,6 +49,13 @@ const needWrite = wrap(async (req, res, next) => {
 
 router.get('/config', wrap(async (req, res) => {
   const st = await orders.stateOf(req.shopId);
+  const ledger = require('../lib/order-ledger');
+  //  برنامه‌ای که «فروشِ تحویل» دارد (`caps=saleOnHandover`) ⇒ کفِ تحویلِ این دکان (یک بار، همین
+  //  لحظه)؛ برنامهٔ کهنه یا پنل ⇒ فقط خواندن (تا هیچ برنامه‌ای کف نگذاشته: null ⇒ هیچ فروشی)
+  const caps = String(req.query.caps || '').split(',').map((s) => s.trim());
+  const handoverSince = caps.includes(ledger.SALE_CAP)
+    ? await ledger.claimFloor(req.shopId, req.user.id)
+    : await ledger.sinceOf(req.shopId);
   res.json({
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
@@ -56,9 +63,15 @@ router.get('/config', wrap(async (req, res) => {
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
-    permissions: Object.fromEntries(
-      ['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])
-    ),
+    //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
+    //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
+    saleOnHandover: true,
+    handoverSince,
+    permissions: {
+      ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
+      //  اجازهٔ کلیِ نقش و اشتراک (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
+      ...(await ledger.capsFor(req.shopId, req.role)),
+    },
   });
 }));
 
@@ -79,6 +92,17 @@ router.get('/', needFlag, wrap(async (req, res) => {
  */
 router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
   res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
+}));
+
+/**
+ * سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست (`lib/order-ledger.js`) —
+ * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد. فقط‌خواندنی؛
+ * همان کسی که سفارش را تحویل می‌دهد (`orders.manage`). پیش از `/:id`.
+ */
+router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
+  res.json(await require('../lib/order-ledger').handoverPending(req.shopId, {
+    since: req.query.since, limit: req.query.limit, after: req.query.after, orderId: req.query.orderId,
+  }, actorOf(req)));
 }));
 
 router.get('/:id', needFlag, wrap(async (req, res) => {

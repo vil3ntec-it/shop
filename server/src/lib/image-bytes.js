@@ -213,6 +213,29 @@ function stripMetadata(buf) {
   throw badRequest('فقط عکسِ JPG، PNG یا WebP', 'image_type');
 }
 
+/**
+ * JPEG ِ بی فراداده + فقط برچسبِ «چرخش» (EXIF 0x0112): لوگوی عکس‌گرفته‌شده پس از
+ * `stripMetadata` کج نمی‌شود و هیچ چیزِ دیگری (جا، دستگاه، زمان) برنمی‌گردد. یک APP1 ِ
+ * کوچک (۳۴ بایت) پس از SOI. چرخشِ ۱ یا ناشناخته، یا PNG/WebP ⇒ همان بایت‌ها.
+ */
+function withOrientation(buf, orientation) {
+  if (sniff(buf) !== 'image/jpeg' || !(orientation >= 2 && orientation <= 8)) return buf;
+  const tiff = Buffer.alloc(26);
+  tiff.write('MM', 0, 'latin1');
+  tiff.writeUInt16BE(42, 2);
+  tiff.writeUInt32BE(8, 4);           // IFD0 درست پس از سرآیند
+  tiff.writeUInt16BE(1, 8);           // یک برچسب
+  tiff.writeUInt16BE(0x0112, 10);     // Orientation
+  tiff.writeUInt16BE(3, 12);          // SHORT
+  tiff.writeUInt32BE(1, 14);
+  tiff.writeUInt16BE(orientation, 18);
+  tiff.writeUInt32BE(0, 22);          // IFD ِ بعدی ندارد
+  const body = Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiff]);
+  const head = Buffer.from([0xff, 0xe1, 0, 0]);
+  head.writeUInt16BE(body.length + 2, 2);
+  return Buffer.concat([buf.subarray(0, 2), head, body, buf.subarray(2)]);
+}
+
 const EXT_MIME = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
 /** پسوندِ نامِ فایل با محتوا جور است؟ (نامِ بی پسوند ⇒ بله) */
 function extensionMatches(name, mime) {
@@ -221,4 +244,4 @@ function extensionMatches(name, mime) {
   return EXT_MIME[m[1].toLowerCase()] === mime;
 }
 
-module.exports = { inspect, stripMetadata, extensionMatches, crc32, MAX_SIDE, MAX_PIXELS };
+module.exports = { inspect, stripMetadata, withOrientation, extensionMatches, crc32, MAX_SIDE, MAX_PIXELS };

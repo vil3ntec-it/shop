@@ -197,7 +197,7 @@
   const st = {
     known: false, enabled: false, cfg: null, cfgAt: 0, cfgBusy: null,
     counts: {}, rev: null, tab: 'new', items: [], cursor: null, loading: false, err: '', listSeq: 0,
-    open: null, act: null, formKey: '', timer: null, busy: false,
+    open: null, act: null, formKey: '', timer: null, busy: false, detailSeq: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -386,8 +386,7 @@
   function onModalClick(e) {
     const m = e.currentTarget;
     if (e.target === m || e.target.closest('[data-ord-close]')) {
-      closeModal(m);
-      if (m.id === 'ord-detail-modal') st.open = null;
+      if (m.id === 'ord-detail-modal') closeDetail(m); else closeModal(m);
     }
   }
 
@@ -573,20 +572,35 @@
 
   // ── جزئیات و خطِ زمانی ───────────────────────────────────────────
 
+  /**
+   *  فقط تازه‌ترین پرسش جای پنجره می‌نشیند: پاسخِ دیرِ سفارشی که بسته شد یا جایش
+   *  سفارشِ دیگری باز شد، نه آن را دوباره «باز» می‌کند و نه دکمه‌هایش را روی
+   *  سفارشِ تازه می‌گذارد — وگرنه گذار روی سفارشِ دیگری می‌نشست.
+   */
   async function openDetail(id, quiet) {
     const m = $('ord-detail-modal');
     if (!m) return;
+    const seq = ++st.detailSeq;
     if (!quiet) {
+      st.open = null;
       $('ord-detail-body').innerHTML = '<p class="ord-empty">در حالِ آوردن…</p>';
       m.classList.add('open');
     }
+    const current = () => seq === st.detailSeq && m.classList.contains('open');
     try {
       const r = await call('/' + encodeURIComponent(id));
+      if (!current()) return;
       st.open = r.order;
       paintDetail();
     } catch (e) {
-      if (!quiet) $('ord-detail-body').innerHTML = `<p class="ord-empty">${esc((e && e.message) || 'سفارش نیامد.')}</p>`;
+      if (!quiet && current()) $('ord-detail-body').innerHTML = `<p class="ord-empty">${esc((e && e.message) || 'سفارش نیامد.')}</p>`;
     }
+  }
+
+  function closeDetail(m) {
+    closeModal(m);
+    st.open = null;
+    st.detailSeq++;
   }
 
   function actorName(e) {
@@ -717,6 +731,7 @@
     try {
       const r = await call('/' + encodeURIComponent(o.id) + '/transition', { method: 'POST', body: { ...body, from: o.status } });
       st.open = r.order;
+      st.detailSeq++;   // تازه‌سازیِ در راه از پیش از این گذار است
       closeModal($('ord-act-modal'));
       st.act = null;
       paintDetail();
@@ -880,7 +895,7 @@
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     const open = [...document.querySelectorAll('.ord-modal.open')].pop();
-    if (open) { closeModal(open); if (open.id === 'ord-detail-modal') st.open = null; }
+    if (open) { if (open.id === 'ord-detail-modal') closeDetail(open); else closeModal(open); }
   });
 
   /**

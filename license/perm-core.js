@@ -78,6 +78,11 @@
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
       edit: 'full', approvable: false, caps: [], display: true,
     },
+    //  HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286
+    'drawer.open': {
+      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      edit: 'restrict', approvable: true, caps: [], display: false,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

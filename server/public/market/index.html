@@ -4,141 +4,234 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#E9ECF3" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0A0C11" media="(prefers-color-scheme: dark)">
-<meta name="description" content="بازارچه: دکان‌های نزدیک و کالاهایشان را ببینید، آنلاین سفارش بدهید و سفارش را دنبال کنید.">
-<title>بازارچه</title>
+<meta name="theme-color" content="#F3F6FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)">
+<meta name="description" content="VILL3N: کالاهای دکان‌های نزدیک را ببینید، آنلاین سفارش بدهید و سفارش را دنبال کنید.">
+<title data-t="title.market">VILL3N — بازارچه</title>
 <link rel="manifest" href="/market/manifest.webmanifest">
 <link rel="icon" href="/kit/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/kit/icon-192.png">
 <link rel="preload" href="/kit/fonts/vazirmatn-regular.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/kit/kit.css">
+<link rel="stylesheet" href="/market/market.css">
+<script src="/kit/boot.js"></script>
 <script src="/kit/kit.js" defer></script>
 <script src="/market/market.js" defer></script>
 </head>
 <body>
-<a class="skip" href="#main">پرش به محتوا</a>
-<header class="appbar">
-  <div class="wrap appbar-row">
-    <a class="brand" href="#/">
-      <span class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 8h13l-1 12.5h-11L5.5 8z M9 8V7a3 3 0 0 1 6 0v1"/></svg></span>
-      بازارچه
-    </a>
-    <span class="grow"></span>
-    <a class="btn btn-soft btn-sm" href="#/orders" id="nav-orders">سفارش‌های من</a>
+<a class="skip" href="#main" data-t="skip">پرش به محتوا</a>
+<div id="surface" class="surface">
+<div class="shell">
+  <aside class="side" data-ta="a.sections" aria-label="بخش‌ها">
+    <a class="logo" href="#/" data-ta="a.logo" aria-label="VILL3N، خانه"><svg viewBox="0 0 40 40" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="v1" d="M7 9l11.5 22"/><path class="v2" d="M18.5 31L33 9"/></svg>VILL3N</a>
+    <nav class="nav" data-ta="a.sections" aria-label="بخش‌ها">
+      <a data-nav="home" data-i="home" href="#/"><span class="nav-label" data-t="nav.home">خانه</span></a>
+      <a data-nav="shops" data-i="store" href="#/shops"><span class="nav-label" data-t="nav.shops">دکان‌ها</span></a>
+      <a data-nav="orders" data-i="receipt" href="#/orders"><span class="nav-label" data-t="nav.orders">سفارش‌ها</span></a>
+      <button data-act="settings" data-i="gear" type="button"><span class="nav-label" data-t="nav.settings">تنظیمات</span></button>
+    </nav>
+    <div class="side-foot">
+      <section id="side-carts-sec" class="side-carts" hidden aria-labelledby="side-carts-title">
+        <h2 id="side-carts-title" class="label" data-t="carts.device">سبدهای این دستگاه</h2>
+        <ul id="side-carts"></ul>
+      </section>
+      <p class="side-note" data-t="side.note">پرداخت نقد هنگامِ تحویل؛ دیدنِ دکان و کالا حساب نمی‌خواهد.</p>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <header class="topbar">
+      <div class="wrap topbar-row">
+        <a class="logo" href="#/" data-ta="a.logo" aria-label="VILL3N، خانه"><svg viewBox="0 0 40 40" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="v1" d="M7 9l11.5 22"/><path class="v2" d="M18.5 31L33 9"/></svg>VILL3N</a>
+        <button id="find" class="search-trigger" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg><span data-t="find.ph">جست‌وجوی دکان یا کالا…</span></button>
+        <span class="grow"></span>
+        <button class="icon-btn" type="button" data-act="lang" data-ta="set.lang" aria-label="زبان"></button>
+        <button class="icon-btn" type="button" data-act="theme" data-ta="a.theme" aria-label="تمِ تیره"></button>
+        <a id="account" class="account" href="#/orders"></a>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- خانه: اول کالا، بعد دکان‌های پیشنهادی -->
+      <section id="view-home" hidden>
+        <div class="wrap">
+          <div class="hero">
+            <div class="hero-body">
+              <h1><em data-t="hero.a">خریدِ آنلاین</em> <span data-t="hero.b">از دکان‌های نزدیک</span></h1>
+              <p data-t="hero.sub">کالا را ببینید، سفارش بدهید و تا درِ خانه دنبالش کنید.</p>
+              <form id="search-form" class="search" role="search">
+                <label for="q" class="sr-only" data-t="find.l">جست‌وجوی دکان یا کالا</label>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
+                <input id="q" type="search" data-tp="find.ph" placeholder="جست‌وجوی دکان یا کالا…" autocomplete="off" enterkeyhint="search" maxlength="60">
+                <button id="q-clear" class="clear btn btn-icon btn-ghost" type="button" data-ta="find.clear" aria-label="پاک کردنِ جست‌وجو" hidden></button>
+              </form>
+              <p class="facts"><span data-i="cash" data-t="fact.cod">نقد هنگامِ تحویل</span><span data-i="clock" data-t="fact.track">پیگیریِ سفارش تا رسیدن</span><span data-i="shield" data-t="fact.noacc">خرید بی ساختنِ حساب</span></p>
+            </div>
+            <svg class="hero-art" viewBox="0 0 300 220" aria-hidden="true" focusable="false">
+              <rect x="30" y="26" width="200" height="164" rx="26" fill="#FFFFFF" fill-opacity=".10" stroke="#FFFFFF" stroke-opacity=".30" stroke-width="1.5"/>
+              <rect x="58" y="96" width="144" height="76" rx="6" fill="#FFFFFF" fill-opacity=".94"/>
+              <path d="M52 96l12-34h132l12 34z" fill="#A7F3E4"/>
+              <path d="M52 96c0 8 7 13 15 13s14-5 14-13c0 8 7 13 15 13s14-5 14-13c0 8 7 13 15 13s14-5 14-13c0 8 7 13 15 13s14-5 14-13c0 8 7 13 15 13s14-5 14-13" fill="#FFFFFF"/>
+              <path d="M83 62l-6 34 M112 62l-3 34 M148 62l3 34 M177 62l6 34" stroke="#108B81" stroke-opacity=".45" stroke-width="2"/>
+              <rect x="76" y="124" width="38" height="48" rx="5" fill="#108B81"/>
+              <rect x="128" y="122" width="58" height="30" rx="5" fill="#CCEFEA"/>
+              <circle cx="107" cy="150" r="2.5" fill="#FFFFFF"/>
+              <path d="M222 118h52l-6 66h-40z" fill="#FFFFFF"/>
+              <path d="M236 118v-6a12 12 0 0 1 24 0v6" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+              <path d="M235 142h26" stroke="#108B81" stroke-width="4" stroke-linecap="round"/>
+              <path d="M268 54c0 15-19 32-19 32s-19-17-19-32a19 19 0 0 1 38 0z" fill="#A7F3E4"/>
+              <circle cx="249" cy="54" r="7" fill="#08665F"/>
+              <circle cx="22" cy="198" r="5" fill="#A7F3E4" fill-opacity=".8"/>
+              <circle cx="286" cy="200" r="3" fill="#FFFFFF" fill-opacity=".7"/>
+              <circle cx="16" cy="40" r="3" fill="#FFFFFF" fill-opacity=".6"/>
+            </svg>
+          </div>
+
+          <div class="cat-row section">
+            <div id="cats" class="chips" role="group" data-ta="a.shopcat" aria-label="دستهٔ دکان"></div>
+            <button id="cats-all" class="chip all-cats" type="button" aria-expanded="false" aria-controls="cats" data-ta="cats.all" aria-label="همه دسته‌بندی‌ها"><span class="ico k5" data-i="grid"></span><span data-t="cats.all">همه دسته‌بندی‌ها</span></button>
+          </div>
+          <div id="home-note" class="note section" hidden role="status"></div>
+
+          <!-- نتیجهٔ جست‌وجو -->
+          <section id="results" class="section" hidden aria-live="polite">
+            <div id="r-shops-sec" hidden>
+              <div class="section-head"><h2 data-t="nav.shops">دکان‌ها</h2></div>
+              <ul id="r-shops" class="shop-grid"></ul>
+            </div>
+            <div id="r-products-sec" class="section" hidden>
+              <div class="section-head"><h2 data-t="r.products">کالاها</h2><p data-t="r.products.p">قیمت و موجودیِ نهایی در صفحهٔ دکان</p></div>
+              <ul id="r-products" class="grid"></ul>
+            </div>
+            <div id="r-empty" class="empty" hidden>
+              <div class="art" data-i="search"></div>
+              <h2 data-t="nohit">چیزی پیدا نشد</h2>
+              <p data-t="nohit.market">نامِ دیگری را امتحان کنید یا از دسته‌ها دکانی را باز کنید.</p>
+              <button id="r-clear" class="btn btn-ghost" type="button" data-t="show.all">نمایشِ همه</button>
+            </div>
+          </section>
+
+          <!-- مثلِ مرجع: اول دکان‌ها (هر دکان یک کارت)، بعد ردیف‌های کالا -->
+          <div id="feed">
+            <section id="sug-sec" class="section" aria-labelledby="sug-title">
+              <div class="section-head">
+                <h2 id="sug-title" data-i="spark" data-t="sug.title">دکان‌های پیشنهادی</h2>
+                <a id="sug-more" class="link" href="#/shops"><span data-t="see.all">مشاهدهٔ همه</span><span class="arrow" data-i="back"></span></a>
+              </div>
+              <ul id="sug" class="shop-grid" aria-busy="true"></ul>
+              <div id="sug-empty" class="empty" hidden>
+                <div class="art" data-i="store"></div>
+                <h2 id="sug-empty-title" data-t="shops.none.cat">هنوز دکانی در این دسته نیست</h2>
+                <p data-t="try.cat">دستهٔ دیگری را ببینید.</p>
+              </div>
+            </section>
+            <section id="pop-sec" class="section" hidden aria-labelledby="pop-title">
+              <div class="section-head"><h2 id="pop-title" data-i="flame" data-t="pop.title">پرفروش‌های بازارچه</h2><p id="pop-why"></p></div>
+              <ul id="pop" class="rail products"></ul>
+            </section>
+            <section id="deal-sec" class="section" hidden aria-labelledby="deal-title">
+              <div class="section-head"><h2 id="deal-title" data-i="tag" data-t="deal.title">ارزان‌تر از قیمتِ دکان</h2><p data-t="deal.why">قیمتِ آنلاینِ خودِ دکان کمتر است</p></div>
+              <ul id="deal" class="rail products"></ul>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <!-- همهٔ دکان‌ها -->
+      <section id="view-shops" hidden>
+        <div class="wrap section">
+          <div class="section-head">
+            <h1 id="shops-title" data-t="shops.all">همهٔ دکان‌ها</h1>
+            <button id="locate2" class="btn btn-ghost btn-sm" type="button" data-i="locate" data-t="near.me">نزدیکِ من</button>
+          </div>
+          <div id="shop-cats" class="chips" role="group" data-ta="a.shopcat" aria-label="دستهٔ دکان"></div>
+          <ul id="shops" class="shop-grid section" aria-busy="true"></ul>
+          <button id="more" class="btn btn-ghost btn-block section" type="button" hidden data-t="shops.more">دکان‌های بیشتر</button>
+          <div id="shops-empty" class="empty" hidden>
+            <div class="art" data-i="store"></div>
+            <h2 id="shops-empty-title" data-t="shops.none.cat">هنوز دکانی در این دسته نیست</h2>
+            <p data-t="try.cat">دستهٔ دیگری را ببینید.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- سفارش‌های من (با شمارهٔ تأییدشده، از هر دستگاه) -->
+      <section id="view-orders" hidden>
+        <div class="wrap section stack">
+          <h1 data-t="my.orders">سفارش‌های من</h1>
+          <form id="verify-card" class="card card-lg stack" hidden novalidate>
+            <div>
+              <h2 data-t="v.title">شماره‌تان را تأیید کنید</h2>
+              <p class="muted" data-t="v.market">با یک کدِ یک‌بارمصرف، سفارش‌هایتان را از هر دستگاهی می‌بینید. دیدنِ دکان‌ها و سبد حساب نمی‌خواهد.</p>
+            </div>
+            <label class="field"><span data-t="phone.l">شمارهٔ موبایل</span><input id="v-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx"></label>
+            <button id="v-send" class="btn btn-block" type="button" data-t="v.send">فرستادنِ کد</button>
+            <div id="v-code-row" hidden class="stack">
+              <label class="field"><span data-t="v.code">کدِ تأیید</span><input id="v-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8"></label>
+              <button id="v-check" class="btn btn-block" type="submit" data-t="v.check">تأیید</button>
+            </div>
+            <div id="v-msg" class="note" hidden role="status"></div>
+          </form>
+          <div id="who" class="spread card" hidden>
+            <span><span class="muted" data-t="who.phone">شماره:</span> <b id="who-phone" class="ltr"></b></span>
+            <button id="who-out" class="btn btn-ghost btn-sm" type="button" data-t="who.other">شمارهٔ دیگر</button>
+          </div>
+          <div id="o-msg" class="note" hidden role="status"></div>
+          <ul id="orders" class="olist"></ul>
+          <div id="orders-empty" class="empty" hidden>
+            <div class="art" data-i="receipt"></div>
+            <h2 data-t="orders.none">هنوز سفارشی نیست</h2>
+            <p data-t="orders.none.p">از یکی از دکان‌ها خرید کنید؛ سفارش این‌جا دیده می‌شود.</p>
+            <a class="btn" href="#/" data-t="see.products">دیدنِ کالاها</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- بازارچه خاموش است -->
+      <section id="view-off" hidden>
+        <div class="wrap empty section">
+          <div class="art" data-i="store"></div>
+          <h1 data-t="off.title">بازارچه هنوز باز نیست</h1>
+          <p data-t="off.text">اگر نشانیِ ویترینِ دکانی را دارید، از همان نشانی خرید کنید.</p>
+        </div>
+      </section>
+
+      <p id="boot" class="wrap section muted" role="status" data-t="loading">در حالِ باز کردن…</p>
+    </main>
   </div>
-</header>
+</div>
+<nav class="bnav" data-ta="a.sections" aria-label="بخش‌ها">
+  <a data-nav="home" data-i="home" href="#/"><span data-t="nav.home">خانه</span></a>
+  <a data-nav="shops" data-i="store" href="#/shops"><span data-t="nav.shops">دکان‌ها</span></a>
+  <a data-nav="orders" data-i="receipt" href="#/orders"><span data-t="nav.orders">سفارش‌ها</span></a>
+  <button data-act="settings" data-i="gear" type="button"><span data-t="nav.settings">تنظیمات</span></button>
+</nav>
+</div>
+<button id="surface-cap" class="surface-cap" type="button" data-ta="a.capm" aria-label="بستنِ سبدها و بازگشت" hidden></button>
 
-<main id="main">
-  <!-- خانه: یک جست‌وجو، یک ردیفِ دسته، کارتِ دکان‌ها -->
-  <section id="view-home" hidden>
-    <div class="hero">
-      <div class="wrap">
-        <h1>خریدِ آنلاین از دکان‌های نزدیک</h1>
-        <p>کالا را ببینید، سفارش بدهید و تا رسیدن دنبالش کنید.</p>
-        <form id="search-form" class="search" role="search">
-          <label for="q" class="sr-only">جست‌وجوی دکان یا کالا</label>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
-          <input id="q" type="search" placeholder="جست‌وجوی دکان یا کالا…" autocomplete="off" enterkeyhint="search" maxlength="60">
-          <button id="q-clear" class="clear btn btn-icon btn-ghost" type="button" aria-label="پاک کردنِ جست‌وجو" hidden></button>
-        </form>
-        <p class="facts" id="facts"><span data-i="bag">دیدنِ دکان و کالا بی حساب</span><span data-i="cash">پرداختِ نقد هنگامِ تحویل</span><span data-i="clock">پیگیریِ سفارش تا رسیدن</span></p>
-      </div>
-    </div>
-    <div class="wrap">
-      <div id="cats" class="chips section" role="group" aria-label="دستهٔ دکان"></div>
-      <div id="home-note" class="note section" hidden role="status"></div>
+<!-- نوارِ سبد روی پایهٔ تیره (r3): سبدهای همین دستگاه، هر دکان جدا -->
+<button id="cart-bar" class="cartbar" type="button" hidden aria-haspopup="dialog" aria-controls="cart-sheet">
+  <span class="ttl" data-t="cart">سبد</span>
+  <span id="bar-thumbs" class="thumbs" aria-hidden="true"></span>
+  <span id="bar-more" class="more" dir="ltr" aria-hidden="true" hidden></span>
+  <span class="sum"><small data-t="sum">جمع</small><b id="bar-total" class="num"></b></span>
+  <span id="open-cart" class="count" aria-hidden="true"></span>
+  <span id="bar-label" class="sr-only"></span>
+</button>
 
-      <section id="carts-sec" class="section" hidden aria-labelledby="carts-title">
-        <div class="section-head"><h2 id="carts-title">ادامهٔ خرید</h2><p>سبدهای همین دستگاه</p></div>
-        <ul id="carts" class="rail"></ul>
-      </section>
-
-      <!-- نتیجهٔ جست‌وجو -->
-      <section id="results" class="section" hidden aria-live="polite">
-        <div id="r-shops-sec" hidden>
-          <div class="section-head"><h2>دکان‌ها</h2></div>
-          <ul id="r-shops" class="shop-grid"></ul>
-        </div>
-        <div id="r-products-sec" class="section" hidden>
-          <div class="section-head"><h2>کالاها</h2><p>قیمت و موجودیِ نهایی در صفحهٔ دکان</p></div>
-          <ul id="r-products" class="plist"></ul>
-        </div>
-        <div id="r-empty" class="empty" hidden>
-          <div class="art" id="r-empty-art"></div>
-          <h2>چیزی پیدا نشد</h2>
-          <p>نامِ دیگری را امتحان کنید یا از دسته‌ها دکانی را باز کنید.</p>
-          <button id="r-clear" class="btn btn-ghost" type="button">نمایشِ همهٔ دکان‌ها</button>
-        </div>
-      </section>
-
-      <section id="near-sec" class="section" hidden aria-labelledby="near-title">
-        <div class="section-head"><h2 id="near-title">نزدیکِ شما</h2><p>فاصلهٔ تقریبی</p></div>
-        <ul id="near" class="rail"></ul>
-      </section>
-
-      <section id="shops-sec" class="section" aria-labelledby="shops-title">
-        <div class="section-head">
-          <h2 id="shops-title">همهٔ دکان‌ها</h2>
-          <button id="locate" class="btn btn-ghost btn-sm" type="button">نزدیکِ من</button>
-        </div>
-        <ul id="shops" class="shop-grid" aria-busy="true"></ul>
-        <button id="more" class="btn btn-ghost btn-block section" type="button" hidden>دکان‌های بیشتر</button>
-        <div id="shops-empty" class="empty" hidden>
-          <div class="art" id="shops-empty-art"></div>
-          <h2 id="shops-empty-title">هنوز دکانی در این دسته نیست</h2>
-          <p>دستهٔ دیگری را ببینید.</p>
-        </div>
-      </section>
-    </div>
-  </section>
-
-  <!-- سفارش‌های من (با شمارهٔ تأییدشده، از هر دستگاه) -->
-  <section id="view-orders" hidden>
-    <div class="wrap section stack">
-      <div class="spread">
-        <h1>سفارش‌های من</h1>
-        <a class="btn btn-ghost btn-sm" href="#/">دکان‌ها</a>
-      </div>
-      <form id="verify-card" class="card card-lg stack" hidden novalidate>
-        <div>
-          <h2>شماره‌تان را تأیید کنید</h2>
-          <p class="muted">با یک کدِ یک‌بارمصرف، سفارش‌هایتان را از هر دستگاهی می‌بینید. دیدنِ دکان‌ها و سبد حساب نمی‌خواهد.</p>
-        </div>
-        <label class="field"><span>شمارهٔ موبایل</span><input id="v-phone" type="tel" inputmode="tel" autocomplete="tel" dir="ltr" maxlength="20" placeholder="07xx xxx xxx"></label>
-        <button id="v-send" class="btn btn-block" type="button">فرستادنِ کد</button>
-        <div id="v-code-row" hidden class="stack">
-          <label class="field"><span>کدِ تأیید</span><input id="v-code" class="code-input" type="text" inputmode="numeric" autocomplete="one-time-code" dir="ltr" maxlength="8"></label>
-          <button id="v-check" class="btn btn-block" type="submit">تأیید</button>
-        </div>
-        <div id="v-msg" class="note" hidden role="status"></div>
-      </form>
-      <div id="who" class="spread card" hidden>
-        <span><span class="muted">شماره: </span><b id="who-phone" class="ltr"></b></span>
-        <button id="who-out" class="btn btn-ghost btn-sm" type="button">شمارهٔ دیگر</button>
-      </div>
-      <div id="o-msg" class="note" hidden role="status"></div>
-      <ul id="orders" class="olist"></ul>
-      <div id="orders-empty" class="empty" hidden>
-        <div class="art" id="orders-empty-art"></div>
-        <h2>هنوز سفارشی نیست</h2>
-        <p>از یکی از دکان‌ها خرید کنید؛ سفارش این‌جا دیده می‌شود.</p>
-        <a class="btn" href="#/">دیدنِ دکان‌ها</a>
-      </div>
-    </div>
-  </section>
-
-  <!-- بازارچه خاموش است -->
-  <section id="view-off" hidden>
-    <div class="wrap empty section">
-      <div class="art" id="off-art"></div>
-      <h1>بازارچه هنوز باز نیست</h1>
-      <p>اگر نشانیِ ویترینِ دکانی را دارید، از همان نشانی خرید کنید.</p>
-    </div>
-  </section>
-
-  <p id="boot" class="wrap section muted" role="status">در حالِ باز کردن…</p>
-</main>
 <div id="scrim" class="scrim" hidden></div>
+
+<div id="cart-sheet" class="sheet dark drawer" role="dialog" aria-modal="true" aria-labelledby="cart-title" hidden>
+  <div class="sheet-head">
+    <div><h2 id="cart-title" tabindex="-1" data-t="carts">سبدها</h2><p id="cart-shop" class="muted small" data-t="carts.p">هر دکان سفارشِ جدا دارد؛ دکان را بزنید تا سبدش باز شود.</p></div>
+    <button id="cart-close" class="btn btn-icon btn-ghost" type="button" data-ta="close" aria-label="بستن" data-i="close"></button>
+  </div>
+  <div class="sheet-body">
+    <ul id="sheet-lines" class="lines"></ul>
+  </div>
+  <div class="sheet-foot">
+    <button id="cart-next" class="btn btn-accent btn-block section" type="button" hidden data-t="next">ادامه</button>
+  </div>
+</div>
 </body>
 </html>
