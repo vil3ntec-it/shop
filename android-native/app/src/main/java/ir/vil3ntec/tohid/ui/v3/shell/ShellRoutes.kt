@@ -49,7 +49,8 @@ private fun RouteScope.Search() {
     onOpen = { nav.open(it) },
     onScan = { scanToSearch() },
     onBack = if (nav.canBack) ({ back() }) else null,
-    bottomReserve = bottomReserve,
+    //  پوسته پایینِ صفحه (جای نوار + نوارِ سیستم) را خودش نگه می‌دارد (`ShellFrame`)
+    bottomReserve = 0.dp,
   )
 }
 
