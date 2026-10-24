@@ -150,5 +150,5 @@ object SettingsLayout {
   }
 
   /** ستونِ کناریِ کامپیوتر: همهٔ بخش‌ها به ترتیبِ گروه‌ها، بی بخش‌های فقط‌گوشی */
-  val deskSections: List<String> get() = deskOrder(sections)
+  val deskSections: List<String> get() = sections.filterNot { it in DESK_HIDDEN }
 }
