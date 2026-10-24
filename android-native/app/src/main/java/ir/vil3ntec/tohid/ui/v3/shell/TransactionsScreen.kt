@@ -120,7 +120,7 @@ fun TransactionsScreen(d: ShopData, initialKind: Transactions.Kind?, onOpen: (St
         verticalArrangement = Arrangement.spacedBy(10.dp),
       ) {
         itemsIndexed(list, key = { _, t -> t.key }) { i, tx ->
-          TxRow(tx, today, onClick = { open = tx }, modifier = Modifier.v3Stagger(stagger, tx.key, i))
+          TxRow(tx, today, onClick = { open = tx }, modifier = Modifier.animateItem().v3Stagger(stagger, tx.key, i))
         }
       }
     }

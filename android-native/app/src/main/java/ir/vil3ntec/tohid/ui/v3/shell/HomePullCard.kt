@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,6 +48,7 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
+import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.PagerDots
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -129,7 +131,11 @@ internal fun HomePullCard(
     Spacer(Modifier.height(4.dp))
     //  owner-feedback-3 B: کارت ورق می‌خورد — ۱ «صندوق» (نقدِ دخل همین حالا)، ۲ «گاوصندوق»
     val faces = rememberPagerState(initialPage = initialFace) { 2 }
-    HorizontalPager(state = faces, modifier = Modifier.fillMaxWidth()) { page ->
+    HorizontalPager(
+      state = faces,
+      modifier = Modifier.fillMaxWidth(),
+      flingBehavior = PagerDefaults.flingBehavior(faces, snapAnimationSpec = MotionSpec.sheet()),
+    ) { page ->
       if (page == 0) {
         val profit = view.profit
         PullFace(

@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerDefaults
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -83,7 +84,13 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
     val pager = rememberPagerState(initialPage = shot.page.coerceIn(0, pages - 1)) { pages }
     val rtl = LocalLayoutDirection.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-      HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), beyondViewportPageCount = 0) { page ->
+      //  ورق با انگشت ۱:۱ می‌آید و با سرعتِ رها کردن روی فنرِ کیت می‌نشیند (MOTION-APPLE)
+      HorizontalPager(
+        state = pager,
+        modifier = Modifier.fillMaxSize(),
+        beyondViewportPageCount = 0,
+        flingBehavior = PagerDefaults.flingBehavior(pager, snapAnimationSpec = MotionSpec.sheet()),
+      ) { page ->
         CompositionLocalProvider(LocalLayoutDirection provides rtl) {
           if (page == 0) HomePage(d, view, onOpen, bottomReserve, shot.pull, shot.pullPage, pages, pager.currentPage)
           else HomeStatsPage(d, bottomReserve, pages, pager.currentPage, shot.big)

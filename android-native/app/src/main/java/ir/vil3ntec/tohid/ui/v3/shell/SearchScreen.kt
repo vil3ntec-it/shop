@@ -133,7 +133,10 @@ fun SearchScreen(
             }
             item(key = "g:" + g.kind) {
               val open = g.kind in expanded
-              HitCard(g, if (open) g.hits else g.hits.take(PREVIEW), showMore = !open && g.total > PREVIEW, onMore = { expanded = expanded + g.kind }, onOpen = onOpen)
+              //  گروهِ تازه/رفته با جابه‌جاییِ نرم؛ ردیف‌های تازهٔ «همهٔ n نتیجه» پلکانی می‌آیند
+              Box(Modifier.animateItem()) {
+                HitCard(g, if (open) g.hits else g.hits.take(PREVIEW), showMore = !open && g.total > PREVIEW, onMore = { expanded = expanded + g.kind }, onOpen = onOpen)
+              }
             }
           }
         }
