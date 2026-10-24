@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
-import ir.vil3ntec.tohid.ui.v3.settings.draftShake
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.launch
 
 /**
@@ -75,7 +75,7 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
             toasts.show(StrSettings.passwordChanged)
             onBack?.invoke()
           }
-          .onFailure { failed++; Haptics.confirm(context); toasts.show(it.userMessage) }
+          .onFailure { failed++; toasts.show(it.userMessage) }
         busy = false
       }
     },
@@ -86,7 +86,7 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
   ) {
     SettingsNote(StrSettings.serverPassword)
     //  رمزِ نادرست: لرزشِ کوتاهِ فرم (MOTION-APPLE) کنارِ پیام
-    V3Section(null, Modifier.draftShake(failed), padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
+    V3Section(null, Modifier.v3Shake(failed.takeIf { it > 0 }), padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {
       V3TextField(current, { current = it }, StrSettings.currentPassword, Modifier.fillMaxWidth(), kind = V3FieldKind.PASSWORD, required = true)
       Spacer(Modifier.height(14.dp))
       V3TextField(fresh, { fresh = it }, Str.newPassword, Modifier.fillMaxWidth(), kind = V3FieldKind.PASSWORD, helper = StrSettings.pwdMin8, error = check.freshError, required = true)

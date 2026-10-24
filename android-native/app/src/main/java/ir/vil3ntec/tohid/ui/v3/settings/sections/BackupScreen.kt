@@ -51,7 +51,6 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.ROW_DIVIDER_START
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
-import ir.vil3ntec.tohid.ui.v3.settings.draftResize
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 
@@ -140,7 +139,7 @@ private enum class Ask { COMPACT, WIPE }
 private fun CloudSection(ctrl: BackupController, signedIn: Boolean) {
   val c = PhoneV3.colors
   val cloud = ctrl.cloud
-  V3Section(StrSettings.cloudBackup, Modifier.draftResize()) {
+  V3Section(StrSettings.cloudBackup) {
     if (cloud != null && cloud.stats.quotaBytes > 0) {
       Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
         val used = (cloud.stats.usedBytes.toFloat() / cloud.stats.quotaBytes).coerceIn(0f, 1f)

@@ -50,7 +50,7 @@ import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
-import ir.vil3ntec.tohid.ui.v3.settings.draftShake
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import kotlinx.coroutines.delay
 
@@ -65,13 +65,11 @@ internal fun PinSheet(onDone: () -> Unit) {
   val toasts = LocalV3Toasts.current
   val had = remember { LockStore(context).enabled }
   var entry by remember { mutableStateOf(PinEntry()) }
-  LaunchedEffect(entry.mismatch) { if (entry.mismatch > 0) Haptics.confirm(context) }
   V3Sheet(onDismiss = onDone, title = StrSettings.appPin) { closer ->
     LaunchedEffect(entry.done) {
       val pin = entry.done ?: return@LaunchedEffect
       LockStore(context).set(pin)
       LockSignal.version++
-      Haptics.success(context)
       //  تیکِ موفقیت کشیده می‌شود، بعد برگه با فنر پایین می‌رود
       if (Motion.enabled) delay(MotionTokens.EMPHASIZED + 250L)
       toasts?.show(if (had) StrSettings.pinChanged else StrSettings.lockTurnedOn)
@@ -93,8 +91,9 @@ internal fun PinSheet(onDone: () -> Unit) {
     }
     Spacer(Modifier.height(20.dp))
     Box(Modifier.fillMaxWidth().height(28.dp), contentAlignment = Alignment.Center) {
+      //  موفقیت: تیک و لرزشِ نرمِ کیت؛ ناهمسانی: لرزشِ خطای کیت (۳×۸dp + لرزشِ گوشی)
       if (entry.done != null) V3SuccessCheck(visible = true, size = 28.dp)
-      else PinDots(entry.typed.length, Modifier.draftShake(entry.mismatch))
+      else PinDots(entry.typed.length, Modifier.v3Shake(entry.mismatch.takeIf { it > 0 }))
     }
     Spacer(Modifier.height(24.dp))
     DraftPinPad(onDigit = { entry = PinModel.type(entry, it) }, onErase = { entry = PinModel.erase(entry) })

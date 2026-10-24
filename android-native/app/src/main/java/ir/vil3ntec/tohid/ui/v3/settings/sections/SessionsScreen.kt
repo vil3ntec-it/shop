@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.settings.sections
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Devices
@@ -35,7 +36,7 @@ import ir.vil3ntec.tohid.ui.v3.V3TextButton
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
-import ir.vil3ntec.tohid.ui.v3.settings.draftResize
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import kotlinx.coroutines.launch
 
 /**
@@ -54,6 +55,8 @@ internal fun RouteScope.SessionsScreen(onBack: (() -> Unit)?) {
   var failed by remember { mutableStateOf<String?>(null) }
   var reload by remember { mutableIntStateOf(0) }
   var closing by remember { mutableStateOf<DeviceDto?>(null) }
+  //  نشستِ بسته‌شده با جمع شدنِ نرمِ ردیف می‌رود (`V3Collapse`)
+  var closed by remember { mutableStateOf(emptySet<String>()) }
   LaunchedEffect(signedIn, reload) {
     if (!signedIn) return@LaunchedEffect
     failed = null
@@ -68,7 +71,7 @@ internal fun RouteScope.SessionsScreen(onBack: (() -> Unit)?) {
       onConfirm = {
         scope.launch {
           account.revokeDevice(d.id)
-            .onSuccess { toasts.show(StrSettings.sessionClosed); reload++ }
+            .onSuccess { closed = closed + d.id; toasts.show(StrSettings.sessionClosed) }
             .onFailure { toasts.show(it.userMessage) }
         }
       },
@@ -85,23 +88,30 @@ internal fun RouteScope.SessionsScreen(onBack: (() -> Unit)?) {
         V3EmptyState(Icons.Outlined.Devices, failed ?: StrSettings.noDevices, action = if (failed != null) Str.again else null, onAction = { reload++ })
       }
       else -> item(key = "list") {
-        V3Section(null, Modifier.draftResize(), footer = StrSettings.lostPhone) {
+        V3Section(null, footer = StrSettings.lostPhone) {
           list.forEachIndexed { i, d ->
-            if (i > 0) V3Divider(start = 64.dp)
             //  «همین دستگاه» از روی شناسهٔ دستگاه شناخته می‌شود، نه از روی نام
             val isThis = d.deviceUid.isNotBlank() && d.deviceUid == state.deviceUid
-            V3ListRow(
-              d.label,
-              subtitle = if (isThis) StrSettings.thisDevice else d.lastSeenAt?.let { StrSettings.lastSeen(formatMillis(it)) },
-              icon = Icons.Outlined.PhoneAndroid,
-              chevron = false,
-              endActions = if (isThis) emptyList() else listOf(V3SwipeAction(Icons.AutoMirrored.Outlined.Logout, StrSettings.closeSessionAction, V3ButtonKind.DANGER) { closing = d }),
-              trailing = if (isThis) null else ({ V3TextButton(StrSettings.closeSessionAction, { closing = d }, danger = true) }),
-            )
+            V3Collapse(visible = d.id !in closed) { SessionRow(d, isThis, divider = i > 0) { closing = d } }
           }
         }
       }
     }
     item(key = "note") { SettingsNote(StrSettings.sessionsNote) }
+  }
+}
+
+@Composable
+private fun SessionRow(d: DeviceDto, isThis: Boolean, divider: Boolean, onClose: () -> Unit) {
+  Column {
+    if (divider) V3Divider(start = 64.dp)
+    V3ListRow(
+      d.label,
+      subtitle = if (isThis) StrSettings.thisDevice else d.lastSeenAt?.let { StrSettings.lastSeen(formatMillis(it)) },
+      icon = Icons.Outlined.PhoneAndroid,
+      chevron = false,
+      endActions = if (isThis) emptyList() else listOf(V3SwipeAction(Icons.AutoMirrored.Outlined.Logout, StrSettings.closeSessionAction, V3ButtonKind.DANGER, onClose)),
+      trailing = if (isThis) null else ({ V3TextButton(StrSettings.closeSessionAction, onClose, danger = true) }),
+    )
   }
 }
