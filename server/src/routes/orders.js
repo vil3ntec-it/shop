@@ -69,8 +69,8 @@ router.get('/config', wrap(async (req, res) => {
     handoverSince,
     permissions: {
       ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
-      //  اجازهٔ کلیِ نقش (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
-      ...ledger.capsOf(req.role),
+      //  اجازهٔ کلیِ نقش و اشتراک (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
+      ...(await ledger.capsFor(req.shopId, req.role)),
     },
   });
 }));

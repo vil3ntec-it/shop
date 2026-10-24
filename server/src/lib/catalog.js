@@ -317,7 +317,7 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttl
 async function afterIngest(shopId, out) {
   if (!out || !out.retired) return;
   retired.add(shopId);
-  if (!out.retired.changed) return;
+  if (!out.retired.changed && !out.retired.needsAudit) return;
   await require('./audit').log({
     shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
     detail: out.retired.audit,
@@ -366,6 +366,9 @@ async function keptByW(c, shopId, m) {
  * دورِ دوم (حتی پس از راه‌اندازیِ دوباره) هیچ نمی‌نویسد. شمارش‌ها در `audit` ⇒ دفترِ ممیزی.
  * درونِ تراکنشِ ingest (قفلِ دکان گرفته شده).
  */
+/** توضیحِ وظیفه‌های رزروی که کنار گذاشته شد (نشانِ همان کار در دورِ بعد) */
+const RETIRED_NOTE = 'سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند (تصمیمِ صاحبِ مخزن)';
+
 async function retireOrderStock(c, shopId, at) {
   const touched = new Set();
   const none = { changed: false, touched: [], audit: null };
@@ -406,8 +409,8 @@ async function retireOrderStock(c, shopId, at) {
   }
   const tasks = await c.query(
     `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
-            note='سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند (تصمیمِ صاحبِ مخزن)'
-      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at]
+            note=$3
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at, RETIRED_NOTE]
   );
   const undone = sold.length - keptWithW;
   const dismissed = tasks.rowCount || 0;
@@ -416,7 +419,32 @@ async function retireOrderStock(c, shopId, at) {
     releasedHolds: held.length, releasedMilli: held.reduce((s, r) => s + num(r.qty_milli), 0),
     dismissedTasks: dismissed, products: [...touched].sort().slice(0, 50),
   };
-  return { changed: undone + held.length + dismissed > 0, touched: [...touched], audit };
+  const changed = undone + held.length + dismissed > 0;
+  if (changed) return { changed, touched: [...touched], audit };
+  //  دورِ پیشین کنار گذاشت ولی سطرِ ممیزی‌اش نوشته نشد (خطا یا افتادنِ سرور پس از COMMIT) ⇒ همان
+  //  سطر از روی خودِ دفتر (`recovered`)؛ سطر هست ⇒ هیچ
+  const done = (await c.query(
+    `SELECT (SELECT COUNT(*) FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%')::int AS moves,
+            (SELECT COALESCE(SUM(qty_milli),0) FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%')::bigint AS milli,
+            (SELECT COUNT(*) FROM stock_reservations WHERE shop_id=$1 AND close_reason='reservations_retired')::int AS holds,
+            (SELECT COALESCE(SUM(qty_milli),0) FROM stock_reservations WHERE shop_id=$1 AND close_reason='reservations_retired')::bigint AS held_milli,
+            (SELECT COUNT(*) FROM stock_tasks WHERE shop_id=$1 AND status='dismissed' AND resolved_by='system' AND note=$2)::int AS tasks,
+            EXISTS (SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired') AS logged`,
+    [shopId, RETIRED_NOTE]
+  )).rows[0];
+  if (done.logged || num(done.moves) + num(done.holds) + num(done.tasks) === 0) return { changed, touched: [...touched], audit };
+  const products = (await c.query(
+    `SELECT DISTINCT product_id FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%' ORDER BY 1 LIMIT 50`,
+    [shopId]
+  )).rows.map((r) => r.product_id);
+  return {
+    changed, touched: [...touched], needsAudit: true,
+    audit: {
+      reason: audit.reason, undoneMoves: num(done.moves), undoneMilli: num(done.milli), keptWithW,
+      releasedHolds: num(done.holds), releasedMilli: num(done.held_milli), dismissedTasks: num(done.tasks),
+      products, recovered: true,
+    },
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -882,7 +910,7 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS,
-  ingestTx, refresh, hasNewer, retireOrderStock, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
+  ingestTx, refresh, hasNewer, retireOrderStock, afterIngest, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
   list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,
   toStockLines, checkOrder, requireEnabled,

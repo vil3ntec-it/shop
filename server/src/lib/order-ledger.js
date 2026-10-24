@@ -18,15 +18,19 @@
  *   جاافتاده ─ [handoverPending]: سفارش‌های بیرون‌رفته‌ای که فروشی (`o-…` یا فاکتورِ W ِ
  *            قدیمی `w-…`) در دفترِ همگام‌شدهٔ دکان ندارند، و سفارش‌های برگشته‌ای که فروشِ
  *            لغونشده دارند. برنامه پیش از **هر** ثبت همین را برای همان سفارش می‌پرسد.
- *   کف ───── **هر دکان جدا** ([claimFloor]): نخستین باری که برنامه‌ای که «فروشِ تحویل» را دارد
- *            (`GET /orders/config?caps=saleOnHandover`) این دکان را دید، در «تنظیماتِ زنده»
- *            (`live_config`، scope = دکان، کلیدِ [FLOOR_KEY]) — یک بار، هرگز جابه‌جا. هرگز زودتر
- *            از زمانِ به‌کارگیری ([deployFloor]، `ORDERS_HANDOVER_FLOOR_MS`). تحویلِ پیش از کف
- *            هرگز فهرست نمی‌شود — آن روزها یا فاکتورِ W بود، یا کسرِ سروری (`res:…:sale`)، یا
- *            فروشِ دستیِ صندوق؛ و تا هیچ برنامه‌ای کف نگذاشته، هیچ (برنامهٔ کهنه فروش نمی‌سازد).
+ *   کف ───── **هر دکان جدا**، در «تنظیماتِ زنده» (`live_config`، scope = دکان، کلیدِ [FLOOR_KEY]،
+ *            رزرو: پنل نمی‌نویسد/پاک نمی‌کند) — یک بار، هرگز جابه‌جا، هرگز زودتر از زمانِ به‌کارگیری
+ *            ([deployFloor]، `ORDERS_HANDOVER_FLOOR_MS`):
+ *              • دکانی که کسرِ سفارشیِ سرور داشت (`shop.orders.ledger` یا `shop.catalog` روشن) ⇒
+ *                لحظهٔ **راه‌اندازیِ سرور** ([claimFloorsAtStart]) — تحویلِ پس از استقرار گم نمی‌شود؛
+ *              • بقیه ⇒ نخستین `GET /orders/config?caps=saleOnHandover` ([claimFloor]).
+ *            فروشِ خودکار فقط وقتی **نخستین** گذارِ تحویل پس از کف است. سفارشی که پیش از کف بیرون
+ *            رفت و پس از آن گذارِ تحویلِ دیگری گرفت («ارسال» پیش، «رسید» پس) ⇒ `review`
+ *            (`before_floor`): شاید دستگاهِ کهنه دستی فروخته باشد ⇒ صاحب تصمیم می‌گیرد. تا کف
+ *            نیست، هیچ (برنامهٔ کهنه فروش نمی‌سازد).
  *   اجازه ── **هر سفارش جدا** ([judgeOf] ⇒ `recordable`/`reversible` روی هر ردیف): همان سنجشِ
  *            Sync v1 برای **همین کاربر** — نوشتنِ `sales`/`saleItems`/`stockMovements`/`auditLog`
- *            ([capsOf])، و با تخفیف `sales.discount` با اجازهٔ مؤثر (لایه‌های نقش و عضو،
+ *            ([capsOf]؛ شاگرد بی اشتراکِ `multi_device` نه، همان `requireSyncWrite` — [capsFor])، و با تخفیف `sales.discount` با اجازهٔ مؤثر (لایه‌های نقش و عضو،
  *            `perm-core.evaluate`) روی درصد و مبلغِ تخفیفِ **همین سفارش**؛ برای لغو `sales.cancel`.
  *            «نیازمندِ تأیید» یا بیش از سقف ⇒ نه (v1 بی برگه ردش می‌کرد و فروش فقط روی همان دستگاه
  *            می‌ماند) ⇒ برنامه آن را به دستگاهِ صاحب/مدیر می‌سپارد و در فهرست می‌شمارد.
@@ -108,6 +112,19 @@ function capsOf(role) {
   };
 }
 
+/**
+ * [capsOf] + اشتراکِ دکان، همان `requireSyncWrite` ِ push: صاحب و مدیر همیشه؛ شاگرد فقط با
+ * `multi_device` (وگرنه push ِ فروش ۴۰۳ می‌گرفت و فروش فقط روی همان گوشی می‌ماند).
+ */
+async function capsFor(shopId, role) {
+  const base = capsOf(role);
+  if (!base.recordSale || role === 'owner' || role === 'manager') return base;
+  const { entitlementOf } = require('./entitlement');
+  const ent = await entitlementOf(shopId);
+  if (ent.features.includes('multi_device')) return base;
+  return { recordSale: false, saleDiscount: false, saleCancel: false };
+}
+
 function docView(r) {
   if (!r) return null;
   return {
@@ -145,6 +162,49 @@ async function claimFloor(shopId, by = '') {
   return sinceOf(shopId);
 }
 
+/** پرچم‌هایی که کدِ پیش از این تصمیم با آن‌ها سفارش را خودکار در موجودی/دفتر می‌نشاند */
+const LEGACY_FLAGS = Object.freeze(['shop.orders.ledger', 'shop.catalog']);
+
+/**
+ * راه‌اندازیِ سرور: هر دکانی که یکی از [LEGACY_FLAGS] برایش روشن است (`true` ِ خودِ دکان، یا
+ * `all` بی `false` ِ خودِ دکان) و هنوز کف ندارد ⇒ کف = همین لحظه (زمانِ سرور). پس کفِ این دکان‌ها
+ * لحظهٔ استقرار است، نه نخستین config ِ برنامهٔ تازه: سفارشی که میانِ این دو تحویل شد (و کدِ
+ * پیشین خودش کم می‌کرد، پس دستگاهِ کهنه دستی نمی‌فروخت) گم نمی‌شود. تکرار ⇒ هیچ. ⇒ شمارِ تازه‌ها
+ */
+async function claimFloorsAtStart(at) {
+  const db = require('../db');
+  const t = Math.max(Number.isSafeInteger(at) ? at : db.now(), deployFloor());
+  const rows = await db.many(
+    'SELECT scope, key, value FROM live_config WHERE key = ANY($1::text[])', [[...LEGACY_FLAGS, FLOOR_KEY]]
+  );
+  const allOn = new Set();
+  const own = new Map();                     //  دکان ⇒ Map(پرچم ⇒ مقدار)
+  const floored = new Set();
+  for (const r of rows) {
+    if (r.key === FLOOR_KEY) { floored.add(r.scope); continue; }
+    const v = decode(r.value) === true;
+    if (r.scope === 'all') { if (v) allOn.add(r.key); continue; }
+    if (!own.has(r.scope)) own.set(r.scope, new Map());
+    own.get(r.scope).set(r.key, v);
+  }
+  const shops = new Set();
+  for (const [shop, flags] of own) if ([...flags.values()].some(Boolean)) shops.add(shop);
+  if (allOn.size) {
+    for (const r of await db.many('SELECT id FROM shops')) {
+      const flags = own.get(r.id);
+      if ([...allOn].some((k) => !flags || !flags.has(k) || flags.get(k))) shops.add(r.id);
+    }
+  }
+  const lc = require('./live-config');
+  let n = 0;
+  for (const shop of shops) {
+    if (floored.has(shop) || !/^[A-Za-z0-9_-]{1,80}$/.test(shop)) continue;
+    const r = await lc.setOnce(shop, FLOOR_KEY, t, 'system:start');
+    if (r.inserted) n += 1;
+  }
+  return n;
+}
+
 /**
  * اجازهٔ ثبت و لغوِ فروشِ تحویل برای **همین کاربر** و **همین سفارش** — همان سنجشی که Sync v1
  * (`authorizeOp` + `staff-approval.v1Guard`) روی opهای همان فروش می‌کند:
@@ -155,7 +215,7 @@ async function claimFloor(shopId, by = '') {
  */
 async function judgeOf(shopId, viewer) {
   const role = viewer && viewer.role;
-  const base = capsOf(role);
+  const base = await capsFor(shopId, role);
   const layers = await staffPerms.layersFor(shopId, role, viewer && viewer.id);
   const allow = (perm, req) => core.evaluate(role, layers, perm, req).decision === 'allow';
   return {
@@ -188,13 +248,15 @@ function parseAfter(raw) {
 /**
  * سفارش‌هایی که برنامه باید برایشان کاری بکند — فقط‌خواندنی، به ترتیبِ زمانِ تحویل.
  *
- *   items ────── `action: 'sale'`: بیرون رفته (OUT_OF_SHOP)، **یکی از** گذارهای تحویلش
- *                از `max(since, کفِ دکان)` به بعد است (سفارشی که پیش از آن «ارسال» و پس از آن
- *                «رسید» شده هم می‌آید)، و هیچ فروشی (`o-…`/`w-…`) در دفترِ همگام‌شده ندارد.
+ *   items ────── `action: 'sale'`: بیرون رفته (OUT_OF_SHOP)، **نخستین** گذارِ تحویلش از
+ *                `max(since, کفِ دکان)` به بعد است، و هیچ فروشی (`o-…`/`w-…`) در دفترِ همگام‌شده ندارد.
  *                `recordable`: همین کاربر می‌تواند فروشِ همین سفارش را بنویسد ([judgeOf]).
  *                صفحه‌بندی با `after` (`<زمان>:<شناسه>`)؛ سفارشی که برنامه نتوانست ثبت کند
  *                (کمبود، اجازه) جلوی بقیه را نمی‌گیرد.
  *   reversals ── `action: 'reverse'`: به دکان برگشته و فروشِ `o-…` ِ لغونشده دارد؛ `reversible`.
+ *   review ───── `action: 'review'`، `reviewCode: 'before_floor'`: بیرون‌رفتهٔ بی‌فروش که نخستین گذارِ
+ *                تحویلش **پیش از کف** و گذارِ تحویلِ دیگری **پس از کف** دارد — هرگز خودکار نه؛ صاحب
+ *                بررسی می‌کند (شاید دستگاهِ کهنه دستی فروخته باشد).
  *   `orderId` ⇒ فقط همان سفارش (برنامه پیش از هر ثبتِ دستی یا پس از «وضعیت عوض شد» می‌پرسد).
  * سفارشِ آزمایشی هرگز. دکانی که هنوز کف ندارد ⇒ هیچ (`since: null`).
  */
@@ -204,7 +266,7 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
   const lim = Math.min(Math.max(Number(limit) || 20, 1), MAX_PENDING);
   const cur = parseAfter(after);
   const floor = await sinceOf(shopId);
-  if (floor === null) return { items: [], reversals: [], since: null, nextAfter: null, serverTime: Date.now() };
+  if (floor === null) return { items: [], reversals: [], review: [], since: null, nextAfter: null, serverTime: Date.now() };
   const asked = Number(since);
   const from = Math.max(floor, Number.isSafeInteger(asked) && asked > 0 ? asked : 0);
   const only = String(orderId || '').slice(0, 64);
@@ -217,17 +279,17 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
   const params = [shopId, HANDED_OVER, OUT_OF_SHOP, from];
   let extra = '';
   if (only) { params.push(only); extra += ` AND o.id = $${params.length}`; }
-  let having = '';
+  //  **نخستین** گذارِ تحویل از کف به بعد (نه «هر» گذار): سفارشی که پیش از کف بیرون رفت ⇒ review
+  let having = 'HAVING MIN(e.created_at) >= $4';
   if (cur) {
     params.push(cur.at, cur.id);
-    having = `HAVING MIN(e.created_at) > $${params.length - 1} OR (MIN(e.created_at) = $${params.length - 1} AND o.id > $${params.length})`;
+    having += ` AND (MIN(e.created_at) > $${params.length - 1} OR (MIN(e.created_at) = $${params.length - 1} AND o.id > $${params.length}))`;
   }
   params.push(lim + 1);
   const saleRows = await db.many(
     `SELECT o.id, MIN(e.created_at)::bigint AS at
        FROM online_orders o
-       JOIN online_order_events e ON e.order_id = o.id AND e.kind = 'status'
-                                 AND e.to_status = ANY($2::text[]) AND e.created_at >= $4
+       JOIN online_order_events e ON e.order_id = o.id AND e.kind = 'status' AND e.to_status = ANY($2::text[])
       WHERE o.shop_id = $1 AND o.is_test = false AND o.status = ANY($3::text[]) AND o.updated_at >= $4 ${extra}
         AND ${noSale('sync_rows')} ${v3 ? `AND ${noSale('sync_v3_rows')}` : ''}
       GROUP BY o.id
@@ -254,21 +316,40 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
     rparams
   );
 
+  //  پیش از کف بیرون رفت، پس از آن گذارِ تحویلِ دیگری گرفت ⇒ بررسیِ صاحب (فقط صفحهٔ نخست)
+  const vparams = [shopId, HANDED_OVER, OUT_OF_SHOP, floor];
+  let vextra = '';
+  if (only) { vparams.push(only); vextra = ` AND o.id = $${vparams.length}`; }
+  const reviewRows = cur ? [] : await db.many(
+    `SELECT o.id, MIN(e.created_at)::bigint AS at
+       FROM online_orders o
+       JOIN online_order_events e ON e.order_id = o.id AND e.kind = 'status' AND e.to_status = ANY($2::text[])
+      WHERE o.shop_id = $1 AND o.is_test = false AND o.status = ANY($3::text[]) AND o.updated_at >= $4 ${vextra}
+        AND ${noSale('sync_rows')} ${v3 ? `AND ${noSale('sync_v3_rows')}` : ''}
+      GROUP BY o.id
+     HAVING MIN(e.created_at) < $4 AND MAX(e.created_at) >= $4
+      ORDER BY 2, 1
+      LIMIT ${MAX_PENDING}`,
+    vparams
+  );
+
   const judge = await judgeOf(shopId, viewer);
   const view = async (r, action) => {
     const o = await orders.get(shopId, r.id, viewer);
     const at = Number(r.at);
-    return {
-      ...o, action, saleId: saleIdOf(r.id),
-      ...(action === 'sale' ? { handedOverAt: at, recordable: judge.recordable(o) } : { returnedAt: at, reversible: judge.reversible(o) }),
-    };
+    const extra = action === 'sale' ? { handedOverAt: at, recordable: judge.recordable(o) }
+      : action === 'reverse' ? { returnedAt: at, reversible: judge.reversible(o) }
+        : { handedOverAt: at, reviewCode: 'before_floor' };
+    return { ...o, action, saleId: saleIdOf(r.id), ...extra };
   };
   const items = [];
   for (const r of page) items.push(await view(r, 'sale'));
   const reversals = [];
   for (const r of backRows) reversals.push(await view(r, 'reverse'));
+  const review = [];
+  for (const r of reviewRows) review.push(await view(r, 'review'));
   return {
-    items, reversals, since: from,
+    items, reversals, review, since: from,
     nextAfter: saleRows.length > lim && last ? `${Number(last.at)}:${last.id}` : null,
     serverTime: Date.now(),
   };
@@ -276,5 +357,6 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
 
 module.exports = {
   SERIES, ORDER_SERIES, HANDED_OVER, OUT_OF_SHOP, BACK_IN_SHOP, MAX_PENDING, FLOOR_KEY, SALE_CAP, SALE_TABLES,
-  saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, judgeOf, deployFloor, floorOf, sinceOf, claimFloor, handoverPending,
+  LEGACY_FLAGS, saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, capsFor, judgeOf, deployFloor, floorOf, sinceOf,
+  claimFloor, claimFloorsAtStart, handoverPending,
 };
