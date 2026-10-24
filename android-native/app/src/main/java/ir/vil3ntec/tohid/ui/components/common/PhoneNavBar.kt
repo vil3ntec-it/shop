@@ -247,7 +247,7 @@ private fun NavPill(
   ) {
     Box(
       Modifier
-        .offset(x = x)
+        .offset { androidx.compose.ui.unit.IntOffset(x.roundToPx(), 0) }
         .size(dot)
         .graphicsLayer { alpha = shown; scaleX = 0.8f + 0.2f * shown; scaleY = 0.8f + 0.2f * shown }
         .clip(CircleShape)

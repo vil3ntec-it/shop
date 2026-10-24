@@ -37,6 +37,12 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
   /** چیدمانِ پهن (کامپیوتر/تبلتِ افقی): صفحه‌ها هم‌سطح */
   var wide: Boolean = false
 
+  /**
+   *  تبی که بخش‌های بیرون از نوار زیرش باز می‌شوند (گوشی: «بیشتر»؛ کامپیوتر: خانه). پیوندِ سرد
+   *  به `stock/42` ⇐ `[more, stock, stock/42]`: «بیشتر» فعال است و برگشت به «بیشتر» می‌رود.
+   */
+  var sectionsRoot: String = home
+
   /** پوسته پشتِ دروازه است؟ (پیوندها نگه داشته می‌شوند) */
   var held: Boolean = false
     set(value) {
@@ -55,7 +61,8 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
   /** صفحهٔ زیرِ برگه‌ها (برگه روی صفحهٔ پیشین است و جایش را نمی‌گیرد) */
   val page: String get() = stack.entries.lastOrNull { table.resolve(it)?.route?.kind != RouteKind.SHEET } ?: stack.current
   val move: Move get() = stack.move
-  val canBack: Boolean get() = stack.canPop || stack.root != home
+  /** «برگشت»ِ دستگاه کاری دارد؟ دروازهٔ باز هم بسته می‌شود (AUDIT-NAV N7) */
+  val canBack: Boolean get() = gate != null || stack.canPop || stack.root != home
 
   fun resolve(path: String): Resolved? = table.resolve(path)
 
@@ -63,11 +70,39 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     val p = table.canonical(path)
     val kind = table.resolve(p)?.route?.kind
     if (kind == RouteKind.GATE) { gate = p; return }
-    stack = when {
-      isTab(RoutePaths.normalize(p.substringBefore('?'))) -> stack.switchTab(p)
-      wide && kind != RouteKind.SHEET -> stack.jump(p)
-      else -> stack.push(p)
+    //  رفتن درونِ صفحه همیشه روی پشته می‌نشیند، پهن یا باریک (AUDIT-NAV N3)؛ پرشِ هم‌سطح فقط `openFromRail`
+    if (isTab(RoutePaths.normalize(p.substringBefore('?')))) toTab(p) else stack = stack.push(p)
+  }
+
+  /**
+   *  منوی کناری، فهرستِ فرمان و میان‌برهای کامپیوتر: بخشِ هم‌سطح — ریشهٔ تازهٔ همان بخش
+   *  (پهن: `[root, بخش]`)، نه رفتن به عمقِ صفحهٔ جاری.
+   */
+  fun openFromRail(path: String) {
+    val p = table.canonical(path)
+    val kind = table.resolve(p)?.route?.kind
+    if (kind == RouteKind.GATE) { gate = p; return }
+    if (isTab(RoutePaths.normalize(p.substringBefore('?')))) {
+      tabStacks.remove(RoutePaths.normalize(p.substringBefore('?')))
+      stack = stack.switchTab(p)
+      return
     }
+    stack = if (wide && kind != RouteKind.SHEET) stack.jump(p) else stack.push(p)
+  }
+
+  /**
+   *  پشتهٔ هر تب نگه داشته می‌شود (AUDIT-NAV N6): «محصولات ⇐ کالای ۴۲» ⇐ خانه ⇐ «محصولات»
+   *  دوباره همان کالای ۴۲. زدنِ دوبارهٔ تبِ باز ⇐ ریشهٔ همان تب.
+   */
+  private val tabStacks = HashMap<String, List<String>>()
+
+  private fun toTab(p: String) {
+    val target = RoutePaths.normalize(p.substringBefore('?'))
+    val from = RoutePaths.normalize(stack.root.substringBefore('?'))
+    if (target == from) { stack = stack.switchTab(p); return }
+    tabStacks[from] = stack.entries
+    val saved = tabStacks.remove(target)
+    stack = if (saved != null && '?' !in p) NavStack(saved, Move.SWITCH) else stack.switchTab(p)
   }
 
   /** برگشت از **همین** مسیر؛ اگر دیگر بالا نیست (نتیجه داده و برداشته شده)، هیچ کاری نمی‌کند */
@@ -111,9 +146,7 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     gate = null
   }
 
-  fun switchTab(path: String) {
-    stack = stack.switchTab(table.canonical(path))
-  }
+  fun switchTab(path: String) = toTab(table.canonical(path))
 
   fun openForResult(path: String, onResult: (String?) -> Unit) {
     open(path)
@@ -131,7 +164,11 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
     val chain = table.chain(path)
     if (chain.isEmpty()) return
     val root = chain.first()
-    val entries = if (isTab(RoutePaths.normalize(root.substringBefore('?'))) || root == home) chain else listOf(home) + chain
+    val entries = when {
+      isTab(RoutePaths.normalize(root.substringBefore('?'))) || root == home -> chain
+      root == sectionsRoot -> chain
+      else -> listOf(sectionsRoot) + chain
+    }
     stack = NavStack(entries.takeLast(NavStack.MAX_DEPTH), Move.PUSH)
   }
 

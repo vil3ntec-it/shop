@@ -14,7 +14,6 @@ import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.DeskProductsScreen
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
@@ -57,7 +56,7 @@ val ProductsModule = AppModule(
   ),
   routes = listOf(
     V3Route(ProductsPaths.LIST, RouteKind.TAB, { StrProducts.listTitle }, chrome = Chrome.OWN) {
-      if (Platform.DESKTOP) DeskProductsScreen(
+      if (desk) DeskProductsScreen(
         store = store, d = data, snackbar = snackbar,
         onOpenWarehouse = { id -> nav.open(if (id == null) StockPaths.LIST else StockPaths.item(id)) },
         onOpenProduct = { id -> nav.open(ProductsPaths.item(id)) },
