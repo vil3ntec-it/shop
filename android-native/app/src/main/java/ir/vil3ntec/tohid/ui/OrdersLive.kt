@@ -63,8 +63,11 @@ object OrdersLive {
   val enabled: Boolean get() = config.value != null
   val newCount: Int get() = counts.value["new"] ?: 0
 
-  /** تحویلی که فروشش این‌جا ثبت نشد (اجازه، قفلِ برنامه، دیسک…) — صفحهٔ «سفارش‌ها» هشدار می‌دهد */
-  data class Unposted(val orderId: String, val orderNo: Long, val message: String)
+  /**
+   *  تحویلی که فروشش این‌جا ثبت نشد (اجازه، قفلِ برنامه، دیسک…) — صفحهٔ «سفارش‌ها» هشدار می‌دهد.
+   *  [productIds]: فقط برای [shortfalls] — کالاهای منفی‌شده (هشدار با درست شدنِ موجودی می‌رود).
+   */
+  data class Unposted(val orderId: String, val orderNo: Long, val message: String, val productIds: List<String> = emptyList())
   val unposted = mutableStateOf<List<Unposted>>(emptyList())
 
   /** فروش ثبت شد ولی کالا در دفتر کم بود (موجودی منفی) — INV-19: ثبت‌شده رد نمی‌شود، فقط گفته می‌شود */
@@ -76,12 +79,33 @@ object OrdersLive {
    */
   val waiting = mutableStateOf<List<Unposted>>(emptyList())
 
+  /**
+   *  بررسیِ صاحب — کارِ خودکار انجام نشد و نباید بشود: سفارشِ پیش از کف بیرون‌رفته (`review` ِ سرور،
+   *  [OrderFulfillment.REVIEW_BEFORE_FLOOR]) و برگشتهٔ دارای «مرجوعیِ» دستی ([OrderFulfillment.reverseBlock]).
+   */
+  val review = mutableStateOf<List<Unposted>>(emptyList())
+
+  /** چند روز پس از کفِ دکان یادآوریِ «همهٔ دستگاه‌ها را به‌روز کنید» دیده می‌شود */
+  const val ROLLOUT_NOTICE_MS = 30L * 24 * 3600 * 1000
+  const val ROLLOUT_NOTE = "همهٔ دستگاه‌های دکان را به‌روز کنید؛ نسخهٔ قدیم فروشِ سفارش را دستی ثبت می‌کند"
+
+  /**
+   *  دورهٔ گذار: دستگاهی با نسخهٔ پیش از «فروشِ تحویل» هنوز فروشِ سفارش را دستی در صندوق می‌زند و
+   *  این برنامه هم خودکار ⇒ دو فروش. سدِ نسخه نیست؛ فقط همین یادآوری تا [ROLLOUT_NOTICE_MS] پس از کف.
+   */
+  fun rolloutNotice(now: Long = System.currentTimeMillis()): Boolean {
+    val since = config.value?.takeIf { it.saleOnHandover }?.handoverSince ?: return false
+    return now - since < ROLLOUT_NOTICE_MS
+  }
+
   sealed interface Posted {
     data object Saved : Posted
     data object Already : Posted
     /** این نقش/سرور نمی‌تواند — گذار رفت، ثبت با دستگاهِ توانا (صاحب/مدیر) */
     data class Skipped(val message: String) : Posted
     data class Failed(val message: String) : Posted
+    /** کارِ خودکار نشد؛ صاحب باید ببیند ([review]) */
+    data class Review(val message: String) : Posted
   }
 
   /** فاصلهٔ پرسیدنِ دوبارهٔ تحویل‌های بی‌فروش وقتی صف عوض نشده */
@@ -125,10 +149,26 @@ object OrdersLive {
     return "${c.get(java.util.Calendar.YEAR)}-$m-$d"
   }
 
-  private fun note(list: MutableState<List<Unposted>>, o: OrderDto, message: String?) {
+  private fun note(list: MutableState<List<Unposted>>, o: OrderDto, message: String?, productIds: List<String> = emptyList()) {
     val rest = list.value.filter { it.orderId != o.id }
-    list.value = if (message == null) rest else rest + Unposted(o.id, o.orderNo, message)
+    list.value = if (message == null) rest else rest + Unposted(o.id, o.orderNo, message, productIds)
   }
+
+  /**
+   *  هشدارهایی که دیگر راست نیستند: «ثبت نشد» وقتی فروشِ همان سفارش (از هر دستگاه) در دفتر آمد،
+   *  «کمبود» وقتی موجودیِ آن کالاها دیگر منفی نیست (ورودِ انبار از هر دستگاه)، «منتظر» وقتی فروش آمد.
+   */
+  fun prune(d: ir.vil3ntec.tohid.data.ShopData) {
+    unposted.value = unposted.value.filterNot { OrderFulfillment.settled(d, it.orderId) }
+    waiting.value = waiting.value.filterNot { w ->
+      if (w.message.endsWith(REVERSE_WAIT)) OrderFulfillment.saleOf(d, w.orderId)?.status == "cancelled"
+      else OrderFulfillment.settled(d, w.orderId)
+    }
+    shortfalls.value = shortfalls.value.filter { OrderFulfillment.stillShort(d, it.productIds) }
+  }
+
+  private const val SALE_WAIT = "ثبتِ فروشِ تحویل"
+  private const val REVERSE_WAIT = "لغوِ فروشِ برگشته"
 
   /**
    *  کارِ یک ردیفِ `GET /shop/orders/handover` در همین دفتر — `sale`: فروشِ تحویل با زمان و روزِ
@@ -142,7 +182,7 @@ object OrdersLive {
     if (!store.loaded.value) return@withLock Posted.Failed("دفترِ دکان هنوز باز نشده؛ کمی بعد دوباره بزنید")
     if (if (reverse) !canReverse(cfg, item) else !canRecord(cfg, item)) {
       //  پرچمِ سرورِ همین سفارش برای همین کاربر: منتظرِ دستگاهِ صاحب یا مدیر (فهرست می‌شماردش)
-      note(waiting, item, "سفارش #${item.orderNo} — " + if (reverse) "لغوِ فروشِ برگشته" else "ثبتِ فروشِ تحویل")
+      note(waiting, item, "سفارش #${item.orderNo} — " + if (reverse) REVERSE_WAIT else SALE_WAIT)
       return@withLock Posted.Skipped(if (reverse) SKIPPED_REVERSE_NOTE else SKIPPED_NOTE)
     }
     note(waiting, item, null)
@@ -152,21 +192,24 @@ object OrdersLive {
     val blockExpired = ShopPolicy.blockExpired(context)
     var outcome: Posted = Posted.Already
     var short: List<String> = emptyList()
+    var shortIds: List<String> = emptyList()
     val wrote = store.update { cur ->
       val r = if (reverse) OrderFulfillment.reverse(cur, item, day, at)
       else OrderFulfillment.fulfill(cur, item, day, at, seller = seller, blockExpired = blockExpired, allowShortage = true)
       when (r) {
-        is OrderFulfillment.Result.Ok -> { outcome = Posted.Saved; short = r.short; r.data }
+        is OrderFulfillment.Result.Ok -> { outcome = Posted.Saved; short = r.short; shortIds = r.shortIds; r.data }
         is OrderFulfillment.Result.Already -> { outcome = Posted.Already; null }
         is OrderFulfillment.Result.Failed -> { outcome = Posted.Failed(r.message); null }
+        is OrderFulfillment.Result.Review -> { outcome = Posted.Review(r.message); null }
       }
     }
+    note(review, item, (outcome as? Posted.Review)?.message)
     if (outcome == Posted.Saved && wrote != true) {
       outcome = Posted.Failed("فروشِ سفارش #${item.orderNo} روی دستگاه نوشته نشد (قفلِ برنامه؟)؛ دوباره بزنید")
     }
     note(unposted, item, (outcome as? Posted.Failed)?.message)
     if (outcome == Posted.Saved) {
-      note(shortfalls, item, if (short.isEmpty()) null else "سفارش #${item.orderNo} ثبت شد ولی موجودی منفی شد: ${short.joinToString(" · ")}")
+      note(shortfalls, item, if (short.isEmpty()) null else "سفارش #${item.orderNo} ثبت شد ولی موجودی منفی شد: ${short.joinToString(" · ")}", shortIds)
       //  §۳۲.۲: موجودیِ تازه همین حالا به سرور، ویترین و دستگاه‌های دیگر برود
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
     }
@@ -188,9 +231,25 @@ object OrdersLive {
       is ApiResult.Failure -> Posted.Failed(r.error.userMessage)
       is ApiResult.Success -> {
         val item = r.value.items.firstOrNull { it.id == orderId } ?: r.value.reversals.firstOrNull { it.id == orderId }
-        if (item == null) Posted.Already else applyItem(context, store, item)
+        val held = r.value.review.firstOrNull { it.id == orderId }
+        when {
+          item != null -> applyItem(context, store, item)
+          //  پیش از کف بیرون رفت ⇒ هرگز خودکار؛ صاحب می‌بیند
+          held != null -> reviewOf(held)
+          else -> Posted.Already
+        }
       }
     }
+  }
+
+  /** ردیفِ `review` ِ سرور ⇒ فهرستِ بررسیِ صاحب، با دلیلِ همان کد */
+  private fun reviewOf(o: OrderDto): Posted {
+    val msg = "سفارش #${o.orderNo} — " + when (o.reviewCode) {
+      "before_floor" -> OrderFulfillment.REVIEW_BEFORE_FLOOR
+      else -> "کارِ خودکار نشد؛ بررسی کنید"
+    }
+    note(review, o, msg)
+    return Posted.Review(msg)
   }
 
   /**
@@ -209,6 +268,7 @@ object OrdersLive {
           )
           is Posted.Skipped -> HandoverSaleResult.Failed(r.message)
           is Posted.Failed -> HandoverSaleResult.Failed(r.message)
+          is Posted.Review -> HandoverSaleResult.Failed(r.message)
         }
     }
   }
@@ -223,21 +283,40 @@ object OrdersLive {
     val cfg = config.value ?: return
     if (!cfg.permissions.manage || !cfg.saleOnHandover || !store.loaded.value) return
     val since = cfg.handoverSince ?: return
+    prune(store.data.value)
     val now = System.currentTimeMillis()
     if (!force && rev.value == handoverRev && now - handoverAt < HANDOVER_MS) return
     handoverRev = rev.value
     handoverAt = now
     val left = HashSet<String>()
+    val held = HashSet<String>()
+    val listed = HashSet<String>()
     var after: String? = null
     for (page in 0 until HANDOVER_PAGES) {
       val r = repository(context).handover(since, after = after)
       val p = (r as? ApiResult.Success)?.value ?: return
-      for (o in p.items) if (applyItem(context, store, o) is Posted.Skipped) left += o.id
-      if (page == 0) for (o in p.reversals) if (applyItem(context, store, o) is Posted.Skipped) left += o.id
+      for (o in p.items) {
+        listed += o.id
+        if (applyItem(context, store, o) is Posted.Skipped) left += o.id
+      }
+      if (page == 0) {
+        for (o in p.reversals) {
+          listed += o.id
+          when (applyItem(context, store, o)) {
+            is Posted.Skipped -> left += o.id
+            is Posted.Review -> held += o.id
+            else -> Unit
+          }
+        }
+        for (o in p.review) { reviewOf(o); held += o.id }
+      }
       after = p.nextAfter
       if (after == null) {
-        //  همهٔ صفحه‌ها دیده شد ⇒ منتظرهایی که دیگر در فهرستِ سرور نیستند (جای دیگر ثبت شد) می‌روند
+        //  همهٔ صفحه‌ها دیده شد ⇒ آن‌چه دیگر در فهرستِ سرور نیست (جای دیگر ثبت شد) می‌رود
         waiting.value = waiting.value.filter { it.orderId in left }
+        review.value = review.value.filter { it.orderId in held }
+        unposted.value = unposted.value.filter { it.orderId in listed }
+        prune(store.data.value)
         return
       }
     }
@@ -267,7 +346,7 @@ object OrdersLive {
     config.value = cfg
     if (cfg == null) {
       counts.value = emptyMap(); rev.value = 0
-      unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList()
+      unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList(); review.value = emptyList()
     }
   }
 

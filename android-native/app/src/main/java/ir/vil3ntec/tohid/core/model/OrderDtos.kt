@@ -142,6 +142,8 @@ data class OrderDto(
   val recordable: Boolean? = null,
   /** فقط در `handover` برای `reverse`: همین کاربر لغوِ فروش را می‌تواند بنویسد */
   val reversible: Boolean? = null,
+  /** فقط در `handover` برای `review`: چرا خودکار نه (`before_floor`: نخستین تحویل پیش از کفِ دکان) */
+  val reviewCode: String? = null,
 )
 
 /** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
@@ -150,6 +152,8 @@ data class HandoverPageDto(
   val items: List<OrderDto> = emptyList(),
   /** برگشته به دکان با فروشِ لغونشده */
   val reversals: List<OrderDto> = emptyList(),
+  /** بررسیِ صاحب: پیش از کف بیرون رفت و پس از آن تحویل شد — هرگز خودکار */
+  val review: List<OrderDto> = emptyList(),
   /** صفحهٔ بعد (`after`) — سفارشِ گیرکرده جلوی بقیه را نمی‌گیرد */
   val nextAfter: String? = null,
   val since: Long = 0,

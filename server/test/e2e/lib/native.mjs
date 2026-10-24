@@ -705,6 +705,10 @@ export class NativeDevice {
     const saleId = `o-${o.id}`;
     const sale = d.sales.find((s) => s.id === saleId);
     if (!sale || sale.status === 'cancelled') return { ok: true, already: true, saleId };
+    //  `OrderFulfillment.reverseBlock`: فاکتوری که «مرجوعیِ» دستی گرفته ⇒ لغوِ خاموش نه، بررسیِ صاحب
+    if (d.saleItems.some((x) => x.saleId === saleId && x.returnedQty > 1e-9) || (d.returns || []).some((r) => r.saleId === saleId)) {
+      return { ok: false, review: true, saleId, message: `سفارش #${o.orderNo} به دکان برگشت ولی برای فاکتورش پیش‌تر «مرجوعیِ» دستی ثبت شده — لغوِ خودکار نشد` };
+    }
     const now = o.returnedAt || this.now();
     const today = todayOf(now);
     const reason = 'سفارشِ اینترنتی به دکان برگشت';

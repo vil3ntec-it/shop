@@ -24,6 +24,10 @@ import ir.vil3ntec.tohid.money
  *    موجودی یک بار برمی‌گردد، صندوق و گزارش دیگر نمی‌شمارندش. (مرجوعی نه: `returnedQty` در
  *    Sync v1 شمارندهٔ `$inc` است و دو دستگاه آن را دو بار می‌افزودند؛ وضعیت تکرارپذیر است.)
  *    حرکت یا ممیزیِ لغوی که از دستگاهِ دیگر پیش‌تر رسیده دوباره ساخته نمی‌شود (شناسهٔ تکراری نه).
+ *    فاکتوری که پیش‌تر «مرجوعیِ» دستی گرفته ([reverseBlock]) ⇒ لغوِ خاموش **نه**: پولِ مرجوعی از دخل
+ *    رفته و کالا یک بار برگشته؛ لغو آن را دوباره برمی‌گرداند ⇒ [Result.Review] برای صاحب.
+ *  • کف: فقط سفارشی که **نخستین** گذارِ تحویلش پس از کفِ دکان است خودکار فروش می‌گیرد؛ «ارسال»
+ *    پیش از کف ⇒ فهرستِ بررسیِ صاحب ([REVIEW_BEFORE_FLOOR]).
  *  • قیمت‌ها همانِ سفارش‌اند (به پول، دقیق)؛ هزینهٔ ارسال یک قلمِ آزاد است (بی اثر بر
  *    موجودی)؛ تخفیفِ سفارش تخفیفِ فاکتور.
  *  • پول ([paymentOf]) — همیشه `channel = online`:
@@ -121,9 +125,42 @@ object OrderFulfillment {
     return first?.toStatus == "picked_up" || (first == null && o.status == "picked_up")
   }
 
+  /** دلیلِ فهرستِ بررسی برای ردیفِ `review` ِ سرور (`reviewCode = before_floor`) */
+  const val REVIEW_BEFORE_FLOOR = "پیش از راه‌اندازی تحویل شده؛ اگر دستی ثبت نکرده‌اید، ثبت کنید"
+
+  /** فروشِ این سفارش (از هر دستگاه) در دفتر هست ⇒ هشدارِ «ثبت نشد» دیگر لازم نیست */
+  fun settled(d: ShopData, orderId: String): Boolean = saleOf(d, orderId) != null
+
+  /** یکی از این کالاها هنوز موجودیِ منفی دارد ⇒ هشدارِ «کمبود» بماند */
+  fun stillShort(d: ShopData, productIds: List<String>): Boolean =
+    productIds.any { ShopStore.stock(d, it) < -1e-9 }
+
+  /**
+   *  چرا [reverse] نباید فروشِ این سفارشِ برگشته را خاموش لغو کند — یا null. فاکتوری که پیش‌تر
+   *  «مرجوعیِ» دستی گرفته (صندوق‌دار کالای پیک را به‌جای «برگشت به دکان» مرجوع زد): پولِ مرجوعی از
+   *  دخل رفته و کالا یک بار برگشته؛ لغو موجودی را دوباره برمی‌گرداند و فروش را از درآمد برمی‌دارد.
+   */
+  fun reverseBlock(d: ShopData, o: OrderDto): String? {
+    val saleId = saleIdOf(o.id)
+    val returned = d.saleItems.any { it.saleId == saleId && it.returnedQty > 1e-9 } || d.saleReturns.any { it.saleId == saleId }
+    if (!returned) return null
+    return "سفارش #${o.orderNo} به دکان برگشت ولی برای فاکتورش پیش‌تر «مرجوعیِ» دستی ثبت شده — لغوِ خودکار نشد. " +
+      "مرجوعی پول را از دخل برداشته و کالا را یک بار برگردانده؛ صاحب دخل و موجودی را بررسی کند."
+  }
+
   sealed interface Result {
-    /** [short]: کالاهایی که پس از تحویل از موجودیِ دفتر بیشتر بودند (موجودی منفی شد) */
-    data class Ok(val data: ShopData, val saleId: String, val short: List<String> = emptyList()) : Result
+    /**
+     *  [short]: کالاهایی که پس از تحویل از موجودیِ دفتر بیشتر بودند (موجودی منفی شد)؛
+     *  [shortIds]: شناسهٔ همان کالاها (هشدار با درست شدنِ موجودی می‌رود)
+     */
+    data class Ok(
+      val data: ShopData,
+      val saleId: String,
+      val short: List<String> = emptyList(),
+      val shortIds: List<String> = emptyList(),
+    ) : Result
+    /** کارِ خودکار انجام نشد؛ صاحب باید ببیند ([message] دلیل است) — هیچ تغییری نیست */
+    data class Review(val saleId: String, val message: String) : Result
     /** پیش‌تر ثبت شده — هیچ تغییری نیست */
     data class Already(val saleId: String) : Result
     data class Failed(val message: String) : Result
@@ -200,6 +237,7 @@ object OrderFulfillment {
     val need = LinkedHashMap<String, Double>()
     for (pl in plan) pl.product?.let { need[it.id] = (need[it.id] ?: 0.0) + pl.cart.quantity }
     val short = ArrayList<String>()
+    val shortIds = ArrayList<String>()
     val cover = ArrayList<WarehouseEntry>()
     for ((pid, q) in need) {
       val available = ShopStore.stock(d, pid)
@@ -207,6 +245,7 @@ object OrderFulfillment {
       val msg = SalesEngine.shortageMessage(byId.getValue(pid), q, available)
       if (!allowShortage) return Result.Failed(tag + msg)
       short += msg
+      shortIds += pid
       //  فقط برای گذشتن از سنجشِ صندوق در `record`؛ این ردیف هرگز در دفتر نمی‌نشیند
       cover += WarehouseEntry(id = "o-cover-$pid", productId = pid, units = q - available)
     }
@@ -292,6 +331,7 @@ object OrderFulfillment {
       ),
       sale.id,
       short,
+      shortIds,
     )
   }
 
@@ -304,6 +344,7 @@ object OrderFulfillment {
     val saleId = saleIdOf(o.id)
     val sale = d.sales.firstOrNull { it.id == saleId } ?: return Result.Already(saleId)
     if (sale.status == "cancelled") return Result.Already(saleId)
+    reverseBlock(d, o)?.let { return Result.Review(saleId, it) }
     val label = sale.invoiceLabel() ?: "0"
     //  همگام‌سازیِ نیمه (حرکت یا ممیزیِ لغو از دستگاهِ دیگر رسیده، وضعیتِ فاکتور هنوز نه) ⇒ همان‌ها
     val moved = d.stockMovements.mapTo(HashSet()) { it.id }

@@ -125,6 +125,22 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       "اعلانِ فوری (وقتی برنامه بسته است) هنوز وصل نیست؛ تا برنامه باز است، صف هر چند ثانیه خودش تازه می‌شود.",
       style = MaterialTheme.typography.labelSmall, color = colors.muted,
     )
+    //  دورهٔ گذار: دستگاهِ کهنه فروشِ سفارش را دستی می‌زند و این برنامه خودکار ⇒ دو فروش
+    if (OrdersLive.rolloutNotice()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(title = OrdersLive.ROLLOUT_NOTE, body = "", action = null, onAction = {})
+    }
+    //  بررسیِ صاحب: کاری که خودکار نشد و نباید بشود (تحویلِ پیش از راه‌اندازی، برگشت پس از مرجوعی)
+    val review = OrdersLive.review.value
+    if (review.isNotEmpty() && cfg.permissions.refund) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${review.size} سفارش بررسیِ صاحب می‌خواهد",
+        body = review.take(3).joinToString("\n") { it.message },
+        action = null,
+        onAction = {},
+      )
+    }
     //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
     val unposted = OrdersLive.unposted.value
     if (unposted.isNotEmpty()) {
@@ -394,6 +410,7 @@ private fun OrderDetailSheet(
       OrdersLive.Posted.Already -> Unit
       is OrdersLive.Posted.Skipped -> snackbar.showSnackbar(r.message)
       is OrdersLive.Posted.Failed -> snackbar.showSnackbar(r.message)
+      is OrdersLive.Posted.Review -> snackbar.showSnackbar(r.message)
     }
   }
 
@@ -473,8 +490,16 @@ private fun OrderDetailSheet(
       if (sold != null) {
         Spacer(Modifier.height(6.dp))
         Text(
-          "فروشِ تحویل: فاکتور #${sold.invoiceLabel() ?: "—"} — برگشتِ کالا با «مرجوعیِ» همین فاکتور در «فروش‌ها»",
+          "فروشِ تحویل: فاکتور #${sold.invoiceLabel() ?: "—"} — کالایی که پیک برگرداند ⇒ همین سفارش را «برگشت به دکان» بزنید (فروش خودش لغو می‌شود)؛ «مرجوعی» نزنید",
           style = MaterialTheme.typography.bodySmall, color = c.muted,
+        )
+      } else if (OrdersLive.review.value.any { it.orderId == o.id }) {
+        Spacer(Modifier.height(8.dp))
+        FulfillNotice(
+          title = "بررسیِ صاحب — فروشِ این سفارش خودکار ثبت نمی‌شود",
+          body = OrdersLive.review.value.first { it.orderId == o.id }.message,
+          action = null,
+          onAction = {},
         )
       } else if (OrderFulfillment.needsSale(ledger, o, OrdersLive.handoverSince())) {
         Spacer(Modifier.height(8.dp))
@@ -489,10 +514,12 @@ private fun OrderDetailSheet(
       }
       if (sold != null && OrderFulfillment.needsReverse(ledger, o)) {
         Spacer(Modifier.height(8.dp))
-        val able = cfg.permissions.manage && OrdersLive.canReverse(cfg, o) && !OrdersLive.isWaiting(o.id)
+        //  پیش‌تر «مرجوعیِ» دستی گرفته ⇒ لغوِ خودکار نه؛ صاحب بررسی کند
+        val blocked = OrderFulfillment.reverseBlock(ledger, o)
+        val able = blocked == null && cfg.permissions.manage && OrdersLive.canReverse(cfg, o) && !OrdersLive.isWaiting(o.id)
         FulfillNotice(
           title = "کالای این سفارش به دکان برگشته ولی فروشش هنوز لغو نشده",
-          body = if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_REVERSE_NOTE,
+          body = blocked ?: if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_REVERSE_NOTE,
           action = if (able) "لغوِ فروشِ تحویل" else null,
           onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
         )
