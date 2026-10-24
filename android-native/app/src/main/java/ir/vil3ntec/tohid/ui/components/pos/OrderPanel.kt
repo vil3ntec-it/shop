@@ -153,6 +153,8 @@ fun OrderLines(
   onMinus: (String) -> Unit,
   onPlus: (String) -> Unit,
   modifier: Modifier = Modifier,
+  /** تهِ همان فهرست (با اسکرولِ اقلام) — مثلاً ردیف‌های تخفیف و کادرِ کد؛ null ⇒ هیچ */
+  footer: (@Composable () -> Unit)? = null,
 ) {
   if (lines.isEmpty()) {
     Column(
@@ -204,6 +206,7 @@ fun OrderLines(
       }
       if (i < lines.size - 1) HorizontalDivider(color = Shop.colors.border.copy(alpha = 0.6f))
     }
+    if (footer != null) item(key = "order-lines-footer") { footer() }
   }
 }
 
