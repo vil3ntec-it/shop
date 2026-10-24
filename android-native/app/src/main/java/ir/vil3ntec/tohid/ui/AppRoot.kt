@@ -371,6 +371,28 @@ fun AppRoot(
     }
   }
 
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛ پنجره با
+  //  «بازسازی از سرور» و راهِ «تنظیمات ← امنیت» (بازبینیِ #331). با دفترِ ساده هرگز پیش نمی‌آید.
+  val unreadable by store.unreadable.collectAsState()
+  var unreadableOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(unreadable) { unreadableOpen = unreadable != null }
+  //  پشتِ قفلِ برنامه نه: پنجره رویِ صفحهٔ قفل باز نمی‌شود
+  if (unreadableOpen && unreadable != null && !(lockStore.enabled && !unlocked)) {
+    ir.vil3ntec.tohid.ui.screens.UnreadableLedgerDialog(
+      store = store,
+      onOpenSecurity = { unreadableOpen = false; AppNav.go("settings") },
+      onDismiss = { unreadableOpen = false },
+      toast = { msg -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
+    )
+  }
+  //  نتیجهٔ بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود (`ShopStore.notice`)
+  LaunchedEffect(store) {
+    store.notice.collect { msg ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
+    }
+  }
+
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }
     return
@@ -747,6 +769,7 @@ fun AppRoot(
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
+                ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
                 "کد شاگرد" to androidx.compose.material.icons.Icons.Filled.Key,

@@ -75,6 +75,10 @@ val replaced = listOf(
   "MainActivity.kt",
   "core/net/TokenStore.kt",
   "data/Fingerprint.kt",
+  //  SEC-01: کلیدِ اصلیِ رمزِ دفتر — اندروید Keystore، این‌جا فایلِ فقط-صاحب (‎data/AtRestKeysDesk.kt‎)
+  "data/AtRestKeys.kt",
+  //  SEC-01: عاملِ پشتیبانِ خودکارِ اندروید — کامپیوتر پشتیبانِ سیستمی ندارد (جایگزین ندارد)
+  "data/TohidBackupAgent.kt",
   "data/GoogleSignIn.kt",
   "data/Migration.kt",
   "scan/BarcodeScanner.kt",

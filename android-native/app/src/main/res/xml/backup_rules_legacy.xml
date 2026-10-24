@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ -->
+<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ (و همان استثنای SEC-01 در `TohidBackupAgent`) -->
 <full-backup-content>
   <include domain="file" path="." />
   <include domain="sharedpref" path="." />
