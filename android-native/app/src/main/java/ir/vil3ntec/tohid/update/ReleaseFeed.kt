@@ -128,4 +128,35 @@ object ReleaseFeed {
     }
     return null
   }
+
+  // ── نسخهٔ پیش‌نمایش (`BuildConfig.PREVIEW`) ─────────────────────────
+  //  فقط `releases/tags/tohid-native-preview`؛ سرور پرسیده نمی‌شود. نامِ نصبی
+  //  ثابت است و به `.apk` ختم نمی‌شود؛ نسخه‌اش در `label`ِ همان دارایی است
+  //  (`3.2.<شمارهٔ اجرا>-preview`) که با خودِ فایل یک‌جا بالا می‌رود.
+
+  const val PREVIEW_TAG = "tohid-native-preview"
+  const val PREVIEW_ASSET = "tohid-preview.apk.preview"
+  private val PREVIEW_BUILD = Regex("\\.(\\d+)-preview$")
+
+  /** شمارهٔ ساختِ پیش‌نمایش از نامِ نسخه (`3.2.17-preview` ⇒ ۱۷)؛ ناخوانا ⇒ -۱ */
+  fun previewBuild(version: String): Int =
+    PREVIEW_BUILD.find(version.trim())?.groupValues?.get(1)?.toIntOrNull() ?: -1
+
+  /** پاسخِ `releases/tags/tohid-native-preview`؛ برچسبِ دیگر، پیش‌نویس، بی نسخه یا بی فهرست ⇒ null */
+  fun previewPick(body: String): Latest? {
+    val r = JSONObject(body)
+    if (r.optBoolean("draft") || str(r, "tag_name") != PREVIEW_TAG) return null
+    val raw = r.optJSONArray("assets") ?: return null
+    val assets = (0 until raw.length()).map { raw.getJSONObject(it) }
+    val apk = assets.firstOrNull { str(it, "name") == PREVIEW_ASSET } ?: return null
+    val version = str(apk, "label").trim().takeIf { previewBuild(it) >= 0 } ?: return null
+    val sums = assets.firstOrNull { str(it, "name").equals(SUMS, true) } ?: return null
+    return Latest(
+      PREVIEW_TAG, version, str(r, "body"),
+      listOf(
+        Asset(PREVIEW_ASSET, apk.optLong("size"), str(apk, "browser_download_url")),
+        Asset(SUMS, sums.optLong("size"), str(sums, "browser_download_url")),
+      ),
+    )
+  }
 }
