@@ -27,6 +27,7 @@ const { many, one, query, newId, now } = require('../src/db');
 const { can } = require('../src/lib/permissions');
 const chat = require('../src/lib/shop-chat');
 const orders = require('../src/lib/orders');
+const trust = require('../src/lib/market-trust');
 
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
@@ -187,17 +188,22 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
  * شناسهٔ کالا در «کدام عکس برای این کالا» (کالا شناسهٔ ساختهٔ دستگاه است؛ برای
- * «ب» همان «کالای بی‌عکس» است). این‌ها برای «ب» ۲۰۰ِ **فضای خودِ «ب»** می‌دهند —
- * نشت نبودنش را همان سنجهٔ «هیچ شناسهٔ دیگرِ الف برنگشت» و ردپای بایت‌به‌بایت می‌گیرد.
+ * «ب» همان «کالای بی‌عکس» است)، و شناسهٔ قاعدهٔ تخفیف (ساختهٔ برنامه؛ upsert با
+ * کلیدِ (shop_id, id) — «ب» با شناسهٔ «الف» فقط ردیفِ خودش را می‌سازد/پاک می‌کند).
+ * این‌ها برای «ب» ۲۰۰ِ **فضای خودِ «ب»** می‌دهند — نشت نبودنش را همان سنجهٔ «هیچ
+ * شناسهٔ دیگرِ الف برنگشت» و ردپای بایت‌به‌بایت می‌گیرد (و برای تخفیف، سنجهٔ صریحِ پایین).
  */
-const PER_SHOP_KEYS = new Set(['PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId']);
-/** شناسهٔ کالا کلیدِ فضای دکان است، نه راز — برای «ب» بازتابِ همان نشانی است */
-const NOT_SECRET = new Set(['product']);
+const PER_SHOP_KEYS = new Set([
+  'PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId',
+  'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+]);
+/** شناسهٔ کالا و قاعدهٔ تخفیف کلیدِ فضای دکان‌اند، نه راز — برای «ب» بازتابِ همان نشانی‌اند */
+const NOT_SECRET = new Set(['product', 'promoRule']);
 
 let k = 0;
 const fresh = (p) => `${p}-${++k}-${Date.now()}`;
@@ -352,6 +358,22 @@ async function seedShop(a) {
   assert.ok([200, 201].includes(key.status), JSON.stringify(key.body));
   ids.approverKey = key.body.key.id;
 
+  //  قاعدهٔ تخفیف — شناسه را برنامه می‌سازد؛ کلیدِ فضای خودِ دکان
+  ids.promoRule = 'inv-promo-a1';
+  const promo = await h.put(`/api/shop/promos/rules/${ids.promoRule}`,
+    { rule: { name: 'تخفیفِ الف', kind: 'percent', bp: 1000 } }, { token: a.accessToken });
+  assert.equal(promo.status, 200, JSON.stringify(promo.body));
+
+  //  شکایتِ بازارچه از «الف» + پاسخِ دکان — از لایهٔ اعتماد، همان راهِ مشتریِ ویترین
+  const filed = await trust.file({ shop_id: a.shopId }, { phone: '+93791112244', ip: '' },
+    { subject: 'shop', category: 'rude', body: 'فروشنده بد برخورد کرد' }, 'complaint');
+  assert.equal(filed.duplicate, false, JSON.stringify(filed));
+  ids.trustCase = (await one('SELECT id FROM trust_cases WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [a.shopId]))?.id;
+  assert.ok(ids.trustCase, 'پروندهٔ شکایتِ الف');
+  const resp = await h.post(`/api/shop/trust/cases/${ids.trustCase}/responses`,
+    { body: 'پوزش؛ پیگیری شد', clientId: `client-${fresh('t')}-0000` }, { token: a.accessToken });
+  assert.equal(resp.status, 201, JSON.stringify(resp.body));
+
   return { ids, staff, courier };
 }
 
@@ -381,6 +403,8 @@ function concreteFor(ids) {
     [/^(\/shop\/permissions\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
+    [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
+    [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
   ];
   const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
   return (r) => {
@@ -417,6 +441,9 @@ function bodyFor(r, ids) {
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/permissions/roles/:role': { perms: {} },
+    'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
+    'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },
+    'POST /shop/trust/cases/:id/appeal': { body: 'اعتراضِ «ب» به این تصمیم' },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});
 }
@@ -467,6 +494,9 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
   assert.deepEqual(own, [], own.join('\n'));
 
   const before = await footprint(a.shopId);
+  const promoOfA = () => one('SELECT * FROM shop_promotions WHERE shop_id=$1 AND id=$2', [a.shopId, ids.promoRule]);
+  const promoBefore = await promoOfA();
+  assert.ok(promoBefore && promoBefore.deleted === false, 'قاعدهٔ تخفیفِ «الف» ساخته شده');
   const failures = [];
   for (const r of withIds) {
     const key = `${r.method} ${r.path}`;
@@ -494,6 +524,20 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
     }
   }
   assert.deepEqual(failures, [], failures.join('\n'));
+
+  //  قاعدهٔ تخفیف، صریح: PUT/DELETEِ «ب» با شناسهٔ «الف» فقط فضای خودِ «ب» است —
+  //  ردیفِ «الف» پس از هر کدام بایت‌به‌بایت همان می‌ماند
+  assert.deepEqual(await promoOfA(), promoBefore, 'درهای بالا قاعدهٔ تخفیفِ «الف» را عوض نکردند');
+  const promoUrl = `/api/shop/promos/rules/${ids.promoRule}`;
+  const bPut = await h.put(promoUrl, { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } }, { token: b.accessToken });
+  assert.equal(bPut.status, 200, JSON.stringify(bPut.body));
+  assert.ok(await one('SELECT 1 AS x FROM shop_promotions WHERE shop_id=$1 AND id=$2 AND deleted=false', [b.shopId, ids.promoRule]),
+    'PUTِ «ب» در فضای خودِ «ب» نشست');
+  assert.deepEqual(await promoOfA(), promoBefore, 'PUTِ «ب» با شناسهٔ «الف» ردیفِ «الف» را عوض نکرد');
+  const bDel = await h.del(promoUrl, { token: b.accessToken });
+  assert.equal(bDel.status, 200, JSON.stringify(bDel.body));
+  assert.deepEqual(await promoOfA(), promoBefore, 'DELETEِ «ب» با شناسهٔ «الف» ردیفِ «الف» را پاک نکرد');
+
   //  آزمونِ شاگرد بی‌اثر نبود: دست‌کم درهای اعضا، تسویه، عکس و بازپرداخت را سنجید
   for (const p of ['members.manage', 'delivery.settle', 'delivery.photo', 'orders.refund', 'chat.moderate', 'stock.adjust']) {
     assert.ok(withIds.some((r) => r.perms.includes(p)), `هیچ مسیرِ شناسه‌داری «${p}» نخواست — خواندنِ اجازه‌ها از سورس شکسته؟`);

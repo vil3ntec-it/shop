@@ -200,6 +200,8 @@ fun OrderLines(
   onMinus: (String) -> Unit,
   onPlus: (String) -> Unit,
   modifier: Modifier = Modifier,
+  /** تهِ همان فهرست (با اسکرولِ اقلام) — مثلاً ردیف‌های تخفیف و کادرِ کد؛ null ⇒ هیچ */
+  footer: (@Composable () -> Unit)? = null,
 ) {
   val c = Shop.colors
   if (lines.isEmpty()) {
@@ -268,6 +270,7 @@ fun OrderLines(
         Box(Modifier.fillMaxWidth().padding(start = 50.dp, end = 6.dp).height(1.dp).background(c.border))
       } else Spacer(Modifier.height(1.dp))
     }
+    if (footer != null) item(key = "order-lines-footer") { footer() }
   }
 }
 

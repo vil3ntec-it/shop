@@ -66,6 +66,8 @@ object DevShot {
               }
               //  «موردِ تازه» در همین صفحه — همان Ctrl+N
               "new" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.addAction.value?.invoke() }; Thread.sleep(1200) }
+              //  تخفیف‌ها: promo:demo — پنج قاعدهٔ نمونه روی دفترِ نمایشی، کلید روشن (`PromoLive.demo`)
+              "promo" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.PromoLive.demo() }; Thread.sleep(800) }
               "help" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.help.value = arg != "off" }; Thread.sleep(1500) }
               //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
               "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
