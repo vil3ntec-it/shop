@@ -2,6 +2,17 @@ package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.sync.SyncBadge
+import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
+import ir.vil3ntec.tohid.ui.v3.analytics.AnalyticsPaths
+import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
+import ir.vil3ntec.tohid.ui.v3.online.OnlinePaths
+import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
+import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
+import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
+import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 
 /*
  *  خانهٔ گوشی، نسخهٔ ۳ (r7 خانه، r6 کارتِ کششی، r8 آمار) — منطقِ خالص.
@@ -81,26 +92,29 @@ object PullCard {
  *
  *  هشت خانه همیشه پر است و هشتمی «بیشتر». کارمندان فقط برای مدیر (همان سدِ
  *  «بیشتر»)، سفارش‌ها فقط وقتی سفارشِ آنلاین برای این دکان روشن است؛ جای
- *  خالی با خرید و بعد تاریخچه پر می‌شود.
+ *  خالی با خرید و بعد تاریخچه پر می‌شود. `id` رنگ و نشانهٔ کاشی را می‌گوید و
+ *  `route` مسیرِ نوع‌دارِ همان بخش است؛ نام هر بار از جدولِ نوشته خوانده می‌شود.
  */
 object HomeSections {
-  data class Tile(val id: String, val label: String, val route: String)
+  data class Tile(val id: String, val route: String) {
+    val label: String get() = labelOf(id)
+  }
 
   private val CORE = listOf(
-    Tile("products", "کالاها", "products"),
-    Tile("warehouse", "انبار", "warehouse"),
-    Tile("debtors", "قرض‌داران", "debtors"),
-    Tile("expenses", "مصارف", "expenses"),
-    Tile("reports", "گزارش‌ها", "reports"),
+    Tile("products", ProductsPaths.LIST),
+    Tile("warehouse", StockPaths.LIST),
+    Tile("debtors", MoneyPaths.DEBTORS),
+    Tile("expenses", MoneyPaths.EXPENSES),
+    Tile("reports", AnalyticsPaths.REPORTS),
   )
-  private val TEAM = Tile("team", "کارمندان", "team")
-  private val ORDERS = Tile("orders", "سفارش‌ها", "orders")
+  private val TEAM = Tile("team", AccountPaths.TEAM)
+  private val ORDERS = Tile("orders", OnlinePaths.ORDERS)
   private val FILL = listOf(
-    Tile("purchasing", "خرید", "purchasing"),
-    Tile("sales", "تاریخچه", "sales"),
-    Tile("receipts", "رسیدها", "receipts"),
+    Tile("purchasing", MoneyPaths.PURCHASING),
+    Tile("sales", SalesPaths.HISTORY),
+    Tile("receipts", MoneyPaths.RECEIPTS),
   )
-  val MORE = Tile("more", "بیشتر", "more")
+  val MORE = Tile("more", "more")
 
   fun tiles(canManage: Boolean, ordersLive: Boolean): List<Tile> {
     val out = CORE.toMutableList()
@@ -108,6 +122,20 @@ object HomeSections {
     if (ordersLive) out += ORDERS
     for (f in FILL) { if (out.size >= 7) break; out += f }
     return out.take(7) + MORE
+  }
+
+  fun labelOf(id: String): String = when (id) {
+    "products" -> StrHome.tileProducts
+    "warehouse" -> Str.warehouse
+    "debtors" -> Str.debtors
+    "expenses" -> Str.expenses
+    "reports" -> Str.reports
+    "team" -> StrHome.tileTeam
+    "orders" -> Str.orders
+    "purchasing" -> Str.purchases
+    "sales" -> StrHome.history
+    "receipts" -> Str.receipts
+    else -> Str.more
   }
 }
 
@@ -117,6 +145,11 @@ object HomeSections {
  *  ترتیب = فوریت: سفارشِ آنلاینِ تازه، اشتراکِ تمام‌شده/رو به پایان، خطای
  *  همگام‌سازی، کالای تمام‌شده/کم، قرضِ عقب‌افتاده، انقضا، صفِ همگام‌سازی.
  *  هیچ‌چیز ⇒ فهرستِ خالی (صفحه کارتِ آرامِ «همه چیز مرتب است» را نشان می‌دهد).
+ *
+ *  هر هشدار مستقیم سرِ کادرِ خودش می‌رود (`ShellTargets`): همگام‌سازی ⇐ صفحهٔ
+ *  همگام‌سازی (نه دستگاه‌های جانبی)، کالا ⇐ فهرستِ همان فیلتر، اشتراک ⇐ اشتراک و
+ *  دکمهٔ «تمدید» ⇐ پلن‌ها (`actionRoute`). خطای همگام‌سازی دلیلِ واقعیِ موتور را
+ *  (`syncError`) همان‌جا می‌گوید.
  */
 object HomeAlerts {
   enum class Kind { ORDERS, SUBSCRIPTION, SYNC, STOCK, DEBTS, EXPIRY }
@@ -129,10 +162,15 @@ object HomeAlerts {
     val route: String,
     /** فوری‌ها (سرخ‌ها) زمینهٔ تیره‌تر می‌گیرند */
     val urgent: Boolean = false,
+    /** دکمهٔ کارِ کارت (مثلاً «تمدید» ⇐ پلن‌ها)؛ پیش‌فرض همان مقصدِ کارت */
+    val actionRoute: String = route,
   )
 
   /** همگام‌سازی از نگاهِ هشدار */
   enum class Sync { OK, QUEUED, OFFLINE, ERROR, LOCAL_ONLY }
+
+  /** خطای بلندِ موتور در یک کارت جا نمی‌شود (همان سقفِ نوارِ وضعیت) */
+  const val MAX_ERROR = SyncBadge.MAX_ERROR
 
   data class Input(
     val ordersLive: Boolean = false,
@@ -142,6 +180,8 @@ object HomeAlerts {
     val subscriptionDaysLeft: Int? = null,
     val sync: Sync = Sync.OK,
     val queued: Int = 0,
+    /** آخرین خطای موتورِ همگام‌سازی (`SyncStatus.lastError`) — دلیلِ واقعی */
+    val syncError: String = "",
     val outOfStock: Int = 0,
     val lowStock: Int = 0,
     val overdueDebtors: Int = 0,
@@ -149,38 +189,48 @@ object HomeAlerts {
     val expiring: Int = 0,
   )
 
+  /** دلیلِ واقعیِ خطا در یک خط، یا متنِ همیشگی وقتی موتور چیزی نگفته */
+  fun syncReason(error: String): String {
+    val e = error.trim().replace('\n', ' ')
+    return when {
+      e.isEmpty() -> StrHome.alertSyncErrorBody
+      e.length <= MAX_ERROR -> e
+      else -> e.take(MAX_ERROR - 1) + "…"
+    }
+  }
+
   fun build(i: Input): List<Alert> = buildList {
     if (i.ordersLive && i.newOrders > 0) add(
-      Alert(Kind.ORDERS, "${i.newOrders} سفارشِ آنلاینِ تازه", "مشتری منتظرِ تأییدِ شماست", "دیدن", "orders", urgent = true),
+      Alert(Kind.ORDERS, StrHome.alertNewOrders(i.newOrders), StrHome.alertNewOrdersBody, StrHome.actionSee, ShellTargets.NEW_ORDERS, urgent = true),
     )
     if (i.subscriptionLocked) add(
-      Alert(Kind.SUBSCRIPTION, "اشتراک تمام شده", "دفتر سرِ جایش است؛ فروشِ تازه با تمدید باز می‌شود", "تمدید", "vip", urgent = true),
+      Alert(Kind.SUBSCRIPTION, StrHome.alertSubEnded, StrHome.alertSubEndedBody, Str.renew, ShellTargets.SUBSCRIPTION, urgent = true, actionRoute = ShellTargets.PLANS),
     ) else i.subscriptionDaysLeft?.let { left -> add(
-      Alert(Kind.SUBSCRIPTION, "$left روز تا پایانِ اشتراک", "پیش از قفل شدن تمدید کنید؛ هیچ داده‌ای پاک نمی‌شود", "تمدید", "vip", urgent = left <= 3),
+      Alert(Kind.SUBSCRIPTION, StrHome.alertSubDays(left), StrHome.alertSubDaysBody, Str.renew, ShellTargets.SUBSCRIPTION, urgent = left <= 3, actionRoute = ShellTargets.PLANS),
     ) }
     when (i.sync) {
-      Sync.ERROR -> add(Alert(Kind.SYNC, "همگام‌سازی خطا دارد", "کارهای این دستگاه نگه داشته شده‌اند", "بررسی", "devices", urgent = true))
+      Sync.ERROR -> add(Alert(Kind.SYNC, StrHome.alertSyncError, syncReason(i.syncError), StrHome.actionCheck, ShellTargets.SYNC, urgent = true))
       Sync.OFFLINE -> if (i.queued > 0) add(
-        Alert(Kind.SYNC, "${i.queued} کار در انتظارِ اینترنت", "با وصل شدن خودکار فرستاده می‌شوند", "بررسی", "devices"),
+        Alert(Kind.SYNC, StrHome.alertWaitingInternet(i.queued), StrHome.alertWaitingInternetBody, StrHome.actionCheck, ShellTargets.SYNC),
       )
       else -> Unit
     }
     if (i.outOfStock > 0 || i.lowStock > 0) add(
       Alert(
         Kind.STOCK,
-        if (i.outOfStock > 0) "${i.outOfStock} کالا تمام شده" else "${i.lowStock} کالا رو به پایان",
-        if (i.outOfStock > 0 && i.lowStock > 0) "و ${i.lowStock} کالای دیگر کم مانده" else "پیش از خالی شدنِ قفسه سفارش دهید",
-        "دیدن", "products", urgent = i.outOfStock > 0,
+        if (i.outOfStock > 0) StrHome.alertOut(i.outOfStock) else StrHome.alertLow(i.lowStock),
+        if (i.outOfStock > 0 && i.lowStock > 0) StrHome.alertAlsoLow(i.lowStock) else StrHome.alertReorderBody,
+        StrHome.actionSee, ShellTargets.stock(anyOut = i.outOfStock > 0), urgent = i.outOfStock > 0,
       ),
     )
     if (i.overdueDebtors > 0) add(
-      Alert(Kind.DEBTS, "${i.overdueDebtors} قرضِ عقب‌افتاده", "بیش از یک ماه بی‌حرکت · ${i.overdueTotal}", "پیگیری", "debtors"),
+      Alert(Kind.DEBTS, StrHome.alertOverdue(i.overdueDebtors), StrHome.alertOverdueBody(i.overdueTotal), StrHome.actionFollowUp, ShellTargets.OVERDUE_DEBTS),
     )
     if (i.expiring > 0) add(
-      Alert(Kind.EXPIRY, "${i.expiring} محموله نزدیکِ انقضا", "زودتر بفروشید یا جدا کنید", "دیدن", "warehouse"),
+      Alert(Kind.EXPIRY, StrHome.alertExpiring(i.expiring), StrHome.alertExpiringBody, StrHome.actionSee, ShellTargets.EXPIRING),
     )
     if (i.sync == Sync.QUEUED && i.queued > 0) add(
-      Alert(Kind.SYNC, "${i.queued} کار در صفِ همگام‌سازی", "در حالِ فرستادن به سرور", "بررسی", "devices"),
+      Alert(Kind.SYNC, StrHome.alertQueued(i.queued), StrHome.alertQueuedBody, StrHome.actionCheck, ShellTargets.SYNC),
     )
   }
 }
