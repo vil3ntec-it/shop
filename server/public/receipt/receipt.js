@@ -85,7 +85,9 @@
 
   function render(r) {
     var logo = $('shop-logo');
-    if (r.shop.logo) { logo.src = r.shop.logo; logo.hidden = false; } else { logo.hidden = true; }
+    //  فقط تصویرِ درون‌خطیِ خودِ سرور (CSP هم جز data: و همین مبدأ چیزی نمی‌پذیرد)
+    var src = typeof r.shop.logo === 'string' && /^data:image\/(png|jpeg|webp);base64,/.test(r.shop.logo) ? r.shop.logo : '';
+    if (src) { logo.src = src; logo.hidden = false; } else { logo.hidden = true; }
     text('shop-name', r.shop.name);
     text('shop-address', r.shop.address);
     var phone = $('shop-phone');
