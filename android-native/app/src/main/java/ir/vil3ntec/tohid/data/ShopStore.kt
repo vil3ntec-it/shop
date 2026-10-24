@@ -300,6 +300,27 @@ class ShopStore(private val context: Context) {
   }
 
   /**
+   *  خواندن ⇐ تبدیل ⇐ نوشتن **زیرِ همان قفلِ موتور** (`synchronized(engine)`) که نشاندنِ
+   *  opهای رسیده هم زیرِ آن است: [transform] همیشه تازه‌ترین دفتر را می‌گیرد، نه نسخهٔ کهنهٔ
+   *  صفحه — نوشتنی که در پس‌زمینه می‌رود (فروشِ تحویلِ سفارش) چیزی از دیگران را پاک نمی‌کند.
+   *  [transform] باید سبک و خالص باشد. `null` ⇒ چیزی برای نوشتن نبود. قفلِ نرم مثلِ [save].
+   *  @return null (هیچ) · true (نوشته شد) · false (قفلِ نرم یا دیسک)
+   */
+  suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      val cur = _data.value
+      val next = transform(cur) ?: return@synchronized null
+      if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
+        SoftLock.noteBlocked()
+        _blocked.tryEmit(Unit)
+        return@synchronized false
+      }
+      writeLocked(engine, next)
+    }
+  }
+
+  /**
    *  نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر.
    *
    *  @return آیا به دیسک رسید
@@ -329,6 +350,7 @@ class ShopStore(private val context: Context) {
     return LedgerWriter(engine, { _data.value }) { next -> writeLocked(engine, next) }
   }
 
+  /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */
   private fun writeLocked(engine: SyncV1Engine, next: ShopData): Boolean {
     /*
      *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور

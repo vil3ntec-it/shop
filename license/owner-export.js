@@ -104,6 +104,8 @@
     invoiceNumber: 'شمارهٔ فاکتور',
     series: 'سری سند',
     channel: 'کانال فروش',
+    orderId: 'شناسهٔ سفارش',
+    orderNo: 'شمارهٔ سفارش',
     total: 'جمع',
     discountType: 'نوع تخفیف',
     discountValue: 'مقدار تخفیف',
