@@ -145,6 +145,8 @@ object OwnerExport {
     "invoiceNumber" to "شمارهٔ فاکتور",
     "series" to "سری سند",
     "channel" to "کانال فروش",
+    "orderId" to "شناسهٔ سفارش",
+    "orderNo" to "شمارهٔ سفارش",
     "total" to "جمع",
     "discountType" to "نوع تخفیف",
     "discountValue" to "مقدار تخفیف",

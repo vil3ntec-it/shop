@@ -10,7 +10,8 @@
  *
  * آن‌چه قفل می‌شود:
  *   ⛔ پرچمِ `shop.catalog` خاموش ⇒ هیچ ردیفی و همان رفتارِ پیشین.
- *   ⛔ رزرو و ساختِ سفارش در یک تراکنش؛ دو خریدِ هم‌زمانِ آخرین عدد ⇒ فقط یکی.
+ *   ⛔ سفارش موجودی را نه رزرو می‌کند نه کم (تصمیمِ صاحبِ مخزن)؛ فقط می‌سنجد. کسر فقط
+ *      از فروشِ دستگاه (همان فروشی که برنامه هنگامِ تحویلِ سفارش می‌نویسد).
  *   ⛔ فروشِ ثبت‌شدهٔ دستگاه هرگز رد نمی‌شود و دو بار کم نمی‌شود؛ تعارض ⇒ وظیفه.
  *   ⛔ دفتر = مانده‌ها = بازپخشِ `stock-core` (INV-16).
  */
@@ -42,7 +43,7 @@ test.before(async () => {
   admin = (await h.post('/api/admin/login', { username: 'admin', password: 'Admin!12345' })).body.token;
   assert.ok(admin, 'ورودِ مدیر');
 });
-test.after(async () => { stock.stopSweeper(); await h.stop(); });
+test.after(async () => { await h.stop(); });
 
 // ── کمکی‌ها ──────────────────────────────────────────────────────────
 
@@ -115,9 +116,6 @@ async function stockOf(s, pid) {
   assert.equal(r.status, 200, JSON.stringify(r.body));
   return r.body.product.stock;
 }
-async function heldOf(s, orderId) {
-  return (await cat(s, `/reservations?orderId=${orderId}`)).body.reservations;
-}
 async function movesOf(s, pid) {
   return (await cat(s, `/moves?productId=${pid}&limit=100`)).body.items;
 }
@@ -187,14 +185,16 @@ test('INV-01: کالای تعریف‌شده در دستگاه با همان ش�
   assert.ok((await cat(s, `/products?q=${encodeURIComponent('برن')}`)).body.items.some((i) => i.id === 'p1'));
   assert.ok((await cat(s, '/products?q=6261234')).body.items.some((i) => i.id === 'p1'));
 
+  //  سفارش همان شناسه را می‌شناسد ولی ⛔ موجودی را نه رزرو می‌کند نه کم (تصمیمِ صاحبِ مخزن)
   const o = await order(s, [line('p1', 2000)]);
   assert.equal(o.status, 201, JSON.stringify(o.body));
-  const held = await heldOf(s, o.body.order.id);
-  assert.deepEqual(held.map((x) => [x.productId, x.qtyMilli, x.status]), [['p1', 2000, 'held']]);
+  const st = await stockOf(s, 'p1');
+  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [10000, 0, 10000]);
+  assert.equal(await count('stock_reservations', s.shopId), 0);
   await reconciled(s, 'p1');
 });
 
-test('INV-02: قفسه صفر و انبار ۵ ⇒ «در انبار، آماده‌سازی لازم»، نه «تمام شده»؛ رزرو وظیفهٔ انتقال می‌سازد', async () => {
+test('INV-02: قفسه صفر و انبار ۵ ⇒ «در انبار، آماده‌سازی لازم»، نه «تمام شده»؛ سفارش نه رزرو می‌کند نه وظیفه می‌سازد', async () => {
   const s = await shop('انبار');
   await enable(s);
   await push(s, [product('w1'), entry('w1-e1', 'w1', 5)]);
@@ -221,11 +221,9 @@ test('INV-02: قفسه صفر و انبار ۵ ⇒ «در انبار، آماد�
 
   const o = await order(s, [line('w1', 2000)]);
   assert.equal(o.status, 201, JSON.stringify(o.body));
-  const task = (await openTasks(s)).find((x) => x.kind === 'transfer_needed' && x.productId === 'w1');
-  assert.ok(task, 'وظیفهٔ انتقالِ انبار به قفسه ساخته نشد');
-  assert.equal(task.detail.needMilli, 2000);
+  assert.deepEqual((await openTasks(s)).filter((x) => x.productId === 'w1'), [], 'سفارش وظیفه‌ای نمی‌سازد');
   st = await stockOf(s, 'w1');
-  assert.equal(st.sellableMilli, 3000);
+  assert.equal(st.sellableMilli, 5000);
   await reconciled(s, 'w1');
 });
 
@@ -243,56 +241,60 @@ test('INV-03: قفسه و انبار صفر ⇒ «تمام شده» و سفار�
   assert.equal(await count('stock_reservations', s.shopId), 0);
 });
 
-test('INV-04: ۵ موجود و ۴ رزرو ⇒ فقط ۱ آزاد؛ نمایش و ثبت با همان سازگار', async () => {
+test('INV-04: ۵ موجود ⇒ سفارشِ ۴ چیزی کم نمی‌کند؛ بیش از ۵ رد با مقدارِ قابلِ سفارش؛ فروشِ دستگاه کم می‌کند', async () => {
   const s = await shop('آزاد');
   await enable(s);
   await push(s, [product('f1'), entry('f1-e1', 'f1', 5)]);
   assert.equal((await order(s, [line('f1', 4000)])).status, 201);
   let st = await stockOf(s, 'f1');
-  assert.equal(st.reservedMilli, 4000);
-  assert.equal(st.sellableMilli, 1000);
+  assert.equal(st.reservedMilli, 0);
+  assert.equal(st.sellableMilli, 5000, 'سفارش رزرو نمی‌کند');
   assert.equal(st.badge.status, 'in_stock');
 
-  const two = await order(s, [line('f1', 2000)]);
-  assert.equal(two.status, 409);
-  assert.equal(two.body.error.code, 'out_of_stock');
-  assert.equal(two.body.error.lines[0].availableMilli, 1000, 'مشتری مقدارِ قابلِ سفارش را می‌بیند');
-  assert.equal(two.body.error.lines[0].requestedMilli, 2000);
+  const six = await order(s, [line('f1', 6000)]);
+  assert.equal(six.status, 409);
+  assert.equal(six.body.error.code, 'out_of_stock');
+  assert.equal(six.body.error.lines[0].availableMilli, 5000, 'مشتری مقدارِ قابلِ سفارش را می‌بیند');
+  assert.equal(six.body.error.lines[0].requestedMilli, 6000);
 
-  assert.equal((await order(s, [line('f1', 1000)])).status, 201);
+  //  دکان سفارش را تحویل داد ⇒ فروشِ عادیِ دستگاه ⇒ همان‌جا کم
+  await push(s, sale('f1-s', [['f1-i', 'f1', 4]]));
+  st = await stockOf(s, 'f1');
+  assert.equal(st.sellableMilli, 1000);
+  await push(s, sale('f1-s2', [['f1-i2', 'f1', 1]]));
   st = await stockOf(s, 'f1');
   assert.equal(st.sellableMilli, 0);
   assert.equal(st.badge.status, 'out_of_stock');
   await reconciled(s, 'f1');
 });
 
-test('INV-05: دو خریدِ هم‌زمانِ آخرین عدد ⇒ فقط یکی؛ شش خریدِ هم‌زمان با سه عدد ⇒ فقط سه', async () => {
+test('INV-05 (تصمیمِ صاحبِ مخزن): خریدِ هم‌زمانِ آخرین عدد ⇒ سفارش‌ها ثبت، موجودی دست نمی‌خورد و منفی نمی‌شود', async () => {
   const s = await shop('هم‌زمان');
   await enable(s);
   await push(s, [product('last1', { name: 'شیر' }), entry('last1-e', 'last1', 1), product('m3'), entry('m3-e', 'm3', 3)]);
-  //  کاتالوگ یک بار خوانده شود تا هم‌زمانی روی خودِ رزرو باشد
   await stockOf(s, 'last1');
 
+  //  رزروی نیست ⇒ هر دو درخواست ثبت می‌شوند؛ دکان یکی را با «ناموجود» رد می‌کند و برنامه
+  //  هنگامِ تحویل بیش از موجودی نمی‌فروشد (سیاستِ صندوق)
   const two = await Promise.all([order(s, [line('last1', 1000)]), order(s, [line('last1', 1000)])]);
-  assert.deepEqual(two.map((r) => r.status).sort(), [201, 409], JSON.stringify(two.map((r) => r.body)));
-  const lost = two.find((r) => r.status === 409);
-  assert.equal(lost.body.error.code, 'out_of_stock');
-  assert.match(lost.body.error.message, /شیر.*موجود نیست/);
-
+  assert.deepEqual(two.map((r) => r.status), [201, 201], JSON.stringify(two.map((r) => r.body)));
   const six = await Promise.all(Array.from({ length: 6 }, () => order(s, [line('m3', 1000)])));
-  assert.equal(six.filter((r) => r.status === 201).length, 3, JSON.stringify(six.map((r) => r.status)));
-  assert.equal(six.filter((r) => r.status === 409).length, 3);
+  assert.equal(six.filter((r) => r.status === 201).length, 6, JSON.stringify(six.map((r) => r.status)));
 
-  for (const pid of ['last1', 'm3']) {
+  for (const [pid, q] of [['last1', 1000], ['m3', 3000]]) {
     const st = await stockOf(s, pid);
-    assert.equal(st.sellableMilli, 0);
-    assert.ok(st.levels.shop_floor >= 0, 'موجودی منفی نشد');
-    assert.equal(st.reservedMilli, st.levels.shop_floor);
+    assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [q, 0, q], 'سفارش موجودی را کم نکرد');
     await reconciled(s, pid);
   }
+  assert.equal(await count('stock_reservations', s.shopId), 0);
+  //  ولی کالای «تمام‌شده» هنوز سفارش نمی‌گیرد (سنجشِ فقط‌خواندنی)
+  await push(s, sale('last1-s', [['last1-i', 'last1', 1]]));
+  const none = await order(s, [line('last1', 1000)]);
+  assert.equal(none.status, 409);
+  assert.match(none.body.error.message, /شیر.*موجود نیست/);
 });
 
-test('INV-06 + INV-19: فروشِ حضوری و سفارشِ آنلاینِ هم‌زمان ⇒ فروشِ ثبت‌شده رد نمی‌شود، رزروِ بی‌پشتوانه وظیفه می‌سازد', async () => {
+test('INV-06 + INV-19: فروشِ حضوری و سفارشِ آنلاینِ هم‌زمان ⇒ فروشِ ثبت‌شده رد نمی‌شود؛ سفارش بی‌رزرو و بی‌وظیفه', async () => {
   const s = await shop('حضوری');
   await enable(s);
   await push(s, [product('mix'), entry('mix-e', 'mix', 2)]);
@@ -302,18 +304,14 @@ test('INV-06 + INV-19: فروشِ حضوری و سفارشِ آنلاینِ هم
   //  هم‌زمان: دستگاه یک فروشِ حضوری می‌فرستد و مشتریِ دیگری سفارش می‌دهد
   const [pushed, other] = await Promise.all([push(s, sale('mix-s1', [['mix-i1', 'mix', 1]])), order(s, [line('mix', 1000)])]);
   assert.ok(pushed.results.every((x) => x.status === 'applied'), 'فروشِ ثبت‌شدهٔ دستگاه پذیرفته شد');
-  assert.equal(other.status, 409, 'همهٔ موجودی رزرو بود');
+  assert.equal(other.status, 201, 'سفارشِ اول چیزی رزرو نکرده بود');
 
   const st = await stockOf(s, 'mix');
-  assert.equal(st.levels.shop_floor, 1000, 'فروشِ حضوری کم شد');
-  assert.equal(st.reservedMilli, 2000);
-  assert.equal(st.sellableMilli, 0);
+  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [1000, 0, 1000], 'فقط فروشِ حضوری کم شد');
   const deviceSale = (await movesOf(s, 'mix')).find((m) => m.source === 'device' && m.type === 'sale');
   assert.ok(deviceSale, 'حرکتِ فروشِ دستگاه در دفتر نیست');
   assert.equal(deviceSale.mode, 'recorded');
-  const short = (await openTasks(s)).find((x) => x.kind === 'reservation_short' && x.productId === 'mix');
-  assert.ok(short, 'رزروِ بی‌پشتوانه بی‌صدا ماند');
-  assert.deepEqual(short.detail.orders, [o.body.order.id]);
+  assert.deepEqual((await openTasks(s)).filter((x) => x.kind === 'reservation_short'), []);
   await reconciled(s, 'mix');
 });
 
@@ -351,7 +349,7 @@ test('INV-07 + §۳۸.۳: فروشِ آفلاینِ دو دستگاه ⇒ هر �
   await reconciled(s, 'd1');
 });
 
-test('INV-08: انتقال، خراب، مرجوعی، لغوِ سفارش و دورریز ⇒ رویدادهای جدا با اجازهٔ درست', async () => {
+test('INV-08: انتقال، خراب، مرجوعی و دورریز ⇒ رویدادهای جدا با اجازهٔ درست؛ ردِ سفارش هیچ حرکتی ندارد', async () => {
   const s = await shop('رویدادها');
   await enable(s);
   const staff = await member(s, 'staff', 'شاگرد');
@@ -370,37 +368,37 @@ test('INV-08: انتقال، خراب، مرجوعی، لغوِ سفارش و د
   const o = await order(s, [line('t1', 1000)]);
   assert.equal(o.status, 201);
   assert.equal((await go(s, o.body.order.id, { to: 'rejected', reason: 'busy' })).status, 200);
-  assert.deepEqual((await heldOf(s, o.body.order.id)).map((x) => [x.status, x.closeReason]), [['released', 'rejected']]);
 
   const st = await stockOf(s, 't1');
   assert.deepEqual([st.levels.shop_floor, st.levels.warehouse, st.levels.damaged], [4000, 2000, 0]);
   assert.equal(st.sellableMilli, 6000, 'خراب هرگز قابل‌فروش نیست');
   const kinds = (await movesOf(s, 't1')).filter((m) => m.source !== 'device').map((m) => `${m.type}@${m.location}`).sort();
-  assert.deepEqual(kinds, ['customer_return@shop_floor', 'damage@damaged', 'release@', 'reserve@',
+  assert.deepEqual(kinds, ['customer_return@shop_floor', 'damage@damaged',
     'transfer_in@damaged', 'transfer_in@warehouse', 'transfer_out@shop_floor', 'transfer_out@shop_floor']);
   await reconciled(s, 't1');
 });
 
-test('INV-10: واحدِ دوم (کارتن = ۲۴ دانه) با ضریب رزرو می‌شود؛ واحدِ ناشناس رد می‌شود', async () => {
+test('INV-10: واحدِ دوم (کارتن = ۲۴ دانه) با ضریب سنجیده می‌شود؛ واحدِ ناشناس رد می‌شود', async () => {
   const s = await shop('واحد');
   await enable(s);
-  await push(s, [product('u1', { unit: 'دانه', saleUnit: 'کارتن', unitFactor: 24 }), entry('u1-e', 'u1', 48)]);
+  await push(s, [product('u1', { unit: 'دانه', saleUnit: 'کارتن', unitFactor: 24 }), entry('u1-e', 'u1', 30)]);
   const o = await order(s, [line('u1', 1000, { unit: 'کارتن' })]);
   assert.equal(o.status, 201, JSON.stringify(o.body));
-  assert.equal((await heldOf(s, o.body.order.id))[0].qtyMilli, 24000);
 
   const bad = await order(s, [line('u1', 1000, { unit: 'کیلو' })]);
   assert.equal(bad.status, 400);
   assert.equal(bad.body.error.code, 'bad_unit');
   assert.deepEqual(bad.body.error.units, ['دانه', 'کارتن']);
 
+  //  ۲ کارتن = ۴۸ دانه > ۳۰
   const over = await order(s, [line('u1', 2000, { unit: 'کارتن' })]);
   assert.equal(over.status, 409);
-  assert.equal(over.body.error.lines[0].availableMilli, 24000);
-  assert.equal((await stockOf(s, 'u1')).sellableMilli, 24000);
+  assert.equal(over.body.error.lines[0].requestedMilli, 48000);
+  assert.equal(over.body.error.lines[0].availableMilli, 30000);
+  assert.equal((await stockOf(s, 'u1')).sellableMilli, 30000);
 });
 
-test('INV-11: کاربرِ دکانِ B موجودی، حرکت و رزروِ دکانِ A را نه می‌بیند نه عوض می‌کند', async () => {
+test('INV-11: کاربرِ دکانِ B موجودی و حرکتِ دکانِ A را نه می‌بیند نه عوض می‌کند', async () => {
   const a = await shop('الف');
   const b = await shop('ب');
   await enable(a);
@@ -412,7 +410,6 @@ test('INV-11: کاربرِ دکانِ B موجودی، حرکت و رزروِ د
   assert.equal((await cat(b, '/products/iso1')).status, 404);
   assert.ok(!(await cat(b, '/products')).body.items.some((i) => i.id === 'iso1'));
   assert.deepEqual((await cat(b, '/moves?productId=iso1')).body.items, []);
-  assert.deepEqual((await heldOf(b, o.body.order.id)), []);
   const steal = await mv(b, { kind: 'adjust', productId: 'iso1', location: 'shop_floor', qtyMilli: -1000, reason: 'دزدی' });
   assert.equal(steal.status, 404);
   const buy = await order(b, [line('iso1', 1000)]);
@@ -510,14 +507,14 @@ test('INV-15: خرید، لغو و حرکتِ دستیِ تکراری با هم�
   assert.equal(first.status, 201);
   assert.equal(again.status, 200);
   assert.equal(again.body.replayed, true);
-  assert.equal(await count('stock_reservations', s.shopId), 1);
+  assert.equal(await count('online_orders', s.shopId), 1);
 
   const id = first.body.order.id;
   assert.equal((await go(s, id, { to: 'cancelled_by_customer' })).status, 200);
   const twice = await go(s, id, { to: 'cancelled_by_customer' });
   assert.equal(twice.status, 200);
   assert.equal(twice.body.unchanged, true);
-  assert.equal((await movesOf(s, 'k1')).filter((m) => m.type === 'release').length, 1);
+  assert.equal((await movesOf(s, 'k1')).filter((m) => m.source !== 'device').length, 0, 'سفارش و لغوش هیچ حرکتی ندارند');
 
   const mkey = fresh();
   const body = { kind: 'transfer', productId: 'k1', from: 'shop_floor', to: 'warehouse', qtyMilli: 1000 };
@@ -532,37 +529,26 @@ test('INV-15: خرید، لغو و حرکتِ دستیِ تکراری با هم�
   await reconciled(s, 'k1');
 });
 
-test('CHK-18: رزرو مهلت دارد؛ سررسید ⇒ آزاد؛ قبول ⇒ بی‌مهلت یا ۴۰۹ اگر موجودی رفته', async () => {
+test('CHK-18 (تصمیمِ صاحبِ مخزن): سفارش رزرو و مهلت ندارد؛ قبول هرگز برای موجودی ۴۰۹ نمی‌گیرد؛ «مهلتِ رزرو» نادیده', async () => {
   const s = await shop('مهلت');
   await enable(s);
-  assert.equal((await settings(s, { reserveTtlSec: 60 })).status, 200);
+  const set = await settings(s, { reserveTtlSec: 60 });
+  assert.equal(set.status, 200, 'تنظیمِ قدیمی خطا نمی‌دهد');
+  assert.equal(set.body.settings ? set.body.settings.reserveTtlSec : undefined, undefined);
   await push(s, [product('ex1'), entry('ex1-e', 'ex1', 1)]);
-  const t0 = Date.now();
   const a = await order(s, [line('ex1', 1000)]);
-  assert.equal(a.status, 201);
-  const [ha] = await heldOf(s, a.body.order.id);
-  assert.ok(ha.expiresAt >= t0 + 60_000 && ha.expiresAt <= Date.now() + 60_000);
-  assert.equal((await order(s, [line('ex1', 1000)])).status, 409);
-
-  assert.equal(await stock.sweepExpired(Date.now() + 61_000, { shopId: s.shopId }), 1);
-  assert.deepEqual((await heldOf(s, a.body.order.id)).map((x) => [x.status, x.closeReason]), [['expired', 'expired']]);
   const b = await order(s, [line('ex1', 1000)]);
-  assert.equal(b.status, 201, 'پس از آزادسازی دوباره قابلِ سفارش است');
-
-  const acceptA = await go(s, a.body.order.id, { to: 'accepted' });
-  assert.equal(acceptA.status, 409);
-  assert.equal(acceptA.body.error.code, 'out_of_stock');
-  const stillNew = await h.get(`/api/shop/orders/${a.body.order.id}`, { token: s.token });
-  assert.equal(stillNew.body.order.status, 'new', 'قبولِ بی‌موجودی برگشت');
-  assert.equal((await go(s, a.body.order.id, { to: 'rejected', reason: 'out_of_stock' })).status, 200);
-
-  assert.equal((await go(s, b.body.order.id, { to: 'accepted' })).status, 200);
-  assert.equal((await heldOf(s, b.body.order.id))[0].expiresAt, null);
-  assert.equal(await stock.sweepExpired(Date.now() + 36_000_000, { shopId: s.shopId }), 0, 'سفارشِ قبول‌شده منقضی نمی‌شود');
+  assert.deepEqual([a.status, b.status], [201, 201]);
+  //  فروشِ حضوری آخرین عدد را برد؛ «قبول» دیگر ربطی به موجودیِ سرور ندارد
+  await push(s, sale('ex1-s', [['ex1-i', 'ex1', 1]]));
+  assert.equal((await go(s, a.body.order.id, { to: 'accepted' })).status, 200);
+  assert.equal((await go(s, b.body.order.id, { to: 'rejected', reason: 'out_of_stock' })).status, 200);
+  assert.equal(typeof stock.sweepExpired, 'undefined', 'جاروی رزرو برداشته شد');
+  assert.equal(await count('stock_reservations', s.shopId), 0);
   await reconciled(s, 'ex1');
 });
 
-test('تحویل ⇒ کسرِ قطعی از قفسه و آزادیِ رزرو در یک تراکنش؛ تکرارش بی‌اثر', async () => {
+test('تحویل ⇒ سرور هیچ کم نمی‌کند؛ فروشِ برنامه با شناسهٔ ثابتِ سفارش ⇒ یک بار کم، تکرارش بی‌اثر', async () => {
   const s = await shop('تحویل');
   await enable(s);
   await push(s, [product('c1'), entry('c1-e', 'c1', 3)]);
@@ -573,14 +559,17 @@ test('تحویل ⇒ کسرِ قطعی از قفسه و آزادیِ رزرو د
     const r = await go(s, id, { to });
     assert.equal(r.status, 200, `${to}: ${JSON.stringify(r.body)}`);
   }
-  assert.deepEqual((await heldOf(s, id)).map((x) => x.status), ['committed']);
   let st = await stockOf(s, 'c1');
-  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [1000, 0, 1000]);
-  const sold = (await movesOf(s, 'c1')).filter((m) => m.source === 'order' && m.type === 'sale');
-  assert.deepEqual(sold.map((m) => [m.location, m.qtyMilli, m.refId]), [['shop_floor', 2000, id]]);
-  assert.equal((await go(s, id, { to: 'picked_up' })).body.unchanged, true);
+  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [3000, 0, 3000]);
+  assert.equal((await movesOf(s, 'c1')).filter((m) => m.source !== 'device').length, 0);
+  //  برنامه همان لحظه فروشِ `o-<سفارش>` را می‌نویسد؛ دستگاهِ دیگر هم همان را (شناسهٔ یکسان)
+  const appSale = () => sale(`o-${id}`, [[`o-${id}-1`, 'c1', 2]]);
+  await push(s, appSale());
+  await push(s, appSale(), { device: `${s.device}-B` });
   st = await stockOf(s, 'c1');
-  assert.equal(st.levels.shop_floor, 1000);
+  assert.equal(st.levels.shop_floor, 1000, 'یک بار کم شد');
+  assert.equal((await go(s, id, { to: 'picked_up' })).body.unchanged, true);
+  assert.equal((await stockOf(s, 'c1')).levels.shop_floor, 1000);
   await reconciled(s, 'c1');
 });
 
@@ -630,7 +619,7 @@ test('Sync v3: با منبعِ v3 کالا و موجودی از sync_v3_rows (م
   await reconciled(s, 'v3p');
 });
 
-test('ارسال (همان گذارهایی که پیکِ #249 از transitionIn می‌زند): تحویل ⇒ کسر؛ برگشت به دکان و بازگشت به قفسه ⇒ آزادی', async () => {
+test('ارسال (همان گذارهایی که پیکِ #249 از transitionIn می‌زند): هیچ گذاری موجودیِ سرور را عوض نمی‌کند', async () => {
   const s = await shop('ارسال');
   await enable(s);
   await push(s, [product('dv1'), entry('dv1-e', 'dv1', 3)]);
@@ -652,10 +641,9 @@ test('ارسال (همان گذارهایی که پیکِ #249 از transitionIn
     const r = await go(s, b.body.order.id, { to, ...extra });
     assert.equal(r.status, 200, `${to}: ${JSON.stringify(r.body)}`);
   }
-  assert.deepEqual((await heldOf(s, a.body.order.id)).map((x) => x.status), ['committed']);
-  assert.deepEqual((await heldOf(s, b.body.order.id)).map((x) => [x.status, x.closeReason]), [['released', 'restocked']]);
   const st = await stockOf(s, 'dv1');
-  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [2000, 0, 2000]);
+  assert.deepEqual([st.levels.shop_floor, st.reservedMilli, st.sellableMilli], [3000, 0, 3000]);
+  assert.equal((await movesOf(s, 'dv1')).filter((m) => m.source !== 'device').length, 0);
   await reconciled(s, 'dv1');
 });
 
@@ -663,46 +651,26 @@ test('ارسال (همان گذارهایی که پیکِ #249 از transitionIn
 //  QA #263 — سفارشِ آزمایشی، نخستین خواندنِ دفتر، خواندنِ کامل
 // ════════════════════════════════════════════════════════════════════
 
-test('QA #263: سفارشِ آزمایشیِ کارمند نه رزرو می‌کند نه فروشِ قطعی؛ رزروِ ماندهٔ قدیمی آزاد می‌شود، کسر نه', async () => {
+test('QA #263: سفارشِ آزمایشیِ کارمند موجودی را نه می‌سنجد نه لمس می‌کند', async () => {
   const s = await shop('آزمایشیِ موجودی');
   await enable(s);
   await push(s, [product('t1'), entry('t1-e', 't1', 3)]);
   await stockOf(s, 't1');
   const made = await h.post('/api/shop/orders', {
     source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'آزمونِ کارمند' }, test: true,
-    lines: [line('t1', 2000)],
+    lines: [line('t1', 5000)],
   }, { token: s.token, headers: { 'Idempotency-Key': fresh() } });
-  assert.equal(made.status, 201, JSON.stringify(made.body));
+  assert.equal(made.status, 201, `بیش از موجودی هم ثبت می‌شود (سنجش نمی‌شود): ${JSON.stringify(made.body)}`);
   assert.equal(made.body.order.isTest, true);
   const id = made.body.order.id;
-  assert.deepEqual(await heldOf(s, id), [], 'سفارشِ آزمایشی رزرو نمی‌کند');
   for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
     const r = await go(s, id, { to });
     assert.equal(r.status, 200, `${to}: ${JSON.stringify(r.body)}`);
   }
-  assert.deepEqual(await heldOf(s, id), []);
   const st = await stockOf(s, 't1');
   assert.deepEqual([st.levels.shop_floor, st.reservedMilli], [3000, 0], 'موجودیِ سرور = موجودیِ دستگاه');
-  assert.equal((await movesOf(s, 't1')).filter((m) => m.refId === id).length, 0, 'هیچ حرکتِ فروشی برای سفارشِ آزمایشی');
-
-  //  رزروی که پیش از این اصلاح برای سفارشِ آزمایشی گرفته شده بود ⇒ در پایان آزاد، نه کسرِ قطعی
-  const old = await order(s, [line('t1', 1000)]);
-  assert.equal(old.status, 201, JSON.stringify(old.body));
-  assert.deepEqual((await heldOf(s, old.body.order.id)).map((x) => x.status), ['held']);
-  await query('UPDATE online_orders SET is_test=true WHERE id=$1', [old.body.order.id]);
-  for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
-    assert.equal((await go(s, old.body.order.id, { to })).status, 200, to);
-  }
-  assert.deepEqual((await heldOf(s, old.body.order.id)).map((x) => x.status), ['released']);
-  const after = await stockOf(s, 't1');
-  assert.deepEqual([after.levels.shop_floor, after.reservedMilli], [3000, 0]);
-  assert.equal((await movesOf(s, 't1')).filter((m) => m.type === 'sale' && m.source === 'order').length, 0);
+  assert.equal((await movesOf(s, 't1')).filter((m) => m.refId === id).length, 0, 'هیچ حرکتی برای سفارشِ آزمایشی');
   await reconciled(s, 't1');
-
-  //  سفارشِ واقعی همان رفتارِ پیشین را دارد
-  const real = await order(s, [line('t1', 1000)]);
-  assert.equal(real.status, 201);
-  assert.deepEqual((await heldOf(s, real.body.order.id)).map((x) => [x.qtyMilli, x.status]), [[1000, 'held']]);
 });
 
 test('QA #263: نخستین خواندنِ دفتر بیرون از تراکنشِ سفارش است — ردِ سفارشِ نخست آن را برنمی‌گرداند', async () => {
@@ -714,14 +682,14 @@ test('QA #263: نخستین خواندنِ دفتر بیرون از تراکنش
   const o = await order(s, [line('f0', 1000)]);
   assert.equal(o.status, 409, JSON.stringify(o.body));
   assert.equal(o.body.error.code, 'out_of_stock');
-  //  … ولی خواندنِ کامل در تراکنشِ خودش ثبت شده بود (پیش از این اصلاح با سفارش برمی‌گشت)
+  //  … ولی خواندنِ کامل در تراکنشِ خودش ثبت شده بود
   assert.equal(await count('catalog_sync_state', s.shopId), 1);
   assert.equal(await count('catalog_products', s.shopId), 2);
   assert.equal(await count('online_orders', s.shopId), 0);
-  //  سفارشِ بعدی فقط تفاوت را می‌خواند و درست رزرو می‌کند
+  //  سفارشِ بعدی فقط تفاوت را می‌خواند و با همان عدد سنجیده می‌شود (بی رزرو)
   const ok = await order(s, [line('f1', 2000)]);
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assert.deepEqual((await heldOf(s, ok.body.order.id)).map((x) => [x.productId, x.qtyMilli]), [['f1', 2000]]);
+  assert.equal(await count('stock_reservations', s.shopId), 0);
   //  پرچمِ خاموش ⇒ prepare هیچ نمی‌کند
   const off = await shop('نخستین خاموش');
   assert.equal(await catalog.prepare(off.shopId), null);

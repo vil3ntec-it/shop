@@ -467,6 +467,8 @@ fun SettingsScreen(
       }
     }
 
+    /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
@@ -569,6 +571,9 @@ fun SettingsScreen(
         }
       }
     }
+
+    /* ===================== امنیت (SEC-01) ===================== */
+    item { SecuritySection(store, ::toast) }
 
     /* ========================= رمز حساب ========================= */
     if (signedIn) {
@@ -709,7 +714,8 @@ fun SettingsScreen(
               onClick = {
                 scope.launch {
                   val opened = withContext(Dispatchers.IO) {
-                    runCatching { store.parseBackup(snap.file.readText()).getOrThrow() }
+                    //  نسخهٔ خودکار رونوشتِ دفتر است؛ اگر دفتر رمزدار بود، این هم (SEC-01)
+                    runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() }
                   }
                   opened
                     .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
