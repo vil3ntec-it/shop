@@ -46,6 +46,7 @@ class DrawerKickTest {
       val (a, b) = files.getValue(job.id)
       val bytes = PrintQueue.payload(job) { c -> if (c) b else a }
       if (bytes == null) { q.discard(job.id); return true }
+      q.begin(job.id)
       sent += bytes
       if (failing) q.failed(job.id, "چاپ نیمه‌کاره ماند", now) else q.succeeded(job.id)
       return true
@@ -94,20 +95,24 @@ class DrawerKickTest {
     assertTrue("پس از تلاشِ نخست همه نسخهٔ «چاپِ دوباره»اند", w.sent.drop(1).all { it.contentEquals(staleCopy.let(EscPos::withoutDrawerKick)) })
   }
 
-  @Test fun `بازگشتِ صف — پس از بسته شدنِ برنامه کشو باز نمی‌شود و رسید نشانِ چاپِ دوباره دارد`() {
+  @Test fun `بازگشتِ صف — پس از بسته شدنِ برنامه کشو باز نمی‌شود و رسیدِ نیمه‌راه نشانِ چاپِ دوباره دارد`() {
     val before = PrintQueue()
     before.enqueue(job("s1"))
+    before.begin("s1")        // برنامه وسطِ فرستادن بسته شد
+    before.enqueue(job("s2")) // هنوز نوبتش نرسیده بود
     //  کارِ کشوی ذخیره‌شده از نسخه‌ای کهنه
     val saved = before.all() + job("d1", PrintQueue.Kind.DRAWER)
     val q = PrintQueue()
     q.restore(saved)
-    assertEquals(listOf("s1"), q.all().map { it.id })
-    assertTrue(q.all().single().needsCopyMark)
-    val w = Wire(q, mapOf("s1" to (first to copy), "d1" to (EscPos.drawerOnly(profile) to null)))
+    assertEquals(listOf("s1", "s2"), q.all().map { it.id })
+    assertTrue(q.all()[0].needsCopyMark)
+    assertFalse("رسیدی که هرگز فرستاده نشد بی نشان چاپ می‌شود", q.all()[1].needsCopyMark)
+    val w = Wire(q, mapOf("s1" to (first to copy), "s2" to (first to copy), "d1" to (EscPos.drawerOnly(profile) to null)))
     w.failing = false
     while (w.step(0)) Unit
-    assertEquals(1, w.sent.size)
+    assertEquals(2, w.sent.size)
     assertArrayEquals(copy, w.sent[0])
+    assertArrayEquals(first, w.sent[1])
     assertEquals(0, w.sent.sumOf(::kicks))
   }
 

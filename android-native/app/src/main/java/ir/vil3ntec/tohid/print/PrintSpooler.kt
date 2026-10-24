@@ -17,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -25,9 +24,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 
 /**
  *  صفِ چاپِ زنده (HW-02، سناریوی S16) — منطقش `core/hw/PrintQueue`، این‌جا
@@ -47,7 +43,8 @@ import kotlin.concurrent.withLock
  *  • رسیدی که دوباره تلاش می‌شود یا پس از بازشدنِ برنامه از صف برمی‌گردد
  *    نسخهٔ «چاپِ دوباره» را می‌برد (`<id>.copy.bin` که همان لحظه ساخته شد).
  *  • هر بار باز کردنِ دستیِ کشو ردیفِ `no_sale` و هر چاپِ دوباره ردیفِ
- *    `reprint` در سابقهٔ دکان می‌نویسد (`audits` ⇐ `AppRoot`) — همگام می‌شود.
+ *    `reprint` در سابقهٔ دکان می‌نویسد (`ShopStore.appendAudit` که `AppRoot`
+ *    وصل می‌کند: روی دفترِ همان لحظه، زیرِ قفلِ نوشتن) — همگام می‌شود.
  *  ──────────────────────────────────────────────────────────────────
  */
 object PrintSpooler {
@@ -75,14 +72,49 @@ object PrintSpooler {
   fun consumed(n: Notice) { if (tillNotice.value?.id == n.id) tillNotice.value = null }
 
   /**
-   *  ردیف‌های سابقهٔ دکان (`no_sale`، `reprint`). `AppRoot` با دفترِ همان لحظه
-   *  می‌سازد و ذخیره می‌کند (همان راهِ هر صفحه) تا همگام شوند.
+   *  ردیف‌های سابقهٔ دکان (`no_sale`، `reprint`) ⇐ `ShopStore.appendAudit`
+   *  (روی دفترِ همان لحظه، زیرِ قفلِ نوشتن). `AppRoot` پس از بارِ دفتر وصلش
+   *  می‌کند؛ تا آن وقت ردیف‌ها در حافظه می‌مانند.
    */
-  private val auditOut = Channel<(ShopData) -> AuditEntry>(Channel.UNLIMITED)
-  val audits: ReceiveChannel<(ShopData) -> AuditEntry> get() = auditOut
+  private var auditSink: (suspend ((ShopData) -> AuditEntry) -> Boolean)? = null
+  private val pendingAudits = ArrayList<(ShopData) -> AuditEntry>()
+  private val auditLock = kotlinx.coroutines.sync.Mutex()
 
-  /** یک فرستنده در هر لحظه: کارگرِ صف و ضربهٔ کشو هم‌زمان به چاپگر نمی‌نویسند */
-  private val wire = ReentrantLock()
+  fun attachAudit(sink: suspend ((ShopData) -> AuditEntry) -> Boolean) {
+    scope.launch {
+      auditLock.lock()
+      try {
+        auditSink = sink
+        flushAudits(sink)
+      } finally {
+        auditLock.unlock()
+      }
+    }
+  }
+
+  /** ردیف‌هایی که پیش‌تر نرسیدند — به همان ترتیب؛ نرسیده‌ها می‌مانند (زیرِ `auditLock`) */
+  private suspend fun flushAudits(sink: suspend ((ShopData) -> AuditEntry) -> Boolean) {
+    val waiting = synchronized(pendingAudits) { pendingAudits.toList().also { pendingAudits.clear() } }
+    waiting.forEach { row -> if (!runCatching { sink(row) }.getOrDefault(false)) synchronized(pendingAudits) { pendingAudits += row } }
+  }
+
+  /**
+   *  @return آیا ردیف به دیسکِ دفتر رسید. `false` ⇒ در حافظه می‌ماند و با ردیفِ
+   *  بعدی یا وصل شدنِ دوبارهٔ `AppRoot` دوباره نوشته می‌شود.
+   */
+  private suspend fun audit(row: (ShopData) -> AuditEntry): Boolean {
+    auditLock.lock()
+    try {
+      val sink = auditSink
+      if (sink == null) { synchronized(pendingAudits) { pendingAudits += row }; return false }
+      flushAudits(sink)
+      val ok = runCatching { sink(row) }.getOrDefault(false)
+      if (!ok) synchronized(pendingAudits) { pendingAudits += row }
+      return ok
+    } finally {
+      auditLock.unlock()
+    }
+  }
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val wake = Channel<Unit>(Channel.CONFLATED)
@@ -242,18 +274,15 @@ object PrintSpooler {
   /**
    *  یک ضربهٔ کشو — «همین حالا یا هرگز». نه صف، نه فایل، نه تلاشِ دوباره:
    *  اگر چاپگر تا `KickOnce.WINDOW_MS` آزاد نشد یا خطا داد، کشو باز نمی‌شود
-   *  و همین گفته می‌شود. `reached` یعنی بایت‌ها به راهِ چاپگر سپرده شد.
+   *  و همین گفته می‌شود. `reached` یعنی بایت‌ها واقعاً به چاپگر سپرده شد
+   *  (بلوتوثِ خاموش یا اتصالِ ناشده ⇒ نه).
    */
   private suspend fun kick(context: Context, link: String, profile: PrinterProfile): Kick = withContext(Dispatchers.IO) {
     val ticket = KickOnce(System.currentTimeMillis())
     val l = ThermalPrinter.Link.parse(link) ?: return@withContext Kick(false, "نشانیِ چاپگر خوانده نشد")
-    if (!wire.tryLock(KickOnce.WINDOW_MS, TimeUnit.MILLISECONDS)) return@withContext Kick(false, "چاپگر مشغول بود")
-    try {
-      if (!ticket.take(System.currentTimeMillis())) return@withContext Kick(false, "چاپگر دیر آزاد شد")
-      Kick(true, runCatching { ThermalPrinter.send(context, l, EscPos.drawerOnly(profile)) }.getOrElse { it.message ?: "نرسید" })
-    } finally {
-      wire.unlock()
-    }
+    val sent = ThermalPrinter.sendWithin(context, l, EscPos.drawerOnly(profile), KickOnce.WINDOW_MS) { ticket.take(System.currentTimeMillis()) }
+      ?: return@withContext Kick(false, "چاپگر مشغول بود")
+    Kick(sent.wrote, sent.error)
   }
 
   /**
@@ -262,44 +291,50 @@ object PrintSpooler {
    *  `no_sale` با همان شکلِ #286 می‌نویسد: چه کسی (`by`)، کی، چرا (`reason`)،
    *  تأییدکننده و در `notes` کدام دستگاه و کدام چاپگر.
    */
-  suspend fun openDrawer(context: Context, printer: PrinterRegistry.Saved, reason: String, approvedBy: String): String {
+  suspend fun openDrawer(context: Context, printer: PrinterRegistry.Saved, reason: String): String {
     val why = reason.trim()
     if (why.isEmpty()) return "دلیل را بنویسید"
+    //  همان #286: نقشی که سیاستِ دکان اجازه داده خودش تأییدکننده است؛ شاگردِ «نیازمندِ تأیید» نه
+    if (!ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context)) return "باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد (APPROVAL_REQUIRED)"
     //  در دامنهٔ خودِ صف: صفحه‌ای که وسطِ کار بسته شد ضربه را بی ردیفِ سابقه نمی‌گذارد
-    return scope.async { openDrawerNow(context.applicationContext ?: context, printer, why, approvedBy) }.await()
+    return scope.async { openDrawerNow(context.applicationContext ?: context, printer, why) }.await()
   }
 
-  private suspend fun openDrawerNow(context: Context, printer: PrinterRegistry.Saved, why: String, approvedBy: String): String {
+  private suspend fun openDrawerNow(context: Context, printer: PrinterRegistry.Saved, why: String): String {
     val k = kick(context, printer.link, printer.profile())
-    if (k.reached) {
-      val now = System.currentTimeMillis()
-      val by = who(context)
-      val approver = approvedBy.trim().ifEmpty { by ?: "صاحب/مدیر" }
-      val notes = "کشو بی فروش — $why — دستگاه: ${device()} · چاپگر: ${printer.name}" +
-        (if (k.error != null) " — خطای چاپگر: ${k.error}" else "") + " — تأیید: $approver"
-      auditOut.trySend { d ->
-        AuditEntry(
-          id = auditId(), type = "no_sale", date = ir.vil3ntec.tohid.todayIso(),
-          refId = ir.vil3ntec.tohid.data.CashShift.current(d)?.open?.id, notes = notes, createdAt = now,
-          by = by, reason = why, approvedBy = approver,
-        )
-      }
+    //  ضربه‌ای که به چاپگر نرسید (بلوتوثِ خاموش، اتصالِ ناشده) کشو را باز نکرد ⇒ ردیفی هم نیست
+    if (!k.reached) return "کشو باز نشد: ${k.error ?: "به چاپگر نرسید"}"
+    val now = System.currentTimeMillis()
+    val by = who(context)
+    val approver = by ?: POLICY_APPROVER
+    val notes = "کشو بی فروش — $why — دستگاه: ${device()} · چاپگر: ${printer.name}" +
+      (if (k.error != null) " — خطای چاپگر: ${k.error}" else "") + " — تأیید: $approver"
+    val saved = audit { d ->
+      AuditEntry(
+        id = auditId(), type = "no_sale", date = ir.vil3ntec.tohid.todayIso(),
+        refId = ir.vil3ntec.tohid.data.CashShift.current(d)?.open?.id, notes = notes, createdAt = now,
+        by = by, reason = why, approvedBy = approver,
+      )
     }
-    return k.error?.let { "کشو باز نشد: $it" + if (k.reached) " — در سابقه ثبت شد" else "" } ?: "کشو باز شد — در سابقه ثبت شد"
+    val head = if (k.error == null) "کشو باز شد" else "شاید کشو باز شد (خطای چاپگر: ${k.error})"
+    return head + if (saved) " — در سابقه ثبت شد" else " — ولی در سابقه ثبت نشد؛ دوباره ثبت می‌شود"
   }
 
   private fun who(context: Context): String? =
     runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull()?.trim()?.ifEmpty { null }
 
+  /** تأییدکننده وقتی نامِ کاربر نیست ولی سیاستِ دکان اجازه داده (هرگز «صاحب/مدیر»ِ ساختگی) */
+  private const val POLICY_APPROVER = "policy"
+
   private fun device(): String = runCatching { android.os.Build.MODEL }.getOrNull()?.ifBlank { null } ?: "این دستگاه"
 
-  /** چاپِ دوباره (دستی، یا تلاشِ دوباره/بازگشتِ صفِ رسید) ⇐ ردیفِ `reprint` در سابقهٔ دکان */
-  private fun auditReprint(ctx: Context, job: PrintQueue.Job, reason: String) {
+  /** چاپِ دوباره (دستی، یا تلاشِ دوبارهٔ رسید) ⇐ ردیفِ `reprint` در سابقهٔ دکان */
+  private suspend fun auditReprint(ctx: Context, job: PrintQueue.Job, reason: String) {
     val saleId = job.saleId ?: return
     val now = System.currentTimeMillis()
     val by = who(ctx)
     val notes = "چاپِ دوبارهٔ ${job.title} — $reason — دستگاه: ${device()}" + (by?.let { " — $it" } ?: "")
-    auditOut.trySend { _ ->
+    audit { _ ->
       AuditEntry(id = auditId(), type = "reprint", date = ir.vil3ntec.tohid.todayIso(), refId = saleId, notes = notes,
         createdAt = now, by = by, reason = reason)
     }
@@ -336,14 +371,22 @@ object PrintSpooler {
         withTimeoutOrNull(wait) { wake.receive() }
         continue
       }
-      //  تلاشِ پس از خطا یا پس از بازگشتِ صف ⇒ نسخهٔ «چاپِ دوباره»؛ ضربهٔ کشو هرگز
+      //  تلاشِ پس از خطا یا رسیدی که پیش از بسته شدنِ برنامه نیمه‌راه ماند ⇒ نسخهٔ «چاپِ دوباره»؛ ضربهٔ کشو هرگز
       val copy = job.needsCopyMark
       val bytes = PrintQueue.payload(job) { c -> runCatching { (if (c) copyFile(ctx, job.id) else binFile(ctx, job.id)).readBytes() }.getOrNull() }
       val link = ThermalPrinter.Link.parse(job.link)
+      if (bytes != null && link != null) {
+        //  «آغاز شد» پیش از فرستادن روی دیسک می‌رود: برنامه‌ای که وسطِ چاپ بسته شد نسخهٔ نشان‌دار را می‌فرستد
+        synchronized(queue) { queue.begin(job.id) }
+        persist(ctx)
+      }
       val err = when {
+        bytes == null && copy && !copyFile(ctx, job.id).isFile ->
+          "${job.title} نسخهٔ «چاپِ دوباره» ندارد (صفِ نسخهٔ پیشین) و کنار گذاشته شد — از فهرستِ فاکتورها با دلیل دوباره چاپ کنید".also(::notifyTill)
         bytes == null -> "فایلِ این کار پیدا نشد"
         link == null -> "نشانیِ چاپگر خوانده نشد"
-        else -> wire.withLock { runCatching { ThermalPrinter.send(ctx, link, bytes) }.getOrElse { it.message ?: "چاپ نشد" } }
+        //  `send` خودش یک فرستنده در هر لحظه است (`ThermalPrinter.wire`)
+        else -> runCatching { ThermalPrinter.send(ctx, link, bytes) }.getOrElse { it.message ?: "چاپ نشد" }
       }
       synchronized(queue) {
         when {
@@ -359,7 +402,7 @@ object PrintSpooler {
         val reprint = job.kind == PrintQueue.Kind.REPRINT || copy
         val why = when {
           job.kind == PrintQueue.Kind.REPRINT -> job.reason
-          job.restored && job.attempts == 0 -> "ادامهٔ صفِ چاپ پس از بازشدنِ برنامه"
+          job.attempts == 0 -> "چاپِ نیمه‌راه پیش از بسته شدنِ برنامه"
           else -> "تلاشِ دوباره پس از خطای چاپگر"
         }
         PrintLog.add(ctx, PrintLog.Entry(printedSale, if (reprint) PrintQueue.Kind.REPRINT.key else job.kind.key,
@@ -400,6 +443,7 @@ object PrintSpooler {
           JSONObject().put("id", j.id).put("kind", j.kind.key).put("link", j.link).put("title", j.title)
             .put("createdAt", j.createdAt).put("saleId", j.saleId ?: "").put("reason", j.reason)
             .put("attempts", j.attempts).put("held", j.held).put("lastError", j.lastError ?: "")
+            .put("started", j.started)
         )
       }
       runCatching {
@@ -419,9 +463,9 @@ object PrintSpooler {
       .filter { o ->
         val id = o.getString("id")
         val kind = PrintQueue.Kind.of(o.optString("kind"))
-        //  کشو هرگز برنمی‌گردد؛ رسیدی که نسخهٔ «چاپِ دوباره» ندارد هم نه (چاپِ بی‌نشانِ دوباره)
-        val keep = kind != PrintQueue.Kind.DRAWER && binFile(ctx, id).isFile &&
-          (kind != PrintQueue.Kind.RECEIPT || copyFile(ctx, id).isFile)
+        //  کشو هرگز برنمی‌گردد. رسیدِ بی نسخهٔ «چاپِ دوباره» (صفِ نسخهٔ پیشین) می‌ماند:
+        //  اگر هرگز فرستاده نشده بی نشان چاپ می‌شود، وگرنه کارگر با پیام کنارش می‌گذارد
+        val keep = kind != PrintQueue.Kind.DRAWER && binFile(ctx, id).isFile
         if (!keep) dropFiles(ctx, id)
         keep
       }
@@ -439,6 +483,7 @@ object PrintSpooler {
           nextAt = 0,
           lastError = o.optString("lastError").ifBlank { null },
           held = o.optBoolean("held"),
+          started = o.optBoolean("started"),
         )
       }
   }.getOrDefault(emptyList())

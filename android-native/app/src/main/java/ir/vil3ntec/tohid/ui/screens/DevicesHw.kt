@@ -354,9 +354,8 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
     confirmButton = {
       Button(enabled = !busy && reason.isNotBlank(), onClick = {
         busy = true
-        val approver = if (ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) "صاحب/مدیر" else ""
         scope.launch {
-          val msg = PrintSpooler.openDrawer(context, printer, reason, approver)
+          val msg = PrintSpooler.openDrawer(context, printer, reason)
           busy = false
           onDismiss()
           toast(msg)

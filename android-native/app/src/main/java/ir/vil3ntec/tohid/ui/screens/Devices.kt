@@ -46,8 +46,10 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
   LaunchedEffect(Unit) { PhoneScanner.load(context); PhotoPrefs.load(context) }
 
   //  تنظیمِ چاپگر و کشو فقط صاحب و مدیر (`settings.write`)؛ باز کردنِ کشو با `drawer.open`
-  val canAdmin = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
-  val canDrawer = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context) }
+  //  نقش یا سیاستِ دکان که عوض شد (پاسخِ تازهٔ سرور) همین‌جا دوباره سنجیده می‌شود
+  val policy by ir.vil3ntec.tohid.data.ShopRole.policyVersion.collectAsState()
+  val canAdmin = remember(policy) { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
+  val canDrawer = remember(policy) { ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context) }
 
   val wide = screenSize() == Screen.WIDE
   val left: @Composable () -> Unit = {

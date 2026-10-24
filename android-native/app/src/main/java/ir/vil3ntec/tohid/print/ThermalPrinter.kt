@@ -16,6 +16,10 @@ import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /**
  *  چاپ روی چاپگرِ حرارتی — همان ۵۸ و ۸۰ میلی‌متری‌های دکان.
@@ -200,13 +204,45 @@ object ThermalPrinter {
   }
 
   /**
+   *  یک فرستنده در هر لحظه: صفِ چاپ، ضربهٔ کشو، برگهٔ آزمون، چاپِ قدیمی
+   *  (`PrintJob`) و «بررسیِ اتصال» هم‌زمان به چاپگر نمی‌نویسند — بایت‌های دو
+   *  کار در هم نمی‌روند و بلوتوث دو اتصالِ هم‌زمان نمی‌خواهد.
+   */
+  private val wire = ReentrantLock()
+
+  /** نتیجهٔ فرستادن: `error == null` یعنی رفت؛ `wrote` یعنی دستِ‌کم یک تکه به چاپگر سپرده شد */
+  data class Sent(val error: String?, val wrote: Boolean)
+
+  /**
    *  بایت‌های آماده روی همان سه راه — صفِ چاپ، برچسب، کشو و برگهٔ آزمون.
    *  @return `null` یعنی رفت؛ وگرنه پیامِ فارسیِ خطا.
    */
-  fun send(context: Context, link: Link, bytes: ByteArray): String? = when (link) {
-    is Link.Bluetooth -> sendBluetooth(context, link.address, bytes)
-    is Link.Network -> sendNetwork(link.host, link.port, bytes)
-    is Link.Usb -> sendUsb(context, link.deviceName, bytes)
+  fun send(context: Context, link: Link, bytes: ByteArray): String? = wire.withLock { sendRaw(context, link, bytes).error }
+
+  /**
+   *  همان، ولی «همین حالا یا هرگز» (ضربهٔ کشو): اگر چاپگر تا `waitMs` آزاد
+   *  نشد یا `admit` پس از گرفتنِ نوبت «نه» گفت، هیچ نمی‌رود (`null`).
+   */
+  fun sendWithin(context: Context, link: Link, bytes: ByteArray, waitMs: Long, admit: () -> Boolean = { true }): Sent? {
+    if (!wire.tryLock(waitMs, TimeUnit.MILLISECONDS)) return null
+    try {
+      if (!admit()) return null
+      return sendRaw(context, link, bytes)
+    } finally {
+      wire.unlock()
+    }
+  }
+
+  private fun sendRaw(context: Context, link: Link, bytes: ByteArray): Sent {
+    val wrote = AtomicBoolean(false)
+    val err = runCatching {
+      when (link) {
+        is Link.Bluetooth -> sendBluetooth(context, link.address, bytes, wrote)
+        is Link.Network -> sendNetwork(link.host, link.port, bytes, wrote)
+        is Link.Usb -> sendUsb(context, link.deviceName, bytes, wrote)
+      }
+    }.getOrElse { it.message ?: "چاپ نشد" }
+    return Sent(err, wrote.get())
   }
 
   /**
@@ -217,7 +253,9 @@ object ThermalPrinter {
    *  ⚠️ روی چاپگرِ واقعی آزموده نشده (NOT-VERIFIED)؛ منطقِ خواندنِ پاسخ
    *  (`EscPos.parsePaperStatus`) آزمون دارد.
    */
-  fun probe(context: Context, link: Link): Probe = when (link) {
+  fun probe(context: Context, link: Link): Probe = wire.withLock { probeNow(context, link) }
+
+  private fun probeNow(context: Context, link: Link): Probe = when (link) {
     is Link.Network -> probeStream(link.label()) {
       val socket = Socket()
       socket.connect(InetSocketAddress(link.host, link.port), CONNECT_TIMEOUT_MS)
@@ -293,7 +331,7 @@ object ThermalPrinter {
 
   /* ---------------------------- بلوتوث ---------------------------- */
 
-  private fun sendBluetooth(context: Context, address: String, bytes: ByteArray): String? {
+  private fun sendBluetooth(context: Context, address: String, bytes: ByteArray, wrote: AtomicBoolean): String? {
     val adapter = adapter(context) ?: return "بلوتوث روی این گوشی نیست"
     if (!adapter.isEnabled) return "بلوتوث خاموش است"
 
@@ -308,7 +346,7 @@ object ThermalPrinter {
       socket = device.createRfcommSocketToServiceRecord(SPP)
       adapter.cancelDiscovery()
       socket.connect()
-      socket.outputStream.use { out -> writeChunked(out, bytes) }
+      socket.outputStream.use { out -> writeChunked(out, bytes, wrote) }
       null
     } catch (e: SecurityException) {
       "اجازهٔ بلوتوث داده نشده"
@@ -328,7 +366,7 @@ object ThermalPrinter {
    *  مهلت **دقیقه‌ها** برنامه را نگه می‌دارد و فروشنده فکر می‌کند
    *  برنامه هنگ کرده. شش ثانیه برای یک شبکهٔ محلی خیلی زیاد هم هست.
    */
-  private fun sendNetwork(host: String, port: Int, bytes: ByteArray): String? {
+  private fun sendNetwork(host: String, port: Int, bytes: ByteArray, wrote: AtomicBoolean): String? {
     var socket: Socket? = null
     return try {
       socket = Socket()
@@ -337,7 +375,7 @@ object ThermalPrinter {
       //  بی این، بستنِ سوکت می‌تواند بایت‌های آخر را دور بریزد و
       //  فاکتور نصفه چاپ شود
       socket.setSoLinger(true, 5)
-      socket.getOutputStream().use { out -> writeChunked(out, bytes) }
+      socket.getOutputStream().use { out -> writeChunked(out, bytes, wrote) }
       null
     } catch (e: java.net.SocketTimeoutException) {
       "چاپگر در شبکه جواب نداد ($host) — روشن است؟"
@@ -361,7 +399,7 @@ object ThermalPrinter {
    *  `openDevice` خالی برمی‌گردد. صفحه پیش از چاپ اجازه را می‌خواهد؛
    *  اینجا فقط پیامِ روشنش گفته می‌شود تا کاربر بداند چه شده.
    */
-  private fun sendUsb(context: Context, deviceName: String, bytes: ByteArray): String? {
+  private fun sendUsb(context: Context, deviceName: String, bytes: ByteArray, wrote: AtomicBoolean): String? {
     val manager = usbManager(context) ?: return "این گوشی از چاپگرِ سیمی پشتیبانی نمی‌کند"
     val device = manager.deviceList?.get(deviceName)
       ?: return "چاپگرِ سیمی پیدا نشد — کابل وصل است؟"
@@ -382,6 +420,7 @@ object ThermalPrinter {
         val slice = bytes.copyOfRange(sent, sent + size)
         val moved = connection.bulkTransfer(endpoint, slice, slice.size, WRITE_TIMEOUT_MS)
         if (moved < 0) return "چاپ نیمه‌کاره ماند — کابل را ببینید"
+        wrote.set(true)
         sent += size
       }
       null
@@ -398,11 +437,12 @@ object ThermalPrinter {
   /** تکهٔ نوشتن — بافرِ این چاپگرها کوچک است و یک‌جا نمی‌پذیرد */
   private const val CHUNK = 4096
 
-  private fun writeChunked(out: OutputStream, bytes: ByteArray) {
+  private fun writeChunked(out: OutputStream, bytes: ByteArray, wrote: AtomicBoolean) {
     var sent = 0
     while (sent < bytes.size) {
       val size = minOf(CHUNK, bytes.size - sent)
       out.write(bytes, sent, size)
+      wrote.set(true)
       out.flush()
       sent += size
     }

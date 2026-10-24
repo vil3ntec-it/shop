@@ -14,9 +14,10 @@ package ir.vil3ntec.tohid.core.hw
  *    • **کشو هرگز در صف نمی‌نشیند** (HW-03): ضربهٔ کشو «همین حالا یا هرگز»
  *      است — نه در صف، نه در فایل، نه تلاشِ دوباره. وگرنه تلاشِ دوباره یا
  *      بازگشتِ صف پس از بسته شدنِ برنامه کشو را بی فروش باز می‌کرد.
- *    • تلاشِ دوبارهٔ رسید (`attempts > 0`) یا رسیدی که پس از بازگشتِ صف
- *      چاپ می‌شود نسخهٔ «چاپِ دوباره» را می‌برد (`needsCopyMark`): شاید
- *      تلاشِ پیشین نیمه‌کاره روی کاغذ آمده باشد.
+ *    • تلاشِ دوبارهٔ رسید (`attempts > 0`) یا رسیدی که پیش از بسته شدنِ
+ *      برنامه فرستادنش آغاز شده بود (`started` و `restored`) نسخهٔ «چاپِ
+ *      دوباره» را می‌برد (`needsCopyMark`): شاید تلاشِ پیشین نیمه‌کاره روی
+ *      کاغذ آمده باشد. رسیدِ برگشته‌ای که هرگز فرستاده نشده بی نشان چاپ می‌شود.
  */
 class PrintQueue(
   private val backoffMs: List<Long> = listOf(2_000, 5_000, 15_000, 30_000, 60_000),
@@ -47,9 +48,11 @@ class PrintQueue(
     val held: Boolean = false,
     /** از فایلِ صف برگشته (پس از بسته شدنِ برنامه) — ذخیره نمی‌شود */
     val restored: Boolean = false,
+    /** فرستادنش دستِ‌کم یک بار آغاز شد (`begin`) — ذخیره می‌شود، پیش از فرستادن */
+    val started: Boolean = false,
   ) {
-    /** این تلاش نسخهٔ «چاپِ دوباره» را می‌برد: رسیدی که پیش‌تر تلاش شده یا از فایل برگشته */
-    val needsCopyMark: Boolean get() = kind == Kind.RECEIPT && (attempts > 0 || restored)
+    /** این تلاش نسخهٔ «چاپِ دوباره» را می‌برد: رسیدی که پیش‌تر تلاش شده، یا پیش از بسته شدنِ برنامه نیمه‌راه ماند */
+    val needsCopyMark: Boolean get() = kind == Kind.RECEIPT && (attempts > 0 || (restored && started))
   }
 
   sealed interface Status {
@@ -87,6 +90,12 @@ class PrintQueue(
     val head = jobs.firstOrNull() ?: return null
     if (head.held || now < head.nextAt) return null
     return head
+  }
+
+  /** فرستادنِ سرِ صف آغاز می‌شود — صدازننده پیش از فرستادن ذخیره‌اش می‌کند */
+  fun begin(id: String) {
+    val i = jobs.indexOfFirst { it.id == id }
+    if (i >= 0) jobs[i] = jobs[i].copy(started = true)
   }
 
   fun succeeded(id: String) {
