@@ -234,7 +234,7 @@ object StrHome {
   val txAll: String get() = t("همه", "All", "ټول")
   val drawer: String get() = t("صندوق", "Drawer", "صندوق")
   val safe: String get() = t("گاوصندوق", "Safe", "سېف")
-  val safeSoon: String get() = t("شمارش و موجودیِ دقیقِ گاوصندوق به‌زودی همین‌جا", "Count your safe and see its exact balance here — coming soon", "د سېف شمېرنه او دقیقه موجودي ژر دلته")
+  val safeSoon: String get() = t("شمارش و موجودیِ دقیقِ گاوصندوق به‌زودی همین‌جا", "Safe count and balance — coming soon", "د سېف شمېرنه او دقیقه موجودي ژر دلته")
   //  HOME-V2: کادرِ پنهانِ کششی، مقایسهٔ فروش، «امروز»
   val pullHint: String get() = t("برای صندوق پایین بکشید", "Pull down for the drawer", "د صندوق لپاره ښکته یې کش کړئ")
   val showDrawer: String get() = t("نشان دادنِ صندوق", "Show the drawer", "صندوق ښکاره کړئ")
@@ -244,8 +244,10 @@ object StrHome {
   /** «+۱۲٪ از دیروز» — همین ساعتِ دیروز (`HomeTrend`) */
   fun vsYesterday(pct: Int): String {
     if (pct == 0) return sameAsYesterday
-    val n = (if (pct > 0) "+" else "−") + kotlin.math.abs(pct)
-    return t("$n٪ از دیروز", "$n% vs yesterday", "له پرون $n٪")
+    //  عددِ علامت‌دار در جداسازِ چپ‌به‌راست (LRI…PDI) تا در متنِ راست‌به‌چپ «+۱۲٪» بماند، نه «۱۲٪+»
+    val sign = if (pct > 0) "+" else "−"
+    val abs = kotlin.math.abs(pct)
+    return t("\u2066$sign$abs٪\u2069 از دیروز", "$sign$abs% vs yesterday", "له پرون \u2066$sign$abs٪\u2069")
   }
   val txEmptyToday: String get() = t("امروز هنوز تراکنشی ثبت نشده", "No transactions yet today", "نن تر اوسه هېڅ راکړه ورکړه نه ده ثبت شوې")
 }
