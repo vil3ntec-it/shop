@@ -6,9 +6,12 @@
  *     - همان دکان: سفارشِ ششم در یک ساعت ⇒ ۴۲۹ `phone_order_limit` با
  *       Retry-After و بی ردیف؛ تکرارِ کلیدِ پیشین همچنان «replayed»؛ شمارهٔ
  *       دیگر و دکانِ دیگر آزاد.
- *     - همهٔ ویترین‌ها: بیستمین سفارشِ ۲۴ ساعت ⇒ ۴۲۹ حتی در دکانِ تازه.
- *   PRES-10) اعلامِ حضورِ دکانِ دیگر یا دست‌کاری‌شده ⇒ رد و یک ردیف در
- *     audit_logs؛ بی‌توکن ⇒ ۴۰۱ بی ردیف؛ اعلامِ سالم ⇒ بی ردیفِ رد.
+ *     - همهٔ ویترین‌ها: چهل‌ویکمین سفارشِ ۲۴ ساعت ⇒ ۴۲۹ حتی در دکانِ تازه؛
+ *       ‎+930…‎ و ‎+93…‎ یک شماره‌اند؛ Retry-After بیشترینِ دو قاعده.
+ *     - هم‌زمان: ۱۵ ثبتِ هم‌زمان با کلیدهای گوناگون ⇒ دقیقاً ۱۰ سفارش (سنجش در تراکنش).
+ *   PRES-10) اعلامِ حضورِ دکانِ دیگر یا دست‌کاری‌شده ⇒ رد و ردیف در audit_logs،
+ *     برای هر (کاربر، دلیل) در ۱۰ دقیقه یکی؛ بی‌توکن یا بی دکان ⇒ بی ردیف؛
+ *     اعلامِ سالم ⇒ بی ردیفِ رد.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '200';
 const test = require('node:test');
@@ -17,6 +20,7 @@ const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const orderRate = require('../src/lib/order-rate');
+const run = (t, p) => query(t, p);
 
 let admin = '';
 let seq = 0;
@@ -136,11 +140,12 @@ test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ سا�
       `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment,
                                   customer_phone, created_at, updated_at)
        VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$6,$6)`,
-      [newId('ord'), a.shopId, 900000 + i, `seed-${uniq()}`, phone, t]
+      //  نیمی با صفرِ پس از ‎+93‎ ذخیره شده — همان شماره است
+      [newId('ord'), a.shopId, 900000 + i, `seed-${uniq()}`, i % 2 ? '+930795550001' : phone, t]
     );
   }
-  await assert.doesNotReject(orderRate.check(a.shopId, phone, { at, rules: [orderRate.PER_SHOP] }));
-  const err = await orderRate.check(b.shopId, phone, { at }).then(() => null, (e) => e);
+  await assert.doesNotReject(orderRate.check(run, a.shopId, phone, { at, rules: [orderRate.PER_SHOP] }));
+  const err = await orderRate.check(run, b.shopId, phone, { at }).then(() => null, (e) => e);
   assert.ok(err, 'دکانِ تازه هم باید ۴۲۹ بدهد');
   assert.equal(err.status, 429);
   assert.equal(err.code, 'phone_order_limit');
@@ -148,10 +153,41 @@ test('RSK-07: چهل‌ویکمین سفارشِ یک شماره در ۲۴ سا�
   //  کهنه‌ترینِ چهل که بیرون برود یک جا باز می‌شود
   assert.equal(err.retryAfter, Math.ceil((times[max - 1] + 24 * 3600_000 - at) / 1000));
   //  شمارهٔ دیگر و شمارهٔ خالی آزاد
-  await assert.doesNotReject(orderRate.check(b.shopId, '+93795550002', { at }));
-  assert.deepEqual(await orderRate.check(b.shopId, '', { at }), { ok: true });
+  await assert.doesNotReject(orderRate.check(run, b.shopId, '+93795550002', { at }));
+  await assert.doesNotReject(orderRate.check(run, b.shopId, '', { at }));
+  //  همان شماره با صفر هم همان سقف را می‌گیرد
+  assert.equal((await orderRate.check(run, b.shopId, '+930795550001', { at }).catch((e) => e)).code, 'phone_order_limit');
   //  پنجره می‌گذرد ⇒ آزاد
-  await assert.doesNotReject(orderRate.check(b.shopId, phone, { at: at + 6 * 3600_000 }));
+  await assert.doesNotReject(orderRate.check(run, b.shopId, phone, { at: at + 6 * 3600_000 }));
+
+  //  Retry-After: هر دو قاعده پر ⇒ بیشترینِ آن دو
+  const tb = Array.from({ length: orderRate.PER_SHOP.max }, (_, i) => at - (10 + i) * 60_000);
+  for (let i = 0; i < tb.length; i++) {
+    await query(
+      `INSERT INTO online_orders (id, shop_id, order_no, client_key, request_hash, source, fulfillment,
+                                  customer_phone, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,'h','storefront','pickup',$5,$6,$6)`,
+      [newId('ord'), b.shopId, 900000 + i, `seed-${uniq()}`, phone, tb[i]]
+    );
+  }
+  const raShop = Math.ceil((tb[tb.length - 1] + 3600_000 - at) / 1000);
+  //  ۵۰ ردیف در ۲۴ ساعت: ۱۰ تازه‌ترِ ب، سپس الف به ترتیب ⇒ چهلمین = الفِ شمارهٔ ۲۹
+  const raAll = Math.ceil((times[max - 1 - tb.length] + 24 * 3600_000 - at) / 1000);
+  const onlyShop = await orderRate.check(run, b.shopId, phone, { at, rules: [orderRate.PER_SHOP] }).catch((e) => e);
+  assert.equal(onlyShop.retryAfter, raShop);
+  const both = await orderRate.check(run, b.shopId, phone, { at }).catch((e) => e);
+  assert.ok(raAll > raShop);
+  assert.deepEqual([both.retryAfter, both.data.scope], [raAll, 'all']);
+});
+
+test('RSK-07: ۱۵ ثبتِ هم‌زمانِ یک شماره با کلیدهای گوناگون ⇒ دقیقاً ۱۰ سفارش، بقیه ۴۲۹', async () => {
+  const s = await liveStore('هم‌زمان');
+  const phone = '0791230077';
+  const ticket = await ticketFor(s.slug, phone);
+  const res = await Promise.all(Array.from({ length: 15 }, () => checkout(s.slug, phone, ticket)));
+  const codes = res.map((r) => r.status).sort();
+  assert.deepEqual(codes, [...Array(10).fill(201), ...Array(5).fill(429)], JSON.stringify(codes));
+  assert.equal(await count(s.shopId), orderRate.PER_SHOP.max);
 });
 
 /* ── PRES-10 ────────────────────────────────────────────────────────── */
@@ -164,6 +200,7 @@ const rejected = async (shopId) => (await query(
 test('PRES-10: اعلامِ دکانِ دیگر یا دست‌کاری‌شده رد و در سابقه ثبت می‌شود؛ اعلامِ سالم نه', async () => {
   const s = await liveStore('حضورِ امن');
   const foreign = await liveStore('دکانِ بیگانه');
+  require('../src/routes/storefront-admin').resetRejectAudit();
   const declare = (body, token = s.token) => h.post('/api/shop/storefront/presence', body, { token });
   const ev = () => `ev-${uniq()}-p`;
 
@@ -171,8 +208,10 @@ test('PRES-10: اعلامِ دکانِ دیگر یا دست‌کاری‌شده 
   const f = await declare({ eventId: ev(), mode: 'closed', shopId: foreign.shopId });
   assert.equal(f.status, 403, JSON.stringify(f.body));
   assert.equal(f.body.error.code, 'foreign_shop');
-  const f2 = await declare({ eventId: ev(), mode: 'closed', store_id: foreign.shopId });
+  //  هر کلیدِ بیگانه بس است، حتی اگر نخستین کلید شناسهٔ خودِ دکان باشد
+  const f2 = await declare({ eventId: ev(), mode: 'closed', shopId: s.shopId, store_id: foreign.shopId });
   assert.equal(f2.status, 403);
+  assert.equal(f2.body.error.code, 'foreign_shop');
   const events = await one('SELECT COUNT(*)::int AS n FROM storefront_presence_events WHERE shop_id = ANY($1)',
     [[s.shopId, foreign.shopId]]);
   assert.equal(events.n, 0);
@@ -190,9 +229,17 @@ test('PRES-10: اعلامِ دکانِ دیگر یا دست‌کاری‌شده 
   assert.equal(ok.body.status.badge, 'closed');
 
   const rows = await rejected(s.shopId);
+  //  ضدِ سیل: دو ردِ foreign_shop ِ پیاپی ⇒ یک ردیف
   assert.deepEqual(rows.map((r) => [r.status, r.reason]), [
-    [403, 'foreign_shop'], [403, 'foreign_shop'], [400, 'bad_mode'], [400, 'bad_number'],
+    [403, 'foreign_shop'], [400, 'bad_mode'], [400, 'bad_number'],
   ]);
+  for (let i = 0; i < 5; i++) await declare({ eventId: ev(), mode: 'hacked' });
+  assert.equal((await rejected(s.shopId)).length, 3, 'تکرارِ همان دلیل در ۱۰ دقیقه ردیفِ تازه نمی‌سازد');
+  //  کاربرِ بی دکان ⇒ ۴۰۳ no_shop و هیچ ردیف
+  const lone = await h.newUser('بی‌دکان', 'shop');
+  const nos = await h.post('/api/shop/storefront/presence', { eventId: ev(), mode: 'closed' }, { token: lone.accessToken });
+  assert.equal(nos.status, 403);
+  assert.equal((await one(`SELECT COUNT(*)::int AS n FROM audit_logs WHERE action='storefront.presence_rejected' AND shop_id=''`)).n, 0);
   assert.ok(rows.every((r) => !JSON.stringify(r).includes(foreign.shopId)), 'شناسهٔ دکانِ دیگر در سابقهٔ این دکان نیست');
   assert.ok(rows.every((r) => r.userId), 'کاربرِ واردشده ثبت شد');
   assert.equal((await rejected(foreign.shopId)).length, 0, 'سابقه زیرِ دکانِ خودِ درخواست‌کننده است');

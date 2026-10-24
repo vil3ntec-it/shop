@@ -64,15 +64,11 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
 //  PRES-10: نامِ دکانِ دیگر در بدنه ⇒ ۴۰۳ (پیش‌تر نادیده گرفته می‌شد و
 //  اعلام روی دکانِ خودِ توکن می‌نشست). خودِ دکان همیشه از عضویت است.
 const SHOP_KEYS = ['shopId', 'shop_id', 'storeId', 'store_id'];
-const claimedShopOf = (req) => {
-  const b = req.body && typeof req.body === 'object' ? req.body : {};
-  return SHOP_KEYS.map((k) => b[k]).find((v) => v !== undefined && v !== null && v !== '');
-};
 const ownShopOnly = (req, res, next) => {
-  const claimed = claimedShopOf(req);
-  if (claimed !== undefined && String(claimed) !== req.shopId) {
-    return next(forbidden('این اعلام برای دکانِ دیگری است', 'foreign_shop'));
-  }
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  //  هر کدام از کلیدها که پر و بیگانه باشد بس است (نه فقط نخستینِ پر)
+  const foreign = SHOP_KEYS.some((k) => b[k] !== undefined && b[k] !== null && b[k] !== '' && String(b[k]) !== req.shopId);
+  if (foreign) return next(forbidden('این اعلام برای دکانِ دیگری است', 'foreign_shop'));
   next();
 };
 
@@ -84,17 +80,31 @@ router.post('/presence', ownShopOnly, requirePermission('settings.write'), needF
 }));
 
 /**
- * PRES-10: هر اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
- * بی‌اجازه، بی اشتراک، …) در سابقه می‌نشیند و همان خطا برمی‌گردد. بی‌توکن ⇒
- * ثبت نمی‌شود (سابقه پرِ درخواستِ ناشناس نشود). بدنه و شناسهٔ دکانِ دیگر
- * نوشته نمی‌شوند.
+ * PRES-10: اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
+ * بی‌اجازه، بی اشتراک، …) در سابقه می‌نشیند و همان خطا برمی‌گردد.
+ * ⛔ ضدِ سیل: برای هر (کاربر، دلیل) در هر ۱۰ دقیقه یک ردیف. بی‌توکن یا بی دکان ⇒
+ * هیچ ردیف. بدنه و شناسهٔ دکانِ دیگر نوشته نمی‌شوند.
  */
+const REJECT_AUDIT_MS = 10 * 60 * 1000;
+const lastRejectAudit = new Map();
+function shouldAuditReject(key, at = Date.now()) {
+  const last = lastRejectAudit.get(key);
+  if (last !== undefined && at - last < REJECT_AUDIT_MS) return false;
+  if (lastRejectAudit.size >= 10_000) {
+    for (const [k, t] of lastRejectAudit) if (at - t >= REJECT_AUDIT_MS) lastRejectAudit.delete(k);
+    if (lastRejectAudit.size >= 10_000) lastRejectAudit.clear();
+  }
+  lastRejectAudit.set(key, at);
+  return true;
+}
+
 router.use('/presence', (err, req, res, next) => {
   const status = Number(err && err.status);
-  if (req.method !== 'POST' || !req.user || !(status >= 400 && status < 500)) return next(err);
+  if (req.method !== 'POST' || !req.user || !req.shopId || !(status >= 400 && status < 500)) return next(err);
+  if (!shouldAuditReject(`${req.user.id}|${String(err.code || '')}`)) return next(err);
   audit.log({
-    shopId: req.shopId || '', userId: req.user.id, action: 'storefront.presence_rejected',
-    targetType: 'storefront', targetId: req.shopId || '',
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.presence_rejected',
+    targetType: 'storefront', targetId: req.shopId,
     //  ⛔ شناسهٔ دکانِ دیگر نوشته نمی‌شود: سابقهٔ این دکان را اعضایش می‌بینند
     detail: { status, reason: String(err.code || '') },
     ip: clientIp(req),
@@ -137,3 +147,4 @@ router.put('/products/:productId', requirePermission('settings.write'), needFlag
 }));
 
 module.exports = router;
+module.exports.resetRejectAudit = () => lastRejectAudit.clear();

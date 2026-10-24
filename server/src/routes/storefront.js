@@ -20,7 +20,6 @@ const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
-const orderRate = require('../lib/order-rate');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -127,28 +126,17 @@ router.post('/:slug/verify/check', codeLimit, store, wrap(async (req, res) => {
   res.json(await sf.checkVerification(req.body));
 }));
 
-/**
- * RSK-07: سقفِ سفارش به‌ازای شمارهٔ تأییدشده — همان ترتیبِ خودِ ثبت (بلیت،
- * وگرنه نشستِ حساب). بی شمارهٔ تأییدشده کاری نمی‌کند؛ ثبت خودش ۴۰۱ می‌دهد.
- */
-const phoneLimit = wrap(async (req, res, next) => {
-  const fromTicket = await sf.verifiedPhoneOfTicket(ticketOf(req));
-  const a = fromTicket || !sessionOf(req) ? null : await customers.auth(sessionOf(req));
-  const phone = fromTicket || (a ? a.customer.phone : '');
-  const clientKey = req.get('idempotency-key') || (req.body && req.body.clientKey) || '';
+//  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
+router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  let out;
   try {
-    await orderRate.check(req.store.shop_id, phone, { clientKey });
+    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
   } catch (err) {
-    if (err.retryAfter) res.set('Retry-After', String(err.retryAfter));
+    //  RSK-07: سقفِ شماره (lib/order-rate) — کِی دوباره
+    if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));
     throw err;
   }
-  next();
-});
-
-//  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
-router.post('/:slug/checkout', checkoutLimit, store, phoneLimit, wrap(async (req, res) => {
-  const key = orders.clientKeyOf(req);
-  const out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });
