@@ -11,6 +11,9 @@
  * ⛔ هر قاعده پیش از نوشتن با `validate`ِ همان هستهٔ صندوق سنجیده می‌شود
  *    (`lib/promo-core.js` = بایت‌به‌بایت `license/promo-core.js`).
  * ⛔ پاک کردن نرم است و کدِ تخفیف حتی پس از پاک شدن آزاد نمی‌شود (PRM-02).
+ * ⛔ «سقفِ مصرف» (`maxUses > 0`) تا شمارشِ مصرف نیامده پذیرفته نمی‌شود
+ *    (`max_uses_unsupported`): `uses` را هنوز هیچ فروشی بالا نمی‌برد، پس سقف فقط
+ *    روی کاغذ بود و کدی که «ده بار» گفته می‌شد بی‌شمار می‌خورد.
  *
  * زیرِ پیشوندِ موجودِ `/shop` ⇒ `ACCOUNT_PREFIXES` چیزِ تازه‌ای نمی‌خواهد.
  * ⚠️ در app.js پیش از `/shop` سوار می‌شود.
@@ -93,6 +96,9 @@ router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, r
     return res.status(400).json({
       error: { code: 'invalid_rule', message: errors.map((e) => MESSAGES[e] || e).join('؛ '), fields: errors },
     });
+  }
+  if (rule.maxUses > 0) {
+    throw badRequest('«سقفِ مصرفِ کد» هنوز شمرده نمی‌شود؛ آن را خالی بگذارید (بی سقف)', 'max_uses_unsupported');
   }
   if (rule.allowBelowCost && req.role !== 'owner') {
     throw forbidden('فروشِ زیرِ بهای خرید را فقط صاحبِ دکان اجازه می‌دهد', 'below_cost_owner_only');

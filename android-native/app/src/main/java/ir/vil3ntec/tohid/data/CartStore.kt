@@ -44,6 +44,10 @@ class CartStore(context: Context) {
   private val _debtorId = MutableStateFlow(initial?.debtorId)
   val debtorId: StateFlow<String?> = _debtorId.asStateFlow()
 
+  /** کدهای تخفیفِ همین سبد (N3) — `PromoLive` می‌نویسد و از همین برمی‌گرداند */
+  private val _coupons = MutableStateFlow(initial?.takeIf { it.lines.isNotEmpty() }?.coupons.orEmpty())
+  val coupons: StateFlow<List<String>> = _coupons.asStateFlow()
+
   /**
    *  پیش‌نویسی که از بارِ پیش مانده و هنوز از کاربر پرسیده نشده
    *  (`DraftRecoveryPrompt`). تا پاسخ، همان ردیف‌ها در سبد هستند — مثلِ پیش.
@@ -63,7 +67,7 @@ class CartStore(context: Context) {
   }
 
   private fun persist() {
-    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis())
+    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value)
     write(file, draft) {
       //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
       if (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY)) {
@@ -76,6 +80,7 @@ class CartStore(context: Context) {
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
+    if (lines.isEmpty()) _coupons.value = emptyList()
     persist()
   }
 
@@ -84,10 +89,22 @@ class CartStore(context: Context) {
     persist()
   }
 
+  fun setCoupons(codes: List<String>) {
+    if (codes == _coupons.value) return
+    _coupons.value = codes
+    persist()
+  }
+
+  /** S1 — حساب عوض شد: کدهای حسابِ قبلی فقط از حافظه می‌روند (فایل را `LedgerOwner` خالی کرده) */
+  fun forgetCoupons() {
+    _coupons.value = emptyList()
+  }
+
   fun clear() {
     key = null
     _lines.value = emptyList()
     _debtorId.value = null
+    _coupons.value = emptyList()
     persist()
   }
 
@@ -111,6 +128,7 @@ class CartStore(context: Context) {
     key = keep.key ?: key
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
+    _coupons.value = keep.coupons
     persist()
   }
 

@@ -16,8 +16,12 @@ import kotlin.math.roundToLong
  *    • Sync v1/v3 فاکتورِ شاگرد با `discount > 0` را رد می‌کند (`sales.discount`)،
  *      ولی تخفیفِ خودکار را صاحب/مدیر از پیش تعریف کرده و شاگرد هم باید بزند؛
  *    • جمعِ ردیف‌ها = جمعِ فاکتور، برگشت سهمش را از همان ردیف می‌گیرد و سود از
- *      همان قیمتِ واحد حساب می‌شود؛ قالبِ داده و همگام‌سازی دست نمی‌خورد.
+ *      همان قیمتِ واحد حساب می‌شود؛ هیچ عددِ دفتر معنای تازه نمی‌گیرد.
  *  تخفیفِ دستیِ فاکتور (با سقفِ نقش) همان‌طور روی جمعِ پس از تخفیفِ خودکار می‌آید.
+ *
+ *  تا سرور تخفیفِ خودکار را از قیمتِ دستیِ ردیف جدا کند، `stamp` فیلدهای
+ *  **اختیاری** می‌گذارد (همه به واحدِ کوچک): `SaleItem.listPriceMinor` و
+ *  `SaleItem.promo`، `Sale.promoDiscountMinor` و `Sale.coupons`. خاموش ⇒ هیچ‌کدام.
  *
  *  ردیفِ آزاد و ردیفِ با قیمتِ دستی تخفیفِ خودکار نمی‌گیرند (قیمتِ دستی نهایی است).
  */
@@ -33,12 +37,22 @@ object PromoEngine {
     val belowCost: Boolean = false,
     /** زمانِ آخرین پاسخِ سرور (میلی‌ثانیه)؛ ۰ = هرگز */
     val at: Long = 0,
+    /** شمارهٔ نسخهٔ هر قاعده در سرور (`rev`) — روی قلمِ فاکتور می‌نشیند (`SalePromo.rev`) */
+    val revs: Map<String, Long> = emptyMap(),
+    /** «حساب@دکان»ی که این حال مالِ اوست (`PromoLive.ensure`)؛ خالی = هنوز هیچ‌کس */
+    val account: String = "",
   ) {
     val active: Boolean get() = enabled && rules.any { it.active }
     val hasCodes: Boolean get() = rules.any { it.active && it.code.isNotBlank() }
   }
 
   data class Applied(val id: String, val name: String, val discount: Double)
+
+  /**
+   *  آنچه از تخفیف روی قلمِ فاکتور می‌نشیند: قیمتِ فهرستِ کالا (واحدِ کوچک؛ قلمِ
+   *  آزاد ندارد) و سهمِ هر قاعده از تخفیفِ همان ردیف.
+   */
+  data class LineTag(val listMinor: Long?, val promo: List<SalePromo>)
 
   /**
    *  @param gross جمعِ سبد پیش از تخفیفِ خودکار (`SalesEngine.cartTotal`)
@@ -50,7 +64,43 @@ object PromoEngine {
     val applied: List<Applied>,
     val codes: List<PromoCore.CodeStatus>,
     val cart: List<SalesEngine.CartLine>,
+    /** به کلیدِ ردیف (`CartLine.productId`) — `stamp` آن را روی قلم‌های فاکتور می‌گذارد */
+    val tags: Map<String, LineTag> = emptyMap(),
   )
+
+  /**
+   *  S1 — حالِ حافظه فقط برای همان «حساب@دکان»ی که مالِ اوست؛ حسابِ دیگر ⇒ حالِ
+   *  خالی (خاموش). تا ده دقیقه پس از عوض شدنِ حساب، فروشِ دکانِ دوم تخفیف‌های دکانِ
+   *  اول را می‌گرفت.
+   */
+  fun forAccount(s: Snapshot, account: String): Snapshot = if (s.account == account) s else Snapshot(account = account)
+
+  /**
+   *  S1 — نشانِ «حالِ حافظه مالِ کیست»؛ `PromoLive` آن را پیش از هر خواندن و
+   *  نوشتن می‌پرسد. کلیدِ تازه ⇒ `true` و «نسخهٔ دستگاه خوانده شد» و «آخرین
+   *  تلاش» صفر می‌شوند تا صدازننده عکس و کدها را دور بریزد و از نو بخواند.
+   */
+  class Binding {
+    @Volatile var key: String? = null
+      private set
+    @Volatile var loaded: Boolean = false
+    @Volatile var triedAt: Long = 0L
+
+    @Synchronized fun bind(now: String): Boolean {
+      if (now == key) return false
+      key = now
+      loaded = false
+      triedAt = 0L
+      return true
+    }
+
+    /** ورود و خروج: مالِ هیچ‌کس — نخستین `bind` از نو می‌خواند */
+    @Synchronized fun reset() {
+      key = null
+      loaded = false
+      triedAt = 0L
+    }
+  }
 
   /** ردیف‌های سبد ⇒ ورودیِ هسته. مبلغِ هر ردیف همان `SalesEngine.lineTotal`ِ امروز است. */
   fun lines(d: ShopData, cart: List<SalesEngine.CartLine>): List<PromoCore.Line> = cart.map { line ->
@@ -94,17 +144,23 @@ object PromoEngine {
     minute: Int,
   ): Outcome? {
     if (!snap.active || cart.isEmpty()) return null
-    val r = runCatching {
-      PromoCore.evaluate(
-        PromoCore.Cart(lines(d, cart), coupons, group = "", channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100),
-        snap.rules,
-      )
-    }.getOrNull() ?: return null
+    val input = PromoCore.Cart(lines(d, cart), coupons, group = "", channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100)
+    val r = runCatching { PromoCore.evaluate(input, snap.rules) }.getOrNull() ?: return null
     val net = r.lines.associate { it.key to it }
+    val parts = runCatching { split(input, snap.rules, r) }.getOrNull()
     val priced = cart.map { line ->
       val o = net[line.productId]
       if (o == null || o.discountMinor <= 0 || line.quantity <= 0) line
       else line.copy(unitPrice = (o.netMinor / 100.0) / line.quantity)
+    }
+    val tags = cart.associate { line ->
+      val p = if (line.free) null else d.products.find { it.id == line.productId }
+      val o = net[line.productId]
+      val promo = if (o == null || o.discountMinor <= 0 || line.quantity <= 0) emptyList()
+      //  تقسیم نشد (هرگز نباید) ⇒ جمعِ ردیف درست می‌ماند، فقط بی نامِ قاعده
+      else parts?.get(line.productId)?.map { (id, minor) -> SalePromo(id, snap.revs[id] ?: 0, minor) }
+        ?: listOf(SalePromo(discountMinor = o.discountMinor))
+      line.productId to LineTag(p?.let { (it.salePrice * 100).roundToLong() }, promo)
     }
     return Outcome(
       gross = SalesEngine.cartTotal(d, cart),
@@ -112,7 +168,76 @@ object PromoEngine {
       applied = r.applied.map { Applied(it.id, it.name, it.discountMinor / 100.0) },
       codes = r.codes,
       cart = priced,
+      tags = tags,
     )
+  }
+
+  /**
+   *  سهمِ هر قاعده از تخفیفِ هر ردیف (S2). هسته جمعِ هر ردیف و جمعِ هر قاعده را
+   *  می‌دهد، نه جدولِ ردیف × قاعده؛ پس قاعده‌های اعمال‌شده با **همان ترتیبِ هسته**
+   *  یکی‌یکی دوباره سنجیده می‌شوند (همه «ترکیبی» تا هیچ‌کدام کنار نرود) و تفاضلِ
+   *  دو پیشوند سهمِ قاعدهٔ تازه است — هسته هر قاعده را روی ماندهٔ قاعده‌های پیشین
+   *  می‌زند و قاعدهٔ بی‌اثر چیزی از مانده کم نمی‌کند. هر دو جمع با خروجیِ اصلی
+   *  سنجیده می‌شوند؛ ناهمخوان ⇒ `null`.
+   *
+   *  @return کلیدِ ردیف ⇒ [(شناسهٔ قاعده، تخفیف به واحدِ کوچک)] به ترتیبِ اعمال
+   */
+  internal fun split(cart: PromoCore.Cart, rules: List<PromoCore.Rule>, r: PromoCore.Result): Map<String, List<Pair<String, Long>>>? {
+    val out = LinkedHashMap<String, MutableList<Pair<String, Long>>>()
+    if (r.applied.size == 1) {
+      val id = r.applied[0].id
+      r.lines.forEach { if (it.discountMinor > 0) out[it.key] = mutableListOf(id to it.discountMinor) }
+    } else if (r.applied.size > 1) {
+      val byId = rules.associateBy { it.id }
+      val prefix = ArrayList<PromoCore.Rule>()
+      var before = LongArray(r.lines.size)
+      for (a in r.applied) {
+        prefix += (byId[a.id] ?: return null).copy(stack = "combine")
+        val step = PromoCore.evaluate(cart, prefix)
+        if (step.lines.size != r.lines.size) return null
+        var got = 0L
+        val now = LongArray(step.lines.size) { step.lines[it].discountMinor }
+        for (i in now.indices) {
+          val share = now[i] - before[i]
+          if (share < 0) return null
+          if (share > 0) { out.getOrPut(r.lines[i].key) { mutableListOf() } += a.id to share; got += share }
+        }
+        if (got != a.discountMinor) return null
+        before = now
+      }
+    }
+    for (l in r.lines) if ((out[l.key]?.sumOf { it.second } ?: 0L) != l.discountMinor) return null
+    return out
+  }
+
+  /**
+   *  S2 — فاکتورِ ثبت‌شده + نتیجهٔ تخفیف ⇒ همان فاکتور با فیلدهای اختیاری: روی
+   *  هر قلمِ کالایی `listPriceMinor` و `promo`، روی فاکتور `promoDiscountMinor`
+   *  (جمعِ همان سهم‌ها) و `coupons`. عددِ هیچ قلم و جمعی عوض نمی‌شود — فقط نشان
+   *  تا سرور تخفیفِ خودکار را از پایین آوردنِ دستیِ قیمت جدا کند.
+   *
+   *  ⛔ خاموش (`o == null`) یا ثبتِ ناموفق ⇒ **همان شیء**؛ فاکتور همان امروز.
+   */
+  fun stamp(r: SalesEngine.Result, o: Outcome?): SalesEngine.Result {
+    if (o == null || r !is SalesEngine.Result.Ok) return r
+    val si = r.data.sales.indexOfLast { it.id == r.saleId }
+    if (si < 0) return r
+    val items = r.data.saleItems.toMutableList()
+    var promoMinor = 0L
+    var seen = false
+    //  قلم‌های همین فاکتور تهِ فهرست‌اند (`SalesEngine.record`)
+    for (i in items.indices.reversed()) {
+      val item = items[i]
+      if (item.saleId != r.saleId) { if (seen) break else continue }
+      seen = true
+      if (item.productId.isEmpty()) continue
+      val tag = o.tags[item.productId] ?: continue
+      items[i] = item.copy(listPriceMinor = tag.listMinor, promo = tag.promo)
+      promoMinor += tag.promo.sumOf { it.discountMinor }
+    }
+    val sales = r.data.sales.toMutableList()
+    sales[si] = sales[si].copy(promoDiscountMinor = promoMinor, coupons = o.codes.map { it.code })
+    return r.copy(data = r.data.copy(sales = sales, saleItems = items))
   }
 
   /** سبدی که جمع و ثبت از آن می‌رود: با تخفیف اگر هست، وگرنه همان سبد (همان شیء) */

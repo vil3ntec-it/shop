@@ -423,13 +423,15 @@ fun QuickSaleScreen(
       d = d,
       //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
       cart = priced,
+      promo = promo,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
       onConfirm = { options ->
         if (!checkout) return@CheckoutDialog
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
-        scope.launch { when (val posted = cartStore.post(store) { key ->
+        //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
+        scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
           SalesEngine.record(
           d, priced, options,
           today = todayIso(),
@@ -438,7 +440,7 @@ fun QuickSaleScreen(
           //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
           series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
           saleId = key,
-        ) }) {
+        ), promo) }) {
           SalePost.Outcome.Busy -> Unit
           SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
           is SalePost.Outcome.Refused -> toast(posted.message)

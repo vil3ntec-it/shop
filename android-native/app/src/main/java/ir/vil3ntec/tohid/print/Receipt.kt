@@ -130,6 +130,12 @@ object Receipt {
     val symbol = LocaleChoice.symbol
     fun num(value: Double) = LocaleText.amount(value, digits)
     fun afn(value: Double) = LocaleText.afghani(value, digits, symbol)
+    //  قیمتِ واحدِ اعشاری (۳۳۳٫۳۳) گرد نمی‌شود تا «مقدار × قیمت» با جمعِ قلم بخواند (S3)
+    fun priceText(value: Double): String {
+      if (Math.round(value * 100) % 100 == 0L) return num(value)
+      val text = LocaleText.digitsIn(ir.vil3ntec.tohid.unitMoney(value), digits)
+      return if (digits == ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_FA) text.replace(',', '٬').replace('.', '٫') else text
+    }
 
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)
@@ -155,8 +161,11 @@ object Receipt {
       val name = ir.vil3ntec.tohid.data.SalesEngine.itemName(d, item)
       val unit = product?.unit.orEmpty()
       line(name, body)
-      val detail = "${num(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${num(item.unitPrice)}"
-      row(detail, num(item.totalPrice), small)
+      //  S3: از خودِ قلمِ ثبت‌شده — تخفیفِ خودکار با قیمتِ فهرست و سهمش، جمع همان `totalPrice`
+      val l = ir.vil3ntec.tohid.data.SaleReceipt.line(item)
+      val detail = "${LocaleText.digitsIn(ir.vil3ntec.tohid.qty(item.quantity), digits)}${if (unit.isNotBlank()) " $unit" else ""} × ${priceText(l.unit)}" +
+        if (l.promo > 0) " − ${num(l.promo)} تخفیف" else ""
+      row(detail, num(l.total), small)
       if (item.returnedQty > 0) line("مرجوعی: ${num(item.returnedQty)}", small)
       gap(0.25f)
     }
@@ -164,7 +173,11 @@ object Receipt {
     rule()
 
     /* ------------------------------ جمع‌ها ------------------------------ */
-    row("جمع اقلام", afn(sale.total), body)
+    val sums = ir.vil3ntec.tohid.data.SaleReceipt.totals(sale, items) { id ->
+      ir.vil3ntec.tohid.ui.PromoLive.snap.value.rules.find { it.id == id }?.name
+    }
+    row("جمع اقلام", afn(sums.before), body)
+    if (sums.promo > 0) row(ir.vil3ntec.tohid.data.SaleReceipt.promoLabel(sums.names), "−" + afn(sums.promo), body)
     row("تخفیف", afn(sale.discount), body)
     rule()
     row("مبلغ نهایی", afn(sale.finalTotal), head)

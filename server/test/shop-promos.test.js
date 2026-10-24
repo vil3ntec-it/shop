@@ -68,8 +68,16 @@ test('قاعده: اعتبارسنجیِ هسته، کدِ نرمال، uses ف�
   assert.equal((await h.put('/api/shop/promos/rules/bad%20id', { rule: P10 }, { token: t.owner })).status, 400);
   assert.equal((await h.put('/api/shop/promos/rules/r1', { rule: [] }, { token: t.owner })).status, 400);
 
+  //  سقفِ مصرف تا شمارشش نیامده رد می‌شود — نه این‌که بی‌صدا بی‌اثر بماند
+  for (const maxUses of [1, 10]) {
+    const capped = await h.put('/api/shop/promos/rules/r1', { rule: { ...P10, code: 'CAP10', maxUses } }, { token: t.owner });
+    assert.equal(capped.status, 400, JSON.stringify(capped.body));
+    assert.equal(capped.body.error.code, 'max_uses_unsupported');
+  }
+  assert.equal((await many(`SELECT id FROM shop_promotions WHERE shop_id=$1`, [t.shopId])).length, 0);
+
   const ok = await h.put('/api/shop/promos/rules/r1',
-    { rule: { ...P10, code: 'sale-۱۰', uses: 5, maxUses: 10, stack: 'combine' } }, { token: t.manager });
+    { rule: { ...P10, code: 'sale-۱۰', uses: 5, maxUses: 0, stack: 'combine' } }, { token: t.manager });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.rule.code, 'SALE10');
   assert.equal(ok.body.rule.uses, 0);
