@@ -312,7 +312,8 @@ fun DeskSaleScreen(
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
       SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
-      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
+      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)

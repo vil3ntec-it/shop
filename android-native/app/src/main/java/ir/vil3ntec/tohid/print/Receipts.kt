@@ -20,6 +20,7 @@ import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
 import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
 import ir.vil3ntec.tohid.core.receipt.ShopHeader
 import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.ReceiptFlag
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
@@ -47,9 +48,12 @@ object Receipts {
   /** پهنای PNG و PDF ِ «فرستادن» — همان کاغذِ ۸۰ میلی‌متری */
   const val SHARE_DOTS = PrinterProfile.WIDTH_80MM
 
+  /** توکنِ QR برای فروشِ تازهٔ صندوق — فقط با پرچمِ `shop.receipt_v2`؛ خاموش ⇒ null (همان فروشِ پیشین) */
+  fun newToken(context: Context): String? = if (ReceiptFlag.enabled(context)) ReceiptTokens.new() else null
+
   fun publicUrl(context: Context, sale: Sale): String? {
     val token = sale.receiptToken ?: return null
-    if (!ReceiptProfileStore.current(context).qr) return null
+    if (!ReceiptFlag.enabled(context) || !ReceiptProfileStore.current(context).qr) return null
     return ReceiptTokens.url(AppConfig.baseUrl(context), LedgerOwner.currentShop(context), token)
   }
 
@@ -133,6 +137,8 @@ object Receipts {
       override fun amount(afn: Double) = LocaleText.amount(afn, digits)
       override fun qty(q: Double) = LocaleText.digitsIn(ir.vil3ntec.tohid.qty(q), digits)
       override fun digits(text: String) = LocaleText.digitsIn(text, digits)
+      //  شماره جدا و چپ‌به‌راست (LRE…PDF) تا در سطرِ راست‌به‌چپ رقم‌ها جابه‌جا نشوند
+      override fun phone(text: String) = "\u202A" + LocaleText.digitsIn(text, digits) + "\u202C"
       override fun date(iso: String) = LocaleText.date(iso, digits)
     }
   }

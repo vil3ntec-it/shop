@@ -5,7 +5,7 @@ import ir.vil3ntec.tohid.core.qr.QrCode
 /**
  *  چیدمانِ فاکتورِ نسخهٔ ۲ (RECEIPT-V2 §۱.۳) — از بالا به پایین:
  *  لوگو · نامِ دکان · نشانی و تلفن · ‒ · «لغو شد» · شماره، تاریخ، فروشنده، نوع · ‒ ·
- *  قلم‌ها · ‒ · تعداد · جمع، تخفیف‌ها، مبلغِ نهایی · پرداخت‌ها، دریافتی، باقی‌پول، نسیه ·
+ *  قلم‌ها · ‒ · تعداد · جمع، تخفیف‌ها، مبلغِ نهایی · پرداخت‌ها، دریافتی، پولِ پس، نسیه ·
  *  ‒ · QR · متنِ پایین.
  *
  *  فقط چیدمان است: نه مبلغی حساب می‌شود (همه از [ReceiptInput])، نه قلم و نه سکو.
@@ -29,7 +29,7 @@ object ReceiptLayout {
     input.logo?.let { b += ReceiptBlock.Logo(it); b += ReceiptBlock.Gap(m.gap) }
     text(input.shop.name.ifBlank { labels.fallbackShop }, TextStyle.TITLE)
     text(input.shop.address, TextStyle.SMALL)
-    if (input.shop.phone.isNotBlank()) text("${labels.phone}: ${fmt.digits(input.shop.phone)}", TextStyle.SMALL)
+    if (input.shop.phone.isNotBlank()) text("${labels.phone}: ${fmt.phone(input.shop.phone)}", TextStyle.SMALL)
     input.copyMark?.let { text(it, TextStyle.SMALL) }
     b += ReceiptBlock.Rule()
 
@@ -74,10 +74,12 @@ object ReceiptLayout {
 
     /* ------------------------------ QR و پایان ------------------------------ */
     b += ReceiptBlock.Rule()
-    input.qrUrl?.let { url ->
+    //  QR ِ نشدنی (نشانیِ بلندتر از نسخهٔ ۶) ⇒ فاکتور بی QR چاپ می‌شود، چاپ نمی‌شکند
+    val qr = input.qrUrl?.let { url -> runCatching { url to QrCode.encode(url) }.getOrNull() }
+    qr?.let { (url, modules) ->
       if (input.qrCaption) text(labels.scan, TextStyle.SMALL)
       b += ReceiptBlock.Gap(m.gap / 2)
-      b += ReceiptBlock.Qr(url, QrCode.encode(url))
+      b += ReceiptBlock.Qr(url, modules)
       b += ReceiptBlock.Gap(m.gap / 2)
     }
     text(input.shop.footer.ifBlank { labels.footer }, TextStyle.SMALL)

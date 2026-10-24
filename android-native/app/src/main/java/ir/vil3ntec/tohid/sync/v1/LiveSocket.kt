@@ -128,7 +128,7 @@ class LiveSocket(
           //  عکسِ کالایی روی دستگاهِ دیگر عوض شد؛ و هنگامِ وصل شدن، صفِ عکس‌ها خالی شود
           if (event == "photos" || event == "hello") ir.vil3ntec.tohid.sync.PhotoSync.kick(app)
           //  سربرگ و لوگوی فاکتور (فاکتورِ نسخهٔ ۲) برای چاپِ بی اینترنت تازه شود
-          if (event == "hello") ir.vil3ntec.tohid.data.ReceiptProfileStore.kick(app)
+          if (event == "hello") ir.vil3ntec.tohid.data.ReceiptFlag.kick(app)
           if (event == "inbox") runCatching {
             val o = JSONObject(text)
             ir.vil3ntec.tohid.sync.PhoneScanner.inboxArrived(o.optString("id"), o.optString("pair"), o.optString("product_id"))

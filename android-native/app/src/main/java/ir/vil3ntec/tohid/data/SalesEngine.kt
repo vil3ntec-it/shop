@@ -4,7 +4,6 @@ import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
-import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
 
 /**
  *  ثبتِ فروش — همان حسابی که نسخهٔ وب می‌کند.
@@ -304,6 +303,12 @@ object SalesEngine {
      *  `null` ⇒ مثلِ همیشه شناسهٔ تازه.
      */
     saleId: String? = null,
+    /**
+     *  توکنِ QRِ فاکتور (فاکتورِ نسخهٔ ۲، `Receipts.newToken`) — فقط صندوق، و فقط با پرچمِ
+     *  `shop.receipt_v2`. `null` ⇒ مثلِ همیشه. فروشی که باید روی همهٔ دستگاه‌ها یکی باشد
+     *  (تحویلِ سفارش، `OrderFulfillment`) هرگز توکنِ تصادفی نمی‌گیرد.
+     */
+    receiptToken: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
@@ -388,7 +393,7 @@ object SalesEngine {
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
-      receiptToken = ReceiptTokens.new(),
+      receiptToken = receiptToken,
     )
 
     val items = mutableListOf<SaleItem>()

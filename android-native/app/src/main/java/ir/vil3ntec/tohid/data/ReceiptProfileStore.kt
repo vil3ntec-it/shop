@@ -5,10 +5,7 @@ import android.graphics.BitmapFactory
 import ir.vil3ntec.tohid.core.hw.LogoDither
 import ir.vil3ntec.tohid.core.hw.MonoImage
 import ir.vil3ntec.tohid.data.repo.Backend
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -33,7 +30,7 @@ import java.io.File
  *
  *  ── رابط برای صفحه‌ها (V3 G9 «فاکتور و چاپ») ──────────────────────────────
  *    [profile]             حالتِ فعلی (از حافظهٔ دستگاه، بی شبکه)
- *    [refresh]/[kick]      گرفتن از سرور — اتصالِ سوکتِ زنده (`hello`) و پس از هر ویرایش
+ *    [refresh]             گرفتن از سرور — `ReceiptFlag.kick` (پرچمِ روشن، اتصالِ سوکت) و پس از هر ویرایش
  *    [save]                نام، نشانی، تلفن، متنِ پایین، qr، حالتِ لوگو، رقم و نماد
  *    [setLogo]/[removeLogo] لوگو (PNG/JPG/WebP، ≤ ۲۰۰ KB، ≤ ۱۰۲۴ px — آماده‌سازی با صفحه)
  *    [logoMono]            لوگوی یک‌بیتیِ این کاغذ برای چاپ و پیش‌نمایش (`LogoDither`)
@@ -73,7 +70,6 @@ object ReceiptProfileStore {
   private const val ROOT = "/shop/receipt-profile"
   private const val LOGO_DIR = "receipt-logo"
 
-  private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val lock = Mutex()
   private val state = MutableStateFlow(Profile())
   private var loadedFor: String? = null
@@ -93,14 +89,9 @@ object ReceiptProfileStore {
   /** گرفتن از سرور و نگه داشتن؛ خطا ⇒ همان نسخهٔ قبلی می‌ماند. برمی‌گرداند: پیامِ خطا یا null */
   suspend fun refresh(context: Context): String? = withContext(Dispatchers.IO) {
     lock.withLock {
-      runCatching { adopt(context, Backend.api(context).get(ROOT)) }.exceptionOrNull()?.let { message(it) }
+      val shop = shopKey(context)
+      runCatching { adopt(context, shop, Backend.api(context).get(ROOT)) }.exceptionOrNull()?.let { message(it) }
     }
-  }
-
-  /** همان [refresh]، بی انتظار — اتصالِ سوکتِ زنده (`hello`) */
-  fun kick(context: Context) {
-    val app = context.applicationContext
-    scope.launch { refresh(app) }
   }
 
   suspend fun save(context: Context, patch: Patch): String? = withContext(Dispatchers.IO) {
@@ -112,18 +103,25 @@ object ReceiptProfileStore {
       patch.qr?.let { put("qr", it) }
       patch.logoMode?.let { put("logoMode", it.key) }
     }
-    lock.withLock { runCatching { adopt(context, Backend.api(context).put(ROOT, body)) }.exceptionOrNull()?.let { message(it) } }
+    lock.withLock {
+      val shop = shopKey(context)
+      runCatching { adopt(context, shop, Backend.api(context).put(ROOT, body)) }.exceptionOrNull()?.let { message(it) }
+    }
   }
 
   suspend fun setLogo(context: Context, bytes: ByteArray, contentType: String): String? = withContext(Dispatchers.IO) {
     lock.withLock {
-      runCatching { adopt(context, Backend.api(context).putBytes("$ROOT/logo", bytes, contentType)) }
+      val shop = shopKey(context)
+      runCatching { adopt(context, shop, Backend.api(context).putBytes("$ROOT/logo", bytes, contentType)) }
         .exceptionOrNull()?.let { message(it) }
     }
   }
 
   suspend fun removeLogo(context: Context): String? = withContext(Dispatchers.IO) {
-    lock.withLock { runCatching { adopt(context, Backend.api(context).delete("$ROOT/logo")) }.exceptionOrNull()?.let { message(it) } }
+    lock.withLock {
+      val shop = shopKey(context)
+      runCatching { adopt(context, shop, Backend.api(context).delete("$ROOT/logo")) }.exceptionOrNull()?.let { message(it) }
+    }
   }
 
   /**
@@ -162,22 +160,29 @@ object ReceiptProfileStore {
     loadedFor = shop
   }
 
-  /** پاسخِ سرور ⇒ نگه داشتن، و گرفتنِ لوگوی تازه اگر hash عوض شده */
-  private suspend fun adopt(context: Context, body: JsonObject) {
+  /**
+   *  پاسخِ سرور ⇒ نگه داشتن، و گرفتنِ لوگوی تازه اگر hash عوض شده. [shop] دکانی است که
+   *  درخواست برایش رفت: اگر کاربر در این میان دکان را عوض کرده، پاسخ دور ریخته می‌شود تا
+   *  سربرگِ یک دکان در حافظهٔ دکانِ دیگر ننشیند.
+   */
+  private suspend fun adopt(context: Context, shop: String, body: JsonObject) {
+    if (shopKey(context) != shop) return
     val next = parse(body)
-    val shop = shopKey(context)
+    val dir = logoDir(context, shop)
     next.logoHash?.let { hash ->
-      val file = logoFile(context, hash)
+      val file = File(dir, hash)
       if (!file.isFile) {
         val bytes = Backend.api(context).getBytes("$ROOT/logo")
-        file.parentFile?.mkdirs()
-        val tmp = File(file.parentFile, "${file.name}.tmp")
+        if (shopKey(context) != shop) return
+        dir.mkdirs()
+        val tmp = File(dir, "$hash.tmp")
         tmp.writeBytes(bytes)
         if (!tmp.renameTo(file)) { tmp.delete(); error("لوگو ذخیره نشد") }
       }
     }
-    logoDir(context).listFiles()?.forEach { if (it.name != next.logoHash) it.delete() }
+    dir.listFiles()?.forEach { if (it.name != next.logoHash) it.delete() }
     prefs(context).edit().putString("profile:$shop", serialize(body)).apply()
+    if (shopKey(context) != shop) return
     loadedFor = shop
     state.value = next
   }
@@ -200,7 +205,7 @@ object ReceiptProfileStore {
 
   private fun serialize(body: JsonObject): String = Json.encodeToString(JsonObject.serializer(), body)
 
-  private fun logoDir(context: Context) = File(context.filesDir, "$LOGO_DIR/${shopKey(context)}")
+  private fun logoDir(context: Context, shop: String = shopKey(context)) = File(context.filesDir, "$LOGO_DIR/$shop")
 
   private fun logoFile(context: Context, hash: String) = File(logoDir(context), hash)
 

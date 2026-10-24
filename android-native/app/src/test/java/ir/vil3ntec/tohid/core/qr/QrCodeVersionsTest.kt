@@ -31,7 +31,7 @@ class QrCodeVersionsTest {
 
   @Test fun `ماتریس‌ها همان بردارند؛ نسخه کوچک‌ترین نسخهٔ جاگیر`() {
     val cases = v.getValue("cases").jsonArray.map { it.jsonObject }
-    assertEquals(setOf(1, 4, 5, 6), cases.map { it.getValue("version").jsonPrimitive.int }.toSet())
+    assertEquals(setOf(1, 2, 4, 5, 6), cases.map { it.getValue("version").jsonPrimitive.int }.toSet())
     for (c in cases) {
       val text = c.getValue("text").jsonPrimitive.content
       val rows = c.getValue("rows").jsonArray.map { it.jsonPrimitive.content }

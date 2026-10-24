@@ -19,6 +19,7 @@ class ReceiptLayoutTest {
     override fun amount(afn: Double) = afn.toLong().toString()
     override fun qty(q: Double) = if (q == Math.floor(q)) q.toLong().toString() else q.toString()
     override fun digits(text: String) = text
+    override fun phone(text: String) = "<$text>"
     override fun date(iso: String) = "1405/08/02"
   }
 
@@ -58,12 +59,12 @@ class ReceiptLayoutTest {
     val doc = ReceiptLayout.build(input(), PrinterProfile.WIDTH_58MM, fmt)
     assertEquals(ReceiptMetrics.MM58, doc.metrics)
     assertEquals(listOf(
-      "T:سوپرمارکتِ نمونه", "T:کابل، شهرِ نو", "T:تلفن: 0799 123 456", "--",
+      "T:سوپرمارکتِ نمونه", "T:کابل، شهرِ نو", "T:تلفن: <0799 123 456>", "--",
       "R:شمارهٔ فاکتور=#B1-154", "R:تاریخ=1405/08/02 — 14:35", "R:فروشنده=احمد", "R:نوع=نقدی", "--",
       "I:چای سبز|3 بسته × 150|450|", "I:برنج|1.5 کیلو × 100|150|قیمتِ اصلی: 120;مرجوعی: 0.5", "--",
       "T:تعداد اقلام: 2 ردیف",
       "R:جمع اقلام=600 افغانی", "R:تخفیفِ ویژه=−30 افغانی", "==", "R:مبلغ نهایی=570 افغانی",
-      "R:پرداختی=570 افغانی", "R:باقی‌پول=30 افغانی", "--",
+      "R:پرداختی=570 افغانی", "R:پولِ پس=30 افغانی", "--",
       "T:برای دیدنِ این خرید اسکن کنید", "gap", "qr:$url", "gap", "T:تشکر از خرید شما",
     ), texts(doc))
     assertEquals(TextStyle.TOTAL, (doc.blocks.first { it is ReceiptBlock.Row && it.label == "مبلغ نهایی" } as ReceiptBlock.Row).style)
@@ -81,6 +82,14 @@ class ReceiptLayoutTest {
     assertFalse(t.any { it.startsWith("qr:") || it.contains("اسکن") })
     //  بی بدهی ⇒ نامِ قرض‌دار هرگز
     assertFalse(texts(ReceiptLayout.build(input(), PrinterProfile.WIDTH_80MM, fmt)).any { it.contains("محمود") })
+  }
+
+  @Test fun `نشانیِ بلندتر از ظرفیتِ QR — فاکتور بی QR چاپ می‌شود، نمی‌شکند`() {
+    val long = "https://api.example.com/r/d2jcj71t/" + "x".repeat(200)
+    assertTrue(runCatching { QrCode.encode(long) }.isFailure)
+    val t = texts(ReceiptLayout.build(input(qrUrl = long), PrinterProfile.WIDTH_58MM, fmt))
+    assertFalse(t.any { it.startsWith("qr:") || it.contains("اسکن") })
+    assertEquals("T:تشکر از خرید شما", t.last())
   }
 
   @Test fun `رستر — پهنای کاغذ، QR با حاشیهٔ خالی وسطِ کاغذ و خطِ نقطه‌چین`() {

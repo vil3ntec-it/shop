@@ -33,9 +33,11 @@ object PrintJob {
     }
   }
 
-  /** همان فاکتور به PDF ِ ۸۰ میلی‌متری (فاکتورِ نسخهٔ ۲) */
+  /** همان تصویرِ [shareSale]، به PDF ِ ۸۰ میلی‌متری (`ReceiptPdf`) — با پرچمِ خاموش همان فاکتورِ پیشین */
   suspend fun sharePdf(context: Context, d: ShopData, sale: Sale): String? = share(context, sale, "pdf", "application/pdf") { file ->
-    file.writeBytes(Receipts.pdf(context, d, sale, legacyQr = receiptQr(context, sale)))
+    val bitmap = Receipt.render(context, d, sale, Receipts.localName(context), Receipts.SHARE_DOTS, qr = receiptQr(context, sale))
+    val mono = try { ThermalPrinter.toMono(bitmap, Receipts.SHARE_DOTS) } finally { bitmap.recycle() }
+    file.writeBytes(ir.vil3ntec.tohid.core.receipt.ReceiptPdf.single(mono))
   }
 
   private suspend fun share(
@@ -45,7 +47,9 @@ object PrintJob {
     mime: String,
     write: (java.io.File) -> Unit,
   ): String? {
-    val storeName = ReceiptProfileStore.current(context).name.ifBlank { Receipts.localName(context) }
+    //  پرچمِ خاموش ⇒ همان نامِ محلیِ پیشین در متنِ اشتراک
+    val local = Receipts.localName(context)
+    val storeName = if (ir.vil3ntec.tohid.data.ReceiptFlag.enabled(context)) ReceiptProfileStore.current(context).name.ifBlank { local } else local
     val file = withContext(Dispatchers.IO) {
       runCatching {
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }

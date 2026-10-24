@@ -10,6 +10,7 @@ import java.security.SecureRandom
 object ReceiptTokens {
 
   private val random = SecureRandom()
+  private val ABSOLUTE = Regex("^https?://[^/\\s]+.*$", RegexOption.IGNORE_CASE)
 
   /** توکنِ تازهٔ فاکتور — فقط هنگامِ ثبتِ فروش */
   fun new(): String {
@@ -27,7 +28,8 @@ object ReceiptTokens {
   /** نشانیِ QR ِ این فروش، یا null اگر فروش توکن ندارد (فروشِ پیش از نسخهٔ ۲) */
   fun url(base: String, shopId: String, token: String?): String? {
     val t = ReceiptToken.normalizeToken(token) ?: return null
-    if (shopId.isBlank()) return null
+    //  بی دکان یا بی ریشهٔ سرور ⇒ بی QR (نشانیِ نسبی روی کاغذ به هیچ‌جا نمی‌رسد)
+    if (shopId.isBlank() || !ABSOLUTE.matches(base.trim())) return null
     return ReceiptToken.url(base, shopTag(shopId), t)
   }
 }

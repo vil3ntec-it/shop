@@ -60,6 +60,10 @@ class ReceiptTokenTest {
     assertNull(ReceiptTokens.url("https://x", "shop", null))
     assertNull(ReceiptTokens.url("https://x", "shop", "not-a-token"))
     assertNull(ReceiptTokens.url("https://x", " ", ReceiptTokens.new()))
+    //  ریشهٔ سرورِ خالی یا نسبی ⇒ بی QR، هرگز نشانیِ نسبی روی کاغذ
+    assertNull(ReceiptTokens.url("", "shop", ReceiptTokens.new()))
+    assertNull(ReceiptTokens.url("api.example.com", "shop", ReceiptTokens.new()))
+    assertNull(ReceiptTokens.url("/api", "shop", ReceiptTokens.new()))
   }
 
   @Test fun `توکنِ تازه — شکلِ درست و هر بار تازه`() {

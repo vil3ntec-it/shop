@@ -75,8 +75,10 @@ interface ReceiptFormat {
   fun amount(afn: Double): String
   /** مقدار: «3»، «1.5» */
   fun qty(q: Double): String
-  /** رقم‌های یک متن (شمارهٔ فاکتور، ساعت، تلفن) */
+  /** رقم‌های یک متن (شمارهٔ فاکتور، ساعت) */
   fun digits(text: String): String
+  /** تلفن — جدا و چپ‌به‌راست، با رقمِ انتخابی */
+  fun phone(text: String): String
   /** تاریخِ خورشیدیِ عددی از `YYYY-MM-DD` */
   fun date(iso: String): String
 }
@@ -99,7 +101,7 @@ data class ReceiptLabels(
   val total: String = "مبلغ نهایی",
   val paid: String = "پرداختی",
   val tendered: String = "دریافتی",
-  val change: String = "باقی‌پول",
+  val change: String = "پولِ پس",
   val remaining: String = "باقی‌مانده (نسیه)",
   val debtor: String = "قرض‌دار",
   val phone: String = "تلفن",

@@ -37,7 +37,7 @@ function decode(Z, rows, scale) {
 
 test('receipt-qr-v1: هر ماتریس اندازهٔ نسخهٔ خودش را دارد و zxing همان نشانی را می‌خواند', () => {
   const Z = zxing();
-  assert.deepEqual([...new Set(QV.cases.map((c) => c.version))].sort(), [1, 4, 5, 6]);
+  assert.deepEqual([...new Set(QV.cases.map((c) => c.version))].sort(), [1, 2, 4, 5, 6]);
   for (const c of QV.cases) {
     const size = 17 + 4 * c.version;
     assert.equal(c.rows.length, size, c.text);
