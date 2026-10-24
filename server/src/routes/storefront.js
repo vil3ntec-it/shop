@@ -20,6 +20,7 @@ const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
+const orderTimeout = require('../lib/order-timeout');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -141,6 +142,10 @@ router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });
   }
+  //  ORD-05: زمان‌سنجِ قبول — فقط اگر دکان همین لحظه می‌پذیرد (سفارشِ «بعداً» نه).
+  //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
+  await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
+    .catch((err) => console.error('[order-timeout] arm', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,

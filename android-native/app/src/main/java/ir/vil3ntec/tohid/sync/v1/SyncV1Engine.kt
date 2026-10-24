@@ -364,6 +364,7 @@ class SyncV1Engine private constructor(context: Context) {
    */
   internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
     busy = true
+    rebuilding = true
     publish()
     try {
       synchronized(this) { commit.queueRecorded() }
@@ -402,10 +403,18 @@ class SyncV1Engine private constructor(context: Context) {
       }
       out
     } finally {
+      rebuilding = false
       busy = false
       publish()
     }
   }
+
+  /**
+   *  همین فرایند وسطِ بازسازی است — `ShopStore.recoverRebuild` ِ نمونهٔ دیگر (کارگرِ پس‌زمینه)
+   *  کناری و نشانِ نیمه‌کاره را نه تمام می‌کند نه دور می‌ریزد.
+   */
+  @Volatile var rebuilding: Boolean = false
+    private set
 
   /**
    *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
@@ -422,12 +431,17 @@ class SyncV1Engine private constructor(context: Context) {
    */
   @Synchronized
   internal fun resetTo(ledger: ShopData, files: SyncRebuild.Staging) {
-    val shadow = SyncRebuild.shadowFor(ledger)
-    files.stage(ledger, SyncRebuild.sha(shadow))
-    if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
-    state.reconciledAt = 0L
-    state.snapshotAt = 0L
-    files.swap()
+    rebuilding = true
+    try {
+      val shadow = SyncRebuild.shadowFor(ledger)
+      files.stage(ledger, SyncRebuild.sha(shadow))
+      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      state.reconciledAt = 0L
+      state.snapshotAt = 0L
+      files.swap()
+    } finally {
+      rebuilding = false
+    }
     publish()
   }
 

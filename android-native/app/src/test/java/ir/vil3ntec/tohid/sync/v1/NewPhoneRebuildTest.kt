@@ -11,6 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -279,5 +280,24 @@ class NewPhoneRebuildTest {
     assertEquals(SyncRebuild.AtLoad.DISCARD, SyncRebuild.atLoad(phone.marker, phone.sidecar != null, SyncRebuild.sha(phone.shadow)))
     assertEquals(SyncRebuild.AtLoad.DISCARD, SyncRebuild.atLoad(null, true, SyncRebuild.sha(phone.shadow)))
     assertEquals(SyncRebuild.AtLoad.NONE, SyncRebuild.atLoad(null, false, SyncRebuild.sha(phone.shadow)))
+  }
+
+  @Test fun `فروشی که از پشتیبان افزوده شد کفِ شمارهٔ فاکتور را بالا می‌برد`() {
+    val (old, server, backup) = oldPhone()
+    val withSale = backup.copy(sales = listOf(Sale(id = "s-offline", invoiceNumber = 12)), nextInvoiceNo = 1)
+    val phone = newPhone(old)
+    val out = runBlocking { SyncRebuild(io(phone, server, ArrayList())).run(withSale) } as SyncRebuild.Outcome.Done
+    val merged = SyncRebuild.withBackupRows(out.ledger, withSale, out.before)
+    assertTrue(merged.sales.any { it.id == "s-offline" })
+    assertEquals(13, merged.nextInvoiceNo)
+  }
+
+  @Test fun `جابه‌جایی را دیگری زودتر تمام کرد — فقط وقتی نشان و کناری رفته‌اند و دفترِ دیسک همان است`() {
+    val staged = ShopData(products = listOf(p("p1", 10.0)))
+    assertTrue(SyncRebuild.swappedElsewhere(sidecar = false, marker = false, onDisk = staged, staged = staged))
+    assertFalse(SyncRebuild.swappedElsewhere(sidecar = true, marker = false, onDisk = staged, staged = staged))
+    assertFalse(SyncRebuild.swappedElsewhere(sidecar = false, marker = true, onDisk = staged, staged = staged))
+    assertFalse("دفترِ دیگری روی دیسک (کناری دور ریخته شد)", SyncRebuild.swappedElsewhere(false, false, ShopData(), staged))
+    assertFalse(SyncRebuild.swappedElsewhere(false, false, staged, null))
   }
 }
