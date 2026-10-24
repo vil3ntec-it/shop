@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.onboarding
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -101,11 +102,11 @@ internal fun GateLink(text: String, onClick: () -> Unit, enabled: Boolean = true
   )
 }
 
-/** دو راهِ فرعیِ هم‌وزن در یک خط، با نقطهٔ میانه (پای کارتِ دروازه) */
+/** دو راهِ فرعیِ هم‌وزن در یک خط با نقطهٔ میانه (پای کارتِ دروازه)؛ نوشتهٔ بلند ⇐ خطِ بعد، نه شکستنِ واژه */
 @Composable
 internal fun GateLinks(vararg links: Pair<String, () -> Unit>) {
   val c = PhoneV3.colors
-  Row(horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+  FlowRow(horizontalArrangement = Arrangement.Center, verticalArrangement = Arrangement.Center) {
     links.forEachIndexed { i, (label, go) ->
       if (i > 0) Text("·", style = v3Text(15, FontWeight.SemiBold, 22), color = c.inkMuted)
       V3TextButton(label, go)

@@ -2,16 +2,19 @@ package ir.vil3ntec.tohid.desktop.shots
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.data.LocationFix
@@ -19,6 +22,8 @@ import ir.vil3ntec.tohid.data.LockStore
 import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.ui.screens.frosted
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.onboarding.GateLink
 import ir.vil3ntec.tohid.ui.v3.onboarding.AuthActions
 import ir.vil3ntec.tohid.ui.v3.onboarding.AuthEnv
 import ir.vil3ntec.tohid.ui.v3.onboarding.AuthFlow
@@ -74,7 +79,7 @@ object OnboardingShots : GroupShots {
     Shot("join", content = { Flow(AuthUi(step = AuthStep.JOIN, name = "احمد", staffCode = "F6D75A07")) }),
     Shot("terms", content = { TermsPage(accepting = true, onClose = {}, onAccept = {}) }),
     Shot("code-sheet", content = {
-      SheetMock {
+      SheetMock(null) {
         EmailCodeBody(
           EmailCodeUi(email = "karim@gmail.com", requestId = "r1", masked = "k***@gmail.com", code = "48"),
           left = 37, focus = remember { FocusRequester() }, showTitle = true,
@@ -92,10 +97,10 @@ object OnboardingShots : GroupShots {
       LockBody(StrAuth.lockTitle, StrAuth.lockWrong, error = true, length = LockStore.NEW_PIN_LEN, filled = 0, shake = null, onDigit = {}, onErase = {}, onFinger = {})
     }),
     Shot("lock-setup", content = {
-      LockBody(StrAuth.lockAgain, StrAuth.lockSetupNote, error = false, length = LockStore.NEW_PIN_LEN, filled = 3, shake = null, onDigit = {}, onErase = {}, onFinger = null, footer = {})
+      LockBody(StrAuth.lockAgain, StrAuth.lockSetupNote, error = false, length = LockStore.NEW_PIN_LEN, filled = 3, shake = null, onDigit = {}, onErase = {}, onFinger = null, footer = { GateLink(StrAuth.notNow, {}) })
     }),
     Shot("reauth", content = {
-      SheetMock {
+      SheetMock(StrAuth.reauthTitle) {
         ReauthBody(ReauthProof.PASSWORD, "secret", busy = false, note = null, error = null, failures = 0, onSecret = {}, onUseCode = {}, onResend = {}, onSubmit = {}, onCancel = {})
       }
     }),
@@ -112,13 +117,18 @@ object OnboardingShots : GroupShots {
 
   /** برگه روی صفحهٔ مه‌گرفته — ModalBottomSheet در پنجرهٔ عکس جدا کشیده می‌شود، پس قابِ همان شکل */
   @Composable
-  private fun SheetMock(content: @Composable () -> Unit) {
+  private fun SheetMock(title: String?, content: @Composable () -> Unit) {
     val c = PhoneV3.colors
     Box(Modifier.fillMaxSize().frosted(c).background(c.black.copy(alpha = 0.32f)), contentAlignment = Alignment.BottomCenter) {
-      Box(
+      Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)).background(c.card)
-          .padding(start = 20.dp, end = 20.dp, top = 28.dp, bottom = 28.dp),
-      ) { content() }
+          .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 28.dp),
+      ) {
+        if (title != null) {
+          Text(title, style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp))
+        }
+        content()
+      }
     }
   }
 
