@@ -23,6 +23,8 @@ const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'mark
 const searchLimit = rateLimit({ max: config.rateLimit.marketSearchMax, keyPrefix: 'market-search' });
 //  سقفِ ضربه‌ای: چند جست‌وجو در دقیقه از یک IP، جدا از سقفِ ربع‌ساعته
 const searchBurst = rateLimit({ max: config.rateLimit.marketSearchBurstMax, windowMs: 60 * 1000, keyPrefix: 'market-search-burst' });
+//  خانه (قفسه‌ها و دو فهرست) همان سقفِ دقیقه‌ای را دارد، با سطلِ خودش
+const feedBurst = rateLimit({ max: config.rateLimit.marketFeedBurstMax, windowMs: 60 * 1000, keyPrefix: 'market-feed-burst' });
 //  همان کلیدهای `routes/storefront.js` ⇒ همان سطل
 const sendCodeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-verify' });
 const codeLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'store-verify-code' });
@@ -38,8 +40,14 @@ router.get('/', readLimit, on, wrap(async (req, res) => {
 }));
 
 router.get('/shops', readLimit, on, wrap(async (req, res) => {
-  const { q, category, lat, lng, limit, offset } = req.query;
-  res.json(await market.shops({ q, category, lat, lng, limit, offset }));
+  const { q, category, lat, lng, limit, offset, first } = req.query;
+  res.json(await market.shops({ q, category, lat, lng, limit, offset, first }));
+}));
+
+//  خانه: قفسهٔ دکان‌ها، «پرفروش» و «ارزان‌تر» ِ واقعی؛ `only=lists` ⇒ فقط دو فهرست
+router.get('/products', feedBurst, readLimit, on, wrap(async (req, res) => {
+  const { category, lat, lng, limit, only } = req.query;
+  res.json(await market.feed({ category, lat, lng, limit, only }));
 }));
 
 router.get('/search', searchBurst, searchLimit, on, wrap(async (req, res) => {
