@@ -307,6 +307,11 @@ const config = {
     //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
     marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
     marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
+    //  فاکتورِ عمومی (QRِ هر فاکتور، `/api/receipt`) به‌ازای IP: ربع‌ساعته و ضربه‌ای در دقیقه
+    receiptReadMax: num(process.env.RATE_RECEIPT_READ_MAX, 60),
+    receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
+    //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در ربع ساعت (هر لوگوی تازه در `image_blobs` می‌ماند)
+    receiptLogoMax: num(process.env.RATE_RECEIPT_LOGO_MAX, 20),
   },
 
   /**
