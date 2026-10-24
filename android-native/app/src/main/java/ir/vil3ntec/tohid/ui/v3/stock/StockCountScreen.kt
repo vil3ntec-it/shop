@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -21,14 +20,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FileDownload
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -75,6 +71,11 @@ import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
+import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import androidx.compose.runtime.mutableIntStateOf
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import androidx.compose.ui.text.font.FontWeight
@@ -108,6 +109,7 @@ fun StockCountScreen(
   val system = remember(data) { CountState.system(data) }
   val rows = remember(data, query) { CountState.rows(data, query) }
   val stagger = rememberV3Stagger()
+  var shake by remember { mutableIntStateOf(0) }
   val back = { if (state.dirty) askDiscard = true else onBack() }
   BackHandler(enabled = state.dirty) { askDiscard = true }
 
@@ -124,7 +126,7 @@ fun StockCountScreen(
         onPrimary = {
           val bad = state.firstInvalid(data)
           failure = bad?.let { StrStock.badNumber(it.name) }
-          if (bad == null) confirm = true
+          if (bad == null) confirm = true else shake++
         },
         primaryEnabled = lines.isNotEmpty(),
         summary = StrStock.countSummary(money(state.parsed.size.toDouble()), money(lines.size.toDouble()), money(lines.sumOf { it.value })),
@@ -141,18 +143,18 @@ fun StockCountScreen(
           Text(StrStock.countHelper, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
           Spacer(Modifier.height(10.dp))
           V3TextField(state.note, { state = state.copy(note = it) }, StrStock.countNote, Modifier.fillMaxWidth())
-          failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp)) }
+          failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp).v3Shake(shake)) }
         }
       }
       itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
-        CountRow(p, system[p.id] ?: 0.0, state, draftItem().v3Stagger(stagger, p.id, i)) { v -> state = state.copy(counts = state.counts + (p.id to v)); failure = null }
+        CountRow(p, system[p.id] ?: 0.0, state, Modifier.v3AnimateItem(this).v3Stagger(stagger, p.id, i)) { v -> state = state.copy(counts = state.counts + (p.id to v)); failure = null }
       }
     }
   }
 
   if (confirm) ConfirmLines(lines, onDismiss = { confirm = false }) {
     failure = onSave(state.valid, state.note)
-    if (failure == null) onBack()
+    if (failure == null) onBack() else shake++
   }
   if (askDiscard) {
     V3ConfirmSheet(StrKit.discardTitle, StrKit.discardBody, StrKit.discard, onConfirm = onBack, onDismiss = { askDiscard = false })
@@ -166,7 +168,7 @@ private fun CountRow(p: Product, system: Double, state: CountState, modifier: Mo
   val invalid = state.invalid(p.id)
   val diff = state.diff(p.id, system)
   val counted = text.isNotBlank() && !invalid
-  V3Card(modifier.draftResize(), radius = V3Space.cardRadius, padding = PaddingValues(0.dp)) {
+  V3Card(modifier, radius = V3Space.cardRadius, padding = PaddingValues(0.dp)) {
     V3ListRow(
       title = p.name,
       subtitle = StrStock.systemQty(listOf(qty(system), p.unit).filter { it.isNotBlank() }.joinToString(" ")),
@@ -183,7 +185,7 @@ private fun CountRow(p: Product, system: Double, state: CountState, modifier: Mo
         }
       },
     )
-    if (invalid) {
+    V3Collapse(invalid) {
       Text(
         StrStock.badNumber(p.name),
         style = V3Type.footnote,
@@ -194,25 +196,12 @@ private fun CountRow(p: Product, system: Double, state: CountState, modifier: Mo
   }
 }
 
-/** عکسِ کالا با نشانِ «شمرده» که با فنر روی گوشه‌اش می‌نشیند */
+/** عکسِ کالا با تیکِ «شمرده» (`V3SuccessCheck`، فنرِ شاد و کشیدنِ تیک) روی گوشه‌اش */
 @Composable
 private fun CountedThumb(p: Product, counted: Boolean) {
-  val c = PhoneV3.colors
-  val brand = PhoneV3Roles.button(c, V3ButtonKind.PRIMARY)
-  Box {
+  Box(Modifier.semantics(mergeDescendants = true) { if (counted) contentDescription = StrStock.counted }) {
     V3ProductThumb(p.id, p.name, size = 44.dp)
-    AnimatedVisibility(
-      counted,
-      modifier = Modifier.align(Alignment.BottomEnd).offset(x = 4.dp, y = 4.dp),
-      enter = DraftMotion.pop(),
-      exit = DraftMotion.unpop(),
-    ) {
-      Box(
-        Modifier.size(20.dp).clip(CircleShape).background(c.card).padding(2.dp).clip(CircleShape).background(brand.bg)
-          .semantics { contentDescription = StrStock.counted },
-        contentAlignment = Alignment.Center,
-      ) { Icon(Icons.Outlined.Check, contentDescription = null, tint = brand.fg, modifier = Modifier.size(12.dp)) }
-    }
+    V3SuccessCheck(counted, Modifier.align(Alignment.BottomEnd).offset(x = 5.dp, y = 5.dp), size = 20.dp, haptic = false)
   }
 }
 

@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -108,7 +109,7 @@ fun ImportScreen(state: ImportState, onPick: () -> Unit, onSave: (ProductImport.
             Modifier.padding(top = 8.dp).v3Stagger(stagger, "summary", 0),
             body = p.skipped.takeIf { it.isNotEmpty() }?.let { StrStock.importSkipped(money(it.size.toDouble())) },
           )
-          failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp)) }
+          failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp).v3Shake(it)) }
         }
         if (p.skipped.isNotEmpty()) item(key = "skipped") {
           V3Section(StrStock.skippedTitle, modifier = Modifier.v3Stagger(stagger, "skipped", 1)) {

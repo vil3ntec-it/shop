@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
@@ -43,6 +46,9 @@ import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.v3.V3ContainerTransform
+import ir.vil3ntec.tohid.ui.v3.V3StaggerState
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -57,6 +63,8 @@ class StockListActions(
   val import: () -> Unit,
   val bulk: () -> Unit,
   val newProduct: () -> Unit,
+  /** ثبتِ ورود از صفحهٔ دکمهٔ شناور: null یعنی ثبت شد؛ وگرنه دلیلِ رد */
+  val saveEntry: (ir.vil3ntec.tohid.data.WarehouseEngine.EntryDraft) -> String?,
 )
 
 /**
@@ -89,10 +97,15 @@ fun StockListScreen(
   }
   val categories = remember(data) { StockListModel.usedCategories(data) }
   val empty = data.products.isEmpty()
+  //  فهرست زیرِ صفحهٔ «ورود کالا» از ترکیب بیرون می‌رود؛ جای پیمایش و پلکان همین‌جا می‌ماند
+  val listState = rememberLazyListState()
+  val stagger = rememberV3Stagger()
+  var entryOpen by rememberSaveable { mutableStateOf(false) }
+  var entryRun by rememberSaveable { mutableIntStateOf(0) }
 
+  V3ContainerTransform(selected = if (entryOpen) FAB_KEY else null, modifier = modifier, list = {
   V3Scaffold(
     title = Str.warehouse,
-    modifier = modifier,
     onBack = onBack,
     actions = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode, onClick = actions.scan)),
     overflow = if (wide) emptyList() else listOf(
@@ -104,7 +117,10 @@ fun StockListScreen(
     chips = if (empty) null else ({
       FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it })
     }),
-    fab = if (empty) null else ({ expanded -> V3Fab(Icons.Outlined.MoveToInbox, StrStock.fabEntry, expanded, onClick = { actions.entry(null) }) }),
+    //  دکمهٔ شناور با container transform به صفحهٔ «ورود کالا» باز می‌شود و به خودش برمی‌گردد
+    fab = if (empty) null else ({ expanded ->
+      V3Fab(Icons.Outlined.MoveToInbox, StrStock.fabEntry, expanded, onClick = { entryRun++; entryOpen = true }, modifier = Modifier.v3Container(FAB_KEY))
+    }),
   ) { pad ->
     val ready = overview
     when {
@@ -123,13 +139,28 @@ fun StockListScreen(
         wide = wide,
         selectedId = selectedId,
         actions = actions,
+        listState = listState,
+        stagger = stagger,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + 72.dp),
         onFilter = { filterKey = it.key },
         onClear = { query = ""; filterKey = StockFilter.ALL.key; category = null },
       )
     }
   }
+  }, detail = {
+    val flow = rememberEntryFlow(data, product = null, barcode = null, key = entryRun)
+    StockEntryPage(
+      data = data,
+      flow = flow,
+      onSave = actions.saveEntry,
+      onNewProduct = { entryOpen = false; actions.newProduct() },
+      onClose = { entryOpen = false },
+      modifier = Modifier.v3Container(FAB_KEY),
+    )
+  })
 }
+
+private const val FAB_KEY = "stock-entry-fab"
 
 @Composable
 private fun FilterChips(
@@ -173,13 +204,14 @@ private fun StockList(
   wide: Boolean,
   selectedId: String?,
   actions: StockListActions,
+  listState: LazyListState,
+  stagger: V3StaggerState,
   contentPadding: PaddingValues,
   onFilter: (StockFilter) -> Unit,
   onClear: () -> Unit,
 ) {
   val rows = remember(overview, filter, query, category) { StockListModel.visible(overview.rows, filter, query, category) }
-  val stagger = rememberV3Stagger()
-  LazyColumn(Modifier.fillMaxSize(), contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+  LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item(key = "stats") {
       StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 4.dp).v3Stagger(stagger, "stats", 0))
     }
@@ -202,7 +234,7 @@ private fun StockList(
         onOpen = { actions.open(id) },
         onEntry = { actions.entry(id) },
         onAdjust = { actions.adjust(id) },
-        modifier = draftItem().v3Stagger(stagger, id, index),
+        modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, id, index),
       )
     }
     item(key = "end") { Spacer(Modifier.height(8.dp)) }

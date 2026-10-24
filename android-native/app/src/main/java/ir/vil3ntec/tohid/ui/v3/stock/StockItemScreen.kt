@@ -69,6 +69,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 
 /** کارهای صفحهٔ یک کالا — همه مسیرند، جز حذفِ محصول که پس از تأییدِ همین صفحه می‌آید */
@@ -132,13 +133,22 @@ fun StockItemScreen(
         }
       }
       item(key = "entries") {
-        V3Section(StrStock.entriesTitle, modifier = Modifier.draftResize().v3Stagger(stagger, "entries", 2)) {
+        V3Section(StrStock.entriesTitle, modifier = Modifier.v3Stagger(stagger, "entries", 2)) {
           if (item.entries.isEmpty()) {
             V3ListRow(StrStock.noEntries, icon = Icons.Outlined.MoveToInbox, chevron = false)
           }
-          StockItemModel.shown(item.entries, expanded).forEachIndexed { i, e ->
+          StockItemModel.shown(item.entries, false).forEachIndexed { i, e ->
             if (i > 0) V3Divider(start = 64.dp)
             EntryRow(e, onDelete = { actions.deleteEntry(e.entry.id) })
+          }
+          //  ورودهای قدیمی‌تر درجا باز می‌شوند (`V3Collapse`، فنرِ کیت)
+          V3Collapse(expanded) {
+            Column {
+              item.entries.drop(StockItemModel.PREVIEW).forEach { e ->
+                V3Divider(start = 64.dp)
+                EntryRow(e, onDelete = { actions.deleteEntry(e.entry.id) })
+              }
+            }
           }
           val hidden = StockItemModel.hiddenCount(item.entries, expanded)
           if (hidden > 0 || expanded && item.entries.size > StockItemModel.PREVIEW) {

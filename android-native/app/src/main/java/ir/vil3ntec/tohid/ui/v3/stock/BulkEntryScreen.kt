@@ -54,6 +54,10 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
+import ir.vil3ntec.tohid.ui.v3.V3Collapse
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.foundation.layout.Column
 
 /**
  *  `stock/entry/bulk` — «ورودِ چند قلم» (فرمِ نسخهٔ ۳): تاریخِ همهٔ ردیف‌ها، کارتِ هر ردیف
@@ -81,6 +85,7 @@ fun BulkEntryScreen(
   var menuFor by remember { mutableStateOf<Int?>(null) }
   val unit = BulkEntryState.defaultUnit(data)
   val stagger = rememberV3Stagger()
+  var shake by remember { mutableIntStateOf(0) }
   val ready = state.ready
 
   fun change(next: BulkEntryState) { state = next; failure = null }
@@ -91,6 +96,7 @@ fun BulkEntryScreen(
     onPrimary = {
       showErrors = true
       failure = state.problem() ?: onSave(state.entries(data), state.date)
+      if (failure != null) shake++
     },
     onBack = onBack,
     actions = listOf(V3Action(Icons.Outlined.QrCodeScanner, StrKit.scanBarcode) { onScan { code -> change(state.scanned(data, code, unit)) } }),
@@ -116,7 +122,7 @@ fun BulkEntryScreen(
     }
     Spacer(Modifier.height(12.dp))
     V3Button(StrStock.addRow, { change(state.add(unit)) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Add)
-    failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 12.dp)) }
+    failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 12.dp).v3Shake(shake)) }
     Spacer(Modifier.height(16.dp))
   }
 
@@ -157,7 +163,7 @@ private fun RowCard(
 ) {
   val c = PhoneV3.colors
   val ring = if (broken) Modifier.border(2.dp, PhoneV3Roles.errorText(c), RoundedCornerShape(V3Space.cardRadius)) else Modifier
-  V3Card(modifier.then(ring).draftResize(), radius = V3Space.cardRadius, padding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 14.dp)) {
+  V3Card(modifier.then(ring), radius = V3Space.cardRadius, padding = PaddingValues(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 14.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(StrStock.rowN(money(number.toDouble())), style = V3Type.headline, color = c.ink, modifier = Modifier.weight(1f))
       V3IconButton(Icons.Outlined.MoreHoriz, StrKit.more, size = 38.dp, iconSize = 20.dp, onClick = onMenu)
@@ -173,7 +179,9 @@ private fun RowCard(
         onClick = onPick,
       )
     }
-    if (row.newProduct) {
+    //  «محصولِ تازه»: کادرهای نام/دسته/بارکد/واحد با فنرِ کیت باز و بسته می‌شوند
+    V3Collapse(row.newProduct) {
+    Column {
       if (row.scanMiss) Text(StrStock.scanMiss, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 6.dp))
       Spacer(Modifier.height(10.dp))
       V3TextField(row.newName, { onChange(row.copy(newName = it)) }, StrStock.newProductName, Modifier.fillMaxWidth(), placeholder = StrStock.newProductNameHint, required = true)
@@ -189,12 +197,13 @@ private fun RowCard(
         }
       }
     }
+    }
     Spacer(Modifier.height(10.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3TextField(row.qty, { onChange(row.copy(qty = it)) }, StrStock.quantity, Modifier.weight(1f), kind = V3FieldKind.NUMBER, suffix = row.unit.ifBlank { null }, required = true)
       V3TextField(row.price, { onChange(row.copy(price = it)) }, StrStock.purchasePrice, Modifier.weight(1f), kind = V3FieldKind.MONEY, required = true)
     }
-    if (row.amount > 0) {
+    V3Collapse(row.amount > 0) {
       Text(
         StrStock.rowValue(money(row.value)),
         style = V3Type.subhead,
@@ -202,6 +211,8 @@ private fun RowCard(
         modifier = Modifier.padding(top = 8.dp),
       )
     }
-    if (broken) Text(StrStock.errRow(money(number.toDouble())), style = V3Type.footnote, color = PhoneV3Roles.errorText(c), modifier = Modifier.padding(top = 6.dp))
+    V3Collapse(broken) {
+      Text(StrStock.errRow(money(number.toDouble())), style = V3Type.footnote, color = PhoneV3Roles.errorText(c), modifier = Modifier.padding(top = 6.dp))
+    }
   }
 }

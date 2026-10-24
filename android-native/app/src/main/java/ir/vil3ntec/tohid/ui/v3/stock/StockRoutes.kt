@@ -169,6 +169,7 @@ private fun RouteScope.StockHome(selected: String?) {
     import = { nav.open(StockPaths.IMPORT) },
     bulk = { nav.open(StockPaths.ENTRY_BULK) },
     newProduct = { nav.open(ProductsPaths.new()) },
+    saveEntry = { draft -> writer.commit(WarehouseEngine.addEntry(data, draft, today, writer.now, writer.newId), StrStock.entrySaved) },
   )
   val itemActions = StockItemActions(
     edit = { nav.open(ProductsPaths.edit(it)) },

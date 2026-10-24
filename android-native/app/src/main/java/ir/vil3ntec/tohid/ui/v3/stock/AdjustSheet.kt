@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -32,6 +31,9 @@ import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.v3Shake
+import androidx.compose.runtime.mutableIntStateOf
 import kotlinx.coroutines.delay
 
 /**
@@ -54,6 +56,7 @@ fun AdjustSheet(
   var showErrors by remember { mutableStateOf(false) }
   var failure by remember { mutableStateOf<String?>(null) }
   var saved by remember { mutableStateOf(false) }
+  var shake by remember { mutableIntStateOf(0) }
   val errors = if (showErrors) form.errors() else emptyMap()
   val unit = product.unit.ifBlank { null }
 
@@ -65,6 +68,7 @@ fun AdjustSheet(
       { form = form.copy(choice = AdjustChoice.entries[it]); failure = null },
     )
     Spacer(Modifier.height(16.dp))
+    Column(Modifier.v3Shake(shake.takeIf { it > 0 })) {
     V3TextField(
       form.amount, { form = form.copy(amount = it); failure = null }, StrStock.quantity, Modifier.fillMaxWidth(),
       kind = V3FieldKind.NUMBER, suffix = unit, required = true, error = errors[AdjustForm.AMOUNT],
@@ -74,9 +78,10 @@ fun AdjustSheet(
       form.reason, { form = form.copy(reason = it); failure = null }, StrStock.reason, Modifier.fillMaxWidth(),
       helper = StrStock.reasonHelper, required = true, error = errors[AdjustForm.REASON], singleLine = false,
     )
+    failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 12.dp)) }
+    }
     Spacer(Modifier.height(14.dp))
     Preview(stock, form.after(stock), unit.orEmpty())
-    failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 12.dp)) }
     Spacer(Modifier.height(14.dp))
     Box(contentAlignment = Alignment.Center) {
       V3Button(StrStock.submit, {
@@ -85,26 +90,26 @@ fun AdjustSheet(
           failure = onSave(form)
           saved = failure == null
         }
+        if (!saved) shake++
       }, Modifier.fillMaxWidth(), enabled = !saved, haptic = true)
-      V3SuccessCheck(saved, size = 44.dp)
+      V3SuccessCheck(saved, size = 44.dp, haptic = false)
     }
   }
 }
 
-/** «۱۴۴ ← ۱۳۰ عدد» — عددِ تازه با حرکت عوض می‌شود */
+/** «۱۴۴ ← ۱۳۰ عدد» — عددِ تازه با شمارندهٔ کیت به جای خودش می‌رسد */
 @Composable
 private fun Preview(stock: Double, after: Double?, unit: String) {
   val c = PhoneV3.colors
+  val shown = rememberCountUp(after ?: stock)
   Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(StrStock.stock, style = V3Type.footnote, color = c.inkMuted)
-    AnimatedContent(after, transitionSpec = { DraftMotion.figure() }, label = "adjustPreview") { next ->
-      Text(
-        if (next == null) listOf(qty(stock), unit).filter { it.isNotBlank() }.joinToString(" ")
-        else StrStock.preview(qty(stock), qty(next), unit).trim(),
-        style = V3Type.title,
-        color = if (next != null && next < 0) PhoneV3Roles.errorText(c) else c.ink,
-        textAlign = TextAlign.Center,
-      )
-    }
+    Text(
+      if (after == null) listOf(qty(stock), unit).filter { it.isNotBlank() }.joinToString(" ")
+      else StrStock.preview(qty(stock), qty(shown), unit).trim(),
+      style = V3Type.title,
+      color = if (after != null && after < 0) PhoneV3Roles.errorText(c) else c.ink,
+      textAlign = TextAlign.Center,
+    )
   }
 }

@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3ProductThumb
 import ir.vil3ntec.tohid.ui.v3.V3SearchField
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 
 /** کالاهای پیدا در جست‌وجوی انتخاب‌گر: نام یا بارکد، فقط کالاهای فعال */
 internal fun pickable(d: ShopData, query: String): List<Product> {
@@ -83,7 +84,7 @@ internal fun ProductPickerList(
       }
       itemsIndexed(shown, key = { _, p -> p.id }) { i, p ->
         val unit = listOf(qty(ShopStore.stock(data, p.id)), p.unit).filter { it.isNotBlank() }.joinToString(" ")
-        Column(draftItem()) {
+        Column(Modifier.v3AnimateItem(this)) {
           if (i > 0 || onNew != null) V3Divider(start = 64.dp)
           V3ListRow(
             title = p.name,

@@ -48,6 +48,8 @@ object StockShots : GroupShots {
     Shot("item", content = { ItemShot() }),
     Shot("entry", content = { EntryShot() }),
     Shot("entry-pick", content = { EntryShot(pick = true) }),
+    //  صفحه‌ای که دکمهٔ شناورِ «ورود کالا» با container transform به آن باز می‌شود
+    Shot("entry-fab", content = { EntryPageShot() }),
     Shot("bulk", content = { BulkShot() }),
     Shot("adjust-up", content = { AdjustShot(AdjustChoice.UP) }),
     Shot("adjust-down", content = { AdjustShot(AdjustChoice.DOWN) }),
@@ -58,7 +60,7 @@ object StockShots : GroupShots {
   )
 }
 
-private val noList = StockListActions({}, {}, {}, {}, {}, {}, {}, {})
+private val noList = StockListActions({}, {}, {}, {}, {}, {}, {}, {}, { null })
 private val noItem = StockItemActions({}, {}, {}, {}, {}, {}, {}, {})
 
 @Composable
@@ -86,6 +88,16 @@ private fun EntryShot(pick: Boolean = false) {
       ),
     )
   }
+}
+
+@Composable
+private fun EntryPageShot() {
+  val d = StockDemo.full()
+  val flow = ir.vil3ntec.tohid.ui.v3.stock.rememberEntryFlow(
+    d, null, null,
+    start = EntryForm(productId = "p3", units = "24", price = "180", unit = "عدد"),
+  )
+  ir.vil3ntec.tohid.ui.v3.stock.StockEntryPage(d, flow, onSave = { null }, onNewProduct = {}, onClose = {})
 }
 
 @Composable
