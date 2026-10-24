@@ -11,8 +11,10 @@
  *              «سهمی» دارد؛ همگام‌سازیِ دوباره فقط تفاوت را با حالتِ recorded
  *              در دفتر می‌نویسد ⇒ هیچ فروشی دو بار کم نمی‌شود (INV-07) و هیچ
  *              فروشِ ثبت‌شده‌ای رد نمی‌شود (INV-19).
- *   سفارش ──── رزرو درونِ همان تراکنشِ ساختِ سفارش (`onOrderCreated`)؛ گذارِ
- *              وضعیت رزرو را تمدید/آزاد/قطعی می‌کند (`onOrderStatus`).
+ *   سفارش ──── ⛔ تصمیمِ صاحبِ مخزن (۱۴۰۵/۰۷/۲۷): سفارشِ آنلاین موجودی را **نه رزرو
+ *              می‌کند نه کم**. دکان کالا را از برنامهٔ خودش تحویل می‌دهد و همان‌جا یک
+ *              فروشِ عادی (با `orderId`) ثبت می‌شود؛ این کاتالوگ فقط دفترِ همگام‌شدهٔ
+ *              دستگاه‌ها را می‌خواند. ساختِ سفارش فقط می‌سنجد (`checkOrder`، بی نوشتن).
  *   نمایش ──── «در قفسه» / «در انبار، آماده‌سازی لازم» / «تمام شده» /
  *              «در حال بررسی» / «قابلِ سفارش نیست» — موجودیِ نامعلوم یا کهنه
  *              هرگز «موجود» نیست (INV-02، INV-14).
@@ -113,6 +115,13 @@ function atOf(d, at) {
  */
 async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   await stock.lock(c, shopId);
+  //  کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین — فقط دکانی که ردیفِ آن را دارد؛ پس از COMMIT در
+  //  `refresh` در دفترِ ممیزی نوشته و «انجام‌شده» علامت می‌خورد
+  let retiredNow = null;
+  if (!retired.has(shopId)) {
+    retiredNow = await retireOrderStock(c, shopId, at);
+    if (retiredNow.touched.length) await stock.checkProducts(c, shopId, retiredNow.touched.sort(), settings, at);
+  }
   const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
   const T = TABLES[fmt];
   const rd = reader(fmt);
@@ -243,31 +252,199 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     [shopId, fmt, wm, at]
   );
   if (touched.size) await stock.checkProducts(c, shopId, [...touched].sort(), settings, at);
-  return { products, moves, source: fmt };
+  return { products, moves, source: fmt, retired: retiredNow };
 }
 
 /**
- * نخستین خواندنِ دفترِ دستگاه (یا پس از عوض شدنِ منبعِ v1/v3) **در تراکنشِ خودش**، پیش از
- * تراکنشِ سفارش (QA #263): خواندنِ کاملِ دفتر دیگر درونِ تراکنشِ ساختِ سفارشِ مشتری و زیرِ
- * قفلِ `orders:<دکان>` نمی‌ماند. کاتالوگِ از پیش خوانده‌شده ⇒ هیچ (همان خواندنِ تفاوتِ کوچک
- * درونِ تراکنشِ سفارش می‌ماند تا رزرو با موجودیِ تازه سنجیده شود). پرچم خاموش ⇒ هیچ.
+ * خواندنِ دفترِ دستگاه **در تراکنشِ خودش**، پیش از تراکنشِ سفارش (QA #263): خواندنِ دفتر
+ * درونِ تراکنشِ ساختِ سفارشِ مشتری و زیرِ قفلِ `orders:<دکان>` نمی‌ماند؛ سنجشِ فقط‌خواندنیِ
+ * `checkOrder` با همین عددِ تازه است. بی ردیفِ تازه ⇒ هیچ. پرچم خاموش ⇒ هیچ.
  */
 async function prepare(shopId, { at = now() } = {}) {
   if (!(await stock.flagOf(shopId))) return null;
-  const settings = await stock.settingsOf(shopId);
-  const fmt = settings.syncSource === 'v3' ? 'v3' : 'v1';
-  const st = await one('SELECT source FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
-  if (st && st.source === fmt) return null;
-  return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c)));
+  //  ساختِ سفارش کم‌شمار است ⇒ بی مهلتِ پرسش (فقط خواندنِ ویترین/بازار مهلت دارد)
+  return refresh(shopId, { maxAgeMs: 1, at, throttle: false });
 }
 
-/** همگام‌سازیِ کاتالوگ در تراکنشِ خودش؛ `maxAgeMs` ⇒ اگر تازه خوانده شده، نه. */
-async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) {
+/**
+ * آیا دفترِ دستگاه‌ها از آخرین خواندن ردیفِ تازه‌ای دارد؟ (یک پرسشِ نمایه‌دار؛ منبعِ
+ * عوض‌شده یا هرگز‌نخوانده ⇒ «بله».)
+ */
+async function hasNewer(shopId) {
+  const st = await one('SELECT source, watermark FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  if (!st) return true;
+  const fmt = (await stock.settingsOf(shopId)).syncSource === 'v3' ? 'v3' : 'v1';
+  if (st.source !== fmt) return true;
+  const r = await one(
+    `SELECT 1 AS x FROM ${TABLES[fmt]} WHERE app='shop' AND account_kind='shop' AND account_id=$1
+        AND table_name = ANY($2::text[]) AND updated_seq > $3 LIMIT 1`,
+    [shopId, DEVICE_TABLES, num(st.watermark)]
+  );
+  return !!r;
+}
+
+/** فاصلهٔ کمینهٔ دو پرسشِ «ردیفِ تازه؟» برای یک دکان در خواندنِ پرترافیکِ ویترین/بازار */
+const REFRESH_THROTTLE_MS = (() => {
+  const v = Number(process.env.CATALOG_REFRESH_THROTTLE_MS);
+  return Number.isSafeInteger(v) && v >= 0 ? v : 500;
+})();
+const lastCheck = new Map();
+
+/**
+ * همگام‌سازیِ کاتالوگ در تراکنشِ خودش. `maxAgeMs` (خواندنِ ویترین/بازار) ⇒ فقط وقتی
+ * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود، و برای هر دکان حداکثر هر
+ * [REFRESH_THROTTLE_MS] یک بار پرسیده می‌شود؛ پس فروشِ رسیده حداکثر همین‌قدر بعد در
+ * ویترین است و خواندنِ پیاپیِ بی‌تغییر بار ندارد.
+ */
+async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttle = true } = {}) {
   if (maxAgeMs > 0 && !full) {
-    const st = await one('SELECT last_run_at FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
-    if (st && at - num(st.last_run_at) < maxAgeMs) return { skipped: true };
+    const t = Date.now();
+    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) return { skipped: true, throttled: true };
+    lastCheck.set(shopId, t);
+    if (lastCheck.size > 10_000) lastCheck.clear();
+    if (!(await hasNewer(shopId))) return { skipped: true };
   }
-  return tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
+  const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
+  await afterIngest(shopId, out);
+  return out;
+}
+
+/**
+ * پس از **کامیتِ** تراکنشی که `ingestTx` در آن دوید (خواندنِ کاتالوگ یا حرکتِ دستی): کنار
+ * گذاشتنِ کسرِ سفارشیِ پیشین انجام‌شده است ⇒ دکان دیگر سنجیده نمی‌شود، و اگر چیزی عوض شد یک
+ * سطر در دفترِ ممیزیِ دکان (دورِ دوم ⇒ هیچ). تراکنشِ برگشت‌خورده به این‌جا نمی‌رسد.
+ */
+async function afterIngest(shopId, out) {
+  if (!out || !out.retired) return;
+  retired.add(shopId);
+  if (!out.retired.changed && !out.retired.needsAudit) return;
+  await require('./audit').log({
+    shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
+    detail: out.retired.audit,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین (یک بار برای هر دکان)
+// ════════════════════════════════════════════════════════════════════
+
+const retired = new Set();
+
+/** آیا کسرِ سفارشیِ [m] قلمِ W ِ خودش را دارد؟ (دستگاه همان را کم کرده ⇒ نگه داشتن) */
+async function keptByW(c, shopId, m) {
+  const has = async (sql, key) => (await c.query(sql, [shopId, key])).rows.length > 0;
+  const res = /^res:([^:]+):sale:/.exec(String(m.source_key || ''));
+  if (res) {
+    const line = (await c.query(
+      'SELECT order_id, line_no FROM stock_reservations WHERE shop_id=$1 AND id=$2', [shopId, res[1]]
+    )).rows[0];
+    if (line) {
+      return has('SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key=$2 LIMIT 1', `si:w-${line.order_id}-${Number(line.line_no)}`);
+    }
+  }
+  return has('SELECT 1 FROM stock_sources WHERE shop_id=$1 AND source_key LIKE $2 LIMIT 1', `si:w-${m.ref_id}-%`);
+}
+
+/**
+ * پیش از تصمیمِ صاحبِ مخزن، `shop.catalog` سفارش را رزرو و هنگامِ تحویل «کسرِ قطعی»
+ * (`res:<رزرو>:sale:<مکان>`، `source = order`) می‌کرد — کسری که دستگاه هرگز ندید. حالا موجودیِ
+ * سرور فقط دفترِ دستگاه‌هاست، پس:
+ *   ۱) هر کسرِ سفارشی که فاکتورِ W ندارد ⇒ یک حرکتِ جبرانیِ هم‌اندازه (`customer_return`،
+ *      `source = system`، کلیدِ `undo:<کلید>`). دفتر فقط افزوده می‌شود، چیزی پاک یا ویرایش
+ *      نمی‌شود و تطبیق (INV-16) همان می‌ماند. کسری که قلمِ فاکتورِ W دارد دست نمی‌خورد: دستگاه
+ *      همان W را کم کرده، پس سرور و دستگاه یکی‌اند. سنجش **هر قلم جدا** ([keptByW]): رزروِ همان
+ *      کسر (`res:<رزرو>:…`) ⇒ قلمِ سفارش ⇒ پیش‌ثبتِ همان قلمِ W (`si:w-<سفارش>-<قلم>`)؛ رزروِ
+ *      گم‌شده ⇒ هر قلمِ W ِ همان سفارش (محتاطانه: نگه داشتن).
+ *      (کنار گذاشتنِ این حرکت‌ها هنگامِ خواندن امن‌تر نبود: سهمِ W را دوباره بی‌کسر می‌کرد.)
+ *   ۲) رزروِ «نگه‌داشته» ⇒ آزاد، با همان حرکتِ release (`res:<رزرو>:release`).
+ *   ۳) وظیفه‌های بازِ «رزروِ بی‌پشتوانه» و «انتقال برای رزرو» ⇒ کنار گذاشته، با توضیح.
+ *
+ * فقط دکانی که `shop.catalog` برایش **روزی روشن بوده**: ingest فقط با پرچمِ روشن می‌دود، و
+ * کاری انجام می‌شود فقط اگر ردیفِ سفارش‌محوری (`stock_reservations` یا حرکتِ `source = order`)
+ * هست — که هر دو را فقط کدِ پیشین و فقط با پرچمِ روشن می‌نوشت. دیگر دکان‌ها ⇒ یک پرسشِ خالی.
+ * تکرارپذیر: کلیدِ `undo:` یکتاست، رزروِ آزادشده دیگر «نگه‌داشته» نیست، وظیفهٔ بسته باز نیست ⇒
+ * دورِ دوم (حتی پس از راه‌اندازیِ دوباره) هیچ نمی‌نویسد. شمارش‌ها در `audit` ⇒ دفترِ ممیزی.
+ * درونِ تراکنشِ ingest (قفلِ دکان گرفته شده).
+ */
+/** توضیحِ وظیفه‌های رزروی که کنار گذاشته شد (نشانِ همان کار در دورِ بعد) */
+const RETIRED_NOTE = 'سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند (تصمیمِ صاحبِ مخزن)';
+
+async function retireOrderStock(c, shopId, at) {
+  const touched = new Set();
+  const none = { changed: false, touched: [], audit: null };
+  const legacy = (await c.query(
+    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1)
+         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order') AS any`, [shopId]
+  )).rows[0];
+  if (!legacy || !legacy.any) return none;
+  let undoneMilli = 0;
+  let keptWithW = 0;
+  const sold = (await c.query(
+    `SELECT m.product_id, m.location, m.qty_milli, m.source_key, m.ref_id FROM stock_moves m
+      WHERE m.shop_id=$1 AND m.source='order' AND m.type='sale'
+        AND NOT EXISTS (SELECT 1 FROM stock_moves x WHERE x.shop_id=m.shop_id AND x.source_key = 'undo:' || m.source_key)
+      ORDER BY m.created_at, m.id`, [shopId]
+  )).rows;
+  for (const m of sold) {
+    if (await keptByW(c, shopId, m)) { keptWithW += 1; continue; }
+    undoneMilli += num(m.qty_milli);
+    await stock.postMove(c, shopId, {
+      productId: m.product_id, location: m.location, type: 'customer_return', qtyMilli: num(m.qty_milli),
+      mode: 'recorded', source: 'system', sourceKey: `undo:${m.source_key}`, refType: 'order', refId: m.ref_id,
+      actorType: 'system', actorId: '', reason: 'order_stock_retired', at,
+    }, at);
+    touched.add(m.product_id);
+  }
+  const held = (await c.query(
+    `UPDATE stock_reservations SET status='released', closed_at=$2, close_reason='reservations_retired'
+      WHERE shop_id=$1 AND status='held' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
+  )).rows;
+  for (const r of held) {
+    await stock.insertMove(c, shopId, {
+      productId: r.product_id, location: '', type: 'release', qtyMilli: num(r.qty_milli),
+      deltaOnHand: 0, deltaReserved: -num(r.qty_milli), mode: 'local', source: 'system',
+      sourceKey: `res:${r.id}:release`, refType: 'order', refId: r.order_id,
+      actorType: 'system', actorId: '', reason: 'reservations_retired', at,
+    }, at);
+  }
+  const tasks = await c.query(
+    `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
+            note=$3
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at, RETIRED_NOTE]
+  );
+  const undone = sold.length - keptWithW;
+  const dismissed = tasks.rowCount || 0;
+  const audit = {
+    reason: 'online_orders_no_longer_touch_stock', undoneMoves: undone, undoneMilli, keptWithW,
+    releasedHolds: held.length, releasedMilli: held.reduce((s, r) => s + num(r.qty_milli), 0),
+    dismissedTasks: dismissed, products: [...touched].sort().slice(0, 50),
+  };
+  const changed = undone + held.length + dismissed > 0;
+  if (changed) return { changed, touched: [...touched], audit };
+  //  دورِ پیشین کنار گذاشت ولی سطرِ ممیزی‌اش نوشته نشد (خطا یا افتادنِ سرور پس از COMMIT) ⇒ همان
+  //  سطر از روی خودِ دفتر (`recovered`)؛ سطر هست ⇒ هیچ
+  const done = (await c.query(
+    `SELECT (SELECT COUNT(*) FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%')::int AS moves,
+            (SELECT COALESCE(SUM(qty_milli),0) FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%')::bigint AS milli,
+            (SELECT COUNT(*) FROM stock_reservations WHERE shop_id=$1 AND close_reason='reservations_retired')::int AS holds,
+            (SELECT COALESCE(SUM(qty_milli),0) FROM stock_reservations WHERE shop_id=$1 AND close_reason='reservations_retired')::bigint AS held_milli,
+            (SELECT COUNT(*) FROM stock_tasks WHERE shop_id=$1 AND status='dismissed' AND resolved_by='system' AND note=$2)::int AS tasks,
+            EXISTS (SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired') AS logged`,
+    [shopId, RETIRED_NOTE]
+  )).rows[0];
+  if (done.logged || num(done.moves) + num(done.holds) + num(done.tasks) === 0) return { changed, touched: [...touched], audit };
+  const products = (await c.query(
+    `SELECT DISTINCT product_id FROM stock_moves WHERE shop_id=$1 AND source='system' AND source_key LIKE 'undo:%' ORDER BY 1 LIMIT 50`,
+    [shopId]
+  )).rows.map((r) => r.product_id);
+  return {
+    changed, touched: [...touched], needsAudit: true,
+    audit: {
+      reason: audit.reason, undoneMoves: num(done.moves), undoneMilli: num(done.milli), keptWithW,
+      releasedHolds: num(done.holds), releasedMilli: num(done.held_milli), dismissedTasks: num(done.tasks),
+      products, recovered: true,
+    },
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -281,9 +458,14 @@ async function refresh(shopId, { full = false, maxAgeMs = 0, at = now() } = {}) 
  */
 async function freshness(shopId, settings, at) {
   const since = at - settings.staleAfterSec * 1000;
+  //  `queued` ِ Sync v1 اندازهٔ صف **پیش از** همان push است (دسته را هم می‌شمارد). برنامه پس از
+  //  خالی کردنِ صف pull می‌کند ⇒ pull ِ پس از آخرین push یعنی صف خالی شد؛ وگرنه پس از هر فروش
+  //  ویترین تا pushِ بعدی «در حال بررسی» می‌ماند و عددِ تازه را نشان نمی‌داد.
   const v1 = await one(
     `SELECT COALESCE(MAX(last_seen_at),0)::bigint AS seen,
-            COALESCE(MAX(CASE WHEN last_seen_at >= $2 THEN queued_count ELSE 0 END),0)::int AS queued
+            COALESCE(MAX(CASE WHEN last_seen_at >= $2
+                               AND NOT (last_push_at IS NOT NULL AND last_pull_at IS NOT NULL AND last_pull_at >= last_push_at)
+                              THEN queued_count ELSE 0 END),0)::int AS queued
        FROM sync_devices WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, since]
   );
   const v3 = await one(
@@ -339,10 +521,11 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), stock.heldOf(null, shopId, ids)]);
+  const [ps, lvs] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids)]);
   const out = new Map();
+  //  فقط دفترِ همگام‌شدهٔ دستگاه‌ها — سفارشِ آنلاین هیچ رزرو و کسری ندارد
   for (const id of ids) {
-    out.set(id, badgeOf(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr, settings.showQty === 'exact'));
+    out.set(id, badgeOf(ps.get(id), lvs.get(id), 0, settings, fr, settings.showQty === 'exact'));
   }
   return out;
 }
@@ -401,8 +584,8 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), stock.heldOf(null, shopId, page)]);
-  const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
+  const [ps, lvs] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page)]);
+  const items = page.map((id) => productView(ps.get(id), lvs.get(id), 0, settings, fr));
   const last = items[items.length - 1];
   return {
     items, freshness: fr,
@@ -419,17 +602,9 @@ async function detail(shopId, productId) {
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
-  const held = (await stock.heldOf(null, shopId, [id])).get(id) || 0;
-  const reservations = (await query(
-    `SELECT id, order_id, line_no, qty_milli, expires_at, created_at FROM stock_reservations
-      WHERE shop_id=$1 AND product_id=$2 AND status='held' ORDER BY created_at, id`, [shopId, id]
-  )).rows.map((r) => ({
-    id: r.id, orderId: r.order_id, lineNo: r.line_no, qtyMilli: num(r.qty_milli),
-    expiresAt: r.expires_at === null ? null : num(r.expires_at), createdAt: num(r.created_at),
-  }));
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  return { product: productView(p, lv, held, settings, fr), reservations, lowByLocation: lows, freshness: fr };
+  return { product: productView(p, lv, 0, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
 function moveView(r) {
@@ -460,18 +635,6 @@ async function moves(shopId, { productId, cursor, limit } = {}) {
   const items = rows.slice(0, lim).map(moveView);
   const last = items[items.length - 1];
   return { items, nextCursor: rows.length > lim && last ? encodeCursor(String(last.createdAt), last.id) : null };
-}
-
-async function reservationsOf(shopId, orderId) {
-  return (await query(
-    `SELECT id, line_no, product_id, qty_milli, status, expires_at, created_at, closed_at, close_reason
-       FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 ORDER BY created_at, line_no, id`,
-    [shopId, String(orderId || '')]
-  )).rows.map((r) => ({
-    id: r.id, lineNo: r.line_no, productId: r.product_id, qtyMilli: num(r.qty_milli), status: r.status,
-    expiresAt: r.expires_at === null ? null : num(r.expires_at), createdAt: num(r.created_at),
-    closedAt: r.closed_at === null ? null : num(r.closed_at), closeReason: r.close_reason,
-  }));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -603,7 +766,8 @@ async function manualMove(shopId, { key, body, actor }) {
   const m = parseManual(body);
   const hash = hashOf(body);
   const at = now();
-  return tx(async (c) => {
+  let ingested = null;
+  const out = await tx(async (c) => {
     await stock.lock(c, shopId);
     const prev = (await c.query(
       `SELECT * FROM stock_moves WHERE shop_id=$1 AND source_key = ANY($2::text[]) ORDER BY source_key`, [shopId, staffKeys(k)]
@@ -614,7 +778,7 @@ async function manualMove(shopId, { key, body, actor }) {
     }
     const settings = await stock.settingsOf(shopId, c);
     //  دفترِ دستگاه پیش از اصلاح: شمارش و انتقال روی موجودیِ امروز حساب شوند
-    await ingestTx(c, shopId, at, settings);
+    ingested = await ingestTx(c, shopId, at, settings);
     const p = (await c.query('SELECT product_id FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, m.productId])).rows[0];
     if (!p) throw notFound('کالا پیدا نشد', 'product_not_found');
 
@@ -650,6 +814,9 @@ async function manualMove(shopId, { key, body, actor }) {
     )).rows;
     return { moves: rows.map(moveView), replayed: false, unchanged: false };
   });
+  //  کنار گذاشتنِ کسرِ سفارشیِ پیشین در همین تراکنش ⇒ همان سطرِ ممیزیِ خواندنِ کاتالوگ
+  await afterIngest(shopId, ingested);
+  return out;
 }
 
 /** آستانهٔ «موجودیِ کم» برای یک مکان (§۳۲.۲ بندِ ۷)؛ null ⇒ برداشتنِ آستانه. */
@@ -720,81 +887,20 @@ async function toStockLines(c, shopId, lines) {
 }
 
 /**
- * درونِ تراکنشِ `orders.create`، پس از نوشتنِ قلم‌ها: پرچم روشن ⇒ دفترِ
- * دستگاه خوانده و قلم‌های کالادار رزرو می‌شوند؛ کمبود ⇒ خطا و **کلِ سفارش**
- * برمی‌گردد. پرچم خاموش ⇒ null، بی هیچ نوشتنی.
+ * درونِ تراکنشِ `orders.create`، پس از بررسیِ کلیدِ یکتایی: پرچم روشن ⇒ قلم‌های کالادار
+ * **فقط سنجیده** می‌شوند — کالای ناموجود/غیرفعال/حذف‌شده (`product_unavailable`)، واحدِ
+ * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
+ * ⛔ هیچ رزرو، هیچ حرکت و هیچ نوشتنی (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل
+ * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null.
  */
-async function onOrderCreated(c, shopId, { orderId, lines, at, actor, isTest = false }) {
-  //  سفارشِ آزمایشیِ کارمند موجودیِ واقعی را نه رزرو می‌کند نه کم (QA #263)
+async function checkOrder(c, shopId, { lines, isTest = false }) {
   if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
-  await stock.lock(c, shopId);
   const settings = await stock.settingsOf(shopId, c);
-  await ingestTx(c, shopId, at, settings);
-  await stock.expireDue(c, shopId, at);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  return stock.reserve(c, shopId, {
-    orderId, lines: sl, at, expiresAt: at + settings.reserveTtlSec * 1000, actor, settings, names,
-  });
-}
-
-const RELEASE_ON = new Set(['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'restocked']);
-const COMMIT_ON = new Set(['picked_up', 'delivered']);
-
-/**
- * درونِ تراکنشِ گذارِ سفارش، پس از عوض شدنِ وضعیت:
- *   accepted ⇒ رزرو تا پایان می‌ماند؛ رزروِ منقضی/نبوده ⇒ دوباره رزرو (کمبود ⇒ ۴۰۹)
- *   رد/لغو/بازگشت به قفسه ⇒ آزادسازی · تحویل ⇒ کسرِ قطعی
- */
-async function onOrderStatus(c, shopId, { id, to }, actor, at) {
-  if (to !== 'accepted' && !RELEASE_ON.has(to) && !COMMIT_ON.has(to)) return null;
-  const has = (await c.query(
-    `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
-  )).rows.length > 0;
-  if (!has && to !== 'accepted') return null;
-  const test = (await c.query('SELECT is_test FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id])).rows[0];
-  if (test && test.is_test === true) {
-    //  سفارشِ آزمایشی: هرگز رزرو یا کسرِ قطعی (فروشِ واقعی در دفترِ موجودی) نه.
-    //  رزروِ مانده از پیش از این اصلاح در پایانِ کار آزاد می‌شود، کسر نمی‌شود.
-    if (!has || to === 'accepted') return null;
-    await stock.lock(c, shopId);
-    return { released: await stock.release(c, shopId, id, { reason: 'test_order', actor, at }) };
-  }
-  const flag = await stock.flagOf(shopId, c);
-  if (!has && !flag) return null;
-  await stock.lock(c, shopId);
-  const settings = await stock.settingsOf(shopId, c);
-  if (RELEASE_ON.has(to)) return { released: await stock.release(c, shopId, id, { reason: to, actor, at }) };
-  if (COMMIT_ON.has(to)) return { committed: await stock.commit(c, shopId, id, { actor, at, settings }) };
-
-  await stock.expireDue(c, shopId, at);
-  //  CHK-18: رزروی که فروشِ حضوریِ هم‌زمان پشتوانه‌اش را برده (INV-06) با «قبول» بی‌مهلت
-  //  نمی‌شود؛ ۴۰۹ و گذار برمی‌گردد — دکان رد می‌کند یا موجودی را درست می‌کند. اول فروش‌های
-  //  تازه‌رسیدهٔ دستگاه‌ها خوانده می‌شوند، وگرنه داوری با موجودیِ کهنه است.
-  const held = await c.query(
-    `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' LIMIT 1`, [shopId, id]
-  );
-  if (held.rows.length && flag) await ingestTx(c, shopId, at, settings);
-  const short = held.rows.length ? await stock.shortOf(c, shopId, id, settings) : [];
-  if (short.length) {
-    const names = new Map((await c.query(
-      'SELECT product_id, name, unit FROM catalog_products WHERE shop_id=$1 AND product_id = ANY($2::text[])',
-      [shopId, short.map((x) => x.productId)]
-    )).rows.map((r) => [r.product_id, r]));
-    throw stock.outOfStock(short.map((x) => ({ ...x, name: names.get(x.productId)?.name || '', unit: names.get(x.productId)?.unit || '' })));
-  }
-  if (await stock.extend(c, shopId, id)) return { extended: true };
-  if (!flag) return null;
-  const lines = (await c.query(
-    `SELECT line_no AS "lineNo", product_id AS "productId", unit, qty_milli AS "qtyMilli"
-       FROM online_order_lines WHERE order_id=$1 AND shop_id=$2 AND product_id <> '' ORDER BY line_no`, [id, shopId]
-  )).rows;
-  if (!lines.length) return null;
-  await ingestTx(c, shopId, at, settings);
-  const { lines: sl, names } = await toStockLines(c, shopId, lines);
-  return { reserved: await stock.reserve(c, shopId, { orderId: id, lines: sl, at, expiresAt: null, actor, settings, names }) };
+  return stock.check(c, shopId, { lines: sl, settings, names });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */
@@ -804,8 +910,8 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS,
-  ingestTx, refresh, prepare, freshness, badgeOf, publicStock,
-  list, detail, moves, reservationsOf, tasks, resolveTask,
+  ingestTx, refresh, hasNewer, retireOrderStock, afterIngest, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
+  list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,
-  toStockLines, onOrderCreated, onOrderStatus, requireEnabled,
+  toStockLines, checkOrder, requireEnabled,
 };

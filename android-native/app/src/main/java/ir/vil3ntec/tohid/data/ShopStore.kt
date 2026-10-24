@@ -120,6 +120,27 @@ class ShopStore(private val context: Context) {
   suspend fun applyRestore(next: ShopData) = writeInternal(next)
 
   /**
+   *  خواندن ⇐ تبدیل ⇐ نوشتن **زیرِ همان قفلِ موتور** (`synchronized(engine)`) که نشاندنِ
+   *  opهای رسیده هم زیرِ آن است: [transform] همیشه تازه‌ترین دفتر را می‌گیرد، نه نسخهٔ کهنهٔ
+   *  صفحه — نوشتنی که در پس‌زمینه می‌رود (فروشِ تحویلِ سفارش) چیزی از دیگران را پاک نمی‌کند.
+   *  [transform] باید سبک و خالص باشد. `null` ⇒ چیزی برای نوشتن نبود. قفلِ نرم مثلِ [save].
+   *  @return null (هیچ) · true (نوشته شد) · false (قفلِ نرم یا دیسک)
+   */
+  suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      val cur = _data.value
+      val next = transform(cur) ?: return@synchronized null
+      if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
+        SoftLock.noteBlocked()
+        _blocked.tryEmit(Unit)
+        return@synchronized false
+      }
+      writeNow(engine, next)
+    }
+  }
+
+  /**
    *  نوشتنی که قفلِ نرم جلویش را نمی‌گیرد: بازیابی و جابه‌جاییِ دفتر.
    *
    *  @return آیا به دیسک رسید
@@ -128,7 +149,12 @@ class ShopStore(private val context: Context) {
     //  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
     //  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا
     val engine = SyncV1Engine.of(context)
-    synchronized(engine) {
+    writeNow(engine, next)
+  }
+
+  /** بدنهٔ نوشتن، زیرِ قفلِ موتور (قفلِ JVM بازگشت‌پذیر است؛ [update] هم از همین‌جا می‌نویسد) */
+  private fun writeNow(engine: SyncV1Engine, next: ShopData): Boolean {
+    return synchronized(engine) {
     /*
      *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور
      *  می‌رفتند و سایه جلو می‌رفت، ولی پس از بستن و باز کردن دفترِ کهنه
