@@ -132,6 +132,36 @@ class ShopStore(private val context: Context) {
     if (_unreadable.value == null) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
+    //  CRM-10: ردیف‌های دیررسیدهٔ مشتریِ ادغام‌شده — یک بار در شروع (شرح سرِ `sweepMerged`)
+    runCatching { sweepMerged() }
+  }
+
+  /**
+   *  CRM-10: ردیف‌های دیررسیده (فروش یا قرضی که دستگاهِ آفلاین یا ساختِ قدیمی روی مشتریِ
+   *  ادغام‌شده ثبت کرد) و حلقهٔ دو ادغامِ وارونه ⇐ مشتریِ ماندگار (`CustomerMerge.sweep`).
+   *  پس از هر Pull (`SyncV1Worker`: v1 با `absorbRemote` و v3، و [applyFromServer]) و یک
+   *  بار در شروع ([loadAndSummarize]).
+   *
+   *  - فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض **خاموش**): خاموش ⇒
+   *    هیچ کاری نمی‌شود و رفتارِ دکان همان است.
+   *  - **زیرِ همان قفلِ نوشتنِ دفتر** (`synchronized(engine)`، مثلِ [update] و نشاندنِ opهای
+   *    رسیده) و همان درِ نوشتن ([writeLocked])، پس تغییرش مثلِ هر ذخیرهٔ دیگری op می‌شود.
+   *  - نوشتنِ بسته ⇒ هیچ، بی پیام: دفترِ بارنشده، دفترِ خوانده‌نشده (SEC-01 / #331) یا
+   *    قفلِ نرم. کارِ پس‌زمینه است؛ صفحه پیامِ «ثبت نشد» نمی‌گیرد.
+   *  - خودتوان: کاری نبود ⇒ `null`، نه نوشتن نه op. هر دستگاه از همان دفتر همان نتیجه را
+   *    می‌سازد (کوچک‌ترین شناسهٔ حلقه)، پس دو دستگاه پینگ‌پنگ نمی‌سازند.
+   *
+   *  @return null (کاری نبود یا نوشتن بسته/خاموش) · true (نوشته شد) · false (دیسک)
+   */
+  suspend fun sweepMerged(): Boolean? = withContext(Dispatchers.IO) {
+    if (!ShopPolicy.crmReports(context)) return@withContext null
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      if (!_loaded.value || _unreadable.value != null) return@synchronized null
+      val next = CustomerMerge.sweep(_data.value) ?: return@synchronized null
+      if (SoftLock.isLocked(context)) return@synchronized null
+      writeLocked(engine, next)
+    }
   }
 
   /**
@@ -418,8 +448,10 @@ class ShopStore(private val context: Context) {
    *  همان ردیف‌هایی که تازه از سرور آمده‌اند را به سرور پس می‌فرستاد.
    *  سایه را خودِ موتور در همان لحظه جلو می‌برد.
    */
-  suspend fun applyFromServer(next: ShopData) = withContext(Dispatchers.IO) {
-    applyFromServerNow(next)
+  suspend fun applyFromServer(next: ShopData) {
+    withContext(Dispatchers.IO) { applyFromServerNow(next) }
+    //  CRM-10 — شرح سرِ `sweepMerged`
+    runCatching { sweepMerged() }
   }
 
   /**

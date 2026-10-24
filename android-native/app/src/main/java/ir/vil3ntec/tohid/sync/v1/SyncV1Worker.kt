@@ -58,7 +58,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     }
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همین کارگر، موتورِ دیگر
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
-      return if (ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)) Result.success() else Result.retry()
+      val done = ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)
+      sweepAfterPull(store)
+      return if (done) Result.success() else Result.retry()
     }
     val engine = SyncV1Engine.of(app)
     engine.rebind()
@@ -87,7 +89,18 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       read = { store.data.value },
       write = { next -> store.applyFromServerNow(next) },
     )
+    sweepAfterPull(store)
     return if (outcome.isSuccess) Result.success() else Result.retry()
+  }
+
+  /**
+   *  CRM-10: پس از Pull، ردیف‌هایی که هنوز به مشتریِ ادغام‌شده اشاره می‌کنند به ماندگار
+   *  (`ShopStore.sweepMerged`: پشتِ تنظیمِ خاموشِ «گزارش‌های مشتری»، زیرِ قفلِ دفتر). اگر
+   *  چیزی نوشت، op ِ آن با همان `SyncV1Worker.now` ِ هر ذخیره در دورِ بعد می‌رود؛ دورِ بعد
+   *  دیگر کاری ندارد. شکستش دورِ همگام‌سازی را نمی‌گیرد.
+   */
+  private suspend fun sweepAfterPull(store: ShopStore) {
+    runCatching { store.sweepMerged() }
   }
 
   companion object {
