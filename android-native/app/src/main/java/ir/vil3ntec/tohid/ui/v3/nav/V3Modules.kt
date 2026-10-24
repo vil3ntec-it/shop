@@ -59,8 +59,9 @@ object V3Modules {
   }
 
   /** آیکنِ موردِ نوارِ یک ماژولِ تازه (ساخته‌شده‌ها آیکنِ خودشان را در `PhoneNav` دارند) */
-  fun navIcon(id: String): androidx.compose.ui.graphics.vector.ImageVector? =
-    ALL.asSequence().flatMap { it.entries.asSequence() }.firstOrNull { it.id == id && Place.NAV in it.places }?.icon
+  fun navIcon(id: String, selected: Boolean = false): androidx.compose.ui.graphics.vector.ImageVector? =
+    ALL.asSequence().flatMap { it.entries.asSequence() }.firstOrNull { it.id == id && Place.NAV in it.places }
+      ?.let { e -> if (selected) e.iconSelected ?: e.icon else e.icon }
 
   private fun visible(m: AppModule, access: Access) =
     access.mode in m.modes && access.allows(m.needs, m.flag)

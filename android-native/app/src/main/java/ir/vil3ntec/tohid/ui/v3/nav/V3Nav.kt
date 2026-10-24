@@ -96,6 +96,9 @@ class V3Nav(private val table: RouteTable, val home: String, initial: NavStack) 
    */
   private val tabStacks = HashMap<String, List<String>>()
 
+  /** مسیرهایی که هنوز در پشته‌ای هستند (پشتهٔ جاری، پشتهٔ تب‌های دیگر، دروازه) — بقیه فراموش می‌شوند */
+  internal val alive: Set<String> get() = stack.entries.toSet() + tabStacks.values.flatten() + listOfNotNull(gate)
+
   private fun toTab(p: String) {
     val target = RoutePaths.normalize(p.substringBefore('?'))
     val from = RoutePaths.normalize(stack.root.substringBefore('?'))

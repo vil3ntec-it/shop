@@ -139,3 +139,17 @@ fun V3Collapse(visible: Boolean, modifier: Modifier = Modifier, content: @Compos
     exit = shrinkVertically(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)) + fadeOut(tween(MotionTokens.SHORT)),
   ) { content() }
 }
+
+/**
+ *  «شیشه»ی نوارها (فقط نوارِ پایین و نوارِ تب): سطحِ نیمه‌شفاف روی گوشیِ توانا؛ گوشیِ کم‌حافظه،
+ *  اندرویدِ پیش از ۱۲ یا «کاهشِ حرکت» ⇒ همان سطحِ پُر. بی blur — سبک می‌ماند.
+ */
+@Composable
+fun v3GlassColor(solid: androidx.compose.ui.graphics.Color): androidx.compose.ui.graphics.Color {
+  val context = LocalContext.current
+  val rich = remember(context) {
+    Motion.enabled && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+      runCatching { context.getSystemService(android.app.ActivityManager::class.java)?.isLowRamDevice != true }.getOrDefault(false)
+  }
+  return if (rich) solid.copy(alpha = 0.88f) else solid
+}

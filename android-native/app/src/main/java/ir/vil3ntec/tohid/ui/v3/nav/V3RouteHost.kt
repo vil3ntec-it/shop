@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.ExploreOff
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.ToggleOff
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
@@ -45,6 +46,15 @@ fun V3RouteHost(nav: V3Nav, shell: ShellContext, modifier: Modifier = Modifier) 
   val topIsSheet = remember(top) { nav.resolve(top)?.route?.kind == RouteKind.SHEET } && stack.canPop
   val base = if (!topIsSheet) top
   else stack.entries.dropLast(1).lastOrNull { nav.resolve(it)?.route?.kind != RouteKind.SHEET } ?: top
+
+  //  حالتِ ذخیره‌شدهٔ مسیری که دیگر در هیچ پشته‌ای نیست پاک می‌شود — حافظه بالا نمی‌رود و
+  //  بازکردنِ دوباره از بالای صفحه است، نه از پیمایشِ کهنه (AUDIT-NAV F6)
+  val seen = remember { HashSet<String>() }
+  LaunchedEffect(stack) {
+    seen += stack.entries
+    val alive = nav.alive
+    seen.filter { it !in alive }.forEach { saved.removeState(it); seen.remove(it) }
+  }
 
   CompositionLocalProvider(LocalV3Nav provides nav) {
     AnimatedContent(

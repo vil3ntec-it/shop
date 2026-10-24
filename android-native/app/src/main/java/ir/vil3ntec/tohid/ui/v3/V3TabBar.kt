@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -22,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -55,7 +57,7 @@ fun V3TabBar(tabs: List<V3Tab>, current: String?, onPick: (String) -> Unit, modi
         .height(64.dp)
         .shadow(16.dp, shape, clip = false, ambientColor = c.black.copy(alpha = 0.16f), spotColor = c.black.copy(alpha = 0.16f))
         .clip(shape)
-        .background(c.card)
+        .background(v3GlassColor(c.card))
         .border(1.dp, c.hairline, shape)
         .padding(horizontal = 6.dp),
       horizontalArrangement = Arrangement.SpaceEvenly,
@@ -72,7 +74,10 @@ fun V3TabBar(tabs: List<V3Tab>, current: String?, onPick: (String) -> Unit, modi
           horizontalAlignment = Alignment.CenterHorizontally,
         ) {
           Box(Modifier.size(width = 48.dp, height = 30.dp).clip(RoundedCornerShape(15.dp)).background(bg), contentAlignment = Alignment.Center) {
-            Icon(t.icon, contentDescription = null, tint = if (on) PhoneV3Palette.iconActive(c) else c.icon, modifier = Modifier.size(22.dp))
+            //  آیکنِ تبِ فعال: رنگ با محو و یک جهشِ فنریِ کوچک (فقط graphicsLayer)
+            val tint by animateColorAsState(if (on) PhoneV3Palette.iconActive(c) else c.icon, MotionSpec.tweenOf(MotionTokens.SHORT), label = "tabTint")
+            val pop by animateFloatAsState(if (on) 1.08f else 1f, V3Springs.playful(), label = "tabPop")
+            Icon(t.icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp).graphicsLayer { scaleX = pop; scaleY = pop })
           }
           Text(t.label, style = V3Type.caption, color = if (on) c.ink else c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

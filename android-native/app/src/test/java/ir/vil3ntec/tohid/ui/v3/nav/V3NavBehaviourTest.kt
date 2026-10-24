@@ -44,6 +44,18 @@ class V3NavBehaviourTest {
   }
 
   @Test
+  fun `حالتِ صفحه فقط تا وقتی در پشته‌ای هست نگه داشته می‌شود`() {
+    val n = nav()
+    n.open("products")
+    n.open("products/42")
+    n.open("home")
+    assertTrue("پشتهٔ تبِ دیگر زنده است", "products/42" in n.alive)
+    n.open("products")
+    n.back()
+    assertFalse("برداشته شد ⇒ فراموش", "products/42" in n.alive)
+  }
+
+  @Test
   fun `دروازهٔ باز روی خانه — «برگشت» می‌بنددش و برنامه بسته نمی‌شود`() {
     val n = nav()
     assertFalse(n.canBack)
