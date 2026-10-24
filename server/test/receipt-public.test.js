@@ -152,6 +152,24 @@ test('همان توکن در دکانِ دیگر — حتی زودتر — هر�
   assert.ok(!JSON.stringify(his.body).includes('چای سبز'));
 });
 
+test('۶۰ دکانِ رقیب با همان توکن، همه زودتر از دکانِ اصلی ⇒ فاکتورِ اصلی باز هم پیدا می‌شود', async () => {
+  const victim = await shop('ثِ');
+  const token = newToken();
+  //  هر ردیف از حسابی جدا و با زمانِ رسیدنِ پیش از فروشِ اصلی (سنجشِ نشان باید پیش از هر سقفی باشد)
+  for (let i = 0; i < 60; i++) {
+    await query(
+      `INSERT INTO sync_rows (app, account_kind, account_id, table_name, row_id, data, created_at, updated_at)
+       VALUES ('shop','shop',$1,'sales',$2,$3::jsonb,1,1)`,
+      [`rival-${i}`, `sale-rival-${i}`, JSON.stringify({ invoiceNumber: i, total: 1, finalTotal: 1, status: 'completed', receiptToken: token })]
+    );
+  }
+  await sell(victim, 'sale-many', token);
+  const r = await read(victim.tag, token);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.receipt.shop.name, 'دکانِ ثِ');
+  assert.equal(r.body.receipt.total, '400 افغانی');
+});
+
 test('لغو ⇒ «لغو شد»؛ پاک‌شده، QR ِ خاموش و دکانِ غیرفعال ⇒ همان ۴۰۴', async () => {
   const a = await shop('ج');
   const t1 = newToken();

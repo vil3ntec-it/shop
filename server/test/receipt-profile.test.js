@@ -8,12 +8,13 @@
  * لوگو: نوع از محتوا، سقفِ حجم و ابعاد، بی فراداده، با ETag.
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
+process.env.RATE_RECEIPT_LOGO_DAILY_MAX = '8';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const F = require('./image-fixtures');
-const { one } = require('../src/db');
+const { one, query } = require('../src/db');
 const profiles = require('../src/lib/receipt-profile');
 
 test.before(async () => { await h.start(); });
@@ -114,4 +115,63 @@ test('لوگو: فقط عکسِ سالم، بی فراداده، با سقف؛ E
   assert.equal(gone.status, 200);
   assert.equal(gone.body.profile.logo, null);
   assert.equal((await h.get(L, { token: t.owner })).status, 404);
+});
+
+const blobExists = async (hash) => !!(await one('SELECT 1 AS x FROM image_blobs WHERE hash=$1', [hash]));
+
+test('لوگوی جایگزین‌شده و حذف‌شده از دیسک پاک می‌شود؛ لوگوی مشترک با دکانِ دیگر می‌ماند', async () => {
+  const t = await shopWithTeam('ج');
+  const u = await shopWithTeam('چ');
+  const L = `${P}/logo`;
+  const a = (await h.raw('PUT', L, F.png(30, 30, { seed: 11 }), { token: t.owner })).body.profile.logo.hash;
+  const b = (await h.raw('PUT', L, F.png(30, 30, { seed: 12 }), { token: t.owner })).body.profile.logo.hash;
+  assert.notEqual(a, b);
+  assert.equal(await blobExists(a), false, 'لوگوی پیشین پاک شد');
+  assert.equal(await blobExists(b), true);
+  //  همان بایت‌ها دوباره ⇒ همان لوگو، چیزی پاک نمی‌شود
+  assert.equal((await h.raw('PUT', L, F.png(30, 30, { seed: 12 }), { token: t.owner })).body.profile.logo.hash, b);
+  assert.equal(await blobExists(b), true);
+
+  //  دکانِ دیگر همان تصویر را دارد ⇒ با عوض شدنِ لوگوی این دکان نمی‌رود
+  assert.equal((await h.raw('PUT', L, F.png(30, 30, { seed: 12 }), { token: u.owner })).body.profile.logo.hash, b);
+  await h.del(L, { token: t.owner });
+  assert.equal(await blobExists(b), true, 'دکانِ دیگر هنوز به آن اشاره دارد');
+  assert.equal((await h.download(L, { token: u.staff })).status, 200);
+  await h.del(L, { token: u.owner });
+  assert.equal(await blobExists(b), false, 'دیگر کسی اشاره ندارد');
+});
+
+test('سقفِ شبانه‌روزیِ بارگذاریِ لوگو به‌ازای دکان ⇒ ۴۲۹؛ دکانِ دیگر آزاد', async () => {
+  const t = await shopWithTeam('ح');
+  const u = await shopWithTeam('خ');
+  const L = `${P}/logo`;
+  const hashes = [];
+  for (let i = 0; i < 8; i++) {
+    const r = await h.raw('PUT', L, F.png(20, 20, { seed: 100 + i }), { token: i % 2 ? t.manager : t.owner });
+    assert.equal(r.status, 200, `بارِ ${i + 1}`);
+    hashes.push(r.body.profile.logo.hash);
+  }
+  const ninth = await h.raw('PUT', L, F.png(20, 20, { seed: 200 }), { token: t.owner });
+  assert.equal(ninth.status, 429);
+  assert.equal((await h.raw('PUT', L, F.png(20, 20, { seed: 201 }), { token: u.owner })).status, 200);
+  //  از هشت تصویرِ پیاپیِ این دکان فقط آخری روی دیسک است
+  assert.equal(new Set(hashes).size, 8);
+  const { rows } = await query('SELECT hash FROM image_blobs WHERE hash = ANY($1::text[])', [hashes]);
+  assert.deepEqual(rows.map((r) => r.hash), [hashes[7]]);
+});
+
+test('لوگوی JPEG ِ عکس‌گرفته: چرخش می‌ماند (در فایل و سربرگ)، بقیهٔ فراداده نه', async () => {
+  const bytes = require('../src/lib/image-bytes');
+  const t = await shopWithTeam('د');
+  const src = F.jpeg(40, 20, { orientation: 6 });
+  assert.ok(src.includes(Buffer.from('34.5,69.1')));
+  const up = await h.raw('PUT', `${P}/logo`, src, { token: t.owner });
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.equal(up.body.profile.logo.orientation, 6);
+  const got = await h.download(`${P}/logo`, { token: t.owner });
+  assert.equal(bytes.inspect(got.buffer).orientation, 6);
+  assert.ok(!got.buffer.includes(Buffer.from('34.5,69.1')), 'یادداشت و جا برداشته شد');
+  //  PNG چرخش ندارد
+  const png = await h.raw('PUT', `${P}/logo`, F.png(40, 20), { token: t.owner });
+  assert.equal(png.body.profile.logo.orientation, 1);
 });

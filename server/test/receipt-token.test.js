@@ -43,6 +43,16 @@ test('نشانِ دکان: ۸ نویسه از sha256، برای هر شناسه 
   assert.equal(R.normalizeTag('abc'), null);
 });
 
+test('نشان ⇒ همان ۵ بایتِ اولِ sha256 (سنجشِ نشان درونِ پرس‌وجو)', () => {
+  const crypto = require('node:crypto');
+  for (const c of V.tags) {
+    const digest = crypto.createHash('sha256').update(R.TAG_SALT + c.shopId, 'utf8').digest().subarray(0, 5);
+    assert.ok(R.decodeTag(c.tag).equals(digest), c.shopId);
+    assert.ok(R.decodeTag(c.tag.toUpperCase()).equals(digest));
+  }
+  for (const bad of ['', 'abc', 'zzzzzzzzz', 'iiiiiiii', null]) assert.equal(R.decodeTag(bad), null);
+});
+
 test('نشانیِ QR: ریشه بی / ِ آخر + /r/<نشان>/<توکن>', () => {
   for (const c of V.urls) assert.equal(R.receiptUrl(c.base, c.shopId, c.token), c.url);
 });

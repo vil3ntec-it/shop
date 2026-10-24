@@ -56,6 +56,17 @@ function normalizeTag(raw) {
   return TAG_RE.test(s) ? s : null;
 }
 
+/** نشانِ ۸ نویسه‌ای ⇒ همان ۵ بایتِ اولِ sha256 (برای سنجشِ نشان درونِ پرس‌وجو)، یا null */
+function decodeTag(raw) {
+  const tag = normalizeTag(raw);
+  if (!tag) return null;
+  let n = 0n;
+  for (const ch of tag) n = (n << 5n) | BigInt(ALPHABET.indexOf(ch));
+  const out = Buffer.alloc(TAG_BYTES);
+  for (let i = TAG_BYTES - 1; i >= 0; i--) { out[i] = Number(n & 0xffn); n >>= 8n; }
+  return out;
+}
+
 /** نشانِ ۸ نویسه‌ایِ دکان — بی راز، فقط برای جدا کردنِ دکان‌ها */
 function shopTag(shopId) {
   const digest = createHash('sha256').update(TAG_SALT + String(shopId), 'utf8').digest();
@@ -73,6 +84,6 @@ function receiptUrl(base, shopId, token) {
 }
 
 module.exports = {
-  ALPHABET, TOKEN_LENGTH, TAG_LENGTH, PATH_PREFIX,
-  encodeToken, normalizeToken, normalizeTag, shopTag, receiptPath, receiptUrl,
+  ALPHABET, TOKEN_LENGTH, TAG_LENGTH, TAG_SALT, PATH_PREFIX,
+  encodeToken, normalizeToken, normalizeTag, decodeTag, shopTag, receiptPath, receiptUrl,
 };

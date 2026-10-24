@@ -29,7 +29,6 @@ const STORES = Object.freeze([
   Object.freeze({ fmt: 'v1', table: 'sync_rows', order: "(field_seq->>'saleId')::bigint" }),
   Object.freeze({ fmt: 'v3', table: 'sync_v3_rows', order: "field_hlc->>'saleId'" }),
 ]);
-const MAX_CANDIDATES = 50;
 const MAX_ITEMS = 500;
 const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
 const NOT_YET = 'هنوز ثبت نشده، کمی بعد دوباره';
@@ -60,25 +59,29 @@ function legacy(store, table, data) {
 }
 
 /**
- * فروشِ صاحبِ این نشانی — یا ۴۰۴. در هر انبار نخستین ردیفِ هر حساب با این توکن،
- * به ترتیبِ رسیدن به سرور؛ از میانِ آن‌هایی که نشانِ حسابشان می‌خورد، نخستین.
- * ردیفِ نخستینِ پاک‌شده ⇒ ۴۰۴ (به کپیِ بعدی نمی‌افتد).
+ * فروشِ صاحبِ این نشانی — یا ۴۰۴.
+ *
+ * ⛔ نشانِ دکان **درونِ پرس‌وجو** و پیش از هر سقفی سنجیده می‌شود (۵ بایتِ اولِ
+ *    `sha256(نمک + account_id)`): ردیف‌های دکان‌های دیگر با همان توکن — هر چند تا و هر
+ *    قدر زودتر — اصلاً نامزد نمی‌شوند و نمی‌توانند فروشِ اصلی را بیرون برانند.
+ *    نشان در JS هم دوباره سنجیده می‌شود.
+ * از ردیف‌های همان دکان نخستین (به ترتیبِ رسیدن به سرور)؛ نخستینِ پاک‌شده ⇒ ۴۰۴
+ * (به کپیِ بعدی نمی‌افتد).
  */
 async function findSale(tagRaw, tokenRaw) {
   const tag = token.normalizeTag(tagRaw);
+  const tagBytes = token.decodeTag(tag);
   const tok = token.normalizeToken(tokenRaw);
-  if (!tag || !tok) throw gone();
+  if (!tag || !tagBytes || !tok) throw gone();
   const hits = [];
   for (const store of stores()) {
-    //  یک نامزد برای هر حساب (نخستین ردیفش): انبوهِ کپی در یک دکان جای دکانِ دیگر را نمی‌گیرد
     const { rows } = await query(
-      `SELECT * FROM (
-         SELECT DISTINCT ON (account_id) account_id, row_id, data, deleted_at, created_at FROM ${store.table}
-          WHERE app='shop' AND account_kind='shop' AND table_name='sales'
-            AND data ? 'receiptToken' AND data->>'receiptToken' = $1
-          ORDER BY account_id, created_at, row_id
-       ) first_per_shop ORDER BY created_at LIMIT ${MAX_CANDIDATES}`,
-      [tok]
+      `SELECT account_id, row_id, data, deleted_at, created_at FROM ${store.table}
+        WHERE app='shop' AND account_kind='shop' AND table_name='sales'
+          AND data ? 'receiptToken' AND data->>'receiptToken' = $1
+          AND substring(sha256(convert_to($3 || account_id, 'UTF8')) from 1 for ${tagBytes.length}) = $2
+        ORDER BY created_at, row_id LIMIT 1`,
+      [tok, tagBytes, token.TAG_SALT]
     );
     for (const r of rows) if (token.shopTag(r.account_id) === tag) hits.push({ ...r, store });
   }

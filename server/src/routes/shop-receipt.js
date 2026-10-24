@@ -6,7 +6,7 @@
  *   GET    /             هر عضو ⇒ { profile, rev } (دستگاه برای چاپِ بی اینترنت نگه می‌دارد)
  *   PUT    /             `settings.write` ⇒ نام، نشانی، تلفن، متنِ پایین، qr، logoMode، digits، symbol
  *   GET    /logo         هر عضو ⇒ بایت‌های لوگو (ETag = hash)
- *   PUT    /logo         `settings.write` ⇒ بدنهٔ خامِ عکس (JPG/PNG/WebP، ≤ ۲۰۰ KB)
+ *   PUT    /logo         `settings.write` ⇒ بدنهٔ خامِ عکس (JPG/PNG/WebP، ≤ ۲۰۰ KB)، ۲۰ بار در شبانه‌روز
  *   DELETE /logo         `settings.write`
  */
 const express = require('express');
@@ -21,8 +21,10 @@ const router = express.Router();
 router.use(requireUser, requireShop);
 
 const write = requirePermission('settings.write');
+//  سقفِ شبانه‌روزیِ بارگذاری به‌ازای دکان (نه کاربر یا IP)
 const logoLimit = rateLimit({
-  max: config.rateLimit.receiptLogoMax, keyPrefix: 'receipt-logo', key: (req) => req.shopId,
+  max: config.rateLimit.receiptLogoDailyMax, windowMs: 24 * 60 * 60 * 1000,
+  keyPrefix: 'receipt-logo-day', key: (req) => req.shopId,
 });
 const rawLogo = express.raw({ type: () => true, limit: profiles.LOGO_MAX_BYTES + 1024 });
 
