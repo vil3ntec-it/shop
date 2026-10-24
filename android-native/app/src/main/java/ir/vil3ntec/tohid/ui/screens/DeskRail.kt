@@ -208,8 +208,9 @@ private fun RailItem(id: String, label: String, key: String, icon: ImageVector, 
     if (badge > 0) Text(
       badge.toString(),
       style = MaterialTheme.typography.labelSmall,
-      color = MaterialTheme.colorScheme.onError,
-      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.danger).padding(horizontal = 7.dp, vertical = 1.dp),
+      //  شمارِ هشدار = هشدارِ واقعی ⇒ همان جفتِ دکمهٔ خطر (#DC2626 + سفید، ۴٫۸:۱) در روز و شب
+      color = Shop.colors.button.danger.text,
+      modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(Shop.colors.button.danger.bg).padding(horizontal = 7.dp, vertical = 1.dp),
     )
   }
 }
