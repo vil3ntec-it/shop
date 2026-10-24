@@ -41,6 +41,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Stat
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Grow
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
@@ -50,7 +52,7 @@ import ir.vil3ntec.tohid.ui.v3.v3Stagger
 /** فهرستِ بلند: هر ردیف کارتِ مرزدارِ خودش (تنبل، ورودِ پلکانیِ بارِ اول) */
 private fun <T> LazyListScope.rowCards(stagger: V3StaggerState, rows: List<T>, key: (T) -> Any, row: @Composable (T) -> Unit) =
   itemsIndexed(rows, key = { _, r -> key(r) }) { i, r ->
-    Box(Modifier.animateItem().padding(top = 8.dp).v3Stagger(stagger, key(r), i)) { V3Card(padding = PaddingValues(0.dp)) { row(r) } }
+    Box(Modifier.v3AnimateItem(this).padding(top = 8.dp).v3Stagger(stagger, key(r), i)) { V3Card(padding = PaddingValues(0.dp)) { row(r) } }
   }
 
 /** «قرض‌داران»: جمعِ طلب و هر نفر با «فروش نسیه — پرداخت‌شده» و مانده ⇐ پروندهٔ همان نفر */
@@ -111,7 +113,7 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
     }
     item(key = "share") {
       val max = r.bySupplier.maxOfOrNull { it.second } ?: 0.0
-      val grow = rememberGrowth(r.bySupplier.size, spec.grow, "share")
+      val grow = rememberV3Grow(r.bySupplier)
       val color = chartColor(c, ChartSeries.COSTS)
       V3Section(StrReports.bySupplier, spec.appear("share", 1)) {
         Legend(listOf(color to StrReports.purchasesInRange), Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 4.dp))
@@ -127,7 +129,7 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
               Text(afn(total), style = V3Type.subhead, color = c.ink)
             }
             Spacer(Modifier.height(6.dp))
-            InlineBar(ReportsModel.fraction(total, max), color, grow, i, Modifier.fillMaxWidth(), height = 8.dp)
+            InlineBar(ReportsModel.fraction(total, max), color, grow, Modifier.fillMaxWidth(), height = 8.dp)
           }
         }
       }

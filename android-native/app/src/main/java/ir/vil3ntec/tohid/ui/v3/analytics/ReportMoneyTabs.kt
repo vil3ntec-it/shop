@@ -40,6 +40,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Stat
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.rememberV3Grow
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 
@@ -163,7 +164,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rankItem(
   val c = PhoneV3.colors
   val top = rows.take(5)
   val max = top.maxOfOrNull { measure(it) } ?: 0.0
-  val grow = rememberGrowth(top.size, spec.grow, key)
+  val grow = rememberV3Grow(key)
   V3Section(title, spec.appear(key, order)) {
     if (top.isEmpty()) Text(StrReports.noData, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(16.dp))
     top.forEachIndexed { i, s ->
@@ -175,7 +176,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.rankItem(
           Column(horizontalAlignment = Alignment.End) {
             Text(label(s), style = V3Type.subhead, color = c.ink, maxLines = 1)
             Spacer(Modifier.height(4.dp))
-            InlineBar(ReportsModel.fraction(measure(s), max), chartColor(c, ChartSeries.SALES), grow, i, Modifier.width(72.dp))
+            InlineBar(ReportsModel.fraction(measure(s), max), chartColor(c, ChartSeries.SALES), grow, Modifier.width(72.dp))
           }
         },
         onClick = { spec.onOpen(ProductsPaths.item(s.product.id)) },

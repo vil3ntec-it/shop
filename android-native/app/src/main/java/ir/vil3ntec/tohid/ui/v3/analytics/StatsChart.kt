@@ -24,8 +24,6 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.input.pointer.pointerInput
@@ -38,15 +36,16 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrReports
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.V3Springs
 import ir.vil3ntec.tohid.ui.v3.V3Type
+import ir.vil3ntec.tohid.ui.v3.v3GrowFromBaseline
 
 /**
  *  نمودارِ ستونیِ آمار (شکلِ stats-chart-ref): محورِ عدد در سمتِ آغاز با خط‌های نقطه‌چین،
  *  ستونِ انتخاب‌شده به رنگِ برند و بقیه خنثی، نامِ بازه زیرِ هر ستون، و بالای ستونِ انتخاب‌شده
- *  برچسبِ عددِ دقیق. ستون‌ها از خطِ پایه با فنر بالا می‌آیند (`growth`) و رنگ و برچسبِ
- *  انتخاب با فنرِ نشانگر (`MotionSpec.indicator`) به ستونِ تازه می‌لغزد. همهٔ متن‌ها پیش از
+ *  برچسبِ عددِ دقیق. ستون‌ها از خطِ پایه بالا می‌آیند (`rememberV3Grow` ِ کیت) و رنگ و برچسبِ
+ *  انتخاب با فنرِ کیت (`V3Springs.ui`) به ستونِ تازه می‌لغزد. همهٔ متن‌ها پیش از
  *  کشیدن اندازه گرفته می‌شوند؛ کشیدن فقط می‌خواند (بی ساختنِ چیزِ تازه در هر فریم).
  */
 @Composable
@@ -54,7 +53,7 @@ internal fun StatsBarChart(
   values: List<Double>,
   labels: List<String>,
   selected: Int,
-  growth: Growth,
+  growth: Float,
   onSelect: (Int) -> Unit,
   modifier: Modifier = Modifier,
 ) {
@@ -75,7 +74,7 @@ internal fun StatsBarChart(
   val tipBg = c.black
   val dash = remember { PathEffect.dashPathEffect(floatArrayOf(14f, 14f)) }
   val pos = remember { Animatable(selected.toFloat()) }
-  LaunchedEffect(selected) { pos.animateTo(selected.toFloat(), MotionSpec.indicator()) }
+  LaunchedEffect(selected) { pos.animateTo(selected.toFloat(), V3Springs.ui()) }
   val desc = labels.indices.joinToString("، ") { "${labels[it]}: ${afn(values.getOrElse(it) { 0.0 })}" }
   Canvas(
     modifier
@@ -112,7 +111,7 @@ internal fun StatsBarChart(
     fun heightOf(i: Int): Float {
       val v = values[i]
       val full = if (v <= 0.0 || axis <= 0.0) 0f else maxOf((v / axis).toFloat().coerceIn(0f, 1f) * h, 4.dp.toPx())
-      return full * growth.at(i)
+      return full * growth
     }
     values.indices.forEach { i ->
       val center = centerOf(i.toFloat())
@@ -141,7 +140,7 @@ private val AXIS_W = 44.dp
  *  نشانگرِ مثلثی بالایش، و ساعتِ آغازِ هر خانه زیرش.
  */
 @Composable
-internal fun HourStrip(bins: List<HourBin>, peak: HourBin?, growth: Growth, modifier: Modifier = Modifier) {
+internal fun HourStrip(bins: List<HourBin>, peak: HourBin?, growth: Float, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   val max = bins.maxOfOrNull { it.count } ?: 0
   val brand = chartColor(c, ChartSeries.SALES)
@@ -161,7 +160,7 @@ internal fun HourStrip(bins: List<HourBin>, peak: HourBin?, growth: Growth, modi
           //  بلندیِ پایانی ثابت؛ رشد از خطِ پایه با `scaleY` (بی چیدمانِ دوباره)
           Box(
             Modifier.fillMaxWidth().height((8 + 36 * f).dp)
-              .graphicsLayer { scaleY = growth.at(i); transformOrigin = TransformOrigin(0.5f, 1f) }
+              .v3GrowFromBaseline { growth }
               .clip(RoundedCornerShape(6.dp)).background(if (on) brand else neutral),
           )
         }

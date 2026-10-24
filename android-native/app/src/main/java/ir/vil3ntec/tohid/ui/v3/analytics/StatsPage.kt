@@ -49,6 +49,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -63,10 +64,24 @@ import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Stat
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
+import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
+import ir.vil3ntec.tohid.ui.v3.rememberV3Grow
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import java.util.Calendar
+
+/**
+ *  محتوای صفحهٔ دومِ ورقِ خانه (`HomePager.stats`، ثبت در `AnalyticsModule`): پول با همان
+ *  سدِ `canSeeMoney`، و هر کارت با مسیر (`LocalV3Nav`). نقطه‌های ورق را خودِ ورقِ خانه می‌کشد.
+ */
+@Composable
+internal fun HomeStats(d: ShopData, bottomReserve: Dp) {
+  val context = LocalContext.current
+  val nav = LocalV3Nav.current
+  val money = remember { ShopRole.canSeeMoney(context) }
+  StatsPage(d, money, null, { nav?.open(it) }, bottomReserve, embedded = true)
+}
 
 /** دورهٔ خواسته‌شده از پیوندِ `stats?period=` برای ورقِ خانه — صفحهٔ آمار برمی‌دارد و پاک می‌کند */
 object StatsRequest {
@@ -97,18 +112,18 @@ fun StatsPage(
   if (!embedded) {
     V3Scaffold(title = StrReports.statsTitle, onBack = onBack, largeTitle = false, bottomReserve = bottomReserve) { pad ->
       if (!canSeeMoney) V3EmptyState(Icons.Outlined.Lock, StrReports.moneyLocked, body = StrReports.moneyLockedBody, action = Str.goBack, onAction = onBack)
-      else StatsBody(d, periodArg, onOpen, today, big, Modifier.padding(bottom = pad.calculateBottomPadding()), null)
+      else StatsBody(d, periodArg, onOpen, today, big, Modifier.padding(bottom = pad.calculateBottomPadding()), title = false, dots = null)
     }
     return
   }
   val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   Box(Modifier.fillMaxSize().background(PhoneV3.colors.bg).padding(top = top + 10.dp, bottom = bottomReserve)) {
-    StatsBody(d, periodArg, onOpen, today, big, Modifier, dots)
+    StatsBody(d, periodArg, onOpen, today, big, Modifier, title = true, dots = dots)
   }
 }
 
 @Composable
-private fun StatsBody(d: ShopData, periodArg: String?, onOpen: (String) -> Unit, today: String, big: Boolean, modifier: Modifier, dots: (@Composable () -> Unit)?) {
+private fun StatsBody(d: ShopData, periodArg: String?, onOpen: (String) -> Unit, today: String, big: Boolean, modifier: Modifier, title: Boolean, dots: (@Composable () -> Unit)?) {
   val c = PhoneV3.colors
   val context = LocalContext.current
   var periodId by rememberSaveable(periodArg) { mutableStateOf(StatsPeriod.of(periodArg).id) }
@@ -126,18 +141,17 @@ private fun StatsBody(d: ShopData, periodArg: String?, onOpen: (String) -> Unit,
   val streak = remember(d, today) { StatsModel.streak(d, today) }
   val bins = remember(d, sel) { sel?.let { StatsModel.hours(d, it.from, it.to, ::hourOf) }.orEmpty() }
   val peak = StatsModel.peak(bins)
-  val grow = rememberGrowth(bars.size, true, period)
-  val hourGrow = rememberGrowth(bins.size, true, period, selected)
+  val grow = rememberV3Grow(period)
+  val hourGrow = rememberV3Grow(period to selected)
   val shown = rememberCountUp(sel?.net ?: 0.0)
   val stagger = rememberV3Stagger()
   fun Modifier.appear(i: Int) = v3Stagger(stagger, "stats-$i", i)
 
   Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-    if (dots != null) {
+    if (title) {
       Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
         Text(StrReports.statsTitle, style = V3Type.headline, color = c.ink, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(8.dp))
-        dots()
+        if (dots != null) { Spacer(Modifier.height(8.dp)); dots() }
       }
     }
     //  سر: عددِ درشتِ ستونِ انتخاب‌شده و تاریخش
@@ -209,7 +223,7 @@ private fun StreakCard(days: List<StreakDay>, modifier: Modifier = Modifier) {
 
 /** پخشِ ساعتیِ فاکتورهای ستونِ انتخاب‌شده با پُرفروش‌ترین ساعت */
 @Composable
-private fun HoursCard(bins: List<HourBin>, peak: HourBin?, grow: Growth, count: Int, modifier: Modifier = Modifier) {
+private fun HoursCard(bins: List<HourBin>, peak: HourBin?, grow: Float, count: Int, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   V3Card(modifier, padding = PaddingValues(16.dp)) {
     Row(verticalAlignment = Alignment.CenterVertically) {

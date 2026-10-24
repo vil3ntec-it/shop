@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -25,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -51,20 +48,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.absoluteOffset
 import ir.vil3ntec.tohid.money
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.MotionSpec
-import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3Springs
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberCountUp
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 /** مبلغ با نشانِ افغانی — همان `money()` ِ برنامه (رقم را قلم به انتخابِ دکان می‌کشد) */
 internal fun afn(v: Double): String = "${money(v)} ؋"
@@ -91,41 +84,17 @@ internal fun chartColor(c: PhoneV3Colors, s: ChartSeries): Color = when (s) {
 internal fun chartGrid(c: PhoneV3Colors): Color = PhoneV3Palette.chartGrid(c)
 
 /**
- *  رشدِ میله‌ها از خطِ پایه با فنرِ `sheet` (بی پرش)، پله‌پله (`STAGGER_STEP`) — فقط وقتی
- *  `animate` (بارِ اولِ زبانه/دوره) و حرکت روشن است؛ وگرنه همه یک‌جا پُر. مقدار فقط در
- *  مرحلهٔ کشیدن (`graphicsLayer`/`Canvas`) خوانده می‌شود تا هر فریم ترکیبِ دوباره نسازد.
- */
-@Stable
-internal class Growth(private val items: List<Animatable<Float, AnimationVector1D>>) {
-  fun at(i: Int): Float = items.getOrNull(i)?.value ?: 1f
-}
-
-@Composable
-internal fun rememberGrowth(count: Int, animate: Boolean, vararg keys: Any?): Growth {
-  val items = remember(count, *keys) { List(count) { Animatable(if (animate && Motion.enabled) 0f else 1f) } }
-  LaunchedEffect(items) {
-    items.forEachIndexed { i, a ->
-      if (a.value < 1f) launch {
-        delay((i * MotionTokens.STAGGER_STEP).toLong())
-        a.animateTo(1f, MotionSpec.sheet())
-      }
-    }
-  }
-  return remember(items) { Growth(items) }
-}
-
-/**
  *  میلهٔ افقیِ نازک (رتبه‌ها، سهمِ تأمین‌کننده): زمینهٔ خط‌راهنما و پُرشدگیِ رنگِ سری که از
- *  سمتِ آغاز (آینه در راست‌به‌چپ) با `scaleX` رشد می‌کند — بی چیدمانِ دوباره در هر فریم.
+ *  سمتِ آغاز (آینه در راست‌به‌چپ) با `scaleX` رشد می‌کند — پیشرفت از `rememberV3Grow` ِ کیت.
  */
 @Composable
-internal fun InlineBar(fraction: Float, color: Color, growth: Growth, index: Int, modifier: Modifier = Modifier, height: Dp = 6.dp) {
+internal fun InlineBar(fraction: Float, color: Color, progress: Float, modifier: Modifier = Modifier, height: Dp = 6.dp) {
   val c = PhoneV3.colors
   val origin = if (LocalLayoutDirection.current == LayoutDirection.Rtl) TransformOrigin(1f, 0.5f) else TransformOrigin(0f, 0.5f)
   Box(modifier.height(height).clip(RoundedCornerShape(50)).background(chartGrid(c))) {
     if (fraction > 0f) Box(
       Modifier.fillMaxSize().graphicsLayer {
-        scaleX = (fraction * growth.at(index)).coerceIn(0f, 1f)
+        scaleX = (fraction * progress).coerceIn(0f, 1f)
         transformOrigin = origin
       }.clip(RoundedCornerShape(50)).background(color),
     )
@@ -163,7 +132,7 @@ internal fun HeroFigure(label: String, value: Double, caption: String?, negative
 }
 
 /**
- *  نوارِ زبانه‌های پیمایشی با نشانگرِ لغزان (فنرِ `indicator`) — زبانهٔ انتخاب‌شده خودش
+ *  نوارِ زبانه‌های پیمایشی با نشانگرِ لغزان (فنرِ `V3Springs.ui`) — زبانهٔ انتخاب‌شده خودش
  *  به دید می‌آید؛ در راست‌به‌چپ آینه (جای زبانه‌ها از چیدمانِ واقعی خوانده می‌شود).
  *  پیش‌نویسِ کیت (`DraftTabStrip`): کیت نوارِ زبانهٔ پیمایشی ندارد.
  */
@@ -175,8 +144,8 @@ internal fun DraftTabStrip(labels: List<String>, selected: Int, onSelect: (Int) 
   val lefts = remember(labels.size) { mutableStateListOf<Float>().apply { repeat(labels.size) { add(0f) } } }
   val widths = remember(labels.size) { mutableStateListOf<Float>().apply { repeat(labels.size) { add(0f) } } }
   val requesters = remember(labels.size) { List(labels.size) { BringIntoViewRequester() } }
-  val x by animateFloatAsState(lefts.getOrElse(selected) { 0f }, MotionSpec.indicator(), label = "tabX")
-  val w by animateFloatAsState(widths.getOrElse(selected) { 0f }, MotionSpec.indicator(), label = "tabW")
+  val x by animateFloatAsState(lefts.getOrElse(selected) { 0f }, V3Springs.ui(), label = "tabX")
+  val w by animateFloatAsState(widths.getOrElse(selected) { 0f }, V3Springs.ui(), label = "tabW")
   LaunchedEffect(selected) { requesters.getOrNull(selected)?.bringIntoView() }
   Column(modifier.fillMaxWidth()) {
     Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {

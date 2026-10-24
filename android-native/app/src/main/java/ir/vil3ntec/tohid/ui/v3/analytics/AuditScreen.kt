@@ -65,6 +65,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -121,7 +122,7 @@ fun AuditScreen(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
       ) {
         itemsIndexed(rows, key = { _, g -> g.first }) { i, (date, entries) ->
-          V3Section(dayTitle(date, today), Modifier.animateItem().v3Stagger(stagger, "$kind-$date", i)) {
+          V3Section(dayTitle(date, today), Modifier.v3AnimateItem(this).v3Stagger(stagger, "$kind-$date", i)) {
             entries.forEachIndexed { i, e ->
               if (i > 0) V3Divider(start = 64.dp)
               AuditRow(e) { AuditModel.target(e, d)?.let(onOpen) ?: run { detail = e } }

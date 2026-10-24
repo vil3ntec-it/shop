@@ -14,9 +14,7 @@ import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,6 +46,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3PageSwitch
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Type
@@ -91,7 +90,7 @@ fun ReportsScreen(
   val period = ReportPeriod(ReportsModel.rangeOf(rangeId), year, month)
   var picker by remember { mutableStateOf(if (startPicker) period.range else null) }
   var csvFailed by remember { mutableStateOf(false) }
-  val seen = remember { mutableStateListOf<ReportTab>() }
+  var failures by remember { mutableStateOf(0) }
   val (from, to) = ReportsModel.bounds(period, today)
 
   fun sheet() = ReportCsv.of(tab.csv, d, from, to, today)
@@ -108,6 +107,7 @@ fun ReportsScreen(
         }
       }.isSuccess
       csvFailed = !ok
+      if (!ok) failures++
       if (ok) { Haptics.success(context); toasts?.show(StrReports.csvSaved, V3Tone.SUCCESS) }
     }
   }
@@ -140,13 +140,11 @@ fun ReportsScreen(
         )
       }
       if (csvFailed) item(key = "csv-error") {
-        V3Message(V3Tone.ERROR, StrReports.csvFailed, Modifier.padding(top = 12.dp), body = StrReports.csvFailedBody, action = Str.close, onAction = { csvFailed = false })
+        V3Message(V3Tone.ERROR, StrReports.csvFailed, Modifier.padding(top = 12.dp).v3Shake(failures), body = StrReports.csvFailedBody, action = Str.close, onAction = { csvFailed = false })
       }
     }
     V3PageSwitch(tab, { it.ordinal }, Modifier.fillMaxSize()) { t ->
-      val grow = t !in seen
-      if (grow) SideEffect { if (t !in seen) seen.add(t) }
-      val list = ReportListSpec(pad, header(t), grow, onOpen, rememberV3Stagger(t))
+      val list = ReportListSpec(pad, header(t), onOpen, rememberV3Stagger(t))
       when (t) {
         ReportTab.PROFIT -> ProfitTab(d, from, to, list)
         ReportTab.PRODUCTS -> ProductsTab(d, canSeeMoney, list)
@@ -163,11 +161,10 @@ fun ReportsScreen(
   }
 }
 
-/** آنچه هر زبانه برای فهرستش می‌گیرد: فاصلهٔ پایین، سرِ مشترک (بازه/پیام)، رشدِ بارِ اول و ناوبری */
+/** آنچه هر زبانه برای فهرستش می‌گیرد: فاصلهٔ پایین، سرِ مشترک (بازه/پیام)، ناوبری و آمدنِ پلکانی */
 internal class ReportListSpec(
   val pad: PaddingValues,
   val header: LazyListScope.() -> Unit,
-  val grow: Boolean,
   val onOpen: (String) -> Unit,
   private val stagger: V3StaggerState,
 ) {

@@ -46,7 +46,7 @@ private fun canSeeMoney(): Boolean {
 
 private fun RouteScope.backOrNull(): (() -> Unit)? = if (nav.canBack) ({ back() }) else null
 
-/** گروهِ گزارش‌ها (G6، `analytics.md`): گزارش‌ها، آمار، سابقهٔ عملیات و مرکزِ مدیریت */
+/** گروهِ گزارش‌ها (G6، `analytics.md`): گزارش‌ها، آمار، سابقهٔ عملیات و مرکزِ مدیریت؛ آمار را در ورقِ خانه هم می‌گذارد */
 val AnalyticsModule = AppModule(
   id = "analytics",
   title = { Str.reports },
@@ -87,4 +87,6 @@ val AnalyticsModule = AppModule(
     V3Route("reports/export", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
     V3Route("reports/print", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
   ),
-)
+).also {
+  HomePager.stats = { d, bottomReserve, _, _ -> HomeStats(d, bottomReserve) }
+}
