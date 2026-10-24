@@ -467,6 +467,8 @@ fun SettingsScreen(
       }
     }
 
+    /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
