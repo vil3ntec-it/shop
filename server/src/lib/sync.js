@@ -40,6 +40,8 @@ const TABLES = {
   productCategories: 'product_categories',
   productUnits:      'product_units',
   expenseCategories: 'expense_categories',
+  //  PAY-18 (migrations/118، پلهٔ ۴): گاوصندوق — فقط‌افزودنی؛ شکل و مجوز در `safe-ledger.js`
+  safeEntries:       'shop_safe_entries',
 };
 const COLLECTIONS = Object.keys(TABLES);
 

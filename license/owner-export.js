@@ -56,7 +56,8 @@
     ['supplierPayments', 'پرداخت به تأمین‌کنندگان'],
     ['stockMovements', 'حرکات انبار'],
     ['priceHistory', 'سابقهٔ قیمت‌ها'],
-    ['auditLog', 'سابقهٔ عملیات']
+    ['auditLog', 'سابقهٔ عملیات'],
+    ['safeEntries', 'گاوصندوق']
   ];
 
   /** فیلد ⇐ سرستونِ فارسی */
@@ -83,6 +84,7 @@
     purchaseId: 'شناسهٔ خرید',
     warehouseEntryId: 'شناسهٔ ورودی انبار',
     refId: 'شناسهٔ مرجع',
+    kind: 'نوعِ ردیفِ سیستمی',
     purchasePrice: 'قیمت خرید',
     salePrice: 'قیمت فروش',
     wholesalePrice: 'قیمت عمده',
@@ -117,6 +119,14 @@
     syncStatus: 'وضعیت همگام‌سازی',
     cancelReason: 'دلیل لغو',
     seller: 'فروشنده',
+    //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
+    payments: 'ردیف‌های پرداخت',
+    tenderedMinor: 'دریافتی (پول)',
+    changeMinor: 'پول پس (پول)',
+    by: 'کاربر',
+    approvedBy: 'تأییدکننده',
+    note: 'توضیح',
+    z: 'گزارش Z',
     quantity: 'تعداد',
     unitPrice: 'قیمت واحد',
     totalPrice: 'جمع قلم',
@@ -129,7 +139,13 @@
     qty: 'مقدار',
     oldPrice: 'قیمت قبلی',
     newPrice: 'قیمت تازه',
-    nextInvoiceNo: 'شمارهٔ فاکتور بعدی'
+    nextInvoiceNo: 'شمارهٔ فاکتور بعدی',
+    //  گاوصندوق (PAY-18)
+    amountMinor: 'مبلغ (پول)',
+    bagNo: 'شمارهٔ کیسه',
+    expectedMinor: 'ماندهٔ دفتر هنگامِ شمارش (پول)',
+    shiftId: 'شناسهٔ صندوق',
+    auditId: 'شناسهٔ ردیفِ صندوق'
   };
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

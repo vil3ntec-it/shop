@@ -78,6 +78,11 @@
       defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
       edit: 'full', approvable: false, caps: [], display: true,
     },
+    //  گاوصندوق (PAY-18): شمارش، ورود، خروج، به بانک و به دخل؛ «از دخل» فقط نوشتن می‌خواهد
+    'safe.move': {
+      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      edit: 'restrict', approvable: false, caps: [], display: false,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

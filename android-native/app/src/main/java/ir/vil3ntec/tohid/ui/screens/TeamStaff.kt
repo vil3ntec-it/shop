@@ -54,6 +54,7 @@ private fun permLabel(key: String): String = when (key) {
   "settings.write" -> "تنظیماتِ دکان"
   "audit.view" -> "سابقهٔ عملیات"
   "reports.money" -> "دیدنِ عددهای مالی (درآمد، سود)"
+  "safe.move" -> "گاوصندوق: شمارش و جابه‌جاییِ پول"
   else -> key
 }
 

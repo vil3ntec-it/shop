@@ -34,6 +34,7 @@ const schema = require('./sync-v3-schema');
 const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
+const safeLedger = require('./safe-ledger');
 const permCore = require('./perm-core');
 
 const PROTOCOL = 3;
@@ -434,6 +435,8 @@ async function authorize(c, ctx, op, row, deviceId, origin) {
     if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
+  //  گاوصندوق (PAY-18): فقط درج، شکلِ درست و `safe.move` (جز «از دخل») — `safe-ledger.js`
+  if (op.table === safeLedger.TABLE) return safeLedger.judgeV3(ctx, op);
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {

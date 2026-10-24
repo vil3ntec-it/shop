@@ -98,6 +98,7 @@ object OwnerExport {
     "stockMovements" to "حرکات انبار",
     "priceHistory" to "سابقهٔ قیمت‌ها",
     "auditLog" to "سابقهٔ عملیات",
+    "safeEntries" to "گاوصندوق",
   )
 
   /** فیلد ⇐ سرستونِ فارسی */
@@ -124,6 +125,7 @@ object OwnerExport {
     "purchaseId" to "شناسهٔ خرید",
     "warehouseEntryId" to "شناسهٔ ورودی انبار",
     "refId" to "شناسهٔ مرجع",
+    "kind" to "نوعِ ردیفِ سیستمی",
     "purchasePrice" to "قیمت خرید",
     "salePrice" to "قیمت فروش",
     "wholesalePrice" to "قیمت عمده",
@@ -158,6 +160,13 @@ object OwnerExport {
     "syncStatus" to "وضعیت همگام‌سازی",
     "cancelReason" to "دلیل لغو",
     "seller" to "فروشنده",
+    "payments" to "ردیف‌های پرداخت",
+    "tenderedMinor" to "دریافتی (پول)",
+    "changeMinor" to "پول پس (پول)",
+    "by" to "کاربر",
+    "approvedBy" to "تأییدکننده",
+    "note" to "توضیح",
+    "z" to "گزارش Z",
     "quantity" to "تعداد",
     "unitPrice" to "قیمت واحد",
     "totalPrice" to "جمع قلم",
@@ -171,6 +180,11 @@ object OwnerExport {
     "oldPrice" to "قیمت قبلی",
     "newPrice" to "قیمت تازه",
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    "amountMinor" to "مبلغ (پول)",
+    "bagNo" to "شمارهٔ کیسه",
+    "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",
+    "shiftId" to "شناسهٔ صندوق",
+    "auditId" to "شناسهٔ ردیفِ صندوق",
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

@@ -31,6 +31,8 @@ const SERVER_EDITABLE = Object.freeze([
   'audit.view', 'reports.money', 'settings.write',
   //  اجرا در همگام‌سازی، با سقف و برگهٔ امضاشده — `staff-approval.js`
   'sales.discount', 'sales.cancel', 'returns.create',
+  //  اجرا روی opِ گاوصندوق در v1 و v3 — `safe-ledger.js`
+  'safe.move',
 ]);
 const EDITABLE_ROLES = Object.freeze(['manager', 'staff']);
 
