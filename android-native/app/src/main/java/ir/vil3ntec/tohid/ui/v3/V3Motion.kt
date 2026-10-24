@@ -44,10 +44,10 @@ import kotlinx.coroutines.delay
 /**
  *  حرکت‌های کیتِ نسخهٔ ۳ — از واژه‌نامهٔ `MotionTokens`/`MotionSpec` (`Motion.kt`).
  *
- *  • `V3Transitions.page`: جابه‌جاییِ صفحه‌ها روی یک محور (shared-axis). رفتن به
- *    عمق: صفحهٔ تازه از **سمتِ پایان** می‌آید (راست‌به‌چپ: از چپ — آینهٔ iOS) و
- *    صفحهٔ رفته کمی به سمتِ آغاز می‌رود و محو می‌شود؛ برگشت درست برعکس. تبِ تازه
- *    (نوارِ پایین): محو و کمی بزرگ‌شدن (fade-through).
+ *  • `V3Transitions.page`: رفتن به عمق مثلِ iOS — صفحهٔ تازه تمام‌عرض با فنر از
+ *    **لبهٔ پایان** (راست‌به‌چپ: از چپ) روی صفحهٔ پیشین می‌آید و پیشین ۳۰٪ به سمتِ
+ *    آغاز می‌رود و کم‌نور می‌شود؛ برگشت درست برعکس. تبِ تازه (نوارِ پایین): محو و
+ *    کمی بزرگ‌شدن (fade-through). باقیِ حرکت‌های «مثلِ اپل» در `V3MotionFx.kt`.
  *  • `V3ContainerTransform`: کارتِ فهرست تا صفحهٔ جزئیات بزرگ می‌شود و برمی‌گردد.
  *  • `rememberV3Stagger` + `Modifier.v3Stagger`: ورودِ پلکانیِ ردیف‌ها فقط بارِ اول.
  *  • `Modifier.v3Pressable`: کوچک‌شدنِ فنری + لرزشِ اختیاری + زدن.
@@ -55,6 +55,9 @@ import kotlinx.coroutines.delay
  *  با «کاهشِ حرکت» (`Motion.enabled = false`) همه بی‌درنگ‌اند.
  */
 object V3Transitions {
+  /** کم‌نوریِ صفحهٔ پیشین زیرِ صفحهٔ تازه */
+  private const val DIM = 0.72f
+
   /** جهتِ «پایان» در راست‌به‌چپ منفی است (چپ) */
   private fun endSign(dir: LayoutDirection) = if (dir == LayoutDirection.Rtl) -1 else 1
 
@@ -62,12 +65,16 @@ object V3Transitions {
     if (!Motion.enabled) return EnterTransition.None togetherWith ExitTransition.None
     val end = endSign(dir)
     return when (move) {
+      //  رفتن (iOS): صفحهٔ تازه تمام‌عرض از لبهٔ پایان (راست‌به‌چپ: چپ) روی صفحهٔ پیشین می‌آید؛
+      //  پیشین ۳۰٪ به سمتِ آغاز می‌رود و کم‌نور می‌شود
       Move.PUSH ->
-        (slideInHorizontally(MotionSpec.pageOffset) { w -> end * w / 3 } + fadeIn(tween(MotionTokens.MEDIUM, easing = MotionTokens.EmphasizedDecelerate)))
-          .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> -end * w / 8 } + fadeOut(tween(MotionTokens.SHORT, easing = MotionTokens.EmphasizedAccelerate)))
+        slideInHorizontally(MotionSpec.pageOffset) { w -> end * w }
+          .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> -end * (w * 3 / 10) } + fadeOut(tween(MotionTokens.LONG), targetAlpha = DIM))
+      //  برگشت: برعکس — صفحهٔ رفته رویِ پیشین است تا بیرون برود
       Move.POP ->
-        (slideInHorizontally(MotionSpec.pageOffset) { w -> -end * w / 8 } + fadeIn(tween(MotionTokens.MEDIUM, easing = MotionTokens.EmphasizedDecelerate)))
-          .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> end * w / 3 } + fadeOut(tween(MotionTokens.SHORT, easing = MotionTokens.EmphasizedAccelerate)))
+        (slideInHorizontally(MotionSpec.pageOffset) { w -> -end * (w * 3 / 10) } + fadeIn(tween(MotionTokens.LONG), initialAlpha = DIM))
+          .togetherWith(slideOutHorizontally(MotionSpec.pageOffset) { w -> end * w })
+          .apply { targetContentZIndex = -1f }
       Move.SWITCH, Move.NONE ->
         (fadeIn(tween(MotionTokens.MEDIUM, delayMillis = 60, easing = MotionTokens.EmphasizedDecelerate)) +
           scaleIn(tween(MotionTokens.MEDIUM, delayMillis = 60, easing = MotionTokens.EmphasizedDecelerate), initialScale = 0.98f))

@@ -24,6 +24,9 @@ object Haptics {
   /** تأییدِ یک کارِ مهم — یک ضربِ محکم */
   fun confirm(context: Context) = pattern(context, longArrayOf(0, 70))
 
+  /** خطا / رد — دو ضربِ کوتاه و پرفاصله (همراهِ لرزشِ افقیِ `v3Shake`) */
+  fun error(context: Context) = pattern(context, longArrayOf(0, 30, 90, 30))
+
   private fun pattern(context: Context, timings: LongArray) {
     runCatching {
       val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
