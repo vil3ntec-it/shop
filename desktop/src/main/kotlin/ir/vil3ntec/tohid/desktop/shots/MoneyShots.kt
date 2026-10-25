@@ -37,6 +37,21 @@ import ir.vil3ntec.tohid.ui.v3.money.TxFormSheet
 object MoneyShots : GroupShots {
   override val group = "money"
   override val shots = listOf(
+    Shot("supplier-new", content = { SupplierFormSheet(null, onClose = {}, onSave = { false }, onSaved = {}) }),
+    Shot("supplier-pay", content = { MoneyDemo.full().let { d -> SupplierPaySheet(d.suppliers.first(), ShopStore.supplierDebt(d, MoneyDemo.SUPPLIER), {}, { false }, {}) } }),
+    Shot("purchase-form", content = { PurchaseFormScreen(MoneyDemo.full(), MoneyDemo.SUPPLIER, onBack = {}, onNewProduct = {}, onSave = { false }) }),
+    Shot("purchase-form-empty-catalog", content = { PurchaseFormScreen(ShopData(), null, onBack = {}, onNewProduct = {}, onSave = { false }) }),
+    Shot("expenses", content = { ExpensesShot(MoneyDemo.full()) }),
+    Shot("expenses-category", content = { ExpensesShot(MoneyDemo.full(), category = "برق") }),
+    Shot("expenses-empty", content = { ExpensesShot(ShopData()) }),
+    Shot("expenses-month", content = { ExpenseMonthSheet(MoneyDemo.full(), todayIso().take(7), onPick = {}, onDismiss = {}) }),
+    Shot("expenses-breakdown", content = { ExpenseBreakdownSheet(MoneyDemo.full(), todayIso().take(7), "برق", onPick = {}, onDismiss = {}) }),
+    Shot("expense-new", content = { ExpenseFormSheet(null, MoneyDemo.full().expenseCategories, {}, { false }, {}, null) }),
+    Shot("expense-edit", content = { MoneyDemo.full().let { d -> ExpenseFormSheet(d.expenses.first(), d.expenseCategories, {}, { false }, {}, onDelete = {}) } }),
+    Shot("route-debtors", route = "debtors"),
+    Shot("route-expenses", route = "expenses"),
+    Shot("route-purchasing", route = "purchasing"),
+    Shot("route-receipts", route = "receipts"),
     Shot("debtors", content = { DebtorsShot(MoneyDemo.full()) }),
     Shot("debtors-60", content = { DebtorsShot(MoneyDemo.many()) }),
     Shot("debtors-empty", content = { DebtorsShot(ShopData()) }),
@@ -57,21 +72,6 @@ object MoneyShots : GroupShots {
     Shot("suppliers", content = { SuppliersScreen(MoneyDemo.full(), noSuppliers) }),
     Shot("suppliers-empty", content = { SuppliersScreen(ShopData(), noSuppliers) }),
     Shot("supplier-ledger", content = { SupplierLedgerScreen(MoneyDemo.SUPPLIER, MoneyDemo.full(), noSupplier) }),
-    Shot("supplier-new", content = { SupplierFormSheet(null, onClose = {}, onSave = { false }, onSaved = {}) }),
-    Shot("supplier-pay", content = { MoneyDemo.full().let { d -> SupplierPaySheet(d.suppliers.first(), ShopStore.supplierDebt(d, MoneyDemo.SUPPLIER), {}, { false }, {}) } }),
-    Shot("purchase-form", content = { PurchaseFormScreen(MoneyDemo.full(), MoneyDemo.SUPPLIER, onBack = {}, onNewProduct = {}, onSave = { false }) }),
-    Shot("purchase-form-empty-catalog", content = { PurchaseFormScreen(ShopData(), null, onBack = {}, onNewProduct = {}, onSave = { false }) }),
-    Shot("expenses", content = { ExpensesShot(MoneyDemo.full()) }),
-    Shot("expenses-category", content = { ExpensesShot(MoneyDemo.full(), category = "برق") }),
-    Shot("expenses-empty", content = { ExpensesShot(ShopData()) }),
-    Shot("expenses-month", content = { ExpenseMonthSheet(MoneyDemo.full(), todayIso().take(7), onPick = {}, onDismiss = {}) }),
-    Shot("expenses-breakdown", content = { ExpenseBreakdownSheet(MoneyDemo.full(), todayIso().take(7), "برق", onPick = {}, onDismiss = {}) }),
-    Shot("expense-new", content = { ExpenseFormSheet(null, MoneyDemo.full().expenseCategories, {}, { false }, {}, null) }),
-    Shot("expense-edit", content = { MoneyDemo.full().let { d -> ExpenseFormSheet(d.expenses.first(), d.expenseCategories, {}, { false }, {}, onDelete = {}) } }),
-    Shot("route-debtors", route = "debtors"),
-    Shot("route-expenses", route = "expenses"),
-    Shot("route-purchasing", route = "purchasing"),
-    Shot("route-receipts", route = "receipts"),
   )
 }
 
