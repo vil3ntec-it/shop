@@ -63,6 +63,9 @@ import ir.vil3ntec.tohid.ui.theme.softCard
 import ir.vil3ntec.tohid.ui.theme.tabular
 import ir.vil3ntec.tohid.ui.theme.zone
 import ir.vil3ntec.tohid.ui.theme.Shape as ShopShape
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /*
  *  ناحیهٔ «سبد خرید» (VISUAL-DIRECTION «نسخهٔ ۲»، سمتِ چپ در RTL).
@@ -93,10 +96,10 @@ fun OrderPanel(
     Row(verticalAlignment = Alignment.CenterVertically) {
       Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = c.iconActive, modifier = Modifier.size(22.dp))
       Spacer(Modifier.width(8.dp))
-      Text("سبد خرید", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text)
+      Text(StrSale.cart, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text)
       Spacer(Modifier.width(8.dp))
       Text(
-        "$itemCount قلم",
+        StrSale.linesCount(itemCount),
         Modifier.clip(ShopShape.chip).background(c.surface).padding(horizontal = 10.dp, vertical = 2.dp),
         style = MaterialTheme.typography.labelMedium.tabular(), color = c.primaryDark, fontWeight = FontWeight.SemiBold,
       )
@@ -146,7 +149,7 @@ fun CustomerRow(
       .heightIn(min = target + 4.dp)
       .clip(ShopShape.chip)
       .background(c.surface)
-      .clickable(onClickLabel = "انتخابِ مشتری", onClick = onPick)
+      .clickable(onClickLabel = StrPos.pickCustomer, onClick = onPick)
       .padding(start = 6.dp, end = 6.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
@@ -155,7 +158,7 @@ fun CustomerRow(
     }
     Spacer(Modifier.width(8.dp))
     Text(
-      name ?: "مشتریِ گذری",
+      name ?: Str.walkIn,
       Modifier.weight(1f),
       style = MaterialTheme.typography.bodyMedium,
       fontWeight = if (name != null) FontWeight.SemiBold else FontWeight.Medium,
@@ -166,7 +169,7 @@ fun CustomerRow(
     if (name != null) {
       Spacer(Modifier.width(4.dp))
       Icon(
-        Icons.Filled.Close, contentDescription = "برداشتنِ مشتری", tint = c.muted,
+        Icons.Filled.Close, contentDescription = StrPos.removeCustomer, tint = c.muted,
         modifier = Modifier.size(28.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onRemove).padding(5.dp),
       )
     } else Spacer(Modifier.width(6.dp))
@@ -213,10 +216,10 @@ fun OrderLines(
         Icon(Icons.Filled.ShoppingBasket, contentDescription = null, tint = c.primaryDark, modifier = Modifier.size(26.dp))
       }
       Spacer(Modifier.height(10.dp))
-      Text("سبد خالی است", style = MaterialTheme.typography.titleSmall, color = c.text)
+      Text(Str.cartEmpty, style = MaterialTheme.typography.titleSmall, color = c.text)
       Spacer(Modifier.height(4.dp))
       Text(
-        "بارکد را بخوانید، نام را بنویسید و Enter بزنید، یا روی کارتِ کالا بزنید.",
+        StrPos.scanHintCard,
         style = MaterialTheme.typography.bodySmall, color = c.muted, textAlign = TextAlign.Center,
       )
     }
@@ -231,7 +234,7 @@ fun OrderLines(
           .clip(ShopShape.button)
           .background(if (on) c.primaryTint else Color.Transparent)
           .semantics { this.selected = on }
-          .clickable(onClickLabel = "انتخابِ ردیف") { onSelect(line.id) }
+          .clickable(onClickLabel = StrSale.selectRow) { onSelect(line.id) }
           .padding(horizontal = 6.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
@@ -242,7 +245,7 @@ fun OrderLines(
           Row(
             Modifier
               .clip(ShopShape.chip)
-              .clickable(onClickLabel = "ویرایشِ تعداد و قیمت") { onEdit(line.id) }
+              .clickable(onClickLabel = StrSale.editQtyPrice) { onEdit(line.id) }
               .semantics { role = Role.Button },
             verticalAlignment = Alignment.CenterVertically,
           ) {
@@ -300,7 +303,7 @@ fun PaymentSummary(
     Box(Modifier.fillMaxWidth().height(1.dp).background(c.border))
     Spacer(Modifier.height(8.dp))
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-      Text("مبلغِ قابلِ پرداخت", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = c.text)
+      Text(StrSale.payable, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, color = c.text)
       Text("${money(payable)} ؋", style = MaterialTheme.typography.headlineMedium.tabular(), fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
     }
   }
@@ -337,7 +340,7 @@ fun MiniNumberField(label: String, value: String, onValue: (String) -> Unit, isE
       Text(suffix, style = MaterialTheme.typography.labelMedium, color = c.muted)
     }
   }
-  if (isError) Text("عدد درست نیست", Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, color = c.danger, textAlign = TextAlign.End)
+  if (isError) Text(StrSale.badNumberShort, Modifier.fillMaxWidth(), style = MaterialTheme.typography.labelSmall, color = c.danger, textAlign = TextAlign.End)
 }
 
 /** روشِ پرداخت — کنترلِ قطعه‌ای، فقط `PosPayments.configured()` (روش‌هایی که موتور ثبت می‌کند) */
@@ -395,7 +398,7 @@ fun OrderActions(
     ),
     modifier = Modifier.fillMaxWidth().height(54.dp),
   ) {
-    Text(if (posting) "در حالِ ثبت…" else "ثبتِ فروش", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+    Text(if (posting) StrSale.posting else StrPos.recordSaleBtn, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
     if (!posting) {
       Spacer(Modifier.width(10.dp))
       Text(postHint, style = MaterialTheme.typography.labelMedium, maxLines = 1)
@@ -407,7 +410,7 @@ fun OrderActions(
       val fg = if (canPrint) Shop.colors.primaryDark else Shop.colors.muted2
       Icon(Icons.Filled.Print, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
       Spacer(Modifier.width(6.dp))
-      Text("چاپِ فاکتورِ آخر", style = MaterialTheme.typography.labelLarge, color = fg)
+      Text(StrPos.printLastInvoice, style = MaterialTheme.typography.labelLarge, color = fg)
       Spacer(Modifier.width(6.dp))
       PosKeyHint(printHint)
     }

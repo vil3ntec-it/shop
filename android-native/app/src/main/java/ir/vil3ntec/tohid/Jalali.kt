@@ -149,7 +149,21 @@ fun todayIso(): String {
  *  عوض‌شدنِ کلید برچسب‌ها هم بی بازکردنِ دوباره عوض می‌شوند.
  */
 val JALALI_MONTHS: List<String>
-  get() = LocaleText.monthNames(LocaleChoice.months)
+  get() = ir.vil3ntec.tohid.core.i18n.I18n.solarMonths(LocaleChoice.lang, LocaleChoice.months)
+
+/**
+ *  تاریخ برای **نمایش**، به زبان و تقویمِ انتخاب‌شده: فارسی و پشتو (تقویمِ
+ *  خودکار) دقیقاً همان `formatDate`؛ انگلیسی `2026-10-20`. رقمِ ASCII است و
+ *  رقمِ فارسی را فونت می‌کشد. ⛔ برای CSV، یادداشتِ ذخیره‌شده و کادرِ ویرایش
+ *  همان `formatDate` بماند — داده نباید با زبانِ صفحه عوض شود.
+ */
+fun displayDate(iso: String): String {
+  val lang = LocaleChoice.lang
+  val calendar = LocaleChoice.calendar
+  return if (ir.vil3ntec.tohid.core.i18n.I18n.gregorian(lang, calendar))
+    ir.vil3ntec.tohid.core.i18n.I18n.dateNumeric(iso, lang, calendar)
+  else formatDate(iso)
+}
 
 /**
  *  برچسبِ یک ماه: از `2026-09` به «سنبله ۱۴۰۵».
