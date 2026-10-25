@@ -109,8 +109,12 @@ object Transactions {
     return (sales + bought).sortedByDescending { it.at }
   }
 
-  /** چند تراکنشِ تازه برای خانه */
-  fun recent(d: ShopData, n: Int = 5, purchases: Boolean = true): List<Tx> = list(d, purchases = purchases).take(n)
+  /** «امروز» ِ خانه (HOME-V2 §۲٫۴): آخرین `n` تراکنشِ همین روز، تازه‌ترین بالا */
+  fun today(d: ShopData, today: String, n: Int = TODAY_ROWS, purchases: Boolean = true): List<Tx> =
+    list(d, purchases = purchases).asSequence().filter { it.date == today }.take(n).toList()
+
+  /** چند ردیف در «امروز» ِ خانه */
+  const val TODAY_ROWS = 5
 
   /** اقلامِ یک تراکنش — فروش: اقلامِ فاکتور با قیمتِ همان لحظه؛ خرید: ردیف‌های فاکتورِ خرید */
   fun lines(d: ShopData, tx: Tx): List<Line> {
