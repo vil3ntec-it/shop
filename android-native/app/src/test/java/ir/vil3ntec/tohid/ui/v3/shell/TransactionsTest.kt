@@ -69,6 +69,13 @@ class TransactionsTest {
   @Test
   fun `بی دیدنِ عددهای مالی خریدی نمی‌آید`() {
     assertTrue(Transactions.list(d, purchases = false).none { it.kind == Transactions.Kind.PURCHASE })
-    assertEquals(3, Transactions.recent(d, n = 3).size)
+  }
+
+  @Test
+  fun `امروز فقط تراکنش‌های همین روز، حداکثر n تا`() {
+    assertEquals(listOf("p:u1", "s:a"), Transactions.today(d, "2026-10-20").map { it.key })
+    assertEquals(listOf("s:a"), Transactions.today(d, "2026-10-20", purchases = false).map { it.key })
+    assertEquals(listOf("p:u1"), Transactions.today(d, "2026-10-20", n = 1).map { it.key })
+    assertTrue(Transactions.today(d, "2026-10-25").isEmpty())
   }
 }
