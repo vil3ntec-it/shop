@@ -81,7 +81,9 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
  */
 const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
 
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopStaffGuard, shopNewerFields, shopSafeGuard, async (req, res, next) => {
+//  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
+//  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,

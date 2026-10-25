@@ -12,9 +12,9 @@
  *   • push/pull/snapshot با همان بدنه و سرآیندهای `SyncV1Client.kt` و `HttpEngine.kt`
  *     (`X-App` · `X-Device` · `X-App-Version` · `X-Request-Id`)؛ ترتیبِ کار همان
  *     `SyncV1Engine.runOnce`/`firstSync`/`SyncCommit.absorb`.
- *   • کارهای دکان (کالا، ورودِ انبار، فروش، قرض، صندوق، مرجوعی) سطر به سطر از
- *     `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt` و `CashShift.kt` برگردانده
- *     شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
+ *   • کارهای دکان (کالا، ورودِ انبار، فروش، قرض، صندوق، مرجوعی، فروشِ تحویلِ سفارش) سطر به
+ *     سطر از `WarehouseEngine.kt`، `SalesEngine.kt`، `DebtorEngine.kt`، `CashShift.kt` و
+ *     `OrderFulfillment.kt` برگردانده شده‌اند (نامِ تابعِ کاتلین کنارِ هر کدام).
  *   • «حالتِ هواپیما»: `offline = true` ⇒ هیچ درخواستی بیرون نمی‌رود (همان `Backend.isOnline`).
  */
 import { createRequire } from 'node:module';
@@ -131,9 +131,11 @@ function nestedModel(type) {
  * `encodeToJsonElement` (با `encodeDefaults`) می‌بیند: کلیدِ ناشناختهٔ مدل می‌افتد، پیش‌فرض‌ها
  * پر می‌شوند، `@EncodeDefault(NEVER)` با مقدارِ پیش‌فرض نوشته نمی‌شود، `@JsonNames` خوانده می‌شود.
  */
-export function project(cls, src) {
+export function project(cls, src, keep = null) {
   const out = {};
   for (const f of MODELS[cls]) {
+    //  ساختِ قدیمی‌تر فیلدِ تازه‌ترِ مدل را ندارد ([oldModelOf])
+    if (keep && !keep(f.key)) continue;
     let v = src[f.key];
     if (v === undefined) for (const a of f.aliases || []) if (src[a] !== undefined) { v = src[a]; break; }
     if (v === undefined) v = f.def;
@@ -150,14 +152,31 @@ export function project(cls, src) {
 export const COLLECTION_MODEL = Object.fromEntries((MODELS.ShopData || [])
   .map((f) => [f.key, (/^List<(\w+)>$/.exec(f.type) || [])[1]]).filter(([, c]) => c && MODELS[c]));
 
-/** همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند */
-export function projectLedger(tree) {
+/**
+ * همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند. [keepOf]: مدلِ ساختی
+ * قدیمی‌تر از `Models.kt` ِ امروز (مجموعه ⇒ پالایهٔ کلید، یا null یعنی همان مدلِ امروز).
+ */
+export function projectLedger(tree, keepOf = null) {
   const out = { ...tree };
   for (const c of core.COLLECTIONS) {
     if (!Array.isArray(tree[c]) || !COLLECTION_MODEL[c]) continue;
-    out[c] = tree[c].map((r) => project(COLLECTION_MODEL[c], r));
+    const keep = keepOf ? keepOf(c) : null;
+    out[c] = tree[c].map((r) => project(COLLECTION_MODEL[c], r, keep));
   }
   return out;
+}
+
+/** فهرستِ منجمدِ تورِ سرور: مدلِ دفترِ ساخت‌های پیش از A00، هر فیلد با کفِ نسخه‌اش */
+const newerFields = require(path.join(ROOT, 'server', 'src', 'lib', 'newer-fields.js'));
+
+/**
+ * مدلِ دفترِ ساختِ نصب‌شدهٔ پیش از A00 با شمارهٔ [version]: فقط فیلدهایی که آن ساخت می‌شناخت
+ * (`newer-fields.knows`) — نه `Models.kt` ِ امروز، که فیلدهای پس از A00 (`orderId`، `payments`، …)
+ * را هم دارد و ساختِ قدیمی را «داناتر» از آن‌چه بود نشان می‌داد.
+ */
+function oldModelOf(version) {
+  const client = newerFields.clientOf(version);
+  return (table) => (newerFields.PRE_A00[table] ? (key) => newerFields.knows(client, table, key) : null);
 }
 
 /*
@@ -191,7 +210,7 @@ export const KOTLIN = {
 };
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
-export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
+export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false, frozenModel: true });
 /** وب: دفترِ خام، هیچ مدلی در کار نیست */
 const NO_MODEL = Object.freeze({ applyRemoteShaped: false, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false });
 
@@ -247,6 +266,8 @@ export class NativeDevice {
     this.appVersion = appVersion;
     this.kotlin = raw ? NO_MODEL : kotlin;
     this.raw = raw;
+    //  مدلِ دفترِ همین ساخت: امروز ⇒ `Models.kt`؛ ساختِ پیش از A00 ⇒ فهرستِ منجمدِ همان نسخه
+    this.keepOf = this.kotlin.frozenModel ? oldModelOf(appVersion) : null;
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
@@ -351,7 +372,7 @@ export class NativeDevice {
   save(next) {
     //  A00: تفاضل به زبانِ مدل (`modelView`) — برای ردیفی که خام برابر است همان نتیجه را دارد
     const k = this.kotlin;
-    const base = k.diffInModelTerms ? projectLedger(this.shadow) : this.shadow;
+    const base = k.diffInModelTerms ? projectLedger(this.shadow, this.keepOf) : this.shadow;
     const ops = dropUnknownRemovals(core.diff(base, next).ops, k);
     if (ops.length) this.queue.push(...ops);
     this.shadow = core.shadowOf(next);
@@ -404,7 +425,7 @@ export class NativeDevice {
   /** `SyncCommit.absorb`: دفتر و سایه هر دو با همان opها جلو می‌روند */
   absorb(ops) {
     //  `LedgerDiff.applyRemote` خروجی را از درِ مدل رد می‌کند: کلیدِ ناشناخته در دفتر و سایه نمی‌ماند
-    const shape = this.kotlin.applyRemoteShaped ? projectLedger : (x) => x;
+    const shape = this.kotlin.applyRemoteShaped ? (x) => projectLedger(x, this.keepOf) : (x) => x;
     this.ledger = shape(core.applyRemote(this.ledger, ops).data);
     this.shadow = core.shadowOf(shape(core.applyRemote(this.shadow, ops).data));
   }
@@ -418,8 +439,8 @@ export class NativeDevice {
       const next = core.fromSnapshot(r.body, this.ledger);
       //  `restoreFromServer`: دفتر = fromJson(next) (از درِ مدل)؛ سایه = `writeShadow(next)` —
       //  از A00 از درِ مدل (`modelTree`)، پیش از آن خام
-      this.ledger = this.raw ? next : projectLedger(next);
-      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next) : next);
+      this.ledger = this.raw ? next : projectLedger(next, this.keepOf);
+      this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next, this.keepOf) : next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
       return { ok: true, rows: Number(r.body.rows || 0) };
@@ -570,6 +591,153 @@ export class NativeDevice {
     d.nextInvoiceNo = invoiceNumber + 1;
     this.save(d);
     return { ok: true, saleId: id, invoiceNumber, finalTotal };
+  }
+
+  /**
+   * `OrderFulfillment.fulfill` (+ `OrdersLive.post`): تحویلِ سفارشِ آنلاین ⇒ یک فروشِ عادی در
+   * همین دفتر با شناسه‌های ثابتِ سفارش (`o-<سفارش>`، `o-<سفارش>-<قلم>`، `…-m`، `…-a`)،
+   * قیمت‌های دقیقِ سفارش، هزینهٔ ارسال به‌صورتِ قلمِ آزاد، `channel = online` و روشِ پرداختِ
+   * واقعی؛ سریِ `O` با شمارهٔ سفارش و زمانِ گذارِ تحویل (یکسان روی هر دستگاه). موجودی: پیش از
+   * گذار (`allowShortage: false`) سیاستِ صندوق؛ پس از تحویل ثبت با کمبودِ گزارش‌شده (INV-19).
+   * order: یک ردیفِ `GET /shop/orders/handover` (یا جزئیاتِ سفارش با خطِ زمانی).
+   * @returns {{ok:true, saleId:string, already?:true, short?:string[]} | {ok:false, message:string}}
+   */
+  fulfillOrder(o, { allowShortage = true } = {}) {
+    const d = clone(this.ledger);
+    const saleId = `o-${o.id}`;
+    const have = d.sales.find((s) => s.orderId === o.id || s.id === saleId || s.id === `w-${o.id}`);
+    if (have) return { ok: true, already: true, saleId: have.id };
+    if (o.isTest) return { ok: false, message: 'سفارشِ آزمایشی فروش و کسرِ موجودی ندارد' };
+    const tag = `سفارش #${o.orderNo}: `;
+    const lines = [...(o.lines || [])].sort((a, b) => a.lineNo - b.lineNo);
+    if (!lines.length) return { ok: false, message: `قلم‌های سفارش #${o.orderNo} نیامد؛ سفارش را دوباره باز کنید` };
+    //  `handedOverAt`: زمان و روزِ فاکتور = زمانِ گذارِ تحویل (نه لحظهٔ ثبت)
+    const evAt = (o.events || []).filter((e) => e.kind === 'status' && ['picked_up', 'out_for_delivery', 'delivered'].includes(e.toStatus)).map((e) => e.at);
+    const now = o.handedOverAt || (evAt.length ? Math.min(...evAt) : this.now());
+    const today = todayOf(now);
+    const byId = new Map(d.products.map((p) => [p.id, p]));
+    const plan = lines.map((l) => {
+      const p = l.productId ? byId.get(l.productId) || null : null;
+      let q = l.qtyMilli / 1000;
+      //  `SalesEngine.toStockQty`: واحدِ فروش (کارتن) ⇒ واحدِ موجودی
+      if (p && l.unit && l.unit === p.saleUnit && l.unit !== p.unit && p.unitFactor > 0) q = Math.round(q * p.unitFactor * 1000) / 1000;
+      return { itemId: `${saleId}-${l.lineNo}`, lineNo: l.lineNo, p, q, name: l.name, totalMinor: l.lineTotalMinor };
+    });
+    const need = new Map();
+    for (const x of plan) {
+      if (!x.p) continue;
+      if (!x.p.active) return { ok: false, message: `${tag}«${x.p.name}» غیرفعال است` };
+      need.set(x.p.id, (need.get(x.p.id) || 0) + x.q);
+    }
+    const short = [];
+    for (const [pid, q] of need) {
+      const available = this.stock(pid, d);
+      if (q <= available + 1e-9) continue;
+      const msg = `از «${byId.get(pid).name}» فقط ${available} مانده`;
+      //  پیش از گذار: سیاستِ صندوق؛ پس از تحویل (کالا رفته): ثبت و گزارشِ کمبود (INV-19)
+      if (!allowShortage) return { ok: false, message: tag + msg };
+      short.push(msg);
+    }
+    const fee = Number(o.deliveryFeeMinor || 0);
+    const rows = plan.map((x) => [x.itemId, x.totalMinor]);
+    if (fee > 0) rows.push([`${saleId}-fee`, fee]);
+    const finalTotal = o.totalMinor / 100;
+    let pay;
+    //  `OrderFulfillment.atCounter`: نخستین گذارِ تحویل «مشتری گرفت» ⇒ نقدِ پیشخوان (حتی سفارشِ «ارسال»)
+    const first = (o.events || []).filter((e) => e.kind === 'status' && ['picked_up', 'out_for_delivery', 'delivered'].includes(e.toStatus))
+      .sort((a, b) => a.at - b.at)[0];
+    const atCounter = first ? first.toStatus === 'picked_up' : o.status === 'picked_up';
+    if (o.paymentMethod === 'online') {
+      const paid = o.paymentStatus === 'paid';
+      pay = { method: 'online', rows: [{ method: 'online', kind: 'other', amount: o.totalMinor, status: paid ? 'confirmed' : 'pending', ...(paid ? { verification: 'provider' } : {}) }] };
+    } else if (o.fulfillment === 'delivery' && !atCounter) {
+      pay = { method: 'cod', rows: [{ method: 'cod', kind: 'cash', amount: o.totalMinor, status: 'pending', custody: 'courier' }] };
+    } else {
+      pay = { method: 'cash', rows: [{ method: 'cash', kind: 'cash', amount: o.totalMinor, status: 'confirmed' }] };
+    }
+    const digits = (s) => String(s || '').replace(/\D/g, '').slice(-9);
+    const phone = digits(o.customer && o.customer.phone);
+    const debtor = phone.length >= 7 ? d.debtors.find((x) => digits(x.phone) === phone) : null;
+    //  سریِ O و شمارهٔ همان سفارش؛ شمارندهٔ فاکتورِ دستگاه دست نمی‌خورد
+    const invoiceNumber = Number(o.orderNo);
+    const label = `O-${invoiceNumber}`;
+    const discount = Number(o.discountMinor || 0) / 100;
+    d.sales.push(row('Sale', {
+      id: saleId, invoiceNumber, total: rows.reduce((s, r) => s + r[1], 0) / 100, discountType: 'amount',
+      discountValue: discount, discount, finalTotal, paymentMethod: pay.method, debtorId: debtor ? debtor.id : null,
+      paidAmount: finalTotal, remaining: 0, status: 'completed', debtGiven: 0, debtSettled: 0, createdAt: now, date: today,
+      syncStatus: 'pending', seller: this.seller, orderId: o.id, orderNo: o.orderNo, series: 'O', payments: pay.rows, channel: 'online',
+    }));
+    for (const x of plan) {
+      const total = x.totalMinor / 100;
+      d.saleItems.push(row('SaleItem', {
+        id: x.itemId, saleId, productId: x.p ? x.p.id : '', name: x.p ? '' : (x.name || 'قلمِ سفارش'), quantity: x.q,
+        unitPrice: Math.round((total / x.q) * 100) / 100, purchasePrice: x.p ? x.p.purchasePrice : 0, totalPrice: total, returnedQty: 0,
+      }));
+    }
+    if (fee > 0) {
+      d.saleItems.push(row('SaleItem', {
+        id: `${saleId}-fee`, saleId, productId: '', name: 'هزینهٔ ارسال', quantity: 1, unitPrice: fee / 100, purchasePrice: 0,
+        totalPrice: fee / 100, returnedQty: 0,
+      }));
+    }
+    for (const x of plan) {
+      if (!x.p) continue;
+      d.stockMovements.push(row('StockMovement', {
+        id: `${x.itemId}-m`, productId: x.p.id, type: 'sale', qty: -x.q, date: today,
+        notes: `فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}`, refId: saleId, createdAt: now,
+      }));
+    }
+    d.auditLog.push(row('AuditEntry', {
+      id: `${saleId}-a`, type: 'sale', date: today, refId: saleId,
+      notes: `ثبت فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی`, createdAt: now,
+    }));
+    this.save(d);
+    return { ok: true, saleId, short };
+  }
+
+  /**
+   * `OrderFulfillment.reverse`: سفارشِ برگشته به دکان ⇒ لغوِ فروشِ `o-<سفارش>` با شناسه‌های ثابت
+   * (وضعیت، نه شمارنده ⇒ تکرار و دستگاهِ دوم بی‌اثر).
+   */
+  reverseOrder(o) {
+    const d = clone(this.ledger);
+    const saleId = `o-${o.id}`;
+    const sale = d.sales.find((s) => s.id === saleId);
+    if (!sale || sale.status === 'cancelled') return { ok: true, already: true, saleId };
+    //  `OrderFulfillment.reverseBlock`: فاکتوری که «مرجوعیِ» دستی گرفته ⇒ لغوِ خاموش نه، بررسیِ صاحب
+    if (d.saleItems.some((x) => x.saleId === saleId && x.returnedQty > 1e-9) || (d.returns || []).some((r) => r.saleId === saleId)) {
+      return { ok: false, review: true, saleId, message: `سفارش #${o.orderNo} به دکان برگشت ولی برای فاکتورش پیش‌تر «مرجوعیِ» دستی ثبت شده — لغوِ خودکار نشد` };
+    }
+    const now = o.returnedAt || this.now();
+    const today = todayOf(now);
+    const reason = 'سفارشِ اینترنتی به دکان برگشت';
+    const label = `${sale.series}-${sale.invoiceNumber}`;
+    //  همگام‌سازیِ نیمه (حرکت یا ممیزیِ لغو از دستگاهِ دیگر رسیده) ⇒ شناسهٔ تکراری ساخته نمی‌شود
+    const moved = new Set(d.stockMovements.map((m) => m.id));
+    for (const it of d.saleItems.filter((x) => x.saleId === saleId && x.productId && x.quantity - x.returnedQty > 0 && !moved.has(`${x.id}-x`))) {
+      d.stockMovements.push(row('StockMovement', {
+        id: `${it.id}-x`, productId: it.productId, type: 'sale_cancel', qty: it.quantity - it.returnedQty, date: today,
+        notes: `لغو فروش — فاکتور #${label} — ${reason}`, refId: saleId, createdAt: now,
+      }));
+    }
+    Object.assign(sale, { status: 'cancelled', cancelReason: reason });
+    if (!d.auditLog.some((a) => a.id === `${saleId}-x`)) {
+      d.auditLog.push(row('AuditEntry', {
+        id: `${saleId}-x`, type: 'cancel_sale', date: today, refId: saleId,
+        notes: `لغو فروش فاکتور #${label} — سفارشِ اینترنتی #${o.orderNo}: ${reason}`, createdAt: now,
+      }));
+    }
+    this.save(d);
+    return { ok: true, saleId };
+  }
+
+  /**
+   * `OrdersRepository.config` ِ برنامه: `caps=saleOnHandover` ⇒ سرور کفِ تحویلِ این دکان را (اگر
+   * نیست) همین لحظه می‌گذارد؛ تحویلِ پیش از آن هرگز فروش نمی‌گیرد.
+   */
+  ordersConfig() {
+    return this.api('GET', '/shop/orders/config?caps=saleOnHandover');
   }
 
   /** `DebtorEngine.addTransaction(kind = RECEIVE)` */

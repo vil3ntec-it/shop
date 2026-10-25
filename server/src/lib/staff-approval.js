@@ -739,17 +739,24 @@ async function v1Guard(req, res, next) {
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.length) return next();
-    const { validateOp } = require('./sync-v1');
+    const { validateOp, tableOf } = require('./sync-v1');
     const valid = [];
+    const rejected = new Map();
     ops.forEach((raw, i) => {
       const v = validateOp('shop', raw);
-      if (v.ok) valid.push({ i, op: v.op, need: needOfV1(v.op) });   //  نادرست را خودِ v1 رد می‌کند
+      if (v.ok) { valid.push({ i, op: v.op, need: needOfV1(v.op) }); return; }
+      //  opِ نادرستِ جدولِ زیرِ نگهبان همین‌جا رد می‌شود، نه «خودِ v1 ردش می‌کند»: هر لایهٔ بعدی که
+      //  درستش کند (مثلِ پالایشِ null ِ قدیمی) آن را بی داوری به v1 می‌رساند
+      const r = isPlainObject(raw) ? raw : {};
+      if (LINKABLE.has(tableOf('shop', r.table ?? r.table_name ?? r.tableName))) {
+        rejected.set(i, { op_id: v.op_id, status: 'rejected', reason: v.reason });
+      }
     });
     const hasNeed = valid.some((x) => x.need);
-    if (!hasNeed && !valid.some((x) => LINKABLE.has(x.op.table))) return next();
+    if (!hasNeed && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
-    if (!hasNeed && !held0.length) return next();
+    if (!hasNeed && !held0.length) return finish();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
     //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه همراه، نه صندوق.
     const seen = new Set((await many(
@@ -767,7 +774,6 @@ async function v1Guard(req, res, next) {
       heads.get(t).add(h);
     }
 
-    const rejected = new Map();
     const reject = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
     const parents = [];
 
@@ -868,8 +874,13 @@ async function v1Guard(req, res, next) {
       await boxV1(ctx, op, deviceId, { box: out.box, detail });
     }
 
-    rejectOps(req, res, ops, rejected);
-    next();
+    return finish();
+
+    /** ردشده‌ها از دسته بیرون و پاسخشان سرِ جای خودشان (‎lib/v1-reject.js‎)؛ بی ردشده همان دسته به v1 */
+    function finish() {
+      rejectOps(req, res, ops, rejected);
+      return next();
+    }
   } catch (err) { next(err); }
 }
 

@@ -56,6 +56,16 @@ class SyncGuardTest {
   }
 
   @Test
+  fun `دفترِ رمزدارِ خوانده‌نشده — خروج تا ابد بسته نیست، ولی فقط با دو تأیید و پیامِ «کنار می‌ماند»`() {
+    assertFalse(LogoutGuard.canForceUnreadable(unreadable = false, confirmations = 2))
+    assertFalse(LogoutGuard.canForceUnreadable(unreadable = true, confirmations = 1))
+    assertTrue(LogoutGuard.canForceUnreadable(unreadable = true, confirmations = 2))
+    val m = LogoutGuard.forceUnreadableMessage(3)
+    assertTrue(m.contains("3 تغییر"))
+    assertTrue(m.contains("پاک نمی‌شوند"))
+  }
+
+  @Test
   fun `پیامِ قفل شمار را می‌گوید و راهِ همگام‌سازی را نشان می‌دهد`() {
     val on = LogoutGuard.message(7, online = true)
     assertTrue(on.startsWith("7 تغییر"))

@@ -264,7 +264,7 @@ fun AppRoot(
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
-  OrdersLive.Host()
+  OrdersLive.Host(store)
   //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
   PromoLive.Host()
 
@@ -375,6 +375,28 @@ fun AppRoot(
         "ذخیره نشد — دفتر روی حافظهٔ دستگاه نوشته نشد ($reason). دوباره امتحان کنید؛ اگر تکرار شد جای خالیِ حافظه را ببینید.",
         duration = SnackbarDuration.Long,
       )
+    }
+  }
+
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛ پنجره با
+  //  «بازسازی از سرور» و راهِ «تنظیمات ← امنیت» (بازبینیِ #331). با دفترِ ساده هرگز پیش نمی‌آید.
+  val unreadable by store.unreadable.collectAsState()
+  var unreadableOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(unreadable) { unreadableOpen = unreadable != null }
+  //  پشتِ قفلِ برنامه نه: پنجره رویِ صفحهٔ قفل باز نمی‌شود
+  if (unreadableOpen && unreadable != null && !(lockStore.enabled && !unlocked)) {
+    ir.vil3ntec.tohid.ui.screens.UnreadableLedgerDialog(
+      store = store,
+      onOpenSecurity = { unreadableOpen = false; AppNav.go("settings") },
+      onDismiss = { unreadableOpen = false },
+      toast = { msg -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
+    )
+  }
+  //  نتیجهٔ بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود (`ShopStore.notice`)
+  LaunchedEffect(store) {
+    store.notice.collect { msg ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
     }
   }
 
@@ -755,8 +777,10 @@ fun AppRoot(
                 "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
                 "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
                 "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
+                ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
                 "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
                 "کد شاگرد" to androidx.compose.material.icons.Icons.Filled.Key,
@@ -846,7 +870,7 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
-        "orders" -> OrdersScreen(snackbar) { sub = null }
+        "orders" -> OrdersScreen(store, snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
         //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
         "promos" ->
