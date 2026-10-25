@@ -3,6 +3,8 @@
  * سربرگِ فاکتورِ دکان — `/api/shop/receipt-profile` (فاکتورِ نسخهٔ ۲). منطق در
  * `lib/receipt-profile.js`.
  *
+ *   GET    /config       هر عضو ⇒ { enabled } — پرچمِ `shop.receipt_v2` (live_config، پیش‌فرض خاموش):
+ *                         تا روشن نشده برنامه همان فاکتورِ پیشین را می‌زند، توکن نمی‌سازد و سربرگ نمی‌پرسد
  *   GET    /             هر عضو ⇒ { profile, rev } (دستگاه برای چاپِ بی اینترنت نگه می‌دارد)
  *   PUT    /             `settings.write` ⇒ نام، نشانی، تلفن، متنِ پایین، qr، logoMode، digits، symbol
  *   GET    /logo         هر عضو ⇒ بایت‌های لوگو (ETag = hash)
@@ -30,6 +32,10 @@ const rawLogo = express.raw({ type: () => true, limit: profiles.LOGO_MAX_BYTES +
 
 const logged = (req, action, detail) => audit.log({
   shopId: req.shopId, userId: req.user.id, action, targetType: 'shop', targetId: req.shopId, detail, ip: clientIp(req),
+});
+
+router.get('/config', async (req, res) => {
+  res.json({ enabled: await profiles.enabledFor(req.shopId) });
 });
 
 router.get('/', async (req, res) => {

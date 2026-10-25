@@ -164,7 +164,7 @@ function mergeResults(fl, results) {
   return merged.filter(Boolean).concat(rest);
 }
 
-/** میان‌افزارِ `POST /sync/v1/push` — فقط حسابِ دکان، پس از `v1Guard` (همان الگو) */
+/** میان‌افزارِ `POST /sync/v1/push` — فقط حسابِ دکان، **پیش از** `v1Guard` (نگهبان دستهٔ پالایش‌شده را می‌سنجد) */
 function v1NewerFields(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') return next();

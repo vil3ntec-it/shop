@@ -35,6 +35,9 @@ import androidx.compose.material.icons.filled.ShoppingBasket
 import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.WorkspacePremium
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  بیشتر — وضعیت برنامه، به‌روزرسانی، و راهِ ورود به بخش‌هایی که در
@@ -64,82 +67,82 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)
   ) {
     Spacer(Modifier.height(16.dp))
-    SectionTitle("بخش‌های دیگر")
+    SectionTitle(StrNav.otherSections)
     Panel {
       // قرض‌داران و محصولات از اینجا رفتند به نوارِ پایین، و انبار و
       // گزارش جایشان آمدند
       //  «سفارش‌ها» فقط وقتی سرور برای این دکان روشن گفته (پیش‌فرض خاموش)
       if (ir.vil3ntec.tohid.ui.OrdersLive.enabled) MoreCard(
-        title = "سفارش‌ها" + ir.vil3ntec.tohid.ui.OrdersLive.newCount.let { if (it > 0) " ($it تازه)" else "" },
+        title = Str.orders + ir.vil3ntec.tohid.ui.OrdersLive.newCount.let { if (it > 0) " " + StrNav.ordersNew(it) else "" },
         icon = Icons.Filled.ShoppingBasket,
         tint = Shop.colors.primary,
-        subtitle = "صفِ سفارش‌های آنلاین، تلفنی، تلگرام و واتس‌اپ",
+        subtitle = StrNav.ordersSub,
         onClick = { onOpen("orders") },
       )
       MoreCard(
-        title = "مرکزِ مدیریت",
+        title = Str.adminCenter,
         icon = Icons.Filled.AdminPanelSettings,
         tint = Shop.colors.primary,
-        subtitle = "همه‌چیز یک‌جا: فروش، صندوق، هشدارها، دستگاه‌ها و کارمندان",
+        subtitle = StrNav.adminSub,
         onClick = { onOpen("admin") },
       )
       //  ویترین (فاز ۴): فقط وقتی سرور روشنش کرده و کاربر صاحب/مدیر است
       if (StorefrontGate.visible) {
         MoreCard(
-          title = "ویترینِ اینترنتی",
+          title = Str.storefront,
           icon = Icons.Filled.Storefront,
           tint = Shop.colors.primary,
-          subtitle = "نشانی، ساعتِ کاری، کالاهای آنلاین و وضعیتی که مشتری می‌بیند",
+          subtitle = StrNav.storefrontSub,
           onClick = { onOpen("storefront") },
         )
       }
       MoreCard(
-        title = "دستگاه‌های جانبی",
+        title = Str.devices,
         icon = Icons.Filled.Devices,
         tint = Shop.colors.accent,
-        subtitle = "چاپگرها، بارکدخوان‌ها، گوشی به‌عنوانِ بارکدخوانِ کامپیوتر",
+        subtitle = StrNav.devicesSub,
         onClick = { onOpen("devices") },
       )
       MoreCard(
-        title = "انبار",
+        title = Str.warehouse,
         icon = Icons.Filled.Inventory2,
         tint = Shop.colors.accent,
-        subtitle = "ورود کالا، موجودی و حرکت هر جنس",
+        subtitle = StrNav.warehouseSub,
         onClick = { onOpen("warehouse") },
       )
       MoreCard(
-        title = "مصارف",
+        title = Str.expenses,
         icon = Icons.Filled.Payments,
         tint = Shop.colors.danger,
-        subtitle = "خرج‌های دکان به تفکیک دسته",
+        subtitle = StrNav.expensesSub,
         onClick = { onOpen("expenses") },
       )
       MoreCard(
-        title = "رسیدها",
+        title = Str.receipts,
         icon = Icons.Filled.ReceiptLong,
         tint = Shop.colors.success,
-        subtitle = "دریافتی‌های هر قرض‌دار به تفکیک ماه و سال",
+        subtitle = StrNav.receiptsSub,
         onClick = { onOpen("receipts") },
       )
       MoreCard(
-        title = "تاریخچه فروش",
+        title = Str.salesHistory,
         icon = Icons.Filled.History,
         tint = Shop.colors.primary,
-        subtitle = "فاکتورهای ثبت‌شده، مرجوعی و لغو فروش",
+        subtitle = StrNav.salesHistorySub,
         onClick = { onOpen("sales") },
       )
       MoreCard(
-        title = "خرید و تأمین‌کننده",
+        title = Str.purchasing,
         icon = Icons.Filled.LocalShipping,
         tint = Shop.colors.accent,
-        subtitle = "حساب تأمین‌کننده‌ها و بدهی به آن‌ها",
+        subtitle = StrNav.purchasingSub,
         onClick = { onOpen("purchasing") },
       )
       MoreCard(
-        title = "گزارشات",
+        title = Str.reportsAlt,
         icon = Icons.Filled.BarChart,
         tint = Shop.colors.success,
-        subtitle = "سود، فروش و مصارف در بازهٔ دلخواه",
+        subtitle = StrNav.reportsSub,
         onClick = { onOpen("reports") },
       )
       /*
@@ -150,25 +153,25 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        *  می‌داد که سرور برای شاگرد بسته بود.
        */
       if (canManage) MoreCard(
-        title = "سابقه عملیات",
+        title = Str.auditLog,
         icon = Icons.Filled.ManageSearch,
         tint = Shop.colors.muted,
-        subtitle = "هر کاری که در برنامه انجام شده",
+        subtitle = StrNav.auditSub,
         onClick = { onOpen("audit") },
       )
       if (canManage) MoreCard(
-        title = "کارمندان دکان",
+        title = Str.staff,
         icon = Icons.Filled.Groups,
         tint = Shop.colors.accent,
-        subtitle = "کد پیوستن بسازید و دسترسی شاگردها را ببندید",
+        subtitle = StrNav.staffSub,
         onClick = { onOpen("team") },
       )
       //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان پیش‌فرض خاموش است
       if (canManage) MoreCard(
-        title = "تخفیف‌ها",
+        title = StrShell.promos,
         icon = Icons.Filled.LocalOffer,
         tint = Shop.colors.success,
-        subtitle = "تخفیفِ خودکار، بخر X بگیر Y، بسته، ساعتِ خوش و کدِ تخفیف",
+        subtitle = StrShell.promosSub,
         onClick = { onOpen("promos") },
       )
       /*
@@ -185,10 +188,10 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        *  پرداخت‌ها و پیام‌های مدیر را.
        */
       MoreCard(
-        title = "اشتراکِ من",
+        title = Str.mySubscription,
         icon = Icons.Filled.WorkspacePremium,
         tint = Shop.colors.warning,
-        subtitle = "روزهای مانده، دستگاه‌ها، پرداخت‌ها و پیام‌های مدیر",
+        subtitle = StrNav.mySubscriptionSub,
         onClick = { onOpen("myplan") },
       )
       /*
@@ -197,24 +200,24 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
        */
       //  میزِ تحویل (C01): فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
       if (DeliveryGate.visible) MoreCard(
-        title = "میزِ تحویل",
+        title = StrNav.deliveryDesk,
         icon = Icons.Filled.DeliveryDining,
         tint = Shop.colors.primary,
-        subtitle = "سپردن به پیک، نقدِ پیک‌ها و تسویه، دریافتِ حضوری با کد",
+        subtitle = StrNav.deliverySub,
         onClick = { onOpen("delivery") },
       )
       if (ir.vil3ntec.tohid.data.ShopChatSync.config.value?.enabled == true) MoreCard(
-        title = "گفت‌وگو با مشتری",
+        title = Str.customerChat,
         icon = Icons.Filled.Forum,
         tint = Shop.colors.accent,
-        subtitle = "پیام‌های مشتریانِ ویترین دربارهٔ سفارش‌ها",
+        subtitle = StrNav.customerChatSub,
         onClick = { onOpen("chat") },
       )
       MoreCard(
-        title = "پشتیبانی",
+        title = Str.support,
         icon = Icons.AutoMirrored.Filled.Chat,
         tint = Shop.colors.primary,
-        subtitle = "سؤال یا مشکلتان را بنویسید — همین‌جا جواب می‌گیرید",
+        subtitle = StrNav.supportSub,
         onClick = { onOpen("support") },
       )
       /*
@@ -233,7 +236,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
     if (BuildConfig.STORE != "bazaar") {
     Spacer(Modifier.height(20.dp))
-    SectionTitle("به‌روزرسانی برنامه")
+    SectionTitle(StrNav.appUpdate)
     Panel { UpdateControls(repo) }
     }
 
@@ -246,14 +249,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
      *  رسیدن به «انبار» باید از روی شش عدد رد می‌شد.
      */
     Spacer(Modifier.height(20.dp))
-    SectionTitle("وضعیت")
+    SectionTitle(StrNav.status)
     Panel {
-      InfoRow("نسخه", BuildConfig.VERSION_NAME)
-      InfoRow("اجناس", d.products.size.fa())
-      InfoRow("فاکتورها", d.sales.size.fa())
-      InfoRow("قرض‌داران", d.debtors.size.fa())
-      InfoRow("مصارف", d.expenses.size.fa())
-      InfoRow("تأمین‌کننده‌ها", d.suppliers.size.fa())
+      InfoRow(StrNav.versionLabel, BuildConfig.VERSION_NAME)
+      InfoRow(StrNav.goods, d.products.size.fa())
+      InfoRow(Str.invoices, d.sales.size.fa())
+      InfoRow(Str.debtors, d.debtors.size.fa())
+      InfoRow(Str.expenses, d.expenses.size.fa())
+      InfoRow(StrNav.suppliers, d.suppliers.size.fa())
     }
 
     Spacer(Modifier.height(24.dp))
@@ -286,7 +289,7 @@ internal fun UpdateControls(repo: String) {
   val needsPermission = UpdateManager.needsPermission
   Column {
       Text(
-        "نسخهٔ تازه از همین‌جا گرفته و نصب می‌شود؛ اطلاعات دکان دست‌نخورده می‌ماند.",
+        StrNav.updateNote,
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -305,12 +308,12 @@ internal fun UpdateControls(repo: String) {
           horizontalArrangement = Arrangement.SpaceBetween,
         ) {
           Text(
-            "در حال دانلود… ${progress.fa()}٪" + (UpdateManager.note?.let { " · $it" } ?: ""),
+            StrNav.downloading(progress.fa()) + (UpdateManager.note?.let { " · $it" } ?: ""),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
           Text(
-            "توقف",
+            StrNav.stop,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.danger,
             modifier = Modifier.clickable { UpdateManager.cancel() },
@@ -318,7 +321,7 @@ internal fun UpdateControls(repo: String) {
         }
         Spacer(Modifier.height(4.dp))
         Text(
-          "می‌توانید به بخش‌های دیگر بروید؛ دانلود قطع نمی‌شود.",
+          StrNav.downloadContinues,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -331,10 +334,10 @@ internal fun UpdateControls(repo: String) {
           enabled = !busy,
           onClick = { UpdateManager.check(context, repo, BuildConfig.VERSION_NAME) },
           modifier = Modifier.fillMaxWidth(),
-        ) { Text("بررسی نسخهٔ تازه") }
+        ) { Text(StrNav.checkUpdate) }
       } else {
         Text(
-          "نسخهٔ ${release.version} آماده است",
+          StrNav.versionReady(release.version),
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.success,
         )
@@ -353,7 +356,7 @@ internal fun UpdateControls(repo: String) {
           // سرِ پرسشِ نصب «نه» زده، بارِ بعد یک‌راست به نصب می‌رسد
           onClick = { UpdateManager.download(context) },
           modifier = Modifier.fillMaxWidth(),
-        ) { Text(if (ready != null) "نصب نسخهٔ ${release.version}" else "دانلود و نصب") }
+        ) { Text(if (ready != null) StrNav.installVersion(release.version) else StrNav.downloadInstall) }
 
         /*
          *  اجازهٔ نصب.
@@ -368,7 +371,7 @@ internal fun UpdateControls(repo: String) {
           Button(
             onClick = { UpdateManager.allowInstall(context) },
             modifier = Modifier.fillMaxWidth(),
-          ) { Text("باز کردنِ صفحهٔ اجازهٔ نصب") }
+          ) { Text(StrNav.openInstallPermission) }
         }
 
         // راهِ آخر، وقتی دانلودِ داخلی نمی‌گیرد
@@ -378,7 +381,7 @@ internal fun UpdateControls(repo: String) {
           modifier = Modifier.fillMaxWidth(),
         ) {
           Text(
-            "گرفتن با مرورگر",
+            StrNav.viaBrowser,
             style = MaterialTheme.typography.labelLarge,
             color = Shop.colors.muted,
           )

@@ -34,7 +34,7 @@ import ir.vil3ntec.tohid.data.AutoBackup
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.LedgerArchive
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
@@ -103,7 +103,7 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
         V3Section(StrSettings.autoTitle, footer = StrSettings.autoSnapshots) {
           autoBackups.forEachIndexed { i, snap ->
             if (i > 0) V3Divider(start = ROW_DIVIDER_START)
-            V3ListRow(formatMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = Icons.Outlined.History, tile = false, onClick = { ctrl.readSnapshot(snap) })
+            V3ListRow(displayMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = Icons.Outlined.History, tile = false, onClick = { ctrl.readSnapshot(snap) })
           }
         }
       }
@@ -168,7 +168,7 @@ private fun CloudSection(ctrl: BackupController, signedIn: Boolean) {
     cloud?.items?.take(5)?.forEach { b ->
       V3Divider(start = ROW_DIVIDER_START)
       V3ListRow(
-        formatMillis(b.createdAt),
+        displayMillis(b.createdAt),
         subtitle = StrSettings.kb((b.bytes / 1024).toInt()) + " · " + (if (b.kind == "manual") StrSettings.manual else StrSettings.auto),
         icon = Icons.Outlined.CloudDone,
         tile = false,
@@ -189,7 +189,7 @@ private fun MirrorSection(ctrl: BackupController, signedIn: Boolean) {
   V3Section(StrSettings.folderBackup, footer = StrSettings.folder(dir)) {
     V3ListRow(
       if (ctrl.mirrorBusy) StrSettings.buildingDots else StrSettings.mirrorNow,
-      subtitle = StrSettings.mirrorDesc(files.size) + (files.firstOrNull()?.let { " · " + StrSettings.lastLabel + " " + formatMillis(it.lastModified()) } ?: ""),
+      subtitle = StrSettings.mirrorDesc(files.size) + (files.firstOrNull()?.let { " · " + StrSettings.lastLabel + " " + displayMillis(it.lastModified()) } ?: ""),
       icon = Icons.Outlined.CloudUpload,
       tile = false,
       trailing = if (ctrl.mirrorBusy) ({ Spinner() }) else null,

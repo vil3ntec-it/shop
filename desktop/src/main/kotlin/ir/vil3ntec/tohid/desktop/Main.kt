@@ -20,8 +20,6 @@ import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
@@ -157,8 +155,11 @@ fun main() {
         val theme = remember {
           runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
         }
-        CompositionLocalProvider(LocalContext provides context, LocalLayoutDirection provides LayoutDirection.Rtl) {
-          TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+        //  زبان و جهت همان برنامه (ProvideLang): فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+        CompositionLocalProvider(LocalContext provides context) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+          }
         }
       }
     }

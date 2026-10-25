@@ -21,8 +21,9 @@ class DeskMenuTest {
 
   /** از متنِ AppNav.kt، نه خودِ شیء — AppNav وضعیتِ Compose دارد (همان روشِ KeyMapTest) */
   private fun shortcuts(): List<Pair<String, String>> {
-    val nav = File(ui!!, "AppNav.kt").readText().substringAfter("val SHORTCUTS = listOf(").substringBefore(")\n")
-    return Regex(""""([a-z]+)" to "([^"]+)"""").findAll(nav).map { it.groupValues[1] to it.groupValues[2] }.toList()
+    //  نامِ هر صفحه حالا از جدولِ سه‌زبانه است (`Str.dashboard`…)؛ این‌جا فقط شناسه و ترتیب مهم است
+    val nav = File(ui!!, "AppNav.kt").readText().substringAfter("val SHORTCUTS").substringAfter("listOf(").substringBefore(")\n")
+    return Regex(""""([a-z]+)" to ([^,\n]+)""").findAll(nav).map { it.groupValues[1] to it.groupValues[2] }.toList()
   }
 
   @Test

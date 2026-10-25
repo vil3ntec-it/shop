@@ -83,6 +83,15 @@ object SettingsLayout {
     ABOUT_APP to "app",
   )
 
+  /**
+   *  کلیدِ ثابتِ بخش از عنوانی که صفحه داده: کلیدِ فارسیِ خودش، یا عنوانِ ترجمه‌شده‌ای که `labelOf` ِ یکی از
+   *  کلیدهاست (پس از عوض‌شدنِ زبان)؛ وگرنه `fallback` (همان `stateKey` ِ بخش).
+   */
+  fun keyOf(title: String, fallback: String = title): String = when {
+    title in SECTION_SLUGS -> title
+    else -> SECTION_SLUGS.keys.firstOrNull { labelOf(it) == title } ?: fallback
+  }
+
   /** نامِ ردیف به زبانِ صفحه — کلید عوض نمی‌شود */
   fun labelOf(row: String): String = when (row) {
     "هشدارها" -> Str.alerts
