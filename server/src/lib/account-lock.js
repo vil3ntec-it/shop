@@ -5,32 +5,51 @@
  * (گاوصندوق: «این ردیف هست؟»، `safe-ledger.js`).
  *
  * ── دو لایه ─────────────────────────────────────────────────────────
- *   • صفِ همین فرآیند (زنجیرهٔ promise) — روی یک نمونهٔ سرور همین بس است و PGlite فقط همین را دارد؛
- *   • روی PostgreSQL، قفلِ advisoryِ نشستی با `pg_try_advisory_lock` و تلاشِ دوباره، روی اتصالی از
- *     **استخرِ کوچکِ جدا** (`db.extraPool`) — اتصالِ استخرِ اصلی هرگز گرفته نمی‌ماند، و چون صفِ
- *     فرآیند جلوتر است هر حساب در هر نمونه حداکثر یک اتصالِ قفل دارد. کلید با قفلِ تراکنشیِ v1
- *     (`sync-v1:shop:shop:<حساب>`) فرق دارد، پس چرخهٔ انتظار ساخته نمی‌شود.
+ *   • صفِ همین فرآیند (زنجیرهٔ promise) — همیشه. روی PGlite و سرورِ تک‌نمونه
+ *     (`SAFE_LOCK_SCOPE=local`، `config.accountLock.scope`) همین تنها لایه است و اتصالی نمی‌گیرد؛
+ *   • `scope = db` (پیش‌فرض، برای چند نمونهٔ سرور): قفلِ advisoryِ نشستی با `pg_try_advisory_lock`
+ *     و تلاشِ دوباره، روی **استخرِ جدا** (`db.extraPool`، `SAFE_LOCK_POOL_MAX` اتصال، پیش‌فرض ۱۰).
+ *     اتصالِ استخرِ اصلی هرگز گرفته نمی‌ماند، و چون صفِ فرآیند جلوتر است هر حساب در هر نمونه
+ *     حداکثر یک اتصال دارد. کلید با قفلِ تراکنشیِ v1 (`sync-v1:shop:shop:<حساب>`) فرق دارد، پس
+ *     چرخهٔ انتظار ساخته نمی‌شود. هر خطای این استخر (اتصال، پرس‌وجو) `503 SAFE_BUSY` است، نه ۵۰۰.
  *
  * ── آزاد شدن ────────────────────────────────────────────────────────
  *   با `res.end` (هر پاسخی: موفق، رد، خطای `next(err)`) — **نه** با `close`: اتصالی که وسطِ کار
- *   قطع شود تراکنش را نمی‌ایستاند، پس قفل هم تا پایانِ کار می‌ماند. سقفِ سختِ [HOLD_MS] هر قفلِ
- *   گیرکرده را آزاد می‌کند؛ انتظار در صف هم سقف دارد ([WAIT_MS]) و بعد `503 SAFE_BUSY`. درخواستی
- *   که در صف قطع شده باشد، پس از رسیدنِ نوبت بی‌درنگ آزاد می‌کند و کاری نمی‌کند.
+ *   قطع شود تراکنش را نمی‌ایستاند، پس قفل هم تا پایانِ کار می‌ماند. اول صفِ فرآیند، بعد قفلِ
+ *   پایگاه در پس‌زمینه با سقفِ [UNLOCK_MS]: unlock ِ گیرکرده صفِ دکان را نمی‌ایستاند و پس از سقف
+ *   اتصالش بسته می‌شود (قفل با نشست می‌رود). سقفِ سختِ [HOLD_MS] هر قفلِ گیرکرده را آزاد می‌کند؛
+ *   انتظار هم سقف دارد ([WAIT_MS]) و بعد `503 SAFE_BUSY`. درخواستی که در صف قطع شده باشد، پس از
+ *   رسیدنِ نوبت بی‌درنگ آزاد می‌کند و کاری نمی‌کند.
  */
+const config = require('../config');
 const db = require('../db');
 const { ApiError } = require('../middleware/errors');
 
 /** سقف‌ها — آزمون کوچکشان می‌کند */
-const limits = { WAIT_MS: 15_000, HOLD_MS: 60_000, RETRY_MS: 25, POOL_MAX: 4 };
+const limits = { WAIT_MS: 15_000, HOLD_MS: 60_000, RETRY_MS: 25, UNLOCK_MS: 5_000 };
 
 const chains = new Map();
-let lockPool;
+let lockPool = null;
+/** استخرِ ساختگیِ آزمون (`testing.usePool`) */
+let fakePool = null;
 
 function busy() {
   return new ApiError(503, 'SAFE_BUSY', 'گاوصندوقِ این دکان همین حالا در حالِ ثبت است؛ چند لحظهٔ دیگر دوباره');
 }
 
+/** خطای استخرِ قفل ⇒ `SAFE_BUSY` (با گزارش)؛ خودِ `SAFE_BUSY` همان می‌ماند */
+function asBusy(err, what) {
+  if (err instanceof ApiError && err.code === 'SAFE_BUSY') return err;
+  console.error(`[account-lock] ${what}:`, err?.message || err);
+  return busy();
+}
+
 const sleep = (ms) => new Promise((r) => { setTimeout(r, ms).unref?.(); });
+
+/** آیا لایهٔ پایگاه روشن است — نه روی PGlite و نه با `scope = local` */
+function usesDb() {
+  return config.accountLock.scope === 'db' && (Boolean(fakePool) || !db.isPglite());
+}
 
 /** نوبت در صفِ همین فرآیند؛ برگشتی آزاد می‌کند. انتظارِ رهاشده نوبتش را هم پس می‌دهد. */
 function localTurn(key, waitMs) {
@@ -56,8 +75,8 @@ function localTurn(key, waitMs) {
 
 /** اتصالی از استخرِ قفل تا [deadline]؛ اتصالی که دیر برسد پس داده می‌شود */
 async function connectBy(deadline) {
-  lockPool ||= db.extraPool(limits.POOL_MAX);
-  const pending = lockPool.connect();
+  const pool = fakePool || (lockPool ||= db.extraPool(config.accountLock.poolMax));
+  const pending = Promise.resolve().then(() => pool.connect());
   let timer;
   const late = new Promise((_, reject) => {
     timer = setTimeout(() => reject(busy()), Math.max(0, deadline - Date.now()));
@@ -67,15 +86,35 @@ async function connectBy(deadline) {
     return await Promise.race([pending, late]);
   } catch (err) {
     pending.then((c) => c.release(), () => {});
-    throw err;
+    throw asBusy(err, 'اتصال به استخرِ قفل');
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** قفلِ نشستیِ PostgreSQL؛ روی PGlite هیچ */
+/** آزاد کردنِ قفلِ پایگاه در پس‌زمینه؛ unlock ِ گیرکرده پس از [UNLOCK_MS] اتصالش را می‌بندد */
+function unlockLater(client, key) {
+  let done = false;
+  let cap = null;
+  const finish = (destroy) => {
+    if (done) return;
+    done = true;
+    clearTimeout(cap);
+    client.release(destroy || undefined);
+  };
+  cap = setTimeout(() => {
+    console.warn(`[account-lock] unlock ِ ${key} پس از ${limits.UNLOCK_MS}ms جواب نداد؛ اتصال بسته شد`);
+    finish(true);
+  }, limits.UNLOCK_MS);
+  cap.unref?.();
+  Promise.resolve()
+    .then(() => client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]))
+    .then(() => finish(false), () => finish(true));   //  خطا ⇒ اتصال بسته می‌شود و قفل با نشست می‌رود
+}
+
+/** قفلِ نشستیِ PostgreSQL؛ بی لایهٔ پایگاه هیچ. برگشتی آزاد می‌کند و منتظر نمی‌ماند. */
 async function dbTurn(key, deadline) {
-  if (db.isPglite()) return async () => {};
+  if (!usesDb()) return () => {};
   const client = await connectBy(deadline);
   try {
     for (;;) {
@@ -86,16 +125,9 @@ async function dbTurn(key, deadline) {
     }
   } catch (err) {
     client.release(true);
-    throw err;
+    throw asBusy(err, 'گرفتنِ قفلِ پایگاه');
   }
-  return async () => {
-    try {
-      await client.query('SELECT pg_advisory_unlock(hashtext($1))', [key]);
-      client.release();
-    } catch {
-      client.release(true);                          //  اتصال بسته می‌شود و قفل با نشست می‌رود
-    }
-  };
+  return () => unlockLater(client, key);
 }
 
 /**
@@ -127,7 +159,8 @@ async function holdFor(res, key) {
     if (done) return;
     done = true;
     clearTimeout(cap);
-    freeDb().finally(freeLocal);
+    freeLocal();                                     //  اول صفِ دکان؛ نوبتِ بعدی تا unlock با تلاشِ دوباره می‌ماند
+    freeDb();
   };
   if (gone || res.destroyed || res.writableEnded) {
     free();
@@ -147,4 +180,10 @@ async function holdFor(res, key) {
   return free;
 }
 
-module.exports = { holdFor, limits };
+/** فقط آزمون: استخرِ ساختگی برای لایهٔ پایگاه، و اینکه لایهٔ پایگاه روشن است یا نه */
+const testing = {
+  usePool(pool) { fakePool = pool; },
+  usesDb,
+};
+
+module.exports = { holdFor, limits, testing };

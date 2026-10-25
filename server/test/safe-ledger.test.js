@@ -13,12 +13,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { EventEmitter } = require('node:events');
+const { execFileSync } = require('node:child_process');
 const h = require('./helpers');
 const { one } = require('../src/db');
 const hlc = require('../src/lib/hlc');
 const syncV1 = require('../src/lib/sync-v1');
 const safe = require('../src/lib/safe-ledger');
 const lock = require('../src/lib/account-lock');
+const config = require('../src/config');
 const migrations = require('../src/lib/sync-v1-migrations');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -316,6 +318,143 @@ test('قفلِ حساب: سقفِ انتظار ⇒ 503 SAFE_BUSY، و سقفِ �
     await lock.holdFor(r2, 'acc-lock-t');
     r2.end();
   });
+});
+
+/**
+ * استخرِ ساختگیِ لایهٔ پایگاهِ `account-lock` — قفلِ advisoryِ نشستی مثلِ PostgreSQL: تا unlock یا بسته
+ * شدنِ اتصال می‌ماند (پس دادنِ عادیِ اتصال آن را آزاد نمی‌کند).
+ */
+function fakePool({ connectFails = false, lockFails = false, unlockHangs = false } = {}) {
+  const held = new Map();
+  const log = [];
+  const clients = [];
+  return {
+    log, held, clients,
+    async connect() {
+      if (connectFails) throw new Error('connect ECONNREFUSED');
+      const me = { id: clients.length + 1, released: null };
+      clients.push(me);
+      me.query = async (sql, [key]) => {
+        if (sql.includes('pg_try_advisory_lock')) {
+          if (lockFails) throw new Error('terminating connection');
+          log.push(`try:${me.id}`);
+          if (held.has(key) && held.get(key) !== me) return { rows: [{ ok: false }] };
+          held.set(key, me);
+          return { rows: [{ ok: true }] };
+        }
+        log.push(`unlock:${me.id}`);
+        if (unlockHangs) return new Promise(() => {});
+        if (held.get(key) === me) held.delete(key);
+        return { rows: [{ pg_advisory_unlock: true }] };
+      };
+      me.release = (destroy) => {
+        me.released = destroy ? 'destroyed' : 'ok';
+        if (destroy) for (const [k, c] of held) if (c === me) held.delete(k);   //  نشست رفت ⇒ قفل رفت
+      };
+      return me;
+    },
+  };
+}
+async function withPool(pool, fn) {
+  lock.testing.usePool(pool);
+  try { await fn(); } finally { lock.testing.usePool(null); }
+}
+
+test('قفلِ حساب: SAFE_LOCK_SCOPE و SAFE_LOCK_POOL_MAX از env (پیش‌فرض db و ۱۰)؛ local و PGlite بی اتصال', async () => {
+  const read = (env) => JSON.parse(execFileSync(process.execPath, ['-e',
+    "process.stdout.write(JSON.stringify(require('./src/config').accountLock))"], {
+    cwd: path.join(__dirname, '..'), env: { ...process.env, SAFE_LOCK_SCOPE: '', SAFE_LOCK_POOL_MAX: '', ...env },
+  }).toString());
+  assert.deepEqual(read({}), { scope: 'db', poolMax: 10 });
+  assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'local', SAFE_LOCK_POOL_MAX: '3' }), { scope: 'local', poolMax: 3 });
+  assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'cluster', SAFE_LOCK_POOL_MAX: '0' }), { scope: 'db', poolMax: 1 });
+  assert.equal(lock.testing.usesDb(), false, 'روی PGlite فقط صفِ فرآیند');
+  //  سرورِ تک‌نمونه (`local`): حتی با استخرِ پایگاه، اتصالی گرفته نمی‌شود
+  const pool = fakePool();
+  const was = config.accountLock.scope;
+  config.accountLock.scope = 'local';
+  try {
+    await withPool(pool, async () => {
+      assert.equal(lock.testing.usesDb(), false);
+      const r = fakeRes();
+      assert.equal(typeof await lock.holdFor(r, 'acc-local'), 'function');
+      r.end();
+    });
+  } finally { config.accountLock.scope = was; }
+  assert.equal(pool.clients.length, 0);
+});
+
+test('قفلِ حساب (پایگاه): اول صفِ دکان آزاد می‌شود؛ unlock ِ گیرکرده پس از سقف اتصالش را می‌بندد', async () => {
+  //  حالتِ عادی: unlock و پس دادنِ اتصال
+  const ok = fakePool();
+  await withPool(ok, async () => {
+    const r = fakeRes();
+    await lock.holdFor(r, 'acc-db-ok');
+    r.end();
+    await pause(5);
+    assert.equal(ok.clients[0].released, 'ok');
+    assert.equal(ok.held.size, 0);
+  });
+  const stuck = fakePool({ unlockHangs: true });
+  await withPool(stuck, () => withLimits({ UNLOCK_MS: 60, RETRY_MS: 5 }, async () => {
+    const r1 = fakeRes();
+    await lock.holdFor(r1, 'acc-db-1');
+    const r2 = fakeRes();
+    const p2 = settled(lock.holdFor(r2, 'acc-db-1'));
+    const r3 = fakeRes();
+    assert.equal(typeof await lock.holdFor(r3, 'acc-db-2'), 'function', 'دکانِ دیگر منتظر نمی‌ماند');
+    r1.end();
+    await pause(20);
+    assert.ok(stuck.log.includes('try:2'), 'صفِ دکان منتظرِ unlock نماند');
+    assert.equal(p2.done, false, 'قفلِ پایگاه تا رفتنِ نشستِ اولی مالِ اولی است');
+    await pause(80);
+    assert.equal(stuck.clients[0].released, 'destroyed', 'unlock ِ گیرکرده ⇒ اتصال بسته شد');
+    assert.equal(p2.done, true);
+    assert.equal(typeof p2.value, 'function');
+    r2.end();
+    r3.end();
+    await pause(80);
+    assert.equal(stuck.held.size, 0);
+  }));
+});
+
+test('قفلِ حساب (پایگاه): خطای استخر یا پرس‌وجو ⇒ 503 SAFE_BUSY، نه ۵۰۰؛ نوبتِ دکان پس داده می‌شود', async (t) => {
+  t.mock.method(console, 'error', () => {});
+  const busy = (e) => e.status === 503 && e.code === 'SAFE_BUSY';
+  await withPool(fakePool({ connectFails: true }), async () => {
+    await assert.rejects(lock.holdFor(fakeRes(), 'acc-db-bad'), busy);
+    //  از درِ HTTP: همان 503
+    const r = await push1(owner, 'safe-own', [count('pool-c1', 100)]);
+    assert.equal(r.status, 503, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'SAFE_BUSY');
+  });
+  const broken = fakePool({ lockFails: true });
+  await withPool(broken, async () => {
+    await assert.rejects(lock.holdFor(fakeRes(), 'acc-db-bad'), busy);
+    assert.equal(broken.clients[0].released, 'destroyed');
+  });
+  const r = fakeRes();
+  assert.equal(typeof await lock.holdFor(r, 'acc-db-bad'), 'function', 'صفِ فرآیند گیر نکرد');
+  r.end();
+  assert.equal(await rowOf('pool-c1'), null);
+});
+
+test('v1: ردیفی که فقط در v3 است (پلِ v3⇒v1 هنوز نبرده) هم «هست» — فقط عینِ همان می‌گذرد', async () => {
+  const fields = { kind: 'count', amountMinor: 700, createdAt: at(), expectedMinor: 0 };
+  const t = Date.now();
+  await one(
+    `INSERT INTO sync_v3_rows (app, account_kind, account_id, table_name, row_id, data, inserted, created_at, updated_at)
+     VALUES ('shop', 'shop', $1, 'safeEntries', 'v3o-c1', $2::jsonb, true, $3, $3) RETURNING row_id`,
+    [shopId, JSON.stringify({ id: 'v3o-c1', ...fields }), t]
+  );
+  const ins = (f) => op1('v3o-c1', f);
+  assert.deepEqual(statuses(await pushA00(owner, 'safe-own-a00', [ins({ ...fields, amountMinor: 701 })])), ['rejected:safe_append_only']);
+  //  بخشی از آن ردیفِ ناقص در v1 می‌ساخت
+  assert.deepEqual(statuses(await pushA00(staff, 'safe-staff-a00', [ins({ amountMinor: 700 })])), ['rejected:safe_append_only']);
+  assert.equal(await rowOf('v3o-c1'), null);
+  //  عینِ همان (همان دستگاه از راهِ دیگر): همان ردیفی است که پل می‌برد
+  assert.deepEqual(statuses(await pushA00(staff, 'safe-staff-a00', [ins({ id: 'v3o-c1', ...fields })])), ['applied']);
+  assert.deepEqual((await rowOf('v3o-c1')).data, { id: 'v3o-c1', ...fields });
 });
 
 test('v1 و v3 یک قفل دارند: push ِ گاوصندوق تا پایانِ پاسخِ دیگری می‌ایستد؛ push ِ بی گاوصندوق نه', async () => {

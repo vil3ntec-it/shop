@@ -449,6 +449,16 @@ const config = {
   syncV3: {
     enabled: bool(process.env.SYNC_V3_ENABLED, false),
   },
+
+  /**
+   * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ `db` قفلِ advisory هم برای چند
+   * نمونهٔ سرور، روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). سرورِ تک‌نمونه:
+   * `SAFE_LOCK_SCOPE=local` (بی اتصالِ اضافه). روی PGlite همیشه `local`.
+   */
+  accountLock: {
+    scope: process.env.SAFE_LOCK_SCOPE === 'local' ? 'local' : 'db',
+    poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
+  },
 };
 
 /** بررسی پیکربندی هنگام راه‌اندازی — بهتر است سرور بالا نیاید تا ناامن کار کند. */

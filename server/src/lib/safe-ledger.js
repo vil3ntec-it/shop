@@ -203,11 +203,24 @@ async function judgeBatch(ctx, ops, req, res) {
       [...acc, mine.map(({ op }) => String(op.op_id))]
     )).map((r) => r.op_id));
     //  ردیف‌های موجود (حتی پاک‌شده): درجِ v1 روی آن‌ها ادغام می‌شد
+    const ids = [...new Set(mine.map(({ op }) => String(op.row_id)))];
     const existing = new Map((await many(
       `SELECT row_id, data, deleted_at FROM sync_rows
         WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id = ANY($3::text[])`,
-      [...acc, TABLE, [...new Set(mine.map(({ op }) => String(op.row_id)))]]
+      [...acc, TABLE, ids]
     )).map((r) => [r.row_id, r]));
+    //  ردیفی که فقط در v3 است هم «هست»: پلِ v3⇒v1 (`catchUp` ِ `sync-v3.js`، بی این قفل) آن را بعداً
+    //  به `sync_rows` می‌برد. هر دو راهِ ساختنِ ردیفِ تازه (push ِ v1 و v3) زیرِ همین قفل‌اند، پس
+    //  «نیست ⇐ هست» هرگز بیرون از قفل رخ نمی‌دهد. v1 آن را هنوز ندارد، پس فقط عینِ همان می‌گذرد
+    //  (بخشی از آن، ردیفِ ناقص در v1 می‌ساخت).
+    const v3only = ids.filter((id) => !existing.has(id));
+    if (v3only.length) {
+      for (const r of await many(
+        `SELECT row_id, data, deleted_at FROM sync_v3_rows
+          WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id = ANY($3::text[])`,
+        [...acc, TABLE, v3only]
+      )) existing.set(r.row_id, { ...r, v3: true });
+    }
     const allowed = once(() => mayMove(ctx));
     const nowMs = Date.now();
     const batch = new Set();
@@ -218,7 +231,8 @@ async function judgeBatch(ctx, ops, req, res) {
       const cur = existing.get(op.row_id);
       if (cur) {
         //  عینِ همان ردیف یا بخشی از آن ⇒ بی‌اثر می‌گذرد؛ هر چیزِ دیگر (یا ردیفِ پاک‌شده) ویرایش است
-        if (cur.deleted_at !== null || !within(op.fields, cur.data, op.row_id)) reject(i, op.op_id, 'safe_append_only');
+        const same = within(op.fields, cur.data, op.row_id) && (!cur.v3 || within(cur.data, op.fields, op.row_id));
+        if (cur.deleted_at !== null || !same) reject(i, op.op_id, 'safe_append_only');
         continue;
       }
       const row = rowOf(op);
