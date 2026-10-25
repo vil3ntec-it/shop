@@ -57,6 +57,8 @@ object DevShot {
               //  پروندهٔ مشتری: cust:first · زبانه‌اش: custtab:0|1|2
               "cust" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.open.value = arg }; Thread.sleep(1200) }
               "custtab" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskCustomersShot.tab.value = arg.toInt() }; Thread.sleep(1000) }
+              //  برگشت و تعویض (RET): ret:first (فرمِ تازه‌ترین فاکتور) · ret:none (بی رسید) · ret:close
+              "ret" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.ReturnsShot.open.value = arg }; Thread.sleep(1200) }
               //  نمای کالای صندوق: posview:card|table — همان کلیدِ «کارتی/جدولی» (`PosShot`)
               "posview" -> {
                 java.awt.EventQueue.invokeAndWait {
@@ -71,6 +73,18 @@ object DevShot {
               "help" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.help.value = arg != "off" }; Thread.sleep(1500) }
               //  محصولات: نما (prodview:card|table) و انتخابِ n ردیفِ اولِ فهرست (prodsel:3 — نوارِ کارِ گروهی)
               "prodview" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.view.value = arg }; Thread.sleep(1200) }
+              //  دستگاه‌ها: پیش‌نمایشِ بی چاپگر — hwshot:receipt|label|a4|close (HW-11)
+              //  و نمایشگرِ مشتری — hwshot:customer|nocustomer (HW-10)
+              "hwshot" -> {
+                java.awt.EventQueue.invokeAndWait {
+                  when (arg) {
+                    "customer" -> ir.vil3ntec.tohid.hw.CustomerFacing.open.value = true
+                    "nocustomer" -> ir.vil3ntec.tohid.hw.CustomerFacing.open.value = false
+                    else -> ir.vil3ntec.tohid.ui.screens.HwShot.preview.value = arg.takeIf { it != "close" }
+                  }
+                }
+                Thread.sleep(1500)
+              }
               "prodsel" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.select.value = arg.toInt() }; Thread.sleep(1000) }
               //  تم: theme:DARK|LIGHT|SYSTEM — همان درخواستِ نوارِ منو (`AppNav.theme`)
               "theme" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.theme.value = arg }; Thread.sleep(1500) }
@@ -105,6 +119,14 @@ object DevShot {
                 val code = java.awt.event.KeyEvent::class.java.getField("VK_$arg").getInt(null)
                 robot.keyPress(code); robot.keyRelease(code); Thread.sleep(250)
               }
+              //  Shift+کلید، مثلِ shift:F6
+              "shift" -> {
+                val code = java.awt.event.KeyEvent::class.java.getField("VK_$arg").getInt(null)
+                robot.keyPress(java.awt.event.KeyEvent.VK_SHIFT); robot.keyPress(code)
+                robot.keyRelease(code); robot.keyRelease(java.awt.event.KeyEvent.VK_SHIFT); Thread.sleep(400)
+              }
+              //  POS-12: held:on|off — تنظیمِ «چند فاکتورِ هم‌زمان» فقط در همین اجرا (ذخیره نمی‌شود)
+              "held" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.on.value = arg != "off" }; Thread.sleep(800) }
             }
           }
         }

@@ -116,6 +116,27 @@ class ShopRepository(
   suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
     result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
 
+  /**
+   *  ثبتِ کلیدِ عمومیِ تأییدِ همین دستگاه (STF-02). کلیدِ خصوصی و PIN هرگز
+   *  نمی‌روند؛ پاسخ شناسهٔ کلید است که باید با `PinCrypto.keyId` بخواند.
+   */
+  suspend fun registerApproverKey(spkiB64: String, label: String, deviceId: String): ApiResult<String> =
+    result {
+      val body = api.post(
+        ApiEndpoints.Shop.APPROVER_KEYS,
+        buildJsonObject {
+          put("public_key", JsonPrimitive(spkiB64))
+          put("label", JsonPrimitive(label.take(60)))
+          put("device_id", JsonPrimitive(deviceId.take(64)))
+        },
+      )
+      ApiJson.text(body["key"] as? JsonObject ?: JsonObject(emptyMap()), "id")
+    }
+
+  /** باطل کردنِ کلیدِ تأییدِ قبلیِ همین دستگاه (پس از PINِ تازه) */
+  suspend fun revokeApproverKey(id: String): ApiResult<Unit> =
+    result { api.delete(ApiEndpoints.Shop.approverKey(id)); Unit }
+
   suspend fun devices(): ApiResult<List<ShopDeviceDto>> =
     result { ApiJson.decode<ShopDevicesDto>(api.get(ApiEndpoints.Shop.DEVICES)).devices }
 

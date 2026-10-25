@@ -23,8 +23,18 @@ plugins {
 group = "ir.vil3ntec.tohid"
 version = "1.0"
 
+//  آزمایشِ iOS (spike): هدف‌های iOS فقط با `-Pios=true` ساخته می‌شوند (کارِ
+//  `.github/workflows/ios-spike.yml` روی macOS). بی این پرچم هیچ‌چیز این‌جا
+//  پیکربندی نمی‌شود، پس گرافِ کارها و خروجیِ jvmِ اندروید/کامپیوتر همان است.
+val iosSpike = providers.gradleProperty("ios").orNull == "true"
+
 kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
+  }
+  if (iosSpike) {
+    iosArm64()
+    iosSimulatorArm64()
+    sourceSets.iosTest.dependencies { implementation(kotlin("test")) }
   }
 }

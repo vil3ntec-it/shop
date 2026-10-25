@@ -41,6 +41,9 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /*
  *  تخفیف‌های خودکار در صندوق (PRM-18): هر قاعدهٔ اعمال‌شده یک ردیف با نامش در
@@ -56,9 +59,9 @@ object PromoSummary {
    */
   fun rows(t: SalesEngine.Totals, o: PromoEngine.Outcome?): List<PosSummaryRow> =
     if (o == null || o.discount <= 0) PosSummary.rows(t) else buildList {
-      add(PosSummaryRow("جمع", o.gross))
-      add(PosSummaryRow("تخفیفِ خودکار", o.discount, negative = true))
-      if (t.discount > 0) add(PosSummaryRow("تخفیف", t.discount, negative = true))
+      add(PosSummaryRow(StrSale.subtotal, o.gross))
+      add(PosSummaryRow(StrPos.autoDiscount, o.discount, negative = true))
+      if (t.discount > 0) add(PosSummaryRow(Str.discount, t.discount, negative = true))
     }
 }
 
@@ -74,7 +77,7 @@ fun PromoLines(applied: List<PromoEngine.Applied>, modifier: Modifier = Modifier
           .fillMaxWidth()
           .background(c.successTint, Shape.card)
           .padding(horizontal = Space.sm, vertical = Space.xs)
-          .semantics { contentDescription = "تخفیفِ ${a.name}: ${money(a.discount)} افغانی" },
+          .semantics { contentDescription = StrPos.promoA11y(a.name, money(a.discount)) },
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Icon(Icons.Filled.LocalOffer, contentDescription = null, tint = c.success, modifier = Modifier.size(18.dp))
@@ -112,14 +115,14 @@ fun PromoCodeField(
       OutlinedTextField(
         value = text,
         onValueChange = { text = it },
-        label = { Text("کدِ تخفیف") },
+        label = { Text(StrPos.discountCode) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { submit() }),
         modifier = Modifier.weight(1f),
       )
       Spacer(Modifier.width(Space.xs))
-      OutlinedButton(onClick = { submit() }, enabled = text.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text("اعمال") }
+      OutlinedButton(onClick = { submit() }, enabled = text.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text(StrPos.apply) }
     }
     entered.forEach { code ->
       val st = codes.firstOrNull { it.code == code }?.status ?: "unknown"
@@ -135,7 +138,7 @@ fun PromoCodeField(
           style = MaterialTheme.typography.bodySmall, color = if (ok) c.success else c.danger,
         )
         IconButton(onClick = { onRemove(code) }) {
-          Icon(Icons.Filled.Close, contentDescription = "برداشتنِ کدِ $code", tint = c.muted, modifier = Modifier.size(16.dp))
+          Icon(Icons.Filled.Close, contentDescription = StrPos.removeCode(code), tint = c.muted, modifier = Modifier.size(16.dp))
         }
       }
     }
