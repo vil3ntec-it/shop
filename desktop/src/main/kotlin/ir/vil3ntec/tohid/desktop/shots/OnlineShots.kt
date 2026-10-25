@@ -391,7 +391,7 @@ private object OnlineDemo {
   )
   val zones = ZonesForm(
     zones = listOf(
-      StorefrontDelivery.ZoneDraft("نزدیکِ دکان", kind = "circle", fee = "50", min = "300", free = "1500", center = "34.53, 69.17", radiusKm = "2"),
+      StorefrontDelivery.ZoneDraft("نزدیکِ دکان", kind = "radius", fee = "50", min = "300", free = "1500", center = "34.53, 69.17", radiusKm = "2"),
       StorefrontDelivery.ZoneDraft("شهرِ نو", kind = "polygon", fee = "100", min = "500", polygon = "34.52, 69.16\n34.54, 69.16\n34.54, 69.19\n34.52, 69.19"),
     ),
     rules = listOf(

@@ -155,7 +155,7 @@ private fun CustomerSection(o: OrderDto, actions: DetailActions) {
   V3Section(StrOnline.customer, footer = if (phone == null && o.customer.phoneMasked.isNotEmpty()) StrOnline.fullNumberHelper else null) {
     V3ListRow(
       o.customer.name.ifBlank { StrOnline.customer },
-      subtitle = phone ?: o.customer.phoneMasked.ifBlank { StrOnline.noNumber },
+      subtitle = (phone ?: o.customer.phoneMasked).ifBlank { null }?.let(StrOnline::ltr) ?: StrOnline.noNumber,
       icon = Icons.Outlined.Person,
       hue = V3Hue.CORAL,
       chevron = false,
@@ -177,7 +177,7 @@ private fun AddressSection(o: OrderDto, actions: DetailActions) {
     if (o.address.text.isNotEmpty()) add { V3ListRow(o.address.text, icon = Icons.Outlined.Place, hue = V3Hue.SKY, subtitleLines = 3, chevron = false) }
     if (o.address.landmark.isNotEmpty()) add { V3ListRow(o.address.landmark, subtitle = StrOnline.landmark, icon = Icons.Outlined.Flag, hue = V3Hue.AMBER, chevron = false) }
     if (map != null) add {
-      V3ListRow(StrOnline.openMap, subtitle = "${o.address.lat}, ${o.address.lng}", icon = Icons.Outlined.Map, hue = V3Hue.MINT, onClick = { actions.onMap(map) })
+      V3ListRow(StrOnline.openMap, subtitle = StrOnline.ltr("${o.address.lat}, ${o.address.lng}"), icon = Icons.Outlined.Map, hue = V3Hue.MINT, onClick = { actions.onMap(map) })
     }
   }
   V3Section(StrOnline.address) {

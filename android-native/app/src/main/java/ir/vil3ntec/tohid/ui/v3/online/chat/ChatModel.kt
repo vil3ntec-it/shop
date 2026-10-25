@@ -39,7 +39,7 @@ object ChatModel {
   fun whenOf(c: ChatConversation): Long = c.lastMessageAt ?: c.updatedAt
 
   fun subtitle(c: ChatConversation?): String =
-    listOfNotNull(c?.customer?.shownPhone?.ifBlank { null }, c?.orderNo?.let(StrOnline::ctOrderChip)).joinToString(" · ")
+    listOfNotNull(c?.customer?.shownPhone?.ifBlank { null }?.let(StrOnline::ltr), c?.orderNo?.let(StrOnline::ctOrderChip)).joinToString(" · ")
 
   /** «۱:۰۵» */
   fun mmss(ms: Long): String {

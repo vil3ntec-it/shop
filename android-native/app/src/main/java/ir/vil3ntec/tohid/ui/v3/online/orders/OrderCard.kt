@@ -88,7 +88,7 @@ fun OrderCard(
     }
     Spacer(Modifier.height(6.dp))
     Text(
-      listOfNotNull(o.customer.name.ifBlank { null }, o.customer.phoneMasked.ifBlank { null }, StrOnline.orderSource(o.source)).joinToString(" · "),
+      listOfNotNull(o.customer.name.ifBlank { null }, o.customer.phoneMasked.ifBlank { null }?.let(StrOnline::ltr), StrOnline.orderSource(o.source)).joinToString(" · "),
       style = V3Type.subhead,
       color = c.inkMuted,
       maxLines = 1,

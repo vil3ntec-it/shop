@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.chat.ChatMessage
 import ir.vil3ntec.tohid.core.chat.ChatQueue
@@ -70,7 +71,8 @@ fun ServerBubble(
         "audio" -> MediaChip(Icons.Outlined.GraphicEq, (if (ChatMedia.voiceSupported) StrOnline.ctPlayVoice else StrOnline.ctSaveVoice) + (m.meta.durationMs?.let { " · " + ChatModel.mmss(it) }.orEmpty()), onAudio)
         "file" -> MediaChip(Icons.Outlined.Description, StrOnline.ctPdf, null)
       }
-      if (m.body.isNotBlank()) Text(m.body, style = V3Type.body, color = c.ink)
+      //  هر پیام جهتِ خودش را دارد (پیامِ فارسی در برنامهٔ انگلیسی وارونه نمی‌شود)
+      if (m.body.isNotBlank()) Text(m.body, style = V3Type.body.copy(textDirection = TextDirection.Content), color = c.ink)
     }
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
       Text(OrdersModel.stamp(m.createdAt), style = V3Type.caption, color = c.inkMuted)
@@ -100,7 +102,7 @@ fun LocalBubble(x: OutboxItem, image: ImageBitmap?, onRetry: () -> Unit, onCance
       "image" -> Photo(image, StrOnline.ctQueuedImage, null)
       "audio" -> MediaChip(Icons.Outlined.GraphicEq, StrOnline.ctKind("audio") + (x.meta.durationMs?.let { " · " + ChatModel.mmss(it) }.orEmpty()), null)
     }
-    if (x.body.isNotBlank()) Text(x.body, style = V3Type.body, color = c.ink)
+    if (x.body.isNotBlank()) Text(x.body, style = V3Type.body.copy(textDirection = TextDirection.Content), color = c.ink)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.Schedule, contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(13.dp))

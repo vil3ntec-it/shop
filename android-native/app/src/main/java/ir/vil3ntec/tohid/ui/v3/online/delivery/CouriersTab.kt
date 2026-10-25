@@ -26,8 +26,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -35,7 +35,6 @@ import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.i18n.StrOnline
-import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -78,12 +77,12 @@ internal fun CouriersTab(d: DeskData, cfg: DeskConfig, writable: Boolean, action
           DraftTag(label, tone = tone)
         }
         Spacer(Modifier.height(10.dp))
-        DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr))
+        DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), StrOnline.afn(cr.cashCapMinor))
         Spacer(Modifier.height(10.dp))
         Row {
           Figure(StrOnline.dlHeld, StrOnline.afn(cr.cashHeldMinor), Modifier.weight(1f))
           Figure(StrOnline.dlLiveExpected(cr.liveCount), StrOnline.afn(cr.liveExpectedMinor), Modifier.weight(1f))
-          Figure(StrOnline.dlCapRoom, "${StrOnline.afn(cr.cashCapMinor)} · ${OrderText.money(CourierCash.headroom(cr))}", Modifier.weight(1f))
+          Figure(StrOnline.dlRoom, StrOnline.afn(CourierCash.headroom(cr)), Modifier.weight(1f))
         }
         CourierCash.autoBlockReason(cr)?.let {
           Spacer(Modifier.height(8.dp))
@@ -112,7 +111,7 @@ internal fun CouriersTab(d: DeskData, cfg: DeskConfig, writable: Boolean, action
  *  بی چیدمانِ دوباره). به سقف رسیده ⇐ رنگِ «در انتظار/هشدار». ⇐ `DraftCapBar` برای بردن به کیت.
  */
 @Composable
-internal fun DraftCapBar(percent: Int, full: Boolean) {
+internal fun DraftCapBar(percent: Int, full: Boolean, cap: String) {
   val c = PhoneV3.colors
   val fill by animateFloatAsState(percent.coerceIn(0, 100) / 100f, V3Springs.ui(), label = "capFill")
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -132,6 +131,6 @@ internal fun DraftCapBar(percent: Int, full: Boolean) {
       )
     }
     Spacer(Modifier.width(8.dp))
-    Text(StrOnline.dlCapPercent(percent), style = V3Type.caption, color = c.inkMuted)
+    Text(StrOnline.dlCapPercent(percent, cap), style = V3Type.caption, color = c.inkMuted)
   }
 }

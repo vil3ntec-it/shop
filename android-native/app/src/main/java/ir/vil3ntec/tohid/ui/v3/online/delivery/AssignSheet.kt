@@ -104,7 +104,7 @@ internal fun AssignSheet(
             onClick = if (cr.active) ({ form = form.copy(courierId = cr.id, override = false) }) else null,
           )
           if (cr.active) Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
-            DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr))
+            DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), StrOnline.afn(cr.cashCapMinor))
             if (!fits) { Spacer(Modifier.height(6.dp)); DraftTag(StrOnline.dlWouldExceed, Icons.Outlined.WarningAmber, V3Tone.WARNING) }
           }
         }

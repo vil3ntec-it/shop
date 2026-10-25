@@ -29,7 +29,8 @@ object PresenceModel {
   fun caption(st: PresenceStatusDto): String {
     val today = when {
       st.holiday -> StrOnline.todayHoliday
-      st.today.isNotEmpty() -> StrOnline.todayHours(StorefrontOwner.formatDay(st.today.map { it[0] to it[1] }))
+      //  هر بازه جدا از جهتِ جمله، وگرنه «۰۸:۰۰-۲۱:۰۰» در جملهٔ فارسی وارونه دیده می‌شود
+      st.today.isNotEmpty() -> StrOnline.todayHours(st.today.joinToString("، ") { StrOnline.ltr(StorefrontOwner.formatDay(listOf(it[0] to it[1]))) })
       st.hoursSet -> StrOnline.todayClosed
       else -> StrOnline.hoursNotSet
     }

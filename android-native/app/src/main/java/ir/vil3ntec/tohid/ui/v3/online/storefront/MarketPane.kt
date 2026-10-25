@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.ui.v3.online.storefront
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -111,14 +110,15 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
       V3ListRow(StrOnline.locationText(loc?.lat, loc?.lng), icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
       if (!hasLocator) { V3Divider(start = 64.dp); V3ListRow(StrOnline.mkDesktopNote, subtitleLines = 3, tile = false, chevron = false) }
       V3Divider()
-      Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      //  دو دکمه زیرِ هم تا برچسبِ بلندشان بریده نشود
+      Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         if (hasLocator) V3Button(
-          if (ctl.locating) StrOnline.mkLocating else StrOnline.mkSetHere, onLocate, Modifier.weight(1f),
+          if (ctl.locating) StrOnline.mkLocating else StrOnline.mkSetHere, onLocate, Modifier.fillMaxWidth(),
           kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.MyLocation, loading = ctl.locating,
           enabled = ctl.save != MarketController.Save.SAVING,
         )
         if (loc != null) V3Button(
-          StrOnline.mkRemoveLocation, { ctl.clearLocation() }, Modifier.weight(1f),
+          StrOnline.mkRemoveLocation, { ctl.clearLocation() }, Modifier.fillMaxWidth(),
           kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.WrongLocation, enabled = ctl.save != MarketController.Save.SAVING,
         )
       }

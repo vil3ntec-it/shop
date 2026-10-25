@@ -39,9 +39,10 @@ class ChatModelTest {
     assertEquals("م", ChatModel.initial(conv))
     assertEquals(StrOnline.customer, ChatModel.name(conv.copy(customer = ChatCustomer())))
     assertEquals(StrOnline.customer, ChatModel.name(null))
-    assertEquals("07•• ••• 456 · " + StrOnline.ctOrderChip(1042), ChatModel.subtitle(conv))
+    //  شماره درونِ جملهٔ فارسی جدا از جهتِ جمله می‌آید تا وارونه نشود
+    assertEquals(StrOnline.ltr("07•• ••• 456") + " · " + StrOnline.ctOrderChip(1042), ChatModel.subtitle(conv))
     //  شمارهٔ کامل فقط وقتی سرور داد
-    assertTrue(ChatModel.subtitle(conv.copy(customer = conv.customer.copy(phone = "0700000456"))).startsWith("0700000456"))
+    assertTrue(ChatModel.subtitle(conv.copy(customer = conv.customer.copy(phone = "0700000456"))).startsWith(StrOnline.ltr("0700000456")))
     assertEquals("", ChatModel.subtitle(null))
   }
 

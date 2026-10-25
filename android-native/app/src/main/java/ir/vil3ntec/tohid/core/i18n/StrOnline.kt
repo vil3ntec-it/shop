@@ -19,6 +19,8 @@ object StrOnline {
   fun afn(minor: Long): String = OrderText.money(minor).let { t("$it افغانی", "AFN $it", "$it افغانۍ") }
   fun items(n: Int): String = t("$n قلم", "$n ${pl(n, "item", "items")}", "$n توکي")
   fun orderNo(n: Long): String = "#$n"
+  /** شماره، مختصات و کدِ لاتین درونِ جملهٔ فارسی: جدا از جهتِ جمله (LRI…PDI) تا وارونه نشود */
+  fun ltr(s: String): String = "\u2066$s\u2069"
   fun orderTitle(n: Long): String = t("سفارش #$n", "Order #$n", "فرمایش #$n")
   fun ago(ms: Long, now: Long): String {
     val d = maxOf(0L, (now - ms) / 60_000)
@@ -523,8 +525,8 @@ object StrOnline {
   val dlReadyState: String get() = t("آماده", "Ready", "چمتو")
   val dlHeld: String get() = t("در دست، تسویه‌نشده", "Held, unsettled", "په لاس، نه تصفیه شوې")
   fun dlLiveExpected(n: Int): String = t("گرفتنی از $n مأموریتِ زنده", "To collect from $n live", "له $n ژوندیو دندو اخیستونکې")
-  val dlCapRoom: String get() = t("سقف · جای خالی", "Cap · room", "سقف · تشه ځای")
-  fun dlCapPercent(p: Int): String = t("$p٪ سقف", "$p% of cap", "$p٪ سقف")
+  val dlRoom: String get() = t("جای خالی تا سقف", "Room under cap", "تر سقف تش ځای")
+  fun dlCapPercent(p: Int, cap: String): String = t("$p٪ از سقفِ $cap", "$p% of $cap cap", "$p٪ د $cap سقف")
   val dlSettle: String get() = t("تسویهٔ پایانِ روز", "End-of-day settlement", "د ورځې د پای تصفیه")
   val dlLedger: String get() = t("دفترِ نقد", "Cash ledger", "د نغدو دفتر")
   val dlCapAndState: String get() = t("سقف و وضعیت", "Cap and status", "سقف او حالت")
