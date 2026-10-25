@@ -116,9 +116,9 @@
    *  `auditLog` برای هر نقشِ نویسنده است: سابقهٔ همان کاری که کرده.
    *  فروش با قلم، حرکتِ انبار، پرداختِ قرض و سابقه یک‌جا می‌نشیند؛ رسیدِ خرید
    *  با کالا، تاریخچهٔ قیمت، رسیدِ انبار و حرکتِ انبار.
-   *  صندوق‌دار `warehouseEntries` را فقط با «قاعدهٔ ردیف» دارد (`ROW_RULES` پایین): برگشتِ
-   *  ضایعات و برگشتِ بی‌رسید (RET، #318) اصلاحِ موجودی را با همین ردیف‌ها می‌نویسد، ولی
-   *  رسیدِ انبارِ دستی نه.
+   *  صندوق‌دار `warehouseEntries` و `stockMovements` را فقط با «قاعدهٔ ردیف» دارد (`ROW_RULES`
+   *  پایین): اصلاحِ موجودیِ قلمِ برگشت (RET، #318) و حرکتِ انبارِ فاکتور و برگشت — نه رسیدِ
+   *  انبارِ دستی، نه اصلاح یا خریدِ آزاد.
    */
   var WRITES = {
     owner: '*',
@@ -139,13 +139,26 @@
   }
 
   /*
-   *  قاعدهٔ ردیف: جدولی که نقش فقط بخشی از ردیف‌هایش را می‌نویسد.
-   *    return_adjustment  فقط درجِ اصلاحِ موجودیِ یک برگشت: `adjKind` یکی از
-   *                       RETURN_ADJ_KINDS و `refId` = شناسه یا `docId`ِ برگشتی که در همین
-   *                       دسته درج می‌شود یا از پیش ثبت است. ویرایش و حذف نه.
+   *  قاعدهٔ ردیف: جدولی که نقش فقط ردیف‌های تازهٔ معینی از آن را می‌نویسد. ویرایش و حذف
+   *  هرگز؛ «insert» روی ردیفِ موجود هم ویرایش است (گردآورنده آن را null می‌دهد).
+   *    return_adjustment  اصلاحِ موجودیِ یک قلمِ برگشت (#318): `isAdjustment` = true، بی قیمت و
+   *                       کارتن، `adjKind` یکی از RETURN_ADJ_KINDS با علامتِ همان نوع (ضایعات منفی،
+   *                       برگشتِ بی‌رسید مثبت)، `refId` = شناسه یا `docId`ِ برگشتی که مالِ خودِ
+   *                       نویسنده است (همین دسته، یا ثبت‌شده با همین دستگاه/کاربر)، `productId`
+   *                       یکی از قلم‌های همان برگشت و |units| نه بیش از مقدارِ آن قلم. هر قلم فقط
+   *                       یک اصلاح (اصلاح‌های ثبت‌شده در `taken`).
+   *    doc_movement       حرکتِ انبارِ یک سند: `type` یکی از DOC_MOVE_TYPES با علامتِ همان نوع،
+   *                       `refId` = فاکتور (sale، sale_cancel) یا قلمِ برگشت (customer_return،
+   *                       damage) از همین دسته یا ثبت‌شده؛ برای برگشت همان کالا و |qty| نه بیش از قلم.
+   *  ردیف (`row`) نمای یک‌دستِ درج است با یکاهای برنامه (v3: Milli/Minor ÷ ۱۰۰۰/۱۰۰، کارِ گردآورنده).
+   *  refs = { returns: [{id, docId, productId, qty, own}], sales: [id], taken: [{refId, productId, units}] }
    */
   var RETURN_ADJ_KINDS = ['customer_return', 'damage'];
-  var ROW_RULES = { cashier: { warehouseEntries: 'return_adjustment' } };
+  /** نوعِ حرکت ⇐ سندی که `refId` به آن اشاره می‌کند */
+  var DOC_MOVE_TYPES = { sale: 'sale', sale_cancel: 'sale', customer_return: 'return', damage: 'return' };
+  /** نوع‌هایی که مقدارشان منفی است (بیرون رفتن از موجودی)؛ بقیه مثبت */
+  var NEGATIVE_KINDS = ['damage', 'sale'];
+  var ROW_RULES = { cashier: { warehouseEntries: 'return_adjustment', stockMovements: 'doc_movement' } };
 
   /** نامِ قاعدهٔ ردیفِ این نقش برای این جدول، یا null (یعنی همهٔ ردیف‌ها، اگر `canWrite`) */
   function rowRule(role, table) {
@@ -153,20 +166,129 @@
     return typeof table === 'string' && has(ROW_RULES[role], table) ? ROW_RULES[role][table] : null;
   }
 
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isId(v) { return typeof v === 'string' && v !== ''; }
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function signOk(kind, v) { return v !== null && (NEGATIVE_KINDS.indexOf(kind) >= 0 ? v < 0 : v > 0); }
+  /** قلم‌های برگشتی که `ref` شناسه یا `docId`ِ آن است */
+  function linesOf(refs, ref) {
+    var out = [];
+    var list = isObj(refs) && Array.isArray(refs.returns) ? refs.returns : [];
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (isObj(r) && isId(r.id) && (r.id === ref || r.docId === ref)) out.push(r);
+    }
+    return out;
+  }
+  /** کوچک‌ترین قلمِ آزادی که مقدارِ `need` در آن جا می‌شود (اولی در برابری) */
+  function bestFit(lines, need, used) {
+    var best = null;
+    for (var i = 0; i < lines.length; i++) {
+      var q = num(lines[i].qty);
+      if (used[lines[i].id] === true || q === null || q < need) continue;
+      if (best === null || q < num(best.qty)) best = lines[i];
+    }
+    return best;
+  }
+  function fits(lines, need) {
+    for (var i = 0; i < lines.length; i++) {
+      var q = num(lines[i].qty);
+      if (q !== null && q >= need) return true;
+    }
+    return false;
+  }
+  function ofProduct(lines, productId) {
+    if (!isId(productId)) return [];
+    return lines.filter(function (r) { return r.productId === productId; });
+  }
+
+  function no(reason) { return { ok: false, reason: reason }; }
+  function yes() { return { ok: true, reason: '' }; }
+
+  function checkAdjustment(row, refs, used) {
+    if (row.isAdjustment !== true) return no('adjustment');
+    var money = ['price', 'cartons', 'perCarton'];
+    for (var i = 0; i < money.length; i++) {
+      var m = row[money[i]];
+      if (m !== undefined && m !== null && m !== 0) return no('price');
+    }
+    if (RETURN_ADJ_KINDS.indexOf(row.adjKind) < 0) return no('kind');
+    var units = num(row.units);
+    if (!signOk(row.adjKind, units)) return no('sign');
+    if (!isId(row.refId)) return no('ref');
+    var lines = linesOf(refs, row.refId);
+    if (!lines.length) return no('ref');
+    lines = lines.filter(function (r) { return r.own === true; });
+    if (!lines.length) return no('owner');
+    lines = ofProduct(lines, row.productId);
+    if (!lines.length) return no('product');
+    var need = Math.abs(units);
+    if (!fits(lines, need)) return no('qty');
+    var line = bestFit(lines, need, used);
+    if (!line) return no('used');
+    used[line.id] = true;
+    return yes();
+  }
+
+  function checkMovement(row, refs) {
+    var doc = typeof row.type === 'string' && has(DOC_MOVE_TYPES, row.type) ? DOC_MOVE_TYPES[row.type] : null;
+    if (!doc) return no('kind');
+    var qty = num(row.qty);
+    if (!signOk(row.type, qty)) return no('sign');
+    if (!isId(row.refId)) return no('ref');
+    if (doc === 'sale') {
+      var sales = isObj(refs) && Array.isArray(refs.sales) ? refs.sales : [];
+      return sales.indexOf(row.refId) >= 0 ? yes() : no('ref');
+    }
+    var lines = linesOf(refs, row.refId);
+    if (!lines.length) return no('ref');
+    lines = ofProduct(lines, row.productId);
+    if (!lines.length) return no('product');
+    return fits(lines, Math.abs(qty)) ? yes() : no('qty');
+  }
+
+  /** قلم‌هایی که اصلاحِ ثبت‌شده دارند (`refs.taken`): هر اصلاح یک قلم، با همان قاعدهٔ جا شدن */
+  function usedLines(refs) {
+    var used = Object.create(null);   //  شناسهٔ «__proto__» هم کلیدِ ساده است
+    var taken = isObj(refs) && Array.isArray(refs.taken) ? refs.taken : [];
+    for (var i = 0; i < taken.length; i++) {
+      var t = taken[i];
+      if (!isObj(t) || !isId(t.refId)) continue;
+      var lines = ofProduct(linesOf(refs, t.refId), t.productId);
+      var u = num(t.units);
+      var line = bestFit(lines, u === null ? 0 : Math.abs(u), used) || bestFit(lines, 0, used);
+      if (line) used[line.id] = true;
+    }
+    return used;
+  }
+
   /**
-   *  این نقش همین ردیف را می‌نویسد؟
-   *  @param {Object|null} fields  فیلدهای ردیفِ درج‌شونده؛ null یعنی ویرایش یا حذف
-   *  @param {Array<string>} returnRefs  شناسه‌ها و `docId`های برگشت‌های همین دسته و از پیش
+   *  داوریِ ردیف‌های یک دسته، به ترتیب (قلمی که اصلاحِ یک ردیف گرفت برای بعدی آزاد نیست).
+   *  @param {Array<{table: string, row: Object|null}>} rows  `row` = نمای درجِ تازه؛ null =
+   *         ویرایش، حذف، ردیفِ موجود یا شناسهٔ تکراریِ دسته
+   *  @returns {Array<{ok: boolean, reason: string}>}  reason: '' | table | not_insert |
+   *         adjustment | price | kind | sign | ref | owner | product | qty | used | rule
    */
-  function canWriteRow(role, table, fields, returnRefs) {
-    if (!canWrite(role, table)) return false;
-    var rule = rowRule(role, table);
-    if (!rule) return true;
-    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return false;
-    if (RETURN_ADJ_KINDS.indexOf(fields.adjKind) < 0) return false;
-    var ref = fields.refId;
-    if (typeof ref !== 'string' || !ref) return false;
-    return Array.isArray(returnRefs) && returnRefs.indexOf(ref) >= 0;
+  function checkRows(role, rows, refs) {
+    var used = usedLines(refs);
+    var out = [];
+    var list = Array.isArray(rows) ? rows : [];
+    for (var i = 0; i < list.length; i++) {
+      var it = isObj(list[i]) ? list[i] : {};
+      if (!canWrite(role, it.table)) { out.push(no('table')); continue; }
+      var rule = rowRule(role, it.table);
+      if (!rule) { out.push(yes()); continue; }
+      if (!isObj(it.row)) { out.push(no('not_insert')); continue; }
+      if (rule === 'return_adjustment') out.push(checkAdjustment(it.row, refs, used));
+      else if (rule === 'doc_movement') out.push(checkMovement(it.row, refs));
+      else out.push(no('rule'));
+    }
+    return out;
+  }
+
+  /** این نقش همین یک ردیف را می‌نویسد؟ — `checkRows` با یک ردیف */
+  function canWriteRow(role, table, row, refs) {
+    return checkRows(role, [{ table: table, row: row }], refs)[0].ok;
   }
 
   /** فهرستِ جدول‌های نوشتنیِ یک نقش: «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته */
@@ -331,7 +453,9 @@
     canWrite: canWrite,
     writable: writable,
     RETURN_ADJ_KINDS: RETURN_ADJ_KINDS,
+    DOC_MOVE_TYPES: DOC_MOVE_TYPES,
     rowRule: rowRule,
+    checkRows: checkRows,
     canWriteRow: canWriteRow,
     ROUNDING_MINOR: ROUNDING_MINOR,
     discountBp: discountBp,

@@ -46,19 +46,50 @@ object RoleGate {
   }
 
   /**
-   *  قاعدهٔ ردیف (همان `canWriteRow`ِ سرور): فقط ردیفِ تازه، و هر ردیفِ تازه قاعده را
-   *  بگذراند. ویرایش یا حذفِ ردیفِ موجود نه. امروز تنها قاعده رسیدِ انبارِ صندوق‌دار است:
-   *  اصلاحِ موجودیِ یک برگشت (`adjKind` ِ برگشت و `refId` = شناسه یا `docId`ِ یک برگشت).
+   *  قاعدهٔ ردیف (همان `PermCore.checkRows`ِ سرور): فقط ردیفِ تازه، و همهٔ ردیف‌های تازه قاعده
+   *  را بگذرانند؛ ویرایش یا حذفِ ردیفِ موجود نه. صندوق‌دار: رسیدِ انبار فقط اصلاحِ موجودیِ قلمِ
+   *  برگشتی که در همین ذخیره ساخته شده (هر قلم یک اصلاح)، حرکتِ انبار فقط حرکتِ فاکتور و برگشت.
+   *  تنگ‌تر از سرور است، نه گشادتر: سرور برگشتِ ثبت‌شده با همین دستگاه را هم «خودی» می‌داند.
    */
   private fun rowsAllowed(role: String, table: String, cur: ShopData, next: ShopData): Boolean {
-    if (table != "warehouseEntries") return false
-    val before = cur.warehouseEntries.associateBy { it.id }
-    val after = next.warehouseEntries.associateBy { it.id }
-    if (before.any { (id, e) -> after[id] != e }) return false
-    val refs = next.saleReturns.flatMap { listOfNotNull(it.id, it.docId) }.filter { it.isNotEmpty() }.toSet()
-    return after.values.filter { it.id !in before }.all { e ->
-      PermCore.canWriteRow(role, table, mapOf("adjKind" to e.adjKind, "refId" to e.refId), refs)
-    }
+    val rows = when (table) {
+      "warehouseEntries" -> added(cur.warehouseEntries, next.warehouseEntries) { it.id }
+        ?.map { PermCore.RowIn(table, entryView(it)) }
+      "stockMovements" -> added(cur.stockMovements, next.stockMovements) { it.id }
+        ?.map { PermCore.RowIn(table, moveView(it)) }
+      else -> null
+    } ?: return false
+    return rows.isEmpty() || PermCore.checkRows(role, rows, refsOf(cur, next)).all { it.ok }
+  }
+
+  /** ردیف‌های تازه؛ null اگر ردیفِ موجودی عوض یا حذف شده یا شناسه‌ای دو بار آمده است */
+  private fun <T> added(before: List<T>, after: List<T>, id: (T) -> String): List<T>? {
+    val old = before.associateBy(id)
+    val now = after.associateBy(id)
+    if (now.size != after.size || old.any { (k, v) -> now[k] != v }) return null
+    return after.filter { id(it) !in old }
+  }
+
+  private fun entryView(e: WarehouseEntry): Map<String, Any?> = mapOf(
+    "isAdjustment" to e.isAdjustment, "price" to e.price, "cartons" to e.cartons, "perCarton" to e.perCarton,
+    "adjKind" to e.adjKind, "refId" to e.refId, "productId" to e.productId, "units" to e.units,
+  )
+
+  private fun moveView(m: StockMovement): Map<String, Any?> =
+    mapOf("type" to m.type, "qty" to m.qty, "refId" to m.refId, "productId" to m.productId)
+
+  /** قلم‌های برگشت (خودی = ساختهٔ همین ذخیره)، فاکتورها، و اصلاح‌های ثبت‌شدهٔ برگشت */
+  private fun refsOf(cur: ShopData, next: ShopData): PermCore.RowRefs {
+    val before = cur.saleReturns.mapTo(HashSet()) { it.id }
+    return PermCore.RowRefs(
+      returns = next.saleReturns.map {
+        PermCore.ReturnLine(it.id, it.docId, it.productId, it.quantity, own = it.id !in before)
+      },
+      sales = next.sales.mapTo(HashSet()) { it.id },
+      taken = cur.warehouseEntries
+        .filter { it.adjKind in PermCore.RETURN_ADJ_KINDS && !it.refId.isNullOrEmpty() }
+        .map { PermCore.Taken(it.refId!!, it.productId, it.units) },
+    )
   }
 
   /** نامِ فارسیِ بخشِ دفتر برای پیام */

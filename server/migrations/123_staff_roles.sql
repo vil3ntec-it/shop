@@ -13,8 +13,12 @@
 --  ⛔ هیچ ردیفی عوض نمی‌شود: تا صاحب دکانی خودش نقشِ تازه ندهد هیچ عضوی
 --  آن را نمی‌گیرد — رفتارِ امروز همان است. 'courier' (مهاجرتِ ۱۰۲) سرِ جایش.
 --
---  برگشت:
---    UPDATE shop_members SET role='staff' WHERE role IN ('cashier','storekeeper','picker','accountant');
+--  برگشت (عضوِ نقشِ تازه کنار گذاشته می‌شود، نه «شاگرد»: شاگرد همه را می‌نویسد و
+--  حسابدارِ فقط‌خواندنی با آن دسترسیِ بیشتری می‌گرفت؛ `role`='staff' فقط برای قیدِ CHECK است
+--  و صاحب دکان هنگامِ فعال کردنِ دوباره نقشش را خودش انتخاب می‌کند):
+--    UPDATE shop_members SET role='staff',
+--           status = CASE WHEN status='active' THEN 'suspended' ELSE status END
+--     WHERE role IN ('cashier','storekeeper','picker','accountant');
 --    UPDATE staff_codes SET status='revoked' WHERE role IN ('cashier','storekeeper','picker','accountant');
 --    UPDATE staff_codes SET role='staff' WHERE role IN ('cashier','storekeeper','picker','accountant');
 --    DELETE FROM shop_role_perms WHERE role IN ('cashier','storekeeper','picker','accountant');
@@ -24,8 +28,6 @@
 --    ALTER TABLE staff_codes ADD CONSTRAINT staff_codes_role_check CHECK (role IN ('manager','staff','courier'));
 --    ALTER TABLE shop_role_perms DROP CONSTRAINT shop_role_perms_role_check;
 --    ALTER TABLE shop_role_perms ADD CONSTRAINT shop_role_perms_role_check CHECK (role IN ('manager','staff'));
---  (برگرداندن به 'staff' دسترسیِ آن عضو را **بیشتر** می‌کند — حسابدار
---  می‌نویسد؛ اگر نمی‌خواهید، به‌جایش status='suspended' بزنید.)
 -- ============================================================
 
 ALTER TABLE shop_members DROP CONSTRAINT IF EXISTS shop_members_role_check;

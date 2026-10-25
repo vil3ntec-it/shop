@@ -20,7 +20,7 @@ class RoleGateTest {
   private val sale = base.copy(
     sales = base.sales + Sale(id = "s1"),
     saleItems = listOf(SaleItem(id = "si1", saleId = "s1", productId = "p1")),
-    stockMovements = listOf(StockMovement(id = "m1", productId = "p1")),
+    stockMovements = listOf(StockMovement(id = "m1", productId = "p1", type = "sale", qty = -1.0, refId = "s1")),
     auditLog = listOf(AuditEntry(id = "a1")),
     nextInvoiceNo = 2,
   )
@@ -70,27 +70,54 @@ class RoleGateTest {
     assertEquals("expenses", RoleGate.blocked("storekeeper", base, expense))
 
     //  برگشتِ ضایعات (#318): ردیفِ برگشت + اصلاحِ موجودی در رسیدِ انبار + حرکتِ انبار
+    val ret = SaleReturn(id = "r1", saleId = "s0", productId = "p1", quantity = 2.0, docId = "doc-1")
+    val dmg = WarehouseEntry(id = "w1", productId = "p1", units = -2.0, isAdjustment = true, adjKind = "damage", refId = "doc-1")
     val damagedReturn = base.copy(
-      saleReturns = listOf(SaleReturn(id = "r1", docId = "doc-1")),
-      warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1", units = -1.0, isAdjustment = true, adjKind = "damage", refId = "doc-1")),
-      stockMovements = listOf(StockMovement(id = "m3", productId = "p1")),
+      saleReturns = listOf(ret),
+      warehouseEntries = listOf(dmg),
+      stockMovements = listOf(
+        StockMovement(id = "m3", productId = "p1", type = "customer_return", qty = 2.0, refId = "r1"),
+        StockMovement(id = "m4", productId = "p1", type = "damage", qty = -2.0, refId = "r1"),
+      ),
     )
     assertNull(RoleGate.blocked("cashier", base, damagedReturn))
     assertEquals("returns", RoleGate.blocked("storekeeper", base, damagedReturn))
-    //  برگشتِ بی‌رسید با کالای سالم: همان، با نوعِ customer_return
-    val restock = damagedReturn.copy(warehouseEntries = listOf(WarehouseEntry(id = "w2", productId = "p1", units = 1.0, adjKind = "customer_return", refId = "r1")))
+    //  برگشتِ بی‌رسید با کالای سالم: همان، با نوعِ customer_return و مقدارِ مثبت
+    val restock = damagedReturn.copy(warehouseEntries = listOf(dmg.copy(id = "w2", units = 2.0, adjKind = "customer_return", refId = "r1")))
     assertNull(RoleGate.blocked("cashier", base, restock))
     //  رسیدِ انبارِ دستی، نوعِ اصلاحِ دیگر، یا اشاره به برگشتی که نیست ⇒ بسته
     val manual = base.copy(warehouseEntries = listOf(WarehouseEntry(id = "w3", productId = "p1", units = 10.0)))
     assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, manual))
-    val count = damagedReturn.copy(warehouseEntries = listOf(WarehouseEntry(id = "w4", productId = "p1", adjKind = "count", refId = "doc-1")))
-    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, count))
-    val orphan = base.copy(warehouseEntries = listOf(WarehouseEntry(id = "w5", productId = "p1", adjKind = "damage", refId = "doc-404")))
-    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, orphan))
+    fun withEntry(e: WarehouseEntry) = damagedReturn.copy(warehouseEntries = listOf(e))
+    for (bad in listOf(
+      dmg.copy(adjKind = "count"),                          //  نوعِ دیگر
+      dmg.copy(refId = "doc-404"),                          //  برگشتی که نیست
+      dmg.copy(isAdjustment = false),                       //  رسیدِ دستی با برچسبِ برگشت (بازبینیِ #336، یافتهٔ ۲)
+      dmg.copy(price = 70.0),                               //  با قیمت
+      dmg.copy(productId = "p2"),                           //  کالایی که در برگشت نیست
+      dmg.copy(units = -500.0),                             //  بیش از قلم
+      dmg.copy(units = 2.0),                                //  ضایعاتِ مثبت
+    )) assertEquals(bad.toString(), "warehouseEntries", RoleGate.blocked("cashier", base, withEntry(bad)))
+    //  هر قلم یک اصلاح
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base,
+      damagedReturn.copy(warehouseEntries = listOf(dmg, dmg.copy(id = "w1b")))))
+    //  برگشتِ ثبت‌شده (نه همین ذخیره) پایهٔ اصلاحِ تازه نیست
+    val old = base.copy(saleReturns = listOf(ret))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", old, old.copy(warehouseEntries = listOf(dmg))))
     //  ردیفِ موجود را صندوق‌دار نه ویرایش می‌کند نه حذف
     assertEquals("warehouseEntries", RoleGate.blocked("cashier", damagedReturn, damagedReturn.copy(warehouseEntries = emptyList())))
     assertEquals("warehouseEntries", RoleGate.blocked("cashier", damagedReturn,
-      damagedReturn.copy(warehouseEntries = damagedReturn.warehouseEntries.map { it.copy(units = -5.0) })))
+      damagedReturn.copy(warehouseEntries = damagedReturn.warehouseEntries.map { it.copy(units = -1.0) })))
+    //  حرکتِ انبار فقط از فاکتور و برگشت (یافتهٔ ۴): اصلاح یا خریدِ آزاد، یا فاکتوری که نیست ⇒ بسته
+    for (bad in listOf(
+      StockMovement(id = "mx", productId = "p1", type = "adjustment", qty = 1000.0),
+      StockMovement(id = "mx", productId = "p1", type = "purchase_in", qty = 5.0, refId = "s0"),
+      StockMovement(id = "mx", productId = "p1", type = "sale", qty = -1.0, refId = "s404"),
+      StockMovement(id = "mx", productId = "p1", type = "sale", qty = 1.0, refId = "s0"),
+    )) assertEquals(bad.toString(), "stockMovements", RoleGate.blocked("cashier", base, base.copy(stockMovements = listOf(bad))))
+    assertNull(RoleGate.blocked("cashier", base, base.copy(stockMovements = listOf(
+      StockMovement(id = "mc", productId = "p1", type = "sale_cancel", qty = 1.0, refId = "s0")))))
+    assertEquals("stockMovements", RoleGate.blocked("cashier", sale, sale.copy(stockMovements = emptyList())))
     //  انباردار رسیدِ دستی می‌نویسد؛ شاگرد و مدیر هم (بی قاعدهٔ ردیف)
     assertNull(RoleGate.blocked("storekeeper", base, manual))
     assertNull(RoleGate.blocked("staff", base, manual))

@@ -44,6 +44,7 @@ const staffPerms = require('./staff-perms');
 const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
+const roleRows = require('./role-rows');
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -578,56 +579,29 @@ function refersTo(parent, op) {
 }
 
 /**
- * نشانی‌های برگشت (شناسهٔ ردیف و `docId`) که ردیفِ قاعده‌دار می‌تواند به آن اشاره کند:
- * برگشت‌های درجِ همین دسته، به‌علاوهٔ برگشت‌های از پیش ثبت‌شده‌ای که `refId`ِ یکی از
- * ردیف‌ها به آن‌ها اشاره می‌کند (یک پرس‌وجو، فقط وقتی ردیفِ قاعده‌دار هست).
- * @param ops      opهای همین دسته — `{table, row_id, fields, insert}`
- * @param wanted   `refId`های ردیف‌های قاعده‌دار
- * @param lookup   async (ids) ⇒ [{row_id, doc}] از ردیف‌های ثبت‌شدهٔ `returns`
- * @returns {Promise<string[]>}
+ * opهای v1ِ بیرون از حدِ نقش: جدولی که نقش نمی‌نویسد، یا ردیفی از جدولِ قاعده‌دار که قاعده را
+ * نمی‌گذراند (صندوق‌دار: رسیدِ انبار فقط اصلاحِ قلمِ برگشتِ خودش، حرکتِ انبار فقط از فاکتور و
+ * برگشت؛ `role-rows.js`). برگشت و فاکتورِ همین دسته فقط اگر واقعاً می‌نشیند: نه op_id ِ ثبت‌شده
+ * (پاسخش «تکراری» است و ردیفی نمی‌سازد)، نه opِ نادرستِ ردشده. برگشتی که پس از این با داوریِ
+ * تأیید رد شود همراه‌هایش را با خودش می‌برد (`companionOf`).
  */
-async function returnRefs(ops, wanted, lookup) {
-  const refs = new Set();
-  for (const o of ops) {
-    if (o.table !== 'returns' || !o.insert) continue;
-    refs.add(String(o.row_id));
-    const d = isPlainObject(o.fields) ? o.fields.docId : null;
-    if (typeof d === 'string' && d) refs.add(d);
-  }
-  const missing = [...new Set(wanted.filter((r) => typeof r === 'string' && r && !refs.has(r)))];
-  if (missing.length) {
-    for (const r of await lookup(missing)) {
-      refs.add(String(r.row_id));
-      if (r.doc) refs.add(String(r.doc));
-    }
-  }
-  return [...refs];
-}
-
-/**
- * opهای v1ِ بیرون از حدِ نقش: جدولی که نقش نمی‌نویسد، یا ردیفی از جدولِ قاعده‌دار که
- * قاعده را نمی‌گذراند (صندوق‌دار: `warehouseEntries` فقط اصلاحِ موجودیِ یک برگشت).
- */
-async function offRoleV1(ctx, valid) {
+async function offRoleV1(ctx, valid, { deviceId = '', rejected = new Map() } = {}) {
   const off = [];
-  const ruled = [];
+  let ruled = false;
   for (const x of valid) {
     if (!core.canWrite(ctx.role, x.op.table)) off.push(x);
-    else if (core.rowRule(ctx.role, x.op.table)) ruled.push(x);
+    else if (core.rowRule(ctx.role, x.op.table)) ruled = true;
   }
-  if (!ruled.length) return off;
-  const fieldsOf1 = (x) => (x.op.type === 'insert' && isPlainObject(x.op.fields) ? x.op.fields : null);
-  const refs = await returnRefs(
-    valid.map((x) => ({ table: x.op.table, row_id: x.op.row_id, fields: x.op.fields, insert: x.op.type === 'insert' })),
-    ruled.map((x) => fieldsOf1(x)?.refId),
-    (ids) => many(
-      `SELECT row_id, data->>'docId' AS doc FROM sync_rows
-        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns' AND deleted_at IS NULL
-          AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
-      [ctx.accountId, ids]
-    ),
-  );
-  for (const x of ruled) if (!core.canWriteRow(ctx.role, x.op.table, fieldsOf1(x), refs)) off.push(x);
+  if (!ruled) return off;
+  const seen = new Set((await many(
+    'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
+  )).map((r) => r.op_id));
+  const items = valid.map((x) => ({
+    x, table: x.op.table, rowId: String(x.op.row_id || ''), insert: x.op.type === 'insert',
+    fresh: x.op.type === 'insert' && !seen.has(String(x.op.op_id)) && !rejected.has(x.i), fields: x.op.fields, unit: 0,
+  }));
+  const res = await roleRows.judge(ctx.role, items, roleRows.v1Db(many, ctx, deviceId));
+  for (const it of items) if (res.has(it) && !res.get(it).ok) off.push(it.x);
   return off;
 }
 
@@ -824,10 +798,10 @@ async function v1Guard(req, res, next) {
     //  A16: opی که جدولش (یا ردیفش) در حدِ نقش نیست (صندوق‌دار خرید، انباردار فروش، حسابدار
     //  هیچ). روی همان opِ یک‌دست‌شده‌ای سنجیده می‌شود که به v1 می‌رسد (پس از shopNewerFields).
     //  سه نقشِ قدیم «*»اند و قاعدهٔ ردیف ندارند، پس برایشان این فهرست همیشه خالی است.
-    const offTable = await offRoleV1(ctx, valid);
+    const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const offTable = await offRoleV1(ctx, valid, { deviceId, rejected });
     const hasNeed = valid.some((x) => x.need);
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
-    const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
     if (!hasNeed && !held0.length && !offTable.length) return finish();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
@@ -1157,7 +1131,7 @@ async function listApprovals(shopId, { limit = 100 } = {}) {
 }
 
 module.exports = {
-  ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES, returnRefs,
+  ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,

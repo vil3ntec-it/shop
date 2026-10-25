@@ -18,6 +18,7 @@ const { one, many, tx, newId, now } = require('../db');
 const { badRequest, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
 const permCore = require('./perm-core');
+const roleRows = require('./role-rows');
 
 /** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
 const TABLES = {
@@ -93,32 +94,21 @@ async function pushChanges(ctx, changes) {
   if (offTable) {
     throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(offTable.collection)})`, 'table_not_allowed');
   }
-  //  قاعدهٔ ردیف (صندوق‌دار: رسیدِ انبار فقط اصلاحِ موجودیِ یک برگشتِ همین دسته یا از پیش).
-  //  راهِ قدیم «ویرایش» و «درج» را از هم جدا نمی‌کند: ردیفِ تازه درج است، ردیفِ موجود ویرایش.
-  const ruled = changes.filter((ch) => permCore.rowRule(role, String(ch?.collection || '')));
-  if (ruled.length) {
-    const ids = ruled.map((ch) => String(ch?.id || '')).filter(Boolean);
-    const existing = new Set((ids.length ? await many(
-      `SELECT id FROM ${TABLES.warehouseEntries} WHERE shop_id=$1 AND id = ANY($2::text[])`, [shopId, ids]
-    ) : []).map((x) => x.id));
-    const refs = await require('./staff-approval').returnRefs(
-      changes.map((ch) => ({
-        table: String(ch?.collection || ''), row_id: String(ch?.id || ''),
-        fields: ch?.data && typeof ch.data === 'object' ? ch.data : null, insert: ch?.deleted !== true,
-      })),
-      ruled.map((ch) => (ch?.data && typeof ch.data === 'object' ? ch.data.refId : null)),
-      (want) => many(
-        `SELECT id AS row_id, data->>'docId' AS doc FROM ${TABLES.returns}
-          WHERE shop_id=$1 AND deleted=false AND (id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
-        [shopId, want]
-      ),
-    );
-    const bad = ruled.find((ch) => {
-      const insert = ch?.deleted !== true && !existing.has(String(ch?.id || ''));
-      const fields = insert && ch?.data && typeof ch.data === 'object' ? ch.data : null;
-      return !permCore.canWriteRow(role, String(ch.collection), fields, refs);
+  //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت؛ `role-rows.js`).
+  //  راهِ قدیم «ویرایش» و «درج» را از هم جدا نمی‌کند: ردیفِ موجود (حتی حذف‌شده) ویرایش است.
+  //  دسته همه یا هیچ است، پس برگشتی که این‌جا «تازه» است با همین دسته می‌نشیند — مگر کنار
+  //  گذاشته شود (شناسهٔ نادرست یا ردیفِ بزرگ)، که همان‌ها تازه شمرده نمی‌شوند.
+  if (changes.some((ch) => permCore.rowRule(role, String(ch?.collection || '')))) {
+    const items = changes.map((ch) => {
+      const id = String(ch?.id || '');
+      const data = ch?.data && typeof ch.data === 'object' && !Array.isArray(ch.data) ? ch.data : null;
+      const insert = ch?.deleted !== true && !!data;
+      const fits = insert && id.length <= 80 && Buffer.byteLength(JSON.stringify(data), 'utf8') <= MAX_RECORD_BYTES;
+      return { ch, table: String(ch?.collection || ''), rowId: id, insert, fresh: fits, fields: data, unit: 0 };
     });
-    if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(bad.collection)})`, 'table_not_allowed');
+    const res = await roleRows.judge(role, items, roleRows.legacyDb(many, shopId, userId, TABLES));
+    const bad = items.find((it) => res.has(it) && !res.get(it).ok);
+    if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${bad.table})`, 'table_not_allowed');
   }
 
   return tx(async (c) => {

@@ -40,7 +40,14 @@ for (const [name, file] of [['وب', WEB], ['سرور', SRV]]) {
     for (const c of V.writable) assert.deepEqual(P.writable(c.role), c.out, JSON.stringify(c));
     assert.deepEqual(P.RETURN_ADJ_KINDS, V.return_adj_kinds);
     for (const c of V.row_rules) assert.equal(P.rowRule(c.role, c.table), c.out, JSON.stringify(c));
-    for (const c of V.rows) assert.equal(P.canWriteRow(c.role, c.table, c.fields, c.refs), c.out, JSON.stringify(c));
+    assert.deepEqual(P.DOC_MOVE_TYPES, V.doc_move_types);
+    for (const c of V.rows) {
+      const got = P.checkRows(c.role, c.rows, c.refs);
+      assert.deepEqual(got.map((r) => r.reason), c.out, c._);
+      assert.deepEqual(got.map((r) => r.ok), c.out.map((r) => r === ''), c._);
+      //  تک‌ردیف همان دسته‌ای است که فقط همان ردیف را دارد
+      if (c.rows.length === 1) assert.equal(P.canWriteRow(c.role, c.rows[0].table, c.rows[0].row, c.refs), c.out[0] === '', c._);
+    }
   });
 }
 

@@ -112,27 +112,134 @@ object PermCore {
   /** نوعِ اصلاحِ موجودی که «برگشت» شمرده می‌شود — همان `RETURN_ADJ_KINDS`ِ JS */
   val RETURN_ADJ_KINDS: List<String> = listOf("customer_return", "damage")
 
-  /** قاعدهٔ ردیف: جدولی که نقش فقط بخشی از ردیف‌هایش را می‌نویسد — همان `ROW_RULES`ِ JS */
+  /** نوعِ حرکت ⇐ سندی که `refId` به آن اشاره می‌کند — همان `DOC_MOVE_TYPES`ِ JS */
+  val DOC_MOVE_TYPES: Map<String, String> =
+    mapOf("sale" to "sale", "sale_cancel" to "sale", "customer_return" to "return", "damage" to "return")
+
+  /** نوع‌هایی که مقدارشان منفی است (بیرون رفتن از موجودی)؛ بقیه مثبت */
+  private val NEGATIVE_KINDS = setOf("damage", "sale")
+
+  /** قاعدهٔ ردیف: جدولی که نقش فقط ردیف‌های تازهٔ معینی از آن را می‌نویسد — همان `ROW_RULES`ِ JS */
   private val ROW_RULES: Map<String, Map<String, String>> =
-    mapOf("cashier" to mapOf("warehouseEntries" to "return_adjustment"))
+    mapOf("cashier" to mapOf("warehouseEntries" to "return_adjustment", "stockMovements" to "doc_movement"))
 
   /** نامِ قاعدهٔ ردیفِ این نقش برای این جدول، یا null */
   fun rowRule(role: String, table: String): String? = ROW_RULES[role]?.get(table)
 
-  /**
-   *  این نقش همین ردیف را می‌نویسد؟ — همان `canWriteRow`ِ JS.
-   *  @param fields فیلدهای ردیفِ درج‌شونده؛ null یعنی ویرایش یا حذف
-   *  @param returnRefs شناسه‌ها و `docId`های برگشت‌های همین دسته و از پیش
-   */
-  fun canWriteRow(role: String, table: String, fields: Map<String, Any?>?, returnRefs: Collection<String>): Boolean {
-    if (!canWrite(role, table)) return false
-    rowRule(role, table) ?: return true
-    if (fields == null) return false
-    if ((fields["adjKind"] as? String) !in RETURN_ADJ_KINDS) return false
-    val ref = fields["refId"] as? String
-    if (ref.isNullOrEmpty()) return false
-    return ref in returnRefs
+  /** یک قلمِ برگشت: `own` = همین دسته، یا ثبت‌شده با همین دستگاه/کاربر */
+  data class ReturnLine(val id: String, val docId: String?, val productId: String, val qty: Double, val own: Boolean)
+
+  /** اصلاحِ ثبت‌شده‌ای که قلمی از برگشت را پیش‌تر گرفته است */
+  data class Taken(val refId: String, val productId: String, val units: Double?)
+
+  /** نشانی‌های قاعدهٔ ردیف — همان `refs`ِ JS */
+  data class RowRefs(
+    val returns: List<ReturnLine> = emptyList(),
+    val sales: Collection<String> = emptyList(),
+    val taken: List<Taken> = emptyList(),
+  )
+
+  /** یک ردیفِ دسته: `row` = نمای درجِ تازه؛ null = ویرایش، حذف، ردیفِ موجود یا شناسهٔ تکراری */
+  data class RowIn(val table: String, val row: Map<String, Any?>?)
+
+  data class RowCheck(val ok: Boolean, val reason: String)
+
+  private fun no(reason: String) = RowCheck(false, reason)
+  private val YES = RowCheck(true, "")
+  private fun num(v: Any?): Double? = (v as? Number)?.toDouble()?.takeIf { it.isFinite() }
+  private fun signOk(kind: String, v: Double?): Boolean = v != null && (if (kind in NEGATIVE_KINDS) v < 0 else v > 0)
+  private fun linesOf(refs: RowRefs, ref: String): List<ReturnLine> =
+    refs.returns.filter { it.id.isNotEmpty() && (it.id == ref || it.docId == ref) }
+  private fun ofProduct(lines: List<ReturnLine>, productId: Any?): List<ReturnLine> =
+    if (productId !is String || productId.isEmpty()) emptyList() else lines.filter { it.productId == productId }
+  private fun fits(lines: List<ReturnLine>, need: Double): Boolean = lines.any { it.qty.isFinite() && it.qty >= need }
+
+  /** کوچک‌ترین قلمِ آزادی که `need` در آن جا می‌شود (اولی در برابری) — همان `bestFit`ِ JS */
+  private fun bestFit(lines: List<ReturnLine>, need: Double, used: Set<String>): ReturnLine? {
+    var best: ReturnLine? = null
+    for (l in lines) {
+      if (l.id in used || !l.qty.isFinite() || l.qty < need) continue
+      if (best == null || l.qty < best.qty) best = l
+    }
+    return best
   }
+
+  private fun checkAdjustment(row: Map<String, Any?>, refs: RowRefs, used: MutableSet<String>): RowCheck {
+    if (row["isAdjustment"] != true) return no("adjustment")
+    for (k in listOf("price", "cartons", "perCarton")) {
+      val m = row[k]
+      if (m != null && !(m is Number && m.toDouble() == 0.0)) return no("price")
+    }
+    val kind = row["adjKind"] as? String
+    if (kind == null || kind !in RETURN_ADJ_KINDS) return no("kind")
+    val units = num(row["units"])
+    if (!signOk(kind, units)) return no("sign")
+    val ref = row["refId"] as? String
+    if (ref.isNullOrEmpty()) return no("ref")
+    var lines = linesOf(refs, ref)
+    if (lines.isEmpty()) return no("ref")
+    lines = lines.filter { it.own }
+    if (lines.isEmpty()) return no("owner")
+    lines = ofProduct(lines, row["productId"])
+    if (lines.isEmpty()) return no("product")
+    val need = kotlin.math.abs(units!!)
+    if (!fits(lines, need)) return no("qty")
+    val line = bestFit(lines, need, used) ?: return no("used")
+    used += line.id
+    return YES
+  }
+
+  private fun checkMovement(row: Map<String, Any?>, refs: RowRefs): RowCheck {
+    val type = row["type"] as? String
+    val doc = type?.let { DOC_MOVE_TYPES[it] } ?: return no("kind")
+    val qty = num(row["qty"])
+    if (!signOk(type, qty)) return no("sign")
+    val ref = row["refId"] as? String
+    if (ref.isNullOrEmpty()) return no("ref")
+    if (doc == "sale") return if (ref in refs.sales) YES else no("ref")
+    var lines = linesOf(refs, ref)
+    if (lines.isEmpty()) return no("ref")
+    lines = ofProduct(lines, row["productId"])
+    if (lines.isEmpty()) return no("product")
+    return if (fits(lines, kotlin.math.abs(qty!!))) YES else no("qty")
+  }
+
+  /** قلم‌هایی که اصلاحِ ثبت‌شده دارند — همان `usedLines`ِ JS */
+  private fun usedLines(refs: RowRefs): MutableSet<String> {
+    val used = HashSet<String>()
+    for (t in refs.taken) {
+      if (t.refId.isEmpty()) continue
+      val lines = ofProduct(linesOf(refs, t.refId), t.productId)
+      val u = t.units?.takeIf { it.isFinite() }
+      val line = bestFit(lines, if (u == null) 0.0 else kotlin.math.abs(u), used) ?: bestFit(lines, 0.0, used)
+      if (line != null) used += line.id
+    }
+    return used
+  }
+
+  /**
+   *  داوریِ ردیف‌های یک دسته، به ترتیب — همان `checkRows`ِ JS (و همان دلیل‌ها:
+   *  table · not_insert · adjustment · price · kind · sign · ref · owner · product · qty · used · rule).
+   */
+  fun checkRows(role: String, rows: List<RowIn>, refs: RowRefs): List<RowCheck> {
+    val used = usedLines(refs)
+    return rows.map { r ->
+      val rule = rowRule(role, r.table)
+      val row = r.row
+      when {
+        !canWrite(role, r.table) -> no("table")
+        rule == null -> YES
+        row == null -> no("not_insert")
+        rule == "return_adjustment" -> checkAdjustment(row, refs, used)
+        rule == "doc_movement" -> checkMovement(row, refs)
+        else -> no("rule")
+      }
+    }
+  }
+
+  /** این نقش همین یک ردیف را می‌نویسد؟ — `checkRows` با یک ردیف */
+  fun canWriteRow(role: String, table: String, row: Map<String, Any?>?, refs: RowRefs): Boolean =
+    checkRows(role, listOf(RowIn(table, row)), refs)[0].ok
 
   /** «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته — همان `writable`ِ JS */
   fun writable(role: String): Any? {

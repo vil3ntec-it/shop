@@ -243,7 +243,8 @@ test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف
   const r = await push1('cashier', buy);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.deepEqual(r.body.results.map((x) => x.op_id), buy.map((o) => o.op_id));
-  assert.deepEqual(reasons(r), ['tx_rejected', 'table_not_allowed', 'tx_rejected', 'table_not_allowed', 'applied']);
+  //  حرکتِ «purchase» خودش هم بیرون از قاعدهٔ حرکتِ صندوق‌دار است (فقط فاکتور و برگشت)
+  assert.deepEqual(reasons(r), ['table_not_allowed', 'table_not_allowed', 'tx_rejected', 'table_not_allowed', 'applied']);
   for (const o of buy.slice(0, 4)) assert.equal(await inOplog(o.op_id), false, o.table);
   assert.equal(await inOplog(buy[4].op_id), true);
 
@@ -256,20 +257,29 @@ test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف
   const back = await push1('cashier', ret);
   assert.equal(back.status, 200, JSON.stringify(back.body));
   assert.deepEqual(reasons(back), ['applied', 'applied', 'applied']);
-  //  رسیدِ انبارِ صندوق‌دار فقط اصلاحِ موجودیِ یک برگشت است (قاعدهٔ ردیفِ هسته):
-  //  رسیدِ دستی، نوعِ اصلاحِ دیگر، اشاره به برگشتی که نیست، و ویرایشِ ردیفِ موجود ⇒ رد
+  //  رسیدِ انبارِ صندوق‌دار فقط اصلاحِ موجودیِ قلمِ برگشتِ خودش است (قاعدهٔ ردیفِ هسته):
+  //  رسیدِ دستی، نوعِ اصلاحِ دیگر، اشاره به برگشتی که نیست، ویرایشِ ردیفِ موجود، و اصلاحِ دوم
+  //  برای قلمی که اصلاحش نشسته ⇒ رد
   const wh = [
     v1op('warehouseEntries', 'w2-csh', { productId: 'p1', units: 10, price: 50 }),
     v1op('warehouseEntries', 'w3-csh', { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'count', refId: 'rd1-csh' }),
     v1op('warehouseEntries', 'w4-csh', { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'damage', refId: 'rd-404' }),
     v1op('warehouseEntries', 'w1-csh', { units: -5 }, 'update'),
-    //  برگشتی که در دستهٔ پیش نشست (rd1-csh) ⇒ پذیرفته
     v1op('warehouseEntries', 'w5-csh', { productId: 'p1', units: 1, isAdjustment: true, adjKind: 'customer_return', refId: 'rd1-csh' }),
   ];
   const whr = await push1('cashier', wh);
   assert.equal(whr.status, 200, JSON.stringify(whr.body));
-  assert.deepEqual(reasons(whr), ['table_not_allowed', 'table_not_allowed', 'table_not_allowed', 'table_not_allowed', 'applied']);
-  for (const o of wh.slice(0, 4)) assert.equal(await inOplog(o.op_id), false, o.row_id);
+  assert.deepEqual(reasons(whr), wh.map(() => 'table_not_allowed'));
+  for (const o of wh) assert.equal(await inOplog(o.op_id), false, o.row_id);
+  //  برگشتی که همین دستگاه در دستهٔ پیش ثبت کرد پایهٔ اصلاحِ تازه است (قلمی که هنوز اصلاح ندارد)
+  const r2 = await push1('cashier', [
+    v1op('returns', 'r2-csh', { saleId: 's1-csh', saleItemId: 'si1-csh', productId: 'p1', quantity: 1, amount: 0, docId: 'rd2-csh' }),
+  ]);
+  assert.deepEqual(reasons(r2), ['applied'], JSON.stringify(r2.body));
+  const w6 = await push1('cashier', [
+    v1op('warehouseEntries', 'w6-csh', { productId: 'p1', units: 1, isAdjustment: true, adjKind: 'customer_return', refId: 'rd2-csh' }),
+  ]);
+  assert.deepEqual(reasons(w6), ['applied'], JSON.stringify(w6.body));
 
   //  ولی انباردار برگشت نمی‌زند
   const sk = await push1('storekeeper', [
@@ -339,7 +349,7 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   const sale = [
     v3op('c', 'sales', 's3-csh', { totalMinor: 2000, status: 'completed' }, 'tx-s3'),
     v3op('c', 'saleItems', 'si3-csh', { saleId: 's3-csh', productId: 'p1', quantityMilli: 1000 }, 'tx-s3'),
-    v3op('c', 'stockMovements', 'm3-s-csh', { productId: 'p1', qtyMilli: -1000, type: 'sale' }, 'tx-s3'),
+    v3op('c', 'stockMovements', 'm3-s-csh', { productId: 'p1', qtyMilli: -1000, type: 'sale', refId: 's3-csh' }, 'tx-s3'),
   ];
   const r = await push3('cashier', [...buy, ...sale]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -362,19 +372,22 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   const ret3 = await push3('cashier', [
     v3op('c', 'warehouseEntries', 'w3-ret-csh', { productId: 'p1', unitsMilli: -1000, isAdjustment: true, adjKind: 'damage', refId: 'rd3-csh' }, 'tx-r3'),
     v3op('c', 'returns', 'r3-csh', { saleId: 's3-csh', saleItemId: 'si3-csh', productId: 'p1', quantityMilli: 1000, amountMinor: 2000, docId: 'rd3-csh' }, 'tx-r3'),
+    v3op('c', 'returns', 'r3b-csh', { saleId: 's3-csh', saleItemId: 'si3-csh', productId: 'p1', quantityMilli: 1000, amountMinor: 0, docId: 'rd3-csh' }, 'tx-r3'),
   ]);
-  assert.deepEqual(reasons(ret3), ['applied', 'applied'], JSON.stringify(ret3.body));
+  assert.deepEqual(reasons(ret3), ['applied', 'applied', 'applied'], JSON.stringify(ret3.body));
   const man3 = await push3('cashier', [
     v3op('c', 'warehouseEntries', 'w3-man-csh', { productId: 'p1', unitsMilli: 5000, priceMinor: 100 }, 'tx-m3'),
     v3op('c', 'stockMovements', 'm3-man-csh', { productId: 'p1', qtyMilli: 5000, type: 'purchase' }, 'tx-m3'),
   ]);
   assert.deepEqual(reasons(man3), ['table_not_allowed', 'tx_rejected'], JSON.stringify(man3.body));
   assert.equal(await inV3('w3-man-csh'), false);
-  //  برگشتِ از پیش ثبت‌شده (دستهٔ پیش) هم نشانیِ درست است
+  //  برگشتِ همین دستگاه از دستهٔ پیش هم نشانیِ درست است — ولی هر قلم یک اصلاح: r3-csh اصلاحش را
+  //  دارد، r3b-csh نه
   const later3 = await push3('cashier', [
     v3op('c', 'warehouseEntries', 'w3-later-csh', { productId: 'p1', unitsMilli: 1000, isAdjustment: true, adjKind: 'customer_return', refId: 'r3-csh' }),
+    v3op('c', 'warehouseEntries', 'w3-later2-csh', { productId: 'p1', unitsMilli: 1000, isAdjustment: true, adjKind: 'customer_return', refId: 'r3b-csh' }),
   ]);
-  assert.deepEqual(reasons(later3), ['applied'], JSON.stringify(later3.body));
+  assert.deepEqual(reasons(later3), ['table_not_allowed', 'applied'], JSON.stringify(later3.body));
 
   const p = await push3('picker', [v3op('p', 'products', 'p3-pck', { name: 'x' })]);
   assert.deepEqual(reasons(p), ['table_not_allowed']);
@@ -419,8 +432,9 @@ test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data)
   assert.equal(inv.status, 403);
   assert.equal(inv.body.error.code, 'table_not_allowed');
   const lgRet = await legacy('cashier', [
-    { collection: 'returns', id: 'lg-r1', updatedAt: Date.now(), data: { saleId: 'lg-s1', amount: 10, docId: 'lg-rd1' } },
-    { collection: 'warehouseEntries', id: 'lg-w1', updatedAt: Date.now(), data: { productId: 'p1', units: -1, adjKind: 'damage', refId: 'lg-rd1' } },
+    { collection: 'returns', id: 'lg-r1', updatedAt: Date.now(), data: { saleId: 'lg-s1', productId: 'p1', quantity: 1, amount: 10, docId: 'lg-rd1' } },
+    { collection: 'warehouseEntries', id: 'lg-w1', updatedAt: Date.now(), data: { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'damage', refId: 'lg-rd1' } },
+    { collection: 'stockMovements', id: 'lg-m1', updatedAt: Date.now(), data: { productId: 'p1', qty: -1, type: 'damage', refId: 'lg-r1' } },
   ]);
   assert.equal(lgRet.status, 200, JSON.stringify(lgRet.body));
   const acc = await h.post('/api/products', { data: { name: 'x' } }, { token: T.accountant.accessToken });

@@ -110,18 +110,42 @@ class PermCoreTest {
     }
   }
 
-  /** قاعدهٔ ردیف (A16): صندوق‌دار از `warehouseEntries` فقط اصلاحِ موجودیِ یک برگشت را — همان JS */
+  @Suppress("UNCHECKED_CAST")
+  private fun refsOf(o: Any?): PermCore.RowRefs {
+    val m = (o as? Map<String, Any?>).orEmpty()
+    fun maps(k: String) = (m[k] as? List<*>).orEmpty().map { it as Map<String, Any?> }
+    return PermCore.RowRefs(
+      returns = maps("returns").map {
+        PermCore.ReturnLine(
+          id = it["id"] as String, docId = it["docId"] as String?, productId = it["productId"] as String,
+          qty = (it["qty"] as Number).toDouble(), own = it["own"] == true,
+        )
+      },
+      sales = (m["sales"] as? List<*>).orEmpty().map { it as String },
+      taken = maps("taken").map {
+        PermCore.Taken(it["refId"] as String, it["productId"] as String, (it["units"] as Number?)?.toDouble())
+      },
+    )
+  }
+
+  /** قاعدهٔ ردیف (A16): صندوق‌دار اصلاحِ موجودیِ قلمِ برگشتِ خودش و حرکتِ انبارِ سند — همان JS */
   @Test fun rowRules() {
     assertEquals(v.getValue("return_adj_kinds").jsonArray.map { it.jsonPrimitive.content }, PermCore.RETURN_ADJ_KINDS)
+    assertEquals(PermPolicy.tree(v.getValue("doc_move_types")), PermCore.DOC_MOVE_TYPES)
     for (c in list("row_rules")) {
       val out = c.getValue("out").let { if (it is JsonNull) null else it.jsonPrimitive.content }
       assertEquals(c.toString(), out, PermCore.rowRule(c.s("role"), c.s("table")))
     }
     for (c in list("rows")) {
       @Suppress("UNCHECKED_CAST")
-      val fields = PermPolicy.tree(c.getValue("fields")) as Map<String, Any?>?
-      val refs = c.getValue("refs").jsonArray.map { it.jsonPrimitive.content }
-      assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toBoolean(), PermCore.canWriteRow(c.s("role"), c.s("table"), fields, refs))
+      val rows = (PermPolicy.tree(c.getValue("rows")) as List<Map<String, Any?>>)
+        .map { PermCore.RowIn(it["table"] as String, it["row"] as Map<String, Any?>?) }
+      val refs = refsOf(PermPolicy.tree(c.getValue("refs")))
+      val want = c.getValue("out").jsonArray.map { it.jsonPrimitive.content }
+      val got = PermCore.checkRows(c.s("role"), rows, refs)
+      assertEquals(c.s("_"), want, got.map { it.reason })
+      assertEquals(c.s("_"), want.map { it.isEmpty() }, got.map { it.ok })
+      if (rows.size == 1) assertEquals(c.s("_"), want[0].isEmpty(), PermCore.canWriteRow(c.s("role"), rows[0].table, rows[0].row, refs))
     }
   }
 
