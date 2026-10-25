@@ -120,13 +120,3 @@ internal fun NewsDay(day: NewsModel.Day, stagger: V3StaggerState, offset: Int) {
     }
   }
 }
-
-/** فهرستِ عمودیِ هشدارهای خانه — ستونِ پایانِ خانهٔ تبلت */
-@Composable
-internal fun HomeAlertsList(view: HomeView, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
-  val stagger = ir.vil3ntec.tohid.ui.v3.rememberV3Stagger()
-  Box(modifier.padding(horizontal = 16.dp)) {
-    if (view.alerts.isEmpty()) HomeAlertsRow(emptyList(), onOpen)
-    else AlertGroup(ir.vil3ntec.tohid.core.i18n.StrHome.alertsAndMessages, view.alerts.map(ShopAlerts::fromHome), stagger, 0, onOpen)
-  }
-}
