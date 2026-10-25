@@ -327,7 +327,41 @@ async function versions() {
   };
 }
 
+/*
+ *  ── بررسیِ زنجیرهٔ هش از پنل — SEC-02 (نیمهٔ پنل) ─────────────────────
+ *  همان `verifyAll`ِ `lib/hash-chain-store.js` که `scripts/verify-chain.js`
+ *  صدا می‌زند — فقط‌خواندنی، بی هیچ منطقِ تازهٔ سنجش. شکسته‌ها همه می‌آیند
+ *  (نخستین حلقهٔ شکسته و دلیل)؛ از سالم‌ها فقط `maxOk` تا (با «سر» برای
+ *  یادداشتِ بیرونی) و بقیه فقط شمرده می‌شوند.
+ */
+const CHAIN_LIMITS = Object.freeze({ maxOk: 100, maxChains: 50 });
+
+async function chainReport({ rows = true, chains = [] } = {}) {
+  const store = require('./hash-chain-store');
+  const names = (Array.isArray(chains) ? chains : []).map(String).filter(Boolean).slice(0, CHAIN_LIMITS.maxChains);
+  const t = now();
+  let rep;
+  try {
+    rep = await store.verifyAll({ chains: names, rows: rows !== false });
+  } catch (err) {
+    if (err && err.code === 'bad_chain') throw require('../middleware/errors').badRequest(err.message, 'bad_chain');
+    throw err;
+  }
+  const enabled = await store.auditEnabled();
+  const pick = (r) => (r.ok
+    ? { chain: r.chain, ok: true, length: r.length, head: r.head }
+    : { chain: r.chain, ok: false, length: r.length, seq: r.seq, reason: r.reason });
+  const broken = rep.results.filter((r) => !r.ok).map(pick);
+  const good = rep.results.filter((r) => r.ok);
+  return {
+    ok: rep.ok, checkedAt: t, enabled, rows: rows !== false,
+    total: rep.results.length, okCount: good.length, brokenCount: broken.length,
+    broken, healthy: good.slice(0, CHAIN_LIMITS.maxOk).map(pick), truncated: good.length > CHAIN_LIMITS.maxOk,
+    reasons: require('../../scripts/verify-chain').REASONS,
+  };
+}
+
 module.exports = {
-  LIMITS, PROVIDER_STATES, VERSION_LIMITS, worst, snapshot, providers, versions, versionReport,
-  smsState, emailState, pushState,
+  LIMITS, PROVIDER_STATES, VERSION_LIMITS, CHAIN_LIMITS, worst, snapshot, providers, versions, versionReport,
+  chainReport, smsState, emailState, pushState,
 };

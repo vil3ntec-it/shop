@@ -52,7 +52,13 @@ sealed class HandoverSaleResult {
   data class Recorded(val saleId: String) : HandoverSaleResult()
   /** همین سفارش پیش‌تر فروش شده بود — همان فروش */
   data class AlreadyRecorded(val saleId: String) : HandoverSaleResult()
+  /** ثبت نشد؛ برنامه دوباره می‌کوشد (از فهرستِ «تحویلِ بی‌فروش») */
   data class Failed(val message: String) : HandoverSaleResult()
+  /**
+   *  خودکار ثبت **نمی‌شود** و دوباره هم کوشیده نمی‌شود — صاحب باید ببیند ([message] دلیل است؛
+   *  مثلاً تحویلِ پیش از راه‌اندازیِ «فروشِ تحویل»). وعدهٔ «دوباره می‌کوشد» نباید داده شود.
+   */
+  data class NeedsReview(val message: String) : HandoverSaleResult()
 }
 
 object HandoverSale {
