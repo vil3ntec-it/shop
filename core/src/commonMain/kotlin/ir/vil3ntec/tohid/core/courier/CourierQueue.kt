@@ -58,8 +58,15 @@ object CourierFlow {
   fun isLive(status: String): Boolean = status in LIVE
   fun isTerminal(status: String): Boolean = status in STATUSES && status !in LIVE
 
+  /**
+   *  گذارهای جدول که فقط برای «دریافتِ حضوری» است، نه پیک: بی «گرفتنِ بسته»
+   *  تحویل نیست (`check()`ِ سرور: invalid_transition). پیک فقط در روشِ
+   *  shop_courier کار دارد، پس این‌ها هرگز از پیک نیستند.
+   */
+  private val PICKUP_ONLY: Set<Pair<String, String>> = setOf("assigned" to "delivered")
+
   fun canSend(from: String, to: String): Boolean =
-    to in COURIER_TARGETS && to in (TRANSITIONS[from] ?: emptySet())
+    to in COURIER_TARGETS && to in (TRANSITIONS[from] ?: emptySet()) && (from to to) !in PICKUP_ONLY
 
   /**
    *  دکمه‌های کارتِ پیک برای هر وضعیت، به ترتیبِ نمایش. «تحویل شد» فقط پس

@@ -805,14 +805,14 @@ async function verificationAvailable() {
   return Boolean(provider) && provider !== 'log';
 }
 
-async function startVerification(body, { ip = '' } = {}) {
+async function startVerification(body, { ip = '', shopId = '' } = {}) {
   const phone = require('./validate').phone(obj(body).phone, { required: true });
   if (!(await verificationAvailable())) {
     throw new ApiError(503, 'verification_unavailable',
       'تأییدِ شماره هنوز روی این سرور راه‌اندازی نشده است؛ فعلاً برای سفارش با شمارهٔ دکان تماس بگیرید');
   }
   tokenKey();
-  const out = await require('./otp').request(phone, { purpose: OTP_PURPOSE, ip, app: 'shop' });
+  const out = await require('./otp').request(phone, { purpose: OTP_PURPOSE, ip, app: 'shop', shopId });
   return {
     sent: out.sent === true, expiresAt: out.expiresAt, resendSeconds: out.resendSeconds,
     ...(out.devCode ? { devCode: out.devCode } : {}),
