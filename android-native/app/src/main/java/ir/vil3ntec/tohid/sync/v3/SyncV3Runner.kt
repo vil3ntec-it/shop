@@ -185,6 +185,10 @@ class SyncV3Runner private constructor(context: Context) {
   /** زیرِ قفلِ `ShopStore.writeInternal` */
   fun record(data: ShopData): Int = runCatching { engine().record(data) }.getOrDefault(0).also { publish() }
 
+  /** همان، با opهای هدفمند (`SyncV1Engine.recordOps`) */
+  fun recordOps(ops: List<ir.vil3ntec.tohid.sync.v1.SyncOp>): Int =
+    runCatching { engine().recordOps(ops) }.getOrDefault(0).also { publish() }
+
   fun recover(onDisk: ShopData) {
     runCatching { engine().recover(onDisk) }
     publish()
