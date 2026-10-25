@@ -14,6 +14,10 @@
  * • عددها همین‌جا با هستهٔ مشترکِ متن و تقویم (`text-core.js`، `calendar-core.js`)
  *   به رقم و نمادِ انتخابیِ دکان در سربرگ قالب می‌خورند؛ صفحه فقط نشان می‌دهد.
  * • مبلغ‌ها همان فیلدهای ذخیره‌شده‌اند؛ این‌جا هیچ مبلغی حساب نمی‌شود.
+ * • تخفیفِ خودکار (پیگیریِ #307، فقط با پرچمِ `shop.promo_stamp`): ستونِ قلم‌ها همان مبلغِ
+ *   پرداختی و «جمع اقلام» همان `sale.total` (جمعِ همان ستون) می‌مانند؛ قلمِ تخفیف‌دار «مقدار ×
+ *   قیمتِ فهرست − تخفیفش» را نشان می‌دهد و تخفیفِ فاکتور فقط یک ردیفِ **آگاهی** است
+ *   («شاملِ تخفیفِ خودکار …»، `included`) — هیچ مبلغی دو بار کم نمی‌شود. خاموش ⇒ همان پاسخِ پیشین.
  */
 const config = require('../config');
 const { query, one } = require('../db');
@@ -38,7 +42,11 @@ const KIND_LABELS = Object.freeze({
   store_credit: 'اعتبار فروشگاه', gift_card: 'کارت هدیه', other: 'سایر', mixed: 'ترکیبی',
   online: 'پرداختِ آنلاین', cod: 'نقد هنگامِ تحویل',
 });
+/** پرچمِ نشانِ تخفیف روی فاکتور — همان `routes/shop-promos.js` و برنامه */
+const PROMO_FLAG = 'shop.promo_stamp';
+const MAX_PROMO_NAMES = 5;
 const LABELS = Object.freeze({
+  includesAuto: 'شاملِ تخفیفِ خودکار',
   subtotal: 'جمع اقلام', discount: 'تخفیف', total: 'مبلغ نهایی', paid: 'پرداختی',
   tendered: 'دریافتی', change: 'پولِ پس', remaining: 'باقی‌مانده (نسیه)',
   cash: 'نقدی', credit: 'نسیه', online: 'آنلاین', item: 'کالا',
@@ -166,7 +174,27 @@ function paymentRows(sale, money) {
   return [{ label: LABELS.paid, amount: money(sale.paidAmount) }];
 }
 
-function render({ sale, items, products, profile, tz }) {
+/** سهم‌های تخفیفِ خودکارِ یک قلم (`SaleItem.promo`)؛ فقط عددِ صحیحِ مثبت */
+function promoParts(it) {
+  return (Array.isArray(it.promo) ? it.promo : []).map(asObject)
+    .filter((p) => Number.isSafeInteger(p.discountMinor) && p.discountMinor > 0);
+}
+
+/** ردیفِ آگاهیِ «شاملِ تخفیفِ خودکار (نام‌ها)» — از جمع کم نمی‌شود؛ null ⇒ نیست */
+function includedOf(sale, items, money) {
+  const minor = sale.promoDiscountMinor;
+  if (!Number.isSafeInteger(minor) || minor <= 0) return null;
+  const names = [];
+  for (const it of items) {
+    for (const p of promoParts(it)) {
+      const name = typeof p.name === 'string' ? p.name.trim().slice(0, 80) : '';
+      if (name && !names.includes(name) && names.length < MAX_PROMO_NAMES) names.push(name);
+    }
+  }
+  return { label: LABELS.includesAuto + (names.length ? ` (${names.join('، ')})` : ''), amount: money(minor / 100) };
+}
+
+function render({ sale, items, products, profile, tz, stamp = false }) {
   const digits = profile.digits;
   const money = (x) => T.formatAfghani(num(x), profile.symbol, digits);
   const plain = (x) => T.formatAfghani(num(x), 'none', digits);
@@ -178,7 +206,7 @@ function render({ sale, items, products, profile, tz }) {
     const product = products.get(it.productId) || {};
     const name = (typeof it.name === 'string' && it.name.trim()) || (typeof product.name === 'string' && product.name.trim()) || LABELS.item;
     const returned = num(it.returnedQty);
-    return {
+    const line = {
       name,
       qty: formatQty(it.quantity, digits),
       unit: typeof product.unit === 'string' ? product.unit : '',
@@ -186,12 +214,20 @@ function render({ sale, items, products, profile, tz }) {
       total: plain(it.totalPrice),
       returned: returned > 0 ? formatQty(returned, digits) : null,
     };
+    //  پرچمِ روشن و قلمِ تخفیف‌دار: «مقدار × قیمتِ فهرست − تخفیفش» = همان مبلغِ پرداختیِ قلم
+    const promo = stamp ? promoParts(it).reduce((s, p) => s + p.discountMinor, 0) : 0;
+    if (promo > 0 && Number.isSafeInteger(it.listPriceMinor) && it.listPriceMinor >= 0) {
+      line.unitPrice = plain(it.listPriceMinor / 100);
+      line.autoDiscount = plain(promo / 100);
+    }
+    return line;
   });
   const allWhole = items.every((it) => Number.isInteger(num(it.quantity)));
   const qtySum = items.reduce((s, it) => s + num(it.quantity), 0);
 
   const discounts = num(sale.discount) > 0 ? [{ label: LABELS.discount, amount: money(sale.discount) }] : [];
-  return {
+  const included = stamp ? includedOf(sale, items, money) : null;
+  const view = {
     shop: { name: profile.name, address: profile.address, phone: T.displayDigits(profile.phone, digits), footer: profile.footer },
     no: T.displayDigits(invoiceNo(sale), digits),
     date: iso ? C.formatSolarNumeric(iso, digits) : '',
@@ -207,6 +243,8 @@ function render({ sale, items, products, profile, tz }) {
     payments: paymentRows(sale, money),
     remaining: num(sale.remaining) > 0 ? { label: LABELS.remaining, amount: money(sale.remaining) } : null,
   };
+  if (included) view.included = [included];
+  return view;
 }
 
 /** دادهٔ صفحه — یا ۴۰۴ ِ یکسان */
@@ -218,11 +256,13 @@ async function receiptOf(tag, tok) {
   if (!profile.qr) throw gone();
   const items = await itemsOf(store, shopId, saleId);
   const ids = [...new Set(items.map((i) => i.productId).filter((x) => typeof x === 'string' && x))];
-  const [products, tz] = await Promise.all([productsOf(store, shopId, ids), timezoneOf(shopId)]);
-  const view = render({ sale, items, products, profile: { ...profile, name: profile.name || shop.name || '' }, tz });
+  const [products, tz, stamp] = await Promise.all([
+    productsOf(store, shopId, ids), timezoneOf(shopId), require('./orders').flagOf(shopId, PROMO_FLAG),
+  ]);
+  const view = render({ sale, items, products, profile: { ...profile, name: profile.name || shop.name || '' }, tz, stamp });
   const logo = profile.logo ? await profiles.blob(profile.logo.hash) : null;
   view.shop.logo = logo ? `data:${logo.mime};base64,${logo.data.toString('base64')}` : null;
   return view;
 }
 
-module.exports = { NOT_YET, receiptOf, formatQty };
+module.exports = { NOT_YET, PROMO_FLAG, receiptOf, render, formatQty };
