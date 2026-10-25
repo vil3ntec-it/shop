@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.data.CustomerMerge
+import ir.vil3ntec.tohid.data.DebtTransaction
+import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
@@ -8,6 +11,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
+import ir.vil3ntec.tohid.sync.v1.SyncOp
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -492,5 +496,42 @@ class SyncV3EngineTest {
     assertTrue(counters.all { it.seq > head.seq })
     assertTrue(head.tx.startsWith("tx."))
     assertTrue(counters.all { it.tx == head.tx })
+  }
+
+  /**
+   *  CRM-10 روی v3: `recordOps` فقط همان opهای داده‌شده را به صف می‌برد و سایه را با همان‌ها
+   *  جلو می‌برد — تفاضلِ کلِ دفتر نمی‌گیرد، پس تغییرِ محلیِ دیگر نه همراهش می‌رود نه گم می‌شود.
+   *  و چرا `ShopStore.sweepMerged` روی v3 نمی‌نشیند: جابه‌جاییِ `debtorId` ِ قرض «ویرایشِ سند»
+   *  است و با قالبِ v2 به صندوقِ تعارض می‌رود.
+   */
+  @Test fun crmSweepRecordOpsIsTargetedAndDocMovesGoAsV2() {
+    val server = FakeServer()
+    val crm = ShopData(
+      debtors = listOf(Debtor(id = "c1", name = "احمد", phone = "+93700123456"), Debtor(id = "c2", name = "احمد کابلی", phone = "+93799555444")),
+      transactions = listOf(DebtTransaction(id = "t1", debtorId = "c2", type = "give", amount = 300.0, date = "2026-09-01")),
+    )
+    val b = Device("dev-b", server, crm).also { assertTrue(it.sync().ok) }
+    //  c1 در c2 ادغام شده و یک قرضِ دیررسیده هنوز روی c1 است (هر دو ثبت‌شده)
+    b.edit { d ->
+      d.copy(
+        debtors = d.debtors.map { if (it.id == "c1") it.copy(mergedInto = "c2") else it },
+        transactions = d.transactions + DebtTransaction(id = "late", debtorId = "c1", type = "give", amount = 70.0, date = "2026-10-18"),
+      )
+    }
+    assertTrue(b.engine.record(b.ledger.data) > 0)
+    //  تغییرِ محلیِ دیگری که هنوز op نشده
+    b.edit { it.copy(products = it.products + p1) }
+
+    val disk = b.ledger.data
+    val next = CustomerMerge.sweep(disk, "2026-10-20", 2) { "m2" }!!
+    val ops = CustomerMerge.sweepOps(disk, next)!!
+    assertEquals(setOf("transactions" to SyncOp.UPDATE, "auditLog" to SyncOp.INSERT), ops.map { it.table to it.type }.toSet())
+    b.ledger.data = next
+    val before = b.engine.queue.outbox.size
+    assertEquals(2, b.engine.recordOps(ops))
+    val added = b.engine.queue.outbox.drop(before)
+    assertTrue("جابه‌جاییِ قرض در v3 ویرایشِ سند است ⇒ v2", added.any { it.fmt == V3Entry.V2 })
+    assertEquals("فقط درجِ کالا مانده؛ sweep دوباره نمی‌رود و کالا گم نشده", 1, b.engine.record(b.ledger.data))
+    assertEquals(0, b.engine.record(b.ledger.data))
   }
 }
