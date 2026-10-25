@@ -7,6 +7,7 @@
  *      قلم، و فقط برگشتِ خودی (همین دسته یا همین دستگاه/کاربر).
  *   ۳. برگشتِ شبح: برگشتی که نمی‌نشیند (op_id ِ تکراری، tx ِ دیگر، لغوشده) نشانی نیست.
  *   ۴. حرکتِ انبار: فقط فاکتور و برگشت، با نشانیِ درست.
+ *   ۰. (#406) کدِ ثابتِ شاگرد نقشِ حسابدار را «شاگرد» نمی‌کند.
  */
 process.env.SYNC_V3_ENABLED = '1';
 const test = require('node:test');
@@ -290,4 +291,29 @@ test('کنترل — حسابدار: v1/v3/قدیم/عکس هیچ نمی‌نش�
   assert.equal((await h.api('PUT', '/api/sync/v1/photos/pA', { token: T.accountant.accessToken, body: {} })).status, 403);
   assert.equal(await v1Exists('auditLog', 'a-acc'), false);
   assert.equal(await v1Exists('warehouseEntries', 'w-acc'), false);
+});
+
+test('۰ — کدِ ثابتِ شاگرد نقشِ حسابدار را بالا نمی‌برد: همان حسابدار می‌ماند و هنوز هیچ نمی‌نویسد (#406)', async () => {
+  const standing = (await h.get('/api/shop/staff-code', { token: T.owner.accessToken })).body.code;
+  assert.ok(standing, 'کدِ ثابت');
+  const u = await h.newUser('شاگردی که حسابدار شد', 'shop');
+  const j1 = await h.post('/api/shop/join', { code: standing }, { token: u.accessToken });
+  assert.ok([200, 201].includes(j1.status), JSON.stringify(j1.body));
+  const m = (await h.get('/api/shop/members', { token: T.owner.accessToken })).body.members.find((x) => x.userId === u.user.id);
+  assert.ok(m, 'عضو');
+  const owner = await h.signIn(T.owner, 'shop');
+  const ch = await h.patch(`/api/shop/members/${m.id}`, { role: 'accountant' }, { token: owner.accessToken });
+  assert.equal(ch.status, 200, JSON.stringify(ch.body));
+  let s = await h.signIn(u, 'shop');
+  assert.equal(s.shop.actualRole, 'accountant');
+  const push = (ops) => h.api('POST', '/api/sync/v1/push', { token: s.accessToken, body: { device_id: 'esc-1', schema_version: 1, ops } });
+  assert.deepEqual(reasons(await push([v1op('products', 'p-esc-0', { name: 'x' })])), [DENY]);
+  //  خودِ کارمند همان کدِ ثابتِ همیشگی را دوباره می‌زند
+  const j2 = await h.post('/api/shop/join', { code: standing }, { token: s.accessToken });
+  assert.ok([200, 201].includes(j2.status), JSON.stringify(j2.body));
+  assert.equal(j2.body.actualRole, 'accountant', 'نقش بی اجازهٔ صاحب دکان بالا نرفت');
+  s = await h.signIn(u, 'shop');
+  assert.equal(s.shop.actualRole, 'accountant');
+  assert.deepEqual(reasons(await push([v1op('products', 'p-esc-1', { name: 'x', salePrice: 1 })])), [DENY]);
+  assert.equal(await v1Exists('products', 'p-esc-1'), false);
 });
