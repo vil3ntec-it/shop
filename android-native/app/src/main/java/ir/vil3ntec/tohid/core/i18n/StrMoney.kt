@@ -189,6 +189,8 @@ object StrMoney {
   val weOwe: String get() = t("بدهکاریم", "We owe", "پوروړي یو")
   val prepaidToSupplier: String get() = t("پیش‌پرداخت داریم", "Prepaid", "مخکې مو ورکړي")
   val accountSettled: String get() = t("حساب صاف است", "Settled", "حساب صاف دی")
+  fun owesAfn(amount: Any): String = t("$amount افغانی بدهکار", "Owes $amount AFN", "$amount افغانۍ پوروړی")
+  fun creditAfn(amount: Any): String = t("$amount افغانی موجودی دارد", "$amount AFN in credit", "$amount افغانۍ زېرمه لري")
   val emptySuppliers: String get() = t("هنوز تأمین‌کننده‌ای ثبت نشده است.", "No suppliers yet.", "تر اوسه عرضه‌کوونکی نشته.")
   val emptySuppliersBody: String get() = t(
     "کسانی که از آن‌ها جنس می‌خرید را ثبت کنید تا خرید و بدهی به هرکدام جدا بماند.",

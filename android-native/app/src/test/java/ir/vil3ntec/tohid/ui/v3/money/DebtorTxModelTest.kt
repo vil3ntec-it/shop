@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
@@ -74,5 +76,25 @@ class DebtorTxModelTest {
     assertTrue(s.contains("0791112233"))
     assertTrue(s.endsWith("بدهی ندارد"))
     assertEquals("بدهی ندارد", DebtorLedgerModel.summary("", since = null))
+  }
+
+  @Test
+  fun `مدت و حالِ حساب در انگلیسی هم ترجمه است — نه «۱ ماه in debt»`() {
+    val day = 86_400_000L
+    val now = 1_800_000_000_000L
+    assertEquals("2 ماه", MoneyText.span(now - 65 * day, now))
+    assertEquals("1,000 افغانی بدهکار", MoneyText.state(1000.0))
+    assertEquals("—", MoneyText.span(0, now))
+    I18n.source = { Lang.EN }
+    try {
+      assertEquals("2 months", MoneyText.span(now - 65 * day, now))
+      assertEquals("1 year and 2 months", MoneyText.days(430))
+      assertEquals("Owes 1,000 AFN", MoneyText.state(1000.0))
+      assertEquals("250 AFN in credit", MoneyText.state(-250.0))
+      assertEquals("Settled", MoneyText.state(0.0))
+      assertEquals("1 day in debt", DebtorLedgerModel.summary("", now - day, now))
+    } finally {
+      I18n.source = { Lang.FA }
+    }
   }
 }

@@ -121,7 +121,7 @@ internal fun TxFormSheet(
     V3PageSwitch(step, depth = { it.ordinal }) { s ->
       when (s) {
         TxFormStep.FORM -> Column(Modifier.v3Shake(shake)) {
-          Text("${debtor.name} — ${DebtorEngine.stateText(balance)}", style = v3Text(13, FontWeight.Medium, 18), color = PhoneV3.colors.inkMuted)
+          Text("${debtor.name} — ${MoneyText.state(balance)}", style = v3Text(13, FontWeight.Medium, 18), color = PhoneV3.colors.inkMuted)
           Spacer(Modifier.height(12.dp))
           V3Segmented(
             listOf(StrMoney.giveKind, StrMoney.receiveKind),
@@ -145,7 +145,7 @@ internal fun TxFormSheet(
           }
           Spacer(Modifier.height(14.dp))
           Text(
-            StrMoney.balanceAfterSave(DebtorEngine.stateText(DebtorFormsModel.balanceAfter(balance, f))),
+            StrMoney.balanceAfterSave(MoneyText.state(DebtorFormsModel.balanceAfter(balance, f))),
             style = v3Text(14, FontWeight.SemiBold, 20),
             color = PhoneV3.colors.ink,
           )

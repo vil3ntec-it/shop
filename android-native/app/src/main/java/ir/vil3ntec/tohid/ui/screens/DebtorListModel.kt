@@ -157,8 +157,8 @@ object DebtorListModel {
   /** زیرِ مبلغ: شماره اگر هست، وگرنه «۱٬۰۰۰ افغانی بدهکار» / «حساب صاف است» */
   fun subtitle(row: Row): String =
     if (row.debtor.phone.isNotBlank()) LocaleText.phoneDisplay(row.debtor.phone)
-    else DebtorEngine.stateText(row.balance)
+    else ir.vil3ntec.tohid.ui.v3.money.MoneyText.state(row.balance)
 
   /** قرصِ ساعت: فقط وقتی بدهکار است */
-  fun daysLabel(row: Row): String? = row.days?.takeIf { row.owes }?.let { ir.vil3ntec.tohid.daysText(it) }
+  fun daysLabel(row: Row): String? = row.days?.takeIf { row.owes }?.let { ir.vil3ntec.tohid.ui.v3.money.MoneyText.days(it) }
 }

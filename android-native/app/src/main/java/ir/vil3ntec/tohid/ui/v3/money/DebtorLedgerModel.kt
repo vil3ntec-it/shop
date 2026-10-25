@@ -93,7 +93,7 @@ object DebtorLedgerModel {
    */
   fun info(account: DebtorEngine.Account, book: DebtBook.Book?, now: Long = System.currentTimeMillis()): List<Info> = buildList {
     account.since?.let { since ->
-      add(Info(StrMoney.daysInDebt(ir.vil3ntec.tohid.spanText(since, now), ir.vil3ntec.tohid.formatMillis(since)), InfoTone.OWE))
+      add(Info(StrMoney.daysInDebt(MoneyText.span(since, now), ir.vil3ntec.tohid.formatMillis(since)), InfoTone.OWE))
     }
     book ?: return@buildList
     if (book.overdue.isNotEmpty()) add(Info(StrMoney.overdue(book.overdue.size, DebtBook.show(book.overdueAmount)), InfoTone.OWE))
@@ -106,7 +106,7 @@ object DebtorLedgerModel {
 
   /** خلاصهٔ کشوی بسته: شماره (اگر هست) و «۶ روز بدهکار» / «بدهی ندارد» */
   fun summary(phone: String, since: Long?, now: Long = System.currentTimeMillis()): String {
-    val debt = if (since != null) StrMoney.inDebtShort(ir.vil3ntec.tohid.spanText(since, now)) else StrMoney.noDebt
+    val debt = if (since != null) StrMoney.inDebtShort(MoneyText.span(since, now)) else StrMoney.noDebt
     val number = ir.vil3ntec.tohid.LocaleText.phoneDisplay(phone).trim()
     return if (number.isEmpty()) debt else "\u2066$number\u2069 · $debt"
   }
