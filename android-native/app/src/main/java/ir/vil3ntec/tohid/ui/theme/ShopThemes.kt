@@ -20,7 +20,7 @@ import androidx.compose.ui.graphics.Color
  *   • «در انتظارِ تأیید» بنفش است (`status.awaitingApproval`، همان بنفشِ «نیازِ بررسی»)؛ هشدار کهربایی
  *     (`status.warning`). نشان‌ها: `PillTone.AWAITING` / `WARNING`، کیت: `V3Status.AWAITING` / `WARNING`.
  *   • `heroChipShade`: سایهٔ سیاهِ زیرِ شیشهٔ سفیدِ تراشه‌های کادرِ بزرگ تا برچسبِ ۱۲sp روی هر جای
- *     گرادیان ≥ ۴٫۵:۱ بماند (روز: آسمان و غروب ۱۰٪، اقیانوس ۳۰٪؛ شب لازم نیست).
+ *     گرادیان ≥ ۴٫۵:۱ بماند (روز: آسمان و غروب ۱۵٪، اقیانوس ۳۰٪؛ شب لازم نیست).
  *  `PhoneV3Colors`، `PhoneV3Roles`، `PhoneV3Palette` و `PhoneV3Ui` همه از همین `ShopColors` می‌گیرند.
  */
 
@@ -137,7 +137,7 @@ internal val SkyLight = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF60A5FA),
   heroScrim = 0.04f,
-  heroChipShade = 0.1f,
+  heroChipShade = 0.15f,
 )
 
 internal val SkyDark = ShopColors(
@@ -385,7 +385,7 @@ internal val DuskLight = ShopColors(
   accents = ThemeAccents.ALL,
   brandOnInverse = Color(0xFF818CF8),
   heroScrim = 0.3f,
-  heroChipShade = 0.1f,
+  heroChipShade = 0.15f,
 )
 
 internal val DuskDark = ShopColors(
