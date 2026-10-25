@@ -13,6 +13,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ir.vil3ntec.tohid.core.atrest.AtRestException
 import ir.vil3ntec.tohid.core.atrest.AtRestMigration
+import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.v1.SyncRebuild
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
@@ -351,6 +352,33 @@ class ShopStore(private val context: Context) {
       }
       writeLocked(engine, next)
     }
+  }
+
+  /**
+   *  CRM-10: آیا «ادغامِ مشتری» روی این دستگاه باز است؟ `null` ⇒ باز؛ وگرنه همان یک خطِ دلیل
+   *  برای کنارِ دکمهٔ بسته.
+   *
+   *  ⛔ روی همگام‌سازیِ v3 بسته است: آن‌جا جابه‌جاییِ `debtorId` ِ قرض و فاکتور «ویرایشِ سندِ
+   *  مالی» است، با قالبِ v2 می‌رود و سرور آن را به صندوقِ تعارض می‌برد (`SyncV3Engine`، آزمونِ
+   *  `docEditIsNotLostGoesAsV2`). راهِ سرور بعداً ساخته می‌شود (STATUS: CRM-10 ⇒ PARTIAL).
+   */
+  fun mergeBlockedReason(): String? = if (SyncChoice.isV3(context)) StrShell.mergeNotOnV3 else null
+
+  /**
+   *  CRM-10: تنها درِ ادغامِ دو مشتری — `CustomerMerge.merge` روی دفترِ همین لحظه، از همان
+   *  [update] (قفلِ نوشتن، قفلِ نرم، op). بسته ([mergeBlockedReason]) ⇒ `Failed` با همان دلیل:
+   *  نه نوشتن، نه op.
+   */
+  suspend fun mergeCustomers(keepId: String, dropId: String): CustomerMerge.Result {
+    mergeBlockedReason()?.let { return CustomerMerge.Result.Failed(it) }
+    var out: CustomerMerge.Result = CustomerMerge.Result.Failed(StrShell.mergeNotSaved)
+    val wrote = update { d ->
+      when (val r = CustomerMerge.merge(d, keepId, dropId)) {
+        is CustomerMerge.Result.Ok -> { out = r; r.data }
+        is CustomerMerge.Result.Failed -> { out = r; null }
+      }
+    }
+    return if (wrote == false) CustomerMerge.Result.Failed(StrShell.mergeNotSaved) else out
   }
 
   /**
