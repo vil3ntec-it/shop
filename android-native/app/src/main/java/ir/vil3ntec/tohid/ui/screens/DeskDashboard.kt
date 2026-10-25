@@ -31,12 +31,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.DashboardEngine
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.softCard
 import ir.vil3ntec.tohid.ui.theme.tabular
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.Str
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 
 /**
  *  داشبوردِ کامپیوتر — نمای کلیِ دکان در یک نگاه، نه کاشی‌های گوشی.
@@ -71,18 +74,18 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
         Text(
-          if (name.isNotBlank()) "سلام، $name" else "سلام",
+          if (name.isNotBlank()) StrHome.hello(name) else StrHome.hi,
           style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text,
         )
         Text(
-          "${formatDate(today)} · ${if (b.alertCount > 0) "${b.alertCount} هشدار نیاز به توجه دارد" else "همه‌چیز رو به راه است"}",
+          displayDate(today) + " · " + (if (b.alertCount > 0) StrHome.alertsNeedAttention(b.alertCount) else StrHome.allGood),
           style = MaterialTheme.typography.bodyMedium, color = if (b.alertCount > 0) Shop.colors.danger else Shop.colors.muted,
         )
       }
       Row(
         Modifier.clip(RoundedCornerShape(20.dp)).background(Shop.colors.surface2).padding(3.dp),
       ) {
-        listOf(1 to "امروز", 7 to "۷ روز", 30 to "۳۰ روز", 90 to "۹۰ روز").forEach { (n, label) ->
+        listOf(1 to Str.today, 7 to Str.days(7), 30 to Str.days(30), 90 to Str.days(90)).forEach { (n, label) ->
           val on = n == days
           Text(
             label,
@@ -106,73 +109,73 @@ fun DeskDashboardScreen(d: ShopData, onOpen: (String) -> Unit, onProduct: (Strin
     } else Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       //  VILL3N: فروش = برند، سود = موفق، شمار = آبیِ اطلاع، میانگین = بنفشِ دادهٔ تکمیلی، طلب = کهربایی
       //  (قرمز فقط برای هشدارِ واقعی — طلب از مشتری دادهٔ عادیِ دکان است)
-      KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, "فروش", money(b.sales.value), b.sales.changePct, Shop.colors.iconActive)
-      KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, "سودِ ناخالص", money(b.profit.value), b.profit.changePct, Shop.colors.success)
-      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, "تعدادِ فاکتور", b.invoices.value.toInt().toString(), b.invoices.changePct, Shop.colors.info)
-      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, "میانگینِ فاکتور", money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.status.needsReview.fg)
-      KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, "طلب از مشتریان", money(b.receivables), null, Shop.colors.warning) { onOpen("debtors") }
+      KpiCard(Modifier.weight(1f), Icons.Filled.PointOfSale, StrHome.sales, money(b.sales.value), b.sales.changePct, Shop.colors.iconActive)
+      KpiCard(Modifier.weight(1f), Icons.Filled.TrendingUp, StrHome.grossProfit, money(b.profit.value), b.profit.changePct, Shop.colors.success)
+      KpiCard(Modifier.weight(1f), Icons.Filled.Receipt, StrHome.invoiceCount, b.invoices.value.toInt().toString(), b.invoices.changePct, Shop.colors.info)
+      KpiCard(Modifier.weight(1f), Icons.Filled.ShoppingBasket, StrHome.avgInvoice, money(b.avgTicket.value), b.avgTicket.changePct, Shop.colors.status.needsReview.fg)
+      KpiCard(Modifier.weight(1f), Icons.Filled.AccountBalanceWallet, StrHome.receivablesCustomers, money(b.receivables), null, Shop.colors.warning) { onOpen("debtors") }
     }
 
     /* ۳ ─ نمودار و کارهای سریع */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(300.dp)) {
       //  scroll = false: نمودار باید همهٔ ارتفاعِ کارت را بگیرد؛ درونِ ستونِ لغزان ارتفاعش صفر می‌شد و خطِ صاف می‌کشید
-      Panel2(Modifier.weight(2.2f).fillMaxHeight(), "فروش و سود", "${if (days == 1) "امروز" else "$days روزِ گذشته"} · امروز ${money(b.todaySales)} ؋", scroll = false) {
+      Panel2(Modifier.weight(2.2f).fillMaxHeight(), StrHome.salesAndProfit, (if (days == 1) Str.today else StrHome.pastDays(days)) + " · " + StrHome.todayAmount(money(b.todaySales)), scroll = false) {
         SalesChart(b.series, Modifier.fillMaxSize())
       }
-      Panel2(Modifier.weight(1f).fillMaxHeight(), "کارهای سریع") {
-        QuickAction(Icons.Filled.PointOfSale, "فروشِ تازه", "صندوق — Ctrl+2") { onOpen("sale") }
-        QuickAction(Icons.Filled.AddBox, "کالای تازه", "جدولِ کالاها") { onOpen("products") }
-        QuickAction(Icons.Filled.Payments, "دریافت از مشتری", "صورت‌حساب و F7") { onOpen("debtors") }
-        QuickAction(Icons.Filled.LocalShipping, "ورودِ انبار و خرید", "${b.activeCount} کالای فعال") { onOpen("warehouse") }
-        QuickAction(Icons.Filled.Assessment, "گزارش‌ها", "اکسل و چاپ") { onOpen("reports") }
+      Panel2(Modifier.weight(1f).fillMaxHeight(), StrHome.quickActions) {
+        QuickAction(Icons.Filled.PointOfSale, StrHome.newSale, StrHome.registerCtrl2) { onOpen("sale") }
+        QuickAction(Icons.Filled.AddBox, StrHome.newItem, StrHome.itemsTable) { onOpen("products") }
+        QuickAction(Icons.Filled.Payments, StrHome.receiveFromCustomer, StrHome.statementF7) { onOpen("debtors") }
+        QuickAction(Icons.Filled.LocalShipping, StrHome.stockInPurchase, StrHome.activeItems(b.activeCount)) { onOpen("warehouse") }
+        QuickAction(Icons.Filled.Assessment, Str.reports, StrHome.excelPrint) { onOpen("reports") }
       }
     }
 
     /* ۴ ─ هشدارها */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(270.dp)) {
-      AlertPanel(Modifier.weight(1f), "ناموجود", b.outOfStock.size, Shop.colors.danger,
-        b.outOfStock.map { it.product.id to (it.product.name to "۰ ${it.product.unit}") }, onProduct)
-      AlertPanel(Modifier.weight(1f), "کم‌موجود", b.lowStock.size, Shop.colors.warning,
-        b.lowStock.map { it.product.id to (it.product.name to "${qty(it.stock)} از حدِ ${qty(it.product.minStock)}") }, onProduct)
-      AlertPanel(Modifier.weight(1f), "انقضا (۳۰ روزِ آینده)", b.expiring.size, Shop.colors.warning,
-        b.expiring.map { it.product.id to (it.product.name to if (it.expired) "گذشته · ${qty(it.remaining)}" else "${it.daysLeft} روز · ${qty(it.remaining)}") }, onProduct)
-      AlertPanel(Modifier.weight(1f), "قرضِ بیش از ۶۰ روز", b.debtOverdue.size, Shop.colors.danger,
-        b.debtOverdue.map { it.debtor.id to (it.debtor.name to "${money(it.balance)} · ${it.days} روز") }) { onOpen("debtors") }
+      AlertPanel(Modifier.weight(1f), Str.outOfStock, b.outOfStock.size, Shop.colors.danger,
+        b.outOfStock.map { it.product.id to (it.product.name to "0 ${it.product.unit}") }, onProduct)
+      AlertPanel(Modifier.weight(1f), Str.lowStock, b.lowStock.size, Shop.colors.warning,
+        b.lowStock.map { it.product.id to (it.product.name to StrHome.ofMin(qty(it.stock), qty(it.product.minStock))) }, onProduct)
+      AlertPanel(Modifier.weight(1f), StrHome.expiry30, b.expiring.size, Shop.colors.warning,
+        b.expiring.map { it.product.id to (it.product.name to if (it.expired) StrHome.expiredQty(qty(it.remaining)) else Str.days(it.daysLeft) + " · " + qty(it.remaining)) }, onProduct)
+      AlertPanel(Modifier.weight(1f), Str.overdue60, b.debtOverdue.size, Shop.colors.danger,
+        b.debtOverdue.map { it.debtor.id to (it.debtor.name to money(it.balance) + (it.days?.let { n -> " · " + Str.days(n) } ?: "")) }) { onOpen("debtors") }
     }
 
     /* ۵ ─ فروش‌ها و قرض‌ها */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(330.dp)) {
-      Panel2(Modifier.weight(1.3f).fillMaxHeight(), "پرفروش‌ها", "در همین بازه") {
-        if (b.top.isEmpty()) Empty("فروشی در این بازه نیست")
+      Panel2(Modifier.weight(1.3f).fillMaxHeight(), StrHome.topSellers, StrHome.inThisPeriod) {
+        if (b.top.isEmpty()) Empty(StrHome.noSalesPeriod)
         b.top.forEachIndexed { i, p ->
           ListRow("${i + 1}. ${p.product.name}", "${qty(p.quantity)} ${p.product.unit}", "${money(p.revenue)} ؋") { onProduct(p.product.id) }
         }
       }
-      Panel2(Modifier.weight(1.3f).fillMaxHeight(), "بی‌فروش (موجود ولی نفروخته)", "${b.unsold.size} کالا — سرمایهٔ خوابیده") {
-        if (b.unsold.isEmpty()) Empty("همهٔ کالاهای موجود فروش داشته‌اند")
+      Panel2(Modifier.weight(1.3f).fillMaxHeight(), StrHome.unsold, StrHome.idleCapital(b.unsold.size)) {
+        if (b.unsold.isEmpty()) Empty(StrHome.allSold)
         b.unsold.take(8).forEach { a ->
           ListRow(a.product.name, "${qty(a.stock)} ${a.product.unit}", "${money(a.stock * a.product.purchasePrice)} ؋") { onProduct(a.product.id) }
         }
       }
-      Panel2(Modifier.weight(1.1f).fillMaxHeight(), "قرض‌هایی که بالا رفته", "افزایشِ بدهی در همین بازه") {
-        if (b.debtRising.isEmpty()) Empty("بدهیِ هیچ مشتری‌ای بالا نرفته")
+      Panel2(Modifier.weight(1.1f).fillMaxHeight(), StrHome.risingDebts, StrHome.debtIncrease) {
+        if (b.debtRising.isEmpty()) Empty(StrHome.noRisingDebt)
         b.debtRising.forEach { l ->
-          ListRow(l.debtor.name, "+${money(l.change)}", "مانده ${money(l.balance)}", Shop.colors.danger) { onOpen("debtors") }
+          ListRow(l.debtor.name, "+${money(l.change)}", StrHome.balance(money(l.balance)), Shop.colors.danger) { onOpen("debtors") }
         }
       }
     }
 
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(300.dp)) {
-      Panel2(Modifier.weight(1f).fillMaxHeight(), "سهمِ دسته‌ها از فروش") {
+      Panel2(Modifier.weight(1f).fillMaxHeight(), StrHome.categoryShare) {
         CategoryDonut(b.categories, Modifier.fillMaxSize())
       }
-      Panel2(Modifier.weight(1.6f).fillMaxHeight(), "فاکتورهای تازه", "ارزشِ انبار ${money(b.stockValue)} ؋ · ${b.productCount} کالا") {
-        if (b.recent.isEmpty()) Empty("هنوز فاکتوری نیست")
+      Panel2(Modifier.weight(1.6f).fillMaxHeight(), StrHome.recentInvoices, StrHome.stockValueLine(money(b.stockValue), b.productCount)) {
+        if (b.recent.isEmpty()) Empty(StrHome.noInvoices)
         b.recent.forEach { s ->
-          val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: "مشتریِ گذری"
+          val who = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name } ?: Str.walkIn
           ListRow(
             "#${s.invoiceLabel() ?: "-"} · $who",
-            "${formatDate(s.date)} · ${ir.vil3ntec.tohid.data.PayFlow.payLabel(s)}",
+            "${displayDate(s.date)} · ${ir.vil3ntec.tohid.data.PayFlow.payLabel(s)}",
             "${money(s.finalTotal)} ؋",
           ) { onOpen("sales") }
         }
@@ -215,7 +218,7 @@ private fun KpiCard(modifier: Modifier, icon: ImageVector, title: String, value:
       if (change != null) {
         val up = change >= 0
         Text(
-          "${if (up) "▲" else "▼"} ${"%.0f".format(kotlin.math.abs(change))}٪ نسبت به بازهٔ قبل",
+          "${if (up) "▲" else "▼"} " + StrHome.vsPrevious("%.0f".format(kotlin.math.abs(change))),
           style = MaterialTheme.typography.labelMedium, color = if (up) Shop.colors.success else Shop.colors.danger,
         )
       } else Text(" ", style = MaterialTheme.typography.labelMedium)
@@ -237,7 +240,7 @@ private fun QuickAction(icon: ImageVector, title: String, hint: String, onClick:
       Text(title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       Text(hint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
-    Icon(Icons.Filled.ChevronLeft, null, tint = Shop.colors.muted)
+    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, tint = Shop.colors.muted)
   }
 }
 
@@ -282,7 +285,7 @@ private fun AlertPanel(
       }
       Spacer(Modifier.height(8.dp))
       Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-        if (rows.isEmpty()) Empty("چیزی نیست ✓")
+        if (rows.isEmpty()) Empty(StrHome.nothingCheck)
         rows.take(30).forEach { (id, pair) ->
           Row(
             Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).clickable { onClick(id) }.padding(vertical = 5.dp, horizontal = 2.dp),
@@ -300,7 +303,7 @@ private fun AlertPanel(
 @Composable
 private fun SalesChart(series: List<DashboardEngine.Day>, modifier: Modifier) {
   if (series.isEmpty() || series.all { it.sales == 0.0 }) {
-    Box(modifier, contentAlignment = Alignment.Center) { Text("فروشی در این بازه ثبت نشده", color = Shop.colors.muted) }
+    Box(modifier, contentAlignment = Alignment.Center) { Text(StrHome.noSalesPeriodRecorded, color = Shop.colors.muted) }
     return
   }
   val brand = Shop.colors.chart.sales
@@ -308,11 +311,11 @@ private fun SalesChart(series: List<DashboardEngine.Day>, modifier: Modifier) {
   val grid = Shop.colors.chart.grid
   Column(modifier) {
     Row {
-      Legend(brand, "فروش")
+      Legend(brand, StrHome.sales)
       Spacer(Modifier.width(14.dp))
-      Legend(green, "سود")
+      Legend(green, StrHome.profit)
       Spacer(Modifier.weight(1f))
-      Text("بیشینه ${money(series.maxOf { it.sales })}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text(StrHome.maxOf(money(series.maxOf { it.sales })), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     Spacer(Modifier.height(6.dp))
     Canvas(Modifier.weight(1f).fillMaxWidth()) {
@@ -336,9 +339,9 @@ private fun SalesChart(series: List<DashboardEngine.Day>, modifier: Modifier) {
       area(series.map { it.profit.coerceAtLeast(0.0) }, green)
     }
     Row {
-      Text(formatDate(series.last().iso), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text(displayDate(series.last().iso), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       Spacer(Modifier.weight(1f))
-      Text(formatDate(series.first().iso), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text(displayDate(series.first().iso), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
   }
 }
@@ -364,10 +367,10 @@ private fun donutColors(): List<Color> = Shop.colors.let { c ->
 @Composable
 private fun CategoryDonut(shares: List<DashboardEngine.Share>, modifier: Modifier) {
   val total = shares.sumOf { it.revenue }
-  if (total <= 0) { Box(modifier, contentAlignment = Alignment.Center) { Text("فروشی در این بازه نیست", color = Shop.colors.muted) }; return }
+  if (total <= 0) { Box(modifier, contentAlignment = Alignment.Center) { Text(StrHome.noSalesPeriod, color = Shop.colors.muted) }; return }
   val top = shares.take(6).toMutableList()
   val rest = shares.drop(6).sumOf { it.revenue }
-  if (rest > 0) top += DashboardEngine.Share("بقیه", rest)
+  if (rest > 0) top += DashboardEngine.Share(StrHome.others, rest)
   val DonutColors = donutColors()
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
     Canvas(Modifier.size(150.dp)) {

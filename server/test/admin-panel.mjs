@@ -788,6 +788,36 @@ await step('عملیات: سرویس‌های بیرونی با برچسبِ «�
   }
 });
 
+// ── OPS-04: داشبوردِ نسخهٔ دستگاه‌ها و هشدارِ زیرِ حداقل ───────────
+await step('عملیات: نسخهٔ دستگاه‌ها با هشدارِ قرمزِ «زیرِ حداقل»', async () => {
+  const plans = require('../src/lib/plans');
+  const before = await plans.allConfig();
+  const t = now();
+  await query(
+    `INSERT INTO sync_devices (app, account_kind, account_id, device_id, app_version, last_seen_at)
+     VALUES ('shop','shop','ops-acc','ops-dev-1','2.13.0',$1), ('shop','shop','ops-acc','ops-dev-2','2.14.2',$1)`,
+    [t - 60_000]
+  );
+  await plans.setConfig('latest_version_shop', '2.14.2');
+  await plans.setConfig('min_app_version_shop', '2.14.0');
+  try {
+    await openTab('ops');
+    await page.waitForSelector('#ops-versions tr[data-version="2.13.0"]', { timeout: 10_000 });
+    const badge = (v) => page.locator(`#ops-versions tr[data-app="shop"][data-version="${v}"] .badge`).textContent();
+    assert.equal((await badge('2.13.0')).trim(), 'زیرِ حداقل');
+    assert.equal((await badge('2.14.2')).trim(), 'به‌روز');
+    const alert = page.locator('#ops-ver-msg .msg');
+    assert.match(await alert.textContent(), /۱ دستگاهِ دکان زیرِ حداقل نسخهٔ 2\.14\.0/);
+    assert.ok((await alert.getAttribute('class')).includes('msg-bad'), 'هشدارِ زیرِ حداقل باید قرمز باشد');
+    assert.ok(!(await page.locator('#ops-versions').textContent()).includes('ops-acc'), 'شناسهٔ حساب در پنل');
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-versions.png`, fullPage: true });
+  } finally {
+    await query(`DELETE FROM sync_devices WHERE account_id='ops-acc'`);
+    await plans.setConfig('latest_version_shop', before.latest_version_shop || '');
+    await plans.setConfig('min_app_version_shop', before.min_app_version_shop || '');
+  }
+});
+
 // ── IMG-01 / IMG-BANK-01 / IMG-03 / IMG-PRO-09: ورودِ گروهی از پنل، با گزارشِ ردیف و فایل ──
 await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ جعلی و خراب جدا گزارش می‌شوند و دسته نمی‌خوابد', async () => {
   const F = require('./image-fixtures');

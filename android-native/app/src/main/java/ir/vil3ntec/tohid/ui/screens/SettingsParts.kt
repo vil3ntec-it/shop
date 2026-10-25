@@ -13,7 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +30,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
 import ir.vil3ntec.tohid.ui.theme.glassSurface
 import androidx.compose.runtime.saveable.rememberSaveable
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  اجزای صفحهٔ تنظیمات.
@@ -53,6 +55,8 @@ fun SettingsSection(
   subtitle: String,
   tint: Color = Shop.colors.primary,
   initiallyOpen: Boolean = false,
+  /** کلیدِ باز/بسته ماندن؛ پیش‌فرض همان عنوان. بخشی که عنوانش با زبان عوض می‌شود و نباید با زدنِ کلیدِ زبان بسته شود (بخشِ «زبان») کلیدِ ثابت می‌دهد */
+  stateKey: String = title,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
@@ -62,7 +66,7 @@ fun SettingsSection(
     DeskSettingsSection(icon, title, subtitle, tint, content)
     return
   }
-  var open by rememberSaveable(title) { mutableStateOf(initiallyOpen) }
+  var open by rememberSaveable(stateKey) { mutableStateOf(initiallyOpen) }
   val colors = Shop.colors
   val turn by animateFloatAsState(
     targetValue = if (open) 180f else 0f,
@@ -90,7 +94,7 @@ fun SettingsSection(
       }
       Icon(
         Icons.Filled.ExpandMore,
-        contentDescription = if (open) "بستن" else "باز کردن",
+        contentDescription = if (open) Str.close else StrSettings.open,
         tint = colors.muted,
         modifier = Modifier.rotate(turn),
       )
@@ -170,7 +174,7 @@ fun SettingsRow(
       trailing != null -> trailing()
       value != null -> Text(value, style = MaterialTheme.typography.labelMedium, color = colors.muted)
       onClick != null -> Icon(
-        Icons.Filled.ChevronLeft,
+        Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
         tint = colors.muted2,
         modifier = Modifier.size(18.dp),
@@ -265,7 +269,9 @@ private fun DeskSettingsSection(icon: ImageVector, title: String, subtitle: Stri
  */
 @Composable
 fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable () -> Unit) {
-  var pick by rememberSaveable { mutableStateOf(sections.first().first) }
+  //  جای بخش نگه داشته می‌شود، نه عنوانش: با عوض‌شدنِ زبان عنوان‌ها عوض می‌شوند و بخشِ باز نباید گم شود
+  var pickAt by rememberSaveable { mutableStateOf(0) }
+  val pick = sections.getOrElse(pickAt) { sections.first() }.first
   Row(Modifier.fillMaxSize().padding(16.dp)) {
     Column(
       Modifier
@@ -276,15 +282,15 @@ fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable
         .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
         .padding(10.dp),
     ) {
-      Text("تنظیمات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
-      sections.forEach { (title, icon) ->
-        val on = title == pick
+      Text(Str.settings, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
+      sections.forEachIndexed { i, (title, icon) ->
+        val on = i == pickAt
         Row(
           Modifier
             .fillMaxWidth()
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .background(if (on) Shop.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
-            .clickable { pick = title }
+            .clickable { pickAt = i }
             .padding(horizontal = 12.dp, vertical = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
