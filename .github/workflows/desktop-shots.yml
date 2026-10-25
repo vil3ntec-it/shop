@@ -32,8 +32,9 @@ permissions:
 
 jobs:
   #  کدام گروه‌های نسخهٔ ۳ عکس بگیرند و در چند تکهٔ موازی:
-  #   • درخواستِ یک گروه ⇐ فقط گروه‌هایی که در `ui/v3/<گروه>/` یا `shots/<Group>Shots.kt` تغییر کرده‌اند، + foundation؛
-  #   • پایه (v3-foundation)، phone-v3 و اجرای دستی ⇐ همهٔ گروه‌ها، سه‌تا‌سه‌تا در تکه‌های موازی.
+  #   • شاخهٔ یک گروه (`…-v3-<گروه>`) ⇐ foundation + همان گروه + هر گروهِ دیگری که در `ui/v3/<گروه>/` یا
+  #     `shots/<Group>Shots.kt` ِ همان درخواست تغییر کرده؛
+  #   • پایه (v3-foundation)، phone-v3، هر شاخهٔ دیگر و اجرای دستی ⇐ همهٔ گروه‌ها، سه‌تا‌سه‌تا در تکه‌های موازی.
   #  فهرستِ گروه‌ها از خودِ `*Shots.kt` خوانده می‌شود (`override val group`)؛ گروهِ تازه خودش می‌آید.
   plan:
     name: گزینشِ گروه‌های نسخهٔ ۳
@@ -53,15 +54,15 @@ jobs:
           BR="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
           ALL=$(grep -ho 'override val group = "[a-z0-9-]*"' desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/*Shots.kt | sed 's/.*"\(.*\)"/\1/' | sort -u)
           test -n "$ALL"
-          case "$BR" in
-            ccr-3a0d593c-ac0jpj-v3-foundation|ccr-3a0d593c-ac0jpj-phone-v3) FULL=1 ;;
-            *) FULL=$([ "$EVENT" = pull_request ] && echo 0 || echo 1) ;;
-          esac
+          #  گروهِ شاخه از نامش (`…-v3-<گروه>`) و فقط اگر چنین گروهی در `*Shots.kt` هست
+          G="${BR##*-v3-}"
+          FULL=1
+          if [ "$EVENT" = pull_request ] && [ "$G" != "$BR" ] && [ "$G" != foundation ] && grep -Fxq "$G" <<<"$ALL"; then FULL=0; fi
           if [ "$FULL" = 1 ]; then
             PICK="$ALL"
           else
             FILES=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
-            PICK=$( { echo foundation
+            PICK=$( { echo foundation; echo "$G"
               sed -nE 's#^android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/([a-z0-9-]+)/.*#\1#p' <<<"$FILES"
               for f in $(sed -nE 's#^desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/([A-Za-z]+Shots)\.kt$#\1#p' <<<"$FILES"); do
                 grep -ho 'override val group = "[a-z0-9-]*"' "desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/$f.kt" 2>/dev/null | sed 's/.*"\(.*\)"/\1/' || true
@@ -69,7 +70,7 @@ jobs:
           fi
           #  تکه‌ها: هر تکه تا سه گروه (`groupshots:a,b,c`)
           SHARDS=$(printf '%s\n' $PICK | paste -sd' ' | python3 -c 'import json,sys; g=sys.stdin.read().split(); print(json.dumps([",".join(g[i:i+3]) for i in range(0, len(g), 3)]))')
-          echo "گروه‌ها ($([ "$FULL" = 1 ] && echo همه || echo تغییرکرده)): $SHARDS"
+          echo "گروه‌ها ($([ "$FULL" = 1 ] && echo همه || echo "گروهِ $G و تغییرکرده‌ها")): $SHARDS"
           echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
 
   shots:
