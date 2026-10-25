@@ -98,7 +98,7 @@ internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
             title = StrMoney.supplierDebtTotal,
             value = MoneyText.afn(owed),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
-            chips = listOf(V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, actions.onNewSupplier)),
+            chips = listOf(V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)),
           )
           Spacer(Modifier.height(16.dp))
         }

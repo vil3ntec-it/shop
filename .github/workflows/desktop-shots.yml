@@ -27,8 +27,52 @@ concurrency:
 
 permissions:
   contents: write
+  #  فهرستِ فایل‌های PR برای گزینشِ گروه‌های نسخهٔ ۳ (`plan`)
+  pull-requests: read
 
 jobs:
+  #  کدام گروه‌های نسخهٔ ۳ عکس بگیرند و در چند تکهٔ موازی:
+  #   • شاخهٔ یک گروه (`…-v3-<گروه>`) ⇐ foundation + همان گروه + هر گروهِ دیگری که در `ui/v3/<گروه>/` یا
+  #     `shots/<Group>Shots.kt` ِ همان درخواست تغییر کرده؛
+  #   • پایه (v3-foundation)، phone-v3، هر شاخهٔ دیگر و اجرای دستی ⇐ همهٔ گروه‌ها، سه‌تا‌سه‌تا در تکه‌های موازی.
+  #  فهرستِ گروه‌ها از خودِ `*Shots.kt` خوانده می‌شود (`override val group`)؛ گروهِ تازه خودش می‌آید.
+  plan:
+    name: گزینشِ گروه‌های نسخهٔ ۳
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          BR="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          ALL=$(grep -ho 'override val group = "[a-z0-9-]*"' desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/*Shots.kt | sed 's/.*"\(.*\)"/\1/' | sort -u)
+          test -n "$ALL"
+          #  گروهِ شاخه از نامش (`…-v3-<گروه>`) و فقط اگر چنین گروهی در `*Shots.kt` هست
+          G="${BR##*-v3-}"
+          FULL=1
+          if [ "$EVENT" = pull_request ] && [ "$G" != "$BR" ] && [ "$G" != foundation ] && grep -Fxq "$G" <<<"$ALL"; then FULL=0; fi
+          if [ "$FULL" = 1 ]; then
+            PICK="$ALL"
+          else
+            FILES=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
+            PICK=$( { echo foundation; echo "$G"
+              sed -nE 's#^android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/([a-z0-9-]+)/.*#\1#p' <<<"$FILES"
+              for f in $(sed -nE 's#^desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/([A-Za-z]+Shots)\.kt$#\1#p' <<<"$FILES"); do
+                grep -ho 'override val group = "[a-z0-9-]*"' "desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/$f.kt" 2>/dev/null | sed 's/.*"\(.*\)"/\1/' || true
+              done; } | sort -u | grep -Fxf <(echo "$ALL") )
+          fi
+          #  تکه‌ها: هر تکه تا سه گروه (`groupshots:a,b,c`)
+          SHARDS=$(printf '%s\n' $PICK | paste -sd' ' | python3 -c 'import json,sys; g=sys.stdin.read().split(); print(json.dumps([",".join(g[i:i+3]) for i in range(0, len(g), 3)]))')
+          echo "گروه‌ها ($([ "$FULL" = 1 ] && echo همه || echo "گروهِ $G و تغییرکرده‌ها")): $SHARDS"
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+
   shots:
     name: عکس از همهٔ بخش‌ها
     runs-on: ubuntu-latest
@@ -148,18 +192,95 @@ jobs:
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 
-      #  بازسازیِ VILL3N: کیت و هر گروه (`desktop/.../shots/<Group>Shots.kt`) — هر حالت
-      #  روشن/تیره × فارسی/انگلیسی در shots/v3/<گروه>/<حالت>-<تم>-<زبان>.png
-      - name: عکس‌های کیت و گروه‌های نسخهٔ ۳
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shots-legacy
+          path: ${{ runner.temp }}/shots
+          retention-days: 3
+
+  #  بازسازیِ VILL3N: کیت و هر گروه (`desktop/.../shots/<Group>Shots.kt`) — هر حالت روشن/تیره ×
+  #  فارسی/انگلیسی در shots/v3/<گروه>/<حالت>-<تم>-<زبان>.png. هر تکه برنامهٔ خودش را باز می‌کند؛ پایانِ
+  #  هر گروه نشانِ `.done` دارد (`DevShot`). مهلت تمام شد یا گروهی نیمه ماند ⇐ کار قرمز، نه عکسِ کم و بی‌صدا.
+  v3:
+    name: نسخهٔ ۳ — ${{ matrix.groups }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        groups: ${{ fromJson(needs.plan.outputs.shards) }}
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: قلم و نمایشگرِ مجازی
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb fonts-noto-core >/dev/null
+
+      - name: کامپایل
+        working-directory: desktop
+        run: ./gradlew --no-daemon -q -Pdev=true compileKotlin
+
+      - name: دفترِ نمایشی
+        run: node desktop/tools/demo-ledger.mjs "$RUNNER_TEMP/tohid-data"
+
+      - name: عکس‌های گروه‌ها
         working-directory: desktop
         env:
           TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
+          SHOT_GROUPS: ${{ matrix.groups }}
         run: |
           mkdir -p "$RUNNER_TEMP/shots/v3"
-          S="wait:6000;key:ESCAPE;wait:1500;groupshots:all"
+          S="wait:6000;key:ESCAPE;wait:1500;groupshots:$SHOT_GROUPS"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots/v3 -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 900 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run || true
-          find "$RUNNER_TEMP/shots/v3" -name '*.png' | wc -l
+          set +e
+          timeout 1800 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run
+          rc=$?
+          set -e
+          [ "$rc" -eq 124 ] && echo "::error::مهلتِ ۳۰ دقیقهٔ عکس‌های «$SHOT_GROUPS» تمام شد"
+          bad=""
+          for g in ${SHOT_GROUPS//,/ }; do
+            n=$(find "$RUNNER_TEMP/shots/v3/$g" -name '*.png' 2>/dev/null | wc -l)
+            if [ -f "$RUNNER_TEMP/shots/v3/$g/.done" ]; then echo "$g: $n عکس، کامل"
+            else bad="$bad $g($n$(cat "$RUNNER_TEMP/shots/v3/$g/.partial" 2>/dev/null | sed 's/^/ از /'))"; fi
+          done
+          if [ -n "$bad" ]; then echo "::error::عکسِ این گروه‌ها کامل نشد:$bad (کدِ خروج $rc)"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shots-v3-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 3
+          if-no-files-found: ignore
+
+  #  همهٔ عکس‌ها یک‌جا ⇐ شاخهٔ desktop-screenshots. اگر تکه‌ای قرمز شد، باز هم هرچه هست منتشر می‌شود
+  #  (و کارِ همان تکه قرمز می‌ماند)، تا عکس‌های گروه‌های سالم از دست نروند.
+  publish:
+    name: انتشارِ عکس‌ها
+    needs: [shots, v3]
+    if: ${{ always() && needs.shots.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: shots-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/shots
+
+      - name: نشان‌های پایانِ گروه بیرون
+        run: find "$RUNNER_TEMP/shots" \( -name .done -o -name .partial \) -delete
 
       - uses: actions/upload-artifact@v4
         with:
