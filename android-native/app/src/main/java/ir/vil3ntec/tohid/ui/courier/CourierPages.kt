@@ -10,12 +10,9 @@ import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,10 +50,8 @@ import androidx.compose.material.icons.outlined.NotificationsNone
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.Place
-import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.ReportProblem
 import androidx.compose.material.icons.outlined.Route
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.TaskAlt
@@ -69,7 +64,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -89,6 +83,15 @@ import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Tone
 import ir.vil3ntec.tohid.ui.theme.PhoneV3UiDark
+import ir.vil3ntec.tohid.ui.theme.V3Status
+import ir.vil3ntec.tohid.ui.v3.V3IconButton
+import ir.vil3ntec.tohid.ui.v3.V3SearchField
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.ui.v3.V3Sheet
+import ir.vil3ntec.tohid.ui.v3.V3StaggerState
+import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.v3Pressable
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /*
  *  برگه‌های حالتِ پیک به شکلِ مرجعِ صاحب محصول (courier-ref.jpg، صفحهٔ چپ):
@@ -99,16 +102,6 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3UiDark
 
 private fun lastSyncText(at: Long): String =
   if (at <= 0) "هنوز با دکان همگام نشده است" else "آخرین به‌روزرسانی: ${formatMillis(at)} · ${clock(at)}"
-
-/** فشردنِ کاشی‌ها (بخشِ G) */
-@Composable
-private fun Modifier.pressable(onClick: () -> Unit, role: Role = Role.Button, enabled: Boolean = true): Modifier {
-  val interaction = androidx.compose.runtime.remember { MutableInteractionSource() }
-  val down by interaction.collectIsPressedAsState()
-  val scale by animateFloatAsState(if (down && Motion.enabled) 0.94f else 1f, label = "tilePress")
-  return this.graphicsLayer { scaleX = scale; scaleY = scale }
-    .clickable(interactionSource = interaction, indication = LocalIndication.current, enabled = enabled, role = role, onClick = onClick)
-}
 
 @Composable
 private fun Avatar(name: String, size: Int) {
@@ -136,7 +129,7 @@ internal fun CourierHomeTab(
   queue: QueueState,
   query: String,
   onQuery: (String) -> Unit,
-  seen: MutableSet<String>,
+  seen: V3StaggerState,
   onBell: () -> Unit,
   onOpen: (MissionCard) -> Unit,
   onMissions: () -> Unit,
@@ -169,14 +162,14 @@ internal fun CourierHomeTab(
             )
           }
         }
-        CourierRoundButton(Icons.Outlined.NotificationsNone, "پیام‌ها", onBell, dot = bell.total > 0)
+        V3IconButton(Icons.Outlined.NotificationsNone, "پیام‌ها", dot = bell.total > 0, onClick = onBell)
       }
     }
     item(key = "search") {
       Column {
         Text("پیگیریِ سفارش", style = courierText(16.sp, FontWeight.Bold), color = p.ink)
         Spacer(Modifier.height(8.dp))
-        CourierSearch(query, onQuery, "شمارهٔ سفارش…", Icons.Outlined.Search)
+        V3SearchField(query, onQuery, "شمارهٔ سفارش…")
       }
     }
     if (query.isNotBlank()) {
@@ -212,10 +205,9 @@ internal fun CourierHomeTab(
         }
       } else {
         itemsIndexed(recent, key = { _, c -> "r-" + c.id }) { index, c ->
-          val appear = rememberCourierAppear("r-" + c.id, index, seen)
           RecentRow(
             c, CourierQueue.pendingFor(queue, c.id).isNotEmpty(),
-            Modifier.animateItem().graphicsLayer { alpha = appear.value; translationY = (1f - appear.value) * 20.dp.toPx() },
+            Modifier.animateItem().v3Stagger(seen, "r-" + c.id, index),
           ) { onOpen(c) }
         }
       }
@@ -230,7 +222,7 @@ private fun CurrentMissionCard(c: MissionCard?, waiting: Boolean, onOpen: () -> 
   val dark = PhoneV3UiDark
   Column(
     Modifier.fillMaxWidth().courierDark(p).clip(CourierCardShape)
-      .then(if (c != null) Modifier.pressable(onOpen) else Modifier)
+      .then(if (c != null) Modifier.v3Pressable(label = "سفارشِ #${c.orderNo.fa()}", onClick = onOpen) else Modifier)
       .padding(18.dp),
   ) {
     if (c == null) {
@@ -275,8 +267,10 @@ private fun CurrentMissionBody(c: MissionCard, waiting: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("وضعیت", style = courierText(12.sp), color = p.onBlackMuted)
       Spacer(Modifier.width(8.dp))
-      CourierPill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, dark))
-      if (waiting) { Spacer(Modifier.width(6.dp)); CourierPill("در صف", dark.awaiting) }
+      CourierOnDark {
+        MissionStatus(c.status)
+        if (waiting) { Spacer(Modifier.width(6.dp)); QueuedPill() }
+      }
     }
     if (reached(c.status) >= 0) {
       Spacer(Modifier.height(14.dp))
@@ -290,7 +284,7 @@ private fun Shortcut(icon: ImageVector, label: String, onClick: () -> Unit) {
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   Column(
-    Modifier.width(80.dp).clip(RoundedCornerShape(16.dp)).pressable(onClick).padding(vertical = 4.dp),
+    Modifier.width(80.dp).clip(RoundedCornerShape(16.dp)).v3Pressable(label = label, scale = 0.94f, onClick = onClick).padding(vertical = 4.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {
     Box(Modifier.size(56.dp).courierCard(p, CircleShape, elevation = 2.dp), contentAlignment = Alignment.Center) {
@@ -324,7 +318,7 @@ internal fun RecentRow(c: MissionCard, waiting: Boolean, modifier: Modifier = Mo
     }
     Spacer(Modifier.width(8.dp))
     Column(horizontalAlignment = Alignment.End) {
-      CourierPill(if (waiting) "در صف" else STATUS_LABEL[c.status] ?: c.status, if (waiting) ui.awaiting else statusTone(c.status, ui))
+      if (waiting) QueuedPill() else MissionStatus(c.status)
       val amount = c.cashCollectedMinor ?: c.expectedCollectMinor
       if (amount > 0) {
         Spacer(Modifier.height(4.dp))
@@ -364,7 +358,7 @@ internal fun CourierNavBar(current: String, onPick: (String) -> Unit, modifier: 
       val circle by animateColorAsState(if (sel) dark.primaryOnDark else Color.Transparent, tween(motionMs(220)), label = "navCircle")
       Row(
         Modifier.height(48.dp).clip(CourierPillShape).background(capsule)
-          .pressable({ onPick(item.id) }, role = Role.Tab)
+          .v3Pressable(label = item.label, role = Role.Tab, scale = 0.94f, onClick = { onPick(item.id) })
           .padding(start = 4.dp, end = if (sel) 14.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
@@ -406,9 +400,9 @@ internal fun CourierStatsTab(
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("آمار", style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
-      CourierRoundButton(Icons.Outlined.Refresh, "به‌روز کردن", onRefresh, enabled = !syncing, spin = syncing)
+      RefreshButton(syncing, onRefresh)
     }
-    CourierTabs("امروز" to null, "این هفته" to null, firstSelected = !week, onSelect = { onWeek(!it) })
+    V3Segmented(listOf("امروز", "این هفته"), selected = if (week) 1 else 0, onSelect = { onWeek(it == 1) })
     if (summary == null) {
       EmptyCard(
         "آمار هنوز از دکان نیامده",
@@ -438,7 +432,7 @@ private fun StatsBody(summary: CourierSummary, week: Boolean, lastSyncAt: Long, 
       Text("نقدِ در دستِ شما", style = courierText(13.sp), color = p.onBlackMuted)
       Text(afn(summary.cashInHandMinor), style = courierText(26.sp, FontWeight.Bold), color = p.onBlack)
       Spacer(Modifier.height(12.dp))
-      CourierPrimaryButton("دیدنِ نقدِ من", onCash, Modifier.fillMaxWidth(), onDark = true, icon = Icons.Outlined.Payments)
+      CourierOnDark { StepButton("دیدنِ نقدِ من", onCash, Modifier.fillMaxWidth(), icon = Icons.Outlined.Payments) }
     }
     Text(
       (if (week) "از شنبهٔ همین هفته" else "از آغازِ امروز") + " · " + lastSyncText(lastSyncAt),
@@ -479,7 +473,6 @@ internal fun CourierAccountTab(
   onSignOut: () -> Unit,
 ) {
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 16.dp, bottom = NavClearance),
     verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -491,7 +484,7 @@ internal fun CourierAccountTab(
       Text(name.ifBlank { "پیک" }, style = courierText(20.sp, FontWeight.Bold), color = p.ink)
       Text(summary?.shopName?.ifBlank { null } ?: "دکان", style = courierText(14.sp), color = p.inkMuted)
       Spacer(Modifier.height(8.dp))
-      CourierPill("پیک", ui.preparing)
+      V3StatusPill(V3Status.PREPARING, "پیک")
     }
     Column(Modifier.fillMaxWidth().courierCard(p).padding(horizontal = 16.dp, vertical = 4.dp)) {
       val phone = summary?.shopPhone.orEmpty()
@@ -506,10 +499,7 @@ internal fun CourierAccountTab(
       AccountRow(Icons.Outlined.Sync, "همگام‌سازی", syncText, onClick = onRefresh, divider = false)
     }
     Text(lastSyncText(lastSyncAt), style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
-    CourierSecondaryButton(
-      "خروج از حسابِ پیک", onSignOut, Modifier.fillMaxWidth(),
-      icon = Icons.AutoMirrored.Outlined.Logout, tone = CourierTone.NEGATIVE,
-    )
+    CourierSecondary("خروج از حسابِ پیک", onSignOut, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Logout, negative = true)
   }
 }
 
@@ -540,12 +530,11 @@ private fun AccountRow(icon: ImageVector, label: String, value: String, ltr: Boo
 @Composable
 internal fun CourierCashPage(summary: CourierSummary?, lastSyncAt: Long, syncing: Boolean, onBack: () -> Unit, onRefresh: () -> Unit) {
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   Column(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      CourierRoundButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
       Text("نقدِ من", style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-      CourierRoundButton(Icons.Outlined.Refresh, "به‌روز کردن", onRefresh, enabled = !syncing, spin = syncing)
+      RefreshButton(syncing, onRefresh)
     }
     if (summary == null) {
       Box(Modifier.padding(16.dp)) {
@@ -618,9 +607,9 @@ private fun CashList(summary: CourierSummary, lastSyncAt: Long) {
             Spacer(Modifier.height(8.dp))
             Row {
               when {
-                s.shortageMinor > 0 -> CourierPill("کسری: ${afn(s.shortageMinor)}", ui.cancelled)
-                s.excessMinor > 0 -> CourierPill("اضافه: ${afn(s.excessMinor)}", ui.awaiting)
-                else -> CourierPill("بی اختلاف", ui.success)
+                s.shortageMinor > 0 -> V3StatusPill(V3Status.CANCELLED, "کسری: ${afn(s.shortageMinor)}")
+                s.excessMinor > 0 -> V3StatusPill(V3Status.WARNING, "اضافه: ${afn(s.excessMinor)}")
+                else -> V3StatusPill(V3Status.DELIVERED, "بی اختلاف")
               }
             }
           }
@@ -692,9 +681,7 @@ internal fun CourierBellSheet(
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   val b = CourierBoardModel.bell(live, queue)
-  CourierSheet(onDismiss) {
-    CourierSheetTitle("پیام‌ها")
-    Spacer(Modifier.height(12.dp))
+  V3Sheet(onDismiss = onDismiss, title = "پیام‌ها") { _ ->
     if (b.total == 0) {
       Text("پیامِ تازه‌ای نیست.", style = courierText(15.sp), color = p.inkMuted)
     }
@@ -708,7 +695,7 @@ internal fun CourierBellSheet(
       BellRow(Icons.Outlined.ReportProblem, "${b.rejectedEvents.fa()} کار ثبت نشد — ببینید", ui.cancelled, onRejected)
     }
     Spacer(Modifier.height(16.dp))
-    CourierSecondaryButton("بستن", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary("بستن", onDismiss, Modifier.fillMaxWidth())
   }
 }
 

@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -36,11 +36,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.v3.V3IconButton
+import ir.vil3ntec.tohid.ui.v3.V3TextField
 
 /**
  *  «ورودِ پیک» — DLV-01، v3 §۳.۱۱: ورود با کدِ شاگرد و نقشِ «پیک».
@@ -69,7 +70,7 @@ internal fun CourierJoinScreen(
     Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding(),
   ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      CourierRoundButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
     }
     Column(
       Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
@@ -88,16 +89,13 @@ internal fun CourierJoinScreen(
       )
       Spacer(Modifier.height(20.dp))
       Column(Modifier.fillMaxWidth().courierCard(p).padding(18.dp)) {
-        CourierField(name, onName, "نام شما", placeholder = "مثلاً کریم")
+        V3TextField(name, onName, "نام شما", Modifier.fillMaxWidth(), placeholder = "مثلاً کریم")
         Spacer(Modifier.height(14.dp))
-        CourierField(
-          code, onCode, "کدِ دعوت", placeholder = "SHG-XXXX-XXXX-XXXX", ltr = true,
-          capitalization = KeyboardCapitalization.Characters,
+        //  کد را صفحهٔ خوش‌آمد بزرگ می‌کند (`onCode` ⇐ uppercase)؛ لاتین است پس چپ‌به‌راست نوشته می‌شود
+        V3TextField(
+          code, onCode, "کدِ دعوت", Modifier.fillMaxWidth(), placeholder = "SHG-XXXX-XXXX-XXXX",
+          error = error?.takeIf { it.isNotBlank() },
         )
-        if (!error.isNullOrBlank()) {
-          Spacer(Modifier.height(10.dp))
-          Text(error, style = courierText(14.sp, FontWeight.Medium), color = p.negative)
-        }
       }
       Spacer(Modifier.height(16.dp))
       Column(Modifier.fillMaxWidth().courierCard(p, CourierGroupShape, elevation = 6.dp).padding(horizontal = 16.dp, vertical = 6.dp)) {
@@ -108,10 +106,7 @@ internal fun CourierJoinScreen(
       Spacer(Modifier.height(20.dp))
     }
     Box(Modifier.fillMaxWidth().padding(16.dp)) {
-      CourierPrimaryButton(
-        "پیوستن", onJoin, Modifier.fillMaxWidth(),
-        enabled = code.isNotBlank(), busy = busy,
-      )
+      StepButton("پیوستن", onJoin, Modifier.fillMaxWidth(), enabled = code.isNotBlank(), loading = busy)
     }
   }
 }
