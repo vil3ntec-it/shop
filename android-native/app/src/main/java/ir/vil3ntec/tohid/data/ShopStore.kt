@@ -51,7 +51,12 @@ class ShopStore(private val context: Context) {
   private val _loaded = MutableStateFlow(false)
   val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
-  suspend fun load() {
+  /**
+   *  @param sweep CRM-10: sweep ِ شروع ([loadAndSummarize]) — **پیش از** `loaded = true`. صفحه تا آن
+   *         لحظه دفتر را برنمی‌دارد، پس ذخیره‌ای که از دفترِ پیش از sweep ساخته شده باشد پیش نمی‌آید
+   *         و sweep (با ردهای دفترچه‌اش) برنمی‌گردد. کارگر و خلاصه (`load()` ِ بی sweep) چیزی نمی‌نویسند.
+   */
+  suspend fun load(sweep: Boolean = false) {
     withContext(Dispatchers.IO) {
       //  SEC-01: بازسازیِ نیمه‌کاره پیش از خواندنِ دفتر تمام یا دور ریخته می‌شود (`SyncRebuild.atLoad`)
       val stuck = runCatching { recoverRebuild() }.getOrElse { rebuildMark.exists() && rebuildSide.exists() }
@@ -84,6 +89,7 @@ class ShopStore(private val context: Context) {
         recoverSync(ShopData())
       }
     }
+    if (sweep) quietly { sweepNow(requireLoaded = false) }
     _loaded.value = true
   }
 
@@ -128,20 +134,19 @@ class ShopStore(private val context: Context) {
    *  می‌مانند.
    */
   suspend fun loadAndSummarize() {
-    load()
+    //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)
+    load(sweep = true)
     //  دفترِ خوانده‌نشده خلاصهٔ «خالی» نمی‌گیرد
     if (_unreadable.value == null) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
-    //  CRM-10: ردیف‌های دیررسیدهٔ مشتریِ ادغام‌شده — یک بار در شروع (شرح سرِ `sweepMerged`)
-    sweepMergedQuietly()
   }
 
   /**
    *  CRM-10: ردیف‌های دیررسیده (فروش یا قرضی که دستگاهِ آفلاین یا ساختِ قدیمی روی مشتریِ
    *  ادغام‌شده ثبت کرد) و حلقهٔ دو ادغامِ وارونه ⇐ مشتریِ ماندگار (`CustomerMerge.sweep`).
    *  پس از هر Pull (`SyncV1Worker`: v1 با `absorbRemote` و v3، و [applyFromServer]) و یک
-   *  بار در شروع ([loadAndSummarize]).
+   *  بار در شروع ([loadAndSummarize] ⇐ [load]، پیش از `loaded`).
    *
    *  - فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض **خاموش**): خاموش ⇒
    *    هیچ کاری نمی‌شود و رفتارِ دکان همان است.
@@ -162,12 +167,15 @@ class ShopStore(private val context: Context) {
    *
    *  @return null (کاری نبود یا نوشتن بسته/خاموش) · true (نوشته شد) · false (دیسک)
    */
-  suspend fun sweepMerged(): Boolean? = withContext(Dispatchers.IO) {
+  suspend fun sweepMerged(): Boolean? = sweepNow(requireLoaded = true)
+
+  /** @param requireLoaded `false` فقط برای sweep ِ شروع درونِ [load]، پیش از `loaded = true` */
+  private suspend fun sweepNow(requireLoaded: Boolean): Boolean? = withContext(Dispatchers.IO) {
     if (!ShopPolicy.crmReports(context)) return@withContext null
     if (SyncChoice.isV3(context)) return@withContext null
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
-      if (!_loaded.value || _unreadable.value != null) return@synchronized null
+      if ((requireLoaded && !_loaded.value) || _unreadable.value != null) return@synchronized null
       val disk = readDiskLocked() ?: return@synchronized null
       val next = CustomerMerge.sweep(disk) ?: return@synchronized null
       val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
@@ -180,9 +188,12 @@ class ShopStore(private val context: Context) {
   }
 
   /** همان [sweepMerged] برای جاهایی که شکستش نباید Pull یا بارِ دفتر را بگیرد — لغو بالا می‌رود */
-  suspend fun sweepMergedQuietly() {
+  suspend fun sweepMergedQuietly() = quietly { sweepMerged() }
+
+  /** شکست بی‌صدا، ولی لغو (`CancellationException`) بالا می‌رود */
+  private suspend fun quietly(block: suspend () -> Unit) {
     try {
-      sweepMerged()
+      block()
     } catch (e: kotlinx.coroutines.CancellationException) {
       throw e
     } catch (_: Exception) {
