@@ -1,15 +1,14 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
-import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.data.DebtBook
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.formatMonth
 import ir.vil3ntec.tohid.money
 
 /**
- *  قالبِ عدد و تاریخِ صفحه‌های پول — همان تابع‌های برنامه (`money`، `formatDate`، `formatMonth`)
+ *  قالبِ عدد و تاریخِ صفحه‌های پول — همان تابع‌های برنامه (`money`، `displayDate`، `formatMonth`)
  *  با نمادِ «؋»؛ هیچ حسابی این‌جا نیست، فقط شکلِ نوشتن.
  */
 internal object MoneyText {
@@ -20,7 +19,7 @@ internal object MoneyText {
   fun signed(value: Double, plus: Boolean): String = "\u2066${if (plus) "+" else "−"}${money(value)}\u2069"
 
   /** تاریخِ خورشیدی، یا «—» برای ردیفِ بی‌تاریخ (پشتیبانِ خیلی قدیمی) */
-  fun date(iso: String): String = if (iso.isBlank()) DebtorLedgerModel.UNDATED else formatDate(iso)
+  fun date(iso: String): String = if (iso.isBlank()) DebtorLedgerModel.UNDATED else displayDate(iso)
 
   /** `2026-10` ⇐ «میزان ۱۴۰۵» */
   fun month(month: String): String = formatMonth(month)
@@ -38,20 +37,6 @@ internal object MoneyText {
   /** «۲۰۰ افغانی بیش از سقفِ اعتبار (۱٬۰۰۰) — ماندهٔ فعلی ۹۰۰» سه‌زبانه (به جای `DebtBook.overLimitText`) */
   fun overLimit(c: DebtBook.Credit): String =
     "${StrMoney.overLimitBy(DebtBook.show(c.excess), DebtBook.show(c.limit))} — ${StrMoney.currentBalance(DebtBook.show(c.balance))}"
-
-  /** چند روز به متنِ سه‌زبانه — همان حسابِ `daysText` (ماه ۳۰ روز، سال ۳۶۵ روز) */
-  fun days(n: Long): String {
-    val d = n.coerceAtLeast(0)
-    return when {
-      d < 1 -> Str.today
-      d < 31 -> Str.days(d)
-      d < 365 -> Str.months(d / 30)
-      else -> if ((d % 365) / 30 == 0L) Str.years(d / 365) else Str.yearsMonths(d / 365, (d % 365) / 30)
-    }
-  }
-
-  /** «چقدر گذشته» از یک لحظه — همان `spanText`، سه‌زبانه */
-  fun span(from: Long, now: Long): String = if (from <= 0) "—" else days((now - from) / 86_400_000L)
 
   /** مقدار با واحد: «20 کیلوگرم» */
   fun qtyUnit(quantity: Double, unit: String): String =

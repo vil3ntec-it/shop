@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.JALALI_MONTHS
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -104,7 +105,7 @@ internal fun ReceiptsScreen(
           V3ChipRow(contentPadding = PaddingValues(0.dp)) {
             V3Chip(year?.let { plain(it) } ?: StrMoney.allYears, selected = year != null, icon = Icons.Outlined.CalendarMonth, onClick = { picker = ReceiptsPicker.YEAR })
             V3Chip(month?.let { months[it - 1] } ?: StrMoney.allMonths, selected = month != null, icon = Icons.Outlined.Event, onClick = { picker = ReceiptsPicker.MONTH })
-            if (tab == ReceiptsModel.Tab.DEBTORS && d.debtors.isNotEmpty()) {
+            if (tab == ReceiptsModel.Tab.DEBTORS && CustomerCrm.active(d).isNotEmpty()) {
               V3Chip(
                 who?.let { id -> d.debtors.find { it.id == id }?.name } ?: StrMoney.allDebtors,
                 selected = who != null,
@@ -206,6 +207,6 @@ private fun ReceiptRow(row: ReceiptsModel.Row, first: Boolean, last: Boolean, ta
 /** قرض‌دار برای فیلتر — با شناسه، نه با نام (دو نفر ممکن است هم‌نام باشند) */
 @Composable
 private fun DebtorFilterSheet(d: ShopData, selected: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
-  val options = remember(d) { listOf(PickOption(null, StrMoney.allDebtors)) + d.debtors.map { PickOption(it.id, it.name, it.phone.ifBlank { null }) } }
+  val options = remember(d) { listOf(PickOption(null, StrMoney.allDebtors)) + CustomerCrm.active(d).map { PickOption(it.id, it.name, it.phone.ifBlank { null }) } }
   IdPickerSheet(StrMoney.debtor, options, selected, onPick, onDismiss)
 }

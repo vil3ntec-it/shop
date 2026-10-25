@@ -74,11 +74,10 @@ object DebtorLedgerModel {
 
   /**
    *  متنِ آمادهٔ پیامک و واتساپ — نوشتنِ «سلام، … افغانی طلب دارید» برای هر
-   *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود.
+   *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود. قالب همان `DebtReminder` (#330).
    */
   fun reminder(name: String, balance: Double): String =
-    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${ir.vil3ntec.tohid.money(balance)} افغانی از حساب شما باقی مانده. ممنون."
-    else "سلام $name عزیز،"
+    ir.vil3ntec.tohid.data.DebtReminder.message(ir.vil3ntec.tohid.data.DebtReminder.Vars(name, balance))
 
   /* ------------------------------ اطلاعاتِ کشو ------------------------------ */
 
@@ -93,11 +92,11 @@ object DebtorLedgerModel {
    */
   fun info(account: DebtorEngine.Account, book: DebtBook.Book?, now: Long = System.currentTimeMillis()): List<Info> = buildList {
     account.since?.let { since ->
-      add(Info(StrMoney.daysInDebt(MoneyText.span(since, now), ir.vil3ntec.tohid.formatMillis(since)), InfoTone.OWE))
+      add(Info(StrMoney.daysInDebt(ir.vil3ntec.tohid.spanText(since, now), ir.vil3ntec.tohid.displayMillis(since)), InfoTone.OWE))
     }
     book ?: return@buildList
     if (book.overdue.isNotEmpty()) add(Info(StrMoney.overdue(book.overdue.size, DebtBook.show(book.overdueAmount)), InfoTone.OWE))
-    book.nextDue?.let { e -> e.dueDate?.let { due -> add(Info(StrMoney.nextDue(ir.vil3ntec.tohid.formatDate(due), DebtBook.show(e.open)), InfoTone.INFO)) } }
+    book.nextDue?.let { e -> e.dueDate?.let { due -> add(Info(StrMoney.nextDue(ir.vil3ntec.tohid.displayDate(due), DebtBook.show(e.open)), InfoTone.INFO)) } }
     book.credit?.let { cr ->
       if (cr.over) add(Info(StrMoney.overLimitBy(DebtBook.show(cr.excess), DebtBook.show(cr.limit)), InfoTone.OWE))
       else add(Info(StrMoney.limitHeadroom(DebtBook.show(cr.limit), DebtBook.show(cr.headroom)), InfoTone.NEUTRAL))
@@ -106,7 +105,7 @@ object DebtorLedgerModel {
 
   /** خلاصهٔ کشوی بسته: شماره (اگر هست) و «۶ روز بدهکار» / «بدهی ندارد» */
   fun summary(phone: String, since: Long?, now: Long = System.currentTimeMillis()): String {
-    val debt = if (since != null) StrMoney.inDebtShort(MoneyText.span(since, now)) else StrMoney.noDebt
+    val debt = if (since != null) StrMoney.inDebtShort(ir.vil3ntec.tohid.spanText(since, now)) else StrMoney.noDebt
     val number = ir.vil3ntec.tohid.LocaleText.phoneDisplay(phone).trim()
     return if (number.isEmpty()) debt else "\u2066$number\u2069 · $debt"
   }

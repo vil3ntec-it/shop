@@ -14,6 +14,7 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.todayIso
@@ -97,7 +98,8 @@ val MoneyModule = AppModule(
       }
     },
     V3Route("debtors/{id}", RouteKind.PAGE, { Str.debtor }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) {
-      val id = args["id"].orEmpty()
+      //  پیوندِ کهنه به مشتریِ ادغام‌شده (#330) همان مشتریِ ماندگار را باز می‌کند
+      val id = CustomerCrm.resolve(data, args["id"].orEmpty())
       VipGate(Str.debtors) {
         DebtorLedgerScreen(
           id = id,

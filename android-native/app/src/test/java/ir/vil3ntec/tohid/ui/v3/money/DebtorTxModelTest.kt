@@ -82,17 +82,15 @@ class DebtorTxModelTest {
   fun `مدت و حالِ حساب در انگلیسی هم ترجمه است — نه «۱ ماه in debt»`() {
     val day = 86_400_000L
     val now = 1_800_000_000_000L
-    assertEquals("2 ماه", MoneyText.span(now - 65 * day, now))
+    assertEquals("2 ماه بدهکار", DebtorLedgerModel.summary("", now - 65 * day, now))
     assertEquals("1,000 افغانی بدهکار", MoneyText.state(1000.0))
-    assertEquals("—", MoneyText.span(0, now))
     //  فارسی همان جمله‌های موتور است، حرف‌به‌حرف
     val over = DebtBook.creditCheck(ledger, "d", DebtBook.minor(500.0))!!
     assertEquals(DebtBook.overLimitText(over), MoneyText.overLimit(over))
     assertEquals(DebtBook.state(DebtBook.minor(700.0)), MoneyText.state(DebtBook.minor(700.0)))
     I18n.source = { Lang.EN }
     try {
-      assertEquals("2 months", MoneyText.span(now - 65 * day, now))
-      assertEquals("1 year and 2 months", MoneyText.days(430))
+      assertEquals("2 months in debt", DebtorLedgerModel.summary("", now - 65 * day, now))
       assertEquals("Owes 1,000 AFN", MoneyText.state(1000.0))
       assertEquals("250 AFN in credit", MoneyText.state(-250.0))
       assertEquals("Settled", MoneyText.state(0.0))

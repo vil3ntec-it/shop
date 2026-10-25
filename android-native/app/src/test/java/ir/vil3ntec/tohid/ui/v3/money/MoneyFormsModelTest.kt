@@ -5,7 +5,9 @@ import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.ui.screens.DebtorListModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -85,5 +87,41 @@ class MoneyFormsModelTest {
     assertEquals("2026-10-20", LedgerFormsModel.of(null, "2026-10-20").date)
     assertEquals(listOf("کرایه", "برق"), LedgerFormsModel.categories(listOf("کرایه"), "برق"))
     assertNotNull(LedgerFormsModel.expenseAmountError(ExpenseForm(amount = "-1")))
+  }
+
+  @Test
+  fun `پروندهٔ CRM — شمارهٔ دوم، برچسب و رضایت با همان ذخیره، همه یا هیچ`() {
+    val f = DebtorForm(name = "زرغونه", phone = "0791112233", phone2 = "0702223344", tags = "عمده، همسایه", consent = true, consentSource = "حضوری")
+    val ok = DebtorFormsModel.save(ledger, null, f, 1L) { "z" } as DebtorEngine.Result.Ok
+    val z = ok.data.debtors.first { it.id == "z" }
+    assertEquals("0702223344", z.phone2)
+    assertEquals(listOf("عمده", "همسایه"), z.tags)
+    assertEquals(true, z.marketingConsent)
+    assertTrue(ok.data.auditLog.any { it.type == "marketing_consent" && it.refId == "z" })
+    //  برگهٔ ویرایش همان‌ها را نشان می‌دهد؛ رضایت بی منبع را نمی‌پذیرد
+    val back = DebtorFormsModel.of(z)
+    assertEquals("0702223344", back.phone2)
+    assertEquals("عمده، همسایه", back.tags)
+    assertEquals(true, back.consent)
+    assertNotNull(DebtorFormsModel.consentError(back))
+    assertNull(DebtorFormsModel.consentError(back.copy(consent = false)))
+    //  ردِ پرونده (شمارهٔ دوم = اول) ⇒ هیچ‌چیز، حتی قرض‌دارِ تازه، نوشته نمی‌شود
+    val bad = DebtorFormsModel.save(ledger, null, f.copy(phone2 = "0791112233"), 1L) { "y" }
+    assertTrue(bad is DebtorEngine.Result.Failed)
+    val noSource = DebtorFormsModel.save(ledger, "d", DebtorFormsModel.of(ledger.debtors[0]).copy(consent = true), 1L) { "x" }
+    assertTrue(noSource is DebtorEngine.Result.Failed)
+  }
+
+  @Test
+  fun `فهرست و انتخاب‌گر — فقط مشتریِ فعال؛ جست‌وجو با شمارهٔ دوم و برچسب`() {
+    val d = ledger.copy(
+      debtors = ledger.debtors + Debtor(id = "old", name = "نصیر کهنه", mergedInto = "d") +
+        Debtor(id = "t", name = "توریالی", phone2 = "0705556677", tags = listOf("عمده")),
+    )
+    val ids = DebtorListModel.rows(d, "", DebtorListModel.Sort.NAME, 0L).map { it.debtor.id }
+    assertFalse("old" in ids)
+    assertEquals(3, DebtorListModel.summary(d).people)
+    assertEquals(listOf("t"), DebtorListModel.rows(d, "0705556677", DebtorListModel.Sort.NAME, 0L).map { it.debtor.id })
+    assertEquals(listOf("t"), DebtorListModel.rows(d, "#عمده", DebtorListModel.Sort.NAME, 0L).map { it.debtor.id })
   }
 }

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.text.TextNormalizer
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -83,9 +84,8 @@ object DebtorListModel {
   fun matches(debtor: Debtor, term: String): Boolean {
     val q = term.trim()
     if (q.isEmpty()) return true
-    return debtor.name.contains(q, ignoreCase = true) ||
-      TextNormalizer.matches(debtor.name, q) ||
-      LocaleText.phoneMatches(debtor.phone, q)
+    //  نام، هر دو شماره، برچسب و گروه (`CustomerCrm.matches`، #330) — و همان «بخشی از نام» ِ قبلی
+    return debtor.name.contains(q, ignoreCase = true) || CustomerCrm.matches(debtor, q)
   }
 
   /* ------------------------------ ترتیب ------------------------------ */
@@ -144,11 +144,11 @@ object DebtorListModel {
 
   /** کارت‌های صفحه: جست‌وجو، بعد ترتیب */
   fun rows(d: ShopData, term: String, sort: Sort, now: Long): List<Row> =
-    sorted(d.debtors.filter { matches(it, term) }.map { row(d, it, now) }, sort)
+    sorted(CustomerCrm.active(d).filter { matches(it, term) }.map { row(d, it, now) }, sort)
 
   fun summary(d: ShopData): Summary = Summary(
-    people = d.debtors.size,
-    owed = d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) },
+    people = CustomerCrm.active(d).size,
+    owed = CustomerCrm.active(d).sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) },
     received = d.transactions.filter { it.type == "receive" }.sumOf { it.amount },
   )
 
@@ -160,5 +160,5 @@ object DebtorListModel {
     else ir.vil3ntec.tohid.ui.v3.money.MoneyText.state(row.balance)
 
   /** قرصِ ساعت: فقط وقتی بدهکار است */
-  fun daysLabel(row: Row): String? = row.days?.takeIf { row.owes }?.let { ir.vil3ntec.tohid.ui.v3.money.MoneyText.days(it) }
+  fun daysLabel(row: Row): String? = row.days?.takeIf { row.owes }?.let { ir.vil3ntec.tohid.daysText(it) }
 }

@@ -62,11 +62,14 @@ internal fun DebtorFormSheet(
   var shake by remember { mutableStateOf(0) }
   val nameError = DebtorFormsModel.nameError(f)
   val limitError = DebtorFormsModel.limitError(f)
+  val consentError = DebtorFormsModel.consentError(f)
   V3FormSheet(title = if (debtor == null) StrMoney.newDebtor else StrMoney.editDebtor, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
       V3TextField(f.name, { f = f.copy(name = it) }, StrMoney.name, required = true, error = nameError.takeIf { tried })
       Spacer(Modifier.height(12.dp))
       V3TextField(f.phone, { f = f.copy(phone = it) }, StrMoney.phoneOptional, kind = V3FieldKind.PHONE)
+      Spacer(Modifier.height(12.dp))
+      V3TextField(f.phone2, { f = f.copy(phone2 = it) }, StrMoney.phone2Optional, kind = V3FieldKind.PHONE)
       Spacer(Modifier.height(12.dp))
       V3TextField(f.notes, { f = f.copy(notes = it) }, StrMoney.notesOptional, singleLine = false)
       Spacer(Modifier.height(12.dp))
@@ -74,12 +77,29 @@ internal fun DebtorFormSheet(
         f.creditLimit, { f = f.copy(creditLimit = it) }, StrMoney.creditLimitField,
         kind = V3FieldKind.MONEY, helper = StrMoney.creditLimitHelper, error = limitError,
       )
+      Spacer(Modifier.height(12.dp))
+      V3TextField(f.tags, { f = f.copy(tags = it) }, StrMoney.tagsField, helper = StrMoney.tagsHelper)
+      Spacer(Modifier.height(14.dp))
+      Text(StrMoney.consentTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
+      Spacer(Modifier.height(6.dp))
+      V3Segmented(
+        listOf(StrMoney.consentUnknown, StrMoney.consentYes, StrMoney.consentNo),
+        selected = when (f.consent) { null -> 0; true -> 1; false -> 2 },
+        onSelect = { i -> f = f.copy(consent = when (i) { 1 -> true; 2 -> false; else -> null }) },
+      )
+      if (f.consent == true) {
+        Spacer(Modifier.height(10.dp))
+        V3TextField(
+          f.consentSource, { f = f.copy(consentSource = it) }, StrMoney.consentSource,
+          required = true, placeholder = StrMoney.consentSourceHint, error = consentError.takeIf { tried },
+        )
+      }
       Spacer(Modifier.height(18.dp))
       V3Button(
         StrKit.save,
         {
           tried = true
-          if (nameError != null || limitError != null) shake++
+          if (nameError != null || limitError != null || consentError != null) shake++
           else if (onSave(f)) sheet.finish(onSaved)
         },
         Modifier.fillMaxWidth(),

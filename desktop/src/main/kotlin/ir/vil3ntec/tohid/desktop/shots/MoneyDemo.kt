@@ -52,6 +52,10 @@ internal object MoneyDemo {
         notes = if (i == 0) "مغازهٔ سرِ کوچه — هر جمعه حساب می‌کند" else "",
         creditLimit = when (i) { 0 -> 5000.0; 2 -> 1000.0; else -> null },
         createdAt = at(90 - i),
+        //  پروندهٔ CRM (#330) روی اولی: شمارهٔ دوم، برچسب و رضایت — برگهٔ «ویرایش» همه را نشان می‌دهد
+        phone2 = if (i == 0) "0702223344" else null,
+        tags = if (i == 0) listOf("عمده", "همسایه") else null,
+        marketingConsent = if (i == 0) true else null,
       )
     }
     val sale = Sale(

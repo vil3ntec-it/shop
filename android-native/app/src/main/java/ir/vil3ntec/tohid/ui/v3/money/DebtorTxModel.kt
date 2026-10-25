@@ -4,7 +4,7 @@ import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtTransaction
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceLine
 
@@ -34,15 +34,15 @@ internal object DebtorTxModel {
       add(
         when {
           due == null -> Line(StrMoney.due, StrMoney.noDue)
-          entry.overdue -> Line(StrMoney.due, "${formatDate(due)} — ${StrMoney.pastDue}", Pill.OWE)
-          else -> Line(StrMoney.due, formatDate(due), Pill.INFO)
+          entry.overdue -> Line(StrMoney.due, "${displayDate(due)} — ${StrMoney.pastDue}", Pill.OWE)
+          else -> Line(StrMoney.due, displayDate(due), Pill.INFO)
         },
       )
     }
     if (!entry.give && entry.allocations.isNotEmpty() && book != null) {
       add(Line(StrMoney.forWhat, entry.allocations.joinToString("، ") { a ->
         val g = book.entry(a.txId)
-        val what = g?.invoiceLabel?.let { StrMoney.invoiceNo(it) } ?: "${StrMoney.giveTag} ${g?.tx?.date?.let(::formatDate).orEmpty()}"
+        val what = g?.invoiceLabel?.let { StrMoney.invoiceNo(it) } ?: "${StrMoney.giveTag} ${g?.tx?.date?.let(::displayDate).orEmpty()}"
         "$what (${DebtBook.show(a.amount)})"
       }))
     }
@@ -64,7 +64,7 @@ internal object DebtorTxModel {
 
   /** «اقلام · فاکتور #۱۲ · ۱۴۰۵/۰۷/۲۰» */
   fun itemsTitle(entry: DebtBook.Entry): String =
-    (listOf(StrMoney.items) + listOfNotNull(entry.invoiceLabel?.let { StrMoney.invoiceNo(it) }, entry.sale?.date?.let(::formatDate))).joinToString(" · ")
+    (listOf(StrMoney.items) + listOfNotNull(entry.invoiceLabel?.let { StrMoney.invoiceNo(it) }, entry.sale?.date?.let(::displayDate))).joinToString(" · ")
 
   /** تخفیف و پرداختِ همان لحظهٔ فاکتور، اگر بود */
   fun itemsFooter(entry: DebtBook.Entry): String? {

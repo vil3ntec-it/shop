@@ -144,6 +144,16 @@ object StrMoney {
     "Empty means no limit. A give over the limit needs your confirmation.",
     "تش یعنې بې حده. له حد زیاته ورکړه یوازې په تایید ثبتېږي.",
   )
+  //  پروندهٔ CRM (#330)
+  val phone2Optional: String get() = t("شمارهٔ دوم (اختیاری)", "Second phone (optional)", "دویمه شمېره (اختیاري)")
+  val tagsField: String get() = t("برچسب‌ها (اختیاری)", "Tags (optional)", "نښانونه (اختیاري)")
+  val tagsHelper: String get() = t("با «،» جدا کنید — مثلاً عمده، همسایه", "Separate with commas — e.g. wholesale, neighbour", "په «،» جلا کړئ — لکه عمده، ګاونډی")
+  val consentTitle: String get() = t("رضایت برای پیامِ تبلیغاتی", "Consent to promotional messages", "د تبلیغي پیغام لپاره رضایت")
+  val consentUnknown: String get() = t("نپرسیده", "Not asked", "نه دی پوښتل شوی")
+  val consentYes: String get() = t("بله", "Yes", "هو")
+  val consentNo: String get() = t("نه", "No", "نه")
+  val consentSource: String get() = t("منبعِ رضایت", "Where they agreed", "د رضایت سرچینه")
+  val consentSourceHint: String get() = t("حضوری، تلفنی…", "In person, by phone…", "حضوري، تلیفوني…")
   val giveKind: String get() = t("برد — جنس یا پول برد", "Give — took goods or cash", "ورکړه — توکي یا پیسې یې یوړې")
   val receiveKind: String get() = t("رسید — پول رساند", "Receive — paid back", "رسید — پیسې یې راکړې")
   val recordGive: String get() = t("ثبت برد", "Record give", "ورکړه ثبت کړئ")

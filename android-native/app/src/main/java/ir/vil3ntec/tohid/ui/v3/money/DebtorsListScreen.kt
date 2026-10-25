@@ -30,6 +30,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.gridMinSize
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.ui.screens.DebtorListModel
 import ir.vil3ntec.tohid.ui.screens.DebtorTile
 import ir.vil3ntec.tohid.ui.screens.DebtorsAddButton
@@ -96,7 +97,7 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
               Spacer(Modifier.height(12.dp))
               DebtorsSearchField(value = search, onValueChange = { search = it })
               Spacer(Modifier.height(10.dp))
-              if (d.debtors.isNotEmpty()) {
+              if (CustomerCrm.active(d).isNotEmpty()) {
                 DebtorsSortRow(current = sort, count = rows.size) { sortName = it.name }
                 Spacer(Modifier.height(4.dp))
               }
@@ -104,7 +105,7 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
           }
           if (rows.isEmpty()) {
             item(key = "debtors-empty", span = { GridItemSpan(maxLineSpan) }) {
-              if (d.debtors.isEmpty()) {
+              if (CustomerCrm.active(d).isEmpty()) {
                 DebtorsEmptyCard(Icons.Filled.Groups, StrMoney.emptyDebtorsTitle, StrMoney.emptyDebtorsBody, actionText = StrMoney.newDebtor, onAction = actions.onAdd)
               } else {
                 DebtorsEmptyCard(Icons.Filled.Search, StrMoney.noDebtorMatchTitle, StrMoney.noDebtorMatchBody)
@@ -128,7 +129,7 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
         DebtorsAddButton(
           onClick = actions.onAdd,
           modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, end = 8.dp, bottom = pad.calculateBottomPadding()),
-          visible = d.debtors.isNotEmpty(),
+          visible = CustomerCrm.active(d).isNotEmpty(),
         )
       }
     }
