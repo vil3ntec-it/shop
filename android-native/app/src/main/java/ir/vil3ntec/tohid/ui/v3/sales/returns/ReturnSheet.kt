@@ -75,7 +75,7 @@ fun ReturnSheet(
           Text(ReturnModel.leftText(l), style = V3Type.footnote, color = c.inkMuted)
           Spacer(Modifier.height(8.dp))
           Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            V3IconButton(Icons.Outlined.Remove, StrSale.oneLess, size = 40.dp) { texts = texts + (l.item.id to ReturnModel.bump(text, l, -1)) }
+            V3IconButton(Icons.Outlined.Remove, StrSale.oneLess(l.name), size = 40.dp) { texts = texts + (l.item.id to ReturnModel.bump(text, l, -1)) }
             V3TextField(
               value = text,
               onValueChange = { texts = texts + (l.item.id to it) },
@@ -85,7 +85,7 @@ fun ReturnSheet(
               error = ReturnModel.error(text, l),
               modifier = Modifier.weight(1f),
             )
-            V3IconButton(Icons.Outlined.Add, StrSale.oneMore, size = 40.dp) { texts = texts + (l.item.id to ReturnModel.bump(text, l, +1)) }
+            V3IconButton(Icons.Outlined.Add, StrSale.oneMore(l.name), size = 40.dp) { texts = texts + (l.item.id to ReturnModel.bump(text, l, +1)) }
           }
         }
       }

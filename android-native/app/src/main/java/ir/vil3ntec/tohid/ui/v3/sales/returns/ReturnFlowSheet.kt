@@ -238,9 +238,9 @@ fun ReturnFlowSheet(
                 Text(p?.name ?: StrSale.itemWord, style = V3Type.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(PhoneSaleText.amount(SalesEngine.linePrice(d, line)), style = V3Type.footnote, color = c.inkMuted)
               }
-              V3IconButton(Icons.Outlined.Remove, StrSale.oneLess, size = 36.dp) { cart = SalesEngine.setCartQty(cart, line.productId, line.quantity - step) }
+              V3IconButton(Icons.Outlined.Remove, StrSale.oneLess(p?.name.orEmpty()), size = 36.dp) { cart = SalesEngine.setCartQty(cart, line.productId, line.quantity - step) }
               Text(qty(line.quantity), style = V3Type.headline, color = c.ink, modifier = Modifier.padding(horizontal = 10.dp))
-              V3IconButton(Icons.Outlined.Add, StrSale.oneMore, size = 36.dp) { cart = SalesEngine.setCartQty(cart, line.productId, line.quantity + step) }
+              V3IconButton(Icons.Outlined.Add, StrSale.oneMore(p?.name.orEmpty()), size = 36.dp) { cart = SalesEngine.setCartQty(cart, line.productId, line.quantity + step) }
             }
           }
           ProductSearch(d, StrSale.newItemSearch, Modifier.padding(horizontal = 14.dp, vertical = 8.dp)) { p -> cart = SalesEngine.addToCart(cart, p.id, 1.0) }

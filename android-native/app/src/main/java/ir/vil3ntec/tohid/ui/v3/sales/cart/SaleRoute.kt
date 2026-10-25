@@ -98,6 +98,8 @@ fun RouteScope.SaleRoute() {
     }
   }
 
+  //  صندوق نوارِ پایین ندارد (نوارِ سبد جایش است) ⇒ برگشت همیشه هست؛ در ریشه ⇒ خانه
+  val back: () -> Unit = backOrNull ?: { nav.back(); Unit }
   val mode = remember(context) { CatalogMode(context) }
   var listMode by remember { mutableStateOf(mode.list()) }
 
@@ -130,8 +132,7 @@ fun RouteScope.SaleRoute() {
       freeLine = { nav.open(SalesPaths.FREE_LINE) },
       quickSale = { nav.open(SalesPaths.QUICK) },
       history = { nav.open(SalesPaths.HISTORY) },
-      //  صندوق نوارِ پایین ندارد (نوارِ سبد جایش است) ⇒ برگشت همیشه هست؛ در ریشه ⇒ خانه
-      back = backOrNull ?: { nav.back() },
+      back = back,
       toggleMode = { listMode = !listMode; mode.save(listMode) },
     ),
   )
