@@ -149,7 +149,11 @@ class ShopStore(private val context: Context) {
    *    (`SyncV1Worker`) دو نمونهٔ جدای `ShopStore` دارند و دفترِ حافظهٔ یکی از دیگری کهنه است.
    *  - ⛔ هرگز `record` ِ کلِ دفتر: فقط opهای هدفمندِ خودِ sweep (`CustomerMerge.sweepOps`:
    *    UPDATE ِ `debtorId`/`mergedInto` و INSERT ِ ردِ دفترچه) با `SyncV1Engine.recordOps`
-   *    (سایه = سایه + همین opها). پس هیچ DELETEی ساخته نمی‌شود، در v1 و v3.
+   *    (سایه = سایه + همین opها). پس هیچ DELETEی ساخته نمی‌شود.
+   *  - ⛔ روی همگام‌سازیِ v3 نمی‌نشیند: آن‌جا عوض کردنِ `debtorId` ِ سندِ مالی (قرض، فاکتور)
+   *    «ویرایشِ سند» است، با قالبِ v2 می‌رود و سرور آن را به صندوقِ تعارض می‌برد
+   *    (`SyncV3Engine`، آزمونِ `docEditIsNotLostGoesAsV2`). خودِ ادغام هم همین‌طور؛ راهِ v3 باید
+   *    سمتِ سرور (یا با سندِ معکوس) ساخته شود.
    *  - نوشتنِ بسته ⇒ هیچ، بی پیام: دفترِ بارنشده، دفترِ خوانده‌نشده (SEC-01 / #331) یا
    *    قفلِ نرم. خطای دیسکِ همین sweep هم پیامِ «ذخیره نشد» ِ صفحه نمی‌شود؛ دورِ بعد دوباره.
    *  - خودتوان: کاری نبود ⇒ `null`، نه نوشتن نه op. هر دستگاه از همان دفتر همان نتیجه را
@@ -159,6 +163,7 @@ class ShopStore(private val context: Context) {
    */
   suspend fun sweepMerged(): Boolean? = withContext(Dispatchers.IO) {
     if (!ShopPolicy.crmReports(context)) return@withContext null
+    if (SyncChoice.isV3(context)) return@withContext null
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
       if (!_loaded.value || _unreadable.value != null) return@synchronized null

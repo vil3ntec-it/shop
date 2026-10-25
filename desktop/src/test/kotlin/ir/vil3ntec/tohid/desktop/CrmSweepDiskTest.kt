@@ -14,6 +14,7 @@ import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
+import ir.vil3ntec.tohid.sync.v3.SyncChoice
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -261,5 +262,23 @@ class CrmSweepDiskTest {
     assertFalse(SoftLock.isLocked(ctx))
     assertEquals(true, runBlocking { b.sweepMerged() })
     assertTargeted(added(q0))
+  }
+
+  @Test fun `همگام‌سازیِ v3 — sweep نمی‌نشیند، چون جابه‌جاییِ سندِ مالی آن‌جا به صندوقِ تعارض می‌رود`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    val m = merged()
+    val b = open()
+    assertTrue(runBlocking { b.save(m.copy(transactions = m.transactions + late)) })
+    val bytes = ledger.readBytes()
+    val q0 = engine.queueSize()
+    assertEquals("", SyncChoice.set(ctx, SyncChoice.V3, 0))
+    try {
+      assertNull(runBlocking { b.sweepMerged() })
+      runBlocking { ShopStore(ctx).loadAndSummarize() }
+    } finally {
+      assertEquals("", SyncChoice.set(ctx, SyncChoice.V1, 0))
+    }
+    assertEquals(q0, engine.queueSize())
+    assertArrayEquals(bytes, ledger.readBytes())
   }
 }
