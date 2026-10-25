@@ -2,9 +2,13 @@ package ir.vil3ntec.tohid.desktop
 
 import ir.vil3ntec.tohid.core.atrest.AtRestEnvelope
 import ir.vil3ntec.tohid.data.AtRest
+import ir.vil3ntec.tohid.data.CustomerMerge
+import ir.vil3ntec.tohid.data.DebtTransaction
+import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
@@ -193,6 +197,43 @@ class StaleSaveTest {
     assertTrue(thrown.exceptionOrNull() is java.io.IOException)
     assertFalse("دفترِ حسابِ پیشین روی فایلِ حسابِ تازه ننشست", ledger.exists())
     File(ctx.filesDir, "ledger-stale_a.json").delete()
+  }
+
+  /* --------------------- CRM-10: sweep ِ کارگر پس از Pull --------------------- */
+
+  @Test fun `پس از sweep ِ کارگر، ذخیرهٔ صفحه نه sweep را برمی‌گرداند نه DELETE می‌سازد`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    try {
+      val two = ShopData(
+        debtors = listOf(Debtor(id = "stale-c1", name = "احمد", createdAt = 10), Debtor(id = "stale-c2", name = "احمد کابلی", createdAt = 20)),
+        transactions = listOf(DebtTransaction(id = "stale-t1", debtorId = "stale-c1", type = "give", amount = 300.0, date = "2026-09-01")),
+      )
+      var seq = 0
+      val merged = (CustomerMerge.merge(two, "stale-c2", "stale-c1", "2026-10-19", 1) { "stale-a${seq++}" } as CustomerMerge.Result.Ok).data
+      //  دستگاهی آفلاین روی مشتریِ ادغام‌شده قرض داد — sweep جابه‌جایش می‌کند
+      val late = DebtTransaction(id = "stale-late", debtorId = "stale-c1", type = "give", amount = 70.0, date = "2026-10-18")
+      val ui = open()
+      assertTrue(runBlocking { ui.save(merged.copy(transactions = merged.transactions + late)) })
+      assertEquals(emptyList<String>(), queued())
+      val inHand = ui.data.value
+
+      val w = open()
+      assertEquals(true, runBlocking { w.sweepMerged() })    // `SyncV1Worker.sweepAfterPull`
+      val swept = queued()
+      assertEquals(setOf("transactions:stale-late:update", "auditLog"), swept.map { if (it.startsWith("auditLog:")) "auditLog" else it }.toSet())
+      assertEquals("صفحه sweep را می‌بیند", "stale-c2", ui.data.value.transactions.first { it.id == "stale-late" }.debtorId)
+
+      //  صفحه با دفترِ پیش از sweep فروش ثبت می‌کند
+      assertTrue(runBlocking { ui.save(inHand.copy(sales = inHand.sales + sale)) })
+      assertEquals("فقط فروشِ صفحه — نه برگرداندنِ debtorId، نه DELETE ِ ردِ دفترچه", listOf("sales:stale-s1:insert"), queued().drop(swept.size))
+      val disk = open().data.value
+      assertEquals("stale-c2", disk.transactions.first { it.id == "stale-late" }.debtorId)
+      assertEquals(merged.auditLog.size + 1, disk.auditLog.size)
+      assertEquals(listOf("stale-s1"), disk.sales.map { it.id })
+      assertTrue("sweep ِ دوم کاری ندارد", runBlocking { w.sweepMerged() } == null)
+    } finally {
+      ShopPolicy.setCrmReports(ctx, false)
+    }
   }
 
   /* --------------------------------- Sync v3 --------------------------------- */

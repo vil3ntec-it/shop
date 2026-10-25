@@ -226,11 +226,12 @@ class CrmSweepDiskTest {
     val local = base.copy(transactions = base.transactions + late)
     assertTrue(runBlocking { ui.save(base) })
     assertTrue(runBlocking { ui.save(local) })
-    //  کارگر ادغامِ دستگاهِ دیگر را Pull کرد؛ دفترِ حافظهٔ صفحه هنوز کهنه است
+    //  کارگر ادغامِ دستگاهِ دیگر را Pull کرد. دفترِ حافظهٔ صفحه پیش‌تر کهنه می‌ماند؛ حالا همان را
+    //  می‌گیرد (`LedgerFollow`) — sweep ِ صفحه در هر دو حال از دیسک می‌خواند
     val worker = open()
     val m = merged()
     worker.pull(opsOf(base, m))
-    assertFalse(ui.data.value.auditLog.any { it.type == "customer_merge" })
+    assertTrue(ui.data.value.auditLog.any { it.type == "customer_merge" })
     val q0 = engine.queueSize()
 
     assertEquals(true, runBlocking { ui.sweepMerged() })

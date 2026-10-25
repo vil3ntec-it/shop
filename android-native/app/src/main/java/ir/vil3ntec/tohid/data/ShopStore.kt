@@ -194,6 +194,8 @@ class ShopStore(private val context: Context) {
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
       if (!_loaded.value || _unreadable.value != null) return@synchronized null
+      //  نمونه‌ای که پیش از عوضِ حساب بار شده روی دفترِ حسابِ تازه نمی‌نویسد (`LedgerFollow.movedLocked`)
+      if (!follow.sameAccount()) return@synchronized null
       val disk = readDiskLocked() ?: return@synchronized null
       val next = CustomerMerge.sweep(disk) ?: return@synchronized null
       val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
