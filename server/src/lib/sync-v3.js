@@ -425,13 +425,18 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
  * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
  *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
  */
-async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
+async function authorize(c, ctx, op, row, deviceId, origin, groups = null, rowRefs = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
   //  A16: جدولی که این نقش نمی‌نویسد (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ).
   //  سه نقشِ قدیم «*»اند، پس برای آن‌ها هیچ چیز عوض نمی‌شود. ردِ یک op کلِ
   //  واحدِ tx را برمی‌گرداند، پس قلم و حرکتِ انبارِ همان سند هم نمی‌نشیند.
   if (!permCore.canWrite(role, op.table)) return 'table_not_allowed';
+  //  قاعدهٔ ردیف (صندوق‌دار: رسیدِ انبار فقط اصلاحِ موجودیِ یک برگشتِ همین دسته یا از پیش)
+  if (permCore.rowRule(role, op.table)
+    && !permCore.canWriteRow(role, op.table, op.kind === 'insert' ? op.fields : null, rowRefs || [])) {
+    return 'table_not_allowed';
+  }
   const own = !!row && row.created_by === deviceId;
   if (op.kind === 'delete' && op.spec.policy === 'master') {
     if (can(role, 'data.delete.any')) return null;
@@ -471,14 +476,14 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, rowRefs = null }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups);
+  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups, rowRefs);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -761,6 +766,19 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
   const plan = approvals.bundleV3(units, groups);
+  //  A16، قاعدهٔ ردیف: نشانی‌های برگشتِ همین دسته و از پیش (فقط وقتی ردیفِ قاعده‌داری هست)
+  const allOps = units.flatMap((u) => u.items.flatMap((it) => it.ops));
+  const ruled = allOps.filter((o) => permCore.rowRule(ctx.role, o.table));
+  const rowRefs = ruled.length ? await approvals.returnRefs(
+    allOps.map((o) => ({ table: o.table, row_id: o.row_id, fields: o.fields, insert: o.kind === 'insert' })),
+    ruled.map((o) => (o.kind === 'insert' && o.fields && typeof o.fields === 'object' ? o.fields.refId : null)),
+    (ids) => many(
+      `SELECT row_id, data->>'docId' AS doc FROM sync_v3_rows
+        WHERE app='shop' AND account_id=$1 AND table_name='returns'
+          AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+      [ctx.accountId, ids]
+    ),
+  ) : null;
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 
@@ -809,7 +827,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, rowRefs });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }

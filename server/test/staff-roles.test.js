@@ -256,6 +256,21 @@ test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف
   const back = await push1('cashier', ret);
   assert.equal(back.status, 200, JSON.stringify(back.body));
   assert.deepEqual(reasons(back), ['applied', 'applied', 'applied']);
+  //  رسیدِ انبارِ صندوق‌دار فقط اصلاحِ موجودیِ یک برگشت است (قاعدهٔ ردیفِ هسته):
+  //  رسیدِ دستی، نوعِ اصلاحِ دیگر، اشاره به برگشتی که نیست، و ویرایشِ ردیفِ موجود ⇒ رد
+  const wh = [
+    v1op('warehouseEntries', 'w2-csh', { productId: 'p1', units: 10, price: 50 }),
+    v1op('warehouseEntries', 'w3-csh', { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'count', refId: 'rd1-csh' }),
+    v1op('warehouseEntries', 'w4-csh', { productId: 'p1', units: -1, isAdjustment: true, adjKind: 'damage', refId: 'rd-404' }),
+    v1op('warehouseEntries', 'w1-csh', { units: -5 }, 'update'),
+    //  برگشتی که در دستهٔ پیش نشست (rd1-csh) ⇒ پذیرفته
+    v1op('warehouseEntries', 'w5-csh', { productId: 'p1', units: 1, isAdjustment: true, adjKind: 'customer_return', refId: 'rd1-csh' }),
+  ];
+  const whr = await push1('cashier', wh);
+  assert.equal(whr.status, 200, JSON.stringify(whr.body));
+  assert.deepEqual(reasons(whr), ['table_not_allowed', 'table_not_allowed', 'table_not_allowed', 'table_not_allowed', 'applied']);
+  for (const o of wh.slice(0, 4)) assert.equal(await inOplog(o.op_id), false, o.row_id);
+
   //  ولی انباردار برگشت نمی‌زند
   const sk = await push1('storekeeper', [
     v1op('returns', 'r1-stk', { saleId: 's1-csh', saleItemId: 'si1-csh', productId: 'p1', quantity: 1, amount: 100 }),
@@ -343,6 +358,24 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   assert.equal(await inV3('m3-stk'), false);
   assert.equal(await inV3('p3-stk'), true);
 
+  //  رسیدِ انبارِ صندوق‌دار در v3: اصلاحِ برگشتِ همین tx پذیرفته، رسیدِ دستی کلِ tx ِ خودش را برمی‌گرداند
+  const ret3 = await push3('cashier', [
+    v3op('c', 'warehouseEntries', 'w3-ret-csh', { productId: 'p1', unitsMilli: -1000, isAdjustment: true, adjKind: 'damage', refId: 'rd3-csh' }, 'tx-r3'),
+    v3op('c', 'returns', 'r3-csh', { saleId: 's3-csh', saleItemId: 'si3-csh', productId: 'p1', quantityMilli: 1000, amountMinor: 2000, docId: 'rd3-csh' }, 'tx-r3'),
+  ]);
+  assert.deepEqual(reasons(ret3), ['applied', 'applied'], JSON.stringify(ret3.body));
+  const man3 = await push3('cashier', [
+    v3op('c', 'warehouseEntries', 'w3-man-csh', { productId: 'p1', unitsMilli: 5000, priceMinor: 100 }, 'tx-m3'),
+    v3op('c', 'stockMovements', 'm3-man-csh', { productId: 'p1', qtyMilli: 5000, type: 'purchase' }, 'tx-m3'),
+  ]);
+  assert.deepEqual(reasons(man3), ['table_not_allowed', 'tx_rejected'], JSON.stringify(man3.body));
+  assert.equal(await inV3('w3-man-csh'), false);
+  //  برگشتِ از پیش ثبت‌شده (دستهٔ پیش) هم نشانیِ درست است
+  const later3 = await push3('cashier', [
+    v3op('c', 'warehouseEntries', 'w3-later-csh', { productId: 'p1', unitsMilli: 1000, isAdjustment: true, adjKind: 'customer_return', refId: 'r3-csh' }),
+  ]);
+  assert.deepEqual(reasons(later3), ['applied'], JSON.stringify(later3.body));
+
   const p = await push3('picker', [v3op('p', 'products', 'p3-pck', { name: 'x' })]);
   assert.deepEqual(reasons(p), ['table_not_allowed']);
 
@@ -381,6 +414,15 @@ test('راهِ قدیم: /api/sync و درهای دفترِ /api/* (routes/data)
   assert.equal(bad.body.error.code, 'table_not_allowed');
   assert.equal(await one(`SELECT 1 FROM sales WHERE shop_id=$1 AND id='lg-full-2'`, [shopId]), null);
   assert.equal((await h.post('/api/expenses', { data: { amount: 1 } }, { token: T.cashier.accessToken })).status, 403);
+  //  رسیدِ انبارِ دستیِ صندوق‌دار از راهِ قدیم هم بسته است؛ اصلاحِ یک برگشتِ همین دسته نه
+  const inv = await h.post('/api/inventory', { data: { productId: 'p1', units: 10 } }, { token: T.cashier.accessToken });
+  assert.equal(inv.status, 403);
+  assert.equal(inv.body.error.code, 'table_not_allowed');
+  const lgRet = await legacy('cashier', [
+    { collection: 'returns', id: 'lg-r1', updatedAt: Date.now(), data: { saleId: 'lg-s1', amount: 10, docId: 'lg-rd1' } },
+    { collection: 'warehouseEntries', id: 'lg-w1', updatedAt: Date.now(), data: { productId: 'p1', units: -1, adjKind: 'damage', refId: 'lg-rd1' } },
+  ]);
+  assert.equal(lgRet.status, 200, JSON.stringify(lgRet.body));
   const acc = await h.post('/api/products', { data: { name: 'x' } }, { token: T.accountant.accessToken });
   assert.equal(acc.status, 403);
   assert.equal((await h.get('/api/products', { token: T.accountant.accessToken })).status, 200);

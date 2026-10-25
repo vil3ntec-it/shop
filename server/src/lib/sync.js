@@ -93,6 +93,33 @@ async function pushChanges(ctx, changes) {
   if (offTable) {
     throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(offTable.collection)})`, 'table_not_allowed');
   }
+  //  قاعدهٔ ردیف (صندوق‌دار: رسیدِ انبار فقط اصلاحِ موجودیِ یک برگشتِ همین دسته یا از پیش).
+  //  راهِ قدیم «ویرایش» و «درج» را از هم جدا نمی‌کند: ردیفِ تازه درج است، ردیفِ موجود ویرایش.
+  const ruled = changes.filter((ch) => permCore.rowRule(role, String(ch?.collection || '')));
+  if (ruled.length) {
+    const ids = ruled.map((ch) => String(ch?.id || '')).filter(Boolean);
+    const existing = new Set((ids.length ? await many(
+      `SELECT id FROM ${TABLES.warehouseEntries} WHERE shop_id=$1 AND id = ANY($2::text[])`, [shopId, ids]
+    ) : []).map((x) => x.id));
+    const refs = await require('./staff-approval').returnRefs(
+      changes.map((ch) => ({
+        table: String(ch?.collection || ''), row_id: String(ch?.id || ''),
+        fields: ch?.data && typeof ch.data === 'object' ? ch.data : null, insert: ch?.deleted !== true,
+      })),
+      ruled.map((ch) => (ch?.data && typeof ch.data === 'object' ? ch.data.refId : null)),
+      (want) => many(
+        `SELECT id AS row_id, data->>'docId' AS doc FROM ${TABLES.returns}
+          WHERE shop_id=$1 AND deleted=false AND (id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+        [shopId, want]
+      ),
+    );
+    const bad = ruled.find((ch) => {
+      const insert = ch?.deleted !== true && !existing.has(String(ch?.id || ''));
+      const fields = insert && ch?.data && typeof ch.data === 'object' ? ch.data : null;
+      return !permCore.canWriteRow(role, String(ch.collection), fields, refs);
+    });
+    if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(bad.collection)})`, 'table_not_allowed');
+  }
 
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);

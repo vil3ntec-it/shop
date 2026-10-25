@@ -38,6 +38,9 @@ for (const [name, file] of [['وب', WEB], ['سرور', SRV]]) {
     for (const c of V.discount_bp) assert.equal(P.discountBp(c.discount, c.total), c.out, JSON.stringify(c));
     for (const c of V.writes) assert.equal(P.canWrite(c.role, c.table), c.out, JSON.stringify(c));
     for (const c of V.writable) assert.deepEqual(P.writable(c.role), c.out, JSON.stringify(c));
+    assert.deepEqual(P.RETURN_ADJ_KINDS, V.return_adj_kinds);
+    for (const c of V.row_rules) assert.equal(P.rowRule(c.role, c.table), c.out, JSON.stringify(c));
+    for (const c of V.rows) assert.equal(P.canWriteRow(c.role, c.table, c.fields, c.refs), c.out, JSON.stringify(c));
   });
 }
 

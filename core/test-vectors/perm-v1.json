@@ -1,5 +1,5 @@
 {
-  "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. نقش‌های تازهٔ A16 (cashier، storekeeper، picker، accountant) و writes/writable = جدول‌های همگام‌سازیِ نوشتنیِ هر نقش؛ سه نقشِ قدیم «*». همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه). returns.create و «نیازمند تأیید» برای شاگرد و discount_bp: برگهٔ امضاشده (بخشِ ۱۰.۱).",
+  "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. نقش‌های تازهٔ A16 (cashier، storekeeper، picker، accountant) و writes/writable = جدول‌های همگام‌سازیِ نوشتنیِ هر نقش؛ سه نقشِ قدیم «*». row_rules/rows = قاعدهٔ ردیف (صندوق‌دار: warehouseEntries فقط اصلاحِ موجودیِ یک برگشت). همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه). returns.create و «نیازمند تأیید» برای شاگرد و discount_bp: برگهٔ امضاشده (بخشِ ۱۰.۱).",
   "version": 1,
   "keys": ["audit.view", "drawer.open", "reports.money", "returns.create", "sales.cancel", "sales.discount", "settings.write"],
   "defaults": [
@@ -380,5 +380,31 @@
     { "role": "accountant", "out": [] },
     { "role": "janitor", "out": null },
     { "role": "courier", "out": null }
+  ],
+  "return_adj_kinds": ["customer_return", "damage"],
+  "row_rules": [
+    { "role": "cashier", "table": "warehouseEntries", "out": "return_adjustment" },
+    { "role": "cashier", "table": "sales", "out": null },
+    { "role": "storekeeper", "table": "warehouseEntries", "out": null },
+    { "role": "staff", "table": "warehouseEntries", "out": null },
+    { "role": "janitor", "table": "warehouseEntries", "out": null }
+  ],
+  "rows": [
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "doc-1", "units": -1 }, "refs": ["doc-1"], "out": true },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "customer_return", "refId": "ret-1" }, "refs": ["ret-1", "doc-9"], "out": true },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "doc-x" }, "refs": ["doc-1"], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "count", "refId": "doc-1" }, "refs": ["doc-1"], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "refId": "doc-1", "units": 5 }, "refs": ["doc-1"], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "damage" }, "refs": ["doc-1"], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "" }, "refs": [""], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": null, "refs": ["doc-1"], "out": false },
+    { "role": "cashier", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "doc-1" }, "refs": [], "out": false },
+    { "role": "cashier", "table": "sales", "fields": null, "refs": [], "out": true },
+    { "role": "cashier", "table": "purchases", "fields": { "adjKind": "damage", "refId": "doc-1" }, "refs": ["doc-1"], "out": false },
+    { "role": "storekeeper", "table": "warehouseEntries", "fields": { "units": 10 }, "refs": [], "out": true },
+    { "role": "staff", "table": "warehouseEntries", "fields": null, "refs": [], "out": true },
+    { "role": "owner", "table": "warehouseEntries", "fields": { "units": 1 }, "refs": [], "out": true },
+    { "role": "accountant", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "doc-1" }, "refs": ["doc-1"], "out": false },
+    { "role": "janitor", "table": "warehouseEntries", "fields": { "adjKind": "damage", "refId": "doc-1" }, "refs": ["doc-1"], "out": false }
   ]
 }

@@ -110,6 +110,21 @@ class PermCoreTest {
     }
   }
 
+  /** قاعدهٔ ردیف (A16): صندوق‌دار از `warehouseEntries` فقط اصلاحِ موجودیِ یک برگشت را — همان JS */
+  @Test fun rowRules() {
+    assertEquals(v.getValue("return_adj_kinds").jsonArray.map { it.jsonPrimitive.content }, PermCore.RETURN_ADJ_KINDS)
+    for (c in list("row_rules")) {
+      val out = c.getValue("out").let { if (it is JsonNull) null else it.jsonPrimitive.content }
+      assertEquals(c.toString(), out, PermCore.rowRule(c.s("role"), c.s("table")))
+    }
+    for (c in list("rows")) {
+      @Suppress("UNCHECKED_CAST")
+      val fields = PermPolicy.tree(c.getValue("fields")) as Map<String, Any?>?
+      val refs = c.getValue("refs").jsonArray.map { it.jsonPrimitive.content }
+      assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toBoolean(), PermCore.canWriteRow(c.s("role"), c.s("table"), fields, refs))
+    }
+  }
+
   /** نقش‌های تازه هیچ‌کدام از سه نقشِ قدیم را عوض نکرده‌اند (آزمونِ مرجع) */
   @Test fun legacyRolesUnchanged() {
     assertEquals(listOf("owner", "manager", "staff"), PermCore.ROLES.take(3))

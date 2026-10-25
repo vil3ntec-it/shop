@@ -116,9 +116,9 @@
    *  `auditLog` برای هر نقشِ نویسنده است: سابقهٔ همان کاری که کرده.
    *  فروش با قلم، حرکتِ انبار، پرداختِ قرض و سابقه یک‌جا می‌نشیند؛ رسیدِ خرید
    *  با کالا، تاریخچهٔ قیمت، رسیدِ انبار و حرکتِ انبار.
-   *  صندوق‌دار `warehouseEntries` هم دارد: برگشتِ ضایعات و برگشتِ بی‌رسید (RET، #318)
-   *  اصلاحِ موجودی را با همان ردیف‌ها همراهِ برگشت می‌نویسد. محدود کردن به «فقط ردیفِ
-   *  اصلاحیِ بسته به برگشت» سنجشِ ردیف است، نه جدول — کارِ جداگانهٔ بعدی.
+   *  صندوق‌دار `warehouseEntries` را فقط با «قاعدهٔ ردیف» دارد (`ROW_RULES` پایین): برگشتِ
+   *  ضایعات و برگشتِ بی‌رسید (RET، #318) اصلاحِ موجودی را با همین ردیف‌ها می‌نویسد، ولی
+   *  رسیدِ انبارِ دستی نه.
    */
   var WRITES = {
     owner: '*',
@@ -136,6 +136,37 @@
     if (typeof role !== 'string' || !has(WRITES, role) || typeof table !== 'string' || !table) return false;
     var w = WRITES[role];
     return w === '*' || w.indexOf(table) >= 0;
+  }
+
+  /*
+   *  قاعدهٔ ردیف: جدولی که نقش فقط بخشی از ردیف‌هایش را می‌نویسد.
+   *    return_adjustment  فقط درجِ اصلاحِ موجودیِ یک برگشت: `adjKind` یکی از
+   *                       RETURN_ADJ_KINDS و `refId` = شناسه یا `docId`ِ برگشتی که در همین
+   *                       دسته درج می‌شود یا از پیش ثبت است. ویرایش و حذف نه.
+   */
+  var RETURN_ADJ_KINDS = ['customer_return', 'damage'];
+  var ROW_RULES = { cashier: { warehouseEntries: 'return_adjustment' } };
+
+  /** نامِ قاعدهٔ ردیفِ این نقش برای این جدول، یا null (یعنی همهٔ ردیف‌ها، اگر `canWrite`) */
+  function rowRule(role, table) {
+    if (typeof role !== 'string' || !has(ROW_RULES, role)) return null;
+    return typeof table === 'string' && has(ROW_RULES[role], table) ? ROW_RULES[role][table] : null;
+  }
+
+  /**
+   *  این نقش همین ردیف را می‌نویسد؟
+   *  @param {Object|null} fields  فیلدهای ردیفِ درج‌شونده؛ null یعنی ویرایش یا حذف
+   *  @param {Array<string>} returnRefs  شناسه‌ها و `docId`های برگشت‌های همین دسته و از پیش
+   */
+  function canWriteRow(role, table, fields, returnRefs) {
+    if (!canWrite(role, table)) return false;
+    var rule = rowRule(role, table);
+    if (!rule) return true;
+    if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return false;
+    if (RETURN_ADJ_KINDS.indexOf(fields.adjKind) < 0) return false;
+    var ref = fields.refId;
+    if (typeof ref !== 'string' || !ref) return false;
+    return Array.isArray(returnRefs) && returnRefs.indexOf(ref) >= 0;
   }
 
   /** فهرستِ جدول‌های نوشتنیِ یک نقش: «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته */
@@ -299,6 +330,9 @@
     WRITES: WRITES,
     canWrite: canWrite,
     writable: writable,
+    RETURN_ADJ_KINDS: RETURN_ADJ_KINDS,
+    rowRule: rowRule,
+    canWriteRow: canWriteRow,
     ROUNDING_MINOR: ROUNDING_MINOR,
     discountBp: discountBp,
     discountPct: discountPct,

@@ -86,7 +86,11 @@ data class WarehouseEntry(
   val batch: String = "",
   /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
   val productionDate: String = "",
-  /** نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return */
+  /**
+   *  نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return ·
+   *  customer_return (برگشتِ بی‌رسیدِ کالای سالم، #318). اصلاحِ برگشت (damage یا
+   *  customer_return با `refId` = برگشت) تنها ردیفِ رسیدِ انبار است که صندوق‌دار می‌نویسد (A16).
+   */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val adjKind: String? = null,
@@ -173,6 +177,17 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+  /**
+   *  توکنِ QRِ فاکتور (فاکتورِ نسخهٔ ۲): ۱۲۸ بیتِ تصادفی، ۲۶ نویسه (`ReceiptToken`)، فقط
+   *  هنگامِ **ثبتِ** فروش (`SalesEngine`). نشانیِ QR = `<سرور>/r/<نشانِ دکان>/<توکن>` و
+   *  صفحهٔ عمومیِ سرور فروش را فقط در همین دکان با آن پیدا می‌کند. فروشِ پیش از نسخهٔ ۲
+   *  `null` است و QR ندارد (v3 فروش را فقط‌افزودنی می‌داند؛ توکنِ دیرتر ممکن نیست).
+   *  مثلِ `series` هرگز `null` نوشته نمی‌شود: فروشِ کهنه opِ تازه نمی‌سازد و برنامهٔ
+   *  کهنه‌ای که این را نمی‌شناسد آن را روی سرور پاک نمی‌کند (A00، `newer-fields.js`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val receiptToken: String? = null,
 )
 
 /**

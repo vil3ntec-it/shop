@@ -577,6 +577,60 @@ function refersTo(parent, op) {
   return REF_FIELDS.some((k) => typeof f[k] === 'string' && f[k] !== '' && f[k] === parent.row_id);
 }
 
+/**
+ * نشانی‌های برگشت (شناسهٔ ردیف و `docId`) که ردیفِ قاعده‌دار می‌تواند به آن اشاره کند:
+ * برگشت‌های درجِ همین دسته، به‌علاوهٔ برگشت‌های از پیش ثبت‌شده‌ای که `refId`ِ یکی از
+ * ردیف‌ها به آن‌ها اشاره می‌کند (یک پرس‌وجو، فقط وقتی ردیفِ قاعده‌دار هست).
+ * @param ops      opهای همین دسته — `{table, row_id, fields, insert}`
+ * @param wanted   `refId`های ردیف‌های قاعده‌دار
+ * @param lookup   async (ids) ⇒ [{row_id, doc}] از ردیف‌های ثبت‌شدهٔ `returns`
+ * @returns {Promise<string[]>}
+ */
+async function returnRefs(ops, wanted, lookup) {
+  const refs = new Set();
+  for (const o of ops) {
+    if (o.table !== 'returns' || !o.insert) continue;
+    refs.add(String(o.row_id));
+    const d = isPlainObject(o.fields) ? o.fields.docId : null;
+    if (typeof d === 'string' && d) refs.add(d);
+  }
+  const missing = [...new Set(wanted.filter((r) => typeof r === 'string' && r && !refs.has(r)))];
+  if (missing.length) {
+    for (const r of await lookup(missing)) {
+      refs.add(String(r.row_id));
+      if (r.doc) refs.add(String(r.doc));
+    }
+  }
+  return [...refs];
+}
+
+/**
+ * opهای v1ِ بیرون از حدِ نقش: جدولی که نقش نمی‌نویسد، یا ردیفی از جدولِ قاعده‌دار که
+ * قاعده را نمی‌گذراند (صندوق‌دار: `warehouseEntries` فقط اصلاحِ موجودیِ یک برگشت).
+ */
+async function offRoleV1(ctx, valid) {
+  const off = [];
+  const ruled = [];
+  for (const x of valid) {
+    if (!core.canWrite(ctx.role, x.op.table)) off.push(x);
+    else if (core.rowRule(ctx.role, x.op.table)) ruled.push(x);
+  }
+  if (!ruled.length) return off;
+  const fieldsOf1 = (x) => (x.op.type === 'insert' && isPlainObject(x.op.fields) ? x.op.fields : null);
+  const refs = await returnRefs(
+    valid.map((x) => ({ table: x.op.table, row_id: x.op.row_id, fields: x.op.fields, insert: x.op.type === 'insert' })),
+    ruled.map((x) => fieldsOf1(x)?.refId),
+    (ids) => many(
+      `SELECT row_id, data->>'docId' AS doc FROM sync_rows
+        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='returns' AND deleted_at IS NULL
+          AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+      [ctx.accountId, ids]
+    ),
+  );
+  for (const x of ruled) if (!core.canWriteRow(ctx.role, x.op.table, fieldsOf1(x), refs)) off.push(x);
+  return off;
+}
+
 /** ردیفِ پولیِ «بی نشانی» (برنامهٔ پیش از refId): تراکنش، یا اصلاحِ انبار */
 function isLoose(op) {
   const f = fieldsOf(op);
@@ -754,20 +808,28 @@ async function v1Guard(req, res, next) {
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.length) return next();
-    const { validateOp } = require('./sync-v1');
+    const { validateOp, tableOf } = require('./sync-v1');
     const valid = [];
+    const rejected = new Map();
     ops.forEach((raw, i) => {
       const v = validateOp('shop', raw);
-      if (v.ok) valid.push({ i, op: v.op, need: needOfV1(v.op) });   //  نادرست را خودِ v1 رد می‌کند
+      if (v.ok) { valid.push({ i, op: v.op, need: needOfV1(v.op) }); return; }
+      //  opِ نادرستِ جدولِ زیرِ نگهبان همین‌جا رد می‌شود، نه «خودِ v1 ردش می‌کند»: هر لایهٔ بعدی که
+      //  درستش کند (مثلِ پالایشِ null ِ قدیمی) آن را بی داوری به v1 می‌رساند
+      const r = isPlainObject(raw) ? raw : {};
+      if (LINKABLE.has(tableOf('shop', r.table ?? r.table_name ?? r.tableName))) {
+        rejected.set(i, { op_id: v.op_id, status: 'rejected', reason: v.reason });
+      }
     });
-    //  A16: opی که جدولش در حدِ نقش نیست (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ).
-    //  سه نقشِ قدیم «*»اند، پس برایشان این فهرست همیشه خالی است.
-    const offTable = valid.filter((x) => !core.canWrite(ctx.role, x.op.table));
+    //  A16: opی که جدولش (یا ردیفش) در حدِ نقش نیست (صندوق‌دار خرید، انباردار فروش، حسابدار
+    //  هیچ). روی همان opِ یک‌دست‌شده‌ای سنجیده می‌شود که به v1 می‌رسد (پس از shopNewerFields).
+    //  سه نقشِ قدیم «*»اند و قاعدهٔ ردیف ندارند، پس برایشان این فهرست همیشه خالی است.
+    const offTable = await offRoleV1(ctx, valid);
     const hasNeed = valid.some((x) => x.need);
-    if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return next();
+    if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
-    if (!hasNeed && !held0.length && !offTable.length) return next();
+    if (!hasNeed && !held0.length && !offTable.length) return finish();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
     //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه همراه، نه صندوق.
     const seen = new Set((await many(
@@ -776,15 +838,14 @@ async function v1Guard(req, res, next) {
     //  A16، پیش از هر داوری: opِ بیرون از نقش `table_not_allowed` و همراه‌هایش در همین دسته
     //  (`refersTo`) `tx_rejected` — تا برگه‌ای برای opی که به‌هرحال نمی‌نشیند خرج نشود و
     //  صندوقِ تعارضی برایش ساخته نشود. opِ ثبت‌شده را باز خودِ v1 «تکراری» جواب می‌دهد.
-    const tableOut = new Map();
     const offLive = offTable.filter((x) => !seen.has(String(x.op.op_id)));
-    const drop = (x, reason) => tableOut.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
+    const drop = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
     for (const x of offLive) drop(x, 'table_not_allowed');
     for (const x of valid) {
-      if (tableOut.has(x.i) || seen.has(String(x.op.op_id))) continue;
+      if (rejected.has(x.i) || seen.has(String(x.op.op_id))) continue;
       if (offLive.some((p) => refersTo(p.op, x.op))) drop(x, 'tx_rejected');
     }
-    const live = valid.filter((x) => !seen.has(String(x.op.op_id)) && !tableOut.has(x.i));
+    const live = valid.filter((x) => !seen.has(String(x.op.op_id)) && !rejected.has(x.i));
     const liveOps = live.map((x) => x.op);
     //  دفترِ پایه: چند سند زیرِ یک ts
     const heads = new Map();
@@ -796,7 +857,6 @@ async function v1Guard(req, res, next) {
       heads.get(t).add(h);
     }
 
-    const rejected = new Map(tableOut);
     const reject = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
     const parents = [];
 
@@ -897,19 +957,25 @@ async function v1Guard(req, res, next) {
       await boxV1(ctx, op, deviceId, { box: out.box, detail });
     }
 
-    req.body.ops = ops.filter((_, i) => !rejected.has(i));
-    const send = res.json.bind(res);
-    res.json = (body) => {
-      if (body && body.ok && Array.isArray(body.results)) {
-        const rest = body.results.slice();
-        const merged = [];
-        for (let i = 0; i < ops.length; i++) merged.push(rejected.has(i) ? rejected.get(i) : rest.shift());
-        //  اگر شمارِ پاسخ‌ها نخواند، چیزی گم نشود
-        body.results = merged.filter(Boolean).concat(rest);
-      }
-      return send(body);
-    };
-    next();
+    return finish();
+
+    /** ردشده‌ها از دسته بیرون و پاسخشان سرِ جای خودشان؛ بی ردشده همان دسته به v1 */
+    function finish() {
+      if (!rejected.size) return next();
+      req.body.ops = ops.filter((_, i) => !rejected.has(i));
+      const send = res.json.bind(res);
+      res.json = (body) => {
+        if (body && body.ok && Array.isArray(body.results)) {
+          const rest = body.results.slice();
+          const merged = [];
+          for (let i = 0; i < ops.length; i++) merged.push(rejected.has(i) ? rejected.get(i) : rest.shift());
+          //  اگر شمارِ پاسخ‌ها نخواند، چیزی گم نشود
+          body.results = merged.filter(Boolean).concat(rest);
+        }
+        return send(body);
+      };
+      return next();
+    }
   } catch (err) { next(err); }
 }
 
@@ -1091,7 +1157,7 @@ async function listApprovals(shopId, { limit = 100 } = {}) {
 }
 
 module.exports = {
-  ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
+  ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES, returnRefs,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,

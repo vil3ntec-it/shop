@@ -40,7 +40,25 @@ object RoleGate {
   /** نخستین جدولی که این نقش نمی‌نویسد و در این نوشتن عوض شده — یا null */
   fun blocked(role: String, cur: ShopData, next: ShopData): String? {
     if (role !in PermCore.ROLES || PermCore.writable(role) == PermCore.ALL_TABLES) return null
-    return changedTables(cur, next).firstOrNull { !PermCore.canWrite(role, it) }
+    return changedTables(cur, next).firstOrNull { table ->
+      !PermCore.canWrite(role, table) || (PermCore.rowRule(role, table) != null && !rowsAllowed(role, table, cur, next))
+    }
+  }
+
+  /**
+   *  قاعدهٔ ردیف (همان `canWriteRow`ِ سرور): فقط ردیفِ تازه، و هر ردیفِ تازه قاعده را
+   *  بگذراند. ویرایش یا حذفِ ردیفِ موجود نه. امروز تنها قاعده رسیدِ انبارِ صندوق‌دار است:
+   *  اصلاحِ موجودیِ یک برگشت (`adjKind` ِ برگشت و `refId` = شناسه یا `docId`ِ یک برگشت).
+   */
+  private fun rowsAllowed(role: String, table: String, cur: ShopData, next: ShopData): Boolean {
+    if (table != "warehouseEntries") return false
+    val before = cur.warehouseEntries.associateBy { it.id }
+    val after = next.warehouseEntries.associateBy { it.id }
+    if (before.any { (id, e) -> after[id] != e }) return false
+    val refs = next.saleReturns.flatMap { listOfNotNull(it.id, it.docId) }.filter { it.isNotEmpty() }.toSet()
+    return after.values.filter { it.id !in before }.all { e ->
+      PermCore.canWriteRow(role, table, mapOf("adjKind" to e.adjKind, "refId" to e.refId), refs)
+    }
   }
 
   /** نامِ فارسیِ بخشِ دفتر برای پیام */

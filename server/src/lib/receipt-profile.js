@@ -20,6 +20,8 @@ const v = require('./validate');
 const { badRequest } = require('../middleware/errors');
 
 const KEY = 'receipt';
+/** پرچمِ فاکتورِ نسخهٔ ۲ برای برنامه‌ها (live_config، دامنهٔ دکان یا all؛ پیش‌فرض خاموش) */
+const FLAG_KEY = 'shop.receipt_v2';
 const LOGO_MAX_BYTES = 200 * 1024;
 const LOGO_MAX_SIDE = 1024;
 const TEXT_MAX = Object.freeze({ name: 80, address: 160, phone: 32, footer: 160 });
@@ -161,6 +163,9 @@ async function releaseBlob(hash) {
   });
 }
 
+/** پرچمِ نسخهٔ ۲ برای این دکان — همان خوانشِ `live_config` ِ بخش‌های دیگر (`orders.flagOf`) */
+const enabledFor = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
+
 /** بایت‌های یک لوگو از `image_blobs`، یا null */
 async function blob(hash) {
   const b = await one('SELECT data, mime, hash FROM image_blobs WHERE hash=$1', [hash]);
@@ -173,4 +178,4 @@ async function logoOf(shopId) {
   return profile.logo ? blob(profile.logo.hash) : null;
 }
 
-module.exports = { KEY, LOGO_MAX_BYTES, LOGO_MAX_SIDE, DEFAULTS, view, patchOf, read, update, putLogo, removeLogo, blob, logoOf };
+module.exports = { KEY, FLAG_KEY, enabledFor, LOGO_MAX_BYTES, LOGO_MAX_SIDE, DEFAULTS, view, patchOf, read, update, putLogo, removeLogo, blob, logoOf };

@@ -91,7 +91,8 @@ object PermCore {
     "owner" to listOf(ALL_TABLES),
     "manager" to listOf(ALL_TABLES),
     "staff" to listOf(ALL_TABLES),
-    //  `warehouseEntries`: اصلاحِ موجودیِ برگشتِ ضایعات و بی‌رسید (#318) همراهِ همان برگشت
+    //  `warehouseEntries` فقط با قاعدهٔ ردیفِ `return_adjustment` (`ROW_RULES`): اصلاحِ موجودیِ
+    //  برگشتِ ضایعات و بی‌رسید (#318)، نه رسیدِ انبارِ دستی
     "cashier" to listOf("auditLog", "debtors", "returns", "saleItems", "sales", "stockMovements", "transactions", "warehouseEntries"),
     "storekeeper" to listOf(
       "auditLog", "priceHistory", "productCategories", "productUnits", "products", "purchases",
@@ -106,6 +107,31 @@ object PermCore {
     val w = WRITES[role] ?: return false
     if (table.isEmpty()) return false
     return w == listOf(ALL_TABLES) || table in w
+  }
+
+  /** نوعِ اصلاحِ موجودی که «برگشت» شمرده می‌شود — همان `RETURN_ADJ_KINDS`ِ JS */
+  val RETURN_ADJ_KINDS: List<String> = listOf("customer_return", "damage")
+
+  /** قاعدهٔ ردیف: جدولی که نقش فقط بخشی از ردیف‌هایش را می‌نویسد — همان `ROW_RULES`ِ JS */
+  private val ROW_RULES: Map<String, Map<String, String>> =
+    mapOf("cashier" to mapOf("warehouseEntries" to "return_adjustment"))
+
+  /** نامِ قاعدهٔ ردیفِ این نقش برای این جدول، یا null */
+  fun rowRule(role: String, table: String): String? = ROW_RULES[role]?.get(table)
+
+  /**
+   *  این نقش همین ردیف را می‌نویسد؟ — همان `canWriteRow`ِ JS.
+   *  @param fields فیلدهای ردیفِ درج‌شونده؛ null یعنی ویرایش یا حذف
+   *  @param returnRefs شناسه‌ها و `docId`های برگشت‌های همین دسته و از پیش
+   */
+  fun canWriteRow(role: String, table: String, fields: Map<String, Any?>?, returnRefs: Collection<String>): Boolean {
+    if (!canWrite(role, table)) return false
+    rowRule(role, table) ?: return true
+    if (fields == null) return false
+    if ((fields["adjKind"] as? String) !in RETURN_ADJ_KINDS) return false
+    val ref = fields["refId"] as? String
+    if (ref.isNullOrEmpty()) return false
+    return ref in returnRefs
   }
 
   /** «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته — همان `writable`ِ JS */

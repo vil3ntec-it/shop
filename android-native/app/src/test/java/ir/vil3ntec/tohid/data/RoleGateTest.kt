@@ -71,12 +71,29 @@ class RoleGateTest {
 
     //  برگشتِ ضایعات (#318): ردیفِ برگشت + اصلاحِ موجودی در رسیدِ انبار + حرکتِ انبار
     val damagedReturn = base.copy(
-      saleReturns = listOf(SaleReturn(id = "r1")),
-      warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1")),
+      saleReturns = listOf(SaleReturn(id = "r1", docId = "doc-1")),
+      warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1", units = -1.0, isAdjustment = true, adjKind = "damage", refId = "doc-1")),
       stockMovements = listOf(StockMovement(id = "m3", productId = "p1")),
     )
     assertNull(RoleGate.blocked("cashier", base, damagedReturn))
     assertEquals("returns", RoleGate.blocked("storekeeper", base, damagedReturn))
+    //  برگشتِ بی‌رسید با کالای سالم: همان، با نوعِ customer_return
+    val restock = damagedReturn.copy(warehouseEntries = listOf(WarehouseEntry(id = "w2", productId = "p1", units = 1.0, adjKind = "customer_return", refId = "r1")))
+    assertNull(RoleGate.blocked("cashier", base, restock))
+    //  رسیدِ انبارِ دستی، نوعِ اصلاحِ دیگر، یا اشاره به برگشتی که نیست ⇒ بسته
+    val manual = base.copy(warehouseEntries = listOf(WarehouseEntry(id = "w3", productId = "p1", units = 10.0)))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, manual))
+    val count = damagedReturn.copy(warehouseEntries = listOf(WarehouseEntry(id = "w4", productId = "p1", adjKind = "count", refId = "doc-1")))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, count))
+    val orphan = base.copy(warehouseEntries = listOf(WarehouseEntry(id = "w5", productId = "p1", adjKind = "damage", refId = "doc-404")))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", base, orphan))
+    //  ردیفِ موجود را صندوق‌دار نه ویرایش می‌کند نه حذف
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", damagedReturn, damagedReturn.copy(warehouseEntries = emptyList())))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", damagedReturn,
+      damagedReturn.copy(warehouseEntries = damagedReturn.warehouseEntries.map { it.copy(units = -5.0) })))
+    //  انباردار رسیدِ دستی می‌نویسد؛ شاگرد و مدیر هم (بی قاعدهٔ ردیف)
+    assertNull(RoleGate.blocked("storekeeper", base, manual))
+    assertNull(RoleGate.blocked("staff", base, manual))
 
     assertEquals("sales", RoleGate.blocked("picker", base, sale))
     assertNull(RoleGate.blocked("picker", base, base.copy(auditLog = listOf(AuditEntry(id = "a")))))
