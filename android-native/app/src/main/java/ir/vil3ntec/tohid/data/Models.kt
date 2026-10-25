@@ -173,6 +173,17 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+  /**
+   *  توکنِ QRِ فاکتور (فاکتورِ نسخهٔ ۲): ۱۲۸ بیتِ تصادفی، ۲۶ نویسه (`ReceiptToken`)، فقط
+   *  هنگامِ **ثبتِ** فروش (`SalesEngine`). نشانیِ QR = `<سرور>/r/<نشانِ دکان>/<توکن>` و
+   *  صفحهٔ عمومیِ سرور فروش را فقط در همین دکان با آن پیدا می‌کند. فروشِ پیش از نسخهٔ ۲
+   *  `null` است و QR ندارد (v3 فروش را فقط‌افزودنی می‌داند؛ توکنِ دیرتر ممکن نیست).
+   *  مثلِ `series` هرگز `null` نوشته نمی‌شود: فروشِ کهنه opِ تازه نمی‌سازد و برنامهٔ
+   *  کهنه‌ای که این را نمی‌شناسد آن را روی سرور پاک نمی‌کند (A00، `newer-fields.js`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val receiptToken: String? = null,
 )
 
 /**
@@ -338,6 +349,39 @@ data class Debtor(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val creditLimit: Double? = null,
+  /*
+   *  پروندهٔ مشتری (CRM-02، ۰۸، ۱۰، ۱۱، ۱۲) — همه اختیاری و همه `null` به معنای «همان رفتارِ همیشه».
+   *  ⛔ هیچ‌کدام `null` نوشته نمی‌شود (`EncodeDefault.NEVER`، مثلِ `creditLimit`): قرض‌دارِ قدیمی
+   *  بایت‌به‌بایت همان می‌ماند و نخستین تفاضلِ Sync v1 برایش op نمی‌سازد. نوشتن فقط از `CustomerCrm`
+   *  و `CustomerMerge`.
+   */
+  /** شمارهٔ دوم (CRM-02) — همان قالبِ `phone` (`LocaleText.phoneForSave`) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val phone2: String? = null,
+  /** برچسب‌ها (CRM-11) — بی تکرار (با `TextNormalizer.compareKey`)، بی «#» */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tags: List<String>? = null,
+  /** گروهِ مشتری (CRM-08)، مثلاً «همکار» یا «عمده‌فروش» */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val group: String? = null,
+  /** لیستِ قیمتِ پیش‌فرض (CRM-08): `wholesale` = قیمتِ عمده؛ `null` = خرده (همیشه) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceList: String? = null,
+  /** رضایت برای پیامِ تبلیغاتی (CRM-12): `null` = نپرسیده (یعنی نه)، `false` = صریحاً نه */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val marketingConsent: Boolean? = null,
+  /**
+   *  ادغام‌شده در (CRM-10): شناسهٔ مشتریِ ماندگار. ردیف پاک نمی‌شود (سابقه و شناسه می‌مانند)،
+   *  ولی دیگر «فعال» نیست: `CustomerCrm.active` آن را بیرون می‌گذارد.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val mergedInto: String? = null,
 )
 
 @Serializable
@@ -491,6 +535,14 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val z: kotlinx.serialization.json.JsonObject? = null,
+  /**
+   *  ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) —
+   *  فعلاً فقط `customer_merge` (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر
+   *  `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val refIds: List<String>? = null,
 )
 
 /**

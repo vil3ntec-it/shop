@@ -38,6 +38,9 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrNav
 
 /**
  *  «درخواستِ تأیید» — STF-02، سناریوهای S07 و S08 (بخشِ ۱۰.۱).
@@ -76,31 +79,30 @@ fun ApprovalDialog(
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(8.dp))
-        StatusPill("نیازمند تأیید", PillTone.WARNING)
+        StatusPill(StrPos.needsApproval, PillTone.WARNING)
         Spacer(Modifier.height(8.dp))
         Text(summary, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))
 
         if (shopId.isBlank() || approvers.isEmpty()) {
           Text(
-            if (shopId.isBlank()) "این دستگاه هنوز به دکان وصل نشده است؛ یک بار آنلاین وارد شوید."
-            else "روی این دستگاه هیچ مدیر یا صاحبِ دکانی PIN و کلیدِ تأییدِ ثبت‌شده ندارد. " +
-              "از «کارمندان ← PIN و کلیدِ تأیید» یک بار آنلاین بسازید.",
+            if (shopId.isBlank()) StrPos.deviceNotLinked
+            else StrPos.noApprovers,
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
           Spacer(Modifier.height(12.dp))
           Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onDismiss) { Text("بستن") }
+            TextButton(onClick = onDismiss) { Text(Str.close) }
           }
           return@Column
         }
 
         if (approvers.size > 1) {
-          Text("تأییدکننده", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Text(StrPos.approver, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Spacer(Modifier.height(6.dp))
           SegmentedChoice(
-            options = approvers.map { it.userId to it.name.ifBlank { if (it.role == "owner") "صاحب دکان" else "مدیر" } },
+            options = approvers.map { it.userId to it.name.ifBlank { if (it.role == "owner") StrNav.roleOwner else StrNav.roleManager } },
             selected = who,
             onSelect = { if (!busy) { who = it; error = null } },
           )
@@ -109,19 +111,19 @@ fun ApprovalDialog(
         OutlinedTextField(
           value = reason,
           onValueChange = { reason = it.replace('\n', ' ').take(ApprovalSlip.MAX_REASON) },
-          label = { Text("دلیل (در سابقه می‌ماند)") },
+          label = { Text(StrPos.reasonKept) },
           singleLine = true,
           enabled = !busy,
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(14.dp))
 
-        val name = record?.name?.ifBlank { null } ?: "تأییدکننده"
+        val name = record?.name?.ifBlank { null } ?: StrPos.approver
         PinPad(
-          title = "PINِ $name",
-          hint = if (reason.isBlank()) "اول دلیل را بنویسید" else "PINِ شش‌رقمیِ $name",
+          title = StrPos.pinOf(name),
+          hint = if (reason.isBlank()) StrPos.writeReasonFirst else StrPos.sixDigitPinOf(name),
           error = when {
-            locked -> "PINِ $name پس از ${plain(PinGuard.MAX_FAILURES)} خطا قفل شد؛ با ورودِ آنلاین PINِ تازه بگذارد."
+            locked -> StrPos.pinLocked(name, plain(PinGuard.MAX_FAILURES))
             else -> error
           },
           locked = locked || reason.isBlank(),
@@ -140,14 +142,14 @@ fun ApprovalDialog(
                 onApproved(slip)
               } else {
                 locked = next.locked
-                error = "PIN درست نیست — ${plain(PinGuard.remaining(next.guard))} تلاش مانده"
+                error = StrPos.pinWrong(plain(PinGuard.remaining(next.guard)))
               }
             }
           },
         )
         Spacer(Modifier.height(10.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-          TextButton(onClick = onDismiss, enabled = !busy) { Text("انصراف") }
+          TextButton(onClick = onDismiss, enabled = !busy) { Text(Str.cancel) }
         }
       }
     }

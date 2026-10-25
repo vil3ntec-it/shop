@@ -58,6 +58,9 @@ import ir.vil3ntec.tohid.ui.theme.softCard
 import ir.vil3ntec.tohid.ui.theme.avatarColors
 import ir.vil3ntec.tohid.ui.theme.tabular
 import ir.vil3ntec.tohid.ui.theme.Shape as ShopShape
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /*
  *  کاتالوگِ صندوق — نسخهٔ ۲ (نقدِ صاحب محصول، ۱۴۰۵/۰۷/۲۷: «− / + هم در کاتالوگ
@@ -93,7 +96,7 @@ fun QtyStepper(
     Modifier.clip(ShopShape.chip).background(Shop.colors.surface2).padding(2.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    StepButton(Icons.Filled.Remove, "یکی کمتر از $itemName", enabled = quantity > 0, target = target, onClick = onMinus)
+    StepButton(Icons.Filled.Remove, StrSale.oneLess(itemName), enabled = quantity > 0, target = target, onClick = onMinus)
     Text(
       if (unit.isNotBlank() && quantity > 0) "${qty(quantity)} $unit" else qty(quantity),
       Modifier.widthIn(min = 26.dp).padding(horizontal = 4.dp),
@@ -103,7 +106,7 @@ fun QtyStepper(
       textAlign = TextAlign.Center,
       maxLines = 1,
     )
-    StepButton(Icons.Filled.Add, "یکی بیشتر از $itemName", enabled = plusEnabled, target = target, onClick = onPlus)
+    StepButton(Icons.Filled.Add, StrSale.oneMore(itemName), enabled = plusEnabled, target = target, onClick = onPlus)
   }
 }
 
@@ -126,9 +129,9 @@ private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 @Composable
 fun StockLine(stock: Double, minStock: Double, unit: String, modifier: Modifier = Modifier) {
   val (color, text) = when {
-    stock <= 0 -> Shop.colors.danger to "ناموجود"
-    minStock > 0 && stock <= minStock -> Shop.colors.warning to "کم · ${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""}"
-    else -> Shop.colors.success to "موجودی ${qty(stock)}${if (unit.isNotBlank()) " $unit" else ""}"
+    stock <= 0 -> Shop.colors.danger to Str.outOfStock
+    minStock > 0 && stock <= minStock -> Shop.colors.warning to StrSale.lowQty(qty(stock) + (if (unit.isNotBlank()) " $unit" else ""))
+    else -> Shop.colors.success to StrSale.inStockQty(qty(stock) + (if (unit.isNotBlank()) " $unit" else ""))
   }
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
     Box(Modifier.size(7.dp).clip(CircleShape).background(color))
@@ -184,8 +187,8 @@ fun ProductCard(
 ) {
   val c = Shop.colors
   val label = buildString {
-    append(product.name); append("، "); append(money(product.salePrice)); append(" افغانی")
-    if (inCart > 0) { append("، در سبد: "); append(qty(inCart)) }
+    append(product.name); append(Str.listSep + " "); append(money(product.salePrice)); append(" " + Str.afghani)
+    if (inCart > 0) { append(Str.listSep + " " + StrPos.inCartColon + " "); append(qty(inCart)) }
   }
   Column(
     modifier
@@ -200,7 +203,7 @@ fun ProductCard(
         },
       )
       .semantics { selected = highlighted; contentDescription = label }
-      .clickable(onClickLabel = "افزودن به سبد", onClick = onAdd)
+      .clickable(onClickLabel = StrSale.addToCart, onClick = onAdd)
       .padding(12.dp),
   ) {
     Row(verticalAlignment = Alignment.Top) {
@@ -295,12 +298,12 @@ fun ProductTable(
       Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text("کالا", Modifier.weight(1f), style = head, color = c.muted)
-      Text("کد", Modifier.width(112.dp), style = head, color = c.muted)
-      Text("قیمت", Modifier.width(110.dp), style = head, color = c.muted, textAlign = TextAlign.End)
+      Text(Str.product, Modifier.weight(1f), style = head, color = c.muted)
+      Text(StrSale.code, Modifier.width(112.dp), style = head, color = c.muted)
+      Text(StrSale.price, Modifier.width(110.dp), style = head, color = c.muted, textAlign = TextAlign.End)
       Spacer(Modifier.width(16.dp))
-      Text("موجودی", Modifier.width(130.dp), style = head, color = c.muted)
-      Text("در سبد", Modifier.width(64.dp), style = head, color = c.muted, textAlign = TextAlign.Center)
+      Text(StrSale.stock, Modifier.width(130.dp), style = head, color = c.muted)
+      Text(StrPos.inCart, Modifier.width(64.dp), style = head, color = c.muted, textAlign = TextAlign.Center)
     }
     LazyColumn(state = state, modifier = Modifier.fillMaxSize()) {
       itemsIndexed(items, key = { _, p -> p.id }) { i, p ->
@@ -314,7 +317,7 @@ fun ProductTable(
             .clip(ShopShape.button)
             .background(if (on) c.primaryTint else if (i % 2 == 1) c.surface2 else Color.Transparent)
             .semantics { selected = on }
-            .clickable(onClickLabel = "افزودن به سبد") { cb.onAdd(p) }
+            .clickable(onClickLabel = StrSale.addToCart) { cb.onAdd(p) }
             .padding(horizontal = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {

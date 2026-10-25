@@ -131,8 +131,16 @@ internal class SyncRebuild(private val io: Io) {
         val names = tree[key] as? JsonArray ?: continue
         fresh[key] = JsonArray(names.filter { (it as? JsonPrimitive)?.content !in seen })
       }
-      return LedgerDiff.fromJson(LedgerDiff.unionRows(LedgerDiff.toJson(server), JsonObject(fresh)))
+      //  فروشی که از پشتیبان آمد شاید شمارهٔ فاکتورِ بلندتری داشته باشد ⇒ کف دوباره (پیگیریِ #331)
+      return SyncEngine.withInvoiceCursor(LedgerDiff.fromJson(LedgerDiff.unionRows(LedgerDiff.toJson(server), JsonObject(fresh))))
     }
+
+    /**
+     *  جابه‌جایی را کسِ دیگری (کارگرِ پس‌زمینه با نمونهٔ دیگرِ `ShopStore`) زودتر تمام کرده؟
+     *  نشان و کناری رفته‌اند و دفترِ روی دیسک همان است که این بازسازی گذاشت.
+     */
+    fun swappedElsewhere(sidecar: Boolean, marker: Boolean, onDisk: ShopData?, staged: ShopData?): Boolean =
+      !sidecar && !marker && staged != null && onDisk == staged
 
     /**
      *  هنگامِ باز شدنِ برنامه، اگر بازسازی نیمه‌کاره ماند.
