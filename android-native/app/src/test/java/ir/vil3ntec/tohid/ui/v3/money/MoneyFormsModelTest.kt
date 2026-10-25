@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -94,13 +95,14 @@ class MoneyFormsModelTest {
     val f = DebtorForm(name = "زرغونه", phone = "0791112233", phone2 = "0702223344", tags = "عمده، همسایه", consent = true, consentSource = "حضوری")
     val ok = DebtorFormsModel.save(ledger, null, f, 1L) { "z" } as DebtorEngine.Result.Ok
     val z = ok.data.debtors.first { it.id == "z" }
-    assertEquals("0702223344", z.phone2)
+    //  شمارهٔ دوم به شکلِ ذخیرهٔ برنامه (+93…)، همان `LocaleText.phoneForSave`
+    assertEquals(LocaleText.phoneForSave("0702223344"), z.phone2)
     assertEquals(listOf("عمده", "همسایه"), z.tags)
     assertEquals(true, z.marketingConsent)
     assertTrue(ok.data.auditLog.any { it.type == "marketing_consent" && it.refId == "z" })
     //  برگهٔ ویرایش همان‌ها را نشان می‌دهد؛ رضایت بی منبع را نمی‌پذیرد
     val back = DebtorFormsModel.of(z)
-    assertEquals("0702223344", back.phone2)
+    assertEquals(z.phone2, back.phone2)
     assertEquals("عمده، همسایه", back.tags)
     assertEquals(true, back.consent)
     assertNotNull(DebtorFormsModel.consentError(back))
