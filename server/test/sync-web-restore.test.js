@@ -99,7 +99,10 @@ function webV1(token, deviceId) {
     navigator: { onLine: true },
     document: { addEventListener: () => {}, hidden: false },
     CustomEvent: class { constructor(type, init) { this.type = type; this.detail = init && init.detail; } },
-    setTimeout, clearTimeout, setInterval, clearInterval, console, URL,
+    //  زمان‌سنج‌های موتور (Pushِ پس از ثبت، تلاشِ دوباره، تیک) این‌جا هرگز نمی‌دوند: آزمون خودش
+    //  `sync()` را صدا می‌زند. زمان‌سنجِ واقعی پس از بسته شدنِ سرور در حلقهٔ «تلاشِ دوباره» می‌ماند
+    //  و فرایندِ آزمون هرگز تمام نمی‌شد (CI ِ PGlite/Electron تا مهلت ایستاد).
+    setTimeout: () => 0, clearTimeout: () => {}, setInterval: () => 0, clearInterval: () => {}, console, URL,
   };
   vm.runInNewContext(ENGINE, sandbox, { filename: 'sync-engine.js' });
   let ledger = {};
