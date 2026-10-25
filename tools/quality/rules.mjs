@@ -69,6 +69,13 @@ export const DUPLICATE_HELPERS = [
     home: [],
     pattern: /(?<![!\w.])config\.secrets\.\w+\s*\|\|\s*config\.secrets\.\w+(?![\w.])/g,
   },
+  {
+    id: 'express-wrap',
+    what: 'سرور: `const wrap = (fn) => …` در مسیر — Express 5 خودش promiseِ ردشده را به next(err) می‌دهد؛ تابعِ async را مستقیم بدهید',
+    applies: isServerJs,
+    home: [],
+    pattern: /\bconst\s+wrap\s*=\s*\(fn\)\s*=>/g,
+  },
 ];
 
 /** Inline product/role literals in the server (`=== 'pump'`, `case 'shop':` …), AUDIT §1.8. */

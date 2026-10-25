@@ -71,6 +71,8 @@ test('helper detectors: real declarations count, comments and look-alikes do not
   assert.equal(hits('html-escape', `${htmlEsc}\n${csvEsc}`), 1);
   assert.equal(hits('secret-derivation', "return config.secrets.api || config.secrets.jwt || 'x';"), 1);
   assert.equal(hits('secret-derivation', 'if (!config.secrets.api || config.secrets.api.length < 24) {}'), 0);
+  assert.equal(hits('express-wrap',
+    "const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);\nrouter.get('/', wrap(h));"), 1);
 });
 
 test("product literals: comparisons and case labels count, plain values do not", () => {

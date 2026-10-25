@@ -76,6 +76,7 @@
     "minorOf": 2,
     "StatusPill": 2,
     "html-escape": 12,
-    "secret-derivation": 6
+    "secret-derivation": 6,
+    "express-wrap": 5
   }
 }
