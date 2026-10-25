@@ -552,6 +552,11 @@ class V1RestoreTest {
     a.crashAt = null
     assertTrue(a.commit.pending())
     assertEquals(100.0, a.paid(), 0.0)
+    //  opِ هدفمندِ بی دفتر (CRM-10 `recordOps`) ژورنالِ ساختن را رونویسی نمی‌کند: پرتاب، ژورنال سرِ جایش
+    val sweep = SyncOp("01SWEEP000000000000000001", 1L, "sales", "s1", SyncOp.UPDATE, buildJsonObject { put("note", JsonPrimitive("x")) })
+    assertTrue(runCatching { a.commit.recordOps(listOf(sweep)) }.isFailure)
+    assertTrue(a.commit.pending())
+    assertTrue(a.queue.isEmpty())
     a.edit { d -> d.copy(products = d.products.map { if (it.id == "p1") it.copy(salePrice = 140.0) else it }) }
     assertEquals("فقط همان ویرایش", listOf(SyncOp.UPDATE), a.queue.map { it.type })
     assertFalse(a.commit.pending())

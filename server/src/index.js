@@ -34,6 +34,17 @@ async function main() {
     process.exit(1);
   }
 
+  //  کفِ «فروشِ تحویل» برای دکان‌هایی که کدِ پیشین سفارش را خودکار کم می‌کرد (shop.orders.ledger /
+  //  shop.catalog) = لحظهٔ همین راه‌اندازی — **پیش از** نخستین درخواست، وگرنه config ِ زودرسِ برنامه کفِ
+  //  دیرتری می‌گذاشت و تحویلِ میانِ این دو فروش نمی‌گرفت (lib/order-ledger.js). شکست ⇒ سرور بالا
+  //  می‌آید و claimFloor همان لحظهٔ راه‌اندازی را به کار می‌برد.
+  try {
+    const n = await require('./lib/order-ledger').claimFloorsAtStart();
+    if (n) console.log(`[orders] کفِ تحویل برای ${n} دکان گذاشته شد`);
+  } catch (e) {
+    console.error('[orders] کفِ تحویل', e.message);
+  }
+
   const app = await createApp();
   const server = app.listen(config.port, config.host, () => {
     const where = config.serverUrl || `http://${config.host}:${config.port}`;
@@ -68,11 +79,6 @@ async function main() {
   const notices = require('./lib/notices');
   notices.startRunner();
   //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
-  //  کفِ «فروشِ تحویل» برای دکان‌هایی که کدِ پیشین سفارش را خودکار کم می‌کرد (shop.orders.ledger /
-  //  shop.catalog) = لحظهٔ همین راه‌اندازی، نه نخستین config ِ برنامهٔ تازه (lib/order-ledger.js)
-  require('./lib/order-ledger').claimFloorsAtStart()
-    .then((n) => { if (n) console.log(`[orders] کفِ تحویل برای ${n} دکان گذاشته شد`); })
-    .catch((e) => console.error('[orders] کفِ تحویل', e.message));
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
   const telegram = require('./lib/bots').pump();

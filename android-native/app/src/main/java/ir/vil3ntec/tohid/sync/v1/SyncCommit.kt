@@ -87,6 +87,24 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     return ops.size
   }
 
+  /**
+   *  opهای از پیش ساخته‌شده — **نه** تفاضلِ کلِ دفتر با سایه (CRM-10، `ShopStore.sweepMerged`).
+   *  سایه = سایهٔ پیشین + همین opها (همان قاعدهٔ [absorb])، پس دفترِ کهنهٔ نمونهٔ دیگری از
+   *  `ShopStore` هرگز DELETE نمی‌سازد و تغییرِ محلیِ دیگری که هنوز op نشده نه فرستاده می‌شود نه
+   *  گم: `record` ِ بعدی همان را می‌بیند. ژورنال، صف و سایه با هم، مثلِ [record].
+   *
+   *  @return چند op به صف رفت؛ `0` اگر هنوز سایه‌ای نیست (نخستین بارگذاری کلِ دفتر را می‌برد)
+   */
+  fun recordOps(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    //  §۹.۵: ژورنالِ «ساختنِ دوباره» بی دفتر تصمیم‌پذیر نیست ⇒ پرتاب، نه رونویسیِ آن (`settle`)
+    settle(null)
+    val before = parts.shadow()
+    val shadow = parse(before) ?: return 0
+    commitOps(ops, before, LedgerDiff.shadowOf(LedgerDiff.applyRemote(shadow, ops)).toString())
+    return ops.size
+  }
+
   /** کلِ دفتر یک‌جا — فقط دستگاهِ نخست (`SyncV1Engine.baseline`). */
   fun baseline(data: ShopData): Int {
     settle(data)

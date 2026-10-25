@@ -148,6 +148,23 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   /**
+   *  opهای هدفمندِ از پیش ساخته‌شده، **بی** تفاضلِ کلِ دفتر — شرح سرِ `SyncCommit.recordOps`
+   *  (CRM-10 `ShopStore.sweepMerged`). زیرِ همان قفلِ [record]؛ v3 هم همین را می‌گیرد.
+   *  @return چند op به صف رفت
+   */
+  @Synchronized
+  fun recordOps(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    if (SyncChoice.isV3(app)) return SyncV3Runner.of(app).recordOps(ops)
+    val made = commit.recordOps(ops)
+    publish()
+    return made
+  }
+
+  /** opهای صف — فقط برای آزمون */
+  internal fun queuedOps(): List<SyncOp> = queue.all()
+
+  /**
    *  بایگانیِ دفتر: ردیف‌هایی که به بایگانی می‌روند از سایهٔ همین حساب هم
    *  بیرون می‌آیند، زیرِ همان قفلِ `record()` — شرح سرِ `SyncCommit.forget`.
    *  شکست پرتاب می‌شود تا `LedgerArchive.compact` دفتر را کوتاه نکند.
