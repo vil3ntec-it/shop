@@ -158,7 +158,7 @@ fun HistoryScreen(
           title = StrSale.salesTotal,
           value = PhoneSaleText.amount(stats.total),
           caption = HistoryModel.statsLine(stats),
-          chips = listOf(V3HeroChip(drawer.text, Icons.Outlined.PointOfSale, actions.drawer)),
+          chips = listOf(V3HeroChip(drawer.text, Icons.Outlined.PointOfSale, onClick = actions.drawer)),
           modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
       }
