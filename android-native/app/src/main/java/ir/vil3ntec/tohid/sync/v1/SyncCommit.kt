@@ -166,6 +166,23 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   fun pending(): Boolean = journal.exists()
 
   /**
+   *  SEC-01 — دفترِ رمزدارِ خوانده‌نشده: opهای ژورنالِ «ثبت» (همان `op_id`) به صف می‌روند تا
+   *  فرستاده شوند، **بی** دست زدن به سایه یا ژورنال. `recover` ِ بعدی (با دفترِ خوانده‌شده) همان
+   *  را تمام می‌کند و چون صف را می‌بیند opی دوباره نمی‌گذارد؛ ژورنالِ «نشاندن» دست نمی‌خورد، چون
+   *  بی دفتر نمی‌شود دانست نشسته بود یا نه.
+   *
+   *  @return چند op به صف رفت
+   */
+  fun queueRecorded(): Int {
+    val j = journal.read() ?: return 0
+    if (j.stage != Journal.RECORD || sha(parts.shadow()) != j.before) return 0
+    val have = parts.queued()
+    val fresh = j.ops.filter { it.opId !in have }
+    if (fresh.isNotEmpty()) parts.push(fresh)
+    return fresh.size
+  }
+
+  /**
    *  A00 — درمانِ سایهٔ ساختِ پیش از A00، یک بار: هنگامِ شروع (`recover` ِ موتورها) با
    *  دفترِ روی دیسک و **پیش از نخستین تفاضل**. سایهٔ بی مهر (`LedgerDiff.SHADOW_STAMP`)
    *  یعنی ساختِ پیشین نوشته‌اش؛ سایهٔ Snapshot ِ آن ساخت‌ها ردیفِ خامِ سرور بود و کلیدهایی

@@ -99,6 +99,20 @@ const config = {
      *  که کندتر برود پشتِ پاسخ ادامه می‌دهد. ۰ = بی کف (فقط برای آزمون).
      */
     uniformMs:  num(process.env.OTP_UNIFORM_MS, 1500),
+    /*
+     *  SEC-06 — سقفِ هزینه و ضدِ SMS pumping (`lib/otp.js`)؛ فقط پیامکِ واقعی.
+     *  شمارهٔ «آشنا» (پیش‌تر کدی را درست زده یا مشتریِ ویترین است) از سقفِ IP و
+     *  بلوک معاف است، سقفِ خارجیِ جدا و بالاتر دارد، و فقط knownExtra پیامک بیش
+     *  از dailyMax (آشنا شدن با یک کد ارزان است؛ سهمش کوچک می‌ماند).
+     */
+    smsGuard: {
+      ipPhones:      num(process.env.OTP_SMS_IP_PHONES, 10),        // شمارهٔ ناآشنای جدا از یک IP در ساعت
+      blockPhones:   num(process.env.OTP_SMS_BLOCK_PHONES, 10),     // در یک بلوکِ هزارتایی در ساعت
+      foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ ناآشنای جدا در ساعت، کلِ سرور
+      knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
+      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
+      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+    },
   },
 
   /*
@@ -304,9 +318,21 @@ const config = {
     storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
     //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
     //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
-    //  بازبینیِ امنیتی: ۳۰۰ ⇒ ۶۰ در ربع ساعت، و سقفِ ضربه‌ای در دقیقه
-    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 60),
-    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 10),
+    //  بازبینیِ امنیتی سقفِ ضربه‌ای در دقیقه گذاشت. ⚠️ اپراتورهای موبایل (CGNAT) صدها
+    //  مشتری را پشتِ یک IP می‌برند؛ ۱۰ در دقیقه و ۶۰ در ربع ساعت یعنی مشتریِ عادی ۴۲۹ می‌گرفت.
+    //  حالا ۳۰ در دقیقه و ۳۰۰ در ربع ساعت (میانگینِ ۲۰ در دقیقه). سپرِ دیتابیس فقط این سقف
+    //  نیست: برشِ یک‌پروازِ دکان‌ها (eligibleCacheMs)، نمایهٔ باریکِ market_search، دست‌کم دو
+    //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
+    //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
+    marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
+    //  فاکتورِ عمومی (QRِ هر فاکتور، `/api/receipt`) به‌ازای IP: ربع‌ساعته و ضربه‌ای در دقیقه.
+    //  سقفِ ربع‌ساعته گشاد است: مشتری‌های پشتِ NAT ِ اپراتور یک IP دارند؛ ضربه‌ای تنگ می‌ماند
+    receiptReadMax: num(process.env.RATE_RECEIPT_READ_MAX, 300),
+    receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
+    //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
+    receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
   },
 
   /**
@@ -341,6 +367,8 @@ const config = {
     //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
     //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
+    //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
+    feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS

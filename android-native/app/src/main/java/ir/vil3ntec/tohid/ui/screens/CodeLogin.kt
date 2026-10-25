@@ -29,6 +29,8 @@ import ir.vil3ntec.tohid.fa
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  ورود با ایمیل و کدِ شش‌رقمی — بندِ ۲۱٫۴.
@@ -76,9 +78,9 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
 
   suspend fun submit() {
     val code = digits.joinToString("")
-    if (code.length != 6) { say("شش رقم را کامل بنویسید.", true); return }
+    if (code.length != 6) { say(StrAuth.sixDigits, true); return }
     busy = true
-    say("در حالِ بررسی…")
+    say(StrAuth.verifying)
     val out = repo.verify(
       requestId = requestId,
       code = code,
@@ -95,7 +97,7 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
       }
       ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).rebind()
       ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(context)
-      say("وارد شدید.")
+      say(StrAuth.signedIn)
       onSignedIn()
     }.onFailure { failure ->
       //  کد که غلط بود، خانه‌ها خالی می‌شوند — وگرنه کاربر باید
@@ -123,11 +125,10 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
   }
 
   Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
-    Text("ورود با ایمیل", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+    Text(StrAuth.emailSignIn, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
     Spacer(Modifier.height(8.dp))
     Text(
-      "ایمیل‌تان را بنویسید؛ یک کدِ شش‌رقمی برایتان می‌فرستیم. همین ایمیل " +
-        "روی گوشی و روی سایت یک حساب است.",
+      StrAuth.emailCodeNote,
       style = MaterialTheme.typography.labelMedium,
       color = Shop.colors.muted,
     )
@@ -148,10 +149,10 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
       Button(
         onClick = {
           val value = email.text.trim()
-          if (!value.contains('@') || !value.contains('.')) { say("ایمیل درست نیست.", true); return@Button }
+          if (!value.contains('@') || !value.contains('.')) { say(StrAuth.emailInvalid, true); return@Button }
           scope.launch {
             busy = true
-            say("در حالِ فرستادن…")
+            say(StrAuth.sendingDots)
             val out = repo.requestCode(value, android.os.Build.MODEL ?: "گوشی")
             busy = false
             out.onSuccess { r ->
@@ -166,8 +167,8 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
                 if (requestId.isBlank()) return@repeat
                 repo.deliveryStatus(requestId).onSuccess { st ->
                   when (st.state) {
-                    "failed" -> say("ایمیل فرستاده نشد (${st.reason}). دوباره تلاش کنید.", true)
-                    "sent" -> say("ایمیل رفت.")
+                    "failed" -> say(StrAuth.emailFailed(st.reason), true)
+                    "sent" -> say(StrAuth.emailSent)
                   }
                 }
               }
@@ -176,10 +177,10 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
         },
         enabled = !busy,
         modifier = Modifier.fillMaxWidth().height(48.dp),
-      ) { Text("فرستادنِ کد") }
+      ) { Text(StrAuth.sendCode) }
     } else {
       Text(
-        "کد به $masked فرستاده شد. شش رقم را بنویسید.",
+        StrAuth.codeSentEnter(masked),
         style = MaterialTheme.typography.labelMedium,
         color = Shop.colors.muted,
       )
@@ -224,8 +225,8 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
 
       Spacer(Modifier.height(10.dp))
       Text(
-        if (left > 0) "تا فرستادنِ دوبارهٔ کد: ${left.fa()} ثانیه"
-        else "کد نیامد؟ پوشهٔ Spam را هم ببینید.",
+        if (left > 0) StrAuth.resendWait(left.fa())
+        else StrAuth.noCodeSpam,
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted2,
         modifier = Modifier.fillMaxWidth(),
@@ -235,24 +236,24 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
         onClick = {
           scope.launch {
             repo.requestCode(email.text.trim(), android.os.Build.MODEL ?: "گوشی")
-              .onSuccess { resendAt = System.currentTimeMillis() + it.resendAfter * 1000L; say("کد دوباره فرستاده شد.") }
+              .onSuccess { resendAt = System.currentTimeMillis() + it.resendAfter * 1000L; say(StrAuth.codeResentDot) }
               .onFailure { say(it.userMessage, true) }
           }
         },
         enabled = left == 0 && !busy,
         modifier = Modifier.fillMaxWidth(),
-      ) { Text("فرستادنِ دوبارهٔ کد") }
+      ) { Text(StrAuth.resendCodeAlt) }
 
       Button(
         onClick = { scope.launch { submit() } },
         enabled = !busy,
         modifier = Modifier.fillMaxWidth().height(48.dp),
-      ) { Text("ورود") }
+      ) { Text(Str.signIn) }
 
       TextButton(
         onClick = { requestId = ""; digits = List(6) { "" }; say("") },
         modifier = Modifier.fillMaxWidth(),
-      ) { Text("ایمیلِ دیگر") }
+      ) { Text(StrAuth.otherEmail) }
     }
 
     if (message.isNotBlank()) {
@@ -266,7 +267,7 @@ fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
 
     Spacer(Modifier.height(6.dp))
     TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) {
-      Text("بعداً — فعلاً بی حساب ادامه می‌دهم", color = Shop.colors.muted)
+      Text(StrAuth.laterNoAccount, color = Shop.colors.muted)
     }
   }
 }
