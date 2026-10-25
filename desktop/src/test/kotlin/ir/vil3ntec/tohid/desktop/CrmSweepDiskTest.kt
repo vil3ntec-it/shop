@@ -15,6 +15,9 @@ import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -281,5 +284,33 @@ class CrmSweepDiskTest {
     }
     assertEquals(q0, engine.queueSize())
     assertArrayEquals(bytes, ledger.readBytes())
+  }
+
+  @Test fun `شروع — ذخیره‌ای که با بارِ دفتر خوانده و پس از sweep نوشته شد، sweep را برنمی‌گرداند و DELETE نمی‌سازد`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    val m = merged()
+    assertTrue(runBlocking { open().save(m.copy(transactions = m.transactions + late)) })
+    val q0 = engine.queueSize()
+
+    //  صفحه همان لحظه‌ای که `loaded` روشن می‌شود دفتر را برمی‌دارد و بعد فروشی رویش ثبت می‌کند
+    val ui = ShopStore(ctx)
+    val seen = runBlocking {
+      val cur = async(start = CoroutineStart.UNDISPATCHED) { ui.loaded.first { it }; ui.data.value }
+      ui.loadAndSummarize()
+      cur.await()
+    }
+    assertEquals("صفحه دفترِ پس از sweep را دید", "crm9-c2", seen.transactions.first { it.id == "crm9-late" }.debtorId)
+    val swept = engine.queuedOps().drop(q0)
+    assertTargeted(swept)
+    assertEquals(2, swept.size)
+
+    val sale = Sale(id = "crm9-race", invoiceNumber = 11, finalTotal = 40.0, date = "2026-10-21")
+    assertTrue(runBlocking { ui.save(seen.copy(sales = seen.sales + sale)) })
+    val after = engine.queuedOps().drop(q0 + swept.size)
+    assertEquals("فقط درجِ همان فروش", listOf("sales" to SyncOp.INSERT), after.map { it.table to it.type })
+    val disk = open().data.value
+    assertEquals("crm9-c2", disk.transactions.first { it.id == "crm9-late" }.debtorId)
+    assertTrue(disk.auditLog.any { it.type == "customer_merge" && it.refId == "crm9-c2" })
+    assertTrue(disk.sales.any { it.id == "crm9-race" })
   }
 }
