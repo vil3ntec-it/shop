@@ -202,12 +202,14 @@ data class Sale(
 
 /**
  *  سهمِ یک قاعدهٔ تخفیفِ خودکار از یک قلمِ فاکتور — `id` و `rev`ِ قاعده در سرور
- *  (`/api/shop/promos`) و تخفیفش روی همین قلم به واحدِ کوچک.
+ *  (`/api/shop/promos`)، نامش همان لحظه (برای چاپِ دوباره؛ قاعده بعداً عوض یا پاک
+ *  می‌شود) و تخفیفش روی همین قلم به واحدِ کوچک.
  */
 @Serializable
 data class SalePromo(
   val id: String = "",
   val rev: Long = 0,
+  val name: String = "",
   val discountMinor: Long = 0,
 )
 

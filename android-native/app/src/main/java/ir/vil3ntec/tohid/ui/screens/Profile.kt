@@ -469,7 +469,7 @@ fun ProfileScreen(
       runCatching { Backend.auth(context).signOut() }
       state.signOut()
       //  S1: تخفیف‌ها و کدهای این حساب در حافظه نمی‌مانند
-      ir.vil3ntec.tohid.ui.PromoLive.reset()
+      ir.vil3ntec.tohid.ui.PromoLive.reset(context)
       busy = false
       toast("از حساب خارج شدید")
       onBack()

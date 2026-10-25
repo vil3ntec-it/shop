@@ -46,11 +46,11 @@ class SalePromoFieldsTest {
 
   @Test fun `فیلدهای تازه فقط وقتی هستند نوشته می‌شوند و رفت‌وبرگشت دارند`() {
     val s = sale.copy(promoDiscountMinor = 9900, coupons = listOf("EID5"))
-    val i = item.copy(listPriceMinor = 30000, promo = listOf(SalePromo("r1", 3, 6000), SalePromo("r2", 7, 2700)))
+    val i = item.copy(listPriceMinor = 30000, promo = listOf(SalePromo("r1", 3, "ten", 6000), SalePromo("r2", 7, "eid", 2700)))
     val sj = ledger.encodeToString(Sale.serializer(), s)
     val ij = ledger.encodeToString(SaleItem.serializer(), i)
     assertEquals(oldSale.dropLast(1) + ""","promoDiscountMinor":9900,"coupons":["EID5"]}""", sj)
-    assertEquals(oldItem.dropLast(1) + ""","listPriceMinor":30000,"promo":[{"id":"r1","rev":3,"discountMinor":6000},{"id":"r2","rev":7,"discountMinor":2700}]}""", ij)
+    assertEquals(oldItem.dropLast(1) + ""","listPriceMinor":30000,"promo":[{"id":"r1","rev":3,"name":"ten","discountMinor":6000},{"id":"r2","rev":7,"name":"eid","discountMinor":2700}]}""", ij)
     assertEquals(s, ledger.decodeFromString(Sale.serializer(), sj))
     assertEquals(i, ledger.decodeFromString(SaleItem.serializer(), ij))
     //  صفرِ صریح («سنجید و چیزی نشد») با null فرق دارد و نوشته می‌شود
@@ -62,6 +62,6 @@ class SalePromoFieldsTest {
     //  همان `ignoreUnknownKeys` ِ برنامه: ردیفِ تازه برای مدلی که فیلد را ندارد فقط فیلدِ اضافه است
     val withNew = oldItem.dropLast(1) + ""","listPriceMinor":30000,"promo":[{"id":"r1","rev":3,"discountMinor":6000,"future":1}]}"""
     val back = ledger.decodeFromString(SaleItem.serializer(), withNew)
-    assertEquals(item.copy(listPriceMinor = 30000, promo = listOf(SalePromo("r1", 3, 6000))), back)
+    assertEquals(item.copy(listPriceMinor = 30000, promo = listOf(SalePromo("r1", 3, discountMinor = 6000))), back)
   }
 }

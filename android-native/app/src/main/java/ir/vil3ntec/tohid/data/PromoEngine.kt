@@ -41,6 +41,12 @@ object PromoEngine {
     val revs: Map<String, Long> = emptyMap(),
     /** «حساب@دکان»ی که این حال مالِ اوست (`PromoLive.ensure`)؛ خالی = هنوز هیچ‌کس */
     val account: String = "",
+    /**
+     *  پرچمِ `shop.promo_stamp` ِ سرور (`live_config`، پیش‌فرض خاموش): نشانِ تخفیف روی
+     *  فاکتور (`stamp`) و ردیف‌های تازهٔ فاکتورِ چاپی و صفحه. خاموش ⇒ فاکتور و ردیفِ دفتر
+     *  بایت‌به‌بایت همان پیشین.
+     */
+    val stamp: Boolean = false,
   ) {
     val active: Boolean get() = enabled && rules.any { it.active }
     val hasCodes: Boolean get() = rules.any { it.active && it.code.isNotBlank() }
@@ -66,7 +72,22 @@ object PromoEngine {
     val cart: List<SalesEngine.CartLine>,
     /** به کلیدِ ردیف (`CartLine.productId`) — `stamp` آن را روی قلم‌های فاکتور می‌گذارد */
     val tags: Map<String, LineTag> = emptyMap(),
+    /** همان `Snapshot.stamp` هنگامِ سنجش */
+    val stamp: Boolean = false,
   )
+
+  /** سقفِ `Sale.coupons` — کدِ هسته ۳ تا ۳۲ نویسه است */
+  const val MAX_COUPONS = 10
+  const val MAX_COUPON_LEN = 32
+  /** سقفِ `SalePromo.name` — همان سقفِ نامِ قاعده در سرور */
+  const val MAX_NAME_LEN = 80
+
+  /**
+   *  S1 — پاسخِ سرور برای حسابِ [request] فقط وقتی می‌نشیند که حالِ حافظه هنوز مالِ همان
+   *  است ([bound]) **و** حسابِ واردشدهٔ همین لحظه ([current]) هم همان است. پاسخی که پیش از
+   *  جابه‌جاییِ حساب رفته بود، پس از آن نه در حافظه می‌نشیند و نه در نسخهٔ دستگاه.
+   */
+  fun accepts(bound: String?, request: String, current: String): Boolean = bound == request && current == request
 
   /**
    *  S1 — حالِ حافظه فقط برای همان «حساب@دکان»ی که مالِ اوست؛ حسابِ دیگر ⇒ حالِ
@@ -148,6 +169,7 @@ object PromoEngine {
     val r = runCatching { PromoCore.evaluate(input, snap.rules) }.getOrNull() ?: return null
     val net = r.lines.associate { it.key to it }
     val parts = runCatching { split(input, snap.rules, r) }.getOrNull()
+    val nameOf = snap.rules.associate { it.id to it.name.trim().take(MAX_NAME_LEN) }
     val priced = cart.map { line ->
       val o = net[line.productId]
       if (o == null || o.discountMinor <= 0 || line.quantity <= 0) line
@@ -158,7 +180,7 @@ object PromoEngine {
       val o = net[line.productId]
       val promo = if (o == null || o.discountMinor <= 0 || line.quantity <= 0) emptyList()
       //  تقسیم نشد (هرگز نباید) ⇒ جمعِ ردیف درست می‌ماند، فقط بی نامِ قاعده
-      else parts?.get(line.productId)?.map { (id, minor) -> SalePromo(id, snap.revs[id] ?: 0, minor) }
+      else parts?.get(line.productId)?.map { (id, minor) -> SalePromo(id, snap.revs[id] ?: 0, nameOf[id].orEmpty(), minor) }
         ?: listOf(SalePromo(discountMinor = o.discountMinor))
       line.productId to LineTag(p?.let { (it.salePrice * 100).roundToLong() }, promo)
     }
@@ -169,6 +191,7 @@ object PromoEngine {
       codes = r.codes,
       cart = priced,
       tags = tags,
+      stamp = snap.stamp,
     )
   }
 
@@ -216,10 +239,13 @@ object PromoEngine {
    *  (جمعِ همان سهم‌ها) و `coupons`. عددِ هیچ قلم و جمعی عوض نمی‌شود — فقط نشان
    *  تا سرور تخفیفِ خودکار را از پایین آوردنِ دستیِ قیمت جدا کند.
    *
-   *  ⛔ خاموش (`o == null`) یا ثبتِ ناموفق ⇒ **همان شیء**؛ فاکتور همان امروز.
+   *  `coupons` فقط کدهایی که اعمال شدند (`applied`)، با سقفِ [MAX_COUPONS] و [MAX_COUPON_LEN].
+   *
+   *  ⛔ کلیدِ دکان خاموش (`o == null`)، پرچمِ `shop.promo_stamp` خاموش یا ثبتِ ناموفق ⇒
+   *  **همان شیء**؛ فاکتور و قلم‌ها بایت‌به‌بایت همان امروز.
    */
   fun stamp(r: SalesEngine.Result, o: Outcome?): SalesEngine.Result {
-    if (o == null || r !is SalesEngine.Result.Ok) return r
+    if (o == null || !o.stamp || r !is SalesEngine.Result.Ok) return r
     val si = r.data.sales.indexOfLast { it.id == r.saleId }
     if (si < 0) return r
     val items = r.data.saleItems.toMutableList()
@@ -236,7 +262,9 @@ object PromoEngine {
       promoMinor += tag.promo.sumOf { it.discountMinor }
     }
     val sales = r.data.sales.toMutableList()
-    sales[si] = sales[si].copy(promoDiscountMinor = promoMinor, coupons = o.codes.map { it.code })
+    val applied = o.codes.filter { it.status == "applied" }.map { it.code.take(MAX_COUPON_LEN) }.filter { it.isNotEmpty() }
+      .distinct().take(MAX_COUPONS)
+    sales[si] = sales[si].copy(promoDiscountMinor = promoMinor, coupons = applied)
     return r.copy(data = r.data.copy(sales = sales, saleItems = items))
   }
 

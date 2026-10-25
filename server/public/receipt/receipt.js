@@ -19,6 +19,7 @@
     rows: 'ردیف',
     pieces: 'عدد',
     returned: 'مرجوعی',
+    autoDiscount: 'تخفیفِ خودکار',
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -60,7 +61,8 @@
     var line = document.createElement('div');
     line.className = 'slip-item-line';
     var detail = document.createElement('span');
-    detail.appendChild(bdi(it.qty + (it.unit ? ' ' + it.unit : '') + ' × ' + it.unitPrice));
+    detail.appendChild(bdi(it.qty + (it.unit ? ' ' + it.unit : '') + ' × ' + it.unitPrice +
+      (it.autoDiscount ? ' − ' + it.autoDiscount + ' ' + MSG.autoDiscount : '')));
     var total = document.createElement('span');
     total.className = 'slip-item-total';
     total.appendChild(bdi(it.total));
@@ -109,6 +111,8 @@
 
     var totals = clear('totals');
     row(totals, MSG.subtotal, r.subtotal);
+    //  تخفیفِ خودکار فقط آگاهی است — «جمع اقلام» همان جمعِ ستونِ قلم‌هاست و دوباره کم نمی‌شود
+    (r.included || []).forEach(function (d) { row(totals, d.label, d.amount); });
     r.discounts.forEach(function (d) { row(totals, d.label, '−' + d.amount); });
     row(totals, MSG.total, r.total, 'is-total');
 

@@ -280,7 +280,7 @@ fun CheckoutDialog(
         Spacer(Modifier.height(16.dp))
         Panel {
           //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
-          if (promo != null && promo.discount > 0) {
+          if (promo != null && promo.stamp && promo.discount > 0) {
             MoneyRow("جمع اقلام", promo.gross)
             MoneyRow(SaleReceipt.promoLabel(promo.applied.map { it.name }), promo.discount, negative = true)
           } else MoneyRow("جمع اقلام", totals.subtotal)
@@ -386,6 +386,7 @@ fun InvoiceDialog(
   var printer by remember { mutableStateOf(false) }
 
   val items = remember(sale.id) { d.saleItems.filter { it.saleId == sale.id } }
+  val stamped = remember { ir.vil3ntec.tohid.ui.PromoLive.stampOn(context) }
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
 
   Dialog(onDismissRequest = onDismiss) {
@@ -412,8 +413,6 @@ fun InvoiceDialog(
         items.forEach { item ->
           val product = d.products.find { it.id == item.productId }
           val name = SalesEngine.itemName(d, item)
-          //  S3: «مقدار × قیمت» از خودِ قلمِ ثبت‌شده — تخفیفِ خودکار با قیمتِ فهرست و سهمش
-          val line = SaleReceipt.line(item)
           Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
             Column(Modifier.weight(1f)) {
               Text(
@@ -421,14 +420,14 @@ fun InvoiceDialog(
                 style = MaterialTheme.typography.bodyMedium,
                 color = Shop.colors.text,
               )
+              //  S3 (پرچمِ `shop.promo_stamp`): «مقدار × قیمتِ فهرست − تخفیفِ خودکار»؛ خاموش ⇒ همان متنِ پیشین
               Text(
-                "${qty(item.quantity)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""} × ${unitMoney(line.unit)}" +
-                  if (line.promo > 0) " − ${money(line.promo)} تخفیف" else "",
+                SaleReceipt.detail(item, product?.unit.orEmpty(), stamped, ::money, ::unitMoney, ::qty),
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
             }
-            Text(money(line.total), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            Text(money(item.totalPrice), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
         }
 
@@ -436,11 +435,9 @@ fun InvoiceDialog(
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))
 
-        val sums = remember(sale.id, items) {
-          SaleReceipt.totals(sale, items) { id -> ir.vil3ntec.tohid.ui.PromoLive.snap.value.rules.find { it.id == id }?.name }
-        }
-        MoneyRow("جمع اقلام", sums.before)
-        if (sums.promo > 0) MoneyRow(SaleReceipt.promoLabel(sums.names), sums.promo, negative = true)
+        //  «جمع اقلام» = جمعِ همان ستون؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
+        MoneyRow("جمع اقلام", sale.total)
+        SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { MoneyRow(it.label, it.amount) }
         MoneyRow("تخفیف", sale.discount)
         MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
         MoneyRow("پرداختی", sale.paidAmount)

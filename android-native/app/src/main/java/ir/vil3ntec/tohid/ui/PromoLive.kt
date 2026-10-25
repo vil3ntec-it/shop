@@ -104,19 +104,29 @@ object PromoLive {
   }
 
   /**
-   *  S1 — ورود و خروج (`LedgerOwner.signedIn`/`shopChanged`، «خروج از حساب»): عکس،
-   *  کدهای زده‌شده، «خوانده شد» و «آخرین تلاش» همان لحظه صفر؛ نخستین خواندنِ بعد
-   *  نسخهٔ دستگاهِ همان حساب و سپس سرور است — حتی اگر سرور در دسترس نباشد، حالِ
-   *  حسابِ قبلی نمی‌ماند.
+   *  S1 — حساب یا دکان **واقعاً** عوض شد (`LedgerOwner`: پس از `align` و فقط با
+   *  `SWITCHED`/`ADOPTED`) یا «خروج از حساب»: عکس، کدهای زده‌شده، «خوانده شد»، «آخرین
+   *  تلاش» و نسخهٔ دستگاه همان لحظه پاک؛ نخستین خواندنِ بعد از سرور است. شروعِ سردِ همان
+   *  حساب (`SAME`) هیچ‌چیز را پاک نمی‌کند — کدهای سبد و پیش‌نویس می‌مانند.
+   *
+   *  نسخهٔ دستگاه هم پاک می‌شود چون پاسخی که میانِ عوض شدنِ توکن و `align` رسیده باشد
+   *  می‌توانست زیرِ کلیدِ حسابِ قبلی نشسته باشد.
    */
-  fun reset() {
+  fun reset(context: Context) {
     if (isDemo) return
     bound.reset()
     snap.value = PromoEngine.Snapshot()
     coupons.value = emptyList()
     draft?.forgetCoupons()
+    runCatching { prefs(context).edit().remove(KEY).apply() }
     epoch.intValue++
   }
+
+  /** پرچمِ `shop.promo_stamp` برای حسابِ واردشده (فاکتورِ صفحه و چاپ) — خاموش ⇒ همان فاکتورِ پیشین */
+  fun stampOn(context: Context): Boolean = !isDemo && PromoEngine.forAccount(snap.value, account(context)).stamp
+
+  /** نامِ کنونیِ قاعده — فقط برای قلمی که نام را با خودش ندارد */
+  fun ruleName(id: String): String? = snap.value.rules.find { it.id == id }?.name
 
   /** نسخهٔ همین دستگاه — فقط اگر مالِ همین حساب است */
   fun loadCache(context: Context) {
@@ -133,6 +143,7 @@ object PromoLive {
   }
 
   private fun saveCache(context: Context, key: String, s: PromoEngine.Snapshot) {
+    if (account(context) != key) return
     runCatching {
       val o = buildJsonObject {
         put("account", JsonPrimitive(key))
@@ -148,7 +159,7 @@ object PromoLive {
    *  ریخته می‌شود — نه در حافظه می‌نشیند، نه در نسخهٔ دستگاه.
    */
   private fun publish(context: Context, key: String, next: (PromoEngine.Snapshot) -> PromoEngine.Snapshot) {
-    if (bound.key != key) return
+    if (!PromoEngine.accepts(bound.key, key, account(context))) return
     val s = next(PromoEngine.forAccount(snap.value, key)).copy(account = key)
     snap.value = s
     saveCache(context, key, s)

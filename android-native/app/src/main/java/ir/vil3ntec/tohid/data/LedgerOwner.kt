@@ -101,10 +101,8 @@ object LedgerOwner {
     shopId: String = "",
   ): Result {
     val user = userId.trim()
-    //  S1: تخفیف‌های حافظه مالِ حسابِ قبلی‌اند — هر ورود از نو
-    runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset() }
     if (user.isBlank()) return Result.SAME   // شناسه نداریم؛ چیزی را خراب نمی‌کنیم
-    return align(context, store, user, shopId.trim())
+    return align(context, store, user, shopId.trim()).also { afterAlign(context, it) }
   }
 
   /**
@@ -115,9 +113,19 @@ object LedgerOwner {
    */
   suspend fun shopChanged(context: Context, store: ShopStore, shopId: String): Result {
     val user = currentUser(context)
-    runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset() }
     if (user.isBlank()) return Result.SAME
-    return align(context, store, user, shopId.trim())
+    return align(context, store, user, shopId.trim()).also { afterAlign(context, it) }
+  }
+
+  /**
+   *  S1 — تخفیف‌های حافظه (`PromoLive`) فقط وقتی دور ریخته می‌شوند که دفتر واقعاً به حساب یا
+   *  دکانِ دیگری رسید؛ شروعِ سردِ همان حساب (`SAME`) کدهای سبد و پیش‌نویس را نگه می‌دارد.
+   *  **پس از** `align` تا «حساب@دکان» ِ تازه همان لحظه خوانده شود.
+   */
+  internal fun promoReset(r: Result): Boolean = r == Result.SWITCHED || r == Result.ADOPTED
+
+  private fun afterAlign(context: Context, r: Result) {
+    if (promoReset(r)) runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset(context) }
   }
 
   private suspend fun align(

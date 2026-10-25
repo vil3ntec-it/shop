@@ -136,7 +136,7 @@ class PromoEngineTest {
       code = "SALE10", maxUses = 3, allowBelowCost = true, priority = 7, stack = "exclusive",
     )
     assertEquals(full, PromoCore.ruleOf(PermPolicy.tree(PromoJson.toJson(full))))
-    val snap = PromoEngine.Snapshot(enabled = true, rules = listOf(full, r2), manage = true, belowCost = false, at = 42)
+    val snap = PromoEngine.Snapshot(enabled = true, rules = listOf(full, r2), manage = true, belowCost = false, at = 42, stamp = true)
     assertEquals(snap, PromoJson.snapshotOf(PromoJson.toJson(snap), 42))
     assertEquals(PromoEngine.Snapshot(at = 7), PromoJson.snapshotOf(kotlinx.serialization.json.JsonObject(emptyMap()), 7))
   }
@@ -144,19 +144,31 @@ class PromoEngineTest {
   /* ---------------- S2: فیلدهای تازهٔ فاکتور ---------------- */
 
   private val revs = mapOf("r1" to 3L, "r2" to 7L)
+  /** کلیدِ دکان روشن و پرچمِ `shop.promo_stamp` روشن */
+  private val stamping = on.copy(stamp = true)
 
   @Test fun `خاموش ⇒ stamp همان شیء را برمی‌گرداند و هیچ فیلدِ تازه‌ای نمی‌نشیند`() {
     val r = record(cart)
     assertSame(r, PromoEngine.stamp(r, null))
-    assertSame(r, PromoEngine.stamp(r, eval(on.copy(enabled = false))))
+    assertSame(r, PromoEngine.stamp(r, eval(stamping.copy(enabled = false))))
     val failed = SalesEngine.Result.Failed("x")
-    assertSame(failed, PromoEngine.stamp(failed, eval(on)))
+    assertSame(failed, PromoEngine.stamp(failed, eval(stamping)))
     assertNull(r.data.sales.last().promoDiscountMinor)
     assertTrue(r.data.saleItems.all { it.listPriceMinor == null && it.promo.isEmpty() })
   }
 
-  @Test fun `روشن ⇒ قیمتِ فهرست، سهمِ هر قاعده با rev، جمعِ تخفیفِ خودکار و کدها روی فاکتور`() {
-    val o = eval(on.copy(revs = revs), listOf("eid-5"))!!
+  @Test fun `پرچمِ shop_promo_stamp خاموش ⇒ تخفیف می‌خورد ولی فاکتور و قلم‌ها بایت‌به‌بایت همان پیشین`() {
+    val o = eval(on, listOf("eid-5"))!!
+    assertTrue(o.discount > 0)
+    val r = record(PromoEngine.priced(cart, o))
+    assertSame(r, PromoEngine.stamp(r, o))
+    val json = kotlinx.serialization.json.Json { encodeDefaults = true; ignoreUnknownKeys = true }
+    val text = json.encodeToString(ShopData.serializer(), (PromoEngine.stamp(r, o) as SalesEngine.Result.Ok).data)
+    for (k in listOf("promoDiscountMinor", "coupons", "listPriceMinor", "\"promo\"")) assertTrue(k, !text.contains(k))
+  }
+
+  @Test fun `روشن ⇒ قیمتِ فهرست، سهمِ هر قاعده با rev و نام، جمعِ تخفیفِ خودکار و فقط کدهای اعمال‌شده`() {
+    val o = eval(stamping.copy(revs = revs), listOf("eid-5", "NOPE123"))!!
     val before = record(PromoEngine.priced(cart, o))
     val r = PromoEngine.stamp(before, o) as SalesEngine.Result.Ok
     val sale = r.data.sales.last()
@@ -171,6 +183,8 @@ class PromoEngineTest {
     //  چای: ده درصدِ نوشیدنی، بعد کدِ عید روی مانده؛ برنج فقط کدِ عید
     assertEquals(listOf("r1", "r2"), items.getValue("tea").promo.map { it.id })
     assertEquals(listOf(3L, 7L), items.getValue("tea").promo.map { it.rev })
+    //  نامِ همان لحظه — فاکتورِ دوباره‌چاپ‌شده از حالِ امروزِ قاعده‌ها نمی‌خواند
+    assertEquals(listOf("ده درصدِ نوشیدنی", "کدِ عید"), items.getValue("tea").promo.map { it.name })
     assertEquals(listOf("r2"), items.getValue("rice").promo.map { it.id })
     for (it in r.data.saleItems) {
       val list = it.listPriceMinor!!
@@ -183,7 +197,7 @@ class PromoEngineTest {
 
   @Test fun `قیمتِ دستی و قلمِ آزاد — فهرست هست، سهم نه؛ قلمِ آزاد هیچ`() {
     val c = listOf(SalesEngine.CartLine("tea", 2.0, unitPrice = 280.0), SalesEngine.CartLine("free-1", 1.0, unitPrice = 50.0, label = "کیسه"))
-    val o = eval(on.copy(rules = listOf(r1.copy(scope = PromoCore.Scope()))), c = c)!!
+    val o = eval(stamping.copy(rules = listOf(r1.copy(scope = PromoCore.Scope()))), c = c)!!
     val r = PromoEngine.stamp(record(PromoEngine.priced(c, o)), o) as SalesEngine.Result.Ok
     val tea = r.data.saleItems.single { it.productId == "tea" }
     val free = r.data.saleItems.single { it.productId.isEmpty() }
@@ -262,6 +276,17 @@ class PromoEngineTest {
     }
   }
 
+  @Test fun `کدها — فقط اعمال‌شده، بی تکرار، با سقفِ شمار و طول`() {
+    val many = (1..15).map { PromoCore.CodeStatus("C${it}OK", "applied") } + PromoCore.CodeStatus("NOPE", "unknown") +
+      PromoCore.CodeStatus("X".repeat(60), "applied") + PromoCore.CodeStatus("C1OK", "applied")
+    val o = eval(stamping)!!.copy(codes = many)
+    val sale = (PromoEngine.stamp(record(PromoEngine.priced(cart, o)), o) as SalesEngine.Result.Ok).data.sales.last()
+    assertEquals(PromoEngine.MAX_COUPONS, sale.coupons.size)
+    assertTrue(sale.coupons.none { it == "NOPE" })
+    assertTrue(sale.coupons.all { it.length <= PromoEngine.MAX_COUPON_LEN })
+    assertEquals(sale.coupons.distinct(), sale.coupons)
+  }
+
   /* ---------------- S1: حالِ حسابِ دیگر ---------------- */
 
   @Test fun `S1 — عکسِ حسابِ قبلی روی سبدِ حسابِ تازه نمی‌نشیند`() {
@@ -273,6 +298,15 @@ class PromoEngineTest {
       assertEquals(PromoEngine.Snapshot(account = other), s)
       assertNull(eval(s, listOf("EID5")))
     }
+  }
+
+  @Test fun `S1 — پاسخِ سرور فقط وقتی می‌نشیند که حافظه و حسابِ همین لحظه هر دو مالِ همان حساب‌اند`() {
+    assertTrue(PromoEngine.accepts("u1@A", "u1@A", "u1@A"))
+    //  پاسخِ حسابِ قبلی پس از جابه‌جایی (حافظه یا حسابِ واردشده عوض شده)
+    assertTrue(!PromoEngine.accepts("u2@B", "u1@A", "u2@B"))
+    assertTrue(!PromoEngine.accepts(null, "u1@A", "u1@A"))
+    //  توکنِ تازه پیش از `align`: حافظه هنوز «u1@A» است ولی حسابِ همین لحظه نه ⇒ نه در حافظه، نه در نسخهٔ دستگاه
+    assertTrue(!PromoEngine.accepts("u1@A", "u1@A", "u2@B"))
   }
 
   @Test fun `S1 — کلیدِ تازه «خوانده شد» و «آخرین تلاش» را صفر می‌کند`() {
@@ -287,5 +321,11 @@ class PromoEngineTest {
     assertEquals("u1@shopB", b.key)
     assertTrue(!b.loaded)
     assertEquals(0L, b.triedAt)
+    //  ورود/خروج: مالِ هیچ‌کس؛ همان کلید دوباره «تازه» است
+    b.loaded = true
+    b.reset()
+    assertNull(b.key)
+    assertTrue(!b.loaded)
+    assertTrue(b.bind("u1@shopB"))
   }
 }

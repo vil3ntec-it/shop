@@ -59,6 +59,8 @@ object ReceiptLayout {
 
     /* ------------------------------ جمع‌ها ------------------------------ */
     row(labels.subtotal, fmt.money(input.subtotal))
+    //  آگاهی، نه کسر: بی «−»
+    input.included.filter { it.amount > 0 }.forEach { row(it.label, fmt.money(it.amount)) }
     input.discounts.filter { it.amount > 0 }.forEach { row(it.label, "−" + fmt.money(it.amount)) }
     b += ReceiptBlock.Rule(dashed = false)
     row(labels.total, fmt.money(input.total), TextStyle.TOTAL)

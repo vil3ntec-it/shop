@@ -75,6 +75,7 @@ object Receipts {
     val publicUrl = publicUrl(context, sale)
     val profile = ReceiptProfileStore.current(context)
     val saleItems = d.saleItems.filter { it.saleId == sale.id }
+    val stamped = ir.vil3ntec.tohid.ui.PromoLive.stampOn(context)
     val items = saleItems.map { item ->
       LineView(
         name = SalesEngine.itemName(d, item),
@@ -83,12 +84,10 @@ object Receipts {
         unitPrice = item.unitPrice,
         total = item.totalPrice,
         returnedQty = item.returnedQty,
-        //  پیگیریِ #307 (S3): قیمتِ فهرست فقط برای قلمی که تخفیفِ خودکار گرفته
-        listPrice = item.listPriceMinor?.takeIf { item.promo.isNotEmpty() }?.let { it / 100.0 },
+        //  پیگیریِ #307 (S3، پرچمِ `shop.promo_stamp`): قیمتِ فهرست فقط برای قلمی که تخفیفِ خودکار گرفته
+        listPrice = SaleReceipt.line(item, stamped).takeIf { it.promo > 0 }?.unit,
       )
     }
-    //  «جمع اقلام» پیش از تخفیف‌های خودکار و ردیفِ آن‌ها پیش از تخفیفِ دستی — مثلِ خلاصهٔ صندوق
-    val sums = SaleReceipt.totals(sale, saleItems) { id -> ir.vil3ntec.tohid.ui.PromoLive.snap.value.rules.find { it.id == id }?.name }
     val time = if (sale.createdAt > 0) SimpleDateFormat("HH:mm", Locale.US).format(Date(sale.createdAt)) else ""
     return ReceiptInput(
       shop = ShopHeader(profile.name.ifBlank { fallbackName }, profile.address, profile.phone, profile.footer),
@@ -100,8 +99,12 @@ object Receipts {
       kind = PayFlow.payLabel(sale, cash = labels.cash),
       cancelled = sale.status == "cancelled",
       items = items,
-      subtotal = sums.before,
-      discounts = listOf(DiscountLine(SaleReceipt.promoLabel(sums.names), sums.promo), DiscountLine(labels.discount, sale.discount)),
+      subtotal = sale.total,
+      discounts = listOf(DiscountLine(labels.discount, sale.discount)),
+      //  «جمع اقلام» = جمعِ ستونِ قلم‌ها؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
+      included = listOfNotNull(
+        SaleReceipt.included(sale, saleItems, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { DiscountLine(it.label, it.amount) },
+      ),
       total = sale.finalTotal,
       //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
       payments = PayFlow.receiptLines(sale).map { (label, amount) -> PaymentLine(label, amount) },
@@ -119,7 +122,7 @@ object Receipts {
   fun doc(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
     copyMark: String? = null, fallbackName: String = localName(context), legacyQr: String? = null,
-  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), widthDots, format())
+  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), widthDots, format(ir.vil3ntec.tohid.ui.PromoLive.stampOn(context)))
 
   fun mono(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
@@ -135,13 +138,14 @@ object Receipts {
     ReceiptPdf.single(mono(context, d, sale, SHARE_DOTS, legacyQr = legacyQr))
 
   /** رقم و نمادِ همین دستگاه (LOC-05، LOC-07) — همان `LocaleText` ِ همه‌جای برنامه */
-  fun format(): ReceiptFormat {
+  /** @param exactUnit پرچمِ `shop.promo_stamp`: قیمتِ واحدِ اعشاری با دو رقم؛ خاموش ⇒ همان پیشین */
+  fun format(exactUnit: Boolean = false): ReceiptFormat {
     val digits = LocaleChoice.digits
     val symbol = LocaleChoice.symbol
     return object : ReceiptFormat {
       override fun money(afn: Double) = LocaleText.afghani(afn, digits, symbol)
       //  قیمتِ واحدِ اعشاری (قلمِ تخفیفِ خودکار) با دو رقم؛ عددِ کامل همان `LocaleText.amount`
-      override fun amount(afn: Double) = LocaleText.unitAmount(afn, digits)
+      override fun amount(afn: Double) = if (exactUnit) LocaleText.unitAmount(afn, digits) else LocaleText.amount(afn, digits)
       override fun qty(q: Double) = LocaleText.digitsIn(ir.vil3ntec.tohid.qty(q), digits)
       override fun digits(text: String) = LocaleText.digitsIn(text, digits)
       //  شماره جدا و چپ‌به‌راست (LRE…PDF) تا در سطرِ راست‌به‌چپ رقم‌ها جابه‌جا نشوند
