@@ -233,8 +233,20 @@ async function verifyAll({ chains = null, rows = true } = {}) {
   return { ok: results.every((r) => r.ok), results };
 }
 
+/** متنِ فارسیِ هر دلیلِ شکستِ [verifyChain] — اسکریپتِ verify-chain و پنلِ مدیر هر دو همین را می‌خوانند */
+const REASONS = Object.freeze({
+  seq_gap: 'حلقه‌ای جا افتاده',
+  prev_mismatch: 'پیوند به حلقهٔ قبلی نمی‌خورد',
+  bad_body: 'متنِ حلقه خوانا نیست',
+  not_canonical: 'متنِ حلقه دست‌کاری شده (قالب)',
+  body_mismatch: 'حلقه جابه‌جا شده',
+  hash_mismatch: 'متنِ حلقه با هشش نمی‌خواند',
+  row_missing: 'ردیفِ سابقه پاک شده',
+  row_changed: 'ردیفِ سابقه دست‌کاری شده',
+});
+
 module.exports = {
-  FLAG_SCOPE, FLAG_AUDIT, FLAG_SQL, flagOn,
+  FLAG_SCOPE, FLAG_AUDIT, FLAG_SQL, REASONS, flagOn,
   auditEnabled, auditChainId, detailHash, append, appendAudit,
   verifyChain, verifyAll, listChains,
 };
