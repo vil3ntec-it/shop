@@ -23,8 +23,11 @@ const config = require('../config');
  * @returns {string}
  */
 function serverSecret(order, fallback) {
+  //  همهٔ نام‌ها پیش از خواندن سنجیده می‌شوند: غلطِ تایپیِ نامِ دوم هم خطاست، حتی وقتی نامِ اول پُر است
+  const unknown = order.filter((name) => !Object.hasOwn(config.secrets, name));
+  if (unknown.length) throw new Error(`unknown server secret: ${unknown.join(', ')}`);
   for (const name of order) {
-    if (!Object.hasOwn(config.secrets, name)) throw new Error(`unknown server secret: ${name}`);
+    //  رازِ فقط‌فاصله هم راز است (مثلِ `||`ِ کپی‌های پیشین) — trim نمی‌شود
     const value = config.secrets[name];
     if (value) return value;
   }

@@ -788,6 +788,36 @@ await step('عملیات: سرویس‌های بیرونی با برچسبِ «�
   }
 });
 
+// ── OPS-04: داشبوردِ نسخهٔ دستگاه‌ها و هشدارِ زیرِ حداقل ───────────
+await step('عملیات: نسخهٔ دستگاه‌ها با هشدارِ قرمزِ «زیرِ حداقل»', async () => {
+  const plans = require('../src/lib/plans');
+  const before = await plans.allConfig();
+  const t = now();
+  await query(
+    `INSERT INTO sync_devices (app, account_kind, account_id, device_id, app_version, last_seen_at)
+     VALUES ('shop','shop','ops-acc','ops-dev-1','2.13.0',$1), ('shop','shop','ops-acc','ops-dev-2','2.14.2',$1)`,
+    [t - 60_000]
+  );
+  await plans.setConfig('latest_version_shop', '2.14.2');
+  await plans.setConfig('min_app_version_shop', '2.14.0');
+  try {
+    await openTab('ops');
+    await page.waitForSelector('#ops-versions tr[data-version="2.13.0"]', { timeout: 10_000 });
+    const badge = (v) => page.locator(`#ops-versions tr[data-app="shop"][data-version="${v}"] .badge`).textContent();
+    assert.equal((await badge('2.13.0')).trim(), 'زیرِ حداقل');
+    assert.equal((await badge('2.14.2')).trim(), 'به‌روز');
+    const alert = page.locator('#ops-ver-msg .msg');
+    assert.match(await alert.textContent(), /۱ دستگاهِ دکان زیرِ حداقل نسخهٔ 2\.14\.0/);
+    assert.ok((await alert.getAttribute('class')).includes('msg-bad'), 'هشدارِ زیرِ حداقل باید قرمز باشد');
+    assert.ok(!(await page.locator('#ops-versions').textContent()).includes('ops-acc'), 'شناسهٔ حساب در پنل');
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-versions.png`, fullPage: true });
+  } finally {
+    await query(`DELETE FROM sync_devices WHERE account_id='ops-acc'`);
+    await plans.setConfig('latest_version_shop', before.latest_version_shop || '');
+    await plans.setConfig('min_app_version_shop', before.min_app_version_shop || '');
+  }
+});
+
 // ── IMG-01 / IMG-BANK-01 / IMG-03 / IMG-PRO-09: ورودِ گروهی از پنل، با گزارشِ ردیف و فایل ──
 await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ جعلی و خراب جدا گزارش می‌شوند و دسته نمی‌خوابد', async () => {
   const F = require('./image-fixtures');
@@ -916,6 +946,55 @@ await step('بانکِ تصاویر: تطبیقِ مبهم با دلیل و ان
   assert.deepEqual([done.space, done.status], ['central', 'APPROVED']);
   const audit = await one(`SELECT detail FROM audit_logs WHERE action='admin.bank_image_approved' AND target_id=$1`, [imageId]);
   assert.ok(audit, 'انتشار سابقه نداشت');
+});
+
+// ── IMG-BANK-13 / IMG-BANK-15: تکراری فقط نشان؛ بایگانی فقط ارشد با دلیل ──
+await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» بی حذف یا ادغام؛ بایگانیِ عکسِ منتشرشده با دلیل', async () => {
+  const F = require('./image-fixtures');
+  const tok = await page.evaluate(() => sessionStorage.getItem('shop-admin-token'));
+  const api = async (method, path, body, raw) => {
+    const r = await fetch(`${base}/api/admin/image-bank${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+      body: raw || (body === undefined ? undefined : JSON.stringify(body)),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const b = await api('POST', '/batches', { license_source: 'کاتالوگ', license_status: 'licensed', commercial_use: true });
+  const same = F.jpeg(800, 600, { seed: 961 });
+  await api('PUT', `/batches/${b.body.id}/files/dup1.jpg`, undefined, same);
+  await api('PUT', `/batches/${b.body.id}/files/dup2.jpg`, undefined, same);
+  const run = await api('POST', `/batches/${b.body.id}/rows`,
+    { csv: 'sku,barcode,name,brand,size,unit,image_path\nDUP-1,,چای سیاه,الف,1,kg,dup1.jpg\nDUP-2,,چای سبز,ب,1,kg,dup2.jpg' });
+  const [first, second] = run.body.rows.map((r) => r.image_id);
+
+  await openTab('imgbank');
+  await page.check('#ib-rv-dups');
+  await page.waitForSelector(`#ib-review tr[data-image="${second}"]`, { timeout: 10_000 });
+  assert.equal(await page.locator(`#ib-review tr[data-image="${first}"]`).count(), 0, 'غیرِ تکراری در صافی ماند');
+  assert.match(await page.locator(`#ib-review tr[data-image="${second}"] td:nth-child(6)`).textContent(), /تکراری × ۱/);
+  await page.click(`#ib-review tr[data-image="${second}"] button`);
+  await page.waitForSelector(`#ib-dt-dups li[data-dup="${first}"]`, { timeout: 10_000 });
+  assert.match(await page.locator(`#ib-dt-dups li[data-dup="${first}"]`).textContent(), /در انتظارِ بررسی.*چای سیاه/);
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM images WHERE id IN ($1,$2)', [first, second])).n, 2, 'تکراری حذف یا ادغام شد');
+  await page.uncheck('#ib-rv-dups');
+
+  //  بایگانیِ عکسِ منتشرشدهٔ گامِ پیش
+  const pub = await one(`SELECT id FROM images WHERE space='central' AND status='APPROVED' ORDER BY id LIMIT 1`);
+  await page.selectOption('#ib-rv-status', 'APPROVED');
+  await page.selectOption('#ib-rv-space', 'central');
+  await page.click('#btn-ib-rv-load');
+  await page.waitForSelector(`#ib-review tr[data-image="${pub.id}"]`, { timeout: 10_000 });
+  await page.click(`#ib-review tr[data-image="${pub.id}"] button`);
+  await page.waitForSelector('#btn-ib-archive:not(.hidden)', { timeout: 10_000 });
+  assert.ok(await page.locator('#btn-ib-approve').isHidden(), 'دکمهٔ انتشار برای عکسِ منتشرشده');
+  page.once('dialog', (d) => d.accept('بسته‌بندیِ قدیمی'));
+  await page.click('#btn-ib-archive');
+  await page.waitForFunction(() => /بایگانی شد/.test(document.getElementById('ib-rv-msg').textContent), null, { timeout: 10_000 });
+  assert.equal((await one('SELECT status FROM images WHERE id=$1', [pub.id])).status, 'ARCHIVED');
+  assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.bank_image_archived' AND target_id=$1`, [pub.id]), 'بایگانی سابقه نداشت');
+  await page.selectOption('#ib-rv-status', 'NEEDS_REVIEW');
+  await page.selectOption('#ib-rv-space', 'pending');
 });
 
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──

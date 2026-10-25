@@ -1166,7 +1166,18 @@
   </section>
 
   <section id="tab-ops" class="hidden">
-    <!-- ماژولِ ops.js — سرویس‌های بیرونی (OPS-04@29) -->
+    <!-- ماژولِ ops.js — نسخهٔ دستگاه‌ها (OPS-04) و سرویس‌های بیرونی (OPS-04@29) -->
+    <div class="panel">
+      <h2>نسخهٔ دستگاه‌ها</h2>
+      <div class="row"><span class="muted" id="ops-ver-checked"></span></div>
+      <div id="ops-ver-msg"></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>نسخه</th><th>دستگاه</th><th>آخرین دیده‌شدن</th><th>وضعیت</th></tr></thead>
+          <tbody id="ops-versions"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="panel">
       <h2>سرویس‌های بیرونی</h2>
       <div class="row"><span class="muted" id="ops-prov-checked"></span></div>
@@ -1181,7 +1192,7 @@
   </section>
 
   <section id="tab-imgbank" class="hidden">
-    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) و صفِ بررسی (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09) -->
+    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) ، صفِ بررسی (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09)، تکراری و بایگانی (IMG-BANK-13، IMG-BANK-15) -->
     <div class="panel hidden" id="ib-off">
       <h2>بانکِ تصاویر</h2>
       <div class="msg msg-warn">بانکِ مرکزیِ تصاویر روشن نیست (پرچمِ <code>image_bank.central</code>). تا روشن نشود هیچ ورودی پذیرفته نمی‌شود.</div>
@@ -1254,6 +1265,7 @@
           <div class="row">
             <select id="ib-rv-status" style="width:auto;"><option value="NEEDS_REVIEW">در انتظارِ بررسی</option><option value="APPROVED">منتشرشده</option><option value="REJECTED">ردشده</option><option value="ARCHIVED">بایگانی</option></select>
             <select id="ib-rv-space" style="width:auto;"><option value="pending">در انتظار</option><option value="central">بانکِ عمومی</option></select>
+            <label style="margin:0;"><input type="checkbox" id="ib-rv-dups"> فقط تکراری‌ها</label>
             <button class="btn btn-sm" id="btn-ib-rv-load">نمایش</button>
           </div>
         </div>
@@ -1278,11 +1290,12 @@
             <div class="row"><strong>تطبیق:</strong><span id="ib-dt-match"></span></div>
             <div class="row" style="margin-top:6px;"><strong>دلیل:</strong><span id="ib-dt-reasons"></span></div>
             <div class="row" style="margin-top:6px;"><strong>کالا:</strong><span id="ib-dt-product"></span></div>
-            <div class="row" style="margin-top:6px;"><strong>تکراری:</strong><span id="ib-dt-dups" class="muted"></span></div>
+            <div style="margin-top:6px;"><strong>تکراری:</strong> <span class="muted">همان فایل — فقط نشان؛ حذف یا ادغام نمی‌شود</span><ul id="ib-dt-dups" class="muted" style="margin:4px 18px 0;"></ul></div>
             <div class="row" style="margin-top:12px;">
               <button class="btn btn-sm" id="btn-ib-approve">تأیید و انتشار</button>
               <button class="btn btn-sm btn-danger" id="btn-ib-reject">رد</button>
-              <span class="muted hidden" id="ib-dt-super">انتشار و رد فقط با مدیرِ ارشد است.</span>
+              <button class="btn btn-sm btn-warn" id="btn-ib-archive">بایگانی</button>
+              <span class="muted hidden" id="ib-dt-super">انتشار، رد و بایگانی فقط با مدیرِ ارشد است.</span>
             </div>
           </div>
         </div>

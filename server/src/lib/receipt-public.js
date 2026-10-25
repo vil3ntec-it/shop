@@ -40,7 +40,7 @@ const KIND_LABELS = Object.freeze({
 });
 const LABELS = Object.freeze({
   subtotal: 'جمع اقلام', discount: 'تخفیف', total: 'مبلغ نهایی', paid: 'پرداختی',
-  tendered: 'دریافتی', change: 'باقی‌پول', remaining: 'باقی‌مانده (نسیه)',
+  tendered: 'دریافتی', change: 'پولِ پس', remaining: 'باقی‌مانده (نسیه)',
   cash: 'نقدی', credit: 'نسیه', online: 'آنلاین', item: 'کالا',
 });
 

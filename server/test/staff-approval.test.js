@@ -521,3 +521,42 @@ test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خود�
   ]);
   assert.deepEqual(ok.body.results.map((x) => x.status), ['applied', 'applied', 'applied'], JSON.stringify(ok.body));
 });
+
+/* ------------------------- v1: opِ نادرستی که «پالایشِ null ِ قدیمی» درستش می‌کند */
+
+//  `shopNewerFields` کلیدِ null ِ ناشناخته را برمی‌دارد و hash را دوباره می‌سازد. نگهبان اگر پیش
+//  از آن بیاید، opِ نادرست را بی داوری رها می‌کند («خودِ v1 ردش می‌کند») و پالایش آن را درست می‌کند
+//  ⇒ تخفیف/لغو/برگشتِ بیش از سقف بی برگه می‌نشست. فرستنده با نفرستادنِ `caps` خودش این را تعیین می‌کند.
+test('Sync v1: کلیدِ null ِ نادرست («$x» یا بیش از ۶۴KB) تخفیف، لغو و برگشتِ بیش از سقف را از نگهبان رد نمی‌کند', async () => {
+  assert.equal((await setRole('manager', { 'sales.discount': { caps: { maxPct: 10 } }, 'sales.cancel': { mode: 'approve' } })).status, 200);
+  assert.equal((await setRole('staff', { 'returns.create': { caps: { maxAmount: 50000 } } })).status, 200);
+  const big = {};
+  for (let i = 0; JSON.stringify(big).length < 70 * 1024; i++) big[`n${String(i).padStart(56, '0')}`] = null;
+  const cases = [
+    [manager, v1op('sales', 's-nl-1', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', $x: null })],
+    [manager, v1op('sales', 's-nl-2', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', ...big })],
+    [manager, v1op('sales', 's-nl-1', 'update', { status: 'cancelled', finalTotal: 70, $x: null })],
+    [staff, v1op('returns', 'r-nl-1', 'insert', { saleId: 's-nl-1', quantity: 1, amount: 600, $x: null })],
+  ];
+  for (const [who, op] of cases) {
+    const r = await push1(who, 'nl-1', [op]);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.results[0].status, 'rejected', `${op.table}/${op.type}: ${JSON.stringify(r.body.results[0])}`);
+    assert.equal(r.body.results[0].reason, 'approval_required');
+    assert.equal(await inOplog(op.op_id), false);
+  }
+  //  دستهٔ آمیخته: پاسخ‌ها با ترتیبِ دستهٔ اصلی (پالایش یکی را کامل برمی‌دارد، نگهبان یکی را رد می‌کند)
+  const gone = v1op('products', 'p-nl-1', 'update', { junk: null });
+  const over = v1op('sales', 's-nl-4', 'insert', { total: 100, discount: 30, finalTotal: 70, status: 'completed', $x: null });
+  const fine = v1op('products', 'p-nl-2', 'insert', { name: 'نبات' });
+  const mix = await push1(manager, 'nl-1', [gone, over, fine]);
+  assert.deepEqual(mix.body.results.map((x) => [x.op_id, x.reason || x.status]),
+    [[gone.op_id, 'stale_null_ignored'], [over.op_id, 'approval_required'], [fine.op_id, 'applied']]);
+  //  op ِ نادرستی که پالایش هم درستش نمی‌کند، روی جدولِ زیرِ نگهبان صریحاً رد می‌شود
+  const bad = v1op('sales', 's-nl-3', 'insert', { total: 100, discount: 30, finalTotal: 70, $x: 1 });
+  const rb = await push1(manager, 'nl-1', [bad]);
+  assert.equal(rb.body.results[0].status, 'rejected');
+  assert.equal(rb.body.results[0].reason, 'bad_field_name');
+  assert.equal(await inOplog(bad.op_id), false);
+  assert.equal((await setRole('manager', {})).status, 200);
+});
