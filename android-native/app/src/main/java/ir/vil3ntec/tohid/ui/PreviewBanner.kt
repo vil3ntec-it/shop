@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  نوارِ «نسخهٔ پیش‌نمایش» — فقط در buildTypeِ `preview` (`BuildConfig.PREVIEW`).
@@ -41,7 +42,7 @@ fun PreviewBanner() {
     }
   }
   Text(
-    "نسخهٔ پیش‌نمایش",
+    StrShell.previewBuild,
     modifier = Modifier
       .fillMaxWidth()
       .background(Shop.colors.warningTint)
@@ -53,9 +54,9 @@ fun PreviewBanner() {
   if (warn) {
     AlertDialog(
       onDismissRequest = { warn = false },
-      confirmButton = { TextButton(onClick = { warn = false }) { Text("فهمیدم") } },
-      title = { Text("نسخهٔ پیش‌نمایش") },
-      text = { Text("پیش‌نمایش است؛ برای دیدن، نه کارِ روزانه.") },
+      confirmButton = { TextButton(onClick = { warn = false }) { Text(StrShell.gotIt) } },
+      title = { Text(StrShell.previewBuild) },
+      text = { Text(StrShell.previewNote) },
     )
   }
 }

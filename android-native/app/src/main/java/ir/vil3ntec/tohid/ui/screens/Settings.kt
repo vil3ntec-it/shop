@@ -76,6 +76,9 @@ import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  تنظیمات.
@@ -225,17 +228,17 @@ fun SettingsScreen(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
           val ledger = store.exportBackup(storeName)
           val out = context.contentResolver.openOutputStream(uri)
-            ?: error("این مسیر برای نوشتن باز نشد")
+            ?: error(StrSettings.pathNotWritable)
           out.use { BackupBundle.write(context, it, ledger).getOrThrow() }
         }
       }.onSuccess { photos ->
         BackupClock.mark(context)
         toast(
-          if (photos > 0) "پشتیبان ساخته شد — با ${plain(photos)} عکس"
-          else "پشتیبان ساخته شد"
+          if (photos > 0) StrSettings.backupMadeWithPhotos(plain(photos))
+          else StrSettings.backupMade
         )
       }
-        .onFailure { toast("فایل پشتیبان ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+        .onFailure { toast(StrSettings.backupFailed(it.message ?: Str.unknownReason)) }
     }
   }
 
@@ -247,13 +250,13 @@ fun SettingsScreen(
     scope.launch {
       runCatching {
         val out = context.contentResolver.openOutputStream(uri)
-          ?: error("این مسیر برای نوشتن باز نشد")
+          ?: error(StrSettings.pathNotWritable)
         out.use { it.write(store.exportBackup(storeName).toByteArray(Charsets.UTF_8)) }
       }.onSuccess {
         BackupClock.mark(context)
-        toast("فایل دفتر ساخته شد — بدون عکس‌ها")
+        toast(StrSettings.ledgerFileMade)
       }
-        .onFailure { toast("فایل ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+        .onFailure { toast(StrSettings.fileFailed(it.message ?: Str.unknownReason)) }
     }
   }
 
@@ -264,7 +267,7 @@ fun SettingsScreen(
    *  ردیفِ سابقه چیزی در دفتر نوشته نمی‌شود و مُهرِ پشتیبان (`BackupClock`) نمی‌خورد.
    */
   fun ownerExport(excel: Boolean) = { uri: android.net.Uri? ->
-    if (uri != null && ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) toast("خروجی کامل فقط برای صاحب دکان یا مدیر است")
+    if (uri != null && ir.vil3ntec.tohid.data.ShopRole.isStaff(context)) toast(StrSettings.exportOwnerOnly)
     else if (uri != null) scope.launch {
       runCatching {
         withContext(Dispatchers.IO) {
@@ -273,7 +276,7 @@ fun SettingsScreen(
             BuildConfig.VERSION_NAME, storeName,
           )
           val archive = LedgerArchive.readArchive(context)
-          val out = context.contentResolver.openOutputStream(uri) ?: error("این مسیر برای نوشتن باز نشد")
+          val out = context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable)
           out.use {
             if (excel) ir.vil3ntec.tohid.data.OwnerExport.writeXlsx(store.data.value, meta, archive, it)
             else ir.vil3ntec.tohid.data.OwnerExport.writeJson(store.data.value, meta, archive, it)
@@ -290,9 +293,9 @@ fun SettingsScreen(
             ),
           ),
         )
-        toast(if (excel) "فایل اکسلِ همهٔ داده‌ها ساخته شد" else "فایل JSONِ همهٔ داده‌ها ساخته شد")
+        toast(if (excel) StrSettings.excelExportMade else StrSettings.jsonExportMade)
       }
-        .onFailure { toast("خروجی ساخته نشد: ${it.message ?: "دلیل نامعلوم"}") }
+        .onFailure { toast(StrSettings.exportFailed(it.message ?: Str.unknownReason)) }
     }
     Unit
   }
@@ -308,7 +311,7 @@ fun SettingsScreen(
       val opened = withContext(Dispatchers.IO) {
         runCatching {
           val input = context.contentResolver.openInputStream(uri)
-            ?: error("این فایل باز نشد")
+            ?: error(StrSettings.fileNotOpened)
           input.use { BackupBundle.read(context, it) { text -> store.parseBackup(text) }.getOrThrow() }
         }
       }
@@ -320,7 +323,7 @@ fun SettingsScreen(
         }
         .onFailure {
           BackupBundle.dropStaging(context)
-          restoreError = it.message ?: "فایل پشتیبان معتبر نیست"
+          restoreError = it.message ?: StrSettings.invalidBackup
         }
     }
   }
@@ -330,7 +333,7 @@ fun SettingsScreen(
     ActivityResultContracts.RequestPermission()
   ) { granted ->
     cameraGranted = granted
-    toast(if (granted) "دوربین آماده است — بارکدخوان کار می‌کند" else "بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود")
+    toast(if (granted) StrSettings.cameraReady else StrSettings.cameraDenied)
   }
 
   LazyColumn(
@@ -340,7 +343,7 @@ fun SettingsScreen(
   ) {
     item {
       Text(
-        "هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است",
+        StrSettings.settingsIntro,
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -362,17 +365,19 @@ fun SettingsScreen(
      *  تنظیماتِ خودِ برنامه را دارد.
      */
 
+    /* ============================== زبان ============================== */
+    item { ir.vil3ntec.tohid.ui.LanguageSection() }
+
     /* ============================== هشدارها ============================== */
     item {
       SettingsSection(
         icon = Icons.Filled.NotificationsActive,
-        title = "هشدارها",
-        subtitle = "قرض از ${money(debtLimit)} ؋ به بالا",
+        title = Str.alerts,
+        subtitle = StrSettings.debtFrom(money(debtLimit)),
         tint = Shop.colors.warning,
       ) {
         Text(
-          "وقتی کالایی تمام شود، قرضِ کسی از این مبلغ بگذرد، یا اشتراک رو " +
-            "به پایان باشد، برنامه خبر می‌دهد — حتی وقتی بسته است.",
+          StrSettings.alertsNote,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -387,7 +392,7 @@ fun SettingsScreen(
             debtLimit = value
             ir.vil3ntec.tohid.data.Watchman.setDebtLimit(context, value)
           },
-          label = "هشدار قرض از این مبلغ به بالا (افغانی)",
+          label = StrSettings.debtAlertLabel,
           keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Number,
             imeAction = ImeAction.Done,
@@ -395,7 +400,7 @@ fun SettingsScreen(
         )
         Spacer(Modifier.height(8.dp))
         Text(
-          "صفر یعنی هشدارِ قرض خاموش. کالای تمام‌شده و اشتراک سرِ جایشان می‌مانند.",
+          StrSettings.zeroOff,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -406,32 +411,32 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Palette,
-        title = "ظاهر",
+        title = Str.appearance,
         subtitle = when (theme) {
-          ThemeChoice.LIGHT -> "روشن"
-          ThemeChoice.DARK -> "تاریک"
-          ThemeChoice.SYSTEM -> "مثل گوشی"
+          ThemeChoice.LIGHT -> StrSettings.light
+          ThemeChoice.DARK -> StrSettings.dark
+          ThemeChoice.SYSTEM -> StrSettings.likePhone
         },
         tint = Shop.colors.primary,
       ) {
         SegmentedChoice(
           options = listOf(
-            ThemeChoice.LIGHT.name to "روشن",
-            ThemeChoice.DARK.name to "تاریک",
-            ThemeChoice.SYSTEM.name to "مثل گوشی",
+            ThemeChoice.LIGHT.name to StrSettings.light,
+            ThemeChoice.DARK.name to StrSettings.dark,
+            ThemeChoice.SYSTEM.name to StrSettings.likePhone,
           ),
           selected = theme.name,
           onSelect = { onTheme(ThemeChoice.valueOf(it)) },
         )
         Spacer(Modifier.height(14.dp))
         Text(
-          "اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.",
+          StrSettings.reduceMotionNote,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
-          options = listOf("full" to "انیمیشن روشن", "auto" to "مثل تنظیم گوشی"),
+          options = listOf("full" to StrSettings.animationsOn, "auto" to StrSettings.likePhoneSetting),
           selected = Motion.choice,
           onSelect = { Motion.set(context, it) },
         )
@@ -446,18 +451,18 @@ fun SettingsScreen(
       var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
       SettingsSection(
         icon = Icons.Filled.Lock,
-        title = "کالای منقضی",
-        subtitle = if (blockExpired) "فروخته نمی‌شود" else "فقط هشدار",
+        title = Str.expiredGoods,
+        subtitle = if (blockExpired) StrSettings.notSold else StrSettings.warnOnly,
         tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
       ) {
         Text(
-          "هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.",
+          StrSettings.expiryNote,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
-          options = listOf("warn" to "فقط هشدار", "block" to "فروخته نشود"),
+          options = listOf("warn" to StrSettings.warnOnly, "block" to StrSettings.dontSell),
           selected = if (blockExpired) "block" else "warn",
           onSelect = {
             blockExpired = it == "block"
@@ -476,18 +481,18 @@ fun SettingsScreen(
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
       SettingsSection(
         icon = Icons.Filled.PointOfSale,
-        title = "پرداخت و صندوق",
-        subtitle = if (payV2) "ترکیبی و شیفت" else "نقد و نسیه (امروز)",
+        title = StrShell.payAndRegister,
+        subtitle = if (payV2) StrShell.payMixed else StrShell.payLegacy,
         tint = if (payV2) Shop.colors.primary else Shop.colors.muted,
       ) {
         Text(
-          "«ترکیبی» یعنی: نقد و کیف پول/کارت/حواله در یک فاکتور (با شمارهٔ مرجع، به‌صورتِ «ثبتِ دستی، در انتظار»)، پولِ پس فقط از نقد، باقی‌مانده به حسابِ مشتری؛ و صندوقِ شیفت با ورود/خروجِ نقد، کشو بی فروش، گزارش X و بستن با شمارشِ اسکناس. فقط روی همین دستگاه. برنامه‌های قدیمی فاکتورِ تازه را می‌خوانند، ولی پرداختِ کیف‌پولی را در صندوقِ خودشان نقد می‌شمارند.",
+          StrShell.payNote,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
-          options = listOf("legacy" to "نقد و نسیه (امروز)", "v2" to "ترکیبی و شیفت"),
+          options = listOf("legacy" to StrShell.payLegacy, "v2" to StrShell.payMixed),
           selected = if (payV2) "v2" else "legacy",
           onSelect = {
             payV2 = it == "v2"
@@ -504,18 +509,18 @@ fun SettingsScreen(
       var crmReports by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context)) }
       SettingsSection(
         icon = Icons.Filled.TableChart,
-        title = "گزارش‌های مشتری",
-        subtitle = if (crmReports) "در «گزارش‌ها» دیده می‌شوند" else "خاموش",
+        title = StrShell.crmReports,
+        subtitle = if (crmReports) StrShell.crmShownInReports else StrSettings.off,
         tint = if (crmReports) Shop.colors.success else Shop.colors.muted,
       ) {
         Text(
-          "چهار زبانهٔ تازه در «گزارش‌ها»: سنِ بدهی (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز)، تحلیلِ خریدِ مشتریان (RFM)، مشتریانِ تکراری و یادآوریِ امروز. خودِ گزارش‌ها فقط خواندنی‌اند. با روشن بودن، اگر مشتری‌ای ادغام شده باشد، فروش یا قرضی که بعداً روی نامِ کهنه‌اش رسید هم پس از هر همگام‌سازی به همان مشتریِ ماندگار می‌رود. در صفحهٔ فعلیِ گزارش‌ها می‌آیند، نه در «گزارشِ تازه». پس از تغییر، «گزارش‌ها» را دوباره باز کنید.",
+          StrShell.crmNote,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
-          options = listOf("off" to "خاموش", "on" to "روشن"),
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
           selected = if (crmReports) "on" else "off",
           onSelect = {
             crmReports = it == "on"
@@ -529,20 +534,20 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.PhotoCamera,
-        title = "دوربین بارکدخوان",
-        subtitle = if (cameraGranted) "اجازه داده شده" else "هنوز اجازه داده نشده",
+        title = StrSettings.cameraScanner,
+        subtitle = if (cameraGranted) StrSettings.permitted else StrSettings.notPermitted,
         tint = if (cameraGranted) Shop.colors.success else Shop.colors.warning,
       ) {
         Text(
-          "برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.",
+          StrSettings.cameraNeeded,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
         Spacer(Modifier.height(12.dp))
         TohidSecondaryButton(
-          text = if (cameraGranted) "آزمایش دوربین" else "درخواست دسترسی دوربین",
+          text = if (cameraGranted) StrSettings.testCamera else StrSettings.requestCamera,
           onClick = {
-            if (cameraGranted) toast("دوربین آماده است — بارکدخوان کار می‌کند")
+            if (cameraGranted) toast(StrSettings.cameraReady)
             else askCamera.launch(android.Manifest.permission.CAMERA)
           },
           modifier = Modifier.fillMaxWidth(),
@@ -554,12 +559,12 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Lock,
-        title = "قفل برنامه",
-        subtitle = if (lockOn) "روشن — با رمز باز می‌شود" else "خاموش",
+        title = Str.appLock,
+        subtitle = if (lockOn) StrSettings.lockOnPin else StrSettings.off,
         tint = if (lockOn) Shop.colors.success else Shop.colors.muted,
       ) {
         Text(
-          "تا امروز هر کسی گوشی را برمی‌داشت، حساب‌های دکان جلویش باز بود: طلب مشتری‌ها، سود، قیمت خرید. با رمز، تا زده نشود هیچ‌چیز دیده نمی‌شود.",
+          StrSettings.lockNote,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -572,27 +577,27 @@ fun SettingsScreen(
            */
           if (lockStore.isLegacyLength) {
             Text(
-              "رمز شما چهار رقمی است. رمزهای تازه شش رقمی‌اند — اگر خواستید عوضش کنید.",
+              StrSettings.oldPin4,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.warning,
             )
             Spacer(Modifier.height(10.dp))
           }
           TohidButton(
-            text = "عوض کردن رمز",
+            text = StrSettings.changePin,
             onClick = { askPin = true },
             modifier = Modifier.fillMaxWidth(),
           )
           Spacer(Modifier.height(8.dp))
           TohidSecondaryButton(
-            text = "برداشتن رمز",
-            onClick = { lockStore.set(""); lockOn = false; toast("قفل برداشته شد") },
+            text = StrSettings.removePin,
+            onClick = { lockStore.set(""); lockOn = false; toast(StrSettings.lockRemoved) },
             modifier = Modifier.fillMaxWidth(),
           )
           IdleLockChoice(lockStore)   // STF-05
         } else {
           TohidButton(
-            text = "گذاشتن رمز",
+            text = StrSettings.setPin,
             onClick = { askPin = true },
             modifier = Modifier.fillMaxWidth(),
           )
@@ -608,8 +613,8 @@ fun SettingsScreen(
       item {
         SettingsSection(
           icon = Icons.Filled.Password,
-          title = "تغییر رمز حساب",
-          subtitle = "رمزِ ورود به سرور",
+          title = Str.changeAccountPassword,
+          subtitle = StrSettings.serverPassword,
           tint = Shop.colors.primary,
         ) {
           PasswordChange(state = state, snackbarToast = ::toast)
@@ -620,8 +625,8 @@ fun SettingsScreen(
       item {
         SettingsSection(
           icon = Icons.Filled.Devices,
-          title = "دستگاه‌های وارد شده",
-          subtitle = "گوشی گم شد؟ نشستش را ببندید",
+          title = Str.signedInDevices,
+          subtitle = StrSettings.lostPhone,
           tint = Shop.colors.warning,
         ) {
           DeviceList(state = state, snackbarToast = ::toast)
@@ -633,34 +638,31 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Key,
-        title = "کد شاگرد",
-        subtitle = "کدی که کارمندتان با آن روی همین دکان می‌آید",
+        title = Str.staffCode,
+        subtitle = StrSettings.staffCodeSub,
         tint = Shop.colors.accent,
       ) {
         if (staffCode.isNotBlank()) {
-          KeyLine("کد شاگرد", staffCode) {
-            copyToClipboard(context, "کد شاگرد", staffCode)
-            toast("کد شاگرد کپی شد")
+          KeyLine(Str.staffCode, staffCode) {
+            copyToClipboard(context, Str.staffCode, staffCode)
+            toast(StrSettings.staffCodeCopied)
           }
           Text(
-            "این کد را به شاگردتان بدهید تا در صفحهٔ ورود بزند و روی همین دکان بیاید — " +
-              "ایمیل و شماره لازم نیست. با کد، حسابِ خودش ساخته می‌شود و هر کارش در " +
-              "«سابقه عملیات» به نامِ خودش می‌نشیند. تنظیمات و عددهای سود برای او بسته است.",
+            StrSettings.staffCodeNote,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
           Spacer(Modifier.height(12.dp))
           TohidSecondaryButton(
-            text = if (staffCodeBusy) "در حال ساخت…" else "ساخت کد تازه",
+            text = if (staffCodeBusy) StrSettings.creating else StrSettings.newCode,
             onClick = { if (!staffCodeBusy) confirmRotate = true },
           )
         } else {
           Text(
             if (!signedIn)
-              "کد شاگرد روی سرور ساخته می‌شود، پس اول وارد حساب شوید و دکانتان را بسازید."
+              StrSettings.staffCodeNeedsAccount
             else
-              "کد خوانده نشد — برای گرفتنش به اینترنت نیاز است. " +
-                "همین کد در «بیشتر → کارمندان دکان» هم هست.",
+              StrSettings.staffCodeOffline,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
@@ -672,48 +674,48 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Storage,
-        title = "داده‌ها",
+        title = Str.data,
         subtitle = BackupClock.text(context),
         tint = if (BackupClock.isStale(context)) Shop.colors.warning else Shop.colors.success,
       ) {
         Text(
-          "${plain(d.products.size)} کالا — ${plain(d.sales.size)} فاکتور — ${plain(d.debtors.size)} قرض‌دار",
+          StrSettings.dataSummary(plain(d.products.size), plain(d.sales.size), plain(d.debtors.size)),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
         Spacer(Modifier.height(12.dp))
         SettingsRow(
           icon = Icons.Filled.CloudUpload,
-          title = "گرفتن پشتیبان کامل",
-          description = "دفتر و عکس‌های کالاها، در یک فایل",
+          title = StrSettings.fullBackup,
+          description = StrSettings.fullBackupDesc,
           tint = Shop.colors.success,
           onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
         )
         SettingsRow(
           icon = Icons.Filled.Description,
-          title = "پشتیبان فقط دفتر",
-          description = "بدون عکس — همان فایلی که نسخهٔ وب می‌خواند",
+          title = StrSettings.ledgerOnly,
+          description = StrSettings.ledgerOnlyDesc,
           tint = Shop.colors.muted,
           onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
         )
         SettingsRow(
           icon = Icons.Filled.TableChart,
-          title = "خروجی کامل داده — اکسل",
-          description = "همهٔ داده‌ها، هر بخش در یک برگه با سرستونِ فارسی",
+          title = StrSettings.exportExcel,
+          description = StrSettings.exportExcelDesc,
           tint = Shop.colors.success,
           onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
         )
         SettingsRow(
           icon = Icons.Filled.Description,
-          title = "خروجی کامل داده — JSON",
-          description = "همهٔ داده‌ها با سرآیندِ نسخه‌دار، برای بردن به هر جای دیگر",
+          title = StrSettings.exportJson,
+          description = StrSettings.exportJsonDesc,
           tint = Shop.colors.muted,
           onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
         )
         SettingsRow(
           icon = Icons.Filled.CloudDownload,
-          title = "بازیابی از فایل",
-          description = "جایگزینی اطلاعات فعلی با یک پشتیبان",
+          title = StrSettings.restoreFromFile,
+          description = StrSettings.restoreDesc,
           tint = Shop.colors.primary,
           onClick = { pickFile.launch("*/*") },
         )
@@ -729,7 +731,7 @@ fun SettingsScreen(
         if (autoBackups.isNotEmpty()) {
           Spacer(Modifier.height(12.dp))
           Text(
-            "نسخه‌های خودکار — هر نیم ساعت اگر دفتر عوض شده؛ ۷ روز و ۴ هفتهٔ اخیر",
+            StrSettings.autoSnapshots,
             style = MaterialTheme.typography.labelMedium,
             color = Shop.colors.muted,
           )
@@ -737,7 +739,7 @@ fun SettingsScreen(
             SettingsRow(
               icon = Icons.Filled.History,
               title = ir.vil3ntec.tohid.formatMillis(snap.at),
-              description = "${plain((snap.bytes / 1024).toInt())} کیلوبایت — برای بازگرداندن بزنید",
+              description = StrSettings.snapshotDesc(plain((snap.bytes / 1024).toInt())),
               tint = Shop.colors.muted,
               onClick = {
                 scope.launch {
@@ -747,7 +749,7 @@ fun SettingsScreen(
                   }
                   opened
                     .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
-                    .onFailure { restoreError = "این نسخه خوانده نشد" }
+                    .onFailure { restoreError = StrSettings.snapshotUnreadable }
                 }
               },
             )
@@ -766,26 +768,28 @@ fun SettingsScreen(
          */
         Spacer(Modifier.height(12.dp))
         Text(
-          "پشتیبان روی سرور",
+          StrSettings.cloudBackup,
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
         val cloud = cloudBackups
         SettingsRow(
           icon = Icons.Filled.CloudUpload,
-          title = if (cloudBusy) "در حال فرستادن…" else "همین حالا روی سرور بگذار",
+          title = if (cloudBusy) Str.sending else StrSettings.sendToServerNow,
           description = when {
-            !signedIn -> "برای این کار باید وارد حساب شده باشید"
-            cloud == null -> "هنوز چیزی نرفته — یا نت نیست"
-            cloud.stats.count == 0 -> "هنوز چیزی نرفته"
-            else -> "${plain(cloud.stats.count)} نسخه روی سرور · " +
-              "${plain((cloud.stats.usedBytes / 1024 / 1024).toInt())} از " +
-              "${plain((cloud.stats.quotaBytes / 1024 / 1024).toInt())} مگابایت"
+            !signedIn -> StrSettings.needSignIn
+            cloud == null -> StrSettings.nothingSentOrOffline
+            cloud.stats.count == 0 -> StrSettings.nothingSent
+            else -> StrSettings.cloudStats(
+              plain(cloud.stats.count),
+              plain((cloud.stats.usedBytes / 1024 / 1024).toInt()),
+              plain((cloud.stats.quotaBytes / 1024 / 1024).toInt()),
+            )
           },
           tint = Shop.colors.primary,
           onClick = {
             if (cloudBusy) return@SettingsRow
-            if (!signedIn) { toast("اول وارد حساب شوید"); return@SettingsRow }
+            if (!signedIn) { toast(StrSettings.signInFirst); return@SettingsRow }
             scope.launch {
               cloudBusy = true
               cloudNote = null
@@ -793,8 +797,8 @@ fun SettingsScreen(
               cloudBusy = false
               cloudReload += 1
               toast(
-                if (sent) "پشتیبان روی سرور نشست"
-                else "نرفت — نت یا حساب را ببینید. نسخهٔ روی گوشی سرِ جایش است."
+                if (sent) StrSettings.cloudSent
+                else StrSettings.cloudNotSent
               )
             }
           },
@@ -806,14 +810,14 @@ fun SettingsScreen(
           SettingsRow(
             icon = Icons.Filled.CloudDone,
             title = ir.vil3ntec.tohid.formatMillis(b.createdAt),
-            description = "${plain((b.bytes / 1024).toInt())} کیلوبایت · " +
-              (if (b.kind == "manual") "دستی" else "خودکار"),
+            description = StrSettings.kb(plain((b.bytes / 1024).toInt())) + " · " +
+              (if (b.kind == "manual") StrSettings.manual else StrSettings.auto),
             tint = Shop.colors.muted,
             onClick = {
               //  ⚠️ برگرداندن از ابر عمداً این‌جا نیست: بازیابی کاری
               //  است که برنمی‌گردد و باید از همان درِ «بازیابی از فایل»
               //  برود تا کاربر اول ببیند داخلش چیست.
-              toast("برای برگرداندن، فایل را از پنل بگیرید و «بازیابی از فایل» را بزنید")
+              toast(StrSettings.restoreFromPanel)
             },
           )
         }
@@ -824,7 +828,7 @@ fun SettingsScreen(
          *  با هر پشتیبانِ ۱۲ ساعته، و این‌جا «همین حالا» (پوشه + سرور با هم).
          */
         Spacer(Modifier.height(10.dp))
-        Text("پشتیبانِ کامل در پوشه", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrSettings.folderBackup, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         var mirrorTick by remember { mutableStateOf(0) }
         val mirrorDir = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.folder(context)?.path ?: "—" }
         val mirrorList = remember(mirrorTick) { ir.vil3ntec.tohid.data.BackupMirror.list(context) }
@@ -832,9 +836,9 @@ fun SettingsScreen(
         var mirrorBusy by remember { mutableStateOf(false) }
         SettingsRow(
           icon = Icons.Filled.CloudUpload,
-          title = if (mirrorBusy) "در حالِ ساختن…" else "پشتیبانِ کامل همین حالا (پوشه + سرور)",
-          description = "دفتر و همهٔ عکس‌ها · ${mirrorList.size} نسخه در پوشه" +
-            (mirrorList.firstOrNull()?.let { " · آخرین: " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
+          title = if (mirrorBusy) StrSettings.buildingDots else StrSettings.mirrorNow,
+          description = StrSettings.mirrorDesc(mirrorList.size) +
+            (mirrorList.firstOrNull()?.let { " · " + StrSettings.lastLabel + " " + ir.vil3ntec.tohid.formatMillis(it.lastModified()) } ?: ""),
           tint = Shop.colors.success,
           onClick = {
             if (mirrorBusy) return@SettingsRow
@@ -845,22 +849,22 @@ fun SettingsScreen(
               mirrorBusy = false
               mirrorTick++; cloudReload += 1
               toast(
-                local.fold({ "در پوشه نشست" }, { "پوشه: ${it.message}" }) +
-                  if (signedIn) (if (cloud) " · روی سرور هم رفت" else " · سرور: نرفت (نت؟)") else ""
+                local.fold({ StrSettings.savedToFolder }, { StrSettings.folder(it.message ?: "") }) +
+                  if (signedIn) " · " + (if (cloud) StrSettings.alsoOnServer else StrSettings.serverNotSent) else ""
               )
             }
           },
         )
-        Text("پوشه: $mirrorDir", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Text(StrSettings.folder(mirrorDir), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         Row(verticalAlignment = Alignment.CenterVertically) {
           if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
             TextButton(onClick = {
               ir.vil3ntec.tohid.ui.Platform.pickFolder(mirrorDir)?.let { ir.vil3ntec.tohid.data.BackupMirror.setFolder(context, it); mirrorTick++ }
-            }) { Text("انتخابِ پوشه…") }
-            TextButton(onClick = { if (!ir.vil3ntec.tohid.ui.Platform.openFolder(mirrorDir)) toast("پوشه باز نشد") }) { Text("باز کردنِ پوشه") }
+            }) { Text(StrSettings.chooseFolder) }
+            TextButton(onClick = { if (!ir.vil3ntec.tohid.ui.Platform.openFolder(mirrorDir)) toast(StrSettings.folderNotOpened) }) { Text(StrSettings.openFolder) }
           }
           Spacer(Modifier.weight(1f))
-          Text("خودکار هر ۱۲ ساعت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(StrSettings.every12h, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           Switch(checked = mirrorOn, onCheckedChange = { mirrorOn = it; ir.vil3ntec.tohid.data.BackupMirror.setEnabled(context, it) })
         }
 
@@ -873,8 +877,8 @@ fun SettingsScreen(
         if (archivePlan.total > 0) {
           SettingsRow(
             icon = Icons.Filled.Compress,
-            title = "فشرده کردن دفتر",
-            description = "${plain(archivePlan.total)} ردیف سابقهٔ کهنه به بایگانی می‌رود — دفتر سبک‌تر و ثبت فروش تندتر می‌شود",
+            title = StrSettings.compactLedger,
+            description = StrSettings.compactDesc(plain(archivePlan.total)),
             tint = Shop.colors.warning,
             onClick = { confirmCompact = true },
           )
@@ -882,14 +886,14 @@ fun SettingsScreen(
         if (canUndo) {
           SettingsRow(
             icon = Icons.Filled.Undo,
-            title = "برگرداندن به پیش از بازیابی",
-            description = "اگر فایل اشتباهی بازیابی شد",
+            title = StrSettings.undoRestore,
+            description = StrSettings.undoRestoreDesc,
             tint = Shop.colors.warning,
             onClick = {
               scope.launch {
                 store.undoRestore()
-                  .onSuccess { canUndo = false; toast("به وضعیت پیش از بازیابی برگشت") }
-                  .onFailure { toast("برگرداندن ممکن نشد") }
+                  .onSuccess { canUndo = false; toast(StrSettings.undone) }
+                  .onFailure { toast(StrSettings.undoFailed) }
               }
             },
           )
@@ -900,7 +904,7 @@ fun SettingsScreen(
         }
         Spacer(Modifier.height(12.dp))
         TohidDangerButton(
-          text = "پاک‌سازی کامل اطلاعات",
+          text = StrSettings.wipeAll,
           onClick = { confirmClear = true },
           modifier = Modifier.fillMaxWidth(),
         )
@@ -911,20 +915,20 @@ fun SettingsScreen(
     item {
       SettingsSection(
         icon = Icons.Filled.Info,
-        title = "درباره برنامه",
-        subtitle = "نسخهٔ ${BuildConfig.VERSION_NAME}",
+        title = Str.aboutApp,
+        subtitle = Str.version(BuildConfig.VERSION_NAME),
         tint = Shop.colors.muted,
       ) {
         Text(
-          "فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.",
+          StrSettings.aboutText,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
         Spacer(Modifier.height(12.dp))
         SettingsRow(
           icon = Icons.Filled.SystemUpdate,
-          title = "دریافت آخرین نسخه",
-          description = "نسخهٔ نصب‌شده: ${BuildConfig.VERSION_NAME}",
+          title = StrSettings.getLatest,
+          description = StrSettings.installedVersion(BuildConfig.VERSION_NAME),
           tint = Shop.colors.primary,
           onClick = onUpdates,
         )
@@ -939,24 +943,24 @@ fun SettingsScreen(
     AlertDialog(
       onDismissRequest = { BackupBundle.dropStaging(context); pendingRestore = null; restorePhotos = 0 },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("بازیابی اطلاعات؟", color = Shop.colors.text) },
+      title = { Text(StrSettings.restoreQ, color = Shop.colors.text) },
       text = {
         Column {
           Text(
-            "با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.",
+            StrSettings.restoreWarn,
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
           Spacer(Modifier.height(12.dp))
-          RestoreLine("محصولات", d.products.size, incoming.products.size)
-          RestoreLine("فاکتورها", d.sales.size, incoming.sales.size)
-          RestoreLine("قرض‌داران", d.debtors.size, incoming.debtors.size)
-          RestoreLine("مصارف", d.expenses.size, incoming.expenses.size)
-          RestoreLine("ورودهای انبار", d.warehouseEntries.size, incoming.warehouseEntries.size)
+          RestoreLine(Str.products, d.products.size, incoming.products.size)
+          RestoreLine(Str.invoices, d.sales.size, incoming.sales.size)
+          RestoreLine(Str.debtors, d.debtors.size, incoming.debtors.size)
+          RestoreLine(Str.expenses, d.expenses.size, incoming.expenses.size)
+          RestoreLine(StrSettings.warehouseEntries, d.warehouseEntries.size, incoming.warehouseEntries.size)
           Spacer(Modifier.height(8.dp))
           Text(
-            if (restorePhotos > 0) "${plain(restorePhotos)} عکس هم در این فایل هست"
-            else "این فایل عکسی ندارد — عکس‌های فعلی دست‌نخورده می‌مانند",
+            if (restorePhotos > 0) StrSettings.restorePhotos(plain(restorePhotos))
+            else StrSettings.restoreNoPhotos,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
@@ -977,24 +981,24 @@ fun SettingsScreen(
             //  پایانِ اشتراک نباید گروگانش بگیرد.
             if (!store.applyRestore(fixed)) {
               //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
-              toast("بازیابی روی حافظهٔ دستگاه نوشته نشد — اطلاعاتِ قبلی سرِ جایش است")
+              toast(StrSettings.restoreDiskFail)
               return@launch
             }
             canUndo = true
             restorePhotos = 0
             toast(
-              if (moved > 0) "اطلاعات بازیابی شد — با ${plain(moved)} عکس"
-              else "اطلاعات با موفقیت بازیابی شد"
+              if (moved > 0) StrSettings.restoredWithPhotos(plain(moved))
+              else StrSettings.restored
             )
           }
-        }) { Text("بازیابی", color = Shop.colors.danger) }
+        }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },
       dismissButton = {
         TextButton(onClick = {
           BackupBundle.dropStaging(context)
           pendingRestore = null
           restorePhotos = 0
-        }) { Text("انصراف") }
+        }) { Text(Str.cancel) }
       },
     )
   }
@@ -1003,13 +1007,10 @@ fun SettingsScreen(
     AlertDialog(
       onDismissRequest = { confirmCompact = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("دفتر فشرده شود؟", color = Shop.colors.text) },
+      title = { Text(StrSettings.compactQ, color = Shop.colors.text) },
       text = {
         Text(
-          "${plain(archivePlan.total)} ردیف از حرکات انبار، سابقهٔ عملیات و تغییرات قیمت که بیش از یک سال " +
-            "از آن‌ها گذشته، به یک فایل بایگانی کنار دفتر منتقل می‌شوند. پاک نمی‌شوند و با پشتیبان کامل " +
-            "هم بیرون می‌روند — فقط از دفتری که هر فروش آن را بازنویسی می‌کند بیرون می‌آیند. " +
-            "فاکتورها، کالاها، قرض‌داران و موجودی دست‌نخورده می‌مانند.",
+          StrSettings.compactWarn(plain(archivePlan.total)),
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -1022,13 +1023,13 @@ fun SettingsScreen(
             done
               .onSuccess {
                 store.save(it.data)
-                toast("${plain(it.moved.total)} ردیف بایگانی شد")
+                toast(StrSettings.archived(plain(it.moved.total)))
               }
-              .onFailure { toast("فشرده کردن انجام نشد: ${it.message ?: "دلیل نامعلوم"}") }
+              .onFailure { toast(StrSettings.compactFailed(it.message ?: Str.unknownReason)) }
           }
-        }) { Text("فشرده کن") }
+        }) { Text(StrSettings.compactDo) }
       },
-      dismissButton = { TextButton(onClick = { confirmCompact = false }) { Text("بازگشت") } },
+      dismissButton = { TextButton(onClick = { confirmCompact = false }) { Text(Str.goBack) } },
     )
   }
 
@@ -1036,10 +1037,10 @@ fun SettingsScreen(
     AlertDialog(
       onDismissRequest = { confirmRotate = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("کد شاگرد تازه ساخته شود؟", color = Shop.colors.text) },
+      title = { Text(StrSettings.rotateQ, color = Shop.colors.text) },
       text = {
         Text(
-          "کد فعلی از کار می‌افتد و هر شاگردی که با آن وارد شده، دفعهٔ بعد باید کد تازه را بزند.",
+          StrSettings.rotateWarn,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -1054,14 +1055,14 @@ fun SettingsScreen(
             shops.rotateStandingCode()
               .onSuccess {
                 staffCode = it.code.ifBlank { shops.standingCode() }
-                toast("کد شاگرد تازه ساخته شد")
+                toast(StrSettings.newCodeMade)
               }
               .onFailure { toast(it.userMessage) }
             staffCodeBusy = false
           }
-        }) { Text("بساز") }
+        }) { Text(StrSettings.make) }
       },
-      dismissButton = { TextButton(onClick = { confirmRotate = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { confirmRotate = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -1069,10 +1070,10 @@ fun SettingsScreen(
     AlertDialog(
       onDismissRequest = { confirmClear = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("پاک‌سازی کامل اطلاعات؟", color = Shop.colors.text) },
+      title = { Text(StrSettings.wipeQ, color = Shop.colors.text) },
       text = {
         Text(
-          "همه چیز روی این دستگاه پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.",
+          StrSettings.wipeWarn,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -1082,11 +1083,11 @@ fun SettingsScreen(
           confirmClear = false
           scope.launch {
             store.save(ShopData())
-            toast("تمام اطلاعات پاک شد")
+            toast(StrSettings.wiped)
           }
-        }) { Text("پاک کن", color = Shop.colors.danger) }
+        }) { Text(StrSettings.wipe, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -1098,7 +1099,7 @@ fun SettingsScreen(
         lockStore.set(pin)
         lockOn = true
         askPin = false
-        toast(if (had) "رمز عوض شد" else "قفل برنامه روشن شد")
+        toast(if (had) StrSettings.passwordChanged else StrSettings.lockTurnedOn)
       },
     )
   }
@@ -1132,7 +1133,7 @@ private fun KeyLine(label: String, value: String, onCopy: () -> Unit) {
         modifier = Modifier.weight(1f),
       )
     }
-    TextButton(onClick = onCopy) { Text("کپی") }
+    TextButton(onClick = onCopy) { Text(Str.copy) }
   }
   Spacer(Modifier.height(6.dp))
 }
@@ -1165,12 +1166,12 @@ private fun RestoreLine(label: String, now: Int, next: Int) {
 }
 
 private fun licenseText(status: License.Status): String = when (status.state) {
-  License.State.ACTIVE -> status.payload?.planTitle ?: "فعال"
-  License.State.GRACE -> "تمام شده — در مهلت"
-  License.State.EXPIRED -> "تمام شده"
-  License.State.PENDING -> "هنوز شروع نشده"
-  License.State.INVALID -> "مجوز معتبر نیست"
-  License.State.NONE -> "بدون اشتراک"
+  License.State.ACTIVE -> status.payload?.planTitle ?: StrSettings.active
+  License.State.GRACE -> StrSettings.graceEnded
+  License.State.EXPIRED -> StrSettings.ended
+  License.State.PENDING -> StrSettings.notStarted
+  License.State.INVALID -> StrSettings.licenseInvalid
+  License.State.NONE -> StrSettings.noSubscription
 }
 
 private fun isoOf(millis: Long): String {
@@ -1199,30 +1200,30 @@ private fun PinDialog(onDismiss: () -> Unit, onSet: (String) -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
-    title = { Text("رمز برنامه", color = colors.text) },
+    title = { Text(StrSettings.appPin, color = colors.text) },
     text = {
       Column {
         Text(
-          "یک رمزِ شش رقمی. هر بار که برنامه باز شود همین پرسیده می‌شود.",
+          StrSettings.pinNote,
           style = MaterialTheme.typography.bodySmall,
           color = colors.muted,
         )
         Spacer(Modifier.height(14.dp))
-        NumberField(first, { if (it.length <= MAX_PIN) first = it }, "رمز")
+        NumberField(first, { if (it.length <= MAX_PIN) first = it }, StrSettings.pin)
         Spacer(Modifier.height(10.dp))
-        NumberField(again, { if (it.length <= MAX_PIN) again = it }, "دوباره")
+        NumberField(again, { if (it.length <= MAX_PIN) again = it }, StrSettings.pinAgain)
         if (again.isNotBlank() && first != again) {
           Spacer(Modifier.height(6.dp))
-          Text("دو رمز یکی نیستند", style = MaterialTheme.typography.labelSmall, color = colors.danger)
+          Text(Str.passwordsDiffer, style = MaterialTheme.typography.labelSmall, color = colors.danger)
         }
       }
     },
     confirmButton = {
       TextButton(enabled = ready, onClick = { onSet(first) }) {
-        Text("بگذار", color = if (ready) colors.primary else colors.muted2)
+        Text(StrSettings.put, color = if (ready) colors.primary else colors.muted2)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف", color = colors.muted) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }
 
@@ -1238,7 +1239,7 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
 
   Column {
     Text(
-      "رمزِ تازه دستِ‌کم هشت نویسه باشد.",
+      StrSettings.pwdMin8,
       style = MaterialTheme.typography.bodySmall,
       color = Shop.colors.muted,
     )
@@ -1246,7 +1247,7 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
     OutlinedTextField(
       value = current,
       onValueChange = { current = it },
-      label = { Text("رمز فعلی") },
+      label = { Text(StrSettings.currentPassword) },
       singleLine = true,
       visualTransformation = PasswordVisualTransformation(),
       modifier = Modifier.fillMaxWidth(),
@@ -1255,21 +1256,21 @@ private fun PasswordChange(state: SyncStore, snackbarToast: (String) -> Unit) {
     OutlinedTextField(
       value = fresh,
       onValueChange = { fresh = it },
-      label = { Text("رمز تازه") },
+      label = { Text(Str.newPassword) },
       singleLine = true,
       visualTransformation = PasswordVisualTransformation(),
       modifier = Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(12.dp))
     TohidButton(
-      text = "تغییر رمز",
+      text = StrSettings.changePassword,
       busy = busy,
       enabled = fresh.length >= 8,
       onClick = {
         busy = true
         scope.launch {
           auth.changePassword(current, fresh)
-            .onSuccess { current = ""; fresh = ""; snackbarToast("رمز عوض شد") }
+            .onSuccess { current = ""; fresh = ""; snackbarToast(StrSettings.passwordChanged) }
             .onFailure { snackbarToast(it.userMessage) }
           busy = false
         }
@@ -1302,10 +1303,10 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
 
   Column {
     if (!loaded) {
-      Text("در حال خواندن…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      Text(StrSettings.reading, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     } else if (devices.isEmpty()) {
       Text(
-        "دستگاهی ثبت نشده است.",
+        StrSettings.noDevices,
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -1321,7 +1322,7 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
             Text(device.label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
             if (isThis) {
               Text(
-                "همین گوشی",
+                StrSettings.thisDevice,
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.success,
               )
@@ -1330,7 +1331,7 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
           // نشستِ همین گوشی را نمی‌بندیم؛ کاربر خودش را بیرون می‌کرد
           if (!isThis) {
             Text(
-              "ببند",
+              StrSettings.closeSession,
               style = MaterialTheme.typography.labelMedium,
               color = Shop.colors.danger,
               modifier = Modifier
@@ -1338,7 +1339,7 @@ private fun DeviceList(state: SyncStore, snackbarToast: (String) -> Unit) {
                 .clickable {
                   scope.launch {
                     account.revokeDevice(device.id)
-                      .onSuccess { snackbarToast("نشست بسته شد"); load() }
+                      .onSuccess { snackbarToast(StrSettings.sessionClosed); load() }
                       .onFailure { snackbarToast(it.userMessage) }
                   }
                 }
