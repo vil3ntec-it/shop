@@ -128,12 +128,24 @@ object ReturnFlow {
     return CODE_LABEL_PREFIX + (sale.invoiceLabel() ?: sale.id.takeLast(20))
   }
 
+  /** نشانیِ QRِ فاکتورِ نسخهٔ ۲ که نشانِ دکانِ دیگری دارد ⇒ «رسیدِ دکانِ دیگر» */
+  fun isForeignReceipt(query: String, shopTag: String): Boolean =
+    ir.vil3ntec.tohid.core.receipt.ReceiptToken.parse(query)?.let { it.first != shopTag } ?: false
+
+  const val FOREIGN_RECEIPT = "این رسیدِ دکانِ دیگری است"
+
   /**
    *  RET-01 — اسکنِ QRِ رسید، شمارهٔ فاکتور (`B1-154`، `154`، `#154`، با رقمِ
    *  فارسی هم) یا نام/تلفنِ مشتری. تازه‌ترین اول. فاکتورِ لغوشده هم پیدا
    *  می‌شود (تا بگوییم چرا برنمی‌گردد)، ولی برگشت نمی‌پذیرد.
    */
-  fun find(d: ShopData, query: String, limit: Int = 20): List<Sale> {
+  fun find(d: ShopData, query: String, limit: Int = 20, shopTag: String? = null): List<Sale> {
+    //  فاکتورِ نسخهٔ ۲: QRِ رسید نشانیِ عمومیِ همان فروش است (`<سرور>/r/<نشان>/<توکن>`)؛
+    //  رسیدِ دکانِ دیگر (نشانِ دیگر) هیچ فروشی از این دفتر را باز نمی‌کند
+    ir.vil3ntec.tohid.core.receipt.ReceiptToken.parse(query)?.let { (tag, token) ->
+      if (shopTag != null && tag != shopTag) return emptyList()
+      return d.sales.filter { it.receiptToken == token }
+    }
     val raw = LocaleFormat.asciiDigits(query).trim()
     if (raw.isEmpty()) return emptyList()
     if (raw.startsWith(CODE_PREFIX)) {

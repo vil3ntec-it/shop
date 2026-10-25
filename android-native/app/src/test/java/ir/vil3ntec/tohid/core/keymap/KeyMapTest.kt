@@ -148,8 +148,8 @@ class KeyMapTest {
   @Test
   fun `میان‌برِ صفحه‌ها همان ترتیبِ AppNav است`() {
     //  از متنِ AppNav.kt، نه خودِ شیء: AppNav وضعیتِ Compose دارد و در آزمونِ واحدِ اندروید بالا نمی‌آید
-    val nav = File(screens!!.parentFile, "AppNav.kt").readText().substringAfter("val SHORTCUTS = listOf(").substringBefore(")\n")
-    val order = Regex(""""([a-z]+)" to """").findAll(nav).map { it.groupValues[1] }.toList()
+    val nav = File(screens!!.parentFile, "AppNav.kt").readText().substringAfter("val SHORTCUTS").substringAfter("listOf(").substringBefore(")\n")
+    val order = Regex(""""([a-z]+)" to """).findAll(nav).map { it.groupValues[1] }.toList()
     val pages = KeyMap.ALL.filter { it.page != null }
     assertEquals(9, order.size)
     assertEquals(order, pages.map { it.page })

@@ -76,6 +76,10 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrShell
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrNav
 
 /**
  *  برگه‌های فاکتورهای باز — POS-12 (چند فاکتورِ هم‌زمان، نگه‌داشتن با نام یا شماره).
@@ -107,7 +111,7 @@ object HeldInvoicePrefs {
     context.getSharedPreferences("tohid-ui", 0).edit().putBoolean(KEY, value).apply()
   }
 
-  const val SECTION = "چند فاکتورِ هم‌زمان"
+  val SECTION: String get() = StrPos.heldSection
 }
 
 internal sealed interface HeldDialog {
@@ -211,8 +215,8 @@ class HeldInvoicesUi internal constructor(
   }
 
   internal companion object {
-    const val SWITCHING = "فاکتور در حالِ جابه‌جایی است — لحظه‌ای بعد دوباره بزنید"
-    const val NOT_LOADED = "دادهٔ دکان هنوز بار نشده — لحظه‌ای بعد"
+    val SWITCHING: String get() = StrPos.heldSwitching
+    val NOT_LOADED: String get() = StrPos.heldNotLoaded
   }
 }
 
@@ -278,8 +282,8 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
     //  جاری — همیشه اول و برجسته
     HeldChip(
       number = activeNo,
-      title = tag?.label?.ifBlank { null } ?: customerName(d, debtorId) ?: if (lines.isEmpty()) "فاکتورِ تازه" else "فاکتورِ جاری",
-      detail = if (lines.isEmpty()) "خالی" else summary(d, active),
+      title = tag?.label?.ifBlank { null } ?: customerName(d, debtorId) ?: if (lines.isEmpty()) StrPos.newInvoice else StrPos.currentInvoice,
+      detail = if (lines.isEmpty()) StrPos.empty else summary(d, active),
       selected = true,
       warn = false,
       target = target,
@@ -288,8 +292,8 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
     book.items.forEach { h ->
       HeldChip(
         number = h.number,
-        title = h.label.ifBlank { null } ?: customerName(d, h.debtorId) ?: "فاکتور",
-        detail = summary(d, h.draft()) + if (h.id in stale) " · کهنه" else "",
+        title = h.label.ifBlank { null } ?: customerName(d, h.debtorId) ?: StrPos.invoice,
+        detail = summary(d, h.draft()) + if (h.id in stale) " · " + StrPos.stale else "",
         selected = false,
         warn = h.id in stale,
         target = target,
@@ -299,13 +303,13 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
     TextButton(onClick = { ui.newInvoice() }, enabled = lines.isNotEmpty(), modifier = Modifier.heightIn(min = target)) {
       Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(4.dp))
-      Text("فاکتورِ تازه" + keyHint(KeyMap.SALE_HOLD), maxLines = 1)
+      Text(StrPos.newInvoice + keyHint(KeyMap.SALE_HOLD), maxLines = 1)
     }
     if (book.items.isNotEmpty()) {
       TextButton(onClick = { ui.dialog = HeldDialog.List }, modifier = Modifier.heightIn(min = target)) {
         Icon(Icons.Filled.Layers, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(4.dp))
-        Text("همه" + keyHint(KeyMap.SALE_HELD_LIST), maxLines = 1)
+        Text(Str.all + keyHint(KeyMap.SALE_HELD_LIST), maxLines = 1)
       }
     }
   }
@@ -314,7 +318,7 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
 @Composable
 private fun HeldChip(number: Int?, title: String, detail: String, selected: Boolean, warn: Boolean, target: androidx.compose.ui.unit.Dp, onClick: () -> Unit) {
   val colors = Shop.colors
-  val spoken = listOfNotNull(number?.let { "فاکتورِ ${plain(it)}" }, title, detail, if (selected) "در صندوق" else "نگه‌داشته").joinToString("، ")
+  val spoken = listOfNotNull(number?.let { StrPos.invoiceN(plain(it)) }, title, detail, if (selected) StrPos.atRegister else StrPos.held).joinToString(Str.listSep + " ")
   Surface(
     onClick = onClick,
     enabled = !selected,
@@ -347,16 +351,16 @@ private fun customerName(d: ShopData, debtorId: String?): String? = debtorId?.le
 private fun summary(d: ShopData, draft: SaleDraft): String {
   val cart = draft.cart()
   val total = cart.sumOf { SalesEngine.lineTotal(SalesEngine.linePrice(d, it), it.quantity) }
-  return "${plain(cart.size)} قلم · ${money(total)} ؋"
+  return StrPos.linesAndTotal(plain(cart.size), money(total))
 }
 
 private fun ago(now: Long, at: Long): String {
   val min = ((now - at).coerceAtLeast(0) / 60_000L).toInt()
   return when {
-    min < 1 -> "همین حالا"
-    min < 60 -> "${plain(min)} دقیقه پیش"
-    min < 48 * 60 -> "${plain(min / 60)} ساعت پیش"
-    else -> "${plain(min / (24 * 60))} روز پیش"
+    min < 1 -> StrNav.justNow
+    min < 60 -> StrNav.minutesAgo(plain(min))
+    min < 48 * 60 -> StrNav.hoursAgo(plain(min / 60))
+    else -> StrNav.daysAgo(plain(min / (24 * 60)))
   }
 }
 
@@ -373,16 +377,16 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       AlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
-        title = { Text("نگه‌داشتنِ فاکتور") },
+        title = { Text(StrPos.holdInvoice) },
         text = {
           Column {
-            Text("مشتری منتظر است؟ نام یا شماره‌ای بدهید تا بعد پیدایش کنید. صندوق برای نفرِ بعد خالی می‌شود.", style = MaterialTheme.typography.bodySmall, color = colors.muted)
+            Text(StrPos.holdNote, style = MaterialTheme.typography.bodySmall, color = colors.muted)
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(
               value = label,
               onValueChange = { label = it.take(HeldRules.LABEL_MAX) },
               singleLine = true,
-              label = { Text("نام یا شماره (اختیاری)") },
+              label = { Text(StrPos.nameOrNumberOptional) },
               keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
               keyboardActions = KeyboardActions(onDone = { ui.hold(label, note) }),
               modifier = Modifier.fillMaxWidth().focusRequester(focus).onPreviewKeyEvent { e ->
@@ -393,13 +397,13 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
             OutlinedTextField(
               value = note,
               onValueChange = { note = it.take(HeldRules.NOTE_MAX) },
-              label = { Text("یادداشت (اختیاری)") },
+              label = { Text(StrPos.noteOptional) },
               modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             )
           }
         },
-        confirmButton = { Button(onClick = { ui.hold(label, note) }) { Text("نگه دار") } },
-        dismissButton = { TextButton(onClick = { ui.close() }) { Text("بی‌خیال") } },
+        confirmButton = { Button(onClick = { ui.hold(label, note) }) { Text(StrPos.holdIt) } },
+        dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.nevermind) } },
       )
     }
     HeldDialog.List -> {
@@ -411,9 +415,9 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
       AlertDialog(
         onDismissRequest = { ui.close() },
         shape = Shape.dialog,
-        title = { Text("فاکتورهای نگه‌داشته") },
+        title = { Text(StrPos.heldInvoices) },
         text = {
-          if (items.isEmpty()) Text("فاکتورِ نگه‌داشته‌ای نیست.", color = colors.muted)
+          if (items.isEmpty()) Text(StrPos.noHeldInvoices, color = colors.muted)
           //  حداکثر ۸ ردیف (`MAX_OPEN` − ۱) — ستونِ ساده با پیمایش، بی `LazyColumn` در پنجره
           else Column(
             Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()).onPreviewKeyEvent { e ->
@@ -427,45 +431,45 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
             items.forEachIndexed { i, h ->
               Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                  Text("#${plain(h.number)} · ${h.label.ifBlank { null } ?: customerName(ui.data, h.debtorId) ?: "فاکتور"}", style = MaterialTheme.typography.titleSmall, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                  Text("#${plain(h.number)} · ${h.label.ifBlank { null } ?: customerName(ui.data, h.debtorId) ?: StrPos.invoice}", style = MaterialTheme.typography.titleSmall, color = colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                   Text(
-                    summary(ui.data, h.draft()) + " · " + ago(now, h.heldAt) + if (h in stale) " · کهنه" else "",
+                    summary(ui.data, h.draft()) + " · " + ago(now, h.heldAt) + if (h in stale) " · " + StrPos.stale else "",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (h in stale) colors.warning else colors.muted,
                   )
                   if (h.note.isNotBlank()) Text(h.note, style = MaterialTheme.typography.labelSmall, color = colors.muted2, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
-                TextButton(onClick = { ui.dialog = HeldDialog.Discard(h) }) { Text("دور بینداز", color = colors.danger) }
-                Button(onClick = { ui.resume(h.id) }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) { Text("باز کن") }
+                TextButton(onClick = { ui.dialog = HeldDialog.Discard(h) }) { Text(StrPos.discardIt, color = colors.danger) }
+                Button(onClick = { ui.resume(h.id) }, modifier = if (i == 0) Modifier.focusRequester(first) else Modifier) { Text(StrPos.openIt) }
               }
             }
           }
         },
-        confirmButton = { TextButton(onClick = { ui.close() }) { Text("بستن") } },
+        confirmButton = { TextButton(onClick = { ui.close() }) { Text(Str.close) } },
         dismissButton = if (ui.canDropStale && stale.isNotEmpty()) {
-          { TextButton(onClick = { ui.dialog = HeldDialog.DropStale }) { Text("پاک کردنِ ${plain(stale.size)} کهنه", color = colors.danger) } }
+          { TextButton(onClick = { ui.dialog = HeldDialog.DropStale }) { Text(StrPos.clearStale(plain(stale.size)), color = colors.danger) } }
         } else null,
       )
     }
     is HeldDialog.Discard -> AlertDialog(
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
-      title = { Text("دور انداختنِ فاکتورِ #${plain(dlg.invoice.number)}؟") },
-      text = { Text("«${dlg.invoice.label.ifBlank { "بی‌نام" }}» با ${summary(ui.data, dlg.invoice.draft())} دور انداخته می‌شود. این کار برنمی‌گردد؛ موجودی و دفتر دست نمی‌خورند.") },
+      title = { Text(StrPos.discardQ(plain(dlg.invoice.number))) },
+      text = { Text(StrPos.discardWarn(dlg.invoice.label.ifBlank { StrPos.unnamed }, summary(ui.data, dlg.invoice.draft()))) },
       confirmButton = {
-        Button(onClick = { ui.discard(dlg.invoice) }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text("دور بینداز") }
+        Button(onClick = { ui.discard(dlg.invoice) }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.discardIt) }
       },
-      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text("نه") } },
+      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
     HeldDialog.DropStale -> AlertDialog(
       onDismissRequest = { ui.dialog = HeldDialog.List },
       shape = Shape.dialog,
-      title = { Text("پاک کردنِ فاکتورهای کهنه؟") },
-      text = { Text("فاکتورهای نگه‌داشتهٔ کهنه‌تر از ${plain(HeldRules.STALE_HOURS)} ساعت دور انداخته می‌شوند. این کار برنمی‌گردد.") },
+      title = { Text(StrPos.clearStaleQ) },
+      text = { Text(StrPos.clearStaleWarn(plain(HeldRules.STALE_HOURS))) },
       confirmButton = {
-        Button(onClick = { ui.dropStale() }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text("پاک کن") }
+        Button(onClick = { ui.dropStale() }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.clearIt) }
       },
-      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text("نه") } },
+      dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
     )
   }
 }
@@ -479,17 +483,17 @@ fun HeldInvoiceSettings() {
   ir.vil3ntec.tohid.ui.screens.SettingsSection(
     icon = Icons.Filled.Layers,
     title = HeldInvoicePrefs.SECTION,
-    subtitle = if (on) "روشن" + keyHint(KeyMap.SALE_HOLD) else "خاموش",
+    subtitle = if (on) StrShell.switchOn + keyHint(KeyMap.SALE_HOLD) else StrShell.switchOff,
     tint = if (on) Shop.colors.success else Shop.colors.muted,
   ) {
     Text(
-      "مشتری‌ای منتظر است و دیگری پول می‌دهد: فاکتورِ اولی با نام یا شماره نگه داشته می‌شود و صندوق خالی. تا ${plain(HeldRules.MAX_OPEN)} فاکتورِ باز با هم، هر کدام با سبد، مشتری، تخفیف و یادداشتِ خودش. فقط روی همین دستگاه می‌ماند و با بسته شدنِ برنامه یا قطعِ برق از دست نمی‌رود.",
+      StrPos.heldNote(plain(HeldRules.MAX_OPEN)),
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
     Spacer(Modifier.height(8.dp))
     ir.vil3ntec.tohid.ui.screens.SegmentedChoice(
-      options = listOf("off" to "خاموش", "on" to "روشن"),
+      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
       selected = if (on) "on" else "off",
       onSelect = { HeldInvoicePrefs.set(context, it == "on") },
     )
