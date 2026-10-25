@@ -62,11 +62,20 @@ router.post('/chain-verify', requireSuperAdmin, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-/** ⛔ پولِ همهٔ دکان‌ها ⇒ فقط مدیرِ ارشد؛ فقط‌خواندنی (همان `order-refunds.report`). */
+/**
+ * ⛔ پولِ همهٔ دکان‌ها ⇒ فقط مدیرِ ارشد؛ فقط‌خواندنی (همان `order-refunds.reportMany`).
+ * دیدنش یک ردیفِ سابقه با بازه و شمارِ دکان‌ها دارد.
+ */
 router.get('/reconciliation', requireSuperAdmin, async (req, res, next) => {
   try {
+    const q = req.query || {};
+    const out = await health.reconciliation({ from: q.from, to: q.to, fromDate: q.fromDate, toDate: q.toDate });
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, ip: clientIp(req), action: 'admin.reconciliation_viewed',
+      detail: { from: out.window.from, to: out.window.to, shops: out.shopsTotal },
+    });
     res.set('Cache-Control', 'no-store');
-    res.json(await health.reconciliation({ from: req.query?.from, to: req.query?.to }));
+    res.json(out);
   } catch (err) { next(err); }
 });
 

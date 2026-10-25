@@ -168,18 +168,12 @@
     refund_partial_mismatch: 'جزئی ولی کامل پرداخت شده', refund_full_mismatch: 'کامل ولی کمتر پرداخت شده',
     refund_exceeds_total: 'بازپرداخت بیش از مبلغ', refund_on_wrong_status: 'بازپرداخت روی وضعیتِ نادرست',
   };
-  const dayMs = (v, end) => {
-    if (!v) return '';
-    const d = new Date(`${v}T00:00:00`);
-    return String(d.getTime() + (end ? 86_400_000 : 0));
-  };
-
   async function loadRecon() {
+    //  روزها همان‌طور که انتخاب شده‌اند می‌روند؛ نیمه‌شب را سرور در منطقهٔ پیش‌فرض
+    //  (Asia/Kabul) می‌گذارد، نه مرورگر. روزِ «تا» شامل است.
     const q = new URLSearchParams();
-    const from = dayMs($('ops-recon-from').value, false);
-    const to = dayMs($('ops-recon-to').value, true);
-    if (from) q.set('from', from);
-    if (to) q.set('to', to);
+    if ($('ops-recon-from').value) q.set('fromDate', $('ops-recon-from').value);
+    if ($('ops-recon-to').value) q.set('toDate', $('ops-recon-to').value);
     const out = await call('GET', `/admin/system/reconciliation?${q}`);
     const t = out.totals;
     const cards = $('ops-recon-totals');
@@ -191,7 +185,9 @@
       ['لغو و رد', fa(t.cancellations)],
       ['نقدِ گرفته‌شدهٔ پیک', afn(t.courierCollectedMinor)],
       ['نقدِ تسویه‌نشده (اکنون)', afn(t.courierHeldMinor)],
+      ['تسویه‌ها (دریافت)', `${fa(t.settlements)} · ${afn(t.receivedMinor)}`],
       ['کسری / اضافهٔ تسویه', `${afn(t.shortageMinor)} / ${afn(t.excessMinor)}`],
+      ['اختلافِ باز', fa(t.issues)],
       ['کارمزد', out.commission?.defined ? '—' : 'تعریف نشده'],
     ]) {
       const c = el('div', 'stat');
@@ -230,8 +226,9 @@
       tr.appendChild(iss);
       body.appendChild(tr);
     }
-    $('ops-recon-checked').textContent = `${dateTime(out.window.from)} تا ${dateTime(out.window.to)} · کارمزد: تعریف نشده (تصمیمِ صاحبِ محصول)`
-      + (out.truncated ? ' · فهرست بریده شد' : '');
+    $('ops-recon-checked').textContent = `${out.local.fromDate} تا ${out.local.toDate} (هر دو روز شامل، ${out.local.timezone})`
+      + ` · ${out.truncated ? `فهرست: ${fa(out.shops.length)} از ${fa(out.shopsTotal)} دکان، به ترتیبِ اهمیت؛ جمع‌ها از همه` : `${fa(out.shopsTotal)} دکان`}`
+      + ' · کارمزد: تعریف نشده (تصمیمِ صاحبِ محصول)';
   }
 
   document.addEventListener('DOMContentLoaded', () => {

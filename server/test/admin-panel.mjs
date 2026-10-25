@@ -1016,14 +1016,23 @@ await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ
   for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
     assert.equal((await call('POST', `/api/shop/orders/${made.body.order.id}/transition`, { to })).status, 200, to);
   }
-  const own = (await call('GET', '/api/shop/orders/reconciliation')).body;
 
   await openTab('ops');
   await page.waitForSelector('#ops-recon-tools:not(.hidden)', { timeout: 10_000 });
-  await page.click('#btn-ops-recon');
+  //  امروزِ کابل برای هر دو؛ پاسخِ پنل بازه را می‌گوید و گزارشِ خودِ دکان با **همان** بازه خوانده می‌شود
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kabul' }).format(new Date());
+  await page.fill('#ops-recon-from', today);
+  await page.fill('#ops-recon-to', today);
+  const [resp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/admin/system/reconciliation')),
+    page.click('#btn-ops-recon'),
+  ]);
+  const win = (await resp.json()).window;
+  const own = (await call('GET', `/api/shop/orders/reconciliation?from=${win.from}&to=${win.to}`)).body;
   const row = `#ops-recon tr[data-shop="${owner.shopId}"]`;
   await page.waitForSelector(row, { timeout: 10_000 });
   const cells = await page.locator(`${row} td`).allTextContents();
+  assert.match(await page.locator('#ops-recon-checked').textContent(), new RegExp(`^${today} تا ${today} \\(هر دو روز شامل، Asia/Kabul\\)`));
   assert.equal(own.collected.count, 1);
   assert.equal(cells[1], `۱ سفارش · ${(own.collected.totalMinor / 100).toLocaleString('fa-AF')} افغانی`);
   assert.equal(cells[7], 'تعریف نشده');
