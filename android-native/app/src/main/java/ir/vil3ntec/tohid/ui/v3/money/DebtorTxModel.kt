@@ -47,7 +47,7 @@ internal object DebtorTxModel {
       }))
     }
     if (!entry.give && entry.open.minor > 0) add(Line(StrMoney.prepaid, DebtBook.show(entry.open)))
-    add(Line(StrMoney.balanceAfter, DebtBook.state(entry.balanceAfter)))
+    add(Line(StrMoney.balanceAfter, MoneyText.state(entry.balanceAfter)))
   }
 
   /** بردِ فاکتوردار: «این چی‌ها رو برده» — اقلامِ همان فاکتور با قیمتِ همان لحظه */

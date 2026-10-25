@@ -169,7 +169,7 @@ internal fun TxFormSheet(
           V3Message(
             V3Tone.WARNING,
             StrMoney.overLimitTitle,
-            body = (credit?.let { DebtBook.overLimitText(it) + ".\n" } ?: "") + StrMoney.overLimitNote,
+            body = (credit?.let { MoneyText.overLimit(it) + ".\n" } ?: "") + StrMoney.overLimitNote,
           )
           Spacer(Modifier.height(16.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {

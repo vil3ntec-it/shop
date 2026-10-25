@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.money.Money
+import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.formatMonth
 import ir.vil3ntec.tohid.money
@@ -29,6 +31,13 @@ internal object MoneyText {
     balance < 0 -> StrMoney.creditAfn(money(-balance))
     else -> StrMoney.accountSettled
   }
+
+  /** همان، برای مانده‌های `DebtBook` (به جای `DebtBook.state`) */
+  fun state(m: Money): String = state(m.minor.toDouble() / DebtBook.CURRENCY.minorPerMajor)
+
+  /** «۲۰۰ افغانی بیش از سقفِ اعتبار (۱٬۰۰۰) — ماندهٔ فعلی ۹۰۰» سه‌زبانه (به جای `DebtBook.overLimitText`) */
+  fun overLimit(c: DebtBook.Credit): String =
+    "${StrMoney.overLimitBy(DebtBook.show(c.excess), DebtBook.show(c.limit))} — ${StrMoney.currentBalance(DebtBook.show(c.balance))}"
 
   /** چند روز به متنِ سه‌زبانه — همان حسابِ `daysText` (ماه ۳۰ روز، سال ۳۶۵ روز) */
   fun days(n: Long): String {

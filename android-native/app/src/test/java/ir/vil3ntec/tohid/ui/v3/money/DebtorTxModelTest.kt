@@ -85,6 +85,10 @@ class DebtorTxModelTest {
     assertEquals("2 ماه", MoneyText.span(now - 65 * day, now))
     assertEquals("1,000 افغانی بدهکار", MoneyText.state(1000.0))
     assertEquals("—", MoneyText.span(0, now))
+    //  فارسی همان جمله‌های موتور است، حرف‌به‌حرف
+    val over = DebtBook.creditCheck(ledger, "d", DebtBook.minor(500.0))!!
+    assertEquals(DebtBook.overLimitText(over), MoneyText.overLimit(over))
+    assertEquals(DebtBook.state(DebtBook.minor(700.0)), MoneyText.state(DebtBook.minor(700.0)))
     I18n.source = { Lang.EN }
     try {
       assertEquals("2 months", MoneyText.span(now - 65 * day, now))
@@ -92,6 +96,7 @@ class DebtorTxModelTest {
       assertEquals("Owes 1,000 AFN", MoneyText.state(1000.0))
       assertEquals("250 AFN in credit", MoneyText.state(-250.0))
       assertEquals("Settled", MoneyText.state(0.0))
+      assertEquals("200 AFN over the credit limit (1,000) — current balance 700", MoneyText.overLimit(over))
       assertEquals("1 day in debt", DebtorLedgerModel.summary("", now - day, now))
     } finally {
       I18n.source = { Lang.FA }

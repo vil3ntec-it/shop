@@ -70,6 +70,7 @@ object StrMoney {
     t("سررسیدِ بعدی $date — $amount افغانی", "Next due $date — $amount AFN", "راتلونکې نېټه $date — $amount افغانۍ")
   fun overLimitBy(excess: Any, limit: Any): String =
     t("$excess افغانی بیش از سقفِ اعتبار ($limit)", "$excess AFN over the credit limit ($limit)", "$excess افغانۍ د پور له حد ($limit) زیات")
+  fun currentBalance(amount: Any): String = t("ماندهٔ فعلی $amount", "current balance $amount", "اوسنی پاتې $amount")
   fun limitHeadroom(limit: Any, headroom: Any): String =
     t("سقفِ اعتبار $limit — تا سقف $headroom افغانی", "Credit limit $limit — $headroom AFN left", "د پور حد $limit — $headroom افغانۍ پاتې")
   val given: String get() = t("کل برد", "Total given", "ټول ورکړل شوي")
