@@ -341,7 +341,9 @@ class StockWiringTest {
       sales = d.sales + Sale(id = "sx", status = "completed", date = today, createdAt = now + 1000),
       saleItems = d.saleItems + SaleItem(id = "ix", saleId = "sx", productId = "p1", quantity = 20.0),
     )
-    d = StockActions.ack(d, StockLedger.replay(d), listOf("ix"), "کریم", today, now + 2000, ::newId)
+    val open = StockLedger.replay(d).tasks
+    assertTrue(open.isNotEmpty())
+    d = StockActions.ack(d, StockLedger.replay(d), open.map { it.id }, "کریم", today, now + 2000, ::newId)
     //  همهٔ ردیف‌ها کهنه‌تر از ۴۰۰ روز، به‌علاوهٔ یک حرکتِ عادی که باید برود
     d = d.copy(
       stockMovements = d.stockMovements + StockMovement(id = "plain", productId = "p1", type = "sale", qty = -1.0, createdAt = 1000),
@@ -353,11 +355,12 @@ class StockWiringTest {
     assertEquals(listOf("plain"), gone.stockMovements.map { it.id })
     assertTrue(gone.auditLog.any { it.id == "a-plain" })
     assertTrue(gone.auditLog.none { LedgerArchive.pinned(it) })
-    assertEquals(2, kept.auditLog.count { LedgerArchive.pinned(it) })
+    assertEquals(1 + open.size, kept.auditLog.count { LedgerArchive.pinned(it) })
     assertEquals(LedgerArchive.Plan(1, 0, gone.auditLog.size), LedgerArchive.plan(d, later))
     assertTrue(StockLedger.isOn(kept))
     val after = StockLedger.replay(kept)
-    assertTrue(after.tasks.single().acked)
+    assertEquals(open.size, after.tasks.size)
+    assertTrue(after.tasks.all { it.acked })
     assertEquals(
       StockLedger.productView(before, "p1").locations,
       StockLedger.productView(after, "p1").locations,
