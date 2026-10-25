@@ -9,7 +9,7 @@ import ir.vil3ntec.tohid.ui.theme.V3Tone
  *  «حساب من» و پنجرهٔ «همه»ِ خانه). منطقِ خالص، بی Compose، با آزمونِ `ShopAlertsTest`.
  *
  *  منبع: هشدارهای خانه (`HomeAlerts.build`) + ردیف‌هایی که فقط زنگِ قدیم داشت، **همان
- *  قاعده‌ها، بی قاعدهٔ تازه**: هر کالای تمام‌شده و هر کالای کم، بدهیِ پرداخت‌نشده به
+ *  قاعده‌ها، بی قاعدهٔ تازه**: کالای تمام‌شده و کم (نام‌ها زیرِ هشدارِ «کالا»)، بدهیِ پرداخت‌نشده به
  *  تأمین‌کننده‌ها، یادآوریِ پشتیبان، و سه قرض‌دارِ بیشترین قرض. اشتراک یک بار (از خانه)
  *  می‌آید. هر ردیف مستقیم سرِ کادرِ خودش می‌رود: کالا ⇐ همان کالا، قرض‌دار ⇐ همان
  *  قرض‌دار، تأمین‌کنندهٔ تنها ⇐ صفحهٔ خودش، پشتیبان ⇐ صفحهٔ پشتیبان.
@@ -30,7 +30,10 @@ object ShopAlerts {
     val actionRoute: String,
     val tone: V3Tone,
     val urgent: Boolean,
-  )
+  ) {
+    /** کارِ ردیف همان «دیدن» ِ خودِ ردیف است ⇐ دکمهٔ جدا لازم نیست */
+    val plainSee: Boolean get() = action == StrHome.actionSee && actionRoute == route
+  }
 
   data class Product(val id: String, val name: String)
   data class Low(val id: String, val name: String, val left: String)
@@ -85,14 +88,30 @@ object ShopAlerts {
     else -> V3Tone.WARNING
   }
 
+  /** «الف، ب، ج و ۲ دیگر» — چند نام در یک خط */
+  fun names(all: List<String>, max: Int = 3): String {
+    val shown = all.take(max).joinToString(StrHome.listSep)
+    val more = all.size - max
+    return if (more > 0) shown + " " + StrHome.andMore(more) else shown
+  }
+
+  /**
+   *  ساده مثلِ خانه (HOME-V2): کالاهای تمام‌شده/کم وقتی هشدارِ جمعِ «کالا» هست، ردیفِ جدا
+   *  نمی‌گیرند — نامشان زیرنویسِ همان یک ردیف می‌شود (تکرار نه). چند قرض‌دارِ بیشترین قرض هم
+   *  یک ردیف ⇐ فهرستِ قرض‌دارها به ترتیبِ بیشترین؛ یکی ⇐ همان قرض‌دار.
+   */
   fun build(home: List<HomeAlerts.Alert>, x: Extras): Groups {
-    val fromHome = home.map(::fromHome)
+    val products = x.out.map { it.name } + x.low.map { it.name }
+    val folded = products.isNotEmpty() && home.any { it.kind == HomeAlerts.Kind.STOCK }
+    val fromHome = home.map(::fromHome).map { if (folded && it.kind == Kind.STOCK) it.copy(subtitle = names(products)) else it }
     val extra = buildList {
-      x.out.forEach {
-        add(Item("out:${it.id}", Kind.PRODUCT_OUT, it.name, StrHome.itemOut, StrHome.actionSee, ShellTargets.product(it.id), ShellTargets.product(it.id), V3Tone.ERROR, false))
-      }
-      x.low.forEach {
-        add(Item("low:${it.id}", Kind.PRODUCT_LOW, it.name, StrHome.itemLeft(it.left), StrHome.actionSee, ShellTargets.product(it.id), ShellTargets.product(it.id), V3Tone.WARNING, false))
+      if (!folded) {
+        x.out.forEach {
+          add(Item("out:${it.id}", Kind.PRODUCT_OUT, it.name, StrHome.itemOut, StrHome.actionSee, ShellTargets.product(it.id), ShellTargets.product(it.id), V3Tone.ERROR, false))
+        }
+        x.low.forEach {
+          add(Item("low:${it.id}", Kind.PRODUCT_LOW, it.name, StrHome.itemLeft(it.left), StrHome.actionSee, ShellTargets.product(it.id), ShellTargets.product(it.id), V3Tone.WARNING, false))
+        }
       }
       x.supplierDebt?.let { amount ->
         val route = x.onlySupplierId?.let(ShellTargets::supplier) ?: ShellTargets.PURCHASING
@@ -101,8 +120,12 @@ object ShopAlerts {
       if (x.backupStale) {
         add(Item("backup", Kind.BACKUP, StrHome.backupNow, x.backupText, StrHome.actionCheck, ShellTargets.BACKUP, ShellTargets.BACKUP, V3Tone.WARNING, false))
       }
-      x.topDebtors.forEach {
+      val top = x.topDebtors
+      if (top.size == 1) top.single().let {
         add(Item("debtor:${it.id}", Kind.DEBTOR, it.name, StrHome.debtOf(it.amount), StrHome.actionFollowUp, ShellTargets.debtor(it.id), ShellTargets.debtor(it.id), V3Tone.INFO, false))
+      } else if (top.size > 1) {
+        val sub = names(top.map { it.name + " " + it.amount + " ؋" })
+        add(Item("debtors:top", Kind.DEBTOR, StrHome.topDebts, sub, StrHome.actionFollowUp, ShellTargets.MOST_DEBT, ShellTargets.MOST_DEBT, V3Tone.INFO, false))
       }
     }
     return Groups(urgent = fromHome.filter { it.urgent }, rest = fromHome.filterNot { it.urgent } + extra)

@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrHome
@@ -51,11 +52,11 @@ import ir.vil3ntec.tohid.ui.v3.v3Pressable
  *  قالب همان `V3HeroCard` ِ پایه است تا با کادرِ پنهانِ «صندوق» یک خانواده بماند.
  */
 @Composable
-internal fun HomeSalesCard(amount: Double, trend: HomeTrend.View, onStats: (() -> Unit)?, modifier: Modifier = Modifier) {
+internal fun HomeSalesCard(amount: Double, trend: HomeTrend.View, onStats: (() -> Unit)?, modifier: Modifier = Modifier, inset: Dp = 16.dp) {
   val shown = rememberCountUp(amount)
   Box(
     modifier
-      .padding(horizontal = 16.dp)
+      .padding(horizontal = inset)
       .then(if (onStats != null) Modifier.clip(RoundedCornerShape(ir.vil3ntec.tohid.ui.v3.HERO_RADIUS)).v3Pressable(label = StrHome.openStats, onClick = onStats) else Modifier),
   ) {
     V3HeroCard(title = StrHome.todaySales, value = "${money(shown)} ؋")
