@@ -277,10 +277,13 @@ async function ackReview(shopId, orderId, kind, actor) {
   await require('./audit').log({
     shopId, actorType: 'user', userId: actor && actor.id ? String(actor.id) : '', action: REVIEW_ACK,
     targetType: 'order_review', targetId: target, detail: { orderId: o.id, orderNo: o.orderNo, kind }, once: true,
+    onceSince: o.createdAt,
   });
   const db = require('../db');
-  const done = await db.one('SELECT 1 AS x FROM audit_logs WHERE shop_id=$1 AND action=$2 AND target_id=$3 LIMIT 1',
-    [shopId, REVIEW_ACK, target]);
+  const done = await db.one(
+    'SELECT 1 AS x FROM audit_logs WHERE shop_id=$1 AND created_at >= $4 AND action=$2 AND target_id=$3 LIMIT 1',
+    [shopId, REVIEW_ACK, target, Number(o.createdAt) || 0]
+  );
   if (!done) throw new errors.ApiError(500, 'ack_not_saved', '«بررسی شد» ذخیره نشد؛ دوباره بزنید');
   return { orderId: o.id, kind, acked: true };
 }
@@ -329,8 +332,10 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
   const noSale = (table) => `NOT EXISTS (${rowsOf(table, "r.row_id IN ('o-' || o.id, 'w-' || o.id)")})`;
   const liveSale = (table) => `EXISTS (${rowsOf(table, "r.row_id = 'o-' || o.id AND COALESCE(r.data->>'status', '') <> 'cancelled'")})`;
   //  صاحب «بررسی شد» زده ⇒ دیگر نه در review، نه (برای reverse_blocked) در reversals
-  const acked = (kind) => `NOT EXISTS (SELECT 1 FROM audit_logs a WHERE a.shop_id = o.shop_id AND a.action = '${REVIEW_ACK}'
-        AND a.target_id = o.id || ':${kind}')`;
+  //  «بررسی شد» همیشه پس از ساختِ سفارش است (هر دو میلی‌ثانیه) ⇒ بازهٔ `idx_audit_shop (shop_id, created_at)`
+  //  از همان لحظه، نه همهٔ سطرهای ممیزیِ دکان برای هر سفارش (updated_at نه: پس از ack عوض می‌شود)
+  const acked = (kind) => `NOT EXISTS (SELECT 1 FROM audit_logs a WHERE a.shop_id = o.shop_id AND a.created_at >= o.created_at
+        AND a.action = '${REVIEW_ACK}' AND a.target_id = o.id || ':${kind}')`;
 
   const params = [shopId, HANDED_OVER, OUT_OF_SHOP, from];
   let extra = '';

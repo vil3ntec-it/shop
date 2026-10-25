@@ -21,6 +21,8 @@ function scrub(detail) {
 }
 
 /**
+ * @param entry.onceSince  (با `once`، اختیاری) سطرِ پیشین زودتر از این لحظه (میلی‌ثانیه) نیست ⇒ سنجش فقط
+ *                         از همان‌جا روی `idx_audit_shop (shop_id, created_at)`
  * @param entry.once  فقط اگر سطری با همین (دکان، کار، هدف) نیست — سنجشِ وجود درونِ همان INSERT
  *                    (`INSERT … SELECT … WHERE NOT EXISTS`) و زیرِ قفلِ تراکنشیِ همان کلید
  *                    (`pg_advisory_xact_lock`)، تا دو اتصالِ هم‌زمان در READ COMMITTED هر دو
@@ -29,7 +31,7 @@ function scrub(detail) {
 async function log(entry) {
   const {
     shopId = '', actorType = 'user', userId = '', action,
-    targetType = '', targetId = '', detail = {}, ip = '', once = false,
+    targetType = '', targetId = '', detail = {}, ip = '', once = false, onceSince = null,
   } = entry || {};
   if (!action) return null;
   const id = newId('aud');
@@ -38,6 +40,7 @@ async function log(entry) {
   let r;
   try {
     const params = [id, shopId, actorType, userId, action, targetType, targetId, JSON.stringify(clean), ip, at];
+    const since = once && Number.isSafeInteger(onceSince) && onceSince > 0 ? onceSince : 0;
     //  پرچمِ زنجیره (STF-09) با همین INSERT برمی‌گردد — خاموش ⇒ هیچ پرسشِ دیگری
     r = once
       ? await tx(async (c) => {
@@ -45,9 +48,10 @@ async function log(entry) {
         return c.query(
           `INSERT INTO audit_logs (id, shop_id, actor_type, user_id, action, target_type, target_id, detail, ip, created_at)
            SELECT $1::text, $2::text, $3::text, $4::text, $5::text, $6::text, $7::text, $8::jsonb, $9::text, $10::bigint
-            WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE shop_id = $2::text AND action = $5::text AND target_id = $7::text)
+            WHERE NOT EXISTS (SELECT 1 FROM audit_logs WHERE shop_id = $2::text AND created_at >= $11::bigint
+                                AND action = $5::text AND target_id = $7::text)
            RETURNING ${chain.FLAG_SQL} AS hashchain`,
-          params
+          [...params, since]
         );
       })
       : await query(
