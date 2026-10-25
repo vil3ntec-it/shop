@@ -25,6 +25,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Shape
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /** پهنای منوی کناری — محتوا به همین اندازه از کنار فاصله می‌گیرد */
 val DESK_RAIL_WIDTH = 200.dp
@@ -84,11 +87,11 @@ fun DeskRail(
     //  می‌ماند (صندوق `desk_rail_pos`، بقیه `desk_rail` — `AppRoot`)
     val canToggle = mode == RailMode.FULL || mode == RailMode.COMPACT
     if (compact) {
-      if (canToggle) RailTip("بازکردنِ منو") {
+      if (canToggle) RailTip(StrShell.openMenu) {
         Box(
-          Modifier.fillMaxWidth().clip(Shape.button).clickable(onClickLabel = "بازکردنِ منو") { onMode(RailMode.FULL) }.padding(vertical = 10.dp),
+          Modifier.fillMaxWidth().clip(Shape.button).clickable(onClickLabel = StrShell.openMenu) { onMode(RailMode.FULL) }.padding(vertical = 10.dp),
           contentAlignment = Alignment.Center,
-        ) { Icon(Icons.Filled.ViewSidebar, contentDescription = "بازکردنِ منو", tint = Shop.colors.muted, modifier = Modifier.size(20.dp)) }
+        ) { Icon(Icons.Filled.ViewSidebar, contentDescription = StrShell.openMenu, tint = Shop.colors.muted, modifier = Modifier.size(20.dp)) }
       }
     } else {
       //  نشانِ برنامه
@@ -98,14 +101,14 @@ fun DeskRail(
         }
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-          Text("فروشگاه من", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
-          Text("مدیریتِ دکان", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
+          Text(Str.appName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1)
+          Text(StrNav.shopManagement, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, maxLines = 1)
         }
-        if (canToggle) RailTip("جمع‌کردنِ منو (فقط آیکن)") {
+        if (canToggle) RailTip(StrShell.collapseMenuTip) {
           Box(
-            Modifier.size(32.dp).clip(Shape.button).clickable(onClickLabel = "جمع‌کردنِ منو") { onMode(RailMode.COMPACT) },
+            Modifier.size(32.dp).clip(Shape.button).clickable(onClickLabel = StrShell.collapseMenu) { onMode(RailMode.COMPACT) },
             contentAlignment = Alignment.Center,
-          ) { Icon(Icons.Filled.ViewCompact, contentDescription = "جمع‌کردنِ منو", tint = Shop.colors.muted, modifier = Modifier.size(19.dp)) }
+          ) { Icon(Icons.Filled.ViewCompact, contentDescription = StrShell.collapseMenu, tint = Shop.colors.muted, modifier = Modifier.size(19.dp)) }
         }
       }
     }

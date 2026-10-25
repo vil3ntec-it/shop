@@ -587,9 +587,6 @@
     ["pickup","failed","returned","staff_none","invalid_transition"]
   ],
   "knownDivergences": [
-    {"id":"courier-assigned-delivered","impl":"CourierFlow.canSend","kind":"latent-bug","note":"سرور: پیک بی «گرفتنِ بسته» تحویل نمی‌دهد (invalid_transition؛ assigned → delivered فقط دریافتِ حضوری). canSend جدولِ گذار را بی این قید کپی کرده و true می‌دهد. امروز بی‌اثر است: هیچ دکمه‌ای آن را نمی‌فرستد (actions(\"assigned\") = picked_up)، ولی enqueue(from=\"assigned\", type=\"delivered\") پذیرفته و projectedStatus کارت را «تحویل شد» نشان می‌دهد تا سرور رد کند.", "pairs": [
-      ["shop_courier","assigned","delivered"]
-    ]},
     {"id":"courier-delivered-after-arrived","impl":"CourierFlow.actions","kind":"ui-choice","note":"«تحویل شد» فقط پس از «رسیدم» پیش‌نهاد می‌شود (کد/نقد/عکس جلوی مشتری)؛ سرور میان‌بر را هم می‌پذیرد.", "pairs": [
       ["shop_courier","picked_up","delivered"],
       ["shop_courier","moving","delivered"]

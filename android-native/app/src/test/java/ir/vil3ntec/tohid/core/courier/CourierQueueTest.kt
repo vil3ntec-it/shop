@@ -129,12 +129,23 @@ class CourierQueueTest {
     assertEquals("moving", CourierQueue.projectedStatus("moving", "C", s))
   }
 
+  @Test fun `پیک بی گرفتنِ بسته تحویل نمی‌دهد — نه در صف، نه در کارت`() {
+    //  همان ردِ سرور (invalid_transition): رویداد اصلاً در صف نمی‌نشیند
+    expectError("invalid_transition") { add(QueueState(), "A", "delivered", from = "assigned") }
+    //  رویدادِ بی from (کارتِ کهنه) در صف می‌ماند تا سرور داوری کند، ولی کارت «تحویل شد» نمی‌شود
+    val s = add(QueueState(), "A", "delivered").first
+    assertEquals("assigned", CourierQueue.projectedStatus("assigned", "A", s))
+    assertEquals("delivered", CourierQueue.projectedStatus("picked_up", "A", s))
+  }
+
   @Test fun `ماشین همان سرور است`() {
     assertTrue(CourierFlow.canSend("requested", "assigned"))
     assertTrue(CourierFlow.canSend("failed", "moving"))
     assertFalse("برگشت با دکان است", CourierFlow.canSend("failed", "returned"))
     assertFalse(CourierFlow.canSend("delivered", "failed"))
     assertFalse(CourierFlow.canSend("assigned", "arrived"))
+    assertFalse("بی گرفتنِ بسته تحویل نیست (فقط دریافتِ حضوری)", CourierFlow.canSend("assigned", "delivered"))
+    assertTrue("میان‌برِ پس از گرفتنِ بسته مجاز است", CourierFlow.canSend("picked_up", "delivered"))
     assertEquals(listOf("assigned", "rejected"), CourierFlow.actions("requested"))
     assertEquals(listOf("delivered", "failed"), CourierFlow.actions("arrived"))
     assertEquals(listOf("moving"), CourierFlow.actions("failed"))
