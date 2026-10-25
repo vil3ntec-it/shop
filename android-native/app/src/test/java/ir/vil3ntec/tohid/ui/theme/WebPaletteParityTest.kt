@@ -1,56 +1,44 @@
 package ir.vil3ntec.tohid.ui.theme
 
-import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
-import kotlin.math.abs
-import kotlin.math.roundToInt
 
 /**
- *  پالتِ وب همان `Theme.kt` است، عدد به عدد (MASTER-SPEC ۵.۴، «قاعدهٔ موجود»).
+ *  **وبِ منجمد، تصمیمِ صاحب‌کار (۱۴۰۵/۰۸/۰۲).** وبِ قدیم (`index.html`، پنلِ پروانه) منجمد است و فقط
+ *  درمانِ ایمنیِ داده می‌گیرد، نه رنگ. پس از THEME-V2 پالتِ برنامه (`ShopThemes.kt`، سه تم) دیگر با وب
+ *  سنجیده نمی‌شود؛ این آزمون وب را روی پالتِ منجمدِ خودش (سیستمِ رنگِ VILL3N، ۱۴۰۵/۰۷/۲۸) ثابت نگه
+ *  می‌دارد تا رنگی بی‌صدا عوض نشود. عوض کردنِ هر عددِ این‌جا تصمیمِ صاحب‌کار می‌خواهد.
  *
- *  `index.html` سرِ پالتش همین را می‌گوید، ولی تا حالا هیچ آزمونی آن را نمی‌سنجید.
- *  این آزمون متغیرهای `:root` و `html[data-theme="dark"]` را با `LightColors` و
- *  `DarkColors` می‌سنجد، و `--radius-*` را با ستونِ لمسیِ `Corner`.
- *
- *  `drift` جاهایی است که امروز با هم نمی‌خوانند. یکی کردنشان تغییرِ ظاهر است و
- *  تصمیمِ جدا می‌خواهد. این فهرست فقط کوتاه می‌شود: ناهم‌خوانیِ تازه رد می‌شود، و
- *  اگر یکی درست شد باید از فهرست هم برداشته شود.
- *
- *  آلفا یک پله (۱/۲۵۵) جا دارد، چون `.95`ِ CSS همان `0xF2`ِ Kotlin است.
+ *  گِردی‌ها (`--radius-*`) هنوز همان ستونِ لمسیِ `Corner` ِ برنامه‌اند — آن‌ها عوض نشده‌اند.
  */
 class WebPaletteParityTest {
 
   private val html: File? = listOf("../../index.html", "../index.html", "index.html")
     .map { File(it) }.firstOrNull { it.isFile && "--primary" in it.readText() }
 
-  /** متغیرِ وب ⇐ توکنِ `ShopColors` */
-  private val colors: List<Pair<String, (ShopColors) -> Color>> = listOf(
-    "bg" to { it.bg }, "surface" to { it.surface }, "surface-2" to { it.surface2 },
-    "surface-solid" to { it.surfaceSolid }, "border" to { it.border },
-    "text" to { it.text }, "muted" to { it.muted }, "muted-2" to { it.muted2 },
-    //  VILL3N: `--primary`ِ وب بیشتر **پُرکردن** است با متنِ سفید (دکمه، گزینهٔ فعال) ⇒ همان
-    //  دکمهٔ اصلیِ برنامه؛ `--primary-dark` متن روی تینت است ⇒ برندِ خوانا (`primaryDark`).
-    //  در روز هر دو #08665F‌اند؛ در شب #19A985 و #6EE7D1.
-    "primary" to { it.button.primary.bg }, "primary-dark" to { it.primaryDark }, "primary-tint" to { it.primaryTint },
-    "accent" to { it.accent },
-    "success" to { it.success }, "success-tint" to { it.successTint },
-    "warning" to { it.warning }, "warning-tint" to { it.warningTint },
-    "danger" to { it.danger }, "danger-tint" to { it.dangerTint },
-    "aurora-1" to { it.auroraOne }, "aurora-2" to { it.auroraTwo }, "aurora-3" to { it.auroraThree },
-    //  نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷): رنگِ اطلاع و سه ناحیه؛ از ۱۴۰۵/۰۷/۲۸ با عددهای VILL3N
-    "info" to { it.info }, "info-tint" to { it.infoTint },
-    "zone-nav" to { it.zoneNav }, "zone-cart" to { it.zoneCart },
-    "field-border" to { it.fieldBorder },
+  /** پالتِ منجمدِ روزِ وب — عینِ `index.html` در لحظهٔ انجماد */
+  private val frozenLight = mapOf(
+    "bg" to "#f3f6fa", "surface" to "#ffffff", "surface-2" to "#f8fafc", "surface-solid" to "#ffffff",
+    "border" to "#d5dee9", "text" to "#17212b", "muted" to "#5b687a", "muted-2" to "#5b687a",
+    "primary" to "#08665f", "primary-dark" to "#08665f", "primary-tint" to "#e0f2ef", "accent" to "#108b81",
+    "success" to "#15803d", "success-tint" to "#dcfce7", "warning" to "#92400e", "warning-tint" to "#fef3c7",
+    "danger" to "#b91c1c", "danger-tint" to "#fee2e2",
+    "aurora-1" to "rgba(16,139,129,.30)", "aurora-2" to "rgba(37,99,235,.24)", "aurora-3" to "rgba(20,184,166,.20)",
+    "info" to "#1d4ed8", "info-tint" to "#dbeafe", "zone-nav" to "#eaf0f6", "zone-cart" to "#f8fafc", "field-border" to "#c5d0de",
   )
 
-  /**
-   *  ناهم‌خوانیِ امروز — فقط کم شود. نسخهٔ ۲ (۱۴۰۵/۰۷/۲۷) هر هشت موردِ پیشین را یکی
-   *  کرد (accent، تینت‌ها، آرورا و `radius-lg`)؛ فهرست خالی است و خالی می‌ماند.
-   */
-  private val drift = emptySet<String>()
+  /** پالتِ منجمدِ شبِ وب */
+  private val frozenDark = mapOf(
+    "bg" to "#0b1220", "surface" to "#162235", "surface-2" to "#203149", "surface-solid" to "#162235",
+    "border" to "#34445a", "text" to "#f1f5f9", "muted" to "#b6c2d2", "muted-2" to "#b6c2d2",
+    "primary" to "#19a985", "primary-dark" to "#6ee7d1", "primary-tint" to "#123c3a", "accent" to "#6ee7d1",
+    "success" to "#86efac", "success-tint" to "#123c2b", "warning" to "#fcd34d", "warning-tint" to "#3d2e0e",
+    "danger" to "#fca5a5", "danger-tint" to "#451a1e",
+    "aurora-1" to "rgba(16,139,129,.55)", "aurora-2" to "rgba(37,99,235,.38)", "aurora-3" to "rgba(20,184,166,.34)",
+    "info" to "#93c5fd", "info-tint" to "#172f57", "zone-nav" to "#050a14", "zone-cart" to "#203149", "field-border" to "#40516a",
+  )
 
   private fun block(src: String, selector: String): Map<String, String> {
     val body = src.substringAfter(selector, "").substringBefore("}")
@@ -58,45 +46,31 @@ class WebPaletteParityTest {
     return Regex("""--([a-z0-9-]+)\s*:\s*([^;]+);""").findAll(body).associate { it.groupValues[1] to it.groupValues[2].trim() }
   }
 
-  /** `#rgb`، `#rrggbb` یا `rgba(r,g,b,a)` ⇐ [a, r, g, b] */
-  private fun css(v: String): List<Int>? {
-    if (v.startsWith("#")) {
-      val h = v.drop(1).let { if (it.length == 3) it.map { c -> "$c$c" }.joinToString("") else it }
-      return listOf(255) + (0..2).map { h.substring(it * 2, it * 2 + 2).toInt(16) }
-    }
-    val m = Regex("""rgba?\(([^)]*)\)""").matchEntire(v) ?: return null
-    val p = m.groupValues[1].split(',').map { it.trim() }
-    val a = if (p.size > 3) (p[3].toFloat() * 255).roundToInt() else 255
-    return listOf(a) + p.take(3).map { it.toInt() }
-  }
-
-  private fun argb(c: Color) = listOf(c.alpha, c.red, c.green, c.blue).map { (it * 255).roundToInt() }
-
   @Test
-  fun `پالتِ وب و برنامه یکی‌اند، جز ناهم‌خوانی‌های ثبت‌شده`() {
+  fun `پالتِ وبِ منجمد عوض نشده است — وبِ منجمد، تصمیمِ صاحب‌کار`() {
     assertTrue("index.html پیدا نشد (cwd=${File(".").absoluteFile})", html != null)
     val src = html!!.readText()
     val bad = mutableListOf<String>()
-    for ((theme, web, app) in listOf(
-      Triple("light", block(src, ":root{"), LightColors),
-      Triple("dark", block(src, "html[data-theme=\"dark\"]{"), DarkColors),
+    for ((theme, web, frozen) in listOf(
+      Triple("light", block(src, ":root{"), frozenLight),
+      Triple("dark", block(src, "html[data-theme=\"dark\"]{"), frozenDark),
     )) {
-      for ((name, token) in colors) {
-        val key = "$theme:$name"
-        val w = web[name]?.let(::css)
-        if (w == null) { bad += "$key: در وب نیست یا خوانده نشد (${web[name]})"; continue }
-        val a = argb(token(app))
-        val same = abs(w[0] - a[0]) <= 1 && w.drop(1) == a.drop(1)
-        if (!same && key !in drift) bad += "$key: وب ${web[name]} ≠ برنامه ${a} — یکی را به دیگری برسانید"
-        if (same && key in drift) bad += "$key درست شده — از drift بردارید"
+      for ((name, want) in frozen) {
+        val got = web[name]?.lowercase()?.replace(" ", "")
+        if (got != want) bad += "$theme:$name: وب $got ≠ منجمد $want — وب فقط درمانِ ایمنیِ داده می‌گیرد، نه رنگ"
       }
     }
-    val root = block(src, ":root{")
+    assertEquals(emptyList<String>(), bad)
+  }
+
+  @Test
+  fun `گردی‌های وب همان ستونِ لمسیِ برنامه‌اند`() {
+    assertTrue("index.html پیدا نشد", html != null)
+    val root = block(html!!.readText(), ":root{")
+    val bad = mutableListOf<String>()
     for ((name, token) in listOf("radius-sm" to Corner.panelSm, "radius-md" to Corner.panelMd, "radius-lg" to Corner.panelLg)) {
       val w = root[name]?.removeSuffix("px")?.toFloatOrNull()
-      val same = w == token.touch.value
-      if (!same && name !in drift) bad += "$name: وب ${root[name]} ≠ برنامه ${token.touch}"
-      if (same && name in drift) bad += "$name درست شده — از drift بردارید"
+      if (w != token.touch.value) bad += "$name: وب ${root[name]} ≠ برنامه ${token.touch}"
     }
     assertEquals(emptyList<String>(), bad)
   }

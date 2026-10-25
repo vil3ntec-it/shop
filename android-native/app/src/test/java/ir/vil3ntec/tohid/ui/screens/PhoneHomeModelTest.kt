@@ -5,61 +5,100 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** خانهٔ گوشی v3: کارتِ کششی (r6)، کاشی‌ها و هشدارها (r7)، بازه‌های آمار (r8). */
+/** خانهٔ گوشی v3: کادرِ پنهانِ کششی (HOME-V2)، کاشی‌ها و هشدارها، بازه‌های آمار (r8). */
 class PhoneHomeModelTest {
 
-  private val cfg = PullCard.Config(threshold = 120f, flingMin = 40f, flingVelocity = 1500f)
+  private val cfg = PullCard.Config(open = 400f, threshold = 120f, flingMin = 40f, flingVelocity = 1500f)
 
   private fun pulled(px: Float, atTop: Boolean = true): PullCard.State {
     var s = PullCard.touchDown(PullCard.State(), atTop)
     //  چند گامِ کوچکِ انگشت
-    repeat(10) { s = PullCard.pullDown(s, px / 10) }
+    repeat(10) { s = PullCard.pullDown(s, px / 10, cfg) }
     return s
   }
 
   @Test
-  fun `کشیدنِ کوتاه و آرام برمی‌گردد`() {
-    val s = PullCard.release(pulled(100f), 0f, cfg)          // ۵۰ پیکسل با مقاومت
-    assertFalse(s.shown); assertEquals(0f, s.pull)
+  fun `لاستیک — مقاومت با فاصله بیشتر می‌شود و از سقف نمی‌گذرد`() {
+    val a = PullCard.stretch(100f, cfg)
+    val b = PullCard.stretch(200f, cfg)
+    assertTrue(a < 100f * PullCard.RUBBER + 0.01f)
+    assertTrue(b > a)
+    assertTrue(b - a < a)                                   // پیکسلِ دوم کمتر از اول
+    assertTrue(PullCard.stretch(1_000_000f, cfg) < cfg.limit)
+    assertEquals(0f, PullCard.stretch(-5f, cfg))
   }
 
   @Test
-  fun `کشیدن تا آستانه کارت را می‌آورد`() {
-    val s = PullCard.release(pulled(300f), 0f, cfg)
-    assertTrue(s.shown)
-    assertEquals(1f, PullCard.progress(s, 400f))
+  fun `وارونهٔ لاستیک همان پیکسلِ دیدنی را برمی‌گرداند`() {
+    listOf(10f, 120f, 200f, 399f).forEach { v ->
+      assertEquals(v, PullCard.stretch(PullCard.fingerFor(v, cfg), cfg), 0.5f)
+    }
   }
 
   @Test
-  fun `کششِ کوتاهِ تند هم کارت را می‌آورد`() {
+  fun `کشیدنِ کوتاه و آرام با فنر برمی‌گردد`() {
+    val s = pulled(100f)                                    // ~۴۹ پیکسلِ دیدنی
+    assertFalse(s.latched)
+    assertFalse(PullCard.release(s, 0f, cfg).shown)
+  }
+
+  @Test
+  fun `گذر از آستانه قفل می‌کند و رها کردن کادر را باز نگه می‌دارد`() {
+    val s = pulled(400f)                                    // ~۱۴۸ پیکسلِ دیدنی
+    assertTrue(s.latched)
+    val open = PullCard.release(s, 0f, cfg)
+    assertTrue(open.shown)
+    assertEquals(1f, PullCard.progress(open, cfg))
+    assertEquals(cfg.open, PullCard.visible(open, cfg))
+  }
+
+  @Test
+  fun `قفل تا نیمهٔ آستانه می‌ماند و پایین‌تر برداشته می‌شود`() {
+    val (half, used) = PullCard.pullUp(pulled(400f), 150f, cfg)    // ~۱۰۵ پیکسل
+    assertEquals(150f, used)
+    assertTrue(half.latched)
+    val (low, _) = PullCard.pullUp(half, 150f, cfg)                  // ~۴۹ پیکسل
+    assertFalse(low.latched)
+    assertFalse(PullCard.release(low, 0f, cfg).shown)
+  }
+
+  @Test
+  fun `کششِ کوتاهِ تند هم کادر را می‌آورد`() {
     assertTrue(PullCard.release(pulled(100f), 2400f, cfg).shown)
-    //  ولی تکانِ خیلی کوچک، حتی تند، نه
-    assertFalse(PullCard.release(pulled(40f), 4000f, cfg).shown)
+    //  کمتر از کمینه — پرتاب هم بس نیست
+    assertFalse(PullCard.release(pulled(60f), 4000f, cfg).shown)
   }
 
   @Test
-  fun `اسکرولِ معمولی کارت را نمی‌آورد — لمس از وسطِ صفحه شروع شده بود`() {
-    val s = pulled(600f, atTop = false)
-    assertEquals(0f, s.pull)
+  fun `اسکرولِ معمولی کادر را نمی‌آورد — لمس از وسطِ صفحه شروع شده بود`() {
+    val s = pulled(900f, atTop = false)
+    assertEquals(0f, s.finger)
     assertFalse(PullCard.release(s, 5000f, cfg).shown)
   }
 
   @Test
   fun `بالا بردنِ انگشت پیش از رها کردن کشش را پس می‌گیرد`() {
-    val s = pulled(300f)
-    val (back, used) = PullCard.pullUp(s, 300f)
-    assertEquals(0f, back.pull)
-    assertEquals(300f, used)
+    val s = pulled(100f)
+    val (back, used) = PullCard.pullUp(s, 300f, cfg)
+    assertEquals(0f, back.finger)
+    assertEquals(100f, used, 0.01f)                          // فقط همان که کشیده بود
     assertFalse(PullCard.release(back, 0f, cfg).shown)
   }
 
   @Test
-  fun `نمایان — کششِ دوباره بی‌اثر و لمسِ بیرون یا هل به بالا پنهانش می‌کند`() {
-    val shown = PullCard.release(pulled(300f), 0f, cfg)
-    assertEquals(shown, PullCard.pullDown(shown, 50f))
+  fun `باز — کششِ دوباره بی‌اثر و بالا کشیدن یا اسکرول می‌بندد`() {
+    val shown = PullCard.release(pulled(400f), 0f, cfg)
+    assertEquals(shown, PullCard.pullDown(shown, 50f, cfg))
     assertEquals(shown, PullCard.touchDown(shown, atTop = true))
     assertFalse(PullCard.dismiss(shown).shown)
-    assertEquals(0f, PullCard.progress(PullCard.dismiss(shown), 400f))
+    assertEquals(0f, PullCard.progress(PullCard.dismiss(shown), cfg))
+  }
+
+  @Test
+  fun `عکسِ نیمه‌کشیده همان نیمه را نشان می‌دهد`() {
+    val s = PullCard.forcePulled(0.5f, cfg)
+    assertEquals(0.5f, PullCard.progress(s, cfg), 0.01f)
+    assertTrue(s.latched)
   }
 
   @Test
@@ -127,6 +166,18 @@ class PhoneHomeModelTest {
   fun `صفِ بی‌اینترنت هم به صفحهٔ همگام‌سازی می‌رود`() {
     val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OFFLINE, queued = 4)).single()
     assertEquals("settings/data/sync", a.route)
+  }
+
+  @Test
+  fun `کارتِ خانه فقط کارِ فوری — تمام‌شده و صفِ مانده بله، کم و قرض و انقضا نه`() {
+    val calm = HomeAlerts.build(HomeAlerts.Input(lowStock = 3, overdueDebtors = 2, expiring = 1, sync = HomeAlerts.Sync.QUEUED, queued = 2))
+    assertTrue(HomeAlerts.pressing(calm).isEmpty())
+    val out = HomeAlerts.build(HomeAlerts.Input(outOfStock = 2, lowStock = 3))
+    assertEquals(listOf(HomeAlerts.Kind.STOCK), HomeAlerts.pressing(out).map { it.kind })
+    val offline = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OFFLINE, queued = 4))
+    assertEquals(listOf(HomeAlerts.Kind.SYNC), HomeAlerts.pressing(offline).map { it.kind })
+    val error = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.ERROR))
+    assertEquals(1, HomeAlerts.pressing(error).size)
   }
 
   @Test

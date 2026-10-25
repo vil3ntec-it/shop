@@ -116,9 +116,10 @@ fun V3HeroCard(
         }
       }
       Spacer(Modifier.height(6.dp))
-      if (label != null) Text(label, style = v3Text(13, FontWeight.Medium, 18), color = white.copy(alpha = 0.86f), maxLines = 1)
+      //  برچسب و زیرنویس سفیدِ کامل (نه کم‌رنگ): روی گرادیانِ روشن کم‌رنگش زیرِ ۴٫۵:۱ می‌رفت
+      if (label != null) Text(label, style = v3Text(13, FontWeight.Medium, 18), color = white, maxLines = 1)
       Text(value, style = v3Text(32, FontWeight.Bold, 42), color = white, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      if (caption != null) Text(caption, style = v3Text(12, FontWeight.Normal, 17), color = white.copy(alpha = 0.86f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+      if (caption != null) Text(caption, style = v3Text(12, FontWeight.Normal, 17), color = white, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Spacer(Modifier.weight(1f))
       if (chips.isNotEmpty()) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -126,6 +127,8 @@ fun V3HeroCard(
             Row(
               Modifier
                 .clip(RoundedCornerShape(16.dp))
+                //  سایهٔ تم زیرِ شیشه (`heroChipShade`) تا برچسبِ ۱۲sp همه‌جای گرادیان ≥ ۴٫۵:۱ بماند
+                .background(Color.Black.copy(alpha = s.heroChipShade))
                 .background(glass)
                 .border(1.dp, white.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
                 .v3Pressable(label = c.label, onClick = c.onClick)

@@ -6,13 +6,15 @@ package ir.vil3ntec.tohid.ui.components.common
  *  «وضعیتِ سفارش همه‌جا یک معنا دارد» — صفحهٔ سفارش‌ها، پیک، میزِ تحویل و ویترین
  *  همین دو تابع را صدا می‌زنند تا «در مسیر» در هیچ صفحه‌ای رنگِ دیگری نگیرد.
  *  فقط رنگ است: منطقِ وضعیت (`core/orders/OrderStates.kt`) دست نمی‌خورد.
- *  قرمز فقط برای لغو و رد است؛ «تازه» در انتظارِ تأییدِ دکان است (کهربایی).
+ *  قرمز فقط برای لغو و رد است؛ «تازه» و «درخواستِ برگشت» در انتظارِ تأییدِ دکان‌اند (بنفش، THEME-V2)؛
+ *  «زمان‌دار» هشدارِ زمان است (کهربایی).
  */
 object OrderStatusTone {
 
   /** وضعیتِ سفارش (`OrderStates`) */
   fun order(status: String): PillTone = when (status) {
-    "new", "return_requested", "scheduled" -> PillTone.WARNING
+    "new", "return_requested" -> PillTone.AWAITING
+    "scheduled" -> PillTone.WARNING
     "accepted", "picking", "packed", "preparing", "ready", "ready_for_pickup" -> PillTone.PREPARING
     "out_for_delivery", "on_the_way", "retry_scheduled" -> PillTone.INFO
     "delivered", "picked_up", "done" -> PillTone.SUCCESS
@@ -24,7 +26,7 @@ object OrderStatusTone {
 
   /** وضعیتِ مأموریتِ پیک (`CourierHome`) — همان معناها با نام‌های پیک */
   fun courier(status: String): PillTone = when (status) {
-    "requested" -> PillTone.WARNING
+    "requested" -> PillTone.AWAITING
     "assigned" -> PillTone.PREPARING
     "picked_up", "moving", "arrived" -> PillTone.INFO
     "delivered" -> PillTone.SUCCESS

@@ -82,7 +82,7 @@ internal fun ProductRowCard(
     ) {
       Text(summary(number, row, expanded), style = V3Type.body.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
       Spacer(Modifier.width(8.dp))
-      if (ready) V3StatusPill(V3Status.DELIVERED, StrProducts.ready) else V3StatusPill(V3Status.AWAITING, StrProducts.incomplete)
+      if (ready) V3StatusPill(V3Status.DELIVERED, StrProducts.ready) else V3StatusPill(V3Status.WARNING, StrProducts.incomplete)
       Spacer(Modifier.width(6.dp))
       V3IconButton(Icons.Outlined.MoreHoriz, StrProducts.rowActions, size = 36.dp, iconSize = 20.dp) { menu = true }
     }

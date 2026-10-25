@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import ir.vil3ntec.tohid.data.LockStore
 import ir.vil3ntec.tohid.ui.v3.onboarding.LockGate
 import ir.vil3ntec.tohid.ui.v3.onboarding.LockSetupGate
+import ir.vil3ntec.tohid.ui.v3.onboarding.PinPad
 
 /*
  *  نام‌های پیشینِ دروازه‌های قفل — `AppRoot` هنوز این‌ها را صدا می‌زند. صفحه‌های تازه
@@ -17,6 +18,13 @@ fun AppLockScreen(onUnlocked: () -> Unit) = LockGate(onUnlocked)
 /** گذاشتنِ رمز، یک بار پس از ساختنِ حساب («فعلاً نه» هم همان `onDone`) */
 @Composable
 fun LockSetupScreen(onDone: () -> Unit) = LockSetupGate(onDone)
+
+/**
+ *  صفحه‌کلیدِ رمزِ پیشین — «PINِ هر کاربر» در صندوق (`components/staff/PinPad`) هنوز این نام را
+ *  صدا می‌زند؛ همان صفحه‌کلیدِ نسخهٔ ۳ ِ قفل (`ui/v3/onboarding/PinPad`، بی اثرِ انگشت) را می‌کشد.
+ */
+@Composable
+internal fun Keypad(onDigit: (Char) -> Unit, onBack: () -> Unit) = PinPad(onDigit = onDigit, onErase = onBack, onFinger = null)
 
 /**
  *  طولِ رمزِ **تازه** (تنظیمات ⇐ رمزِ برنامه). صفحهٔ قفل این را نمی‌خواند و از

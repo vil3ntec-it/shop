@@ -97,10 +97,12 @@ object ShellShots : GroupShots {
     Shot("home", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE) } }),
     Shot("home-6-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = SIX)) } }),
     Shot("home-0-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = emptyList())) } }),
-    Shot("home-drawer", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(heroPage = 1)) } }),
-    Shot("home-safe", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(heroPage = 2)) } }),
+    //  کادرِ پنهان (HOME-V2 §۱): نیمه‌کشیده، باز روی «صندوق»، باز روی «گاوصندوق»
+    Shot("home-pull-half", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 0.5f)) } }),
+    Shot("home-drawer", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f)) } }),
+    Shot("home-safe", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f, drawerPage = 1)) } }),
     Shot("home-stats", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(page = 1)) } }),
-    Shot("home-big", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(big = true, heroPage = 1)) } }),
+    Shot("home-big", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(big = true, reveal = 1f)) } }),
     Shot("transactions", route = "transactions"),
     Shot("transaction-sheet", content = { s ->
       Data(s) { d ->
