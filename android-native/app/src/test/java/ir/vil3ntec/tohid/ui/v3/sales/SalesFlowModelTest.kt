@@ -231,13 +231,16 @@ class SalesFlowModelTest {
 
   @Test
   fun `چاپگرِ دفعهٔ قبل همان راه را باز می کند`() {
-    val net = PrintModel.start("192.168.1.50:9200", ThermalPrinter.WIDTH_80MM, emptyList())
+    //  همان قالبِ ذخیرهٔ `ThermalPrinter.Link.save`
+    val net = PrintModel.start("net:192.168.1.50:9200", ThermalPrinter.WIDTH_80MM, emptyList())
     assertEquals(PrintKind.NETWORK, net.kind)
     assertEquals("9200", net.port)
     assertEquals(ThermalPrinter.WIDTH_80MM, net.width)
-    assertEquals("192.168.1.50:9200", PrintModel.target(net))
-    val saved = PrintModel.start("192.168.1.50", 1, listOf("192.168.1.50"))
-    assertEquals("192.168.1.50", saved.saved)
+    assertEquals("net:192.168.1.50:9200", PrintModel.target(net))
+    //  نشانیِ لختِ نسخه‌های قبلی بلوتوث است
+    assertEquals(PrintKind.BLUETOOTH, PrintModel.start("00:11:22:33:44:55", ThermalPrinter.WIDTH_58MM, emptyList()).kind)
+    val saved = PrintModel.start("net:192.168.1.50", 1, listOf("net:192.168.1.50"))
+    assertEquals("net:192.168.1.50", saved.saved)
     assertEquals(ThermalPrinter.WIDTH_58MM, saved.width)
     assertNull(PrintModel.target(PrintModel.start(null, ThermalPrinter.WIDTH_58MM, emptyList())))
     assertEquals("123", PrintModel.port("1a2۳"))
