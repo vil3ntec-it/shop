@@ -65,6 +65,8 @@ object PermCore {
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMD, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMD, "full", false, emptyList(), true),
+    // HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286
+    "drawer.open" to Spec(OMD, "restrict", true, emptyList(), false),
   )
 
   private fun isCapValue(v: Any?): Boolean =

@@ -118,6 +118,7 @@ private fun auditLabel(type: String): String = when (type) {
   "sale" -> "ثبت فروش"
   "cancel_sale" -> "لغو فروش"
   "return" -> "مرجوعی"
+  "return_no_receipt" -> "برگشتِ بی رسید"
   "purchase" -> "ثبت خرید"
   "customer_payment" -> "پرداخت مشتری"
   "supplier_payment" -> "پرداخت تأمین‌کننده"
@@ -135,6 +136,10 @@ private fun auditLabel(type: String): String = when (type) {
   "debt_due_set" -> "سررسیدِ قرض"
   "credit_over_limit" -> "برد بیش از سقفِ اعتبار"
   "credit_limit_set" -> "سقفِ اعتبار"
+  "customer_merge" -> "ادغامِ مشتری"
+  "marketing_consent" -> "رضایتِ پیامِ تبلیغاتی"
+  "price_list_set" -> "لیستِ قیمتِ مشتری"
+  "debt_reminder" -> "یادآوریِ بدهی"
   else -> type
 }
 

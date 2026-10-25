@@ -527,7 +527,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
                 4 -> TCell(money(v.finalTotal), if (off) Shop.colors.muted else Shop.colors.text, bold = true)
                 5 -> TCell(money(v.paidAmount), Shop.colors.success)
                 6 -> TCell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
-                7 -> TCell(if (v.paymentMethod == "credit") "نسیه" else "نقد")
+                7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(v))
                 else -> TCell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
               }
             },

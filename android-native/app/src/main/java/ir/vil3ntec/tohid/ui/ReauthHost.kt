@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  میزبانِ «تأییدِ دوبارهٔ هویت» — یک بار در `AppRoot`، پس اندروید و کامپیوتر هر دو.
@@ -82,7 +83,7 @@ private fun ReauthDialog(onDone: (Boolean) -> Unit) {
     error = null
     scope.launch {
       auth.requestReauthCode()
-        .onSuccess { note = if (destination.isBlank()) "کد فرستاده شد." else "کد به $destination فرستاده شد." }
+        .onSuccess { note = if (destination.isBlank()) StrShell.codeSentShort else StrShell.codeSentTo(destination) }
         .onFailure { error = it.userMessage }
       busy = false
     }
@@ -109,12 +110,12 @@ private fun ReauthDialog(onDone: (Boolean) -> Unit) {
 
   AlertDialog(
     onDismissRequest = { if (!busy) onDone(false) },
-    title = { Text("تأییدِ دوبارهٔ هویت") },
+    title = { Text(StrShell.reauthTitle) },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-          "برای امنیتِ حساب، این کار فقط چند دقیقه پس از ورود ممکن است. " +
-            if (proof == Proof.CODE) "کدی را که برایتان فرستاده شد بزنید." else "رمزِ حساب را دوباره بزنید.",
+          StrShell.reauthNote + " " +
+            if (proof == Proof.CODE) StrShell.enterSentCode else StrShell.reenterPassword,
           style = MaterialTheme.typography.bodyMedium,
         )
         when (proof) {
@@ -125,12 +126,12 @@ private fun ReauthDialog(onDone: (Boolean) -> Unit) {
               onValueChange = { secret = it },
               singleLine = true,
               enabled = !busy,
-              label = { Text("رمزِ حساب") },
+              label = { Text(StrShell.accountPassword) },
               visualTransformation = PasswordVisualTransformation(),
               modifier = Modifier.fillMaxWidth(),
             )
             TextButton(onClick = { secret = ""; proof = Proof.CODE }, enabled = !busy) {
-              Text("رمز ندارم — کد بفرست")
+              Text(StrShell.noPasswordSendCode)
             }
           }
           Proof.CODE -> {
@@ -141,11 +142,11 @@ private fun ReauthDialog(onDone: (Boolean) -> Unit) {
               onValueChange = { secret = ir.vil3ntec.tohid.latinDigits(it).filter { c -> c in '0'..'9' }.take(8) },
               singleLine = true,
               enabled = !busy,
-              label = { Text("کدِ تأیید") },
+              label = { Text(StrShell.verifyCode) },
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
               modifier = Modifier.fillMaxWidth(),
             )
-            TextButton(onClick = { sendCode() }, enabled = !busy) { Text("فرستادنِ دوبارهٔ کد") }
+            TextButton(onClick = { sendCode() }, enabled = !busy) { Text(StrShell.resendCode) }
           }
         }
         error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = colors.danger) }
@@ -153,11 +154,11 @@ private fun ReauthDialog(onDone: (Boolean) -> Unit) {
     },
     confirmButton = {
       TextButton(enabled = ready, onClick = { submit() }) {
-        Text("تأیید", color = if (ready) colors.primary else colors.muted2)
+        Text(StrShell.confirm, color = if (ready) colors.primary else colors.muted2)
       }
     },
     dismissButton = {
-      TextButton(onClick = { onDone(false) }, enabled = !busy) { Text("انصراف", color = colors.muted) }
+      TextButton(onClick = { onDone(false) }, enabled = !busy) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel, color = colors.muted) }
     },
   )
 }

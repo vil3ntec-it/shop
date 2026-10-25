@@ -426,6 +426,8 @@ fun QuickSaleScreen(
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
+      //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است
+      saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         if (!checkout) return@CheckoutDialog
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
@@ -438,6 +440,8 @@ fun QuickSaleScreen(
           //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
           series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
           saleId = key,
+          //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
+          receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
         ) }) {
           SalePost.Outcome.Busy -> Unit
           SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
