@@ -202,7 +202,9 @@ object Pay {
     return PayResult.Ok(out)
   }
 
-  internal fun table(list: List<PayMethod>?): PayResult<MethodTable> {
+  //  عمومی (نه internal): `data/PayFlow.kt`ِ برنامه جدولِ پیش‌فرض را از این‌جا می‌گیرد و
+  //  این هسته حالا ماژولِ جدای core است
+  fun table(list: List<PayMethod>?): PayResult<MethodTable> {
     if (list == null) return PayResult.Ok(DEFAULT_TABLE)
     return when (val r = defineMethods(list)) {
       is PayResult.Ok -> PayResult.Ok(MethodTable(r.value))
