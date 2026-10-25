@@ -24,6 +24,8 @@ import ir.vil3ntec.tohid.sync.PhoneScanner
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.PromoLive
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
+import ir.vil3ntec.tohid.ui.components.pos.HeldDialog
+import ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices
 import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -53,6 +55,17 @@ fun RouteScope.SaleRoute() {
   val feedback = remember(cart, toasts, snackbar, scope) {
     CartFeedback(context, cart, toasts, snackbar, scope) { code -> nav.open(ProductsPaths.new(barcode = code)) }
   }
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش) — جابه‌جایی ⇒ تسویهٔ
+  //  نیمه‌کاره مالِ فاکتورِ قبلی بود و از نو آغاز می‌شود
+  val loaded by store.loaded.collectAsState()
+  val held = rememberHeldInvoices(
+    cart, data, snackbar, loaded,
+    extras = { HeldSession.extras(cart) },
+    onSwitched = { x ->
+      HeldSession.kept = cart.snapshot().key?.let { it to x }
+      CheckoutSession.reset()
+    },
+  )
   val gate = remember { ScanGate() }
   val d by rememberUpdatedState(data)
   val codes by rememberUpdatedState(index)
@@ -110,6 +123,9 @@ fun RouteScope.SaleRoute() {
     debtorId = debtorId,
     listMode = listMode,
     promo = promo?.applied.orEmpty(),
+    heldStrip = if (held.visible) ({ HeldStrip(held, data) }) else null,
+    onHold = if (held.visible) ({ held.askHold() }) else null,
+    onHeldList = if (held.visible) ({ held.dialog = HeldDialog.List }) else null,
     modifier = Modifier.hidScanner { onCode(it, manual = true, fromPhone = false) },
     actions = SaleActions(
       tap = { item -> if (item.weighed) nav.open(SalesPaths.keypad(item.id)) else feedback.addOne(data, item.id) },
@@ -136,6 +152,7 @@ fun RouteScope.SaleRoute() {
       toggleMode = { listMode = !listMode; mode.save(listMode) },
     ),
   )
+  HeldSheets(held, data)
 }
 
 /** کاشی یا فهرستِ کاتالوگ — همان انبارِ `ViewModePref` (کارت = کاشی، جدول = فهرست)، برای هر کاربر */

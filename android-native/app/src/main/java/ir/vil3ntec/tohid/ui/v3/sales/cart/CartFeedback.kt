@@ -37,7 +37,8 @@ class CartFeedback(
   /** زدنِ کاشی: یک پله، با نگهبانِ موجودی؛ «تمام شد» لرزش و پیامِ موتور */
   fun addOne(d: ShopData, productId: String) {
     val step = CartModel.addOne(d, cart.lines.value, productId)
-    step.lines?.let(cart::set)
+    //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
+    if (step.lines != null && !cart.set(step.lines)) { locked(); return }
     if (step.capped) {
       Haptics.confirm(context)
       step.note?.let { toasts.show(it, V3Tone.WARNING) }
@@ -61,14 +62,14 @@ class CartFeedback(
       }
       is ScaleLabels.Match.Weighed -> {
         val s = CartModel.weighed(d, cart.lines.value, w.product, w.quantity)
-        cart.set(s.lines)
+        if (!cart.set(s.lines)) { ScanFeedback.unknown(context); return CartNote(CartStore.NOT_ADDED, V3Tone.WARNING) }
         if (s.capped) ScanFeedback.unknown(context) else ScanFeedback.ok(context)
         return CartNote(CartModel.scanNote(s), if (s.capped) V3Tone.WARNING else V3Tone.SUCCESS)
       }
     }
     return when (val s = CartModel.scan(d, index, cart.lines.value, code, multiplier) ?: return null) {
       is CartModel.Scan.Added -> {
-        cart.set(s.lines)
+        if (!cart.set(s.lines)) { ScanFeedback.unknown(context); return CartNote(CartStore.NOT_ADDED, V3Tone.WARNING) }
         if (s.capped) ScanFeedback.unknown(context) else ScanFeedback.ok(context)
         CartNote(CartModel.scanNote(s), if (s.capped) V3Tone.WARNING else V3Tone.SUCCESS)
       }
@@ -95,6 +96,11 @@ class CartFeedback(
       val answer = snackbar.showSnackbar(V3SnackVisuals(note.text, note.tone, actionLabel = StrSale.registerItemAlt))
       if (answer == SnackbarResult.ActionPerformed) register(code)
     }
+  }
+
+  private fun locked() {
+    ScanFeedback.unknown(context)
+    toasts.show(CartStore.NOT_ADDED, V3Tone.WARNING)
   }
 
   /** «ثبتِ کالا» ِ بارکدِ ناشناس از برگهٔ اسکن */

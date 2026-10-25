@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.receipt.ReceiptToken
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.Sale
@@ -8,7 +9,7 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.isOnlineOrder
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.formatMonth
 import ir.vil3ntec.tohid.plain
 
@@ -73,10 +74,12 @@ object HistoryModel {
 
   fun monthLabel(m: String): String = if (m == ALL_MONTHS) StrSale.allMonths else formatMonth(m)
 
-  fun shown(d: ShopData, filter: HistoryFilter, search: String, month: String, returnsV2: Boolean): List<Sale> {
+  fun shown(d: ShopData, filter: HistoryFilter, search: String, month: String, returnsV2: Boolean, shopTag: String? = null): List<Sale> {
     val term = search.trim()
     //  RET-01 — QRِ رسید (اسکنر یا دوربین) همان فاکتور را پیدا می‌کند
     if (returnsV2 && term.startsWith(ReturnFlow.CODE_PREFIX.take(3))) return ReturnFlow.find(d, term)
+    //  فاکتورِ نسخهٔ ۲: نشانیِ QRِ رسید، فقط فروشِ همین دکان
+    if (returnsV2 && shopTag != null && ReceiptToken.parse(term) != null) return ReturnFlow.find(d, term, shopTag = shopTag)
     val names = d.debtors.associate { it.id to it.name }
     return d.sales
       .filter {
@@ -105,7 +108,7 @@ object HistoryModel {
   fun dayTitle(date: String, today: String, yesterday: String): String = when (date) {
     today -> ir.vil3ntec.tohid.core.i18n.Str.today
     yesterday -> ir.vil3ntec.tohid.core.i18n.StrKit.yesterday
-    else -> formatDate(date)
+    else -> displayDate(date)
   }
 
   fun stats(d: ShopData): HistoryStats {
@@ -155,5 +158,6 @@ object HistoryModel {
     }
 
   /** فاکتورِ زنده‌ای که QRِ رسید یک‌جا پیدا کرد ⇒ همان لحظه فرمِ برگشت */
-  fun scanned(d: ShopData, code: String): Sale? = ReturnFlow.find(d, code).singleOrNull()?.takeIf { it.status != "cancelled" }
+  fun scanned(d: ShopData, code: String, shopTag: String? = null): Sale? =
+    ReturnFlow.find(d, code, shopTag = shopTag).singleOrNull()?.takeIf { it.status != "cancelled" }
 }

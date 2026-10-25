@@ -7,7 +7,8 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.isOnlineOrder
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceLine
@@ -44,7 +45,7 @@ object ReceiptModel {
   fun payLabel(s: Sale): String = PayFlow.payLabel(s, cash = StrSale.cashPay)
 
   /** «۱۴۰۵/۰۷/۲۸ · ۱۴:۰۵ · نقدی» */
-  fun subtitle(s: Sale): String = listOf(formatDate(s.date), SaleTime.clock(s.createdAt), payLabel(s)).filter { it.isNotBlank() }.joinToString(" · ")
+  fun subtitle(s: Sale): String = listOf(displayDate(s.date), SaleTime.clock(s.createdAt), payLabel(s)).filter { it.isNotBlank() }.joinToString(" · ")
 
   fun lines(d: ShopData, s: Sale): List<V3InvoiceLine> {
     val products = d.products.associateBy { it.id }
@@ -78,4 +79,7 @@ object SaleTime {
     val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
     return "${c.get(java.util.Calendar.HOUR_OF_DAY)}:${c.get(java.util.Calendar.MINUTE).toString().padStart(2, '0')}"
   }
+
+  /** روز (به زبان و تقویمِ برگزیده) و ساعت — صندوق و گزارش‌ها */
+  fun stamp(at: Long): String = if (at <= 0) "—" else displayMillis(at) + " · " + clock(at)
 }

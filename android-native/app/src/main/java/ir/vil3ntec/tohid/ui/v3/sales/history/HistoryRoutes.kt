@@ -4,12 +4,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import ir.vil3ntec.tohid.data.ReceiptFlag
+import ir.vil3ntec.tohid.print.Receipts
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
+import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnSettings
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -58,6 +69,8 @@ fun RouteScope.HistoryRoute() {
     HistoryQuery(HistoryFilter.of(args.query("filter")), args.query("q").orEmpty(), HistoryModel.ALL_MONTHS)
   }
   val today = remember { todayIso() }
+  //  نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`)
+  val shopTag = remember { ReceiptTokens.shopTag(LedgerOwner.currentShop(context)) }
   //  عکسِ CI (`DevShot` «ret»): فرمِ برگشتِ تازه‌ترین فاکتورِ زنده، یا برگشتِ بی رسید
   val shot = ReturnsShot.open.value
   LaunchedEffect(shot) {
@@ -87,8 +100,9 @@ fun RouteScope.HistoryRoute() {
         nav.openForResult(SalesPaths.scan(SalesPaths.SCAN_RECEIPT)) { code ->
           if (code != null) {
             query.search = code
+            if (ReturnFlow.isForeignReceipt(code, shopTag)) toasts.show(ReturnFlow.FOREIGN_RECEIPT, V3Tone.WARNING)
             //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
-            HistoryModel.scanned(data, code)?.let { nav.open(SalesPaths.returnOf(it.id)) }
+            HistoryModel.scanned(data, code, shopTag)?.let { nav.open(SalesPaths.returnOf(it.id)) }
           }
         }
       }) else null,
@@ -96,6 +110,7 @@ fun RouteScope.HistoryRoute() {
       back = backOrNull,
     ),
     bottomReserve = bottomReserve,
+    shopTag = shopTag,
   )
 }
 
@@ -127,6 +142,16 @@ fun RouteScope.InvoiceRoute() {
   val v2 = returnsV2()
   val canCancel = remember { ShopRole.canCancelSale(context) }
   val row = HistoryModel.row(data, sale, v2)
+  //  فاکتورِ نسخهٔ ۲ فقط با پرچمِ `shop.receipt_v2` (خاموش ⇒ همین رسیدِ کارتی، مثلِ پیش)
+  val receiptV2 = remember { ReceiptFlag.enabled(context) }
+  val paper by produceState<ImageBitmap?>(null, sale, data.saleItems.size, receiptV2) {
+    if (!receiptV2) return@produceState
+    value = withContext(Dispatchers.Default) {
+      //  همان QRِ رسیدِ برگشت که چاپ می‌گذارد (فروشِ بی توکن)
+      val qr = if (ReturnSettings.enabled(context) && sale.status != "cancelled") ReturnFlow.receiptCode(sale) else null
+      runCatching { Receipts.bitmap(context, data, sale, legacyQr = qr).asImageBitmap() }.getOrNull()
+    }
+  }
   InvoiceScreen(
     d = data,
     sale = sale,
@@ -144,7 +169,11 @@ fun RouteScope.InvoiceRoute() {
       returnReceipt = { nav.open(SalesPaths.returnReceipt(it)) },
       debtor = { nav.open(MoneyPaths.debtor(it)) },
       back = backOrNull,
+      pdf = if (receiptV2 && !Platform.DESKTOP) ({
+        scope.launch { PrintJob.sharePdf(context, data, sale)?.let { toasts.show(it, V3Tone.WARNING) } }
+      }) else null,
     ),
+    paper = paper,
   )
 }
 

@@ -11,7 +11,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.data.DiscountGate
+import ir.vil3ntec.tohid.data.HeldRules
+import ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalePost
@@ -20,6 +23,7 @@ import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.print.PrintJob
+import ir.vil3ntec.tohid.print.Receipts
 import ir.vil3ntec.tohid.sync.DocSeries
 import ir.vil3ntec.tohid.sync.ShopNews
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -71,7 +75,7 @@ fun RouteScope.CheckoutRoute() {
   val view: CheckoutView? = if (done != null || lines.isEmpty()) last[0] else {
     val promo = PromoLive.rememberOutcome(data, lines)
     val priced = PromoEngine.priced(lines, promo)
-    val form = CheckoutSession.form ?: CheckoutModel.start(cart.debtorId.value, data.debtors)
+    val form = CheckoutSession.form ?: CheckoutModel.start(cart.debtorId.value, data.debtors, HeldSession.extras(cart).discount)
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
@@ -88,6 +92,8 @@ fun RouteScope.CheckoutRoute() {
 
     fun submit() {
       if (!CheckoutModel.canSubmit(busy, discountError, paidError, gate)) return
+      //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
+      if (!HeldRules.shownIsCurrent(lines, cart.lines.value)) { error = StrPos.cartChangedRetry; return }
       //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد
       val signed = if (gate == DiscountGate.State.APPROVED) CheckoutSession.approval?.let(DiscountGate::json) else null
       val options = if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
@@ -111,6 +117,8 @@ fun RouteScope.CheckoutRoute() {
             //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
             series = DocSeries.current(context),
             saleId = key,
+            //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
+            receiptToken = Receipts.newToken(context),
           )
         }) {
           SalePost.Outcome.Busy -> submitted = false

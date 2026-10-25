@@ -14,7 +14,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.PauseCircleOutline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3Hue
@@ -26,7 +29,15 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
  *  سریع» (`sale/quick`) و «تاریخچهٔ فروش» (`sales`). زدن ⇒ برگه با حرکت پایین و بعد همان کار.
  */
 @Composable
-fun SaleMenuSheet(onFreeLine: () -> Unit, onQuickSale: () -> Unit, onHistory: () -> Unit, onClose: () -> Unit) {
+fun SaleMenuSheet(
+  onFreeLine: () -> Unit,
+  onQuickSale: () -> Unit,
+  onHistory: () -> Unit,
+  onClose: () -> Unit,
+  /** «چند فاکتورِ هم‌زمان» روشن (POS-12) ⇒ نگه‌داشتن و فهرستِ فاکتورهای باز */
+  onHold: (() -> Unit)? = null,
+  onHeldList: (() -> Unit)? = null,
+) {
   val c = PhoneV3.colors
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
   val chosen = remember { booleanArrayOf(false) }
@@ -38,6 +49,14 @@ fun SaleMenuSheet(onFreeLine: () -> Unit, onQuickSale: () -> Unit, onHistory: ()
       V3ListRow(StrSale.quickSale, subtitle = StrSale.quickHint, icon = Icons.Outlined.GridView, hue = V3Hue.BRAND, onClick = { go(onQuickSale) })
       V3Divider(start = 64.dp)
       V3ListRow(Str.salesHistoryAlt, icon = Icons.Outlined.History, hue = V3Hue.VIOLET, onClick = { go(onHistory) })
+      onHold?.let { hold ->
+        V3Divider(start = 64.dp)
+        V3ListRow(StrPos.holdInvoice, icon = Icons.Outlined.PauseCircleOutline, hue = V3Hue.TEAL, onClick = { go(hold) })
+      }
+      onHeldList?.let { list ->
+        V3Divider(start = 64.dp)
+        V3ListRow(StrPos.heldInvoices, icon = Icons.Outlined.Layers, hue = V3Hue.SKY, onClick = { go(list) })
+      }
     }
   }
 }

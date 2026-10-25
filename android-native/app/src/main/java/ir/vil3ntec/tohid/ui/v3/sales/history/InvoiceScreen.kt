@@ -1,6 +1,17 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +59,8 @@ class InvoiceActions(
   val returnReceipt: (String) -> Unit,
   val debtor: (String) -> Unit,
   val back: (() -> Unit)?,
+  /** فاکتورِ نسخهٔ ۲ (`shop.receipt_v2`) و گوشی ⇒ «PDF» */
+  val pdf: (() -> Unit)? = null,
 )
 
 /**
@@ -62,6 +75,8 @@ fun InvoiceScreen(
   storeName: String,
   returnsV2: Boolean,
   actions: InvoiceActions,
+  /** فاکتورِ نسخهٔ ۲: پیش‌نمایشِ همان کاغذِ چاپ (`Receipts.bitmap`)؛ `null` ⇒ رسیدِ کارتی */
+  paper: ImageBitmap? = null,
 ) {
   val docs = if (returnsV2) HistoryModel.returnDocs(d, sale) else emptyList()
   V3Scaffold(
@@ -70,6 +85,7 @@ fun InvoiceScreen(
     onBack = actions.back,
     overflow = buildList {
       actions.ret?.let { add(V3MenuItem(Icons.AutoMirrored.Outlined.AssignmentReturn, if (returnsV2) StrSale.returnOrExchange else StrSale.returnWord, onClick = it)) }
+      actions.pdf?.let { add(V3MenuItem(Icons.Outlined.PictureAsPdf, StrSale.sharePdf, onClick = it)) }
       actions.fix?.let { add(V3MenuItem(Icons.Outlined.Edit, StrSale.fixInvoice, onClick = it)) }
       actions.cancel?.let { add(V3MenuItem(Icons.Outlined.Block, StrSale.cancelSale, danger = true, onClick = it)) }
     },
@@ -87,7 +103,7 @@ fun InvoiceScreen(
       Modifier.fillMaxSize().verticalScroll(rememberScrollState())
         .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding() + 16.dp),
     ) {
-      ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
+      if (paper != null) PaperPreview(paper, ReceiptModel.title(sale)) else ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
       if (docs.isNotEmpty()) {
         V3Section(StrSale.returnReceipts) {
           docs.forEachIndexed { i, doc ->
@@ -102,5 +118,21 @@ fun InvoiceScreen(
       }
       Spacer(Modifier.height(8.dp))
     }
+  }
+}
+
+/** کاغذِ فاکتورِ نسخهٔ ۲ (لوگو، سربرگ و QR) روی کارتِ سفید، به پهنای صفحه تا ۴۰۰ */
+@Composable
+private fun PaperPreview(paper: ImageBitmap, label: String) {
+  val c = PhoneV3.colors
+  Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+    Image(
+      bitmap = paper,
+      contentDescription = label,
+      contentScale = ContentScale.FillWidth,
+      modifier = Modifier.widthIn(max = 400.dp).fillMaxWidth()
+        .clip(RoundedCornerShape(16.dp))
+        .border(1.dp, c.hairline, RoundedCornerShape(16.dp)),
+    )
   }
 }

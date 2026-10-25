@@ -227,10 +227,10 @@ fun ShiftReportSheet(rep: ShiftReport, staff: Boolean, title: String?, notes: Li
 fun ShiftNotesSheet(shift: CashShift.Shift, onClose: () -> Unit) {
   val c = PhoneV3.colors
   V3Sheet(onDismiss = onClose, title = StrSale.drawerHistory, detents = false) {
-    Text(ir.vil3ntec.tohid.formatMillis(shift.open.createdAt), style = V3Type.headline, color = c.ink)
+    Text(ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(shift.open.createdAt), style = V3Type.headline, color = c.ink)
     Text(shift.open.notes, style = V3Type.callout, color = c.inkMuted)
     Spacer(Modifier.height(12.dp))
-    Text(shift.close?.let { ir.vil3ntec.tohid.formatMillis(it.createdAt) } ?: StrSale.stillOpen, style = V3Type.headline, color = c.ink)
+    Text(shift.close?.let { ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime.stamp(it.createdAt) } ?: StrSale.stillOpen, style = V3Type.headline, color = c.ink)
     shift.close?.let { Text(it.notes, style = V3Type.callout, color = c.inkMuted) }
   }
 }

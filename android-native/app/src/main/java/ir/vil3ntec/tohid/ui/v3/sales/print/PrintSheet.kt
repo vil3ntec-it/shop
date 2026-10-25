@@ -254,7 +254,7 @@ private fun PickPrinter(
   Spacer(Modifier.height(14.dp))
   Text(StrSale.connectedBy, style = V3Type.subhead, color = c.inkMuted)
   Spacer(Modifier.height(6.dp))
-  V3Segmented(listOf(StrSale.kindBluetooth, StrSale.kindWifi, StrSale.kindCable), form.kind.ordinal, { onForm(form.copy(kind = PrintKind.entries[it])) })
+  V3Segmented(listOf(StrSale.kindBluetooth, StrSale.kindWifi, if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrSale.kindSystem else StrSale.kindCable), form.kind.ordinal, { onForm(form.copy(kind = PrintKind.entries[it])) })
   Spacer(Modifier.height(14.dp))
   when (form.kind) {
     PrintKind.BLUETOOTH -> when {

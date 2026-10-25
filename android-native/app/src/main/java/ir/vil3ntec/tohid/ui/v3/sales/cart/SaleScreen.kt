@@ -89,6 +89,11 @@ fun SaleScreen(
   modifier: Modifier = Modifier,
   /** تخفیف‌های خودکارِ اعمال‌شده (PRM-18) — هر کدام یک ردیف با نامش زیرِ اقلام */
   promo: List<PromoEngine.Applied> = emptyList(),
+  /** نوارِ فاکتورهای باز (POS-12) زیرِ سرخطِ سبد */
+  heldStrip: (@Composable () -> Unit)? = null,
+  /** «چند فاکتورِ هم‌زمان» روشن ⇒ «…» نگه‌داشتن و فهرست را هم دارد */
+  onHold: (() -> Unit)? = null,
+  onHeldList: (() -> Unit)? = null,
   start: SaleStart = SaleStart(),
 ) {
   var search by rememberSaveable { mutableStateOf(start.search) }
@@ -148,7 +153,8 @@ fun SaleScreen(
         )
       },
       cart = { revealed, dragHandle ->
-        Box(dragHandle.fillMaxWidth().padding(top = 62.dp, bottom = 38.dp)) { PhoneCartTitle() }
+        Box(dragHandle.fillMaxWidth().padding(top = 62.dp, bottom = if (heldStrip != null) 12.dp else 38.dp)) { PhoneCartTitle() }
+        heldStrip?.let { strip -> Box(Modifier.fillMaxWidth().padding(bottom = 16.dp)) { strip() } }
         //  ردیف‌ها می‌لغزند؛ «مشتری» و «تخفیف» زیرشان می‌مانند و هرگز پشتِ «جمع:» نمی‌روند
         Box(Modifier.weight(1f).fillMaxWidth()) {
           Column(Modifier.fillMaxWidth()) {
@@ -215,6 +221,8 @@ fun SaleScreen(
         onQuickSale = actions.quickSale,
         onHistory = actions.history,
         onClose = { menu = false },
+        onHold = onHold,
+        onHeldList = onHeldList,
       )
     }
   }

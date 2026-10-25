@@ -6,7 +6,6 @@ import ir.vil3ntec.tohid.core.pay.ShiftReport
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.v3.sales.history.DrawerLine
@@ -89,8 +88,8 @@ object DrawerModel {
 
   /** ردیف‌های گزارشِ X/Z — همان ترتیبِ `ShiftReportLines` ِ پیشین */
   fun report(rep: ShiftReport): List<ReportLine> = buildList {
-    add(ReportLine(StrSale.openedAt, formatMillis(rep.openedAt)))
-    add(ReportLine(if (rep.kind == "Z") StrSale.closedAt else StrSale.reportTime, formatMillis(rep.at)))
+    add(ReportLine(StrSale.openedAt, SaleTime.stamp(rep.openedAt)))
+    add(ReportLine(if (rep.kind == "Z") StrSale.closedAt else StrSale.reportTime, SaleTime.stamp(rep.at)))
     rep.by?.let { add(ReportLine(StrSale.userWord, it)) }
     add(ReportLine(StrSale.openingCash, shown(rep.float)))
     rep.methods.forEach { (id, m) ->

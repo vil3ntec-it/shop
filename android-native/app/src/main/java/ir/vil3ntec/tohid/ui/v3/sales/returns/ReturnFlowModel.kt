@@ -7,7 +7,7 @@ import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -33,7 +33,7 @@ object ReturnFlowModel {
 
   /** «۱۴۰۵/۰۷/۲۸ · ۱٬۲۰۰ ؋ · نامِ مشتری» */
   fun saleLine(d: ShopData, s: Sale): String =
-    listOfNotNull(formatDate(s.date), PhoneSaleText.amount(s.finalTotal), s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name }).joinToString(" · ")
+    listOfNotNull(displayDate(s.date), PhoneSaleText.amount(s.finalTotal), s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name }).joinToString(" · ")
 
   fun itemLine(item: SaleItem, unit: String): String =
     StrSale.returnableEach(qty(ReturnFlow.returnable(item)) + if (unit.isNotBlank()) " $unit" else "", PhoneSaleText.amount(item.totalPrice / item.quantity.coerceAtLeast(1e-9)))

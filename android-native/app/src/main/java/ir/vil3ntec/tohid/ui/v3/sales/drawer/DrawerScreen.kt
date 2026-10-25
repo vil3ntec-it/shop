@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -95,7 +95,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
           Spacer(Modifier.width(12.dp))
           Column(Modifier.weight(1f)) {
             Text(if (open) StrSale.drawerOpen else StrSale.drawerClosed, style = V3Type.headline, color = c.ink)
-            v.shift?.let { Text(StrSale.sinceWhen(formatMillis(it.open.createdAt)), style = V3Type.footnote, color = c.inkMuted) }
+            v.shift?.let { Text(StrSale.sinceWhen(SaleTime.stamp(it.open.createdAt)), style = V3Type.footnote, color = c.inkMuted) }
           }
           V3StatusPill(if (open) V3Status.DELIVERED else V3Status.INACTIVE, if (open) StrSale.openWord else StrSale.closedWord)
         }
@@ -132,8 +132,8 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         v.history.forEachIndexed { i, sh ->
           if (i > 0) V3Divider(start = 64.dp)
           V3ListRow(
-            title = formatMillis(sh.open.createdAt),
-            subtitle = sh.close?.let { formatMillis(it.createdAt) + " — " + it.notes } ?: StrSale.stillOpen,
+            title = SaleTime.stamp(sh.open.createdAt),
+            subtitle = sh.close?.let { SaleTime.stamp(it.createdAt) + " — " + it.notes } ?: StrSale.stillOpen,
             icon = Icons.Outlined.PointOfSale,
             hue = if (sh.close == null) V3Hue.BRAND else null,
             onClick = { actions.shift(sh.open.id) },

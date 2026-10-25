@@ -41,10 +41,12 @@ data class CheckoutNumbers(
  */
 object CheckoutModel {
 
-  fun start(presetDebtorId: String?, debtors: List<Debtor>): CheckoutForm {
+  /** @param presetDiscount POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  fun start(presetDebtorId: String?, debtors: List<Debtor>, presetDiscount: String = ""): CheckoutForm {
     val preset = presetDebtorId?.takeIf { id -> debtors.any { it.id == id } }
-    return if (preset != null) CheckoutForm(SalesEngine.Payment.CREDIT, preset, paidText = "0")
-    else CheckoutForm(SalesEngine.Payment.CASH, null)
+    val discount = presetDiscount.ifBlank { "0" }
+    return if (preset != null) CheckoutForm(SalesEngine.Payment.CREDIT, preset, discountText = discount, paidText = "0")
+    else CheckoutForm(SalesEngine.Payment.CASH, null, discountText = discount)
   }
 
   fun checkout(form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String): SalesEngine.Checkout =

@@ -113,14 +113,16 @@ fun HistoryScreen(
   query: HistoryQuery,
   actions: HistoryActions,
   bottomReserve: androidx.compose.ui.unit.Dp = 0.dp,
+  /** نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`) */
+  shopTag: String? = null,
 ) {
   val c = PhoneV3.colors
   var searching by rememberSaveable { mutableStateOf(query.search.isNotEmpty()) }
   var monthSheet by remember { mutableStateOf(false) }
   var menuFor by remember { mutableStateOf<String?>(null) }
   val months = remember(d.sales) { HistoryModel.months(d) }
-  val shown = remember(d, query.filter, query.search, query.month, returnsV2) {
-    HistoryModel.shown(d, query.filter, query.search, query.month, returnsV2)
+  val shown = remember(d, query.filter, query.search, query.month, returnsV2, shopTag) {
+    HistoryModel.shown(d, query.filter, query.search, query.month, returnsV2, shopTag)
   }
   val days = remember(shown) { HistoryModel.days(shown) }
   val stats = remember(d.sales) { HistoryModel.stats(d) }

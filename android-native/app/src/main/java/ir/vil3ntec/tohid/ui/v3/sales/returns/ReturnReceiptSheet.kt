@@ -21,7 +21,7 @@ import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -50,7 +50,7 @@ fun ReturnReceiptSheet(
   val doc = remember(d, docId) { ReturnFlow.doc(d, docId) } ?: return
   V3Sheet(onDismiss = onClose, title = StrSale.returnReceiptOf(doc.label), detents = false) {
     Text(
-      (doc.sale?.let { StrSale.fromInvoice(it.invoiceLabel() ?: "0") } ?: StrSale.withoutReceipt) + " · " + formatDate(doc.date),
+      (doc.sale?.let { StrSale.fromInvoice(it.invoiceLabel() ?: "0") } ?: StrSale.withoutReceipt) + " · " + displayDate(doc.date),
       style = V3Type.footnote,
       color = c.inkMuted,
     )
