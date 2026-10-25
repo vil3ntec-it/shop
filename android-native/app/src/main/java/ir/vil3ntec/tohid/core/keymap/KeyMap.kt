@@ -95,7 +95,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.K, mod = true)),
   )
   val GLOBAL_PAGE1 = KeyAction(
-    "global.page1", "global", "داشبورد", KeyStatus.LIVE,
+    "global.page1", "global", "خانه", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.D1, mod = true)),
     web = listOf(Chord(KeyName.D1, alt = true)),
     page = "dashboard",
