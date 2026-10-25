@@ -52,7 +52,7 @@ object StrAccount {
   val photoFailed: String get() = t("عکس ذخیره نشد", "The photo wasn't saved", "انځور خوندي نه شو")
   val photoSource: String get() = t("انتخاب تصویر", "Choose a picture", "انځور وټاکئ")
   val camera: String get() = t("دوربین", "Camera", "کمره")
-  val cameraBody: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo taken with your phone or webcam", "هغه انځور چې په موبایل یا ویب‌کم اخیستل شوی")
+  val cameraBody: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo on this computer, taken with a phone or webcam", "په کمپیوټر کې انځور، چې په موبایل یا ویب‌کم اخیستل شوی")
   val gallery: String get() = t("گالری", "Gallery", "ګالري")
   val galleryBody: String get() = td("انتخاب از عکس‌های گوشی", "Pick from the phone's photos", "د تلیفون له انځورونو وټاکئ", "Pick from the computer's pictures", "د کمپیوټر له انځورونو وټاکئ")
   val groupAccount: String get() = t("حساب", "Account", "حساب")

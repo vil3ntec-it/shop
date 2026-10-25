@@ -16,7 +16,7 @@ object StrSearch {
   val showLess: String get() = t("کمتر", "Show less", "لږ")
   val nothing: String get() = t("چیزی پیدا نشد.", "Nothing found.", "هېڅ ونه موندل شو.")
   val nothingBody: String get() = t("نامِ دیگر، بارکد یا شمارهٔ فاکتور را امتحان کنید.", "Try another name, a barcode or an invoice number.", "بل نوم، بارکوډ یا د بل شمېره وازمویئ.")
-  val scanTitle: String get() = td("اسکنِ بارکد برای جست‌وجو", "Scan a barcode to search", "د لټون لپاره بارکوډ سکن کړئ", "Scan a barcode to search", "د لټون لپاره بارکوډ سکن کړئ")
+  val scanTitle: String get() = t("اسکنِ بارکد برای جست‌وجو", "Scan a barcode to search", "د لټون لپاره بارکوډ سکن کړئ")
   fun productHint(stock: Any, price: Any): String = t("موجودی $stock · $price ؋", "In stock $stock · $price ؋", "موجودي $stock · $price ؋")
   fun debtorHint(debt: Any): String = t("بدهی $debt ؋", "Owes $debt ؋", "پور $debt ؋")
   fun invoiceTitle(label: Any): String = t("فاکتورِ $label", "Invoice $label", "بل $label")
