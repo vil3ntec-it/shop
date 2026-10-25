@@ -1166,7 +1166,18 @@
   </section>
 
   <section id="tab-ops" class="hidden">
-    <!-- ماژولِ ops.js — سرویس‌های بیرونی (OPS-04@29) -->
+    <!-- ماژولِ ops.js — نسخهٔ دستگاه‌ها (OPS-04)، سرویس‌های بیرونی (OPS-04@29) و زنجیرهٔ هش (SEC-02) -->
+    <div class="panel">
+      <h2>نسخهٔ دستگاه‌ها</h2>
+      <div class="row"><span class="muted" id="ops-ver-checked"></span></div>
+      <div id="ops-ver-msg"></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>برنامه</th><th>نسخه</th><th>دستگاه</th><th>آخرین دیده‌شدن</th><th>وضعیت</th></tr></thead>
+          <tbody id="ops-versions"></tbody>
+        </table>
+      </div>
+    </div>
     <div class="panel">
       <h2>سرویس‌های بیرونی</h2>
       <div class="row"><span class="muted" id="ops-prov-checked"></span></div>
@@ -1175,6 +1186,24 @@
         <table>
           <thead><tr><th>سرویس</th><th>راه</th><th>وضعیت</th><th>توضیح</th></tr></thead>
           <tbody id="ops-providers"></tbody>
+        </table>
+      </div>
+    </div>
+      <div class="panel">
+      <h2>زنجیرهٔ هشِ سابقه (SEC-02)</h2>
+      <div class="muted">همان سنجشِ <code>scripts/verify-chain.js</code>: هر زنجیره از نخستین حلقه؛ شکسته ⇒ نخستین حلقهٔ شکسته و دلیل. فقط‌خواندنی.</div>
+      <div class="row hidden" id="ops-chain-tools" style="margin-top:10px;">
+        <input type="text" id="ops-chain-name" placeholder="فقط یک زنجیره (اختیاری)، مثلاً audit/…" style="flex:1;min-width:220px;">
+        <label style="margin:0;"><input type="checkbox" id="ops-chain-rows" checked> ردیف‌های سابقه هم سنجیده شوند</label>
+        <button class="btn btn-sm" id="btn-ops-chain">بررسیِ زنجیره</button>
+      </div>
+      <div class="muted hidden" id="ops-chain-super" style="margin-top:10px;">بررسیِ زنجیره فقط با مدیرِ ارشد است.</div>
+      <div id="ops-chain-msg"></div>
+      <div class="row"><span class="muted" id="ops-chain-checked"></span></div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>زنجیره</th><th>وضعیت</th><th>حلقه</th><th>سر یا نخستین شکستگی</th></tr></thead>
+          <tbody id="ops-chains"></tbody>
         </table>
       </div>
     </div>

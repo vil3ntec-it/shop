@@ -788,6 +788,36 @@ await step('عملیات: سرویس‌های بیرونی با برچسبِ «�
   }
 });
 
+// ── OPS-04: داشبوردِ نسخهٔ دستگاه‌ها و هشدارِ زیرِ حداقل ───────────
+await step('عملیات: نسخهٔ دستگاه‌ها با هشدارِ قرمزِ «زیرِ حداقل»', async () => {
+  const plans = require('../src/lib/plans');
+  const before = await plans.allConfig();
+  const t = now();
+  await query(
+    `INSERT INTO sync_devices (app, account_kind, account_id, device_id, app_version, last_seen_at)
+     VALUES ('shop','shop','ops-acc','ops-dev-1','2.13.0',$1), ('shop','shop','ops-acc','ops-dev-2','2.14.2',$1)`,
+    [t - 60_000]
+  );
+  await plans.setConfig('latest_version_shop', '2.14.2');
+  await plans.setConfig('min_app_version_shop', '2.14.0');
+  try {
+    await openTab('ops');
+    await page.waitForSelector('#ops-versions tr[data-version="2.13.0"]', { timeout: 10_000 });
+    const badge = (v) => page.locator(`#ops-versions tr[data-app="shop"][data-version="${v}"] .badge`).textContent();
+    assert.equal((await badge('2.13.0')).trim(), 'زیرِ حداقل');
+    assert.equal((await badge('2.14.2')).trim(), 'به‌روز');
+    const alert = page.locator('#ops-ver-msg .msg');
+    assert.match(await alert.textContent(), /۱ دستگاهِ دکان زیرِ حداقل نسخهٔ 2\.14\.0/);
+    assert.ok((await alert.getAttribute('class')).includes('msg-bad'), 'هشدارِ زیرِ حداقل باید قرمز باشد');
+    assert.ok(!(await page.locator('#ops-versions').textContent()).includes('ops-acc'), 'شناسهٔ حساب در پنل');
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/ops-04-versions.png`, fullPage: true });
+  } finally {
+    await query(`DELETE FROM sync_devices WHERE account_id='ops-acc'`);
+    await plans.setConfig('latest_version_shop', before.latest_version_shop || '');
+    await plans.setConfig('min_app_version_shop', before.min_app_version_shop || '');
+  }
+});
+
 // ── IMG-01 / IMG-BANK-01 / IMG-03 / IMG-PRO-09: ورودِ گروهی از پنل، با گزارشِ ردیف و فایل ──
 await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ جعلی و خراب جدا گزارش می‌شوند و دسته نمی‌خوابد', async () => {
   const F = require('./image-fixtures');
@@ -965,6 +995,48 @@ await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» �
   assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.bank_image_archived' AND target_id=$1`, [pub.id]), 'بایگانی سابقه نداشت');
   await page.selectOption('#ib-rv-status', 'NEEDS_REVIEW');
   await page.selectOption('#ib-rv-space', 'pending');
+});
+
+// ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────
+await step('عملیات: بررسیِ زنجیرهٔ هش؛ دست‌کاری با نخستین حلقهٔ شکسته و دلیل دیده می‌شود', async () => {
+  const store = require('../src/lib/hash-chain-store');
+  const live = require('../src/lib/live-config');
+  await live.set(store.FLAG_SCOPE, store.FLAG_AUDIT, true, 'panel-test');
+  const tamper = async (sql, params) => {
+    await query('ALTER TABLE hash_chain DISABLE TRIGGER hash_chain_immutable');
+    try { await query(sql, params); } finally { await query('ALTER TABLE hash_chain ENABLE TRIGGER hash_chain_immutable'); }
+  };
+  try {
+    const audit = require('../src/lib/audit');
+    for (const action of ['sale.create', 'sale.void']) {
+      await audit.log({ shopId: 'shp_panel_chain', actorType: 'user', userId: 'usr_panel', action, detail: { n: 1 } });
+    }
+    const chain = store.auditChainId({ shopId: 'shp_panel_chain', actorType: 'user', userId: 'usr_panel' });
+    await openTab('ops');
+    await page.waitForSelector('#ops-chain-tools:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ops-chain-name', chain);
+    await page.click('#btn-ops-chain');
+    await page.waitForSelector(`#ops-chains tr[data-chain="${chain}"]`, { timeout: 10_000 });
+    assert.match(await page.locator('#ops-chain-msg').textContent(), /✔/);
+    assert.match(await page.locator(`#ops-chains tr[data-chain="${chain}"]`).textContent(), /سالم.*سر:/);
+
+    const two = (await one('SELECT body FROM hash_chain WHERE chain=$1 AND seq=2', [chain])).body;
+    await tamper('UPDATE hash_chain SET body=$2 WHERE chain=$1 AND seq=2', [chain, two.replace('"sale.void"', '"sale.keep"')]);
+    try {
+      await page.click('#btn-ops-chain');
+      await page.waitForFunction(() => /✖/.test(document.getElementById('ops-chain-msg').textContent), null, { timeout: 10_000 });
+      const row = await page.locator(`#ops-chains tr[data-chain="${chain}"]`).textContent();
+      assert.match(row, /شکسته/);
+      assert.match(row, /#۲: متنِ حلقه با هشش نمی‌خواند \(hash_mismatch\)/);
+      assert.ok((await page.locator('#ops-chain-msg .msg').getAttribute('class')).includes('msg-bad'));
+      if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/sec-02-chain.png`, fullPage: true });
+    } finally {
+      await tamper('UPDATE hash_chain SET body=$2 WHERE chain=$1 AND seq=2', [chain, two]);
+    }
+    assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.chain_verified'`), 'بررسی سابقه نداشت');
+  } finally {
+    await live.set(store.FLAG_SCOPE, store.FLAG_AUDIT, false, 'panel-test');
+  }
 });
 
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──

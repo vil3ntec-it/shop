@@ -23,6 +23,8 @@ import ir.vil3ntec.tohid.core.net.userText
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  «دکانت کدام است؟» — گامی که اصلاً وجود نداشت.
@@ -96,15 +98,14 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
     TohidMark(Modifier.size(56.dp))
     Spacer(Modifier.height(18.dp))
     Text(
-      "دکانت را بسازیم",
+      StrAuth.setupShop,
       style = MaterialTheme.typography.headlineSmall,
       color = colors.text,
       fontWeight = FontWeight.Bold,
     )
     Spacer(Modifier.height(8.dp))
     Text(
-      "تا وقتی دکانی ثبت نشده، اطلاعات روی سرور ذخیره نمی‌شود و روی " +
-        "گوشی دوم هم دیده نمی‌شود.",
+      StrAuth.setupNote,
       style = MaterialTheme.typography.bodySmall,
       color = colors.muted,
       textAlign = TextAlign.Center,
@@ -114,7 +115,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
 
     /* ---------------------- صاحبِ دکان ---------------------- */
     Text(
-      "صاحب دکان هستید؟",
+      StrAuth.areYouOwner,
       style = MaterialTheme.typography.labelLarge,
       color = colors.text,
       modifier = Modifier.fillMaxWidth(),
@@ -123,8 +124,8 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
     PillField(
       value = name,
       onValueChange = { name = it; error = null },
-      placeholder = "نام دکان — مثلاً «فروشگاه نور»",
-      label = "نام دکان",
+      placeholder = StrAuth.shopNameHint,
+      label = StrAuth.shopName,
       icon = Icons.Filled.Storefront,
     )
     Spacer(Modifier.height(10.dp))
@@ -134,13 +135,13 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
         scope.launch {
           shops.create(name.trim().ifBlank { "دکان من" })
             .onSuccess { settle(it.shop?.id.orEmpty()) }
-            .onFailure { error = it.userText("دکان ساخته نشد") }
+            .onFailure { error = it.userText(StrAuth.shopNotCreated) }
           busy = false
         }
       },
       enabled = !busy,
       modifier = Modifier.fillMaxWidth().height(52.dp),
-    ) { Text(if (busy) "…" else "دکان من را بساز") }
+    ) { Text(if (busy) "…" else StrAuth.createMyShop) }
 
     Spacer(Modifier.height(26.dp))
     HorizontalDivider(color = colors.fieldBorder)
@@ -148,7 +149,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
 
     /* ---------------------- شاگرد ---------------------- */
     Text(
-      "شاگرد دکان هستید؟",
+      StrAuth.areYouStaff,
       style = MaterialTheme.typography.labelLarge,
       color = colors.text,
       modifier = Modifier.fillMaxWidth(),
@@ -158,7 +159,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
       value = code,
       onValueChange = { code = it.uppercase(); error = null },
       placeholder = ir.vil3ntec.tohid.data.StaffCode.HINT,
-      label = "کد پیوستن",
+      label = Str.joinCode,
       icon = Icons.Filled.Badge,
       ltr = true,
       keyboardOptions = KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Characters),
@@ -169,7 +170,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
         val entered = ir.vil3ntec.tohid.data.StaffCode.clean(code)
         //  سنجشِ قالب کارِ سرور است؛ گوشی فقط می‌بیند خالی نباشد
         if (!ir.vil3ntec.tohid.data.StaffCode.usable(entered)) {
-          error = "کد را کامل بزنید."
+          error = Str.codeIncomplete
           return@OutlinedButton
         }
         busy = true; error = null
@@ -181,13 +182,13 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
               it.effectiveRole?.let { role -> ir.vil3ntec.tohid.data.ShopRole.remember(context, role) }
               settle(it.shop?.id.orEmpty())
             }
-            .onFailure { error = it.userText("پیوستن به دکان انجام نشد") }
+            .onFailure { error = it.userText(StrAuth.joinFailed) }
           busy = false
         }
       },
       enabled = !busy && code.isNotBlank(),
       modifier = Modifier.fillMaxWidth().height(52.dp),
-    ) { Text("پیوستن به دکان") }
+    ) { Text(StrAuth.joinShop) }
 
     error?.let {
       Spacer(Modifier.height(14.dp))
@@ -203,7 +204,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
      *  شود دوباره پرسیده می‌شود.
      */
     TextButton(onClick = onDone, enabled = !busy) {
-      Text("بعداً — فعلاً روی همین گوشی کار می‌کنم", color = colors.muted)
+      Text(StrAuth.laterThisDevice, color = colors.muted)
     }
   }
 }

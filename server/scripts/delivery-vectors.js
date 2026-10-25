@@ -51,16 +51,6 @@ function verdict(mode, from, to, actor, note = 'x') {
  */
 const KNOWN_DIVERGENCES = [
   {
-    id: 'courier-assigned-delivered',
-    impl: 'CourierFlow.canSend',
-    kind: 'latent-bug',
-    pairs: [['shop_courier', 'assigned', 'delivered']],
-    note: 'سرور: پیک بی «گرفتنِ بسته» تحویل نمی‌دهد (invalid_transition؛ assigned → delivered فقط دریافتِ حضوری). '
-      + 'canSend جدولِ گذار را بی این قید کپی کرده و true می‌دهد. امروز بی‌اثر است: هیچ دکمه‌ای آن را نمی‌فرستد '
-      + '(actions("assigned") = picked_up)، ولی enqueue(from="assigned", type="delivered") پذیرفته و projectedStatus '
-      + 'کارت را «تحویل شد» نشان می‌دهد تا سرور رد کند.',
-  },
-  {
     id: 'courier-delivered-after-arrived',
     impl: 'CourierFlow.actions',
     kind: 'ui-choice',

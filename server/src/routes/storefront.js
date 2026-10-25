@@ -120,7 +120,7 @@ router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
 
 //  ── ۲۳: تأییدِ شماره پیش از ثبتِ سفارش ──────────────────────────────
 router.post('/:slug/verify/start', sendCodeLimit, store, wrap(async (req, res) => {
-  res.json(await sf.startVerification(req.body, { ip: clientIp(req) }));
+  res.json(await sf.startVerification(req.body, { ip: clientIp(req), shopId: req.store.shop_id }));
 }));
 
 router.post('/:slug/verify/check', codeLimit, store, wrap(async (req, res) => {

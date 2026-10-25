@@ -81,8 +81,6 @@ import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import ir.vil3ntec.tohid.plain
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,6 +104,11 @@ import ir.vil3ntec.tohid.sync.SavedLogins
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrAuth
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  صفحهٔ ورود.
@@ -188,9 +191,9 @@ private val EMAIL_SHAPE = Regex("^[^\\s@]+@[^\\s@.]+(\\.[^\\s@.]+)+$")
 private fun emailValidationError(raw: String): String? {
   val s = raw.trim()
   return when {
-    s.isEmpty() -> "ایمیل را وارد کنید"
-    s.length > 190 -> "این ایمیل خیلی بلند است"
-    !EMAIL_SHAPE.matches(s) -> "ایمیل کامل نیست — مثل name@example.com"
+    s.isEmpty() -> StrAuth.enterEmail
+    s.length > 190 -> StrAuth.emailTooLong
+    !EMAIL_SHAPE.matches(s) -> StrAuth.emailIncomplete
     else -> null
   }
 }
@@ -315,7 +318,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
   }
 
   fun fail(e: Throwable) {
-    error = e.userText("ارتباط با سرور برقرار نشد")
+    error = e.userText(StrAuth.serverUnreachable)
   }
 
   /**
@@ -408,7 +411,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                  */
                 emailMode = "login"
                 password2 = ""
-                note = "حساب ساخته شد — حالا وارد شوید"
+                note = StrAuth.accountCreated
               }
             }
             .onFailure {
@@ -454,7 +457,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           asked
             .onSuccess {
               cooldown.start(destination, it.resendSeconds)
-              note = "کد دوباره فرستاده شد"
+              note = StrAuth.codeResent
             }
             .onFailure { fail(it) }
           busy = false
@@ -502,9 +505,9 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
        *  در `index.html` از قبل داشت.
        */
       GradientHeader(
-        title = if (emailMode == "login") "خوش آمدید" else "ساخت حساب",
-        subtitle = if (emailMode == "login") "با ایمیل و رمزتان وارد شوید"
-        else "با ایمیل‌تان، در سه گام کوتاه",
+        title = if (emailMode == "login") StrAuth.welcome else Str.createAccount,
+        subtitle = if (emailMode == "login") StrAuth.signInSub
+        else StrAuth.registerSub,
       )
 
       /*
@@ -526,6 +529,10 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           .padding(horizontal = 22.dp),
       ) {
         Spacer(Modifier.height(10.dp))
+
+        //  زبانِ برنامه، همان بارِ اول — فارسی / English / پښتو؛ بعداً از تنظیمات ← زبان
+        ir.vil3ntec.tohid.ui.LanguagePicker()
+        Spacer(Modifier.height(12.dp))
 
         /*
          *  ورود یا ساختِ حساب — یک کلیدِ دوتکه، بالای خودِ فرم.
@@ -580,8 +587,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           PillField(
             value = name,
             onValueChange = { name = it; error = null },
-            placeholder = "مثلاً کریم",
-            label = "نام شما",
+            placeholder = StrAuth.nameExample,
+            label = StrAuth.yourName,
             icon = Icons.Filled.Person,
           )
           Spacer(Modifier.height(12.dp))
@@ -592,7 +599,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             value = email,
             onValueChange = { email = it; error = null; emailError = null },
             placeholder = "name@gmail.com",
-            label = "ایمیل",
+            label = StrAuth.email,
             icon = Icons.Filled.AlternateEmail,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Email,
@@ -606,8 +613,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             value = password,
             onValueChange = { password = it; error = null; passwordError = null },
             error = passwordError,
-            placeholder = if (emailMode == "register") "حداقل ۸ نویسه" else "رمز عبور",
-            label = "رمز عبور",
+            placeholder = if (emailMode == "register") StrAuth.min8 else StrAuth.password,
+            label = StrAuth.password,
             icon = Icons.Filled.Lock,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Password,
@@ -620,7 +627,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               IconButton(onClick = { showPassword = !showPassword }, modifier = Modifier.size(44.dp)) {
                 Icon(
                   if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                  contentDescription = if (showPassword) "پنهان کردن رمز" else "نمایش رمز",
+                  contentDescription = if (showPassword) StrAuth.hidePassword else StrAuth.showPassword,
                   tint = Shop.colors.muted,
                   modifier = Modifier.size(19.dp),
                 )
@@ -648,8 +655,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             PillField(
               value = password2,
               onValueChange = { password2 = it; error = null },
-              placeholder = "همان رمز، دوباره",
-              label = "تکرار رمز عبور",
+              placeholder = StrAuth.samePasswordAgain,
+              label = StrAuth.repeatPassword,
               icon = Icons.Filled.Lock,
               keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Password,
@@ -658,13 +665,13 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               visual = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
               //  پیامِ زنده و **چسبیده به همان کادر**، نه یک خطِ جدا که
               //  معلوم نیست مالِ کدام است
-              error = if (password2.isNotBlank() && !same) "دو رمز یکی نیستند" else null,
+              error = if (password2.isNotBlank() && !same) Str.passwordsDiffer else null,
             )
             //  و وقتی جور شد، همان‌جا تأیید می‌گیرد
             if (password2.isNotBlank() && same) {
               Spacer(Modifier.height(6.dp))
               Text(
-                "هر دو یکی‌اند",
+                StrAuth.bothMatch,
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.success,
                 modifier = Modifier.padding(horizontal = 14.dp),
@@ -723,7 +730,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               },
             ) {
               Text(
-                "رمز عبور را فراموش کرده‌اید؟",
+                StrAuth.forgotPassword,
                 color = inkSoft,
                 style = MaterialTheme.typography.labelMedium,
               )
@@ -743,7 +750,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         Spacer(Modifier.height(if (emailMode == "login") 12.dp else 18.dp))
 
         /* ------------------------ دکمهٔ اصلی ------------------------ */
-        val label = if (emailMode == "register") "ساخت حساب" else "ورود به حساب"
+        val label = if (emailMode == "register") Str.createAccount else StrAuth.signInToAccount
         /*
          *  ── نامی که جلوی ورود را گرفته بود ────────────────────────────
          *  اینجا `name.isNotBlank()` روی **هر دو** راه بود. یعنی کسی که
@@ -779,8 +786,8 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           //  نشود و کاربر همان‌جا بفهمد چه کم است
           emailError = emailValidationError(email)
           passwordError = when {
-            password.isBlank() -> "رمز عبور را وارد کنید"
-            emailMode == "register" && password.length < 8 -> "رمز باید حداقل ۸ نویسه باشد"
+            password.isBlank() -> StrAuth.enterPassword
+            emailMode == "register" && password.length < 8 -> StrAuth.passwordMin8
             else -> null
           }
           if (emailError != null || passwordError != null) return@GradientButton
@@ -799,7 +806,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 auth.registerStart(name.trim(), email.trim(), password)
                   .onSuccess {
                     cooldown.start(email.trim(), it.resendSeconds)
-                    it.devCode?.let { c -> note = "کد آزمایشی: $c" }
+                    it.devCode?.let { c -> note = StrAuth.testCode(c) }
                     signupStep = "code"
                     codeSent = true
                   }
@@ -815,8 +822,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                      *  ────────────────────────────────────────────────
                      */
                     if (e is ApiFailure.NotFound) {
-                      error = "سرورِ این دکان هنوز کدِ تأیید نمی‌فرستد؛ " +
-                        "تا وقتی به‌روز نشود، ثبت‌نام از برنامه ممکن نیست."
+                      error = StrAuth.noVerifyServer
                     } else fail(e)
                   }
 
@@ -850,7 +856,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         if (otpReady && emailMode == "login") {
           Spacer(Modifier.height(10.dp))
           GhostButton(
-            text = "ورود با کد به‌جای رمز",
+            text = StrAuth.signInWithCode,
             //  نام اینجا لازم نیست: کد به **ایمیل** می‌رود. برای
             //  حسابی که تازه ساخته می‌شود سرور خودش نامِ خالی را
             //  می‌پذیرد و کاربر بعداً در پروفایل می‌نویسدش.
@@ -863,7 +869,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 val to = email.trim()
                 if (cooldown.secondsLeft(to) > 0) {
                   codeSent = true
-                  note = "کد قبلی هنوز معتبر است"
+                  note = StrAuth.previousCodeValid
                 } else {
                   auth.requestOtp(to)
                     .onSuccess {
@@ -895,7 +901,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           ) {
             HorizontalDivider(Modifier.weight(1f), color = fieldLine)
             Text(
-              "یا",
+              StrAuth.or,
               style = MaterialTheme.typography.labelMedium,
               color = inkSoft,
               modifier = Modifier.padding(horizontal = 12.dp),
@@ -906,8 +912,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
           GoogleButton(enabled = ready && !busy) {
             if (googleId.isBlank()) {
               note = null
-              error = "ورود با گوگل روی این سرور باز نشده — در پروندهٔ .env مقدار " +
-                "GOOGLE_CLIENT_ID را بگذارید و سرور را دوباره بالا بیاورید"
+              error = StrAuth.googleNotEnabled
             } else {
               busy = true; error = null; note = null
               scope.launch {
@@ -927,7 +932,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                         }
                     }
                   }
-                  .onFailure { error = it.userText("ورود با گوگل انجام نشد") }
+                  .onFailure { error = it.userText(StrAuth.googleFailed) }
                 busy = false
               }
             }
@@ -944,7 +949,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               scope.launch {
                 auth.requestGoogleLinkCode(ask.idToken)
                   .onSuccess { googleLink = ask.copy(codeSent = true, problem = null) }
-                  .onFailure { googleLink = ask.copy(problem = it.userText("کد فرستاده نشد")) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText(StrShell.codeNotSent)) }
                 busy = false
               }
             },
@@ -953,7 +958,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
               scope.launch {
                 auth.loginWithGoogle(ask.idToken, password = secret.takeUnless { isCode }, code = secret.takeIf { isCode })
                   .onSuccess { googleLink = null; finish(ask.email, it) }
-                  .onFailure { googleLink = ask.copy(problem = it.userText("وصل نشد")) }
+                  .onFailure { googleLink = ask.copy(problem = it.userText(StrShell.notConnected)) }
                 busy = false
               }
             },
@@ -972,7 +977,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         if (saved.isNotEmpty() && emailMode == "login") {
           Spacer(Modifier.height(20.dp))
           Text(
-            "ورودهای ذخیره شده",
+            StrAuth.savedSignIns,
             style = MaterialTheme.typography.labelMedium,
             color = inkSoft,
           )
@@ -1007,7 +1012,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                 } else {
                   //  حسابی که با شماره ساخته شده بود: کادرِ شماره از
                   //  صفحهٔ ورود برداشته شده، پس همان‌جا می‌گوییم چه کند
-                  note = "این حساب با شماره ساخته شده بود — با ایمیلِ همان حساب وارد شوید"
+                  note = StrAuth.phoneAccount
                 }
                 if (name.isBlank()) name = entry.shop
               },
@@ -1037,7 +1042,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
         ) {
           TextButton(onClick = onDone, contentPadding = PaddingValues(horizontal = 8.dp)) {
             Text(
-              "ادامه بدون حساب",
+              StrAuth.continueWithout,
               style = MaterialTheme.typography.labelLarge,
               color = BLUE,
               fontWeight = FontWeight.Bold,
@@ -1053,7 +1058,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             contentPadding = PaddingValues(horizontal = 8.dp),
           ) {
             Text(
-              if (showMore) "بستن" else "کد شاگرد دارم",
+              if (showMore) Str.close else StrAuth.haveStaffCode,
               style = MaterialTheme.typography.labelLarge,
               color = inkSoft,
             )
@@ -1079,16 +1084,16 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             PillField(
               value = name,
               onValueChange = { name = it; error = null },
-              placeholder = "مثلاً کریم",
-              label = "نام شما",
+              placeholder = StrAuth.nameExample,
+              label = StrAuth.yourName,
               icon = Icons.Filled.Person,
             )
             Spacer(Modifier.height(10.dp))
             PillField(
               value = staffCode,
               onValueChange = { staffCode = it.uppercase(); error = null },
-              placeholder = "کد پیوستن — ${StaffCode.HINT}",
-              label = "کد پیوستن",
+              placeholder = StrAuth.joinCodeHint(StaffCode.HINT),
+              label = Str.joinCode,
               icon = Icons.Filled.Storefront,
               ltr = true,
               trailing = {
@@ -1101,7 +1106,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                     //  «چیزی زده شده؟» سنجیده می‌شود؛ بقیه‌اش با سرور
                     //  است و پیامِ ردّش هم از همان‌جا می‌آید.
                     if (!StaffCode.usable(entered)) {
-                      error = "کد را کامل بزنید."
+                      error = Str.codeIncomplete
                       return@TextButton
                     }
                     busy = true; error = null
@@ -1167,11 +1172,11 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
                       busy = false
                     }
                   },
-                ) { Text("پیوستن", color = Shop.colors.primary, style = MaterialTheme.typography.labelMedium) }
+                ) { Text(StrAuth.join, color = Shop.colors.primary, style = MaterialTheme.typography.labelMedium) }
               },
             )
             Text(
-              "کدی که صاحب دکان از تنظیمات برنامه‌اش به شما می‌دهد. همین کافی است — ایمیل و رمز لازم نیست.",
+              StrAuth.staffCodeNote,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
               modifier = Modifier.padding(top = 6.dp, start = 4.dp),
@@ -1190,9 +1195,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
             if (!AppConfig.isConfigured(context)) {
               Spacer(Modifier.height(12.dp))
               Text(
-                "این نسخه به سروری بسته نشده، پس حساب و همگام‌سازی در آن " +
-                  "کار نمی‌کند. برنامه بدونِ حساب کامل کار می‌کند؛ برای حساب، " +
-                  "نسخهٔ منتشرشده را نصب کنید.",
+                StrAuth.noServerAccounts,
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.warning,
                 modifier = Modifier.padding(top = 6.dp, start = 4.dp),
@@ -1277,15 +1280,15 @@ private fun CodeScreen(
       BrandMark()
       Spacer(Modifier.height(22.dp))
       Text(
-        if (askPassword) "رمز تازه" else "کد را بزنید",
+        if (askPassword) Str.newPassword else StrAuth.enterCode,
         style = MaterialTheme.typography.headlineSmall,
         color = ink,
         fontWeight = FontWeight.Bold,
       )
       Spacer(Modifier.height(8.dp))
       Text(
-        if (askPassword) "کد به $destination فرستاده شد. آن را بزنید و رمز تازه بگذارید."
-        else "کد شش‌رقمی به $destination فرستاده شد",
+        if (askPassword) StrAuth.codeSentReset(destination)
+        else StrAuth.codeSent6(destination),
         style = MaterialTheme.typography.bodyMedium,
         color = inkSoft,
         textAlign = TextAlign.Center,
@@ -1354,8 +1357,8 @@ private fun CodeScreen(
           PillField(
             value = fresh,
             onValueChange = { fresh = it },
-            placeholder = "رمز تازه (حداقل ۸ نویسه)",
-            label = "رمز تازه",
+            placeholder = StrAuth.newPasswordMin8,
+            label = Str.newPassword,
             icon = Icons.Filled.Lock,
             keyboardOptions = KeyboardOptions(
               keyboardType = KeyboardType.Password,
@@ -1366,7 +1369,7 @@ private fun CodeScreen(
               IconButton(onClick = { showFresh = !showFresh }, modifier = Modifier.size(44.dp)) {
                 Icon(
                   if (showFresh) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
-                  contentDescription = if (showFresh) "پنهان کردن رمز" else "نمایش رمز",
+                  contentDescription = if (showFresh) StrAuth.hidePassword else StrAuth.showPassword,
                   tint = Shop.colors.muted,
                   modifier = Modifier.size(19.dp),
                 )
@@ -1379,7 +1382,7 @@ private fun CodeScreen(
       Spacer(Modifier.height(24.dp))
       Box(Modifier.widthIn(max = 400.dp).fillMaxWidth().padding(horizontal = 22.dp)) {
         GradientButton(
-          text = if (askPassword) "گذاشتن رمز و ورود" else "ورود",
+          text = if (askPassword) StrAuth.setPasswordSignIn else Str.signIn,
           enabled = code.length == 6 && !busy && (!askPassword || fresh.length >= 8),
           busy = busy,
         ) { onSubmit(code, fresh) }
@@ -1394,14 +1397,14 @@ private fun CodeScreen(
         onClick = onResend,
       ) {
         Text(
-          if (wait > 0) "ارسال دوبارهٔ کد تا ${wait.faDigits()} ثانیه" else "ارسال دوبارهٔ کد",
+          if (wait > 0) StrAuth.resendIn(wait.faDigits()) else StrAuth.resendCode,
           style = MaterialTheme.typography.labelLarge,
           color = if (wait == 0) BLUE else inkSoft,
         )
       }
       TextButton(onClick = onBack) {
         Text(
-          "برگشت و عوض کردن نشانی",
+          StrAuth.changeAddress,
           style = MaterialTheme.typography.labelMedium,
           color = inkSoft,
         )
@@ -1486,14 +1489,14 @@ private fun TermsLocationScreen(
       BrandMark()
       Spacer(Modifier.height(20.dp))
       Text(
-        "یک قدم مانده",
+        StrAuth.oneStepLeft,
         style = MaterialTheme.typography.headlineSmall,
         color = ink,
         fontWeight = FontWeight.Bold,
       )
       Spacer(Modifier.height(8.dp))
       Text(
-        "لوکیشن دکان‌تان و پذیرش شرایط",
+        StrAuth.locationAndTerms,
         style = MaterialTheme.typography.bodyMedium,
         color = inkSoft,
         textAlign = TextAlign.Center,
@@ -1557,9 +1560,9 @@ private fun TermsLocationScreen(
           Column(Modifier.weight(1f)) {
             Text(
               when {
-                looking -> "در حال پیدا کردن لوکیشن…"
-                found -> "لوکیشن پیدا شد"
-                else -> "لوکیشن پیدا نشد"
+                looking -> StrAuth.findingLocation
+                found -> StrAuth.locationFound
+                else -> StrAuth.locationNotFound
               },
               style = MaterialTheme.typography.labelLarge,
               color = ink,
@@ -1570,15 +1573,15 @@ private fun TermsLocationScreen(
             if (detail != null) {
               CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
                 Text(
-                  String.format(java.util.Locale.US, "%.5f, %.5f · روی نقشه ببینید", detail.lat, detail.lng),
+                  String.format(java.util.Locale.US, "%.5f, %.5f", detail.lat, detail.lng) + " · " + StrAuth.seeOnMap,
                   style = MaterialTheme.typography.labelSmall,
                   color = inkSoft,
                 )
               }
             } else {
               Text(
-                if (looking) "چند لحظه — همراه حساب ثبت می‌شود"
-                else "بدون آن هم می‌توانید حساب بسازید",
+                if (looking) StrAuth.locationSaving
+                else StrAuth.locationOptional,
                 style = MaterialTheme.typography.labelSmall,
                 color = inkSoft,
                 overflow = TextOverflow.Ellipsis,
@@ -1589,7 +1592,7 @@ private fun TermsLocationScreen(
             TextButton(onClick = {
               if (DeviceLocation.granted(context)) look(true) else ask.launch(DeviceLocation.PERMISSIONS)
             }) {
-              Text("دوباره", style = MaterialTheme.typography.labelMedium, color = BLUE)
+              Text(Str.again, style = MaterialTheme.typography.labelMedium, color = BLUE)
             }
           }
         }
@@ -1631,13 +1634,13 @@ private fun TermsLocationScreen(
             )
             Spacer(Modifier.height(2.dp))
             Text(
-              "برای خواندنِ کاملش بزنید — ${Terms.SECTIONS.size} بند",
+              StrAuth.termsTap(Terms.SECTIONS.size),
               style = MaterialTheme.typography.labelSmall,
               color = inkSoft,
             )
           }
           Icon(
-            Icons.Filled.ChevronLeft,
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = inkSoft,
             modifier = Modifier.size(20.dp),
@@ -1663,7 +1666,7 @@ private fun TermsLocationScreen(
           )
           Spacer(Modifier.width(4.dp))
           Text(
-            "شرایط و ضوابط را خوانده‌ام و می‌پذیرم.",
+            StrAuth.acceptTerms,
             style = MaterialTheme.typography.labelLarge,
             color = ink,
           )
@@ -1672,7 +1675,7 @@ private fun TermsLocationScreen(
         if (showTermsError) {
           Spacer(Modifier.height(8.dp))
           Text(
-            "برای ساختن حساب باید شرایط و ضوابط را بپذیرید.",
+            StrAuth.mustAcceptTerms,
             style = MaterialTheme.typography.labelMedium,
             color = Shop.colors.danger,
           )
@@ -1684,7 +1687,7 @@ private fun TermsLocationScreen(
 
         Spacer(Modifier.height(18.dp))
         GradientButton(
-          text = "ساخت حساب و ورود",
+          text = StrAuth.createAndSignIn,
           enabled = !busy,
           busy = busy,
         ) {
@@ -1693,7 +1696,7 @@ private fun TermsLocationScreen(
 
         Spacer(Modifier.height(6.dp))
         TextButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) {
-          Text("برگشت", style = MaterialTheme.typography.labelMedium, color = inkSoft)
+          Text(Str.back, style = MaterialTheme.typography.labelMedium, color = inkSoft)
         }
         Spacer(Modifier.height(28.dp))
       }
@@ -1766,9 +1769,9 @@ private fun CodeCell(digit: String, active: Boolean, modifier: Modifier = Modifi
   }
 }
 
-/** رقم‌های فارسی، فقط برای شمارش */
+/** رقم‌های فارسی، فقط برای شمارش — در انگلیسی رقمِ لاتین */
 private fun Int.faDigits(): String =
-  toString().map { c -> if (c.isDigit()) "۰۱۲۳۴۵۶۷۸۹"[c - '0'] else c }.joinToString("")
+  if (ir.vil3ntec.tohid.LocaleChoice.lang == ir.vil3ntec.tohid.core.i18n.Lang.EN) toString() else toString().map { c -> if (c.isDigit()) "۰۱۲۳۴۵۶۷۸۹"[c - '0'] else c }.joinToString("")
 
 /* ============================== اجزا ============================== */
 
@@ -1845,8 +1848,8 @@ private fun ModeSwitch(login: Boolean, onPick: (String) -> Unit) {
       .padding(4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    ModeTab("ورود", Icons.Filled.Lock, login, Modifier.weight(1f)) { onPick("login") }
-    ModeTab("ساخت حساب", Icons.Filled.Person, !login, Modifier.weight(1f)) { onPick("register") }
+    ModeTab(Str.signIn, Icons.Filled.Lock, login, Modifier.weight(1f)) { onPick("login") }
+    ModeTab(Str.createAccount, Icons.Filled.Person, !login, Modifier.weight(1f)) { onPick("register") }
   }
 }
 
@@ -1903,7 +1906,7 @@ private fun ModeTab(
  */
 @Composable
 private fun SignupSteps(active: Int) {
-  val labels = listOf("ایمیل و رمز", "کد تأیید", "لوکیشن و شرایط")
+  val labels = listOf(StrAuth.stepEmail, StrAuth.stepCode, StrAuth.stepLocation)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
     labels.forEachIndexed { i, text ->
       val n = i + 1
@@ -2309,7 +2312,7 @@ private fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
     GoogleMark()
     Spacer(Modifier.width(10.dp))
     Text(
-      "ورود با حساب گوگل",
+      StrAuth.googleSignIn,
       style = MaterialTheme.typography.titleSmall,
       color = ink,
       fontWeight = FontWeight.Bold,
@@ -2395,12 +2398,12 @@ private fun GoogleLinkDialog(
   var secret by remember(ask.codeSent) { mutableStateOf("") }
   AlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
-    title = { Text("وصل کردنِ گوگل به حسابِ موجود") },
+    title = { Text(StrShell.linkGoogleTitle) },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
           ask.message.ifBlank {
-            "این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید."
+            StrShell.linkGoogleNote
           },
           style = MaterialTheme.typography.bodyMedium,
         )
@@ -2410,7 +2413,7 @@ private fun GoogleLinkDialog(
           onValueChange = { secret = it },
           singleLine = true,
           enabled = !busy,
-          label = { Text(if (ask.codeSent) "کدِ ایمیل" else "رمزِ همین حساب") },
+          label = { Text(if (ask.codeSent) StrShell.emailCode else StrShell.thisAccountPassword) },
           visualTransformation = if (ask.codeSent) VisualTransformation.None else PasswordVisualTransformation(),
           keyboardOptions = KeyboardOptions(
             keyboardType = if (ask.codeSent) KeyboardType.NumberPassword else KeyboardType.Password,
@@ -2418,20 +2421,20 @@ private fun GoogleLinkDialog(
           modifier = Modifier.fillMaxWidth(),
         )
         if (!ask.codeSent) {
-          TextButton(onClick = onSendCode, enabled = !busy) { Text("رمز را نمی‌دانم — کد به ایمیل بفرست") }
+          TextButton(onClick = onSendCode, enabled = !busy) { Text(StrShell.sendCodeInstead) }
         } else {
-          Text("کد به همین ایمیل رفت.", style = MaterialTheme.typography.labelMedium)
+          Text(StrShell.codeSentToEmail, style = MaterialTheme.typography.labelMedium)
         }
         ask.problem?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelMedium) }
       }
     },
     confirmButton = {
       TextButton(onClick = { onProve(secret, ask.codeSent) }, enabled = !busy && secret.isNotBlank()) {
-        Text("وصل و ورود")
+        Text(StrShell.linkAndSignIn)
       }
     },
     dismissButton = {
-      TextButton(onClick = onDismiss, enabled = !busy) { Text("وصل نکن") }
+      TextButton(onClick = onDismiss, enabled = !busy) { Text(StrShell.dontLink) }
     },
   )
 }
@@ -2553,7 +2556,7 @@ private fun SavedLoginRow(
       }
       if (entry.shop.isNotBlank()) {
         Text(
-          "فروشگاه: ${entry.shop}",
+          StrAuth.shopLabel(entry.shop),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
           maxLines = 1,
@@ -2563,7 +2566,7 @@ private fun SavedLoginRow(
     IconButton(onClick = onForget, modifier = Modifier.size(32.dp)) {
       Icon(
         Icons.Filled.Close,
-        contentDescription = "حذف این حساب از فهرست",
+        contentDescription = StrAuth.removeSaved,
         tint = Shop.colors.muted2,
         modifier = Modifier.size(15.dp),
       )
@@ -2597,8 +2600,8 @@ private fun TermsFullScreen(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(
-        Icons.Filled.ChevronRight,
-        contentDescription = "بستن",
+        Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+        contentDescription = Str.close,
         tint = colors.muted,
         modifier = Modifier.size(24.dp).clickable(onClick = onClose),
       )
@@ -2611,7 +2614,7 @@ private fun TermsFullScreen(
         modifier = Modifier.weight(1f),
       )
       Text(
-        "نسخهٔ ${Terms.VERSION}",
+        Str.version(Terms.VERSION),
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted2,
       )
@@ -2667,7 +2670,7 @@ private fun TermsFullScreen(
     HorizontalDivider(color = colors.border)
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
       GradientButton(
-        text = if (accepted) "خواندم — بستن" else "می‌پذیرم",
+        text = if (accepted) StrAuth.readClose else StrAuth.iAccept,
         enabled = true,
         busy = false,
         onClick = { if (accepted) onClose() else onAccept() },
@@ -2686,7 +2689,7 @@ private fun TermsFullScreen(
  *  می‌فهمد؛ اگر هیچ‌کدام نبود، نشانیِ وب باز می‌شود که مرورگر هم دارد.
  *  ──────────────────────────────────────────────────────────────────
  */
-internal fun openOnMap(context: android.content.Context, lat: Double, lng: Double, label: String = "دکان") {
+internal fun openOnMap(context: android.content.Context, lat: Double, lng: Double, label: String = Str.shop) {
   val point = String.format(java.util.Locale.US, "%f,%f", lat, lng)
   val geo = android.content.Intent(
     android.content.Intent.ACTION_VIEW,

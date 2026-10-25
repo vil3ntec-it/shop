@@ -20,11 +20,9 @@ import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
@@ -156,8 +154,11 @@ fun main() {
         val theme = remember {
           runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
         }
-        CompositionLocalProvider(LocalContext provides context, LocalLayoutDirection provides LayoutDirection.Rtl) {
-          TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+        //  زبان و جهت همان برنامه (ProvideLang): فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+        CompositionLocalProvider(LocalContext provides context) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+          }
         }
       }
     }
@@ -303,7 +304,8 @@ fun main() {
         }
 
         TohidTheme(theme) {
-          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+          //  زبان و جهت: فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+          ir.vil3ntec.tohid.ui.ProvideLang {
             if (!welcomed) {
               WelcomeScreen(store) {
                 prefs.edit().putBoolean("welcomed", true).apply()
@@ -378,7 +380,7 @@ private fun ShortcutsHelp() {
       "Esc" to "بستن",
     ),
   )
-  androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
+  ir.vil3ntec.tohid.ui.ProvideLang {
     androidx.compose.foundation.layout.Column(
       //  رنگ‌ها از تم (F0-18): در حالتِ تاریک پنجره دیگر سفید نمی‌ماند
       androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)

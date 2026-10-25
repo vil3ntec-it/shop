@@ -382,6 +382,9 @@ internal class SyncV3Engine(
   /** ثبتِ محلی (زیرِ همان قفلِ `ShopStore`). @return چند opِ v1 دیده شد */
   fun record(data: ShopData): Int = if (!meta.initialized) 0 else commit.record(data)
 
+  /** opهای هدفمند، بی تفاضلِ کلِ دفتر (`SyncCommit.recordOps`، CRM-10) */
+  fun recordOps(ops: List<SyncOp>): Int = if (!meta.initialized) 0 else commit.recordOps(ops)
+
   /** بایگانیِ دفتر: ردیف‌ها از سایه هم بیرون می‌روند، بی هیچ op (همان `SyncCommit.forget`) */
   fun forget(gone: Map<String, Collection<String>>): Int = if (!meta.initialized) 0 else commit.forget(gone)
 

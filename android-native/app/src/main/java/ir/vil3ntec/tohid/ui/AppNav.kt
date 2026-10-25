@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui
 
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  ناوبری از بیرونِ صفحه‌ها — میان‌برهای صفحه‌کلیدِ برنامهٔ کامپیوتر.
@@ -11,16 +12,16 @@ import androidx.compose.runtime.mutableStateOf
  */
 object AppNav {
   /** ترتیبِ میان‌برها: Ctrl+۱ داشبورد، Ctrl+۲ فروش، … */
-  val SHORTCUTS = listOf(
-    "dashboard" to "داشبورد",
-    "sale" to "فروش",
-    "debtors" to "قرض‌داران",
-    "warehouse" to "انبار",
-    "products" to "محصولات",
-    "sales" to "تاریخچهٔ فروش",
-    "purchasing" to "خرید",
-    "reports" to "گزارش‌ها",
-    "expenses" to "مصارف",
+  val SHORTCUTS: List<Pair<String, String>> get() = listOf(
+    "dashboard" to Str.dashboard,
+    "sale" to Str.sale,
+    "debtors" to Str.debtors,
+    "warehouse" to Str.warehouse,
+    "products" to Str.products,
+    "sales" to Str.salesHistoryAlt,
+    "purchasing" to Str.purchases,
+    "reports" to Str.reports,
+    "expenses" to Str.expenses,
   )
 
   val request = mutableStateOf<String?>(null)
