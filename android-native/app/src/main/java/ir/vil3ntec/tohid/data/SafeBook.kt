@@ -59,12 +59,10 @@ object SafeBook {
       }
     }
 
-  private fun afn(minor: Long): String = money(minor / 100.0)
-
   fun message(code: String, varianceMinor: Long? = null): String = when (code) {
     SafeCore.Code.REASON_REQUIRED -> varianceMinor?.let {
-      "اختلافِ شمارش ${if (it > 0) "اضافه" else "کسری"} ${afn(kotlin.math.abs(it))} افغانی است — " +
-        "بیش از ${afn(Pay.DEFAULT_VARIANCE_THRESHOLD)} افغانی دلیل می‌خواهد"
+      "اختلافِ شمارش ${if (it > 0) "اضافه" else "کسری"} ${money(kotlin.math.abs(it) / 100.0)} افغانی است — " +
+        "بیش از ${money(Pay.DEFAULT_VARIANCE_THRESHOLD / 100.0)} افغانی دلیل می‌خواهد"
     } ?: "دلیل را بنویسید"
     SafeCore.Code.INSUFFICIENT_FUNDS -> "این مبلغ بیش از ماندهٔ گاوصندوق است"
     SafeCore.Code.INVALID_AMOUNT -> "مبلغ درست نیست"

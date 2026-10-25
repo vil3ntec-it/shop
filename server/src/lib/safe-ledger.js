@@ -30,6 +30,7 @@ const staffPerms = require('./staff-perms');
 const { many } = require('../db');
 const { rejectOps } = require('./v1-reject');
 const { holdFor } = require('./account-lock');
+const { SHOP } = require('./tenancy');
 
 const TABLE = 'safeEntries';
 const PERM = 'safe.move';
@@ -153,6 +154,11 @@ function hold(res, ctx) {
   return holdFor(res, `safe:shop:${ctx.accountId}`);
 }
 
+/** بخشِ دکان با حسابِ دکان (حسابِ پمپ `station` است؛ `accountKind` ِ دکان همان نامِ بخش است) */
+function isShopSync(ctx) {
+  return Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
+}
+
 function once(fn) {
   let p = null;
   return () => (p ||= fn());
@@ -161,7 +167,7 @@ function once(fn) {
 /** میان‌افزارِ push ِ v1 — فقط دکان؛ پمپ و بقیهٔ جدول‌ها بی هیچ کاری می‌گذرند */
 async function v1SafeGuard(req, res, next) {
   const ctx = req.sync;
-  if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return next();
+  if (!isShopSync(ctx)) return next();
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.some(isSafeOp)) return next();
