@@ -99,9 +99,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
    *  چیزی نوشت، op ِ آن با همان `SyncV1Worker.now` ِ هر ذخیره در دورِ بعد می‌رود؛ دورِ بعد
    *  دیگر کاری ندارد. شکستش دورِ همگام‌سازی را نمی‌گیرد.
    */
-  private suspend fun sweepAfterPull(store: ShopStore) {
-    runCatching { store.sweepMerged() }
-  }
+  private suspend fun sweepAfterPull(store: ShopStore) = store.sweepMergedQuietly()
 
   companion object {
     private const val PERIODIC = "tohid-sync-v1-periodic"

@@ -133,7 +133,7 @@ class ShopStore(private val context: Context) {
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
     //  CRM-10: ردیف‌های دیررسیدهٔ مشتریِ ادغام‌شده — یک بار در شروع (شرح سرِ `sweepMerged`)
-    runCatching { sweepMerged() }
+    sweepMergedQuietly()
   }
 
   /**
@@ -145,9 +145,13 @@ class ShopStore(private val context: Context) {
    *  - فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض **خاموش**): خاموش ⇒
    *    هیچ کاری نمی‌شود و رفتارِ دکان همان است.
    *  - **زیرِ همان قفلِ نوشتنِ دفتر** (`synchronized(engine)`، مثلِ [update] و نشاندنِ opهای
-   *    رسیده) و همان درِ نوشتن ([writeLocked])، پس تغییرش مثلِ هر ذخیرهٔ دیگری op می‌شود.
+   *    رسیده)، روی **دفترِ همین لحظهٔ دیسک**، نه `_data` ِ این نمونه: صفحه و کارگرِ همگام‌سازی
+   *    (`SyncV1Worker`) دو نمونهٔ جدای `ShopStore` دارند و دفترِ حافظهٔ یکی از دیگری کهنه است.
+   *  - ⛔ هرگز `record` ِ کلِ دفتر: فقط opهای هدفمندِ خودِ sweep (`CustomerMerge.sweepOps`:
+   *    UPDATE ِ `debtorId`/`mergedInto` و INSERT ِ ردِ دفترچه) با `SyncV1Engine.recordOps`
+   *    (سایه = سایه + همین opها). پس هیچ DELETEی ساخته نمی‌شود، در v1 و v3.
    *  - نوشتنِ بسته ⇒ هیچ، بی پیام: دفترِ بارنشده، دفترِ خوانده‌نشده (SEC-01 / #331) یا
-   *    قفلِ نرم. کارِ پس‌زمینه است؛ صفحه پیامِ «ثبت نشد» نمی‌گیرد.
+   *    قفلِ نرم. خطای دیسکِ همین sweep هم پیامِ «ذخیره نشد» ِ صفحه نمی‌شود؛ دورِ بعد دوباره.
    *  - خودتوان: کاری نبود ⇒ `null`، نه نوشتن نه op. هر دستگاه از همان دفتر همان نتیجه را
    *    می‌سازد (کوچک‌ترین شناسهٔ حلقه)، پس دو دستگاه پینگ‌پنگ نمی‌سازند.
    *
@@ -158,11 +162,31 @@ class ShopStore(private val context: Context) {
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
       if (!_loaded.value || _unreadable.value != null) return@synchronized null
-      val next = CustomerMerge.sweep(_data.value) ?: return@synchronized null
+      val disk = readDiskLocked() ?: return@synchronized null
+      val next = CustomerMerge.sweep(disk) ?: return@synchronized null
+      val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
       if (SoftLock.isLocked(context)) return@synchronized null
-      writeLocked(engine, next)
+      //  همان قاعدهٔ `writeLocked`: دفتری که به دیسک نرسید op نمی‌سازد (F0-01)
+      if (!writeToDisk(next, quiet = true)) return@synchronized false
+      runCatching { if (engine.recordOps(ops) > 0) SyncV1Worker.now(context) }
+      true
     }
   }
+
+  /** همان [sweepMerged] برای جاهایی که شکستش نباید Pull یا بارِ دفتر را بگیرد — لغو بالا می‌رود */
+  suspend fun sweepMergedQuietly() {
+    try {
+      sweepMerged()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+      throw e
+    } catch (_: Exception) {
+    }
+  }
+
+  /** دفترِ همین لحظهٔ دیسک؛ فراخوان قفلِ نوشتن (`synchronized(engine)`) را دارد. `null` ⇒ نبود یا خوانده نشد */
+  private fun readDiskLocked(): ShopData? = runCatching {
+    if (!file.exists()) null else json.decodeFromString<ShopData>(AtRest.readText(context, file))
+  }.getOrNull()
 
   /**
    *  ذخیرهٔ دفتر — تنها درِ نوشتن.
@@ -451,7 +475,7 @@ class ShopStore(private val context: Context) {
   suspend fun applyFromServer(next: ShopData) {
     withContext(Dispatchers.IO) { applyFromServerNow(next) }
     //  CRM-10 — شرح سرِ `sweepMerged`
-    runCatching { sweepMerged() }
+    sweepMergedQuietly()
   }
 
   /**
@@ -477,11 +501,11 @@ class ShopStore(private val context: Context) {
    *  ⚠️ دفترِ حافظه (`data`) فقط **پس از** نشستن روی دیسک عوض می‌شود: آنچه
    *  صفحه نشان می‌دهد همان است که پس از بستن و باز کردن می‌ماند.
    */
-  private fun writeToDisk(next: ShopData): Boolean {
+  private fun writeToDisk(next: ShopData, quiet: Boolean = false): Boolean {
     //  SEC-01: دفترِ رمزدارِ خوانده‌نشده فقط با «بازسازی از سرور» جایگزین می‌شود (`finishRebuild`)
     //  — شرح سرِ `unreadable`
     if (_unreadable.value != null) {
-      _diskError.tryEmit(UNREADABLE)
+      if (!quiet) _diskError.tryEmit(UNREADABLE)
       return false
     }
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
@@ -489,7 +513,8 @@ class ShopStore(private val context: Context) {
     //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
     val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next)) }
     saved.exceptionOrNull()?.let {
-      _diskError.tryEmit(it.message ?: "خطای نامشخص")
+      //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
+      if (!quiet) _diskError.tryEmit(it.message ?: "خطای نامشخص")
       return false
     }
     _unreadable.value = null

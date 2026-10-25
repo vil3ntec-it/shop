@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.data.CustomerMerge
+import ir.vil3ntec.tohid.data.DebtTransaction
+import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
@@ -8,6 +11,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
+import ir.vil3ntec.tohid.sync.v1.SyncOp
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -492,5 +496,45 @@ class SyncV3EngineTest {
     assertTrue(counters.all { it.seq > head.seq })
     assertTrue(head.tx.startsWith("tx."))
     assertTrue(counters.all { it.tx == head.tx })
+  }
+
+  /**
+   *  CRM-10 روی v3: sweep ِ «ب» پس از Pull فقط opهای هدفمندِ خودش را می‌فرستد
+   *  (`recordOps`، سایه = سایه + همین opها) — نه تفاضلِ کلِ دفتر؛ تغییرِ محلیِ دیگرِ «ب» گم
+   *  نمی‌شود و دوباره هم فرستاده نمی‌شود، و «الف» پس از گرفتنش کاری ندارد (پینگ‌پنگ نیست).
+   */
+  @Test fun crmSweepGoesAsTargetedOpsWithoutDiffingTheLedger() {
+    val server = FakeServer()
+    val crm = ShopData(
+      debtors = listOf(Debtor(id = "c1", name = "احمد", phone = "+93700123456"), Debtor(id = "c2", name = "احمد کابلی", phone = "+93799555444")),
+      transactions = listOf(DebtTransaction(id = "t1", debtorId = "c1", type = "give", amount = 300.0, date = "2026-09-01")),
+    )
+    val a = Device("dev-a", server, crm).also { assertTrue(it.sync().ok) }
+    val b = Device("dev-b", server, ShopData()).also { assertTrue(it.sync().ok) }
+    //  «ب» آفلاین روی c1 ِ کهنه قرض داد؛ «الف» c1 را در c2 ادغام کرد
+    b.edit { it.copy(transactions = it.transactions + DebtTransaction(id = "late", debtorId = "c1", type = "give", amount = 70.0, date = "2026-10-18")) }
+    a.edit { (CustomerMerge.merge(it, "c2", "c1", "2026-10-19", 1) { "m1" } as CustomerMerge.Result.Ok).data }
+    assertTrue(a.sync().ok)
+    assertTrue(b.sync().ok)
+    assertEquals("c2", b.ledger.data.debtors.first { it.id == "c1" }.mergedInto)
+    assertEquals("c1", b.ledger.data.transactions.first { it.id == "late" }.debtorId)
+
+    //  تغییرِ محلیِ دیگری که هنوز op نشده — sweep نباید آن را ببرد یا گم کند
+    b.edit { it.copy(products = it.products + p1) }
+    val disk = b.ledger.data
+    val next = CustomerMerge.sweep(disk, "2026-10-20", 2) { "m2" }!!
+    val ops = CustomerMerge.sweepOps(disk, next)!!
+    assertEquals(setOf("transactions" to SyncOp.UPDATE, "auditLog" to SyncOp.INSERT), ops.map { it.table to it.type }.toSet())
+    b.ledger.data = next
+    assertEquals(2, b.engine.recordOps(ops))
+    assertEquals("فقط درجِ کالا مانده؛ sweep دوباره نمی‌رود", 1, b.engine.record(b.ledger.data))
+    assertTrue(b.sync().ok)
+
+    assertTrue(a.sync().ok)
+    assertEquals("c2", a.ledger.data.transactions.first { it.id == "late" }.debtorId)
+    assertEquals(listOf("p1"), a.ledger.data.products.map { it.id })
+    assertNull("«الف» دیگر کاری ندارد", CustomerMerge.sweep(a.ledger.data))
+    assertEquals(0, a.engine.record(a.ledger.data))
+    assertNull(CustomerMerge.sweep(b.ledger.data))
   }
 }

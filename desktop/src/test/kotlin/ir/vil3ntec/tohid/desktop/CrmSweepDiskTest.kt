@@ -9,13 +9,18 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.v1.HeartbeatCache
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
+import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -37,6 +42,8 @@ class CrmSweepDiskTest {
 
   private fun clean() {
     ShopPolicy.setCrmReports(ctx, false)
+    HeartbeatCache(ctx).forget()
+    SoftLock.refresh(ctx)
     AtRest.setWanted(ctx, false)
     dir.listFiles().orEmpty()
       .filter { it.name.startsWith("shop-data.json") || it.name.startsWith("before-restore") }
@@ -75,6 +82,27 @@ class CrmSweepDiskTest {
   private fun applied(d: ShopData, ops: List<SyncOp>): ShopData =
     LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(d), ops))
 
+  /** opهایی که از [from] به بعد به صف رفتند — صف از آزمون‌های دیگرِ همین موتور هم پر است */
+  private fun added(from: Int): List<SyncOp> = engine.queuedOps().drop(from)
+
+  /** UPDATE ِ `debtorId`/`mergedInto` و INSERT ِ ردِ دفترچه — هیچ چیزِ دیگر، هرگز DELETE */
+  private fun assertTargeted(ops: List<SyncOp>) {
+    assertFalse("sweep هرگز DELETE نمی‌سازد: $ops", ops.any { it.type == SyncOp.DELETE })
+    for (op in ops) {
+      val keys = op.fields?.keys.orEmpty()
+      val ok = when (op.table) {
+        "transactions", "sales" -> op.type == SyncOp.UPDATE && keys == setOf("debtorId")
+        "debtors" -> op.type == SyncOp.UPDATE && keys == setOf("mergedInto")
+        "auditLog" -> op.type == SyncOp.INSERT
+        else -> false
+      }
+      assertTrue("op ِ بیرون از sweep: $op", ok)
+    }
+  }
+
+  private fun merged(): ShopData =
+    (CustomerMerge.merge(base, "crm9-c2", "crm9-c1", "2026-10-19", 1, ::newId) as CustomerMerge.Result.Ok).data
+
   /** همان Pull ِ `SyncV1Worker`: `absorbRemote` با `applyFromServerNow` */
   private fun ShopStore.pull(ops: List<SyncOp>) =
     engine.absorbRemote(ops, read = { data.value }, write = { applyFromServerNow(it) })
@@ -99,6 +127,8 @@ class CrmSweepDiskTest {
     val beforeSweep = b.data.value
     assertEquals(true, runBlocking { b.sweepMerged() })
     assertEquals(q0 + 2, engine.queueSize())
+    assertTargeted(added(q0))
+    assertEquals(setOf("transactions" to SyncOp.UPDATE, "auditLog" to SyncOp.INSERT), added(q0).map { it.table to it.type }.toSet())
     val swept = b.data.value
     assertEquals("crm9-c2", swept.transactions.first { it.id == "crm9-late" }.debtorId)
     assertEquals(1370.0, ShopStore.debt(swept, "crm9-c2"), 0.0)
@@ -166,5 +196,70 @@ class CrmSweepDiskTest {
     assertEquals(q0, engine.queueSize())
     assertArrayEquals("دفترِ واقعی دست نخورد", bytes, ledger.readBytes())
     assertEquals(ShopData(), store.data.value)
+  }
+
+  @Test fun `دو نمونه روی یک دیسک — فروشِ صفحه پس از بارِ کارگر نه گم می‌شود نه DELETE می‌گیرد`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    val m = merged()
+    val ui = open()
+    assertTrue(runBlocking { ui.save(m.copy(transactions = m.transactions + late)) })
+    //  کارگرِ همگام‌سازی دفتر را خواند…
+    val worker = open()
+    //  …و صندوق‌دار همان وقت فروخت (دفترِ حافظهٔ کارگر این را ندارد)
+    val sale = Sale(id = "crm9-new", invoiceNumber = 9, finalTotal = 55.0, date = "2026-10-20")
+    assertTrue(runBlocking { ui.save(ui.data.value.copy(sales = ui.data.value.sales + sale)) })
+    val q0 = engine.queueSize()
+
+    assertEquals(true, runBlocking { worker.sweepMerged() })
+    assertTargeted(added(q0))
+    assertEquals(2, added(q0).size)
+    val disk = open().data.value
+    assertTrue("فروشِ صفحه روی دیسک ماند", disk.sales.any { it.id == "crm9-new" })
+    assertEquals("crm9-c2", disk.transactions.first { it.id == "crm9-late" }.debtorId)
+    assertEquals(disk, worker.data.value)
+  }
+
+  @Test fun `شروعِ برنامه پس از Pull ِ کارگر — sweep ِ نمونهٔ صفحه ردیف‌های رسیده را حذف نمی‌کند`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    val ui = open()
+    val local = base.copy(transactions = base.transactions + late)
+    assertTrue(runBlocking { ui.save(base) })
+    assertTrue(runBlocking { ui.save(local) })
+    //  کارگر ادغامِ دستگاهِ دیگر را Pull کرد؛ دفترِ حافظهٔ صفحه هنوز کهنه است
+    val worker = open()
+    val m = merged()
+    worker.pull(opsOf(base, m))
+    assertFalse(ui.data.value.auditLog.any { it.type == "customer_merge" })
+    val q0 = engine.queueSize()
+
+    assertEquals(true, runBlocking { ui.sweepMerged() })
+    assertTargeted(added(q0))
+    val disk = open().data.value
+    assertTrue("ردِ ادغامِ رسیده ماند", disk.auditLog.any { it.type == "customer_merge" && it.refId == "crm9-c1" })
+    assertEquals("crm9-c2", disk.debtors.first { it.id == "crm9-c1" }.mergedInto)
+    assertEquals(setOf("crm9-c2"), disk.transactions.map { it.debtorId }.toSet())
+    assertEquals(disk, ui.data.value)
+  }
+
+  @Test fun `قفلِ نرم — sweep چیزی نمی‌نویسد و op نمی‌سازد؛ با باز شدنِ قفل می‌نشیند`() {
+    ShopPolicy.setCrmReports(ctx, true)
+    val m = merged()
+    val b = open()
+    assertTrue(runBlocking { b.save(m.copy(transactions = m.transactions + late)) })
+    val bytes = ledger.readBytes()
+    val q0 = engine.queueSize()
+
+    HeartbeatCache(ctx).write(buildJsonObject {
+      put("subscription", buildJsonObject { put("active", JsonPrimitive(false)); put("status", JsonPrimitive("expired")) })
+    })
+    assertTrue("پیش‌شرطِ آزمون: قفلِ نرم بسته است", SoftLock.isLocked(ctx))
+    assertNull(runBlocking { b.sweepMerged() })
+    assertEquals(q0, engine.queueSize())
+    assertArrayEquals(bytes, ledger.readBytes())
+
+    HeartbeatCache(ctx).forget()
+    assertFalse(SoftLock.isLocked(ctx))
+    assertEquals(true, runBlocking { b.sweepMerged() })
+    assertTargeted(added(q0))
   }
 }
