@@ -67,7 +67,12 @@ object ShotRegistry {
     SalesShots, AnalyticsShots, AccountShots, OnlineShots, SettingsShots, ShopperShots,
   )
 
-  fun of(group: String): List<GroupShots> = if (group == "all") ALL else ALL.filter { it.group == group }
+  /** `all`، یک گروه یا چند گروه با ویرگول (`foundation,stock`) — همان ترتیبِ `ALL` */
+  fun of(group: String): List<GroupShots> {
+    if (group == "all") return ALL
+    val names = group.split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    return ALL.filter { it.group in names }
+  }
 
   fun find(group: String, name: String): Shot? = ALL.firstOrNull { it.group == group }?.shots?.firstOrNull { it.name == name }
 }
