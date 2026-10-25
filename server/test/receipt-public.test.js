@@ -197,7 +197,7 @@ test('لغو ⇒ «لغو شد»؛ پاک‌شده، QR ِ خاموش و دکا�
   await query("UPDATE shops SET status='active' WHERE id=$1", [a.shopId]);
 });
 
-test('سربرگ، رقمِ فارسی و لوگوی دکان؛ نسیه بی نامِ قرض‌دار؛ پرداختِ ترکیبی با باقی‌پول', async () => {
+test('سربرگ، رقمِ فارسی و لوگوی دکان؛ نسیه بی نامِ قرض‌دار؛ پرداختِ ترکیبی با پولِ پس', async () => {
   const a = await shop('چ');
   const credit = newToken();
   const mixed = newToken();
@@ -229,7 +229,7 @@ test('سربرگ، رقمِ فارسی و لوگوی دکان؛ نسیه بی ن
   assert.equal(m.kind, 'ترکیبی');
   assert.deepEqual(m.payments, [
     { label: 'نقد', amount: '۳۰۰ ؋' }, { label: 'کیف پول', amount: '۱۰۰ ؋' },
-    { label: 'دریافتی', amount: '۵۰۰ ؋' }, { label: 'باقی‌پول', amount: '۱۰۰ ؋' },
+    { label: 'دریافتی', amount: '۵۰۰ ؋' }, { label: 'پولِ پس', amount: '۱۰۰ ؋' },
   ]);
 });
 

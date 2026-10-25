@@ -172,6 +172,8 @@ object OwnerExport {
     "payments" to "ردیف‌های پرداخت",
     "tenderedMinor" to "دریافتی (پول)",
     "changeMinor" to "پول پس (پول)",
+    //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (نشانیِ عمومیِ همان فروش)
+    "receiptToken" to "توکنِ QRِ فاکتور",
     "by" to "کاربر",
     "approvedBy" to "تأییدکننده",
     "note" to "توضیح",

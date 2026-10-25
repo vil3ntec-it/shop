@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.perm.PinGuard
 import ir.vil3ntec.tohid.ui.screens.Keypad
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /**
  *  صفحهٔ PINِ شخصی — STF-04 (و تأییدِ مدیر، STF-02).
@@ -64,7 +65,7 @@ fun PinPad(
     //  نقطه‌ها؛ برای صفحه‌خوان «چند رقم از چند»
     Row(
       horizontalArrangement = Arrangement.spacedBy(12.dp),
-      modifier = Modifier.semantics { contentDescription = "${pin.length} رقم از $length" },
+      modifier = Modifier.semantics { contentDescription = StrPos.pinA11y(pin.length, length) },
     ) {
       repeat(length) { i ->
         val filled = i < pin.length

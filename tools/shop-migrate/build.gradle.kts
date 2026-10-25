@@ -33,6 +33,10 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
+  //  Format.kt و Jalali.kt نوشته‌ها و تاریخِ نمایشی را از جدولِ سه‌زبانه می‌گیرند (کاتلینِ خالص)؛
+  //  ابزار همیشه فارسی است (LocaleChoice ِ src/main)، پس خروجی همان دیروز است
+  "ir/vil3ntec/tohid/core/i18n/I18n.kt",
+  "ir/vil3ntec/tohid/core/i18n/Str.kt",
 )
 //  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته
 val coreRoot = repoRoot.resolve("core/src/jvmMain/kotlin")

@@ -16,6 +16,8 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.EscPosPreview
 import ir.vil3ntec.tohid.core.hw.Labels
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.data.ReceiptFlag
+import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import java.io.File
@@ -96,12 +98,25 @@ object HwPages {
     copyMark: String? = null,
   ): ByteArray {
     val profile = printer.profile()
+    if (ReceiptFlag.enabled(context)) return EscPos.document(saleMonoV2(context, d, sale, profile, copyMark), profile)
     val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
     val bitmap = Receipt.render(context, d, sale, storeName, profile.paperDots, copyMark)
     val receipt = try { ThermalPrinter.toMono(bitmap, profile.paperDots) } finally { bitmap.recycle() }
     val logo = if (profile.logo) logoMono(context, profile.paperDots) else null
     val page = if (logo != null) stack(profile.paperDots, listOf(logo, receipt), gap = 12) else receipt
     return EscPos.document(page, profile)
+  }
+
+  /**
+   *  فاکتورِ نسخهٔ ۲ (پرچمِ `shop.receipt_v2`): لوگوی همگامِ دکان خودش در فاکتور است؛ نشانِ
+   *  محلیِ همین دستگاه فقط برای دکانی می‌ماند که هنوز لوگوی همگام ندارد.
+   */
+  private fun saleMonoV2(
+    context: Context, d: ShopData, sale: Sale, profile: ir.vil3ntec.tohid.core.hw.PrinterProfile, copyMark: String?,
+  ): MonoImage {
+    val receipt = Receipts.mono(context, d, sale, profile.paperDots, copyMark)
+    val legacy = if (profile.logo && ReceiptProfileStore.current(context).logoHash == null) logoMono(context, profile.paperDots) else null
+    return if (legacy != null) stack(profile.paperDots, listOf(legacy, receipt), gap = 12) else receipt
   }
 
   /* ============================ برگهٔ آزمون ============================ */

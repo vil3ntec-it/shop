@@ -11,6 +11,9 @@
  * دلیلِ تطبیق، کالای وصل یا کالاهای ممکن با SKU/بارکد/نوع/اندازه؛ تطبیقِ مبهم
  * فقط با انتخابِ انسانی وصل می‌شود و انتشار فقط کارِ مدیرِ ارشد با دلیل است.
  *
+ * تکراری (IMG-BANK-13) فقط نشان و صافی است — نه حذف، نه ادغام. بایگانی
+ * (IMG-BANK-15) فقط عکسِ منتشرشده، فقط مدیرِ ارشد با دلیل.
+ *
  * پس از `app.js` بار می‌شود ($، el، call، msg، fa، dateTime، token، logout، LOADERS).
  * ⛔ همه درونِ یک تابعِ بی‌نام: نامِ هم‌سان با `app.js` کلِ فایل را می‌خواباند.
  */
@@ -289,15 +292,10 @@
     const out = await call('GET', `${IB}/review?${q}`);
     rvCursor = out.next_cursor;
     $('btn-ib-rv-more').classList.toggle('hidden', !rvCursor);
-    if (reset && !out.items.length) {
-      const tr = el('tr');
-      const c = td('چیزی در این صف نیست', 'muted');
-      c.colSpan = 8;
-      tr.appendChild(c);
-      body.appendChild(tr);
-    }
+    const onlyDups = $('ib-rv-dups').checked;
     for (const it of out.items) {
       rvItems.set(it.id, it);
+      if (onlyDups && !it.duplicate_of.length) continue;
       const tr = el('tr');
       tr.dataset.image = it.id;
       tr.appendChild(td(it.id.slice(-8)));
@@ -322,6 +320,13 @@
       open.onclick = () => openDetail(it.id).catch((err) => msg($('ib-rv-msg'), err.message, 'bad'));
       act.appendChild(open);
       tr.appendChild(act);
+      body.appendChild(tr);
+    }
+    if (reset && !body.children.length) {
+      const tr = el('tr');
+      const c = td(onlyDups ? 'در این صفحه عکسِ تکراری نیست' : 'چیزی در این صف نیست', 'muted');
+      c.colSpan = 8;
+      tr.appendChild(c);
       body.appendChild(tr);
     }
   }
@@ -353,7 +358,7 @@
     $('ib-dt-match').appendChild(badge(MATCH_CLS[it.match_status] || 'b-mute', MATCH_FA[it.match_status] || '—'));
     $('ib-dt-reasons').textContent = reasonsFa(it.match_reasons);
     $('ib-dt-product').textContent = it.product ? `${productLine(it.product)} (${keyLine(it.product)})` : 'به کالایی وصل نیست';
-    $('ib-dt-dups').textContent = it.duplicate_of.length ? `همان فایلِ ${it.duplicate_of.join('، ')} — فقط نشان؛ حذف یا ادغام نمی‌شود` : '—';
+    await showDups(it);
     //  کالاهای ممکن: SKU/بارکد/نوع/اندازه کنارِ هم تا انتخاب انسانی باشد (IMG-09، IMG-PRO-07)
     const cb = $('ib-dt-cands');
     cb.innerHTML = '';
@@ -379,7 +384,8 @@
     const sup = adminRole === 'superadmin';
     $('btn-ib-approve').classList.toggle('hidden', !sup || it.status !== 'NEEDS_REVIEW');
     $('btn-ib-reject').classList.toggle('hidden', !sup || it.status !== 'NEEDS_REVIEW');
-    $('ib-dt-super').classList.toggle('hidden', sup || it.status !== 'NEEDS_REVIEW');
+    $('btn-ib-archive').classList.toggle('hidden', !sup || it.status !== 'APPROVED');
+    $('ib-dt-super').classList.toggle('hidden', sup || !['NEEDS_REVIEW', 'APPROVED'].includes(it.status));
     const img = $('ib-dt-img');
     img.removeAttribute('src');
     img.alt = 'در حالِ بار…';
@@ -387,6 +393,22 @@
       img.src = await imageData(it.file.url);
       img.alt = `عکسِ ${it.id}`;
     } else img.alt = 'فایلی نیست';
+  }
+
+  /** هر عکسِ هم‌فایل با وضعیت و فضایش — فقط خواندن (IMG-BANK-13). */
+  async function showDups(it) {
+    const ul = $('ib-dt-dups');
+    ul.innerHTML = '';
+    if (!it.duplicate_of.length) { ul.appendChild(el('li', '', '—')); return; }
+    const rows = await Promise.all(it.duplicate_of.map((id) => call('GET', `${IB}/images/${encodeURIComponent(id)}`)
+      .then((d) => ({ id, d })).catch(() => ({ id, d: null }))));
+    for (const { id, d } of rows) {
+      const li = el('li', '', d
+        ? `${id} — ${IMG_FA[d.status] || d.status} · ${d.space === 'central' ? 'بانکِ عمومی' : 'در انتظار'}${d.product ? ` · ${productLine(d.product)}` : ''}`
+        : `${id} — دیده نمی‌شود`);
+      li.dataset.dup = id;
+      ul.appendChild(li);
+    }
   }
 
   async function refreshCurrent() {
@@ -404,12 +426,17 @@
     await refreshCurrent();
   }
 
+  const DECIDE = {
+    approve: ['دلیلِ انتشار در بانکِ عمومی:', 'منتشر شد.'],
+    reject: ['دلیلِ رد:', 'رد شد.'],
+    archive: ['دلیلِ بایگانی (انتخابِ تازه متوقف می‌شود؛ سنجاقِ قبلیِ دکان‌ها می‌ماند):', 'بایگانی شد.'],
+  };
   async function decide(kind) {
     if (!current) return;
-    const reason = askReason(kind === 'approve' ? 'دلیلِ انتشار در بانکِ عمومی:' : 'دلیلِ رد:');
+    const reason = askReason(DECIDE[kind][0]);
     if (!reason) return;
     await call('POST', `${IB}/images/${encodeURIComponent(current.id)}/${kind}`, { reason });
-    msg($('ib-rv-msg'), kind === 'approve' ? 'منتشر شد.' : 'رد شد.', 'ok');
+    msg($('ib-rv-msg'), DECIDE[kind][1], 'ok');
     $('ib-detail').classList.add('hidden');
     current = null;
     await loadReview(true);
@@ -443,6 +470,8 @@
     $('btn-ib-rv-more').onclick = rv(() => loadReview(false));
     $('btn-ib-approve').onclick = dt(() => decide('approve'));
     $('btn-ib-reject').onclick = dt(() => decide('reject'));
+    $('btn-ib-archive').onclick = dt(() => decide('archive'));
+    $('ib-rv-dups').onchange = rv(() => loadReview(true));
     $('btn-ib-dt-close').onclick = () => { $('ib-detail').classList.add('hidden'); current = null; };
   });
 
