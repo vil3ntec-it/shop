@@ -67,6 +67,7 @@ fun LanguageSection() {
     title = StrSettings.language,
     subtitle = LocaleChoice.lang.native,
     tint = Shop.colors.primary,
+    stateKey = "settings-language",
   ) {
     Text(
       StrSettings.languageNote,

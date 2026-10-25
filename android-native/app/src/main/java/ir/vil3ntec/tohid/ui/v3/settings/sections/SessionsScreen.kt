@@ -21,7 +21,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.model.DeviceDto
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -107,7 +107,7 @@ private fun SessionRow(d: DeviceDto, isThis: Boolean, divider: Boolean, onClose:
     if (divider) V3Divider(start = 64.dp)
     V3ListRow(
       d.label,
-      subtitle = if (isThis) StrSettings.thisDevice else d.lastSeenAt?.let { StrSettings.lastSeen(formatMillis(it)) },
+      subtitle = if (isThis) StrSettings.thisDevice else d.lastSeenAt?.let { StrSettings.lastSeen(displayMillis(it)) },
       icon = Icons.Outlined.PhoneAndroid,
       chevron = false,
       endActions = if (isThis) emptyList() else listOf(V3SwipeAction(Icons.AutoMirrored.Outlined.Logout, StrSettings.closeSessionAction, V3ButtonKind.DANGER, onClose)),

@@ -18,7 +18,7 @@ object StrKit {
   val more: String get() = t("بیشتر", "More", "نور")
   val search: String get() = t("جست‌وجو", "Search", "لټون")
   val searchHint: String get() = t("جست‌وجو…", "Search…", "لټون…")
-  val scanBarcode: String get() = td("اسکنِ بارکد", "Scan barcode", "بارکوډ سکن کړئ", "Scan barcode", "بارکوډ سکن کړئ")
+  val scanBarcode: String get() = t("اسکنِ بارکد", "Scan barcode", "بارکوډ سکن کړئ")
   val voice: String get() = t("جست‌وجوی صوتی", "Voice search", "غږیز لټون")
   val clear: String get() = t("پاک کردن", "Clear", "پاکول")
   val selected: String get() = t("انتخاب‌شده", "Selected", "ټاکل شوی")

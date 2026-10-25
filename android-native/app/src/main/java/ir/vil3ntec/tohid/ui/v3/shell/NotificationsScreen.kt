@@ -29,6 +29,7 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -67,7 +68,7 @@ fun NotificationsScreen(d: ShopData, initialTab: String?, onOpen: (String) -> Un
   val me by ShopFeed.me
   val now = remember(events) { System.currentTimeMillis() }
   val days = remember(events, seenAtOpen, me, now) {
-    NewsModel.days(events, me, now, seenAtOpen, ::dayOf) { iso -> formatDate(iso) }
+    NewsModel.days(events, me, now, seenAtOpen, ::dayOf) { iso -> displayDate(iso) }
   }
   val unseen = days.sumOf { day -> day.rows.count { it.unseen } }
   LaunchedEffect(tab, events) { if (tab == 1) ShopFeed.markSeen(context) }

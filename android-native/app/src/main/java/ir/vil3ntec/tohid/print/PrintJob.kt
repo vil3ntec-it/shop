@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.print
 
 import ir.vil3ntec.tohid.data.invoiceLabel
 import android.content.Context
+import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.coroutines.Dispatchers
@@ -23,22 +24,42 @@ object PrintJob {
    *
    *  @return پیامِ خطا یا null
    */
-  suspend fun shareSale(context: Context, d: ShopData, sale: Sale): String? {
-    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+  suspend fun shareSale(context: Context, d: ShopData, sale: Sale): String? = share(context, sale, "png", "image/png") { file ->
+    val bitmap = Receipt.render(context, d, sale, Receipts.localName(context), Receipts.SHARE_DOTS, qr = receiptQr(context, sale))
+    try {
+      file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
+  /** همان تصویرِ [shareSale]، به PDF ِ ۸۰ میلی‌متری (`ReceiptPdf`) — با پرچمِ خاموش همان فاکتورِ پیشین */
+  suspend fun sharePdf(context: Context, d: ShopData, sale: Sale): String? = share(context, sale, "pdf", "application/pdf") { file ->
+    val bitmap = Receipt.render(context, d, sale, Receipts.localName(context), Receipts.SHARE_DOTS, qr = receiptQr(context, sale))
+    val mono = try { ThermalPrinter.toMono(bitmap, Receipts.SHARE_DOTS) } finally { bitmap.recycle() }
+    file.writeBytes(ir.vil3ntec.tohid.core.receipt.ReceiptPdf.single(mono))
+  }
+
+  private suspend fun share(
+    context: Context,
+    sale: Sale,
+    ext: String,
+    mime: String,
+    write: (java.io.File) -> Unit,
+  ): String? {
+    //  پرچمِ خاموش ⇒ همان نامِ محلیِ پیشین در متنِ اشتراک
+    val local = Receipts.localName(context)
+    val storeName = if (ir.vil3ntec.tohid.data.ReceiptFlag.enabled(context)) ReceiptProfileStore.current(context).name.ifBlank { local } else local
     val file = withContext(Dispatchers.IO) {
       runCatching {
-        val bitmap = Receipt.render(context, d, sale, storeName, 576, qr = receiptQr(context, sale))
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
-        val f = java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.png")
-        f.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
-        bitmap.recycle()
-        f
+        java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.$ext").also(write)
       }
     }.getOrElse { return "فاکتور ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
     return runCatching {
       val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-        type = "image/png"
+        type = mime
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
         putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceLabel() ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)

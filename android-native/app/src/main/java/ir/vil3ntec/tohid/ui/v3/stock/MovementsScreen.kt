@@ -30,7 +30,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -96,7 +96,7 @@ fun MovementsScreen(
             when (day.date) {
               today -> Str.today
               yesterday -> StrKit.yesterday
-              else -> formatDate(day.date)
+              else -> displayDate(day.date)
             },
             style = V3Type.subhead,
             color = c.inkMuted,

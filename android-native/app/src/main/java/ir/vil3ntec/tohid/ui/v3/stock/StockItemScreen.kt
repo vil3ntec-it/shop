@@ -44,7 +44,7 @@ import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -262,8 +262,8 @@ private fun EntryRow(e: EntryUi, onDelete: () -> Unit) {
     else -> units
   }
   val subtitle = listOfNotNull(
-    formatDate(entry.date),
-    entry.expiryDate.takeIf { it.isNotBlank() }?.let { StrStock.expiryOn(formatDate(it)) },
+    displayDate(entry.date),
+    entry.expiryDate.takeIf { it.isNotBlank() }?.let { StrStock.expiryOn(displayDate(it)) },
     e.lot?.let { StrStock.lotLeft(qty(it.remaining)) },
     entry.batch.takeIf { it.isNotBlank() }?.let { StrStock.batchOf(it) },
     entry.notes.takeIf { it.isNotBlank() && !entry.isAdjustment },

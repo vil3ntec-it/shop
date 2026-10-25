@@ -32,7 +32,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -156,7 +156,7 @@ private fun KpiTile(k: AdminKpi, n: AdminNumbers, modifier: Modifier, onClick: (
     AdminKpi.STOCK_VALUE -> StrReports.itemCount(n.stockProducts)
     AdminKpi.RECEIVABLE -> StrReports.people(n.owingPeople)
     AdminKpi.PAYABLE -> StrReports.suppliers(n.suppliers)
-    AdminKpi.CASH -> n.cashOpenedAt?.let { StrReports.openSince(formatMillis(it)) } ?: StrReports.openFromHistory
+    AdminKpi.CASH -> n.cashOpenedAt?.let { StrReports.openSince(displayMillis(it)) } ?: StrReports.openFromHistory
     AdminKpi.STOCK_ALERT -> StrReports.outAndLow(n.out, n.low)
   }
   val shown = rememberCountUp(value ?: 0.0)
