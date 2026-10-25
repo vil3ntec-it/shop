@@ -25,14 +25,14 @@ internal object MoneyWriter {
     context?.let { Haptics.success(it) }
   }
 
-  /** `true` ⇐ ثبت شد (برگه/فرم بسته شود) */
-  fun ledger(store: ShopStore, toasts: V3Toasts?, context: Context?, result: LedgerEngine.Result, done: String): Boolean = when (result) {
-    is LedgerEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); false }
-    is LedgerEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); true }
+  /** شناسهٔ ردیفِ ثبت‌شده ⇐ ثبت شد (برگه/فرم بسته شود)؛ null ⇐ موتور رد کرد */
+  fun ledger(store: ShopStore, toasts: V3Toasts?, context: Context?, result: LedgerEngine.Result, done: String): String? = when (result) {
+    is LedgerEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
+    is LedgerEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); result.id }
   }
 
-  fun debtor(store: ShopStore, toasts: V3Toasts?, context: Context?, result: DebtorEngine.Result, done: String): Boolean = when (result) {
-    is DebtorEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); false }
-    is DebtorEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); true }
+  fun debtor(store: ShopStore, toasts: V3Toasts?, context: Context?, result: DebtorEngine.Result, done: String): String? = when (result) {
+    is DebtorEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
+    is DebtorEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); result.id }
   }
 }

@@ -116,9 +116,10 @@ val MoneyModule = AppModule(
         )
       }
     },
-    V3Route(MoneyPaths.NEW_DEBTOR, RouteKind.SHEET, { StrMoney.newDebtor }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) { LandOn(MoneyPaths.DEBTORS) },
-    V3Route("debtors/{id}/edit", RouteKind.SHEET, { StrMoney.editDebtor }, parent = "debtors/{id}", chrome = Chrome.OWN) { LandOn(MoneyPaths.debtor(args["id"].orEmpty())) },
-    V3Route("debtors/{id}/tx", RouteKind.SHEET, { StrMoney.newTx }, parent = "debtors/{id}", chrome = Chrome.OWN) { LandOn(MoneyPaths.debtor(args["id"].orEmpty())) },
+    //  `debtors/new` نتیجه دارد: شناسهٔ قرض‌دارِ تازه به صدازننده (صندوق ⇐ `openForResult`)
+    V3Route(MoneyPaths.NEW_DEBTOR, RouteKind.SHEET, { StrMoney.newDebtor }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) { DebtorFormRoute(null) },
+    V3Route("debtors/{id}/edit", RouteKind.SHEET, { StrMoney.editDebtor }, parent = "debtors/{id}", chrome = Chrome.OWN) { DebtorFormRoute(args["id"].orEmpty()) },
+    V3Route("debtors/{id}/tx", RouteKind.SHEET, { StrMoney.newTx }, parent = "debtors/{id}", chrome = Chrome.OWN) { TxFormRoute() },
     V3Route(MoneyPaths.RECEIVE, RouteKind.SHEET, { StrMoney.receiveTitlePick }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) {
       VipGate(Str.debtors) {
         ReceivePickerSheet(
@@ -161,7 +162,7 @@ val MoneyModule = AppModule(
         ),
       )
     },
-    V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { LandOn(MoneyPaths.PURCHASING) },
+    V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierFormRoute(null) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
       SupplierLedgerScreen(
@@ -172,16 +173,14 @@ val MoneyModule = AppModule(
           onPay = { nav.open(MoneyPaths.paySupplier(id)) },
           onNewPurchase = { nav.open(MoneyPaths.newPurchase(id)) },
           onEdit = { nav.open(MoneyPaths.editSupplier(id)) },
-          onDelete = { if (MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted)) back() },
+          onDelete = { if (MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) != null) back() },
         ),
       )
     },
     V3Route("purchasing/suppliers/{id}/edit", RouteKind.SHEET, { StrMoney.editSupplier }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) {
-      LandOn(MoneyPaths.supplier(args["id"].orEmpty()))
+      SupplierFormRoute(args["id"].orEmpty())
     },
-    V3Route("purchasing/suppliers/{id}/pay", RouteKind.SHEET, { StrMoney.pay }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) {
-      LandOn(MoneyPaths.supplier(args["id"].orEmpty()))
-    },
+    V3Route("purchasing/suppliers/{id}/pay", RouteKind.SHEET, { StrMoney.pay }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) { PayRoute() },
     V3Route("purchasing/new", RouteKind.PAGE, { StrMoney.newPurchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val context = LocalContext.current
       PurchaseFormScreen(
@@ -190,7 +189,7 @@ val MoneyModule = AppModule(
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
         onSave = { draft ->
-          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId), StrMoney.purchaseSaved)
+          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId), StrMoney.purchaseSaved) != null
         },
       )
     },
@@ -211,7 +210,7 @@ val MoneyModule = AppModule(
         ),
       )
     },
-    V3Route(MoneyPaths.NEW_EXPENSE, RouteKind.SHEET, { StrMoney.newExpense }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) { LandOn(MoneyPaths.EXPENSES) },
+    V3Route(MoneyPaths.NEW_EXPENSE, RouteKind.SHEET, { StrMoney.newExpense }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) { ExpenseFormRoute(null) },
     V3Route("expenses/month", RouteKind.SHEET, { StrMoney.pickMonth }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) {
       val picked = remember { arrayOfNulls<String>(1) }
       ExpenseMonthSheet(
@@ -231,7 +230,7 @@ val MoneyModule = AppModule(
         onDismiss = { picked[0]?.let { nav.finish(it) } ?: back() },
       )
     },
-    V3Route("expenses/{id}", RouteKind.SHEET, { StrMoney.editExpense }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) { LandOn(MoneyPaths.EXPENSES) },
+    V3Route("expenses/{id}", RouteKind.SHEET, { StrMoney.editExpense }, parent = MoneyPaths.EXPENSES, chrome = Chrome.OWN) { ExpenseFormRoute(args["id"].orEmpty()) },
   ),
 )
 
@@ -289,4 +288,107 @@ private fun RouteScope.DeleteDebtorRoute() {
       onDismiss = { back() },
     )
   }
+}
+
+/* ------------------------------ برگه‌های فرم ------------------------------ */
+
+/** `debtors/new` (نتیجه: شناسهٔ تازه) و `debtors/{id}/edit` */
+@Composable
+private fun RouteScope.DebtorFormRoute(id: String?) {
+  val context = LocalContext.current
+  val debtor = id?.let { k -> data.debtors.find { it.id == k } }
+  if (id != null && debtor == null) { LandOn(MoneyPaths.DEBTORS); return }
+  val saved = remember { arrayOfNulls<String>(1) }
+  VipGate(Str.debtors) {
+    DebtorFormSheet(
+      debtor = debtor,
+      onClose = { back() },
+      onSave = { f ->
+        saved[0] = MoneyWriter.debtor(store, toasts, context, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] != null
+      },
+      onSaved = { if (id == null) nav.finish(saved[0]) else back() },
+    )
+  }
+}
+
+/** `debtors/{id}/tx?kind=give|receive` — بیش از سقف گامِ دومِ همین برگه است؛ ثبت ⇒ نتیجهٔ «ok» (گامِ ۲ ِ «دریافت») */
+@Composable
+private fun RouteScope.TxFormRoute() {
+  val context = LocalContext.current
+  val id = args["id"].orEmpty()
+  val debtor = data.debtors.find { it.id == id }
+  if (debtor == null) { LandOn(MoneyPaths.DEBTORS); return }
+  VipGate(Str.debtors) {
+    TxFormSheet(
+      debtor = debtor,
+      balance = ir.vil3ntec.tohid.data.ShopStore.debt(data, id),
+      initialKind = if (args.query("kind") == "receive") DebtorEngine.Kind.RECEIVE else DebtorEngine.Kind.GIVE,
+      overLimitOf = { f -> DebtorFormsModel.overLimit(data, id, f) },
+      onClose = { back() },
+      onSubmit = { f, over ->
+        MoneyWriter.debtor(store, toasts, context, DebtorFormsModel.submit(data, id, f, todayIso(), System.currentTimeMillis(), ::moneyId, over), StrMoney.saved) != null
+      },
+      onDone = { nav.finish("ok") },
+    )
+  }
+}
+
+/** `purchasing/suppliers/new` و `purchasing/suppliers/{id}/edit` */
+@Composable
+private fun RouteScope.SupplierFormRoute(id: String?) {
+  val context = LocalContext.current
+  val supplier = id?.let { k -> data.suppliers.find { it.id == k } }
+  if (id != null && supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
+  SupplierFormSheet(
+    supplier = supplier,
+    onClose = { back() },
+    onSave = { draft ->
+      val result = if (id == null) LedgerEngine.addSupplier(data, draft, System.currentTimeMillis(), ::moneyId) else LedgerEngine.editSupplier(data, id, draft)
+      MoneyWriter.ledger(store, toasts, context, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
+    },
+    onSaved = { back() },
+  )
+}
+
+/** `purchasing/suppliers/{id}/pay` */
+@Composable
+private fun RouteScope.PayRoute() {
+  val context = LocalContext.current
+  val id = args["id"].orEmpty()
+  val supplier = data.suppliers.find { it.id == id }
+  if (supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
+  SupplierPaySheet(
+    supplier = supplier,
+    debt = ir.vil3ntec.tohid.data.ShopStore.supplierDebt(data, id),
+    onClose = { back() },
+    onSave = { f ->
+      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId)
+      MoneyWriter.ledger(store, toasts, context, result, StrMoney.saved) != null
+    },
+    onSaved = { back() },
+  )
+}
+
+/** `expenses/new` (از «مصرف تازه» و «پرداخت» ِ کارتِ کشیدنی) و `expenses/{id}` (ویرایش و حذف) */
+@Composable
+private fun RouteScope.ExpenseFormRoute(id: String?) {
+  val context = LocalContext.current
+  val expense = id?.let { k -> data.expenses.find { it.id == k } }
+  if (id != null && expense == null) { LandOn(MoneyPaths.EXPENSES); return }
+  ExpenseFormSheet(
+    expense = expense,
+    categories = data.expenseCategories,
+    onClose = { back() },
+    onSave = { draft ->
+      val result = if (id == null) LedgerEngine.addExpense(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId)
+      else LedgerEngine.editExpense(data, id, draft, todayIso())
+      MoneyWriter.ledger(store, toasts, context, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
+    },
+    onSaved = { back() },
+    onDelete = if (id == null) null else ({
+      MoneyWriter.ledger(store, toasts, context, LedgerEngine.deleteExpense(data, id), StrMoney.deleted)
+      back()
+    }),
+  )
 }

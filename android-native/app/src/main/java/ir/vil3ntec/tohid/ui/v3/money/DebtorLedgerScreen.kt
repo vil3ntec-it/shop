@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.money
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.WindowInsets
@@ -36,7 +37,6 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -107,53 +107,57 @@ internal fun DebtorLedgerScreen(
   val available = DebtorLedgerModel.actions(account.debtor.phone, account.transactions.isNotEmpty())
   val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
-  V3Scaffold(
-    title = account.debtor.name.ifBlank { StrMoney.debtor },
-    onBack = actions.onBack,
-    largeTitle = false,
-    actions = if (wide) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrMoney.actionsAndInfo) { drawer.toggle() }),
-    bottomBar = {
-      LedgerActionBar(
-        title = StrMoney.newTx,
-        hint = StrMoney.newTxHint,
-        onMain = { actions.onCompose(DebtorEngine.Kind.GIVE) },
-        quick = listOf(
-          LedgerQuick(StrMoney.giveTag, LedgerTone.OWE) { actions.onCompose(DebtorEngine.Kind.GIVE) },
-          LedgerQuick(StrMoney.receiveTag, LedgerTone.SETTLED) { actions.onCompose(DebtorEngine.Kind.RECEIVE) },
-        ),
-        modifier = Modifier.padding(bottom = navInset),
-      )
-    },
-  ) { pad ->
-    val listPad = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = pad.calculateBottomPadding())
-    val totalCells = ledgerCells(totals)
-    if (wide) {
-      V3TwoPane(
-        listWidth = 400.dp,
-        list = {
-          Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding()),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-          ) {
-            DebtorDrawer(account, book, available, open = true, onToggle = null, onAction = tasks::run)
-            LedgerTotals(totalCells)
+  //  دو ستون فقط وقتی جا هست (کامپیوتر، تبلت) — پنجرهٔ باریک همان چیدمانِ گوشی
+  BoxWithConstraints(Modifier.fillMaxSize()) {
+    val twoPane = wide && maxWidth >= WIDE_MIN
+    V3Scaffold(
+      title = account.debtor.name.ifBlank { StrMoney.debtor },
+      onBack = actions.onBack,
+      largeTitle = false,
+      actions = if (twoPane) emptyList() else listOf(V3Action(Icons.Outlined.MoreHoriz, StrMoney.actionsAndInfo) { drawer.toggle() }),
+      bottomBar = {
+        LedgerActionBar(
+          title = StrMoney.newTx,
+          hint = StrMoney.newTxHint,
+          onMain = { actions.onCompose(DebtorEngine.Kind.GIVE) },
+          quick = listOf(
+            LedgerQuick(StrMoney.giveTag, LedgerTone.OWE) { actions.onCompose(DebtorEngine.Kind.GIVE) },
+            LedgerQuick(StrMoney.receiveTag, LedgerTone.SETTLED) { actions.onCompose(DebtorEngine.Kind.RECEIVE) },
+          ),
+          modifier = Modifier.padding(bottom = navInset),
+        )
+      },
+    ) { pad ->
+      val listPad = PaddingValues(start = 16.dp, end = 16.dp, top = 2.dp, bottom = pad.calculateBottomPadding())
+      val totalCells = ledgerCells(totals)
+      if (twoPane) {
+        V3TwoPane(
+          listWidth = 400.dp,
+          list = {
+            Column(
+              Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding()),
+              verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+              DebtorDrawer(account, book, available, open = true, onToggle = null, onAction = tasks::run)
+              LedgerTotals(totalCells)
+            }
+          },
+          detail = {
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad.copyTop(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+              ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
+            }
+          },
+        )
+      } else {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+          item(key = "drawer") {
+            Box(Modifier.padding(bottom = 4.dp)) {
+              DebtorDrawer(account, book, available, open = drawer.open, onToggle = drawer::toggle, onAction = tasks::run)
+            }
           }
-        },
-        detail = {
-          LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad.copyTop(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
-          }
-        },
-      )
-    } else {
-      LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        item(key = "drawer") {
-          Box(Modifier.padding(bottom = 4.dp)) {
-            DebtorDrawer(account, book, available, open = drawer.open, onToggle = drawer::toggle, onAction = tasks::run)
-          }
+          item(key = "totals") { LedgerTotals(totalCells) }
+          ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
         }
-        item(key = "totals") { LedgerTotals(totalCells) }
-        ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
       }
     }
   }
@@ -169,6 +173,9 @@ internal fun DebtorLedgerScreen(
     }
   }
 }
+
+/** پهنای کمینهٔ چیدمانِ دوستونه (۴۰۰ کشو + ۳۲۰ ردیف‌ها) */
+private val WIDE_MIN = 720.dp
 
 private fun PaddingValues.copyTop(top: androidx.compose.ui.unit.Dp) = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = calculateBottomPadding())
 
@@ -222,7 +229,7 @@ private fun LazyListScope.ledgerItems(
     val give = tx.type == "give"
     LedgerRow(
       date = MoneyText.date(tx.date),
-      amount = "${if (give) "+" else "−"}${money(tx.amount)}",
+      amount = MoneyText.signed(tx.amount, give),
       after = book?.entry(tx.id)?.let { StrMoney.balanceAfterShort(DebtBook.show(it.balanceAfter)) },
       tone = if (give) LedgerTone.OWE else LedgerTone.SETTLED,
       up = give,

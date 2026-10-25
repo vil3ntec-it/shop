@@ -31,6 +31,17 @@ class MoneyFormsModelTest {
   }
 
   @Test
+  fun `قرض‌دار — تازه با شناسهٔ تازه، ویرایش با همان شناسه، نامِ خالی رد`() {
+    val added = DebtorFormsModel.save(ledger, null, DebtorForm(name = "زرغونه", creditLimit = "500"), 1L) { "new" } as DebtorEngine.Result.Ok
+    assertEquals("new", added.id)
+    assertEquals(500.0, added.data.debtors.first { it.id == "new" }.creditLimit!!, 0.0)
+    val edited = DebtorFormsModel.save(ledger, "d", DebtorFormsModel.of(ledger.debtors[0]).copy(notes = "عمده"), 1L) { "x" } as DebtorEngine.Result.Ok
+    assertEquals("d", edited.id)
+    assertEquals("عمده", edited.data.debtors.first { it.id == "d" }.notes)
+    assertTrue(DebtorFormsModel.save(ledger, null, DebtorForm(name = " "), 1L) { "n" } is DebtorEngine.Result.Failed)
+  }
+
+  @Test
   fun `تراکنش — ماندهٔ پس از ثبت و تسویهٔ کامل`() {
     val give = TxForm(kind = DebtorEngine.Kind.GIVE, amount = "200")
     val receive = give.copy(kind = DebtorEngine.Kind.RECEIVE)

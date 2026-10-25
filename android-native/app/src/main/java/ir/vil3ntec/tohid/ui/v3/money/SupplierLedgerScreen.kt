@@ -46,7 +46,6 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
-import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet

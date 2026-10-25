@@ -12,6 +12,9 @@ internal object MoneyText {
   /** مبلغ با «؋» — «1,200 ؋» */
   fun afn(value: Double): String = "${money(value)} ؋"
 
+  /** مبلغِ علامت‌دار «+۱٬۲۰۰» / «−۴۰۰» — جداشده به چپ‌به‌راست تا علامت در صفحهٔ راست‌به‌چپ پیشِ عدد بماند */
+  fun signed(value: Double, plus: Boolean): String = "\u2066${if (plus) "+" else "−"}${money(value)}\u2069"
+
   /** تاریخِ خورشیدی، یا «—» برای ردیفِ بی‌تاریخ (پشتیبانِ خیلی قدیمی) */
   fun date(iso: String): String = if (iso.isBlank()) DebtorLedgerModel.UNDATED else formatDate(iso)
 

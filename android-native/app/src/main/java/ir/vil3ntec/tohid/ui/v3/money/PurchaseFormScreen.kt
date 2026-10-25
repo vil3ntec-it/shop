@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -29,6 +30,7 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3DateField
+import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Form
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -38,6 +40,11 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 private enum class PurchasePicker { SUPPLIER, PRODUCT }
+
+private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
+  save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes) },
+  restore = { v -> PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6]) },
+)
 
 /**
  *  «ثبت خرید» (`purchasing/new?supplier=`، صفحه): گروه‌های «تأمین‌کننده» (پیش‌پُر از حسابِ همان
@@ -55,7 +62,8 @@ internal fun PurchaseFormScreen(
   onSave: (LedgerEngine.PurchaseDraft) -> Boolean,
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
-  var form by remember(supplierArg) { mutableStateOf(initial) }
+  //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
+  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormSaver) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
@@ -78,7 +86,8 @@ internal fun PurchaseFormScreen(
     summary = if (total > 0) "${StrMoney.purchaseTotal}: ${MoneyText.afn(total)}" else null,
   ) {
     Column(Modifier.v3Shake(shake)) {
-      V3Section(StrMoney.supplierLabel, padding = PaddingValues(vertical = 4.dp)) {
+      //  تأمین‌کننده و کالا در یک کارت — برچسبِ هر ردیف خودش سرخط است
+      V3Section(null, padding = PaddingValues(vertical = 4.dp)) {
         V3PickerRow(
           label = StrMoney.supplierLabel,
           value = supplier?.name,
@@ -87,8 +96,7 @@ internal fun PurchaseFormScreen(
           error = shownErrors.supplier,
           onClick = { picker = PurchasePicker.SUPPLIER },
         )
-      }
-      V3Section(StrMoney.item, padding = PaddingValues(vertical = 4.dp)) {
+        V3Divider(start = 64.dp)
         if (d.products.isEmpty()) {
           Column(Modifier.padding(12.dp)) {
             V3Message(V3Tone.INFO, StrMoney.noProductsHint, action = StrMoney.addProduct, onAction = onNewProduct)

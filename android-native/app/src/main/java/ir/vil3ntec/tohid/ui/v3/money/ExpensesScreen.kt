@@ -91,6 +91,8 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
   var confirm by remember { mutableStateOf<Expense?>(null) }
   val shown = remember(d, month, category) { ExpensesModel.shown(d, month, category) }
   val byCategory = remember(d, month) { ExpensesModel.byCategory(d, month) }
+  //  جمع و شمارِ کادرِ بزرگ همهٔ ماه است، نه فقط دستهٔ انتخاب‌شده
+  val monthCount = remember(d, month) { ExpensesModel.shown(d, month, null).size }
   val total = rememberCountUp(remember(d, month) { ExpensesModel.total(d, month) })
   val label = MoneyText.month(month)
   val stagger = rememberV3Stagger(month, category)
@@ -118,7 +120,7 @@ internal fun ExpensesScreen(d: ShopData, monthArg: String?, categoryArg: String?
           V3HeroCard(
             title = StrMoney.monthTotal(label),
             value = MoneyText.afn(total),
-            caption = StrMoney.rows(shown.size),
+            caption = StrMoney.rows(monthCount),
             chips = if (byCategory.isEmpty()) emptyList() else listOf(
               V3HeroChip(StrMoney.byCategory, Icons.Outlined.PieChart) { actions.onBreakdown(month, category) { c -> category = c?.takeIf { it.isNotBlank() } } },
             ),

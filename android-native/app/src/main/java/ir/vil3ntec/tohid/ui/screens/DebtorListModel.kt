@@ -44,18 +44,26 @@ object DebtorListModel {
    *  هر ترتیب تا آخر یکتاست (مانده ⇐ نام ⇐ شناسه): با دو قرض‌دارِ هم‌مبلغ،
    *  جای کارت‌ها با هر بار باز شدنِ صفحه عوض نمی‌شود.
    */
-  enum class Sort(val label: String) {
+  enum class Sort {
     /** بیشترین مبلغ اول — همان ترتیبی که فهرست از روزِ اول داشت */
-    MOST("بیشترین قرض"),
+    MOST,
 
     /** کمترین اول؛ کسی که پیشِ ما موجودی دارد (مانده‌ی منفی) سرِ فهرست */
-    LEAST("کمترین قرض"),
+    LEAST,
 
     /** قرضی که بیشتر مانده اول؛ کسی که بدهکار نیست ته می‌رود */
-    OLDEST("قدیمی‌ترین قرض"),
+    OLDEST,
 
     /** الفبای فارسی (و پشتو)، بعد لاتین — نه ترتیبِ کدِ یونی‌کد */
-    NAME("بر اساس نام");
+    NAME;
+
+    /** برچسبِ تراشه — از جدولِ نوشته‌ها (`StrMoney`) */
+    val label: String get() = when (this) {
+      MOST -> ir.vil3ntec.tohid.core.i18n.StrMoney.sortMost
+      LEAST -> ir.vil3ntec.tohid.core.i18n.StrMoney.sortLeast
+      OLDEST -> ir.vil3ntec.tohid.core.i18n.StrMoney.sortOldest
+      NAME -> ir.vil3ntec.tohid.core.i18n.StrMoney.sortName
+    }
 
     companion object {
       /** نامِ ذخیره‌شده ⇐ ترتیب؛ نامِ ناشناس (نسخهٔ دیگر) همان پیش‌فرض */

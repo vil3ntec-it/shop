@@ -37,7 +37,6 @@ import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtTransaction
-import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.ReportPrint
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -110,7 +109,7 @@ private fun TxDetails(tx: DebtTransaction, entry: DebtBook.Entry?, book: DebtBoo
   Column {
     V3StatusPill(if (give) V3Status.CANCELLED else V3Status.DELIVERED, if (give) StrMoney.giveTitle else StrMoney.receiveTitle)
     Spacer(Modifier.height(8.dp))
-    Text("${if (give) "+" else "−"}${money(tx.amount)}", style = v3Text(28, FontWeight.Bold, 36), color = tone.ink())
+    Text(MoneyText.signed(tx.amount, give), style = v3Text(28, FontWeight.Bold, 36), color = tone.ink())
     Spacer(Modifier.height(12.dp))
     val lines = remember(tx, entry, book) { DebtorTxModel.lines(tx, entry, book) }
     V3Card(padding = PaddingValues(vertical = 4.dp)) {

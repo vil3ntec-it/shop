@@ -42,6 +42,10 @@ internal object DebtorFormsModel {
 
   fun draft(f: DebtorForm) = DebtorEngine.DebtorDraft(f.name, f.phone, f.notes, parseLimit(f.creditLimit))
 
+  /** ذخیرهٔ برگه: قرض‌دارِ تازه (`add`) یا ویرایش (`editWithLimit`) */
+  fun save(d: ShopData, editingId: String?, f: DebtorForm, now: Long, newId: () -> String): DebtorEngine.Result =
+    if (editingId == null) DebtorEngine.add(d, draft(f), now, newId) else DebtorEngine.editWithLimit(d, editingId, draft(f))
+
   /* ------------------------------ تراکنش ------------------------------ */
 
   fun amountOf(f: TxForm): Double = f.amount.trim().toDoubleOrNull() ?: 0.0

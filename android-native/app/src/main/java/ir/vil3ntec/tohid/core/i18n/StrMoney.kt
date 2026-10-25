@@ -44,6 +44,18 @@ object StrMoney {
   val debtorGone: String get() = t("این قرض‌دار دیگر نیست", "This debtor no longer exists", "دا پوروړی نور نشته")
   val debtorGoneBody: String get() = t("شاید روی دستگاهِ دیگری حذف شده باشد.", "It may have been deleted on another device.", "کېدای شي په بله وسیله ړنګ شوی وي.")
 
+  //  فهرستِ r9
+  val statPeople: String get() = t("تعداد قرض‌داران", "Debtors", "د پوروړو شمېر")
+  val statOwed: String get() = t("جمع تمام قرض‌ها", "Total owed", "ټول پورونه")
+  val statReceived: String get() = t("رسیدهای همه", "All received", "ټول ترلاسه شوي")
+  fun itemsCount(n: Any): String = t("$n مورد", "$n ${pl(n, "person", "people")}", "$n کسان")
+  val openAccount: String get() = t("باز کردنِ حساب", "Open account", "حساب پرانیستل")
+  val noName: String get() = t("بی‌نام", "No name", "بې نومه")
+  val sortMost: String get() = t("بیشترین قرض", "Most owed", "تر ټولو ډېر پور")
+  val sortLeast: String get() = t("کمترین قرض", "Least owed", "تر ټولو لږ پور")
+  val sortOldest: String get() = t("قدیمی‌ترین قرض", "Oldest debt", "تر ټولو زوړ پور")
+  val sortName: String get() = t("بر اساس نام", "By name", "د نوم له مخې")
+
   //  حسابِ یک قرض‌دار (#354)
   val actionsAndInfo: String get() = t("کارها و اطلاعات", "Actions & info", "کړنې او معلومات")
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
