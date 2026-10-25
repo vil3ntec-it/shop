@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.net.userText
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
@@ -134,7 +134,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
         V3Section(StrNav.changeLog) {
           V3ListRow(q.text, chevron = false, trailing = { Dot(q.tone) })
           V3Divider(start = 22.dp)
-          V3ListRow(if (v1.lastOkAt > 0) StrNav.lastSyncOk(formatMillis(v1.lastOkAt)) else StrNav.noSyncYet, chevron = false)
+          V3ListRow(if (v1.lastOkAt > 0) StrNav.lastSyncOk(displayMillis(v1.lastOkAt)) else StrNav.noSyncYet, chevron = false)
           V3Divider(start = 22.dp)
           V3ListRow(StrNav.schemaVersion(v1.schemaVersion) + if (v1.serverSchema > 0) " · " + StrNav.serverN(v1.serverSchema) else "", chevron = false)
           if (v1.dropped > 0) {

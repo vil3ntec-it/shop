@@ -138,6 +138,8 @@
 
 ## ساختار و قاعده‌ها
 
+- **تاریخ و روز در صفحه:** `displayDate(iso)` و `displayMillis(at)` (به زبان و تقویمِ انتخاب‌شده، ۳۴۸)، شمارِ روز
+  `daysText(n)`، نامِ ماه `JALALI_MONTHS`. `formatDate` فقط برای داده، CSV و کادرِ ویرایش.
 - کیت: `ui/v3/*.kt` (هر جزء یک فایلِ کوچک)؛ نقش‌های رنگ: `ui/theme/PhoneV3Roles.kt`؛ تم‌ها: `ui/theme/ShopThemes.kt`؛ حرکت: `ui/screens/Motion.kt`.
 - مسیریاب: موتورِ خالص در `core/nav/` (آزمون: `NavCoreTest`)، فهرست و پوسته در `ui/v3/nav/` (آزمون: `ModuleRegistryTest`).
 - جزءِ تازه لازم شد؟ در بستهٔ گروهِ خودتان `internal DraftX` بسازید و در PR بنویسید؛ پایه آن را به کیت می‌برد.
