@@ -41,12 +41,31 @@ object CashShift {
   const val ONLINE = "online"
   const val ONLINE_SERIES = "W"
 
-  /** فاکتورِ اینترنتیِ سرور — پولش به دخل نمی‌آید */
-  fun isOnline(s: Sale): Boolean = s.channel == ONLINE || s.series == ONLINE_SERIES
+  /**
+   *  فاکتورِ اینترنتی که پولش به دخل نمی‌آید: فاکتورِ W ِ سرور همیشه؛ هر فروشِ `channel = online`
+   *  (از جمله فروشِ تحویلِ سفارش در برنامه، `OrderFulfillment`) مگر «نقد سرِ پیشخوان»
+   *  ([paidAtCounter]) — پرداختِ آنلاین نزدِ درگاه است و نقدِ پیک تا تسویهٔ پیک.
+   */
+  fun isOnline(s: Sale): Boolean =
+    s.series == ONLINE_SERIES || (s.channel == ONLINE && !paidAtCounter(s))
 
   /**
-   *  مرجوعیِ سرور برای سفارشِ اینترنتی. ردیف‌های پیش از نشانِ `channel` با شناسهٔ
-   *  ثابتِ سرور (`w-…`، هرگز ULID ِ دستگاه) و فاکتورِ اینترنتی شناخته می‌شوند.
+   *  سفارشی که مشتری سرِ پیشخوان گرفت و نقد داد (`OrderFulfillment.atCounter`، حتی سفارشِ
+   *  «ارسال»): ردیفِ پرداختِ نقدِ بی‌امانت
+   *  (`kind = cash`، بی `custody`) — همان نقدِ عادیِ دخل. نقدِ پیک `custody = courier` دارد.
+   */
+  fun paidAtCounter(s: Sale): Boolean =
+    s.payments?.any { it.kind == "cash" && it.custody == null && it.amountMinor > 0 } == true
+
+  /**
+   *  مرجوعیِ بیرون از دخل: ردیفی که خودش `channel = online` دارد — مرجوعیِ سرور برای سفارشِ
+   *  اینترنتی، یا مرجوعیِ پیوسته به بازپرداختی که بیرون از دخل داده شد — و ردیف‌های سرورِ پیش
+   *  از نشانِ `channel` (شناسهٔ ثابتِ `w-…`، هرگز ULID ِ دستگاه) بر فاکتورِ اینترنتی.
+   *  ⛔ مرجوعیِ **دستیِ** همین صندوق — حتی برای فروشِ آنلاین یا پیک (`o-…`، `w-…`) — پولی است که
+   *  از همین دخل رفت ⇒ کم می‌شود (تصمیمِ صاحبِ مخزن، بازبینیِ دومِ #340؛ پسِ تحویلِ ناموفق
+   *  «لغو» است، نه مرجوعی ⇒ اثری بر دخل ندارد).
+   *  ⛔ دفترِ بازپرداختِ سفارش (`order-refunds`) امروز فقط `cash` دارد و نشانِ «بیرون از دخل»
+   *  ندارد؛ پس امروز هیچ مرجوعیِ دستی‌ای `channel = online` نمی‌گیرد.
    */
   fun isOnlineReturn(r: SaleReturn, onlineSales: Set<String>): Boolean =
     r.channel == ONLINE || (r.saleId in onlineSales && r.id.startsWith("w-"))

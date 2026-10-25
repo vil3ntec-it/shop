@@ -57,7 +57,7 @@ val OnlineModule = AppModule(
     ModuleEntry("chat", { Str.customerChat }, OnlinePaths.CHAT, Icons.Outlined.Forum, setOf(Place.MORE), MoreGroup.SALES, V3Hue.PURPLE, needs = setOf(Need.CHAT), order = 50),
   ),
   routes = listOf(
-    V3Route(OnlinePaths.ORDERS, RouteKind.TAB, { Str.orders }, needs = setOf(Need.ORDERS_LIVE)) { OrdersScreen(snackbar) { back() } },
+    V3Route(OnlinePaths.ORDERS, RouteKind.TAB, { Str.orders }, needs = setOf(Need.ORDERS_LIVE)) { OrdersScreen(store, snackbar) { back() } },
     V3Route(OnlinePaths.NEW_ORDER, RouteKind.PAGE, { Str.orders }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE)) { LandOn(OnlinePaths.ORDERS) },
     V3Route("orders/{id}", RouteKind.PAGE, { Str.orders }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE)) { LandOn(OnlinePaths.ORDERS) },
     V3Route("orders/{id}/action", RouteKind.SHEET, { Str.orders }, parent = "orders/{id}", needs = setOf(Need.ORDERS_LIVE)) { LandOn(OnlinePaths.ORDERS) },

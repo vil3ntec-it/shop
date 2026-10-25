@@ -175,3 +175,13 @@ test('لوگوی JPEG ِ عکس‌گرفته: چرخش می‌ماند (در ف�
   const png = await h.raw('PUT', `${P}/logo`, F.png(40, 20), { token: t.owner });
   assert.equal(png.body.profile.logo.orientation, 1);
 });
+
+test('پرچمِ shop.receipt_v2: پیش‌فرض خاموش؛ روشن برای همین دکان یا all', async () => {
+  const t = await shopWithTeam('ذ');
+  const u = await shopWithTeam('ر');
+  const C = `${P}/config`;
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false });
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.receipt_v2','true',1)", [t.shopId]);
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: true });
+  assert.deepEqual((await h.get(C, { token: u.owner })).body, { enabled: false });
+});

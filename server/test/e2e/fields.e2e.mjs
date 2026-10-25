@@ -144,7 +144,7 @@ await E.step('UF.web-clear', 'وب سقفِ اعتبارِ یک قرض‌دار 
 }, { needs: ['UF.0'] });
 
 await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ سرور فیلدِ فهرست‌شده را نگه می‌دارد؛ ساختی که فیلد را می‌شناسد پاکش می‌کند', async () => {
-  //  فیلدهای فهرست‌شده: `orderId` (هیچ ساختی هنوز نمی‌شناسد) و `channel` (از 3.2.522)
+  //  فیلدهای فهرست‌شده: `orderId` (پس از A00 — فروشِ تحویلِ سفارش، #340؛ هیچ ساختِ پیش از A00 نمی‌شناسد) و `channel` (از 3.2.522)
   await N.drain();
   const d = structuredClone(N.ledger);
   Object.assign(d.sales.find((s) => s.id === saleId), { orderId: 'ord_e2e', channel: 'online' });

@@ -60,6 +60,8 @@ import ir.vil3ntec.tohid.numericInput
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /*
  *  پنلِ پرداختِ ترکیبی (PAY-01، 02، 04، 05، 06، 07؛ S01، S06) — فقط با پرچمِ
@@ -128,8 +130,8 @@ fun PaySplitSection(
     OutlinedTextField(
       value = state.cash,
       onValueChange = { state.cash = numericInput(it) },
-      label = { Text("نقدِ دریافتی") },
-      supportingText = { Text("Enter روی کادرِ خالی = نقدِ دقیق") },
+      label = { Text(StrPos.cashReceived) },
+      supportingText = { Text(StrPos.enterExactHint) },
       singleLine = true,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
       keyboardActions = KeyboardActions(onDone = { if (state.cash.isBlank()) state.fillExact(total, customerId) else onSubmit() }),
@@ -144,7 +146,7 @@ fun PaySplitSection(
     OutlinedButton(
       onClick = { state.fillExact(total, customerId); runCatching { cashFocus.requestFocus() } },
       modifier = Modifier.heightIn(min = maxOf(target, 44.dp)),
-    ) { Text("نقدِ دقیق") }
+    ) { Text(StrPos.exactCash) }
   }
 
   state.rows.forEachIndexed { i, row ->
@@ -162,7 +164,7 @@ fun PaySplitSection(
       OutlinedTextField(
         value = row.ref,
         onValueChange = { state.rows[i] = row.copy(ref = it) },
-        label = { Text("شمارهٔ مرجع") },
+        label = { Text(StrPos.reference) },
         singleLine = true,
         isError = bad,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
@@ -174,7 +176,7 @@ fun PaySplitSection(
       OutlinedTextField(
         value = row.amount,
         onValueChange = { state.rows[i] = row.copy(amount = numericInput(it)) },
-        label = { Text("مبلغ") },
+        label = { Text(StrPos.amount) },
         singleLine = true,
         isError = bad,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
@@ -184,28 +186,28 @@ fun PaySplitSection(
         },
       )
       IconButton(onClick = { state.rows.removeAt(i); refFocus.removeAt(i); amountFocus.removeAt(i); runCatching { cashFocus.requestFocus() } }) {
-        Icon(Icons.Filled.Close, contentDescription = "حذفِ این روش", tint = Shop.colors.muted)
+        Icon(Icons.Filled.Close, contentDescription = StrPos.removeMethod, tint = Shop.colors.muted)
       }
     }
   }
-  TextButton(onClick = { addRow() }) { Text("+ روشِ دیگر (PgDn)") }
+  TextButton(onClick = { addRow() }) { Text(StrPos.addMethod) }
 
   //  خلاصه — همان عددِ هسته
   val s: Settlement? = preview.valueOrNull()
   Column(
     Modifier.fillMaxWidth().background(Shop.colors.surface2, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
   ) {
-    SumRow("مبلغِ قابلِ پرداخت", money(total), strong = true)
-    SumRow("دریافتی", s?.let { money(PayFlow.major(it.tendered)) } ?: "—")
-    SumRow("پولِ پس (فقط از نقد)", s?.let { money(PayFlow.major(it.change)) } ?: "—")
+    SumRow(StrSale.payable, money(total), strong = true)
+    SumRow(StrSale.received, s?.let { money(PayFlow.major(it.tendered)) } ?: "—")
+    SumRow(StrPos.changeCashOnly, s?.let { money(PayFlow.major(it.change)) } ?: "—")
     SumRow(
-      if ((s?.toAccount ?: 0) > 0) "به حسابِ ${customerName ?: "مشتری"}" else "باقی‌مانده",
+      if ((s?.toAccount ?: 0) > 0) StrPos.toAccountOf(customerName ?: StrPos.customer) else StrSale.remaining,
       s?.let { money(PayFlow.major(it.remaining)) } ?: "—",
       warn = (s?.remaining ?: 0) > 0,
     )
     if (s != null && s.payments.any { it.status == "pending" }) {
       Spacer(Modifier.height(4.dp))
-      StatusPill("غیرنقد: ثبتِ دستی، در انتظارِ تأیید", PillTone.AWAITING)
+      StatusPill(StrPos.nonCashPending, PillTone.AWAITING)
     }
   }
   val error = when {
@@ -279,9 +281,9 @@ fun PayPanelDialog(
           if (e.down(Key.Escape)) { onDismiss(); true } else false
         },
       ) {
-        Text("پنلِ پرداخت", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrPos.payPanel, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Text(
-          customerName?.let { "مشتری: $it — باقی‌مانده به حسابش می‌رود" } ?: "بی مشتری — برای پرداختِ جزئی پیش از F9 با F2 مشتری بگذارید",
+          customerName?.let { StrPos.customerRestToAccount(it) } ?: StrPos.noCustomerHint,
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
         )
         Spacer(Modifier.height(10.dp))
@@ -294,9 +296,9 @@ fun PayPanelDialog(
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text("انصراف (Esc)") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(StrPos.cancelEsc) }
           Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.weight(1.6f).height(48.dp)) {
-            Text(if (busy) "در حالِ ثبت…" else "ثبتِ فروش (Enter)")
+            Text(if (busy) StrSale.posting else StrPos.recordSaleEnter)
           }
         }
       }
