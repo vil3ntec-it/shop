@@ -52,6 +52,8 @@ class ShopStore(private val context: Context) {
 
   suspend fun load() {
     withContext(Dispatchers.IO) {
+      //  نشانِ دیسک **پیش از** خواندن — نوشتنی که میانِ خواندن برسد پایین دیده می‌شود
+      val mark = follow.mark()
       //  SEC-01: بازسازیِ نیمه‌کاره پیش از خواندنِ دفتر تمام یا دور ریخته می‌شود (`SyncRebuild.atLoad`)
       val stuck = runCatching { recoverRebuild() }.getOrElse { rebuildMark.exists() && rebuildSide.exists() }
       if (stuck) {
@@ -76,12 +78,14 @@ class ShopStore(private val context: Context) {
         }
         if (text != null) {
           runCatching { json.decodeFromString<ShopData>(text) }
-            .onSuccess { _data.value = it; recoverSync(it) }
+            .onSuccess { follow.replace(it); recoverSync(it) }
         }
       } else {
         _unreadable.value = null
         recoverSync(ShopData())
       }
+      //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو
+      synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) }
     }
     _loaded.value = true
   }
@@ -99,6 +103,29 @@ class ShopStore(private val context: Context) {
    */
   private val _unreadable = MutableStateFlow<AtRestException.Kind?>(null)
   val unreadable: StateFlow<AtRestException.Kind?> = _unreadable.asStateFlow()
+
+  /* ------- چند نمونه روی یک دفتر: صفحه و کارگرِ پس‌زمینه — شرح سرِ `LedgerFollow` ------- */
+
+  private val follow = LedgerFollow(
+    file, _data,
+    unreadable = { _unreadable.value != null },
+    readDisk = { runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() },
+  )
+
+  /** [LedgerFollow.freshLocked] برای نوشتنِ صفحه؛ `null` با پیامِ روشن */
+  private fun currentForWrite(): ShopData? =
+    follow.freshLocked() ?: run { _diskError.tryEmit(STALE_UNREADABLE); null }
+
+  /**
+   *  دفترِ همین لحظهٔ دیسک — `read` ِ موتورهای همگام‌سازی (`SyncV1Worker`، `SyncV3Runner`)، زیرِ
+   *  همان قفلِ نوشتن. ⛔ نشاندنِ opهای سرور روی دفترِ کهنهٔ این نمونه فروشی را که صفحه در این
+   *  فاصله ثبت کرده بود از دیسک پاک می‌کرد.
+   *
+   *  @throws java.io.IOException دیسک جلوتر است و خوانده نشد — هیچ چیزی نشانده نمی‌شود
+   */
+  fun ledgerNow(): ShopData = synchronized(SyncV1Engine.of(context)) {
+    follow.freshLocked() ?: throw java.io.IOException(STALE_UNREADABLE)
+  }
 
   /**
    *  هم‌سو کردنِ فایل‌های دفتر با تنظیمِ «رمزگذاریِ داده» — زیرِ همان قفلِ
@@ -145,14 +172,31 @@ class ShopStore(private val context: Context) {
    *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
   suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    //  دفتری که صفحه با آن ساخت — نه لزوماً دفترِ همین حالا (شرح سرِ `LedgerMerge`)
+    val base = follow.baseOf(next)
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
     //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
-    if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
+    //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
+    if (touchesPaid(base, next) && SoftLock.isLocked(context)) {
       SoftLock.noteBlocked()
       _blocked.tryEmit(Unit)
       return@withContext false
     }
-    writeInternal(next)
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      val theirs = currentForWrite() ?: return@synchronized false
+      //  دیسک همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام
+      if (theirs === base) return@synchronized writeLocked(engine, next)
+      //  ⛔ دیسک جلوتر است: فقط تغییرِ صفحه نسبت به پایه روی دیسک می‌نشیند. نوشتنِ کاملِ دفترِ
+      //  کهنه برای ردیف‌های تازهٔ دیسک DELETE و برای ویرایش‌های تازه‌اش برگرداندن می‌ساخت.
+      val merged = runCatching { LedgerMerge.merge(base, next, theirs) }.getOrElse {
+        _diskError.tryEmit(it.message ?: STALE_UNREADABLE)
+        return@synchronized false
+      }
+      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد
+      if (merged !== next) follow.remember(theirs)
+      writeLocked(engine, merged)
+    }
   }
 
   /**
@@ -280,7 +324,9 @@ class ShopStore(private val context: Context) {
       val onDisk = if (!side && !mark) runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() else null
       if (SyncRebuild.swappedElsewhere(side, mark, onDisk, staged)) {
         _unreadable.value = null
-        _data.value = onDisk!!
+        follow.replace(onDisk!!)
+        //  همان دفترِ دیسک، زیرِ قفلِ موتور — این نمونه دوباره همتاها را دنبال می‌کند
+        follow.syncedLocked()
         staged = null
         return
       }
@@ -303,7 +349,8 @@ class ShopStore(private val context: Context) {
     if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
     rebuildMark.delete()
     _unreadable.value = null
-    _data.value = next
+    follow.replace(next)
+    follow.publishedLocked(next)
     runCatching { LedgerSummary.write(context, next) }
     return true
   }
@@ -342,7 +389,7 @@ class ShopStore(private val context: Context) {
   suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
-      val cur = _data.value
+      val cur = currentForWrite() ?: return@synchronized false
       val next = transform(cur) ?: return@synchronized null
       if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
         SoftLock.noteBlocked()
@@ -358,7 +405,11 @@ class ShopStore(private val context: Context) {
    *
    *  @return آیا به دیسک رسید
    */
-  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) { writer().save(next) }
+  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    //  جایگزینیِ کامل (بازیابی، بازسازی): صفحه‌ای که هنوز با دفترِ پیشین می‌سازد، روی همین می‌نشیند
+    follow.remember(_data.value)
+    writer().save(next)
+  }
 
   /**
    *  ردیفِ سابقه (`auditLog`) روی دفترِ **همان لحظه** — خواندن و نوشتن زیرِ
@@ -380,7 +431,7 @@ class ShopStore(private val context: Context) {
    */
   private fun writer(): LedgerWriter {
     val engine = SyncV1Engine.of(context)
-    return LedgerWriter(engine, { _data.value }) { next -> writeLocked(engine, next) }
+    return LedgerWriter(engine, { currentForWrite() }) { next -> writeLocked(engine, next) }
   }
 
   /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */
@@ -429,7 +480,12 @@ class ShopStore(private val context: Context) {
    *  ببرد؛ همان opها دورِ بعد دوباره گرفته می‌شوند.
    */
   fun applyFromServerNow(next: ShopData) {
-    if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+    synchronized(SyncV1Engine.of(context)) {
+      //  ⛔ دفترِ حسابِ دیگری جای این نشسته (خروج/ورود در میانهٔ همگام‌سازی): opهای حسابِ پیشین
+      //  روی آن نمی‌نشینند؛ cursor جلو نمی‌رود و دورِ بعد با کلیدِ درست
+      if (!follow.sameAccount()) throw java.io.IOException(STALE_UNREADABLE)
+      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+    }
   }
 
   /**
@@ -462,6 +518,8 @@ class ShopStore(private val context: Context) {
     }
     _unreadable.value = null
     _data.value = next
+    //  همتاها (صفحه یا کارگر) همین دفتر را می‌گیرند؛ این نمونه نسخهٔ تازه را
+    follow.publishedLocked(next)
     //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
     //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
     //  `LedgerSummary`.
@@ -564,17 +622,18 @@ class ShopStore(private val context: Context) {
   /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
   suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
     //  زیرِ قفلِ نوشتنِ دفتر و قفلِ کوچِ رمز (`AtRest.converge`): کوچ میانِ کپی و پاک کردن نمی‌نشیند
-    runCatching {
-      synchronized(SyncV1Engine.of(context)) {
+    synchronized(SyncV1Engine.of(context)) {
+      runCatching {
         synchronized(AtRest.lock) {
           if (file.exists()) file.copyTo(vault(key), overwrite = true)
           file.delete()
         }
       }
+      //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
+      follow.movedLocked(stop = false, next = ShopData())
+      _unreadable.value = null
     }
     LedgerSummary.clear(context)
-    _data.value = ShopData()
-    _unreadable.value = null
     Unit
   }
 
@@ -582,14 +641,14 @@ class ShopStore(private val context: Context) {
   suspend fun openFrom(key: String) {
     withContext(Dispatchers.IO) {
       val saved = vault(key)
-      runCatching {
-        synchronized(SyncV1Engine.of(context)) {
+      synchronized(SyncV1Engine.of(context)) {
+        runCatching {
           synchronized(AtRest.lock) { if (saved.exists()) saved.copyTo(file, overwrite = true) else file.delete() }
         }
+        follow.movedLocked(stop = true, next = ShopData())
       }
     }
     _loaded.value = false
-    _data.value = ShopData()
     //  خلاصهٔ حسابِ قبلی نباید روی حسابِ تازه بماند؛ با خواندنِ دفتر از نو
     //  ساخته می‌شود
     LedgerSummary.clear(context)
@@ -623,6 +682,10 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
+    /** پیامِ نوشتنی که رد شد چون دفترِ دیسک جلوتر بود و خوانده نشد (یا دفترِ حسابِ دیگری بود) */
+    const val STALE_UNREADABLE =
+      "دفترِ روی دیسک در این فاصله عوض شده بود و دوباره خوانده نشد، پس این تغییر ثبت نشد تا چیزی از آن رونویسی نشود. دوباره امتحان کنید."
+
     /** پیامِ نوشتنی که به‌خاطرِ دفترِ رمزدارِ خوانده‌نشده رد شد */
     const val UNREADABLE =
       "دفترِ رمزدارِ این دستگاه باز نشد، پس این تغییر ثبت نشد تا دفترِ واقعی رونویسی نشود. از «تنظیمات ← امنیت» دوباره امتحان یا «بازسازی از سرور» را بزنید."

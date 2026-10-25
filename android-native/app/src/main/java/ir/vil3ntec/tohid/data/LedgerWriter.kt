@@ -9,15 +9,21 @@ package ir.vil3ntec.tohid.data
  *      نوشتنِ پس‌زمینه (ردیفِ سابقهٔ صفِ چاپ) هرگز از تصویرِ کهنه ساخته
  *      نمی‌شود: فروشی که هم‌زمان ثبت شد گم نمی‌شود و `record` برایش opِ حذف
  *      به سرور نمی‌فرستد.
+ *
+ *  [current] دفترِ همین لحظهٔ **دیسک** است (`ShopStore.freshLocked`)، نه فقط دفترِ حافظهٔ این
+ *  نمونه؛ `null` یعنی دیسک جلوتر بود و خوانده نشد ⇒ هیچ نوشتنی.
  */
 class LedgerWriter(
   private val lock: Any,
-  private val current: () -> ShopData,
+  private val current: () -> ShopData?,
   private val write: (ShopData) -> Boolean,
 ) {
   fun save(next: ShopData): Boolean = synchronized(lock) { write(next) }
 
-  fun edit(change: (ShopData) -> ShopData): Boolean = synchronized(lock) { write(change(current())) }
+  fun edit(change: (ShopData) -> ShopData): Boolean = synchronized(lock) {
+    val cur = current() ?: return@synchronized false
+    write(change(cur))
+  }
 
   companion object {
     /** ردیفِ سابقه ته دفترِ همان لحظه؛ ردیف را همان دفتر می‌سازد (مثلاً صندوقِ باز برای `no_sale`) */

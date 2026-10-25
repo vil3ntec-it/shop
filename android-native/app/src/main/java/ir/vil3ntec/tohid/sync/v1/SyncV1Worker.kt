@@ -79,12 +79,14 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     runCatching { ir.vil3ntec.tohid.sync.DocSeries.ensure(app) }
 
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
+    //  ⛔ `read` دفترِ همین لحظهٔ دیسک است (`ledgerNow`)، نه دفتری که این نمونه هنگامِ `load` خواند:
+    //  نشاندنِ opها روی آن فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد
     runCatching {
-      engine.prepare(read = { store.data.value }, write = { next -> store.applyFromServerNow(next) })
+      engine.prepare(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
     }
 
     val outcome = engine.runOnce(
-      read = { store.data.value },
+      read = { store.ledgerNow() },
       write = { next -> store.applyFromServerNow(next) },
     )
     return if (outcome.isSuccess) Result.success() else Result.retry()
