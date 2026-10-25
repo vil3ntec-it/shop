@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.LocaleText
+import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.unitMoney
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -27,6 +29,10 @@ class SaleReceiptTest {
     assertEquals("1,250", unitMoney(1250.0))
     assertEquals("1,234.50", unitMoney(1234.5))
     assertEquals("0", unitMoney(Double.NaN))
+    //  همان در فاکتورِ چاپی و نسخهٔ ۲ (`LocaleText.unitAmount`)، با رقمِ فارسی هم
+    assertEquals("333.33", LocaleText.unitAmount(l.unit, LocaleFormat.DIGITS_LATN))
+    assertEquals("۱٬۲۳۴٫۵۰", LocaleText.unitAmount(1234.5, LocaleFormat.DIGITS_FA))
+    assertEquals(LocaleText.amount(1250.0, LocaleFormat.DIGITS_FA), LocaleText.unitAmount(1250.0, LocaleFormat.DIGITS_FA))
   }
 
   @Test fun `جمع‌ها مثلِ خلاصهٔ صندوق — پیش از تخفیفِ خودکار، ردیفِ آن با نام، بعد تخفیفِ دستی`() {

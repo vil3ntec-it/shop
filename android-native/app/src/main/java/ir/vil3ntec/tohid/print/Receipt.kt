@@ -14,6 +14,7 @@ import androidx.core.content.res.ResourcesCompat
 import ir.vil3ntec.tohid.R
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ReceiptFlag
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
@@ -49,6 +50,9 @@ object Receipt {
      *  پس از [copyMark]، چون `HwPages` آن را بی نام (ششمین) می‌دهد. */
     qr: String? = null,
   ): Bitmap {
+    //  فاکتورِ نسخهٔ ۲ (`Receipts`، چیدمان در `core/receipt`) فقط با پرچمِ `shop.receipt_v2`؛
+    //  خاموش ⇒ همین چیدمانِ پیشین، بیت‌به‌بیت. فروشِ بی توکن کدِ [qr] را (اگر هست) نگه می‌دارد.
+    if (ReceiptFlag.enabled(context)) return Receipts.bitmap(context, d, sale, width, copyMark, fallbackName = storeName, legacyQr = qr)
     val regular = font(context, R.font.vazirmatn_regular)
     val bold = font(context, R.font.vazirmatn_bold)
 
@@ -138,11 +142,7 @@ object Receipt {
     fun num(value: Double) = LocaleText.amount(value, digits)
     fun afn(value: Double) = LocaleText.afghani(value, digits, symbol)
     //  قیمتِ واحدِ اعشاری (۳۳۳٫۳۳) گرد نمی‌شود تا «مقدار × قیمت» با جمعِ قلم بخواند (S3)
-    fun priceText(value: Double): String {
-      if (Math.round(value * 100) % 100 == 0L) return num(value)
-      val text = LocaleText.digitsIn(ir.vil3ntec.tohid.unitMoney(value), digits)
-      return if (digits == ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_FA) text.replace(',', '٬').replace('.', '٫') else text
-    }
+    fun priceText(value: Double) = LocaleText.unitAmount(value, digits)
 
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { "فروشگاه" }, title, Layout.Alignment.ALIGN_CENTER)

@@ -132,6 +132,8 @@
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',
     changeMinor: 'پول پس (پول)',
+    //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (همتای OwnerExport.kt)
+    receiptToken: 'توکنِ QRِ فاکتور',
     by: 'کاربر',
     approvedBy: 'تأییدکننده',
     note: 'توضیح',
