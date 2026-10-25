@@ -46,7 +46,7 @@ class LedgerMergeTest {
     assertTrue(raw.toString(), "products:p2:delete" in raw && "products:p1:update" in raw)
   }
 
-  @Test fun `یک ردیف، هم‌زمان: فیلدهای جدا هر دو می‌مانند؛ فیلدِ یکسان کاربر برنده`() {
+  @Test fun `یک ردیف، هم‌زمان — فیلدهای جدا هر دو می‌مانند؛ فیلدِ یکسان کاربر برنده`() {
     val base = ShopData(products = listOf(p1))
     val theirs = disk(ShopData(products = listOf(p1.copy(name = "برنج اعلا", salePrice = 200.0))))
     val ours = base.copy(products = listOf(p1.copy(salePrice = 150.0, notes = "قفسهٔ دوم")))
@@ -94,7 +94,7 @@ class LedgerMergeTest {
     assertEquals("-50", ((f["remaining"] as JsonObject)["\$inc"])!!.jsonPrimitive.content)
   }
 
-  @Test fun `فهرستِ نام‌ها: افزوده و حذفِ هر طرف`() {
+  @Test fun `فهرستِ نام‌ها — افزوده و حذفِ هر طرف`() {
     val base = ShopData(productCategories = listOf("لبنیات", "نوشیدنی"))
     val theirs = disk(base.copy(productCategories = listOf("لبنیات", "نوشیدنی", "حبوبات")))
     val ours = base.copy(productCategories = listOf("لبنیات", "شوینده"))
@@ -116,7 +116,7 @@ class LedgerMergeTest {
     assertSame(ours, LedgerMerge.merge(base, ours, base))
   }
 
-  @Test fun `پایه: دفتری که صفحه با آن ساخت، با ردیف‌های همان شیء`() {
+  @Test fun `پایه — دفتری که صفحه با آن ساخت، با ردیف‌های همان شیء`() {
     val screen = disk(ShopData(products = listOf(p1, p2), sales = listOf(sale)))
     //  کارگر نوشت: دفترِ تازهٔ همین نمونه از JSON ِ جداست
     val current = disk(screen.copy(products = screen.products + p3))
