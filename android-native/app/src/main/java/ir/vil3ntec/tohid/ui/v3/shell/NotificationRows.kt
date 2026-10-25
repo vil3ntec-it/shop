@@ -82,7 +82,8 @@ internal fun AlertGroup(title: String, items: List<ShopAlerts.Item>, stagger: V3
         minHeight = ROW,
         subtitleLines = 1,
         modifier = Modifier.v3Stagger(stagger, item.key, offset + i),
-        trailing = {
+        //  «دیدن» همان زدنِ ردیف است ⇐ فقط چِورون؛ کارِ دیگر (تمدید، بررسی، پیگیری) نوشته می‌ماند
+        trailing = if (item.plainSee) null else ({
           Text(
             item.action,
             style = v3Text(14, FontWeight.SemiBold, 20),
@@ -90,7 +91,8 @@ internal fun AlertGroup(title: String, items: List<ShopAlerts.Item>, stagger: V3
             modifier = Modifier.clip(RoundedCornerShape(8.dp)).v3Pressable(label = item.action) { onOpen(item.actionRoute) }
               .padding(horizontal = 8.dp, vertical = 6.dp),
           )
-        },
+        }),
+        chevron = item.plainSee,
         onClick = { onOpen(item.route) },
       )
     }

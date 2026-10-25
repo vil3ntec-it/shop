@@ -12,7 +12,6 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
-import ir.vil3ntec.tohid.ui.screens.DeskDashboardScreen
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
@@ -67,7 +66,7 @@ val ShellModule = AppModule(
   ),
   routes = listOf(
     V3Route(ShellPaths.HOME, RouteKind.TAB, { Str.home }, aliases = listOf("dashboard"), chrome = Chrome.OWN) {
-      if (desk) DeskDashboardScreen(data, { nav.open(it) }) { id -> nav.open(ShellTargets.product(id)) }
+      if (desk) DeskHomeScreen(data, onOpen = { nav.open(it) })
       else HomeScreen(data, onOpen = { nav.open(it) }, bottomReserve = bottomReserve)
     },
     V3Route("notifications", RouteKind.PAGE, { StrKit.notifications }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
