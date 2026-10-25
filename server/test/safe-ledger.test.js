@@ -15,7 +15,7 @@ const path = require('node:path');
 const { EventEmitter } = require('node:events');
 const { execFileSync } = require('node:child_process');
 const h = require('./helpers');
-const { one } = require('../src/db');
+const { one, isPglite } = require('../src/db');
 const hlc = require('../src/lib/hlc');
 const syncV1 = require('../src/lib/sync-v1');
 const safe = require('../src/lib/safe-ledger');
@@ -229,6 +229,11 @@ function fakeRes() {
   return r;
 }
 const pause = (ms = 30) => new Promise((r) => { setTimeout(r, ms); });
+/** تا [cond] یا سقف — روی PostgreSQL ِ واقعی آزادسازیِ قفلِ پایگاه چند رفت‌وبرگشت است */
+async function until(cond, ms = 3000) {
+  const end = Date.now() + ms;
+  while (!cond() && Date.now() < end) await pause(5);
+}
 const settled = (p) => {
   const s = { done: false, value: undefined };
   p.then((v) => { s.done = true; s.value = v; }, (e) => { s.done = true; s.error = e; });
@@ -256,7 +261,7 @@ test('قفلِ حساب: تا پایانِ کارِ گرداننده (res.end) �
   assert.equal(p2.done, false, 'تا گرداننده پاسخ نداده، دومی منتظر است');
   r1.end();
   r1.end();                                                //  آزاد کردنِ دوباره بی‌اثر است
-  await pause(5);
+  await until(() => p2.done);
   assert.equal(p2.done, true);
   assert.equal(typeof p2.value, 'function');
   free1();
@@ -279,7 +284,7 @@ test('قفلِ حساب: درخواستی که در صف قطع شد کاری ن
   const r3 = fakeRes();
   const p3 = settled(lock.holdFor(r3, 'acc-lock-q'));
   r1.end();
-  await pause(5);
+  await until(() => p2.done && p3.done);
   assert.equal(p2.done, true);
   assert.equal(p2.value, null, 'قطع‌شده قفل نمی‌گیرد');
   assert.equal(p3.done, true, 'نوبتِ قطع‌شده بی‌درنگ به بعدی می‌رسد');
@@ -309,6 +314,7 @@ test('قفلِ حساب: سقفِ انتظار ⇒ 503 SAFE_BUSY، و سقفِ �
     const stuck = fakeRes();
     await lock.holdFor(stuck, 'acc-lock-t');               //  گرداننده‌ای که هرگز پاسخ نمی‌دهد
     await assert.rejects(lock.holdFor(fakeRes(), 'acc-lock-t'), (e) => e.status === 503 && e.code === 'SAFE_BUSY');
+    lock.limits.WAIT_MS = 3000;                            //  از این‌جا فقط سقفِ سخت سنجیده می‌شود
     await pause(130);
     const r = fakeRes();
     assert.equal(typeof await lock.holdFor(r, 'acc-lock-t'), 'function', 'پس از سقفِ سخت آزاد است');
@@ -368,7 +374,7 @@ test('قفلِ حساب: SAFE_LOCK_SCOPE و SAFE_LOCK_POOL_MAX از env (پیش�
   assert.deepEqual(read({}), { scope: 'db', poolMax: 10 });
   assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'local', SAFE_LOCK_POOL_MAX: '3' }), { scope: 'local', poolMax: 3 });
   assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'cluster', SAFE_LOCK_POOL_MAX: '0' }), { scope: 'db', poolMax: 1 });
-  assert.equal(lock.testing.usesDb(), false, 'روی PGlite فقط صفِ فرآیند');
+  assert.equal(lock.testing.usesDb(), !isPglite(), 'روی PGlite فقط صفِ فرآیند؛ روی PostgreSQL قفلِ پایگاه هم');
   //  سرورِ تک‌نمونه (`local`): حتی با استخرِ پایگاه، اتصالی گرفته نمی‌شود
   const pool = fakePool();
   const was = config.accountLock.scope;
@@ -391,7 +397,7 @@ test('قفلِ حساب (پایگاه): اول صفِ دکان آزاد می‌�
     const r = fakeRes();
     await lock.holdFor(r, 'acc-db-ok');
     r.end();
-    await pause(5);
+    await until(() => ok.clients[0].released);
     assert.equal(ok.clients[0].released, 'ok');
     assert.equal(ok.held.size, 0);
   });

@@ -142,10 +142,13 @@ async function holdFor(res, key) {
   const onClose = () => { gone = true; };
   res.once('close', onClose);
   const deadline = Date.now() + limits.WAIT_MS;
+  const left = () => gone || res.destroyed || res.writableEnded;
   let freeLocal;
   let freeDb;
   try {
     freeLocal = await localTurn(key, limits.WAIT_MS);
+    //  در صف قطع شد: نه قفلِ پایگاه، نه کار
+    if (left()) { freeLocal(); return null; }
     freeDb = await dbTurn(key, deadline);
   } catch (err) {
     freeLocal?.();
@@ -162,7 +165,7 @@ async function holdFor(res, key) {
     freeLocal();                                     //  اول صفِ دکان؛ نوبتِ بعدی تا unlock با تلاشِ دوباره می‌ماند
     freeDb();
   };
-  if (gone || res.destroyed || res.writableEnded) {
+  if (left()) {
     free();
     return null;
   }
