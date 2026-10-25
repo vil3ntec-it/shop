@@ -738,3 +738,93 @@ test('ممیزیِ کنار گذاشتن که نوشته نشد (خطا پس ا�
   assert.deepEqual([third.changed, Boolean(third.needsAudit)], [false, false]);
   assert.equal((await audits()).length, 1);
 });
+
+/* ══════════════════════ پیگیریِ #340: کفِ زودرس، «بررسی شد»، ممیزیِ یک‌باره ══════════════════════ */
+
+test('راه‌اندازی: کفِ دکان‌های ledger/catalog پیش از listen گذاشته می‌شود (await)، نه پس از نخستین درخواست', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'src', 'index.js'), 'utf8');
+  const claim = src.indexOf("await require('./lib/order-ledger').claimFloorsAtStart()");
+  const listen = src.indexOf('app.listen(');
+  assert.ok(claim > 0, 'claimFloorsAtStart باید await شود');
+  assert.ok(claim < listen, 'پیش از app.listen');
+});
+
+test('کفِ زودرس: config ِ دکانِ ledger/catalog پیش از کفِ راه‌اندازی ⇒ همان لحظهٔ راه‌اندازی، نه دیرتر؛ دکانِ ساده ⇒ همین لحظه', async () => {
+  const flagged = await shopWithStock('زودرس', { claim: false });
+  const plain = await shopWithStock('زودرس-ساده', { claim: false, catalogOn: false, ledgerOn: false });
+  //  سرور «پنج ثانیه پیش» بالا آمد و هنوز به این دو دکان نرسیده بود (یا کفِ راه‌اندازی شکست خورد)
+  const started = Date.now() - 5000;
+  ledger.markStarted(started);
+  try {
+    assert.equal((await appConfig(flagged.token)).body.handoverSince, started, 'تحویلِ میانِ راه‌اندازی و این config گم نمی‌شود');
+    const t0 = Date.now();
+    const p = (await appConfig(plain.token)).body.handoverSince;
+    assert.ok(p >= t0 - 5 && p <= Date.now(), `${p}`);
+  } finally {
+    ledger.markStarted(0);
+  }
+});
+
+test('بررسیِ صاحب: «بررسی شد» ردیف را برای همهٔ دستگاه‌ها برمی‌دارد (دفترِ ممیزی)، فقط صاحب و مدیر، تکرار بی‌اثر', async () => {
+  const a = await shopWithStock('بررسی شد', { claim: false });
+  const s = await staffOf(a, 'شاگردِ بررسی');
+  const m = await staffOf(a, 'مدیرِ بررسی', 'manager');
+  const send = async () => {
+    const r = await h.post('/api/shop/orders', { source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod',
+      customer: { name: 'احمد', phone: '0791234567' }, address: { landmark: 'کنارِ مسجد' }, lines: riceLine(1000) },
+    { token: a.token, headers: { 'Idempotency-Key': `ledger-ack-${++keySeq}-${Date.now()}` } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    return r.body.order;
+  };
+  //  before_floor: «ارسال» پیش از کف، «رسید» پس از آن
+  const old = await send();
+  await walk(a, old.id, ['accepted', 'picking', 'packed', 'out_for_delivery']);
+  await tick();
+  assert.ok((await appConfig(a.token)).body.handoverSince > 0);
+  await tick();
+  await walk(a, old.id, ['delivered']);
+  assert.deepEqual((await handover(a)).body.review.map((x) => x.id), [old.id]);
+  const ack = (u, id, kind) => h.post(`/api/shop/orders/${id}/review-ack`, { kind }, { token: u.token });
+  assert.equal((await ack(s, old.id, 'before_floor')).status, 403, 'شاگرد نه');
+  assert.equal((await ack(a, old.id, 'other')).status, 400);
+  assert.equal((await ack(a, 'ord_missing', 'before_floor')).status, 404);
+  const ok = await ack(a, old.id, 'before_floor');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual([ok.body.orderId, ok.body.kind, ok.body.acked], [old.id, 'before_floor', true]);
+  assert.deepEqual((await handover(a)).body.review, [], 'برای همه می‌رود');
+  assert.deepEqual((await handover(m)).body.review, []);
+  assert.equal((await ack(a, old.id, 'before_floor')).status, 200, 'تکرار');
+  const rows = await many(`SELECT user_id FROM audit_logs WHERE shop_id=$1 AND action=$2`, [a.shopId, ledger.REVIEW_ACK]);
+  assert.equal(rows.length, 1, 'یک سطر');
+  assert.equal(rows[0].user_id, a.user.id);
+
+  //  reverse_blocked: فروشِ زنده، برگشت به دکان ⇒ در reversals تا «بررسی شد»
+  const back = await send();
+  await walk(a, back.id, ['accepted', 'picking', 'packed', 'out_for_delivery']);
+  const full = (await h.get(`/api/shop/orders/${back.id}`, { token: a.token })).body.order;
+  assert.equal((await push(a.token, DEV_A, appSaleOps(full))).status, 200);
+  await h.post(`/api/shop/orders/${back.id}/transition`, { to: 'delivery_failed', reason: 'no_answer' }, { token: a.token });
+  await walk(a, back.id, ['retry_scheduled', 'returned_to_store']);
+  assert.deepEqual((await handover(a)).body.reversals.map((x) => x.id), [back.id]);
+  const mk = await ack(m, back.id, 'reverse_blocked');
+  assert.equal(mk.status, 200, JSON.stringify(mk.body));
+  assert.deepEqual((await handover(a)).body.reversals, [], 'مدیر هم می‌تواند؛ دیگر خودکار لغو نمی‌شود');
+});
+
+test('ممیزیِ کنار گذاشتن یک بار: دو afterIngest ِ هم‌زمان یا پیاپی ⇒ یک سطر (وجود در همان INSERT سنجیده می‌شود)', async () => {
+  const a = await shopWithStock('ممیزیِ یک‌باره');
+  const stock = require('../src/lib/stock');
+  const catalog = require('../src/lib/catalog');
+  const t = now();
+  await tx((c) => stock.postMove(c, a.shopId, {
+    productId: 'p-rice', location: 'shop_floor', type: 'sale', qtyMilli: 300, mode: 'recorded', source: 'order',
+    sourceKey: 'res:legacy-once:sale:shop_floor', refType: 'order', refId: 'ord-legacy-once', actorType: 'user', actorId: '',
+    reason: 'order_fulfilled', at: t,
+  }, t));
+  const out = await tx((c) => catalog.retireOrderStock(c, a.shopId, now()));
+  assert.equal(out.changed, true);
+  await Promise.all([catalog.afterIngest(a.shopId, { retired: out }), catalog.afterIngest(a.shopId, { retired: out })]);
+  await catalog.afterIngest(a.shopId, { retired: out });
+  const rows = await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId]);
+  assert.equal(rows.length, 1);
+});
