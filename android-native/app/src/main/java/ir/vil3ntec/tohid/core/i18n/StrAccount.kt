@@ -24,7 +24,7 @@ object StrAccount {
 
   // نوارِ تیرهٔ اشتراک
   val bannerGuestTitle: String get() = t("وارد حساب نشده‌اید", "You're not signed in", "حساب ته نه یاست ننوتي")
-  val bannerGuestBody: String get() = t("با حساب، دفترِ دکان پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید", "With an account the shop ledger is backed up and appears on your other phones too", "په حساب سره د دوکان دفتر بیک اپ کېږي او په بل تلیفون هم راځي")
+  val bannerGuestBody: String get() = td("با حساب، دفترِ دکان پشتیبان می‌گیرد و روی گوشیِ دیگر هم می‌آید", "With an account the shop ledger is backed up and appears on your other phones too", "په حساب سره د دوکان دفتر بیک اپ کېږي او په بل تلیفون هم راځي", "With an account the shop ledger is backed up and appears on your other devices too", "په حساب سره د دوکان دفتر بیک اپ کېږي او په بله وسیله هم راځي")
   val bannerExpiredTitle: String get() = t("اشتراک تمام شده", "Subscription ended", "ګډون پای ته رسېدلی")
   val bannerExpiredBody: String get() = t("هیچ داده‌ای پاک نمی‌شود؛ خروجی و چاپ باز می‌ماند", "No data is deleted; export and printing stay open", "هېڅ معلومات نه ړنګېږي؛ صادرول او چاپ پرانیستي پاتې کېږي")
   fun bannerTrialDays(n: Any): String = t("آزمایشی: $n روزِ دیگر", "Trial: $n more ${pl(n, "day", "days")}", "ازمایښتي: $n نورې ورځې")
@@ -52,7 +52,7 @@ object StrAccount {
   val photoFailed: String get() = t("عکس ذخیره نشد", "The photo wasn't saved", "انځور خوندي نه شو")
   val photoSource: String get() = t("انتخاب تصویر", "Choose a picture", "انځور وټاکئ")
   val camera: String get() = t("دوربین", "Camera", "کمره")
-  val cameraBody: String get() = t("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ")
+  val cameraBody: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo taken with your phone or webcam", "هغه انځور چې په موبایل یا ویب‌کم اخیستل شوی")
   val gallery: String get() = t("گالری", "Gallery", "ګالري")
   val galleryBody: String get() = td("انتخاب از عکس‌های گوشی", "Pick from the phone's photos", "د تلیفون له انځورونو وټاکئ", "Pick from the computer's pictures", "د کمپیوټر له انځورونو وټاکئ")
   val groupAccount: String get() = t("حساب", "Account", "حساب")
@@ -75,14 +75,14 @@ object StrAccount {
   val saveChanges: String get() = t("ذخیره تغییرات", "Save changes", "بدلونونه خوندي کړئ")
   val saving: String get() = t("در حال ذخیره…", "Saving…", "خوندي کېږي…")
   val nameRequired: String get() = t("نام را بنویسید", "Write your name", "نوم ولیکئ")
-  val nameSavedOffline: String get() = t("نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است", "The name was saved on this phone — saving it on the server needs internet", "نوم په تلیفون خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی")
+  val nameSavedOffline: String get() = td("نام روی گوشی ذخیره شد — برای ثبت روی سرور به اینترنت نیاز است", "The name was saved on this phone — saving it on the server needs internet", "نوم په تلیفون خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی", "The name was saved on this computer — saving it on the server needs internet", "نوم په کمپیوټر خوندي شو — په سرور د ثبت لپاره انټرنیټ پکار دی")
   val phoneNeedsInternet: String get() = t("ثبتِ شماره به اینترنت نیاز دارد", "Saving the number needs internet", "د شمېرې ثبت انټرنیټ ته اړتیا لري")
   val phoneSaved: String get() = t("شماره ثبت شد و قفل شد", "The number was saved and locked", "شمېره ثبت او قفل شوه")
   val saved: String get() = t("ذخیره شد", "Saved", "خوندي شو")
 
   // خروج از حساب
   val signOutTitle: String get() = t("خروج از حساب؟", "Sign out?", "له حساب وځئ؟")
-  val signOutBody: String get() = t("برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.", "To come back you enter your email and password again. The shop ledger stays on this phone.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې تلیفون پاتې کېږي.")
+  val signOutBody: String get() = td("برای برگشتن، ایمیل و رمزتان را دوباره می‌زنید. دفترِ دکان روی همین گوشی سرِ جایش می‌ماند.", "To come back you enter your email and password again. The shop ledger stays on this phone.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې تلیفون پاتې کېږي.", "To come back you enter your email and password again. The shop ledger stays on this computer.", "د بیرته راتګ لپاره به بیا ایمیل او پټنوم ولیکئ. د دوکان دفتر په همدې کمپیوټر پاتې کېږي.")
   val signOutAction: String get() = t("خروج", "Sign out", "وتل")
   val stay: String get() = t("ماندن", "Stay", "پاتې کېدل")
   val pendingTitle: String get() = t("هنوز همه‌چیز به سرور نرفته", "Not everything has reached the server yet", "لا ټول شیان سرور ته نه دي رسېدلي")
@@ -114,7 +114,7 @@ object StrAccount {
   // کارمندان
   val teamIntro: String get() = t("کسانی که با شما روی همین دکان کار می‌کنند. هر کدام حساب خودش را دارد و کارهایش در سابقهٔ عملیات به نامِ خودش ثبت می‌شود.", "People who work on this shop with you. Each has their own account, and their work is logged under their own name.", "هغه کسان چې له تاسو سره په همدې دوکان کار کوي. هر یو خپل حساب لري او کارونه یې د هغه په نوم ثبتېږي.")
   val signInFirst: String get() = t("اول وارد حساب شوید", "Sign in first", "لومړی حساب ته ننوځئ")
-  val teamSignInBody: String get() = t("کارمندان روی سرور نگه داشته می‌شوند تا روی هر گوشی یکی باشند. بدون حساب، چیزی برای نشان دادن نیست.", "Staff are kept on the server so every phone sees the same list. Without an account there's nothing to show.", "کارکوونکي په سرور ساتل کېږي څو په هر تلیفون یو شان وي. بې حسابه د ښودلو لپاره څه نشته.")
+  val teamSignInBody: String get() = td("کارمندان روی سرور نگه داشته می‌شوند تا روی هر گوشی یکی باشند. بدون حساب، چیزی برای نشان دادن نیست.", "Staff are kept on the server so every phone sees the same list. Without an account there's nothing to show.", "کارکوونکي په سرور ساتل کېږي څو په هر تلیفون یو شان وي. بې حسابه د ښودلو لپاره څه نشته.", "Staff are kept on the server so every device sees the same list. Without an account there's nothing to show.", "کارکوونکي په سرور ساتل کېږي څو په هره وسیله یو شان وي. بې حسابه د ښودلو لپاره څه نشته.")
   val shopCode: String get() = t("کد دکان شما", "Your shop code", "ستاسو د دوکان کوډ")
   val shopCodeHelper: String get() = t("این کد را به هر شاگردی که می‌خواهید بدهید. همیشه همین است و عوض نمی‌شود.", "Give this code to any staff member you want. It always stays the same.", "دا کوډ هر شاګرد ته ورکړئ. تل همدا دی او نه بدلېږي.")
   val copyCode: String get() = t("کپی کد", "Copy code", "کوډ کاپي کړئ")
