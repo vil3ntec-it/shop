@@ -23,7 +23,7 @@
 | `V3FormSheet(title, dirty, onClose, scroll = true) { sheet -> }` | فرم در برگه (ورود، اصلاح، پرداخت) | همان `V3Sheet` با نگهبانِ «دور ریخته شود؟»: اگر `dirty` است، کشیدن، زدنِ پس‌زمینه و «برگشت» اول `V3ConfirmSheet` (`StrKit.discardTitle/Body/discard`) می‌آورد؛ «ادامهٔ ویرایش» برگه را با همان وضع دوباره باز می‌کند (حالتِ فرم را بیرونِ برگه نگه دارید). کارِ تمام‌شده: `sheet.finish { بعد }` — بستن بی پرسش. `scroll = false` وقتی فرم خودش بخشِ پیمایش‌پذیر و دکمهٔ چسبان دارد. |
 | `V3Stat(label, value, format)` + `V3StatGrid` | آمار و پول | شمارندهٔ عدد، عددِ پایانی دقیق. |
 | `V3StatusPill(V3Status, label)` | وضعیت (§۸) | نقطه + برچسب. `AWAITING` فقط «در انتظارِ تأیید» است (بنفش، همان بنفشِ `REVIEW`)؛ هشدار — کم‌موجود، نزدیکِ انقضا، سقف، اختلاف، رو به پایان — `WARNING` (کهربایی). در صفحه‌های قدیم همین جدایی `PillTone.AWAITING` / `WARNING` است. |
-| `V3HeroCard(title, value, label?, caption?, chips: List<V3HeroChip>, pages, page, onBell?, bellDot)` | کادرِ بزرگِ خانه و کادرِ کشیدنی | **یک قالب** برای «فروشِ امروز»، «صندوق»، «گاوصندوق» و کادری که پایین کشیده می‌شود: گرادیانِ تم (۱۳۵°، آینه در RTL)، دو دایرهٔ نرمِ رنگِ همراه، متنِ سفید، تا ۳ تراشهٔ شیشه‌ای (`V3HeroChip(label, icon?) { }`)، زنگ و نشانگرِ صفحه. شعاع ۲۸، بلندیِ ثابتِ ۲۱۲dp (با درشتیِ نوشته تا ×۱٫۳)؛ حاشیهٔ ۱۶ از لبه را صدازننده می‌دهد. |
+| `V3HeroCard(title, value, label?, caption?, chips: List<V3HeroChip>, pages, page, onBell?, bellDot, onTitle?, live, valueForSize)` | کادرِ بزرگِ خانه و کادرِ کشیدنی | **یک قالب** برای «فروشِ امروز»، «صندوق»، «گاوصندوق» و کادری که پایین کشیده می‌شود (خانهٔ G10 همین را به کار می‌برد): گرادیانِ تم (۱۳۵°، آینه در RTL)، دو دایرهٔ نرمِ رنگِ همراه، متنِ سفیدِ کامل، سرخطِ نامِ دکان (با `onTitle` زدنی) + زنگ، عددِ ۳۶sp (۳۰sp وقتی `valueForSize` بلند است — برای عددِ در حالِ شمارش عددِ پایانی را بدهید)، زیرنویس (با `live` آیکنِ «زنده»)، تا ۳ تراشهٔ شیشه‌ای `V3HeroChip(label, icon?, haptic, onClick?)` (بی `onClick` = فقط نوشته) و نشانگرِ صفحه در همان ردیف. شعاع ۲۸، بلندیِ ثابتِ ۲۲۸dp (با درشتیِ نوشته تا ×۱٫۳)؛ حاشیهٔ ۱۶ از لبه را ورق‌زن می‌دهد. زیرِ شیشهٔ تراشه سایهٔ تم (`heroChipShade`) تا AA. |
 | `V3InvoiceItems(items: List<V3InvoiceLine>, title?, footer?)` | اقلامِ فاکتور | `V3InvoiceLine(name, detail, total, note?)` با متنِ از پیش قالب‌شده (پول را موتورِ صدازننده می‌سازد)؛ همان کارتِ اقلامِ برگهٔ تراکنشِ قرض‌دار. |
 | `V3Message(V3Tone, title, body?, action?)` | پیام (§۹) | |
 | `V3EmptyState(icon, title, body?, action?)`، `V3Skeleton(rows)` | خالی / در حالِ بار | به‌جای چرخنده، اسکلت. |
@@ -45,7 +45,7 @@
 | چه | API | نکته |
 |---|---|---|
 | تمِ جاری | `ThemeStore.theme` (فقط خواندن، `State`) | فقط روی همین دستگاه (`tohid-theme`)، همگام نمی‌شود؛ `load(context)` در `MainActivity` و `Main.kt`. |
-| ردیفِ «تم» در تنظیمات (G9) | `ShopTheme.entries` + `ThemeStore.set(context, t)` | نام‌ها: آسمان / اقیانوس / غروب؛ جدا از «روشن / تیره / خودکار» (`ThemeChoice`). پیش‌نمایش بی ذخیره: `ThemeStore.preview(t)`. |
+| ردیفِ «تم» در تنظیمات (`ThemePaletteRow` ِ G9، وصل در `settings/general/appearance`) | `ShopTheme.entries` + `ThemeStore.set(context, t)` | نام‌ها: آسمان / اقیانوس / غروب؛ جدا از «روشن / تیره / خودکار» (`ThemeChoice`). پیش‌نمایش بی ذخیره: `ThemeStore.preview(t)`. |
 | پالتِ یک تم | `shopColors(theme, dark)` | `LightColors`/`DarkColors` همان «آسمان»‌اند. |
 | گرادیانِ کادرِ بزرگ | `Shop.colors.heroGradient` (سه رنگ) + `heroScrim` | فقط برای `V3HeroCard` و ستونِ انتخاب‌شدهٔ نمودار؛ متن رویش همیشه سفید. |
 | رنگِ همراه | `Shop.colors.accent(i)` / `accentSoft(i)` (۱۲٪ روز، ۲۰٪ شب)؛ در کیت `V3Hue` | هفت رنگ به ترتیب: آسمانی، بنفش، مرجانی، کهربایی، نعنایی، صورتی، لیمویی؛ در هر سه تم یکی. سری‌های نمودار (`chart.series`) همین ترتیب‌اند. |
@@ -176,5 +176,10 @@ cd <scratchpad>/kt-v3render && gradle --no-daemon -q run --args="<پوشهٔ خ�
 `collection-jvm` در کش بود (ماشینِ دیگر)، `repositories { mavenCentral(); google() }` و برداشتنِ exclude ِ
 `androidx.collection`/`androidx.annotation` کافی است. صفحهٔ تازه: یک خط در `screens` ِ `Render.kt`.
 
-عکس‌های CI: `desktop-shots` هر `Shot` ِ `desktop/.../shots/<Group>Shots.kt` را با `groupshots:all` می‌گیرد و در شاخهٔ
+عکس‌های CI: `desktop-shots` هر `Shot` ِ `desktop/.../shots/<Group>Shots.kt` را می‌گیرد و در شاخهٔ
 `desktop-screenshots` زیرِ `pr/<شاخه>/v3/<گروه>/<حالت>-<light|dark>-<fa|en>.png` (با README ِ هر گروه) می‌گذارد.
+- **درخواستِ یک گروه:** فقط گروه‌هایی که در `ui/v3/<گروه>/` یا `shots/<Group>Shots.kt` ِ خودشان تغییر کرده‌اند، به‌اضافهٔ `foundation`.
+- **پایه (v3-foundation)، phone-v3 و اجرای دستی:** همهٔ گروه‌ها، سه‌تا‌سه‌تا در تکه‌های موازی (`groupshots:a,b,c`).
+- پایانِ هر گروه نشانِ `.done` دارد (`DevShot`). اگر مهلتِ ۳۰ دقیقهٔ تکه تمام شود یا گروهی نیمه بماند، کار قرمز می‌شود؛
+  هرچه گرفته شده باز هم منتشر می‌شود.
+- محلی: `groupshots:<گروه>` یا چند گروه با ویرگول.
