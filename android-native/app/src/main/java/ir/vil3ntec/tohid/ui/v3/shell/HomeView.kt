@@ -13,15 +13,16 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
-import ir.vil3ntec.tohid.ui.screens.HomeSections
 
 /**
  *  حالت‌های ثابت برای پیش‌نمایش و عکسِ خودکار — برنامهٔ دستِ کاربر همیشه `NONE` می‌فرستد.
  *  `alerts` = هشدارهای نمایشی (عکسِ «۶ هشدار»/«بی هشدار»)، `null` یعنی همان دادهٔ واقعی.
  */
 data class HomeShot(
-  /** صفحهٔ کادرِ بزرگ: ۰ فروشِ امروز، ۱ صندوق (همان که کشیدن نشان می‌دهد)، ۲ گاوصندوق */
-  val heroPage: Int = 0,
+  /** کادرِ پنهان: ۰ بسته، بینِ ۰ و ۱ نیمه‌کشیده (همان کسر از بلندیِ باز)، ۱ باز */
+  val reveal: Float = 0f,
+  /** صفحهٔ کادرِ پنهان: ۰ صندوق، ۱ گاوصندوق */
+  val drawerPage: Int = 0,
   val page: Int = 0,
   /** نامِ بلندِ دکان و عددهای درشت — آزمونِ جا شدن */
   val big: Boolean = false,
@@ -39,7 +40,6 @@ data class HomeView(
   val shiftOpen: Boolean,
   /** `null` = این نقش عددِ سود را نمی‌بیند */
   val profit: Double?,
-  val tiles: List<HomeSections.Tile>,
   val alerts: List<HomeAlerts.Alert>,
   val sync: HomeAlerts.Sync,
   val queued: Int,
@@ -67,7 +67,6 @@ fun rememberHomeView(d: ShopData): HomeView {
     context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE).getString("store_name", "").orEmpty()
   }
   val canSeeMoney = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
-  val canManage = remember { ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context) }
   val nums = remember(d, today) { DashboardNumbers.of(d, today) }
   //  نقدِ دخل: صندوقِ باز ⇐ «باید باشد»ِ همان صندوق؛ بسته ⇐ گردشِ نقدِ امروز
   val drawer = remember(d, today) {
@@ -114,7 +113,6 @@ fun rememberHomeView(d: ShopData): HomeView {
     cash = drawer.first,
     shiftOpen = drawer.second,
     profit = if (canSeeMoney) nums.todayProfit else null,
-    tiles = HomeSections.tiles(canManage, ordersLive),
     alerts = alerts,
     sync = sync,
     queued = status.queued,

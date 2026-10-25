@@ -15,76 +15,112 @@ import ir.vil3ntec.tohid.ui.v3.shell.ShellTargets
 import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 
 /*
- *  خانهٔ گوشی، نسخهٔ ۳ (r7 خانه، r6 کارتِ کششی، r8 آمار) — منطقِ خالص.
+ *  خانهٔ گوشی، نسخهٔ ۳ (HOME-V2: خانهٔ ساده، کادرِ پنهانِ کششی، r8 آمار) — منطقِ خالص.
  *
  *  هیچ‌کدام Compose یا اندروید نمی‌خواهد تا با آزمونِ سادهٔ JVM سنجیده شود:
- *  ماشینِ حالتِ کارتِ کششی، کاشی‌های «بخش‌ها»، هشدارها و بازه‌های نمودار.
+ *  ماشینِ حالتِ کادرِ کششی، کاشی‌های «بخش‌ها»، هشدارها و بازه‌های نمودار.
  */
 
 /**
- *  کارتِ سیاهِ کششی (r6) — فقط با کشیدنِ صفحه به پایین **از بالای صفحه**.
+ *  کادرِ پنهانِ «صندوق / گاوصندوق» (HOME-V2 §۱) — فقط با کشیدنِ **به‌زورِ** صفحه به پایین
+ *  **از بالای صفحه**.
  *
  *  • لمس که شروع شد، `touchDown(atTop)` می‌گوید صفحه همان لحظه بالا بود یا نه؛
- *    کشیدنی که از وسطِ صفحه شروع شده (اسکرولِ معمولی) هرگز کارت را نمی‌آورد،
- *    حتی اگر در همان حرکت به بالا برسد و ادامه دهد.
- *  • فقط حرکتِ انگشت (نه پرتابِ اسکرول) شمرده می‌شود — `pullDown` را همان‌جا
- *    صدا می‌زنند که اسکرول دیگر جا نداشت و منبع «ورودیِ کاربر» بود.
- *  • رها کردن: از آستانه گذشته، یا پرتابِ تند پس از کششِ کوتاه ⇒ نمایان؛
- *    وگرنه برمی‌گردد.
- *  • نمایان: لمسِ بیرون، هل دادن به بالا یا دکمهٔ برگشت ⇒ پنهان.
+ *    کشیدنی که از وسطِ صفحه شروع شده (اسکرولِ معمولی) هرگز کادر را نمی‌آورد.
+ *  • کششِ لاستیکی (`stretch`): هر پیکسلِ انگشت کمتر از پیکسلِ پیش کادر را پایین می‌آورد
+ *    (مقاومت با فاصله بیشتر می‌شود) و کشِ دیدنی هرگز از `Config.limit` نمی‌گذرد.
+ *  • گذر از `threshold` ⇒ `latched` (صدازننده یک لرزشِ کوچک می‌دهد) و رها کردن کادر را باز
+ *    نگه می‌دارد؛ برگشتِ انگشت به زیرِ نیمهٔ آستانه قفل را برمی‌دارد.
+ *  • رها کردنِ بی‌قفل ⇒ با فنر پس می‌رود، مگر پرتابِ تند پس از کششِ کوتاه.
+ *  • باز: کشیدن رو به بالا، اسکرول یا دکمهٔ برگشت ⇒ بسته (`dismiss`).
  */
 object PullCard {
-  /** `pull` پیکسلِ کشیده‌شده (با مقاومت)، `armed` یعنی لمس از بالای صفحه شروع شد */
+  /** `finger` پیکسلِ خامِ انگشت از آغازِ کشش؛ `armed` یعنی لمس از بالای صفحه شروع شد */
   data class State(
     val shown: Boolean = false,
-    val pull: Float = 0f,
+    val finger: Float = 0f,
     val dragging: Boolean = false,
     val armed: Boolean = false,
+    val latched: Boolean = false,
   )
 
   /**
-   *  @param threshold کششی که به‌تنهایی کارت را می‌آورد
-   *  @param flingMin کمترین کشش برای «کشیدنِ تند»
+   *  @param open بلندیِ کادرِ باز (پیکسل)
+   *  @param threshold کششِ **دیدنی** که قفل می‌کند
+   *  @param flingMin کمترین کششِ دیدنی برای «کشیدنِ تند»
    *  @param flingVelocity سرعتِ رو به پایین (px/s) که کششِ کوتاه را بس می‌کند
    */
-  data class Config(val threshold: Float, val flingMin: Float, val flingVelocity: Float)
+  data class Config(val open: Float, val threshold: Float, val flingMin: Float, val flingVelocity: Float) {
+    /** سقفِ کشِ دیدنی — کمی بیش از کادرِ باز، تا لاستیک حس شود */
+    val limit: Float get() = open * OVERSHOOT
+  }
 
-  /** مقاومتِ کش: هر پیکسلِ انگشت نیم پیکسل کارت را پایین می‌آورد */
-  const val RESIST = 0.5f
+  /** شیبِ آغازِ لاستیک (همان ۰٫۵۵ ِ لبهٔ iOS): پیکسلِ اولِ انگشت ۰٫۵۵ پیکسل کادر */
+  const val RUBBER = 0.55f
+
+  /** کشِ دیدنی حداکثر ۱۲٪ بیش از کادرِ باز */
+  const val OVERSHOOT = 1.12f
+
+  /** پیکسلِ دیدنی برای `finger` پیکسل کشش: `L·(1 − 1/(f·k/L + 1))` — یکنوا، شیب رو به کاهش، سقفِ L */
+  fun stretch(finger: Float, c: Config): Float {
+    val l = c.limit
+    if (finger <= 0f || l <= 0f) return 0f
+    return l * (1f - 1f / (finger * RUBBER / l + 1f))
+  }
+
+  /** وارونهٔ `stretch`: چند پیکسل انگشت تا کادر `visible` پیکسل دیده شود */
+  fun fingerFor(visible: Float, c: Config): Float {
+    val l = c.limit
+    if (visible <= 0f || l <= 0f) return 0f
+    val v = visible.coerceAtMost(l * 0.999f)
+    return l / RUBBER * (v / (l - v))
+  }
+
+  private fun latch(was: Boolean, visible: Float, c: Config): Boolean =
+    if (was) visible >= c.threshold * 0.5f else visible >= c.threshold
 
   fun touchDown(s: State, atTop: Boolean): State =
-    if (s.shown) s else s.copy(armed = atTop, pull = 0f, dragging = false)
+    if (s.shown) s else s.copy(armed = atTop, finger = 0f, dragging = false, latched = false)
 
   /** انگشت `dy` پیکسل پایین رفت و اسکرول جایی برای خوردنش نداشت */
-  fun pullDown(s: State, dy: Float): State =
-    if (s.shown || !s.armed || dy <= 0f) s else s.copy(pull = s.pull + dy * RESIST, dragging = true)
+  fun pullDown(s: State, dy: Float, c: Config): State {
+    if (s.shown || !s.armed || dy <= 0f) return s
+    val f = s.finger + dy
+    return s.copy(finger = f, dragging = true, latched = latch(s.latched, stretch(f, c), c))
+  }
 
   /**
-   *  انگشت `dy` پیکسل بالا رفت. تا کارتِ نیمه‌کشیده هست، اول همان جمع می‌شود
+   *  انگشت `dy` پیکسل بالا رفت. تا کادرِ نیمه‌کشیده هست، اول همان جمع می‌شود
    *  (و صفحه اسکرول نمی‌شود). دومی = چند پیکسل از حرکت خورده شد.
    */
-  fun pullUp(s: State, dy: Float): Pair<State, Float> {
-    if (s.shown || s.pull <= 0f || dy <= 0f) return s to 0f
-    val take = minOf(s.pull, dy * RESIST)
-    return s.copy(pull = s.pull - take) to take / RESIST
+  fun pullUp(s: State, dy: Float, c: Config): Pair<State, Float> {
+    if (s.shown || s.finger <= 0f || dy <= 0f) return s to 0f
+    val take = minOf(s.finger, dy)
+    val f = s.finger - take
+    return s.copy(finger = f, latched = latch(s.latched, stretch(f, c), c)) to take
   }
 
   /** انگشت رها شد؛ `velocityY` مثبت یعنی رو به پایین */
   fun release(s: State, velocityY: Float, c: Config): State {
     if (s.shown) return s.copy(dragging = false)
-    val open = s.pull >= c.threshold || (s.pull >= c.flingMin && velocityY >= c.flingVelocity)
+    val open = s.latched || (stretch(s.finger, c) >= c.flingMin && velocityY >= c.flingVelocity)
     return if (open) State(shown = true) else State()
   }
 
-  /** لمسِ بیرونِ کارت، هل دادن به بالا، یا دکمهٔ برگشت */
+  /** کشیدن رو به بالا، اسکرول یا دکمهٔ برگشت */
   fun dismiss(@Suppress("UNUSED_PARAMETER") s: State): State = State()
 
-  /** فقط برای پیش‌نمایش و عکس */
+  /** فقط برای پیش‌نمایش و عکس: باز، یا نیمه‌کشیده (`fraction` از بلندیِ باز) */
   fun forceShown(): State = State(shown = true)
+  fun forcePulled(fraction: Float, c: Config): State =
+    State(armed = true, dragging = true, finger = fingerFor(c.open * fraction, c)).let { it.copy(latched = latch(false, stretch(it.finger, c), c)) }
 
-  /** ۰ = پنهان، ۱ = کامل پایین آمده */
-  fun progress(s: State, revealPx: Float): Float =
-    if (s.shown) 1f else if (revealPx <= 0f) 0f else (s.pull / revealPx).coerceIn(0f, 1f)
+  /** پیکسلِ دیدنیِ کادر همین حالا */
+  fun visible(s: State, c: Config): Float = if (s.shown) c.open else stretch(s.finger, c)
+
+  /** ۰ = پنهان، ۱ = کامل پایین آمده (کشِ بیش از باز هم ۱) */
+  fun progress(s: State, c: Config): Float =
+    if (c.open <= 0f) 0f else (visible(s, c) / c.open).coerceIn(0f, 1f)
 }
 
 /**
@@ -164,7 +200,12 @@ object HomeAlerts {
     val urgent: Boolean = false,
     /** دکمهٔ کارِ کارت (مثلاً «تمدید» ⇐ پلن‌ها)؛ پیش‌فرض همان مقصدِ کارت */
     val actionRoute: String = route,
+    /** خانه فقط همین‌ها را نشان می‌دهد (HOME-V2 §۲٫۵): فوری‌ها و صفِ ماندهٔ بی‌اینترنت */
+    val pressing: Boolean = urgent,
   )
+
+  /** هشدارهای کارتِ یک‌خطیِ خانه — «وقتی چیزی نیست، هیچ» */
+  fun pressing(all: List<Alert>): List<Alert> = all.filter { it.pressing }
 
   /** همگام‌سازی از نگاهِ هشدار */
   enum class Sync { OK, QUEUED, OFFLINE, ERROR, LOCAL_ONLY }
@@ -211,7 +252,7 @@ object HomeAlerts {
     when (i.sync) {
       Sync.ERROR -> add(Alert(Kind.SYNC, StrHome.alertSyncError, syncReason(i.syncError), StrHome.actionCheck, ShellTargets.SYNC, urgent = true))
       Sync.OFFLINE -> if (i.queued > 0) add(
-        Alert(Kind.SYNC, StrHome.alertWaitingInternet(i.queued), StrHome.alertWaitingInternetBody, StrHome.actionCheck, ShellTargets.SYNC),
+        Alert(Kind.SYNC, StrHome.alertWaitingInternet(i.queued), StrHome.alertWaitingInternetBody, StrHome.actionCheck, ShellTargets.SYNC, pressing = true),
       )
       else -> Unit
     }
