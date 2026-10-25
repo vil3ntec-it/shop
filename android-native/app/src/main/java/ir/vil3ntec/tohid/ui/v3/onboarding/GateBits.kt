@@ -102,14 +102,13 @@ internal fun GateLink(text: String, onClick: () -> Unit, enabled: Boolean = true
   )
 }
 
-/** دو راهِ فرعیِ هم‌وزن در یک خط با نقطهٔ میانه (پای کارتِ دروازه)؛ نوشتهٔ بلند ⇐ خطِ بعد، نه شکستنِ واژه */
+/**
+ *  دو راهِ فرعیِ هم‌وزن (پای کارتِ دروازه): در یک خط با فاصله، و اگر جا نشد هر کدام خطِ خودش را
+ *  می‌گیرد — هیچ واژه‌ای نمی‌شکند و جداکننده‌ای تنها سرِ خط نمی‌ماند.
+ */
 @Composable
 internal fun GateLinks(vararg links: Pair<String, () -> Unit>) {
-  val c = PhoneV3.colors
-  FlowRow(horizontalArrangement = Arrangement.Center, verticalArrangement = Arrangement.Center) {
-    links.forEachIndexed { i, (label, go) ->
-      if (i > 0) Text("·", style = v3Text(15, FontWeight.SemiBold, 22), color = c.inkMuted)
-      V3TextButton(label, go)
-    }
+  FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
+    links.forEach { (label, go) -> V3TextButton(label, go) }
   }
 }
