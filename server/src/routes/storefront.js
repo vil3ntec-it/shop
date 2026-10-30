@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
+const campaigns = require('../lib/campaigns');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -138,6 +139,10 @@ router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
     if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));
     throw err;
   }
+  //  MKT-11: سفارش ⇐ پیوندِ کمپین (`campaign` ِ بدنه، همان `?c=` ِ پیوند). بی‌صدا و
+  //  پس از ثبت: کدِ نادرست یا شکستِ این‌جا سفارش را نه می‌بندد و نه عوض می‌کند.
+  await campaigns.attribute(req.store, out.orderId, req.body && req.body.campaign)
+    .catch((err) => console.error('[campaigns] attribute', err.message));
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order: out.order, replayed: true });

@@ -19,11 +19,20 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
+  //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود
+  var campaign = campaignOfPage();
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
     if (parts[0] === 'store' && parts[1]) return parts[1].toLowerCase();
     return location.hostname.split('.')[0].toLowerCase();
+  }
+  function campaignOfPage() {
+    var key = 'store-campaign:' + slug;
+    var m = /[?&]c=([0-9A-Za-z]{10})(?:&|#|$)/.exec(location.search);
+    if (m) { K.saveS(key, m[1].toUpperCase()); return m[1].toUpperCase(); }
+    var v = K.loadS(key);
+    return typeof v === 'string' ? v : '';
   }
   function sanitize(c) {
     var out = {};
@@ -423,6 +432,7 @@
       note: $('c-note').value.trim(),
       expectedTotalMinor: subtotal() + feeFor(f),
     };
+    if (campaign) body.campaign = campaign;
     if (f === 'delivery') {
       body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim() };
       if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
