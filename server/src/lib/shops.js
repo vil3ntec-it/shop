@@ -10,15 +10,41 @@ const { query, one, many, tx, newId, now } = require('../db');
 const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
 const { can } = require('./permissions');
 
-/** عضویت فعال کاربر — کاربر فقط در یک دکان فعال است. */
-async function membershipOf(userId) {
+/**
+ * عضویتِ فعالِ کاربر.
+ *
+ * ── دکانِ فعالِ نشست (بندِ ۲۹.۲ قاعدهٔ ۱، مهاجرتِ ۰۹۷) ────────────────
+ * بی `shopId`: همان قاعدهٔ همیشگی — اول دکانی که صاحبش است، بعد قدیمی‌ترین.
+ * با `shopId` (از `tokens.shop_id`ِ نشست، **هرگز** از بدنه/سرآیندِ
+ * درخواست): فقط عضویتِ فعال در **همان** دکان، وگرنه null — هیچ‌وقت
+ * بی‌صدا به دکانِ دیگر نمی‌افتد.
+ */
+async function membershipOf(userId, { shopId = null } = {}) {
   return one(
     `SELECT m.*, s.name AS shop_name, s.status AS shop_status, s.owner_user_id
        FROM shop_members m
        JOIN shops s ON s.id = m.shop_id
       WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active'
+        AND ($2::text IS NULL OR m.shop_id = $2::text)
       ORDER BY (m.role = 'owner') DESC, m.created_at ASC
       LIMIT 1`,
+    [userId, shopId || null]
+  );
+}
+
+/** دکانی که این نشست برگزیده — فقط از ردیفِ خودِ توکن. */
+function sessionShopOf(tokenRow) {
+  return (tokenRow && tokenRow.shop_id) || null;
+}
+
+/** همهٔ دکان‌هایی که کاربر عضوِ فعالشان است — برای «انتخابِ دکان». */
+async function membershipsOf(userId) {
+  return many(
+    `SELECT m.shop_id, m.role, s.name AS shop_name
+       FROM shop_members m
+       JOIN shops s ON s.id = m.shop_id
+      WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active'
+      ORDER BY (m.role = 'owner') DESC, m.created_at ASC`,
     [userId]
   );
 }
@@ -138,6 +164,6 @@ async function updateMember(shopId, memberId, patch) {
 }
 
 module.exports = {
-  membershipOf, requireMembership, assertCan, createShop, getShop, updateShop,
+  membershipOf, membershipsOf, sessionShopOf, requireMembership, assertCan, createShop, getShop, updateShop,
   members, memberCount, updateMember, findMember,
 };

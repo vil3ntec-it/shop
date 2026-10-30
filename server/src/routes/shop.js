@@ -6,7 +6,8 @@
  * کاربرِ توکن پیدا می‌شود.
  */
 const express = require('express');
-const { one, many, now, newId } = require('../db');
+const { one, many, now, newId, query } = require('../db');
+const { hashToken } = require('../lib/tokens');
 const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
@@ -65,9 +66,54 @@ router.get(['/', '/me'], optionalShop, async (req, res) => {
 router.post(['/', '/create'], async (req, res) => {
   const name = v.text(req.body?.name, { max: 80 }) || 'دکان من';
   const shop = await shops.createShop(req.user.id, name);
-  const member = await shops.membershipOf(req.user.id);
+  const member = await shops.membershipOf(req.user.id, { shopId: shop.id });
   await audit.log({ shopId: shop.id, userId: req.user.id, action: 'shop.created', detail: { name }, ip: clientIp(req) });
   res.status(201).json(shopPayload(shop, member, { memberCount: 1 }));
+});
+
+/* ---------- دکانِ فعالِ نشست — کاربرِ چنددکانی (بندِ ۲۹.۲ قاعدهٔ ۱، ۲۱.۱) ----------
+ *
+ *  ⛔ شناسهٔ دکان فقط **یک بار** و فقط این‌جا از بدنه خوانده می‌شود، و فقط
+ *  پس از سنجیدنِ عضویتِ فعالِ همین کاربر در همان دکان. از آن پس دکان از
+ *  ردیفِ توکن می‌آید (`tokens.shop_id`)، نه از درخواست؛ و هر پرسشِ دکان
+ *  (`requireShop`) باز هم عضویت را در همان دکان می‌سنجد.
+ */
+router.get('/memberships', async (req, res) => {
+  const bound = shops.sessionShopOf(req.tokenRow);
+  const current = await shops.membershipOf(req.user.id, { shopId: bound });
+  const all = await shops.membershipsOf(req.user.id);
+  res.json({
+    activeShopId: current ? current.shop_id : null,
+    explicit: !!bound,
+    shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
+  });
+});
+
+router.post('/active', async (req, res, next) => {
+  const shopId = v.id(req.body?.shopId || req.body?.shop_id, { field: 'شناسهٔ دکان' });
+  const member = await shops.membershipOf(req.user.id, { shopId });
+  //  همان پاسخ برای «دکان نیست» و «عضوش نیستی» — وجودِ دکانِ دیگران لو نمی‌رود
+  if (!member) return next(forbidden('شما عضوِ فعالِ این دکان نیستید', 'not_member'));
+
+  /*
+   *  «نشست» = توکنِ همین درخواست، به‌علاوهٔ توکن‌های زندهٔ دکانِ **همین
+   *  دستگاه** (تا تازه‌سازی همان دکان را نگه دارد) و توکنِ تازه‌سازی‌ای که
+   *  برنامه در بدنه فرستاده (برای نشستِ بی شناسهٔ دستگاه). نشستِ دستگاه‌های
+   *  دیگرِ همین آدم دست نمی‌خورد.
+   */
+  const t = req.tokenRow;
+  const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
+  const r = await query(
+    `UPDATE tokens SET shop_id=$1
+      WHERE subject_id=$2 AND app='shop' AND revoked_at IS NULL AND kind IN ('access','refresh')
+        AND (token_hash=$3 OR token_hash=$4 OR ($5::text IS NOT NULL AND device_id=$5::text))`,
+    [shopId, req.user.id, t.token_hash, refresh ? hashToken(refresh) : '', t.device_id || null]
+  );
+  await audit.log({
+    shopId, userId: req.user.id, action: 'auth.active_shop',
+    detail: { sessions: r.rowCount }, ip: clientIp(req),
+  });
+  res.json({ ok: true, activeShopId: shopId, shop: { id: shopId, name: member.shop_name || '', role: member.role } });
 });
 
 // ---------- ویرایش دکان ----------
