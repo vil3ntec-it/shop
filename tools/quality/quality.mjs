@@ -4,7 +4,8 @@
  * Never edits or reformats source files. Guide: docs/QUALITY-fa.md.
  *
  *   node tools/quality/quality.mjs                      ratchet: file size, re-declared helpers,
- *                                                       'pump'/'shop' literals, frozen index.html
+ *                                                       'pump'/'shop' literals, frozen index.html,
+ *                                                       platform deps in Kotlin logic (iPhone)
  *   node tools/quality/quality.mjs --check migrations   duplicate migration numbers (blocking in CI)
  *   node tools/quality/quality.mjs --check eslint [--all]
  *   node tools/quality/quality.mjs --check coverage
@@ -25,9 +26,10 @@ import * as frozenWeb from './checks/frozen-web.mjs';
 import * as migrations from './checks/migrations.mjs';
 import * as eslint from './checks/eslint.mjs';
 import * as coverage from './checks/coverage.mjs';
+import * as platformDeps from './checks/platform-deps.mjs';
 
 const GROUPS = {
-  ratchet: [fileSize, duplicateHelpers, productLiterals, frozenWeb],
+  ratchet: [fileSize, duplicateHelpers, productLiterals, frozenWeb, platformDeps],
   migrations: [migrations],
   eslint: [eslint],
   coverage: [coverage],
@@ -77,8 +79,9 @@ function context(options) {
 
 function writeBaseline(ctx, snapshot) {
   for (const check of GROUPS.ratchet) check.update(ctx.baseline, ctx, { snapshot });
-  const { fileSize: size, frozen, productLiterals: literals, duplicateHelpers: helpers } = ctx.baseline;
-  const text = `${JSON.stringify({ _doc: BASELINE_DOC, fileSize: size, frozen, productLiterals: literals, duplicateHelpers: helpers }, null, 2)}\n`;
+  const { fileSize: size, frozen, productLiterals: literals, duplicateHelpers: helpers, platformDeps: platform } = ctx.baseline;
+  const text = `${JSON.stringify({ _doc: BASELINE_DOC, fileSize: size, frozen, productLiterals: literals, duplicateHelpers: helpers,
+    platformDeps: platform }, null, 2)}\n`;
   const old = fs.existsSync(BASELINE) ? fs.readFileSync(BASELINE, 'utf8') : '';
   if (text === old) return console.log('خط‌مبنا عوض نشد');
   fs.writeFileSync(BASELINE, text);
