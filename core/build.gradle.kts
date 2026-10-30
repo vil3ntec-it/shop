@@ -37,4 +37,7 @@ kotlin {
     iosSimulatorArm64()
     sourceSets.iosTest.dependencies { implementation(kotlin("test")) }
   }
+  //  `src/commonTest` — آزمونِ منطقِ خالصِ commonMain (`cd core && ../desktop/gradlew jvmTest`)؛
+  //  روی شبیه‌سازِ iOS هم با `iosSimulatorArm64Test` اجرا می‌شود. در گرافِ برنامه‌ها اثری ندارد.
+  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
 }
