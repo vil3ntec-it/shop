@@ -75,10 +75,13 @@ fun main() {
   DevShot.start()
 
   val context = DesktopContext
+  //  OPS-03: خطای گرفته‌نشده ⇒ گزارشِ بی دادهٔ شخصی با کد؛ صفِ اجرای پیش فرستاده می‌شود
+  ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }
+  scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
   //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
