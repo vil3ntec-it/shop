@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.delivery.CashReport
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
@@ -79,6 +80,10 @@ class DeliveryRepository(private val api: ApiClient) {
 
   suspend fun settlements(courierId: String, limit: Int = 20): ApiResult<SettlementPage> =
     result { DeliveryWire.settlementPage(api.get(Delivery.settlements(courierId, limit))) }
+
+  /** RPT-15 — نقدِ پیک‌ها و تسویه در [from، to) (زمانِ سرور، میلی‌ثانیه)؛ فقط با اجازهٔ تسویه */
+  suspend fun cashReport(from: Long, to: Long): ApiResult<CashReport> =
+    result { DeliveryWire.cashReport(api.get(Delivery.cashReport(from, to))) }
 
   suspend fun companies(): ApiResult<List<ExternalCompany>> =
     result { DeliveryWire.rows(api.get(Delivery.EXTERNAL), "items", DeliveryWire::company) }
