@@ -20,6 +20,28 @@ permissions:
   contents: read
 
 jobs:
+  #  نگهبانِ ارزان (گامِ ۰ِ docs/IOS-PLAN-fa.md): commonMain برای linuxX64 (Kotlin/Native، بی JDK و بی Xcode)
+  #  روی ubuntu کامپایل می‌شود ⇒ هر java.*/javax.* ِ تازه در commonMain همین‌جا خطا می‌دهد. فعلاً گزارش.
+  core-native:
+    name: کامپایلِ commonMain برای linuxX64 (گزارش)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: konan-${{ runner.os }}-${{ hashFiles('core/build.gradle.kts') }}
+      - name: compileKotlinLinuxX64
+        working-directory: core
+        run: ../desktop/gradlew --no-daemon -Pnative=true compileKotlinLinuxX64
+
   ios:
     name: کامپایلِ core برای iOS و آزمون روی شبیه‌ساز
     runs-on: macos-latest
