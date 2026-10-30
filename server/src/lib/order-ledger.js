@@ -35,6 +35,15 @@
  *            «نیازمندِ تأیید» یا بیش از سقف ⇒ نه (v1 بی برگه ردش می‌کرد و فروش فقط روی همان دستگاه
  *            می‌ماند) ⇒ برنامه آن را به دستگاهِ صاحب/مدیر می‌سپارد و در فهرست می‌شمارد.
  *
+ *   بازپرداخت ─ [refundEventsOf]: سفارشِ تحویل‌شده‌ای که فروشِ `o-…` ِ زنده دارد و بازپرداخت گرفت
+ *            (ردیفِ دفترِ `online_order_refunds` ⇒ کلیدِ `r<seq>`؛ «بازپرداختِ کامل» ِ بی ردیف یا
+ *            پولِ برگشتهٔ درگاه (`payment_status = refunded`) ⇒ **یک** کلیدِ `full`) ⇒ `refunds` ِ
+ *            [handoverPending]. برنامه برای هر رویداد سندِ برگشتِ همان فروش (RET، `SaleReturn` با
+ *            شناسهٔ ثابتِ `o-<سفارش>-rf-<کلید>`) و ردیفِ سابقهٔ `…-a` می‌نویسد (`OrderFulfillment.refund`)؛
+ *            سرور همان ردیفِ سابقه را در دفترِ همگام‌شده می‌بیند و سفارش از فهرست می‌رود. مبلغ‌ها با
+ *            سقفِ کلِ سفارش (جمعِ همهٔ رویدادها هرگز بیشتر نه) ⇒ دو منبع (دفتر و درگاه) دو بار برنمی‌گردانند.
+ *            کالا فقط با «کالا به انبار برگشت؟» ِ برنامه (پیش‌فرض نه).
+ *
  * فاکتورهای W ِ پیش از این تصمیم (`order_ledger_docs`، migration 095، و حلقه‌هایشان در
  * `hash_chain`) دست‌نخورده می‌مانند؛ این پرونده فقط می‌خواندشان (`docsOf`) و برنامه آن‌ها
  * را «فروشِ همین سفارش» می‌شمارد تا دوباره کم نشود. پرچمِ `shop.orders.ledger` دیگر
@@ -83,6 +92,35 @@ const SALE_TABLES = Object.freeze(['sales', 'saleItems', 'stockMovements', 'audi
 const saleIdOf = (orderId) => `o-${orderId}`;
 /** فاکتورِ W ِ قدیمیِ سرور برای همان سفارش (پیش از این تصمیم) */
 const legacySaleIdOf = (orderId) => `w-${orderId}`;
+
+/** کلیدِ «بازپرداختِ کامل» — گذارِ سادهٔ `refunded_full` یا پولِ برگشتهٔ درگاه؛ هر دو یکی */
+const REFUND_FULL = 'full';
+/** وضعیت‌هایی که ردیفِ دفترِ بازپرداخت می‌گیرند یا پس از آن می‌آیند (`order-refunds`: فقط از `return_requested`) */
+const REFUND_STATUSES = Object.freeze(['return_requested', 'refunded_partial', 'refunded_full']);
+/** سندِ برگشتِ برنامه برای رویدادِ بازپرداخت — همان `core/orders/OrderRefunds.docIdOf` */
+const refundDocIdOf = (orderId, key) => `o-${orderId}-rf-${key}`;
+/** ردیفِ سابقهٔ همان سند (`auditLog`) — نشانِ «در دفتر نشست» */
+const refundMarkOf = (orderId, key) => `${refundDocIdOf(orderId, key)}-a`;
+
+/**
+ * رویدادهای بازپرداختِ یک سفارش — خالص. [entries]: ردیف‌های دفتر `{seq, amountMinor, at}`؛
+ * [full]: `{at, source}` اگر «بازپرداختِ کامل» (گذار) یا بازپرداختِ درگاه هست، وگرنه null.
+ * ⇒ `[{key, amountMinor, at, source}]` به ترتیبِ زمان (هم‌زمان: ردیف‌ها به ترتیبِ شماره، بعد `full`)؛
+ * هر مبلغ با سقفِ ماندهٔ کلِ سفارش ⇒ جمع هرگز بیش از [totalMinor] نیست (`full` = آن‌چه مانده).
+ */
+function refundEventsOf(totalMinor, entries = [], full = null) {
+  const list = entries.map((e) => ({
+    key: `r${Number(e.seq)}`, want: Number(e.amountMinor), at: Number(e.at), rank: Number(e.seq), source: 'ledger',
+  }));
+  if (full) list.push({ key: REFUND_FULL, want: Infinity, at: Number(full.at), rank: Infinity, source: full.source });
+  list.sort((a, b) => a.at - b.at || a.rank - b.rank);
+  let left = Math.max(0, Number(totalMinor) || 0);
+  return list.map((e) => {
+    const take = Math.min(left, Math.max(0, e.want));
+    left -= take;
+    return { key: e.key, amountMinor: take, at: e.at, source: e.source };
+  });
+}
 
 const part = (v) => String(v || '').replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 60) || '-';
 /** نامِ زنجیرهٔ هشِ سریِ W ِ یک دکان (فقط برای سنجشِ سندهای قدیمی) */
@@ -254,6 +292,10 @@ async function judgeOf(shopId, viewer) {
     reversible(o) {
       return base.recordSale && can(role, 'sales.cancel') && allow('sales.cancel', { amount: Number(o.totalMinor) || 0 });
     },
+    /** سندِ برگشتِ بازپرداخت = همان «برگشت» ِ صندوق (`returns.create`، سقفِ مبلغِ همین کاربر) */
+    refundable(amountMinor) {
+      return base.recordSale && allow('returns.create', { amount: Math.max(0, Number(amountMinor) || 0) });
+    },
   };
 }
 
@@ -313,6 +355,10 @@ function parseAfter(raw) {
  *   review ───── `action: 'review'`، `reviewCode: 'before_floor'`: بیرون‌رفتهٔ بی‌فروش که نخستین گذارِ
  *                تحویلش **پیش از کف** و گذارِ تحویلِ دیگری **پس از کف** دارد — هرگز خودکار نه؛ صاحب
  *                بررسی می‌کند (شاید دستگاهِ کهنه دستی فروخته باشد).
+ *   refunds ──── `action: 'refund'`: فروشِ `o-…` ِ زنده دارد و رویدادِ بازپرداختی ([refundEventsOf]) که
+ *                ردیفِ سابقه‌اش (`o-<سفارش>-rf-<کلید>-a`) در دفترِ همگام‌شده نیست. `refundEvents`: همهٔ
+ *                رویدادها با مبلغِ سقف‌دار (برنامه نشسته‌ها را خودش رد می‌کند)؛ `refundable`: همین کاربر
+ *                سندِ برگشت را می‌تواند بنویسد ([judgeOf]، `returns.create`). فقط صفحهٔ نخست.
  *   `orderId` ⇒ فقط همان سفارش (برنامه پیش از هر ثبتِ دستی یا پس از «وضعیت عوض شد» می‌پرسد).
  * سفارشِ آزمایشی هرگز. دکانی که هنوز کف ندارد ⇒ هیچ (`since: null`).
  */
@@ -322,7 +368,7 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
   const lim = Math.min(Math.max(Number(limit) || 20, 1), MAX_PENDING);
   const cur = parseAfter(after);
   const floor = await sinceOf(shopId);
-  if (floor === null) return { items: [], reversals: [], review: [], since: null, nextAfter: null, serverTime: Date.now() };
+  if (floor === null) return { items: [], reversals: [], review: [], refunds: [], since: null, nextAfter: null, serverTime: Date.now() };
   const asked = Number(since);
   const from = Math.max(floor, Number.isSafeInteger(asked) && asked > 0 ? asked : 0);
   const only = String(orderId || '').slice(0, 64);
@@ -395,6 +441,28 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
     vparams
   );
 
+  //  بازپرداختِ سفارشی که فروشِ `o-…` ِ زنده دارد و رویدادِ بازپرداختش هنوز در دفتر ننشسته
+  //  (ردیفِ سابقهٔ `o-<سفارش>-rf-<کلید>-a` نیست) — فقط صفحهٔ نخست، مثلِ reversals
+  const marked = (table, key) => `EXISTS (SELECT 1 FROM ${table} m WHERE m.app='shop' AND m.account_kind='shop'
+        AND m.account_id = o.shop_id AND m.table_name='auditLog' AND m.deleted_at IS NULL
+        AND m.row_id = 'o-' || o.id || '-rf-' || ${key} || '-a')`;
+  const done = (key) => (v3 ? `(${marked('sync_rows', key)} OR ${marked('sync_v3_rows', key)})` : marked('sync_rows', key));
+  const fparams = [shopId, from];
+  let fextra = '';
+  if (only) { fparams.push(only); fextra = ` AND o.id = $${fparams.length}`; }
+  const refundRows = cur ? [] : await db.many(
+    `SELECT o.id FROM online_orders o
+      WHERE o.shop_id = $1 AND o.is_test = false AND o.updated_at >= $2 ${fextra}
+        --  ردیفِ دفترِ بازپرداخت فقط از «درخواستِ برگشت» به بعد است (پایانی‌ها هم همین‌جا می‌مانند)
+        AND (o.status = ANY($${fparams.length + 1}::text[]) OR o.payment_status = 'refunded')
+        AND (${liveSale('sync_rows')}${v3 ? ` OR ${liveSale('sync_v3_rows')}` : ''})
+        AND (EXISTS (SELECT 1 FROM online_order_refunds f WHERE f.order_id = o.id AND NOT ${done("('r' || f.seq)")})
+          OR ((o.status = 'refunded_full' OR o.payment_status = 'refunded') AND NOT ${done(`'${REFUND_FULL}'`)}))
+      ORDER BY o.updated_at, o.id
+      LIMIT ${MAX_PENDING}`,
+    [...fparams, REFUND_STATUSES]
+  );
+
   const judge = await judgeOf(shopId, viewer);
   const view = async (r, action) => {
     const o = await orders.get(shopId, r.id, viewer);
@@ -404,14 +472,38 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
         : { handedOverAt: at, reviewCode: 'before_floor' };
     return { ...o, action, saleId: saleIdOf(r.id), ...extra };
   };
+  const refundView = async (r) => {
+    const o = await orders.get(shopId, r.id, viewer);
+    const entries = (await db.many(
+      'SELECT seq, amount_minor, created_at FROM online_order_refunds WHERE shop_id=$1 AND order_id=$2 ORDER BY seq',
+      [shopId, o.id]
+    )).map((e) => ({ seq: Number(e.seq), amountMinor: Number(e.amount_minor), at: Number(e.created_at) }));
+    //  «بازپرداختِ کامل» (گذار) یا پولِ برگشتهٔ درگاه — زودترینِ دو، یک کلید
+    const firstAt = (kind, to) => {
+      const ats = o.events.filter((e) => e.kind === kind && e.toStatus === to).map((e) => e.at);
+      return ats.length ? Math.min(...ats) : null;
+    };
+    const fulls = [];
+    if (o.status === 'refunded_full') fulls.push({ at: firstAt('status', 'refunded_full') ?? o.updatedAt, source: 'status' });
+    if (o.paymentStatus === 'refunded') fulls.push({ at: firstAt('payment', 'refunded') ?? o.updatedAt, source: 'gateway' });
+    fulls.sort((a, b) => a.at - b.at);
+    const refundEvents = refundEventsOf(o.totalMinor, entries, fulls[0] || null);
+    const pending = refundEvents.reduce((s, e) => s + e.amountMinor, 0);
+    return {
+      ...o, action: 'refund', saleId: saleIdOf(o.id), refundEvents,
+      refundable: judge.refundable(pending),
+    };
+  };
   const items = [];
   for (const r of page) items.push(await view(r, 'sale'));
   const reversals = [];
   for (const r of backRows) reversals.push(await view(r, 'reverse'));
   const review = [];
   for (const r of reviewRows) review.push(await view(r, 'review'));
+  const refunds = [];
+  for (const r of refundRows) refunds.push(await refundView(r));
   return {
-    items, reversals, review, since: from,
+    items, reversals, review, refunds, since: from,
     nextAfter: saleRows.length > lim && last ? `${Number(last.at)}:${last.id}` : null,
     serverTime: Date.now(),
   };
@@ -420,5 +512,5 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
 module.exports = {
   SERIES, ORDER_SERIES, HANDED_OVER, OUT_OF_SHOP, BACK_IN_SHOP, MAX_PENDING, FLOOR_KEY, SALE_CAP, SALE_TABLES,
   LEGACY_FLAGS, REVIEW_ACK, ACK_KINDS, ackReview, markStarted, saleIdOf, legacySaleIdOf, chainOf, docsOf, capsOf, capsFor, judgeOf, deployFloor, floorOf, sinceOf,
-  claimFloor, claimFloorsAtStart, handoverPending,
+  claimFloor, claimFloorsAtStart, handoverPending, REFUND_FULL, refundDocIdOf, refundMarkOf, refundEventsOf,
 };

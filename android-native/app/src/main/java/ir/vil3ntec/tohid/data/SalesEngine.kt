@@ -627,7 +627,8 @@ object SalesEngine {
       var quantity = quantities[item.id] ?: return@forEachIndexed
       if (quantity.isNaN() || quantity <= 0) return@forEachIndexed
 
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
