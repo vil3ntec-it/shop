@@ -8,7 +8,6 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
-import ir.vil3ntec.tohid.core.image.BankSearchCache
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
@@ -155,7 +154,7 @@ object ImageBank {
 
   /* ---------- کشِ جست‌وجو روی دیسک (`BankSearchCache` ِ core؛ فقط متادیتای بانکِ مرکزی) ---------- */
 
-  private val cache = BankSearchCache()
+  private val cache = ir.vil3ntec.tohid.core.image.BankSearchCache()
   @Volatile private var cacheLoaded = false
   private fun cacheFile(context: Context) = File(context.applicationContext.cacheDir, "imgbank-search.json")
 
@@ -166,7 +165,7 @@ object ImageBank {
         val f = cacheFile(context)
         if (!f.isFile) emptyList() else (Json.parseToJsonElement(f.readText()) as? JsonArray).orEmpty().mapNotNull { e ->
           val o = e as? JsonObject ?: return@mapNotNull null
-          BankSearchCache.Entry(
+          ir.vil3ntec.tohid.core.image.BankSearchCache.Entry(
             key = o.s("k"), payload = o.s("p"),
             savedAtMs = o["t"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,
             bankRev = o["r"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,

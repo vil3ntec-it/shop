@@ -87,13 +87,13 @@ fun ImageBankPicker(
   var hasImage by remember { mutableStateOf(true) }
   val items = remember { mutableStateListOf<ImageBank.Hit>() }
   var next by remember { mutableStateOf<String?>(null) }
+  /** نتیجه‌های روی صفحه از کشِ بی‌اینترنتی‌اند (IMG-BANK-11): برچسبِ «قدیمی» و انتخاب نه */
+  var stale by remember { mutableStateOf(false) }
+  var scanOpen by remember { mutableStateOf(false) }
   var state by remember { mutableStateOf("") }
   var stateTone by remember { mutableStateOf(PillTone.NEUTRAL) }
   var loading by remember { mutableStateOf(false) }
   var open by remember { mutableStateOf<ImageBank.Hit?>(null) }
-  /** نتیجه‌های روی صفحه از کشِ بی‌اینترنتی‌اند (IMG-BANK-11): برچسبِ «قدیمی» و انتخاب نه */
-  var stale by remember { mutableStateOf(false) }
-  var scanOpen by remember { mutableStateOf(false) }
 
   fun search(more: Boolean) {
     val text = query.trim()
@@ -106,10 +106,10 @@ fun ImageBankPicker(
         if (!more) items.clear()
         items += page.items
         next = page.next
-        stale = page.stale
         val note = if (page.barcodeValid == false) "این بارکد معتبر نیست — نتیجه‌ها با نام است. " else ""
         state = note + if (items.isEmpty()) "چیزی پیدا نشد. می‌توانید عکسِ خودتان را بگذارید." else "${items.size} نتیجه" + if (next != null) " (بیشتر هم هست)" else ""
         stateTone = if (page.barcodeValid == false) PillTone.WARNING else PillTone.NEUTRAL
+        stale = page.stale
         if (page.stale) {
           //  ⛔ هرگز «جست‌وجوی زنده» نیست: سن و «آخرین همگام‌سازی» پیدا، و انتخاب فقط با اینترنت
           state = "بی اینترنت — نتیجه‌های ذخیره‌شده از ${ago(System.currentTimeMillis() - page.savedAtMs)} (آخرین همگام‌سازی). " +
