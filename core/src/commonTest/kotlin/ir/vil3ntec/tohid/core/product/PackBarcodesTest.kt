@@ -29,6 +29,8 @@ class PackBarcodesTest {
     assertEquals(listOf(Pack("بسته", 250, listOf("7"))), ok(check(Draft("بسته", "0.25", "7"), unit = "کیلوگرم", fractional = true)))
     assertEquals("0.25", PackBarcodes.sizeText(250))
     assertEquals("1.5", PackBarcodes.sizeText(1_500))
+    assertEquals("0.05", PackBarcodes.sizeText(50))
+    assertEquals("2.005", PackBarcodes.sizeText(2_005))
   }
 
   @Test fun noBarcodeIsSharedWithAnotherProductOrWithTheUnitItself() {
