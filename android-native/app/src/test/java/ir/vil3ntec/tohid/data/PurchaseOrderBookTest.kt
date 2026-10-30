@@ -181,4 +181,62 @@ class PurchaseOrderBookTest {
     //  هستهٔ برنامه همان وضعیتِ سرور را از همان داده می‌سازد
     assertEquals(PurchaseOrderCore.Status.PARTIAL, PurchaseOrderCore.status(PurchaseOrderBook.core(o), PurchaseOrderBook.coreReceipts(o)))
   }
+
+  @Test fun `فروشِ ۳۰ روز، «در راه» و زمانِ تأمین ⇒ پیشنهادِ مقدار (PUR-10)`() {
+    var d = d0
+    //  خرید از s1 تا pA و pB «کالاهای این تأمین‌کننده» باشند
+    for (pid in listOf("pA", "pB")) {
+      d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line(pid, 2.0, 100.0)), 0.0, "2026-09-01", "", "2026-09-01", 1, ::newId)
+        as PurchaseBook.Result.Ok).data
+    }
+    //  فروشِ pA در پنجره: ۲۰ + ۴۰ (۵ تا برگشته) ⇒ ۵۵؛ فروشِ لغوشده و فروشِ پیش از پنجره حساب نمی‌شوند
+    d = d.copy(
+      sales = listOf(
+        Sale(id = "s-a", date = "2026-11-01"), Sale(id = "s-b", date = "2026-10-10"),
+        Sale(id = "s-x", date = "2026-11-01", status = "cancelled"), Sale(id = "s-old", date = "2026-10-02"),
+      ),
+      saleItems = listOf(
+        SaleItem(id = "i1", saleId = "s-a", productId = "pA", quantity = 20.0),
+        SaleItem(id = "i2", saleId = "s-b", productId = "pA", quantity = 40.0, returnedQty = 5.0),
+        SaleItem(id = "i3", saleId = "s-x", productId = "pA", quantity = 99.0),
+        SaleItem(id = "i4", saleId = "s-old", productId = "pA", quantity = 99.0),
+      ),
+    )
+    assertEquals(mapOf("pA" to 55_000L), PurchaseOrderBook.soldMilli(d, "2026-11-01"))
+
+    val sentA = po.copy(id = "o1", supplierId = "s1", status = "partial", sentAt = 1_000L, firstReceiptAt = 1_000L + 3 * 86_400_000L,
+      progress = listOf(PoProgressDto("l1", "pA", 10_000, 4_000, 0, 4_000, 6_000, 0)))
+    val doneB = po.copy(id = "o2", supplierId = "s1", status = "complete", sentAt = 5_000L, firstReceiptAt = 5_000L + 5 * 86_400_000L,
+      progress = listOf(PoProgressDto("l2", "pB", 1_000, 1_000, 0, 1_000, 0, 0)))
+    val other = po.copy(id = "o3", supplierId = "s2", status = "sent", sentAt = 9_000L, firstReceiptAt = null,
+      progress = listOf(PoProgressDto("l1", "pA", 7_000, 0, 0, 0, 7_000, 0)))
+    val orders = listOf(sentA, doneB, other)
+    //  «در راه»: فقط فرستاده/بخشی (کامل نه)، از هر تأمین‌کننده
+    assertEquals(mapOf("pA" to 13_000L), PurchaseOrderBook.onOrderMilli(orders))
+    assertEquals(5, PurchaseOrderBook.leadTime(orders, "s1").days)
+    assertEquals(2, PurchaseOrderBook.leadTime(orders, "s1").samples)
+    assertEquals(null, PurchaseOrderBook.leadTime(orders, "s2").days)
+
+    //  pA: موجودی ۲، در راه ۱۳، روزی ۵۵/۳۰؛ زمانِ تأمین ۵ ⇒ نقطه = ۹٫۱۶۷ + ۵ (حدِ کم) = ۱۴٫۱۶۷ < جایگاهِ ۱۵ ⇒ کافی
+    assertTrue(PurchaseOrderBook.planned(d, "s1", orders, "2026-11-01").isEmpty())
+    //  بی سفارشِ در راه ⇒ جایگاه ۲؛ هدف = ۵۵ × (۵ + ۱۴) / ۳۰ + ۵ = ۳۴٫۸۳۳ + ۵ = ۳۹٫۸۳۳ ⇒ ۳۷٫۸۳۳ ⇒ ۳۸ عدد
+    val plan = PurchaseOrderBook.planned(d, "s1", listOf(doneB), "2026-11-01")
+    assertEquals(listOf("pA"), plan.map { it.pick.productId })
+    assertEquals(38_000L, plan.single().pick.qtyMilli)
+    assertEquals(ir.vil3ntec.tohid.core.purchase.ReorderCore.Confidence.HIGH, plan.single().suggestion.confidence)
+  }
+
+  @Test fun `تاریخچهٔ قیمت از دفتر: سندِ کسر بیرون، آخرین فیِ همان تأمین‌کننده (PUR-09)`() {
+    var d = d0
+    d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line("pA", 1.0, 100.0)), 0.0, "2026-09-01", "", "2026-09-01", 1, ::newId) as PurchaseBook.Result.Ok).data
+    d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line("pA", 1.0, 110.0)), 0.0, "2026-10-01", "", "2026-10-01", 2, ::newId) as PurchaseBook.Result.Ok).data
+    d = (PurchaseBook.record(d, "s2", listOf(PurchaseBook.Line("pA", 1.0, 95.0)), 0.0, "2026-10-02", "", "2026-10-02", 3, ::newId) as PurchaseBook.Result.Ok).data
+    d = d.copy(purchases = d.purchases + Purchase(id = "credit", productId = "pA", supplierId = "s1", quantity = -1.0, purchasePrice = 10.0,
+      totalAmount = -10.0, date = "2026-10-05", createdAt = 4))
+    val buys = PurchaseOrderBook.buys(d)
+    val last = ir.vil3ntec.tohid.core.purchase.SupplierPricing.last(buys, "pA", "s1")!!
+    assertEquals(11_000L, last.priceMinor)
+    assertEquals(1_000L, last.changeBp)
+    assertEquals(listOf("s2", "s1"), ir.vil3ntec.tohid.core.purchase.SupplierPricing.bySupplier(buys, "pA").map { it.supplierId })
+  }
 }
