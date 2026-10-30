@@ -28,6 +28,7 @@
 | کمکی‌های تکراری | `afn`، `minorOf`، `StatusPill`، escapeِ HTML و زنجیرهٔ رمزِ `pepper()` بیرون از خانهٔ اصلی‌شان | شمارِ نسخه‌ها از سقف بیشتر شود |
 | رشته‌های `'pump'` / `'shop'` | مقایسهٔ درجا در `server/src`، برای هر فایل | فایلی از سقفش بگذرد؛ فایلِ تازه سقفِ صفر دارد |
 | برنامهٔ وبِ یخ‌زده | خط و بایتِ `index.html` | بزرگ‌تر شود |
+| وابستگیِ پلتفرمی (راهِ آیفون) | `android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `java.*`/`javax.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized` در Kotlinِ `android-native/app/src/main/java` و `core/src/commonMain`، برای هر فایل؛ پوشهٔ `platform/` و `*Android.kt`/`*Desktop.kt` شمرده نمی‌شوند | فایلی از سقفش بگذرد؛ فایلِ تازه سقفِ صفر دارد |
 | شمارهٔ مهاجرت‌ها (سد) | شمارهٔ همهٔ فایل‌های `.sql` در `server/migrations`، نام‌های ناهم‌شکل هم | همین PR فایلی با شمارهٔ گرفته‌شده بیفزاید؛ **کار قرمز می‌شود**. تکراریِ ازپیش‌مانده روی main فقط ⚠️ است و نباید تغییرِ نام بگیرد |
 | ESLint | فقط قاعده‌های درستی، فقط روی فایل‌های `server/src` که PR عوض کرده؛ بی قاعدهٔ ظاهری و بی `--fix` | خطا (مثلِ `no-undef`)؛ متغیرِ بی‌استفاده فقط هشدار است |
 | ES5 | هسته‌های `license/*-core.js` و `debt-book`، `hash-chain`، `keymap`، `ledger-store`، `money`، `report-board` | `let`/`const`/پیکان/`class` در آن‌ها |
