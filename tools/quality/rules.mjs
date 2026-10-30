@@ -139,3 +139,26 @@ export const matchesAny = (globs) => {
   const res = globs.map(globToRegExp);
   return (file) => res.some((r) => r.test(file));
 };
+
+/**
+ * Platform dependencies in logic (docs/IOS-PLAN-fa.md §۴ گامِ ۰، RULES-fa «v3 · هسته‌های مشترک»):
+ * what keeps a Kotlin file off iPhone. Measured in the Android app and core/commonMain; a new file
+ * may have none, an existing one may only go down. Boundary files (the platform side of an
+ * interface) are not measured. `*Desk.kt` is not a boundary name: ui/screens/DeliveryDesk.kt is a screen.
+ */
+export const PLATFORM_DEPS = {
+  applies: (file) => isKotlinMain(file)
+    && (/^android-native\/app\/src\/main\/java\//.test(file) || /^core\/src\/commonMain\//.test(file)),
+  boundary: (file) => /\/platform\//.test(file) || /(?:Android|Desktop|\.android|\.desktop)\.kt$/.test(file),
+  patterns: [
+    { id: 'android.*', pattern: /(?<![\w.])android\.[a-z]/g },
+    { id: 'androidx (غیرِ Compose)', pattern: /(?<![\w.])androidx\.(?!compose\.)[a-z]/g },
+    { id: 'Context', pattern: /(?<![\w.])(?:Local)?Context\b/g },
+    { id: 'SharedPreferences', pattern: /(?<![\w.])SharedPreferences\b/g },
+    { id: 'java.* / javax.*', pattern: /(?<![\w.])javax?\.[a-z]/g },
+    { id: 'org.json', pattern: /(?<![\w.])org\.json\b/g },
+    { id: 'System.currentTimeMillis', pattern: /\bSystem\.currentTimeMillis\b/g },
+    { id: 'String.format', pattern: /\bString\.format\b|"\.format\s*\(/g },
+    { id: 'synchronized', pattern: /\bsynchronized\s*\(|@Synchronized\b/g },
+  ],
+};
