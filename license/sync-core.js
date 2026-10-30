@@ -51,6 +51,16 @@
      می‌دارد — هیچ چیزی گم نمی‌شود.
      ========================================================== */
   var SCHEMA_VERSION = 4;
+  /**
+   *  پله‌ای که هر سرور می‌شناسد (main). پلهٔ ۴ روی سرور پشتِ پرچمِ `sync.safe_entries` ِ هر
+   *  دکان است، پس برنامه همان پله‌ای را می‌فرستد که سرور گفته (`wireSchema`) — نه بیشتر، تا
+   *  روی دکانِ پرچم‌خاموش ۴۲۶ نگیرد. سرورِ ناشناخته (۰) ⇒ همین پایه.
+   */
+  var BASE_SCHEMA = 3;
+  function wireSchema(serverSchema) {
+    var s = Math.floor(Number(serverSchema) || 0);
+    return Math.max(BASE_SCHEMA, Math.min(SCHEMA_VERSION, s));
+  }
 
   /* ==========================================================
      ۱) مجموعه‌ها — فهرستِ سفید، همان نام‌هایی که سرور می‌شناسد
@@ -765,6 +775,8 @@
 
   return {
     SCHEMA_VERSION: SCHEMA_VERSION,
+    BASE_SCHEMA: BASE_SCHEMA,
+    wireSchema: wireSchema,
     COLLECTIONS: COLLECTIONS,
     LIST_COLLECTIONS: LIST_COLLECTIONS,
     listRowId: listRowId,

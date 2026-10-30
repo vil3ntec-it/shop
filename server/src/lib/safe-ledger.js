@@ -31,6 +31,7 @@ const { many } = require('../db');
 const { rejectOps } = require('./v1-reject');
 const { holdFor } = require('./account-lock');
 const { SHOP } = require('./tenancy');
+const safeFlag = require('./safe-flag');
 
 const TABLE = 'safeEntries';
 const PERM = 'safe.move';
@@ -171,6 +172,20 @@ async function v1SafeGuard(req, res, next) {
   try {
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
     if (!ops || !ops.some(isSafeOp)) return next();
+    //  پرچمِ خاموش ⇒ همان main: جدولِ ناشناخته، بی قفل و بی داوری (‎lib/safe-flag.js‎)
+    if (!safeFlag.on(ctx)) {
+      const rejected = new Map();
+      const { validateOp } = require('./sync-v1');
+      ops.forEach((raw, i) => {
+        if (!isSafeOp(raw)) return;
+        const v = validateOp('shop', raw);
+        //  همان دلیلی که main می‌داد: شناسهٔ op پیش از جدول سنجیده می‌شود
+        const reason = !v.ok && v.reason === 'bad_op_id' ? 'bad_op_id' : 'unknown_table';
+        rejected.set(i, { op_id: v.ok ? v.op.op_id : v.op_id, status: 'rejected', reason });
+      });
+      rejectOps(req, res, ops, rejected);
+      return next();
+    }
     const free = await hold(res, ctx);
     if (!free) return;                               //  در صف قطع شد: نه داوری، نه v1
     try {

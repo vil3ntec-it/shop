@@ -283,7 +283,7 @@ await step('لایه‌های Sync v1 در صفحه بالا آمده‌اند',
   assert.equal(out.account, true, 'account-code.js');
   assert.equal(out.sync, true, 'sync-engine.js');
   assert.equal(out.ui, true, 'account-ui.js');
-  assert.equal(out.schema, require('../src/lib/sync-v1-migrations').currentVersion('shop'),
+  assert.equal(out.schema, require('../src/lib/sync-v1-migrations').currentVersion('shop', { safeEntries: true }),
     'نسخهٔ schema باید با سرور یکی باشد (پلهٔ ۴: گاوصندوق، PAY-18)');
   assert.equal(out.ulid, 26, 'شناسهٔ ردیف باید ULID باشد');
 });

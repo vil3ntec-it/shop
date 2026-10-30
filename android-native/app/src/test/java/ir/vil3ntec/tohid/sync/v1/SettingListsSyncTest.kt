@@ -29,6 +29,14 @@ class SettingListsSyncTest {
     (o[key] as JsonArray).map { (it as JsonPrimitive).content }
 
   @Test
+  fun `پلهٔ روی سیم همان پلهٔ سرور است، نه بیشتر — پرچمِ گاوصندوق (PAY-18)`() {
+    assertEquals(3, LedgerDiff.BASE_SCHEMA)
+    assertEquals(4, LedgerDiff.SCHEMA_VERSION)
+    //  سرورِ ناشناخته، پرچم‌خاموش، پرچم‌روشن، سرورِ جلوتر — همان `wireSchema` ِ وب
+    assertEquals(listOf(3, 3, 3, 4, 4), listOf(0, 2, 3, 4, 9).map(LedgerDiff::wireSchema))
+  }
+
+  @Test
   fun `شناسهٔ ردیف همان sha256ِ نام است — یکی با وب و سرور`() {
     assertTrue("فهرست‌ها از پلهٔ ۳ می‌روند", LedgerDiff.SCHEMA_VERSION >= 3)
     assertEquals(listOf("productCategories", "productUnits", "expenseCategories"), LedgerDiff.LIST_COLLECTIONS)

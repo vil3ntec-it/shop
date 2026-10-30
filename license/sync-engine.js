@@ -290,7 +290,8 @@
 
     var body = {
       device_id: acc.deviceId(),
-      schema_version: core.SCHEMA_VERSION,
+      //  پلهٔ همان سرور، نه بیشتر (`wireSchema` ِ sync-core.js، پرچمِ گاوصندوق)
+      schema_version: core.wireSchema(state().serverSchema),
       ops: batch,
       queued: q.size(),
       //  A00: وب ردیفِ JSON ِ خام را نگه می‌دارد و null اش پاک کردنِ واقعی است — سرور
@@ -304,7 +305,10 @@
       if (e.status === 426) {
         //  سرور عقب‌تر است. هیچ opی اعمال نشده و هیچ opی هم پاک
         //  نمی‌شود؛ منتظر می‌مانیم تا سرور به‌روز شود.
-        patchState({ holding: true, lastError: e.message || 'سرور باید به‌روز شود' });
+        //  پلهٔ بالاتر از پایه را سرور دیگر نمی‌شناسد (پرچمِ دکان خاموش شد)؟ بارِ بعد با پایه
+        var sent = body.schema_version;
+        patchState({ holding: true, lastError: e.message || 'سرور باید به‌روز شود',
+          serverSchema: sent > core.BASE_SCHEMA ? 0 : state().serverSchema });
         announce();
         throw e;
       }

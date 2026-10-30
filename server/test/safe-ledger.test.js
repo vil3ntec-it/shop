@@ -38,11 +38,11 @@ let tick = 0;
 const H = (node) => hlc.format({ wall: Date.now() + (++tick), counter: 0, node });
 
 const push1 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', {
-  token: who.accessToken, body: { device_id: device, schema_version: migrations.currentVersion('shop'), ops },
+  token: who.accessToken, body: { device_id: device, schema_version: migrations.FLAGGED.shop, ops },
 });
 /** ساختِ A00 به بعد (`caps`): newer-fields کلیدِ null را برنمی‌دارد */
 const pushA00 = (who, device, ops) => h.api('POST', '/api/sync/v1/push', {
-  token: who.accessToken, body: { device_id: device, schema_version: migrations.currentVersion('shop'), caps: ['a00'], ops },
+  token: who.accessToken, body: { device_id: device, schema_version: migrations.FLAGGED.shop, caps: ['a00'], ops },
 });
 const push3 = (who, device, ops) => h.api('POST', '/api/sync/v3/push', {
   token: who.accessToken, body: { device_id: device, protocol: 3, ops },
@@ -68,6 +68,8 @@ test.before(async () => {
   const o = await h.newUser('صاحبِ گاوصندوق', 'shop');
   const shop = await h.post('/api/shop', { name: 'دکانِ گاوصندوق' }, { token: o.accessToken });
   shopId = shop.body?.shop?.id || shop.body?.id;
+  //  پرچمِ `sync.safe_entries` برای همین دکان؛ خاموشش = همان main (‎test/safe-flag.test.js‎)
+  await require('../src/lib/live-config').set(shopId, 'sync.safe_entries', true);
   const code = (await h.get('/api/shop/staff-code', { token: o.accessToken })).body.code;
   const s = await h.newUser('شاگردِ گاوصندوق', 'shop');
   assert.ok([200, 201].includes((await h.post('/api/shop/join', { code }, { token: s.accessToken })).status));
@@ -103,7 +105,8 @@ test('جدولِ تازه در هر سه فهرست: v1 ِ دکان، پلهٔ �
   assert.ok('safeEntries' in legacy.TABLES, 'فهرستِ سفیدِ v1 ِ دکان');
   assert.equal(legacy.TABLES.safeEntries, null, 'جدولِ راهِ قدیم ندارد');
   assert.ok(legacy.V1_ONLY.has('safeEntries') && !legacy.LEGACY_COLLECTIONS.includes('safeEntries'));
-  assert.equal(migrations.currentVersion('shop'), 4);
+  assert.equal(migrations.currentVersion('shop'), 3, 'بی پرچم همان پلهٔ main');
+  assert.equal(migrations.currentVersion('shop', { safeEntries: true }), 4, 'پلهٔ ۴ فقط با پرچم');
   assert.equal(require('../src/lib/sync-v3-schema').specOf('safeEntries').policy, 'log');
   assert.ok(!syncV1.PUMP_TABLES.includes('safeEntries'), 'جدولِ پمپ نیست');
 });
@@ -294,7 +297,7 @@ test('قفلِ حساب: درخواستی که در صف قطع شد کاری ن
   r3.end();
 
   //  همان از درِ نگهبانِ v1: نه داوری، نه `next`
-  const ctx = { app: 'shop', accountKind: 'shop', accountId: shopId, role: 'owner', userId: 'u' };
+  const ctx = { app: 'shop', accountKind: 'shop', accountId: shopId, role: 'owner', userId: 'u', safeEntries: true };
   const held = fakeRes();
   await safe.hold(held, ctx);
   const req = { sync: ctx, body: { ops: [count('gone-c1', 100)] } };

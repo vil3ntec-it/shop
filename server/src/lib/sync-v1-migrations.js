@@ -31,10 +31,16 @@ const CURRENT = Object.freeze({
   //  expenseCategories. برنامهٔ پلهٔ ۲ همچنان پذیرفته می‌شود؛ برنامهٔ
   //  پلهٔ ۳ روی سرورِ پلهٔ ۲ ۴۲۶ می‌گیرد و opهایش را نگه می‌دارد (نه
   //  اینکه opهای این سه جدول «جدولِ ناشناخته» بگیرند و دور ریخته شوند).
-  //  پلهٔ ۴ (PAY-18): جدولِ تازهٔ `safeEntries` (گاوصندوق)؛ همان قاعدهٔ پلهٔ ۳.
-  shop: 4,
+  shop: 3,
   pump: 1,
 });
+
+/**
+ * پله‌هایی که فقط با پرچمِ همان حساب روشن‌اند (`safe-flag.js`). پرچمِ خاموش ⇒ همان `CURRENT`،
+ * یعنی سرور همان main است و برنامهٔ پلهٔ بالاتر با پلهٔ پایه می‌فرستد (`wireSchema` ِ برنامه‌ها).
+ *   پلهٔ ۴ (PAY-18): جدولِ تازهٔ `safeEntries` (گاوصندوق)، پشتِ `sync.safe_entries`.
+ */
+const FLAGGED = Object.freeze({ shop: 4 });
 
 const MIGRATIONS = {
   shop: {
@@ -64,8 +70,12 @@ const MIGRATIONS = {
   pump: {},
 };
 
-/** نسخهٔ فعلیِ یک بخش؛ بخشِ ناشناخته ۰ (یعنی هیچ opی پذیرفته نمی‌شود). */
-function currentVersion(app) {
+/**
+ * نسخهٔ فعلیِ یک بخش؛ بخشِ ناشناخته ۰ (یعنی هیچ opی پذیرفته نمی‌شود).
+ * @param ctx بافتِ همگام‌سازی (`req.sync`)؛ بی آن یا با پرچمِ خاموش همان `CURRENT`
+ */
+function currentVersion(app, ctx = null) {
+  if (FLAGGED[app] && require('./safe-flag').on(ctx)) return FLAGGED[app];
   return CURRENT[app] || 0;
 }
 
@@ -76,8 +86,8 @@ function currentVersion(app) {
  * رد می‌شود؛ ولی پله‌ای که از `CURRENT` بزرگ‌تر باشد هرگز صدا زده
  * نمی‌شود — آن‌جا 426 است، نه این‌جا.
  */
-function upgrade(app, from, op) {
-  const to = currentVersion(app);
+function upgrade(app, from, op, ctx = null) {
+  const to = currentVersion(app, ctx);
   let cur = op;
   for (let n = from + 1; n <= to; n++) {
     const step = MIGRATIONS[app] && MIGRATIONS[app][n];
@@ -86,4 +96,4 @@ function upgrade(app, from, op) {
   return cur;
 }
 
-module.exports = { CURRENT, MIGRATIONS, currentVersion, upgrade };
+module.exports = { CURRENT, FLAGGED, MIGRATIONS, currentVersion, upgrade };

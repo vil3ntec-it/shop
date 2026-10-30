@@ -349,6 +349,7 @@
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `sync.safe_entries` | دکان / `all` | خاموش | گاوصندوق (PAY-18): پلهٔ ۴ ِ schema ِ دکان و جدولِ `safeEntries` در Sync v1/v3 با نگهبانِ `safe-ledger.js`؛ خاموش ⇒ همان main (پلهٔ ۳، `unknown_table`، راهِ قدیم بی‌صدا، `/status` و `/hello` بی این جدول)؛ برنامه‌ها پلهٔ همان سرور را می‌فرستند (`wireSchema`) | #364 | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
