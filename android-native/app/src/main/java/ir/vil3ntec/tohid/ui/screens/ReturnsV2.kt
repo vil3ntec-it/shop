@@ -109,6 +109,8 @@ fun ReturnFlowDialog(
   val role = remember { ShopRole.current(context) }
   val layers = remember { ShopRole.layers(context) }
   val limit = remember { ReturnSettings.limit(context) }
+  //  RET-08 — فهرستِ دلیل‌های همین دکان (تنظیمات)؛ ثبت فقط با یکی از همین‌ها
+  val reasons = remember { ReturnSettings.reasons(context) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { newId() }
@@ -118,7 +120,7 @@ fun ReturnFlowDialog(
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<FreeRow>()) }
-  var reason by remember { mutableStateOf<String?>(if (prefill) ReturnFlow.REASONS.first() else null) }
+  var reason by remember { mutableStateOf<String?>(if (prefill) reasons.first() else null) }
   var mode by remember { mutableStateOf(ReturnFlow.ORIGINAL) }
   var customerId by remember { mutableStateOf(sale?.debtorId) }
   var exchange by remember { mutableStateOf(false) }
@@ -221,7 +223,7 @@ fun ReturnFlowDialog(
           /* ----------------------------- دلیل ----------------------------- */
           Section("دلیلِ برگشت (اجباری)") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              ReturnFlow.REASONS.forEach { r ->
+              reasons.forEach { r ->
                 FilterChip(selected = reason == r, onClick = { reason = r }, label = { Text(r) }, shape = Shape.chip)
               }
             }
@@ -324,7 +326,7 @@ fun ReturnFlowDialog(
                   docId = docId, saleId = sale?.id,
                   picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
                   free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
-                  reason = reason.orEmpty(), mode = mode, customerId = creditTo,
+                  reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
                   by = me, role = role, perm = perm, limit = limit, approval = approval,
                 )
                 val now = System.currentTimeMillis()
@@ -457,6 +459,8 @@ fun ReturnSettingsSection() {
   val context = LocalContext.current
   var on by remember { mutableStateOf(ReturnSettings.enabled(context)) }
   var limit by remember { mutableStateOf(ReturnSettings.limit(context).let { if (it > 0) money(it).replace(",", "") else "" }) }
+  //  RET-08 — متنِ کادر همان نوشتهٔ کاربر می‌ماند (خطِ خالیِ وسطِ نوشتن پاک نمی‌شود)؛ ذخیره پاک‌شده است
+  var reasonsText by remember { mutableStateOf(ir.vil3ntec.tohid.core.returns.ReturnReasons.format(ReturnSettings.reasons(context))) }
   val c = Shop.colors
   SettingsSection(
     icon = Icons.Filled.SwapHoriz,
@@ -490,6 +494,20 @@ fun ReturnSettingsSection() {
           ReturnSettings.setLimit(context, v.toDoubleOrNull() ?: 0.0)
         },
         label = "سقف (؋)",
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(12.dp))
+      Text(
+        "دلیل‌های برگشت — هر خط یک دلیل (حداکثر ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_COUNT}، هر کدام تا ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_LENGTH} نویسه). صندوق فقط از همین فهرست دلیل می‌پذیرد؛ خالی = فهرستِ پیش‌فرض.",
+        style = MaterialTheme.typography.labelSmall,
+        color = c.muted,
+      )
+      Spacer(Modifier.height(6.dp))
+      OutlinedTextField(
+        value = reasonsText,
+        onValueChange = { v -> reasonsText = v; ReturnSettings.setReasons(context, v) },
+        label = { Text("دلیل‌ها") },
+        minLines = 3,
         modifier = Modifier.fillMaxWidth(),
       )
     }
