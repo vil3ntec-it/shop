@@ -13,7 +13,8 @@
  *
  * ⛔ موجودی (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): سفارش موجودیِ سرور را **نه رزرو می‌کند نه
  * کم** و هیچ ردیفی در دفترِ دکان نمی‌نویسد. ساختِ سفارش با پرچمِ `shop.catalog` فقط
- * می‌سنجد (`catalog.checkOrder`). وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
+ * می‌سنجد (`catalog.checkOrder`)؛ استثنای M5: `shop.stock_reserve` + موجودیِ تازه ⇒ رزروِ نرم
+ * (`lib/stock-reserve.js`). وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
  * داده شد / رسید)، **برنامهٔ دکان** یک فروشِ عادی با `orderId` ثبت می‌کند
  * (`OrderFulfillment.kt`) و موجودی با همگام‌سازی همه‌جا کم می‌شود؛ `handoverPending`
  * سفارش‌های تحویل‌شدهٔ بی‌فروش را به برنامه می‌دهد. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
@@ -27,7 +28,7 @@ const S = require('./order-states');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
-const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
+const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders';
 const FEATURE_KEY = 'online_orders';
@@ -281,7 +282,11 @@ async function loadDetail(run, shopId, id, viewer) {
   if (!row) return null;
   const lines = (await run('SELECT * FROM online_order_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows;
   const events = (await run('SELECT * FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id])).rows;
-  return detail(row, lines, events, viewer, now());
+  const out = detail(row, lines, events, viewer, now());
+  //  M5: رزروِ نرمِ سفارش (فقط اگر دارد ⇒ بی رزرو همان پاسخِ پیشین)
+  const hold = await require('./stock-reserve').orderView(run, shopId, id);
+  if (hold) out.stockHold = hold;
+  return out;
 }
 
 const viaDb = (text, params) => db.query(text, params);
@@ -328,7 +333,7 @@ async function create(shopId, { key, body, actor, price, notify }) {
     if (price) input = await price(run, at);
     //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
     //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
-    await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
+    const stockPlan = await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest, at });
 
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
@@ -371,6 +376,10 @@ async function create(shopId, { key, body, actor, price, notify }) {
      *  `shop.order_notify` هیچ نمی‌نویسد)؛ سفارشِ کارمند هیچ — رفتارِ پیشین.
      *  `null` ⇒ هیچ. خطایش کلِ سفارش را برمی‌گرداند: «ثبت شد» بی صفِ اعلان نیست.
      */
+    //  M5: رزروِ نرم (پرچمِ `shop.stock_reserve` + موجودیِ تازه) — همان تراکنش و همان قفلِ موجودی
+    if (stockPlan && stockPlan.hold) {
+      await require('./stock-reserve').holdIn(c, shopId, { orderId: id, ...stockPlan.hold, at });
+    }
     const hook = notify !== undefined ? notify
       : (actor.type === 'customer' ? require('./order-notify').enqueueIn : null);
     if (hook) await hook(run, { shopId, orderId: id, orderNo: no, at });
@@ -468,6 +477,8 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
       [shopId, row.id, to, reason, readyAt ?? null, at]
     );
     //  ⛔ موجودی: هیچ (تصمیمِ صاحبِ مخزن) — تحویل را برنامهٔ دکان با فروشِ عادی ثبت می‌کند.
+    //  M5: فقط اگر سفارش رزروِ نرم دارد ⇒ قبول بی انقضا، پایان/تحویل آزاد (بی رزرو ⇒ هیچ)
+    await require('./stock-reserve').onTransitionIn(c, shopId, row.id, to, at);
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)

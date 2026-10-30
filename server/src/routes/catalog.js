@@ -24,6 +24,7 @@ const { badRequest, forbidden } = require('../middleware/errors');
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('stock.view'));
 
+const reserve = require('../lib/stock-reserve');
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const needFlag = wrap(async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); });
 
@@ -31,6 +32,8 @@ router.get('/config', wrap(async (req, res) => {
   res.json({
     enabled: await stock.flagOf(req.shopId),
     settings: await stock.settingsOf(req.shopId),
+    //  M5: رزروِ نرمِ سفارشِ آنلاین — فقط وقتی روشن است (خاموش ⇒ همان پاسخِ پیشین)
+    ...(await reserve.enabled(req.shopId) ? { reserve: { enabled: true, ttlSec: await reserve.ttlSecOf(null, req.shopId) } } : {}),
     locations: stock.LOCATIONS,
     sellableChoices: stock.SELLABLE_CHOICES,
     kinds: Object.keys(catalog.MANUAL),
