@@ -16,7 +16,10 @@ const market = require('../lib/market');
 const sf = require('../lib/storefront');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 
+const views = require('../lib/public-views');
 const router = express.Router();
+//  S2: پرچمِ `market.public_views` پیش از هر پاسخ (خاموش ⇒ پاسخِ بی بُرش، همان main)
+router.use(views.gate);
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'market-read' });

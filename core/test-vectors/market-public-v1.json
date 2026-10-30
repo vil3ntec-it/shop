@@ -1,0 +1,686 @@
+{
+  "_doc": "قراردادِ نمای عمومیِ دکان ⇐ بازار (docs/MARKETPLACE-CONTRACT-fa.md، S2/S4). ⛔ با تغییرِ fields، schemaVersion و نامِ پرونده بالا می‌رود (market-public-v2.json). سرور: server/test/public-views.test.js و server/src/lib/public-views.js؛ core: MarketContractTest.kt. inputs = ورودیِ سازنده‌های سرور (با فیلدهای داخلی که نباید بیرون بیایند)، samples = نمای عمومیِ همان.",
+  "schemaVersion": 1,
+  "fields": {
+    "shop": [
+      "slug",
+      "title",
+      "tagline",
+      "contactPhone",
+      "accent",
+      "status",
+      "fulfillment",
+      "deliveryFeeMinor",
+      "minOrderMinor",
+      "currency",
+      "payment",
+      "categories",
+      "delivery?"
+    ],
+    "presence": [
+      "badge",
+      "mode",
+      "declaredUntil",
+      "connection",
+      "lastConfirmedAt",
+      "orderAcceptance",
+      "timezone",
+      "localTime",
+      "hoursSet",
+      "holiday",
+      "today",
+      "notice"
+    ],
+    "cardPresence": [
+      "badge",
+      "declaredUntil",
+      "connection",
+      "lastConfirmedAt",
+      "orderAcceptance",
+      "timezone",
+      "localTime",
+      "hoursSet",
+      "holiday",
+      "today",
+      "notice"
+    ],
+    "shopCard": [
+      "slug",
+      "title",
+      "tagline",
+      "accent",
+      "category",
+      "categoryLabel",
+      "area",
+      "status",
+      "fulfillment",
+      "deliveryFeeMinor",
+      "minOrderMinor",
+      "currency",
+      "productCount",
+      "distanceKm",
+      "isNew",
+      "cover?"
+    ],
+    "shopRef": [
+      "slug",
+      "title",
+      "accent",
+      "badge",
+      "orderAcceptance",
+      "distanceKm"
+    ],
+    "product": [
+      "id",
+      "name",
+      "unit",
+      "category",
+      "priceMinor",
+      "maxQtyMilli",
+      "photo",
+      "stock",
+      "description?",
+      "specs?"
+    ],
+    "marketProduct": [
+      "id",
+      "name",
+      "unit",
+      "category",
+      "priceMinor",
+      "regularPriceMinor?",
+      "maxQtyMilli",
+      "photo",
+      "stock",
+      "shop"
+    ],
+    "searchProduct": [
+      "id",
+      "name",
+      "unit",
+      "category",
+      "priceMinor",
+      "photo",
+      "shop"
+    ],
+    "stock": [
+      "status",
+      "reason?",
+      "checkedAt?",
+      "unit?",
+      "prepMinutes?",
+      "sellableMilli?",
+      "readyMilli?",
+      "laterMilli?"
+    ],
+    "order": [
+      "token",
+      "orderNo",
+      "status",
+      "statusReason",
+      "fulfillment",
+      "paymentMethod",
+      "paymentStatus",
+      "currency",
+      "itemsCount",
+      "lines",
+      "subtotalMinor",
+      "discountMinor",
+      "deliveryFeeMinor",
+      "totalMinor",
+      "readyAt",
+      "scheduledFor",
+      "slotEndsAt",
+      "zoneName",
+      "createdAt",
+      "updatedAt",
+      "canCancel",
+      "timeline"
+    ],
+    "orderLine": [
+      "productId",
+      "name",
+      "unit",
+      "qtyMilli",
+      "unitPriceMinor",
+      "lineTotalMinor",
+      "note"
+    ],
+    "orderEvent": [
+      "status",
+      "at"
+    ],
+    "orderSummary": [
+      "orderNo",
+      "status",
+      "fulfillment?",
+      "totalMinor",
+      "itemsCount",
+      "createdAt",
+      "scheduledFor?",
+      "preview?",
+      "token",
+      "store?"
+    ],
+    "storeRef": [
+      "slug",
+      "title",
+      "accent"
+    ],
+    "reorderLine": [
+      "productId",
+      "name",
+      "unit",
+      "qtyMilli",
+      "previousPriceMinor",
+      "priceMinor",
+      "maxQtyMilli",
+      "available",
+      "reason",
+      "stock"
+    ],
+    "delivery": [
+      "status",
+      "mode"
+    ]
+  },
+  "inputs": {
+    "at": 1761800000000,
+    "lastSeenAt": 1761799940000,
+    "storefront": {
+      "shop_id": "shp_internal_do_not_publish",
+      "slug": "nan-o-namak",
+      "title": "نان و نمک",
+      "tagline": "کالای روزانه",
+      "contact_phone": "0700000001",
+      "accent": "#0f766e",
+      "accept_delivery": true,
+      "accept_pickup": true,
+      "delivery_fee_minor": "5000",
+      "min_order_minor": "20000",
+      "presence_mode": "auto",
+      "declared_until": null,
+      "timezone": "Asia/Kabul",
+      "notice": "جمعه‌ها از ساعتِ ۱۰",
+      "closed_dates": [],
+      "weekly_hours": {
+        "0": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "1": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "2": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "3": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "4": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "5": [
+          [
+            600,
+            1080
+          ]
+        ],
+        "6": [
+          [
+            480,
+            1200
+          ]
+        ]
+      },
+      "owner_phone": "0799999999"
+    },
+    "categories": [
+      "خوراکی",
+      "شوینده"
+    ],
+    "productRow": {
+      "id": "rice",
+      "online_price_minor": null,
+      "max_qty_milli": "5000",
+      "has_photo": true,
+      "data": {
+        "name": "برنج",
+        "unit": "کیلو",
+        "category": "خوراکی",
+        "salePrice": 120,
+        "costPrice": 90,
+        "note": "یادداشتِ داخلی"
+      }
+    },
+    "order": {
+      "id": "01JBXQ5Z0000000000000000AB",
+      "shopId": "shp_internal_do_not_publish",
+      "customerPhone": "0791112233",
+      "customerName": "مشتری",
+      "address": {
+        "text": "نشانیِ کامل",
+        "lat": 34.5312,
+        "lng": 69.1661,
+        "zone": {
+          "id": "z1",
+          "name": "شهرِ نو"
+        }
+      },
+      "orderNo": 42,
+      "status": "accepted",
+      "statusReason": "",
+      "fulfillment": "delivery",
+      "paymentMethod": "cod",
+      "paymentStatus": "unpaid",
+      "currency": "AFN",
+      "itemsCount": 2,
+      "subtotalMinor": 36000,
+      "discountMinor": 0,
+      "deliveryFeeMinor": 5000,
+      "totalMinor": 41000,
+      "readyAt": null,
+      "scheduledFor": null,
+      "delivery": {
+        "slot": {
+          "endsAt": "1761807200000"
+        }
+      },
+      "createdAt": 1761799400000,
+      "updatedAt": 1761799700000,
+      "staffNote": "یادداشتِ کارمند",
+      "acceptedBy": "usr_internal",
+      "lines": [
+        {
+          "lineNo": 1,
+          "productId": "rice",
+          "name": "برنج",
+          "unit": "کیلو",
+          "qtyMilli": 2000,
+          "unitPriceMinor": 12000,
+          "lineTotalMinor": 24000,
+          "note": "",
+          "costMinor": 9000
+        },
+        {
+          "lineNo": 2,
+          "productId": "oil",
+          "name": "روغن",
+          "unit": "دانه",
+          "qtyMilli": 1000,
+          "unitPriceMinor": 12000,
+          "lineTotalMinor": 12000,
+          "note": "بزرگ"
+        }
+      ],
+      "events": [
+        {
+          "kind": "created",
+          "toStatus": "new",
+          "at": 1761799400000,
+          "actorId": ""
+        },
+        {
+          "kind": "note",
+          "toStatus": null,
+          "at": 1761799500000,
+          "actorId": "usr_internal"
+        },
+        {
+          "kind": "status",
+          "toStatus": "accepted",
+          "at": 1761799700000,
+          "actorId": "usr_internal"
+        }
+      ]
+    },
+    "orderToken": "01JBXQ5Z0000000000000000AB.abcdefghijklmnopqrstuvwxyz012345"
+  },
+  "samples": {
+    "shop": {
+      "slug": "nan-o-namak",
+      "title": "نان و نمک",
+      "tagline": "کالای روزانه",
+      "contactPhone": "0700000001",
+      "accent": "#0f766e",
+      "status": {
+        "badge": "open_online",
+        "mode": "auto",
+        "declaredUntil": null,
+        "connection": "confirmed",
+        "lastConfirmedAt": 1761799940000,
+        "orderAcceptance": "accepting",
+        "timezone": "Asia/Kabul",
+        "localTime": "09:23",
+        "hoursSet": true,
+        "holiday": false,
+        "today": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "notice": "جمعه‌ها از ساعتِ ۱۰"
+      },
+      "fulfillment": {
+        "delivery": true,
+        "pickup": true
+      },
+      "deliveryFeeMinor": 5000,
+      "minOrderMinor": 20000,
+      "currency": "AFN",
+      "payment": {
+        "methods": [
+          "cod"
+        ],
+        "online": {
+          "available": false,
+          "decision": "D-08"
+        }
+      },
+      "categories": [
+        "خوراکی",
+        "شوینده"
+      ]
+    },
+    "presence": {
+      "badge": "open_online",
+      "mode": "auto",
+      "declaredUntil": null,
+      "connection": "confirmed",
+      "lastConfirmedAt": 1761799940000,
+      "orderAcceptance": "accepting",
+      "timezone": "Asia/Kabul",
+      "localTime": "09:23",
+      "hoursSet": true,
+      "holiday": false,
+      "today": [
+        [
+          480,
+          1200
+        ]
+      ],
+      "notice": "جمعه‌ها از ساعتِ ۱۰"
+    },
+    "product": {
+      "id": "rice",
+      "name": "برنج",
+      "unit": "کیلو",
+      "category": "خوراکی",
+      "priceMinor": 12000,
+      "maxQtyMilli": 5000,
+      "photo": true,
+      "stock": {
+        "status": "unverified",
+        "checkedAt": null
+      }
+    },
+    "productDetail": {
+      "id": "rice",
+      "name": "برنج",
+      "unit": "کیلو",
+      "category": "خوراکی",
+      "priceMinor": 12000,
+      "maxQtyMilli": 5000,
+      "photo": true,
+      "stock": {
+        "status": "unverified",
+        "checkedAt": null
+      },
+      "description": "برنجِ دانه‌بلند",
+      "specs": [
+        {
+          "name": "وزن",
+          "value": "۱ کیلو"
+        }
+      ]
+    },
+    "shopCard": {
+      "slug": "nan-o-namak",
+      "title": "نان و نمک",
+      "tagline": "کالای روزانه",
+      "accent": "#0f766e",
+      "category": "grocery",
+      "categoryLabel": "سوپرمارکت و خواربار",
+      "area": "شهرِ نو",
+      "status": {
+        "badge": "open_online",
+        "declaredUntil": null,
+        "connection": "confirmed",
+        "lastConfirmedAt": 1761799940000,
+        "orderAcceptance": "accepting",
+        "timezone": "Asia/Kabul",
+        "localTime": "09:23",
+        "hoursSet": true,
+        "holiday": false,
+        "today": [
+          [
+            480,
+            1200
+          ]
+        ],
+        "notice": "جمعه‌ها از ساعتِ ۱۰"
+      },
+      "fulfillment": {
+        "delivery": true,
+        "pickup": true
+      },
+      "deliveryFeeMinor": 5000,
+      "minOrderMinor": 20000,
+      "currency": "AFN",
+      "productCount": 2,
+      "distanceKm": 1.5,
+      "isNew": true,
+      "cover": "rice"
+    },
+    "marketProduct": {
+      "id": "oil",
+      "name": "روغن",
+      "unit": "دانه",
+      "category": "خوراکی",
+      "priceMinor": 12000,
+      "regularPriceMinor": 30000,
+      "maxQtyMilli": null,
+      "photo": false,
+      "stock": {
+        "status": "in_stock",
+        "checkedAt": 1761799880000,
+        "unit": "دانه"
+      },
+      "shop": {
+        "slug": "nan-o-namak",
+        "title": "نان و نمک",
+        "accent": "#0f766e",
+        "badge": "open_online",
+        "orderAcceptance": "accepting",
+        "distanceKm": 1.5
+      }
+    },
+    "searchProduct": {
+      "id": "rice",
+      "name": "برنج",
+      "unit": "کیلو",
+      "category": "خوراکی",
+      "priceMinor": 12000,
+      "photo": true,
+      "shop": {
+        "slug": "nan-o-namak",
+        "title": "نان و نمک",
+        "accent": "#0f766e",
+        "badge": "open_online",
+        "orderAcceptance": "accepting",
+        "distanceKm": null
+      }
+    },
+    "stock": [
+      {
+        "status": "unverified",
+        "checkedAt": null
+      },
+      {
+        "status": "unverified",
+        "reason": "stale",
+        "checkedAt": 1761796400000
+      },
+      {
+        "status": "unavailable"
+      },
+      {
+        "status": "in_stock",
+        "checkedAt": 1761799880000,
+        "unit": "کیلو"
+      },
+      {
+        "status": "in_warehouse",
+        "checkedAt": 1761799880000,
+        "unit": "کیلو",
+        "prepMinutes": 30
+      },
+      {
+        "status": "out_of_stock",
+        "checkedAt": 1761799880000,
+        "unit": "کیلو",
+        "sellableMilli": 0,
+        "readyMilli": 0,
+        "laterMilli": 0
+      }
+    ],
+    "order": {
+      "token": "01JBXQ5Z0000000000000000AB.abcdefghijklmnopqrstuvwxyz012345",
+      "orderNo": 42,
+      "status": "accepted",
+      "statusReason": "",
+      "fulfillment": "delivery",
+      "paymentMethod": "cod",
+      "paymentStatus": "unpaid",
+      "currency": "AFN",
+      "itemsCount": 2,
+      "lines": [
+        {
+          "productId": "rice",
+          "name": "برنج",
+          "unit": "کیلو",
+          "qtyMilli": 2000,
+          "unitPriceMinor": 12000,
+          "lineTotalMinor": 24000,
+          "note": ""
+        },
+        {
+          "productId": "oil",
+          "name": "روغن",
+          "unit": "دانه",
+          "qtyMilli": 1000,
+          "unitPriceMinor": 12000,
+          "lineTotalMinor": 12000,
+          "note": "بزرگ"
+        }
+      ],
+      "subtotalMinor": 36000,
+      "discountMinor": 0,
+      "deliveryFeeMinor": 5000,
+      "totalMinor": 41000,
+      "readyAt": null,
+      "scheduledFor": null,
+      "slotEndsAt": 1761807200000,
+      "zoneName": "شهرِ نو",
+      "createdAt": 1761799400000,
+      "updatedAt": 1761799700000,
+      "canCancel": false,
+      "timeline": [
+        {
+          "status": "new",
+          "at": 1761799400000
+        },
+        {
+          "status": "accepted",
+          "at": 1761799700000
+        }
+      ]
+    },
+    "orderSummary": [
+      {
+        "orderNo": 42,
+        "status": "accepted",
+        "totalMinor": 41000,
+        "itemsCount": 2,
+        "createdAt": 1761799400000,
+        "token": "01JBXQ5Z0000000000000000AB.abcdefghijklmnopqrstuvwxyz012345"
+      },
+      {
+        "orderNo": 42,
+        "status": "accepted",
+        "fulfillment": "delivery",
+        "totalMinor": 41000,
+        "itemsCount": 2,
+        "createdAt": 1761799400000,
+        "scheduledFor": null,
+        "preview": [
+          "برنج",
+          "روغن"
+        ],
+        "token": "01JBXQ5Z0000000000000000AB.abcdefghijklmnopqrstuvwxyz012345"
+      },
+      {
+        "orderNo": 42,
+        "status": "accepted",
+        "totalMinor": 41000,
+        "itemsCount": 2,
+        "fulfillment": "delivery",
+        "createdAt": 1761799400000,
+        "token": "01JBXQ5Z0000000000000000AB.abcdefghijklmnopqrstuvwxyz012345",
+        "store": {
+          "slug": "nan-o-namak",
+          "title": "نان و نمک",
+          "accent": "#0f766e"
+        }
+      }
+    ],
+    "reorderLine": [
+      {
+        "productId": "rice",
+        "name": "برنج",
+        "unit": "کیلو",
+        "qtyMilli": 2000,
+        "previousPriceMinor": 11000,
+        "priceMinor": 12000,
+        "maxQtyMilli": 5000,
+        "available": true,
+        "reason": "",
+        "stock": {
+          "status": "unverified",
+          "checkedAt": null
+        }
+      },
+      {
+        "productId": "soap",
+        "name": "صابون",
+        "unit": "دانه",
+        "qtyMilli": 1000,
+        "previousPriceMinor": 4000,
+        "priceMinor": null,
+        "maxQtyMilli": null,
+        "available": false,
+        "reason": "not_in_store",
+        "stock": null
+      }
+    ],
+    "delivery": {
+      "status": "picked_up",
+      "mode": "shop_courier"
+    }
+  }
+}
