@@ -97,6 +97,16 @@ async function planIn(c, shopId, settings, ids, at) {
   return { held: await heldOf(c, shopId, ids, at), ttlSec: await ttlSecOf(c, shopId) };
 }
 
+/**
+ * سنجشِ سفارش (`catalog.checkOrder`): پرچمِ رزرو خاموش یا موجودیِ کهنه ⇒ همان `stock.check` ِ امروز؛
+ * وگرنه رزروِ فعالِ دیگران هم از آزاد کم می‌شود و `hold` برای `orders.create` برمی‌گردد.
+ */
+async function checkOrderIn(c, shopId, { lines, settings, names, at }) {
+  const plan = await planIn(c, shopId, settings, [...new Set(lines.map((l) => l.productId))], at);
+  const out = await stock.check(c, shopId, { lines, settings, names, held: plan ? plan.held : null });
+  return plan ? { ...out, hold: { lines, ttlSec: plan.ttlSec } } : out;
+}
+
 /** پس از درجِ سفارش، در همان تراکنش و زیرِ همان قفل: یک رزرو برای هر قلمِ کالادار. */
 async function holdIn(c, shopId, { orderId, lines, ttlSec, at }) {
   const expires = at + ttlSec * 1000;
@@ -278,6 +288,6 @@ function stop() {
 
 module.exports = {
   DEFAULT_TTL_SEC, RELEASE_ON,
-  enabled, ttlSecOf, heldOf, expireDueIn, planIn, holdIn, onTransitionIn, recheckShort, afterMovesIn,
+  enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, onTransitionIn, recheckShort, afterMovesIn,
   orderView, sweep, start, stop,
 };

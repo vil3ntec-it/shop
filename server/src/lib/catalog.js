@@ -15,8 +15,6 @@
  *              می‌کند نه کم**. دکان کالا را از برنامهٔ خودش تحویل می‌دهد و همان‌جا یک
  *              فروشِ عادی (با `orderId`) ثبت می‌شود؛ این کاتالوگ فقط دفترِ همگام‌شدهٔ
  *              دستگاه‌ها را می‌خواند. ساختِ سفارش فقط می‌سنجد (`checkOrder`، بی نوشتن).
- *              استثنا (M5، تصمیمِ صاحب محصول ۱۴۰۵/۰۸/۰۸): با پرچمِ خاموشِ `shop.stock_reserve` و
- *              موجودیِ تازه، رزروِ «نرم» با انقضا (`lib/stock-reserve.js`).
  *   نمایش ──── «در قفسه» / «در انبار، آماده‌سازی لازم» / «تمام شده» /
  *              «در حال بررسی» / «قابلِ سفارش نیست» — موجودیِ نامعلوم یا کهنه
  *              هرگز «موجود» نیست (INV-02، INV-14).
@@ -31,7 +29,7 @@ const { toMinor, toMilli } = require('./sync-v3-convert');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
-const reserve = () => require('./stock-reserve');
+const reserve = () => require('./stock-reserve');   // M5: رزروِ نرم (موجودیِ آزاد = دفتر − رزروِ فعال)
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
 const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems'];
 const PAGE = 5000;
@@ -414,8 +412,7 @@ async function retireOrderStock(c, shopId, at) {
   const tasks = await c.query(
     `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
             note=$3
-      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')
-        AND dedupe NOT LIKE 'soft-short:%'`, [shopId, at, RETIRED_NOTE]
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed') AND dedupe NOT LIKE 'soft-short:%'`, [shopId, at, RETIRED_NOTE]
   );
   const undone = sold.length - keptWithW;
   const dismissed = tasks.rowCount || 0;
@@ -526,10 +523,8 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids),
-    reserve().heldOf(null, shopId, ids, at)]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), reserve().heldOf(null, shopId, ids, at)]);
   const out = new Map();
-  //  دفترِ همگام‌شدهٔ دستگاه‌ها − رزروِ نرمِ فعال (M5؛ بی رزرو ⇒ صفر، همان رفتارِ پیشین)
   for (const id of ids) {
     out.set(id, badgeOf(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr, settings.showQty === 'exact'));
   }
@@ -590,8 +585,7 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page),
-    reserve().heldOf(null, shopId, page)]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page)]);
   const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
   const last = items[items.length - 1];
   return {
@@ -611,8 +605,7 @@ async function detail(shopId, productId) {
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  const held = (await reserve().heldOf(null, shopId, [id])).get(id) || 0;
-  return { product: productView(p, lv, held, settings, fr), lowByLocation: lows, freshness: fr };
+  return { product: productView(p, lv, (await reserve().heldOf(null, shopId, [id])).get(id) || 0, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
 function moveView(r) {
@@ -899,9 +892,7 @@ async function toStockLines(c, shopId, lines) {
  * **فقط سنجیده** می‌شوند — کالای ناموجود/غیرفعال/حذف‌شده (`product_unavailable`)، واحدِ
  * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
  * ⛔ هیچ رزرو، هیچ حرکت و هیچ نوشتنی (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل
- * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null.
- * استثنای M5: با `shop.stock_reserve` و موجودیِ تازه، `hold` برمی‌گردد و `orders.create` پس از درجِ
- * سفارش رزروِ نرم می‌نویسد (`lib/stock-reserve.js`).
+ * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null. M5 (`lib/stock-reserve.js`) ⇒ `hold`.
  */
 async function checkOrder(c, shopId, { lines, isTest = false, at = now() }) {
   if (isTest) return null;
@@ -910,10 +901,7 @@ async function checkOrder(c, shopId, { lines, isTest = false, at = now() }) {
   if (!(await stock.flagOf(shopId, c))) return null;
   const settings = await stock.settingsOf(shopId, c);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  //  M5: رزروِ نرم روشن و موجودی تازه ⇒ زیرِ قفلِ موجودی، رزروِ دیگران از آزاد کم می‌شود
-  const plan = await require('./stock-reserve').planIn(c, shopId, settings, [...new Set(sl.map((l) => l.productId))], at);
-  const out = await stock.check(c, shopId, { lines: sl, settings, names, held: plan ? plan.held : null });
-  return plan ? { ...out, hold: { lines: sl, ttlSec: plan.ttlSec } } : out;
+  return reserve().checkOrderIn(c, shopId, { lines: sl, settings, names, at });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */
