@@ -59,19 +59,15 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
     return cachedDropped
   }
 
+  /**
+   *  ⛔ **هیچ سقفی که کهنه‌ترین‌ها را دور بریزد نیست** (`core/…/core/sync/OpBacklog.kt`): پیش‌تر بالای
+   *  ۵۰٬۰۰۰ op کهنه‌ترین‌ها `queue_overflow` می‌شدند و هرگز به سرور نمی‌رسیدند. صفِ بزرگ با پیامِ
+   *  `OpBacklog.warning` دیده می‌شود؛ حافظهٔ پر ⇒ نوشتن پرتاب می‌کند (`update`) و تغییر روی دفتر می‌ماند
+   *  تا ثبتِ بعدی، با پیامِ «حافظه پر است» (`SyncV1Engine.record`).
+   */
   fun push(ops: List<SyncOp>) {
     if (ops.isEmpty()) return
-    update { current ->
-      val list = current.toMutableList()
-      list += ops.map { it.toJson() }
-      if (list.size > MAX) {
-        //  سقفِ ایمنی. کهنه‌ترین می‌رود **و ثبت می‌شود**، نه بی‌صدا.
-        val cut = list.subList(0, list.size - MAX).toList()
-        repeat(cut.size) { list.removeAt(0) }
-        dropRaw(cut, "queue_overflow")
-      }
-      list
-    }
+    update { current -> current + ops.map { it.toJson() } }
   }
 
   /**
@@ -195,7 +191,6 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
       accountKey.map { if (it.isLetterOrDigit()) it else '_' }
         .joinToString("").take(48).ifBlank { "anon" }
 
-    const val MAX = 50_000
     const val MAX_OPS = 200
     const val MAX_BYTES = 256 * 1024
 
