@@ -11,7 +11,7 @@
  *      منتشرشده و با پیوندِ خودِ دکان.
  *   ۴) دستهٔ سراسری = نگاشتِ صاحب دکان، وگرنه دستهٔ خودِ دکان؛ کلیدِ ناشناخته رد.
  *   ۵) کاتالوگِ واحد اگر ردیف دارد مقدم است.
- *   ۶) مهاجرتِ ۱۲۲: برگشت (rollback) و اجرای دوباره.
+ *   ۶) مهاجرتِ ۱۳۰: برگشت (rollback) و اجرای دوباره.
  */
 process.env.MARKET_GATE_CACHE_MS = '0';
 process.env.MARKET_ELIGIBLE_CACHE_MS = '0';
@@ -234,7 +234,7 @@ test('کاتالوگِ واحد اگر ردیف دارد مقدم است (هما
   }
 });
 
-test('مهاجرتِ ۱۲۲: برگشت ستون‌ها را برمی‌دارد و اجرای دوباره برمی‌گرداند', async () => {
+test('مهاجرتِ ۱۳۰: برگشت ستون‌ها را برمی‌دارد و اجرای دوباره برمی‌گرداند', async () => {
   const cols = async () => (await many(
     `SELECT table_name || '.' || column_name AS c FROM information_schema.columns
       WHERE (table_name = 'market_search' AND column_name IN ('brand_norm','barcodes','bank_product_id'))
@@ -242,10 +242,10 @@ test('مهاجرتِ ۱۲۲: برگشت ستون‌ها را برمی‌دارد
   )).map((r) => r.c);
   const all = ['market_listings.category_map', 'market_search.bank_product_id', 'market_search.barcodes', 'market_search.brand_norm'];
   assert.deepEqual(await cols(), all);
-  const down = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '122_market_product_details.down.sql'), 'utf8');
+  const down = fs.readFileSync(path.join(__dirname, '..', 'migrations', 'rollback', '130_market_product_details.down.sql'), 'utf8');
   await query(down);
   assert.deepEqual(await cols(), []);
-  assert.equal(await one("SELECT 1 FROM schema_migrations WHERE version = '122_market_product_details.sql'"), null);
+  assert.equal(await one("SELECT 1 FROM schema_migrations WHERE version = '130_market_product_details.sql'"), null);
   await require('../src/migrate').run();
   assert.deepEqual(await cols(), all);
   const search = await h.get(`/api/market/search?q=${q('شکر')}`);
