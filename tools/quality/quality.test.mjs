@@ -73,6 +73,18 @@ test('helper detectors: real declarations count, comments and look-alikes do not
   assert.equal(hits('secret-derivation', 'if (!config.secrets.api || config.secrets.api.length < 24) {}'), 0);
   assert.equal(hits('express-wrap',
     "const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);\nrouter.get('/', wrap(h));"), 1);
+  //  هر نامی و هر شکلی از همان پوشاننده؛ `.catch(next)` ِ تنهای یک فراخوانی نه
+  assert.equal(hits('express-wrap', [
+    'const w = (f) => (req, res, next) => Promise.resolve(f(req, res, next)).catch(next);',
+    'const aw = (h) => async (q, s, n) => h(q, s, n).catch(n);',
+    'function asyncHandler(handler) { return function (req, res, next) { return Promise.resolve(handler(req, res, next)).catch(next); }; }',
+    'function ah(h) { return (req, res, next) => { h(req, res, next).catch(next); }; }',
+  ].join('\n')), 4);
+  assert.equal(hits('express-wrap', [
+    "app.get('/store/:slug', (req, res, next) => storePage(req.params.slug, res).catch(next));",
+    '(async () => { await x(); })().catch(next);',
+    'const f = (x) => (a, b, c) => g(x).catch(c);',
+  ].join('\n')), 0);
 });
 
 test("product literals: comparisons and case labels count, plain values do not", () => {
