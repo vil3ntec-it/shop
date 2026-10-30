@@ -1200,6 +1200,20 @@ function isActive(data) {
   return String(d.active ?? 'true') !== 'false';
 }
 
+/**
+ * ردیف‌های دفترِ کالا برای نوشتنِ ویترین (انتشارِ تکی و گروهی) — از همان منبعی که ویترین
+ * می‌خواند: پرچمِ S1 روشن ⇒ کاتالوگِ واحد، که همین‌جا و بیرون از تراکنشِ نوشتن بی مهلت
+ * تازه می‌شود (دکانِ v3 هم پیدا می‌شود)؛ وگرنه `sync_rows` ِ همیشگی. `$1` = شناسهٔ دکان.
+ * ⇒ { from, where } با نامِ مستعارِ `r` (`row_id`، `data`)؛ حذف‌شده‌ها بیرون.
+ */
+async function ledgerSource(shopId) {
+  if (!(await catalogOn())) {
+    return { from: 'sync_rows r', where: `${SHOP_ROWS} AND r.account_id = $1 AND r.deleted_at IS NULL` };
+  }
+  await fillCatalog(shopId, { strict: true });
+  return { from: `${CATALOG_ROWS} r`, where: 'r.account_id = $1 AND r.deleted_at IS NULL' };
+}
+
 /** گذاشتن یا برداشتنِ یک کالا از ویترین. */
 async function setProduct(shopId, productId, body, userId) {
   const id = String(productId || '');
@@ -1217,14 +1231,8 @@ async function setProduct(shopId, productId, body, userId) {
     if (!Array.isArray(b.specs) || b.specs.length > 20) throw badRequest('حداکثر ۲۰ مشخصه', 'bad_specs');
     specs = specsOf(b.specs);
   }
-  const fromCatalog = await catalogOn();
-  if (fromCatalog) await fillCatalog(shopId, { strict: true });
-  const exists = await one(
-    fromCatalog
-      ? 'SELECT 1 FROM catalog_products WHERE shop_id = $1 AND product_id = $2 AND NOT deleted'
-      : `SELECT 1 FROM sync_rows r WHERE ${SHOP_ROWS} AND r.account_id = $1 AND r.row_id = $2 AND r.deleted_at IS NULL`,
-    [shopId, id]
-  );
+  const src = await ledgerSource(shopId);
+  const exists = await one(`SELECT 1 FROM ${src.from} WHERE ${src.where} AND r.row_id = $2`, [shopId, id]);
   if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
   const at = now();
   const row = await one(
@@ -1334,6 +1342,8 @@ async function setProducts(shopId, body, userId, idem) {
   const items = parseBulk(body);
   const prior = await idempotency.find(idem);
   if (prior) return { ...prior.response, replayed: true };
+  //  همان منبعِ ویترین (S1: کاتالوگِ واحد، پیش از تراکنش تازه) — نه همیشه `sync_rows`
+  const src = await ledgerSource(shopId);
   const at = now();
   return tx(async (c) => {
     await idempotency.lock(c, idem);
@@ -1341,8 +1351,7 @@ async function setProducts(shopId, body, userId, idem) {
     if (again) return { ...again.response, replayed: true };
     const ids = items.map((i) => i.productId);
     const rows = (await c.query(
-      `SELECT r.row_id AS id, r.data FROM sync_rows r
-        WHERE ${SHOP_ROWS} AND r.account_id = $1 AND r.row_id = ANY($2::text[]) AND r.deleted_at IS NULL`,
+      `SELECT r.row_id AS id, r.data FROM ${src.from} WHERE ${src.where} AND r.row_id = ANY($2::text[])`,
       [shopId, ids]
     )).rows;
     const byId = new Map(rows.map((r) => [r.id, r]));
