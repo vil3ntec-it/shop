@@ -27,6 +27,7 @@ const { entitlementOf } = require('../lib/entitlement').pump;
 const { badRequest, notFound } = require('../middleware/errors');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { reasonOf } = require('../lib/admin-access');
+const { clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 const PUMP = catalogOf('pump');
@@ -134,6 +135,11 @@ router.get('/stations/:id', async (req, res, next) => {
     const id = v.id(req.params.id);
     const st = await one('SELECT * FROM stations WHERE id=$1', [id]);
     if (!st) return next(notFound('پمپ پیدا نشد', 'station_not_found'));
+    //  TEN-04: همتای `admin.shop_viewed` — پروندهٔ پمپ (اعضا، دستگاه‌ها، کدِ کارمندان) سابقه دارد
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.station_viewed',
+      targetType: 'station', targetId: id, ip: clientIp(req), detail: { tenantId: id },
+    });
     const ent = await entitlementOf(id);
     const files = await many(
       `SELECT path, rev, size, updated_at FROM station_files
@@ -173,6 +179,11 @@ router.get('/stations/:id/events', async (req, res, next) => {
     const id = v.id(req.params.id);
     const st = await one('SELECT id FROM stations WHERE id=$1', [id]);
     if (!st) return next(notFound('پمپ پیدا نشد', 'station_not_found'));
+    //  TEN-04: خبرهای کارِ یک پمپ (مخزن، قرض، شیفت) دادهٔ همان حساب است
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, action: 'admin.station_events_viewed',
+      targetType: 'station', targetId: id, ip: clientIp(req), detail: { tenantId: id },
+    });
     res.json({
       events: await require('../lib/events').pump.list(id, {
         limit: v.integer(req.query?.limit, { min: 1, max: 200, def: 50 }),

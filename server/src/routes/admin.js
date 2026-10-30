@@ -195,6 +195,8 @@ router.get('/users/:id/delete-preview', async (req, res, next) => {
   const id = v.id(req.params.id);
   const out = await require('../lib/user-delete').preview(id);
   if (!out) return next(notFound('کاربر پیدا نشد'));
+  //  TEN-04: پیش‌نمایش همهٔ دادهٔ یک حساب را می‌شمارد — مثلِ پروندهٔ کاربر، سابقه دارد
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_delete_previewed', targetType: 'user', targetId: id, ip: clientIp(req) });
   res.json(out);
 });
 
