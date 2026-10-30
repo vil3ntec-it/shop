@@ -60,7 +60,7 @@ fun WarehouseScreen(
   /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
   onStockBook: () -> Unit = {},
 ) {
-  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }

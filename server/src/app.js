@@ -333,6 +333,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/courier', require('./routes/courier'));
     //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
     api.use('/shop/promos', require('./routes/shop-promos'));
+    //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
+    api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.

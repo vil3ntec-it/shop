@@ -7,7 +7,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -47,6 +49,11 @@ class StockWiringTest {
     SalesEngine.record(d, lines.toList(), SalesEngine.Checkout(), today, now, ::newId)
 
   private val wire = Json { encodeDefaults = true }
+
+  //  پرچمِ سرورِ `shop.stock_v2` در این آزمون‌ها روشن است؛ «خاموش» یعنی بی ردیفِ `stock_mode`.
+  //  آزمون‌های `flagOff_*` پایین خودشان آن را خاموش می‌کنند.
+  @Before fun flagOn() { StockLedger.serverFlag = true }
+  @After fun flagReset() { StockLedger.serverFlag = false }
 
   /* ============================== خاموش ============================== */
 
@@ -99,6 +106,37 @@ class StockWiringTest {
         "purchaseId", "createdAt", "expiryDate", "batch", "productionDate"),
       keys,
     )
+  }
+
+  /* ====== پرچمِ سرور خاموش: حتی با `stock_mode=on` همان رفتارِ امروز (RULES، «⛔ استثنا») ====== */
+
+  @Test
+  fun flagOff_modeOnRowStillRunsTodaysEngine() {
+    StockLedger.serverFlag = false
+    val d = on()
+    assertTrue(StockLedger.modeOn(d))
+    assertFalse(StockLedger.isOn(d))
+    //  قیمتِ خریدِ آخر (نه میانگینِ ۱۱۳٫۳۳)، بی سری و بی فیلدِ تازه روی قلم
+    val r = sell(d, SalesEngine.CartLine("p1", 3.0)) as SalesEngine.Result.Ok
+    val item = r.data.saleItems.single()
+    assertEquals(130.0, item.purchasePrice, 0.0)
+    assertNull(item.lotId)
+    assertNull(item.locationId)
+    //  سریِ منقضی مثلِ امروز فروخته می‌شود و کمبودِ «سالم» رد نمی‌شود
+    assertTrue(sell(d, SalesEngine.CartLine("p2", 8.0)) is SalesEngine.Result.Ok)
+    //  اسکنِ سری سرِ صندوق خاموش است (همان «بارکدِ ناشناس» ِ امروز)؛ با پرچم همان سری پیدا می‌شود
+    assertNull(StockActions.lotForCode(d, "NEW1"))
+    StockLedger.serverFlag = true
+    assertEquals("p2" to "NEW1", StockActions.lotForCode(d, "NEW1"))
+  }
+
+  @Test
+  fun flagOff_thenOn_sameLedgerSwitchesEngine() {
+    val d = on()
+    StockLedger.serverFlag = false
+    assertEquals(130.0, (sell(d, SalesEngine.CartLine("p1", 3.0)) as SalesEngine.Result.Ok).data.saleItems.single().purchasePrice, 0.0)
+    StockLedger.serverFlag = true
+    assertEquals(113.33, (sell(d, SalesEngine.CartLine("p1", 3.0)) as SalesEngine.Result.Ok).data.saleItems.single().purchasePrice, 0.0)
   }
 
   /* ============================== روشن ============================== */
@@ -379,12 +417,17 @@ class StockWiringTest {
       items += SaleItem(id = "bi$k", saleId = "bs${k / 4}", productId = "b${k % 400}", quantity = 1.0)
     }
     val d = on(base.copy(products = base.products + products, warehouseEntries = base.warehouseEntries + entries, sales = sales, saleItems = items))
-    assertTrue(StockLedger.events(d, setOf("b7")).all { it.productId == "b7" })
-    repeat(2) { sell(d, SalesEngine.CartLine("b7", 1.0)) }
+    //  شمارِ کار، نه زمانِ دیواری: سنجشِ سبدِ یک‌قلمی فقط رویدادهای همان کالا را می‌دواند —
+    //  ۱ ورود + ۲۰۰ قلمِ فروش از ۸۰۴۰۰ رویدادِ کلِ دفتر
+    val only = StockLedger.events(d, setOf("b7"))
+    assertTrue(only.all { it.productId == "b7" })
+    assertEquals(1 + 80_000 / 400, only.size)
+    assertEquals(400 + 80_000, StockLedger.events(d, products.map { it.id }.toSet()).size)
+    //  تورِ ایمنیِ گشاد فقط برای انفجارِ مرتبهٔ دوم (نه سنجشِ سرعت؛ CI ِ کند را سرخ نمی‌کند)
     val t0 = System.nanoTime()
-    repeat(5) { assertTrue(sell(d, SalesEngine.CartLine("b7", 1.0)) is SalesEngine.Result.Ok) }
-    val ms = (System.nanoTime() - t0) / 1_000_000 / 5
-    assertTrue("ثبتِ یک فروش روی دفترِ بزرگ $ms ms طول کشید", ms < 1500)
+    repeat(3) { assertTrue(sell(d, SalesEngine.CartLine("b7", 1.0)) is SalesEngine.Result.Ok) }
+    val ms = (System.nanoTime() - t0) / 1_000_000 / 3
+    assertTrue("ثبتِ یک فروش روی دفترِ بزرگ $ms ms طول کشید", ms < 15_000)
   }
 
   @Test

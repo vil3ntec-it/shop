@@ -385,7 +385,7 @@ private fun PurchaseDialog(
   onSave: (LedgerEngine.PurchaseDraft) -> Unit,
 ) {
   var productId by remember { mutableStateOf<String?>(null) }
-  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var landed by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
   var quantity by remember { mutableStateOf("") }

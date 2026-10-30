@@ -100,7 +100,7 @@ fun StockBookScreen(
 ) {
   val scope = rememberCoroutineScope()
   val context = LocalContext.current
-  val on = remember(d.auditLog) { StockLedger.isOn(d) }
+  val on = remember(d.auditLog, StockLedger.serverFlag) { StockLedger.isOn(d) }
   val user = remember(context) { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   fun save(next: ShopData, done: String) { scope.launch { store.save(next) }; toast(done) }
@@ -108,7 +108,7 @@ fun StockBookScreen(
   //  عکسِ CI: روشن کردن با همان راهِ کارتِ تنظیمات
   val shotEnable by StockBookNav.enable
   LaunchedEffect(shotEnable, on) {
-    if (shotEnable && !on) store.save(StockActions.setMode(d, true, user, todayIso(), System.currentTimeMillis(), ::newId))
+    if (shotEnable && !on && StockLedger.serverFlag) store.save(StockActions.setMode(d, true, user, todayIso(), System.currentTimeMillis(), ::newId))
   }
 
   if (!on) {
@@ -117,10 +117,12 @@ fun StockBookScreen(
         Text("موتورِ تازهٔ موجودی و بها خاموش است", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(6.dp))
         Text(
-          "بهای میانگینِ موزون، سری و انقضا، دفترِ حرکت، شمارش با بازبینی و انتقال بین محل‌ها با روشن کردنِ «موجودی و بهای تمام‌شده» در تنظیمات می‌آیند.",
+          if (StockLedger.serverFlag) "بهای میانگینِ موزون، سری و انقضا، دفترِ حرکت، شمارش با بازبینی و انتقال بین محل‌ها با روشن کردنِ «موجودی و بهای تمام‌شده» در تنظیمات می‌آیند."
+          else "این بخش هنوز برای دکانِ شما باز نشده است؛ انبار و فروش مثلِ همیشه کار می‌کنند.",
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
-        if (ShopRole.canOpenSettings(context)) {
+        //  پرچمِ `shop.stock_v2` خاموش ⇒ کارتِ تنظیمات پنهان است، پس دکمه‌اش هم نه
+        if (StockLedger.serverFlag && ShopRole.canOpenSettings(context)) {
           Spacer(Modifier.height(12.dp))
           Button(onClick = onSettings) { Text("رفتن به تنظیمات") }
         }
@@ -713,9 +715,11 @@ const val STOCK_SETTINGS_TITLE = "موجودی و بها"
  */
 @Composable
 fun StockModeSection(store: ShopStore, d: ShopData) {
+  //  پرچمِ `shop.stock_v2` خاموش ⇒ کارت اصلاً دیده نمی‌شود (RULES، «⛔ استثنا»)
+  if (!StockLedger.serverFlag) return
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val on = remember(d.auditLog) { StockLedger.isOn(d) }
+  val on = remember(d.auditLog) { StockLedger.modeOn(d) }
   val row = StockLedger.modeRow(d)
   var ask by remember { mutableStateOf<Boolean?>(null) }
   SettingsSection(
@@ -773,7 +777,7 @@ fun StockModeSection(store: ShopStore, d: ShopData) {
 /** فقط وقتی موتور روشن است: ارزش به بهای میانگین، وظیفه‌های باز و سری‌های منقضی؛ زدنِ هر کارت ⇐ «دفترِ موجودی» */
 @Composable
 fun StockStrip(d: ShopData, onOpen: () -> Unit) {
-  val on = remember(d.auditLog) { StockLedger.isOn(d) }
+  val on = remember(d.auditLog, StockLedger.serverFlag) { StockLedger.isOn(d) }
   if (!on) return
   val view by produceState<StockLedger.View?>(null, d) { value = withContext(Dispatchers.Default) { StockLedger.replay(d) } }
   val v = view ?: return

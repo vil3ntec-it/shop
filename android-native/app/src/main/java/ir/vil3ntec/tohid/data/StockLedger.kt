@@ -14,6 +14,7 @@ import ir.vil3ntec.tohid.core.calendar.CivilDays
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToLong
 
 /**
  *  پلِ دفترِ دکان ⇐ هستهٔ موجودی (`core/stock/StockCore`) — مشترکِ اندروید و کامپیوتر.
@@ -58,8 +59,10 @@ object StockLedger {
   )
   private val RANK = mapOf("entry" to 0, "transfer" to 1, "sale" to 2, "return" to 3)
 
-  fun milli(q: Double): Long = if (q.isFinite()) Math.round(q * 1000.0) else 0L
-  fun minor(a: Double?): Long = if (a != null && a.isFinite()) Math.round(a * 100.0) else 0L
+  //  kotlin.math (نه java.lang.Math) تا به core/commonMain برود (§۴۰.۳)؛ roundToLong همان نیم‌به‌بالا ِ Math.round است
+  private fun roundOr0(x: Double): Long = if (x.isFinite()) x.roundToLong() else 0L
+  fun milli(q: Double): Long = roundOr0(q * 1000.0)
+  fun minor(a: Double?): Long = if (a != null) roundOr0(a * 100.0) else 0L
 
   /*  بی java.time: اندرویدِ ۷ (minSdk ۲۴) آن را ندارد. روزِ JDNِ ۱۹۷۰-۰۱-۰۱ = ۲۴۴۰۵۸۸. */
   private const val EPOCH_JDN = 2_440_588
@@ -73,7 +76,7 @@ object StockLedger {
   }
 
   /** روزِ UTCِ یک لحظه، `yyyy-MM-dd` */
-  fun isoOf(ms: Long): String = CivilDays.isoOf((Math.floorDiv(ms, DAY_MS) + EPOCH_JDN).toInt())
+  fun isoOf(ms: Long): String = CivilDays.isoOf((ms.floorDiv(DAY_MS) + EPOCH_JDN).toInt())
 
   /** فاصلهٔ دو روزِ `yyyy-MM-dd` (b − a)؛ نادرست ⇒ null */
   fun daysBetween(a: String, b: String): Int? {
@@ -103,7 +106,18 @@ object StockLedger {
     return best
   }
 
-  fun isOn(d: ShopData): Boolean = modeRow(d)?.refId == "on"
+  /** فقط تنظیمِ دکان (ردیفِ `stock_mode`)، بی پرچمِ سرور — برای کارتِ تنظیمات و بردارها */
+  fun modeOn(d: ShopData): Boolean = modeRow(d)?.refId == "on"
+
+  /**
+   *  پرچمِ `shop.stock_v2` در `live_config` ِ سرور — **پیش‌فرض خاموش** (RULES، «⛔ استثنا»: رفتارِ تازهٔ
+   *  پول و موجودی در برنامهٔ نصب‌شده فقط پشتِ پرچم). `StockFlag` آن را برای دکانِ فعال می‌گذارد.
+   *  خاموش ⇒ حتی با `stock_mode=on` در دفتر، همه‌جا همان موتورِ امروز.
+   */
+  @Volatile var serverFlag: Boolean = false
+
+  /** موتورِ تازه فقط وقتی هم پرچمِ سرور و هم تنظیمِ دکان روشن‌اند */
+  fun isOn(d: ShopData): Boolean = serverFlag && modeOn(d)
 
   /* ==========================================================
      دفتر ⇐ رویدادها
@@ -202,7 +216,7 @@ object StockLedger {
       if (!w.isAdjustment && q > 0) {
         out += Event(
           id, "entry", "purchase_receipt", at, dayOf(w.date, at), w.productId, loc, q, user, ref,
-          costMinor = max(0L, Math.round(w.units * w.price * 100.0)),
+          costMinor = max(0L, roundOr0(w.units * w.price * 100.0)),
           landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
         )

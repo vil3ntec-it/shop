@@ -84,13 +84,13 @@ class StockLedgerVectorsTest {
   @Test
   fun modes() {
     val expect = vectors.getValue("expect").jsonObject
-    assertEquals(expect["on"]!!.jsonPrimitive.content.toBoolean(), StockLedger.isOn(shop))
+    assertEquals(expect["on"]!!.jsonPrimitive.content.toBoolean(), StockLedger.modeOn(shop))
     for (m in vectors.getValue("modes").jsonArray) {
       val o = m.jsonObject
       val d = ledger(JsonObject(mapOf("auditLog" to o.getValue("auditLog"))))
-      assertEquals(o["name"]!!.jsonPrimitive.content, o["on"]!!.jsonPrimitive.content.toBoolean(), StockLedger.isOn(d))
+      assertEquals(o["name"]!!.jsonPrimitive.content, o["on"]!!.jsonPrimitive.content.toBoolean(), StockLedger.modeOn(d))
     }
-    assertEquals(false, StockLedger.isOn(ShopData()))
+    assertEquals(false, StockLedger.modeOn(ShopData()))
   }
 
   @Test
@@ -217,7 +217,7 @@ class StockLedgerVectorsTest {
   @Test
   fun offByDefault() {
     val off = shop.copy(auditLog = emptyList())
-    assertEquals(false, StockLedger.isOn(off))
+    assertEquals(false, StockLedger.modeOn(off))
     val before = off.toString()
     StockLedger.checkCart(StockLedger.replay(off), listOf(StockLedger.Line("p1", 1000)), "2026-10-15")
     assertEquals(before, off.toString())

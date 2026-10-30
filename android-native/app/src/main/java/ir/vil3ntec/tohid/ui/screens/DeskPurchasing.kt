@@ -243,7 +243,7 @@ private fun NewPurchaseInvoice(
   var paid by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
   //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبیِ کلِ فاکتور (PUR-06) — روی بهای ردیف‌ها پخش می‌شود، نه بدهیِ تأمین‌کننده
-  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   var landed by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
   val lines = remember { mutableStateListOf(Draft()) }
