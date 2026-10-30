@@ -1,16 +1,18 @@
-package ir.vil3ntec.tohid.ui.screens
+package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.DebtorEngine
 
 /**
- *  منطقِ خالصِ صفحهٔ حسابِ یک قرض‌دار (`DebtorDetailScreen`) — بی Compose، زیرِ آزمون.
+ *  منطقِ خالصِ صفحهٔ حسابِ یک قرض‌دار (`DebtorLedgerScreen`) — بی Compose، زیرِ آزمون.
  *
  *  عددها همان `DebtorEngine.Account` است (مانده هیچ‌جا ذخیره نمی‌شود)؛ این‌جا فقط
  *  گروه‌بندیِ تراکنش‌ها زیرِ سرخطِ روز، پنهان کردنِ ردیفی که «حذف با برگرداندن» در
  *  انتظار دارد، کارهای کشو، و متن‌های آماده.
  */
-object DebtorDetailModel {
+object DebtorLedgerModel {
 
   /** یک روز در فهرست: سرخطِ چسبان و ردیف‌هایش، تازه‌ترین بالا */
   data class Day(val date: String, val rows: List<DebtTransaction>)
@@ -72,11 +74,41 @@ object DebtorDetailModel {
 
   /**
    *  متنِ آمادهٔ پیامک و واتساپ — نوشتنِ «سلام، … افغانی طلب دارید» برای هر
-   *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود.
+   *  مشتری، همان کاری است که فروشنده از انجامش طفره می‌رود. قالب همان `DebtReminder` (#330).
    */
   fun reminder(name: String, balance: Double): String =
-    if (balance > 0) "سلام $name عزیز، یادآوری می‌کنم که ${ir.vil3ntec.tohid.money(balance)} افغانی از حساب شما باقی مانده. ممنون."
-    else "سلام $name عزیز،"
+    ir.vil3ntec.tohid.data.DebtReminder.message(ir.vil3ntec.tohid.data.DebtReminder.Vars(name, balance))
+
+  /* ------------------------------ اطلاعاتِ کشو ------------------------------ */
+
+  /** رنگِ یک خطِ اطلاعات: بدهی/عقب‌افتاده سرخ، سررسیدِ بعدی آبیِ اطلاع، سقفِ اعتبار خنثی */
+  enum class InfoTone { OWE, INFO, NEUTRAL }
+
+  data class Info(val text: String, val tone: InfoTone)
+
+  /**
+   *  خط‌های زیرِ کارهای کشو: «۳ ماه است که بدهکار است — از …»، بردهای عقب‌افتاده، سررسیدِ بعدی،
+   *  و سقفِ اعتبار (بیش از سقف یا جای مانده). همه از `DebtorEngine.Account` و `DebtBook.Book`.
+   */
+  fun info(account: DebtorEngine.Account, book: DebtBook.Book?, now: Long = System.currentTimeMillis()): List<Info> = buildList {
+    account.since?.let { since ->
+      add(Info(StrMoney.daysInDebt(ir.vil3ntec.tohid.spanText(since, now), ir.vil3ntec.tohid.displayMillis(since)), InfoTone.OWE))
+    }
+    book ?: return@buildList
+    if (book.overdue.isNotEmpty()) add(Info(StrMoney.overdue(book.overdue.size, DebtBook.show(book.overdueAmount)), InfoTone.OWE))
+    book.nextDue?.let { e -> e.dueDate?.let { due -> add(Info(StrMoney.nextDue(ir.vil3ntec.tohid.displayDate(due), DebtBook.show(e.open)), InfoTone.INFO)) } }
+    book.credit?.let { cr ->
+      if (cr.over) add(Info(StrMoney.overLimitBy(DebtBook.show(cr.excess), DebtBook.show(cr.limit)), InfoTone.OWE))
+      else add(Info(StrMoney.limitHeadroom(DebtBook.show(cr.limit), DebtBook.show(cr.headroom)), InfoTone.NEUTRAL))
+    }
+  }
+
+  /** خلاصهٔ کشوی بسته: شماره (اگر هست) و «۶ روز بدهکار» / «بدهی ندارد» */
+  fun summary(phone: String, since: Long?, now: Long = System.currentTimeMillis()): String {
+    val debt = if (since != null) StrMoney.inDebtShort(ir.vil3ntec.tohid.spanText(since, now)) else StrMoney.noDebt
+    val number = ir.vil3ntec.tohid.LocaleText.phoneDisplay(phone).trim()
+    return if (number.isEmpty()) debt else "\u2066$number\u2069 · $debt"
+  }
 
   /* ------------------------------ برگرداندن ------------------------------ */
 

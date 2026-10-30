@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
+
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,7 +76,7 @@ internal fun TxDetailSheet(
     Spacer(Modifier.height(12.dp))
 
     V3Card(radius = 16.dp, padding = PaddingValues(vertical = 4.dp)) {
-      DetailLine(StrDebtor.date, if (tx.date.isBlank()) DebtorDetailModel.UNDATED else formatDate(tx.date))
+      DetailLine(StrDebtor.date, if (tx.date.isBlank()) DebtorLedgerModel.UNDATED else formatDate(tx.date))
       if (tx.notes.isNotBlank()) { V3Divider(start = 14.dp); DetailLine(StrDebtor.notes, tx.notes) }
       if (entry != null) {
         if (entry.give && entry.amount.minor > 0) {
