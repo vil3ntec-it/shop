@@ -24,6 +24,8 @@ import ir.vil3ntec.tohid.ui.v3.onboarding.ReauthSheet
  */
 @Composable
 fun ReauthHost() {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!UiV3.on) { ReauthHostLegacy(); return }
   val context = LocalContext.current
   val gate = remember(context) { Backend.api(context).reauth }
   DisposableEffect(gate) {

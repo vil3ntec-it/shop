@@ -97,6 +97,8 @@ fun DebtorsScreen(
   /** باز شده از «بیشتر» ⇒ دکمهٔ برگشتِ سربرگ؛ `null` ⇒ بی دکمه */
   onBack: (() -> Unit)? = null,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on && !showHeader && onBack == null) { DebtorsScreenLegacy(store, d, snackbar); return }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }

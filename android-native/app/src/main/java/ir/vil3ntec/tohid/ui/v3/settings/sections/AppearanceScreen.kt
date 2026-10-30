@@ -76,6 +76,18 @@ internal fun RouteScope.AppearanceScreen(onBack: (() -> Unit)?) {
       }
       SettingsNote(StrSettings.reduceMotionNote)
     }
+    item(key = "ui-v3") {
+      //  پرچمِ رابطِ نسخهٔ ۳ (`UiV3`، پیش‌فرض خاموش) — خاموش کردن همان لحظه به رابطِ امروز برمی‌گردد
+      V3Section(null) {
+        V3ToggleRow(
+          StrSettings.uiV3,
+          checked = ir.vil3ntec.tohid.ui.UiV3.on,
+          onCheckedChange = { ir.vil3ntec.tohid.ui.UiV3.set(context, it) },
+          icon = Icons.Outlined.Animation,
+        )
+      }
+      SettingsNote(StrSettings.uiV3Note)
+    }
   }
 }
 

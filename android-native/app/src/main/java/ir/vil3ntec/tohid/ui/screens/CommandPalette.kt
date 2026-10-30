@@ -23,6 +23,8 @@ class PaletteHit(val kind: String, val id: String, val title: String, val hint: 
  */
 @Composable
 fun CommandPalette(d: ShopData, onDismiss: () -> Unit, onPick: (PaletteHit) -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { CommandPaletteLegacy(d, onDismiss, onPick); return }
   V3Palette(d, SearchIndex.sections(), onDismiss) { h -> onPick(h.toPaletteHit()) }
 }
 

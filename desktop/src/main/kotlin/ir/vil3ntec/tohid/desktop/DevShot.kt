@@ -99,10 +99,11 @@ object DevShot {
               }
               "shot" -> shot(arg)
               //  پیش‌نمایشِ گوشیِ ۳۹۰×۸۴۴ (`PhonePreview`): phone:nav|nav-dark|off — و عکس فقط از همان پنجره
-              "phone" -> { java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = arg.takeIf { it.isNotBlank() && it != "off" } }; Thread.sleep(1800) }
+              //  پیش‌نمایشِ گوشی و عکس‌های گروه رابطِ نسخهٔ ۳ را نشان می‌دهند ⇐ پرچمِ `UiV3` فقط در همین اجرا روشن (بی ذخیره)
+              "phone" -> { java.awt.EventQueue.invokeAndWait { val s = arg.takeIf { it.isNotBlank() && it != "off" }; if (s != null) ir.vil3ntec.tohid.ui.UiV3.preview(true); PhonePreview.screen.value = s }; Thread.sleep(1800) }
               //  عکس‌های گروه‌ها: groupshots:<گروه|all|گروه,گروه> ⇒ هر حالت روشن/تیره × فارسی/انگلیسی در
               //  <پوشه>/<گروه>/؛ پایانِ هر گروه با نشانِ `.done` (شمارِ عکس‌ها) تا CI گروهِ نیمه‌کاره را قرمز کند
-              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg)) {
+              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg).also { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.UiV3.preview(true) } }) {
                 val out = File(dir, g.group).apply { mkdirs() }
                 var saved = 0
                 for (s in g.shots) for (dark in listOf(false, true)) for (en in listOf(false, true)) {

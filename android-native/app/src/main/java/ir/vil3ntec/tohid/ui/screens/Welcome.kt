@@ -19,7 +19,11 @@ import ir.vil3ntec.tohid.ui.v3.onboarding.AuthGate
  *  برداشته می‌شود و `GoogleMark` جای خودش را می‌گیرد. `openOnMap` (پیک هم صدا می‌زند) در `ui/components/common/OpenOnMap.kt` است.
  */
 @Composable
-fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) = AuthGate(store, onDone = onDone)
+fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { WelcomeScreenLegacy(store, onDone); return }
+  AuthGate(store, onDone = onDone)
+}
 
 /**
  *  نشانِ رسمیِ گوگل («G» ِ چهاررنگ) — همان چهار تکهٔ مسیرهای برداریِ خودِ گوگل در دستگاهِ ۴۸×۴۸،

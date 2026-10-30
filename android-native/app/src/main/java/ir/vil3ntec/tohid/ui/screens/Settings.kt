@@ -103,6 +103,8 @@ fun SettingsScreen(
   onBack: (() -> Unit)? = null,
   onUpdates: () -> Unit,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on && onBack == null) { SettingsScreenLegacy(store, d, snackbar, theme, onTheme, onUpdates); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }

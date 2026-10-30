@@ -13,6 +13,8 @@ import ir.vil3ntec.tohid.ui.v3.onboarding.EmailCodeContent
  */
 @Composable
 fun CodeLoginSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { CodeLoginSheetLegacy(onClose, onSignedIn); return }
   Box(Modifier.padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
     EmailCodeContent(onClose = onClose, onSignedIn = onSignedIn, showTitle = true)
   }

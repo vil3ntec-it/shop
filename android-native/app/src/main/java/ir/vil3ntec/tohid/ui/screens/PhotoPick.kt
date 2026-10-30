@@ -20,4 +20,8 @@ fun PhotoSourceSheet(
   /** نوشتهٔ راهنمای زیرِ گزینه‌ها */
   note: String = StrProducts.photoNote,
   onPicked: (Uri) -> Unit,
-) = DraftPhotoSourceSheet(open = open, onDismiss = onDismiss, note = note, onPicked = onPicked)
+) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { PhotoSourceSheetLegacy(open, onDismiss, note, onPicked); return }
+  DraftPhotoSourceSheet(open = open, onDismiss = onDismiss, note = note, onPicked = onPicked)
+}
