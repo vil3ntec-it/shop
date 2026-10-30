@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -27,6 +29,11 @@ object WarehouseEngine {
     val active: Boolean? = null,
     val saleUnit: String? = null,
     val unitFactor: Double? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
   )
 
   data class EntryDraft(
@@ -135,9 +142,8 @@ object WarehouseEngine {
 
   /* ---------------------------- ثبتِ کالا ---------------------------- */
 
-  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود */
-  private fun nameKey(name: String): String =
-    name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود (همان کلیدِ core) */
+  private fun nameKey(name: String): String = SimilarNames.exactKey(name)
 
   /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
   internal fun productChanges(a: Product, b: Product): List<String> = buildList {
@@ -154,6 +160,16 @@ object WarehouseEngine {
   fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
     d.auditLog.filter { it.refId == productId && (it.type == "product_edit" || it.type == "price_change") }
       .sortedByDescending { it.createdAt }
+
+  /**
+   *  PRD-19: کالاهایی با نامِ **مشابه** (نه یکسان) — هشدار، نه رد: فاصله/نیم‌فاصله/اعراب، ترتیبِ
+   *  کلمه‌ها یا غلطِ تایپیِ کوچک؛ رقمِ متفاوت هرگز (`SimilarNames` ِ core). `exceptId` خودِ کالا.
+   */
+  fun similarNames(d: ShopData, name: String, exceptId: String? = null, limit: Int = 3): List<Product> {
+    if (name.isBlank()) return emptyList()
+    val except = if (exceptId == null) -1 else d.products.indexOfFirst { it.id == exceptId }
+    return SimilarNames.Index(d.products.map { it.name }).find(name, except, limit).map { d.products[it.index] }
+  }
 
   /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
   fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
@@ -181,9 +197,13 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: (if (barcode.isEmpty()) emptyList() else listOf(barcode))
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
     // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد
-    if (barcode.isNotEmpty() && ShopStore.barcodeIndex(d).containsKey(barcode)) {
-      return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    val index = ShopStore.barcodeIndex(d)
+    ProductBarcodes.conflict(codes, null) { index[it] }?.let {
+      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val id = newId()
@@ -197,7 +217,7 @@ object WarehouseEngine {
       wholesalePrice = 0.0,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       notes = "",
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       createdAt = now,
       subcategory = draft.subcategory?.trim().orEmpty(),
       supplierId = draft.supplierId.orEmpty(),
@@ -234,9 +254,16 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
-    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد
-    val owner = if (barcode.isEmpty()) null else ShopStore.barcodeIndex(d)[barcode]
-    if (owner != null && owner != id) return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: ProductBarcodes.mergePrimary(barcode, existing.barcodes)
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
+    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
+    // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
+    val index = ShopStore.barcodeIndex(d)
+    ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
+      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+    }
 
     val updated = existing.copy(
       name = name,
@@ -245,7 +272,7 @@ object WarehouseEngine {
       purchasePrice = draft.purchasePrice,
       salePrice = draft.salePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       subcategory = draft.subcategory?.trim() ?: existing.subcategory,
       supplierId = draft.supplierId ?: existing.supplierId,
       active = draft.active ?: existing.active,
