@@ -142,6 +142,8 @@ object Receipts {
   fun format(exactUnit: Boolean = false): ReceiptFormat {
     val digits = LocaleChoice.digits
     val symbol = LocaleChoice.symbol
+    val lunar = LocaleChoice.lunar
+    val lunarAdjust = LocaleChoice.lunarAdjust
     return object : ReceiptFormat {
       override fun money(afn: Double) = LocaleText.afghani(afn, digits, symbol)
       //  قیمتِ واحدِ اعشاری (قلمِ تخفیفِ خودکار) با دو رقم؛ عددِ کامل همان `LocaleText.amount`
@@ -151,6 +153,8 @@ object Receipts {
       //  شماره جدا و چپ‌به‌راست (LRE…PDF) تا در سطرِ راست‌به‌چپ رقم‌ها جابه‌جا نشوند
       override fun phone(text: String) = "\u202A" + LocaleText.digitsIn(text, digits) + "\u202C"
       override fun date(iso: String) = LocaleText.date(iso, digits)
+      //  LOC-01: فقط با تنظیمِ «تاریخِ قمری» (پیش‌فرض خاموش)
+      override fun lunarDate(iso: String) = if (lunar) LocaleText.lunar(iso, digits, lunarAdjust) else null
     }
   }
 }

@@ -167,6 +167,8 @@ object Receipt {
       else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale)
     }
     line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(sale.date), digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    //  LOC-01: تاریخِ قمری فقط با تنظیمِ دکان (پیش‌فرض خاموش)
+    LocaleChoice.lunarOn(sale.date)?.let { line(StrSale.hijriDate(it), small, Layout.Alignment.ALIGN_CENTER) }
 
     rule(thick = true)
 
@@ -315,6 +317,7 @@ object Receipt {
     )
     val time = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date(if (doc.createdAt > 0) doc.createdAt else System.currentTimeMillis())) }.getOrDefault("")
     line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(doc.date), digits)} — ${LocaleText.digitsIn(time, digits)}", p.small, Layout.Alignment.ALIGN_CENTER)
+    LocaleChoice.lunarOn(doc.date)?.let { line(StrSale.hijriDate(it), p.small, Layout.Alignment.ALIGN_CENTER) }
     rule(thick = true)
 
     doc.rows.forEach { r ->
