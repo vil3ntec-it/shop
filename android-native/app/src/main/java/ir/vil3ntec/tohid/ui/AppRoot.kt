@@ -191,8 +191,10 @@ fun AppRoot(
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
   OrdersLive.Host(store)
-  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
-  PromoLive.Host()
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین؛ کدها با پیش‌نویسِ سبد
+  PromoLive.Host(cartStore)
+
+  //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
     if (loaded) {
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)

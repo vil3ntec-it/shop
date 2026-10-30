@@ -148,6 +148,8 @@ object Receipt {
     val symbol = LocaleChoice.symbol
     fun num(value: Double) = LocaleText.amount(value, digits)
     fun afn(value: Double) = I18n.money(value, I18n.lang, digits, symbol)
+    //  S3 — پرچمِ `shop.promo_stamp`: خاموش ⇒ همان متن و ردیف‌های پیشین (`SaleReceipt`)
+    val stamped = ir.vil3ntec.tohid.ui.PromoLive.stampOn(context)
 
     /* ------------------------------ سربرگ ------------------------------ */
     line(storeName.ifBlank { StrSale.storeFallback }, title, Layout.Alignment.ALIGN_CENTER)
@@ -174,7 +176,8 @@ object Receipt {
       val name = ir.vil3ntec.tohid.data.SalesEngine.itemName(d, item)
       val unit = product?.unit.orEmpty()
       line(name, body)
-      val detail = "${num(item.quantity)}${if (unit.isNotBlank()) " $unit" else ""} × ${num(item.unitPrice)}"
+      val detail = ir.vil3ntec.tohid.data.SaleReceipt.detail(item, unit, stamped, ::num,
+        { LocaleText.unitAmount(it, digits) }, { LocaleText.digitsIn(ir.vil3ntec.tohid.qty(it), digits) })
       row(detail, num(item.totalPrice), small)
       if (item.returnedQty > 0) line(StrSale.returned(num(item.returnedQty)), small)
       gap(0.25f)
@@ -184,6 +187,9 @@ object Receipt {
 
     /* ------------------------------ جمع‌ها ------------------------------ */
     row(StrSale.itemsTotal, afn(sale.total), body)
+    //  «جمع اقلام» = جمعِ ستونِ بالا؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
+    ir.vil3ntec.tohid.data.SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)
+      ?.let { row(it.label, afn(it.amount), body) }
     row(Str.discount, afn(sale.discount), body)
     rule()
     row(StrSale.finalAmount, afn(sale.finalTotal), head)

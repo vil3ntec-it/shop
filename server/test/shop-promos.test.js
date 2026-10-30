@@ -9,7 +9,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const h = require('./helpers');
-const { many } = require('../src/db');
+const { many, query } = require('../src/db');
 
 const ROOT = path.join(__dirname, '..', '..');
 
@@ -68,8 +68,16 @@ test('قاعده: اعتبارسنجیِ هسته، کدِ نرمال، uses ف�
   assert.equal((await h.put('/api/shop/promos/rules/bad%20id', { rule: P10 }, { token: t.owner })).status, 400);
   assert.equal((await h.put('/api/shop/promos/rules/r1', { rule: [] }, { token: t.owner })).status, 400);
 
+  //  سقفِ مصرف تا شمارشش نیامده رد می‌شود — نه این‌که بی‌صدا بی‌اثر بماند؛ نوعِ دیگر هم ("10" ⇏ ۰ ِ بی‌صدا)
+  for (const maxUses of [1, 10, '10', '0', 2.5, -1, true, [5], 1e300]) {
+    const capped = await h.put('/api/shop/promos/rules/r1', { rule: { ...P10, code: 'CAP10', maxUses } }, { token: t.owner });
+    assert.equal(capped.status, 400, `${JSON.stringify(maxUses)} ⇒ ${JSON.stringify(capped.body)}`);
+    assert.equal(capped.body.error.code, 'max_uses_unsupported');
+  }
+  assert.equal((await many(`SELECT id FROM shop_promotions WHERE shop_id=$1`, [t.shopId])).length, 0);
+
   const ok = await h.put('/api/shop/promos/rules/r1',
-    { rule: { ...P10, code: 'sale-۱۰', uses: 5, maxUses: 10, stack: 'combine' } }, { token: t.manager });
+    { rule: { ...P10, code: 'sale-۱۰', uses: 5, maxUses: 0, stack: 'combine' } }, { token: t.manager });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.rule.code, 'SALE10');
   assert.equal(ok.body.rule.uses, 0);
@@ -92,6 +100,45 @@ test('قاعده: اعتبارسنجیِ هسته، کدِ نرمال، uses ف�
   assert.deepEqual(list.body.rules, []);
   const kept = await many(`SELECT id, deleted FROM shop_promotions WHERE shop_id=$1`, [t.shopId]);
   assert.deepEqual(kept.map((k) => [k.id, k.deleted]), [['r1', true]]);
+});
+
+test('سقفِ مصرف: بی سقف پذیرفته؛ ردیفِ پیش از این PR با سقف ویرایش‌پذیر و سقفش صفر می‌شود', async () => {
+  const t = await shopWithTeam('سقف');
+  for (const maxUses of [0, null, undefined]) {
+    const free = await h.put('/api/shop/promos/rules/free', { rule: { ...P10, maxUses } }, { token: t.owner });
+    assert.equal(free.status, 200, JSON.stringify(free.body));
+    assert.equal(free.body.rule.maxUses, 0);
+  }
+  //  ردیفی که پیش از این PR با سقف نوشته شد (آن سقف هرگز شمرده نمی‌شد)
+  const ok = await h.put('/api/shop/promos/rules/old', { rule: { ...P10, code: 'OLD10' } }, { token: t.owner });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  await query(`UPDATE shop_promotions SET data = jsonb_set(data, '{maxUses}', '10') WHERE shop_id=$1 AND id='old'`, [t.shopId]);
+  const legacy = (await h.get('/api/shop/promos', { token: t.owner })).body.rules.find((r) => r.id === 'old');
+  assert.equal(legacy.maxUses, 10);
+  //  مقدارِ تازه هنوز رد است
+  const raised = await h.put('/api/shop/promos/rules/old', { rule: { ...legacy, maxUses: 11 } }, { token: t.owner });
+  assert.equal(raised.status, 400);
+  assert.equal(raised.body.error.code, 'max_uses_unsupported');
+  const asText = await h.put('/api/shop/promos/rules/old', { rule: { ...legacy, maxUses: '10' } }, { token: t.owner });
+  assert.equal(asText.status, 400);
+  //  همان چیزی که فرمِ برنامهٔ پیشین می‌فرستد: قاعدهٔ پایه با همان سقف + خاموش ⇒ می‌نشیند و سقف صفر
+  const off = await h.put('/api/shop/promos/rules/old', { rule: { ...legacy, active: false } }, { token: t.owner });
+  assert.equal(off.status, 200, JSON.stringify(off.body));
+  assert.equal(off.body.rule.maxUses, 0);
+  assert.equal(off.body.rule.active, false);
+  const stored = await many(`SELECT data->>'maxUses' AS m FROM shop_promotions WHERE shop_id=$1 AND id='old'`, [t.shopId]);
+  assert.deepEqual(stored.map((r) => Number(r.m)), [0]);
+  //  حالا که صفر است، ۱۰ ِ دوباره سقفِ تازه است
+  assert.equal((await h.put('/api/shop/promos/rules/old', { rule: { ...legacy } }, { token: t.owner })).status, 400);
+});
+
+test('stamp = پرچمِ shop.promo_stamp ِ live_config — پیش‌فرض خاموش، مالِ همان دکان', async () => {
+  const a = await shopWithTeam('مهر');
+  const b = await shopWithTeam('مهرِ دوم');
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.stamp, false);
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.promo_stamp','true',1)", [a.shopId]);
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.stamp, true);
+  assert.equal((await h.get('/api/shop/promos', { token: b.staff })).body.stamp, false);
 });
 
 test('«زیرِ بهای خرید» فقط با صاحب', async () => {

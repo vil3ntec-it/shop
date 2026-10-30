@@ -24,10 +24,10 @@ class PromoRepository(private val api: ApiClient) {
     on
   }
 
-  /** قاعدهٔ ذخیره‌شده، همان‌طور که سرور نرمالش کرده (کدِ بزرگ، `uses`ِ سرور) */
-  suspend fun save(rule: PromoCore.Rule): ApiResult<PromoCore.Rule> = result {
+  /** قاعدهٔ ذخیره‌شده، همان‌طور که سرور نرمالش کرده (کدِ بزرگ، `uses`ِ سرور)، با `rev`ِ تازه‌اش */
+  suspend fun save(rule: PromoCore.Rule): ApiResult<Pair<PromoCore.Rule, Long>> = result {
     val out = api.put("$ROOT/rules/${enc(rule.id)}", buildJsonObject { put("rule", PromoJson.toJson(rule)) })
-    PromoCore.ruleOf(PermPolicy.tree(out["rule"]))
+    PromoCore.ruleOf(PermPolicy.tree(out["rule"])) to ((out["rule"] as? JsonObject)?.let(PromoJson::rev) ?: 0)
   }
 
   suspend fun delete(id: String): ApiResult<Unit> = result { api.delete("$ROOT/rules/${enc(id)}"); Unit }
