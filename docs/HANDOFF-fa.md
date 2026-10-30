@@ -54,6 +54,15 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
+- انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
+  BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
+  linuxX64 فقط برای نگهبانِ #415)؛ `mathRound` = برگردانِ بیت‌به‌بیتِ `Math.round`. `PinCrypto` و `ApproverVault` ماندند.
+  آزمون: `core` allTests روی JVM سبز (۱۳)، کامپایلِ klib ِ iOS (main و test) روی لینوکس سبز، سنجهٔ platform-deps ِ #415 سبز.
+- اجرانشده این‌جا: آزمونِ desktop/android (dl.google.com بسته، Maven Central 429)، `iosSimulatorArm64Test` (فقط macOS)، کامپایلِ linuxX64
+  (download.jetbrains.com بسته) ⇒ به CI سپرده شد.
+- قدمِ بعدی: سبز شدنِ CI ِ همین PR؛ پس از مرجِ #414 جدولِ §۲.۳ ِ `docs/IOS-PLAN-fa.md` به‌روز شود؛ با #415 در `core/build.gradle.kts` تعارضِ ساده دارد.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/great-ptolemy-ptt10v`
 - انجام شد: بندِ ۴ِ `CLAUDE.md` (هر سه اسکیل در هر سیزن) و بندِ ۷ (چتِ معمولی بی دست‌زدن به پروژه) و هوکِ
   `SessionStart` (PR #413)؛ ممیزیِ وضعیتِ پروژه در برابرِ سندِ v32 (همین فایل).
