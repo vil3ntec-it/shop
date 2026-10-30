@@ -41,7 +41,7 @@ class OrderFulfillNotesTest {
   ) = OrderFulfillNotes.detail(d, o, review, emptyList(), since, manage, refund, record, reverse, waiting)
 
   @Test
-  fun `صف: هر فهرستِ پُر یک هشدار؛ بررسی فقط برای صاحبِ بازپرداخت و نخستین سفارش را باز می‌کند`() {
+  fun `صف — هر فهرستِ پُر یک هشدار؛ بررسی فقط برای صاحبِ بازپرداخت و نخستین سفارش را باز می‌کند`() {
     assertTrue(OrderFulfillNotes.queue(false, emptyList(), emptyList(), emptyList(), emptyList(), canRefund = true).isEmpty())
     val all = OrderFulfillNotes.queue(true, listOf(row("a"), row("b")), listOf(row()), listOf(row()), listOf(row()), canRefund = true)
     assertEquals(listOf("rollout", "review", "unposted", "waiting", "short"), all.map { it.key })
@@ -54,7 +54,7 @@ class OrderFulfillNotesTest {
   }
 
   @Test
-  fun `جزئیات: تحویلِ بی‌فروش ⇒ «ثبتِ فروش» فقط با اجازه؛ پیش از کف یا آزمایشی ⇒ هیچ`() {
+  fun `جزئیات — تحویلِ بی‌فروش ⇒ «ثبتِ فروش» فقط با اجازه؛ پیش از کف یا آزمایشی ⇒ هیچ`() {
     val n = detail().single()
     assertEquals("unposted", n.key)
     assertEquals(Act.POST, n.act)
@@ -65,7 +65,7 @@ class OrderFulfillNotesTest {
   }
 
   @Test
-  fun `جزئیات: فروش ثبت شده ⇒ برچسبِ فاکتور؛ برگشت به دکان ⇒ «لغوِ فروشِ تحویل»`() {
+  fun `جزئیات — فروش ثبت شده ⇒ برچسبِ فاکتور؛ برگشت به دکان ⇒ «لغوِ فروشِ تحویل»`() {
     val sold = (OrderFulfillment.fulfill(ledger, order(), "2026-10-19", 5_000L) as OrderFulfillment.Result.Ok).data
     val n = detail(d = sold).single()
     assertEquals("sold", n.key)
@@ -77,7 +77,7 @@ class OrderFulfillNotesTest {
   }
 
   @Test
-  fun `جزئیات: ردیفِ بررسی ⇒ «بررسی شد» فقط برای صاحبِ بازپرداخت`() {
+  fun `جزئیات — ردیفِ بررسی ⇒ «بررسی شد» فقط برای صاحبِ بازپرداخت`() {
     val n = detail(review = listOf(row(msg = "پیش از راه‌اندازی"))).single()
     assertEquals("review", n.key)
     assertEquals("پیش از راه‌اندازی", n.body)
