@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -525,6 +526,33 @@ fun SettingsScreen(
           onSelect = {
             crmReports = it == "on"
             ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
+          },
+        )
+      }
+    }
+
+    /* ============ تحلیلِ موجودی (INV-15، INV-16) — گزارشِ کالاها در گوشی و کامپیوتر ============ */
+    //  پیش‌فرض خاموش؛ فقط خواندنی و فقط همین دستگاه (`ShopPolicy.stockInsight`).
+    item {
+      var stockInsight by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.stockInsight(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Inventory2,
+        title = StrShell.stockInsight,
+        subtitle = if (stockInsight) StrShell.stockInsightShown else StrSettings.off,
+        tint = if (stockInsight) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.stockInsightNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (stockInsight) "on" else "off",
+          onSelect = {
+            stockInsight = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setStockInsight(context, stockInsight)
           },
         )
       }
