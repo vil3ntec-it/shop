@@ -195,6 +195,11 @@ test('جداییِ دکان‌ها: سفارشِ دکانِ دیگر ۴۰۴ و �
   const cross = await h.post(`${BASE}/${oa2.id}/receipts`, { id: 'shared-key', lines: [{ lineId: 'l1', receivedMilli: 1000 }] }, { token: a.owner });
   assert.equal(cross.status, 409);
   assert.equal(cross.body.error.code, 'id_conflict');
+  //  همان کلیدِ تازه هم‌زمان روی دو سفارش (قفل‌های جدا) ⇒ یکی ۲۰۱، دیگری ۴۰۹ — هرگز ۵۰۰
+  const both = await Promise.all([oa.id, oa2.id].map((id) =>
+    h.post(`${BASE}/${id}/receipts`, { id: 'race-key', lines: [{ lineId: 'l2', receivedMilli: 1000 }] }, { token: a.owner })));
+  assert.deepEqual(both.map((r) => r.status).sort(), [201, 409], JSON.stringify(both.map((r) => r.body)));
+  assert.equal(both.find((r) => r.status === 409).body.error.code, 'id_conflict');
   //  همان کلید در دکانِ دیگر آزاد است
   await h.post(`${BASE}/${ob.id}/send`, {}, { token: b.owner });
   assert.equal((await h.post(`${BASE}/${ob.id}/receipts`, { id: 'shared-key', lines: [{ lineId: 'l1', receivedMilli: 1000 }] }, { token: b.owner })).status, 201);

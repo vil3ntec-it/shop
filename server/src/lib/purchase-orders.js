@@ -339,12 +339,19 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
       if (l.priceMinor > MAX_PRICE_MINOR) throw refuse({ code: 'bad_price', lineId: l.lineId, index: i });
     });
     const at = now();
-    const row = (await c.query(
-      `INSERT INTO purchase_receipts (shop_id, id, po_id, lines, posted, total_minor, note, created_by, created_at)
-       VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9) RETURNING *`,
-      [shopId, rid, current.id, JSON.stringify(r.ok.receipt.lines), JSON.stringify(r.ok.lines), r.ok.totalMinor,
-        note, userId || '', at]
-    )).rows[0];
+    let row;
+    try {
+      row = (await c.query(
+        `INSERT INTO purchase_receipts (shop_id, id, po_id, lines, posted, total_minor, note, created_by, created_at)
+         VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9) RETURNING *`,
+        [shopId, rid, current.id, JSON.stringify(r.ok.receipt.lines), JSON.stringify(r.ok.lines), r.ok.totalMinor,
+          note, userId || '', at]
+      )).rows[0];
+    } catch (e) {
+      //  همان کلید هم‌زمان روی سفارشِ دیگری نشست (قفلِ هر سفارش جداست) ⇒ تعارض، نه ۵۰۰
+      if (e && e.code === '23505') throw refuse({ code: 'id_conflict', lineId: null, index: -1 });
+      throw e;
+    }
     //  رسید وضعیتِ نمایشی را عوض می‌کند ⇒ نسخه و زمان بالا می‌روند (فهرست و ویرایشِ هم‌زمان)
     const updated = (await c.query(
       'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *',
