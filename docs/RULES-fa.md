@@ -224,6 +224,7 @@
 - کرایه از نقد کم نمی‌شود مگر در تسویه `farePaidFromCash: true` بیاید (#249).
 - کدِ تحویل ۶ رقم، فقط HMAC در دیتابیس، یک‌بارمصرف، قفل پس از ۵ تلاش، بی انقضای زمانی (D-05، #249).
 - عکسِ تحویل فقط با `photoConsent`ِ سفارش + `parcelOnly`ِ پیک؛ فقط صاحب و مدیر می‌بینند (#249).
+- «تماس با مشتری» (DLV-02، `POST /api/courier/missions/:id/call`): شمارهٔ کامل فقط پشتِ پرچمِ خاموشِ `shop.delivery_courier_call`، فقط پیکِ فعال، فقط مأموریتِ خودش پس از «قبول» و تا پایان (`CALLABLE` = `CourierFlow.CALLABLE`)؛ پاسخ `no-store`، برنامه فقط شماره‌گیر را باز می‌کند و شماره را نگه نمی‌دارد؛ هر تماس در سابقهٔ دکان بی خودِ شماره. فهرست و کارت همیشه پوشیده.
 - شمارهٔ مشتری برای پیک پوشیده است و نشانی و نام پس از پایانِ مأموریت از کارتِ پیک برداشته می‌شود (§۳.۱۱، §۳۸.۴، #249).
 - پیشوندِ `courier` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#249).
 
@@ -351,6 +352,7 @@
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
+| `shop.delivery_courier_call` | دکان / `all` | خاموش | «تماس با مشتری» روی کارتِ پیک (`POST /api/courier/missions/:id/call`، شمارهٔ کامل فقط برای همان تماس)؛ خاموش ⇒ ۴۰۴ `courier_call_disabled` و دکمه پنهان؛ با `shop.delivery` | DLV-02 | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |

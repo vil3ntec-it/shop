@@ -55,6 +55,14 @@ object CourierFlow {
   val FAIL_REASONS: List<String> = listOf("no_answer", "wrong_address", "refused", "recalled", "other")
   val CASH_REASONS: List<String> = listOf("partial_payment", "refused_amount", "damaged_or_short", "other")
 
+  /**
+   *  «تماس با مشتری» (DLV-02): پس از «قبول» و تا پایان — همان `CALLABLE`ِ سرور
+   *  (`delivery.callCustomer`). پیش از قبول پیک فقط آن‌چه برای تصمیم لازم است را می‌بیند.
+   */
+  val CALLABLE: Set<String> = setOf("assigned", "picked_up", "moving", "arrived", "failed")
+
+  fun canCall(status: String): Boolean = status in CALLABLE
+
   fun isLive(status: String): Boolean = status in LIVE
   fun isTerminal(status: String): Boolean = status in STATUSES && status !in LIVE
 

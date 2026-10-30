@@ -16,7 +16,9 @@
  */
 const express = require('express');
 const delivery = require('../lib/delivery');
+const audit = require('../lib/audit');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
+const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -44,6 +46,8 @@ router.get('/me', wrap(async (req, res) => {
   const c = req.courier;
   res.json({
     courier: { id: c.id, name: c.name, active: c.active === true, cashCapMinor: Number(c.cash_cap_minor) },
+    //  DLV-02: دکمهٔ «تماس با مشتری» فقط وقتی دیده می‌شود که دکان روشنش کرده باشد
+    callEnabled: await delivery.callFlagOf(req.shopId),
     serverTime: Date.now(),
   });
 }));
@@ -67,6 +71,23 @@ router.post('/missions/:id/photos', wrap(async (req, res) => {
   const out = await delivery.putPhoto(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);
 }));
+
+/**
+ * «تماس با مشتری» (DLV-02، §۳۸): شمارهٔ کامل فقط همین لحظه و فقط برای مأموریتِ پذیرفته و
+ * زندهٔ همین پیک، پشتِ پرچمِ خاموشِ `shop.delivery_courier_call`. POST است چون هر بار در
+ * سابقهٔ دکان می‌نشیند (بی خودِ شماره) و نباید پیش‌واکشی یا نگه داشته شود.
+ * دستگیره بی `wrap` است: Express 5 خطای async را خودش به `next` می‌دهد.
+ */
+router.post('/missions/:id/call', async (req, res) => {
+  const out = await delivery.callCustomer(req.shopId, req.params.id, req.courierActor);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'delivery.courier.call',
+    targetType: 'delivery_assignment', targetId: out.assignmentId,
+    detail: { orderId: out.orderId, courierId: req.courier.id, status: out.status }, ip: clientIp(req),
+  });
+  res.set('Cache-Control', 'no-store');
+  res.json({ phone: out.phone, status: out.status });
+});
 
 //  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
 router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));
