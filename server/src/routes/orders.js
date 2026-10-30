@@ -19,7 +19,7 @@ const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
-const { forbidden, conflict } = require('../middleware/errors');
+const { forbidden, conflict, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
@@ -119,6 +119,16 @@ router.get('/:id', needFlag, wrap(async (req, res) => {
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
   order.refund = await refunds.summary(req.shopId, order.id);
   res.json({ order });
+}));
+
+/**
+ * NTF-01/04: پیام‌های وضعیت به مشتریِ همین سفارش — کدام رویداد، از کدام کانال، چه شد — و حالِ
+ * کانال‌ها. فقط خواندن؛ بی شماره، متن یا لینک. سفارشِ دکانِ دیگر ⇒ ۴۰۴.
+ */
+router.get('/:id/notices', needFlag, wrap(async (req, res) => {
+  const out = await require('../lib/customer-notify').forOrder(req.shopId, req.params.id);
+  if (!out) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  res.json(out);
 }));
 
 /**

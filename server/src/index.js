@@ -64,6 +64,8 @@ async function main() {
   //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
   const orderNotify = require('./lib/order-notify');
   orderNotify.start();
+  //  NTF-01: اعلانِ وضعیت به مشتری (بی پرچمِ `shop.customer_notify` ⇒ صفِ خالی، یک پرسشِ کوچک)
+  require('./lib/customer-notify').start();
   //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
   require('./lib/order-timeout').start();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
@@ -94,6 +96,7 @@ async function main() {
     if (pgliteStats) pgliteStats.stop();
     outbox.stop();
     orderNotify.stop();
+    require('./lib/customer-notify').stop();
     notices.stopRunner();
     telegram.stop();
     server.close(async () => {
