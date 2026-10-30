@@ -19,7 +19,8 @@ class RoleGateTest {
   )
   private val sale = base.copy(
     sales = base.sales + Sale(id = "s1"),
-    saleItems = listOf(SaleItem(id = "si1", saleId = "s1", productId = "p1")),
+    //  ۱ عدد: حرکتِ ‎-1‎ ِ همین فاکتور در سقفِ قلم جا می‌شود (هر قلم تا مقدارش، یافتهٔ ۱ ِ بازبینی)
+    saleItems = listOf(SaleItem(id = "si1", saleId = "s1", productId = "p1", quantity = 1.0)),
     stockMovements = listOf(StockMovement(id = "m1", productId = "p1", type = "sale", qty = -1.0, refId = "s1")),
     auditLog = listOf(AuditEntry(id = "a1")),
     nextInvoiceNo = 2,
@@ -120,8 +121,13 @@ class RoleGateTest {
       StockMovement(id = "mx", productId = "p1", type = "sale", qty = -1.0, refId = "s404"),
       StockMovement(id = "mx", productId = "p1", type = "sale", qty = 1.0, refId = "s0"),
     )) assertEquals(bad.toString(), "stockMovements", RoleGate.blocked("cashier", base, base.copy(stockMovements = listOf(bad))))
-    assertNull(RoleGate.blocked("cashier", base, base.copy(stockMovements = listOf(
-      StockMovement(id = "mc", productId = "p1", type = "sale_cancel", qty = 1.0, refId = "s0")))))
+    //  لغو فقط برای فاکتورِ لغوشده و کالای همان فاکتور (یافتهٔ ۱): s0 در همین ذخیره لغو می‌شود
+    val withItem = base.copy(saleItems = listOf(SaleItem(id = "si0", saleId = "s0", productId = "p1", quantity = 1.0)))
+    val mc = StockMovement(id = "mc", productId = "p1", type = "sale_cancel", qty = 1.0, refId = "s0")
+    assertNull(RoleGate.blocked("cashier", withItem, withItem.copy(
+      sales = listOf(Sale(id = "s0", status = "cancelled")), stockMovements = listOf(mc))))
+    //  ولی فاکتوری که لغو نشده نه
+    assertEquals("stockMovements", RoleGate.blocked("cashier", withItem, withItem.copy(stockMovements = listOf(mc))))
     assertEquals("stockMovements", RoleGate.blocked("cashier", sale, sale.copy(stockMovements = emptyList())))
     //  انباردار رسیدِ دستی می‌نویسد؛ شاگرد و مدیر هم (بی قاعدهٔ ردیف)
     assertNull(RoleGate.blocked("storekeeper", base, manual))
