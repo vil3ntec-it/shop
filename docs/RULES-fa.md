@@ -349,6 +349,7 @@
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `shop.storefront.search` | دکان / `all` | خاموش | جست‌وجوی ویترین در `GET /api/store/:slug/products?q=`: رقمِ فارسی/عربی، نامِ دسته ⇒ همان دسته (`jump`)، غلطِ تایپی با بودجهٔ `text-core` (سقفِ اسکنِ ۱۰۰۰؛ ناموجود و منتشرنشده نه) و `suggest` ِ «پیدا نشد»؛ خاموش ⇒ پاسخِ پیشین (WEB-05/06) | #454 | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
