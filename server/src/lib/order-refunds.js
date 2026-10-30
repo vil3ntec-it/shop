@@ -251,8 +251,10 @@ function windowOf({ from, to } = {}, at = now()) {
  * `reportMany(shopIds, query)` همین را برای چند دکان با **همان پرس‌وجوها**
  * (`shop_id = ANY` + `GROUP BY`) می‌دهد — پنلِ VILL3N (E2E-ADM-15). `report`
  * خودش `reportMany([shopId])` است، پس برابریِ پنل با گزارشِ دکان ساختاری است.
+ * `{ liveOnly: true }` (پنل): سفارشِ آزمایشی همان‌جا در SQL کنار می‌رود، پس سقفِ
+ * ۱۰۰ اختلاف فقط اختلاف‌های واقعی را می‌شمارد.
  */
-async function reportMany(shopIds, query = {}) {
+async function reportMany(shopIds, query = {}, { liveOnly = false } = {}) {
   const w = windowOf(query);
   const ids = [...new Set((Array.isArray(shopIds) ? shopIds : []).map(String))];
   const out = new Map();
@@ -279,11 +281,11 @@ async function reportMany(shopIds, query = {}) {
          FROM online_orders o
          LEFT JOIN (SELECT order_id, SUM(amount_minor) AS s FROM online_order_refunds
                      WHERE shop_id = ANY($1::text[]) GROUP BY order_id) r ON r.order_id = o.id
-        WHERE o.shop_id = ANY($1::text[])
+        WHERE o.shop_id = ANY($1::text[]) AND ($2::boolean = false OR o.is_test = false)
           AND (o.status IN ('return_requested','refunded_partial','refunded_full') OR r.s IS NOT NULL)
      ) x WHERE rn <= 1000
      ORDER BY shop_id, rn`,
-    [ids]
+    [ids, liveOnly === true]
   )).rows;
   const col = new Map(collected.map((r) => [r.shop_id, r]));
   const ref = new Map(refunds.map((r) => [r.shop_id, r]));

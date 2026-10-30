@@ -12,7 +12,8 @@
  *   ۷) بیش از ۲۰۰ دکان: جمعِ کل از همه، فهرست به اهمیت، «۲۰۰ از M».
  *   ۸) reportMany همان report است، دکان به دکان.
  *   ۹) دیدنِ گزارش سابقه دارد.
- *  ۱۰) بازهٔ روزانه در Asia/Kabul؛ روزِ «تا» شامل است.
+ *  ۱۰) بازهٔ روزانه در Asia/Kabul؛ روزِ «تا» شامل است؛ تاریخِ ناممکن (۰۲-۳۱) ⇒ ۴۰۰.
+ *  ۱۱) سقفِ ۱۰۰ اختلاف پس از کنار گذاشتنِ آزمایشی است، نه پیش از آن (بازبینیِ سرپرست).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -250,7 +251,8 @@ test('۱۰) بازهٔ روزانه در Asia/Kabul؛ روزِ «تا» شامل
   const r = (await recon(`?fromDate=${day}&toDate=${day}`)).body;
   assert.deepEqual([r.local.fromDate, r.local.toDate], [day, day]);
   assert.equal(rowOf(r, s.shopId).courier.collectedMinor, 11);
-  for (const q of ['?fromDate=2026-13-01', '?fromDate=2026-10-02&toDate=2026-10-01', '?fromDate=2026-01-01&toDate=2026-06-01']) {
+  for (const q of ['?fromDate=2026-13-01', '?fromDate=2026-02-31', '?toDate=2026-04-31', '?fromDate=2026-02-29&toDate=2026-03-01',
+    '?fromDate=2026-10-02&toDate=2026-10-01', '?fromDate=2026-01-01&toDate=2026-06-01']) {
     assert.equal((await recon(q)).status, 400, q);
   }
 });
@@ -277,4 +279,30 @@ test('۷) بیش از ۲۰۰ دکان: جمعِ کل از همه، فهرست ب
     assert.ok(rank[i - 1][0] > rank[i][0] || (rank[i - 1][0] === rank[i][0] && rank[i - 1][1] >= rank[i][1]), `ترتیب در ${i}`);
   }
   assert.ok(b.shops[0].issues.length >= 1);
+});
+
+test('۱۱) سقفِ ۱۰۰ اختلاف پس از کنار گذاشتنِ آزمایشی است — ۱۰۵ آزمایشیِ تازه‌تر اختلافِ واقعی را نمی‌پوشانند', async () => {
+  const s = await shop('سقف');
+  const o = await order(s);
+  await move(s, o.id, 'accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up');
+  await query(`UPDATE online_orders SET status='refunded_full', updated_at=$2 WHERE id=$1`, [o.id, now() - 2 * DAY]);
+  //  همان سفارش، رونوشت: ۲ واقعیِ کهنه‌تر و ۱۰۵ آزمایشیِ تازه‌تر (همه refund_without_ledger)
+  const clone = (i, isTest, at) => query(
+    `INSERT INTO online_orders SELECT (jsonb_populate_record(o, jsonb_build_object(
+        'id', $2::text, 'order_no', $3::int, 'client_key', $2::text, 'is_test', $4::boolean, 'updated_at', $5::bigint))).*
+       FROM online_orders o WHERE o.id = $1`,
+    [o.id, `${o.id}-c${i}`, 1000 + i, isTest, at]
+  );
+  for (let i = 0; i < 2; i++) await clone(i, false, now() - 3 * DAY - i);
+  for (let i = 2; i < 107; i++) await clone(i, true, now() - HOUR - i);
+
+  const own = (await h.get('/api/shop/orders/reconciliation', { token: s.token })).body;
+  assert.equal(own.issues.length, 100, 'گزارشِ خودِ دکان همان سقفِ ۱۰۰ با آزمایشی‌ها');
+  assert.ok(own.issues.every((i) => i.isTest), 'صد تازه‌ترین همه آزمایشی‌اند — شرطِ آزمون');
+  const r = rowOf((await recon()).body, s.shopId);
+  assert.ok(r, 'دکان با سه اختلافِ واقعی نیامد');
+  assert.equal(r.issues.length, 3, 'سقف پیش از کنار گذاشتنِ آزمایشی خورد');
+  const live = (await R.reportMany([s.shopId], {}, { liveOnly: true })).get(s.shopId);
+  assert.equal(live.issues.length, 3);
+  assert.ok(live.issues.every((i) => !i.isTest));
 });

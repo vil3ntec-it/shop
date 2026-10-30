@@ -415,7 +415,9 @@ function reconWindow(q = {}, at = now()) {
   };
   const date = (v) => {
     if (v === undefined || v === null || v === '') return null;
-    if (!DATE_RE.test(String(v)) || Number.isNaN(Date.parse(`${v}T00:00:00Z`))) throw bad();
+    //  رفت‌وبرگشت: ۲۰۲۶-۰۲-۳۱ در Date به ۰۳-۰۳ می‌لغزد ⇒ ناممکن است و ۴۰۰
+    const d = DATE_RE.test(String(v)) ? new Date(`${v}T00:00:00Z`) : null;
+    if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== String(v)) throw bad();
     return String(v);
   };
   const fromDate = date(q.fromDate);
@@ -480,7 +482,7 @@ async function reconciliation(query = {}) {
   const args = [w.from, w.to, ids];
   const by = async (sql, params = args) => new Map((ids.length ? await many(sql, params) : []).map((r) => [r.shop_id, r]));
   const [reports, cancels, courier, held, settleRows] = await Promise.all([
-    require('./order-refunds').reportMany(ids, { from: w.from, to: w.to }),
+    require('./order-refunds').reportMany(ids, { from: w.from, to: w.to }, { liveOnly: true }),
     by(`SELECT e.shop_id, COUNT(*)::int AS n FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
          WHERE e.shop_id = ANY($3::text[]) AND e.kind = 'status' AND e.to_status = ANY($4::text[])
            AND e.created_at >= $1 AND e.created_at < $2 AND o.is_test = false
