@@ -16,6 +16,8 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # سنجهٔ بانکِ تصاویر در اندازهٔ کوچک (image-bank-bench.test.js)
+      - 'bench/image-bank.mjs'
       # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       - '.github/workflows/server.yml'
@@ -26,6 +28,8 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # سنجهٔ بانکِ تصاویر در اندازهٔ کوچک (image-bank-bench.test.js)
+      - 'bench/image-bank.mjs'
       # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       - '.github/workflows/server.yml'
