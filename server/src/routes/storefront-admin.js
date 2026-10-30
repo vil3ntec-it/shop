@@ -75,10 +75,11 @@ const ownShopOnly = (req, res, next) => {
 
 /**
  * S7 (§۳۱.۲ بندِ ۴): ضربانِ سبکِ دستگاهی که باز است ولی چیزی برای همگام‌سازی ندارد ⇒ «آخرین تماس»
- * ِ ویترین، حداکثر هر ۳۰ ثانیه یک نوشتن. هر عضوِ دکان (دستگاهِ باز، نه تنظیم). فقط با پرچمِ
+ * ِ ویترین، حداکثر هر ۳۰ ثانیه یک نوشتن. هر عضوِ دکان (دستگاهِ باز، نه تنظیم)، ولی مثلِ بقیهٔ نوشتنی‌های
+ * ویترین پولی است (`needWrite`، SUB-10: اشتراکِ تمام‌شده ⇒ ۴۰۳ subscription_*). فقط با پرچمِ
  * `market.load` (all)؛ خاموش ⇒ ۴۰۴ و هیچ نوشتنی (حضور همان از `sync_devices` است).
  */
-router.post('/heartbeat', needFlag, wrap(async (req, res) => {
+router.post('/heartbeat', needFlag, needWrite, wrap(async (req, res) => {
   if (!(await require('../lib/market-load').enabled())) throw notFound('ضربانِ ویترین روشن نیست', 'heartbeat_disabled');
   const at = Date.now();
   const written = await sf.noteSeen(req.shopId, at);
