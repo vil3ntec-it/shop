@@ -54,6 +54,14 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-1` (OPS-01: آماده‌سازیِ انتشارِ مرحله‌ای)
+- انجام شد: برچسبِ نسخه‌دارِ ثابت `<برچسب>-v<نسخه>` و کلیدِ `stage.<برچسب>` (`{version, percent}`) پشتِ پیکربندی
+  (`lib/release-stage.js`، `routes/releases.js`)؛ پنلِ `GET|PUT|DELETE /api/admin/release/stage` (فقط مدیرِ ارشد، با سابقه)؛
+  برنامه `staged=1` می‌فرستد و برچسبِ نسخه‌دارِ همان نسخه را می‌پذیرد (`ReleaseFeed.kt`). بی کلید ⇒ رفتارِ پیشین.
+  آزمون: `release-stage.test.js` ۱۰/۱۰ (جهش ۱۰ از ۱۰)، `ReleaseFeedTest` ۱۷/۱۷ با kotlinc ِ محلی.
+- نیمه‌کاره (عمداً): ورک‌فلو و امضا دست نخورد — گامِ `channel = staged` در `docs/RULES-fa.md` (بخشِ F0-27) نوشته شده؛ دلتا نیست.
+- قدمِ بعدی: PRِ جدای ورک‌فلو با تأییدِ صاحب محصول؛ تا آن‌وقت کلیدِ `stage.*` زده نشود.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
