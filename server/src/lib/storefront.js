@@ -40,6 +40,7 @@ const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
 const shelf = require('./storefront-shelf');
+const search = require('./storefront-search');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -308,17 +309,29 @@ function decodeCursor(raw) {
   }
 }
 
-/** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی. */
-async function catalog(shopId, { q, category, cursor, limit } = {}) {
+/**
+ * کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی.
+ * با پرچمِ `shop.storefront.search` (WEB-05/06، `storefront-search.js`): رقمِ فارسی،
+ * پرش به دسته، تحملِ غلطِ تایپی و `suggest` ِ «چیزی پیدا نشد»؛ خاموش ⇒ همان قبلی.
+ */
+async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
-  const needle = normalize(text(q, 60));
-  if (needle) {
-    params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    where += ` AND ${SQL_NAME} LIKE $${params.length}`;
+  const raw = text(q, 60);
+  const smart = raw ? await search.enabled(shopId) : false;
+  let cat = text(category, 80);
+  let jump = '';
+  let needle = normalize(raw);
+  if (smart && !cat) {
+    jump = search.categoryOf(raw, await categories(shopId));
+    if (jump) { cat = jump; needle = ''; }
   }
-  const cat = text(category, 80);
+  if (needle) {
+    if (smart) needle = search.needle(needle);
+    params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where += ` AND ${smart ? search.sqlName(SQL_NAME) : SQL_NAME} LIKE $${params.length}`;
+  }
   if (cat) {
     params.push(cat);
     where += ` AND r.data->>'category' = $${params.length}`;
@@ -337,10 +350,47 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
   const last = page[page.length - 1];
-  return {
+  const out = {
     //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
     items: await decorate(shopId, page.map(productView).filter((p) => p.priceMinor !== null && p.name)),
     nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
+  };
+  if (!smart) return out;
+  if (jump) return { ...out, match: 'category', jump: { category: jump } };
+  if (out.items.length || cursor) return { ...out, match: 'exact' };
+  return smartMiss(shopId, raw, cat, lim, contactPhone);
+}
+
+/**
+ * WEB-05/06 — بی نتیجهٔ دقیق: اول غلطِ تایپی (فقط کالای پیشنهادشدنی؛ ناموجود هرگز، WEB-09)،
+ * وگرنه «چیزی پیدا نشد» با دسته‌های نزدیک، پرفروش/تازهٔ واقعی و تلفنِ تماسِ ویترین.
+ */
+async function smartMiss(shopId, raw, cat, lim, contactPhone) {
+  if (search.fuzzyWorthy(raw)) {
+    const params = [shopId];
+    let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
+    if (cat) {
+      params.push(cat);
+      where += ` AND r.data->>'category' = $${params.length}`;
+    }
+    const rows = await many(
+      `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM} WHERE ${where}
+        ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT ${search.FUZZY_SCAN}`,
+      params
+    );
+    const views = rows.map(productView).filter((p) => p.priceMinor !== null && p.name);
+    const hits = (await decorate(shopId, search.fuzzyPick(views, raw, lim * 3))).filter(shelf.suggestable).slice(0, lim);
+    if (hits.length) return { items: hits, nextCursor: null, match: 'fuzzy' };
+  }
+  const [cats, hl] = await Promise.all([categories(shopId), highlights(shopId)]);
+  const best = hl.bestsellers.length > 0;
+  return {
+    items: [], nextCursor: null, match: 'none',
+    suggest: {
+      categories: search.nearCategories(raw, cats),
+      picks: best ? hl.bestsellers : hl.newArrivals, picksKind: best ? 'bestsellers' : 'newArrivals',
+      contactPhone: contactPhone || '',
+    },
   };
 }
 

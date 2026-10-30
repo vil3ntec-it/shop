@@ -128,6 +128,27 @@ ok(true, 'جست‌وجو');
 await page.fill('#q', 'چیزی‌که‌نیست');
 await page.waitForSelector('#catalog-empty:not([hidden])', { timeout: 5000 });
 ok((await page.textContent('#catalog-empty')).includes('پیدا نشد'), 'صفحهٔ «چیزی پیدا نشد» راه دارد (WEB-06)');
+//  WEB-06: کنارِ «پیدا نشد» پیشنهادِ واقعیِ همین دکان (تازه‌ها) و راهِ تماس هم پیداست
+ok(await page.isVisible('#picks') && (await page.locator('#picks-list li[data-id]').count()) > 0
+  && await page.isVisible('#store-call') && /^tel:\+93/.test(await page.getAttribute('#store-call', 'href')),
+  '«پیدا نشد»: پیشنهادِ همین دکان و دکمهٔ تماس دیده می‌شوند (WEB-06)');
+//  WEB-05 با پرچمِ `shop.storefront.search`: غلطِ تایپی و نامِ دسته در همین صفحه، بی تغییرِ کدِ صفحه
+{
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.search', value: true }, A);
+  const sc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const sp = await sc.newPage();
+  sp.on('pageerror', (e) => errors.push(String(e)));
+  await sp.goto(`${base}/store/${slug}`);
+  await sp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  const shows = (pred, label) => sp.waitForFunction(pred, null, { timeout: 5000 }).then(() => ok(true, label), () => ok(false, label));
+  await sp.fill('#q', 'روغم');
+  await shows(() => [...document.querySelectorAll('#products li[data-id]')].map((x) => x.getAttribute('data-id')).join() === 'oil',
+    'غلطِ تایپی («روغم») ⇒ روغن (WEB-05)');
+  await sp.fill('#q', 'خوراکی');
+  await shows(() => document.querySelectorAll('#products li[data-id]').length === 2, 'نامِ دسته («خوراکی») ⇒ کالاهای همان دسته (WEB-05)');
+  await sc.close();
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.search', value: false }, A);
+}
 await page.click('#clear-search');
 await page.waitForFunction(() => document.querySelectorAll('#products li[data-id]').length === 2, null, { timeout: 5000 });
 
