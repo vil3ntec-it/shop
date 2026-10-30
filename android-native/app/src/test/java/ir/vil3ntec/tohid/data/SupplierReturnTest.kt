@@ -86,6 +86,34 @@ class SupplierReturnTest {
     assertEquals(listOf("p1"), PurchaseBook.boughtFrom(d, "s1").map { it.id })
   }
 
+  /** سقفِ برگشت = خریدِ همان (تأمین‌کننده، کالا) منهای برگشت‌های پیشین — نه کلِ موجودی */
+  @Test
+  fun returnIsCappedByWhatThisSupplierSold() {
+    val d0 = ShopData(
+      products = listOf(Product(id = "p1", name = "روغن", unit = "عدد", purchasePrice = 100.0)),
+      suppliers = listOf(Supplier(id = "A", name = "الف"), Supplier(id = "B", name = "ب")),
+    )
+    val a = (PurchaseBook.record(d0, "A", listOf(PurchaseBook.Line("p1", 1.0, 100.0)), 0.0, "2026-10-01", "", today, now, ::newId)
+      as PurchaseBook.Result.Ok).data
+    val d = (PurchaseBook.record(a, "B", listOf(PurchaseBook.Line("p1", 100.0, 100.0)), 0.0, "2026-10-02", "", today, now + 1, ::newId)
+      as PurchaseBook.Result.Ok).data
+    assertEquals(101.0, ShopStore.stock(d, "p1"), 0.0)
+    assertEquals(1.0, PurchaseBook.returnable(d, "A", "p1"), 0.0)
+    assertTrue(PurchaseBook.supplierReturn(d, "A", "p1", 2.0, 100.0, "بیش از خرید", "", today, now + 2, ::newId)
+      is PurchaseBook.Result.Failed)
+
+    //  دو برگشتِ پیاپی که روی‌هم از خریدِ B بیشتر شوند
+    val once = (PurchaseBook.supplierReturn(d, "B", "p1", 60.0, 100.0, "اول", "", today, now + 3, ::newId)
+      as PurchaseBook.Result.Ok).data
+    assertEquals(40.0, PurchaseBook.returnable(once, "B", "p1"), 0.0)
+    assertTrue(PurchaseBook.supplierReturn(once, "B", "p1", 41.0, 100.0, "دوم", "", today, now + 4, ::newId)
+      is PurchaseBook.Result.Failed)
+    assertTrue(PurchaseBook.supplierReturn(once, "B", "p1", 40.0, 100.0, "دوم", "", today, now + 4, ::newId)
+      is PurchaseBook.Result.Ok)
+    //  برگشت به A دست‌نخورده می‌ماند
+    assertEquals(1.0, PurchaseBook.returnable(once, "A", "p1"), 0.0)
+  }
+
   @Test
   fun dueDatesAndReminders() {
     val d0 = shop()

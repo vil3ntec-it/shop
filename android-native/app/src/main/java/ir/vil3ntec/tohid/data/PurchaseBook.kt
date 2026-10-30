@@ -227,6 +227,13 @@ object PurchaseBook {
     d.purchases.filter { it.supplierId == supplierId && it.productId == productId && it.quantity > 0 }
       .maxByOrNull { it.createdAt }?.purchasePrice
 
+  /**
+   *  سقفِ برگشت به یک تأمین‌کننده: خریدهای همین (تأمین‌کننده، کالا) منهای برگشت‌های پیشین به
+   *  او (سندهای کسر = خریدِ منفی). بی این، کالای خریده از دیگری هم به او برمی‌گشت.
+   */
+  fun returnable(d: ShopData, supplierId: String, productId: String): Double =
+    kotlin.math.max(0.0, d.purchases.filter { it.supplierId == supplierId && it.productId == productId }.sumOf { it.quantity })
+
   /** کالاهایی که از این تأمین‌کننده خریده شده‌اند — گزینه‌های برگشت */
   fun boughtFrom(d: ShopData, supplierId: String): List<Product> {
     val ids = d.purchases.filter { it.supplierId == supplierId && it.quantity > 0 }.map { it.productId }.toSet()
@@ -267,6 +274,8 @@ object PurchaseBook {
     if (why.isEmpty()) return Result.Failed("دلیلِ برگشت را بنویسید")
     val stock = ShopStore.stock(d, productId)
     if (quantity > stock) return Result.Failed("فقط ${ir.vil3ntec.tohid.qty(kotlin.math.max(0.0, stock))} ${product.unit} موجود است")
+    val cap = returnable(d, supplierId, productId)
+    if (quantity > cap) return Result.Failed("از «${supplier.name}» فقط ${ir.vil3ntec.tohid.qty(cap)} ${product.unit} خریده شده که هنوز برنگشته")
     val day = date.ifBlank { today }
     if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed("تاریخ درست نیست")
     val amount = Math.round(quantity * unitPrice).toDouble()

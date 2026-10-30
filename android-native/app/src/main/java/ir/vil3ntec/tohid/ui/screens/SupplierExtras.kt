@@ -115,7 +115,7 @@ fun SupplierReturnDialog(
               allowNew = false,
             )
             product?.let {
-              Text("موجودی: ${qty(ShopStore.stock(d, it.id))} ${it.unit}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Text("موجودی: ${qty(ShopStore.stock(d, it.id))} ${it.unit} · قابلِ برگشت به همین تأمین‌کننده: ${qty(PurchaseBook.returnable(d, supplierId, it.id))}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
