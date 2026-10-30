@@ -64,6 +64,7 @@ object Watchman {
   private const val SEEN_DEBT = "notified_debt"
   private const val SEEN_SUB = "notified_sub_step"
   private const val SEEN_NEWS = "notified_news_at"
+  private const val SEEN_REVIEW = "notified_order_review"
 
   private const val WORK = "tohid-watchman"
 
@@ -88,8 +89,9 @@ object Watchman {
   private val DEBT = Channel("tohid-debt", "قرض زیاد", "وقتی قرضِ یک نفر از حد بگذرد", 4302)
   private val SUB = Channel("tohid-subscription", "اشتراک", "پیش از تمام شدن اشتراک", 4303)
   private val NEWS = Channel("tohid-news", "خبر دکان", "کارِ بقیهٔ اعضای دکان", 4304)
+  private val ORDER_REVIEW = Channel("tohid-order-review", "سفارش در بررسی", "وقتی فروشِ حضوری کالای نگه‌داشتهٔ سفارشِ آنلاین را ببرد", 4305)
 
-  private val ALL = listOf(STOCK, DEBT, SUB, NEWS)
+  private val ALL = listOf(STOCK, DEBT, SUB, NEWS, ORDER_REVIEW)
 
   /* ------------------------------ راه‌اندازی ------------------------------ */
 
@@ -254,6 +256,20 @@ object Watchman {
 
   fun lastNewsAt(context: Context): Long = prefs(context).getLong(SEEN_NEWS, 0)
 
+  /**
+   *  «سفارش به بررسی رفت» (M5) — از `GET /shop/orders/summary` (`review`)، هم وقتی برنامه باز است
+   *  (`OrdersLive.pollSummary`) و هم در کارِ دوره‌ای. هر سفارش یک بار؛ سفارشی که از بررسی بیرون آمد
+   *  و دوباره رفت، دوباره خبر می‌دهد (`StockHold.fresh`). متن بی دادهٔ مشتری، مثلِ اعلانِ سرور.
+   */
+  fun checkOrderReview(context: Context, review: List<ir.vil3ntec.tohid.core.model.OrderReviewRefDto>) {
+    val seen = prefs(context).getStringSet(SEEN_REVIEW, emptySet()).orEmpty()
+    val out = ir.vil3ntec.tohid.core.orders.StockHold.fresh(
+      review.map { ir.vil3ntec.tohid.core.orders.StockHold.Ref(it.id, it.orderNo) }, seen,
+    )
+    ir.vil3ntec.tohid.core.orders.StockHold.notice(out.fresh)?.let { (title, body) -> notify(context, ORDER_REVIEW, title, body) }
+    if (out.keep != seen) prefs(context).edit().putStringSet(SEEN_REVIEW, out.keep).apply()
+  }
+
   /* ------------------------------ کارِ دوره‌ای ------------------------------ */
 
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -282,7 +298,16 @@ object Watchman {
 
       //  خبرهای اعضای دیگر — جدا، چون شبکه می‌خواهد و ممکن است نباشد
       runCatching { pullNews(app) }
+      //  «سفارش به بررسی رفت» وقتی برنامه بسته است (بخشِ سفارش خاموش ⇒ خطای سرور ⇒ هیچ)
+      runCatching { pullOrderReview(app) }
       return Result.success()
+    }
+
+    private suspend fun pullOrderReview(app: Context) {
+      if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(app)) return
+      if (!ir.vil3ntec.tohid.data.repo.Backend.isOnline(app)) return
+      ir.vil3ntec.tohid.ui.OrdersLive.repository(app).summary()
+        .onSuccess { checkOrderReview(app, it.review) }
     }
 
     private suspend fun pullNews(app: Context) {
