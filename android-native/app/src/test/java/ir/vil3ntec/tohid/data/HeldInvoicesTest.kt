@@ -122,6 +122,21 @@ class HeldInvoicesTest {
   }
 
   @Test
+  fun `N3 — کدهای تخفیف با فاکتورِ نگه‌داشته می‌روند و با همان برمی‌گردند، نه با فاکتورِ دیگر`() {
+    val a = SaleDraft(key = "A", lines = listOf(SaleDraft.Line("p1", 1.0)), coupons = listOf("EID5"))
+    val held = HeldRules.hold(HeldBook(), a, HeldExtras(), "الف", null, now, "A") as HeldRules.Result.Ok
+    assertEquals(listOf("EID5"), held.book.items.single().coupons)
+    //  فاکتورِ «ب» با کدِ خودش جاری است؛ «الف» برمی‌گردد و «ب» با کدش نگه داشته می‌شود
+    val b = SaleDraft(key = "B", lines = listOf(SaleDraft.Line("p2", 1.0)), coupons = listOf("VIP10"))
+    val back = HeldRules.resume(held.book, "A", b, HeldExtras(), now, "A") as HeldRules.Result.Ok
+    assertEquals(listOf("EID5"), back.cart!!.coupons)
+    assertEquals(listOf("VIP10"), back.book.items.single { it.id == "B" }.coupons)
+    //  نگه‌داشتهٔ نسخهٔ پیش (بی `coupons`) بی کد برمی‌گردد
+    val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}]}]}""")!!
+    assertEquals(emptyList<String>(), old.items.single().draft().coupons)
+  }
+
+  @Test
   fun `سبدِ خالی نگه داشته نمی‌شود`() = runBlocking<Unit> {
     val s = store(MemDisk())
     assertEquals(HeldRules.EMPTY, refused(s.hold(MemCart(), HeldExtras())))
