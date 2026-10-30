@@ -54,6 +54,16 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-2` (OPS-03: گزارشِ از کار افتادنِ برنامهٔ نصبی)
+- انجام شد: منطق در `core/.../core/ops/CrashReports.kt` (پوشاندنِ ایمیل/شماره با هر سه خطِ رقم/توکن/عددِ ۷+ رقمی پیش از دیسک،
+  کدِ `cer_<ULID>`، یکی کردنِ حلقهٔ خطا، صفِ ۲۰تایی ۷روزه)؛ `data/platform/CrashReporter.kt` + `CrashStore.kt` (گیرندهٔ خطا، صفِ اتمی روی
+  دیسک، فرستادنِ بی توکن در اجرای بعد) در `MainActivity` و `desktop/Main.kt`؛ پنجرهٔ یک‌بارهٔ «برنامه ناگهان بسته شد» با کد
+  (اندروید)؛ سرور `report_id` را شناسهٔ ردیف می‌کند و فرستادنِ دوباره بی‌اثر است.
+  آزمون: `CrashReportsTest` ۸/۸ (Gradle ِ core)، `CrashStoreTest` ۴/۴ (kotlinc ِ محلی)، `client-errors-report-id.test.js` ۲/۲.
+- نیمه‌کاره: ساختِ اندروید/کامپیوتر این‌جا ممکن نبود (dl.google.com) ⇒ CI؛ پنجرهٔ کد روی کامپیوتر نیست؛ گزینهٔ خاموش کردن در تنظیمات
+  (پرسش از صاحب محصول).
+- قدمِ بعدی: سبز شدنِ CI ِ «توحید بومی» و «فروشگاه من — کامپیوتر»؛ آزمونِ روی گوشیِ واقعی (یک کرشِ عمدی در ساختِ dev).
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
