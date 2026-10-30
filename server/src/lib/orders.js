@@ -576,9 +576,11 @@ async function list(shopId, { tab = 'new', limit, cursor } = {}, viewer) {
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
   const last = page[page.length - 1];
+  //  M5: «در بررسی» روی کارت (فروشِ حضوری رزروِ نرمِ سفارش را برد) — بی رزروِ نرم ⇒ همان کارتِ پیشین
+  const review = await require('./stock-reserve').reviewIdsOf(viaDb, shopId, page.map((r) => r.id), at);
   return {
     tab,
-    items: page.map((r) => card(r, viewer, at)),
+    items: page.map((r) => (review.has(r.id) ? { ...card(r, viewer, at), stockReview: true } : card(r, viewer, at))),
     nextCursor: more ? encodeCursor(Number(last[col]), last.id) : null,
   };
 }
@@ -595,7 +597,9 @@ async function summary(shopId) {
     [shopId, at]
   );
   const counts = Object.fromEntries(S.OPEN_TABS.map((tab) => [tab, Number(r?.[tab] || 0)]));
-  return { counts, oldestNewAt: n(r?.oldest), rev: n(r?.rev) || 0, serverTime: at };
+  //  M5: سفارش‌های «در بررسی» (سقف ۲۰) — برنامه اعلانِ «سفارش به بررسی رفت» را از همین می‌سازد
+  const review = await require('./stock-reserve').reviewOrdersOf(viaDb, shopId, at);
+  return { counts, oldestNewAt: n(r?.oldest), rev: n(r?.rev) || 0, serverTime: at, review };
 }
 
 module.exports = {

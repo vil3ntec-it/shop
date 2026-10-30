@@ -175,6 +175,7 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
     byPid.get(r.product_id).push(r);
   }
   const shortAll = [];
+  const newly = new Set();
   for (const [pid, list] of byPid) {
     const sell = Math.max(0, stock.sellableOnHand(lvs.get(pid), s));
     let cum = 0;
@@ -185,6 +186,7 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
       if (isShort) short.push(r);
       if (isShort && r.short_at === null) {
         await c.query('UPDATE stock_reservations SET short_at=$2 WHERE id=$1', [r.id, at]);
+        newly.add(r.order_id);
       } else if (!isShort && r.short_at !== null) {
         await c.query('UPDATE stock_reservations SET short_at=NULL WHERE id=$1', [r.id]);
       }
@@ -197,7 +199,36 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
       shortAll.push(...short);
     }
   }
+  //  «سفارش به بررسی رفت» ⇒ همان صفِ پایدارِ اعلانِ سفارش (پشتِ `shop.order_notify`؛ خاموش ⇒ هیچ).
+  //  همان تراکنش: بی بررسی، بی اعلان؛ هر سفارش یک بار (یکتاییِ order_id + event).
+  for (const orderId of [...newly].sort()) {
+    await require('./order-notify').enqueueReviewIn((t, p) => c.query(t, p), { shopId, orderId, at });
+  }
   return shortAll;
+}
+
+/** شرطِ «سفارش در بررسی»: رزروِ نرمِ نگه‌داشته و نگذشته‌ای که فروشِ حضوری پوششش را برده. */
+const REVIEW_SQL = `SELECT DISTINCT order_id FROM stock_reservations
+  WHERE shop_id=$1 AND kind='soft' AND status='held' AND short_at IS NOT NULL
+    AND (expires_at IS NULL OR expires_at > $2)`;
+
+/** از میانِ [orderIds] آن‌هایی که در بررسی‌اند ⇒ Set (برای کارتِ فهرستِ سفارش‌ها). بی شناسه ⇒ بی پرسش. */
+async function reviewIdsOf(run, shopId, orderIds, at = now()) {
+  const out = new Set();
+  if (!orderIds || !orderIds.length) return out;
+  const rows = (await run(`${REVIEW_SQL} AND order_id = ANY($3::text[])`, [shopId, at, orderIds])).rows;
+  for (const r of rows) out.add(r.order_id);
+  return out;
+}
+
+/** سفارش‌های در بررسیِ دکان (تازه‌ترین بالا، سقف‌دار) ⇒ [{ id, orderNo }] برای `GET /shop/orders/summary`. */
+async function reviewOrdersOf(run, shopId, at = now(), limit = 20) {
+  const rows = (await run(
+    `SELECT o.id, o.order_no FROM online_orders o
+      WHERE o.shop_id=$1 AND o.id IN (${REVIEW_SQL})
+      ORDER BY o.created_at DESC, o.id DESC LIMIT $3`, [shopId, at, limit]
+  )).rows;
+  return rows.map((r) => ({ id: r.id, orderNo: num(r.order_no) }));
 }
 
 /**
@@ -289,5 +320,5 @@ function stop() {
 module.exports = {
   DEFAULT_TTL_SEC, RELEASE_ON,
   enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, onTransitionIn, recheckShort, afterMovesIn,
-  orderView, sweep, start, stop,
+  orderView, reviewIdsOf, reviewOrdersOf, sweep, start, stop,
 };

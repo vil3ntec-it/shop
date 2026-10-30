@@ -18,7 +18,7 @@ process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query, one, newId, now, tx } = require('../src/db');
+const { query, one, many, newId, now, tx } = require('../src/db');
 const syncV1 = require('../src/lib/sync-v1');
 const catalog = require('../src/lib/catalog');
 const reserve = require('../src/lib/stock-reserve');
@@ -250,6 +250,48 @@ test('⛔ INV-19: فروشِ حضوری روی موجودیِ رزروشده ه�
   assert.equal((await go(s, b.body.order.id, { to: 'rejected', reason: 'out_of_stock' })).status, 200);
   assert.equal((await holds(s)).length, 1);
   await reconciled(s, 'p1');
+});
+
+test('M5: «سفارش به بررسی رفت» — کارتِ فهرست، summary و صفِ پایدارِ اعلانِ سفارش (order_review، یک بار)؛ بستن با رد', async () => {
+  const N = require('../src/lib/order-notify');
+  const s = await shop('رزرو-اعلان');
+  await enable(s);
+  await live(s.shopId, 'shop.order_notify', true);
+  await push(s, [product('n1'), entry('n1-e', 'n1', 1)]);
+  const a = await order(s, [line('n1', 1000)]);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const id = a.body.order.id;
+  const outbox = () => many(`SELECT * FROM order_notify_outbox WHERE shop_id=$1 AND event='order_review'`, [s.shopId]);
+  //  هنوز پوشش دارد ⇒ نه اعلان، نه نشان
+  assert.equal((await outbox()).length, 0);
+  assert.deepEqual((await h.get('/api/shop/orders/summary', { token: s.token })).body.review, []);
+  //  فروشِ حضوری عددِ نگه‌داشته را برد ⇒ بررسی + یک ردیفِ اعلان
+  await push(s, sale('n1-s', [['n1-i', 'n1', 1]]));
+  assert.equal((await h.post('/api/shop/catalog/refresh', {}, { token: s.token })).status, 200);
+  const rows = await outbox();
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].order_id, id);
+  assert.equal(N.messageFor(rows[0], false).title.startsWith('سفارش به بررسی رفت'), true);
+  assert.equal(N.messageFor(rows[0], false).data.event, 'order_review');
+  const sum = (await h.get('/api/shop/orders/summary', { token: s.token })).body;
+  assert.deepEqual(sum.review, [{ id, orderNo: a.body.order.orderNo }]);
+  const card = (await h.get('/api/shop/orders?tab=new', { token: s.token })).body.items.find((o) => o.id === id);
+  assert.equal(card.stockReview, true);
+  const pend = await h.get('/api/shop/order-notify/pending', { token: s.token });
+  assert.equal(pend.status, 200, JSON.stringify(pend.body));
+  assert.ok(pend.body.notifications.some((x) => x.orderId === id && x.event === 'order_review'), JSON.stringify(pend.body));
+  //  فروشِ حضوریِ دیگر (هنوز در بررسی) ⇒ ردیفِ دوم نیست
+  await push(s, [entry('n1-e2', 'n1', 1)]);
+  await push(s, sale('n1-s2', [['n1-i2', 'n1', 1]]));
+  assert.equal((await h.post('/api/shop/catalog/refresh', {}, { token: s.token })).status, 200);
+  assert.equal((await outbox()).length, 1);
+  //  دکان رد می‌کند ⇒ بررسی تمام: نه نشان، نه در pending، کارگر ردیف را می‌بندد
+  assert.equal((await go(s, id, { to: 'rejected', reason: 'out_of_stock' })).status, 200);
+  assert.deepEqual((await h.get('/api/shop/orders/summary', { token: s.token })).body.review, []);
+  const pend2 = await h.get('/api/shop/order-notify/pending', { token: s.token });
+  assert.ok(!pend2.body.notifications.some((x) => x.orderId === id), JSON.stringify(pend2.body));
+  await N.tick(now() + 60_000);
+  assert.equal((await outbox())[0].status, 'acked');
 });
 
 test('M5: فروشِ تحویلِ همان سفارش (o-<سفارش>-<قلم>) از دستگاه ⇒ رزرو «انجام‌شده»، بی دو بار شمردن', async () => {

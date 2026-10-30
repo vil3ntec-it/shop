@@ -43,6 +43,11 @@ const { badRequest, notFound } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.order_notify';
 const EVENT = 'order_created';
+//  M5: فروشِ حضوری موجودیِ رزروشدهٔ سفارش را برد ⇒ «سفارش به بررسی رفت» (`stock-reserve.recheckShort`)
+const REVIEW_EVENT = 'order_review';
+/** همان شرطِ `stock-reserve` (رزروِ نرمِ نگه‌داشتهٔ نگذشته با `short_at`) — برای ردیفِ `x` و سفارشِ `o` */
+const REVIEW_OPEN = `EXISTS (SELECT 1 FROM stock_reservations sr WHERE sr.shop_id = x.shop_id AND sr.order_id = x.order_id
+  AND sr.kind='soft' AND sr.status='held' AND sr.short_at IS NOT NULL AND (sr.expires_at IS NULL OR sr.expires_at > $AT))`;
 const CHANNEL = 'orders';
 
 const num = (k, d) => { const v = Number(process.env[k]); return Number.isFinite(v) && v > 0 ? v : d; };
@@ -105,6 +110,26 @@ async function enqueueIn(run, { shopId, orderId, orderNo, at = now() }) {
   return r.rows[0] ? r.rows[0].id : null;
 }
 
+/**
+ * M5: «سفارش به بررسی رفت» — درونِ همان تراکنشی که رزرو `short_at` گرفت (`stock-reserve.recheckShort`).
+ * پرچم خاموش ⇒ هیچ. هر سفارش یک بار (یکتاییِ order_id + event)؛ سفارشِ دستیِ کارمند هم (رزرو دارد ⇒ از
+ * فروشگاهِ آنلاین است). متن مثلِ اعلانِ سفارشِ تازه بی دادهٔ مشتری است.
+ * @returns {Promise<string|null>} شناسهٔ اعلان
+ */
+async function enqueueReviewIn(run, { shopId, orderId, at = now() }) {
+  if (!(await flagIn(run, shopId))) return null;
+  const r = await run(
+    `INSERT INTO order_notify_outbox (id, shop_id, order_id, order_no, event, status,
+                                      next_attempt_at, created_at, updated_at)
+     SELECT $1, o.shop_id, o.id, o.order_no, $4, 'pending', $5, $5, $5
+       FROM online_orders o WHERE o.id=$3 AND o.shop_id=$2
+     ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
+    [ulid(at), shopId, orderId, REVIEW_EVENT, at]
+  );
+  soon();
+  return r.rows[0] ? r.rows[0].id : null;
+}
+
 // ════════════════════════════════════════════════════════════════════
 //  کانالِ پشتیبان (§۳۰.۴) — امروز «تنظیم نشده»
 // ════════════════════════════════════════════════════════════════════
@@ -152,12 +177,15 @@ const faNum = (n) => String(n).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
 /** بی نام، تلفن، نشانی یا مبلغ — صفحهٔ قفل جای دادهٔ مشتری نیست. */
 function messageFor(row, reminder) {
   const no = Number(row.order_no);
+  const review = row.event === REVIEW_EVENT;
   return {
-    title: `سفارشِ تازه — شمارهٔ ${faNum(no)}`,
-    body: reminder ? 'این سفارش هنوز باز نشده است.' : 'برای دیدنِ جزئیات باز کنید.',
+    title: review ? `سفارش به بررسی رفت — شمارهٔ ${faNum(no)}` : `سفارشِ تازه — شمارهٔ ${faNum(no)}`,
+    body: review
+      ? (reminder ? 'این سفارش هنوز در بررسی است.' : 'فروشِ حضوری کالای نگه‌داشتهٔ این سفارش را برد؛ برای تصمیم باز کنید.')
+      : (reminder ? 'این سفارش هنوز باز نشده است.' : 'برای دیدنِ جزئیات باز کنید.'),
     channel: CHANNEL,
     data: {
-      type: 'order_notify', notifId: row.id, orderId: row.order_id, orderNo: String(no),
+      type: 'order_notify', event: row.event || EVENT, notifId: row.id, orderId: row.order_id, orderNo: String(no),
       shopId: row.shop_id, reminder: reminder ? '1' : '0',
     },
   };
@@ -242,8 +270,12 @@ async function processRow(row, at) {
   const lock = Number(row.locked_at);
   const order = await one('SELECT status FROM online_orders WHERE id=$1 AND shop_id=$2', [row.order_id, row.shop_id]);
   if (!order) return settle(row, lock, { status: 'cancelled', last_result: 'order_missing', updated_at: at });
-  //  کسی سفارش را قبول/رد کرده (از هر دستگاهی) ⇒ دیگر زنگ لازم نیست
-  if (order.status !== 'new') {
+  //  کسی سفارش را قبول/رد کرده (از هر دستگاهی) ⇒ دیگر زنگ لازم نیست.
+  //  M5 (`order_review`): بررسی تمام شد (موجودی رسید، سفارش رد/لغو/تحویل شد، رزرو گذشت) ⇒ همان
+  const live = row.event === REVIEW_EVENT
+    ? (await many(`SELECT 1 FROM order_notify_outbox x WHERE x.id=$1 AND ${REVIEW_OPEN.replace('$AT', '$2')}`, [row.id, at])).length > 0
+    : order.status === 'new';
+  if (!live) {
     return settle(row, lock, { status: 'acked', acked_at: at, ack_source: 'order_status', updated_at: at });
   }
   //  کلیدِ قطعِ فوری: پرچم خاموش شد ⇒ هیچ پیامِ دیگری
@@ -387,9 +419,10 @@ async function pending(shopId, { limit } = {}) {
   const cap = Math.min(Math.max(1, Number(limit) || MAX_LIST), MAX_LIST);
   const rows = await many(
     `SELECT x.* FROM order_notify_outbox x JOIN online_orders o ON o.id = x.order_id
-      WHERE x.shop_id=$1 AND x.status IN (${OPEN.map((s) => `'${s}'`).join(',')}) AND o.status='new'
+      WHERE x.shop_id=$1 AND x.status IN (${OPEN.map((s) => `'${s}'`).join(',')})
+        AND ((x.event = '${EVENT}' AND o.status='new') OR (x.event = '${REVIEW_EVENT}' AND ${REVIEW_OPEN.replace('$AT', '$3')}))
       ORDER BY x.created_at DESC LIMIT $2`,
-    [shopId, cap]
+    [shopId, cap, now()]
   );
   return rows.map(shape);
 }
@@ -431,6 +464,6 @@ async function ack(shopId, notifId, { kind, userId = '', deviceUid = '' } = {}) 
 }
 
 module.exports = {
-  FLAG_KEY, EVENT, CHANNEL, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
-  flagOf, enqueueIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
+  FLAG_KEY, EVENT, REVIEW_EVENT, CHANNEL, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
+  flagOf, enqueueIn, enqueueReviewIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
 };

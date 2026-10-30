@@ -11,3 +11,9 @@ ALTER TABLE stock_reservations ADD COLUMN IF NOT EXISTS kind text NOT NULL DEFAU
 ALTER TABLE stock_reservations ADD COLUMN IF NOT EXISTS short_at bigint;
 CREATE INDEX IF NOT EXISTS ix_stock_reservations_soft_held
   ON stock_reservations(shop_id, product_id, created_at) WHERE status = 'held' AND kind = 'soft';
+-- «سفارش به بررسی رفت»: همان صفِ پایدارِ اعلانِ سفارش (۰۸۰، پشتِ `shop.order_notify`) رویدادِ دوم می‌گیرد
+-- (`order_review`، هر سفارش یک بار با همان یکتاییِ order_id + event). بازه فقط بازتر می‌شود.
+-- برگشت: ردیف‌های `order_review` را پاک کنید و همان CHECK ِ ۰۸۰ را بگذارید.
+ALTER TABLE order_notify_outbox DROP CONSTRAINT IF EXISTS order_notify_outbox_event_check;
+ALTER TABLE order_notify_outbox ADD CONSTRAINT order_notify_outbox_event_check
+  CHECK (event IN ('order_created', 'order_review'));
