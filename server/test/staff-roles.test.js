@@ -225,7 +225,8 @@ test('سفارش: صندوق‌دار ثبت می‌کند، جمع‌آور ق�
 test('Sync v1: صندوق‌دار می‌فروشد ولی خرید و مصرف نمی‌نویسد؛ همراه‌های خریدِ ردشده هم برمی‌گردند', async () => {
   const sale = [
     v1op('sales', 's1-csh', { total: 100, discount: 0, finalTotal: 100, status: 'completed' }),
-    v1op('saleItems', 'si1-csh', { saleId: 's1-csh', productId: 'p1', quantity: 1, unitPrice: 100 }),
+    //  ۲ عدد: حرکتِ «sale» ِ دستهٔ بعد (m3) جا دارد — هر قلم تا مقدارش (یافتهٔ ۱ ِ بازبینی، e13092d)
+    v1op('saleItems', 'si1-csh', { saleId: 's1-csh', productId: 'p1', quantity: 2, unitPrice: 50 }),
     v1op('stockMovements', 'm1-csh', { productId: 'p1', type: 'sale', qty: -1, refId: 's1-csh' }),
     v1op('auditLog', 'a1-csh', { type: 'sale', refId: 's1-csh', notes: 'ثبت فروش' }),
   ];
