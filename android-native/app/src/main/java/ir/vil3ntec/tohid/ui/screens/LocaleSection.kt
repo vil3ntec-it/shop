@@ -109,5 +109,30 @@ fun LocaleSection() {
       selected = symbol,
       onSelect = { LocaleChoice.setSymbol(context, it) },
     )
+    //  LOC-01: تاریخِ قمریِ اختیاری روی فاکتور و رسیدِ برگشت — پیش‌فرض خاموش
+    Spacer(Modifier.height(14.dp))
+    Text(
+      StrSettings.lunarNote,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+    )
+    Spacer(Modifier.height(8.dp))
+    SegmentedChoice(
+      options = listOf("off" to StrSettings.lunarOff, "on" to StrSettings.lunarOn),
+      selected = if (LocaleChoice.lunar) "on" else "off",
+      onSelect = { LocaleChoice.setLunar(context, it == "on") },
+    )
+    if (LocaleChoice.lunar) {
+      Spacer(Modifier.height(8.dp))
+      SegmentedChoice(
+        options = listOf("-1" to StrSettings.lunarEarlier, "0" to StrSettings.lunarAsIs, "1" to StrSettings.lunarLater),
+        selected = LocaleChoice.lunarAdjust.toString(),
+        onSelect = { LocaleChoice.setLunarAdjust(context, it.toIntOrNull() ?: 0) },
+      )
+      LocaleChoice.lunarOn(todayIso())?.let {
+        Spacer(Modifier.height(6.dp))
+        Text(StrSettings.lunarToday(it), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      }
+    }
   }
 }
