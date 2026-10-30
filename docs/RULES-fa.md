@@ -226,6 +226,7 @@
 - عکسِ تحویل فقط با `photoConsent`ِ سفارش + `parcelOnly`ِ پیک؛ فقط صاحب و مدیر می‌بینند (#249).
 - شمارهٔ مشتری برای پیک پوشیده است و نشانی و نام پس از پایانِ مأموریت از کارتِ پیک برداشته می‌شود (§۳.۱۱، §۳۸.۴، #249).
 - پیشوندِ `courier` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#249).
+- QRِ کدِ تحویل/دریافت (PCK-11، پشتِ `shop.orders.picking`): متنِ `VLNH-<شمارهٔ سفارش>-<کد>`؛ خواندن فقط از رقم‌ها (`core/pick/HandoverCode`) تا بارکدخوانِ HID با چیدمانِ فارسی هم درست بخواند؛ سرور همان شش رقم را می‌گیرد و کد هرگز جز همان یک بار نشان داده نمی‌شود؛ QRِ سفارشِ دیگر کادرِ کد را پر نمی‌کند (`claude/spec-pck-1`).
 
 ### v3 · اعلان
 
@@ -352,6 +353,7 @@
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
+| `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ گامِ ۱: QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11) | `claude/spec-pck-1` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
