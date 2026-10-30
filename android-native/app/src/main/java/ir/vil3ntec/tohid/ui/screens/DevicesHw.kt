@@ -568,8 +568,16 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
       var ports by remember { mutableStateOf(emptyList<ir.vil3ntec.tohid.hw.SerialPorts.Port>()) }
       var port by remember { mutableStateOf(prefs.getString("scale_port", "") ?: "") }
       var reading by remember { mutableStateOf<String?>(null) }
+      //  HW-09: پروتکلِ قابلِ انتخاب فقط با «ابزارهای تازهٔ دستگاه»؛ خاموش ⇒ همان NCI
+      var protoId by remember { mutableStateOf(prefs.getString("scale_protocol", NciScale.id) ?: NciScale.id) }
+      val proto = if (HwTools.on.value) ir.vil3ntec.tohid.core.hw.Scales.of(protoId) ?: NciScale else NciScale
       LaunchedEffect(Unit) { ports = withContext(Dispatchers.IO) { serial.list() } }
-      Text("ترازوی سریال — پروتکلِ ${NciScale.title}، ۹۶۰۰ و 7E1. روی ترازوی واقعی آزموده نشده است.",
+      if (HwTools.on.value) {
+        SegmentedTabs(ir.vil3ntec.tohid.core.hw.Scales.all.map { SegmentTab(it.id, it.title) }, proto.id, {
+          protoId = it; prefs.edit().putString("scale_protocol", it).apply()
+        })
+      }
+      Text("ترازوی سریال — پروتکلِ ${proto.title}، ${proto.serial.baud} و ${proto.serial.dataBits}${proto.serial.parity.take(1).uppercase()}${proto.serial.stopBits}. روی ترازوی واقعی آزموده نشده است.",
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       if (ports.isEmpty()) Text("درگاهِ سریالی پیدا نشد.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       ports.forEach { pt ->
@@ -580,7 +588,7 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
       }
       OutlinedButton(enabled = port.isNotBlank(), onClick = {
         scope.launch {
-          reading = when (val r = withContext(Dispatchers.IO) { ScaleReader.read(port, NciScale) }) {
+          reading = when (val r = withContext(Dispatchers.IO) { ScaleReader.read(port, proto) }) {
             is ScaleReader.Result.Failed -> r.message
             is ScaleReader.Result.Ok -> with(r.reading) {
               val w = kg?.let { "${ir.vil3ntec.tohid.qty(it)} کیلو" } ?: "بی‌وزن"
@@ -605,5 +613,38 @@ internal fun CustomerDisplayPanel() {
   var open by CustomerFacing.open
   Panel {
     HwSwitchRow("نمایشگرِ مشتری", "پنجرهٔ دوم رو به مشتری: اقلامِ سبد و جمع. پنجره را به صفحهٔ دوم ببرید.", open) { open = it }
+    if (HwTools.on.value) PolePanel()
   }
+}
+
+/**
+ *  HW-10 (با «ابزارهای تازهٔ دستگاه»): نمایشگرِ قطبیِ دوخطی روی درگاهِ سریال — شمارِ قلم و جمعِ سبد، و
+ *  پس از فروش جمع/«THANK YOU». فقط رقمِ لاتین و برچسبِ انگلیسی (جدولِ نویسهٔ این نمایشگرها دری ندارد).
+ */
+@Composable
+private fun PolePanel() {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val serial = ir.vil3ntec.tohid.hw.HwPlatform.serial ?: return
+  var ports by remember { mutableStateOf(emptyList<ir.vil3ntec.tohid.hw.SerialPorts.Port>()) }
+  var port by remember { mutableStateOf(ir.vil3ntec.tohid.hw.Pole.port) }
+  var note by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.hw.Pole.load(context); port = ir.vil3ntec.tohid.hw.Pole.port; ports = withContext(Dispatchers.IO) { serial.list() } }
+  Spacer(Modifier.height(Space.sm))
+  Text("نمایشگرِ قطبی (دوخطی، ۲۰ نویسه) — ۹۶۰۰ و 8N1. روی نمایشگرِ واقعی آزموده نشده است.",
+    style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  Row(verticalAlignment = Alignment.CenterVertically) {
+    RadioButton(selected = port.isBlank(), onClick = { port = ""; ir.vil3ntec.tohid.hw.Pole.save(context, "") })
+    Text("خاموش", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+  }
+  ports.forEach { pt ->
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      RadioButton(selected = port == pt.name, onClick = { port = pt.name; ir.vil3ntec.tohid.hw.Pole.save(context, pt.name) })
+      Text("${pt.name} — ${pt.title}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+    }
+  }
+  OutlinedButton(enabled = port.isNotBlank(), onClick = {
+    scope.launch { note = withContext(Dispatchers.IO) { ir.vil3ntec.tohid.hw.Pole.test(port) } ?: "فرستاده شد — «VILL3N TEST» روی نمایشگر است؟" }
+  }) { Text("آزمونِ نمایشگرِ قطبی") }
+  note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text) }
 }
