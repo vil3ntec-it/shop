@@ -120,6 +120,7 @@ test('سقفِ سخت: دو بار مصرف، سومی used_up؛ تکرارِ ه
   assert.equal(full.status, 409);
   assert.equal(full.body.error.code, 'coupon_rejected');
   assert.deepEqual(full.body.error.codes, [{ code: 'TWO2', promoId: 'c2', status: 'used_up', uses: 2, maxUses: 2 }]);
+  assert.equal(full.body.error.message, 'کدِ TWO2 ظرفیتش پر شده — آن را از سبد بردارید');
   assert.equal(await usesOf(t, 'c2'), 2);
   assert.deepEqual((await live(t.shopId)).map((r) => r.sale_id), [s1, s2].sort());
   //  فاکتوری که پیش‌تر گرفته، حتی با سقفِ پُر، همان «پیش‌تر» است
@@ -147,6 +148,7 @@ test('چند کدِ یک فاکتور همه یا هیچ؛ کدِ ناشناخت
   const mixed = await redeem(t, t.staff, s, ['FREE1', 'ONE1']);
   assert.equal(mixed.status, 409);
   assert.deepEqual(mixed.body.error.codes.map((c) => [c.code, c.status]), [['FREE1', 'ok'], ['ONE1', 'used_up']]);
+  assert.equal(mixed.body.error.message, 'کدِ ONE1 ظرفیتش پر شده — آن را از سبد بردارید', 'فقط کدِ ردشده نام برده می‌شود');
   assert.equal((await live(t.shopId)).filter((r) => r.sale_id === s).length, 0, 'هیچ‌کدام نماند');
   assert.equal(await usesOf(t, 'free'), 0);
 
@@ -154,6 +156,7 @@ test('چند کدِ یک فاکتور همه یا هیچ؛ کدِ ناشناخت
     const r = await redeem(t, t.staff, saleId(), [code]);
     assert.equal(r.status, 409, code);
     assert.deepEqual(r.body.error.codes.map((c) => [c.code, c.status]), [[code, status]]);
+    assert.match(r.body.error.message, new RegExp(`^کدِ ${code} `));
   }
   //  بی سقف ⇒ پذیرفته و شمرده (برای گزارش)؛ دو شکلِ یک کد یک بار
   const f = await redeem(t, t.staff, saleId(), ['free1', 'FREE 1']);

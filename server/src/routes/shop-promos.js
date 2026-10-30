@@ -289,8 +289,11 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, wrap(async 
     return { rejected: false, results };
   });
   if (out.rejected) {
+    //  پیامِ صندوق همین است (برنامه جزئیاتِ `codes` را نمی‌خواند): کدام کد و چرا
+    const why = { used_up: 'ظرفیتش پر شده', unknown_code: 'در این دکان نیست', inactive: 'خاموش است' };
+    const bad = out.results.filter((x) => why[x.status]).map((x) => `کدِ ${x.code} ${why[x.status]}`);
     return res.status(409).json({
-      error: { code: 'coupon_rejected', message: 'کدِ تخفیف پذیرفته نشد؛ آن را از سبد بردارید', codes: out.results },
+      error: { code: 'coupon_rejected', message: `${bad.join('؛ ')} — آن را از سبد بردارید`, codes: out.results },
     });
   }
   //  سابقه با شناسهٔ قاعده، به‌صورتِ متن (کلیدِ «code» را `audit.scrub` عمداً دور می‌ریزد و آرایه را شیء می‌کند)
