@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.image.BankSearchCache
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,9 +31,11 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.URLEncoder
 import java.security.MessageDigest
 
@@ -83,7 +87,14 @@ object ImageBank {
     val certain: Boolean, val kind: String, val reasons: List<String>,
     val ambiguous: Boolean, val distinguish: List<String>, val images: List<Img>,
   )
-  data class Page(val items: List<Hit>, val next: String?, val barcodeValid: Boolean?)
+  /**
+   *  `stale` = بی اینترنت از کشِ همین دستگاه (IMG-BANK-11): `savedAtMs` زمانِ آخرین پاسخِ زنده است و
+   *  رابط آن را «قدیمی» نشان می‌دهد؛ نتیجهٔ کش هرگز «جست‌وجوی زنده» نیست و انتخاب اینترنت می‌خواهد.
+   */
+  data class Page(
+    val items: List<Hit>, val next: String?, val barcodeValid: Boolean?,
+    val stale: Boolean = false, val savedAtMs: Long = 0L,
+  )
 
   val KIND = mapOf(
     "barcode_exact" to "بارکدِ دقیق", "sku_exact" to "SKUِ دقیق", "name_exact" to "نامِ کاملِ یکسان",
@@ -103,7 +114,23 @@ object ImageBank {
     if (digits.length >= 8 && digits.length == text.replace(Regex("[\\s-]"), "").length) params.append("&barcode=").append(digits)
     if (hasImage) params.append("&has_image=1")
     if (cursor != null) params.append("&cursor=").append(enc(cursor))
-    val r = Backend.api(context).get("$BASE/search?$params")
+    val key = cache.keyOf(text, hasImage, cursor)
+    loadCache(context)
+    val r = try {
+      Backend.api(context).get("$BASE/search?$params")
+    } catch (f: ApiFailure) {
+      //  فقط بی اینترنت/مهلت؛ خطای دیگرِ سرور همان خطاست، نه کشِ قدیمی
+      if (f !is ApiFailure.Offline && f !is ApiFailure.Timeout) throw f
+      val old = synchronized(cache) { cache.offline(key, System.currentTimeMillis()) } ?: throw f
+      return parsePage(Json.parseToJsonElement(old.payload).jsonObject).copy(stale = true, savedAtMs = old.savedAtMs)
+    }
+    val rev = r["bank_rev"]?.jsonPrimitive?.longOrNull ?: -1L
+    synchronized(cache) { cache.put(key, r.toString(), System.currentTimeMillis(), rev) }
+    saveCache(context)
+    return parsePage(r)
+  }
+
+  private fun parsePage(r: JsonObject): Page {
     val items = (r["items"] as? JsonArray).orEmpty().map { e ->
       val o = e.jsonObject
       val p = o["product"]?.jsonObject ?: JsonObject(emptyMap())
@@ -124,6 +151,56 @@ object ImageBank {
       )
     }
     return Page(items, r["next_cursor"]?.jsonPrimitive?.contentOrNull, r["barcode_valid"]?.jsonPrimitive?.booleanOrNull)
+  }
+
+  /* ---------- کشِ جست‌وجو روی دیسک (`BankSearchCache` ِ core؛ فقط متادیتای بانکِ مرکزی) ---------- */
+
+  private val cache = BankSearchCache()
+  @Volatile private var cacheLoaded = false
+  private fun cacheFile(context: Context) = File(context.applicationContext.cacheDir, "imgbank-search.json")
+
+  private suspend fun loadCache(context: Context) {
+    if (cacheLoaded) return
+    withContext(Dispatchers.IO) {
+      val saved = try {
+        val f = cacheFile(context)
+        if (!f.isFile) emptyList() else (Json.parseToJsonElement(f.readText()) as? JsonArray).orEmpty().mapNotNull { e ->
+          val o = e as? JsonObject ?: return@mapNotNull null
+          BankSearchCache.Entry(
+            key = o.s("k"), payload = o.s("p"),
+            savedAtMs = o["t"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,
+            bankRev = o["r"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,
+          )
+        }
+      } catch (c: CancellationException) {
+        throw c
+      } catch (_: Exception) {
+        emptyList()   //  کشِ خراب فقط کش است: از نو
+      }
+      synchronized(cache) {
+        if (!cacheLoaded) { cache.restore(saved, System.currentTimeMillis()); cacheLoaded = true }
+      }
+    }
+  }
+
+  private suspend fun saveCache(context: Context) {
+    val text = synchronized(cache) {
+      JsonArray(cache.entries().map { e ->
+        buildJsonObject { put("k", e.key); put("p", e.payload); put("t", e.savedAtMs); put("r", e.bankRev) }
+      }).toString()
+    }
+    try {
+      withContext(Dispatchers.IO) {
+        val f = cacheFile(context)
+        val tmp = File(f.parentFile, f.name + ".tmp")
+        tmp.writeText(text)
+        if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+      }
+    } catch (c: CancellationException) {
+      throw c
+    } catch (_: Exception) {
+      //  نوشتنِ کش شکست خورد ⇒ فقط بی‌اینترنتیِ بعدی کش ندارد
+    }
   }
 
   /** نشانیِ فایلی که سرور داد (`/api/shop/images/file/…`) ⇒ بایت‌ها با نشستِ کاربر */
