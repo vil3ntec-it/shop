@@ -130,12 +130,14 @@ internal fun PickupHandoverSheet(
 
 /**
  *  پس از «تحویل شد»: فروشِ همین سفارش از راهِ قلابِ `HandoverSale` (جابه‌جاشده از `DeliveryDialogs.kt`،
- *  همان منطق). تحویل پیش‌تر در سرور ثبت شده؛ هر شکست فقط «فروش را در صندوق ثبت کنید» است — هیچ
- *  فروشِ ساختگی ساخته نمی‌شود.
+ *  همان منطق؛ #340، `OrdersLive.postById`: از سرور می‌پرسد و با شناسهٔ سفارش یکتا ثبت می‌کند). تحویل
+ *  پیش‌تر در سرور ثبت شده؛ اگر ثبت همین حالا نشد، برنامه آن را از فهرستِ «تحویلِ بی‌فروش» دوباره
+ *  ثبت می‌کند — کسی در صندوق دستی نمی‌زند (دو بار می‌شد).
  */
 internal suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, ordersRepo: OrdersRepository): String {
   val hook = HandoverSale.hook ?: return StrOnline.dlSaleNoHook(order.orderNo)
-  val full = ordersRepo.get(order.id).valueOrNull() ?: return StrOnline.dlSaleNoOrder(order.orderNo)
+  //  قلاب فقط شناسهٔ سفارش را لازم دارد؛ جزئیات را خودش از سرور می‌گیرد
+  val full = ordersRepo.get(order.id).valueOrNull() ?: order
   val handed = HandedOverOrder(
     kind = HandoverKind.PICKUP_AT_STORE,
     orderId = full.id, orderNo = full.orderNo, assignmentId = m.id, customerName = full.customer.name,
@@ -148,5 +150,7 @@ internal suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, or
     is HandoverSaleResult.Recorded -> StrOnline.dlSaleRecorded(order.orderNo)
     is HandoverSaleResult.AlreadyRecorded -> StrOnline.dlSaleAlready(order.orderNo)
     is HandoverSaleResult.Failed -> StrOnline.dlSaleFailed(order.orderNo, r.message)
+    //  بررسیِ صاحب: نه وعدهٔ «دوباره می‌کوشد»، فقط دلیل
+    is HandoverSaleResult.NeedsReview -> StrOnline.dlSaleNeedsReview(order.orderNo, r.message)
   }
 }

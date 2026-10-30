@@ -33,6 +33,10 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
+  //  Format.kt و Jalali.kt نوشته‌ها و تاریخِ نمایشی را از جدولِ سه‌زبانه می‌گیرند (کاتلینِ خالص)؛
+  //  ابزار همیشه فارسی است (LocaleChoice ِ src/main)، پس خروجی همان دیروز است
+  "ir/vil3ntec/tohid/core/i18n/I18n.kt",
+  "ir/vil3ntec/tohid/core/i18n/Str.kt",
 )
 //  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته
 val coreRoot = repoRoot.resolve("core/src/jvmMain/kotlin")
@@ -40,16 +44,25 @@ val coreFiles = listOf(
   "ir/vil3ntec/tohid/sync/v1/Ulid.kt",
 )
 
+//  فایلی از legacyFiles که از android-native به ماژولِ مشترکِ core رفته (با همان مسیرِ بسته) از
+//  همان‌جا خوانده می‌شود — جابه‌جاییِ یک هسته دیگر این ابزار را نمی‌شکند
+val legacyRoots = listOf(
+  legacyRoot,
+  repoRoot.resolve("core/src/commonMain/kotlin"),
+  repoRoot.resolve("core/src/jvmMain/kotlin"),
+)
+fun legacyRootOf(file: String): File? = legacyRoots.firstOrNull { it.resolve(file).isFile }
+
 val legacySources by tasks.registering(Sync::class) {
-  inputs.files(legacyFiles.map { legacyRoot.resolve(it) } + coreFiles.map { coreRoot.resolve(it) })
+  inputs.files(legacyFiles.mapNotNull { f -> legacyRootOf(f)?.resolve(f) } + coreFiles.map { coreRoot.resolve(it) })
   doFirst {
-    val missing = legacyFiles.filterNot { legacyRoot.resolve(it).isFile } +
+    val missing = legacyFiles.filter { legacyRootOf(it) == null } +
       coreFiles.filterNot { coreRoot.resolve(it).isFile }
     check(missing.isEmpty()) {
       "فایلِ مدلِ قدیم جابه‌جا شده؛ فهرستِ legacyFiles/coreFiles را درست کنید: $missing"
     }
   }
-  from(legacyRoot) { legacyFiles.forEach { include(it) } }
+  legacyFiles.forEach { f -> legacyRootOf(f)?.let { root -> from(root) { include(f) } } }
   from(coreRoot) { coreFiles.forEach { include(it) } }
   into(layout.buildDirectory.dir("generated/legacy-src"))
 }

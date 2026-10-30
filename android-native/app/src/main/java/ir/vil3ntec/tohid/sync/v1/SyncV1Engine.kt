@@ -137,6 +137,23 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   /**
+   *  opهای هدفمندِ از پیش ساخته‌شده، **بی** تفاضلِ کلِ دفتر — شرح سرِ `SyncCommit.recordOps`
+   *  (CRM-10 `ShopStore.sweepMerged`). زیرِ همان قفلِ [record]؛ v3 هم همین را می‌گیرد.
+   *  @return چند op به صف رفت
+   */
+  @Synchronized
+  fun recordOps(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    if (SyncChoice.isV3(app)) return SyncV3Runner.of(app).recordOps(ops)
+    val made = commit.recordOps(ops)
+    publish()
+    return made
+  }
+
+  /** opهای صف — فقط برای آزمون */
+  internal fun queuedOps(): List<SyncOp> = queue.all()
+
+  /**
    *  بایگانیِ دفتر: ردیف‌هایی که به بایگانی می‌روند از سایهٔ همین حساب هم
    *  بیرون می‌آیند، زیرِ همان قفلِ `record()` — شرح سرِ `SyncCommit.forget`.
    *  شکست پرتاب می‌شود تا `LedgerArchive.compact` دفتر را کوتاه نکند.
@@ -299,6 +316,7 @@ class SyncV1Engine private constructor(context: Context) {
    */
   internal suspend fun rebuildFromServer(base: ShopData, files: SyncRebuild.Staging): SyncRebuild.Outcome = gate.withLock {
     busy = true
+    rebuilding = true
     publish()
     try {
       synchronized(this) { commit.queueRecorded() }
@@ -325,10 +343,18 @@ class SyncV1Engine private constructor(context: Context) {
       }
       out
     } finally {
+      rebuilding = false
       busy = false
       publish()
     }
   }
+
+  /**
+   *  همین فرایند وسطِ بازسازی است — `ShopStore.recoverRebuild` ِ نمونهٔ دیگر (کارگرِ پس‌زمینه)
+   *  کناری و نشانِ نیمه‌کاره را نه تمام می‌کند نه دور می‌ریزد.
+   */
+  @Volatile var rebuilding: Boolean = false
+    private set
 
   /**
    *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
@@ -345,12 +371,17 @@ class SyncV1Engine private constructor(context: Context) {
    */
   @Synchronized
   internal fun resetTo(ledger: ShopData, files: SyncRebuild.Staging) {
-    val shadow = SyncRebuild.shadowFor(ledger)
-    files.stage(ledger, SyncRebuild.sha(shadow))
-    if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
-    state.reconciledAt = 0L
-    state.snapshotAt = 0L
-    files.swap()
+    rebuilding = true
+    try {
+      val shadow = SyncRebuild.shadowFor(ledger)
+      files.stage(ledger, SyncRebuild.sha(shadow))
+      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      state.reconciledAt = 0L
+      state.snapshotAt = 0L
+      files.swap()
+    } finally {
+      rebuilding = false
+    }
     publish()
   }
 

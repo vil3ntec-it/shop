@@ -30,7 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -51,7 +51,7 @@ internal fun txWhen(tx: Transactions.Tx, today: String): String =
   if (tx.date == today && tx.at > 0) {
     val c = java.util.Calendar.getInstance().apply { timeInMillis = tx.at }
     "%02d:%02d".format(c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE))
-  } else formatDate(tx.date)
+  } else displayDate(tx.date)
 
 /**
  *  یک تراکنش به شکلِ عکسِ ۳: کارتِ گرد، دایرهٔ جهت (↓ پول آمد / ↑ پول رفت، با رنگ و آیکن —
@@ -115,7 +115,7 @@ internal fun TxSheet(d: ShopData, tx: Transactions.Tx, onDismiss: () -> Unit, on
     }
     Spacer(Modifier.height(6.dp))
     Text(
-      listOfNotNull(tx.invoice?.let { StrHome.invoiceNo(it) }, formatDate(tx.date), txWhen(tx, tx.date).takeIf { tx.at > 0 }).distinct().joinToString(" · "),
+      listOfNotNull(tx.invoice?.let { StrHome.invoiceNo(it) }, displayDate(tx.date), txWhen(tx, tx.date).takeIf { tx.at > 0 }).distinct().joinToString(" · "),
       style = v3Text(13, FontWeight.Medium, 18),
       color = c.inkMuted,
     )

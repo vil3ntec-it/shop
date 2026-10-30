@@ -168,7 +168,7 @@ object StrProducts {
   val camera: String get() = t("دوربین", "Camera", "کمره")
   /** همان ردیفِ «دوربین» روی کامپیوتر (عکسی که از پیش گرفته شده) */
   val cameraDesk: String get() = t("عکسِ آماده", "Ready photo", "چمتو انځور")
-  val cameraDetail: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo taken with a phone or webcam", "د ګرځنده یا وېبکم انځور")
+  val cameraDetail: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo on this computer, taken with a phone or webcam", "په کمپیوټر کې انځور، د ګرځنده یا وېبکم")
   val gallery: String get() = t("گالری", "Gallery", "ګالري")
   val galleryDetail: String get() = td("انتخاب از عکس‌های گوشی", "Pick from the phone's photos", "د ګرځنده له انځورونو وټاکئ", "Pick from the computer's folders", "د کمپیوټر له فولډرونو وټاکئ")
   val photoNote: String get() = td(

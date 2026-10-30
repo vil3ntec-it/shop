@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
@@ -127,11 +128,11 @@ internal fun PullHandle(shown: Boolean, hint: Boolean, progress: () -> Float, on
  *  ورق با انگشت ۱:۱ و نشستنِ فنری؛ صفحهٔ کناری کمی کوچک و کم‌رنگ (`v3PagerItem`).
  */
 @Composable
-internal fun HomeDrawerPager(view: HomeView, state: PagerState, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun HomeDrawerPager(view: HomeView, state: PagerState, onOpen: (String) -> Unit, modifier: Modifier = Modifier, inset: Dp = 16.dp) {
   HorizontalPager(
     state = state,
     modifier = modifier.fillMaxWidth(),
-    contentPadding = PaddingValues(horizontal = 16.dp),
+    contentPadding = PaddingValues(horizontal = inset),
     pageSpacing = 10.dp,
     flingBehavior = PagerDefaults.flingBehavior(state, snapAnimationSpec = MotionSpec.sheet()),
     key = { it },

@@ -69,6 +69,9 @@ import ir.vil3ntec.tohid.ui.components.pos.ProductGrid
 import ir.vil3ntec.tohid.ui.components.pos.ProductTable
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
 
 /**
  *  صندوقِ فروشِ کامپیوتر — برای صفحه‌کلید و بارکدخوان، نه برای انگشت.
@@ -117,6 +120,8 @@ fun DeskSaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  //  POS-12: همان سبدی که `priced` از آن ساخته شد — `finish` با سبدِ عوض‌شده ثبت نمی‌کند
+  val pricedFrom = cart
   val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
 
   var query by remember { mutableStateOf("") }
@@ -150,7 +155,13 @@ fun DeskSaleScreen(
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
   var paidText by remember { mutableStateOf("") }
-  LaunchedEffect(cartDebtorId) { if (cartDebtorId != null) payment = SalesEngine.Payment.CREDIT }
+  //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
+  var switchedDebtor by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(cartDebtorId) {
+    val fromSwitch = cartDebtorId != null && cartDebtorId == switchedDebtor
+    switchedDebtor = null
+    if (cartDebtorId != null && !fromSwitch) payment = SalesEngine.Payment.CREDIT
+  }
 
   val searchFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
@@ -175,18 +186,19 @@ fun DeskSaleScreen(
   //  همان قاعدهٔ پیشنهادها، حالا در شبکه (`PosCatalog`): فعال، نام یا آغازِ بارکد
   val matches: List<Product> = remember(term, d.products) { PosCatalog.matches(d.products, term) }
   LaunchedEffect(term) { hint = 0 }
-  val categories = remember(d.products, d.productCategories) { PosCatalog.categories(d) }
+  val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
   val shown: List<Product> = remember(term, category, d.products, matches) {
     if (term.isNotEmpty()) matches else PosCatalog.byCategory(d.products, category)
   }
 
   fun applyAdded(product: Product, added: SalesEngine.Added) {
-    cartStore.set(added.cart)
+    //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد؛ بوقِ خطا تا دوباره اسکن شود
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
-      toast("${product.name} فقط ${qty(added.available)}${if (product.unit.isNotBlank()) " ${product.unit}" else ""} موجود است")
+      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")))
     } else ScanFeedback.ok(context)
   }
   fun add(product: Product, count: Double) =
@@ -210,12 +222,12 @@ fun DeskSaleScreen(
     if (scaleLabel(query, d)) { query = ""; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
       PosHit.None -> Unit
-      is PosHit.Inactive -> toast("«${hit.product.name}» غیرفعال است")
+      is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
       is PosHit.Add -> { add(hit.product, hit.count); query = "" }
       is PosHit.Unknown -> {
         ScanFeedback.unknown(context)
         scope.launch {
-          val r = snackbar.showSnackbar("«${hit.code}» پیدا نشد", actionLabel = "ثبتِ کالا", duration = SnackbarDuration.Long)
+          val r = snackbar.showSnackbar(StrSale.notFound(hit.code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
           if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(hit.code)
         }
       }
@@ -233,11 +245,11 @@ fun DeskSaleScreen(
     if (scaleLabel(code, dd)) return true
     when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
-        if (!it.active) toast("«${it.name}» غیرفعال است") else add(it, 1.0)
+        if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
       else -> scope.launch {
         ScanFeedback.unknown(context)
-        val r = snackbar.showSnackbar("بارکدِ «$code» ثبت نشده", actionLabel = "ثبتِ کالا", duration = SnackbarDuration.Long)
+        val r = snackbar.showSnackbar(StrSale.barcodeUnregistered(code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
       }
     }
@@ -263,6 +275,8 @@ fun DeskSaleScreen(
     blockExpired = blockExpired,
   )
   val totals = SalesEngine.totals(d, priced, checkout)
+  //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
+  val inputsFrom = listOf<Any?>(discountText, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
@@ -277,10 +291,16 @@ fun DeskSaleScreen(
 
   /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
-    if (cart.isEmpty()) { toast("سبد خالی است"); return }
-    if (discountBad || (!payV2 && paidBad)) { toast("عددِ «${if (discountBad) "تخفیف" else "دریافتی"}» درست نیست"); return }
-    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast("فروشِ نسیه مشتری می‌خواهد — F2"); pickDebtor = true; return }
-    if (gate == DiscountGate.State.DENIED) { toast("این تخفیف برای شما ممنوع است"); return }
+    if (cart.isEmpty()) { toast(Str.cartEmpty); return }
+    //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
+    if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value) || checkout.debtorId != cartStore.debtorId.value ||
+      inputsFrom != listOf<Any?>(discountText, paidText, payment)
+    ) {
+      toast(StrPos.cartChangedRetry); return
+    }
+    if (discountBad || (!payV2 && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
+    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (gate == DiscountGate.State.DENIED) { toast(StrPos.discountForbidden); return }
     if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
     val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
     val st = if (!payV2) null else settled ?: when (
@@ -295,7 +315,8 @@ fun DeskSaleScreen(
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     scope.launch { when (val posted = cartStore.post(store) { key ->
       SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
-      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key) }) {
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
+      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
@@ -306,7 +327,7 @@ fun DeskSaleScreen(
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
-        toast("فروش ${money(r.data.sales.last().finalTotal)} ؋ ثبت شد" + (if (change > 0) " — پولِ پس: ${money(ir.vil3ntec.tohid.data.PayFlow.major(change))} ؋" else "") + " — F8 چاپ")
+        toast(StrPos.saleRecorded(money(r.data.sales.last().finalTotal)) + (if (change > 0) " — " + StrPos.changeDue(money(ir.vil3ntec.tohid.data.PayFlow.major(change))) else "") + " — " + StrPos.f8Print)
         refocus()
       }
     } }
@@ -357,6 +378,23 @@ fun DeskSaleScreen(
   }
   val c = Shop.colors
 
+  //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش)
+  val dataLoaded by store.loaded.collectAsState()
+  val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
+    cartStore, d, snackbar, dataLoaded,
+    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText) },
+    onSwitched = { x ->
+      discountText = x.discount; paidText = x.paid; selected = null
+      //  پنلِ پرداخت مالِ فاکتورِ قبلی بود
+      payOpen = false
+      //  روشِ پرداخت با فاکتور برمی‌گردد (نسیهٔ بی‌مشتری هم: `finish` مشتری می‌خواهد و فهرست را باز می‌کند)
+      val debtorNow = cartStore.debtorId.value
+      payment = ir.vil3ntec.tohid.data.HeldRules.paymentAfterSwitch(x.payment, debtorNow)
+      switchedDebtor = debtorNow
+    },
+    onFocusBack = { refocus() },
+  )
+
   /* ─────────── کاتالوگ: کادرِ اسکن (تنها جست‌وجوی صفحه)، تراشهٔ دسته‌ها، کارت‌ها ─────────── */
   @Composable
   fun Catalogue(modifier: Modifier) {
@@ -374,7 +412,7 @@ fun DeskSaleScreen(
             focusedBorderColor = c.focus,
           ),
           leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = c.muted) },
-          placeholder = { Text("بارکد را بخوانید یا نامِ کالا را بنویسید — ۳* پیش از آن یعنی سه تا", maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.muted) },
+          placeholder = { Text(StrSale.deskSearchHint, maxLines = 1, overflow = TextOverflow.Ellipsis, color = c.muted) },
           modifier = Modifier
             .weight(1f)
             .focusRequester(searchFocus)
@@ -401,7 +439,7 @@ fun DeskSaleScreen(
       if (term.isNotEmpty()) {
         //  با عبارت، نتیجه از همهٔ دسته‌هاست — تراشه‌ها جایشان را به همین خط می‌دهند
         Text(
-          "${shown.size} نتیجه در همهٔ دسته‌ها · ↑↓ و Enter",
+          StrSale.resultsAll(shown.size),
           Modifier.heightIn(min = target).padding(horizontal = 6.dp).wrapContentHeight(Alignment.CenterVertically),
           style = MaterialTheme.typography.labelLarge, color = c.muted,
         )
@@ -419,12 +457,12 @@ fun DeskSaleScreen(
         val highlight = if (term.isNotEmpty()) hint else -1
         when {
           shown.isEmpty() && term.isNotEmpty() -> PosEmpty(
-            "کالایی با «$term» در فهرست نیست",
-            "اگر بارکد است Enter بزنید؛ بارکدِ ناشناخته راهِ «ثبتِ کالا» را باز می‌کند.",
+            StrSale.noMatch(term),
+            StrSale.noMatchHint,
           )
           shown.isEmpty() -> PosEmpty(
-            "کالایی برای فروش نیست",
-            if (d.products.none { it.active }) "از «کالاها» کالا اضافه کنید یا کالای غیرفعال را فعال کنید." else "در این دسته کالای فعالی نیست.",
+            StrSale.nothingToSell,
+            if (d.products.none { it.active }) StrSale.addItemsHint else StrSale.noActiveInCategory,
           )
           view.mode == ViewMode.TABLE -> ProductTable(shown, highlight, target, showPhotos, productCb, tableState, Modifier.fillMaxSize())
           else -> ProductGrid(
@@ -435,7 +473,7 @@ fun DeskSaleScreen(
         }
       }
       //  یادآوریِ کلیدها — باریک و کم‌رنگ؛ فهرستِ کامل در F1
-      PosHintLine("Enter افزودن · ↑↓ ردیف · + − تعداد · Delete حذف · F3 قیمت/تعداد · F4 قلمِ آزاد · F2 مشتری · F9 ثبت · F8 چاپِ آخر · Esc پاک · F1 همهٔ کلیدها")
+      PosHintLine(StrPos.keysLineF1)
     }
   }
 
@@ -446,8 +484,8 @@ fun DeskSaleScreen(
       itemCount = cart.size,
       modifier = modifier,
       headerActions = {
-        CartHeaderAction("قلمِ آزاد", Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
-        CartHeaderAction("خالی", Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
+        CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
+        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
       },
       customer = {
         CustomerRow(
@@ -491,7 +529,7 @@ fun DeskSaleScreen(
       summary = {
         PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
           if (canDiscount) {
-            MiniNumberField("تخفیف", discountText, { discountText = numericInput(it) }, discountBad, "٪")
+            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, "٪")
             //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
             when (gate) {
               DiscountGate.State.NEEDS_APPROVAL -> Row(
@@ -500,16 +538,16 @@ fun DeskSaleScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
               ) {
                 ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                  "نیازمند تأیید", ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING,
+                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING,
                 )
                 Spacer(Modifier.weight(1f))
-                OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text("درخواستِ تأیید (F9)") }
+                OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text(StrPos.requestApprovalF9) }
               }
               DiscountGate.State.APPROVED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                "تأیید شد", ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS, Modifier.padding(top = 6.dp),
+                StrPos.approved, ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS, Modifier.padding(top = 6.dp),
               )
               DiscountGate.State.DENIED -> ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                "این تخفیف برای شما ممنوع است", ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER,
+                StrPos.discountForbidden, ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER,
                 Modifier.padding(top = 6.dp),
               )
               DiscountGate.State.FREE -> Unit
@@ -521,7 +559,7 @@ fun DeskSaleScreen(
         if (payV2) {
           //  PAY (v3 A4): روش‌ها در پنلِ پرداخت‌اند — نقد، کیف پول، کارت، حواله و به حساب
           Text(
-            "پرداختِ ترکیبی: F9 پنلِ پرداخت (نقد، کیف پول، کارت، حواله، به حسابِ مشتری) — F12 نقدِ دقیق",
+            StrPos.mixedPayHint,
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
           )
         } else {
@@ -532,7 +570,7 @@ fun DeskSaleScreen(
             }
           }
           if (payment == SalesEngine.Payment.CREDIT) {
-            MiniNumberField("دریافتیِ همین حالا", paidText, { paidText = numericInput(it) }, paidBad, "؋")
+            MiniNumberField(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
           }
         }
       },
@@ -550,10 +588,12 @@ fun DeskSaleScreen(
     )
   }
 
-  BoxWithConstraints(
+  Column(
     Modifier
       .fillMaxSize()
       .onPreviewKeyEvent { e ->
+        //  POS-12: پیش از هر شرطی — وسطِ جابه‌جاییِ فاکتور همهٔ کلیدها خورده می‌شوند
+        if (held.onKey(e)) return@onPreviewKeyEvent true
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
@@ -566,23 +606,26 @@ fun DeskSaleScreen(
       }
       .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
   ) {
-    /*
-     *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).
-     *  ستونِ دسته‌ها و نوارِ دکمه‌های پایین دیگر نیستند. پنجرهٔ باریک (تبلتِ
-     *  ایستاده): سبد زیرِ کاتالوگ.
-     */
-    val w = maxWidth.value
-    if (PosLayout.sideCart(w)) {
-      Row(Modifier.fillMaxSize()) {
-        Catalogue(Modifier.weight(1f).fillMaxHeight())
-        Spacer(Modifier.width(16.dp))
-        Cart(Modifier.width(PosLayout.cartWidth(w).dp).fillMaxHeight())
-      }
-    } else {
-      Column(Modifier.fillMaxSize()) {
-        Catalogue(Modifier.weight(1f).fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        Cart(Modifier.weight(1f).fillMaxWidth())
+    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp))
+    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+      /*
+       *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).
+       *  ستونِ دسته‌ها و نوارِ دکمه‌های پایین دیگر نیستند. پنجرهٔ باریک (تبلتِ
+       *  ایستاده): سبد زیرِ کاتالوگ.
+       */
+      val w = maxWidth.value
+      if (PosLayout.sideCart(w)) {
+        Row(Modifier.fillMaxSize()) {
+          Catalogue(Modifier.weight(1f).fillMaxHeight())
+          Spacer(Modifier.width(16.dp))
+          Cart(Modifier.width(PosLayout.cartWidth(w).dp).fillMaxHeight())
+        }
+      } else {
+        Column(Modifier.fillMaxSize()) {
+          Catalogue(Modifier.weight(1f).fillMaxWidth())
+          Spacer(Modifier.height(12.dp))
+          Cart(Modifier.weight(1f).fillMaxWidth())
+        }
       }
     }
   }
@@ -592,15 +635,15 @@ fun DeskSaleScreen(
     val safe = remember { FocusRequester() }
     AlertDialog(
       onDismissRequest = { confirmClear = false; refocus() },
-      title = { Text("سبدِ تازه؟") },
-      text = { Text("${cart.size} ردیفِ این سبد پاک می‌شود و فروشی ثبت نمی‌شود.") },
+      title = { Text(StrSale.newCartQ) },
+      text = { Text(StrSale.clearCartWarn(cart.size)) },
       confirmButton = {
         TextButton(onClick = { cartStore.clear(); selected = null; confirmClear = false; refocus() }) {
-          Text("پاک شود", color = Shop.colors.danger)
+          Text(StrSale.clearIt, color = Shop.colors.danger)
         }
       },
       dismissButton = {
-        TextButton(onClick = { confirmClear = false; refocus() }, modifier = Modifier.focusRequester(safe)) { Text("انصراف") }
+        TextButton(onClick = { confirmClear = false; refocus() }, modifier = Modifier.focusRequester(safe)) { Text(Str.cancel) }
         LaunchedEffect(Unit) { runCatching { safe.requestFocus() } }
       },
     )
@@ -641,9 +684,9 @@ fun DeskSaleScreen(
   }
   if (askApproval && saleKey != null) {
     ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
-      title = "تأییدِ تخفیف",
-      summary = "تخفیفِ ${money(totals.discount)} ؋ روی فاکتورِ ${money(totals.subtotal)} ؋" +
-        if (discountDecision.cap == "maxPct") " — سقفِ صندوقدار ${qty(discountDecision.limit ?: 0.0)}٪" else "",
+      title = StrPos.approveDiscount,
+      summary = StrPos.discountSummary(money(totals.discount), money(totals.subtotal)) +
+        if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
       need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),

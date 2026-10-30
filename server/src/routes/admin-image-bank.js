@@ -4,7 +4,8 @@
  *
  *   مدیر (هر نقش):  کالای بانک، بارگذاری به pending، ویرایشِ pending، نسخه و
  *                   نسخهٔ کوچک، ورودِ گروهی (دسته، فهرستِ دسته‌ها، فایل، ردیف‌ها،
- *                   گزارش)، صف؛ `/status` (روشن یا نه) حتی با پرچمِ خاموش
+ *                   گزارش)، صف و `/review` (صف با جزئیات)؛ `/status` (روشن یا نه)
+ *                   حتی با پرچمِ خاموش
  *   مدیرِ ارشد:     تأیید، رد، بایگانی، روشن/خاموش در جست‌وجو — هر بار با
  *                   دلیلِ نوشته و یک ردیفِ سابقه (الگوی ADMIN-CONTROL-PLANE)
  *
@@ -83,6 +84,37 @@ router.post('/images', raw, wrap(async (req, res) => {
 
 router.get('/queue', wrap(async (req, res) => {
   res.json(await bank.queue(req.query || {}));
+}));
+
+/**
+ * صفِ بررسی برای پنل (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09): همان `queue` با
+ * جزئیاتِ هر عکس — وضعیت و دلیلِ تطبیق، کالای وصل، کالاهای ممکنِ تطبیقِ مبهم
+ * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز و نشانیِ فایلِ نسخهٔ جاری.
+ * فقط‌خواندنی؛ همان صفحه‌بندیِ `queue` (حداکثر ۵۰).
+ */
+router.get('/review', wrap(async (req, res) => {
+  const q = await bank.queue(req.query || {});
+  const details = await Promise.all(q.items.map((i) => bank.adminDetail(i.id, BASE)));
+  const candIds = [...new Set(details.flatMap((d) => d?.proposal?.candidates || []))].map(String).slice(0, 500);
+  const cands = candIds.length ? await many('SELECT * FROM bank_products WHERE id = ANY($1::text[])', [candIds]) : [];
+  const byId = new Map(cands.map((p) => [p.id, bank.productOut(p)]));
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    items: q.items.map((i, k) => {
+      const d = details[k] || {};
+      const v = (d.versions || []).find((x) => x.version === d.current_version) || {};
+      return {
+        id: i.id, status: i.status, space: i.space, role: i.role, from_shop: i.from_shop, batch_id: i.batch_id,
+        created_at: i.created_at, match_status: d.match_status || '', match_reasons: d.match_reasons || [],
+        quality_flags: i.quality_flags, duplicate_of: i.duplicate_of, license: d.license || null,
+        product: d.product || null,
+        candidates: (d.proposal?.candidates || []).map((id) => byId.get(String(id)) || { id: String(id), missing: true }),
+        version: d.current_version || null,
+        file: v.urls ? { url: v.urls.thumb || v.urls.original, mime: v.mime, width: v.width, height: v.height } : null,
+      };
+    }),
+    next_cursor: q.next_cursor,
+  });
 }));
 
 router.get('/images/:id', wrap(async (req, res) => {

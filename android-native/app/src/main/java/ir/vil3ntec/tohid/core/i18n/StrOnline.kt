@@ -706,11 +706,11 @@ object StrOnline {
   val dlManualApprove: String get() = t("مشتری کد ندارد — تأییدِ دستیِ مدیر (با توضیح، در سابقه)", "Customer has no code — manager's manual approval (with a note, logged)", "پېرودونکی کوډ نه لري — د مدیر لاسي تایید (له تشریح سره، په تاریخچه کې)")
   val dlCashAtTill: String get() = t("نقدِ گرفته‌شده در صندوق", "Cash taken at the till", "په صندوق کې اخیستې نغدې")
   fun dlOrderAmount(a: String): String = t("مبلغِ سفارش: $a", "Order amount: $a", "د فرمایش مبلغ: $a")
-  fun dlSaleNoHook(n: Long): String = t("سفارش #$n تحویل شد. ثبتِ خودکارِ فروش هنوز وصل نیست — فروش را در صندوق ثبت کنید.", "Order #$n handed over. Automatic sale recording isn't connected yet — record the sale at the till.", "فرمایش #$n وسپارل شو. د پلور خپلکاره ثبت لا نه دی نښلول شوی — پلور په صندوق کې ثبت کړئ.")
-  fun dlSaleNoOrder(n: Long): String = t("سفارش #$n تحویل شد؛ جزئیاتِ سفارش نیامد — فروش را در صندوق ثبت کنید.", "Order #$n handed over; order details didn't load — record the sale at the till.", "فرمایش #$n وسپارل شو؛ د فرمایش جزئیات رانغلل — پلور په صندوق کې ثبت کړئ.")
+  fun dlSaleNoHook(n: Long): String = t("سفارش #$n تحویل شد؛ فروشش را برنامه از «سفارش‌ها ⇐ تحویلِ بی‌فروش» ثبت می‌کند.", "Order #$n handed over; the app records its sale from \"Orders ⇐ Handed over without sale\".", "فرمایش #$n وسپارل شو؛ پلور یې اپ د «فرمایشونه ⇐ بې پلوره سپارل» څخه ثبتوي.")
   fun dlSaleRecorded(n: Long): String = t("سفارش #$n تحویل و فروشش ثبت شد.", "Order #$n handed over and its sale recorded.", "فرمایش #$n وسپارل شو او پلور یې ثبت شو.")
   fun dlSaleAlready(n: Long): String = t("سفارش #$n تحویل شد؛ فروشش پیش‌تر ثبت شده بود.", "Order #$n handed over; its sale was already recorded.", "فرمایش #$n وسپارل شو؛ پلور یې مخکې ثبت شوی و.")
-  fun dlSaleFailed(n: Long, m: String): String = t("سفارش #$n تحویل شد ولی فروش ثبت نشد ($m) — در صندوق ثبت کنید.", "Order #$n handed over but the sale wasn't recorded ($m) — record it at the till.", "فرمایش #$n وسپارل شو خو پلور ثبت نشو ($m) — په صندوق کې یې ثبت کړئ.")
+  fun dlSaleFailed(n: Long, m: String): String = t("سفارش #$n تحویل شد؛ فروش همین حالا ثبت نشد ($m) — برنامه دوباره می‌کوشد، در صندوق دستی نزنید.", "Order #$n handed over; the sale wasn't recorded just now ($m) — the app will retry, don't enter it at the till.", "فرمایش #$n وسپارل شو؛ پلور اوس ثبت نشو ($m) — اپ بیا هڅه کوي، په صندوق کې یې لاسي مه ثبتوئ.")
+  fun dlSaleNeedsReview(n: Long, m: String): String = t("سفارش #$n تحویل شد؛ فروشش خودکار ثبت نمی‌شود — $m", "Order #$n handed over; its sale won't be recorded automatically — $m", "فرمایش #$n وسپارل شو؛ پلور یې خپلکاره نه ثبتیږي — $m")
 
   // ── جدول‌های ترجمهٔ واژه‌های موتور ───────────────────────────────────────────
   private val STATUS_EN = mapOf(

@@ -18,7 +18,7 @@
  */
 const fsp = require('fs/promises');
 const config = require('../config');
-const { one, now, driverName } = require('../db');
+const { one, many, now, driverName } = require('../db');
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -228,4 +228,140 @@ async function providers() {
   };
 }
 
-module.exports = { LIMITS, PROVIDER_STATES, worst, snapshot, providers, smsState, emailState, pushState };
+/*
+ *  ── نسخهٔ دستگاه‌ها — OPS-04 (§۶.۲۴) ───────────────────────────────
+ *  «چند دستگاه روی کدام نسخه‌اند و چند تا زیرِ حداقل یا کهنه مانده‌اند.»
+ *  منبع همان تعریفِ «نصب» در `admin-sync` /version-health است: دستگاه‌هایی که
+ *  همگام شده‌اند (`sync_devices` و `sync_v3_devices`؛ هر دستگاه یک بار، با
+ *  تازه‌ترین ردیف). ⛔ `tokens.app_version` نه: تازه‌سازیِ نشست نسخه را نمی‌برد
+ *  و پس از نخستین refresh خالی می‌شد.
+ *
+ *  هشدار (بی جدولِ تازه — هر بار از داده حساب می‌شود):
+ *    down  ⇐ دستگاهِ فعال زیرِ حداقل نسخهٔ همان برنامه (`min_app_version_<app>`)
+ *    warn  ⇐ دستگاهِ فعال پایین‌تر از آخرین نسخهٔ منتشرشده (`latest_version_<app>`)
+ *  آخرین نسخه ثبت نشده ⇒ «کهنه» سنجیده نمی‌شود (`outdated: null`)، نه حدس.
+ *  ⛔ فقط شمار و نسخه؛ نه شناسهٔ حساب، نه دستگاه.
+ */
+const VERSION_LIMITS = Object.freeze({ activeDays: 30, maxVersionsPerApp: 50, maxGroups: 1000 });
+const BASE_APPS = Object.freeze(['shop', 'pump']);
+const APP_RE = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/** گروه‌های خامِ (برنامه، نسخه، شمار) ⇒ داشبوردِ هر برنامه. */
+function versionReport(rows, cfg) {
+  const compat = require('./app-compat');
+  const apps = new Map(BASE_APPS.map((a) => [a, new Map()]));
+  for (const r of rows) {
+    const app = String(r.app || '');
+    if (!APP_RE.test(app)) continue;
+    if (!apps.has(app)) apps.set(app, new Map());
+    const v = compat.valid(r.app_version) || '';
+    const cur = apps.get(app).get(v) || { devices: 0, lastSeenAt: 0 };
+    cur.devices += Number(r.n) || 0;
+    cur.lastSeenAt = Math.max(cur.lastSeenAt, Number(r.last_seen) || 0);
+    apps.get(app).set(v, cur);
+  }
+  const out = [];
+  for (const [app, groups] of apps) {
+    const latest = compat.valid(cfg[`latest_version_${app}`]);
+    const minVersion = compat.minVersionOf(cfg, app);
+    let devices = 0; let belowMin = 0; let outdated = 0; let unknown = 0;
+    const versions = [];
+    for (const [version, g] of groups) {
+      let state = 'current';
+      if (!version) state = 'unknown';
+      else if (minVersion && compat.compare(version, minVersion) < 0) state = 'below_min';
+      else if (latest && compat.compare(version, latest) < 0) state = 'outdated';
+      devices += g.devices;
+      if (state === 'unknown') unknown += g.devices;
+      if (state === 'below_min') belowMin += g.devices;
+      if (state === 'outdated') outdated += g.devices;
+      versions.push({ version, devices: g.devices, lastSeenAt: g.lastSeenAt || null, state });
+    }
+    //  سقفِ نمایش: پرشمارترین نسخه‌ها می‌مانند (نه تازه‌ترین‌ها — وگرنه همان نسخه‌های
+    //  کهنهٔ زیرِ حداقل بریده می‌شدند)، بعد از تازه به کهنه؛ شمارها از همه است
+    const shown = versions.length > VERSION_LIMITS.maxVersionsPerApp
+      ? [...versions].sort((a, b) => b.devices - a.devices).slice(0, VERSION_LIMITS.maxVersionsPerApp)
+      : versions;
+    shown.sort((a, b) => (!a.version ? 1 : !b.version ? -1 : compat.compare(b.version, a.version)));
+    out.push({
+      app, latest, minVersion, devices, unknown, belowMin,
+      outdated: latest ? outdated : null,
+      status: belowMin ? 'down' : latest && outdated ? 'warn' : 'ok',
+      versions: shown,
+      versionsTruncated: shown.length < versions.length,
+    });
+  }
+  return out;
+}
+
+/** داشبوردِ نسخه‌ها: دستگاه‌های دیده‌شده در `activeDays` روزِ گذشته. */
+/*
+ *  هر دستگاه (برنامه، حساب، دستگاه) یک بار: نسخه از تازه‌ترین ردیفی که نسخه
+ *  دارد — ردیفِ تازه‌ترِ بی‌نسخه به ردیفِ دیگرِ همان دستگاه برمی‌گردد — و
+ *  «آخرین دیده‌شدن» بیشینهٔ هر دو جدول. فعال = دیده‌شده در `activeDays`.
+ *  `v2.14.4` همان `2.14.4` است (در خودِ پرس‌وجو، تا گروه‌بندی و سقف درست باشد).
+ *  گروه‌ها پرشمار به کم‌شمار؛ بیش از `maxGroups` ⇒ `truncated`.
+ */
+async function versions() {
+  const t = now();
+  const lim = VERSION_LIMITS.maxGroups;
+  const rows = await many(
+    `SELECT app, app_version, COUNT(*)::int AS n, MAX(seen) AS last_seen
+       FROM (SELECT DISTINCT ON (app, account_kind, account_id, device_id)
+                    app, regexp_replace(btrim(app_version), '^[vV]', '') AS app_version, MAX(last_seen_at) OVER w AS seen
+               FROM (SELECT app, account_kind, account_id, device_id, app_version, last_seen_at FROM sync_devices
+                     UNION ALL
+                     SELECT app, account_kind, account_id, device_id, app_version, last_seen_at FROM sync_v3_devices) u
+             WINDOW w AS (PARTITION BY app, account_kind, account_id, device_id)
+              ORDER BY app, account_kind, account_id, device_id, (btrim(app_version) <> '') DESC, last_seen_at DESC) d
+      WHERE seen > $1
+      GROUP BY app, app_version
+      ORDER BY n DESC, app, app_version
+      LIMIT ${lim + 1}`,
+    [t - VERSION_LIMITS.activeDays * DAY]
+  );
+  const apps = versionReport(rows.slice(0, lim), await require('./plans').allConfig());
+  return {
+    checkedAt: t, activeDays: VERSION_LIMITS.activeDays, truncated: rows.length > lim,
+    status: worst(apps.map((a) => a.status)), apps,
+  };
+}
+
+/*
+ *  ── بررسیِ زنجیرهٔ هش از پنل — SEC-02 (نیمهٔ پنل) ─────────────────────
+ *  همان `verifyAll`ِ `lib/hash-chain-store.js` که `scripts/verify-chain.js`
+ *  صدا می‌زند — فقط‌خواندنی، بی هیچ منطقِ تازهٔ سنجش. شکسته‌ها همه می‌آیند
+ *  (نخستین حلقهٔ شکسته و دلیل)؛ از سالم‌ها فقط `maxOk` تا (با «سر» برای
+ *  یادداشتِ بیرونی) و بقیه فقط شمرده می‌شوند.
+ */
+const CHAIN_LIMITS = Object.freeze({ maxOk: 100, maxChains: 50 });
+
+async function chainReport({ rows = true, chains = [] } = {}) {
+  const store = require('./hash-chain-store');
+  const names = (Array.isArray(chains) ? chains : []).map(String).filter(Boolean).slice(0, CHAIN_LIMITS.maxChains);
+  const t = now();
+  let rep;
+  try {
+    rep = await store.verifyAll({ chains: names, rows: rows !== false });
+  } catch (err) {
+    if (err && err.code === 'bad_chain') throw require('../middleware/errors').badRequest(err.message, 'bad_chain');
+    throw err;
+  }
+  const enabled = await store.auditEnabled();
+  const pick = (r) => (r.ok
+    ? { chain: r.chain, ok: true, length: r.length, head: r.head }
+    : { chain: r.chain, ok: false, length: r.length, seq: r.seq, reason: r.reason });
+  const broken = rep.results.filter((r) => !r.ok).map(pick);
+  const good = rep.results.filter((r) => r.ok);
+  return {
+    ok: rep.ok, checkedAt: t, enabled, rows: rows !== false,
+    total: rep.results.length, okCount: good.length, brokenCount: broken.length,
+    broken, healthy: good.slice(0, CHAIN_LIMITS.maxOk).map(pick), truncated: good.length > CHAIN_LIMITS.maxOk,
+    reasons: store.REASONS,
+  };
+}
+
+module.exports = {
+  LIMITS, PROVIDER_STATES, VERSION_LIMITS, CHAIN_LIMITS, worst, snapshot, providers, versions, versionReport,
+  chainReport, smsState, emailState, pushState,
+};

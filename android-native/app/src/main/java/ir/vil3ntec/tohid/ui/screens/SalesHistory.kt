@@ -91,6 +91,8 @@ fun SalesHistoryScreen(
       "close" -> { returnFor = null; noReceipt = false }
     }
   }
+  //  نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`)
+  val myReceiptTag = remember { ir.vil3ntec.tohid.core.receipt.ReceiptTokens.shopTag(ir.vil3ntec.tohid.data.LedgerOwner.currentShop(roleContext)) }
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
   }
@@ -123,6 +125,10 @@ fun SalesHistoryScreen(
     //  RET-01 — QRِ رسید (اسکنر یا دوربین) همان فاکتور را پیدا می‌کند
     if (returnsV2 && term.startsWith(ir.vil3ntec.tohid.data.ReturnFlow.CODE_PREFIX.take(3))) {
       return@remember ir.vil3ntec.tohid.data.ReturnFlow.find(d, term)
+    }
+    //  فاکتورِ نسخهٔ ۲: نشانیِ QRِ رسید، فقط فروشِ همین دکان
+    if (returnsV2 && ir.vil3ntec.tohid.core.receipt.ReceiptToken.parse(term) != null) {
+      return@remember ir.vil3ntec.tohid.data.ReturnFlow.find(d, term, shopTag = myReceiptTag)
     }
     val debtorNames = d.debtors.associate { it.id to it.name }
     d.sales
@@ -446,9 +452,10 @@ fun SalesHistoryScreen(
         onDismiss = { scanReceipt = false },
         onCode = { code ->
           scanReceipt = false
+          if (ir.vil3ntec.tohid.data.ReturnFlow.isForeignReceipt(code, myReceiptTag)) toast(ir.vil3ntec.tohid.data.ReturnFlow.FOREIGN_RECEIPT)
           search = code
           //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
-          ir.vil3ntec.tohid.data.ReturnFlow.find(d, code).singleOrNull()?.takeIf { it.status != "cancelled" }?.let { returnFor = it }
+          ir.vil3ntec.tohid.data.ReturnFlow.find(d, code, shopTag = myReceiptTag).singleOrNull()?.takeIf { it.status != "cancelled" }?.let { returnFor = it }
         },
         title = "اسکنِ QRِ رسید",
         qr = true,

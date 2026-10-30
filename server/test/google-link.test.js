@@ -39,11 +39,11 @@ test.after(async () => {
 });
 
 const b64u = (x) => Buffer.from(typeof x === 'string' ? x : JSON.stringify(x)).toString('base64url');
-function googleToken({ sub, email, verified = true, aud = CLIENT_ID, key = keys.privateKey, expIn = 600 }) {
+function googleToken({ sub, email, verified = true, aud = CLIENT_ID, key = keys.privateKey, expIn = 600, iss = 'https://accounts.google.com' }) {
   const t = Math.floor(Date.now() / 1000);
   const head = b64u({ alg: 'RS256', kid: KID, typ: 'JWT' });
   const body = b64u({
-    iss: 'https://accounts.google.com', aud, sub, email, email_verified: verified,
+    iss, aud, sub, email, email_verified: verified,
     name: 'کاربرِ گوگل', iat: t, exp: t + expIn,
   });
   const s = createSign('RSA-SHA256');
@@ -295,4 +295,18 @@ test('امنیت ۲: کدِ وصل به‌ازای «ایمیل + IP» سقف د
   const v = await h.newUser('ایمیلِ دیگر');
   const other = await h.post('/api/auth/google/link-code', { idToken: googleToken({ sub: 'g-sub-limit-2', email: v.email }) });
   assert.equal(other.status, 200, JSON.stringify(other.body));
+});
+
+test('AUTH-03: صادرکنندهٔ دیگر (iss) با امضای درست هم رد می‌شود؛ هر دو شکلِ iss گوگل پذیرفته است', async () => {
+  for (const iss of ['https://accounts.google.com.evil.test', 'https://evil.test', 'accounts.google.co', '']) {
+    const r = await h.post('/api/auth/google', { idToken: googleToken({ sub: 'iss-x', email: 'iss-x@test.local', iss }) });
+    assert.equal(r.status, 403, `iss=${iss}`);
+    assert.equal(r.body.error.code, 'bad_google_token', `iss=${iss}`);
+  }
+  const rows = await many(`SELECT id FROM users WHERE email=$1`, ['iss-x@test.local']);
+  assert.equal(rows.length, 0, 'توکنِ iss نادرست حسابی نمی‌سازد');
+  for (const [i, iss] of ['accounts.google.com', 'https://accounts.google.com'].entries()) {
+    const ok = await h.post('/api/auth/google', { idToken: googleToken({ sub: `iss-ok-${i}`, email: `iss-ok-${i}@test.local`, iss }) });
+    assert.equal(ok.status, 201, `iss=${iss} ${JSON.stringify(ok.body)}`);
+  }
 });
