@@ -41,12 +41,13 @@ const FREE = [
     'POST /shop/chat/conversations/:id/receipts', 'POST /shop/chat/conversations/:id/media',
     'PUT /shop/chat/conversations/:id/block', 'DELETE /shop/chat/conversations/:id/block', 'POST /shop/chat/conversations/:id/reports',
     'POST /shop/trust/cases/:id/responses', 'POST /shop/trust/cases/:id/appeal']],
-  ['موجودیِ سرور، بانکِ عکس، قاعدهٔ تخفیف و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
+  ['موجودیِ سرور، بانکِ عکس، قاعده و مصرفِ کدِ تخفیف (بخشی از صندوقِ پایه، PRM-02) و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
     'PUT /shop/catalog/settings', 'POST /shop/catalog/refresh', 'PUT /shop/catalog/products/:id/low',
     'POST /shop/catalog/tasks/:id/resolve', 'POST /shop/catalog/moves',
     'POST /shop/images/select', 'POST /shop/images', 'POST /shop/images/:id/versions', 'PUT /shop/images/:id/v/:version/:size',
     'POST /shop/images/:id/propose', 'POST /shop/images/:id/report', 'POST /shop/images/:id/process',
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+    'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
@@ -55,7 +56,7 @@ const FREE = [
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.promo_uses'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
