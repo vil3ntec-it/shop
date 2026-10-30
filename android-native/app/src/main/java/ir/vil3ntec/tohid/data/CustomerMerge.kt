@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.sync.v1.LedgerDiff
+import ir.vil3ntec.tohid.sync.v1.SyncOp
 
 /**
  *  مشتریِ تکراری — پیدا کردن و ادغام با حفظِ همهٔ سوابق (CRM-10).
@@ -273,6 +275,27 @@ object CustomerMerge {
       trail(to, head + "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور", rows, today, now, newId)
     }
     return d.copy(debtors = debtors, transactions = transactions, sales = salesOut, auditLog = d.auditLog + trace)
+  }
+
+  /**
+   *  opهای هدفمندِ همان [sweep] — نه تفاضلِ کلِ دفتر با سایه: فقط UPDATE ِ `debtorId` ِ
+   *  تراکنش و فاکتورِ جابه‌جاشده، UPDATE ِ `mergedInto` ِ مشتری و INSERT ِ ردِ دفترچه. از
+   *  [before] (دفترِ همین لحظهٔ دیسک) و [after] = `sweep(before)` ساخته می‌شوند، پس دفترِ
+   *  کهنهٔ نمونهٔ دیگری از `ShopStore` هرگز DELETE نمی‌سازد.
+   *  `null` ⇒ چیزی بیرون از این شکل دیده شد (نباید پیش بیاید) و sweep نباید بنشیند.
+   */
+  fun sweepOps(before: ShopData, after: ShopData, now: Long = System.currentTimeMillis()): List<SyncOp>? {
+    val ops = LedgerDiff.diff(LedgerDiff.shadowOf(before), LedgerDiff.toJson(after), now)
+    val ok = ops.all { op ->
+      val keys = op.fields?.keys.orEmpty()
+      when (op.table) {
+        "transactions", "sales" -> op.type == SyncOp.UPDATE && keys == setOf("debtorId")
+        "debtors" -> op.type == SyncOp.UPDATE && keys == setOf("mergedInto")
+        "auditLog" -> op.type == SyncOp.INSERT
+        else -> false
+      }
+    }
+    return if (ok) ops else null
   }
 
   /* --------------------------------- برگه --------------------------------- */

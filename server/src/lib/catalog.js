@@ -318,9 +318,10 @@ async function afterIngest(shopId, out) {
   if (!out || !out.retired) return;
   retired.add(shopId);
   if (!out.retired.changed && !out.retired.needsAudit) return;
+  //  یک سطر برای هر دکان، حتی با دو afterIngest ِ هم‌زمان یا دو فرایند (`once`: وجود در همان INSERT)
   await require('./audit').log({
     shopId, actorType: 'system', action: 'stock.order_stock_retired', targetType: 'shop', targetId: String(shopId),
-    detail: out.retired.audit,
+    detail: out.retired.audit, once: true,
   });
 }
 

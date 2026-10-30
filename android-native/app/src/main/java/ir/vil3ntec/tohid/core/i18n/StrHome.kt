@@ -249,5 +249,9 @@ object StrHome {
     val abs = kotlin.math.abs(pct)
     return t("\u2066$sign$abs٪\u2069 از دیروز", "$sign$abs% vs yesterday", "له پرون \u2066$sign$abs٪\u2069")
   }
+  val urgentNow: String get() = t("کارهای فوری", "Needs attention", "بیړني کارونه")
+  val listSep: String get() = t("، ", ", ", "، ")
+  fun andMore(n: Int): String = t("و $n دیگر", "and $n more", "او $n نور")
+  val topDebts: String get() = t("بیشترین قرض‌ها", "Largest debts", "تر ټولو لوی پورونه")
   val txEmptyToday: String get() = t("امروز هنوز تراکنشی ثبت نشده", "No transactions yet today", "نن تر اوسه هېڅ راکړه ورکړه نه ده ثبت شوې")
 }
