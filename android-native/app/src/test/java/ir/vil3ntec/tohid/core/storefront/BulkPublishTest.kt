@@ -61,7 +61,7 @@ class BulkPublishTest {
     assertTrue(Regex("^[A-Za-z0-9_.:-]{8,128}$").matches(BulkPublish.keyOf("01HZX0ABCDEFGHJKMNPQRSTVWX", 12)))
   }
 
-  @Test fun `صف: نرسیده با همان کلید می‌ماند، رسیده دوباره نمی‌رود`() {
+  @Test fun `صف — نرسیده با همان کلید می‌ماند، رسیده دوباره نمی‌رود`() {
     val (q0, invalid) = BulkPublish.queueOf("batch1", (0 until 501).map { Change("p$it", published = true) } + Change("../bad", published = true))
     assertEquals(listOf("../bad"), invalid.map { it.first })
     assertEquals(2, q0.pending.size)
@@ -90,7 +90,7 @@ class BulkPublishTest {
     )
   }
 
-  @Test fun `مخزن: فقط فیلدهای خواسته‌شده، با کلید؛ ۵xx ⇒ دوباره، ۴۰۳ ⇒ رد`() {
+  @Test fun `مخزن — فقط فیلدهای خواسته‌شده، با کلید؛ ۵xx ⇒ دوباره، ۴۰۳ ⇒ رد`() {
     val server = TestHttpServer()
     try {
       var sent: TestHttpServer.Request? = null
