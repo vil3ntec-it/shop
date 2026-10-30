@@ -221,7 +221,7 @@ object WarehouseEngine {
     // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد
     val index = ShopStore.barcodeIndex(d)
     ProductBarcodes.conflict(codes, null) { index[it] }?.let {
-      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val id = newId()
@@ -281,8 +281,9 @@ object WarehouseEngine {
     // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
     // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
     val index = ShopStore.barcodeIndex(d)
+    //  فرمِ تک‌بارکدی (`barcodes == null`) همان پیامِ همیشگی را می‌گیرد، هر چند بارکدِ دیگر هم کالا داشته باشد (#476)
     ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
-      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val updated = existing.copy(
