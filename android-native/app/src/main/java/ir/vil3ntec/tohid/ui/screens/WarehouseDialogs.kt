@@ -14,11 +14,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -49,6 +53,8 @@ data class ProductFormState(
   val active: Boolean = true,
   val saleUnit: String = "",
   val unitFactor: String = "",
+  /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
+  val barcodes: String = barcode,
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -65,6 +71,7 @@ data class ProductFormState(
       active = p.active,
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
+      barcodes = p.barcodes.joinToString("، "),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -81,6 +88,13 @@ fun ProductDialog(
   onSave: (WarehouseEngine.ProductDraft) -> Unit,
 ) {
   var form by remember(state.editingId, state.barcode) { mutableStateOf(state) }
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(form.name, similarIndex) {
+    similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
+  }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -100,6 +114,14 @@ fun ProductDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        //  هشدار، نه رد: نامِ عیناً یکسان را موتور رد می‌کند؛ این فقط «شاید همان کالاست»
+        if (similar.isNotEmpty()) {
+          Text(
+            "نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" } + " — اگر همان کالاست، ثبتِ دوباره نکنید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.warning,
+          )
+        }
 
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,14 +147,24 @@ fun ProductDialog(
             label = "حد کم بودن",
             modifier = Modifier.weight(1f),
           )
-          OutlinedTextField(
-            value = form.barcode,
-            onValueChange = { form = form.copy(barcode = it) },
-            label = { Text("بارکد") },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.weight(1f),
-          )
+          if (tools) {
+            OutlinedTextField(
+              value = form.barcodes,
+              onValueChange = { form = form.copy(barcodes = it) },
+              label = { Text("بارکدها (با «،» جدا)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+          } else {
+            OutlinedTextField(
+              value = form.barcode,
+              onValueChange = { form = form.copy(barcode = it) },
+              label = { Text("بارکد") },
+              singleLine = true,
+              keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+              modifier = Modifier.weight(1f),
+            )
+          }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -225,6 +257,7 @@ fun ProductDialog(
                   saleUnit = form.saleUnit,
                   //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
                   unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
+                  barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
                 )
               )
             },

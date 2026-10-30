@@ -47,4 +47,17 @@ object ShopPolicy {
   fun setCrmReports(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(CRM_REPORTS, on).apply()
   }
+
+  /*
+   *  ابزارهای تازهٔ کالا (PRD-19، PRD-04): هشدارِ «نامِ مشابه» در فرمِ کالا و پیش‌نمایشِ ورود از
+   *  فایل (ثبت را نمی‌بندد؛ نامِ عیناً یکسان همیشه رد می‌شود)، و کادرِ «بارکدها» برای چند بارکد.
+   *  پیش‌فرض **خاموش**: فرم همان تک‌بارکدیِ امروز. فقط روی همین دستگاه.
+   */
+  private const val PRODUCT_TOOLS = "product_tools"
+
+  fun productTools(context: Context): Boolean = prefs(context).getBoolean(PRODUCT_TOOLS, false)
+
+  fun setProductTools(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(PRODUCT_TOOLS, on).apply()
+  }
 }
