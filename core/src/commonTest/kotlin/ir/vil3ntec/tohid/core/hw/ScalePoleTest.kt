@@ -9,6 +9,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** HW-09 (پروتکلِ دوم و خواندنِ تکه‌تکهٔ سریال) و HW-10 (نمایشگرِ قطبی) — بی ترازو و نمایشگرِ واقعی */
+/** «AnD» در نامِ آزمون‌ها = ترازوی A&D؛ Kotlin/Native «&» را در نام نمی‌پذیرد. */
 class ScalePoleTest {
 
   private fun b(s: String) = s.encodeToByteArray()
@@ -16,7 +17,7 @@ class ScalePoleTest {
   /** جمع‌کننده با نامِ لاتین — مرجعِ تابع در آزمونِ نام‌فارسی کلاسِ نام‌فارسی می‌سازد */
   private fun collector(p: ScaleProtocol, max: Int = 512) = SerialCollect({ p.complete(it) }, max)
 
-  @Test fun `پروتکل‌ها قابل افزودن‌اند - NCI و A&D با شناسه`() {
+  @Test fun `پروتکل‌ها قابل افزودن‌اند - NCI و AnD با شناسه`() {
     assertEquals(listOf("nci", "and"), Scales.all.map { it.id })
     assertEquals(AndScale, Scales.of("and"))
     assertNull(Scales.of("x"))
@@ -24,7 +25,7 @@ class ScalePoleTest {
     assertEquals(SerialParams(2400, 7, "even", 1), AndScale.serial)
   }
 
-  @Test fun `A&D - ایستا، در حرکت، گرم و پوند، بیش از ظرفیت و شمارش`() {
+  @Test fun `AnD - ایستا، در حرکت، گرم و پوند، بیش از ظرفیت و شمارش`() {
     val st = AndScale.parse(b("ST,+00001.234 kg\r\n"))!!
     assertEquals(1.234, st.kg!!, 1e-9); assertFalse(st.motion); assertTrue(st.usable)
     val us = AndScale.parse(b("US,GS,+0000.500kg\r\n"))!!
@@ -40,14 +41,14 @@ class ScalePoleTest {
     assertNull(AndScale.parse(b("hello\r\n")))
   }
 
-  @Test fun `A&D پیوسته - آخرین سطر کامل، نه سطر نیمه‌کاره`() {
+  @Test fun `AnD پیوسته - آخرین سطر کامل، نه سطر نیمه‌کاره`() {
     val stream = b("ST,+00001.000 kg\r\nUS,+00001.050 kg\r\nST,+00001.100 kg\r\nST,+0000")
     assertTrue(AndScale.complete(stream))
     assertEquals(1.1, AndScale.parse(stream)!!.kg!!, 1e-9)
     assertFalse(AndScale.complete(b("ST,+00001.000 kg")), "بی پایانِ سطر هنوز کامل نیست")
   }
 
-  @Test fun `خواندن سریال تکه‌تکه - NCI و A&D با زباله و سقف بافر`() {
+  @Test fun `خواندن سریال تکه‌تکه - NCI و AnD با زباله و سقف بافر`() {
     //  NCI: پاسخ در سه تکه
     val nci = collector(NciScale)
     assertFalse(nci.add(b("\n00")))
