@@ -59,19 +59,19 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
     return cachedDropped
   }
 
-  @Synchronized
   fun push(ops: List<SyncOp>) {
     if (ops.isEmpty()) return
-    val list = read(file).toMutableList()
-    list += ops.map { it.toJson() }
-    if (list.size > MAX) {
-      //  سقفِ ایمنی. کهنه‌ترین می‌رود **و ثبت می‌شود**، نه بی‌صدا.
-      val cut = list.subList(0, list.size - MAX).toList()
-      repeat(cut.size) { list.removeAt(0) }
-      dropRaw(cut, "queue_overflow")
+    update { current ->
+      val list = current.toMutableList()
+      list += ops.map { it.toJson() }
+      if (list.size > MAX) {
+        //  سقفِ ایمنی. کهنه‌ترین می‌رود **و ثبت می‌شود**، نه بی‌صدا.
+        val cut = list.subList(0, list.size - MAX).toList()
+        repeat(cut.size) { list.removeAt(0) }
+        dropRaw(cut, "queue_overflow")
+      }
+      list
     }
-    //  اگر نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود
-    if (!write(file, list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
   }
 
   /**
@@ -81,15 +81,26 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
    *
    *  @return چند op به صف آمد
    */
-  @Synchronized
   override fun pushFront(ops: List<SyncOp>): Int {
     if (ops.isEmpty()) return 0
-    val list = read(file)
-    val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }
-    val add = ops.filter { it.opId.isNotEmpty() && have.add(it.opId) }.map { it.toJson() }
-    if (add.isEmpty()) return 0
-    if (!write(file, add + list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
-    return add.size
+    var added = 0
+    update { list ->
+      val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }
+      val add = ops.filter { it.opId.isNotEmpty() && have.add(it.opId) }.map { it.toJson() }
+      added = add.size
+      if (add.isEmpty()) null else add + list
+    }
+    return added
+  }
+
+  /**
+   *  خواندن، تغییر و نوشتنِ صف زیرِ یک قفل (`push`، `pushFront`)؛ null ⇒ بی نوشتن.
+   *  اگر نوشتن نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود.
+   */
+  @Synchronized
+  private fun update(edit: (List<JsonObject>) -> List<JsonObject>?) {
+    val next = edit(read(file)) ?: return
+    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
   }
 
   /**

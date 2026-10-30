@@ -228,7 +228,7 @@ function moved(dev, label) {
   Object.assign(d, {
     token: dev.token, refreshToken: dev.refreshToken, ledger: dev.ledger, shadow: dev.shadow, queue: dev.queue.slice(), cursor: dev.cursor, snapshotAt: dev.snapshotAt,
     //  دورانِ دیده‌شده و دفترچهٔ `ReplayBook` هم روی همان دستگاه می‌مانند (§۹.۵)
-    epoch: dev.epoch, restorePending: dev.restorePending, sent: dev.sent.slice(),
+    epoch: dev.epoch, restorePending: dev.restorePending, epochLive: dev.epochLive, sent: dev.sent.slice(),
   });
   return d;
 }

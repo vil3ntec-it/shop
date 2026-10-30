@@ -327,6 +327,9 @@ export class NativeDevice {
     //  §۹.۵ (`V1Restore`): دورانِ بازیابیِ سرور، «در انتظارِ ساختنِ دوباره» و دفترچهٔ `ReplayBook`
     this.epoch = '';
     this.restorePending = false;
+    //  `SyncStateV1.epochLive`: آخرین pull دوران آورد (پرچمِ سرور روشن) ⇒ درِ دوران پرسیده می‌شود
+    this.epochLive = false;
+    this.epochCalls = 0;
     this.sent = [];          //  …-sent.jsonl: {id, seq, op} ِ پذیرفته‌شده‌ها و گرفته‌شده‌ها (`sent` + `seen`)
     this.replayedIds = new Set();
     this.replayed = 0;
@@ -431,11 +434,17 @@ export class NativeDevice {
     return ops.length;
   }
 
-  /** `V1Restore.check` — هر دور: دورانِ سرور؛ بازیابی ⇒ opهای خودِ دستگاه جلوی صف و «در انتظار» */
+  /**
+   *  `SyncV1Engine.checkEpoch` + `V1Restore.check` — هر دور، **فقط اگر** آخرین pull دوران آورد
+   *  (`V1Restore.asks`): دورانِ سرور؛ بازیابی ⇒ opهای خودِ دستگاه جلوی صف و «در انتظار». ۴۰۴ ⇒ `closed`.
+   */
   async checkEpoch() {
+    if (!this.epochLive) return;
     let r;
+    this.epochCalls++;
     try { r = await this.api('GET', '/shop/sync-epoch'); } catch { return; }
-    if (r.status !== 200) return;                              //  سرورِ کهنه/خاموش/خطا ⇒ رفتارِ پیشین
+    if (r.status === 404) { this.epochLive = false; return; }
+    if (r.status !== 200) return;                              //  خطا ⇒ این دور رفتارِ پیشین
     const latest = new Map();
     for (const x of this.sent) latest.set(x.id, x.seq);
     const plan = restorePlan(this.epoch, this.cursor, epochFrom(r.body?.epoch), (base) => [...latest.values()].some((q) => q > base));
@@ -530,6 +539,8 @@ export class NativeDevice {
         const ops = r.body.ops || [];
         //  `ReplayBook.seen`: گرفته‌ها با شماره و دستگاه — پیش از نشاندن؛ opِ خودِ سرور نه
         for (const o of ops) if (o.device_id && o.device_id !== SERVER_DEVICE && Number(o.server_seq) > 0) this.sent.push({ id: o.op_id, seq: Number(o.server_seq), op: opOf(o) });
+        //  `V1Restore.pulled`: دوران کنارِ pull ⇔ پرچمِ سرور روشن
+        this.epochLive = !!epochFrom(r.body?.epoch);
         if (ops.length) this.absorb(ops);
         this.cursor = Number(r.body.cursor || this.cursor);
         if (!r.body.has_more) break;
@@ -554,8 +565,6 @@ export class NativeDevice {
   async firstSync() {
     const rows = core.COLLECTIONS.reduce((s, c) => s + (this.ledger[c] || []).length, 0);
     if (rows === 0) {
-      //  `restoreFromServer`: دورانِ پیش از Snapshot — دستگاهِ تازه هم بداند Snapshot ِ کدام دوران است (§۹.۵)
-      const ep = await this.api('GET', '/shop/sync-epoch').catch(() => null);
       const r = await this.api('GET', '/sync/v1/snapshot');
       if (r.status !== 200) return { ok: false, status: r.status, body: r.body };
       const next = core.fromSnapshot(r.body, this.ledger);
@@ -565,7 +574,10 @@ export class NativeDevice {
       this.shadow = core.shadowOf(this.kotlin.snapshotShaped ? projectLedger(next, this.keepOf) : next);
       this.cursor = Number(r.body.cursor || 0);
       this.snapshotAt = Date.now();
-      const seen = ep && ep.status === 200 ? epochFrom(ep.body?.epoch) : null;
+      //  `restoreFromServer`: دورانِ پیش از Snapshot کنارِ خودش — دستگاهِ تازه هم بداند Snapshot ِ کدام دوران
+      //  است (§۹.۵)، بی درِ جدای دوران
+      const seen = epochFrom(r.body?.epoch);
+      this.epochLive = !!seen;
       if (seen) { this.epoch = seen.id; this.restorePending = false; }
       return { ok: true, rows: Number(r.body.rows || 0) };
     }

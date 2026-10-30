@@ -7,13 +7,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import java.io.IOException
 
 /**
  *  §۹.۵ برای Sync v1 — «سرور از پشتیبان برگشت» (شرح سرِ `core/sync/RestoreReplay.kt`)،
  *  جدا از اندروید تا روی JVM سنجیده شود. `SyncV1Engine.runOnce` فقط ترتیبِ شبکه را دارد:
  *
- *      دوران (هر دور) ⇒ `check` ⇒ Push تا خالی ⇒ اگر «در انتظار» و صف خالی:
+ *      دوران (هر دور، فقط اگر `asks`) ⇒ `check` ⇒ Push تا خالی ⇒ اگر «در انتظار» و صف خالی:
  *      Snapshot ⇒ `localOnly` ⇒ (سرور: کدام حذف‌شده) ⇒ `rebuild` ⇒ Push ⇒ Pull
  *      (در انتظار ⇒ هیچ Pullی روی دفترِ کهنه)
  *
@@ -40,6 +39,11 @@ import java.io.IOException
  *
  *  ⛔ صف، سایه و cursor فقط از راه‌های F0-05: opِ دوباره همان op_id را دارد
  *     (`Queue.pushFront`) و دفتر + سایه + cursor با ژورنالِ `SyncCommit.rebuild`.
+ *  ── پرچمِ خاموشِ سرور (`SYNC_EPOCH_ENABLED`) ─────────────────────────
+ *  درِ `GET /api/shop/sync-epoch` فقط وقتی زده می‌شود (`asks`) که pull ِ پیشین دوران آورده بود
+ *  (`pulled`) — سرور آن را فقط با پرچمِ روشن کنارِ pull می‌گذارد. خاموش ⇒ هیچ درخواستی که هر دور ۴۰۴
+ *  بگیرد؛ ۴۰۴ ِ پس از روشن بودن (`closed`) ⇒ تا pull ِ بعدیِ دوران‌دار دیگر نه.
+ *
  *  ⛔ دوران و «در انتظار» با هم و همزمان (`State.commitRestore`): بسته شدن پس از آن ⇒ دورِ
  *     بعد کار را از همان‌جا ادامه می‌دهد؛ پیش از آن ⇒ دورِ بعد بازیابی را دوباره می‌بیند و
  *     `pushFront` opِ در صف را دوباره نمی‌آورد.
@@ -49,6 +53,8 @@ class V1Restore internal constructor(
   private val queue: Queue,
   private val book: ReplayBook,
   private val commit: SyncCommit,
+  /** ساعت (`SyncV1Engine.clock`) — برای هشدارِ پوششِ دفترچه */
+  private val now: () -> Long,
   /** شناسهٔ ردیف‌های بایگانی‌شدهٔ دفتر، هر مجموعه (`LedgerArchive.archivedIds`) */
   private val archived: () -> Map<String, Set<String>> = { emptyMap() },
 ) {
@@ -61,14 +67,28 @@ class V1Restore internal constructor(
     fun commitRestore(epoch: String, pending: Boolean): Boolean
     /** فقط دوران (بی بازیابی) */
     fun adoptEpoch(epoch: String)
-    /** دفترچه همهٔ پنجرهٔ پس از پایه را ندارد — هشدارِ ماندگار به کاربر */
-    fun noteGap() {}
+    /** دفترچه همهٔ پنجرهٔ پس از پایه را ندارد — هشدارِ ماندگار به کاربر از این لحظه */
+    fun noteGap(at: Long) {}
+    /** آخرین pull دوران آورد (پرچمِ سرور روشن) ⇒ درِ دوران پرسیده می‌شود */
+    var epochLive: Boolean
   }
 
   interface Queue {
     fun all(): List<SyncOp>
     fun pushFront(ops: List<SyncOp>): Int
   }
+
+  /** درِ دورانِ سرور این دور پرسیده شود؟ فقط وقتی آخرین pull دوران آورد — خاموش ⇒ هیچ درخواستی */
+  fun asks(): Boolean = state.epochLive
+
+  /** پاسخِ pull (یا Snapshot): دوران دارد ⇔ پرچمِ سرور روشن */
+  fun pulled(epoch: RestoreReplay.Epoch?) {
+    val live = epoch != null
+    if (state.epochLive != live) state.epochLive = live
+  }
+
+  /** درِ دوران ۴۰۴ داد (پرچم خاموش شد یا سرورِ کهنه) ⇒ دیگر نپرس تا pull دوباره دوران بیاورد */
+  fun closed() { if (state.epochLive) state.epochLive = false }
 
   /**
    *  دورانِ سرور (null ⇒ سرورِ کهنه یا خاموش ⇒ هیچ). بازیابی ⇒ opهای خودِ دستگاه و
@@ -87,8 +107,8 @@ class V1Restore internal constructor(
       return false
     }
     queue.pushFront(book.replayAbove(plan.base).mapNotNull { SyncOp.fromJson(it.body) })
-    if (book.floor() > plan.base) state.noteGap()
-    if (!state.commitRestore(plan.epoch, true)) throw IOException("دورانِ همگام‌سازی روی دیسک ننشست")
+    if (book.floor() > plan.base) state.noteGap(now())
+    check(state.commitRestore(plan.epoch, true)) { "دورانِ همگام‌سازی روی دیسک ننشست" }
     return true
   }
 
@@ -131,7 +151,7 @@ class V1Restore internal constructor(
     if (commit.record(current) > 0) return false
     val (ledger, shadow) = RestoreMerge.merge(snapshot, LedgerDiff.toJson(current), gone, archived())
     val written = commit.rebuild(ledger, shadow, current, cursor, write)
-    if (!state.commitRestore(state.epoch, false)) throw IOException("دورانِ همگام‌سازی روی دیسک ننشست")
+    check(state.commitRestore(state.epoch, false)) { "دورانِ همگام‌سازی روی دیسک ننشست" }
     //  ردیف‌های تنهای این دستگاه ⇒ «درج» (همان op_idِ تازه با ژورنالِ ثبت)
     commit.record(written)
     return true

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.sync
 
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -76,7 +77,7 @@ class RestoreReplayTest {
   /* ------------------------------------------------------- ReplayBook */
 
   private val dir: File = Files.createTempDirectory("replay-book").toFile()
-  private fun book(cap: Int = ReplayBook.CAP) = ReplayBook(File(dir, "x-sent.jsonl"), cap)
+  private fun book(cap: Int = ReplayBook.CAP) = ReplayBook(FileReplayStore(File(dir, "x-sent.jsonl")), cap)
   private fun op(id: String) = buildJsonObject {
     put("op_id", JsonPrimitive(id)); put("table", JsonPrimitive("sales")); put("row_id", JsonPrimitive("s1"))
     put("type", JsonPrimitive("update")); put("fields", buildJsonObject { put("paidAmount", buildJsonObject { put("\$inc", JsonPrimitive(50)) }) })
@@ -153,7 +154,7 @@ class RestoreReplayTest {
     val c = book(cap = 4)
     assertTrue("کهنه‌ها رفتند ⇒ پایه زیرِ ۱۰۳ پوشیده نیست", c.floor() >= 103)
     assertTrue(c.replayAbove(0).all { it.seq > c.floor() })
-    val fresh = ReplayBook(File(dir, "y-sent.jsonl"))
+    val fresh = ReplayBook(FileReplayStore(File(dir, "y-sent.jsonl")))
     fresh.begin(cursor = 0)
     assertEquals(0L, fresh.floor())
     assertEquals(0, fresh.count())
@@ -196,10 +197,71 @@ class RestoreReplayTest {
   }
 
   @Test fun `بی فایل و پوشه ⇒ خالی، بی خطا`() {
-    val b = ReplayBook.inDir(File(dir, "nested/deeper"), "acc")
+    val b = FileReplayStore.inDir(File(dir, "nested/deeper"), "acc")
     assertEquals(emptyList<ReplayBook.Sent>(), b.replayAbove(0))
     assertFalse(b.hasAbove(0))
     b.sent(listOf(ReplayBook.Sent("a", 1, op("a"))))
     assertTrue(File(dir, "nested/deeper/acc-sent.jsonl").isFile)
+  }
+
+  /* -------------------------------------------- نگهبانِ آیفون (RULES-fa «هسته‌های مشترک») */
+
+  /** `ReplayBook.Store` ِ حافظه‌ای — همان قرارداد، بی هیچ `java.io`: منطقِ دفترچه به پرونده بسته نیست */
+  private class MemoryStore : ReplayBook.Store {
+    val buf = StringBuilder()
+    var replaced = 0
+    var locks = 0
+    override fun started() = buf.isNotEmpty()
+    override fun lines() = buf.split('\n').filter { it.isNotBlank() }
+    override fun append(text: String): Boolean {
+      if (buf.isNotEmpty() && buf.last() != '\n') buf.append('\n')
+      buf.append(text)
+      return true
+    }
+    override fun replace(text: String): Boolean { buf.setLength(0); buf.append(text); replaced++; return true }
+    override fun <T> locked(block: () -> T): T { locks++; return block() }
+  }
+
+  @Test fun `دفترچه بی پرونده هم همان است — begin، فرستاده و گرفته، ترتیب، سقف و پوشش روی Store ِ حافظه‌ای`() {
+    val m = MemoryStore()
+    val b = ReplayBook(m, cap = 4)
+    b.begin(10)
+    b.begin(99)                                                     //  جز بارِ نخست هیچ
+    assertEquals(10L, b.floor())
+    b.sent(listOf(ReplayBook.Sent("mine-2", 12, op("mine-2"))))
+    b.seen(listOf(
+      ReplayBook.Sent("theirs-1", 11, op("theirs-1"), device = "dev-a"),
+      ReplayBook.Sent("srv", 13, op("srv"), device = ReplayBook.SERVER_DEVICE),
+    ))
+    assertEquals(listOf("theirs-1", "mine-2"), b.replayAbove(10).map { it.id })
+    assertTrue(b.wasSent("mine-2"))
+    assertFalse("opِ خودِ سرور نوشته نمی‌شود", b.wasSent("srv"))
+    for (i in 1..6) b.sent(listOf(ReplayBook.Sent("o$i", 20L + i, op("o$i"))))
+    assertEquals("فشرده شد (جایگزینیِ اتمی)", 1, m.replaced)
+    assertEquals("o6", b.replayAbove(0).last().id)
+    assertTrue("کفِ پوشش بالا رفت", b.floor() > 10)
+    assertTrue("هر کار زیرِ قفلِ Store", m.locks > 0)
+  }
+
+  @Test fun `منطقِ بازیابی بی وابستگیِ پلتفرمی — java، synchronized، Context، ساعتِ سیستم (همان الگوهای platform-deps)`() {
+    val root = generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+      .first { File(it, "android-native/app/src/main/java").isDirectory }
+    val main = File(root, "android-native/app/src/main/java/ir/vil3ntec/tohid")
+    val banned = mapOf(
+      "android.*" to Regex("(?<![\\w.])android\\.[a-z]"),
+      "androidx" to Regex("(?<![\\w.])androidx\\.(?!compose\\.)[a-z]"),
+      "Context" to Regex("(?<![\\w.])(?:Local)?Context\\b"),
+      "SharedPreferences" to Regex("(?<![\\w.])SharedPreferences\\b"),
+      "java.* / javax.*" to Regex("(?<![\\w.])javax?\\.[a-z]"),
+      "org.json" to Regex("(?<![\\w.])org\\.json\\b"),
+      "System.currentTimeMillis" to Regex("\\bSystem\\.currentTimeMillis\\b"),
+      "String.format" to Regex("\\bString\\.format\\b|\"\\.format\\s*\\("),
+      "synchronized" to Regex("\\bsynchronized\\s*\\(|@Synchronized\\b"),
+    )
+    for (path in listOf("core/sync/RestoreReplay.kt", "sync/v1/V1Restore.kt")) {
+      val text = File(main, path).readText()
+      val hits = banned.filterValues { it.containsMatchIn(text) }.keys
+      assertEquals("$path: وابستگیِ پلتفرمی (پشتِ `ReplayBook.Store` / `platform/` بگذارید)", emptySet<String>(), hits)
+    }
   }
 }

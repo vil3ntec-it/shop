@@ -1,14 +1,10 @@
 package ir.vil3ntec.tohid.core.sync
 
-import ir.vil3ntec.tohid.data.DiskWrite
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import java.io.File
-import java.io.FileOutputStream
-import java.io.RandomAccessFile
 import kotlin.math.max
 import kotlin.math.min
 
@@ -37,7 +33,8 @@ import kotlin.math.min
  *      دیگر یک بار می‌نشیند و همهٔ دستگاه‌ها یکی می‌شوند.
  *  بالا آمدنِ عادیِ سرور: همان `id` ⇒ هیچ کاری.
  *
- *  منطقِ خالص، بی اندروید — همان را `V1Restore`، `SyncV3Engine` و دستگاهِ آزمونِ
+ *  منطقِ خالص، بی اندروید و بی `java.*` (نگهبانِ آیفون، RULES-fa «هسته‌های مشترک»): پرونده و قفلِ
+ *  دفترچه پشتِ `ReplayBook.Store`، پیاده‌سازیِ JVM در `core/sync/platform/FileReplayStore.kt`. همان را `V1Restore`، `SyncV3Engine` و دستگاهِ آزمونِ
  *  سرتاسری (`server/test/e2e/lib/native.mjs`) می‌خوانند.
  */
 object RestoreReplay {
@@ -104,11 +101,27 @@ object RestoreReplay {
  *
  *  ⚠️ opِ بی شماره (`seq ≤ 0`) و شناسهٔ نادرست نوشته نمی‌شود.
  *  ⚠️ فقط افزودن (هر خط یک رکورد، با fsync)؛ خطِ نیمه‌کارهٔ قطعِ برق نادیده گرفته می‌شود.
- *  فشرده کردن با `DiskWrite` (F0-01).
+ *  فشرده کردن با جایگزینیِ اتمیِ `Store.replace` (`DiskWrite`، F0-01).
  *  ⚠️ هیچ شکستی این‌جا همگام‌سازی را نمی‌خواباند: نوشتنِ ناموفق فقط یعنی آن op پس از
  *  بازیابیِ بعدی دوباره نمی‌رود — همان رفتارِ پیش از این دفترچه.
  */
-class ReplayBook(private val file: File, private val cap: Int = CAP) {
+class ReplayBook(private val store: Store, private val cap: Int = CAP) {
+
+  /**
+   *  پرونده و قفلِ دفترچه — مرزِ پلتفرم (JVM: `platform/FileReplayStore`). هیچ‌کدام پرتاب نمی‌کند.
+   */
+  interface Store {
+    /** پرونده هست و خالی نیست؛ خطای خواندن ⇒ true (بارِ نخست را دوباره ننویس) */
+    fun started(): Boolean
+    /** خط‌های ناخالی؛ نبودن یا خطا ⇒ خالی */
+    fun lines(): List<String>
+    /** افزودن با fsync؛ خطِ نیمه‌کارهٔ قطعِ برق ⇒ رکوردِ تازه از سرِ خطِ تازه */
+    fun append(text: String): Boolean
+    /** جایگزینیِ اتمیِ همهٔ پرونده (فایلِ کناری، بعد جابه‌جایی) */
+    fun replace(text: String): Boolean
+    /** همهٔ کارِ یک صدا زدن زیرِ یک قفل (بازگشت‌پذیر) */
+    fun <T> locked(block: () -> T): T
+  }
 
   /** یک op ِ پذیرفته یا گرفته‌شده: `body` همان چیزی است که دوباره فرستاده می‌شود؛ `device` فقط برای `seen` */
   data class Sent(val id: String, val seq: Long, val body: JsonObject, val device: String = "")
@@ -123,10 +136,9 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
    *  نخستین بار برای این حساب (فایل نیست): `floor` = cursor ِ همین حالا — آنچه پیش از آن بود
    *  در دفترچه نیست. هر دور صدا زده می‌شود و جز بارِ نخست کاری نمی‌کند.
    */
-  @Synchronized
-  fun begin(cursor: Long) {
-    if (runCatching { file.exists() && file.length() > 0 }.getOrDefault(true)) return
-    if (append(floorLine(max(0L, cursor)))) {
+  fun begin(cursor: Long) = store.locked {
+    if (store.started()) return@locked
+    if (store.append(floorLine(max(0L, cursor)))) {
       floor = max(0L, cursor)
       latest = HashMap()
       lines = 0
@@ -134,12 +146,10 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
   }
 
   /** opهای خودِ دستگاه که سرور پذیرفت — **پیش از** `ack`ِ صف */
-  @Synchronized
-  fun sent(items: List<Sent>) = write(items)
+  fun sent(items: List<Sent>) = store.locked { write(items) }
 
   /** opهای دستگاه‌های دیگر که Pull آورد — **پیش از** نشاندن روی دفتر؛ opِ خودِ سرور نه */
-  @Synchronized
-  fun seen(items: List<Sent>) = write(items.filter { it.device.isNotEmpty() && it.device != SERVER_DEVICE })
+  fun seen(items: List<Sent>) = store.locked { write(items.filter { it.device.isNotEmpty() && it.device != SERVER_DEVICE }) }
 
   private fun write(items: List<Sent>) {
     val ok = items.filter { it.seq > 0 && ID.matches(it.id) }
@@ -156,41 +166,36 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
         append('\n')
       }
     }
-    if (!append(text)) return
+    if (!store.append(text)) return
     ok.forEach { map[it.id] = it.seq }
     lines += ok.size
     if (lines > cap + cap / 2) { compact(); latest = null }
   }
 
   /** پیش‌تر پذیرفته یا گرفته شده بود؟ (ردِ دوباره‌فرستاده «انجام‌شده» است، نه ردشده‌ای که کاربر ببیند) */
-  @Synchronized
-  fun wasSent(id: String): Boolean = id.isNotEmpty() && id in loaded()
+  fun wasSent(id: String): Boolean = store.locked { id.isNotEmpty() && id in loaded() }
 
   /** opی که **آخرین** شماره‌اش بالای این پایه است هست؟ */
-  @Synchronized
-  fun hasAbove(base: Long): Boolean = loaded().values.any { it > base }
+  fun hasAbove(base: Long): Boolean = store.locked { loaded().values.any { it > base } }
 
   /** بالاترین شماره‌ای که دفترچه دیگر ندارد (شرحِ بالا) */
-  @Synchronized
-  fun floor(): Long { loaded(); return floor }
+  fun floor(): Long = store.locked { loaded(); floor }
 
   /**
    *  opهایی که آخرین `server_seq`شان بالای پایه است، **به ترتیبِ همان شماره**. همان op اگر دو
    *  بار پذیرفته شده (پس از بازیابیِ پیشین)، آخرین شماره‌اش حساب است.
    */
-  @Synchronized
-  fun replayAbove(base: Long): List<Sent> {
+  fun replayAbove(base: Long): List<Sent> = store.locked {
     val byId = LinkedHashMap<String, Sent>()
-    for (line in read()) {
+    for (line in store.lines()) {
       val s = parse(line) ?: continue
       val prev = byId[s.id]
       byId[s.id] = if (prev == null) s else prev.copy(seq = s.seq)
     }
-    return byId.values.filter { it.seq > base }.sortedBy { it.seq }
+    byId.values.filter { it.seq > base }.sortedBy { it.seq }
   }
 
-  @Synchronized
-  fun count(): Int { loaded(); return lines }
+  fun count(): Int = store.locked { loaded(); lines }
 
   /** فقط سرِ هر خط (شناسه و شماره) — بی تجزیهٔ کاملِ هزاران op در هر بالا آمدن */
   private fun loaded(): HashMap<String, Long> {
@@ -198,7 +203,7 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
     val map = HashMap<String, Long>()
     var n = 0
     var low = 0L
-    for (line in read()) {
+    for (line in store.lines()) {
       val f = FLOOR.matchEntire(line)
       if (f != null) { f.groupValues[1].toLongOrNull()?.let { low = max(low, it) }; continue }
       val m = HEAD.find(line) ?: continue
@@ -222,22 +227,6 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
     if (seq <= 0 || !ID.matches(id)) null else Sent(id, seq, body)
   }.getOrNull()
 
-  private fun read(): List<String> =
-    runCatching { if (file.exists()) file.readLines(Charsets.UTF_8).filter { it.isNotBlank() } else emptyList() }
-      .getOrDefault(emptyList())
-
-  private fun append(text: String): Boolean = runCatching {
-    file.parentFile?.mkdirs()
-    //  خطِ نیمه‌کارهٔ قطعِ برق: رکوردِ تازه از سرِ خطِ تازه، نه چسبیده به آن
-    val lead = if (file.length() > 0 && lastByte() != '\n'.code) "\n" else ""
-    FileOutputStream(file, true).use { out ->
-      out.write((lead + text).toByteArray(Charsets.UTF_8))
-      out.fd.sync()
-    }
-  }.isSuccess
-
-  private fun lastByte(): Int = RandomAccessFile(file, "r").use { it.seek(it.length() - 1); it.read() }
-
   private fun floorLine(seq: Long) = "{\"floor\":$seq}\n"
 
   /**
@@ -245,21 +234,19 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
    *  تلاشِ دوباره در افزودنِ بعدی.
    */
   private fun compact() {
-    runCatching {
-      var low = 0L
-      val entries = ArrayList<Pair<String, Long>>()
-      for (line in read()) {
-        val f = FLOOR.matchEntire(line)
-        if (f != null) { f.groupValues[1].toLongOrNull()?.let { low = max(low, it) }; continue }
-        val m = HEAD.find(line) ?: continue
-        if (!line.endsWith("}}")) continue
-        entries += line to (m.groupValues[2].toLongOrNull() ?: continue)
-      }
-      if (entries.size <= cap) return@runCatching
-      val gone = entries.subList(0, entries.size - cap).maxOf { it.second }
-      val keep = entries.subList(entries.size - cap, entries.size)
-      DiskWrite.text(file, floorLine(max(low, gone)) + keep.joinToString("") { it.first + "\n" })
+    var low = 0L
+    val entries = ArrayList<Pair<String, Long>>()
+    for (line in store.lines()) {
+      val f = FLOOR.matchEntire(line)
+      if (f != null) { f.groupValues[1].toLongOrNull()?.let { low = max(low, it) }; continue }
+      val m = HEAD.find(line) ?: continue
+      if (!line.endsWith("}}")) continue
+      entries += line to (m.groupValues[2].toLongOrNull() ?: continue)
     }
+    if (entries.size <= cap) return
+    val gone = entries.subList(0, entries.size - cap).maxOf { it.second }
+    val keep = entries.subList(entries.size - cap, entries.size)
+    store.replace(floorLine(max(low, gone)) + keep.joinToString("") { it.first + "\n" })
   }
 
   companion object {
@@ -274,6 +261,7 @@ class ReplayBook(private val file: File, private val cap: Int = CAP) {
     private val HEAD = Regex("^\\{\"id\":\"([A-Za-z0-9_.:-]{1,128})\",\"q\":(\\d{1,18}),\"op\":\\{")
     private val FLOOR = Regex("^\\{\"floor\":(\\d{1,18})\\}$")
 
-    fun inDir(dir: File, name: String): ReplayBook = ReplayBook(File(dir, "$name-sent.jsonl"))
+    /** نامِ پروندهٔ دفترچهٔ یک حساب: `<name>-sent.jsonl` (`platform/FileReplayStore.inDir`) */
+    fun fileName(name: String): String = "$name-sent.jsonl"
   }
 }

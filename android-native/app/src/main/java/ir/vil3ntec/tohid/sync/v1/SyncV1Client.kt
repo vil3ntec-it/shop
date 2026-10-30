@@ -33,6 +33,8 @@ class SyncV1Client(private val api: ApiClient) {
     val serverSchema: Int,
     /** همان opها با `server_seq` و دستگاهِ سازنده — دفترچهٔ `ReplayBook.seen` (§۹.۵) */
     val seen: List<ReplayBook.Sent> = emptyList(),
+    /** §۹.۵: دورانِ سرور — فقط با پرچمِ روشنِ `SYNC_EPOCH_ENABLED` (`V1Restore.pulled`) */
+    val epoch: RestoreReplay.Epoch? = null,
   )
 
   /**
@@ -89,6 +91,7 @@ class SyncV1Client(private val api: ApiClient) {
       hasMore = (res["has_more"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() == true,
       serverSchema = (num(res, "schema_version") ?: 0L).toInt(),
       seen = seen,
+      epoch = RestoreReplay.Epoch.from(res["epoch"]),
     )
   }
 
@@ -120,8 +123,9 @@ class SyncV1Client(private val api: ApiClient) {
   }
 
   /**
-   *  «دورانِ» سرور برای همین حساب (§۹.۵، `core/sync/RestoreReplay.kt`).
-   *  ۴۰۴ (سرورِ کهنه یا خاموش‌کنِ `SYNC_EPOCH_ENABLED`) ⇒ null ⇒ همان رفتارِ پیشین.
+   *  «دورانِ» سرور برای همین حساب (§۹.۵، `core/sync/RestoreReplay.kt`). فقط وقتی صدا زده می‌شود
+   *  که pull ِ پیشین دوران آورد (`V1Restore.asks`) — پرچمِ خاموش ⇒ هرگز.
+   *  ۴۰۴ (سرورِ کهنه یا خاموش‌کنِ `SYNC_EPOCH_ENABLED`) ⇒ null ⇒ `V1Restore.closed`.
    */
   suspend fun epoch(): RestoreReplay.Epoch? {
     val res = try {

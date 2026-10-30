@@ -218,6 +218,33 @@ test('خاموش‌کن (SYNC_EPOCH_ENABLED=false) ⇒ ۴۰۴ و pull ِ v3 بی
   }
 });
 
+test('v1: pull و Snapshot ِ دکان با پرچمِ روشن دوران دارند — برنامه فقط آن‌وقت درِ دوران را می‌زند', async () => {
+  const hdr = { 'X-App': 'shop', 'X-Device': DEV };
+  const p = await h.api('GET', `/api/sync/v1/pull?device_id=${DEV}&since=0`, { token: owner.accessToken, headers: hdr });
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  const now = await ep();
+  assert.deepEqual(p.body.epoch && { id: p.body.epoch.id, base: p.body.epoch.base }, { id: now.id, base: now.base });
+  assert.ok(p.body.epoch.base <= p.body.epoch.head);
+  const s = await h.api('GET', '/api/sync/v1/snapshot', { token: owner.accessToken, headers: hdr });
+  assert.equal(s.status, 200, JSON.stringify(s.body));
+  assert.equal(s.body.epoch?.id, now.id);
+});
+
+test('v1: پرچمِ خاموش ⇒ pull و Snapshot بی کلیدِ epoch (برنامه درِ ۴۰۴ِ دوران را هرگز نمی‌زند)', async () => {
+  config.syncEpoch.enabled = false;
+  try {
+    const hdr = { 'X-App': 'shop', 'X-Device': DEV };
+    const p = await h.api('GET', `/api/sync/v1/pull?device_id=${DEV}&since=0`, { token: owner.accessToken, headers: hdr });
+    assert.equal(p.status, 200, JSON.stringify(p.body));
+    assert.equal('epoch' in p.body, false, 'pull ِ خاموش کلیدِ epoch دارد');
+    const s = await h.api('GET', '/api/sync/v1/snapshot', { token: owner.accessToken, headers: hdr });
+    assert.equal(s.status, 200, JSON.stringify(s.body));
+    assert.equal('epoch' in s.body, false, 'Snapshot ِ خاموش کلیدِ epoch دارد');
+  } finally {
+    config.syncEpoch.enabled = true;
+  }
+});
+
 test('بی توکن ⇒ ۴۰۱؛ توکنِ پمپ ⇒ ۴۰۱ (همان قاعدهٔ همهٔ مسیرهای /api/shop)', async () => {
   assert.equal((await h.api('GET', '/api/shop/sync-epoch')).status, 401);
   const pump = await h.newUser('پمپ‌دارِ دوران', 'pump');

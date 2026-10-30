@@ -45,4 +45,25 @@ class RestoreReplayDesktopTest {
     assertTrue(s.commitRestore("ep_new", false))
     assertFalse(SyncStateV1(DesktopContext, key).restorePending)
   }
+
+  @Test fun `«پرچمِ دورانِ سرور روشن است» برای هر حساب جدا روی دیسک — خاموش پیش‌فرض، پس هیچ درخواستی`() {
+    val s = SyncStateV1(DesktopContext, key)
+    assertFalse("پیش‌فرض: درِ دوران پرسیده نمی‌شود", s.epochLive)
+    s.epochLive = true
+    assertTrue(SyncStateV1(DesktopContext, key).epochLive)
+    assertFalse("حسابِ دیگر جدا", SyncStateV1(DesktopContext, "$key-other").epochLive)
+    s.epochLive = false
+    assertFalse(SyncStateV1(DesktopContext, key).epochLive)
+  }
+
+  @Test fun `pushFront و push زیرِ یک قفل — سقفِ صف و دوباره‌ها با هم`() {
+    val q = OpQueue(DesktopContext, "$key-lock")
+    val t = Thread { repeat(50) { i -> q.push(listOf(op("n$i"))) } }
+    t.start()
+    repeat(50) { i -> q.pushFront(listOf(op("r$i"))) }
+    t.join()
+    val ids = q.all().map { it.opId }
+    assertEquals("هیچ opی گم نشد", 100, ids.size)
+    assertEquals(100, ids.toSet().size)
+  }
 }

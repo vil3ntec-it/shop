@@ -367,6 +367,8 @@
     patchState({
       cursor: Number(r.cursor || since), lastPullAt: Date.now(),
       serverSchema: Number(r.schema_version || st.serverSchema || 0),
+      //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ `SYNC_EPOCH_ENABLED` ِ سرور روشن ⇒ دورِ بعد `checkEpoch` می‌پرسد
+      epochLive: !!epochOf(r),
     });
     //  صفحه بیش از یک بسته داشت ⇒ همان‌جا بقیه را هم بیاور
     if (r.has_more) return (await pullOnce()) + ops.length;
@@ -385,6 +387,8 @@
      ویرایشِ «اعمال‌شده»ی گم‌شدهٔ همین مرورگر روی ردیفی که سرور دارد (مثلاً دریافتِ دیگری روی
      فاکتورِ پیش از پشتیبان) دوباره نمی‌رود — ردیفِ تازه می‌ماند و می‌رود.
      سرورِ کهنه یا خاموش (۴۰۴) ⇒ همان رفتارِ پیشین.
+     ⛔ درِ `/api/shop/sync-epoch` فقط وقتی زده می‌شود که pull ِ پیشین دوران آورد (`epochLive`)؛
+     پرچمِ خاموش ⇒ هیچ درخواستی که هر دور ۴۰۴ بگیرد. ۴۰۴ ⇒ تا pull ِ دوران‌دارِ بعدی دیگر نه.
      ========================================================== */
   function epochOf(r) {
     var ep = r && r.epoch;
@@ -396,8 +400,14 @@
   }
 
   async function checkEpoch() {
+    if (!state().epochLive) return;
     var ep;
-    try { ep = epochOf(await acc.authFetch('/api/shop/sync-epoch')); } catch (e) { return; }
+    try {
+      ep = epochOf(await acc.authFetch('/api/shop/sync-epoch'));
+    } catch (e) {
+      if (e && e.status === 404) patchState({ epochLive: false });
+      return;
+    }
     if (!ep) return;
     var st = state();
     var known = st.epoch || '';
@@ -501,15 +511,16 @@
      ۵) Snapshot — گوشیِ نو، یک بار
      ========================================================== */
   async function restoreFromServer() {
-    //  §۹.۵: دورانِ پیش از Snapshot — دفتر حالا همان سرور است، پس همان دوران
-    var ep = null;
-    try { ep = epochOf(await acc.authFetch('/api/shop/sync-epoch')); } catch (e) { /* سرورِ کهنه */ }
     var r = await acc.authFetch('/api/sync/v1/snapshot');
+    //  §۹.۵: دورانِ پیش از Snapshot کنارِ خودش (فقط با پرچمِ روشن) — دفتر حالا همان سرور است، پس همان
+    //  دوران؛ بی درِ جدای دوران
+    var ep = epochOf(r);
     var data = ledger.read() || {};
     var next = core.fromSnapshot(r, data);
     ledger.write(next);
     setShadow(next);
     patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), lastOkAt: Date.now(), lastError: '' });
+    patchState({ epochLive: !!ep });
     if (ep) patchState({ epoch: ep.id, restorePending: false });
     announce();
     return { rows: Number(r.rows || 0), cursor: Number(r.cursor || 0) };

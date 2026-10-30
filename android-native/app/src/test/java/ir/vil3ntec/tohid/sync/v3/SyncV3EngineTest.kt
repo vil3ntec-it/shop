@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
@@ -259,7 +260,7 @@ class SyncV3EngineTest {
     override fun loadQueue() = queue
     override fun saveQueue(queue: V3Queue) { this.queue = queue }
     //  همان دفترچهٔ `FileV3Store` (§۹.۵) — همهٔ آزمون‌ها با آن می‌دوند، مثلِ برنامه
-    override var replay: ReplayBook? = ReplayBook.inDir(dir, "replay")
+    override var replay: ReplayBook? = FileReplayStore.inDir(dir, "replay")
   }
 
   private val tmp: File = Files.createTempDirectory("v3-engine").toFile()
@@ -691,7 +692,7 @@ class SyncV3EngineTest {
     val saved = server.backup()
     b.edit { d -> d.copy(sales = d.sales + Sale(id = "s9", total = 50.0, finalTotal = 50.0, paidAmount = 50.0)) }
     assertTrue(b.sync().ok)
-    b.store.replay = ReplayBook.inDir(File(tmp, "dev-b-lost").apply { mkdirs() }, "replay")
+    b.store.replay = FileReplayStore.inDir(File(tmp, "dev-b-lost").apply { mkdirs() }, "replay")
     server.restore(saved, "ep_2")
     assertNull(server.row("sales", "s9"))
     assertTrue(b.sync().ok)

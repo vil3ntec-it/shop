@@ -157,6 +157,37 @@ test('وب v1: پس از بازیابی دلتای دوباره‌فرستاده
   assert.equal(sale().paidAmount, 150);
 });
 
+test('وب v1: پرچمِ SYNC_EPOCH_ENABLED خاموش ⇒ درِ دوران هرگز زده نمی‌شود (نه ۴۰۴ در هر دور)؛ روشن ⇒ از دورِ پس از pull', async () => {
+  const config = require('../src/config');
+  config.syncEpoch.enabled = false;
+  const W = webV1(owner.accessToken, 'web-off');
+  const asked = () => W.calls.filter((c) => c.endsWith('/api/shop/sync-epoch')).length;
+  try {
+    await W.sync.firstSync();
+    for (let i = 0; i < 5; i++) await W.sync.sync();
+    assert.equal(asked(), 0, `خاموش: ${asked()} درخواست به درِ دوران`);
+    assert.equal(W.state().epochLive, false);
+    assert.equal(W.state().epoch || '', '');
+  } finally {
+    config.syncEpoch.enabled = true;
+  }
+  //  روشن: pull ِ همین دور دوران می‌آورد ⇒ دورِ بعد پرسیده می‌شود
+  await W.sync.sync();
+  assert.equal(W.state().epochLive, true);
+  await W.sync.sync();
+  assert.ok(asked() >= 1, 'روشن: درِ دوران پرسیده نشد');
+  assert.equal(W.state().epoch, (await epoch.current()).id);
+  //  دوباره خاموش ⇒ یک ۴۰۴ و دیگر هیچ
+  config.syncEpoch.enabled = false;
+  try {
+    const before = asked();
+    for (let i = 0; i < 4; i++) await W.sync.sync();
+    assert.ok(asked() - before <= 1, `پس از خاموش شدن ${asked() - before} درخواست`);
+  } finally {
+    config.syncEpoch.enabled = true;
+  }
+});
+
 test('وب v1: فروشِ پس از پشتیبانِ همین مرورگر پس از بازیابی می‌ماند و «درج» می‌رود؛ حذف‌شدهٔ سرور زنده نمی‌شود؛ ثبت‌نشده زیرِ Snapshot نمی‌رود', async () => {
   //  بازبینِ دوم، B1(c): پیش‌تر دفتر همان Snapshot می‌شد و فروشِ خودِ مرورگر پاک
   const W = webV1(owner.accessToken, 'web-w2');

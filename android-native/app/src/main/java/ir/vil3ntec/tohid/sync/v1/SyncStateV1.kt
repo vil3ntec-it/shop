@@ -115,7 +115,12 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getLong(k("restoreNoticeAt"), 0)
     set(v) = prefs.edit().putLong(k("restoreNoticeAt"), v).apply()
 
-  override fun noteGap() { restoreNoticeAt = System.currentTimeMillis() }
+  override fun noteGap(at: Long) { restoreNoticeAt = at }
+
+  /** آخرین pull دوران آورد (پرچمِ `SYNC_EPOCH_ENABLED` ِ سرور روشن) — `V1Restore.asks` */
+  override var epochLive: Boolean
+    get() = prefs.getBoolean(k("epochLive"), false)
+    set(v) = prefs.edit().putBoolean(k("epochLive"), v).apply()
 
   /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
   var reconciledAt: Long

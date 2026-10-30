@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync.v1
 
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.data.Product
@@ -48,6 +49,20 @@ class V1RestoreTest {
     /** پرچمِ `SYNC_EPOCH_ENABLED` ِ سرور خاموش ⇒ درِ دوران ۴۰۴ (برنامه null می‌بیند)، بقیه همان */
     var epochOff = false
     var pushes = 0
+    /** شمارِ `GET /api/shop/sync-epoch` — خاموش ⇒ هر بار ۴۰۴ (آزمونِ «خاموش ⇒ هیچ درخواستی») */
+    var epochCalls = 0
+    var epoch404 = 0
+
+    /** درِ جدای دوران: خاموش ⇒ ۴۰۴ (برنامه null می‌بیند) */
+    fun epochDoor(): RestoreReplay.Epoch? {
+      check(!offline) { "offline" }
+      epochCalls++
+      if (epochOff) { epoch404++; return null }
+      return epoch()
+    }
+
+    /** دورانِ کنارِ pull ِ v1 (`routes/sync-v1.js`): فقط با پرچمِ روشن */
+    fun pullEpoch(): RestoreReplay.Epoch? = if (epochOff) null else epoch()
 
     class Saved(val seq: Long, val tree: JsonObject, val log: List<Triple<Long, String, SyncOp>>, val seen: Map<String, Long>, val gone: Set<RestoreMerge.Row>)
     fun backup() = Saved(seq, tree, log.toList(), HashMap(seen), HashSet(gone))
@@ -112,6 +127,7 @@ class V1RestoreTest {
     override var cursor = 0L
     override var epoch = ""
     override var restorePending = false
+    override var epochLive = false
     var gapNoted = false
     val queue = ArrayList<SyncOp>()
     val dropped = ArrayList<SyncOp>()
@@ -121,7 +137,7 @@ class V1RestoreTest {
 
     override fun commitRestore(epoch: String, pending: Boolean): Boolean { this.epoch = epoch; restorePending = pending; return true }
     override fun adoptEpoch(epoch: String) { this.epoch = epoch }
-    override fun noteGap() { gapNoted = true }
+    override fun noteGap(at: Long) { gapNoted = true }
     override fun all(): List<SyncOp> = queue.toList()
     override fun pushFront(ops: List<SyncOp>): Int {
       val have = queue.mapTo(HashSet()) { it.opId }
@@ -141,14 +157,14 @@ class V1RestoreTest {
       override fun push(ops: List<SyncOp>) { queue += ops }
     }
     val commit = SyncCommit(SyncCommit.Journal(File(tmp, "$name-journal.json")), parts)
-    var book = ReplayBook.inDir(tmp, name)
-    var restore = V1Restore(this, this, book, commit) { archived }
+    var book = FileReplayStore.inDir(tmp, name)
+    var restore = V1Restore(this, this, book, commit, { 0L }) { archived }
 
     /** دفترچه از دست رفت (برنامه میانِ پشتیبان و بازیابی به‌روز شد / پاک شد) */
     fun loseBook() {
       File(tmp, "$name-sent.jsonl").delete()
-      book = ReplayBook.inDir(tmp, name)
-      restore = V1Restore(this, this, book, commit) { archived }
+      book = FileReplayStore.inDir(tmp, name)
+      restore = V1Restore(this, this, book, commit, { 0L }) { archived }
     }
 
     /** `ShopStore.save` ⇒ `record` */
@@ -166,7 +182,10 @@ class V1RestoreTest {
       val next = LedgerDiff.fromSnapshot(snap, LedgerDiff.toJson(ledger))
       ledger = LedgerDiff.fromJson(next)
       parts.commit(LedgerDiff.shadowOf(next).toString(), server.seq)
-      epoch = server.epochId
+      //  `restoreFromServer`: دوران کنارِ همان Snapshot (فقط با پرچمِ روشن)، بی درِ جدا
+      val ep = server.pullEpoch()
+      restore.pulled(ep)
+      if (ep != null) epoch = ep.id
     }
 
     /** `SyncV1Engine.pushAll` */
@@ -189,7 +208,11 @@ class V1RestoreTest {
     /** همان ترتیبِ `SyncV1Engine.runOnce` */
     fun sync(): Boolean {
       if (commit.pending()) commit.recover(ledger)
-      restore.check(if (server.offline || server.epochOff) null else server.epoch())
+      //  `SyncV1Engine.checkEpoch`: درِ دوران فقط وقتی آخرین pull دوران آورد؛ ۴۰۴ ⇒ `closed`
+      if (restore.asks()) {
+        val ep = runCatching { server.epochDoor() }
+        ep.onSuccess { if (it == null) restore.closed() else restore.check(it) }
+      }
       if (!pushAll()) return false
       if (restorePending && queue.isEmpty()) {
         if (server.offline) return false
@@ -201,6 +224,7 @@ class V1RestoreTest {
       if (!restorePending) {
         val (got, next) = server.pull(name, cursor)
         restore.seen(got.map { (seq, device, op) -> ReplayBook.Sent(op.opId, seq, op.toJson(), device) })
+        restore.pulled(server.pullEpoch())
         val ops = got.map { it.third }
         if (ops.isNotEmpty()) commit.absorb(ops, ledger, next) { ledger = it } else cursor = next
       }
@@ -591,8 +615,13 @@ class V1RestoreTest {
     assertEquals("", a.epoch)
     assertFalse(a.restore.check(null))
 
-    //  پرچم روشن شد؛ a زودتر می‌رسد و می‌فروشد ⇒ نخستین دورانِ b سرِ دفترِ بالاتر از cursor ِ خودش را می‌بیند
+    assertEquals("خاموش: درِ دوران هرگز زده نشد (نه ۴۰۴ در هر دور)", 0, server.epochCalls)
+
+    //  پرچم روشن شد: دورِ نخست فقط pull ِ دوران‌دار را می‌بیند؛ از دورِ بعد درِ دوران پرسیده می‌شود
     server.epochOff = false
+    assertTrue(a.sync())
+    assertEquals("هنوز پرسیده نشد", 0, server.epochCalls)
+    assertTrue(a.epochLive)
     assertTrue(a.sync())
     assertEquals("ep_1", a.epoch)
     assertEquals(server.seq, a.book.floor())
@@ -601,12 +630,46 @@ class V1RestoreTest {
     val head = server.seq
     assertTrue("b هنوز عقب است", b.cursor < head)
     assertTrue(b.sync())
-    assertEquals("پوشش از سرِ دفترِ سرور، نه cursor ِ کهنهٔ b", head, b.book.floor())
+    assertTrue(b.sync())
+    assertEquals("پوشش از سرِ دفترِ سرور در نخستین دوران", head, b.book.floor())
     assertTrue("روشن: opِ خودی نوشته شد", a.book.count() > 0)
     a.edit(sale("s4", "i4"))
     assertTrue(a.sync())
     assertTrue(b.sync())
     assertTrue("روشن: opِ گرفته‌شده نوشته شد", b.book.count() > 0)
     converged(server, a, b)
+  }
+
+  @Test fun `پرچمِ خاموش ⇒ هیچ درخواستی به درِ دوران در هیچ دوری — نه ۴۰۴ ِ تکراری`() {
+    val server = Server().apply { epochOff = true }
+    val a = Device("a-quiet", server).apply { baseline(base) }
+    val b = Device("b-quiet", server).apply { join() }
+    repeat(20) { i ->
+      a.edit(sale("q$i", "qi$i"))
+      assertTrue(a.sync())
+      assertTrue(b.sync())
+    }
+    assertEquals("خاموش ⇒ هرگز", 0, server.epochCalls)
+    assertFalse(a.epochLive)
+    assertFalse(b.epochLive)
+    assertEquals("", b.epoch)
+    converged(server, a, b)
+  }
+
+  @Test fun `پرچم پس از روشن بودن خاموش شد ⇒ یک ۴۰۴ و دیگر هیچ؛ روشن شدنِ دوباره ⇒ دوباره پرسیده می‌شود`() {
+    val (server, a, _) = shop("-flip")
+    assertTrue(a.sync())
+    assertTrue("روشن ⇒ پرسیده می‌شود", server.epochCalls > 0)
+    server.epochOff = true
+    val before = server.epochCalls
+    repeat(10) { assertTrue(a.sync()) }
+    assertEquals("فقط یک بار، همان ۴۰۴", 1, server.epochCalls - before)
+    assertEquals(1, server.epoch404)
+    assertFalse(a.epochLive)
+    server.epochOff = false
+    assertTrue(a.sync())
+    val on = server.epochCalls
+    assertTrue(a.sync())
+    assertEquals("روشن ⇒ دوباره هر دور", on + 1, server.epochCalls)
   }
 }

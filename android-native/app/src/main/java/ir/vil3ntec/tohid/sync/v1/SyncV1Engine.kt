@@ -2,7 +2,8 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
-import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoreReplay
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -67,8 +68,8 @@ class SyncV1Engine private constructor(context: Context) {
   private var restore = restoreFor(accountKey)
 
   private fun restoreFor(key: String) =
-    V1Restore(state, queue, ReplayBook.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit) {
-      LedgerArchive.archivedIds(app)
+    V1Restore(state, queue, FileReplayStore.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit, ::clock) {
+      LedgerArchive.archivedIds(LedgerArchive.readArchive(app))
     }
 
   private val gate = Mutex()
@@ -207,14 +208,7 @@ class SyncV1Engine private constructor(context: Context) {
         val device = store.deviceUid
 
         //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
-        val epoch = try {
-          client.epoch()
-        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-          throw cancelled
-        } catch (_: Throwable) {
-          null
-        }
-        synchronized(this) { restore.check(epoch) }
+        checkEpoch(client)
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
         try {
@@ -230,9 +224,9 @@ class SyncV1Engine private constructor(context: Context) {
          */
         if (state.restorePending && queue.size() == 0) {
           val snapshot = client.snapshot()
-          val ask = synchronized(this) { restore.localOnly(snapshot, read()) }
+          val ask = locked { restore.localOnly(snapshot, read()) }
           val gone = if (ask.isEmpty()) emptySet() else client.deleted(ask)
-          val built = synchronized(this) {
+          val built = locked {
             if (commit.pending()) commit.recover(read())
             try {
               restore.rebuild(snapshot, read(), gone, write)
@@ -244,7 +238,7 @@ class SyncV1Engine private constructor(context: Context) {
             }
           }
           if (built) {
-            state.snapshotAt = System.currentTimeMillis()
+            state.snapshotAt = clock()
             //  ردیف‌های تنها (اگر بود) همین حالا بروند
             try {
               pushQueue(client, device)
@@ -261,16 +255,18 @@ class SyncV1Engine private constructor(context: Context) {
           val got = client.pull(device, state.cursor)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
           if (got.seen.isNotEmpty()) restore.seen(got.seen)
+          //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز
+          restore.pulled(got.epoch)
           if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
           state.cursor = got.cursor
-          state.lastPullAt = System.currentTimeMillis()
+          state.lastPullAt = clock()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
           if (!got.hasMore) break
         }
 
         attempt = 0
         state.lastError = ""
-        state.lastOkAt = System.currentTimeMillis()
+        state.lastOkAt = clock()
         Result.success(Unit)
       } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
@@ -333,7 +329,7 @@ class SyncV1Engine private constructor(context: Context) {
         queue.drop(batch.filter { it.opId in ids }, "rejected")
         queue.ack(ids)
       }
-      state.lastPushAt = System.currentTimeMillis()
+      state.lastPushAt = clock()
     }
   }
 
@@ -389,14 +385,7 @@ class SyncV1Engine private constructor(context: Context) {
       val device = store.deviceUid
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
       //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد
-      val epoch = try {
-        client.epoch()
-      } catch (cancelled: kotlinx.coroutines.CancellationException) {
-        throw cancelled
-      } catch (_: Throwable) {
-        null
-      }
-      synchronized(this) { restore.check(epoch) }
+      checkEpoch(client)
       val out = SyncRebuild(object : SyncRebuild.Io {
         override fun queued(): Int = queue.size()
         override suspend fun push() = pushQueue(client, device)
@@ -409,7 +398,7 @@ class SyncV1Engine private constructor(context: Context) {
         override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
       }).run(base)
       if (out is SyncRebuild.Outcome.Done) {
-        val now = System.currentTimeMillis()
+        val now = clock()
         //  دفتر حالا همان سرور است (با opهای دوباره‌رفته) ⇒ ساختنِ دوبارهٔ §۹.۵ دیگر لازم نیست
         if (state.restorePending) state.commitRestore(state.epoch, false)
         state.snapshotAt = now
@@ -497,7 +486,7 @@ class SyncV1Engine private constructor(context: Context) {
           write(LedgerDiff.fromJson(next))
           writeShadow(next)
           state.cursor = serverCursor
-          state.snapshotAt = System.currentTimeMillis()
+          state.snapshotAt = clock()
         } else {
           val missing = LedgerDiff.diff(server, local).filter { it.type == SyncOp.INSERT }
           if (missing.isNotEmpty()) queue.push(missing)
@@ -509,7 +498,7 @@ class SyncV1Engine private constructor(context: Context) {
             state.cursor = serverCursor
           }
         }
-        state.reconciledAt = System.currentTimeMillis()
+        state.reconciledAt = clock()
       }
     }
     publish()
@@ -555,22 +544,18 @@ class SyncV1Engine private constructor(context: Context) {
 
   suspend fun restoreFromServer(read: () -> ShopData, write: suspend (ShopData) -> Unit): Int {
     val client = SyncV1Client(Backend.api(app))
-    //  §۹.۵: دورانِ پیش از Snapshot — دفتر حالا همان سرور است، پس همان دوران و دیگر «در انتظار» نه
-    val epoch = try {
-      client.epoch()
-    } catch (cancelled: kotlinx.coroutines.CancellationException) {
-      throw cancelled
-    } catch (_: Throwable) {
-      null
-    }
     val body = client.snapshot()
+    //  §۹.۵: دورانِ پیش از Snapshot کنارِ خودش (فقط با پرچمِ روشن) — دفتر حالا همان سرور است، پس همان
+    //  دوران و دیگر «در انتظار» نه؛ بی درِ جدای دوران
+    val epoch = RestoreReplay.Epoch.from(body["epoch"])
+    restore.pulled(epoch)
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
     writeShadow(next)
     state.cursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
       ?.content?.toLongOrNull() ?: 0L
-    state.snapshotAt = System.currentTimeMillis()
-    state.lastOkAt = System.currentTimeMillis()
+    state.snapshotAt = clock()
+    state.lastOkAt = clock()
     state.lastError = ""
     if (epoch != null) state.commitRestore(epoch.id, false)
     publish()
@@ -640,10 +625,33 @@ class SyncV1Engine private constructor(context: Context) {
 
   internal fun publish() { _status.value = snapshotStatus() }
 
+  /**
+   *  §۹.۵: دورانِ سرور و `V1Restore.check` — فقط وقتی آخرین pull دوران آورد (`V1Restore.asks`)؛
+   *  پرچمِ خاموشِ `SYNC_EPOCH_ENABLED` ⇒ هیچ درخواستی (نه ۴۰۴ در هر دور). ۴۰۴ ⇒ `closed`؛ خطای
+   *  شبکه ⇒ این دور بی دوران (همان رفتارِ پیشین).
+   */
+  private suspend fun checkEpoch(client: SyncV1Client) {
+    if (!restore.asks()) return
+    val epoch = try {
+      client.epoch() ?: return restore.closed()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      return
+    }
+    locked { restore.check(epoch) }
+  }
+
+  /** قفلِ دفتر و حالِ همگام‌سازی (`synchronized` روی همین موتور) — یک جا، برای کارهای §۹.۵ */
+  private inline fun <T> locked(block: () -> T): T = synchronized(this) { block() }
+
+  /** ساعتِ همگام‌سازی — یک جا (نگهبانِ آیفون: جایِ `Clock` ِ تزریق‌شده) */
+  private fun clock(): Long = System.currentTimeMillis()
+
   /** §۹.۵: پس از بازیابیِ سروری که دفترچه همهٔ پنجره‌اش را نداشت، چند روز دیده شود */
   private fun notice(): String {
     val at = runCatching { state.restoreNoticeAt }.getOrDefault(0L)
-    return if (at > 0 && System.currentTimeMillis() - at < RESTORE_NOTICE_MS) RESTORE_NOTICE else ""
+    return if (at > 0 && clock() - at < RESTORE_NOTICE_MS) RESTORE_NOTICE else ""
   }
 
   fun queueSize(): Int = queue.size()
