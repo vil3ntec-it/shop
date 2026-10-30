@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.sync.OpBacklog
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.data.LedgerArchive
@@ -143,7 +144,15 @@ class SyncV1Engine private constructor(context: Context) {
      *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد.
      *  شرح سرِ `SyncCommit`.
      */
-    val made = commit.record(data)
+    val made = try {
+      commit.record(data)
+    } catch (e: Exception) {
+      //  صف (یا ژورنالش) روی حافظه ننشست — معمولاً حافظهٔ پر. دفتر پیش‌تر نشسته و سایه جلو نرفته، پس
+      //  همین تغییر با ثبتِ بعدی دوباره op می‌شود؛ ولی بی‌صدا نه (هیچ opی هم دور ریخته نمی‌شود: `OpBacklog`)
+      state.lastError = "$QUEUE_NOT_WRITTEN (${e.message ?: e::class.simpleName})"
+      publish()
+      throw e
+    }
     publish()
     return made
   }
@@ -257,7 +266,7 @@ class SyncV1Engine private constructor(context: Context) {
           if (got.seen.isNotEmpty()) restore.seen(got.seen)
           //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز
           restore.pulled(got.epoch)
-          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
+          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor, keepPending = got.keepPending)
           state.cursor = got.cursor
           state.lastPullAt = clock()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
@@ -515,6 +524,10 @@ class SyncV1Engine private constructor(context: Context) {
    *
    *  سایه هم به‌جای «کلِ دفترِ امروز»، خودِ سایه به‌اضافهٔ همین opهاست؛
    *  تغییرِ محلی‌ای که هنوز op نشده، با این کار گم نمی‌شود.
+   *
+   *  [keepPending] (پرچمِ دکانِ `sync.keep_pending`، از پاسخِ همان pull): تغییرِ محلی‌ای که **در صف** است
+   *  (مثلاً ثبت‌شده وسطِ همین pull) با opِ رسیده بازنویسی نمی‌شود — opها پیش از نشاندن از
+   *  `LedgerDiff.keepPending` می‌گذرند؛ همان opها روی دفتر، سایه و ژورنال می‌نشینند.
    */
   @Synchronized
   internal fun absorbRemote(
@@ -522,14 +535,23 @@ class SyncV1Engine private constructor(context: Context) {
     read: () -> ShopData,
     write: (ShopData) -> Unit,
     cursor: Long? = null,
+    keepPending: Boolean = false,
   ) {
+    var use = ops
+    if (keepPending) {
+      //  ژورنالِ «ثبتِ» نیمه‌مانده اول، تا opهایش هم در صف دیده شوند
+      if (commit.pending()) commit.recover(read())
+      use = LedgerDiff.keepPending(ops, queue.all())
+      //  همه نباید بنشینند ⇒ دفتر و سایه دست نمی‌خورند؛ cursor را صدازننده جلو می‌برد
+      if (use.isEmpty()) return
+    }
     /*
      *  ⛔ دفتر، سایه و cursor با هم (F0-05): اگر دفتر نوشته شود و سایه و
      *  cursor نه، همان opها دوباره گرفته و روی دفتر جمع می‌شدند و تفاضلِ
      *  بعدی آن‌ها را «تغییرِ من» به سرور پس می‌فرستاد.
      */
     try {
-      commit.absorb(ops, read(), cursor, write)
+      commit.absorb(use, read(), cursor, write)
     } catch (e: Throwable) {
       //  نیمه‌کاره در همین اجرا (نه بسته شدن): همان‌جا با دفترِ همین حالا
       //  تمام یا برگردانده می‌شود، پیش از آنکه ذخیرهٔ محلی‌ای برسد
@@ -614,7 +636,8 @@ class SyncV1Engine private constructor(context: Context) {
       cursor = state.cursor,
       lastOkAt = state.lastOkAt,
       //  §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی چراغ را قرمز نمی‌کند
-      lastError = state.lastError.ifBlank { notice() },
+      //  صفِ بزرگ (`OpBacklog.WARN_AT`): «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ
+      lastError = state.lastError.ifBlank { notice() }.ifBlank { OpBacklog.warning(queued) },
       holding = state.holding,
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
@@ -685,6 +708,11 @@ class SyncV1Engine private constructor(context: Context) {
     const val RESTORE_NOTICE =
       "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
         "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
+
+    /** صف (یا ژورنالش) ننشست — تغییر روی دفترِ همین دستگاه می‌ماند و با ثبتِ بعدی دوباره op می‌شود */
+    const val QUEUE_NOT_WRITTEN =
+      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +
+        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"
 
     @Volatile private var instance: SyncV1Engine? = null
 

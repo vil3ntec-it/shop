@@ -54,6 +54,18 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/sync-no-data-loss` (روی #335؛ سه یافتهٔ داده‌ازدست‌دادنِ ممیزیِ SYN + gzip ِ pull)
+- انجام شد: (۱) صفِ v1 (اندروید/کامپیوتر و وب) دیگر بالای ۵۰٬۰۰۰ op کهنه‌ترین‌ها را دور نمی‌ریزد؛ از ۱۰٬۰۰۰ پیامِ «X تغییر هنوز به
+  سرور نرسیده» (`core/…/sync/OpBacklog.kt`)؛ صفِ ننشسته در اندروید پیامِ روشن می‌دهد — بی پرچم (تصمیمِ سرپرست). (۲) تغییرِ در صف
+  (ثبتِ وسطِ pull) با op ِ رسیده بازنویسی نمی‌شود — پرچمِ خاموشِ `sync.keep_pending` (`core/…/sync/KeepPending.kt`). (۳) ردیفی که
+  دستگاهِ دیگر پس از حذف زنده کرد کامل می‌رسد — پرچمِ خاموشِ `sync.revive_full_row` (`server/src/lib/sync-v1-keep.js`). (۴) pull ِ بزرگ
+  فشرده پشتِ `sync.gzip_pull`؛ push نه.
+- آزمون: `sync-keep-local.test.js` ۱۳/۱۳ (پیش از درمان ۱۰ سرخ)، `:core:jvmTest` (KeepPending/OpBacklog + بردارها)، KeepLocalTest ۸/۸ و
+  OpQueueBacklogDesktopTest (۶۰٬۰۰۰ op) در پروژهٔ JVM ِ جدا؛ ۱۰ جهش سرخ. Gradle ِ اندروید/کامپیوتر فقط CI.
+- نیمه‌کاره: push ِ فشرده (برنامه باید بدنه را فشرده کند و از سرور بداند)؛ صفِ خیلی بزرگ کند است (هر batch/ack کلِ پرونده را
+  می‌خواند)؛ v3 دست نخورد. قدمِ بعدی: پس از مرجِ #335 همین PR به main؛ روشن کردنِ سه پرچم دکان‌به‌دکان با صاحب محصول؛ با #501/#506/#553
+  فقط ردیف‌های STATUS/RULES/HANDOFF برخورد دارند.
+
 ### ۱۴۰۵/۰۸/۰۸ — PR #335 (دورِ CI)، شاخهٔ `ccr-3a0d593c-ac0jpj-restore-repush`
 - انجام شد: ادغامِ main (تعارضِ FREE ِ `paid-routes-entitlement`: هر دو ردیف). ریشهٔ سرخیِ PostgreSQL (`sync-epoch.test:182`):
   با pg_dump ِ ناموجود Promise ِ `closed` در `lib/backup.js` پیش از `await` بی‌شنونده رد می‌شد ⇒ unhandledRejection (در تولید یعنی

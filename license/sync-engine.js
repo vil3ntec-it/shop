@@ -137,7 +137,8 @@
       lastOkAt: Number(st.lastOkAt || 0),
       lastPushAt: Number(st.lastPushAt || 0),
       lastPullAt: Number(st.lastPullAt || 0),
-      lastError: st.lastError || '',
+      //  صفِ بزرگ: «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ (هیچ opی دور ریخته نمی‌شود)
+      lastError: st.lastError || (typeof core.backlogWarning === 'function' ? core.backlogWarning(n.queued) : ''),
       lastErrorAt: Number(st.lastErrorAt || 0),
       holding: !!st.holding,
       needsShop: !!st.needsShop,
@@ -351,6 +352,9 @@
     var r = await acc.authFetch('/api/sync/v1/pull?device_id='
       + encodeURIComponent(acc.deviceId()) + '&since=' + since);
     var ops = Array.isArray(r.ops) ? r.ops : [];
+    //  پرچمِ دکانِ `sync.keep_pending`: تغییرِ محلیِ «در صف» (مثلاً ذخیره‌شده وسطِ همین pull) با opِ رسیده
+    //  بازنویسی نمی‌شود — همان opها روی دفتر و سایه (`core.keepPending`؛ sync-core ِ کهنه ⇒ همان پیشین)
+    if (r.keep_pending === true && ops.length && typeof core.keepPending === 'function') ops = core.keepPending(ops, queue().all());
     if (ops.length) {
       var data = ledger.read();
       //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود، وگرنه همین opها

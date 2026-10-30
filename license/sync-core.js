@@ -506,8 +506,11 @@
         continue;
       }
 
-      var row = at >= 0 ? Object.assign({}, list[at]) : { id: op.row_id };
-      var keys = Object.keys(op.fields || {});
+      //  ردیفِ نبوده که این op زنده‌اش کرد (پرچمِ سرورِ `sync.revive_full_row`): ردیفِ کاملِ سرور پس از همین
+      //  op، نه نیمه‌ای فقط با فیلدهای op؛ فیلدهای op (و `$inc`) در آن هست ⇒ دوباره نشانده نمی‌شوند
+      var revived = at < 0 && op.row ? op.row : null;
+      var row = at >= 0 ? Object.assign({}, list[at]) : Object.assign({}, revived || {}, { id: op.row_id });
+      var keys = revived ? [] : Object.keys(op.fields || {});
       for (var k = 0; k < keys.length; k++) {
         var f = keys[k];
         var v = op.fields[f];
@@ -537,7 +540,74 @@
       table: table, row_id: rowId, type: type,
       fields: isPlainObject(raw.fields) ? raw.fields : {},
       server_seq: Number(raw.server_seq || 0) || 0,
+      row: type !== 'delete' && isPlainObject(raw.row) ? raw.row : null,
     };
+  }
+
+  /* ----------------------------------------------------------
+     opهای رسیده بی بازنویسیِ تغییرِ محلیِ «در صف» — پرچمِ دکانِ `sync.keep_pending` (سرور
+     `keep_pending: true` در پاسخِ pull). قاعده و شرح: core/…/core/sync/KeepPending.kt؛ بردار:
+     core/test-vectors/keep-pending-v1.json. حکمِ هر op: {v:'keep'} | {v:'drop'} |
+     {v:'trim', drop:[فیلد], rebase:{فیلد: دلتا}}.
+     ---------------------------------------------------------- */
+  function incOf(v) {
+    return isPlainObject(v) && typeof v.$inc === 'number' && Number.isFinite(v.$inc) ? v.$inc : null;
+  }
+
+  function keepPendingVerdicts(incoming, pending) {
+    var rows = Object.create(null);
+    var keyOf = function (o) { return String(o.table) + '\u0000' + String(o.row_id); };
+    for (var i = 0; i < (pending || []).length; i++) {
+      var p = normalizeIncoming(pending[i]);
+      if (!p) continue;
+      var r = rows[keyOf(p)] || (rows[keyOf(p)] = { live: false, set: {}, inc: {} });
+      if (p.type === 'delete') { r.live = false; r.set = {}; r.inc = {}; continue; }
+      r.live = true;
+      var pf = Object.keys(p.fields);
+      for (var a = 0; a < pf.length; a++) {
+        var d = incOf(p.fields[pf[a]]);
+        if (d === null) { r.set[pf[a]] = true; delete r.inc[pf[a]]; } else if (!r.set[pf[a]]) r.inc[pf[a]] = (r.inc[pf[a]] || 0) + d;
+      }
+    }
+    var out = [];
+    for (var j = 0; j < (incoming || []).length; j++) {
+      var x = normalizeIncoming(incoming[j]);
+      var row = x && rows[keyOf(x)];
+      if (!row) { out.push({ v: 'keep' }); continue; }
+      if (x.type === 'delete') { out.push({ v: row.live ? 'drop' : 'keep' }); continue; }
+      if (!row.live) { out.push({ v: 'drop' }); continue; }
+      var drop = [], rebase = {}, any = false;
+      var xf = Object.keys(x.fields);
+      for (var b = 0; b < xf.length; b++) {
+        var f = xf[b];
+        if (row.set[f]) drop.push(f);
+        else if (incOf(x.fields[f]) === null && f in row.inc) { rebase[f] = row.inc[f]; any = true; }
+      }
+      out.push(drop.length || any ? { v: 'trim', drop: drop, rebase: rebase } : { v: 'keep' });
+    }
+    return out;
+  }
+
+  /** opهای رسیده پس از صافیِ «در صف» — همان ترتیب، جز آنچه نباید بنشیند (قرینهٔ `LedgerDiff.keepPending`) */
+  function keepPending(ops, pending) {
+    if (!ops || !ops.length || !pending || !pending.length) return ops || [];
+    var verdicts = keepPendingVerdicts(ops, pending);
+    var out = [];
+    for (var i = 0; i < ops.length; i++) {
+      var v = verdicts[i];
+      if (v.v === 'drop') continue;
+      if (v.v === 'keep') { out.push(ops[i]); continue; }
+      var fields = {};
+      var src = isPlainObject(ops[i].fields) ? ops[i].fields : {};
+      var keys = Object.keys(src);
+      for (var k = 0; k < keys.length; k++) {
+        var f = keys[k];
+        if (v.drop.indexOf(f) !== -1) continue;
+        fields[f] = f in v.rebase ? (typeof src[f] === 'number' && Number.isFinite(src[f]) ? src[f] : 0) + v.rebase[f] : src[f];
+      }
+      out.push(Object.assign({}, ops[i], { fields: fields }));
+    }
+    return out;
   }
 
   /* ==========================================================
@@ -648,7 +718,29 @@
      (`dropped`) تا معلوم باشد چه شد — بی‌صدا دور ریختن یعنی دادهٔ
      گم‌شده‌ای که هیچ‌کس نمی‌فهمد.
      ========================================================== */
-  var QUEUE_MAX = 50000;
+  /*
+   *  ⛔ صف سقفی ندارد که کهنه‌ترین‌ها را دور بریزد (پیش‌تر بالای ۵۰٬۰۰۰ op `queue_overflow` می‌شدند و هرگز
+   *  به سرور نمی‌رسیدند). از `QUEUE_WARN` به بالا پیامِ «X تغییر هنوز به سرور نرسیده» (`backlogWarning`)؛
+   *  حافظهٔ پر ⇒ `push` ‏-1 و صدازننده سایه را جلو نمی‌برد («حافظهٔ مرورگر پر است»). قرینهٔ
+   *  core/…/core/sync/OpBacklog.kt — بردار: core/test-vectors/op-backlog-v1.json
+   */
+  var QUEUE_WARN = 10000;
+
+  function faCount(n) {
+    var d = String(Math.max(0, Math.floor(Number(n) || 0)));
+    var out = '';
+    for (var i = 0; i < d.length; i++) {
+      if (i > 0 && (d.length - i) % 3 === 0) out += '\u066C';
+      out += String.fromCharCode(0x06F0 + d.charCodeAt(i) - 48);
+    }
+    return out;
+  }
+
+  function backlogWarning(queued) {
+    var n = Number(queued) || 0;
+    return n < QUEUE_WARN ? ''
+      : faCount(n) + ' تغییر هنوز به سرور نرسیده؛ روی همین دستگاه نگه داشته شده‌اند — به اینترنت وصل بمانید تا برسند';
+  }
 
   function OpQueue(io, key) {
     this.io = io;
@@ -664,13 +756,8 @@
 
   OpQueue.prototype.push = function (ops) {
     if (!ops || !ops.length) return 0;
+    //  ⛔ بی سقف: هیچ opی دور ریخته نمی‌شود (شرح سرِ `QUEUE_WARN`)
     var list = this.all().concat(ops);
-    //  سقفِ ایمنی: دفترِ صف نباید حافظهٔ مرورگر را پر کند. کهنه‌ترین
-    //  می‌رود **و در دفترِ کنار ثبت می‌شود**، نه بی‌صدا.
-    if (list.length > QUEUE_MAX) {
-      var cut = list.splice(0, list.length - QUEUE_MAX);
-      this.drop(cut, 'queue_overflow');
-    }
     //  نوشتنی که نگرفت (حافظهٔ مرورگر پر) گفته می‌شود، نه بی‌صدا رد —
     //  صدازننده سایه را جلو نمی‌برد تا تغییر دفعهٔ بعد دوباره op شود
     if (this.io.write(this.key, list) === false) return -1;
@@ -795,7 +882,7 @@
     LIST_COLLECTIONS: LIST_COLLECTIONS,
     listRowId: listRowId,
     INC_FIELDS: INC_FIELDS,
-    QUEUE_MAX: QUEUE_MAX,
+    QUEUE_WARN: QUEUE_WARN,
     BACKOFF_MIN_MS: BACKOFF_MIN_MS,
     BACKOFF_MAX_MS: BACKOFF_MAX_MS,
     DOT_LABEL: DOT_LABEL,
@@ -812,6 +899,10 @@
     cloneLedger: cloneLedger,
     isIncField: isIncField,
     OpQueue: OpQueue,
+    faCount: faCount,
+    backlogWarning: backlogWarning,
+    keepPendingVerdicts: keepPendingVerdicts,
+    keepPending: keepPending,
     dotOf: dotOf,
     backoffMs: backoffMs,
   };
