@@ -57,11 +57,14 @@ import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.qr.QrCode
 import ir.vil3ntec.tohid.data.PayFlow
+import ir.vil3ntec.tohid.pay.CustomerPay
 import ir.vil3ntec.tohid.pay.HceSlot
 import ir.vil3ntec.tohid.pay.HesabPaySettle
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import ir.vil3ntec.tohid.pay.platform.PayDevice
+import ir.vil3ntec.tohid.ui.ProvideLang
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -102,12 +105,20 @@ fun CheckoutGateways(
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid, modifier)
+  var available by remember { mutableStateOf(false) }
+  //  هر فاکتورِ تازه دوباره می‌پرسد (یک دقیقه در حافظه): پرچم یا نت که عوض شد، صفحهٔ ماندگارِ کامپیوتر هم می‌فهمد
+  LaunchedEffect(hook.env, hook.saleKey) { available = hook.env.available() }
+  if (!available) return
+  Column(modifier) {
+    HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid)
+    //  کارت‌خوان (آداپتورِ دستی) فقط جایی که ثبتِ دستیِ PAY-06 هست: پنلِ ترکیبی
+    if (panel != null) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy)
+  }
 }
 
-/** دکمهٔ «پرداخت با حساب‌پی» و برگه‌اش. `draft` = پنلِ ترکیبی (حساب‌پی باقی را می‌پردازد)، `null` = کلِ فاکتور */
+/** دکمهٔ «پرداخت با حساب‌پی» و برگه‌اش (درگاه روشن و نت هست). `draft` = پنلِ ترکیبی (حساب‌پی باقی را می‌پردازد)، `null` = کلِ فاکتور */
 @Composable
-fun HesabPayEntry(
+private fun HesabPayEntry(
   hook: GatewayHook,
   total: Double,
   draft: PayFlow.Draft?,
@@ -117,11 +128,7 @@ fun HesabPayEntry(
   modifier: Modifier = Modifier,
 ) {
   val env = hook.env
-  val saleKey = hook.saleKey
-  var available by remember { mutableStateOf(false) }
-  //  هر فاکتورِ تازه دوباره می‌پرسد (یک دقیقه در حافظه): پرچم یا نت که عوض شد، صفحهٔ ماندگارِ کامپیوتر هم می‌فهمد
-  LaunchedEffect(env, saleKey) { available = env.available() }
-  if (!available || saleKey == null) return
+  val saleKey = hook.saleKey ?: return
   val due = HesabPaySettle.due(total, draft)
   if (due !is HesabPaySettle.Due.Amount) return
   var open by remember(saleKey) { mutableStateOf(false) }
@@ -230,6 +237,19 @@ private fun HesabPaySheet(
         is SheetFlow.Step.Stop -> phase = r.phase
       }
     }
+  }
+
+  //  نمایشگرِ رو به مشتری (HW-10): مبلغ، QR و وضعیت؛ بی صفحهٔ دوم هیچ‌جا دیده نمی‌شود
+  val shown = when (val p = phase) {
+    is Phase.Live -> CustomerPay.View(amountMinor, p.intent.qrPayload, CustomerPay.Stage.WAITING)
+    is Phase.Paid -> CustomerPay.View(amountMinor, "", CustomerPay.Stage.PAID)
+    else -> null
+  }
+  LaunchedEffect(shown) { CustomerPay.view.value = shown }
+  DisposableEffect(Unit) { onDispose { CustomerPay.view.value = null } }
+  val storeName = remember { env.storeName() }
+  PayDevice.CustomerScreen(active = shown != null) {
+    TohidTheme { ProvideLang { CustomerPay.view.value?.let { CustomerPayScreen(storeName, it) } } }
   }
 
   //  NFC: تا QR زنده است همان نشانی؛ با بسته شدنِ برگه پاک

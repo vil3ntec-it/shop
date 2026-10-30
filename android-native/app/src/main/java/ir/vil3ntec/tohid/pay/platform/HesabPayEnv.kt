@@ -46,6 +46,9 @@ class HesabPayEnv private constructor(private val app: Context) {
 
   fun openNfcSettings() = PayDevice.openNfcSettings(app)
 
+  /** نامِ دکان برای صفحهٔ رو به مشتری (همان `store_name` ِ نمایه) */
+  fun storeName(): String = runCatching { app.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "").orEmpty() }.getOrDefault("")
+
   @Volatile private var cached: Pair<Long, Boolean>? = null
 
   /** حساب‌پی برای این دکان روشن است و نت هست؟ بی‌نت ⇐ فوراً نه (روش پنهان) */
