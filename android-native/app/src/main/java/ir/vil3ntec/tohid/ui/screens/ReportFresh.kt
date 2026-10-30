@@ -197,6 +197,15 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(view.tables))
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name)
   fun excel() { Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar("ذخیره شد: $it") } } }
+  //  RPT-11: PDF ِ مستقیم — همان جدول‌های چاپ، بی پنجرهٔ چاپ (فقط در «گزارشِ تازه»، پشتِ `report_fresh`)
+  //  کامپیوتر: پنجرهٔ ذخیره؛ گوشی: «فرستادن» (همان راهِ PDF ِ فاکتور). ساختنِ صفحه‌ها بیرون از نخِ صفحه.
+  fun pdf() {
+    val s = sheet()
+    scope.launch {
+      val msg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.print.ReportPrint.savePdf(context, s, name) }
+      snackbar.showSnackbar(msg)
+    }
+  }
 
   Column(
     Modifier
@@ -223,6 +232,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       ReportFreshSwitch()
       Spacer(Modifier.width(12.dp))
       OutlinedButton(onClick = ::print) { Text("چاپ  ${KeyMap.GLOBAL_PRINT.hint}") }
+      Spacer(Modifier.width(6.dp))
+      OutlinedButton(onClick = ::pdf) { Text("PDF") }
       Spacer(Modifier.width(6.dp))
       Button(onClick = ::excel) { Text("اکسل  ${KeyMap.GLOBAL_EXPORT.hint}") }
     }
