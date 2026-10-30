@@ -1,6 +1,11 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.foundation.horizontalScroll
+import ir.vil3ntec.tohid.ui.v3.online.delivery.DeskData
+import ir.vil3ntec.tohid.ui.v3.online.delivery.fieldOf
+import ir.vil3ntec.tohid.ui.v3.online.delivery.minorOf
+import ir.vil3ntec.tohid.ui.v3.online.delivery.reasonsOf
+import ir.vil3ntec.tohid.ui.v3.online.delivery.recordSale
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,13 +47,6 @@ import kotlinx.coroutines.launch
 
 /* ============================ ابزارهای فرم ============================ */
 
-/** «۱۲٬۵۰۰» یا «12500.5» ⇐ واحدِ کوچک؛ خالی ⇐ ۰؛ نامعتبر ⇐ null */
-internal fun minorOf(text: String): Long? = if (text.isBlank()) 0L else OrderDraft.scaled(text, 2)
-
-/** واحدِ کوچک ⇐ متنِ فیلد (بی جداکننده تا ویرایش ساده بماند) */
-internal fun fieldOf(minor: Long): String =
-  if (minor % 100 == 0L) (minor / 100).toString() else "${minor / 100}.${(minor % 100).toString().padStart(2, '0')}"
-
 internal val MONEY_KEYS = KeyboardOptions(keyboardType = KeyboardType.Decimal)
 
 /** بدنهٔ برگه: روی گوشی خودش می‌لغزد؛ کامپیوتر را `AdaptiveSheet` می‌لغزاند */
@@ -71,8 +69,6 @@ internal fun ErrorLine(text: String?) {
   if (text != null) Text(text, style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
 }
 
-internal fun reasonsOf(cfg: DeskConfig, key: String): List<String> =
-  cfg.reasons[key]?.takeIf { it.isNotEmpty() } ?: DeliveryText.FALLBACK_REASONS[key].orEmpty()
 
 /* ============================ سپردنِ دستی ============================ */
 
@@ -690,33 +686,5 @@ private fun PickupHandoverDialog(
         },
       )
     }
-  }
-}
-
-/**
- *  پس از «تحویل شد»: فروشِ همین سفارش از راهِ قلابِ `HandoverSale` (#340،
- *  `OrdersLive.postById`: از سرور می‌پرسد و با شناسهٔ سفارش یکتا ثبت می‌کند). تحویل
- *  پیش‌تر در سرور ثبت شده؛ اگر ثبت همین حالا نشد، برنامه آن را از فهرستِ «تحویلِ
- *  بی‌فروش» دوباره ثبت می‌کند — دیگر لازم نیست کسی در صندوق دستی بزند (دو بار می‌شد).
- */
-private suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, ordersRepo: OrdersRepository): String {
-  val hook = HandoverSale.hook
-    ?: return "سفارش #${order.orderNo} تحویل شد؛ فروشش را برنامه از «سفارش‌ها ⇐ تحویلِ بی‌فروش» ثبت می‌کند."
-  //  قلاب فقط شناسهٔ سفارش را لازم دارد؛ جزئیات را خودش از سرور می‌گیرد
-  val full = ordersRepo.get(order.id).valueOrNull() ?: order
-  val handed = HandedOverOrder(
-    kind = HandoverKind.PICKUP_AT_STORE,
-    orderId = full.id, orderNo = full.orderNo, assignmentId = m.id, customerName = full.customer.name,
-    paymentMethod = full.paymentMethod, paymentStatus = full.paymentStatus,
-    subtotalMinor = full.subtotalMinor, discountMinor = full.discountMinor, deliveryFeeMinor = full.deliveryFeeMinor,
-    totalMinor = full.totalMinor, collectedMinor = collected,
-    lines = full.lines.map { HandedOverLine(it.productId, it.name, it.qtyMilli, it.unitPriceMinor, it.lineTotalMinor) },
-  )
-  return when (val r = runCatching { hook.record(handed) }.getOrElse { HandoverSaleResult.Failed(it.message ?: "خطا") }) {
-    is HandoverSaleResult.Recorded -> "سفارش #${order.orderNo} تحویل و فروشش ثبت شد."
-    is HandoverSaleResult.AlreadyRecorded -> "سفارش #${order.orderNo} تحویل شد؛ فروشش پیش‌تر ثبت شده بود."
-    is HandoverSaleResult.Failed -> "سفارش #${order.orderNo} تحویل شد؛ فروش همین حالا ثبت نشد (${r.message}) — برنامه دوباره می‌کوشد، در صندوق دستی نزنید."
-    //  بررسیِ صاحب: نه وعدهٔ «دوباره می‌کوشد»، فقط دلیل
-    is HandoverSaleResult.NeedsReview -> "سفارش #${order.orderNo} تحویل شد؛ فروشش خودکار ثبت نمی‌شود — ${r.message}"
   }
 }
