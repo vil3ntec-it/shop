@@ -80,6 +80,7 @@ private fun permLabel(key: String): String = when (key) {
   "sales.discount" -> "تخفیف"
   "sales.cancel" -> "لغوِ فاکتور"
   "returns.create" -> "برگشت و بازپرداخت"
+  "safe.move" -> "گاوصندوق: شمارش و جابه‌جاییِ پول"
   else -> key
 }
 

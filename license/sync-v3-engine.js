@@ -172,6 +172,7 @@
     warehouseEntries: { policy: 'doc', money: ['price'], qty: ['cartons', 'perCarton', 'units'], cancel: 'data.delete.any' },
     priceHistory: { policy: 'log', money: ['oldPrice', 'newPrice'] },
     auditLog: { policy: 'log', money: ['amount'] },
+    safeEntries: { policy: 'log' },
     stockMovements: { policy: 'moves', qty: ['qty'] },
     stockCounts: { policy: 'count', qty: ['countedQty'], v3only: true },
   };

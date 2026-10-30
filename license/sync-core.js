@@ -43,11 +43,24 @@
 
      پلهٔ ۳ (F0-04) یعنی سه فهرستِ تنظیماتی (بخشِ ۱-ب) هم می‌روند.
 
+     پلهٔ ۴ (PAY-18) یعنی مجموعهٔ گاوصندوق (`safeEntries`) هم هست. وب آن را
+     نمی‌سازد؛ فقط ردیفِ خام را نگه می‌دارد و همان را پس می‌دهد.
+
      ⚠️ هر فیلد یا مجموعهٔ تازه = یک پله بالاتر، این‌جا **و** روی سرور.
      برنامه‌ای که جلوتر از سرور باشد ۴۲۶ می‌گیرد و opهایش را نگه
      می‌دارد — هیچ چیزی گم نمی‌شود.
      ========================================================== */
-  var SCHEMA_VERSION = 3;
+  var SCHEMA_VERSION = 4;
+  /**
+   *  پله‌ای که هر سرور می‌شناسد (main). پلهٔ ۴ روی سرور پشتِ پرچمِ `sync.safe_entries` ِ هر
+   *  دکان است، پس برنامه همان پله‌ای را می‌فرستد که سرور گفته (`wireSchema`) — نه بیشتر، تا
+   *  روی دکانِ پرچم‌خاموش ۴۲۶ نگیرد. سرورِ ناشناخته (۰) ⇒ همین پایه.
+   */
+  var BASE_SCHEMA = 3;
+  function wireSchema(serverSchema) {
+    var s = Math.floor(Number(serverSchema) || 0);
+    return Math.max(BASE_SCHEMA, Math.min(SCHEMA_VERSION, s));
+  }
 
   /* ==========================================================
      ۱) مجموعه‌ها — فهرستِ سفید، همان نام‌هایی که سرور می‌شناسد
@@ -67,6 +80,7 @@
     'debtors', 'transactions', 'expenses',
     'suppliers', 'purchases', 'supplierPayments',
     'stockMovements', 'priceHistory', 'auditLog',
+    'safeEntries',
   ];
   /**
    *  ترتیبِ opهای یک ثبت (`diff`): ردیف‌های برگشت پیش از شمارنده‌هایشان (`debtSettled` ِ فاکتور،
@@ -761,6 +775,8 @@
 
   return {
     SCHEMA_VERSION: SCHEMA_VERSION,
+    BASE_SCHEMA: BASE_SCHEMA,
+    wireSchema: wireSchema,
     COLLECTIONS: COLLECTIONS,
     LIST_COLLECTIONS: LIST_COLLECTIONS,
     listRowId: listRowId,

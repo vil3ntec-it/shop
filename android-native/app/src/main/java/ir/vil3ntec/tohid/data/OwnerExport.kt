@@ -98,6 +98,7 @@ object OwnerExport {
     "stockMovements" to "حرکات انبار",
     "priceHistory" to "سابقهٔ قیمت‌ها",
     "auditLog" to "سابقهٔ عملیات",
+    "safeEntries" to "گاوصندوق",
   )
 
   /** فیلد ⇐ سرستونِ فارسی */
@@ -205,6 +206,11 @@ object OwnerExport {
     "oldPrice" to "قیمت قبلی",
     "newPrice" to "قیمت تازه",
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    "amountMinor" to "مبلغ (پول)",
+    "bagNo" to "شمارهٔ کیسه",
+    "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",
+    "shiftId" to "شناسهٔ صندوق",
+    "auditId" to "شناسهٔ ردیفِ صندوق",
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

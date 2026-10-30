@@ -282,8 +282,13 @@ export class NativeDevice {
     this.snapshotAt = 0;
     this.lastError = '';
     this.holding = false;
+    //  `SyncState.serverSchema`: پله‌ای که سرور در push/pull گفته (۰ = هنوز نمی‌دانیم)
+    this.serverSchema = 0;
     this.requests = [];
   }
+
+  /** `LedgerDiff.wireSchema(state.serverSchema)`: پلهٔ همان سرور روی سیم، نه بیشتر (پرچمِ گاوصندوق) */
+  wireSchema() { return core.wireSchema(this.serverSchema); }
 
   /* ---------------- شبکه ---------------- */
 
@@ -395,10 +400,15 @@ export class NativeDevice {
           size += s;
           batch.push(op);
         }
-        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: core.SCHEMA_VERSION, queued: this.queue.length, ops: batch, ...this.marks() });
-        if (r.status === 426) { this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 }; }
+        const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: this.wireSchema(), queued: this.queue.length, ops: batch, ...this.marks() });
+        if (r.status === 426) {
+          //  `SyncV1Engine.pushQueue`: پلهٔ بالاتر از پایه را سرور دیگر نمی‌شناسد ⇒ بارِ بعد با پایه
+          if (this.wireSchema() > core.BASE_SCHEMA) this.serverSchema = 0;
+          this.holding = true; this.lastError = r.body?.message || 'upgrade'; return { ok: false, status: 426 };
+        }
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         this.holding = false;
+        this.serverSchema = Number(r.body.schema_version || 0);
         const res = r.body.results || [];
         const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
         const bad = res.filter((x) => !(x.status === 'applied' || x.status === 'duplicate'));
@@ -412,6 +422,7 @@ export class NativeDevice {
         const ops = r.body.ops || [];
         if (ops.length) this.absorb(ops);
         this.cursor = Number(r.body.cursor || this.cursor);
+        if (Number(r.body.schema_version) > 0) this.serverSchema = Number(r.body.schema_version);
         if (!r.body.has_more) break;
       }
       this.lastError = '';

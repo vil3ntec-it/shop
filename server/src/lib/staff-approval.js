@@ -38,6 +38,7 @@ const staffPerms = require('./staff-perms');
 const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
+const { rejectOps } = require('./v1-reject');
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -875,21 +876,9 @@ async function v1Guard(req, res, next) {
 
     return finish();
 
-    /** ردشده‌ها از دسته بیرون و پاسخشان سرِ جای خودشان؛ بی ردشده همان دسته به v1 */
+    /** ردشده‌ها از دسته بیرون و پاسخشان سرِ جای خودشان (‎lib/v1-reject.js‎)؛ بی ردشده همان دسته به v1 */
     function finish() {
-      if (!rejected.size) return next();
-      req.body.ops = ops.filter((_, i) => !rejected.has(i));
-      const send = res.json.bind(res);
-      res.json = (body) => {
-        if (body && body.ok && Array.isArray(body.results)) {
-          const rest = body.results.slice();
-          const merged = [];
-          for (let i = 0; i < ops.length; i++) merged.push(rejected.has(i) ? rejected.get(i) : rest.shift());
-          //  اگر شمارِ پاسخ‌ها نخواند، چیزی گم نشود
-          body.results = merged.filter(Boolean).concat(rest);
-        }
-        return send(body);
-      };
+      rejectOps(req, res, ops, rejected);
       return next();
     }
   } catch (err) { next(err); }

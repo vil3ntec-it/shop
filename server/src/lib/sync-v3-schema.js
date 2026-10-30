@@ -75,6 +75,8 @@ const TABLES = Object.freeze({
 
   priceHistory: { policy: 'log', money: ['oldPrice', 'newPrice'] },
   auditLog: { policy: 'log', money: ['amount'] },
+  //  گاوصندوق (PAY-18): فقط‌افزودنی؛ مبلغ از اول `amountMinor`ِ صحیح است
+  safeEntries: { policy: 'log' },
 
   stockMovements: { policy: 'moves', qty: ['qty'] },
   //  تازهٔ v3 — در v1 نیست

@@ -1,7 +1,7 @@
 {
   "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه). returns.create و «نیازمند تأیید» برای شاگرد و discount_bp: برگهٔ امضاشده (بخشِ ۱۰.۱).",
   "version": 1,
-  "keys": ["audit.view", "drawer.open", "reports.money", "returns.create", "sales.cancel", "sales.discount", "settings.write"],
+  "keys": ["audit.view", "drawer.open", "reports.money", "returns.create", "safe.move", "sales.cancel", "sales.discount", "settings.write"],
   "defaults": [
     { "role": "owner", "key": "sales.discount", "out": "allow" },
     { "role": "manager", "key": "sales.discount", "out": "allow" },
@@ -26,7 +26,10 @@
     { "role": "staff", "key": "returns.create", "out": "allow" },
     { "role": "owner", "key": "drawer.open", "out": "allow" },
     { "role": "manager", "key": "drawer.open", "out": "allow" },
-    { "role": "staff", "key": "drawer.open", "out": "deny" }
+    { "role": "staff", "key": "drawer.open", "out": "deny" },
+    { "role": "owner", "key": "safe.move", "out": "allow" },
+    { "role": "manager", "key": "safe.move", "out": "allow" },
+    { "role": "staff", "key": "safe.move", "out": "deny" }
   ],
   "resolve": [
     { "role": "staff", "layers": [], "key": "sales.discount", "out": { "mode": "deny", "caps": {} } },
@@ -37,6 +40,8 @@
     { "role": "manager", "layers": [{ "settings.write": { "mode": "deny" } }, { "settings.write": { "mode": "allow" } }], "key": "settings.write", "out": { "mode": "allow", "caps": {} } },
     { "role": "staff", "layers": [{ "settings.write": { "mode": "allow" } }], "key": "settings.write", "out": { "mode": "deny", "caps": {} } },
     { "role": "staff", "layers": [{ "sales.discount": { "mode": "approve" } }], "key": "sales.discount", "out": { "mode": "approve", "caps": {} } },
+    { "role": "staff", "layers": [{ "safe.move": { "mode": "allow" } }], "key": "safe.move", "out": { "mode": "deny", "caps": {} } },
+    { "role": "manager", "layers": [{ "safe.move": { "mode": "deny" } }], "key": "safe.move", "out": { "mode": "deny", "caps": {} } },
     { "role": "staff", "layers": [{ "reports.money": { "mode": "allow" } }], "key": "reports.money", "out": { "mode": "allow", "caps": {} } },
     { "role": "manager", "layers": [{ "reports.money": { "mode": "deny" } }], "key": "reports.money", "out": { "mode": "deny", "caps": {} } },
     { "role": "manager", "layers": [{ "sales.discount": { "caps": { "maxPct": 10 } } }], "key": "sales.discount", "out": { "mode": "allow", "caps": { "maxPct": 10 } } },
@@ -87,6 +92,7 @@
         "drawer.open": { "mode": "allow", "caps": {} },
         "reports.money": { "mode": "deny", "caps": {} },
         "returns.create": { "mode": "allow", "caps": {} },
+        "safe.move": { "mode": "allow", "caps": {} },
         "sales.cancel": { "mode": "allow", "caps": {} },
         "sales.discount": { "mode": "allow", "caps": { "maxPct": 7 } },
         "settings.write": { "mode": "deny", "caps": {} }

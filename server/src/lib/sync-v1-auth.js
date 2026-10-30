@@ -105,6 +105,8 @@ async function requireSyncAccount(req, res, next) {
     if (claimed && claimed !== ctx.app) {
       return next(forbidden('این نشست مالِ بخشِ دیگری است', 'app_mismatch'));
     }
+    //  گاوصندوق (PAY-18): پرچمِ `sync.safe_entries` یک بار برای همین درخواست (‎lib/safe-flag.js‎)
+    if (ctx.app === 'shop' && ctx.accountKind === 'shop') ctx.safeEntries = await require('./safe-flag').enabledFor(ctx.accountId);
     req.sync = ctx;
     req.appSection = ctx.app;
     if (ctx.accountKind === 'shop') { req.shopId = ctx.accountId; req.role = ctx.role; }
