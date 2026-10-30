@@ -11,7 +11,7 @@
 --
 --  ⛔ هیچ دادهٔ موجودی عوض نمی‌شود؛ همه پیش‌فرضِ بی‌اثر دارند. خواندنِ این‌ها
 --     پشتِ پرچمِ `market.product_details` (پیش‌فرض خاموش) است.
---  برگشت: `migrations/rollback/130_market_product_details.down.sql`.
+--  برگشت: `migrations/rollback/122_market_product_details.down.sql`.
 -- ============================================================
 
 ALTER TABLE market_search ADD COLUMN IF NOT EXISTS brand_norm text NOT NULL DEFAULT '';
