@@ -209,9 +209,10 @@ test('WebSocket: عضوِ معلق‌شده (نشستِ باطل) سوکتش ب�
   const sus = await h.patch(`/api/shop/members/${mid}`, { status: 'suspended' }, { token: a.accessToken });
   assert.equal(sus.status, 200, JSON.stringify(sus.body));
 
-  //  همان تپشِ ۳۰ثانیه‌ای، این‌جا مستقیم
-  const dropped = await live.dropRevoked(h.server().__syncLive);
-  assert.ok(dropped >= 1, `سوکتِ نشستِ باطل بسته نشد (${dropped})`);
+  //  همان تپشِ ۳۰ثانیه‌ای، این‌جا مستقیم. ⚠️ S78: سوکت از پیش در همان درخواستِ تعلیق بسته شده
+  //  (`accessChanged`)، پس تپش ممکن است چیزی برای بستن نیابد — بسته‌بودن پایین با 4401 سنجیده می‌شود؛
+  //  خودِ تپش (هوکِ دورزده) در `sync-live-revoke.test.js` آزموده می‌شود.
+  await live.dropRevoked(h.server().__syncLive);
   const r = await push(a.accessToken, 'dev-a-phone2', [op('ten-a-ws2', { name: 'پس از تعلیق', unit: 'دانه', salePrice: 10, active: true, createdAt: Date.now() })]);
   assert.equal(r.status, 200, JSON.stringify(r.body));
   await sleep(400);

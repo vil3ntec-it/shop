@@ -18,6 +18,29 @@
  * حساب از توکن؛ `?device_id=` فقط می‌گوید خبرِ کارِ خودش را برای خودش
  * نفرستیم.
  *
+ * ── لغوِ دسترسی: سه لایه، همه «بسته‌پیش‌فرض» (S78، §۱۹.۱۲) ─────────
+ * تا دیروز توکن فقط هنگامِ وصل سنجیده می‌شد؛ عضوِ برداشته‌شده سوکتِ بازش
+ * را نگه می‌داشت، «changed» می‌گرفت و «scan»ش به صندوقِ کامپیوترِ صاحب
+ * می‌رسید. حالا (هر سه برای `?ticket=` و `?token=`ِ کهنه یکسان):
+ *   ۱) `accessChanged(...)` — **تنها درِ** «دسترسی عوض شد». هر راهی که
+ *      دسترسی را می‌بندد یا کم می‌کند، پس از نوشتن (و بیرون از تراکنش)
+ *      همین را صدا می‌زند و منتظرش می‌ماند. سوکت‌های هدف با توکنِ خودشان
+ *      همان لحظه دوباره سنجیده می‌شوند و هر کدام که دیگر همان حساب و همان
+ *      نقش نیست بسته می‌شود؛ بقیه (دستگاهِ دیگر، دکانِ دیگرِ همان آدم،
+ *      عضوهای دیگر، صاحب) دست نمی‌خورند. فهرستِ صدازننده‌ها پایینِ همین تابع.
+ *   ۲) پیش از هر پیامِ اثرگذارِ برنامه (relay، ping) و پیش از رساندنِ هر
+ *      خبر (hello، changed، relay) سنجش با حافظهٔ حداکثر ۵ ثانیه — اگر
+ *      لایهٔ ۱ جایی جا ماند، سوکت حداکثر چند ثانیه بعد باز هم بسته است.
+ *   ۳) سرِ انقضای توکن، سوکت بسته می‌شود؛ برنامه از راهِ همیشگی (بلیت با
+ *      توکنِ تازه‌شده) برمی‌گردد.
+ *   تورِ ایمنی (TEN-02، #534): `dropRevoked` در هر تپشِ ۳۰ثانیه‌ای هشِ توکنِ
+ *      همهٔ سوکت‌های کاربری را یک‌جا می‌سنجد — سوکتِ بی‌کارِ نشستِ باطل هم می‌رود.
+ * کدهای بستن (کلاینت‌ها در هر حالت با فاصلهٔ فزاینده دوباره وصل می‌شوند):
+ *   4401 `session_revoked` — نشست باطل شد (خروج، برداشتن/تعلیق، رمز، دستگاه، …)
+ *   4401 `access_changed`  — نشست زنده است ولی دسترسی عوض شد (نقش، دکانِ نشست)
+ *   4403 `expired`         — توکنِ دسترسی پیر شد؛ با توکنِ تازه برگرد
+ *   1011 `recheck_failed`  — سنجش نشد (خطای پایگاه) ⇒ بسته، نه باز
+ *
  * ⚠️ روی همان سرورِ HTTP سوار می‌شود (`attach(server)`) و `app.js`
  * خودش `app.listen` را می‌پیچد، پس `index.js` و سنجه‌ها هر دو بی هیچ
  * کارِ اضافه‌ای آن را دارند.
@@ -54,6 +77,31 @@ function takeTicket(ticket) {
   return e.exp > Date.now() ? e.token : '';
 }
 
+/* ----------------------------------------------- لغوِ دسترسی (S78) */
+/** لایهٔ ۲: عمرِ حافظهٔ سنجش. ⛔ بیشتر از ۵ ثانیه نمی‌شود (آزمون کوتاه‌ترش می‌کند). */
+const RECHECK_MS = Math.min(5_000, Math.max(50, Number(process.env.SYNC_LIVE_RECHECK_MS) || 5_000));
+/** پس از فرمانِ بستن، اگر کلاینت پاسخِ بستن نداد (OkHttpِ کهنه)، قطعِ کامل */
+const CLOSE_GRACE_MS = 2_000;
+/** پیام‌های در صفِ سنجشِ یک سوکت — بیشتر ⇒ دور ریخته (سیلِ پیام) */
+const QUEUE_MAX = 64;
+/** setTimeout بیش از ~۲۴٫۸ روز را نمی‌پذیرد */
+const MAX_TIMER_MS = 2_147_000_000;
+
+const CLOSE = Object.freeze({
+  revoked: Object.freeze({ code: 4401, reason: 'session_revoked' }),   // همان کدِ #534
+  changed: Object.freeze({ code: 4401, reason: 'access_changed' }),
+  expired: Object.freeze({ code: 4403, reason: 'expired' }),
+  failed: Object.freeze({ code: 1011, reason: 'recheck_failed' }),
+});
+
+/** همهٔ سوکت‌های زنده — هدفِ `accessChanged` از همین‌جا پیدا می‌شود */
+const sockets = new Set();
+/** سوکت ⇒ توکنِ خامش؛ بیرون از `ws.sync` تا در هیچ لاگ و بازرسی‌ای نیفتد */
+const secrets = new WeakMap();
+/** هر `accessChanged` یک واحد؛ وصلی که وسطش «دسترسی عوض شد» دید، پیش از
+ *  نخستین کار دوباره سنجیده می‌شود (فاصلهٔ resolveToken تا join) */
+let epoch = 0;
+
 /** اتاقِ هر حساب: کلید ⇒ مجموعهٔ سوکت‌ها */
 const rooms = new Map();
 
@@ -77,51 +125,221 @@ function send(ws, obj) {
   }
 }
 
-function join(ctx, ws, deviceId, tokenHash = '') {
+/** همان حساب، همان کاربر، همان نقش، همان راه — وگرنه دسترسیِ این سوکت دیگر آن نیست که بود */
+function sameAccess(was, now) {
+  return !!now && !!now.accountId &&
+    now.app === was.app && now.accountKind === was.accountKind && now.accountId === was.accountId &&
+    (now.userId || '') === (was.userId || '') && (now.role || '') === (was.role || '') &&
+    (now.via || '') === (was.via || '');
+}
+
+function expiredNow(s) {
+  const exp = Number(s.ctx.expiresAt) || 0;
+  return exp > 0 && Date.now() > exp;
+}
+
+/** از اتاق و فهرست بیرون — بعد از این هیچ خبری به این سوکت نمی‌رسد */
+function forget(ws) {
+  const s = ws.sync;
+  if (!s) return;
+  if (s.expiry) { clearTimeout(s.expiry); s.expiry = null; }
+  sockets.delete(ws);
+  secrets.delete(ws);
+  const room = rooms.get(s.key);
+  if (room) { room.delete(ws); if (!room.size) rooms.delete(s.key); }
+}
+
+/** بستن با کد و دلیل؛ همان لحظه از اتاق بیرون، و اگر کلاینت جواب نداد، قطعِ کامل */
+function kill(ws, why) {
+  const s = ws.sync;
+  if (!s || s.dead) return;
+  s.dead = true;
+  forget(ws);
+  try { ws.close(why.code, why.reason); } catch { /* رفته */ }
+  const t = setTimeout(() => { try { ws.terminate(); } catch { /* رفته */ } }, CLOSE_GRACE_MS);
+  if (t.unref) t.unref();
+}
+
+/**
+ * سنجشِ دوبارهٔ یک سوکت با توکنِ خودش (همان `resolveToken`ِ درهای HTTP).
+ * سنجش‌های هم‌زمانِ یک «نسل» یکی می‌شوند. ناجور ⇒ بسته (4401/4403)؛
+ * خطا ⇒ بسته (1011). هرگز رد نمی‌شود (reject).
+ */
+function check(ws) {
+  const s = ws.sync;
+  if (s.dead) return Promise.resolve(false);
+  if (s.inflight && s.inflightGen === s.gen) return s.inflight;
+  const gen = s.gen;
+  const p = (async () => {
+    let now = null;
+    try { now = await resolveToken(secrets.get(ws) || ''); } catch { kill(ws, CLOSE.failed); return false; }
+    if (s.dead) return false;
+    if (!now) { kill(ws, expiredNow(s) ? CLOSE.expired : CLOSE.revoked); return false; }
+    if (!sameAccess(s.ctx, now)) { kill(ws, CLOSE.changed); return false; }
+    //  نتیجه‌ای که پیش از یک «دسترسی عوض شد» شروع شده بود، حافظه نمی‌شود
+    if (gen === s.gen) { s.okGen = gen; s.okUntil = Date.now() + RECHECK_MS; }
+    return true;
+  })();
+  s.inflight = p;
+  s.inflightGen = gen;
+  p.then(() => { if (s.inflight === p) s.inflight = null; });
+  return p;
+}
+
+/** لایهٔ ۲: آیا این سوکت همین حالا اجازهٔ کار دارد؟ (حافظهٔ ≤ ۵ ثانیه) */
+async function allowed(ws) {
+  const s = ws.sync;
+  for (let i = 0; i < 3; i++) {
+    if (s.dead) return false;
+    if (s.okGen === s.gen && s.okUntil > Date.now()) return true;
+    const gen = s.gen;
+    if (!(await check(ws))) return false;
+    if (gen === s.gen) return true;
+  }
+  return false;   // دسترسی پشتِ‌سرِهم عوض می‌شود — این پیام نه؛ پیامِ بعدی دوباره می‌سنجد
+}
+
+/** کارهای یک سوکت به ترتیبِ رسیدن؛ صفِ پر ⇒ دور ریخته */
+function enqueue(ws, job) {
+  const s = ws.sync;
+  if (s.dead || s.queued >= QUEUE_MAX) return;
+  s.queued++;
+  s.chain = s.chain.then(job).catch(() => { /* یک پیامِ خراب صف را نمی‌بندد */ }).then(() => { s.queued--; });
+}
+
+/** رساندنِ یک خبر به یک سوکت — فقط اگر هنوز همان دسترسی را دارد */
+function deliver(ws, payload) {
+  allowed(ws).then((ok) => { if (ok) send(ws, payload); }, () => { /* بسته */ });
+}
+
+/**
+ * لایهٔ ۳: سرِ انقضای توکن بسته شود (4403) — همان قاعدهٔ درهای HTTP (توکنِ پیر ۴۰۱).
+ * کلاینت‌های این ریپو (`LiveSocket.kt`، `license/sync-engine.js`) پس از آن با توکنِ تازه برمی‌گردند.
+ * ⚠️ کلاینت‌های پمپ در ریپوی دیگرند و رفتارشان پس از 4403 این‌جا سنجیده نشده.
+ */
+function armExpiry(ws) {
+  const s = ws.sync;
+  const exp = Number(s.ctx.expiresAt) || 0;
+  if (!exp || s.dead) return;
+  const left = exp - Date.now();
+  if (left <= 0) { kill(ws, CLOSE.expired); return; }
+  s.expiry = setTimeout(() => {
+    s.expiry = null;
+    if (Date.now() >= exp) kill(ws, CLOSE.expired); else armExpiry(ws);
+  }, Math.min(left, MAX_TIMER_MS));
+  if (s.expiry.unref) s.expiry.unref();
+}
+
+function join(ctx, ws, deviceId, token, seenEpoch) {
   const key = roomKey(ctx);
-  ws.sync = { key, deviceId, ctx, tokenHash };
+  const s = {
+    key, deviceId, ctx,
+    //  برای سنجشِ دسته‌ایِ تپش (`dropRevoked`)؛ کامپیوترِ پمپ توکنِ کاربری ندارد
+    tokenHash: ctx.via === 'user' ? require('./tokens').hashToken(token) : '',
+    //  همین الان با `resolveToken` سنجیده شد
+    gen: 0, okGen: 0, okUntil: Date.now() + RECHECK_MS,
+    inflight: null, inflightGen: -1,
+    chain: Promise.resolve(), queued: 0,
+    expiry: null, dead: false,
+  };
+  ws.sync = s;
   ws.isAlive = true;
+  secrets.set(ws, token);
+  //  میانِ سنجش و همین‌جا دسترسی‌ای عوض شد ⇒ پیش از نخستین کار دوباره سنجیده شود
+  if (seenEpoch !== epoch) s.gen++;
+  sockets.add(ws);
   if (!rooms.has(key)) rooms.set(key, new Set());
   rooms.get(key).add(ws);
+  armExpiry(ws);
 
   ws.on('pong', () => { ws.isAlive = true; });
   ws.on('message', (raw) => {
     let msg = null;
     try { msg = JSON.parse(String(raw)); } catch { return; }
-    if (msg && (msg.type === 'ping' || msg.event === 'ping')) {
-      headOf(ctx).then(cursor => send(ws, { event: 'pong', cursor, serverTime: Date.now() }));
-      return;
-    }
+    if (!msg || typeof msg !== 'object') return;
+    const ping = msg.type === 'ping' || msg.event === 'ping';
     //  پیامِ دستگاه به دستگاه‌های دیگرِ همان حساب — فقط رخدادهای شناخته
     //  (گوشی به‌عنوانِ بارکدخوانِ کامپیوتر). هیچ داده‌ای ذخیره نمی‌شود.
-    if (msg && msg.type === 'relay' && RELAY_EVENTS.has(msg.event)) {
-      const payload = cleanRelay(msg);
-      if (payload) relay(ctx, payload, deviceId);
-    }
+    const payload = !ping && msg.type === 'relay' && RELAY_EVENTS.has(msg.event) ? cleanRelay(msg) : null;
+    if (!ping && !payload) return;
+    enqueue(ws, async () => {
+      if (!(await allowed(ws))) return;
+      if (ping) {
+        const cursor = await headOf(s.ctx);
+        send(ws, { event: 'pong', cursor, serverTime: Date.now() });
+        return;
+      }
+      relay(s.ctx, payload, deviceId);
+    });
   });
-  ws.on('close', () => {
-    const room = rooms.get(key);
-    if (room) { room.delete(ws); if (!room.size) rooms.delete(key); }
-  });
+  ws.on('close', () => { s.dead = true; forget(ws); });
   ws.on('error', () => { try { ws.terminate(); } catch { /* بسته شد */ } });
 
-  headOf(ctx).then(cursor => send(ws, { event: 'hello', cursor, device_id: deviceId, serverTime: Date.now() }));
+  if (s.dead) return;   // توکن همان لحظهٔ وصل پیر بود
+  allowed(ws).then(async (ok) => {
+    if (!ok) return;
+    const cursor = await headOf(ctx);
+    send(ws, { event: 'hello', cursor, device_id: deviceId, serverTime: Date.now() });
+  }, () => { /* بسته */ });
 }
 
 /**
- * خبر به دستگاه‌های دیگرِ همان حساب.
- * @returns {number} چند سوکت خبر گرفت
+ * ⛔ لایهٔ ۱ — تنها درِ «دسترسی عوض شد». پس از نوشتنِ تغییر (بیرون از
+ * تراکنش یا پس از آن) صدا بزنید و منتظرش بمانید تا سوکت در **همان
+ * درخواست** بسته شود. همان لحظه حافظهٔ سنجشِ هدف‌ها باطل می‌شود (هیچ
+ * پیام و خبری بی سنجشِ تازه رد نمی‌شود) و بعد هر کدام با توکنِ خودش
+ * سنجیده و اگر لازم بود بسته می‌شود. هرگز خطا بیرون نمی‌دهد.
+ *
+ * هدف: `{ userId }` (همهٔ سوکت‌های یک کاربر، در هر دکان/پمپ) یا
+ * `{ accountKind, accountId }` (همهٔ سوکت‌های یک دکان/پمپ، از جمله
+ * کامپیوترهای پمپ که کاربر ندارند)؛ هر دو با هم = اشتراکشان.
+ *
+ * صدازننده‌ها (هر راهِ تازهٔ بستن/کم‌کردنِ دسترسی باید به این فهرست بپیوندد):
+ *   lib/tokens.js          revoke · revokeFamily · revokeAllForSubject · revokeOthersForSubject ·
+ *                          revokeAllForDevice — خروج، خروج از همه، تازه‌سازیِ دزدیده (refresh_reused)،
+ *                          عوض‌کردن و بازیابیِ رمز، بستنِ کاربر از پنل، از کار انداختنِ دستگاه (STF-10)
+ *   lib/shops.js           updateMember — تغییرِ نقش، تعلیق، برداشتن، خروجِ داوطلبانه
+ *   lib/stations.js        updateMember — همان برای پمپ
+ *   lib/station-devices.js revoke · revokeBoundBy — بیرون‌کردنِ کامپیوترِ پمپ
+ *   lib/user-delete.js     remove — حذفِ کاملِ حساب و دکان‌ها/پمپ‌هایش
+ *   routes/me.js، routes/portal.js  DELETE /devices/:id — بیرون‌کردنِ دستگاهِ خود
+ *   routes/shop.js         POST /active (دکانِ نشست عوض شد) · POST /staff/join (عضو ⇒ پیک)
+ *   routes/admin-pump.js   POST /stations/:id/status — خاموش‌کردنِ پمپ
+ *   routes/pump-device.js  adoptFromDevice — کامپیوترِ پمپ به پمپِ دیگر رفت
+ *
+ * @param {{userId?: string, accountKind?: string, accountId?: string}} target
+ * @returns {Promise<number>} چند سوکت بسته شد
+ */
+async function accessChanged(target = {}) {
+  const userId = String((target && target.userId) || '');
+  const kind = String((target && target.accountKind) || '');
+  const accountId = String((target && target.accountId) || '');
+  if (!userId && !accountId) return 0;
+  epoch++;
+  const hits = [];
+  for (const ws of sockets) {
+    const c = ws.sync.ctx;
+    if (userId && (c.userId || '') !== userId) continue;
+    if (accountId && (c.accountId !== accountId || (kind && c.accountKind !== kind))) continue;
+    ws.sync.gen++;   // همان لحظه: حافظهٔ سنجش باطل
+    hits.push(ws);
+  }
+  if (!hits.length) return 0;
+  try {
+    const ok = await Promise.all(hits.map((ws) => check(ws)));
+    return ok.filter((x) => !x).length;
+  } catch {
+    for (const ws of hits) kill(ws, CLOSE.failed);
+    return hits.length;
+  }
+}
+
+/**
+ * خبر به دستگاه‌های دیگرِ همان حساب (هر کدام پس از سنجشِ لایهٔ ۲).
+ * @returns {number} چند سوکت هدف بود
  */
 function broadcast(ctx, cursor, exceptDevice = '') {
-  const room = rooms.get(roomKey(ctx));
-  if (!room) return 0;
-  let n = 0;
-  for (const ws of room) {
-    if (exceptDevice && ws.sync && ws.sync.deviceId === exceptDevice) continue;
-    send(ws, { event: 'changed', cursor });
-    n++;
-  }
-  return n;
+  return relay(ctx, { event: 'changed', cursor }, exceptDevice);
 }
 
 /**
@@ -160,7 +378,7 @@ function relay(ctx, payload, exceptDevice = '') {
   let n = 0;
   for (const ws of room) {
     if (exceptDevice && ws.sync && ws.sync.deviceId === exceptDevice) continue;
-    send(ws, payload);
+    deliver(ws, payload);
     n++;
   }
   return n;
@@ -190,13 +408,13 @@ function attach(server) {
     const token = ticket != null ? takeTicket(ticket)
       : m ? m[1].trim() : (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
+    const seen = epoch;
 
     resolveToken(token).then((ctx) => {
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);
       if (claimed && claimed !== ctx.app) return reject(socket, 403, 'Forbidden');
-      const tokenHash = ctx.via === 'user' ? require('./tokens').hashToken(token) : '';
-      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, tokenHash));
+      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, token, seen));
     }).catch(() => reject(socket, 500, 'Internal Server Error'));
   });
 
@@ -222,16 +440,16 @@ function attach(server) {
 }
 
 /**
- * ⛔ TEN-02 (WebSocket) — سوکتِ نشستی که در سرور باطل شد (خروج، خروج از همه‌جا، تعلیق یا
- * برداشتنِ عضو، دستگاهِ ازکارافتاده — همه `tokens.revoked_at` می‌گذارند) دیگر خبرِ همان
- * دکان را نمی‌گیرد: «تغییر کرد»، بارکدِ گوشی و نامِ کالای «عکس بگیر» هم دادهٔ دکان‌اند. پیش
- * از این، سوکتِ باز تا قطعِ خودش همهٔ این‌ها را می‌گرفت. هر تپش (۳۰ ثانیه) یک پرسشِ دسته‌ای
- * برای همهٔ سوکت‌های کاربری؛ فقط **باطل‌شده** بسته می‌شود (پایانِ عادیِ مهلتِ توکنِ دسترسی نه،
- * تا برنامه هر ساعت از نو وصل نشود). سوکتِ کامپیوترِ پمپ (توکنِ دستگاه) این‌جا نیست.
+ * ⛔ TEN-02 (WebSocket، #534) — تورِ ایمنیِ لایهٔ ۱: سوکتِ نشستی که در سرور باطل شد (خروج، خروج
+ * از همه‌جا، تعلیق یا برداشتنِ عضو، دستگاهِ ازکارافتاده — همه `tokens.revoked_at` می‌گذارند)
+ * حتی اگر راهی `accessChanged` را صدا نزده باشد و سوکت بی‌کار باشد، در تپشِ بعدی بسته می‌شود.
+ * هر تپش (۳۰ ثانیه) یک پرسشِ دسته‌ای برای همهٔ سوکت‌های کاربری؛ فقط **باطل‌شده** این‌جا بسته
+ * می‌شود (پایانِ مهلتِ توکن کارِ لایهٔ ۳ است، با 4403). سوکتِ کامپیوترِ پمپ (توکنِ دستگاه) این‌جا
+ * نیست؛ لایه‌های ۱ و ۲ آن را می‌سنجند.
  * @returns {Promise<number>} چند سوکت بسته شد
  */
 async function dropRevoked(wss) {
-  const open = [...wss.clients].filter((ws) => ws.sync && ws.sync.tokenHash);
+  const open = [...wss.clients].filter((ws) => ws.sync && ws.sync.tokenHash && !ws.sync.dead);
   if (!open.length) return 0;
   const hashes = [...new Set(open.map((ws) => ws.sync.tokenHash))];
   const rows = await require('../db').many(
@@ -241,13 +459,14 @@ async function dropRevoked(wss) {
   const dead = new Set(rows.map((r) => r.token_hash));
   let n = 0;
   for (const ws of open) {
-    if (!dead.has(ws.sync.tokenHash)) continue;
-    try { ws.close(4401, 'session_revoked'); } catch { /* رفته */ }
-    const room = rooms.get(ws.sync.key);
-    if (room) { room.delete(ws); if (!room.size) rooms.delete(ws.sync.key); }
+    if (!dead.has(ws.sync.tokenHash) || ws.sync.dead) continue;
+    kill(ws, CLOSE.revoked);
     n++;
   }
   return n;
 }
 
-module.exports = { attach, broadcast, relay, listeners, roomKey, issueTicket, dropRevoked, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
+module.exports = {
+  attach, broadcast, relay, listeners, roomKey, issueTicket, accessChanged, dropRevoked,
+  PATHS, PING_MS, RELAY_EVENTS, TICKET_MS, RECHECK_MS, CLOSE,
+};

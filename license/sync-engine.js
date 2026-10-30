@@ -515,8 +515,10 @@
     socket.onmessage = function (ev) {
       var msg = null;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      //  فقط «چیزی عوض شد» می‌آید؛ خودِ داده هرگز از این در نمی‌رود
-      if (msg && msg.event === 'changed') pump();
+      //  فقط «چیزی عوض شد» می‌آید؛ خودِ داده هرگز از این در نمی‌رود.
+      //  «hello» هم: هر وصل (از جمله پس از بسته‌شدنِ 4401/4403 ِ سرور، S78) یک pump —
+      //  خبری که در فاصلهٔ قطع آمد گم نشود
+      if (msg && (msg.event === 'changed' || msg.event === 'hello')) pump();
       //  عکسِ کالا و بارکدِ گوشی — ‎license/photo-studio.js‎ گوش می‌دهد
       if (msg && (msg.event === 'photos' || msg.event === 'scan' || msg.event === 'hello' || msg.event === 'photo-request' || msg.event === 'inbox')) {
         try { window.dispatchEvent(new CustomEvent('tohid:live', { detail: msg })); } catch (e) { /* مرورگرِ کهنه */ }

@@ -63,13 +63,19 @@ await E.step('S78.0', 'صاحب با گوشی و کامپیوتر، عضوِ «�
   await sM.until(() => sM.msgs.find((m) => m.event === 'changed'), '«changed» برای M پیش از لغو');
 });
 
-await E.step('S78.role', 'نقش از «مدیر» به «شاگرد» ⇒ درِ مدیر (تطبیقِ پول، فهرستِ اعضا) همان لحظه ۴۰۳؛ درِ شاگرد باز', async () => {
+await E.step('S78.role', 'نقش از «مدیر» به «شاگرد» ⇒ درِ مدیر (تطبیقِ پول، فهرستِ اعضا) همان لحظه ۴۰۳؛ درِ شاگرد باز؛ سوکتِ زنده با 4401 بسته و با نقشِ تازه دوباره وصل', async () => {
   assert.equal((await M.api('GET', '/shop/orders/reconciliation')).status, 200, 'مدیر پیش از تغییر');
   assert.equal((await M.api('GET', '/shop/members')).status, 200);
   E.ok(await A.api('PATCH', `/shop/members/${memberId}`, { role: 'staff' }), 'تغییرِ نقش');
   assert.equal((await M.api('GET', '/shop/orders/reconciliation')).status, 403, 'درِ مدیر پس از تغییرِ نقش');
   assert.equal((await M.api('GET', '/shop/members')).status, 403);
   assert.equal((await M.api('GET', '/shop/orders?tab=new')).status, 200, 'درِ شاگرد');
+  //  ⚠️ افزوده با اصلاحِ S78: تغییرِ نقش هم «دسترسی عوض شد» است ⇒ سوکتِ زنده همان لحظه بسته (4401)
+  //  و برنامه با بلیتِ تازه برمی‌گردد. بی این، سوکتِ همین‌جا بسته‌شده گامِ بعد را بی‌اثر می‌کرد
+  //  (برداشتن روی سوکتی سنجیده می‌شد که دیگر باز نبود).
+  await sM.until(() => sM.isClosed(), 'سوکتِ زنده پس از تغییرِ نقش بسته نشد');
+  assert.equal(sM.isClosed().code, 4401, 'کدِ بستن پس از تغییرِ نقش');
+  sM = await live(M);   //  شاگرد هنوز سوکت دارد — با نقشِ تازه
 }, { needs: ['S78.0'] });
 
 await E.step('S78.remove', 'برداشتنِ عضو ⇒ همهٔ درهای HTTP همان لحظه ۴۰۱، بلیتِ تازهٔ سوکت نه، و سوکتِ زندهٔ بازش همان لحظه بسته', async () => {
@@ -77,6 +83,7 @@ await E.step('S78.remove', 'برداشتنِ عضو ⇒ همهٔ درهای HTTP
   for (const p of ['/shop/orders?tab=new', '/sync/v1/snapshot']) assert.equal((await M.api('GET', p)).status, 401, `${p} پس از برداشتن`);
   assert.equal((await M.api('POST', '/sync/v1/live/ticket', {})).status, 401, 'بلیتِ تازه پس از برداشتن');
   await sM.until(() => sM.isClosed(), 'سوکتِ زندهٔ عضوِ برداشته‌شده بسته نشد (باز ماند)');
+  assert.equal(sM.isClosed().code, 4401, 'کدِ بستن پس از برداشتن');
 }, { needs: ['S78.0'] });
 
 await E.step('S78.live', 'سوکتِ عضوِ برداشته‌شده نه اسکنی به صندوقِ کامپیوترِ صاحب می‌برد و نه خبرِ دفترِ دکان را می‌گیرد', async () => {

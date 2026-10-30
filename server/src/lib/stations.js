@@ -349,6 +349,8 @@ async function updateMember(stationId, memberId, patch = {}) {
     //  ⛔ و کامپیوتری که خودِ او بند کرده بود — توکنِ دستگاه انقضا ندارد
     await require('./station-devices').revokeBoundBy(stationId, m.user_id);
   }
+  //  ⛔ S78: سوکتِ زندهٔ او هم در همین درخواست (برداشتن، تعلیق، تغییرِ نقش)
+  await require('./sync-v1-live').accessChanged({ userId: m.user_id });
   return row;
 }
 

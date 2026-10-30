@@ -28,7 +28,7 @@ function appAlias(raw) {
 
 /**
  * از یک توکنِ خام، بافتِ حساب را می‌سازد — یا null.
- * @returns {null | {app, accountKind, accountId, accountName, userId, role, via}}
+ * @returns {null | {app, accountKind, accountId, accountName, userId, role, via, expiresAt?}}
  */
 async function resolveToken(token) {
   if (!token || typeof token !== 'string' || token.length < 20) return null;
@@ -42,12 +42,14 @@ async function resolveToken(token) {
       if (!dev || dev.status !== 'active') return null;
     }
     const app = row.app || 'shop';
+    //  S78: سوکتِ زنده سرِ همین لحظه بسته می‌شود (`sync-v1-live`، کدِ 4403)
+    const expiresAt = Number(row.expires_at) || 0;
     if (app === 'pump') {
       const m = await require('./stations').membershipOf(user.id);
       if (!m) return { app, accountKind: 'station', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_station' };
       return {
         app, accountKind: 'station', accountId: m.station_id, accountName: m.station_name || '',
-        userId: user.id, role: m.role, via: 'user',
+        userId: user.id, role: m.role, via: 'user', expiresAt,
       };
     }
     //  ⛔ DLV-01 (§۳.۱۱): توکنِ پیک — یا عضوی که نقشش پیک است — به دفترِ دکان
@@ -59,7 +61,7 @@ async function resolveToken(token) {
     if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
     return {
       app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
-      userId: user.id, role: m.role, via: 'user',
+      userId: user.id, role: m.role, via: 'user', expiresAt,
     };
   }
 
