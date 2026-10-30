@@ -8,6 +8,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.doubleOrNull
 import java.util.Collections
 import java.util.IdentityHashMap
+import kotlin.math.abs
+import kotlin.math.round
 
 /**
  *  ادغامِ سه‌طرفهٔ دفتر — وقتی دفترِ دیسک از دفتری که صفحه با آن ساخت جلوتر است.
@@ -199,7 +201,7 @@ object LedgerMerge {
   private fun num(e: JsonElement?): Double? = (e as? JsonPrimitive)?.takeIf { !it.isString }?.doubleOrNull
 
   private fun number(d: Double): JsonPrimitive =
-    if (d == Math.rint(d) && !d.isInfinite() && Math.abs(d) < 9.007199254740992E15) JsonPrimitive(d.toLong()) else JsonPrimitive(d)
+    if (!d.isInfinite() && d == round(d) && abs(d) < 9.007199254740992E15) JsonPrimitive(d.toLong()) else JsonPrimitive(d)
 
   /** شمارنده: دیسک + (مالِ ما − پایه) */
   private fun sum(b: JsonElement?, o: JsonElement?, t: JsonElement?): JsonElement? {
