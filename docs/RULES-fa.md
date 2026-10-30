@@ -213,6 +213,7 @@
 - توکنِ پیگیری `<ULID>.<HMAC>` و بی ذخیره؛ نمای مشتری شناسهٔ داخلی، شماره، نشانی و یادداشتِ کارمند ندارد (#244).
 - صفحهٔ `server/public/store/` با CSPِ سخت (`script-src 'self'`، بی `unsafe-inline`) (SEC-09، #244).
 - پیشوندِ `/store` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#244).
+- کالای دکان برای ویترین فقط از `productFrom` (خواندن) یا `ledgerSource` (نوشتنِ تکی و گروهی) جسته می‌شود، هرگز `sync_rows` ِ مستقیم؛ وگرنه با `storefront.catalog_source` دکانِ v3 «کالا پیدا نشد» می‌گیرد (S1×M2، `storefront-bulk-catalog-source.test.js`).
 
 ### v3 · پیک و تحویل
 
@@ -364,6 +365,8 @@
 | `shop.orders.ledger` | دکان / `all` | خاموش | فاکتورِ سریِ W و سندِ برگشت در دفترِ دکان | #275 | باز |
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
+| `storefront.catalog_source` | فقط `all` | خاموش | S1 ِ قراردادِ بازار: ویترین، فهرستِ «در ویترین» ِ صاحب دکان، انتشارِ کالا (تکی و گروهیِ M2، `ledgerSource`)، بازار و ثبتِ سفارش کالا را از `catalog_products` می‌خوانند (نه `sync_rows`)؛ کاتالوگ فقط بخشِ کالا و مستقل از `shop.catalog` از دفترِ v1 یا v3 ِ دکان پر می‌شود (`catalog.refreshProducts`؛ منبع = `catalog_settings.sync_source` اگر هست، وگرنه v3 اگر کالای v3 دارد). scope ِ دکان اثری ندارد تا ویترین و جست‌وجوی چنددکانی یک منبع بخوانند | S1 | باز |
+| `shop.storefront.bulk` | دکان / `all` | خاموش | M2 ِ قراردادِ بازار: `PUT /api/shop/storefront/products` (تا ۵۰۰ کالا، `Idempotency-Key` اجباری) و `notLive` در فهرستِ کالای کارمند؛ کالا از همان منبعِ ویترین (`ledgerSource`) ⇒ با `storefront.catalog_source` دکانِ v3 هم | M2، #425 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 

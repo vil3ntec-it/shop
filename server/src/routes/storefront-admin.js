@@ -16,10 +16,11 @@ const express = require('express');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const audit = require('../lib/audit');
+const idempotency = require('../lib/idempotency');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
-const { forbidden } = require('../middleware/errors');
+const { forbidden, badRequest } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -48,6 +49,8 @@ router.get('/config', wrap(async (req, res) => {
     permissions: { manage: can(req.role, 'settings.write') },
     //  برگهٔ «ارسال و زمان» فقط با پرچمِ جدای `shop.storefront.zones`
     zones: st.flag ? await sfd.flagOn(req.shopId) : false,
+    //  انتشارِ گروهی در یک درخواست (M2) فقط با پرچمِ جدای `shop.storefront.bulk`
+    bulk: st.flag ? await sf.bulkFlagOn(req.shopId) : false,
   });
 }));
 
@@ -133,7 +136,30 @@ router.put('/delivery', requirePermission('settings.write'), needFlag, needZones
 }));
 
 router.get('/products', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
-  res.json(await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit }));
+  const page = await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit });
+  //  M2: دلیلِ «در بازار نمی‌آید» فقط با پرچمِ گروهی؛ بی آن پاسخ همان قبلی است
+  res.json(await sf.bulkFlagOn(req.shopId) ? await sf.withReasons(req.shopId, page) : page);
+}));
+
+//  ── انتشارِ گروهی (M2): تا ۵۰۰ کالا در یک درخواست، کلیدِ یکتایی اجباری ──
+const needBulk = wrap(async (req, res, next) => {
+  if (!(await sf.bulkFlagOn(req.shopId))) return next(forbidden('انتشارِ گروهی برای این دکان روشن نیست', 'bulk_disabled'));
+  next();
+});
+
+router.put('/products', requirePermission('settings.write'), needFlag, needBulk, needWrite, wrap(async (req, res) => {
+  const idem = idempotency.fromRequest(req, `storefront-bulk:${req.shopId}`);
+  if (!idem) throw badRequest('کلیدِ یکتایی (Idempotency-Key) لازم است', 'idempotency_key_required');
+  const out = await sf.setProducts(req.shopId, req.body, req.user.id, idem);
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'storefront.products_bulk',
+      targetType: 'storefront', targetId: req.shopId,
+      detail: { applied: out.applied, notFound: out.notFound, published: out.published }, ip: clientIp(req),
+    });
+  }
+  res.json(out);
 }));
 
 router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
