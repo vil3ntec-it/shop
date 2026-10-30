@@ -19,6 +19,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
@@ -55,6 +56,9 @@ data class ProductFormState(
   val unitFactor: String = "",
   /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
   val barcodes: String = barcode,
+  /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
+  val brand: String = "",
+  val tags: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -72,6 +76,8 @@ data class ProductFormState(
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
       barcodes = p.barcodes.joinToString("، "),
+      brand = p.brand.orEmpty(),
+      tags = p.tags.orEmpty().joinToString("، "),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -208,6 +214,25 @@ fun ProductDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        if (tools) {
+          Spacer(Modifier.height(10.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+              value = form.brand,
+              onValueChange = { form = form.copy(brand = it) },
+              label = { Text("برند (اختیاری)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+              value = form.tags,
+              onValueChange = { form = form.copy(tags = it) },
+              label = { Text("برچسب‌ها (با «،» جدا)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
 
         //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
         Spacer(Modifier.height(10.dp))
@@ -275,6 +300,8 @@ fun ProductDialog(
                   barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
                   changedBy = if (tools) me else null,
                   reason = if (tools) priceReason else null,
+                  brand = if (tools) form.brand else null,
+                  tags = if (tools) ProductLabels.tags(form.tags) else null,
                 )
               )
             },

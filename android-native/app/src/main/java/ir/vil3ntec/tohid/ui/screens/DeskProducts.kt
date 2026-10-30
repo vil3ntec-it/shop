@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
@@ -724,6 +725,9 @@ private fun EditPanel(
   //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   var priceReason by remember { mutableStateOf("") }
+  //  PRD-06 (همان پرچم): برند و برچسب‌ها
+  var brand by remember { mutableStateOf(p.brand.orEmpty()) }
+  var tags by remember { mutableStateOf(p.tags.orEmpty().joinToString("، ")) }
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
@@ -739,6 +743,8 @@ private fun EditPanel(
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
       changedBy = if (tools) me else null,
       reason = if (tools) priceReason else null,
+      brand = if (tools) brand else null,
+      tags = if (tools) ProductLabels.tags(tags) else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -787,6 +793,10 @@ private fun EditPanel(
       }
       F(barcode, { barcode = it }, if (tools) "بارکدها (با «،» جدا)" else "بارکد")
       F(category, { category = it }, "دسته")
+      if (tools) {
+        F(brand, { brand = it }, "برند")
+        F(tags, { tags = it }, "برچسب‌ها (با «،» جدا)")
+      }
       F(unit, { unit = it }, "واحد")
       Row {
         Box(Modifier.weight(1f)) { F(buy, { buy = it }, "قیمتِ خرید", true) }
