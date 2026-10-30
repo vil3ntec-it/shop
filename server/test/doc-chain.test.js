@@ -234,6 +234,29 @@ test('سریِ دستگاهِ دیگر و دورهٔ کهنه ⇐ مشکل بی 
   assert.deepEqual((await status(OTHER)).body.series.map((s) => s.series), [otherSeries]);
 });
 
+test('SEC-03: سندِ معکوس (همان reverseDoc ِ مشترک) حلقهٔ تازه است؛ حلقهٔ «ثبت» دست نمی‌خورد', async () => {
+  const web = require('../../license/hash-chain.js');
+  const chain = `doc/${shopId}/${series}/2`;
+  const head2 = await one('SELECT seq, hash, body FROM hash_chain WHERE chain=$1 ORDER BY seq DESC LIMIT 1', [chain]);
+  const first = await one('SELECT body FROM hash_chain WHERE chain=$1 AND seq=1', [chain]);
+  //  همان شکلِ `InvoiceVoid.reversalDoc` ِ Kotlin: reverse(saleDoc) + type/voidKind، در حلقهٔ بعدی
+  const orig = { ...JSON.parse(first.body), chain, seq: Number(head2.seq) + 1 };
+  const rev = { ...web.reverseDoc(orig, { id: `${orig.id}~r`, no: orig.no, postedAt: 1761900000000, reason: 'اشتباه در مقدار', by: 'usr_t' }),
+    type: 'void', voidKind: 'void' };
+  const text = hc.canonicalJson(rev);
+  const link = { series, epoch: 2, seq: Number(head2.seq) + 1, prevHash: head2.hash, hash: hc.sha256Hex(head2.hash + text), body: text };
+  const r = await report(body([{ series, epoch: 2, seq: link.seq, hash: link.hash }], [link]));
+  assert.deepEqual(r.body.problems, []);
+  assert.deepEqual(r.body.acks, [{ series, epoch: 2, seq: link.seq, hash: link.hash }]);
+  const v = await chainStore.verifyChain(chain);
+  assert.equal(v.ok, true, JSON.stringify(v));
+  const stored = JSON.parse((await one('SELECT body FROM hash_chain WHERE chain=$1 AND seq=$2', [chain, link.seq])).body);
+  assert.equal(stored.reverses, orig.id);
+  assert.equal(stored.total, -orig.total);
+  assert.equal(stored.lines[0].unitPrice, orig.lines[0].unitPrice);
+  assert.equal((await one('SELECT body FROM hash_chain WHERE chain=$1 AND seq=1', [chain])).body, first.body, 'حلقهٔ ثبت همان است');
+});
+
 test('ورودیِ بدشکل ⇐ ۴۰۰ (بی رویداد)؛ push با زنجیرهٔ مشکل‌دار باز می‌ماند', async () => {
   const before = (await events()).length;
   const ok = linksFor(series, 2, 3, 1);
