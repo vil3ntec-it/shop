@@ -77,6 +77,8 @@ fun ImageBankPicker(
   barcode: String,
   hasPhoto: Boolean,
   onDismiss: () -> Unit,
+  /** IMG-BANK-10: بی نتیجه ⇒ دکمهٔ «عکسِ خودم را می‌گذارم» (null = بی دکمه) */
+  onUploadOwn: (() -> Unit)? = null,
   onChosen: (ByteArray) -> Unit,
 ) {
   val context = LocalContext.current
@@ -94,11 +96,14 @@ fun ImageBankPicker(
   var stateTone by remember { mutableStateOf(PillTone.NEUTRAL) }
   var loading by remember { mutableStateOf(false) }
   var open by remember { mutableStateOf<ImageBank.Hit?>(null) }
+  /** آخرین جست‌وجوی کامل‌شده هیچ نتیجه‌ای نداشت (نه «هنوز نپرسیده»، نه خطا) */
+  var empty by remember { mutableStateOf(false) }
 
   fun search(more: Boolean) {
     val text = query.trim()
-    if (text.isEmpty()) { state = "بارکد را اسکن یا نامِ کالا را بنویسید"; stateTone = PillTone.NEUTRAL; items.clear(); next = null; return }
+    if (text.isEmpty()) { state = "بارکد را اسکن یا نامِ کالا را بنویسید"; stateTone = PillTone.NEUTRAL; items.clear(); next = null; empty = false; return }
     loading = true
+    empty = false
     state = "در حالِ جست‌وجو…"; stateTone = PillTone.NEUTRAL
     scope.launch {
       try {
@@ -106,6 +111,7 @@ fun ImageBankPicker(
         if (!more) items.clear()
         items += page.items
         next = page.next
+        empty = items.isEmpty()
         val note = if (page.barcodeValid == false) "این بارکد معتبر نیست — نتیجه‌ها با نام است. " else ""
         state = note + if (items.isEmpty()) "چیزی پیدا نشد. می‌توانید عکسِ خودتان را بگذارید." else "${items.size} نتیجه" + if (next != null) " (بیشتر هم هست)" else ""
         stateTone = if (page.barcodeValid == false) PillTone.WARNING else PillTone.NEUTRAL
@@ -161,6 +167,10 @@ fun ImageBankPicker(
           if (stateTone == PillTone.DANGER) TextButton(onClick = { search(false) }) { Text("دوباره") }
         }
         Spacer(Modifier.height(Space.xs))
+        //  IMG-BANK-10: بی نتیجه هیچ کالای نامرتبطی «نتیجه» نمی‌شود؛ راهِ روشن همین است
+        if (empty && !loading && onUploadOwn != null) {
+          OutlinedButton(onClick = onUploadOwn) { Text("عکسِ خودم را می‌گذارم") }
+        }
         Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           items.forEach { h -> HitCard(h) { open = h } }
           if (next != null) OutlinedButton(onClick = { search(true) }, enabled = !loading, modifier = Modifier.align(Alignment.CenterHorizontally)) {

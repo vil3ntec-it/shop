@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.image.BankPhotoCard
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
@@ -251,6 +252,71 @@ object ImageBank {
       if (confirm) put("confirm", true)
     })
     return bytes
+  }
+
+  /* --------------- منبعِ عکسِ کالا (۳۷.۷؛ IMG-BANK-08، ۰۹، ۱۶) --------------- */
+
+  /** `GET /products/:id` + پیشنهادهای عکسِ خودِ دکان (`/mine`) ⇒ کارتِ منبع (`BankPhotoCard`ِ core) */
+  data class SourceState(val resolved: BankPhotoCard.Resolved, val proposals: List<BankPhotoCard.Proposal>)
+
+  suspend fun source(context: Context, productId: String): SourceState {
+    val api = Backend.api(context)
+    val r = api.get("$BASE/products/${enc(productId)}")
+    val central = r["central"] as? JsonObject
+    val resolved = BankPhotoCard.Resolved(
+      source = BankPhotoCard.sourceOf(r["source"]?.jsonPrimitive?.contentOrNull),
+      imageId = r.s("image_id"),
+      version = r["version"]?.jsonPrimitive?.intOrNull ?: 0,
+      archived = r["archived"]?.jsonPrimitive?.booleanOrNull == true,
+      updateAvailable = r["update_available"]?.jsonPrimitive?.intOrNull ?: 0,
+      centralImageId = central?.s("image_id").orEmpty(),
+      centralVersion = central?.get("version")?.jsonPrimitive?.intOrNull ?: 0,
+      userConfirmed = r["confirmed_by_user"]?.jsonPrimitive?.booleanOrNull == true,
+    )
+    if (resolved.source != BankPhotoCard.Source.SHOP || resolved.imageId.isEmpty()) return SourceState(resolved, emptyList())
+    val mine = api.get("$BASE/mine?product_id=${enc(productId)}")
+    val proposals = (mine["items"] as? JsonArray).orEmpty()
+      .map { it.jsonObject }
+      .filter { it.s("id") == resolved.imageId }
+      .flatMap { (it["proposals"] as? JsonArray).orEmpty() }
+      .map { p -> p.jsonObject.let { BankPhotoCard.Proposal(it.s("id"), it.s("status")) } }
+    return SourceState(resolved, proposals)
+  }
+
+  /** نسخهٔ نمایشِ عکسی که حالا برای این کالا ثبت است — همان که ویترین نشان می‌دهد */
+  private suspend fun shownBytes(context: Context, productId: String): ByteArray {
+    val r = Backend.api(context).get("$BASE/products/${enc(productId)}")
+    val urls = r["urls"] as? JsonObject
+    val url = urls?.get("display")?.jsonPrimitive?.contentOrNull ?: urls?.get("thumb")?.jsonPrimitive?.contentOrNull
+      ?: error("این عکس هنوز نسخهٔ نمایش ندارد")
+    return file(context, url)
+  }
+
+  /**
+   *  کارِ کارتِ منبع روی سرور، بعد بایت‌های عکسی که حالا ثبت است (برای گذاشتن روی دستگاه).
+   *  بازگشت/نسخه: `select`؛ سرور باز تطبیق و تأییدِ نسخه را می‌سنجد (`needs_confirmation`،
+   *  `version_not_approved`، `image_not_selectable` همان‌طور بالا می‌روند).
+   */
+  suspend fun applySource(context: Context, productId: String, action: BankPhotoCard.Action, name: String, barcode: String): ByteArray? {
+    val api = Backend.api(context)
+    when (action) {
+      is BankPhotoCard.Action.RevertToCentral ->
+        api.post("$BASE/select", buildJsonObject { put("product_id", productId); put("source", "central") })
+      is BankPhotoCard.Action.UseCentralVersion -> api.post("$BASE/select", buildJsonObject {
+        put("product_id", productId); put("source", "central"); put("image_id", action.imageId); put("version", action.version)
+        put("expect", buildJsonObject { put("barcode", barcode); put("name", name) })
+        if (action.confirm) put("confirm", true)
+      })
+      is BankPhotoCard.Action.Propose -> {
+        //  ⛔ فقط با تیکِ اجازهٔ صریح در رابط صدا زده می‌شود؛ اصلِ عکس خصوصی می‌ماند
+        api.post("$BASE/${enc(action.imageId)}/propose", buildJsonObject {
+          put("consent", true)
+          put("product", buildJsonObject { put("name", name); put("barcode", barcode) })
+        })
+        return null
+      }
+    }
+    return shownBytes(context, productId)
   }
 
   /* ------------------------- آماده‌سازی روی دستگاه ------------------------- */
