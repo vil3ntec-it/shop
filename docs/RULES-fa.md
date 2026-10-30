@@ -353,7 +353,9 @@
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
-`hw_tools_v2` «ابزارهای تازهٔ دستگاه» در `tohid-ui` (بررسیِ کاملِ چاپگر با `DLE EOT 1–4` و برگهٔ دوروشیِ HW-01؛ فقط صاحب/مدیر می‌بیند؛ HW-01/02/11، باز).
+`hw_tools_v2` «ابزارهای تازهٔ دستگاه» در `tohid-ui` (بررسیِ کاملِ چاپگر با `DLE EOT 1–4` و برگهٔ دوروشیِ HW-01؛ تنظیمِ بارکدخوان
+`scan_gap_ms`/`scan_min_len`/`scan_prefix`/`scan_suffix`، اسکنِ آزمون و نگهبانِ `NumberField` که اسکن را از کادرِ قیمت/تعداد برمی‌گرداند؛
+فقط صاحب/مدیر می‌بیند؛ HW-01/02/05/11، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
