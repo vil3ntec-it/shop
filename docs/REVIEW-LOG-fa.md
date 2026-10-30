@@ -29,6 +29,7 @@
 | #411 | wp2-recon2 | نیازِ اصلاح (کوچک) | ۱ | سقفِ MAX_ISSUES پیش از حذفِ سفارشِ آزمایشی؛ تاریخِ ناممکن؛ قالبِ بدنه. مجوز/ممیزی درست | آزمون‌های سرور اجرا نشده |
 | — | research-ios-readiness | **تأیید** (فقط سند: `docs/IOS-PLAN-fa.md`؛ PR نمی‌شود) | ۱ | — | سند؛ آزمونی لازم نیست |
 | — | research-marketplace-contract | **تأیید** (فقط سند: `docs/MARKETPLACE-CONTRACT-fa.md`؛ کامیتِ CRLFِ `gradlew.bat` نادیده گرفته شد) | ۱ | — | سند؛ آزمونی لازم نیست |
+| #416 | claude/fix-review-ack-needwrite | تأییدِ کد (یک خط: needWrite روی review-ack)؛ منتظرِ CI | ۱ | — | ادعا: PGlite paid-routes ۶/۶، online-orders ۱۳/۱۳، جهش ۱/۶؛ CI در صف |
 | #414 | claude/docs-ios-market | تأییدِ محتوا (همان دو سندِ تأییدشده، بایت‌به‌بایت)؛ منتظرِ CI | ۱ | — | CI در صف |
 | — | claude/ios-step0-guard (موجِ ۲) | در حالِ کار | ۰ | — | — |
 | — | claude/core-common-ios (موجِ ۲) | در حالِ کار | ۰ | — | — |
