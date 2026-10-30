@@ -147,6 +147,10 @@
 - Sync v3ِ سرور فقط با `SYNC_V3_ENABLED` (پیش‌فرض خاموش) و فقط برای دکان؛ خاموش ⇒ `/api/sync/v3/*` همان ۴۰۴؛ v1 و پمپ دست نمی‌خورند (#233).
 - opِ v3 مبلغ را `<نام>Minor` و مقدار را `<نام>Milli` (صحیح) می‌فرستد؛ نامِ قدیم یا عددِ اعشاری رد می‌شود (#233).
 - ویرایشِ قدیمی‌تر از حذف ردیف را زنده نمی‌کند و به صندوقِ تعارض می‌رود (#233).
+- push ِ v1 ِ هر دو برنامه `since` می‌فرستد (برای پرچمِ دکانِ `sync.cursor_from_since`، #481): کم‌ترینِ cursor و «یادداشت» = cursor ِ لحظه‌ای
+  که صفِ **خالی** نخستین op را گرفت (تا خالی شدنِ صف فقط پایین). cursor ِ همین حالا نه: op ِ ثبت‌شده وسطِ pull تعارضش گم می‌شد.
+  منطق فقط `core/…/core/sync/PushSince.kt` و `pushSinceNote`/`pushSince` ِ `license/sync-core.js` با `core/test-vectors/push-since-v1.json`؛
+  اندروید در `SyncV1Engine` (`parts.push`، `pushClient`)، وب در `recordChange`/`pushBaseline`/`pushOnce`. sync-core ِ کهنه ⇒ بی `since`، بی خطا.
 - opِ قدیمی مهلت ندارد (D-05، #233).
 - بستنِ تعارض با `data.delete.any` (مالک و مدیر)؛ لغوِ فاکتور با `sales.cancel` (#233).
 - v3 ⇒ v1 خودکار نیست: v3 را برای دکانی بزن که همهٔ دستگاه‌هایش v3اند (#233؛ پلِ v3 ⇒ v1 در #287، باز).
