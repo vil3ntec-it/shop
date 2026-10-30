@@ -28,6 +28,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.onboarding.PinEntry
+import ir.vil3ntec.tohid.core.onboarding.PinRules
+import ir.vil3ntec.tohid.core.onboarding.PinSetup
 import ir.vil3ntec.tohid.data.Fingerprint
 import ir.vil3ntec.tohid.data.LockStore
 import ir.vil3ntec.tohid.ui.theme.PhoneV3

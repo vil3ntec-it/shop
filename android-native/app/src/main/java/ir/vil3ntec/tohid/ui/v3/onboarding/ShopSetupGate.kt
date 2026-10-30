@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.net.userText
+import ir.vil3ntec.tohid.core.onboarding.ShopChoice
+import ir.vil3ntec.tohid.core.onboarding.ShopSetupRules
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore

@@ -1,6 +1,4 @@
-package ir.vil3ntec.tohid.ui.v3.onboarding
-
-import ir.vil3ntec.tohid.normalizeDigits
+package ir.vil3ntec.tohid.core.onboarding
 
 /*
  *  حالتِ خالصِ دروازهٔ ورود (`auth?mode=signin|signup|join|forgot`) — بی Compose و بی شبکه.
@@ -191,7 +189,7 @@ object AuthRules {
   fun passwordsMatch(ui: AuthUi): Boolean? = if (ui.password2.isBlank()) null else ui.password == ui.password2
 
   /** رقمِ فارسی/عربی ⇐ لاتین، فقط رقم، حداکثر شش (چسباندن از پیامک هم) */
-  fun codeDigits(raw: String): String = normalizeDigits(raw).filter { it in '0'..'9' }.take(CODE_LENGTH)
+  fun codeDigits(raw: String): String = OnboardingText.latinDigits(raw).filter { it in '0'..'9' }.take(CODE_LENGTH)
 
   /** با ششمین رقم خودش می‌فرستد — جز بازیابی، که رمزِ تازه هم باید نوشته شود */
   fun autoSubmit(code: String, busy: Boolean, askPassword: Boolean): Boolean =
@@ -209,7 +207,7 @@ object AuthRules {
   }
 
   /** نقطهٔ پیداشده، چپ‌به‌راست و با ممیزِ لاتین (پنج رقمِ اعشار ≈ یک متر) */
-  fun coordinates(lat: Double, lng: Double): String = String.format(java.util.Locale.US, "%.5f, %.5f", lat, lng)
+  fun coordinates(lat: Double, lng: Double): String = "${OnboardingText.fixed5(lat)}, ${OnboardingText.fixed5(lng)}"
 
   /** `auth?mode=` ⇒ گامِ آغاز */
   fun start(mode: String?): AuthUi = when (mode) {

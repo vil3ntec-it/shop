@@ -1,4 +1,4 @@
-package ir.vil3ntec.tohid.ui.v3.onboarding
+package ir.vil3ntec.tohid.core.onboarding
 
 /** دو راهِ «ساختِ دکان»: صاحبِ دکان می‌سازد، شاگرد با کد می‌پیوندد */
 enum class ShopChoice { OWNER, STAFF }

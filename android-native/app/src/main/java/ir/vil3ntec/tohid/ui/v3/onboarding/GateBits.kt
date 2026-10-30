@@ -16,6 +16,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.onboarding.AuthNote
+import ir.vil3ntec.tohid.core.onboarding.EmailIssue
+import ir.vil3ntec.tohid.core.onboarding.PasswordIssue
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone

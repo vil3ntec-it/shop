@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.onboarding.AuthRules
+import ir.vil3ntec.tohid.core.onboarding.AuthUi
+import ir.vil3ntec.tohid.core.onboarding.CodePurpose
 import kotlinx.coroutines.delay
 
 /**

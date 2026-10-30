@@ -1,6 +1,12 @@
 package ir.vil3ntec.tohid.ui.v3.onboarding
 
 import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.core.onboarding.PinEntry
+import ir.vil3ntec.tohid.core.onboarding.PinRules
+import ir.vil3ntec.tohid.core.onboarding.PinSetup
+import ir.vil3ntec.tohid.core.onboarding.ReauthProof
+import ir.vil3ntec.tohid.core.onboarding.ReauthRules
+import ir.vil3ntec.tohid.core.onboarding.ShopSetupRules
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue

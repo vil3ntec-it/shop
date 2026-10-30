@@ -1,5 +1,12 @@
 package ir.vil3ntec.tohid.ui.v3.onboarding
 
+import ir.vil3ntec.tohid.core.onboarding.AuthNote
+import ir.vil3ntec.tohid.core.onboarding.AuthRules
+import ir.vil3ntec.tohid.core.onboarding.AuthStep
+import ir.vil3ntec.tohid.core.onboarding.AuthUi
+import ir.vil3ntec.tohid.core.onboarding.CodePurpose
+import ir.vil3ntec.tohid.core.onboarding.EmailIssue
+import ir.vil3ntec.tohid.core.onboarding.PasswordIssue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -188,5 +195,19 @@ class AuthModelTest {
   @Test
   fun `لوکیشن چپ به راست با پنج رقمِ اعشار`() {
     assertEquals("34.52813, 69.17233", AuthRules.coordinates(34.528128, 69.172331))
+  }
+
+  /** مدل در `core` (بی `java.*`) است؛ نوشتهٔ لوکیشن باید همان `%.5f` ِ پیشین بماند */
+  @Test
+  fun `لوکیشن همان String format ِ Locale US است — مرزی و تصادفی`() {
+    fun old(x: Double) = String.format(java.util.Locale.US, "%.5f", x)
+    val edge = listOf(
+      0.0, -0.0, 0.000005, -0.000005, 0.0000049, 1.000005, 34.528125, 69.999995, 9.999995, 99.999999,
+      -179.999995, 180.0, 1e-7, -1e-7, 1.5e-5, 12345678.123456, 0.1 + 0.2, 33.000015, 64.123455,
+    )
+    val rnd = java.util.Random(390)
+    val all = edge + List(20_000) { (rnd.nextDouble() * 360 - 180) } +
+      List(5_000) { Math.round(rnd.nextDouble() * 36_000_000) / 1_000_000.0 + 0.0000005 }
+    for (x in all) assertEquals("x=$x", "${old(x)}, ${old(-x)}", AuthRules.coordinates(x, -x))
   }
 }

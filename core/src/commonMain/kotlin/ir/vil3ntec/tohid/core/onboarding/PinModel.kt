@@ -1,4 +1,4 @@
-package ir.vil3ntec.tohid.ui.v3.onboarding
+package ir.vil3ntec.tohid.core.onboarding
 
 /*
  *  حالتِ خالصِ قفلِ برنامه (`lock`، `lock/setup`) — همان رفتارِ `AppLockScreen`/`LockSetupScreen` ِ

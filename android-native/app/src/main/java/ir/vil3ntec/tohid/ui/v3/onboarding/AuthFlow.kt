@@ -6,12 +6,15 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.onboarding.AuthRules
+import ir.vil3ntec.tohid.core.onboarding.AuthStep
+import ir.vil3ntec.tohid.core.onboarding.AuthUi
 import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.SavedLogins

@@ -21,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.core.onboarding.ReauthProof
+import ir.vil3ntec.tohid.core.onboarding.ReauthRules
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind

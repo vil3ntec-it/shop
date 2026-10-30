@@ -12,6 +12,10 @@ import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.model.SessionDto
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.userText
+import ir.vil3ntec.tohid.core.onboarding.AuthNote
+import ir.vil3ntec.tohid.core.onboarding.AuthRules
+import ir.vil3ntec.tohid.core.onboarding.AuthUi
+import ir.vil3ntec.tohid.core.onboarding.CodePurpose
 import ir.vil3ntec.tohid.data.GoogleSignIn
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.LocationFix

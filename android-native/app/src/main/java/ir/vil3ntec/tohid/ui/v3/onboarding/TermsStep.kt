@@ -41,6 +41,9 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.onboarding.AuthRules
+import ir.vil3ntec.tohid.core.onboarding.AuthStep
+import ir.vil3ntec.tohid.core.onboarding.AuthUi
 import ir.vil3ntec.tohid.data.DeviceLocation
 import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.Terms
