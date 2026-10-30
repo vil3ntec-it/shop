@@ -65,6 +65,42 @@ function nearCategories(q, categories) {
     .slice(0, SUGGEST_CATEGORIES);
 }
 
+/**
+ * بی نتیجهٔ دقیق (صفحهٔ اول): اول غلطِ تایپی — فقط کالای پیشنهادشدنی (ناموجود هرگز، WEB-09) —
+ * وگرنه «چیزی پیدا نشد» با دسته‌های نزدیک، پرفروش/تازهٔ واقعی و تلفنِ تماسِ ویترین.
+ * `decorate` همان تابعِ ویترین است (عکسِ بانک و موجودی روی نماها).
+ */
+async function miss({ shopId, raw, cat, lim, contactPhone, decorate }) {
+  const sf = require('./storefront');
+  if (fuzzyWorthy(raw)) {
+    const params = [shopId];
+    let where = `sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT}`;
+    if (cat) {
+      params.push(cat);
+      where += ` AND r.data->>'category' = $${params.length}`;
+    }
+    const rows = await require('../db').many(
+      `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM} WHERE ${where}
+        ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT ${FUZZY_SCAN}`,
+      params
+    );
+    const views = rows.map(sf.productView).filter((p) => p.priceMinor !== null && p.name);
+    const { suggestable } = require('./storefront-shelf');
+    const hits = (await decorate(shopId, fuzzyPick(views, raw, lim * 3))).filter(suggestable).slice(0, lim);
+    if (hits.length) return { items: hits, nextCursor: null, match: 'fuzzy' };
+  }
+  const [cats, hl] = await Promise.all([sf.categories(shopId), sf.highlights(shopId)]);
+  const best = hl.bestsellers.length > 0;
+  return {
+    items: [], nextCursor: null, match: 'none',
+    suggest: {
+      categories: nearCategories(raw, cats),
+      picks: best ? hl.bestsellers : hl.newArrivals, picksKind: best ? 'bestsellers' : 'newArrivals',
+      contactPhone: contactPhone || '',
+    },
+  };
+}
+
 module.exports = {
-  FLAG, FUZZY_SCAN, enabled, sqlName, needle, categoryOf, fuzzyWorthy, fuzzyPick, nearCategories,
+  FLAG, FUZZY_SCAN, enabled, sqlName, needle, categoryOf, fuzzyWorthy, fuzzyPick, nearCategories, miss,
 };

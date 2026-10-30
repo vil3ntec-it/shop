@@ -358,40 +358,7 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
   if (!smart) return out;
   if (jump) return { ...out, match: 'category', jump: { category: jump } };
   if (out.items.length || cursor) return { ...out, match: 'exact' };
-  return smartMiss(shopId, raw, cat, lim, contactPhone);
-}
-
-/**
- * WEB-05/06 — بی نتیجهٔ دقیق: اول غلطِ تایپی (فقط کالای پیشنهادشدنی؛ ناموجود هرگز، WEB-09)،
- * وگرنه «چیزی پیدا نشد» با دسته‌های نزدیک، پرفروش/تازهٔ واقعی و تلفنِ تماسِ ویترین.
- */
-async function smartMiss(shopId, raw, cat, lim, contactPhone) {
-  if (search.fuzzyWorthy(raw)) {
-    const params = [shopId];
-    let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
-    if (cat) {
-      params.push(cat);
-      where += ` AND r.data->>'category' = $${params.length}`;
-    }
-    const rows = await many(
-      `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM} WHERE ${where}
-        ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT ${search.FUZZY_SCAN}`,
-      params
-    );
-    const views = rows.map(productView).filter((p) => p.priceMinor !== null && p.name);
-    const hits = (await decorate(shopId, search.fuzzyPick(views, raw, lim * 3))).filter(shelf.suggestable).slice(0, lim);
-    if (hits.length) return { items: hits, nextCursor: null, match: 'fuzzy' };
-  }
-  const [cats, hl] = await Promise.all([categories(shopId), highlights(shopId)]);
-  const best = hl.bestsellers.length > 0;
-  return {
-    items: [], nextCursor: null, match: 'none',
-    suggest: {
-      categories: search.nearCategories(raw, cats),
-      picks: best ? hl.bestsellers : hl.newArrivals, picksKind: best ? 'bestsellers' : 'newArrivals',
-      contactPhone: contactPhone || '',
-    },
-  };
+  return search.miss({ shopId, raw, cat, lim, contactPhone, decorate });
 }
 
 /** عکسِ بانک (اگر هست) و وضعیتِ موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
