@@ -19,6 +19,7 @@ import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.data.OrderFulfillment
+import ir.vil3ntec.tohid.data.OrderNotify
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -373,6 +374,7 @@ object OrdersLive {
   private fun apply(cfg: OrdersConfigDto?) {
     known = true
     config.value = cfg
+    if (cfg != null) deferredOpen?.let { deferredOpen = null; openOrder(it) }
     if (cfg == null) {
       counts.value = emptyMap(); rev.value = 0
       unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList(); review.value = emptyList()
@@ -396,6 +398,14 @@ object OrdersLive {
     AppNav.go("orders")
   }
 
+  /** سفارشِ اعلانِ لمس‌شده (M6) — اگر «روشن است؟» هنوز نرسیده، پس از رسیدنش باز می‌شود */
+  @Volatile private var deferredOpen: String? = null
+
+  fun openFromNotice(id: String) {
+    if (id.isBlank()) return
+    if (enabled) openOrder(id) else deferredOpen = id
+  }
+
   /**
    *  زمان‌سنجِ صف — یک بار در `AppRoot`. فقط بینِ ON_START و ON_STOP می‌دود.
    */
@@ -412,11 +422,14 @@ object OrdersLive {
       if (!known || System.currentTimeMillis() - configAt > 60_000) refreshConfig(context)
       pollSummary(context)
       reconcile(context, store, force = true)
+      //  M6: رسیدِ «باز شد» ِ اعلان‌های لمس‌شده و اعلانِ سفارشِ تازه (پرچمِ `shop.order_notify`)
+      if (enabled) OrderNotify.tick(context)
       while (isActive) {
         delay(POLL_MS)
         if (System.currentTimeMillis() - configAt > CONFIG_MS) refreshConfig(context)
         pollSummary(context)
         reconcile(context, store)
+        if (enabled) OrderNotify.tick(context)
       }
     }
   }
