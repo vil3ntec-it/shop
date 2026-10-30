@@ -131,7 +131,18 @@ async function createApp({ runMigrations = true } = {}) {
 
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
-  app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
+  //  S8 (پرچمِ `market.load`، پیش‌فرض خاموش): بازار و ویترینِ بی‌توکن سطلِ نرخ و سقفِ هم‌زمانیِ
+  //  خودشان را دارند تا شلوغیِ‌شان سطلِ `/api/shop/*` و اتصال‌های همگام‌سازی را نخورد.
+  const marketLoad = require('./lib/market-load');
+  const publicRate = rateLimit({ max: config.rateLimit.publicMax, keyPrefix: 'public' });
+  app.use((req, res, next) => {
+    if (/^\/api\/sync\/v[13]\//.test(req.path)) return next();
+    if (!marketLoad.isPublic(req.path)) return general(req, res, next);
+    marketLoad.enabled().then((on) => {
+      if (!on) return general(req, res, next);
+      publicRate(req, res, (err) => (err ? next(err) : marketLoad.concurrency(req, res, next)));
+    }, next);
+  });
 
   // ---- بررسی سلامت ----
   /*

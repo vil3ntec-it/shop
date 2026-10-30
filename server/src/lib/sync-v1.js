@@ -286,6 +286,15 @@ async function touchDevice(q, ctx, deviceId, patch) {
   );
 }
 
+/**
+ * S7: آخرین تماس روی ردیفِ ویترین (هر ۳۰ ثانیه یک بار؛ `storefront.noteSeen`) — **پس از** تراکنش
+ * صدا زده می‌شود تا قفلِ ردیفِ ویترین در push نماند. شکستش همگام‌سازی را نمی‌شکند.
+ */
+async function noteShopSeen(ctx, t) {
+  if (ctx.app !== 'shop' || ctx.accountKind !== 'shop') return;
+  await require('./storefront').noteSeen(ctx.accountId, t).catch(() => {});
+}
+
 // ---------- Push ----------
 
 /**
@@ -310,7 +319,7 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
   const upgradeAvailable = clientSchema < current;
   const t = now();
 
-  return tx(async (c) => {
+  const out = await tx(async (c) => {
     /*
      *  پوش‌های یک حساب پشتِ سرِ هم، نه هم‌زمان.
      *
@@ -397,6 +406,8 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
       schema_version: current, upgrade_available: upgradeAvailable,
     };
   });
+  await noteShopSeen(ctx, t);
+  return out;
 }
 
 // ---------- دسترسیِ هر op ----------
@@ -460,6 +471,7 @@ async function pull(ctx, { since = 0, deviceId, limit = DEFAULT_PULL }) {
   await touchDevice({ query: (s, p) => require('../db').query(s, p) }, ctx, deviceId, {
     cursor, lastPullAt: now(),
   });
+  await noteShopSeen(ctx, now());
   return {
     ops: page.map(r => ({
       op_id: r.op_id, device_id: r.device_id, server_seq: Number(r.server_seq), ts: Number(r.client_ts),
