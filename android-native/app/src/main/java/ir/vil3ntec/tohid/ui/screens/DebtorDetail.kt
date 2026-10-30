@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
+
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -157,12 +159,12 @@ internal fun DebtorDetailScreen(
   val debtor = account.debtor
   //  دفترِ همین مشتری: اقلام، تخصیصِ پرداخت، سررسید و ماندهٔ پس از هر ردیف
   val book = remember(d, debtor.id) { DebtBook.book(d, debtor.id, todayIso()) }
-  val rows = remember(account.transactions, hiddenTx) { DebtorDetailModel.rows(account.transactions, hiddenTx) }
+  val rows = remember(account.transactions, hiddenTx) { DebtorLedgerModel.rows(account.transactions, hiddenTx) }
   //  برگهٔ جزئیاتِ یک ردیف (زدنِ ردیف)
   var sheetTx by rememberSaveable { mutableStateOf<String?>(null) }
   val shotTx = DebtorDetailShot.txSheet.value
   LaunchedEffect(shotTx) { if (shotTx != null) sheetTx = shotTx }
-  val totals = DebtorDetailModel.totals(account)
+  val totals = DebtorLedgerModel.totals(account)
 
   //  کشو: بازی/بستگی‌اش روی دستگاه می‌ماند — کسی که بسته‌اش کرده، هر بار نمی‌بندد
   val prefs = remember(context) { runCatching { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE) }.getOrNull() }
@@ -195,27 +197,27 @@ internal fun DebtorDetailScreen(
     runCatching { context.startActivity(android.content.Intent(action, android.net.Uri.parse(uri))) }
   }
 
-  fun run(action: DebtorDetailModel.Action) {
-    val number = DebtorDetailModel.dialable(debtor.phone)
-    val message = DebtorDetailModel.reminder(debtor.name, account.balance)
+  fun run(action: DebtorLedgerModel.Action) {
+    val number = DebtorLedgerModel.dialable(debtor.phone)
+    val message = DebtorLedgerModel.reminder(debtor.name, account.balance)
     when (action) {
-      DebtorDetailModel.Action.CALL -> open("tel:$number", android.content.Intent.ACTION_DIAL)
-      DebtorDetailModel.Action.SMS -> open("smsto:$number?body=" + android.net.Uri.encode(message))
-      DebtorDetailModel.Action.WHATSAPP ->
-        open("https://wa.me/${DebtorDetailModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message))
-      DebtorDetailModel.Action.EDIT -> onEdit()
-      DebtorDetailModel.Action.STATEMENT_CSV -> {
+      DebtorLedgerModel.Action.CALL -> open("tel:$number", android.content.Intent.ACTION_DIAL)
+      DebtorLedgerModel.Action.SMS -> open("smsto:$number?body=" + android.net.Uri.encode(message))
+      DebtorLedgerModel.Action.WHATSAPP ->
+        open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message))
+      DebtorLedgerModel.Action.EDIT -> onEdit()
+      DebtorLedgerModel.Action.STATEMENT_CSV -> {
         val sheet = ReportCsv.statement(d, debtor.id, todayIso())
         pendingCsv = sheet
         saveCsv.launch("${sheet.name}.csv")
       }
-      DebtorDetailModel.Action.PRINT ->
+      DebtorLedgerModel.Action.PRINT ->
         ReportPrint.print(context, ReportCsv.statement(d, debtor.id, todayIso()), StrDebtor.printTitle(debtor.name))
-      DebtorDetailModel.Action.DELETE -> onDelete()
+      DebtorLedgerModel.Action.DELETE -> onDelete()
     }
   }
 
-  val actions = DebtorDetailModel.actions(debtor.phone, account.transactions.isNotEmpty())
+  val actions = DebtorLedgerModel.actions(debtor.phone, account.transactions.isNotEmpty())
   val wide = screenSize() != Screen.PHONE
 
   V3MaterialColors {
@@ -320,10 +322,10 @@ private fun DetailHeader(name: String, phone: String, drawerOpen: Boolean, onBac
 private fun ActionDrawer(
   account: DebtorEngine.Account,
   book: DebtBook.Book?,
-  actions: List<DebtorDetailModel.Action>,
+  actions: List<DebtorLedgerModel.Action>,
   open: Boolean,
   onToggle: (() -> Unit)?,
-  onAction: (DebtorDetailModel.Action) -> Unit,
+  onAction: (DebtorLedgerModel.Action) -> Unit,
 ) {
   val c = PhoneV3.colors
   val since = account.since
@@ -368,19 +370,19 @@ private fun ActionDrawer(
 }
 
 @Composable
-private fun ActionButton(action: DebtorDetailModel.Action, modifier: Modifier, onClick: () -> Unit) {
+private fun ActionButton(action: DebtorLedgerModel.Action, modifier: Modifier, onClick: () -> Unit) {
   val c = PhoneV3.colors
   val dc = PhoneV3Debt.colors
   val (icon, label) = when (action) {
-    DebtorDetailModel.Action.CALL -> Icons.Outlined.Call to StrDebtor.call
-    DebtorDetailModel.Action.SMS -> Icons.Outlined.Sms to StrDebtor.sms
-    DebtorDetailModel.Action.WHATSAPP -> Icons.AutoMirrored.Outlined.Chat to StrDebtor.whatsapp
-    DebtorDetailModel.Action.EDIT -> Icons.Outlined.Edit to StrDebtor.edit
-    DebtorDetailModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrDebtor.statementCsv
-    DebtorDetailModel.Action.PRINT -> Icons.Outlined.Print to StrDebtor.print
-    DebtorDetailModel.Action.DELETE -> Icons.Outlined.DeleteOutline to StrDebtor.delete
+    DebtorLedgerModel.Action.CALL -> Icons.Outlined.Call to StrDebtor.call
+    DebtorLedgerModel.Action.SMS -> Icons.Outlined.Sms to StrDebtor.sms
+    DebtorLedgerModel.Action.WHATSAPP -> Icons.AutoMirrored.Outlined.Chat to StrDebtor.whatsapp
+    DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrDebtor.edit
+    DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrDebtor.statementCsv
+    DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrDebtor.print
+    DebtorLedgerModel.Action.DELETE -> Icons.Outlined.DeleteOutline to StrDebtor.delete
   }
-  val danger = action == DebtorDetailModel.Action.DELETE
+  val danger = action == DebtorLedgerModel.Action.DELETE
   Column(
     modifier.clip(RoundedCornerShape(14.dp)).v3PressScale(onClick, label).padding(vertical = 6.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
@@ -451,13 +453,13 @@ internal fun StatusPill(text: String, fg: Color, bg: Color, icon: ImageVector? =
  *  صفر خنثی است (`inkMuted`): نه قرمزِ بدهی، نه سبزِ رسید.
  */
 @Composable
-private fun TotalsCard(t: DebtorDetailModel.Totals) {
+private fun TotalsCard(t: DebtorLedgerModel.Totals) {
   val c = PhoneV3.colors
   val dc = PhoneV3Debt.colors
   V3Card(radius = 16.dp, padding = PaddingValues(vertical = 9.dp)) {
     Row(Modifier.fillMaxWidth()) {
-      TotalCell(StrDebtor.given, t.given, if (DebtorDetailModel.isZero(t.given)) c.inkMuted else dc.owe, Modifier.weight(1f))
-      TotalCell(StrDebtor.received, t.received, if (DebtorDetailModel.isZero(t.received)) c.inkMuted else dc.settled, Modifier.weight(1f))
+      TotalCell(StrDebtor.given, t.given, if (DebtorLedgerModel.isZero(t.given)) c.inkMuted else dc.owe, Modifier.weight(1f))
+      TotalCell(StrDebtor.received, t.received, if (DebtorLedgerModel.isZero(t.received)) c.inkMuted else dc.settled, Modifier.weight(1f))
       TotalCell(
         StrDebtor.balance,
         kotlin.math.abs(t.balance),
@@ -590,7 +592,7 @@ private fun TxRow(tx: DebtTransaction, entry: DebtBook.Entry?, onShow: () -> Uni
         Icon(if (give) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = if (give) StrDebtor.giveTag else StrDebtor.receiveTag, tint = tint, modifier = Modifier.size(15.dp))
         Spacer(Modifier.width(8.dp))
         Text(
-          if (tx.date.isBlank()) DebtorDetailModel.UNDATED else formatDate(tx.date),
+          if (tx.date.isBlank()) DebtorLedgerModel.UNDATED else formatDate(tx.date),
           style = v3Text(12, FontWeight.Normal, 16),
           color = c.inkMuted,
           maxLines = 1,

@@ -34,6 +34,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.GridView
@@ -43,8 +44,6 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.TableRows
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
@@ -60,7 +59,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -87,11 +85,28 @@ import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhotoSourceSheet
-import ir.vil3ntec.tohid.ui.screens.TohidSnackbar
 import ir.vil3ntec.tohid.ui.components.common.openOnMap
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Tone
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Ui
+import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.theme.V3Status
+import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3Card
+import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
+import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.V3FieldKind
+import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3IconButton
+import ir.vil3ntec.tohid.ui.v3.V3ListRow
+import ir.vil3ntec.tohid.ui.v3.V3Message
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.ui.v3.V3Sheet
+import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
+import ir.vil3ntec.tohid.ui.v3.V3StaggerState
+import ir.vil3ntec.tohid.ui.v3.V3StatusPill
+import ir.vil3ntec.tohid.ui.v3.V3TextField
+import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
+import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -137,22 +152,6 @@ internal fun headline(s: String): String = when (s) {
   else -> STATUS_LABEL[s] ?: s
 }
 
-/** رنگِ وضعیت با همان معنای همه‌جا (سیستمِ رنگ §۸) */
-/**
- *  رنگِ وضعیتِ پیک از همان نگاشتِ مشترک (`OrderStatusTone.courier`) — هر وضعیت همه‌جا یک معنا:
- *  «گرفتم» آبیِ در راه است نه «آماده‌سازی»، و «ناموفق» بنفشِ «نیازِ بررسی» نه قرمزِ لغو.
- */
-internal fun statusTone(s: String, ui: PhoneV3Ui): PhoneV3Tone = when (ir.vil3ntec.tohid.ui.components.common.OrderStatusTone.courier(s)) {
-  ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING -> ui.awaiting
-  ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING -> ui.approval
-  ir.vil3ntec.tohid.ui.components.common.PillTone.PREPARING -> ui.preparing
-  ir.vil3ntec.tohid.ui.components.common.PillTone.INFO -> ui.delivery
-  ir.vil3ntec.tohid.ui.components.common.PillTone.SUCCESS -> ui.success
-  ir.vil3ntec.tohid.ui.components.common.PillTone.DANGER -> ui.cancelled
-  ir.vil3ntec.tohid.ui.components.common.PillTone.REVIEW -> ui.review
-  ir.vil3ntec.tohid.ui.components.common.PillTone.NEUTRAL -> ui.inactive
-}
-
 internal fun actionLabel(from: String, to: String): String = when (to) {
   "assigned" -> "قبول"
   "rejected" -> "رد"
@@ -172,6 +171,9 @@ internal val REASON_LABEL = mapOf(
   "recalled" to "دکان پس خواست", "partial_payment" to "مشتری کمتر داد", "refused_amount" to "مبلغ را نپذیرفت",
   "damaged_or_short" to "کالا آسیب یا کسری داشت", "other" to "دلیلِ دیگر (بنویسید)",
 )
+
+/** یادداشتِ «دکان پس خواست» روی کارت و جزئیات */
+internal const val RECALL_NOTE = "دکان این سفارش را پس خواسته است — بسته را برگردانید."
 
 /** پله‌های نوارِ پیشرفت: گرفتم ⇐ در راه ⇐ رسیدم ⇐ تحویل */
 internal val STEPS = listOf("گرفتم", "در راه", "رسیدم", "تحویل")
@@ -382,7 +384,7 @@ internal fun CourierBoard(
   var askSignOut by remember { mutableStateOf(false) }
   var bellOpen by remember { mutableStateOf(false) }
   val view = rememberViewMode("courier.jobs", ScreenKind.SALE)
-  val seen = remember { mutableSetOf<String>() }
+  val seen = rememberV3Stagger()
   val scope = rememberCoroutineScope()
 
   val shownActive = active.map { MissionView.forDisplay(it, queue) }
@@ -432,7 +434,7 @@ internal fun CourierBoard(
   Box(Modifier.fillMaxSize().background(p.bg)) {
     Scaffold(
       containerColor = p.bg,
-      snackbarHost = { TohidSnackbar(snackbar) },
+      snackbarHost = { V3SnackbarHost(snackbar) },
     ) { pad ->
       //  برگه‌ها نرم جابه‌جا می‌شوند؛ زیرصفحه از سمتِ پایان می‌آید (بخشِ G)
       AnimatedContent(
@@ -479,10 +481,10 @@ internal fun CourierBoard(
                 //  کلیدِ کارت/جدول فقط روی صفحهٔ پهن (گوشی همیشه کارت است)؛ تک‌رنگ
                 if (LocalConfiguration.current.screenWidthDp >= 600 && view.toggleVisible) {
                   val toTable = view.mode == ViewMode.CARD
-                  CourierRoundButton(
+                  V3IconButton(
                     if (toTable) Icons.Outlined.TableRows else Icons.Outlined.GridView,
                     if (toTable) "نمای جدولی" else "نمای کارتی",
-                    { view.set(ViewModePref.other(view.mode)) },
+                    onClick = { view.set(ViewModePref.other(view.mode)) },
                   )
                 }
               },
@@ -571,7 +573,7 @@ private fun RouteTab(
   lastError: String?,
   view: ViewMode,
   wideToggle: @Composable () -> Unit,
-  seen: MutableSet<String>,
+  seen: V3StaggerState,
   onRefresh: () -> Unit,
   onDismissRejected: (String) -> Unit,
   onOpen: (MissionCard) -> Unit,
@@ -589,7 +591,7 @@ private fun RouteTab(
         Text("مسیر", style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
         wideToggle()
         Spacer(Modifier.width(8.dp))
-        CourierRoundButton(Icons.Outlined.Refresh, "به‌روز کردن", onRefresh, enabled = !syncing, spin = syncing)
+        RefreshButton(syncing, onRefresh)
       }
     }
     item(key = "sync") { SyncLine(syncing, waitingTotal, lastError) }
@@ -602,11 +604,10 @@ private fun RouteTab(
       )
     }
     item(key = "tabs") {
-      CourierTabs(
-        first = "فعال" to live.size,
-        second = "پایان‌یافته" to finished.size,
-        firstSelected = routeTab == "active",
-        onSelect = { onRouteTab(if (it) "active" else "done") },
+      V3Segmented(
+        listOf("فعال · ${live.size.fa()}", "پایان‌یافته · ${finished.size.fa()}"),
+        selected = if (routeTab == "active") 0 else 1,
+        onSelect = { onRouteTab(if (it == 0) "active" else "done") },
       )
     }
     if (list.isEmpty()) {
@@ -623,12 +624,8 @@ private fun RouteTab(
       }
     } else {
       itemsIndexed(list, key = { _, c -> c.id }) { index, c ->
-        val appear = rememberCourierAppear(c.id, index, seen)
         val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
-        val itemMod = Modifier.animateItem().graphicsLayer {
-          alpha = appear.value
-          translationY = (1f - appear.value) * 24.dp.toPx()
-        }
+        val itemMod = Modifier.animateItem().v3Stagger(seen, c.id, index)
         if (view == ViewMode.CARD) {
           MissionCardView(c, waiting, itemMod, onOpen = { onOpen(c) }, onAction = { to -> onAction(c, to) })
         } else {
@@ -643,15 +640,14 @@ private fun RouteTab(
 @Composable
 internal fun SyncLine(syncing: Boolean, waiting: Int, lastError: String?) {
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   Column {
     val (text, tone) = when {
-      syncing -> "در حالِ فرستادن…" to ui.inactive
-      waiting > 0 -> "${waiting.fa()} کار در صفِ گوشی" to ui.awaiting
-      lastError != null -> "وصل نیست" to ui.inactive
-      else -> "همه به دکان رسید" to ui.success
+      syncing -> "در حالِ فرستادن…" to V3Status.INACTIVE
+      waiting > 0 -> "${waiting.fa()} کار در صفِ گوشی" to V3Status.WARNING
+      lastError != null -> "وصل نیست" to V3Status.INACTIVE
+      else -> "همه به دکان رسید" to V3Status.DELIVERED
     }
-    Row { CourierPill(text, tone) }
+    Row { V3StatusPill(tone, text) }
     if (lastError != null) {
       Spacer(Modifier.height(6.dp))
       Text(lastError, style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(start = 4.dp))
@@ -697,7 +693,7 @@ internal fun EmptyCard(title: String, sub: String, onRefresh: (() -> Unit)?) {
     Text(sub, style = courierText(14.sp), color = p.inkMuted, textAlign = TextAlign.Center)
     if (onRefresh != null) {
       Spacer(Modifier.height(16.dp))
-      CourierSecondaryButton("به‌روز کردن", onRefresh, icon = Icons.Outlined.Refresh)
+      CourierSecondary("به‌روز کردن", onRefresh, icon = Icons.Outlined.Refresh)
     }
   }
 }
@@ -751,19 +747,18 @@ private fun MissionCardView(
   onAction: (String) -> Unit,
 ) {
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   val live = CourierFlow.isLive(c.status)
   Column(
     modifier.fillMaxWidth().courierCard(p).clip(CourierCardShape).clickable(onClick = onOpen).padding(18.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text("سفارشِ #${c.orderNo.fa()}", style = courierText(14.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
-      if (waiting) { CourierPill("در صف", ui.awaiting); Spacer(Modifier.width(6.dp)) }
-      CourierPill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, ui))
+      if (waiting) { QueuedPill(); Spacer(Modifier.width(6.dp)) }
+      MissionStatus(c.status)
     }
     if (c.recallRequested && live) {
       Spacer(Modifier.height(10.dp))
-      CourierWarnNote("دکان این سفارش را پس خواسته است — بسته را برگردانید.")
+      V3Message(V3Tone.ERROR, RECALL_NOTE)
     }
     //  DLV-02: «اول نشانه»
     if (c.landmark.isNotBlank()) {
@@ -798,14 +793,14 @@ private fun MissionCardView(
       if (c.status == "requested") {
         //  کارِ تازه: قبول و رد کنارِ هم، هم‌اندازه
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          primary?.let { CourierPrimaryButton(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f)) }
+          primary?.let { StepButton(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f)) }
           actions.filter { isNegative(it) }.forEach {
-            CourierSecondaryButton(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f).height(56.dp), tone = CourierTone.NEGATIVE)
+            CourierSecondary(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f), negative = true, height = 56.dp)
           }
         }
       } else if (primary != null) {
         //  یک دکمهٔ بزرگ برای پلهٔ بعد؛ «ناموفق» و بقیه در صفحهٔ جزئیات
-        CourierPrimaryButton(actionLabel(c.status, primary), { onAction(primary) }, Modifier.fillMaxWidth())
+        StepButton(actionLabel(c.status, primary), { onAction(primary) }, Modifier.fillMaxWidth())
       }
     }
   }
@@ -815,7 +810,6 @@ private fun MissionCardView(
 @Composable
 private fun MissionRow(c: MissionCard, waiting: Boolean, modifier: Modifier, onOpen: () -> Unit) {
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   Row(
     modifier.fillMaxWidth().courierCard(p, CourierGroupShape).clip(CourierGroupShape).clickable(onClick = onOpen)
       .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -825,8 +819,8 @@ private fun MissionRow(c: MissionCard, waiting: Boolean, modifier: Modifier, onO
     Text(c.orderNo.fa(), style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.width(56.dp))
     Text(c.landmark.ifBlank { "—" }, style = courierText(15.sp), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     Text(if (c.expectedCollectMinor > 0) afn(c.expectedCollectMinor) else "—", style = courierText(13.sp), color = p.inkMuted)
-    if (waiting) CourierPill("در صف", ui.awaiting)
-    CourierPill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, ui))
+    if (waiting) QueuedPill()
+    MissionStatus(c.status)
   }
 }
 
@@ -837,23 +831,34 @@ private fun ReasonSheet(type: String, onDismiss: () -> Unit, onDone: (String, St
   var reason by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   val ready = reason.isNotBlank() && (reason != "other" || note.isNotBlank())
-  CourierSheet(onDismiss) {
-    CourierSheetTitle(if (type == "rejected") "ردِ این کار" else "تحویل نشد", "دلیل را انتخاب کنید")
+  V3Sheet(onDismiss = onDismiss, title = if (type == "rejected") "ردِ این کار" else "تحویل نشد") { _ ->
+    CourierSheetSub("دلیل را انتخاب کنید")
     Spacer(Modifier.height(14.dp))
-    CourierChoices(CourierFlow.reasonsFor(type).map { it to (REASON_LABEL[it] ?: it) }, reason) { reason = it }
+    ReasonList(CourierFlow.reasonsFor(type).map { it to (REASON_LABEL[it] ?: it) }, reason) { reason = it }
     Spacer(Modifier.height(14.dp))
-    CourierField(
+    V3TextField(
       note, { note = it.take(CourierQueue.MAX_NOTE) },
       "توضیح" + if (reason == "other") " (لازم)" else " (اختیاری)",
-      singleLine = false,
+      Modifier.fillMaxWidth(), singleLine = false,
     )
     Spacer(Modifier.height(18.dp))
-    CourierPrimaryButton(
+    StepButton(
       "ثبت", { onDone(reason, note.trim()) }, Modifier.fillMaxWidth(),
-      enabled = ready, tone = if (type == "failed") CourierTone.NEGATIVE else CourierTone.BRAND,
+      kind = if (type == "failed") V3ButtonKind.DANGER else V3ButtonKind.PRIMARY, enabled = ready,
     )
     Spacer(Modifier.height(8.dp))
-    CourierSecondaryButton("انصراف", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
+  }
+}
+
+/** یکی از چند دلیل — ردیف‌های انتخابیِ کیت در یک کارت */
+@Composable
+private fun ReasonList(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
+  V3Card(padding = PaddingValues(0.dp)) {
+    options.forEachIndexed { i, (id, label) ->
+      if (i > 0) V3Divider(start = 16.dp)
+      V3ListRow(label, tile = false, chevron = false, selected = id == selected, onClick = { onSelect(id) })
+    }
   }
 }
 
@@ -870,8 +875,8 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
   val differs = collects && minor != null && minor != c.expectedCollectMinor
   val codeOk = !c.requiresCode || CourierQueue.latinDigits(code).length >= 4
   val cashOk = !collects || (minor != null && (!differs || (cashReason.isNotBlank() && (cashReason != "other" || note.isNotBlank()))))
-  CourierSheet(onDismiss) {
-    CourierSheetTitle("تحویل به مشتری", "سفارشِ #${c.orderNo.fa()}")
+  V3Sheet(onDismiss = onDismiss, title = "تحویل به مشتری") { _ ->
+    CourierSheetSub("سفارشِ #${c.orderNo.fa()}")
     if (collects) {
       Spacer(Modifier.height(16.dp))
       Column(Modifier.fillMaxWidth().background(p.tile, CourierGroupShape).padding(vertical = 16.dp)) {
@@ -880,28 +885,27 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
     }
     if (c.requiresCode) {
       Spacer(Modifier.height(16.dp))
-      CourierField(
+      V3TextField(
         code, { code = numberInput(it).filter { ch -> ch != '.' }.take(12) },
-        "کدِ تحویل — از مشتری بپرسید", placeholder = "••••", ltr = true,
-        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number, big = true,
+        "کدِ تحویل — از مشتری بپرسید", Modifier.fillMaxWidth(), kind = V3FieldKind.BARCODE, placeholder = "••••",
       )
     }
     if (collects) {
       Spacer(Modifier.height(14.dp))
-      CourierField(
-        cash, { cash = numberInput(it) }, "نقدِ گرفته‌شده (افغانی)", ltr = true,
-        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal, big = true,
+      V3TextField(
+        cash, { cash = numberInput(it) }, "نقدِ گرفته‌شده (افغانی)", Modifier.fillMaxWidth(),
+        kind = V3FieldKind.MONEY,
       )
       if (differs) {
         Spacer(Modifier.height(14.dp))
         Text("مبلغ با سفارش فرق دارد — دلیل:", style = courierText(14.sp, FontWeight.Bold), color = p.ink)
         Spacer(Modifier.height(8.dp))
-        CourierChoices(CourierFlow.CASH_REASONS.map { it to (REASON_LABEL[it] ?: it) }, cashReason) { cashReason = it }
+        ReasonList(CourierFlow.CASH_REASONS.map { it to (REASON_LABEL[it] ?: it) }, cashReason) { cashReason = it }
         Spacer(Modifier.height(12.dp))
-        CourierField(
+        V3TextField(
           note, { note = it.take(CourierQueue.MAX_NOTE) },
           "توضیح" + if (cashReason == "other") " (لازم)" else " (اختیاری)",
-          singleLine = false,
+          Modifier.fillMaxWidth(), singleLine = false,
         )
       }
     }
@@ -911,39 +915,31 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
     }
     Spacer(Modifier.height(18.dp))
     val label = if (collects && minor != null) "تحویل شد · ${afn(minor)} گرفتم" else "تحویل شد"
-    CourierPrimaryButton(
+    StepButton(
       label,
       { onDone(CourierQueue.latinDigits(code), minor, if (differs) cashReason else "", if (differs) note.trim() else "") },
       Modifier.fillMaxWidth(),
       enabled = codeOk && cashOk,
     )
     Spacer(Modifier.height(8.dp))
-    CourierSecondaryButton("انصراف", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
   }
 }
 
+/** خروج: با کارِ در صف، هشدار و دکمهٔ خطر (برگهٔ تأییدِ کیت) */
 @Composable
 private fun SignOutSheet(waiting: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-  val p = PhoneV3.colors
-  val ui = PhoneV3.ui
-  CourierSheet(onDismiss) {
-    CourierSheetTitle("خروج از حسابِ پیک")
-    Spacer(Modifier.height(8.dp))
-    Text(
-      if (waiting > 0)
-        "${waiting.fa()} کار هنوز به دکان نرسیده و با خروج از این گوشی پاک می‌شود. اول به اینترنت وصل شوید و «به‌روز کردن» را بزنید."
-      else "مأموریت‌ها و نشانی‌ها از این گوشی پاک می‌شوند.",
-      style = courierText(15.sp), color = if (waiting > 0) ui.cancelled.fg else p.inkMuted,
-    )
-    Spacer(Modifier.height(18.dp))
-    CourierPrimaryButton(
-      if (waiting > 0) "با وجودِ این خارج شو" else "خروج",
-      onConfirm, Modifier.fillMaxWidth(),
-      tone = if (waiting > 0) CourierTone.NEGATIVE else CourierTone.BRAND,
-    )
-    Spacer(Modifier.height(8.dp))
-    CourierSecondaryButton("انصراف", onDismiss, Modifier.fillMaxWidth())
-  }
+  V3ConfirmSheet(
+    title = "خروج از حسابِ پیک",
+    message = if (waiting > 0)
+      "${waiting.fa()} کار هنوز به دکان نرسیده و با خروج از این گوشی پاک می‌شود. اول به اینترنت وصل شوید و «به‌روز کردن» را بزنید."
+    else "مأموریت‌ها و نشانی‌ها از این گوشی پاک می‌شوند.",
+    confirm = if (waiting > 0) "با وجودِ این خارج شو" else "خروج",
+    onConfirm = onConfirm,
+    onDismiss = onDismiss,
+    icon = Icons.AutoMirrored.Outlined.Logout,
+    danger = waiting > 0,
+  )
 }
 
 /**
@@ -955,42 +951,32 @@ private fun PhotoFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (ByteArray
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val p = PhoneV3.colors
-  val ui = PhoneV3.ui
   var parcelOnly by remember { mutableStateOf(false) }
   var pick by remember { mutableStateOf(false) }
   var busy by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
 
   if (!pick) {
-    CourierSheet(onDismiss) {
-      CourierSheetTitle("عکسِ بسته")
-      Spacer(Modifier.height(8.dp))
+    V3Sheet(onDismiss = onDismiss, title = "عکسِ بسته") { _ ->
       Text(
         "مشتریِ سفارشِ #${c.orderNo.fa()} به عکسِ تحویل رضایت داده است. عکس فقط از بسته گرفته شود؛ چهرهٔ کسی در عکس نباشد.",
         style = courierText(15.sp), color = p.inkMuted,
       )
       Spacer(Modifier.height(12.dp))
-      Row(
-        Modifier.fillMaxWidth().clip(CourierGroupShape).background(p.tile).clickable { parcelOnly = !parcelOnly }.padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-      ) {
-        Checkbox(
-          checked = parcelOnly, onCheckedChange = { parcelOnly = it },
-          colors = CheckboxDefaults.colors(checkedColor = ui.primary, uncheckedColor = p.chevron, checkmarkColor = ui.onPrimary),
-        )
-        Text("عکس فقط از بسته است", style = courierText(15.sp, FontWeight.Medium), color = p.ink)
+      V3Card(padding = PaddingValues(0.dp)) {
+        V3ToggleRow("عکس فقط از بسته است", parcelOnly, { parcelOnly = it }, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.SKY)
       }
       error?.let {
         Spacer(Modifier.height(8.dp))
-        Text(it, style = courierText(13.sp), color = ui.cancelled.fg)
+        V3Message(V3Tone.ERROR, it)
       }
       Spacer(Modifier.height(18.dp))
-      CourierPrimaryButton(
+      StepButton(
         "گرفتنِ عکس", { pick = true }, Modifier.fillMaxWidth(),
-        enabled = parcelOnly && !busy, busy = busy, icon = Icons.Outlined.PhotoCamera,
+        enabled = parcelOnly && !busy, loading = busy, icon = Icons.Outlined.PhotoCamera,
       )
       Spacer(Modifier.height(8.dp))
-      CourierSecondaryButton("انصراف", onDismiss, Modifier.fillMaxWidth())
+      CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
     }
   }
   PhotoSourceSheet(
