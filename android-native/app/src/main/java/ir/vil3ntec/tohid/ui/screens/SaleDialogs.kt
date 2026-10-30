@@ -33,6 +33,7 @@ import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleReceipt
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -43,6 +44,7 @@ import ir.vil3ntec.tohid.numericInput
 import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.unitMoney
 import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -68,6 +70,8 @@ fun CheckoutDialog(
   presetDebtorId: String?,
   onDismiss: () -> Unit,
   onConfirm: (SalesEngine.Checkout) -> Unit,
+  /** تخفیف‌های خودکارِ همین سبد (`cart` پس از آن‌هاست)؛ `null` ⇒ همان ردیف‌های امروز */
+  promo: ir.vil3ntec.tohid.data.PromoEngine.Outcome? = null,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
   /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
@@ -275,7 +279,11 @@ fun CheckoutDialog(
 
         Spacer(Modifier.height(16.dp))
         Panel {
-          MoneyRow("جمع اقلام", totals.subtotal)
+          //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
+          if (promo != null && promo.stamp && promo.discount > 0) {
+            MoneyRow("جمع اقلام", promo.gross)
+            MoneyRow(SaleReceipt.promoLabel(promo.applied.map { it.name }), promo.discount, negative = true)
+          } else MoneyRow("جمع اقلام", totals.subtotal)
           MoneyRow("تخفیف", totals.discount)
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           MoneyRow("مبلغ نهایی", totals.finalTotal, strong = true)
@@ -344,15 +352,16 @@ private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect:
 }
 
 @Composable
-private fun MoneyRow(label: String, amount: Double, strong: Boolean = false, tint: Color? = null) {
+private fun MoneyRow(label: String, amount: Double, strong: Boolean = false, tint: Color? = null, negative: Boolean = false) {
   Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
     Text(
       label,
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
       color = if (strong) Shop.colors.text else Shop.colors.muted,
+      modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
     )
     Text(
-      "${money(amount)} ؋",
+      "${if (negative) "−" else ""}${money(amount)} ؋",
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
       color = tint ?: Shop.colors.text,
       fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
@@ -377,6 +386,7 @@ fun InvoiceDialog(
   var printer by remember { mutableStateOf(false) }
 
   val items = remember(sale.id) { d.saleItems.filter { it.saleId == sale.id } }
+  val stamped = remember { ir.vil3ntec.tohid.ui.PromoLive.stampOn(context) }
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
 
   Dialog(onDismissRequest = onDismiss) {
@@ -410,8 +420,9 @@ fun InvoiceDialog(
                 style = MaterialTheme.typography.bodyMedium,
                 color = Shop.colors.text,
               )
+              //  S3 (پرچمِ `shop.promo_stamp`): «مقدار × قیمتِ فهرست − تخفیفِ خودکار»؛ خاموش ⇒ همان متنِ پیشین
               Text(
-                "${money(item.quantity)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""} × ${money(item.unitPrice)}",
+                SaleReceipt.detail(item, product?.unit.orEmpty(), stamped, ::money, ::unitMoney, ::qty),
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
@@ -424,7 +435,9 @@ fun InvoiceDialog(
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))
 
+        //  «جمع اقلام» = جمعِ همان ستون؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
         MoneyRow("جمع اقلام", sale.total)
+        SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { MoneyRow(it.label, it.amount) }
         MoneyRow("تخفیف", sale.discount)
         MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
         MoneyRow("پرداختی", sale.paidAmount)

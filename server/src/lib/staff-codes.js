@@ -286,7 +286,19 @@ async function redeem(rawCode, userId, ip = '') {
       throw forbidden('صاحب دکان دسترسی شما را بسته است؛ از خودش بخواهید دوباره بازش کند', 'member_blocked');
     }
 
+    //  ⛔ عضوِ فعالِ همین دکان: کد هیچ کاری نمی‌کند — نه نقشش عوض می‌شود، نه کد مصرف
+    //  می‌شود. تغییرِ نقش فقط از `PATCH`/`PUT /members/:id` (با تأییدِ دوبارهٔ هویت) است.
+    //  پیش‌تر `role = code.role` می‌نشست: کدِ ثابتِ شاگرد بی‌شمار و بی‌پایان است و هر عضوی
+    //  آن را دارد، پس مدیری که صاحب دکان شاگردش کرده بود (یا پیک، یا نقشِ محدودتر) با
+    //  زدنِ دوبارهٔ همان کد نقشِ دلخواهش را خودش برمی‌گرداند؛ و کدِ یک‌بارِ نقشِ دیگر
+    //  عضوِ فعال را جابه‌جا می‌کرد و برای کسی که برایش ساخته شده بود می‌سوخت.
+    if (existing && existing.status === 'active') {
+      return { shop, role: existing.role, unchanged: true };
+    }
+
     if (existing) {
+      //  بازگشتِ عضوِ کنار گذاشته (فقط با کدی که بعد از کنار گذاشتنش ساخته شده — بالا):
+      //  همان پیوستنِ تازه، با نقشِ همان کد
       await c.query(
         `UPDATE shop_members SET status='active', role=$3, updated_at=$4 WHERE id=$1 AND shop_id=$2`,
         [existing.id, code.shop_id, code.role, t]

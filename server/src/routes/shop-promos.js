@@ -11,6 +11,13 @@
  * ⛔ هر قاعده پیش از نوشتن با `validate`ِ همان هستهٔ صندوق سنجیده می‌شود
  *    (`lib/promo-core.js` = بایت‌به‌بایت `license/promo-core.js`).
  * ⛔ پاک کردن نرم است و کدِ تخفیف حتی پس از پاک شدن آزاد نمی‌شود (PRM-02).
+ * ⛔ «سقفِ مصرف» تا شمارشِ مصرف نیامده پذیرفته نمی‌شود (`max_uses_unsupported`):
+ *    `uses` را هنوز هیچ فروشی بالا نمی‌برد، پس سقف فقط روی کاغذ بود. هر `maxUses` جز
+ *    «نبودن» و `0` پیش از `ruleOf` رد می‌شود (رشتهٔ "10" بی‌صدا صفر نمی‌شد) — مگر همان
+ *    مقدارِ ذخیره‌شدهٔ ردیفِ قبلی باشد: آن سقف هرگز کار نمی‌کرد و برنامهٔ پیشین (که فرمش
+ *    سقف را نشان نمی‌دهد و از قاعدهٔ پایه نگه می‌دارد) باید بتواند ویرایش کند ⇒ `0` می‌نشیند.
+ * ⛔ `stamp` در پاسخِ GET = پرچمِ `shop.promo_stamp` (`live_config`، پیش‌فرض خاموش): نشانِ
+ *    تخفیف روی فاکتور و ردیف‌های تازهٔ فاکتور در برنامه، و ردیفِ آگاهیِ فاکتورِ عمومی.
  *
  * زیرِ پیشوندِ موجودِ `/shop` ⇒ `ACCOUNT_PREFIXES` چیزِ تازه‌ای نمی‌خواهد.
  * ⚠️ در app.js پیش از `/shop` سوار می‌شود.
@@ -24,6 +31,11 @@ const { query, one, many, now } = require('../db');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, conflict, notFound } = require('../middleware/errors');
+
+const { flagOf } = require('../lib/orders');
+
+/** پرچمِ `live_config` ِ نشانِ تخفیف روی فاکتور — همان `receipt-public.js` */
+const STAMP_FLAG = 'shop.promo_stamp';
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -56,6 +68,7 @@ async function stateOf(shopId) {
 router.get('/', requirePermission('data.read'), wrap(async (req, res) => {
   res.json({
     ...(await stateOf(req.shopId)),
+    stamp: await flagOf(req.shopId, STAMP_FLAG),
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
   });
@@ -85,7 +98,12 @@ router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, r
 
   const prev = await one('SELECT data, deleted FROM shop_promotions WHERE shop_id=$1 AND id=$2', [req.shopId, id]);
   //  `uses` را فقط سرور می‌شمارد؛ مقدارِ برنامه نادیده
-  const rule = P.ruleOf({ ...body, id, uses: prev ? Number(prev.data.uses || 0) : 0 });
+  const max = body.maxUses;
+  if (max !== undefined && max !== null && max !== 0) {
+    const kept = prev && typeof prev.data.maxUses === 'number' && prev.data.maxUses > 0 && max === prev.data.maxUses;
+    if (!kept) throw badRequest('«سقفِ مصرفِ کد» هنوز شمرده نمی‌شود؛ آن را خالی بگذارید (بی سقف)', 'max_uses_unsupported');
+  }
+  const rule = P.ruleOf({ ...body, id, maxUses: 0, uses: prev ? Number(prev.data.uses || 0) : 0 });
   rule.name = stripControl(rule.name).trim().slice(0, 80);
   rule.code = P.normalizeCode(rule.code);
   const errors = P.validate(rule, 100);
