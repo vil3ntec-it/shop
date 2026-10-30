@@ -52,6 +52,8 @@ const FREE = [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
     'POST /shop/sync-epoch/deleted']],
+  ['دکانِ فعالِ نشست (مهاجرتِ ۰۹۷، #273) دادهٔ دکان نمی‌نویسد؛ پس از پایانِ اشتراکِ یک دکان هم باید بتوان به دکانِ دیگر رفت', [
+    'POST /shop/active']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
