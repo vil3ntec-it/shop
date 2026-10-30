@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.product.BulkPrice
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -27,6 +30,17 @@ object WarehouseEngine {
     val active: Boolean? = null,
     val saleUnit: String? = null,
     val unitFactor: Double? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
   )
 
   data class EntryDraft(
@@ -135,9 +149,8 @@ object WarehouseEngine {
 
   /* ---------------------------- ثبتِ کالا ---------------------------- */
 
-  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود */
-  private fun nameKey(name: String): String =
-    name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود (همان کلیدِ core) */
+  private fun nameKey(name: String): String = SimilarNames.exactKey(name)
 
   /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
   internal fun productChanges(a: Product, b: Product): List<String> = buildList {
@@ -154,6 +167,16 @@ object WarehouseEngine {
   fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
     d.auditLog.filter { it.refId == productId && (it.type == "product_edit" || it.type == "price_change") }
       .sortedByDescending { it.createdAt }
+
+  /**
+   *  PRD-19: کالاهایی با نامِ **مشابه** (نه یکسان) — هشدار، نه رد: فاصله/نیم‌فاصله/اعراب، ترتیبِ
+   *  کلمه‌ها یا غلطِ تایپیِ کوچک؛ رقمِ متفاوت هرگز (`SimilarNames` ِ core). `exceptId` خودِ کالا.
+   */
+  fun similarNames(d: ShopData, name: String, exceptId: String? = null, limit: Int = 3): List<Product> {
+    if (name.isBlank()) return emptyList()
+    val except = if (exceptId == null) -1 else d.products.indexOfFirst { it.id == exceptId }
+    return SimilarNames.Index(d.products.map { it.name }).find(name, except, limit).map { d.products[it.index] }
+  }
 
   /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
   fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
@@ -181,9 +204,13 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: (if (barcode.isEmpty()) emptyList() else listOf(barcode))
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
     // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد
-    if (barcode.isNotEmpty() && ShopStore.barcodeIndex(d).containsKey(barcode)) {
-      return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    val index = ShopStore.barcodeIndex(d)
+    ProductBarcodes.conflict(codes, null) { index[it] }?.let {
+      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val id = newId()
@@ -197,7 +224,7 @@ object WarehouseEngine {
       wholesalePrice = 0.0,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       notes = "",
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       createdAt = now,
       subcategory = draft.subcategory?.trim().orEmpty(),
       supplierId = draft.supplierId.orEmpty(),
@@ -234,9 +261,16 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
-    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد
-    val owner = if (barcode.isEmpty()) null else ShopStore.barcodeIndex(d)[barcode]
-    if (owner != null && owner != id) return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: ProductBarcodes.mergePrimary(barcode, existing.barcodes)
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
+    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
+    // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
+    val index = ShopStore.barcodeIndex(d)
+    ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
+      return Result.Failed(if (codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+    }
 
     val updated = existing.copy(
       name = name,
@@ -245,7 +279,7 @@ object WarehouseEngine {
       purchasePrice = draft.purchasePrice,
       salePrice = draft.salePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       subcategory = draft.subcategory?.trim() ?: existing.subcategory,
       supplierId = draft.supplierId ?: existing.supplierId,
       active = draft.active ?: existing.active,
@@ -259,6 +293,9 @@ object WarehouseEngine {
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
     var history = d.priceHistory
     var audit = d.auditLog
+    val by = draft.changedBy?.trim()?.ifEmpty { null }
+    val why = draft.reason?.trim()?.ifEmpty { null }
+    val whySuffix = why?.let { " — دلیل: $it" }.orEmpty()
     if (existing.purchasePrice != draft.purchasePrice) {
       history = history + PriceChange(
         id = newId(),
@@ -267,14 +304,17 @@ object WarehouseEngine {
         newPrice = draft.purchasePrice,
         date = today,
         createdAt = now,
+        by = by,
+        reason = why,
       )
       audit = audit + AuditEntry(
         id = newId(),
         type = "price_change",
         date = today,
         refId = id,
-        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی$whySuffix",
         createdAt = now,
+        by = by,
       )
     }
     //  بقیهٔ تغییرهای کالا هم ردپا دارند — «چه کسی نام یا قیمتِ فروش را عوض کرد؟»
@@ -285,8 +325,9 @@ object WarehouseEngine {
         type = "product_edit",
         date = today,
         refId = id,
-        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}",
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice) whySuffix else "",
         createdAt = now,
+        by = by,
       )
     }
 
@@ -375,6 +416,60 @@ object WarehouseEngine {
     if (audit.isEmpty()) return Result.Failed("چیزی عوض نشد")
     val categories = products.filter { it.id in ids }.map { it.category }.fold(d.productCategories) { acc, c -> withCategory(acc, c) }
     return Result.Ok(d.copy(products = products, productCategories = categories, auditLog = d.auditLog + audit), id = ids.first())
+  }
+
+  /** کالاهای انتخاب‌شده به زبانِ `BulkPrice` ِ core (پول به یک‌صدمِ افغانی) */
+  private fun minorOf(x: Double): Long = Math.round(x * 100)
+
+  /**
+   *  PRD-21: پیش‌نمایشِ قیمتِ گروهی — همان که رابط رنگی نشان می‌دهد و همان که `bulkPrice` اعمال می‌کند.
+   */
+  fun bulkPricePreview(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long = 100,
+  ): BulkPrice.Preview = BulkPrice.preview(
+    d.products.filter { it.id in ids }.map { BulkPrice.Item(it.id, it.name, minorOf(it.salePrice), minorOf(it.purchasePrice)) },
+    field, op, roundToMinor,
+  )
+
+  /**
+   *  PRD-21 و PRD-14: قیمتِ گروهی. فقط ردیف‌های `applies` ِ پیش‌نمایش؛ ردیفِ «رد» (منفی) دست نمی‌خورد.
+   *  ⛔ پیش‌نمایشِ هشدارداده (زیرِ بها، صفر، تغییرِ ۵۰٪) بی `confirmed` اعمال نمی‌شود؛ دلیل اجباری است.
+   *  هر کالا ردیفِ سابقه با کاربر و دلیل دارد؛ تغییرِ قیمتِ خرید در `priceHistory` هم می‌نشیند.
+   */
+  fun bulkPrice(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long,
+    confirmed: Boolean, by: String, reason: String, today: String, now: Long, newId: () -> String,
+  ): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    if (!BulkPrice.valid(op)) return Result.Failed("مقدار درست نیست")
+    val why = reason.trim()
+    if (why.isEmpty()) return Result.Failed("دلیلِ تغییرِ قیمت را بنویسید")
+    val preview = bulkPricePreview(d, ids, field, op, roundToMinor)
+    if (preview.changed == 0) return Result.Failed("چیزی عوض نشد")
+    if (preview.needsConfirm && !confirmed) return Result.Failed("هشدارهای پیش‌نمایش را ببینید و تأیید کنید")
+    val who = by.trim().ifEmpty { null }
+    val rows = preview.rows.filter { it.applies }.associateBy { it.id }
+    val audit = ArrayList<AuditEntry>()
+    val history = ArrayList<PriceChange>()
+    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"
+    val products = d.products.map { p ->
+      val r = rows[p.id] ?: return@map p
+      val value = r.newMinor / 100.0
+      val old = r.oldMinor / 100.0
+      if (field == BulkPrice.Field.PURCHASE) {
+        history += PriceChange(id = newId(), productId = p.id, oldPrice = p.purchasePrice, newPrice = value,
+          date = today, createdAt = now, by = who, reason = why)
+      }
+      audit += AuditEntry(
+        id = newId(), type = if (field == BulkPrice.Field.PURCHASE) "price_change" else "product_edit", date = today, refId = p.id,
+        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,
+      )
+      if (field == BulkPrice.Field.SALE) p.copy(salePrice = value) else p.copy(purchasePrice = value)
+    }
+    return Result.Ok(
+      d.copy(products = products, priceHistory = d.priceHistory + history, auditLog = d.auditLog + audit),
+      id = rows.keys.first(),
+    )
   }
 
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
