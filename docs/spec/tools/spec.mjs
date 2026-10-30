@@ -60,7 +60,7 @@ const SLUG = {
   20: 'product-decisions', 21: 'accounts-support', 22: 'execution-order', 23: 'marketplace-login',
   24: 'evidence-audit', 25: 'dev-instructions', 26: 'completion', 27: 'old-start', 28: 'safe-execution',
   29: 'auth-security-annex', 30: 'order-notify', 31: 'store-presence', 32: 'catalog-stock', 33: 'chat',
-  34: 'product-images', 35: 'new-gate', 36: 'image-studio', 37: 'image-bank', 38: 'gap-closure', 39: 'disambiguation',
+  34: 'product-images', 35: 'new-gate', 36: 'image-studio', 37: 'image-bank', 38: 'gap-closure', 39: 'disambiguation', 40: 'owner-decisions',
 };
 const fileFor = (n) => `${String(n).padStart(2, '0')}-${SLUG[n] ?? 'section'}`;
 

@@ -28,6 +28,22 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   /** سوکتِ «چیزی عوض شد» — با بسته شدنِ صفحه بسته می‌شود */
   private var live: ir.vil3ntec.tohid.sync.v1.LiveSocket? = null
 
+  /** برنامهٔ باز (singleTask) با لمسِ اعلانِ سفارش */
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    openNotice(intent)
+  }
+
+  private fun openNotice(intent: android.content.Intent?) {
+    val orderId = runCatching { ir.vil3ntec.tohid.data.OrderNotify.fromIntent(applicationContext, intent) }.getOrNull()
+    if (orderId != null) {
+      ir.vil3ntec.tohid.ui.OrdersLive.openFromNotice(orderId)
+      //  رسید همان دم (اگر نت هست)؛ وگرنه در صف تا دورِ بعدیِ OrdersLive
+      lifecycleScope.launch { runCatching { ir.vil3ntec.tohid.data.OrderNotify.flush(applicationContext) } }
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -47,6 +63,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
      *  میلی‌ثانیه است و اگر چیزی برای پاک کردن نباشد، هیچ.
      */
     runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(applicationContext) }
+
+    //  M6: برنامه با لمسِ اعلانِ سفارش باز شد ⇒ رسید در صف و همان سفارش
+    openNotice(intent)
 
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
