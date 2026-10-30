@@ -139,6 +139,10 @@ class PromoEngineTest {
     val snap = PromoEngine.Snapshot(enabled = true, rules = listOf(full, r2), manage = true, belowCost = false, at = 42, stamp = true)
     assertEquals(snap, PromoJson.snapshotOf(PromoJson.toJson(snap), 42))
     assertEquals(PromoEngine.Snapshot(at = 7), PromoJson.snapshotOf(kotlinx.serialization.json.JsonObject(emptyMap()), 7))
+    //  PRM-02: پرچمِ `redeem` ِ سرور هم رفت‌وبرگشت دارد؛ پاسخِ سرورِ قدیم (بی کلید) ⇒ خاموش
+    val counted = snap.copy(redeem = true)
+    assertEquals(counted, PromoJson.snapshotOf(PromoJson.toJson(counted), 42))
+    assertEquals(false, PromoJson.snapshotOf(PromoJson.toJson(snap), 42).redeem)
   }
 
   /* ---------------- S2: فیلدهای تازهٔ فاکتور ---------------- */

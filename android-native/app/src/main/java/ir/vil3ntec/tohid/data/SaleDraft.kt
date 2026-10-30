@@ -132,15 +132,21 @@ class SalePost {
     data class Done(val ok: SalesEngine.Result.Ok) : Outcome
   }
 
+  /**
+   *  @param before کارِ پیش از ساختنِ فاکتور، زیرِ همان قفل (PRM-02: گرفتنِ کدِ سقف‌دار از سرور).
+   *    پیام ⇒ `Refused` و هیچ ثبتی؛ `null` ⇒ ادامه. نبودنش ⇒ همان رفتارِ پیشین.
+   */
   suspend fun run(
     key: String,
     record: (key: String) -> SalesEngine.Result,
     save: suspend (ShopData) -> Boolean,
+    before: (suspend (key: String) -> String?)? = null,
     done: (key: String) -> Unit,
   ): Outcome {
     if (!gate.compareAndSet(false, true)) return Outcome.Busy
     _busy.value = true
     try {
+      before?.invoke(key)?.let { return Outcome.Refused(it) }
       return when (val r = record(key)) {
         is SalesEngine.Result.Failed -> Outcome.Refused(r.message)
         //  رفتن از صفحه نباید نوشتن را نصفه بگذارد: یا هر دو، یا هیچ

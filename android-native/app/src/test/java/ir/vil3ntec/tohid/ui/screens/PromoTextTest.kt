@@ -41,6 +41,26 @@ class PromoTextTest {
     assertEquals(listOf("prices"), PromoCore.validate(PromoForm(name = "n", kind = "price").toRule(base)))
   }
 
+  @Test fun `PRM-02 — سقفِ مصرف فقط با پرچمِ redeem و فقط برای کد؛ بی پرچم همان سقفِ پایه`() {
+    val coded = PromoCore.Rule(id = "c", name = "کد", kind = "percent", bp = 1000, code = "CAP10", maxUses = 3, uses = 2, channels = listOf("pos"))
+    //  بی پرچم: فرم سقف را نمی‌شناسد و دست نمی‌زند (رفتارِ پیشین)
+    assertEquals(null, PromoForm.of(coded).maxUses)
+    assertEquals(3L, PromoForm.of(coded).copy(pct = "15").toRule(coded).maxUses)
+    //  با پرچم: نشان داده و نوشته می‌شود؛ خالی = بی سقف؛ uses ِ سرور دست نمی‌خورد
+    assertEquals("3", PromoForm.of(coded, uses = true).maxUses)
+    assertEquals(25L, PromoForm.of(coded, uses = true).copy(maxUses = "۲۵").toRule(coded).maxUses)
+    assertEquals(0L, PromoForm.of(coded, uses = true).copy(maxUses = " ").toRule(coded).maxUses)
+    assertEquals(2L, PromoForm.of(coded, uses = true).copy(maxUses = "25").toRule(coded).uses)
+    assertEquals("", PromoForm.of(coded.copy(maxUses = 0), uses = true).maxUses)
+    //  بی کد (خودکار) سقف نمی‌گیرد — سرور فقط کد را می‌شمارد
+    assertEquals(0L, PromoForm.of(coded, uses = true).copy(code = "", maxUses = "25").toRule(coded).maxUses)
+    //  عددِ نادرست ⇒ validate («uses»)، نه بی‌صدا صفر
+    for (bad in listOf("2.5", "-1", "ده")) {
+      val r = PromoForm.of(coded, uses = true).copy(maxUses = bad).toRule(coded)
+      assertTrue(bad, "uses" in PromoCore.validate(r))
+    }
+  }
+
   @Test fun `دقیقه از متن، با ارقامِ فارسی`() {
     assertEquals(1320L, PromoForm.minutes("22:00"))
     assertEquals(150L, PromoForm.minutes("۰۲:۳۰"))
