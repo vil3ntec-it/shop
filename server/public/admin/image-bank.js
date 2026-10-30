@@ -405,6 +405,60 @@
   const REVIEW_FA = { approved: 'پذیرفته', needs_review: 'منتظرِ بررسی', rejected: 'ردشده' };
   let cmp = null;   // { id, d (adminDetail), pick }
 
+  /**
+   * قابِ مقایسه زیرِ جزئیاتِ عکس — همین‌جا ساخته می‌شود تا `index.html` (بالای سقفِ اندازه) بزرگ‌تر نشود.
+   * اصل در قابِ اول (راست)، نسخه در دوم؛ زمینهٔ شطرنجی و ۱:۱ در `admin.css` (`.ib-cmp`).
+   */
+  function buildCompareBox() {
+    const box = el('div', 'hidden');
+    box.id = 'ib-dt-cmp-box';
+    const h = el('h2', '', 'مقایسهٔ اصل و نسخه — اصل هرگز عوض نمی‌شود');
+    h.style.marginTop = '14px';
+    box.appendChild(h);
+    const vers = el('div', 'row');
+    vers.id = 'ib-dt-versions';
+    vers.style.cssText = 'flex-wrap:wrap;gap:6px;';
+    box.appendChild(vers);
+    const zr = el('div', 'row');
+    zr.style.marginTop = '8px';
+    const zl = el('label');
+    zl.style.margin = '0';
+    const zoom = el('input');
+    zoom.type = 'checkbox';
+    zoom.id = 'ib-cmp-zoom';
+    zl.append(zoom, ' اندازهٔ واقعی (۱:۱) — دو قاب با هم می‌چرخند');
+    zr.appendChild(zl);
+    box.appendChild(zr);
+    const grid = el('div', 'grid grid-2');
+    grid.style.marginTop = '8px';
+    for (const k of ['a', 'b']) {
+      const fig = el('figure');
+      fig.style.margin = '0';
+      const cap = el('figcaption', 'muted');
+      cap.id = `ib-cmp-${k}-cap`;
+      const pane = el('div', 'ib-cmp');
+      pane.id = `ib-cmp-${k}`;
+      const img = el('img');
+      img.id = `ib-cmp-${k}-img`;
+      img.alt = '';
+      pane.appendChild(img);
+      fig.append(cap, pane);
+      grid.appendChild(fig);
+    }
+    box.appendChild(grid);
+    const act = el('div', 'row');
+    act.style.marginTop = '8px';
+    const ok = el('button', 'btn btn-sm', 'جاری کردنِ این نسخه');
+    ok.id = 'btn-ib-ver-approve';
+    const no = el('button', 'btn btn-sm btn-danger', 'ردِ این نسخه');
+    no.id = 'btn-ib-ver-reject';
+    const note = el('span', 'muted');
+    note.id = 'ib-cmp-note';
+    act.append(ok, no, note);
+    box.appendChild(act);
+    $('ib-detail').appendChild(box);
+  }
+
   /** نسخه‌های عکس؛ فقط وقتی بیش از یکی هست. پیش‌فرض: تازه‌ترین نسخهٔ منتظر، وگرنه جاری. */
   async function showVersions(it) {
     const box = $('ib-dt-cmp-box');
@@ -565,6 +619,7 @@
     $('btn-ib-archive').onclick = dt(() => decide('archive'));
     $('ib-rv-dups').onchange = rv(() => loadReview(true));
     $('btn-ib-dt-close').onclick = () => { $('ib-detail').classList.add('hidden'); current = null; };
+    buildCompareBox();
     $('btn-ib-ver-approve').onclick = dt(() => decideVersion('approve'));
     $('btn-ib-ver-reject').onclick = dt(() => decideVersion('reject'));
     $('ib-cmp-zoom').onchange = () => {
