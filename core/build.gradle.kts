@@ -37,4 +37,6 @@ kotlin {
     iosSimulatorArm64()
     sourceSets.iosTest.dependencies { implementation(kotlin("test")) }
   }
+  //  آزمون‌های منطقِ خالصِ commonMain روی JVM (`gradle -p core jvmTest`) — همان خطِ #426
+  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
 }

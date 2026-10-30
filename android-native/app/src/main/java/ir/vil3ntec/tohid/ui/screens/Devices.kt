@@ -75,6 +75,7 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
     Text("هر دستگاهی که به برنامه وصل است — چاپگر، بارکدخوان، گوشی — همین‌جا ثبت و آزموده می‌شود.",
       style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     Spacer(Modifier.height(12.dp))
+    if (canAdmin) { HwToolsSwitch(); Spacer(Modifier.height(8.dp)) }
     if (wide) {
       Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
         Column(Modifier.weight(1f)) { left() }

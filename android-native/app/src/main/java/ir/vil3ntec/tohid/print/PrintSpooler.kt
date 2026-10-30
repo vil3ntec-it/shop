@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.print
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import ir.vil3ntec.tohid.core.hw.EscPos
+import ir.vil3ntec.tohid.core.hw.DrawerRule
 import ir.vil3ntec.tohid.core.hw.KickOnce
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
@@ -246,7 +247,16 @@ object PrintSpooler {
     val auto = autoPrint(context)
     val printer = PrinterRegistry.defaultSaved(context) ?: return
     val sale = data.sales.firstOrNull { it.id == saleId } ?: return
-    val cash = sale.paymentMethod == "cash" && sale.status != "cancelled"
+    //  HW-03: فقط وقتی نقد به دخل آمد — ردیفِ نقدِ بی‌امانت در تسویهٔ نسخهٔ ۲ (نقد + کارت، بخشی نقد)
+    //  یا `cash`ِ فاکتورِ نسخهٔ ۱ (همان رفتارِ همیشگی). قاعده و آزمونش: `core/hw/DrawerRule`
+    val cash = DrawerRule.opensAfter(
+      DrawerRule.Sale(
+        paymentMethod = sale.paymentMethod,
+        cancelled = sale.status == "cancelled",
+        online = ir.vil3ntec.tohid.data.CashShift.isOnline(sale),
+        payments = sale.payments?.map { DrawerRule.Payment(it.kind, it.amountMinor, it.status, it.custody) },
+      ),
+    )
     val drawerNow = printer.profile().drawer && cash
     if (!auto && !drawerNow) return
     val no = sale.invoiceLabel() ?: "—"

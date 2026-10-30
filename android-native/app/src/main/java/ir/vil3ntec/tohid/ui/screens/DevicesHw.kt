@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.hw.CustomerFacing
 import ir.vil3ntec.tohid.hw.HwPlatform
 import ir.vil3ntec.tohid.hw.ScaleReader
 import ir.vil3ntec.tohid.print.HwPages
+import ir.vil3ntec.tohid.print.HwTools
 import ir.vil3ntec.tohid.print.PrintLog
 import ir.vil3ntec.tohid.print.PrintSpooler
 import ir.vil3ntec.tohid.print.PrinterRegistry
@@ -209,6 +210,18 @@ private fun HwSwitchRow(title: String, note: String, on: Boolean, onChange: (Boo
   }
 }
 
+/** کلیدِ «ابزارهای تازهٔ دستگاه» (`HwTools`) — فقط صاحب و مدیر می‌بینند */
+@Composable
+internal fun HwToolsSwitch() {
+  val context = LocalContext.current
+  LaunchedEffect(Unit) { HwTools.load(context) }
+  HwSwitchRow(
+    "ابزارهای تازهٔ دستگاه (آزمایشی)",
+    "بررسیِ کاملِ چاپگر (درِ باز، آفلاین، تیغه، کاغذ) و «کدام روش؟» برای چاپگری که رسید را بی‌معنا می‌زند. انتخابِ همین دستگاه است.",
+    HwTools.on.value,
+  ) { HwTools.set(context, it) }
+}
+
 /* ============================== پروفایلِ چاپگر ============================== */
 
 /**
@@ -233,6 +246,8 @@ internal fun PrinterSettingsDialog(
   var pickLogo by remember { mutableStateOf(false) }
   var hasLogo by remember { mutableStateOf(HwPages.hasLogo(context)) }
   var drawerTest by remember { mutableStateOf(false) }
+  //  HW-01: برگهٔ دوروشی چاپ شد ⇒ «کدام نمونه درست درآمد؟»
+  var modeAsk by remember { mutableStateOf(false) }
 
   fun work(label: String, block: suspend () -> String?) {
     busy = true
@@ -267,7 +282,15 @@ internal fun PrinterSettingsDialog(
           if (s.width >= ThermalPrinter.WIDTH_80MM) ThermalPrinter.WIDTH_80MM else ThermalPrinter.WIDTH_58MM, { s = s.copy(width = it) })
         HwLabel("راهِ فرستادنِ تصویر")
         SegmentedTabs(listOf(SegmentTab("raster", "رستری GS v 0 (پیش‌فرض)"), SegmentTab("column", "ستونی ESC *")), s.mode, { s = s.copy(mode = it) })
-        Text("اگر چاپگر به‌جای رسید نویسه‌های بی‌معنا زد، «ستونی» را بزنید.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Text(if (HwTools.on.value) "اگر چاپگر به‌جای رسید نویسه‌های بی‌معنا زد، «ستونی» را بزنید — یا «کدام روش؟» تا با یک برگه معلوم شود." else "اگر چاپگر به‌جای رسید نویسه‌های بی‌معنا زد، «ستونی» را بزنید.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        if (HwTools.on.value) OutlinedButton(enabled = !busy && s.link.isNotBlank(), onClick = {
+          busy = true
+          scope.launch {
+            val err = runCatching { withContext(Dispatchers.IO) { PrinterRegistry.modeTestPrint(context, s) } }.getOrElse { "خطا: ${it.message}" }
+            busy = false
+            if (err == null) modeAsk = true else toast(err)
+          }
+        }) { Text("کدام روش؟ (برگهٔ دوروشی)") }
         HwLabel("برشِ کاغذ")
         SegmentedTabs(listOf(SegmentTab("partial", "نیمه"), SegmentTab("full", "کامل"), SegmentTab("none", "بی‌تیغه")), s.cut, { s = s.copy(cut = it) })
         HwSwitchRow("باز کردنِ کشوی پول پس از فروشِ نقدی", "از راهِ چاپگر (ESC p). فروشِ نسیه کشو را باز نمی‌کند.", s.drawer) { s = s.copy(drawer = it) }
@@ -302,7 +325,7 @@ internal fun PrinterSettingsDialog(
           busy = true
           scope.launch {
             val r = withContext(Dispatchers.IO) {
-              ThermalPrinter.Link.parse(s.link)?.let { ThermalPrinter.probe(context, it) }
+              ThermalPrinter.Link.parse(s.link)?.let { ThermalPrinter.probe(context, it, full = HwTools.on.value) }
             }
             busy = false
             probe = r?.message ?: "نشانیِ چاپگر خوانده نشد"
@@ -327,6 +350,27 @@ internal fun PrinterSettingsDialog(
   }
   preview?.let { PrintPreviewDialog("پیش‌نمایشِ چاپ — بی کاغذ", it) { preview = null } }
   if (drawerTest) OpenDrawerDialog(s, initialReason = "آزمونِ کشو", onDismiss = { drawerTest = false }, toast = toast)
+  if (modeAsk) {
+    fun pick(columnOk: Boolean, rasterOk: Boolean) {
+      modeAsk = false
+      val m = ir.vil3ntec.tohid.core.hw.ModeProbe.choose(columnOk, rasterOk)
+      if (m == null) toast("هیچ‌کدام درست نبود — عرضِ کاغذ و اتصال را بررسی کنید؛ روش عوض نشد")
+      else { s = s.copy(mode = m.key); toast(if (m.key == "column") "«ستونی ESC *» انتخاب شد — «ذخیره» را بزنید" else "«رستری GS v 0» می‌ماند — «ذخیره» را بزنید") }
+    }
+    AlertDialog(
+      onDismissRequest = { modeAsk = false },
+      title = { Text("کدام نمونه درست چاپ شد؟") },
+      text = { Text("برگه دو نمونه دارد: «۱» ستونی و «۲» رستری. نمونه‌ای درست است که نوشتهٔ دری و پشتو و خطِ سیاهِ تمام‌عرضش کامل آمده.") },
+      confirmButton = {
+        Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+          TextButton(onClick = { pick(columnOk = true, rasterOk = true) }) { Text("هر دو") }
+          TextButton(onClick = { pick(columnOk = false, rasterOk = true) }) { Text("فقط ۲") }
+          TextButton(onClick = { pick(columnOk = true, rasterOk = false) }) { Text("فقط ۱") }
+        }
+      },
+      dismissButton = { TextButton(onClick = { pick(columnOk = false, rasterOk = false) }) { Text("هیچ‌کدام") } },
+    )
+  }
 }
 
 /**
