@@ -254,7 +254,7 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
-    //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (PRD-04)
+    //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
     val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
       ?: ProductBarcodes.mergePrimary(barcode, existing.barcodes)
     if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
