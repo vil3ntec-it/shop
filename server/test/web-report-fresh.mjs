@@ -200,6 +200,20 @@ await step('سود و حاشیه همیشه «تقریبی»؛ مرتب‌ساز
   const all = C.sales(LEDGER, { clock: CLOCK });
   assert.equal(await footCell(pg, 'سود ناخالص'), money(all.totals.grossProfit));
 
+  //  LOC-02: «این سه‌ماهه» = ۱ میزان ۱۴۰۵ (۲۰۲۶-۰۹-۲۳) تا امروز؛ «سه‌ماههٔ پیش» = سرطان–سنبله، کامل
+  assert.deepEqual(B.range('quarter', DATE), { from: '2026-09-23', to: DATE });
+  assert.deepEqual(B.range('lastQuarter', DATE), { from: '2026-06-22', to: '2026-09-22' });
+  await pg.click('#rep-fresh button[data-span="quarter"]');
+  assert.deepEqual(await pressed(pg, 'data-span'), ['quarter']);
+  const q = C.sales(LEDGER, { from: '2026-09-23', to: DATE, clock: CLOCK });
+  assert.equal(await footCell(pg, 'سود ناخالص'), money(q.totals.grossProfit));
+  await pg.click('#rep-fresh button[data-span="lastQuarter"]');
+  assert.deepEqual(await pressed(pg, 'data-span'), ['lastQuarter']);
+  assert.equal(C.sales(LEDGER, { from: '2026-06-22', to: '2026-09-22', clock: CLOCK }).totals.netSales, 0, 'دفترِ نمونه در سه‌ماههٔ پیش فروشی ندارد');
+  assert.equal((await pg.locator('#rep-fresh tbody').textContent()).trim(), 'در این بازه چیزی نیست.', 'سه‌ماههٔ پیش: هیچ فروش');
+  assert.equal(await footCell(pg, 'سود ناخالص'), money(0));
+  await pg.click('#rep-fresh button[data-span="all"]');
+
   //  مرتب‌سازی: «سود ناخالص» نزولی، بعد صعودی — با کیبورد هم (دکمهٔ سرستون)
   const col = await pg.evaluate(() => [...document.querySelectorAll('#rep-fresh thead th')].findIndex(th => th.textContent.trim() === 'سود ناخالص'));
   const sortBtn = `#rep-fresh thead th:nth-child(${col + 1}) button`;
