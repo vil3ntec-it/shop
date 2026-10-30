@@ -108,9 +108,8 @@ router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async
 /**
  * «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
  * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر.
- * نوشتن است، پس مثلِ بقیهٔ نوشتن‌های سفارش پشتِ `needWrite` (SUB-10).
  */
-router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), needWrite, wrap(async (req, res) => {
+router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
   res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
 }));
 
