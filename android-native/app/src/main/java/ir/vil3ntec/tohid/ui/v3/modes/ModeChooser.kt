@@ -27,7 +27,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.DeliveryDining
-import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -68,12 +67,11 @@ internal data class ModeLook(val icon: ImageVector, val hue: V3Hue, val title: (
 internal fun lookOf(mode: AppMode): ModeLook = when (mode) {
   AppMode.SHOP -> ModeLook(Icons.Outlined.Storefront, V3Hue.BRAND, { StrKit.modeShop }, { StrKit.modeShopBody })
   AppMode.COURIER -> ModeLook(Icons.Outlined.DeliveryDining, V3Hue.BLUE, { StrKit.modeCourier }, { StrKit.modeCourierBody })
-  AppMode.SHOPPER -> ModeLook(Icons.Outlined.ShoppingBag, V3Hue.ORANGE, { StrKit.modeShopper }, { StrKit.modeShopperBody })
 }
 
 /**
- *  بارِ اول: «از برنامه چه می‌خواهید؟» — سه کارتِ بزرگ (دکان دارم / پیکم / خرید
- *  می‌کنم) که پلکانی می‌آیند، با فشار کوچک می‌شوند و انتخاب‌شده مرزِ برند و تیک
+ *  بارِ اول: «از برنامه چه می‌خواهید؟» — دو کارتِ بزرگ (دکان دارم / پیکم) که
+ *  پلکانی می‌آیند، با فشار کوچک می‌شوند و انتخاب‌شده مرزِ برند و تیک
  *  می‌گیرد؛ «ادامه» تا انتخاب نشده غیرفعال است.
  */
 @Composable
