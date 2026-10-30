@@ -68,4 +68,23 @@ class PromoTextTest {
     assertEquals(listOf("r3"), PromoText.filter(all, "eid", PromoText.Tab.ALL, "2026-10-19").map { it.id })
     assertTrue(PromoText.windowText(later).contains("2026-11-01"))
   }
+
+  @Test fun `N2 — ویرایش کانالِ خالی و کالاهای دیگرِ قیمتِ ویژه را دست نمی‌زند`() {
+    //  کانالِ خالی یعنی «همه»؛ ویرایش آن را «فقط صندوق» نمی‌کند
+    val all = base.copy(name = "همه‌جا", kind = "percent", bp = 1000, channels = emptyList())
+    assertEquals(emptyList<String>(), PromoForm.of(all).copy(pct = "15").toRule(all).channels)
+    //  قیمتِ ویژهٔ سه‌کالایی: فرم فقط نخستین را دارد؛ بقیه و محدودهٔ کالا همان می‌مانند
+    val multi = base.copy(
+      name = "ویژه", kind = "price", scope = PromoCore.Scope(products = listOf("x")),
+      prices = listOf(PromoCore.Price("tea", 25000), PromoCore.Price("rice", 9000), PromoCore.Price("oil", 40000)),
+    )
+    assertEquals(multi, PromoForm.of(multi).toRule(multi))
+    val edited = PromoForm.of(multi).copy(priceUnit = "240").toRule(multi)
+    assertEquals(listOf(PromoCore.Price("tea", 24000), PromoCore.Price("rice", 9000), PromoCore.Price("oil", 40000)), edited.prices)
+    //  کالای نخست به یکی از بقیه عوض شد ⇒ تکراری نمی‌شود
+    val swapped = PromoForm.of(multi).copy(priceProduct = "oil", priceUnit = "390").toRule(multi)
+    assertEquals(listOf(PromoCore.Price("oil", 39000), PromoCore.Price("rice", 9000)), swapped.prices)
+    //  قاعدهٔ تازه همان کانالی را دارد که صفحه برایش گذاشت
+    assertEquals(listOf("pos"), PromoForm(name = "n").toRule(base).channels)
+  }
 }
