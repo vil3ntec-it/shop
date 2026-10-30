@@ -14,6 +14,7 @@
  */
 const express = require('express');
 const bank = require('../lib/image-bank');
+const upload = require('../lib/image-upload');
 const audit = require('../lib/audit');
 const { requireReason } = require('../lib/admin-access');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
@@ -28,7 +29,7 @@ const raw = express.raw({ type: () => true, limit: bank.DERIV.zoom.bytes + 1024 
 //  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر کلاینت فرستاده باشد (IMG-14)
 const bufOf = (req) => {
   const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-  bank.verifyDigest(buf, req.get('x-content-sha256'));
+  upload.verifyDigest(buf, req.get('x-content-sha256'));
   return buf;
 };
 const num = (x) => {
@@ -47,7 +48,7 @@ router.get('/status', wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({
     enabled: await bank.centralEnabled(), rows_max: bank.ROWS_MAX, roles: bank.ROLES, licenses: bank.LICENSES,
-    resume: await bank.resumeEnabled(),
+    resume: await upload.resumeEnabled(),
   });
 }));
 
@@ -208,7 +209,7 @@ router.put('/batches/:id/files/:name', raw, wrap(async (req, res) => {
 /** فایل‌های رسیدهٔ دسته با sha256 — ادامهٔ بارگذاری پس از قطع (IMG-14، IMG-PRO-06). فقط‌خواندنی. */
 router.get('/batches/:id/files', wrap(async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json(await bank.batchFiles(req.params.id, { after: req.query?.after || '', limit: req.query?.limit }));
+  res.json(await upload.batchFiles(req.params.id, { after: req.query?.after || '', limit: req.query?.limit }));
 }));
 
 //  ⚠️ CSVِ ۱۰۰۰ ردیفی از سقفِ ۲ مگابایتیِ JSON کوچک‌تر است
