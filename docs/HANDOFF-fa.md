@@ -54,6 +54,14 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-s89-finalized` (S89، نیمهٔ سرورِ SEC-03؛ روی `claude/spec-sec2-2`)
+- انجام شد: `server/src/lib/finalized-sales.js` پشتِ همان پرچمِ `shop.doc_chain`: ویرایش/حذفِ سرِ جای فاکتور و قلمِ ثبت‌شده برای
+  دستگاهِ زنجیره‌دار `rejected` (`sale_finalized_edit_forbidden`) و در API ِ مستقیم ۴۰۹؛ لغو و برگشت آزاد؛ بازپخشِ یکسان پذیرفته و
+  بی بازنویسی؛ برنامهٔ بی زنجیره و `/api/sync` فقط رویدادِ `security.doc_chain` (`finalized_edit`). آزمون: `finalized-sales.test.js` ۷/۷.
+- نیمه‌کاره: سندهای برگشت/قرض/خرید و `transactions`؛ نمایشِ رویدادِ `finalized_edit` در پنل؛ برنامه هنوز دلیلِ ردِ تازه را فقط در دفترِ کنار نشان می‌دهد.
+- قدمِ بعدی: پس از مرجِ #541 و #547 و این، پرچم برای یک دکانِ آزمایشی؛ یک هفته رویدادهای `enforced:false` پاییده شود تا معلوم شود
+  کدام برنامهٔ کهنه هنوز فاکتور را سرِ جا عوض می‌کند، بعد تصمیمِ «رد برای همه».
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخه‌های `claude/spec-sec2-1` و `claude/spec-sec2-2` (SEC-02، SEC-03، STF-09؛ مهاجرتِ ۱۵۱)
 - انجام شد: زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه در core ِ خالص (`Sha256` با NIST، `HashChain`/`PostedDocument` از
   android-native به commonMain، `DocChain`، `DocChainCycle`)، گزارش در هر دورِ `SyncV1Worker` به `POST /api/sync/v1/chain`،
