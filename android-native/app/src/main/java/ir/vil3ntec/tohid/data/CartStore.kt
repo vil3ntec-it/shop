@@ -52,6 +52,10 @@ class CartStore(context: Context) : HeldCart {
   private val _debtorId = MutableStateFlow(initial?.debtorId)
   val debtorId: StateFlow<String?> = _debtorId.asStateFlow()
 
+  /** کدهای تخفیفِ همین سبد (N3) — `PromoLive` می‌نویسد و از همین برمی‌گرداند */
+  private val _coupons = MutableStateFlow(initial?.takeIf { it.lines.isNotEmpty() }?.coupons.orEmpty())
+  val coupons: StateFlow<List<String>> = _coupons.asStateFlow()
+
   /**
    *  پیش‌نویسی که از بارِ پیش مانده و هنوز از کاربر پرسیده نشده
    *  (`DraftRecoveryPrompt`). تا پاسخ، همان ردیف‌ها در سبد هستند — مثلِ پیش.
@@ -71,7 +75,7 @@ class CartStore(context: Context) : HeldCart {
   }
 
   private fun persist() {
-    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis())
+    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value)
     write(file, draft) {
       //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
       if (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY)) {
@@ -89,6 +93,7 @@ class CartStore(context: Context) : HeldCart {
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
+    if (lines.isEmpty()) _coupons.value = emptyList()
     persist()
     return true
   }
@@ -98,6 +103,21 @@ class CartStore(context: Context) : HeldCart {
     _debtorId.value = id
     persist()
     return true
+  }
+
+  /** `false` ⇒ وسطِ جابه‌جاییِ فاکتور بود و کدها همان ماندند (`HeldCart.freeze`) */
+  fun setCoupons(codes: List<String>): Boolean {
+    if (frozen) return false
+    if (codes != _coupons.value) {
+      _coupons.value = codes
+      persist()
+    }
+    return true
+  }
+
+  /** S1 — حساب عوض شد: کدهای حسابِ قبلی فقط از حافظه می‌روند (فایل را `LedgerOwner` خالی کرده) */
+  fun forgetCoupons() {
+    _coupons.value = emptyList()
   }
 
   fun clear(): Boolean {
@@ -110,6 +130,7 @@ class CartStore(context: Context) : HeldCart {
     key = null
     _lines.value = emptyList()
     _debtorId.value = null
+    _coupons.value = emptyList()
     persist()
   }
 
@@ -139,6 +160,7 @@ class CartStore(context: Context) : HeldCart {
     key = keep.key ?: key
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
+    _coupons.value = keep.coupons
     persist()
   }
 
@@ -151,7 +173,7 @@ class CartStore(context: Context) : HeldCart {
   override val recovering: Boolean get() = _recovered.value != null
 
   override fun snapshot(): SaleDraft =
-    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis())
+    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value)
 
   /**
    *  سبد را با فاکتورِ دیگری عوض می‌کند (`null` = سبدِ خالی) و تا رسیدنش به
@@ -163,11 +185,13 @@ class CartStore(context: Context) : HeldCart {
     key = if (lines.isEmpty()) null else draft?.key ?: newKey()
     _lines.value = lines
     _debtorId.value = draft?.debtorId
+    //  N3: کدهای تخفیف مالِ همان فاکتورند — با آن می‌روند و برمی‌گردند، به فاکتورِ دیگر نمی‌رسند
+    _coupons.value = if (lines.isEmpty()) emptyList() else draft?.coupons.orEmpty()
     //  همان نویسندهٔ تک‌رشته‌ای: نوشتن‌های پیشین پیش از این می‌روند و این یکی آخرین حالت را می‌نویسد
     return withContext(Dispatchers.IO) {
       runCatching {
         writer.submit(Callable {
-          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis()))) }.isSuccess
+          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value))) }.isSuccess
         }).get()
       }.getOrDefault(false)
     }

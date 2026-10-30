@@ -111,6 +111,41 @@ test('QR ِ فروشِ همگام‌شده همان فاکتورِ کاغذی ر
   assert.equal((await read(a.tag.toUpperCase(), token.toUpperCase())).status, 200);
 });
 
+test('تخفیفِ خودکار (پرچمِ shop.promo_stamp): ستون و «جمع اقلام» همان، قلم با قیمتِ فهرست و یک ردیفِ آگاهی', async () => {
+  const a = await shop('ت');
+  const token = newToken();
+  const saleId = 'sale-p1';
+  const pid = `${saleId}-p`;
+  //  ۳ × ۳۵۰ = ۱۰۵۰، تخفیفِ خودکار ۵۰ ⇒ ۱۰۰۰ (همان قیمتِ ردیفی که برنامه ثبت می‌کند)
+  await push(a, [
+    op('insert', 'products', pid, { name: 'چای سبز', unit: 'بسته', salePrice: 350, purchasePrice: 100, active: true, barcodes: [], createdAt: AT }),
+    op('insert', 'sales', saleId, {
+      invoiceNumber: 155, series: 'B1', total: 1000, discount: 0, finalTotal: 1000, paymentMethod: 'cash',
+      paidAmount: 1000, remaining: 0, status: 'completed', createdAt: AT, date: '2026-10-24', seller: 'احمد',
+      receiptToken: token, promoDiscountMinor: 5000, coupons: ['EID5'],
+    }),
+    op('insert', 'saleItems', `${saleId}-i1`, {
+      saleId, productId: pid, quantity: 3, unitPrice: 1000 / 3, totalPrice: 1000, returnedQty: 0,
+      listPriceMinor: 35000, promo: [{ id: 'r1', rev: 2, name: 'ده درصدِ نوشیدنی', discountMinor: 5000 }],
+    }),
+  ]);
+  const off = (await read(a.tag, token)).body.receipt;
+  //  خاموش ⇒ همان پاسخِ پیشین
+  assert.deepEqual(off.items, [{ name: 'چای سبز', qty: '3', unit: 'بسته', unitPrice: '333', total: '1,000', returned: null }]);
+  assert.equal(off.included, undefined);
+  assert.equal(off.subtotal, '1,000 افغانی');
+
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.promo_stamp','true',1)", [a.shopId]);
+  const on = (await read(a.tag, token)).body.receipt;
+  assert.deepEqual(on.items, [{ name: 'چای سبز', qty: '3', unit: 'بسته', unitPrice: '350', total: '1,000', returned: null, autoDiscount: '50' }]);
+  //  «جمع اقلام» = جمعِ ستونِ قلم‌ها؛ تخفیفِ خودکار فقط آگاهی، بی کسرِ دوباره
+  assert.equal(on.subtotal, '1,000 افغانی');
+  assert.deepEqual(on.included, [{ label: 'شاملِ تخفیفِ خودکار (ده درصدِ نوشیدنی)', amount: '50 افغانی' }]);
+  assert.deepEqual(on.discounts, []);
+  assert.equal(on.total, '1,000 افغانی');
+  assert.ok(!JSON.stringify(on).includes('EID5'), 'کدِ تخفیف روی صفحهٔ عمومی نمی‌آید');
+});
+
 test('ناشناخته، همگام‌نشده، نشانِ دکانِ دیگر و شکلِ بد: یک ۴۰۴ ِ یکسان', async () => {
   const a = await shop('ب');
   const b = await shop('پ');
