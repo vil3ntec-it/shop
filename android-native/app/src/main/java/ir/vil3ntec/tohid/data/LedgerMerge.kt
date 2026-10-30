@@ -32,6 +32,7 @@ import kotlin.math.round
  *    • ردیف: افزودهٔ هر طرف می‌ماند. حذف همیشه می‌برد — حذفِ کاربر DELETE می‌سازد و ردیفی که
  *      دستگاهِ دیگر حذف کرد با ویرایشِ کهنهٔ صفحه زنده نمی‌شود (همان قاعدهٔ v3: «ویرایشِ
  *      قدیمی‌تر از حذف ردیف را زنده نمی‌کند»، و همان کاری که `applyRemote` با دفتر می‌کند).
+ *      ⛔ آن ویرایش بی‌صدا گم نمی‌شود: در [Outcome.dropped] می‌آید و `ShopStore.save` پیامش را می‌دهد.
  *    • فیلد: فقط یک طرف عوض کرد ⇒ همان؛ هر دو، یکسان ⇒ همان؛ هر دو، متفاوت ⇒ کاربر برنده.
  *    • شمارنده‌ها (`LedgerDiff.INC_FIELDS`: پولِ رسیده، مانده، مقدارِ برگشتی) جمع‌پذیرند:
  *      دیسک + (مالِ ما − پایه). «کاربر برنده» این‌جا یعنی پرداختِ دستگاهِ دیگر گم شود.
@@ -43,34 +44,34 @@ import kotlin.math.round
  */
 object LedgerMerge {
 
-  /** پیش از اصلاح: همان ادغام، بی گزارش (آزمون‌ها کامپایل شوند و سرخ) */
+  /**
+   *  دفترِ ادغام‌شده، و ردیف‌هایی (`جدول:شناسه`) که کاربر ویرایش کرد ولی دستگاهِ دیگر در همین فاصله حذفشان
+   *  کرده بود — حذف برد و ویرایش نشست.
+   */
   class Outcome(val data: ShopData, val dropped: List<String>)
 
-  fun mergeReport(base: ShopData, ours: ShopData, theirs: ShopData): Outcome = Outcome(merge(base, ours, theirs), emptyList())
+  fun merge(base: ShopData, ours: ShopData, theirs: ShopData): ShopData = mergeReport(base, ours, theirs).data
 
-  @Suppress("UNUSED_PARAMETER")
-  fun retainedBaseOf(next: ShopData, current: ShopData, earlier: List<ShopData>, lost: Boolean): ShopData? =
-    baseOf(next, current, earlier)
-
-  fun merge(base: ShopData, ours: ShopData, theirs: ShopData): ShopData {
-    if (theirs === base || ours === base) return if (ours === base) theirs else ours
+  fun mergeReport(base: ShopData, ours: ShopData, theirs: ShopData): Outcome {
+    if (theirs === base || ours === base) return Outcome(if (ours === base) theirs else ours, emptyList())
     val b = LedgerDiff.toJson(base)
     val o = LedgerDiff.toJson(ours)
     val t = LedgerDiff.toJson(theirs)
     //  دیسک همان پایه است (مثلاً همان دفتر از نو رمز/خوانده شد) ⇒ همان دفترِ صفحه، بی شیءِ تازه
-    if (t == b) return ours
-    if (o == b) return theirs
+    if (t == b) return Outcome(ours, emptyList())
+    if (o == b) return Outcome(theirs, emptyList())
+    val dropped = ArrayList<String>()
     val out = LinkedHashMap<String, JsonElement>()
     for (key in LinkedHashSet(o.keys + t.keys)) {
       val v = when (key) {
-        in LedgerDiff.COLLECTIONS -> rows(key, b[key], o[key], t[key])
+        in LedgerDiff.COLLECTIONS -> rows(key, b[key], o[key], t[key], dropped)
         in LedgerDiff.LIST_COLLECTIONS -> names(b[key], o[key], t[key])
         INVOICE_COUNTER -> counter(b[key], o[key], t[key])
         else -> if (o[key] == b[key]) t[key] else o[key]
       }
       if (v != null) out[key] = v
     }
-    return LedgerDiff.fromJson(JsonObject(out))
+    return Outcome(LedgerDiff.fromJson(JsonObject(out)), dropped)
   }
 
   /**
@@ -82,8 +83,17 @@ object LedgerMerge {
    *  هم ندارند. پس دفتری که بیشترین ردیفِ مشترک (همان شیء) را با [next] دارد پایه است؛ برابری یا
    *  هیچ نشانه ⇒ [current] (رفتارِ همیشه).
    */
-  fun baseOf(next: ShopData, current: ShopData, earlier: List<ShopData>): ShopData {
-    if (earlier.isEmpty()) return current
+  fun baseOf(next: ShopData, current: ShopData, earlier: List<ShopData>): ShopData =
+    retainedBaseOf(next, current, earlier, lost = false)!!
+
+  /**
+   *  همان [baseOf]؛ [lost] یعنی دفترِ پیشینی از نگهداری بیرون رفته. آن‌گاه [next] ِ بی هیچ شیءِ مشترک با دفترهای
+   *  مانده از دفترِ بیرون‌رفته ساخته شده ⇒ `null` (پایه نیست؛ ادغام با دفترِ همین حالا ردیف‌های تازه را حذف می‌کرد).
+   *  دفترِ خالیِ نو (`ShopData()`، «پاک کردنِ همه») هرگز پایه نمی‌خواهد و این‌جا نمی‌آید.
+   */
+  fun retainedBaseOf(next: ShopData, current: ShopData, earlier: List<ShopData>, lost: Boolean): ShopData? {
+    //  مسیرِ همیشگی: هیچ جایگزینی از بیرون ⇒ دفترِ همین حالا، بی شمردنِ شیءها
+    if (earlier.isEmpty() && !lost) return current
     var best = current
     var score = kinship(next, current)
     for (c in earlier.asReversed()) {
@@ -91,7 +101,7 @@ object LedgerMerge {
       val s = kinship(next, c)
       if (s > score) { best = c; score = s }
     }
-    return best
+    return if (lost && score == 0L) null else best
   }
 
   /**
@@ -134,7 +144,7 @@ object LedgerMerge {
     return out
   }
 
-  private fun rows(table: String, b: JsonElement?, o: JsonElement?, t: JsonElement?): JsonElement? {
+  private fun rows(table: String, b: JsonElement?, o: JsonElement?, t: JsonElement?, dropped: MutableList<String>): JsonElement? {
     if (o == null) return t
     if (t == null) return o
     if (o == b) return t
@@ -152,7 +162,7 @@ object LedgerMerge {
       val now = theirs[id]
       when {
         now == null && was == null -> out += row                 // کاربر افزود
-        now == null -> Unit                                      // دیسک حذف کرد ⇒ حذف می‌برد
+        now == null -> if (row != was) dropped += "$table:$id"   // دیسک حذف کرد ⇒ حذف می‌برد؛ ویرایشِ کاربر گزارش می‌شود
         else -> out += fields(table, was, row, now)
       }
     }

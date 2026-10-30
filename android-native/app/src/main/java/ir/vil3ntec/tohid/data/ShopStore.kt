@@ -90,8 +90,9 @@ class ShopStore(private val context: Context) {
         _unreadable.value = null
         recoverSync(ShopData())
       }
-      //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو
-      synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) }
+      //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو.
+      //  پرچمِ خاموش ⇒ هیچ خواندنِ دوباره، پس بی قفلِ موتور (همان `main`)
+      if (follow.on) synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) } else follow.loadedLocked(mark)
     }
     if (sweep) quietly { sweepNow(requireLoaded = false) }
     _loaded.value = true
@@ -117,6 +118,7 @@ class ShopStore(private val context: Context) {
     file, _data,
     unreadable = { _unreadable.value != null },
     readDisk = { runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() },
+    enabled = { LedgerMergeFlag.enabled(context) },
   )
 
   /** [LedgerFollow.freshLocked] برای نوشتنِ صفحه؛ `null` با پیامِ روشن */
@@ -128,11 +130,17 @@ class ShopStore(private val context: Context) {
    *  همان قفلِ نوشتن. ⛔ نشاندنِ opهای سرور روی دفترِ کهنهٔ این نمونه فروشی را که صفحه در این
    *  فاصله ثبت کرده بود از دیسک پاک می‌کرد.
    *
-   *  @throws java.io.IOException دیسک جلوتر است و خوانده نشد — هیچ چیزی نشانده نمی‌شود
+   *  پرچمِ `shop.ledger_merge` خاموش ⇒ همان `data.value` ِ همیشه، بی قفل (همان `main`).
+   *
+   *  @throws StaleLedger دیسک جلوتر است و خوانده نشد — هیچ چیزی نشانده نمی‌شود
    */
-  fun ledgerNow(): ShopData = synchronized(SyncV1Engine.of(context)) {
-    follow.freshLocked() ?: throw java.io.IOException(STALE_UNREADABLE)
+  fun ledgerNow(): ShopData {
+    if (!follow.on) return _data.value
+    return synchronized(SyncV1Engine.of(context)) { follow.freshLocked() ?: throw StaleLedger(STALE_UNREADABLE) }
   }
+
+  /** دیسکِ جلوترِ خوانده‌نشده یا دفترِ حسابِ دیگر ([ledgerNow]، [applyFromServerNow]) — فقط با پرچمِ روشن */
+  class StaleLedger(message: String) : java.io.IOException(message)
 
   /**
    *  هم‌سو کردنِ فایل‌های دفتر با تنظیمِ «رمزگذاریِ داده» — زیرِ همان قفلِ
@@ -245,8 +253,22 @@ class ShopStore(private val context: Context) {
    *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
   suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    //  ⛔ پرچمِ `shop.ledger_merge` خاموش (پیش‌فرض) ⇒ همان رفتارِ `main`: دفترِ صفحه کامل نوشته می‌شود.
+    //  «پاک کردنِ همه» (`ShopData()`) هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
+    if (!follow.on || next == EMPTY) {
+      if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
+        SoftLock.noteBlocked()
+        _blocked.tryEmit(Unit)
+        return@withContext false
+      }
+      return@withContext writeInternal(next)
+    }
     //  دفتری که صفحه با آن ساخت — نه لزوماً دفترِ همین حالا (شرح سرِ `LedgerMerge`)
-    val base = follow.baseOf(next)!!
+    val base = follow.baseOf(next) ?: run {
+      //  ⛔ پایه دیگر نگه داشته نشده: ادغام با دفترِ همین حالا ردیف‌های تازه را DELETE می‌کرد
+      _notice.tryEmit(STALE_BASE)
+      return@withContext false
+    }
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
     //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
     //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
@@ -262,13 +284,19 @@ class ShopStore(private val context: Context) {
       if (theirs === base) return@synchronized writeLocked(engine, next)
       //  ⛔ دیسک جلوتر است: فقط تغییرِ صفحه نسبت به پایه روی دیسک می‌نشیند. نوشتنِ کاملِ دفترِ
       //  کهنه برای ردیف‌های تازهٔ دیسک DELETE و برای ویرایش‌های تازه‌اش برگرداندن می‌ساخت.
-      val merged = runCatching { LedgerMerge.merge(base, next, theirs) }.getOrElse {
+      val outcome = runCatching { LedgerMerge.mergeReport(base, next, theirs) }.getOrElse {
         _diskError.tryEmit(it.message ?: STALE_UNREADABLE)
         return@synchronized false
       }
-      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد
+      val merged = outcome.data
+      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد.
+      //  ⛔ خودِ [next] پایه نمی‌شود: ذخیرهٔ دومی که صفحه هم‌زمان از همان پایه ساخته (دو کلیکِ پیاپی) با آن هم‌امتیاز
+      //  است و ردیف‌های این ذخیره را «حذفِ کاربر» می‌دید — DELETE روی همهٔ دستگاه‌ها
       if (merged !== next) follow.remember(theirs)
-      writeLocked(engine, merged)
+      val ok = writeLocked(engine, merged)
+      //  ⛔ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست بی‌صدا گم نمی‌شود
+      if (ok && outcome.dropped.isNotEmpty()) _notice.tryEmit(editsDropped(outcome.dropped.size))
+      ok
     }
   }
 
@@ -298,8 +326,9 @@ class ShopStore(private val context: Context) {
   data class Rebuilt(val ok: Boolean, val message: String)
 
   /**
-   *  پیامِ روشنِ کارهایی که از صفحهٔ خودشان بیرون می‌افتند (بازیابی در حالِ دفترِ خوانده‌نشده)
-   *  — `AppRoot` نشانش می‌دهد. با دفترِ ساده (پیش‌فرض) هرگز چیزی نمی‌فرستد.
+   *  پیامِ روشنِ کارهایی که از صفحهٔ خودشان بیرون می‌افتند (بازیابی در حالِ دفترِ خوانده‌نشده؛ و با پرچمِ
+   *  `shop.ledger_merge`: ذخیره‌ای که پایه‌اش دیگر نگه داشته نشده بود، یا ویرایشی که روی ردیفِ حذف‌شده در
+   *  دستگاهِ دیگر ننشست) — `AppRoot` نشانش می‌دهد. با دفترِ ساده و پرچمِ خاموش (پیش‌فرض) هرگز چیزی نمی‌فرستد.
    */
   private val _notice = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
   val notice: kotlinx.coroutines.flow.SharedFlow<String> = _notice
@@ -582,10 +611,15 @@ class ShopStore(private val context: Context) {
    *  ببرد؛ همان opها دورِ بعد دوباره گرفته می‌شوند.
    */
   fun applyFromServerNow(next: ShopData) {
+    //  پرچمِ خاموش ⇒ همان `main`
+    if (!follow.on) {
+      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      return
+    }
     synchronized(SyncV1Engine.of(context)) {
       //  ⛔ دفترِ حسابِ دیگری جای این نشسته (خروج/ورود در میانهٔ همگام‌سازی): opهای حسابِ پیشین
       //  روی آن نمی‌نشینند؛ cursor جلو نمی‌رود و دورِ بعد با کلیدِ درست
-      if (!follow.sameAccount()) throw java.io.IOException(STALE_UNREADABLE)
+      if (!follow.sameAccount()) throw StaleLedger(STALE_UNREADABLE)
       if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
     }
   }
@@ -785,8 +819,15 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
-    const val STALE_BASE = "—"
-    fun editsDropped(n: Int): String = "— $n"
+    private val EMPTY = ShopData()
+
+    /** پیامِ ذخیره‌ای که رد شد چون دفتری که صفحه با آن ساخت دیگر نگه داشته نشده ([LedgerFollow.baseOf]) */
+    const val STALE_BASE =
+      "ثبت نشد — این صفحه از دفتری ساخته شده بود که در این فاصله چند بار از دستگاه‌های دیگر تازه شد، و ثبتش ردیف‌های تازه را پاک می‌کرد. صفحه را دوباره باز کنید و دوباره ثبت کنید؛ چیزی پاک نشده."
+
+    /** پیامِ ویرایش‌هایی که چون ردیفشان در دستگاهِ دیگر حذف شده بود ننشستند ([LedgerMerge.Outcome.dropped]) */
+    fun editsDropped(n: Int): String =
+      "ثبت شد، جز ویرایشِ شما روی $n ردیف که در همین فاصله در دستگاهِ دیگری حذف شده بود؛ آن ردیف‌ها حذف‌شده می‌مانند. اگر لازم‌اند، دوباره بسازیدشان."
 
     /** پیامِ نوشتنی که رد شد چون دفترِ دیسک جلوتر بود و خوانده نشد (یا دفترِ حسابِ دیگری بود) */
     const val STALE_UNREADABLE =

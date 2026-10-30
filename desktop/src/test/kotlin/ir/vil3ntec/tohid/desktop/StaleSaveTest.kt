@@ -137,7 +137,7 @@ class StaleSaveTest {
 
   @Test fun `بازتولید — ذخیرهٔ صفحه پس از Pull ِ کارگر هیچ ردیفِ تازه‌ای را حذف یا برنمی‌گرداند`() = reproduce(encrypted = false)
 
-  @Test fun `پرچمِ خاموش (پیش‌فرض) — همان رفتارِ main: دفترِ صفحه کهنه می‌ماند و ذخیره‌اش کامل نوشته می‌شود`() {
+  @Test fun `پرچمِ خاموش (پیش‌فرض) — همان رفتارِ main، دفترِ صفحه کهنه می‌ماند و ذخیره‌اش کامل نوشته می‌شود`() {
     LedgerMergeFlag.set(ctx, false)
     val ui = screen()
     val inHand = ui.data.value

@@ -200,17 +200,18 @@ class SyncV3Runner private constructor(context: Context) {
   suspend fun work(store: ShopStore): Boolean {
     shop = store
     val e = engine()
-    //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`) ⇒ هیچ چیزی نشانده نمی‌شود؛ دورِ بعد دوباره
+    //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`، فقط با پرچمِ `shop.ledger_merge`) ⇒ هیچ چیزی نشانده
+    //  نمی‌شود؛ دورِ بعد دوباره. هر خطای دیگر همان رفتارِ `main` (بالا می‌رود، بی `publish`).
     try {
       synchronized(lock()) { e.recover(store.ledgerNow()) }
       //  دستگاهی که هرگز با v1 همگام نشده، دفترش را یک بار «درج» می‌فرستد (نخستین بارگذاری)
       val firstUpload = SyncV1Engine.of(app).snapshotStatus().lastOkAt == 0L
       val r = e.sync(keepLocalOnly = firstUpload) { synchronized(lock()) { e.record(store.ledgerNow()) } }
-      return r.ok || r.stopped
-    } catch (stale: java.io.IOException) {
-      return false
-    } finally {
       publish()
+      return r.ok || r.stopped
+    } catch (stale: ShopStore.StaleLedger) {
+      publish()
+      return false
     }
   }
 
