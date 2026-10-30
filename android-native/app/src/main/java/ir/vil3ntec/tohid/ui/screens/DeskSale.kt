@@ -284,10 +284,13 @@ fun DeskSaleScreen(
   var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
   var askApproval by remember { mutableStateOf(false) }
   val saleKey = remember(cart) { if (cart.isEmpty()) null else cartStore.saleKey() }
+  //  POS-21 (پشتِ `LinePolicy.on`، پیش‌فرض خاموش): قیمتِ دستیِ زیرِ فهرست و تخفیفِ ردیف هم تخفیف‌اند
+  val lineGate = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
+  val basis = DiscountGate.basis(lineGate, d, priced, promo, totals)
   val discountDecision = ir.vil3ntec.tohid.data.ShopRole.decide(
-    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+    context, "sales.discount", DiscountGate.req(basis.discount, basis.subtotal),
   )
-  val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
+  val gate = DiscountGate.state(discountDecision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
   /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
@@ -658,7 +661,7 @@ fun DeskSaleScreen(
   if (freeLine) {
     FreeLineDialog(onDismiss = { freeLine = false; refocus() }, onConfirm = { label, price, count ->
       cartStore.set(SalesEngine.addFreeLine(cart, label, price, count, ::newId)); freeLine = false; refocus()
-    })
+    }, linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) })
   }
   editLine?.let { id ->
     val line = cart.find { it.productId == id }
@@ -672,6 +675,8 @@ fun DeskSaleScreen(
         unitPrice = line.unitPrice ?: base,
         basePrice = base,
         custom = line.free || line.unitPrice != null,
+        free = line.free,
+        linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = p?.saleUnit.orEmpty(),
         unitFactor = p?.unitFactor ?: 1.0,
         onDismiss = { editLine = null; refocus() },
@@ -686,11 +691,11 @@ fun DeskSaleScreen(
   if (askApproval && saleKey != null) {
     ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
       title = StrPos.approveDiscount,
-      summary = StrPos.discountSummary(money(totals.discount), money(totals.subtotal)) +
+      summary = StrPos.discountSummary(money(basis.discount), money(basis.subtotal)) +
         if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
-      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
     )
