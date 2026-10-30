@@ -1052,6 +1052,8 @@ async function saveSettings(shopId, body, userId) {
         JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
         v.delivery_fee_minor, v.min_order_minor, userId || '', at]
     );
+    //  S6: جریانِ تغییرِ بازار (پرچمِ `market.changes`) در همین تراکنش
+    await require('./market-changes').record(c, shopId, { entity: 'shop', kind: cur ? 'update' : 'create', state: v, at });
     //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
     if (has('timezone') || has('weeklyHours') || has('closedDates')) {
       await recordEvent(c, shopId, {
@@ -1102,6 +1104,7 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
         'UPDATE storefronts SET presence_mode = $2, declared_until = $3, updated_by = $4, updated_at = $5 WHERE shop_id = $1',
         [shopId, mode, declaredUntil, userId || '', at]
       );
+      await require('./market-changes').record(c, shopId, { entity: 'presence', kind: 'update', state: { mode, declaredUntil }, at });
     }
     const sfNow = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1', [shopId])).rows[0];
     return { sf: sfNow, replayed: !inserted, applied: inserted ? applied : null };
@@ -1170,20 +1173,36 @@ async function setProduct(shopId, productId, body, userId) {
   );
   if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
   const at = now();
-  const row = await one(
-    `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at,
-       description, specs, published_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,''),COALESCE($9::jsonb,'[]'::jsonb),CASE WHEN $3 THEN $7::bigint END)
-     ON CONFLICT (shop_id, product_id) DO UPDATE SET published = EXCLUDED.published,
-       online_price_minor = EXCLUDED.online_price_minor, max_qty_milli = EXCLUDED.max_qty_milli,
-       updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at,
-       description = COALESCE($8, storefront_products.description),
-       specs = COALESCE($9::jsonb, storefront_products.specs),
-       published_at = COALESCE(storefront_products.published_at, EXCLUDED.published_at)
-     RETURNING product_id, description, specs`,
-    [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', at, description,
-      specs === null ? null : JSON.stringify(specs)]
-  );
+  const row = await tx(async (c) => {
+    const prev = (await c.query(
+      'SELECT published, online_price_minor FROM storefront_products WHERE shop_id = $1 AND product_id = $2 FOR UPDATE',
+      [shopId, id]
+    )).rows[0];
+    const saved = (await c.query(
+      `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at,
+         description, specs, published_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,''),COALESCE($9::jsonb,'[]'::jsonb),CASE WHEN $3 THEN $7::bigint END)
+       ON CONFLICT (shop_id, product_id) DO UPDATE SET published = EXCLUDED.published,
+         online_price_minor = EXCLUDED.online_price_minor, max_qty_milli = EXCLUDED.max_qty_milli,
+         updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at,
+         description = COALESCE($8, storefront_products.description),
+         specs = COALESCE($9::jsonb, storefront_products.specs),
+         published_at = COALESCE(storefront_products.published_at, EXCLUDED.published_at)
+       RETURNING product_id, description, specs`,
+      [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', at, description,
+        specs === null ? null : JSON.stringify(specs)]
+    )).rows[0];
+    //  S6: انتشار/برداشتن، قیمت یا بقیه — تکرارِ همان درخواست ردیفِ دوم نمی‌سازد (امضای حالت)
+    const wasPub = prev ? prev.published === true : false;
+    const prevPrice = prev && prev.online_price_minor !== null ? Number(prev.online_price_minor) : null;
+    const kind = wasPub !== published ? (published ? 'publish' : 'unpublish')
+      : prevPrice !== onlinePriceMinor ? 'price' : 'update';
+    await require('./market-changes').record(c, shopId, {
+      entity: 'product', entityId: id, kind, at,
+      state: { published, onlinePriceMinor, maxQtyMilli, description: saved.description, specs: specsOf(saved.specs) },
+    });
+    return saved;
+  });
   return {
     productId: id, published, onlinePriceMinor, maxQtyMilli,
     description: text(row.description, 2000), specs: specsOf(row.specs),

@@ -71,7 +71,7 @@ function barcodesOf(d) {
   return [...new Set(list.filter((b) => typeof b === 'string' && b.trim()).map((b) => b.trim().slice(0, 64)))].slice(0, 20);
 }
 
-async function upsertProduct(c, shopId, row, fmt, at) {
+async function upsertProduct(c, shopId, row, fmt, at, track = false) {
   const d = decode(row.data) || {};
   const rd = reader(fmt);
   const price = rd.money(d, 'salePrice');
@@ -97,6 +97,15 @@ async function upsertProduct(c, shopId, row, fmt, at) {
       d.active !== false, row.deleted_at !== null && row.deleted_at !== undefined,
       fmt, num(row.updated_seq), at]
   );
+  //  S6: نام، قیمت، فعال/حذف ⇒ جریانِ تغییرِ بازار (همان تراکنشِ همگام‌سازی؛ همان حالت ⇒ بی ردیف)
+  if (track) {
+    const deleted = row.deleted_at !== null && row.deleted_at !== undefined;
+    const p = price !== null && price > 0 ? price : null;
+    await require('./market-changes').record(c, shopId, {
+      entity: 'product', entityId: row.row_id, kind: deleted ? 'unpublish' : 'update', at,
+      state: { source: 'catalog', name: text(d.name, 200), priceMinor: p, active: d.active !== false, deleted },
+    }, { on: true });
+  }
 }
 
 const isDeleted = (row) => row.deleted_at !== null && row.deleted_at !== undefined;
@@ -133,6 +142,8 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   let products = 0;
   let moves = 0;
   const touched = new Set();
+  //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
+  const track = await require('./market-changes').enabled(shopId, c);
   for (;;) {
     const page = (await c.query(
       `SELECT table_name, row_id, data, deleted_at, updated_seq FROM ${T}
@@ -153,7 +164,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     const items = new Map();
     const cancelledSales = [];
     for (const r of rows) {
-      if (r.table_name === 'products') { await upsertProduct(c, shopId, r, fmt, at); products += 1; }
+      if (r.table_name === 'products') { await upsertProduct(c, shopId, r, fmt, at, track); products += 1; }
       else if (r.table_name === 'warehouseEntries') entries.push(r);
       else if (r.table_name === 'saleItems') items.set(r.row_id, r);
       else if (r.table_name === 'sales' && cancelled(r, decode(r.data) || {})) cancelledSales.push(r.row_id);
