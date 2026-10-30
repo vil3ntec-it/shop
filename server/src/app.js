@@ -438,11 +438,21 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
-  const storePage = async (slug, res) => {
+  const storePage = async (slug, res, onHost = false) => {
     let status = 200;
     try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    //  S3 (پرچمِ `market.public_id`): نشانیِ پیشین ⇒ نشانیِ تازهٔ همان دکان؛ خاموش ⇒ همان ۴۰۴
+    const moved = status === 404 ? await storefront.movedTo(slug) : null;
+    if (moved) {
+      return res.set('Cache-Control', 'no-store')
+        .redirect(301, onHost ? `//${moved}.${config.storefront.domain}/` : `/store/${moved}`);
+    }
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  S3: پیوندِ پایدار (تبلیغ، API) — `/store?id=<ULID>` ⇒ نشانیِ امروز؛ نبود ⇒ همان راهِ امروز (پیش از static، که `/store` را به `/store/` می‌برد)
+  app.get('/store', (req, res, next) => (typeof req.query.id !== 'string' ? next()
+    : storefront.byPublicId(req.query.id).then((hit) => (hit
+      ? res.set('Cache-Control', 'no-store').redirect(302, `/store/${hit.slug}`) : next())).catch(next)));
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
@@ -463,7 +473,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, true).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته

@@ -45,6 +45,9 @@ const { badRequest, notFound, conflict, ApiError } = require('../middleware/erro
 
 const FLAG_KEY = 'shop.storefront';
 const FEATURE_KEY = 'storefront';
+//  S3 ِ قراردادِ بازار: شناسهٔ عمومیِ پایدار و نشانی‌های پیشین (مهاجرتِ ۱۲۲) — پیش‌فرض خاموش
+const PUBLIC_ID_FLAG = 'market.public_id';
+const PUBLIC_ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 const PRODUCT_ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 /** زیردامنه‌هایی که مالِ خودِ سامانه‌اند یا گمراه می‌کنند. */
@@ -134,6 +137,48 @@ async function open(slug) {
   if (!row || row.enabled !== true || row.shop_status !== 'active' || row.trust_suspended === true) throw gone();
   if (!(await stateOf(row.shop_id)).enabled) throw gone();
   return row;
+}
+
+// ── S3: شناسهٔ عمومیِ پایدار و نشانیِ پیشین (پرچمِ `market.public_id`) ──
+
+/** پرچمِ S3 برای این دکان — خاموش ⇒ پاسخ‌ها همان امروزند. */
+function publicIdOn(shopId) {
+  return orders.flagOf(shopId, PUBLIC_ID_FLAG);
+}
+
+/** ویترینِ باز ⇒ ردیف؛ ۴۰۴ ⇒ null. */
+async function openOrNull(slug) {
+  try {
+    return await open(slug);
+  } catch (err) {
+    if (err && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * نشانیِ پیشین ⇒ نشانیِ زندهٔ همان دکان، فقط وقتی پرچم روشن و ویترین باز است؛
+ * وگرنه null (همان ۴۰۴ ِ امروز — دکانِ بسته از راهِ نشانیِ کهنه هم پیدا نمی‌شود).
+ */
+async function movedTo(slug) {
+  const s = str(slug).toLowerCase();
+  if (!SLUG_RE.test(s)) return null;
+  const row = await one(
+    `SELECT sf.shop_id, sf.slug FROM storefront_slug_redirects r
+       JOIN storefronts sf ON sf.shop_id = r.shop_id WHERE r.old_slug = $1`,
+    [s]
+  );
+  if (!row || row.slug === s || !(await publicIdOn(row.shop_id))) return null;
+  return (await openOrNull(row.slug)) ? row.slug : null;
+}
+
+/** شناسهٔ عمومی ⇒ `{ publicId, slug }` ِ ویترینِ باز؛ وگرنه null. */
+async function byPublicId(publicId) {
+  const p = str(publicId).toUpperCase();
+  if (!PUBLIC_ID_RE.test(p)) return null;
+  const row = await one('SELECT shop_id, slug, public_id FROM storefronts WHERE public_id = $1', [p]);
+  if (!row || !(await publicIdOn(row.shop_id)) || !(await openOrNull(row.slug))) return null;
+  return { publicId: row.public_id, slug: row.slug };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -1052,6 +1097,15 @@ async function saveSettings(shopId, body, userId) {
         JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
         v.delivery_fee_minor, v.min_order_minor, userId || '', at]
     );
+    //  S3: نشانیِ زنده بر نشانیِ پیشین مقدم است؛ نشانیِ رهاشده به همین دکان می‌رسد
+    await c.query('DELETE FROM storefront_slug_redirects WHERE old_slug = $1', [v.slug]);
+    if (cur && cur.slug && cur.slug !== v.slug) {
+      await c.query(
+        `INSERT INTO storefront_slug_redirects (old_slug, shop_id, created_at) VALUES ($1,$2,$3)
+         ON CONFLICT (old_slug) DO UPDATE SET shop_id = EXCLUDED.shop_id, created_at = EXCLUDED.created_at`,
+        [cur.slug, shopId, at]
+      );
+    }
     //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
     if (has('timezone') || has('weeklyHours') || has('closedDates')) {
       await recordEvent(c, shopId, {
@@ -1202,7 +1256,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, PUBLIC_ID_FLAG, PUBLIC_ID_RE, publicIdOn, movedTo, byPublicId,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
