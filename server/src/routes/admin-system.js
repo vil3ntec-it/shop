@@ -8,12 +8,17 @@
  *                                      یا «آزمایشی» (OPS-04@29)
  *   GET /api/admin/system/versions  ⇐ نسخهٔ دستگاه‌های فعال و هشدارِ کهنه یا
  *                                      زیرِ حداقل (OPS-04)
+ *   POST /api/admin/system/chain-verify ⇐ بررسیِ زنجیرهٔ هشِ سابقه (SEC-02)؛
+ *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
  *
  * زیرِ `requireAdmin`ِ `routes/admin.js` سوار است. فقط عدد و وضعیت؛ هیچ
  * راز، نشانی یا دادهٔ مشتری (شرح در `lib/system-health.js`).
  */
 const express = require('express');
 const health = require('../lib/system-health');
+const audit = require('../lib/audit');
+const { requireSuperAdmin } = require('../middleware/auth');
+const { clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 
@@ -35,6 +40,23 @@ router.get('/versions', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'no-store');
     res.json(await health.versions());
+  } catch (err) { next(err); }
+});
+
+/*
+ *  ⛔ فقط مدیرِ ارشد: نامِ زنجیره‌ها شناسهٔ دکان و کاربر را دارد و سنجش هزینه
+ *  دارد. سابقه پس از سنجش نوشته می‌شود تا ردیفِ خودش وسطِ سنجش نیاید.
+ */
+router.post('/chain-verify', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const b = req.body || {};
+    const out = await health.chainReport({ rows: b.rows !== false, chains: b.chain ? [String(b.chain).slice(0, 200)] : [] });
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, ip: clientIp(req), action: 'admin.chain_verified',
+      detail: { ok: out.ok, total: out.total, broken: out.brokenCount, rows: out.rows },
+    });
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
   } catch (err) { next(err); }
 });
 

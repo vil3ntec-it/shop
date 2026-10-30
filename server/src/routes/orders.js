@@ -105,6 +105,14 @@ router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async
   }, actorOf(req)));
 }));
 
+/**
+ * «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
+ * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر.
+ */
+router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
+  res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
+}));
+
 router.get('/:id', needFlag, wrap(async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)

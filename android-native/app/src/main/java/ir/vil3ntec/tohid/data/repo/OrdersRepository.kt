@@ -65,6 +65,15 @@ class OrdersRepository(private val api: ApiClient) {
   suspend fun create(clientKey: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     result { order(api.post(ROOT, createJson(clientKey, body))) }
 
+  /**
+   *  «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
+   *  ردیف برای همهٔ دستگاه‌ها می‌رود؛ تکرار بی‌اثر.
+   */
+  suspend fun reviewAck(id: String, kind: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(id)}/review-ack", buildJsonObject { put("kind", kind) })
+    Unit
+  }
+
   suspend fun transition(
     id: String,
     to: String,
