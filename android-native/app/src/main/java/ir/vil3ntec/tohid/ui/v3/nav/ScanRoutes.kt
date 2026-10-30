@@ -53,7 +53,7 @@ object ScanPaths {
 }
 
 /**
- *  اسکنِ QR برای همهٔ حالت‌ها (دکان، پیک، خرید). `scan?kind=qr` از `scan` ِ بارکدِ فروش
+ *  اسکنِ QR برای هر دو حالت (دکان، پیک). `scan?kind=qr` از `scan` ِ بارکدِ فروش
  *  دقیق‌تر است، پس در دکان هم همین باز می‌شود و `scan` ِ فروش دست نمی‌خورد.
  *  فقط QR می‌خواند و متنِ خام را با `nav.finish(text)` برمی‌گرداند. کامپیوتر دوربین ندارد:
  *  «این‌جا دوربین نیست».
@@ -62,7 +62,7 @@ val ScanModule = AppModule(
   id = "scan",
   title = { StrKit.scanQr },
   icon = Icons.Outlined.QrCodeScanner,
-  modes = setOf(AppMode.SHOP, AppMode.COURIER, AppMode.SHOPPER),
+  modes = setOf(AppMode.SHOP, AppMode.COURIER),
   routes = listOf(
     V3Route(ScanPaths.QR, RouteKind.SHEET, { StrKit.scanQr }, chrome = Chrome.OWN) {
       if (desk) {

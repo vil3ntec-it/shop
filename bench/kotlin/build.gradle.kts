@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  *  bench/kotlin — ریزسنجشِ JVMِ موتورهای مشترکِ اندروید و کامپیوتر.
  *
  *  ‌• موتورها کپی نمی‌شوند و بازنویسی هم نمی‌شوند: همان فایل‌های
- *    `android-native/.../core/{money,stock,report,text,audit,calendar}` پیش از
+ *    `core/.../{money,text,calendar}` و `android-native/.../core/{stock,report,audit}` پیش از
  *    ساخت به `build/generated/engines` همگام می‌شوند — پس سنجه همیشه همان کدی
  *    است که در برنامه اجرا می‌شود.
  *  ‌• نسخهٔ Kotlin همان `android-native`، `desktop` و `core` است (2.2.20).
@@ -18,23 +18,27 @@ plugins {
 }
 
 val repoRoot = rootDir.resolve("../..")
-val engineRoot = repoRoot.resolve("android-native/app/src/main/java")
-val engineDirs = listOf(
-  "ir/vil3ntec/tohid/core/money",
-  "ir/vil3ntec/tohid/core/stock",
-  "ir/vil3ntec/tohid/core/report",
-  "ir/vil3ntec/tohid/core/text",
-  "ir/vil3ntec/tohid/core/audit",
-  "ir/vil3ntec/tohid/core/calendar",
+//  موتورهای خالص (money، text، calendar) به ماژولِ `core` رفته‌اند (#371)؛ بقیه هنوز در اندرویدند.
+val engineRoots = mapOf(
+  repoRoot.resolve("core/src/jvmMain/kotlin") to listOf(
+    "ir/vil3ntec/tohid/core/money",
+    "ir/vil3ntec/tohid/core/text",
+    "ir/vil3ntec/tohid/core/calendar",
+  ),
+  repoRoot.resolve("android-native/app/src/main/java") to listOf(
+    "ir/vil3ntec/tohid/core/stock",
+    "ir/vil3ntec/tohid/core/report",
+    "ir/vil3ntec/tohid/core/audit",
+  ),
 )
 
 val engineSources by tasks.registering(Sync::class) {
-  inputs.files(engineDirs.map { engineRoot.resolve(it) })
+  inputs.files(engineRoots.flatMap { (root, dirs) -> dirs.map { root.resolve(it) } })
   doFirst {
-    val missing = engineDirs.filterNot { engineRoot.resolve(it).isDirectory }
-    check(missing.isEmpty()) { "پوشهٔ موتور جابه‌جا شده؛ فهرستِ engineDirs را درست کنید: $missing" }
+    val missing = engineRoots.flatMap { (root, dirs) -> dirs.filterNot { root.resolve(it).isDirectory } }
+    check(missing.isEmpty()) { "پوشهٔ موتور جابه‌جا شده؛ فهرستِ engineRoots را درست کنید: $missing" }
   }
-  from(engineRoot) { engineDirs.forEach { include("$it/*.kt") } }
+  engineRoots.forEach { (root, dirs) -> from(root) { dirs.forEach { include("$it/*.kt") } } }
   into(layout.buildDirectory.dir("generated/engines"))
 }
 

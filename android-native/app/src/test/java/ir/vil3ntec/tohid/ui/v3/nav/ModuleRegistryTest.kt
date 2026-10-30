@@ -94,8 +94,6 @@ class ModuleRegistryTest {
       "orders", "orders/1", "orders/new", "storefront", "chat", "delivery", "courier",
       "settings", "settings/general", "settings/security", "settings/security/app-lock", "settings/general/navbar",
       "settings/data/sync", "settings/data/backup", "settings/about", "devices",
-      "shopper/home", "shopper/shop/abc", "shopper/cart", "shopper/cart/abc", "shopper/checkout", "shopper/orders",
-      "shopper/order/1", "shopper/order/abc/tok", "shopper/account",
     ).forEach { assertNotNull("ثبت نیست: $it", table.resolve(it)) }
   }
 
@@ -121,7 +119,6 @@ class ModuleRegistryTest {
     V3Modules.ALL.forEach { m ->
       m.entries.forEach { e -> assertNotNull("${m.id}/${e.id} ⇐ ${e.route}", table.resolve(e.route)) }
       m.settings.forEach { s -> assertNotNull("${m.id} settings ⇐ ${s.route}", table.resolve(s.route)) }
-      m.shopper.forEach { s -> assertNotNull("${m.id} shopper ⇐ ${s.route}", table.resolve(s.route.replace("{slug}", "abc"))) }
     }
     NavCatalog.BUILT_IN.forEach { assertNotNull("نوار: ${it.id} ⇐ ${it.route}", table.resolve(it.route)) }
     MoreLayout.groups(true, true, 0, true, "1", storefrontOn = true, deliveryOn = true, flags = setOf(EXAMPLE_FLAG))
@@ -153,23 +150,23 @@ class ModuleRegistryTest {
     assertFalse(table.resolve("example")!!.allowed(off))
     assertTrue(table.resolve("example")!!.allowed(on))
     assertTrue(V3Modules.settingsEntries(on).any { it.route == "settings/example" })
-    assertTrue(V3Modules.shopperSections(on.copy(mode = AppMode.SHOPPER)).any { it.id == "example" })
-    assertTrue(V3Modules.shopperSections(off.copy(mode = AppMode.SHOPPER)).none { it.id == "example" })
   }
 
   @Test
-  fun `حالت‌ها — مسیرهای خرید فقط در حالتِ خرید و مسیرهای دکان فقط در دکان`() {
-    val shopper = Access.all(AppMode.SHOPPER)
-    assertTrue(table.resolve("shopper/home")!!.allowed(shopper))
-    assertFalse(table.resolve("stock")!!.allowed(shopper))
-    assertFalse(table.resolve("shopper/home")!!.allowed(all))
-    assertTrue(table.resolve("courier")!!.allowed(Access.all(AppMode.COURIER)))
-    val tabs = V3Modules.entries(Place.NAV, shopper).map { it.route }
-    assertEquals(listOf("shopper/home", "shopper/cart", "shopper/orders", "shopper/account"), tabs)
+  fun `حالت‌ها — مسیرهای پیک فقط در پیک و مسیرهای دکان فقط در دکان؛ «خرید» در برنامهٔ مدیریت نیست`() {
+    val courier = Access.all(AppMode.COURIER)
+    assertTrue(table.resolve("courier")!!.allowed(courier))
+    assertFalse(table.resolve("stock")!!.allowed(courier))
+    assertFalse(table.resolve("courier")!!.allowed(all))
+    //  تصمیمِ ۱۴۰۵/۰۸/۰۸: هیچ مسیر، ماژول یا ورودیِ «خرید»
+    listOf("shopper/home", "shopper/shop/abc", "shopper/cart", "shopper/checkout", "shopper/orders", "shopper/account")
+      .forEach { assertNull("مسیرِ خرید مانده: $it", table.resolve(it)) }
+    assertTrue(V3Modules.ALL.none { it.id == "shopper" })
+    assertTrue(V3Modules.ALL.flatMap { m -> m.routes.map { it.pattern } + m.entries.map { it.route } }.none { it.startsWith("shopper") })
   }
 
   @Test
-  fun `اسکنِ QR در هر سه حالت؛ اسکنِ بارکدِ فروش همان که بود`() {
+  fun `اسکنِ QR در هر دو حالت؛ اسکنِ بارکدِ فروش همان که بود`() {
     val qr = table.resolve(ScanPaths.QR)!!
     assertEquals("scan", qr.module.id)
     assertEquals(RouteKind.SHEET, qr.route.kind)
@@ -177,6 +174,6 @@ class ModuleRegistryTest {
     val barcode = table.resolve("scan?for=stock")!!
     assertEquals("scan", barcode.route.pattern)
     assertTrue(barcode.allowed(all))
-    assertFalse(barcode.allowed(Access.all(AppMode.SHOPPER)))
+    assertFalse(barcode.allowed(Access.all(AppMode.COURIER)))
   }
 }

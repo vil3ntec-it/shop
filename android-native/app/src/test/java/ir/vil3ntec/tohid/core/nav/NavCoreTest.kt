@@ -87,7 +87,6 @@ class NavCoreTest {
   fun `پیوندِ برنامه — vill3n__app با حالتِ درست`() {
     assertEquals(DeepLink(AppMode.SHOP, "settings/security"), DeepLinks.parse("vill3n://app/settings/security"))
     assertEquals(DeepLink(AppMode.SHOP, "products?filter=out"), DeepLinks.parse("vill3n://app/products?filter=out"))
-    assertEquals(AppMode.SHOPPER, DeepLinks.parse("vill3n://app/shopper/home")!!.mode)
     assertEquals(AppMode.COURIER, DeepLinks.parse("vill3n://app/courier")!!.mode)
     assertEquals("vill3n://app/stock/42", DeepLinks.appLink("/stock/42"))
     assertNull(DeepLinks.parse("vill3n://other/x"))
@@ -97,39 +96,40 @@ class NavCoreTest {
   }
 
   @Test
-  fun `ویترین — پیوندِ وب را هستهٔ خرید می‌خواند ⇐ حالتِ خرید`() {
-    //  قاعده‌های کامل در `ShopperLinksTest`؛ این‌جا فقط سپردن و حالت
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://karim-store.vill3n.top/"))
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/karim-store"), DeepLinks.parse("https://vill3n.top/store/karim-store"))
-    val token = "01HX" + "0".repeat(22) + "." + "a".repeat(32)
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/order/karim-store/$token"), DeepLinks.parse("https://vill3n.top/store/karim-store#/o/$token"))
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/cart/karim-store"), DeepLinks.parse("https://karim-store.vill3n.top/#/cart"))
-    //  میزبانِ سرورِ همین ساخت (`API_BASE`)
-    assertEquals(DeepLink(AppMode.SHOPPER, "shopper/shop/abc"), DeepLinks.parse("https://shop.example.af/store/abc", setOf("shop.example.af")))
-    assertNull(DeepLinks.parse("https://shop.example.af/store/abc"))
-    //  نام‌های رزرو و نشانی‌های دیگرِ سایت در مرورگر می‌مانند
-    assertNull(DeepLinks.parse("https://api.vill3n.top/"))
-    assertNull(DeepLinks.parse("https://admin.vill3n.top/"))
-    assertNull(DeepLinks.parse("https://vill3n.top/market"))
-    assertNull(DeepLinks.parse("https://vill3n.top/store/admin"))
-    assertNull(DeepLinks.parse("https://evil.example/store/karim"))
-    assertNull(DeepLinks.parse("ftp://vill3n.top/store/abc"))
+  fun `ویترین — پیوندِ وب و حالتِ خرید مالِ برنامهٔ خرید است، نه برنامهٔ مدیریت`() {
+    //  تصمیمِ ۱۴۰۵/۰۸/۰۸: QR و پیوندِ ویترین در مرورگر می‌ماند؛ خواندنش در `ShopperLinksTest`
+    assertNull(DeepLinks.parse("https://karim-store.vill3n.top/"))
+    assertNull(DeepLinks.parse("https://vill3n.top/store/karim-store"))
+    assertNull(DeepLinks.parse("https://vill3n.top/store/karim-store#/o/tok"))
+    assertNull(DeepLinks.parse("http://karim-store.vill3n.top/#/cart"))
+    assertNull(DeepLinks.parse("vill3n://app/shopper/home"))
+    assertNull(DeepLinks.parse("vill3n://app/shopper/shop/karim-store"))
+    assertNull(AppMode.of("shopper"))
+    assertEquals(listOf(AppMode.SHOP, AppMode.COURIER), AppMode.entries)
   }
 
   @Test
-  fun `حالت‌ها — خرید همیشه؛ نصبِ پیشین همان رفتارِ امروز`() {
+  fun `حالت‌ها — دکان برای هر که پیک نیست؛ نصبِ پیشین همان رفتارِ امروز`() {
     val shop = ModeFacts(shopMember = true, courier = false)
     val courier = ModeFacts(shopMember = false, courier = true)
     val none = ModeFacts(shopMember = false, courier = false)
-    assertEquals(listOf(AppMode.SHOP, AppMode.SHOPPER), AppModes.available(shop))
-    assertEquals(listOf(AppMode.COURIER, AppMode.SHOPPER), AppModes.available(courier))
-    assertEquals(listOf(AppMode.SHOPPER), AppModes.available(none))
+    val both = ModeFacts(shopMember = true, courier = true)
+    assertEquals(listOf(AppMode.SHOP), AppModes.available(shop))
+    assertEquals(listOf(AppMode.COURIER), AppModes.available(courier))
+    assertEquals(listOf(AppMode.SHOP), AppModes.available(none))
+    assertEquals(listOf(AppMode.SHOP, AppMode.COURIER), AppModes.available(both))
     assertEquals(AppMode.SHOP, AppModes.resolve(null, shop))
     assertEquals(AppMode.COURIER, AppModes.resolve(null, courier))
     assertEquals(AppMode.COURIER, AppModes.resolve(AppMode.SHOP, courier))
-    assertEquals(AppMode.SHOPPER, AppModes.resolve(AppMode.SHOPPER, shop))
-    assertEquals(AppMode.SHOPPER, AppModes.resolve(null, none))
+    assertEquals(AppMode.SHOP, AppModes.resolve(AppMode.COURIER, shop))
+    assertEquals(AppMode.SHOP, AppModes.resolve(AppMode.SHOP, both))
+    assertEquals(AppMode.COURIER, AppModes.resolve(null, both))
+    assertEquals(AppMode.SHOP, AppModes.resolve(null, none))
+    //  انتخابِ ذخیره‌شدهٔ کهنهٔ «خرید» ⇐ همان رفتارِ نصبِ بی انتخاب
+    assertEquals(AppMode.SHOP, AppModes.resolve(AppMode.of("shopper"), none))
+    assertEquals(AppMode.COURIER, AppModes.resolve(AppMode.of("shopper"), courier))
     assertEquals("home", AppModes.home(AppMode.SHOP))
+    assertEquals("courier", AppModes.home(AppMode.COURIER))
     assertTrue(AppMode.entries.all { AppMode.of(it.id) == it })
   }
 

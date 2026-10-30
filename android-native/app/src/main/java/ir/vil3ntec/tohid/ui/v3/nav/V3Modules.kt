@@ -19,13 +19,12 @@ import ir.vil3ntec.tohid.ui.v3.products.ProductsModule
 import ir.vil3ntec.tohid.ui.v3.sales.SalesModule
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsModule
 import ir.vil3ntec.tohid.ui.v3.shell.ShellModule
-import ir.vil3ntec.tohid.ui.v3.shopper.ShopperModule
 import ir.vil3ntec.tohid.ui.v3.stock.StockModule
 
 /**
  *  فهرستِ یکتای بخش‌های برنامه — **تنها جایی** که بخشِ تازه اضافه می‌شود
  *  (`docs/MODULES-fa.md`). پوسته (مسیرها، پیوندها)، «بیشتر»، تنظیمات، فهرستِ
- *  نوارِ پایین و صفحهٔ دکان در حالتِ خرید همه از همین می‌خوانند.
+ *  نوارِ پایین همه از همین می‌خوانند.
  */
 object V3Modules {
   val ALL: List<AppModule> by lazy {
@@ -44,7 +43,6 @@ object V3Modules {
       OnlineModule,
       SettingsModule,
       CourierModule,
-      ShopperModule,
       ExampleModule,
     )
   }
@@ -107,10 +105,6 @@ object V3Modules {
   /** صفحه‌هایی که ماژول‌ها در تنظیمات گذاشته‌اند */
   fun settingsEntries(access: Access): List<SettingsEntry> =
     ALL.filter { visible(it, access) }.flatMap { m -> m.settings.filter { access.allows(it.needs, null) } }
-
-  /** بخش‌هایی که ماژول‌ها روی صفحهٔ دکان در حالتِ خرید گذاشته‌اند */
-  fun shopperSections(access: Access): List<ShopperSection> =
-    ALL.filter { access.allows(it.needs, it.flag) }.flatMap { it.shopper }.sortedBy { it.order }
 
   /** شناسهٔ قدیمیِ یک مسیر (منوی کناری و سربرگِ کامپیوتر هنوز با آن کار می‌کنند) */
   /**

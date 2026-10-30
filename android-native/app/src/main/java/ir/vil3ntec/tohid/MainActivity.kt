@@ -8,7 +8,6 @@ import ir.vil3ntec.tohid.core.nav.Move
 import ir.vil3ntec.tohid.ui.v3.V3Transitions
 import ir.vil3ntec.tohid.ui.v3.modes.ModeChooser
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
-import ir.vil3ntec.tohid.ui.v3.modes.ShopperRoot
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
@@ -105,7 +104,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         }
       }
 
-      //  حالتِ برنامه (دکان / پیک / خرید) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
+      //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
       val chosen = ModeState.chosen.value
       ModeState.onCourierSignedOut = {
         //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
@@ -116,19 +115,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         prefs.edit().putBoolean("welcomed", false).apply()
         welcomed = false
       }
-      //  پیوندِ «خرید» (QRِ دکان) روی نصبِ تازه ⇒ مستقیم حالتِ خرید، بی پرسیدن
-      val link = ModeState.pendingLink.value
-      LaunchedEffect(link) {
-        if (link != null && link.mode == AppMode.SHOPPER && !welcomed) {
-          ModeState.choose(applicationContext, AppMode.SHOPPER)
-          prefs.edit().putBoolean("welcomed", true).apply()
-          welcomed = true
-        }
-      }
       val mode = remember(chosen, courier, welcomed) { ModeState.current(applicationContext) }
       val screen = when {
         !welcomed && chosen == null -> "choose"
-        !welcomed && chosen != AppMode.SHOPPER -> "welcome"
+        !welcomed -> "welcome"
         else -> mode.id
       }
 
@@ -142,26 +132,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
             label = "mode",
           ) { s ->
             when (s) {
-              "choose" -> ModeChooser { picked ->
-                ModeState.choose(applicationContext, picked)
-                if (picked == AppMode.SHOPPER) {
-                  prefs.edit().putBoolean("welcomed", true).apply()
-                  welcomed = true
-                }
-              }
+              "choose" -> ModeChooser { picked -> ModeState.choose(applicationContext, picked) }
               "welcome" -> WelcomeScreen(store) {
                 prefs.edit().putBoolean("welcomed", true).apply()
                 welcomed = true
               }
               AppMode.COURIER.id -> ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = { ModeState.signedOutOfCourier() })
-              AppMode.SHOPPER.id -> ShopperRoot(
-                store = store,
-                theme = theme,
-                onTheme = {
-                  theme = it
-                  prefs.edit().putString("theme", it.name).apply()
-                },
-              )
               else -> AppRoot(
                 store = store,
                 theme = theme,
@@ -184,13 +160,12 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   }
 
   /**
-   *  پیوندِ بیرونی (`vill3n://app/…`، QRِ دکان، پیگیریِ سفارشِ ویترین) ⇐ حالتِ
-   *  همان پیوند و صفحهٔ دقیقش (`DeepLinks`). پوستهٔ همان حالت پیوند را پس از
-   *  دروازه‌ها (قفل، ورود) باز می‌کند.
+   *  پیوندِ بیرونی (`vill3n://app/…`) ⇐ حالتِ همان پیوند و صفحهٔ دقیقش
+   *  (`DeepLinks`)؛ پوستهٔ همان حالت پیوند را پس از دروازه‌ها (قفل، ورود) باز
+   *  می‌کند. پیوندِ ویترین و QRِ دکان مالِ برنامهٔ خرید است و در مرورگر می‌ماند.
    */
   private fun handleLink(intent: android.content.Intent?) {
-    val host = runCatching { java.net.URI(BuildConfig.API_BASE).host }.getOrNull()
-    val link = DeepLinks.parse(intent?.dataString, setOfNotNull(host)) ?: return
+    val link = DeepLinks.parse(intent?.dataString) ?: return
     ModeState.pendingLink.value = link
     if (link.mode in ModeState.available(applicationContext) && ModeState.chosen.value != link.mode) {
       ModeState.choose(applicationContext, link.mode)
