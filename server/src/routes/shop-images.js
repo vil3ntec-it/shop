@@ -44,7 +44,12 @@ router.use(wrap(async (req, res, next) => {
 }));
 
 const write = requirePermission('data.write');
-const bufOf = (req) => (Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+//  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر برنامه فرستاده باشد (IMG-14؛ بی سرآیند همان پیشین)
+const bufOf = (req) => {
+  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  bank.verifyDigest(buf, req.get('x-content-sha256'));
+  return buf;
+};
 const version = (v) => {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1 || n > 100000) throw badRequest('نسخه درست نیست', 'bad_version');

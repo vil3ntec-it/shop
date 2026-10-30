@@ -32,6 +32,8 @@ const { ApiError, badRequest, notFound, conflict } = require('../middleware/erro
 
 const SHOP_FLAG = 'shop.image_bank';
 const CENTRAL_FLAG = 'image_bank.central';
+//  ادامهٔ ورودِ گروهی در پنل (فهرستِ رسیده‌ها، sha256، تلاشِ دوباره) — فقط `all`، پیش‌فرض خاموش
+const RESUME_FLAG = 'image_bank.resume';
 
 //  همان سقف‌های عکسِ کالا (۰۴۵/۰۴۶) — عکسِ دکان فشرده می‌آید، اصلِ بانک تا ۲ مگابایت
 const SHOP_MAX_BYTES = photos.MAX_BYTES;
@@ -82,6 +84,21 @@ async function flagOf(key, scope) {
 }
 const shopEnabled = (shopId) => flagOf(SHOP_FLAG, shopId);
 const centralEnabled = () => flagOf(CENTRAL_FLAG, 'all');
+const resumeEnabled = () => flagOf(RESUME_FLAG, 'all');
+
+/**
+ * IMG-14: رسیدنِ کاملِ فایل. کلاینت sha256 ِ بایت‌ها را در `X-Content-SHA256` می‌فرستد؛
+ * ناجور ⇒ ۴۲۲ `checksum_mismatch` پیش از هر نوشتن — فایلِ نیمه‌رسیده (شبکهٔ ضعیف، پراکسیِ
+ * بُرنده) نه بلاب می‌سازد و نه جای نسخهٔ سالمِ همان نام را می‌گیرد. بی سرآیند ⇒ همان پیشین.
+ */
+function verifyDigest(buf, claimed) {
+  if (claimed == null || claimed === '') return;
+  const want = String(claimed).trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(want)) throw badRequest('X-Content-SHA256 باید ۶۴ رقمِ هگز باشد', 'bad_checksum');
+  if (sha256(Buffer.isBuffer(buf) ? buf : Buffer.alloc(0)) !== want) {
+    throw new ApiError(422, 'checksum_mismatch', 'فایل کامل نرسید (sha256 نمی‌خواند) — دوباره بفرستید');
+  }
+}
 
 function fileUrl(base, id, version, size) {
   return `${base}/file/${encodeURIComponent(id)}/${version}/${size}`;
@@ -972,8 +989,30 @@ async function batchFile(id, name, buf) {
        ON CONFLICT (batch_id, name) DO UPDATE SET blob_hash=EXCLUDED.blob_hash, status=EXCLUDED.status,
           error=EXCLUDED.error, warnings=EXCLUDED.warnings, orientation=EXCLUDED.orientation`,
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
-    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags };
+    //  sha256 ِ بایت‌های رسیده — کلاینت بی سرآیند هم می‌تواند رسیدنِ کامل را بسنجد
+    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags,
+      sha256: row.hash || sha256(Buffer.isBuffer(buf) ? buf : Buffer.alloc(0)) };
   }
+}
+
+const FILES_PAGE_MAX = 1000;
+
+/**
+ * فایل‌های رسیدهٔ یک دسته به ترتیبِ نام (IMG-14، IMG-PRO-06): پنل پیش از بارگذاریِ دوباره
+ * می‌پرسد و فایلی را که با همان نام و همان sha256 «موفق» رسیده دوباره نمی‌فرستد.
+ * sha256 فقط برای فایلِ موفق (همان کلیدِ بلاب)؛ فایلِ ناموفق دوباره سنجیده می‌شود.
+ */
+async function batchFiles(id, { after = '', limit } = {}) {
+  const b = await one('SELECT id FROM image_batches WHERE id=$1', [String(id || '').slice(0, 40)]);
+  if (!b) throw notFound('دسته پیدا نشد');
+  const n = intIn(limit, 1, FILES_PAGE_MAX, FILES_PAGE_MAX);
+  const rows = await many(
+    `SELECT name, blob_hash, status, error, warnings FROM image_batch_files
+      WHERE batch_id=$1 AND name > $2 ORDER BY name LIMIT $3`, [b.id, str(after, 200), n + 1]);
+  const items = rows.slice(0, n).map((r) => ({
+    name: r.name, status: r.status, error: r.error, sha256: r.blob_hash, quality_flags: json(r.warnings, []),
+  }));
+  return { items, next_after: rows.length > n ? items[items.length - 1].name : null };
 }
 
 /** CSV با سطرِ سرآیند ⇒ ردیف‌ها (row_no = شمارهٔ سطرِ فایل). نقل‌قولِ "…" پشتیبانی می‌شود. */
@@ -1202,10 +1241,10 @@ async function reportsList({ status = 'open', limit = 50 } = {}) {
 }
 
 module.exports = {
-  SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
-  shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
+  SHOP_FLAG, CENTRAL_FLAG, RESUME_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX, FILES_PAGE_MAX,
+  shopEnabled, centralEnabled, resumeEnabled, verifyDigest, imageRow, readFile, fileUrl, putBlob,
   productInput, insertProduct, updateProduct, productOut,
   search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
-  batchCreate, batchFile, batchRows, batchStatus, batchReport, reportCsv, reportsList, parseCsv, tx,
+  batchCreate, batchFile, batchFiles, batchRows, batchStatus, batchReport, reportCsv, reportsList, parseCsv, tx,
 };

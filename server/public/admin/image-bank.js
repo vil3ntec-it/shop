@@ -11,6 +11,11 @@
  * دلیلِ تطبیق، کالای وصل یا کالاهای ممکن با SKU/بارکد/نوع/اندازه؛ تطبیقِ مبهم
  * فقط با انتخابِ انسانی وصل می‌شود و انتشار فقط کارِ مدیرِ ارشد با دلیل است.
  *
+ * ادامهٔ بارگذاری (IMG-14، IMG-PRO-06؛ پشتِ پرچمِ `image_bank.resume`، پیش‌فرض خاموش): پیش
+ * از فرستادن فهرستِ رسیده‌ها پرسیده می‌شود و فایلی که با همان نام و همان sha256 رسیده دوباره
+ * نمی‌رود؛ هر فایل با `X-Content-SHA256` می‌رود (نیمه‌رسیده ⇒ ۴۲۲) و خطای شبکه/۵xx/sha256
+ * دو بار دوباره تلاش می‌شود. پرچمِ خاموش ⇒ همان بارگذاریِ پیشین.
+ *
  * تکراری (IMG-BANK-13) فقط نشان و صافی است — نه حذف، نه ادغام. بایگانی
  * (IMG-BANK-15) فقط عکسِ منتشرشده، فقط مدیرِ ارشد با دلیل.
  *
@@ -20,6 +25,7 @@
 (() => {
   const IB = '/admin/image-bank';
   const UPLOAD_PARALLEL = 4;
+  const RETRY_WAIT = [600, 2000];   // دو تلاشِ دوباره پس از قطعِ شبکه، ۵xx یا sha256 ِ ناجور
 
   //  برچسبِ آدمیزادِ کدهای خطا و نشان‌ها (همان کدهای `lib/image-bank.js`)
   const ERR_FA = {
@@ -40,6 +46,9 @@
     batch_done: 'دسته بسته بود',
     row_error: 'خطای پیش‌بینی‌نشده',
     upload_failed: 'بارگذاری نشد',
+    checksum_mismatch: 'فایل کامل نرسید (sha256)',
+    bad_checksum: 'sha256 ِ نادرست',
+    network: 'اینترنت قطع شد',
   };
   const FLAG_FA = { extension_mismatch: 'پسوند با نوع نمی‌خواند', too_small: 'عکسِ کوچک' };
   const ROW_FA = {
@@ -76,22 +85,69 @@
   const badge = (cls, text) => el('span', `badge ${cls}`, text);
   const td = (text, cls = '') => el('td', cls, text);
 
-  /** PUT با بدنهٔ خام (فایل) — `call()` بدنه را JSON می‌کند. */
-  async function putFile(path, file) {
-    const res = await fetch(API + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/octet-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: file,
-    });
+  /** PUT با بدنهٔ خام (فایل) — `call()` بدنه را JSON می‌کند. `sum`: sha256 برای `X-Content-SHA256`. */
+  async function putFile(path, file, sum = '') {
+    let res;
+    try {
+      res = await fetch(API + path, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(sum ? { 'X-Content-SHA256': sum } : {}),
+        },
+        body: file,
+      });
+    } catch {
+      const err = new Error('اینترنت قطع شد');
+      err.code = 'network';
+      throw err;
+    }
     if (res.status === 401) { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
     let json = null;
     try { json = await res.json(); } catch { json = null; }
     if (!res.ok) {
       const err = new Error(json?.error?.message || `خطای ${res.status}`);
       err.code = json?.error?.code || (res.status === 413 ? 'too_large' : 'upload_failed');
+      err.status = res.status;
       throw err;
     }
     return json;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** همان PUT با تلاشِ دوباره فقط برای خطای گذرا؛ ۴xx ِ دیگر (حجم، دستهٔ متوقف) دوباره نمی‌رود. */
+  async function putRetry(path, body, sum) {
+    for (let k = 0; ; k++) {
+      try {
+        return await putFile(path, body, sum);
+      } catch (err) {
+        const again = err.code === 'network' || err.code === 'checksum_mismatch' || err.status >= 500;
+        if (!again || k >= RETRY_WAIT.length) throw err;
+        await sleep(RETRY_WAIT[k]);
+      }
+    }
+  }
+
+  /** sha256 ِ هگز در مرورگر؛ بی `crypto.subtle` (http ِ غیرِ محلی) ⇒ '' و همان بارگذاریِ ساده. */
+  async function sha256Hex(buf) {
+    if (!globalThis.crypto?.subtle) return '';
+    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+    return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** فایل‌های «موفق» ِ رسیدهٔ همین دسته: نام ⇐ sha256 (صفحه‌به‌صفحه). */
+  async function receivedFiles() {
+    const have = new Map();
+    let after = '';
+    for (let page = 0; page < 100; page++) {
+      const out = await call('GET', `${IB}/batches/${encodeURIComponent(batchId)}/files?after=${encodeURIComponent(after)}`);
+      for (const f of out.items) if (f.status === 'ok' && f.sha256) have.set(f.name, f.sha256);
+      if (!out.next_after) break;
+      after = out.next_after;
+    }
+    return have;
   }
 
   function counts(box, c) {
@@ -160,15 +216,42 @@
     const progress = $('ib-progress');
     let done = 0;
     let failed = 0;
+    let skipped = 0;
     let i = 0;
-    const show = () => { progress.textContent = `${fa(done)} از ${fa(picked.length)} فایل · ${fa(failed)} ناموفق`; };
+    const show = () => {
+      progress.textContent = `${fa(done)} از ${fa(picked.length)} فایل · ${fa(failed)} ناموفق` +
+        (skipped ? ` · ${fa(skipped)} از پیش رسیده` : '');
+    };
     show();
     $('btn-ib-upload').disabled = true;
+    const resume = status?.resume === true;
+    let have = new Map();
+    try {
+      if (resume) have = await receivedFiles();
+    } catch (err) {
+      $('btn-ib-upload').disabled = false;
+      throw err;
+    }
     const worker = async () => {
       while (i < picked.length) {
         const f = picked[i++];
+        const path = `${IB}/batches/${encodeURIComponent(batchId)}/files/${encodeURIComponent(f.name)}`;
         try {
-          const out = await putFile(`${IB}/batches/${encodeURIComponent(batchId)}/files/${encodeURIComponent(f.name)}`, f);
+          let out;
+          if (resume) {
+            const buf = await f.arrayBuffer();
+            const sum = await sha256Hex(buf);
+            if (sum && have.get(f.name) === sum) {      // همان فایل پیش‌تر کامل رسیده
+              skipped++;
+              localFails.delete(f.name);
+              done++;
+              show();
+              continue;
+            }
+            out = await putRetry(path, buf, sum);
+          } else {
+            out = await putFile(path, f);
+          }
           if (out.status === 'failed') failed++;
           else localFails.delete(f.name);
         } catch (err) {
