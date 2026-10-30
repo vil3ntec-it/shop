@@ -196,7 +196,11 @@ fun main() {
         } else {
           //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
           val ch = e.scanChar()
-          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch, now); true } else false
+          //  HW-05: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) اسکن را همین‌جا تمام می‌کند
+          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) {
+            windowHid.feed(ch, now)?.let { code -> ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") } }
+            true
+          } else false
         }
       },
       onPreviewKeyEvent = { e ->
