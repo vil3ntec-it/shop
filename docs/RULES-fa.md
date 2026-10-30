@@ -356,6 +356,7 @@
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
 | `hashchain.audit` | `security` | خاموش | زنجیرهٔ هشِ سابقه در `hash_chain`؛ روشن با `true` (و `1`، `"true"`، `"on"`) | #242 | main |
+| `auth.phone_add_code` | `security` | خاموش | افزودنِ شماره (راهِ ورود) به حسابِ بی‌شماره فقط با کدِ همان شماره و همان حساب: `POST /api/me/phone/code` و `phoneCode` در `PUT /api/me` (خاموش ⇒ درِ کد ۴۰۴ و رفتارِ امروز)؛ پیش از روشن کردن، برنامه‌ها `phoneCode` بفرستند (AUTH-08) | `claude/spec-auth-3` | باز |
 | `beta.shops`، `beta.devices` | `release` | فهرستِ خالی | کدام دکان/دستگاه نسخهٔ آزمایشی می‌گیرد؛ پنل: `/api/admin/release/beta` | F0-27، #265 | main |
 | `SYNC_V3_ENABLED` (محیط، نه `live_config`) | کلِ سرور | خاموش | `/api/sync/v3/*` (خاموش ⇒ ۴۰۴) | #233 | main |
 | `min_app_version_<app>` (پیکربندیِ پلن‌ها) | هر برنامه | خالی | پیامِ قرمزِ «پشتیبانی نمی‌شود»، بی قفل | #260 | main |
