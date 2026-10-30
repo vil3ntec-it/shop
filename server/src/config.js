@@ -112,6 +112,9 @@ const config = {
       knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
       dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
       knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+      //  SEC-06، سقفِ **هزینه** (واحدِ خُردِ sms_usage.cost_minor) در ۲۴ ساعت برای هر کانال؛ ۰ = خاموش
+      dailyCostMax:     num(process.env.OTP_SMS_DAILY_COST_MAX_MINOR, 0),      // کلِ سرور
+      shopDailyCostMax: num(process.env.OTP_SMS_SHOP_DAILY_COST_MAX_MINOR, 0), // هر دکان (ویترین)
     },
   },
 
