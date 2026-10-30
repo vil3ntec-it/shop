@@ -1210,7 +1210,7 @@
   </section>
 
   <section id="tab-imgbank" class="hidden">
-    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) ، صفِ بررسی (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09)، تکراری و بایگانی (IMG-BANK-13، IMG-BANK-15) -->
+    <!-- ماژولِ image-bank.js — ورودِ گروهی و گزارش (IMG-01، IMG-03، IMG-BANK-01، IMG-PRO-09) ، صفِ بررسی (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09)، تکراری و بایگانی (IMG-BANK-13، IMG-BANK-15)، مقایسهٔ اصل و نسخه (IMG-PRO-05، IMG-07) -->
     <div class="panel hidden" id="ib-off">
       <h2>بانکِ تصاویر</h2>
       <div class="msg msg-warn">بانکِ مرکزیِ تصاویر روشن نیست (پرچمِ <code>image_bank.central</code>). تا روشن نشود هیچ ورودی پذیرفته نمی‌شود.</div>
@@ -1324,6 +1324,23 @@
               <thead><tr><th>نام</th><th>برند</th><th>نوع/طعم</th><th>اندازه</th><th>بسته‌بندی</th><th>SKU · بارکد</th><th></th></tr></thead>
               <tbody id="ib-dt-cands"></tbody>
             </table>
+          </div>
+        </div>
+        <!-- IMG-PRO-05، IMG-07: اصل کنارِ نسخه، با بزرگ‌نماییِ هم‌گام؛ ردِ نسخه اصل و نسخهٔ جاری را نگه می‌دارد -->
+        <div class="hidden" id="ib-dt-cmp-box">
+          <h2 style="margin-top:14px;">مقایسهٔ اصل و نسخه — اصل هرگز عوض نمی‌شود</h2>
+          <div class="row" id="ib-dt-versions" style="flex-wrap:wrap;gap:6px;"></div>
+          <div class="row" style="margin-top:8px;">
+            <label style="margin:0;"><input type="checkbox" id="ib-cmp-zoom"> اندازهٔ واقعی (۱:۱) — دو قاب با هم می‌چرخند</label>
+          </div>
+          <div class="grid grid-2" style="margin-top:8px;">
+            <figure style="margin:0;"><figcaption class="muted" id="ib-cmp-a-cap"></figcaption><div class="ib-cmp" id="ib-cmp-a"><img id="ib-cmp-a-img" alt=""></div></figure>
+            <figure style="margin:0;"><figcaption class="muted" id="ib-cmp-b-cap"></figcaption><div class="ib-cmp" id="ib-cmp-b"><img id="ib-cmp-b-img" alt=""></div></figure>
+          </div>
+          <div class="row" style="margin-top:8px;">
+            <button class="btn btn-sm" id="btn-ib-ver-approve">جاری کردنِ این نسخه</button>
+            <button class="btn btn-sm btn-danger" id="btn-ib-ver-reject">ردِ این نسخه</button>
+            <span class="muted" id="ib-cmp-note"></span>
           </div>
         </div>
       </div>
