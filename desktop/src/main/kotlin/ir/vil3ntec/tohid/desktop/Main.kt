@@ -86,6 +86,7 @@ fun main() {
   ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
+  ir.vil3ntec.tohid.ShopDayChoice.load(context)
 
   var live: LiveSocket? = null
   runCatching {

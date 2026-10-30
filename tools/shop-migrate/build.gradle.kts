@@ -25,6 +25,9 @@ val legacyRoot = repoRoot.resolve("android-native/app/src/main/java")
 val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
+  //  LOC-03: `todayIso` روزِ کاری را از `ShopDay` می‌گیرد؛ `ShopDayChoice` (حالتِ Compose و Context)
+  //  این‌جا جانشینِ JVMِ خودش را در src/main دارد — همیشه نیمه‌شب، پس خروجی همان دیروز است
+  "ir/vil3ntec/tohid/core/calendar/ShopDay.kt",
   "ir/vil3ntec/tohid/Format.kt",
   //  Jalali.kt از LOC-01 به هستهٔ تقویم و متن تکیه دارد؛ LocaleChoice (حالتِ Compose)
   //  این‌جا جانشینِ JVMِ خودش را در src/main دارد
