@@ -22,7 +22,7 @@
 | CRM | ۱۶ | ۱ | ۹ | ۶ | ۰ | ۰ | ۰ |
 | RET | ۱۳ | ۳ | ۹ | ۱ | ۰ | ۰ | ۰ |
 | STF | ۱۱ | ۳ | ۵ | ۳ | ۰ | ۰ | ۰ |
-| RPT | ۱۸ | ۲ | ۸ | ۸ | ۰ | ۰ | ۰ |
+| RPT | ۱۸ | ۵ | ۵ | ۸ | ۰ | ۰ | ۰ |
 | HW | ۱۳ | ۲ | ۸ | ۳ | ۰ | ۰ | ۰ |
 | SYN | ۱۴ | ۶ | ۷ | ۱ | ۰ | ۰ | ۰ |
 | SEC | ۱۱ | ۴ | ۴ | ۳ | ۰ | ۰ | ۰ |
@@ -68,7 +68,7 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۱۱۵ | ۳۰۵ | ۲۳۱ | ۰ | ۹۰ | ۲۳ |
+| **همه** | ۷۶۴ | ۱۱۸ | ۳۰۲ | ۲۳۱ | ۰ | ۹۰ | ۲۳ |
 
 ## خلاصه به تفکیکِ فاز
 
@@ -76,7 +76,7 @@
 |---|---|---|---|---|---|---|---|
 | ۰ | ۳۲ | ۲۶ | ۳ | ۳ | ۰ | ۰ | ۰ |
 | ۱ | ۴۰ | ۱۷ | ۱۶ | ۵ | ۰ | ۲ | ۰ |
-| ۲ | ۱۱۳ | ۱۰ | ۷۴ | ۲۶ | ۰ | ۳ | ۰ |
+| ۲ | ۱۱۳ | ۱۳ | ۷۱ | ۲۶ | ۰ | ۳ | ۰ |
 | ۳ | ۷۷ | ۱۰ | ۲۷ | ۴۰ | ۰ | ۰ | ۰ |
 | ۴ | ۱۴۱ | ۱۲ | ۵۹ | ۶۱ | ۰ | ۲ | ۷ |
 | ۵ | ۸۲ | ۵ | ۱۱ | ۶۳ | ۰ | ۰ | ۳ |
@@ -369,15 +369,15 @@
 
 | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
 |---|---|---|---|---|---|---|---|---|---|
-| RPT-01 | داشبورد امروز با مقایسه با دیروز و هفته قبل. | §۶.۱۰ | ۲ | P0 | PARTIAL | داشبورد با مقایسه با بازهٔ قبل (DashboardEngine.Kpi؛ DashboardEngineTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ «همان روزِ هفتهٔ پیش» فقط در ReportCore (وصل نیست)؛ صفحهٔ «گزارشِ تازه» روی همین هسته پشتِ تنظیمِ خاموش (#279: ReportBoardVectorsTest، ReportBridgeParityTest، `report-board.test.js`) | — | — | پیش از v3؛ #236، #279 (afeb844) |
-| RPT-02 | فروش بر اساس کالا، دسته، کاربر، ساعت، روش پرداخت و کانال (حضوری یا اینترنتی). | §۶.۱۰ | ۲ | P0 | PARTIAL | برنامه: فروشِ دوره، هر کاربر و هر کالا (ReportEngineTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ دسته، ساعت، روشِ پرداخت و کانال فقط در ReportCore (report-core.test.js ۱۱/۱۱؛ Kotlin محلی ReportCoreVectorsTest ۲/۲)؛ صفحهٔ «گزارشِ تازه» روی همین هسته پشتِ تنظیمِ خاموش (#279: ReportBoardVectorsTest، ReportBridgeParityTest، `report-board.test.js`) | — | — | #236، #279 (afeb844) |
+| RPT-01 | داشبورد امروز با مقایسه با دیروز و هفته قبل. | §۶.۱۰ | ۲ | P0 | IMPLEMENTED-VERIFIED | «گزارشِ تازه» (پشتِ تنظیمِ خاموشِ `report_fresh`، همین دستگاه): کارت‌های خانه با تفاوت نسبت به دیروز و زبانهٔ «داشبورد امروز» با سه ردیفِ امروز، دیروز و همان روزِ هفتهٔ پیش، همه از `ReportCore.today` — ReportCoreVectorsTest، ReportBoardVectorsTest، ReportFreshModelTest «هر زبانه جدولِ خودش را…»، ReportBridgeParityTest؛ CIِ «توحید بومی» روی main ‏41081653448 (6e8acd9، `testReleaseUnitTest :core:jvmTest` سبز؛ پرونده‌های گزارش از 6e8acd9 تا a43a41b دست نخورده‌اند)؛ `cd server && node --test test/report-core.test.js test/report-board.test.js` ⇒ ۱۵/۱۵ (401b1a2). بی تنظیم همان داشبوردِ پیشین با مقایسه با بازهٔ قبل (DashboardEngineTest) | — | — | پیش از v3؛ #236، #279 (afeb844) |
+| RPT-02 | فروش بر اساس کالا، دسته، کاربر، ساعت، روش پرداخت و کانال (حضوری یا اینترنتی). | §۶.۱۰ | ۲ | P0 | IMPLEMENTED-VERIFIED | زبانهٔ «فروش» ِ گزارشِ تازه (پشتِ تنظیمِ خاموشِ `report_fresh`) شش تفکیک از `ReportCore.sales` با پخشِ تخفیف به «بزرگ‌ترین باقی‌مانده» (جمعِ هر تفکیک = جمعِ کل)؛ کاربر = فروشندهٔ فاکتور، کانال = `Sale.channel` (حضوری/اینترنتی)، روش = `paymentMethod` (پرداختِ چندروشی یک ردیفِ «ترکیبی») — ReportCoreVectorsTest، ReportFreshModelTest، ReportBridgeParityTest؛ CIِ «توحید بومی» روی main ‏41081653448 (6e8acd9، `testReleaseUnitTest :core:jvmTest` سبز؛ پرونده‌های گزارش از 6e8acd9 تا a43a41b دست نخورده‌اند)؛ `cd server && node --test test/report-core.test.js test/report-board.test.js` ⇒ ۱۵/۱۵ (401b1a2). بی تنظیم همان گزارشِ پیشینِ کالا/کاربر (ReportEngineTest) | — | — | #236، #279 (afeb844) |
 | RPT-03 | سود ناخالص و حاشیه بر اساس بهای میانگین موزون. | §۶.۱۰ | ۲ | P0 | PARTIAL | سود و حاشیه از قیمتِ خریدِ ثبت‌شده روی قلم (ReportEngineTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ بر پایهٔ میانگینِ موزون نه؛ صفحهٔ «گزارشِ تازه» روی همین هسته پشتِ تنظیمِ خاموش (#279: ReportBoardVectorsTest، ReportBridgeParityTest، `report-board.test.js`) | — | D-23 | #236، #279 (afeb844) |
 | RPT-04 | گزارش شیفت و پایان روز (X و Z). | §۶.۱۰ | ۲ | P0 | PARTIAL | جمعِ شیفتِ جاری و بستن (CashShift)؛ X/Z فقط در هسته (PAY-15) | — | — | #237 |
 | RPT-05 | ارزش و گردش موجودی، کالای راکد، پرفروش و کم‌فروش. | §۶.۱۰ | ۳ | P1 | IMPLEMENTED-VERIFIED | ارزش و گردشِ موجودی، پرفروش/کم‌فروش و بی‌فروش در گوشی و کامپیوتر: ReportEngineTest («ارزش موجودی…»، «پرفروش ها و کم فروش ها…»، «گردش موجودی…»)، DashboardEngineTest (CIِ اندرویدِ main ‏39268884098 سبز) | — | — | پیش از v3 |
-| RPT-06 | بدهی مشتری‌ها (سن بدهی) و طلب تأمین‌کنندگان. | §۶.۱۰ | ۲ | P0 | PARTIAL | گزارشِ قرض‌داران و بدهیِ تأمین‌کنندگان (ReportEngineTest، PurchaseBookTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ سنِ بدهی فقط در ReportCore؛ صفحهٔ «گزارشِ تازه» روی همین هسته پشتِ تنظیمِ خاموش (#279: ReportBoardVectorsTest، ReportBridgeParityTest، `report-board.test.js`) | — | — | پیش از v3؛ #236، #279 (afeb844) |
+| RPT-06 | بدهی مشتری‌ها (سن بدهی) و طلب تأمین‌کنندگان. | §۶.۱۰ | ۲ | P0 | IMPLEMENTED-VERIFIED | زبانهٔ «سن بدهی» ِ گزارشِ تازه (پشتِ تنظیمِ خاموشِ `report_fresh`؛ شاگرد هم فقط همین را می‌بیند): مانده، پیش‌پرداخت و ستون‌های ۰–۳۰/۳۱–۶۰/۶۱–۹۰/۹۱+ روز برای مشتری‌ها و طلبِ تأمین‌کنندگان از `ReportCore.debts` — ReportCoreVectorsTest، ReportFreshModelTest، ReportBoardVectorsTest (نشانِ «قرض بیش از … روز»)؛ CIِ «توحید بومی» روی main ‏41081653448 (6e8acd9، `testReleaseUnitTest :core:jvmTest` سبز؛ پرونده‌های گزارش از 6e8acd9 تا a43a41b دست نخورده‌اند)؛ `cd server && node --test test/report-core.test.js test/report-board.test.js` ⇒ ۱۵/۱۵ (401b1a2). بی تنظیم همان قرض‌داران و بدهیِ تأمین‌کنندگان (ReportEngineTest، PurchaseBookTest) | — | — | پیش از v3؛ #236، #279 (afeb844) |
 | RPT-07 | مصارف و سود خالص ساده. | §۶.۱۰ | ۳ | P1 | IMPLEMENTED-VERIFIED | مصارف و سودِ خالص در «سود و زیان»: ReportEngineTest «مصارف از سود ناخالص کم می شوند» (CIِ اندرویدِ main ‏39268884098 سبز) | — | — | پیش از v3 |
 | RPT-08 | نقشه حرارتی ساعت در برابر روز. | §۶.۱۰ | ۵ | P2 | MISSING | — | — | — | — |
-| RPT-09 | ضدتقلب: تخفیف، برگشت، لغو، حذف ردیف و باز کردن کشو به تفکیک کاربر. | §۶.۱۰ | ۲ | P1 | PARTIAL | ضدتقلبِ هر کاربر فقط در ReportCore (report-core.test.js ۱۱/۱۱)؛ وصل نیست؛ صفحهٔ «گزارشِ تازه» روی همین هسته پشتِ تنظیمِ خاموش (#279: ReportBoardVectorsTest، ReportBridgeParityTest، `report-board.test.js`) | — | — | #236، #279 (afeb844) |
+| RPT-09 | ضدتقلب: تخفیف، برگشت، لغو، حذف ردیف و باز کردن کشو به تفکیک کاربر. | §۶.۱۰ | ۲ | P1 | PARTIAL | هسته و زبانهٔ «ضدتقلب» ِ گزارشِ تازه کامل‌اند (ReportCoreVectorsTest، ReportFreshModelTest، `report-core.test.js`؛ CIِ main ‏41081653448 سبز)، ولی برنامه دادهٔ کاربرِ سه رویداد را نمی‌نویسد: هیچ‌جا سابقهٔ `line_delete` ساخته نمی‌شود (حذفِ ردیف همیشه صفر)، `cancel_sale` ِ `SalesEngine` و `SaleReturn` فیلدِ کاربر ندارند (لغو و برگشت «نامعلوم»). تخفیف (فروشندهٔ فاکتور) و کشو بی فروش (`no_sale` با `by`، پشتِ `payV2`) به تفکیکِ کاربرند | — | — | #236، #279 (afeb844) |
 | RPT-10 | گزارش مالیات سه‌ماهه (قابل تنظیم) با یادآور سررسید. | §۶.۱۰ | ۴ | P1 | MISSING | — | — | D-11، D-25 | — |
 | RPT-11 | خروجی Excel و PDF و چاپ در همه پلتفرم‌ها. | §۶.۱۰ | ۲ | P0 | PARTIAL | کامپیوتر: اکسل و چاپ؛ گوشی: CSV/اکسل و چاپِ سیستم (Xlsx، ReportCsv؛ XlsxTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ PDFِ مستقیم نیست | — | — | پیش از v3 |
 | RPT-12 | گزارش زمان‌بندی‌شده برای مالک. | §۶.۱۰ | ۳ | P1 | MISSING | — | — | D-09 | — |
