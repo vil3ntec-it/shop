@@ -8,7 +8,9 @@
  *   ۳) شکلِ پاسخ‌های امروز (کارت، جزئیات، پیگیریِ مشتری) دست نخورده: هیچ فیلدِ تازه‌ای بیرون نمی‌رود.
  *   ۴) قیدها: `channel` فقط storefront | market_app | api:<appId> | ''؛ مبلغِ منفی رد.
  *   ۵) گزارش‌ها و جمع‌های امروز (شمارشِ برگه‌ها، تطبیقِ دریافت) با پرکردنِ این ستون‌ها عوض نمی‌شوند.
- *   ۶) برگشت: همان خط‌های `rollback:` ِ خودِ فایلِ مهاجرت اجرا می‌شوند؛ داده و جمع‌ها دست نمی‌خورند؛
+ *   ۶) سیاستِ کارمزد (`lib/market-fees.js`): پیش‌فرض ۰؛ نرخِ ناصفر دقیق با گردِ نیم‌به‌بالا؛ هرگز منفی
+ *      و هرگز بیش از کلِ سفارش؛ سفارشِ کارمند ۰؛ تغییرِ تنظیمات سفارشِ ثبت‌شده را بازنویسی نمی‌کند.
+ *   ۷) برگشت: همان خط‌های `rollback:` ِ خودِ فایلِ مهاجرت اجرا می‌شوند؛ داده و جمع‌ها دست نمی‌خورند؛
  *      اجرای دوباره ستون‌ها را با پیش‌فرض روی ردیف‌های پیشین برمی‌گرداند.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '200';
@@ -19,6 +21,7 @@ const path = require('node:path');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
 const migrate = require('../src/migrate');
+const fees = require('../src/lib/market-fees');
 
 const MIGRATION = '130_order_market_fields.sql';
 const NEW_COLS = ['market_order_group_id', 'platform_fee_minor', 'commission_minor', 'channel'];
@@ -79,14 +82,20 @@ async function ticketFor(slug, phone) {
 }
 
 /** سفارشِ مشتری از درِ ویترین — بدنه عمداً فیلدهای بازار را هم می‌فرستد. */
-async function storefrontOrder(s, phone) {
+async function storefrontOrder(s, phone, { qtyMilli = 1000, key = `s10-${uniq()}-key`, status = 201 } = {}) {
   const r = await h.post(`/api/store/${s.slug}/checkout`, {
-    fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],
+    fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'rice', qtyMilli }],
     channel: 'api:evil', platformFeeMinor: 999, commissionMinor: 999, marketOrderGroupId: 'g-1',
-  }, { headers: { 'Idempotency-Key': `s10-${uniq()}-key`, 'X-Store-Ticket': await ticketFor(s.slug, phone) } });
-  assert.equal(r.status, 201, JSON.stringify(r.body));
+    platform_fee_minor: 999, commission_minor: 999,
+  }, { headers: { 'Idempotency-Key': key, 'X-Store-Ticket': await ticketFor(s.slug, phone) } });
+  assert.equal(r.status, status, JSON.stringify(r.body));
   return r.body.order;
 }
+
+/** تازه‌ترین سفارشِ یک دکان (بیشترین شماره). */
+const lastRow = (shopId) => one(
+  `SELECT id, source, subtotal_minor, discount_minor, delivery_fee_minor, total_minor
+     FROM online_orders WHERE shop_id=$1 ORDER BY order_no DESC LIMIT 1`, [shopId]);
 
 /** سفارشِ دستیِ کارمند — همان بدنهٔ اضافه. */
 async function staffOrder(s) {
@@ -215,6 +224,119 @@ test('گزارش‌ها و جمع‌های امروز با پرشدنِ این �
   const d = (await h.get(`/api/shop/orders/${b.id}`, { token: s.token })).body.order;
   assert.equal(d.totalMinor, b.totalMinor);
   assert.equal(d.subtotalMinor, b.subtotalMinor);
+});
+
+test('سیاستِ کارمزد (حسابِ خالص): پایه = کالا پس از تخفیف، گردِ نیم‌به‌بالا، هرگز منفی و هرگز بیش از کلِ سفارش', () => {
+  const o = (subtotalMinor, discountMinor = 0, deliveryFeeMinor = 0) =>
+    ({ subtotalMinor, discountMinor, totalMinor: subtotalMinor - discountMinor + deliveryFeeMinor });
+  const pf = (platformFeeBps, platformFeeFixedMinor = 0) => ({ platformFeeBps, platformFeeFixedMinor });
+  const cm = (commissionBps, commissionFixedMinor = 0) => ({ commissionBps, commissionFixedMinor });
+
+  //  پیش‌فرض (هیچ تنظیمی) ⇒ ۰
+  assert.deepEqual(fees.compute({}, o(12000)), { platformFeeMinor: 0, commissionMinor: 0 });
+  assert.deepEqual(fees.compute(undefined, o(12000)), { platformFeeMinor: 0, commissionMinor: 0 });
+
+  //  گرد کردن روی یک‌صدم: ‎.۴ پایین، ‎.۵ بالا، ‎.۶ بالا
+  assert.equal(fees.compute(pf(4), o(1000)).platformFeeMinor, 0);    // 0.4
+  assert.equal(fees.compute(pf(5), o(1000)).platformFeeMinor, 1);    // 0.5
+  assert.equal(fees.compute(pf(14), o(1000)).platformFeeMinor, 1);   // 1.4
+  assert.equal(fees.compute(pf(15), o(1000)).platformFeeMinor, 2);   // 1.5
+  assert.equal(fees.compute(cm(13), o(12000)).commissionMinor, 16);  // 15.6
+  assert.deepEqual(fees.compute({ ...pf(13, 100), ...cm(7) }, o(15000)), { platformFeeMinor: 120, commissionMinor: 11 }); // 19.5+100، 10.5
+
+  //  پایه: تخفیف کم می‌شود، هزینهٔ رساندن نه؛ تخفیفِ بیش از کالا ⇒ پایهٔ ۰ (فقط مبلغِ ثابت)
+  assert.equal(fees.compute(pf(1000), o(10000, 2000)).platformFeeMinor, 800);
+  assert.equal(fees.compute(pf(100), o(10000, 0, 5000)).platformFeeMinor, 100);
+  assert.deepEqual(fees.compute({ ...pf(5000, 30), ...cm(5000) }, { subtotalMinor: 100, discountMinor: 500, totalMinor: 50 }),
+    { platformFeeMinor: 30, commissionMinor: 0 });
+
+  //  سقف: هر کدام ≤ کل، و جمعِ هر دو ≤ کل (کارمزد اول)
+  assert.deepEqual(fees.compute({ ...pf(0, 5000), ...cm(10000) }, o(3000)), { platformFeeMinor: 3000, commissionMinor: 0 });
+  assert.deepEqual(fees.compute({ ...pf(0, 2000), ...cm(0, 2000) }, o(3000)), { platformFeeMinor: 2000, commissionMinor: 1000 });
+  assert.deepEqual(fees.compute({ ...pf(10000), ...cm(10000) }, o(3000)), { platformFeeMinor: 3000, commissionMinor: 0 });
+
+  //  مقدارِ نامعتبر ⇒ ۰ (نادیده)، هرگز منفی
+  for (const bad of [-1, 1.5, '100', null, NaN, Infinity, true, [100], { v: 1 }]) {
+    assert.deepEqual(fees.compute({ ...pf(bad, bad), ...cm(bad, bad) }, o(12000)),
+      { platformFeeMinor: 0, commissionMinor: 0 }, String(bad));
+  }
+  assert.deepEqual(fees.compute({ ...pf(fees.MAX_BPS + 1), ...cm(fees.MAX_BPS + 1) }, o(12000)),
+    { platformFeeMinor: 0, commissionMinor: 0 }, 'bps بیش از ۱۰۰٪');
+  assert.equal(fees.compute(pf(0, fees.MAX_FIXED_MINOR + 1), o(12000)).platformFeeMinor, 0);
+
+  //  عددِ بزرگ بی گم شدنِ دقت (BigInt)
+  const big = Number.MAX_SAFE_INTEGER;
+  assert.deepEqual(fees.compute({ ...pf(10000), ...cm(10000) }, o(big)), { platformFeeMinor: big, commissionMinor: 0 });
+  assert.equal(fees.compute(pf(1), o(big)).platformFeeMinor, Number((BigInt(big) + 5000n) / 10000n));
+});
+
+test('سیاستِ کارمزد روی سفارشِ ویترین: پیش‌فرض ۰؛ نرخِ ناصفر دقیق؛ کارمند ۰؛ تغییرِ تنظیمات سفارشِ ثبت‌شده را بازنویسی نمی‌کند', async () => {
+  const s = await liveStore('کارمزد');
+
+  //  ۱) پیش‌فرض: هیچ کلیدی نیست ⇒ ۰
+  await storefrontOrder(s, '0791110010');
+  const r0 = await lastRow(s.shopId);
+  assert.equal(r0.source, 'storefront');
+  assert.equal(Number(r0.subtotal_minor), 12000, 'برنج ۱۲۰ افغانی ⇒ ۱۲٬۰۰۰ یک‌صدم');
+  assert.deepEqual(norm(await marketCols(r0.id)), inert('storefront'));
+
+  //  ۲) نرخِ ناصفر برای همین دکان (scope ِ دکان)
+  await setFlag(s.shopId, 'market.platform_fee_bps', 13);
+  await setFlag(s.shopId, 'market.platform_fee_fixed_minor', 100);
+  await setFlag(s.shopId, 'market.commission_bps', 7);
+  const keyA = `s10-fee-${uniq()}-a`;
+  await storefrontOrder(s, '0791110011', { key: keyA });
+  const a = await lastRow(s.shopId);
+  //  پایه ۱۲٬۰۰۰: کارمزد = گرد(15.6)=16 + 100 = 116؛ کمیسیون = گرد(8.4) = 8
+  assert.deepEqual(norm(await marketCols(a.id)), { ...inert('storefront'), platform_fee_minor: 116, commission_minor: 8 });
+  await storefrontOrder(s, '0791110012', { qtyMilli: 1250 });
+  const b = await lastRow(s.shopId);
+  assert.equal(Number(b.subtotal_minor), 15000);
+  //  پایه ۱۵٬۰۰۰: کارمزد = گرد(19.5)=20 + 100 = 120؛ کمیسیون = گرد(10.5) = 11 (نیم به بالا)
+  assert.deepEqual(norm(await marketCols(b.id)), { ...inert('storefront'), platform_fee_minor: 120, commission_minor: 11 });
+  //  سفارشِ دستیِ کارمند با همان تنظیمات ⇒ ۰
+  const st = await staffOrder(s);
+  assert.deepEqual(norm(await marketCols(st.id)), inert(''));
+  //  مبلغ‌های خودِ سفارش دست نخورده
+  assert.equal(Number(a.total_minor), 12000);
+  assert.equal(Number(b.total_minor), 15000);
+
+  //  ۳) تنظیمات عوض می‌شود ⇒ سفارش‌های ثبت‌شده همان می‌مانند
+  await setFlag(s.shopId, 'market.platform_fee_bps', 0);
+  await setFlag(s.shopId, 'market.commission_bps', 500);
+  assert.deepEqual(norm(await marketCols(a.id)), { ...inert('storefront'), platform_fee_minor: 116, commission_minor: 8 });
+  assert.deepEqual(norm(await marketCols(b.id)), { ...inert('storefront'), platform_fee_minor: 120, commission_minor: 11 });
+  //  تکرارِ همان کلید: همان سفارش، بی ردیفِ تازه و بی حسابِ دوباره
+  const n = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [s.shopId])).n;
+  await storefrontOrder(s, '0791110011', { key: keyA, status: 200 });
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [s.shopId])).n, n);
+  assert.deepEqual(norm(await marketCols(a.id)), { ...inert('storefront'), platform_fee_minor: 116, commission_minor: 8 });
+  //  گذارِ وضعیت هم دستش نمی‌زند
+  await deliverPickup(s, a.id);
+  assert.deepEqual(norm(await marketCols(a.id)), { ...inert('storefront'), platform_fee_minor: 116, commission_minor: 8 });
+  //  سفارشِ تازه با نرخِ تازه: کارمزد = 0 + 100؛ کمیسیون = 5٪ ِ ۱۲٬۰۰۰ = 600
+  await storefrontOrder(s, '0791110013');
+  const c = await lastRow(s.shopId);
+  assert.deepEqual(norm(await marketCols(c.id)), { ...inert('storefront'), platform_fee_minor: 100, commission_minor: 600 });
+
+  //  ۴) scope ِ دکان بر `all` جلو می‌افتد؛ نبودنِ کلید در دکان ⇒ مقدارِ `all`
+  await setFlag('all', 'market.platform_fee_bps', 50);
+  try {
+    await storefrontOrder(s, '0791110014');
+    const d = await lastRow(s.shopId);
+    assert.equal(Number((await marketCols(d.id)).platform_fee_minor), 100, 'دکان ۰ گفته ⇒ فقط مبلغِ ثابت');
+    const other = await liveStore('کارمزد-دیگر');
+    await storefrontOrder(other, '0791110015');
+    const e = await lastRow(other.shopId);
+    assert.deepEqual(norm(await marketCols(e.id)), { ...inert('storefront'), platform_fee_minor: 60 }, '۰٫۵٪ ِ ۱۲٬۰۰۰');
+  } finally {
+    const del = await h.del('/api/admin/pump/live-config', { token: admin, body: { scope: 'all', key: 'market.platform_fee_bps' } });
+    assert.equal(del.status, 200, JSON.stringify(del.body));
+  }
+  //  گزارش‌ها همان دادهٔ پیشین را می‌شمارند؛ ستون‌های کارمزد در هیچ پاسخی بیرون نمی‌روند
+  const det = await h.get(`/api/shop/orders/${a.id}`, { token: s.token });
+  assert.equal(det.status, 200, JSON.stringify(det.body));
+  noNewKeys(det.body.order, 'جزئیات');
 });
 
 //  ⛔ آخرین آزمونِ این پرونده: طرح را برمی‌گرداند و دوباره می‌سازد.
