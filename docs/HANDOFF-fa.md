@@ -54,6 +54,17 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-s2-public-views` (S2 و S4 ِ قراردادِ بازار)
+- انجام شد: `server/src/lib/public-views.js` (فهرستِ سفیدِ همهٔ شکل‌های عمومی + `SCHEMA_VERSION = 1`)؛ سازنده‌های امروزِ
+  `/store` و `/market` (`profile`، `productView`، `publicOrder`، `cardOf`، `feedItem`، جست‌وجو، «سفارش‌های من»، خریدِ دوباره)
+  از آن می‌گذرند، با ترتیبِ کلیدِ همان ورودی ⇒ پاسخ بی تغییر. نمونهٔ مشترک `core/test-vectors/market-public-v1.json`؛
+  آزمون‌ها `server/test/public-views.test.js` و `core/src/jvmTest/.../market/MarketContractTest.kt`؛ مدل‌ها در
+  `core/src/commonMain/.../market/MarketContract.kt` (kotlinx.serialization 1.7.3، همان نسخهٔ اندروید). کارِ `test` در core
+  = `jvmTest`، و گامِ «آزمونِ core» در `tohid-desktop.yml`.
+- نیمه‌کاره/بیرون از کار: `store.delivery` (ناحیه‌ها، §۱.۵) و پاسخ‌های بازه/ناحیه/گفت‌وگو/حساب هنوز از ماژول نمی‌گذرند؛
+  `delivery` (پیک) شکلش ثابت شده ولی در هیچ پاسخی نیست (S5)؛ `schemaVersion` فقط در کد و پرونده است، نه در پاسخ.
+- قدمِ بعدی: S1 (خواندن از کاتالوگِ واحد) یا S5 (پیک برای مشتری) — هر فیلدِ تازه ⇒ نسخهٔ ۲ و پروندهٔ `market-public-v2.json`.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/great-ptolemy-ptt10v`
 - انجام شد: بندِ ۴ِ `CLAUDE.md` (هر سه اسکیل در هر سیزن) و بندِ ۷ (چتِ معمولی بی دست‌زدن به پروژه) و هوکِ
   `SessionStart` (PR #413)؛ ممیزیِ وضعیتِ پروژه در برابرِ سندِ v32 (همین فایل).

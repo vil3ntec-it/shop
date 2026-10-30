@@ -19,6 +19,7 @@ const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
+const views = require('../lib/public-views');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const audit = require('../lib/audit');
@@ -63,7 +64,7 @@ router.get('/:slug', readLimit, store, wrap(async (req, res) => {
     sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
   ]);
   res.json({
-    store: { ...sf.profile(req.store, cats, status), delivery },
+    store: views.view('shop', { ...sf.profile(req.store, cats, status), delivery }),
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -96,7 +97,7 @@ router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
   const stock = out.items.length
     ? await require('../lib/catalog').publicStock(req.store.shop_id, out.items.map((p) => p.id)) : null;
   if (stock) out.items = out.items.map((p) => ({ ...p, stock: stock.get(p.id) || p.stock }));
-  res.json(out);
+  res.json({ ...out, items: views.list('product', out.items) });
 }));
 
 //  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────

@@ -40,6 +40,7 @@ const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
 const shelf = require('./storefront-shelf');
+const views = require('./public-views');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -233,7 +234,7 @@ async function statusOf(sf, at = now()) {
 }
 
 function profile(sf, categories = [], status = null) {
-  return {
+  return views.view('shop', {
     slug: sf.slug,
     title: sf.title,
     tagline: sf.tagline,
@@ -247,7 +248,7 @@ function profile(sf, categories = [], status = null) {
     //  پرداختِ آنلاین منتظرِ D-08 است (🔌) — تا آن روز هیچ دکمه‌ای نیست
     payment: { methods: ['cod'], online: { available: false, decision: 'D-08' } },
     categories,
-  };
+  });
 }
 
 /** قیمتِ واحد به یک‌صدمِ افغانی — قیمتِ آنلاین، وگرنه قیمتِ فروشِ دفتر؛ نبود ⇒ null. */
@@ -262,7 +263,7 @@ function priceOf(row) {
 
 function productView(row) {
   const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
-  return {
+  return views.view('product', {
     id: row.id,
     name: text(d.name, 200),
     unit: text(d.unit, 30),
@@ -272,7 +273,7 @@ function productView(row) {
     photo: row.has_photo === true,
     //  ۳۲.۱/۳۲.۳: سرور هنوز دفترِ موجودی ندارد ⇒ «در حال بررسی»، هرگز «موجود»
     stock: { status: 'unverified', checkedAt: null },
-  };
+  });
 }
 
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
@@ -404,7 +405,7 @@ async function highlights(shopId, at = now()) {
   const [bestsellers, newArrivals] = await Promise.all([
     shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
   ]);
-  return { bestsellers, newArrivals, windowDays: 30 };
+  return { bestsellers: views.list('product', bestsellers), newArrivals: views.list('product', newArrivals), windowDays: 30 };
 }
 
 function specsOf(v) {
@@ -454,7 +455,10 @@ async function productDetail(shopId, productId) {
   const [similar, complementary] = await Promise.all([
     shelfOf(sameCat.map((r) => r.product_id)), shelfOf(together.map((r) => r.product_id)),
   ]);
-  return { product, similar, complementary };
+  return {
+    product: views.view('product', product),
+    similar: views.list('product', similar), complementary: views.list('product', complementary),
+  };
 }
 
 /**
@@ -636,7 +640,7 @@ function orderIdOf(shopId, token) {
 
 /** نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی. */
 function publicOrder(o, token) {
-  return {
+  return views.view('order', {
     token,
     orderNo: o.orderNo,
     status: o.status,
@@ -666,7 +670,7 @@ function publicOrder(o, token) {
     timeline: o.events
       .filter((e) => e.kind === 'created' || e.kind === 'status')
       .map((e) => ({ status: e.toStatus, at: e.at })),
-  };
+  });
 }
 
 const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
@@ -838,10 +842,10 @@ async function myOrders(sf, ticket, session = '') {
       ORDER BY created_at DESC, id DESC LIMIT 20`,
     [sf.shop_id, phone]
   );
-  return rows.map((r) => ({
+  return views.list('orderSummary', rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
-  }));
+  })));
 }
 
 /**
@@ -873,13 +877,13 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
   ) : [];
   const last = page[page.length - 1];
   return {
-    orders: page.map((r) => ({
+    orders: views.list('orderSummary', page.map((r) => ({
       orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
       scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
       preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
       token: tokenOf(sf.shop_id, r.id),
-    })),
+    }))),
     nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
   };
 }
@@ -896,7 +900,7 @@ async function reorder(sf, token) {
   const byId = new Map(live.map((p) => [p.id, p]));
   return {
     orderNo: o.orderNo,
-    lines: o.lines.map((l) => {
+    lines: views.list('reorderLine', o.lines.map((l) => {
       const p = byId.get(l.productId);
       const ok = Boolean(p && p.priceMinor !== null && p.name) && shelf.suggestable(p);
       const qtyMilli = ok && p.maxQtyMilli !== null ? Math.min(l.qtyMilli, p.maxQtyMilli) : l.qtyMilli;
@@ -909,7 +913,7 @@ async function reorder(sf, token) {
         reason: ok ? '' : (p && p.priceMinor !== null ? 'out_of_stock' : 'not_in_store'),
         stock: ok ? p.stock : null,
       };
-    }),
+    })),
   };
 }
 
@@ -1206,7 +1210,7 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, publicOrder,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن

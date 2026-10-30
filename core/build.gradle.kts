@@ -18,6 +18,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  */
 plugins {
   kotlin("multiplatform") version "2.2.20"
+  //  مدل‌های قراردادِ بازار (`market/`) — فقط تجزیهٔ JSON؛ نسخهٔ کتابخانه همان
+  //  `android-native/app` (۱.۷.۳) تا گرافِ وابستگیِ اندروید عوض نشود؛ کامپیوتر ۱.۹.۰ دارد و همان می‌ماند.
+  kotlin("plugin.serialization") version "2.2.20"
 }
 
 group = "ir.vil3ntec.tohid"
@@ -32,9 +35,22 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
+  sourceSets {
+    commonMain.dependencies { api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") }
+    //  آزمونِ قراردادِ بازار (`MarketContractTest`) — همان `test-vectors/market-public-v1.json` ِ آزمونِ سرور
+    jvmTest.dependencies { implementation(kotlin("test")) }
+  }
   if (iosSpike) {
     iosArm64()
     iosSimulatorArm64()
     sourceSets.iosTest.dependencies { implementation(kotlin("test")) }
   }
+}
+
+//  `cd core && ../desktop/gradlew test` — پروژهٔ چندسکویی کارِ `test` ندارد؛ همان `jvmTest`
+//  (آزمون‌های `src/jvmTest`، مثلِ `MarketContractTest`). در گرافِ برنامه‌ها اثری ندارد.
+tasks.register("test") {
+  group = "verification"
+  description = "آزمون‌های jvmِ core"
+  dependsOn("jvmTest")
 }
