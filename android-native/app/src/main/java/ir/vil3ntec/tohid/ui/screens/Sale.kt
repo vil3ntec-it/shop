@@ -273,6 +273,19 @@ fun SaleScreen(
     for (code in ir.vil3ntec.tohid.sync.PhoneScanner.inbox) onBarcode(code, skipDedup = true, fromPhone = true)
   }
 
+  //  HW-05 (فقط با «ابزارهای تازهٔ دستگاه»): اسکنی که در کادرِ قیمت/تعداد افتاد و نگهبانِ `NumberField`
+  //  برش گرداند (`ScanRouter.dispatch`) به همین سبد می‌رسد — همان کارِ `DeskSale` در کامپیوتر
+  val scanOwner = remember { Any() }
+  val hwTools = ir.vil3ntec.tohid.print.HwTools.on.value
+  DisposableEffect(hwTools) {
+    if (hwTools) ir.vil3ntec.tohid.scan.ScanRouter.register(scanOwner) { onBarcode(it, skipDedup = true); true }
+    onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(scanOwner) }
+  }
+  //  …و اسکنی که بیرون از صندوق از کادرِ عدد برگشت و صندوق را باز کرد (`ScanRouter.toSale`)
+  LaunchedEffect(hwTools) {
+    if (hwTools) for (code in ir.vil3ntec.tohid.scan.ScanRouter.toSale) onBarcode(code, skipDedup = true)
+  }
+
   /*
    *  بارکدخوانِ سخت‌افزاری — کابلی یا بلوتوثی.
    *
@@ -324,7 +337,8 @@ fun SaleScreen(
         //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
         val ch = event.scanChar(allowSpace = true)
         if (ch != null) {
-          hid.feed(ch, now)
+          //  HW-05: بارکدخوانی که به‌جای Enter پسوندِ تنظیم‌شده می‌زند همین‌جا تمام می‌شود
+          hid.feed(ch, now)?.let { onBarcode(it, skipDedup = true) }
           return@onKeyEvent true
         }
         false

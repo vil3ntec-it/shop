@@ -11,6 +11,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import ir.vil3ntec.tohid.scan.scanChar
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -216,6 +220,7 @@ private fun ScannersPanel() {
       "اگر حروف به‌هم‌ریخته آمد، زبانِ صفحه‌کلید را انگلیسی کنید یا بارکدخوان را روی «USB HID / Keyboard» بگذارید (از دفترچهٔ خودش).",
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
+    if (ir.vil3ntec.tohid.print.HwTools.on.value) { Spacer(Modifier.height(10.dp)); ScannerTools() }
   }
 }
 
@@ -373,6 +378,71 @@ private fun PhotosPanel() {
       Text("عکس‌های تازه (از هر دستگاه) خودکار بهتر شوند", modifier = Modifier.weight(1f), color = Shop.colors.text,
         style = MaterialTheme.typography.bodyMedium)
       Switch(checked = auto, onCheckedChange = { auto = it; bot.setAuto(context, it) })
+    }
+  }
+}
+
+/**
+ *  HW-05 و HW-11 (با «ابزارهای تازهٔ دستگاه»): تنظیمِ بارکدخوانِ همین دستگاه — آستانه، پیشوند، پسوند —
+ *  و «اسکنِ آزمون» که زمانِ نویسه‌ها را می‌سنجد و می‌گوید با این تنظیم اسکن شناخته می‌شود یا نه
+ *  (`core/hw/ScanCheck`). روی بارکدخوانِ واقعی آزموده نشده.
+ */
+@Composable
+private fun ScannerTools() {
+  val context = LocalContext.current
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.scan.ScanPrefs.load(context) }
+  val saved = ir.vil3ntec.tohid.scan.ScanPrefs.saved.value
+  var gap by remember(saved) { mutableStateOf(saved.maxGapMs.toString()) }
+  var prefix by remember(saved) { mutableStateOf(saved.prefix) }
+  var suffix by remember(saved) { mutableStateOf(saved.suffix) }
+  var probe by remember { mutableStateOf("") }
+  val keys = remember { mutableListOf<Pair<Char, Long>>() }
+  var report by remember { mutableStateOf<ir.vil3ntec.tohid.core.hw.ScanCheck.Report?>(null) }
+  fun save(c: ir.vil3ntec.tohid.core.hw.ScanConfig) = ir.vil3ntec.tohid.scan.ScanPrefs.save(context, c)
+
+  Text("تنظیمِ بارکدخوانِ همین دستگاه", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    OutlinedTextField(gap, { gap = it.filter(Char::isDigit).take(3) }, label = { Text("آستانه (میلی‌ثانیه)") },
+      singleLine = true, modifier = Modifier.weight(1f))
+    OutlinedTextField(prefix, { prefix = it.take(8) }, label = { Text("پیشوند") }, singleLine = true, modifier = Modifier.weight(1f))
+    OutlinedTextField(suffix, { suffix = it.take(8) }, label = { Text("پسوند") }, singleLine = true, modifier = Modifier.weight(1f))
+  }
+  Text("پیش‌فرض ۵۰ میلی‌ثانیه، بی پیشوند و پسوند. بارکدخوانِ بلوتوثیِ کند تا ۳۰۰. پیشوند/پسوند همان نویسه‌هایی است که خودِ بارکدخوان دورِ کد می‌گذارد.",
+    style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  OutlinedButton(onClick = {
+    save(saved.copy(maxGapMs = gap.toLongOrNull() ?: saved.maxGapMs, prefix = prefix, suffix = suffix))
+  }) { Text("ذخیرهٔ تنظیمِ بارکدخوان") }
+  Spacer(Modifier.height(8.dp))
+  OutlinedTextField(
+    value = probe,
+    onValueChange = { v -> probe = if (v.contains('\n')) "" else v.take(64) },
+    label = { Text("اسکنِ آزمون: این‌جا بزنید و یک کالا اسکن کنید") },
+    singleLine = false, maxLines = 2,
+    modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { e ->
+      if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+      val now = System.currentTimeMillis()
+      if (e.key == androidx.compose.ui.input.key.Key.Enter || e.key == androidx.compose.ui.input.key.Key.NumPadEnter) {
+        report = ir.vil3ntec.tohid.core.hw.ScanCheck.evaluate(keys.toList(), now, ir.vil3ntec.tohid.scan.ScanPrefs.saved.value)
+        keys.clear()
+      } else {
+        val ch = e.scanChar(allowSpace = true) ?: return@onPreviewKeyEvent false
+        //  دو ثانیه سکوت ⇒ تلاشِ تازه
+        if (keys.isNotEmpty() && now - keys.last().second > 2_000) keys.clear()
+        keys += ch to now
+        //  بارکدخوانِ بی Enter: پسوند خودش پایان است
+        val sfx = ir.vil3ntec.tohid.scan.ScanPrefs.saved.value.suffix
+        if (sfx.isNotEmpty() && keys.size > sfx.length && keys.takeLast(sfx.length).map { it.first }.joinToString("") == sfx) {
+          report = ir.vil3ntec.tohid.core.hw.ScanCheck.evaluate(keys.toList(), null, ir.vil3ntec.tohid.scan.ScanPrefs.saved.value)
+          keys.clear()
+        }
+      }
+      false
+    },
+  )
+  report?.let { r ->
+    Text(r.message, color = if (r.ok) Shop.colors.success else Shop.colors.danger, style = MaterialTheme.typography.bodySmall)
+    r.suggestGapMs?.let { g ->
+      TextButton(onClick = { save(saved.copy(maxGapMs = g)); report = null }) { Text("آستانه را $g میلی‌ثانیه کن") }
     }
   }
 }
