@@ -132,11 +132,20 @@ object PermCore {
   /** اصلاحِ ثبت‌شده‌ای که قلمی از برگشت را پیش‌تر گرفته است */
   data class Taken(val refId: String, val productId: String, val units: Double?)
 
+  /** یک قلمِ فاکتور: سقفِ حرکتِ `sale` و `sale_cancel` ِ همان کالا */
+  data class SaleLine(val id: String, val saleId: String, val productId: String, val qty: Double?)
+
+  /** حرکتِ انبارِ ثبت‌شده‌ای که از قلمی از سند برداشته است */
+  data class Moved(val refId: String, val productId: String, val type: String, val qty: Double?)
+
   /** نشانی‌های قاعدهٔ ردیف — همان `refs`ِ JS */
   data class RowRefs(
     val returns: List<ReturnLine> = emptyList(),
     val sales: Collection<String> = emptyList(),
     val taken: List<Taken> = emptyList(),
+    val saleItems: List<SaleLine> = emptyList(),
+    val cancelled: Collection<String> = emptyList(),
+    val moved: List<Moved> = emptyList(),
   )
 
   /** یک ردیفِ دسته: `row` = نمای درجِ تازه؛ null = ویرایش، حذف، ردیفِ موجود یا شناسهٔ تکراری */
@@ -189,19 +198,71 @@ object PermCore {
     return YES
   }
 
-  private fun checkMovement(row: Map<String, Any?>, refs: RowRefs): RowCheck {
+  /** ریزِ گرد کردنِ جمعِ اعشاری — همان `EPS` ِ JS */
+  private const val EPS = 1e-9
+
+  private class Slot(val key: String, val qty: Double?)
+
+  /** قلم‌هایی که حرکتِ این نوع با این نشانی و این کالا از آن‌ها برمی‌دارد — همان `moveLines` ِ JS */
+  private fun moveLines(refs: RowRefs, type: String, ref: String, productId: Any?): List<Slot> {
+    if (productId !is String || productId.isEmpty()) return emptyList()
+    if (DOC_MOVE_TYPES[type] == "sale") {
+      return refs.saleItems.filter { it.id.isNotEmpty() && it.saleId == ref && it.productId == productId }
+        .map { Slot("$type\u0000s\u0000${it.id}", it.qty?.takeIf { q -> q.isFinite() }) }
+    }
+    return ofProduct(linesOf(refs, ref), productId)
+      .map { Slot("$type\u0000r\u0000${it.id}", it.qty.takeIf { q -> q.isFinite() }) }
+  }
+
+  private fun room(lines: List<Slot>, spent: Map<String, Double>): Double {
+    var free = 0.0
+    for (l in lines) {
+      val q = l.qty
+      if (q != null && q > 0) free += maxOf(0.0, q - (spent[l.key] ?: 0.0))
+    }
+    return free
+  }
+
+  private fun spend(lines: List<Slot>, need0: Double, spent: MutableMap<String, Double>) {
+    var need = need0
+    for (l in lines) {
+      if (need <= EPS) break
+      val q = l.qty
+      if (q == null || q <= 0) continue
+      val take = minOf(need, maxOf(0.0, q - (spent[l.key] ?: 0.0)))
+      spent[l.key] = (spent[l.key] ?: 0.0) + take
+      need -= take
+    }
+  }
+
+  /** آنچه حرکت‌های ثبت‌شده (`moved`) از قلم‌ها برداشته‌اند — همان `spentLines` ِ JS */
+  private fun spentLines(refs: RowRefs): MutableMap<String, Double> {
+    val spent = HashMap<String, Double>()
+    for (m in refs.moved) {
+      if (m.type !in DOC_MOVE_TYPES || m.refId.isEmpty()) continue
+      val q = m.qty?.takeIf { it.isFinite() } ?: continue
+      spend(moveLines(refs, m.type, m.refId, m.productId), kotlin.math.abs(q), spent)
+    }
+    return spent
+  }
+
+  private fun checkMovement(row: Map<String, Any?>, refs: RowRefs, spent: MutableMap<String, Double>): RowCheck {
     val type = row["type"] as? String
     val doc = type?.let { DOC_MOVE_TYPES[it] } ?: return no("kind")
     val qty = num(row["qty"])
     if (!signOk(type, qty)) return no("sign")
     val ref = row["refId"] as? String
     if (ref.isNullOrEmpty()) return no("ref")
-    if (doc == "sale") return if (ref in refs.sales) YES else no("ref")
-    var lines = linesOf(refs, ref)
-    if (lines.isEmpty()) return no("ref")
-    lines = ofProduct(lines, row["productId"])
+    if (doc == "sale") {
+      if (ref !in refs.sales) return no("ref")
+      if (type == "sale_cancel" && ref !in refs.cancelled) return no("cancel")
+    } else if (linesOf(refs, ref).isEmpty()) return no("ref")
+    val lines = moveLines(refs, type, ref, row["productId"])
     if (lines.isEmpty()) return no("product")
-    return if (fits(lines, kotlin.math.abs(qty!!))) YES else no("qty")
+    val need = kotlin.math.abs(qty!!)
+    if (need > room(lines, spent) + EPS) return no("qty")
+    spend(lines, need, spent)
+    return YES
   }
 
   /** قلم‌هایی که اصلاحِ ثبت‌شده دارند — همان `usedLines`ِ JS */
@@ -219,10 +280,11 @@ object PermCore {
 
   /**
    *  داوریِ ردیف‌های یک دسته، به ترتیب — همان `checkRows`ِ JS (و همان دلیل‌ها:
-   *  table · not_insert · adjustment · price · kind · sign · ref · owner · product · qty · used · rule).
+   *  table · not_insert · adjustment · price · kind · sign · ref · cancel · owner · product · qty · used · rule).
    */
   fun checkRows(role: String, rows: List<RowIn>, refs: RowRefs): List<RowCheck> {
     val used = usedLines(refs)
+    val spent = spentLines(refs)
     return rows.map { r ->
       val rule = rowRule(role, r.table)
       val row = r.row
@@ -231,7 +293,7 @@ object PermCore {
         rule == null -> YES
         row == null -> no("not_insert")
         rule == "return_adjustment" -> checkAdjustment(row, refs, used)
-        rule == "doc_movement" -> checkMovement(row, refs)
+        rule == "doc_movement" -> checkMovement(row, refs, spent)
         else -> no("rule")
       }
     }

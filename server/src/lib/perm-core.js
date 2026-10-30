@@ -149,9 +149,13 @@
    *                       یک اصلاح (اصلاح‌های ثبت‌شده در `taken`).
    *    doc_movement       حرکتِ انبارِ یک سند: `type` یکی از DOC_MOVE_TYPES با علامتِ همان نوع،
    *                       `refId` = فاکتور (sale، sale_cancel) یا قلمِ برگشت (customer_return،
-   *                       damage) از همین دسته یا ثبت‌شده؛ برای برگشت همان کالا و |qty| نه بیش از قلم.
+   *                       damage) از همین دسته یا ثبت‌شده، و `productId` یکی از قلم‌های همان سند
+   *                       (`saleItems` یا قلمِ برگشت). جمعِ |qty| ِ هر نوع برای هر قلم — حرکت‌های
+   *                       ثبت‌شده (`moved`) و پذیرفته‌های پیشینِ همین دسته — نه بیش از مقدارِ قلم.
+   *                       `sale_cancel` فقط برای فاکتورِ لغوشده (`cancelled`: همین دسته یا ثبت‌شده).
    *  ردیف (`row`) نمای یک‌دستِ درج است با یکاهای برنامه (v3: Milli/Minor ÷ ۱۰۰۰/۱۰۰، کارِ گردآورنده).
-   *  refs = { returns: [{id, docId, productId, qty, own}], sales: [id], taken: [{refId, productId, units}] }
+   *  refs = { returns: [{id, docId, productId, qty, own}], sales: [id], taken: [{refId, productId, units}],
+   *           saleItems: [{id, saleId, productId, qty}], cancelled: [saleId], moved: [{refId, productId, type, qty}] }
    */
   var RETURN_ADJ_KINDS = ['customer_return', 'damage'];
   /** نوعِ حرکت ⇐ سندی که `refId` به آن اشاره می‌کند */
@@ -230,21 +234,75 @@
     return yes();
   }
 
-  function checkMovement(row, refs) {
+  /** ریزِ گرد کردنِ جمعِ اعشاری (۰٫۱ + ۰٫۲)؛ همان در کاتلین */
+  var EPS = 1e-9;
+  function listOf(refs, k) { return isObj(refs) && Array.isArray(refs[k]) ? refs[k] : []; }
+  /** قلم‌هایی که حرکتِ این نوع با این نشانی و این کالا از آن‌ها برمی‌دارد: {key, qty} */
+  function moveLines(refs, type, ref, productId) {
+    var doc = DOC_MOVE_TYPES[type];
+    if (!isId(productId)) return [];
+    if (doc === 'sale') {
+      var items = listOf(refs, 'saleItems');
+      var out = [];
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (isObj(it) && isId(it.id) && it.saleId === ref && it.productId === productId) {
+          out.push({ key: type + '\u0000s\u0000' + it.id, qty: num(it.qty) });
+        }
+      }
+      return out;
+    }
+    return ofProduct(linesOf(refs, ref), productId)
+      .map(function (r) { return { key: type + '\u0000r\u0000' + r.id, qty: num(r.qty) }; });
+  }
+  function room(lines, spent) {
+    var free = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var q = lines[i].qty;
+      if (q !== null && q > 0) free += Math.max(0, q - (spent[lines[i].key] || 0));
+    }
+    return free;
+  }
+  /** `need` را به ترتیب از قلم‌ها برمی‌دارد (ثبت‌شده‌ها بیش از جا را هم نمی‌گیرند) */
+  function spend(lines, need, spent) {
+    for (var i = 0; i < lines.length && need > EPS; i++) {
+      var q = lines[i].qty;
+      if (q === null || q <= 0) continue;
+      var take = Math.min(need, Math.max(0, q - (spent[lines[i].key] || 0)));
+      spent[lines[i].key] = (spent[lines[i].key] || 0) + take;
+      need -= take;
+    }
+  }
+  /** آنچه حرکت‌های ثبت‌شده (`moved`) از قلم‌ها برداشته‌اند */
+  function spentLines(refs) {
+    var spent = Object.create(null);
+    var moved = listOf(refs, 'moved');
+    for (var i = 0; i < moved.length; i++) {
+      var m = moved[i];
+      if (!isObj(m) || typeof m.type !== 'string' || !has(DOC_MOVE_TYPES, m.type) || !isId(m.refId)) continue;
+      var q = num(m.qty);
+      if (q === null) continue;
+      spend(moveLines(refs, m.type, m.refId, m.productId), Math.abs(q), spent);
+    }
+    return spent;
+  }
+
+  function checkMovement(row, refs, spent) {
     var doc = typeof row.type === 'string' && has(DOC_MOVE_TYPES, row.type) ? DOC_MOVE_TYPES[row.type] : null;
     if (!doc) return no('kind');
     var qty = num(row.qty);
     if (!signOk(row.type, qty)) return no('sign');
     if (!isId(row.refId)) return no('ref');
     if (doc === 'sale') {
-      var sales = isObj(refs) && Array.isArray(refs.sales) ? refs.sales : [];
-      return sales.indexOf(row.refId) >= 0 ? yes() : no('ref');
-    }
-    var lines = linesOf(refs, row.refId);
-    if (!lines.length) return no('ref');
-    lines = ofProduct(lines, row.productId);
+      if (listOf(refs, 'sales').indexOf(row.refId) < 0) return no('ref');
+      if (row.type === 'sale_cancel' && listOf(refs, 'cancelled').indexOf(row.refId) < 0) return no('cancel');
+    } else if (!linesOf(refs, row.refId).length) return no('ref');
+    var lines = moveLines(refs, row.type, row.refId, row.productId);
     if (!lines.length) return no('product');
-    return fits(lines, Math.abs(qty)) ? yes() : no('qty');
+    var need = Math.abs(qty);
+    if (need > room(lines, spent) + EPS) return no('qty');
+    spend(lines, need, spent);
+    return yes();
   }
 
   /** قلم‌هایی که اصلاحِ ثبت‌شده دارند (`refs.taken`): هر اصلاح یک قلم، با همان قاعدهٔ جا شدن */
@@ -267,10 +325,11 @@
    *  @param {Array<{table: string, row: Object|null}>} rows  `row` = نمای درجِ تازه؛ null =
    *         ویرایش، حذف، ردیفِ موجود یا شناسهٔ تکراریِ دسته
    *  @returns {Array<{ok: boolean, reason: string}>}  reason: '' | table | not_insert |
-   *         adjustment | price | kind | sign | ref | owner | product | qty | used | rule
+   *         adjustment | price | kind | sign | ref | cancel | owner | product | qty | used | rule
    */
   function checkRows(role, rows, refs) {
     var used = usedLines(refs);
+    var spent = spentLines(refs);
     var out = [];
     var list = Array.isArray(rows) ? rows : [];
     for (var i = 0; i < list.length; i++) {
@@ -280,7 +339,7 @@
       if (!rule) { out.push(yes()); continue; }
       if (!isObj(it.row)) { out.push(no('not_insert')); continue; }
       if (rule === 'return_adjustment') out.push(checkAdjustment(it.row, refs, used));
-      else if (rule === 'doc_movement') out.push(checkMovement(it.row, refs));
+      else if (rule === 'doc_movement') out.push(checkMovement(it.row, refs, spent));
       else out.push(no('rule'));
     }
     return out;

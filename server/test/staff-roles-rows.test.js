@@ -261,12 +261,16 @@ test('۴ — حرکتِ انبارِ صندوق‌دار فقط از فاکتو�
   assert.equal(can('cashier', 'stock.adjust'), false);
   assert.equal(can('cashier', 'stock.move'), false);
 
-  //  فاکتورِ همین دسته و فاکتورِ ثبت‌شده ⇒ می‌نشیند
+  //  فاکتورِ همین دسته (با قلمش) و لغوِ ثبت‌شدهٔ آن ⇒ می‌نشیند — همان ردیف‌های SalesEngine
   const sale = await push1('cashier', [
     v1op('sales', 's-mv', { total: 10, discount: 0, finalTotal: 10, status: 'completed' }),
+    v1op('saleItems', 'si-mv', { saleId: 's-mv', productId: 'pD', quantity: 1, unitPrice: 10 }),
     v1op('stockMovements', 'm-sale', { productId: 'pD', type: 'sale', qty: -1, refId: 's-mv' }),
   ]);
-  assert.deepEqual(reasons(sale), ['applied', 'applied'], JSON.stringify(sale.body));
+  assert.deepEqual(reasons(sale), ['applied', 'applied', 'applied'], JSON.stringify(sale.body));
+  //  صندوق‌دار sales.cancel ندارد (سرور cancel_not_allowed)؛ لغو را صاحب می‌زند، حرکتش را صندوق‌دار
+  const off = await push1('owner', [v1op('sales', 's-mv', { status: 'cancelled', cancelReason: 'آزمون' }, 'update')]);
+  assert.deepEqual(reasons(off), ['applied'], JSON.stringify(off.body));
   const back = await push1('cashier', [v1op('stockMovements', 'm-sale-x', { productId: 'pD', type: 'sale_cancel', qty: 1, refId: 's-mv' })]);
   assert.deepEqual(reasons(back), ['applied'], JSON.stringify(back.body));
   //  راهِ قدیم: فاکتورِ کامل (`/api/sales/full` حرکت را با saleId می‌نشاند)
@@ -275,6 +279,77 @@ test('۴ — حرکتِ انبارِ صندوق‌دار فقط از فاکتو�
     stockMovements: [{ productId: 'pD', qty: -1, type: 'sale' }],
   }, { token: T.cashier.accessToken });
   assert.equal(full.status, 201, JSON.stringify(full.body));
+});
+
+test('۵ — حرکتِ سند سقف دارد: کالای همان فاکتور، لغو فقط برای فاکتورِ لغوشده، و هر قلم تا مقدارش (v1، v3، قدیم)', async () => {
+  //  v1: فاکتورِ ثبت‌شده با ۲ عدد pF، لغونشده
+  assert.deepEqual(reasons(await push1('owner', [
+    v1op('sales', 's-cap', { total: 20, finalTotal: 20, status: 'completed' }),
+    v1op('saleItems', 'si-cap', { saleId: 's-cap', productId: 'pF', quantity: 2, unitPrice: 10 }),
+    v1op('returns', 'r-cap', { saleId: 's-cap', productId: 'pF', quantity: 2, amount: 0, docId: 'rd-cap' }),
+  ])), ['applied', 'applied', 'applied']);
+  const bad = async (fields) => {
+    const r = await push1('cashier', [v1op('stockMovements', `m-cap-${++n}`, fields)]);
+    assert.deepEqual(reasons(r), [DENY], `${JSON.stringify(fields)} ⇒ ${JSON.stringify(r.body)}`);
+  };
+  //  یافتهٔ ۱: لغوِ فروشِ لغونشده، کالای بیرون از فاکتور، بیش از قلم
+  await bad({ productId: 'pF', type: 'sale_cancel', qty: 1, refId: 's-cap' });
+  await bad({ productId: 'pX', type: 'sale', qty: -1, refId: 's-cap' });
+  await bad({ productId: 'pF', type: 'sale', qty: -3, refId: 's-cap' });
+  //  یافتهٔ ۲: برگشتِ تکراری روی همان قلم — یک بار می‌نشیند، بارِ دوم (و با docId) نه
+  const once = await push1('cashier', [v1op('stockMovements', 'm-cap-ret', { productId: 'pF', type: 'customer_return', qty: 2, refId: 'r-cap' })]);
+  assert.deepEqual(reasons(once), ['applied'], JSON.stringify(once.body));
+  await bad({ productId: 'pF', type: 'customer_return', qty: 1, refId: 'r-cap' });
+  await bad({ productId: 'pF', type: 'customer_return', qty: 1, refId: 'rd-cap' });
+  const twice = await push1('cashier', [
+    v1op('stockMovements', 'm-cap-d1', { productId: 'pF', type: 'damage', qty: -2, refId: 'r-cap' }),
+    v1op('stockMovements', 'm-cap-d2', { productId: 'pF', type: 'damage', qty: -1, refId: 'r-cap' }),
+  ]);
+  assert.deepEqual(reasons(twice), ['applied', DENY], JSON.stringify(twice.body));
+  assert.equal(await v1Exists('stockMovements', 'm-cap-d2'), false);
+  //  پس از لغوِ فاکتور (صاحب؛ صندوق‌دار sales.cancel ندارد) ⇒ لغو تا مقدارِ قلم؛ بیش از آن نه
+  assert.deepEqual(reasons(await push1('owner', [v1op('sales', 's-cap', { status: 'cancelled' }, 'update')])), ['applied']);
+  const cancel = await push1('cashier', [
+    v1op('stockMovements', 'm-cap-x1', { productId: 'pF', type: 'sale_cancel', qty: 2, refId: 's-cap' }),
+    v1op('stockMovements', 'm-cap-x2', { productId: 'pF', type: 'sale_cancel', qty: 1, refId: 's-cap' }),
+  ]);
+  assert.deepEqual(reasons(cancel), ['applied', DENY], JSON.stringify(cancel.body));
+  await bad({ productId: 'pF', type: 'sale_cancel', qty: 1, refId: 's-cap' });
+
+  //  v3: لغوِ فاکتورِ لغونشده و برگشتِ تکراری در یک tx ⇒ کلِ tx برمی‌گردد
+  const s3 = await push3('owner', [
+    v3op('o', 'sales', 's3-cap', { totalMinor: 2000, finalTotalMinor: 2000, status: 'completed' }, 'tx-s3cap'),
+    v3op('o', 'saleItems', 'si3-cap', { saleId: 's3-cap', productId: 'pF', quantityMilli: 2000, unitPriceMinor: 1000 }, 'tx-s3cap'),
+  ]);
+  assert.deepEqual(reasons(s3), ['applied', 'applied'], JSON.stringify(s3.body));
+  const x3 = await push3('cashier', [v3op('c', 'stockMovements', 'm3-cap-x', { productId: 'pF', type: 'sale_cancel', qtyMilli: 1000, refId: 's3-cap' })]);
+  assert.deepEqual(reasons(x3), [DENY], JSON.stringify(x3.body));
+  const r3 = await push3('cashier', [
+    v3op('c', 'returns', 'r3-cap', { saleId: 's3-cap', productId: 'pF', quantityMilli: 1000, amountMinor: 0, docId: 'rd3-cap' }, 'tx-r3cap'),
+    v3op('c', 'stockMovements', 'm3-cap-r1', { productId: 'pF', type: 'customer_return', qtyMilli: 1000, refId: 'r3-cap' }, 'tx-r3cap'),
+    v3op('c', 'stockMovements', 'm3-cap-r2', { productId: 'pF', type: 'customer_return', qtyMilli: 1000, refId: 'r3-cap' }, 'tx-r3cap'),
+  ]);
+  assert.ok(reasons(r3).includes(DENY), JSON.stringify(r3.body));
+  assert.equal(await v3Exists('stockMovements', 'm3-cap-r1'), false);
+  assert.equal(await v3Exists('returns', 'r3-cap'), false);
+  const s3sale = await push3('cashier', [v3op('c', 'stockMovements', 'm3-cap-s', { productId: 'pF', type: 'sale', qtyMilli: -2000, refId: 's3-cap' })]);
+  assert.deepEqual(reasons(s3sale), ['applied'], JSON.stringify(s3sale.body));
+  const s3more = await push3('cashier', [v3op('c', 'stockMovements', 'm3-cap-s2', { productId: 'pF', type: 'sale', qtyMilli: -1000, refId: 's3-cap' })]);
+  assert.deepEqual(reasons(s3more), [DENY], JSON.stringify(s3more.body));
+
+  //  راهِ قدیم: لغوِ فاکتورِ لغونشده (همه یا هیچ)
+  const lg = await h.post('/api/sales/full', {
+    sale: { id: 'lg-cap', total: 10, finalTotal: 10 }, items: [{ productId: 'pF', quantity: 1, unitPrice: 10 }],
+    stockMovements: [{ productId: 'pF', qty: -1, type: 'sale' }],
+  }, { token: T.cashier.accessToken });
+  assert.equal(lg.status, 201, JSON.stringify(lg.body));
+  const lgx = await legacy('cashier', [{ collection: 'stockMovements', id: 'lg-cap-x', updatedAt: Date.now(),
+    data: { productId: 'pF', qty: 1, type: 'sale_cancel', refId: 'lg-cap' } }]);
+  assert.equal(lgx.status, 403, JSON.stringify(lgx.body));
+  assert.equal(await lgExists('stock_movements', 'lg-cap-x'), false);
+  const lgs = await legacy('cashier', [{ collection: 'stockMovements', id: 'lg-cap-s2', updatedAt: Date.now(),
+    data: { productId: 'pF', qty: -1, type: 'sale', refId: 'lg-cap' } }]);
+  assert.equal(lgs.status, 403, `فروشِ دوم بیش از قلم: ${JSON.stringify(lgs.body)}`);
 });
 
 test('کنترل — حسابدار: v1/v3/قدیم/عکس هیچ نمی‌نشیند؛ op_id ِ تکراری هم فقط «تکراری» است', async () => {

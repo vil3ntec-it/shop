@@ -125,6 +125,13 @@ class PermCoreTest {
       taken = maps("taken").map {
         PermCore.Taken(it["refId"] as String, it["productId"] as String, (it["units"] as Number?)?.toDouble())
       },
+      saleItems = maps("saleItems").map {
+        PermCore.SaleLine(it["id"] as String, it["saleId"] as String, it["productId"] as String, (it["qty"] as Number?)?.toDouble())
+      },
+      cancelled = (m["cancelled"] as? List<*>).orEmpty().map { it as String },
+      moved = maps("moved").map {
+        PermCore.Moved(it["refId"] as String, it["productId"] as String, it["type"] as String, (it["qty"] as Number?)?.toDouble())
+      },
     )
   }
 

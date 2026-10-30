@@ -104,7 +104,7 @@ async function pushChanges(ctx, changes) {
       const data = ch?.data && typeof ch.data === 'object' && !Array.isArray(ch.data) ? ch.data : null;
       const insert = ch?.deleted !== true && !!data;
       const fits = insert && id.length <= 80 && Buffer.byteLength(JSON.stringify(data), 'utf8') <= MAX_RECORD_BYTES;
-      return { ch, table: String(ch?.collection || ''), rowId: id, insert, fresh: fits, fields: data, unit: 0 };
+      return { ch, table: String(ch?.collection || ''), rowId: id, insert, fresh: fits, live: fits, fields: data, unit: 0 };
     });
     const res = await roleRows.judge(role, items, roleRows.legacyDb(many, shopId, userId, TABLES));
     const bad = items.find((it) => res.has(it) && !res.get(it).ok);

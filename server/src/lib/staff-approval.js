@@ -598,7 +598,8 @@ async function offRoleV1(ctx, valid, { deviceId = '', rejected = new Map() } = {
   )).map((r) => r.op_id));
   const items = valid.map((x) => ({
     x, table: x.op.table, rowId: String(x.op.row_id || ''), insert: x.op.type === 'insert',
-    fresh: x.op.type === 'insert' && !seen.has(String(x.op.op_id)) && !rejected.has(x.i), fields: x.op.fields, unit: 0,
+    fresh: x.op.type === 'insert' && !seen.has(String(x.op.op_id)) && !rejected.has(x.i),
+    live: !seen.has(String(x.op.op_id)) && !rejected.has(x.i), fields: x.op.fields, unit: 0,
   }));
   const res = await roleRows.judge(ctx.role, items, roleRows.v1Db(many, ctx, deviceId));
   for (const it of items) if (res.has(it) && !res.get(it).ok) off.push(it.x);

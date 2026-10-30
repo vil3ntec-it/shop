@@ -709,7 +709,8 @@ async function judgeRows(ctx, plan, deviceId) {
   )).map((r) => r.op_id));
   const items = all.map(({ op, ui, broken }) => ({
     op, table: op.table, rowId: String(op.row_id || ''), insert: op.kind === 'insert',
-    fresh: op.kind === 'insert' && !broken && !dup.has(op.op_id), fields: op.fields, unit: ui,
+    fresh: op.kind === 'insert' && !broken && !dup.has(op.op_id), live: !broken && !dup.has(op.op_id),
+    cancel: op.kind === 'cancel', fields: op.fields, unit: ui,
   }));
   const res = await roleRows.judge(ctx.role, items, roleRows.v3Db(many, ctx, deviceId), { v3: true, perUnit: true });
   const out = new Map();

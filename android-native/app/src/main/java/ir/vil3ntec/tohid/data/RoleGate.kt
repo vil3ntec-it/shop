@@ -48,7 +48,7 @@ object RoleGate {
   /**
    *  قاعدهٔ ردیف (همان `PermCore.checkRows`ِ سرور): فقط ردیفِ تازه، و همهٔ ردیف‌های تازه قاعده
    *  را بگذرانند؛ ویرایش یا حذفِ ردیفِ موجود نه. صندوق‌دار: رسیدِ انبار فقط اصلاحِ موجودیِ قلمِ
-   *  برگشتی که در همین ذخیره ساخته شده (هر قلم یک اصلاح)، حرکتِ انبار فقط حرکتِ فاکتور و برگشت.
+   *  برگشتی که در همین ذخیره ساخته شده (هر قلم یک اصلاح)، حرکتِ انبار فقط حرکتِ فاکتور و برگشت، هر قلم تا مقدارش.
    *  تنگ‌تر از سرور است، نه گشادتر: سرور برگشتِ ثبت‌شده با همین دستگاه را هم «خودی» می‌داند.
    */
   private fun rowsAllowed(role: String, table: String, cur: ShopData, next: ShopData): Boolean {
@@ -78,7 +78,10 @@ object RoleGate {
   private fun moveView(m: StockMovement): Map<String, Any?> =
     mapOf("type" to m.type, "qty" to m.qty, "refId" to m.refId, "productId" to m.productId)
 
-  /** قلم‌های برگشت (خودی = ساختهٔ همین ذخیره)، فاکتورها، و اصلاح‌های ثبت‌شدهٔ برگشت */
+  /**
+   *  قلم‌های برگشت (خودی = ساختهٔ همین ذخیره)، فاکتورها و قلم‌هایشان، فاکتورهای لغوشده، اصلاح‌های
+   *  ثبت‌شدهٔ برگشت، و حرکت‌های ثبت‌شده (سهمِ هر قلم را پیش‌تر گرفته‌اند).
+   */
   private fun refsOf(cur: ShopData, next: ShopData): PermCore.RowRefs {
     val before = cur.saleReturns.mapTo(HashSet()) { it.id }
     return PermCore.RowRefs(
@@ -89,6 +92,10 @@ object RoleGate {
       taken = cur.warehouseEntries
         .filter { it.adjKind in PermCore.RETURN_ADJ_KINDS && !it.refId.isNullOrEmpty() }
         .map { PermCore.Taken(it.refId!!, it.productId, it.units) },
+      saleItems = next.saleItems.map { PermCore.SaleLine(it.id, it.saleId, it.productId, it.quantity) },
+      cancelled = next.sales.filter { it.status == "cancelled" }.mapTo(HashSet()) { it.id },
+      moved = cur.stockMovements.filter { !it.refId.isNullOrEmpty() && it.type in PermCore.DOC_MOVE_TYPES }
+        .map { PermCore.Moved(it.refId!!, it.productId, it.type, it.qty) },
     )
   }
 
