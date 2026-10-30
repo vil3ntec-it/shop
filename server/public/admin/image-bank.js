@@ -14,6 +14,10 @@
  * تکراری (IMG-BANK-13) فقط نشان و صافی است — نه حذف، نه ادغام. بایگانی
  * (IMG-BANK-15) فقط عکسِ منتشرشده، فقط مدیرِ ارشد با دلیل.
  *
+ * مقایسه (IMG-PRO-05، IMG-07): اصل (نسخهٔ ۱) کنارِ هر نسخهٔ دیگر، با «اندازهٔ واقعی» و
+ * پیمایشِ هم‌گامِ دو قاب و زمینهٔ شطرنجی؛ نسخهٔ تازه بی‌صدا جاری نمی‌شود — مدیرِ ارشد با
+ * دلیل جاری یا ردش می‌کند و رد، اصل و نسخهٔ جاری را دست‌نخورده نگه می‌دارد.
+ *
  * پس از `app.js` بار می‌شود ($، el، call، msg، fa، dateTime، token، logout، LOADERS).
  * ⛔ همه درونِ یک تابعِ بی‌نام: نامِ هم‌سان با `app.js` کلِ فایل را می‌خواباند.
  */
@@ -313,6 +317,7 @@
       if (it.duplicate_of.length) flags.appendChild(badge('b-warn', `تکراری × ${fa(it.duplicate_of.length)}`));
       for (const f of it.quality_flags) flags.appendChild(badge('b-mute', FLAG_FA[f] || f));
       if (it.from_shop) flags.appendChild(badge('b-mute', 'از دکان'));
+      if (it.versions_pending) flags.appendChild(badge('b-warn', `نسخهٔ تازه × ${fa(it.versions_pending)}`));
       tr.appendChild(flags);
       tr.appendChild(td(it.license ? `${it.license.status}${it.license.commercial_use ? ' · تجاری' : ''}` : '—'));
       const act = el('td');
@@ -393,6 +398,147 @@
       img.src = await imageData(it.file.url);
       img.alt = `عکسِ ${it.id}`;
     } else img.alt = 'فایلی نیست';
+    await showVersions(it);
+  }
+
+  // ---------- مقایسهٔ اصل و نسخه (IMG-PRO-05، IMG-07) ----------
+  const REVIEW_FA = { approved: 'پذیرفته', needs_review: 'منتظرِ بررسی', rejected: 'ردشده' };
+  let cmp = null;   // { id, d (adminDetail), pick }
+
+  /**
+   * قابِ مقایسه زیرِ جزئیاتِ عکس — همین‌جا ساخته می‌شود تا `index.html` (بالای سقفِ اندازه) بزرگ‌تر نشود.
+   * اصل در قابِ اول (راست)، نسخه در دوم؛ زمینهٔ شطرنجی و ۱:۱ در `admin.css` (`.ib-cmp`).
+   */
+  function buildCompareBox() {
+    const box = el('div', 'hidden');
+    box.id = 'ib-dt-cmp-box';
+    const h = el('h2', '', 'مقایسهٔ اصل و نسخه — اصل هرگز عوض نمی‌شود');
+    h.style.marginTop = '14px';
+    box.appendChild(h);
+    const vers = el('div', 'row');
+    vers.id = 'ib-dt-versions';
+    vers.style.cssText = 'flex-wrap:wrap;gap:6px;';
+    box.appendChild(vers);
+    const zr = el('div', 'row');
+    zr.style.marginTop = '8px';
+    const zl = el('label');
+    zl.style.margin = '0';
+    const zoom = el('input');
+    zoom.type = 'checkbox';
+    zoom.id = 'ib-cmp-zoom';
+    zl.append(zoom, ' اندازهٔ واقعی (۱:۱) — دو قاب با هم می‌چرخند');
+    zr.appendChild(zl);
+    box.appendChild(zr);
+    const grid = el('div', 'grid grid-2');
+    grid.style.marginTop = '8px';
+    for (const k of ['a', 'b']) {
+      const fig = el('figure');
+      fig.style.margin = '0';
+      const cap = el('figcaption', 'muted');
+      cap.id = `ib-cmp-${k}-cap`;
+      const pane = el('div', 'ib-cmp');
+      pane.id = `ib-cmp-${k}`;
+      const img = el('img');
+      img.id = `ib-cmp-${k}-img`;
+      img.alt = '';
+      pane.appendChild(img);
+      fig.append(cap, pane);
+      grid.appendChild(fig);
+    }
+    box.appendChild(grid);
+    const act = el('div', 'row');
+    act.style.marginTop = '8px';
+    const ok = el('button', 'btn btn-sm', 'جاری کردنِ این نسخه');
+    ok.id = 'btn-ib-ver-approve';
+    const no = el('button', 'btn btn-sm btn-danger', 'ردِ این نسخه');
+    no.id = 'btn-ib-ver-reject';
+    const note = el('span', 'muted');
+    note.id = 'ib-cmp-note';
+    act.append(ok, no, note);
+    box.appendChild(act);
+    $('ib-detail').appendChild(box);
+  }
+
+  /** نسخه‌های عکس؛ فقط وقتی بیش از یکی هست. پیش‌فرض: تازه‌ترین نسخهٔ منتظر، وگرنه جاری. */
+  async function showVersions(it) {
+    const box = $('ib-dt-cmp-box');
+    const d = await call('GET', `${IB}/images/${encodeURIComponent(it.id)}`);
+    const vs = d.versions || [];
+    if (vs.length < 2) { box.classList.add('hidden'); cmp = null; return; }
+    const waiting = vs.filter((v) => v.review === 'needs_review' && v.version !== d.current_version);
+    const def = (waiting[waiting.length - 1] || vs.find((v) => v.version === d.current_version && v.version !== 1) || vs[vs.length - 1]).version;
+    cmp = { id: it.id, d, pick: def };
+    box.classList.remove('hidden');
+    renderVersions();
+    await renderCompare();
+  }
+
+  function versionLabel(v) {
+    const kind = v.version === 1 ? 'اصل' : `پردازش‌شده${v.tool ? ` (${v.tool})` : ''}`;
+    return `نسخهٔ ${fa(v.version)} · ${kind} · ${REVIEW_FA[v.review] || v.review}${v.version === cmp.d.current_version ? ' · جاری' : ''}`;
+  }
+
+  function renderVersions() {
+    const row = $('ib-dt-versions');
+    row.innerHTML = '';
+    for (const v of cmp.d.versions) {
+      if (v.version === 1) continue;                     // اصل همیشه در قابِ راست است
+      const b = el('button', `btn btn-sm btn-ghost ib-ver${v.version === cmp.pick ? ' on' : ''}`, versionLabel(v));
+      b.dataset.version = String(v.version);
+      b.onclick = () => { cmp.pick = v.version; renderVersions(); renderCompare().catch((err) => msg($('ib-dt-msg'), err.message, 'bad')); };
+      row.appendChild(b);
+    }
+  }
+
+  async function renderCompare() {
+    const { d } = cmp;
+    const a = d.versions.find((v) => v.version === 1);
+    const b = d.versions.find((v) => v.version === cmp.pick);
+    $('ib-cmp-a-cap').textContent = `${versionLabel(a)} — ${fa(a.width)}×${fa(a.height)}`;
+    $('ib-cmp-b-cap').textContent = `${versionLabel(b)} — ${fa(b.width)}×${fa(b.height)}`;
+    const [ia, ib] = [$('ib-cmp-a-img'), $('ib-cmp-b-img')];
+    ia.removeAttribute('src'); ib.removeAttribute('src');
+    [ia.src, ib.src] = await Promise.all([imageData(a.urls.original), imageData(b.urls.original)]);
+    ia.alt = 'اصل'; ib.alt = `نسخهٔ ${b.version}`;
+    const sup = adminRole === 'superadmin';
+    const open = b.version !== d.current_version && b.review !== 'rejected';
+    $('btn-ib-ver-approve').classList.toggle('hidden', !sup || !open || d.status !== 'APPROVED');
+    $('btn-ib-ver-reject').classList.toggle('hidden', !sup || !open || !['NEEDS_REVIEW', 'APPROVED'].includes(d.status));
+    $('ib-cmp-note').textContent = b.version === d.current_version ? 'همین نسخه جاری است'
+      : b.review === 'rejected' ? 'این نسخه رد شده است؛ نسخهٔ جاری همان ماند'
+        : sup ? '' : 'جاری کردن یا ردِ نسخه فقط با مدیرِ ارشد است';
+  }
+
+  /** دو قاب با هم: پیمایشِ یکی همان نسبت را به دیگری می‌دهد؛ قفلِ مشترک ⇒ بی حلقه. */
+  function syncScroll(a, b) {
+    let busy = false;
+    const follow = (from, to) => () => {
+      if (busy) return;
+      busy = true;
+      const fx = from.scrollWidth - from.clientWidth;
+      const fy = from.scrollHeight - from.clientHeight;
+      to.scrollLeft = fx > 0 ? (from.scrollLeft / fx) * (to.scrollWidth - to.clientWidth) : 0;
+      to.scrollTop = fy > 0 ? (from.scrollTop / fy) * (to.scrollHeight - to.clientHeight) : 0;
+      requestAnimationFrame(() => { busy = false; });
+    };
+    a.addEventListener('scroll', follow(a, b));
+    b.addEventListener('scroll', follow(b, a));
+  }
+
+  /** جاری کردن یا ردِ نسخهٔ انتخاب‌شده — همان approve/reject ِ سرور با `version` و دلیل. */
+  async function decideVersion(kind) {
+    if (!cmp) return;
+    const v = cmp.pick;
+    const reason = askReason(kind === 'approve'
+      ? `دلیلِ جاری کردنِ نسخهٔ ${fa(v)}؟ (دکان‌های سنجاق‌شده فقط «به‌روزرسانیِ موجود» می‌بینند)`
+      : `دلیلِ ردِ نسخهٔ ${fa(v)}؟ (اصل و نسخهٔ جاری دست نمی‌خورند)`);
+    if (!reason) return;
+    await call('POST', `${IB}/images/${encodeURIComponent(cmp.id)}/${kind}`, { reason, version: v });
+    //  فهرست (نشانِ «نسخهٔ تازه»)، عکسِ جاری و نسخه‌ها از نو؛ پیام پس از بازشدنِ دوباره
+    await refreshCurrent();
+    msg($('ib-dt-msg'), kind === 'approve'
+      ? `نسخهٔ ${fa(v)} جاری شد؛ اصل و نسخه‌های دیگر سرِ جایشان‌اند.`
+      : `نسخهٔ ${fa(v)} رد شد؛ نسخهٔ جاری همان ماند.`, 'ok');
   }
 
   /** هر عکسِ هم‌فایل با وضعیت و فضایش — فقط خواندن (IMG-BANK-13). */
@@ -473,6 +619,13 @@
     $('btn-ib-archive').onclick = dt(() => decide('archive'));
     $('ib-rv-dups').onchange = rv(() => loadReview(true));
     $('btn-ib-dt-close').onclick = () => { $('ib-detail').classList.add('hidden'); current = null; };
+    buildCompareBox();
+    $('btn-ib-ver-approve').onclick = dt(() => decideVersion('approve'));
+    $('btn-ib-ver-reject').onclick = dt(() => decideVersion('reject'));
+    $('ib-cmp-zoom').onchange = () => {
+      for (const id of ['ib-cmp-a', 'ib-cmp-b']) $(id).classList.toggle('zoom', $('ib-cmp-zoom').checked);
+    };
+    syncScroll($('ib-cmp-a'), $('ib-cmp-b'));
   });
 
   LOADERS.imgbank = loadImageBank;

@@ -89,7 +89,8 @@ router.get('/queue', wrap(async (req, res) => {
 /**
  * صفِ بررسی برای پنل (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09): همان `queue` با
  * جزئیاتِ هر عکس — وضعیت و دلیلِ تطبیق، کالای وصل، کالاهای ممکنِ تطبیقِ مبهم
- * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز و نشانیِ فایلِ نسخهٔ جاری.
+ * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز، نشانیِ فایلِ نسخهٔ جاری و
+ * شمارِ نسخه‌های تازهٔ منتظرِ بررسی (`versions_pending`، IMG-07، IMG-PRO-05).
  * فقط‌خواندنی؛ همان صفحه‌بندیِ `queue` (حداکثر ۵۰).
  */
 router.get('/review', wrap(async (req, res) => {
@@ -98,6 +99,14 @@ router.get('/review', wrap(async (req, res) => {
   const candIds = [...new Set(details.flatMap((d) => d?.proposal?.candidates || []))].map(String).slice(0, 500);
   const cands = candIds.length ? await many('SELECT * FROM bank_products WHERE id = ANY($1::text[])', [candIds]) : [];
   const byId = new Map(cands.map((p) => [p.id, bank.productOut(p)]));
+  //  نسخه‌های منتظرِ بررسی جز نسخهٔ جاری (IMG-07، IMG-PRO-05): نسخهٔ تازهٔ عکسِ منتشرشده بی‌صدا جاری
+  //  نمی‌شود، پس مدیر باید ببیند که چیزی منتظرِ مقایسه و پذیرش/رد است
+  const ids = q.items.map((i) => i.id);
+  const waiting = ids.length ? await many(
+    `SELECT v.image_id, COUNT(*)::int AS n FROM image_versions v JOIN images i ON i.id = v.image_id
+      WHERE v.image_id = ANY($1::text[]) AND v.review = 'needs_review' AND v.version <> i.current_version
+      GROUP BY v.image_id`, [ids]) : [];
+  const pendingOf = new Map(waiting.map((w) => [w.image_id, Number(w.n)]));
   res.set('Cache-Control', 'no-store');
   res.json({
     items: q.items.map((i, k) => {
@@ -110,6 +119,7 @@ router.get('/review', wrap(async (req, res) => {
         product: d.product || null,
         candidates: (d.proposal?.candidates || []).map((id) => byId.get(String(id)) || { id: String(id), missing: true }),
         version: d.current_version || null,
+        versions_pending: pendingOf.get(i.id) || 0,
         file: v.urls ? { url: v.urls.thumb || v.urls.original, mime: v.mime, width: v.width, height: v.height } : null,
       };
     }),
