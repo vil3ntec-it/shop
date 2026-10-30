@@ -67,7 +67,14 @@ object OrdersLive {
    *  تحویلی که فروشش این‌جا ثبت نشد (اجازه، قفلِ برنامه، دیسک…) — صفحهٔ «سفارش‌ها» هشدار می‌دهد.
    *  [productIds]: فقط برای [shortfalls] — کالاهای منفی‌شده (هشدار با درست شدنِ موجودی می‌رود).
    */
-  data class Unposted(val orderId: String, val orderNo: Long, val message: String, val productIds: List<String> = emptyList())
+  data class Unposted(
+    val orderId: String,
+    val orderNo: Long,
+    val message: String,
+    val productIds: List<String> = emptyList(),
+    /** فقط برای [review]: `before_floor` یا `reverse_blocked` — همان نوعِ «بررسی شد» ِ سرور */
+    val code: String = "",
+  )
   val unposted = mutableStateOf<List<Unposted>>(emptyList())
 
   /** فروش ثبت شد ولی کالا در دفتر کم بود (موجودی منفی) — INV-19: ثبت‌شده رد نمی‌شود، فقط گفته می‌شود */
@@ -149,9 +156,30 @@ object OrdersLive {
     return "${c.get(java.util.Calendar.YEAR)}-$m-$d"
   }
 
-  private fun note(list: MutableState<List<Unposted>>, o: OrderDto, message: String?, productIds: List<String> = emptyList()) {
+  private fun note(
+    list: MutableState<List<Unposted>>,
+    o: OrderDto,
+    message: String?,
+    productIds: List<String> = emptyList(),
+    code: String = "",
+  ) {
     val rest = list.value.filter { it.orderId != o.id }
-    list.value = if (message == null) rest else rest + Unposted(o.id, o.orderNo, message, productIds)
+    list.value = if (message == null) rest else rest + Unposted(o.id, o.orderNo, message, productIds, code)
+  }
+
+  /**
+   *  «بررسی شد» ِ صاحب یا مدیر: سرور آن را در دفترِ ممیزی می‌نشاند و ردیف از فهرستِ **همهٔ**
+   *  دستگاه‌ها می‌رود (دیگر هیچ کارِ خودکاری برایش نیست). ⇒ null یا پیامِ خطا.
+   */
+  suspend fun ackReview(context: Context, orderId: String): String? {
+    val row = review.value.firstOrNull { it.orderId == orderId } ?: return null
+    return when (val r = repository(context).reviewAck(orderId, row.code.ifBlank { "before_floor" })) {
+      is ApiResult.Failure -> r.error.userMessage
+      is ApiResult.Success -> {
+        review.value = review.value.filter { it.orderId != orderId }
+        null
+      }
+    }
   }
 
   /**
@@ -203,7 +231,7 @@ object OrdersLive {
         is OrderFulfillment.Result.Review -> { outcome = Posted.Review(r.message); null }
       }
     }
-    note(review, item, (outcome as? Posted.Review)?.message)
+    note(review, item, (outcome as? Posted.Review)?.message, code = "reverse_blocked")
     if (outcome == Posted.Saved && wrote != true) {
       outcome = Posted.Failed("فروشِ سفارش #${item.orderNo} روی دستگاه نوشته نشد (قفلِ برنامه؟)؛ دوباره بزنید")
     }
@@ -248,14 +276,14 @@ object OrdersLive {
       "before_floor" -> OrderFulfillment.REVIEW_BEFORE_FLOOR
       else -> "کارِ خودکار نشد؛ بررسی کنید"
     }
-    note(review, o, msg)
+    note(review, o, msg, code = o.reviewCode ?: "before_floor")
     return Posted.Review(msg)
   }
 
   /**
    *  قلابِ «میزِ تحویل» (#337، `core/delivery/HandoverSale`): دریافتِ حضوری ⇒ همان [postById]
    *  (پرسیدن از سرور، یکتا با شناسهٔ سفارش). یک بار در [Host]؛ با `applicationContext`.
-   *  Saved ⇒ Recorded("o-<سفارش>") · Already ⇒ AlreadyRecorded · Skipped/Failed ⇒ Failed(پیام).
+   *  Review ⇒ NeedsReview(دلیل) · Saved ⇒ Recorded("o-<سفارش>") · Already ⇒ AlreadyRecorded · Skipped/Failed ⇒ Failed(پیام).
    */
   fun installHandoverHook(context: Context, store: ShopStore) {
     val app = context.applicationContext
@@ -268,7 +296,8 @@ object OrdersLive {
           )
           is Posted.Skipped -> HandoverSaleResult.Failed(r.message)
           is Posted.Failed -> HandoverSaleResult.Failed(r.message)
-          is Posted.Review -> HandoverSaleResult.Failed(r.message)
+          //  بررسیِ صاحب: بی وعدهٔ «دوباره می‌کوشد»
+          is Posted.Review -> HandoverSaleResult.NeedsReview(r.message)
         }
     }
   }

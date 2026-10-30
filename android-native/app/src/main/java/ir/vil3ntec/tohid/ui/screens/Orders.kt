@@ -139,8 +139,9 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       FulfillNotice(
         title = "${review.size} سفارش بررسیِ صاحب می‌خواهد",
         body = review.take(3).joinToString("\n") { it.message },
-        action = null,
-        onAction = {},
+        //  باز کردنِ نخستین؛ «بررسی شد» در جزئیاتِ همان سفارش
+        action = "بررسی",
+        onAction = { openId = review.first().orderId },
       )
     }
     //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
@@ -405,6 +406,12 @@ private fun OrderDetailSheet(
     }
   }
 
+  /** «بررسی شد» ِ صاحب برای ردیفِ بررسیِ همین سفارش — برای همهٔ دستگاه‌ها */
+  suspend fun ackReview(o: OrderDto) {
+    val err = OrdersLive.ackReview(context, o.id)
+    snackbar.showSnackbar(err ?: "سفارش #${o.orderNo}: «بررسی شد» ثبت شد؛ از فهرستِ همهٔ دستگاه‌ها رفت")
+  }
+
   fun send(to: String, reason: String = "", note: String = "", ready: Int? = null) {
     val o = order ?: return
     if (busy) return
@@ -489,8 +496,8 @@ private fun OrderDetailSheet(
         FulfillNotice(
           title = "بررسیِ صاحب — فروشِ این سفارش خودکار ثبت نمی‌شود",
           body = OrdersLive.review.value.first { it.orderId == o.id }.message,
-          action = null,
-          onAction = {},
+          action = if (cfg.permissions.refund) "بررسی شد" else null,
+          onAction = { if (!busy) scope.launch { busy = true; ackReview(o); busy = false } },
         )
       } else if (OrderFulfillment.needsSale(ledger, o, OrdersLive.handoverSince())) {
         Spacer(Modifier.height(8.dp))
@@ -508,11 +515,15 @@ private fun OrderDetailSheet(
         //  پیش‌تر «مرجوعیِ» دستی گرفته ⇒ لغوِ خودکار نه؛ صاحب بررسی کند
         val blocked = OrderFulfillment.reverseBlock(ledger, o)
         val able = blocked == null && cfg.permissions.manage && OrdersLive.canReverse(cfg, o) && !OrdersLive.isWaiting(o.id)
+        //  پس از «مرجوعیِ» دستی: صاحب بررسی می‌کند و «بررسی شد» می‌زند (دیگر لغوِ خودکار نیست)
+        val ackable = blocked != null && cfg.permissions.refund && OrdersLive.review.value.any { it.orderId == o.id }
         FulfillNotice(
           title = "کالای این سفارش به دکان برگشته ولی فروشش هنوز لغو نشده",
           body = blocked ?: if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_REVERSE_NOTE,
-          action = if (able) "لغوِ فروشِ تحویل" else null,
-          onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
+          action = if (able) "لغوِ فروشِ تحویل" else if (ackable) "بررسی شد" else null,
+          onAction = {
+            if (!busy) scope.launch { busy = true; if (able) postSale(o) else ackReview(o); busy = false }
+          },
         )
       }
 
