@@ -14,7 +14,9 @@
  *   • فاکتورها: درجِ همین دسته و ثبت‌شده‌ها، با قلم‌هایشان (`saleItems`) و لغوشده‌ها (`cancelled`:
  *     لغوِ همین دسته که می‌نشیند، یا ثبت‌شده). در v3 دادهٔ فاکتورِ همین دسته فقط از همان واحد یا
  *     واحدِ پیشینی که ردیفِ ردشده‌ای نداشت.
- *   • اصلاح‌های ثبت‌شده (`taken`): هر قلم یک اصلاح. حرکت‌های ثبت‌شدهٔ همان سندها (`moved`) سهمِ
+ *   • اصلاح‌های ثبت‌شده (`taken`): هر قلم یک اصلاح — هر ردیفِ رسیدِ انبار با نشانیِ همان برگشت،
+ *     هر `adjKind` (حتی خالی: برنامهٔ پیش از A16 اصلاحِ بی‌رسید را بی نوع می‌نوشت). پس سقف به نوعی
+ *     که نقش‌های دیگر می‌نویسند تکیه ندارد. حرکت‌های ثبت‌شدهٔ همان سندها (`moved`) سهمِ
  *     هر قلم را پیش‌تر گرفته‌اند؛ حرکتِ پذیرفتهٔ یک واحد هم برای واحدِ بعد.
  */
 const core = require('./perm-core');
@@ -203,8 +205,8 @@ function v1Db(many, ctx, deviceId) {
     async taken(ids) {
       return (await many(
         `SELECT data FROM sync_rows WHERE ${base} AND table_name='warehouseEntries' AND deleted_at IS NULL
-            AND data->>'refId' = ANY($2::text[]) AND data->>'adjKind' = ANY($3::text[])`,
-        [ctx.accountId, ids, core.RETURN_ADJ_KINDS]
+            AND data->>'refId' = ANY($2::text[])`,
+        [ctx.accountId, ids]
       )).map((r) => ({ refId: r.data.refId, productId: r.data.productId, units: numOf(r.data.units) }));
     },
   };
@@ -263,8 +265,8 @@ function v3Db(many, ctx, deviceId) {
     async taken(ids) {
       return (await many(
         `SELECT data FROM sync_v3_rows WHERE ${base} AND table_name='warehouseEntries' AND ${live}
-            AND data->>'refId' = ANY($2::text[]) AND data->>'adjKind' = ANY($3::text[])`,
-        [ctx.accountId, ids, core.RETURN_ADJ_KINDS]
+            AND data->>'refId' = ANY($2::text[])`,
+        [ctx.accountId, ids]
       )).map((r) => {
         const u = numOf(r.data.unitsMilli);
         return { refId: r.data.refId, productId: r.data.productId, units: u === null ? null : u / 1000 };
@@ -318,8 +320,8 @@ function legacyDb(many, shopId, userId, TABLES) {
     async taken(ids) {
       return (await many(
         `SELECT data FROM ${TABLES.warehouseEntries} WHERE shop_id=$1 AND deleted=false
-            AND data->>'refId' = ANY($2::text[]) AND data->>'adjKind' = ANY($3::text[])`,
-        [shopId, ids, core.RETURN_ADJ_KINDS]
+            AND data->>'refId' = ANY($2::text[])`,
+        [shopId, ids]
       )).map((r) => ({ refId: r.data.refId, productId: r.data.productId, units: numOf(r.data.units) }));
     },
   };

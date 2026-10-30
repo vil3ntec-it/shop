@@ -352,6 +352,50 @@ test('۵ — حرکتِ سند سقف دارد: کالای همان فاکتور
   assert.equal(lgs.status, 403, `فروشِ دوم بیش از قلم: ${JSON.stringify(lgs.body)}`);
 });
 
+test('۶ — اصلاحِ بی نوعِ نسخهٔ پیش از A16 همان قلم را گرفته است: صندوق‌دار اصلاحِ دوم نمی‌نویسد (v1، v3، قدیم)', async () => {
+  //  برنامهٔ پیش از A16 اصلاحِ برگشتِ بی‌رسید را بی `adjKind` می‌نوشت (ReturnFlow ِ #318). سقفِ «یک
+  //  اصلاح برای هر قلم» نباید به نوعی که نقش‌های دیگر می‌نویسند تکیه کند (یافتهٔ ۳ ِ بازبینی).
+  const legacyAdj = (refId, units) => ({ productId: 'pR', units, isAdjustment: true, refId });
+  //  v1: برگشتِ خودیِ صندوق‌دار؛ صاحب دکان از دستگاهِ دیگر اصلاحِ بی نوع را نشانده است
+  assert.deepEqual(reasons(await push1('cashier', [
+    v1op('returns', 'r6-1', ret1('rd6-1')), v1op('returns', 'r6-1c', ret1('rd6-1c')),
+  ])), ['applied', 'applied']);
+  assert.deepEqual(reasons(await push1('owner', [v1op('warehouseEntries', 'w6-o1', legacyAdj('rd6-1', 1))])), ['applied']);
+  const v1 = await push1('cashier', [
+    v1op('warehouseEntries', 'w6-c1', adj('rd6-1', { units: 1, adjKind: 'customer_return' })),
+    v1op('warehouseEntries', 'w6-c1c', adj('rd6-1c', { units: 1, adjKind: 'customer_return' })),   //  کنترل
+  ]);
+  assert.deepEqual(reasons(v1), [DENY, 'applied'], JSON.stringify(v1.body));
+
+  //  v3: همان، با Milli
+  const r3 = await push3('cashier', [v3op('c', 'returns', 'r6-3', ret3('rd6-3')), v3op('c', 'returns', 'r6-3c', ret3('rd6-3c'))]);
+  assert.deepEqual(reasons(r3), ['applied', 'applied'], JSON.stringify(r3.body));
+  const o3 = await push3('owner', [v3op('o', 'warehouseEntries', 'w6-o3', { productId: 'pR', unitsMilli: 1000, isAdjustment: true, refId: 'rd6-3' })]);
+  assert.deepEqual(reasons(o3), ['applied'], JSON.stringify(o3.body));
+  const c3 = await push3('cashier', [v3op('c', 'warehouseEntries', 'w6-c3', adj3('rd6-3', { unitsMilli: 1000, adjKind: 'customer_return' }))]);
+  assert.deepEqual(reasons(c3), [DENY], JSON.stringify(c3.body));
+  const k3 = await push3('cashier', [v3op('c', 'warehouseEntries', 'w6-c3c', adj3('rd6-3c', { unitsMilli: 1000, adjKind: 'customer_return' }))]);
+  assert.deepEqual(reasons(k3), ['applied'], JSON.stringify(k3.body));
+  assert.equal(await v3Exists('warehouseEntries', 'w6-c3'), false);
+
+  //  راهِ قدیم: همه یا هیچ ⇒ ۴۰۳
+  for (const id of ['lg6', 'lg6c']) {
+    assert.equal((await legacy('cashier', [{ collection: 'returns', id: `r-${id}`, updatedAt: Date.now(), data: ret1(`rd-${id}`) }])).status, 200);
+  }
+  assert.equal((await legacy('owner', [
+    { collection: 'warehouseEntries', id: 'w6-olg', updatedAt: Date.now(), data: legacyAdj('rd-lg6', 1) },
+  ])).status, 200);
+  const lg = await legacy('cashier', [
+    { collection: 'warehouseEntries', id: 'w6-clg', updatedAt: Date.now(), data: adj('rd-lg6', { units: 1, adjKind: 'customer_return' }) },
+  ]);
+  assert.equal(lg.status, 403, JSON.stringify(lg.body));
+  assert.equal(await lgExists('inventory', 'w6-clg'), false);
+  const lgOk = await legacy('cashier', [
+    { collection: 'warehouseEntries', id: 'w6-clgc', updatedAt: Date.now(), data: adj('rd-lg6c', { units: 1, adjKind: 'customer_return' }) },
+  ]);
+  assert.equal(lgOk.status, 200, JSON.stringify(lgOk.body));
+});
+
 test('کنترل — حسابدار: v1/v3/قدیم/عکس هیچ نمی‌نشیند؛ op_id ِ تکراری هم فقط «تکراری» است', async () => {
   const a = await push1('accountant', [
     v1op('auditLog', 'a-acc', { type: 'note' }),

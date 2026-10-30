@@ -56,8 +56,15 @@
   /** نامِ سقف ⇐ نامِ فیلدِ درخواست */
   var CAP_FIELDS = { maxPct: 'pct', maxAmount: 'amount' };
 
-  /** پیش‌فرض‌ها به ترتیبِ `ROLES` */
+  /**
+   *  پیش‌فرض‌ها به ترتیبِ `ROLES` — هر هفت نقش، صریح. کلیدی که کمتر بدهد (مثلاً فقط سه نقشِ قدیم)
+   *  همین‌جا هنگامِ بارگذاری می‌شکند: نقشِ بی پیش‌فرض در `evaluate` به «allow» می‌رسید (بازبینی، یافتهٔ ۴).
+   */
   function d(owner, manager, staff, cashier, storekeeper, picker, accountant) {
+    if (arguments.length !== ROLES.length) throw new Error('perm-core: d() needs ' + ROLES.length + ' modes');
+    for (var a = 0; a < arguments.length; a++) {
+      if (MODES.indexOf(arguments[a]) < 0) throw new Error('perm-core: bad mode ' + arguments[a]);
+    }
     return {
       owner: owner, manager: manager, staff: staff,
       cashier: cashier, storekeeper: storekeeper, picker: picker, accountant: accountant,
@@ -129,6 +136,8 @@
       'stockCounts', 'stockMovements', 'suppliers', 'warehouseEntries'],
     picker: ['auditLog'],
     accountant: [],
+    //  گاوصندوق (`safeEntries`، #364) عمداً در فهرستِ هیچ نقشِ تازه‌ای نیست: صندوق‌دار دخل را می‌بندد ولی
+    //  پول به/از گاوصندوق نمی‌برد. با مرجِ #364، `safe.move` هم برای هر چهار نقشِ تازه صریحاً «deny» است.
   };
 
   /** این نقش این جدولِ همگام‌سازی را می‌نویسد؟ نقشِ ناشناخته ⇐ نه (بسته‌به‌خطا) */
@@ -363,7 +372,8 @@
   function defaultMode(role, key) {
     var spec = CATALOG[key];
     if (!spec || !has(spec.defaults, role)) return null;
-    return spec.defaults[role];
+    //  مقدارِ نامعتبر (undefined، غلطِ املایی) ⇐ null ⇐ «deny» — بسته‌به‌خطا
+    return MODES.indexOf(spec.defaults[role]) >= 0 ? spec.defaults[role] : null;
   }
 
   /**

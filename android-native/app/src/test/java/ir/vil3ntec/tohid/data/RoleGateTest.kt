@@ -101,6 +101,11 @@ class RoleGateTest {
     //  هر قلم یک اصلاح
     assertEquals("warehouseEntries", RoleGate.blocked("cashier", base,
       damagedReturn.copy(warehouseEntries = listOf(dmg, dmg.copy(id = "w1b")))))
+    //  اصلاحِ ثبت‌شدهٔ بی نوع (برنامهٔ پیش از A16) همان قلم را گرفته است — همان `taken` ِ سرور (یافتهٔ ۳)
+    val legacyAdj = WarehouseEntry(id = "w0", productId = "p1", units = 2.0, isAdjustment = true, refId = "doc-1")
+    val withLegacy = base.copy(warehouseEntries = listOf(legacyAdj))
+    assertEquals("warehouseEntries", RoleGate.blocked("cashier", withLegacy,
+      restock.copy(warehouseEntries = listOf(legacyAdj) + restock.warehouseEntries)))
     //  برگشتِ ثبت‌شده (نه همین ذخیره) پایهٔ اصلاحِ تازه نیست
     val old = base.copy(saleReturns = listOf(ret))
     assertEquals("warehouseEntries", RoleGate.blocked("cashier", old, old.copy(warehouseEntries = listOf(dmg))))

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -49,6 +50,18 @@ class PermCoreTest {
     for (c in list("defaults")) {
       val out = c.getValue("out").let { if (it is JsonNull) null else it.jsonPrimitive.content }
       assertEquals(c.toString(), out, PermCore.defaultMode(c.s("role"), c.s("key")))
+    }
+  }
+
+  /** یافتهٔ ۴: هر کلید برای هر هفت نقش پیش‌فرضِ صریح دارد و بردارها همه را می‌پوشانند (همان آزمونِ JS) */
+  @Test fun everyKeyCoversEveryRole() {
+    val covered = list("defaults").mapTo(HashSet()) { "${it.s("role")}/${it.s("key")}" }
+    for (key in PermCore.keys()) for (role in PermCore.ROLES) {
+      assertTrue("$role / $key", PermCore.defaultMode(role, key) in PermCore.MODES)
+      assertTrue("بردارِ پیش‌فرض نیست: $role / $key", "$role/$key" in covered)
+    }
+    for (role in listOf("cashier", "storekeeper", "picker", "accountant")) {
+      assertEquals(role, false, PermCore.canWrite(role, "safeEntries"))
     }
   }
 

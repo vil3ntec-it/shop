@@ -89,8 +89,9 @@ object RoleGate {
         PermCore.ReturnLine(it.id, it.docId, it.productId, it.quantity, own = it.id !in before)
       },
       sales = next.sales.mapTo(HashSet()) { it.id },
+      //  هر ردیف با نشانیِ برگشت، هر نوع (حتی بی نوعِ نسخهٔ پیش از A16) — همان `taken` ِ سرور
       taken = cur.warehouseEntries
-        .filter { it.adjKind in PermCore.RETURN_ADJ_KINDS && !it.refId.isNullOrEmpty() }
+        .filter { !it.refId.isNullOrEmpty() }
         .map { PermCore.Taken(it.refId!!, it.productId, it.units) },
       saleItems = next.saleItems.map { PermCore.SaleLine(it.id, it.saleId, it.productId, it.quantity) },
       cancelled = next.sales.filter { it.status == "cancelled" }.mapTo(HashSet()) { it.id },

@@ -81,6 +81,40 @@ test('لایه هرگز چیزی بیرون از نقش به فهرستِ قدی
   }
 });
 
+test('هر کلید برای هر هفت نقش پیش‌فرضِ صریح دارد و بردارها همه را می‌پوشانند (بازبینی، یافتهٔ ۴)', () => {
+  //  کلیدی که فقط سه نقشِ قدیم را بدهد (مثلِ `safe.move` ِ #364) نقشِ تازه را بی پیش‌فرض می‌گذاشت و
+  //  `evaluate` به «allow» می‌رسید. حالا `d()` همان‌جا می‌شکند و این آزمون پوشش را قفل می‌کند.
+  const P = require(SRV);
+  const covered = new Set(V.defaults.map((c) => `${c.role}/${c.key}`));
+  for (const key of P.keys()) {
+    for (const role of P.ROLES) {
+      assert.ok(['allow', 'approve', 'deny'].includes(P.defaultMode(role, key)), `${role} / ${key}`);
+      assert.ok(covered.has(`${role}/${key}`), `بردارِ پیش‌فرض نیست: ${role} / ${key}`);
+    }
+  }
+  //  گاوصندوق در حدِ هیچ نقشِ تازه‌ای نیست
+  for (const role of ['cashier', 'storekeeper', 'picker', 'accountant']) assert.equal(P.canWrite(role, 'safeEntries'), false, role);
+});
+
+test('d(): کلیدِ کم‌نقش یا حالتِ نادرست هنگامِ بارگذاری می‌شکند، نه بی‌صدا «allow» (یافتهٔ ۴)', () => {
+  //  همان فایل با یک کلیدِ سه‌نقشیِ ساختگی، در محیطِ جدا
+  const vm = require('node:vm');
+  const src = fs.readFileSync(SRV, 'utf8');
+  const anchor = "    'sales.discount': {";
+  assert.ok(src.includes(anchor));
+  const load = (inject) => {
+    const sandbox = { module: { exports: {} } };
+    sandbox.exports = sandbox.module.exports;
+    vm.runInNewContext(src.replace(anchor, `${inject}\n${anchor}`), sandbox);
+    return sandbox.module.exports;
+  };
+  assert.throws(() => load("    'x.three': { defaults: d('allow', 'allow', 'deny'), edit: 'restrict', approvable: false, caps: [], display: false },"), /d\(\) needs 7/);
+  assert.throws(() => load("    'x.typo': { defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'dney'), edit: 'restrict', approvable: false, caps: [], display: false },"), /bad mode/);
+  //  کنترل: کلیدِ کامل بار می‌شود و برای نقش‌های تازه «deny» است
+  const ok = load("    'x.full': { defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'), edit: 'restrict', approvable: false, caps: [], display: false },");
+  assert.equal(ok.evaluate('cashier', [], 'x.full').decision, 'deny');
+});
+
 test('نقش‌های هسته همان نقش‌های MATRIX‌اند و «نوشتن» در هر دو یکی است (A16)', () => {
   const P = require(SRV);
   assert.deepEqual(P.ROLES, ROLES);

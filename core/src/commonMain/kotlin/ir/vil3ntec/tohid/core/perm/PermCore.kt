@@ -59,8 +59,14 @@ object PermCore {
     val limit: Double? = null,
   )
 
-  /** پیش‌فرض‌ها به ترتیبِ `ROLES` */
-  private fun d(vararg modes: String): Map<String, String> = ROLES.zip(modes.toList()).toMap()
+  /**
+   *  پیش‌فرض‌ها به ترتیبِ `ROLES` — هر هفت نقش، صریح. `zip` نقشِ بی مقدار را بی‌صدا می‌انداخت؛ کلیدی که
+   *  کمتر بدهد (مثلاً فقط سه نقشِ قدیم) حالا هنگامِ بارگذاری می‌شکند — همان `d()` ِ JS (بازبینی، یافتهٔ ۴).
+   */
+  private fun d(vararg modes: String): Map<String, String> {
+    require(modes.size == ROLES.size && modes.all { it in MODES }) { "PermCore: d() needs ${ROLES.size} valid modes" }
+    return ROLES.zip(modes.toList()).toMap()
+  }
 
   private val OMD = d("allow", "allow", "deny", "deny", "deny", "deny", "deny")
   //  حسابدار سابقه و عددِ مالی را می‌بیند — کارش همین است
@@ -100,6 +106,8 @@ object PermCore {
     ),
     "picker" to listOf("auditLog"),
     "accountant" to emptyList(),
+    //  گاوصندوق (`safeEntries`، #364) عمداً در فهرستِ هیچ نقشِ تازه‌ای نیست؛ با مرجِ #364، `safe.move`
+    //  هم برای هر چهار نقشِ تازه صریحاً «deny» است (همان یادداشتِ WRITES در perm-core.js)
   )
 
   /** این نقش این جدولِ همگام‌سازی را می‌نویسد؟ نقشِ ناشناخته ⇐ نه */
@@ -315,7 +323,7 @@ object PermCore {
   fun keys(): List<String> = CATALOG.keys.sorted()
 
   /** حالتِ پیش‌فرضِ یک نقش — یا null برای نقش/مجوزِ ناشناخته */
-  fun defaultMode(role: String, key: String): String? = CATALOG[key]?.defaults?.get(role)
+  fun defaultMode(role: String, key: String): String? = CATALOG[key]?.defaults?.get(role)?.takeIf { it in MODES }
 
   fun resolve(role: String, layers: List<Any?>?, key: String): Resolved {
     val spec = CATALOG[key]
