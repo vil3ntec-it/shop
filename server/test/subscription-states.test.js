@@ -178,3 +178,33 @@ test('معلق و شروع‌نشده: معلق بی دسترسی و کد باز
   assert.equal((await entitlementOf(s2.shopId, start + DAY)).subscription.phase, 'active');
   assert.equal(subs.stateOf(null).phase, 'none');
 });
+
+test('SUB-01: /api/me/subscription و /api/me/heartbeat مرحله را می‌گویند — «مهلت» با پایانِ مهلت، نه «فعال»', async () => {
+  const s = await shop('مهلتِ-API');
+  const row = await subs.grant(s.shopId, { plan: 'custom', days: 30, graceDays: 3 });
+  let r = await h.get('/api/me/subscription', { token: s.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['active', 'active', true]);
+  assert.equal(r.body.graceEndsAt, Number(row.ends_at) + 3 * DAY);
+
+  //  پایانِ دوره دیروز گذشته ⇒ مهلت (ستونِ status همان active می‌ماند و دسترسی باز است)
+  const endsAt = now() - DAY;
+  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [row.id, endsAt]);
+  r = await h.get('/api/me/subscription', { token: s.token });
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['active', 'grace', true]);
+  assert.equal(r.body.endsAt, endsAt);
+  assert.equal(r.body.graceEndsAt, endsAt + 3 * DAY);
+  assert.equal(r.body.daysLeft, 2, 'روزهای ماندهٔ مهلت');
+
+  const hb = await h.get('/api/me/heartbeat', { token: s.token });
+  assert.equal(hb.status, 200, JSON.stringify(hb.body));
+  assert.equal(hb.body.subscription.status, 'active', 'سازگاری: status همان');
+  assert.equal(hb.body.subscription.phase, 'grace');
+  assert.equal(hb.body.subscription.graceEndsAt, endsAt + 3 * DAY);
+
+  //  پس از مهلت ⇒ منقضی در هر دو
+  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [row.id, now() - 4 * DAY]);
+  r = await h.get('/api/me/subscription', { token: s.token });
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['expired', 'expired', false]);
+  assert.equal((await h.get('/api/me/heartbeat', { token: s.token })).body.subscription.phase, 'expired');
+});
