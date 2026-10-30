@@ -64,7 +64,7 @@ interface GroupShots {
 object ShotRegistry {
   val ALL: List<GroupShots> = listOf(
     FoundationShots, ShellShots, OnboardingShots, ProductsShots, StockShots, MoneyShots,
-    SalesShots, AnalyticsShots, AccountShots, OnlineShots, SettingsShots, ShopperShots,
+    SalesShots, AnalyticsShots, AccountShots, OnlineShots, SettingsShots,
   )
 
   /** `all`، یک گروه یا چند گروه با ویرگول (`foundation,stock`) — همان ترتیبِ `ALL` */
@@ -85,7 +85,7 @@ object ShotRegistry {
 fun V3RoutePreview(path: String, store: ShopStore, dark: Boolean) {
   val context = LocalContext.current
   val data by store.data.collectAsState()
-  val mode = if (RoutePaths.base(path) == "shopper") AppMode.SHOPPER else AppMode.SHOP
+  val mode = AppMode.SHOP
   val navRoutes = NavLayouts.DEFAULT.ids.mapNotNull { NavCatalog.of(it)?.route?.substringBefore('?') }.toSet() + "home"
   val nav = remember(path) {
     V3Nav(V3Modules.table, "home", NavStack.of("home")).also { n ->

@@ -15,14 +15,13 @@ AppModule(
   id = "notes",                              // یکتا
   title = { StrNotes.title },                // نوشته از جدولِ i18n
   icon = Icons.Outlined.StickyNote2,
-  modes = setOf(AppMode.SHOP),               // دکان / پیک / خرید (یک یا چند)
+  modes = setOf(AppMode.SHOP),               // دکان / پیک (یک یا هر دو)
   needs = setOf(Need.MANAGE),                // نقش یا پرچمِ سرور (MANAGE، AUDIT، ORDERS_LIVE، STOREFRONT، CHAT، DELIVERY)
   flag = "module.notes",                     // پرچمِ ماژول؛ پیش‌فرض خاموش (`ModuleFlags`)
   routes = listOf(V3Route("notes", RouteKind.PAGE, { StrNotes.title }, chrome = Chrome.OWN) { NotesScreen() }),
   entries = listOf(ModuleEntry("notes", { StrNotes.title }, "notes", Icons.Outlined.StickyNote2,
     setOf(Place.MORE), MoreGroup.SHOP, V3Hue.PURPLE)),          // ردیفِ «بیشتر» / کاشیِ خانه / موردِ نوار
   settings = listOf(SettingsEntry({ StrNotes.settings }, "settings/notes", Icons.Outlined.Tune, SettingsLayout.GENERAL)),
-  shopper = listOf(ShopperSection("notes", { StrNotes.forCustomers }, "shopper/shop/{slug}/notes", Icons.Outlined.StickyNote2)),
 )
 ```
 
@@ -31,7 +30,6 @@ AppModule(
 - `entries`: کجا دیده شود — `Place.MORE` (زیرِ `MoreGroup`)، `Place.HOME` (کاشیِ خانه)، `Place.NAV` (فهرستِ
   ویرایشگرِ نوارِ پایین؛ شناسه ماندگار است، عوضش نکنید).
 - `settings`: صفحه‌هایش در «تنظیمات».
-- `shopper`: بخشی که روی صفحهٔ هر دکان در **فروشگاهِ آنلاین** (حالتِ خرید) می‌گذارد.
 
 ## بخشِ تازه در برنامهٔ دکان — سه قدم
 
@@ -41,19 +39,16 @@ AppModule(
 3. اگر منطقِ تازه دارد (پول، موجودی، همگام‌سازی) جایش `core/` است با آزمونِ خودش، نه صفحه. پرچمِ ماژول خاموش
    می‌ماند تا آماده شود؛ برای آزمایش روی یک دستگاه: `ModuleFlags.set(context, "module.<بخش>", true)`.
 
-## بخشِ تازه درونِ فروشگاهِ آنلاین
+## بخشِ تازه برای مشتری
 
-همان ماژول، با `modes = setOf(AppMode.SHOP, AppMode.SHOPPER)`: مدیریتش در دکان (`routes` با `AppMode.SHOP`) و
-نمایش برای مشتری با `shopper = listOf(ShopperSection(..., route = "shopper/shop/{slug}/<بخش>"))` و یک `V3Route`
-برای همان مسیر. صفحهٔ دکان در حالتِ خرید فهرستِ `V3Modules.shopperSections(access)` را خودش نشان می‌دهد.
-اگر داده باید از سرور بیاید، API ِ تازه زیرِ `/api/store/:slug/<بخش>` و منطقش در `server/src/lib` (مثلِ چت و
-اعتماد)، پشتِ پرچمِ سرورِ خودش.
+حالتِ «خرید» در برنامهٔ مدیریت نیست (تصمیمِ ۱۴۰۵/۰۸/۰۸؛ برنامهٔ خریدِ مشتری جداست). بخشی که مشتری می‌بیند در
+برنامهٔ مدیریت فقط سمتِ مدیریتش را دارد (`routes` با `AppMode.SHOP`)؛ داده‌اش از سرور می‌آید: API ِ تازه زیرِ
+`/api/store/:slug/<بخش>` و منطقش در `server/src/lib` (مثلِ چت و اعتماد)، پشتِ پرچمِ سرورِ خودش.
 
 ## نمونهٔ زنده
 
 `ui/v3/example/ExampleRoutes.kt` (`ExampleModule`، پرچمِ خاموشِ `module.example`): یک ردیف در «بیشتر»، یک
-صفحه در تنظیمات (`settings/example`)، یک بخش روی صفحهٔ دکان در حالتِ خرید (`shopper/shop/{slug}/example`)، و
-مسیرِ `example`. آزمونِ `ModuleRegistryTest` نشان می‌دهد با پرچمِ خاموش هیچ‌کدام دیده نمی‌شود و با روشن شدن
+صفحه در تنظیمات (`settings/example`) و مسیرِ `example`. آزمونِ `ModuleRegistryTest` نشان می‌دهد با پرچمِ خاموش هیچ‌کدام دیده نمی‌شود و با روشن شدن
 همه‌جا می‌آید؛ همان آزمون برای **هر** ماژول می‌سنجد که مسیرها پیدا می‌شوند، پدرها درست‌اند و ورودی‌ها نقش و
 پرچم را رعایت می‌کنند.
 
@@ -71,8 +66,7 @@ AppModule(
 | G8 آنلاین و پیک | `ui/v3/online/OnlineRoutes.kt` | `OnlineModule`، `CourierModule` |
 | G9 تنظیمات | `ui/v3/settings/SettingsRoutes.kt` | `SettingsModule` |
 | G10 پوسته | `ui/v3/shell/ShellRoutes.kt` | `ShellModule` |
-| خرید | `ui/v3/shopper/ShopperRoutes.kt` | `ShopperModule` |
-| پایه | `ui/v3/nav/FoundationRoutes.kt`، `ui/v3/nav/ScanRoutes.kt` | `FoundationModule`، `ScanModule` (`scan?kind=qr`، هر سه حالت) |
+| پایه | `ui/v3/nav/FoundationRoutes.kt`، `ui/v3/nav/ScanRoutes.kt` | `FoundationModule`، `ScanModule` (`scan?kind=qr`، هر دو حالت) |
 
 هر مسیرِ NAV-MAP از پیش ثبت است و امروز به صفحهٔ پیشین اشاره می‌کند (یا با `LandOn` روی نزدیک‌ترین صفحه
 می‌نشیند)؛ گروه فقط محتوای مسیرهای خودش را با صفحهٔ تازه عوض می‌کند.
