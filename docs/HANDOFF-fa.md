@@ -54,6 +54,16 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۹ — برنامهٔ امنیت، شاخهٔ `claude/sec-client` (اشتراک در سرور، اندروید، کامپیوتر)
+- انجام شد: SEC-CLI-01 (High) — `POST /api/license/sync` شناسهٔ دستگاهِ ساختگی را فقط می‌شمرد، نمی‌نشاند ⇒ سقفِ دستگاه دور
+  می‌خورد و دستگاهِ باطل‌شده دوباره مجوز می‌گرفت؛ حالا جا زیرِ قفلِ دکان ثبت می‌شود، باطل ⇒ `device_revoked`، سقفِ دستگاه‌های
+  واردشده پشتِ پرچمِ خاموشِ `shop.device_cap`. آزمون‌های `sec-sub-device-cap`، `sec-sub-trial`، `sec-sub-replay` (روی
+  PostgreSQL هم). سند: `docs/security/client-fa.md`. PRِ جدا #580: `DevShot` فقط در ساختِ dev، مبهم‌سازیِ R8 پشتِ
+  `-Ptohid.obfuscate=true`.
+- نیمه‌کاره / کارِ صاحب محصول: SEC-CLI-02 (Critical) کلیدِ امضای انتشار و رمزش در مخزنِ عمومی ⇒ چرخش؛ SEC-CLI-03 کلیدِ امضای
+  به‌روزرسانی گذاشته نشده؛ SEC-CLI-04 DPAPI برای نشستِ کامپیوتر؛ روشن کردنِ `shop.device_cap`.
+- قدمِ بعدی: پس از مرج، ردیفِ SEC-SUB در `SECURITY-PROGRAM-fa.md` (کارِ هماهنگ‌کننده)؛ مهاجرتِ ۱۶۲ مصرف نشد.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛

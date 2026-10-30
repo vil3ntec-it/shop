@@ -366,6 +366,7 @@
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
+| `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
@@ -471,6 +472,13 @@
   دوباره سنجیده می‌شود. توکن در آدرس فقط وقتی سرور ۴۰۴ می‌دهد (سرورِ کهنه)؛ بی اینترنت هرگز. `?token=` و
   `Authorization: Bearer` روی سرور برای برنامه‌های کهنه پذیرفته می‌مانند و تا داشبوردِ نسخه‌ها برنامهٔ کهنه نشان
   می‌دهد برداشته نمی‌شوند. سنجه: `server/test/sync-live-ticket.test.js` و `LiveCredentialTest.kt`.
+- ⛔ **SEC-CLI-01 — سقفِ دستگاهِ دکان در `POST /api/license/sync`:** شناسهٔ دستگاهِ بدنه ساختگی‌پذیر است، پس فقط
+  «برچسبِ یک جا» است: شناسهٔ تازه فقط با جای خالی و زیرِ `pg_advisory_xact_lock('shop-devices:<دکان>')` در همان
+  تراکنش **ثبت** می‌شود (`devices`، `platform='license'`، در «دستگاه‌های من» دیده و باطل‌شدنی) و از آن پس شمرده
+  می‌شود؛ شناسهٔ باطل‌شدهٔ همان حساب ⇒ `device_revoked` بی مجوز. تا ۲.۱۴.۵ فقط شمرده می‌شد و نشانده نه ⇒ یک توکن با
+  شناسه‌های پیاپی بی‌شمار مجوز می‌گرفت. «شمردن بی نشاندن» برنگردد. دستگاهِ ثبت‌شده با ورود بیرون از سقف فقط با
+  پرچمِ `shop.device_cap` رد می‌شود (نقشهٔ پرچم‌ها). سنجه: `server/test/sec-sub-device-cap.test.js` (روی PostgreSQL، بی
+  قفل ⇒ سرخ). شرح و بقیهٔ SEC-SUB: `docs/security/client-fa.md`.
 
 ### سنجشِ کارایی
 - **F0-26:** خطِ پایه در `docs/spec/bench/baseline-1405-07-22.md`. هر PR که کارایی را عوض می‌کند
