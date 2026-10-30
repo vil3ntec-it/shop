@@ -217,8 +217,16 @@ router.get('/support/threads/:id', async (req, res, next) => {
     const row = await one('SELECT * FROM support_threads WHERE id=$1', [id]);
     if (!row) return next(notFound('این گفت‌وگو پیدا نشد', 'thread_not_found'));
     const after = v.integer(req.query?.after, { min: 0, max: 1e15, def: 0 });
-    //  باز کردنِ گفت‌وگو یعنی مدیر دیدش
-    if (!after) await support.markRead(id, 'admin');
+    //  باز کردنِ گفت‌وگو یعنی مدیر دیدش — و دیدنِ گفت‌وگوی یک حساب سابقه دارد (TEN-04)؛
+    //  نظرسنجیِ پیام‌های تازه (`after`) نه، وگرنه سابقه هر چند ثانیه یک ردیف می‌گرفت
+    if (!after) {
+      await support.markRead(id, 'admin');
+      await audit.log({
+        shopId: row.shop_id || '', actorType: 'admin', userId: req.admin.id, action: 'admin.support_thread_viewed',
+        targetType: 'support_thread', targetId: id, ip: clientIp(req),
+        detail: { app: row.app, ...(row.station_id ? { tenantId: row.station_id } : {}) },
+      });
+    }
     res.json({
       thread: support.shapeThread(row),
       messages: await support.messages(id, { after }),
