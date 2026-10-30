@@ -189,6 +189,8 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+//  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
+FLAGS.push('shop.orders.picking');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -308,6 +310,20 @@ async function seedShop(a) {
     const t = await h.post(`/api/shop/orders/${ids.order}/transition`, { to }, { token: a.accessToken });
     assert.equal(t.status, 200, `${to}: ${JSON.stringify(t.body)}`);
   }
+  //  جمع‌آوری (PCK): سفارشِ دیگرِ «الف» ⇒ برگه ⇒ «پیدا نکردم» ⇒ وظیفهٔ بررسی
+  const po = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'رحیم' },
+    lines: [{ productId: ids.product, name: 'کالای الف', qtyMilli: 1000, unitPriceMinor: 5000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('pick-order') } });
+  assert.equal(po.status, 201, JSON.stringify(po.body));
+  assert.equal((await h.post(`/api/shop/orders/${po.body.order.id}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+  assert.equal((await h.post(`/api/shop/orders/${po.body.order.id}/pick/start`, {}, { token: a.accessToken })).status, 201);
+  const nf = await h.post(`/api/shop/orders/${po.body.order.id}/pick/events`,
+    { events: [{ eventId: fresh('pick-ev'), lineNo: 1, type: 'not_found' }] }, { token: a.accessToken });
+  assert.equal(nf.body.results?.[0]?.status, 'accepted', JSON.stringify(nf.body));
+  ids.pickIssue = (await h.get('/api/shop/orders/pick/issues', { token: a.accessToken })).body.issues[0]?.id;
+  assert.ok(ids.pickIssue, 'وظیفهٔ «پیدا نکردم» ِ الف');
+
   const courier = await courierOf(a, 'پیکِ الف');
   ids.courier = courier.id;
   const asg = await h.post(`/api/shop/delivery/orders/${ids.order}/assign`,
@@ -386,6 +402,8 @@ function concreteFor(ids) {
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
+    [/(\/pick\/issues\/):issueId/, ids.pickIssue],
+    [/(\/pick\/locations\/):productId/, ids.product],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
@@ -421,6 +439,10 @@ function bodyFor(r, ids) {
   const B = {
     'POST /shop/orders/:id/transition': { to: 'accepted' },
     'POST /shop/orders/:id/refunds': { amountMinor: 1000, reason: 'other', note: 'آزمون', method: 'cash' },
+    'POST /shop/orders/:id/pick/events': { events: [{ eventId: fresh('pev'), lineNo: 1, type: 'not_found' }] },
+    'POST /shop/orders/:id/pick/pack': { bags: 1 },
+    'POST /shop/orders/pick/issues/:issueId/resolve': { action: 'resolved', note: 'آزمون' },
+    'PUT /shop/orders/pick/locations/:productId': { aisle: '1' },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },

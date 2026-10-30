@@ -197,6 +197,9 @@
 - اشتراکِ تمام‌شده فقط نوشتن را می‌بندد؛ خواندن باز است (#227).
 - تکرارِ همان گذار ⇒ ۲۰۰ `unchanged` بی رویدادِ دوم؛ `from`ِ ناهمخوان ⇒ ۴۰۹ `status_changed` (#227).
 - نمودارِ وضعیتِ §۳.۹ حرف‌به‌حرف در `order-states.js` است؛ تا سرویسِ پرداخت هیچ دری وضعیتِ پرداخت را عوض نمی‌کند (#227).
+- جمع‌آوری (PCK، پشتِ `shop.orders.picking`): برگه فقط با «شروع» (`accepted ⇒ picking` با `orders.transitionIn`) و بسته فقط با «بسته‌بندی» (`picking ⇒ packed`)؛ هر کارِ جمع‌آور `eventId` دارد (تکرار بی‌اثر، همان کلید با بدنهٔ دیگر `event_key_reused`)؛ منطقِ خالص فقط در `lib/pick-core.js` با بردارِ `core/test-vectors/pick-v1.json` (`claude/spec-pck-2`).
+- ⛔ بسته‌بندی تنها جایی است که قلم و مبلغِ سفارش پس از ثبت عوض می‌شود: قلمِ پیدانشده پاک، قلمِ کم/وزنی با مقدارِ واقعی، `subtotal/discount/total/items_count` و `expected_collect_minor` ِ مأموریتِ هنوزنرفته (`requested`/`assigned`) در همان تراکنش، با رویدادِ `note` و `detail.pick` (مبلغِ پیشین)؛ مأموریتِ رفته ⇒ ۴۰۹ `already_dispatched`؛ هیچ قلم ⇒ ۴۰۹ `nothing_picked` (لغو با «ناموجود»). فروشِ تحویلِ برنامه همان قلم‌های تازه است (`claude/spec-pck-2`).
+- «پیدا نکردم» ⇒ `pick_issues` (نه `stock_tasks`؛ CHECK ِ آن را #464 هم عوض می‌کند) و تا رسیدگی «تمام شده» در ویترین و `product_unavailable` در ثبتِ سفارشِ ویترین؛ رسیدگی با `stock.adjust` و توضیح (`claude/spec-pck-2`).
 - با `shop.orders.refunds` «بازپرداخت‌شده» فقط از راهِ دفتر (`POST …/refunds`) و با مبلغ است؛ گذارِ ساده ۴۰۹ `refund_via_ledger` (FIN-01، #255).
 - مبلغِ بازپرداخت هرگز از مانده بیشتر نیست؛ ردیفِ دفتر فقط افزوده می‌شود؛ روش فقط `cash` تا D-08؛ دلیل اجباری و متنِ آزاد (#255).
 - سفارشِ آزمایشی (`test: true`) در جمعِ تطبیق شمرده نمی‌شود (#227، #255).
@@ -353,7 +356,7 @@
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
-| `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ گامِ ۱: QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11) | `claude/spec-pck-1` | باز |
+| `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11)؛ `/shop/orders/pick/…` و `/shop/orders/:id/pick…` (خاموش ⇒ ۴۰۳ `picking_disabled`)، کسرِ خودکار در بسته‌بندی، «تمام شده» ِ کالای پیدانشده در ویترین | `claude/spec-pck-1`، `claude/spec-pck-2` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
@@ -374,7 +377,7 @@
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
-- روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
+- روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۸ (جمع‌آوری و بسته‌بندی PCK: `order_picks`، `order_pick_lines`، `order_pick_events`، `pick_locations`، `pick_issues`؛ `claude/spec-pck-2`). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 
 ### v3 · تعارض‌های حل‌شده
 
