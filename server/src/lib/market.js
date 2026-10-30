@@ -72,11 +72,20 @@ const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 //  روشن یا خاموش
 // ════════════════════════════════════════════════════════════════════
 
-async function directoryOn() {
-  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [FLAG_KEY]);
+async function globalFlag(key) {
+  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
   if (!r) return false;
   try { return JSON.parse(r.value) === true; } catch { return false; }
 }
+
+const directoryOn = () => globalFlag(FLAG_KEY);
+
+/**
+ * حسابِ مشتریِ بازار بی دکان (S9): `/api/market/account/*` و نشستِ حساب در چتِ
+ * ویترین. پرچمِ سراسریِ `market.account`، پیش‌فرض خاموش.
+ */
+const ACCOUNT_FLAG = 'market.account';
+const accountOn = () => globalFlag(ACCOUNT_FLAG);
 
 /** «بازارچه نیست» — همان جوابِ نشانیِ ناموجود. */
 async function requireOn() {
@@ -721,6 +730,11 @@ async function myOrders(ticket) {
   //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
   const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
+  return ordersOfPhone(phone);
+}
+
+/** سفارش‌های ویترینیِ یک شماره در همهٔ دکان‌های باز (۵۰ تای تازه). */
+async function ordersOfPhone(phone) {
   const rows = await many(
     `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
             sf.slug, sf.title, sf.accent
@@ -822,7 +836,7 @@ async function requireStorefrontFlag(shopId) {
 }
 
 module.exports = {
-  FLAG_KEY, CATEGORIES,
-  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
+  FLAG_KEY, ACCOUNT_FLAG, CATEGORIES,
+  directoryOn, accountOn, requireOn, ordersOfPhone, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };
