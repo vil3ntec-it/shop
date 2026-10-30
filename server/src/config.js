@@ -47,8 +47,23 @@ const config = {
   host: process.env.HOST || '0.0.0.0',
   port: num(process.env.PORT, 3000),
 
-  /** آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها. */
-  serverUrl: process.env.SERVER_URL || '',
+  /**
+   *  آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها، و `publicUrl` ِ
+   *  `GET /api/v1/config/server`. `PUBLIC_URL` نامِ دومِ همین است (docs/SERVERS-fa.md).
+   */
+  serverUrl: process.env.SERVER_URL || process.env.PUBLIC_URL || '',
+
+  /**
+   *  HTTPS ِ مستقیم، بی Caddy و بی تونل — برای سرورِ شبکهٔ دکان (برنامه‌ها `http` ِ شبکه را
+   *  نمی‌پذیرند؛ گواهیِ خودامضا در برنامه سنجاق می‌شود). یا `TLS_CERT_FILE` + `TLS_KEY_FILE`
+   *  (PEM)، یا `TLS_PFX_FILE` (+ `TLS_PFX_PASSPHRASE`، خروجیِ ویندوز). خالی ⇒ همان http ِ امروز.
+   */
+  tls: {
+    certFile:   process.env.TLS_CERT_FILE || '',
+    keyFile:    process.env.TLS_KEY_FILE || '',
+    pfxFile:    process.env.TLS_PFX_FILE || '',
+    passphrase: process.env.TLS_PFX_PASSPHRASE || '',
+  },
 
   db: {
     url:              databaseUrl(),
@@ -455,6 +470,8 @@ const config = {
 function validate() {
   const problems = [];
   if (!config.db.url) problems.push('DATABASE_URL تنظیم نشده است');
+  if (config.tls.certFile && !config.tls.keyFile) problems.push('TLS_CERT_FILE بی TLS_KEY_FILE است');
+  if (config.tls.keyFile && !config.tls.certFile) problems.push('TLS_KEY_FILE بی TLS_CERT_FILE است');
   if (config.env === 'production') {
     if (!config.secrets.api || config.secrets.api.length < 24) {
       problems.push('API_SECRET باید حداقل ۲۴ کاراکتر باشد');

@@ -54,6 +54,15 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخه‌های `claude/any-server` و `claude/any-server-app` («برنامه‌ها به هر سرور وصل شوند»)
+- انجام شد (PRِ اول): `core/server` (پروفایلِ سرور، کیو‌آرِ `tohid-server:`، قاعدهٔ نشانی، سنجاقِ هویت، جابه‌جاییِ نشانی، نامِ
+  بایگانیِ جدا برای هر سرور؛ `ServerProfilesTest` ۱۶)، `GET /api/v1/config/server` با `serverId` ِ پایدار (`server-info.test.js` ۶)،
+  HTTPS ِ مستقیمِ اختیاری (`TLS_*`)، `PUBLIC_URL`/`SERVER_NAME`، `docs/SERVERS-fa.md` و بخشِ «🌐 هر سرور» در `RULES-fa.md`.
+  PRِ دوم (روی اولی): صفحهٔ «سرورها» در گوشی و کامپیوتر پشتِ پرچمِ خاموشِ `app.multi_server`.
+- تصمیمِ فنی: `http` ِ شبکهٔ دکان پذیرفته **نشد** (همان شنودِ توکن)؛ به‌جایش https با گواهیِ خودامضای سنجاق‌شده.
+- نیمه‌کاره: نسخهٔ وب هنوز فقط نشانیِ زمانِ ساخت را دارد؛ پنلِ مدیریتِ سرورها؛ تصمیمِ مجوزِ اشتراک روی سرورِ دیگر (`SERVERS-fa.md` §۲.۱).
+- قدمِ بعدی: سبز شدنِ CIِ اندروید/کامپیوترِ PRِ دوم (این‌جا کامپایل نشد)، سپس پنلِ سرورها که همان کیو‌آر را بسازد.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
