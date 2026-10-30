@@ -30,6 +30,12 @@
  *     (مشترک با پمپ) دست نمی‌خورد؛ opِ ناروا پیش از آن از دسته بیرون می‌آید و
  *     پاسخش «rejected» با همان دلیل در جای خودش برمی‌گردد. پمپ از این
  *     میان‌افزار بی هیچ کاری رد می‌شود.
+ *
+ * ── جدولِ نوشتنیِ هر نقش (STF-01، A16) ───────────────────────────────
+ * `v1Guard` پیش از همهٔ این‌ها `canWrite`ِ هسته را می‌سنجد: opی که جدولش در
+ * حدِ نقش نیست `table_not_allowed` می‌گیرد و هر opِ همین دسته که با
+ * `refId`/`saleId`/`purchaseId`/`returnId` به آن بسته است `tx_rejected`.
+ * سه نقشِ قدیم «*»اند، پس این شاخه برایشان هرگز کاری نمی‌کند.
  */
 const crypto = require('crypto');
 const core = require('./perm-core');
@@ -38,6 +44,7 @@ const staffPerms = require('./staff-perms');
 const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
+const roleRows = require('./role-rows');
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -561,6 +568,44 @@ function companionOf(p, op) {
   return false;
 }
 
+/** فیلدهایی که opِ همراه با آن به سندِ پدر اشاره می‌کند */
+const REF_FIELDS = Object.freeze(['refId', 'saleId', 'purchaseId', 'returnId']);
+
+/** opِ `op` به ردیفِ `parent` بسته است؟ (برای ردِ جدولیِ A16) */
+function refersTo(parent, op) {
+  if (op.table === parent.table && op.row_id === parent.row_id) return true;
+  const f = isPlainObject(op.fields) ? op.fields : {};
+  return REF_FIELDS.some((k) => typeof f[k] === 'string' && f[k] !== '' && f[k] === parent.row_id);
+}
+
+/**
+ * opهای v1ِ بیرون از حدِ نقش: جدولی که نقش نمی‌نویسد، یا ردیفی از جدولِ قاعده‌دار که قاعده را
+ * نمی‌گذراند (صندوق‌دار: رسیدِ انبار فقط اصلاحِ قلمِ برگشتِ خودش، حرکتِ انبار فقط از فاکتور و
+ * برگشت؛ `role-rows.js`). برگشت و فاکتورِ همین دسته فقط اگر واقعاً می‌نشیند: نه op_id ِ ثبت‌شده
+ * (پاسخش «تکراری» است و ردیفی نمی‌سازد)، نه opِ نادرستِ ردشده. برگشتی که پس از این با داوریِ
+ * تأیید رد شود همراه‌هایش را با خودش می‌برد (`companionOf`).
+ */
+async function offRoleV1(ctx, valid, { deviceId = '', rejected = new Map() } = {}) {
+  const off = [];
+  let ruled = false;
+  for (const x of valid) {
+    if (!core.canWrite(ctx.role, x.op.table)) off.push(x);
+    else if (core.rowRule(ctx.role, x.op.table)) ruled = true;
+  }
+  if (!ruled) return off;
+  const seen = new Set((await many(
+    'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
+  )).map((r) => r.op_id));
+  const items = valid.map((x) => ({
+    x, table: x.op.table, rowId: String(x.op.row_id || ''), insert: x.op.type === 'insert',
+    fresh: x.op.type === 'insert' && !seen.has(String(x.op.op_id)) && !rejected.has(x.i),
+    live: !seen.has(String(x.op.op_id)) && !rejected.has(x.i), fields: x.op.fields, unit: 0,
+  }));
+  const res = await roleRows.judge(ctx.role, items, roleRows.v1Db(many, ctx, deviceId));
+  for (const it of items) if (res.has(it) && !res.get(it).ok) off.push(it.x);
+  return off;
+}
+
 /** ردیفِ پولیِ «بی نشانی» (برنامهٔ پیش از refId): تراکنش، یا اصلاحِ انبار */
 function isLoose(op) {
   const f = fieldsOf(op);
@@ -751,17 +796,31 @@ async function v1Guard(req, res, next) {
         rejected.set(i, { op_id: v.op_id, status: 'rejected', reason: v.reason });
       }
     });
-    const hasNeed = valid.some((x) => x.need);
-    if (!hasNeed && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
+    //  A16: opی که جدولش (یا ردیفش) در حدِ نقش نیست (صندوق‌دار خرید، انباردار فروش، حسابدار
+    //  هیچ). روی همان opِ یک‌دست‌شده‌ای سنجیده می‌شود که به v1 می‌رسد (پس از shopNewerFields).
+    //  سه نقشِ قدیم «*»اند و قاعدهٔ ردیف ندارند، پس برایشان این فهرست همیشه خالی است.
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const offTable = await offRoleV1(ctx, valid, { deviceId, rejected });
+    const hasNeed = valid.some((x) => x.need);
+    if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
-    if (!hasNeed && !held0.length) return finish();
+    if (!hasNeed && !held0.length && !offTable.length) return finish();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
     //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه همراه، نه صندوق.
     const seen = new Set((await many(
       'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
     )).map((r) => r.op_id));
-    const live = valid.filter((x) => !seen.has(String(x.op.op_id)));
+    //  A16، پیش از هر داوری: opِ بیرون از نقش `table_not_allowed` و همراه‌هایش در همین دسته
+    //  (`refersTo`) `tx_rejected` — تا برگه‌ای برای opی که به‌هرحال نمی‌نشیند خرج نشود و
+    //  صندوقِ تعارضی برایش ساخته نشود. opِ ثبت‌شده را باز خودِ v1 «تکراری» جواب می‌دهد.
+    const offLive = offTable.filter((x) => !seen.has(String(x.op.op_id)));
+    const drop = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
+    for (const x of offLive) drop(x, 'table_not_allowed');
+    for (const x of valid) {
+      if (rejected.has(x.i) || seen.has(String(x.op.op_id))) continue;
+      if (offLive.some((p) => refersTo(p.op, x.op))) drop(x, 'tx_rejected');
+    }
+    const live = valid.filter((x) => !seen.has(String(x.op.op_id)) && !rejected.has(x.i));
     const liveOps = live.map((x) => x.op);
     //  دفترِ پایه: چند سند زیرِ یک ts
     const heads = new Map();

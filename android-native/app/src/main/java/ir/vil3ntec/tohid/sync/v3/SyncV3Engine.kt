@@ -542,9 +542,14 @@ internal class SyncV3Engine(
         if (!init.ok) return init
       }
       recordNow()
+      //  A16: Pushِ ۴۰۳ (نقش یا اشتراک) Pull را نمی‌خواباند — دادهٔ دکان همچنان
+      //  می‌رسد و opهای همین دستگاه در صف می‌مانند؛ خطا پس از Pull سرِ جایش می‌ماند.
+      var refused: V3Step? = null
+      var refusedError = ""
       for (i in 0 until ROUNDS) {
         if (queue.outbox.isEmpty()) break
         val p = pushOnce()
+        if (!p.ok && p.status == 403) { refused = p; refusedError = meta.lastError; break }
         if (!p.ok) return p
         if (p.done == 0 && p.rejected == 0) break
       }
@@ -556,6 +561,10 @@ internal class SyncV3Engine(
       if (meta.conflictsDirty || now() - conflictsAt > 5 * 60 * 1000L) {
         conflictsAt = now()
         fetchConflicts()
+      }
+      if (refused != null) {
+        withLock { save(meta.copy(lastError = refusedError, lastErrorAt = now())) }
+        return refused
       }
       return V3Step(ok = true)
     } finally {

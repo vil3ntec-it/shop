@@ -86,7 +86,11 @@ data class WarehouseEntry(
   val batch: String = "",
   /** تاریخِ تولید (اختیاری، `yyyy-MM-dd`) — خالی یعنی ثبت نشده */
   val productionDate: String = "",
-  /** نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return */
+  /**
+   *  نوعِ اصلاح (INV-04): count · damage · expired · lost · other · supplier_return ·
+   *  customer_return (برگشتِ بی‌رسیدِ کالای سالم، #318). اصلاحِ برگشت (damage یا
+   *  customer_return با `refId` = برگشت) تنها ردیفِ رسیدِ انبار است که صندوق‌دار می‌نویسد (A16).
+   */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val adjKind: String? = null,

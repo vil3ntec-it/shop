@@ -35,6 +35,7 @@ const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
 const permCore = require('./perm-core');
+const roleRows = require('./role-rows');
 
 const PROTOCOL = 3;
 const MAX_OPS = 500;
@@ -425,9 +426,19 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
  * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
  *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
  */
-async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
+async function authorize(c, ctx, op, row, deviceId, origin, groups = null, rowChecks = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
+  //  A16: جدولی که این نقش نمی‌نویسد (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ).
+  //  سه نقشِ قدیم «*»اند، پس برای آن‌ها هیچ چیز عوض نمی‌شود. ردِ یک op کلِ
+  //  واحدِ tx را برمی‌گرداند، پس قلم و حرکتِ انبارِ همان سند هم نمی‌نشیند.
+  if (!permCore.canWrite(role, op.table)) return 'table_not_allowed';
+  //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت) — داوریِ کلِ دسته
+  //  پیش از اعمال (`role-rows.judge` در `push`)؛ opی که داوری ندارد بسته است
+  if (permCore.rowRule(role, op.table)) {
+    const r = rowChecks ? rowChecks.get(op) : null;
+    if (!r || !r.ok) return 'table_not_allowed';
+  }
   const own = !!row && row.created_by === deviceId;
   if (op.kind === 'delete' && op.spec.policy === 'master') {
     if (can(role, 'data.delete.any')) return null;
@@ -467,14 +478,14 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, rowChecks = null }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups);
+  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups, rowChecks);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -686,6 +697,28 @@ function errorText(v) {
 // ---------- Push ----------
 
 /**
+ * A16: داوریِ ردیف‌های قاعده‌دارِ دسته (`role-rows.judge`) ⇒ Map(op ⇒ {ok, reason})؛ null وقتی
+ * نقش قاعدهٔ ردیف ندارد یا چنین opی نیست (سه نقشِ قدیم هرگز این‌جا پرس‌وجو نمی‌کنند).
+ */
+async function judgeRows(ctx, plan, deviceId) {
+  const all = [];
+  plan.forEach((u, ui) => u.items.forEach((it) => it.ops.forEach((op) => all.push({ op, ui, broken: !!u.broken }))));
+  if (!all.some(({ op }) => permCore.rowRule(ctx.role, op.table))) return null;
+  const dup = new Set((await many(
+    `SELECT op_id FROM sync_v3_ops WHERE ${ACC} AND op_id = ANY($4::text[])`, [...acc(ctx), all.map(({ op }) => op.op_id)]
+  )).map((r) => r.op_id));
+  const items = all.map(({ op, ui, broken }) => ({
+    op, table: op.table, rowId: String(op.row_id || ''), insert: op.kind === 'insert',
+    fresh: op.kind === 'insert' && !broken && !dup.has(op.op_id), live: !broken && !dup.has(op.op_id),
+    cancel: op.kind === 'cancel', fields: op.fields, unit: ui,
+  }));
+  const res = await roleRows.judge(ctx.role, items, roleRows.v3Db(many, ctx, deviceId), { v3: true, perUnit: true });
+  const out = new Map();
+  for (const it of items) if (res.has(it)) out.set(it.op, res.get(it));
+  return out;
+}
+
+/**
  * @param body {device_id, protocol?, format?: 'v3'|'v2', schema_version?, ops, queued?, last_error?, clock_offset_ms?}
  * @throws 426 اگر برنامه از سرور جلوتر باشد — و هیچ چیزی اعمال نمی‌شود (opها روی برنامه می‌مانند)
  */
@@ -757,6 +790,9 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
   const plan = approvals.bundleV3(units, groups);
+  //  A16، قاعدهٔ ردیف: داوریِ ردیف‌های قاعده‌دار پیش از اعمال (فقط وقتی چنین ردیفی هست).
+  //  برگشتِ همین دسته فقط از همان واحد (tx یا بستهٔ `bundleV3`) و فقط اگر op_idاش تازه است.
+  const rowChecks = await judgeRows(ctx, plan, deviceId);
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 
@@ -805,7 +841,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, rowChecks });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }

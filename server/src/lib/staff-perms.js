@@ -22,7 +22,7 @@
  * کلیدِ تازه‌ای که هنوز اجرا نمی‌شود رد می‌شود: `not_enforceable_yet`.
  */
 const core = require('./perm-core');
-const { can, permissionsOf } = require('./permissions');
+const { can, permissionsOf, STAFF_ROLES } = require('./permissions');
 const { one, many, query, now } = require('../db');
 const { badRequest, notFound } = require('../middleware/errors');
 
@@ -32,7 +32,8 @@ const SERVER_EDITABLE = Object.freeze([
   //  اجرا در همگام‌سازی، با سقف و برگهٔ امضاشده — `staff-approval.js`
   'sales.discount', 'sales.cancel', 'returns.create',
 ]);
-const EDITABLE_ROLES = Object.freeze(['manager', 'staff']);
+//  همهٔ نقش‌های کارمند، از جمله چهار نقشِ تازهٔ A16 (مهاجرتِ ۱۲۳)
+const EDITABLE_ROLES = STAFF_ROLES;
 
 const MESSAGES = {
   unknown_permission: 'این مجوز شناخته نیست',

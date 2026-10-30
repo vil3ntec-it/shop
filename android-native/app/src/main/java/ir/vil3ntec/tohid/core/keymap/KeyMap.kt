@@ -184,7 +184,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.E, mod = true)),
   )
   val GLOBAL_LOCK = KeyAction(
-    "global.lock", "global", "قفلِ صندوق و تعویضِ کاربر با PIN", KeyStatus.PLANNED,
+    "global.lock", "global", "قفلِ صندوق و تعویضِ کاربر با PIN", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.L, mod = true)),
     web = listOf(Chord(KeyName.L, alt = true)),
   )
