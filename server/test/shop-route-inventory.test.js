@@ -274,6 +274,11 @@ async function seedShop(a) {
   const tasks = (await h.get('/api/shop/catalog/tasks?status=open', { token: a.accessToken })).body.tasks;
   ids.task = tasks.find((t) => t.kind === 'low_stock' && t.productId === ids.product)?.id;
   assert.ok(ids.task, 'وظیفهٔ «موجودیِ کم»ِ الف');
+  //  انتقالِ «در مسیر» ِ الف (INV-11)
+  const xf = await h.post('/api/shop/catalog/transfers', { from: 'shop_floor', to: 'warehouse', lines: [{ productId: ids.product, qtyMilli: 1000 }] },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('xfer') } });
+  assert.equal(xf.status, 201, JSON.stringify(xf.body));
+  ids.transfer = xf.body.transfer.id;
 
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
@@ -385,6 +390,7 @@ function concreteFor(ids) {
     [/(\/media\/):mediaId/, ids.media],
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
+    [/^(\/shop\/catalog\/transfers\/):id/, ids.transfer],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
@@ -433,6 +439,8 @@ function bodyFor(r, ids) {
     'POST /shop/chat/conversations/:id/reports': { reason: 'spam', note: 'آزمون' },
     'PUT /shop/catalog/products/:id/low': { location: 'shop_floor', lowMilli: 5000 },
     'POST /shop/catalog/tasks/:id/resolve': { action: 'resolved', note: 'آزمون' },
+    'POST /shop/catalog/transfers/:id/receive': { lines: [{ productId: ids.product, receivedMilli: 1000 }] },
+    'POST /shop/catalog/transfers/:id/reject': { reason: 'آزمون' },
     'POST /shop/order-notify/:id/ack': { kind: 'opened' },
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },

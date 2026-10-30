@@ -14,6 +14,7 @@
 const express = require('express');
 const catalog = require('../lib/catalog');
 const stock = require('../lib/stock');
+const transfers = require('../lib/stock-transfers');
 const audit = require('../lib/audit');
 const { now } = require('../db');
 const { can } = require('../lib/permissions');
@@ -125,6 +126,49 @@ router.post('/moves', needFlag, wrap(async (req, res) => {
     });
   }
   res.status(out.unchanged ? 200 : 201).json(out);
+}));
+
+/**
+ * انتقالِ دومرحله‌ای با «در مسیر» و قبول یا رد در مقصد (INV-11، `lib/stock-transfers.js`).
+ * هر سه نوشتن اجازهٔ `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ کسری و رد دلیل.
+ */
+router.get('/transfers', needFlag, wrap(async (req, res) => {
+  res.json({ transfers: await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit }) });
+}));
+
+async function transferDone(req, res, action, out) {
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(200).json(out);
+  }
+  const t = out.transfer;
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action, targetType: 'stock_transfer', targetId: t.id,
+    detail: { from: t.from, to: t.to, status: t.status, lines: t.lines.map((l) => [l.productId, l.sentMilli, l.receivedMilli]), reason: t.reason },
+    ip: clientIp(req),
+  });
+  return res.status(action === 'stock.transfer_send' ? 201 : 200).json(out);
+}
+
+router.post('/transfers', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
+  const out = await transfers.send(req.shopId, {
+    key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
+  });
+  await transferDone(req, res, 'stock.transfer_send', out);
+}));
+
+router.post('/transfers/:id/receive', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
+  const out = await transfers.receive(req.shopId, req.params.id, {
+    key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
+  });
+  await transferDone(req, res, 'stock.transfer_receive', out);
+}));
+
+router.post('/transfers/:id/reject', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
+  const out = await transfers.reject(req.shopId, req.params.id, {
+    key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
+  });
+  await transferDone(req, res, 'stock.transfer_reject', out);
 }));
 
 module.exports = router;
