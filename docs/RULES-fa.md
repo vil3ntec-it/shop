@@ -474,6 +474,10 @@
   افتِ بیش از ۱۰٪ رد است. عددِ ماشینِ ایجنت با بودجهٔ بخشِ ۹.۲ مقایسه نمی‌شود؛ عددِ مرجع فقط از سخت‌افزارِ مرجع
   (`bench/desktop-cold-start.ps1`، `bench/android-cold-start.sh`، `bench/web.mjs --channel msedge`).
   ⛔ دادهٔ سنجش فقط از `bench/datagen.mjs` (seed ثابت)؛ دادهٔ واقعیِ دکان در ریپو نمی‌آید.
+- **PERF-06:** عددِ PostgreSQL و PGlite همیشه جدا ثبت می‌شود و یکی به دیگری تعمیم داده نمی‌شود (§۲۹.۶ بند ۸). کارِ
+  «PostgreSQL و PGlite، کنارِ هم» ِ `perf.yml` جدول را با `bench/db-compare.mjs` می‌سازد (درایورِ جابه‌جا یا مقیاسِ ناهمسان ⇒ کدِ ۲)؛
+  ثبتِ ماندگار در `docs/spec/bench/perf-<تاریخ>.md` با شمارهٔ اجرای CI. `bench/kotlin` بسته‌های رفته به `core` را با
+  `includeBuild("../../core")` می‌گیرد، نه کپی از android-native.
 
 ### کلیدها (فقط دستورالعمل؛ اجرا با صاحب محصول)
 - ⛔ کلیدِ خصوصیِ مجوز فقط با **همان** کلیدِ فعلی به `LICENSE_PRIVATE_KEY` منتقل می‌شود؛

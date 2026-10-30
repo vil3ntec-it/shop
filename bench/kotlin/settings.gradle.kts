@@ -18,3 +18,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "engine-bench"
+
+//  core — منطقِ خالصِ مشترکِ اندروید و کامپیوتر (`ir.vil3ntec.tohid:core`)؛ بسته‌هایی که از
+//  android-native به آن رفته‌اند (money، text، calendar) از همین‌جا می‌آیند
+includeBuild("../../core")
