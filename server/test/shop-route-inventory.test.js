@@ -188,7 +188,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.order_risk'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -374,6 +374,12 @@ async function seedShop(a) {
     { body: 'پوزش؛ پیگیری شد', clientId: `client-${fresh('t')}-0000` }, { token: a.accessToken });
   assert.equal(resp.status, 201, JSON.stringify(resp.body));
 
+  //  فهرستِ سیاهِ ویترینِ «الف» (RSK-04؛ پرچمِ `shop.order_risk` در FLAGS)
+  const listed = await h.post('/api/shop/orders/risk/lists',
+    { list: 'block', kind: 'phone', phone: '0791112255', reason: 'آزمونِ جداسازی', expiresInDays: 30 }, { token: a.accessToken });
+  assert.equal(listed.status, 201, JSON.stringify(listed.body));
+  ids.riskEntry = listed.body.entry.id;
+
   return { ids, staff, courier };
 }
 
@@ -386,6 +392,7 @@ function concreteFor(ids) {
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
+    [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
