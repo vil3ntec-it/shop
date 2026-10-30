@@ -42,6 +42,6 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
   }
-  if (nativeGuard) linuxX64()
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
+  if (nativeGuard) linuxX64()
 }
