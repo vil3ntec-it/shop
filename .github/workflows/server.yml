@@ -9,7 +9,8 @@ name: سرور
 
 on:
   push:
-    branches: ['claude/**', main]
+    #  شاخه‌های claude/** فقط از راهِ PR سنجیده می‌شوند (اجرای دوتایی صفِ Actions را چند ساعت عقب انداخت)
+    branches: [main]
     paths:
       - 'server/**'
       - 'index.html'
