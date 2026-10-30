@@ -39,9 +39,21 @@ const locateLimit = rateLimit({
   key: (req) => `${clientIp(req)}|${String(req.params.slug || '').toLowerCase()}`,
 });
 
-/** ویترینِ روشن — یا ۴۰۴. پاسخ‌ها کش نمی‌شوند (قیمت و وضعیت زنده‌اند). */
+/**
+ * ویترینِ روشن — یا ۴۰۴. پاسخ‌ها کش نمی‌شوند (قیمت و وضعیت زنده‌اند).
+ * S3 (پرچمِ `market.public_id`): نشانیِ پیشینِ دکانی که نشانی‌اش را عوض کرده ⇒
+ * ۳۰۸ به همان مسیر با نشانیِ تازه (روش و بدنه می‌مانند). پرچمِ خاموش ⇒ همان ۴۰۴.
+ */
 const store = wrap(async (req, res, next) => {
-  req.store = await sf.open(req.params.slug);
+  try {
+    req.store = await sf.open(req.params.slug);
+  } catch (err) {
+    const moved = err && err.status === 404 ? await sf.movedTo(req.params.slug) : null;
+    if (!moved) throw err;
+    const location = `${req.baseUrl}${req.url.replace(/^\/[^/?]*/, `/${moved}`)}`;
+    res.set('Cache-Control', 'no-store').location(location);
+    return res.status(308).json({ error: { code: 'store_moved', message: 'نشانیِ این ویترین عوض شده است', slug: moved } });
+  }
   res.set('Cache-Control', 'no-store');
   next();
 });
@@ -58,12 +70,20 @@ const customer = wrap(async (req, res, next) => {
   next();
 });
 
+//  ── S3: ویترین با شناسهٔ عمومیِ پایدار — `/api/store?id=<ULID>` ⇒ نشانیِ امروز ──
+//  (پرچمِ خاموش، ویترینِ بسته یا شناسهٔ ناموجود ⇒ همان ۴۰۴ ِ امروزِ این نشانی)
+router.get('/', (req, res, next) => next(typeof req.query.id === 'string' ? undefined : 'route'), readLimit, wrap(async (req, res, next) => {
+  const hit = await sf.byPublicId(req.query.id);
+  if (!hit) return next();
+  res.set('Cache-Control', 'no-store').json(hit);
+}));
+
 router.get('/:slug', readLimit, store, wrap(async (req, res) => {
-  const [cats, status, delivery] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
+  const [cats, status, delivery, pid] = await Promise.all([
+    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store), sf.publicIdOn(req.store.shop_id),
   ]);
   res.json({
-    store: { ...sf.profile(req.store, cats, status), delivery },
+    store: { ...sf.profile(req.store, cats, status), delivery, ...(pid ? { publicId: req.store.public_id } : {}) },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
