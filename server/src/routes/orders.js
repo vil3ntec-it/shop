@@ -60,6 +60,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
+    //  ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی و نامِ «کالای مشخص» (CHK-15) — پیش‌فرض خاموش
+    substitution: await require('../lib/order-substitution').flagOn(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,

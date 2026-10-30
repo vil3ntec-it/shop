@@ -569,13 +569,12 @@ private fun OrderDetailSheet(
         Text(bits.joinToString(" · ").ifEmpty { "—" }, color = c.text)
       }
       if (o.note.isNotEmpty()) { Section("یادداشت"); Text(o.note, color = c.text) }
-
-      Section("اقلام")
+      Section("اقلام"); OrderSubstitutionNote(o.substitution)   // CHK-15: ترجیحِ کلی
       o.lines.forEach { l ->
         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
           Column(Modifier.weight(1f)) {
             Text(l.name, color = c.text)
-            if (l.note.isNotEmpty()) Text(l.note, style = MaterialTheme.typography.labelSmall, color = c.muted)
+            OrderLineExtras(l)   // یادداشتِ قلم و ترجیحِ جایگزینیِ آن (CHK-16، CHK-15)
           }
           Text("${OrderText.qty(l.qtyMilli)}${if (l.unit.isNotEmpty()) " ${l.unit}" else ""} × ${OrderText.money(l.unitPriceMinor)}", color = c.muted, style = MaterialTheme.typography.bodySmall)
           Spacer(Modifier.width(10.dp))
@@ -810,6 +809,7 @@ private fun NewOrderSheet(
         }
       }
       TextButton(onClick = { form = form.copy(lines = form.lines + OrderDraft.LineInput(qty = "1")) }) { Text("+ قلمِ دیگر") }
+      OrderSubstitutionPicker(cfg.substitution, form.substitution) { form = form.copy(substitution = it) }
       TohidTextField(form.note, { form = form.copy(note = it.take(500)) }, label = "یادداشت", singleLine = false)
       Row(
         Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = form.test, role = Role.Checkbox) { form = form.copy(test = !form.test) },
