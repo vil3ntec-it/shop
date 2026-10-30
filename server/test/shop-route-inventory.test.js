@@ -382,6 +382,7 @@ function concreteFor(ids) {
   const rules = [
     [/^(\/shop\/chat\/conversations\/):id/, ids.conv],
     [/(\/messages\/):mid/, ids.message],
+    [/(\/pins\/):mid/, ids.message],
     [/(\/media\/):mediaId/, ids.media],
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
