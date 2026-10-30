@@ -139,14 +139,17 @@ class SalePost {
     key: String,
     record: (key: String) -> SalesEngine.Result,
     save: suspend (ShopData) -> Boolean,
+    /** فقط موتورِ تازهٔ موجودی (`StockLedger.isOn`) بیرون از رشتهٔ صفحه؛ خاموش ⇒ همان مسیرِ امروز */
+    offMain: Boolean = false,
     done: (key: String) -> Unit,
   ): Outcome {
     if (!gate.compareAndSet(false, true)) return Outcome.Busy
     _busy.value = true
     try {
-      //  ساختنِ فروش (با سنجشِ دفترِ موجودی وقتی موتورِ تازه روشن است) بیرون از رشتهٔ صفحه —
-      //  روی دفترِ بزرگ صندوق را قفل نمی‌کند. `record` تابعِ خالص است (`SalesEngine.record`).
-      return when (val r = withContext(Dispatchers.Default) { record(key) }) {
+      //  موتورِ تازه روشن ⇒ سنجشِ دفترِ موجودی بیرون از رشتهٔ صفحه تا دفترِ بزرگ صندوق را قفل
+      //  نکند (`record` تابعِ خالص است، `SalesEngine.record`). خاموش ⇒ همان فراخوانیِ مستقیمِ امروز.
+      val r = if (offMain) withContext(Dispatchers.Default) { record(key) } else record(key)
+      return when (r) {
         is SalesEngine.Result.Failed -> Outcome.Refused(r.message)
         //  رفتن از صفحه نباید نوشتن را نصفه بگذارد: یا هر دو، یا هیچ
         is SalesEngine.Result.Ok -> withContext(NonCancellable) {

@@ -91,7 +91,11 @@ object DevShot {
               "stock" -> {
                 java.awt.EventQueue.invokeAndWait {
                   if (arg == "transfer") ir.vil3ntec.tohid.ui.screens.StockBookNav.transfer.value = true
-                  else ir.vil3ntec.tohid.ui.screens.StockBookNav.enable.value = arg == "on"
+                  else {
+                    //  عکس: پرچمِ سرورِ `shop.stock_v2` را هم روشن فرض کن (در برنامهٔ واقعی از `StockFlag`)
+                    if (arg == "on") ir.vil3ntec.tohid.data.StockLedger.serverFlag = true
+                    ir.vil3ntec.tohid.ui.screens.StockBookNav.enable.value = arg == "on"
+                  }
                 }
                 Thread.sleep(1500)
               }
