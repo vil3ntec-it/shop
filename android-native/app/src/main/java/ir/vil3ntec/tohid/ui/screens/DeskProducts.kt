@@ -98,6 +98,8 @@ fun DeskProductsScreen(
   var openId by remember { mutableStateOf<String?>(null) }
   var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
   var confirm by remember { mutableStateOf<BulkKind?>(null) }
+  var priceOpen by remember { mutableStateOf(false) }
+  val productTools = remember { ShopPolicy.productTools(context) }
   var results by remember { mutableStateOf<Pair<String, List<BulkRowResult>>?>(null) }
   val searchFocus = remember { FocusRequester() }
   val addFocus = remember { FocusRequester() }
@@ -282,6 +284,8 @@ fun DeskProductsScreen(
                   ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))
                     ?.let { toast("${plain(part.products.size)} کالا ذخیره شد: $it") }
                 })
+                //  PRD-21 (پیش‌فرض خاموش): قیمتِ گروهی با پیش‌نمایش، هشدار، تأیید و دلیل
+                if (productTools) add(BulkAction("قیمت", Icons.Filled.Sell) { priceOpen = true })
                 add(BulkAction("فعال", Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
                 add(BulkAction("غیرفعال", Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
                 if (canDelete) add(BulkAction("حذف", Icons.Filled.Delete, destructive = true) { confirm = BulkKind.DELETE })
@@ -314,6 +318,18 @@ fun DeskProductsScreen(
   }
 
   /* ─────────── پیش‌نمایش و نتیجهٔ کارِ گروهی ─────────── */
+  if (priceOpen) {
+    BulkPriceDialog(d, selected, onDismiss = { priceOpen = false }) { r ->
+      when (r) {
+        is WarehouseEngine.Result.Failed -> toast(r.message)
+        is WarehouseEngine.Result.Ok -> {
+          scope.launch { store.save(r.data) }
+          toast("قیمتِ ${plain(selected.size)} کالا عوض شد")
+          selected = emptySet(); priceOpen = false
+        }
+      }
+    }
+  }
   confirm?.let { kind ->
     val hidden = Selection.hiddenCount(selected, rows.map { it.id })
     val warnings = if (hidden > 0) listOf("${plain(hidden)} مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند ولی در این کار هستند.") else emptyList()
@@ -705,6 +721,9 @@ private fun EditPanel(
   var barcode by remember { mutableStateOf(if (tools) p.barcodes.joinToString("، ") else p.barcodes.firstOrNull().orEmpty()) }
   val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
   val similar = remember(name, similarIndex) { similarIndex?.find(name, except = d.products.indexOfFirst { it.id == p.id }).orEmpty() }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember { mutableStateOf("") }
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
@@ -718,6 +737,8 @@ private fun EditPanel(
       purchasePrice = buy.toDoubleOrNull() ?: 0.0, salePrice = sell.toDoubleOrNull() ?: 0.0,
       minStock = min.toDoubleOrNull() ?: 0.0, barcode = if (tools) "" else barcode.trim(), active = active,
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
+      changedBy = if (tools) me else null,
+      reason = if (tools) priceReason else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -771,6 +792,9 @@ private fun EditPanel(
         Box(Modifier.weight(1f)) { F(buy, { buy = it }, "قیمتِ خرید", true) }
         Spacer(Modifier.width(6.dp))
         Box(Modifier.weight(1f)) { F(sell, { sell = it }, "قیمتِ فروش", true) }
+      }
+      if (tools && (buy != qty(p.purchasePrice) || sell != qty(p.salePrice))) {
+        F(priceReason, { priceReason = it }, "دلیلِ تغییرِ قیمت (با نامِ شما در سابقه)")
       }
       F(min, { min = it }, "حدِ هشدارِ موجودی", true)
       Row(verticalAlignment = Alignment.CenterVertically) {

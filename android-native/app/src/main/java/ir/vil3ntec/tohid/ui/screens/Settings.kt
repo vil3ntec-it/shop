@@ -535,13 +535,14 @@ fun SettingsScreen(
       var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
       SettingsSection(
         icon = Icons.Filled.Description,
-        title = "کالا: نامِ مشابه و چند بارکد",
+        title = "ابزارهای تازهٔ کالا",
         subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
         tint = if (productTools) Shop.colors.success else Shop.colors.muted,
       ) {
         Text(
-          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد) " +
-            "و فرمِ کالا چند بارکد می‌گیرد، با «،» جدا. فقط روی همین دستگاه.",
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد می‌گیرد (با «،» جدا)، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. فقط روی همین دستگاه.",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
