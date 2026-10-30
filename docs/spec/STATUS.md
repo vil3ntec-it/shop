@@ -1,6 +1,6 @@
 # وضعیتِ شناسه‌ها (STATUS) — مشخصاتِ نسخهٔ ۳
 
-> ساختار را `node docs/spec/tools/spec.mjs status` از `MASTER-SPEC.md` (SHA-256 `9e4a59f3e95d…`) می‌سازد.
+> ساختار را `node docs/spec/tools/spec.mjs status` از `MASTER-SPEC.md` (SHA-256 `dfa093074218…`) می‌سازد.
 > ستون‌های **وضعیت**، **تأیید: دستور و نتیجه**، **اتصال بیرونی**، **مانع** و **commit/PR** دستی پر می‌شوند و با اجرای دوباره
 > حفظ می‌مانند (§۲۸.۳، §۳۹.۵). وضعیت فقط یکی از: `IMPLEMENTED-VERIFIED` · `PARTIAL` · `MISSING` · `BROKEN` · `NOT-VERIFIED` · `BLOCKED-EXTERNAL`.
 > `NOT-VERIFIED` یعنی هنوز ممیزی نشده (نه «ندارد»)؛ `BLOCKED-EXTERNAL` قبول نیست. `IMPLEMENTED-VERIFIED` بی دستور/نتیجهٔ
