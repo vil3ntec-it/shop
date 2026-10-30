@@ -54,6 +54,13 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-3` (OPS-06: ساختارِ راهنمای هر صفحه)
+- انجام شد: `core/.../core/guide/ScreenGuides.kt` — راهنمای چندگامی و ویدیوی کوتاه برای ۱۶ صفحه، همه جای خالیِ پنهان؛
+  `AppNav.screen` (از `AppRoot`) و بخشِ «راهنمای این صفحه» بالای F1 ِ کامپیوتر فقط برای ردیفِ READY ِ بی‌ایراد.
+  آزمون: `ScreenGuidesTest` ۴/۴ (Gradle ِ core روی JVM). فهرستِ محتوای لازم: `docs/spec/OWNER-ACTIONS-fa.md` بخشِ ۷.
+- نیمه‌کاره (عمداً): متن و ویدیو (کارِ صاحب محصول)؛ مسیرِ سروِ `/guides/*.mp4` پس از نخستین ویدیو؛ دکمهٔ راهنما روی گوشی (تصمیم).
+- قدمِ بعدی: گرفتنِ متنِ صفحه‌ها از صاحب محصول و READY کردنِ ردیف‌ها.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
