@@ -10,8 +10,10 @@
 --  ⛔ shop_id فقط از عضویتِ کاربرِ توکن می‌آید؛ قاعدهٔ دکانِ دیگر با کلیدِ خارجی هم بسته است.
 --
 --  فقط افزودنی: هیچ جدولِ موجودی دست نمی‌خورد و Sync هم نه.
---  بازگشت: `rollback/136_promo_redemptions.down.sql` (DROP TABLE)؛ هیچ مسیری جز
---  `/api/shop/promos` به آن نمی‌رسد و `uses` ِ قاعده‌ها دوباره همان ۰ ِ پیشین می‌شود.
+--  بازگشت (فقط وقتی `shop.promo_uses` همه‌جا خاموش است؛ سابقهٔ مصرف از دست می‌رود):
+--    DROP TABLE IF EXISTS shop_promo_redemptions;
+--    DELETE FROM schema_migrations WHERE version = '136_promo_redemptions.sql';
+--  هیچ مسیری جز `/api/shop/promos` به آن نمی‌رسد و `uses` ِ قاعده‌ها دوباره همان ۰ ِ پیشین می‌شود.
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS shop_promo_redemptions (
