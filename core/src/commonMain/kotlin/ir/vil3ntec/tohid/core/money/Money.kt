@@ -1,6 +1,6 @@
 package ir.vil3ntec.tohid.core.money
 
-import kotlin.math.roundToLong
+import kotlin.jvm.JvmInline
 
 /*
  *  نوع‌های پایهٔ پول و مقدار — بخشِ ۳.۴ِ مشخصات (docs/spec/03-architecture.md).
@@ -9,7 +9,7 @@ import kotlin.math.roundToLong
  *  به «هزارم». هیچ Double‌ای در حساب نیست؛ Double فقط در مرزِ دادهٔ امروز
  *  (`fromLegacy`) خوانده می‌شود.
  *
- *  کاتلینِ خالص است (بی `java.lang.Math`) تا بی تغییر به ماژولِ مشترکِ KMP برود.
+ *  کاتلینِ خالص است (بی `Math` ِ JDK) تا بی تغییر به ماژولِ مشترکِ KMP برود.
  *
  *  ⛔ هم‌زادِ این پرونده `license/money.js` است و هر دو با یک فایلِ بردارِ مرجع
  *  (`license/test-vectors/money-v1.json`) سنجیده می‌شوند. یکی را عوض کنی، دیگری هم.
@@ -106,7 +106,7 @@ data class Money(val minor: Long, val currency: Currency) : Comparable<Money> {
      */
     fun fromLegacy(major: Double, currency: Currency): Money {
       require(!major.isNaN() && !major.isInfinite()) { "مبلغِ نامعتبر: $major" }
-      return Money((major * currency.minorPerMajor).roundToLong(), currency)
+      return Money(mathRound(major * currency.minorPerMajor), currency)
     }
   }
 }
@@ -126,7 +126,7 @@ value class Qty(val milli: Long) : Comparable<Qty> {
     /** همان پاک‌سازیِ `SalesEngine.setCartQty`: `Math.round(x × 1000)` */
     fun fromLegacy(quantity: Double): Qty {
       require(!quantity.isNaN() && !quantity.isInfinite()) { "مقدارِ نامعتبر: $quantity" }
-      return Qty((quantity * SCALE).roundToLong())
+      return Qty(mathRound(quantity * SCALE))
     }
   }
 }
