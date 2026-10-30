@@ -66,14 +66,25 @@ class CashKeysTest {
   }
 
   @Test
-  fun cashTextToPulRoundsLikeThePanelPreview() {
+  fun cashTextIsReadExactlyToPul() {
     assertEquals(0L, CashKeys.cashMinor(""))
     assertEquals(0L, CashKeys.cashMinor("   "))
+    assertEquals(0L, CashKeys.cashMinor("0"))
     assertEquals(89_960L, CashKeys.cashMinor("899.6"))
-    assertEquals(1L, CashKeys.cashMinor("0.005"))     // نیمه به سمتِ +∞، همان Money.fromLegacy
-    assertEquals(100L, CashKeys.cashMinor("1.005"))   // 1.005 × 100 = 100.49999999999999 در Double
+    assertEquals(5L, CashKeys.cashMinor("0.05"))
+    assertEquals(1_200L, CashKeys.cashMinor("12."))
+    assertEquals(50L, CashKeys.cashMinor(".5"))
+    assertEquals(700L, CashKeys.cashMinor("007"))
+    assertEquals(1_250L, CashKeys.cashMinor("0000000000000000012.5"))
+    //  سقفِ دقیق بی Double: در آیفون (Kotlin/Native) خواندنِ Double نزدیکِ ۲^۵۳ با JVM یکی نبود
     assertEquals(9_007_199_254_740_991L, CashKeys.cashMinor("90071992547409.91"))
     assertNull(CashKeys.cashMinor("90071992547409.92"))
+    assertNull(CashKeys.cashMinor("99999999999999"))
+    assertNull(CashKeys.cashMinor("999999999999999"))
+    //  کمتر از یک پول پول نیست
+    assertNull(CashKeys.cashMinor("1.005"))
+    assertNull(CashKeys.cashMinor("0.001"))
+    assertNull(CashKeys.addNote("1.005", 1_000L))
   }
 
   @Test

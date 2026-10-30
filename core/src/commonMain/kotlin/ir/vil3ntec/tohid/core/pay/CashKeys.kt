@@ -1,7 +1,6 @@
 package ir.vil3ntec.tohid.core.pay
 
 import ir.vil3ntec.tohid.core.money.MoneyInput
-import kotlin.math.roundToLong
 
 /**
  *  پنلِ پرداخت: دکمه و کلیدِ اسکناس (PAY-03) و نگهبانِ Enter (PAY-04) — جدولِ «پنلِ پرداخت» در بخشِ ۵.۲ِ مشخصات.
@@ -18,31 +17,34 @@ object CashKeys {
   /** Enter تا این مدت پس از باز شدنِ پنل کاری نمی‌کند: Enterِ بارکدخوان یا دستِ جامانده فاکتور را نمی‌بندد */
   const val ENTER_GUARD_MS: Long = 400
 
-  private const val MINOR_PER_MAJOR = 100.0
-
   /** همان `MAX_EXACT` ِ Money.kt: بیرون از ۲^۵۳−۱ پول عددِ دقیقی نیست */
   private const val MAX_EXACT_MINOR = 9_007_199_254_740_991L
 
-  /** فقط رقم و حداکثر یک نقطه، با دستِ کم یک رقم — همان چیزی که `numericInput` ِ کادر می‌گذارد */
-  private val AMOUNT = Regex("^(?:[0-9]+\\.?[0-9]*|\\.[0-9]+)$")
+  /** رقم، و اختیاری یک نقطه با حداکثر دو رقمِ اعشار (پول) — همان چیزی که `numericInput` ِ کادر می‌گذارد */
+  private val AMOUNT = Regex("^([0-9]*)(?:\\.([0-9]{0,2}))?$")
+
+  /** بیش از ۱۴ رقمِ افغانی همیشه بیرون از سقفِ دقیق است (و در `toLong` سرریز می‌کند)؛ پیش از خواندن رد می‌شود */
+  private const val MAX_WHOLE_DIGITS = 14
 
   /** Shift+رقم (۱ تا ۶) ⇒ اسکناس؛ بیرون از بازه ⇒ null */
   fun noteForDigit(digit: Int): Long? = if (digit in 1..NOTES.size) NOTES[digit - 1] else null
 
   /**
-   *  متنِ کادرِ «نقدِ دریافتی» (افغانی) ⇒ پول. خالی = ۰.
-   *  تبدیل همان `PayFlow.minor(amountOf(...))` ِ پیش‌نمایشِ پنل است (`round(x × 100)`، نیمه به سمتِ +∞)، تا
-   *  عددی که دکمه می‌افزاید با عددی که تسویه می‌بیند یکی باشد. نوشتهٔ نامعتبر یا بیرون از بازهٔ دقیق ⇒ null.
+   *  متنِ کادرِ «نقدِ دریافتی» (افغانی) ⇒ پول، **دقیق** و بی Double: «899.6» ⇒ 89960، «12.» ⇒ 1200، «.5» ⇒ 50؛ خالی = ۰.
+   *  بیش از دو رقمِ اعشار (کمتر از یک پول)، نوشتهٔ نامعتبر یا بیرون از بازهٔ دقیق ⇒ null. تا دو رقمِ اعشار همان پولی است
+   *  که پیش‌نمایشِ پنل (`PayFlow.minor` = `Money.fromLegacy`) می‌سازد (`CashKeysParityTest`)؛ خواندنِ Double در آیفون
+   *  (Kotlin/Native) نزدیکِ سقف با JVM یکی نیست، پس این‌جا عدد از خودِ رقم‌ها ساخته می‌شود.
    */
   fun cashMinor(text: String): Long? {
     val t = text.trim()
     if (t.isEmpty()) return 0L
-    if (!AMOUNT.matches(t)) return null
-    val scaled = (t.toDoubleOrNull() ?: return null) * MINOR_PER_MAJOR
-    //  هزار رقم ⇒ بی‌نهایت؛ `roundToLong` عددِ بزرگ را به Long.MAX می‌چسباند که از بازه بیرون است
-    if (!scaled.isFinite()) return null
-    val m = scaled.roundToLong()
-    return if (m > MAX_EXACT_MINOR) null else m
+    val m = AMOUNT.matchEntire(t) ?: return null
+    val whole = m.groupValues[1].trimStart('0')
+    val frac = m.groupValues[2]
+    if (m.groupValues[1].isEmpty() && frac.isEmpty()) return null // «.» به‌تنهایی
+    if (whole.length > MAX_WHOLE_DIGITS) return null
+    val minor = (if (whole.isEmpty()) 0L else whole.toLong()) * 100 + frac.padEnd(2, '0').toLong()
+    return if (minor > MAX_EXACT_MINOR) null else minor
   }
 
   /**
