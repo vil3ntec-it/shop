@@ -34,6 +34,9 @@ process.env.RATE_PROBE_IP_MAX ||= '10000';
 //  پیامِ همگانی سقفِ ۵تایی دارد و چند آزمون پشتِ سرِ هم می‌زنندش؛
 //  خودِ سقف در `pump-support.test.js` جدا و با عددِ کوچک سنجیده می‌شود.
 process.env.RATE_BROADCAST_MAX = '10000';
+//  SEC-AUTH-01: هزینهٔ scrypt در production `p=5` است (~۲۰۰ms)؛ صدها حسابِ آزمون با آن
+//  دقیقه‌ها کند می‌شوند. خودِ پیش‌فرض و بازنویسیِ هشِ کهنه در `auth-hardening.test.js` با p=5 سنجیده می‌شوند.
+process.env.PASSWORD_SCRYPT_P ||= '1';
 
 const { createApp } = require('../src/app');
 const { query, closeDb } = require('../src/db');

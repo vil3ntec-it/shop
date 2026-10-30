@@ -168,6 +168,11 @@
 - وب یک تازه‌سازیِ هم‌زمان دارد (`TohidAccount.refresh`)؛ هر لایهٔ تازه همان را صدا بزند (#246).
 - سرور را برای این کار نرم نکن: چرخش و ردِ `refresh_reused` (`login-contract ۹`) قفل است (#246).
 - دستگاهِ از کار افتاده `403 device_disabled` می‌گیرد، نه `401`؛ صاحب دستگاهی را که با آن کار می‌کند نمی‌بندد (S44، #243).
+- ⛔ هشِ رمز scrypt با `N=2^14, r=8, p=5` (هم‌ارزِ کفِ OWASP، ۱۶MB)؛ هشِ کهنه پس از ورودِ **درست** شرطی بازنویسی می‌شود (`auth.upgradeHash`). `PASSWORD_SCRYPT_P` فقط برای تندیِ آزمون است و بی `NODE_ENV=test|development` هرگز زیرِ ۵ نمی‌رود (SEC-AUTH-01، `sec-auth.test.js`).
+- ⛔ `X-Forwarded-For` فقط وقتی خوانده می‌شود که `TRUST_PROXY=true` **و** همسایهٔ سوکت loopback/خصوصی (یا در `TRUST_PROXY_FROM`) باشد، و فقط راست‌ترین بخش؛ همین تابع (`ratelimit.trustedPeer`) برای `trust proxy`ِ Express (SEC-AUTH-05).
+- ⛔ `devCode` (کدِ یک‌بارمصرف در پاسخ) و کدِ خام در لاگ فقط با `NODE_ENV`ِ **صریحِ** `test` یا `development` (`config.devCodes`)؛ سرورِ بی `NODE_ENV` production حساب می‌شود (SEC-AUTH-06).
+- ⛔ قفلِ ورودِ مدیر همان دو شمارندهٔ کاربران است: «نام + IP» (`lockoutTries`) و «نام، از همه‌جا» (`lockoutGlobalTries`)؛ نامِ ناموجود/غیرفعال همان scrypt را می‌سوزاند (SEC-AUTH-03/04).
+- ⛔ هر درِ نوشتنیِ تازهٔ `/api` در `test/route-authz-inventory.test.js` یکی از PUBLIC/SELF (با دلیل) است یا زنجیره‌اش احراز + حسابِ توکن (`requireShop`/`requireStation`/`requireSyncAccount`/`requireDevice`/`requireAdmin`) دارد؛ میان‌افزارِ احرازِ تازه **نام‌دار** باشد تا فهرست ببیندش (SEC-AUTH-10).
 
 ### v3 · کارمندان و مجوز
 
@@ -413,6 +418,10 @@
   `test/admin-totp.test.js` نباید قرمز شوند. کدِ نادرست در قفل حساب می‌شود، یک گام دو بار پذیرفته نمی‌شود، کدِ
   بازیابی یک‌بارمصرف است و فقط درهمش ذخیره می‌شود. ⛔ راهِ نجات: `ADMIN_BOOTSTRAP_PASSWORD`ِ تازه یا
   `scripts/create-admin.js` رمز را برمی‌گرداند و تأییدِ دومرحله‌ایِ همان مدیر را خاموش می‌کند.
+  اجرای تصمیمِ «اجباری» آماده است ولی **خاموش** (`lib/admin-guard.js`): `ADMIN_2FA_REQUIRED=1` ⇒ مدیرِ بی TOTP با رمزِ درست
+  فقط به `GET /admin/me`، `/admin/2fa` (حال، setup، enable) و خروج می‌رسد، از ردیفِ زنده در هر درخواست (SEC-AUTH-12)؛
+  `ADMIN_REAUTH=1` ⇒ هر نوشتنِ پشتِ `requireSuperAdmin` و دانلودِ پشتیبانِ حساب فقط تا `REAUTH_WINDOW_MIN` پس از ورود یا
+  `POST /api/admin/reauth` (رمز + کدِ TOTP اگر روشن است؛ شکست ۴۰۳، نه ۴۰۱) (SEC-AUTH-13). ⛔ هیچ‌کدام راهِ نجات را نمی‌بندد.
 
 ### وب
 - ⛔ **F0-22:** `connect-src`ِ CSP فقط `'self'` و همان `tohid-api-base` (https و wss). طرحِ باز (`https:`، `http:`،

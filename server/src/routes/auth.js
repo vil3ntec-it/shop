@@ -275,6 +275,26 @@ async function issueSession(user, device, ip, app = 'shop', appVersion = '') {
   };
 }
 
+/**
+ *  SEC-AUTH-01: هشِ رمزی که از هزینهٔ امروز ارزان‌تر است، پس از ورودِ **درست** بازنویسی
+ *  می‌شود — شرطی، تا عوض شدنِ هم‌زمانِ رمز را پاک نکند. شکستش ورود را نمی‌خواباند.
+ *  `table` فقط یکی از دو نامِ ثابتِ پایین است (هرگز از درخواست).
+ */
+async function upgradeHash(table, row, plain) {
+  try {
+    const fresh = await pw.upgrade(plain, row.password_hash);
+    if (!fresh) return false;
+    const sql = table === 'admins'
+      ? 'UPDATE admins SET password_hash=$2 WHERE id=$1 AND password_hash=$3'
+      : 'UPDATE users SET password_hash=$2 WHERE id=$1 AND password_hash=$3';
+    const r = await query(sql, [row.id, fresh, row.password_hash]);
+    return (r.rowCount || 0) > 0;
+  } catch (err) {
+    console.warn(`[auth] بازنویسیِ هشِ رمز نشد: ${err.message}`);
+    return false;
+  }
+}
+
 function publicUser(u) {
   return {
     id: u.id, name: u.name || '', email: u.email || null, phone: u.phone || null,
@@ -597,11 +617,14 @@ router.post('/login', authLimit, async (req, res, next) => {
   let ok = false;
   if (user && user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
   else await pw.burnTime(password);
+  //  SEC-AUTH-01: هشِ کهنه ارزان‌تر است؛ رمزِ غلط روی آن کمتر از «حساب نیست» طول نکشد
+  if (!ok && user && pw.needsRehash(user.password_hash)) await pw.burnTime(password);
 
   await noteAttempt('user', identifier, clientIp(req), ok);
   if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
   await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
+  await upgradeHash('users', user, password);
 
   const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.login', detail: { method: 'password' }, ip: clientIp(req) });
@@ -1183,4 +1206,5 @@ module.exports.issueSession = issueSession;
 //  همدیگر را نبندند
 module.exports.assertNotLocked = assertNotLocked;
 module.exports.publicUser = publicUser;
+module.exports.upgradeHash = upgradeHash;
 module.exports.loginPayload = loginPayload;
