@@ -96,7 +96,7 @@ object SaleTime {
   /** حسابِ خالص: لحظه + فاصلهٔ منطقه ⇒ «ساعت:دقیقه» */
   fun clock(at: Long, offsetMs: Int = zoneOffset(at)): String {
     if (at <= 0) return ""
-    val minutes = (at + offsetMs).floorDiv(60_000L).mod(1_440L).toInt()
+    val minutes = (at).floorDiv(60_000L).mod(1_440L).toInt()
     return "${minutes / 60}:${(minutes % 60).toString().padStart(2, '0')}"
   }
 

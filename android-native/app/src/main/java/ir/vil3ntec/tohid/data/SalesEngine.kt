@@ -602,7 +602,7 @@ object SalesEngine {
    *  تخفیفِ فاکتور. [recordReturn] و پیش‌نمایشِ مرجوعیِ نسخهٔ ۳ هر دو همین را می‌خوانند.
    */
   fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double =
-    if (item.quantity > 0) (item.totalPrice / item.quantity * quantity * paidRatio(sale)).roundToLong().toDouble() else 0.0
+    if (item.quantity > 0) (item.totalPrice / item.quantity * quantity).roundToLong().toDouble() else 0.0
 
   /**
    * مرجوعیِ جزئی — چند قلم از یک فاکتور، هرکدام به هر مقدار.

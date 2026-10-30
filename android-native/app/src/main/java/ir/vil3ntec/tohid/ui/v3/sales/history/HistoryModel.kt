@@ -60,7 +60,7 @@ object HistoryModel {
   const val FREE_ITEM = "قلم آزاد"
 
   /** روزِ پیش از `today` (`yyyy-MM-dd`) — برای سرخطِ «دیروز» */
-  fun yesterday(today: String): String = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, -1).orEmpty()
+  fun yesterday(today: String): String = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, 1).orEmpty()
 
   /** ماه‌هایی که واقعاً فاکتور دارند، تازه‌ترین اول */
   fun months(d: ShopData): List<String> =
