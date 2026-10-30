@@ -27,7 +27,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  شکلِ دفتر عوض نمی‌شود: شناسهٔ فروش همان ULID است که بود.
  *
  *  ── شکلِ فایل ────────────────────────────────────────────────────────
- *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…}`. شکلِ قدیمی
+ *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…,"coupons":[…]}`. شکلِ قدیمی
  *  (آرایهٔ ردیف‌ها، همان `tohid-shop-draft-cart-v1`ِ وب و برنامهٔ قبلی) هم
  *  خوانده می‌شود و کلید ندارد.
  */
@@ -38,6 +38,8 @@ data class SaleDraft(
   val lines: List<Line> = emptyList(),
   val debtorId: String? = null,
   val savedAt: Long = 0,
+  /** کدهای تخفیفِ زده‌شده (نرمال‌شده) — با پیش‌نویس برمی‌گردند (N3)؛ پیش‌نویسِ قدیمی ندارد */
+  val coupons: List<String> = emptyList(),
 ) {
   /** همان شکلِ ردیفِ پیش‌نویسِ قدیمی؛ فیلدهای تازه پیش‌فرض دارند */
   @Serializable
@@ -53,11 +55,13 @@ data class SaleDraft(
   fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) }
 
   companion object {
-    fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long) = SaleDraft(
+    fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList()) = SaleDraft(
       key = key,
       lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) },
       debtorId = debtorId,
       savedAt = now,
+      //  کد بی سبد معنا ندارد
+      coupons = if (cart.isEmpty()) emptyList() else coupons,
     )
   }
 }
