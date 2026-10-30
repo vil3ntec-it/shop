@@ -19,6 +19,7 @@ internal object StrDebtor {
   val edit: String get() = t("ویرایش", "Edit", "سمول")
   val delete: String get() = t("حذف", "Delete", "ړنګول")
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
+  val statementImage: String get() = t("تصویرِ صورت‌حساب", "Statement image", "د صورتحساب انځور")
   val print: String get() = t("چاپ", "Print", "چاپ")
   fun printTitle(name: String): String = t("صورت‌حسابِ $name", "Statement — $name", "صورتحساب — $name")
   val notes: String get() = t("یادداشت", "Note", "یادښت")

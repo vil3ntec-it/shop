@@ -51,6 +51,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.MoreHoriz
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.Print
@@ -101,6 +102,8 @@ import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.ReportPrint
+import ir.vil3ntec.tohid.print.StatementImage
+import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.spanText
 import ir.vil3ntec.tohid.todayIso
@@ -197,6 +200,9 @@ internal fun DebtorDetailScreen(
     runCatching { context.startActivity(android.content.Intent(action, android.net.Uri.parse(uri))) }
   }
 
+  //  CRM-05: نتیجهٔ «تصویرِ صورت‌حساب» — پیامِ پوسته
+  val toasts = LocalV3Toasts.current
+
   fun run(action: DebtorLedgerModel.Action) {
     val number = DebtorLedgerModel.dialable(debtor.phone)
     val message = DebtorLedgerModel.reminder(debtor.name, account.balance)
@@ -213,11 +219,16 @@ internal fun DebtorDetailScreen(
       }
       DebtorLedgerModel.Action.PRINT ->
         ReportPrint.print(context, ReportCsv.statement(d, debtor.id, todayIso()), StrDebtor.printTitle(debtor.name))
+      DebtorLedgerModel.Action.STATEMENT_IMAGE ->
+        scope.launch { toasts?.show(StatementImage.share(context, d, debtor.id, todayIso())) }
       DebtorLedgerModel.Action.DELETE -> onDelete()
     }
   }
 
-  val actions = DebtorLedgerModel.actions(debtor.phone, account.transactions.isNotEmpty())
+  val actions = DebtorLedgerModel.actions(
+    debtor.phone, account.transactions.isNotEmpty(),
+    image = ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context),
+  )
   val wide = screenSize() != Screen.PHONE
 
   V3MaterialColors {
@@ -380,6 +391,7 @@ private fun ActionButton(action: DebtorLedgerModel.Action, modifier: Modifier, o
     DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrDebtor.edit
     DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrDebtor.statementCsv
     DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrDebtor.print
+    DebtorLedgerModel.Action.STATEMENT_IMAGE -> Icons.Outlined.Image to StrDebtor.statementImage
     DebtorLedgerModel.Action.DELETE -> Icons.Outlined.DeleteOutline to StrDebtor.delete
   }
   val danger = action == DebtorLedgerModel.Action.DELETE

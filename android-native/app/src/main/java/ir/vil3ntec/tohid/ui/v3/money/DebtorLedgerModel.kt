@@ -52,16 +52,18 @@ object DebtorLedgerModel {
   /* ------------------------------ کشو ------------------------------ */
 
   /** کارهای کشوی حساب، به همان ترتیبی که دیده می‌شوند */
-  enum class Action { CALL, SMS, WHATSAPP, EDIT, STATEMENT_CSV, PRINT, DELETE }
+  enum class Action { CALL, SMS, WHATSAPP, EDIT, STATEMENT_CSV, PRINT, STATEMENT_IMAGE, DELETE }
 
   /**
    *  کدام کارها برای این حساب معنی دارد: تماس/پیامک/واتساپ فقط با شمارهٔ
    *  گرفتنی؛ صورت‌حساب و چاپ فقط وقتی تراکنشی هست. ویرایش و حذف همیشه.
+   *  [image] (CRM-05، «گزارش‌های مشتری» روشن) ⇒ «تصویرِ صورت‌حساب» هم، کنارِ صورت‌حساب و چاپ.
    */
-  fun actions(phone: String, hasTransactions: Boolean): List<Action> = buildList {
+  fun actions(phone: String, hasTransactions: Boolean, image: Boolean = false): List<Action> = buildList {
     if (dialable(phone).isNotEmpty()) addAll(listOf(Action.CALL, Action.SMS, Action.WHATSAPP))
     add(Action.EDIT)
     if (hasTransactions) addAll(listOf(Action.STATEMENT_CSV, Action.PRINT))
+    if (hasTransactions && image) add(Action.STATEMENT_IMAGE)
     add(Action.DELETE)
   }
 

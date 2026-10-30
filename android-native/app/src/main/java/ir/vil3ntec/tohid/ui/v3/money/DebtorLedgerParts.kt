@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ExpandMore
 import androidx.compose.material.icons.outlined.FileDownload
+import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.Sms
 import androidx.compose.material.icons.outlined.Tune
@@ -56,6 +57,8 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.ReportPrint
+import ir.vil3ntec.tohid.print.StatementImage
+import ir.vil3ntec.tohid.ui.v3.LocalV3Toasts
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -171,6 +174,7 @@ private fun actionLook(action: DebtorLedgerModel.Action): Pair<ImageVector, Stri
   DebtorLedgerModel.Action.EDIT -> Icons.Outlined.Edit to StrMoney.edit
   DebtorLedgerModel.Action.STATEMENT_CSV -> Icons.Outlined.FileDownload to StrMoney.statementCsv
   DebtorLedgerModel.Action.PRINT -> Icons.Outlined.Print to StrMoney.print
+  DebtorLedgerModel.Action.STATEMENT_IMAGE -> Icons.Outlined.Image to StrMoney.statementImage
   DebtorLedgerModel.Action.DELETE -> Icons.Outlined.DeleteOutline to StrMoney.delete
 }
 
@@ -222,6 +226,8 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
       }
     }
   }
+  //  CRM-05: نتیجهٔ «تصویرِ صورت‌حساب» (فرستاده شد یا خطا) — پیامِ پوسته
+  val toasts = LocalV3Toasts.current
   return remember(context) {
     DebtorTasks { action ->
       val (data, acc, acts) = latest
@@ -242,6 +248,7 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
           saveCsv.launch("${sheet.name}.csv")
         }
         DebtorLedgerModel.Action.PRINT -> ReportPrint.print(context, ReportCsv.statement(data, debtor.id, todayIso()), StrMoney.printTitle(debtor.name))
+        DebtorLedgerModel.Action.STATEMENT_IMAGE -> scope.launch { toasts?.show(StatementImage.share(context, data, debtor.id, todayIso())) }
         DebtorLedgerModel.Action.DELETE -> acts.onDelete()
       }
     }
