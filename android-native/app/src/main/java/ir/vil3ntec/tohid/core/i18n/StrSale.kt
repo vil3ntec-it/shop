@@ -482,4 +482,8 @@ object StrSale {
   val notCounted: String get() = t("شمرده نشد", "Not counted", "ونه شمېرل شو")
   val diffReason: String get() = t("دلیلِ اختلاف", "Reason for the difference", "د توپیر دلیل")
   val needsReview: String get() = t("اختلاف خودکار اصلاح نمی‌شود — برای بررسیِ مدیر ثبت شد", "Differences aren't fixed automatically — recorded for manager review", "توپیر پخپله نه سمېږي — د مدیر کتنې ته ثبت شو")
+
+  //  تخفیفِ خودکار روی فاکتور (پرچمِ `shop.promo_stamp`) — آگاهی است، از «جمع اقلام» کم نمی‌شود
+  fun lineAutoDiscount(a: Any): String = t("− $a تخفیفِ خودکار", "− $a automatic discount", "− $a اتومات تخفیف")
+  fun includesAutoDiscount(names: Any): String = t("شاملِ تخفیفِ خودکار$names", "Includes automatic discount$names", "اتومات تخفیف پکې شامل دی$names")
 }

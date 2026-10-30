@@ -1151,6 +1151,7 @@ fun SaleScreen(
       d = d,
       //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
       cart = priced,
+      promo = promo,
       presetDebtorId = cartDebtorId,
       presetDiscount = extrasNow().discount,
       onDismiss = { checkout = false },
@@ -1166,7 +1167,8 @@ fun SaleScreen(
           toast(StrPos.cartChangedRetry); return@CheckoutDialog
         }
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
-        scope.launch { when (val posted = cartStore.post(store) { key ->
+        //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
+        scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
           SalesEngine.record(
           d, priced, options,
           today = ir.vil3ntec.tohid.todayIso(),
@@ -1177,7 +1179,7 @@ fun SaleScreen(
           saleId = key,
           //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
           receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
-        ) }) {
+        ), promo) }) {
           SalePost.Outcome.Busy -> Unit
           SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
           is SalePost.Outcome.Refused -> toast(posted.message)
