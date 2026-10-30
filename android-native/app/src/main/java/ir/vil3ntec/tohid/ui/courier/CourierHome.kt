@@ -88,7 +88,7 @@ import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhotoSourceSheet
 import ir.vil3ntec.tohid.ui.screens.TohidSnackbar
-import ir.vil3ntec.tohid.ui.screens.openOnMap
+import ir.vil3ntec.tohid.ui.components.common.openOnMap
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Tone
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Ui

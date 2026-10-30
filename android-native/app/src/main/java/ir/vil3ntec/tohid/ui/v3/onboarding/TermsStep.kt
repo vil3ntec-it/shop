@@ -44,7 +44,7 @@ import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.data.DeviceLocation
 import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.Terms
-import ir.vil3ntec.tohid.ui.screens.openOnMap
+import ir.vil3ntec.tohid.ui.components.common.openOnMap
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind

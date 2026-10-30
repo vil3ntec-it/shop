@@ -16,7 +16,7 @@ import ir.vil3ntec.tohid.ui.v3.onboarding.AuthGate
 /**
  *  نامِ پیشینِ دروازهٔ ورود — `MainActivity`، `Main.kt` ِ کامپیوتر و پوسته هنوز این را صدا می‌زنند.
  *  صفحهٔ تازه `ui/v3/onboarding/AuthGate` است (گروهِ G1)؛ این فایل در فاز ۳ با رفتنِ آخرین صدازننده
- *  برداشته می‌شود و `GoogleMark` و `openOnMap` (پیک هم صدا می‌زند) جای خودشان را می‌گیرند.
+ *  برداشته می‌شود و `GoogleMark` جای خودش را می‌گیرد. `openOnMap` (پیک هم صدا می‌زند) در `ui/components/common/OpenOnMap.kt` است.
  */
 @Composable
 fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) = AuthGate(store, onDone = onDone)
@@ -56,30 +56,3 @@ private const val G_YELLOW =
 private const val G_RED =
   "M24 10.75c3.23 0 6.13 1.11 8.41 3.29l6.31-6.31C34.91 4.18 29.93 2 24 2 15.4 2 7.96 6.93 4.34 14.12" +
     "l7.35 5.7c1.73-5.2 6.58-9.07 12.31-9.07z"
-
-/**
- *  باز کردنِ یک نقطه روی نقشه‌ی خودِ گوشی.
- *
- *  ── چرا نقشه‌ی گوشی و نه نقشه‌ی داخلِ برنامه ──────────────────────────
- *  نقشه‌ی توکار یعنی یک SDK، یک کلیدِ API، و چند مگابایت به حجمِ برنامه —
- *  برای کاری که هر گوشی‌ای خودش بلد است. `geo:` را هر برنامه‌ی نقشه‌ای
- *  می‌فهمد؛ اگر هیچ‌کدام نبود، نشانیِ وب باز می‌شود که مرورگر هم دارد.
- *  ──────────────────────────────────────────────────────────────────
- */
-internal fun openOnMap(context: android.content.Context, lat: Double, lng: Double, label: String = "دکان") {
-  val point = String.format(java.util.Locale.US, "%f,%f", lat, lng)
-  val geo = android.content.Intent(
-    android.content.Intent.ACTION_VIEW,
-    android.net.Uri.parse("geo:$point?q=$point(${android.net.Uri.encode(label)})"),
-  )
-  val opened = runCatching { context.startActivity(geo); true }.getOrDefault(false)
-  if (opened) return
-  runCatching {
-    context.startActivity(
-      android.content.Intent(
-        android.content.Intent.ACTION_VIEW,
-        android.net.Uri.parse("https://www.google.com/maps/search/?api=1&query=$point"),
-      )
-    )
-  }
-}

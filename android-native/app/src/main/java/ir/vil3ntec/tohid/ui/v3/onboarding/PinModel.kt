@@ -2,7 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.onboarding
 
 /*
  *  حالتِ خالصِ قفلِ برنامه (`lock`، `lock/setup`) — همان رفتارِ `AppLockScreen`/`LockSetupScreen` ِ
- *  پیشین، با آزمون (`PinModelTest`). سنجش و نگهداریِ رمز همچنان با `LockStore` است.
+ *  پیشین، با آزمون (`OnboardingModelsTest`). سنجش و نگهداریِ رمز همچنان با `LockStore` است.
  */
 
 object PinRules {
