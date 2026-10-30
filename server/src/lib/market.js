@@ -24,7 +24,7 @@
  *           برای دکانی که امضای کالاهایش عوض شده، تازه می‌کند؛ با `pg_trgm` نمایهٔ
  *           GIN دارد، بی آن (PGlite) پیمایشِ همان جدولِ باریک. هر نتیجه دوباره
  *           با دادهٔ زنده (منتشرشده، فعال، همان نام) سنجیده می‌شود.
- *   کالا ── فقط از راهِ `PRODUCT_FROM` و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
+ *   کالا ── فقط از راهِ `productFrom()` (`PRODUCT_FROM`، یا با پرچمِ S1 کاتالوگ) و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
  *           حذف‌نشده، فعال، قیمت‌دار) — همان چیزی که ثبتِ سفارش می‌پذیرد.
  *   حریم ── هیچ شناسهٔ داخلی، شماره، ایمیل، نامِ صاحب یا مختصات در پاسخ نیست؛
  *           «نزدیکِ من» فقط فاصلهٔ گردشده می‌دهد و مکانِ مشتری ذخیره یا لاگ نمی‌شود
@@ -146,12 +146,13 @@ async function reindex(sigs, ids) {
     });
   }
   const stale = [...sigs].filter(([id, sig]) => known.get(id) !== sig).slice(0, REINDEX_PER_PASS);
+  const from = stale.length ? await sf.productFrom() : '';
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
       await c.query(
         `INSERT INTO market_search (shop_id, product_id, name_norm)
-         SELECT sp.shop_id, sp.product_id, ${sf.SQL_NAME} FROM ${sf.PRODUCT_FROM}
+         SELECT sp.shop_id, sp.product_id, ${sf.SQL_NAME} FROM ${from}
           WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
         [id]
       );
@@ -181,11 +182,14 @@ async function buildSnapshot() {
   );
   const open = await filterAsync(rows, gateOf);
   const ids = open.map((r) => r.shop_id);
+  //  S1: کاتالوگ منبع است ⇒ کاتالوگِ هر دکانِ باز پیش از شمردن تازه (هر کدام یک پرسشِ «تازه؟»)
+  if (ids.length && await sf.catalogOn()) for (const id of ids) await sf.fillCatalog(id);
+  const from = await sf.productFrom();
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
               md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${sf.PRODUCT_FROM}
+         FROM ${from}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -384,9 +388,10 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     const slugOfShop = new Map(list.map((e) => [e.row.shop_id, e.row.slug]));
     const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
+    const from = await sf.productFrom();
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
-         FROM market_search ms JOIN (${sf.PRODUCT_FROM}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
+         FROM market_search ms JOIN (${from}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
         WHERE ms.shop_id = ANY($1::text[]) AND ms.name_norm LIKE $2
           AND sp.published AND ${sf.LIVE_PRODUCT} AND ${sf.SQL_NAME} LIKE $2
         ORDER BY COALESCE(r.data->>'name', ''), sp.shop_id, r.row_id LIMIT $3`,
@@ -485,8 +490,9 @@ function shelfOf(shopId) {
 
 async function loadShelf(shopId) {
   counters.shelves++;
+  const from = await sf.productFrom(shopId);
   const rows = await many(
-    `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT ${sf.PRODUCT_COLS} FROM ${from}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
     [shopId, SHELF * 2]
@@ -503,8 +509,9 @@ async function liveViews(pairs) {
   const out = new Map();
   const uniq = [...new Map(pairs.map((x) => [pairKey(x.shopId, x.id), x])).values()];
   if (!uniq.length) return out;
+  const from = await sf.productFrom();
   const rows = await many(
-    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${from}
       WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
         AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
     [uniq.map((x) => x.shopId), uniq.map((x) => x.id)]
@@ -587,12 +594,13 @@ async function popularOf(ids, at) {
 /** «ارزان‌تر» ِ دکان‌هایی که صاحبشان خواسته (`market_listings.show_deals`)، تا PER_SHOP از هر دکان. */
 async function loadDeals(ids) {
   counters.deals++;
+  const from = await sf.productFrom();
   const rows = ids.length ? await many(
     `SELECT shop_id, id FROM (
        SELECT sp.shop_id, r.row_id AS id,
               ROW_NUMBER() OVER (PARTITION BY sp.shop_id
                 ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), r.row_id) AS n
-         FROM ${sf.PRODUCT_FROM}
+         FROM ${from}
          JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL

@@ -348,6 +348,7 @@
 | `shop.orders.ledger` | دکان / `all` | خاموش | فاکتورِ سریِ W و سندِ برگشت در دفترِ دکان | #275 | باز |
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
+| `storefront.catalog_source` | فقط `all` | خاموش | S1 ِ قراردادِ بازار: ویترین، فهرستِ «در ویترین» ِ صاحب دکان، انتشارِ کالا، بازار و ثبتِ سفارش کالا را از `catalog_products` می‌خوانند (نه `sync_rows`)؛ کاتالوگ فقط بخشِ کالا و مستقل از `shop.catalog` از دفترِ v1 یا v3 ِ دکان پر می‌شود (`catalog.refreshProducts`؛ منبع = `catalog_settings.sync_source` اگر هست، وگرنه v3 اگر کالای v3 دارد). scope ِ دکان اثری ندارد تا ویترین و جست‌وجوی چنددکانی یک منبع بخوانند | S1 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
