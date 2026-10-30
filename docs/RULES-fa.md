@@ -352,7 +352,10 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
-= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز).
+= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
+`ShopPolicy.productTools` (`tohid-policy` ⇐ `product_tools`، پیش‌فرض خاموش؛ «تنظیمات ⇐ ابزارهای تازهٔ کالا»): هشدارِ «نامِ مشابه» در فرم
+و ورود از فایل و کادرِ «بارکدها» (PRD-19، PRD-04؛ #459، باز)، نام و دلیلِ تغییرِ قیمت و «قیمتِ گروهی» با پیش‌نمایش و تأیید (PRD-14،
+PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ رفعِ «ویرایش بارکدهای دیگر را پاک می‌کرد» (#476) پشتِ هیچ پرچمی نیست.
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
