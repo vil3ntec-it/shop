@@ -81,10 +81,22 @@ object PosSearch {
    *  (`matches[hint]`)؛ وگرنه «پیدا نشد». «۳*» پیش از بارکد یا نام ⇐ سه تا
    *  (`CartQuery`، رقمِ فارسی هم — F0-06).
    */
-  fun resolve(query: String, index: Map<String, String>, products: List<Product>, matches: List<Product>, hint: Int): PosHit {
+  fun resolve(
+    query: String,
+    index: Map<String, String>,
+    products: List<Product>,
+    matches: List<Product>,
+    hint: Int,
+    packs: ir.vil3ntec.tohid.core.product.PackBarcodes.Index? = null,
+  ): PosHit {
     val parsed = CartQuery.parse(query)
     val code = parsed.term.trim()
     if (code.isEmpty()) return PosHit.None
+    //  PRD-04: بارکدِ بسته (فقط کامل) ⇒ «۳*کارتن» = ۳ × ۲۴ دانه
+    packs?.find(code)?.let { h ->
+      val p = products.firstOrNull { it.id == h.productId } ?: return@let
+      return if (!p.active) PosHit.Inactive(p) else PosHit.Add(p, parsed.count * h.pack.sizeMilli / 1000.0)
+    }
     val hit = BarcodeMatch.find(code, index)
     if (hit is BarcodeMatch.Hit.Product) {
       val p = products.firstOrNull { it.id == hit.id } ?: return PosHit.None

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.product.BulkPrice
+import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.ProductImportPlan
 import ir.vil3ntec.tohid.core.product.ProductLabels
@@ -46,6 +47,11 @@ object WarehouseEngine {
     /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
     val brand: String? = null,
     val tags: List<String>? = null,
+    /**
+     *  PRD-04 (همان پرچم): بسته‌ها با بارکدِ خودشان (کارتنِ ۲۴ دانه‌ای)، به شکلِ فرم؛ موتور می‌سنجد
+     *  (`PackBarcodes.check`). null ⇒ در ویرایش دست نمی‌خورد؛ فهرستِ خالی ⇒ همه برداشته.
+     */
+    val packs: List<PackBarcodes.Draft>? = null,
   )
 
   data class EntryDraft(
@@ -168,6 +174,26 @@ object WarehouseEngine {
     if (a.barcodes != b.barcodes) add("بارکد عوض شد")
     if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
     if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
+    if (a.packs.orEmpty() != b.packs.orEmpty()) {
+      add(if (b.packs.isNullOrEmpty()) "بسته‌ها برداشته شد"
+        else "بسته‌ها «${b.packs.joinToString("، ") { PackBarcodes.label(ShopStore.coreOf(it), b.unit) }}»")
+    }
+  }
+
+  /**
+   *  PRD-04: بسته‌های فرم ⇒ بسته‌های کالا، یا پیامِ رد. `null` ⇒ همان `keep`؛ خالی ⇒ null (همان JSON ِ بی بسته).
+   *  کالای شمارشی اندازهٔ اعشاری نمی‌گیرد، مگر واحدِ فروشِ دوم داشته باشد (همان قاعدهٔ `SalesEngine.quantityProblem`).
+   */
+  private fun packsOf(
+    drafts: List<PackBarcodes.Draft>?, keep: List<ProductPack>?, unit: String, saleUnit: String,
+    codes: List<String>, selfId: String?, owners: Map<String, String>,
+  ): Pair<List<ProductPack>?, String?> {
+    if (drafts == null) return keep to null
+    val fractional = SalesEngine.isFractionalUnit(unit) || saleUnit.isNotBlank()
+    return when (val c = PackBarcodes.check(drafts, unit, fractional, codes, selfId) { owners[it] }) {
+      is PackBarcodes.Checked.Failed -> null to c.message
+      is PackBarcodes.Checked.Ok -> c.packs.map { ProductPack(it.name, it.sizeMilli, it.barcodes) }.ifEmpty { null } to null
+    }
   }
 
   /** برند/برچسبِ فرم ⇒ مقدارِ ذخیره؛ خالی ⇒ null تا JSON ِ کالای بی برند همان پیشین بماند */
@@ -219,11 +245,13 @@ object WarehouseEngine {
     val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
       ?: (if (barcode.isEmpty()) emptyList() else listOf(barcode))
     if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
-    // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد
-    val index = ShopStore.barcodeIndex(d)
+    // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد — بارکدِ بستهٔ کالای دیگر هم (PRD-04)
+    val index = ShopStore.codeOwners(d)
     ProductBarcodes.conflict(codes, null) { index[it] }?.let {
       return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
+    val (packs, packProblem) = packsOf(draft.packs, null, draft.unit, draft.saleUnit.orEmpty(), codes, null, index)
+    packProblem?.let { return Result.Failed(it) }
 
     val id = newId()
     val product = Product(
@@ -245,6 +273,7 @@ object WarehouseEngine {
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
       brand = brandOf(draft.brand, null),
       tags = tagsOf(draft.tags, null),
+      packs = packs,
     )
 
     return Result.Ok(
@@ -281,10 +310,21 @@ object WarehouseEngine {
     if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
     // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
     // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
-    val index = ShopStore.barcodeIndex(d)
+    val index = ShopStore.codeOwners(d)
     //  فرمِ تک‌بارکدی (`barcodes == null`) همان پیامِ همیشگی را می‌گیرد، هر چند بارکدِ دیگر هم کالا داشته باشد (#476)
     ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
       return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+    }
+    val unitNow = draft.unit
+    val (packs, packProblem) = packsOf(draft.packs, existing.packs, unitNow, draft.saleUnit ?: existing.saleUnit, codes, id, index)
+    packProblem?.let { return Result.Failed(it) }
+    //  PRD-04: بارکدِ تازهٔ کالا بارکدِ بستهٔ خودش نباشد — وگرنه یک اسکن هم «۱» بود هم «۲۴»
+    packs.orEmpty().firstNotNullOfOrNull { pk -> codes.firstOrNull { it in pk.barcodes && it !in existing.barcodes }?.let { it to pk } }?.let { (code, pk) ->
+      return Result.Failed("بارکدِ $code بارکدِ بستهٔ «${pk.name}» همین کالاست")
+    }
+    //  واحدِ موجودی عوض شد ⇒ اندازهٔ بسته‌ها (به همان واحد) دیگر معنا ندارد
+    if (packs != null && draft.packs == null && unitNow != existing.unit) {
+      return Result.Failed("این کالا بسته دارد؛ پیش از عوض کردنِ واحد، بسته‌ها را بردارید یا دوباره بنویسید")
     }
 
     val updated = existing.copy(
@@ -305,6 +345,7 @@ object WarehouseEngine {
       },
       brand = brandOf(draft.brand, existing.brand),
       tags = tagsOf(draft.tags, existing.tags),
+      packs = packs,
     )
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود

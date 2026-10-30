@@ -239,6 +239,7 @@ object ProductImport {
       id = p.id, name = p.name, category = p.category, unit = p.unit,
       purchaseMinor = Math.round(p.purchasePrice * 100), saleMinor = Math.round(p.salePrice * 100),
       minMilli = Math.round(p.minStock * 1000), barcodes = p.barcodes,
+      reserved = p.packs.orEmpty().flatMap { it.barcodes },
     )
   }
 

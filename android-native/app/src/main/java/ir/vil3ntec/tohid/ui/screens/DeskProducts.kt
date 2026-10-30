@@ -728,6 +728,10 @@ private fun EditPanel(
   //  PRD-06 (همان پرچم): برند و برچسب‌ها
   var brand by remember { mutableStateOf(p.brand.orEmpty()) }
   var tags by remember { mutableStateOf(p.tags.orEmpty().joinToString("، ")) }
+  //  PRD-04 (همان پرچم): بسته‌ها با بارکدِ هر واحد
+  var packs by remember {
+    mutableStateOf(p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ShopStore.coreOf(it)) })
+  }
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
@@ -745,6 +749,7 @@ private fun EditPanel(
       reason = if (tools) priceReason else null,
       brand = if (tools) brand else null,
       tags = if (tools) ProductLabels.tags(tags) else null,
+      packs = if (tools) packs else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -798,6 +803,10 @@ private fun EditPanel(
         F(tags, { tags = it }, "برچسب‌ها (با «،» جدا)")
       }
       F(unit, { unit = it }, "واحد")
+      if (tools) {
+        PackEditor(packs, unit) { packs = it }
+        Spacer(Modifier.height(6.dp))
+      }
       Row {
         Box(Modifier.weight(1f)) { F(buy, { buy = it }, "قیمتِ خرید", true) }
         Spacer(Modifier.width(6.dp))
