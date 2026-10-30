@@ -284,6 +284,7 @@
 - نصاب و `install.ps1` با curl.exe و `--continue-at -`، هر تلاش یک curlِ تازه؛ `--retry` همراهِ `-C -` به کار نرود (#264).
 - نصابِ آنلاین برچسب را از `/DReleaseTag` می‌گیرد (push ⇒ `tohid-desktop-beta`، Run workflow + stable ⇒ `tohid-desktop`) (#264).
 - دروازه‌های سختِ CI: `applicationId` یکسان، `versionCode` نه کمتر، اثرِ انگشتِ امضا یکسان، حجمِ APK در ±۵٪ برای PRِ فایلِ ساخت؛ کامپیوتر: `upgradeUuid`، `AppId` و `bundleID` بی‌تغییر (#220، #223).
+- ⛔ SEC-CLI (۱۴۰۵/۰۸/۰۹): ابزارِ عکس/اسکریپتِ کامپیوتر (`DevShot`، با `typecmd` = فرمانِ پوسته) فقط در ساختِ `-Pdev=true`؛ در انتشار هیچ `-Dtohid.shot…`ی روشنش نمی‌کند (`DevShotReleaseGateTest`). مبهم‌سازیِ R8ِ کدِ خودِ برنامهٔ اندروید فقط با `-Ptohid.obfuscate=true` (پیش‌فرض خاموش ⇒ `proguard-keep-app.pro`، خروجیِ بی‌تغییر)؛ روشن کردنش برای کاربران فقط پس از سنجش‌های سرِ `proguard-obfuscate.pro` و نگه داشتنِ `mapping.txt`. شرح: `docs/security/client-fa.md`.
 
 ### v3 · پشتیبان و خروجی
 
