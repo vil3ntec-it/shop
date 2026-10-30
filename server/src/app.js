@@ -316,6 +316,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
+    //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
+    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
@@ -443,6 +445,32 @@ async function createApp({ runMigrations = true } = {}) {
     try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  پیوندِ کمپین و QR ِ دکان (MKT-10/11، `lib/campaigns.js`): `/store/go/<کد>` ⇒ ویترینِ
+  //  همان دکان با `?c=<کد>`. «go» هرگز slug نیست (کمینه ۳ نویسه) و زیرِ همان پیشوندِ
+  //  `/store` است ⇒ ACCOUNT_PREFIXES ِ پنلِ خانگی چیزِ تازه‌ای نمی‌خواهد. پرچمِ خاموش،
+  //  کدِ ناشناخته و ویترینِ بسته همان پوستهٔ ۴۰۴ ِ ویترین‌اند. برنامه با
+  //  `Accept: application/json` همان را JSON می‌گیرد. HEAD بازدید نمی‌شمارد.
+  const campaigns = require('./lib/campaigns');
+  const { clientIp } = require('./middleware/ratelimit');
+  const goLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-go' });
+  app.get('/store/go/:code', storeHeaders, goLimit, (req, res, next) => {
+    const wantsJson = req.accepts(['html', 'json']) === 'json';
+    res.set('Cache-Control', 'no-store');
+    campaigns.resolve(req.params.code).then(async ({ campaign, store }) => {
+      const live = campaign.archived !== true;
+      if (req.method === 'GET') {
+        await campaigns.recordVisit(campaign, store, { ip: clientIp(req), ua: req.get('user-agent') || '' })
+          .catch((err) => console.error('[campaigns] visit', err.message));
+      }
+      const target = `/store/${store.slug}`;
+      if (wantsJson) return res.json({ store: { slug: store.slug, path: target }, campaign: live ? campaign.code : null });
+      res.redirect(302, live ? `${target}?c=${campaign.code}` : target);
+    }).catch((err) => {
+      if (err.status !== 404) return next(err);
+      if (wantsJson) return res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } });
+      res.status(404).sendFile('index.html', { root: storeDir });
+    });
+  });
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش

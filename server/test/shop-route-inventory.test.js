@@ -188,7 +188,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.storefront', 'shop.storefront.campaigns', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -278,6 +278,10 @@ async function seedShop(a) {
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
+  //  پیوندِ کمپین (MKT-11)
+  const camp = await h.post('/api/shop/storefront/campaigns', { clientId: fresh('camp'), name: 'QR ِ الف', source: 'qr_wall' }, { token: a.accessToken });
+  assert.equal(camp.status, 201, JSON.stringify(camp.body));
+  ids.campaign = camp.body.campaign.id;
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -388,6 +392,7 @@ function concreteFor(ids) {
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/campaigns\/):id/, ids.campaign],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
@@ -435,6 +440,7 @@ function bodyFor(r, ids) {
     'POST /shop/catalog/tasks/:id/resolve': { action: 'resolved', note: 'آزمون' },
     'POST /shop/order-notify/:id/ack': { kind: 'opened' },
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
+    'PUT /shop/storefront/campaigns/:id': { name: 'پیوندِ ب', archived: true },
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },
     'POST /shop/images/:id/process': { step: 'strip_metadata' },
     'POST /shop/images/:id/propose': { consent: true },
