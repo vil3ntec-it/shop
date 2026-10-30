@@ -21,7 +21,7 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
-const { rateLimit } = require('../middleware/ratelimit');
+const { rateLimit, refund } = require('../middleware/ratelimit');
 const { ApiError, notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -29,8 +29,9 @@ const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).cat
 
 const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${req.chatViewer.phone}` : '');
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-chat-read' });
-const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey });
-const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'store-chat-upload', key: viewerKey });
+//  تکرارِ همان پیام/همان بایت سهمیه را پس می‌دهد (CHAT-11) ⇒ `refundable`
+const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey, refundable: true });
+const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'store-chat-upload', key: viewerKey, refundable: true });
 
 /** ماژولِ ویترین — اگر هنوز روی این سرور نیست، null (نه خطای ۵۰۰). */
 function storefront() {
@@ -84,7 +85,7 @@ router.get(`${base}/conversations/:id/messages`, readLimit, customer, wrap(async
 
 router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, wrap(async (req, res) => {
   const out = await chat.send(v(req), req.params.id, req.body);
-  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  if (out.replayed) { res.set('Idempotent-Replayed', 'true'); refund(req, 'store-chat-send'); }
   res.status(out.replayed ? 200 : 201).json(out);
 }));
 
@@ -101,7 +102,9 @@ router.post(`${base}/conversations/:id/receipts`, readLimit, customer, wrap(asyn
 }));
 
 router.post(`${base}/conversations/:id/media`, readLimit, customer, uploadLimit, chat.rawMedia, wrap(async (req, res) => {
-  res.status(201).json(await chat.putMedia(v(req), req.params.id, req.body, { role: req.query.role }));
+  const out = await chat.putMedia(v(req), req.params.id, req.body, { role: req.query.role });
+  if (out.reused) refund(req, 'store-chat-upload');
+  res.status(201).json(out);
 }));
 
 router.get(`${base}/conversations/:id/media/:mediaId`, readLimit, customer, wrap(async (req, res) => {
