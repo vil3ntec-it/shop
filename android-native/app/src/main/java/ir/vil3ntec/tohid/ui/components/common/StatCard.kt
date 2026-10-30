@@ -34,6 +34,7 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.softCard
 import ir.vil3ntec.tohid.ui.theme.tabular
+import ir.vil3ntec.tohid.core.i18n.Str
 
 enum class Trend { UP, DOWN, FLAT }
 
@@ -67,9 +68,9 @@ fun StatCard(
     modifier
       .softCard(c, Shape.card)
       .then(if (selected) Modifier.border(2.dp, c.focus, Shape.card) else Modifier)
-      .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "نمایشِ فهرست", onClick = onClick) else Modifier)
+      .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = Str.showList, onClick = onClick) else Modifier)
       .semantics {
-        contentDescription = listOfNotNull(title, value, delta?.text, period).joinToString("، ")
+        contentDescription = listOfNotNull(title, value, delta?.text, period).joinToString(Str.listSep + " ")
         if (onClick != null) this.selected = selected
       }
       .padding(16.dp),

@@ -31,6 +31,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.SegmentInnerShape
 import ir.vil3ntec.tohid.ui.theme.segmentSelected
 import ir.vil3ntec.tohid.ui.theme.segmentTrack
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  نمای همین صفحه (کارت/جدول) به‌همراهِ ذخیره — `ViewModePref`.
@@ -96,7 +97,7 @@ fun ViewModeToggle(state: ViewModeState, modifier: Modifier = Modifier) {
       .selectableGroup(),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    for ((m, label) in listOf(ViewMode.CARD to "نمای کارتی", ViewMode.TABLE to "نمای جدولی")) {
+    for ((m, label) in listOf(ViewMode.CARD to Str.cardView, ViewMode.TABLE to Str.tableView)) {
       val on = state.mode == m
       Box(
         Modifier

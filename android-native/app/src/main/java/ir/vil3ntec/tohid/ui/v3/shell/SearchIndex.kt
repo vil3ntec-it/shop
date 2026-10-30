@@ -9,7 +9,7 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.invoiceLabel
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.latinDigits
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
@@ -139,7 +139,7 @@ object SearchIndex {
 
   private fun invoiceHit(s: Sale, customer: String?, q: String): Hit {
     val title = StrSearch.invoiceTitle(s.invoiceLabel() ?: "—")
-    val hint = "${formatDate(s.date)} · ${money(s.finalTotal)} ؋" + (customer?.let { " · $it" } ?: "")
+    val hint = "${displayDate(s.date)} · ${money(s.finalTotal)} ؋" + (customer?.let { " · $it" } ?: "")
     return Hit(Kind.INVOICE, s.id, title, hint, ShellTargets.invoice(s.id), matchIn(title, q))
   }
 }

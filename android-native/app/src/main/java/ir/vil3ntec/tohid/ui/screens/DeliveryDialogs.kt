@@ -694,15 +694,16 @@ private fun PickupHandoverDialog(
 }
 
 /**
- *  پس از «تحویل شد»: فروشِ همین سفارش از راهِ قلابِ `HandoverSale`. تحویل
- *  پیش‌تر در سرور ثبت شده؛ این‌جا هر شکست فقط «فروش را در صندوق ثبت کنید»
- *  است — هیچ فروشِ ساختگی ساخته نمی‌شود.
+ *  پس از «تحویل شد»: فروشِ همین سفارش از راهِ قلابِ `HandoverSale` (#340،
+ *  `OrdersLive.postById`: از سرور می‌پرسد و با شناسهٔ سفارش یکتا ثبت می‌کند). تحویل
+ *  پیش‌تر در سرور ثبت شده؛ اگر ثبت همین حالا نشد، برنامه آن را از فهرستِ «تحویلِ
+ *  بی‌فروش» دوباره ثبت می‌کند — دیگر لازم نیست کسی در صندوق دستی بزند (دو بار می‌شد).
  */
 private suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, ordersRepo: OrdersRepository): String {
   val hook = HandoverSale.hook
-    ?: return "سفارش #${order.orderNo} تحویل شد. ثبتِ خودکارِ فروش هنوز وصل نیست — فروش را در صندوق ثبت کنید."
-  val full = ordersRepo.get(order.id).valueOrNull()
-    ?: return "سفارش #${order.orderNo} تحویل شد؛ جزئیاتِ سفارش نیامد — فروش را در صندوق ثبت کنید."
+    ?: return "سفارش #${order.orderNo} تحویل شد؛ فروشش را برنامه از «سفارش‌ها ⇐ تحویلِ بی‌فروش» ثبت می‌کند."
+  //  قلاب فقط شناسهٔ سفارش را لازم دارد؛ جزئیات را خودش از سرور می‌گیرد
+  val full = ordersRepo.get(order.id).valueOrNull() ?: order
   val handed = HandedOverOrder(
     kind = HandoverKind.PICKUP_AT_STORE,
     orderId = full.id, orderNo = full.orderNo, assignmentId = m.id, customerName = full.customer.name,
@@ -714,6 +715,8 @@ private suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, ord
   return when (val r = runCatching { hook.record(handed) }.getOrElse { HandoverSaleResult.Failed(it.message ?: "خطا") }) {
     is HandoverSaleResult.Recorded -> "سفارش #${order.orderNo} تحویل و فروشش ثبت شد."
     is HandoverSaleResult.AlreadyRecorded -> "سفارش #${order.orderNo} تحویل شد؛ فروشش پیش‌تر ثبت شده بود."
-    is HandoverSaleResult.Failed -> "سفارش #${order.orderNo} تحویل شد ولی فروش ثبت نشد (${r.message}) — در صندوق ثبت کنید."
+    is HandoverSaleResult.Failed -> "سفارش #${order.orderNo} تحویل شد؛ فروش همین حالا ثبت نشد (${r.message}) — برنامه دوباره می‌کوشد، در صندوق دستی نزنید."
+    //  بررسیِ صاحب: نه وعدهٔ «دوباره می‌کوشد»، فقط دلیل
+    is HandoverSaleResult.NeedsReview -> "سفارش #${order.orderNo} تحویل شد؛ فروشش خودکار ثبت نمی‌شود — ${r.message}"
   }
 }

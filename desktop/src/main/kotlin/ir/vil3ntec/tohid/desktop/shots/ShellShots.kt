@@ -42,6 +42,28 @@ private val SIX = HomeAlerts.build(
   ),
 )
 
+/**
+ *  فروشِ نمایشیِ دیروز تا همین ساعت — تا خطِ مقایسهٔ کادرِ «فروشِ امروز» در عکس همیشه دیده
+ *  شود و به ساعتِ ساختِ عکس بسته نباشد. `ratio` = دیروز ÷ امروز: کمتر از ۱ ⇐ سبز، بیشتر ⇐ سرخ.
+ */
+private fun withYesterday(d: ShopData, ratio: Double): ShopData {
+  val today = ir.vil3ntec.tohid.todayIso()
+  val y = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, -1) ?: return d
+  val now = d.sales.filter { it.date == today && it.status != "cancelled" }.sumOf { it.finalTotal }.takeIf { it > 0.0 } ?: 1000.0
+  val amount = Math.round(now * ratio).toDouble()
+  val at = System.currentTimeMillis() - 25L * 60 * 60 * 1000
+  return d.copy(sales = d.sales.filterNot { it.date == y } + ir.vil3ntec.tohid.data.Sale(id = "shot-yesterday", total = amount, finalTotal = amount, date = y, createdAt = at))
+}
+
+/** خانه با دیروزِ نمایشی (پیش‌فرض: امروز ۲۲٪ بیشتر ⇐ سبز) */
+@Composable
+private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0.82) {
+  Data(s) { d ->
+    val withY = androidx.compose.runtime.remember(d) { withYesterday(d, ratio) }
+    HomeScreen(withY, {}, PhoneNav.RESERVE, shot)
+  }
+}
+
 /** خبرهای نمایشیِ دکان (بی دادهٔ واقعی) */
 private fun demoNews(): List<EventsRepository.Event> {
   val now = System.currentTimeMillis()
@@ -94,15 +116,24 @@ object ShellShots : GroupShots {
   override val group = "shell"
   override val shots = listOf(
     //  مسیرِ `home` روی کامپیوتر داشبوردِ کامپیوتر است؛ عکسِ گوشی خودِ خانهٔ نسخهٔ ۳
-    Shot("home", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE) } }),
-    Shot("home-6-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = SIX)) } }),
-    Shot("home-0-alerts", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(alerts = emptyList())) } }),
+    Shot("home", content = { s -> Home(s) }),
+    //  خطِ مقایسه سرخ (امروز کمتر از همین ساعتِ دیروز)
+    Shot("home-down", content = { s -> Home(s, ratio = 1.6) }),
+    //  رقمِ فارسی (انتخابِ دکان، `ss01` ِ فونت) — دکانِ نمایشی رقمِ لاتین دارد
+    Shot(
+      "home-fa-digits",
+      prepare = { ir.vil3ntec.tohid.LocaleChoice.setDigits(ir.vil3ntec.tohid.desktop.DesktopContext, ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_FA) },
+      cleanup = { ir.vil3ntec.tohid.LocaleChoice.setDigits(ir.vil3ntec.tohid.desktop.DesktopContext, ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_LATN) },
+      content = { s -> Home(s, HomeShot(reveal = 1f)) },
+    ),
+    Shot("home-6-alerts", content = { s -> Home(s, HomeShot(alerts = SIX)) }),
+    Shot("home-0-alerts", content = { s -> Home(s, HomeShot(alerts = emptyList())) }),
     //  کادرِ پنهان (HOME-V2 §۱): نیمه‌کشیده، باز روی «صندوق»، باز روی «گاوصندوق»
-    Shot("home-pull-half", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 0.5f)) } }),
-    Shot("home-drawer", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f)) } }),
-    Shot("home-safe", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(reveal = 1f, drawerPage = 1)) } }),
-    Shot("home-stats", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(page = 1)) } }),
-    Shot("home-big", content = { s -> Data(s) { HomeScreen(it, {}, PhoneNav.RESERVE, HomeShot(big = true, reveal = 1f)) } }),
+    Shot("home-pull-half", content = { s -> Home(s, HomeShot(reveal = 0.5f)) }),
+    Shot("home-drawer", content = { s -> Home(s, HomeShot(reveal = 1f)) }),
+    Shot("home-safe", content = { s -> Home(s, HomeShot(reveal = 1f, drawerPage = 1)) }),
+    Shot("home-stats", content = { s -> Home(s, HomeShot(page = 1)) }),
+    Shot("home-big", content = { s -> Home(s, HomeShot(big = true, reveal = 1f)) }),
     Shot("transactions", route = "transactions"),
     Shot("transaction-sheet", content = { s ->
       Data(s) { d ->

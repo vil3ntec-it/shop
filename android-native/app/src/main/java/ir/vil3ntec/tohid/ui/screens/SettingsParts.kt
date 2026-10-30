@@ -40,6 +40,8 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Sync
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,6 +58,8 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
 import androidx.compose.runtime.saveable.rememberSaveable
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  اجزای صفحهٔ تنظیمات.
@@ -188,35 +192,40 @@ fun SettingsSection(
   value: String? = null,
   toggle: Boolean? = null,
   onToggle: ((Boolean) -> Unit)? = null,
+  initiallyOpen: Boolean = false,
+  /** کلیدِ ثابتِ بخش وقتی عنوانش در `SettingsLayout` نیست؛ عنوانِ ترجمه‌شده خودش به کلیدِ فارسیِ چیدمان برمی‌گردد (`SettingsLayout.keyOf`) تا با عوض‌شدنِ زبان صفحهٔ بخش بسته نشود */
+  stateKey: String = title,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  //  عنوان‌ها با زبان عوض می‌شوند (`Str*`)، چیدمان و صفحهٔ بازِ بخش با کلیدِ فارسیِ ثابت
+  val key = SettingsLayout.keyOf(title, stateKey)
   //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
   val pick = LocalSettingsPick.current
   if (pick != null) {
-    if (pick != title) return
+    if (pick != key) return
     DeskSettingsSection(icon, title, subtitle, tint, content)
     return
   }
   when (val mode = LocalPhoneSettings.current) {
     is PhoneSettingsMode.Root -> V3Row(
-      icon = settingsIcon(title) ?: icon,
-      label = SettingsLayout.labelOf(title),
+      icon = settingsIcon(key) ?: icon,
+      label = SettingsLayout.labelOf(key),
       value = value,
       toggle = toggle,
       onToggle = onToggle,
-      hue = settingsHue(title),
-      onClick = { mode.open(title) },
+      hue = settingsHue(key),
+      onClick = { mode.open(key) },
     )
     is PhoneSettingsMode.Group -> V3Row(
-      icon = settingsIcon(title) ?: icon,
-      label = SettingsLayout.labelOf(title),
+      icon = settingsIcon(key) ?: icon,
+      label = SettingsLayout.labelOf(key),
       value = value,
       toggle = toggle,
       onToggle = onToggle,
-      hue = settingsHue(title),
-      onClick = { mode.open(title) },
+      hue = settingsHue(key),
+      onClick = { mode.open(key) },
     )
-    is PhoneSettingsMode.Detail -> if (mode.title == title) SettingsDetailBody(subtitle, content)
+    is PhoneSettingsMode.Detail -> if (mode.title == key) SettingsDetailBody(subtitle, content)
     null -> SettingsDetailBody(subtitle, content)
   }
 }
@@ -346,7 +355,7 @@ fun SettingsRow(
       trailing != null -> trailing()
       value != null -> Text(value, style = MaterialTheme.typography.labelMedium, color = colors.muted)
       onClick != null -> Icon(
-        Icons.Filled.ChevronLeft,
+        Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
         tint = colors.muted2,
         modifier = Modifier.size(18.dp),
@@ -513,7 +522,7 @@ fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable
         .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
         .padding(10.dp),
     ) {
-      Text("تنظیمات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
+      Text(Str.settings, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
       all.forEach { (title, icon) ->
         val on = title == pick
         Row(

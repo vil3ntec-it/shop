@@ -303,6 +303,12 @@ object SalesEngine {
      *  `null` ⇒ مثلِ همیشه شناسهٔ تازه.
      */
     saleId: String? = null,
+    /**
+     *  توکنِ QRِ فاکتور (فاکتورِ نسخهٔ ۲، `Receipts.newToken`) — فقط صندوق، و فقط با پرچمِ
+     *  `shop.receipt_v2`. `null` ⇒ مثلِ همیشه. فروشی که باید روی همهٔ دستگاه‌ها یکی باشد
+     *  (تحویلِ سفارش، `OrderFulfillment`) هرگز توکنِ تصادفی نمی‌گیرد.
+     */
+    receiptToken: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
@@ -387,6 +393,7 @@ object SalesEngine {
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
+      receiptToken = receiptToken,
     )
 
     val items = mutableListOf<SaleItem>()
@@ -565,7 +572,7 @@ object SalesEngine {
   /** جملهٔ هشدارِ پیش از لغو */
   /** پیامِ ردِ لغوِ فاکتورِ سفارشِ اینترنتی */
   const val ONLINE_ORDER_LOCKED =
-    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود؛ برگشتِ کاملش از بخشِ «سفارش‌ها» (بازپرداخت) ثبت می‌شود"
+    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود. کالایی که پیک برگرداند ⇒ همان سفارش را در «سفارش‌ها» «برگشت به دکان» بزنید (فروش خودش لغو می‌شود). «مرجوعی» فقط برای کالایی است که مشتری پس از تحویل پس آورد و پولش را از دخل گرفت"
 
   fun cancelWarning(sale: Sale): String =
     "فروش #${sale.invoiceLabel() ?: "0"} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."

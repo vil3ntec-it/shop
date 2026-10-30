@@ -28,6 +28,7 @@ object StrSettings {
   val invalidBackup: String get() = t("فایل پشتیبان معتبر نیست", "The backup file isn't valid", "د بیک‌اپ دوتنه سمه نه ده")
   val cameraReady: String get() = td("دوربین آماده است — بارکدخوان کار می‌کند", "Camera ready — the scanner works", "کمره چمتو ده — بارکوډ لوستونکی کار کوي", "Barcode scanner ready", "بارکوډ لوستونکی چمتو دی")
   val cameraDenied: String get() = t("بدون اجازهٔ دوربین، بارکدخوان باز نمی‌شود", "Without camera permission, the scanner can't open", "د کمرې له اجازې پرته بارکوډ لوستونکی نه خلاصېږي")
+  val settingsIntro: String get() = t("هشدارها، ظاهر، داده‌ها و پشتیبان — حساب و نام دکان در «حساب من» است", "Alerts, appearance, data and backup — your account and shop name are under “My account”", "خبرتیاوې، بڼه، معلومات او بیک‌اپ — حساب او د دوکان نوم په «زما حساب» کې دي")
 
   // هشدارها
   fun debtFrom(a: Any): String = t("قرض از $a ؋ به بالا", "Debts of $a ؋ or more", "له $a ؋ او زیات پور")
@@ -38,6 +39,7 @@ object StrSettings {
   // ظاهر
   val light: String get() = t("روشن", "Light", "روښانه")
   val dark: String get() = t("تیره", "Dark", "تیاره")
+  val likePhone: String get() = td("مثل گوشی", "Like the phone", "د موبایل په څېر", "Like the system", "د سیستم په څېر")
   val reduceMotionNote: String get() = td("اگر گوشی «کاهش حرکت» یا حالت ذخیرهٔ باتری روشن باشد، انیمیشن‌ها خاموش می‌شوند. با این کلید همیشه روشن می‌مانند.", "If the phone has “Reduce motion” or battery saver on, animations are turned off. With this switch they always stay on.", "که په موبایل کې «حرکت کمول» یا د بیټرۍ د سپما حالت روښانه وي، انیمیشنونه بندېږي. په دې کلي سره تل روښانه پاتې کېږي.", "If the system has “Reduce motion” on, animations are turned off. With this switch they always stay on.", "که سیستم «حرکت کمول» روښانه کړی وي، انیمیشنونه بندېږي. په دې کلي سره تل روښانه پاتې کېږي.")
   val animationsOn: String get() = t("انیمیشن روشن", "Animations on", "انیمیشن روښانه")
   val likePhoneSetting: String get() = td("مثل تنظیم گوشی", "Follow the phone setting", "د موبایل د امستنې په څېر", "Follow the system setting", "د سیستم د امستنې په څېر")
@@ -49,6 +51,7 @@ object StrSettings {
   val dontSell: String get() = t("فروخته نشود", "Don't sell", "ونه پلورل شي")
 
   // دوربین
+  val cameraScanner: String get() = td("دوربین بارکدخوان", "Barcode camera", "د بارکوډ کمره", "Barcode scanner", "بارکوډ لوستونکی")
   val permitted: String get() = t("اجازه داده شده", "Permission granted", "اجازه ورکړل شوې")
   val notPermitted: String get() = t("هنوز اجازه داده نشده", "Permission not granted yet", "لا اجازه نه ده ورکړل شوې")
   val cameraNeeded: String get() = td("برنامه برای اسکن بارکد محصولات به دوربین نیاز دارد.", "The app needs the camera to scan product barcodes.", "اپ د توکو د بارکوډ سکن کولو لپاره کمرې ته اړتیا لري.", "Connect a USB or Bluetooth barcode scanner to the computer; it works like a keyboard and needs no installation. Without a scanner, type the code in the sale box.", "د USB یا بلوتوث بارکوډ لوستونکی کمپیوټر ته وصل کړئ؛ د کیبورډ په څېر کار کوي او نصب ته اړتیا نه لري. بې بارکوډ لوستونکي، کوډ د پلور په بکس کې ولیکئ.")
@@ -75,6 +78,7 @@ object StrSettings {
   // حساب و دستگاه‌ها
   val serverPassword: String get() = t("رمزِ ورود به سرور", "Your server sign-in password", "سرور ته د ننوتلو پټنوم")
   val lostPhone: String get() = td("گوشی گم شد؟ نشستش را ببندید", "Lost a phone? Close its session", "موبایل مو ورک شو؟ ناسته یې بنده کړئ", "Lost a device? Close its session", "وسیله مو ورکه شوه؟ ناسته یې بنده کړئ")
+  val signedInDevicesHint: String get() = t("دستگاه‌هایی که با این حساب وارد شده‌اند", "Devices signed in with this account", "هغه وسیلې چې په دې حساب ننوتې دي")
   val pwdMin8: String get() = t("رمزِ تازه دستِ‌کم هشت نویسه باشد.", "The new password must be at least eight characters.", "نوی پټنوم باید لږ تر لږه اته توري وي.")
   val currentPassword: String get() = t("رمز فعلی", "Current password", "اوسنی پټنوم")
   val changePassword: String get() = t("تغییر رمز", "Change password", "پټنوم بدل کړئ")
@@ -91,7 +95,7 @@ object StrSettings {
   val creating: String get() = t("در حال ساخت…", "Creating…", "جوړېږي…")
   val newCode: String get() = t("ساخت کد تازه", "Create a new code", "نوی کوډ جوړ کړئ")
   val staffCodeNeedsAccount: String get() = t("کد شاگرد روی سرور ساخته می‌شود، پس اول وارد حساب شوید و دکانتان را بسازید.", "Staff codes are created on the server, so sign in and create your shop first.", "د شاګرد کوډ په سرور کې جوړېږي، نو لومړی حساب ته ننوځئ او خپل دوکان جوړ کړئ.")
-  val staffCodeOffline: String get() = t("کد خوانده نشد — برای گرفتنش به اینترنت نیاز است.", "Couldn't load the code — you need internet to get it.", "کوډ ونه لوستل شو — د اخیستو لپاره یې انټرنېټ ته اړتیا ده.")
+  val staffCodeOffline: String get() = t("کد خوانده نشد — برای گرفتنش به اینترنت نیاز است. همین کد در «بیشتر → کارمندان دکان» هم هست.", "Couldn't load the code — you need internet to get it. The same code is also under “More → Shop staff”.", "کوډ ونه لوستل شو — د اخیستو لپاره یې انټرنېټ ته اړتیا ده. همدا کوډ په «نور → د دوکان کارکوونکي» کې هم شته.")
   val rotateQ: String get() = t("کد شاگرد تازه ساخته شود؟", "Create a new staff code?", "د شاګرد نوی کوډ جوړ شي؟")
   val rotateWarn: String get() = t("کد فعلی از کار می‌افتد و هر شاگردی که با آن وارد شده، دفعهٔ بعد باید کد تازه را بزند.", "The current code stops working, and any staff member who signed in with it will need the new code next time.", "اوسنی کوډ له کاره لوېږي، او هر شاګرد چې پرې ننوتلی، بله ځل به نوی کوډ لیکي.")
   val newCodeMade: String get() = t("کد شاگرد تازه ساخته شد", "New staff code created", "د شاګرد نوی کوډ جوړ شو")
@@ -146,6 +150,8 @@ object StrSettings {
   val undoFailed: String get() = t("برگرداندن ممکن نشد", "Couldn't undo", "ستنول ونه شول")
   val wipeAll: String get() = t("پاک‌سازی کامل اطلاعات", "Erase all data", "ټول معلومات پاکول")
   val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
+  val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
+  fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: $v", "Installed version: $v", "نصب شوې نسخه: $v")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")
   val restoreWarn: String get() = t("با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring this file replaces all current data on this device. A copy of the current state is kept so it can be undone if this was a mistake.", "د دې دوتنې په بېرته راګرځولو سره، د دې وسیلې ټول اوسني معلومات بدلېږي. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
   val warehouseEntries: String get() = t("ورودهای انبار", "Warehouse entries", "د ګدام داخلې")
@@ -164,6 +170,17 @@ object StrSettings {
   val wipeWarn: String get() = t("همه چیز روی این دستگاه پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "Everything on this device will be erased and can't be recovered. If you haven't made a backup, make one first.", "په دې وسیله کې هر څه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
   val wiped: String get() = t("تمام اطلاعات پاک شد", "All data erased", "ټول معلومات پاک شول")
   val wipe: String get() = t("پاک کن", "Erase", "پاک یې کړه")
+
+  // اشتراک (برچسبِ وضعیت)
+  val active: String get() = t("فعال", "Active", "فعال")
+  val graceEnded: String get() = t("تمام شده — در مهلت", "Ended — in grace period", "پای ته رسېدلی — په مهلت کې")
+  val ended: String get() = t("تمام شده", "Ended", "پای ته رسېدلی")
+  val notStarted: String get() = t("هنوز شروع نشده", "Not started yet", "لا نه دی پیل شوی")
+  val licenseInvalid: String get() = t("مجوز معتبر نیست", "The license isn't valid", "جواز د اعتبار وړ نه دی")
+  val noSubscription: String get() = t("بدون اشتراک", "No subscription", "ګډون نشته")
+
+  // بخش‌های جمع‌شو
+  val open: String get() = t("باز کردن", "Open", "پرانیستل")
 
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
@@ -196,7 +213,7 @@ object StrSettings {
   val passwordRow: String get() = t("رمزِ حساب", "Account password", "د حساب پټنوم")
   val printerRow: String get() = t("چاپگر و رسید", "Printer & receipt", "پرنټر او رسید")
   val scannerRow: String get() = t("بارکدخوان", "Barcode scanner", "بارکوډ لوستونکی")
-  val peripheralsRow: String get() = td("چاپگر، بارکدخوان، گوشی", "Printers, scanners, phone", "پرنټر، بارکوډ لوستونکی، موبایل", "Printers, scanners, phone", "پرنټر، بارکوډ لوستونکی، موبایل")
+  val peripheralsRow: String get() = t("چاپگر، بارکدخوان، گوشی", "Printers, scanners, phone", "پرنټر، بارکوډ لوستونکی، موبایل")
   val syncRow: String get() = t("همگام‌سازی", "Sync", "همغږي")
   val backupRow: String get() = t("پشتیبان و بازگردانی", "Backup & restore", "بیک‌اپ او بېرته راوستل")
   val versionRow: String get() = t("نسخه و به‌روزرسانی", "Version & updates", "نسخه او تازه کول")
@@ -220,7 +237,7 @@ object StrSettings {
   // هشدارها، ظاهر، زبان، رقم
   val alertsTitle: String get() = t("برنامه خودش خبر می‌دهد", "The app lets you know", "اپ پخپله خبر درکوي")
   val phoneNotifications: String get() = t("اعلان‌های گوشی", "Phone notifications", "د موبایل خبرتیاوې")
-  val phoneNotificationsNote: String get() = t("صدا، لرزش و نشانِ اعلان‌ها در تنظیمات گوشی", "Sound, vibration and badges in the phone settings", "د موبایل په امستنو کې غږ، لړزه او نښې")
+  val phoneNotificationsNote: String get() = td("صدا، لرزش و نشانِ اعلان‌ها در تنظیمات گوشی", "Sound, vibration and badges in the phone settings", "د موبایل په امستنو کې غږ، لړزه او نښې", "Sound, vibration and badges in the system settings", "د سیستم په امستنو کې غږ، لړزه او نښې")
   val themeNote: String get() = td("«خودکار» یعنی هر وقت گوشی تیره شد، برنامه هم تیره می‌شود.", "“Automatic” follows the phone's light or dark mode.", "«اتومات» یعنی د موبایل له روښانه یا تیاره حالت سره سم.", "“Automatic” follows the system's light or dark mode.", "«اتومات» یعنی د سیستم له روښانه یا تیاره حالت سره سم.")
   val appLanguage: String get() = t("زبانِ برنامه", "App language", "د اپ ژبه")
   val monthNames: String get() = t("نامِ ماه‌های خورشیدی", "Solar month names", "د لمریزو میاشتو نومونه")
@@ -265,7 +282,7 @@ object StrSettings {
   val repeatPassword: String get() = t("تکرارِ رمزِ تازه", "Repeat the new password", "نوی پټنوم بیا ولیکئ")
   val passwordSignedOut: String get() = t("بیرون از حساب رمزی برای عوض کردن نیست", "There's no password to change while signed out", "له حساب بهر د بدلولو پټنوم نشته")
   // دوربین و همگام‌سازی
-  val cameraTestNote: String get() = t("«آزمایش دوربین» برگهٔ اسکن را باز می‌کند؛ کدِ خوانده‌شده همین‌جا می‌آید.", "“Test camera” opens the scanner; the code it reads shows here.", "«کمره وازمویئ» د سکن پاڼه پرانیزي؛ لوستل شوی کوډ دلته راځي.")
+  val cameraTestNote: String get() = td("«آزمایش دوربین» برگهٔ اسکن را باز می‌کند؛ کدِ خوانده‌شده همین‌جا می‌آید.", "“Test camera” opens the scanner; the code it reads shows here.", "«کمره وازمویئ» د سکن پاڼه پرانیزي؛ لوستل شوی کوډ دلته راځي.", "“Test scanner” opens the scanner; the code it reads shows here.", "«بارکوډ لوستونکی وازمویئ» د سکن پاڼه پرانیزي؛ لوستل شوی کوډ دلته راځي.")
   val syncNow: String get() = t("همگام‌سازی حالا", "Sync now", "اوس همغږي")
   val syncStarted: String get() = t("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود", "Sync started; “Last sync” updates in a few seconds", "همغږي پیل شوه؛ څو ثانیې وروسته «وروستۍ همغږي» تازه کېږي")
   val syncFailed: String get() = t("همگام‌سازی ناموفق بود", "Sync failed", "همغږي ناکامه شوه")
@@ -279,7 +296,7 @@ object StrSettings {
   val careTitle: String get() = t("نگه‌داری", "Maintenance", "ساتنه")
 
   // دستگاه‌های جانبی
-  val devicesIntro: String get() = td("هر دستگاهی که به برنامه وصل است — چاپگر، بارکدخوان، گوشی — همین‌جا ثبت و آزموده می‌شود.", "Everything connected to the app — printers, scanners, phones — is added and tested here.", "هر هغه وسیله چې له اپ سره نښتې ده — پرنټر، بارکوډ لوستونکی، موبایل — دلته ثبتېږي او ازمویل کېږي.", "Everything connected to the app — printers, scanners, phones — is added and tested here.", "هر هغه وسیله چې له اپ سره نښتې ده — پرنټر، بارکوډ لوستونکی، موبایل — دلته ثبتېږي او ازمویل کېږي.")
+  val devicesIntro: String get() = t("هر دستگاهی که به برنامه وصل است — چاپگر، بارکدخوان، گوشی — همین‌جا ثبت و آزموده می‌شود.", "Everything connected to the app — printers, scanners, phones — is added and tested here.", "هر هغه وسیله چې له اپ سره نښتې ده — پرنټر، بارکوډ لوستونکی، موبایل — دلته ثبتېږي او ازمویل کېږي.")
   val printers: String get() = t("چاپگرها", "Printers", "پرنټرونه")
   val printersNote: String get() = t("حرارتیِ ۵۸ و ۸۰ میلی‌متری — بلوتوث، وای‌فای، سیم یا چاپگرِ نصب‌شده. کشیدنِ ردیف: حذف یا پیش‌فرض.", "58 and 80 mm thermal — Bluetooth, Wi-Fi, cable or an installed printer. Swipe a row: remove or make default.", "۵۸ او ۸۰ ملي‌متري حرارتي — بلوتوث، وای‌فای، کېبل یا نصب شوی پرنټر. کرښه کش کړئ: لرې کول یا لومړنی.")
   val noPrinterYet: String get() = t("هنوز چاپگری ثبت نشده.", "No printer added yet.", "لا کوم پرنټر نه دی ثبت شوی.")
@@ -313,8 +330,8 @@ object StrSettings {
   val scannersNote: String get() = t("بارکدخوانِ دستی، رومیزی یا بلوتوثی خودش را «صفحه‌کلید» معرفی می‌کند: وصل کنید (بلوتوثی را در تنظیماتِ دستگاه جفت کنید) و در صفحهٔ فروش اسکن کنید. چند بارکدخوان هم‌زمان هم کار می‌کنند.", "Handheld, desk or Bluetooth scanners act as a keyboard: connect it (pair Bluetooth ones in the device settings) and scan on the sale screen. Several can work at once.", "لاسي، مېزي یا بلوتوث لوستونکي ځان «کیبورډ» ښيي: ونښلوئ (بلوتوث یې د وسیلې په امستنو کې جوړه کړئ) او د پلور په پاڼه کې سکن کړئ. څو لوستونکي یوځای هم کار کوي.")
   val scannerTest: String get() = t("آزمون: این‌جا بزنید و یک کالا اسکن کنید", "Test: tap here and scan an item", "ازموینه: دلته ووهئ او یو توکی سکن کړئ")
   val scannersTrouble: String get() = t("اگر حروف به‌هم‌ریخته آمد، زبانِ صفحه‌کلید را انگلیسی کنید یا بارکدخوان را روی «USB HID / Keyboard» بگذارید (از دفترچهٔ خودش).", "If the text comes out scrambled, switch the keyboard to English or set the scanner to “USB HID / Keyboard” (see its manual).", "که توري ګډوډ راغلل، د کیبورډ ژبه انګلیسي کړئ یا لوستونکی په «USB HID / Keyboard» کېږدئ (د هغه له لارښود).")
-  val phoneLink: String get() = td("گوشی ⇄ کامپیوتر", "Phone ⇄ computer", "موبایل ⇄ کمپیوټر", "Phone ⇄ computer", "موبایل ⇄ کمپیوټر")
-  val phoneLinkSub: String get() = td("بارکدخوان و دوربینِ گوشی برای کامپیوتر — با یک کدِ شش‌رقمی", "The phone's scanner and camera for the computer — with a six-digit code", "د کمپیوټر لپاره د موبایل لوستونکی او کمره — په شپږ عددي کوډ", "The phone's scanner and camera for the computer — with a six-digit code", "د کمپیوټر لپاره د موبایل لوستونکی او کمره — په شپږ عددي کوډ")
+  val phoneLink: String get() = t("گوشی ⇄ کامپیوتر", "Phone ⇄ computer", "موبایل ⇄ کمپیوټر")
+  val phoneLinkSub: String get() = t("بارکدخوان و دوربینِ گوشی برای کامپیوتر — با یک کدِ شش‌رقمی", "The phone's scanner and camera for the computer — with a six-digit code", "د کمپیوټر لپاره د موبایل لوستونکی او کمره — په شپږ عددي کوډ")
   val phoneLinkNeedsAccount: String get() = t("برای این کار هر دو دستگاه باید با یک حساب وارد شده باشند.", "Both devices must be signed in to the same account.", "دواړه وسیلې باید په یوه حساب ننوتې وي.")
   val asReceiver: String get() = t("این دستگاه گیرنده باشد (کامپیوترِ صندوق):", "This device receives (the till computer):", "دا وسیله اخیستونکې وي (د صندوق کمپیوټر):")
   val asSender: String get() = t("این دستگاه فرستنده باشد (گوشی):", "This device sends (the phone):", "دا وسیله لېږونکې وي (موبایل):")
@@ -338,9 +355,9 @@ object StrSettings {
   val photoFrom: String get() = t("انتخاب تصویر", "Choose a picture", "انځور وټاکئ")
   val photoForPc: String get() = t("عکس برای کامپیوتر فرستاده می‌شود", "The photo is sent to the computer", "انځور کمپیوټر ته لېږل کېږي")
   val camera: String get() = t("دوربین", "Camera", "کمره")
-  val cameraNewPhoto: String get() = t("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ")
+  val cameraNewPhoto: String get() = td("گرفتنِ عکسِ تازه", "Take a new photo", "نوی انځور واخلئ", "A photo on this computer, taken with a phone or webcam", "په کمپیوټر کې انځور، چې په موبایل یا ویب‌کم اخیستل شوی")
   val gallery: String get() = t("گالری", "Gallery", "ګالري")
-  val galleryPick: String get() = t("انتخاب از عکس‌های گوشی", "Pick from the phone's photos", "د موبایل له انځورونو وټاکئ")
+  val galleryPick: String get() = td("انتخاب از عکس‌های گوشی", "Pick from the phone's photos", "د موبایل له انځورونو وټاکئ", "Pick from the computer's folders", "د کمپیوټر له فولډرونو وټاکئ")
   val liveSync: String get() = t("همگام‌سازیِ زنده", "Live sync", "ژوندۍ همغږي")
   val liveNoAccount: String get() = t("بی حساب کار می‌کنید — دفتر فقط روی همین دستگاه است. برای دیدنِ فروش‌ها روی همهٔ دستگاه‌ها وارد حساب شوید.", "You're working without an account — the ledger is on this device only. Sign in to see sales on every device.", "بې حسابه کار کوئ — دفتر یوازې په همدې وسیله دی. په ټولو وسیلو د پلور لیدو ته ننوځئ.")
   val liveOn: String get() = t("وصل — هر فروش، کالا یا عکسی که روی دستگاهِ دیگرِ همین حساب ثبت شود، همان لحظه این‌جا می‌آید.", "Connected — every sale, item or photo added on another device of this account appears here instantly.", "وصل — هر پلور، توکی یا انځور چې د همدې حساب په بله وسیله ثبت شي، سمدستي دلته راځي.")

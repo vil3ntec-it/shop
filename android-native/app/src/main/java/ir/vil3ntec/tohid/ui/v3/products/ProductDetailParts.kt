@@ -36,7 +36,7 @@ import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.StockMovement
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.ProductListModel.Status
@@ -189,7 +189,7 @@ internal fun MovesSection(p: Product, moves: List<StockMovement>, total: Int, on
       val sign = if (m.qty > 0) "+" else if (m.qty < 0) "−" else ""
       V3ListRow(
         title = moveLabel(kind, m.type),
-        subtitle = formatDate(m.date) + if (m.notes.isNotBlank()) " — ${m.notes}" else "",
+        subtitle = displayDate(m.date) + if (m.notes.isNotBlank()) " — ${m.notes}" else "",
         subtitleLines = 1,
         icon = icon,
         hue = hue,
@@ -213,7 +213,7 @@ internal fun HistorySection(history: List<AuditEntry>) {
   V3Section(StrProducts.history) {
     history.forEachIndexed { i, a ->
       if (i > 0) V3Divider(start = 16.dp)
-      V3ListRow(title = formatDate(a.date), subtitle = a.notes, subtitleLines = 3, tile = false, chevron = false)
+      V3ListRow(title = displayDate(a.date), subtitle = a.notes, subtitleLines = 3, tile = false, chevron = false)
     }
   }
 }

@@ -36,15 +36,19 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
-import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
-import ir.vil3ntec.tohid.ui.components.common.StatusPill
+import ir.vil3ntec.tohid.data.OrderFulfillment
+import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.Platform
+import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
+import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModeToggle
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
+import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -58,9 +62,12 @@ import kotlinx.coroutines.launch
  *  با `orders.manage`؛ سرور هر گذار را دوباره می‌سنجد.
  *  ⛔ شمارهٔ کامل و دکمهٔ تماس فقط وقتی سرور شماره را داده (`orders.contact`).
  *  نمای کارتی/جدولی: `ViewModePref` (گوشی همیشه کارتی).
+ *  ⛔ موجودی (تصمیمِ صاحبِ مخزن): سایت و سرور به موجودی دست نمی‌زنند. «مشتری گرفت»، «ارسال
+ *  شد» یا «تحویل شد» ⇒ همین برنامه یک فروشِ عادی با قیمت‌های سفارش ثبت می‌کند
+ *  (`OrderFulfillment`) و همان لحظه همگام می‌کند؛ کمبود ⇒ گذار فرستاده نمی‌شود و پیامِ روشن.
  */
 @Composable
-fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
+fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cfg = OrdersLive.config.value
@@ -120,6 +127,58 @@ fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
       "اعلانِ فوری (وقتی برنامه بسته است) هنوز وصل نیست؛ تا برنامه باز است، صف هر چند ثانیه خودش تازه می‌شود.",
       style = MaterialTheme.typography.labelSmall, color = colors.muted,
     )
+    //  دورهٔ گذار: دستگاهِ کهنه فروشِ سفارش را دستی می‌زند و این برنامه خودکار ⇒ دو فروش
+    if (OrdersLive.rolloutNotice()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(title = OrdersLive.ROLLOUT_NOTE, body = "", action = null, onAction = {})
+    }
+    //  بررسیِ صاحب: کاری که خودکار نشد و نباید بشود (تحویلِ پیش از راه‌اندازی، برگشت پس از مرجوعی)
+    val review = OrdersLive.review.value
+    if (review.isNotEmpty() && cfg.permissions.refund) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${review.size} سفارش بررسیِ صاحب می‌خواهد",
+        body = review.take(3).joinToString("\n") { it.message },
+        //  باز کردنِ نخستین؛ «بررسی شد» در جزئیاتِ همان سفارش
+        action = "بررسی",
+        onAction = { openId = review.first().orderId },
+      )
+    }
+    //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
+    val unposted = OrdersLive.unposted.value
+    if (unposted.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${unposted.size} سفارشِ تحویل‌شده هنوز فروش ندارد — موجودی کم نشده",
+        body = unposted.take(3).joinToString("\n") { it.message },
+        action = "دوباره ثبت کن",
+        onAction = { scope.launch { OrdersLive.reconcile(context, store, force = true) } },
+      )
+    }
+    //  تحویل‌هایی که این حساب نمی‌تواند فروش یا لغوشان را بنویسد (پرچمِ سرورِ همان سفارش:
+    //  اجازه یا سقفِ تخفیفِ همین کاربر) — منتظرِ دستگاهِ صاحب یا مدیر
+    val waiting = OrdersLive.waiting.value
+    if (waiting.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "${waiting.size} سفارشِ تحویل‌شده منتظرِ دستگاهِ صاحب یا مدیر است",
+        body = (listOf("این حساب فروش یا لغوِ این‌ها را نمی‌تواند ثبت کند (اجازه یا سقفِ تخفیف)؛ با باز شدنِ برنامه روی دستگاهِ صاحب یا مدیر خودکار ثبت می‌شود.") +
+          waiting.take(3).map { it.message }).joinToString("\n"),
+        action = null,
+        onAction = {},
+      )
+    }
+    //  فروش ثبت شد ولی کالا در دفتر کم بود (INV-19: ثبت‌شده رد نمی‌شود) — ورودِ انبار را درست کنید
+    val shortfalls = OrdersLive.shortfalls.value
+    if (shortfalls.isNotEmpty()) {
+      Spacer(Modifier.height(8.dp))
+      FulfillNotice(
+        title = "موجودیِ ${shortfalls.size} کالا پس از تحویل منفی شد — ورودِ انبار را درست کنید",
+        body = shortfalls.take(3).joinToString("\n") { it.message },
+        action = null,
+        onAction = {},
+      )
+    }
     Spacer(Modifier.height(10.dp))
     //  برگه‌های ORD-12 با شمارش
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -167,7 +226,7 @@ fun OrdersScreen(snackbar: SnackbarHostState, onLeave: () -> Unit) {
 
   openId?.let { id ->
     OrderDetailSheet(
-      id = id, repo = repo, cfg = cfg, snackbar = snackbar,
+      id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
       onClose = { openId = null },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
@@ -304,11 +363,14 @@ private fun OrderDetailSheet(
   id: String,
   repo: OrdersRepository,
   cfg: OrdersConfigDto,
+  store: ShopStore,
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
   onChanged: () -> Unit,
 ) {
   val c = Shop.colors
+  val context = LocalContext.current
+  val ledger by store.data.collectAsState()
   val scope = rememberCoroutineScope()
   val uri = LocalUriHandler.current
   val clipboard = LocalClipboardManager.current
@@ -326,9 +388,46 @@ private fun OrderDetailSheet(
       .onFailure { if (order == null) { error = it.userMessage } }
   }
 
+  /**
+   *  فروشِ تحویل (یا لغوِ آن برای سفارشِ برگشته) در همین دفتر — همیشه پس از پرسیدن از سرور
+   *  (`OrdersLive.postById`)؛ یکتا با شناسهٔ سفارش. نتیجه همیشه گفته می‌شود.
+   */
+  suspend fun postSale(o: OrderDto) {
+    val back = o.status in OrderFulfillment.BACK_IN_SHOP
+    when (val r = OrdersLive.postById(context, store, o.id)) {
+      OrdersLive.Posted.Saved -> snackbar.showSnackbar(
+        if (back) "فروشِ سفارش #${o.orderNo} لغو شد؛ کالا به موجودی برگشت و همگام می‌شود"
+        else "فروشِ سفارش #${o.orderNo} ثبت شد؛ موجودی کم شد و همگام می‌شود"
+      )
+      OrdersLive.Posted.Already -> Unit
+      is OrdersLive.Posted.Skipped -> snackbar.showSnackbar(r.message)
+      is OrdersLive.Posted.Failed -> snackbar.showSnackbar(r.message)
+      is OrdersLive.Posted.Review -> snackbar.showSnackbar(r.message)
+    }
+  }
+
+  /** «بررسی شد» ِ صاحب برای ردیفِ بررسیِ همین سفارش — برای همهٔ دستگاه‌ها */
+  suspend fun ackReview(o: OrderDto) {
+    val err = OrdersLive.ackReview(context, o.id)
+    snackbar.showSnackbar(err ?: "سفارش #${o.orderNo}: «بررسی شد» ثبت شد؛ از فهرستِ همهٔ دستگاه‌ها رفت")
+  }
+
   fun send(to: String, reason: String = "", note: String = "", ready: Int? = null) {
     val o = order ?: return
     if (busy) return
+    //  تحویل ⇒ فروش در همین دفتر: پیش از فرستادنِ گذار سنجیده می‌شود (سیاستِ موجودیِ صندوق)؛
+    //  کمبود ⇒ گذار نمی‌رود و پیام روشن است، نه سفارشِ «تحویل‌شده» بی فروش
+    if (to in OrderFulfillment.HANDED_OVER && OrdersLive.canRecord(cfg, o) && OrderFulfillment.saleOf(ledger, o.id) == null && !o.isTest) {
+      val dry = OrderFulfillment.fulfill(
+        ledger, o, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(),
+        blockExpired = ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context),
+      )
+      if (dry is OrderFulfillment.Result.Failed) {
+        val msg = "تحویل ثبت نشد — ${dry.message}"
+        if (act != null) actError = msg else scope.launch { snackbar.showSnackbar(msg) }
+        return
+      }
+    }
     busy = true
     actError = null
     scope.launch {
@@ -338,12 +437,17 @@ private fun OrderDetailSheet(
           act = null
           onChanged()
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
+          if (it.status in OrderFulfillment.HANDED_OVER || it.status in OrderFulfillment.BACK_IN_SHOP) postSale(it)
         }
         .onFailure { f ->
           if (f.code == "status_changed") {
             act = null
             scope.launch { snackbar.showSnackbar("وضعیتِ این سفارش همین حالا جای دیگری عوض شد؛ وضعیتِ تازه را ببینید.") }
-            repo.get(o.id).onSuccess { order = it }
+            repo.get(o.id).onSuccess {
+              order = it
+              //  دستگاهِ دیگر یا پیک تحویل داد ⇒ فقط اگر سرور هم بگوید لازم است (postSale می‌پرسد)
+              if (OrderFulfillment.needsSale(ledger, it, OrdersLive.handoverSince()) || OrderFulfillment.needsReverse(ledger, it)) postSale(it)
+            }
             onChanged()
           } else if (act != null) {
             actError = f.userMessage
@@ -377,6 +481,50 @@ private fun OrderDetailSheet(
         Tag(fulfillmentLabel(o)); Tag("${o.itemsCount} قلم"); Tag(OrderText.pay(o.paymentStatus, o.paymentMethod))
         Tag(OrderText.source(o.source)); Tag(timeLabel(o, System.currentTimeMillis()))
         if (o.isTest) Tag("آزمایشی", warn = true)
+      }
+
+      //  فروشِ تحویل در دفترِ دکان (موجودی فقط این‌جا کم می‌شود)
+      val sold = OrderFulfillment.saleOf(ledger, o.id)
+      if (sold != null) {
+        Spacer(Modifier.height(6.dp))
+        Text(
+          "فروشِ تحویل: فاکتور #${sold.invoiceLabel() ?: "—"} — کالایی که پیک برگرداند ⇒ همین سفارش را «برگشت به دکان» بزنید (فروش خودش لغو می‌شود)؛ «مرجوعی» نزنید",
+          style = MaterialTheme.typography.bodySmall, color = c.muted,
+        )
+      } else if (OrdersLive.review.value.any { it.orderId == o.id }) {
+        Spacer(Modifier.height(8.dp))
+        FulfillNotice(
+          title = "بررسیِ صاحب — فروشِ این سفارش خودکار ثبت نمی‌شود",
+          body = OrdersLive.review.value.first { it.orderId == o.id }.message,
+          action = if (cfg.permissions.refund) "بررسی شد" else null,
+          onAction = { if (!busy) scope.launch { busy = true; ackReview(o); busy = false } },
+        )
+      } else if (OrderFulfillment.needsSale(ledger, o, OrdersLive.handoverSince())) {
+        Spacer(Modifier.height(8.dp))
+        val able = cfg.permissions.manage && OrdersLive.canRecord(cfg, o) && !OrdersLive.isWaiting(o.id)
+        FulfillNotice(
+          title = "فروشِ این سفارش هنوز در دفترِ دکان نیست — موجودی کم نشده",
+          body = OrdersLive.unposted.value.firstOrNull { it.orderId == o.id }?.message
+            ?: if (able) "کالا از دکان بیرون رفته؛ فروش را با قیمت‌های همین سفارش ثبت کنید." else OrdersLive.SKIPPED_NOTE,
+          action = if (able) "ثبتِ فروش" else null,
+          onAction = { if (!busy) scope.launch { busy = true; postSale(o); busy = false } },
+        )
+      }
+      if (sold != null && OrderFulfillment.needsReverse(ledger, o)) {
+        Spacer(Modifier.height(8.dp))
+        //  پیش‌تر «مرجوعیِ» دستی گرفته ⇒ لغوِ خودکار نه؛ صاحب بررسی کند
+        val blocked = OrderFulfillment.reverseBlock(ledger, o)
+        val able = blocked == null && cfg.permissions.manage && OrdersLive.canReverse(cfg, o) && !OrdersLive.isWaiting(o.id)
+        //  پس از «مرجوعیِ» دستی: صاحب بررسی می‌کند و «بررسی شد» می‌زند (دیگر لغوِ خودکار نیست)
+        val ackable = blocked != null && cfg.permissions.refund && OrdersLive.review.value.any { it.orderId == o.id }
+        FulfillNotice(
+          title = "کالای این سفارش به دکان برگشته ولی فروشش هنوز لغو نشده",
+          body = blocked ?: if (able) "لغوِ همان فاکتور موجودی را برمی‌گرداند؛ پولی از دخل جابه‌جا نمی‌شود." else OrdersLive.SKIPPED_REVERSE_NOTE,
+          action = if (able) "لغوِ فروشِ تحویل" else if (ackable) "بررسی شد" else null,
+          onAction = {
+            if (!busy) scope.launch { busy = true; if (able) postSale(o) else ackReview(o); busy = false }
+          },
+        )
       }
 
       val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
@@ -478,6 +626,29 @@ private fun OrderDetailSheet(
       onDismiss = { act = null },
       onConfirm = { reason, note, ready -> send(to, reason, note, ready) },
     )
+  }
+}
+
+/** هشدارِ «تحویل بی فروش» — رنگِ هشدار + متن، با کارِ بعدی (VISUAL-DIRECTION: هرگز رنگِ تنها) */
+@Composable
+private fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
+  val c = Shop.colors
+  Column(
+    Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.md)).background(c.warningTint).padding(12.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.size(8.dp).clip(CircleShape).background(c.warning))
+      Spacer(Modifier.width(8.dp))
+      Text(title, Modifier.weight(1f), color = c.text, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+    }
+    if (body.isNotBlank()) {
+      Spacer(Modifier.height(4.dp))
+      Text(body, color = c.text, style = MaterialTheme.typography.bodySmall)
+    }
+    if (action != null) {
+      Spacer(Modifier.height(8.dp))
+      TohidSecondaryButton(action, onClick = onAction)
+    }
   }
 }
 

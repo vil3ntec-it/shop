@@ -179,7 +179,8 @@ object StrReports {
     "debt_due_set" -> t("سررسیدِ قرض", "Debt due date", "د پور د ورکړې نېټه")
     "credit_over_limit" -> t("برد بیش از سقفِ اعتبار", "Over the credit limit", "له پور حد څخه زیات")
     "credit_limit_set" -> t("سقفِ اعتبار", "Credit limit", "د پور حد")
-    else -> type
+    //  نوعِ ناشناخته: همان کدِ رویداد، در هر سه زبان (و از t، تا آزمونِ پوشش آن را بشمارد)
+    else -> t(type, type, type)
   }
 
   // مرکزِ مدیریت

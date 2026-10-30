@@ -84,6 +84,9 @@ import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.rememberV3Toasts
 import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  ریشهٔ برنامهٔ دکان (حالتِ «دکان») — پوسته، نه صفحه.
@@ -183,9 +186,11 @@ fun AppRoot(
       ir.vil3ntec.tohid.sync.ShopNews.flush(context)
     }
   }
-  LifecycleEventEffect(Lifecycle.Event.ON_STOP) { ir.vil3ntec.tohid.sync.AutoSync.stopPolling() }
-  //  «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
-  OrdersLive.Host()
+  LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+    ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
+  }
+  //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
+  OrdersLive.Host(store)
   //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین
   PromoLive.Host()
   LaunchedEffect(loaded) {

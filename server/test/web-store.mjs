@@ -207,7 +207,7 @@ ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${s
 ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');
 
 //  سه زبان (دودی): en چپ‌به‌راست و ps راست‌به‌چپ — ویترین، سبد، ثبت؛ axe در هر دو جهت
-for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'Checkout'], ['ps', 'rtl', 'موجودیت لا کتل کېږي', 'فرمایش ثبتول']]) {
+for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'Checkout'], ['ps', 'rtl', 'موجودي لا کتل کېږي', 'فرمایش ثبتول']]) {
   const lc = await browser.newContext({ viewport: { width: 390, height: 844 }, bypassCSP: Boolean(axeSrc) });
   const lp = await lc.newPage();
   lp.on('pageerror', (e) => errors.push(String(e)));

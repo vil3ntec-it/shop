@@ -30,7 +30,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.PhoneScanner
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -75,7 +75,7 @@ internal fun PhoneLinkCard(data: ShopData, highlight: Boolean) {
       }
       Text(StrSettings.pairHowTo, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
       PhoneScanner.lastReceived.value?.let { (code, at) ->
-        Text(StrSettings.lastFromPhone(code, formatMillis(at)), style = V3Type.footnote, color = PhoneV3Roles.toneIcon(PhoneV3.colors, V3Tone.SUCCESS), modifier = Modifier.padding(top = 4.dp))
+        Text(StrSettings.lastFromPhone(code, displayMillis(at)), style = V3Type.footnote, color = PhoneV3Roles.toneIcon(PhoneV3.colors, V3Tone.SUCCESS), modifier = Modifier.padding(top = 4.dp))
       }
       Inbox(data)
     }
@@ -144,7 +144,7 @@ private fun Inbox(data: ShopData) {
     Text(StrSettings.inboxTitle(inbox.size), style = V3Type.subhead, color = PhoneV3.colors.ink)
     inbox.toList().forEach { item ->
       V3ListRow(
-        StrSettings.photoAt(formatMillis(item.at)),
+        StrSettings.photoAt(displayMillis(item.at)),
         icon = Icons.Outlined.Image,
         tile = false,
         chevron = false,
