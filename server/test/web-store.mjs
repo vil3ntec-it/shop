@@ -285,6 +285,70 @@ for (const lang of ['fa', 'en']) {
   await rc.close();
 }
 
+//  ── WEB-18: عدد و تم ── رقمِ فارسی در قیمت‌ها؛ کلیدِ تم تیره/روشن را عوض می‌کند و پس از
+//  بارِ دوباره می‌ماند؛ بی انتخاب، تمِ سیستم (prefers-color-scheme) پیروی می‌شود
+{
+  const luminance = (pg) => pg.evaluate(() => {
+    const m = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g).map(Number);
+    const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * lin(m[0]) + 0.7152 * lin(m[1]) + 0.0722 * lin(m[2]);
+  });
+  const theme = (pg) => pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  const tc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: 'light' });
+  const tp = await tc.newPage();
+  tp.on('pageerror', (e) => errors.push(String(e)));
+  await tp.goto(`${base}/store/${slug}`);
+  await tp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  const prices = await tp.$$eval('#products li[data-id] .p-price', (xs) => xs.map((x) => x.textContent).join(' '));
+  ok(/[۰-۹]/.test(prices) && !/[0-9]/.test(prices), 'رقمِ قیمت‌ها فارسی (fa-AF)، بی رقمِ لاتین (WEB-18)', prices.slice(0, 60));
+  const light = await luminance(tp);
+  ok((await theme(tp)) === 'light' && light > 0.6, 'تمِ روشنِ سیستم ⇒ زمینهٔ روشن (WEB-18)', `L=${light.toFixed(2)}`);
+  await tp.click('[data-act="theme"]');
+  const darkL = await luminance(tp);
+  ok((await theme(tp)) === 'dark' && darkL < 0.1, 'کلیدِ تم ⇒ تیره (WEB-18)', `L=${darkL.toFixed(2)}`);
+  await tp.reload();
+  await tp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await theme(tp)) === 'dark' && (await luminance(tp)) < 0.1, 'تمِ برگزیده پس از بارِ دوباره می‌ماند (WEB-18)');
+  await tp.click('[data-act="theme"]');
+  ok((await theme(tp)) === 'light', 'کلیدِ تم ⇒ دوباره روشن (WEB-18)');
+  await tc.close();
+  const dc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: 'dark' });
+  const dp = await dc.newPage();
+  dp.on('pageerror', (e) => errors.push(String(e)));
+  await dp.goto(`${base}/store/${slug}`);
+  await dp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await theme(dp)) === 'dark' && (await luminance(dp)) < 0.1, 'تمِ تیرهٔ سیستم ⇒ ویترینِ تیره (WEB-18)');
+  await dc.close();
+}
+
+//  ── WEB-15 (۳.۱۰): کلِ بارِ اول ≤ ۵۰۰KB و CLS ≤ ۰٫۱ — قطعی و بی وابستگی به سرعتِ ماشینِ CI.
+//  (LCP/INP و امتیازِ Lighthouse این‌جا سنجیده نمی‌شوند: روی ماشینِ مشترکِ CI ناپایدارند.)
+{
+  const wc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const wp = await wc.newPage();
+  wp.on('pageerror', (e) => errors.push(String(e)));
+  await wp.addInitScript(() => {
+    window.__cls = 0;
+    try {
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; })
+        .observe({ type: 'layout-shift', buffered: true });
+    } catch { /* مرورگرِ بی layout-shift */ }
+  });
+  const bytes = new Map();
+  wp.on('response', async (r) => {
+    try { bytes.set(r.url(), (await r.body()).length); } catch { /* بدنه نداشت (۳۰۴/ریدایرکت) */ }
+  });
+  await wp.goto(`${base}/store/${slug}`, { waitUntil: 'networkidle' });
+  await wp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await wp.evaluate(() => document.fonts.ready);
+  await wp.waitForTimeout(300);
+  const total = [...bytes.values()].reduce((s, n) => s + n, 0);
+  ok(total > 0 && total <= 500 * 1024, 'کلِ بارِ اولِ ویترین ≤ ۵۰۰KB (۳.۱۰، WEB-15)', `${total} بایت در ${bytes.size} پاسخ`);
+  const cls = await wp.evaluate(() => window.__cls);
+  ok(cls <= 0.1, 'جابه‌جاییِ چیدمان (CLS) ≤ ۰٫۱ (۳.۱۰، WEB-15)', cls.toFixed(3));
+  await wc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
