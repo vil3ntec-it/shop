@@ -207,6 +207,9 @@ export const KOTLIN = {
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
   capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
+  //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
+  restoreNoOps: /RestoreRoute\.decide\(/.test(bodyOf('restoreBackup', fs.readFileSync(
+    path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
 };
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
@@ -455,6 +458,52 @@ export class NativeDevice {
     const r = await this.sync();
     if (!r.ok || this.queue.length) throw new Error(`${this.label}: همگام نشد (${this.queue.length} در صف؛ ${this.lastError || JSON.stringify(r)})`);
     return r;
+  }
+
+  /**
+   * «بازیابیِ پشتیبان» = `ShopStore.restoreBackup` (S143، #455) — راه از `RestoreRoute.decide` ِ core
+   * (`core/.../backup/RestoreRoute.kt`؛ یکی را عوض کنی، هر دو را). بازیابی **هرگز op نمی‌سازد**:
+   *   • هرگز هم‌تراز نشده ⇒ `SyncV1Engine.resetTo`: پشتیبان جای دفتر و خودش سایه، cursor صفر؛
+   *   • همگام، بی ورود یا بی شبکه ⇒ هیچ چیزی عوض نمی‌شود؛
+   *   • همگام ⇒ `SyncRebuild.run`: صف تا ته (این‌جا همان دورِ همیشه)، بعد Snapshot — ردیف‌ها فقط از سرور،
+   *     از پشتیبان فقط آنچه همگام نمی‌شود (`fromServer`)، کفِ فاکتور (`withInvoiceCursor`)؛ سایه و
+   *     cursor با همان Snapshot.
+   * ساختی که بازیابی را هنوز «ذخیره» می‌کند (`KOTLIN.restoreNoOps` خاموش) ⇒ همان [save] (تفاضل با سایه).
+   * @returns {Promise<{ok:boolean, route:string, rows?:number, notOnServer?:number}>}
+   */
+  async restore(backup) {
+    if (!this.kotlin.restoreNoOps) { this.save(backup); return { ok: true, route: 'save' }; }
+    const shaped = (t) => (this.kotlin.snapshotShaped ? projectLedger(t, this.keepOf) : t);
+    const synced = this.cursor > 0 || this.snapshotAt > 0;
+    if (!synced) {
+      this.ledger = this.raw ? backup : projectLedger(backup, this.keepOf);
+      this.shadow = core.shadowOf(shaped(backup));
+      this.cursor = 0;
+      return { ok: true, route: 'local' };
+    }
+    if (!this.token) return { ok: false, route: 'need_sign_in' };
+    if (this.offline) return { ok: false, route: 'need_net' };
+    const pushed = await this.sync();
+    if (!pushed.ok) return { ok: false, route: 'from_server', error: this.lastError };
+    if (this.queue.length) return { ok: false, route: 'queue_left' };
+    const r = await this.api('GET', '/sync/v1/snapshot');
+    if (r.status !== 200) return { ok: false, route: 'from_server', status: r.status };
+    const syncedKeys = new Set([...core.COLLECTIONS, ...core.LIST_COLLECTIONS]);
+    const base = emptyLedger();
+    for (const [k, v] of Object.entries(backup)) if (!syncedKeys.has(k)) base[k] = v;
+    const next = core.fromSnapshot(r.body, base);
+    const highest = Math.max(0, ...(next.sales || []).map((s) => Number(s.invoiceNumber) || 0));
+    next.nextInvoiceNo = Math.max(Number(next.nextInvoiceNo) || 1, highest + 1);
+    this.ledger = this.raw ? next : projectLedger(next, this.keepOf);
+    this.shadow = core.shadowOf(shaped(next));
+    this.cursor = Number(r.body.cursor || 0);
+    this.snapshotAt = Date.now();
+    //  `RestoreRoute.notOnServer`: ردیف‌های پشتیبان که دفترِ تازه ندارد — افزوده نمی‌شوند، فقط شمرده
+    const notOnServer = core.COLLECTIONS.reduce((n, t) => {
+      const have = new Set((this.ledger[t] || []).map((x) => String(x.id)));
+      return n + new Set((backup[t] || []).map((x) => String(x.id)).filter((id) => !have.has(id))).size;
+    }, 0);
+    return { ok: true, route: 'from_server', rows: Number(r.body.rows || 0), notOnServer };
   }
 
   /* ---------------- کارهای دکان (سطر به سطرِ موتورهای کاتلین) ---------------- */

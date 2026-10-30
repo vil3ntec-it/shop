@@ -8,12 +8,14 @@
  *   • A — گوشیِ صاحب که کار می‌کند (فروش، نسیه، دریافتِ قرض)؛
  *   • B — کامپیوترِ صاحب که پشتیبان گرفته و بعد همان پشتیبان را بازیابی می‌کند.
  *
- * بازیابی در برنامه همان `ShopStore.applyRestore` ⇒ `writeInternal` ⇒ `SyncV1Engine.record` است؛
- * این‌جا همان `NativeDevice.save(دفترِ پشتیبان)` (تفاضل با سایه ⇒ صف). پشتیبان همان JSON ِ دفتر است
- * (`BackupBundle`/`importJson`).
+ * بازیابی در برنامه `ShopStore.restoreBackup` است و این‌جا `NativeDevice.restore(دفترِ پشتیبان)`. تا #455
+ * یک «ذخیره»ٔ عادی بود (`writeInternal` ⇒ `SyncV1Engine.record`: تفاضل با سایه ⇒ DELETE برای هر ردیفِ
+ * پس از پشتیبان)؛ حالا از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد: دستگاهِ همگام صف را
+ * می‌فرستد و ردیف‌ها را فقط از Snapshot ِ سرور می‌گیرد. پشتیبان همان JSON ِ دفتر است (`BackupBundle`/`importJson`).
  *
  * سنجه‌ها: اسنادِ پشتیبان (قدیم) سرِ جایشان؛ اسنادی که A پس از پشتیبان ساخته (پیش و هم‌زمان با بازیابی)
- * روی سرور و A و B می‌مانند؛ هیچ opی دو بار اثر نمی‌کند (یک فاکتور، یک قرض، موجودی یک بار).
+ * روی سرور و A و B می‌مانند؛ هیچ opی دو بار اثر نمی‌کند (یک فاکتور، یک قرض، موجودی یک بار)؛ بی شبکه
+ * بازیابی هیچ چیزی را عوض نمی‌کند؛ ردیفی که پس از پشتیبان حذف شد با بازیابی زنده نمی‌شود.
  * «سری مستقل» (شمارهٔ سندِ هر دستگاه، F0-03) در `DocSeries` ِ کاتلین است و این‌جا سنجیده نمی‌شود.
  *
  * اجرا:  node test/e2e/restore.e2e.mjs
@@ -70,8 +72,10 @@ await E.step('S143', 'B پشتیبانِ پیش را بازیابی می‌کن�
   A.offline = true;
   after.during = A.sell({ lines: [{ id: rice, qty: 1 }] });
   assert.equal(after.during.ok, true);
-  //  B: «بازیابی» ⇒ ShopStore.applyRestore(پشتیبان) ⇒ record
-  B.save(JSON.parse(JSON.stringify(backup)));
+  //  B: «بازیابی» ⇒ ShopStore.restoreBackup(پشتیبان) — هیچ op؛ ردیف‌ها از سرور
+  const r = await B.restore(JSON.parse(JSON.stringify(backup)));
+  assert.equal(r.ok, true, `بازیابی روی B: ${JSON.stringify(r)}`);
+  assert.equal(B.queue.length, 0, 'بازیابی op ساخت');
   await B.drain();
   A.offline = false;
   await A.drain();
@@ -98,5 +102,43 @@ await E.step('S143', 'B پشتیبانِ پیش را بازیابی می‌کن�
   const dup = await E.db.many(`SELECT row_id, COUNT(*)::int AS n FROM oplog WHERE account_id=$1 AND table_name='sales' AND op_type='insert' GROUP BY row_id HAVING COUNT(*) > 1`, [owner.shopId]);
   assert.deepEqual(dup, [], 'فاکتور دو بار درج شد');
 }, { needs: ['S143.after'] });
+
+await E.step('S143.offline', 'B بی اینترنت بازیابی می‌کند ⇐ هیچ چیزی عوض نمی‌شود: نه دفتر، نه صف، نه سرور', async () => {
+  const ledgerBefore = JSON.stringify(B.ledger);
+  const serverBefore = (await live('sales')).map((r) => r.row_id).sort();
+  B.offline = true;
+  const r = await B.restore(JSON.parse(JSON.stringify(backup)));
+  B.offline = false;
+  assert.deepEqual([r.ok, r.route], [false, 'need_net']);
+  assert.equal(B.queue.length, 0, 'بازیابیِ بی شبکه op ساخت');
+  assert.equal(JSON.stringify(B.ledger), ledgerBefore, 'بازیابیِ بی شبکه دفترِ B را عوض کرد');
+  await B.drain();
+  assert.deepEqual((await live('sales')).map((r) => r.row_id).sort(), serverBefore);
+}, { needs: ['S143'] });
+
+await E.step('S143.gone', 'ردیفی که پس از پشتیبان حذف شد با بازیابی زنده نمی‌شود — نه روی سرور، نه A، نه B', async () => {
+  const hasan = A.addDebtor('حسن رحیمی', '0797654321');
+  await A.drain();
+  await B.drain();
+  assert.ok(B.ledger.debtors.some((d) => d.id === hasan));
+  const backup2 = JSON.parse(JSON.stringify(B.ledger));
+  //  A پس از پشتیبان حسن را حذف می‌کند؛ B حذف را می‌گیرد (دیگر در سایه‌اش نیست)
+  A.save({ ...JSON.parse(JSON.stringify(A.ledger)), debtors: A.ledger.debtors.filter((d) => d.id !== hasan) });
+  await A.drain();
+  await B.drain();
+  assert.ok(!B.ledger.debtors.some((d) => d.id === hasan));
+  const r = await B.restore(backup2);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  await B.drain();
+  await A.drain();
+  assert.ok(!(await live('debtors')).some((x) => x.row_id === hasan), 'حسن روی سرور زنده شد');
+  assert.ok(!B.ledger.debtors.some((d) => d.id === hasan), 'حسن روی B زنده شد');
+  assert.ok(!A.ledger.debtors.some((d) => d.id === hasan), 'حسن روی A زنده شد');
+  //  پیامِ برنامه همین را می‌شمارد: «… ردیفِ پشتیبان روی سرور نیست و افزوده نشد»
+  assert.ok(r.notOnServer >= 1, `ردیفِ حذف‌شده شمرده نشد: ${JSON.stringify(r)}`);
+  //  و هیچ چیزِ دیگری هم نرفت
+  assert.equal(await serverDebt(ahmad), 180);
+  assert.equal(B.stock(rice), 40);
+}, { needs: ['S143'] });
 
 await E.finish();
