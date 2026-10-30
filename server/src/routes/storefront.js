@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
+const orderDesk = require('../lib/order-desk');
 const audit = require('../lib/audit');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -60,7 +61,7 @@ const customer = wrap(async (req, res, next) => {
 
 router.get('/:slug', readLimit, store, wrap(async (req, res) => {
   const [cats, status, delivery] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
+    sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
   ]);
   res.json({
     store: { ...sf.profile(req.store, cats, status), delivery },
@@ -130,6 +131,8 @@ router.post('/:slug/verify/check', codeLimit, store, wrap(async (req, res) => {
 //  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
 router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
   const key = orders.clientKeyOf(req);
+  //  ORD-08/09: توقفِ موقتِ سفارش‌گیری ⇒ ۴۰۹ `store_paused` (تکرارِ سفارشِ پیشین آزاد)
+  await orderDesk.guardCheckout(req.store.shop_id, key);
   let out;
   try {
     out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
@@ -146,6 +149,8 @@ router.post('/:slug/checkout', checkoutLimit, store, wrap(async (req, res) => {
   //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
   await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
     .catch((err) => console.error('[order-timeout] arm', err.message));
+  //  ORD-04 قبولِ خودکار و ORD-09 سنجشِ توقف (پرچمِ `shop.orders.desk`)؛ شکست سفارش را پس نمی‌گیرد
+  await orderDesk.afterOrder(req.store, out.orderId).catch((err) => console.error('[order-desk] after', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,
