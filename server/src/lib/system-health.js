@@ -373,7 +373,10 @@ async function chainReport({ rows = true, chains = [] } = {}) {
  *      آزمایشی (نقد منهای کرایه اگر کرایه از نقد بود) از «باید» و «دریافت» کم می‌شود و
  *      کسری/اضافه از همان دو عدد دوباره حساب می‌شود (بی آزمایشی همان عددِ ثبت‌شده است).
  *  ⛔ نقدِ آزمایشی همه‌جا بیرون است — عمداً با DLV-11 (که آن را می‌شمارد) فرق دارد.
- *  کارمزد تعریف نشده ⇒ `commission: null`، نه صفرِ ساختگی. پول همه به واحدِ خُرد (AFN).
+ *    • کارمزد ── تصمیمِ صاحبِ محصول (۱۴۰۵/۰۸): فعلاً بی کارمزد ⇒ ۰. اگر ستون‌های S10
+ *      (`platform_fee_minor` / `commission_minor`) روی `online_orders` باشند، جمعِ آن‌ها روی همان
+ *      سفارش‌های «فروش» ِ بازه خوانده می‌شود؛ نبودِ ستون ⇒ ۰ (پرس‌وجو نمی‌شکند).
+ *  پول همه به واحدِ خُرد (AFN).
  *
  *  فهرستِ دکان‌ها از `shops` با `EXISTS` روی نمایه‌های shop_id‌دار ساخته می‌شود: کارِ بازه،
  *  نقدِ تسویه‌نشده یا اختلافِ ممکن (بی بازه) — هر کدام فقط با سفارشِ غیرِ آزمایشی. جمعِ کل
@@ -384,6 +387,18 @@ const RECON_LIMITS = Object.freeze({ defDays: 30, maxDays: 92, maxShops: 200 });
 const CANCELLED = Object.freeze(['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled']);
 const SOLD = Object.freeze(['delivered', 'picked_up']);
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+//  فقط همین نام‌ها در SQL می‌آیند (فهرستِ سفید) — نامِ ستون هرگز از ورودی نیست
+const FEE_COLUMNS = Object.freeze(['platform_fee_minor', 'commission_minor']);
+
+/** ستون‌های کارمزدِ S10 که اکنون روی `online_orders` هست (شاید هیچ). */
+async function feeColumns() {
+  const have = new Set((await many(
+    `SELECT column_name AS c FROM information_schema.columns
+      WHERE table_schema = current_schema() AND table_name = 'online_orders' AND column_name = ANY($1::text[])`,
+    [[...FEE_COLUMNS]]
+  )).map((r) => r.c));
+  return FEE_COLUMNS.filter((c) => have.has(c));
+}
 
 /** اختلافِ ساعتِ منطقه با UTC در لحظهٔ `at` (میلی‌ثانیه). */
 function tzOffsetMs(at, tz) {
@@ -481,7 +496,8 @@ async function reconciliation(query = {}) {
   const names = new Map(shops.map((r) => [r.shop_id, r.name || '']));
   const args = [w.from, w.to, ids];
   const by = async (sql, params = args) => new Map((ids.length ? await many(sql, params) : []).map((r) => [r.shop_id, r]));
-  const [reports, cancels, courier, held, settleRows] = await Promise.all([
+  const feeCols = await feeColumns();
+  const [reports, cancels, courier, held, settleRows, fees] = await Promise.all([
     require('./order-refunds').reportMany(ids, { from: w.from, to: w.to }, { liveOnly: true }),
     by(`SELECT e.shop_id, COUNT(*)::int AS n FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
          WHERE e.shop_id = ANY($3::text[]) AND e.kind = 'status' AND e.to_status = ANY($4::text[])
@@ -509,6 +525,12 @@ async function reconciliation(query = {}) {
         WHERE c.shop_id = ANY($3::text[]) AND c.created_at >= $1 AND c.created_at < $2`,
       args
     ) : [],
+    //  کارمزد روی همان سفارش‌های «فروش» (همان پیوندِ collected در order-refunds)
+    feeCols.length ? by(`SELECT e.shop_id, COALESCE(SUM(${feeCols.map((c) => `COALESCE(o.${c}, 0)`).join(' + ')}), 0)::bigint AS s
+          FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
+         WHERE e.shop_id = ANY($3::text[]) AND e.kind = 'status' AND e.to_status IN ('delivered','picked_up')
+           AND e.created_at >= $1 AND e.created_at < $2 AND o.is_test = false
+         GROUP BY e.shop_id`) : new Map(),
   ]);
   const settled = settledOf(settleRows);
   const N = (v) => Number(v) || 0;
@@ -524,7 +546,7 @@ async function reconciliation(query = {}) {
       sales: rep.collected, refunds: rep.refunds, netMinor: rep.netMinor,
       cancellations: N(cancels.get(id)?.n),
       courier: { deliveries: N(c?.n), collectedMinor: N(c?.s), heldMinor: N(held.get(id)?.s), ...st },
-      commission: null,
+      commission: N(fees.get(id)?.s),
       issues,
     };
     //  نامزدِ «اختلافِ ممکن» که در عمل نه کاری دارد نه اختلافی ⇒ ردیفِ صفر نمی‌آید
@@ -540,7 +562,7 @@ async function reconciliation(query = {}) {
     local: { timezone: w.timezone, fromDate: w.fromDate, toDate: w.toDate },
     currency: 'AFN', checkedAt: now(), testExcluded: true,
     shopsTotal: rows.length, truncated: rows.length > RECON_LIMITS.maxShops,
-    commission: { defined: false },
+    commission: { columns: feeCols },
     totals: {
       salesCount: sum((r) => r.sales.count), salesMinor: sum((r) => r.sales.totalMinor),
       refundsCount: sum((r) => r.refunds.count), refundsMinor: sum((r) => r.refunds.totalMinor),
@@ -548,7 +570,7 @@ async function reconciliation(query = {}) {
       courierCollectedMinor: sum((r) => r.courier.collectedMinor), courierHeldMinor: sum((r) => r.courier.heldMinor),
       settlements: sum((r) => r.courier.settlements), receivedMinor: sum((r) => r.courier.receivedMinor),
       shortageMinor: sum((r) => r.courier.shortageMinor), excessMinor: sum((r) => r.courier.excessMinor),
-      issues: sum((r) => r.issues.length),
+      issues: sum((r) => r.issues.length), commissionMinor: sum((r) => r.commission),
     },
     shops: rows.slice(0, RECON_LIMITS.maxShops),
   };

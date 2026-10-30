@@ -188,7 +188,7 @@
       ['تسویه‌ها (دریافت)', `${fa(t.settlements)} · ${afn(t.receivedMinor)}`],
       ['کسری / اضافهٔ تسویه', `${afn(t.shortageMinor)} / ${afn(t.excessMinor)}`],
       ['اختلافِ باز', fa(t.issues)],
-      ['کارمزد', out.commission?.defined ? '—' : 'تعریف نشده'],
+      ['کارمزد', t.commissionMinor ? afn(t.commissionMinor) : `${afn(0)} · فعلاً بی کارمزد`],
     ]) {
       const c = el('div', 'stat');
       c.appendChild(el('div', 'l', label));
@@ -216,8 +216,8 @@
       tr.appendChild(el('td', '', r.courier.settlements
         ? `${fa(r.courier.settlements)} تسویه · دریافت ${afn(r.courier.receivedMinor)}${r.courier.shortageMinor ? ` · کسری ${afn(r.courier.shortageMinor)}` : ''}${r.courier.excessMinor ? ` · اضافه ${afn(r.courier.excessMinor)}` : ''}`
         : '—'));
-      //  کارمزد هنوز تعریف نشده (تصمیمِ صاحبِ محصول) — نه صفرِ ساختگی
-      tr.appendChild(el('td', 'muted', r.commission == null ? 'تعریف نشده' : afn(r.commission)));
+      //  فعلاً بی کارمزد (تصمیمِ صاحبِ محصول) ⇒ ۰؛ با ستون‌های S10 جمعِ واقعی
+      tr.appendChild(el('td', r.commission ? '' : 'muted', afn(r.commission || 0)));
       const iss = el('td');
       if (r.issues.length) {
         iss.appendChild(el('span', 'badge b-bad', `${fa(r.issues.length)} اختلاف`));
@@ -228,7 +228,7 @@
     }
     $('ops-recon-checked').textContent = `${out.local.fromDate} تا ${out.local.toDate} (هر دو روز شامل، ${out.local.timezone})`
       + ` · ${out.truncated ? `فهرست: ${fa(out.shops.length)} از ${fa(out.shopsTotal)} دکان، به ترتیبِ اهمیت؛ جمع‌ها از همه` : `${fa(out.shopsTotal)} دکان`}`
-      + ' · کارمزد: تعریف نشده (تصمیمِ صاحبِ محصول)';
+      + (t.commissionMinor ? '' : ' · کارمزد: فعلاً بی کارمزد');
   }
 
   document.addEventListener('DOMContentLoaded', () => {

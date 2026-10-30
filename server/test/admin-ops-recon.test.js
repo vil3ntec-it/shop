@@ -6,7 +6,8 @@
  *   ۲) فروش، بازپرداخت، خالص و اختلاف همان `order-refunds.report` ِ خودِ دکان است
  *      (دادهٔ مرجع) — دقیقاً؛ لغوها شمرده می‌شوند؛ سفارشِ آزمایشی هیچ‌جا نیست.
  *   ۳) نقدِ پیک: گرفته‌شده در بازه، تسویه‌نشدهٔ همین لحظه (بی بازه)، تسویه‌ها با کسری.
- *   ۴) کارمزد تعریف نشده ⇒ null، نه صفر.
+ *   ۴) کارمزد: فعلاً بی کارمزد ⇒ ۰؛ با ستون‌های S10 (`platform_fee_minor` / `commission_minor`)
+ *      جمعِ همان سفارش‌های فروش، بی آزمایشی؛ نبودِ ستون پرس‌وجو را نمی‌شکند.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -117,13 +118,13 @@ test('فقط مدیرِ ارشد؛ بازهٔ نادرست ۴۰۰', async () => 
   }
 });
 
-test('E2E-ADM-15: هر دکان دقیقاً برابرِ دادهٔ مرجع؛ آزمایشی بیرون؛ کارمزد null', async () => {
+test('E2E-ADM-15: هر دکان دقیقاً برابرِ دادهٔ مرجع؛ آزمایشی بیرون؛ کارمزد ۰', async () => {
   const r = await get(root);
   assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 300));
   assert.equal(r.headers.get('cache-control'), 'no-store');
   const b = r.body;
   assert.equal(b.currency, 'AFN');
-  assert.deepEqual(b.commission, { defined: false });
+  assert.deepEqual(b.commission, { columns: [] });
   const row = (id) => b.shops.find((s) => s.shopId === id);
 
   //  الف: همان عددی که خودِ دکان در /api/shop/orders/reconciliation می‌بیند
@@ -134,7 +135,7 @@ test('E2E-ADM-15: هر دکان دقیقاً برابرِ دادهٔ مرجع؛ 
   assert.deepEqual(a.refunds, { count: 1, totalMinor: 2000 });
   assert.equal(a.netMinor, TOTAL - 2000);
   assert.equal(a.cancellations, 1);
-  assert.equal(a.commission, null);
+  assert.equal(a.commission, 0);
   assert.deepEqual(a.issues, []);
   assert.equal(a.shopName, 'دکانِ تطبیق‌الف');
 
@@ -149,6 +150,7 @@ test('E2E-ADM-15: هر دکان دقیقاً برابرِ دادهٔ مرجع؛ 
   assert.equal(b.totals.netMinor, TOTAL - 2000);
   assert.equal(b.totals.courierCollectedMinor, 8000);
   assert.equal(b.totals.shortageMinor, 500);
+  assert.equal(b.totals.commissionMinor, 0);
   assert.equal(b.truncated, false);
 });
 
@@ -159,4 +161,37 @@ test('اختلافِ دفتر در صفِ هر دکان می‌آید', async ()
   await query(`UPDATE online_orders SET status='refunded_full' WHERE id=$1`, [o.id]);
   const a = (await get(root)).body.shops.find((s) => s.shopId === A.shopId);
   assert.deepEqual(a.issues.map((i) => [i.orderNo, i.code]), [[Number(o.orderNo ?? o.order_no), 'refund_without_ledger']]);
+});
+
+test('کارمزد: ستون‌های S10 اگر باشند جمع می‌شوند (تک‌تک یا هر دو، NULL = ۰، آزمایشی بیرون)', async () => {
+  const shopFee = async () => {
+    const b = (await get(root)).body;
+    const a = b.shops.find((x) => x.shopId === A.shopId);
+    assert.equal(b.totals.commissionMinor, b.shops.reduce((s, x) => s + x.commission, 0));
+    return { b, a };
+  };
+  try {
+    //  فقط یکی از دو ستون (مهاجرتِ نیمه) — باز هم کار می‌کند
+    await query('ALTER TABLE online_orders ADD COLUMN commission_minor BIGINT');
+    await query('UPDATE online_orders SET commission_minor = 25 WHERE shop_id = $1', [A.shopId]);
+    let { b, a } = await shopFee();
+    assert.deepEqual(b.commission, { columns: ['commission_minor'] });
+    assert.ok(a.sales.count >= 1);
+    assert.equal(a.commission, 25 * a.sales.count);           //  ردشده و آزمایشی بیرون
+
+    //  هر دو ستون؛ NULL ِ سفارشِ واقعی ۰ است و کارمزدِ آزمایشی شمرده نمی‌شود
+    await query('ALTER TABLE online_orders ADD COLUMN platform_fee_minor BIGINT');
+    await query('UPDATE online_orders SET platform_fee_minor = 100000 WHERE shop_id = $1 AND is_test = true', [A.shopId]);
+    ({ b, a } = await shopFee());
+    assert.deepEqual(b.commission, { columns: ['platform_fee_minor', 'commission_minor'] });
+    assert.equal(a.commission, 25 * a.sales.count);
+
+    await query('UPDATE online_orders SET platform_fee_minor = 100 WHERE shop_id = $1', [A.shopId]);
+    ({ b, a } = await shopFee());
+    assert.equal(a.commission, 125 * a.sales.count);
+    assert.equal(b.shops.find((x) => x.shopId === B.shopId).commission, 0);
+  } finally {
+    await query('ALTER TABLE online_orders DROP COLUMN IF EXISTS platform_fee_minor');
+    await query('ALTER TABLE online_orders DROP COLUMN IF EXISTS commission_minor');
+  }
 });

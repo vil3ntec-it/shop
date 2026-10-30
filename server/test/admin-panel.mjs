@@ -998,7 +998,7 @@ await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» �
 });
 
 // ── E2E-ADM-15: تطبیقِ فروشِ آنلاین — همان عددِ گزارشِ خودِ دکان ──────
-await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ گزارشِ دکان را نشان می‌دهد؛ کارمزد «تعریف نشده»', async () => {
+await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ گزارشِ دکان را نشان می‌دهد؛ کارمزد ۰ «فعلاً بی کارمزد»', async () => {
   const live = require('../src/lib/live-config');
   for (const key of ['shop.orders', require('../src/lib/order-refunds').FLAG_KEY]) await live.set(owner.shopId, key, true, 'panel-test');
   const call = async (method, path, body, headers = {}) => {
@@ -1035,9 +1035,9 @@ await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ
   assert.match(await page.locator('#ops-recon-checked').textContent(), new RegExp(`^${today} تا ${today} \\(هر دو روز شامل، Asia/Kabul\\)`));
   assert.equal(own.collected.count, 1);
   assert.equal(cells[1], `۱ سفارش · ${(own.collected.totalMinor / 100).toLocaleString('fa-AF')} افغانی`);
-  assert.equal(cells[7], 'تعریف نشده');
+  assert.equal(cells[7], '۰ افغانی');
   assert.match(cells[8], /بی اختلاف/);
-  assert.match(await page.locator('#ops-recon-totals').textContent(), /کارمزد.*تعریف نشده/);
+  assert.match(await page.locator('#ops-recon-totals').textContent(), /کارمزد۰ افغانی · فعلاً بی کارمزد/);
   if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/e2e-adm-15.png`, fullPage: true });
 });
 
