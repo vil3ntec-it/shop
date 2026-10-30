@@ -249,7 +249,8 @@ fun WarehouseScreen(
           Spacer(Modifier.width(6.dp))
           Text(if (productTools) "ورود کالا از فایل اکسل (xlsx یا CSV)" else "ورود کالا از فایل اکسل (CSV)")
         }
-        if (productTools && d.auditLog.any { it.type == ir.vil3ntec.tohid.data.ProductImport.AUDIT_TYPE }) {
+        val imported = remember(d.auditLog) { d.auditLog.any { it.type == ir.vil3ntec.tohid.data.ProductImport.AUDIT_TYPE } }
+        if (productTools && imported) {
           TextButton(onClick = { importHistory = true }, modifier = Modifier.fillMaxWidth()) {
             Text("سابقهٔ ورود از فایل")
           }

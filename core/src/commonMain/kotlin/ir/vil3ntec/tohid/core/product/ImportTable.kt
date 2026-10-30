@@ -332,12 +332,16 @@ object ImportTable {
       return -1
     }
 
-    /** `<!DOCTYPE … [ … ]>`: کروشهٔ درونی هم گذر می‌شود */
+    /** `<!DOCTYPE … [ … ]>`: کروشهٔ درونی و متنِ گیومه‌دار (که `]>` هم می‌تواند داشته باشد) گذر می‌شوند */
     private fun skipDecl(from: Int): Int {
       var depth = 0
+      var q = 0.toChar()
       var i = from + 2
       while (i < s.length) {
-        when (s[i]) {
+        val c = s[i]
+        if (q != 0.toChar()) { if (c == q) q = 0.toChar() }
+        else when (c) {
+          '"', '\'' -> q = c
           '[' -> depth++
           ']' -> depth--
           '>' -> if (depth <= 0) return i + 1
