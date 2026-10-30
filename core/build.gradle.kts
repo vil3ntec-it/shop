@@ -32,6 +32,12 @@ version = "1.0"
 //  پیکربندی نمی‌شود، پس گرافِ کارها و خروجیِ jvmِ اندروید/کامپیوتر همان است.
 val iosSpike = providers.gradleProperty("ios").orNull == "true"
 
+//  نگهبانِ commonMain (گامِ ۰ِ docs/IOS-PLAN-fa.md): با `-Pnative=true` یک هدفِ
+//  Kotlin/Native روی لینوکس (`linuxX64`، بی Xcode) هم ساخته می‌شود. چون این هدف JDK
+//  ندارد، هر `java.*`/`javax.*` ِ تازه در commonMain همان‌جا خطای کامپایل می‌شود
+//  (کارِ `core-native` در `.github/workflows/ios-spike.yml`). بی پرچم هیچ‌چیز عوض نمی‌شود.
+val nativeGuard = providers.gradleProperty("native").orNull == "true"
+
 kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
@@ -41,4 +47,5 @@ kotlin {
     iosSimulatorArm64()
   }
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
+  if (nativeGuard) linuxX64()
 }
