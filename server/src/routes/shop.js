@@ -222,13 +222,14 @@ router.delete('/staff-codes/:id', requireShop, requirePermission('staffcode.revo
 // ---------- ورود شاگرد به دکان ----------
 router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
   const code = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
-  const { shop, role } = await staffCodes.redeem(code, req.user.id, clientIp(req));
+  const { shop, role, unchanged } = await staffCodes.redeem(code, req.user.id, clientIp(req));
   const member = await shops.membershipOf(req.user.id);
   const ent = await entitlementOf(shop.id);
-  await audit.log({ shopId: shop.id, userId: req.user.id, action: 'staff.joined', detail: { role }, ip: clientIp(req) });
+  //  عضوِ فعالی که کد را دوباره زد: هیچ چیز عوض نشد (نقش فقط از PATCH/PUT /members/:id)
+  await audit.log({ shopId: shop.id, userId: req.user.id, action: 'staff.joined', detail: unchanged ? { role, unchanged: true } : { role }, ip: clientIp(req) });
   //  پیک (DLV-01): `redeem` نشست‌های بی‌دامنهٔ همین حساب — از جمله همین —
   //  را بست؛ نشستِ تازه با دامنهٔ `courier` روی همان دستگاه همین‌جا داده می‌شود
-  if (role === 'courier') {
+  if (role === 'courier' && !unchanged) {
     const tokens = require('../lib/tokens');
     const deviceId = req.tokenRow?.device_id || null;
     const access = await tokens.issue({ kind: 'access', subjectId: req.user.id, deviceId, ttlMs: config.tokens.accessTtlMs, app: 'shop' });

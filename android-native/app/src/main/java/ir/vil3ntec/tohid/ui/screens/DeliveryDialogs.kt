@@ -716,5 +716,7 @@ private suspend fun recordSale(order: OrderDto, m: Mission, collected: Long, ord
     is HandoverSaleResult.Recorded -> "سفارش #${order.orderNo} تحویل و فروشش ثبت شد."
     is HandoverSaleResult.AlreadyRecorded -> "سفارش #${order.orderNo} تحویل شد؛ فروشش پیش‌تر ثبت شده بود."
     is HandoverSaleResult.Failed -> "سفارش #${order.orderNo} تحویل شد؛ فروش همین حالا ثبت نشد (${r.message}) — برنامه دوباره می‌کوشد، در صندوق دستی نزنید."
+    //  بررسیِ صاحب: نه وعدهٔ «دوباره می‌کوشد»، فقط دلیل
+    is HandoverSaleResult.NeedsReview -> "سفارش #${order.orderNo} تحویل شد؛ فروشش خودکار ثبت نمی‌شود — ${r.message}"
   }
 }

@@ -112,6 +112,56 @@
       + (out.truncated ? ' · فهرست بریده شد (پرشمارترین‌ها)' : '');
   }
 
+  // ---------- زنجیرهٔ هشِ سابقه — SEC-02 ----------
+  //  فقط با دکمه (سنجش هزینه دارد) و فقط مدیرِ ارشد؛ همان سنجشِ scripts/verify-chain.js
+  async function verifyChain() {
+    const note = $('ops-chain-msg');
+    const btn = $('btn-ops-chain');
+    msg(note, '');
+    btn.disabled = true;
+    try {
+      const chain = $('ops-chain-name').value.trim();
+      const out = await call('POST', '/admin/system/chain-verify', { rows: $('ops-chain-rows').checked, ...(chain ? { chain } : {}) });
+      const R = out.reasons || {};
+      if (!out.total) {
+        msg(note, out.enabled ? 'زنجیره‌ای نیست.' : 'زنجیره‌ای نیست — پرچمِ security / hashchain.audit خاموش است.', 'warn');
+      } else if (out.ok) {
+        msg(note, `✔ هر ${fa(out.total)} زنجیره سالم است${out.rows ? ' (با ردیف‌های سابقه)' : ' (بی سنجشِ ردیف‌های سابقه)'}.`, 'ok');
+      } else {
+        msg(note, `✖ ${fa(out.brokenCount)} زنجیره از ${fa(out.total)} شکسته است.`, 'bad');
+      }
+      const body = $('ops-chains');
+      body.innerHTML = '';
+      for (const r of [...out.broken, ...out.healthy]) {
+        const tr = el('tr');
+        tr.dataset.chain = r.chain;
+        tr.appendChild(el('td', '', r.chain));
+        const st = el('td');
+        st.appendChild(el('span', `badge ${r.ok ? 'b-ok' : 'b-bad'}`, r.ok ? 'سالم' : 'شکسته'));
+        tr.appendChild(st);
+        tr.appendChild(el('td', '', fa(r.length)));
+        tr.appendChild(el('td', r.ok ? 'muted' : '', r.ok
+          ? `سر: ${r.head.slice(0, 16)}…`
+          : `نخستین حلقهٔ شکسته #${fa(r.seq)}: ${R[r.reason] || r.reason} (${r.reason})`));
+        body.appendChild(tr);
+      }
+      $('ops-chain-checked').textContent = `بررسی: ${dateTime(out.checkedAt)}`
+        + (out.truncated ? ` · فقط ${fa(out.healthy.length)} زنجیرهٔ سالم از ${fa(out.okCount)} نشان داده شد` : '');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function chainRole() {
+    const sup = adminRole === 'superadmin';
+    $('ops-chain-tools').classList.toggle('hidden', !sup);
+    $('ops-chain-super').classList.toggle('hidden', sup);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    $('btn-ops-chain').onclick = () => verifyChain().catch((err) => msg($('ops-chain-msg'), err.message, 'bad'));
+  });
+
   // ---------- بارِ زبانه ----------
   const OPS_PARTS = [
     [loadProviders, 'ops-prov-msg'],
@@ -119,6 +169,7 @@
   ];
 
   async function loadOps() {
+    chainRole();
     await Promise.all(OPS_PARTS.map(([fn, box]) => fn().catch((err) => msg($(box), err.message, 'bad'))));
   }
 

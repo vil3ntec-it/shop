@@ -997,6 +997,48 @@ await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» �
   await page.selectOption('#ib-rv-space', 'pending');
 });
 
+// ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────
+await step('عملیات: بررسیِ زنجیرهٔ هش؛ دست‌کاری با نخستین حلقهٔ شکسته و دلیل دیده می‌شود', async () => {
+  const store = require('../src/lib/hash-chain-store');
+  const live = require('../src/lib/live-config');
+  await live.set(store.FLAG_SCOPE, store.FLAG_AUDIT, true, 'panel-test');
+  const tamper = async (sql, params) => {
+    await query('ALTER TABLE hash_chain DISABLE TRIGGER hash_chain_immutable');
+    try { await query(sql, params); } finally { await query('ALTER TABLE hash_chain ENABLE TRIGGER hash_chain_immutable'); }
+  };
+  try {
+    const audit = require('../src/lib/audit');
+    for (const action of ['sale.create', 'sale.void']) {
+      await audit.log({ shopId: 'shp_panel_chain', actorType: 'user', userId: 'usr_panel', action, detail: { n: 1 } });
+    }
+    const chain = store.auditChainId({ shopId: 'shp_panel_chain', actorType: 'user', userId: 'usr_panel' });
+    await openTab('ops');
+    await page.waitForSelector('#ops-chain-tools:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ops-chain-name', chain);
+    await page.click('#btn-ops-chain');
+    await page.waitForSelector(`#ops-chains tr[data-chain="${chain}"]`, { timeout: 10_000 });
+    assert.match(await page.locator('#ops-chain-msg').textContent(), /✔/);
+    assert.match(await page.locator(`#ops-chains tr[data-chain="${chain}"]`).textContent(), /سالم.*سر:/);
+
+    const two = (await one('SELECT body FROM hash_chain WHERE chain=$1 AND seq=2', [chain])).body;
+    await tamper('UPDATE hash_chain SET body=$2 WHERE chain=$1 AND seq=2', [chain, two.replace('"sale.void"', '"sale.keep"')]);
+    try {
+      await page.click('#btn-ops-chain');
+      await page.waitForFunction(() => /✖/.test(document.getElementById('ops-chain-msg').textContent), null, { timeout: 10_000 });
+      const row = await page.locator(`#ops-chains tr[data-chain="${chain}"]`).textContent();
+      assert.match(row, /شکسته/);
+      assert.match(row, /#۲: متنِ حلقه با هشش نمی‌خواند \(hash_mismatch\)/);
+      assert.ok((await page.locator('#ops-chain-msg .msg').getAttribute('class')).includes('msg-bad'));
+      if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/sec-02-chain.png`, fullPage: true });
+    } finally {
+      await tamper('UPDATE hash_chain SET body=$2 WHERE chain=$1 AND seq=2', [chain, two]);
+    }
+    assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.chain_verified'`), 'بررسی سابقه نداشت');
+  } finally {
+    await live.set(store.FLAG_SCOPE, store.FLAG_AUDIT, false, 'panel-test');
+  }
+});
+
 // ── F0-27: کانالِ آزمایشی — مدیرِ ارشد از پنل دکان و دستگاه را می‌افزاید ──
 await step('کانالِ آزمایشی: ذخیره در live_config و سابقه؛ شناسهٔ ناجور پیامِ قرمز و بی‌تغییر', async () => {
   await openTab('plans');
