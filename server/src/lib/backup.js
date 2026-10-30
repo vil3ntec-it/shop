@@ -101,6 +101,10 @@ async function dump({ kind = 'manual', dir = null } = {}) {
     dump.on('close', resolve);
     dump.on('error', reject);
   });
+  //  pg_dump اجرا نشد (ENOENT/EACCES) ⇒ `closed` پیش از `await closed` ِ پایین رد می‌شود؛ بی این
+  //  شنونده همان لحظه «unhandledRejection» است و Node ِ پیش‌فرض کلِ سرور را می‌خواباند. خطا همان‌جا
+  //  پایین (`await closed`) بالا می‌رود، نه این‌جا.
+  closed.catch(() => {});
 
   const gzip = zlib.createGzip({ level: 6 });
 
@@ -144,7 +148,13 @@ async function dump({ kind = 'manual', dir = null } = {}) {
     await pipeline(dump.stdout, counter, gzip, file);
   }
 
-  const code = await closed;
+  let code;
+  try {
+    code = await closed;
+  } catch (e) {
+    await fsp.rm(tmp, { force: true });
+    throw new Error(`pg_dump اجرا نشد: ${e.message}`);
+  }
   if (code !== 0) {
     await fsp.rm(tmp, { force: true });
     throw new Error(`pg_dump شکست خورد: ${stderr.trim().slice(0, 300)}`);
@@ -279,6 +289,9 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
       { stdio: ['pipe', 'pipe', 'pipe'] });
     let err = '';
     psql.stderr.on('data', d => { err += d.toString(); });
+    //  psql اجرا نشد ⇒ رویدادِ 'error' بی شنونده کلِ سرور را می‌خواباند؛ همان شکستِ بازیابی است
+    psql.on('error', e => reject(new Error(`بازیابی شکست خورد: psql اجرا نشد: ${e.message}`)));
+    psql.stdin.on('error', () => {}); // EPIPE وقتی psql نیست — خطای اصلی همان 'error' ِ بالاست
     psql.on('close', code => code === 0
       ? resolve({ ok: true, bytes: sql.length })
       : reject(new Error(`بازیابی شکست خورد: ${err.trim().slice(0, 500)}`)));
