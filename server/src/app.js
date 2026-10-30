@@ -129,6 +129,23 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  /*
+   *  ⛔ TEN-02 (cache) — پاسخِ درخواستِ دارای اعتبارنامه هرگز در کشِ مشترک (CDN، پراکسیِ
+   *  کش‌دار، قاعدهٔ «همه را کش کن») نمی‌نشیند: پیش‌فرضِ `private, no-cache` و `Vary`
+   *  روی همان سرآیندها. مسیری که خودش Cache-Control می‌گذارد (‎no-store‎، ‎private,
+   *  max-age‎، ETag ِ فاکتور…) پس از این می‌نویسد و همان می‌ماند. `tenant-surfaces.test.js`.
+   */
+  const CREDENTIALS = ['authorization', 'x-store-session', 'x-store-ticket'];
+  app.use('/api', (req, res, next) => {
+    if (CREDENTIALS.some((k) => req.headers[k])) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.vary('Authorization');
+      res.vary('X-Store-Session');
+      res.vary('X-Store-Ticket');
+    }
+    next();
+  });
+
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
