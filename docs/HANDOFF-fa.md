@@ -54,6 +54,14 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-4` (OPS-02: عبارتِ بازیابیِ فروشگاه — منطق و رمز)
+- انجام شد: `core/.../core/backup/RecoveryPhrase.kt` (ساخت، خواندن با هر شکلِ نوشتن و رقمِ فارسی، وارسیِ غلطِ تایپی، KID ِ
+  `rp1.<تکرار>.<نمک>` با بازهٔ امن) و `android-native/.../core/atrest/platform/PhraseBackup.kt` (PBKDF2-HMAC-SHA256 ۶۰۰ هزار + همان
+  پاکتِ AES-GCM ِ `AtRestEnvelope`). بردارِ ثابتِ کلید و پاکت با Python (`hashlib` + `cryptography`) ساخته و در هر دو آزمون قفل شد.
+- نیمه‌کاره (عمداً، برشِ بعد): صفحهٔ «عبارتِ بازیابی» (یک بار نشان دادن و چاپ)، نگه داشتنِ کلیدِ ساخته‌شده زیرِ Keystore/DPAPI،
+  رمز کردنِ `auto-*.json`، خروجیِ USB/SD با یک لمس (SAF) و بازیابی با عبارت روی دستگاهِ تازه.
+- قدمِ بعدی: پاسخِ صاحب محصول به شکلِ عبارت (۲۵ نویسهٔ لاتین یا واژه‌های فارسی) و چاپ؛ سپس صفحه و سیم‌کشی.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
