@@ -7,6 +7,7 @@ import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,7 +59,11 @@ internal fun RouteScope.OrdersRoute() {
   val wide = desk
   var selected by rememberSaveable { mutableStateOf<String?>(null) }
   val perms = cfg?.permissions ?: OrderPermsDto()
-  val state = ctl.state.copy(perms = perms, counts = OrdersLive.counts.value)
+  val notes = OrderFulfillNotes.queue(
+    rollout = OrdersLive.rolloutNotice(), review = OrdersLive.review.value, unposted = OrdersLive.unposted.value,
+    waiting = OrdersLive.waiting.value, shortfalls = OrdersLive.shortfalls.value, canRefund = perms.refund,
+  )
+  val state = ctl.state.copy(perms = perms, counts = OrdersLive.counts.value, notes = notes)
   val actions = QueueActions(
     onTab = ctl::selectTab,
     onOpen = { o -> if (wide) selected = o.id else nav.open(OnlinePaths.order(o.id)) },
@@ -66,6 +71,13 @@ internal fun RouteScope.OrdersRoute() {
     onNew = { nav.open(OnlinePaths.NEW_ORDER) },
     onRetry = ctl::reload,
     onMore = ctl::more,
+    onNote = { n ->
+      when (n.act) {
+        OrderFulfillNotes.Act.RETRY_ALL -> scope.launch { OrdersLive.reconcile(context, store, force = true) }
+        OrderFulfillNotes.Act.OPEN_REVIEW -> n.orderId?.let { if (wide) selected = it else nav.open(OnlinePaths.order(it)) }
+        else -> Unit
+      }
+    },
   )
   //  کامپیوتر: Ctrl+N همان «سفارشِ دستی»
   val create by rememberUpdatedState(perms.create)
@@ -107,9 +119,18 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
     OrdersHub.fetch(context, id).onSuccess { error = null }.onFailure { if (OrdersHub.known[id] == null) error = it.userMessage }
   }
   val order = OrdersHub.known[id]
+  val ledger by store.data.collectAsState()
+  val perms = cfg?.permissions ?: OrderPermsDto()
+  val notes = order?.let { o ->
+    OrderFulfillNotes.detail(
+      ledger, o, OrdersLive.review.value, OrdersLive.unposted.value, OrdersLive.handoverSince(),
+      manage = perms.manage, canRefund = perms.refund, canRecord = OrdersLive.canRecord(cfg, o),
+      canReverse = OrdersLive.canReverse(cfg, o), waiting = OrdersLive.isWaiting(o.id),
+    )
+  }.orEmpty()
   val state = DetailState(
     order = order, loading = order == null && error == null, error = error, stale = OrdersHub.stale[id] == true,
-    perms = cfg?.permissions ?: OrderPermsDto(), now = System.currentTimeMillis(), busy = busy, failure = failure,
+    perms = perms, now = System.currentTimeMillis(), busy = busy, failure = failure, notes = notes,
   )
   val actions = DetailActions(
     onRetry = { error = null; reload++ },
@@ -119,10 +140,12 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       if (o != null) {
         if (OrdersModel.needsSheet(to)) nav.open(OnlinePaths.action(o.id, to))
         else if (busy == null) {
+          val blocked = OrdersHub.preflight(context, store, o, to)
+          if (blocked != null) { failure = blocked; return@DetailActions }
           busy = to
           failure = null
           scope.launch {
-            OrdersHub.transition(context, o, to)
+            OrdersHub.transition(context, store, o, to, say = { toasts.show(it) })
               .onSuccess { toasts.show(StrOnline.movedTo(it.orderNo, StrOnline.orderStatus(it.status))) }
               .onFailure { f -> if (f.code != "status_changed") failure = f.userMessage }
             busy = null
@@ -142,6 +165,17 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       toasts.show(StrOnline.numberCopied)
     },
     onMap = { link -> runCatching { uri.openUri(link) } },
+    onNote = { n ->
+      val o = order
+      if (o != null && busy == null && (n.act == OrderFulfillNotes.Act.POST || n.act == OrderFulfillNotes.Act.ACK)) {
+        busy = n.key
+        scope.launch {
+          val msg = if (n.act == OrderFulfillNotes.Act.POST) OrdersHub.postSale(context, store, o) else OrdersHub.ackReview(context, o)
+          msg?.let { toasts.show(it) }
+          busy = null
+        }
+      }
+    },
   )
   OrderDetailScreen(state, actions, onBack = if (embedded) null else backOrNull)
 }
@@ -170,10 +204,12 @@ internal fun RouteScope.OrderActionRoute() {
     error = error,
     onDismiss = { back() },
     onConfirm = { f ->
+      val blocked = OrdersHub.preflight(context, store, order, to)
+      if (blocked != null) { error = blocked; return@OrderActionSheet }
       busy = true
       error = null
       scope.launch {
-        OrdersHub.transition(context, order, to, f.reason, f.note, OrderActionModel.readyOf(to, f))
+        OrdersHub.transition(context, store, order, to, f.reason, f.note, OrderActionModel.readyOf(to, f), say = { toasts.show(it) })
           .onSuccess {
             Haptics.success(context)
             toasts.show(StrOnline.movedTo(it.orderNo, StrOnline.orderStatus(it.status)))

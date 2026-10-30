@@ -62,6 +62,8 @@ data class DetailState(
   val busy: String? = null,
   /** خطای آخرین گذارِ مستقیم — با لرزش زیرِ نوار */
   val failure: String? = null,
+  /** فروشِ تحویل (`OrderFulfillNotes.detail`) */
+  val notes: List<OrderFulfillNotes.Note> = emptyList(),
 )
 
 class DetailActions(
@@ -72,6 +74,7 @@ class DetailActions(
   val onCall: (String) -> Unit,
   val onCopy: (String) -> Unit,
   val onMap: (String) -> Unit,
+  val onNote: (OrderFulfillNotes.Note) -> Unit = {},
 )
 
 /**
@@ -103,6 +106,12 @@ fun OrderDetailScreen(state: DetailState, actions: DetailActions, onBack: (() ->
           V3Message(V3Tone.WARNING, StrOnline.staleStatus, Modifier.padding(top = 8.dp), action = StrOnline.reload, onAction = actions.onReload)
         }
         HeaderCard(o, state.now)
+        state.notes.forEach { n ->
+          V3Message(
+            if (n.warn) V3Tone.WARNING else V3Tone.INFO, n.title, Modifier.padding(top = 8.dp),
+            body = n.body.takeIf { it.isNotBlank() }, action = n.actLabel.takeIf { n.act != null }, onAction = { actions.onNote(n) },
+          )
+        }
         CustomerSection(o, actions)
         if (o.fulfillment == "delivery") AddressSection(o, actions)
         Spacer(Modifier.height(16.dp))

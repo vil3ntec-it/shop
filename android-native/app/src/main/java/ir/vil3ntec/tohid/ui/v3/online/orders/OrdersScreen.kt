@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -47,6 +48,8 @@ data class QueueState(
   val now: Long = 0L,
   /** تازه‌رسیده‌ها (درخششِ «در انتظارِ تأیید») */
   val fresh: Set<String> = emptySet(),
+  /** هشدارهای فروشِ تحویل (`OrderFulfillNotes.queue`) */
+  val notes: List<OrderFulfillNotes.Note> = emptyList(),
 )
 
 class QueueActions(
@@ -56,6 +59,7 @@ class QueueActions(
   val onNew: () -> Unit,
   val onRetry: () -> Unit,
   val onMore: () -> Unit,
+  val onNote: (OrderFulfillNotes.Note) -> Unit = {},
 )
 
 /**
@@ -93,6 +97,12 @@ fun OrdersScreen(
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
       item(key = "live-note") { V3Message(V3Tone.INFO, StrOnline.liveNote) }
+      items(state.notes, key = { "ff-" + it.key }) { n ->
+        V3Message(
+          V3Tone.WARNING, n.title, body = n.body.takeIf { it.isNotBlank() },
+          action = n.actLabel.takeIf { n.act != null }, onAction = { actions.onNote(n) },
+        )
+      }
       when {
         state.loading && state.items.isEmpty() -> item(key = "skeleton") { V3Skeleton(rows = 4) }
         state.error != null && state.items.isEmpty() -> item(key = "error") {
