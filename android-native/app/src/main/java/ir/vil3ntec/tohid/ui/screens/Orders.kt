@@ -36,10 +36,13 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
+import ir.vil3ntec.tohid.core.pick.PickText
 import ir.vil3ntec.tohid.data.OrderFulfillment
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
+import ir.vil3ntec.tohid.data.repo.PickingRepository
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
@@ -86,6 +89,8 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var error by remember { mutableStateOf<String?>(null) }
   var openId by remember { mutableStateOf<String?>(null) }
   var creating by remember { mutableStateOf(false) }
+  //  برگهٔ جمع‌آوری (PCK، پرچمِ `shop.orders.picking`)
+  var pickFor by remember { mutableStateOf<OrderDto?>(null) }
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   val rev = OrdersLive.rev.value
@@ -229,6 +234,15 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
       onClose = { openId = null },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
+      onPick = { o -> openId = null; pickFor = o },
+    )
+  }
+  pickFor?.let { o ->
+    PickSheet(
+      orderId = o.id, orderNo = o.orderNo, repo = remember(context) { PickingRepository(Backend.api(context)) },
+      buzz = { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) },
+      onClose = { pickFor = null; openId = o.id },
+      onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
   }
   if (creating) {
@@ -367,6 +381,7 @@ private fun OrderDetailSheet(
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
   onChanged: () -> Unit,
+  onPick: (OrderDto) -> Unit = {},
 ) {
   val c = Shop.colors
   val context = LocalContext.current
@@ -527,10 +542,15 @@ private fun OrderDetailSheet(
         )
       }
 
-      val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
-      if (actions.isNotEmpty()) {
+      //  جمع‌آوری (PCK): با پرچم، «جمع‌آوری» و «بسته‌بندی» فقط از برگه (کسرِ خودکار، برچسب)
+      val actions = PickText.orderActions(
+        OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund), cfg.picking,
+      )
+      val pickable = cfg.picking && PickText.canPick(o.status, cfg.permissions.manage)
+      if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (pickable) TohidButton(PickText.pickAction(o.status), onClick = { onPick(o) }, enabled = !busy)
           actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
