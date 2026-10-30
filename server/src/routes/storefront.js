@@ -18,6 +18,7 @@ const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
+const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
@@ -59,11 +60,11 @@ const customer = wrap(async (req, res, next) => {
 });
 
 router.get('/:slug', readLimit, store, wrap(async (req, res) => {
-  const [cats, status, delivery] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
+  const [cats, status, delivery, media] = await Promise.all([
+    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store), sfm.publicView(req.store),
   ]);
   res.json({
-    store: { ...sf.profile(req.store, cats, status), delivery },
+    store: { ...sf.profile(req.store, cats, status), delivery, media },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -115,6 +116,19 @@ const picture = (size) => wrap(async (req, res) => {
   if (req.get('if-none-match') === etag) return res.status(304).end();
   res.type(p.mime || sniff(p.data) || 'application/octet-stream').send(p.data);
 });
+//  ── M3: لوگو و تصویرِ سر — فقط نسخهٔ جاری. نشانی نسخه‌دار است ولی کشِ عمومی
+//  یک روز می‌ماند (نه immutable) تا «برداشتنِ» عکس دیر یا زود به همه برسد ──
+router.get('/:slug/media/:kind/:version', readLimit, store, wrap(async (req, res) => {
+  const kind = String(req.params.kind);
+  const f = sfm.KINDS.includes(kind) && await sfm.flagOn(req.store.shop_id)
+    ? await sfm.file(req.store.shop_id, kind, req.params.version, { onlyCurrent: true }) : null;
+  if (!f) throw notFound('عکس نیست', 'media_not_found');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('ETag', `"${f.hash}"`);
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.get('if-none-match') === `"${f.hash}"`) return res.status(304).end();
+  res.type(f.mime).send(f.data);
+}));
 router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
 router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
 

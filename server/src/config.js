@@ -333,6 +333,8 @@ const config = {
     receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
     //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
     receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
+    //  M3: بارگذاریِ لوگو/تصویرِ سرِ ویترین به‌ازای دکان در شبانه‌روز (دو نسخهٔ آخر می‌مانند؛ سقف بارِ دیسک را می‌بندد)
+    storefrontMediaDailyMax: num(process.env.RATE_STOREFRONT_MEDIA_DAILY_MAX, 30),
   },
 
   /**
