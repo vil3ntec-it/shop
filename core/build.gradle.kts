@@ -13,7 +13,8 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  *    `desktop/build.gradle.kts` است — سه‌تا با هم عوض می‌شوند.
  *  • آزمون‌ها فعلاً همان‌جا که بودند (`android-native/app/src/test`) می‌مانند و
  *    در هر دو برنامه روی همین کتابخانه اجرا می‌شوند؛ انتقالشان به
- *    `commonTest` قدمِ ۱ِ مسیرِ انتقال است.
+ *    `commonTest` قدمِ ۱ِ مسیرِ انتقال است. آزمونِ کدِ تازهٔ commonMain از همین
+ *    حالا در `src/commonTest` است (`:core:jvmTest`؛ CI: «توحید بومی»).
  *  ──────────────────────────────────────────────────────────────────
  */
 plugins {
@@ -38,8 +39,6 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
-  //  آزمون‌های commonTest (Kotlin ِ خالص، بی دستگاه): روی jvm با `jvmTest` و در آیفون با iosTest.
-  //  فقط kotlin-test از Maven Central — همان قاعدهٔ «بی مخزنِ گوگل» ِ settings.gradle.kts.
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
   if (iosSpike) {
     iosArm64()
