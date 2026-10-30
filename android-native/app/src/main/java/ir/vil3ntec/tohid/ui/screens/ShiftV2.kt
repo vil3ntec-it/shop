@@ -49,6 +49,8 @@ import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShift
 
 /*
  *  صندوقِ شیفت با هستهٔ pay-core (PAY-11..15، 19؛ S12) — فقط با پرچمِ `ShopPolicy.payV2`.
@@ -56,11 +58,23 @@ import kotlinx.coroutines.launch
  *  دلیل، کشو بی فروش با تأییدِ صاحب/مدیر، گزارشِ X، بستن با شمارشِ اسکناس و Z.
  *  شمارشِ کور: شاگرد (صندوقدار) مبلغِ مورد انتظار و اختلاف را نمی‌بیند؛ صاحب و مدیر می‌بینند.
  *  خاموش ⇒ این‌جا صدا زده نمی‌شود و همان کارتِ `CashShift`ِ امروز در `SalesHistory` است.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrShift` (LOC-06)؛ یادداشتِ سابقه و «تأیید» ِ ذخیره‌شده داده‌اند و فارسی می‌مانند.
  */
 
+/** نامِ دلیل در یادداشتِ سابقه (داده، همیشه فارسی)؛ برای صفحه [moveLabel] */
 private val MOVE_LABEL = mapOf(
-  "deposit" to "واریز به دخل", "owner_withdrawal" to "برداشتِ مالک", "petty_expense" to "پرداختِ کوچک", "other" to "دیگر",
+  "deposit" to "واریز به دخل", "owner_withdrawal" to "برداشتِ مالک", "petty_expense" to "پرداختِ کوچک", "other" to "دیگر", // داده: یادداشتِ سابقهٔ صندوق
 )
+
+/** نامِ دلیلِ ورود/خروج روی دکمه، به زبانِ صفحه */
+private fun moveLabel(reason: String): String = when (reason) {
+  "deposit" -> StrShift.moveDeposit
+  "owner_withdrawal" -> StrShift.moveOwnerWithdrawal
+  "petty_expense" -> StrShift.movePettyExpense
+  "other" -> StrShift.moveOther
+  else -> reason
+}
 
 private fun afn(m: Long?): String = "${money(PayFlow.major(m ?: 0))} ؋"
 
@@ -80,14 +94,14 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   var showReport by remember { mutableStateOf<ShiftReport?>(null) }
 
   fun save(row: AuditEntry, done: String) {
-    scope.launch { if (store.save(d.copy(auditLog = d.auditLog + row))) toast(done) else toast("ذخیره نشد") }
+    scope.launch { if (store.save(d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
   }
 
   Panel {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
         Text(
-          if (shift == null) "صندوق بسته است" else "صندوق باز — از ${formatMillis(shift.open.createdAt)}",
+          if (shift == null) StrShift.registerClosed else StrShift.registerOpenSince(formatMillis(shift.open.createdAt)),
           style = MaterialTheme.typography.titleSmall, color = Shop.colors.text,
         )
         when (val r = x) {
@@ -95,12 +109,12 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           is PayFlow.Outcome.Bad -> Text(PayFlow.message(r.problem), style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
           is PayFlow.Outcome.Ok -> {
             Text(
-              if (staff) "شمارشِ کور: مبلغِ مورد انتظار پس از بستن به مدیر نشان داده می‌شود"
-              else "نقدِ مورد انتظار در دخل: ${afn(r.value.report.expected?.get(PayFlow.CASH))}",
+              if (staff) StrShift.blindNote
+              else StrShift.expectedInDrawer(afn(r.value.report.expected?.get(PayFlow.CASH))),
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
             )
             if (r.value.skipped.isNotEmpty()) {
-              StatusPill("${r.value.skipped.size} خروجِ دفتر بیش از نقدِ دخل — بررسیِ مدیر", PillTone.WARNING)
+              StatusPill(StrShift.skippedOuts(r.value.skipped.size), PillTone.WARNING)
             }
           }
         }
@@ -108,14 +122,14 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     }
     Spacer(Modifier.height(8.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-      TextButton(onClick = { history = true }) { Text("سابقه") }
+      TextButton(onClick = { history = true }) { Text(StrShift.history) }
       if (shift != null) {
-        OutlinedButton(onClick = { moveMode = "cash_out" }) { Text("ورود/خروجِ نقد") }
-        OutlinedButton(onClick = { moveMode = "no_sale" }) { Text("کشو بی فروش") }
-        OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast("گزارش ساخته نشد") }) { Text("گزارش X") }
-        Button(onClick = { closeDialog = true }) { Text("بستن صندوق") }
+        OutlinedButton(onClick = { moveMode = "cash_out" }) { Text(StrShift.cashInOut) }
+        OutlinedButton(onClick = { moveMode = "no_sale" }) { Text(StrShift.noSale) }
+        OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast(StrShift.reportFailed) }) { Text(StrShift.xReport) }
+        Button(onClick = { closeDialog = true }) { Text(StrShift.closeRegister) }
       } else {
-        Button(onClick = { openDialog = true }) { Text("باز کردن") }
+        Button(onClick = { openDialog = true }) { Text(StrShift.openRegister) }
       }
     }
   }
@@ -126,10 +140,10 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     AlertDialog(
       onDismissRequest = { openDialog = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("باز کردنِ صندوق", color = Shop.colors.text) },
+      title = { Text(StrShift.openRegisterTitle, color = Shop.colors.text) },
       text = {
         OutlinedTextField(
-          value = amount, onValueChange = { amount = numericInput(it) }, label = { Text("پولِ اولِ صندوق") }, singleLine = true,
+          value = amount, onValueChange = { amount = numericInput(it) }, label = { Text(StrShift.openingCash) }, singleLine = true,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
         )
       },
@@ -137,11 +151,11 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         TextButton(onClick = {
           when (val r = CashShift.open(d, amount.toDoubleOrNull() ?: Double.NaN, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
             is CashShift.Result.Failed -> toast(r.message)
-            is CashShift.Result.Ok -> { scope.launch { store.save(r.data) }; toast("صندوق باز شد"); openDialog = false }
+            is CashShift.Result.Ok -> { scope.launch { store.save(r.data) }; toast(StrShift.registerOpened); openDialog = false }
           }
-        }) { Text("باز کن") }
+        }) { Text(StrShift.openIt) }
       },
-      dismissButton = { TextButton(onClick = { openDialog = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { openDialog = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -158,39 +172,39 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     AlertDialog(
       onDismissRequest = { moveMode = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text(if (noSale) "باز کردنِ کشو بی فروش" else "ورود/خروجِ نقد", color = Shop.colors.text) },
+      title = { Text(if (noSale) StrShift.noSaleTitle else StrShift.cashInOut, color = Shop.colors.text) },
       text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
           if (!noSale) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              listOf("cash_out" to "خروج از دخل", "cash_in" to "ورود به دخل").forEach { (k, l) ->
+              listOf("cash_out" to StrShift.outOfDrawer, "cash_in" to StrShift.intoDrawer).forEach { (k, l) ->
                 if (k == mode) Button(onClick = {}, modifier = Modifier.weight(1f)) { Text(l) }
                 else OutlinedButton(onClick = { mode = k }, modifier = Modifier.weight(1f)) { Text(l) }
               }
             }
             Spacer(Modifier.height(8.dp))
-            Text("دلیل", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+            Text(StrShift.reason, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               ShiftCore.MOVE_REASONS[mode].orEmpty().forEach { r ->
-                if (r == reason) Button(onClick = {}) { Text(MOVE_LABEL[r] ?: r) }
-                else OutlinedButton(onClick = { reason = r }) { Text(MOVE_LABEL[r] ?: r) }
+                if (r == reason) Button(onClick = {}) { Text(moveLabel(r)) }
+                else OutlinedButton(onClick = { reason = r }) { Text(moveLabel(r)) }
               }
             }
             OutlinedTextField(
-              value = amount, onValueChange = { amount = numericInput(it) }, label = { Text("مبلغ (افغانی)") }, singleLine = true,
+              value = amount, onValueChange = { amount = numericInput(it) }, label = { Text(StrShift.amountAfn) }, singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
             )
           }
           OutlinedTextField(
             value = note, onValueChange = { note = it },
-            label = { Text(if (noSale) "دلیلِ باز کردنِ کشو" else "توضیح (برای «دیگر» لازم)") },
+            label = { Text(if (noSale) StrShift.noSaleReason else StrShift.noteForOther) },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
           )
           if (noSale) {
             Spacer(Modifier.height(6.dp))
             Text(
-              if (staff) "باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد؛ با حسابِ صاحب یا مدیر وارد شوید."
-              else "تأییدکننده: ${me.ifBlank { "همین حساب" }} — کشوِ برقی هنوز وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.",
+              if (staff) StrShift.noSaleNeedsApproval
+              else StrShift.noSaleApprover(me.ifBlank { StrShift.thisAccount }),
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
             )
           }
@@ -199,22 +213,22 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       },
       confirmButton = {
         TextButton(enabled = !(noSale && staff), onClick = {
-          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = if (staff) "" else me.ifBlank { "صاحب/مدیر" })
+          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = if (staff) "" else me.ifBlank { "صاحب/مدیر" }) // داده: «تأیید» ِ ذخیره‌شده در ردیفِ کشو
           else PayFlow.Move(mode, amount, reason, note, by = me)
           when (val r = PayFlow.moveRow(d, sh.open, m, System.currentTimeMillis(), ::newId)) {
             is PayFlow.Outcome.Bad -> error = PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val row = r.value
-              val notes = if (noSale) "کشو بی فروش — ${note.trim()}" + (row.approvedBy?.let { " — تأیید: $it" } ?: "")
-              else "${if (mode == "cash_in") "ورود به دخل" else "خروج از دخل"}: ${MOVE_LABEL[row.reason] ?: row.reason} — ${money(row.amount)} افغانی" +
+              val notes = if (noSale) "کشو بی فروش — ${note.trim()}" + (row.approvedBy?.let { " — تأیید: $it" } ?: "") // داده: یادداشتِ سابقهٔ صندوق
+              else "${if (mode == "cash_in") "ورود به دخل" else "خروج از دخل"}: ${MOVE_LABEL[row.reason] ?: row.reason} — ${money(row.amount)} افغانی" + // داده: یادداشتِ سابقهٔ صندوق
                 (row.note?.let { " — $it" } ?: "") + (if (me.isNotBlank()) " — $me" else "")
-              save(row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), if (noSale) "باز کردنِ کشو ثبت شد" else "ثبت شد")
+              save(row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), if (noSale) StrShift.noSaleRecorded else StrShift.recorded)
               moveMode = null
             }
           }
-        }) { Text("ثبت") }
+        }) { Text(StrShift.record) }
       },
-      dismissButton = { TextButton(onClick = { moveMode = null }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { moveMode = null }) { Text(Str.cancel) } },
     )
   }
 
@@ -227,12 +241,12 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     AlertDialog(
       onDismissRequest = { closeDialog = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("بستنِ صندوق — شمارشِ اسکناس", color = Shop.colors.text) },
+      title = { Text(StrShift.closeCountTitle, color = Shop.colors.text) },
       text = {
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
           Text(
-            if (staff) "شمارشِ کور: اسکناس‌ها را بشمارید؛ مبلغِ مورد انتظار پس از بستن به مدیر نشان داده می‌شود."
-            else "نقدِ مورد انتظار: ${x?.valueOrNull()?.let { afn(it.report.expected?.get(PayFlow.CASH)) } ?: "—"}",
+            if (staff) StrShift.blindCountNote
+            else StrShift.expectedCash(x?.valueOrNull()?.let { afn(it.report.expected?.get(PayFlow.CASH)) } ?: "—"),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
           )
           Spacer(Modifier.height(6.dp))
@@ -251,11 +265,11 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
             }
           }
           Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("نقدِ شمرده", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+            Text(StrShift.countedCash, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
             Text(afn(PayFlow.countTotal(parsed)), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
           }
           OutlinedTextField(
-            value = reason, onValueChange = { reason = it }, label = { Text("دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)") },
+            value = reason, onValueChange = { reason = it }, label = { Text(StrShift.varianceReasonLabel) },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
           )
           error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
@@ -264,22 +278,22 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       confirmButton = {
         TextButton(onClick = {
           when (val r = PayFlow.closeRow(d, shift.open, PayFlow.Count(parsed, by = me, blind = staff, reason = reason), System.currentTimeMillis(), ::newId)) {
-            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") "اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید" else PayFlow.message(r.problem)
+            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") StrShift.varianceReasonRequired else PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val z = r.value.report
               val vc = z.variance?.get(PayFlow.CASH) ?: 0L
               val extra = listOf(reason.trim(), me.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
-              val notes = "بستنِ صندوق: مورد انتظار ${money(PayFlow.major(z.expected?.get(PayFlow.CASH) ?: 0))}، شمرده ${money(r.value.row.amount)}، " +
-                (if (vc == 0L) "بی اختلاف" else if (vc > 0) "اضافه ${money(PayFlow.major(vc))}" else "کسری ${money(PayFlow.major(-vc))}") +
+              val notes = "بستنِ صندوق: مورد انتظار ${money(PayFlow.major(z.expected?.get(PayFlow.CASH) ?: 0))}، شمرده ${money(r.value.row.amount)}، " + // داده: یادداشتِ سابقهٔ صندوق
+                (if (vc == 0L) "بی اختلاف" else if (vc > 0) "اضافه ${money(PayFlow.major(vc))}" else "کسری ${money(PayFlow.major(-vc))}") + // داده: یادداشتِ سابقهٔ صندوق
                 (if (extra.isNotEmpty()) " — $extra" else "")
-              save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), "صندوق بسته شد")
+              save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), StrShift.registerClosedNow)
               closeDialog = false
               showReport = z
             }
           }
-        }) { Text("ببند") }
+        }) { Text(StrShift.closeIt) }
       },
-      dismissButton = { TextButton(onClick = { closeDialog = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { closeDialog = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -288,9 +302,9 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     AlertDialog(
       onDismissRequest = { showReport = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text(if (rep.kind == "Z") "گزارش Z (پایانِ شیفت)" else "گزارش X (میانِ شیفت)", color = Shop.colors.text) },
+      title = { Text(if (rep.kind == "Z") StrShift.zReportTitle else StrShift.xReportTitle, color = Shop.colors.text) },
       text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) { ShiftReportLines(if (staff) ShiftCore.cashierView(rep) else rep) } },
-      confirmButton = { TextButton(onClick = { showReport = null }) { Text("بستن") } },
+      confirmButton = { TextButton(onClick = { showReport = null }) { Text(Str.close) } },
     )
   }
 
@@ -300,24 +314,24 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     AlertDialog(
       onDismissRequest = { history = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("سابقهٔ صندوق", color = Shop.colors.text) },
+      title = { Text(StrShift.registerHistory, color = Shop.colors.text) },
       text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-          if (shifts.isEmpty()) Text("هنوز صندوقی باز نشده.", color = Shop.colors.muted)
+          if (shifts.isEmpty()) Text(StrShift.noShiftsYet, color = Shop.colors.muted)
           shifts.forEach { sh ->
             Text(formatMillis(sh.open.createdAt) + " — " + sh.open.notes, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
             Text(
-              sh.close?.let { formatMillis(it.createdAt) + " — " + it.notes } ?: "هنوز باز است",
+              sh.close?.let { formatMillis(it.createdAt) + " — " + it.notes } ?: StrShift.stillOpen,
               style = MaterialTheme.typography.labelSmall, color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
             )
             sh.close?.z?.let { PayFlow.reportOf(it) }?.let { z ->
-              TextButton(onClick = { history = false; showReport = z }) { Text("گزارش Z") }
+              TextButton(onClick = { history = false; showReport = z }) { Text(StrShift.zReport) }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           }
         }
       },
-      confirmButton = { TextButton(onClick = { history = false }) { Text("بستن") } },
+      confirmButton = { TextButton(onClick = { history = false }) { Text(Str.close) } },
     )
   }
 }
@@ -332,34 +346,34 @@ private fun ShiftReportLines(rep: ShiftReport) {
       Text(value, style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall, color = Shop.colors.text)
     }
   }
-  line("باز شد", formatMillis(rep.openedAt))
-  line(if (rep.kind == "Z") "بسته شد" else "زمانِ گزارش", formatMillis(rep.at))
-  rep.by?.let { line("کاربر", it) }
-  line("اولِ صندوق", afn(rep.float))
+  line(StrShift.opened, formatMillis(rep.openedAt))
+  line(if (rep.kind == "Z") StrShift.closed else StrShift.reportTime, formatMillis(rep.at))
+  rep.by?.let { line(StrShift.user, it) }
+  line(StrShift.openingFloat, afn(rep.float))
   rep.methods.forEach { (id, m) ->
-    if (m.sales != 0L) line("${PayFlow.methodName(id)} — فروش", afn(m.sales))
-    if (m.receipts != 0L) line("${PayFlow.methodName(id)} — رسیدِ قرض‌داران", afn(m.receipts))
-    if (m.refunds != 0L) line("${PayFlow.methodName(id)} — مرجوعی", "−" + afn(m.refunds))
+    if (m.sales != 0L) line(StrShift.methodSales(PayFlow.methodName(id)), afn(m.sales))
+    if (m.receipts != 0L) line(StrShift.methodReceipts(PayFlow.methodName(id)), afn(m.receipts))
+    if (m.refunds != 0L) line(StrShift.methodRefunds(PayFlow.methodName(id)), "−" + afn(m.refunds))
   }
-  line("ورود به دخل", afn(rep.moves.cashIn))
-  line("خروج از دخل", "−" + afn(rep.moves.cashOut))
-  line("کشو بی فروش", "${rep.events.noSale} بار")
-  rep.expected?.forEach { (id, v) -> line("مورد انتظار — ${PayFlow.methodName(id)}", afn(v), id == PayFlow.CASH) }
+  line(StrShift.intoDrawer, afn(rep.moves.cashIn))
+  line(StrShift.outOfDrawer, "−" + afn(rep.moves.cashOut))
+  line(StrShift.noSale, StrShift.times(rep.events.noSale))
+  rep.expected?.forEach { (id, v) -> line(StrShift.expectedOf(PayFlow.methodName(id)), afn(v), id == PayFlow.CASH) }
   if (rep.kind == "Z") {
     rep.denominations?.entries?.sortedByDescending { it.key.toLongOrNull() ?: 0 }?.forEach { (k, n) ->
       line("${money(PayFlow.major(k.toLongOrNull() ?: 0))} × $n", afn((k.toLongOrNull() ?: 0) * n))
     }
-    line("نقدِ شمرده", afn(rep.counted?.get(PayFlow.CASH)), true)
+    line(StrShift.countedCash, afn(rep.counted?.get(PayFlow.CASH)), true)
     rep.variance?.forEach { (id, v) ->
       line(
-        "اختلاف — ${PayFlow.methodName(id)}",
-        when { v == null -> "شمرده نشد"; v == 0L -> "بی اختلاف"; v > 0 -> "اضافه ${afn(v)}"; else -> "کسری ${afn(-v)}" },
+        StrShift.varianceOf(PayFlow.methodName(id)),
+        when { v == null -> StrShift.notCounted; v == 0L -> StrShift.noDifference; v > 0 -> StrShift.over(afn(v)); else -> StrShift.shortBy(afn(-v)) },
       )
     }
-    rep.reason?.let { line("دلیلِ اختلاف", it) }
+    rep.reason?.let { line(StrShift.varianceReason, it) }
     if (rep.needsReview == true) {
       Spacer(Modifier.height(4.dp))
-      StatusPill("اختلاف خودکار اصلاح نمی‌شود — برای بررسیِ مدیر ثبت شد", PillTone.WARNING)
+      StatusPill(StrShift.notAutoFixed, PillTone.WARNING)
     }
   }
 }
