@@ -50,6 +50,18 @@ data class Product(
    */
   val saleUnit: String = "",
   val unitFactor: Double = 1.0,
+  /*
+   *  INV-12 — نقطهٔ سفارش و بیشینهٔ موجودی (به همان `unit`). افزودنی: `null` = تعریف نشده و
+   *  نوشته نمی‌شود (`NEVER`) تا ردیفِ قدیمی بایت‌به‌بایت همان بماند. فقط وقتی «نقطهٔ سفارش و
+   *  بیشینه» در تنظیمات روشن است ویرایش می‌شوند (`ShopPolicy.stockLevels`)؛ قاعده‌ها در `core`
+   *  (`StockLevelRules`). «حد کم بودن» همان `minStock` می‌ماند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reorderPoint: Double? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val maxStock: Double? = null,
 )
 
 @Serializable

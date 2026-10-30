@@ -37,8 +37,15 @@ import kotlinx.coroutines.launch
  *
  *  Ctrl+P چاپ، Ctrl+E اکسل — از ثبتِ مرکزیِ کلیدها (`KeyMap.GLOBAL_PRINT` / `GLOBAL_EXPORT`).
  */
-/** `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش) */
-private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false) {
+/**
+ *  `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش).
+ *  `insight`: «تحلیلِ موجودی» (INV-15، INV-16) — فقط وقتی `ShopPolicy.stockInsight` روشن است (پیش‌فرض خاموش).
+ *  `levels`: «نیاز به سفارش» (INV-12) — فقط وقتی `ShopPolicy.stockLevels` روشن است (پیش‌فرض خاموش).
+ */
+private enum class Rep(
+  val key: String, val label: String, val ranged: Boolean,
+  val crm: Boolean = false, val insight: Boolean = false, val levels: Boolean = false,
+) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
   PURCHASES("purchases", "خرید", true),
@@ -48,6 +55,9 @@ private enum class Rep(val key: String, val label: String, val ranged: Boolean, 
   DEBTORS("debtors", "قرض‌داران", false),
   STOCK("stock", "گردشِ موجودی", false),
   EXPIRY("expiry", "انقضا", false),
+  //  بازه = دورهٔ فروشِ ABC؛ ارزش و سودِ بالقوه همیشه موجودیِ همین حالاست
+  INSIGHT("insight", "تحلیلِ موجودی", true, insight = true),
+  REORDER("reorder", "نیاز به سفارش", false, levels = true),
   AGING("aging", "سنِ بدهی", false, crm = true),
   RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
@@ -68,7 +78,11 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val j = remember(today) { Jalali.ofIso(today) }
 
   val crm = remember { ShopPolicy.crmReports(context) }
-  val reps = remember(crm) { Rep.values().filter { crm || !it.crm } }
+  val insight = remember { ShopPolicy.stockInsight(context) }
+  val levels = remember { ShopPolicy.stockLevels(context) }
+  val reps = remember(crm, insight, levels) {
+    Rep.values().filter { (crm || !it.crm) && (insight || !it.insight) && (levels || !it.levels) }
+  }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -166,6 +180,28 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi("کالاها", "${d.products.size}", Shop.colors.text, Modifier.weight(1f))
           DeskKpi("تمام‌شده", "$out", Shop.colors.danger, Modifier.weight(1f))
           DeskKpi("کم‌موجود", "$low", Shop.colors.warning, Modifier.weight(1f))
+        }
+        Rep.INSIGHT -> {
+          val s = remember(d, from, to) { ReportEngine.stockInsight(d, from, to) }
+          val v = s.valuation
+          DeskKpi("ارزش به قیمتِ خرید", "${money(v.costMinor / 100.0)} ؋", Shop.colors.primary, Modifier.weight(1f))
+          DeskKpi("ارزش به قیمتِ فروش", "${money(v.retailMinor / 100.0)} ؋", Shop.colors.text, Modifier.weight(1f))
+          DeskKpi(
+            "سودِ بالقوه (تقریبی)" + (v.marginBp?.let { " · ${bpText(it)}" } ?: ""),
+            "${money(v.potentialProfitMinor / 100.0)} ؋",
+            if (v.potentialProfitMinor >= 0) Shop.colors.success else Shop.colors.danger, Modifier.weight(1f),
+          )
+          val c = s.abc.count
+          DeskKpi("A / B / C", "${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.A] ?: 0} / ${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.B] ?: 0} / ${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.C] ?: 0}", Shop.colors.text, Modifier.weight(1f))
+          val gaps = v.missingCost.size + v.negative.size + v.outOfRange.size
+          DeskKpi("بی قیمتِ خرید / منفی", "${v.missingCost.size} / ${v.negative.size}", if (gaps > 0) Shop.colors.warning else Shop.colors.muted, Modifier.weight(1f))
+        }
+        Rep.REORDER -> {
+          val due = remember(d) { ir.vil3ntec.tohid.data.WarehouseEngine.reorderList(d) }
+          DeskKpi("نیاز به سفارش", "${due.size}", Shop.colors.primary, Modifier.weight(1f))
+          DeskKpi("تمام‌شده", "${due.count { it.state == ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT }}", Shop.colors.danger, Modifier.weight(1f))
+          DeskKpi("زیرِ حد کم بودن", "${due.count { it.state == ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN }}", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi("بی بیشینه (بی پیشنهاد)", "${due.count { it.suggest == null }}", Shop.colors.muted, Modifier.weight(1f))
         }
         Rep.DEBTORS -> {
           val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }
