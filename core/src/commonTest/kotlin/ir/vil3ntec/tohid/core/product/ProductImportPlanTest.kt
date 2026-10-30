@@ -67,6 +67,11 @@ class ProductImportPlanTest {
     assertEquals(kept.changes, upd.changes)
   }
 
+  @Test fun minimumStockIsComparedInThousandths() {
+    assertEquals(listOf<Change>(Change.MinStock(2_000, 3_500)), plan(listOf("برنج", "", "", "", "", "3.5", ""), update = true).at(2).changes)
+    assertEquals(Status.SAME, plan(listOf("برنج", "", "", "", "", "2.000", "")).at(2).status)
+  }
+
   @Test fun updateNeverClearsAFieldFromABlankCell() {
     val r = plan(listOf("برنج", "", "", "", "", "", ""), update = true).at(2)
     assertEquals(Status.SAME, r.status)

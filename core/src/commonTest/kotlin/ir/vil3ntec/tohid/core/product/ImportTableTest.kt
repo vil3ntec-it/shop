@@ -93,6 +93,17 @@ class ImportTableTest {
     val sheet = """<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "AAAAAAAAAA"><!ENTITY b "&a;&a;&a;">]>
       <worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>&b;&#1587;&#x633;</t></is></c></row></sheetData></worksheet>"""
     assertEquals(listOf(listOf("&b;سس")), table(ImportTable.readXlsx(sheet, null)))
+    //  نشانه‌گذاریِ درونِ DTD هرگز خانه نمی‌شود (کلِ `[ … ]` گذر می‌شود، نه تا نخستین `>`)
+    val sneaky = """<!DOCTYPE x [<!ENTITY e "<x/><c r='B1' t='inlineStr'><is><t>EVIL</t></is></c>">]>
+      <worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>name</t></is></c></row></sheetData></worksheet>"""
+    assertEquals(listOf(listOf("name")), table(ImportTable.readXlsx(sneaky, null)))
+    val quoted = """<!DOCTYPE x [<!ENTITY e "]><x/><c r='C1' t='inlineStr'><is><t>EVIL</t></is></c>">]>
+      <worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>name</t></is></c></row></sheetData></worksheet>"""
+    assertEquals(listOf(listOf("name")), table(ImportTable.readXlsx(quoted, null)))
+    //  نشانه‌گذاریِ بی گیومه درونِ `[ … ]` هم (فایلِ دست‌ساز) — تا `]>` گذر می‌شود، نه تا نخستین `>`
+    val bare = """<!DOCTYPE x [<!ELEMENT a ANY><c r='D1' t='inlineStr'><is><t>EVIL</t></is></c>]>
+      <worksheet><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>name</t></is></c></row></sheetData></worksheet>"""
+    assertEquals(listOf(listOf("name")), table(ImportTable.readXlsx(bare, null)))
   }
 
   /* ------------------------------ سقف‌ها ------------------------------ */
