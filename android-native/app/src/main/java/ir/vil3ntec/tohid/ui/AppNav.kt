@@ -14,7 +14,7 @@ object AppNav {
   /** ترتیبِ میان‌برها: Ctrl+۱ خانه، Ctrl+۲ فروش، … */
   val SHORTCUTS: List<Pair<String, String>> get() = listOf(
     //  نامِ صفحهٔ اول همان سرخطش است: «خانه»، نه «داشبورد»
-    "dashboard" to Str.home,
+    "dashboard" to (if (ir.vil3ntec.tohid.ui.UiV3.on) Str.home else Str.dashboard),
     "sale" to Str.sale,
     "debtors" to Str.debtors,
     "warehouse" to Str.warehouse,

@@ -75,7 +75,8 @@ fun QuickSaleScreen(
    *  گوشی (نسخهٔ ۳): صندوقِ گوشی خودش همین کاتالوگ است (r3 + سبدِ r2) — همان صفحه با
    *  پیکانِ برگشتِ همین‌جا. دو کاتالوگِ جدا برای یک کار، همان «تکراری»ای بود که رد شد.
    */
-  if (screenSize() == Screen.PHONE) {
+  //  پرچمِ نسخهٔ ۳ خاموش (`UiV3`) ⇒ گوشی همان صندوقِ سریعِ امروز را دارد
+  if (ir.vil3ntec.tohid.ui.UiV3.on && screenSize() == Screen.PHONE) {
     SaleScreen(
       store = store,
       cartStore = cartStore,

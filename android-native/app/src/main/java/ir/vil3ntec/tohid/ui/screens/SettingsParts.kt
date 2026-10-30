@@ -197,6 +197,8 @@ fun SettingsSection(
   stateKey: String = title,
   content: @Composable ColumnScope.() -> Unit,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on && value == null && toggle == null && onToggle == null) { SettingsSectionLegacy(icon, title, subtitle, tint, initiallyOpen, stateKey, content); return }
   //  عنوان‌ها با زبان عوض می‌شوند (`Str*`)، چیدمان و صفحهٔ بازِ بخش با کلیدِ فارسیِ ثابت
   val key = SettingsLayout.keyOf(title, stateKey)
   //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
@@ -321,6 +323,8 @@ fun SettingsRow(
   onClick: (() -> Unit)? = null,
   trailing: @Composable (() -> Unit)? = null,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { SettingsRowLegacy(icon, title, modifier, description, tint, value, onClick, trailing); return }
   if (LocalPhoneSettings.current != null && trailing == null) {
     V3Row(icon = icon, label = title, modifier = modifier, value = value, description = description, onClick = onClick)
     return
@@ -378,6 +382,8 @@ fun SegmentedChoice(
   onSelect: (String) -> Unit,
   modifier: Modifier = Modifier,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { SegmentedChoiceLegacy(options, selected, onSelect, modifier); return }
   if (LocalPhoneSettings.current != null) {
     V3Segmented(options, selected, onSelect, modifier)
     return

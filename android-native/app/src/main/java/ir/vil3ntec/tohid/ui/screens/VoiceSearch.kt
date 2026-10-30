@@ -50,6 +50,8 @@ fun VoiceSearchField(
   label: String,
   modifier: Modifier = Modifier.fillMaxWidth(),
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { VoiceSearchFieldLegacy(value, onValueChange, label, modifier); return }
   val voice = rememberVoiceSearch(onValueChange)
   val canListen = voice != null
 

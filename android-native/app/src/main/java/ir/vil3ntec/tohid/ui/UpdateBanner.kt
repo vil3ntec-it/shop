@@ -26,7 +26,11 @@ import ir.vil3ntec.tohid.update.UpdateManager
  *  `settings/about`. کامپیوتر تراشهٔ سربرگ را دارد (`UpdateChip` پایین‌تر).
  */
 @Composable
-fun UpdateBanner() = ir.vil3ntec.tohid.ui.v3.shell.UpdateNotice()
+fun UpdateBanner() {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { UpdateBannerLegacy(); return }
+  ir.vil3ntec.tohid.ui.v3.shell.UpdateNotice()
+}
 
 /** بررسیِ خودکار (`UpdateManager.startAuto`) — هر جا نوار یا تراشه دیده شود همین یک بار */
 @Composable
@@ -56,6 +60,8 @@ private fun updateMessage(version: String, required: Boolean, progress: Int, rea
  */
 @Composable
 fun UpdateChip() {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { UpdateChipLegacy(); return }
   if (BuildConfig.STORE == "bazaar") return
   val context = LocalContext.current
   AutoCheck()

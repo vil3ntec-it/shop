@@ -9,6 +9,8 @@
 #    • حجم در ±۵٪ِ منتشرشده — سخت فقط وقتی PR فایلِ ساخت را عوض کرده
 #      (build/settings.gradle.kts، gradle.properties، proguard، wrapper)؛
 #      در بقیه فقط هشدار، چون قابلیتِ تازه حق دارد APK را بزرگ کند.
+#      استثنای یک‌باره فقط با تصمیمِ صاحب محصول: خطی در `apk-size-exceptions.txt`
+#      (شمارهٔ همان PR و سقفِ پذیرفته‌شده)؛ مرزِ ±۵٪ برای هر PRِ دیگر عوض نمی‌شود.
 #  شمارِ آزمون‌ها هم (اگر پوشهٔ نتیجه داده شود) در خلاصهٔ اجرا می‌آید.
 #
 #  usage: apk-gates.sh <apk> <expected-versionCode> [test-results-dir]
@@ -33,6 +35,10 @@ field() { sed -n "s/.* $1='\([^']*\)'.*/\1/p" <<<"$2"; }
 #  «Signer (minSdkVersion=…) certificate …» یا «V3.0 Signer: certificate …»
 #  می‌نویسد — هر سه پذیرفته است؛ فقط اثر انگشتِ **گواهی** (نه کلیدِ عمومی)
 cert() { { "$apksigner" verify --print-certs -v "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
+
+#  استثنای یک‌بارهٔ دروازهٔ حجم — هر خط «شمارهٔ PR  سقفِ درصد  دلیل»؛ فقط با تصمیمِ صاحب محصول
+exceptions="$(dirname "$0")/apk-size-exceptions.txt"
+exception_note=""
 
 fail=0
 err() { echo "::error::$1"; fail=1; }
@@ -84,7 +90,15 @@ if [ -n "$ref" ]; then
   [ "$code" -ge "$ref_code" ] || err "versionCode ($code) از نسخهٔ منتشرشده ($ref_code) کمتر است"
   ratio=$(awk -v a="$size" -v b="$ref_size" 'BEGIN { printf "%+.2f", (a - b) * 100 / b }')
   if awk -v r="$ratio" 'BEGIN { exit !(r > 5 || r < -5) }'; then
-    if [ "$strict" = 1 ]; then
+    #  استثنای یک‌بارهٔ صاحب محصول: فقط همان PR و فقط تا سقفِ پذیرفته‌شده (`apk-size-exceptions.txt`)
+    allowed_max=""
+    if [ -n "${PR_NUMBER:-}" ] && [ -f "$exceptions" ]; then
+      allowed_max=$(awk -v pr="$PR_NUMBER" '$1 !~ /^#/ && $1 == pr { print $2; exit }' "$exceptions")
+    fi
+    if [ "$strict" = 1 ] && [ -n "$allowed_max" ] && awk -v r="$ratio" -v m="$allowed_max" 'BEGIN { a = r < 0 ? -r : r; exit !(a <= m + 0) }'; then
+      echo "::warning::حجمِ APK ${ratio}٪ — استثنای یک‌بارهٔ PR #$PR_NUMBER تا ${allowed_max}٪ (apk-size-exceptions.txt)؛ مرزِ ±۵٪ برای بقیه سر جایش است"
+      exception_note="استثنای یک‌بارهٔ PR #$PR_NUMBER (سقف ${allowed_max}٪)"
+    elif [ "$strict" = 1 ]; then
       err "حجمِ APK ${ratio}٪ با نسخهٔ منتشرشده فرق دارد (مرز ±۵٪ برای تغییرِ ساخت)"
     else
       echo "::warning::حجمِ APK ${ratio}٪ با نسخهٔ منتشرشده فرق دارد"
@@ -111,7 +125,7 @@ fi
   echo "| versionCode | $code | $ref_code |"
   echo "| امضا SHA-256 | \`$fp\` | \`$ref_fp\` |"
   echo "| حجم (بایت) | $size | $ref_size |"
-  echo "| اختلافِ حجم | ${ratio}٪ (مرزِ سخت: $([ "$strict" = 1 ] && echo بله || echo خیر)) | |"
+  echo "| اختلافِ حجم | ${ratio}٪ (مرزِ سخت: $([ "$strict" = 1 ] && echo بله || echo خیر))${exception_note:+ — $exception_note} | |"
   echo "| آزمون‌ها | $tests | |"
 } >> "$summary"
 

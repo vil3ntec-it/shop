@@ -1,0 +1,1703 @@
+/*
+ *  ⛔ رابطِ امروز (پیش از نسخهٔ ۳) — رونوشتِ همان `ui/screens/Vip.kt` ِ main، فقط با پسوندِ `Legacy`.
+ *  وقتی پرچمِ `UiV3` خاموش است (پیش‌فرض) همین دیده می‌شود؛ نسخهٔ ۳ در فایلِ اصلی است.
+ *  دستی ویرایش نکنید مگر برای همان رابطِ امروز؛ با روشن‌شدنِ نسخهٔ ۳ برای همه، این پوشه برداشته می‌شود.
+ */
+package ir.vil3ntec.tohid.ui.screens
+
+import ir.vil3ntec.tohid.ui.theme.Vill3nBrand
+
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.animation.core.EaseInOutSine
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material.icons.filled.Redeem
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CreditCardOff
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.WorkspacePremium
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.HourglassBottom
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import ir.vil3ntec.tohid.ui.theme.DarkColors
+import ir.vil3ntec.tohid.ui.theme.Brand
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.plain
+import ir.vil3ntec.tohid.sync.License
+import ir.vil3ntec.tohid.sync.LicenseGuard
+import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.sync.SyncStore
+import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.ui.theme.Radius
+import ir.vil3ntec.tohid.ui.theme.Shop
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.snap
+import androidx.compose.ui.draw.shadow
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import ir.vil3ntec.tohid.fa
+import ir.vil3ntec.tohid.formatMillis
+import ir.vil3ntec.tohid.money
+
+/**
+ *  اشتراک و قیمت‌ها — همان چیزی که نسخهٔ وب دارد.
+ *
+ *  نشانِ طلایی بالای داشبورد وضعیت را می‌گوید و با زدنش صفحهٔ قیمت‌ها باز
+ *  می‌شود. پلن‌ها و قابلیت‌ها عیناً همان‌هایی هستند که وب نشان می‌دهد، پس
+ *  کسی که آنجا قیمت دیده، اینجا همان را می‌بیند.
+ *
+ *  پرداخت بیرون از برنامه است: هماهنگی از راه واتساپ، همان‌طور که بود.
+ */
+
+//  F0-24: شمارهٔ واتس‌اپِ فروش از سرور می‌آید (`SalesContact`)، نه از این‌جا
+private const val BUY_MESSAGELegacy = "سلام، می‌خواهم اشتراک برنامهٔ فروشگاه من را بخرم."
+
+/** قابلیت‌هایی که همیشه باز است */
+private val FREE_FEATURESLegacy = listOf(
+  "انبار و موجودی",
+  "مصارف دکان",
+  "خریداری و تأمین‌کننده",
+  "گزارش‌ها و سود",
+  "دفتر رویدادها",
+  "پشتیبان‌گیری",
+  "خروجی اکسل",
+)
+
+/** قابلیت‌هایی که با اشتراک باز می‌شود */
+private val PAID_FEATURESLegacy = listOf(
+  "فروش (صندوق)",
+  "قرض‌داران",
+  "اسکنر بارکد",
+  "چند کاربر روی یک دکان",
+)
+
+/**
+ *  یک پلن، همان‌طور که روی صفحه دیده می‌شود.
+ *
+ *  `fullPrice` قیمتِ پیش از تخفیف است. اگر با `price` یکی باشد تخفیفی
+ *  در کار نیست و چیزی خط‌خورده نشان داده نمی‌شود.
+ */
+private data class PlanLegacy(
+  val code: String,
+  val title: String,
+  val price: Int,
+  val fullPrice: Int = price,
+  val badge: String = "",
+  val days: Int,
+  val discountLabel: String = "",
+) {
+  val discounted: Boolean get() = fullPrice > price
+  val offPercent: Int get() =
+    if (!discounted || fullPrice <= 0) 0 else ((fullPrice - price) * 100 / fullPrice)
+}
+
+/**
+ *  پلن‌های پیش‌فرض — فقط تا وقتی که سرور جواب بدهد.
+ *
+ *  ── چرا هنوز اینجا هستند ──────────────────────────────────────────
+ *  برنامه باید آفلاین هم چیزی نشان بدهد؛ صفحهٔ خالیِ «قیمت‌ها خوانده
+ *  نشد» بدتر از یک قیمتِ تقریبی است.
+ *
+ *  ── چرا دیگر تنها منبع نیستند ─────────────────────────────────────
+ *  تا دیروز همین سه خط، تنها جای قیمت بودند. یعنی صاحب سامانه قیمت را
+ *  در پنل عوض می‌کرد و روی گوشیِ هیچ‌کس چیزی تغییر نمی‌کرد — چون گوشی
+ *  هرگز نمی‌پرسید. حالا اول از سرور خوانده می‌شود و این‌ها فقط
+ *  جانشین‌اند.
+ */
+private val FALLBACK_PLANSLegacy = listOf(
+  PlanLegacy("m1", "ماهانه", 500, days = 30),
+  PlanLegacy("m6", "۶ ماهه", 2500, badge = "پیشنهاد ما", days = 180),
+  PlanLegacy("y1", "۱ ساله", 4000, badge = "بیشترین صرفه", days = 365),
+)
+
+/**
+ *  قفلِ قابلیت‌ها — روشن.
+ *
+ *  ── قاعده، از زبانِ صاحب مخزن ──────────────────────────────────────
+ *  «کسانی که حساب می‌سازند فقط همان هفت روزِ آزمایشی را داشته باشند، و
+ *  کسانی که حساب ندارند قفل باشند — چون نه اشتراکی دارند نه حسابی.»
+ *
+ *  پس چهار حالت، و هر کدام یک جواب:
+ *
+ *   • نسخه‌ای که به هیچ سروری بسته نیست → **باز**. آن نسخه فروشی نیست و
+ *     قفلش یعنی برنامه‌ای که هیچ‌کس نمی‌تواند استفاده کند.
+ *   • حساب ندارد → **قفل**. همان خواسته.
+ *   • اشتراک یا دورهٔ آزمایشی دارد (`ACTIVE`/`GRACE`) → **باز**.
+ *   • تمام شده یا نامعتبر (`EXPIRED`/`INVALID`) → **قفل**.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  و یک حالتِ پنجم که عمداً **باز** است: حساب دارد ولی هیچ مجوزی از سرور
+ *  نگرفته (`NONE`). این یعنی سرور هنوز مجوز صادر نمی‌کند — مثلاً تازه
+ *  بالا آمده یا نسخه‌اش قدیمی است. قفل کردنِ اینجا، صاحبِ دکان را به‌خاطرِ
+ *  اشکالِ سرورِ خودش از برنامه بیرون می‌اندازد؛ و آن‌وقت راهی هم برای
+ *  درست کردنش ندارد، چون خودِ برنامه قفل است. وقتی سرور مجوزِ آزمایشی را
+ *  درست صادر کرد، همین یک حالت هم بسته می‌شود.
+ */
+private const val LOCKINGLegacy = true
+
+/* ============================== رنگِ نشان ============================== */
+
+/*
+ *  ── طلا به رنگِ برند رفت ──────────────────────────────────────────
+ *  این صفحه پالتِ جدایی داشت: طلاییِ ثابت که از تم نمی‌آمد. کنارِ بنفش و
+ *  نعناییِ تازه، طلا مثلِ چیزی از یک برنامه‌ی دیگر دیده می‌شد. نقش‌ها همان
+ *  است — نشانِ افتخار، لبه‌ی درخشان، دکمه‌ی اصلی — فقط رنگش عوض شد. چون
+ *  بیرونِ کامپوز تعریف می‌شوند، مقدارها همان مقدارهای پالت‌اند.
+ */
+//  ۱۴۰۵/۰۷/۲۸: بنفش ⇐ سبزآبیِ برندِ VILL3N (روشن، سیر، پررنگ) — همان عددهای پالت، نه عددِ تازه
+private val GOLD_PALELegacy = DarkColors.brandText
+private val GOLD_SOFTLegacy = DarkColors.brandPrimary
+private val GOLDLegacy = Vill3nBrand.PRIMARY
+private val GOLD_DEEPLegacy = Vill3nBrand.DEEP
+private val GOLD_INKLegacy = Color.White
+
+/** خودِ فلز: روشن، سیر، دوباره روشن — نه یک زردِ تخت */
+private val GOLD_SWEEPLegacy = Brush.linearGradient(
+  listOf(GOLD_SOFTLegacy, GOLDLegacy, GOLD_PALELegacy, GOLD_DEEPLegacy)
+)
+
+/**
+ *  نبضِ آرام — هالهٔ طلاییِ کارت‌ها با یک ضربان نفس می‌کشد.
+ *
+ *  این همان چیزی است که از اول بود و برداشتنش اشتباه بود: خواسته
+ *  «برداشتنِ خطِ نور» بود، نه ساکن کردنِ همه‌چیز. هاله خطی نمی‌کشد،
+ *  فقط کم‌وزیاد می‌شود.
+ */
+@Composable
+private fun goldPulseLegacy(): Float {
+  /*
+   *  ── درخشش، یک بار ────────────────────────────────────────────────
+   *  هاله‌ی کارت‌ها بی‌وقفه کم‌وزیاد می‌شد. حرکتِ همیشگی روی صفحه‌ای که
+   *  کارش «انتخاب کن» است، حواس را می‌برد و ارزان به نظر می‌رسد؛
+   *  برنامه‌های گران، یک بار درخشش می‌دهند و بعد آرام می‌مانند.
+   *  ──────────────────────────────────────────────────────────────────
+   */
+  var lit by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { lit = true }
+  val value by animateFloatAsState(
+    targetValue = if (lit) 1f else 0f,
+    animationSpec = tween(if (Motion.enabled) 1100 else 1, easing = EaseInOutSine),
+    label = "pulse",
+  )
+  return value
+}
+
+/**
+ *  لبهٔ طلاییِ درخشان.
+ *
+ *  یک خطِ تنها فقط یک خط است؛ درخشش از لایه‌لایه بودن می‌آید — سه هالهٔ
+ *  پهن و کم‌رنگِ بیرون از کادر، و بعد خودِ خط. چون هاله بیرونِ کادر
+ *  کشیده می‌شود، این باید **پیش از** `clip` بیاید وگرنه بریده می‌شود.
+ *
+ */
+
+private fun Modifier.goldEdge(radius: Dp, pulse: Float, strong: Boolean = false): Modifier =
+  drawBehind {
+    val lift = if (strong) 1f else 0.62f
+    listOf(8f to 0.05f, 5f to 0.08f, 2.5f to 0.13f).forEach { (grow, alpha) ->
+      val g = grow.dp.toPx()
+      drawRoundRect(
+        color = GOLDLegacy.copy(alpha = alpha * lift * (0.55f + pulse * 0.45f)),
+        topLeft = Offset(-g, -g),
+        size = Size(size.width + g * 2f, size.height + g * 2f),
+        cornerRadius = CornerRadius(radius.toPx() + g, radius.toPx() + g),
+        style = Stroke(width = g),
+      )
+    }
+    val line = (if (strong) 1.8f else 1.2f) + pulse * 0.4f
+    val inset = line / 2f
+    drawRoundRect(
+      brush = Brush.linearGradient(listOf(GOLD_PALELegacy, GOLD_DEEPLegacy, GOLD_SOFTLegacy, GOLD_DEEPLegacy)),
+      topLeft = Offset(inset.dp.toPx(), inset.dp.toPx()),
+      size = Size(size.width - line.dp.toPx(), size.height - line.dp.toPx()),
+      cornerRadius = CornerRadius(radius.toPx(), radius.toPx()),
+      style = Stroke(width = line.dp.toPx()),
+    )
+  }
+
+/** بلندیِ نوارِ نشان — در همهٔ کارت‌ها یکی، حتی آن‌که نشان ندارد */
+private val BADGE_BANDLegacy = 26.dp
+
+/** بلندیِ نوارِ بالای ستونِ مقایسه — همین‌طور، در هر دو ستون یکی */
+private val RIBBON_BANDLegacy = 28.dp
+
+/**
+ *  نشانِ طلاییِ بالای کارت — «پیشنهاد ما» و «بیشترین صرفه».
+ */
+@Composable
+private fun GoldBadgeLegacy(text: String) {
+  // روی گوشی نشان باید در عرضِ یک‌سومِ صفحه بنشیند: نه تاجِ کنارِ متن، نه
+  // فاصلهٔ پهن. «بیشترین صرفه» با آن دو، از کارت بیرون می‌زد.
+  val wide = isTablet()
+  Row(
+    Modifier
+      .clip(RoundedCornerShape(topStart = 11.dp, topEnd = 11.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
+      .background(GOLD_SWEEPLegacy)
+      .padding(horizontal = if (wide) 11.dp else 7.dp, vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    if (wide) {
+      Icon(
+        Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = GOLD_INKLegacy,
+        modifier = Modifier.size(12.dp),
+      )
+    }
+    Text(
+      text,
+      style = MaterialTheme.typography.labelSmall,
+      color = GOLD_INKLegacy,
+      fontWeight = FontWeight.Bold,
+      maxLines = 1,
+      // اگر روی صفحه‌ای خیلی باریک هم جا نشد، کوتاه شود؛ سرریز شدن روی
+      // کارتِ بغلی از سه‌نقطه بدتر است
+      overflow = TextOverflow.Ellipsis,
+      softWrap = false,
+    )
+  }
+}
+
+/* ============================ صفحهٔ قیمت‌ها ============================ */
+
+/**
+ *  صفحهٔ اشتراک — همان چیدمانی که در طرح هست.
+ *
+ *  ترتیبش عمدی است: اول «هفت روز رایگان» چون اولین سؤالِ هر کسی این است
+ *  که «باید همین حالا پول بدهم؟»؛ بعد مقایسهٔ رایگان و VIP تا معلوم شود
+ *  دقیقاً چه چیزی باز می‌شود؛ بعد مدت‌ها؛ و آخر راهِ خرید.
+ *
+ *  فهرستِ قابلیت‌ها در هر دو ستون **کامل** است، نه فقط آنچه هر پلن دارد.
+ *  ستونِ رایگان همان چهار قلمِ آخر را با قفل نشان می‌دهد؛ اگر نشانشان
+ *  ندهیم، کاربر نمی‌فهمد با اشتراک چه چیزی به‌دست می‌آورد.
+ */
+@Composable
+fun VipScreenLegacy(onDismiss: () -> Unit) {
+  val context = LocalContext.current
+  val state = remember { SyncStore(context) }
+  val signedIn = !state.accessToken.isNullOrBlank()
+  val scope = rememberCoroutineScope()
+  /*
+   *  ── قیمت‌ها از سرور ───────────────────────────────────────────────
+   *  تا دیروز این فهرست در خودِ کد بود و هیچ‌وقت از سرور خوانده نمی‌شد.
+   *  یعنی عوض کردنِ قیمت در پنل مدیریت روی گوشیِ هیچ‌کس اثری نداشت، و
+   *  تخفیف اصلاً راهی برای رسیدن نداشت.
+   *
+   *  حالا اول از سرور، و اگر نرسید همان پیش‌فرض‌ها — پس آفلاین هم صفحه
+   *  خالی نمی‌ماند.
+   */
+  var plans by remember { mutableStateOf(FALLBACK_PLANSLegacy) }
+  var currency by remember { mutableStateOf("؋") }
+  //  F0-24: `whatsapp_number`ِ پنلِ مدیر؛ تا نرسیده (یا آفلاین) همان شمارهٔ همیشگی
+  var salesNumber by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(Unit) {
+    Backend.account(context).plans().onSuccess { dto ->
+      val fresh = dto.plans
+        .filter { it.active && it.days > 0 }
+        .map { p ->
+          PlanLegacy(
+            code = p.code,
+            title = p.title.ifBlank { p.code },
+            price = p.price.toInt(),
+            fullPrice = (if (p.fullPrice > 0) p.fullPrice else p.price).toInt(),
+            badge = p.badge,
+            days = p.days,
+            discountLabel = p.discount?.label.orEmpty(),
+          )
+        }
+      if (fresh.isNotEmpty()) plans = fresh
+      if (dto.currency.isNotBlank()) currency = dto.currency
+      if (dto.whatsapp.number.isNotBlank()) salesNumber = dto.whatsapp.number
+    }
+  }
+
+  // پیش‌فرض روی «پیشنهاد ما» است؛ کسی که تصمیم ندارد، همان را می‌گیرد
+  var chosenPlan by rememberSaveable { mutableStateOf("") }
+  //  اگر فهرست از سرور آمد و انتخابِ قبلی دیگر در آن نیست، به نشان‌دار
+  //  برمی‌گردیم — وگرنه دکمهٔ خرید به پلنی اشاره می‌کرد که وجود ندارد
+  val picked = plans.find { it.title == chosenPlan }
+    ?: plans.find { it.badge.isNotBlank() }
+    ?: plans.first()
+
+  //  کدِ اشتراک — پایینِ صفحه
+  var codeOpen by rememberSaveable { mutableStateOf(false) }
+  var code by rememberSaveable { mutableStateOf("") }
+  var codeBusy by remember { mutableStateOf(false) }
+  var codeNote by remember { mutableStateOf<String?>(null) }
+  var codeOk by remember { mutableStateOf(false) }
+
+  fun buy(planTitle: String) {
+    val text = Uri.encode("${BUY_MESSAGELegacy} ($planTitle)")
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${SalesContact.waDigits(salesNumber)}?text=$text"))
+    runCatching { context.startActivity(intent) }
+  }
+
+  fun openWhatsApp() {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/${SalesContact.waDigits(salesNumber)}"))
+    runCatching { context.startActivity(intent) }
+  }
+
+  val colors = Shop.colors
+
+  Box(Modifier.fillMaxSize().background(colors.bg)) {
+    Column(
+      Modifier
+        .fillMaxSize()
+        .verticalScroll(rememberScrollState())
+        .padding(start = 16.dp, end = 16.dp, bottom = 28.dp)
+    ) {
+      TextButton(onClick = onDismiss, contentPadding = PaddingValues(0.dp)) {
+        Icon(Icons.Filled.ArrowForward, contentDescription = null, tint = colors.primary)
+        Spacer(Modifier.width(6.dp))
+        Text("بازگشت", color = colors.primary)
+      }
+
+      /*
+       *  یک کارت، نه دو کارتِ متناقض.
+       *
+       *  ── چه چیزی را می‌بندد ────────────────────────────────────────
+       *  بالای این صفحه دو کارت پشتِ سرِ هم می‌نشست: یکی می‌گفت
+       *  «اشتراک رو به پایان است — ۷ روز مانده» و همان زیر، دیگری
+       *  می‌گفت «۷ روز رایگان — حساب بسازید و امتحان کنید». برای کسی
+       *  که حساب دارد و وسطِ دورهٔ آزمایشی‌اش است، این دو با هم یعنی
+       *  هیچ: کدام؟ تازه شروع شده یا تمام می‌شود؟
+       *
+       *  حالا یکی از این دو ساخته می‌شود، نه هر دو: وضعیتِ واقعی اگر
+       *  حسابی در کار باشد، و دعوت به دورهٔ آزمایشی اگر نباشد.
+       *  ────────────────────────────────────────────────────────────
+       */
+      val hasStatus = remember {
+        val st = runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
+        st != null && st.state != License.State.NONE
+      }
+      /*
+       *  و اگر مجوزی روی گوشی نیست ولی سرور می‌گوید دورهٔ آزمایشی باز
+       *  است، نه کارتِ وضعیت ساخته می‌شد نه چیزی جز «۷ روز رایگان
+       *  بگیرید» — یعنی به کسی که همین حالا وسطِ همان هفته است،
+       *  پیشنهادِ گرفتنش را می‌داد. حالا حالتِ سومی هست.
+       */
+      LaunchedEffect(Unit) { SubscriptionPulse.refresh(context) }
+      val trialOn = SubscriptionPulse.active && SubscriptionPulse.days > 0
+      when {
+        hasStatus -> SubscriptionStateLegacy()
+        trialOn -> TrialStateLegacy(SubscriptionPulse.days, SubscriptionPulse.trial)
+        else -> TrialInviteLegacy()
+      }
+
+      Spacer(Modifier.height(16.dp))
+
+      VipHeroLegacy()
+
+      Spacer(Modifier.height(18.dp))
+
+      /*
+       *  دو ستونِ مقایسه.
+       *
+       *  `IntrinsicSize.Min` هست چون دو ستونِ ناهم‌قد، مقایسه را سخت
+       *  می‌کنند: چشم باید بالا و پایین برود تا بفهمد کدام قلم روبه‌روی
+       *  کدام است. حالا هر دو تا یک جا پایین می‌آیند.
+       */
+      Row(
+        Modifier.height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+      ) {
+        TierCardLegacy(
+          title = "رایگان",
+          price = "۰",
+          priceNote = "؋",
+          note = "همیشه رایگان",
+          features = FREE_FEATURESLegacy.map { it to true } + PAID_FEATURESLegacy.map { it to false },
+          highlighted = false,
+          footer = "همین حالا فعال است",
+          footerTint = colors.success,
+          modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+        TierCardLegacy(
+          title = "اشتراک VIP",
+          price = "همه‌چیز",
+          priceNote = "",
+          note = "هر مدتی که بخواهید",
+          features = (FREE_FEATURESLegacy + PAID_FEATURESLegacy).map { it to true },
+          highlighted = true,
+          ribbon = "پیشنهاد ما",
+          footer = "مدت را از پایین انتخاب کنید",
+          footerTint = GOLD_DEEPLegacy,
+          modifier = Modifier.weight(1f).fillMaxHeight(),
+        )
+      }
+
+      Spacer(Modifier.height(20.dp))
+      Text(
+        "مدت اشتراک را انتخاب کنید",
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(12.dp))
+
+      /*
+       *  هر سه مدت کنارِ هم، روی گوشی هم.
+       *
+       *  یک بار روی گوشی زیرِ هم گذاشتمشان چون سه کارت در عرضِ یک گوشی
+       *  یعنی هر کدام حدودِ صد نقطه؛ ولی زیرِ هم بودن، مقایسه را از بین
+       *  می‌برد: کاربر باید اسکرول می‌کرد تا قیمتِ دوم را کنارِ اولی
+       *  به‌یاد بیاورد. جایش خودِ کارت روی صفحهٔ باریک جمع‌وجور می‌شود —
+       *  فاصله‌های کمتر، قلمِ کوچک‌تر و «افغانی» زیرِ عدد نه کنارش.
+       */
+      Row(
+        Modifier.height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(if (isTablet()) 10.dp else 7.dp),
+      ) {
+        plans.forEach { plan ->
+          PlanCardLegacy(
+            plan = plan,
+            selected = picked.title == plan.title,
+            onClick = { chosenPlan = plan.title },
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            stretch = true,
+          )
+        }
+      }
+
+      /* ---------------------- هشدارِ ورود ---------------------- */
+      if (!signedIn) {
+        Spacer(Modifier.height(16.dp))
+        Row(
+          Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(Radius.md))
+            .background(colors.warningTint)
+            .border(1.dp, colors.warning.copy(alpha = 0.55f), RoundedCornerShape(Radius.md))
+            .padding(14.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Box(
+            Modifier.size(36.dp).clip(RoundedCornerShape(18.dp)).background(colors.status.awaitingApproval.fg),
+            contentAlignment = Alignment.Center,
+          ) {
+            //  جفتِ وارونهٔ «در انتظار»: در شب آیکنِ تیره روی کهربایی (سفید روی #FCD34D ۱٫۵:۱ بود)
+            Icon(Icons.Filled.Lock, contentDescription = null, tint = colors.status.awaitingApproval.bg, modifier = Modifier.size(18.dp))
+          }
+          Spacer(Modifier.width(12.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              "برای خرید اشتراک اول وارد حساب شوید",
+              style = MaterialTheme.typography.labelLarge,
+              color = colors.text,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              "کار رایگان با برنامه حساب نمی‌خواهد — فقط خرید اشتراک لازم دارد.",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+        }
+      }
+
+      /* ---------------------- گرفتنِ اشتراک ---------------------- */
+      //  ⛔ نسخهٔ کافه‌بازار: پرداختِ بیرون از بازار ممنوع است ⇒ نه دکمهٔ خرید با
+      //  واتساپ، نه «پرداخت از راهِ واتساپ». اشتراکِ حساب همین‌جا دیده می‌شود.
+      if (ir.vil3ntec.tohid.BuildConfig.STORE == "bazaar") {
+        Spacer(Modifier.height(16.dp))
+        Text(
+          "اشتراکِ حسابِ شما خودکار همین‌جا دیده می‌شود؛ کار با انبار، کالا، خرید و مصارف همیشه رایگان است.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+          textAlign = TextAlign.Center,
+          modifier = Modifier.fillMaxWidth(),
+        )
+      } else {
+      Spacer(Modifier.height(16.dp))
+      BuyButtonLegacy(
+        text = "گرفتن اشتراک ${picked.title} — ${plain(picked.price)} $currency",
+        onClick = {
+          /*
+           *  درخواستِ خرید، همین‌جا ثبت می‌شود.
+           *
+           *  تا امروز خرید فقط یک پیامِ واتساپ بود: مدیر باید از روی
+           *  پیام می‌فهمید چه کسی چه پلنی خواسته و دستی فعالش می‌کرد.
+           *  سرور از اول `purchase-request` را داشت. حالا اگر کاربر
+           *  وارد شده باشد، درخواست ثبت می‌شود **و** واتساپ هم باز
+           *  می‌شود — پیام برای هماهنگیِ پول لازم است، ولی دیگر تنها
+           *  ردِ ماجرا نیست.
+           */
+          if (signedIn) {
+            //  ثبتِ درخواست بی‌صداست: اگر نگرفت، واتساپ همچنان باز
+            //  می‌شود و کاربر سرِ راهش نمی‌ماند
+            /*
+             *  کدِ پلن می‌رود، نه عنوانش.
+             *
+             *  سرور با همین کد پلن را پیدا می‌کند و مدت را از رویش حساب
+             *  می‌کند. تا دیروز عنوانِ فارسی («ماهانه») فرستاده می‌شد و
+             *  هیچ پلنی با آن نام پیدا نمی‌شد — یعنی درخواستِ خرید ثبت
+             *  می‌شد ولی موقعِ تأیید، مدتش معلوم نبود.
+             */
+            scope.launch {
+              Backend.account(context).requestPurchase(picked.code, "از برنامهٔ اندروید — ${picked.title}")
+            }
+          }
+          buy(picked.title)
+        },
+      )
+      Spacer(Modifier.height(8.dp))
+      Text(
+        "بدون قرارداد. بدون ریسک. هماهنگی و پرداخت از راه واتساپ انجام می‌شود.",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      }
+
+      /* ---------------------- کد اشتراک ---------------------- */
+      /*
+       *  ── چرا این هست ──────────────────────────────────────────────
+       *  تا دیروز تنها راهِ گرفتنِ اشتراک این بود که کاربر واتساپ بزند و
+       *  صاحب سامانه هم همان لحظه پشتِ پنل باشد و دستی فعالش کند. حالا
+       *  صاحب سامانه یک کدِ شش‌رقمی به ایمیلِ او می‌فرستد و او هر وقت
+       *  خواست همین‌جا می‌زند — بی واسطه، بی انتظار.
+       */
+      Spacer(Modifier.height(12.dp))
+      Column(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(colors.surface)
+          .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+          .padding(14.dp),
+      ) {
+        Row(
+          Modifier.fillMaxWidth().clickable { codeOpen = !codeOpen },
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          Icon(Icons.Filled.Redeem, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(9.dp))
+          Column(Modifier.weight(1f)) {
+            Text(
+              "کد اشتراک دارم",
+              style = MaterialTheme.typography.labelLarge,
+              color = colors.text,
+              fontWeight = FontWeight.Bold,
+            )
+            Text(
+              "کدِ شش‌رقمی که به ایمیلتان آمده",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+          Text(
+            if (codeOpen) "بستن" else "وارد کردن",
+            style = MaterialTheme.typography.labelSmall,
+            color = colors.primary,
+            fontWeight = FontWeight.Bold,
+          )
+        }
+
+        if (codeOpen) {
+          Spacer(Modifier.height(12.dp))
+          OutlinedTextField(
+            value = code,
+            onValueChange = { codeNote = null; code = ir.vil3ntec.tohid.normalizeDigits(it).filter { ch -> ch in '0'..'9' }.take(6) },
+            label = { Text("کد شش‌رقمی") },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            shape = RoundedCornerShape(Radius.sm),
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(10.dp))
+          Button(
+            onClick = {
+              codeBusy = true
+              codeNote = null
+              scope.launch {
+                Backend.support(context).redeemVip(code)
+                  .onSuccess {
+                    codeOk = true
+                    codeNote = it.message.ifBlank { "اشتراک شما فعال شد." }
+                    code = ""
+                    //  وضعیتِ اشتراک همان لحظه تازه می‌شود، وگرنه صفحه
+                    //  هنوز «اشتراک ندارید» نشان می‌داد
+                    SubscriptionPulse.refresh(context)
+                    runCatching { ir.vil3ntec.tohid.sync.v1.HeartbeatCache(context).forget() }
+                    LicenseGuard.changed()
+                  }
+                  .onFailure {
+                    codeOk = false
+                    codeNote = it.userMessage
+                  }
+                codeBusy = false
+              }
+            },
+            enabled = !codeBusy && code.length == 6 && signedIn,
+            shape = RoundedCornerShape(Radius.sm),
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+          ) {
+            if (codeBusy) {
+              CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(18.dp))
+            } else {
+              Text("فعال کردن", fontWeight = FontWeight.Bold)
+            }
+          }
+          if (!signedIn) {
+            Spacer(Modifier.height(6.dp))
+            Text(
+              "برای فعال کردنِ کد، اول وارد حساب شوید — اشتراک روی دکانِ شما می‌نشیند.",
+              style = MaterialTheme.typography.labelSmall,
+              color = colors.muted,
+            )
+          }
+          codeNote?.let { note ->
+            Spacer(Modifier.height(8.dp))
+            Text(
+              note,
+              style = MaterialTheme.typography.labelSmall,
+              color = if (codeOk) colors.success else colors.danger,
+            )
+          }
+        }
+      }
+
+      /* ------------- کدِ اشتراکِ آفلاین (بی اینترنت) ------------- */
+      Spacer(Modifier.height(10.dp))
+      OfflineCodeCardLegacy()
+
+      /*
+       *  پرداخت آنلاین — گفته می‌شود که نیست.
+       *
+       *  کاربری که دنبالِ دکمهٔ «پرداخت با کارت» می‌گردد و پیدایش
+       *  نمی‌کند، فکر می‌کند برنامه ناقص است. یک خط که بگوید «فعلاً
+       *  نیست»، همان سؤال را جواب می‌دهد.
+       */
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(10.dp))
+          .background(colors.surface2.copy(alpha = 0.5f))
+          .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
+      ) {
+        Icon(
+          Icons.Filled.CreditCardOff,
+          contentDescription = null,
+          tint = colors.muted2,
+          modifier = Modifier.size(15.dp),
+        )
+        Spacer(Modifier.width(7.dp))
+        Text(
+          "پرداخت آنلاین فعلاً ناموجود است",
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted2,
+        )
+      }
+
+      /* ---------------------- راه‌های تماس ---------------------- */
+      Spacer(Modifier.height(22.dp))
+      Text(
+        "راه‌های تماس",
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(10.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.md))
+          .background(colors.surface)
+          .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+          .clickable { openWhatsApp() }
+          .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        Box(
+          Modifier.size(38.dp).clip(RoundedCornerShape(19.dp)).background(Color(0xFF25D366)),
+          contentAlignment = Alignment.Center,
+        ) {
+          Icon(Icons.Filled.Chat, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column {
+          Text("واتساپ", style = MaterialTheme.typography.labelLarge, color = colors.text)
+          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            Text(SalesContact.display(salesNumber), style = MaterialTheme.typography.labelSmall, color = colors.muted)
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ *  اشتراکِ همین حالا — چند روز مانده، و از کِی.
+ *
+ *  ── چه چیزی را می‌بندد ────────────────────────────────────────────
+ *  صفحهٔ اشتراک فقط قیمت‌ها را نشان می‌داد. کاربری که اشتراک داشت و
+ *  می‌آمد ببیند «چند روز مانده»، هیچ‌جا جوابش را پیدا نمی‌کرد: نه در
+ *  این صفحه، نه در تنظیمات. تنها نشانه، عددِ داخلِ زنگ بود که فقط از
+ *  هفت روز به پایین می‌آمد.
+ *  ──────────────────────────────────────────────────────────────────
+ *
+ *  از یک هفته به پایین کلِ کارت قرمز می‌شود — همان مرزی که نشانِ سربرگ
+ *  هم با آن قرمز می‌شود (`SUBSCRIPTION_WARN_DAYS`)، تا دو جا یک حرف بزنند.
+ */
+/**
+ *  دعوت به دورهٔ آزمایشی — فقط برای کسی که هنوز حسابی ندارد.
+ *
+ *  حرکتش یک «تنفس» است، نه خطِ لغزان: حاشیه و هالهٔ کارت آرام کم‌وزیاد
+ *  می‌شوند. چیزی که چشم را می‌گیرد ولی نمی‌آزارد، و در صفحه‌ای که کارِ
+ *  اصلی‌اش «انتخاب کن» است، همان اندازه توجه لازم دارد.
+ */
+@Composable
+private fun TrialInviteLegacy() {
+  val colors = Shop.colors
+  val pulse = goldPulseLegacy()
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(colors.surface)
+      .border(
+        (1f + pulse * 0.8f).dp,
+        colors.primary.copy(alpha = 0.28f + pulse * 0.34f),
+        RoundedCornerShape(Radius.md),
+      )
+      .padding(16.dp)
+  ) {
+    Text(
+      "۷ روز رایگان",
+      style = MaterialTheme.typography.titleSmall,
+      color = colors.primary,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      "حساب بسازید و همهٔ قابلیت‌ها را ۷ روز رایگان امتحان کنید. " +
+        "اطلاعاتی که ثبت می‌کنید در حساب خودتان می‌ماند.",
+      style = MaterialTheme.typography.bodySmall,
+      color = colors.muted,
+    )
+  }
+}
+
+/**
+ *  وضعیتِ دورهٔ آزمایشی — از زبانِ سرور، نه از مجوزِ گوشی.
+ *
+ *  همان کارتِ دعوت است، اما به‌جای «بگیرید» می‌گوید «داری، و این‌قدر
+ *  مانده». زیرِ یک هفته سرخ می‌شود، مثل هر جای دیگرِ برنامه
+ *  (`SUBSCRIPTION_WARN_DAYS`).
+ */
+@Composable
+private fun TrialStateLegacy(days: Int, trial: Boolean) {
+  val colors = Shop.colors
+  val urgent = days <= SUBSCRIPTION_WARN_DAYS
+  val tint = if (urgent) colors.danger else colors.success
+  val pulse = goldPulseLegacy()
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(if (urgent) colors.dangerTint else colors.surface)
+      .border(
+        (1f + pulse * 0.8f).dp,
+        tint.copy(alpha = 0.30f + pulse * 0.34f),
+        RoundedCornerShape(Radius.md),
+      )
+      .padding(16.dp)
+  ) {
+    Text(
+      if (trial) "دورهٔ آزمایشی" else "اشتراک فعال است",
+      style = MaterialTheme.typography.titleSmall,
+      color = tint,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      if (days > 0) "${days.fa()} روز مانده" else "امروز آخرین روز است",
+      style = MaterialTheme.typography.headlineSmall,
+      color = colors.text,
+      fontWeight = FontWeight.Bold,
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      if (trial) "تا پایانِ این مدت همهٔ قابلیت‌ها باز است؛ برای ادامه، یکی از پلن‌های پایین را بگیرید."
+      else "برای ادامه، پیش از تمام شدن تمدید کنید.",
+      style = MaterialTheme.typography.bodySmall,
+      color = colors.muted,
+    )
+  }
+}
+
+@Composable
+private fun SubscriptionStateLegacy() {
+  val context = LocalContext.current
+  val colors = Shop.colors
+  val status = remember {
+    runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull()
+  } ?: return
+  //  «هیچ اشتراکی نبوده» حالت نیست که کارت بخواهد: قیمت‌های پایینِ
+  //  همین صفحه خودشان جواب‌اند
+  if (status.state == License.State.NONE) return
+
+  val days = status.daysLeft()
+  val ends = status.payload?.subscriptionEndsAt ?: 0L
+  val expired = status.state == License.State.EXPIRED || status.state == License.State.GRACE
+  val urgent = expired || (status.state == License.State.ACTIVE && days <= SUBSCRIPTION_WARN_DAYS)
+
+  val tint = when {
+    urgent -> colors.danger
+    status.state == License.State.ACTIVE -> colors.success
+    else -> colors.warning
+  }
+  val title = when (status.state) {
+    License.State.ACTIVE -> if (urgent) "اشتراک رو به پایان است" else "اشتراک فعال است"
+    License.State.GRACE -> "اشتراک تمام شده — مهلتِ تمدید"
+    License.State.EXPIRED -> "اشتراک تمام شده"
+    License.State.PENDING -> "اشتراک هنوز شروع نشده"
+    else -> "مجوزِ اشتراک خوانده نشد"
+  }
+  val big = when {
+    expired -> "تمدید کنید"
+    status.state == License.State.ACTIVE && days > 0 -> "${days.fa()} روز مانده"
+    status.state == License.State.ACTIVE -> "امروز آخرین روز است"
+    else -> "—"
+  }
+
+  Spacer(Modifier.height(12.dp))
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(if (urgent) colors.dangerTint else colors.surface)
+      .border(1.dp, tint.copy(alpha = 0.55f), RoundedCornerShape(Radius.md))
+      .padding(14.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Box(
+      Modifier.size(38.dp).clip(CircleShape).background(tint.copy(alpha = 0.18f)),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        if (urgent) Icons.Filled.HourglassBottom else Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = tint,
+        modifier = Modifier.size(20.dp),
+      )
+    }
+    Spacer(Modifier.width(12.dp))
+    Column(Modifier.weight(1f)) {
+      Text(title, style = MaterialTheme.typography.labelLarge, color = colors.text, fontWeight = FontWeight.Bold)
+      Spacer(Modifier.height(3.dp))
+      Text(big, style = MaterialTheme.typography.titleSmall, color = tint, fontWeight = FontWeight.Bold)
+      if (ends > 0) {
+        Spacer(Modifier.height(3.dp))
+        Text(
+          (if (expired) "پایان: " else "تا تاریخ ") + formatMillis(ends),
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted,
+        )
+      }
+      status.payload?.planTitle?.takeIf { it.isNotBlank() }?.let {
+        Spacer(Modifier.height(2.dp))
+        Text("پلن: $it", style = MaterialTheme.typography.labelSmall, color = colors.muted2)
+      }
+    }
+  }
+}
+
+/**
+ *  دکمهٔ خرید.
+ *
+ *  تا حالا دکمهٔ آبیِ همیشگیِ برنامه بود و متنش خوانده نمی‌شد: رنگِ متنِ
+ *  آن دکمه یک سرمه‌ایِ تقریباً سیاه است که روی زمینهٔ آبیِ تیره‌اش گم
+ *  می‌شود. اینجا زمینه طلاست و متن قهوه‌ایِ تیره — بیشترین اختلافی که
+ *  می‌شد گذاشت — و بلندیِ دکمه هم بسته به متن باز می‌شود، پس عنوانِ
+ *  بلندِ «گرفتن اشتراک ۱ ساله — 4000 افغانی» بریده نمی‌شود.
+ */
+@Composable
+private fun BuyButtonLegacy(text: String, onClick: () -> Unit) {
+  val pulse = goldPulseLegacy()
+  val interaction = remember { MutableInteractionSource() }
+  val pressed by interaction.collectIsPressedAsState()
+  val scale by animateFloatAsState(
+    targetValue = if (pressed) 0.97f else 1f,
+    animationSpec = tween(120, easing = FastOutSlowInEasing),
+    label = "press",
+  )
+  val shape = RoundedCornerShape(28.dp)
+
+  Row(
+    Modifier
+      .fillMaxWidth()
+      .graphicsLayer { scaleX = scale; scaleY = scale }
+      .goldEdge(28.dp, pulse, strong = true)
+      //  تا انگشت روی دکمه است، نور از کناره‌ها می‌آید
+      .edgeSparks(pressed, GOLDLegacy)
+      .clip(shape)
+      .background(GOLD_SWEEPLegacy)
+      .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+      .padding(horizontal = 18.dp, vertical = 15.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.Center,
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = null,
+      tint = GOLD_INKLegacy,
+      modifier = Modifier.size(19.dp),
+    )
+    Spacer(Modifier.width(8.dp))
+    Text(
+      text,
+      style = MaterialTheme.typography.titleSmall,
+      color = GOLD_INKLegacy,
+      fontWeight = FontWeight.Bold,
+      textAlign = TextAlign.Center,
+    )
+  }
+}
+
+/**
+ *  یک ستونِ مقایسه — رایگان یا VIP.
+ *
+ *  قابلیتِ بسته با قفل نشان داده می‌شود، نه با نبودن در فهرست: فهرستی که
+ *  کوتاه‌تر است فقط «کمتر» به نظر می‌رسد؛ قفل می‌گوید **چه چیزی** کم است.
+ */
+@Composable
+private fun TierCardLegacy(
+  title: String,
+  price: String,
+  priceNote: String,
+  note: String,
+  features: List<Pair<String, Boolean>>,
+  highlighted: Boolean,
+  footer: String,
+  footerTint: Color,
+  modifier: Modifier = Modifier,
+  ribbon: String = "",
+) {
+  val colors = Shop.colors
+  val pulse = goldPulseLegacy()
+  //  ستونِ VIP تا وقتی انگشت رویش است نور می‌دهد؛ ستونِ رایگان ساکن است
+  val tap = remember { MutableInteractionSource() }
+  val touched by tap.collectIsPressedAsState()
+  val bodyShape =
+    if (ribbon.isNotBlank()) RoundedCornerShape(bottomStart = Radius.md, bottomEnd = Radius.md)
+    else RoundedCornerShape(Radius.md)
+
+  Column(modifier) {
+    /*
+     *  نوارِ نشان همیشه جا می‌گیرد، حتی در ستونی که نشان ندارد.
+     *
+     *  وگرنه ستونِ نشان‌دار به‌اندازهٔ همان نوار پایین‌تر شروع می‌شد و دو
+     *  ستون از بالا با هم تراز نبودند — همان چیزی که در عکس دیده می‌شد.
+     */
+    if (ribbon.isNotBlank()) {
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(topStart = Radius.md, topEnd = Radius.md))
+          .height(RIBBON_BANDLegacy)
+          .background(GOLD_SWEEPLegacy),
+        contentAlignment = Alignment.Center,
+      ) {
+        Row(
+          verticalAlignment = Alignment.CenterVertically,
+          horizontalArrangement = Arrangement.spacedBy(5.dp),
+        ) {
+          Icon(
+            Icons.Filled.WorkspacePremium,
+            contentDescription = null,
+            tint = GOLD_INKLegacy,
+            modifier = Modifier.size(13.dp),
+          )
+          Text(
+            ribbon,
+            style = MaterialTheme.typography.labelSmall,
+            color = GOLD_INKLegacy,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+          )
+        }
+      }
+    } else {
+      Spacer(Modifier.height(RIBBON_BANDLegacy))
+    }
+
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .weight(1f)
+        .then(if (highlighted) Modifier.goldEdge(Radius.md, pulse, strong = true) else Modifier)
+        .then(if (highlighted) Modifier.edgeSparks(touched, GOLDLegacy) else Modifier)
+        .clip(bodyShape)
+        .background(colors.surface)
+        .then(
+          if (highlighted) Modifier
+          else Modifier.border(1.dp, colors.border, bodyShape)
+        )
+        .then(
+          //  زدنِ این ستون جایی نمی‌برد؛ فقط نورش را روشن می‌کند —
+          //  مدت را کاربر از کارت‌های پایین انتخاب می‌کند
+          if (highlighted) Modifier.clickable(
+            interactionSource = tap, indication = null,
+          ) {}
+          else Modifier
+        )
+        .padding(14.dp),
+    ) {
+      Text(
+        title,
+        style = MaterialTheme.typography.titleSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(8.dp))
+      Row(verticalAlignment = Alignment.Bottom) {
+        Text(
+          price,
+          style = MaterialTheme.typography.headlineSmall,
+          color = if (highlighted) GOLD_DEEPLegacy else colors.primary,
+          fontWeight = FontWeight.Bold,
+        )
+        if (priceNote.isNotBlank()) {
+          Spacer(Modifier.width(4.dp))
+          Text(priceNote, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+        }
+      }
+      Text(note, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+
+      Spacer(Modifier.height(10.dp))
+      HorizontalDivider(color = if (highlighted) GOLDLegacy.copy(alpha = 0.45f) else colors.border)
+      Spacer(Modifier.height(10.dp))
+
+      features.forEach { (name, on) ->
+        Row(
+          Modifier.fillMaxWidth().padding(vertical = 4.dp),
+          verticalAlignment = Alignment.CenterVertically,
+        ) {
+          // در ستونِ VIP خودِ تیک‌ها هم طلایی‌اند؛ ستونی که «همه‌چیز» را
+          // می‌دهد نباید با همان آبیِ ستونِ رایگان علامت بخورد
+          Box(
+            Modifier
+              .size(18.dp)
+              .clip(CircleShape)
+              .then(
+                if (on && highlighted) Modifier.background(GOLD_SWEEPLegacy)
+                else Modifier.background(if (on) colors.primary else colors.surface2)
+              ),
+            contentAlignment = Alignment.Center,
+          ) {
+            Icon(
+              if (on) Icons.Filled.Check else Icons.Filled.Lock,
+              contentDescription = null,
+              tint = when {
+                on && highlighted -> GOLD_INKLegacy
+                on -> Color.White
+                else -> colors.muted2
+              },
+              modifier = Modifier.size(11.dp),
+            )
+          }
+          Spacer(Modifier.width(8.dp))
+          Text(
+            name,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (on) colors.text else colors.muted2,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+          )
+        }
+      }
+
+      // پاورقی همیشه کفِ کارت می‌نشیند، پس در دو ستونِ هم‌قد روبه‌روی هم است
+      Spacer(Modifier.height(12.dp))
+      Spacer(Modifier.weight(1f))
+      Box(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .background(footerTint.copy(alpha = 0.14f))
+          .padding(vertical = 9.dp),
+        contentAlignment = Alignment.Center,
+      ) {
+        Text(
+          footer,
+          style = MaterialTheme.typography.labelSmall,
+          color = footerTint,
+          fontWeight = FontWeight.Bold,
+          textAlign = TextAlign.Center,
+        )
+      }
+    }
+  }
+}
+
+/**
+ *  یک مدتِ اشتراک.
+ *
+ *  «روزی حدود …» عمداً هست: ۴۰۰۰ افغانی در سال بزرگ به نظر می‌رسد،
+ *  ۱۱ افغانی در روز نه — و هر دو یک عددند.
+ *
+ *  کارتِ نشان‌دار طلایی است: لبهٔ درخشان، برقی که روی سطح می‌لغزد، و
+ *  نشانِ طلا بالای آن.
+ */
+@Composable
+private fun PlanCardLegacy(
+  plan: PlanLegacy,
+  selected: Boolean,
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier,
+  /**
+   *  آیا این کارت تا کفِ ردیف کشیده شود.
+   *
+   *  فقط وقتی درست است که ردیف قدِ معلومی داشته باشد — یعنی
+   *  `Modifier.height(IntrinsicSize.Min)`. در ستونی که بلندیِ در دسترسش
+   *  بی‌نهایت است (هر ستونِ اسکرول‌شونده)، `weight` به بچه‌اش **صفر**
+   *  بلندی می‌دهد و کارت اصلاً دیده نمی‌شود.
+   */
+  stretch: Boolean = false,
+) {
+  val colors = Shop.colors
+  val perDay = plan.price.toDouble() / plan.days
+  val golden = plan.badge.isNotBlank()
+  val pulse = goldPulseLegacy()
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
+  val shape = RoundedCornerShape(Radius.md)
+
+  // سه کارت در عرضِ یک گوشی یعنی هر کدام حدودِ صد نقطه؛ با فاصله‌های
+  // تبلت، متن‌ها بریده می‌شوند. پس کارت روی صفحهٔ باریک جمع می‌شود.
+  val wide = isTablet()
+
+  Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+    /*
+     *  نوارِ نشان همیشه همین بلندی را می‌گیرد، حتی در کارتی که نشان
+     *  ندارد. کارتِ «ماهانه» نشان ندارد و بدونِ این فاصله، بالاترش
+     *  می‌نشست و با آن دو تای دیگر تراز نبود.
+     */
+    Box(Modifier.height(BADGE_BANDLegacy), contentAlignment = Alignment.BottomCenter) {
+      //  تخفیف بر نشانِ همیشگی می‌چربد: «٪۲۰ کمتر» خبرِ تازه است،
+      //  «پیشنهاد ما» همیشه بوده
+      when {
+        plan.discounted -> GoldBadgeLegacy(
+          plan.discountLabel.ifBlank { "٪${plan.offPercent.fa()} تخفیف" }
+        )
+        golden -> GoldBadgeLegacy(plan.badge)
+      }
+    }
+
+    Column(
+      Modifier
+        .fillMaxWidth()
+        .then(if (stretch) Modifier.weight(1f) else Modifier)
+        .selectScale(selected)
+        .then(if (golden) Modifier.goldEdge(Radius.md, pulse, strong = selected) else Modifier)
+        //  نورِ چرخانِ دورِ کارت‌های طلایی — شرحش سرِ `borderBeam`
+        .then(if (golden) Modifier.borderBeam(GOLDLegacy, strong = selected) else Modifier)
+        //  تا انگشت روی کارت است، نور از کناره‌هایش می‌آید
+        .edgeSparks(touched, if (golden) GOLDLegacy else colors.primary)
+        .clip(shape)
+        .background(colors.surface)
+        .then(
+          if (golden) Modifier
+          else Modifier.border(
+            if (selected) 1.6.dp else 1.dp,
+            if (selected) colors.primary else colors.border,
+            shape,
+          )
+        )
+        .clickable(
+          interactionSource = press,
+          indication = LocalIndication.current,
+          onClick = onClick,
+        )
+        .padding(horizontal = if (wide) 14.dp else 8.dp, vertical = if (wide) 14.dp else 11.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Text(
+        plan.title,
+        style = if (wide) MaterialTheme.typography.titleSmall
+        else MaterialTheme.typography.labelLarge,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(6.dp))
+      /*
+       *  قیمتِ قبلی، خط‌خورده.
+       *
+       *  تخفیف تا وقتی عددِ قبلی دیده نشود، تخفیف نیست — فقط یک قیمتِ
+       *  دیگر است. پس هر دو نشان داده می‌شوند، و نشانِ «٪۲۰» بالای
+       *  کارت می‌گوید چقدر.
+       */
+      if (plan.discounted) {
+        Text(
+          plain(plan.fullPrice),
+          style = MaterialTheme.typography.labelSmall,
+          color = colors.muted2,
+          textDecoration = TextDecoration.LineThrough,
+          maxLines = 1,
+        )
+      }
+      Text(
+        plain(plan.price),
+        style = if (wide) MaterialTheme.typography.titleMedium
+        else MaterialTheme.typography.titleSmall,
+        color = when {
+          plan.discounted -> colors.success
+          golden -> GOLD_DEEPLegacy
+          else -> colors.primary
+        },
+        fontWeight = FontWeight.Bold,
+        maxLines = 1,
+      )
+      // «افغانی» روی گوشی زیرِ عدد می‌رود نه کنارش: کنارِ هم بودنشان،
+      // عرضی می‌خواهد که در یک‌سومِ صفحهٔ گوشی نیست
+      Text(
+        "؋",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted,
+        maxLines = 1,
+      )
+      Spacer(Modifier.height(4.dp))
+      Text(
+        // روی گوشی «حدود» برداشته می‌شود؛ همان عدد را می‌گوید با جای کمتر
+        if (wide) "روزی حدود ${money(perDay)} ؋" else "روزی ${money(perDay)}",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+        textAlign = TextAlign.Center,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+      )
+      Spacer(Modifier.height(10.dp))
+      if (stretch) Spacer(Modifier.weight(1f))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .then(
+            when {
+              selected && golden -> Modifier.background(GOLD_SWEEPLegacy)
+              selected -> Modifier.background(colors.primaryTint)
+              else -> Modifier.background(colors.surface2)
+            }
+          )
+          .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        // تیک فقط روی صفحهٔ پهن؛ در کارتِ باریک، همان چند نقطه فرقِ جا
+        // شدن و نشدنِ «انتخاب شد» است
+        if (wide) {
+          Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = when {
+              selected && golden -> GOLD_INKLegacy
+              selected -> colors.primary
+              else -> colors.muted2
+            },
+            modifier = Modifier.size(14.dp),
+          )
+          Spacer(Modifier.width(5.dp))
+        }
+        Text(
+          if (selected) "انتخاب شد" else "انتخاب",
+          style = MaterialTheme.typography.labelSmall,
+          color = when {
+            selected && golden -> GOLD_INKLegacy
+            selected -> colors.primary
+            else -> colors.muted
+          },
+          fontWeight = FontWeight.Bold,
+          maxLines = 1,
+        )
+      }
+    }
+  }
+}
+
+@Composable
+fun VipGateLegacy(label: String, content: @Composable () -> Unit) {
+  val context = LocalContext.current
+  val state = remember { SyncStore(context) }
+  val enforcing = LOCKINGLegacy && AppConfig.isConfigured(context)
+  //  «حساب دارد یا نه» یک بار پرسیده می‌شود، نه با هر بار کشیده شدنِ صفحه
+  val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.tokens(context).signedIn }
+  val status = remember(enforcing, LicenseGuard.changes.intValue, SubscriptionPulse.at) { LicenseGuard.status(context, state) }
+  val open = when {
+    !enforcing -> true
+    //  کدِ آفلاینِ همین کامپیوتر — بی اینترنت و حتی پیش از ساختنِ حساب
+    LicenseGuard.offline(context, state) != null -> true
+    !signedIn -> false
+    status.state == License.State.ACTIVE -> true
+    status.state == License.State.GRACE -> true
+    //  حساب دارد ولی سرور هنوز مجوزی نداده — شرحش سرِ `LOCKINGLegacy`؛ اما اگر
+    //  سرور صریحاً گفته «اشتراکی نیست»، دیگر «هنوز» نیست و قفل است
+    status.state == License.State.NONE -> state.serverDenied == null
+    else -> false
+  }
+
+  if (open) {
+    content()
+    return
+  }
+
+  var sheet by remember { mutableStateOf(false) }
+
+  /*
+   *  صفحهٔ قفل، وسطِ صفحه.
+   *
+   *  قبلاً یک ستونِ تمام‌عرض بود با متن‌های چسبیده به یک لبه؛ روی تبلت
+   *  همه‌چیز به یک کنار می‌رفت و وسطِ صفحه خالی می‌ماند. حالا یک کارتِ
+   *  با پهنای محدود است که وسط می‌ایستد — روی گوشی و تبلت یک‌شکل.
+   */
+  Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+    Column(
+      Modifier
+        .widthIn(max = 420.dp)
+        .fillMaxWidth()
+        .clip(RoundedCornerShape(Radius.lg))
+        .background(Shop.colors.surface)
+        .border(1.dp, Shop.colors.fieldBorder.copy(alpha = 0.5f), RoundedCornerShape(Radius.lg))
+        .padding(24.dp),
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      /*
+       *  قفلِ خاکستریِ نفس‌کشنده رفت.
+       *
+       *  این صفحه خبرِ بد نمی‌دهد؛ می‌گوید چه چیزی با اشتراک باز می‌شود.
+       *  پس همان نشانِ صفحه‌ی اشتراک، با یک بار باز شدنِ نرم — نه تپشِ
+       *  همیشگیِ یک قفلِ خاکستری.
+       */
+      var lit by remember { mutableStateOf(false) }
+      LaunchedEffect(Unit) { lit = true }
+      val grow by animateFloatAsState(
+        targetValue = if (lit) 1f else 0.84f,
+        animationSpec = if (Motion.enabled) spring(dampingRatio = 0.6f, stiffness = 320f) else snap(),
+        label = "gateGrow",
+      )
+      Box(
+        Modifier
+          .graphicsLayer { scaleX = grow; scaleY = grow }
+          .size(66.dp)
+          .shadow(20.dp, RoundedCornerShape(22.dp), ambientColor = GOLDLegacy, spotColor = GOLDLegacy)
+          .clip(RoundedCornerShape(22.dp))
+          .background(Brush.linearGradient(listOf(GOLD_SOFTLegacy, GOLDLegacy, GOLD_DEEPLegacy))),
+        contentAlignment = Alignment.Center,
+      ) {
+        Icon(
+          Icons.Filled.WorkspacePremium,
+          contentDescription = null,
+          tint = Color.White,
+          modifier = Modifier.size(29.dp),
+        )
+      }
+      Spacer(Modifier.height(16.dp))
+      /*
+       *  «حساب نداری» و «اشتراکت تمام شده» دو چیزِ متفاوت‌اند و کارِ
+       *  بعدیِ کاربر هم در هر دو فرق دارد. یک متنِ مشترک برای هر دو،
+       *  کسی را که فقط باید ثبت‌نام کند سرِ صفحهٔ قیمت‌ها می‌فرستاد.
+       */
+      Text(
+        if (!signedIn) "برای «$label» باید حساب بسازید"
+        else "«$label» با اشتراک باز می‌شود",
+        style = MaterialTheme.typography.titleMedium,
+        color = Shop.colors.text,
+        fontWeight = FontWeight.Bold,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(8.dp))
+      Text(
+        if (!signedIn)
+          "ساختنِ حساب مجانی است و هفت روز آزمایشی دارد — با آن همه‌چیز باز می‌شود. " +
+            "از کلیدِ حساب در بالای صفحه حساب بسازید. بقیهٔ برنامه هم بدونِ حساب باز " +
+            "است: انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری."
+        else
+          "بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.",
+        style = MaterialTheme.typography.bodySmall,
+        color = Shop.colors.muted,
+        textAlign = TextAlign.Center,
+      )
+      Spacer(Modifier.height(20.dp))
+      //  کلید همان صفحهٔ قیمت‌ها را باز می‌کند؛ ساختنِ حساب از سربرگ است
+      //  و متنِ بالا همان را می‌گوید — کلیدی که جای دیگری ببرد، دروغ است
+      GoldButtonLegacy("اشتراک و قیمت‌ها") { sheet = true }
+    }
+  }
+  if (sheet) VipScreenLegacy { sheet = false }
+}
+
+/**
+ *  دکمهٔ طلاییِ اشتراک — با همان جرقه‌ای که کارت‌های اشتراک می‌زنند.
+ *
+ *  دکمهٔ تختِ قبلی کنارِ آن نشانِ متحرک، مرده به نظر می‌رسید: همان کار را
+ *  می‌کرد ولی نمی‌گفت که همان چیز است.
+ */
+@Composable
+private fun GoldButtonLegacy(text: String, onClick: () -> Unit) {
+  val press = remember { MutableInteractionSource() }
+  val touched by press.collectIsPressedAsState()
+  Row(
+    Modifier
+      .edgeSparks(touched, GOLDLegacy)
+      .clip(RoundedCornerShape(26.dp))
+      .background(
+        Brush.linearGradient(
+          listOf(Color(0xFFF6D36B), Color(0xFFE0A92C), Color(0xFFF8E39A), Color(0xFFD9982A))
+        )
+      )
+      .clickable(interactionSource = press, indication = LocalIndication.current, onClick = onClick)
+      .padding(horizontal = 22.dp, vertical = 13.dp),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.spacedBy(7.dp),
+  ) {
+    Icon(
+      Icons.Filled.WorkspacePremium,
+      contentDescription = null,
+      tint = Color(0xFF4A3208),
+      modifier = Modifier.size(18.dp),
+    )
+    Text(text, color = Color(0xFF3A2705), fontWeight = FontWeight.Bold)
+  }
+}
+
+
+/* ==================== هیروی صفحه‌ی اشتراک ==================== */
+
+/**
+ *  بالای صفحه، پیش از قیمت‌ها: اول بگو چه می‌فروشی.
+ *
+ *  یک مربعِ نرمِ گرادینتی با تاجِ سفید و هاله‌ی بنفشِ زیرش، و دو خط زیرِ
+ *  آن. همان چیزی که در برنامه‌های گران، صفحه‌ی اشتراک با آن باز می‌شود:
+ *  یک نشانِ بزرگ و یک جمله، نه یک جدولِ قیمت.
+ */
+@Composable
+private fun VipHeroLegacy() {
+  val colors = Shop.colors
+  //  ورودِ نرم: نشان از ۰٫۸ باز می‌شود و متن کمی از پایین بالا می‌آید —
+  //  یک بار، هنگام آمدنِ صفحه
+  var shown by remember { mutableStateOf(false) }
+  LaunchedEffect(Unit) { shown = true }
+  val grow by animateFloatAsState(
+    targetValue = if (shown) 1f else 0.82f,
+    animationSpec = if (Motion.enabled) spring(dampingRatio = 0.62f, stiffness = 320f) else snap(),
+    label = "heroGrow",
+  )
+  val rise by animateFloatAsState(
+    targetValue = if (shown) 0f else 14f,
+    animationSpec = if (Motion.enabled) tween(420, easing = FastOutSlowInEasing) else snap(),
+    label = "heroRise",
+  )
+
+  Column(
+    Modifier.fillMaxWidth(),
+    horizontalAlignment = Alignment.CenterHorizontally,
+  ) {
+    Box(
+      Modifier
+        .graphicsLayer { scaleX = grow; scaleY = grow }
+        .size(66.dp)
+        .shadow(22.dp, RoundedCornerShape(24.dp), ambientColor = GOLDLegacy, spotColor = GOLDLegacy)
+        .clip(RoundedCornerShape(24.dp))
+        .background(Brush.linearGradient(listOf(GOLD_SOFTLegacy, GOLDLegacy, GOLD_DEEPLegacy))),
+      contentAlignment = Alignment.Center,
+    ) {
+      Icon(
+        Icons.Filled.WorkspacePremium,
+        contentDescription = null,
+        tint = Color.White,
+        modifier = Modifier.size(31.dp),
+      )
+    }
+    Spacer(Modifier.height(14.dp))
+    Column(
+      Modifier.graphicsLayer { translationY = rise; alpha = if (rise > 0.5f) 0.6f else 1f },
+      horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+      Text(
+        "دکان بدون محدودیت",
+        style = MaterialTheme.typography.headlineSmall,
+        color = colors.text,
+        fontWeight = FontWeight.Bold,
+      )
+      Spacer(Modifier.height(5.dp))
+      Text(
+        "فروش، قرض‌داران و بارکد — همه باز",
+        style = MaterialTheme.typography.bodySmall,
+        color = colors.muted,
+        textAlign = TextAlign.Center,
+      )
+    }
+  }
+}
+
+
+/**
+ *  کدِ اشتراکِ آفلاین — برای کسی که اینترنت ندارد.
+ *
+ *  خواستهٔ صاحب سامانه: «برای هر کامپیوتر یک ایدی… از سرور به اون ادرس کد
+ *  داده میشه و میزنه و روی همون کد فقط کار کنه و یک بار بیشتر هم استفاده نشه.»
+ *
+ *  ۱) «شناسهٔ کامپیوتر» را با دکمهٔ رونوشت برای فروشنده می‌فرستد
+ *  ۲) کدی که پنل برای همین شناسه ساخته این‌جا چسبانده می‌شود ⇒ بی اینترنت
+ *     سنجیده و اشتراک همان لحظه باز (‎LicenseGuard.applyOffline‎)
+ *  ۳) اینترنت که آمد، برنامه خودش کد را یک بار به سرور می‌برد (‎Syncer‎)
+ */
+@Composable
+private fun OfflineCodeCardLegacy() {
+  val context = LocalContext.current
+  val colors = Shop.colors
+  val state = remember { SyncStore(context) }
+  val computer = remember { runCatching { LicenseGuard.computerId(context) }.getOrDefault("—") }
+  val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+  var open by remember { mutableStateOf(false) }
+  var code by remember { mutableStateOf("") }
+  var note by remember { mutableStateOf<String?>(null) }
+  var ok by remember { mutableStateOf(false) }
+  var active by remember { mutableStateOf(LicenseGuard.offline(context, state)) }
+
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.md))
+      .background(colors.surface)
+      .border(1.dp, colors.border, RoundedCornerShape(Radius.md))
+      .padding(14.dp),
+  ) {
+    Row(Modifier.fillMaxWidth().clickable { open = !open }, verticalAlignment = Alignment.CenterVertically) {
+      Icon(Icons.Filled.Redeem, contentDescription = null, tint = colors.primary, modifier = Modifier.size(18.dp))
+      Spacer(Modifier.width(9.dp))
+      Column(Modifier.weight(1f)) {
+        Text("کدِ اشتراکِ آفلاین (بی اینترنت)", style = MaterialTheme.typography.labelLarge, color = colors.text, fontWeight = FontWeight.Bold)
+        Text(
+          active?.let { "فعال — ${it.payload?.planTitle.orEmpty()}" } ?: "کدی که فقط روی همین کامپیوتر کار می‌کند",
+          style = MaterialTheme.typography.labelSmall,
+          color = if (active != null) colors.success else colors.muted,
+        )
+      }
+      Text(if (open) "بستن" else "باز کردن", style = MaterialTheme.typography.labelSmall, color = colors.primary, fontWeight = FontWeight.Bold)
+    }
+
+    if (open) {
+      Spacer(Modifier.height(12.dp))
+      Text("شناسهٔ این کامپیوتر — همین را برای فروشنده بفرستید:", style = MaterialTheme.typography.labelSmall, color = colors.muted)
+      Spacer(Modifier.height(6.dp))
+      Row(
+        Modifier
+          .fillMaxWidth()
+          .clip(RoundedCornerShape(Radius.sm))
+          .background(colors.surface2)
+          .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+      ) {
+        androidx.compose.runtime.CompositionLocalProvider(
+          androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr,
+        ) {
+          Text(
+            computer,
+            Modifier.weight(1f),
+            style = MaterialTheme.typography.titleMedium,
+            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+            fontWeight = FontWeight.Bold,
+            color = colors.text,
+          )
+        }
+        TextButton(onClick = {
+          clipboard.setText(androidx.compose.ui.text.AnnotatedString(computer))
+          ok = true; note = "شناسه رونوشت شد"
+        }) { Text("رونوشت") }
+      }
+
+      Spacer(Modifier.height(12.dp))
+      OutlinedTextField(
+        value = code,
+        onValueChange = { note = null; code = it.take(400) },
+        label = { Text("کدِ اشتراکِ آفلاین (۱۳۸ نویسه)") },
+        minLines = 3,
+        shape = RoundedCornerShape(Radius.sm),
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(10.dp))
+      Button(
+        onClick = {
+          val err = LicenseGuard.applyOffline(context, state, code)
+          if (err == null) {
+            ok = true
+            active = LicenseGuard.offline(context, state)
+            note = "اشتراک روی همین کامپیوتر باز شد" + (active?.let { s ->
+              val d = s.daysLeft()
+              if (d > 3650) " — دائمی" else " — ${d} روز"
+            } ?: "") + ". اینترنت که وصل شد، خودش به حسابتان ثبت می‌شود."
+            code = ""
+          } else {
+            ok = false
+            note = err
+          }
+        },
+        enabled = code.isNotBlank(),
+        shape = RoundedCornerShape(Radius.sm),
+        modifier = Modifier.fillMaxWidth().height(46.dp),
+      ) { Text("ثبتِ کد", fontWeight = FontWeight.Bold) }
+      note?.let {
+        Spacer(Modifier.height(8.dp))
+        Text(it, style = MaterialTheme.typography.labelSmall, color = if (ok) colors.success else colors.danger)
+      }
+      Spacer(Modifier.height(6.dp))
+      Text(
+        "هر کد فقط برای همین شناسه و فقط یک بار است؛ روی کامپیوترِ دیگر یا دوباره پذیرفته نمی‌شود.",
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted2,
+      )
+    }
+  }
+}

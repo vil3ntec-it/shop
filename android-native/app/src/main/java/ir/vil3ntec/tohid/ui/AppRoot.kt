@@ -104,6 +104,8 @@ fun AppRoot(
   theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()

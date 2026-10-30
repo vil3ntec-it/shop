@@ -73,7 +73,7 @@ private val SHEEN = Color(0xFFFFFFFF)
 
 /** لهجهٔ گرم — فقط چند نقطه، به‌اندازه‌ای که چشم را گرم کند */
 private val ACCENT_AMBER = Brand.orange
-private val ACCENT_BLUE = Brand.primary
+private val ACCENT_BLUE get() = Brand.primary
 
 /*
  *  رنگِ حباب‌ها.

@@ -60,6 +60,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     LocaleChoice.load(applicationContext)
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
+    ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
@@ -102,6 +103,36 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
           if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext)
           else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)   // KEEP: بی اثرِ دوم
         }
+      }
+
+      //  پرچمِ رابطِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز، بی انتخابگرِ حالت (`UiV3`)
+      if (!ir.vil3ntec.tohid.ui.UiV3.on) {
+        TohidTheme(theme) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            if (!welcomed) {
+              WelcomeScreen(store) {
+                prefs.edit().putBoolean("welcomed", true).apply()
+                welcomed = true
+              }
+            } else if (courier) {
+              ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
+                //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
+                prefs.edit().putBoolean("welcomed", false).apply()
+                welcomed = false
+              })
+            } else {
+              AppRoot(
+                store = store,
+                theme = theme,
+                onTheme = {
+                  theme = it
+                  prefs.edit().putString("theme", it.name).apply()
+                },
+              )
+            }
+          }
+        }
+        return@setContent
       }
 
       //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
@@ -165,6 +196,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
    *  می‌کند. پیوندِ ویترین و QRِ دکان مالِ برنامهٔ خرید است و در مرورگر می‌ماند.
    */
   private fun handleLink(intent: android.content.Intent?) {
+    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) پیوندِ درونی نداشت — همان رفتار
+    if (!ir.vil3ntec.tohid.ui.UiV3.on) return
     val link = DeepLinks.parse(intent?.dataString) ?: return
     ModeState.pendingLink.value = link
     if (link.mode in ModeState.available(applicationContext) && ModeState.chosen.value != link.mode) {
