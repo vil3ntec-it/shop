@@ -148,6 +148,8 @@ fun DeskSaleScreen(
   //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
+  //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
+  val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
   var payOpen by remember { mutableStateOf(false) }
@@ -273,6 +275,7 @@ fun DeskSaleScreen(
     paidAmount = parseNumber(paidText) ?: 0.0,
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
+    rules = checkoutRules,
   )
   val totals = SalesEngine.totals(d, priced, checkout)
   //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
