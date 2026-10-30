@@ -76,7 +76,7 @@ object LedgerDiff {
   }
 
   /** فهرستِ نام ⇒ نام‌های بی خالی و بی تکرار؛ `null` یعنی کلید اصلاً نیست. */
-  private fun listNames(tree: JsonObject?, key: String): List<String>? {
+  internal fun listNames(tree: JsonObject?, key: String): List<String>? {
     val arr = tree?.get(key) as? JsonArray ?: return null
     val out = ArrayList<String>(arr.size)
     for (e in arr) {

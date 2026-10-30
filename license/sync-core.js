@@ -579,6 +579,36 @@
     return out;
   }
 
+  /* §۹.۵ «نگه‌دارِ محلی» پس از بازیابی — قرینهٔ `RestoreMerge` ِ `V1Restore.kt`: دفتر = Snapshot (جز بایگانی) + تنهاهای این‌جا (جز حذف‌شده‌های سرور)؛ سایه = بی تنهاها ⇒ تفاضل = «درج»ِ آن‌ها */
+  function idSet(list) { var o = Object.create(null); (list || []).forEach(function (x) { o[String(x)] = true; }); return o; }
+  function restoreLocalOnly(snapshot, local, archived) { return restoreMerge(snapshot, local, [], archived).alone; } // سرور می‌سنجد کدام حذف‌شده است
+  function restoreMerge(snapshot, local, gone, archived) {
+    var t = (snapshot && snapshot.tables) || {};
+    var dead = idSet((gone || []).map(function (g) { return g.table + '\u0000' + g.row_id; }));
+    var out = { ledger: cloneLedger(local || {}), shadow: {}, alone: [] };
+    var lone = function (key, id) { out.alone.push({ table: key, row_id: id }); return !dead[key + '\u0000' + id]; };
+    COLLECTIONS.forEach(function (key) {
+      var skip = idSet(archived && archived[key]);
+      var server = (Array.isArray(t[key]) ? t[key] : []).filter(function (r) { return isPlainObject(r) && r.id != null && !skip[r.id]; })
+        .map(function (r) { return Object.assign({}, isPlainObject(r.data) ? r.data : {}, { id: String(r.id) }); });
+      var ids = idSet(server.map(function (r) { return r.id; }));
+      var mine = (Array.isArray(local && local[key]) ? local[key] : []).filter(function (r) {
+        return isPlainObject(r) && r.id != null && !ids[r.id] && !skip[r.id] && lone(key, String(r.id));
+      });
+      out.ledger[key] = server.concat(JSON.parse(JSON.stringify(mine)));
+      out.shadow[key] = JSON.parse(JSON.stringify(server));
+    });
+    LIST_COLLECTIONS.forEach(function (key) {
+      if (!Array.isArray(t[key]) && !Array.isArray(local && local[key])) { delete out.ledger[key]; return; }
+      var srv = listRows((t[key] || []).map(function (r) { return isPlainObject(r) ? r.data : null; })).map(function (r) { return r.name; });
+      var names = listRows(local && local[key]).map(function (r) { return r.name; });
+      var keep = names.filter(function (n) { return srv.indexOf(n) !== -1; });
+      var mine = names.filter(function (n) { return srv.indexOf(n) === -1 && lone(key, listRowId(n)); });
+      out.ledger[key] = keep.concat(srv.filter(function (n) { return keep.indexOf(n) === -1; }), mine);
+      out.shadow[key] = out.ledger[key].filter(function (n) { return srv.indexOf(n) !== -1; });
+    });
+    return out;
+  }
   /** فقط مجموعه‌های همگام‌شدنی — سایه چیزِ دیگری لازم ندارد. */
   function shadowOf(data) {
     var out = {};
@@ -776,6 +806,8 @@
     diff: diff,
     applyRemote: applyRemote,
     fromSnapshot: fromSnapshot,
+    restoreLocalOnly: restoreLocalOnly,
+    restoreMerge: restoreMerge,
     shadowOf: shadowOf,
     cloneLedger: cloneLedger,
     isIncField: isIncField,

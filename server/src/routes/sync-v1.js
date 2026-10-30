@@ -28,6 +28,8 @@ const config = require('../config');
 const { requireSyncAccount, requireSyncWrite, tokenOf } = require('../lib/sync-v1-auth');
 const live = require('../lib/sync-v1-live');
 const v = require('../lib/validate');
+const syncEpoch = require('../lib/sync-epoch');
+const { SHOP } = require('../lib/tenancy');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -50,6 +52,22 @@ const pumpOnline = require('../middleware/pump-services').requirePumpServices();
 function pumpServicesOnly(req, res, next) {
   if (req.sync && req.sync.accountKind === 'station') return pumpOnline(req, res, next);
   next();
+}
+
+/*
+ *  §۹.۵: «دورانِ بازیابی» کنارِ pull و Snapshot ِ دکان — فقط با پرچمِ روشنِ `SYNC_EPOCH_ENABLED`.
+ *  برنامه (`V1Restore.pulled`، وب `epochLive`) درِ جدای `GET /api/shop/sync-epoch` را **فقط** وقتی
+ *  می‌زند که pull ِ پیشین دوران آورده باشد؛ خاموش ⇒ این کلید نیست ⇒ هیچ درخواستی که ۴۰۴ بگیرد.
+ *  پمپ و پرچمِ خاموش ⇒ همان پاسخِ پیشین. شکستِ خواندنِ دوران pull را نمی‌خواباند (فقط کلید نیست).
+ */
+async function epochFor(ctx) {
+  if (!config.syncEpoch.enabled || !ctx || ctx.app !== SHOP.app || ctx.accountKind !== SHOP.app) return undefined;
+  try {
+    return await syncEpoch.forAccount(ctx, 'v1');
+  } catch (err) {
+    console.error('[sync-epoch] دوران کنارِ pull خوانده نشد:', err.message);
+    return undefined;
+  }
 }
 
 /* ------------------------------------------------------- بلیتِ سوکت (F0-11) */
@@ -121,7 +139,9 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     });
     const since = Number(req.query?.since || 0);
     const limit = Number(req.query?.limit || 0) || undefined;
-    res.json({ ok: true, ...(await sync.pull(req.sync, { since, deviceId, limit })) });
+    const out = await sync.pull(req.sync, { since, deviceId, limit });
+    const epoch = await epochFor(req.sync);
+    res.json({ ok: true, ...out, ...(epoch ? { epoch } : {}) });
   } catch (err) { next(err); }
 });
 
@@ -129,8 +149,10 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
 
 router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
   try {
+    //  دورانِ پیش از Snapshot: دفترِ ساخته‌شده از آن دست‌کم همین دوران را دارد
+    const epoch = await epochFor(req.sync);
     const snap = await sync.snapshot(req.sync);
-    const body = JSON.stringify({ ok: true, ...snap });
+    const body = JSON.stringify({ ok: true, ...snap, ...(epoch ? { epoch } : {}) });
     //  عکسِ کاملِ یک دفتر چند مگابایت می‌شود؛ روی اینترنتِ موبایل فشرده می‌رود
     if (String(req.headers['accept-encoding'] || '').includes('gzip')) {
       const packed = await gzip(Buffer.from(body, 'utf8'));

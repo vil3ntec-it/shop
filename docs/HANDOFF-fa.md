@@ -54,6 +54,12 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — PR #335 (دورِ CI)، شاخهٔ `ccr-3a0d593c-ac0jpj-restore-repush`
+- انجام شد: ادغامِ main (تعارضِ FREE ِ `paid-routes-entitlement`: هر دو ردیف). ریشهٔ سرخیِ PostgreSQL (`sync-epoch.test:182`):
+  با pg_dump ِ ناموجود Promise ِ `closed` در `lib/backup.js` پیش از `await` بی‌شنونده رد می‌شد ⇒ unhandledRejection (در تولید یعنی
+  خوابیدنِ سرور هنگامِ پشتیبانِ زمان‌بندی‌شده). درست شد؛ psql ِ بازیابی هم شنوندهٔ error گرفت؛ آزمونِ برگشت در `backup.test` (فقط PostgreSQL).
+- قدمِ بعدی: CI را ببین.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/ios-step0-guard` (گامِ ۰ِ آیفون)
 - انجام شد: قاعدهٔ کدِ تازه برای آیفون در `RULES-fa.md` (بخشِ «v3 · هسته‌های مشترک»)؛ سنجهٔ `tools/quality/checks/platform-deps.mjs`
   (فایلِ تازه صفر، موجود فقط کاهشی، سقفِ ۲۱۴ فایل در `baseline.json`، فعلاً گزارش)؛ هدفِ `linuxX64` پشتِ `-Pnative=true` در `core`
