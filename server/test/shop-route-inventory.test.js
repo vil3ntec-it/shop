@@ -188,7 +188,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.storefront', 'shop.storefront.media', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -201,6 +201,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat
 const PER_SHOP_KEYS = new Set([
   'PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId',
   'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+  //  M3: `:kind` (logo/header) نامِ جایگاه در فضای خودِ هر دکان است — «ب» فقط لوگوی خودش را می‌نویسد
+  'PUT /shop/storefront/media/:kind', 'DELETE /shop/storefront/media/:kind',
 ]);
 /** شناسهٔ کالا و قاعدهٔ تخفیف کلیدِ فضای دکان‌اند، نه راز — برای «ب» بازتابِ همان نشانی‌اند */
 const NOT_SECRET = new Set(['product', 'promoRule']);
@@ -278,6 +280,10 @@ async function seedShop(a) {
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
+
+  //  M3: لوگوی ویترین (نسخهٔ ۱)
+  const logo = await h.raw('PUT', '/api/shop/storefront/media/logo', F.jpeg(256, 256, { seed: 733 }), { token: a.accessToken });
+  assert.equal(logo.status, 200, JSON.stringify(logo.body));
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -388,6 +394,7 @@ function concreteFor(ids) {
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/media\/):kind/, 'logo'],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
@@ -453,6 +460,7 @@ const RAW = new Set([
   'POST /shop/chat/conversations/:id/media',
   'POST /shop/images/:id/versions',
   'PUT /shop/images/:id/v/:version/:size',
+  'PUT /shop/storefront/media/:kind',
 ]);
 
 function call(r, url, body, token, extraHeaders = {}) {
