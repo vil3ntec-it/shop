@@ -29,6 +29,8 @@ async function createApp({ runMigrations = true } = {}) {
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     log: (m) => console.log(`[admin] ${m}`),
   });
+  //  SUB-04 / F0-28: کلیدِ LICENSE_PRIVATE_KEY همان کلیدِ ثبت‌شده؟ ناهمخوان ⇒ صدورِ مجوز بسته، نه امضای بی‌صدا با کلیدِ دیگر
+  await require('./lib/license').checkKeyContinuity().catch(err => console.error('[license]', err.message));
 
   //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
   //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
