@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
-import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
@@ -26,7 +25,6 @@ import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.SettingsEntry
-import ir.vil3ntec.tohid.ui.v3.nav.ShopperSection
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
 
 /** پرچمِ ماژولِ نمونه — پیش‌فرض خاموش (`ModuleFlags`) */
@@ -34,15 +32,14 @@ const val EXAMPLE_FLAG = "module.example"
 
 /**
  *  ماژولِ نمونه — نشان می‌دهد «سیستمِ تازه» با **یک پوشه و یک خط** (`V3Modules.ALL`)
- *  به همه‌جا وصل می‌شود: ردیفی در «بیشتر»، صفحه‌ای در تنظیمات، بخشی روی صفحهٔ
- *  دکان در حالتِ خرید، و مسیرها با پیوندِ `vill3n://app/example`. پشتِ پرچمِ خاموش
+ *  به همه‌جا وصل می‌شود: ردیفی در «بیشتر»، صفحه‌ای در تنظیمات، و مسیرها با
+ *  پیوندِ `vill3n://app/example`. پشتِ پرچمِ خاموش
  *  است، پس کاربر هیچ‌کدام را نمی‌بیند (`docs/MODULES-fa.md`).
  */
 val ExampleModule = AppModule(
   id = "example",
   title = { StrKit.exampleTitle },
   icon = Icons.Outlined.Extension,
-  modes = setOf(AppMode.SHOP, AppMode.SHOPPER),
   flag = EXAMPLE_FLAG,
   entries = listOf(
     ModuleEntry("example", { StrKit.exampleTitle }, "example", Icons.Outlined.Extension, setOf(Place.MORE), MoreGroup.SHOP, V3Hue.PURPLE, order = 99),
@@ -50,13 +47,9 @@ val ExampleModule = AppModule(
   settings = listOf(
     SettingsEntry({ StrKit.exampleTitle }, "settings/example", Icons.Outlined.Extension, SettingsLayout.GENERAL),
   ),
-  shopper = listOf(
-    ShopperSection("example", { StrKit.exampleTitle }, "shopper/shop/{slug}/example", Icons.Outlined.Extension),
-  ),
   routes = listOf(
     V3Route("example", RouteKind.PAGE, { StrKit.exampleTitle }, chrome = Chrome.OWN) { ExampleScreen() },
     V3Route("settings/example", RouteKind.PAGE, { StrKit.exampleTitle }, chrome = Chrome.OWN) { ExampleScreen() },
-    V3Route("shopper/shop/{slug}/example", RouteKind.PAGE, { StrKit.exampleTitle }, parent = "shopper/shop/{slug}", chrome = Chrome.OWN) { ExampleScreen() },
   ),
 )
 

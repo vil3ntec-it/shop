@@ -52,8 +52,6 @@ object StrKit {
   val modeShopBody: String get() = t("فروش، انبار، قرض و گزارشِ دکان", "Sales, stock, debts and reports", "پلور، ګدام، پور او راپورونه")
   val modeCourier: String get() = t("پیکم", "I'm a courier", "رسوونکی یم")
   val modeCourierBody: String get() = t("سفارش‌ها را از دکان به مشتری می‌رسانم", "I deliver orders from shops to customers", "فرمایشونه له دوکان څخه پېرودونکي ته رسوم")
-  val modeShopper: String get() = t("خرید می‌کنم", "I'm shopping", "پېرود کوم")
-  val modeShopperBody: String get() = t("از دکان‌های نزدیک سفارش می‌دهم", "I order from nearby shops", "له نږدې دوکانونو فرمایش ورکوم")
   val continueLabel: String get() = t("ادامه", "Continue", "دوام")
   val switchMode: String get() = t("حالتِ برنامه", "App mode", "د اپ حالت")
   val currentMode: String get() = t("حالتِ فعلی", "Current mode", "اوسنی حالت")
@@ -63,14 +61,6 @@ object StrKit {
   val notificationsEmpty: String get() = t("هشداری نیست", "No notifications", "هېڅ خبرتیا نشته")
   val notificationsEmptyBody: String get() = t("هر چه نیاز به کارِ شما داشته باشد این‌جا می‌آید.", "Anything that needs your attention shows up here.", "هر څه چې ستاسو پاملرنې ته اړتیا ولري دلته راځي.")
 
-  // خرید (جای‌نگهدارِ حالتِ خرید تا گروهِ خرید بسازد)
-  val shopperHome: String get() = t("بازارچه", "Market", "بازار")
-  val shopperCart: String get() = t("سبد", "Cart", "ټوکرۍ")
-  val shopperCheckout: String get() = t("پرداخت", "Checkout", "تادیه")
-  val shopperOrders: String get() = t("سفارش‌های من", "My orders", "زما فرمایشونه")
-  val shopperOrder: String get() = t("سفارش", "Order", "فرمایش")
-  val shopperShop: String get() = t("دکان", "Shop", "دوکان")
-  val shopperAccount: String get() = t("حساب", "Account", "حساب")
   val openShopMode: String get() = t("دکان دارم — ورود یا ساختِ دکان", "I run a shop — sign in or create one", "دوکان لرم — ننوتل یا جوړول")
 
   // ماژولِ نمونه (پشتِ پرچمِ خاموش؛ `docs/MODULES-fa.md`)
