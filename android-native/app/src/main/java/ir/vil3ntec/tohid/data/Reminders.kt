@@ -144,6 +144,7 @@ object Reminders {
   class DailyWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+      ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(applicationContext)
       runCatching { check(applicationContext) }
       return Result.success()
     }

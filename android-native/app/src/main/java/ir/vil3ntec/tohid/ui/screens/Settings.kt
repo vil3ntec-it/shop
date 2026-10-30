@@ -126,6 +126,8 @@ fun SettingsScreen(
    *
    *  نشانی فقط در زمانِ **ساخت** داخلِ برنامه می‌نشیند
    *  (`tohid.apiBase` در `gradle.properties`) و از آن به بعد قفل است.
+   *  ⚠️ تنها استثنا بخشِ «سرورها» (`ServersSettings`) پشتِ پرچمِ خاموشِ `app.multi_server` است — فقط صاحبِ دکان،
+   *  با سنجاقِ هویت و دادهٔ جدا برای هر سرور (`docs/SERVERS-fa.md`).
    */
   val serverReady = AppConfig.isConfigured(context)
   var busy by remember { mutableStateOf(false) }
@@ -668,6 +670,12 @@ fun SettingsScreen(
           )
         }
       }
+    }
+
+    /* ============== سرورها (پرچمِ `app.multi_server`، فقط صاحبِ دکان) ============== */
+    item {
+      val servers = remember { ir.vil3ntec.tohid.platform.ServersController(context) }
+      ServersSettings(servers) { toast(it) }
     }
 
     /* ============================== داده‌ها ============================== */
