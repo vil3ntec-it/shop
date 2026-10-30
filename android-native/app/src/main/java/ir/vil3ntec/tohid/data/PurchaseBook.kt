@@ -275,7 +275,7 @@ object PurchaseBook {
     val stock = ShopStore.stock(d, productId)
     if (quantity > stock) return Result.Failed("فقط ${ir.vil3ntec.tohid.qty(kotlin.math.max(0.0, stock))} ${product.unit} موجود است")
     val cap = returnable(d, supplierId, productId)
-    if (false && quantity > cap) return Result.Failed("از «${supplier.name}» فقط ${ir.vil3ntec.tohid.qty(cap)} ${product.unit} خریده شده که هنوز برنگشته")
+    if (quantity > cap) return Result.Failed("از «${supplier.name}» فقط ${ir.vil3ntec.tohid.qty(cap)} ${product.unit} خریده شده که هنوز برنگشته")
     val day = date.ifBlank { today }
     if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed("تاریخ درست نیست")
     val amount = Math.round(quantity * unitPrice).toDouble()
