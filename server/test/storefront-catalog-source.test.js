@@ -238,6 +238,13 @@ test('پرچم روشن: قاعدهٔ «زنده» و قیمتِ تازه در �
     assert.equal(ok.body.order.totalMinor, 13000, `${o.fmt}: قیمتِ تازهٔ دفتر، نه کهنهٔ کاتالوگ`);
   }
 
+  //  `active: "false"` ِ رشته‌ای (همان قاعدهٔ `LIVE_PRODUCT` ِ sync_rows) در کاتالوگ هم غیرفعال است
+  assert.equal((await pushV1(a, [['rice', { active: 'false' }, 'update']])).status, 200);
+  assert.deepEqual(await storeList(a), [], 'رشتهٔ "false" هم غیرفعال');
+  assert.equal((await checkout(a, [{ productId: 'rice', qtyMilli: 1000 }])).status, 409);
+  assert.equal((await pushV1(a, [['rice', { active: true }, 'update']])).status, 200);
+  assert.deepEqual(await storeList(a), want);
+
   //  حذف در دفتر ⇒ از ویترین و ثبت بیرون؛ برگرداندنِ پرچم ⇒ همان منبعِ v1 ِ پیشین
   assert.equal((await pushV3(b, [['rice', {}, 'delete']])).status, 200);
   assert.deepEqual(await storeList(b), []);
