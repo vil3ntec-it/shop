@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,14 +48,16 @@ data class SaleDraft(
     val quantity: Double,
     val unitPrice: Double? = null,
     val label: String = "",
+    /** سریِ اسکن‌شده (افزودنی) */
+    val lotId: String? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) }
 
   companion object {
     fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList()) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label) },
+      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) },
       debtorId = debtorId,
       savedAt = now,
       //  کد بی سبد معنا ندارد
@@ -136,12 +139,17 @@ class SalePost {
     key: String,
     record: (key: String) -> SalesEngine.Result,
     save: suspend (ShopData) -> Boolean,
+    /** فقط موتورِ تازهٔ موجودی (`StockLedger.isOn`) بیرون از رشتهٔ صفحه؛ خاموش ⇒ همان مسیرِ امروز */
+    offMain: Boolean = false,
     done: (key: String) -> Unit,
   ): Outcome {
     if (!gate.compareAndSet(false, true)) return Outcome.Busy
     _busy.value = true
     try {
-      return when (val r = record(key)) {
+      //  موتورِ تازه روشن ⇒ سنجشِ دفترِ موجودی بیرون از رشتهٔ صفحه تا دفترِ بزرگ صندوق را قفل
+      //  نکند (`record` تابعِ خالص است، `SalesEngine.record`). خاموش ⇒ همان فراخوانیِ مستقیمِ امروز.
+      val r = if (offMain) withContext(Dispatchers.Default) { record(key) } else record(key)
+      return when (r) {
         is SalesEngine.Result.Failed -> Outcome.Refused(r.message)
         //  رفتن از صفحه نباید نوشتن را نصفه بگذارد: یا هر دو، یا هیچ
         is SalesEngine.Result.Ok -> withContext(NonCancellable) {

@@ -145,7 +145,7 @@ class CartStore(context: Context) : HeldCart {
     //  ضربه‌ای که پس از پایانِ ثبتِ قبلی رسید سبدِ کهنهٔ صفحه را در دست دارد، نه سبدِ تازه را
     //  POS-12: F9/F12ِ وسطِ جابه‌جاییِ فاکتور ثبت نمی‌شود (سبد نیمه‌جابه‌جا است)
     if (frozen || _lines.value.isEmpty()) return SalePost.Outcome.Busy
-    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) wipe() }
+    val out = poster.run(saleKey(), record, { store.save(it) }, offMain = StockLedger.isOn(store.data.value)) { done -> if (key == done) wipe() }
     //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
     if (out is SalePost.Outcome.Done) {
       runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }

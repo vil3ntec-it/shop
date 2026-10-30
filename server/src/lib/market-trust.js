@@ -127,10 +127,16 @@ async function flagOf(shopId) {
 //  تاریخچه و نماها
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ *  ترتیبِ تاریخچه `created_at, id` است و `id` تصادفی. دو رویدادِ یک تراکنش (تصمیم و جریمه، ثبت و برچسب)
+ *  در یک میلی‌ثانیه ⇒ ترتیبِ تصادفی (جریمه پیش از تصمیم). پس زمانِ هر رویداد دست‌کم یکی بیش از
+ *  آخرین رویدادِ همان پرونده است: تاریخچه همیشه به ترتیبِ ثبت، با همان نمایه (case_id, created_at, id).
+ */
 async function addEvent(c, row, actor, actorId, type, body = '', data = {}) {
   await c.query(
     `INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, body, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+             GREATEST($9::bigint, COALESCE((SELECT MAX(e.created_at) + 1 FROM trust_case_events e WHERE e.case_id = $2), 0)))`,
     [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), now()]
   );
 }
