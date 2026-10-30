@@ -117,6 +117,11 @@ jobs:
         working-directory: desktop
         run: ./gradlew --no-daemon test
 
+      #  آزمون‌های commonTest ِ خودِ core (Kotlin ِ خالص؛ همان که در آیفون هم می‌دود) — با همان wrapper
+      - name: آزمونِ core (commonTest)
+        working-directory: core
+        run: ../desktop/gradlew --no-daemon jvmTest
+
       #  معیارِ «قدم صفر»ِ ۳.۳: شناسه‌های نصاب ثابت می‌مانند — با شناسهٔ تازه نصاب
       #  کنارِ نسخهٔ قبلی می‌نشیند به‌جای به‌روزرسانی‌اش. شمارِ آزمون‌ها در خلاصهٔ اجرا.
       - name: دروازه‌های نصاب

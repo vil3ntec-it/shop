@@ -20,7 +20,11 @@ import ir.vil3ntec.tohid.core.storefront.MarketListingRepository
 import ir.vil3ntec.tohid.core.storefront.MarketStateDto
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.data.DeviceLocation
+import ir.vil3ntec.tohid.core.storefront.SendOutcome
+import ir.vil3ntec.tohid.core.storefront.StorefrontChange
+import ir.vil3ntec.tohid.core.storefront.StorefrontOutbox
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.StorefrontQueue
 import ir.vil3ntec.tohid.data.repo.StorefrontConfigDto
 import ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto
 import ir.vil3ntec.tohid.ui.Platform
@@ -68,7 +72,10 @@ internal fun MarketPane(config: StorefrontConfigDto, snackbar: SnackbarHostState
         TohidEmptyState("فقط صاحب دکان یا مدیر", "نمایش در بازارچه را صاحب دکان یا مدیر تنظیم می‌کند.", icon = Icons.Filled.Storefront)
       else -> s?.let { st ->
         if (!config.permissions.manage || !config.entitled) MarketReadOnly(st.listing, config)
-        else MarketForm(st.listing, config.settings, repo, snackbar) { saved -> state = st.copy(listing = saved) }
+        else MarketForm(st.listing, config.settings, snackbar) {
+          //  بی «در حالِ خواندن»: پیامِ «ثبت شد» ِ فرم سرِ جایش بماند
+          scope.launch { repo.load().onSuccess { state = it } }
+        }
       }
     }
   }
@@ -79,17 +86,19 @@ private enum class SaveState { IDLE, SAVING, SAVED, FAILED }
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun MarketForm(
-  listing: MarketListingDto,
+  serverListing: MarketListingDto,
   storefront: StorefrontSettingsDto?,
-  repo: MarketListingRepository,
   snackbar: SnackbarHostState,
-  onSaved: (MarketListingDto) -> Unit,
+  onConfirmed: () -> Unit,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val cats = remember(listing) { MarketListing.categoriesOf(listing) }
-  //  پس از ذخیره `updatedAt` عوض می‌شود و فرم از پاسخِ سرور از نو پر می‌شود
-  val key = listing.updatedAt
+  //  ویرایشِ نرسیده (صفِ آفلاین) روی دادهٔ سرور — کاربر کارِ خودش را می‌بیند
+  val pendingEntry = StorefrontQueue.entries.value.let { StorefrontQueue.pending(context, StorefrontChange.MARKET) }
+  val listing = StorefrontQueue.marketWithPending(serverListing, pendingEntry)
+  val cats = remember(serverListing) { MarketListing.categoriesOf(serverListing) }
+  //  پس از ثبت `updatedAt` عوض می‌شود و فرم از پاسخِ سرور از نو پر می‌شود
+  val key = serverListing.updatedAt
   var listed by remember(key) { mutableStateOf(listing.listed) }
   var category by remember(key) { mutableStateOf(listing.category) }
   var area by remember(key) { mutableStateOf(listing.area) }
@@ -97,11 +106,24 @@ private fun MarketForm(
   var categoryError by remember { mutableStateOf<String?>(null) }
   var save by remember { mutableStateOf(SaveState.IDLE) }
   var saveError by remember { mutableStateOf("") }
+  var savedText by remember { mutableStateOf("") }
+  //  «ثبت شد» فقط با پاسخِ ۲xx ِ سرور (گزارشِ صف)، نه هنگامِ گذاشتن در صف (§۳۱.۲ بندِ ۲)
+  LaunchedEffect(Unit) {
+    StorefrontQueue.reports.collect { r ->
+      if (r.change != StorefrontChange.MARKET) return@collect
+      when (r.outcome) {
+        SendOutcome.CONFIRMED -> { save = SaveState.SAVED; savedText = r.message; onConfirmed() }
+        SendOutcome.REJECTED -> { save = SaveState.FAILED; saveError = r.message }
+        SendOutcome.HOLD -> save = SaveState.IDLE
+      }
+    }
+  }
   var locating by remember { mutableStateOf(false) }
   var locNote by remember { mutableStateOf<String?>(null) }
 
   fun touched() { if (save != SaveState.SAVING) save = SaveState.IDLE }
 
+  val busy = save == SaveState.SAVING && StorefrontQueue.sending.value
   val shownLocation = when (val l = locEdit) {
     LocationEdit.Keep -> listing.location
     LocationEdit.Clear -> null
@@ -165,41 +187,34 @@ private fun MarketForm(
         TohidSecondaryButton(
           if (locating) "در حالِ یافتنِ موقعیت…" else "گذاشتنِ موقعیتِ همین‌جا",
           onClick = { if (DeviceLocation.granted(context)) locate() else ask.launch(DeviceLocation.PERMISSIONS) },
-          enabled = !locating && save != SaveState.SAVING,
+          enabled = !locating && !busy,
         )
       }
       if (shownLocation != null) {
         TohidSecondaryButton("برداشتنِ موقعیت", onClick = { locEdit = LocationEdit.Clear; locNote = null; touched() },
-          enabled = save != SaveState.SAVING)
+          enabled = !busy)
       }
     }
     locNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.warning) }
   } }
 
-  TohidButton(if (save == SaveState.SAVING) "در حالِ ذخیره…" else "ذخیرهٔ بازارچه", onClick = {
+  TohidButton(if (busy) "در حالِ فرستادن…" else "ذخیرهٔ بازارچه", onClick = {
     val form = MarketListing.Form(listed, category, area, locEdit)
     val errors = MarketListing.errors(form, cats)
     categoryError = errors["category"]
     if (errors.isNotEmpty()) return@TohidButton
+    //  اول روی دیسک (صف)، بعد سرور
+    val e = StorefrontQueue.enqueue(context, StorefrontChange.MARKET, MarketListing.body(form).toString(),
+      pendingEntry?.base ?: StorefrontQueue.marketBase(serverListing))
+    if (e == null) { saveError = "دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید."; save = SaveState.FAILED; return@TohidButton }
     save = SaveState.SAVING
-    scope.launch {
-      repo.save(form)
-        .onSuccess { saved ->
-          save = SaveState.SAVED
-          onSaved(saved)
-          snackbar.showSnackbar("بازارچه ذخیره شد")
-        }
-        .onFailure { e -> saveError = e.userMessage; save = SaveState.FAILED }
-    }
-  }, enabled = save != SaveState.SAVING && !locating, busy = save == SaveState.SAVING, modifier = Modifier.fillMaxWidth())
+    scope.launch { StorefrontQueue.flush(context, force = true) }
+  }, enabled = !busy && !locating, busy = busy, modifier = Modifier.fillMaxWidth())
 
   when (save) {
-    SaveState.SAVED -> Text(
-      if (listing.listed) "ذخیره شد — دکان در بازارچه نشان داده می‌شود." else "ذخیره شد — دکان در بازارچه نشان داده نمی‌شود.",
-      style = MaterialTheme.typography.bodySmall, color = Shop.colors.success,
-    )
+    SaveState.SAVED -> Text(savedText, style = MaterialTheme.typography.bodySmall, color = Shop.colors.success)
     SaveState.FAILED -> Text("ذخیره نشد: $saveError", style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
-    else -> Unit
+    else -> pendingEntry?.let { Text(StorefrontOutbox.statusLine(it), style = MaterialTheme.typography.bodySmall, color = Shop.colors.warning) }
   }
 }
 
