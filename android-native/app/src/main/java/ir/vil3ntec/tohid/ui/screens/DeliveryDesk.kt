@@ -367,16 +367,29 @@ private fun ColumnScope.AssignTab(
     )
   }
   actOn?.let { (m, act) ->
-    MissionActionDialog(
-      m = m, act = act, cfg = cfg, repo = repo,
-      onDismiss = { actOn = null },
-      onCode = { code -> actOn = null; shownCode = m.orderNo to code },
-      onDone = { msg ->
-        actOn = null
-        onChanged()
-        scope.launch { snackbar.showSnackbar(msg) }
-      },
-    )
+    //  DLV-09: «اصلاحِ نشانی» فرمِ خودش را دارد (نه گذارِ وضعیت)
+    if (act == DeskActions.Act.FIX_ADDRESS) {
+      AddressFixDialog(
+        m = m, repo = repo,
+        onDismiss = { actOn = null },
+        onDone = { msg ->
+          actOn = null
+          onChanged()
+          scope.launch { snackbar.showSnackbar(msg) }
+        },
+      )
+    } else {
+      MissionActionDialog(
+        m = m, act = act, cfg = cfg, repo = repo,
+        onDismiss = { actOn = null },
+        onCode = { code -> actOn = null; shownCode = m.orderNo to code },
+        onDone = { msg ->
+          actOn = null
+          onChanged()
+          scope.launch { snackbar.showSnackbar(msg) }
+        },
+      )
+    }
   }
   shownCode?.let { (no, code) -> CodeOnceDialog(no, code) { shownCode = null } }
 }

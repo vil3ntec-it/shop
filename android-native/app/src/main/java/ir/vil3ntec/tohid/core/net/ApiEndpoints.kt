@@ -177,6 +177,8 @@ object ApiEndpoints {
     fun status(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/status"
     fun code(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/code"
     fun recall(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/recall"
+    /** «اصلاحِ نشانی» پس از ناموفق (DLV-09) */
+    fun address(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/address"
     /** POST (همان PATCHِ سرور) — JVMِ کامپیوتر PATCH نمی‌فرستد */
     fun courier(id: String) = "$COURIERS/${enc(id)}"
     fun settlementPreview(courierId: String) = "$COURIERS/${enc(courierId)}/settlement-preview"
