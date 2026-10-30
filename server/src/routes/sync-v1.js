@@ -93,6 +93,8 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
         ops,
         appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
         queued: Number.isFinite(Number(req.body?.queued)) ? Number(req.body.queued) : null,
+        //  cursor ِ خودِ دستگاه (اختیاری) — فقط با پرچمِ دکانِ `sync.cursor_from_since` خوانده می‌شود
+        since: req.body?.since,
       });
     } catch (err) {
       //  نسخهٔ برنامه از سرور جلوتر است: هیچ چیزی اعمال نشد و برنامه باید
