@@ -74,11 +74,19 @@ fun RouteScope.DrawerOpenRoute() {
   if (CashShift.current(data) != null) { LaunchedEffect(Unit) { back() }; return }
   DrawerOpenSheet(
     onSubmit = { v ->
-      when (val r = CashShift.open(data, v, me(context), todayIso(), System.currentTimeMillis(), Ulid::next)) {
+      val by = me(context)
+      val today = todayIso()
+      val now = System.currentTimeMillis()
+      val id = Ulid.next()
+      when (val r = CashShift.open(data, v, by, today, now) { id }) {
         is CashShift.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is CashShift.Result.Ok -> {
-          scope.launch { store.save(r.data) }
-          toasts.show(StrSale.drawerOpened, V3Tone.SUCCESS)
+          //  همان CashShift.open روی دفترِ همان لحظه، زیرِ قفلِ نوشتن — نه تصویرِ کهنهٔ صفحه
+          scope.launch {
+            val wrote = store.update { d -> (CashShift.open(d, v, by, today, now) { id } as? CashShift.Result.Ok)?.data }
+            if (wrote == true) toasts.show(StrSale.drawerOpened, V3Tone.SUCCESS)
+            else toasts.show(StrSale.notSaved, V3Tone.ERROR)
+          }
           back()
         }
       }
@@ -101,11 +109,18 @@ fun RouteScope.DrawerCloseRoute() {
     DrawerCloseSheet(
       totals = CashShift.totalsOf(data, shift, System.currentTimeMillis()),
       onSubmit = { v, note ->
-        when (val r = CashShift.close(data, v, note, me, todayIso(), System.currentTimeMillis(), Ulid::next)) {
+        val today = todayIso()
+        val now = System.currentTimeMillis()
+        val id = Ulid.next()
+        when (val r = CashShift.close(data, v, note, me, today, now) { id }) {
           is CashShift.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
           is CashShift.Result.Ok -> {
-            scope.launch { store.save(r.data) }
-            toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
+            //  «موردِ انتظار» از دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد هم در آن است و گم نمی‌شود
+            scope.launch {
+              val wrote = store.update { d -> (CashShift.close(d, v, note, me, today, now) { id } as? CashShift.Result.Ok)?.data }
+              if (wrote == true) toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
+              else toasts.show(StrSale.notSaved, V3Tone.ERROR)
+            }
             back()
           }
         }

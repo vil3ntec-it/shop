@@ -162,6 +162,8 @@ class SalesFlowModelTest {
       .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
     assertFalse(src.contains("store.save("))
     assertEquals(2, Regex("""store\.appendAudit \{""").findAll(src).count())
+    //  باز و بستنِ صندوقِ ساده: CashShift روی دفترِ همان لحظه (store.update)، نه r.data ِ صفحه
+    assertEquals(2, Regex("""store\.update \{ d -> \(CashShift\.(open|close)\(d,""").findAll(src).count())
   }
 
   @Test
