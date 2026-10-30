@@ -307,6 +307,7 @@ async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
   let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
+  const prefsOn = await require('./delivery-prefs').flagOn(shopId);   // CHK-14 (پیش‌فرض خاموش)
   //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
   //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
   if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
@@ -326,6 +327,8 @@ async function create(shopId, { key, body, actor, price, notify }) {
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
     if (price) input = await price(run, at);
+    //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در برابرِ جمعِ همین لحظه؛ خاموش ⇒ کلید دور ریخته می‌شود
+    input = require('./delivery-prefs').applyOnCreate(input, body, prefsOn);
     //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
     //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
     await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });

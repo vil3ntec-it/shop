@@ -60,6 +60,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
+    //  «با اسکناسِ … پرداخت می‌کنم» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24) — پیش‌فرض خاموش
+    deliveryPrefs: await require('../lib/delivery-prefs').flagOn(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
@@ -161,6 +163,25 @@ router.post('/:id/transition', needFlag, requirePermission('orders.manage'), nee
       shopId: req.shopId, userId: req.user.id, action: 'order.transition',
       targetType: 'online_order', targetId: out.order.id,
       detail: { orderNo: out.order.orderNo, from: out.from, to: out.to, reason: out.order.statusReason },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ order: out.order, unchanged: out.unchanged });
+}));
+
+/**
+ * ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-24) — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، نشانه و
+ * مبلغِ اسکناسِ مشتری (CHK-14). پشتِ پرچمِ خاموشِ `shop.orders.delivery_prefs` (۴۰۳ در خودِ lib)؛
+ * مثلِ هر نوشتنِ دیگرِ سفارش پشتِ `needWrite` (SUB-10). `expectedVersion` ِ ناهمخوان ⇒ ۴۰۹.
+ * POST و نه PATCH: `HttpURLConnection` ِ برنامهٔ کامپیوتر PATCH نمی‌فرستد.
+ */
+router.post('/:id/delivery', needFlag, requirePermission('orders.manage'), needWrite, wrap(async (req, res) => {
+  const out = await require('../lib/delivery-prefs').edit(req.shopId, req.params.id, req.body || {}, actorOf(req));
+  if (!out.unchanged) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.delivery_edit',
+      targetType: 'online_order', targetId: out.order.id,
+      detail: { orderNo: out.order.orderNo, changed: out.changed },
       ip: clientIp(req),
     });
   }

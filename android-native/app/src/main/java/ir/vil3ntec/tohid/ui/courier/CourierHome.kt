@@ -59,6 +59,7 @@ import ir.vil3ntec.tohid.core.courier.CourierInputError
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
+import ir.vil3ntec.tohid.core.orders.DeliveryPrefs
 import ir.vil3ntec.tohid.data.CourierStore
 import ir.vil3ntec.tohid.data.CourierSync
 import ir.vil3ntec.tohid.data.PhotoStore
@@ -383,6 +384,8 @@ private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String)
       )
     }
     if (c.leaveWith.isNotBlank()) Text("سپردن به: ${c.leaveWith}", style = MaterialTheme.typography.bodySmall, color = colors.muted)
+    //  CHK-14: پول خردِ لازم، از همان مبلغِ نقدِ این مأموریت
+    c.cashTenderMinor?.let { Text(DeliveryPrefs.tenderLine(it, c.expectedCollectMinor), style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold) }
     Spacer(Modifier.height(8.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
       if (c.expectedCollectMinor > 0) StatusPill("نقد: ${afn(c.expectedCollectMinor)}", PillTone.NEUTRAL)

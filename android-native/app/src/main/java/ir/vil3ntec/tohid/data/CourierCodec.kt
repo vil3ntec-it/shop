@@ -60,6 +60,7 @@ object CourierCodec {
     .put("lat", c.lat ?: JSONObject.NULL).put("lng", c.lng ?: JSONObject.NULL)
     .put("customerName", c.customerName).put("phoneMasked", c.phoneMasked)
     .put("callBeforeArrival", c.callBeforeArrival).put("leaveWith", c.leaveWith)
+    .put("cashTenderMinor", c.cashTenderMinor ?: JSONObject.NULL)
     .put("itemsCount", c.itemsCount).put("paymentMethod", c.paymentMethod)
     .put("expectedCollectMinor", c.expectedCollectMinor)
     .put("cashCollectedMinor", c.cashCollectedMinor ?: JSONObject.NULL)
@@ -78,6 +79,7 @@ object CourierCodec {
     phoneMasked = o.optString("phoneMasked"),
     callBeforeArrival = o.optBoolean("callBeforeArrival"),
     leaveWith = o.optString("leaveWith"),
+    cashTenderMinor = if (o.isNull("cashTenderMinor")) null else o.optLong("cashTenderMinor"),
     itemsCount = o.optInt("itemsCount"),
     paymentMethod = o.optString("paymentMethod"),
     expectedCollectMinor = o.optLong("expectedCollectMinor"),
