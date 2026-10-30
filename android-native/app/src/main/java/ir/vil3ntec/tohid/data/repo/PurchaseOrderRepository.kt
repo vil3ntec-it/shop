@@ -14,7 +14,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.net.URLEncoder
 
 /**
  *  سفارشِ خرید — `/api/shop/purchase-orders` (`server/src/routes/purchase-orders.js`، PUR-02/04).
@@ -105,6 +104,17 @@ class PurchaseOrderRepository(private val api: ApiClient) {
 
   private companion object {
     const val ROOT = "/shop/purchase-orders"
-    fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
+
+    /** درصدی‌کردنِ بخشِ نشانی بی کتابخانهٔ جاوا (قاعدهٔ آیفون، §۴۰.۳): جز حرف و رقمِ لاتین و `-._~` هر بایتِ UTF-8 ⇒ `%XX` */
+    fun enc(s: String): String = buildString {
+      for (b in s.encodeToByteArray()) {
+        val c = b.toInt() and 0xFF
+        if (c in 'A'.code..'Z'.code || c in 'a'.code..'z'.code || c in '0'.code..'9'.code || c == '-'.code || c == '.'.code || c == '_'.code || c == '~'.code) {
+          append(c.toChar())
+        } else {
+          append('%').append("0123456789ABCDEF"[c shr 4]).append("0123456789ABCDEF"[c and 0x0F])
+        }
+      }
+    }
   }
 }

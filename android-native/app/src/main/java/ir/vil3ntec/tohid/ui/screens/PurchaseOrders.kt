@@ -10,7 +10,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -28,7 +27,6 @@ import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PurchaseOrderRepository
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -37,6 +35,8 @@ import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.platform.PurchaseOrderHost
+import ir.vil3ntec.tohid.ui.platform.rememberPurchaseOrderHost
 import kotlinx.coroutines.launch
 
 /*
@@ -52,15 +52,16 @@ import kotlinx.coroutines.launch
 /** دکمهٔ «سفارش‌های خرید» — فقط با پرچمِ روشن */
 @Composable
 fun PurchaseOrdersEntry(store: ShopStore, d: ShopData, toast: (String) -> Unit, modifier: Modifier = Modifier) {
-  val context = LocalContext.current
-  val repo = remember { PurchaseOrderRepository(Backend.api(context)) }
+  //  دسترسیِ سکو و ساعت فقط از مرزِ سکو (`ui/platform/PurchaseOrderHost.kt`، §۴۰.۳)
+  val host = rememberPurchaseOrderHost()
+  val repo = host.repo
   var config by remember { mutableStateOf<PoConfigDto?>(null) }
   var open by remember { mutableStateOf(false) }
   LaunchedEffect(Unit) { config = repo.config().valueOrNull() }
   val cfg = config
   if (cfg == null || !cfg.enabled) return
   OutlinedButton(onClick = { open = true }, modifier = modifier) { Text("سفارش‌های خرید") }
-  if (open) PurchaseOrdersDialog(store, d, repo, cfg.permissions, toast) { open = false }
+  if (open) PurchaseOrdersDialog(store, d, host, cfg.permissions, toast) { open = false }
 }
 
 private sealed interface PoMode {
@@ -75,13 +76,14 @@ private sealed interface PoMode {
 private fun PurchaseOrdersDialog(
   store: ShopStore,
   d: ShopData,
-  repo: PurchaseOrderRepository,
+  host: PurchaseOrderHost,
   perms: PoPermsDto,
   toast: (String) -> Unit,
   onDismiss: () -> Unit,
 ) {
   var mode by remember { mutableStateOf<PoMode>(PoMode.Index) }
   val c = Shop.colors
+  val repo = host.repo
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     DialogEntry {
       Surface(
@@ -98,10 +100,10 @@ private fun PurchaseOrdersDialog(
           Spacer(Modifier.height(8.dp))
           when (val m = mode) {
             PoMode.Index -> PoList(repo, perms, onOpen = { mode = PoMode.Detail(it) }, onNew = { mode = PoMode.Edit(null) })
-            is PoMode.Detail -> PoDetail(store, d, repo, perms, m.id, toast,
+            is PoMode.Detail -> PoDetail(store, d, host, perms, m.id, toast,
               onEdit = { mode = PoMode.Edit(it) }, onReceive = { mode = PoMode.Receive(it) })
             is PoMode.Edit -> PoEditor(d, repo, m.base, toast, onSaved = { mode = PoMode.Detail(it.id) })
-            is PoMode.Receive -> PoReceive(store, d, repo, perms, m.order, toast, onDone = { mode = PoMode.Detail(m.order.id) })
+            is PoMode.Receive -> PoReceive(store, d, host, perms, m.order, toast, onDone = { mode = PoMode.Detail(m.order.id) })
           }
         }
       }
@@ -172,7 +174,7 @@ private fun poTone(s: PurchaseOrderCore.Status): PillTone = when (s) {
 private fun PoDetail(
   store: ShopStore,
   d: ShopData,
-  repo: PurchaseOrderRepository,
+  host: PurchaseOrderHost,
   perms: PoPermsDto,
   id: String,
   toast: (String) -> Unit,
@@ -181,6 +183,7 @@ private fun PoDetail(
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
+  val repo = host.repo
   var order by remember(id) { mutableStateOf<PurchaseOrderDto?>(null) }
   var error by remember(id) { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
@@ -211,7 +214,7 @@ private fun PoDetail(
     scope.launch {
       var msg = "ثبت نشد"
       val wrote = store.update { cur ->
-        when (val p = PurchaseOrderBook.post(cur, o, r, todayIso(), System.currentTimeMillis())) {
+        when (val p = PurchaseOrderBook.post(cur, o, r, todayIso(), host.now())) {
           is PurchaseOrderBook.Posting.Ok -> { msg = "فاکتورِ خریدِ #${p.invoiceNo} در دفتر ثبت شد"; p.data }
           PurchaseOrderBook.Posting.Already -> { msg = "این رسید پیش‌تر در دفتر ثبت شده است"; null }
           is PurchaseOrderBook.Posting.Failed -> { msg = p.message; null }
@@ -486,7 +489,7 @@ private data class RecvRow(val received: String = "", val damaged: String = "", 
 private fun PoReceive(
   store: ShopStore,
   d: ShopData,
-  repo: PurchaseOrderRepository,
+  host: PurchaseOrderHost,
   perms: PoPermsDto,
   order: PurchaseOrderDto,
   toast: (String) -> Unit,
@@ -494,6 +497,7 @@ private fun PoReceive(
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
+  val repo = host.repo
   //  کلیدِ یکتای همین رسید: تلاشِ دوباره همان رسید است (سرور «تکراری» می‌گوید)
   val receiptId = remember { newId() }
   val prog = remember(order) { order.progress.associateBy { it.lineId } }
@@ -548,7 +552,7 @@ private fun PoReceive(
       //  رسید در سرور ثبت شد ⇒ فاکتورِ خریدِ دفتر (شناسه‌های قطعی؛ تکرار بی اثر)
       var msg = "رسید ثبت شد"
       val wrote = store.update { cur ->
-        when (val p = PurchaseOrderBook.post(cur, got.order, got.receipt, todayIso(), System.currentTimeMillis())) {
+        when (val p = PurchaseOrderBook.post(cur, got.order, got.receipt, todayIso(), host.now())) {
           is PurchaseOrderBook.Posting.Ok -> { msg = "رسید ثبت شد · فاکتورِ خریدِ #${p.invoiceNo} در دفتر"; p.data }
           PurchaseOrderBook.Posting.Already -> null
           is PurchaseOrderBook.Posting.Failed -> { msg = "رسید ثبت شد، ولی دفتر نه: ${p.message}"; null }
