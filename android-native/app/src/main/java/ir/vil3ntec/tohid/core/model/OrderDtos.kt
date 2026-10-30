@@ -49,6 +49,27 @@ data class OrdersSummaryDto(
   val oldestNewAt: Long? = null,
   val rev: Long = 0,
   val serverTime: Long = 0,
+  /** M5: سفارش‌های «در بررسی» (فروشِ حضوری رزروِ نرمشان را برد)، تازه‌ترین بالا، سقف ۲۰. سرورِ کهنه ⇒ خالی */
+  val review: List<OrderReviewRefDto> = emptyList(),
+)
+
+@Serializable
+data class OrderReviewRefDto(val id: String = "", val orderNo: Long = 0)
+
+/** M5: یک قلمِ رزروِ نرم (`stockHold.lines`) — `short` = فروشِ حضوری پوششش را برد */
+@Serializable
+data class StockHoldLineDto(val lineNo: Int = 0, val status: String = "", val short: Boolean = false)
+
+/**
+ *  M5 (`server/src/lib/stock-reserve.js` → `orderView`): فقط در جزئیاتِ سفارشی که رزروِ نرم دارد.
+ *  `status`: held | expired | committed | released؛ `review`: سفارش در بررسی.
+ */
+@Serializable
+data class StockHoldDto(
+  val status: String = "",
+  val review: Boolean = false,
+  val expiresAt: Long? = null,
+  val lines: List<StockHoldLineDto> = emptyList(),
 )
 
 @Serializable
@@ -144,6 +165,10 @@ data class OrderDto(
   val reversible: Boolean? = null,
   /** فقط در `handover` برای `review`: چرا خودکار نه (`before_floor`: نخستین تحویل پیش از کفِ دکان) */
   val reviewCode: String? = null,
+  /** M5، فقط در کارتِ فهرست: سفارش در بررسی (سرورِ کهنه یا بی رزرو ⇒ false) */
+  val stockReview: Boolean = false,
+  /** M5، فقط در جزئیات: رزروِ نرمِ موجودی (بی رزرو ⇒ null) */
+  val stockHold: StockHoldDto? = null,
 )
 
 /** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
