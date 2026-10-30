@@ -291,6 +291,7 @@
 
 - هر منطقِ مشترکِ Kotlin و JS یک فایلِ بردارِ مرجع دارد (`core/test-vectors/*` یا `license/test-vectors/*`)؛ یکی را بی دیگری و بردار عوض نکن (#224، #231، #236، #237، #261).
 - Kotlinِ خالص در `core/` است (includeBuild در هر دو برنامه)؛ `jvmMain` فقط برای چیزی که به JDK تکیه دارد (#223).
+- **کدِ تازه برای آیفون** (`docs/IOS-PLAN-fa.md` §۴ گامِ ۰): منطقِ تازه (موتور، قاعده، محاسبه، تبدیلِ داده) در `core/src/commonMain`، نه در `android-native/app`. در منطق ممنوع: `android.*`، androidxِ غیرِ Compose، `Context`/`LocalContext`، `SharedPreferences`، `java.*`، `javax.*`، `org.json`، `System.currentTimeMillis`، `String.format`/`"…".format`، `synchronized`؛ به‌جایش `Clock` ِ تزریق‌شده، `KeyValueStore`، okio، kotlinx.serialization، `Mutex`. نیازِ پلتفرمی پشتِ رابط (`interface`/`expect`) در commonMain؛ پیاده‌سازی فقط در پوشهٔ مرزیِ `…/platform/` یا فایلِ `*Android.kt`/`*Desktop.kt`. صفحهٔ تازه `LocalContext` نمی‌گیرد. وابستگیِ تازهٔ Gradle فقط با نسخهٔ iOS یا پشتِ رابط. سنجه: `tools/quality/checks/platform-deps.mjs` (فایلِ تازه صفر، فایلِ موجود فقط کاهشی، سقف در `baseline.json`، فعلاً گزارش) و کارِ `core-native` (`-Pnative=true`، linuxX64).
 - هستهٔ JSی که سرور لازم دارد، کپیِ بایت‌به‌بایت در `server/src/lib` با آزمونِ برابری است (#243).
 - `keymap.json` تنها منبعِ میان‌برهاست؛ `gen-keymap.mjs --check` فایلِ کهنه را رد می‌کند؛ پیرایه‌ها دقیق سنجیده می‌شوند (#225).
 - `Mod` یعنی Ctrl در ویندوز/لینوکس/اندروید و Cmd در مک؛ Cmd+Tab، Cmd+Space، Cmd+Q و Cmd+H رزروند (#225).
