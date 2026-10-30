@@ -352,7 +352,7 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
-= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛ `ShopPolicy.stockInsight` / `tohid-policy:stock_insight` «تحلیلِ موجودی» در گزارشِ کالاها: ارزش، سودِ بالقوه و ABC، فقط خواندنی (INV-15/16، باز).
+= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛ `ShopPolicy.stockInsight` / `tohid-policy:stock_insight` «تحلیلِ موجودی» در گزارشِ کالاها: ارزش، سودِ بالقوه و ABC، فقط خواندنی (INV-15/16، #438، باز)؛ `ShopPolicy.stockLevels` / `tohid-policy:stock_levels` «نقطهٔ سفارش و بیشینه»: دو کادرِ فرمِ کالا، ویرایشِ گروهیِ حدها و «نیاز به سفارش»؛ فیلدهای افزودنیِ `Product.reorderPoint`/`maxStock` (`NEVER`) فقط با روشن بودن نوشته می‌شوند (INV-12، #438، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

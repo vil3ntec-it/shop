@@ -141,6 +141,8 @@ object OwnerExport {
     "active" to "فعال",
     "saleUnit" to "واحد فروش",
     "unitFactor" to "ضریب واحد",
+    "reorderPoint" to "نقطهٔ سفارش",
+    "maxStock" to "حداکثر موجودی",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",

@@ -60,4 +60,18 @@ object ShopPolicy {
   fun setStockInsight(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(STOCK_INSIGHT, on).apply()
   }
+
+  /**
+   *  «نقطهٔ سفارش و بیشینه» (INV-12): دو کادرِ تازه در فرمِ کالا، ویرایشِ گروهیِ «حدِ موجودی» در فهرستِ
+   *  کالاهای کامپیوتر و فهرستِ «نیاز به سفارش» با پیشنهادِ «تا بیشینه» در گزارش‌ها. پیش‌فرض **خاموش**:
+   *  فرم و فهرست همان امروزند. روشن ⇒ فقط دو فیلدِ افزودنیِ کالا (`reorderPoint`، `maxStock`) نوشته
+   *  می‌شوند و همگام می‌شوند؛ دستگاهی که خاموش است آن‌ها را نمی‌بیند ولی پاکشان هم نمی‌کند. فقط همین دستگاه.
+   */
+  private const val STOCK_LEVELS = "stock_levels"
+
+  fun stockLevels(context: Context): Boolean = prefs(context).getBoolean(STOCK_LEVELS, false)
+
+  fun setStockLevels(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(STOCK_LEVELS, on).apply()
+  }
 }

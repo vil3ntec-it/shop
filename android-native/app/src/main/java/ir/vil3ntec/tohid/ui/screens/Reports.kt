@@ -347,7 +347,30 @@ private fun productsSection(
       }
       Spacer(Modifier.height(16.dp))
     }
+
+    //  INV-12: «نیاز به سفارش» با پیشنهادِ «تا بیشینه» — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+    val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+    if (levelsOn) {
+      val due = remember(d) { ir.vil3ntec.tohid.data.WarehouseEngine.reorderList(d) }
+      SectionTitle("نیاز به سفارش")
+      Panel {
+        if (due.isEmpty()) EmptyNote("کالایی به نقطهٔ سفارش نرسیده")
+        due.forEach { row -> IssueRow(row.product.name, reorderLabel(row), reorderTint(row)) }
+      }
+      Spacer(Modifier.height(16.dp))
+    }
   }
+}
+
+/** «۳ موجود · سفارش ۲۷» یا «… · بیشینه تعریف نشده» */
+internal fun reorderLabel(row: ir.vil3ntec.tohid.data.WarehouseEngine.ReorderRow): String =
+  "${qty(row.onHand)} موجود · " + (row.suggest?.let { "سفارش ${qty(it)}" } ?: "بیشینه تعریف نشده")
+
+@Composable
+internal fun reorderTint(row: ir.vil3ntec.tohid.data.WarehouseEngine.ReorderRow): Color = when (row.state) {
+  ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> Shop.colors.danger
+  ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> Shop.colors.warning
+  else -> Shop.colors.primary
 }
 
 @Composable

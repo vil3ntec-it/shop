@@ -36,6 +36,8 @@ object ReportCsv {
       "reminders" -> DebtReminder.dueSheet(d, today)
       //  «تحلیلِ موجودی» (INV-15، INV-16) — فقط وقتی `ShopPolicy.stockInsight` روشن است دیده می‌شود
       "insight" -> insight(d, from, to)
+      //  «نیاز به سفارش» (INV-12) — فقط وقتی `ShopPolicy.stockLevels` روشن است دیده می‌شود
+      "reorder" -> reorder(d, today)
       else -> stock(d, today)
     }
 
@@ -143,6 +145,27 @@ object ReportCsv {
       )
     }
     return Sheet("تحلیل-موجودی-$from-تا-$to", rows)
+  }
+
+  /** کالاهایی که به نقطهٔ سفارش، حد کم بودن یا صفر رسیده‌اند، با پیشنهادِ «تا بیشینه» — `WarehouseEngine.reorderList` */
+  private fun reorder(d: ShopData, today: String): Sheet {
+    val rows = mutableListOf(
+      listOf("نام محصول", "دسته", "واحد", "موجودی", "حد کم بودن", "نقطهٔ سفارش", "بیشینه", "وضعیت", "مقدارِ پیشنهادی")
+    )
+    WarehouseEngine.reorderList(d).forEach { r ->
+      val p = r.product
+      rows += listOf(
+        p.name, p.category, p.unit, trim(r.onHand),
+        if (p.minStock > 0) trim(p.minStock) else "", p.reorderPoint?.let { trim(it) }.orEmpty(), p.maxStock?.let { trim(it) }.orEmpty(),
+        when (r.state) {
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> "تمام‌شده"
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> "زیرِ حد کم بودن"
+          else -> "وقتِ سفارش"
+        },
+        r.suggest?.let { trim(it) } ?: "بیشینه تعریف نشده",
+      )
+    }
+    return Sheet("نیاز-به-سفارش-$today", rows)
   }
 
   /** بیسیس‌پوینت ⇒ «۲۶.۸٪» */

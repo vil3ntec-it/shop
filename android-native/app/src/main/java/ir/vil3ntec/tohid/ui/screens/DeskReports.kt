@@ -40,8 +40,12 @@ import kotlinx.coroutines.launch
 /**
  *  `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش).
  *  `insight`: «تحلیلِ موجودی» (INV-15، INV-16) — فقط وقتی `ShopPolicy.stockInsight` روشن است (پیش‌فرض خاموش).
+ *  `levels`: «نیاز به سفارش» (INV-12) — فقط وقتی `ShopPolicy.stockLevels` روشن است (پیش‌فرض خاموش).
  */
-private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false, val insight: Boolean = false) {
+private enum class Rep(
+  val key: String, val label: String, val ranged: Boolean,
+  val crm: Boolean = false, val insight: Boolean = false, val levels: Boolean = false,
+) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
   PURCHASES("purchases", "خرید", true),
@@ -53,6 +57,7 @@ private enum class Rep(val key: String, val label: String, val ranged: Boolean, 
   EXPIRY("expiry", "انقضا", false),
   //  بازه = دورهٔ فروشِ ABC؛ ارزش و سودِ بالقوه همیشه موجودیِ همین حالاست
   INSIGHT("insight", "تحلیلِ موجودی", true, insight = true),
+  REORDER("reorder", "نیاز به سفارش", false, levels = true),
   AGING("aging", "سنِ بدهی", false, crm = true),
   RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
@@ -74,7 +79,10 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
 
   val crm = remember { ShopPolicy.crmReports(context) }
   val insight = remember { ShopPolicy.stockInsight(context) }
-  val reps = remember(crm, insight) { Rep.values().filter { (crm || !it.crm) && (insight || !it.insight) } }
+  val levels = remember { ShopPolicy.stockLevels(context) }
+  val reps = remember(crm, insight, levels) {
+    Rep.values().filter { (crm || !it.crm) && (insight || !it.insight) && (levels || !it.levels) }
+  }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -187,6 +195,13 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi("A / B / C", "${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.A] ?: 0} / ${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.B] ?: 0} / ${c[ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.C] ?: 0}", Shop.colors.text, Modifier.weight(1f))
           val gaps = v.missingCost.size + v.negative.size + v.outOfRange.size
           DeskKpi("بی قیمتِ خرید / منفی", "${v.missingCost.size} / ${v.negative.size}", if (gaps > 0) Shop.colors.warning else Shop.colors.muted, Modifier.weight(1f))
+        }
+        Rep.REORDER -> {
+          val due = remember(d) { ir.vil3ntec.tohid.data.WarehouseEngine.reorderList(d) }
+          DeskKpi("نیاز به سفارش", "${due.size}", Shop.colors.primary, Modifier.weight(1f))
+          DeskKpi("تمام‌شده", "${due.count { it.state == ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT }}", Shop.colors.danger, Modifier.weight(1f))
+          DeskKpi("زیرِ حد کم بودن", "${due.count { it.state == ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN }}", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi("بی بیشینه (بی پیشنهاد)", "${due.count { it.suggest == null }}", Shop.colors.muted, Modifier.weight(1f))
         }
         Rep.DEBTORS -> {
           val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }

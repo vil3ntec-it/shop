@@ -100,6 +100,8 @@
     active: 'فعال',
     saleUnit: 'واحد فروش',
     unitFactor: 'ضریب واحد',
+    reorderPoint: 'نقطهٔ سفارش',
+    maxStock: 'حداکثر موجودی',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',

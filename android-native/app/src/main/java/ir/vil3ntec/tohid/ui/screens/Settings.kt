@@ -558,6 +558,33 @@ fun SettingsScreen(
       }
     }
 
+    /* ============ نقطهٔ سفارش و بیشینه (INV-12) — فرمِ کالا، ویرایشِ گروهی و «نیاز به سفارش» ============ */
+    //  پیش‌فرض خاموش؛ فقط همین دستگاه (`ShopPolicy.stockLevels`).
+    item {
+      var stockLevels by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Inventory2,
+        title = StrShell.stockLevels,
+        subtitle = if (stockLevels) StrShell.stockLevelsShown else StrSettings.off,
+        tint = if (stockLevels) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.stockLevelsNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (stockLevels) "on" else "off",
+          onSelect = {
+            stockLevels = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setStockLevels(context, stockLevels)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(

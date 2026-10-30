@@ -49,6 +49,9 @@ data class ProductFormState(
   val active: Boolean = true,
   val saleUnit: String = "",
   val unitFactor: String = "",
+  /** INV-12 — فقط وقتی «نقطهٔ سفارش و بیشینه» روشن است دیده و فرستاده می‌شوند؛ خالی = تعریف نشده */
+  val reorder: String = "",
+  val max: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -65,6 +68,8 @@ data class ProductFormState(
       active = p.active,
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
+      reorder = p.reorderPoint?.let { numberText(it) }.orEmpty(),
+      max = p.maxStock?.let { numberText(it) }.orEmpty(),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -81,6 +86,8 @@ fun ProductDialog(
   onSave: (WarehouseEngine.ProductDraft) -> Unit,
 ) {
   var form by remember(state.editingId, state.barcode) { mutableStateOf(state) }
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -133,6 +140,24 @@ fun ProductDialog(
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
           )
+        }
+        //  INV-12: نقطهٔ سفارش و بیشینه — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+        if (levelsOn) {
+          Spacer(Modifier.height(10.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(
+              value = form.reorder,
+              onValueChange = { form = form.copy(reorder = it) },
+              label = "نقطهٔ سفارش",
+              modifier = Modifier.weight(1f),
+            )
+            NumberField(
+              value = form.max,
+              onValueChange = { form = form.copy(max = it) },
+              label = "بیشینهٔ موجودی",
+              modifier = Modifier.weight(1f),
+            )
+          }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -225,6 +250,10 @@ fun ProductDialog(
                   saleUnit = form.saleUnit,
                   //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
                   unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
+                  //  خالی ⇒ پاک؛ نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
+                  editLevels = levelsOn,
+                  reorderPoint = if (levelsOn) levelNumber(form.reorder) else null,
+                  maxStock = if (levelsOn) levelNumber(form.max) else null,
                 )
               )
             },
@@ -236,6 +265,9 @@ fun ProductDialog(
     }
   }
 }
+
+/** کادرِ حد: خالی ⇒ `null` (تعریف نشده)، عددِ نادرست ⇒ NaN (موتور پیامِ روشن می‌دهد) */
+internal fun levelNumber(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: Double.NaN }
 
 /* ========================= فرمِ ورودِ کالا ========================= */
 
