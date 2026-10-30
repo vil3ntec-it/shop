@@ -519,7 +519,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
   var paying by remember(openId) { mutableStateOf(false) }
   var returning by remember(openId) { mutableStateOf(false) }
   var amount by remember(openId) { mutableStateOf("") }
-  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val ledger = remember(d, openId) { PurchaseBook.ledger(d, open.supplier.id) }
   fun sheet() = PurchaseBook.ledgerSheet(d, open.supplier, today)
   Column(

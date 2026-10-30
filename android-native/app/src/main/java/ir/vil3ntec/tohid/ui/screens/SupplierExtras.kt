@@ -35,7 +35,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  */
 @Composable
 fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) -> Unit)? = null) {
-  val on = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val on = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   if (!on) return
   val late = remember(d, today) { PurchaseBook.overdue(d, today) }
   val soon = remember(d, today) { PurchaseBook.dueSoon(d, today) }

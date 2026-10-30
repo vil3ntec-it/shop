@@ -55,7 +55,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   var payFor by remember { mutableStateOf<String?>(null) }
   //  برگشت به تأمین‌کننده با سندِ کسر (PUR-08) — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است
   var returnFor by remember { mutableStateOf<String?>(null) }
-  val stockOn = remember(d.auditLog) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val context = androidx.compose.ui.platform.LocalContext.current
   var confirmDelete by remember { mutableStateOf<Supplier?>(null) }
 
