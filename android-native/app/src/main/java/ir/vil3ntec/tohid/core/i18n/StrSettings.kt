@@ -197,4 +197,12 @@ object StrSettings {
   val calSolar: String get() = t("خورشیدی", "Solar", "لمریز")
   val calGregorian: String get() = t("میلادی", "Gregorian", "میلادي")
   val calNote: String get() = t("خودکار یعنی فارسی و پشتو خورشیدی، انگلیسی میلادی. فقط نمایش است؛ تاریخِ ذخیره‌شده عوض نمی‌شود.", "Automatic means solar for Persian and Pashto, Gregorian for English. Display only; saved dates don't change.", "اتومات یعني فارسي او پښتو لمریز، انګلیسي میلادي. یوازې ښودنه ده؛ خوندي شوې نېټې نه بدلېږي.")
+
+  // POS-39: دریافت از مشتری در صندوق (F7)
+  val tillReceiveTitle: String get() = t("دریافت از مشتری در صندوق (F7)", "Take customer payments at the till (F7)", "په صندوق کې له پیرودونکي پیسې اخیستل (F7)")
+  val tillReceiveNote: String get() = t(
+    "قسط یا بدهیِ مشتری بی رفتن به «قرض‌داران»، با رسید. همان ردیفِ دفترِ قرض است و در دخلِ شیفت شمرده می‌شود. فقط روی همین دستگاه.",
+    "Take an instalment or debt payment without leaving the register, with a receipt. It is the same debt-book entry and counts in the shift's cash. On this device only.",
+    "قسط یا پور پرته له دې چې «پوروړي» ته ولاړ شئ، له رسید سره. همغه د پور دفتر کرښه ده او د شیفټ په نغدو کې شمېرل کېږي. یوازې په همدې وسیله.",
+  )
 }

@@ -97,6 +97,7 @@
 - ⛔ تخفیفِ خودکار (PRM): حالِ حافظهٔ `PromoLive` مالِ یک «حساب@دکان» است (`PromoEngine.forAccount`)؛ پاسخِ سرور و نسخهٔ دستگاه فقط وقتی می‌نشینند که حافظه و حسابِ همین لحظه هر دو همان‌اند (`PromoEngine.accepts`). `PromoLive.reset(context)` فقط **پس از** `LedgerOwner.align` و فقط با `SWITCHED`/`ADOPTED` (`LedgerOwner.promoReset`)، و در «خروج از حساب» — شروعِ سردِ همان حساب (`SAME`) کدهای سبد و پیش‌نویس را پاک نمی‌کند (S1، `PromoEngineTest`، `LedgerOwnerPromoTest`، `PromoLiveWiringTest`).
 - ⛔ نشانِ تخفیف روی فاکتور فقط با پرچمِ `shop.promo_stamp` (`live_config`، پیش‌فرض خاموش؛ در پاسخِ `GET /api/shop/promos` به نامِ `stamp`): `PromoEngine.stamp` فیلدهای **اختیاری**، همه به واحدِ کوچک، می‌گذارد — `SaleItem.listPriceMinor`، `SaleItem.promo: [{id, rev, name, discountMinor}]` (نامِ همان لحظه)، `Sale.promoDiscountMinor` و `Sale.coupons` (فقط کدهای اعمال‌شده، حداکثر ۱۰ تا و ۳۲ نویسه). کلیدِ دکان یا پرچم خاموش ⇒ همان شیء و همان JSON (`SalePromoFieldsTest`). فیلدِ پس از A00 است و کف نمی‌خواهد؛ `PRE_A00` دست نمی‌خورد.
 - فاکتورِ صفحه، چاپِ پیشین، نسخهٔ ۲ (`Receipts.input`) و فاکتورِ عمومیِ QR (`receipt-public.js`) با همان پرچم: ستونِ قلم‌ها همان مبلغِ پرداختی و «جمع اقلام» همان `sale.total` (جمعِ ستون)؛ قلمِ تخفیف‌دار «مقدار × قیمتِ فهرست − تخفیفش»؛ تخفیفِ خودکارِ فاکتور فقط یک ردیفِ **آگاهی** «شاملِ تخفیفِ خودکار (نام‌ها)» — هیچ مبلغی دو بار کم نمی‌شود (`SaleReceipt`، `ReceiptInput.included`). پرچمِ خاموش ⇒ همان متنِ پیشین. کدهای تخفیف مالِ همان فاکتورند: با پیش‌نویس (`SaleDraft.coupons`) و فاکتورِ نگه‌داشته (`HeldInvoice.coupons`) می‌مانند و به فاکتورِ دیگر نمی‌رسند.
+- دریافت از مشتری در صندوق (POS-39، F7): فقط با `TillReceivePref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ F7 مالِ صندوق نیست). ثبت فقط با `TillReceiveFlow.apply` درونِ `ShopStore.update` (دفترِ همین لحظه، نه نسخهٔ صفحه)؛ کلیدِ یکتا = شناسهٔ همان ردیفِ `receive` که با زدنِ F7 ساخته می‌شود ⇒ تکرار `Already` و بی نوشتن. مبلغ با `core/debt/TillReceive` به پول: صفر/منفی/نادرست رد، بیش از بدهی فقط با تأییدِ «پیش‌پرداخت». همان `DebtorEngine.addTransaction(RECEIVE)` ِ قرض‌داران — ردیف یا حسابِ تازه‌ای نساز؛ پنجره پشتِ `VipGate` ِ قرض‌داران.
 - ⛔ «سقفِ مصرفِ کد» تا شمارشِ مصرف نیامده رد می‌شود (`max_uses_unsupported`، `shop-promos.js`): هر `maxUses` جز «نبودن» و `0` پیش از `ruleOf` (رشته، اعشار، منفی…) — مگر همان مقدارِ ذخیره‌شدهٔ ردیفِ قبلی، که آن‌وقت `0` می‌نشیند تا برنامهٔ پیشین ویرایش کند. ویرایشِ قاعده چیزی را که فرم نشان نمی‌دهد (کانالِ خالی، کالاهای دیگرِ «قیمتِ ویژه») عوض نمی‌کند.
 
 ### v3 · پرداخت
@@ -368,7 +369,8 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
-= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز).
+= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
+`tohid-policy` ⇒ `till_receive = false` دریافت از مشتری در صندوق با F7 (POS-39، `claude/spec-pos-b-4`).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

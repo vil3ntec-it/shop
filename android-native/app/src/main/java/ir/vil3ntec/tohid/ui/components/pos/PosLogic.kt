@@ -172,6 +172,8 @@ object PosLayout {
 /** کارِ هر کلید در صندوق */
 enum class PosAction {
   FINISH, CUSTOMER, EDIT_ROW, FREE_ITEM, REPRINT,
+  /** F7 — دریافتِ قسط/بدهی از مشتری (POS-39)؛ صفحه فقط با `TillReceivePref` روشن کاری می‌کند */
+  RECEIVE,
   SUBMIT, HINT_DOWN, HINT_UP, ROW_DOWN, ROW_UP, CLEAR_QUERY, DELETE_ROW, QTY_UP, QTY_DOWN,
 }
 
@@ -188,6 +190,7 @@ object PosKeys {
     key == KeyName.F2 -> PosAction.CUSTOMER
     key == KeyName.F3 -> PosAction.EDIT_ROW
     key == KeyName.F4 -> PosAction.FREE_ITEM
+    key == KeyName.F7 -> PosAction.RECEIVE
     key == KeyName.F8 -> PosAction.REPRINT
     else -> null
   }
