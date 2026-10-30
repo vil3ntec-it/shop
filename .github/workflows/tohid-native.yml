@@ -90,6 +90,12 @@ jobs:
         working-directory: android-native
         run: gradle --no-daemon testReleaseUnitTest :core:jvmTest
 
+      #  آزمون‌های commonTest ِ core (منطقِ خالص و بی اندروید: کشو، وضعیتِ چاپگر، برگهٔ دوروشی…)
+      #  همان دستورِ محلیِ `gradle -p core jvmTest`؛ testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)
+      - name: آزمون‌های core
+        working-directory: core
+        run: gradle --no-daemon jvmTest
+
       - name: ساخت APK
         working-directory: android-native
         env:
