@@ -32,8 +32,8 @@ internal object LedgerFormsModel {
 
   fun payError(f: PayForm): String? = if (payAmount(f) <= 0) StrKit.notANumber else null
 
-  /** «تسویهٔ کامل» ِ پرداخت: همهٔ بدهیِ ما، گرد؛ بدهکار نیستیم ⇒ null */
-  fun settleAll(debt: Double): String? = if (debt > 0) Math.round(debt).toString() else null
+  /** «تسویهٔ کامل» ِ پرداخت: همهٔ بدهیِ ما تا پول، بی گرد؛ بدهکار نیستیم ⇒ null */
+  fun settleAll(debt: Double): String? = MoneyText.settleInput(debt)
 
   /* ------------------------------ مصرف ------------------------------ */
 

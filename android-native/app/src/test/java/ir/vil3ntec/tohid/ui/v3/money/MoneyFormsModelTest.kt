@@ -50,8 +50,18 @@ class MoneyFormsModelTest {
     val receive = give.copy(kind = DebtorEngine.Kind.RECEIVE)
     assertEquals(1100.0, DebtorFormsModel.balanceAfter(900.0, give), 0.0)
     assertEquals(700.0, DebtorFormsModel.balanceAfter(900.0, receive), 0.0)
-    assertEquals("900", DebtorFormsModel.settleAll(899.6))
+    assertEquals("900", DebtorFormsModel.settleAll(900.0))
+    //  «تسویهٔ کامل» گردِ افغانی نیست: 900 از 899.6 ⇒ ۰٫۴ پیش‌پرداخت؛ دقیقاً همان مانده
+    assertEquals("899.6", DebtorFormsModel.settleAll(899.6))
+    assertEquals("0.05", DebtorFormsModel.settleAll(0.05))
+    //  نویزِ جمعِ Double (0.1 + 0.2) تا پول بریده می‌شود
+    assertEquals("0.3", DebtorFormsModel.settleAll(0.1 + 0.2))
     assertNull(DebtorFormsModel.settleAll(0.0))
+    assertNull(DebtorFormsModel.settleAll(0.004))
+    assertNull(DebtorFormsModel.settleAll(-50.0))
+    //  پس از رسیدِ «تسویهٔ کامل» مانده دقیقاً صفر است
+    val settle = TxForm(kind = DebtorEngine.Kind.RECEIVE, amount = DebtorFormsModel.settleAll(1200.45)!!)
+    assertEquals(0.0, DebtorFormsModel.balanceAfter(1200.45, settle), 0.0)
     assertNotNull(DebtorFormsModel.amountError(TxForm(amount = "0")))
   }
 
@@ -88,7 +98,8 @@ class MoneyFormsModelTest {
 
   @Test
   fun `پرداخت و مصرف — پیش‌نویس و خطا`() {
-    assertEquals("1200", LedgerFormsModel.settleAll(1200.4))
+    assertEquals("1200", LedgerFormsModel.settleAll(1200.0))
+    assertEquals("1200.4", LedgerFormsModel.settleAll(1200.4))
     assertNull(LedgerFormsModel.settleAll(-3.0))
     assertNotNull(LedgerFormsModel.payError(PayForm(amount = "")))
     assertNull(LedgerFormsModel.payError(PayForm(amount = "50")))

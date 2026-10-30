@@ -38,6 +38,19 @@ internal object MoneyText {
   fun overLimit(c: DebtBook.Credit): String =
     "${StrMoney.overLimitBy(DebtBook.show(c.excess), DebtBook.show(c.limit))} — ${StrMoney.currentBalance(DebtBook.show(c.balance))}"
 
+  /**
+   *  متنِ کادرِ مبلغ برای «تسویهٔ کامل»: همهٔ مانده تا ریزترین واحدِ ارز (۱ پول = ۱/۱۰۰ افغانی)،
+   *  **بی گردِ افغانی** — 899.6 ⇒ "899.6" (نه "900" که ۰٫۴ پیش‌پرداخت می‌سازد)، 1200.4 ⇒ "1200.4"
+   *  (نه "1200" که ۰٫۴ بدهی باز می‌گذارد). مانده‌ای که به یک پول نمی‌رسد یا منفی است ⇒ null.
+   */
+  fun settleInput(balance: Double): String? {
+    val minor = DebtBook.minor(balance).minor
+    if (minor <= 0) return null
+    val per = DebtBook.CURRENCY.minorPerMajor
+    val frac = (minor % per).toString().padStart(DebtBook.CURRENCY.decimals, '0').trimEnd('0')
+    return (minor / per).toString() + if (frac.isEmpty()) "" else ".$frac"
+  }
+
   /** مقدار با واحد: «20 کیلوگرم» */
   fun qtyUnit(quantity: Double, unit: String): String =
     ir.vil3ntec.tohid.qty(quantity) + if (unit.isNotBlank()) " $unit" else ""

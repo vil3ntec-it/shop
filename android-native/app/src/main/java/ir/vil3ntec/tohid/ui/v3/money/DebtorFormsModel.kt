@@ -101,8 +101,8 @@ internal object DebtorFormsModel {
   fun balanceAfter(balance: Double, f: TxForm): Double =
     if (f.kind == DebtorEngine.Kind.GIVE) balance + amountOf(f) else balance - amountOf(f)
 
-  /** «تسویهٔ کامل» (فقط رسید و فقط وقتی بدهکار است): همهٔ مانده، گرد */
-  fun settleAll(balance: Double): String? = if (balance > 0) Math.round(balance).toString() else null
+  /** «تسویهٔ کامل» (فقط رسید و فقط وقتی بدهکار است): همهٔ مانده تا پول، بی گرد — مانده پس از ثبت دقیقاً صفر */
+  fun settleAll(balance: Double): String? = MoneyText.settleInput(balance)
 
   /** بردی که از سقف می‌گذرد ⇒ گامِ دوم با هشدار؛ رسید یا بی سقف ⇒ null */
   fun overLimit(d: ShopData, debtorId: String, f: TxForm): DebtBook.Credit? {
