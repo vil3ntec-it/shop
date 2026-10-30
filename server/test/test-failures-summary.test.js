@@ -58,3 +58,24 @@ test('بی شکست ⇒ خلاصه‌ای نیست؛ کدِ ناصفر بی not 
   assert.match(failures.summarize('/nonexistent/file.jsonl', { exitCode: 1 }), /هیچ «not ok»ی ثبت نشد/);
   assert.equal(failures.summarize('/nonexistent/file.jsonl', { exitCode: 0 }), '');
 });
+
+test('scripts/test-run.js (npm test): همان پرچم و فایل، TAP و کدِ خروج همان، خلاصه در پایان', () => {
+  const env = { ...process.env };
+  delete env.NODE_TEST_CONTEXT;
+  const r = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'test-run.js'), '--test-concurrency=1', SAMPLE],
+    { encoding: 'utf8', env, cwd: path.join(__dirname, '..') });
+  assert.equal(r.status, 1);
+  assert.match(r.stdout, /not ok \d+ - زیرآزمونِ قرمز/);
+  const tail = r.stdout.slice(r.stdout.lastIndexOf('── آزمون‌های ناموفق'));
+  assert.match(tail, /^── آزمون‌های ناموفق \(2\) ──/);
+  assert.match(tail, /✖ زیرآزمونِ قرمز {2}— {2}test\/fixtures\/test-failures-sample\.js:\d+/);
+  assert.match(tail, /✖ قرمزِ سطحِ بالا/);
+  //  سبز ⇒ خروجِ ۰ و بی خلاصه
+  const ok = path.join(os.tmpdir(), `tf-run-ok-${process.pid}.js`);
+  fs.writeFileSync(ok, "require('node:test')('سبز', () => {});\n");
+  try {
+    const g = spawnSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'test-run.js'), ok], { encoding: 'utf8', env });
+    assert.equal(g.status, 0);
+    assert.ok(!g.stdout.includes('آزمون‌های ناموفق'));
+  } finally { fs.unlinkSync(ok); }
+});

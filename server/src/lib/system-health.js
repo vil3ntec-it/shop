@@ -357,7 +357,7 @@ async function chainReport({ rows = true, chains = [] } = {}) {
     ok: rep.ok, checkedAt: t, enabled, rows: rows !== false,
     total: rep.results.length, okCount: good.length, brokenCount: broken.length,
     broken, healthy: good.slice(0, CHAIN_LIMITS.maxOk).map(pick), truncated: good.length > CHAIN_LIMITS.maxOk,
-    reasons: require('../../scripts/verify-chain').REASONS,
+    reasons: store.REASONS,
   };
 }
 

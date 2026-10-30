@@ -61,8 +61,10 @@ data class HeldInvoice(
   val payment: String = "",
   /** «دریافتیِ همین حالا» همان‌طور که در کادر نوشته شده بود */
   val paid: String = "",
+  /** کدهای تخفیفِ زده‌شده (`SaleDraft.coupons`) — با فاکتور برمی‌گردند؛ نگه‌داشتهٔ نسخهٔ پیش ندارد */
+  val coupons: List<String> = emptyList(),
 ) {
-  fun draft(): SaleDraft = SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt)
+  fun draft(): SaleDraft = SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt, coupons = coupons)
 }
 
 /**
@@ -150,6 +152,7 @@ object HeldRules {
       device = device,
       payment = extras.payment?.name.orEmpty(),
       paid = extras.paid.trim(),
+      coupons = active.coupons,
     )
 
   private fun extrasOf(h: HeldInvoice) =

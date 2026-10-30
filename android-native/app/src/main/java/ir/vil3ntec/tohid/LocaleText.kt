@@ -44,6 +44,16 @@ object LocaleText {
   fun amount(value: Double, digits: String): String =
     LocaleFormat.formatAfghani(value, LocaleFormat.SYMBOL_NONE, digits)
 
+  /**
+   *  قیمتِ واحد بی نماد — مثلِ `amount`، ولی اعشارِ واقعی (۳۳۳٫۳۳، قلمِ تخفیفِ خودکار)
+   *  با دو رقم (`unitMoney`) تا «مقدار × قیمت» با جمعِ قلم بخواند. عددِ کامل همان `amount`.
+   */
+  fun unitAmount(value: Double, digits: String): String {
+    if (value.isNaN() || value.isInfinite() || Math.round(value * 100) % 100 == 0L) return amount(value, digits)
+    val text = LocaleFormat.displayDigits(unitMoney(value), digits)
+    return if (digits == LocaleFormat.DIGITS_FA) text.replace(',', '٬').replace('.', '٫') else text
+  }
+
   /** نمادِ پول (LOC-07): «؋» یا «افغانی»؛ هر مقدارِ ناشناخته ⇒ «افغانی»، یعنی رفتارِ امروز */
   fun symbolOf(value: String?): String =
     if (value == LocaleFormat.SYMBOL_SIGN) LocaleFormat.SYMBOL_SIGN else LocaleFormat.SYMBOL_WORD
