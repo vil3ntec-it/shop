@@ -594,10 +594,6 @@ class ShopStore(private val context: Context) {
    *  خطای نوشتنِ دفتر روی دیسک — `AppRoot` پیامِ روشن نشان می‌دهد (F0-01).
    *  پیش‌تر این خطا بی‌صدا خورده می‌شد و صفحه «ثبت شد» می‌گفت.
    */
-  /** پیش از اصلاح: جریان هست ولی چیزی در آن نمی‌آید (آزمون‌ها کامپایل شوند و سرخ) */
-  private val _notice = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
-  val notice: kotlinx.coroutines.flow.SharedFlow<String> = _notice
-
   private val _diskError = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
   val diskError: kotlinx.coroutines.flow.SharedFlow<String> = _diskError
 
