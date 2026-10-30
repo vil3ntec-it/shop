@@ -61,6 +61,10 @@
   آزمون‌ها `server/test/public-views.test.js` و `core/src/jvmTest/.../market/MarketContractTest.kt`؛ مدل‌ها در
   `core/src/commonMain/.../market/MarketContract.kt` (kotlinx.serialization 1.7.3، همان نسخهٔ اندروید). کارِ `test` در core
   = `jvmTest`، و گامِ «آزمونِ core» در `tohid-desktop.yml`.
+- دنباله (همان روز): بُرشِ پاسخِ زنده پشتِ پرچمِ `market.public_views` (scope `all`، **پیش‌فرض خاموش**) رفت تا فیلدِ تازهٔ
+  M4/S3/S5/S7 پیش از رسیدن به فهرست بی‌صدا بریده نشود: سازنده‌ها `pub`/`pubList` را صدا می‌زنند (خاموش ⇒ همان شیء، پاسخِ main)،
+  `view`/`list` همیشه می‌بُرند، و `router.use(views.gate)` در `/store` و `/market` پرچم را می‌خواند. روشن کردنِ پرچم
+  فقط پس از هم‌گام شدنِ فهرست با فیلدهای شاخه‌های بالا (نسخهٔ ۲).
 - نیمه‌کاره/بیرون از کار: `store.delivery` (ناحیه‌ها، §۱.۵) و پاسخ‌های بازه/ناحیه/گفت‌وگو/حساب هنوز از ماژول نمی‌گذرند؛
   `delivery` (پیک) شکلش ثابت شده ولی در هیچ پاسخی نیست (S5)؛ `schemaVersion` فقط در کد و پرونده است، نه در پاسخ.
 - قدمِ بعدی: S1 (خواندن از کاتالوگِ واحد) یا S5 (پیک برای مشتری) — هر فیلدِ تازه ⇒ نسخهٔ ۲ و پروندهٔ `market-public-v2.json`.

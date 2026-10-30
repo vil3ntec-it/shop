@@ -279,7 +279,7 @@ function cardOf(e, near, at = now()) {
   const s = e.status;
   const cat = categoryOf(r.m_category);
   const hasGeo = near && r.m_lat !== null && r.m_lat !== undefined && r.m_lng !== null && r.m_lng !== undefined;
-  return views.view('shopCard', {
+  return views.pub('shopCard', {
     slug: r.slug,
     title: r.title,
     tagline: r.tagline,
@@ -359,7 +359,7 @@ async function shops({ q, category, lat, lng, limit, offset, first } = {}, at = 
   const cand = page.map((x, j) => ({ shopId: x.id, ids: sh[j].filter((p) => p.photo).slice(0, 2).map((p) => p.id) }));
   const live = await liveViews(cand.flatMap((c) => c.ids.map((id) => ({ shopId: c.shopId, id }))));
   return {
-    shops: page.map((x, j) => views.view('shopCard', { ...x.c, cover: cand[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
+    shops: page.map((x, j) => views.pub('shopCard', { ...x.c, cover: cand[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
     total: cards.length, nextOffset: off + lim < cards.length ? off + lim : null,
   };
 }
@@ -398,7 +398,7 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
       .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name)
       .sort((a, b) => rank(near)(a.shop, b.shop) || a.p.name.localeCompare(b.p.name, 'fa'))
       .slice(0, lim)
-      .map(({ shop, p }) => views.view('searchProduct', {
+      .map(({ shop, p }) => views.pub('searchProduct', {
         id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor, photo: p.photo,
         shop: {
           slug: shop.slug, title: shop.title, accent: shop.accent,
@@ -647,7 +647,7 @@ function capPerShop(list, max) {
 const withoutLedger = ({ regularPriceMinor: _r, ...rest }) => rest;
 
 function feedItem(card, p) {
-  return views.view('marketProduct', {
+  return views.pub('marketProduct', {
     id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor,
     ...(p.regularPriceMinor ? { regularPriceMinor: p.regularPriceMinor } : {}),
     maxQtyMilli: p.maxQtyMilli, photo: p.photo, stock: p.stock,
@@ -707,7 +707,7 @@ async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
     popular: popular.map(out),
     deals: dealList.map(out),
     windowDays: POPULAR_DAYS,
-    shops: top.slice(0, 6).map((x, j) => views.view('shopCard', {
+    shops: top.slice(0, 6).map((x, j) => views.pub('shopCard', {
       ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null,
     })),
     shopTotal: inCat.length,
@@ -732,7 +732,7 @@ async function myOrders(ticket) {
   );
   const slugs = [...new Set(rows.map((r) => r.slug))];
   const open = new Set(await filterAsync(slugs, storeOpen));
-  return rows.filter((r) => open.has(r.slug)).map((r) => views.view('orderSummary', {
+  return rows.filter((r) => open.has(r.slug)).map((r) => views.pub('orderSummary', {
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
     token: sf.tokenOf(r.shop_id, r.id),

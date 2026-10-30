@@ -166,6 +166,7 @@ function noLeak(body, secrets, where) {
 
 test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شناسهٔ داخلی، شماره یا مختصاتِ دقیق', async () => {
   await setFlag('all', 'market.directory', true);
+  await setFlag('all', V.FLAG, true);
   const u = await h.newUser('قرارداد', 'shop');
   const made = await h.post('/api/shop', { name: 'دکانِ قرارداد' }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -206,8 +207,10 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
   const T = { headers: { 'X-Store-Ticket': ticket } };
 
   const secrets = [shopId, u.user.id, u.email, phone, device, '34.5312', '69.1661'].filter(Boolean);
+  const seen = new Map();
   const check = async (url, opts, shapes) => {
     const r = await h.get(url, opts);
+    seen.set(url, { opts, body: r.body });
     assert.equal(r.status, 200, `${url}: ${JSON.stringify(r.body)}`);
     noLeak(r.body, secrets, url);
     for (const [pick, shape] of shapes) {
@@ -249,5 +252,33 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
   //  شناسهٔ سفارش فقط درونِ توکنِ HMAC دار؛ جای دیگر هرگز
   const tr = JSON.stringify(tracked).split(orderToken).join('');
   assert.equal(tr.includes(orderId), false, 'شناسهٔ خامِ سفارش بیرون از توکن');
+
+  //  پرچمِ خاموش (پیش‌فرض) ⇒ پاسخِ امروز همان است که با بُرش (سازنده‌های امروز فیلدِ اضافه ندارند)
+  await setFlag('all', V.FLAG, false);
+  for (const url of [`/api/store/${slug}/products`, `/api/store/${slug}/products/rice`, `/api/store/${slug}/orders/${orderToken}`]) {
+    const { opts, body } = seen.get(url);
+    const r = await h.get(url, opts);
+    assert.equal(r.status, 200, url);
+    assert.deepEqual(r.body, body, `${url}: پرچمِ خاموش همان پاسخ`);
+  }
   await setFlag('all', 'market.directory', false);
+});
+
+test('پرچمِ market.public_views: خاموش (پیش‌فرض) ⇒ فیلدِ تازهٔ سازنده بی‌صدا بریده نمی‌شود؛ روشن ⇒ فهرستِ سفید', async () => {
+  const p = { ...C.samples.product, brand: 'برندِ تازه (M4)', publicId: 'pub_x (S3)' };
+  await setFlag('all', V.FLAG, false);
+  assert.equal(await V.sync(), false);
+  assert.equal(V.enforced(), false);
+  assert.equal(V.pub('product', p), p, 'خاموش ⇒ همان شیء');
+  assert.deepEqual(V.pubList('product', [p]), [p]);
+  await setFlag('all', V.FLAG, true);
+  assert.equal(await V.sync(), true);
+  const cut = V.pub('product', p);
+  assert.equal('brand' in cut, false);
+  assert.equal('publicId' in cut, false);
+  assert.deepEqual(cut, C.samples.product);
+  //  view/list (آزمون و پیش‌نمایش) همیشه می‌بُرند، پرچم هر چه باشد
+  await setFlag('all', V.FLAG, false);
+  assert.equal(await V.sync(), false);
+  assert.deepEqual(V.view('product', p), C.samples.product);
 });

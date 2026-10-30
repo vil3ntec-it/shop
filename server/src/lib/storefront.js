@@ -234,7 +234,7 @@ async function statusOf(sf, at = now()) {
 }
 
 function profile(sf, categories = [], status = null) {
-  return views.view('shop', {
+  return views.pub('shop', {
     slug: sf.slug,
     title: sf.title,
     tagline: sf.tagline,
@@ -263,7 +263,7 @@ function priceOf(row) {
 
 function productView(row) {
   const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
-  return views.view('product', {
+  return views.pub('product', {
     id: row.id,
     name: text(d.name, 200),
     unit: text(d.unit, 30),
@@ -405,7 +405,7 @@ async function highlights(shopId, at = now()) {
   const [bestsellers, newArrivals] = await Promise.all([
     shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
   ]);
-  return { bestsellers: views.list('product', bestsellers), newArrivals: views.list('product', newArrivals), windowDays: 30 };
+  return { bestsellers: views.pubList('product', bestsellers), newArrivals: views.pubList('product', newArrivals), windowDays: 30 };
 }
 
 function specsOf(v) {
@@ -456,8 +456,8 @@ async function productDetail(shopId, productId) {
     shelfOf(sameCat.map((r) => r.product_id)), shelfOf(together.map((r) => r.product_id)),
   ]);
   return {
-    product: views.view('product', product),
-    similar: views.list('product', similar), complementary: views.list('product', complementary),
+    product: views.pub('product', product),
+    similar: views.pubList('product', similar), complementary: views.pubList('product', complementary),
   };
 }
 
@@ -640,7 +640,7 @@ function orderIdOf(shopId, token) {
 
 /** نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی. */
 function publicOrder(o, token) {
-  return views.view('order', {
+  return views.pub('order', {
     token,
     orderNo: o.orderNo,
     status: o.status,
@@ -842,7 +842,7 @@ async function myOrders(sf, ticket, session = '') {
       ORDER BY created_at DESC, id DESC LIMIT 20`,
     [sf.shop_id, phone]
   );
-  return views.list('orderSummary', rows.map((r) => ({
+  return views.pubList('orderSummary', rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
   })));
@@ -877,7 +877,7 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
   ) : [];
   const last = page[page.length - 1];
   return {
-    orders: views.list('orderSummary', page.map((r) => ({
+    orders: views.pubList('orderSummary', page.map((r) => ({
       orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
       scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
@@ -900,7 +900,7 @@ async function reorder(sf, token) {
   const byId = new Map(live.map((p) => [p.id, p]));
   return {
     orderNo: o.orderNo,
-    lines: views.list('reorderLine', o.lines.map((l) => {
+    lines: views.pubList('reorderLine', o.lines.map((l) => {
       const p = byId.get(l.productId);
       const ok = Boolean(p && p.priceMinor !== null && p.name) && shelf.suggestable(p);
       const qtyMilli = ok && p.maxQtyMilli !== null ? Math.min(l.qtyMilli, p.maxQtyMilli) : l.qtyMilli;

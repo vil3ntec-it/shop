@@ -18,6 +18,12 @@
  *           ایمیل، مختصاتِ دقیق، قیمتِ خرید. `test/public-views.test.js` پاسخ‌های واقعی را می‌کاود.
  *   پیک ── `delivery` (S5) امروز در هیچ پاسخی نیست؛ شکلش این‌جا ثابت شده تا S5 فقط وصلش کند
  *           (با پرچمِ خاموش و نسخهٔ تازه).
+ *   پرچم ── بریدنِ پاسخ‌های زنده پشتِ `market.public_views` (scope `all`، پیش‌فرض خاموش) است:
+ *           سازنده‌ها `pub`/`pubList` را صدا می‌زنند که با پرچمِ خاموش همان شیء را بی دست‌زدن
+ *           برمی‌گرداند (پاسخِ امروزِ main) تا فیلدِ تازهٔ شاخه‌های دیگر (M4، S3، S5، S7) پیش از
+ *           رسیدن به این فهرست و نسخهٔ تازه بی‌صدا بریده نشود. `view`/`list` همیشه می‌بُرند
+ *           (آزمون، پیش‌نمایشِ «مشتری چه می‌بیند»). مسیرهای `/store` و `/market` پیش از هر
+ *           پاسخ `gate` را می‌گذرانند که پرچم را (با همان حافظهٔ `market.gateCacheMs`) می‌خواند.
  */
 
 const SCHEMA_VERSION = 1;
@@ -97,6 +103,31 @@ function view(shape, obj) {
 
 const list = (shape, items) => items.map((x) => view(shape, x));
 
+const FLAG = 'market.public_views';
+const state = { on: false, at: -Infinity, flight: null };
+
+/** پرچمِ `market.public_views` را می‌خواند (یک‌پرواز، با حافظهٔ `market.gateCacheMs`). */
+function sync(at = Date.now()) {
+  if (state.flight) return state.flight;
+  const ttl = Number(require('../config').market.gateCacheMs) || 0;
+  if (ttl > 0 && at - state.at < ttl) return Promise.resolve(state.on);
+  state.flight = require('./orders').flagOf('all', FLAG)
+    .then((on) => { state.on = on === true; state.at = at; return state.on; })
+    .finally(() => { state.flight = null; });
+  return state.flight;
+}
+
+/** میان‌افزارِ مسیرهای عمومی: پیش از ساختنِ پاسخ، پرچم تازه است. */
+async function gate(req, res, next) {
+  try { await sync(); } catch (err) { return next(err); }
+  return next();
+}
+
+/** نمای پاسخِ زنده: پرچم روشن ⇒ `view`؛ خاموش ⇒ همان شیء (رفتارِ پیش از S2). */
+const pub = (shape, obj) => (state.on ? view(shape, obj) : obj);
+const pubList = (shape, items) => (state.on ? list(shape, items) : items);
+const enforced = () => state.on;
+
 /** فیلدهای همیشگی و همهٔ فیلدهای مجازِ یک شکل — برای آزمون. */
 function keysOf(shape) {
   const keys = allowed.get(shape);
@@ -108,4 +139,4 @@ function delivery(a) {
   return a ? view('delivery', { status: a.status, mode: a.mode }) : null;
 }
 
-module.exports = { SCHEMA_VERSION, FIELDS, NESTED, view, list, keysOf, delivery };
+module.exports = { SCHEMA_VERSION, FIELDS, NESTED, FLAG, view, list, pub, pubList, sync, gate, enforced, keysOf, delivery };

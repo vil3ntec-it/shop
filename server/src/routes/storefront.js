@@ -28,6 +28,8 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
+//  S2: پرچمِ `market.public_views` پیش از هر پاسخ (خاموش ⇒ پاسخِ بی بُرش، همان main)
+router.use(views.gate);
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
@@ -64,7 +66,7 @@ router.get('/:slug', readLimit, store, wrap(async (req, res) => {
     sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
   ]);
   res.json({
-    store: views.view('shop', { ...sf.profile(req.store, cats, status), delivery }),
+    store: views.pub('shop', { ...sf.profile(req.store, cats, status), delivery }),
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -97,7 +99,7 @@ router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
   const stock = out.items.length
     ? await require('../lib/catalog').publicStock(req.store.shop_id, out.items.map((p) => p.id)) : null;
   if (stock) out.items = out.items.map((p) => ({ ...p, stock: stock.get(p.id) || p.stock }));
-  res.json({ ...out, items: views.list('product', out.items) });
+  res.json({ ...out, items: views.pubList('product', out.items) });
 }));
 
 //  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────
