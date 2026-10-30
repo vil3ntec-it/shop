@@ -119,4 +119,7 @@ object StrSale {
   val paid: String get() = t("پرداختی", "Paid", "ورکړل شوي")
   val remaining: String get() = t("باقی‌مانده", "Balance", "پاتې")
   val thanks: String get() = t("تشکر از خرید شما", "Thank you for your purchase", "له پېرود څخه مو مننه")
+  //  تخفیفِ خودکار روی فاکتور (پرچمِ `shop.promo_stamp`) — آگاهی است، از «جمع اقلام» کم نمی‌شود
+  fun lineAutoDiscount(a: Any): String = t("− $a تخفیفِ خودکار", "− $a automatic discount", "− $a اتومات تخفیف")
+  fun includesAutoDiscount(names: Any): String = t("شاملِ تخفیفِ خودکار$names", "Includes automatic discount$names", "اتومات تخفیف پکې شامل دی$names")
 }
