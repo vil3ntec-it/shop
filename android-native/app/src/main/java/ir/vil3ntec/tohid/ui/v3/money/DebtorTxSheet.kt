@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
+import ir.vil3ntec.tohid.ui.v3.v3Shake
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -205,11 +206,13 @@ private fun DueStep(entry: DebtBook.Entry?, onCancel: () -> Unit, onSave: (Strin
       )
     }
     Spacer(Modifier.height(14.dp))
-    DueDateEditor(due, { due = it })
+    var dueText by remember { mutableStateOf("") }
+    var shake by remember { mutableStateOf(0) }
+    DueDateEditor(due, { due = it }, Modifier.v3Shake(shake), onText = { dueText = it })
     Spacer(Modifier.height(18.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3Button(StrKit.cancel, onCancel, Modifier.weight(1f), kind = V3ButtonKind.NEUTRAL)
-      V3Button(StrKit.save, { onSave(due.ifBlank { null }) }, Modifier.weight(1.4f), haptic = true)
+      V3Button(StrKit.save, { if (DebtorTxModel.dueBroken(dueText)) shake++ else onSave(due.ifBlank { null }) }, Modifier.weight(1.4f), haptic = true)
     }
   }
 }

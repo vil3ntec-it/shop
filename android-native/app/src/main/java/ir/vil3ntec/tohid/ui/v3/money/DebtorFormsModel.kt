@@ -31,6 +31,8 @@ internal data class TxForm(
   val notes: String = "",
   /** سررسیدِ برد (`yyyy-MM-dd`)؛ خالی ⇒ ندارد */
   val due: String = "",
+  /** نوشتهٔ همان لحظهٔ کادرِ سررسید (`DueDateEditor`) — فقط برای بستنِ «ثبت» وقتی ناخواناست */
+  val dueText: String = "",
 )
 
 /**
@@ -91,6 +93,9 @@ internal object DebtorFormsModel {
   fun amountOf(f: TxForm): Double = f.amount.trim().toDoubleOrNull() ?: 0.0
 
   fun amountError(f: TxForm): String? = if (amountOf(f) <= 0) StrKit.notANumber else null
+
+  /** سررسیدِ ناخوانا فقط برای برد (رسید سررسید ندارد) — «ثبت» بسته می‌ماند */
+  fun dueBroken(f: TxForm): Boolean = f.kind == DebtorEngine.Kind.GIVE && DebtorTxModel.dueBroken(f.dueText)
 
   /** «مانده پس از ثبت» — بدهی + برد یا − رسید */
   fun balanceAfter(balance: Double, f: TxForm): Double =

@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -58,6 +59,10 @@ class DebtorTxModelTest {
     assertEquals("", DebtorTxModel.parseDue(" "))
     assertNull(DebtorTxModel.parseDue("فردا"))
     assertEquals("2026-11-01", DebtorTxModel.parseDue("1405-08-10"))
+    //  گامِ «سررسید» ِ برگه: ناخوانا ⇒ «ذخیره» بسته
+    assertTrue(DebtorTxModel.dueBroken("فردا"))
+    assertFalse(DebtorTxModel.dueBroken(""))
+    assertFalse(DebtorTxModel.dueBroken("1405-08-10"))
   }
 
   @Test

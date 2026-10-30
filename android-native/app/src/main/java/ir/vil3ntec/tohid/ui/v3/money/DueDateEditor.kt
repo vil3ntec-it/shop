@@ -9,6 +9,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -24,16 +25,19 @@ import ir.vil3ntec.tohid.ui.v3.V3TextField
 /**
  *  کادرِ سررسیدِ برد: خورشیدی نوشته می‌شود و `yyyy-MM-dd` نگه داشته می‌شود؛ خالی یعنی سررسید
  *  ندارد. زیرش تراشه‌های «یک هفته · دو هفته · یک ماه · بی سررسید». نوشتهٔ ناخوانا خطای درجا دارد
- *  و مقدار را عوض نمی‌کند.
+ *  و مقدار را عوض نمی‌کند؛ نوشتهٔ کادر با [onText] به صدازننده می‌رسد تا تا وقتی ناخواناست
+ *  «ثبت» را ببندد (`DebtorTxModel.dueBroken`) — وگرنه تاریخِ قبلی بی‌صدا ذخیره می‌شد.
  */
 @Composable
-internal fun DueDateEditor(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun DueDateEditor(value: String, onValueChange: (String) -> Unit, modifier: Modifier = Modifier, onText: (String) -> Unit = {}) {
   //  کادرِ تاریخِ کیت فقط رقم و «-» می‌گیرد ⇒ «۱۴۰۵-۰۸-۱۰»
   fun shown(iso: String) = if (iso.isBlank()) "" else formatDate(iso).replace('/', '-')
   var text by remember { mutableStateOf(shown(value)) }
   LaunchedEffect(value) {
     if (DebtorTxModel.parseDue(text) != value) text = shown(value)
   }
+  val report by rememberUpdatedState(onText)
+  LaunchedEffect(text) { report(text) }
   val today = todayIso()
   val sample = remember(today) { shown(plusDays(today, DebtorTxModel.DUE_PRESETS.first())) }
   val broken = DebtorTxModel.parseDue(text) == null

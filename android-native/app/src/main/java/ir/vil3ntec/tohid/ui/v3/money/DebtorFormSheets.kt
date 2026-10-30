@@ -161,7 +161,7 @@ internal fun TxFormSheet(
           V3TextField(f.notes, { f = f.copy(notes = it) }, StrMoney.notesOptional)
           if (!receiving) {
             Spacer(Modifier.height(12.dp))
-            DueDateEditor(f.due, { f = f.copy(due = it) })
+            DueDateEditor(f.due, { f = f.copy(due = it) }, onText = { f = f.copy(dueText = it) })
           }
           Spacer(Modifier.height(14.dp))
           Text(
@@ -175,7 +175,7 @@ internal fun TxFormSheet(
             {
               tried = true
               when {
-                amountError != null -> shake++
+                amountError != null || DebtorFormsModel.dueBroken(f) -> shake++
                 overLimitOf(f) != null -> step = TxFormStep.OVER_LIMIT
                 onSubmit(f, false) -> step = TxFormStep.DONE
               }

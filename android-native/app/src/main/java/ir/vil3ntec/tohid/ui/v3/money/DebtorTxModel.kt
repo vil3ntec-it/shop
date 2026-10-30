@@ -85,4 +85,7 @@ internal object DebtorTxModel {
    *  نوشتهٔ ناخوانا ⇒ null (خطای درجا، ذخیره نه).
    */
   fun parseDue(text: String): String? = if (text.isBlank()) "" else Jalali.parseTyped(text)
+
+  /** نوشتهٔ ناخوانای کادرِ سررسید ⇒ «ثبت» بسته (لرزش)، نه ذخیرهٔ بی‌صدای تاریخِ قبلی */
+  fun dueBroken(text: String): Boolean = parseDue(text) == null
 }

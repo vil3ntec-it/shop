@@ -56,6 +56,18 @@ class MoneyFormsModelTest {
   }
 
   @Test
+  fun `سررسیدِ ناخوانا «ثبت» ِ برد را می‌بندد، تاریخِ قبلی بی‌صدا ذخیره نمی‌شود`() {
+    //  کادرِ سررسید تاریخِ قبلی را نگه می‌دارد؛ تا نوشته ناخواناست برد ثبت نمی‌شود
+    val give = TxForm(kind = DebtorEngine.Kind.GIVE, amount = "200", due = "2026-11-01", dueText = "۱۴۰۵-۱۳-۴۰")
+    assertTrue(DebtorFormsModel.dueBroken(give))
+    assertTrue(DebtorFormsModel.dueBroken(give.copy(dueText = "فردا")))
+    assertFalse(DebtorFormsModel.dueBroken(give.copy(dueText = "")))
+    assertFalse(DebtorFormsModel.dueBroken(give.copy(dueText = "1405-08-10")))
+    //  رسید سررسید ندارد — نوشتهٔ کهنهٔ کادر جلویش را نمی‌گیرد
+    assertFalse(DebtorFormsModel.dueBroken(give.copy(kind = DebtorEngine.Kind.RECEIVE)))
+  }
+
+  @Test
   fun `بیش از سقف — فقط بردی که از سقف می‌گذرد`() {
     assertNotNull(DebtorFormsModel.overLimit(ledger, "d", TxForm(amount = "200")))
     assertNull(DebtorFormsModel.overLimit(ledger, "d", TxForm(amount = "50")))
