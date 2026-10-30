@@ -59,6 +59,12 @@ import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3UiDark
+import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3IconButton
+import ir.vil3ntec.tohid.ui.v3.V3Message
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.ui.v3.V3StaggerState
+import ir.vil3ntec.tohid.ui.v3.v3Stagger
 
 /*
  *  جزئیاتِ مأموریت به شکلِ مرجعِ صاحب محصول (courier-ref.jpg، صفحهٔ راست و کارتِ
@@ -111,14 +117,14 @@ internal fun CourierDetailPage(
   onAction: (String) -> Unit,
   onPhoto: () -> Unit,
   onNavigate: () -> Unit,
-  seen: MutableSet<String>,
+  seen: V3StaggerState,
 ) {
   val p = PhoneV3.colors
   val live = CourierFlow.isLive(c.status)
   val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
   Column(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      CourierRoundButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onBack)
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
       Text(
         "سفارشِ #${c.orderNo.fa()}",
         style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center,
@@ -132,13 +138,14 @@ internal fun CourierDetailPage(
     Column(Modifier.weight(1f).fillMaxWidth().background(p.black, SheetTop).padding(top = 10.dp)) {
       Box(Modifier.align(Alignment.CenterHorizontally).width(40.dp).height(4.dp).background(p.blackRaised, CourierPillShape))
       Spacer(Modifier.height(12.dp))
-      CourierTabs(
-        "جزئیاتِ پیگیری" to null, "جزئیاتِ ارسال" to null,
-        firstSelected = detailTab == "track",
-        onSelect = { onDetailTab(if (it) "track" else "ship") },
-        modifier = Modifier.padding(horizontal = 16.dp),
-        onDark = true,
-      )
+      CourierOnDark {
+        V3Segmented(
+          listOf("جزئیاتِ پیگیری", "جزئیاتِ ارسال"),
+          selected = if (detailTab == "track") 0 else 1,
+          onSelect = { onDetailTab(if (it == 0) "track" else "ship") },
+          modifier = Modifier.padding(horizontal = 16.dp),
+        )
+      }
       Spacer(Modifier.height(14.dp))
       AnimatedContent(
         targetState = detailTab,
@@ -191,22 +198,23 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
     }
     if (live && c.lat != null && c.lng != null) {
       Spacer(Modifier.height(14.dp))
-      CourierSecondaryButton("مسیریابی", onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions, onDark = true)
+      CourierOnDark { CourierSecondary("مسیریابی", onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions) }
     }
   }
 }
 
 @Composable
-private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: Boolean, seen: MutableSet<String>) {
+private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: Boolean, seen: V3StaggerState) {
   val p = PhoneV3.colors
-  val dark = PhoneV3UiDark
   Row(verticalAlignment = Alignment.Bottom) {
     Column(Modifier.weight(1f)) {
       Text("شمارهٔ سفارش", style = courierText(12.sp), color = p.onBlackMuted)
       Text("#${c.orderNo.fa()}", style = courierText(22.sp, FontWeight.Bold), color = p.onBlack)
     }
-    if (waiting) { CourierPill("در صف", dark.awaiting); Spacer(Modifier.width(6.dp)) }
-    CourierPill(STATUS_LABEL[c.status] ?: c.status, statusTone(c.status, dark))
+    CourierOnDark {
+      if (waiting) { QueuedPill(); Spacer(Modifier.width(6.dp)) }
+      MissionStatus(c.status)
+    }
   }
   if (live && reached(c.status) >= 0) {
     Spacer(Modifier.height(14.dp))
@@ -214,7 +222,7 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
   }
   if (c.recallRequested && live) {
     Spacer(Modifier.height(12.dp))
-    CourierWarnNote("دکان این سفارش را پس خواسته است — بسته را برگردانید.")
+    CourierOnDark { V3Message(V3Tone.ERROR, RECALL_NOTE) }
   }
   Spacer(Modifier.height(18.dp))
   val rows = CourierBoardModel.track(c, queue)
@@ -222,11 +230,7 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
     Text("خطِ زمانی پس از همگام‌سازی با دکان می‌آید.", style = courierText(13.sp), color = p.onBlackMuted)
   }
   rows.forEachIndexed { i, r ->
-    val appear = rememberCourierAppear("t-${c.id}-${r.at}-$i", i, seen)
-    TrackRowView(r, last = i == rows.lastIndex, modifier = Modifier.graphicsLayer {
-      alpha = appear.value
-      translationY = (1f - appear.value) * 16.dp.toPx()
-    })
+    TrackRowView(r, last = i == rows.lastIndex, modifier = Modifier.v3Stagger(seen, "t-${c.id}-${r.at}-$i", i))
   }
 }
 
@@ -329,23 +333,23 @@ private fun DarkKV(label: String, value: String, strong: Boolean, ltr: Boolean =
   Box(Modifier.fillMaxWidth().height(1.dp).background(p.blackRaised))
 }
 
-/** دکمه‌های پله ته برگهٔ تیره — اصلی سبزآبی، بقیه روی سطحِ برآمده */
+/** دکمه‌های پله ته برگهٔ تیره (کیتِ شب): اصلی بزرگ، بقیه کنارِ هم؛ کارِ منفی گونهٔ «خطر» */
 @Composable
 private fun ActionArea(c: MissionCard, actions: List<String>, onAction: (String) -> Unit, onPhoto: () -> Unit) {
   val positive = actions.filterNot { isNegative(it) }
   val negative = actions.filter { isNegative(it) }
   val photo = c.photoAllowed && c.status == "arrived"
-  Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    positive.firstOrNull()?.let { to ->
-      CourierPrimaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.fillMaxWidth(), onDark = true)
-    }
-    val rest = positive.drop(1)
-    if (rest.isNotEmpty() || photo || negative.isNotEmpty()) {
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        rest.forEach { to -> CourierSecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), onDark = true) }
-        if (photo) CourierSecondaryButton("عکسِ بسته", onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera, onDark = true)
-        negative.forEach { to ->
-          CourierSecondaryButton(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), tone = CourierTone.NEGATIVE, onDark = true)
+  CourierOnDark {
+    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+      positive.firstOrNull()?.let { to ->
+        StepButton(actionLabel(c.status, to), { onAction(to) }, Modifier.fillMaxWidth())
+      }
+      val rest = positive.drop(1)
+      if (rest.isNotEmpty() || photo || negative.isNotEmpty()) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          rest.forEach { to -> CourierSecondary(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f)) }
+          if (photo) CourierSecondary("عکسِ بسته", onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera)
+          negative.forEach { to -> CourierSecondary(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), negative = true) }
         }
       }
     }
