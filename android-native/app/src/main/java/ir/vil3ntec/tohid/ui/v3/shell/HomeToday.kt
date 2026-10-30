@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
@@ -64,13 +65,13 @@ internal fun HomeTitle(text: String, modifier: Modifier = Modifier) {
  *  بی سرخطِ تاریخ؛ روزِ بی تراکنش فقط یک خطِ آرام. زدن ⇐ برگهٔ اقلام (`TxSheet`).
  */
 @Composable
-internal fun HomeToday(d: ShopData, purchases: Boolean, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun HomeToday(d: ShopData, purchases: Boolean, onOpen: (String) -> Unit, modifier: Modifier = Modifier, inset: Dp = 16.dp) {
   val c = PhoneV3.colors
   val today = ir.vil3ntec.tohid.todayIso()
   //  نوشته‌ها (مشتریِ گذری) در زبانِ همین لحظه
   val rows = remember(d, purchases, today, I18n.lang) { Transactions.today(d, today, purchases = purchases) }
   var open by remember { mutableStateOf<Transactions.Tx?>(null) }
-  Column(modifier.padding(horizontal = 16.dp)) {
+  Column(modifier.padding(horizontal = inset)) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
       HomeTitle(Str.today, Modifier.weight(1f))
       Text(
@@ -141,7 +142,7 @@ internal fun alertIcon(k: HomeAlerts.Kind): ImageVector = when (k) {
  *  فوری‌ها سرخ، صفِ مانده کهربایی — رنگ با آیکن، نه تنها.
  */
 @Composable
-internal fun HomeUrgent(alerts: List<HomeAlerts.Alert>, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
+internal fun HomeUrgent(alerts: List<HomeAlerts.Alert>, onOpen: (String) -> Unit, modifier: Modifier = Modifier, inset: Dp = 16.dp) {
   val first = alerts.firstOrNull() ?: return
   val c = PhoneV3.colors
   val s = Shop.colors
@@ -150,7 +151,7 @@ internal fun HomeUrgent(alerts: List<HomeAlerts.Alert>, onOpen: (String) -> Unit
   val route = if (alerts.size == 1) first.route else ShellTargets.notifications()
   Row(
     modifier
-      .padding(horizontal = 16.dp)
+      .padding(horizontal = inset)
       .fillMaxWidth()
       .v3Pressable(label = first.title) { onOpen(route) }
       .clip(shape)

@@ -47,6 +47,41 @@ class ShopAlertsTest {
   }
 
   @Test
+  fun `ساده مثلِ خانه — نامِ کالاها زیرِ همان هشدارِ کالا، نه ردیفِ جدا`() {
+    val withStock = HomeAlerts.build(HomeAlerts.Input(outOfStock = 2, lowStock = 2))
+    val g = ShopAlerts.build(
+      withStock,
+      ShopAlerts.Extras(
+        out = listOf(ShopAlerts.Product("p1", "چای"), ShopAlerts.Product("p2", "قند")),
+        low = listOf(ShopAlerts.Low("p3", "برنج", "2"), ShopAlerts.Low("p4", "روغن", "1")),
+      ),
+    )
+    assertTrue(g.all.none { it.kind == ShopAlerts.Kind.PRODUCT_OUT || it.kind == ShopAlerts.Kind.PRODUCT_LOW })
+    val stock = g.all.single { it.kind == ShopAlerts.Kind.STOCK }
+    assertTrue(stock.subtitle.startsWith("چای"))
+    assertTrue(stock.subtitle.contains("برنج"))
+    assertFalse(stock.subtitle.contains("روغن"))           // سه نام و «۱ دیگر»
+    assertEquals("products?filter=out", stock.route)
+  }
+
+  @Test
+  fun `چند قرض‌دارِ بیشترین قرض یک ردیف ⇐ فهرست به ترتیبِ بیشترین`() {
+    val g = ShopAlerts.build(
+      emptyList(),
+      ShopAlerts.Extras(topDebtors = listOf(ShopAlerts.Owing("d1", "احمد", "1,200"), ShopAlerts.Owing("d2", "کریم", "900"))),
+    )
+    val row = g.rest.single()
+    assertEquals("debtors?sort=most", row.route)
+    assertTrue(row.subtitle.contains("احمد") && row.subtitle.contains("کریم"))
+  }
+
+  @Test
+  fun `فهرستِ نام‌ها سه تا و باقی شمرده`() {
+    assertEquals("الف", ShopAlerts.names(listOf("الف")))
+    assertTrue(ShopAlerts.names(listOf("a", "b", "c", "d", "e")).endsWith(ir.vil3ntec.tohid.core.i18n.StrHome.andMore(2)))
+  }
+
+  @Test
   fun `چند تأمین‌کننده ⇐ فهرستِ خرید؛ بی بدهی ⇐ ردیفی نیست`() {
     val many = ShopAlerts.build(emptyList(), ShopAlerts.Extras(supplierDebt = "9,000", onlySupplierId = null))
     assertEquals("purchasing", many.rest.single().route)
