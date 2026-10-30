@@ -106,7 +106,8 @@ jobs:
           S="$S;go:warehouse;wait:1800;shot:20g-warehouse-stock-on"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
-          S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  F0-18: پنجرهٔ میان‌برها (F1) و قرض‌داران (DeskCustomers) در شب هم — رنگ‌ها از تم، نه ثابت
+          S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;help:on;wait:1500;shot:19b-shortcuts-F1-dark;help:off;go:debtors;wait:1500;shot:19c-debtors-dark;theme:LIGHT"
           #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
           for WH in 1280,800 1920,1080; do
             N="v2-${WH/,/x}"
