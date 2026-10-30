@@ -58,7 +58,17 @@ const customer = wrap(async (req, res, next) => {
   next();
 });
 
-router.get('/:slug', readLimit, store, wrap(async (req, res) => {
+/**
+ * S8 (پرچمِ `market.load`): پروفایل و نمای کالا داده‌ای همگانی‌اند ⇒ `no-cache` به‌جای `no-store`، تا
+ * مرورگر با `ETag` ِ خودکارِ Express (`If-None-Match`) بازپرسی کند و ۳۰۴ ِ بی بدنه بگیرد. باز هم هر
+ * بار با سرور سنجیده می‌شود (قیمت و وضعیت زنده می‌مانند). خاموش ⇒ همان `no-store`.
+ */
+const revalidate = wrap(async (req, res, next) => {
+  if (await require('../lib/market-load').enabled()) res.set('Cache-Control', 'no-cache');
+  next();
+});
+
+router.get('/:slug', readLimit, store, revalidate, wrap(async (req, res) => {
   const [cats, status, delivery] = await Promise.all([
     sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
   ]);
@@ -100,7 +110,7 @@ router.get('/:slug/products', readLimit, store, wrap(async (req, res) => {
 }));
 
 //  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────
-router.get('/:slug/products/:id', readLimit, store, wrap(async (req, res) => {
+router.get('/:slug/products/:id', readLimit, store, revalidate, wrap(async (req, res) => {
   res.json(await sf.productDetail(req.store.shop_id, req.params.id));
 }));
 

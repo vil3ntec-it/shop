@@ -327,6 +327,9 @@ const config = {
     marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
     //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
     marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
+    //  S8: با پرچمِ `market.load` (lib/market-load.js) `/api/store/*` و `/api/market/*` به‌جای سطلِ
+    //  `general` ِ هر IP (که `/api/shop/*` هم می‌خورد) این سطلِ جدا را می‌خورند.
+    publicMax: num(process.env.RATE_PUBLIC_MAX, 600),
     //  فاکتورِ عمومی (QRِ هر فاکتور، `/api/receipt`) به‌ازای IP: ربع‌ساعته و ضربه‌ای در دقیقه.
     //  سقفِ ربع‌ساعته گشاد است: مشتری‌های پشتِ NAT ِ اپراتور یک IP دارند؛ ضربه‌ای تنگ می‌ماند
     receiptReadMax: num(process.env.RATE_RECEIPT_READ_MAX, 300),
@@ -369,6 +372,13 @@ const config = {
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
     //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
     feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
+    //  S8 (پرچمِ `market.load`): سقفِ هم‌زمانیِ `/api/store/*` و `/api/market/*` — زیرِ `PG_POOL_MAX`
+    //  تا همگام‌سازی و فروش همیشه اتصال داشته باشند؛ بیشتر ⇒ صفِ کوتاه، بعد ۵۰۳ `market_busy`.
+    publicConcurrency: num(process.env.MARKET_PUBLIC_CONCURRENCY, 6),
+    publicQueue:       num(process.env.MARKET_PUBLIC_QUEUE, 32),
+    publicWaitMs:      num(process.env.MARKET_PUBLIC_WAIT_MS, 2000),
+    //  S7: کمترین فاصلهٔ دو نوشتنِ `storefronts.last_seen_at` برای یک دکان
+    seenWriteMs:       num(process.env.MARKET_SEEN_WRITE_MS, 30 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS

@@ -19,7 +19,8 @@ const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
-const { forbidden } = require('../middleware/errors');
+const { forbidden, notFound } = require('../middleware/errors');
+const config = require('../config');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -71,6 +72,18 @@ const ownShopOnly = (req, res, next) => {
   if (foreign) return next(forbidden('این اعلام برای دکانِ دیگری است', 'foreign_shop'));
   next();
 };
+
+/**
+ * S7 (§۳۱.۲ بندِ ۴): ضربانِ سبکِ دستگاهی که باز است ولی چیزی برای همگام‌سازی ندارد ⇒ «آخرین تماس»
+ * ِ ویترین، حداکثر هر ۳۰ ثانیه یک نوشتن. هر عضوِ دکان (دستگاهِ باز، نه تنظیم). فقط با پرچمِ
+ * `market.load` (all)؛ خاموش ⇒ ۴۰۴ و هیچ نوشتنی (حضور همان از `sync_devices` است).
+ */
+router.post('/heartbeat', needFlag, wrap(async (req, res) => {
+  if (!(await require('../lib/market-load').enabled())) throw notFound('ضربانِ ویترین روشن نیست', 'heartbeat_disabled');
+  const at = Date.now();
+  const written = await sf.noteSeen(req.shopId, at);
+  res.json({ ok: true, recorded: written !== null, serverTime: at, nextInMs: Number(config.market.seenWriteMs) || 0 });
+}));
 
 router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
   const out = await sf.declarePresence(req.shopId, req.body, {

@@ -181,6 +181,9 @@ async function buildSnapshot() {
   );
   const open = await filterAsync(rows, gateOf);
   const ids = open.map((r) => r.shop_id);
+  //  S7 (پرچمِ `market.load`): «آخرین تماس» همان ستونِ `sf.last_seen_at` ِ همین ردیف‌هاست ⇒
+  //  پرسشِ جدای `sync_devices` نیست؛ خاموش ⇒ همان پرسشِ گروهیِ پیشین.
+  const seenColumn = await require('./market-load').enabled();
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
@@ -191,12 +194,14 @@ async function buildSnapshot() {
         GROUP BY sp.shop_id`,
       [ids]
     ),
-    many(
-      `SELECT account_id, MAX(last_seen_at) AS t FROM sync_devices
-        WHERE app = 'shop' AND account_kind = 'shop' AND account_id = ANY($1::text[])
-        GROUP BY account_id`,
-      [ids]
-    ),
+    seenColumn
+      ? open.map((r) => ({ account_id: r.shop_id, t: r.last_seen_at }))
+      : many(
+        `SELECT account_id, MAX(last_seen_at) AS t FROM sync_devices
+          WHERE app = 'shop' AND account_kind = 'shop' AND account_id = ANY($1::text[])
+          GROUP BY account_id`,
+        [ids]
+      ),
   ]) : [[], []];
   await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id));
   const n = new Map(counts.map((r) => [r.shop_id, Number(r.n)]));

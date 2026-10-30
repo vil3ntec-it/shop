@@ -228,9 +228,46 @@ async function lastSeenOf(shopId) {
   return r && r.t !== null && r.t !== undefined ? Number(r.t) : 0;
 }
 
-async function statusOf(sf, at = now()) {
-  return presenceOf(sf, at, await lastSeenOf(sf.shop_id));
+/**
+ * S7: آخرین تماس از ستونِ خودِ ویترین (`storefronts.last_seen_at`) — فقط با پرچمِ `market.load`؛
+ * ردیفِ `sf.*` آن را دارد ⇒ بی هیچ پرسشی. خاموش ⇒ همان `lastSeenOf` ِ پیشین.
+ */
+async function seenOf(sf) {
+  if (!(await require('./market-load').enabled())) return lastSeenOf(sf.shop_id);
+  let t = sf.last_seen_at;
+  if (t === undefined) t = (await one('SELECT last_seen_at FROM storefronts WHERE shop_id = $1', [sf.shop_id]))?.last_seen_at;
+  return t === null || t === undefined ? 0 : Number(t);
 }
+
+async function statusOf(sf, at = now()) {
+  return presenceOf(sf, at, await seenOf(sf));
+}
+
+const seenWritten = new Map();   //  دکان ⇒ آخرین نوشتنِ همین فرایند (سقفِ «هر ۳۰ ثانیه یک بار»)
+
+/**
+ * S7: «دستگاهِ این دکان الان با سرور حرف زد» ⇒ `storefronts.last_seen_at`، حداکثر هر
+ * `market.seenWriteMs` یک بار برای هر دکان (حافظه + شرطِ همان پرسش، تا عقب نرود).
+ * دکانِ بی ویترین ⇒ هیچ ردیفی. ⇒ زمانِ نوشته‌شده، یا null اگر سقف نگذاشت.
+ * ⚠️ بیرون از تراکنشِ همگام‌سازی صدا زده شود (قفلِ ردیفِ ویترین در push نمی‌ماند).
+ */
+async function noteSeen(shopId, at = now()) {
+  const gap = Math.max(0, Number(config.market.seenWriteMs) || 0);
+  const id = String(shopId || '');
+  if (!id) return null;
+  const last = seenWritten.get(id);
+  if (last !== undefined && at - last < gap) return null;
+  seenWritten.set(id, at);
+  if (seenWritten.size > 50_000) seenWritten.delete(seenWritten.keys().next().value);
+  await db.query(
+    `UPDATE storefronts SET last_seen_at = $2
+      WHERE shop_id = $1 AND (last_seen_at IS NULL OR last_seen_at <= $2 - $3::bigint)`,
+    [id, at, gap]
+  );
+  return at;
+}
+
+function _forgetSeen() { seenWritten.clear(); }
 
 function profile(sf, categories = [], status = null) {
   return {
@@ -1205,7 +1242,7 @@ module.exports = {
   FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
-  localParts, presenceOf, statusOf,
+  localParts, presenceOf, statusOf, noteSeen, _forgetSeen,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,

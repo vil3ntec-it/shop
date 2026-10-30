@@ -18,7 +18,7 @@ process.env.BACKUP_ENABLED = 'false';
 process.env.BACKUP_PATH = require('path').join(
   require('os').tmpdir(), `shop-test-backups-${process.pid}`
 );
-process.env.RATE_GENERAL_MAX = '100000';
+process.env.RATE_GENERAL_MAX ||= '100000';
 process.env.RATE_AUTH_MAX = '10000';
 process.env.RATE_OTP_MAX ||= '10000';
 process.env.RATE_VERIFY_MAX ||= '10000';
