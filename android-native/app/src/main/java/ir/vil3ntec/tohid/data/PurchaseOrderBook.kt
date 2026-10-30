@@ -238,10 +238,9 @@ object PurchaseOrderBook {
 
   data class Pick(val productId: String, val name: String, val unit: String, val qtyMilli: Long, val priceMinor: Long, val low: Boolean)
 
-  /** آخرین فیِ خریدِ یک کالا از همین تأمین‌کننده؛ نبود ⇒ فیِ خریدِ کالا */
-  fun lastPriceMinor(d: ShopData, supplierId: String, product: Product): Long =
-    minor(d.purchases.filter { it.supplierId == supplierId && it.productId == product.id && it.quantity > 0 }
-      .maxByOrNull { it.createdAt }?.purchasePrice ?: product.purchasePrice)
+  /** آخرین فیِ خریدِ یک کالا از همین تأمین‌کننده (`SupplierPricing.last`، PUR-09)؛ نبود ⇒ فیِ خریدِ کالا */
+  fun lastPriceMinor(d: ShopData, supplierId: String, product: Product, history: List<SupplierPricing.Buy> = buys(d)): Long =
+    SupplierPricing.last(history, product.id, supplierId)?.priceMinor ?: minor(product.purchasePrice)
 
   /** مقدارِ پیشنهادی: تا «حدِ کم» و دست‌کم یک واحد (عددِ کامل) */
   fun suggestedQtyMilli(d: ShopData, product: Product): Long {
@@ -255,9 +254,10 @@ object PurchaseOrderBook {
    */
   fun supplierPicks(d: ShopData, supplierId: String, onlyLow: Boolean = false): List<Pick> {
     val bought = d.purchases.filter { it.supplierId == supplierId && it.quantity > 0 }.mapTo(HashSet()) { it.productId }
+    val all = buys(d)
     return d.products.filter { it.active && it.id in bought }.map { p ->
       val low = p.minStock > 0 && ShopStore.stock(d, p.id) <= p.minStock
-      Pick(p.id, p.name, p.unit, suggestedQtyMilli(d, p), lastPriceMinor(d, supplierId, p), low)
+      Pick(p.id, p.name, p.unit, suggestedQtyMilli(d, p), lastPriceMinor(d, supplierId, p, all), low)
     }.filter { !onlyLow || it.low }.sortedWith(compareByDescending<Pick> { it.low }.thenBy { it.name })
   }
 
