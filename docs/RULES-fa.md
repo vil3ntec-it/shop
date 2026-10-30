@@ -138,6 +138,7 @@
 - تخصیصِ پرداخت: اول بردِ فاکتورِ نام‌برده، بعد قدیمی‌ترین بردِ باز، مازاد پیش‌پرداخت؛ فقط نمایش است و در دفتر چیزی جابه‌جا نمی‌کند (§۲۱.۱۱، #261).
 - `dueDate` و `creditLimit` اختیاری‌اند (`EncodeDefault.NEVER`) و برداشتنشان با `null`ِ صریح؛ migration ندارد (#261).
 - بردِ بیش از سقف بی تأییدِ صریح ثبت نمی‌شود و با تأیید ردِ `credit_over_limit` می‌گیرد؛ تا STF-02 «تأییدِ مدیر» همین است (CRM-03، #261).
+- ⛔ مبلغِ «تسویهٔ کامل» (رسیدِ قرض‌دار و پرداختِ تأمین‌کننده) هرگز گرد نمی‌شود: دقیقاً همهٔ مانده تا پول (۰٫۰۱ افغانی)، فقط از `MoneyInput.settleInput` ِ `core` (commonMain، آزمون در `core/src/commonTest`). گردِ افغانی (`Math.round(balance)`) از 899.6 رسیدِ 900 (۰٫۴ پیش‌پرداختِ ساختگی) و از 1200.4 پرداختِ 1200 (۰٫۴ بدهیِ باز) می‌ساخت. مانده‌ای کمتر از یک پول، منفی یا بیرون از ۲^۵۳−۱ پول ⇒ میان‌بُر نیست (#470).
 
 ### v3 · همگام‌سازی
 
@@ -364,10 +365,13 @@
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
-= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز).
+= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
+`tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
