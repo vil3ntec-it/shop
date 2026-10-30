@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.ui.AppNav
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  منوی کناریِ کامپیوتر، گروه‌بندی‌شده — v3 §۲۰.۳ («منوی پیشنهادیِ
@@ -25,7 +28,7 @@ object DeskMenu {
 
   data class Group(val title: String, val items: List<Item>)
 
-  const val SOON_LABEL = "در دست ساخت"
+  val SOON_LABEL: String get() = StrNav.soon
 
   private fun shortcutItem(shortcuts: List<Pair<String, String>>, id: String, label: String?): Item {
     val i = shortcuts.indexOfFirst { it.first == id }
@@ -63,11 +66,11 @@ object DeskMenu {
     page: (String, String?) -> Item,
   ): List<Group> = listOf(
     Group(
-      "اصلی",
+      StrNav.groupMain,
       listOf(
         page("dashboard", null),
-        if (ordersLive) Item("orders", "سفارش‌های آنلاین") else soon("orders", "سفارش‌های آنلاین"),
-        soon("fulfil", "آماده‌سازی و تحویل"),
+        if (ordersLive) Item("orders", StrNav.onlineOrders) else soon("orders", StrNav.onlineOrders),
+        soon("fulfil", StrNav.fulfilment),
         page("products", null),
         page("warehouse", null),
         page("debtors", null),
@@ -75,35 +78,37 @@ object DeskMenu {
         page("sales", null),
         page("purchasing", null),
         page("reports", null),
-        Item("team", "کارمندان"),
+        Item("team", StrNav.staffShort),
       ),
     ),
     Group(
-      "کانال‌های فروش",
-      listOf(
-        page("sale", "فروش (صندوق)"),
-        if (storefrontLive) Item("storefront", "ویترین و بازارچه") else soon("storefront", "ویترین و بازارچه"),
-        if (deliveryLive) Item("delivery", "میزِ تحویل و پیک") else soon("delivery", "پیک و مناطق تحویل"),
-      ),
-    ),
-    Group(
-      "مدیریت و سامانه",
+      StrNav.groupChannels,
       buildList {
-        add(Item("admin", "مرکزِ مدیریت", "Ctrl+M"))
-        add(Item("receipts", "رسیدها"))
-        add(Item("devices", "دستگاه‌های جانبی"))
-        if (canAdmin) add(Item("audit", "سابقهٔ عملیات"))
+        add(page("sale", Str.saleRegister))
+        //  تخفیف‌ها (PRM) — صاحب و مدیر؛ کلیدِ دکان درونِ همان صفحه است
+        if (canAdmin) add(Item("promos", StrShell.promos))
+        add(if (storefrontLive) Item("storefront", StrNav.storefrontMarket) else soon("storefront", StrNav.storefrontMarket))
+        add(if (deliveryLive) Item("delivery", StrNav.deliveryDeskCourier) else soon("delivery", StrNav.delivery))
+      },
+    ),
+    Group(
+      StrNav.groupAdmin,
+      buildList {
+        add(Item("admin", Str.adminCenter, "Ctrl+M"))
+        add(Item("receipts", Str.receipts))
+        add(Item("devices", Str.devices))
+        if (canAdmin) add(Item("audit", StrNav.auditLogAlt))
         //  پشتیبان‌گیری بخشی از تنظیمات است (فقط صاحب/مدیر)
-        if (canAdmin) add(Item("settings", "تنظیمات و پشتیبان‌گیری"))
-        add(Item("more", "بیشتر"))
+        if (canAdmin) add(Item("settings", StrNav.settingsBackup))
+        add(Item("more", Str.more))
       },
     ),
   )
 
   /** نامِ نقش برای سربرگ — همان واژه‌های صفحهٔ کارمندان */
   fun roleLabel(role: String): String = when (role) {
-    "owner" -> "صاحب دکان"
-    "manager" -> "مدیر"
-    else -> "شاگرد"
+    "owner" -> StrNav.roleOwner
+    "manager" -> StrNav.roleManager
+    else -> StrNav.roleStaff
   }
 }

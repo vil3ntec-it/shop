@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.fa
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.isoMillis
 import ir.vil3ntec.tohid.daysText
 import ir.vil3ntec.tohid.money
@@ -51,10 +51,13 @@ import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.theme.Brand
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import androidx.compose.material3.Icon
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.Str
 
 private fun todayIso(): String =
   SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
@@ -123,14 +126,14 @@ fun DashboardScreen(
         Text(greeting(), fontSize = 12.sp, color = Shop.colors.muted)
         Spacer(Modifier.height(2.dp))
         Text(
-          storeName.ifBlank { "دکان شما" },
+          storeName.ifBlank { StrHome.yourShop },
           fontSize = 16.sp,
           fontWeight = FontWeight.Bold,
           color = Shop.colors.text,
           maxLines = 1,
         )
       }
-      LetterAvatar(storeName.ifBlank { "دکان" }, 36.dp)
+      LetterAvatar(storeName.ifBlank { Str.shop }, 36.dp)
     }
     Spacer(Modifier.height(14.dp))
 
@@ -156,11 +159,11 @@ fun DashboardScreen(
        *  نه کارتِ گرادیانیِ درشتِ گوشی.
        */
       val tiles = buildList {
-        add(Triple("فروشِ امروز", "${ir.vil3ntec.tohid.money(view.todayTotal)} ؋", "${ir.vil3ntec.tohid.plain(view.todaySales.size)} فاکتور"))
-        if (canSeeMoney) add(Triple(if (view.todayProfit < 0) "ضررِ امروز" else "سودِ امروز", "${ir.vil3ntec.tohid.money(kotlin.math.abs(view.todayProfit))} ؋", "پس از مصارفِ امروز"))
-        add(Triple("فروشِ این ماه", "${ir.vil3ntec.tohid.money(view.monthSalesTotal)} ؋", "این هفته ${ir.vil3ntec.tohid.money(view.weekTotal)} ؋"))
-        add(Triple("طلب از قرض‌داران", "${ir.vil3ntec.tohid.money(view.totalDebt)} ؋", "${ir.vil3ntec.tohid.plain(view.owing.size)} نفر"))
-        add(Triple("هشدارِ انبار", ir.vil3ntec.tohid.plain(view.lowStock.size + view.outOfStock.size), "${ir.vil3ntec.tohid.plain(view.outOfStock.size)} تمام‌شده"))
+        add(Triple(StrHome.todaySales, "${ir.vil3ntec.tohid.money(view.todayTotal)} ؋", Str.invoicesCount(ir.vil3ntec.tohid.plain(view.todaySales.size))))
+        if (canSeeMoney) add(Triple(if (view.todayProfit < 0) StrHome.todayLoss else StrHome.todayProfit, "${ir.vil3ntec.tohid.money(kotlin.math.abs(view.todayProfit))} ؋", StrHome.afterTodayExpenses))
+        add(Triple(StrHome.monthSales, "${ir.vil3ntec.tohid.money(view.monthSalesTotal)} ؋", StrHome.thisWeek(ir.vil3ntec.tohid.money(view.weekTotal))))
+        add(Triple(StrHome.receivables, "${ir.vil3ntec.tohid.money(view.totalDebt)} ؋", StrHome.people(ir.vil3ntec.tohid.plain(view.owing.size))))
+        add(Triple(StrHome.stockAlert, ir.vil3ntec.tohid.plain(view.lowStock.size + view.outOfStock.size), StrHome.soldOutCount(ir.vil3ntec.tohid.plain(view.outOfStock.size))))
       }
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         tiles.forEach { (label, value, hint) ->
@@ -227,12 +230,12 @@ fun DashboardScreen(
     Spacer(Modifier.height(16.dp))
 
     val attention = buildList {
-      view.outOfStock.take(3).forEach { add(Triple(it.name, "تمام‌شده", "products")) }
-      view.lowStock.take(3).forEach { add(Triple(it.name, "موجودی کم", "products")) }
+      view.outOfStock.take(3).forEach { add(Triple(it.name, Str.finished, "products")) }
+      view.lowStock.take(3).forEach { add(Triple(it.name, Str.stockLow, "products")) }
       view.expiring.take(3).forEach {
-        add(Triple(it.product.name, if (it.expired) "منقضی شده" else "${it.daysLeft.fa()} روز تا انقضا", "warehouse"))
+        add(Triple(it.product.name, if (it.expired) StrHome.expired else StrHome.daysToExpiry(it.daysLeft.fa()), "warehouse"))
       }
-      view.owing.take(2).forEach { add(Triple(it.first.name, "${money(it.second)} ؋ طلب", "debtors")) }
+      view.owing.take(2).forEach { add(Triple(it.first.name, StrHome.owed(money(it.second)), "debtors")) }
     }
 
     val panels = buildList<@Composable () -> Unit> {
@@ -240,13 +243,13 @@ fun DashboardScreen(
       // «همه‌چیز خوب است» فقط جا می‌گیرد
       if (attention.isNotEmpty()) add {
         Panel {
-          PanelHead("نیاز به توجه", "${attention.size.fa()} مورد")
+          PanelHead(StrHome.needsAttention, StrHome.itemsN(attention.size.fa()))
           Spacer(Modifier.height(10.dp))
           attention.forEach { (name, note, target) ->
             LineRow(
               name,
               note,
-              if (note == "تمام‌شده") Shop.colors.danger else Shop.colors.warning,
+              if (note == Str.finished) Shop.colors.danger else Shop.colors.warning,
               onClick = { onOpen(target) },
             )
           }
@@ -255,18 +258,18 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("مصارف اخیر", "مشاهده همه") { onOpen("expenses") }
+          PanelHead(StrHome.recentExpenses, Str.seeAll) { onOpen("expenses") }
           Spacer(Modifier.height(8.dp))
           val recent = d.expenses.sortedByDescending { it.createdAt }.take(5)
           if (recent.isEmpty()) {
-            EmptyNote("هنوز اطلاعاتی ثبت نشده")
+            EmptyNote(StrHome.noDataYet)
           } else {
             recent.forEach { e ->
               LineRow(
-                e.title.ifBlank { e.category.ifBlank { "مصرف" } },
+                e.title.ifBlank { e.category.ifBlank { StrHome.expense } },
                 "${money(e.amount)} ؋",
                 Shop.colors.warning,
-                detail = formatDate(e.date),
+                detail = displayDate(e.date),
               )
             }
           }
@@ -275,10 +278,10 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("قرض‌داران", "مشاهده همه") { onOpen("debtors") }
+          PanelHead(Str.debtors, Str.seeAll) { onOpen("debtors") }
           Spacer(Modifier.height(8.dp))
           if (view.owing.isEmpty()) {
-            EmptyNote("هنوز اطلاعاتی ثبت نشده")
+            EmptyNote(StrHome.noDataYet)
           } else {
             view.owing.take(5).forEach { (debtor, amount) ->
               LineRow(debtor.name, "${money(amount)} ؋", Shop.colors.danger)
@@ -289,14 +292,14 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("وضعیت انبار", "مشاهده همه") { onOpen("products") }
+          PanelHead(StrHome.warehouseStatus, Str.seeAll) { onOpen("products") }
           Spacer(Modifier.height(10.dp))
           ChipRow(
             listOf(
-              "تعداد محصولات" to view.warehouse.products.fa(),
-              "تعداد کارتن" to qty(view.warehouse.cartons),
-              "تعداد واحد" to qty(view.warehouse.units),
-              "ارزش تقریبی موجودی" to "${money(view.warehouse.value)} ؋",
+              StrHome.productCount to view.warehouse.products.fa(),
+              StrHome.cartonCount to qty(view.warehouse.cartons),
+              StrHome.unitCount to qty(view.warehouse.units),
+              StrHome.stockValueApprox to "${money(view.warehouse.value)} ؋",
             )
           )
           if (view.lowStock.isNotEmpty() || view.outOfStock.isNotEmpty()) {
@@ -305,7 +308,7 @@ fun DashboardScreen(
               val out = ShopStore.stockStatus(d, p) == "out"
               LineRow(
                 p.name,
-                if (out) "تمام‌شده" else "موجودی کم",
+                if (out) Str.finished else Str.stockLow,
                 if (out) Shop.colors.danger else Shop.colors.warning,
                 detail = "${qty(ShopStore.stock(d, p.id))}${if (p.unit.isNotBlank()) " ${p.unit}" else ""}",
               )
@@ -317,10 +320,10 @@ fun DashboardScreen(
             view.expiring.take(5).forEach { lot ->
               LineRow(
                 lot.product.name,
-                if (lot.expired) "منقضی شده" else "${lot.daysLeft.fa()} روز تا انقضا",
+                if (lot.expired) StrHome.expired else StrHome.daysToExpiry(lot.daysLeft.fa()),
                 if (lot.expired) Shop.colors.danger else Shop.colors.warning,
-                detail = "${qty(lot.remaining)}${if (lot.product.unit.isNotBlank()) " ${lot.product.unit}" else ""} · ${ir.vil3ntec.tohid.formatDate(lot.entry.expiryDate)}" +
-                  if (lot.entry.batch.isNotBlank()) " · سری ${lot.entry.batch}" else "",
+                detail = "${qty(lot.remaining)}${if (lot.product.unit.isNotBlank()) " ${lot.product.unit}" else ""} · ${ir.vil3ntec.tohid.displayDate(lot.entry.expiryDate)}" +
+                  if (lot.entry.batch.isNotBlank()) " · " + StrHome.batch(lot.entry.batch) else "",
               )
             }
           }
@@ -329,17 +332,17 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("روند معاملات", "این ماه")
+          PanelHead(StrHome.salesTrend, StrHome.thisMonth)
           Spacer(Modifier.height(12.dp))
           val monthSales = d.sales.filter { it.status != "cancelled" && it.date.startsWith(monthPrefix) }
           if (monthSales.isEmpty()) {
-            EmptyNote("هنوز فروشی ثبت نشده")
+            EmptyNote(StrHome.noSalesYet)
           } else {
             val byDay = monthSales.groupBy { it.date }.mapValues { (_, list) -> list.sumOf { it.finalTotal } }
             TrendChart(byDay.toSortedMap().values.toList())
             Spacer(Modifier.height(8.dp))
             Text(
-              "جمع ماه: ${money(byDay.values.sum())} ؋",
+              StrHome.monthTotal(money(byDay.values.sum())),
               style = MaterialTheme.typography.labelMedium,
               color = Shop.colors.muted,
             )
@@ -349,16 +352,16 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("مصارف بر اساس دسته", "این ماه")
+          PanelHead(StrHome.expensesByCategory, StrHome.thisMonth)
           Spacer(Modifier.height(8.dp))
           val byCategory = d.expenses
             .filter { it.date.startsWith(monthPrefix) }
-            .groupBy { it.category.ifBlank { "بدون دسته" } }
+            .groupBy { it.category.ifBlank { StrHome.noCategory } }
             .mapValues { (_, list) -> list.sumOf { it.amount } }
             .toList()
             .sortedByDescending { it.second }
           if (byCategory.isEmpty()) {
-            EmptyNote("این ماه مصرفی ثبت نشده")
+            EmptyNote(StrHome.noExpensesMonth)
           } else {
             val max = byCategory.first().second
             byCategory.take(6).forEach { (name, amount) ->
@@ -370,25 +373,25 @@ fun DashboardScreen(
 
       add {
         Panel {
-          PanelHead("خلاصه امروز", formatDate(today))
+          PanelHead(StrHome.todaySummary, displayDate(today))
           Spacer(Modifier.height(10.dp))
           ChipRow(
             buildList {
-              add("فروش امروز" to "${money(view.todayTotal)} ؋")
-              add("تعداد فروش امروز" to view.todaySales.size.fa())
+              add(StrHome.todaySalesAlt to "${money(view.todayTotal)} ؋")
+              add(StrHome.todaySalesCount to view.todaySales.size.fa())
               //  سود و مصارف، عددهای مالیِ دکان‌اند — نه کارِ شاگرد
               if (canSeeMoney) {
-                add("سود امروز" to "${money(view.todayProfit)} ؋")
-                add("مصارف امروز" to "${money(view.todayExpense)} ؋")
+                add(StrHome.todayProfitAlt to "${money(view.todayProfit)} ؋")
+                add(StrHome.todayExpenses to "${money(view.todayExpense)} ؋")
               }
             }
           )
           Spacer(Modifier.height(8.dp))
           ChipRow(
             listOf(
-              "بدهی تأمین‌کنندگان" to "${money(view.supplierDebt)} ؋",
-              "کالاهای کم‌موجودی" to view.lowStock.size.fa(),
-              "کالاهای تمام‌شده" to view.outOfStock.size.fa(),
+              StrHome.supplierDebts to "${money(view.supplierDebt)} ؋",
+              StrHome.lowStockItems to view.lowStock.size.fa(),
+              StrHome.soldOutItems to view.outOfStock.size.fa(),
             )
           )
         }
@@ -566,7 +569,7 @@ private fun CategoryBar(name: String, amount: Double, ratio: Float) {
 /** نمودارِ ساده و بی‌کتابخانه — همان روندی که وب می‌کشد */
 @Composable
 private fun TrendChart(values: List<Double>) {
-  val line = Shop.colors.primary
+  val line = Shop.colors.chart.sales
   val fill = Shop.colors.primaryTint
   Canvas(Modifier.fillMaxWidth().height(120.dp)) {
     if (values.isEmpty()) return@Canvas
@@ -602,10 +605,10 @@ private fun TrendChart(values: List<Double>) {
 private fun greeting(): String {
   val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
   return when {
-    hour < 5 -> "شب بخیر"
-    hour < 12 -> "صبح بخیر"
-    hour < 17 -> "روز بخیر"
-    else -> "شام بخیر"
+    hour < 5 -> StrHome.night
+    hour < 12 -> StrHome.morning
+    hour < 17 -> StrHome.afternoon
+    else -> StrHome.evening
   }
 }
 
@@ -786,7 +789,8 @@ fun LetterAvatar(name: String, size: androidx.compose.ui.unit.Dp, radius: androi
     Modifier
       .size(size)
       .clip(RoundedCornerShape(radius))
-      .background(Brush.linearGradient(listOf(colors.primary, colors.accent))),
+      //  VILL3N: پُرِ برند (سبزآبیِ پررنگ ⇐ برند) تا حرفِ سفید در روز و شب ≥ ۴٫۵:۱ بماند
+      .background(Brush.linearGradient(listOf(colors.brandDeep, colors.brandDeep))),
     contentAlignment = Alignment.Center,
   ) {
     Text(
@@ -813,18 +817,18 @@ private fun HeroSalesCard(view: DashboardNumbers) {
       .shadow(
         elevation = 18.dp,
         shape = RoundedCornerShape(Radius.lg),
-        ambientColor = colors.primary,
-        spotColor = colors.primary,
+        ambientColor = colors.glow,
+        spotColor = colors.glow,
       )
       .clip(RoundedCornerShape(Radius.lg))
-      //  بنفش به آبی به نعنایی — سه ایست، نه دو: گذارِ دو رنگه وسطش
-      //  خاکستری می‌زند و کارت کدر می‌شود
+      //  VILL3N: سبزآبیِ پررنگ ⇐ برند ⇐ آبیِ پیوند (پیش‌تر بنفش به آبی به نعنایی). سه ایست،
+      //  نه دو: گذارِ دو رنگه وسطش خاکستری می‌زند. همه در روز و شب همان، چون متن سفید است
       .background(
-        Brush.linearGradient(listOf(colors.primaryDark, colors.primary, Color(0xFF4F8BE8), colors.accent))
+        Brush.linearGradient(listOf(Brand.deep, Brand.primary, Brand.blue))
       )
       .padding(18.dp),
   ) {
-    Text("فروش امروز", fontSize = 12.sp, color = Color.White.copy(alpha = 0.86f))
+    Text(StrHome.todaySalesAlt, fontSize = 12.sp, color = Color.White.copy(alpha = 0.86f))
     Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.Bottom) {
       Text(
@@ -834,7 +838,7 @@ private fun HeroSalesCard(view: DashboardNumbers) {
         color = Color.White,
       )
       Spacer(Modifier.width(6.dp))
-      Text("افغانی", fontSize = 14.sp, color = Color.White.copy(alpha = 0.86f))
+      Text(Str.afghani, fontSize = 14.sp, color = Color.White.copy(alpha = 0.86f))
     }
     Spacer(Modifier.height(8.dp))
     Text(
@@ -850,14 +854,14 @@ private fun weekStory(view: DashboardNumbers): String {
   val now = view.weekTotal
   val before = view.prevWeekTotal
   return when {
-    now <= 0.0 && before <= 0.0 -> "این هفته هنوز فروشی ثبت نشده"
-    before <= 0.0 -> "این هفته ${money(now)} ؋ فروختی — هفتهٔ گذشته چیزی ثبت نشده بود"
+    now <= 0.0 && before <= 0.0 -> StrHome.weekNone
+    before <= 0.0 -> StrHome.weekOnly(money(now))
     else -> {
       val change = ((now - before) / before * 100).toInt()
       when {
-        change > 0 -> "این هفته ${change.fa()}٪ بیشتر از هفتهٔ گذشته فروختی"
-        change < 0 -> "این هفته ${(-change).fa()}٪ کمتر از هفتهٔ گذشته فروختی"
-        else -> "این هفته اندازهٔ هفتهٔ گذشته فروختی"
+        change > 0 -> StrHome.weekMore(change.fa())
+        change < 0 -> StrHome.weekLess((-change).fa())
+        else -> StrHome.weekSame
       }
     }
   }
@@ -883,23 +887,23 @@ private fun DominantAction(view: DashboardNumbers, onOpen: (String) -> Unit) {
   when {
     overdue > 0 -> {
       tint = colors.danger
-      title = "${overdue.fa()} قرض عقب‌افتاده"
-      detail = "مجموع ${money(view.overdueTotal)} ؋ — قدیمی‌ترین ${daysText(view.overdueOldestDays)}"
-      action = "پیگیری قرض‌ها"
+      title = StrHome.overdueDebts(overdue.fa())
+      detail = StrHome.overdueDetail(money(view.overdueTotal), daysText(view.overdueOldestDays))
+      action = StrHome.followUpDebts
       target = "debtors"
     }
     short > 0 -> {
       tint = colors.warning
-      title = "${short.fa()} جنس رو به ختم است"
-      detail = "پیش از تمام‌شدن سفارش بده"
-      action = "سفارش بده"
+      title = StrHome.runningLow(short.fa())
+      detail = StrHome.orderBeforeOut
+      action = StrHome.placeOrder
       target = "warehouse"
     }
     else -> {
       tint = colors.primary
-      title = "دکان مرتب است"
-      detail = "نه قرضِ خوابیده، نه جنسِ رو به ختم"
-      action = "فاکتور جدید"
+      title = StrHome.shopInOrder
+      detail = StrHome.noIssues
+      action = StrHome.newInvoice
       target = "sale"
     }
   }
@@ -984,16 +988,16 @@ private fun ActionButton(text: String, tint: Color, onClick: () -> Unit) {
 private fun ShopStatusPanel(view: DashboardNumbers, canSeeMoney: Boolean, onOpen: (String) -> Unit) {
   val colors = Shop.colors
   Panel(Modifier.fillMaxWidth()) {
-    Text("وضعیت دکان", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.text)
+    Text(StrHome.shopStatus, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = colors.text)
     Spacer(Modifier.height(6.dp))
     if (canSeeMoney) {
-      StatusLine("مفاد خالص ماه", "${money(view.monthNet)} ؋", if (view.monthNet < 0) colors.danger else colors.success) { onOpen("reports") }
+      StatusLine(StrHome.monthNet, "${money(view.monthNet)} ؋", if (view.monthNet < 0) colors.danger else colors.success) { onOpen("reports") }
     }
-    StatusLine("فروش ماه", "${money(view.monthSalesTotal)} ؋", colors.text) { onOpen("reports") }
-    StatusLine("ارزش انبار", "${money(view.warehouse.value)} ؋", colors.warning) { onOpen("products") }
-    StatusLine("قرض بیرون", "${money(view.totalDebt)} ؋", colors.danger) { onOpen("debtors") }
+    StatusLine(StrHome.monthSalesShort, "${money(view.monthSalesTotal)} ؋", colors.text) { onOpen("reports") }
+    StatusLine(StrHome.stockValue, "${money(view.warehouse.value)} ؋", colors.warning) { onOpen("products") }
+    StatusLine(StrHome.debtOut, "${money(view.totalDebt)} ؋", colors.danger) { onOpen("debtors") }
     StatusLine(
-      "اجناس رو به ختم",
+      StrHome.runningLowItems,
       (view.lowStock.size + view.outOfStock.size).fa(),
       colors.warning,
       last = true,
@@ -1048,10 +1052,10 @@ private fun RecentDeals(d: ShopData, onOpen: (String) -> Unit) {
     }
   }
   Panel(Modifier.fillMaxWidth()) {
-    PanelHead("معاملات اخیر", "مشاهده همه") { onOpen("sales") }
+    PanelHead(StrHome.recentSales, Str.seeAll) { onOpen("sales") }
     Spacer(Modifier.height(6.dp))
     if (recent.isEmpty()) {
-      EmptyNote("هنوز فاکتوری ثبت نشده")
+      EmptyNote(StrHome.noInvoicesYet)
       return@Panel
     }
     recent.forEachIndexed { index, sale ->
@@ -1078,14 +1082,14 @@ private fun RecentDeals(d: ShopData, onOpen: (String) -> Unit) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
           Text(
-            "فاکتور ${sale.invoiceLabel() ?: 0.fa()}",
+            StrHome.invoiceNo(sale.invoiceLabel() ?: 0.fa()),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = colors.text,
           )
           Spacer(Modifier.height(1.dp))
           Text(
-            "${if (debt) "قرضی" else "نقد"} · ${formatDate(sale.date)}",
+            "${if (debt) StrHome.onCredit else Str.cash} · ${displayDate(sale.date)}",
             fontSize = 10.5.sp,
             color = colors.muted2,
           )
@@ -1098,7 +1102,7 @@ private fun RecentDeals(d: ShopData, onOpen: (String) -> Unit) {
             color = colors.text,
           )
           Text(
-            "ماندهٔ روز: ${money(running[sale.id] ?: 0.0)}",
+            StrHome.dayBalance(money(running[sale.id] ?: 0.0)),
             fontSize = 10.sp,
             color = colors.muted2,
           )
@@ -1128,8 +1132,8 @@ private fun MoreActionsRow(onOpen: (String) -> Unit) {
       .padding(horizontal = 16.dp, vertical = 14.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("کارهای دیگر", fontSize = 13.sp, color = colors.text, modifier = Modifier.weight(1f))
-    Text("فروش سریع · ورود کالا · گزارش‌ها", fontSize = 10.5.sp, color = colors.muted2)
+    Text(StrHome.otherActions, fontSize = 13.sp, color = colors.text, modifier = Modifier.weight(1f))
+    Text(StrHome.otherActionsSub, fontSize = 10.5.sp, color = colors.muted2)
   }
   if (open) {
     AdaptiveSheet(
@@ -1138,10 +1142,10 @@ private fun MoreActionsRow(onOpen: (String) -> Unit) {
     ) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
         listOf(
-          Triple("فروش سریع", Icons.Filled.PointOfSale, "sale"),
-          Triple("ورود کالا", Icons.Filled.Inventory2, "warehouse"),
-          Triple("قرض‌داران", Icons.Filled.Groups, "debtors"),
-          Triple("گزارش‌ها", Icons.Filled.BarChart, "reports"),
+          Triple(StrHome.quickSale, Icons.Filled.PointOfSale, "sale"),
+          Triple(StrHome.stockIn, Icons.Filled.Inventory2, "warehouse"),
+          Triple(Str.debtors, Icons.Filled.Groups, "debtors"),
+          Triple(Str.reports, Icons.Filled.BarChart, "reports"),
         ).forEach { (title, icon, target) ->
           Row(
             Modifier

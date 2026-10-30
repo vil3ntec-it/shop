@@ -8,10 +8,10 @@ package ir.vil3ntec.tohid.core.delivery
  *  فروشِ عادی (با orderId/orderNo، یکتا: هر سفارش حداکثر یک فروش) ثبت
  *  می‌کند؛ همان فروش موجودیِ دستگاه را کم می‌کند و همگام می‌شود.
  *
- *  ثبتِ آن فروش کارِ شاخهٔ `ccr-3a0d593c-ac0jpj-online-stock` است. میزِ
- *  تحویل فقط این‌جا را صدا می‌زند: وقتی آن شاخه `hook` را بگذارد، دریافتِ
- *  حضوری خودش فروش را ثبت می‌کند. تا آن وقت `hook` تهی است و میز صادقانه
- *  می‌گوید «فروش را در صندوق ثبت کنید» — هیچ فروشِ ساختگی‌ای نمی‌سازد.
+ *  ثبتِ آن فروش: `OrdersLive.installHandoverHook` (#340) ⇒ `OrdersLive.postById`
+ *  (پیش از ثبت از سرور می‌پرسد؛ سریِ O و شمارهٔ سفارش؛ یکتا با شناسهٔ سفارش). اگر
+ *  ثبت همان لحظه نشد، برنامه آن را از فهرستِ «تحویلِ بی‌فروش» دوباره ثبت می‌کند —
+ *  هیچ‌کس دستی در صندوق نمی‌زند (وگرنه دو فروش می‌شد).
  *
  *  ⛔ پیاده‌سازی باید با `orderId` یکتا باشد: صدا زدنِ دوباره (دو بار زدن،
  *     تلاشِ دوباره پس از قطعِ نت) همان فروش را برگرداند، نه دومی.
@@ -52,7 +52,13 @@ sealed class HandoverSaleResult {
   data class Recorded(val saleId: String) : HandoverSaleResult()
   /** همین سفارش پیش‌تر فروش شده بود — همان فروش */
   data class AlreadyRecorded(val saleId: String) : HandoverSaleResult()
+  /** ثبت نشد؛ برنامه دوباره می‌کوشد (از فهرستِ «تحویلِ بی‌فروش») */
   data class Failed(val message: String) : HandoverSaleResult()
+  /**
+   *  خودکار ثبت **نمی‌شود** و دوباره هم کوشیده نمی‌شود — صاحب باید ببیند ([message] دلیل است؛
+   *  مثلاً تحویلِ پیش از راه‌اندازیِ «فروشِ تحویل»). وعدهٔ «دوباره می‌کوشد» نباید داده شود.
+   */
+  data class NeedsReview(val message: String) : HandoverSaleResult()
 }
 
 object HandoverSale {

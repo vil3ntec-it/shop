@@ -47,7 +47,7 @@ object SettingsLayout {
   val GROUPS: List<Group> = listOf(
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
     Group(SECURITY, listOf("قفل برنامه", "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
-    Group(SALES, listOf("کالای منقضی", PRINTER)),
+    Group(SALES, listOf("کالای منقضی", "پرداخت و صندوق", "گزارش‌های مشتری", PRINTER)),
     Group(DEVICES, listOf(CAMERA)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها")),
     Group(ABOUT, listOf("درباره برنامه")),
@@ -64,7 +64,11 @@ object SettingsLayout {
     "داده‌ها" to "پشتیبان و بازگردانی",
   )
 
-  fun labelOf(row: String): String = LABELS[row] ?: row
+  /** کلیدِ ثابتِ صفحهٔ «زبان» (`stateKey` در `LanguageSection`): عنوانش با زبان عوض می‌شود */
+  const val LANGUAGE_KEY = "settings-language"
+
+  fun labelOf(row: String): String =
+    if (row == LANGUAGE_KEY) ir.vil3ntec.tohid.core.i18n.StrSettings.language else LABELS[row] ?: row
 
   /** گروهِ یک بخش یا پیوند؛ null یعنی ناشناس (آزمون جلویش را می‌گیرد) */
   fun groupOf(row: String): String? = GROUPS.firstOrNull { row in it.sections }?.title

@@ -48,6 +48,14 @@ function randomBody() {
  * تا وقتی کدی یکتا نشده، دوباره تولید می‌شود — پس حتی با میلیون‌ها دکان
  * دو کد یکسان صادر نمی‌شود.
  */
+/**
+ * دعوتِ پیک (DLV-01): یک‌بارمصرف، با مهلتِ پیش‌فرضِ ۷۲ ساعت و حداکثر ۷ روز
+ * (برنامهٔ گوشی پیش‌فرض ۷ روز می‌فرستد). کدِ بی‌شمار یا بی‌مهلت را می‌شد در
+ * گروه پخش کرد و هر کس با آن پیکِ همین دکان می‌شد.
+ */
+const DAY_MS = 24 * 3600 * 1000;
+const COURIER_INVITE = Object.freeze({ maxUses: 1, defaultTtlMs: 72 * 3600 * 1000, maxDays: 7 });
+
 async function create(shopId, createdBy, { role = 'staff', expiresAt = null, maxUses = 1 } = {}) {
   //  'courier' (DLV-01) فقط کدِ یک‌بارِ دعوت است — کدِ ثابت همیشه شاگرد/مدیر.
   //  پرچمِ `shop.delivery` را مسیرِ `/api/shop/invite` پیش از این می‌سنجد.
@@ -55,6 +63,13 @@ async function create(shopId, createdBy, { role = 'staff', expiresAt = null, max
   if (maxUses < 0 || maxUses > 500) throw badRequest('تعداد استفاده معتبر نیست');
   if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now())) {
     throw badRequest('تاریخ انقضا باید در آینده باشد');
+  }
+  //  کدِ پیک یک‌بارمصرف و با مهلت است (QA #282) — سدِّ دوم پشتِ مسیرِ `/invite`
+  if (role === 'courier') {
+    if (maxUses !== COURIER_INVITE.maxUses) throw badRequest('کدِ دعوتِ پیک فقط یک بار مصرف می‌شود', 'courier_invite_single_use');
+    if (expiresAt === null || expiresAt > now() + COURIER_INVITE.maxDays * DAY_MS) {
+      throw badRequest(`کدِ دعوتِ پیک باید مهلت داشته باشد (۱ تا ${COURIER_INVITE.maxDays.toLocaleString('fa-IR')} روز)`, 'courier_invite_expiry');
+    }
   }
 
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -271,7 +286,19 @@ async function redeem(rawCode, userId, ip = '') {
       throw forbidden('صاحب دکان دسترسی شما را بسته است؛ از خودش بخواهید دوباره بازش کند', 'member_blocked');
     }
 
+    //  ⛔ عضوِ فعالِ همین دکان: کد هیچ کاری نمی‌کند — نه نقشش عوض می‌شود، نه کد مصرف
+    //  می‌شود. تغییرِ نقش فقط از `PATCH`/`PUT /members/:id` (با تأییدِ دوبارهٔ هویت) است.
+    //  پیش‌تر `role = code.role` می‌نشست: کدِ ثابتِ شاگرد بی‌شمار و بی‌پایان است و هر عضوی
+    //  آن را دارد، پس مدیری که صاحب دکان شاگردش کرده بود (یا پیک، یا نقشِ محدودتر) با
+    //  زدنِ دوبارهٔ همان کد نقشِ دلخواهش را خودش برمی‌گرداند؛ و کدِ یک‌بارِ نقشِ دیگر
+    //  عضوِ فعال را جابه‌جا می‌کرد و برای کسی که برایش ساخته شده بود می‌سوخت.
+    if (existing && existing.status === 'active') {
+      return { shop, role: existing.role, unchanged: true };
+    }
+
     if (existing) {
+      //  بازگشتِ عضوِ کنار گذاشته (فقط با کدی که بعد از کنار گذاشتنش ساخته شده — بالا):
+      //  همان پیوستنِ تازه، با نقشِ همان کد
       await c.query(
         `UPDATE shop_members SET status='active', role=$3, updated_at=$4 WHERE id=$1 AND shop_id=$2`,
         [existing.id, code.shop_id, code.role, t]
@@ -309,4 +336,5 @@ async function redeem(rawCode, userId, ip = '') {
 }
 
 module.exports = {
-  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX };
+  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX,
+  COURIER_INVITE };

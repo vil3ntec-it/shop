@@ -11,6 +11,7 @@ const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
+const receiptProfile = require('../lib/receipt-profile');
 const audit = require('../lib/audit');
 const { requireRecentAuth, assertFresh } = require('../lib/reauth');
 
@@ -180,14 +181,30 @@ router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcod
   if (!INVITE_WITHOUT_REAUTH.has(role)) await assertFresh(req);
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
+  let maxUses, expiresAt;
   if (role === 'courier') {
     const st = await require('../lib/delivery').stateOf(req.shopId);
     if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
     if (!st.entitled) return next(forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
+    //  دعوتِ پیک: فقط ۱ بار و با مهلت (QA #282). بی مهلت ⇐ ۷۲ ساعت؛ ۰ («همیشه») یا بیش از سقف رد می‌شود
+    const C = staffCodes.COURIER_INVITE;
+    const rawUses = req.body?.maxUses;
+    maxUses = rawUses === undefined || rawUses === null || rawUses === '' ? C.maxUses : Number(rawUses);
+    if (maxUses !== C.maxUses) return next(badRequest('کدِ دعوتِ پیک فقط یک بار مصرف می‌شود', 'courier_invite_single_use'));
+    const raw = req.body?.expiresInDays;
+    if (raw === undefined || raw === null || raw === '') expiresAt = now() + C.defaultTtlMs;
+    else {
+      const d = Math.trunc(Number(raw));
+      if (!Number.isFinite(d) || d < 1 || d > C.maxDays) {
+        return next(badRequest(`مهلتِ کدِ دعوتِ پیک باید ۱ تا ${C.maxDays.toLocaleString('fa-IR')} روز باشد`, 'courier_invite_expiry'));
+      }
+      expiresAt = now() + d * 24 * 3600 * 1000;
+    }
+  } else {
+    maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
+    const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
+    expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
   }
-  const maxUses = v.integer(req.body?.maxUses, { field: 'تعداد استفاده', min: 0, max: 500, def: 1 });
-  const days = v.integer(req.body?.expiresInDays, { field: 'مهلت', min: 0, max: 3650, def: 0 });
-  const expiresAt = days ? now() + days * 24 * 3600 * 1000 : null;
 
   const out = await staffCodes.create(req.shopId, req.user.id, { role, expiresAt, maxUses });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.created', targetType: 'staff_code', targetId: out.id, detail: { role, maxUses, expiresAt } });
@@ -205,13 +222,14 @@ router.delete('/staff-codes/:id', requireShop, requirePermission('staffcode.revo
 // ---------- ورود شاگرد به دکان ----------
 router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
   const code = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
-  const { shop, role } = await staffCodes.redeem(code, req.user.id, clientIp(req));
+  const { shop, role, unchanged } = await staffCodes.redeem(code, req.user.id, clientIp(req));
   const member = await shops.membershipOf(req.user.id);
   const ent = await entitlementOf(shop.id);
-  await audit.log({ shopId: shop.id, userId: req.user.id, action: 'staff.joined', detail: { role }, ip: clientIp(req) });
+  //  عضوِ فعالی که کد را دوباره زد: هیچ چیز عوض نشد (نقش فقط از PATCH/PUT /members/:id)
+  await audit.log({ shopId: shop.id, userId: req.user.id, action: 'staff.joined', detail: unchanged ? { role, unchanged: true } : { role }, ip: clientIp(req) });
   //  پیک (DLV-01): `redeem` نشست‌های بی‌دامنهٔ همین حساب — از جمله همین —
   //  را بست؛ نشستِ تازه با دامنهٔ `courier` روی همان دستگاه همین‌جا داده می‌شود
-  if (role === 'courier') {
+  if (role === 'courier' && !unchanged) {
     const tokens = require('../lib/tokens');
     const deviceId = req.tokenRow?.device_id || null;
     const access = await tokens.issue({ kind: 'access', subjectId: req.user.id, deviceId, ttlMs: config.tokens.accessTtlMs, app: 'shop' });
@@ -251,11 +269,19 @@ router.get('/settings', requireShop, async (req, res) => {
 
 router.put('/settings', requireShop, requirePermission('settings.write'), async (req, res) => {
   const data = v.payload(req.body?.settings, { max: 128 * 1024, field: 'تنظیمات' });
+  //  کلیدِ `receipt` (سربرگ و لوگوی فاکتور) فقط از `/api/shop/receipt-profile` نوشته
+  //  می‌شود: این جایگزینیِ کلِ سند نه آن را می‌نویسد نه پاکش می‌کند.
+  const rest = { ...data };
+  delete rest[receiptProfile.KEY];
   const row = await one(
     `INSERT INTO shop_settings (shop_id, data, rev, updated_at) VALUES ($1,$2::jsonb,1,$3)
-     ON CONFLICT (shop_id) DO UPDATE SET data=excluded.data, rev=shop_settings.rev+1, updated_at=excluded.updated_at
+     ON CONFLICT (shop_id) DO UPDATE SET
+       data = CASE WHEN shop_settings.data ? '${receiptProfile.KEY}'
+                   THEN excluded.data || jsonb_build_object('${receiptProfile.KEY}', shop_settings.data->'${receiptProfile.KEY}')
+                   ELSE excluded.data END,
+       rev=shop_settings.rev+1, updated_at=excluded.updated_at
      RETURNING data, rev`,
-    [req.shopId, JSON.stringify(data), now()]
+    [req.shopId, JSON.stringify(rest), now()]
   );
   res.json({ settings: row.data, rev: Number(row.rev) });
 });

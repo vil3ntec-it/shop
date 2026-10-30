@@ -36,44 +36,49 @@ import androidx.compose.ui.graphics.Color
 import ir.vil3ntec.tohid.ui.theme.AuroraBackground
 import ir.vil3ntec.tohid.ui.theme.AuroraTone
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 private data class Tab(val id: String, val label: String, val icon: ImageVector)
 
 /** نامِ صفحه‌ها برای سربرگ — همان عنوان‌هایی که وب بالای صفحه می‌نویسد */
-private val PAGE_TITLES = mapOf(
-  "dashboard" to "داشبورد",
-  "sale" to "فروش",
-  "debtors" to "قرض‌داران",
-  "warehouse" to "انبار",
-  "expenses" to "مصارف",
-  "products" to "محصولات",
-  "more" to "بیشتر",
-  "purchasing" to "خرید و تأمین‌کننده",
-  "admin" to "مرکزِ مدیریت",
-  "devices" to "دستگاه‌های جانبی",
-  "sales" to "تاریخچه فروش",
-  "reports" to "گزارشات",
-  "receipts" to "رسیدها",
-  "audit" to "سابقه عملیات",
-  "settings" to "تنظیمات",
-  "quick" to "انتخاب محصول",
-  "product" to "کالا",
-  "vip" to "اشتراک و قیمت‌ها",
+private val PAGE_TITLES: Map<String, String> get() = mapOf(
+  "dashboard" to Str.dashboard,
+  "sale" to Str.sale,
+  "debtors" to Str.debtors,
+  "warehouse" to Str.warehouse,
+  "expenses" to Str.expenses,
+  "products" to Str.products,
+  "more" to Str.more,
+  "purchasing" to Str.purchasing,
+  "admin" to Str.adminCenter,
+  "devices" to Str.devices,
+  "sales" to Str.salesHistory,
+  "reports" to Str.reportsAlt,
+  "receipts" to Str.receipts,
+  "audit" to Str.auditLog,
+  "settings" to Str.settings,
+  "quick" to Str.pickProduct,
+  "product" to Str.product,
+  "vip" to Str.plans,
   //  «اشتراکِ من» با «اشتراک و قیمت‌ها» یکی نیست: آن یکی پلن‌ها و
   //  قیمت‌های سرور را نشان می‌دهد، این یکی حالِ اشتراکِ خودِ این حساب.
-  "myplan" to "اشتراکِ من",
-  "support" to "پشتیبانی",
+  "myplan" to Str.mySubscription,
+  "support" to Str.support,
   //  چتِ مشتری ↔ دکان (v3 §۳۳) — فقط وقتی سرور پرچمِ `shop.chat` را روشن گفته
-  "chat" to "گفت‌وگو با مشتری",
-  "profile" to "حساب من",
-  "team" to "کارمندان دکان",
-  "orders" to "سفارش‌ها",
-  "storefront" to "ویترینِ اینترنتی",
+  "chat" to Str.customerChat,
+  "profile" to Str.myAccount,
+  "team" to Str.staff,
+  "orders" to Str.orders,
+  "storefront" to Str.storefront,
+  "promos" to StrShell.promos,
   //  phone v3 §F: جست‌وجوی کامل و ویرایشگرِ نوارِ پایین
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.SEARCH to "جست‌وجو",
   ir.vil3ntec.tohid.ui.components.common.PhoneNav.EDITOR to "نوارِ پایین",
   //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
-  "delivery" to "میزِ تحویل",
+  "delivery" to StrNav.deliveryDesk,
 )
 
 /**
@@ -86,12 +91,12 @@ private val PAGE_TITLES = mapOf(
  *  چند بار — آن دو جای نوارِ پایین را می‌خواهند. انبار و گزارش سرِ
  *  جایشان هستند، از «بیشتر».
  */
-private val TABS = listOf(
-  Tab("dashboard", "خانه", Icons.Filled.GridView),
-  Tab("sale", "فروش", Icons.Filled.PointOfSale),
-  Tab("debtors", "قرض‌داران", Icons.Filled.Groups),
-  Tab("products", "محصولات", Icons.Filled.ShoppingBag),
-  Tab("more", "بیشتر", Icons.Filled.MoreHoriz),
+private val TABS: List<Tab> get() = listOf(
+  Tab("dashboard", Str.home, Icons.Filled.GridView),
+  Tab("sale", Str.sale, Icons.Filled.PointOfSale),
+  Tab("debtors", Str.debtors, Icons.Filled.Groups),
+  Tab("products", Str.products, Icons.Filled.ShoppingBag),
+  Tab("more", Str.more, Icons.Filled.MoreHoriz),
 )
 
 
@@ -145,6 +150,7 @@ fun AppRoot(
         state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
+        if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberShopId(context, state.shop?.id)
         //  دکان دارد: مطمئن شویم دفترِ روی گوشی هم مالِ همین دکان است.
         //  اگر حساب از دکانی به دکانِ دیگر رفته باشد، همین‌جا جابه‌جا
         //  می‌شود — وگرنه دفترِ دکانِ قبلی داخلِ دکانِ تازه می‌رفت.
@@ -218,8 +224,8 @@ fun AppRoot(
     val legacy = runCatching { ir.vil3ntec.tohid.data.Migration.readLegacyData(context) }.getOrNull()
     if (legacy.isNullOrBlank()) return@LaunchedEffect
     store.importJson(legacy)
-      .onSuccess { migration = "اطلاعات نسخهٔ قبلی آورده شد" }
-      .onFailure { migration = "اطلاعات نسخهٔ قبلی خوانده نشد" }
+      .onSuccess { migration = StrNav.migrationOk }
+      .onFailure { migration = StrNav.migrationFailed }
   }
 
   /*
@@ -244,7 +250,9 @@ fun AppRoot(
     ir.vil3ntec.tohid.sync.AutoSync.stopPolling()
   }
   //  بخشِ «سفارش‌ها»: فقط اگر سرور برای این دکان روشن گفته، و فقط وقتی برنامه جلوی چشم است
-  OrdersLive.Host()
+  OrdersLive.Host(store)
+  //  تخفیف‌های دکان (PRM): پیش‌فرض خاموش؛ نسخهٔ همین دستگاه برای کارِ آفلاین؛ کدها با پیش‌نویسِ سبد
+  PromoLive.Host(cartStore)
 
   //  اگر دفتر دیرتر از ON_START آماده شد، همان‌جا شروع می‌کنیم
   LaunchedEffect(loaded) {
@@ -326,14 +334,20 @@ fun AppRoot(
   }
   //  POS-13: فاکتورِ نیمه‌کارهٔ بارِ پیش — ادامه یا دور انداختن
   DraftRecoveryPrompt(cartStore, data, loaded, snackbar)
+  //  HW-02/03: کشوی بی فروش (`no_sale`) و چاپِ دوباره (`reprint`) از صفِ چاپ ⇐ سابقهٔ دکان.
+  //  `appendAudit` روی دفترِ همان لحظه و زیرِ قفلِ نوشتن می‌سازد (نه تصویرِ کهنهٔ `data.value`)
+  //  تا فروشِ هم‌زمان گم نشود؛ پس از بارِ دفتر، و مثلِ هر نوشتنی همگام می‌شود
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
     store.blocked.collect {
       snackbar.currentSnackbarData?.dismiss()
       val r = snackbar.showSnackbar(
-        "اشتراک تمام شده — این فروش/قرض ثبت نشد. انبار، کالا، خرید و مصارف باز است.",
-        actionLabel = "تمدید", duration = SnackbarDuration.Long,
+        StrNav.subscriptionBlocked,
+        actionLabel = Str.renew, duration = SnackbarDuration.Long,
       )
       if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
     }
@@ -344,9 +358,31 @@ fun AppRoot(
     store.diskError.collect { reason ->
       snackbar.currentSnackbarData?.dismiss()
       snackbar.showSnackbar(
-        "ذخیره نشد — دفتر روی حافظهٔ دستگاه نوشته نشد ($reason). دوباره امتحان کنید؛ اگر تکرار شد جای خالیِ حافظه را ببینید.",
+        StrNav.diskError(reason),
         duration = SnackbarDuration.Long,
       )
+    }
+  }
+
+  //  SEC-01: دفترِ رمزدار باز نشد ⇐ نوشتن بسته است (`ShopStore.unreadable`)؛ پنجره با
+  //  «بازسازی از سرور» و راهِ «تنظیمات ← امنیت» (بازبینیِ #331). با دفترِ ساده هرگز پیش نمی‌آید.
+  val unreadable by store.unreadable.collectAsState()
+  var unreadableOpen by remember { mutableStateOf(false) }
+  LaunchedEffect(unreadable) { unreadableOpen = unreadable != null }
+  //  پشتِ قفلِ برنامه نه: پنجره رویِ صفحهٔ قفل باز نمی‌شود
+  if (unreadableOpen && unreadable != null && !(lockStore.enabled && !unlocked)) {
+    ir.vil3ntec.tohid.ui.screens.UnreadableLedgerDialog(
+      store = store,
+      onOpenSecurity = { unreadableOpen = false; AppNav.go("settings") },
+      onDismiss = { unreadableOpen = false },
+      toast = { msg -> scope.launch { snackbar.currentSnackbarData?.dismiss(); snackbar.showSnackbar(msg, duration = SnackbarDuration.Long) } },
+    )
+  }
+  //  نتیجهٔ بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود (`ShopStore.notice`)
+  LaunchedEffect(store) {
+    store.notice.collect { msg ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
     }
   }
 
@@ -425,11 +461,28 @@ fun AppRoot(
   LaunchedEffect(railRequest) {
     if (railRequest != null) { setRail(railRequest); AppNav.rail.value = null }
   }
-  /** ☰: ثابت ⇄ آیکن؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
+  /*
+   *  نسخهٔ ۲ — منو در صندوق (تصمیم، بازبینیِ ۱۴۰۵/۰۷/۲۷): صندوق حالتِ منوی **خودش** را
+   *  دارد (`desk_rail_pos`، پیش‌فرض «فقط آیکن») تا کاتالوگ جا بگیرد؛ بقیهٔ صفحه‌ها همان
+   *  انتخابِ کاربر (`desk_rail`، پیش‌فرض «کامل»). همان آیکن‌ها به همان ترتیب، نامِ هر بخش در
+   *  راهنمای هاور، و کلیدِ بازکردن/جمع‌کردنِ بالای منو (و ☰) انتخاب را برای همان صفحه نگه می‌دارد.
+   *  «پنهان» در همه‌جا پنهان است.
+   */
+  val onSale = Platform.DESKTOP && (sub ?: tab) == "sale"
+  var posRail by remember { mutableStateOf(uiPrefs.getString("desk_rail_pos", RailMode.COMPACT) ?: RailMode.COMPACT) }
+  fun setPosRail(m: String) {
+    posRail = m
+    railOverlay = false
+    uiPrefs.edit().putString("desk_rail_pos", m).apply()
+  }
+  val shownRail = if (onSale && railMode != RailMode.HIDDEN) posRail else railMode
+  /** حالتِ منوی همین صفحه را عوض می‌کند (صندوق: `desk_rail_pos`؛ بقیه: `desk_rail`) */
+  fun setShownRail(m: String) { if (onSale && m != RailMode.HIDDEN) setPosRail(m) else setRail(m) }
+  /** ☰: ثابت ⇄ آیکن (برای همین صفحه)؛ در حالتِ پنهان، منو را روی صفحه باز/بسته می‌کند */
   fun onMenuPress() {
-    when (railMode) {
-      RailMode.FULL -> setRail(RailMode.COMPACT)
-      RailMode.COMPACT -> setRail(RailMode.FULL)
+    when (shownRail) {
+      RailMode.FULL -> setShownRail(RailMode.COMPACT)
+      RailMode.COMPACT -> setShownRail(RailMode.FULL)
       else -> railOverlay = !railOverlay
     }
   }
@@ -558,15 +611,16 @@ fun AppRoot(
       Column {
       //  کامپیوتر: سربرگِ باریکِ خودش (عنوان، جست‌وجو، هشدارها، فروشِ تازه) — نه نوارِ آبیِ گوشی
       if (Platform.DESKTOP) DeskHeader(
-        title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
+        title = PAGE_TITLES[sub ?: tab] ?: Str.appName,
         d = data,
         onBack = if (sub != null) ({ sub = null }) else null,
         onMenu = { onMenuPress() },
         onSearch = { AppNav.palette.value = true },
         onOpen = ::open,
+        page = sub ?: tab,
       ) else if (!ownHeader)
       TohidTopBar(
-        title = PAGE_TITLES[sub ?: tab] ?: "فروشگاه من",
+        title = PAGE_TITLES[sub ?: tab] ?: Str.appName,
         d = data,
         theme = theme,
         onTheme = onTheme,
@@ -588,10 +642,13 @@ fun AppRoot(
        *  نمی‌شود و خروجی و چاپ باز می‌مانند؛ همین را هم صریح می‌گوید،
        *  وگرنه کاربر گمان می‌کند دفترش رفته.
        */
+      //  فقط نسخهٔ پیش‌نمایش (`BuildConfig.PREVIEW`)؛ در بقیه هیچ چیز نمی‌کشد
+      PreviewBanner()
       //  خانهٔ گوشی همین را در کارت‌های «هشدارها و پیام‌ها» دارد
       if (!(phoneNav && current == "dashboard")) SubscriptionBanner { sub = "myplan" }
-      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه (اندروید و کامپیوتر)
-      UpdateBanner()
+      //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
+      //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
+      if (!Platform.DESKTOP) UpdateBanner()
       }
     },
     /*
@@ -664,10 +721,10 @@ fun AppRoot(
         return@Box
       }
 
-      if (wide && railMode != RailMode.HIDDEN) {
+      if (wide && shownRail != RailMode.HIDDEN) {
         val railBoard = remember(data) { ir.vil3ntec.tohid.data.DashboardEngine.board(data, ir.vil3ntec.tohid.todayIso(), 7) }
         DeskRail(
-          current = sub ?: tab, onPick = ::open, compact = railMode == RailMode.COMPACT, mode = railMode, onMode = ::setRail,
+          current = sub ?: tab, onPick = ::open, compact = shownRail == RailMode.COMPACT, mode = shownRail, onMode = ::setShownRail,
           badges = mapOf(
             "products" to railBoard.outOfStock.size + railBoard.lowStock.size,
             "warehouse" to railBoard.expiring.size,
@@ -704,8 +761,8 @@ fun AppRoot(
       }
       val railPad = when {
         !wide -> 0.dp
-        railMode == RailMode.FULL -> DESK_RAIL_WIDTH
-        railMode == RailMode.COMPACT -> DESK_RAIL_COMPACT
+        shownRail == RailMode.FULL -> DESK_RAIL_WIDTH
+        shownRail == RailMode.COMPACT -> DESK_RAIL_COMPACT
         else -> 0.dp
       }
       //  جای نوارِ شناور: خانه خودش زیرِ نوار می‌کشد؛ صفحهٔ بی‌نوار (فروش) فقط نوارِ سیستم
@@ -759,16 +816,25 @@ fun AppRoot(
           if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) {
             if (Platform.DESKTOP) DeskSettings(
               listOf(
-                "هشدارها" to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
-                "ظاهر" to androidx.compose.material.icons.Icons.Filled.Palette,
-                "تاریخ و رقم" to androidx.compose.material.icons.Icons.Filled.Event,
-                "کالای منقضی" to androidx.compose.material.icons.Icons.Filled.EventBusy,
-                "قفل برنامه" to androidx.compose.material.icons.Icons.Filled.Lock,
-                "تغییر رمز حساب" to androidx.compose.material.icons.Icons.Filled.Password,
-                "دستگاه‌های وارد شده" to androidx.compose.material.icons.Icons.Filled.Devices,
-                "کد شاگرد" to androidx.compose.material.icons.Icons.Filled.Key,
-                "داده‌ها" to androidx.compose.material.icons.Icons.Filled.Storage,
-                "درباره برنامه" to androidx.compose.material.icons.Icons.Filled.Info,
+                StrSettings.language to androidx.compose.material.icons.Icons.Filled.Language,
+                Str.alerts to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
+                Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
+                Str.dateAndDigits to androidx.compose.material.icons.Icons.Filled.Event,
+                Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
+                ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                //  این دو در `Settings.kt` بودند ولی در این فهرست نه، پس روی کامپیوتر هیچ‌وقت باز نمی‌شدند
+                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
+                StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
+                Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
+                ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
+                Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
+                Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
+                Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
+                //  همگام‌سازی (گوشی نسخهٔ ۳ از «حساب من» به تنظیمات آورد)
+                ir.vil3ntec.tohid.core.i18n.StrNav.sync to androidx.compose.material.icons.Icons.Filled.Sync,
+                Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
             else SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }
@@ -802,16 +868,16 @@ fun AppRoot(
             onEntry = { pendingProduct = id; open("warehouse") },
           )
         }
-        "quick" -> VipGate("فروش (صندوق)") {
+        "quick" -> VipGate(Str.saleRegister) {
           QuickSaleScreen(store, cartStore, data, snackbar) { sub = null; tab = "sale" }
         }
         //  کامپیوتر صندوقِ خودش را دارد (صفحه‌کلید و بارکدخوان، بی دوربین)؛ گوشی همان دوربین
-        "sale" -> if (Platform.DESKTOP) VipGate("فروش (صندوق)") {
+        "sale" -> if (Platform.DESKTOP) VipGate(Str.saleRegister) {
           DeskSaleScreen(store = store, cartStore = cartStore, d = data, snackbar = snackbar) { code ->
             pendingBarcode = code
             open("warehouse")
           }
-        } else VipGate("فروش (صندوق)") {
+        } else VipGate(Str.saleRegister) {
           SaleScreen(
             store = store,
             cartStore = cartStore,
@@ -823,7 +889,7 @@ fun AppRoot(
             open("warehouse")
           }
         }
-        "debtors" -> VipGate("قرض‌داران") {
+        "debtors" -> VipGate(Str.debtors) {
           if (Platform.DESKTOP) DeskCustomersScreen(store, data, snackbar) else DebtorsScreen(store, data, snackbar)
         }
         "products" -> if (Platform.DESKTOP) DeskProductsScreen(
@@ -865,8 +931,12 @@ fun AppRoot(
           onSubscription = { sub = "vip" },
         )
         "team" -> TeamScreen(snackbar)
-        "orders" -> OrdersScreen(snackbar) { sub = null }
+        "orders" -> OrdersScreen(store, snackbar) { sub = null }
         "storefront" -> if (StorefrontGate.visible) StorefrontScreen(snackbar) else LaunchedEffect(Unit) { open("more") }
+        //  مثلِ تنظیمات: فقط صاحب و مدیر (`settings.write`)؛ سرور هم همین را می‌سنجد
+        "promos" ->
+          if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) PromosScreen(data, snackbar)
+          else LaunchedEffect(Unit) { open("more") }
         "delivery" -> DeliveryScreen(snackbar) { open("more") }
         "devices" -> DevicesScreen(data, snackbar)
         "more" -> MoreScreen(store, data, ::open)

@@ -8,7 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -44,6 +44,7 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Space
 import androidx.compose.runtime.saveable.rememberSaveable
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  اجزای صفحهٔ تنظیمات.
@@ -136,6 +137,8 @@ fun SettingsSection(
   value: String? = null,
   toggle: Boolean? = null,
   onToggle: ((Boolean) -> Unit)? = null,
+  /** کلیدِ صفحهٔ بخش روی گوشی؛ پیش‌فرض همان عنوان. بخشی که عنوانش با زبان عوض می‌شود (بخشِ «زبان») کلیدِ ثابت می‌دهد تا با زدنِ کلیدِ زبان صفحه‌اش خالی نشود */
+  stateKey: String = title,
   content: @Composable ColumnScope.() -> Unit,
 ) {
   //  کامپیوتر: فقط بخشِ انتخاب‌شده در ستونِ راستِ «تنظیمات» و همیشه باز (`DeskSettings`)
@@ -152,9 +155,9 @@ fun SettingsSection(
       value = value,
       toggle = toggle,
       onToggle = onToggle,
-      onClick = { mode.open(title) },
+      onClick = { mode.open(stateKey) },
     )
-    is PhoneSettingsMode.Detail -> if (mode.title == title) SettingsDetailBody(subtitle, content)
+    is PhoneSettingsMode.Detail -> if (mode.title == stateKey) SettingsDetailBody(subtitle, content)
     null -> SettingsDetailBody(subtitle, content)
   }
 }
@@ -277,7 +280,7 @@ fun SettingsRow(
       trailing != null -> trailing()
       value != null -> Text(value, style = MaterialTheme.typography.labelMedium, color = colors.muted)
       onClick != null -> Icon(
-        Icons.Filled.ChevronLeft,
+        Icons.AutoMirrored.Filled.KeyboardArrowRight,
         contentDescription = null,
         tint = colors.muted2,
         modifier = Modifier.size(18.dp),
@@ -422,17 +425,17 @@ private fun DeskSettingsSection(icon: ImageVector, title: String, subtitle: Stri
  *  `SettingsScreen`ِ گوشی رسم می‌شود؛ `SettingsSection` با `LocalSettingsPick`
  *  فقط بخشِ انتخاب‌شده را می‌کشد.
  *
- *  بخشی که `AppRoot` در فهرستش ندارد (تازه‌آمده‌ها مثلِ «زبان» و «همگام‌سازی»)
- *  خودکار کنارِ هم‌گروهش می‌نشیند (`SettingsLayout.deskOrder`) تا روی کامپیوتر
- *  هیچ بخشی بی‌راه نماند.
+ *  فهرستِ بخش‌ها همان است که `AppRoot` می‌دهد: عنوان‌ها با زبان عوض می‌شوند و
+ *  با کلیدهای فارسیِ `SettingsLayout` جور نمی‌شوند، پس هر بخشِ تازه (مثلِ
+ *  «همگام‌سازی») باید آن‌جا هم بیاید.
  */
 @Composable
 fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable () -> Unit) {
-  val all = remember(sections) {
-    val given = sections.toMap()
-    SettingsLayout.deskOrder(sections.map { it.first }).map { it to (given[it] ?: settingsIcon(it) ?: Icons.Outlined.Settings) }
-  }
-  var pick by rememberSaveable { mutableStateOf(all.first().first) }
+  //  فهرست همان است که `AppRoot` می‌دهد (عنوان‌ها با زبان عوض می‌شوند، پس با
+  //  `SettingsLayout` ِ فارسی جور نمی‌شوند)؛ جای بخش نگه داشته می‌شود، نه عنوانش
+  val all = sections
+  var pickAt by rememberSaveable { mutableStateOf(0) }
+  val pick = all.getOrElse(pickAt) { all.first() }.first
   Row(Modifier.fillMaxSize().padding(16.dp)) {
     Column(
       Modifier
@@ -443,15 +446,15 @@ fun DeskSettings(sections: List<Pair<String, ImageVector>>, content: @Composable
         .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
         .padding(10.dp),
     ) {
-      Text("تنظیمات", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
-      all.forEach { (title, icon) ->
-        val on = title == pick
+      Text(Str.settings, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
+      all.forEachIndexed { i, (title, icon) ->
+        val on = i == pickAt
         Row(
           Modifier
             .fillMaxWidth()
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
             .background(if (on) Shop.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
-            .clickable { pick = title }
+            .clickable { pickAt = i }
             .padding(horizontal = 12.dp, vertical = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {

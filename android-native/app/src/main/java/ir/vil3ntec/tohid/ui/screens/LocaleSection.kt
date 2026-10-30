@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Event
-import androidx.compose.material.icons.filled.Language
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,45 +12,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
-import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
- *  «زبان» در تنظیمات (گوشی نسخهٔ ۳، گروهِ «عمومی») — زبانِ نامِ ماه‌های خورشیدی
- *  (LOC-01): دری یا پشتو. تنها انتخابِ زبانی که برنامه دارد؛ پیش‌تر درونِ
- *  «تاریخ و رقم» بود و فقط جایش عوض شد. پیش‌فرض همان دری است.
- */
-@Composable
-fun LanguageSection() {
-  val context = LocalContext.current
-  val months = LocaleChoice.months
-  SettingsSection(
-    icon = Icons.Filled.Language,
-    title = "زبان",
-    subtitle = "زبانِ نامِ ماه‌ها در تاریخ‌ها و فاکتور",
-    tint = Shop.colors.primary,
-    value = if (months == LocaleText.MONTHS_PASHTO) "پشتو" else "دری",
-  ) {
-    Text(
-      "نامِ ماه‌های خورشیدی: امروز " + SolarHijri.formatLong(todayIso(), months, LocaleFormat.DIGITS_LATN),
-      style = MaterialTheme.typography.labelSmall,
-      color = Shop.colors.muted2,
-    )
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf(LocaleText.MONTHS_DARI to "دری (حمل، ثور…)", LocaleText.MONTHS_PASHTO to "پشتو (وری، غویی…)"),
-      selected = months,
-      onSelect = { LocaleChoice.setMonths(context, it) },
-    )
-  }
-}
-
-/**
- *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05) و نمادِ پولِ فاکتور
- *  (LOC-07). پیش‌فرض‌ها رفتارِ امروز است: لاتین و «افغانی». زبانِ نامِ ماه‌ها
- *  (LOC-01) در بخشِ «زبان» است (`LanguageSection`).
+ *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05)، زبانِ نامِ ماه‌ها
+ *  (LOC-01) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ امروز است: لاتین، دری، «افغانی».
  *
  *  برچسبِ گزینه‌ها عمداً بی رقم است: وقتی رقمِ فارسی روشن است، فونت هر
  *  «123»ی را «۱۲۳» می‌کشد و نمونهٔ «لاتین» هم فارسی دیده می‌شد.
@@ -60,35 +31,83 @@ fun LanguageSection() {
 fun LocaleSection() {
   val context = LocalContext.current
   val digits = LocaleChoice.digits
+  val months = LocaleChoice.months
   val symbol = LocaleChoice.symbol
+  val lang = LocaleChoice.lang
+  val calendar = LocaleChoice.calendar
+  val gregorian = I18n.gregorian(lang, calendar)
   SettingsSection(
     icon = Icons.Filled.Event,
-    title = "تاریخ و رقم",
-    subtitle = (if (digits == LocaleFormat.DIGITS_FA) "رقمِ فارسی" else "رقمِ لاتین") +
-      " · " + (if (symbol == LocaleFormat.SYMBOL_SIGN) "نمادِ ؋" else "«افغانی»"),
+    title = Str.dateAndDigits,
+    //  فارسی با پیش‌فرض‌ها: «رقمِ لاتین · ماهِ دری» — همان زیرعنوانِ پیشین
+    subtitle = listOfNotNull(
+      if (lang == Lang.EN) null else if (digits == LocaleFormat.DIGITS_FA) StrSettings.persianDigits else StrSettings.latinDigits,
+      when {
+        gregorian -> StrSettings.calGregorian
+        lang == Lang.FA -> if (months == LocaleText.MONTHS_PASHTO) StrSettings.pashtoMonths else StrSettings.dariMonths
+        else -> StrSettings.calSolar
+      },
+    ).joinToString(" · "),
     tint = Shop.colors.primary,
-    value = if (digits == LocaleFormat.DIGITS_FA) "رقمِ فارسی" else "رقمِ لاتین",
+    //  گوشی نسخهٔ ۳: مقدارِ کوتاهِ خاکستریِ ته ردیف
+    value = if (digits == LocaleFormat.DIGITS_FA) StrSettings.persianDigits else StrSettings.latinDigits,
   ) {
     Text(
-      "رقم روی صفحه و فاکتورِ چاپی. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است؛ با عوض کردنِ این کلید هیچ داده‌ای عوض نمی‌شود.",
+      StrSettings.digitsNote,
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
     Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf(LocaleFormat.DIGITS_LATN to "رقمِ لاتین", LocaleFormat.DIGITS_FA to "رقمِ فارسی"),
-      selected = digits,
-      onSelect = { LocaleChoice.setDigits(context, it) },
-    )
+    //  انگلیسی همیشه رقمِ لاتین دارد؛ کلیدی که این‌جا کاری نمی‌کند نشان داده نمی‌شود
+    if (lang == Lang.EN) {
+      Text(StrSettings.digitsEnNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    } else {
+      SegmentedChoice(
+        options = listOf(LocaleFormat.DIGITS_LATN to StrSettings.latinDigits, LocaleFormat.DIGITS_FA to StrSettings.persianDigits),
+        selected = digits,
+        onSelect = { LocaleChoice.setDigits(context, it) },
+      )
+    }
     Spacer(Modifier.height(14.dp))
     Text(
-      "نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.",
+      StrSettings.calNote,
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
     Spacer(Modifier.height(8.dp))
     SegmentedChoice(
-      options = listOf(LocaleFormat.SYMBOL_WORD to "افغانی", LocaleFormat.SYMBOL_SIGN to "؋"),
+      options = listOf(
+        I18n.CAL_AUTO to StrSettings.calAuto,
+        I18n.CAL_SOLAR to StrSettings.calSolar,
+        I18n.CAL_GREGORIAN to StrSettings.calGregorian,
+      ),
+      selected = calendar,
+      onSelect = { LocaleChoice.setCalendar(context, it) },
+    )
+    //  نامِ ماه فقط در فارسی انتخابی است: پشتو همیشه وری، غویی… و انگلیسی Hamal, Sawr…
+    Spacer(Modifier.height(14.dp))
+    Text(
+      StrSettings.monthsToday(I18n.dateLong(todayIso(), lang, I18n.CAL_SOLAR, months)),
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+    )
+    if (lang == Lang.FA) {
+      Spacer(Modifier.height(8.dp))
+      SegmentedChoice(
+        options = listOf(LocaleText.MONTHS_DARI to StrSettings.monthsDari, LocaleText.MONTHS_PASHTO to StrSettings.monthsPashto),
+        selected = months,
+        onSelect = { LocaleChoice.setMonths(context, it) },
+      )
+    }
+    Spacer(Modifier.height(14.dp))
+    Text(
+      StrSettings.symbolNote,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+    )
+    Spacer(Modifier.height(8.dp))
+    SegmentedChoice(
+      options = listOf(LocaleFormat.SYMBOL_WORD to Str.afghani, LocaleFormat.SYMBOL_SIGN to "؋"),
       selected = symbol,
       onSelect = { LocaleChoice.setSymbol(context, it) },
     )

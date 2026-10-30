@@ -176,10 +176,18 @@ class PosLogicTest {
   /* ---------------- چیدمان ---------------- */
 
   @Test
-  fun `ستونِ دسته‌ها از ۹۰۰dp ثابت است و کمتر تاشونده؛ لمس ۴۸ و کامپیوتر دست‌کم ۳۴`() {
-    assertTrue(PosLayout.railFixed(1200f))
-    assertTrue(PosLayout.railFixed(900f))
-    assertFalse(PosLayout.railFixed(899f))
+  fun `سبد از ۷۶۰dp کنارِ کاتالوگ است و کمتر زیرِ آن؛ لمس ۴۸ و کامپیوتر دست‌کم ۳۴`() {
+    //  نسخهٔ ۲: ستونِ عمودیِ دسته‌ها (railFixed از ۹۰۰) برداشته شد — دسته‌ها تراشهٔ افقی‌اند
+    assertTrue(PosLayout.sideCart(1200f))
+    assertTrue(PosLayout.sideCart(760f))
+    assertFalse(PosLayout.sideCart(759f))
+    //  سبدِ کناری پله‌ای پهن می‌شود و کاتالوگ همیشه دست‌کم نیمی از جا را دارد
+    assertEquals(336, PosLayout.cartWidth(760f))
+    assertEquals(372, PosLayout.cartWidth(1100f))
+    assertEquals(420, PosLayout.cartWidth(1800f))
+    for (w in listOf(760f, 900f, 1099f, 1100f, 1499f, 1500f, 2400f)) {
+      assertTrue("پهنای $w: کاتالوگ کمتر از نیمِ صفحه", PosLayout.cartWidth(w) <= w / 2)
+    }
     assertEquals(48, PosLayout.minTarget(touch = true))
     assertTrue(PosLayout.minTarget(touch = false) >= 34)
   }

@@ -20,11 +20,9 @@ import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.Window
@@ -83,6 +81,9 @@ fun main() {
   scope.launch { store.loadAndSummarize() }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
+  //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
+  ir.vil3ntec.tohid.hw.HwPlatform.serial = DeskSerial
+  ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
 
@@ -138,6 +139,27 @@ fun main() {
       )
       LaunchedEffect(Unit) {
         DesktopNotify.sink = { title, text -> tray.sendNotification(androidx.compose.ui.window.Notification(title, text)) }
+      }
+    }
+
+    //  HW-10: نمایشگرِ مشتری — پنجرهٔ دوم که روی صفحهٔ دوم/نمایشگرِ رو به مشتری کشیده می‌شود
+    val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+    if (customerOpen) {
+      Window(
+        onCloseRequest = { ir.vil3ntec.tohid.hw.CustomerFacing.open.value = false },
+        title = "نمایشگرِ مشتری — فروشگاه من",
+        icon = icon,
+        state = rememberWindowState(size = DpSize(800.dp, 600.dp)),
+      ) {
+        val theme = remember {
+          runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
+        }
+        //  زبان و جهت همان برنامه (ProvideLang): فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+        CompositionLocalProvider(LocalContext provides context) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            TohidTheme(theme) { ir.vil3ntec.tohid.ui.screens.CustomerDisplayScreen(prefs.getString("store_name", "") ?: "") }
+          }
+        }
       }
     }
 
@@ -282,7 +304,8 @@ fun main() {
         }
 
         TohidTheme(theme) {
-          CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+          //  زبان و جهت: فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست
+          ir.vil3ntec.tohid.ui.ProvideLang {
             if (!welcomed) {
               WelcomeScreen(store) {
                 prefs.edit().putBoolean("welcomed", true).apply()
@@ -357,7 +380,7 @@ private fun ShortcutsHelp() {
       "Esc" to "بستن",
     ),
   )
-  androidx.compose.runtime.CompositionLocalProvider(androidx.compose.ui.platform.LocalLayoutDirection provides LayoutDirection.Rtl) {
+  ir.vil3ntec.tohid.ui.ProvideLang {
     androidx.compose.foundation.layout.Column(
       //  رنگ‌ها از تم (F0-18): در حالتِ تاریک پنجره دیگر سفید نمی‌ماند
       androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)

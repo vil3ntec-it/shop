@@ -48,7 +48,8 @@ fun shopTypography(scale: Float = 1f, digits: String = ir.vil3ntec.tohid.core.te
   headlineMedium = style(22, FontWeight.Bold, 30, scale, f),
   headlineSmall = style(18, FontWeight.SemiBold, 26, scale, f),
   titleMedium = style(16, FontWeight.SemiBold, 24, scale, f),
-  titleSmall = style(14, FontWeight.Medium, 20, scale, f),
+  //  نسخهٔ ۲: عنوانِ بخش یک پله پررنگ‌تر — سلسله‌مراتب: عنوانِ صفحه / بخش / متن / ریزنوشت
+  titleSmall = style(14, FontWeight.SemiBold, 20, scale, f),
   // متن‌های بدنه و برچسب یک درجه پُرتر شدند.
   //
   // `Normal` روی سطحِ کم‌رنگِ کارت‌ها نازک می‌افتاد و متنِ کوچک — به‌ویژه
@@ -64,3 +65,11 @@ fun shopTypography(scale: Float = 1f, digits: String = ir.vil3ntec.tohid.core.te
   labelSmall = style(11, FontWeight.SemiBold, 14, scale, f),
   )
 }
+
+/**
+ *  عدد با رقم‌های هم‌پهنا (`tnum`) — ستونِ پول، موجودی و جمع صاف می‌ایستد و عدد
+ *  هنگامِ تغییر نمی‌لرزد. با `ss01`ِ رقمِ فارسی (LOC-05) جمع می‌شود: «ss01, tnum».
+ *  کامپیوتر (`FontFeature.parseW3`) و اندروید هر دو فهرستِ ویرگول‌دار را می‌خوانند.
+ */
+fun TextStyle.tabular(): TextStyle =
+  copy(fontFeatureSettings = listOfNotNull(fontFeatureSettings?.takeIf { it.isNotBlank() }, "tnum").joinToString(", "))

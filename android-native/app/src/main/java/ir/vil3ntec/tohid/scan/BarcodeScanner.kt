@@ -295,6 +295,8 @@ fun CameraScanner(
   onStatus: (String, Boolean) -> Unit,
   modifier: Modifier = Modifier,
   isKnown: (String) -> Boolean = { false },
+  /** RET-01 — QRِ رسید هم خوانده شود (فقط اسکنِ رسید؛ فروش همان قالب‌های بارکد) */
+  qr: Boolean = false,
 ) {
   val context = LocalContext.current
   val lifecycleOwner = LocalLifecycleOwner.current
@@ -439,7 +441,7 @@ fun CameraScanner(
         flashReady = runCatching { camera.cameraInfo.hasFlashUnit() }.getOrDefault(false)
         flashOn = false
 
-        val client = buildScanner(maxZoom) { wanted -> pilot.zoomTo(wanted) }
+        val client = buildScanner(maxZoom, qr) { wanted -> pilot.zoomTo(wanted) }
         scanner = client
         //  سدِ خوانشِ دروغین. یکی برای هر بار باز شدنِ دوربین، چون
         //  شمارشِ تکرارش مالِ همین نشست است. فهرستِ کالاها را از راهِ
@@ -714,8 +716,8 @@ private fun sizeWanted(size: Size): ResolutionSelector =
  *  بچسباند به لنز تا بارکد بزرگ شود — و آن فاصله زیرِ کمترین فاصلهٔ فوکوس
  *  است و **هیچ‌وقت** تیز نمی‌شود.
  */
-private fun buildScanner(maxZoom: Float, onZoom: (Float) -> Boolean): MlKitScanner {
-  val builder = BarcodeScannerOptions.Builder().setBarcodeFormats(FORMATS)
+private fun buildScanner(maxZoom: Float, qr: Boolean, onZoom: (Float) -> Boolean): MlKitScanner {
+  val builder = BarcodeScannerOptions.Builder().setBarcodeFormats(if (qr) FORMATS or Barcode.FORMAT_QR_CODE else FORMATS)
   //  اگر دوربینِ گوشی بزرگ‌نمایی ندارد، این قابلیت هم معنایی ندارد
   if (maxZoom > 1.05f) {
     val callback = ZoomSuggestionOptions.ZoomCallback { wanted -> onZoom(wanted) }

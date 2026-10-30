@@ -32,7 +32,18 @@ const MAX_KEYS = 200;
 /** scope → نسخه؛ خالی ⇒ از دیتابیس. تنها جای نگه‌داری در حافظه. */
 const versions = new Map();
 
-const { badRequest: badInput } = require('../middleware/errors');
+const { badRequest: badInput, conflict } = require('../middleware/errors');
+
+/**
+ * کلیدهایی که فقط خودِ سرور می‌نویسد (`setOnce`) — پنل نه می‌نویسد نه پاک می‌کند: کفِ «فروشِ
+ * تحویل» (`order-ledger.FLOOR_KEY`) اگر عوض یا پاک شود، تحویل‌های کهنه دوباره فروش می‌گیرند.
+ */
+const RESERVED = Object.freeze(['shop.orders.handover_floor']);
+
+function writable(k) {
+  if (RESERVED.includes(k)) throw conflict('این کلید را خودِ سرور یک بار می‌گذارد و از پنل عوض یا پاک نمی‌شود', 'reserved_key');
+  return k;
+}
 
 function checkScope(scope) {
   const s = String(scope || '').trim();
@@ -113,7 +124,7 @@ async function bump(client, scope) {
 
 async function set(scope, key, value, by = '') {
   const s = checkScope(scope);
-  const k = checkKey(key);
+  const k = writable(checkKey(key));
   if (value === undefined) throw badInput('مقدار لازم است', 'bad_value');
   const text = JSON.stringify(value);
   if (text.length > MAX_VALUE) throw badInput(`مقدار حداکثر ${MAX_VALUE} نویسه`, 'value_too_long');
@@ -135,9 +146,33 @@ async function set(scope, key, value, by = '') {
   return { scope: s, key: k, value, version };
 }
 
-async function remove(scope, key) {
+/**
+ * فقط اگر کلید نیست بنویس (کارِ سیستم، نه پنل) — دو نوشتنِ هم‌زمان ⇒ نخستین می‌ماند؛ هست ⇒ هیچ،
+ * بی بالا بردنِ نسخه. سقفِ کلیدها را نمی‌سنجد (کلیدِ سیستمیِ یک‌باره). ⇒ { inserted }
+ */
+async function setOnce(scope, key, value, by = '') {
   const s = checkScope(scope);
   const k = checkKey(key);
+  const text = JSON.stringify(value);
+  if (value === undefined || text.length > MAX_VALUE) throw badInput('مقدار معتبر نیست', 'bad_value');
+  let version = 0;
+  const inserted = await tx(async (client) => {
+    const r = await client.query(
+      `INSERT INTO live_config (scope, key, value, updated_at, updated_by) VALUES ($1,$2,$3,$4,$5)
+       ON CONFLICT (scope, key) DO NOTHING RETURNING key`,
+      [s, k, text, now(), String(by || '').slice(0, 80)]
+    );
+    if (!r.rows.length) return false;
+    version = await bump(client, s);
+    return true;
+  });
+  if (inserted) raise(s, version);
+  return { inserted };
+}
+
+async function remove(scope, key) {
+  const s = checkScope(scope);
+  const k = writable(checkKey(key));
   let removed = false;
   let version = await scopeVersion(s);
   await tx(async (client) => {
@@ -152,4 +187,4 @@ async function remove(scope, key) {
 /** فقط برای سنجه‌ها: حافظه را خالی کن تا از دیتابیس خوانده شود. */
 function _forget() { versions.clear(); }
 
-module.exports = { ALL, KEY_RE, MAX_VALUE, MAX_KEYS, versionOf, snapshot, list, set, remove, _forget };
+module.exports = { ALL, KEY_RE, MAX_VALUE, MAX_KEYS, RESERVED, versionOf, snapshot, list, set, setOnce, remove, _forget };

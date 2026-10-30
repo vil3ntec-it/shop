@@ -14,14 +14,37 @@ import java.io.File
  */
 class SettingsLayoutTest {
 
-  private fun src(name: String): String = listOf(
-    "src/main/java/ir/vil3ntec/tohid/ui/screens/$name",
-    "../android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/$name",
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/$name",
-  ).map { File(it) }.firstOrNull { it.isFile }?.readText()
-    ?: error("$name پیدا نشد (cwd=${File(".").absoluteFile})")
+  private fun src(name: String): String = srcAt("ui/screens/$name")
 
-  private val sectionTitle = Regex("""SettingsSection\(\s*icon\s*=[^\n]*\n\s*title\s*=\s*"([^"]+)"""")
+  /** `rel` زیرِ `ir/vil3ntec/tohid/` */
+  private fun srcAt(rel: String): String = listOf(
+    "src/main/java/ir/vil3ntec/tohid/$rel",
+    "../android-native/app/src/main/java/ir/vil3ntec/tohid/$rel",
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/$rel",
+  ).map { File(it) }.firstOrNull { it.isFile }?.readText()
+    ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
+
+  /**
+   *  عنوانِ بخش یا متنِ خام است یا رشتهٔ ترجمه‌پذیرِ `Str*.name` (main، i18n).
+   *  دومی به متنِ فارسیِ همان رشته برگردانده می‌شود — گروه‌ها کلیدِ فارسی دارند.
+   *  رشته‌ای که پیدا نشود، آزمون را می‌شکند، نه این‌که بی‌صدا کنار برود.
+   */
+  private val sectionTitle =
+    Regex("""SettingsSection\(\s*icon\s*=[^\n]*\n\s*title\s*=\s*(?:"([^"]+)"|(Str[A-Za-z]*)\.([A-Za-z0-9_]+)\s*,)""")
+
+  private val faStrings: Map<String, String> by lazy {
+    listOf("Str", "StrSettings", "StrShell", "StrNav").associateWith { obj ->
+      Regex("""val ([A-Za-z0-9_]+): String get\(\) = td?\("([^"]+)"""").findAll(srcAt("core/i18n/$obj.kt"))
+        .associate { it.groupValues[1] to it.groupValues[2] }
+    }.flatMap { (obj, m) -> m.map { (k, v) -> "$obj.$k" to v } }.toMap()
+  }
+
+  private fun titlesIn(text: String): List<String> = sectionTitle.findAll(text).map { m ->
+    m.groupValues[1].ifEmpty {
+      val key = m.groupValues[2] + "." + m.groupValues[3]
+      faStrings[key] ?: error("متنِ فارسیِ $key پیدا نشد")
+    }
+  }.toList()
 
   /**
    *  بخش‌های گروه‌ها از **متنِ** خودِ `SettingsLayout.kt` — نه از شیءِ کامپایل‌شده.
@@ -50,8 +73,7 @@ class SettingsLayoutTest {
 
   @Test
   fun `هر بخشِ تنظیمات دقیقاً در یک گروه است`() {
-    val found = (sectionTitle.findAll(src("Settings.kt")) + sectionTitle.findAll(src("LocaleSection.kt")))
-      .map { it.groupValues[1] }.toList()
+    val found = titlesIn(src("Settings.kt")) + titlesIn(src("LocaleSection.kt")) + titlesIn(srcAt("ui/LangUi.kt"))
     assertTrue("بخشی پیدا نشد — الگوی متن عوض شده؟", found.size >= 10)
     assertEquals("بخشِ تکراری در کد", found.size, found.toSet().size)
     assertEquals(found.toSet(), layoutSections.toSet())

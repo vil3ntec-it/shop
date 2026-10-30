@@ -3568,6 +3568,488 @@
    },
    "rules": [],
    "error": true
+  },
+  {
+   "name": "PRM-08 دامنهٔ برند: فقط ردیفِ همان برند",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "brands": [
+       "b1"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 1000,
+    "totalMinor": 69000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 0,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 1000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-08 برندِ مستثنا بر دستهٔ شامل مقدم است؛ ردیفِ بی برند می‌ماند",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "categories": [
+       "drinks"
+      ],
+      "exBrands": [
+       "b1"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 3500,
+    "totalMinor": 66500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 3500,
+      "netMinor": 31500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 3500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-08 برندِ مستثنا بر همان برندِ شامل مقدم است",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "brands": [
+       "b1"
+      ],
+      "exBrands": [
+       "b1"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 0,
+    "totalMinor": 70000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 0,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-08 دستهٔ مستثنا بر برندِ شامل مقدم است",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "brands": [
+       "b1",
+       "b2"
+      ],
+      "exCategories": [
+       "snacks"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 1000,
+    "totalMinor": 69000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 0,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 1000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-08 تأمین‌کنندهٔ مستثنا بر برندِ شامل مقدم است",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "brands": [
+       "b1",
+       "b2"
+      ],
+      "exSuppliers": [
+       "s1"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 2500,
+    "totalMinor": 67500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 0,
+      "netMinor": 10000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 0,
+      "netMinor": 35000
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 2500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-08 فقط برندِ مستثنا: بقیه، حتی بی برند، شامل‌اند",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 1000,
+      "unitMinor": 10000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "brand": "b1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "category": "snacks",
+      "supplierId": "s2",
+      "brand": "b2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000,
+     "scope": {
+      "exBrands": [
+       "b2"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 70000,
+    "discountMinor": 4500,
+    "totalMinor": 65500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 10000,
+      "discountMinor": 1000,
+      "netMinor": 9000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 3500,
+      "netMinor": 31500
+     }
+    ],
+    "applied": [
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 4500
+     }
+    ],
+    "codes": []
+   }
   }
  ]
 }
