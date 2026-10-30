@@ -451,12 +451,12 @@ const config = {
   },
 
   /**
-   * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ `db` قفلِ advisory هم برای چند
-   * نمونهٔ سرور، روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). سرورِ تک‌نمونه:
-   * `SAFE_LOCK_SCOPE=local` (بی اتصالِ اضافه). روی PGlite همیشه `local`.
+   * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ پیش‌فرض `local` (سرورِ تک‌نمونه،
+   * بی اتصالِ اضافه). فقط با `SAFE_LOCK_SCOPE=db` (چند نمونهٔ سرور روی یک پایگاه) قفلِ advisory هم،
+   * روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). روی PGlite همیشه `local`.
    */
   accountLock: {
-    scope: process.env.SAFE_LOCK_SCOPE === 'local' ? 'local' : 'db',
+    scope: String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase() === 'db' ? 'db' : 'local',
     poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
   },
 };

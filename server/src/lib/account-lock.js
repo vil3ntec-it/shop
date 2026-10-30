@@ -6,8 +6,8 @@
  *
  * ── دو لایه ─────────────────────────────────────────────────────────
  *   • صفِ همین فرآیند (زنجیرهٔ promise) — همیشه. روی PGlite و سرورِ تک‌نمونه
- *     (`SAFE_LOCK_SCOPE=local`، `config.accountLock.scope`) همین تنها لایه است و اتصالی نمی‌گیرد؛
- *   • `scope = db` (پیش‌فرض، برای چند نمونهٔ سرور): قفلِ advisoryِ نشستی با `pg_try_advisory_lock`
+ *     (`SAFE_LOCK_SCOPE` تنظیم‌نشده یا `local`، پیش‌فرض) همین تنها لایه است و اتصالی نمی‌گیرد؛
+ *   • `SAFE_LOCK_SCOPE=db` (فقط برای چند نمونهٔ سرور): قفلِ advisoryِ نشستی با `pg_try_advisory_lock`
  *     و تلاشِ دوباره، روی **استخرِ جدا** (`db.extraPool`، `SAFE_LOCK_POOL_MAX` اتصال، پیش‌فرض ۱۰).
  *     اتصالِ استخرِ اصلی هرگز گرفته نمی‌ماند، و چون صفِ فرآیند جلوتر است هر حساب در هر نمونه
  *     حداکثر یک اتصال دارد. کلید با قفلِ تراکنشیِ v1 (`sync-v1:shop:shop:<حساب>`) فرق دارد، پس
@@ -25,8 +25,12 @@ const config = require('../config');
 const db = require('../db');
 const { ApiError } = require('../middleware/errors');
 
-/** سقف‌ها — آزمون کوچکشان می‌کند */
-const limits = { WAIT_MS: 15_000, HOLD_MS: 60_000, RETRY_MS: 25, UNLOCK_MS: 5_000 };
+/**
+ * سقف‌ها — آزمون کوچکشان می‌کند. [HOLD_MS] بیش از `requestTimeout` ِ پیش‌فرضِ `http` ِ Node (۳۰۰ ثانیه)
+ * است تا قفل پیش از آن‌که خودِ سرور درخواست را رها کند آزاد نشود؛ اگر باز هم رسید، گرداننده شاید هنوز
+ * در کار باشد، پس با `console.error` و برچسبِ `HOLD_EXPIRED` گزارش می‌شود.
+ */
+const limits = { WAIT_MS: 15_000, HOLD_MS: 310_000, RETRY_MS: 25, UNLOCK_MS: 5_000 };
 
 const chains = new Map();
 let lockPool = null;
@@ -170,7 +174,8 @@ async function holdFor(res, key) {
     return null;
   }
   cap = setTimeout(() => {
-    console.warn(`[account-lock] ${key} پس از ${limits.HOLD_MS}ms هنوز پاسخ نداده بود؛ قفل آزاد شد`);
+    console.error(`[account-lock] ⚠️ HOLD_EXPIRED ${key}: گرداننده پس از ${limits.HOLD_MS}ms هنوز پاسخ نداده و شاید `
+      + 'هنوز در کار است؛ قفل آزاد شد و push ِ هم‌زمانِ گاوصندوق دیگر از هم جدا نیست — گرداننده را بررسی کنید');
     free();
   }, limits.HOLD_MS);
   cap.unref?.();

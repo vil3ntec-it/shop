@@ -7,6 +7,8 @@
  *   • پمپ و بقیهٔ جدول‌ها بی هیچ کاری از میان‌افزار می‌گذرند.
  */
 process.env.SYNC_V3_ENABLED = '1';
+//  پیش‌فرضِ سرور `local` است؛ این‌جا `db` تا روی PostgreSQL ِ واقعی قفلِ advisory و استخرِ جدا هم بدوند
+process.env.SAFE_LOCK_SCOPE = 'db';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -326,6 +328,24 @@ test('قفلِ حساب: سقفِ انتظار ⇒ 503 SAFE_BUSY، و سقفِ �
   });
 });
 
+test('قفلِ حساب: سقفِ سخت بیش از requestTimeout ِ Node است و رسیدنش با console.error ِ HOLD_EXPIRED گزارش می‌شود', async (t) => {
+  const http = require('node:http');
+  assert.ok(lock.limits.HOLD_MS > http.createServer().requestTimeout,
+    `HOLD_MS (${lock.limits.HOLD_MS}) باید بیش از requestTimeout باشد تا قفل زیرِ گردانندهٔ زنده آزاد نشود`);
+  const said = [];
+  t.mock.method(console, 'error', (...a) => { said.push(a.join(' ')); });
+  await withLimits({ HOLD_MS: 30 }, async () => {
+    const stuck = fakeRes();
+    await lock.holdFor(stuck, 'acc-hold-warn');
+    await pause(50);
+    stuck.end();
+    const r = fakeRes();
+    await lock.holdFor(r, 'acc-hold-warn');
+    r.end();
+  });
+  assert.equal(said.filter((m) => m.includes('HOLD_EXPIRED') && m.includes('acc-hold-warn')).length, 1, said.join('\n'));
+});
+
 /**
  * استخرِ ساختگیِ لایهٔ پایگاهِ `account-lock` — قفلِ advisoryِ نشستی مثلِ PostgreSQL: تا unlock یا بسته
  * شدنِ اتصال می‌ماند (پس دادنِ عادیِ اتصال آن را آزاد نمی‌کند).
@@ -366,14 +386,16 @@ async function withPool(pool, fn) {
   try { await fn(); } finally { lock.testing.usePool(null); }
 }
 
-test('قفلِ حساب: SAFE_LOCK_SCOPE و SAFE_LOCK_POOL_MAX از env (پیش‌فرض db و ۱۰)؛ local و PGlite بی اتصال', async () => {
+test('قفلِ حساب: SAFE_LOCK_SCOPE و SAFE_LOCK_POOL_MAX از env (پیش‌فرض local و ۱۰، db فقط صریح)؛ local و PGlite بی اتصال', async () => {
   const read = (env) => JSON.parse(execFileSync(process.execPath, ['-e',
     "process.stdout.write(JSON.stringify(require('./src/config').accountLock))"], {
     cwd: path.join(__dirname, '..'), env: { ...process.env, SAFE_LOCK_SCOPE: '', SAFE_LOCK_POOL_MAX: '', ...env },
   }).toString());
-  assert.deepEqual(read({}), { scope: 'db', poolMax: 10 });
+  assert.deepEqual(read({}), { scope: 'local', poolMax: 10 }, 'بی تنظیم: بی اتصالِ اضافه');
   assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'local', SAFE_LOCK_POOL_MAX: '3' }), { scope: 'local', poolMax: 3 });
-  assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'cluster', SAFE_LOCK_POOL_MAX: '0' }), { scope: 'db', poolMax: 1 });
+  assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'db' }), { scope: 'db', poolMax: 10 });
+  assert.deepEqual(read({ SAFE_LOCK_SCOPE: ' DB ' }), { scope: 'db', poolMax: 10 });
+  assert.deepEqual(read({ SAFE_LOCK_SCOPE: 'cluster', SAFE_LOCK_POOL_MAX: '0' }), { scope: 'local', poolMax: 1 });
   assert.equal(lock.testing.usesDb(), !isPglite(), 'روی PGlite فقط صفِ فرآیند؛ روی PostgreSQL قفلِ پایگاه هم');
   //  سرورِ تک‌نمونه (`local`): حتی با استخرِ پایگاه، اتصالی گرفته نمی‌شود
   const pool = fakePool();
