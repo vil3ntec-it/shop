@@ -35,6 +35,6 @@ kotlin {
   if (iosSpike) {
     iosArm64()
     iosSimulatorArm64()
-    sourceSets.iosTest.dependencies { implementation(kotlin("test")) }
   }
+  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
 }
