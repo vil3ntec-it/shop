@@ -63,4 +63,10 @@ object StrShell {
   // مشتری ← ادغامِ تکراری‌ها (CRM-10)
   val mergeNotOnV3: String get() = t("روی همگام‌سازیِ تازه هنوز نیست", "Not available on the new sync yet", "په نوې همغږۍ کې لا نشته")
   val mergeNotSaved: String get() = t("ادغام ثبت نشد", "The merge wasn't saved", "یوځای کول ثبت نه شو")
+  // «گزارش‌های مشتری» در گوشی: پروندهٔ مشتری در «قرض‌داران» (CRM-02/10/11)
+  val crmNotePhone: String get() = t(
+    "در «قرض‌داران»: شمارهٔ دوم و برچسب در فرمِ مشتری، صافیِ برچسب، و ادغامِ مشتریانِ تکراری. با ادغام هیچ ردیفی پاک نمی‌شود.",
+    "In “Debtors”: a second phone and tags on the customer form, a tag filter, and merging duplicate customers. Merging never deletes a record.",
+    "په «پوروړي» کې: د پیرودونکي په فورمه کې دویمه شمېره او ټګونه، د ټګ فلټر، او د تکراري پیرودونکو یوځای کول. یوځای کول هېڅ ریکارډ نه ړنګوي.",
+  )
 }

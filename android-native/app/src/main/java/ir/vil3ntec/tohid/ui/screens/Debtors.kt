@@ -55,10 +55,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.money.MoneyInput
+import ir.vil3ntec.tohid.data.CustomerCrm
+import ir.vil3ntec.tohid.data.CustomerProfileForm
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -101,6 +104,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   var receiptFor by remember { mutableStateOf<String?>(null) }
   var dueFor by remember { mutableStateOf<String?>(null) }
   var overLimit by remember { mutableStateOf<PendingTx?>(null) }
+  //  پروندهٔ CRM (CRM-02/10/11) — فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض خاموش)
+  val crm = ShopPolicy.crmReports(LocalContext.current)
+  var tagFilter by rememberSaveable { mutableStateOf<String?>(null) }
+  var mergeOpen by remember { mutableStateOf(false) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -145,11 +152,9 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
      *  اسکرول را کند می‌کرد.
      */
     val term = search.trim()
-    val rows = remember(d, term, sort) {
-      d.debtors
-        .filter {
-          term.isBlank() || it.name.contains(term, ignoreCase = true) || ir.vil3ntec.tohid.LocaleText.phoneMatches(it.phone, term)
-        }
+    //  ادغام‌شده‌ها بیرون (CRM-10)؛ با CRM روشن جست‌وجو روی هر دو شماره و برچسب و صافیِ برچسب
+    val rows = remember(d, term, sort, tagFilter, crm) {
+      CustomerProfileForm.visible(d, term, tagFilter, crm)
         .map { DebtorRow(it, ShopStore.debt(d, it.id), DebtorEngine.debtDays(d, it.id)) }
         .sortedWith(sort.order)
     }
@@ -189,7 +194,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               d.transactions.filter { it.type == "receive" }.sumOf { it.amount }
             }
             DebtorsSummary(
-              people = d.debtors.size,
+              people = CustomerCrm.active(d).size,
               owed = owed,
               received = received,
             )
@@ -201,6 +206,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               label = "جستجوی نام یا شماره",
             )
             Spacer(Modifier.height(10.dp))
+            if (crm) CrmListTools(d, tagFilter, { tagFilter = it }, onMerge = { mergeOpen = true })
 
             /*
              *  ترتیبِ فهرست، در دسترسِ همان صفحه.
@@ -283,9 +289,13 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   form?.let { state ->
     DebtorDialog(
       state = state,
+      crm = crm,
       onDismiss = { form = null },
-      onSave = { draft ->
-        val result = if (state.editingId == null) {
+      onSave = { draft, phone2, tags ->
+        val result = if (crm) {
+          //  CRM روشن: قرض‌دار، شمارهٔ دوم و برچسب‌ها با هم — همه یا هیچ
+          CustomerProfileForm.save(d, state.editingId, draft, phone2, tags, System.currentTimeMillis(), ::newId)
+        } else if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)
         } else {
           DebtorEngine.editWithLimit(d, state.editingId, draft)
@@ -295,6 +305,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         }
       },
     )
+  }
+
+  if (mergeOpen && crm) {
+    CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = ::toast)
   }
 
   txFor?.let { (debtorId, kind) ->
@@ -772,6 +786,7 @@ private fun AccountView(
         Spacer(Modifier.height(4.dp))
         Text(account.debtor.notes, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
       }
+      CrmExtraLine(account.debtor)
 
       //  «چند وقت است بدهکار است» — با تاریخِ همان قرض، تا بشود سرش حرف زد
       account.since?.let { since ->
@@ -1033,9 +1048,13 @@ data class DebtorFormState(
   val notes: String = "",
   /** سقفِ اعتبار (CRM-03) — خالی یعنی بی سقف */
   val creditLimit: String = "",
+  /** شمارهٔ دوم (CRM-02) — فقط با CRM روشن دیده و ذخیره می‌شود */
+  val phone2: String = "",
+  /** برچسب‌ها با «،» (CRM-11) — فقط با CRM روشن */
+  val tags: String = "",
 ) {
   companion object {
-    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit))
+    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit), d.phone2.orEmpty(), CustomerProfileForm.tagsText(d))
   }
 }
 
@@ -1058,7 +1077,9 @@ private data class PendingTx(
 private fun DebtorDialog(
   state: DebtorFormState,
   onDismiss: () -> Unit,
-  onSave: (DebtorEngine.DebtorDraft) -> Unit,
+  onSave: (draft: DebtorEngine.DebtorDraft, phone2: String, tags: String) -> Unit,
+  /** «گزارش‌های مشتری» روشن ⇒ کادرهای شمارهٔ دوم و برچسب؛ خاموش ⇒ همان فرمِ امروز */
+  crm: Boolean = false,
 ) {
   var form by remember(state.editingId) { mutableStateOf(state) }
 
@@ -1083,12 +1104,16 @@ private fun DebtorDialog(
           modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         CreditLimitField(form.creditLimit) { form = form.copy(creditLimit = it) }
+        if (crm) {
+          Spacer(Modifier.height(10.dp))
+          CrmProfileFields(form.phone2, { form = form.copy(phone2 = it) }, form.tags, { form = form.copy(tags = it) })
+        }
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes, parseLimit(form.creditLimit))) },
+            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes, parseLimit(form.creditLimit)), form.phone2, form.tags) },
             modifier = Modifier.weight(1f),
           ) { Text("ذخیره") }
         }
