@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,6 +43,8 @@ import ir.vil3ntec.tohid.ui.screens.DebtorsStatsCard
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsTheme
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
+import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
@@ -53,6 +56,8 @@ internal class DebtorsListActions(
   val onEdit: (String) -> Unit,
   val onDelete: (String) -> Unit,
   val onAdd: () -> Unit,
+  /** «ادغامِ تکراری‌ها» (`debtors/merge`) — فقط با «گزارش‌های مشتری» روشن؛ وگرنه null و ردیفی نیست */
+  val onMerge: (() -> Unit)? = null,
 )
 
 /**
@@ -62,7 +67,7 @@ internal class DebtorsListActions(
  *  «+» ⇐ `debtors/new`. ترتیب و جستجو از پرسشِ مسیر خوانده می‌شوند (`?sort=oldest` ِ هشدارها).
  */
 @Composable
-internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?, actions: DebtorsListActions) {
+internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?, actions: DebtorsListActions, duplicates: Int = 0) {
   var search by rememberSaveable { mutableStateOf(queryArg.orEmpty()) }
   var sortName by rememberSaveable { mutableStateOf(DebtorListModel.Sort.parse(sortArg?.uppercase()).name) }
   //  پیوندِ تازه (هشدار، جستجو) با همان تبِ باز ⇐ همان ترتیب/جستجو
@@ -97,6 +102,17 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
               Spacer(Modifier.height(12.dp))
               DebtorsSearchField(value = search, onValueChange = { search = it })
               Spacer(Modifier.height(10.dp))
+              val onMerge = actions.onMerge
+              if (onMerge != null && duplicates > 0) {
+                V3ListRow(
+                  title = StrMoney.mergeEntry(duplicates),
+                  subtitle = StrMoney.mergeEntrySub,
+                  icon = Icons.Outlined.PeopleOutline,
+                  hue = V3Hue.ORANGE,
+                  onClick = onMerge,
+                )
+                Spacer(Modifier.height(10.dp))
+              }
               if (CustomerCrm.active(d).isNotEmpty()) {
                 DebtorsSortRow(current = sort, count = rows.size) { sortName = it.name }
                 Spacer(Modifier.height(4.dp))

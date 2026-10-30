@@ -173,6 +173,24 @@ object StrMoney {
   val receivePickHint: String get() = t("جستجوی نام یا شماره", "Search name or number", "نوم یا شمېره ولټوئ")
   val noOneOwes: String get() = t("هیچ‌کس بدهکار نیست", "Nobody owes you", "هېڅوک پوروړی نه دی")
 
+  /* ------------------------------ ادغامِ تکراری‌ها (CRM-10) ------------------------------ */
+
+  val mergeTitle: String get() = t("ادغامِ تکراری‌ها", "Merge duplicates", "تکراري یوځای کول")
+  fun mergeEntry(n: Any): String = t("$n گروه مشتریِ تکراری", "$n duplicate ${pl(n, "group", "groups")}", "$n تکراري ${pl(n, "ډله", "ډلې")}")
+  val mergeEntrySub: String get() = t("ادغام با حفظِ همهٔ سوابق", "Merge and keep every record", "یوځای کول، ټول سوابق پاتې کېږي")
+  val mergeSamePhone: String get() = t("شمارهٔ یکسان", "Same number", "یوه شمېره")
+  val mergeSameName: String get() = t("نامِ یکسان — شاید دو نفرِ جدا", "Same name — may be two people", "یو نوم — کېدای شي دوه کسان وي")
+  val mergeKeep: String get() = t("ماندگار", "Kept", "پاتې کېږي")
+  val mergeAction: String get() = t("ادغام", "Merge", "یوځای کول")
+  val noDuplicates: String get() = t("مشتریِ تکراری‌ای نمانده", "No duplicates left", "هېڅ تکراري نه دی پاتې")
+  fun mergeConfirmTitle(drop: Any, keep: Any): String = t("ادغامِ «$drop» در «$keep»؟", "Merge “$drop” into “$keep”?", "«$drop» په «$keep» کې یوځای شي؟")
+  fun mergeConfirmBody(tx: Any, sales: Any, drop: Any, keep: Any, after: Any): String = t(
+    "$tx تراکنش و $sales فاکتورِ «$drop» به «$keep» می‌رود؛ ماندهٔ «$keep» پس از ادغام: $after. «$drop» پاک نمی‌شود و پیوندهای کهنه‌اش «$keep» را باز می‌کنند. این کار برگشت ندارد.",
+    "$tx ${pl(tx, "transaction", "transactions")} and $sales ${pl(sales, "invoice", "invoices")} of “$drop” move to “$keep”; balance of “$keep” after the merge: $after. “$drop” isn't deleted and old links open “$keep”. This can't be undone.",
+    "د «$drop» $tx راکړې ورکړې او $sales بلونه «$keep» ته ځي؛ له یوځای کېدو وروسته د «$keep» پاتې: $after. «$drop» نه ړنګېږي او زاړه لینکونه «$keep» پرانیزي. دا کار بېرته نه راګرځي.",
+  )
+  fun merged(drop: Any, keep: Any): String = t("«$drop» در «$keep» ادغام شد", "“$drop” merged into “$keep”", "«$drop» په «$keep» کې یوځای شو")
+
   /* ------------------------------ رسیدها ------------------------------ */
 
   val tabDebtorReceipts: String get() = t("رسیدهای قرض‌داران", "Debtor receipts", "د پوروړو رسیدونه")

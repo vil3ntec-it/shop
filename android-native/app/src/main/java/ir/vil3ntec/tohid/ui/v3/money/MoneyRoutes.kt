@@ -17,6 +17,7 @@ import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.LedgerEngine
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.DeskCustomersScreen
 import ir.vil3ntec.tohid.ui.screens.DeskPurchasingScreen
@@ -43,6 +44,8 @@ object MoneyPaths {
   fun editDebtor(id: String) = debtor(id) + "/edit"
   fun deleteDebtor(id: String) = debtor(id) + "/delete"
   const val RECEIVE = "debtors/receive"
+  const val MERGE = "debtors/merge"
+  fun mergeConfirm(keep: String, drop: String) = MERGE + "/" + RoutePaths.encode(keep) + "/" + RoutePaths.encode(drop)
   fun tx(id: String, kind: String? = null) = RoutePaths.withQuery(debtor(id) + "/tx", "kind" to kind)
   fun txDetail(id: String, txId: String) = debtor(id) + "/tx/" + RoutePaths.encode(txId)
   const val RECEIPTS = "receipts"
@@ -81,18 +84,23 @@ val MoneyModule = AppModule(
   routes = listOf(
     /* ------------------------------ قرض‌داران ------------------------------ */
     V3Route(MoneyPaths.DEBTORS, RouteKind.TAB, { Str.debtors }, chrome = Chrome.OWN) {
+      //  CRM-10: «ادغامِ تکراری‌ها» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
+      val crm = ShopPolicy.crmReports(LocalContext.current)
+      val duplicates = remember(data, crm, MoneyUndo.hiddenDebtors) { DebtorMergeModel.groups(data, crm, MoneyUndo.hiddenDebtors).size }
       VipGate(Str.debtors) {
         if (desk) DeskCustomersScreen(store, data, snackbar)
         else DebtorsListScreen(
           d = data,
           sortArg = args.query("sort"),
           queryArg = args.query("q"),
+          duplicates = duplicates,
           actions = DebtorsListActions(
             onBack = backOrNull,
             onOpen = { nav.open(MoneyPaths.debtor(it)) },
             onEdit = { nav.open(MoneyPaths.editDebtor(it)) },
             onDelete = { nav.open(MoneyPaths.deleteDebtor(it)) },
             onAdd = { nav.open(MoneyPaths.NEW_DEBTOR) },
+            onMerge = if (crm) ({ nav.open(MoneyPaths.MERGE) }) else null,
           ),
         )
       }
@@ -132,6 +140,8 @@ val MoneyModule = AppModule(
         )
       }
     },
+    V3Route(MoneyPaths.MERGE, RouteKind.SHEET, { StrMoney.mergeTitle }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) { MergeRoute() },
+    V3Route("debtors/merge/{keep}/{drop}", RouteKind.SHEET, { StrMoney.mergeTitle }, parent = MoneyPaths.MERGE, chrome = Chrome.OWN) { MergeConfirmRoute() },
     V3Route("debtors/{id}/tx/{txId}", RouteKind.SHEET, { StrMoney.details }, parent = "debtors/{id}", chrome = Chrome.OWN) { DebtorTxRoute() },
     V3Route("debtors/{id}/delete", RouteKind.SHEET, { StrMoney.deleteDebtorTitle }, parent = "debtors/{id}", chrome = Chrome.OWN) { DeleteDebtorRoute() },
 
@@ -286,6 +296,50 @@ private fun RouteScope.DeleteDebtorRoute() {
         //  برگه پیش از این بسته شد؛ حسابِ همان قرض‌دار (اگر زیرش بود) هم بسته می‌شود
         nav.backFrom(MoneyPaths.debtor(id))
         MoneyUndo.deleteLater(store, snackbar, PendingDelete.Debtor(id), StrMoney.debtorDeleted(debtor.name))
+      },
+      onDismiss = { back() },
+    )
+  }
+}
+
+/**
+ *  `debtors/merge` (CRM-10) — پشتِ «گزارش‌های مشتری» (پیش‌فرض خاموش): خاموش ⇒ همان فهرست.
+ *  روی همگام‌سازیِ v3 برگه باز است ولی فقط دلیل را می‌گوید (`ShopStore.mergeBlockedReason`).
+ */
+@Composable
+private fun RouteScope.MergeRoute() {
+  if (!ShopPolicy.crmReports(LocalContext.current)) { LandOn(MoneyPaths.DEBTORS); return }
+  val hidden = MoneyUndo.hiddenDebtors
+  val groups = remember(data, hidden) { DebtorMergeModel.groups(data, true, hidden) }
+  VipGate(Str.debtors) {
+    DebtorMergeSheet(
+      groups = groups,
+      blocked = store.mergeBlockedReason(),
+      onMerge = { keep, drop -> nav.open(MoneyPaths.mergeConfirm(keep, drop)) },
+      onClose = { back() },
+    )
+  }
+}
+
+/** `debtors/merge/{keep}/{drop}` — تأییدِ ادغام با پیش‌نمایشِ `CustomerMerge.preview`؛ ادغام فقط از `ShopStore.mergeCustomers` */
+@Composable
+private fun RouteScope.MergeConfirmRoute() {
+  val context = LocalContext.current
+  if (!ShopPolicy.crmReports(context)) { LandOn(MoneyPaths.DEBTORS); return }
+  val keepId = args["keep"].orEmpty()
+  val dropId = args["drop"].orEmpty()
+  val p = remember(data, keepId, dropId) { DebtorMergeModel.preview(data, keepId, dropId) }
+  if (p == null) { LandOn(MoneyPaths.MERGE); return }
+  VipGate(Str.debtors) {
+    V3ConfirmSheet(
+      title = StrMoney.mergeConfirmTitle(p.drop.name, p.keep.name),
+      message = StrMoney.mergeConfirmBody(p.transactions, p.sales, p.drop.name, p.keep.name, MoneyText.afn(p.balanceAfter)),
+      confirm = StrMoney.mergeAction,
+      icon = Icons.Outlined.PeopleOutline,
+      danger = false,
+      onConfirm = {
+        back()
+        MoneyWriter.merge(store, toasts, context, keepId, dropId) { r -> StrMoney.merged(r.drop.name, r.keep.name) }
       },
       onDismiss = { back() },
     )

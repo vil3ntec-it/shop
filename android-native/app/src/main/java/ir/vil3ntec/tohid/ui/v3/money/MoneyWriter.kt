@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import android.content.Context
+import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -34,5 +35,22 @@ internal object MoneyWriter {
   fun debtor(store: ShopStore, toasts: V3Toasts?, context: Context?, result: DebtorEngine.Result, done: String): String? = when (result) {
     is DebtorEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
     is DebtorEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); result.id }
+  }
+
+  /**
+   *  ادغامِ دو مشتری (CRM-10) — تنها درش `ShopStore.mergeCustomers` است (قفلِ نوشتن، قفلِ نرم، op،
+   *  و بسته روی همگام‌سازیِ v3). بیرونِ صفحه اجرا می‌شود تا بسته شدنِ برگه آن را نبرد؛ پیامِ رد
+   *  همان پیامِ موتور است.
+   */
+  fun merge(store: ShopStore, toasts: V3Toasts?, context: Context?, keepId: String, dropId: String, done: (CustomerMerge.Preview) -> String) {
+    scope.launch {
+      when (val r = store.mergeCustomers(keepId, dropId)) {
+        is CustomerMerge.Result.Failed -> toasts?.show(r.message, V3Tone.ERROR)
+        is CustomerMerge.Result.Ok -> {
+          toasts?.show(done(r.preview), V3Tone.SUCCESS)
+          context?.let { Haptics.success(it) }
+        }
+      }
+    }
   }
 }
