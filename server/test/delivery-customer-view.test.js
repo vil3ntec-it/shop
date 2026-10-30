@@ -11,7 +11,7 @@
  *      شده؛ با «رسیدم» و «تحویل» همان لحظه پاک؛ نقطهٔ کهنه دیده نمی‌شود و پاک می‌شود.
  *   ۴) مشتریِ سفارشِ دیگر (همین دکان یا دکانِ دیگر) هیچ چیزی نمی‌بیند؛ پیکِ دیگر
  *      برای مأموریتِ دیگری موقعیت نمی‌فرستد.
- *   ۵) مهاجرتِ ۱۲۴: برگشت (ROLLBACK) و اجرای دوباره.
+ *   ۵) مهاجرتِ ۱۳۲: برگشت (ROLLBACK) و اجرای دوباره.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -281,8 +281,8 @@ test('نگهداریِ کوتاه: نقطهٔ کهنه نشان داده نمی�
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM delivery_locations WHERE assignment_id=$1', [id])).n, 0);
 });
 
-test('مهاجرتِ ۱۲۴: برگشت و اجرای دوباره', async () => {
-  const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', '124_delivery_customer_view.sql'), 'utf8');
+test('مهاجرتِ ۱۳۲: برگشت و اجرای دوباره', async () => {
+  const sql = fs.readFileSync(path.join(__dirname, '..', 'migrations', '132_delivery_customer_view.sql'), 'utf8');
   const lines = sql.split('\n');
   const start = lines.indexOf('-- ROLLBACK:');
   assert.ok(start >= 0);
