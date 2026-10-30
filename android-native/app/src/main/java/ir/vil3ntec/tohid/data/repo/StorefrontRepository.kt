@@ -88,6 +88,10 @@ data class StorefrontConfigDto(
   val permissions: StorefrontPermsDto = StorefrontPermsDto(),
   /** پرچمِ جدای ناحیه و زمان‌بندی (`shop.storefront.zones`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val zones: Boolean = false,
+  /** پرچمِ `shop.orders.subscribers_only`: سفارشِ آنلاینِ تازه فقط با اشتراکِ فعال؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val subscribersOnly: Boolean = false,
+  /** اشتراکِ فعالِ همین لحظه به گفتهٔ سرور (دورهٔ آزمایشی نه) */
+  val subscribed: Boolean = false,
 )
 
 @Serializable

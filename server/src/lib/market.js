@@ -7,7 +7,8 @@
  *           همهٔ `/api/market/*` ۴۰۴ و ویترینِ هر دکان همان رفتارِ امروز را دارد.
  *   دکان ── فقط دکانی که همین حالا ویترینش با `storefront.open` باز می‌شود (همان
  *           دروازه: دو پرچم، اشتراک، «روشن» ِ خودِ دکان، دکانِ فعال — و هر قفلِ
- *           بعدیِ همان تابع) + پرچمِ `market.directory` ِ خودش (مقدارِ دکان بر
+ *           بعدیِ همان تابع) و **سفارش می‌گیرد** (`accepting`؛ با `shop.orders.subscribers_only`
+ *           فقط اشتراکِ فعال) + پرچمِ `market.directory` ِ خودش (مقدارِ دکان بر
  *           `all` جلو می‌افتد ⇒ مدیر می‌تواند یک دکان را بیرون نگه دارد) + `listed`
  *           ِ خودِ صاحب دکان (`market_listings`). ⛔ **فقط با خواستِ صاحب دکان**:
  *           نبودِ ردیف = بیرون از فهرست (ویترینِ خودش با نشانیِ خودش باز می‌ماند)
@@ -87,23 +88,30 @@ async function requireOn() {
 
 const gates = new Map();
 
-async function storeOpen(slug) {
+/** ویترینِ باز (`sf.open`) — ردیفش، یا null. */
+async function openRow(slug) {
   try {
-    await sf.open(slug);
-    return true;
+    return await sf.open(slug);
   } catch (err) {
-    if (err && err.status === 404) return false;
+    if (err && err.status === 404) return null;
     throw err;
   }
 }
+/** «سفارش‌های من» همین را می‌خواهد: سفارشِ پیشینِ دکانی که دیگر سفارش نمی‌گیرد هم دیده می‌شود. */
+const storeOpen = async (slug) => Boolean(await openRow(slug));
 
-/** ویترینِ باز + پرچمِ بازارچهٔ همین دکان. */
+/**
+ * ویترینِ باز **که سفارش می‌گیرد** + پرچمِ بازارچهٔ همین دکان. ⛔ دکانی که سفارش نمی‌پذیرد
+ * (`shop.orders.subscribers_only` و بی اشتراکِ فعال) مثلِ هر دروازهٔ بسته از فهرست، جست‌وجو و
+ * پیشخوان بیرون است (قراردادِ بازار: دروازهٔ بسته ⇒ دیده نمی‌شود)، نه کارتی با «نمی‌پذیرد».
+ */
 async function gateOf(row) {
   const ttl = config.market.gateCacheMs;
   const t = Date.now();
   const hit = gates.get(row.shop_id);
   if (ttl > 0 && hit && hit.slug === row.slug && t - hit.at < ttl) return hit.ok;
-  const ok = (await storeOpen(row.slug)) && (await orders.flagOf(row.shop_id, FLAG_KEY));
+  const open = await openRow(row.slug);
+  const ok = Boolean(open && open.accepting !== false) && (await orders.flagOf(row.shop_id, FLAG_KEY));
   if (gates.size > 10_000) gates.clear();
   gates.set(row.shop_id, { ok, at: t, slug: row.slug });
   return ok;

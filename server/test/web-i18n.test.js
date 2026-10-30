@@ -102,7 +102,7 @@ test('کدهای خطای سرور که صفحه نشان می‌دهد ترجم
   const codes = ['verification_unavailable', 'verification_required', 'phone_not_verified', 'otp_wrong', 'otp_expired',
     'otp_locked', 'otp_used', 'otp_not_found', 'otp_required', 'otp_resend_wait', 'otp_daily_limit', 'rate_limited',
     'product_unavailable', 'qty_over_limit', 'below_min_order', 'fulfillment_unavailable', 'bad_address', 'bad_customer',
-    'bad_lines', 'store_not_found', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
+    'bad_lines', 'store_not_found', 'store_not_accepting_orders', 'market_not_found', 'order_not_found', 'cannot_cancel', 'query_too_short', 'bad_location'];
   for (const l of LANGS) for (const c of codes) assert.ok(dict[l][`err.${c}`], `${l}: err.${c}`);
 });
 
