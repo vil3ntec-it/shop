@@ -81,7 +81,7 @@ fun BankPhotoSource(
     }
   }
 
-  fun run(action: BankPhotoCard.Action) {
+  fun perform(action: BankPhotoCard.Action) {
     busy = true; problem = null
     scope.launch {
       try {
@@ -134,12 +134,12 @@ fun BankPhotoSource(
                 style = MaterialTheme.typography.bodySmall, color = colors.text,
               )
             }
-            OutlinedButton(onClick = { run(a) }, enabled = !busy && consent) { Text("پیشنهاد به بانکِ مرکزی") }
+            OutlinedButton(onClick = { perform(a) }, enabled = !busy && consent) { Text("پیشنهاد به بانکِ مرکزی") }
           }
           is BankPhotoCard.Action.RevertToCentral ->
-            OutlinedButton(onClick = { run(a) }, enabled = !busy) { Text("بازگشت به عکسِ مرکزی") }
+            OutlinedButton(onClick = { perform(a) }, enabled = !busy) { Text("بازگشت به عکسِ مرکزی") }
           is BankPhotoCard.Action.UseCentralVersion ->
-            OutlinedButton(onClick = { run(a) }, enabled = !busy) {
+            OutlinedButton(onClick = { perform(a) }, enabled = !busy) {
               Text(if (a.newer) "گذاشتنِ نسخهٔ تازهٔ مرکزی (${a.version})" else "بازگشت به نسخهٔ قبلی (${a.version})")
             }
         }
