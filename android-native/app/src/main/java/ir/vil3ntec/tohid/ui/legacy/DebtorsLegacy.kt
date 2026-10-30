@@ -353,7 +353,7 @@ fun DebtorsScreenLegacy(store: ShopStore, d: ShopData, snackbar: SnackbarHostSta
 
   dueFor?.let { txId ->
     val tx = d.transactions.find { it.id == txId }
-    val entry = tx?.let { DebtBook.book(d, it.debtorId, todayIsoLegacy())?.entry(txId) }
+    val entry = tx?.let { DebtBook.book(d, it.debtorId, todayIso())?.entry(txId) }
     if (entry == null) {
       LaunchedEffect(txId) { dueFor = null }
     } else {
@@ -717,7 +717,7 @@ private fun AccountViewLegacy(
   val scope = rememberCoroutineScope()
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
   //  دفترِ همین مشتری: اقلام، تخصیصِ پرداخت، سررسید و ماندهٔ پس از هر ردیف
-  val book = remember(d, account.debtor.id) { DebtBook.book(d, account.debtor.id, todayIsoLegacy()) }
+  val book = remember(d, account.debtor.id) { DebtBook.book(d, account.debtor.id, todayIso()) }
   //  صورت‌حساب با انتخابگرِ خودِ سیستم ذخیره می‌شود — بی اجازهٔ حافظه
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
     val sheet = pending
@@ -837,7 +837,7 @@ private fun AccountViewLegacy(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(
             onClick = {
-              val sheet = ReportCsv.statement(d, account.debtor.id, todayIsoLegacy())
+              val sheet = ReportCsv.statement(d, account.debtor.id, todayIso())
               pending = sheet
               saveCsv.launch("${sheet.name}.csv")
             },
@@ -849,7 +849,7 @@ private fun AccountViewLegacy(
           }
           OutlinedButton(
             onClick = {
-              val sheet = ReportCsv.statement(d, account.debtor.id, todayIsoLegacy())
+              val sheet = ReportCsv.statement(d, account.debtor.id, todayIso())
               ReportPrint.print(context, sheet, "صورت‌حسابِ ${account.debtor.name}")
             },
             modifier = Modifier.weight(1f),
@@ -1053,7 +1053,7 @@ private data class PendingTxLegacy(
   val due: String?,
 ) {
   fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIsoLegacy(), System.currentTimeMillis(), ::newIdLegacy,
+    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newIdLegacy,
     dueDate = due, overLimit = overLimit,
   )
 }
@@ -1111,7 +1111,7 @@ private fun TransactionDialogLegacy(
   onSave: (DebtorEngine.Kind, Double, String, String, String?) -> Unit,
 ) {
   var amount by remember { mutableStateOf("") }
-  var date by remember { mutableStateOf(todayIsoLegacy()) }
+  var date by remember { mutableStateOf(todayIso()) }
   var notes by remember { mutableStateOf("") }
   var due by remember { mutableStateOf("") }
   // نوعِ تراکنش داخلِ همین کادر عوض می‌شود — مثل نسخهٔ وب، که یک کادر

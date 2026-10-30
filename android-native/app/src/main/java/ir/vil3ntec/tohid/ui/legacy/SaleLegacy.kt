@@ -239,7 +239,7 @@ fun SaleScreenLegacy(
       scope.launch {
         val answer = snackbar.showSnackbar(
           message = StrSale.unknownBarcode,
-          actionLabelLegacy = StrSale.registerItem,
+          actionLabel = StrSale.registerItem,
           duration = SnackbarDuration.Long,
         )
         if (answer == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
@@ -651,7 +651,7 @@ fun SaleScreenLegacy(
           d, priced, options,
           today = ir.vil3ntec.tohid.todayIso(),
           now = System.currentTimeMillis(),
-          newIdLegacy = ::newIdLegacy,
+          newId = ::newIdLegacy,
           //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
           series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
           saleId = key,

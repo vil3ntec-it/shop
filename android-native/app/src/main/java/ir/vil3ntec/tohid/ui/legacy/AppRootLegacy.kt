@@ -370,7 +370,7 @@ fun AppRootLegacy(
       snackbar.currentSnackbarData?.dismiss()
       val r = snackbar.showSnackbar(
         StrNav.subscriptionBlocked,
-        actionLabelLegacy = Str.renew, duration = SnackbarDuration.Long,
+        actionLabel = Str.renew, duration = SnackbarDuration.Long,
       )
       if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
     }

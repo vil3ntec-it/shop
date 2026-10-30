@@ -54,7 +54,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  جست‌وجو روی دادهٔ همین دستگاه است — بی اینترنت هم کار می‌کند — و
  *  فقط ۴۰ نتیجهٔ اول ساخته می‌شود تا با هزاران کالا هم فوری بماند.
  */
-class PaletteHitLegacy(val kind: String, val id: String, val title: String, val hint: String, val icon: ImageVector)
+//  `PaletteHit` همان کلاسِ `CommandPalette.kt` است (شکلش عوض نشده) تا صدازننده‌ها هر دو رابط را بگیرند
 
 /** همهٔ صفحه‌هایی که از جست‌وجو باز می‌شوند — همان نام‌های سربرگ */
 val PALETTE_PAGESLegacy = listOf(
@@ -67,30 +67,30 @@ val PALETTE_PAGESLegacy = listOf(
 
 private fun normLegacy(s: String) = ir.vil3ntec.tohid.latinDigits(s).replace('ي', 'ی').replace('ك', 'ک').lowercase().trim()
 
-fun paletteSearchLegacy(d: ShopData, query: String, limit: Int = 40): List<PaletteHitLegacy> {
+fun paletteSearchLegacy(d: ShopData, query: String, limit: Int = 40): List<PaletteHit> {
   val q = normLegacy(query)
-  val out = ArrayList<PaletteHitLegacy>()
+  val out = ArrayList<PaletteHit>()
   PALETTE_PAGESLegacy.filter { q.isEmpty() || normLegacy(it.second).contains(q) || it.first.contains(q) }
-    .forEach { out += PaletteHitLegacy("page", it.first, it.second, "صفحه", Icons.Filled.SpaceDashboard) }
+    .forEach { out += PaletteHit("page", it.first, it.second, "صفحه", Icons.Filled.SpaceDashboard) }
   if (q.isEmpty()) return out
   for (p in d.products) {
     if (out.size >= limit) break
     if (normLegacy(p.name).contains(q) || p.barcodes.any { it.contains(q) }) {
       val stock = ShopStore.stock(d, p.id)
-      out += PaletteHitLegacy("product", p.id, p.name, "کالا · موجودی ${money(stock)} · ${money(p.salePrice)} ؋", Icons.Filled.Inventory2)
+      out += PaletteHit("product", p.id, p.name, "کالا · موجودی ${money(stock)} · ${money(p.salePrice)} ؋", Icons.Filled.Inventory2)
     }
   }
   for (b in d.debtors) {
     if (out.size >= limit) break
     if (normLegacy(b.name).contains(q) || normLegacy(b.phone).contains(q) || ir.vil3ntec.tohid.LocaleText.phoneMatches(b.phone, q)) {
-      out += PaletteHitLegacy("debtor", b.id, b.name, "قرض‌دار · بدهی ${money(ShopStore.debt(d, b.id))} ؋", Icons.Filled.Person)
+      out += PaletteHit("debtor", b.id, b.name, "قرض‌دار · بدهی ${money(ShopStore.debt(d, b.id))} ؋", Icons.Filled.Person)
     }
   }
   return out
 }
 
 @Composable
-fun CommandPaletteLegacy(d: ShopData, onDismiss: () -> Unit, onPick: (PaletteHitLegacy) -> Unit) {
+fun CommandPaletteLegacy(d: ShopData, onDismiss: () -> Unit, onPick: (PaletteHit) -> Unit) {
   var query by remember { mutableStateOf("") }
   var index by remember { mutableStateOf(0) }
   val hits = remember(d, query) { paletteSearchLegacy(d, query) }

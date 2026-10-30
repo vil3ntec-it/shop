@@ -293,7 +293,7 @@ fun SettingsScreenLegacy(
         store.save(
           cur.copy(
             auditLog = cur.auditLog + ir.vil3ntec.tohid.data.AuditEntry(
-              id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIsoLegacy(),
+              id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIso(),
               notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now,
             ),
           ),
@@ -715,28 +715,28 @@ fun SettingsScreenLegacy(
           title = StrSettings.fullBackup,
           description = StrSettings.fullBackupDesc,
           tint = Shop.colors.success,
-          onClick = { exportFile.launch("tohid-backup-${todayIsoLegacy()}.zip") },
+          onClick = { exportFile.launch("tohid-backup-${todayIso()}.zip") },
         )
         SettingsRowLegacy(
           icon = Icons.Filled.Description,
           title = StrSettings.ledgerOnly,
           description = StrSettings.ledgerOnlyDesc,
           tint = Shop.colors.muted,
-          onClick = { exportJson.launch("tohid-shop-backup-${todayIsoLegacy()}.json") },
+          onClick = { exportJson.launch("tohid-shop-backup-${todayIso()}.json") },
         )
         SettingsRowLegacy(
           icon = Icons.Filled.TableChart,
           title = StrSettings.exportExcel,
           description = StrSettings.exportExcelDesc,
           tint = Shop.colors.success,
-          onClick = { exportAllXlsx.launch("tohid-export-${todayIsoLegacy()}.xlsx") },
+          onClick = { exportAllXlsx.launch("tohid-export-${todayIso()}.xlsx") },
         )
         SettingsRowLegacy(
           icon = Icons.Filled.Description,
           title = StrSettings.exportJson,
           description = StrSettings.exportJsonDesc,
           tint = Shop.colors.muted,
-          onClick = { exportAllJson.launch("tohid-export-${todayIsoLegacy()}.json") },
+          onClick = { exportAllJson.launch("tohid-export-${todayIso()}.json") },
         )
         SettingsRowLegacy(
           icon = Icons.Filled.CloudDownload,
