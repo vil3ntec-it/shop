@@ -59,6 +59,8 @@ object StrMoney {
   //  حسابِ یک قرض‌دار (#354)
   val actionsAndInfo: String get() = t("کارها و اطلاعات", "Actions & info", "کړنې او معلومات")
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
+  /** CRM-05 — صورت‌حساب به PNG (گوشی: فرستادن) */
+  val statementImage: String get() = t("تصویرِ صورت‌حساب", "Statement image", "د صورتحساب انځور")
   fun printTitle(name: Any): String = t("صورت‌حسابِ $name", "Statement — $name", "صورتحساب — $name")
   fun daysInDebt(span: Any, since: Any): String =
     t("$span است که بدهکار است — از $since", "In debt for $span — since $since", "$span راهیسې پوروړی دی — له $since")
