@@ -79,8 +79,11 @@ fun ReceiptCard(
         )
       }
     }
-    V3InvoiceItems(ReceiptModel.lines(d, sale), title = StrSale.itemsWord)
-    SaleTotals(ReceiptModel.totals(sale))
+    //  #375: نشانِ تخفیفِ خودکار فقط با پرچمِ `shop.promo_stamp`
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val stamped = androidx.compose.runtime.remember { ir.vil3ntec.tohid.ui.PromoLive.stampOn(context) }
+    V3InvoiceItems(ReceiptModel.lines(d, sale, stamped), title = StrSale.itemsWord)
+    SaleTotals(ReceiptModel.totals(sale, d.saleItems.filter { it.saleId == sale.id }, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName))
   }
 }
 

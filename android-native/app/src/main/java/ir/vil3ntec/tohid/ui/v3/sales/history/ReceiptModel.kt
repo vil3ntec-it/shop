@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.sales.history
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleReceipt
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
@@ -10,6 +11,7 @@ import ir.vil3ntec.tohid.data.isOnlineOrder
 import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.unitMoney
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.v3.V3InvoiceLine
 
@@ -47,21 +49,32 @@ object ReceiptModel {
   /** «۱۴۰۵/۰۷/۲۸ · ۱۴:۰۵ · نقدی» */
   fun subtitle(s: Sale): String = listOf(displayDate(s.date), SaleTime.clock(s.createdAt), payLabel(s)).filter { it.isNotBlank() }.joinToString(" · ")
 
-  fun lines(d: ShopData, s: Sale): List<V3InvoiceLine> {
+  /**
+   *  `stamped` = پرچمِ `shop.promo_stamp` (#375): «مقدار × قیمتِ فهرست − تخفیفِ خودکار» از همان
+   *  [SaleReceipt.detail]؛ خاموش ⇒ همان متنِ پیشین.
+   */
+  fun lines(d: ShopData, s: Sale, stamped: Boolean = false): List<V3InvoiceLine> {
     val products = d.products.associateBy { it.id }
     return d.saleItems.filter { it.saleId == s.id }.map { item ->
-      val unit = products[item.productId]?.unit?.takeIf { it.isNotBlank() }?.let { " $it" }.orEmpty()
+      val bare = products[item.productId]?.unit?.takeIf { it.isNotBlank() }.orEmpty()
+      val unit = bare.takeIf { it.isNotEmpty() }?.let { " $it" }.orEmpty()
       V3InvoiceLine(
         name = SalesEngine.itemName(d, item),
-        detail = "${qty(item.quantity)}$unit × ${PhoneSaleText.amount(item.unitPrice)}",
+        detail = if (stamped) SaleReceipt.detail(item, bare, true, PhoneSaleText::amount, ::unitMoney, ::qty)
+        else "${qty(item.quantity)}$unit × ${PhoneSaleText.amount(item.unitPrice)}",
         total = PhoneSaleText.amount(item.totalPrice),
         note = item.returnedQty.takeIf { it > 0 }?.let { StrSale.returned(qty(it) + unit) },
       )
     }
   }
 
-  fun totals(s: Sale): List<TotalRow> = buildList {
+  /**
+   *  `stamped` (پرچمِ `shop.promo_stamp`): زیرِ «جمع اقلام» ردیفِ آگاهیِ «شاملِ تخفیفِ خودکار» —
+   *  از جمع کم نمی‌شود ([SaleReceipt.included])؛ خاموش ⇒ همان ردیف‌ها.
+   */
+  fun totals(s: Sale, items: List<ir.vil3ntec.tohid.data.SaleItem> = emptyList(), stamped: Boolean = false, nameOf: (String) -> String? = { null }): List<TotalRow> = buildList {
     add(TotalRow(StrSale.itemsTotal, s.total))
+    SaleReceipt.included(s, items, stamped, nameOf)?.let { add(TotalRow(it.label, it.amount)) }
     if (s.discount > 0) add(TotalRow(StrSale.discountWord, -s.discount))
     add(TotalRow(StrSale.finalAmount, s.finalTotal, strong = true))
     add(TotalRow(StrSale.paid, s.paidAmount))

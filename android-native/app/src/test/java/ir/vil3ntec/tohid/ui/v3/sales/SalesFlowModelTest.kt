@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
+import ir.vil3ntec.tohid.data.SalePromo
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.SalesEngine.CartLine
 import ir.vil3ntec.tohid.data.ShopData
@@ -171,6 +172,25 @@ class SalesFlowModelTest {
     assertEquals(200.0, rows.single { it.strong }.amount, 0.0)
     assertEquals("احمد کریمی", ReceiptModel.debtorName(history, history.sales[1]))
     assertEquals("W-4", ReceiptModel.number(history.sales[3]))
+  }
+
+  @Test
+  fun `نشانِ تخفیفِ خودکار در رسید فقط با پرچم است و از جمع کم نمی شود`() {
+    val sale = Sale("p", 1, total = 90.0, finalTotal = 90.0, promoDiscountMinor = 1000)
+    val item = SaleItem("pi", "p", "soap", quantity = 2.0, unitPrice = 45.0, totalPrice = 90.0,
+      listPriceMinor = 5000, promo = listOf(SalePromo("r1", 1, "عید", 1000)))
+    val d = ledger.copy(sales = listOf(sale), saleItems = listOf(item))
+    //  خاموش ⇒ همان ردیف‌ها و همان متن
+    assertEquals(ReceiptModel.totals(sale).map { it.label }, ReceiptModel.totals(sale, d.saleItems, false).map { it.label })
+    assertEquals(ReceiptModel.lines(d, sale).single().detail, ReceiptModel.lines(d, sale, false).single().detail)
+    assertFalse(ReceiptModel.lines(d, sale).single().detail.contains("50"))
+    //  روشن ⇒ قیمتِ فهرست و ردیفِ آگاهی؛ «جمع اقلام» و «مبلغ نهایی» همان
+    assertTrue(ReceiptModel.lines(d, sale, true).single().detail.contains("50"))
+    val on = ReceiptModel.totals(sale, d.saleItems, true)
+    assertEquals(ReceiptModel.totals(sale).size + 1, on.size)
+    assertEquals(10.0, on[1].amount, 0.0)
+    assertTrue(on[1].label.contains("عید"))
+    assertEquals(90.0, on.single { it.strong }.amount, 0.0)
   }
 
   /* ------------------------------ برگشتِ ساده ------------------------------ */

@@ -108,7 +108,8 @@ fun RouteScope.CheckoutRoute() {
       val count = lines.size
       scope.launch {
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
-        when (val posted = cart.post(store) { key ->
+        //  S2 (#375): با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور — پرچمِ `shop.promo_stamp` خاموش ⇒ همان
+        when (val posted = cart.post(store) { key -> PromoEngine.stamp(
           SalesEngine.record(
             d, priced, options,
             today = todayIso(),
@@ -119,7 +120,7 @@ fun RouteScope.CheckoutRoute() {
             saleId = key,
             //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
             receiptToken = Receipts.newToken(context),
-          )
+          ), promo)
         }) {
           SalePost.Outcome.Busy -> submitted = false
           SalePost.Outcome.NotSaved -> { submitted = false; error = SalePost.NOT_SAVED }
