@@ -85,9 +85,10 @@ jobs:
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
 
+      #  `:core:jvmTest` = آزمون‌های `core/src/commonTest` (مثلِ «تسویهٔ کامل» بی گردِ افغانی)
       - name: سنجشِ حساب‌ها
         working-directory: android-native
-        run: gradle --no-daemon testReleaseUnitTest
+        run: gradle --no-daemon testReleaseUnitTest :core:jvmTest
 
       - name: ساخت APK
         working-directory: android-native
