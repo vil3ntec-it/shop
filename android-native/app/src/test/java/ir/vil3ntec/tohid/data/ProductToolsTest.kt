@@ -91,7 +91,8 @@ class ProductToolsTest {
       WarehouseEngine.ProductDraft(name = "چای سبز", unit = "عدد", purchasePrice = 95.0, salePrice = 100.0, barcode = "111"),
       "2026-10-30", 0, ::newId)).data.priceHistory.single()
     assertNull(plainEdit.by)
-    val json = Json.encodeToString(PriceChange.serializer(), plainEdit)
+    //  همان تنظیمِ دفتر (`encodeDefaults = true`) — `EncodeDefault.NEVER` باز هم null را نمی‌نویسد
+    val json = Json { encodeDefaults = true }.encodeToString(PriceChange.serializer(), plainEdit)
     assertFalse(json, "\"by\"" in json || "\"reason\"" in json)
   }
 
