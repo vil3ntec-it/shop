@@ -20,13 +20,14 @@
   };
   const PROVIDER_MODE = {
     log: 'فقط لاگِ سرور', sms: 'سرویسِ پیامک', webhook: 'وب‌هوک', whatsapp: 'واتس‌اپ',
-    smtp: 'SMTP', api: 'سرویسِ API', fcm: 'FCM', cod: 'نقد هنگامِ تحویل',
+    smtp: 'SMTP', api: 'سرویسِ API', fcm: 'FCM', cod: 'نقد هنگامِ تحویل', hesabpay: 'حساب‌پی', fake: 'ساختگی',
   };
 
   function providerNote(p) {
     if (p.state === 'mock') return 'به هیچ گوشی یا صندوقی نمی‌رسد؛ فقط در لاگِ سرور چاپ می‌شود';
     if (p.state === 'incomplete') return `کم است: ${(p.missing || []).join('، ') || '—'}`;
     if (p.state === 'off') return 'خاموش است؛ از «ایمیل و پوش» روشن می‌شود';
+    if (p.id === 'payment' && p.state === 'live') return `کلیدهای حساب‌پی داده شده؛ برای هر دکان با پرچمِ ${p.flag || 'pay.hesabpay'}`;
     if (p.id === 'payment') return `پرداختِ آنلاین نیست (تصمیمِ ${p.decision || 'D-08'})؛ ویترین دکمهٔ پرداخت ندارد`;
     if (p.id === 'image_ai') return `provider ندارد: ${(p.steps || []).join('، ')}`;
     if (p.state === 'unknown') return 'تنظیم خوانده نشد';
@@ -162,10 +163,108 @@
     $('btn-ops-chain').onclick = () => verifyChain().catch((err) => msg($('ops-chain-msg'), err.message, 'bad'));
   });
 
+  // ---------- پرداخت‌های حساب‌پی — PAY-21، S35 ----------
+  const PAY_FA = { created: 'ساخته', pending: 'در انتظار', paid: 'پرداخت‌شده', failed: 'ناموفق', expired: 'منقضی', cancelled: 'لغو', refunded: 'بازپرداخت' };
+  const PAY_CLS = { paid: 'b-ok', pending: 'b-warn', failed: 'b-bad' };
+  const PAY_KIND_FA = { pos_sale: 'صندوق (QR)', online_order: 'سفارشِ آنلاین' };
+
+  async function loadPayments() {
+    const body = $('ops-pay');
+    const note = $('ops-pay-msg');
+    body.innerHTML = '';
+    msg(note, '');
+    $('btn-ops-pay-reconcile').classList.toggle('hidden', adminRole !== 'superadmin');
+    const q = new URLSearchParams();
+    if ($('ops-pay-status').value) q.set('status', $('ops-pay-status').value);
+    if ($('ops-pay-review').checked) q.set('review', '1');
+    const out = await call('GET', `/admin/payments/intents?${q}`);
+    for (const x of out.items) {
+      const tr = el('tr');
+      tr.dataset.intent = x.id;
+      tr.appendChild(el('td', '', dateTime(x.createdAt)));
+      tr.appendChild(el('td', '', x.shopName || x.shopId));
+      tr.appendChild(el('td', '', PAY_KIND_FA[x.kind] || x.kind));
+      //  پول (یک‌صدمِ افغانی) ⇒ افغانی برای نمایش
+      tr.appendChild(el('td', '', `${fa(x.amount / 100)} ${x.currency}`));
+      const st = el('td');
+      st.appendChild(el('span', `badge ${PAY_CLS[x.status] || 'b-mute'}`, PAY_FA[x.status] || x.status));
+      if (x.needsReview) st.appendChild(el('span', 'badge b-bad', 'بررسی'));
+      tr.appendChild(st);
+      tr.appendChild(el('td', '', x.providerRef || '—'));
+      tr.appendChild(el('td', 'muted', x.statusReason || ''));
+      body.appendChild(tr);
+    }
+    if (!out.items.length) {
+      const tr = el('tr');
+      const td = el('td', 'muted', 'پرداختی نیست');
+      td.colSpan = 7;
+      tr.appendChild(td);
+      body.appendChild(tr);
+    }
+    if (out.counts && out.counts.review) msg(note, `⚠️ ${fa(out.counts.review)} پرداخت نیازمندِ بررسی است (دیر، دوباره یا اختلافِ مبلغ)`, 'warn');
+  }
+
+  async function reconcilePayments() {
+    const out = await call('POST', '/admin/payments/reconcile', {});
+    await loadPayments();
+    msg($('ops-pay-msg'), `تطبیق: ${fa(out.checked)} بررسی، ${fa(out.paid)} پرداخت‌شده، ${fa(out.closed)} بسته، `
+      + `${fa(out.mismatched)} اختلاف، ${fa(out.errors)} خطا`, out.mismatched || out.errors ? 'warn' : 'ok');
+  }
+
+  /** بخشِ «پرداخت‌های حساب‌پی» همین‌جا ساخته می‌شود تا `index.html` بزرگ‌تر نشود (سقفِ اندازهٔ فایل). */
+  function payPanel() {
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', '', 'پرداخت‌های حساب‌پی (PAY-21)'));
+    panel.appendChild(el('div', 'muted', 'قصدهای پرداختِ درگاهی (QR ِ صندوق و سفارشِ آنلاین). «بررسی» یعنی پرداختِ دیر یا دوباره یا '
+      + 'اختلافِ مبلغ (S35). تطبیق با حساب‌پی هر ۶ ساعت خودکار است.'));
+    const row = el('div', 'row');
+    row.style.marginTop = '10px';
+    const sel = el('select');
+    sel.id = 'ops-pay-status';
+    sel.setAttribute('aria-label', 'وضعیت');
+    for (const [v, t] of [['', 'همهٔ وضعیت‌ها'], ...Object.entries(PAY_FA)]) {
+      const o = el('option', '', t);
+      o.value = v;
+      sel.appendChild(o);
+    }
+    const lab = el('label');
+    lab.style.margin = '0';
+    const cb = el('input');
+    cb.type = 'checkbox';
+    cb.id = 'ops-pay-review';
+    lab.append(cb, ' فقط نیازمندِ بررسی');
+    const load = el('button', 'btn btn-sm', 'نمایش');
+    load.id = 'btn-ops-pay-load';
+    const rec = el('button', 'btn btn-sm hidden', 'تطبیق با حساب‌پی');
+    rec.id = 'btn-ops-pay-reconcile';
+    row.append(sel, lab, load, rec);
+    const note = el('div');
+    note.id = 'ops-pay-msg';
+    const wrap = el('div', 'table-scroll');
+    const table = el('table');
+    const head = el('tr');
+    for (const h of ['زمان', 'دکان', 'نوع', 'مبلغ', 'وضعیت', 'مرجعِ حساب‌پی', 'توضیح']) head.appendChild(el('th', '', h));
+    const thead = el('thead');
+    thead.appendChild(head);
+    const tbody = el('tbody');
+    tbody.id = 'ops-pay';
+    table.append(thead, tbody);
+    wrap.appendChild(table);
+    panel.append(row, note, wrap);
+    $('ops-providers').closest('.panel').after(panel);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    payPanel();
+    $('btn-ops-pay-load').onclick = () => loadPayments().catch((err) => msg($('ops-pay-msg'), err.message, 'bad'));
+    $('btn-ops-pay-reconcile').onclick = () => reconcilePayments().catch((err) => msg($('ops-pay-msg'), err.message, 'bad'));
+  });
+
   // ---------- بارِ زبانه ----------
   const OPS_PARTS = [
     [loadProviders, 'ops-prov-msg'],
     [loadVersions, 'ops-ver-msg'],
+    [loadPayments, 'ops-pay-msg'],
   ];
 
   async function loadOps() {
