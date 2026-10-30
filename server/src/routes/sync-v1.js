@@ -64,7 +64,20 @@ router.post('/live/ticket', (req, res) => {
 
 /* ------------------------------------------------------------------ Push */
 
-router.post('/push', requireSyncWrite, pumpServicesOnly, async (req, res, next) => {
+/*
+ *  دکان: سقفِ تخفیف/لغو/برگشت و «برگهٔ امضاشده» (STF-02/03، بخشِ ۱۰.۱) —
+ *  ‎lib/staff-approval.js‎. حسابِ پمپ بی هیچ کاری از آن رد می‌شود.
+ */
+const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
+/*
+ *  دکان: `null` ِ صریحِ نسخهٔ قدیمی‌تر برای فیلدی که هنوز نمی‌شناسد کنار
+ *  می‌رود (A00) — ‎lib/newer-fields.js‎. پمپ از آن هم بی هیچ کاری رد می‌شود.
+ */
+const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
+
+//  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
+//  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,

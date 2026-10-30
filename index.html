@@ -110,6 +110,8 @@
 <link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=2">
 <link rel="stylesheet" href="license/orders-ui.css?v=1">
+<!-- «گزارشِ تازه» (RPT-01/02/03/06/09/11) — پیش‌فرض خاموش؛ شرح در license/report-ui.js -->
+<link rel="stylesheet" href="license/report-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <!-- فونت به‌صورت غیرمسدودکننده بارگذاری می‌شود تا نبودِ اینترنت باز شدن برنامه را کند نکند -->
@@ -136,33 +138,44 @@
      می‌دهد و صفحه را تودرتو می‌کند.
      ========================================================== */
   :root{
-    --bg:#f5f5f8;
+    /* سیستمِ رنگِ VILL3N (۱۴۰۵/۰۷/۲۸) — همان عددهای `Theme.kt`/`Tokens.kt`ِ برنامه (WebPaletteParityTest).
+       زمینه ≠ کارت ≠ سطحِ درونی با خطِ دورِ دیدنی، سبزآبیِ برند به‌جای بنفش. */
+    --bg:#f3f6fa;
     --surface:#ffffff;
-    --surface-2:rgba(255,255,255,.98);
+    --surface-2:#f8fafc;
     --surface-solid:#ffffff;
-    --border:rgba(25,22,39,.10);
-    --text:#191627;
-    --muted:#635c86;
-    --muted-2:#6a6390;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه (بررسیِ axe، ۱۴۰۵/۰۷/۲۰) */
-    --primary:#6f50f0;
-    --primary-dark:#5b3fe0;
-    --primary-tint:rgba(124,92,255,.08);   /* ۱۴۰۵/۰۷/۲۵: ۱۲٪ زیرِ ۴٫۵:۱ِ رنگِ اصلی روی کارتِ سفید بود */
-    --accent:#00c39a;
-    --success:#08745e;
-    --success-tint:rgba(15,169,138,.12);
-    --warning:#8f5a00;
-    --warning-tint:rgba(184,119,8,.12);
-    --danger:#bf2c2c;
-    --danger-tint:rgba(217,59,59,.12);
-    /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا */
-    --aurora-1:rgba(124,92,255,.30);
-    --aurora-2:rgba(0,195,154,.24);
-    --aurora-3:rgba(255,95,162,.20);
-    --radius-sm:16px;
-    --radius-md:20px;
-    --radius-lg:24px;
-    --shadow-sm:0 1px 2px rgba(25,22,39,.05);
-    --shadow-md:0 10px 30px -12px rgba(124,92,255,.35);
+    --border:#d5dee9;
+    --field-border:#c5d0de;
+    --text:#17212b;
+    --muted:#5b687a;
+    --muted-2:#5b687a;   /* WCAG AA: همهٔ رنگ‌های متن ≥ ۴٫۵:۱ روی زمینه و ناحیه‌ها */
+    --primary:#08665f;
+    --primary-dark:#08665f;
+    --primary-tint:#e0f2ef;
+    --accent:#108b81;
+    --success:#15803d;
+    --success-tint:#dcfce7;
+    --warning:#92400e;
+    --warning-tint:#fef3c7;
+    --danger:#b91c1c;
+    --danger-tint:#fee2e2;
+    --info:#1d4ed8;
+    --info-tint:#dbeafe;
+    /* ناحیه‌ها: منو (سرد) و سبد (تهِ رنگِ اصلی)؛ کاتالوگ همان --bg */
+    --zone-nav:#eaf0f6;
+    --zone-cart:#f8fafc;
+    /* لکه‌های نورِ زمینه — همان سه لکه‌ی آرورا (فقط صفحهٔ آغاز) */
+    --aurora-1:rgba(16,139,129,.30);
+    --aurora-2:rgba(37,99,235,.24);
+    --aurora-3:rgba(20,184,166,.20);
+    /* گِردی: کنترل ۱۲، کارت ۱۶، پنل/پنجره ۲۰، تراشه قرصی */
+    --radius-sm:10px;
+    --radius-md:12px;
+    --radius-lg:16px;
+    --radius-chip:999px;
+    /* سایهٔ نرم به‌جای خطِ تیره */
+    --shadow-sm:0 1px 2px rgba(16,24,40,.05), 0 4px 12px -4px rgba(16,24,40,.08);
+    --shadow-md:0 12px 32px -12px rgba(16,24,40,.22);
     --sidebar-w:220px;
     --header-h:64px;
     --bottomnav-h:66px;
@@ -173,34 +186,39 @@
     --bottomnav-space:calc(var(--bottomnav-h) + var(--bottomnav-gap) + env(safe-area-inset-bottom));
   }
   /*
-     شبِ برنامه: زمینه‌ی بنفشِ بسیار تیره (نه سیاهِ خالص، که با نور
-     لکه‌دار می‌شود)، و کارتی که فقط چند درصد از زمینه روشن‌تر است.
+     شبِ برنامه (نسخهٔ ۲): خاکستریِ تیرهٔ سرد، کارتی که فقط یک پله از زمینه
+     روشن‌تر است با لبهٔ مویی، منوی تیره‌تر و سبدِ تهِ بنفش.
      رنگ برای چیزهایی می‌ماند که معنی دارند: پول، هشدار، دکمه.
   */
   html[data-theme="dark"]{
-    --bg:#0b0a14;
-    --surface:rgba(20,18,33,.94);
-    --surface-2:rgba(28,25,48,.96);
-    --surface-solid:#171526;
-    --border:rgba(255,255,255,.10);
-    --text:#f0eef8;
-    --muted:#a8a3bc;
-    --muted-2:#7e7995;
-    --primary:#a78bff;
-    --primary-dark:#7c5cff;
-    --primary-tint:rgba(167,139,255,.20);
-    --accent:#5ce0bc;
-    --success:#5ce0bc;
-    --success-tint:rgba(92,224,188,.18);
-    --warning:#f5b54a;
-    --warning-tint:rgba(245,181,74,.18);
-    --danger:#ff7a7a;
-    --danger-tint:rgba(255,122,122,.18);
-    --aurora-1:rgba(124,92,255,.55);
-    --aurora-2:rgba(0,195,154,.38);
-    --aurora-3:rgba(255,95,162,.34);
+    --bg:#0b1220;
+    --surface:#162235;
+    --surface-2:#203149;
+    --surface-solid:#162235;
+    --border:#34445a;
+    --field-border:#40516a;
+    --text:#f1f5f9;
+    --muted:#b6c2d2;
+    --muted-2:#b6c2d2;
+    --primary:#19a985;
+    --primary-dark:#6ee7d1;
+    --primary-tint:#123c3a;
+    --accent:#6ee7d1;
+    --success:#86efac;
+    --success-tint:#123c2b;
+    --warning:#fcd34d;
+    --warning-tint:#3d2e0e;
+    --danger:#fca5a5;
+    --danger-tint:#451a1e;
+    --info:#93c5fd;
+    --info-tint:#172f57;
+    --zone-nav:#050a14;
+    --zone-cart:#203149;
+    --aurora-1:rgba(16,139,129,.55);
+    --aurora-2:rgba(37,99,235,.38);
+    --aurora-3:rgba(20,184,166,.34);
     --shadow-sm:0 1px 2px rgba(0,0,0,.4);
-    --shadow-md:0 10px 30px -12px rgba(0,0,0,.7);
+    --shadow-md:0 12px 32px -12px rgba(0,0,0,.7);
   }
   /* ==========================================================
      زمینه‌ی آرورا — سه لکه‌ی نور، ساکن.
@@ -3839,6 +3857,9 @@
           <div class="dash-avatar" id="dash-avatar">د</div>
         </div>
 
+        <!-- «گزارشِ تازه» روشن: کارت‌های امروز و نشان‌های وضعیت از هستهٔ گزارش، با کلیک به فهرستِ همان عدد (v3 §۱۹.۵ بند ۲) -->
+        <div class="rf-home" id="dash-fresh" hidden></div>
+
         <div class="dash-hero">
           <div class="dash-hero-label">فروش امروز</div>
           <div class="dash-hero-value">
@@ -4752,6 +4773,14 @@
           </div>
         </div>
 
+        <!-- «گزارشِ تازه»: پیش‌فرض خاموش، فقط روی همین مرورگر. خاموش ⇒ همان گزارشِ امروز (rep-legacy) -->
+        <label class="rf-switch" for="rep-fresh-toggle">
+          <input type="checkbox" id="rep-fresh-toggle">
+          <span><b>گزارشِ تازه</b><small>آزمایشی · فقط روی همین دستگاه · امروز، فروش به تفکیک، سود و حاشیه، سن بدهی و ضدتقلب</small></span>
+        </label>
+        <div id="rep-fresh" hidden></div>
+
+        <div id="rep-legacy">
         <div class="seg-toggle" id="reports-tabs" style="margin-bottom:10px; flex-wrap:wrap;">
           <button type="button" class="seg-btn active" data-rtab="sales">فروش</button>
           <button type="button" class="seg-btn" data-rtab="products">محصولات</button>
@@ -4851,6 +4880,7 @@
           </div>
           <div class="exp-list" id="rep-stock-list"></div>
         </div>
+        </div><!-- /rep-legacy -->
       </section>
 
       <!-- AUDIT LOG -->
@@ -6356,6 +6386,10 @@
      بی defer، چون اسکریپتِ پایین همان لحظهٔ بالا آمدن تاریخ و ماه می‌سازد. -->
 <script src="license/text-core.js?v=1"></script>
 <script src="license/calendar-core.js?v=1"></script>
+<!-- هستهٔ مشترکِ گزارش (همتای core/report ِ کاتلین) و «گزارشِ تازه» — تا تنظیمش روشن نشود هیچ اثری ندارند -->
+<script src="license/report-core.js?v=1"></script>
+<script src="license/report-board.js?v=1"></script>
+<script src="license/report-ui.js?v=1"></script>
 <script>
   /* ==========================================================
      DEBTORS SYSTEM — state, rendering, and interactions
@@ -7770,6 +7804,7 @@
 
   function renderDashboard(){
     renderDashboardHead();
+    if(window.TohidReportUi) TohidReportUi.renderHome();
     renderDashboardExtra();
     renderSalesTrendChart();
     const count = debtors.length;
@@ -9129,6 +9164,12 @@
     if(!s || s.invoiceNumber == null) return '';
     const series = typeof s.series === 'string' ? s.series.trim() : '';
     return series ? `${series}-${s.invoiceNumber}` : String(s.invoiceNumber);
+  }
+  /* ORD-20: فاکتورِ سریِ W را سرور هنگامِ تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛
+     از صندوق لغو نمی‌شود (برگشتِ کاملش از «سفارش‌ها»/بازپرداخت سندِ برگشت می‌سازد) —
+     همان `Sale.isOnlineOrder()` ِ برنامه. */
+  function isOnlineOrderSale(s){
+    return !!s && (s.channel === 'online' || (typeof s.series === 'string' && s.series.trim() === 'W'));
   }
   let sales = [];            // {id,invoiceNumber,total,discountType,discountValue,discount,finalTotal,paymentMethod,debtorId,paidAmount,remaining,status,createdAt,date,syncStatus}
   let saleItems = [];        // {id,saleId,productId,quantity,unitPrice,purchasePrice,totalPrice,returnedQty}
@@ -11806,7 +11847,16 @@
     renderPurchaseReport();
     renderExpiryReport();
     renderStockLedger();
+    if(window.TohidReportUi) TohidReportUi.syncReports();
   }
+  /* «گزارشِ تازه» (license/report-ui.js) — دفتر و ابزارهای همین صفحه، بی نسخهٔ دوم.
+     فقط خوانده می‌شود؛ چیزی در دفتر نوشته نمی‌شود. */
+  window.tohidReportEnv = () => ({
+    ledger: { products, warehouseEntries, sales, saleItems, returns, debtors, transactions, suppliers, purchases, supplierPayments, auditLog },
+    today: todayISO(),
+    money: shopRole() !== 'staff',
+    goTo, downloadCsv, printRows, formatMoney, formatDate, showToast,
+  });
   let currentReportTab = 'sales';
   document.getElementById('reports-tabs').addEventListener('click', (e)=>{
     const btn = e.target.closest('.seg-btn');
@@ -13318,6 +13368,7 @@
     const sale = sales.find(s=>s.id===saleId);
     if(!sale) return;
     if(!canCancelSale()){ showToast('لغوِ فاکتور با صاحب یا مدیرِ دکان است', 'danger'); return; }
+    if(isOnlineOrderSale(sale)){ showToast('این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود؛ برگشتِ کاملش از بخشِ «سفارش‌ها» ثبت می‌شود', 'danger'); return; }
     document.getElementById('confirm-title').textContent = 'لغو فروش؟';
     document.getElementById('confirm-sub').textContent = `فروش #${invoiceLabel(sale)} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود.`;
     // لغو بی دلیل ثبت نمی‌شود — همان `SalesEngine.cancel(reason)`ِ برنامه
@@ -15749,7 +15800,7 @@
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
-<script src="license/vip.js?v=17" defer></script>
+<script src="license/vip.js?v=18" defer></script>
 <script src="license/support.js?v=16" defer></script>
 <script src="license/account-ui.js?v=3" defer></script>
 <script src="license/auto-backup.js?v=1" defer></script>

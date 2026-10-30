@@ -25,7 +25,11 @@ import kotlinx.serialization.json.buildJsonObject
  *  را ندارد و پیامِ خودِ سرور همان را می‌گوید — دکمه را پنهان نمی‌کنیم و
  *  وانمود نمی‌کنیم که قابلیت نیست.
  */
-class ShopRepository(private val api: ApiClient) {
+class ShopRepository(
+  private val api: ApiClient,
+  /** فقط برای پیوستن به‌عنوانِ پیک: سرور نشستِ تازهٔ دامنه‌دار می‌دهد (DLV-01) */
+  private val tokens: ir.vil3ntec.tohid.core.net.TokenStorage? = null,
+) {
 
   /** دکانِ من — یا `null` اگر هنوز دکانی ساخته نشده */
   suspend fun current(): ApiResult<ShopStateDto> =
@@ -39,10 +43,28 @@ class ShopRepository(private val api: ApiClient) {
 
   /** پیوستن با کدِ شاگرد */
   suspend fun join(code: String): ApiResult<ShopStateDto> = result {
-    ApiJson.decode<ShopStateDto>(
-      api.post(ApiEndpoints.Shop.JOIN, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
-    )
+    val body = api.post(ApiEndpoints.Shop.JOIN, buildJsonObject { put("code", JsonPrimitive(code.trim())) })
+    /*
+     *  کدِ دعوتِ پیک: سرور نشست‌های بی‌دامنهٔ این حساب را بست و نشستِ تازهٔ
+     *  `courier` را همین‌جا داد. اگر نگه داشته نشود، برنامه با توکنِ باطل
+     *  می‌ماند و کاربر بی‌دلیل بیرون می‌افتد.
+     */
+    val access = ApiJson.text(body, "accessToken")
+    if (access.isNotBlank()) {
+      tokens?.save(access, ApiJson.text(body, "refreshToken").ifBlank { null }, ApiJson.long(body, "accessExpiresAt"))
+    }
+    ApiJson.decode<ShopStateDto>(body)
   }
+
+  /**
+   *  «دعوتِ پیک» دیده شود؟ — پرچمِ `shop.delivery` روشن و اشتراکِ تحویل هست.
+   *  سرورِ قدیمی یا هر خطا ⇒ نه (دکمهٔ بی‌اثر نشان داده نمی‌شود).
+   */
+  suspend fun courierInviteAllowed(): Boolean =
+    result {
+      val body = api.get(ApiEndpoints.Shop.DELIVERY_CONFIG)
+      ApiJson.bool(body, "readable") && ApiJson.bool(body, "entitled")
+    }.valueOrNull() == true
 
   /* ------------------------------ کارمندان ------------------------------ */
 
@@ -93,6 +115,27 @@ class ShopRepository(private val api: ApiClient) {
   /** لایهٔ یک کارمند — `perms` همان قالبِ `PermCore` ({کلید: {mode}}) */
   suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
     result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
+
+  /**
+   *  ثبتِ کلیدِ عمومیِ تأییدِ همین دستگاه (STF-02). کلیدِ خصوصی و PIN هرگز
+   *  نمی‌روند؛ پاسخ شناسهٔ کلید است که باید با `PinCrypto.keyId` بخواند.
+   */
+  suspend fun registerApproverKey(spkiB64: String, label: String, deviceId: String): ApiResult<String> =
+    result {
+      val body = api.post(
+        ApiEndpoints.Shop.APPROVER_KEYS,
+        buildJsonObject {
+          put("public_key", JsonPrimitive(spkiB64))
+          put("label", JsonPrimitive(label.take(60)))
+          put("device_id", JsonPrimitive(deviceId.take(64)))
+        },
+      )
+      ApiJson.text(body["key"] as? JsonObject ?: JsonObject(emptyMap()), "id")
+    }
+
+  /** باطل کردنِ کلیدِ تأییدِ قبلیِ همین دستگاه (پس از PINِ تازه) */
+  suspend fun revokeApproverKey(id: String): ApiResult<Unit> =
+    result { api.delete(ApiEndpoints.Shop.approverKey(id)); Unit }
 
   suspend fun devices(): ApiResult<List<ShopDeviceDto>> =
     result { ApiJson.decode<ShopDevicesDto>(api.get(ApiEndpoints.Shop.DEVICES)).devices }

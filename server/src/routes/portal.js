@@ -28,6 +28,7 @@ const stations = require('../lib/stations');
 const tenancy = require('../lib/tenancy');
 const { requireAnyUser } = require('../middleware/auth');
 const { notFound, badRequest } = require('../middleware/errors');
+const reauth = require('../lib/reauth');
 const { publicUser } = require('./auth');
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -318,8 +319,16 @@ router.get('/devices', async (req, res, next) => {
 router.delete('/devices/:id', async (req, res, next) => {
   try {
     const id = v.id(req.params.id, { field: 'شناسه دستگاه' });
-    await query(`UPDATE devices SET status='revoked' WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
-    await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL', [now(), id]);
+    //  ⛔ همان قاعدهٔ `DELETE /api/me/devices/:id` — این درِ دوم به همان کار
+    //  بود و بی آن، تأییدِ دوبارهٔ آن‌جا از همین‌جا دور زده می‌شد (یافتهٔ ۴).
+    if (id !== req.tokenRow?.device_id) await reauth.assertFresh(req);
+    const r = await query(`UPDATE devices SET status='revoked' WHERE id=$1 AND user_id=$2`, [id, req.user.id]);
+    //  ⛔ نشست‌ها فقط وقتی دستگاه واقعاً مالِ همین کاربر بود، و فقط نشست‌های
+    //  خودِ او — تا امروز هر شناسهٔ دستگاهی (حتی مالِ کسِ دیگر) نشست‌هایش بسته می‌شد
+    if (r.rowCount) {
+      await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
+        [now(), id, req.user.id]);
+    }
     res.json({ ok: true });
   } catch (err) { next(err); }
 });

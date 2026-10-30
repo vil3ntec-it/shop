@@ -20,8 +20,9 @@ class DeskMenuTest {
 
   /** از متنِ AppNav.kt، نه خودِ شیء — AppNav وضعیتِ Compose دارد (همان روشِ KeyMapTest) */
   private fun shortcuts(): List<Pair<String, String>> {
-    val nav = File(ui!!, "AppNav.kt").readText().substringAfter("val SHORTCUTS = listOf(").substringBefore(")\n")
-    return Regex(""""([a-z]+)" to "([^"]+)"""").findAll(nav).map { it.groupValues[1] to it.groupValues[2] }.toList()
+    //  نامِ هر صفحه حالا از جدولِ سه‌زبانه است (`Str.dashboard`…)؛ این‌جا فقط شناسه و ترتیب مهم است
+    val nav = File(ui!!, "AppNav.kt").readText().substringAfter("val SHORTCUTS").substringAfter("listOf(").substringBefore(")\n")
+    return Regex(""""([a-z]+)" to ([^,\n]+)""").findAll(nav).map { it.groupValues[1] to it.groupValues[2] }.toList()
   }
 
   @Test
@@ -47,6 +48,27 @@ class DeskMenuTest {
     val live = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.filter { it.state == DeskMenu.State.LIVE }
     val missing = live.filterNot { Regex("""\n\s*"${it.id}"\s*->""").containsMatchIn(root) }.map { it.id }
     assertEquals("مسیرِ AppRoot ندارند", emptyList<String>(), missing)
+  }
+
+  @Test
+  fun `ویترین فقط با روشن بودنِ بخش زنده است و به مسیرِ AppRoot می‌رود`() {
+    val root = File(ui!!, "AppRoot.kt").readText()
+    val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
+    assertTrue("soon:storefront" in off && "storefront" !in off)
+    val on = DeskMenu.groups(true, shortcuts(), storefrontLive = true).flatMap { it.items }
+    assertEquals(DeskMenu.State.LIVE, on.single { it.id == "storefront" }.state)
+    assertTrue(Regex("""\n\s*"storefront"\s*->""").containsMatchIn(root))
+  }
+
+  @Test
+  fun `میزِ تحویل فقط با روشن بودنِ shop_delivery زنده است و به مسیرِ AppRoot می‌رود`() {
+    val root = File(ui!!, "AppRoot.kt").readText()
+    val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
+    assertTrue("soon:delivery" in off && "delivery" !in off)
+    val on = DeskMenu.groups(true, shortcuts(), deliveryLive = true).flatMap { it.items }
+    assertEquals(DeskMenu.State.LIVE, on.single { it.id == "delivery" }.state)
+    assertTrue("soon:delivery" !in on.map { it.id })
+    assertTrue(Regex("""\n\s*"delivery"\s*->""").containsMatchIn(root))
   }
 
   @Test

@@ -30,7 +30,10 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.perm.ApprovalSlip
+import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleReceipt
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -41,8 +44,12 @@ import ir.vil3ntec.tohid.numericInput
 import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.unitMoney
 import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.ThermalPrinter
+import ir.vil3ntec.tohid.ui.components.common.PillTone
+import ir.vil3ntec.tohid.ui.components.common.StatusPill
+import ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -63,18 +70,25 @@ fun CheckoutDialog(
   presetDebtorId: String?,
   onDismiss: () -> Unit,
   onConfirm: (SalesEngine.Checkout) -> Unit,
+  /** تخفیف‌های خودکارِ همین سبد (`cart` پس از آن‌هاست)؛ `null` ⇒ همان ردیف‌های امروز */
+  promo: ir.vil3ntec.tohid.data.PromoEngine.Outcome? = null,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
+  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  presetDiscount: String = "",
+  /** شناسهٔ فاکتورِ همین سبد (`CartStore.saleKey`) — برگهٔ تأیید به آن بسته است */
+  saleKey: String? = null,
 ) {
   val context = LocalContext.current
-  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.canDiscount(context) }
+  //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
+  val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   // مثل نسخهٔ وب: اگر از سبد قرض‌داری انتخاب شده باشد، پنجره روی «نسیه»
   // باز می‌شود؛ وگرنه «نقدی». تخفیف هم پیش‌فرض درصدی است.
   val preset = presetDebtorId?.takeIf { id -> d.debtors.any { it.id == id } }
 
   var discountType by remember { mutableStateOf(SalesEngine.DiscountType.PERCENT) }
   var payment by remember { mutableStateOf(if (preset != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH) }
-  var discountText by remember { mutableStateOf("0") }
+  var discountText by remember { mutableStateOf(presetDiscount.ifBlank { "0" }) }
   var debtorId by remember { mutableStateOf(preset) }
   var paidText by remember { mutableStateOf(if (preset != null) "0" else "") }
   var debtorMenu by remember { mutableStateOf(false) }
@@ -92,12 +106,36 @@ fun CheckoutDialog(
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 
+  //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
+  var approval by remember { mutableStateOf<ApprovalSlip.Slip?>(null) }
+  var askApproval by remember { mutableStateOf(false) }
+  val decision = ir.vil3ntec.tohid.data.ShopRole.decide(
+    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+  )
+  val gate = DiscountGate.state(decision.decision, saleKey, totals.discount, totals.subtotal, approval)
+
   // در فروشِ نقدی مبلغِ پرداختی همیشه کلِ مبلغِ نهایی است
   val paid = if (payment == SalesEngine.Payment.CASH) totals.finalTotal
   else minOf(parseNumber(paidText)?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
   val remaining = (totals.finalTotal - paid).coerceAtLeast(0.0)
   val discountBad = canDiscount && numberInvalid(discountText)
-  val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
+  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ خاموش ⇒ همان نقد/نسیهٔ امروز
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState() }
+  val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+  var payError by remember { mutableStateOf<String?>(null) }
+  val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
+  fun confirm() {
+    if (busy || discountBad || paidBad) return
+    //  STF-02: تخفیفِ «نیازمند تأیید» بی برگه، یا «ممنوع»، ثبت نمی‌شود؛ برگهٔ تأییدشده همراهِ فاکتور
+    if (gate == DiscountGate.State.NEEDS_APPROVAL || gate == DiscountGate.State.DENIED) return
+    val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
+    if (!payV2) { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId, approval = signed)); return }
+    when (val r = ir.vil3ntec.tohid.data.PayFlow.checkout(payState.draft(totals.finalTotal, debtorId))) {
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> onConfirm(checkout.copy(settlement = r.value, debtorId = debtorId, approval = signed))
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> payError = ir.vil3ntec.tohid.data.PayFlow.message(r.problem)
+    }
+  }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -132,8 +170,33 @@ fun CheckoutDialog(
           modifier = Modifier.fillMaxWidth(),
         )
 
+        when (gate) {
+          DiscountGate.State.NEEDS_APPROVAL -> {
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+              StatusPill("نیازمند تأیید", PillTone.WARNING)
+              Text(
+                if (decision.cap == "maxPct") "بیش از سقفِ ${qty(decision.limit ?: 0.0)}٪ِ شما"
+                else "بیش از اختیارِ شما",
+                style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted, modifier = Modifier.weight(1f),
+              )
+              OutlinedButton(onClick = { askApproval = true }, enabled = saleKey != null && !busy) { Text("درخواستِ تأیید") }
+            }
+          }
+          DiscountGate.State.APPROVED -> {
+            Spacer(Modifier.height(6.dp))
+            StatusPill("تأیید شد", PillTone.SUCCESS)
+          }
+          DiscountGate.State.DENIED -> {
+            Spacer(Modifier.height(6.dp))
+            StatusPill("این تخفیف برای شما ممنوع است", PillTone.DANGER)
+          }
+          DiscountGate.State.FREE -> Unit
+        }
+
         Spacer(Modifier.height(14.dp))
         }
+        if (!payV2) {
         Text("نوع پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
@@ -141,6 +204,7 @@ fun CheckoutDialog(
           selected = payment,
           onSelect = { payment = it },
         )
+        }
 
         /*
          *  مشتری — در نسیه اجباری، در نقدی اختیاری.
@@ -155,7 +219,7 @@ fun CheckoutDialog(
          */
         Spacer(Modifier.height(12.dp))
         Text(
-          if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
+          if (payV2) "مشتری — باقی‌مانده به حسابش می‌رود" else if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
@@ -185,7 +249,21 @@ fun CheckoutDialog(
           )
         }
 
-        if (payment == SalesEngine.Payment.CREDIT) {
+        if (payV2) {
+          Spacer(Modifier.height(12.dp))
+          ir.vil3ntec.tohid.ui.components.pos.PaySplitSection(
+            state = payState,
+            total = totals.finalTotal,
+            customerId = debtorId,
+            customerName = debtorId?.let { id -> d.debtors.find { it.id == id }?.name },
+            target = 48.dp,
+            cashFocus = cashFocus,
+            onSubmit = { confirm() },
+          )
+          payError?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
+        }
+
+        if (!payV2 && payment == SalesEngine.Payment.CREDIT) {
           Spacer(Modifier.height(12.dp))
           OutlinedTextField(
             value = paidText,
@@ -201,26 +279,45 @@ fun CheckoutDialog(
 
         Spacer(Modifier.height(16.dp))
         Panel {
-          MoneyRow("جمع اقلام", totals.subtotal)
+          //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
+          if (promo != null && promo.stamp && promo.discount > 0) {
+            MoneyRow("جمع اقلام", promo.gross)
+            MoneyRow(SaleReceipt.promoLabel(promo.applied.map { it.name }), promo.discount, negative = true)
+          } else MoneyRow("جمع اقلام", totals.subtotal)
           MoneyRow("تخفیف", totals.discount)
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           MoneyRow("مبلغ نهایی", totals.finalTotal, strong = true)
+          if (!payV2) {
           MoneyRow("مبلغ پرداختی", paid)
           MoneyRow("باقی‌مانده", remaining, tint = if (remaining > 0) Shop.colors.warning else null)
+          }
         }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId)) },
-            enabled = !busy && !discountBad && !paidBad,
+            onClick = { confirm() },
+            enabled = !busy && !discountBad && !paidBad &&
+              gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
             modifier = Modifier.weight(1f),
           ) { Text(if (busy) "در حالِ ثبت…" else "ثبت فروش") }
         }
       }
     }
     }
+  }
+
+  if (askApproval && saleKey != null) {
+    ApprovalDialog(
+      title = "تأییدِ تخفیف",
+      summary = "تخفیفِ ${money(totals.discount)} ؋ روی فاکتورِ ${money(totals.subtotal)} ؋",
+      shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      onApproved = { approval = it; askApproval = false },
+      onDismiss = { askApproval = false },
+    )
   }
 }
 
@@ -255,15 +352,16 @@ private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, onSelect:
 }
 
 @Composable
-private fun MoneyRow(label: String, amount: Double, strong: Boolean = false, tint: Color? = null) {
+private fun MoneyRow(label: String, amount: Double, strong: Boolean = false, tint: Color? = null, negative: Boolean = false) {
   Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
     Text(
       label,
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall,
       color = if (strong) Shop.colors.text else Shop.colors.muted,
+      modifier = Modifier.weight(1f, fill = false).padding(end = 8.dp),
     )
     Text(
-      "${money(amount)} ؋",
+      "${if (negative) "−" else ""}${money(amount)} ؋",
       style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodyMedium,
       color = tint ?: Shop.colors.text,
       fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal,
@@ -288,6 +386,7 @@ fun InvoiceDialog(
   var printer by remember { mutableStateOf(false) }
 
   val items = remember(sale.id) { d.saleItems.filter { it.saleId == sale.id } }
+  val stamped = remember { ir.vil3ntec.tohid.ui.PromoLive.stampOn(context) }
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
 
   Dialog(onDismissRequest = onDismiss) {
@@ -305,7 +404,7 @@ fun InvoiceDialog(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-          "${formatDate(sale.date)} — ${if (sale.paymentMethod == "credit") "نسیه" else "نقدی"}",
+          "${formatDate(sale.date)} — ${ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")}",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
         )
@@ -321,8 +420,9 @@ fun InvoiceDialog(
                 style = MaterialTheme.typography.bodyMedium,
                 color = Shop.colors.text,
               )
+              //  S3 (پرچمِ `shop.promo_stamp`): «مقدار × قیمتِ فهرست − تخفیفِ خودکار»؛ خاموش ⇒ همان متنِ پیشین
               Text(
-                "${money(item.quantity)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""} × ${money(item.unitPrice)}",
+                SaleReceipt.detail(item, product?.unit.orEmpty(), stamped, ::money, ::unitMoney, ::qty),
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
@@ -335,11 +435,15 @@ fun InvoiceDialog(
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))
 
+        //  «جمع اقلام» = جمعِ همان ستون؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
         MoneyRow("جمع اقلام", sale.total)
+        SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { MoneyRow(it.label, it.amount) }
         MoneyRow("تخفیف", sale.discount)
         MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
         MoneyRow("پرداختی", sale.paidAmount)
         MoneyRow("باقی‌مانده", sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)
+        //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
+        ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> MoneyRow(label, amount) }
         if (debtor != null) {
           Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("قرض‌دار", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
@@ -364,19 +468,58 @@ fun InvoiceDialog(
     }
   }
 
+  //  HW-02: فاکتوری که پیش‌تر چاپ شده دوباره فقط با دلیل؛ چاپ از صفِ چاپ می‌رود و هرگز فروش نمی‌سازد
+  var reprint by remember { mutableStateOf<Pair<String, Int>?>(null) }
+  fun send(address: String, width: Int, reason: String?) {
+    onMessage("در حال فرستادن به چاپگر…")
+    scope.launch { onMessage(ir.vil3ntec.tohid.print.PrintSpooler.printSale(context, d, sale, address, width, reason)) }
+  }
   if (printer) {
     PrinterDialog(
       onDismiss = { printer = false },
       onPrint = { address, width ->
         printer = false
-        onMessage("در حال فرستادن به چاپگر…")
-        scope.launch {
-          val error = PrintJob.printSale(context, d, sale, address, width)
-          onMessage(error ?: "فاکتور به چاپگر فرستاده شد")
-        }
+        //  چاپ‌شده روی همین دستگاه، یا چاپِ دوباره‌ای که از دستگاهِ دیگری در سابقهٔ دکان آمده
+        if (ir.vil3ntec.tohid.print.PrintLog.wasPrinted(context, sale.id) || d.auditLog.any { it.type == "reprint" && it.refId == sale.id }) reprint = address to width
+        else send(address, width, null)
       },
     )
   }
+  reprint?.let { (address, width) ->
+    ReprintReasonDialog(onDismiss = { reprint = null }) { reason -> reprint = null; send(address, width, reason) }
+  }
+}
+
+/** دلیلِ چاپِ دوباره — یکی از دلیل‌های رایج یا نوشتهٔ خودِ فروشنده */
+@Composable
+internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+  val reasons = listOf("کاغذ گیر کرد یا بریده شد", "چاپ ناخوانا بود", "مشتری نسخهٔ دوم خواست")
+  var picked by remember { mutableStateOf<String?>(null) }
+  var other by remember { mutableStateOf("") }
+  val reason = picked ?: other.trim()
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("این فاکتور پیش‌تر چاپ شده") },
+    text = {
+      Column {
+        Text("برای چاپِ دوباره دلیل را بگویید. روی کاغذ «چاپِ دوباره» می‌آید و فروشِ تازه‌ای ساخته نمی‌شود.",
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Spacer(Modifier.height(8.dp))
+        reasons.forEach { r ->
+          Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(selected = picked == r, onClick = { picked = r })
+            Text(r, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+          }
+        }
+        OutlinedTextField(
+          value = other, onValueChange = { other = it.take(80); picked = null }, singleLine = true,
+          label = { Text("دلیلِ دیگر") }, modifier = Modifier.fillMaxWidth(),
+        )
+      }
+    },
+    confirmButton = { Button(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text("چاپِ دوباره") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+  )
 }
 
 /* ============================ چاپگر ============================ */

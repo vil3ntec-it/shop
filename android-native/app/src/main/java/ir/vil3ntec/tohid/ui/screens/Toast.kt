@@ -39,11 +39,9 @@ import ir.vil3ntec.tohid.ui.theme.glassSurface
 fun TohidSnackbar(host: SnackbarHostState, modifier: Modifier = Modifier) {
   SnackbarHost(hostState = host, modifier = modifier) { data ->
     val message = data.visuals.message
-    val tint = when {
-      message.contains("نشد") || message.contains("نیست") || message.contains("نبود") ||
-        message.contains("ناموفق") || message.contains("خطا") || message.contains("معتبر") ->
-        Shop.colors.danger
-      message.contains("شد") || message.contains("موفق") -> Shop.colors.success
+    val tint = when (ir.vil3ntec.tohid.core.i18n.I18n.toneOf(message)) {
+      ir.vil3ntec.tohid.core.i18n.I18n.Tone.ERROR -> Shop.colors.danger
+      ir.vil3ntec.tohid.core.i18n.I18n.Tone.SUCCESS -> Shop.colors.success
       else -> Shop.colors.primary
     }
 
@@ -92,7 +90,7 @@ fun TohidSnackbar(host: SnackbarHostState, modifier: Modifier = Modifier) {
           IconButton(onClick = { data.dismiss() }, modifier = Modifier.size(36.dp)) {
             Icon(
               Icons.Filled.Close,
-              contentDescription = "بستن",
+              contentDescription = ir.vil3ntec.tohid.core.i18n.Str.close,
               tint = Shop.colors.muted2,
               modifier = Modifier.size(16.dp),
             )

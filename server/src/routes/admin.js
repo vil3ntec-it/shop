@@ -200,10 +200,15 @@ router.get('/users/:id/delete-preview', async (req, res, next) => {
 
 router.delete('/users/:id', requireSuperAdmin, async (req, res, next) => {
   const id = v.id(req.params.id);
+  //  `confirm` = ایمیل، شماره یا شناسهٔ همان حساب (`confirmWith`ِ پیش‌نمایش)؛ `confirmEmail` نامِ دیروز
+  const confirm = v.text(req.body?.confirm ?? req.query?.confirm, { max: 200 });
   const confirmEmail = v.text(req.body?.confirmEmail ?? req.query?.confirmEmail, { max: 200 });
-  const out = await require('../lib/user-delete').remove(id, { confirmEmail });
+  const out = await require('../lib/user-delete').remove(id, { confirm, confirmEmail });
   if (!out.ok && out.code === 'not_found') return next(notFound('کاربر پیدا نشد'));
-  if (!out.ok) return next(badRequest('برای حذف، ایمیلِ همین حساب را دقیق بنویسید', 'confirm_mismatch'));
+  if (!out.ok) {
+    const what = { email: 'ایمیلِ', phone: 'شمارهٔ', id: 'شناسهٔ' }[out.confirmWith] || 'ایمیلِ';
+    return next(badRequest(`برای حذف، ${what} همین حساب را دقیق بنویسید`, 'confirm_mismatch'));
+  }
   await audit.log({
     actorType: 'admin', userId: req.admin.id, action: 'admin.user_deleted', targetType: 'user', targetId: id,
     detail: { email: out.user.email, stations: out.stations, shops: out.shops, rows: out.rows },
@@ -260,9 +265,23 @@ router.get('/shops/:id', async (req, res, next) => {
   );
   const ent = await entitlementOf(id);
   const history = await subs.historyOf(id);
+  /*
+   *  شمارِ «اطلاعاتِ ثبت‌شده»: ردیف‌های زندهٔ یکتا از **هر دو** دفتر — راهِ قدیم (`lib/sync.js`)
+   *  و Sync v1 (`sync_rows`، همان‌جا که برنامه‌های اندروید و کامپیوتر می‌نویسند). پیش‌تر فقط
+   *  راهِ قدیم شمرده می‌شد و دکانِ برنامه‌ای در پنل «محصولات: ۰، فروش‌ها: ۰» داشت.
+   *  UNION بر شناسه: ردیفی که در هر دو دفتر هست (کوچ) یک بار شمرده می‌شود.
+   */
   const counts = {};
   for (const [col, table] of Object.entries(require('../lib/sync').TABLES)) {
-    const r = await one(`SELECT COUNT(*)::int n FROM ${table} WHERE shop_id=$1 AND deleted=false`, [id]);
+    const r = await one(
+      `SELECT COUNT(*)::int n FROM (
+         SELECT id FROM ${table} WHERE shop_id=$1 AND deleted=false
+         UNION
+         SELECT row_id FROM sync_rows
+          WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND deleted_at IS NULL
+       ) x`,
+      [id, col]
+    );
     counts[col] = r.n;
   }
   /*

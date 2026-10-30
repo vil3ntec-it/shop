@@ -97,6 +97,21 @@ class SaleDraftTest {
   }
 
   @Test
+  fun `N3 — کدهای تخفیف با پیش‌نویس می‌مانند؛ پیش‌نویسِ پیشین بی کد خوانده می‌شود`() {
+    val cart = listOf(SalesEngine.CartLine("p1", 1.0))
+    val d = SaleDraft.of("K", cart, null, 42, coupons = listOf("EID5", "VIP10"))
+    val back = SaleDraftCodec.decode(SaleDraftCodec.encode(d))!!
+    assertEquals(listOf("EID5", "VIP10"), back.coupons)
+    assertEquals(listOf("EID5", "VIP10"), (SaleDraftRules.decide(back, ledger()) as DraftRestore.Offer).draft.coupons)
+    //  کد بی سبد معنا ندارد
+    assertEquals(emptyList<String>(), SaleDraft.of("K", emptyList(), null, 42, coupons = listOf("EID5")).coupons)
+    //  پیش‌نویسِ ساختِ پیشین (بی `coupons`)
+    val old = SaleDraftCodec.decode("""{"v":2,"key":"K","lines":[{"productId":"p1","quantity":1.0}],"debtorId":null,"savedAt":42}""")!!
+    assertEquals(emptyList<String>(), old.coupons)
+    assertEquals(cart, old.cart())
+  }
+
+  @Test
   fun `پیش‌نویسِ قدیمی (آرایهٔ وب و برنامهٔ پیشین) خوانده می‌شود و کلید ندارد`() {
     val legacy = SaleDraftCodec.decode("""[{"productId":"p1","quantity":2},{"productId":"p2","quantity":1,"extra":true}]""")!!
     assertNull(legacy.key)

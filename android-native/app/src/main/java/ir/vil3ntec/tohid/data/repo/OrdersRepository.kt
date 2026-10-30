@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.HandoverPageDto
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPageDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
@@ -26,8 +27,12 @@ import kotlinx.serialization.json.put
  */
 class OrdersRepository(private val api: ApiClient) {
 
+  /**
+   *  `caps=saleOnHandover`: این برنامه فروشِ تحویل را خودش ثبت می‌کند ⇒ سرور کفِ تحویلِ این دکان
+   *  را (اگر نیست) همین لحظه می‌گذارد؛ تحویلِ پیش از آن هرگز فروش نمی‌گیرد.
+   */
   suspend fun config(): ApiResult<OrdersConfigDto> =
-    result { ApiJson.decode<OrdersConfigDto>(api.get("$ROOT/config")) }
+    result { ApiJson.decode<OrdersConfigDto>(api.get("$ROOT/config?caps=saleOnHandover")) }
 
   suspend fun summary(): ApiResult<OrdersSummaryDto> =
     result { ApiJson.decode<OrdersSummaryDto>(api.get("$ROOT/summary")) }
@@ -43,8 +48,31 @@ class OrdersRepository(private val api: ApiClient) {
   suspend fun get(id: String): ApiResult<OrderDto> =
     result { order(api.get("$ROOT/${enc(id)}")) }
 
+  /**
+   *  سفارش‌های تحویل‌شده (مشتری گرفت / به پیک داده شد / رسید) که فروششان هنوز در دفترِ
+   *  همگام‌شدهٔ دکان نیست (`items`)، و برگشته‌هایی که فروششان لغو نشده (`reversals`).
+   *  [since]: کفِ سرور؛ [after]: صفحهٔ بعد؛ [orderId]: فقط همان سفارش (پیش از هر ثبت).
+   */
+  suspend fun handover(since: Long, after: String? = null, orderId: String? = null): ApiResult<HandoverPageDto> = result {
+    val q = buildString {
+      append("$ROOT/handover?since=").append(since).append("&limit=20")
+      if (!after.isNullOrBlank()) append("&after=").append(enc(after))
+      if (!orderId.isNullOrBlank()) append("&orderId=").append(enc(orderId))
+    }
+    ApiJson.decode<HandoverPageDto>(api.get(q))
+  }
+
   suspend fun create(clientKey: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     result { order(api.post(ROOT, createJson(clientKey, body))) }
+
+  /**
+   *  «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
+   *  ردیف برای همهٔ دستگاه‌ها می‌رود؛ تکرار بی‌اثر.
+   */
+  suspend fun reviewAck(id: String, kind: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(id)}/review-ack", buildJsonObject { put("kind", kind) })
+    Unit
+  }
 
   suspend fun transition(
     id: String,

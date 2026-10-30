@@ -12,7 +12,7 @@
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-orders.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -195,14 +195,14 @@ await step('بخش در منو پیدا می‌شود و شش برگهٔ ORD-12 
 
 await step('سفارشِ دستی (ORD-21): قطعِ نت وسطِ ثبت ⇒ «ثبت» دوباره، و فقط یک سفارش', async () => {
   let dropped = 0;
-  await page.route('**/api/v1/shop/orders', async (route) => {
+  await page.route('**/api/v1/shop/orders', closeSafeRoute(async (route) => {
     if (route.request().method() === 'POST' && !dropped) {
       dropped++;
       await route.fetch();            // سرور واقعاً ثبت می‌کند…
       return route.abort('failed');   // …ولی پاسخ به مرورگر نمی‌رسد
     }
     return route.fallback();
-  });
+  }));
   await page.click('#ord-new-btn');
   await page.waitForSelector('#ord-new-modal.open');
   await page.selectOption('#ord-f-source', 'phone');
@@ -340,6 +340,49 @@ await step('۴۰۹: کسِ دیگری زودتر وضعیت را عوض کرد �
   assert.equal(row.status, 'accepted');
   const n = await one('SELECT COUNT(*)::int n FROM online_order_events WHERE order_id=$1', [made.body.order.id]);
   assert.equal(n.n, 2);
+  await page.keyboard.press('Escape');
+});
+
+await step('پاسخِ دیرِ سفارشِ بسته‌شده جای سفارشِ تازه‌باز نمی‌نشیند؛ گذار روی همانی است که باز است', async () => {
+  const a = (await apiOrder({ customer: { name: 'مشتریِ الف', phone: '0700111222' } })).body.order;
+  const b = (await apiOrder({ customer: { name: 'مشتریِ ب', phone: '0700111222' } })).body.order;
+  await page.click('#ord-tabs [data-tab="new"]');
+  await page.locator(`.ord-card[data-id="${a.id}"]`).click();
+  await page.waitForSelector('#ord-actions [data-act="accepted"]');
+  //  از این‌جا هر پاسخِ جزئیاتِ «الف» نگه داشته می‌شود — همان کندیِ شبکه‌ای که در CI پیش آمد
+  const aPath = `/api/v1/shop/orders/${a.id}`;
+  const held = [];
+  const isA = (u) => u.pathname === aPath;
+  await page.route(isA, (route) => { held.push(route); });
+  //  تغییری روی سرور ⇒ صفِ زنده جزئیاتِ بازِ «الف» را بی‌صدا دوباره می‌پرسد (و پاسخ در راه می‌ماند)
+  assert.equal((await post(`/api/v1/shop/orders/${a.id}/transition`, { to: 'accepted', from: 'new' }, owner.accessToken)).status, 200);
+  for (let i = 0; i < 100 && !held.length; i++) await page.waitForTimeout(50);
+  assert.ok(held.length > 0, 'تازه‌سازیِ بی‌صدای «الف» پرسیده نشد');
+  await page.keyboard.press('Escape');
+  await page.locator(`.ord-card[data-id="${b.id}"]`).click();
+  const showsB = async (when) => {
+    try {
+      await page.waitForFunction((no) => document.getElementById('ord-detail-title')?.textContent === `سفارش #${no}`
+        && !!document.querySelector('#ord-actions [data-act="accepted"]'), Number(b.orderNo), { timeout: 10000 });
+    } catch {
+      throw new Error(`${when}: پنجره «${await page.locator('#ord-detail-title').innerText()}» را نشان می‌دهد، نه «سفارش #${b.orderNo}»`);
+    }
+  };
+  await showsB('پیش از رسیدنِ پاسخِ دیر');
+  //  حالا پاسخِ دیرِ «الف» می‌رسد
+  const late = page.waitForResponse((r) => isA(new URL(r.url())));
+  for (const r of held.splice(0)) await r.continue();
+  await late;
+  await page.unroute(isA);
+  await page.waitForTimeout(300);
+  await showsB('پس از رسیدنِ پاسخِ دیر');
+  await page.click('#ord-actions [data-act="accepted"]');
+  await page.waitForSelector('#ord-act-modal.open #ord-ready');
+  await page.click('#ord-act-ok');
+  await page.waitForFunction(() => /قبول‌شده/.test(document.querySelector('#ord-detail-body .ord-status-line')?.textContent || ''));
+  assert.equal((await one('SELECT status FROM online_orders WHERE id=$1', [b.id])).status, 'accepted');
+  assert.equal((await one('SELECT COUNT(*)::int n FROM online_order_events WHERE order_id=$1', [a.id])).n, 2, '«الف» گذارِ دوم نخورد');
+  assert.equal((await one('SELECT COUNT(*)::int n FROM online_order_events WHERE order_id=$1', [b.id])).n, 2);
   await page.keyboard.press('Escape');
 });
 

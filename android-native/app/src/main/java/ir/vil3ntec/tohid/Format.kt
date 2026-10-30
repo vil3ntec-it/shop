@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.core.i18n.Str
+
 /**
  *  عددها.
  *
@@ -31,6 +33,19 @@ fun money(value: Double): String {
 }
 
 /**
+ *  قیمتِ واحد — مثلِ `money`، ولی اعشارِ واقعی (۳۳۳٫۳۳) گرد نمی‌شود تا «مقدار ×
+ *  قیمت» با جمعِ ردیف بخواند (۳ × 333.33 = 1,000، نه ۳ × ۳۳۳). قیمتِ کامل همان `money`.
+ */
+fun unitMoney(value: Double): String {
+  if (value.isNaN() || value.isInfinite()) return money(0.0)
+  val cents = Math.round(value * 100)
+  if (cents % 100 == 0L) return money(cents / 100.0)
+  val a = kotlin.math.abs(cents)
+  val out = money((a / 100).toDouble()) + "." + (a % 100).toString().padStart(2, '0')
+  return if (cents < 0) "-$out" else out
+}
+
+/**
  * مقدار — کیلو و لیتر و گرم اعشار دارند، دانه ندارد. تا سه رقمِ اعشار،
  * بدونِ صفرهای اضافی؛ همان `formatCartQty` نسخهٔ وب.
  */
@@ -52,13 +67,13 @@ fun plain(value: Int): String = value.toString()
 fun daysText(days: Long): String {
   val d = days.coerceAtLeast(0)
   return when {
-    d < 1 -> "امروز"
-    d < 31 -> "${d.fa()} روز"
-    d < 365 -> "${(d / 30).fa()} ماه"
+    d < 1 -> Str.today
+    d < 31 -> Str.days(d.fa())
+    d < 365 -> Str.months((d / 30).fa())
     else -> {
       val years = d / 365
       val months = (d % 365) / 30
-      if (months == 0L) "${years.fa()} سال" else "${years.fa()} سال و ${months.fa()} ماه"
+      if (months == 0L) Str.years(years.fa()) else Str.yearsMonths(years.fa(), months.fa())
     }
   }
 }

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -72,6 +73,26 @@ fun SalesHistoryScreen(
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
+  val returnsShot = ReturnsShot.open.value
+  val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(roleContext) } || returnsShot != null
+  var noReceipt by remember { mutableStateOf(false) }
+  var receiptFor by remember { mutableStateOf<String?>(null) }
+  var scanReceipt by remember { mutableStateOf(false) }
+  //  عکسِ CI (`DevShot`): فرمِ برگشتِ تازه‌ترین فاکتورِ زنده، یا برگشتِ بی رسید
+  LaunchedEffect(returnsShot) {
+    when (returnsShot) {
+      "first" -> {
+        noReceipt = false
+        returnFor = d.sales.filter { s -> s.status != "cancelled" && d.saleItems.any { it.saleId == s.id && SalesEngine.returnable(it) > 0 } }
+          .maxByOrNull { it.createdAt }
+      }
+      "none" -> { returnFor = null; noReceipt = true }
+      "close" -> { returnFor = null; noReceipt = false }
+    }
+  }
+  //  نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`)
+  val myReceiptTag = remember { ir.vil3ntec.tohid.core.receipt.ReceiptTokens.shopTag(ir.vil3ntec.tohid.data.LedgerOwner.currentShop(roleContext)) }
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
   }
@@ -101,12 +122,20 @@ fun SalesHistoryScreen(
    *  صفحه از نو انجام می‌شد — روی همهٔ فاکتورهای تاریخِ دکان.
    */
   val shown = remember(d, filter, term, month) {
+    //  RET-01 — QRِ رسید (اسکنر یا دوربین) همان فاکتور را پیدا می‌کند
+    if (returnsV2 && term.startsWith(ir.vil3ntec.tohid.data.ReturnFlow.CODE_PREFIX.take(3))) {
+      return@remember ir.vil3ntec.tohid.data.ReturnFlow.find(d, term)
+    }
+    //  فاکتورِ نسخهٔ ۲: نشانیِ QRِ رسید، فقط فروشِ همین دکان
+    if (returnsV2 && ir.vil3ntec.tohid.core.receipt.ReceiptToken.parse(term) != null) {
+      return@remember ir.vil3ntec.tohid.data.ReturnFlow.find(d, term, shopTag = myReceiptTag)
+    }
     val debtorNames = d.debtors.associate { it.id to it.name }
     d.sales
       .filter {
         when (filter) {
-          "cash" -> it.status != "cancelled" && it.paymentMethod == "cash"
-          "credit" -> it.status != "cancelled" && it.paymentMethod == "credit"
+          //  PAY (v3 A4): گروه از `payments` اگر هست — کارت و کیف پول و حواله «نقدی» نیستند
+          "cash", "credit", ir.vil3ntec.tohid.data.PayFlow.NON_CASH -> it.status != "cancelled" && ir.vil3ntec.tohid.data.PayFlow.payGroup(it) == filter
           "cancelled" -> it.status == "cancelled"
           else -> true
         }
@@ -128,6 +157,8 @@ fun SalesHistoryScreen(
   var shiftHistory by remember { mutableStateOf(false) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(roleContext).accountName }.getOrDefault("") }
   val shift = remember(d) { ir.vil3ntec.tohid.data.CashShift.current(d) }
+  //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم (`ShiftPanelV2`)؛ خاموش ⇒ کارتِ امروز
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(roleContext) }
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -149,7 +180,10 @@ fun SalesHistoryScreen(
       Spacer(Modifier.height(12.dp))
     }
 
-    item {
+    if (payV2) item {
+      ShiftPanelV2(d = d, store = store, me = me, toast = ::toast)
+      Spacer(Modifier.height(12.dp))
+    } else item {
       Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {
@@ -186,10 +220,25 @@ fun SalesHistoryScreen(
             IconButton(onClick = { search = "" }) {
               Icon(Icons.Filled.Close, contentDescription = "پاک کردن جستجو", tint = Shop.colors.muted)
             }
+          } else if (returnsV2 && !ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+            //  گوشی: QRِ رسید با دوربین؛ کامپیوتر: اسکنرِ دستی همین کادر را پر می‌کند
+            ScanIconButton(onClick = { scanReceipt = true })
           }
         },
         modifier = Modifier.fillMaxWidth(),
       )
+      if (returnsV2) {
+        Spacer(Modifier.height(8.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            "برای برگشت، QRِ رسید را اسکن کنید یا شماره و نامِ مشتری را بنویسید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+            modifier = Modifier.weight(1f),
+          )
+          OutlinedButton(onClick = { noReceipt = true }) { Text("برگشتِ بی رسید") }
+        }
+      }
       Spacer(Modifier.height(10.dp))
     }
 
@@ -198,7 +247,7 @@ fun SalesHistoryScreen(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", "cancelled" to "لغوشده").forEach { (id, label) ->
+        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", ir.vil3ntec.tohid.data.PayFlow.NON_CASH to "غیرنقد", "cancelled" to "لغوشده").forEach { (id, label) ->
           FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(label) })
         }
       }
@@ -254,6 +303,8 @@ fun SalesHistoryScreen(
           last = index == shown.lastIndex,
           onInvoice = { invoiceFor = sale },
           onReturn = { returnFor = sale },
+          returnsV2 = returnsV2,
+          onReturnReceipt = { receiptFor = it },
           //  لغو و «ویرایش در سبد» (که خودش لغو است) فقط با صاحب و مدیر —
           //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
           onCancel = { if (canCancel) cancelFor = sale else toast(CANCEL_DENIED) },
@@ -276,10 +327,14 @@ fun SalesHistoryScreen(
       text = {
         Column {
           if (t != null) {
-            listOf(
+            (listOf(
               "اول صندوق" to t.opening, "فروش نقدی" to t.sales, "رسید قرض‌داران" to t.receipts,
               "مرجوعی" to -t.returns, "مصارف" to -t.expenses, "پرداخت به تأمین‌کننده و خرید" to -t.suppliers,
-            ).forEach { (label, v) ->
+            ) + listOfNotNull(
+              //  PAY: ورود/خروجِ نقدِ صندوقِ pay v2 — داده است، با پرچمِ خاموش هم شمرده می‌شود
+              ("ورودِ نقد" to t.cashIn).takeIf { t.cashIn > 0 },
+              ("خروجِ نقد" to -t.cashOut).takeIf { t.cashOut > 0 },
+            )).forEach { (label, v) ->
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
                 Text("${if (v < 0) "−" else ""}${money(kotlin.math.abs(v))}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
@@ -374,7 +429,41 @@ fun SalesHistoryScreen(
     InvoiceDialog(d = d, sale = sale, onDismiss = { invoiceFor = null }, onMessage = ::toast)
   }
 
-  returnFor?.let { sale ->
+  //  RET (تنظیم روشن): فرمِ تازه و رسیدِ برگشت؛ خاموش ⇒ پایین، همان پنجرهٔ امروز
+  if (returnsV2) {
+    returnFor?.let { sale ->
+      ReturnFlowDialog(
+        d = d, sale = sale, store = store,
+        onDismiss = { returnFor = null },
+        onPosted = { id, note -> returnFor = null; toast(note); receiptFor = id },
+        prefill = returnsShot == "first",
+      )
+    }
+    if (noReceipt) {
+      ReturnFlowDialog(
+        d = d, sale = null, store = store,
+        onDismiss = { noReceipt = false },
+        onPosted = { id, note -> noReceipt = false; toast(note); receiptFor = id },
+      )
+    }
+    receiptFor?.let { id -> ReturnReceiptDialog(d = d, docId = id, onDismiss = { receiptFor = null }, onMessage = ::toast) }
+    if (scanReceipt) {
+      BarcodeScanSheet(
+        onDismiss = { scanReceipt = false },
+        onCode = { code ->
+          scanReceipt = false
+          if (ir.vil3ntec.tohid.data.ReturnFlow.isForeignReceipt(code, myReceiptTag)) toast(ir.vil3ntec.tohid.data.ReturnFlow.FOREIGN_RECEIPT)
+          search = code
+          //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
+          ir.vil3ntec.tohid.data.ReturnFlow.find(d, code, shopTag = myReceiptTag).singleOrNull()?.takeIf { it.status != "cancelled" }?.let { returnFor = it }
+        },
+        title = "اسکنِ QRِ رسید",
+        qr = true,
+      )
+    }
+  }
+
+  if (!returnsV2) returnFor?.let { sale ->
     ReturnDialog(
       d = d,
       sale = sale,
@@ -505,15 +594,22 @@ private fun SaleRow(
   onReturn: () -> Unit,
   onCancel: () -> Unit,
   onReopen: () -> Unit,
+  returnsV2: Boolean = false,
+  onReturnReceipt: (String) -> Unit = {},
 ) {
   val cancelled = sale.status == "cancelled"
+  //  RET-12 — سندهای برگشتِ تازهٔ همین فاکتور، برای چاپِ دوبارهٔ رسید
+  val returnDocs = if (returnsV2) d.saleReturns.filter { it.saleId == sale.id }.mapNotNull { it.docId }.distinct() else emptyList()
+  //  ORD-20: فاکتورِ سریِ W را سرور هنگامِ تحویلِ سفارشِ اینترنتی ساخته — لغو و «اصلاح» ندارد
+  val online = sale.isOnlineOrder()
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
   val canReturn = !cancelled && d.saleItems.any { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
   var menu by remember { mutableStateOf(false) }
 
   val kindTint = when {
     cancelled -> Shop.colors.danger
-    sale.paymentMethod == "credit" -> Shop.colors.warning
+    online -> Shop.colors.primary
+    ir.vil3ntec.tohid.data.PayFlow.payGroup(sale) == "credit" -> Shop.colors.warning
     else -> Shop.colors.success
   }
 
@@ -538,8 +634,8 @@ private fun SaleRow(
       InvoiceCell(
         when {
           cancelled -> "لغوشده"
-          sale.paymentMethod == "credit" -> "نسیه"
-          else -> "نقدی"
+          online -> "اینترنتی"
+          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
         },
         0.8f,
         tint = kindTint,
@@ -563,9 +659,15 @@ private fun SaleRow(
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
           DropdownMenuItem(text = { Text("دیدن فاکتور") }, onClick = { menu = false; onInvoice() })
           if (canReturn) {
-            DropdownMenuItem(text = { Text("مرجوعی") }, onClick = { menu = false; onReturn() })
+            DropdownMenuItem(text = { Text(if (returnsV2) "برگشت یا تعویض" else "مرجوعی") }, onClick = { menu = false; onReturn() })
           }
-          if (!cancelled) {
+          returnDocs.forEach { id ->
+            DropdownMenuItem(
+              text = { Text("رسیدِ برگشت ${ir.vil3ntec.tohid.data.ReturnFlow.label(id)}") },
+              onClick = { menu = false; onReturnReceipt(id) },
+            )
+          }
+          if (!cancelled && !online) {
             DropdownMenuItem(text = { Text("اصلاح فاکتور") }, onClick = { menu = false; onReopen() })
             DropdownMenuItem(
               text = { Text("لغو فروش", color = Shop.colors.danger) },

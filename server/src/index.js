@@ -34,6 +34,17 @@ async function main() {
     process.exit(1);
   }
 
+  //  کفِ «فروشِ تحویل» برای دکان‌هایی که کدِ پیشین سفارش را خودکار کم می‌کرد (shop.orders.ledger /
+  //  shop.catalog) = لحظهٔ همین راه‌اندازی — **پیش از** نخستین درخواست، وگرنه config ِ زودرسِ برنامه کفِ
+  //  دیرتری می‌گذاشت و تحویلِ میانِ این دو فروش نمی‌گرفت (lib/order-ledger.js). شکست ⇒ سرور بالا
+  //  می‌آید و claimFloor همان لحظهٔ راه‌اندازی را به کار می‌برد.
+  try {
+    const n = await require('./lib/order-ledger').claimFloorsAtStart();
+    if (n) console.log(`[orders] کفِ تحویل برای ${n} دکان گذاشته شد`);
+  } catch (e) {
+    console.error('[orders] کفِ تحویل', e.message);
+  }
+
   const app = await createApp();
   const server = app.listen(config.port, config.host, () => {
     const where = config.serverUrl || `http://${config.host}:${config.port}`;
@@ -49,19 +60,25 @@ async function main() {
    *  سرویسِ ایمیل منتظر می‌ماند و هر کندیِ ایمیل، کندیِ ورود می‌شد.
    */
   outbox.start();
+  //  کارگرِ اعلانِ سفارش (v3 §۳۰) — روی خودِ سرور، بی‌نیاز به کامپیوترِ دکان؛
+  //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
+  const orderNotify = require('./lib/order-notify');
+  orderNotify.start();
+  //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
+  require('./lib/order-timeout').start();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
   live.attach(server);
 
   const backupTimer = backup.schedule();
+  //  PGlite autovacuum ندارد ⇒ آمارِ planner را خودمان تازه می‌کنیم (PERF-03)؛ روی PostgreSQL هیچ
+  const pgliteStats = require('./lib/pglite-stats').schedule();
   //  زمان‌بندِ مرکزِ اعلان: هر دقیقه اعلان‌های وقت‌رسیده، و روزی یک بار
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
-  //  جاروی رزروهای سررسیدهٔ سفارش (v3 §۳۲.۲ بندِ ۶) — بی ردیف (پرچمِ خاموش) کاری نمی‌کند
-  const stock = require('./lib/stock');
-  stock.startSweeper();
+  //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
   const telegram = require('./lib/bots').pump();
@@ -74,9 +91,10 @@ async function main() {
     closing = true;
     console.log(`[${signal}] در حال خاموش شدن…`);
     if (backupTimer) clearInterval(backupTimer);
+    if (pgliteStats) pgliteStats.stop();
     outbox.stop();
+    orderNotify.stop();
     notices.stopRunner();
-    stock.stopSweeper();
     telegram.stop();
     server.close(async () => {
       await closeDb();

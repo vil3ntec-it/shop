@@ -22,6 +22,7 @@ object ShopRole {
 
   private const val PREFS = "tohid-ledger"   // کنارِ صاحبِ دفتر، تا با هم پاک شوند
   private const val KEY = "shop_role"
+  private const val SHOP_ID = "shop_id"
   //  `policy`ِ سرور (STF-01..03) — لایه‌های دکان و همین کاربر، به همان شکلِ JSON
   private const val POLICY = "shop_policy"
 
@@ -29,6 +30,12 @@ object ShopRole {
   const val OWNER = "owner"
   const val MANAGER = "manager"
   const val STAFF = "staff"
+  /**
+   *  پیک (DLV-01، v3 §۳.۱۱) — توکنش فقط درهای `/api/courier/…` را باز می‌کند، پس
+   *  برنامه به‌جای دکان «حالتِ پیک» را باز می‌کند و همگام‌سازیِ دفتر را
+   *  اصلاً راه نمی‌اندازد (سرور هم `403 courier_scope` می‌دهد).
+   */
+  const val COURIER = "courier"
 
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -51,17 +58,30 @@ object ShopRole {
     val edit = p.edit().putString(KEY, clean)
     if (p.getString(KEY, null) != clean) edit.remove(POLICY)
     edit.apply()
+    courierMode.value = clean == COURIER
+    policyVersion.value++
   }
+
+  /** شناسهٔ دکان — «برگهٔ امضاشده»ی تأیید (STF-02) به آن بسته است */
+  fun rememberShopId(context: Context, id: String?) {
+    val clean = id?.trim().orEmpty()
+    if (clean.isNotEmpty()) prefs(context).edit().putString(SHOP_ID, clean).apply()
+  }
+
+  fun shopId(context: Context): String = prefs(context).getString(SHOP_ID, "").orEmpty()
 
   /** `policy`ِ پاسخِ `GET /api/shop`؛ null یعنی «بی لایه» = همان رفتارِ امروزِ نقش */
   fun rememberPolicy(context: Context, policyJson: String?) {
     val e = prefs(context).edit()
     if (policyJson.isNullOrBlank()) e.remove(POLICY) else e.putString(POLICY, policyJson)
     e.apply()
+    policyVersion.value++
   }
 
   fun forget(context: Context) {
-    prefs(context).edit().remove(KEY).remove(POLICY).apply()
+    prefs(context).edit().remove(KEY).remove(POLICY).remove(SHOP_ID).apply()
+    courierMode.value = false
+    policyVersion.value++
   }
 
   /**
@@ -70,6 +90,20 @@ object ShopRole {
    */
   fun allows(context: Context, key: String): Boolean =
     PermPolicy.allows(current(context), prefs(context).getString(POLICY, null), key)
+
+  /** حالتِ پیک: نقشِ ذخیره‌شده «پیک» است */
+  fun isCourier(context: Context): Boolean =
+    prefs(context).getString(KEY, "").orEmpty() == COURIER
+
+  /**
+   *  «الان پیک است؟» — زنده، تا صفحهٔ اصلی از هر راهی که نقش عوض شد (ورود
+   *  با کد، پیوستن از صفحهٔ ساختِ دکان، پرسشِ دوبارهٔ سرور) همان لحظه به
+   *  حالتِ پیک برود یا از آن بیرون بیاید.
+   */
+  val courierMode = kotlinx.coroutines.flow.MutableStateFlow(false)
+
+  /** هر بار نقش یا `policy` عوض شد یک بالا می‌رود — صفحه‌ای که مجوز را `remember` کرده دوباره می‌سنجد */
+  val policyVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
 
   /** شاگرد است — نه صاحب، نه مدیر */
   fun isStaff(context: Context): Boolean = current(context) == STAFF
@@ -93,6 +127,29 @@ object ShopRole {
   fun canDiscount(context: Context): Boolean = allows(context, "sales.discount")
   fun canCancelSale(context: Context): Boolean = allows(context, "sales.cancel")
 
+  /**
+   *  تصمیمِ کامل برای یک کارِ عددی (STF-02/03): allow، approve («درخواستِ
+   *  تأیید») یا deny — همان `evaluate`ی که سرور روی op می‌دواند.
+   *  `req` مثلاً `{"pct": 20.0, "amount": 2000.0}` (مبلغ به Minor).
+   */
+  fun decide(context: Context, key: String, req: Map<String, Double>? = null): ir.vil3ntec.tohid.core.perm.PermCore.Decision =
+    ir.vil3ntec.tohid.core.perm.PermCore.evaluate(
+      current(context), PermPolicy.layers(prefs(context).getString(POLICY, null)), key, req,
+    )
+
+  /** کادرِ تخفیف دیده شود؟ هر چیزی جز «ممنوع» — «نیازمند تأیید» یعنی با PINِ مدیر */
+  fun mayDiscount(context: Context): Boolean = decide(context, "sales.discount").decision != "deny"
+
   /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
   fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
+
+  /** لایه‌های `policy` برای تصمیمِ عددی (RET-10: `ReturnFlow.permDecision`) */
+  fun layers(context: Context): List<Any?> = PermPolicy.layers(prefs(context).getString(POLICY, null))
+
+  /**
+   *  باز کردنِ دستیِ کشو بی فروش (`no_sale`) — `drawer.open`ِ هسته. شاگرد
+   *  پیش‌فرض نه؛ «نیازمندِ تأیید» هم این‌جا یعنی نه (برگهٔ تأیید هنوز در
+   *  برنامه نیست)، همان کشوی بی فروشِ #286.
+   */
+  fun canOpenDrawer(context: Context): Boolean = allows(context, "drawer.open")
 }

@@ -1,38 +1,50 @@
 name: ابزارِ مهاجرتِ داده (shop-migrate)
 
 # فقط ساخت و آزمونِ `tools/shop-migrate` — به هیچ برنامه‌ای وصل نیست و چیزی منتشر نمی‌کند.
-# روی تغییرِ همان فایل‌های برنامه هم اجرا می‌شود که ابزار از آن‌ها کپی می‌گیرد یا
-# فرمولشان را تکرار می‌کند (نگهبانِ دیگرش `MigrationGoldenTest` در آزمون‌های android-native است).
+# روی تغییرِ همان فایل‌های برنامه هم اجرا می‌شود که ابزار از آن‌ها کپی می‌گیرد — دقیقاً
+# `legacyFiles` و `coreFiles`ِ tools/shop-migrate/build.gradle.kts (فایلی که آن‌جا اضافه شد این‌جا هم).
+# ⛔ ShopStore.kt و ReportEngine.kt دیگر این‌جا نیستند: ابزار آن‌ها را کامپایل نمی‌کند و فقط فرمولشان را
+# در LegacyFigures.kt تکرار می‌کند، پس نتیجهٔ این ورک‌فلو با تغییرِ آن‌ها عوض نمی‌شد (هر PRِ دفتر آن را
+# بیهوده می‌دواند). نگهبانِ هم‌خوانیِ فرمول‌ها `MigrationGoldenTest` است که در «توحید بومی» و
+# «فروشگاه من — کامپیوتر» روی همان تغییر می‌دود.
 
 on:
   pull_request:
     paths:
       - 'tools/shop-migrate/**'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/LocaleText.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/calendar/**'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/text/**'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/calendar/SolarHijri.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/calendar/CivilDays.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/text/LocaleFormat.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/text/TextNormalizer.kt'
       - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
+      #  ابزار با Gradleِ پروژهٔ کامپیوتر ساخته می‌شود (پایین)
+      - 'desktop/gradle/wrapper/**'
       - '.github/workflows/shop-migrate.yml'
   push:
     branches: [main]
     paths:
       - 'tools/shop-migrate/**'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReportEngine.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Jalali.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/Format.kt'
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/LocaleText.kt'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/calendar/**'
-      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/core/text/**'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/calendar/SolarHijri.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/calendar/CivilDays.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/text/LocaleFormat.kt'
+      - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/text/TextNormalizer.kt'
       - 'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/sync/v1/Ulid.kt'
+      - 'desktop/gradle/wrapper/**'
       - '.github/workflows/shop-migrate.yml'
   workflow_dispatch:
+
+concurrency:
+  #  PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند. اجرای main هرگز وسطِ کار لغو نمی‌شود.
+  group: shop-migrate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

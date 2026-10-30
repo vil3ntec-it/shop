@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -106,9 +107,41 @@ fun ProductDetailScreen(
             d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
           )
         }
-        ir.vil3ntec.tohid.sync.PhotoSync.changed(context, product.id)
+        //  همگام‌سازیِ امروز + بانکِ تصاویرِ روشن ⇒ عکسِ خودِ دکان به بانکِ همین دکان (در صف)
+        ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = true, scope = scope)
         photoVersion++
       }
+    }
+  }
+
+  /* ------------------ بانکِ تصاویر و دوربینِ راهنما (۳۶.۶، ۳۷.۵) ------------------ */
+  val bankOn = ir.vil3ntec.tohid.data.ImageBank.enabled.value == true
+  LaunchedEffect(Unit) {
+    if (ir.vil3ntec.tohid.data.ImageBank.enabled.value == null) ir.vil3ntec.tohid.data.ImageBank.refresh(context)
+  }
+  var bankOpen by remember { mutableStateOf(false) }
+  var guidedOpen by remember { mutableStateOf(false) }
+  if (bankOpen) {
+    ImageBankPicker(
+      productId = product.id, name = product.name, barcode = product.barcodes.firstOrNull().orEmpty(),
+      hasPhoto = product.photo, onDismiss = { bankOpen = false },
+    ) { bytes ->
+      bankOpen = false
+      PhotoStore.saveBytes(context, product.id, bytes).onSuccess {
+        scope.launch {
+          val cur = store.data.value
+          store.save(cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
+        }
+        //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
+        ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = false)
+        photoVersion++
+      }
+    }
+  }
+  if (guidedOpen) {
+    ir.vil3ntec.tohid.scan.GuidedCaptureDialog(onDismiss = { guidedOpen = false }) { uri ->
+      guidedOpen = false
+      studioUri = uri   //  همان استودیوی همیشگی؛ بی تأیید چیزی جایگزین نمی‌شود
     }
   }
 
@@ -148,13 +181,13 @@ fun ProductDetailScreen(
               .offset(x = (-4).dp, y = (-4).dp)
               .size(22.dp)
               .clip(RoundedCornerShape(11.dp))
-              .background(Shop.colors.primary),
+              .background(Shop.colors.button.primary.bg),
             contentAlignment = Alignment.Center,
           ) {
             Icon(
               Icons.Filled.PhotoCamera,
               contentDescription = "عکس محصول",
-              tint = Color.White,
+              tint = Shop.colors.button.primary.text,
               modifier = Modifier.size(13.dp),
             )
           }
@@ -214,6 +247,20 @@ fun ProductDetailScreen(
           phoneMsg?.let {
             Spacer(Modifier.width(8.dp))
             Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, modifier = Modifier.weight(1f))
+          }
+        }
+      }
+
+      if (bankOn || ir.vil3ntec.tohid.scan.GuidedCapture.AVAILABLE) {
+        Spacer(Modifier.height(Space.xs))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          if (bankOn) OutlinedButton(onClick = { bankOpen = true }) { Text("انتخاب از بانکِ تصاویر") }
+          if (ir.vil3ntec.tohid.scan.GuidedCapture.AVAILABLE) {
+            OutlinedButton(onClick = { guidedOpen = true }) {
+              Icon(Icons.Filled.PhotoCamera, contentDescription = null, modifier = Modifier.size(16.dp))
+              Spacer(Modifier.width(6.dp))
+              Text("عکس با راهنما")
+            }
           }
         }
       }

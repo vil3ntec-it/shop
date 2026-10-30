@@ -21,6 +21,13 @@
   <uses-permission android:name="android.permission.CAMERA" />
 
   <!--
+       پیامِ صوتیِ چتِ دکان (v3 §۳۳). فقط وقتی کاربر دکمهٔ ضبط را می‌زند و
+       با پرسشِ صریحِ اندروید؛ چت پشتِ پرچمِ shop.chat است و بی آن هیچ‌وقت
+       پرسیده نمی‌شود.
+  -->
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+  <!--
        لوکیشنِ دکان.
 
        قرارِ صاحب مخزن: لوکیشن باید همان اولِ کار — حتی پیش از ثبت‌نام —
@@ -57,8 +64,15 @@
   -->
   <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
+  <!--
+    SEC-01: عاملِ پشتیبان فقط وقتی رمزِ دفتر در کار است چیزی کم می‌کند (دفترِ رمزدار،
+    کلیددان و حالِ همگام‌سازی با هم بیرون)؛ خاموش ⇒ همان دو فایلِ قاعده (`TohidBackupAgent`).
+    `fullBackupOnly` یعنی همان پشتیبانِ خودکارِ کامل، نه کلید/مقدارِ قدیمی.
+  -->
   <application
       android:allowBackup="true"
+      android:backupAgent=".data.TohidBackupAgent"
+      android:fullBackupOnly="true"
       android:dataExtractionRules="@xml/backup_rules"
       android:fullBackupContent="@xml/backup_rules_legacy"
       android:icon="@mipmap/ic_launcher"

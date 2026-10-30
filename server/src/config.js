@@ -69,6 +69,13 @@ const config = {
     accessTtlMs:  num(process.env.ACCESS_TOKEN_TTL_MIN, 60) * 60 * 1000,
     refreshTtlMs: num(process.env.REFRESH_TOKEN_TTL_DAYS, 90) * 24 * 60 * 60 * 1000,
     adminTtlMs:   num(process.env.ADMIN_TOKEN_TTL_HOURS, 12) * 60 * 60 * 1000,
+    /*
+     *  تأییدِ دوباره برای کارهای حساس (بندِ ۲۱.۱) — `lib/reauth.js`.
+     *  پنجره: چند دقیقه پس از ورود یا تأییدِ دوباره، همان نشست «تازه» است.
+     *  `AUTH_REAUTH=off` کلیدِ بازگشت است (رفتارِ پیش از این تغییر).
+     */
+    reauthWindowMs: num(process.env.REAUTH_WINDOW_MIN, 10) * 60 * 1000,
+    reauthEnforced: bool(process.env.AUTH_REAUTH, true),
   },
 
   otp: {
@@ -92,6 +99,20 @@ const config = {
      *  که کندتر برود پشتِ پاسخ ادامه می‌دهد. ۰ = بی کف (فقط برای آزمون).
      */
     uniformMs:  num(process.env.OTP_UNIFORM_MS, 1500),
+    /*
+     *  SEC-06 — سقفِ هزینه و ضدِ SMS pumping (`lib/otp.js`)؛ فقط پیامکِ واقعی.
+     *  شمارهٔ «آشنا» (پیش‌تر کدی را درست زده یا مشتریِ ویترین است) از سقفِ IP و
+     *  بلوک معاف است، سقفِ خارجیِ جدا و بالاتر دارد، و فقط knownExtra پیامک بیش
+     *  از dailyMax (آشنا شدن با یک کد ارزان است؛ سهمش کوچک می‌ماند).
+     */
+    smsGuard: {
+      ipPhones:      num(process.env.OTP_SMS_IP_PHONES, 10),        // شمارهٔ ناآشنای جدا از یک IP در ساعت
+      blockPhones:   num(process.env.OTP_SMS_BLOCK_PHONES, 10),     // در یک بلوکِ هزارتایی در ساعت
+      foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ ناآشنای جدا در ساعت، کلِ سرور
+      knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
+      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
+      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+    },
   },
 
   /*
@@ -141,6 +162,12 @@ const config = {
     subject: process.env.EMAIL_SUBJECT || '',
   },
 
+  //  هشدارِ ورود از دستگاه/شبکهٔ تازه (بندِ ۲۱.۱) — `lib/login-alerts.js`؛
+  //  `LOGIN_ALERTS=off` کلیدِ بازگشت است
+  loginAlerts: bool(process.env.LOGIN_ALERTS, true),
+  //  حسابِ تازه‌ساخته در این چند دقیقه دستگاه‌هایش را راه می‌اندازد — هشدار نه
+  loginAlertGraceMs: num(process.env.LOGIN_ALERT_GRACE_MIN, 10) * 60 * 1000,
+
   google: {
     //  همه‌ی شناسه‌های پذیرفته‌شده — سنجشِ توکن هر کدام را قبول می‌کند.
     //  شناسه‌ی Desktop هم این‌جاست، وگرنه توکنی که خودِ ما خواستیم
@@ -157,6 +184,9 @@ const config = {
     //  ‎invalid_client‎ می‌افتد.
     desktopClientId: (process.env.GOOGLE_DESKTOP_CLIENT_ID || '').trim(),
     certsUrl:  process.env.GOOGLE_CERTS_URL || 'https://www.googleapis.com/oauth2/v3/certs',
+    //  ⛔ بندِ ۲۹.۲ قاعدهٔ ۵: گوگل فقط با اثباتِ روشِ قبلیِ حساب وصل می‌شود.
+    //  `1` فقط کلیدِ بازگشتِ اضطراری به وصلِ خودکار با ایمیلِ تأییدشده است.
+    legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
   /*
@@ -211,6 +241,10 @@ const config = {
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
+    //  کدِ وصلِ گوگل (`/auth/google/link-code`) به‌ازای «ایمیلِ توکن + IP».
+    //  کلیدِ `otpMax` از بدنه می‌آید و این مسیر ایمیلی در بدنه ندارد، پس
+    //  تا امروز فقط به‌ازای IP شمرده می‌شد.
+    linkCodeMax:  num(process.env.RATE_LINK_CODE_MAX, 3),
     //  ⛔ F0-16 — `register/start` و `password/forgot` به‌ازای هر **IP**. سقفِ
     //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
@@ -231,6 +265,10 @@ const config = {
     //  است (ساعتی یک بار) و یک دکانِ چندگوشی‌ای پشتِ یک اینترنت
     //  نباید همدیگر را ببندند.
     sessionMax:   num(process.env.RATE_SESSION_MAX, 120),
+    //  سنجیدنِ رمز با یک توکنِ باز (`/auth/password`، `/auth/reauth`) — به‌ازای
+    //  **هر نشست**، نه هر IP (بازبینیِ امنیتی ۱۴۰۵/۰۷/۲۷). ده در پنجره برای
+    //  آدمِ واقعی بس است؛ حدس زدن را از یک توکنِ دزدیده کند می‌کند.
+    passwordSessionMax: num(process.env.RATE_PASSWORD_SESSION_MAX, 10),
     //  پیامِ همگانی — عمداً تنگ: یک اشتباه نباید هزار پیام بفرستد.
     //  از محیط خوانده می‌شود تا آزمون‌ها بتوانند چند بار بزنند و
     //  خودِ سقف هم جدا سنجیده شود.
@@ -272,6 +310,29 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    /*
+     *  «این پین در محدوده است؟» (‎GET /api/store/:slug/delivery‎) — به‌ازای
+     *  (IP، ویترین) در **۲۴ ساعت**. پاسخ خودش با خانهٔ ۳۰۰ متریِ شبکه است؛
+     *  این سقف جمع کردنِ همهٔ خانه‌های لبه برای برازشِ مرکز را هم کند می‌کند.
+     */
+    storeLocateDailyMax: num(process.env.RATE_STORE_LOCATE_DAILY_MAX, 60),
+    //  بازارچه (`/api/market/*`): خواندن سطلِ خودش را با `generalMax` دارد؛
+    //  جست‌وجوی کالا در همهٔ دکان‌ها گران‌تر است ⇒ سطلِ تنگ‌ترِ خودش، به‌ازای IP.
+    //  بازبینیِ امنیتی سقفِ ضربه‌ای در دقیقه گذاشت. ⚠️ اپراتورهای موبایل (CGNAT) صدها
+    //  مشتری را پشتِ یک IP می‌برند؛ ۱۰ در دقیقه و ۶۰ در ربع ساعت یعنی مشتریِ عادی ۴۲۹ می‌گرفت.
+    //  حالا ۳۰ در دقیقه و ۳۰۰ در ربع ساعت (میانگینِ ۲۰ در دقیقه). سپرِ دیتابیس فقط این سقف
+    //  نیست: برشِ یک‌پروازِ دکان‌ها (eligibleCacheMs)، نمایهٔ باریکِ market_search، دست‌کم دو
+    //  حرف و سقفِ نتیجه سرِ جایشان‌اند.
+    marketSearchMax: num(process.env.RATE_MARKET_SEARCH_MAX, 300),
+    marketSearchBurstMax: num(process.env.RATE_MARKET_SEARCH_BURST_MAX, 30),
+    //  خانهٔ بازارچه (`/api/market/products`): همان ۳۰ در دقیقه، سطلِ جدا
+    marketFeedBurstMax: num(process.env.RATE_MARKET_FEED_BURST_MAX, 30),
+    //  فاکتورِ عمومی (QRِ هر فاکتور، `/api/receipt`) به‌ازای IP: ربع‌ساعته و ضربه‌ای در دقیقه.
+    //  سقفِ ربع‌ساعته گشاد است: مشتری‌های پشتِ NAT ِ اپراتور یک IP دارند؛ ضربه‌ای تنگ می‌ماند
+    receiptReadMax: num(process.env.RATE_RECEIPT_READ_MAX, 300),
+    receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
+    //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
+    receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
   },
 
   /**
@@ -290,6 +351,24 @@ const config = {
     offlineMs: num(process.env.STORE_PRESENCE_OFFLINE_MIN, 60) * 60 * 1000,
     //  ۲۳.۴ — شمارهٔ تأییدشدهٔ مشتری چند روز بی کدِ تازه می‌ماند
     ticketTtlMs: num(process.env.STORE_CUSTOMER_TICKET_DAYS, 14) * 24 * 60 * 60 * 1000,
+    //  ساختن/ورود به حسابِ مشتری فقط با بلیتی که همین چند دقیقه پیش صادر شده
+    accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
+    //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
+    customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
+  },
+
+  /**
+   * بازارچه (`lib/market.js`، پرچمِ `market.directory`). نتیجهٔ دروازهٔ هر دکان
+   * (پرچم‌ها و اشتراک) این‌قدر در حافظه می‌ماند؛ «روشن»، «فعال» و «در فهرست»
+   * همیشه زنده خوانده می‌شوند. ۰ ⇒ بی حافظه.
+   */
+  market: {
+    gateCacheMs: num(process.env.MARKET_GATE_CACHE_MS, 30 * 1000),
+    //  «برشِ» دکان‌های در فهرست (شمارِ کالا، دیدهٔ دستگاه، نمایهٔ جست‌وجو) — یک‌پرواز.
+    //  «روشن»، «فعال» و «در فهرست» باز هم در هر درخواست زنده سنجیده می‌شوند.
+    eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
+    //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
+    feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
@@ -333,6 +412,20 @@ const config = {
     //  به‌ازای هر فرستنده (مشتری: دکان+شماره، کارمند: کاربر) در پنجرهٔ `rateLimit.windowMs`
     sendMax:        num(process.env.RATE_CHAT_SEND_MAX, 300),
     uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),
+  },
+
+  //  اعتماد، شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
+  trust: {
+    //  سقفِ ماندگار (در دیتابیس، پس از راه‌اندازیِ دوباره هم سر جاست) در ۲۴ ساعت
+    dailyPerPhone:  num(process.env.TRUST_DAILY_PER_PHONE, 5),
+    dailyPerIp:     num(process.env.TRUST_DAILY_PER_IP, 20),
+    //  سقفِ حافظه‌ای در پنجرهٔ `rateLimit.windowMs`
+    fileMax:        num(process.env.RATE_TRUST_FILE_MAX, 10),
+    fileIpMax:      num(process.env.RATE_TRUST_FILE_IP_MAX, 30),
+    uploadMax:      num(process.env.RATE_TRUST_UPLOAD_MAX, 30),
+    imageMax:       num(process.env.TRUST_IMAGE_MAX_KB, 1536) * 1024,
+    evidenceMax:    num(process.env.TRUST_EVIDENCE_MAX, 5),
+    appealDays:     num(process.env.TRUST_APPEAL_DAYS, 14),
   },
 
   corsOrigins: list(process.env.CORS_ORIGIN || process.env.CORS_ORIGINS),

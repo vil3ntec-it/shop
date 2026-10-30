@@ -27,7 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.HourglassBottom
@@ -41,6 +41,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import ir.vil3ntec.tohid.ui.theme.LightColors
+import ir.vil3ntec.tohid.ui.theme.DarkColors
+import ir.vil3ntec.tohid.ui.theme.Brand
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -65,6 +69,8 @@ import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  سربرگِ همیشگی — همان نواری که در نسخهٔ وب بالای هر صفحه است.
@@ -82,7 +88,7 @@ import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 private val ALERT_ORANGE = Color(0xFFF08A24)
 
 /**
- *  آبیِ سربرگ.
+ *  رنگِ سربرگ — از ۱۴۰۵/۰۷/۲۸ سبزآبیِ برندِ VILL3N (پیش‌تر آبیِ تیره).
  *
  *  ── چرا در تمِ روشن هم آبیِ تیره ────────────────────────────────────
  *  سربرگ تا دیروز هم‌رنگِ زمینه بود: در تمِ روشن یک نوارِ سفید با شش
@@ -94,12 +100,12 @@ private val ALERT_ORANGE = Color(0xFFF08A24)
  *
  *  در شب کمی تیره‌تر است تا کنارِ زمینهٔ سرمه‌ای، پله‌اش زیاد نباشد.
  */
-private val BAR_DAY = listOf(Color(0xFF073E78), Color(0xFF0F62B4), Color(0xFF1E86D6))
-private val BAR_NIGHT = listOf(Color(0xFF04121F), Color(0xFF0B2E52), Color(0xFF11487A))
+private val BAR_DAY = listOf(Brand.deep, lerp(Brand.deep, Brand.primary, 0.5f), Brand.primary)
+private val BAR_NIGHT = listOf(DarkColors.inverse, lerp(DarkColors.inverse, DarkColors.surfaceSelected, 0.5f), DarkColors.surfaceSelected)
 
-/** جوهرِ روی سربرگ — همیشه روشن، چون زیرش همیشه آبیِ تیره است */
-private val BAR_INK = Color(0xFFF4FAFF)
-private val BAR_INK_SOFT = Color(0xFFC7DEF4)
+/** جوهرِ روی سربرگ — همیشه روشن، چون زیرش همیشه سبزآبیِ تیره است */
+private val BAR_INK = LightColors.onInverse
+private val BAR_INK_SOFT = Brand.successSurface
 
 /** نارنجیِ روی آبی — روشن‌تر از `ALERT_ORANGE` که برای زمینهٔ روشن است */
 private val BAR_ALERT = Color(0xFFFFC06A)
@@ -144,15 +150,15 @@ private fun subscriptionAlert(
   return when (status.state) {
     ir.vil3ntec.tohid.sync.License.State.EXPIRED,
     ir.vil3ntec.tohid.sync.License.State.GRACE ->
-      Alert("اشتراک", "اشتراک تمام شده", "برای باز شدن دوباره، تمدید کنید", danger, "vip")
+      Alert(StrNav.subscription, StrNav.subscriptionEnded, StrNav.renewToReopen, danger, "vip")
 
     ir.vil3ntec.tohid.sync.License.State.ACTIVE -> {
       val left = status.daysLeft()
       if (left in 0..SUBSCRIPTION_WARN_DAYS) {
         Alert(
-          if (left <= 0) "امروز" else "${left.fa()} روز",
-          "اشتراک رو به پایان است",
-          "پیش از تمام شدن تمدید کنید تا صندوق فروش بسته نشود",
+          if (left <= 0) Str.today else Str.days(left.fa()),
+          StrNav.subscriptionEnding,
+          StrNav.renewBeforeEnd,
           if (left <= 3) danger else warning,
           "vip",
         )
@@ -224,7 +230,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
   val danger = Shop.colors.danger
   val warning = Shop.colors.warning
   val accent = Shop.colors.accent
-  return remember(d, backupStale, danger, warning, accent, subscription, news) {
+  return remember(d, backupStale, danger, warning, accent, subscription, news, ir.vil3ntec.tohid.LocaleChoice.lang) {
     buildList {
       //  اول از همه، چون از هر موجودیِ کمی مهم‌تر است
       subscriptionAlert(subscription, danger, warning)?.let { add(it) }
@@ -233,7 +239,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
       news.forEach { event ->
         add(
           Alert(
-            value = event.userName.ifBlank { "دکان" },
+            value = event.userName.ifBlank { Str.shop },
             title = event.title,
             detail = event.body.ifBlank { sinceText(event.at) },
             tint = if (event.kind == "stock_out") danger else accent,
@@ -242,17 +248,17 @@ fun rememberAlerts(d: ShopData): List<Alert> {
         )
       }
       d.products.filter { ShopStore.stockStatus(d, it) == "out" }.forEach {
-        add(Alert("تمام شد", it.name, "کالا موجود نیست", danger, "products"))
+        add(Alert(StrNav.soldOut, it.name, StrNav.notInStock, danger, "products"))
       }
       d.products.filter { ShopStore.stockStatus(d, it) == "low" }.forEach {
-        add(Alert("موجودی کم", it.name, "${qty(ShopStore.stock(d, it.id))} مانده", warning, "products"))
+        add(Alert(Str.stockLow, it.name, StrNav.leftQty(qty(ShopStore.stock(d, it.id))), warning, "products"))
       }
       val supplierDebt = d.suppliers.sumOf { ShopStore.supplierDebt(d, it.id) }
       if (supplierDebt > 0) {
-        add(Alert("بدهی به تأمین‌کننده", "${money(supplierDebt)} ؋", "پرداخت‌نشده", warning, "purchasing"))
+        add(Alert(StrNav.supplierDebt, "${money(supplierDebt)} ؋", StrNav.unpaid, warning, "purchasing"))
       }
       if (backupStale) {
-        add(Alert("پشتیبان", "از اطلاعات دکان پشتیبان بگیرید", BackupClock.text(context), warning, "settings"))
+        add(Alert(StrNav.backup, StrNav.takeBackup, BackupClock.text(context), warning, "settings"))
       }
       d.debtors
         .map { it to ShopStore.debt(d, it.id) }
@@ -260,7 +266,7 @@ fun rememberAlerts(d: ShopData): List<Alert> {
         .sortedByDescending { it.second }
         .take(3)
         .forEach { (debtor, amount) ->
-          add(Alert("قرض‌دار", debtor.name, "${money(amount)} ؋", danger, "debtors"))
+          add(Alert(Str.debtor, debtor.name, "${money(amount)} ؋", danger, "debtors"))
         }
     }
   }
@@ -390,7 +396,7 @@ fun TohidTopBar(
               .clickable(onClick = onMenu),
             contentAlignment = Alignment.Center,
           ) {
-            Icon(Icons.Filled.Menu, contentDescription = "منو", tint = Color.White, modifier = Modifier.size(20.dp))
+            Icon(Icons.Filled.Menu, contentDescription = Str.menu, tint = Color.White, modifier = Modifier.size(20.dp))
           }
           Spacer(Modifier.width(8.dp))
         }
@@ -404,8 +410,8 @@ fun TohidTopBar(
             contentAlignment = Alignment.Center,
           ) {
             Icon(
-              Icons.Filled.ArrowForward,
-              contentDescription = "بازگشت",
+              Icons.AutoMirrored.Filled.ArrowBack,
+              contentDescription = Str.goBack,
               tint = BAR_INK,
               modifier = Modifier.size(18.dp),
             )
@@ -453,13 +459,13 @@ fun TohidTopBar(
             ) {
               Icon(Icons.Filled.Search, contentDescription = null, tint = BAR_INK, modifier = Modifier.size(17.dp))
               Spacer(Modifier.width(8.dp))
-              Text("جست‌وجو…", color = BAR_INK.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+              Text(Str.searchHint, color = BAR_INK.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
               Spacer(Modifier.width(60.dp))
               Spacer(Modifier.width(18.dp))
               Text("Ctrl+K", color = BAR_INK.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
             }
           } else {
-            BarButton(Icons.Filled.Search, "جست‌وجو", onClick = onSearch)
+            BarButton(Icons.Filled.Search, Str.search, onClick = onSearch)
           }
         }
 
@@ -471,12 +477,12 @@ fun TohidTopBar(
 
         BarButton(
           if (theme == ThemeChoice.DARK) Icons.Filled.LightMode else Icons.Filled.DarkMode,
-          "روشن یا تاریک",
+          StrNav.lightOrDark,
         ) {
           onTheme(if (theme == ThemeChoice.DARK) ThemeChoice.LIGHT else ThemeChoice.DARK)
         }
 
-        BarButton(Icons.Filled.Settings, "تنظیمات", onClick = onSettings)
+        BarButton(Icons.Filled.Settings, Str.settings, onClick = onSettings)
       }
     }
   }
@@ -484,10 +490,10 @@ fun TohidTopBar(
   if (alertsOpen) {
     AdaptiveSheet(onDismissRequest = { alertsOpen = false }, containerColor = Shop.colors.bg) {
       Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 28.dp)) {
-        Text("هشدارهای فروشگاه", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrNav.shopAlerts, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
         if (alerts.isEmpty()) {
-          EmptyNote("همه‌چیز مرتب است — هشداری نیست.")
+          EmptyNote(StrNav.allClear)
         } else {
           alerts.forEach { alert ->
             // هشداری که فقط خبر می‌دهد، نصفِ کار است: با زدن روی آن،
@@ -762,16 +768,16 @@ private fun SyncDot() {
 
         /* ------------------------- سرور ------------------------- */
 
-        Text("سرور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrNav.server, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
 
         val serverLine = when (pulse) {
-          ServerPulse.State.UP -> "وصل است"
-          ServerPulse.State.DOWN -> "وصل نمی‌شود"
-          ServerPulse.State.NO_NET -> "نتِ گوشی قطع است"
-          ServerPulse.State.CHECKING -> "در حال سنجش…"
-          ServerPulse.State.UNKNOWN -> "هنوز سنجیده نشده"
-          ServerPulse.State.NO_SERVER -> "این نسخه به سروری بسته نشده"
+          ServerPulse.State.UP -> StrNav.serverUp
+          ServerPulse.State.DOWN -> StrNav.serverDown
+          ServerPulse.State.NO_NET -> StrNav.phoneOffline
+          ServerPulse.State.CHECKING -> StrNav.checking
+          ServerPulse.State.UNKNOWN -> StrNav.notCheckedYet
+          ServerPulse.State.NO_SERVER -> StrNav.noServerBuild
         }
         val serverTint = when (pulse) {
           ServerPulse.State.UP -> Shop.colors.success
@@ -801,7 +807,7 @@ private fun SyncDot() {
           Spacer(Modifier.height(4.dp))
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              "نسخهٔ سرور:",
+              StrNav.serverVersion,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )
@@ -823,7 +829,7 @@ private fun SyncDot() {
           Spacer(Modifier.height(4.dp))
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-              "راهِ API:",
+              StrNav.apiPath,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )
@@ -841,7 +847,7 @@ private fun SyncDot() {
         if (ServerPulse.at > 0) {
           Spacer(Modifier.height(4.dp))
           Text(
-            "آخرین سنجش: ${sinceText(ServerPulse.at)}",
+            StrNav.lastCheck(sinceText(ServerPulse.at)),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
@@ -853,7 +859,7 @@ private fun SyncDot() {
           enabled = pulse != ServerPulse.State.CHECKING,
         ) {
           Text(
-            if (pulse == ServerPulse.State.CHECKING) "در حال سنجش…" else "سنجش دوباره",
+            if (pulse == ServerPulse.State.CHECKING) StrNav.checking else StrNav.checkAgain,
             color = Shop.colors.primary,
           )
         }
@@ -863,8 +869,7 @@ private fun SyncDot() {
         if (!signedIn) {
           Spacer(Modifier.height(6.dp))
           Text(
-            "همگام‌سازی بعد از ورود به حساب شروع می‌شود. تا آن وقت همه‌چیز " +
-              "روی گوشی ثبت می‌شود و دکان کامل کار می‌کند.",
+            StrNav.syncAfterSignIn,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
@@ -872,15 +877,15 @@ private fun SyncDot() {
         }
 
         Spacer(Modifier.height(18.dp))
-        Text("همگام‌سازی", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrNav.sync, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
 
         val headline = when (health) {
-          AutoSync.Health.OK -> "همه‌چیز روی سرور نشسته"
+          AutoSync.Health.OK -> StrNav.syncAllOnServer
           AutoSync.Health.WAITING ->
-            if (AutoSync.running) "در حال فرستادن…"
-            else "${AutoSync.pendingCount.fa()} مورد در انتظار"
-          AutoSync.Health.FAILED -> "آخرین تلاش ناموفق بود"
+            if (AutoSync.running) Str.sending
+            else StrNav.pendingItems(AutoSync.pendingCount.fa())
+          AutoSync.Health.FAILED -> StrNav.lastAttemptFailed
         }
         //  رنگِ داخلِ برگه از تم می‌آید، نه از رنگِ روی سربرگ: زمینهٔ
         //  برگه روشن است و سبزِ روشن رویش خوانده نمی‌شد
@@ -893,15 +898,15 @@ private fun SyncDot() {
 
         Spacer(Modifier.height(6.dp))
         Text(
-          if (AutoSync.lastOk > 0) "آخرین همگام‌سازی: ${sinceText(AutoSync.lastOk)}"
-          else "هنوز همگام‌سازیِ موفقی انجام نشده",
+          if (AutoSync.lastOk > 0) StrNav.lastSync(sinceText(AutoSync.lastOk))
+          else StrNav.noSyncYet,
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
 
         AutoSync.lastError?.let {
           Spacer(Modifier.height(8.dp))
-          Text(it, style = MaterialTheme.typography.labelMedium, color = Color(0xFFD64545))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
         }
 
         //  تعارض‌ها: خطا نیستند، ولی کاربر باید بداند کدام تغییرش
@@ -913,8 +918,7 @@ private fun SyncDot() {
 
         Spacer(Modifier.height(6.dp))
         Text(
-          "تغییرها روی گوشی ثبت می‌شوند و خودشان می‌روند؛ نبودنِ اینترنت " +
-            "چیزی را از بین نمی‌برد.",
+          StrNav.changesTravel,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -922,25 +926,25 @@ private fun SyncDot() {
         /* ------------------ دفترِ تغییرات (Sync v1) ------------------ */
 
         Spacer(Modifier.height(18.dp))
-        Text("دفترِ تغییرات", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrNav.changeLog, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(8.dp))
         Text(
-          if (v1.queued > 0) "${v1.queued.fa()} تغییر در صف" else "هیچ تغییری در صف نیست",
+          if (v1.queued > 0) StrNav.changesQueued(v1.queued.fa()) else StrNav.noChangesQueued,
           style = MaterialTheme.typography.bodyMedium,
           color = if (v1.queued > 0) Shop.colors.warning else Shop.colors.success,
           fontWeight = FontWeight.Bold,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-          if (v1.lastOkAt > 0) "آخرین همگام‌سازیِ موفق: ${sinceText(v1.lastOkAt)}"
-          else "هنوز همگام‌سازیِ موفقی انجام نشده",
+          if (v1.lastOkAt > 0) StrNav.lastSyncOk(sinceText(v1.lastOkAt))
+          else StrNav.noSyncYet,
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-          "نسخهٔ Schema: ${v1.schemaVersion.fa()}" +
-            (if (v1.serverSchema > 0) " · سرور ${v1.serverSchema.fa()}" else ""),
+          StrNav.schemaVersion(v1.schemaVersion.fa()) +
+            (if (v1.serverSchema > 0) " · " + StrNav.serverN(v1.serverSchema.fa()) else ""),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -949,8 +953,7 @@ private fun SyncDot() {
           //  ⛔ «نگه داشته شد» با «گم شد» یکی نیست و کاربر باید فرقشان
           //  را بداند
           Text(
-            "سرورِ حساب از برنامه عقب‌تر است. تغییرها روی همین گوشی نگه " +
-              "داشته می‌شوند و هیچ‌کدام گم نمی‌شود؛ با به‌روز شدنِ سرور خودشان می‌روند.",
+            StrNav.serverBehind,
             style = MaterialTheme.typography.labelMedium,
             color = ALERT_ORANGE,
           )
@@ -958,7 +961,7 @@ private fun SyncDot() {
         if (v1.dropped > 0) {
           Spacer(Modifier.height(8.dp))
           Text(
-            "${v1.dropped.fa()} تغییر را سرور نپذیرفت — در دفترِ کنار ثبت شده است.",
+            StrNav.droppedChanges(v1.dropped.fa()),
             style = MaterialTheme.typography.labelMedium,
             color = ALERT_ORANGE,
           )
@@ -1010,10 +1013,10 @@ private fun licenceUrgent(context: android.content.Context): Boolean {
 private fun sinceText(at: Long): String {
   val minutes = ((System.currentTimeMillis() - at) / 60000L).coerceAtLeast(0)
   return when {
-    minutes < 1 -> "همین حالا"
-    minutes < 60 -> "${minutes.fa()} دقیقه پیش"
-    minutes < 24 * 60 -> "${(minutes / 60).fa()} ساعت پیش"
-    else -> "${(minutes / (24 * 60)).fa()} روز پیش"
+    minutes < 1 -> StrNav.justNow
+    minutes < 60 -> StrNav.minutesAgo(minutes.fa())
+    minutes < 24 * 60 -> StrNav.hoursAgo((minutes / 60).fa())
+    else -> StrNav.daysAgo((minutes / (24 * 60)).fa())
   }
 }
 
@@ -1074,12 +1077,12 @@ private fun VipChip(onClick: () -> Unit) {
    *  بسته شده. آخرین روز «امروز» است.
    */
   val label = when {
-    state == ir.vil3ntec.tohid.sync.License.State.EXPIRED -> "تمدید"
-    state == ir.vil3ntec.tohid.sync.License.State.GRACE -> "مهلت"
-    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE && days > 0 -> "${days.fa()} روز"
-    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE -> "امروز"
+    state == ir.vil3ntec.tohid.sync.License.State.EXPIRED -> Str.renew
+    state == ir.vil3ntec.tohid.sync.License.State.GRACE -> StrNav.grace
+    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE && days > 0 -> Str.days(days.fa())
+    state == ir.vil3ntec.tohid.sync.License.State.ACTIVE -> Str.today
     //  حرفِ سرور، وقتی مجوزی روی گوشی نیست
-    serverOn -> "${serverDays.fa()} روز"
+    serverOn -> Str.days(serverDays.fa())
     else -> "VIP"
   }
 
@@ -1120,7 +1123,7 @@ private fun VipChip(onClick: () -> Unit) {
   ) {
     Icon(
       if (urgent) Icons.Filled.HourglassBottom else Icons.Filled.WorkspacePremium,
-      contentDescription = if (urgent) "اشتراک رو به پایان — تمدید" else "اشتراک و قیمت‌ها",
+      contentDescription = if (urgent) StrNav.subscriptionEndingRenew else Str.plans,
       tint = ink,
       modifier = Modifier.size(15.dp),
     )
@@ -1166,7 +1169,7 @@ private fun AccountChip(onClick: () -> Unit) {
   ) {
     Icon(
       Icons.Filled.Person,
-      contentDescription = "حساب",
+      contentDescription = StrNav.account,
       tint = BAR_INK,
       modifier = Modifier.size(18.dp),
     )
@@ -1204,14 +1207,14 @@ private fun AlertChip(count: Int, onClick: () -> Unit) {
     ) {
       Icon(
         Icons.Filled.Notifications,
-        contentDescription = "هشدارها",
+        contentDescription = Str.alerts,
         tint = BAR_ALERT,
         modifier = Modifier.size(18.dp),
       )
     }
     if (count > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.button.danger.bg),
         contentAlignment = Alignment.Center,
       ) {
         Text(
@@ -1251,7 +1254,7 @@ private fun BarButton(
     }
     if (badge > 0) {
       Box(
-        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFFD8352C)),
+        Modifier.size(15.dp).clip(RoundedCornerShape(8.dp)).background(Shop.colors.button.danger.bg),
         contentAlignment = Alignment.Center,
       ) {
         Text(

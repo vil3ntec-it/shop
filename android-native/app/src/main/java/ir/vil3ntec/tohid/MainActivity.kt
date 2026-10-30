@@ -4,9 +4,6 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.lifecycle.lifecycleScope
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.AppRoot
@@ -64,7 +61,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
      *  ⚠️ هیچ‌کدام خطا بیرون نمی‌دهند: برنامه باید بی‌اینترنت و بی‌حساب
      *  هم کامل بالا بیاید.
      */
-    runCatching {
+    //  حالتِ پیک (DLV-01): دفترِ دکانی در کار نیست — نه کارِ دوره‌ای، نه سوکت
+    ir.vil3ntec.tohid.data.ShopRole.courierMode.value = ir.vil3ntec.tohid.data.ShopRole.isCourier(applicationContext)
+    if (ir.vil3ntec.tohid.data.ShopRole.courierMode.value) {
+      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext) }
+    } else runCatching {
       ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)
       live = ir.vil3ntec.tohid.sync.v1.LiveSocket(applicationContext) {
         ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(applicationContext)
@@ -85,15 +86,29 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
       // دروازهٔ ورود فقط بارِ اول می‌آید: یا وارد می‌شوید یا «ادامه بدون
       // حساب» را می‌زنید. از آن به بعد سرِ راه کسی نمی‌ایستد.
       var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
+      //  نقشِ نشست: «پیک» ⇒ حالتِ پیک به‌جای دکان — زنده، از هر راهی که نقش عوض شود
+      val courier by ir.vil3ntec.tohid.data.ShopRole.courierMode.collectAsState()
+      LaunchedEffect(courier) {
+        runCatching {
+          if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext)
+          else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)   // KEEP: بی اثرِ دوم
+        }
+      }
 
       TohidTheme(theme) {
-        // کلِ برنامه راست‌به‌چپ است
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+        // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
+        ir.vil3ntec.tohid.ui.ProvideLang {
           if (!welcomed) {
             WelcomeScreen(store) {
               prefs.edit().putBoolean("welcomed", true).apply()
               welcomed = true
             }
+          } else if (courier) {
+            ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
+              //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
+              prefs.edit().putBoolean("welcomed", false).apply()
+              welcomed = false
+            })
           } else {
             AppRoot(
               store = store,
@@ -112,5 +127,19 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   override fun onDestroy() {
     runCatching { live?.disconnect() }
     super.onDestroy()
+  }
+
+  /*
+   *  چتِ دکان (v3 §۳۳، CHAT-04): «خوانده شد» فقط وقتی برنامه واقعاً جلوی
+   *  چشم است. برنامه در پس‌زمینه پیام را می‌گیرد («رسید») ولی «خواند» نه.
+   */
+  override fun onResume() {
+    super.onResume()
+    ir.vil3ntec.tohid.data.ShopChatSync.foreground = true
+  }
+
+  override fun onPause() {
+    ir.vil3ntec.tohid.data.ShopChatSync.foreground = false
+    super.onPause()
   }
 }

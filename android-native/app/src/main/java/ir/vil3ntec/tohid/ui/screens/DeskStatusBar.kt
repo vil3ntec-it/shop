@@ -23,6 +23,8 @@ import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.delay
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  نوارِ وضعیتِ پایینِ پنجره — فقط برنامهٔ کامپیوتر.
@@ -45,16 +47,17 @@ fun DeskStatusBar(d: ShopData) {
 
   val colors = Shop.colors
   Row(
-    Modifier.fillMaxWidth().height(28.dp).background(colors.surfaceSolid)
+    //  نسخهٔ ۲: نوارِ باریکِ کم‌کنتراست، هم‌رنگِ ناحیهٔ منو و بی خطِ جداکننده
+    Modifier.fillMaxWidth().height(26.dp).background(colors.zoneNav)
       .padding(horizontal = 10.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     val (dot, head) = when {
-      !signedIn -> colors.muted2 to "بی حساب — فقط همین کامپیوتر"
-      sync.dot == SyncDot.GREEN -> colors.success to (if (sync.live) "همگام، زنده" else "همگام با سرور")
-      sync.dot == SyncDot.YELLOW -> colors.warning to "در صفِ ارسال"
-      sync.dot == SyncDot.RED -> colors.danger to "همگام‌سازی خطا دارد"
-      else -> colors.muted2 to "بی اینترنت — کارها نگه داشته می‌شوند"
+      !signedIn -> colors.muted2 to StrNav.statusNoAccount
+      sync.dot == SyncDot.GREEN -> colors.success to (if (sync.live) StrNav.syncLive else StrNav.syncedWithServer)
+      sync.dot == SyncDot.YELLOW -> colors.warning to StrNav.syncQueued
+      sync.dot == SyncDot.RED -> colors.danger to StrNav.syncError
+      else -> colors.muted2 to StrNav.offlineHeld
     }
     //  SYN-08: شمارِ منتظر، آخرین همگام‌سازیِ موفق و خطای آخر همیشه پیداست
     val text = if (!signedIn) head else SyncBadge.line(head, sync.queued, sync.lastOkAt, sync.lastError, now)
@@ -65,24 +68,22 @@ fun DeskStatusBar(d: ShopData) {
     }
     Sep()
     Cell(onClick = { AppNav.go("sales") }) {
-      Label(if (shift != null) "صندوق باز" else "صندوق بسته", if (shift != null) colors.success else colors.muted)
+      Label(if (shift != null) StrNav.registerOpen else StrNav.registerClosed, if (shift != null) colors.success else colors.muted)
     }
     Sep()
     Cell(onClick = { AppNav.go("sales") }) {
-      Label("امروز: ${plain(todaySales.size)} فاکتور · ${money(todaySales.sumOf { it.finalTotal })} ؋")
+      Label(StrNav.todaySummary(plain(todaySales.size), money(todaySales.sumOf { it.finalTotal })))
     }
     Sep()
-    Cell(onClick = { AppNav.go("products") }) { Label("${plain(d.products.size)} کالا") }
+    Cell(onClick = { AppNav.go("products") }) { Label(Str.itemsCount(plain(d.products.size))) }
     Sep()
-    Cell(onClick = { AppNav.go("debtors") }) { Label("${plain(d.debtors.size)} قرض‌دار") }
+    Cell(onClick = { AppNav.go("debtors") }) { Label(Str.debtorsCount(plain(d.debtors.size))) }
     Spacer(Modifier.weight(1f))
-    Cell(onClick = { AppNav.palette.value = true }) { Label("جست‌وجو Ctrl+K", colors.muted2) }
-    Sep()
+    //  «جست‌وجو Ctrl+K» این‌جا برداشته شد — جست‌وجو فقط یک جا (سربرگ یا کادرِ صندوق)
     Label(ir.vil3ntec.tohid.formatDate(today) + " — " + clock(now))
     Sep()
-    Label("نسخهٔ " + ir.vil3ntec.tohid.BuildConfig.VERSION_NAME, colors.muted2)
+    Label(Str.version(ir.vil3ntec.tohid.BuildConfig.VERSION_NAME), colors.muted2)
   }
-  Box(Modifier.fillMaxWidth().height(1.dp).background(colors.border))
 }
 
 private fun clock(at: Long): String {

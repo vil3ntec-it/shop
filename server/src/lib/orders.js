@@ -11,9 +11,12 @@
  *   خواندن ─ کارتِ سبکِ هر برگه (ORD-11/12) با صفحه‌بندیِ کلیدی، شمارش‌ها،
  *           و جزئیات با خطِ زمانی (ORD-16).
  *
- * ⛔ هنوز نیست (و عمداً): بررسیِ دوبارهٔ موجودی (بخشی از CHK-17)، رزروِ
- * موجودی (CHK-18) و سندِ فروشِ سریِ W (ORD-20) — این‌ها لایهٔ موجودیِ سرور
- * را لازم دارند. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
+ * ⛔ موجودی (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): سفارش موجودیِ سرور را **نه رزرو می‌کند نه
+ * کم** و هیچ ردیفی در دفترِ دکان نمی‌نویسد. ساختِ سفارش با پرچمِ `shop.catalog` فقط
+ * می‌سنجد (`catalog.checkOrder`). وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
+ * داده شد / رسید)، **برنامهٔ دکان** یک فروشِ عادی با `orderId` ثبت می‌کند
+ * (`OrderFulfillment.kt`) و موجودی با همگام‌سازی همه‌جا کم می‌شود؛ `handoverPending`
+ * سفارش‌های تحویل‌شدهٔ بی‌فروش را به برنامه می‌دهد. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
  * سفارشِ ویترین قیمت را از دفترِ سرور می‌گیرد (`price` در `create`،
  * ‎lib/storefront.js‎).
  */
@@ -300,10 +303,13 @@ async function get(shopId, id, viewer) {
  * برگرداند حتی اگر قیمت از آن پس عوض شده باشد. نیامدنش ⇒ رفتارِ پیشین.
  * @returns {{order:object, replayed:boolean}}
  */
-async function create(shopId, { key, body, actor, price }) {
+async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
   let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
+  //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
+  //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
+  if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
 
   return tx(async (c) => {
     const run = (t, p) => c.query(t, p);
@@ -320,6 +326,9 @@ async function create(shopId, { key, body, actor, price }) {
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
     if (price) input = await price(run, at);
+    //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
+    //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
+    await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
 
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
@@ -348,9 +357,6 @@ async function create(shopId, { key, body, actor, price }) {
           l.lineTotalMinor, l.note, l.substitution]
       );
     }
-    //  کاتالوگ و موجودی (v3 §۳۲.۲، CHK-18): پرچمِ `shop.catalog` روشن ⇒ رزروِ اتمی در همین
-    //  تراکنش؛ کمبود ⇒ ۴۰۹ و کلِ سفارش برمی‌گردد. خاموش ⇒ هیچ (همان رفتارِ پیشین).
-    await require('./catalog').onOrderCreated(c, shopId, { orderId: id, lines: input.lines, at, actor });
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)
@@ -358,6 +364,16 @@ async function create(shopId, { key, body, actor, price }) {
       [ulid(at), id, shopId, actor.type, actor.id || '', '',
         JSON.stringify({ source: input.source, isTest: input.isTest, totalMinor: input.totalMinor }), at]
     );
+    /*
+     *  اعلانِ سفارش (v3 §۳۰): `notify` = `async (run, {shopId, orderId, orderNo, at})`
+     *  درونِ همین تراکنش و فقط برای سفارشِ تازه (تکرارِ همان کلید به این‌جا
+     *  نمی‌رسد). نیامدنش ⇒ سفارشِ مشتری `order-notify.enqueueIn` (بی پرچمِ
+     *  `shop.order_notify` هیچ نمی‌نویسد)؛ سفارشِ کارمند هیچ — رفتارِ پیشین.
+     *  `null` ⇒ هیچ. خطایش کلِ سفارش را برمی‌گرداند: «ثبت شد» بی صفِ اعلان نیست.
+     */
+    const hook = notify !== undefined ? notify
+      : (actor.type === 'customer' ? require('./order-notify').enqueueIn : null);
+    if (hook) await hook(run, { shopId, orderId: id, orderNo: no, at });
     return { order: await loadDetail(run, shopId, id, actor), replayed: false };
   });
 }
@@ -451,9 +467,7 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
         WHERE shop_id=$1 AND id=$2`,
       [shopId, row.id, to, reason, readyAt ?? null, at]
     );
-    //  کاتالوگ و موجودی (v3 §۳۲.۲): قبول ⇒ رزرو می‌ماند · رد/لغو ⇒ آزاد · تحویل ⇒ کسرِ قطعی؛
-    //  کمبود هنگامِ قبول ⇒ ۴۰۹ و گذار برمی‌گردد. بی رزرو و پرچمِ خاموش ⇒ هیچ.
-    await require('./catalog').onOrderStatus(c, shopId, { id: row.id, from: row.status, to }, actor, at);
+    //  ⛔ موجودی: هیچ (تصمیمِ صاحبِ مخزن) — تحویل را برنامهٔ دکان با فروشِ عادی ثبت می‌کند.
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,
          actor_type, actor_id, reason, note, detail, created_at)

@@ -25,6 +25,8 @@ on:
       - 'fonts/**'
       - 'icons/**'
       - 'license/**'
+      #  بردارهای آزمون (Kotlin و JS) را نسخهٔ وب بار نمی‌کند — سایت از آن‌ها عوض نمی‌شود
+      - '!license/test-vectors/**'
       - 'sounds/**'
       - '.github/workflows/web-pages.yml'
   pull_request:
@@ -38,6 +40,8 @@ on:
       - 'fonts/**'
       - 'icons/**'
       - 'license/**'
+      #  بردارهای آزمون (Kotlin و JS) را نسخهٔ وب بار نمی‌کند — سایت از آن‌ها عوض نمی‌شود
+      - '!license/test-vectors/**'
       - 'sounds/**'
       - '.github/workflows/web-pages.yml'
   workflow_dispatch:
@@ -49,9 +53,10 @@ on:
         default: beta
 
 concurrency:
-  #  دو انتشار هم‌زمان نه؛ و انتشارِ پایدار با pushِ بعدی لغو نشود
-  group: web-pages-${{ github.event_name == 'pull_request' && github.ref || 'publish' }}
-  cancel-in-progress: false
+  #  دو انتشار هم‌زمان نه؛ و انتشارِ پایدار با pushِ بعدی لغو نشود.
+  #  فقط اجرای PR (که چیزی منتشر نمی‌کند) با pushِ تازهٔ همان PR لغو می‌شود.
+  group: web-pages-${{ github.event.pull_request.number || 'publish' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

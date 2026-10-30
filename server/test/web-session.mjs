@@ -19,7 +19,7 @@
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-session.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
+import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -204,7 +204,7 @@ for (const [label, fulfil] of [
   ['خطای سرور (۵۰۲)', (route) => route.fulfill({ status: 502, contentType: 'text/html', body: 'Bad Gateway' })],
 ]) {
   await step(`${label} وسطِ تازه‌سازی ⇒ نشست پاک نمی‌شود و پس از وصل شدن کار می‌کند`, async () => {
-    await page.route('**/auth/refresh', fulfil);
+    await page.route('**/auth/refresh', closeSafeRoute(fulfil));
     try {
       await anHourLater();
       const before = await stored();
@@ -230,6 +230,10 @@ for (const [label, fulfil] of [
 
 await step('نشستی که سرور واقعاً بسته (خروج از همهٔ دستگاه‌ها) ⇒ پاک می‌شود — رفتارِ درست سرِ جایش است', async () => {
   const s = await stored();
+  //  «خروج از همه» کارِ حساس است (بندِ ۲۱.۱، `lib/reauth.js`): این نشست ساعت‌ها
+  //  پیش وارد شده و فقط تازه‌سازی شده، پس اول رمز دوباره زده می‌شود
+  const again = await post('/api/auth/reauth', { password }, s.accessToken);
+  assert.equal(again.status, 200, JSON.stringify(again.body));
   const out1 = await post('/api/auth/logout-all', {}, s.accessToken);
   assert.equal(out1.status, 200, JSON.stringify(out1.body));
   const out = await inPage(() => window.TohidAccount.authFetch('/api/me/heartbeat'));
