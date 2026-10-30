@@ -35,6 +35,7 @@ import kotlin.math.round
  *    • فیلد: فقط یک طرف عوض کرد ⇒ همان؛ هر دو، یکسان ⇒ همان؛ هر دو، متفاوت ⇒ کاربر برنده.
  *    • شمارنده‌ها (`LedgerDiff.INC_FIELDS`: پولِ رسیده، مانده، مقدارِ برگشتی) جمع‌پذیرند:
  *      دیسک + (مالِ ما − پایه). «کاربر برنده» این‌جا یعنی پرداختِ دستگاهِ دیگر گم شود.
+ *      ⛔ دلتای **برابر** هم جمع می‌شود (هر دو ۱۰۰ پرداخت کردند ⇒ ۲۰۰)، نه «هر دو، یکسان ⇒ همان».
  *    • فهرست‌های نام (`LIST_COLLECTIONS`): افزوده و حذفِ هر طرف.
  *    • شمارهٔ فاکتورِ بعدی: هر دو جلو رفته ⇒ بزرگ‌تر (شماره هرگز تکرار نشود).
  *
@@ -160,7 +161,10 @@ object LedgerMerge {
     //  هر دو افزودند (همان شناسه): کاربر برنده، فیلدهایی که فقط دیسک دارد می‌مانند
     if (was == null) return JsonObject(LinkedHashMap<String, JsonElement>(now).apply { putAll(mine) })
     if (mine == was) return now
-    if (now == was || now == mine) return mine
+    if (now == was) return mine
+    //  ⛔ ردیفِ دو طرف یکی است، ولی اگر شمارنده‌ای از پایه جلو رفته، دو دلتای برابر است (هر دو ۱۰۰
+    //  پرداخت کردند) نه یک تغییر ⇒ از میان‌بُر نمی‌گذرد تا جمع شوند
+    if (now == mine && LedgerDiff.INC_FIELDS[table].orEmpty().none { mine[it] != was[it] }) return mine
     val out = LinkedHashMap<String, JsonElement>()
     for (k in LinkedHashSet(mine.keys + now.keys + was.keys)) {
       val b = was[k]
@@ -168,9 +172,10 @@ object LedgerMerge {
       val t = now[k]
       val v = when {
         o == b -> t
-        t == b || o == t -> o
+        t == b -> o
+        //  پیش از `o == t`: دلتای برابرِ دو طرف دو پرداخت است، نه یکی
         LedgerDiff.isInc(table, k) -> sum(b, o, t) ?: o
-        else -> o
+        else -> o                                                // یکسان یا هر دو متفاوت ⇒ کاربر
       }
       if (v != null) out[k] = v
     }
