@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -49,7 +50,7 @@ internal fun CompaniesTab(d: DeskData, cfg: DeskConfig, onInvoice: (ExternalComp
         }
         Spacer(Modifier.height(6.dp))
         Text(
-          StrOnline.dlCompanyLine(StrOnline.afn(co.lastFareMinor), co.delivered, co.assignments, if (co.lastUsedAt > 0) OrdersModel.stamp(co.lastUsedAt) else "—"),
+          StrOnline.dlCompanyLine(OnlineFmt.afn(co.lastFareMinor), co.delivered, co.assignments, if (co.lastUsedAt > 0) OrdersModel.stamp(co.lastUsedAt) else "—"),
           style = V3Type.footnote, color = c.inkMuted,
         )
         if (cfg.perms.settle) {

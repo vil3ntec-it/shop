@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -77,12 +78,12 @@ internal fun CouriersTab(d: DeskData, cfg: DeskConfig, writable: Boolean, action
           DraftTag(label, tone = tone)
         }
         Spacer(Modifier.height(10.dp))
-        DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), StrOnline.afn(cr.cashCapMinor))
+        DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), OnlineFmt.afn(cr.cashCapMinor))
         Spacer(Modifier.height(10.dp))
         Row {
-          Figure(StrOnline.dlHeld, StrOnline.afn(cr.cashHeldMinor), Modifier.weight(1f))
-          Figure(StrOnline.dlLiveExpected(cr.liveCount), StrOnline.afn(cr.liveExpectedMinor), Modifier.weight(1f))
-          Figure(StrOnline.dlRoom, StrOnline.afn(CourierCash.headroom(cr)), Modifier.weight(1f))
+          Figure(StrOnline.dlHeld, OnlineFmt.afn(cr.cashHeldMinor), Modifier.weight(1f))
+          Figure(StrOnline.dlLiveExpected(cr.liveCount), OnlineFmt.afn(cr.liveExpectedMinor), Modifier.weight(1f))
+          Figure(StrOnline.dlRoom, OnlineFmt.afn(CourierCash.headroom(cr)), Modifier.weight(1f))
         }
         CourierCash.autoBlockReason(cr)?.let {
           Spacer(Modifier.height(8.dp))

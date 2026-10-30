@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
@@ -88,7 +89,7 @@ fun OrderDetailScreen(state: DetailState, actions: DetailActions, onBack: (() ->
   val bar = o?.let { OrdersModel.bar(it, state.perms) }
   V3Scaffold(
     title = o?.let { StrOnline.orderTitle(it.orderNo) } ?: StrOnline.ordersTitle,
-    subtitle = o?.let { StrOnline.orderSource(it.source) + " · " + StrOnline.ago(it.createdAt, state.now) },
+    subtitle = o?.let { StrOnline.orderSource(it.source) + " · " + OnlineFmt.ago(it.createdAt, state.now) },
     modifier = modifier,
     onBack = onBack,
     bottomBar = if (bar != null && !bar.isEmpty) ({ OrderActionBar(bar, state.busy, state.failure, actions.onStep) }) else null,
@@ -119,8 +120,8 @@ fun OrderDetailScreen(state: DetailState, actions: DetailActions, onBack: (() ->
           o.lines.map { l ->
             V3InvoiceLine(
               name = l.name,
-              detail = OrderText.qty(l.qtyMilli) + (if (l.unit.isNotEmpty()) " ${l.unit}" else "") + " × " + StrOnline.afn(l.unitPriceMinor),
-              total = StrOnline.afn(l.lineTotalMinor),
+              detail = OrderText.qty(l.qtyMilli) + (if (l.unit.isNotEmpty()) " ${l.unit}" else "") + " × " + OnlineFmt.afn(l.unitPriceMinor),
+              total = OnlineFmt.afn(l.lineTotalMinor),
               note = l.note.takeIf { it.isNotEmpty() },
             )
           },
@@ -143,7 +144,7 @@ private fun HeaderCard(o: OrderDto, now: Long) {
     Row(verticalAlignment = Alignment.CenterVertically) {
       OrderStatusPill(o.status)
       Spacer(Modifier.weight(1f))
-      Text(StrOnline.afn(o.totalMinor), style = V3Type.title, color = c.ink)
+      Text(OnlineFmt.afn(o.totalMinor), style = V3Type.title, color = c.ink)
     }
     Spacer(Modifier.height(10.dp))
     OrderTags(o, now)
@@ -164,7 +165,7 @@ private fun CustomerSection(o: OrderDto, actions: DetailActions) {
   V3Section(StrOnline.customer, footer = if (phone == null && o.customer.phoneMasked.isNotEmpty()) StrOnline.fullNumberHelper else null) {
     V3ListRow(
       o.customer.name.ifBlank { StrOnline.customer },
-      subtitle = (phone ?: o.customer.phoneMasked).ifBlank { null }?.let(StrOnline::ltr) ?: StrOnline.noNumber,
+      subtitle = (phone ?: o.customer.phoneMasked).ifBlank { null }?.let(OnlineFmt::ltr) ?: StrOnline.noNumber,
       icon = Icons.Outlined.Person,
       hue = V3Hue.CORAL,
       chevron = false,
@@ -186,7 +187,7 @@ private fun AddressSection(o: OrderDto, actions: DetailActions) {
     if (o.address.text.isNotEmpty()) add { V3ListRow(o.address.text, icon = Icons.Outlined.Place, hue = V3Hue.SKY, subtitleLines = 3, chevron = false) }
     if (o.address.landmark.isNotEmpty()) add { V3ListRow(o.address.landmark, subtitle = StrOnline.landmark, icon = Icons.Outlined.Flag, hue = V3Hue.AMBER, chevron = false) }
     if (map != null) add {
-      V3ListRow(StrOnline.openMap, subtitle = StrOnline.ltr("${o.address.lat}, ${o.address.lng}"), icon = Icons.Outlined.Map, hue = V3Hue.MINT, onClick = { actions.onMap(map) })
+      V3ListRow(StrOnline.openMap, subtitle = OnlineFmt.ltr("${o.address.lat}, ${o.address.lng}"), icon = Icons.Outlined.Map, hue = V3Hue.MINT, onClick = { actions.onMap(map) })
     }
   }
   V3Section(StrOnline.address) {
@@ -198,11 +199,11 @@ private fun AddressSection(o: OrderDto, actions: DetailActions) {
 @Composable
 private fun TotalsSection(o: OrderDto) {
   V3Section(null) {
-    V3ListRow(StrOnline.subtotal, value = StrOnline.afn(o.subtotalMinor), chevron = false, tile = false)
-    if (o.discountMinor > 0) { V3Divider(start = 22.dp); V3ListRow(StrOnline.discount, value = "−" + StrOnline.afn(o.discountMinor), chevron = false, tile = false) }
-    if (o.deliveryFeeMinor > 0) { V3Divider(start = 22.dp); V3ListRow(StrOnline.deliveryFee, value = StrOnline.afn(o.deliveryFeeMinor), chevron = false, tile = false) }
+    V3ListRow(StrOnline.subtotal, value = OnlineFmt.afn(o.subtotalMinor), chevron = false, tile = false)
+    if (o.discountMinor > 0) { V3Divider(start = 22.dp); V3ListRow(StrOnline.discount, value = "−" + OnlineFmt.afn(o.discountMinor), chevron = false, tile = false) }
+    if (o.deliveryFeeMinor > 0) { V3Divider(start = 22.dp); V3ListRow(StrOnline.deliveryFee, value = OnlineFmt.afn(o.deliveryFeeMinor), chevron = false, tile = false) }
     V3Divider(start = 22.dp)
-    V3ListRow(StrOnline.total, chevron = false, tile = false, trailing = { Text(StrOnline.afn(o.totalMinor), style = V3Type.headline, color = PhoneV3.colors.ink) })
+    V3ListRow(StrOnline.total, chevron = false, tile = false, trailing = { Text(OnlineFmt.afn(o.totalMinor), style = V3Type.headline, color = PhoneV3.colors.ink) })
   }
 }
 

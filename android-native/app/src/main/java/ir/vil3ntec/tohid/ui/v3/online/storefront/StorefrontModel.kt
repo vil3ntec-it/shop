@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.storefront
 
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.StorefrontConfigDto
 import ir.vil3ntec.tohid.data.repo.StorefrontProductDto
@@ -50,14 +51,14 @@ object StorefrontModel {
     val online = p.onlinePriceMinor
     val base = p.priceMinor
     return when {
-      online != null -> StrOnline.onlinePrice(StrOnline.afn(online))
-      base != null -> StrOnline.afn(base)
+      online != null -> StrOnline.onlinePrice(OnlineFmt.afn(online))
+      base != null -> OnlineFmt.afn(base)
       else -> StrOnline.noPrice
     }
   }
 
   /** قیمتِ دفتر برای برگهٔ کالا (null = ندارد) */
-  fun ledgerPrice(p: StorefrontProductDto): String? = p.priceMinor?.let { StrOnline.afn(it) }
+  fun ledgerPrice(p: StorefrontProductDto): String? = p.priceMinor?.let { OnlineFmt.afn(it) }
 
   /** کالای غیرفعال یا بیرون از ویترین / در ویترین — برای قرصِ ردیف */
   fun stateLabel(p: StorefrontProductDto): String = when {

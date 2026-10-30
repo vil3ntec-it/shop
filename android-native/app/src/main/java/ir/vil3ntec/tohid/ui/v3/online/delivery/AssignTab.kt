@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -128,7 +129,7 @@ private fun ReadyCard(o: OrderDto, canAssign: Boolean, actions: AssignActions, m
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        if (expected > 0) StrOnline.dlCollect(StrOnline.afn(expected)) else StrOnline.dlPaidNoCash,
+        if (expected > 0) StrOnline.dlCollect(OnlineFmt.afn(expected)) else StrOnline.dlPaidNoCash,
         style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f),
       )
       if (canAssign) {
@@ -145,11 +146,11 @@ private fun ReadyRow(o: OrderDto, canAssign: Boolean, actions: AssignActions, mo
   val expected = DeliveryModel.expected(o)
   val landmark = DeliveryModel.landmark(o)
   DeskTableRow(modifier) {
-    DeskCell(StrOnline.orderNo(o.orderNo), READY_COLS[0], strong = true)
+    DeskCell(OnlineFmt.orderNo(o.orderNo), READY_COLS[0], strong = true)
     DeskCell(o.customer.name, READY_COLS[1])
     DeskSlot(READY_COLS[2]) { OrderStatusPill(o.status) }
     DeskCell(landmark.ifEmpty { "—" }, READY_COLS[3], muted = landmark.isEmpty())
-    DeskCell(if (expected > 0) StrOnline.afn(expected) else StrOnline.pay("paid", ""), READY_COLS[4], strong = expected > 0, muted = expected == 0L)
+    DeskCell(if (expected > 0) OnlineFmt.afn(expected) else OnlineFmt.pay("paid", ""), READY_COLS[4], strong = expected > 0, muted = expected == 0L)
     DeskSlot(READY_COLS[5], end = true) {
       if (canAssign) DeskButtons {
         V3Button(StrOnline.dlAuto, { actions.onAuto(listOf(o)) }, kind = V3ButtonKind.SECONDARY, height = 38.dp)
@@ -164,7 +165,7 @@ private fun MissionRow(m: Mission, d: DeskData, acts: List<DeskActions.Act>, onA
   val c = PhoneV3.colors
   val notes = DeliveryModel.notes(m)
   DeskTableRow(modifier) {
-    DeskCell(StrOnline.orderNo(m.orderNo), MISSION_COLS[0], strong = true)
+    DeskCell(OnlineFmt.orderNo(m.orderNo), MISSION_COLS[0], strong = true)
     DeskCell(m.customerName.ifEmpty { "—" }, MISSION_COLS[1], muted = m.customerName.isEmpty())
     DeskCell(DeliveryModel.how(m, d), MISSION_COLS[2])
     DeskSlot(MISSION_COLS[3]) {
@@ -173,13 +174,13 @@ private fun MissionRow(m: Mission, d: DeskData, acts: List<DeskActions.Act>, onA
         if (notes.isNotEmpty()) Text(notes.joinToString(" · "), style = V3Type.caption, color = PhoneV3Roles.status(c, V3Status.WARNING).fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
       }
     }
-    DeskCell(if (m.expectedCollectMinor > 0) StrOnline.afn(m.expectedCollectMinor) else "—", MISSION_COLS[4], muted = m.expectedCollectMinor == 0L)
-    DeskCell(if (m.fareMinor > 0) StrOnline.afn(m.fareMinor) else "—", MISSION_COLS[5], muted = m.fareMinor == 0L)
+    DeskCell(if (m.expectedCollectMinor > 0) OnlineFmt.afn(m.expectedCollectMinor) else "—", MISSION_COLS[4], muted = m.expectedCollectMinor == 0L)
+    DeskCell(if (m.fareMinor > 0) OnlineFmt.afn(m.fareMinor) else "—", MISSION_COLS[5], muted = m.fareMinor == 0L)
     DeskSlot(MISSION_COLS[6], end = true) {
       if (acts.isNotEmpty()) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         acts.forEach { a ->
           V3Button(
-            StrOnline.deskAction(a), { onAct(a) },
+            OnlineFmt.deskAction(a), { onAct(a) },
             kind = if (DeliveryModel.secondary(a)) V3ButtonKind.SECONDARY else V3ButtonKind.PRIMARY,
             height = 38.dp, haptic = !DeliveryModel.secondary(a),
           )
@@ -199,8 +200,8 @@ internal fun MissionCard(m: Mission, d: DeskData, acts: List<DeskActions.Act>, o
     Text(DeliveryModel.how(m, d), style = V3Type.footnote, color = c.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
     Spacer(Modifier.height(6.dp))
     Row {
-      Text(if (m.expectedCollectMinor > 0) StrOnline.dlCash(StrOnline.afn(m.expectedCollectMinor)) else StrOnline.dlNoCash, style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f))
-      Text(if (m.fareMinor > 0) StrOnline.dlFare(StrOnline.afn(m.fareMinor)) else StrOnline.dlNoFare, style = V3Type.footnote, color = c.inkMuted)
+      Text(if (m.expectedCollectMinor > 0) StrOnline.dlCash(OnlineFmt.afn(m.expectedCollectMinor)) else StrOnline.dlNoCash, style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f))
+      Text(if (m.fareMinor > 0) StrOnline.dlFare(OnlineFmt.afn(m.fareMinor)) else StrOnline.dlNoFare, style = V3Type.footnote, color = c.inkMuted)
     }
     val notes = DeliveryModel.notes(m)
     if (notes.isNotEmpty()) {
@@ -214,7 +215,7 @@ internal fun MissionCard(m: Mission, d: DeskData, acts: List<DeskActions.Act>, o
       FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         acts.forEach { a ->
           V3Button(
-            StrOnline.deskAction(a), { onAct(a) },
+            OnlineFmt.deskAction(a), { onAct(a) },
             kind = if (DeliveryModel.secondary(a)) V3ButtonKind.SECONDARY else V3ButtonKind.PRIMARY,
             height = 38.dp, haptic = !DeliveryModel.secondary(a),
           )
@@ -229,7 +230,7 @@ internal fun MissionCard(m: Mission, d: DeskData, acts: List<DeskActions.Act>, o
 internal fun OrderHead(orderNo: Long, name: String, pill: @Composable () -> Unit) {
   val c = PhoneV3.colors
   Row(verticalAlignment = Alignment.CenterVertically) {
-    Text(StrOnline.orderNo(orderNo), style = V3Type.headline, color = c.ink)
+    Text(OnlineFmt.orderNo(orderNo), style = V3Type.headline, color = c.ink)
     Spacer(Modifier.width(8.dp))
     Text(name, style = V3Type.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
     pill()

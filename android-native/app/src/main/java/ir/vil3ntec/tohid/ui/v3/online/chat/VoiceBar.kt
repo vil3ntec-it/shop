@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.ChatMedia
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -148,7 +149,7 @@ internal fun VoiceStatus(state: VoiceState, limit: Long, enabled: Boolean, onSen
       val big = limit > 0 && bytes.size > limit
       Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
-          StrOnline.ctVoiceReady(ChatModel.mmss(ms), StrOnline.kb(bytes.size.toLong())) + if (big) " — " + StrOnline.ctTooBig else "",
+          StrOnline.ctVoiceReady(ChatModel.mmss(ms), OnlineFmt.kb(bytes.size.toLong())) + if (big) " — " + StrOnline.ctTooBig else "",
           style = V3Type.callout, color = if (big) PhoneV3Roles.errorText(c) else c.ink, modifier = Modifier.weight(1f),
         )
         V3TextButton(StrKit.cancel, { state.ready = null })

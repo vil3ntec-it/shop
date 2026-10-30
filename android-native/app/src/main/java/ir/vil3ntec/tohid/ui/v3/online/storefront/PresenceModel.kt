@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.storefront
 
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.data.repo.PresenceStatusDto
@@ -20,17 +21,17 @@ object PresenceModel {
   fun untilOf(st: PresenceStatusDto): String? = st.declaredUntil?.let { StorefrontOwner.clock(it, st.timezone) }
 
   /** عددِ بزرگِ کادر: «باز · آنلاین»، «آنلاین تا 20:30»، «بسته» … */
-  fun headline(st: PresenceStatusDto): String = StrOnline.presenceShort(st.badge, untilOf(st))
+  fun headline(st: PresenceStatusDto): String = OnlineFmt.presenceShort(st.badge, untilOf(st))
 
   /** برچسبِ کادر: همان جملهٔ کاملِ ویترین */
-  fun sentence(st: PresenceStatusDto): String = StrOnline.presenceBadge(st.badge, untilOf(st))
+  fun sentence(st: PresenceStatusDto): String = OnlineFmt.presenceBadge(st.badge, untilOf(st))
 
   /** زیرنویس: ساعتِ دکان و ساعتِ امروز */
   fun caption(st: PresenceStatusDto): String {
     val today = when {
       st.holiday -> StrOnline.todayHoliday
       //  هر بازه جدا از جهتِ جمله، وگرنه «۰۸:۰۰-۲۱:۰۰» در جملهٔ فارسی وارونه دیده می‌شود
-      st.today.isNotEmpty() -> StrOnline.todayHours(st.today.joinToString("، ") { StrOnline.ltr(StorefrontOwner.formatDay(listOf(it[0] to it[1]))) })
+      st.today.isNotEmpty() -> StrOnline.todayHours(st.today.joinToString("، ") { OnlineFmt.ltr(StorefrontOwner.formatDay(listOf(it[0] to it[1]))) })
       st.hoursSet -> StrOnline.todayClosed
       else -> StrOnline.hoursNotSet
     }

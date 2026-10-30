@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.DeliveryWire
@@ -90,7 +91,7 @@ internal fun MissionActionSheet(
     }
   }
 
-  V3Sheet(onDismiss = onDismiss, title = StrOnline.actionTitle(StrOnline.deskAction(act), m.orderNo)) { _ ->
+  V3Sheet(onDismiss = onDismiss, title = StrOnline.actionTitle(OnlineFmt.deskAction(act), m.orderNo)) { _ ->
     Text("${StrOnline.deliveryMode(m.mode)} · ${StrOnline.missionStatus(m.status)}", style = V3Type.footnote, color = c.inkMuted)
     when (act) {
       DeskActions.Act.NEW_CODE -> Note(StrOnline.dlNewCodeNote)
@@ -108,7 +109,7 @@ internal fun MissionActionSheet(
       Spacer(Modifier.height(14.dp))
       V3TextField(
         f.cash, { f = f.copy(cash = it.take(DeliveryForms.NUMBER_MAX)) }, StrOnline.dlCashCollected, kind = V3FieldKind.MONEY,
-        helper = if (m.expectedCollectMinor > 0) StrOnline.dlExpected(StrOnline.afn(m.expectedCollectMinor)) else StrOnline.dlPaidUsuallyZero,
+        helper = if (m.expectedCollectMinor > 0) StrOnline.dlExpected(OnlineFmt.afn(m.expectedCollectMinor)) else StrOnline.dlPaidUsuallyZero,
         error = if (cashMinor == null) StrOnline.dlBadNumber else null, modifier = Modifier.fillMaxWidth(),
       )
       if (differs) {
@@ -135,7 +136,7 @@ internal fun MissionActionSheet(
     err?.let { Spacer(Modifier.height(12.dp)); V3Message(V3Tone.ERROR, it, Modifier.v3Shake(it)) }
     Spacer(Modifier.height(20.dp))
     V3Button(
-      StrOnline.deskAction(act), { send() }, Modifier.fillMaxWidth(),
+      OnlineFmt.deskAction(act), { send() }, Modifier.fillMaxWidth(),
       kind = if (DeliveryModel.secondary(act)) V3ButtonKind.DANGER else V3ButtonKind.PRIMARY,
       enabled = DeliveryForms.actValid(m, act, cfg, f) && !busy, loading = busy, haptic = true,
     )

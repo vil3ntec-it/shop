@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -82,13 +83,13 @@ fun OrderCard(
       .padding(16.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(StrOnline.orderNo(o.orderNo), style = V3Type.headline, color = c.ink)
+      Text(OnlineFmt.orderNo(o.orderNo), style = V3Type.headline, color = c.ink)
       Spacer(Modifier.weight(1f))
       OrderStatusPill(o.status)
     }
     Spacer(Modifier.height(6.dp))
     Text(
-      listOfNotNull(o.customer.name.ifBlank { null }, o.customer.phoneMasked.ifBlank { null }?.let(StrOnline::ltr), StrOnline.orderSource(o.source)).joinToString(" · "),
+      listOfNotNull(o.customer.name.ifBlank { null }, o.customer.phoneMasked.ifBlank { null }?.let(OnlineFmt::ltr), StrOnline.orderSource(o.source)).joinToString(" · "),
       style = V3Type.subhead,
       color = c.inkMuted,
       maxLines = 1,
@@ -99,8 +100,8 @@ fun OrderCard(
     Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text(StrOnline.afn(o.totalMinor), style = V3Type.headline, color = c.ink, maxLines = 1)
-        Text(StrOnline.ago(o.createdAt, now), style = V3Type.caption, color = c.inkMuted)
+        Text(OnlineFmt.afn(o.totalMinor), style = V3Type.headline, color = c.ink, maxLines = 1)
+        Text(OnlineFmt.ago(o.createdAt, now), style = V3Type.caption, color = c.inkMuted)
       }
       if (step != null) {
         Spacer(Modifier.width(8.dp))
@@ -125,7 +126,7 @@ fun OrderTags(o: OrderDto, now: Long) {
     else DraftTag(StrOnline.pickup, Icons.Outlined.Storefront)
     o.scheduledFor?.let { DraftTag(StrOnline.forTime(OrdersModel.scheduleLabel(it, now)), Icons.Outlined.Schedule) }
     DraftTag(StrOnline.items(o.itemsCount), Icons.Outlined.ShoppingBag)
-    DraftTag(StrOnline.pay(o.paymentStatus, o.paymentMethod), Icons.Outlined.Payments)
+    DraftTag(OnlineFmt.pay(o.paymentStatus, o.paymentMethod), Icons.Outlined.Payments)
     if (o.isTest) DraftTag(StrOnline.test, Icons.Outlined.Science, tone = V3Tone.WARNING)
   }
 }

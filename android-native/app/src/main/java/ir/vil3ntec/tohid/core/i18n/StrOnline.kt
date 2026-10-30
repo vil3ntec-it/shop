@@ -11,45 +11,44 @@ import ir.vil3ntec.tohid.core.orders.OrderText
  *  واژه‌های موتور (`OrderText`، `DeliveryText`) فارسیِ همان‌جا را نگه می‌دارند؛ این‌جا
  *  فقط انگلیسی و پشتوی کنارشان است (`orderStatus(id)`، …)، و کدِ ناشناخته همان فارسیِ
  *  موتور (یا خودِ کد) می‌ماند.
+ *
+ *  هر عضوِ عمومیِ این جدول یک ردیف است که `I18nCoverageTest` با آرگومانِ ساختگی صدا می‌زند: باید از `t`/`td`
+ *  بگذرد، تهی نباشد و آرگومان را نشان دهد. پس نگاشتِ کدِ ناشناخته به «هیچ»، آرگومانِ نوع‌دار (`DeskActions.Act`،
+ *  مختصات، شمارهٔ روز) و قالب‌های بی‌ترجمه (`#n`، LRI…PDI) در `OnlineFmt` اند و نوشته‌هایشان همین‌جا.
  */
 @Suppress("unused")
 object StrOnline {
 
   // ── پول، زمان، شمار ─────────────────────────────────────────────────────────
-  fun afn(minor: Long): String = OrderText.money(minor).let { t("$it افغانی", "AFN $it", "$it افغانۍ") }
+  /** مبلغِ قالب‌خورده (`OrderText.money`)؛ از واحدِ خرد با `OnlineFmt.afn(minor)` */
+  fun afnAmount(amount: String): String = t("$amount افغانی", "AFN $amount", "$amount افغانۍ")
   fun items(n: Int): String = t("$n قلم", "$n ${pl(n, "item", "items")}", "$n توکي")
-  fun orderNo(n: Long): String = "#$n"
-  /** شماره، مختصات و کدِ لاتین درونِ جملهٔ فارسی: جدا از جهتِ جمله (LRI…PDI) تا وارونه نشود */
-  fun ltr(s: String): String = "\u2066$s\u2069"
   fun orderTitle(n: Long): String = t("سفارش #$n", "Order #$n", "فرمایش #$n")
-  fun ago(ms: Long, now: Long): String {
-    val d = maxOf(0L, (now - ms) / 60_000)
-    return when {
-      d < 1 -> t("همین حالا", "Just now", "همدا اوس")
-      d < 60 -> t("$d دقیقه پیش", "$d min ago", "$d دقیقې مخکې")
-      d < 24 * 60 -> (d / 60).let { h -> t("$h ساعت پیش", "$h h ago", "$h ساعته مخکې") }
-      else -> (d / (24 * 60)).let { n -> t("$n روز پیش", "$n ${pl(n, "day", "days")} ago", "$n ورځې مخکې") }
-    }
-  }
+  //  «چند وقت پیش»؛ از دو زمان با `OnlineFmt.ago(ms, now)`
+  val agoNow: String get() = t("همین حالا", "Just now", "همدا اوس")
+  fun agoMinutes(d: Long): String = t("$d دقیقه پیش", "$d min ago", "$d دقیقې مخکې")
+  fun agoHours(h: Long): String = t("$h ساعت پیش", "$h h ago", "$h ساعته مخکې")
+  fun agoDays(n: Long): String = t("$n روز پیش", "$n ${pl(n, "day", "days")} ago", "$n ورځې مخکې")
 
   // ── واژه‌های موتورِ سفارش (فارسی از `OrderText`) ───────────────────────────
-  fun orderStatus(id: String): String = t(OrderText.status(id), STATUS_EN[id], STATUS_PS[id])
-  fun orderAction(id: String): String = t(OrderText.action(id), ACTION_EN[id], ACTION_PS[id])
-  fun orderReason(id: String): String = t(OrderText.reason(id), REASON_EN[id], REASON_PS[id])
-  fun orderTab(id: String): String = t(OrderText.tab(id), TAB_EN[id], TAB_PS[id])
-  fun orderSource(id: String): String = t(OrderText.source(id), SOURCE_EN[id], SOURCE_PS[id])
-  fun cod(id: String): String = t(OrderText.COD[id] ?: id, COD_EN[id], COD_PS[id])
-  fun pay(paymentStatus: String, paymentMethod: String): String = when {
-    paymentStatus == "paid" -> t("پرداخت‌شده", "Paid", "ورکړل شوی")
-    paymentMethod == "cod" -> t("نقد هنگامِ تحویل", "Cash on delivery", "د سپارلو پر وخت نغدې")
-    else -> t("پرداخت‌نشده", "Unpaid", "نه دی ورکړل شوی")
-  }
+  fun orderStatus(id: String): String = coded(id, OrderText.status(id), STATUS_EN[id], STATUS_PS[id])
+  fun orderAction(id: String): String = coded(id, OrderText.action(id), ACTION_EN[id], ACTION_PS[id])
+  fun orderReason(id: String): String = coded(id, OrderText.reason(id), REASON_EN[id], REASON_PS[id])
+  fun orderTab(id: String): String = coded(id, OrderText.tab(id), TAB_EN[id], TAB_PS[id])
+  fun orderSource(id: String): String = coded(id, OrderText.source(id), SOURCE_EN[id], SOURCE_PS[id])
+  fun cod(id: String): String = coded(id, OrderText.COD[id] ?: id, COD_EN[id], COD_PS[id])
+  //  برچسبِ پرداخت؛ از وضعیت و روش با `OnlineFmt.pay(status, method)`
+  val payPaid: String get() = t("پرداخت‌شده", "Paid", "ورکړل شوی")
+  val payCod: String get() = t("نقد هنگامِ تحویل", "Cash on delivery", "د سپارلو پر وخت نغدې")
+  val payUnpaid: String get() = t("پرداخت‌نشده", "Unpaid", "نه دی ورکړل شوی")
 
   // ── واژه‌های موتورِ تحویل (فارسی از `DeliveryText`) ────────────────────────
-  fun missionStatus(id: String): String = t(DeliveryText.status(id), MISSION_EN[id], MISSION_PS[id])
-  fun deliveryMode(id: String): String = t(DeliveryText.mode(id), MODE_EN[id], MODE_PS[id])
-  fun deliveryReason(id: String): String = t(DeliveryText.reason(id), DREASON_EN[id], DREASON_PS[id])
-  fun deskAction(act: DeskActions.Act): String = t(DeskActions.label(act), DESK_EN[act], DESK_PS[act])
+  fun missionStatus(id: String): String = coded(id, DeliveryText.status(id), MISSION_EN[id], MISSION_PS[id])
+  fun deliveryMode(id: String): String = coded(id, DeliveryText.mode(id), MODE_EN[id], MODE_PS[id])
+  fun deliveryReason(id: String): String = coded(id, DeliveryText.reason(id), DREASON_EN[id], DREASON_PS[id])
+  /** با نامِ `DeskActions.Act`؛ نامِ ناشناخته خودش می‌ماند. صدا زدن از `OnlineFmt.deskAction(act)` */
+  fun deskActionLabel(name: String): String =
+    DeskActions.Act.entries.firstOrNull { it.name == name }?.let { t(DeskActions.label(it), DESK_EN[it], DESK_PS[it]) } ?: t(name, name, name)
 
   // ── صفِ سفارش‌ها ───────────────────────────────────────────────────────────
   val ordersTitle: String get() = t("سفارش‌ها", "Orders", "فرمایشونه")
@@ -140,7 +139,7 @@ object StrOnline {
     "Connection lost. Tap “Place order” again — it won't be placed twice.",
     "اړیکه پرې شوه. بیا «فرمایش ثبتول» ووهئ — فرمایش دوه ځله نه ثبتېږي.",
   )
-  fun linesSummary(n: Int, total: String): String = "${items(n)} · $total"
+  fun linesSummary(n: Int, total: String): String = t("$n قلم · $total", "$n ${pl(n, "item", "items")} · $total", "$n توکي · $total")
   val errName: String get() = t("نامِ مشتری لازم است", "Customer name is required", "د پېرودونکي نوم اړین دی")
   val errPhoneDelivery: String get() = t("برای ارسال، شمارهٔ مشتری لازم است", "A phone number is required for delivery", "د لېږد لپاره د پېرودونکي شمېره اړینه ده")
   val errAddress: String get() = t("نشانی یا نشانهٔ تحویل لازم است", "An address or landmark is required", "پته یا نښه اړینه ده")
@@ -176,36 +175,34 @@ object StrOnline {
 
   // وضعیت و اعلام
   val sfCustomerSees: String get() = t("مشتری الان این را می‌بیند", "What customers see now", "پېرودونکی اوس دا ویني")
-  fun presenceBadge(badge: String, until: String?): String = when (badge) {
-    "open_online" -> t("باز است · آنلاین", "Open · online", "پرانیستی · آنلاین")
-    "open_unconfirmed" -> t("باز است · اتصال تأیید نشده", "Open · connection not confirmed", "پرانیستی · اړیکه نه ده تایید شوې")
-    "declared_until" -> if (until != null) t("تا ساعتِ $until آنلاین اعلام شده", "Declared online until $until", "تر $until پورې آنلاین اعلان شوی") else t("آنلاین اعلام شده", "Declared online", "آنلاین اعلان شوی")
-    "closed" -> t("بسته است", "Closed", "تړلی دی")
-    "offline" -> t("موقتاً آفلاین", "Temporarily offline", "لنډمهاله آفلاین")
-    else -> t("وضعیت نامعلوم", "Status unknown", "حالت نامعلوم")
-  }
-  fun presenceShort(badge: String, until: String?): String = when (badge) {
-    "open_online" -> t("باز · آنلاین", "Open · online", "پرانیستی · آنلاین")
-    "open_unconfirmed" -> t("باز · تأییدنشده", "Open · unconfirmed", "پرانیستی · ناتایید")
-    "declared_until" -> if (until != null) t("آنلاین تا $until", "Online until $until", "تر $until آنلاین") else t("آنلاین", "Online", "آنلاین")
-    "closed" -> t("بسته", "Closed", "تړلی")
-    "offline" -> t("آفلاین", "Offline", "آفلاین")
-    else -> t("نامعلوم", "Unknown", "نامعلوم")
-  }
+  //  جملهٔ وضعیتِ ویترین؛ از نشان با `OnlineFmt.presenceBadge(badge, until)`
+  val presOpenOnline: String get() = t("باز است · آنلاین", "Open · online", "پرانیستی · آنلاین")
+  val presOpenUnconfirmed: String get() = t("باز است · اتصال تأیید نشده", "Open · connection not confirmed", "پرانیستی · اړیکه نه ده تایید شوې")
+  fun presDeclaredUntil(until: String): String = t("تا ساعتِ $until آنلاین اعلام شده", "Declared online until $until", "تر $until پورې آنلاین اعلان شوی")
+  val presDeclared: String get() = t("آنلاین اعلام شده", "Declared online", "آنلاین اعلان شوی")
+  val presClosed: String get() = t("بسته است", "Closed", "تړلی دی")
+  val presOffline: String get() = t("موقتاً آفلاین", "Temporarily offline", "لنډمهاله آفلاین")
+  val presUnknown: String get() = t("وضعیت نامعلوم", "Status unknown", "حالت نامعلوم")
+  //  همان، کوتاه (سرِ صفحه)؛ با `OnlineFmt.presenceShort(badge, until)`
+  val presShortOpenOnline: String get() = t("باز · آنلاین", "Open · online", "پرانیستی · آنلاین")
+  val presShortOpenUnconfirmed: String get() = t("باز · تأییدنشده", "Open · unconfirmed", "پرانیستی · ناتایید")
+  fun presShortUntil(until: String): String = t("آنلاین تا $until", "Online until $until", "تر $until آنلاین")
+  val presShortOnline: String get() = t("آنلاین", "Online", "آنلاین")
+  val presShortClosed: String get() = t("بسته", "Closed", "تړلی")
+  val presShortOffline: String get() = t("آفلاین", "Offline", "آفلاین")
+  val presShortUnknown: String get() = t("نامعلوم", "Unknown", "نامعلوم")
   fun presenceMode(mode: String): String = when (mode) {
     "auto" -> t("طبقِ ساعتِ کاری", "By working hours", "د کاري ساعتونو له مخې")
     "online" -> t("آنلاین بی زمانِ پایان", "Online, no end time", "آنلاین، بې پای وخته")
     "online_until" -> t("آنلاین تا ساعتِ …", "Online until …", "تر … پورې آنلاین")
     "offline" -> t("آفلاین", "Offline", "آفلاین")
     "closed" -> t("تعطیل/بسته", "Closed", "رخصت/تړلی")
-    else -> mode
+    else -> t(mode, mode, mode)
   }
-  fun acceptance(a: String): String = when (a) {
-    "accepting" -> t("سفارش همین حالا به دکان می‌رسد.", "Orders reach the shop right now.", "فرمایش همدا اوس دوکان ته رسېږي.")
-    "delayed" -> t("سفارش ثبت می‌شود، ولی مشتری می‌بیند که دیرتر بررسی می‌شود.", "Orders are placed, but customers see they'll be reviewed later.", "فرمایش ثبتېږي، خو پېرودونکی ویني چې وروسته کتل کېږي.")
-    "later" -> t("سفارش ثبت می‌شود و مشتری می‌بیند که پس از باز شدنِ دکان بررسی می‌شود.", "Orders are placed and customers see they'll be reviewed once the shop opens.", "فرمایش ثبتېږي او پېرودونکی ویني چې د دوکان له پرانیستو وروسته کتل کېږي.")
-    else -> ""
-  }
+  //  پذیرشِ سفارش؛ کدِ ناشناخته ⇐ هیچ (`OnlineFmt.acceptance`)
+  val acceptAccepting: String get() = t("سفارش همین حالا به دکان می‌رسد.", "Orders reach the shop right now.", "فرمایش همدا اوس دوکان ته رسېږي.")
+  val acceptDelayed: String get() = t("سفارش ثبت می‌شود، ولی مشتری می‌بیند که دیرتر بررسی می‌شود.", "Orders are placed, but customers see they'll be reviewed later.", "فرمایش ثبتېږي، خو پېرودونکی ویني چې وروسته کتل کېږي.")
+  val acceptLater: String get() = t("سفارش ثبت می‌شود و مشتری می‌بیند که پس از باز شدنِ دکان بررسی می‌شود.", "Orders are placed and customers see they'll be reviewed once the shop opens.", "فرمایش ثبتېږي او پېرودونکی ویني چې د دوکان له پرانیستو وروسته کتل کېږي.")
   fun connection(at: String?): String = if (at == null) t("اتصالِ دستگاه‌های دکان هنوز تأیید نشده", "Shop devices' connection isn't confirmed yet", "د دوکان د وسایلو اړیکه لا نه ده تایید شوې")
   else t("آخرین تأییدِ اتصال: $at", "Last connection check: $at", "د اړیکې وروستۍ تایید: $at")
   fun shopClock(time: String): String = t("ساعتِ دکان $time", "Shop time $time", "د دوکان ساعت $time")
@@ -256,11 +253,14 @@ object StrOnline {
     "هره ورځ لکه 08:00-12:00، 14:00-20:00؛ تش = رخصت. له نیمې شپې وروسته ساعتونه په بله ورځ ولیکئ. ټول تش = ساعتونه نه دي ټاکل شوي.",
   )
   val sfTimezone: String get() = t("منطقهٔ زمانیِ دکان", "Shop time zone", "د دوکان د وخت سیمه")
-  fun dayName(d: Int): String = t(
-    ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[d],
-    listOf("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday")[d],
-    listOf("یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")[d],
-  )
+  //  نامِ روز به ترتیبِ `StorefrontOwner.DAY_NAMES` (۰ = یکشنبه)؛ با شماره از `OnlineFmt.dayName(d)`
+  val daySunday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[0], "Sunday", "یکشنبه")
+  val dayMonday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[1], "Monday", "دوشنبه")
+  val dayTuesday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[2], "Tuesday", "سه‌شنبه")
+  val dayWednesday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[3], "Wednesday", "چهارشنبه")
+  val dayThursday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[4], "Thursday", "پنجشنبه")
+  val dayFriday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[5], "Friday", "جمعه")
+  val daySaturday: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.DAY_NAMES[6], "Saturday", "شنبه")
   val sfClosed: String get() = t("تعطیلیِ استثنایی (تاریخ‌ها مثلِ 2026-10-20)", "Special closures (dates like 2026-10-20)", "ځانګړې رخصتۍ (نېټې لکه 2026-10-20)")
   val sfSave: String get() = t("ذخیرهٔ ویترین", "Save storefront", "ویترین خوندي کول")
   val sfSaved: String get() = t("ویترین ذخیره شد", "Storefront saved", "ویترین خوندي شو")
@@ -311,8 +311,9 @@ object StrOnline {
     "Only about 1 km is kept, not the exact address — for customers' “near me”. Customers never see the numbers.",
     "یوازې شاوخوا یو کیلومتره ساتل کېږي، نه دقیقه پته؛ د پېرودونکي د «ما ته نږدې» لپاره. پېرودونکی پخپله شمېرې نه ویني.",
   )
-  fun locationText(lat: Double?, lng: Double?): String = if (lat == null || lng == null) t("گذاشته نشده", "Not set", "نه دی ټاکل شوی")
-  else ("%.2f".format(java.util.Locale.ROOT, lat) + "، " + "%.2f".format(java.util.Locale.ROOT, lng)).let { t("حدودِ $it", "About $it", "شاوخوا $it") }
+  //  موقعیتِ تقریبی؛ از مختصات با `OnlineFmt.locationText(lat, lng)`
+  val locNotSet: String get() = t("گذاشته نشده", "Not set", "نه دی ټاکل شوی")
+  fun locAbout(coords: String): String = t("حدودِ $coords", "About $coords", "شاوخوا $coords")
   val mkSetHere: String get() = t("گذاشتنِ موقعیتِ همین‌جا", "Use my current location", "همدا ځای ټاکل")
   val mkLocating: String get() = t("در حالِ یافتنِ موقعیت…", "Finding location…", "ځای موندل کېږي…")
   val mkRemoveLocation: String get() = t("برداشتنِ موقعیت", "Remove location", "ځای لرې کول")
@@ -397,12 +398,10 @@ object StrOnline {
   val ctDeletedMsg: String get() = t("پیامِ پاک‌شده", "Deleted message", "ړنګ شوی پیغام")
   val ctThisDeleted: String get() = t("این پیام پاک شد", "This message was deleted", "دا پیغام ړنګ شو")
   val ctShopPrefix: String get() = t("دکان: ", "Shop: ", "دوکان: ")
-  fun ctKind(kind: String): String = when (kind) {
-    "image" -> t("عکس", "Photo", "انځور")
-    "audio" -> t("پیامِ صوتی", "Voice message", "غږیز پیغام")
-    "file" -> t("فایل", "File", "فایل")
-    else -> ""
-  }
+  //  نوعِ پیام؛ نوعِ دیگر ⇐ هیچ (`OnlineFmt.ctKind`)
+  val ctKindImage: String get() = t("عکس", "Photo", "انځور")
+  val ctKindAudio: String get() = t("پیامِ صوتی", "Voice message", "غږیز پیغام")
+  val ctKindFile: String get() = t("فایل", "File", "فایل")
   val ctBlocked: String get() = t("مسدود", "Blocked", "بند شوی")
   val ctCustomerBlockedShop: String get() = t("مشتری بسته است", "Customer blocked you", "پېرودونکي بند کړی")
   fun ctOrderChip(n: Long): String = t("سفارشِ $n", "Order $n", "فرمایش $n")
@@ -419,7 +418,7 @@ object StrOnline {
     "abuse" -> t("توهین یا آزار", "Insult or harassment", "سپکاوی یا ځورونه")
     "fraud" -> t("کلاه‌برداری", "Fraud", "درغلي")
     "other" -> t("دیگر", "Other", "بل")
-    else -> id
+    else -> t(id, id, id)
   }
   val ctReportNote: String get() = t("توضیح (اختیاری)", "Note (optional)", "تشریح (اختیاري)")
   val ctSendReport: String get() = t("فرستادنِ گزارش", "Send report", "راپور لېږل")
@@ -430,7 +429,8 @@ object StrOnline {
   val ctPreparingPhoto: String get() = t("آماده کردنِ عکس…", "Preparing photo…", "انځور چمتو کېږي…")
   fun ctPhotoReady(size: String): String = t("عکس آماده شد ($size)", "Photo ready ($size)", "انځور چمتو شو ($size)")
   val ctPhotoFailed: String get() = t("عکس آماده نشد", "Photo couldn't be prepared", "انځور چمتو نشو")
-  fun kb(bytes: Long): String = maxOf(1, (bytes + 512) / 1024).let { t("$it کیلوبایت", "$it KB", "$it کیلوبایټ") }
+  /** کیلوبایتِ گردشده؛ از بایت با `OnlineFmt.kb(bytes)` */
+  fun kbAmount(n: Long): String = t("$n کیلوبایت", "$n KB", "$n کیلوبایټ")
   val ctReadOnly: String get() = t("نقشِ شما اجازهٔ پاسخ ندارد؛ فقط خواندن.", "Your role can't reply; read only.", "ستاسو رول د ځواب اجازه نه لري؛ یوازې لوستل.")
   val ctCustomerBlockedNote: String get() = t("مشتری پیامِ این دکان را بسته است.", "The customer has blocked this shop's messages.", "پېرودونکي د دې دوکان پیغامونه بند کړي.")
   val ctMessage: String get() = t("پیام…", "Message…", "پیغام…")
@@ -442,17 +442,15 @@ object StrOnline {
   val ctPdf: String get() = t("فایلِ PDF", "PDF file", "PDF فایل")
   val ctEdited: String get() = t("ویرایش‌شده", "Edited", "سم شوی")
   val ctQueuedImage: String get() = t("عکسِ در صف", "Queued photo", "په کتار کې انځور")
-  fun ctState(id: String): String = when (id) {
-    "queued" -> t("در صفِ دستگاه", "In device queue", "د وسیلې په کتار کې")
-    "sending" -> t("در حالِ ارسال…", "Sending…", "لېږل کېږي…")
-    "waiting" -> t("منتظرِ اینترنت", "Waiting for internet", "د انټرنېټ په تمه")
-    "auth" -> t("منتظرِ ورودِ دوباره", "Waiting for sign-in", "د بیا ننوتو په تمه")
-    "failed" -> t("نرفت", "Not sent", "ونه لېږل شو")
-    "sent" -> t("به سرور رسید", "Reached the server", "سرور ته ورسېد")
-    "delivered" -> t("به دستگاهِ طرف رسید", "Delivered to their device", "د بل لوري وسیلې ته ورسېد")
-    "read" -> t("خوانده شد", "Read", "ولوستل شو")
-    else -> ""
-  }
+  //  وضعیتِ پیام؛ وضعیتِ دیگر ⇐ هیچ (`OnlineFmt.ctState`)
+  val ctStateQueued: String get() = t("در صفِ دستگاه", "In device queue", "د وسیلې په کتار کې")
+  val ctStateSending: String get() = t("در حالِ ارسال…", "Sending…", "لېږل کېږي…")
+  val ctStateWaiting: String get() = t("منتظرِ اینترنت", "Waiting for internet", "د انټرنېټ په تمه")
+  val ctStateAuth: String get() = t("منتظرِ ورودِ دوباره", "Waiting for sign-in", "د بیا ننوتو په تمه")
+  val ctStateFailed: String get() = t("نرفت", "Not sent", "ونه لېږل شو")
+  val ctStateSent: String get() = t("به سرور رسید", "Reached the server", "سرور ته ورسېد")
+  val ctStateDelivered: String get() = t("به دستگاهِ طرف رسید", "Delivered to their device", "د بل لوري وسیلې ته ورسېد")
+  val ctStateRead: String get() = t("خوانده شد", "Read", "ولوستل شو")
   fun ctRecording(time: String): String = t("در حالِ ضبط $time", "Recording $time", "ثبتېږي $time")
   val ctStopRec: String get() = t("پایانِ ضبط", "Stop", "ثبت بس")
   fun ctVoiceReady(time: String, size: String): String = t("پیامِ صوتی $time · $size", "Voice message $time · $size", "غږیز پیغام $time · $size")
@@ -625,7 +623,7 @@ object StrOnline {
     "UNKNOWN" -> t("در دفترِ ما نیست", "Not in our books", "زموږ په دفتر کې نشته")
     "DUPLICATE" -> t("دو بار آمده", "Listed twice", "دوه ځله راغلی")
     "NOT_BILLED" -> t("تحویل شده ولی در صورت‌حساب نیست", "Delivered but not billed", "سپارل شوی خو په بیل کې نشته")
-    else -> k
+    else -> t(k, k, k)
   }
   fun dlBilledBit(a: String): String = t("صورت‌حساب $a", "invoice $a", "بیل $a")
   fun dlOursBit(a: String): String = t("دفترِ ما $a", "ours $a", "زموږ دفتر $a")
@@ -822,6 +820,9 @@ object StrOnline {
     "wrong_order" to "ناسم فرمایش", "partial_payment" to "نیمګړې ورکړه", "refused_amount" to "مبلغ یې ونه مانه",
     "damaged_or_short" to "زیانمن یا کم توکي", "other" to "بل (له تشریح سره)",
   )
+  /** موتور برای کدِ ناشناخته خودِ کد را برمی‌گرداند (`fa == id`)؛ همان کد در هر سه زبان می‌ماند، نه «ترجمهٔ جاافتاده» */
+  private fun coded(id: String, fa: String, en: String?, ps: String?): String = if (fa == id) t(id, id, id) else t(fa, en, ps)
+
   private val DESK_EN = mapOf(
     DeskActions.Act.PICKUP_HANDOVER to "Hand over with code", DeskActions.Act.NEW_CODE to "New code", DeskActions.Act.WITHDRAW to "Withdraw",
     DeskActions.Act.HAND_TO_COMPANY to "Handed to company", DeskActions.Act.DELIVER to "Delivered", DeskActions.Act.FAIL to "Failed",

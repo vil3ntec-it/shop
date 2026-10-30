@@ -28,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -77,7 +78,7 @@ fun StatusPane(
     )
     V3Section(null) {
       if (st != null) {
-        StrOnline.acceptance(st.orderAcceptance).takeIf { it.isNotEmpty() }?.let {
+        OnlineFmt.acceptance(st.orderAcceptance).takeIf { it.isNotEmpty() }?.let {
           V3ListRow(it, icon = Icons.Outlined.ShoppingCartCheckout, hue = V3Hue.MINT, subtitleLines = 3, chevron = false)
           V3Divider(start = 64.dp)
         }

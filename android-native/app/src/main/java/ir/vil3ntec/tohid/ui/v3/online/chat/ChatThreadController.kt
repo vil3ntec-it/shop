@@ -19,6 +19,7 @@ import ir.vil3ntec.tohid.core.chat.ChatMessage
 import ir.vil3ntec.tohid.core.chat.ChatMeta
 import ir.vil3ntec.tohid.core.chat.ChatThread
 import ir.vil3ntec.tohid.core.chat.OutboxItem
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -169,7 +170,7 @@ internal class ChatThreadController(
         convId, kind = "image", body = caption.trim(), meta = ChatMeta(width = p.width, height = p.height),
         blobKey = "$id-main", thumbKey = "$id-thumb", size = p.main.size.toLong(), clientId = id,
       )
-      banner = StrOnline.ctPhotoReady(StrOnline.kb(p.main.size.toLong())) to false
+      banner = StrOnline.ctPhotoReady(OnlineFmt.kb(p.main.size.toLong())) to false
       ShopChatSync.flush(context, convId)
       ok = true
     }.onFailure { banner = (it.message ?: StrOnline.ctPhotoFailed) to true }

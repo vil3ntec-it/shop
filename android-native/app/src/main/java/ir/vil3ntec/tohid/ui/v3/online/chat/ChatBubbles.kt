@@ -40,6 +40,7 @@ import ir.vil3ntec.tohid.core.chat.ChatQueue
 import ir.vil3ntec.tohid.core.chat.ChatReceipts
 import ir.vil3ntec.tohid.core.chat.OutboxItem
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.ChatMedia
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -100,7 +101,7 @@ fun LocalBubble(x: OutboxItem, image: ImageBitmap?, onRetry: () -> Unit, onCance
   Bubble(mine = true) {
     when (x.kind) {
       "image" -> Photo(image, StrOnline.ctQueuedImage, null)
-      "audio" -> MediaChip(Icons.Outlined.GraphicEq, StrOnline.ctKind("audio") + (x.meta.durationMs?.let { " · " + ChatModel.mmss(it) }.orEmpty()), null)
+      "audio" -> MediaChip(Icons.Outlined.GraphicEq, OnlineFmt.ctKind("audio") + (x.meta.durationMs?.let { " · " + ChatModel.mmss(it) }.orEmpty()), null)
     }
     if (x.body.isNotBlank()) Text(x.body, style = V3Type.body.copy(textDirection = TextDirection.Content), color = c.ink)
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.Center) {

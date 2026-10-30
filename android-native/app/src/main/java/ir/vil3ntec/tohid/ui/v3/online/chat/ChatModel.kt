@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.chat.ChatMessage
 import ir.vil3ntec.tohid.core.chat.ChatQueue
 import ir.vil3ntec.tohid.core.chat.ChatReceipts
 import ir.vil3ntec.tohid.core.chat.ChatThread
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 
 /**
@@ -26,7 +27,7 @@ object ChatModel {
     val m = c.lastMessage ?: return StrOnline.ctNoMessageYet
     if (m.deleted) return StrOnline.ctDeletedMsg
     val who = if (m.sender == "shop") StrOnline.ctShopPrefix else ""
-    return who + (m.preview?.takeIf { it.isNotBlank() } ?: StrOnline.ctKind(m.kind))
+    return who + (m.preview?.takeIf { it.isNotBlank() } ?: OnlineFmt.ctKind(m.kind))
   }
 
   /** گونهٔ آخرین پیام برای آیکنِ کنارِ پیش‌نمایش (متن ⇒ null) */
@@ -39,7 +40,7 @@ object ChatModel {
   fun whenOf(c: ChatConversation): Long = c.lastMessageAt ?: c.updatedAt
 
   fun subtitle(c: ChatConversation?): String =
-    listOfNotNull(c?.customer?.shownPhone?.ifBlank { null }?.let(StrOnline::ltr), c?.orderNo?.let(StrOnline::ctOrderChip)).joinToString(" · ")
+    listOfNotNull(c?.customer?.shownPhone?.ifBlank { null }?.let(OnlineFmt::ltr), c?.orderNo?.let(StrOnline::ctOrderChip)).joinToString(" · ")
 
   /** «۱:۰۵» */
   fun mmss(ms: Long): String {
@@ -48,13 +49,13 @@ object ChatModel {
   }
 
   /** برچسبِ رسیدِ پیامِ خودم (فقط از رسیدهای واقعیِ طرف) */
-  fun receipt(m: ChatMessage, receipts: ChatReceipts?): String = StrOnline.ctState(ChatThread.statusOf(m, receipts))
+  fun receipt(m: ChatMessage, receipts: ChatReceipts?): String = OnlineFmt.ctState(ChatThread.statusOf(m, receipts))
 
   fun isRead(m: ChatMessage, receipts: ChatReceipts?): Boolean = ChatThread.statusOf(m, receipts) == "read"
 
   /** پیامِ در صف: برچسب، و آیا «دوباره»/«لغو» دارد */
   fun queuedLabel(state: String, error: String): String =
-    StrOnline.ctState(state) + if (state == ChatQueue.FAILED && error.isNotBlank()) " — $error" else ""
+    OnlineFmt.ctState(state) + if (state == ChatQueue.FAILED && error.isNotBlank()) " — $error" else ""
 
   fun canRetry(state: String): Boolean = state != ChatQueue.SENDING && state != ChatQueue.QUEUED
 

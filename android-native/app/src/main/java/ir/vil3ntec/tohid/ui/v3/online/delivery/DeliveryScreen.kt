@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
@@ -80,7 +81,7 @@ private fun DeskStats(d: DeskData, wide: Boolean, onTab: (String) -> Unit) {
     items = listOf(
       { m -> V3Stat(StrOnline.dlStatReady, s.ready.toDouble(), { it.toLong().toString() }, m, hue = V3Hue.AMBER, caption = StrOnline.dlNow, onClick = { onTab(DeliveryModel.ASSIGN) }) },
       { m -> V3Stat(StrOnline.dlStatLive, s.live.toDouble(), { it.toLong().toString() }, m, hue = V3Hue.SKY, caption = StrOnline.dlNow, onClick = { onTab(DeliveryModel.ASSIGN) }) },
-      { m -> V3Stat(StrOnline.dlStatCash, s.heldMinor.toDouble(), { StrOnline.afn(it.toLong()) }, m, hue = V3Hue.MINT, caption = StrOnline.dlUnsettled, onClick = { onTab(DeliveryModel.COURIERS) }) },
+      { m -> V3Stat(StrOnline.dlStatCash, s.heldMinor.toDouble(), { OnlineFmt.afn(it.toLong()) }, m, hue = V3Hue.MINT, caption = StrOnline.dlUnsettled, onClick = { onTab(DeliveryModel.COURIERS) }) },
       { m -> V3Stat(StrOnline.dlStatAtCap, s.atCap.toDouble(), { it.toLong().toString() }, m, hue = V3Hue.CORAL, caption = StrOnline.dlNoAuto, onClick = { onTab(DeliveryModel.COURIERS) }) },
     ),
   )

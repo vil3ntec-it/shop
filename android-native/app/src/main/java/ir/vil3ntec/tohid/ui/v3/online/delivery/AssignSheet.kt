@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.core.delivery.AutoAssign
 import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
@@ -79,7 +80,7 @@ internal fun AssignSheet(
 
   V3Sheet(onDismiss = onDismiss, title = StrOnline.dlAssignTitle(order.orderNo)) { _ ->
     Text(
-      order.customer.name + " · " + (if (expected > 0) StrOnline.dlCollect(StrOnline.afn(expected)) else StrOnline.pay("paid", "")),
+      order.customer.name + " · " + (if (expected > 0) StrOnline.dlCollect(OnlineFmt.afn(expected)) else OnlineFmt.pay("paid", "")),
       style = V3Type.callout, color = c.ink,
     )
     DeliveryModel.landmark(order).takeIf { it.isNotEmpty() }?.let { Text(it, style = V3Type.footnote, color = c.inkMuted) }
@@ -96,7 +97,7 @@ internal fun AssignSheet(
           val fits = CourierCash.fits(cr, expected)
           V3ListRow(
             cr.name,
-            subtitle = if (cr.active) StrOnline.dlCourierLine(cr.liveCount, StrOnline.afn(CourierCash.committed(cr)), StrOnline.afn(cr.cashCapMinor), StrOnline.afn(CourierCash.headroom(cr))) else StrOnline.dlInactive,
+            subtitle = if (cr.active) StrOnline.dlCourierLine(cr.liveCount, OnlineFmt.afn(CourierCash.committed(cr)), OnlineFmt.afn(cr.cashCapMinor), OnlineFmt.afn(CourierCash.headroom(cr))) else StrOnline.dlInactive,
             icon = Icons.Outlined.DeliveryDining,
             hue = V3Hue.SKY,
             selected = cr.id == form.courierId,
@@ -104,7 +105,7 @@ internal fun AssignSheet(
             onClick = if (cr.active) ({ form = form.copy(courierId = cr.id, override = false) }) else null,
           )
           if (cr.active) Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
-            DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), StrOnline.afn(cr.cashCapMinor))
+            DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), OnlineFmt.afn(cr.cashCapMinor))
             if (!fits) { Spacer(Modifier.height(6.dp)); DraftTag(StrOnline.dlWouldExceed, Icons.Outlined.WarningAmber, V3Tone.WARNING) }
           }
         }

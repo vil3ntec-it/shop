@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
 import ir.vil3ntec.tohid.core.delivery.InvoiceCheck
 import ir.vil3ntec.tohid.core.delivery.Statement
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
@@ -87,8 +88,8 @@ internal fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismi
     V3Card(padding = PaddingValues(vertical = 4.dp)) {
       Sum(StrOnline.dlGiven, StrOnline.dlOrders(s.rows.size))
       Sum(StrOnline.dlDeliveredOurs, StrOnline.dlOrders(delivered))
-      Sum(StrOnline.dlFaresOwed, StrOnline.afn(s.deliveredFareMinor), strong = true)
-      Sum(StrOnline.dlCashOwed, StrOnline.afn(s.deliveredCashMinor), strong = true, tone = if (s.deliveredCashMinor > 0) warn else null)
+      Sum(StrOnline.dlFaresOwed, OnlineFmt.afn(s.deliveredFareMinor), strong = true)
+      Sum(StrOnline.dlCashOwed, OnlineFmt.afn(s.deliveredCashMinor), strong = true, tone = if (s.deliveredCashMinor > 0) warn else null)
       V3Divider()
       DeliveryModel.net(StrOnline.dlNetOurs, s.deliveredFareMinor - s.deliveredCashMinor).let { (l, v) -> Sum(l, v, strong = true) }
       val notDone = s.rows.count { it.status != "delivered" }
@@ -101,11 +102,11 @@ internal fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismi
         val bits = listOfNotNull(
           r.externalRef.takeIf { it.isNotEmpty() },
           StrOnline.missionStatus(r.status),
-          StrOnline.dlFareBit(StrOnline.afn(r.fareMinor)),
-          r.cashCollectedMinor?.takeIf { it > 0 }?.let { StrOnline.dlCashBit(StrOnline.afn(it)) },
-          if (r.status == "delivered" && r.expectedCollectMinor > 0 && (r.cashCollectedMinor ?: 0L) != r.expectedCollectMinor) StrOnline.dlExpectedBit(StrOnline.afn(r.expectedCollectMinor)) else null,
+          StrOnline.dlFareBit(OnlineFmt.afn(r.fareMinor)),
+          r.cashCollectedMinor?.takeIf { it > 0 }?.let { StrOnline.dlCashBit(OnlineFmt.afn(it)) },
+          if (r.status == "delivered" && r.expectedCollectMinor > 0 && (r.cashCollectedMinor ?: 0L) != r.expectedCollectMinor) StrOnline.dlExpectedBit(OnlineFmt.afn(r.expectedCollectMinor)) else null,
         )
-        V3ListRow(StrOnline.orderNo(r.orderNo), subtitle = bits.joinToString(" · "), subtitleLines = 3, icon = Icons.Outlined.LocalShipping, hue = if (r.status == "delivered") V3Hue.MINT else V3Hue.AMBER, chevron = false)
+        V3ListRow(OnlineFmt.orderNo(r.orderNo), subtitle = bits.joinToString(" · "), subtitleLines = 3, icon = Icons.Outlined.LocalShipping, hue = if (r.status == "delivered") V3Hue.MINT else V3Hue.AMBER, chevron = false)
       }
     }
 
@@ -138,7 +139,7 @@ internal fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismi
       Spacer(Modifier.height(8.dp))
       V3Card(padding = PaddingValues(vertical = 4.dp)) {
         DeliveryModel.net(StrOnline.dlNetInvoice, r.netToCompanyByInvoiceMinor).let { (l, v) -> Sum(l, v, strong = true) }
-        Sum(StrOnline.dlAmountDiff, StrOnline.afn(r.amountDiffMinor), strong = true, tone = if (r.amountDiffMinor == 0L) null else PhoneV3Roles.errorText(c))
+        Sum(StrOnline.dlAmountDiff, OnlineFmt.afn(r.amountDiffMinor), strong = true, tone = if (r.amountDiffMinor == 0L) null else PhoneV3Roles.errorText(c))
         r.countDiff?.let { Sum(StrOnline.dlCountDiff, it.toString(), tone = if (it == 0) null else warn) }
       }
       if (r.items.isNotEmpty()) V3Section(null) {
@@ -146,9 +147,9 @@ internal fun InvoiceSheet(co: ExternalCompany, repo: DeliveryRepository, onDismi
           if (i > 0) V3Divider(start = 22.dp)
           val bits = listOfNotNull(
             StrOnline.dlInvoiceKind(item.kind.name),
-            item.billedMinor?.let { StrOnline.dlBilledBit(StrOnline.afn(it)) },
-            item.ourFareMinor?.let { StrOnline.dlOursBit(StrOnline.afn(it)) },
-            item.cashMinor?.takeIf { it > 0 }?.let { StrOnline.dlCashBit(StrOnline.afn(it)) },
+            item.billedMinor?.let { StrOnline.dlBilledBit(OnlineFmt.afn(it)) },
+            item.ourFareMinor?.let { StrOnline.dlOursBit(OnlineFmt.afn(it)) },
+            item.cashMinor?.takeIf { it > 0 }?.let { StrOnline.dlCashBit(OnlineFmt.afn(it)) },
             item.status.takeIf { it.isNotEmpty() && it != "delivered" }?.let(StrOnline::missionStatus),
           )
           V3ListRow(

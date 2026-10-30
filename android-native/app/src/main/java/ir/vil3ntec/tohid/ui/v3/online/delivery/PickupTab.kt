@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -75,7 +76,7 @@ internal fun PickupTab(
         Spacer(Modifier.height(6.dp))
         val expected = DeliveryModel.expected(o)
         Text(
-          (if (expected > 0) StrOnline.dlTakeAtTill(StrOnline.afn(expected)) else StrOnline.pay("paid", "")) + " · " + StrOnline.items(o.itemsCount),
+          (if (expected > 0) StrOnline.dlTakeAtTill(OnlineFmt.afn(expected)) else OnlineFmt.pay("paid", "")) + " · " + StrOnline.items(o.itemsCount),
           style = V3Type.callout, color = c.ink,
         )
         Text(
@@ -92,8 +93,8 @@ internal fun PickupTab(
               if (makeCode) V3Button(StrOnline.dlMakeCode, { actions.onMakeCode(o) }, height = 38.dp, loading = busyId == o.id, enabled = busyId == null, haptic = true)
               if (m != null) acts.forEach { a ->
                 when (a) {
-                  DeskActions.Act.PICKUP_HANDOVER -> V3Button(StrOnline.deskAction(a), { actions.onHandover(o, m) }, height = 38.dp, haptic = true)
-                  DeskActions.Act.NEW_CODE -> V3Button(StrOnline.deskAction(a), { actions.onNewCode(m) }, kind = V3ButtonKind.SECONDARY, height = 38.dp)
+                  DeskActions.Act.PICKUP_HANDOVER -> V3Button(OnlineFmt.deskAction(a), { actions.onHandover(o, m) }, height = 38.dp, haptic = true)
+                  DeskActions.Act.NEW_CODE -> V3Button(OnlineFmt.deskAction(a), { actions.onNewCode(m) }, kind = V3ButtonKind.SECONDARY, height = 38.dp)
                   else -> Unit
                 }
               }

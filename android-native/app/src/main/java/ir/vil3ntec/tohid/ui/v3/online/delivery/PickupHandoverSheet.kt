@@ -22,6 +22,7 @@ import ir.vil3ntec.tohid.core.delivery.HandoverKind
 import ir.vil3ntec.tohid.core.delivery.HandoverSale
 import ir.vil3ntec.tohid.core.delivery.HandoverSaleResult
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -85,7 +86,7 @@ internal fun PickupHandoverSheet(
     }
     V3TextField(
       h.cash, { h = h.copy(cash = it.take(DeliveryForms.NUMBER_MAX)) }, StrOnline.dlCashAtTill, kind = V3FieldKind.MONEY,
-      helper = if (m.expectedCollectMinor > 0) StrOnline.dlOrderAmount(StrOnline.afn(m.expectedCollectMinor)) else StrOnline.pay("paid", ""),
+      helper = if (m.expectedCollectMinor > 0) StrOnline.dlOrderAmount(OnlineFmt.afn(m.expectedCollectMinor)) else OnlineFmt.pay("paid", ""),
       error = if (cashMinor == null) StrOnline.dlBadNumber else null, modifier = Modifier.fillMaxWidth(),
     )
     if (differs) {

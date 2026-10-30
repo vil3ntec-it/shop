@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
@@ -131,7 +132,7 @@ private fun RuleCard(i: Int, r: StorefrontDelivery.RuleDraft, errors: Map<String
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       StorefrontOwner.DISPLAY_DAYS.forEach { day ->
         val on = day in r.weekdays
-        V3Chip(StrOnline.dayName(day), on, { onChange(r.copy(weekdays = if (on) r.weekdays - day else r.weekdays + day)) })
+        V3Chip(OnlineFmt.dayName(day), on, { onChange(r.copy(weekdays = if (on) r.weekdays - day else r.weekdays + day)) })
       }
     }
     errors["$k.days"]?.let { Text(it, style = V3Type.footnote, color = PhoneV3Roles.errorText(PhoneV3.colors)) }

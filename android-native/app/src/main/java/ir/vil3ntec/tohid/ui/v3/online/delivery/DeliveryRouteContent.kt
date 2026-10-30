@@ -11,6 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.DeliveryWire
@@ -194,8 +195,8 @@ internal fun RouteScope.CourierSheetRoute(kind: String) {
     "settle" -> SettlementSheet(cr, repo, onDismiss = { back() }, onDone = { s ->
       Haptics.success(context)
       val gap = when {
-        s.shortageMinor > 0 -> " · " + StrOnline.dlShortage(StrOnline.afn(s.shortageMinor))
-        s.excessMinor > 0 -> " · " + StrOnline.dlExcess(StrOnline.afn(s.excessMinor))
+        s.shortageMinor > 0 -> " · " + StrOnline.dlShortage(OnlineFmt.afn(s.shortageMinor))
+        s.excessMinor > 0 -> " · " + StrOnline.dlExcess(OnlineFmt.afn(s.excessMinor))
         else -> ""
       }
       finished(StrOnline.dlSettled(s.settleNo, gap))

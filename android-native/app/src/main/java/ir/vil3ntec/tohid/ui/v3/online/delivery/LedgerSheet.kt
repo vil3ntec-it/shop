@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.SettlementPage
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -53,25 +54,25 @@ internal fun LedgerSheet(cr: CourierRow, repo: DeliveryRepository, onDismiss: ()
       else -> {
         val l = CourierCash.ledger(cr, p.sums)
         V3Card(padding = PaddingValues(vertical = 4.dp)) {
-          Sum(StrOnline.dlCollectedAll, StrOnline.afn(l.collectedMinor))
-          Sum(StrOnline.dlHandedBack, StrOnline.afn(l.handedBackMinor))
-          Sum(StrOnline.dlOutstanding, StrOnline.afn(l.outstandingMinor), strong = true)
-          Sum(StrOnline.dlFares, StrOnline.afn(l.faresMinor))
-          if (l.shortageMinor > 0) Sum(StrOnline.dlShortages, StrOnline.afn(l.shortageMinor), tone = PhoneV3Roles.errorText(c))
-          if (l.excessMinor > 0) Sum(StrOnline.dlExcesses, StrOnline.afn(l.excessMinor), tone = PhoneV3Roles.status(c, V3Status.WARNING).fg)
+          Sum(StrOnline.dlCollectedAll, OnlineFmt.afn(l.collectedMinor))
+          Sum(StrOnline.dlHandedBack, OnlineFmt.afn(l.handedBackMinor))
+          Sum(StrOnline.dlOutstanding, OnlineFmt.afn(l.outstandingMinor), strong = true)
+          Sum(StrOnline.dlFares, OnlineFmt.afn(l.faresMinor))
+          if (l.shortageMinor > 0) Sum(StrOnline.dlShortages, OnlineFmt.afn(l.shortageMinor), tone = PhoneV3Roles.errorText(c))
+          if (l.excessMinor > 0) Sum(StrOnline.dlExcesses, OnlineFmt.afn(l.excessMinor), tone = PhoneV3Roles.status(c, V3Status.WARNING).fg)
         }
         V3Section(StrOnline.dlRecent) {
           if (p.items.isEmpty()) V3ListRow(StrOnline.dlNoSettlements, tile = false, chevron = false)
           p.items.forEachIndexed { i, s ->
             if (i > 0) V3Divider(start = 64.dp)
             val extra = listOfNotNull(
-              s.shortageMinor.takeIf { it > 0 }?.let { StrOnline.dlShortage(StrOnline.afn(it)) + " — " + s.reason },
-              s.excessMinor.takeIf { it > 0 }?.let { StrOnline.dlExcess(StrOnline.afn(it)) + " — " + s.reason },
-              s.collectionDiffMinor.takeIf { it != 0L }?.let { StrOnline.dlCustomerDiff + " " + StrOnline.afn(it) },
+              s.shortageMinor.takeIf { it > 0 }?.let { StrOnline.dlShortage(OnlineFmt.afn(it)) + " — " + s.reason },
+              s.excessMinor.takeIf { it > 0 }?.let { StrOnline.dlExcess(OnlineFmt.afn(it)) + " — " + s.reason },
+              s.collectionDiffMinor.takeIf { it != 0L }?.let { StrOnline.dlCustomerDiff + " " + OnlineFmt.afn(it) },
             )
             V3ListRow(
               StrOnline.dlSettleNo(s.settleNo),
-              subtitle = (listOf(StrOnline.dlSettleLine(s.assignmentsCount, StrOnline.afn(s.handoverDueMinor), StrOnline.afn(s.receivedMinor))) + extra).joinToString("\n"),
+              subtitle = (listOf(StrOnline.dlSettleLine(s.assignmentsCount, OnlineFmt.afn(s.handoverDueMinor), OnlineFmt.afn(s.receivedMinor))) + extra).joinToString("\n"),
               subtitleLines = 4,
               icon = Icons.Outlined.ReceiptLong,
               hue = V3Hue.VIOLET,

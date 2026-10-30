@@ -27,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.storefront.MarketListing
 import ir.vil3ntec.tohid.data.repo.StorefrontConfigDto
@@ -107,7 +108,7 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
     }
     V3Section(StrOnline.mkLocation, footer = StrOnline.mkLocationBody) {
       val loc = ctl.shownLocation
-      V3ListRow(StrOnline.locationText(loc?.lat, loc?.lng), icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
+      V3ListRow(OnlineFmt.locationText(loc?.lat, loc?.lng), icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
       if (!hasLocator) { V3Divider(start = 64.dp); V3ListRow(StrOnline.mkDesktopNote, subtitleLines = 3, tile = false, chevron = false) }
       V3Divider()
       //  دو دکمه زیرِ هم تا برچسبِ بلندشان بریده نشود
@@ -156,7 +157,7 @@ private fun MarketReadOnly(ctl: MarketController, config: StorefrontConfigDto, p
       V3Divider(start = 64.dp)
       V3ListRow(StrOnline.mkAreaLabel, value = l.area.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.AMBER, chevron = false)
       V3Divider(start = 64.dp)
-      V3ListRow(StrOnline.locationText(l.location?.lat, l.location?.lng), icon = Icons.Outlined.MyLocation, hue = V3Hue.MINT, chevron = false)
+      V3ListRow(OnlineFmt.locationText(l.location?.lat, l.location?.lng), icon = Icons.Outlined.MyLocation, hue = V3Hue.MINT, chevron = false)
     }
     V3Message(V3Tone.WARNING, if (!config.permissions.manage) StrOnline.mkReadOnlyOwner else StrOnline.mkReadOnlyPlan, Modifier.padding(top = 12.dp))
   }

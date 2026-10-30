@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.isoMillis
@@ -103,8 +104,8 @@ object DeliveryModel {
 
   /** خالصِ حساب با شرکت در یک جهتِ روشن (مثبت ⇐ دکان می‌دهد، منفی ⇐ شرکت می‌دهد) */
   fun net(label: String, netToCompanyMinor: Long): Pair<String, String> = when {
-    netToCompanyMinor > 0 -> StrOnline.dlNetShopPays(label) to StrOnline.afn(netToCompanyMinor)
-    netToCompanyMinor < 0 -> StrOnline.dlNetCompanyPays(label) to StrOnline.afn(-netToCompanyMinor)
+    netToCompanyMinor > 0 -> StrOnline.dlNetShopPays(label) to OnlineFmt.afn(netToCompanyMinor)
+    netToCompanyMinor < 0 -> StrOnline.dlNetCompanyPays(label) to OnlineFmt.afn(-netToCompanyMinor)
     else -> label to StrOnline.dlSquare
   }
 }

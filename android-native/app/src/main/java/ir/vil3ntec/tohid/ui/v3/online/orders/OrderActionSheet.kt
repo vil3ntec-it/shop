@@ -16,6 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.orders.OrderText
@@ -53,7 +54,7 @@ fun OrderActionSheet(
   val danger = OrdersModel.danger(to)
   V3Sheet(onDismiss = onDismiss, title = StrOnline.actionTitle(StrOnline.orderAction(to), order.orderNo)) { _ ->
     Text(
-      listOf(order.customer.name, StrOnline.afn(order.totalMinor)).filter { it.isNotBlank() }.joinToString(" · ") + "\n" +
+      listOf(order.customer.name, OnlineFmt.afn(order.totalMinor)).filter { it.isNotBlank() }.joinToString(" · ") + "\n" +
         StrOnline.movesTo(StrOnline.orderStatus(to)),
       style = V3Type.callout,
       color = c.inkMuted,
@@ -87,7 +88,7 @@ fun OrderActionSheet(
     }
     if (OrderActionModel.refund(to)) {
       Spacer(Modifier.height(16.dp))
-      V3Message(V3Tone.WARNING, StrOnline.refundWarn(StrOnline.afn(order.totalMinor)))
+      V3Message(V3Tone.WARNING, StrOnline.refundWarn(OnlineFmt.afn(order.totalMinor)))
     }
     if (error != null) {
       Spacer(Modifier.height(12.dp))

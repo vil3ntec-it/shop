@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.core.delivery.Mission
 import ir.vil3ntec.tohid.core.delivery.SettleRow
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderCustomerDto
 import ir.vil3ntec.tohid.core.model.OrderDto
@@ -87,8 +88,8 @@ class DeliveryModelTest {
 
   @Test
   fun `خالصِ حساب با شرکت در یک جهت`() {
-    assertEquals(StrOnline.dlNetShopPays("x") to StrOnline.afn(500), DeliveryModel.net("x", 500))
-    assertEquals(StrOnline.dlNetCompanyPays("x") to StrOnline.afn(500), DeliveryModel.net("x", -500))
+    assertEquals(StrOnline.dlNetShopPays("x") to OnlineFmt.afn(500), DeliveryModel.net("x", 500))
+    assertEquals(StrOnline.dlNetCompanyPays("x") to OnlineFmt.afn(500), DeliveryModel.net("x", -500))
     assertEquals("x" to StrOnline.dlSquare, DeliveryModel.net("x", 0))
     assertTrue(DeliveryModel.secondary(DeskActions.Act.FAIL))
     assertFalse(DeliveryModel.secondary(DeskActions.Act.DELIVER))
@@ -188,7 +189,7 @@ class DeliveryModelTest {
     OrderStates.TABS.forEach { assertFalse(it, persian(StrOnline.orderTab(it))) }
     OrderStates.REASONS.values.flatten().forEach { assertFalse(it, persian(StrOnline.orderReason(it))) }
     MISSIONS.forEach { assertFalse(it, persian(StrOnline.missionStatus(it))) }
-    DeskActions.Act.entries.forEach { assertFalse(it.name, persian(StrOnline.deskAction(it))) }
+    DeskActions.Act.entries.forEach { assertFalse(it.name, persian(OnlineFmt.deskAction(it))) }
     listOf("shop_courier", "external", "pickup").forEach { assertFalse(it, persian(StrOnline.deliveryMode(it))) }
   }
 

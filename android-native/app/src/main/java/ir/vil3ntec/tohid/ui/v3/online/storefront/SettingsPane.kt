@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -92,7 +93,7 @@ fun SettingsPane(
         V3TextField(form.timezone, { onChange(form.copy(timezone = it)) }, StrOnline.sfTimezone, placeholder = "Asia/Kabul", modifier = Modifier.fillMaxWidth())
         StorefrontOwner.DISPLAY_DAYS.forEach { d ->
           V3TextField(
-            form.days[d].orEmpty(), { onChange(form.copy(days = form.days + (d to it))) }, StrOnline.dayName(d),
+            form.days[d].orEmpty(), { onChange(form.copy(days = form.days + (d to it))) }, OnlineFmt.dayName(d),
             placeholder = "08:00-20:00", error = errors["day$d"], modifier = Modifier.fillMaxWidth(),
           )
         }

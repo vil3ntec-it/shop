@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.Settlement
 import ir.vil3ntec.tohid.core.delivery.SettlementPreview
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
@@ -89,22 +90,22 @@ internal fun SettlementSheet(cr: CourierRow, repo: DeliveryRepository, onDismiss
           p.rows.forEachIndexed { i, r ->
             if (i > 0) V3Divider(start = 16.dp)
             V3ListRow(
-              StrOnline.orderNo(r.orderNo), subtitle = r.deliveredAt?.let(OrdersModel::stamp) ?: "—", tile = false, chevron = false,
-              value = StrOnline.afn(r.cashCollectedMinor),
+              OnlineFmt.orderNo(r.orderNo), subtitle = r.deliveredAt?.let(OrdersModel::stamp) ?: "—", tile = false, chevron = false,
+              value = OnlineFmt.afn(r.cashCollectedMinor),
               trailing = if (r.collectionDiffMinor != 0L) ({ DraftTag(StrOnline.dlDiff(OrderText.money(r.collectionDiffMinor)), tone = V3Tone.WARNING) }) else null,
             )
           }
         }
         Spacer(Modifier.height(12.dp))
         V3Card(padding = PaddingValues(vertical = 4.dp)) {
-          Sum(StrOnline.dlExpectedFromCustomers, StrOnline.afn(t.expectedCashMinor))
-          Sum(StrOnline.dlCourierGot, StrOnline.afn(t.collectedCashMinor))
-          if (t.collectionDiffMinor != 0L) Sum(StrOnline.dlCustomerDiff, StrOnline.afn(t.collectionDiffMinor), tone = PhoneV3Roles.status(c, V3Status.WARNING).fg)
-          Sum(StrOnline.dlFares, StrOnline.afn(t.fareTotalMinor))
+          Sum(StrOnline.dlExpectedFromCustomers, OnlineFmt.afn(t.expectedCashMinor))
+          Sum(StrOnline.dlCourierGot, OnlineFmt.afn(t.collectedCashMinor))
+          if (t.collectionDiffMinor != 0L) Sum(StrOnline.dlCustomerDiff, OnlineFmt.afn(t.collectionDiffMinor), tone = PhoneV3Roles.status(c, V3Status.WARNING).fg)
+          Sum(StrOnline.dlFares, OnlineFmt.afn(t.fareTotalMinor))
           V3Divider()
           V3ToggleRow(StrOnline.dlFareFromCash, s.farePaid, { s = s.copy(farePaid = it) }, icon = Icons.Outlined.Payments, hue = V3Hue.MINT)
           V3Divider()
-          Sum(StrOnline.dlHandoverDue, StrOnline.afn(t.handoverDueMinor), strong = true)
+          Sum(StrOnline.dlHandoverDue, OnlineFmt.afn(t.handoverDueMinor), strong = true)
         }
         Spacer(Modifier.height(14.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -118,8 +119,8 @@ internal fun SettlementSheet(cr: CourierRow, repo: DeliveryRepository, onDismiss
           )
           if (received != null) {
             when {
-              t.shortageMinor > 0 -> V3Message(V3Tone.ERROR, StrOnline.dlShort + ": " + StrOnline.afn(t.shortageMinor))
-              t.excessMinor > 0 -> V3Message(V3Tone.WARNING, StrOnline.dlOver + ": " + StrOnline.afn(t.excessMinor))
+              t.shortageMinor > 0 -> V3Message(V3Tone.ERROR, StrOnline.dlShort + ": " + OnlineFmt.afn(t.shortageMinor))
+              t.excessMinor > 0 -> V3Message(V3Tone.WARNING, StrOnline.dlOver + ": " + OnlineFmt.afn(t.excessMinor))
               else -> V3Message(V3Tone.SUCCESS, StrOnline.dlDiffLabel + ": " + StrOnline.dlNone)
             }
             if (handed != null && t.handedOverMismatch) V3Message(V3Tone.WARNING, StrOnline.dlClaimMismatch)
