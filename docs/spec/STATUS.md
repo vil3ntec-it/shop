@@ -12,7 +12,7 @@
 
 | خانواده | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| F0 | ۲۸ | ۲۲ | ۴ | ۲ | ۰ | ۰ | ۰ |
+| F0 | ۲۸ | ۲۴ | ۲ | ۲ | ۰ | ۰ | ۰ |
 | POS | ۴۲ | ۲ | ۱۹ | ۲۰ | ۰ | ۱ | ۰ |
 | PAY | ۲۴ | ۲ | ۱۵ | ۶ | ۰ | ۰ | ۱ |
 | PRD | ۲۷ | ۳ | ۱۲ | ۱۲ | ۰ | ۰ | ۰ |
@@ -68,13 +68,13 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۱۱۳ | ۳۰۷ | ۲۳۱ | ۰ | ۹۰ | ۲۳ |
+| **همه** | ۷۶۴ | ۱۱۵ | ۳۰۵ | ۲۳۱ | ۰ | ۹۰ | ۲۳ |
 
 ## خلاصه به تفکیکِ فاز
 
 | فاز | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| ۰ | ۳۲ | ۲۴ | ۵ | ۳ | ۰ | ۰ | ۰ |
+| ۰ | ۳۲ | ۲۶ | ۳ | ۳ | ۰ | ۰ | ۰ |
 | ۱ | ۴۰ | ۱۷ | ۱۶ | ۵ | ۰ | ۲ | ۰ |
 | ۲ | ۱۱۳ | ۱۰ | ۷۴ | ۲۶ | ۰ | ۳ | ۰ |
 | ۳ | ۷۷ | ۱۰ | ۲۷ | ۴۰ | ۰ | ۰ | ۰ |
@@ -104,14 +104,14 @@
 | F0-15 | ورود مدیر سرور تأیید دومرحله‌ای ندارد. | §۲.۳ | ۰ | 🟠 | IMPLEMENTED-VERIFIED | #205؛ admin-totp.test.js ۱۰/۱۰ (بردارهای RFC)؛ پنل ۲۸/۲۸ با ورودِ دومرحله‌ای؛ اختیاری | — | — | #205 |
 | F0-16 | از روی register/start و password/forgot می‌شود فهمید کدام حساب‌ها وجود دارند. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #204؛ account-enumeration.test.js ۵/۶ قرمز ⇐ ۶/۶ | — | — | #204 |
 | F0-17 | اگر Playwright نصب نباشد، آزمون‌های مرورگر بی‌صدا «قبول» می‌شوند. test:web-ui (چیدمان و د… | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #191؛ browser-guard.test.js روی main ۰/۵ ⇐ ۵/۵؛ test:web-ui در server.yml | — | — | #191 |
-| F0-18 | رنگ‌های ثابت داخل کد هست (مثلاً 0xFFFF9800 در DeskCustomers و پنجره سفید راهنمای کلیدها). | §۲.۳ | ۰ | 🟡 | PARTIAL | #210؛ HardcodedColorsTest قرمز ⇐ سبز؛ اسکرین‌شاتِ روشن/تاریک هنوز نیامده | — | — | #210 |
+| F0-18 | رنگ‌های ثابت داخل کد هست (مثلاً 0xFFFF9800 در DeskCustomers و پنجره سفید راهنمای کلیدها). | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #210؛ HardcodedColorsTest قرمز ⇐ سبز؛ کنتراستِ روز و شب: ThemeContrastTest (هشدار/اصلی روی سه زمینه)، BackOfficeContrastTest (error/onError، danger)، Vill3nPaletteTest (focus ≥ ۳:۱)؛ عکسِ شبِ CIِ کامپیوتر `19b-shortcuts-F1-dark` و `19c-debtors-dark` (شاخهٔ desktop-screenshots، `pr/claude-spec-f0-18-dark-shots/`) دیده شد: پنجرهٔ میان‌برها و DeskCustomers تیره و از تم، بی پنجرهٔ سفید | — | — | #210، #456 |
 | F0-19 | میان‌برهای هر صفحه فقط isCtrlPressed را بررسی می‌کنند و Cmd در macOS کار نمی‌کند. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #200؛ PrimaryModifierTest؛ CI سبز | — | — | #200 |
 | F0-20 | کد مرده: ComingSoon()، حدود ۲۷۰ خط ورود قدیمی WebSocket در وب (wsRequest، wireConnectButt… | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #214؛ dead-code.test.js ۱/۳ ⇐ ۳/۳ | — | — | #214 |
 | F0-21 | مستندات کهنه است: جدول پوشه‌های README، نوشته «در راه» برای فروش در android-native/README… | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #209 (README و راهنماها) + همین PR (RULES: نوارِ منو و شمارِ آزمون) | — | — | #209 |
 | F0-22 | CSP وب unsafe-inline و هر connect-src را اجازه می‌دهد. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #212؛ web-csp.test.js ۱/۳ ⇐ ۳/۳؛ مرورگر: fetchِ بیگانه بسته | — | — | #212 |
 | F0-23 | داده وب در localStorage است که حدود ۵ مگابایت جا دارد. فروشگاه بزرگ به سقف می‌رسد و داده… | §۲.۳ | ۰ | 🟠 | IMPLEMENTED-VERIFIED | #215؛ گامِ web-ui در ۷۵٪: پنجره باز، دانلود، بسته؛ دنباله #228 (مرج fef243c): دفترِ وب در IndexedDB پشتِ پرچمِ خاموش، test:web-idb ۷/۷، test:web ۱۶/۱۶ (بدنهٔ PR) | — | — | #215، #228 |
 | F0-24 | شماره واتس‌اپ فروش اشتراک داخل Vip.kt ثابت نوشته شده است. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #207؛ SalesContactTest قرمز روی main ⇐ ۳/۳؛ CI سبز | — | — | #207 |
-| F0-25 | سرور فروش صاحب دکانِ اشتراک‌تمام‌شده را می‌پذیرد، ولی قفل فقط در کلاینت است. | §۲.۳ | ۰ | 🟡 | PARTIAL | ثبت شد در OWNER-ACTIONS-fa.md بخشِ ۴؛ سیاست با D-05؛ v3 §۲۹.۳ و SUB-10: بستن فقط پس از آزمونِ مستقیمِ همهٔ APIهای پولی ⇒ از ✅ِ نسخهٔ ۱ به PARTIAL | — | SUB-10 (آزمونِ مستقیمِ APIهای پولی) | #213 |
+| F0-25 | سرور فروش صاحب دکانِ اشتراک‌تمام‌شده را می‌پذیرد، ولی قفل فقط در کلاینت است. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | سیاستِ D-05 در سرور: نوشتنِ دادهٔ خودِ صاحب (فروش، همگام‌سازی) با انقضا گروگان نمی‌شود، کلیدهای پولی (online_orders، storefront، delivery، multi_device) در `requireFeature` ِ سرور بسته‌اند. آزمونِ مستقیمِ **همهٔ** مسیرهای نوشتنیِ /api/shop از سورس با اشتراکِ منقضی/معلق/لغوشده: روی main با PGlite `paid-routes-entitlement.test.js` ۶/۶ و `entitlement-enforcement.test.js` ۷/۷؛ جهش (`requireFeature` بی سنجش) ⇒ ۲/۶ | — | — | #213، #374، #416 |
 | F0-26 | پیش از هر اصلاح، خط پایه گرفته نشده است. | §۲.۳ | ۰ | 🟠 | PARTIAL | #211؛ خطِ پایه روی ماشینِ ایجنت (docs/spec/bench)؛ سخت‌افزارِ مرجع و گوشی مانده | — | — | #211 |
 | F0-27 | هر push به main بی‌درنگ APK، نصب‌کننده و وب تازه منتشر می‌کند و به‌روزرسان در ۶ ساعت آن ر… | §۲.۳ | ۰ | 🔴 | PARTIAL | #188 سرور+CI، #194 برنامه؛ اولین انتشارِ beta سبز (اجرای 38478699893)؛ وب: PR #221 (web-beta-channel ۴/۵ قرمز ⇐ ۵/۵)، پس از آن یک کلیکِ صاحب محصول (OWNER-ACTIONS بخشِ ۵)؛ #221 مرج شد (fdeb48a)؛ #235 (a339283): ساختِ Pages بی برچسبِ tohid-web دیگر قرمز نمی‌شود | — | یک کلیکِ صاحب محصول: Pages ⇐ GitHub Actions (BLOCKERS، بخشِ «ب») | #188، #194، #221، #235 |
 | F0-28 | کلید خصوصی مجوز (license_private_key) در app_config است و داخل پشتیبان‌ها می‌رود. | §۲.۳ | ۰ | 🟠 | MISSING | فقط دستورالعمل: OWNER-ACTIONS-fa.md بخشِ ۳ (نیاز به .env) | — | — | — |
