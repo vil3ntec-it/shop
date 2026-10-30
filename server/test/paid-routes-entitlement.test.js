@@ -52,7 +52,7 @@ const FREE = [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
-const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
+const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones', 'shop.storefront.bulk',
   'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
