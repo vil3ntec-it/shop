@@ -30,7 +30,7 @@ const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 const FREE = [
   ['هستهٔ دکان (core: settings): نام، تنظیمات، شماره‌گذاری و بستنِ دسترسیِ دیگران پس از پایانِ اشتراک هم باز است', [
     'POST /shop', 'POST /shop/create', 'PUT /shop', 'PUT /shop/settings', 'POST /shop/series',
-    'PATCH /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove', 'POST /shop/leave',
+    'PATCH /shop/members/:id', 'PUT /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove', 'POST /shop/leave',
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
     'PUT /shop/permissions/roles/:role', 'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
