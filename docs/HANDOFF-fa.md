@@ -54,6 +54,12 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-s10-order-fields` (S10)
+- **چه شد:** مهاجرتِ ۱۳۰ روی `online_orders`: `market_order_group_id` (NULL)، `platform_fee_minor` و `commission_minor` (۰، نامنفی)، `channel` ('' | storefront | market_app | api:<appId>). فقط جای خالی، **بی منطق**؛ سفارشِ تازهٔ ویترین را سرور `channel = storefront` می‌گذارد، بدنه نمی‌تواند. پاسخ‌ها و گزارش‌ها دست نخورده؛ برگشت با خط‌های `rollback:` ِ خودِ فایل (آزمونِ `order-market-fields`).
+- **نیمه‌کاره:** سیزنِ نخست پیش از push بسته شد؛ از نو روی main ساخته شد.
+- **سیاستِ کارمزد (تصمیمِ صاحب محصول):** فعلاً صفر، ولی کد هست: `lib/market-fees.js` نرخ‌های `market.*` ِ live_config (پیش‌فرض ۰) را هنگامِ ساختِ سفارشِ ویترین در `platform_fee_minor`/`commission_minor` می‌نویسد؛ قاعدهٔ گرد کردن و سقف در `RULES-fa.md` بخشِ «v3 · سفارش».
+- **قدمِ بعد:** منطقِ سبدِ چنددکانی وقتی بازار ساخته شد؛ روشن کردنِ کارمزد فقط با نوشتنِ نرخ در live_config، و گزارشِ کارمزد هنوز ساخته نشده است.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/ios-step0-guard` (گامِ ۰ِ آیفون)
 - انجام شد: قاعدهٔ کدِ تازه برای آیفون در `RULES-fa.md` (بخشِ «v3 · هسته‌های مشترک»)؛ سنجهٔ `tools/quality/checks/platform-deps.mjs`
   (فایلِ تازه صفر، موجود فقط کاهشی، سقفِ ۲۱۴ فایل در `baseline.json`، فعلاً گزارش)؛ هدفِ `linuxX64` پشتِ `-Pnative=true` در `core`
