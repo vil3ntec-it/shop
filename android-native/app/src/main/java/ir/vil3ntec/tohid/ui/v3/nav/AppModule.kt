@@ -12,8 +12,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Hue
  *
  *  همه‌چیزِ یک بخش یک‌جا: مسیرها و پیوندهایش، ورودی‌هایش در «بیشتر»، کاشیِ خانه و
  *  فهرستِ نوارِ پایین، صفحه‌های تنظیماتش، نیازها (نقش/پرچمِ سرور)، پرچمِ ماژول
- *  (روشن/خاموشِ کلِ بخش)، حالت‌هایی که در آن‌ها هست (دکان/پیک/خرید)، و بخش‌هایی
- *  که در فروشگاهِ آنلاین (حالتِ خرید) روی صفحهٔ هر دکان می‌گذارد.
+ *  (روشن/خاموشِ کلِ بخش) و حالت‌هایی که در آن‌ها هست (دکان/پیک).
  *
  *  بخشِ تازه = یک پوشهٔ `ui/v3/<بخش>/` با `<Bخش>Routes.kt` و **یک خط** در
  *  `V3Modules.ALL`؛ پوسته، «بیشتر»، تنظیمات و نوار از همین فهرست می‌خوانند.
@@ -29,7 +28,6 @@ class AppModule(
   val needs: Set<Need> = emptySet(),
   /** پرچمِ ماژول (`ModuleFlags`)؛ خاموش ⇒ هیچ مسیر و ورودیِ این بخش دیده نمی‌شود */
   val flag: String? = null,
-  val shopper: List<ShopperSection> = emptyList(),
 )
 
 /**
@@ -63,17 +61,4 @@ class SettingsEntry(
   val icon: ImageVector,
   val group: String,
   val needs: Set<Need> = emptySet(),
-)
-
-/**
- *  بخشی که این ماژول روی صفحهٔ دکان در حالتِ خرید می‌گذارد (مثلاً «منو»، «خدمات»).
- *  مسیرش زیرِ `shopper/shop/{slug}/…` است و `V3Modules.shopperSections` فهرستشان را
- *  به صفحهٔ دکان می‌دهد.
- */
-class ShopperSection(
-  val id: String,
-  val title: () -> String,
-  val route: String,
-  val icon: ImageVector,
-  val order: Int = 0,
 )

@@ -115,9 +115,8 @@
 
 ### اسکن برای نتیجه
 - بارکد (فقط دکان، قالب‌های فروش): `nav.openForResult(SalesPaths.scan("stock")) { code -> }`.
-- **QR در هر سه حالت** (دکان، پیک، خرید): `nav.openForResult(ScanPaths.QR) { raw -> }` — `ScanPaths.QR = "scan?kind=qr"`،
+- **QR در هر دو حالت** (دکان، پیک): `nav.openForResult(ScanPaths.QR) { raw -> }` — `ScanPaths.QR = "scan?kind=qr"`،
   فقط `FORMAT_QR_CODE`، متنِ خام با `nav.finish(text)`؛ `null` یعنی بسته شد. کامپیوتر دوربین ندارد ⇐ برگهٔ «این‌جا دوربین نیست».
-  در حالتِ خرید: `nav.openForResult(ScanPaths.QR) { raw -> raw?.let { ShopperLinks.parse(it, hosts) }?.let(nav::open) }`.
 - پرسشِ ثابت در الگو (`scan?kind=qr`) شرط است و الگو را از `scan` دقیق‌تر می‌کند (`RoutePattern.required`).
 
 ### درزهای میانِ گروه‌ها (بی import)
@@ -129,12 +128,12 @@
 کامپیوتر `ProvideLang { }` است: جهت از `lang.rtl` (فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست) و `LocalLang`. نوشته‌ها
 (`Str*`) خودشان از `I18n.source = { LocaleChoice.lang }` می‌خوانند. صفحه هیچ‌وقت `LayoutDirection.Rtl` ِ ثابت نمی‌گذارد.
 
-## مسیرهای حالتِ «خرید» (جای‌نگهدار، گروهِ خرید می‌سازد)
+## حالتِ «خرید» در برنامهٔ مدیریت نیست
 
-`shopper/home` · `shopper/shop/{slug}` (`?product=`) · `shopper/cart` · `shopper/cart/{slug}` · `shopper/checkout` ·
-`shopper/orders` · `shopper/order/{id}` · `shopper/order/{slug}/{token}` · `shopper/account` — در
-`ui/v3/shopper/ShopperRoutes.kt`. پیوندِ QRِ دکان (`https://<slug>.vill3n.top/`، `https://<میزبان>/store/<slug>`)
-برنامه را در حالتِ خرید روی همان دکان باز می‌کند.
+تصمیمِ صاحب محصول (۱۴۰۵/۰۸/۰۸): برنامهٔ مدیریت دو حالت دارد (دکان، پیک)؛ خریدِ مشتری برنامهٔ جدای خودش را دارد.
+هیچ مسیرِ `shopper/…`، ماژول یا پیوندِ وب (QRِ دکان، `…/store/<slug>`) این‌جا ثبت نیست — آن پیوندها در مرورگر
+می‌مانند. منطقِ خالصِ خرید (پیوند، سبد، پرداخت، سفارش‌ها، API) با آزمون‌هایش در `core/shopper/*` بی‌مسیر نگه داشته
+شده تا برنامهٔ خرید از آن بسازد.
 
 ## ساختار و قاعده‌ها
 
