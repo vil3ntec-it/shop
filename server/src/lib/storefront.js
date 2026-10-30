@@ -45,7 +45,7 @@ const { badRequest, notFound, conflict, ApiError } = require('../middleware/erro
 
 const FLAG_KEY = 'shop.storefront';
 const FEATURE_KEY = 'storefront';
-//  S3 ِ قراردادِ بازار: شناسهٔ عمومیِ پایدار و نشانی‌های پیشین (مهاجرتِ ۱۲۲) — پیش‌فرض خاموش
+//  S3 ِ قراردادِ بازار: شناسهٔ عمومیِ پایدار و نشانی‌های پیشین (مهاجرتِ ۱۳۱) — پیش‌فرض خاموش
 const PUBLIC_ID_FLAG = 'market.public_id';
 const PUBLIC_ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;

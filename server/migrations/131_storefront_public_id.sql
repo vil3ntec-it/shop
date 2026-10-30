@@ -15,7 +15,7 @@
 --  `market.public_id` (پیش‌فرض خاموش). نوشتنِ نشانیِ پیشین از همین حالا هست تا
 --  روزِ روشن شدن، تاریخچه موجود باشد.
 --
---  Rollback: migrations/rollback/122_storefront_public_id.down.sql
+--  Rollback: migrations/rollback/131_storefront_public_id.down.sql
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION storefront_public_ulid(ms bigint) RETURNS text

@@ -55,7 +55,7 @@
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-s3-public-id` (S3 ِ قراردادِ بازار)
-- انجام شد: مهاجرتِ ۱۲۲ (`storefronts.public_id` ULID ِ تغییرناپذیر با پرکردنِ ردیف‌های موجود، و `storefront_slug_redirects`)
+- انجام شد: مهاجرتِ ۱۳۱ (`storefronts.public_id` ULID ِ تغییرناپذیر با پرکردنِ ردیف‌های موجود، و `storefront_slug_redirects`)
   با rollback در `server/migrations/rollback/`؛ خواندن پشتِ پرچمِ خاموشِ `market.public_id` (۳۰۸/۳۰۱ از نشانیِ کهنه، `GET /api/store?id=`،
   `publicId` در پروفایل). آزمون: `server/test/storefront-public-id.test.js`.
 - نیمه‌کاره: مسیرهای گفت‌وگو و اعتمادِ ویترین (`shop-chat-store`، `trust-store`) و `manifest` نشانیِ کهنه را دنبال نمی‌کنند؛ بازارچه هنوز

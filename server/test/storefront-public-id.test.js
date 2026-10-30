@@ -1,6 +1,6 @@
 'use strict';
 /**
- * S3 ِ قراردادِ بازار — شناسهٔ عمومیِ پایدارِ دکان و نشانیِ پیشین (مهاجرتِ ۱۲۲).
+ * S3 ِ قراردادِ بازار — شناسهٔ عمومیِ پایدارِ دکان و نشانیِ پیشین (مهاجرتِ ۱۳۱).
  *
  * آن‌چه این پرونده قفل می‌کند:
  *   ۱) مهاجرت روی دادهٔ نمونه: ردیف‌های موجود ULID ِ یکتا با زمانِ `created_at`
@@ -21,7 +21,7 @@ const migrate = require('../src/migrate');
 const { resetAll } = require('../src/middleware/ratelimit');
 const { ALPHABET } = require('../src/lib/ulid');
 
-const DOWN = path.join(__dirname, '..', 'migrations', 'rollback', '122_storefront_public_id.down.sql');
+const DOWN = path.join(__dirname, '..', 'migrations', 'rollback', '131_storefront_public_id.down.sql');
 const ULID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 let admin = '';
 let seq = 0;
@@ -80,13 +80,13 @@ test('مهاجرت: ردیف‌های موجود پر می‌شوند؛ rollback
   const old = a.slug;
   await setSlug(a, `p-${uniq()}`);
 
-  //  پیش از ۱۲۲: rollback و دادهٔ نمونهٔ بی ستون، با created_at ِ کهنه
+  //  پیش از ۱۳۱: rollback و دادهٔ نمونهٔ بی ستون، با created_at ِ کهنه
   await query(fs.readFileSync(DOWN, 'utf8'));
   const cols = await one(`SELECT COUNT(*)::int AS n FROM information_schema.columns
                            WHERE table_name='storefronts' AND column_name='public_id'`);
   assert.equal(cols.n, 0, 'rollback ستون را برداشت');
   assert.equal((await one("SELECT to_regclass('storefront_slug_redirects') AS t")).t, null);
-  assert.equal((await one("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE version='122_storefront_public_id.sql'")).n, 0);
+  assert.equal((await one("SELECT COUNT(*)::int AS n FROM schema_migrations WHERE version='131_storefront_public_id.sql'")).n, 0);
   //  هنوز درست کار می‌کند (کدِ خواننده فقط پشتِ پرچم است) — جز نوشتنِ تاریخچه
   assert.equal((await h.get(`/api/store/${a.slug}`)).status, 200);
   const past = Date.UTC(2025, 0, 2, 3, 4, 5, 678);
@@ -101,12 +101,12 @@ test('مهاجرت: ردیف‌های موجود پر می‌شوند؛ rollback
   }
   assert.equal(new Set(rows.map((r) => r.public_id)).size, rows.length, 'یکتا');
   assert.equal(timeOf(await pidOf(b.shopId)), past);
-  //  نشانیِ پیشینِ پیش از ۱۲۲ ثبت نشده (جدول نبود) — فقط از امروز به بعد
+  //  نشانیِ پیشینِ پیش از ۱۳۱ ثبت نشده (جدول نبود) — فقط از امروز به بعد
   assert.equal((await one('SELECT COUNT(*)::int AS n FROM storefront_slug_redirects WHERE old_slug=$1', [old])).n, 0);
 
   //  اجرای دوباره بی اثر
   const again = await migrate.run();
-  assert.ok(!JSON.stringify(again || '').includes('122_'), 'دوباره اجرا نمی‌شود');
+  assert.ok(!JSON.stringify(again || '').includes('131_'), 'دوباره اجرا نمی‌شود');
 });
 
 test('⛔ public_id تغییرناپذیر است و ردیفِ تازه خودکار پر می‌شود', async () => {
