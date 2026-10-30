@@ -14,6 +14,7 @@
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 process.env.RATE_SYNC_MAX = process.env.RATE_SYNC_MAX || '100000';
 process.env.SYNC_V3_ENABLED = '1';
+process.env.SYNC_EPOCH_ENABLED = '1';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');

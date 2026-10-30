@@ -24,8 +24,11 @@ async function createApp({ runMigrations = true } = {}) {
   //  §۹.۵: هر بالا آمدن یک «دورانِ» همگام‌سازیِ تازه — پس از بازیابی از پشتیبان، برنامه‌ها
   //  از همین می‌فهمند سرور به عقب رفته و opهای «اعمال‌شده»ی گم‌شده را دوباره می‌فرستند
   //  (`lib/sync-epoch.js`). شکستش بالا آمدن را نمی‌خواباند؛ فقط آن تشخیص نمی‌شود.
-  await require('./lib/sync-epoch').rotate('boot')
-    .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
+  //  پشتِ پرچمِ خاموشِ `SYNC_EPOCH_ENABLED`
+  if (config.syncEpoch.enabled) {
+    await require('./lib/sync-epoch').rotate('boot')
+      .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
+  }
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست

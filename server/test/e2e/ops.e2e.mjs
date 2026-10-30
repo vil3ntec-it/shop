@@ -30,7 +30,7 @@ import { NativeDevice } from './lib/native.mjs';
 
 const require = createRequire(import.meta.url);
 const PASS = 'e2e-backup-passphrase-ops-14';
-const E = await boot({ name: 'ops', env: { BACKUP_PASSPHRASE: PASS } });
+const E = await boot({ name: 'ops', env: { BACKUP_PASSPHRASE: PASS, SYNC_EPOCH_ENABLED: 'true' } });
 const { db } = E;
 const owner = await E.owner('owner-ops@e2e.local', 'صاحبِ پشتیبان', 'دکانِ پشتیبان');
 const staff = await E.staff(owner, 'staff-ops@e2e.local', 'شاگردِ پشتیبان');

@@ -10,6 +10,8 @@
  *   • خطای دیتابیس دوران را صفر نمی‌کند؛ فقط دکان؛ خاموش‌کن ⇒ ۴۰۴ و pull ِ v3 بی دوران.
  */
 process.env.SYNC_V3_ENABLED = '1';
+//  پرچمِ §۹.۵ پیش‌فرض خاموش است؛ این پرونده رفتارِ روشنش را می‌سنجد (خاموش: آزمونِ «خاموش‌کن»)
+process.env.SYNC_EPOCH_ENABLED = '1';
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 
 const test = require('node:test');
@@ -166,6 +168,41 @@ test('v3: pull کنارِ opها دورانِ v3 را می‌دهد (پایه و
   assert.equal(typeof e.base, 'number');
   assert.equal(typeof e.head, 'number');
   assert.ok(e.base <= e.head);
+});
+
+test('پرچمِ §۹.۵ پیش‌فرض خاموش است: بی SYNC_EPOCH_ENABLED ⇒ config.syncEpoch.enabled = false', () => {
+  const { execFileSync } = require('node:child_process');
+  const env = { ...process.env };
+  delete env.SYNC_EPOCH_ENABLED;
+  const out = execFileSync(process.execPath, ['-e', "process.stdout.write(String(require('./src/config').syncEpoch.enabled))"],
+    { cwd: require('node:path').join(__dirname, '..'), env }).toString();
+  assert.equal(out, 'false');
+});
+
+test('خاموش ⇒ هیچ نوشتنی: نه دوران پس از بازیابی، نه نشانِ پشتیبان، نه دوران در بالا آمدن', async () => {
+  const backup = require('../src/lib/backup');
+  const before = await one('SELECT value FROM app_config WHERE key = $1', [epoch.KEY]);
+  const markers = async () => (await query("SELECT key FROM app_config WHERE key LIKE 'sync.backup_marker.%'")).rows.length;
+  const m0 = await markers();
+  config.syncEpoch.enabled = false;
+  try {
+    let rotated = false;
+    const out = await backup.afterRestore({ ok: true, bytes: 10 }, config.db.url, { rotate: async () => { rotated = true; return { id: 'ep_x' }; } });
+    assert.equal(rotated, false, 'پرچمِ خاموش ⇒ rotate صدا زده نمی‌شود');
+    assert.deepEqual(out, { ok: true, bytes: 10, epoch: false });
+    //  run بی pg_dump شکست می‌خورد — ولی پیش از آن هم نشانی نمی‌نشیند
+    const saved = config.backup.pgDump;
+    config.backup.pgDump = '/nonexistent/pg_dump-for-test';
+    try { await backup.run({ kind: 'manual' }).catch(() => {}); } finally { config.backup.pgDump = saved; }
+    assert.equal(await markers(), m0, 'نشانِ پشتیبان ننشست');
+    //  بالا آمدنِ سرور با پرچمِ خاموش دوران را دست نمی‌زند
+    const { createApp } = require('../src/app');
+    await createApp({ runMigrations: false });
+    const after = await one('SELECT value FROM app_config WHERE key = $1', [epoch.KEY]);
+    assert.deepEqual(after, before, 'دوران همان ماند');
+  } finally {
+    config.syncEpoch.enabled = true;
+  }
 });
 
 test('خاموش‌کن (SYNC_EPOCH_ENABLED=false) ⇒ ۴۰۴ و pull ِ v3 بی دوران — همان رفتارِ پیشین', async () => {

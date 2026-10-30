@@ -522,7 +522,8 @@ internal class SyncV3Engine(
     }
     //  §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف — **پیش از** بیرون رفتن از آن — تا اگر سرور
     //  از پشتیبان برگشت، با همان op_idها دوباره بروند (`pullOnce`)
-    store.replay?.sent(accepted)
+    //  پرچمِ خاموش: تا سرور دوران نداده (`SYNC_EPOCH_ENABLED` خاموش یا سرورِ کهنه) دفترچه نوشته نمی‌شود
+    if (meta.epoch.isNotEmpty()) store.replay?.sent(accepted)
     val q = queue.copy(outbox = queue.outbox.filter { it.key !in done }, rejected = queue.rejected + rejected, seq = seq)
     store.saveQueue(q)
     queue = q
@@ -551,8 +552,11 @@ internal class SyncV3Engine(
      *  (از cursor ِ کهنه) نشانده نمی‌شود.
      */
     val book = store.replay
-    book?.begin(since)
-    val plan = RestoreReplay.plan(meta.epoch, since, RestoreReplay.Epoch.from(body["epoch"])) { book?.hasAbove(it) == true }
+    val served = RestoreReplay.Epoch.from(body["epoch"])
+    //  دفترچه از نخستین دورانِ سرور آغاز می‌شود (`floor` = همان cursor)، نه پیش از روشن شدنِ پرچم
+    //  push ِ پیش از نخستین دوران در دفترچه نیست ⇒ پوشش از سرِ دفترِ سرور در همان لحظه (هشدارِ درست)
+    if (served != null) book?.begin(maxOf(since, served.head))
+    val plan = RestoreReplay.plan(meta.epoch, since, served) { book?.hasAbove(it) == true }
     if (plan.restore) {
       var replayed = 0
       withLock {

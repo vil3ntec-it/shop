@@ -45,6 +45,8 @@ class V1RestoreTest {
     var epochSeq = 0L
     val refuse = HashSet<String>()
     var offline = false
+    /** پرچمِ `SYNC_EPOCH_ENABLED` ِ سرور خاموش ⇒ درِ دوران ۴۰۴ (برنامه null می‌بیند)، بقیه همان */
+    var epochOff = false
     var pushes = 0
 
     class Saved(val seq: Long, val tree: JsonObject, val log: List<Triple<Long, String, SyncOp>>, val seen: Map<String, Long>, val gone: Set<RestoreMerge.Row>)
@@ -187,7 +189,7 @@ class V1RestoreTest {
     /** همان ترتیبِ `SyncV1Engine.runOnce` */
     fun sync(): Boolean {
       if (commit.pending()) commit.recover(ledger)
-      restore.check(if (server.offline) null else server.epoch())
+      restore.check(if (server.offline || server.epochOff) null else server.epoch())
       if (!pushAll()) return false
       if (restorePending && queue.isEmpty()) {
         if (server.offline) return false
@@ -575,5 +577,36 @@ class V1RestoreTest {
     server.restore(saved)
     assertFalse(a.restore.check(null))
     assertFalse(a.restorePending)
+  }
+
+  @Test fun `پرچمِ سرور خاموش ⇒ دفترچه نوشته نمی‌شود؛ روشن شدن ⇒ پوشش از سرِ دفترِ سرور در همان لحظه`() {
+    val server = Server().apply { epochOff = true }
+    val a = Device("a-off", server).apply { baseline(base); assertTrue(sync()) }
+    val b = Device("b-off", server).apply { assertTrue(sync()) }
+    a.edit(sale("s2", "i2"))
+    assertTrue(a.sync())
+    assertTrue(b.sync())
+    assertEquals("خاموش: نه opِ خودی", 0, a.book.count())
+    assertEquals("خاموش: نه opِ گرفته‌شده", 0, b.book.count())
+    assertEquals("", a.epoch)
+    assertFalse(a.restore.check(null))
+
+    //  پرچم روشن شد؛ a زودتر می‌رسد و می‌فروشد ⇒ نخستین دورانِ b سرِ دفترِ بالاتر از cursor ِ خودش را می‌بیند
+    server.epochOff = false
+    assertTrue(a.sync())
+    assertEquals("ep_1", a.epoch)
+    assertEquals(server.seq, a.book.floor())
+    a.edit(sale("s3", "i3"))
+    assertTrue(a.sync())
+    val head = server.seq
+    assertTrue("b هنوز عقب است", b.cursor < head)
+    assertTrue(b.sync())
+    assertEquals("پوشش از سرِ دفترِ سرور، نه cursor ِ کهنهٔ b", head, b.book.floor())
+    assertTrue("روشن: opِ خودی نوشته شد", a.book.count() > 0)
+    a.edit(sale("s4", "i4"))
+    assertTrue(a.sync())
+    assertTrue(b.sync())
+    assertTrue("روشن: opِ گرفته‌شده نوشته شد", b.book.count() > 0)
+    converged(server, a, b)
   }
 }

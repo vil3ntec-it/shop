@@ -55,7 +55,8 @@ class SyncV3EngineTest {
     /** A00: آیا هر push نشانِ `caps` داشت */
     val caps = ArrayList<Boolean>()
     val conflicts = ArrayList<JsonObject>()
-    private var seq = 0L
+    var seq = 0L
+      private set
 
     class Op(val seq: Long, val device: String, val opId: String, val table: String, val rowId: String, val kind: String, val effect: JsonObject?, val tx: String)
     val log = ArrayList<Op>()
@@ -808,6 +809,25 @@ class SyncV3EngineTest {
     assertEquals(12000L, long(server.row("products", "p1"), "salePriceMinor"))
     assertEquals(12000L, long(server.row("sales", "s1"), "paidAmountMinor"))
     converged(server, a)
+  }
+
+  @Test fun serverFlagOffWritesNoReplayBookAndFirstEpochCoversFromServerHead() {
+    //  `SYNC_EPOCH_ENABLED` خاموش ⇒ pull بی دوران ⇒ دفترچه نوشته نمی‌شود (همان رفتارِ پیشین)
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 120.0) }) }
+    assertTrue(a.sync().ok)
+    assertEquals("خاموش: دفترچه خالی", 0, a.store.replay!!.count())
+    assertEquals("", a.engine.meta.epoch)
+
+    //  روشن ⇒ پوشش از سرِ دفترِ سرور در همان لحظه؛ push ِ پس از آن نوشته می‌شود
+    server.epochId = "ep_1"
+    assertTrue(a.sync().ok)
+    assertEquals("ep_1", a.engine.meta.epoch)
+    assertEquals(server.seq, a.store.replay!!.floor())
+    a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 130.0) }) }
+    assertTrue(a.sync().ok)
+    assertTrue("روشن: opِ خودی نوشته شد", a.store.replay!!.count() > 0)
   }
 
   @Test fun oldServerWithoutEpochKeepsCursorAndQueue() {

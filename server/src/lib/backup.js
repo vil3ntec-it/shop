@@ -66,7 +66,8 @@ function warnUnencrypted(kind) {
  */
 async function run(opts = {}) {
   if (!KINDS.includes(opts.kind || 'manual')) throw new Error('نوع پشتیبان معتبر نیست');
-  const unmark = await require('./sync-epoch').markBackup();
+  //  پرچمِ خاموش ⇒ بی نشان (همان رفتارِ پیشین)
+  const unmark = config.syncEpoch.enabled ? await require('./sync-epoch').markBackup() : async () => {};
   try {
     return await dump(opts);
   } finally {
@@ -293,7 +294,7 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
  * از «cursor جلوتر از سرِ دفترِ سرور» برگشتن را می‌فهمند.
  */
 async function afterRestore(out, databaseUrl, { rotate = (r) => require('./sync-epoch').rotate(r) } = {}) {
-  if (databaseUrl !== config.db.url) return { ...out, epoch: false };
+  if (databaseUrl !== config.db.url || !config.syncEpoch.enabled) return { ...out, epoch: false };
   try {
     const e = await rotate('restore');
     return { ...out, epoch: e.id };

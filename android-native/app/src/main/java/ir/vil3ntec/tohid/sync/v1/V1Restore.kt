@@ -76,7 +76,11 @@ class V1Restore internal constructor(
    *  @return بازیابی آغاز شد
    */
   fun check(server: RestoreReplay.Epoch?): Boolean {
-    book.begin(state.cursor)
+    //  پرچمِ خاموش (`SYNC_EPOCH_ENABLED`) یا سرورِ کهنه ⇒ دورانی نیست ⇒ همان رفتارِ پیشین، بی دفترچه
+    if (server == null) return false
+    //  opی که پیش از نخستین دوران پذیرفته شد (مثلاً `pushPending`) در دفترچه نیست ⇒ پوشش از سرِ
+    //  دفترِ سرور در همان لحظه، تا پایه‌ای زیرِ آن هشدار بدهد، نه دوباره‌فرستادنِ ناقصِ بی‌صدا
+    book.begin(maxOf(state.cursor, server.head))
     val plan = RestoreReplay.plan(state.epoch, state.cursor, server) { book.hasAbove(it) }
     if (!plan.restore) {
       if (plan.epoch != state.epoch) state.adoptEpoch(plan.epoch)
@@ -90,13 +94,17 @@ class V1Restore internal constructor(
 
   /** پذیرفته‌های یک دسته (applied/duplicate، با `server_seq`) — **پیش از** `ack`ِ صف */
   fun accepted(batch: List<SyncOp>, results: List<OpResult>) {
+    if (!live()) return
     val seqOf = results.filter { it.accepted && it.seq > 0 }.associate { it.opId to it.seq }
     if (seqOf.isEmpty()) return
     book.sent(batch.filter { it.opId in seqOf }.map { ReplayBook.Sent(it.opId, seqOf.getValue(it.opId), it.toJson()) })
   }
 
   /** opهای دستگاه‌های دیگر که Pull آورد (با `server_seq` و دستگاه) — **پیش از** نشاندن روی دفتر */
-  fun seen(pulled: List<ReplayBook.Sent>) = book.seen(pulled)
+  fun seen(pulled: List<ReplayBook.Sent>) { if (live()) book.seen(pulled) }
+
+  /** دفترچه فقط پس از نخستین دورانی که سرور داد نوشته می‌شود (پرچمِ سرور روشن) */
+  private fun live(): Boolean = state.epoch.isNotEmpty()
 
   /**
    *  ردِ opی که پیش‌تر پذیرفته یا گرفته شده بود (دوباره‌فرستاده پس از بازیابی) — «انجام‌شده»، نه
