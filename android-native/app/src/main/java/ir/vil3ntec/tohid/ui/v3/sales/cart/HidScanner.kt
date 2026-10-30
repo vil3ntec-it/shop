@@ -61,5 +61,6 @@ internal fun hidKey(
 ): HidStep? {
   if (enter) return submit(now)?.let { HidStep(it) }
   val c = ch ?: return null
-  return HidStep(feed(c, now))
+  feed(c, now)
+  return HidStep(null)
 }

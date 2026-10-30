@@ -83,7 +83,7 @@ fun RouteScope.DrawerOpenRoute() {
         is CashShift.Result.Ok -> {
           //  همان CashShift.open روی دفترِ همان لحظه، زیرِ قفلِ نوشتن — نه تصویرِ کهنهٔ صفحه
           scope.launch {
-            val wrote = store.save(r.data)
+            val wrote = store.update { d -> (CashShift.open(d, v, by, today, now) { id } as? CashShift.Result.Ok)?.data }
             if (wrote == true) toasts.show(StrSale.drawerOpened, V3Tone.SUCCESS)
             else toasts.show(StrSale.notSaved, V3Tone.ERROR)
           }
