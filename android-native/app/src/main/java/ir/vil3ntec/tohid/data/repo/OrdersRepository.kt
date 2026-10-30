@@ -127,6 +127,8 @@ class OrdersRepository(private val api: ApiClient) {
       })
       if (b.note.isNotEmpty()) put("note", b.note)
       if (b.test) put("test", JsonPrimitive(true))
+      //  CHK-15: فقط وقتی برگزیده شده (سرورِ کهنه/پرچمِ خاموش همان بدنهٔ پیشین را می‌بیند)
+      if (b.substitution.isNotEmpty()) put("substitution", b.substitution)
     }
 
     /** کلیدِ یکتایی — یک بار برای هر فرم */

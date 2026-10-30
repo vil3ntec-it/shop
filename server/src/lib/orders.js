@@ -120,8 +120,10 @@ function hashOf(body) {
  * بدنهٔ «سفارشِ دستیِ کارمند» (تلفنی/تلگرام/واتس‌اپ/دستی، ORD-21) — بررسی
  * و ساختِ مبلغ. هر عدد صحیح است: `qtyMilli` (هزارم) و `*Minor` (یک‌صدم).
  */
-function parseCreate(body, at) {
+function parseCreate(body, at, { substitution: subOn = false } = {}) {
   const b = body && typeof body === 'object' ? body : {};
+  //  CHK-15: ترجیحِ کلیِ جایگزینی (پرچمِ `shop.orders.substitution`؛ خاموش ⇒ '')
+  const orderSub = require('./order-substitution').orderOf(b, subOn);
   const source = str(b.source) || 'manual';
   if (!STAFF_SOURCES.includes(source)) throw badRequest('منبعِ سفارش معتبر نیست', 'bad_source');
   const fulfillment = str(b.fulfillment);
@@ -146,7 +148,9 @@ function parseCreate(body, at) {
     if (productId && !/^[A-Za-z0-9_.:-]{1,80}$/.test(productId)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_lines');
     return {
       lineNo: i + 1, productId, name, unit: text(x.unit, 30), qtyMilli, unitPriceMinor,
-      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: text(x.note, 200), substitution,
+      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: text(x.note, 200),
+      //  CHK-15: قلمِ بی ترجیح ترجیحِ کلی را می‌گیرد؛ «کالای مشخص» نامِ جایگزین می‌خواهد
+      ...require('./order-substitution').staffLine(x, substitution, orderSub, subOn, i),
     };
   });
 
@@ -168,7 +172,7 @@ function parseCreate(body, at) {
     source, fulfillment, paymentMethod, customerName, customerPhone, address, delivery,
     note: text(b.note, 500), isTest: b.test === true, lines, subtotalMinor, discountMinor,
     deliveryFeeMinor, totalMinor, scheduledFor,
-    itemsCount: lines.length,
+    itemsCount: lines.length, substitution: orderSub,
   };
 }
 
@@ -259,6 +263,8 @@ function detail(row, lines, events, viewer, at) {
     address: asJson(row.address),
     delivery: asJson(row.delivery),
     note: row.note,
+    //  CHK-15: ترجیحِ کلی (هر قلم ترجیحِ مؤثرِ خودش را دارد)
+    substitution: row.substitution || '',
     subtotalMinor: Number(row.subtotal_minor),
     discountMinor: Number(row.discount_minor),
     deliveryFeeMinor: Number(row.delivery_fee_minor),
@@ -267,6 +273,7 @@ function detail(row, lines, events, viewer, at) {
       lineNo: Number(l.line_no), productId: l.product_id, name: l.name, unit: l.unit,
       qtyMilli: Number(l.qty_milli), unitPriceMinor: Number(l.unit_price_minor),
       lineTotalMinor: Number(l.line_total_minor), note: l.note, substitution: l.substitution,
+      substituteProductId: l.substitute_product_id || '', substituteName: l.substitute_name || '',
     })),
     events: events.map((e) => ({
       seq: Number(e.seq), kind: e.kind, fromStatus: e.from_status, toStatus: e.to_status,
@@ -305,7 +312,8 @@ async function get(shopId, id, viewer) {
  */
 async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
-  let input = price ? null : parseCreate(body, at);
+  let input = price ? null
+    : parseCreate(body, at, { substitution: await require('./order-substitution').flagOn(shopId) });
   const hash = hashOf(body);
   //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
   //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
@@ -339,22 +347,22 @@ async function create(shopId, { key, body, actor, price, notify }) {
          id, shop_id, order_no, client_key, request_hash, source, is_test, status, fulfillment,
          payment_method, payment_status, cod_status, customer_name, customer_phone, address, delivery,
          note, items_count, subtotal_minor, discount_minor, delivery_fee_minor, total_minor,
-         scheduled_for, created_by, created_at, updated_at)
+         scheduled_for, created_by, created_at, updated_at, substitution)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,'unpaid',$10,$11,$12,$13::jsonb,$14::jsonb,
-               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23)`,
+               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23,$24)`,
       [id, shopId, no, key, hash, input.source, input.isTest, input.fulfillment,
         input.paymentMethod, input.paymentMethod === 'cod' ? 'to_collect' : '',
         input.customerName, input.customerPhone, JSON.stringify(input.address), JSON.stringify(input.delivery),
         input.note, input.itemsCount, input.subtotalMinor, input.discountMinor, input.deliveryFeeMinor,
-        input.totalMinor, input.scheduledFor, actor.id || '', at]
+        input.totalMinor, input.scheduledFor, actor.id || '', at, input.substitution || '']
     );
     for (const l of input.lines) {
       await c.query(
         `INSERT INTO online_order_lines (id, order_id, shop_id, line_no, product_id, name, unit, qty_milli,
-           unit_price_minor, line_total_minor, note, substitution)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+           unit_price_minor, line_total_minor, note, substitution, substitute_product_id, substitute_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [ulid(at), id, shopId, l.lineNo, l.productId, l.name, l.unit, l.qtyMilli, l.unitPriceMinor,
-          l.lineTotalMinor, l.note, l.substitution]
+          l.lineTotalMinor, l.note, l.substitution, l.substituteProductId || '', l.substituteName || '']
       );
     }
     await c.query(

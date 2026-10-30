@@ -39,6 +39,7 @@ const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
+const subst = require('./order-substitution');
 const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -493,7 +494,7 @@ async function photo(shopId, productId, size = 'display') {
 //  ثبتِ سفارش
 // ════════════════════════════════════════════════════════════════════
 
-function parseCheckout(body, sf) {
+function parseCheckout(body, sf, { substitution: subOn = false } = {}) {
   const b = obj(body);
   const fulfillment = str(b.fulfillment);
   if (!['delivery', 'pickup'].includes(fulfillment)) throw badRequest('ارسال یا دریافت از دکان؟', 'bad_fulfillment');
@@ -517,7 +518,7 @@ function parseCheckout(body, sf) {
     return {
       productId,
       qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
-      note: text(x.note, 200),
+      note: text(x.note, 200), ...subst.storeLine(x, productId, subOn, i),   // CHK-15
     };
   });
 
@@ -533,6 +534,7 @@ function parseCheckout(body, sf) {
     ? null : int(b.slotStartsAt, 'بازهٔ زمانی', { min: 1, max: 4102444800000 });
   return {
     fulfillment, paymentMethod, ...contact, note: text(b.note, 500), lines, expectedTotalMinor, zoneId, slotStartsAt,
+    substitution: subst.orderOf(b, subOn),
   };
 }
 
@@ -565,7 +567,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
     const rows = (await run(
       `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
         WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
-      [shopId, ids]
+      [shopId, subst.withSubstitutes(ids, input.lines)]
     )).rows;
     const byId = new Map(rows.map((r) => [r.id, productView(r)]));
     const unavailable = ids.filter((id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
@@ -581,7 +583,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       return {
         lineNo: i + 1, productId: p.id, name: p.name, unit: p.unit, qtyMilli: l.qtyMilli,
         unitPriceMinor: p.priceMinor, lineTotalMinor: S.lineTotalMinor(l.qtyMilli, p.priceMinor),
-        note: l.note, substitution: '',
+        note: l.note, ...subst.storeResolved(l, byId, input.substitution),
       };
     });
     const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
@@ -604,7 +606,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       customerName: input.customerName, customerPhone: input.customerPhone,
       address: d.address, delivery: d.delivery, note: input.note, isTest: false,
       lines, subtotalMinor, discountMinor: 0, deliveryFeeMinor, totalMinor,
-      scheduledFor: d.scheduledFor, itemsCount: lines.length,
+      scheduledFor: d.scheduledFor, itemsCount: lines.length, substitution: input.substitution,
     };
   };
 }
@@ -638,17 +640,15 @@ function orderIdOf(shopId, token) {
 function publicOrder(o, token) {
   return {
     token,
-    orderNo: o.orderNo,
-    status: o.status,
-    statusReason: o.statusReason,
+    orderNo: o.orderNo, status: o.status, statusReason: o.statusReason,
+    substitution: o.substitution || '',   // CHK-15: ترجیحِ کلی
     fulfillment: o.fulfillment,
-    paymentMethod: o.paymentMethod,
-    paymentStatus: o.paymentStatus,
+    paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus,
     currency: o.currency,
     itemsCount: o.itemsCount,
     lines: o.lines.map((l) => ({
       productId: l.productId, name: l.name, unit: l.unit, qtyMilli: l.qtyMilli,
-      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor, note: l.note,
+      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor, note: l.note, ...subst.publicLine(l),
     })),
     subtotalMinor: o.subtotalMinor,
     discountMinor: o.discountMinor,
@@ -683,7 +683,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
   const verified = await verifiedPhone(ticket, session);
   if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
-  const input = parseCheckout(body, sf);
+  const input = parseCheckout(body, sf, { substitution: await subst.flagOn(sf.shop_id) });
   if (input.customerPhone !== verified) {
     throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
   }
