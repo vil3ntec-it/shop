@@ -31,7 +31,7 @@ class OrdersSubstitutionWireTest {
       {"lineNo":2,"name":"موز","substitution":"refund"}]}"""))
     assertEquals("refund", o.substitution)
     assertEquals(listOf("شیرِ کابل", ""), o.lines.map { it.substituteName })
-    //  سرورِ پیش از ۱۳۹ این کلیدها را ندارد ⇒ خالی، و فرمِ برنامه ترجیحِ کلی را نشان نمی‌دهد
+    //  سرورِ پیش از ۱۴۴ این کلیدها را ندارد ⇒ خالی، و فرمِ برنامه ترجیحِ کلی را نشان نمی‌دهد
     val old = ApiJson.decode<OrderDto>(obj("""{"id":"o2","lines":[{"lineNo":1,"name":"شیر"}]}"""))
     assertEquals("", old.substitution)
     assertEquals("", old.lines[0].substituteName)

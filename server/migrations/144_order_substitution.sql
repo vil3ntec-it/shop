@@ -11,7 +11,7 @@
 --
 --  ⛔ هیچ دادهٔ موجودی عوض نمی‌شود: پیش‌فرض‌ها '' اند (همان «بی ترجیح» ِ امروز) و خواندنِ
 --     کلیدهای تازه پشتِ پرچمِ خاموشِ `shop.orders.substitution` است.
---  برگشت: `migrations/rollback/139_order_substitution.down.sql`.
+--  برگشت: `migrations/rollback/144_order_substitution.down.sql`.
 -- ============================================================
 
 ALTER TABLE online_orders ADD COLUMN IF NOT EXISTS substitution text NOT NULL DEFAULT '';
