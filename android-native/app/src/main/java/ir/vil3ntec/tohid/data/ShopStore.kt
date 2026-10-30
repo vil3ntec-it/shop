@@ -246,7 +246,7 @@ class ShopStore(private val context: Context) {
    */
   suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
     //  دفتری که صفحه با آن ساخت — نه لزوماً دفترِ همین حالا (شرح سرِ `LedgerMerge`)
-    val base = follow.baseOf(next)
+    val base = follow.baseOf(next)!!
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
     //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
     //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
@@ -594,6 +594,10 @@ class ShopStore(private val context: Context) {
    *  خطای نوشتنِ دفتر روی دیسک — `AppRoot` پیامِ روشن نشان می‌دهد (F0-01).
    *  پیش‌تر این خطا بی‌صدا خورده می‌شد و صفحه «ثبت شد» می‌گفت.
    */
+  /** پیش از اصلاح: جریان هست ولی چیزی در آن نمی‌آید (آزمون‌ها کامپایل شوند و سرخ) */
+  private val _notice = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
+  val notice: kotlinx.coroutines.flow.SharedFlow<String> = _notice
+
   private val _diskError = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
   val diskError: kotlinx.coroutines.flow.SharedFlow<String> = _diskError
 
@@ -785,6 +789,9 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
+    const val STALE_BASE = "—"
+    fun editsDropped(n: Int): String = "— $n"
+
     /** پیامِ نوشتنی که رد شد چون دفترِ دیسک جلوتر بود و خوانده نشد (یا دفترِ حسابِ دیگری بود) */
     const val STALE_UNREADABLE =
       "دفترِ روی دیسک در این فاصله عوض شده بود و دوباره خوانده نشد، پس این تغییر ثبت نشد تا چیزی از آن رونویسی نشود. دوباره امتحان کنید."

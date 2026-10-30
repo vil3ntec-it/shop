@@ -43,6 +43,15 @@ import kotlin.math.round
  */
 object LedgerMerge {
 
+  /** پیش از اصلاح: همان ادغام، بی گزارش (آزمون‌ها کامپایل شوند و سرخ) */
+  class Outcome(val data: ShopData, val dropped: List<String>)
+
+  fun mergeReport(base: ShopData, ours: ShopData, theirs: ShopData): Outcome = Outcome(merge(base, ours, theirs), emptyList())
+
+  @Suppress("UNUSED_PARAMETER")
+  fun retainedBaseOf(next: ShopData, current: ShopData, earlier: List<ShopData>, lost: Boolean): ShopData? =
+    baseOf(next, current, earlier)
+
   fun merge(base: ShopData, ours: ShopData, theirs: ShopData): ShopData {
     if (theirs === base || ours === base) return if (ours === base) theirs else ours
     val b = LedgerDiff.toJson(base)

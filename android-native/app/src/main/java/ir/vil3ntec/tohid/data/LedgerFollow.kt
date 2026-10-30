@@ -26,6 +26,8 @@ internal class LedgerFollow(
   private val unreadable: () -> Boolean,
   /** دفترِ دیسک؛ `null` اگر خوانده نشد (رمز، دیسک، JSON) */
   private val readDisk: () -> ShopData?,
+  /** پیش از اصلاح: پذیرفته ولی بی اثر (آزمون‌ها کامپایل شوند و سرخ) */
+  @Suppress("unused") private val enabled: () -> Boolean = { true },
 ) {
   private val peers = LedgerPeers.of(file)
 
@@ -83,7 +85,7 @@ internal class LedgerFollow(
   }
 
   /** دفتری که صفحه [next] را با آن ساخت (شرح سرِ `LedgerMerge.baseOf`) */
-  fun baseOf(next: ShopData): ShopData = LedgerMerge.baseOf(next, data.value, synchronized(earlier) { earlier.toList() })
+  fun baseOf(next: ShopData): ShopData? = LedgerMerge.baseOf(next, data.value, synchronized(earlier) { earlier.toList() })
 
   /** همتا همین حالا نوشت — زیرِ قفلِ نوشتنِ همان همتا */
   private fun adopt(next: ShopData, gen: Long, stamp: LedgerPeers.Stamp) {

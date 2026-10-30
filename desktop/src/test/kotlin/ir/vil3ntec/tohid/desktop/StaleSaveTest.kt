@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.LedgerMergeFlag
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
@@ -19,6 +20,10 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.sync.v3.FileV3Store
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
 import ir.vil3ntec.tohid.sync.v3.V3Meta
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
@@ -39,6 +44,9 @@ import java.io.File
  *  پیش‌تر کارگر opهای سرور را روی دیسک می‌نشاند و سایه را جلو می‌برد ولی دفترِ صفحه کهنه می‌ماند؛
  *  ذخیرهٔ بعدیِ صفحه کلِ دفترِ کهنه را می‌نوشت و `record` برای ردیفِ تازه DELETE و برای ویرایشِ
  *  تازه برگرداندن به سرور می‌فرستاد. همین سناریوها با Sync v1 و v3 و با رمزگذاریِ روشن و خاموش.
+ *
+ *  ⛔ همه پشتِ پرچمِ `shop.ledger_merge` (`LedgerMergeFlag`، پیش‌فرض خاموش)؛ این‌جا روشن، جز آزمونِ «پرچمِ
+ *  خاموش» که همان رفتارِ `main` را قفل می‌کند.
  */
 class StaleSaveTest {
 
@@ -65,9 +73,11 @@ class StaleSaveTest {
     account = "stale-${System.nanoTime()}"
     SyncStateV1.setCurrentAccount(ctx, account)
     engine.rebind()
+    LedgerMergeFlag.set(ctx, true)
   }
 
   @After fun after() {
+    LedgerMergeFlag.set(ctx, false)
     SyncChoice.set(ctx, SyncChoice.V1, 0)
     SyncStateV1.setCurrentAccount(ctx, "")
     engine.rebind()
@@ -126,6 +136,18 @@ class StaleSaveTest {
   }
 
   @Test fun `بازتولید — ذخیرهٔ صفحه پس از Pull ِ کارگر هیچ ردیفِ تازه‌ای را حذف یا برنمی‌گرداند`() = reproduce(encrypted = false)
+
+  @Test fun `پرچمِ خاموش (پیش‌فرض) — همان رفتارِ main: دفترِ صفحه کهنه می‌ماند و ذخیره‌اش کامل نوشته می‌شود`() {
+    LedgerMergeFlag.set(ctx, false)
+    val ui = screen()
+    val inHand = ui.data.value
+    workerPulls(fromOther)
+    assertEquals("صفحه نوشتنِ کارگر را نمی‌گیرد", listOf("برنج"), ui.data.value.products.map { it.name })
+    assertTrue(runBlocking { ui.save(inHand.copy(sales = inHand.sales + sale)) })
+    //  همان opهای `main`: کالای تازه DELETE و نامِ تازه برگردانده — همان باگی که پرچمِ روشن درمان می‌کند
+    assertEquals(setOf("sales:stale-s1:insert", "products:stale-p2:delete", "products:stale-p1:update"), queued().toSet())
+    assertEquals(listOf("برنج"), open().data.value.products.map { it.name })
+  }
 
   @Test fun `همان، با رمزگذاریِ روشن`() = reproduce(encrypted = true)
 
@@ -256,5 +278,55 @@ class StaleSaveTest {
     val entries = FileV3Store(dir).loadQueue()?.outbox.orEmpty()
     assertEquals(listOf("sales:stale-s1"), entries.map { "${it.table}:${it.rowId}" })
     assertEquals(listOf("برنج اعلا", "شکر"), open().data.value.products.map { it.name })
+  }
+
+  /* ------------- پیام‌ها: پایه‌ای که نگه داشته نشده، و ویرایشِ ردیفِ حذف‌شده ------------- */
+
+  /** پیام‌های `ShopStore.notice` در میانِ [act] */
+  private fun noticesOf(store: ShopStore, act: suspend () -> Unit): List<String> = runBlocking {
+    val got = java.util.concurrent.CopyOnWriteArrayList<String>()
+    val job = launch(Dispatchers.Unconfined, start = CoroutineStart.UNDISPATCHED) { store.notice.collect { got += it } }
+    act()
+    delay(200)
+    job.cancel()
+    got.toList()
+  }
+
+  @Test fun `پایه‌ای که دیگر نگه داشته نشده (سه Pull) — ذخیره با پیامِ روشن رد می‌شود، بی هیچ DELETE`() {
+    val ui = screen()
+    val inHand = ui.data.value
+    for (i in 1..3) workerPulls(listOf(op("products", "stale-n$i", SyncOp.INSERT, "name" to "کالا $i", "salePrice" to 10)), cursor = 7L + i)
+    var ok = true
+    val got = noticesOf(ui) { ok = ui.save(inHand.copy(sales = listOf(sale))) }
+    assertFalse("ذخیرهٔ کهنه نوشته نشد", ok)
+    assertEquals(listOf(ShopStore.STALE_BASE), got)
+    assertEquals("هیچ opی — نه DELETE ِ کالاهای تازه", emptyList<String>(), queued())
+    val disk = open().data.value
+    assertEquals(4, disk.products.size)
+    assertEquals(emptyList<String>(), disk.sales.map { it.id })
+    //  همان ذخیره از دفترِ تازهٔ صفحه نوشته می‌شود
+    val now = ui.data.value
+    assertTrue(runBlocking { ui.save(now.copy(sales = listOf(sale))) })
+    assertEquals(listOf("sales:stale-s1:insert"), queued())
+  }
+
+  @Test fun `ویرایشِ ردیفی که دستگاهِ دیگر حذف کرد پیام می‌دهد، بی‌صدا گم نمی‌شود`() {
+    val ui = screen()
+    val inHand = ui.data.value
+    workerPulls(listOf(op("products", "stale-p1", SyncOp.DELETE)))
+    var ok = false
+    val edited = inHand.copy(products = inHand.products.map { it.copy(salePrice = 150.0) }, sales = listOf(sale))
+    val got = noticesOf(ui) { ok = ui.save(edited) }
+    assertTrue(ok)
+    assertEquals(listOf(ShopStore.editsDropped(1)), got)
+    assertEquals("حذف می‌برد", emptyList<String>(), open().data.value.products.map { it.id })
+    assertEquals(listOf("sales:stale-s1:insert"), queued())
+  }
+
+  @Test fun `پاک کردنِ همه (ShopData()) با پرچمِ روشن هم دفتر را خالی می‌کند`() {
+    val ui = screen()
+    workerPulls(fromOther)
+    assertTrue(runBlocking { ui.save(ShopData()) })
+    assertEquals(emptyList<String>(), open().data.value.products.map { it.id })
   }
 }

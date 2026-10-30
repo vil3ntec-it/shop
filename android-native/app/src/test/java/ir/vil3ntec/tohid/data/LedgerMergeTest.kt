@@ -94,6 +94,30 @@ class LedgerMergeTest {
     assertEquals("-50", ((f["remaining"] as JsonObject)["\$inc"])!!.jsonPrimitive.content)
   }
 
+  @Test fun `ویرایشِ ردیفی که دستگاهِ دیگر حذف کرد گزارش می‌شود، نه بی‌صدا گم`() {
+    val base = ShopData(products = listOf(p1, p2))
+    val gone = disk(ShopData(products = listOf(p2)))
+    val edited = base.copy(products = listOf(p1.copy(salePrice = 130.0), p2))
+    val out = LedgerMerge.mergeReport(base, edited, gone)
+    assertEquals(listOf("p2"), out.data.products.map { it.id })
+    assertEquals(listOf("products:p1"), out.dropped)
+    //  ردیفِ دست‌نخورده که دستگاهِ دیگر حذف کرد: حذفی عادی، بی پیام
+    val other = base.copy(sales = listOf(sale))
+    assertEquals(emptyList<String>(), LedgerMerge.mergeReport(base, other, gone).dropped)
+    //  حذفِ خودِ کاربر هم گزارش نیست
+    val renamed = disk(ShopData(products = listOf(p1.copy(name = "برنج اعلا"), p2)))
+    assertEquals(emptyList<String>(), LedgerMerge.mergeReport(base, base.copy(products = listOf(p2)), renamed).dropped)
+  }
+
+  @Test fun `پایه‌ای که دیگر نگه داشته نشده — بی هیچ شیءِ مشترک و با دفترِ بیرون‌رفته تهی است`() {
+    val inHand = disk(ShopData(products = listOf(p1)))
+    val now = disk(ShopData(products = listOf(p1, p2)))
+    val next = inHand.copy(sales = listOf(sale))
+    assertEquals(null, LedgerMerge.retainedBaseOf(next, now, listOf(disk(now)), lost = true))
+    assertSame("بی بیرون‌رفته همان رفتارِ پیشین: دفترِ همین حالا", now, LedgerMerge.retainedBaseOf(next, now, emptyList(), lost = false))
+    assertSame(inHand, LedgerMerge.retainedBaseOf(next, now, listOf(inHand), lost = true))
+  }
+
   /** `$inc` ِ فیلدِ [k] در opی که `record` برای [merged] می‌سازد */
   private fun inc(theirs: ShopData, merged: Sale, k: String): String =
     ((LedgerDiff.diff(LedgerDiff.shadowOf(theirs), LedgerDiff.toJson(ShopData(sales = listOf(merged)))).single()
