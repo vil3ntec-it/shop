@@ -14,16 +14,8 @@
  * زنجیره هم بعداً پیدا شود.
  */
 
-const REASONS = {
-  seq_gap: 'حلقه‌ای جا افتاده',
-  prev_mismatch: 'پیوند به حلقهٔ قبلی نمی‌خورد',
-  bad_body: 'متنِ حلقه خوانا نیست',
-  not_canonical: 'متنِ حلقه دست‌کاری شده (قالب)',
-  body_mismatch: 'حلقه جابه‌جا شده',
-  hash_mismatch: 'متنِ حلقه با هشش نمی‌خواند',
-  row_missing: 'ردیفِ سابقه پاک شده',
-  row_changed: 'ردیفِ سابقه دست‌کاری شده',
-};
+//  دلیل‌ها در خودِ کتابخانه‌اند تا پنل (lib/system-health.js) به پوشهٔ scripts تکیه نکند
+const { REASONS } = require('../src/lib/hash-chain-store');
 
 function parseArgs(argv) {
   const out = { chains: [], rows: true, json: false };

@@ -22,13 +22,16 @@ object PromoJson {
   /** پاسخِ سرور (یا نسخهٔ ذخیره‌شدهٔ همان) ⇒ عکسِ حال */
   fun snapshotOf(o: JsonObject, at: Long): PromoEngine.Snapshot {
     val perms = o["permissions"] as? JsonObject
-    val rules = (o["rules"] as? JsonArray).orEmpty().map { PromoCore.ruleOf(PermPolicy.tree(it)) }
+    val raw = (o["rules"] as? JsonArray).orEmpty()
+    val rules = raw.map { PromoCore.ruleOf(PermPolicy.tree(it)) }
     return PromoEngine.Snapshot(
       enabled = bool(o["enabled"]),
       rules = rules,
       manage = bool(perms?.get("manage")),
       belowCost = bool(perms?.get("belowCost")),
       at = at,
+      stamp = bool(o["stamp"]),
+      revs = rules.zip(raw).mapNotNull { (r, e) -> (e as? JsonObject)?.let { rev(it) }?.takeIf { it > 0 }?.let { r.id to it } }.toMap(),
     )
   }
 
@@ -37,7 +40,9 @@ object PromoJson {
   /** عکسِ حال ⇒ همان شکلِ پاسخِ سرور، برای نگه‌داشتن روی دستگاه */
   fun toJson(s: PromoEngine.Snapshot): JsonObject = buildJsonObject {
     put("enabled", s.enabled)
-    put("rules", JsonArray(s.rules.map { toJson(it) }))
+    put("stamp", s.stamp)
+    //  `rev` فقط برای همین نسخهٔ دستگاه — `PUT` ِ قاعده آن را نمی‌فرستد
+    put("rules", JsonArray(s.rules.map { r -> s.revs[r.id]?.let { JsonObject(toJson(r) + ("rev" to JsonPrimitive(it))) } ?: toJson(r) }))
     put("permissions", buildJsonObject { put("manage", s.manage); put("belowCost", s.belowCost) })
   }
 
@@ -79,6 +84,6 @@ object PromoJson {
     put("priceMinor", r.priceMinor)
   }
 
-  /** شمارهٔ نسخهٔ قاعده که سرور برمی‌گرداند (`rev`) — فقط نمایش */
+  /** شمارهٔ نسخهٔ قاعده که سرور برمی‌گرداند (`rev`) — نمایش، و `SalePromo.rev` روی قلمِ فاکتور */
   fun rev(o: JsonObject): Long = (o["rev"] as? JsonPrimitive)?.longOrNull ?: 0
 }

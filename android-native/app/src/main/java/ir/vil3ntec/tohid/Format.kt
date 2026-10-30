@@ -33,6 +33,19 @@ fun money(value: Double): String {
 }
 
 /**
+ *  قیمتِ واحد — مثلِ `money`، ولی اعشارِ واقعی (۳۳۳٫۳۳) گرد نمی‌شود تا «مقدار ×
+ *  قیمت» با جمعِ ردیف بخواند (۳ × 333.33 = 1,000، نه ۳ × ۳۳۳). قیمتِ کامل همان `money`.
+ */
+fun unitMoney(value: Double): String {
+  if (value.isNaN() || value.isInfinite()) return money(0.0)
+  val cents = Math.round(value * 100)
+  if (cents % 100 == 0L) return money(cents / 100.0)
+  val a = kotlin.math.abs(cents)
+  val out = money((a / 100).toDouble()) + "." + (a % 100).toString().padStart(2, '0')
+  return if (cents < 0) "-$out" else out
+}
+
+/**
  * مقدار — کیلو و لیتر و گرم اعشار دارند، دانه ندارد. تا سه رقمِ اعشار،
  * بدونِ صفرهای اضافی؛ همان `formatCartQty` نسخهٔ وب.
  */

@@ -40,6 +40,11 @@ data class ReceiptInput(
   val logo: MonoImage? = null,
   /** «نسخهٔ دوم» و مانندِ آن (#300) */
   val copyMark: String? = null,
+  /**
+   *  ردیف‌های **آگاهی** زیرِ «جمع اقلام» — «شاملِ تخفیفِ خودکار …» (پیگیریِ #307). از جمع
+   *  کم نمی‌شوند: [subtotal] همان جمعِ ستونِ قلم‌هاست و مبلغ‌ها همان پرداختی. صفرها نمی‌آیند.
+   */
+  val included: List<DiscountLine> = emptyList(),
 )
 
 data class ShopHeader(
