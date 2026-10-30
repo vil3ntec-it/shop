@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.courier.CourierBoardModel
 import ir.vil3ntec.tohid.core.courier.CourierQueue
+import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
 import ir.vil3ntec.tohid.core.courier.QueueState
@@ -39,6 +41,10 @@ class CourierStore(context: Context) {
   var courierName: String
     get() = prefs.getString(K_NAME, "").orEmpty()
     set(v) { prefs.edit().putString(K_NAME, v).apply() }
+
+  /** «نقدِ من»، آمار و نام/شمارهٔ دکان — آخرین پاسخِ سرور؛ null = هنوز نیامده */
+  fun summary(): CourierSummary? = CourierCodec.summary(prefs.getString(K_SUMMARY, null))
+  fun saveSummary(x: CourierSummary) { prefs.edit().putString(K_SUMMARY, CourierCodec.summaryJson(x)).apply() }
 
   /** آخرین بار که سرور جواب داد (ساعتِ گوشی؛ فقط برای نمایش) */
   var lastSyncAt: Long
@@ -92,6 +98,7 @@ class CourierStore(context: Context) {
     private const val K_NAME = "name"
     private const val K_LAST = "last_sync"
     private const val K_PHOTOS = "photos"
+    private const val K_SUMMARY = "summary"
   }
 }
 
@@ -162,6 +169,13 @@ object CourierSync {
       val cards = a.valueOrNull()
       if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)
       if (failure == null) repo.missions("done").onSuccess { store.saveCards("done", it) }
+      //  «نقدِ من» و آمار با روز و هفتهٔ گوشی (شنبه)؛ سرورِ کهنه (۴۰۴) ⇒ همان آخرین
+      if (failure == null) {
+        val now = System.currentTimeMillis()
+        val off = java.util.TimeZone.getDefault().getOffset(now).toLong()
+        repo.summary(CourierBoardModel.dayStart(now, off), CourierBoardModel.weekStart(now, off))
+          .onSuccess { store.saveSummary(it) }
+      }
       if (failure == null) store.lastSyncAt = System.currentTimeMillis()
     }
     Outcome(sent, failure, photoErrors)

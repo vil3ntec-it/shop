@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.nav.DeepLinks
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -39,6 +40,8 @@ object Reminders {
   private const val CHANNEL = "tohid-daily"
   private const val WORK = "tohid-daily-check"
   private const val NOTE_ID = 4201
+  /** مقصدِ اعلانِ خلاصهٔ روز */
+  const val LINK = "home"
 
   /** برنامه‌ریزیِ کارِ روزانه. صدا زدنش چند بار بی‌ضرر است. */
   fun schedule(context: Context) {
@@ -123,8 +126,13 @@ object Reminders {
     val pending = open?.let {
       PendingIntent.getActivity(
         context,
-        0,
-        it.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP },
+        NOTE_ID,
+        //  خلاصهٔ روز ⇐ خانه (`vill3n://app/home`، `DeepLinks`)
+        it.apply {
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+          action = Intent.ACTION_VIEW
+          data = android.net.Uri.parse(DeepLinks.appLink(LINK))
+        },
         PendingIntent.FLAG_IMMUTABLE,
       )
     }

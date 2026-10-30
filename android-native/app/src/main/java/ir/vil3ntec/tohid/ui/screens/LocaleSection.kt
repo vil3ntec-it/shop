@@ -49,6 +49,8 @@ fun LocaleSection() {
       },
     ).joinToString(" · "),
     tint = Shop.colors.primary,
+    //  مقدارِ کوتاهِ ته ردیف در تنظیماتِ گروه‌بندی‌شدهٔ گوشی (r5)
+    value = if (lang == Lang.EN || digits != LocaleFormat.DIGITS_FA) StrSettings.latinDigits else StrSettings.persianDigits,
   ) {
     Text(
       StrSettings.digitsNote,

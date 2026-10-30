@@ -1,6 +1,13 @@
 package ir.vil3ntec.tohid
 
 import android.os.Bundle
+import androidx.compose.animation.AnimatedContent
+import ir.vil3ntec.tohid.core.nav.AppMode
+import ir.vil3ntec.tohid.core.nav.DeepLinks
+import ir.vil3ntec.tohid.core.nav.Move
+import ir.vil3ntec.tohid.ui.v3.V3Transitions
+import ir.vil3ntec.tohid.ui.v3.modes.ModeChooser
+import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.*
@@ -51,6 +58,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
+    ModeState.load(applicationContext)
+    ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
@@ -95,32 +105,103 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         }
       }
 
+      //  پرچمِ رابطِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز، بی انتخابگرِ حالت (`UiV3`)
+      if (!ir.vil3ntec.tohid.ui.UiV3.on) {
+        TohidTheme(theme) {
+          ir.vil3ntec.tohid.ui.ProvideLang {
+            if (!welcomed) {
+              WelcomeScreen(store) {
+                prefs.edit().putBoolean("welcomed", true).apply()
+                welcomed = true
+              }
+            } else if (courier) {
+              ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
+                //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
+                prefs.edit().putBoolean("welcomed", false).apply()
+                welcomed = false
+              })
+            } else {
+              AppRoot(
+                store = store,
+                theme = theme,
+                onTheme = {
+                  theme = it
+                  prefs.edit().putString("theme", it.name).apply()
+                },
+              )
+            }
+          }
+        }
+        return@setContent
+      }
+
+      //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
+      val chosen = ModeState.chosen.value
+      ModeState.onCourierSignedOut = {
+        //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
+        prefs.edit().putBoolean("welcomed", false).apply()
+        welcomed = false
+      }
+      ModeState.onStartShop = {
+        prefs.edit().putBoolean("welcomed", false).apply()
+        welcomed = false
+      }
+      val mode = remember(chosen, courier, welcomed) { ModeState.current(applicationContext) }
+      val screen = when {
+        !welcomed && chosen == null -> "choose"
+        !welcomed -> "welcome"
+        else -> mode.id
+      }
+
       TohidTheme(theme) {
         // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
         ir.vil3ntec.tohid.ui.ProvideLang {
-          if (!welcomed) {
-            WelcomeScreen(store) {
-              prefs.edit().putBoolean("welcomed", true).apply()
-              welcomed = true
+          //  عوض شدنِ حالت (سوییچرِ «حساب من»، پیوند) با محو و بزرگ‌شدنِ نرم
+          AnimatedContent(
+            targetState = screen,
+            transitionSpec = { V3Transitions.page(Move.NONE, ir.vil3ntec.tohid.ui.directionOf(LocaleChoice.lang)) },
+            label = "mode",
+          ) { s ->
+            when (s) {
+              "choose" -> ModeChooser { picked -> ModeState.choose(applicationContext, picked) }
+              "welcome" -> WelcomeScreen(store) {
+                prefs.edit().putBoolean("welcomed", true).apply()
+                welcomed = true
+              }
+              AppMode.COURIER.id -> ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = { ModeState.signedOutOfCourier() })
+              else -> AppRoot(
+                store = store,
+                theme = theme,
+                onTheme = {
+                  theme = it
+                  prefs.edit().putString("theme", it.name).apply()
+                },
+              )
             }
-          } else if (courier) {
-            ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
-              //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
-              prefs.edit().putBoolean("welcomed", false).apply()
-              welcomed = false
-            })
-          } else {
-            AppRoot(
-              store = store,
-              theme = theme,
-              onTheme = {
-                theme = it
-                prefs.edit().putString("theme", it.name).apply()
-              },
-            )
           }
         }
       }
+    }
+    handleLink(intent)
+  }
+
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    handleLink(intent)
+  }
+
+  /**
+   *  پیوندِ بیرونی (`vill3n://app/…`) ⇐ حالتِ همان پیوند و صفحهٔ دقیقش
+   *  (`DeepLinks`)؛ پوستهٔ همان حالت پیوند را پس از دروازه‌ها (قفل، ورود) باز
+   *  می‌کند. پیوندِ ویترین و QRِ دکان مالِ برنامهٔ خرید است و در مرورگر می‌ماند.
+   */
+  private fun handleLink(intent: android.content.Intent?) {
+    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) پیوندِ درونی نداشت — همان رفتار
+    if (!ir.vil3ntec.tohid.ui.UiV3.on) return
+    val link = DeepLinks.parse(intent?.dataString) ?: return
+    ModeState.pendingLink.value = link
+    if (link.mode in ModeState.available(applicationContext) && ModeState.chosen.value != link.mode) {
+      ModeState.choose(applicationContext, link.mode)
     }
   }
 

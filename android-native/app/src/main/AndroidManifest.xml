@@ -70,6 +70,7 @@
     `fullBackupOnly` یعنی همان پشتیبانِ خودکارِ کامل، نه کلید/مقدارِ قدیمی.
   -->
   <application
+      android:enableOnBackInvokedCallback="true"
       android:allowBackup="true"
       android:backupAgent=".data.TohidBackupAgent"
       android:fullBackupOnly="true"
@@ -92,6 +93,15 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- پیوندِ درونیِ برنامه: vill3n://app/<مسیر> (اعلان‌ها، میان‌برها) — `DeepLinks` -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="vill3n" android:host="app" />
+      </intent-filter>
+      <!-- پیوندِ ویترین و QRِ دکان (https://<slug>.vill3n.top/، …/store/<slug>) این‌جا نیست: خریدِ مشتری
+           برنامهٔ جدای خودش را دارد (تصمیمِ ۱۴۰۵/۰۸/۰۸) و برنامهٔ مدیریت آن‌ها را به مرورگر می‌سپارد -->
     </activity>
 
     <provider

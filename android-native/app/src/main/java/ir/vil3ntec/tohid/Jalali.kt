@@ -166,6 +166,19 @@ fun displayDate(iso: String): String {
 }
 
 /**
+ *  همان `formatMillis` برای **نمایش**: روزِ آن لحظه به زبان و تقویمِ انتخاب‌شده (`displayDate`).
+ *  صفحه‌های نسخهٔ ۳ تاریخ را از همین یا `displayDate` می‌گیرند؛ داده و کادرِ ویرایش همان `formatDate`.
+ */
+fun displayMillis(at: Long): String {
+  if (at <= 0) return "—"
+  val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
+  val y = c.get(java.util.Calendar.YEAR)
+  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
+  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
+  return displayDate("$y-$m-$d")
+}
+
+/**
  *  برچسبِ یک ماه: از `2026-09` به «سنبله ۱۴۰۵».
  *
  *  ماهِ ذخیره‌شده در فایلِ داده میلادی است (همان `date.take(7)`) و یک

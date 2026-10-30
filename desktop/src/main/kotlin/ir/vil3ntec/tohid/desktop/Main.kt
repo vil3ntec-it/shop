@@ -86,6 +86,8 @@ fun main() {
   ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
+  ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
+  ir.vil3ntec.tohid.ui.UiV3.load(context)
 
   var live: LiveSocket? = null
   runCatching {
@@ -252,6 +254,8 @@ fun main() {
           TohidTheme(dialogTheme) { ShortcutsHelp() }
         }
       }
+      //  پیش‌نمایشِ گوشی — فقط برای عکس‌های خودکار (`DevShot` ⇐ `phone:<صفحه>`)
+      PhonePreviewWindow(store, context)
       LaunchedEffect(Unit) {
         //  منوی سیستم راست‌به‌چپ، مثلِ خودِ برنامه
         window.jMenuBar?.applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)

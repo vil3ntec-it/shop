@@ -98,6 +98,32 @@ object DevShot {
                 Thread.sleep(500)
               }
               "shot" -> shot(arg)
+              //  پیش‌نمایشِ گوشیِ ۳۹۰×۸۴۴ (`PhonePreview`): phone:nav|nav-dark|off — و عکس فقط از همان پنجره
+              //  پیش‌نمایشِ گوشی و عکس‌های گروه رابطِ نسخهٔ ۳ را نشان می‌دهند ⇐ پرچمِ `UiV3` فقط در همین اجرا روشن (بی ذخیره)
+              "phone" -> { java.awt.EventQueue.invokeAndWait { val s = arg.takeIf { it.isNotBlank() && it != "off" }; if (s != null) ir.vil3ntec.tohid.ui.UiV3.preview(true); PhonePreview.screen.value = s }; Thread.sleep(1800) }
+              //  عکس‌های گروه‌ها: groupshots:<گروه|all|گروه,گروه> ⇒ هر حالت روشن/تیره × فارسی/انگلیسی در
+              //  <پوشه>/<گروه>/؛ پایانِ هر گروه با نشانِ `.done` (شمارِ عکس‌ها) تا CI گروهِ نیمه‌کاره را قرمز کند
+              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg).also { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.UiV3.preview(true) } }) {
+                val out = File(dir, g.group).apply { mkdirs() }
+                var saved = 0
+                for (s in g.shots) for (dark in listOf(false, true)) for (en in listOf(false, true)) {
+                  val name = "g:${g.group}:${s.name}" + (if (dark) "-dark" else "") + (if (en) "-en" else "")
+                  java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = name }
+                  Thread.sleep(2400)
+                  val w = Window.getWindows().firstOrNull { it.isShowing && (it as? java.awt.Dialog)?.title == PhonePreview.TITLE }
+                  val file = File(out, "${s.name}-${if (dark) "dark" else "light"}-${if (en) "en" else "fa"}.png")
+                  if (w != null && ImageIO.write(robot.createScreenCapture(Rectangle(w.x, w.y, w.width, w.height)), "png", file)) saved++
+                }
+                java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = null }
+                Thread.sleep(600)
+                //  همهٔ حالت‌ها (× روشن/تیره × فارسی/انگلیسی) نشستند ⇒ `.done`؛ وگرنه `.partial` با شمار
+                File(out, if (saved == g.shots.size * 4) ".done" else ".partial").writeText("$saved/${g.shots.size * 4}\n")
+              }
+              "pshot" -> {
+                val w = Window.getWindows().firstOrNull { it.isShowing && (it as? java.awt.Dialog)?.title == PhonePreview.TITLE }
+                if (w == null) shot(arg)
+                else ImageIO.write(robot.createScreenCapture(Rectangle(w.x, w.y, w.width, w.height)), "png", File(dir, "$arg.png"))
+              }
               "click" -> {
                 val (x, y) = arg.split(',').map { it.trim().toInt() }
                 robot.mouseMove(x, y); Thread.sleep(80)

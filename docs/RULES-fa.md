@@ -268,6 +268,7 @@
 - نصاب و `install.ps1` با curl.exe و `--continue-at -`، هر تلاش یک curlِ تازه؛ `--retry` همراهِ `-C -` به کار نرود (#264).
 - نصابِ آنلاین برچسب را از `/DReleaseTag` می‌گیرد (push ⇒ `tohid-desktop-beta`، Run workflow + stable ⇒ `tohid-desktop`) (#264).
 - دروازه‌های سختِ CI: `applicationId` یکسان، `versionCode` نه کمتر، اثرِ انگشتِ امضا یکسان، حجمِ APK در ±۵٪ برای PRِ فایلِ ساخت؛ کامپیوتر: `upgradeUuid`، `AppId` و `bundleID` بی‌تغییر (#220، #223).
+- استثنای یک‌بارهٔ حجم فقط با تصمیمِ صاحب محصول و فقط یک خط در `android-native/tools/apk-size-exceptions.txt` (نام، رشدِ پذیرفته‌شده٪، نشانِ dex، دلیل): APKی که نشان را دارد و مرجعِ منتشرشده ندارد با «مرجع × (۱+رشد)» سنجیده می‌شود و همان ±۵٪ از آن‌جا؛ با انتشارِ نسخه‌ای که نشان را دارد خودبه‌خود بی‌اثر است. مرزِ ±۵٪ عوض نمی‌شود. تنها استثنا: `v3-foundation` +۸٫۱۰٪، نشانِ `ui_v3` (پایهٔ نسخهٔ ۳ و PRهای رویش، کدِ Kotlin بی دارایی تازه؛ ۱۴۰۵/۰۸/۰۸، #359).
 
 ### v3 · پشتیبان و خروجی
 
@@ -352,7 +353,8 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
-= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز).
+= `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
+`UiV3` / `tohid-ui` › `ui_v3` رابطِ نسخهٔ ۳ (خاموش ⇒ رابطِ امروز از `ui/legacy/*Legacy.kt` و پالتِ سبزآبی؛ پیش‌نمایشِ اندروید پیش‌فرض روشن؛ کلید در تنظیمات و «ظاهر»ِ نسخهٔ ۳) (#359، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

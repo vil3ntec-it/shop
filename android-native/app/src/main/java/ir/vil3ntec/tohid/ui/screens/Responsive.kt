@@ -58,7 +58,9 @@ fun contentMaxWidth(): Dp = when (screenSize()) {
 /**
  *  محتوای صفحه را وسط نگه می‌دارد و پهنایش را محدود می‌کند.
  *
- *  روی گوشی هیچ کاری نمی‌کند، پس می‌شود همه‌جا گذاشتش بدونِ نگرانی.
+ *  روی گوشی پهنا را محدود نمی‌کند، ولی `modifier` (فاصله‌های پوسته: جای نوارِ شناور،
+ *  نوارِ سیستم و منوی کناری) **همیشه** اعمال می‌شود — پیش‌تر روی گوشی دور انداخته می‌شد
+ *  و نوارِ پایین تهِ همهٔ صفحه‌ها را می‌پوشاند (AUDIT-NAV S1).
  */
 @Composable
 fun PageWidth(
@@ -67,7 +69,8 @@ fun PageWidth(
 ) {
   val max = contentMaxWidth()
   if (max == Dp.Unspecified) {
-    content()
+    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) روی گوشی `modifier` را نمی‌گرفت — همان رفتار
+    if (!ir.vil3ntec.tohid.ui.UiV3.on) content() else Box(modifier.fillMaxSize()) { content() }
     return
   }
   Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {

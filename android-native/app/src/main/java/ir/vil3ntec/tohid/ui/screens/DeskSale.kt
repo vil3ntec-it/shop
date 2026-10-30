@@ -539,7 +539,7 @@ fun DeskSaleScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
               ) {
                 ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING,
+                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING,
                 )
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text(StrPos.requestApprovalF9) }

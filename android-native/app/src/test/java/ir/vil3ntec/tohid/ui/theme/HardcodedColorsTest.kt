@@ -68,6 +68,13 @@ class HardcodedColorsTest {
     "scan/BarcodeScanner.kt" to 1,
     //  بازبینیِ عکسِ تازه‌گرفته (دوربینِ راهنما) — بومِ عکس همیشه تیره، متنِ سفید رویش
     "scan/GuidedCapture.kt" to 1,
+    //  رابطِ امروز پشتِ پرچمِ خاموشِ `UiV3` — رونوشتِ همان فایل‌های main، همان سقف‌های بالا (PR #359)؛
+    //  با برداشتنِ `ui/legacy` این‌ها هم برداشته می‌شوند
+    "ui/legacy/WelcomeLegacy.kt" to 8,
+    "ui/legacy/VipLegacy.kt" to 7,
+    "ui/legacy/DebtorsLegacy.kt" to 1,
+    "ui/legacy/PhotoStudioDialogLegacy.kt" to 1,
+    "ui/legacy/SaleLegacy.kt" to 1,
     "desk:scan/BarcodeScannerDesk.kt" to 6,
     //  چاپ — کاغذ همیشه سفید است
     "desk:print/ReportPrintDesk.kt" to 1,

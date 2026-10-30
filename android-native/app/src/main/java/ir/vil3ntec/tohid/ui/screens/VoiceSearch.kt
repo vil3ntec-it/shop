@@ -22,6 +22,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -49,28 +50,10 @@ fun VoiceSearchField(
   label: String,
   modifier: Modifier = Modifier.fillMaxWidth(),
 ) {
-  val context = LocalContext.current
-
-  // هست یا نیست؟ یک بار پرسیده می‌شود، نه در هر بازچینش
-  val canListen = remember {
-    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-      .resolveActivity(context.packageManager) != null ||
-      context.packageManager.queryIntentActivities(
-        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), PackageManager.MATCH_DEFAULT_ONLY
-      ).isNotEmpty()
-  }
-
-  val listen = rememberLauncherForActivityResult(
-    ActivityResultContracts.StartActivityForResult()
-  ) { result ->
-    if (result.resultCode == Activity.RESULT_OK) {
-      val said = result.data
-        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
-        ?.firstOrNull()
-        ?.trim()
-      if (!said.isNullOrBlank()) onValueChange(said)
-    }
-  }
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { VoiceSearchFieldLegacy(value, onValueChange, label, modifier); return }
+  val voice = rememberVoiceSearch(onValueChange)
+  val canListen = voice != null
 
   OutlinedTextField(
     value = value,
@@ -100,19 +83,7 @@ fun VoiceSearchField(
             .size(34.dp)
             .clip(RoundedCornerShape(17.dp))
             .background(Shop.colors.primary.copy(alpha = 0.14f))
-            .clickable {
-              val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-                putExtra(
-                  RecognizerIntent.EXTRA_LANGUAGE_MODEL,
-                  RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
-                )
-                // فارسی، و اگر دستگاه نداشت خودش سراغِ زبانِ خودش می‌رود
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "بگویید دنبالِ چه می‌گردید")
-                putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
-              }
-              runCatching { listen.launch(intent) }
-            },
+            .clickable { voice?.invoke() },
           contentAlignment = Alignment.Center,
         ) {
           Icon(
@@ -128,4 +99,54 @@ fun VoiceSearchField(
     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
     modifier = modifier,
   )
+}
+
+/**
+ *  گفتن به‌جای نوشتن — همان `RecognizerIntent` ِ بالا، برای هر کادرِ جستجو.
+ *
+ *  `null` یعنی این دستگاه برنامهٔ تشخیصِ گفتار ندارد (و کامپیوتر هیچ‌وقت
+ *  ندارد): صدازننده دکمهٔ میکروفون را اصلاً نمی‌کشد تا دکمهٔ مرده نماند.
+ *  وگرنه تابعی که پنجرهٔ گفتارِ گوشی را باز می‌کند و جملهٔ شنیده‌شده را
+ *  (بی فاصله‌های دو سر) به `onHeard` می‌دهد.
+ */
+@Composable
+fun rememberVoiceSearch(onHeard: (String) -> Unit): (() -> Unit)? {
+  val context = LocalContext.current
+
+  // هست یا نیست؟ یک بار پرسیده می‌شود، نه در هر بازچینش
+  val canListen = remember {
+    Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+      .resolveActivity(context.packageManager) != null ||
+      context.packageManager.queryIntentActivities(
+        Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH), PackageManager.MATCH_DEFAULT_ONLY
+      ).isNotEmpty()
+  }
+
+  val latest = rememberUpdatedState(onHeard)
+  val listen = rememberLauncherForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+  ) { result ->
+    if (result.resultCode == Activity.RESULT_OK) {
+      val said = result.data
+        ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+        ?.firstOrNull()
+        ?.trim()
+      if (!said.isNullOrBlank()) latest.value(said)
+    }
+  }
+
+  if (!canListen) return null
+  return {
+    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+      putExtra(
+        RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+        RecognizerIntent.LANGUAGE_MODEL_FREE_FORM,
+      )
+      // فارسی، و اگر دستگاه نداشت خودش سراغِ زبانِ خودش می‌رود
+      putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
+      putExtra(RecognizerIntent.EXTRA_PROMPT, "بگویید دنبالِ چه می‌گردید")
+      putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+    }
+    runCatching { listen.launch(intent) }
+  }
 }

@@ -25,9 +25,17 @@ class TestHttpServer {
     val path: String,
     val bearer: String,
     val body: String,
-    /** همهٔ سرآیندها با نامِ کوچک — مثلاً `idempotency-key` */
+    /** همهٔ سرآیندها با نامِ کوچک — مثلاً `idempotency-key` یا `x-store-ticket` */
     val headers: Map<String, String> = emptyMap(),
-  )
+    /** پرسمانِ خام (بی `?`) */
+    val query: String = "",
+  ) {
+    /** یک پارامترِ پرسمان، decode‌شده — یا null */
+    fun param(name: String): String? = query.split('&').firstNotNullOfOrNull { pair ->
+      val k = pair.substringBefore('=')
+      if (java.net.URLDecoder.decode(k, "UTF-8") == name) java.net.URLDecoder.decode(pair.substringAfter('=', ""), "UTF-8") else null
+    }
+  }
 
   private val socket = ServerSocket(0, 16, InetAddress.getByName("127.0.0.1"))
   private val routes = HashMap<String, (Request) -> Pair<Int, String>>()
@@ -70,6 +78,7 @@ class TestHttpServer {
       val method = parts[0]
       //  پرسمان برای مسیریابی کنار گذاشته می‌شود
       val path = parts[1].substringBefore('?')
+      val query = parts[1].substringAfter('?', "")
 
       var bearer = ""
       var length = 0
@@ -100,7 +109,7 @@ class TestHttpServer {
         404 to """{"error":{"code":"not_found","message":"این مسیر وجود ندارد"}}"""
       } else {
         counts[path]?.incrementAndGet()
-        handler(Request(method, path, bearer, body, headers))
+        handler(Request(method, path, bearer, body, headers, query))
       }
 
       val payload = text.toByteArray(Charsets.UTF_8)
