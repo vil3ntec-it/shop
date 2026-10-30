@@ -97,7 +97,7 @@ class NavCoreTest {
 
   @Test
   fun `ویترین — پیوندِ وب و حالتِ خرید مالِ برنامهٔ خرید است، نه برنامهٔ مدیریت`() {
-    //  تصمیمِ ۱۴۰۵/۰۸/۰۸: QR و پیوندِ ویترین در مرورگر می‌ماند؛ خواندنش در `ShopperLinksTest`
+    //  تصمیمِ ۱۴۰۵/۰۸/۰۸ (§۴۰.۱): QR و پیوندِ ویترین در مرورگر می‌ماند
     assertNull(DeepLinks.parse("https://karim-store.vill3n.top/"))
     assertNull(DeepLinks.parse("https://vill3n.top/store/karim-store"))
     assertNull(DeepLinks.parse("https://vill3n.top/store/karim-store#/o/tok"))
