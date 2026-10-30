@@ -212,13 +212,27 @@ function build(T) {
     return { row: out.row, replayed: false, response: { subscription: out.row, ...extra } };
   }
 
-  async function grantTx(tenantId, opts, idem, extra = {}) {
+  /*
+   *  ⛔ SUB-06 — اعطایی که پشتِ یک «سند» است (درخواستِ خرید): سند در **همان تراکنشِ** اعطا گرفته می‌شود.
+   *
+   *  `claim(c)` با client ِ همین تراکنش و پیش از قفلِ مشتری می‌دود و باید سند را با یک UPDATE ِ شرط‌دار
+   *  (`… WHERE status='pending' RETURNING`) بگیرد. falsy ⇒ هیچ اعطایی نیست (`{ claimed: false }`). دو درخواستِ
+   *  هم‌زمان پشتِ قفلِ ردیفِ سند می‌مانند و دومی دیگر `pending` نمی‌بیند؛ شکستِ اعطا گرفتنِ سند را هم برمی‌گرداند.
+   *  تا ۲.۱۴.۴ مسیرِ تأیید اول می‌خواند، بعد اعطا می‌کرد و بعد بی شرط می‌نوشت: دو کلیک ⇒ دو دوره برای یک پرداخت.
+   */
+  async function grantClaimed(tenantId, opts, claim) {
+    const out = await grantTx(tenantId, opts, null, {}, claim);
+    return out.skipped ? { row: null, claimed: false } : { row: out.row, claimed: true };
+  }
+
+  async function grantTx(tenantId, opts, idem, extra = {}, claim = null) {
     const out = await tx(async (c) => {
       if (idem) {
         await idempotency.lock(c, idem);
         const prior = await idempotency.find(idem, idempotency.viaClient(c));
         if (prior) return { replayed: true, prior };
       }
+      if (claim && !(await claim(c))) return { skipped: true };
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sub-grant:${T.app}:${tenantId}`]);
       const r = await grantLocked(tenantId, opts);
       if (idem) {
@@ -228,7 +242,7 @@ function build(T) {
       }
       return r;
     });
-    if (out.replayed) return out;
+    if (out.replayed || out.skipped) return out;
     await require('./notices').onSubscription({ app: T.app, action: out.existing ? 'renew' : 'grant', row: out.row });
     //  صفحهٔ «مشتری‌ها» و «فروش»ِ پنل همان لحظه عدد تازه می‌گیرند
     notifyPanel('customers');
@@ -532,7 +546,7 @@ function build(T) {
 
   return {
     tenancy: T,
-    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, grantOnce, setStatus, TRANSITIONS,
+    liveOf, latestOf, historyOf, changeLog, stateOf, expireDue, grant, grantOnce, grantClaimed, setStatus, TRANSITIONS,
     expiringSoon, notifyExpiring, DAY,
   };
 }
