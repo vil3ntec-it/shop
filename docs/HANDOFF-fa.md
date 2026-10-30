@@ -54,6 +54,14 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۹ — برنامهٔ جامعِ امنیت و ضدکرک (شاخه‌های `claude/sec-*`)
+- صاحب محصول خواست امنیتِ **همهٔ بخش‌ها** طبقِ «VILL3N — ULTIMATE SECURITY & ANTI-CRACK MASTER PROMPT» پیاده و هر حفره پیدا و
+  درست شود؛ **هر چه مالِ فروشگاهِ آنلاینِ مشتری است کنار می‌ماند تا هنگامِ ساختش**. خلاصهٔ کاملِ متن، قاعده‌ها، دامنه، شاخهٔ هر بخش،
+  شناسه‌های آزمون (SEC-AI، SEC-ART، SEC-SUB، TEN، DATA) و جدولِ وضعیت: `docs/SECURITY-PROGRAM-fa.md`.
+- هشت شاخهٔ کار: `claude/sec-artifacts`، `sec-auth`، `sec-tenant`، `sec-client`، `sec-api-web`، `sec-data`، `sec-supply`، `sec-ai-access`؛
+  پس از اصلاح‌های بحرانی یک بازبینیِ مستقل. سرورِ خانگی و ریپوی `server` بیرون از این مخزن‌اند و فقط به‌صورتِ کارِ صاحب محصول ثبت می‌شوند.
+- **قدمِ بعدی برای هر حساب:** جدولِ §۴ِ همان فایل را ببین؛ هر ردیفِ `NOT-TESTED` کارِ باقی است. هیچ ادعای «۱۰۰٪ امن» نکن.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
