@@ -70,6 +70,17 @@ class ReceiptLayoutTest {
     assertEquals(TextStyle.TOTAL, (doc.blocks.first { it is ReceiptBlock.Row && it.label == "مبلغ نهایی" } as ReceiptBlock.Row).style)
   }
 
+  @Test fun `ردیفِ آگاهیِ تخفیفِ خودکار زیرِ «جمع اقلام» — بی «−» و بی کسر؛ صفر نمی‌آید (پیگیریِ #307)`() {
+    val base = input().copy(discounts = emptyList(), total = 600.0)
+    val t = texts(ReceiptLayout.build(base.copy(included = listOf(DiscountLine("شاملِ تخفیفِ خودکار (ده درصد)", 50.0))), PrinterProfile.WIDTH_58MM, fmt))
+    val i = t.indexOf("R:جمع اقلام=600 افغانی")
+    assertEquals("R:شاملِ تخفیفِ خودکار (ده درصد)=50 افغانی", t[i + 1])
+    assertEquals("R:مبلغ نهایی=600 افغانی", t[i + 3])
+    //  بی ردیف ⇒ همان فاکتورِ پیشین
+    assertEquals(texts(ReceiptLayout.build(base, PrinterProfile.WIDTH_58MM, fmt)),
+      texts(ReceiptLayout.build(base.copy(included = listOf(DiscountLine("x", 0.0))), PrinterProfile.WIDTH_58MM, fmt)))
+  }
+
   @Test fun `شمارِ عدد فقط وقتی همه دانه‌ای‌اند؛ نسیه با نامِ قرض‌دار؛ بی QR؛ لغو و لوگو`() {
     val whole = listOf(LineView("الف", 2.0, "", 10.0, 20.0), LineView("ب", 3.0, "", 10.0, 30.0))
     val logo = MonoImage(40, 20)
