@@ -277,6 +277,14 @@ fun CheckoutDialog(
           )
         }
 
+        //  PAY-21: حساب‌پی — فقط با پرچمِ سرور (`pay.hesabpay`) و نت؛ پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
+        ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
+          hook = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) { (SalesEngine.record(d, cart, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message },
+          total = totals.finalTotal, panel = if (payV2) payState else null, customerId = debtorId, busy = busy, modifier = Modifier.padding(top = 12.dp),
+          enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
+          onPaid = { st -> onConfirm(checkout.copy(settlement = st, debtorId = debtorId, approval = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null)) },
+        )
+
         Spacer(Modifier.height(16.dp))
         Panel {
           //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
