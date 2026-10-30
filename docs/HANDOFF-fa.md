@@ -54,6 +54,16 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸ — خانوادهٔ ORD (سفارشِ آنلاین، سمتِ مدیریت و سرور)؛ شاخه‌های `claude/spec-ord-1` تا `-4`
+- انجام شد: #533 (ORD-07 «عقب انداختن» و ORD-03 «باز / بسته»، سرور + وب پشتِ `shop.orders.delay`/`shop.orders.presence`)؛
+  #535 (آزمونِ پذیرشِ ORD-01@38 و ORD-02@38، و ORD-05 ⇐ IMPLEMENTED-VERIFIED)؛ #561 (میزِ سفارش: ORD-08 «شلوغم» و توقف،
+  ORD-09 توقفِ خودکار، ORD-04 قبولِ خودکار؛ مهاجرتِ ۱۵۷، پرچمِ `shop.orders.desk`)؛ و همین PR (ORD-18 هشدارِ شروعِ
+  زمان‌بندی‌شده، ORD-19 تغییرِ وضعیتِ گروهی؛ `shop.orders.start_alert`/`shop.orders.bulk`). همه پرچمِ خاموش، با جهش‌آزمایی.
+- نیمه‌کاره: صفحه‌های مدیریت برای ORD-04/08/09/18/19 (وب روی افزونهٔ `license/orders-desk.js` ِ #533؛ اندروید/کامپیوتر
+  پس از #400)؛ ORD-10 (چاپِ خودکار)، ORD-13/14/15 (جایگزین/ویرایش/تحویلِ بخشی با رضایتِ مشتری) شروع نشده؛ ORD-16 و ORD-20
+  به #400 سپرده شد.
+- قدمِ بعدی: پس از ادغامِ #533 دکمه‌های میز و گروهی در وب؛ پس از #467، `existingOrder` روی `POST …/delay`.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
