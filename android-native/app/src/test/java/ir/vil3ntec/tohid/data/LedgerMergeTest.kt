@@ -94,6 +94,41 @@ class LedgerMergeTest {
     assertEquals("-50", ((f["remaining"] as JsonObject)["\$inc"])!!.jsonPrimitive.content)
   }
 
+  /** `$inc` ِ فیلدِ [k] در opی که `record` برای [merged] می‌سازد */
+  private fun inc(theirs: ShopData, merged: Sale, k: String): String =
+    ((LedgerDiff.diff(LedgerDiff.shadowOf(theirs), LedgerDiff.toJson(ShopData(sales = listOf(merged)))).single()
+      .fields!![k] as JsonObject)["\$inc"])!!.jsonPrimitive.content
+
+  @Test fun `دلتای برابر — دو پرداختِ ۱۰۰ تایی هر دو می‌مانند، نه یکی (ردیفِ یکسان)`() {
+    //  صفحه و دستگاهِ دیگر هر کدام ۱۰۰ روی s1 گرفتند: ردیفِ دو طرف عیناً یکی است
+    val base = ShopData(sales = listOf(sale))
+    val theirs = disk(ShopData(sales = listOf(sale.copy(paidAmount = 100.0, remaining = 400.0))))
+    val ours = base.copy(sales = listOf(sale.copy(paidAmount = 100.0, remaining = 400.0)))
+    val merged = LedgerMerge.merge(base, ours, theirs).sales.single()
+    assertEquals(200.0, merged.paidAmount, 0.0)
+    assertEquals(300.0, merged.remaining, 0.0)
+    assertEquals("100", inc(theirs, merged, "paidAmount"))
+    assertEquals("-100", inc(theirs, merged, "remaining"))
+  }
+
+  @Test fun `دلتای برابر — با فیلدِ دیگرِ عوض‌شده هم هر دو پرداخت می‌مانند`() {
+    val base = ShopData(sales = listOf(sale))
+    val theirs = disk(ShopData(sales = listOf(sale.copy(paidAmount = 100.0, remaining = 400.0))))
+    val ours = base.copy(sales = listOf(sale.copy(paidAmount = 100.0, remaining = 400.0, seller = "علی")))
+    val merged = LedgerMerge.merge(base, ours, theirs).sales.single()
+    assertEquals(200.0, merged.paidAmount, 0.0)
+    assertEquals(300.0, merged.remaining, 0.0)
+    assertEquals("علی", merged.seller)
+    assertEquals("100", inc(theirs, merged, "paidAmount"))
+  }
+
+  @Test fun `فیلدِ غیرِشمارندهٔ برابر — همان یک مقدار، بی دو برابر شدن`() {
+    val base = ShopData(products = listOf(p1))
+    val theirs = disk(ShopData(products = listOf(p1.copy(salePrice = 120.0))))
+    val ours = base.copy(products = listOf(p1.copy(salePrice = 120.0)))
+    assertEquals(120.0, LedgerMerge.merge(base, ours, theirs).products.single().salePrice, 0.0)
+  }
+
   @Test fun `فهرستِ نام‌ها — افزوده و حذفِ هر طرف`() {
     val base = ShopData(productCategories = listOf("لبنیات", "نوشیدنی"))
     val theirs = disk(base.copy(productCategories = listOf("لبنیات", "نوشیدنی", "حبوبات")))
