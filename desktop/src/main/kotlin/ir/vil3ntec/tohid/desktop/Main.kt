@@ -87,6 +87,7 @@ fun main() {
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
+  ir.vil3ntec.tohid.ui.UiV3.load(context)
 
   var live: LiveSocket? = null
   runCatching {

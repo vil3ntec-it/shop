@@ -114,6 +114,8 @@ fun SaleScreen(
   /** «ثبت کالا»ِ بارکدِ ناشناس؛ null ⇐ دکمه‌ای نیست و بارکد در کادرِ دستیِ اسکن می‌ماند */
   onRegisterBarcode: ((String) -> Unit)?,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on && onBack == null && onRegisterBarcode != null) { SaleScreenLegacy(store, cartStore, d, snackbar, onQuickSale, onRegisterBarcode); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
 

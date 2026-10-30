@@ -232,6 +232,8 @@ internal data class CourierAction(
 
 @Composable
 fun CourierHome(onSignedOut: () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { CourierHomeLegacy(onSignedOut); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val snackbar = remember { SnackbarHostState() }

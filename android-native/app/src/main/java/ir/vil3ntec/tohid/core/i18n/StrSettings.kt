@@ -403,4 +403,7 @@ object StrSettings {
   val themeOcean: String get() = t("اقیانوس", "Ocean", "سمندر")
   val themeSunset: String get() = t("غروب", "Sunset", "لمر لوېده")
   val themeOnDevice: String get() = t("تم فقط روی همین دستگاه عوض می‌شود.", "The theme changes on this device only.", "تیم یوازې په همدې وسیله بدلېږي.")
+  /** پرچمِ `UiV3`: کلیدِ برگشت به رابطِ امروز (فقط همین دستگاه) */
+  val uiV3: String get() = t("رابطِ تازه (نسخهٔ ۳)", "New interface (version 3)", "نوې ښودنه (۳ نسخه)")
+  val uiV3Note: String get() = t("آزمایشی و فقط روی همین دستگاه. خاموش ⇐ رابطِ امروز؛ داده و همگام‌سازی دست نمی‌خورند.", "Experimental, this device only. Off ⇒ the current interface; data and sync are untouched.", "ازمایښتي او یوازې په همدې وسیله. بند ⇐ اوسنۍ ښودنه؛ معلومات او همغږي نه بدلېږي.")
 }

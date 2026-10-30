@@ -200,6 +200,8 @@ private fun emailValidationError(raw: String): String? {
 
 @Composable
 fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { WelcomeScreenLegacy(store, onDone); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val state = remember { SyncStore(context) }

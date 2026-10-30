@@ -45,6 +45,8 @@ import ir.vil3ntec.tohid.core.i18n.StrShell
  */
 @Composable
 fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { MoreScreenLegacy(store, d, onOpen); return }
   //  گوشی نسخهٔ ۳ (بندِ F): کارت‌های گروهیِ r5 و «تنظیمات» در ته — `PhoneMoreScreen`.
   //  کامپیوتر همین صفحهٔ پیشین را نگه می‌دارد.
   if (!ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout.current) {
