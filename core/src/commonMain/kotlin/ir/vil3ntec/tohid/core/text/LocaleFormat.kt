@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.text
 
+import ir.vil3ntec.tohid.core.money.mathRound
+
 /**
  *  ارقام (LOC-05)، افغانی (LOC-07) و تلفن (LOC-09).
  *
@@ -54,7 +56,7 @@ object LocaleFormat {
    *  digits: "fa" ⇒ ۱۲۳٬۴۵۶؛ غیرِ آن ⇒ 123,456 (نه جداکنندهٔ عجیبِ CLDR ِ پشتو).
    */
   fun formatAfghani(amount: Double, symbol: String, digits: String): String {
-    val n = if (amount.isNaN() || amount.isInfinite()) 0L else Math.round(amount)
+    val n = if (amount.isNaN() || amount.isInfinite()) 0L else mathRound(amount)
     val raw = kotlin.math.abs(n).toString()
     val sb = StringBuilder()
     if (n < 0) sb.append('-')
