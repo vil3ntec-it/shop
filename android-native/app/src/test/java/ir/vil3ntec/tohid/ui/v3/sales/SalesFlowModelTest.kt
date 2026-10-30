@@ -22,6 +22,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryFilter
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel
 import ir.vil3ntec.tohid.ui.v3.sales.history.ReceiptModel
 import ir.vil3ntec.tohid.ui.v3.sales.history.SaleState
+import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTime
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintKind
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintModel
 import ir.vil3ntec.tohid.ui.v3.sales.returns.ReturnModel
@@ -139,6 +140,38 @@ class SalesFlowModelTest {
     assertEquals(listOf("2026-10-24", "2026-09-30", "2026-09-29"), days.map { it.date })
     assertEquals("2026-09-30", HistoryModel.yesterday("2026-10-01"))
     assertEquals("", HistoryModel.yesterday("bad"))
+    //  از CivilDays ِ core: مرزِ سال و کبیسه، و تاریخِ نادرست دیگر «لِنیِنت» جابه‌جا نمی‌شود
+    assertEquals("2025-12-31", HistoryModel.yesterday("2026-01-01"))
+    assertEquals("2024-02-29", HistoryModel.yesterday("2024-03-01"))
+    assertEquals("", HistoryModel.yesterday("2026-02-30"))
+  }
+
+  @Test
+  fun `ساعتِ فاکتور حسابِ خالص با فاصلهٔ منطقه است`() {
+    val at = 1_761_300_000_000L // 2025-10-24T10:00:00Z
+    assertEquals("10:00", SaleTime.clock(at, 0))
+    assertEquals("14:30", SaleTime.clock(at, (4.5 * 3_600_000).toInt())) // کابل
+    assertEquals("23:00", SaleTime.clock(at, -11 * 3_600_000))
+    assertEquals("", SaleTime.clock(0, 0))
+  }
+
+  @Test
+  fun `سابقهٔ صندوق روی دفترِ همان لحظه نوشته می شود، نه تصویرِ کهنه`() {
+    val rel = "ir/vil3ntec/tohid/ui/v3/sales/drawer/DrawerRoutes.kt"
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+    assertFalse(src.contains("store.save("))
+    assertEquals(2, Regex("""store\.appendAudit \{""").findAll(src).count())
+  }
+
+  @Test
+  fun `مدل های فروشِ نسخهٔ ۳ جز درزِ ساعت java نمی خوانند`() {
+    val dir = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/sales") }.first { it.isDirectory }
+    val bad = dir.walk().filter { it.name.endsWith("Model.kt") }
+      .filter { f -> f.readLines().any { l -> !l.trimStart().startsWith("//") && !l.trimStart().startsWith("*") && Regex("""\bjava\.|\bMath\.""").containsMatchIn(l) } }
+      .map { it.name }.toList()
+    assertEquals(emptyList<String>(), bad)
   }
 
   @Test

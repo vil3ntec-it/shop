@@ -36,7 +36,7 @@ object ReturnModel {
   /** −/+ با پلهٔ همان واحد، در بازهٔ ۰ تا قابلِ برگشت */
   fun bump(text: String?, l: ReturnLine, sign: Int): String {
     val next = ((parseNumber(text.orEmpty()) ?: 0.0) + sign * l.step).coerceIn(0.0, l.left)
-    val rounded = Math.round(next * 1000) / 1000.0
+    val rounded = (next * 1000).roundToLong() / 1000.0
     return if (rounded <= 0) "" else qty(rounded)
   }
 
@@ -46,12 +46,8 @@ object ReturnModel {
     return if (v > l.left + 1e-9) StrSale.overReturnable else null
   }
 
-  /** سهمِ پس از تخفیفِ فاکتور — همان `recordReturn` */
-  fun paidRatio(sale: Sale): Double =
-    if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
-
-  fun amount(sale: Sale, l: ReturnLine, q: Double): Double =
-    if (l.item.quantity > 0) (l.item.totalPrice / l.item.quantity * q * paidRatio(sale)).roundToLong().toDouble() else 0.0
+  /** مبلغِ برگشت — همان فرمولِ ثبت ([SalesEngine.returnAmount]) */
+  fun amount(sale: Sale, l: ReturnLine, q: Double): Double = SalesEngine.returnAmount(sale, l.item, q)
 
   fun total(sale: Sale, lines: List<ReturnLine>, texts: Map<String, String>): Double =
     lines.sumOf { amount(sale, it, value(texts[it.item.id], it)) }

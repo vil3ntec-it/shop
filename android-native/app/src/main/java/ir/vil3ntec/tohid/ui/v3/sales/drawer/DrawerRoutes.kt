@@ -127,9 +127,9 @@ fun RouteScope.DrawerCloseRoute() {
           val z = r.value.report
           val notes = DrawerNotes.close(z.expected?.get(PayFlow.CASH) ?: 0, r.value.row.amount, z.variance?.get(PayFlow.CASH) ?: 0L, reason, me)
           val row = r.value.row.copy(date = todayIso(), notes = notes)
-          val d = data
+          //  زیرِ قفلِ نوشتن روی دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد گم نمی‌شود
           scope.launch {
-            if (store.save(d.copy(auditLog = d.auditLog + row))) toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
+            if (store.appendAudit { row }) toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
             else toasts.show(StrSale.notSaved, V3Tone.ERROR)
           }
           //  همان لحظه گزارشِ Z ِ همین بستن (پیش از رسیدنِ دفترِ تازه)
@@ -165,9 +165,10 @@ fun RouteScope.DrawerMoveRoute() {
           val row: AuditEntry = r.value
           val notes = if (noSale) DrawerNotes.noSale(m.reason.orEmpty(), row.approvedBy)
           else DrawerNotes.move(m.type, row.reason, row.amount, row.note, me)
-          val d = data
+          val stamped = row.copy(date = todayIso(), notes = notes)
+          //  زیرِ قفلِ نوشتن روی دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد گم نمی‌شود
           scope.launch {
-            if (store.save(d.copy(auditLog = d.auditLog + row.copy(date = todayIso(), notes = notes)))) {
+            if (store.appendAudit { stamped }) {
               toasts.show(if (noSale) StrSale.noSaleRecorded else StrSale.recorded, V3Tone.SUCCESS)
             } else toasts.show(StrSale.notSaved, V3Tone.ERROR)
           }

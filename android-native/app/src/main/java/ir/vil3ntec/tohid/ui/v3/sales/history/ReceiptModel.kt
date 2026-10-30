@@ -87,10 +87,17 @@ object ReceiptModel {
 
 /** ساعتِ روزِ یک لحظه («۸:۰۵») — برای فهرست و رسید */
 object SaleTime {
-  fun clock(at: Long): String {
+  /**
+   *  فاصلهٔ منطقهٔ زمانیِ دستگاه از UTC (میلی‌ثانیه) در لحظهٔ داده‌شده — تنها درزِ پلتفرم
+   *  ([deviceZoneOffset]؛ برنامهٔ آیفون همتای خودش را می‌گذارد). آزمون‌ها ثابتش می‌کنند.
+   */
+  var zoneOffset: (Long) -> Int = ::deviceZoneOffset
+
+  /** حسابِ خالص: لحظه + فاصلهٔ منطقه ⇒ «ساعت:دقیقه» */
+  fun clock(at: Long, offsetMs: Int = zoneOffset(at)): String {
     if (at <= 0) return ""
-    val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
-    return "${c.get(java.util.Calendar.HOUR_OF_DAY)}:${c.get(java.util.Calendar.MINUTE).toString().padStart(2, '0')}"
+    val minutes = (at + offsetMs).floorDiv(60_000L).mod(1_440L).toInt()
+    return "${minutes / 60}:${(minutes % 60).toString().padStart(2, '0')}"
   }
 
   /** روز (به زبان و تقویمِ برگزیده) و ساعت — صندوق و گزارش‌ها */

@@ -60,13 +60,7 @@ object HistoryModel {
   const val FREE_ITEM = "قلم آزاد"
 
   /** روزِ پیش از `today` (`yyyy-MM-dd`) — برای سرخطِ «دیروز» */
-  fun yesterday(today: String): String {
-    val parts = today.split('-').mapNotNull { it.toIntOrNull() }
-    if (parts.size != 3) return ""
-    val c = java.util.GregorianCalendar(parts[0], parts[1] - 1, parts[2])
-    c.add(java.util.Calendar.DAY_OF_MONTH, -1)
-    return String.format(java.util.Locale.US, "%04d-%02d-%02d", c.get(java.util.Calendar.YEAR), c.get(java.util.Calendar.MONTH) + 1, c.get(java.util.Calendar.DAY_OF_MONTH))
-  }
+  fun yesterday(today: String): String = ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, -1).orEmpty()
 
   /** ماه‌هایی که واقعاً فاکتور دارند، تازه‌ترین اول */
   fun months(d: ShopData): List<String> =
