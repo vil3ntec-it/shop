@@ -5,7 +5,8 @@
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.orders` در «تنظیماتِ زنده» فقط
  * `GET /config` جواب می‌دهد (تا برنامه بداند بخش را نشان ندهد).
  * ⛔ خواندن با اشتراکِ تمام‌شده هم باز است (داده گروگان نیست)؛ نوشتن
- * کلیدِ اشتراکِ `online_orders` را هم می‌خواهد.
+ * کلیدِ اشتراکِ `online_orders` را هم می‌خواهد. با `shop.orders.subscribers_only` روشن، گذار و
+ * بازپرداختِ سفارشِ **موجود** به اشتراک بسته نیست (`existingOrder`)؛ ساختِ سفارش همان قاعده.
  * ⛔ shop_id فقط از عضویتِ کاربرِ توکن می‌آید، هرگز از درخواست.
  *
  * زیرِ پیشوندِ موجودِ `/shop` است، پس `ACCOUNT_PREFIXES`ِ پنلِ خانگی
@@ -35,9 +36,16 @@ const needFlag = wrap(async (req, res, next) => {
   next();
 });
 
+/**
+ * سفارشِ موجود (گذار، بازپرداخت) — نه ساختِ سفارش. با `shop.orders.subscribers_only` روشن
+ * سفارشی که پیش از پایانِ اشتراک ثبت شده جلو می‌رود (تصمیمِ ۱۴۰۵/۰۸/۰۸)؛ خاموش ⇒ رفتارِ پیشین.
+ */
+const existingOrder = (req, res, next) => { req.existingOrder = true; next(); };
+
 /** نوشتن: پرچم + کلیدِ اشتراک (همان پیام‌های `requireFeature`). */
 const needWrite = wrap(async (req, res, next) => {
   const { entitled, ent } = await orders.entitledOf(req.shopId);
+  if (!entitled && req.existingOrder && (await orders.intakeOf(req.shopId, ent)).gated) return next();
   if (!entitled) {
     const err = ent.trial.used && !ent.trial.active
       ? forbidden('اشتراکِ این دکان به پایان رسیده است.', 'subscription_expired')
@@ -141,7 +149,7 @@ router.post('/', needFlag, requirePermission('orders.create'), needWrite, wrap(a
   res.status(201).json({ order: out.order });
 }));
 
-router.post('/:id/transition', needFlag, requirePermission('orders.manage'), needWrite, wrap(async (req, res) => {
+router.post('/:id/transition', needFlag, requirePermission('orders.manage'), existingOrder, needWrite, wrap(async (req, res) => {
   //  دفترِ بازپرداخت روشن ⇒ «بازپرداخت‌شده» بی مبلغ پذیرفته نیست؛ فقط از راهِ `/refunds`
   if (S.MONEY_TARGETS.includes(String(req.body?.to || '').trim()) && (await refunds.flagOf(req.shopId))) {
     throw conflict('بازپرداخت را با مبلغش از «ثبتِ بازپرداخت» بزنید', 'refund_via_ledger');
@@ -178,7 +186,7 @@ const needLedger = wrap(async (req, res, next) => {
   next();
 });
 
-router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWrite, needLedger, wrap(async (req, res) => {
+router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), existingOrder, needWrite, needLedger, wrap(async (req, res) => {
   const key = orders.clientKeyOf(req);
   let out;
   try {

@@ -6,6 +6,8 @@
  *           `shop.storefront` در «تنظیماتِ زنده» (+ کلیدهای اشتراکِ
  *           `online_orders` و `storefront`) و `enabled` ِ خودِ دکان. هر کدام
  *           نباشد ⇒ نشانیِ عمومی ۴۰۴، درست مثلِ نشانیِ ناموجود.
+ *           `shop.orders.subscribers_only` روشن ⇒ اشتراک فقط «سفارش می‌پذیرد؟» را
+ *           می‌گوید (`accepting`)، نه بودنِ نشانی (`stateOf`).
  *   نشانی ─ D-06: `{slug}.vill3n.top` (پیشنهادِ خودِ مشخصات)؛ `/store/<slug>`
  *           همان صفحه روی هر میزبانی است، برای پیش از DNS ِ ستاره‌دار.
  *   کالا ── فقط کالایی که دکان «در ویترین» گذاشته (`storefront_products`)،
@@ -109,13 +111,32 @@ function slugOf(v) {
 //  روشن یا خاموش
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ * `enabled` = نشانیِ عمومی باز است؛ `accepting` = سفارشِ تازه می‌گیرد.
+ * ⛔ `shop.orders.subscribers_only` (`orders.intakeOf` با کلیدِ ویترین) روشن ⇒ سفارشِ تازه فقط با
+ * اشتراکِ فعال که هر دو کلید را دارد، و ویترین بی اشتراک هم **فقط‌خواندنی** باز می‌ماند تا سفارش‌های پیشین پیگیری و
+ * لغو شوند و مشتری «سفارش نمی‌پذیرد» را ببیند، نه «پیدا نشد». خاموش ⇒ همان رفتارِ پیشین.
+ */
 async function stateOf(shopId) {
   const [ordersFlag, storefrontFlag, { ent }] = await Promise.all([
     orders.flagOf(shopId), orders.flagOf(shopId, FLAG_KEY), orders.entitledOf(shopId),
   ]);
   const flag = ordersFlag && storefrontFlag;
   const entitled = ent.features.includes(FEATURE_KEY) && ent.features.includes(orders.FEATURE_KEY);
-  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ent };
+  const intake = await orders.intakeOf(shopId, ent, [FEATURE_KEY]);
+  const enabled = flag && (entitled || intake.gated);
+  return {
+    flag, ordersFlag, storefrontFlag, entitled, enabled,
+    accepting: enabled && intake.accepting,
+    subscribersOnly: intake.gated, subscribed: intake.subscribed,
+    ent,
+  };
+}
+
+/** «سفارش می‌پذیرد؟» برای نمای عمومی — بی هیچ حرفی از اشتراک (`open` آن را روی ردیف می‌گذارد). */
+function orderingOf(sf) {
+  if (sf.accepting !== false) return { accepting: true };
+  return { accepting: false, code: orders.NOT_ACCEPTING, message: orders.NOT_ACCEPTING_MESSAGE };
 }
 
 /** ویترینِ عمومی — یا ۴۰۴؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب‌اند. */
@@ -132,7 +153,9 @@ async function open(slug) {
     [s]
   );
   if (!row || row.enabled !== true || row.shop_status !== 'active' || row.trust_suspended === true) throw gone();
-  if (!(await stateOf(row.shop_id)).enabled) throw gone();
+  const st = await stateOf(row.shop_id);
+  if (!st.enabled) throw gone();
+  row.accepting = st.accepting;
   return row;
 }
 
@@ -692,7 +715,8 @@ async function checkout(sf, { key, body, ticket, session }) {
   const zonesOn = await sfd.flagOn(sf.shop_id);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
   const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn }), { shopId: sf.shop_id, phone: verified });
-  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
+  //  دروازهٔ اشتراک (`orders.intakeOf`) با کلیدِ ویترین هم — درونِ تراکنشِ `create`
+  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });
   return {
     order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id)), replayed: out.replayed,
     orderId: out.order.id,
@@ -1203,7 +1227,7 @@ function slugFromHost(host) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
-  normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
+  normalize, slugOf, slugFromHost, stateOf, orderingOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,

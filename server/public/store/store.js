@@ -76,7 +76,7 @@
       box.appendChild(el('span', { text: t('sh.local', { t: K.fa(Number(s.localTime.slice(0, 2)), 0) + ':' + K.fa(Number(s.localTime.slice(3)), 0).padStart(2, K.fa(0, 0)) }) }));
       //  ۳۱.۱: زمانِ آخرین تأییدِ اتصال فقط با زمانِ واقعیِ ثبت‌شده
       box.appendChild(el('span', { text: s.lastConfirmedAt ? t('sh.seen', { t: K.clock(s.lastConfirmedAt, s.timezone) }) : t('sh.unseen') }));
-      box.appendChild(el('span', { class: 'accept', text: K.accept(s.orderAcceptance) }));
+      box.appendChild(el('span', { class: 'accept', text: accept(s) }));
       if (s.notice) box.appendChild(el('span', { class: 'notice', text: s.notice }));
     }
     var meta = K.clear($('store-meta'));
@@ -84,8 +84,10 @@
     if (store.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (store.minOrderMinor > 0) meta.appendChild(el('span', { text: t('min.order', { m: K.money(store.minOrderMinor) }) }));
     meta.appendChild(el('span', {}, K.icon('cash'), t('cod')));
-    $('accept-line').textContent = s ? K.accept(s.orderAcceptance) : '';
+    $('accept-line').textContent = s || closed() ? accept(s) : '';
   }
+  function closed() { return Boolean(store && store.ordering && store.ordering.accepting === false); }
+  function accept(s) { return closed() ? t('err.store_not_accepting_orders') : K.accept(s.orderAcceptance); }
 
   // ── کاتالوگ ──
   function renderCats() {
@@ -297,7 +299,8 @@
     d.append(el('span', { class: 'ico' }, K.icon(f === 'delivery' ? 'truck' : 'box')), txt);
     $('sheet-total').textContent = K.money(sub + fee);
     var block = '';
-    if (hasBad()) block = t('cart.bad');
+    if (closed()) block = accept();
+    else if (hasBad()) block = t('cart.bad');
     else if (store && store.minOrderMinor > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
@@ -358,7 +361,7 @@
     renderVerify();
     var ok = verifiedFor($('c-phone').value);
     var btn = $('submit-order');
-    btn.disabled = !ids().length || !f || below || hasBad() || !ok;
+    btn.disabled = closed() || !ids().length || !f || below || hasBad() || !ok;
     btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
   }
 
@@ -473,6 +476,10 @@
         d.unavailable.forEach(function (id) { if (cart[id]) cart[id].unavailable = true; });
         saveCart();
         K.note(msg, 'err', e.message);
+      } else if (e.code === 'store_not_accepting_orders') {
+        store.ordering = { accepting: false };
+        renderHead();
+        K.note(msg, 'warn', e.message);
       } else if (e.code === 'qty_over_limit') {
         K.note(msg, 'err', e.message + ' (' + t('maxq', { q: K.qty(d.maxQtyMilli) }) + ')');
       } else if (e.code === 'below_min_order') {

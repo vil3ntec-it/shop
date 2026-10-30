@@ -63,7 +63,8 @@ router.get('/:slug', readLimit, store, wrap(async (req, res) => {
     sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
   ]);
   res.json({
-    store: { ...sf.profile(req.store, cats, status), delivery },
+    //  `ordering.accepting: false` ⇒ دکمهٔ ثبت خاموش با همان پیام؛ ثبت را `orders.create` می‌بندد
+    store: { ...sf.profile(req.store, cats, status), delivery, ordering: sf.orderingOf(req.store) },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },

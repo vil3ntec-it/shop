@@ -115,6 +115,7 @@
   "accept.accepting": "Your order reaches the shop right away.",
   "accept.delayed": "Your order will be placed, but the shop may review it a bit later.",
   "accept.later": "Your order will be placed and reviewed when the shop opens.",
+  "err.store_not_accepting_orders": "This shop isn't taking online orders right now",
   "hours.off": "Closed today",
   "hours.today": "Today {h}",
   "sh.local": "Shop time {t}",
