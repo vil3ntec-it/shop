@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductImportPlan
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.money
@@ -753,6 +754,86 @@ object WarehouseEngine {
       }
     }
     return Result.Ok(data, lastId)
+  }
+
+  /**
+   *  PRD-20: ورودِ کالا از Excel/CSV با پیش‌نمایش (فقط با `ShopPolicy.productTools`).
+   *
+   *  • پیش‌نمایش دوباره روی **همین** دفتر ساخته و با آنچه کاربر دید (`previewed`) سنجیده می‌شود؛ هر فرقی
+   *    (همگام‌سازی در این فاصله کالایی آورد، یا دکمه دو بار زده شد) ⇒ رد، بی هیچ نوشتن. پس همان پیش‌نمایش
+   *    هرگز دو بار نوشته نمی‌شود و ورودِ دوبارهٔ همان فایل چیزی برای نوشتن ندارد (همه SAME).
+   *  • NEW با همان `addProduct` ِ فرم؛ UPDATE با همان `editProduct` و **فقط** `changes` ِ پیش‌نمایش (خانهٔ
+   *    خالی، قیمتِ گردشدهٔ خروجیِ خودِ برنامه و واحد دست نمی‌خورند؛ بارکد فقط افزوده)، با کاربر و دلیلِ
+   *    «ورود از فایلِ …» در سابقه و `priceHistory` (PRD-14). یا همه یا هیچ.
+   *  • یک ردیفِ `product_import` در سابقه (سابقهٔ واردسازی): نامِ فایل، شمارها و اثرِ انگشت در `refId`.
+   */
+  fun importProducts(
+    d: ShopData,
+    rows: List<List<String>>,
+    previewed: ProductImportPlan.Plan,
+    fileName: String,
+    by: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    val plan = ProductImport.planOf(d, rows, previewed.update)
+    if (plan != previewed) return Result.Failed("کالاهای دکان در این فاصله عوض شد — پیش‌نمایش را دوباره ببینید")
+    plan.problem?.let { return Result.Failed(it) }
+    if (plan.writes == 0) return Result.Failed("چیزی برای ثبت نیست — کالاهای این فایل از قبل در دکان‌اند")
+    val who = by.trim().ifEmpty { null }
+    val file = fileName.trim().ifEmpty { "بی‌نام" }
+    var data = d
+    var lastId = ""
+    for (r in plan.rows) {
+      val step = when (r.status) {
+        ProductImportPlan.Status.NEW -> addProduct(data, ProductDraft(
+          name = r.name,
+          category = r.category.orEmpty(),
+          unit = r.unit.orEmpty(),
+          purchasePrice = (r.purchaseMinor ?: 0L) / 100.0,
+          salePrice = (r.saleMinor ?: 0L) / 100.0,
+          minStock = (r.minMilli ?: 0L) / 1000.0,
+          barcodes = r.barcodes,
+        ), now, newId)
+        ProductImportPlan.Status.UPDATE -> {
+          val p = data.products.firstOrNull { it.id == r.existingId }
+            ?: return Result.Failed("ردیفِ ${plain(r.line)}: کالا پیدا نشد")
+          var category = p.category
+          var buy = p.purchasePrice
+          var sell = p.salePrice
+          var min = p.minStock
+          var codes = p.barcodes
+          for (c in r.changes) when (c) {
+            is ProductImportPlan.Change.Text -> if (c.col == ProductImportPlan.Col.CATEGORY) category = c.new
+            is ProductImportPlan.Change.Price ->
+              if (c.col == ProductImportPlan.Col.PURCHASE) buy = c.newMinor / 100.0 else sell = c.newMinor / 100.0
+            is ProductImportPlan.Change.MinStock -> min = c.newMilli / 1000.0
+            is ProductImportPlan.Change.AddBarcodes -> codes = codes + c.codes
+          }
+          editProduct(data, p.id, ProductDraft(
+            name = p.name, category = category, unit = p.unit, purchasePrice = buy, salePrice = sell, minStock = min,
+            barcodes = codes, changedBy = who, reason = "ورود از فایلِ «$file»",
+          ), today, now, newId)
+        }
+        else -> continue
+      }
+      when (step) {
+        is Result.Failed -> return Result.Failed("ردیفِ ${plain(r.line)}: ${step.message}")
+        is Result.Ok -> { data = step.data; lastId = step.id }
+      }
+    }
+    val n = { s: ProductImportPlan.Status -> plain(plan.count(s)) }
+    val notes = "ورود از فایلِ «$file»: ${n(ProductImportPlan.Status.NEW)} کالای تازه، ${n(ProductImportPlan.Status.UPDATE)} به‌روز، " +
+      "${plain(plan.count(ProductImportPlan.Status.SAME) + plan.count(ProductImportPlan.Status.KEPT))} از پیش در دکان، " +
+      "${n(ProductImportPlan.Status.ERROR)} ردیفِ رد"
+    return Result.Ok(
+      data.copy(auditLog = data.auditLog + AuditEntry(
+        id = newId(), type = ProductImport.AUDIT_TYPE, date = today, refId = ProductImport.refOf(plan.fingerprint),
+        notes = notes, createdAt = now, by = who,
+      )),
+      id = lastId,
+    )
   }
 
   /**
