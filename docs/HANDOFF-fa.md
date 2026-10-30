@@ -54,6 +54,19 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۸–۰۹ — شاخه‌های `claude/spec-crm2-1..4` (باقی‌ماندهٔ CRM/RET/STF)
+- انجام شد: crm2-1 = تأییدِ برگشت با «برگهٔ امضاشده» و PINِ مدیر/صاحب، سقفِ تجمعیِ فاکتور مثلِ سرور (RET-04، RET-10، بخشِ برگشتِ
+  STF-02؛ `core/perm/ReturnApprovals`)؛ crm2-2 = شمارهٔ دوم، برچسب و صافی، دکمهٔ ادغامِ تکراری‌ها در صفحه‌های قدیمِ گوشی و کامپیوتر
+  (CRM-02، CRM-10، CRM-11)؛ crm2-3 = تصویرِ صورت‌حساب (CRM-05؛ `core/receipt/StatementLayout`)؛ crm2-4 = همان «تصویرِ صورت‌حساب» در کشوی
+  حسابِ نسخهٔ ۳ (PR روی `ccr-3a0d593c-ac0jpj-v3-foundation`، فایل‌های تازه بایت‌به‌بایت همان). همه پشتِ تنظیم‌های خاموشِ موجود
+  (`ReturnSettings`، `ShopPolicy.crmReports`). مهاجرت ندارند.
+- روشِ آزمون روی ماشینِ مشترک: دیمنِ Gradle زیرِ بار کشته می‌شد؛ آزمون‌های data با کامپایلرِ Kotlin ِ کشِ Gradle (2.2.20 + serialization)
+  مستقیماً روی بستهٔ واقعیِ data و `core` اجرا شد (فقط `ShopStore.stock/debt` و `LocaleChoice` شبیه‌سازی). صفحه‌ها فقط در CI.
+- نیمه‌کاره: CRM-07 (پیوندِ سفارشِ اینترنتی به مشتری با کلیدِ شمارهٔ نرمال و هر دو شماره در `OrderFulfillment`) — به‌خاطرِ کارِ هم‌زمانِ
+  `claude/online-refund-ledger` روی همان مسیر دست نخورد؛ CRM-15 (کلیدِ مجوزِ دیدنِ تماسِ مشتری روی طرحِ ۷نقشیِ #336 و سابقهٔ دسترسی)؛
+  STF-01/04 منتظرِ #336، STF-02 برای لغو (برگهٔ لغو با برگهٔ تخفیف در یک `Sale.approval` جا نمی‌شود)، STF-03 (سقفِ تغییرِ قیمت)، STF-09 (زنجیرهٔ سابقهٔ دستگاه).
+- قدمِ بعدی: CI و بازبینیِ چهار PR؛ پس از مرج، یک خط در برگهٔ برگشتِ نسخهٔ ۳ (#391): `permDecision(..., priorMinor)`.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
