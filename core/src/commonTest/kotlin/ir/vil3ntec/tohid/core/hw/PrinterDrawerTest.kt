@@ -149,7 +149,7 @@ class PrinterDrawerTest {
     return -1
   }
 
-  @Test fun `برگه دوروشی - اول ستونی، ESC @ میانی، بعد رستری، برش و بی کشو`() {
+  @Test fun `برگه دوروشی - اول ستونی، آغاز دوباره در میان، بعد رستری، برش و بی کشو`() {
     val profile = PrinterProfile(paperDots = 384, drawer = true)
     val col = sample(384, 24)
     val ras = sample(384, 24)
