@@ -88,6 +88,8 @@ data class StorefrontConfigDto(
   val permissions: StorefrontPermsDto = StorefrontPermsDto(),
   /** پرچمِ جدای ناحیه و زمان‌بندی (`shop.storefront.zones`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val zones: Boolean = false,
+  /** M3: پرچمِ جدای لوگو و تصویرِ سر (`shop.storefront.media`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val media: Boolean = false,
 )
 
 @Serializable
