@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid
 import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.data.ReportBridge
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import java.util.Calendar
 import java.util.GregorianCalendar
@@ -49,6 +50,20 @@ class ShopDayWiringTest {
     val c = at(2026, 10, 14, 1, 30)
     assertEquals("2026-10-13", todayIsoAt(c, 2))
     assertEquals(14, c.get(Calendar.DAY_OF_MONTH))
+  }
+
+  @Test
+  fun `دیروز یک روز پیش از روزِ کاری است نه همان`() {
+    //  ۱:۳۰ با پایانِ ۲: امروز = ۱۳ ⇒ دیروز = ۱۲ (دیروزِ تقویمی ۱۳ بود، یعنی همان «امروز»)
+    assertEquals("2026-10-12", yesterdayIsoAt(at(2026, 10, 14, 1, 30), 2))
+    assertEquals("2026-10-13", yesterdayIsoAt(at(2026, 10, 14, 2, 0), 2))
+    assertEquals("2026-10-13", yesterdayIsoAt(at(2026, 10, 14, 1, 30), ShopDay.OFF))
+    assertEquals("2026-12-30", yesterdayIsoAt(at(2027, 1, 1, 0, 30), 1))
+    assertEquals("2024-02-28", yesterdayIsoAt(at(2024, 3, 1, 3, 0), 4))
+    for (h in ShopDay.CHOICES) for (hour in 0..23) {
+      val c = at(2026, 10, 14, hour, 45)
+      assertNotEquals("پایانِ $h ساعتِ $hour", todayIsoAt(c, h), yesterdayIsoAt(c, h))
+    }
   }
 
   @Test

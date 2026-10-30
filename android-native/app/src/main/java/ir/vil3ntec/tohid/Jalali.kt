@@ -155,6 +155,18 @@ internal fun todayIsoAt(now: Calendar, dayEndHours: Int): String {
 }
 
 /**
+ *  دیروزِ دکان: یک روز پیش از [todayIso] — دکمهٔ «دیروز» ِ کادرهای تاریخ. با «پایانِ روزِ کاری»
+ *  ساعتِ ۱:۳۰ ِ بامداد «امروز» خودش دیروزِ تقویمی است، پس «دیروز» یک روز پیش از آن است، نه همان.
+ */
+fun yesterdayIso(): String = yesterdayIsoAt(Calendar.getInstance(), ShopDayChoice.hours)
+
+/** همان `yesterdayIso` برای یک لحظهٔ معین (آزمون‌پذیر) */
+internal fun yesterdayIsoAt(now: Calendar, dayEndHours: Int): String {
+  val today = todayIsoAt(now, dayEndHours)
+  return CivilDays.addDays(today, -1) ?: today
+}
+
+/**
  *  نامِ ماه‌های خورشیدی — برای برچسبِ ماه، نه برای تاریخِ کامل.
  *
  *  دری یا پشتو، به انتخابِ دکان (`LocaleChoice.months`، LOC-01)؛ پیش‌فرض دری،

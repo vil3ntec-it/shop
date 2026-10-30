@@ -232,11 +232,5 @@ private fun entryLatinDigits(text: String): String = text.map { c ->
   }
 }.joinToString("")
 
-private fun entryYesterdayIso(): String {
-  val c = java.util.Calendar.getInstance()
-  c.add(java.util.Calendar.DAY_OF_MONTH, -1)
-  val y = c.get(java.util.Calendar.YEAR)
-  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
-  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
-  return "$y-$m-$d"
-}
+/** یک روز پیش از «امروز» ِ دکان (LOC-03: با «پایانِ روزِ کاری» از روزِ کاری، نه از تقویم) */
+private fun entryYesterdayIso(): String = ir.vil3ntec.tohid.yesterdayIso()
