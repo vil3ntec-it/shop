@@ -15,7 +15,7 @@ const path = require('path');
 const zlib = require('zlib');
 const { spawn } = require('child_process');
 const { pipeline } = require('stream/promises');
-const { Transform } = require('stream');
+const { Transform, Writable } = require('stream');
 const { createCipheriv, createDecipheriv, randomBytes, scryptSync, createHash } = require('crypto');
 const config = require('../config');
 const db = require('../db');
@@ -59,13 +59,105 @@ function warnUnencrypted(kind) {
   }).catch(() => {});
 }
 
+/**
+ * SEC-07 — «پشتیبانِ سرور اجباراً رمزدار» (بخشِ ۱۰، رمزگذاری). پشتِ پرچمِ
+ * `security / backup.require_encryption` در live_config، **خاموش به‌طورِ پیش‌فرض**
+ * (همان درِ `hashchain.audit`؛ فقط مدیرِ ارشد می‌نویسد). روشن ⇒
+ *   • بی BACKUP_PASSPHRASE هیچ فایلی (نه متنِ ساده، نه .part) ساخته نمی‌شود؛ اجرا با
+ *     `backup_passphrase_required` شکست می‌خورد و خبرِ `backup.refused_unencrypted` می‌ماند
+ *   • موفقیت فقط پس از بازگشاییِ همان فایل (رمزگشایی + gzip، شمارِ بایت = خروجیِ dump)
+ *   • شکستِ هر کدام ⇒ هرس نمی‌شود، پس پشتیبانِ سالمِ قبلی می‌ماند
+ * خاموش ⇒ رفتارِ F0-08 بی کم‌وکاست (پرسشِ پرچم هم اگر نشد، خاموش حساب می‌شود).
+ */
+const STRICT_SCOPE = 'security';
+const STRICT_KEY = 'backup.require_encryption';
+const REFUSED_WARNING = 'پشتیبانِ رمزدار اجباری است و BACKUP_PASSPHRASE روی سرور تنظیم نشده؛ پشتیبان ساخته نشد و پشتیبان‌های قبلی دست نخوردند.';
+
+async function encryptionRequired() {
+  try {
+    const r = await db.one('SELECT value FROM live_config WHERE scope=$1 AND key=$2', [STRICT_SCOPE, STRICT_KEY]);
+    return require('./hash-chain-store').flagOn(r && r.value);
+  } catch { return false; }
+}
+
+function backupError(status, code, message) {
+  const e = new Error(message);
+  e.status = status;
+  e.code = code;
+  e.expose = true;
+  return e;
+}
+
+function refuseUnencrypted(kind) {
+  console.error(`[backup] ⛔ ${kind}: پشتیبانِ رمزدار اجباری است و BACKUP_PASSPHRASE نیست — پشتیبان ساخته نشد.`);
+  require('./audit').log({
+    actorType: 'system', action: 'backup.refused_unencrypted', detail: { kind },
+  }).catch(() => {});
+  return backupError(409, 'backup_passphrase_required', REFUSED_WARNING);
+}
+
+/**
+ * بازگشاییِ آزمایشیِ فایلِ تازه (SEC-07): رمزگشایی با برچسبِ GCM و gzip، جریانی و بی
+ * نگه‌داشتنِ کلِ فایل در حافظه. شمارِ بایت‌های بازشده باید با خروجیِ dump یکی باشد.
+ * @returns {Promise<number>} شمارِ بایت‌های بازشده
+ */
+async function verifyFile(file, expectRawBytes) {
+  const fh = await fsp.open(file, 'r');
+  let streams;
+  try {
+    const { size } = await fh.stat();
+    const head = Buffer.alloc(MAGIC.length + 28);
+    await fh.read(head, 0, head.length, 0);
+    if (head.subarray(0, MAGIC.length).toString() === MAGIC) {
+      if (!config.backup.passphrase) throw new Error('فایل رمز دارد و BACKUP_PASSPHRASE نیست');
+      if (size <= MAGIC.length + 28 + 16) throw new Error('فایلِ رمزدار کوتاه است');
+      const tag = Buffer.alloc(16);
+      await fh.read(tag, 0, 16, size - 16);
+      const decipher = createDecipheriv('aes-256-gcm',
+        keyFrom(config.backup.passphrase, head.subarray(7, 23)), head.subarray(23, 35));
+      decipher.setAuthTag(tag);
+      streams = [fs.createReadStream(file, { start: MAGIC.length + 28, end: size - 17 }), decipher];
+    } else {
+      streams = [fs.createReadStream(file)];
+    }
+  } finally {
+    await fh.close();
+  }
+  let raw = 0;
+  const sink = new Writable({ write(chunk, _enc, cb) { raw += chunk.length; cb(); } });
+  await pipeline(...streams, zlib.createGunzip(), sink);
+  if (raw < 100) throw new Error('فایل باز شد ولی تقریباً خالی است');
+  if (expectRawBytes != null && raw !== expectRawBytes) {
+    throw new Error(`شمارِ بایتِ بازشده (${raw}) با خروجیِ dump (${expectRawBytes}) یکی نیست`);
+  }
+  return raw;
+}
+
+/** فایلِ موقت را می‌سنجد؛ ناسالم ⇒ پاک و شکست، و هرس هم نمی‌شود. */
+async function verifyOrDrop(tmp, kind, expectRawBytes) {
+  try {
+    return await verifyFile(tmp, expectRawBytes);
+  } catch (err) {
+    await fsp.rm(tmp, { force: true });
+    console.error(`[backup] ⛔ ${kind}: پشتیبانِ تازه باز نشد و کنار رفت: ${err.message}`);
+    require('./audit').log({
+      actorType: 'system', action: 'backup.verify_failed', detail: { kind },
+    }).catch(() => {});
+    throw backupError(500, 'backup_verify_failed',
+      'پشتیبانِ تازه پس از ساخت باز نشد و کنار رفت؛ پشتیبان‌های قبلی دست نخوردند.');
+  }
+}
+
 async function run({ kind = 'manual', dir = null } = {}) {
   if (!KINDS.includes(kind)) throw new Error('نوع پشتیبان معتبر نیست');
-  await ensureDirs();
 
   const encrypted = !!config.backup.passphrase;
+  //  ⛔ پیش از ensureDirs: ردشده هیچ ردی روی دیسک نمی‌گذارد
+  const strict = await encryptionRequired();
+  if (strict && !encrypted) throw refuseUnencrypted(kind);
+  await ensureDirs();
   if (!encrypted) warnUnencrypted(kind);
-  if (db.isPglite()) return runPglite({ kind, dir, encrypted });
+  if (db.isPglite()) return runPglite({ kind, dir, encrypted, strict });
   const base = `shop-${stamp()}.sql.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
@@ -138,16 +230,19 @@ async function run({ kind = 'manual', dir = null } = {}) {
     throw new Error(`pg_dump چیزی نداد — پشتیبان ساخته نشد. ${stderr.trim().slice(0, 300)}`);
   }
 
+  //  SEC-07: «موفق» فقط پس از بازگشاییِ همین فایل؛ ناسالم ⇒ پاک و بی هرس
+  const verified = strict ? { verified: true, rawBytes: await verifyOrDrop(tmp, kind, rawBytes) } : {};
+
   await fsp.rename(tmp, target);
   const stat = await fsp.stat(target);
   const sha = createHash('sha256').update(await fsp.readFile(target)).digest('hex');
   await fsp.writeFile(`${target}.meta.json`, JSON.stringify({
     file: base, kind, createdAt: Date.now(), bytes: stat.size,
-    encrypted, sha256: sha, format: 'pg_dump-plain-gzip', app: 'shop-server', version: 2,
+    encrypted, sha256: sha, format: 'pg_dump-plain-gzip', app: 'shop-server', version: 2, ...verified,
   }, null, 2));
 
   await prune(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
+  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, ...verified };
 }
 
 /**
@@ -158,7 +253,7 @@ async function run({ kind = 'manual', dir = null } = {}) {
  * ⚠️ همان رمزنگاری و همان meta.json، تا فهرست و دانلودِ پنل فرقی نبیند؛
  * فقط پسوند `.pglite.tar.gz` است، نه `.sql.gz`، چون SQLِ متنی نیست.
  */
-async function runPglite({ kind, dir, encrypted }) {
+async function runPglite({ kind, dir, encrypted, strict = false }) {
   const base = `shop-${stamp()}.pglite.tar.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
@@ -174,15 +269,17 @@ async function runPglite({ kind, dir, encrypted }) {
     out = Buffer.concat([Buffer.from(MAGIC), salt, iv, cipher.update(raw), cipher.final(), cipher.getAuthTag()]);
   }
   await fsp.writeFile(tmp, out);
+  //  SEC-07: همان سنجشِ مسیرِ pg_dump — رمزگشایی + gzip ِ همان tar ِ PGlite، پیش از rename
+  const verified = strict ? { verified: true, rawBytes: await verifyOrDrop(tmp, kind, null) } : {};
   await fsp.rename(tmp, target);
   const stat = await fsp.stat(target);
   const sha = createHash('sha256').update(out).digest('hex');
   await fsp.writeFile(`${target}.meta.json`, JSON.stringify({
     file: base, kind, createdAt: Date.now(), bytes: stat.size,
-    encrypted, sha256: sha, format: 'pglite-datadir-tar-gzip', app: 'shop-server', version: 2,
+    encrypted, sha256: sha, format: 'pglite-datadir-tar-gzip', app: 'shop-server', version: 2, ...verified,
   }, null, 2));
   await prune(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
+  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, ...verified };
 }
 
 /** نگه داشتن تعداد مشخصی از هر نوع و پاک کردن قدیمی‌ترها. */
@@ -286,4 +383,7 @@ function schedule() {
   return timer;
 }
 
-module.exports = { run, list, prune, restore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING };
+module.exports = {
+  run, list, prune, restore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING,
+  STRICT_SCOPE, STRICT_KEY, REFUSED_WARNING, encryptionRequired, verifyFile,
+};

@@ -715,9 +715,14 @@ router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
   //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
   const configured = !!config.backup.passphrase;
+  //  SEC-07: `required` = پرچمِ `security / backup.require_encryption` (بی رمز ⇒ پشتیبان نمی‌سازد)
+  const required = await backup.encryptionRequired();
   res.json({
     backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
-    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+    encryption: {
+      configured, required,
+      warning: configured ? '' : (required ? backup.REFUSED_WARNING : backup.UNENCRYPTED_WARNING),
+    },
   });
 });
 
