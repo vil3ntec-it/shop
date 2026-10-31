@@ -502,6 +502,32 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== سقفِ اعتبار در صندوق (CRM-03، S07، پیش‌فرض خاموش) ============== */
+    item {
+      var creditGate by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Lock,
+        title = StrShell.creditGate,
+        subtitle = if (creditGate) StrShell.creditGateOn else StrSettings.off,
+        tint = if (creditGate) Shop.colors.warning else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.creditGateNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (creditGate) "on" else "off",
+          onSelect = {
+            creditGate = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setCreditGate(context, creditGate)
+          },
+        )
+      }
+    }
+
     /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
     //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
     //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
