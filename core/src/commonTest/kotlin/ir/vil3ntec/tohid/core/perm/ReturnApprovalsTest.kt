@@ -50,6 +50,23 @@ class ReturnApprovalsTest {
   }
 
   @Test
+  fun deviceLimitIsCumulativePerInvoiceLikeTheRoleCap() {
+    //  سقفِ دستگاه ۱۰۰۰ افغانی: یک سندِ ۱۱۰۰ و سه سندِ ۳۰۰+۴۰۰+۴۰۰ هر دو بالای سقف‌اند
+    assertTrue(ReturnApprovals.overDeviceLimit(0L, 110_000L, 100_000L))
+    assertFalse(ReturnApprovals.overDeviceLimit(0L, 30_000L, 100_000L))
+    assertFalse(ReturnApprovals.overDeviceLimit(30_000L, 40_000L, 100_000L))
+    assertTrue(ReturnApprovals.overDeviceLimit(70_000L, 40_000L, 100_000L))
+    //  درست همان سقف آزاد است؛ یک پول بیشتر نه
+    assertFalse(ReturnApprovals.overDeviceLimit(70_000L, 30_000L, 100_000L))
+    assertTrue(ReturnApprovals.overDeviceLimit(70_000L, 30_001L, 100_000L))
+    //  سقفِ ۰ یا منفی ⇒ بی سقف؛ پیشینِ منفی صفر؛ جمعِ بزرگ سرریز نمی‌کند و بالای سقف است
+    assertFalse(ReturnApprovals.overDeviceLimit(Long.MAX_VALUE, 1L, 0L))
+    assertFalse(ReturnApprovals.overDeviceLimit(Long.MAX_VALUE, 1L, -5L))
+    assertFalse(ReturnApprovals.overDeviceLimit(-50_000L, 30_000L, 30_000L))
+    assertTrue(ReturnApprovals.overDeviceLimit(Long.MAX_VALUE - 1, 5L, 100_000L))
+  }
+
+  @Test
   fun onlyManagerOrOwnerApproveAndOverCapNeedsOwner() {
     assertTrue(ReturnApprovals.approverCovers("manager", "manager"))
     assertTrue(ReturnApprovals.approverCovers("owner", "manager"))

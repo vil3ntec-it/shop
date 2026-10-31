@@ -135,6 +135,12 @@ internal class SyncRebuild(private val io: Io) {
       return SyncEngine.withInvoiceCursor(LedgerDiff.fromJson(LedgerDiff.unionRows(LedgerDiff.toJson(server), JsonObject(fresh))))
     }
 
+    /** مجموعه ⇐ شناسهٔ ردیف‌ها — برای `RestoreRoute.notOnServer` (پیامِ بازیابیِ دستگاهِ همگام، S143) */
+    fun rowIds(d: ShopData): Map<String, List<String>> {
+      val tree = LedgerDiff.toJson(d)
+      return LedgerDiff.COLLECTIONS.associateWith { key -> (tree[key] as? JsonArray).orEmpty().mapNotNull { idOf(it) } }
+    }
+
     /**
      *  جابه‌جایی را کسِ دیگری (کارگرِ پس‌زمینه با نمونهٔ دیگرِ `ShopStore`) زودتر تمام کرده؟
      *  نشان و کناری رفته‌اند و دفترِ روی دیسک همان است که این بازسازی گذاشت.

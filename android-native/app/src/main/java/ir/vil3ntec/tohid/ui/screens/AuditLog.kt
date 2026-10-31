@@ -132,6 +132,7 @@ private fun auditLabel(type: String): String = when (type) {
   "product_edit" -> StrExpenses.auditProductEdit
   "shift_open" -> StrExpenses.auditShiftOpen
   "shift_close" -> StrExpenses.auditShiftClose
+  "shift_review" -> StrExpenses.auditShiftReview
   "delete_product" -> StrExpenses.auditDeleteProduct
   "debtor_delete" -> StrExpenses.auditDebtorDelete
   "debt_tx_delete" -> StrExpenses.auditDebtTxDelete

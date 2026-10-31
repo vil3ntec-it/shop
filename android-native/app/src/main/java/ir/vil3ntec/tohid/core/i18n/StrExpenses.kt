@@ -63,6 +63,7 @@ object StrExpenses {
   val auditProductEdit: String get() = t("ویرایش کالا", "Item edited", "د توکي سمون")
   val auditShiftOpen: String get() = t("باز کردن صندوق", "Register opened", "د صندوق پرانیستل")
   val auditShiftClose: String get() = t("بستن صندوق", "Register closed", "د صندوق بندول")
+  val auditShiftReview: String get() = t("بررسیِ اختلافِ صندوق", "Register difference reviewed", "د صندوق د توپیر کتنه")
   val auditDeleteProduct: String get() = t("حذف محصول", "Item deleted", "د توکي لرې کول")
   val auditDebtorDelete: String get() = t("حذف قرض‌دار", "Debtor deleted", "د پوروړي لرې کول")
   val auditDebtTxDelete: String get() = t("حذف تراکنش بدهی", "Debt entry deleted", "د پور د راکړې ورکړې لرې کول")
