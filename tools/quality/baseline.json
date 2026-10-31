@@ -36,7 +36,7 @@
     "server/src/lib/otp.js": 877,
     "server/src/lib/shop-chat.js": 902,
     "server/src/lib/staff-approval.js": 1081,
-    "server/src/lib/storefront.js": 1148,
+    "server/src/lib/storefront.js": 1151,
     "server/src/lib/sync-v3.js": 1198,
     "server/src/routes/auth.js": 1181,
     "server/src/routes/pump-device.js": 917

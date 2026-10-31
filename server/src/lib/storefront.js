@@ -97,6 +97,7 @@ function normalize(s) {
 /** همان نرمال‌سازی، در SQL، روی نامِ کالا. */
 const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
 
+const { SEARCH_FLAG, SEARCH_KEY, searchWhere } = require('./storefront-search');   //  SRCH-01 (شرح همان‌جا)
 function slugOf(v) {
   const s = str(v).toLowerCase();
   if (!SLUG_RE.test(s) || s.includes('--')) {
@@ -245,8 +246,10 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
-  const needle = normalize(text(q, 60));
-  if (needle) {
+  const raw = text(q, 60);
+  const needle = normalize(raw);
+  if (raw && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
+  else if (needle) {
     params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
     where += ` AND ${SQL_NAME} LIKE $${params.length}`;
   }
@@ -1136,7 +1139,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
