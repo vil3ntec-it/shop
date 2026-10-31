@@ -93,6 +93,12 @@ object OrdersLive {
    */
   val review = mutableStateOf<List<Unposted>>(emptyList())
 
+  /**
+   *  بازپرداختی که سندِ برگشتش در این دفتر ننشست (فروشِ تحویل هنوز نرسیده، یا پول به حسابِ مشتری
+   *  می‌رفت) — صفحهٔ «سفارش‌ها» هشدار می‌دهد؛ دورِ بعدِ [reconcile] دوباره می‌کوشد.
+   */
+  val refundIssues = mutableStateOf<List<Unposted>>(emptyList())
+
   /** چند روز پس از کفِ دکان یادآوریِ «همهٔ دستگاه‌ها را به‌روز کنید» دیده می‌شود */
   const val ROLLOUT_NOTICE_MS = 30L * 24 * 3600 * 1000
   const val ROLLOUT_NOTE = "همهٔ دستگاه‌های دکان را به‌روز کنید؛ نسخهٔ قدیم فروشِ سفارش را دستی ثبت می‌کند"
@@ -144,6 +150,12 @@ object OrdersLive {
     return if (o == null) cfg.permissions.saleCancel else OrderFulfillment.allowed(o.copy(action = "reverse"), cfg.permissions)
   }
 
+  /** سندِ برگشتِ بازپرداخت — پرچمِ `refundable` ِ همان سفارش (`returns.create`)، وگرنه نوشتنِ فروش */
+  fun canRefund(cfg: OrdersConfigDto?, o: OrderDto): Boolean {
+    if (cfg == null || !cfg.saleOnHandover) return false
+    return OrderFulfillment.refundAllowed(o, cfg.permissions)
+  }
+
   /** این سفارش منتظرِ دستگاهِ صاحب یا مدیر است (این حساب نمی‌تواند) */
   fun isWaiting(orderId: String): Boolean = waiting.value.any { it.orderId == orderId }
 
@@ -191,13 +203,17 @@ object OrdersLive {
     unposted.value = unposted.value.filterNot { OrderFulfillment.settled(d, it.orderId) }
     waiting.value = waiting.value.filterNot { w ->
       if (w.message.endsWith(REVERSE_WAIT)) OrderFulfillment.saleOf(d, w.orderId)?.status == "cancelled"
+      else if (w.message.endsWith(REFUND_WAIT)) OrderFulfillment.refundedKeys(d, w.orderId).isNotEmpty()
       else OrderFulfillment.settled(d, w.orderId)
     }
+    refundIssues.value = refundIssues.value.filterNot { OrderFulfillment.refundedKeys(d, it.orderId).isNotEmpty() }
     shortfalls.value = shortfalls.value.filter { OrderFulfillment.stillShort(d, it.productIds) }
   }
 
   private const val SALE_WAIT = "ثبتِ فروشِ تحویل"
   private const val REVERSE_WAIT = "لغوِ فروشِ برگشته"
+  private const val REFUND_WAIT = "سندِ برگشتِ بازپرداخت"
+  const val SKIPPED_REFUND_NOTE = "سندِ برگشتِ این بازپرداخت را دستگاهی با اجازهٔ برگشتِ کالا (صاحب یا مدیر) ثبت می‌کند؛ گزارش و صندوق همان‌جا درست می‌شوند."
 
   /**
    *  کارِ یک ردیفِ `GET /shop/orders/handover` در همین دفتر — `sale`: فروشِ تحویل با زمان و روزِ
@@ -209,6 +225,10 @@ object OrdersLive {
     val cfg = config.value
     val reverse = item.action == "reverse"
     if (!store.loaded.value) return@withLock Posted.Failed("دفترِ دکان هنوز باز نشده؛ کمی بعد دوباره بزنید")
+    if (item.action == "refund") {
+      val by = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
+      return@withLock applyRefund(store, cfg, item, by).also { if (it == Posted.Saved) ir.vil3ntec.tohid.sync.AutoSync.now(context, store) }
+    }
     if (if (reverse) !canReverse(cfg, item) else !canRecord(cfg, item)) {
       //  پرچمِ سرورِ همین سفارش برای همین کاربر: منتظرِ دستگاهِ صاحب یا مدیر (فهرست می‌شماردش)
       note(waiting, item, "سفارش #${item.orderNo} — " + if (reverse) REVERSE_WAIT else SALE_WAIT)
@@ -246,6 +266,49 @@ object OrdersLive {
   }
 
   /**
+   *  بازپرداختِ سفارشِ تحویل‌شده ⇒ سندِ برگشتِ همان فروش ([OrderFulfillment.refund]) با زمان و روزِ
+   *  همان بازپرداخت. کالا دست نمی‌خورد: «کالا به انبار برگشت؟» جداست ([restock]). زیرِ [postLock] (از [applyItem]).
+   */
+  private suspend fun applyRefund(store: ShopStore, cfg: OrdersConfigDto?, item: OrderDto, by: String): Posted {
+    if (!canRefund(cfg, item)) {
+      note(waiting, item, "سفارش #${item.orderNo} — $REFUND_WAIT")
+      return Posted.Skipped(SKIPPED_REFUND_NOTE)
+    }
+    note(waiting, item, null)
+    var outcome: Posted = Posted.Already
+    val wrote = store.update { cur ->
+      when (val r = OrderFulfillment.refund(cur, item, by) { isoDay(it) }) {
+        is OrderFulfillment.Result.Ok -> { outcome = Posted.Saved; r.data }
+        is OrderFulfillment.Result.Already -> null
+        is OrderFulfillment.Result.Failed -> { outcome = Posted.Failed(r.message); null }
+        is OrderFulfillment.Result.Review -> { outcome = Posted.Review(r.message); null }
+      }
+    }
+    if (outcome == Posted.Saved && wrote != true) {
+      outcome = Posted.Failed("سندِ برگشتِ سفارش #${item.orderNo} روی دستگاه نوشته نشد (قفلِ برنامه؟)؛ دوباره می‌کوشد")
+    }
+    note(refundIssues, item, (outcome as? Posted.Failed)?.message)
+    return outcome
+  }
+
+  /** «کالا به انبار برگشت؟» ِ بازپرداخت‌های همین سفارش — فقط [chosen] به موجودی ⇒ null یا پیامِ خطا */
+  suspend fun restock(context: Context, store: ShopStore, orderId: String, orderNo: Long, chosen: Set<Int>): String? = postLock.withLock {
+    if (!store.loaded.value) return@withLock "دفترِ دکان هنوز باز نشده؛ کمی بعد دوباره بزنید"
+    val by = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
+    var error: String? = null
+    val now = System.currentTimeMillis()
+    val wrote = store.update { cur ->
+      when (val r = OrderFulfillment.restock(cur, orderId, orderNo, chosen, by, isoDay(now), now)) {
+        is OrderFulfillment.Result.Ok -> r.data
+        is OrderFulfillment.Result.Failed -> { error = r.message; null }
+        else -> null
+      }
+    }
+    if (error == null && wrote == true) ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
+    error
+  }
+
+  /**
    *  ثبت (یا لغو) برای یک سفارش — **پس از پرسیدن از سرور** که هنوز لازم است
    *  (`handover?orderId=`): تحویلِ پیش از کفِ سرور، سفارشی که فروشش (`o-…`/`w-…`) در دفترِ
    *  همگام‌شده هست، یا برگشته‌ای که فروشش لغو شده ⇒ هیچ. پس از گذارِ همین دستگاه، پس از
@@ -260,6 +323,7 @@ object OrdersLive {
       is ApiResult.Failure -> Posted.Failed(r.error.userMessage)
       is ApiResult.Success -> {
         val item = r.value.items.firstOrNull { it.id == orderId } ?: r.value.reversals.firstOrNull { it.id == orderId }
+          ?: r.value.refunds.firstOrNull { it.id == orderId }
         val held = r.value.review.firstOrNull { it.id == orderId }
         when {
           item != null -> applyItem(context, store, item)
@@ -339,6 +403,11 @@ object OrdersLive {
           }
         }
         for (o in p.review) { reviewOf(o); held += o.id }
+        //  بازپرداختِ سفارشِ دارای فروش ⇒ سندِ برگشت (روز و صندوقِ همان بازپرداخت)
+        for (o in p.refunds) {
+          listed += o.id
+          if (applyItem(context, store, o) is Posted.Skipped) left += o.id
+        }
       }
       after = p.nextAfter
       if (after == null) {
@@ -346,6 +415,7 @@ object OrdersLive {
         waiting.value = waiting.value.filter { it.orderId in left }
         review.value = review.value.filter { it.orderId in held }
         unposted.value = unposted.value.filter { it.orderId in listed }
+        refundIssues.value = refundIssues.value.filter { it.orderId in listed }
         prune(store.data.value)
         return
       }
@@ -378,6 +448,7 @@ object OrdersLive {
     if (cfg == null) {
       counts.value = emptyMap(); rev.value = 0
       unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList(); review.value = emptyList()
+      refundIssues.value = emptyList()
     }
   }
 

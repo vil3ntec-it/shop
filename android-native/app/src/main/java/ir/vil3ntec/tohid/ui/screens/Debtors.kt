@@ -139,6 +139,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
       onMessage = ::toast,
+      store = store,
     )
   } else {
     /*
@@ -713,6 +714,8 @@ private fun AccountView(
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
   onMessage: (String) -> Unit = {},
+  /** CRM-08/12: دکمهٔ «گروه، لیستِ قیمت و رضایت» (`CrmPricingButton`)؛ null ⇒ نیست */
+  store: ShopStore? = null,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -818,10 +821,11 @@ private fun AccountView(
           "کل رسید", money(account.received), "؋",
           Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
         )
+        val settled = ir.vil3ntec.tohid.data.DebtMinorFlag.settled(account.balance)
         AccountTile(
           "الباقی",
-          if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
-          if (account.balance == 0.0) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          if (settled) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (settled) "حساب صاف" else DebtorEngine.stateText(account.balance),
           when {
             account.balance > 0 -> Shop.colors.warning
             account.balance < 0 -> Shop.colors.success
@@ -862,6 +866,7 @@ private fun AccountView(
         }
         StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
+      if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {
