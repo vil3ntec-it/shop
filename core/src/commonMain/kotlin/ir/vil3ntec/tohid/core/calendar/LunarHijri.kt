@@ -20,13 +20,13 @@ object LunarHijri {
   )
 
   private fun start(y: Int, m: Int): Int =
-    (y - 1) * 354 + Math.floorDiv(3 + 11 * y, 30) + (59 * (m - 1) + 1) / 2 + EPOCH
+    (y - 1) * 354 + (3 + 11 * y).floorDiv(30) + (59 * (m - 1) + 1) / 2 + EPOCH
 
   fun toLunar(iso: String, adjust: Int = 0): Ymd? {
     val jdn = (CivilDays.jdnOfIso(iso) ?: return null) + adjust
     if (jdn < EPOCH) return null
-    val y = Math.floorDiv(30 * (jdn - EPOCH) + 10646, 10631)
-    val m = (-Math.floorDiv(-2 * (jdn - 29 - start(y, 1)), 59) + 1).coerceIn(1, 12)
+    val y = (30 * (jdn - EPOCH) + 10646).floorDiv(10631)
+    val m = (-(-2 * (jdn - 29 - start(y, 1))).floorDiv(59) + 1).coerceIn(1, 12)
     return Ymd(y, m, jdn - start(y, m) + 1)
   }
 

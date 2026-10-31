@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrFields
 
 /**
  *  کادرهای ورودیِ صفحه‌های «محصول جدید» و «ورود کالا به انبار».
@@ -43,6 +45,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  حالتِ فوکوس با دو چیز نشان داده می‌شود: حاشیه پررنگ‌تر و کمی ضخیم‌تر.
  *  فقط رنگ کافی نیست؛ کسی که چشمش رنگ را خوب تشخیص نمی‌دهد هم باید
  *  بفهمد کدام کادر باز است.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrFields` (LOC-06).
  */
 @Composable
 fun EntryField(
@@ -191,7 +195,7 @@ fun EntryFieldBox(
 fun EntryDateField(
   value: String,
   onValueChange: (String) -> Unit,
-  label: String = "تاریخ",
+  label: String = StrFields.date,
   modifier: Modifier = Modifier,
 ) {
   Column(modifier) {
@@ -208,8 +212,8 @@ fun EntryDateField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.weight(1f),
       )
-      TextButton(onClick = { onValueChange(todayIso()) }) { Text("امروز") }
-      TextButton(onClick = { onValueChange(entryYesterdayIso()) }) { Text("دیروز") }
+      TextButton(onClick = { onValueChange(todayIso()) }) { Text(Str.today) }
+      TextButton(onClick = { onValueChange(entryYesterdayIso()) }) { Text(StrFields.yesterday) }
     }
     if (value.isNotBlank()) {
       Spacer(Modifier.height(6.dp))
