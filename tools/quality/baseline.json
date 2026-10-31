@@ -19,7 +19,7 @@
     "license/orders-ui.js": 902,
     "license/sync-v3-engine.js": 1166,
     "license/vip.js": 867,
-    "server/public/admin/app.js": 2369,
+    "server/public/admin/app.js": 2383,
     "server/public/admin/index.html": 1370,
     "server/public/store/store.js": 801,
     "server/src/lib/catalog.js": 811,
