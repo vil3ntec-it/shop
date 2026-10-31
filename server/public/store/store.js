@@ -37,7 +37,8 @@
     return out;
   }
   function api(path, opts) { return K.api(BASE + path, opts); }
-  function photoUrl(id) { return BASE + '/products/' + encodeURIComponent(id) + '/photo'; }
+  //  WEB-16: کارت و سبد thumb؛ برگهٔ کالا photo
+  function photoUrl(id, big) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb'); }
 
   var VIEWS = ['view-missing', 'view-catalog', 'view-checkout', 'view-order', 'view-orders'];
   function show(id) {
@@ -166,7 +167,7 @@
       var st = K.stockOf(x);
       $('ps-cat').textContent = x.category || '';
       $('ps-cat').hidden = !x.category;
-      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id), alt: '', width: '300', height: '300' } })
+      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1), alt: '', width: '300', height: '300' } })
         : el('span', { class: 'ph', text: String(x.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
       $('ps-img').classList.toggle('tile', Boolean(x.photo));

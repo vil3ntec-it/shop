@@ -89,6 +89,10 @@ const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner',
 ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
 ok(pushed.status === 200, 'کالاها از راهِ همگام‌سازیِ واقعی رسیدند');
 for (const id of ['rice', 'oil']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
+//  WEB-16: عکسِ همگام‌شدهٔ برنج — کارت و سبد نسخهٔ کوچک (`/thumb`)، برگهٔ کالا اندازهٔ نمایش (`/photo`)
+const ricePhoto = await call('PUT', '/api/sync/v1/photos/rice', { data: require('./image-fixtures').jpeg(320, 320, { seed: 9 }).toString('base64') },
+  T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+ok(ricePhoto.status === 200, 'عکسِ برنج همگام شد', JSON.stringify(ricePhoto.body).slice(0, 80));
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];
@@ -115,6 +119,19 @@ ok((await page.locator('#products li[data-id]').count()) === 2, 'فقط دو ک�
 //  ۳۲.۳: موجودیِ نامعلوم هرگز «موجود» نیست؛ «در حال بررسی» یک بار بالای کاتالوگ، نه روی هر کارت
 ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')).includes('موجودی در حال بررسی است')
   && !/(^|[\s،.])موجود([\s،.]|$)/.test(await page.textContent('#products')), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
+
+{
+  const sel = '#products li[data-id="rice"] img';
+  await page.waitForFunction((q) => { const i = document.querySelector(q); return Boolean(i && i.complete && i.naturalWidth > 0); }, sel, { timeout: 5000 }).catch(() => {});
+  const img = await page.$eval(sel, (i) => ({ src: i.getAttribute('src'), lazy: i.getAttribute('loading'), w: i.naturalWidth }));
+  ok(/\/products\/rice\/thumb$/.test(img.src) && img.lazy === 'lazy' && img.w > 0, 'کارت: نسخهٔ کوچک (thumb) با بارگذاریِ تنبل (WEB-16)', JSON.stringify(img));
+  await page.evaluate(() => { location.hash = '#/p/rice'; });
+  await page.waitForSelector('#ps-img img', { timeout: 5000 });
+  const big = await page.getAttribute('#ps-img img', 'src');
+  ok(/\/products\/rice\/photo$/.test(big), 'برگهٔ کالا: اندازهٔ نمایش (photo) (WEB-16)', big);
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.waitForFunction(() => !document.querySelector('#product-sheet.open, #product-sheet[open]'), null, { timeout: 5000 }).catch(() => {});
+}
 
 for (const w of [320, 360, 768, 1280]) {
   await page.setViewportSize({ width: w, height: 760 });
