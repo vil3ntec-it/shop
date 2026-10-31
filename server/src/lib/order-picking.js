@@ -15,6 +15,8 @@
  *   بسته ──── همهٔ قلم‌ها تکلیف‌دار ⇒ جمعِ تازه با `pick-core.settle` (کسرِ خودکارِ قلمِ پیدانشده و کم،
  *             PCK-07)، قلم‌های سفارش و مبلغِ نقدِ موردِ انتظارِ مأموریتِ هنوز‌نرفته در همان تراکنش، و
  *             «بسته‌بندی‌شده» با تعدادِ کیسه و برچسب (PCK-09). مبلغِ پیشین در برگه و رویداد می‌ماند.
+ *             ⛔ سفارشِ پرداخت‌شده: هر تغییرِ مبلغ ⇒ ۴۰۹ (`paid_needs_refund` برای کسر، `paid_total_increase`
+ *             برای افزایش) — دفترِ بازپرداخت حالتِ «معلق» و روشِ آنلاین ندارد، پس کسر بی‌ردپا نمی‌ماند.
  *   شاخص ──── زمانِ جمع‌آوری، درصدِ پیدا شدن و نرخِ جایگزینی از برگه‌های بسته‌شده (PCK-13).
  *
  * ⛔ موجودیِ دکان دست نمی‌خورد (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): فروش را برنامه هنگامِ تحویل با
@@ -40,6 +42,8 @@ const EVENT_TYPES = ['scan', 'pick', 'weigh', 'not_found', 'reset'];
 //  مأموریتی که بسته هنوز از دکان بیرون نرفته — مبلغِ نقدِ موردِ انتظارش با جمعِ تازه عوض می‌شود
 const BEFORE_DISPATCH = ['requested', 'assigned'];
 const DISPATCHED = ['picked_up', 'moving', 'arrived', 'failed'];
+//  پولی که دکان گرفته و هنوز (کامل) برنگشته — جمعِ سفارش در بسته‌بندی دست نمی‌خورد
+const PAID = ['paid', 'partially_refunded'];
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم
@@ -556,6 +560,16 @@ async function pack(shopId, orderId, { key, body }, actor) {
       'SELECT id, status FROM delivery_assignments WHERE order_id=$1 AND status = ANY($2::text[])', [id, DISPATCHED]
     )).rows[0];
     if (live) throw conflict('بسته پیش‌تر به پیک سپرده شده است', 'already_dispatched');
+    //  ⛔ پولِ گرفته‌شده: جمعِ تازه نه کم می‌شود (بازپرداختِ بی‌ردپا) نه زیاد (پولِ بی‌رضایت)
+    const paidMinor = Number(order.total_minor);
+    if (PAID.includes(order.payment_status) && (s.deductedMinor > 0 || s.totalMinor !== paidMinor)) {
+      const down = s.deductedMinor > 0;
+      const err = new ApiError(409, down ? 'paid_needs_refund' : 'paid_total_increase', down
+        ? 'این سفارش پرداخت شده است؛ کم کردنِ مبلغ بازپرداخت می‌خواهد — همهٔ قلم‌ها را بردارید یا سفارش را لغو و بازپرداخت کنید'
+        : 'این سفارش پرداخت شده است؛ مبلغِ بیشتر بی رضایتِ مشتری گرفته نمی‌شود — همان مقدارِ سفارش را بردارید');
+      err.data = { paidMinor, totalMinor: s.totalMinor, deductedMinor: s.deductedMinor };
+      throw err;
+    }
 
     const at = now();
     //  قلم‌های سفارش = آن‌چه واقعاً برداشته شد (برنامه فروشِ تحویل را از همین‌ها می‌سازد)
