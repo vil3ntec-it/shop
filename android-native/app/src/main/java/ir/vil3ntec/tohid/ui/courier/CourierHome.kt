@@ -180,7 +180,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
         .onSuccess { phone ->
           if (phone.isBlank()) { snackbar.showSnackbar("شمارهٔ مشتری نیامد"); return@onSuccess }
           runCatching {
-            context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phone))))
+            openDialer(context, phone)   //  مرزِ پلتفرم: CourierDialAndroid.kt
           }.onFailure { snackbar.showSnackbar("برنامهٔ تماس پیدا نشد") }
         }
         .onFailure { f ->
