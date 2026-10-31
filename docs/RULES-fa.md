@@ -385,6 +385,8 @@
 - ⛔ زنجیرهٔ تأمین (§۱۴، `docs/security/supply-fa.md`، سدِ `security.yml`): هر `uses:` با SHAِ کامل و `# vX.Y.Z`؛ `permissions:` ِ بالای فایل فقط خواندنی و `write` فقط در کارِ انتشاری که کدِ ساخت اجرا نمی‌کند (`WRITE_JOBS` در `tools/security/workflow-guard.mjs`)؛ ورودی (`inputs`، نامِ شاخه، عنوانِ PR) در `run:` فقط از `env:`؛ بی `pull_request_target`. کلیدِ امضای فهرستِ به‌روزرسانی فقط در کارِ انتشار.
 - ⛔ `npm ci` بی `|| npm install`؛ وابستگیِ تازهٔ سرور ⇒ `package-lock.json` در همان PR. critical در `npm audit --omit=dev` سد است (high از ۱۴۰۵/۱۰/۰۱)؛ استثنا فقط با GHSA، دلیل و تاریخ در `tools/security/audit-allow.json`.
 - ⛔ secret و فایلِ کلید هرگز در مخزن؛ اسکنِ هر PR سد است و مقدار را چاپ نمی‌کند. استثنا فقط در `tools/security/secret-scan-allow.json` (دلیل، بی مقدار)؛ رازِ لورفته را چرخاندن لازم است، نه فقط برداشتن.
+- آزمون به نگذشتنِ یک میلی‌ثانیه میانِ دو `Date.now()` تکیه ندارد: opهای یک «ثبت» ِ v1 یک `ts` ِ مشترک می‌گیرند (نگهبانِ کارمند «همان ثبت» را با ts ِ برابر می‌شناسد؛ مثلِ `save()` ِ `staff-guard-companions.test.js`). بازتولید: `--require` ِ شیمی که هر `Date.now()` را یک ms جلو می‌برد.
+- سرور روی Express 5 است: دستگیره و میان‌افزارِ async مستقیم، بی پوشانندهٔ `Promise.resolve(fn(…)).catch(next)` (سنجهٔ `express-wrap`).
 
 ### v3 · نقشهٔ پرچم‌ها
 
