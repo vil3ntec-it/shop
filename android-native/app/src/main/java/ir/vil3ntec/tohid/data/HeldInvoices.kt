@@ -428,6 +428,22 @@ class HeldInvoiceStore(
     Outcome.Done("$n فاکتورِ کهنه پاک شد")
   }
 
+  /**
+   *  POS-12 — پاک‌سازیِ **خودکارِ** کهنه‌ها: همان قاعدهٔ `dropStale` ِ دستی، بی پرسش. [on] تنظیمِ
+   *  «پاک‌سازیِ خودکار» است (پیش‌فرض خاموش؛ عوض کردنش فقط با «لغوِ فاکتور»، `HeldInvoiceSettings`).
+   *  خاموش ⇒ حتی فایل هم خوانده نمی‌شود. فاکتورِ جاریِ صندوق (`CartStore`) هرگز این‌جا نیست.
+   *  @return شمارِ پاک‌شده‌ها؛ بی کهنه یا نوشتنِ ناموفق ⇒ ۰ و دفتر همان
+   */
+  suspend fun autoDropStale(on: Boolean, hours: Int = HeldRules.STALE_HOURS): Int {
+    if (!on) return 0
+    return lock.withLock {
+      ensureLoaded()
+      val now = clock()
+      val n = HeldRules.stale(_book.value, now, hours).size
+      if (n == 0 || !commit(HeldRules.dropStale(_book.value, now, hours))) 0 else n
+    }
+  }
+
   /** پس از تغییرِ دفتر (فروش، حذفِ کالا یا مشتری) */
   suspend fun prune(d: ShopData) = lock.withLock {
     ensureLoaded()

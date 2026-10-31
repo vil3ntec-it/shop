@@ -472,7 +472,7 @@
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
 
-تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).

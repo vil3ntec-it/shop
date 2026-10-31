@@ -232,7 +232,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 13,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/common/ViewModePref.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/common/ViewModeToggle.kt": 2,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt": 6,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/ApprovalDialog.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/CreditApprovalDialog.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/ReturnApprovalRequest.kt": 1,
