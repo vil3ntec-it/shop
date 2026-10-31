@@ -4,7 +4,6 @@ import ir.vil3ntec.tohid.core.pay.ShiftSlip.Kind
 import ir.vil3ntec.tohid.core.pay.ShiftSlip.Row
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.test.fail
@@ -49,8 +48,6 @@ class ShiftSlipTest {
   fun cashierXReportHidesExpectedCash() {
     val x = x()
     assertEquals(1_680_000L, x.expected!![Pay.CASH])
-    //  همان باگِ صفحه: نمای صندوق‌دارِ هسته فقط Zِ کور را می‌پوشاند و X را دست‌نخورده می‌گذارد
-    assertNotNull(ShiftCore.cashierView(x).expected)
     val seen = ShiftSlip.forViewer(x, seesExpected = false)
     assertNull(seen.expected)
     assertNull(seen.variance)
@@ -232,8 +229,8 @@ class ShiftSlipTest {
       assertEquals(delta != 0L, ShiftSlip.rows(z).any { it.kind == Kind.NEEDS_REVIEW })
       assertEquals(Row(Kind.REASON, text = "پولِ خرد"), ShiftSlip.rows(z).single { it.kind == Kind.REASON })
     }
-    //  نمای کورِ هسته (`cashierView`) هم در ردیف‌ها نه بررسی را لو می‌دهد نه دلیل را
-    val core = ShiftCore.cashierView(ok(blindClose(-10_000)).z!!)
-    assertTrue(ShiftSlip.rows(core).none { it.kind == Kind.NEEDS_REVIEW || it.kind == Kind.REASON || it.kind == Kind.FLOAT })
+    //  هر گزارشِ بی «مورد انتظار» در ردیف‌ها کور است، حتی اگر دادهٔ خودش را داشته باشد (نه بررسی، نه دلیل، نه اولِ صندوق)
+    val half = ok(blindClose(-10_000)).z!!.copy(expected = null, variance = null, reason = "پولِ خرد")
+    assertTrue(ShiftSlip.rows(half).none { it.kind == Kind.NEEDS_REVIEW || it.kind == Kind.REASON || it.kind == Kind.FLOAT || it.method != null && it.kind != Kind.COUNTED && it.kind != Kind.DENOMINATION })
   }
 }

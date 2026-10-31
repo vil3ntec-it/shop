@@ -241,7 +241,7 @@
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 0, "noSale": 0 },
           "counted": { "cash": 144000 }, "denominations": { "100000": 1, "10000": 4, "2000": 2 }, "variance": { "cash": -6000 }, "reason": "اسکناسِ پاره", "needsReview": true, "blind": false } } }
       ] },
-    { "name": "شمارشِ کور: اضافهٔ بالای آستانه با دلیلِ اختیاری ثبت می‌شود و صندوقدار عددِ مورد انتظار را نمی‌بیند",
+    { "name": "شمارشِ کور: اضافهٔ بالای آستانه با دلیلِ اختیاری ثبت می‌شود",
       "steps": [
         { "op": "open", "input": { "id": "sh-1", "at": 0, "float": 100000 }, "expect": { "ok": true } },
         { "op": "record", "input": { "id": "e12", "type": "sale", "at": 10, "rows": [{ "method": "cash", "amount": 50000 }] }, "expect": { "ok": true } },
@@ -249,12 +249,7 @@
           "kind": "Z", "shiftId": "sh-1", "currency": "AFN", "at": 20, "by": "sara", "openedAt": 0, "openedBy": null, "float": 100000,
           "methods": { "cash": { "sales": 50000, "refunds": 0, "receipts": 0, "net": 50000 } }, "moves": { "in": 0, "out": 0 }, "expected": { "cash": 150000 },
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 0, "noSale": 0 },
-          "counted": { "cash": 156000 }, "denominations": { "100000": 1, "50000": 1, "5000": 1, "1000": 1 }, "variance": { "cash": 6000 }, "reason": "اضافه از دیروز", "needsReview": true, "blind": true } } },
-        { "op": "cashierView", "expect": { "report": {
-          "kind": "Z", "shiftId": "sh-1", "currency": "AFN", "at": 20, "by": "sara", "openedAt": 0, "openedBy": null, "float": 100000,
-          "methods": { "cash": { "sales": 50000, "refunds": 0, "receipts": 0, "net": 50000 } }, "moves": { "in": 0, "out": 0 },
-          "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 0, "noSale": 0 },
-          "counted": { "cash": 156000 }, "denominations": { "100000": 1, "50000": 1, "5000": 1, "1000": 1 }, "reason": "اضافه از دیروز", "needsReview": true, "blind": true } } }
+          "counted": { "cash": 156000 }, "denominations": { "100000": 1, "50000": 1, "5000": 1, "1000": 1 }, "variance": { "cash": 6000 }, "reason": "اضافه از دیروز", "needsReview": true, "blind": true } } }
       ] },
     { "name": "ورود و خروجِ نقد با دلیلِ اجباری، و کشو بی فروش با مجوز",
       "steps": [
@@ -368,13 +363,7 @@
           "methods": { "cash": { "sales": 1530000, "refunds": 0, "receipts": 0, "net": 1530000 } }, "moves": { "in": 0, "out": 50000 }, "expected": { "cash": 1680000 },
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 },
           "counted": { "cash": 1670000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7 },
-          "variance": { "cash": -10000 }, "reason": null, "needsReview": true, "blind": true } } },
-        { "op": "cashierView", "expect": { "report": {
-          "kind": "Z", "shiftId": "s12b", "currency": "AFN", "at": 30, "by": null, "openedAt": 0, "openedBy": null, "float": 200000,
-          "methods": { "cash": { "sales": 1530000, "refunds": 0, "receipts": 0, "net": 1530000 } }, "moves": { "in": 0, "out": 50000 },
-          "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 },
-          "counted": { "cash": 1670000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7 },
-          "reason": null, "needsReview": true, "blind": true } } }
+          "variance": { "cash": -10000 }, "reason": null, "needsReview": true, "blind": true } } }
       ] },
     { "name": "S12b · همان کسریِ ۱۰۰ در بستنِ مدیر (نه کور): بی دلیل بسته نمی‌شود و اختلاف را می‌گوید",
       "steps": [

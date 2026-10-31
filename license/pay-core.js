@@ -557,13 +557,7 @@
     return { ok: true, report: s.z };
   }
 
-  /* شمارشِ کور: صندوقدار نه مبلغِ مورد انتظار را می‌بیند نه اختلاف را */
-  function cashierView(report) {
-    var out = {};
-    for (var k in report) if (has(report, k)) out[k] = report[k];
-    if (report.blind) { delete out.expected; delete out.variance; }
-    return out;
-  }
+  /* شمارشِ کور: نمای شاگرد فقط در برنامه (`ShiftSlip.forViewer` ِ core)؛ «نمای صندوقدار» ِ نیمه‌کور این‌جا نیست */
 
   return {
     ACCOUNT: ACCOUNT,
@@ -588,6 +582,5 @@
     xReport: xReport,
     closeShift: closeShift,
     zReport: zReport,
-    cashierView: cashierView,
   };
 });

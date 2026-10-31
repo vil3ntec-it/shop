@@ -346,6 +346,4 @@ object ShiftCore {
   fun zReport(s: Shift?): PayResult<ShiftReport> =
     if (s?.status == "closed" && s.z != null) PayResult.Ok(s.z) else PayResult.Err("SHIFT_OPEN")
 
-  /** شمارشِ کور: صندوقدار نه مبلغِ مورد انتظار را می‌بیند نه اختلاف را */
-  fun cashierView(r: ShiftReport): ShiftReport = if (r.blind == true) r.copy(expected = null, variance = null) else r
 }

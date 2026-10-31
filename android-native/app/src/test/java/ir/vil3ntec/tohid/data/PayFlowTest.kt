@@ -5,7 +5,7 @@ import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.SettleInput
 import ir.vil3ntec.tohid.core.pay.Settlement
-import ir.vil3ntec.tohid.core.pay.ShiftCore
+import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.Tender
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -323,7 +323,7 @@ class PayFlowTest {
     assertEquals(true, r.report.needsReview)
     assertEquals(16790.0, r.row.amount, 0.0)
     assertEquals("sh12", r.row.refId)
-    val view = ShiftCore.cashierView(r.report)
+    val view = ShiftSlip.forViewer(r.report, seesExpected = false)
     assertNull(view.expected)
     assertNull(view.variance)
   }
@@ -342,6 +342,25 @@ class PayFlowTest {
     val r = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true, reason = "پولِ خرد کم بود"), 1300, newId))
     assertEquals(-10000L, r.report.variance!!["cash"])
     assertEquals("پولِ خرد کم بود", r.row.reason)
+  }
+
+  @Test fun `سابقهٔ بستن در نمای شاگرد بی مورد انتظار و بی اختلاف — بستنِ مدیر، کور و ردیفِ قدیمی`() {
+    val (d, open) = s12()
+    val counts = mapOf("100000" to 10L, "50000" to 12L, "10000" to 7L)  // ۱۶٬۷۰۰ ⇐ کسریِ ۱۰۰
+    val m = { v: Double -> ir.vil3ntec.tohid.money(v) }
+    //  همان متنی که صفحهٔ صندوق برای بستنِ مدیر می‌نویسد (مدیر آن را در سابقه و «سابقهٔ عملیات» می‌بیند)
+    val manager = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, by = "مدیر", reason = "یک اسکناس گم شد"), 1300, newId)).row.let {
+      it.copy(notes = "بستنِ صندوق: مورد انتظار ${m(16800.0)}، شمرده ${m(16700.0)}، کسری ${m(100.0)} — یک اسکناس گم شد — مدیر")
+    }
+    val blind = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true, by = "صندوقدار"), 1300, newId)).row
+    val legacy = AuditEntry(id = "old", type = CashShift.CLOSE, amount = 16700.0, notes = "بستنِ صندوق: مورد انتظار ${m(16800.0)}، شمرده ${m(16700.0)}، کسری ${m(100.0)}")
+    for (row in listOf(manager, blind, legacy)) {
+      val seen = PayFlow.closeNote(row, seesExpected = false)
+      for (w in listOf("مورد انتظار", "کسری", "اضافه", "اختلاف", m(16800.0), "اسکناس گم")) assertFalse("«$w» در «$seen»", seen.contains(w))
+      assertTrue(seen, seen.contains(m(16700.0)))
+    }
+    assertTrue(PayFlow.closeNote(blind, seesExpected = false).contains("شمارشِ کور"))
+    assertEquals(manager.notes, PayFlow.closeNote(manager, seesExpected = true))
   }
 
   @Test fun `ورود و خروجِ نقد و کشو بی فروش`() {
