@@ -3,7 +3,8 @@
  * امنیتِ API و وب (برنامهٔ امنیت §۲.۳، §۱۰، §۱۱ — شاخهٔ `claude/sec-api-web`).
  * شرحِ هر بند و جدولِ کامل: `docs/security/api-web-fa.md`.
  *
- *   SEC-API-02  بدنهٔ بزرگِ ‎/pump/device/state|report‎ فقط پس از توکنِ دستگاه خوانده می‌شود
+ *   SEC-API-02  بدنهٔ درهای غیرِ پمپ پس از سقفِ نرخ خوانده می‌شود؛ درهای پمپ همان main
+ *               (بخشِ پمپی ⇐ #615، `claude/sec-pump-pending`، نیازمندِ اجازهٔ صاحب‌کار)
  *   SEC-API-03  SSRF: نشانیِ سلامتِ «برنامه‌ها» فقط مدیرِ ارشد و فقط http/https
  *   SEC-API-04  `devCode` فقط با خواستِ صریح، نه با نبودِ `NODE_ENV`
  *   SEC-API-05  CSP ِ پیش‌فرضِ `/api` و CSP ِ پورتال
@@ -46,56 +47,63 @@ async function rawJson(p, text, headers = {}) {
   return { status: res.status, body };
 }
 
-/* ── SEC-API-02 ─────────────────────────────────────────────────────── */
+/* ── SEC-API-02 و کدِ پمپ: ترتیبِ میان‌افزارها ───────────────────────── */
 
-test('SEC-API-02: بی توکنِ دستگاه، بدنهٔ ‎/report/‎ خوانده نمی‌شود — ۴۰۱، نه ۴۰۰ِ JSON', async () => {
-  for (const p of ['/api/pump/device/report/x', '/api/v1/pump/device/report/x']) {
+const BODY = new Set(['jsonParser', 'rawParser', 'urlencodedParser', 'textParser']);
+/** لایه‌های سطحِ app که این نشانی را می‌گیرند، به ترتیب، تا روترِ API: body | error | other */
+function chainOf(p) {
+  const app = h.server().listeners('request')[0];
+  const out = [];
+  for (const l of app.router.stack) {
+    if (!l.match(p)) continue;
+    if (l.name === 'router') break;
+    out.push(BODY.has(l.name) ? 'body' : l.handle.length === 4 ? 'error' : 'other');
+  }
+  return out.join(' ');
+}
+
+//  همان شمارِ پارسرهای main برای هر درِ پمپ (state: ۴mb + همگانی؛ report: RegExp ِ ۳۴mb + همگانی؛ بقیه: همگانی)
+const PUMP_MAIN = [
+  ['/api/pump/device/state', 2], ['/api/v1/pump/device/state', 2],
+  ['/api/pump/device/report/x', 2], ['/api/v1/pump/device/report/x', 2],
+  ['/api/pump', 1], ['/api/pump/members/x', 1], ['/api/pump/public/x/acct/y/chat', 1], ['/api/pump/device/bind', 1],
+  ['/api/v1/pump/home', 1], ['/api/admin/pump/stations', 1], ['/api/v1/admin/pump/stations/x/status', 1],
+  ['/API/Pump/device/state', 2],
+];
+
+test('کدِ پمپ: درهای پمپ بدنه را همان‌جای main می‌خوانند — همهٔ پارسرها و خطایشان پیش از هر میان‌افزارِ دیگر، و پس از آن هیچ پارسری', () => {
+  for (const [p, n] of PUMP_MAIN) {
+    const want = `${Array(n).fill('body').join(' ')} error`;
+    const got = chainOf(p);
+    assert.ok(got.startsWith(want), `${p}: ${got}`);
+    assert.ok(!/body|error/.test(got.slice(want.length)), `${p}: پس از سرآیندها/سقفِ نرخ پارسرِ دیگری هست — ${got}`);
+  }
+});
+
+test('SEC-API-02: درهای غیرِ پمپ بدنه را فقط پس از سرآیندها و سقفِ نرخ می‌خوانند', () => {
+  for (const p of ['/api/shop/products', '/api/v1/shop/sync', '/api/me', '/api/admin/admins', '/api/payments/webhook/fake', '/api/pumpkin']) {
+    const got = chainOf(p).split(' ');
+    assert.equal(got[0], 'other', `${p}: ${got.join(' ')}`);
+    const first = got.indexOf('body');
+    assert.ok(first > 0 && got.indexOf('error', first) > first, `${p}: ${got.join(' ')}`);
+  }
+});
+
+test('کدِ پمپ: رفتارِ درِ پمپ همان main — بدنهٔ بدشکل پیش از توکنِ دستگاه ۴۰۰ است، بدنهٔ ۳mb ِ ‎/state‎ پیش از توکن خوانده می‌شود، و CSP ِ تازه ندارد', async () => {
+  for (const p of ['/api/pump/device/state', '/api/pump/device/report/x', '/api/v1/pump/device/state']) {
     const r = await rawJson(p, '{bad json');
-    assert.equal(r.status, 401, `${p}: ${JSON.stringify(r.body)}`);
-    assert.equal(r.body.error.code, 'device_not_registered');
+    assert.equal(r.status, 400, `${p}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'bad_json');
   }
-});
-
-test('SEC-API-02: بی توکنِ دستگاه، بدنهٔ ‎/state‎ خوانده نمی‌شود — نه parse، نه ۴۱۳', async () => {
-  for (const p of ['/api/pump/device/state', '/api/v1/pump/device/state']) {
-    assert.equal((await rawJson(p, '{bad json')).status, 401, p);
-    //  ۵ مگابایت (بیش از سقفِ ۴mb): پیش از اصلاح ۴۱۳ِ پارسر بود، یعنی بدنه پیش از توکن خوانده می‌شد
-    const big = JSON.stringify({ x: 'a'.repeat(5 * 1024 * 1024) });
-    const r = await rawJson(p, big, { Authorization: 'Bearer pd_not_a_real_token' });
-    assert.equal(r.status, 401, `${p}: ${JSON.stringify(r.body)}`);
+  //  ۳ مگابایت (زیرِ ۴mb ِ ‎/state‎، بیش از ۲mb ِ همگانی): پارسرِ ‎/state‎ می‌خواند، بعد توکنِ دستگاه ۴۰۱
+  const big = JSON.stringify({ x: 'a'.repeat(3 * 1024 * 1024) });
+  const r = await rawJson('/api/pump/device/state', big, { Authorization: 'Bearer pd_not_a_real_token' });
+  assert.equal(r.status, 401, JSON.stringify(r.body));
+  for (const p of ['/api/pump', '/api/pump/device/rate', '/api/admin/pump/stations']) {
+    const res = await h.get(p);
+    assert.equal(res.headers.get('content-security-policy'), null, `${p}: درِ پمپ CSP ِ تازه گرفت`);
+    assert.equal(res.headers.get('x-content-type-options'), 'nosniff', p);
   }
-});
-
-test('SEC-API-02: توکنِ ساختگی با پیشوندِ درست هم پیش از پارسر رد می‌شود', async () => {
-  const r = await rawJson('/api/pump/device/report/x', '{bad', { Authorization: 'Bearer pd_forged' });
-  assert.equal(r.status, 401);
-});
-
-test('SEC-API-02: دستگاهِ واقعی — گزارشِ بیش از ۲mb به مقصد می‌رسد (سقفِ ۳۴mb زنده است) و ‎/state‎ همان', async () => {
-  const reports = require('../src/lib/station-reports');
-  const u = await h.newUser('پمپِ گزارش', 'pump');
-  const made = await h.post('/api/pump', { name: 'پمپِ گزارش' }, { token: u.accessToken });
-  assert.equal(made.status, 201, JSON.stringify(made.body));
-  const bound = await h.post('/api/pump/device/bind',
-    { device: { uid: 'pc-sec-big', name: 'کامپیوتر', platform: 'windows' } }, { token: u.accessToken });
-  assert.equal(bound.status, 201, JSON.stringify(bound.body));
-  const dev = bound.body.deviceToken;
-  try {
-    const p = reports.request(made.body.station.id, 'tanks', {});
-    p.catch(() => {});
-    const { reqs } = (await h.get('/api/pump/device/rate', { token: dev })).body;
-    //  ~۳ مگابایت PNG به base64 (۴ مگابایت متن) — بیش از سقفِ همگانی، کمتر از ۶mb ِ هر فایل
-    const png = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(3 * 1024 * 1024, 1)]);
-    const up = await h.post(`/api/pump/device/report/${reqs[0].id}`,
-      { ok: true, files: [{ name: 'big', mime: 'image/png', b64: png.toString('base64') }] }, { token: dev });
-    assert.equal(up.status, 200, JSON.stringify(up.body));
-    const out = await p;
-    assert.ok(out.files[0].data.equals(png), 'بایت‌به‌بایت همان');
-  } finally { reports._reset(); }
-  //  بدنهٔ بدشکل با توکنِ درست ⇒ ۴۰۰ِ خودِ پارسر (یعنی پارسر پس از توکن سرِ کار است)
-  const bad = await rawJson('/api/pump/device/state', '{bad', { Authorization: `Bearer ${dev}` });
-  assert.equal(bad.status, 400);
-  assert.equal(bad.body.error.code, 'bad_json');
 });
 
 /* ── SEC-API-03 ─────────────────────────────────────────────────────── */
