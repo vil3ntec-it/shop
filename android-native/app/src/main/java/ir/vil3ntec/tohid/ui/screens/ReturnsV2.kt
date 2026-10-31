@@ -127,7 +127,6 @@ fun ReturnFlowDialog(
   var customerId by remember { mutableStateOf(sale?.debtorId) }
   var exchange by remember { mutableStateOf(false) }
   var cart by remember { mutableStateOf(listOf<SalesEngine.CartLine>()) }
-  var approval by remember { mutableStateOf<ReturnFlow.Approval?>(null) }
   var asking by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   //  تا ذخیره تمام نشده، دکمه دوباره کار نمی‌کند (دو بار زدن = یک سند)
@@ -145,7 +144,11 @@ fun ReturnFlowDialog(
   //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
   val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
   val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
-  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
+  //  RET-10: سقفِ دستگاه هم مثلِ سقفِ نقش تجمعیِ هر فاکتور است — چند سندِ زیرِ سقف یک برگشتِ بزرگ نمی‌سازند
+  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit), priorMinor)
+  //  تأیید مالِ همان مبلغ و همان دلیل‌هاست: مقدار، ضایعات یا سقف که عوض شد، تأییدِ پیشین کنار می‌رود
+  //  (وگرنه «تأیید شد» می‌ماند و دکمهٔ «درخواستِ تأیید» پنهان، ولی `post` با APPROVAL_REQUIRED رد می‌کرد)
+  var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior) as? ReturnFlow.Outcome.Ok)?.value
