@@ -13,11 +13,11 @@
  * ⛔ موجودی (تصمیمِ صاحبِ مخزن، همان `stock.e2e.mjs`): سرور برای سفارش رزرو و کسری ندارد.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery، shop.catalog.
- * اجرا:  node test/e2e/run.mjs courier
+ * اجرا:  node test/e2e/run.mjs courier-scenarios
  */
 import { boot, assert } from './lib/harness.mjs';
 
-const E = await boot({ name: 'courier' });
+const E = await boot({ name: 'courier-scenarios' });
 const { db } = E;
 const owner = await E.owner('owner-cour@e2e.local', 'صاحبِ پیک‌ها', 'دکانِ پیک‌ها');
 const k1Acct = await E.staff(owner, 'k1-cour@e2e.local', 'پیکِ یک');
