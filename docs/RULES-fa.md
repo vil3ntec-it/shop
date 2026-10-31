@@ -373,6 +373,7 @@
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `shop.stock_v2` | دکان / `all` | خاموش | موتورِ تازهٔ موجودی و بهای برنامه (میانگینِ موزون، سری/FEFO، دفترِ حرکت، شمارش، انتقال)؛ برنامه از `GET /api/shop/stock-ledger/config` می‌خواند (`StockFlag`، هر ۱۰ دقیقه با سوکت)؛ روشن شدن هم پرچم و هم تنظیمِ دکانِ `stock_mode=on` را می‌خواهد (`StockLedger.isOn`)؛ خاموش ⇒ کارتِ «موجودی و بها» پنهان و همان موتورِ امروز | #315 (و #323 رویش) | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`

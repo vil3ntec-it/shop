@@ -94,6 +94,7 @@ private val PAGE_TITLES: Map<String, String> get() = mapOf(
   "team" to Str.staff,
   "orders" to Str.orders,
   "storefront" to Str.storefront,
+  "stockbook" to "دفترِ موجودی",
   "promos" to StrShell.promos,
   //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
   "delivery" to StrNav.deliveryDesk,
@@ -125,6 +126,8 @@ fun AppRoot(
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
   val context = LocalContext.current
+  //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
@@ -776,12 +779,14 @@ fun AppRoot(
         "settings" ->
           if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) {
             if (Platform.DESKTOP) DeskSettings(
-              listOf(
+              listOfNotNull(
                 StrSettings.language to androidx.compose.material.icons.Icons.Filled.Language,
                 Str.alerts to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
                 Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
                 Str.dateAndDigits to androidx.compose.material.icons.Icons.Filled.Event,
                 Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                //  پرچمِ `shop.stock_v2` خاموش ⇒ بی ستونِ «موجودی و بها» (کارتش هم پنهان است)
+                if (ir.vil3ntec.tohid.data.StockLedger.serverFlag) ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz else null,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
@@ -862,7 +867,10 @@ fun AppRoot(
           openProductId = pendingProduct,
           newBarcode = pendingBarcode,
           onConsumed = { pendingBarcode = null; pendingProduct = null },
+          onStockBook = { open("stockbook") },
         )
+        //  «دفترِ موجودی» — موتورِ تازهٔ موجودی و بها (پیش‌فرض خاموش؛ خاموش ⇒ فقط راهِ تنظیمات)
+        "stockbook" -> ir.vil3ntec.tohid.ui.screens.StockBookScreen(store, data, snackbar) { open("settings") }
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }

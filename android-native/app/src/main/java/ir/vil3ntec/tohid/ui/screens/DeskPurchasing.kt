@@ -119,6 +119,8 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
   var menu by remember { mutableStateOf(false) }
   var picked by remember { mutableStateOf<String?>(null) }
   val list = remember(d, supplier) { PurchaseBook.invoices(d, supplier) }
+  //  ماندهٔ واقعیِ هر فاکتور (پرداخت‌های بعدی و سندِ کسر FIFO) — برای رنگِ سررسید
+  val remaining = remember(d) { PurchaseBook.open(d).associate { it.invoice.key to it.remaining } }
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val today = ir.vil3ntec.tohid.todayIso()
   val month = today.take(7)
@@ -130,6 +132,9 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
     DeskKpi("تأمین‌کنندگان", "${d.suppliers.size}", Shop.colors.text, Modifier.weight(1f))
   }
   Spacer(Modifier.height(10.dp))
+  //  یادآورِ سررسید (PUR-07) — فقط وقتی فاکتوری سررسید دارد
+  SupplierDueReminder(d, today) { supplier = it }
+  Spacer(Modifier.height(6.dp))
   Row(verticalAlignment = Alignment.CenterVertically) {
     Box {
       OutlinedButton(onClick = { menu = true }) { Text("تأمین‌کننده: ${supplier?.let { names[it] } ?: "همه"}") }
@@ -154,7 +159,7 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
       cell = { i, c ->
         val v = list[i]
         when (c) {
-          0 -> TCell(if (v.no > 0) "#${v.no}" else "—", Shop.colors.primary, bold = true)
+          0 -> if (v.isReturn) TCell("برگشت", Shop.colors.success, bold = true) else TCell(if (v.no > 0) "#${v.no}" else "—", Shop.colors.primary, bold = true)
           1 -> TCell(formatDate(v.date))
           2 -> TCell(names[v.supplierId] ?: "—")
           3 -> TCell(v.lines.size.toString())
@@ -172,7 +177,10 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
         Modifier.width(380.dp).fillMaxHeight().clip(RoundedCornerShape(12.dp)).background(Shop.colors.surface)
           .border(1.dp, Shop.colors.border, RoundedCornerShape(12.dp)).padding(14.dp),
       ) {
-        Text(if (inv.no > 0) "فاکتورِ خرید #${inv.no}" else "خرید", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(if (inv.isReturn) "برگشت به تأمین‌کننده (سندِ کسر)" else if (inv.no > 0) "فاکتورِ خرید #${inv.no}" else "خرید", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        inv.dueDate?.takeIf { !inv.isReturn }?.let { due ->
+          Text("سررسید ${formatDate(due)}", style = MaterialTheme.typography.labelSmall, color = if (due < today && (remaining[inv.key] ?: 0.0) > 0.5) Shop.colors.danger else Shop.colors.muted)
+        }
         Text("${names[inv.supplierId] ?: "—"} · ${formatDate(inv.date)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         Spacer(Modifier.height(8.dp))
         HeadRow(listOf("کالا" to 0.dp, "مقدار" to 60.dp, "جمع" to 100.dp))
@@ -242,6 +250,11 @@ private fun NewPurchaseInvoice(
   var date by remember { mutableStateOf(formatDate(today)) }
   var paid by remember { mutableStateOf("") }
   var notes by remember { mutableStateOf("") }
+  //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبیِ کلِ فاکتور (PUR-06) — روی بهای ردیف‌ها پخش می‌شود، نه بدهیِ تأمین‌کننده
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  var landed by remember { mutableStateOf("") }
+  var due by remember { mutableStateOf("") }
+  val context = androidx.compose.ui.platform.LocalContext.current
   val lines = remember { mutableStateListOf(Draft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
 
@@ -272,7 +285,10 @@ private fun NewPurchaseInvoice(
         expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast("تاریخِ انقضای «$exp» درست نیست — مثلاً ۱۴۰۶/۰۳/۳۱"))
     }
     val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast("تاریخِ فاکتور درست نیست — مثلاً ${formatDate(today)}")
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId)) {
+    val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast("هزینهٔ جانبی درست نیست")
+    val user = if (stockOn) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null
+    val dueIso = if (!stockOn || due.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(due) ?: return toast("سررسید درست نیست — مثلاً ${formatDate(today)}")
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -352,6 +368,22 @@ private fun NewPurchaseInvoice(
       Spacer(Modifier.width(10.dp))
       OutlinedTextField(paid, { paid = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true, label = { Text("پرداخت‌شده (؋)") }, modifier = Modifier.width(170.dp))
       TextButton(onClick = { paid = Math.round(total).toString() }) { Text("همه") }
+      if (stockOn) {
+        Spacer(Modifier.width(10.dp))
+        OutlinedTextField(
+          landed, { landed = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
+          label = { Text("هزینهٔ جانبی (؋)") },
+          supportingText = { Text("کرایه، گمرک — روی بهای ردیف‌ها؛ جدا در «مصارف» ثبتش نکنید") },
+          modifier = Modifier.width(190.dp),
+        )
+        Spacer(Modifier.width(10.dp))
+        OutlinedTextField(
+          due, { due = it }, singleLine = true,
+          label = { Text("سررسیدِ پرداخت") },
+          supportingText = { Text("اختیاری — یادآور") },
+          modifier = Modifier.width(160.dp),
+        )
+      }
       Spacer(Modifier.width(10.dp))
       Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
         Text("جمعِ فاکتور: ${money(total)} ؋", fontWeight = FontWeight.Bold, color = Shop.colors.text)
@@ -429,9 +461,9 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   var openId by remember { mutableStateOf<String?>(null) }
-  val all = remember(d) { PurchaseBook.suppliers(d) }
-  val open = all.find { it.supplier.id == openId }
   val today = ir.vil3ntec.tohid.todayIso()
+  val all = remember(d, today) { PurchaseBook.suppliers(d, today) }
+  val open = all.find { it.supplier.id == openId }
 
   if (open == null) {
     var name by remember { mutableStateOf("") }
@@ -485,7 +517,9 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
   }
 
   var paying by remember(openId) { mutableStateOf(false) }
+  var returning by remember(openId) { mutableStateOf(false) }
   var amount by remember(openId) { mutableStateOf("") }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val ledger = remember(d, openId) { PurchaseBook.ledger(d, open.supplier.id) }
   fun sheet() = PurchaseBook.ledgerSheet(d, open.supplier, today)
   Column(
@@ -505,6 +539,10 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(open.supplier.phone), color = Shop.colors.muted)
       Spacer(Modifier.weight(1f))
       Button(onClick = { paying = true }) { Text("پرداخت به تأمین‌کننده  F7") }
+      if (stockOn) {
+        Spacer(Modifier.width(6.dp))
+        OutlinedButton(onClick = { returning = true }) { Text("برگشت (سندِ کسر)") }
+      }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }) { Text("چاپ") }
       Spacer(Modifier.width(6.dp))
@@ -516,6 +554,19 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       DeskKpi("جمعِ خرید", "${money(open.bought)} ؋", Shop.colors.primary, Modifier.weight(1f))
       DeskKpi("فاکتورها", "${open.invoices}", Shop.colors.text, Modifier.weight(1f))
       DeskKpi("آخرین خرید", open.lastPurchase?.let { formatDate(it) } ?: "—", Shop.colors.text, Modifier.weight(1f))
+      if (stockOn && open.overdue > 0.5) DeskKpi("سررسیدگذشته", "${money(open.overdue)} ؋", Shop.colors.danger, Modifier.weight(1f))
+      if (open.returned > 0.5) DeskKpi("سندِ کسر (برگشت)", "${money(open.returned)} ؋", Shop.colors.success, Modifier.weight(1f))
+    }
+    if (returning) {
+      SupplierReturnDialog(d, open.supplier.id, onDismiss = { returning = false }) { productId, q, price, reason, date, key ->
+        when (val r = PurchaseBook.supplierReturn(
+          d, open.supplier.id, productId, q, price, reason, date, today, System.currentTimeMillis(), ::newId,
+          userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
+        )) {
+          is PurchaseBook.Result.Failed -> toast(r.message)
+          is PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; returning = false; toast("برگشت و سندِ کسر ثبت شد") }
+        }
+      }
     }
     if (paying) {
       Spacer(Modifier.height(8.dp))

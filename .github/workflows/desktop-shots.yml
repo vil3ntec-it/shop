@@ -99,6 +99,11 @@ jobs:
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
           #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
           S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
+          #  دفترِ موجودی (موتورِ تازهٔ موجودی و بها): خاموش ⇐ روشن با همان راهِ تنظیمات ⇐ زبانه‌ها، انتقال، انبار
+          S="$S;go:stockbook;wait:1500;shot:20-stockbook-off;stock:on;wait:3000;shot:20b-stockbook-positions"
+          S="$S;stocktab:ledger;wait:1500;shot:20c-stockbook-ledger;stocktab:review;wait:1200;shot:20d-stockbook-review"
+          S="$S;stockcount:4;stocktab:count;wait:1800;shot:20e-stockbook-count;stock:transfer;wait:1200;shot:20f-stockbook-transfer;key:ESCAPE;wait:800"
+          S="$S;go:warehouse;wait:1800;shot:20g-warehouse-stock-on"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           #  F0-18: پنجرهٔ میان‌برها (F1) و قرض‌داران (DeskCustomers) در شب هم — رنگ‌ها از تم، نه ثابت
