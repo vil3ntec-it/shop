@@ -19,12 +19,12 @@ const crypto = require('crypto');
 const db = require('../db');
 const { one, many, now, tx } = db;
 const D = require('./delivery-states');
+const codeRule = require('./delivery-code-rule');   //  DLV-08: «نقد یا گران‌قیمت ⇒ کد»، پشتِ پرچمِ خاموش
 const orders = require('./orders');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
-const config = require('../config');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.delivery';
@@ -107,45 +107,8 @@ const asJson = (x) => {
 };
 const hashOf = (obj) => crypto.createHash('sha256').update(stable(obj)).digest('hex');
 
-// ════════════════════════════════════════════════════════════════════
-//  کدِ تحویل (PCK-11، DLV-08، DLV-15) — فقط HMAC در دیتابیس
-// ════════════════════════════════════════════════════════════════════
-
-function pepper() {
-  return config.secrets.api || config.secrets.otp || config.secrets.jwt || 'shop-delivery-code';
-}
-
-function codeHash(assignmentId, code) {
-  return crypto.createHmac('sha256', pepper()).update(`delivery:${assignmentId}:${code}`).digest('hex');
-}
-
-function newCode() {
-  return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-}
-
-/**
- * کدِ قابلِ بازسازی (فقط با پرچمِ نمای مشتری): از دانهٔ تصادفیِ مأموریت و رمزِ
- * سرور ساخته می‌شود، تا مشتری کد را ببیند بی آن‌که خودِ کد جایی نوشته شود.
- */
-function derivedCode(assignmentId, nonce) {
-  const mac = crypto.createHmac('sha256', pepper()).update(`delivery-code:${assignmentId}:${nonce}`).digest();
-  return String(mac.readUIntBE(0, 6) % 1_000_000).padStart(6, '0');
-}
-
-/** کد + دانه: با پرچم قابلِ بازسازی، وگرنه همان کدِ تصادفیِ یک‌بار-دیدنی. */
-function codeFor(assignmentId, rebuildable) {
-  if (!rebuildable) return { code: newCode(), nonce: '' };
-  const nonce = crypto.randomBytes(16).toString('base64url');
-  return { code: derivedCode(assignmentId, nonce), nonce };
-}
-
-function codeMatches(a, raw) {
-  const code = str(raw).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
-  if (!/^\d{6}$/.test(code)) return false;
-  const want = Buffer.from(a.code_hash, 'hex');
-  const got = Buffer.from(codeHash(a.id, code), 'hex');
-  return want.length === got.length && crypto.timingSafeEqual(want, got);
-}
+//  کدِ تحویل (PCK-11، DLV-08، DLV-15) — فقط HMAC در دیتابیس: `lib/delivery-codes.js`
+const { codeHash, derivedCode, codeFor, codeMatches } = require('./delivery-codes');
 
 // ════════════════════════════════════════════════════════════════════
 //  مدلِ خواندنی
@@ -377,7 +340,8 @@ async function assign(shopId, orderId, body, actor, key = '') {
   const requireCode = mode === 'pickup' || b.requireCode === true;
   if (b.overrideCashCap !== undefined && typeof b.overrideCashCap !== 'boolean') throw badRequest('نامعتبر', 'bad_override');
   const reqHash = hashOf({ orderId: String(orderId || ''), mode, fareMinor, courierId, externalName, externalRef, requireCode });
-  const rebuildable = requireCode && await orders.flagOf(shopId, VIEW_FLAG);
+  const codePolicy = await codeRule.policyOf(shopId);
+  const rebuildable = (requireCode || codePolicy.on) && await orders.flagOf(shopId, VIEW_FLAG);
 
   return tx(async (c) => {
     const order = (await c.query(
@@ -411,6 +375,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
     if (live) throw conflict('این سفارش همین حالا مأموریتِ زنده دارد', 'already_assigned');
 
     const expected = order.payment_method === 'cod' && order.payment_status !== 'paid' ? Number(order.total_minor) : 0;
+    const codeBy = codeRule.requires(codePolicy, { mode, totalMinor: Number(order.total_minor), expectedCollectMinor: expected });   //  DLV-08؛ خاموش ⇒ ''
 
     let overCap = false;
     if (mode === 'shop_courier') {
@@ -432,7 +397,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
     const attempt = Number((await c.query(
       'SELECT COALESCE(MAX(attempt_no), 0) + 1 AS n FROM delivery_assignments WHERE order_id=$1', [order.id]
     )).rows[0].n);
-    const { code, nonce } = requireCode ? codeFor(id, rebuildable) : { code: null, nonce: '' };
+    const { code, nonce } = requireCode || codeBy ? codeFor(id, rebuildable) : { code: null, nonce: '' };
     const status = mode === 'shop_courier' ? 'requested' : 'assigned';
     await c.query(
       `INSERT INTO delivery_assignments (id, shop_id, order_id, attempt_no, mode, courier_id, external_name,
@@ -445,7 +410,8 @@ async function assign(shopId, orderId, body, actor, key = '') {
     await appendEvent(c, a, {
       key: key || `srv:${id}:created`, hash: reqHash, kind: 'created', to: status,
       actorType: 'user', actorId: actor.userId, deviceId: actor.deviceId,
-      detail: { mode, courierId, externalName, fareMinor, expectedCollectMinor: expected, requireCode,
+      detail: { mode, courierId, externalName, fareMinor, expectedCollectMinor: expected, requireCode: requireCode || Boolean(codeBy),
+        ...(codeBy ? { codeRule: codeBy } : {}),
         ...(overCap ? { overCashCap: true } : {}) },
     }, at);
     return { assignment: staffView(a), code, replayed: false };
@@ -1333,7 +1299,7 @@ function staffActor(req) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS,
-  VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, customerView, putLocation, putEta, purgeLocations,
+  VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, LOCATION_MIN_INTERVAL_MS, ON_THE_WAY, customerView, putLocation, putEta, purgeLocations,
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, missions, forOrder, board,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
