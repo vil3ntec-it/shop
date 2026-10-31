@@ -17,10 +17,17 @@
  *   POST /:id/pick/start                  شروع — `orders.manage`
  *   POST /:id/pick/events                 کارهای جمع‌آور با کلیدِ یکتا — `orders.manage`
  *   POST /:id/pick/pack                   بسته‌بندی با کلیدِ یکتایی — `orders.manage`
+ *
+ *   قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12، `lib/pick-shelf.js`):
+ *   GET  /pick/shelf                      آن‌چه روی قفسهٔ انتظار است
+ *   POST /pick/shelf/scan                 اسکنِ برچسبِ کیسه روی یک جا ⇒ «آماده» — `orders.manage`
+ *   POST /pick/batches                    دستهٔ ۲ تا ۱۰ سفارش با کلیدِ یکتایی — `orders.manage`
+ *   GET  /pick/batches/:batchId           فهرستِ یک‌جای دسته به ترتیبِ قفسه
  */
 const express = require('express');
 const orders = require('../lib/orders');
 const picking = require('../lib/order-picking');
+const shelf = require('../lib/pick-shelf');
 const audit = require('../lib/audit');
 const { requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
@@ -116,6 +123,33 @@ router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, async (re
     originalTotalMinor: out.sheet.totals.originalTotalMinor, deductedMinor: out.deductedMinor,
   });
   res.json({ pick: out.sheet, replayed: false });
+});
+
+// ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) ─────────────────
+
+router.get('/pick/shelf', needOrders, needPick, async (req, res) => {
+  res.json(await shelf.shelf(req.shopId));
+});
+
+router.post('/pick/shelf/scan', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const out = await shelf.scan(req.shopId, req.body, actorOf(req));
+  if (out.readyNow) await log(req, 'pick.ready', out.orderId, { orderNo: out.orderNo, slot: out.slot, bags: out.bags });
+  res.json(out);
+});
+
+router.post('/pick/batches', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const out = await shelf.createBatch(req.shopId, { key: orders.clientKeyOf(req), body: req.body }, actorOf(req));
+  if (!out.replayed) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'pick.batch', targetType: 'pick_batch', targetId: out.batch.batchId,
+      detail: { orders: out.batch.orders.map((o) => o.orderNo) }, ip: clientIp(req),
+    });
+  }
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.get('/pick/batches/:batchId', needOrders, needPick, async (req, res) => {
+  res.json({ batch: await shelf.batch(req.shopId, req.params.batchId) });
 });
 
 module.exports = router;
