@@ -43,6 +43,8 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
+  //  آزمون‌های commonTest (Kotlin ِ خالص، بی دستگاه): روی jvm با `jvmTest` و در آیفون با iosTest.
+  //  فقط kotlin-test از Maven Central — همان قاعدهٔ «بی مخزنِ گوگل» ِ settings.gradle.kts.
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
   //  فقط آزمونِ JVM: `CoreVectorsCommonParityTest` جدول‌های CoreVectorsCommonTest را با JSON می‌سنجد
   //  (همان نسخهٔ `android-native/app/build.gradle.kts`)
