@@ -23,7 +23,7 @@ let pumpPlans = [];
 let currentShop = null;
 
 // ---------- ابزار ----------
-async function call(method, path, body, extraHeaders = {}) {
+async function call(method, path, body, extraHeaders = {}, retried = false) {
   const res = await fetch(API + path, {
     method,
     headers: {
@@ -42,9 +42,55 @@ async function call(method, path, body, extraHeaders = {}) {
     const err = new Error(json?.error?.message || `خطای ${res.status}`);
     err.code = json?.error?.code || '';
     err.status = res.status;
+    //  SEC-AUTH-12: ورودِ دومرحله‌ای اجباری است و این مدیر هنوز روشنش نکرده
+    if (err.code === 'admin_2fa_enrollment_required') open2fa(err.message);
+    //  SEC-AUTH-13: کارِ حساس ⇒ رمز (و کد) دوباره، بعد همان درخواست یک بارِ دیگر
+    if (err.code === 'admin_reauth_required' && !retried && await askReauth()) {
+      return call(method, path, body, extraHeaders, true);
+    }
     throw err;
   }
   return json;
+}
+
+/** پنجرهٔ «تأییدِ دوباره» — true اگر سرور پذیرفت، false با «انصراف». */
+let reauthWait = null;
+function askReauth() {
+  if (reauthWait) return reauthWait;
+  reauthWait = new Promise((resolve) => {
+    const panel = $('reauth-panel');
+    const done = (ok) => {
+      panel.classList.add('hidden');
+      $('reauth-pass').value = '';
+      $('reauth-code').value = '';
+      $('btn-reauth-ok').onclick = null;
+      $('btn-reauth-cancel').onclick = null;
+      reauthWait = null;
+      resolve(ok);
+    };
+    $('btn-reauth-ok').onclick = async () => {
+      const body = { password: $('reauth-pass').value };
+      const second = asciiDigits($('reauth-code').value);
+      if (second) { if (/^\d{6}$/.test(second)) body.totp = second; else body.recovery_code = second; }
+      try {
+        await call('POST', '/admin/reauth', body, {}, true);
+        done(true);
+      } catch (err) { msg($('reauth-msg'), err.message, 'bad'); }
+    };
+    $('btn-reauth-cancel').onclick = () => done(false);
+    msg($('reauth-msg'), '', 'muted');
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ block: 'center' });
+    $('reauth-pass').focus();
+  });
+  return reauthWait;
+}
+
+function open2fa(note) {
+  $('twofa-panel').classList.remove('hidden');
+  $('twofa-panel').scrollIntoView({ block: 'start' });
+  load2fa().then(() => { if (note) msg($('twofa-msg'), note, 'warn'); })
+    .catch((err) => msg($('twofa-msg'), err.message, 'bad'));
 }
 
 /*
@@ -151,6 +197,11 @@ async function login() {
     $('who').textContent = `${out.admin.name || out.admin.username} — ${out.admin.role === 'superadmin' ? 'مدیر ارشد' : 'مدیر'}`;
     setRole(out.admin.role);
     show();
+    //  SEC-AUTH-12: اجباری و هنوز خاموش ⇒ اول روشن کردن؛ بقیهٔ پنل تا آن‌وقت بسته است
+    if (out.twoFactor && out.twoFactor.required && !out.twoFactor.enabled) {
+      open2fa('ورودِ دومرحله‌ای برای مدیرانِ این سرور اجباری است؛ اول آن را روشن کنید، بعد یک بار خارج و دوباره وارد شوید.');
+      return;
+    }
     await refresh();
   } catch (err) {
     if (err.code === 'totp_required') {
@@ -169,7 +220,9 @@ async function load2fa() {
   const st = await call('GET', '/admin/2fa');
   $('twofa-state').textContent = st.enabled
     ? `روشن است — ${fa(st.recovery_left)} کدِ بازیابی مانده.`
-    : 'خاموش است. اجباری نیست؛ برای مدیرِ سرور پیشنهاد می‌شود.';
+    : st.enforced
+      ? 'خاموش است، ولی روی این سرور اجباری است: تا روشنش نکنید بقیهٔ پنل بسته می‌ماند.'
+      : 'خاموش است. اجباری نیست؛ برای مدیرِ سرور پیشنهاد می‌شود.';
   $('btn-2fa-start').classList.toggle('hidden', st.enabled);
   $('btn-2fa-enable').classList.toggle('hidden', st.enabled || $('twofa-setup').classList.contains('hidden'));
   $('btn-2fa-renew').classList.toggle('hidden', !st.enabled);

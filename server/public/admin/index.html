@@ -72,6 +72,23 @@
     <div id="twofa-msg"></div>
   </section>
 
+  <!-- SEC-AUTH-13: تأییدِ دوبارهٔ نشستِ مدیر پیش از کارِ حساس (پرچمِ ADMIN_REAUTH روی سرور) -->
+  <section class="panel hidden" id="reauth-panel" role="dialog" aria-labelledby="reauth-title">
+    <div class="panel-head">
+      <h2 id="reauth-title">تأییدِ دوباره</h2>
+      <button class="btn btn-ghost btn-sm" id="btn-reauth-cancel">انصراف</button>
+    </div>
+    <p class="muted">برای این کار رمزِ مدیر (و اگر ورودِ دومرحله‌ای روشن است، کدِ برنامهٔ تأیید یا یک کدِ بازیابی) را دوباره بزنید.</p>
+    <label for="reauth-pass">رمزِ کنونی</label>
+    <input type="password" id="reauth-pass" autocomplete="current-password">
+    <label for="reauth-code">کدِ برنامهٔ تأیید یا کدِ بازیابی (اگر روشن است)</label>
+    <input type="text" id="reauth-code" inputmode="numeric" autocomplete="one-time-code" dir="ltr">
+    <div class="row" style="margin-top:12px;gap:8px;">
+      <button class="btn btn-sm" id="btn-reauth-ok">تأیید و ادامه</button>
+    </div>
+    <div id="reauth-msg"></div>
+  </section>
+
   <!-- F0-08: پشتیبانِ بی‌رمز — هشدارِ قرمز تا وقتی BACKUP_PASSPHRASE تنظیم نشده -->
   <div class="msg msg-bad hidden" id="backup-crypto-warn" role="alert"></div>
 

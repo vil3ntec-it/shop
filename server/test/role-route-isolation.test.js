@@ -17,46 +17,16 @@
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const express = require('express');
 
-//  نقشهٔ سوارشدن از روترِ زنده — پیش از ساختنِ برنامه (همان شگردِ courier-scope)
-const RouterProto = express.Router.prototype;
-const origUse = RouterProto.use;
-RouterProto.use = function patchedUse(...args) {
-  const before = this.stack.length;
-  const out = origUse.apply(this, args);
-  const p = typeof args[0] === 'string' || Array.isArray(args[0]) ? args[0] : '/';
-  for (let i = before; i < this.stack.length; i++) this.stack[i].__mount = p;
-  return out;
-};
-
+//  نقشهٔ سوارشدن از روترِ زنده — پیش از ساختنِ برنامه (`route-inventory.tapMounts`، همان شگردِ courier-scope)
+const inv = require('./route-inventory');
+inv.tapMounts();
 const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 
-/** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان. */
-function live() {
-  const app = h.server().listeners('request')[0];
-  const out = [];
-  const join = (a, b) => (a + (b === '/' ? '' : b)).replace(/\/+/g, '/');
-  const walk = (router, prefix, pre) => {
-    const names = [...pre];
-    for (const layer of router.stack || []) {
-      if (layer.route) {
-        const chain = [...names, ...layer.route.stack.map((l) => l.handle.name)];
-        for (const p of [layer.route.path].flat()) {
-          if (typeof p !== 'string') continue;
-          for (const m of Object.keys(layer.route.methods)) if (m !== '_all') out.push({ method: m.toUpperCase(), path: join(prefix, p), chain });
-        }
-      } else if (layer.handle && Array.isArray(layer.handle.stack)) {
-        for (const mp of [layer.__mount || '/'].flat()) if (typeof mp === 'string') walk(layer.handle, join(prefix, mp), names);
-      } else names.push(layer.handle?.name || '');
-    }
-  };
-  for (const layer of app.router.stack) if (layer.__mount === '/api' && layer.handle?.stack) walk(layer.handle, '/api', []);
-  const seen = new Set();
-  return out.filter((r) => { const k = `${r.method} ${r.path}`; r.key = k; return !seen.has(k) && seen.add(k); });
-}
+/** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان (`route-inventory.live`). */
+const live = () => inv.live(h.server().listeners('request')[0]);
 const fill = (p, ids = {}) => p.replace(/:([A-Za-z_]+)/g, (_, k) => ids[k] ?? 'x1');
 const noBody = (m) => m === 'GET' || m === 'DELETE';
 //  سقف‌های درخواست (۴۲۹) این‌جا موضوع نیستند — هر درخواستِ فهرست با شمارندهٔ پاک
