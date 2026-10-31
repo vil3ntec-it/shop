@@ -472,6 +472,7 @@ fun SettingsScreen(
       }
     }
     item { ShrinkReportSettingsWired(context) } // گزارشِ ضایعات و کسری (INV-17)، پیش‌فرض خاموش
+    item { LabelToolsSettingsWired(context) } // برچسب و بارکدِ داخلی (PRD-23، PRD-05)، پیش‌فرض خاموش
 
     /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
     item {

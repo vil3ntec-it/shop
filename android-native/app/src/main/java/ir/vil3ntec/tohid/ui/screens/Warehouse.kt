@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -73,6 +74,8 @@ fun WarehouseScreen(
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
   var stockCount by remember { mutableStateOf(false) }
+  //  چاپِ برچسب و بارکدِ داخلی (PRD-23، PRD-05) — پشتِ `LabelToolsPref`، پیش‌فرض خاموش
+  var labels by remember { mutableStateOf(false) }
   //  ورودِ گروهیِ عکس (v3 ۳۶.۸) — کارِ صاحب/مدیر
   var imageBulk by remember { mutableStateOf(false) }
   //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
@@ -81,6 +84,7 @@ fun WarehouseScreen(
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
   val context = androidx.compose.ui.platform.LocalContext.current
+  val labelTools = remember { ir.vil3ntec.tohid.data.LabelToolsPref.on(context) }
   var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
   val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
@@ -187,6 +191,14 @@ fun WarehouseScreen(
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
+        }
+        if (labelTools) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = { labels = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(ir.vil3ntec.tohid.core.i18n.StrLabel.openButton)
+          }
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -423,6 +435,8 @@ fun WarehouseScreen(
       },
     )
   }
+
+  if (labels) LabelSheetWired(context, d, onDismiss = { labels = false }) { r, done -> apply(r, done) }
 
   if (bulkEntry) {
     BulkEntrySheet(

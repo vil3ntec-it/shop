@@ -154,6 +154,7 @@
 - حالتِ `local` فروشِ بیش از «موجودی − منقضی − رزرو» را رد می‌کند؛ سندِ آفلاینِ ثبت‌شده (`recorded`) هرگز برای کمبود رد نمی‌شود و `reviewTask` می‌سازد (INV-19، #231).
 - کاتالوگِ واحد و رزروِ موجودیِ سرور در #263 (باز، `shop.catalog`) است؛ تا مرج، موجودی فقط در دفترِ دستگاه است.
 - گزارشِ ضایعات و کسری (`core/stock/ShrinkReport`، INV-17) فقط از `stockMovements` می‌خواند، نه ردیفِ انبار، تا هر کار یک بار شمرده شود؛ نوعِ اصلاح از `adjKind` ِ ردیفِ انبارِ همان حرکت (`refId`)، وگرنه یادداشتِ «انبارگردانی…» ⇒ کسری/اضافهٔ شمارش و بقیه «اصلاحِ دستی»؛ برگشت به تأمین‌کننده زیان نیست؛ کالای بی‌بها صفر و جدا شمرده (`claude/new-inv-1`).
+- بارکدِ داخلی فقط `core/product/InternalBarcode`: EAN-13 با ۲۰/۲۹، هرگز هم‌پیشوندِ قاعدهٔ معتبرِ ترازو (هم‌پوشانیِ دوطرفه)، ده رقم از SHA-256 ِ شناسهٔ کالا (یک کالا روی هر دستگاه یک کد) و یکتا با همهٔ بارکدهای دکان؛ فقط به کالای بی‌بارکد و از راهِ `WarehouseEngine.bulkUpdate` (سابقه). برچسب‌ها: ترتیب و سقف (۹۹ هر کالا، ۲۴۰ هر کار، وزنی یکی) فقط `LabelPlan`؛ A4 ِ چندبرگه `Labels.A4.sheets` با همان خانه‌بندیِ `sheet` (PRD-05/23، `claude/new-label-1`).
 
 ### v3 · گزارش
 
@@ -500,6 +501,7 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `whats_new` = «چه چیزی تازه است» پس از به‌روزرسانی و در «دربارهٔ برنامه» (`WhatsNewPref`، آخرین نسخهٔ دیده‌شده در `tohid-whats-new:seen`؛ OPS-05، `claude/new-ops-1`، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 `tohid-ui:pos_price_check = false` قیمت‌پرسی با Ctrl+I در صندوقِ کامپیوتر (`PosPriceCheckPrefs`، POS-15، `claude/new-pos-price-1`).
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `debt_reminder_template` = متنِ یادآوریِ بدهی، فقط متنِ درست، نبودن = جملهٔ امروز (`DebtReminderPref`، CRM-06، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `label_tools` = «چاپِ برچسب و بارکدِ داخلی» در انبار (`LabelToolsPref`، PRD-05/PRD-23، `claude/new-label-1`).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
