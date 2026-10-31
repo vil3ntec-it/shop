@@ -31,8 +31,8 @@ import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  POS-39 — پنجرهٔ «دریافت از مشتری» ِ صندوق (F7). فقط نمایش و ورودی؛ ثبت با `TillReceiveFlow` روی
- *  `ShopStore.update` در صفحه. مبلغِ پیش‌فرض همهٔ بدهی تا پول (`MoneyInput.settleInput`)؛ بیش از بدهی
+ *  POS-39 — پنجرهٔ «دریافت از مشتری» ِ صندوق (F7). فقط نمایش و ورودی؛ ثبت با `TillReceivePref.record` ⇐
+ *  `DebtEntry.record` روی دفترِ همین لحظهٔ دیسک، در صفحه. مبلغِ پیش‌فرض همهٔ بدهی تا پول (`MoneyInput.settleInput`)؛ بیش از بدهی
  *  همین‌جا «پیش‌پرداخت» گفته می‌شود و دکمه «ثبتِ پیش‌پرداخت» است — زدنش همان تأییدِ صریح است.
  */
 @Composable

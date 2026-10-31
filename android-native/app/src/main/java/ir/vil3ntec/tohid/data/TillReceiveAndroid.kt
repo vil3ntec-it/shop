@@ -19,8 +19,10 @@ object TillReceivePref {
   }
 
   /**
-   *  ثبت روی دفترِ **همین لحظه** (`ShopStore.update`، زیرِ قفلِ نوشتن) با ساعتِ دستگاه.
-   *  @return (نتیجهٔ `update`: null هیچ / true نوشته شد / false قفلِ نرم یا دیسک، نتیجهٔ `TillReceiveFlow`)
+   *  ⛔ ثبت فقط با `DebtEntry.record` (#567): زیرِ قفلِ موتور روی دفترِ همین لحظهٔ **دیسک** (`DebtEntry.ledgerNow`) — نه
+   *  حافظهٔ [store]: کارگرِ همگام‌سازی نمونهٔ `ShopStore` ِ خودش را دارد و پس از Pull ِ او نوشتنِ این حافظه رسیدِ دستگاهِ
+   *  دیگر را از دیسک پاک می‌کرد و `record` برایش DELETE می‌ساخت. قاعده‌های صندوق ([TillReceiveFlow.check]) هم روی
+   *  همان دفتر. کلید = شناسهٔ ردیف ⇒ دو ضربه یک ردیف. ساعت از دستگاه.
    */
   suspend fun record(
     store: ShopStore,
@@ -29,14 +31,10 @@ object TillReceivePref {
     notes: String,
     key: String,
     prepayConfirmed: Boolean,
-    newId: () -> String,
-  ): Pair<Boolean?, TillReceiveFlow.Outcome?> {
-    var out: TillReceiveFlow.Outcome? = null
-    val wrote = store.update { cur ->
-      TillReceiveFlow.apply(cur, debtorId, amountMinor, notes, key, prepayConfirmed, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), newId)
-        .also { out = it }
-        .let { (it as? TillReceiveFlow.Outcome.Ok)?.data }
+  ): DebtEntry.Result {
+    val today = ir.vil3ntec.tohid.todayIso()
+    return DebtEntry.record(store, key, TillReceiveFlow.entry(debtorId, amountMinor, notes, today), today, System.currentTimeMillis()) { cur ->
+      TillReceiveFlow.check(cur, debtorId, amountMinor, prepayConfirmed)
     }
-    return wrote to out
   }
 }

@@ -693,18 +693,14 @@ fun DeskSaleScreen(
         onDismiss = { receiveFor = null; refocus() },
         onSubmit = { amount, notes, prepay ->
           receiveBusy = true
+          val key = receiveKey
           scope.launch {
-            //  روی دفترِ همین لحظه؛ همان کلید ⇒ یک ردیف، حتی با دو ضربه
-            val (wrote, out) = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, receiveKey, prepay, ::newId)
+            //  ⛔ روی دفترِ همین لحظهٔ دیسک (`DebtEntry.record`)، نه `d` ِ صفحه؛ همان کلید ⇒ یک ردیف، حتی با دو ضربه
+            val r = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, key, prepay)
             receiveBusy = false
-            when (val o = out) {
-              is ir.vil3ntec.tohid.data.TillReceiveFlow.Outcome.Ok -> if (wrote == true) {
-                toast("دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(o.verdict.amountMinor))} ؋ از «$name» ثبت شد")
-                receiveFor = null; receiptOf = Triple(o.data, id, o.txId)
-              } else toast(SalePost.NOT_SAVED)
-              is ir.vil3ntec.tohid.data.TillReceiveFlow.Outcome.Already -> { receiveFor = null; receiptOf = Triple(d, id, o.txId) }
-              is ir.vil3ntec.tohid.data.TillReceiveFlow.Outcome.Failed -> toast(o.message)
-              is ir.vil3ntec.tohid.data.TillReceiveFlow.Outcome.NeedsConfirm, null -> Unit
+            //  ضربهٔ دوم (`again`) پیامِ دوم نمی‌گیرد؛ «ثبت نشد» ِ قفل/دیسک از `AppRoot`
+            r.show(::toast, "دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L))} ؋ از «$name» ثبت شد") {
+              receiveFor = null; receiptOf = Triple(store.data.value, id, key)
             }
           }
         },
