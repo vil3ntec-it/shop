@@ -318,7 +318,6 @@ class PayCoreTest {
 
   private fun runSteps(name: String, steps: List<JsonObject>): Shift? {
     var shift: Shift? = null
-    var last: ShiftReport? = null
     steps.forEachIndexed { i, st ->
       val label = "$name — گامِ ${i + 1} (${st.str("op")})"
       val expect = st["expect"] ?: JsonObject(mapOf("ok" to JsonPrimitive(true)))
@@ -363,15 +362,13 @@ class PayCoreTest {
                 by = o.str("by"), blind = o.bool("blind") ?: false, reason = o.str("reason"),
               )
             )
-            if (r is PayResult.Ok) { shift = r.value; last = r.value.z }
+            if (r is PayResult.Ok) shift = r.value
             res(r) { mapOf("report" to reportJson(it.z!!)) }
           }
           "z" -> {
             val r = ShiftCore.zReport(shift)
-            if (r is PayResult.Ok) last = r.value
             res(r) { mapOf("report" to reportJson(it)) }
           }
-          "cashierView" -> j(mapOf("report" to reportJson(ShiftCore.cashierView(last!!))))
           else -> error("گامِ ناشناخته: ${st.str("op")}")
         }
         assertEquals(label, expect, got)
