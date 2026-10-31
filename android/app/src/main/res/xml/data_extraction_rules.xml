@@ -1,11 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  پشتیبانِ خودکارِ اندروید ۱۲ به بالا (ابر و انتقالِ گوشی‌به‌گوشی).
+
+  `app_webview` جای localStorage و IndexedDB ِ صفحه است، و توکنِ ورود
+  (`tohid-shop-auth-v1`) هم در همان localStorage کنارِ دفتر می‌نشیند. تا
+  ۲.۱۴.۵ همین پوشه در پشتیبانِ گوگل و انتقالِ گوشی می‌رفت: نشستِ باز روی
+  گوشیِ دیگری بالا می‌آمد و توکن در حسابِ گوگل می‌ماند. توکن را نمی‌شود
+  جدا از بقیهٔ localStorage کنار گذاشت، پس کلِ `app_webview` بیرون می‌ماند
+  (هم‌تراز با `android-native/.../backup_rules.xml` که توکن‌ها را بیرون می‌گذارد).
+
+  دفتر از راهِ «پشتیبان» ِ خودِ برنامه (پرونده در Downloads) یا همگام‌سازی
+  با سرور به گوشیِ تازه می‌رود، نه با پشتیبانِ گوگل.
+
+  `android:allowBackup="false"` روی اندروید ۱۲+ انتقالِ گوشی‌به‌گوشی را
+  نمی‌بندد؛ همین قاعده‌ها آن را می‌بندند.
+-->
 <data-extraction-rules>
     <cloud-backup>
-        <include domain="root" path="app_webview" />
-        <include domain="database" path="." />
+        <exclude domain="root" path="app_webview" />
     </cloud-backup>
     <device-transfer>
-        <include domain="root" path="app_webview" />
-        <include domain="database" path="." />
+        <exclude domain="root" path="app_webview" />
     </device-transfer>
 </data-extraction-rules>
