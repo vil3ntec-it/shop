@@ -54,6 +54,13 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/console-glue` (چسبِ فاز ۳ ⇄ پنل؛ روی `claude/console-phase3`)
+- انجام شد: `GET /api/admin/me` ⇒ `capabilities` (`shop-health.v1`، `shop-holds.v1`، `flags.v1`، `actor.v1`، `service-key.v1` —
+  همان نام‌های پل در ریپوی `server`)؛ مسیرِ ناشناختهٔ `/api/admin/*` با توکنِ معتبرِ مدیر ۴۰۴ `route_not_found` (بی‌توکن همان ۴۰۱)؛
+  `total` ِ `GET /api/admin/shops` همان `q` و `hold` را می‌شمارد. بندِ ۱۲.۶ ِ `ADMIN-CONTROL-PLANE.md`؛ آزمون در `admin-control-plane.test.js`.
+- نیمه‌کاره: هیچ. سمتِ پنل: ریپوی `server`، شاخهٔ `claude/console-glue-panel` (روی #115).
+- قدمِ بعدی: مرجِ #597 و همین، بعد #115 و PRِ پل؛ صاحبِ سامانه از «فروشگاه ← یکپارچه‌سازی» کلیدِ سرویس را می‌سازد.
+
 ### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/console-phase3` (پنلِ مرکزی، فاز ۳ — سمتِ سرورِ حساب)
 - انجام شد: `GET /api/admin/shops/:id/health` (فقط دادهٔ واقعی؛ نبود ⇒ null)؛ چهار حالتِ جدای دکان + بایگانی
   (`lib/shop-holds.js`، مهاجرتِ ۱۶۵) — تعلیقِ دسترسی، غیرفعال کردنِ سرویس، پایانِ اشتراک (فقط مالی/ارشد، با Idempotency-Key)،

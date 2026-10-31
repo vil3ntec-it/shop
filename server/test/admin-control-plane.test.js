@@ -280,3 +280,116 @@ test('هر API مدیر بی‌توکن و با توکنِ دکان ۴۰۱ می�
   }
   assert.ok(supers >= 30, `فقط ${supers} مسیرِ ارشد`);
 });
+
+/* ── ۸) چسبِ پنلِ مرکزی (فاز ۲ ِ پنل ⇄ فاز ۳ ِ سرورِ حساب) ─────────── */
+
+/*
+ *  ⛔ مسیرِ ناشناختهٔ `/api/admin/*` با توکنِ معتبرِ مدیر تا امروز به `routes/data` (روی `/`، با
+ *  `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت — پلِ پنل آن را «نشستِ ارشد تمام شد» می‌خواند،
+ *  دوباره وارد می‌شد و باز همان. حالا ۴۰۴ `route_not_found`؛ **بی‌توکن و با توکنِ دکان همان ۴۰۱** تا
+ *  وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود.
+ */
+const UNKNOWN = [
+  'GET /admin/shops/x1/suspension',      //  همان درِ فرضیِ فاز ۲ ِ پنل که #597 ندارد
+  'GET /admin/no-such-route',
+  'GET /admin/system/no-such-route',
+  'POST /admin/shops',                    //  GET هست، POST نه
+  'DELETE /admin/flags/x1/y1',
+];
+
+test('مسیرِ ناشناختهٔ مدیر: بی‌توکن و توکنِ دکان ۴۰۱؛ با توکنِ مدیر ۴۰۴ route_not_found (نه ۴۰۱ invalid_token) و نشست سالم می‌ماند', async () => {
+  const shopUser = await shopOwner('مسیرِ ناشناخته');
+  const plain = await plainToken();
+  const sup = await superToken();
+  for (const key of UNKNOWN) {
+    const [method, path] = key.split(' ');
+    for (const prefix of ['/api', '/api/v1']) {
+      const url = `${prefix}${path}`;
+      const anon = await h.api(method, url, {});
+      assert.equal(anon.status, 401, `${key} بی‌توکن ⇒ ${anon.status}`);
+      const asUser = await h.api(method, url, { token: shopUser.accessToken });
+      assert.equal(asUser.status, 401, `${key} با توکنِ دکان ⇒ ${asUser.status}`);
+      for (const [who, t] of [['مدیر', plain], ['ارشد', sup]]) {
+        const r = await h.api(method, url, { token: t, body: method === 'GET' ? null : {} });
+        assert.equal(r.status, 404, `${prefix}${key} ${who} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
+        assert.equal(r.body.error.code, 'route_not_found');
+      }
+    }
+  }
+  //  توکن باطل نشده — پل نباید دلیلی برای «دوباره وارد شو» ببیند
+  assert.equal((await h.get('/api/admin/me', { token: plain })).status, 200);
+});
+
+test('هر مسیرِ واقعیِ مدیر با توکنِ مدیر به خودش می‌رسد، نه به ۴۰۴ ِ «مسیر نیست»', async () => {
+  const routes = adminRoutes();
+  const sup = await superToken();
+  let checked = 0;
+  for (const r of routes) {
+    //  فقط خواندنی‌ها با ارشد (بی اثرِ جانبی)؛ نوشتنی‌های «فقط ارشد» را آزمونِ بالا با ۴۰۳ ِ مدیرِ عادی سنجید
+    if (r.method !== 'GET' || PUBLIC.has(`${r.method} ${r.path}`)) continue;
+    const res = await h.api('GET', `/api${concrete(r.path)}`, { token: sup });
+    assert.ok(!(res.status === 404 && res.body?.error?.code === 'route_not_found'), `GET ${r.path} ⇒ route_not_found`);
+    checked += 1;
+  }
+  assert.ok(checked > 60, `فقط ${checked} مسیرِ خواندنی`);
+});
+
+/*
+ *  «توانایی»ها: پلِ پنل (ریپوی server، `account-admin.js`) پیش از صدا زدنِ درِ فاز ۳ این فهرست را
+ *  می‌خواند. ⛔ نامِ هر توانایی همان است که پل می‌شناسد — یکی برای هر دو سو، و هر توانایی‌ای که
+ *  گفته می‌شود درش واقعاً هست (نه ۴۰۴ ِ «مسیر نیست»).
+ */
+const CAPABILITY_PROBES = {
+  'shop-health.v1': ['GET /admin/shops/x1/health'],
+  'shop-holds.v1': ['GET /admin/shops/x1/holds', 'POST /admin/shops/x1/holds', 'POST /admin/shops/x1/holds/x1/lift'],
+  'flags.v1': ['GET /admin/flags', 'GET /admin/flags/history'],
+  'service-key.v1': ['GET /admin/service-keys', 'POST /admin/service-keys', 'POST /admin/service-keys/x1/revoke'],
+  'actor.v1': ['GET /admin/me'],
+};
+
+test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
+  const me = await h.get('/api/admin/me', { token: await plainToken() });
+  assert.equal(me.status, 200);
+  assert.ok(Array.isArray(me.body.capabilities), JSON.stringify(me.body));
+  assert.deepEqual([...me.body.capabilities].sort(), Object.keys(CAPABILITY_PROBES).sort());
+  for (const c of me.body.capabilities) assert.match(c, /^[a-z][a-z0-9-]{0,40}\.v\d{1,3}$/);
+  const sup = await superToken();
+  for (const [cap, probes] of Object.entries(CAPABILITY_PROBES)) {
+    for (const key of probes) {
+      const [method, path] = key.split(' ');
+      const r = await h.api(method, `/api${path}`, { token: sup, body: method === 'GET' ? null : {} });
+      assert.ok(!(r.status === 404 && r.body?.error?.code === 'route_not_found'), `${cap}: ${key} ⇒ route_not_found`);
+      assert.notEqual(r.status, 401, `${cap}: ${key} ⇒ 401`);
+    }
+  }
+});
+
+test('GET /api/admin/shops: «total» همان جست‌وجو (q) و پالایشِ حالت (hold) را می‌شمارد، نه همهٔ دکان‌ها', async () => {
+  const a = await shopOwner('zqglue الف');
+  await shopOwner('zqglue ب');
+  await shopOwner('دیگری بی‌ربط');
+  const sup = await superToken();
+
+  const page = await h.get('/api/admin/shops?q=zqglue&limit=1', { token: sup });
+  assert.equal(page.status, 200);
+  assert.equal(page.body.shops.length, 1);
+  assert.equal(page.body.total, 2, '⛔ total باید همان جست‌وجو را بشمارد');
+
+  const all = await h.get('/api/admin/shops?limit=1', { token: sup });
+  const n = (await many('SELECT COUNT(*)::int n FROM shops'))[0].n;
+  assert.equal(all.body.total, n, 'بی q همان شمارِ همهٔ دکان‌ها');
+
+  const none = await h.get('/api/admin/shops?q=zqglue-nist', { token: sup });
+  assert.equal(none.body.total, 0);
+  assert.equal(none.body.shops.length, 0);
+
+  const placed = await h.api('POST', `/api/admin/shops/${a.shopId}/holds`, {
+    token: sup, body: { kind: 'archived', reason: 'آزمونِ شمارِ پالایش' },
+  });
+  assert.equal(placed.status, 201, JSON.stringify(placed.body));
+  const archived = await h.get('/api/admin/shops?q=zqglue&hold=archived', { token: sup });
+  assert.equal(archived.body.total, 1);
+  assert.deepEqual(archived.body.shops.map((s) => s.id), [a.shopId]);
+  const open = await h.get('/api/admin/shops?q=zqglue&hold=none', { token: sup });
+  assert.equal(open.body.total, 1);
+});
