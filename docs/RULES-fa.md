@@ -206,6 +206,7 @@
 - دکمه‌های حساسِ برنامه از `PermCore` تعیین می‌شوند، نه `!isStaff`؛ «سابقهٔ عملیات» پشتِ `audit.view` است (#248).
 - کدِ ثابتِ شاگرد «خاموش» می‌شود و تا «کدِ تازه» خودبه‌خود ساخته نمی‌شود؛ شاگردهای فعلی بیرون نمی‌افتند (STF-11، #243).
 - کلیدهای تازه: `orders.view/create/manage` همه، `orders.contact` و `orders.refund` صاحب و مدیر (#227)؛ `delivery.view/handover` همه، `delivery.assign/couriers/settle/photo` صاحب و مدیر (#249)؛ `chat.view/reply` همه، `chat.moderate` صاحب و مدیر (#259).
+- ⛔ `device_id`ِ همگام‌سازی (v1/v3، بدنه، querystring و `X-Device`) فقط همان دستگاهِ نشست است (`tokens.device_id` ⇐ `devices.device_uid`، یا `station_devices.device_uid`ِ کامپیوترِ پمپ) — وگرنه شاگرد با شناسهٔ دستگاهِ صاحب «حذفِ ردیفِ خودم» را دور می‌زد. پرچمِ `sync.device_bind` (live_config، `all` یا دکان/پمپ) روشن ⇒ `403 device_mismatch`؛ خاموش (پیش‌فرض) ⇒ فقط سابقهٔ `sync.device_mismatch` (روزی یک بار) تا پیش از روشن کردن دیده شود برنامه‌ای می‌شکند یا نه. سنجه: `sync-device-bind.test.js` (SEC-AUTH-14).
 
 ### v3 · سابقهٔ عملیات و زنجیرهٔ هش
 
