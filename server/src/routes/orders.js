@@ -17,6 +17,7 @@ const refunds = require('../lib/order-refunds');
 const delay = require('../lib/order-delay');
 const amend = require('../lib/order-amend');
 const presence = require('../lib/order-presence');
+const onlineReport = require('../lib/order-online-report');
 const S = require('../lib/order-states');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
@@ -63,6 +64,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
+    //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
+    picking: await require('../lib/order-picking').flagOf(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
@@ -107,8 +110,21 @@ router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap
 }));
 
 /**
+ * RPT-14 — گزارشِ فروشِ اینترنتی (`lib/order-online-report.js`): قیفِ سفارش، زمانِ قبول،
+ * آماده‌سازی و تحویل، نرخِ ازدست‌رفته و ناموفق، و جست‌وجوهای بی‌نتیجهٔ ویترین. فقط‌خواندنی؛
+ * هر کس گزارش می‌بیند (`reports.view`). پرچمِ خاموشِ `shop.orders.online_report` ⇒ ۴۰۳. پیش از `/:id`.
+ */
+router.get('/online-report', needFlag, requirePermission('reports.view'), wrap(async (req, res) => {
+  if (!(await onlineReport.flagOf(req.shopId))) {
+    throw forbidden('گزارشِ فروشِ اینترنتی برای این دکان روشن نیست', 'online_report_disabled');
+  }
+  res.json(await onlineReport.report(req.shopId, { from: req.query.from, to: req.query.to }));
+}));
+
+/**
  * سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست (`lib/order-ledger.js`) —
- * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد. فقط‌خواندنی؛
+ * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد؛ و بازپرداخت‌هایی
+ * که سندِ برگشتشان (`o-<سفارش>-rf-<کلید>`) هنوز در دفتر ننشسته (`refunds`). فقط‌خواندنی؛
  * همان کسی که سفارش را تحویل می‌دهد (`orders.manage`). پیش از `/:id`.
  */
 router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
@@ -316,5 +332,9 @@ router.get('/:id/risk', needFlag, wrap(async (req, res) => {
   if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
 }));
+
+//  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
+//  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
+router.use(require('./order-picking'));
 
 module.exports = router;
