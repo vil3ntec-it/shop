@@ -818,13 +818,16 @@ private fun AccountView(
           "کل رسید", money(account.received), "؋",
           Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
         )
-        //  صاف بودن به پول، نه `== 0.0` ِ Double (تسویهٔ چند ردیفِ اعشاری پسماند می‌گذاشت)
-        val sign = ir.vil3ntec.tohid.core.money.LedgerBalance.sign(account.balance)
+        val settled = ir.vil3ntec.tohid.data.DebtMinorFlag.settled(account.balance)
         AccountTile(
           "الباقی",
-          if (sign == 0) "تسویه" else money(kotlin.math.abs(account.balance)),
-          if (sign == 0) "حساب صاف" else DebtorEngine.stateText(account.balance),
-          if (sign > 0) Shop.colors.warning else Shop.colors.success,
+          if (settled) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (settled) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          when {
+            account.balance > 0 -> Shop.colors.warning
+            account.balance < 0 -> Shop.colors.success
+            else -> Shop.colors.success
+          },
           Shop.colors.surface,
           Modifier.weight(1f),
         )

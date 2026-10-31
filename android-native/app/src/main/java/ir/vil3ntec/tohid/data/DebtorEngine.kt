@@ -396,8 +396,8 @@ object DebtorEngine {
   /** کسری‌های ریزِ اعشار، «صفر» حساب می‌شوند */
   private const val EPSILON = 0.001
 
-  /** حالِ حساب، با همان جمله‌های نسخهٔ وب — صفر و نشانه به پول (پسماندِ Double «حساب صاف» است) */
-  fun stateText(balance: Double): String = when (ir.vil3ntec.tohid.core.money.LedgerBalance.sign(balance)) {
+  /** حالِ حساب، با همان جمله‌های نسخهٔ وب — با `shop.debt_minor` صفر و نشانه به پول (`DebtMinorFlag.sign`) */
+  fun stateText(balance: Double): String = when (DebtMinorFlag.sign(balance)) {
     1 -> "${money(balance)} افغانی بدهکار"
     -1 -> "${money(-balance)} افغانی موجودی دارد"
     else -> "حساب صاف است"

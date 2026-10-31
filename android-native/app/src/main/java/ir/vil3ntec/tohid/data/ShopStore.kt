@@ -29,6 +29,7 @@ import java.io.File
  *  عددی که فروشنده روی کاغذ دارد نباید با به‌روزرسانی عوض شود.
  */
 class ShopStore(private val context: Context) {
+  init { DebtMinorFlag.bind(context) }  //  `shop.debt_minor`: `debt` و موتورهای خالص پرچمِ همین دکان را از `DebtMinorFlag` می‌خوانند
 
   private val file = File(context.filesDir, "shop-data.json")
   private val json = Json {
@@ -908,9 +909,8 @@ class ShopStore(private val context: Context) {
     /** تمام‌شده | موجودی کم | موجودی کافی */
     fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
-    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — به پول (`LedgerBalance`، همان `DebtBook`): تسویهٔ دقیق صفرِ دقیق است */
-    fun debt(d: ShopData, debtorId: String): Double = ir.vil3ntec.tohid.core.money.LedgerBalance.sum(
-      d.transactions.filter { it.debtorId == debtorId }.map { if (it.type == "give") it.amount else -it.amount })
+    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — با `shop.debt_minor` به پول (`DebtMinorFlag`)، خاموش همان جمعِ Double */
+    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(d.transactions.filter { it.debtorId == debtorId })
 
     /**
      *  بدهیِ ما به یک تأمین‌کننده.

@@ -6,6 +6,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -28,8 +29,11 @@ object ReceiptFlag {
 
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-  private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-  private fun key(context: Context) = "v2:" + LedgerOwner.currentShop(context).ifBlank { "-" }
+  internal fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+  internal fun key(context: Context) = "v2:" + LedgerOwner.currentShop(context).ifBlank { "-" }
+
+  /** پیشوندِ کلیدِ پرچمِ `shop.debt_minor` (همان پاسخِ [CONFIG]، `debtMinor`؛ خوانندهٔ `DebtMinorFlag`) */
+  internal const val DEBT_MINOR = "debt-minor:"
 
   fun enabled(context: Context): Boolean = prefs(context).getBoolean(key(context), false)
 
@@ -43,9 +47,12 @@ object ReceiptFlag {
     }
     prefs(app).edit().putLong(at, now).apply()
     scope.launch {
-      val on = runCatching { Backend.api(app).get(CONFIG)["enabled"]?.jsonPrimitive?.booleanOrNull == true }.getOrNull()
-        ?: return@launch
-      prefs(app).edit().putBoolean(key(app), on).apply()
+      //  همان پاسخ پرچمِ `shop.debt_minor` را هم دارد (`debtMinor`)؛ سرورِ پیشین آن را ندارد ⇒ خاموش
+      val (on, debtMinor) = runCatching {
+        val body = Backend.api(app).get(CONFIG)
+        (body["enabled"]?.jsonPrimitive?.booleanOrNull == true) to ((body["debtMinor"] as? JsonPrimitive)?.booleanOrNull == true)
+      }.getOrNull() ?: return@launch
+      prefs(app).edit().putBoolean(key(app), on).putBoolean(DEBT_MINOR + key(app), debtMinor).apply()
       if (on) ReceiptProfileStore.refresh(app)
     }
   }
