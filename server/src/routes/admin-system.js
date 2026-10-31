@@ -10,6 +10,8 @@
  *                                      زیرِ حداقل (OPS-04)
  *   POST /api/admin/system/chain-verify ⇐ بررسیِ زنجیرهٔ هشِ سابقه (SEC-02)؛
  *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
+ *   GET /api/admin/system/reconciliation ⇐ تطبیقِ فروشِ آنلاین، لغو، بازپرداخت، نقدِ
+ *                                      پیک و تسویه به‌ازای هر دکان (E2E-ADM-15)؛ فقط ارشد
  *
  * زیرِ `requireAdmin`ِ `routes/admin.js` سوار است. فقط عدد و وضعیت؛ هیچ
  * راز، نشانی یا دادهٔ مشتری (شرح در `lib/system-health.js`).
@@ -54,6 +56,23 @@ router.post('/chain-verify', requireSuperAdmin, async (req, res, next) => {
     await audit.log({
       actorType: 'admin', userId: req.admin.id, ip: clientIp(req), action: 'admin.chain_verified',
       detail: { ok: out.ok, total: out.total, broken: out.brokenCount, rows: out.rows },
+    });
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  } catch (err) { next(err); }
+});
+
+/**
+ * ⛔ پولِ همهٔ دکان‌ها ⇒ فقط مدیرِ ارشد؛ فقط‌خواندنی (همان `order-refunds.reportMany`).
+ * دیدنش یک ردیفِ سابقه با بازه و شمارِ دکان‌ها دارد.
+ */
+router.get('/reconciliation', requireSuperAdmin, async (req, res, next) => {
+  try {
+    const q = req.query || {};
+    const out = await health.reconciliation({ from: q.from, to: q.to, fromDate: q.fromDate, toDate: q.toDate });
+    await audit.log({
+      actorType: 'admin', userId: req.admin.id, ip: clientIp(req), action: 'admin.reconciliation_viewed',
+      detail: { from: out.window.from, to: out.window.to, shops: out.shopsTotal },
     });
     res.set('Cache-Control', 'no-store');
     res.json(out);
