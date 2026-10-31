@@ -41,6 +41,7 @@ object StrPos {
   val cashReceived: String get() = t("نقدِ دریافتی", "Cash received", "ترلاسه شوې نغدې")
   val enterExactHint: String get() = t("Enter روی کادرِ خالی = نقدِ دقیق", "Enter on an empty box = exact cash", "په تش بکس کې Enter = دقیق نغد")
   val exactCash: String get() = t("نقدِ دقیق", "Exact cash", "دقیق نغد")
+  val notesKeysHint: String get() = t("اسکناس: Shift+1 تا Shift+6 = ۱۰، ۲۰، ۵۰، ۱۰۰، ۵۰۰ و ۱۰۰۰ — هر بار یکی به نقدِ دریافتی", "Banknotes: Shift+1 to Shift+6 = 10, 20, 50, 100, 500 and 1000 — each adds one to cash received", "نوټونه: Shift+1 تر Shift+6 = ۱۰، ۲۰، ۵۰، ۱۰۰، ۵۰۰ او ۱۰۰۰ — هر ځل یو په ترلاسه شویو نغدو ورزیاتوي")
   val reference: String get() = t("شمارهٔ مرجع", "Reference number", "د مرجع شمېره")
   val amount: String get() = t("مبلغ", "Amount", "مبلغ")
   val removeMethod: String get() = t("حذفِ این روش", "Remove this method", "دا لاره لرې کړئ")
