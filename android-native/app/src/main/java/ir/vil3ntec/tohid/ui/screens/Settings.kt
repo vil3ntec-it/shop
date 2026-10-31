@@ -480,6 +480,8 @@ fun SettingsScreen(
 
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
+    item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
