@@ -95,6 +95,10 @@ fun ProductDialog(
   val similar = remember(form.name, similarIndex) {
     similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
   }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember(state.editingId) { mutableStateOf("") }
+  val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -165,6 +169,17 @@ fun ProductDialog(
               modifier = Modifier.weight(1f),
             )
           }
+        }
+
+        if (tools && priceChanged) {
+          Spacer(Modifier.height(10.dp))
+          OutlinedTextField(
+            value = priceReason,
+            onValueChange = { priceReason = it },
+            label = { Text("دلیلِ تغییرِ قیمت (با نامِ شما در سابقه می‌ماند)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+          )
         }
 
         Spacer(Modifier.height(14.dp))
@@ -258,6 +273,8 @@ fun ProductDialog(
                   //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
                   unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
                   barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
+                  changedBy = if (tools) me else null,
+                  reason = if (tools) priceReason else null,
                 )
               )
             },

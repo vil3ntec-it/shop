@@ -1,12 +1,16 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.product.BulkPrice
+import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- *  PRD-04 (چند بارکد) و PRD-19 (نامِ مشابه) در موتورِ انبار و ورود از فایل.
- *  منطقِ خالص در core: `ProductBarcodesTest` و `SimilarNamesTest`.
+ *  PRD-04 (چند بارکد)، PRD-19 (نامِ مشابه)، PRD-14 (کاربر و دلیلِ تغییرِ قیمت) و PRD-21 (قیمتِ گروهی)
+ *  در موتورِ انبار و ورود از فایل. منطقِ خالص در core: `ProductBarcodesTest`، `SimilarNamesTest`، `BulkPriceTest`.
  */
 class ProductToolsTest {
 
@@ -68,5 +72,54 @@ class ProductToolsTest {
     assertEquals(4, plan.drafts.size)
     assertEquals(listOf(2 to "چای سبز", 5 to "قند سفید"), plan.similar.map { it.row to it.other })
     assertEquals(listOf(false, true), plan.similar.map { it.inFile })
+  }
+
+  @Test fun `PRD-14 تغییرِ قیمتِ خرید با کاربر و دلیل؛ بی آن‌ها همان JSON ِ پیشین`() {
+    val priced = base.copy(products = base.products.map { if (it.id == "p1") it.copy(purchasePrice = 80.0) else it })
+    val r = ok(WarehouseEngine.editProduct(priced, "p1",
+      WarehouseEngine.ProductDraft(name = "چای سبز", unit = "عدد", purchasePrice = 90.0, salePrice = 100.0, barcode = "111",
+        changedBy = "احمد", reason = "نرخِ تازهٔ عمده‌فروش"),
+      "2026-10-30", 0, ::newId))
+    val ch = r.data.priceHistory.single()
+    assertEquals("احمد", ch.by)
+    assertEquals("نرخِ تازهٔ عمده‌فروش", ch.reason)
+    val a = r.data.auditLog.single { it.type == "price_change" }
+    assertEquals("احمد", a.by)
+    assertTrue(a.notes, "نرخِ تازهٔ عمده‌فروش" in a.notes)
+    //  پرچمِ خاموش (null) ⇒ ردیف بی by/reason و JSON ِ بی کلیدِ تازه
+    val plainEdit = ok(WarehouseEngine.editProduct(priced, "p1",
+      WarehouseEngine.ProductDraft(name = "چای سبز", unit = "عدد", purchasePrice = 95.0, salePrice = 100.0, barcode = "111"),
+      "2026-10-30", 0, ::newId)).data.priceHistory.single()
+    assertNull(plainEdit.by)
+    //  همان تنظیمِ دفتر (`encodeDefaults = true`) — `EncodeDefault.NEVER` باز هم null را نمی‌نویسد
+    val json = Json { encodeDefaults = true }.encodeToString(PriceChange.serializer(), plainEdit)
+    assertFalse(json, "\"by\"" in json || "\"reason\"" in json)
+  }
+
+  @Test fun `PRD-21 قیمتِ گروهی با دلیل و سابقه؛ هشدار بی تأیید رد`() {
+    val ids = setOf("p1", "p2")
+    val up = ok(WarehouseEngine.bulkPrice(base, ids, BulkPrice.Field.SALE, BulkPrice.Op.Percent(1_000), 100,
+      confirmed = false, by = "احمد", reason = "گرانی", today = "2026-10-30", now = 0, newId = ::newId))
+    assertEquals(listOf(110.0, 330.0), up.data.products.map { it.salePrice })
+    val edits = up.data.auditLog.filter { it.type == "product_edit" }
+    assertEquals(2, edits.size)
+    assertTrue(edits.all { it.by == "احمد" && "گرانی" in it.notes })
+    //  بی دلیل ⇒ نه
+    failed(WarehouseEngine.bulkPrice(base, ids, BulkPrice.Field.SALE, BulkPrice.Op.Percent(1_000), 100,
+      confirmed = true, by = "احمد", reason = " ", today = "2026-10-30", now = 0, newId = ::newId))
+    //  +۶۰٪ ⇒ هشدارِ «تغییرِ بزرگ» ⇒ بی تأیید رد، با تأیید اعمال
+    failed(WarehouseEngine.bulkPrice(base, ids, BulkPrice.Field.SALE, BulkPrice.Op.Percent(6_000), 100,
+      confirmed = false, by = "احمد", reason = "x", today = "2026-10-30", now = 0, newId = ::newId))
+    ok(WarehouseEngine.bulkPrice(base, ids, BulkPrice.Field.SALE, BulkPrice.Op.Percent(6_000), 100,
+      confirmed = true, by = "احمد", reason = "x", today = "2026-10-30", now = 0, newId = ::newId))
+  }
+
+  @Test fun `PRD-21 قیمتِ خریدِ گروهی در تاریخچهٔ قیمت با کاربر و دلیل`() {
+    val r = ok(WarehouseEngine.bulkPrice(base, setOf("p2"), BulkPrice.Field.PURCHASE, BulkPrice.Op.SetTo(25_000), 100,
+      confirmed = false, by = "احمد", reason = "فاکتورِ تازه", today = "2026-10-30", now = 0, newId = ::newId))
+    assertEquals(250.0, r.data.products.first { it.id == "p2" }.purchasePrice, 0.0)
+    val ch = r.data.priceHistory.single()
+    assertEquals(listOf("p2", "احمد", "فاکتورِ تازه"), listOf(ch.productId, ch.by, ch.reason))
+    assertEquals(250.0, ch.newPrice, 0.0)
   }
 }
