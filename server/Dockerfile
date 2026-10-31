@@ -11,9 +11,12 @@ RUN apk add --no-cache postgresql16-client tini
 ENV NODE_ENV=production
 WORKDIR /app
 
-# اول فقط فایل وابستگی‌ها تا لایه‌ی نصب کش شود
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev || npm install --omit=dev
+# اول فقط فایل وابستگی‌ها تا لایه‌ی نصب کش شود.
+# ⛔ فقط `npm ci` از روی package-lock.json (نسخه و integrityِ قفل‌شده). پیش‌تر
+# `|| npm install` بود: اگر قفل با package.json نمی‌خواند، بی صدا نسخه‌های تازه و
+# سنجیده‌نشده نصب می‌شد. نبودنِ قفل یا ناهم‌خوانی حالا ساخت را می‌شکند (docs/security/supply-fa.md).
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 
 COPY . .
 
