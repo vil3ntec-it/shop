@@ -190,7 +190,8 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
+  'shop.storefront.zones', 'shop.storefront.notify_area'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 
@@ -282,6 +283,13 @@ async function seedShop(a) {
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
+  //  «خبرم کن» ِ مشتریِ بیرون از محدوده (CHK-10) — ردیفِ واقعیِ «الف»
+  ids.areaRequest = newId('area');
+  await query(
+    `INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
+     VALUES ($1,$2,'+93791234568',34.62,69.31,$3,$3)`,
+    [ids.areaRequest, a.shopId, now()]
+  );
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -430,6 +438,7 @@ function concreteFor(ids) {
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
@@ -475,6 +484,7 @@ function bodyFor(r, ids) {
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
     'POST /shop/delivery/assignments/:id/recall': { reason: 'other', note: 'آزمون' },
+    'POST /shop/delivery/assignments/:id/address': { address: { landmark: 'آزمون', area: 'ناحیه', gateColor: 'سبز' } },
     'POST /shop/delivery/couriers/:id/settlements': { assignmentIds: [ids.assignment], handedOverMinor: 1, receivedMinor: 1 },
     'PUT /shop/chat/conversations/:id/status': { status: 'closed' },
     'POST /shop/chat/conversations/:id/messages': { clientId: `client-${fresh('x')}-0000`, body: 'سلام' },
