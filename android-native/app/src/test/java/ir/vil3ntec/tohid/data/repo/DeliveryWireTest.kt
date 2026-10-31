@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.delivery.CashReportMath
+import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -135,5 +137,41 @@ class DeliveryWireTest {
     assertEquals(setOf("reason"), DeliveryWire.recallJson("customer_request", " ").keys)
     assertEquals(setOf("cashCapMinor"), DeliveryWire.courierUpdateJson(cashCapMinor = 2_000_000).keys)
     assertEquals(setOf("active"), DeliveryWire.courierUpdateJson(active = false).keys)
+  }
+
+  /** RPT-15 — همان شکلِ `server/test/delivery-cash-report.test.js` */
+  @Test fun `گزارش نقد پیک‌ها - ردیف‌ها، جمع و هم‌خوانی`() {
+    val r = DeliveryWire.cashReport(obj("""
+      {"from":1000,"to":2000,
+       "couriers":[
+         {"courierId":"c1","name":"پیکِ یک","deliveries":2,"expectedCashMinor":2480000,"collectedCashMinor":2480000,
+          "unsettledMinor":1240000,"settlements":1,"handoverDueMinor":1240000,"receivedMinor":1240000,
+          "shortageMinor":0,"excessMinor":0,"fareTotalMinor":0,"inHandMinor":1240000},
+         {"courierId":"c2","name":"پیکِ دو","deliveries":1,"expectedCashMinor":1240000,"collectedCashMinor":1240000,
+          "unsettledMinor":0,"settlements":1,"handoverDueMinor":1240000,"receivedMinor":1230000,
+          "shortageMinor":10000,"excessMinor":0,"fareTotalMinor":0,"inHandMinor":0},
+         {"name":"بی شناسه"}],
+       "totals":{"deliveries":3,"expectedCashMinor":3720000,"collectedCashMinor":3720000,"unsettledMinor":1240000,
+          "settlements":2,"handoverDueMinor":2480000,"receivedMinor":2470000,"shortageMinor":10000,"excessMinor":0,
+          "fareTotalMinor":0,"inHandMinor":1240000}}
+    """))
+    assertEquals(1000L, r.from)
+    assertEquals(2000L, r.to)
+    assertEquals(listOf("c1", "c2"), r.couriers.map { it.courierId })
+    assertEquals(1_240_000L, r.couriers[0].unsettledMinor)
+    assertEquals(10_000L, r.couriers[1].shortageMinor)
+    assertEquals(2, r.totals.settlements)
+    assertTrue(CashReportMath.consistent(r))
+    assertFalse(CashReportMath.consistent(r.copy(couriers = r.couriers.take(1))))
+    val empty = DeliveryWire.cashReport(obj("""{"from":1,"to":2}"""))
+    assertTrue(empty.couriers.isEmpty())
+    assertTrue(CashReportMath.consistent(empty))
+    assertEquals("/shop/delivery/cash-report?from=1&to=2", ApiEndpoints.Delivery.cashReport(1, 2))
+    //  بازه: نیمه‌شبِ روزِ اول تا نیمه‌شبِ پس از روزِ آخر
+    val day = ir.vil3ntec.tohid.ui.screens.cashReportWindow("today", "2026-10-29")!!
+    val week = ir.vil3ntec.tohid.ui.screens.cashReportWindow("week", "2026-10-29")!!
+    assertEquals(86_400_000L, day.second - day.first)
+    assertEquals(7 * 86_400_000L, week.second - week.first)
+    assertEquals(day.second, week.second)
   }
 }
