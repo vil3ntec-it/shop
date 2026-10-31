@@ -9,6 +9,11 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrShell {
 
+  // OPS-03: برنامه دفعهٔ پیش ناگهان بسته شد (MainActivity)
+  val crashTitle: String get() = t("برنامه ناگهان بسته شد", "The app closed unexpectedly", "پروګرام ناڅاپه بند شو")
+  val crashBody: String get() = t("گزارشِ خطا بی هیچ دادهٔ شخصی برای پشتیبانی فرستاده می‌شود. اگر با پشتیبانی تماس گرفتید، این کد را بگویید:", "An error report with no personal data is being sent to support. If you contact support, give them this code:", "د تېروتنې راپور پرته له شخصي معلوماتو ملاتړ ته لېږل کېږي. که له ملاتړ سره اړیکه نیسئ، دا کوډ ورته ووایاست:")
+  val crashOk: String get() = t("باشه", "OK", "سمه ده")
+
   // منو و سربرگ
   val promos: String get() = t("تخفیف‌ها", "Discounts", "تخفیفونه")
   val promosSub: String get() = t("تخفیفِ خودکار، بخر X بگیر Y، بسته، ساعتِ خوش و کدِ تخفیف", "Automatic discounts, buy X get Y, bundles, happy hours and discount codes", "اتومات تخفیف، X واخلئ Y ترلاسه کړئ، بنډل، د خوښۍ ساعتونه او د تخفیف کوډ")

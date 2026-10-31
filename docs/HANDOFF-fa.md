@@ -240,6 +240,16 @@ server؛ (۵) Pages ⇐ GitHub Actions، اسکنِ secret، Dependabot، مجو
 - قدمِ بعدی: کلیدها و ثبتِ وب‌هوک، افزودنِ `/payments` به `ACCOUNT_PREFIXES` ِ پنلِ خانگی، یک پرداختِ آزمایشیِ کوچک و
   درست کردنِ `server/src/lib/payment-hesabpay.js` با سندِ رسمی.
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-2` (OPS-03: گزارشِ از کار افتادنِ برنامهٔ نصبی)
+- انجام شد: منطق در `core/.../core/ops/CrashReports.kt` (پوشاندنِ ایمیل/شماره با هر سه خطِ رقم/توکن/عددِ ۷+ رقمی پیش از دیسک،
+  کدِ `cer_<ULID>`، یکی کردنِ حلقهٔ خطا، صفِ ۲۰تایی ۷روزه)؛ `data/platform/CrashReporter.kt` + `CrashStore.kt` (گیرندهٔ خطا، صفِ اتمی روی
+  دیسک، فرستادنِ بی توکن در اجرای بعد) در `MainActivity` و `desktop/Main.kt`؛ پنجرهٔ یک‌بارهٔ «برنامه ناگهان بسته شد» با کد
+  (اندروید)؛ سرور `report_id` را شناسهٔ ردیف می‌کند و فرستادنِ دوباره بی‌اثر است.
+  آزمون: `CrashReportsTest` ۸/۸ (Gradle ِ core)، `CrashStoreTest` ۴/۴ (kotlinc ِ محلی)، `client-errors-report-id.test.js` ۲/۲.
+- نیمه‌کاره: ساختِ اندروید/کامپیوتر این‌جا ممکن نبود (dl.google.com) ⇒ CI؛ پنجرهٔ کد روی کامپیوتر نیست؛ گزینهٔ خاموش کردن در تنظیمات
+  (پرسش از صاحب محصول).
+- قدمِ بعدی: سبز شدنِ CI ِ «توحید بومی» و «فروشگاه من — کامپیوتر»؛ آزمونِ روی گوشیِ واقعی (یک کرشِ عمدی در ساختِ dev).
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/spec-ops2-4` (OPS-02: عبارتِ بازیابیِ فروشگاه — منطق و رمز)
 - انجام شد: `core/.../core/backup/RecoveryPhrase.kt` (ساخت، خواندن با هر شکلِ نوشتن و رقمِ فارسی، وارسیِ غلطِ تایپی، KID ِ
   `rp1.<تکرار>.<نمک>` با بازهٔ امن) و `android-native/.../core/atrest/platform/PhraseBackup.kt` (PBKDF2-HMAC-SHA256 ۶۰۰ هزار + همان
