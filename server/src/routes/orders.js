@@ -15,6 +15,7 @@ const express = require('express');
 const orders = require('../lib/orders');
 const refunds = require('../lib/order-refunds');
 const delay = require('../lib/order-delay');
+const amend = require('../lib/order-amend');
 const presence = require('../lib/order-presence');
 const S = require('../lib/order-states');
 const audit = require('../lib/audit');
@@ -69,6 +70,8 @@ router.get('/config', wrap(async (req, res) => {
     //  `shop.orders.presence`) — خاموش ⇒ null/false و برنامه هیچ دکمه یا نشانگری نمی‌سازد
     delay: (await delay.flagOf(req.shopId)) ? delay.configOf() : null,
     presence: await presence.flagOf(req.shopId),
+    //  ORD-14 ویرایشِ سفارش (پرچمِ `shop.orders.amend`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...((await amend.flagOf(req.shopId)) ? { amend: amend.configOf() } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,
@@ -127,6 +130,8 @@ router.get('/:id', needFlag, wrap(async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
   order.refund = await refunds.summary(req.shopId, order.id);
+  //  ORD-14: آخرین پیشنهاد/ویرایش — فقط با پرچمِ `shop.orders.amend` (خاموش ⇒ همان پاسخِ پیشین)
+  if (await amend.flagOf(req.shopId)) order.amendment = await amend.staffOf(req.shopId, order.id);
   res.json({ order });
 }));
 
@@ -252,6 +257,54 @@ router.post('/:id/delay', needFlag, requirePermission('orders.manage'), needWrit
   });
   res.json({ order: out.order, replayed: false });
 }));
+
+/**
+ * ORD-14 — ویرایشِ سفارش پس از ثبت (`lib/order-amend.js`) پشتِ پرچمِ خاموشِ `shop.orders.amend`، با
+ * `orders.manage` و اشتراک (SUB-10). سفارشِ ویترین ⇒ پیشنهاد که خودِ مشتری با پیوندِ پیگیری می‌پذیرد
+ * (۲۰۱، `status: pending`)؛ سفارشِ کارمند ⇒ با رضایتِ ثبت‌شده همان دم (`status: applied`). کلیدِ یکتایی لازم است.
+ */
+async function needAmend(req, res, next) {
+  if (!(await amend.flagOf(req.shopId))) {
+    return next(forbidden('ویرایشِ سفارش برای این دکان روشن نیست', 'order_amend_disabled'));
+  }
+  next();
+}
+
+router.post('/:id/amendments', needFlag, requirePermission('orders.manage'), needWrite, needAmend, async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  let out;
+  try {
+    out = await amend.propose(req.shopId, req.params.id, { key, body: req.body, actor: actorOf(req) });
+  } catch (err) {
+    if (err.code === 'amend_not_allowed' || err.code === 'amend_paid_order') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, current: err.current } });
+    }
+    throw err;
+  }
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(200).json({ amendment: out.amendment, order: out.order, replayed: true });
+  }
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'order.amend',
+    targetType: 'online_order', targetId: out.order.id,
+    detail: {
+      orderNo: out.order.orderNo, amendId: out.amendment.id, status: out.amendment.status,
+      prevTotalMinor: out.amendment.prevTotalMinor, totalMinor: out.amendment.totalMinor,
+      consent: out.amendment.consent ? out.amendment.consent.via : 'link',
+    },
+    ip: clientIp(req),
+  });
+  res.status(201).json({ amendment: out.amendment, order: out.order, replayed: false });
+});
+
+router.post('/:id/amendments/:amendId/withdraw', needFlag, requirePermission('orders.manage'), needWrite, needAmend, async (req, res) => {
+  const out = await amend.decide(req.shopId, req.params.id, req.params.amendId, 'withdraw', actorOf(req));
+  if (out.code) {
+    return res.status(409).json({ error: { code: out.code, message: 'این پیشنهاد دیگر باز نیست', status: out.status } });
+  }
+  res.json({ status: out.status, unchanged: out.unchanged, order: await orders.get(req.shopId, req.params.id, actorOf(req)) });
+});
 
 /**
  * RSK-03: سابقهٔ همین مشتری در همین دکان (تحویل، رد، لغو، تحویل‌نشده، برگشت) و نشانه‌های توضیح‌دار

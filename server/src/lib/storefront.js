@@ -707,7 +707,7 @@ async function track(sf, token) {
   if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id));
+  return require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)));
 }
 
 async function cancel(sf, token) {

@@ -190,7 +190,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay', 'shop.orders.amend'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -295,6 +295,18 @@ async function seedShop(a) {
   ids.notify = (await one('SELECT id FROM order_notify_outbox WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [a.shopId]))?.id;
   assert.ok(ids.notify, 'ردیفِ اعلانِ سفارشِ الف');
 
+  //  ORD-14: ویرایشِ سفارشِ تلفنیِ دیگرِ «الف» با رضایتِ ثبت‌شده ⇒ شناسهٔ واقعیِ پیشنهاد
+  const amendable = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', customer: { name: 'مشتریِ ویرایش', phone: '0791234567' },
+    lines: [{ name: 'برنج', qtyMilli: 2000, unitPriceMinor: 5000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend-order') } });
+  assert.equal(amendable.status, 201, JSON.stringify(amendable.body));
+  const am = await h.post(`/api/shop/orders/${amendable.body.order.id}/amendments`,
+    { changes: [{ lineNo: 1, qtyMilli: 1000 }], consent: { via: 'phone' } },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend') } });
+  assert.equal(am.status, 201, JSON.stringify(am.body));
+  ids.amend = am.body.amendment.id;
+
   //  سفارشِ تلفنیِ تحویلی ⇒ مأموریتِ پیک ⇒ عکس ⇒ تحویل ⇒ تسویه
   const TOTAL = 1_240_000;
   const made = await h.post('/api/shop/orders', {
@@ -395,6 +407,7 @@ function concreteFor(ids) {
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
+    [/(\/amendments\/):amendId/, ids.amend],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
@@ -431,6 +444,7 @@ function bodyFor(r, ids) {
   const B = {
     'POST /shop/orders/:id/transition': { to: 'accepted' },
     'POST /shop/orders/:id/refunds': { amountMinor: 1000, reason: 'other', note: 'آزمون', method: 'cash' },
+    'POST /shop/orders/:id/amendments': { changes: [{ lineNo: 1, qtyMilli: 500 }], consent: { via: 'phone' } },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
