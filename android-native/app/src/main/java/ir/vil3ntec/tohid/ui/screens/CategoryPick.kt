@@ -11,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.ui.theme.Radius
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrFields
 
 /**
  *  فیلترِ دسته‌بندی در بالای فهرست‌ها.
@@ -26,6 +28,8 @@ import ir.vil3ntec.tohid.ui.theme.Radius
  *
  *  یک جا نوشته شده تا هر صفحه‌ای که دسته‌بندی دارد همین رفتار را داشته
  *  باشد.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrFields` (LOC-06).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,7 +38,7 @@ fun CategoryFilter(
   selected: String?,
   onSelect: (String?) -> Unit,
   modifier: Modifier = Modifier,
-  allLabel: String = "همه",
+  allLabel: String = Str.all,
 ) {
   if (categories.isEmpty()) return
 
@@ -70,7 +74,7 @@ fun CategoryFilter(
       onValueChange = {},
       readOnly = true,
       singleLine = true,
-      label = { Text("دسته‌بندی") },
+      label = { Text(StrFields.category) },
       shape = RoundedCornerShape(Radius.sm),
       trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null) },
       modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),

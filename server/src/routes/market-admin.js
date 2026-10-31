@@ -16,12 +16,11 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   req.storeState = await market.requireStorefrontFlag(req.shopId);
   next();
-});
+};
 
 const needWrite = (req, res, next) => {
   const { entitled, ent } = req.storeState;
@@ -31,11 +30,11 @@ const needWrite = (req, res, next) => {
     : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
 };
 
-router.get('/', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
+router.get('/', requirePermission('data.read'), needFlag, async (req, res) => {
   res.json({ directory: await market.directoryOn(), listing: await market.listingOf(req.shopId) });
-}));
+});
 
-router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   //  «ارزان‌تر از قیمتِ دکان» قیمتِ فروشِ دفتر را منتشر می‌کند ⇒ فقط صاحبِ دکان (مثلِ «زیرِ بهای خرید»)
   const listing = await market.saveListing(req.shopId, req.body, req.user.id, { owner: req.role === 'owner' });
   await audit.log({
@@ -46,6 +45,6 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
     ip: clientIp(req),
   });
   res.json({ listing });
-}));
+});
 
 module.exports = router;

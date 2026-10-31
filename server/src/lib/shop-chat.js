@@ -160,9 +160,11 @@ async function rowOf(viewer, id, { c = null, lock = false } = {}) {
   return row;
 }
 
+/** بلاک‌های (دکان، شماره) — روی هر شکلِ همان شماره (RSK-07): شکلِ دیگرِ همان گوشی بلاکِ دکان را دور نمی‌زند. */
 async function blocksOf(shopId, phone, c = null) {
-  const sql = 'SELECT blocker FROM shop_chat_blocks WHERE shop_id=$1 AND customer_phone=$2';
-  const rows = c ? (await c.query(sql, [shopId, phone])).rows : await many(sql, [shopId, phone]);
+  const sql = 'SELECT blocker FROM shop_chat_blocks WHERE shop_id=$1 AND customer_phone = ANY($2::text[])';
+  const args = [shopId, require('./validate').phoneForms(phone)];
+  const rows = c ? (await c.query(sql, args)).rows : await many(sql, args);
   return { shop: rows.some((r) => r.blocker === 'shop'), customer: rows.some((r) => r.blocker === 'customer') };
 }
 
