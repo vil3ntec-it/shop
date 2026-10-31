@@ -704,6 +704,8 @@ fun DeskSaleScreen(
         linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = p?.saleUnit.orEmpty(),
         unitFactor = p?.unitFactor ?: 1.0,
+        //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
+        why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         onDismiss = { editLine = null; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)

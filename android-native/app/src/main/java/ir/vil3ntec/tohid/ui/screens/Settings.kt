@@ -486,6 +486,8 @@ fun SettingsScreen(
     item { ReturnSettingsSection() }
     /* =============== جست‌وجوی مقاومِ صندوق (POS-04، فقط کامپیوتر، پیش‌فرض خاموش) =============== */
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }
+    /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
