@@ -15,6 +15,8 @@
 const express = require('express');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
+const areas = require('../lib/storefront-area-requests');
+const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -110,6 +112,25 @@ router.use('/presence', (err, req, res, next) => {
   }).catch(() => {}).then(() => next(err));
 });
 
+//  ── WEB-24: بنرهای زمان‌بندی‌شده (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۳) ─────────
+const needBanners = async (req, res, next) => {
+  if (!(await extras.bannersOn(req.shopId))) return next(forbidden('بنرِ ویترین برای این دکان روشن نیست', 'banners_disabled'));
+  next();
+};
+
+router.get('/banners', requirePermission('data.read'), needFlag, needBanners, async (req, res) => {
+  res.json({ banners: await extras.banners(req.shopId), max: extras.MAX_BANNERS });
+});
+
+router.put('/banners', requirePermission('settings.write'), needFlag, needBanners, needWrite, async (req, res) => {
+  const out = await extras.saveBanners(req.shopId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.banners',
+    targetType: 'storefront', targetId: req.shopId, detail: { count: out.length }, ip: clientIp(req),
+  });
+  res.json({ banners: out, max: extras.MAX_BANNERS });
+});
+
 //  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
 const needZones = async (req, res, next) => {
   if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
@@ -127,6 +148,29 @@ router.put('/delivery', requirePermission('settings.write'), needFlag, needZones
     targetType: 'storefront', targetId: req.shopId,
     detail: { zones: out.zones.length, slotRules: out.slotRules.length, allowAsap: out.allowAsap, slotDays: out.slotDays },
     ip: clientIp(req),
+  });
+  res.json(out);
+});
+
+//  ── CHK-10/S34: «خبرم کن» ِ بیرونِ محدوده ─────────────────────────────
+//  تقاضا به ازای خانهٔ شبکه (بی شماره) و شمارهٔ کسانی که ناحیهٔ امروز پوشانده است.
+//  ⛔ شمارهٔ مشتری ⇒ فقط صاحب و مدیر (`settings.write`)، نه هر عضو.
+const needArea = async (req, res, next) => {
+  if (!(await areas.flagOn(req.shopId))) return next(forbidden('«خبرم کن» برای این دکان روشن نیست', 'notify_area_disabled'));
+  next();
+};
+
+router.get('/area-requests', requirePermission('settings.write'), needFlag, needZones, needArea, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await areas.forShop(req.shopId));
+});
+
+//  «خبر دادم» ⇒ درخواست پاک می‌شود؛ در سابقه نامِ ناحیه، هرگز شماره
+router.post('/area-requests/:id/notified', requirePermission('settings.write'), needFlag, needZones, needArea, needWrite, async (req, res) => {
+  const out = await areas.markNotified(req.shopId, req.params.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.area_request_notified',
+    targetType: 'storefront', targetId: req.shopId, detail: { zone: out.zone }, ip: clientIp(req),
   });
   res.json(out);
 });
