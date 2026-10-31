@@ -38,6 +38,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalAsk
 import ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalSheet
+import ir.vil3ntec.tohid.ui.v3.sales.approval.CreditApprovalSheet
 import kotlinx.coroutines.launch
 
 /**
@@ -81,6 +82,8 @@ fun RouteScope.CheckoutRoute() {
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
     val seller = remember { runCatching { SyncStore(context).accountName }.getOrDefault("") }
     val payV2 = remember { ShopPolicy.payV2(context) }
+    //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
+    val creditGateOn = remember { ShopPolicy.creditGate(context) }
     val saleKey = remember(lines) { cart.saleKey() }
     val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller)
     val n = CheckoutModel.numbers(data, priced, form, checkout)
@@ -103,6 +106,23 @@ fun RouteScope.CheckoutRoute() {
       }
       payError = null
       error = null
+      //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید هیچ چیز
+      //  ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد). تأییدِ گرفته‌شده فقط همین مشتری و تا همین برد
+      //  را می‌پوشاند؛ سبدِ بزرگ‌تر یا مشتریِ دیگر دوباره می‌پرسد. خاموش ⇒ همان ثبتِ امروز.
+      val gated = options.copy(creditGate = creditGateOn)
+      val over = SalesEngine.creditOver(data, priced, gated)
+      val sale = CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)
+      if (sale == null) {
+        val o = over ?: return
+        CheckoutSession.credit = CreditAsk(
+          debtorId = gated.debtorId.orEmpty(),
+          addMinor = o.addMinor,
+          summary = (debtor?.name?.let { "«$it» — " } ?: "") + SalesEngine.creditOverText(o),
+          seller = gated.seller,
+        )
+        nav.open(SalesPaths.CREDIT)
+        return
+      }
       submitted = true
       val d = data
       val count = lines.size
@@ -111,7 +131,7 @@ fun RouteScope.CheckoutRoute() {
         //  S2 (#375): با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور — پرچمِ `shop.promo_stamp` خاموش ⇒ همان
         when (val posted = cart.post(store) { key -> PromoEngine.stamp(
           SalesEngine.record(
-            d, priced, options,
+            d, priced, sale,
             today = todayIso(),
             now = System.currentTimeMillis(),
             newId = Ulid::next,
@@ -135,6 +155,11 @@ fun RouteScope.CheckoutRoute() {
         }
       }
     }
+
+    //  تأییدِ سقفِ اعتبار تازه رسید ⇒ همان فاکتور همان دم ثبت می‌شود (مثلِ رابطِ امروز)؛ اگر در این میان سبد یا
+    //  مشتری عوض شده و تأیید دیگر نمی‌پوشاند، `submit` دوباره می‌پرسد
+    val freshCredit = CheckoutSession.creditApproval
+    LaunchedEffect(freshCredit) { if (freshCredit != null && !submitted) submit() }
 
     actions = CheckoutActions(
       form = { CheckoutSession.form = it },
@@ -213,6 +238,24 @@ fun RouteScope.ApprovalRoute() {
     requesterUserId = remember { runCatching { SyncStore(context).accountId }.getOrDefault("") },
     onApproved = { CheckoutSession.approval = it; back() },
     onClose = { back() },
+  )
+}
+
+/** `sale/checkout/credit`: تأییدِ فروشِ نسیهٔ بیش از سقف (CRM-03)؛ تأیید در `CheckoutSession` می‌ماند و «ثبت» با آن می‌رود */
+@Composable
+fun RouteScope.CreditApprovalRoute() {
+  val context = LocalContext.current
+  val ask = CheckoutSession.credit
+  if (ask == null) { LaunchedEffect(Unit) { back() }; return }
+  CreditApprovalSheet(
+    summary = ask.summary,
+    debtorId = ask.debtorId,
+    addMinor = ask.addMinor,
+    selfRole = remember { ShopRole.current(context) },
+    selfName = ask.seller,
+    requesterUserId = remember { runCatching { SyncStore(context).accountId }.getOrDefault("") },
+    onApproved = { CheckoutSession.creditApproval = it; CheckoutSession.credit = null; back() },
+    onClose = { CheckoutSession.credit = null; back() },
   )
 }
 

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.sales.checkout
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.components.pos.PayPanelState
@@ -10,6 +11,9 @@ import ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalAsk
 
 /** فروشِ تازه ثبت شد: دفترِ همان لحظه (فاکتور همان چیزی را نشان دهد که ثبت شد) و شناسه */
 data class CheckoutDone(val data: ShopData, val saleId: String)
+
+/** فروشِ نسیهٔ بیش از سقف که منتظرِ تأیید است (CRM-03، `sale/checkout/credit`): مشتری، بردِ تازه، خلاصه و فروشنده */
+data class CreditAsk(val debtorId: String, val addMinor: Long, val summary: String, val seller: String)
 
 /**
  *  حالتِ تسویهٔ سبدِ جاری، بیرون از برگه: رفتن به «انتخابِ مشتری» (`sale/checkout/customer`،
@@ -25,6 +29,10 @@ object CheckoutSession {
   var done by mutableStateOf<CheckoutDone?>(null)
   /** برگهٔ «درخواستِ تأیید» ِ باز (`sale/checkout/approve`) */
   var ask by mutableStateOf<ApprovalAsk?>(null)
+  /** برگهٔ «فروشِ نسیه بیش از سقف» ِ باز (`sale/checkout/credit`) */
+  var credit by mutableStateOf<CreditAsk?>(null)
+  /** تأییدِ سقفِ اعتبار؛ فقط همان مشتری و تا همان برد را می‌پوشاند (`CreditGate.state` هر بار می‌سنجد) */
+  var creditApproval by mutableStateOf<CreditGate.Approval?>(null)
 
   fun reset() {
     form = null
@@ -33,5 +41,7 @@ object CheckoutSession {
     approval = null
     done = null
     ask = null
+    credit = null
+    creditApproval = null
   }
 }

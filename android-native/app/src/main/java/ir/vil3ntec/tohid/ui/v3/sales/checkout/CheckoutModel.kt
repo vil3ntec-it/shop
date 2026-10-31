@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.checkout
 
+import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DiscountGate
@@ -121,6 +122,17 @@ object CheckoutModel {
   /** حالِ تخفیف برای کاربر (STF-02): متنِ کنارِ قرصِ «نیازمند تأیید» */
   fun gateNote(cap: String?, limit: Double?): String =
     if (cap == "maxPct") StrSale.overYourCap(qty(limit ?: 0.0)) else StrSale.overYourRights
+
+  /**
+   *  CRM-03 / S07: فاکتوری که از سقفِ مشتری می‌گذرد (`SalesEngine.creditOver`) فقط با تأییدی ثبت می‌شود که همین
+   *  مشتری و دست‌کم همین برد را بپوشاند (`CreditGate.state`) — آن تأیید همراهِ فاکتور می‌رود و `SalesEngine.record`
+   *  دوباره می‌سنجد. `null` ⇒ اول «درخواستِ تأیید». زیرِ سقف، بی مشتری یا تنظیمِ خاموش ⇒ همان گزینه‌ها.
+   */
+  fun credited(options: SalesEngine.Checkout, over: CreditGate.Over?, approval: CreditGate.Approval?): SalesEngine.Checkout? {
+    val debtorId = options.debtorId ?: return options
+    if (over == null) return options
+    return if (CreditGate.state(over, debtorId, approval) == CreditGate.State.APPROVED) options.copy(creditApproval = approval) else null
+  }
 
   /** ثبت ممکن است؟ — همان شرطِ دکمهٔ «ثبت فروش» ِ پیشین */
   fun canSubmit(busy: Boolean, discountError: String?, paidError: String?, gate: DiscountGate.State): Boolean =

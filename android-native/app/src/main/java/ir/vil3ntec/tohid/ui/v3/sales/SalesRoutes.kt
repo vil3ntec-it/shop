@@ -7,6 +7,7 @@ import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
@@ -28,6 +29,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.cart.KeypadRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.LineRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.SaleRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.ApprovalRoute
+import ir.vil3ntec.tohid.ui.v3.sales.checkout.CreditApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerCloseRoute
@@ -62,6 +64,8 @@ object SalesPaths {
   fun customer(selected: String? = null) = RoutePaths.withQuery("sale/checkout/customer", "selected" to selected)
   /** برگهٔ «درخواستِ تأیید» ِ تخفیف (STF-02) */
   const val APPROVE = "sale/checkout/approve"
+  /** برگهٔ «فروشِ نسیه بیش از سقف» (CRM-03، پشتِ `ShopPolicy.creditGate`) */
+  const val CREDIT = "sale/checkout/credit"
   /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
   fun line(i: Int) = "sale/line/$i"
   const val FREE_LINE = "sale/free-line"
@@ -123,6 +127,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.CHECKOUT, RouteKind.SHEET, { StrSale.checkoutTitle }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { CheckoutRoute() },
     V3Route("sale/checkout/customer", RouteKind.SHEET, { StrSale.pickCustomer }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CustomerRoute() },
     V3Route(SalesPaths.APPROVE, RouteKind.SHEET, { StrSale.discountApproval }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ApprovalRoute() },
+    V3Route(SalesPaths.CREDIT, RouteKind.SHEET, { StrPos.creditOverTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CreditApprovalRoute() },
     V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
     V3Route(SalesPaths.FREE_LINE, RouteKind.SHEET, { StrSale.freeItem }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { FreeLineRoute() },
     V3Route("sale/keypad/{productId}", RouteKind.SHEET, { StrSale.typeQty }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { KeypadRoute() },

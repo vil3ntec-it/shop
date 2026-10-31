@@ -102,6 +102,22 @@ fun ApprovalBody(
   onApproved: (ApprovalSlip.Slip) -> Unit,
   onClose: () -> Unit,
   start: ApprovalStart = ApprovalStart(),
+) = ApprovalPinBody(ask.title, ask.summary, approvers, block, onPin, onApproved, onClose, start)
+
+/**
+ *  همان بدنه برای هر نتیجهٔ تأیید: برگهٔ امضاشدهٔ تخفیف (`ApprovalSlip.Slip`) یا تأییدِ سقفِ اعتبار
+ *  (`CreditGate.Approval`، `CreditApprovalSheet`). `onPin` نتیجه را می‌سازد؛ `null` ⇒ PINِ غلط.
+ */
+@Composable
+internal fun <T : Any> ApprovalPinBody(
+  title: String,
+  summary: String,
+  approvers: List<ApproverVault.Record>,
+  block: ApprovalBlock?,
+  onPin: suspend (who: String, pin: String, reason: String) -> Pair<ApproverVault.Record?, T?>,
+  onApproved: (T) -> Unit,
+  onClose: () -> Unit,
+  start: ApprovalStart = ApprovalStart(),
 ) {
   val c = PhoneV3.colors
   val scope = rememberCoroutineScope()
@@ -117,10 +133,10 @@ fun ApprovalBody(
   //  `onDismiss` ِ برگه پیش از کارِ `closer` می‌آید: پس از تأیید، «بستن» دوباره برنمی‌گردد
   val chosen = remember { booleanArrayOf(false) }
 
-  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = ask.title, dismissible = !busy, detents = false) { closer ->
+  V3Sheet(onDismiss = { if (!chosen[0]) onClose() }, title = title, dismissible = !busy, detents = false) { closer ->
     V3StatusPill(V3Status.AWAITING, StrSale.needsApproval)
     Spacer(Modifier.height(10.dp))
-    Text(ask.summary, style = V3Type.body, color = c.ink)
+    Text(summary, style = V3Type.body, color = c.ink)
     Spacer(Modifier.height(14.dp))
 
     if (block != null) {
