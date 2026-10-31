@@ -279,6 +279,7 @@
 - صفحهٔ `server/public/store/` با CSPِ سخت (`script-src 'self'`، بی `unsafe-inline`) (SEC-09، #244).
 - پیشوندِ `/store` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#244).
 - بیرون از محدوده (CHK-10، S34): «کجا؟» برای پینِ بیرون `pickup` و با پرچم `notifyArea` می‌گوید؛ «خبرم کن» (`lib/storefront-area-requests.js`) فقط با شمارهٔ تأییدشده و ⛔ فقط مرکزِ خانهٔ ۳۰۰ متریِ شبکه را نگه می‌دارد، هرگز پینِ خام. دکان شماره را فقط برای خانه‌ای می‌بیند که ناحیهٔ فعالِ امروز پوشانده؛ «خبر دادم» و «پس گرفتن» ردیف را پاک می‌کنند و سابقه شماره ندارد. سرور پیامی نمی‌فرستد (D-09) (`claude/part-chk-2`).
+- سبدِ سروریِ حساب (CHK-03، `lib/store-cart.js`): فقط شناسهٔ کالا، مقدار و یادداشت؛ ⛔ قیمت هرگز ذخیره نمی‌شود و هر خواندن از کالای ویترین می‌خواند. نوشتن فقط با نسخهٔ دیده‌شده (کهنه ⇒ ۴۰۹ `cart_changed`)؛ خالی کردن ردیف را نگه می‌دارد. ادغامِ سبدِ مهمان بیشینهٔ مقدار است نه جمع، تا تکرارش اثرِ دوم نداشته باشد (S140). ثبتِ سفارش سبد را خودبه‌خود عوض نمی‌کند (`claude/part-chk-1`).
 
 ### v3 · پیک و تحویل
 
@@ -475,6 +476,7 @@
 | `shop.promo_tier_price` | دکان / `all` | خاموش | پلهٔ «قیمتِ ثابتِ هر واحد» در قاعدهٔ پله‌ای (`tiers[].unitMinor`، POS-19): خاموش ⇒ `PUT /api/shop/promos/rules/:id` ِ چنین قاعده‌ای ۴۰۳ `tier_price_disabled`؛ `tierPrice` در `GET /api/shop/promos` گزینهٔ فرمِ برنامه را نشان می‌دهد. برنامهٔ پیشین چنین قاعده‌ای را نامعتبر می‌بیند و نادیده می‌گیرد ⇒ پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند | `claude/part-pos-3` | باز |
 | `shop.order_risk` | دکان / `all` | خاموش | قاعده‌های ریسکِ ثبتِ **ویترین** (`lib/order-risk.js`): سفارشِ تکراری ⇒ ۴۰۹ `duplicate_order` (RSK-05) و سقفِ مبلغ و سفارشِ بازِ مشتریِ تازه ⇒ ۴۰۹ `new_customer_limit` (RSK-02)، و `GET /api/shop/orders/:id/risk` ِ سابقه و نشانه‌ها (RSK-03؛ خاموش ⇒ `{enabled:false}`). فروشِ حضوری و سفارشِ کارمند هرگز | `claude/spec-rsk-2` | باز |
 | `shop.storefront.notify_area` | دکان / `all` | خاموش | «خبرم کن» ِ بیرونِ محدوده (CHK-10)، فقط روی `shop.storefront.zones`: `POST`/`DELETE /api/store/:slug/area-request` (خاموش ⇒ همان پاسخِ درِ ناشناخته)، `GET /api/shop/storefront/area-requests` و `POST …/:id/notified` (خاموش ⇒ ۴۰۳ `notify_area_disabled`)، و `notifyArea` در «کجا؟» | `claude/part-chk-2` | باز |
+| `shop.storefront.cart` | دکان / `all` | خاموش | سبدِ سروریِ حسابِ مشتری: `GET`/`PUT /api/store/:slug/account/cart` و `POST …/cart/merge` (CHK-03)؛ خاموش یا ویترینِ بسته ⇒ همان پاسخِ درِ ناشناخته (۴۰۱ `unauthorized`)، پیش از هر سقف و نشست | `claude/part-chk-1` | باز |
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 | `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
@@ -517,6 +519,7 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۲ (S5 نمای پیک برای مشتری، `claude/market-s5-courier-view`؛ نخست ۱۲۴ بود و به سهمِ هماهنگ‌کننده جابه‌جا شد، چون ۱۲۴ از آنِ `claude/market-s7-s8-load` است). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 - ۱۷۶: «خبرم کن» ِ بیرونِ محدوده `storefront_area_requests` (CHK-10، `claude/part-chk-2`)؛ ۱۷۴ از آنِ `claude/part-chk-1` (#628) و ۱۷۵ از آنِ `claude/new-rpt-2` است.
 - ۱۸۱ (`181_staff_time.sql`: `staff_punches` و `shop_commission_plans`، STF-07/STF-08، `claude/new-stf-2`؛ نخست ۱۸۰ بود و چون ۱۸۰ از آنِ #681 (`claude/new-web-3`) است، به ۱۸۱ رفت).
+- ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
 
 ### v3 · تعارض‌های حل‌شده
 

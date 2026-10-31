@@ -20,6 +20,7 @@ const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
+const cart = require('../lib/store-cart');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const areas = require('../lib/storefront-area-requests');
@@ -335,6 +336,31 @@ router.delete('/:slug/account/favorites/:productId', checkoutLimit, store, custo
 router.get('/:slug/banners', readLimit, store, async (req, res) => {
   if (!(await extras.bannersOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'banners_disabled');
   res.json({ banners: await extras.activeBanners(req.store.shop_id, { zone: req.query.zone }) });
+});
+
+//  ── CHK-03: سبدِ ماندگارِ حساب روی سرور (S140) ─────────────────────
+//  ⛔ ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین
+//  (SUB-10، مثلِ #684)، پیش از نشست؛ پرچمِ خاموشِ `shop.storefront.cart` ⇒ `next('route')`: این در نیست.
+const cartStore = async (req, res, next) => {
+  const s = await sf.open(req.params.slug);
+  if (!(await cart.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+
+router.get('/:slug/account/cart', cartStore, readLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.get(req.store, req.customer) });
+});
+
+//  جایگزینیِ کامل با نسخهٔ دیده‌شده؛ فهرستِ خالی = خالی کردن (پس از ثبتِ سفارش هم)
+router.put('/:slug/account/cart', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.replace(req.store, req.customer, req.body) });
+});
+
+//  سبدِ مهمانِ همین مرورگر پس از ورود — تکرارش اثرِ دوم ندارد
+router.post('/:slug/account/cart/merge', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.merge(req.store, req.customer, req.body) });
 });
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {
