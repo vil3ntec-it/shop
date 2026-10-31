@@ -50,7 +50,11 @@ router.get('/live-config', async (req, res, next) => {
 router.put('/live-config', requireSuperAdmin, async (req, res, next) => {
   try {
     const b = req.body || {};
-    const out = await require('../lib/live-config').set(b.scope || 'all', b.key, b.value, req.admin?.username || req.admin?.id || '');
+    //  فاز ۳: تاریخچهٔ هر نوشتن (`live_config_history`)؛ دلیل این‌جا اختیاری است (درِ پیشین) —
+    //  درِ تازهٔ `PUT /api/admin/flags` اجباری‌اش می‌کند.
+    const svc = require('../lib/admin-service');
+    const out = await require('../lib/live-config').set(b.scope || 'all', b.key, b.value, svc.label(req),
+      { reason: require('../lib/admin-access').reasonOf(req), actor: svc.actorRecord(req) });
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.pump_live_config_set',
       targetType: 'live_config', targetId: `${out.scope}:${out.key}`, detail: { scope: out.scope, key: out.key },
@@ -62,7 +66,9 @@ router.put('/live-config', requireSuperAdmin, async (req, res, next) => {
 router.delete('/live-config', requireSuperAdmin, async (req, res, next) => {
   try {
     const b = { ...(req.query || {}), ...(req.body || {}) };
-    const out = await require('../lib/live-config').remove(b.scope || 'all', b.key);
+    const svc = require('../lib/admin-service');
+    const out = await require('../lib/live-config').remove(b.scope || 'all', b.key, svc.label(req),
+      { reason: require('../lib/admin-access').reasonOf(req), actor: svc.actorRecord(req) });
     if (out.removed) {
       await audit.log({
         actorType: 'admin', userId: req.admin.id, action: 'admin.pump_live_config_removed',

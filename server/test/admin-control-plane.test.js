@@ -226,6 +226,10 @@ const MOUNTS = {
   'admin-image-bank.js': '/admin/image-bank',
   'admin-release.js': '/admin/release',
   'admin-trust.js': '/admin/trust',
+  //  پنلِ مرکزی، فاز ۳
+  'admin-shop-state.js': '/admin/shops/:id',
+  'admin-flags.js': '/admin/flags',
+  'admin-service-keys.js': '/admin/service-keys',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
