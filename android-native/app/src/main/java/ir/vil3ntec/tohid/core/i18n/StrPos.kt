@@ -140,6 +140,15 @@ object StrPos {
   val no: String get() = t("نه", "No", "نه")
   val clearStaleQ: String get() = t("پاک کردنِ فاکتورهای کهنه؟", "Clear stale invoices?", "زاړه بلونه پاک شي؟")
   fun clearStaleWarn(h: Any): String = t("فاکتورهای نگه‌داشتهٔ کهنه‌تر از $h ساعت دور انداخته می‌شوند. این کار برنمی‌گردد.", "Held invoices older than $h hours will be discarded. This can't be undone.", "له $h ساعتونو زاړه ساتل شوي بلونه لرې کېږي. دا کار بېرته نه راګرځي.")
+  //  POS-12 — پاک‌سازیِ خودکارِ کهنه‌ها
+  fun heldAutoClean(h: Any): String = t("پاک‌سازیِ خودکارِ فاکتورهای کهنه‌تر از $h ساعت", "Clear held invoices older than $h hours automatically", "له $h ساعتونو زاړه ساتل شوي بلونه پخپله پاک کړئ")
+  val heldAutoCleanNote: String get() = t(
+    "روشن: تا صندوق باز است، فاکتورِ نگه‌داشته‌ای که کهنه شد بی پرسش دور انداخته می‌شود و برنمی‌گردد. فاکتورِ جاریِ صندوق پاک نمی‌شود. فقط روی همین دستگاه.",
+    "On: while the till is open, a held invoice that gets stale is discarded without asking and can't be brought back. The invoice on the till is never cleared. This device only.",
+    "روښانه: تر هغه چې صندوق خلاص وي، هغه ساتل شوی بل چې زوړ شي پرته له پوښتنې لرې کېږي او نه راګرځي. د صندوق اوسنی بل نه پاکېږي. یوازې همدا وسیله.",
+  )
+  val heldAutoCleanLocked: String get() = t("فقط کسی که اجازهٔ لغوِ فاکتور دارد این را عوض می‌کند", "Only someone allowed to cancel invoices can change this", "یوازې هغه څوک چې د بل د لغوه کولو اجازه لري دا بدلولی شي")
+  fun heldAutoCleared(n: Any, h: Any): String = t("$n فاکتورِ نگه‌داشتهٔ کهنه‌تر از $h ساعت خودکار پاک شد", "$n held invoices older than $h hours were cleared automatically", "$n ساتل شوي بلونه له $h ساعتونو زاړه پخپله پاک شول")
   val clearIt: String get() = t("پاک کن", "Clear", "پاک یې کړئ")
   fun heldNote(max: Any): String = t("مشتری‌ای منتظر است و دیگری پول می‌دهد: فاکتورِ اولی با نام یا شماره نگه داشته می‌شود و صندوق خالی. تا $max فاکتورِ باز با هم، هر کدام با سبد، مشتری، تخفیف و یادداشتِ خودش. فقط روی همین دستگاه می‌ماند و با بسته شدنِ برنامه یا قطعِ برق از دست نمی‌رود.", "One customer waits while another pays: the first invoice is held under a name or number and the register clears. Up to $max open invoices at once, each with its own cart, customer, discount and note. Kept only on this device, and not lost if the app closes or the power goes out.", "یو پیرودونکی په تمه دی او بل پیسې ورکوي: لومړی بل په نوم یا شمېره ساتل کېږي او صندوق تشېږي. تر $max پورې خلاص بلونه په یو وخت، هر یو له خپلې ټوکرۍ، پیرودونکي، تخفیف او یادښت سره. یوازې په همدې وسیله پاتې کېږي او د اپ په بندېدو یا برېښنا په تلو نه ورکېږي.")
 }

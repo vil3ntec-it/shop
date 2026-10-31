@@ -1,0 +1,17 @@
+{
+  "_doc": "SEC-DATA-01 — مبلغِ برگشتِ تکه‌تکهٔ یک قلم (ReturnShare.amount ِ core و returnShare ِ license/money.js). عددها دستی از قاعده نوشته شده‌اند، نه از خروجیِ کد: مبلغِ هر برگشت = round(پس‌دادنیِ تا پایانِ این برگشت) − round(پس‌دادنیِ تا پیش از آن)، پس‌دادنیِ تا k = جمعِ قلم × سهمِ پرداخت × k ÷ مقدار (k ≥ مقدار ⇒ همهٔ جمعِ قلم × سهم). گرد به افغانیِ کامل، نیمه به سمتِ +∞. legacy = آن‌چه برگشتِ جدا‌جدای پیشین (round(جمع ÷ مقدار × q × سهم)) پس می‌داد؛ برای نشان دادنِ نشت، نه برای آزمون.",
+  "version": 1,
+  "cases": [
+    { "name": "دو عدد به ۲٫۵، یکی‌یکی", "lineTotal": 5, "quantity": 2, "paidRatio": 1, "steps": [1, 1], "amounts": [3, 2], "legacy": [3, 3] },
+    { "name": "سه عدد با جمعِ ۲، یکی‌یکی", "lineTotal": 2, "quantity": 3, "paidRatio": 1, "steps": [1, 1, 1], "amounts": [1, 0, 1], "legacy": [1, 1, 1] },
+    { "name": "تخفیفِ ۱۰٪ ِ فاکتور، سه عدد به ۵", "lineTotal": 15, "quantity": 3, "paidRatio": 0.9, "steps": [1, 1, 1], "amounts": [5, 4, 5], "legacy": [5, 5, 5] },
+    { "name": "یک‌جا همان برگشتِ امروز است", "lineTotal": 500, "quantity": 2, "paidRatio": 0.9, "steps": [2], "amounts": [450], "legacy": [450] },
+    { "name": "S13 یکی از دو B", "lineTotal": 500, "quantity": 2, "paidRatio": 0.9, "steps": [1], "amounts": [225], "legacy": [225] },
+    { "name": "وزنی، نیم کیلو و بعد بقیه", "lineTotal": 375, "quantity": 1.25, "paidRatio": 1, "steps": [0.5, 0.75], "amounts": [150, 225], "legacy": [150, 225] },
+    { "name": "کیسه با تخفیفِ یک از سه", "lineTotal": 1, "quantity": 1, "paidRatio": 0.6666666666666666, "steps": [1], "amounts": [1], "legacy": [1] },
+    { "name": "پس از برگشتِ همه، چیزی نمی‌ماند", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [2, 1], "amounts": [500, 0], "legacy": [500, 0] },
+    { "name": "مقدارِ صفر یا منفی هیچ", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [0, -1], "amounts": [0, 0], "legacy": [0, 0] },
+    { "name": "مقدارِ منفی پس از یک برگشت هم هیچ", "lineTotal": 500, "quantity": 2, "paidRatio": 1, "steps": [1, -1], "amounts": [250, 0], "legacy": [250, 0] },
+    { "name": "قلمِ با مقدارِ فروشِ صفر هیچ", "lineTotal": 500, "quantity": 0, "paidRatio": 1, "steps": [1], "amounts": [0], "legacy": [0] }
+  ]
+}

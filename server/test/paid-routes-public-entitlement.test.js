@@ -35,6 +35,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const ROUTES = nodePath.join(__dirname, '..', 'src', 'routes');
 const CATEGORY = {
   'storefront.js': 'STORE_PAID', 'shop-chat-store.js': 'STORE_PAID', 'trust-store.js': 'STORE_FREE',
+  'pick-substitutes-store.js': 'STORE_PAID',   //  PCK-05: پاسخِ مشتری به جایگزین — همان ویترینِ پولی (sf.open)
+  'order-amend-store.js': 'STORE_PAID',        //  ORD-14: رضایتِ مشتری به ویرایشِ سفارش — همان ویترینِ پولی
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust'];
