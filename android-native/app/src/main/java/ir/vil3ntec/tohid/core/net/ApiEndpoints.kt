@@ -209,6 +209,8 @@ object ApiEndpoints {
     const val EVENTS = "/courier/events"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
+    /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */
+    fun call(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/call"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */
