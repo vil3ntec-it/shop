@@ -13,7 +13,7 @@
    percent    درصد از مبلغِ ردیف (bp: ۱۰۰ = ۱٪)
    amount     مبلغِ ثابت از هر واحد (amountMinor)
    price      قیمتِ ویژه برای کالاهای نام‌برده (prices) — مثلاً برای یک گروهِ مشتری
-   tiers      پله‌ای بر اساسِ تعدادِ همان ردیف (tiers: {min=qtyMilli, bp})
+   tiers      پله‌ای بر اساسِ تعدادِ همان ردیف (tiers: {min=qtyMilli, bp} یا POS-19: {min, unitMinor} = قیمتِ ثابتِ هر واحد)
    bxgy       بخر X بگیر Y؛ ارزان‌ترین واحدهای دامنه (buy، get، bp)
    bundle     بسته: هر qty واحد از دامنه به priceMinor
    threshold  آستانهٔ مبلغِ خرید (tiers: {min=مبلغ, bp | amountMinor})
@@ -126,7 +126,16 @@
     o = o && typeof o === 'object' ? o : {};
     return { from: str(o.from), to: str(o.to), days: ints(o.days), start: int(o.start, -1), end: int(o.end, -1), except: strs(o.except) };
   }
-  function tierOf(o) { return { min: int(o.min, -1), bp: int(o.bp, 0), amountMinor: int(o.amountMinor, 0) }; }
+  //  POS-19: `unitMinor` فقط وقتی آمده نوشته می‌شود — قاعدهٔ درصدیِ ذخیره‌شده بایت‌به‌بایت همان
+  function tierOf(o) {
+    var t = { min: int(o.min, -1), bp: int(o.bp, 0), amountMinor: int(o.amountMinor, 0) };
+    if (o.unitMinor !== undefined && o.unitMinor !== null) t.unitMinor = int(o.unitMinor, -1);
+    return t;
+  }
+  /** قیمتِ ثابتِ پله؛ `-1` = پلهٔ درصدی */
+  function tierUnit(t) { return typeof t.unitMinor === 'number' ? t.unitMinor : -1; }
+  /** POS-19 — پله‌های این قاعده قیمتِ ثابتِ واحد‌اند، نه درصد (پلهٔ نخست می‌گوید) */
+  function tierPrice(r) { return r.kind === 'tiers' && r.tiers.length > 0 && tierUnit(r.tiers[0]) >= 0; }
   function priceOf(o) { return { productId: str(o.productId), unitMinor: int(o.unitMinor, -1) }; }
 
   /** هر شیء ⇒ قاعدهٔ کامل با پیش‌فرض‌ها. نوعِ نادرست ⇒ پیش‌فرض (که `validate` می‌گیرد). */
@@ -237,15 +246,19 @@
     }
     if (k === 'tiers' || k === 'threshold') {
       var tbad = r.tiers.length === 0, useAmt = r.tiers.length > 0 && r.tiers[0].amountMinor > 0;
+      //  POS-19: پلهٔ قیمتِ ثابت — قیمتِ هر پلهٔ بالاتر کمتر، بی درصد و بی مبلغ
+      var byPrice = tierPrice(r), byBp = !byPrice && (k === 'tiers' || !useAmt);
       for (i = 0; i < r.tiers.length; i++) {
         var t = r.tiers[i];
         if (t.min <= 0) tbad = true;
-        if (k === 'tiers' || !useAmt) { if (!validBp(t.bp) || t.amountMinor !== 0) tbad = true; }
+        if (byPrice) { if (tierUnit(t) < 0 || t.bp !== 0 || t.amountMinor !== 0) tbad = true; }
+        else if (tierUnit(t) !== -1) tbad = true;
+        else if (byBp) { if (!validBp(t.bp) || t.amountMinor !== 0) tbad = true; }
         else if (t.bp !== 0 || t.amountMinor <= 0 || t.amountMinor % step !== 0) tbad = true;
         if (i > 0) {
           var a = r.tiers[i - 1];
           if (t.min <= a.min) tbad = true;
-          if ((k === 'tiers' || !useAmt) ? t.bp <= a.bp : t.amountMinor <= a.amountMinor) tbad = true;
+          if (byPrice ? tierUnit(t) >= tierUnit(a) : byBp ? t.bp <= a.bp : t.amountMinor <= a.amountMinor) tbad = true;
         }
       }
       if (tbad) e.push('tiers');
@@ -380,9 +393,12 @@
             }
           }
         } else {
-          var bp = 0;
-          for (var t = 0; t < r.tiers.length; t++) if (r.tiers[t].min <= l.qtyMilli) bp = r.tiers[t].bp;
-          d = roundStep(mul(l.amountMinor, bp), FULL_BP, step);
+          var tier = null;
+          for (var t = 0; t < r.tiers.length; t++) if (r.tiers[t].min <= l.qtyMilli) tier = r.tiers[t];
+          //  POS-19: همان راهِ «price» — مبلغِ ردیف با قیمتِ پله، هرگز تخفیفِ منفی
+          if (tier === null) d = 0;
+          else if (tierUnit(tier) >= 0) d = Math.max(0, l.amountMinor - lineTotalMinor(l.qtyMilli, tierUnit(tier), step));
+          else d = roundStep(mul(l.amountMinor, tier.bp), FULL_BP, step);
         }
         out[i] = Math.min(d, roomOf(r, l, rem[i], step));
       }
@@ -548,6 +564,7 @@
     normalizeCode: normalizeCode,
     ruleOf: ruleOf,
     validate: validate,
+    tierPrice: function (r) { return tierPrice(ruleOf(r)); },
     inWindow: function (w, at) { return inWindow(windowOf(w), at); },
     isoDow: function (date) { var d = epochDay(date); return d === null ? 0 : isoDow(d); },
     evaluate: evaluate,
