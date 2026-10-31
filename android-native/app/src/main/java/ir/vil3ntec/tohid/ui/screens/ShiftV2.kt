@@ -69,7 +69,7 @@ import kotlinx.coroutines.withContext
  *  مرجوعی و ورود/خروجِ نقد فقط با شمار می‌آیند، و بستنِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (بی پیشگو).
  *  PAY-16: در بستن، هر روشِ غیرنقدی که در شیفت گردش داشت کادرِ شمارشِ خودش را دارد (`ShiftSlip.countable`).
  *  PAY-14: بستنِ «نیازمند بررسی» را صاحب/مدیر با یادداشت «بررسی شد» می‌زند (`ShiftReviewV2`، `core/pay/ShiftReview`).
- *  PAY-15: X و Z از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
+ *  PAY-15: X و Z فقط با مجوزِ `shift.report` (پیش‌فرض همه؛ `ShopRole.allows`)، و از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
  *  خاموش ⇒ این‌جا صدا زده نمی‌شود و همان کارتِ `CashShift`ِ امروز در `SalesHistory` است.
  */
 
@@ -84,6 +84,9 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val staff = remember { ir.vil3ntec.tohid.data.ShopRole.isStaff(context) }
+  //  PAY-15: مجوزِ جدای X/Z (`shift.report`ِ هسته، پیش‌فرض همه؛ فقط نمایش)؛ بسته ⇒ نه دکمهٔ X، نه Z پس از بستن،
+  //  نه «گزارش Z» در سابقه — خودِ بستنِ صندوق بسته نمی‌شود
+  val canReport = remember { ir.vil3ntec.tohid.data.ShopRole.allows(context, "shift.report") }
   val shift = remember(d) { CashShift.current(d) }
   val now = System.currentTimeMillis()
   val x = remember(d, shift) { shift?.let { PayFlow.report(d, it.open, null, now) } }
@@ -145,7 +148,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       if (shift != null) {
         OutlinedButton(onClick = { moveMode = "cash_out" }) { Text("ورود/خروجِ نقد") }
         OutlinedButton(onClick = { moveMode = "no_sale" }) { Text("کشو بی فروش") }
-        OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast("گزارش ساخته نشد") }) { Text("گزارش X") }
+        if (canReport) OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast("گزارش ساخته نشد") }) { Text("گزارش X") }
         Button(onClick = { closeDialog = true }) { Text("بستن صندوق") }
       } else {
         Button(onClick = { openDialog = true }) { Text("باز کردن") }
@@ -350,7 +353,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
                 (if (extra.isNotEmpty()) " — $extra" else "")
               save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), "صندوق بسته شد")
               closeDialog = false
-              showReport = z
+              if (canReport) showReport = z
             }
           }
         }) { Text("ببند") }
@@ -402,7 +405,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
               c.z?.let { PayFlow.reportOf(it) }?.let { z ->
                 //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد و بررسی را ثبت می‌کند
                 if (!staff) ShiftReviewBadge(d, c) { history = false; reviewing = c }
-                TextButton(onClick = { history = false; showReport = z }) { Text("گزارش Z") }
+                if (canReport) TextButton(onClick = { history = false; showReport = z }) { Text("گزارش Z") }
               }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)

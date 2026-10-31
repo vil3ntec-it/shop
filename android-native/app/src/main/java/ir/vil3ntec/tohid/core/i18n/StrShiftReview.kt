@@ -27,4 +27,7 @@ object StrShiftReview {
   val errAlready: String get() = t("این بستن پیش‌تر بررسی شده است", "This close has already been reviewed", "دا تړل مخکې کتل شوی")
   val errRole: String get() = t("فقط صاحب یا مدیر بررسی می‌کند", "Only the owner or a manager can review", "یوازې خاوند یا مدیر کتلی شي")
   val errOther: String get() = t("این بستن بررسی نمی‌خواهد", "This close does not need a review", "دا تړل کتنې ته اړتیا نه لري")
+
+  /** PAY-15 — نامِ مجوزِ `shift.report` در «کارمندان» */
+  val permReports: String get() = t("گزارشِ X و Z ِ صندوق", "Register X and Z reports", "د صندوق X او Z راپورونه")
 }
