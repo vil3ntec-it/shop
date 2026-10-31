@@ -56,8 +56,10 @@ function rng(seed) {
 }
 
 /* ── پراکسیِ TCP ِ یک دستگاه: شمارشِ بایت، بُریدن، و (اختیاری) پهنای باند و تأخیرِ واقعی ── */
+const PULL_LINE = 'GET /api/sync/v1/pull?';
 function linkProxy(targetPort, shape = null) {
-  const st = { up: 0, down: 0, conns: 0, cutUpAfter: -1, cutDownAfter: -1, cuts: 0 };
+  //  cutPullAfter: بُرشِ پاسخ فقط از نخستین `GET …/pull` به بعد (پاسخِ push ِ پیش از آن دست نمی‌خورد)
+  const st = { up: 0, down: 0, conns: 0, cutUpAfter: -1, cutDownAfter: -1, cutPullAfter: -1, cuts: 0 };
   const sockets = new Set();
   const free = { up: 0, down: 0 };
   function send(dir, to, chunk) {
@@ -77,6 +79,10 @@ function linkProxy(targetPort, shape = null) {
     const cut = () => { st.cuts++; client.destroy(); up.destroy(); };
     client.on('data', (c) => {
       st.up += c.length;
+      if (st.cutPullAfter >= 0 && c.subarray(0, PULL_LINE.length).toString('latin1') === PULL_LINE) {
+        st.cutDownAfter = st.cutPullAfter;
+        st.cutPullAfter = -1;
+      }
       if (st.cutUpAfter >= 0) {
         st.cutUpAfter -= c.length;
         if (st.cutUpAfter < 0) { st.cutUpAfter = -1; return cut(); }
@@ -102,8 +108,9 @@ function linkProxy(targetPort, shape = null) {
 
 /* ── `authFetch` ِ دستگاه از راهِ پراکسی (یک اتصالِ ماندگار، مثلِ OkHttp) + شمارشِ بدنه و gzip ِ همان بدنه ── */
 function transport(port, token, deviceId, meter) {
-  const agent = new http.Agent({ keepAlive: true, maxSockets: 1 });
-  return function authFetch(p, o = {}) {
+  const fresh = () => new http.Agent({ keepAlive: true, maxSockets: 1 });
+  let agent = fresh();
+  function authFetch(p, o = {}) {
     const body = o.body === undefined || o.body === null ? null : Buffer.from(JSON.stringify(o.body), 'utf8');
     return new Promise((resolve, reject) => {
       const req = http.request({
@@ -137,7 +144,11 @@ function transport(port, token, deviceId, meter) {
       if (body) req.write(body);
       req.end();
     });
-  };
+  }
+  //  گوشیِ برگشته از آفلاین اتصالِ ماندگارِ پیشین را ندارد. بی این، نخستین درخواست گاهی روی سوکتی می‌رفت که سرور
+  //  در همان لحظه به‌خاطرِ بیکاری می‌بست («socket hang up») و قطعِ ساختگیِ پراکسی اصلاً به کار نمی‌آمد.
+  authFetch.dropConnections = () => { agent.destroy(); agent = fresh(); };
+  return authFetch;
 }
 
 /* ── یک دستگاه: موتورِ وب در vm، ساعتِ خودش، دفترِ صفحه در یک جعبه ── */
@@ -153,6 +164,7 @@ function device({ name, token, userId, port, ledger }) {
     },
   });
   const meter = { requests: 0, reqBody: 0, resBody: 0, reqGz: 0, resGz: 0 };
+  const authFetch = transport(port, token, name, meter);
   const box = new Map();
   const ls = { getItem: (k) => (box.has(k) ? box.get(k) : null), setItem: (k, v) => { box.set(k, String(v)); }, removeItem: (k) => box.delete(k) };
   const window = {
@@ -161,7 +173,7 @@ function device({ name, token, userId, port, ledger }) {
     TohidAccount: {
       configured: () => true, isSignedIn: () => true, account: () => ({ userId }),
       deviceId: () => name, appId: () => 'shop', on() { }, heartbeat: async () => ({}),
-      accessToken: async () => token, authFetch: transport(port, token, name, meter),
+      accessToken: async () => token, authFetch,
     },
     addEventListener() { }, dispatchEvent() { },
   };
@@ -186,6 +198,16 @@ function device({ name, token, userId, port, ledger }) {
       for (const [k, v] of box) if (/-oplog$/.test(k)) n += Buffer.byteLength(v, 'utf8');
       return n;
     },
+    /** بایتِ opهای دستهٔ بعدیِ push، با همان `OpQueue.batch` ِ موتور (بدنهٔ واقعی کمی بزرگ‌تر است) */
+    nextBatchBytes() {
+      for (const [k, v] of box) {
+        if (!/-oplog$/.test(k)) continue;
+        const q = new core.OpQueue({ read: (key) => (key === k ? JSON.parse(v) : null), write() { } }, k);
+        return Buffer.byteLength(JSON.stringify(q.batch()), 'utf8');
+      }
+      return 0;
+    },
+    dropConnections: () => authFetch.dropConnections(),
   };
 }
 
@@ -375,23 +397,33 @@ test(`۱) S26: سه دستگاه ${DAYS} روز آفلاین (${OPS} op، برو
     //  وصل شدن: A با قطعِ وسطِ بدنهٔ push و پاسخِ گم‌شدهٔ push، B با پاسخِ گم‌شدهٔ pull، C بی قطع؛ بعد دورِ دوم
     const onServer = async () => Number((await db.one(`SELECT COUNT(*)::int AS n FROM oplog WHERE account_kind='shop' AND account_id=$1`, [shopId])).n);
     const queuedA = devs[0].sync.queueSize();
-    links[0].st.cutUpAfter = 150 * 1024;       // وسطِ بدنهٔ نخستین دسته: سرور چیزی نمی‌گیرد
+    for (const d of devs) d.dropConnections();
+    //  وسطِ بدنهٔ نخستین دسته: سرور چیزی نمی‌گیرد. اندازه از خودِ دسته؛ عددِ ثابت (۱۵۰KB ِ پیشین) از دستهٔ
+    //  ۲۰۰ opی (~۶۳KB) بزرگ‌تر بود و دو دستهٔ نخست کامل می‌رسیدند
+    const firstBatch = devs[0].nextBatchBytes();
+    assert.ok(firstBatch > 8 * 1024, `دستهٔ نخست ${firstBatch} بایت`);
+    links[0].st.cutUpAfter = Math.floor(firstBatch / 2);
     await devs[0].sync.sync();
     assert.ok(devs[0].sync.status().lastError, 'قطعِ وسطِ بدنه دیده شد');
+    assert.equal(links[0].st.cuts, 1, 'خطا از همان قطعِ پراکسی است');
     assert.equal(devs[0].sync.queueSize(), queuedA);
     assert.equal(await onServer(), startOps);
     links[0].st.cutDownAfter = 10;             // سرور نخستین دسته را گرفت، پاسخش نرسید
     await devs[0].sync.sync();
     assert.ok(devs[0].sync.status().lastError, 'پاسخِ گم‌شده دیده شد');
+    assert.equal(links[0].st.cuts, 2);
     assert.equal(devs[0].sync.queueSize(), queuedA, 'صف دست نخورد');
     assert.ok(await onServer() > startOps, 'ولی سرور همان دسته را دارد');
     await drain(devs[0], shopId);              // همان دسته دوباره ⇒ «تکراری»، بقیه از همان‌جا
-    links[1].st.cutDownAfter = 64 * 1024;      // پاسخِ pull ِ B وسطِ راه بریده شود (پس از push ِ کاملش)
+    devs[1].dropConnections();
+    links[1].st.cutPullAfter = 64 * 1024;      // پاسخِ pull ِ B وسطِ راه بریده شود (پس از push ِ کاملش)
     await drain(devs[1], shopId);
+    assert.equal(links[1].st.cuts, 1, 'پاسخِ pull ِ B بریده شد');
+    devs[2].dropConnections();
     await drain(devs[2], shopId);
-    for (const d of devs) await drain(d, shopId);
+    for (const d of devs) { d.dropConnections(); await drain(d, shopId); }
     const cuts = links.reduce((s, l) => s + l.st.cuts, 0);
-    assert.ok(cuts >= 2, `قطع‌ها اعمال شد (${cuts})`);
+    assert.equal(cuts, 3, `قطع‌ها اعمال شد (${cuts})`);
 
     //  هر op دقیقاً یک بار
     const total = devs.reduce((s, d) => s + d.made.ops, 0);
