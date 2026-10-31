@@ -539,7 +539,8 @@ test('TEN-01 کاربرِ چنددکانی: نشستِ بسته به «الف» 
    فراداده است؛ هر جا **یک** حساب/کاربر/گفت‌وگو با شناسه باز می‌شود، ردیفِ سابقه با
    شناسهٔ همان موضوع می‌نشیند. فهرست‌های پرتکرار سابقه نمی‌خواهند (سیلابِ سابقه). */
 
-/** درهای GETِ مدیر با شناسهٔ موضوع ⇒ سابقه‌دار (`audited`) یا کنار با دلیل (`exempt`). */
+/** درهای GETِ مدیر با شناسهٔ موضوع ⇒ سابقه‌دار (`audited`)، کنار با دلیل (`exempt`)، سنجیده در جای دیگر
+ *  (`elsewhere`) یا منتظرِ اجازهٔ صاحب‌کار (`pending`، کدِ پمپ ⇐ #615). */
 const ADMIN_SUBJECT = {
   'GET /api/admin/users/:id': { audited: 'admin.user_viewed' },
   'GET /api/admin/users/:id/delete-preview': { audited: 'admin.user_delete_previewed' },
@@ -547,8 +548,9 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/shops/:id/staff-perms': { audited: 'admin.shop_staff_perms_viewed' },
   'GET /api/admin/support/threads/:id': { audited: 'admin.support_thread_viewed' },
   'GET /api/admin/accounts/:app/:tenantId/backups/:id': { audited: 'admin.account_backup_downloaded' },
-  'GET /api/admin/pump/stations/:id': { audited: 'admin.station_viewed' },
-  'GET /api/admin/pump/stations/:id/events': { audited: 'admin.station_events_viewed' },
+  //  ⛔ کدِ پمپ بی اجازهٔ صاحب‌کار دست نمی‌خورد: سابقهٔ این دو (و آزمونش) در #615 است
+  'GET /api/admin/pump/stations/:id': { pending: 'کدِ پمپ — `admin.station_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
+  'GET /api/admin/pump/stations/:id/events': { pending: 'کدِ پمپ — `admin.station_events_viewed` در #615 (`claude/sec-pump-pending`)، نیازمندِ اجازهٔ صاحب‌کار' },
   'GET /api/admin/trust/cases/:id': { elsewhere: 'market-trust.test.js (admin.trust_case_viewed، فقط ارشد)' },
   'GET /api/admin/trust/cases/:id/evidence/:evidenceId': { elsewhere: 'market-trust.test.js (admin.trust_evidence_viewed، فقط ارشد)' },
   'GET /api/admin/shops/:id/history': { exempt: 'تاریخچهٔ اشتراک — دفترِ صورت‌حسابِ خودِ پلتفرم، نه دفترِ دکان' },
