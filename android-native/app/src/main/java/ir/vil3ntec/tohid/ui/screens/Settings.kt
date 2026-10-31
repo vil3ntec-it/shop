@@ -596,6 +596,17 @@ fun SettingsScreen(
             ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
           },
         )
+        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود
+        if (crmReports) {
+          var reminderText by remember { mutableStateOf(ir.vil3ntec.tohid.data.DebtReminderPref.template(context)) }
+          Spacer(Modifier.height(12.dp))
+          DebtReminderTemplateEditor(
+            saved = reminderText,
+            onSave = { t -> ir.vil3ntec.tohid.data.DebtReminderPref.set(context, t).also { if (it == null) reminderText = ir.vil3ntec.tohid.data.DebtReminderPref.template(context) } },
+            onReset = { ir.vil3ntec.tohid.data.DebtReminderPref.reset(context); reminderText = ir.vil3ntec.tohid.data.DebtReminderPref.template(context) },
+            onMessage = ::toast,
+          )
+        }
       }
     }
 

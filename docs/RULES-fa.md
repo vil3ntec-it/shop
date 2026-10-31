@@ -499,6 +499,7 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `shrink_report` = زبانهٔ «ضایعات و کسری» در گزارش‌های گوشی و کامپیوتر (`ShrinkReportPref`، INV-17، `claude/new-inv-1`).
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `whats_new` = «چه چیزی تازه است» پس از به‌روزرسانی و در «دربارهٔ برنامه» (`WhatsNewPref`، آخرین نسخهٔ دیده‌شده در `tohid-whats-new:seen`؛ OPS-05، `claude/new-ops-1`، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 `tohid-ui:pos_price_check = false` قیمت‌پرسی با Ctrl+I در صندوقِ کامپیوتر (`PosPriceCheckPrefs`، POS-15، `claude/new-pos-price-1`).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `debt_reminder_template` = متنِ یادآوریِ بدهی، فقط متنِ درست، نبودن = جملهٔ امروز (`DebtReminderPref`، CRM-06، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

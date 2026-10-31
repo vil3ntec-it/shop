@@ -111,7 +111,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
     Span.CUSTOM -> (Jalali.parseTyped(fromText) ?: "0000-01-01") to (Jalali.parseTyped(toText) ?: "9999-12-31")
   }
   val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
-  val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today) }
+  //  CRM-06: متنِ یادآوریِ همین دستگاه (نبودن = همان جملهٔ امروز)
+  val reminderTemplate = remember { ir.vil3ntec.tohid.data.DebtReminderPref.template(context) }
+  val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate) }
 
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name)
   fun excel() { Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { toast("ذخیره شد: $it") } }
@@ -244,7 +246,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi(StrShrink.rows(r.rows), r.rateBp?.let { StrShrink.ofSales(shrinkPercent(it)) } ?: StrShrink.noSales, Shop.colors.text, Modifier.weight(1f))
         }
         Rep.REMINDERS -> {
-          val due = remember(d, today) { DebtReminder.due(d, today) }
+          val due = remember(d, today) { DebtReminder.due(d, today, template = reminderTemplate) }
           DeskKpi("یادآوریِ امروز", "${due.size}", Shop.colors.warning, Modifier.weight(1f))
           DeskKpi("سررسید گذشته", "${due.count { it.overdueSince.isNotEmpty() }}", Shop.colors.danger, Modifier.weight(1f))
           DeskKpi("جمعِ مانده", "${money(due.sumOf { it.balance })} ؋", Shop.colors.text, Modifier.weight(1f))

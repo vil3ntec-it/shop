@@ -80,6 +80,21 @@ object StrShell {
   )
   val crmShownInReports: String get() = t("در «گزارش‌ها» دیده می‌شوند", "Shown under “Reports”", "په «راپورونه» کې ښکاري")
   val crmNote: String get() = t("چهار زبانهٔ تازه در «گزارش‌ها»: سنِ بدهی (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز)، تحلیلِ خریدِ مشتریان (RFM)، مشتریانِ تکراری و یادآوریِ امروز. خودِ گزارش‌ها فقط خواندنی‌اند. با روشن بودن، اگر مشتری‌ای ادغام شده باشد، فروش یا قرضی که بعداً روی نامِ کهنه‌اش رسید هم پس از هر همگام‌سازی به همان مشتریِ ماندگار می‌رود. در صفحهٔ فعلیِ گزارش‌ها می‌آیند، نه در «گزارشِ تازه». پس از تغییر، «گزارش‌ها» را دوباره باز کنید.", "Four new tabs under “Reports”: debt age (0–30, 31–60, 61–90, 90+ days), customer purchase analysis (RFM), repeat customers and today's reminders. The reports themselves are read-only. While this is on, if a customer has been merged, a sale or credit that later arrives under the old name is moved to the surviving customer after each sync. They appear on the current reports screen, not in “New report”. After changing this, reopen “Reports”.", "په «راپورونه» کې څلور نوې پاڼې: د پور عمر (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ ورځې)، د پیرودونکو د پېرود شننه (RFM)، تکراري پیرودونکي او د نن یادونې. راپورونه پخپله یوازې د لوستلو دي. کله چې دا روښانه وي، که کوم پیرودونکی یوځای شوی وي، هغه پلور یا پور چې وروسته د هغه په زاړه نوم راشي، له هرې همغږۍ وروسته هماغه پاتې پیرودونکي ته ځي. په اوسني راپورونو پاڼه کې راځي، نه په «نوی راپور» کې. له بدلون وروسته «راپورونه» بیا پرانیزئ.")
+  // مشتری ← متنِ یادآوریِ بدهی (CRM-06) — جای‌نگهدارها ({نام}…) خودِ قالب‌اند و ترجمه نمی‌شوند
+  val reminderTemplate: String get() = t("متنِ یادآوریِ بدهی", "Debt reminder text", "د پور د یادونې متن")
+  fun reminderTemplateNote(slots: String): String = t(
+    "همین متن در زبانهٔ «یادآوریِ امروز» ِ «گزارش‌ها» و برگهٔ چاپ و اکسلِ آن می‌آید. جای‌نگهدارها: $slots — هر کدام با مقدارِ همان مشتری پر می‌شود.",
+    "This text is used in the “Today's reminders” tab under “Reports” and its print and Excel sheet. Placeholders: $slots — each is filled with that customer's value.",
+    "همدا متن د «راپورونه» د «د نن یادونې» په پاڼه او د هغې د چاپ او اکسل په پاڼه کې راځي. ځای نیونکي: $slots — هر یو د هماغه پیرودونکي په ارزښت ډکېږي.",
+  )
+  fun reminderPreview(text: String): String = t("نمونه: $text", "Preview: $text", "بېلګه: $text")
+  val reminderSampleName: String get() = t("احمد", "Ahmad", "احمد")
+  val reminderSampleStore: String get() = t("دکانِ شما", "Your shop", "ستاسو دوکان")
+  val reminderDefault: String get() = t("همان متنِ پیش‌فرض", "Use the default text", "اصلي متن")
+  val reminderSaved: String get() = t("متنِ یادآوری ذخیره شد", "Reminder text saved", "د یادونې متن خوندي شو")
+  val reminderEmpty: String get() = t("متنِ یادآوری خالی است", "The reminder text is empty", "د یادونې متن خالي دی")
+  fun reminderTooLong(max: Int): String = t("متنِ یادآوری حداکثر $max حرف", "The reminder text can have at most $max characters", "د یادونې متن تر $max تورو پورې")
+  fun reminderUnknown(slots: String): String = t("جای‌نگهدارِ ناشناخته: $slots", "Unknown placeholder: $slots", "ناپېژندل شوی ځای نیونکی: $slots")
   // مشتری ← ادغامِ تکراری‌ها (CRM-10)
   val mergeNotOnV3: String get() = t("روی همگام‌سازیِ تازه هنوز نیست", "Not available on the new sync yet", "په نوې همغږۍ کې لا نشته")
   val mergeNotSaved: String get() = t("ادغام ثبت نشد", "The merge wasn't saved", "یوځای کول ثبت نه شو")
