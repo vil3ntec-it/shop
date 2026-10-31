@@ -14055,6 +14055,8 @@
 
   function saveState(){
     if(ledgerInMemory === false) return;   // دفتر هنوز از IndexedDB نرسیده: دفترِ خالی روی دفترِ واقعی نوشته نشود
+    /* دو برگه، یک دفتر: برگهٔ فقط‌خواندنی (`TohidTabLock`، license/sync-engine.js) دفترِ ذخیره‌شده را با نسخهٔ کهنه‌اش رونویسی نکند */
+    if(window.TohidTabLock && window.TohidTabLock.readOnly()){ try{ showToast(window.TohidTabLock.message, 'danger'); }catch(e){} return; }
     touchLedger();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -15814,7 +15816,7 @@
 <script src="license/account-code.js?v=2" defer></script>
 <script src="license/money.js?v=2" defer></script>
 <script src="license/sync-v3-engine.js?v=1" defer></script>
-<script src="license/sync-engine.js?v=6" defer></script>
+<script src="license/sync-engine.js?v=7" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
