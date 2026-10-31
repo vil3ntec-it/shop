@@ -249,6 +249,7 @@
 - اثرِ تحویل روی سفارش فقط با `orders.transitionIn` و COD فقط با `orders.codIn`، در همان تراکنش (#249).
 - ⛔ ساختِ سفارش بی کلیدِ یکتایی (`Idempotency-Key` یا `clientKey`) نیست و ویترین هم فقط `orders.create` را صدا می‌زند (CHK-19، #227، #244).
 - پول فقط `*Minor` و مقدار `qtyMilli`؛ مبلغِ ردیف فقط با `lineTotalMinor`؛ مبلغِ کلاینت نادیده است (#227).
+- کارِ گروهی (ORD-19) قاعدهٔ تازه‌ای ندارد: هر سفارش جدا از `orders.transition`؛ بازپرداخت و ردِ خودکار گروهی نیستند. هشدارِ شروعِ زمان‌بندی‌شده (ORD-18) هر سفارش یک بار، با رویدادِ `note` ِ `start_alert` زیرِ قفلِ ردیف (`claude/spec-ord-4`).
 - شمارهٔ کاملِ مشتری فقط با `orders.contact`؛ فهرست هرگز شمارهٔ کامل ندارد (ORD-17، #227).
 - اشتراکِ تمام‌شده فقط نوشتن را می‌بندد؛ خواندن باز است (#227).
 - میزِ سفارش (ORD-04/08/09، `lib/order-desk.js`): «شلوغم» و توقف با ساعتِ سرور و پایانِ خودکارِ زمانی؛ توقف فقط سفارشِ **تازهٔ** ویترین را می‌بندد (تکرارِ کلیدِ سفارشِ پیشین و سفارشِ کارمند آزاد)؛ مشتری فقط «تا کی» را می‌بیند؛ قبولِ خودکار فقط با `orderAcceptance = accepting`، زیرِ قفلِ دکان و از راهِ `orders.transitionIn` با بازیگرِ سیستم؛ توقفِ خودکار یک بار در دقیقه (event_id) و «ادامه» ِ دستی یک دور مهلت دارد (`claude/spec-ord-3`).
@@ -467,6 +468,8 @@
 | `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11)؛ `/shop/orders/pick/…` و `/shop/orders/:id/pick…` (خاموش ⇒ ۴۰۳ `picking_disabled`)، کسرِ خودکار در بسته‌بندی، «تمام شده» ِ کالای پیدانشده در ویترین؛ قفسهٔ انتظار و دسته (PCK-10/12): `/shop/orders/pick/shelf…` و `/shop/orders/pick/batches…` | `claude/spec-pck-1`، `claude/spec-pck-2`، `claude/new-pck-2` | باز |
 | `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11)؛ `/shop/orders/pick/…` و `/shop/orders/:id/pick…` (خاموش ⇒ ۴۰۳ `picking_disabled`)، کسرِ خودکار در بسته‌بندی، «تمام شده» ِ کالای پیدانشده در ویترین؛ عکسِ مدرکِ بسته (PCK-08): `/shop/orders/:id/pick/photos…` | `claude/spec-pck-1`، `claude/spec-pck-2`، `claude/new-pck-3` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
+| `shop.orders.start_alert` | دکان / `all` | خاموش | ORD-18: کارگرِ هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (رویدادِ `note` ِ `start_alert`، سابقه، پوش با `shop.order_notify`) | `claude/spec-ord-4` | باز |
+| `shop.orders.bulk` | دکان / `all` | خاموش | ORD-19: `POST /api/shop/orders/bulk/transition` (خاموش ⇒ ۴۰۳ `order_bulk_disabled`) | `claude/spec-ord-4` | باز |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
 | `shop.delivery_code_rule` | دکان / `all` | خاموش | کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل است (DLV-08)؛ خاموش ⇒ کد فقط با `requireCode`، بیت‌به‌بیت همان پیشین | `claude/part-dlv-1` | باز |
