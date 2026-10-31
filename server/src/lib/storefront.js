@@ -1214,5 +1214,5 @@ module.exports = {
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
-  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
+  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView, PRODUCT_ID_RE,
 };

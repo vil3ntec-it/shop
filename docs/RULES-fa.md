@@ -250,6 +250,7 @@
 - توکنِ پیگیری `<ULID>.<HMAC>` و بی ذخیره؛ نمای مشتری شناسهٔ داخلی، شماره، نشانی و یادداشتِ کارمند ندارد (#244).
 - صفحهٔ `server/public/store/` با CSPِ سخت (`script-src 'self'`، بی `unsafe-inline`) (SEC-09، #244).
 - پیشوندِ `/store` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#244).
+- صفحهٔ کالا و سئو (WEB-17/20، `shop.storefront.seo`): نشانیِ مطلق فقط از `config.storefront.domain` (هرگز از `Host`)؛ هر متنِ دکان با `esc` و JSON-LD بی `<`/`>`/`&`؛ جای‌گذاری در پوسته با تابع، نه رشته (`$&`)؛ موجودیِ «در حال بررسی» در JSON-LD ادعای `InStock` نمی‌شود؛ خاموش ⇒ پاسخِ بایت‌به‌بایتِ امروز (`claude/new-web-1`).
 
 ### v3 · پیک و تحویل
 
@@ -393,6 +394,7 @@
 |---|---|---|---|---|---|
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
+| `shop.storefront.seo` | دکان / `all` | خاموش | صفحهٔ کالا `/p/<id>` و `/store/<slug>/p/<id>` با Open Graph و JSON-LD، `sitemap.xml` و `robots.txt` ِ میزبانِ دکان، برچسب‌های `/store/<slug>` و `seo.productBase` در `GET /api/store/:slug` (WEB-17، WEB-20؛ `lib/store-seo.js`)؛ با ویترینِ روشن؛ خاموش ⇒ همان index.html ِ ایستا و همان ۴۰۴، بی شمردنِ سقف | `claude/new-web-1` | باز |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |

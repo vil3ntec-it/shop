@@ -19,6 +19,8 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
+  //  WEB-20: پیوندِ کالا با پیش‌نمایش — فقط وقتی سرور صفحهٔ کالا را می‌دهد (پرچمِ `shop.storefront.seo`)
+  var shareBase = null;
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -172,6 +174,8 @@
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
+      $('ps-share').hidden = !shareBase;
+      $('ps-share').onclick = function () { shareProduct(x); };
       renderAddSheet(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
@@ -180,6 +184,16 @@
       if (r.items[0]) fill(r.items[0]);
       else { K.toast(t('p.gone')); closeToCatalog(); }
     }).catch(function (e) { K.toast(e.message); });
+  }
+  /** WEB-20 — نشانیِ واقعیِ کالا (`…/p/<id>`) که واتس‌اپ و فیسبوک پیش‌نمایشش را می‌سازند. */
+  function shareProduct(p) {
+    var url = shareBase + encodeURIComponent(p.id);
+    if (navigator.share) { navigator.share({ title: p.name, url: url }).catch(function () { /* لغو */ }); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { K.toast(t('ps.copied')); }, function () { K.toast(url); });
+      return;
+    }
+    K.toast(url);
   }
   function renderAddSheet(p) {
     var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
@@ -605,7 +619,15 @@
     renderBar();
   }
 
+  /** صفحهٔ کالا (`/p/<id>` یا `/store/<slug>/p/<id>`، WEB-20) ⇒ همان مسیرِ `#/p/<id>` ِ همین پوسته. */
+  function fromProductPath() {
+    var m = /^(.*?)\/p\/([^/]+)\/?$/.exec(location.pathname);
+    if (!m || (location.hash && location.hash !== '#/')) return;
+    history.replaceState(null, '', (m[1] || '/') + location.search + '#/p/' + m[2]);
+  }
+
   function boot() {
+    fromProductPath();
     K.offline();
     $('to-market').appendChild(K.icon('back'));
     $('to-catalog').appendChild(K.icon('back'));
@@ -621,6 +643,7 @@
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
       verifyAvailable = !r.verification || r.verification.available !== false;
+      shareBase = r.seo && typeof r.seo.productBase === 'string' ? r.seo.productBase : null;
       renderHead();
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;

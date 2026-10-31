@@ -19,6 +19,7 @@ const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
+const storeSeo = require('../lib/store-seo');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const audit = require('../lib/audit');
@@ -59,8 +60,8 @@ const customer = async (req, res, next) => {
 };
 
 router.get('/:slug', readLimit, store, async (req, res) => {
-  const [cats, status, delivery] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
+  const [cats, status, delivery, seo] = await Promise.all([
+    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store), storeSeo.publicInfo(req.store),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
@@ -68,6 +69,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
+    //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
+    ...(seo ? { seo } : {}),
   });
 });
 
