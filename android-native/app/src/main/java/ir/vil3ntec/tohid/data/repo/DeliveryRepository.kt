@@ -62,6 +62,15 @@ class DeliveryRepository(private val api: ApiClient) {
     (out["assignment"] as? JsonObject)?.let(DeliveryWire::mission) ?: throw ApiFailure.InvalidResponse()
   }
 
+  /**
+   *  «اصلاحِ نشانی» پس از ناموفق (DLV-09، `DeliveryWire.addressJson`) با `Idempotency-Key`؛
+   *  نسخهٔ کهنه ⇒ `ApiFailure` با کدِ `assignment_changed` (میز تازه می‌شود).
+   */
+  suspend fun fixAddress(assignmentId: String, body: JsonObject, key: String): ApiResult<Mission> = result {
+    val out = api.postKeyed(Delivery.address(assignmentId), body, key)
+    (out["assignment"] as? JsonObject)?.let(DeliveryWire::mission) ?: throw ApiFailure.InvalidResponse()
+  }
+
   suspend fun updateCourier(courierId: String, body: JsonObject): ApiResult<CourierRow> = result {
     val out = api.post(Delivery.courier(courierId), body)
     (out["courier"] as? JsonObject)?.let(DeliveryWire::courier) ?: throw ApiFailure.InvalidResponse()
