@@ -166,6 +166,14 @@ async function releaseBlob(hash) {
 /** پرچمِ نسخهٔ ۲ برای این دکان — همان خوانشِ `live_config` ِ بخش‌های دیگر (`orders.flagOf`) */
 const enabledFor = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
 
+/**
+ * پرچمِ `shop.debt_minor` (live_config، پیش‌فرض خاموش) — ماندهٔ حساب در برنامه به پول (`DebtMinorFlag`).
+ * سرور چیزی را با آن حساب نمی‌کند؛ فقط در همان پاسخِ `/config` می‌رود که برنامه برای فاکتورِ نسخهٔ ۲ از پیش
+ * می‌پرسد (`ReceiptFlag`)، تا درخواستِ تازه‌ای نباشد.
+ */
+const DEBT_MINOR_KEY = 'shop.debt_minor';
+const debtMinorFor = (shopId) => require('./orders').flagOf(shopId, DEBT_MINOR_KEY);
+
 /** بایت‌های یک لوگو از `image_blobs`، یا null */
 async function blob(hash) {
   const b = await one('SELECT data, mime, hash FROM image_blobs WHERE hash=$1', [hash]);
@@ -178,4 +186,4 @@ async function logoOf(shopId) {
   return profile.logo ? blob(profile.logo.hash) : null;
 }
 
-module.exports = { KEY, FLAG_KEY, enabledFor, LOGO_MAX_BYTES, LOGO_MAX_SIDE, DEFAULTS, view, patchOf, read, update, putLogo, removeLogo, blob, logoOf };
+module.exports = { KEY, FLAG_KEY, enabledFor, DEBT_MINOR_KEY, debtMinorFor, LOGO_MAX_BYTES, LOGO_MAX_SIDE, DEFAULTS, view, patchOf, read, update, putLogo, removeLogo, blob, logoOf };

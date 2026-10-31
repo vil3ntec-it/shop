@@ -519,6 +519,8 @@ fun AppRoot(
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  HW-05: «ابزارهای تازهٔ دستگاه» و تنظیمِ بارکدخوان پیش از نخستین اسکن (`HidScan`، `NumberField`)
+    ir.vil3ntec.tohid.scan.ScanPrefs.load(context)
     //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
     ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
@@ -784,15 +786,23 @@ fun AppRoot(
                 Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
                 Str.dateAndDigits to androidx.compose.material.icons.Icons.Filled.Event,
                 Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                //  هر بخشِ `SettingsScreen` این‌جاست، وگرنه روی کامپیوتر روشن‌شدنی نیست (`DeskSettingsCoverageTest`)
+                ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle to androidx.compose.material.icons.Icons.Filled.Tune,
+                ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
                 ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
+                StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
                 Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
