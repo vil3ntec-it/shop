@@ -493,6 +493,8 @@ fun SettingsScreen(
     item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* ======================== رسیدِ هدیهٔ بی قیمت (POS-34، پیش‌فرض خاموش) ======================== */
     item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }
+    /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
+    item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }

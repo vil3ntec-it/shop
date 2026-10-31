@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.LocalShipping
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
@@ -552,6 +553,10 @@ fun DeskSaleScreen(
     }
   }
 
+  //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
+  val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
+  var deliverOpen by remember { mutableStateOf(false) }
+
   /* ─────────── ناحیهٔ «سبد خرید» ─────────── */
   @Composable
   fun Cart(modifier: Modifier) {
@@ -562,6 +567,12 @@ fun DeskSaleScreen(
         CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
         if (returnsV2) CartHeaderAction(StrInvoices.returnItems, Icons.Filled.SwapHoriz, KeyMap.SALE_RETURN_MODE.hint) { returnMode = true }
         CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
+        //  POS-38 (پشتِ `DeliverLaterPrefs`، پیش‌فرض خاموش): سبد ⇐ سفارشِ ارسال، بی فروش
+        if (deliverLater) {
+          CartHeaderAction(ir.vil3ntec.tohid.core.i18n.StrDeliver.button, Icons.Filled.LocalShipping, null, enabled = cart.isNotEmpty() && !posting) {
+            deliverOpen = true
+          }
+        }
       },
       customer = {
         CustomerRow(
@@ -750,6 +761,17 @@ fun DeskSaleScreen(
         LaunchedEffect(Unit) { runCatching { safe.requestFocus() } }
       },
     )
+  }
+
+  //  POS-38: سفارشِ ارسال از همین سبد (با تخفیفِ خودکار، `priced`)؛ پس از ثبت سبد خالی — هیچ فروشی این‌جا نیست
+  if (deliverOpen) {
+    ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSheetWired(d, priced, onClose = { deliverOpen = false; refocus() }) { o ->
+      deliverOpen = false
+      cartStore.clear()
+      selected = null
+      toast(ir.vil3ntec.tohid.core.i18n.StrDeliver.created(o.orderNo))
+      refocus()
+    }
   }
 
   if (pickDebtor) {
