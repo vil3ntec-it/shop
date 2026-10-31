@@ -50,10 +50,11 @@ import kotlinx.coroutines.launch
  *  ⛔ قلابِ تأیید (STF-02، RET-04/07/10).
  *
  *  وقتی برگشت تأیید لازم دارد (بی رسید یا ضایعات برای شاگرد، بالای سقف برای همه
- *  جز صاحب) و نقشِ همین کاربر بس نیست، این‌جا صدا زده می‌شود. پنجرهٔ «درخواستِ
- *  تأیید» با PINِ مدیر (PRِ تأییدِ کارمندان) خودش را این‌جا می‌گذارد و با
- *  `ReturnFlow.Approval(by, role)` جواب می‌دهد؛ تا آن روز `null` است و فرم
- *  به‌جای دکمهٔ بی‌اثر، روشن می‌گوید چه کسی باید ثبت کند.
+ *  جز صاحب) و نقشِ همین کاربر بس نیست، این‌جا صدا زده می‌شود: پنجرهٔ «درخواستِ
+ *  تأیید» با PINِ مدیر یا صاحب (`ReturnApprovalRequest`، همان `ApprovalDialog` ِ تخفیف)
+ *  و جوابِ `ReturnFlow.Approval(by, role, slip)` با «برگهٔ امضاشده»ی همین سند. فرمِ
+ *  قدیم و برگهٔ نسخهٔ ۳ هر دو همین را می‌خوانند. `null` (فقط آزمون/عکس) ⇒ فرم به‌جای
+ *  دکمه می‌گوید چه کسی باید ثبت کند.
  */
 object ReturnApproval {
   data class Need(
@@ -66,7 +67,8 @@ object ReturnApproval {
     val approver: String,
   )
 
-  var requester: (@Composable (need: Need, onResult: (ReturnFlow.Approval?) -> Unit) -> Unit)? = null
+  var requester: (@Composable (need: Need, onResult: (ReturnFlow.Approval?) -> Unit) -> Unit)? =
+    { need, onResult -> ir.vil3ntec.tohid.ui.components.staff.ReturnApprovalRequest(need, onResult) }
 
   fun whyText(reasons: List<String>): String = reasons.joinToString("، ") {
     when (it) {
@@ -140,7 +142,9 @@ fun ReturnFlowDialog(
   val q = (quote as? ReturnFlow.Outcome.Ok)?.value
   val total = q?.total ?: 0.0
   val damaged = q?.lines?.any { it.disposition == ReturnFlow.DAMAGED } == true
-  val perm = remember(total) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total)) }
+  //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
+  val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
+  val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
   val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
