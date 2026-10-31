@@ -105,6 +105,7 @@ pm2 start src/index.js --name shop-server && pm2 save && pm2 startup
 | `SERVER_URL` | آدرسی که برنامه‌ها با آن به سرور می‌رسند (IP هم قبول است) |
 | `API_SECRET` / `OTP_SECRET` | رازهای سرور؛ حتماً عوض شوند |
 | `OTP_PROVIDER` | `log` \| `sms` \| `webhook` \| `whatsapp` — راه‌اندازی در [`SMS.md`](SMS.md) |
+| `OTP_DEV_ECHO` | فقط سرورِ توسعه: `true` ⇒ کدِ راهِ `log` در خودِ پاسخ (`devCode`). در production هرگز؛ نبودِ `NODE_ENV` دیگر بس نیست (SEC-API-04) |
 | `GOOGLE_CLIENT_ID` | برای ورود با گوگل — راه‌اندازی در [`GOOGLE-LOGIN.md`](GOOGLE-LOGIN.md) |
 | `BACKUP_PATH` | مسیر ذخیره‌ی پشتیبان‌ها |
 | `BACKUP_PASSPHRASE` | اگر پر باشد، پشتیبان‌ها رمز می‌شوند |

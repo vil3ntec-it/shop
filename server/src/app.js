@@ -30,51 +30,22 @@ async function createApp({ runMigrations = true } = {}) {
     log: (m) => console.log(`[admin] ${m}`),
   });
 
-  //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
-  //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
-  //  (پارسرِ اول بدنه را می‌خواند و دومی کاری نمی‌کند).
-  app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
-  //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64
-  app.use(/^\/api(?:\/v1)?\/pump\/device\/report\//, express.json({ limit: '34mb' }));
-  app.use(express.json({ limit: '2mb' }));
-
-  /*
-   *  بدنه‌ای که JSON نیست.
-   *
-   *  ── چه چیزی را می‌بندد ──────────────────────────────────────────
-   *  خواننده‌ی JSON خودش خطا می‌سازد و آن خطا `expose` دارد، پس پیامش
-   *  همان‌طور که هست بیرون می‌رفت:
-   *
-   *      Unexpected token } in JSON at position 42
-   *
-   *  یعنی یک جمله‌ی انگلیسیِ داخلیِ Node، با شماره‌ی بایت، به دستِ
-   *  کاربرِ فارسی‌زبان. نه او می‌فهمید چه شده، نه ما می‌خواستیم درونِ
-   *  کتابخانه‌مان را نشان بدهیم. بدنه‌ی بزرگ‌تر از سقف هم همین‌طور.
-   *
-   *  حالا هر دو یک پاسخِ تمیز می‌گیرند و جزئیات فقط در لاگِ خودمان
-   *  می‌ماند — بی بدنه، چون بدنه ممکن است رمز داشته باشد.
-   *  ──────────────────────────────────────────────────────────────
-   */
-  app.use((err, req, res, next) => {
-    if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large')) {
-      return next(err);
-    }
-    const tooBig = err.type === 'entity.too.large';
-    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type}`);
-    res.status(tooBig ? 413 : 400).json({
-      error: {
-        code: tooBig ? 'body_too_large' : 'bad_json',
-        message: tooBig ? 'حجم درخواست بیش از حد مجاز است' : 'بدنه‌ی درخواست درست نبود',
-      },
-    });
-  });
-
   // ---- سرآیندهای امنیتی ----
   app.use((req, res, next) => {
     res.set('X-Content-Type-Options', 'nosniff');
     res.set('X-Frame-Options', 'DENY');
     res.set('Referrer-Policy', 'no-referrer');
     res.set('Cross-Origin-Opener-Policy', 'same-origin');
+    /*
+     *  ⛔ SEC-API-05 — پاسخِ API هرگز صفحه نیست. اگر کسی نشانیِ یک پاسخ (JSON، عکس، رسانه،
+     *  فایل) را مستقیم در مرورگر باز کند، نه اسکریپت، نه قاب، نه فرم — همان دیواری که رسانهٔ
+     *  چت از پیش داشت، حالا پیش‌فرضِ همهٔ `/api`. مسیری که CSP ِ خودش را می‌خواهد پس از این
+     *  `res.set` می‌کند و همان می‌ماند (رسانهٔ پشتیبانی و چت). صفحه‌ها (`/admin`، `/store`،
+     *  `/portal`…) زیرِ `/api` نیستند و CSP ِ خودشان را دارند.
+     */
+    if (req.path.startsWith('/api/')) {
+      res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox");
+    }
     //  وقتی درخواست از HTTPS آمده، به مرورگر می‌گوییم از این به بعد
     //  فقط HTTPS. بدون این، اولین درخواستِ هر بازدید می‌تواند روی HTTP
     //  ساده برود و توکن همان‌جا دیده شود. فقط پشت TLS فرستاده می‌شود:
@@ -132,6 +103,59 @@ async function createApp({ runMigrations = true } = {}) {
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
+
+  /*
+   *  ⛔ SEC-API-02 — خواندنِ بدنه **پس از** سقفِ نرخ، و بدنهٔ بزرگ فقط **پس از** توکنِ دستگاه.
+   *  تا ۲.۱۴.۴ این سه پارسر بالای همه‌چیز بودند: هر کسی بی هیچ توکنی ۴ مگابایت JSON به
+   *  ‎/pump/device/state‎ می‌فرستاد و سرور پیش از سقفِ نرخ و پیش از `requireDevice` همه را در
+   *  حافظه می‌خواند و parse می‌کرد؛ و ۳۴mb ِ ‎/report/‎ فقط چون الگویش هرگز جور نمی‌شد بی‌اثر بود
+   *  (درستش = همان درِ باز با ۳۴mb). حالا: سقفِ نرخ ⇐ توکنِ دستگاه (همان `requireDevice`، یک بار؛
+   *  روتر دوباره نمی‌پرسد) ⇐ پارسرِ بزرگ. هیچ میان‌افزارِ بالاتری بدنه را نمی‌خواند.
+   *  `api-web-hardening.test.js`.
+   *
+   *  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
+   *  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
+   *  (پارسرِ اول بدنه را می‌خواند و دومی کاری نمی‌کند).
+   */
+  const { requireDevice } = require('./routes/pump-device');
+  app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], requireDevice, express.json({ limit: '4mb' }));
+  //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64.
+  //  ⚠️ نشانیِ رشته‌ای، نه RegExp: الگوی ‎/^\/api(?:\/v1)?\/pump\/device\/report\//‎ ِ پیشین در
+  //  Express 5 هرگز جور نمی‌شد (اسلشِ پایانی مرزِ پیشوند را می‌خورد) و این سقف مرده بود — بدنهٔ
+  //  گزارش زیرِ سقفِ ۲mb ِ همگانی می‌ماند. حالا پس از توکنِ دستگاه، همان ۳۴mb ِ قاعده.
+  app.use(['/api/pump/device/report', '/api/v1/pump/device/report'], requireDevice, express.json({ limit: '34mb' }));
+  app.use(express.json({ limit: '2mb' }));
+
+  /*
+   *  بدنه‌ای که JSON نیست.
+   *
+   *  ── چه چیزی را می‌بندد ──────────────────────────────────────────
+   *  خواننده‌ی JSON خودش خطا می‌سازد و آن خطا `expose` دارد، پس پیامش
+   *  همان‌طور که هست بیرون می‌رفت:
+   *
+   *      Unexpected token } in JSON at position 42
+   *
+   *  یعنی یک جمله‌ی انگلیسیِ داخلیِ Node، با شماره‌ی بایت، به دستِ
+   *  کاربرِ فارسی‌زبان. نه او می‌فهمید چه شده، نه ما می‌خواستیم درونِ
+   *  کتابخانه‌مان را نشان بدهیم. بدنه‌ی بزرگ‌تر از سقف هم همین‌طور.
+   *
+   *  حالا هر دو یک پاسخِ تمیز می‌گیرند و جزئیات فقط در لاگِ خودمان
+   *  می‌ماند — بی بدنه، چون بدنه ممکن است رمز داشته باشد.
+   *  ──────────────────────────────────────────────────────────────
+   */
+  app.use((err, req, res, next) => {
+    if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large')) {
+      return next(err);
+    }
+    const tooBig = err.type === 'entity.too.large';
+    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type}`);
+    res.status(tooBig ? 413 : 400).json({
+      error: {
+        code: tooBig ? 'body_too_large' : 'bad_json',
+        message: tooBig ? 'حجم درخواست بیش از حد مجاز است' : 'بدنه‌ی درخواست درست نبود',
+      },
+    });
+  });
 
   // ---- بررسی سلامت ----
   /*
@@ -489,6 +513,15 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res) => res.redirect('/admin/'));
 
   // ---- پورتالِ مشتری و SDK ----
+  //  ⛔ SEC-API-05 — پورتال توکنِ کاربر را دارد (sessionStorage) و تا ۲.۱۴.۴ هیچ CSP ای نداشت؛
+  //  حالا همان دیوارِ پنل: نه اسکریپتِ درون‌خطی، نه منبعِ بیرونی، نه قاب.
+  app.use('/portal', (req, res, next) => {
+    res.set('Content-Security-Policy',
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; " +
+      "connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
+    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+    next();
+  });
   app.use('/portal', express.static(path.join(__dirname, '..', 'public', 'portal'), {
     index: 'index.html', maxAge: 0, etag: true,
   }));

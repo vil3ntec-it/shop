@@ -593,7 +593,8 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
   // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  if (config.env !== 'production' && via === 'log') out.devCode = code;
+  //  ⛔ SEC-API-04: و فقط با خواستِ صریح (`config.otp.devEcho`) — `NODE_ENV`ِ نیامده دیگر بس نیست
+  if (config.env !== 'production' && config.otp.devEcho === true && via === 'log') out.devCode = code;
   return out;
 }
 

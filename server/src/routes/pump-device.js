@@ -386,7 +386,14 @@ async function adoptFromDevice(userId, deviceUid, rawToken) {
  * قاعده‌ای که همه‌جای این سامانه هست و به همین دلیل: وگرنه عوض کردنِ یک
  * شناسه در درخواست، دفترِ پمپِ دیگری را باز می‌کرد.
  */
+/*
+ *  ⛔ SEC-API-02 — `app.js` همین را **پیش از** پارسرِ بدنهٔ بزرگِ ‎/state‎ و ‎/report/‎ می‌دواند؛
+ *  نشانِ `VERIFIED` (Symbol، از بیرون ساختنی نیست) یعنی همین درخواست یک بار سنجیده شد و
+ *  `router.use(requireDevice)` دوباره پرس‌وجو و `last_seen_at` نمی‌زند.
+ */
+const VERIFIED = Symbol('device-verified');
 async function requireDevice(req, res, next) {
+  if (req[VERIFIED] === true && req.stationDevice) return next();
   try {
     const h = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(h.trim());
@@ -394,6 +401,7 @@ async function requireDevice(req, res, next) {
     if (!row) return next(unauthorized('این دستگاه ثبت نشده است', 'device_not_registered'));
     req.stationDevice = row;
     req.stationId = row.station_id;
+    req[VERIFIED] = true;
     next();
   } catch (err) { next(err); }
 }
@@ -915,3 +923,4 @@ router.post('/state', stateLimit, requirePumpServices(), async (req, res, next) 
 });
 
 module.exports = router;
+module.exports.requireDevice = requireDevice;

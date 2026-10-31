@@ -88,6 +88,14 @@ const config = {
     digits:     num(process.env.OTP_DIGITS, 6),
     ttlMs:      num(process.env.OTP_TTL_MIN, 10) * 60 * 1000,   // ⚠️ ده دقیقه — همان که قالبِ ایمیل می‌گوید، و ایمیل دیر هم می‌رسد
     maxAttempts: num(process.env.OTP_MAX_ATTEMPTS, 5),
+    /*
+     *  ⛔ SEC-API-04 — کدِ راهِ `log` در خودِ پاسخ (`devCode`) فقط وقتی **صریح** خواسته شود:
+     *  `NODE_ENV=test` یا `OTP_DEV_ECHO=true`؛ و در production هرگز (`lib/otp.js`). تا ۲.۱۴.۴
+     *  شرط فقط «NODE_ENV ≠ production» بود، و `NODE_ENV`ِ نیامده یعنی development — سرورِ
+     *  واقعی‌ای که بی `NODE_ENV` بالا بیاید و پیامک/ایمیلش `log` باشد، کدِ ورودِ هر شماره و
+     *  ایمیلی را به هر کسی که درخواستش را می‌زد پس می‌داد.
+     */
+    devEcho: (process.env.NODE_ENV || '') === 'test' || bool(process.env.OTP_DEV_ECHO, false),
     //  دو دقیقه. هر بار «ارسال دوباره» یک پیامک است و پول دارد؛ ۶۰ ثانیه
     //  آن‌قدر کوتاه بود که کاربرِ بی‌حوصله سه بار می‌زد.
     resendMs:   num(process.env.OTP_RESEND_SECONDS, 120) * 1000,
