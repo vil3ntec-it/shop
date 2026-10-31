@@ -127,11 +127,21 @@ async function flagOf(shopId) {
 //  تاریخچه و نماها
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ * زمانِ رویداد، اکیداً صعودی در این فرایند. تاریخچه با `created_at, id` خوانده می‌شود و شناسه تصادفی است؛
+ * دو رویدادِ یک تراکنش (تصمیم و جریمه، رأیِ اعتراض و برداشتنِ جریمه) در یک میلی‌ثانیه جابه‌جا دیده می‌شدند.
+ */
+let lastEventAt = 0;
+function eventAt() {
+  lastEventAt = Math.max(now(), lastEventAt + 1);
+  return lastEventAt;
+}
+
 async function addEvent(c, row, actor, actorId, type, body = '', data = {}) {
   await c.query(
     `INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, body, data, created_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), now()]
+    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), eventAt()]
   );
 }
 
