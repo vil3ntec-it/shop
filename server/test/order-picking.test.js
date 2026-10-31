@@ -370,6 +370,101 @@ test('PCK-07: کدِ دریافتِ ساخته‌شده پیش از جمع‌آ�
   assert.deepEqual(iss.map((x) => x.productId).sort(), ['rice', 'salt']);
 });
 
+/** سفارشِ پرداخت‌شده (بازبینیِ پول): ۶۵۰ = روغنِ ۶۰۰ + کیسهٔ ۵۰. */
+const PAID_LINES = [LINES[0], { name: 'کیسهٔ اضافه', qtyMilli: 1000, unitPriceMinor: 5000 }];
+async function paidOrder(o, lines = PAID_LINES) {
+  const order = await acceptedOrder(o, { lines });
+  await query("UPDATE online_orders SET payment_status='paid', payment_method='online' WHERE id=$1", [order.id]);
+  return order;
+}
+const moneyOf = async (id) => one(
+  `SELECT o.status, o.total_minor::int AS total, (SELECT COUNT(*) FROM online_order_lines WHERE order_id=o.id)::int AS lines,
+          (SELECT COUNT(*) FROM online_order_refunds WHERE order_id=o.id)::int AS refunds,
+          (SELECT COUNT(*) FROM online_order_events WHERE order_id=o.id AND kind='note')::int AS notes
+     FROM online_orders o WHERE o.id=$1`, [id]
+);
+
+test('PCK-07 (پول): سفارشِ پرداخت‌شده با کسر ⇒ ۴۰۹ paid_needs_refund و هیچ تغییری — با پرچمِ بازپرداخت یا بی آن', async () => {
+  const o = await pickShop('پرداخت‌شده');
+  for (const refunds of [false, true]) {
+    if (refunds) await setFlag(o.shopId, 'shop.orders.refunds', true);
+    const order = await paidOrder(o);
+    assert.equal(order.totalMinor, 65000);
+    await start(o, order.id);
+    //  بازتولیدِ بازبین: روغنِ ۶۰۰ «پیدا نکردم» ⇒ جمعِ تازه ۵۰ در حالی که ۶۵۰ پرداخت شده
+    const r = await send(o, order.id, [ev(1, 'not_found'), ev(2, 'pick', { qtyMilli: 1000 })]);
+    assert.ok(r.body.results.every((x) => x.status === 'accepted'), JSON.stringify(r.body.results));
+    const p = await pack(o, order.id, { bags: 1 });
+    assert.equal(p.status, 409, JSON.stringify(p.body));
+    assert.equal(p.body.error.code, 'paid_needs_refund');
+    assert.equal(p.body.error.deductedMinor, 60000);
+    assert.equal(p.body.error.paidMinor, 65000);
+    assert.equal(p.body.error.totalMinor, 5000);
+    assert.deepEqual(await moneyOf(order.id), { status: 'picking', total: 65000, lines: 2, refunds: 0, notes: 0 },
+      `مبلغ، قلم‌ها و وضعیت دست‌نخورده (refunds=${refunds})`);
+    const pick = await one('SELECT status, pack_key FROM order_picks WHERE order_id=$1', [order.id]);
+    assert.equal(pick.status, 'picking', 'برگه باز می‌ماند');
+  }
+  //  پرداخت‌شده و همه برداشته شد (مبلغ همان) ⇒ بسته می‌شود
+  const full = await paidOrder(o);
+  await start(o, full.id);
+  await send(o, full.id, [ev(1, 'scan', { barcode: OIL, qtyMilli: 2000 }), ev(2, 'pick', { qtyMilli: 1000 })]);
+  const ok = await pack(o, full.id, { bags: 1 });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await moneyOf(full.id)).total, 65000);
+  const rep = await require('../src/lib/verify-data').verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((c) => c.count > 0).map((c) => c.id), [], 'verify-data بی خطا');
+});
+
+test('PCK-04 (پول): وزنِ بیشتر روی سفارشِ پرداخت‌شده ⇒ ۴۰۹ paid_total_increase و مبلغ همان؛ نقد هنگامِ تحویل همان رفتار', async () => {
+  const o = await pickShop('وزن-پرداخت');
+  const order = await paidOrder(o, [LINES[1]]);
+  assert.equal(order.totalMinor, 18100);
+  await start(o, order.id);
+  const r = await send(o, order.id, [ev(1, 'scan', { barcode: RICE }), ev(1, 'weigh', { qtyMilli: 1600 })]);
+  assert.ok(r.body.results.every((x) => x.status === 'accepted'), JSON.stringify(r.body.results));
+  const p = await pack(o, order.id, { bags: 1 });
+  assert.equal(p.status, 409, JSON.stringify(p.body));
+  assert.equal(p.body.error.code, 'paid_total_increase');
+  assert.equal(p.body.error.paidMinor, 18100);
+  assert.equal(p.body.error.totalMinor, 19300);
+  assert.deepEqual(await moneyOf(order.id), { status: 'picking', total: 18100, lines: 1, refunds: 0, notes: 0 });
+  //  وزنِ درست ⇒ بسته
+  const again = await send(o, order.id, [ev(1, 'reset'), ev(1, 'scan', { barcode: RICE }), ev(1, 'weigh', { qtyMilli: 1500 })]);
+  assert.ok(again.body.results.every((x) => x.status === 'accepted'), JSON.stringify(again.body.results));
+  const ok = await pack(o, order.id, { bags: 1 });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  //  نقد هنگامِ تحویل: افزایشِ وزن مثلِ پیش پذیرفته است (پول هنوز گرفته نشده)
+  const cod = await acceptedOrder(o, { lines: [LINES[1]] });
+  await start(o, cod.id);
+  await send(o, cod.id, [ev(1, 'scan', { barcode: RICE }), ev(1, 'weigh', { qtyMilli: 1600 })]);
+  const c = await pack(o, cod.id, { bags: 1 });
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  assert.equal(c.body.pick.totals.totalMinor, 19300);
+});
+
+test('PCK-07: بسته‌ای که به پیک سپرده و برداشته شده ⇒ ۴۰۹ already_dispatched و هیچ مبلغی عوض نمی‌شود', async () => {
+  const o = await pickShop('سپرده', { delivery: true });
+  const order = await acceptedOrder(o);
+  const a = await h.post(`/api/shop/delivery/orders/${order.id}/assign`, { mode: 'pickup' }, {
+    token: o.token, headers: { 'Idempotency-Key': key('asg') },
+  });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  await start(o, order.id);
+  await send(o, order.id, [
+    ev(1, 'scan', { barcode: OIL, qtyMilli: 2000 }), ev(2, 'not_found'), ev(3, 'not_found'), ev(4, 'pick', { qtyMilli: 1000 }),
+  ]);
+  //  مأموریت از دکان بیرون رفته (پیک برداشته) — نقدِ موردِ انتظارش دیگر نباید عوض شود
+  await query("UPDATE delivery_assignments SET status='picked_up' WHERE id=$1", [a.body.assignment.id]);
+  const p = await pack(o, order.id, { bags: 1 });
+  assert.equal(p.status, 409, JSON.stringify(p.body));
+  assert.equal(p.body.error.code, 'already_dispatched');
+  const before = order.totalMinor;
+  assert.deepEqual(await moneyOf(order.id), { status: 'picking', total: before, lines: 4, refunds: 0, notes: 0 });
+  const asg = await one('SELECT expected_collect_minor FROM delivery_assignments WHERE id=$1', [a.body.assignment.id]);
+  assert.equal(Number(asg.expected_collect_minor), before, 'نقدِ موردِ انتظارِ پیکِ رفته همان');
+});
+
 test('PCK-07: هیچ قلمی برداشته نشد ⇒ بسته نمی‌شود (لغو با «ناموجود»)؛ لغو در میانه ⇒ برگه بسته', async () => {
   const o = await pickShop('هیچ');
   const order = await acceptedOrder(o, { lines: [LINES[2]] });
