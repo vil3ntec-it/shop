@@ -84,6 +84,10 @@ class LiveSocket(
     if (!Backend.isReady(app)) return
     val token = Backend.tokens(app).accessToken ?: return
     val base = AppConfig.baseUrl(app).ifBlank { return }
+    //  سرورِ شبکهٔ دکان با گواهیِ سنجاق‌شده (پرچمِ `app.multi_server`)؛ وگرنه همان کلاینت
+    val http = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.okHttp(client, base)
+    val tickets = if (http === client) ticketClient
+      else http.newBuilder().readTimeout(15, TimeUnit.SECONDS).callTimeout(20, TimeUnit.SECONDS).build()
     val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(app).deviceUid }.getOrDefault("")
 
     closedByUs = false
@@ -94,7 +98,7 @@ class LiveSocket(
       .header("X-App", AppConfig.appId)
       .post("{}".toRequestBody("application/json".toMediaType()))
       .build()
-    ticketClient.newCall(ask).enqueue(object : Callback {
+    tickets.newCall(ask).enqueue(object : Callback {
       override fun onFailure(call: Call, e: IOException) {
         dialing = false
         fell()
@@ -106,14 +110,14 @@ class LiveSocket(
         }
         dialing = false
         if (cred == null || closedByUs) { if (cred == null) fell(); return }
-        open(LiveCredential.url(base, cred, device, AppConfig.appId))
+        open(LiveCredential.url(base, cred, device, AppConfig.appId), http)
       }
     })
   }
 
-  private fun open(url: String) {
+  private fun open(url: String, http: OkHttpClient = client) {
     if (socket != null) return
-    socket = client.newWebSocket(
+    socket = http.newWebSocket(
       Request.Builder().url(url).build(),
       object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {

@@ -74,10 +74,12 @@ class SyncV1Engine private constructor(context: Context) {
    *  کلیدِ حساب — شناسهٔ کاربر اگر معلوم باشد، وگرنه نامِ حساب، وگرنه
    *  خودِ دستگاه. هر سه پایدارند و هیچ‌کدام بینِ دو حساب مشترک نیست.
    */
-  private fun keyOf(): String =
+  private fun keyOf(): String = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scopedKey(
+    app,
     SyncStateV1.currentAccount(app)
       .ifBlank { store.accountName }
-      .ifBlank { store.deviceUid }
+      .ifBlank { store.deviceUid },
+  )
 
   /** پس از ورود یا خروج صدا زده می‌شود — کلیدها عوض می‌شوند. */
   fun rebind() {

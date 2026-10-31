@@ -793,6 +793,11 @@ fun AppRoot(
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
+              ) + (
+                //  «سرورها» (پرچمِ `app.multi_server`) فقط برای صاحبِ دکان
+                if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER)
+                  listOf(ir.vil3ntec.tohid.ui.screens.SERVERS_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Dns)
+                else emptyList()
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
             else SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }

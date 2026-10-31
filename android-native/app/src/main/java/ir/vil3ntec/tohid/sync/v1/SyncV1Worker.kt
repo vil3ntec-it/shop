@@ -38,6 +38,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
   override suspend fun doWork(): Result {
     val app = applicationContext
+    //  درِ ورودِ فرآیند: «سرورِ بعدی» پیش از هر دفتر و درخواستی (`ServerSwitchAndroid`)
+    ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(app)
     if (!Backend.isReady(app)) return Result.success()
     //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
     if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()

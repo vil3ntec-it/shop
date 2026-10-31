@@ -75,6 +75,8 @@ fun main() {
   DevShot.start()
 
   val context = DesktopContext
+  //  «سرورِ بعدی» (پرچمِ `app.multi_server`) فقط این‌جا، پیش از هر دفتر و درخواستی
+  ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
