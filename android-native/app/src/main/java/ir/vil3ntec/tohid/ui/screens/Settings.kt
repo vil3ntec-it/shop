@@ -472,6 +472,12 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
+    item {
+      var rules by remember { mutableStateOf(ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context)) }
+      CheckoutRulesSection(rules) { rules = it; ir.vil3ntec.tohid.data.CheckoutRulesPref.set(context, it) }
+    }
+
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
     /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */

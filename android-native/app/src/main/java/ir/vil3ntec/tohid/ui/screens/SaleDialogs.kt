@@ -101,6 +101,7 @@ fun CheckoutDialog(
     paidAmount = parseNumber(paidText) ?: 0.0,
     debtorId = debtorId,
     blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) },
+    rules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }, // POS-24، پیش‌فرض خاموش
     //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
     seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") },
   )
