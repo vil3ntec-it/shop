@@ -135,6 +135,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
+      onMessage = ::toast,
     )
   } else {
     /*
@@ -708,6 +709,7 @@ private fun AccountView(
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
+  onMessage: (String) -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -855,6 +857,7 @@ private fun AccountView(
             Text("چاپ صورت‌حساب")
           }
         }
+        StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید

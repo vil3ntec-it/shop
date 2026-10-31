@@ -9,7 +9,7 @@
 1. کدِ برنامه **۳۴۲ فایلِ Kotlin و ۸۹٬۸۷۲ خط** است. از این‌ها **۱۲۰ فایل** فقط Kotlin/Compose/kotlinx دارند، **۵۸ فایل** فقط به JDK تکیه دارند (`java.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized`…) و **۱۶۴ فایل** به اندروید وابسته‌اند (`android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `R.`، کتابخانه‌های گوگل، OkHttp).
 2. ترفندِ کامپیوتر (`desktop/`: کپیِ سورس + ۴۲ فایلِ shim که نام‌های `android.*` را روی JVM می‌سازند + ۱۷ فایلِ جایگزین) **برای آیفون کار نمی‌کند**، چون آیفون JVM ندارد: روی Kotlin/Native هیچ `java.*` و `javax.*`ی نیست. پس هم ۱۶۴ فایلِ اندرویدی و هم ۵۸ فایلِ JDKی جلوی کامپایل‌اند (روی‌هم **۲۲۲ فایل، ۶۵٪**).
 3. پایگاه‌دادهٔ SQL در کار نیست (JDBC/SQLite/Room = **۰**)؛ ذخیره با `SharedPreferences` (**۶۰ فایل**، ۱۵ نامِ پرونده) و فایل‌های JSON (`java.io.File` در **۴۲ فایل**) است. این خبرِ خوبی است: جایگزینِ iOS ساده‌تر است.
-4. خودِ `core` هم کامل آماده نیست: `ios-spike` فقط **۳۲ فایلِ commonMain** را می‌سازد؛ **۱۵ فایلِ jvmMain** (از جمله `Money`، `Ulid`، `PinCrypto`، تقویم‌ها) هنوز روی آیفون نیستند.
+4. خودِ `core` تقریباً آماده است: از ۱۴۰۵/۰۸/۰۸ (PR #426) سیزده فایل از ۱۵ فایلِ jvmMain (`Money`، `Ulid`، تقویم‌ها، متن، پرداخت…) در commonMainاند؛ فقط `PinCrypto` و `ApproverVault` مانده‌اند (بخشِ ۲.۳).
 5. بزرگ‌ترین مانع‌ها ترتیب: `Context`/`LocalContext` (۱۰۷ فایل)، `SharedPreferences` (۶۰)، `java.io.File` (۴۲)، زمان و قالب‌بندی (۸۶ + ۲۸)، رمزنگاری (۱۳ + `PinCrypto`ِ core)، شبکه (۴ + ۱)، و چاپِ حرارتی (۱۱ فایلِ `print/`، همه وابسته).
 
 ## ۲. شمارش (فقط `android-native/app/src/main/java`)
@@ -63,12 +63,15 @@
 
 | بخش | فایل |
 |---|---:|
-| `commonMain` (روی iOS کامپایل می‌شود) | ۳۲ |
-| `jvmMain` (هنوز نه) | ۱۵ |
-| `iosTest` | ۱ |
+| `commonMain` (روی iOS کامپایل می‌شود) | ۴۸ (۳۳ + ۱۳ ِ منتقل‌شده + `MathRound` + `platform/Platform`) |
+| `jvmMain` (هنوز نه) | ۲ (`PinCrypto`، `ApproverVault`) + actual ِ JVM ِ `Platform` |
+| `iosMain` / `linuxX64Main` | ۱ / ۱ (actual ِ `Platform`؛ linuxX64 فقط نگهبانِ کامپایل) |
+| `commonTest` / `jvmTest` / `iosTest` | ۱ / ۱ / ۱ |
 
 وابستگیِ فایل‌های `jvmMain`: `Ulid` و `ReceiptTokens` (`SecureRandom`، `MessageDigest`)، `PinCrypto` (P-256، ECDSA، AES-GCM، HMAC، Base64)، `TextNormalizer` و `LocaleFormat` (`java.text.Normalizer`، `Locale`)، `Money` و `Rounding` (`Math.round`)، `LunarHijri` و `BusinessDay` (`Math.floorDiv`)، `CivilDays` (`Calendar`). پنج فایلِ دیگر (`ApproverVault`، `Payment`، `Shift`، `BackupRetention`، `SolarHijri`) ارجاعِ مستقیمِ JDK ندارند و احتمالاً فقط به‌خاطرِ تکیه بر فایل‌های بالا آن‌جایند.
-آزمون‌ها هنوز در `android-native/app/src/test` (۱۵۸ فایل) هستند، نه در `commonTest`؛ پس روی شبیه‌سازِ iOS فقط یک فایلِ آزمون اجرا می‌شود.
+
+**وضعِ ۱۴۰۵/۰۸/۰۸ (PR #426):** سیزده فایل به commonMain رفتند. `Math.floorDiv` ⇐ `floorDiv` ِ کاتلین؛ `Math.round`/`roundToLong` ⇐ `mathRound` (برگردانِ بیت‌به‌بیتِ `Math.round`، با آزمونِ میلیون‌ها عدد در برابرِ خودش؛ `roundToLong` ِ Native در لبه‌ها فرق دارد)؛ `SecureRandom`، `MessageDigest`، `System.currentTimeMillis` و `@Synchronized` ⇐ `core/platform/Platform.kt` (JVM همان JDK؛ iOS: `SecRandomCopyBytes`، `CC_SHA256`، `NSDate`، `NSLock`). `TextNormalizer`، `LocaleFormat` و `CivilDays` در عمل به `Normalizer`/`Locale`/`Calendar` تکیه نداشتند (فقط در توضیح). `PinCrypto` و `ApproverVault` (که به آن تکیه دارد) ماندند: AES-GCM ِ خام و ECDSA P-256 روی iOS در API ِ عمومیِ C نیستند (CryptoKit فقط Swift است) و قالبِ کلید (PKCS#8/SPKI ⇄ X9.63 ِ `SecKey`) باید جدا و با بردار ساخته شود؛ این کارِ جداگانه‌ای است و رمزنگاریِ PIN برای جابه‌جایی ضعیف نمی‌شود.
+آزمون‌ها هنوز بیشتر در `android-native/app/src/test` (۱۵۸ فایل) هستند؛ از PR #426 بردارهای مرجعِ فایل‌های منتقل‌شده در `commonTest/CoreVectorsCommonTest` روی JVM و شبیه‌سازِ iOS هم اجرا می‌شوند.
 
 ### ۲.۴ مرزهایی که کامپیوتر از پیش پیدا کرده
 

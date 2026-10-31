@@ -12,9 +12,15 @@ import javax.imageio.ImageIO
  *  هر چند ثانیه از پنجره عکس می‌گیرد (`shot-1.png`، …) تا برنامهٔ
  *  واقعی روی یک نمایشگرِ مجازی (Xvfb در CI) دیده و سنجیده شود. در
  *  نسخهٔ دستِ کاربر این ویژگی تنظیم نمی‌شود و هیچ کاری نمی‌کند.
+ *
+ *  ⛔ SEC-CLI (۱۴۰۵/۰۸/۰۹): فقط در ساختِ `-Pdev=true` (`BuildConfig.DEBUG`، همان که
+ *  `desktop-shots.yml` می‌سازد). تا ۲.۱۴.۵ در نسخهٔ انتشار هم با یک `-Dtohid.shot…` (مثلاً از
+ *  `JAVA_TOOL_OPTIONS`) روشن می‌شد — با `typecmd` که فرمانِ پوسته اجرا می‌کند و `click`/`type`
+ *  که روی برنامه کار می‌کنند؛ ابزارِ آزمون در دستِ کاربر نمی‌ماند.
  */
 object DevShot {
   fun start() {
+    if (!ir.vil3ntec.tohid.BuildConfig.DEBUG) return
     val dir = System.getProperty("tohid.shot")?.takeIf { it.isNotBlank() }?.let(::File) ?: return
     val every = System.getProperty("tohid.shot.every")?.toLongOrNull() ?: 4000
     val count = System.getProperty("tohid.shot.count")?.toIntOrNull() ?: 3
