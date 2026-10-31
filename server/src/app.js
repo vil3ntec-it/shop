@@ -333,6 +333,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
+    api.use('/shop/orders/desk', require('./routes/order-desk'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
