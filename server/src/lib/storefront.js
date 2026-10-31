@@ -568,7 +568,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       [shopId, ids]
     )).rows;
     const byId = new Map(rows.map((r) => [r.id, productView(r)]));
-    const unavailable = ids.filter((id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
+    const unavailable = await require('./order-picking').unorderable(run, shopId, ids, (id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
     if (unavailable.length) {
       throw withData(conflict('برخی کالاها دیگر در ویترین نیستند', 'product_unavailable'), { unavailable });
     }

@@ -207,4 +207,9 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
   res.status(201).json({ order, entry: out.entry });
 }));
 
+
+//  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
+//  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
+router.use(require('./order-picking'));
+
 module.exports = router;
