@@ -29,11 +29,6 @@
  * این دستگاه آن نوشته را **ندیده** بود: یعنی `server_seq`ِ نوشتهٔ قبلی
  * از cursorِ این دستگاه (آخرین pullش) بزرگ‌تر است. پس دستگاهی که اول
  * pull کرده و بعد آگاهانه همان فیلد را عوض می‌کند، تعارض نمی‌سازد.
- *
- * ⚠️ «آخرین pullش» تا امروز یعنی **آنچه سرور فرستاد**؛ اگر پاسخِ pull به
- * دستگاه نرسد، سرور خیال می‌کند دستگاه دیده و تعارضِ بعدی ثبت نمی‌شود
- * (یافتهٔ PERF-05، #449). پرچمِ دکان `sync.cursor_from_since` (پیش‌فرض
- * خاموش) آن را «آنچه دستگاه **تأیید** کرده» می‌کند — شرح سرِ `ackMode`.
  */
 const { createHash } = require('crypto');
 const zlib = require('zlib');
@@ -291,50 +286,14 @@ async function touchDevice(q, ctx, deviceId, patch) {
   );
 }
 
-// ---------- cursor از تأییدِ دستگاه (پرچمِ `sync.cursor_from_since`) ----------
-//
-//  بی پرچم (همان امروز): pull cursor ِ دستگاه را برابرِ **آنچه فرستاد** می‌گذارد (فقط بالا می‌رود).
-//  با پرچم، cursor ِ ذخیره‌شده = آنچه دستگاه **تأیید** کرده، و فقط همین برای «دیده بود؟» ِ تعارض است:
-//    • pull ⇐ `since` ِ همان درخواست («تا این‌جا را دارم»)، بریده به سرِ دفتر. پاسخ همان است که بود.
-//    • push ⇐ `since` ِ صریحِ بدنه اگر برنامه بفرستد (cursor ِ واقعیِ خودش، بریده به سرِ دفتر)؛
-//      نفرستد ⇐ همان تأییدِ pull ِ پیشین. برنامه‌ها push را **پیش از** pull می‌زنند، پس برنامهٔ بی
-//      `since` ممکن است تعارضِ اضافه بسازد (فیلدی که همان pull ِ آخر آورد)، ولی تعارضی گم نمی‌شود.
-//  مقدار **دقیق** نوشته می‌شود، نه GREATEST: cursor ِ جلوافتادهٔ پیش از روشن شدنِ پرچم (یا دستگاهِ
-//  بازنشانده) از نخستین تأیید درست می‌شود؛ پایین آمدن فقط تعارض‌سنجی را محتاط‌تر می‌کند.
-//  فقط دکان: پمپ (همین مسیرِ مشترک) حتی پرچم را نمی‌خواند. نوشتنِ پرچم همان `live_config` ِ
-//  `orders.flagOf` (مقدارِ دکان بر `all` جلو می‌افتد؛ فقط `true`).
-
-const ACK_FLAG = 'sync.cursor_from_since';
-
-async function ackMode(ctx) {
-  if (ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return false;
-  return require('./orders').flagOf(ctx.accountId, ACK_FLAG);
-}
-
-/** `since` ِ بدنهٔ push ⇒ عددِ صحیحِ نامنفی، یا null (نیست یا نادرست ⇒ نادیده، یعنی محتاط) */
-function ackOf(raw) {
-  if (typeof raw === 'number') return Number.isSafeInteger(raw) && raw >= 0 ? raw : null;
-  if (typeof raw === 'string' && /^\d{1,16}$/.test(raw)) {
-    const n = Number(raw);
-    return Number.isSafeInteger(n) ? n : null;
-  }
-  return null;
-}
-
-/** cursor ِ تأییدشده، دقیق (پس از `touchDevice` که ردیف را ساخته است) */
-async function setAck(q, ctx, deviceId, ack) {
-  await q.query(`UPDATE sync_devices SET cursor=$5 WHERE ${ACC} AND device_id=$4`, [...accArgs(ctx), deviceId, ack]);
-}
-
 // ---------- Push ----------
 
 /**
  * @param ctx {app, accountKind, accountId}
- * @param since cursor ِ دستگاه هنگامِ همین push — فقط با پرچمِ `sync.cursor_from_since` خوانده می‌شود
  * @returns {{results:Array, head:number, applied:number, schema_version:number, upgrade_available:boolean}}
  * @throws 426 اگر برنامه از سرور جدیدتر باشد — و هیچ چیزی اعمال نمی‌شود
  */
-async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued = null, since = undefined }) {
+async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued = null }) {
   if (!Array.isArray(ops)) throw badRequest('فهرستِ opها درست نیست', 'bad_ops');
   if (ops.length > MAX_OPS) throw badRequest(`حداکثر ${MAX_OPS} op در هر دسته`, 'batch_too_large');
 
@@ -350,9 +309,6 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
   }
   const upgradeAvailable = clientSchema < current;
   const t = now();
-  //  پرچم فقط وقتی خوانده می‌شود که برنامه `since` فرستاده باشد
-  const parsedSince = ackOf(since);
-  const claimed = parsedSince !== null && await ackMode(ctx) ? parsedSince : null;
 
   return tx(async (c) => {
     /*
@@ -367,9 +323,7 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))',
       [`sync-v1:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`]);
     const dev = await deviceRow(c, ctx, deviceId);
-    //  پرچم + `since` ِ صریح ⇒ همان که دستگاه می‌گوید دارد، نه بیش از سرِ دفترِ پیش از این دسته
-    const acked = claimed === null ? null : Math.min(claimed, await headSeq(c, ctx));
-    const deviceCursor = acked !== null ? acked : (dev ? Number(dev.cursor) : 0);
+    const deviceCursor = dev ? Number(dev.cursor) : 0;
     const results = [];
     let applied = 0;
     let lastOpAt = null;
@@ -438,7 +392,6 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
     await touchDevice(c, ctx, deviceId, {
       lastPushAt: t, lastOpAt, queued, appVersion, schemaVersion: clientSchema,
     });
-    if (acked !== null) await setAck(c, ctx, deviceId, acked);
     return {
       results, applied, head: await headSeq(c, ctx),
       schema_version: current, upgrade_available: upgradeAvailable,
@@ -504,14 +457,9 @@ async function pull(ctx, { since = 0, deviceId, limit = DEFAULT_PULL }) {
   //  اگر همه آمد، cursor سرِ دفتر است — opهای خودِ همین دستگاه هم پشتِ
   //  سرش می‌مانند و دیگر لازم نیست دوباره از رویشان رد شود.
   const cursor = hasMore ? Number(page[page.length - 1].server_seq) : Math.max(head, from);
-  const q = { query: (s, p) => require('../db').query(s, p) };
-  if (await ackMode(ctx)) {
-    //  پرچم: دستگاه با `since` می‌گوید «تا این‌جا را دارم» — نه آنچه همین پاسخ می‌برد (شاید نرسد)
-    await touchDevice(q, ctx, deviceId, { lastPullAt: now() });
-    await setAck(q, ctx, deviceId, Math.min(Math.floor(from), head));
-  } else {
-    await touchDevice(q, ctx, deviceId, { cursor, lastPullAt: now() });
-  }
+  await touchDevice({ query: (s, p) => require('../db').query(s, p) }, ctx, deviceId, {
+    cursor, lastPullAt: now(),
+  });
   return {
     ops: page.map(r => ({
       op_id: r.op_id, device_id: r.device_id, server_seq: Number(r.server_seq), ts: Number(r.client_ts),

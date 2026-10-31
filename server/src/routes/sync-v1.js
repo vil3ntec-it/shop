@@ -74,6 +74,11 @@ const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
  *  می‌رود (A00) — ‎lib/newer-fields.js‎. پمپ از آن هم بی هیچ کاری رد می‌شود.
  */
 const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
+/*
+ *  دکان: cursor ِ دستگاه از تأییدِ خودِ دستگاه، پشتِ پرچمِ خاموشِ `sync.cursor_from_since` (#481) —
+ *  ‎lib/sync-v1-ack.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد؛ پمپ همان مسیرِ پیشین را می‌رود.
+ */
+const ack = require('../lib/sync-v1-ack');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
@@ -87,15 +92,14 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
 
     let out;
     try {
-      out = await sync.push(req.sync, {
+      //  `since` ِ اختیاریِ بدنه = cursor ِ خودِ دستگاه؛ فقط دکان و فقط با پرچم خوانده می‌شود
+      out = await ack.aroundPush(req.sync, deviceId, req.body?.since, () => sync.push(req.sync, {
         deviceId,
         schemaVersion,
         ops,
         appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
         queued: Number.isFinite(Number(req.body?.queued)) ? Number(req.body.queued) : null,
-        //  cursor ِ خودِ دستگاه (اختیاری) — فقط با پرچمِ دکانِ `sync.cursor_from_since` خوانده می‌شود
-        since: req.body?.since,
-      });
+      }));
     } catch (err) {
       //  نسخهٔ برنامه از سرور جلوتر است: هیچ چیزی اعمال نشد و برنامه باید
       //  opها را نگه دارد. شکلِ پاسخ همان بندِ ۲ پرامپت است، نه شکلِ عمومیِ خطا.
@@ -123,7 +127,9 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     });
     const since = Number(req.query?.since || 0);
     const limit = Number(req.query?.limit || 0) || undefined;
-    res.json({ ok: true, ...(await sync.pull(req.sync, { since, deviceId, limit })) });
+    //  دکان با پرچم: cursor ِ ذخیره = `since` ِ همین درخواست، نه آنچه همین پاسخ می‌برد (شاید نرسد)
+    const out = await ack.aroundPull(req.sync, deviceId, since, (from) => sync.pull(req.sync, { since: from, deviceId, limit }));
+    res.json({ ok: true, ...out });
   } catch (err) { next(err); }
 });
 
