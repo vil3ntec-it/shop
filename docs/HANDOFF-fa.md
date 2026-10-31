@@ -54,6 +54,13 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/portable-account-server` (جابه‌جاییِ سرورِ حساب؛ همراهِ `claude/portable-server` در ریپوی server)
+- انجام شد: `server/scripts/move-db.js` (inspect · copy · compare) بینِ PGlite و PostgreSQL در هر دو جهت؛ مبدأ هرگز نوشته
+  نمی‌شود، مقصدِ تازه با Migrationهای همین کد، یک تراکنش با ماشه‌های خاموش، و تطبیقِ شمار/هشِ ردیف/جمعِ مبلغ/sequence.
+  سند: `DISASTER-RECOVERY-fa.md` §۳.۱. آزمون: `test/move-db.test.js` ۸/۸ (PGlite؛ و PGlite ⇐ PostgreSQL ⇐ PGlite روی PostgreSQL 16ِ محلی).
+- نیمه‌کاره: پیوند از `docs/SERVERS-fa.md` (هنوز در PRِ باز #576) به همین ابزار، پس از مرجِ آن.
+- قدمِ بعدی: پس از مرج، پنلِ خانگی `move-server.mjs` را با همین ابزار برای تطبیقِ سرورِ حساب صدا می‌زند (کدش آماده است).
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
