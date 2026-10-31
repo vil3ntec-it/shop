@@ -50,28 +50,23 @@ const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' }
 const sessionLimit = rateLimit({ max: config.rateLimit.sessionMax, keyPrefix: 'session' });
 //  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
-const otpLimit = rateLimit({
-  max: config.rateLimit.otpMax, keyPrefix: 'otp',
-  //  کلید همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس
-  //  ثبت‌نامِ ایمیلی روی IP جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ
-  //  چند نفره) همه را با هم می‌بست.
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+/**
+ * کلیدِ سطلِ کد همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس ثبت‌نامِ ایمیلی روی IP
+ * جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ چند نفره) همه را با هم می‌بست.
+ * شماره با کلیدِ یکتا (RSK-07): ‎0700…‎، ‎+93700…‎، ‎0093700…‎ و ‎+9300700…‎ یک سطل‌اند، نه چهار.
+ */
+function destinationKey(req) {
+  const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) return raw.toLowerCase();
+  try { return v.phoneKey(v.phone(raw)) || null; } catch { return raw.replace(/\D/g, '') || null; }
+}
+
+const otpLimit = rateLimit({ max: config.rateLimit.otpMax, keyPrefix: 'otp', key: destinationKey });
 
 //  ⛔ زدنِ کد سطلِ خودش را دارد — شرح بالای `verifyMax` در `config.js`.
 //  کلید همان ایمیل/شماره است، مثلِ `otpLimit`.
-const verifyLimit = rateLimit({
-  max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify',
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+const verifyLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify', key: destinationKey });
 
 /*
  *  ⛔ F0-16 — سقفِ دوم برای دو درِ «آیا این ایمیل حساب دارد؟»
