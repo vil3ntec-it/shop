@@ -18,6 +18,7 @@ const { serverSecret } = require('./server-secret');
 const settings = require('./sms-settings');
 const { sectionOf } = require('./tenancy');
 const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
+const { phoneKey, phoneForms } = require('./validate');
 
 function pepper() {
   return serverSecret(['otp', 'api'], 'shop-otp-pepper');
@@ -378,22 +379,29 @@ const HOME_CC = process.env.DEFAULT_COUNTRY_CODE || '+93';   // همان پیش�
 const smsLimits = () => config.otp.smsGuard;
 const ceilingAlerted = new Set();
 
-/** شمارهٔ آشنا: پیش‌تر کدی را درست زده، یا مشتریِ ویترین است. */
+/** شمارهٔ آشنا: پیش‌تر کدی را درست زده، یا مشتریِ ویترین است (هر شکلِ همان شماره — RSK-07). */
 async function isKnown(destination) {
   const r = await one(
-    `SELECT (EXISTS (SELECT 1 FROM otp_codes WHERE destination = $1 AND consumed_at IS NOT NULL)
-          OR EXISTS (SELECT 1 FROM store_customers WHERE phone = $1)) AS known`,
-    [destination]
+    `SELECT (EXISTS (SELECT 1 FROM otp_codes WHERE destination = ANY($1::text[]) AND consumed_at IS NOT NULL)
+          OR EXISTS (SELECT 1 FROM store_customers WHERE phone = ANY($1::text[]))) AS known`,
+    [phoneForms(destination)]
   );
   return Boolean(r && r.known);
 }
 
+//  کلیدِ یکتای شماره در SQL — همان `phoneKey`: ‎+9300700…‎ ⇒ ‎+93700…‎ (RSK-07)
+const KEY_RE_SQL = `^${HOME_CC.replace(/[+]/g, '\\+')}0+`;
+/**
+ * شمارِ شماره‌های **جدا**ی ساعتِ اخیر جز خودِ `$2` (کلیدِ یکتا). `{key}` در `where` همان کلیدِ ردیف است؛
+ * شکل‌های یک گوشی یک شماره‌اند، پس نه شمارش را بالا می‌برند و نه دسته (`sms_prefix_limit`) را دور می‌زنند.
+ */
 async function distinctPhones(where, params, { failed = true } = {}) {
+  const key = `regexp_replace(destination, $${params.length + 1}, $${params.length + 2})`;
   const r = await one(
-    `SELECT COUNT(DISTINCT destination)::int AS n FROM otp_codes
+    `SELECT COUNT(DISTINCT ${key})::int AS n FROM otp_codes
       WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' ${failed ? '' : "AND via <> 'failed'"}
-        AND destination <> $2 AND ${where}`,
-    params
+        AND ${key} <> $2 AND ${where.replace(/\{key\}/g, key)}`,
+    [...params, KEY_RE_SQL, HOME_CC]
   );
   return r.n;
 }
@@ -429,30 +437,75 @@ async function dailyCeiling(known, at) {
   return tooMany('سقفِ روزانهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_daily_ceiling');
 }
 
-async function smsGuard(destination, { ip = '', at = now() } = {}) {
+/**
+ * SEC-06، سقفِ **هزینه** (بخشِ ۳.۱۲: «سقف روزانه هزینه برای هر فروشگاه و هر کانال»): جمعِ
+ * `cost_minor` ِ ۲۴ ساعتِ همین کانال (راهِ ارسال) در دفترِ sms_usage، یک بار برای کلِ سرور
+ * (dailyCostMax ⇒ sms_cost_ceiling) و یک بار برای دکانِ همین درخواست (shopDailyCostMax ⇒
+ * sms_shop_cost_ceiling). ۰ = خاموش (پیش‌فرض). برای همهٔ شماره‌ها، آشنا یا نه: این بودجهٔ
+ * سخت است و راهِ ایمیل باز می‌ماند. خطای خواندن ⇒ باز (همان دلیلِ dailyCeiling).
+ * @returns {Promise<Error|null>}
+ */
+async function costCeiling({ shopId = '', via = '', at = now() } = {}) {
+  const lim = smsLimits();
+  const shares = [];
+  if (lim.dailyCostMax > 0) shares.push({ scope: 'all', cap: lim.dailyCostMax });
+  if (lim.shopDailyCostMax > 0 && shopId) shares.push({ scope: 'shop', cap: lim.shopDailyCostMax, shopId: String(shopId) });
+  for (const sh of shares) {
+    let spent;
+    try {
+      spent = await require('./sms-usage').costSince({ since: at - 24 * HOUR_MS, via, shopId: sh.shopId });
+    } catch (err) {
+      console.error('[otp] دفترِ پیامک خوانده نشد؛ سقفِ هزینه این بار سنجیده نشد:', err.message);
+      continue;
+    }
+    if (spent < sh.cap) continue;
+    const day = new Date(at).toISOString().slice(0, 10);
+    const tag = `${day}|cost|${sh.scope}|${sh.shopId || ''}|${via}`;
+    if (!ceilingAlerted.has(tag)) {
+      //  حافظه بی‌مرز نشود: برچسب‌های روزهای پیش کنار می‌روند
+      if (ceilingAlerted.size > 1000) for (const t of ceilingAlerted) if (!t.startsWith(day)) ceilingAlerted.delete(t);
+      ceilingAlerted.add(tag);
+      console.error(`[otp] ⛔ سقفِ هزینهٔ روزانهٔ پیامک (${sh.scope}، ${via}: ${spent}/${sh.cap}) پر شد`);
+      await require('./audit').log({
+        actorType: 'system', action: 'sms.cost_ceiling', targetType: sh.scope === 'shop' ? 'shop' : '', targetId: sh.shopId || '',
+        detail: { scope: sh.scope, via, cap: sh.cap, spent },
+      }).catch(() => {});
+      try { require('./panel-live').notifyPanel('codes'); } catch (err) { console.error('[otp] پنل', err.message); }
+    }
+    return sh.scope === 'shop'
+      ? tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ این دکان پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_shop_cost_ceiling')
+      : tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_cost_ceiling');
+  }
+  return null;
+}
+
+async function smsGuard(destination, { ip = '', at = now(), shopId = '', via = '' } = {}) {
   const lim = smsLimits();
   const known = await isKnown(destination);
   const since = at - HOUR_MS;
+  const key = phoneKey(destination);
   const fresh = !known && !(await one(
-    `SELECT 1 AS x FROM otp_codes WHERE destination = $1 AND created_at > $2 LIMIT 1`, [destination, since]
+    `SELECT 1 AS x FROM otp_codes WHERE destination = ANY($1::text[]) AND created_at > $2 LIMIT 1`, [phoneForms(destination), since]
   ));
   if (fresh) {
-    const block = destination.slice(0, -BLOCK_DIGITS);
-    if (ip && await distinctPhones('ip = $3', [since, destination, ip]) >= lim.ipPhones) {
+    const block = key.slice(0, -BLOCK_DIGITS);
+    if (ip && await distinctPhones('ip = $3', [since, key, ip]) >= lim.ipPhones) {
       throw tooMany('از این شبکه در این ساعت برای شماره‌های تازهٔ زیادی کد خواسته شده است؛ کمی بعد دوباره امتحان کنید', 'sms_ip_limit');
     }
-    if (await distinctPhones('destination LIKE $3', [since, destination, `${block}%`]) >= lim.blockPhones) {
+    if (await distinctPhones('{key} LIKE $3', [since, key, `${block}%`]) >= lim.blockPhones) {
       throw tooMany('فرستادنِ کد به این دسته از شماره‌ها فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_prefix_limit');
     }
   }
   //  خارجی: ناآشنا (تازه) سقفِ کوچک، آشنا سقفِ جدا و بزرگ‌تر؛ تلاشِ ناموفق شمرده نمی‌شود
   const foreignCap = known ? lim.knownForeignPhones : (fresh ? lim.foreignPhones : null);
   if (foreignCap !== null && !destination.startsWith(HOME_CC)
-      && await distinctPhones('destination NOT LIKE $3', [since, destination, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
+      && await distinctPhones('destination NOT LIKE $3', [since, key, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
     throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
   }
   const full = await dailyCeiling(known, at);
   if (full) throw full;
+  const broke = await costCeiling({ shopId, via, at });
+  if (broke) throw broke;
 }
 
 /** SEC-06: هر تلاشِ پیامک (نه ایمیل) در دفترِ یگانهٔ sms_usage — شکستش ورود را نمی‌شکند. */
@@ -462,24 +515,16 @@ function recordSms(destination, { shopId = '', app = '', purpose = '', via = '',
     .catch((err) => console.error('[otp] دفترِ پیامک ثبت نشد:', err.message));
 }
 
-/**
- * RSK-07: شکل‌های یک شماره برای **شمردن** — ‎+930…‎ و ‎+93…‎ یک شماره‌اند (همان قاعدهٔ
- * `lib/order-rate`؛ validate.phone صفرِ پس از کدِ کشور را برنمی‌دارد). بی این، شکلِ دوم
- * سقفِ روزانه و فاصلهٔ ارسالِ دوبارهٔ همان گوشی را دو برابر می‌کرد. دادهٔ ذخیره‌شده دست نمی‌خورد.
+/*
+ * RSK-07: سقفِ روزانه و فاصلهٔ ارسالِ دوباره روی **همهٔ** شکل‌های یک شماره (`phoneForms` ِ validate:
+ * ‎+93…‎، ‎+930…‎، ‎+9300…‎ …). پیش از این فقط یک صفر برداشته می‌شد و هر شکلِ دیگر سقفِ جدا داشت.
  */
-function formsOf(destination) {
-  const d = String(destination || '');
-  if (!d.startsWith(HOME_CC)) return [d];
-  const rest = d.slice(HOME_CC.length).replace(/^0/, '');
-  return [`${HOME_CC}${rest}`, `${HOME_CC}0${rest}`];
-}
-
 /** سقفِ روزانهٔ هر نشانی، همهٔ شکل‌هایش با هم (ردیف‌های ناموفق شمرده نمی‌شوند). */
 async function overDailyMax(destination, at) {
   const { n } = await one(
     `SELECT COUNT(*)::int AS n FROM otp_codes
       WHERE destination = ANY($1::text[]) AND created_at > $2 AND via <> 'failed'`,
-    [formsOf(destination), at - 24 * 3600 * 1000]
+    [phoneForms(destination), at - 24 * 3600 * 1000]
   );
   return n >= config.otp.dailyMax;
 }
@@ -495,7 +540,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
   const last = await one(
     `SELECT created_at FROM otp_codes WHERE destination = ANY($1::text[]) AND purpose=$2 AND via <> 'failed'
       ORDER BY created_at DESC LIMIT 1`,
-    [formsOf(destination), purpose]
+    [phoneForms(destination), purpose]
   );
   if (last && t - Number(last.created_at) < config.otp.resendMs) {
     const wait = Math.ceil((config.otp.resendMs - (t - Number(last.created_at))) / 1000);
@@ -512,7 +557,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
   const send = await sender(destination, smsCfg);
   //  SEC-06: فقط پیامکِ واقعی (نه ایمیل، نه log)
   if (!isEmail(destination) && send !== senders.log) {
-    await smsGuard(destination, { ip, at: t });
+    await smsGuard(destination, { ip, at: t, shopId, via: smsCfg.provider });
   }
 
   const code = randomCode(config.otp.digits);
@@ -774,7 +819,8 @@ async function resend(id) {
     if (await overDailyMax(row.destination, t)) {
       return { ok: false, error: 'otp_daily_limit', message: 'امروز درخواست کد برای این نشانی زیاد بوده است' };
     }
-    const full = await dailyCeiling(await isKnown(row.destination), t);
+    const full = await dailyCeiling(await isKnown(row.destination), t)
+      || await costCeiling({ via: smsCfg.provider, at: t });
     if (full) return { ok: false, error: full.code, message: full.message };
   }
 
