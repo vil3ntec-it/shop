@@ -207,4 +207,15 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
   res.status(201).json({ order, entry: out.entry });
 }));
 
+/**
+ * RSK-03: سابقهٔ همین مشتری در همین دکان (تحویل، رد، لغو، تحویل‌نشده، برگشت) و نشانه‌های توضیح‌دار
+ * پیش از ارسال — پشتِ پرچمِ `shop.order_risk` (خاموش ⇒ `{enabled:false}`). فقط خواندن؛ بی شماره.
+ * سفارشِ دکانِ دیگر ⇒ ۴۰۴.
+ */
+router.get('/:id/risk', needFlag, wrap(async (req, res) => {
+  const out = await require('../lib/order-risk').riskOf(req.shopId, req.params.id);
+  if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
+  res.json(out);
+}));
+
 module.exports = router;
