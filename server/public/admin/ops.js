@@ -156,10 +156,84 @@
     const sup = adminRole === 'superadmin';
     $('ops-chain-tools').classList.toggle('hidden', !sup);
     $('ops-chain-super').classList.toggle('hidden', sup);
+    $('ops-recon-tools').classList.toggle('hidden', !sup);
+    $('ops-recon-super').classList.toggle('hidden', sup);
+  }
+
+  // ---------- تطبیقِ فروشِ آنلاین — E2E-ADM-15 ----------
+  //  پول به واحدِ خُرد می‌آید؛ فقط برای نمایش به افغانی (÷۱۰۰) — هیچ حسابی این‌جا نیست
+  const afn = (minor) => `${(Number(minor || 0) / 100).toLocaleString('fa-AF', { maximumFractionDigits: 2 })} افغانی`;
+  const ISSUE_FA = {
+    refund_not_closed: 'بازپرداختِ کامل ولی پرونده باز', refund_without_ledger: 'برگشت بی ردیفِ دفتر',
+    refund_partial_mismatch: 'جزئی ولی کامل پرداخت شده', refund_full_mismatch: 'کامل ولی کمتر پرداخت شده',
+    refund_exceeds_total: 'بازپرداخت بیش از مبلغ', refund_on_wrong_status: 'بازپرداخت روی وضعیتِ نادرست',
+  };
+  async function loadRecon() {
+    //  روزها همان‌طور که انتخاب شده‌اند می‌روند؛ نیمه‌شب را سرور در منطقهٔ پیش‌فرض
+    //  (Asia/Kabul) می‌گذارد، نه مرورگر. روزِ «تا» شامل است.
+    const q = new URLSearchParams();
+    if ($('ops-recon-from').value) q.set('fromDate', $('ops-recon-from').value);
+    if ($('ops-recon-to').value) q.set('toDate', $('ops-recon-to').value);
+    const out = await call('GET', `/admin/system/reconciliation?${q}`);
+    const t = out.totals;
+    const cards = $('ops-recon-totals');
+    cards.innerHTML = '';
+    for (const [label, value] of [
+      ['فروشِ آنلاین', `${fa(t.salesCount)} سفارش · ${afn(t.salesMinor)}`],
+      ['بازپرداخت', `${fa(t.refundsCount)} مورد · ${afn(t.refundsMinor)}`],
+      ['خالص', afn(t.netMinor)],
+      ['لغو و رد', fa(t.cancellations)],
+      ['نقدِ گرفته‌شدهٔ پیک', afn(t.courierCollectedMinor)],
+      ['نقدِ تسویه‌نشده (اکنون)', afn(t.courierHeldMinor)],
+      ['تسویه‌ها (دریافت)', `${fa(t.settlements)} · ${afn(t.receivedMinor)}`],
+      ['کسری / اضافهٔ تسویه', `${afn(t.shortageMinor)} / ${afn(t.excessMinor)}`],
+      ['اختلافِ باز', fa(t.issues)],
+      ['کارمزد', t.commissionMinor ? afn(t.commissionMinor) : `${afn(0)} · فعلاً بی کارمزد`],
+    ]) {
+      const c = el('div', 'stat');
+      c.appendChild(el('div', 'l', label));
+      c.appendChild(el('div', 'v', value));
+      cards.appendChild(c);
+    }
+    const body = $('ops-recon');
+    body.innerHTML = '';
+    if (!out.shops.length) {
+      const tr = el('tr');
+      const c = el('td', 'muted', 'در این بازه فروش یا تسویه‌ای نیست');
+      c.colSpan = 9;
+      tr.appendChild(c);
+      body.appendChild(tr);
+    }
+    for (const r of out.shops) {
+      const tr = el('tr');
+      tr.dataset.shop = r.shopId;
+      tr.appendChild(el('td', '', r.shopName || r.shopId));
+      tr.appendChild(el('td', '', `${fa(r.sales.count)} سفارش · ${afn(r.sales.totalMinor)}`));
+      tr.appendChild(el('td', '', fa(r.cancellations)));
+      tr.appendChild(el('td', '', `${fa(r.refunds.count)} مورد · ${afn(r.refunds.totalMinor)}`));
+      tr.appendChild(el('td', '', afn(r.netMinor)));
+      tr.appendChild(el('td', '', `${afn(r.courier.collectedMinor)} · تسویه‌نشده ${afn(r.courier.heldMinor)}`));
+      tr.appendChild(el('td', '', r.courier.settlements
+        ? `${fa(r.courier.settlements)} تسویه · دریافت ${afn(r.courier.receivedMinor)}${r.courier.shortageMinor ? ` · کسری ${afn(r.courier.shortageMinor)}` : ''}${r.courier.excessMinor ? ` · اضافه ${afn(r.courier.excessMinor)}` : ''}`
+        : '—'));
+      //  فعلاً بی کارمزد (تصمیمِ صاحبِ محصول) ⇒ ۰؛ با ستون‌های S10 جمعِ واقعی
+      tr.appendChild(el('td', r.commission ? '' : 'muted', afn(r.commission || 0)));
+      const iss = el('td');
+      if (r.issues.length) {
+        iss.appendChild(el('span', 'badge b-bad', `${fa(r.issues.length)} اختلاف`));
+        iss.appendChild(el('div', 'muted', r.issues.map((i) => `#${fa(i.orderNo)} ${ISSUE_FA[i.code] || i.code}`).join('، ')));
+      } else iss.appendChild(el('span', 'badge b-ok', 'بی اختلاف'));
+      tr.appendChild(iss);
+      body.appendChild(tr);
+    }
+    $('ops-recon-checked').textContent = `${out.local.fromDate} تا ${out.local.toDate} (هر دو روز شامل، ${out.local.timezone})`
+      + ` · ${out.truncated ? `فهرست: ${fa(out.shops.length)} از ${fa(out.shopsTotal)} دکان، به ترتیبِ اهمیت؛ جمع‌ها از همه` : `${fa(out.shopsTotal)} دکان`}`
+      + (t.commissionMinor ? '' : ' · کارمزد: فعلاً بی کارمزد');
   }
 
   document.addEventListener('DOMContentLoaded', () => {
     $('btn-ops-chain').onclick = () => verifyChain().catch((err) => msg($('ops-chain-msg'), err.message, 'bad'));
+    $('btn-ops-recon').onclick = () => { msg($('ops-recon-msg'), ''); loadRecon().catch((err) => msg($('ops-recon-msg'), err.message, 'bad')); };
   });
 
   // ---------- بارِ زبانه ----------

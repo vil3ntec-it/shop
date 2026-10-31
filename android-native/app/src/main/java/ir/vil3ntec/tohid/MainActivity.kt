@@ -35,6 +35,23 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   /** سوکتِ «چیزی عوض شد» — با بسته شدنِ صفحه بسته می‌شود */
   private var live: ir.vil3ntec.tohid.sync.v1.LiveSocket? = null
 
+  /** برنامهٔ باز (singleTask) با لمسِ اعلانِ سفارش، یا پیوندِ `vill3n://app/…` (فقط با پرچمِ `UiV3`) */
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    openNotice(intent)
+    handleLink(intent)
+  }
+
+  private fun openNotice(intent: android.content.Intent?) {
+    val orderId = runCatching { ir.vil3ntec.tohid.data.OrderNotify.fromIntent(applicationContext, intent) }.getOrNull()
+    if (orderId != null) {
+      ir.vil3ntec.tohid.ui.OrdersLive.openFromNotice(orderId)
+      //  رسید همان دم (اگر نت هست)؛ وگرنه در صف تا دورِ بعدیِ OrdersLive
+      lifecycleScope.launch { runCatching { ir.vil3ntec.tohid.data.OrderNotify.flush(applicationContext) } }
+    }
+  }
+
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
@@ -55,9 +72,13 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
      */
     runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(applicationContext) }
 
+    //  M6: برنامه با لمسِ اعلانِ سفارش باز شد ⇒ رسید در صف و همان سفارش
+    openNotice(intent)
+
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ShopDayChoice.load(applicationContext)
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
     ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
@@ -182,11 +203,6 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         }
       }
     }
-    handleLink(intent)
-  }
-
-  override fun onNewIntent(intent: android.content.Intent) {
-    super.onNewIntent(intent)
     handleLink(intent)
   }
 

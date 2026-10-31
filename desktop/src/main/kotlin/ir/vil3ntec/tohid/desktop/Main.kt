@@ -86,6 +86,7 @@ fun main() {
   ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
+  ir.vil3ntec.tohid.ShopDayChoice.load(context)
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
   ir.vil3ntec.tohid.ui.UiV3.load(context)
 
@@ -388,6 +389,17 @@ private fun ShortcutsHelp() {
       androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)
         .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)
     ) {
+      //  OPS-06: راهنمای همین صفحه — فقط وقتی متنش آماده است (امروز هیچ صفحه‌ای؛ جای خالی دیده نمی‌شود)
+      val guide = ir.vil3ntec.tohid.core.guide.ScreenGuides.forScreen(ir.vil3ntec.tohid.ui.AppNav.screen.value)
+      if (guide != null) {
+        val lang = ir.vil3ntec.tohid.LocaleChoice.lang.code
+        androidx.compose.material3.Text(guide.title.of(lang), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+          color = Shop.colors.primary, modifier = androidx.compose.ui.Modifier.padding(bottom = 4.dp))
+        guide.steps.forEachIndexed { i, step ->
+          androidx.compose.material3.Text("${i + 1}. ${step.of(lang)}", color = Shop.colors.text,
+            modifier = androidx.compose.ui.Modifier.padding(vertical = 2.dp))
+        }
+      }
       groups.forEach { (title, rows) ->
         androidx.compose.material3.Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
           color = Shop.colors.primary, modifier = androidx.compose.ui.Modifier.padding(top = 10.dp, bottom = 4.dp))

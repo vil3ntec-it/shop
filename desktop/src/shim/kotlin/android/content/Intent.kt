@@ -26,6 +26,7 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   /** پیوستِ فایل (`EXTRA_STREAM`) — روی کامپیوتر فقط نگه داشته می‌شود */
   fun putExtra(key: String, value: android.net.Uri?): Intent = apply { extras[key] = value }
   fun getStringExtra(key: String): String? = extras[key] as? String
+  fun removeExtra(key: String) { extras.remove(key) }
   @Suppress("UNCHECKED_CAST")
   fun getStringArrayListExtra(key: String): ArrayList<String>? = extras[key] as? ArrayList<String>
   fun resolveActivity(pm: android.content.pm.PackageManager): ComponentName? = null
@@ -41,6 +42,7 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
     const val EXTRA_STREAM = "android.intent.extra.STREAM"
     const val FLAG_ACTIVITY_NEW_TASK = 0x10000000
     const val FLAG_ACTIVITY_CLEAR_TOP = 0x04000000
+    const val FLAG_ACTIVITY_SINGLE_TOP = 0x20000000
     const val FLAG_GRANT_READ_URI_PERMISSION = 0x00000001
     fun createChooser(target: Intent, title: CharSequence?): Intent = target
   }
