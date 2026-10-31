@@ -63,6 +63,7 @@ import ir.vil3ntec.tohid.pay.HesabPaySettle
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import ir.vil3ntec.tohid.pay.platform.PayDevice
 import ir.vil3ntec.tohid.ui.ProvideLang
+import ir.vil3ntec.tohid.ui.theme.LightColors
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.delay
@@ -312,8 +313,10 @@ private fun QrPanel(phase: Phase, side: androidx.compose.ui.unit.Dp) {
   val rows = remember(payload) {
     if (payload.isBlank()) null else runCatching { QrCode.encode(payload, QrCode.LARGE_MAX_VERSION) }.getOrNull()
   }
+  //  کادرِ QR در هر دو تم روشن است (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند)؛
+  //  پس رنگ‌ها از پالتِ روزِ Theme.kt می‌آیند، نه از تمِ جاری و نه عددِ ثابت (F0-18)
   Box(
-    Modifier.size(side).clip(RoundedCornerShape(16.dp)).background(Color.White),
+    Modifier.size(side).clip(RoundedCornerShape(16.dp)).background(LightColors.surface),
     contentAlignment = Alignment.Center,
   ) {
     if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp))
@@ -322,7 +325,7 @@ private fun QrPanel(phase: Phase, side: androidx.compose.ui.unit.Dp) {
         is Phase.Paid -> "✓"
         else -> "…"
       },
-      fontSize = 64.sp, color = Color(0xFF1F2937),
+      fontSize = 64.sp, color = LightColors.textPrimary,
     )
   }
 }
