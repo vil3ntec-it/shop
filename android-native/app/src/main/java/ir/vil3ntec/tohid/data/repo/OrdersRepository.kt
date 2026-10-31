@@ -120,7 +120,10 @@ class OrdersRepository(private val api: ApiClient) {
       }
       put("lines", buildJsonArray {
         for (l in b.lines) add(buildJsonObject {
+          //  POS-38: قلمِ صندوق شناسهٔ کالا و واحد دارد؛ تهی ⇒ نوشته نمی‌شود (بدنهٔ سفارشِ دستی همان پیشین)
+          if (l.productId.isNotEmpty()) put("productId", l.productId)
           put("name", l.name)
+          if (l.unit.isNotEmpty()) put("unit", l.unit)
           put("qtyMilli", l.qtyMilli)
           put("unitPriceMinor", l.unitPriceMinor)
         })
