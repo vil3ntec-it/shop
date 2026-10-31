@@ -7,7 +7,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- *  SEC-02 — یک دورِ همگام‌سازی: پرچمِ خاموش ⇒ فقط پرسش (نه زودتر از ده دقیقه) و هیچ حلقه؛ روشن ⇒
+ *  SEC-02 — یک دورِ همگام‌سازی: پرچمِ خاموش ⇒ فقط پرسش (حداکثر روزی یک بار) و هیچ حلقه؛ روشن ⇒
  *  از همین لحظه، دورهٔ «آخرینِ سرور + ۱»، گزارش و تأیید؛ مشکلِ سرور ⇒ ایستادن و دورهٔ تازه؛ سریِ دیگر ⇒
  *  ایستادن بی دورهٔ تازه؛ بی شبکه ⇒ حلقه روی دیسک ساخته می‌شود و دورِ بعد می‌رود.
  */
@@ -20,7 +20,7 @@ class DocChainCycleTest {
     runSync { DocChainCycle.tick(gate, now, DocChainBook(disk), server, "shp_t", "B1", "usr_1", sales) }
 
   @Test
-  fun flagOffAsksAtMostEveryTenMinutesAndBuildsNothing() {
+  fun flagOffAsksAtMostOncePerDayAndBuildsNothing() {
     val disk = MemoryDocDisk()
     val server = FakeChainServer().apply { status = DocChainStatus(enabled = false) }
     val (g1, o1) = tick(off, 1_000_000, disk, server, history)
@@ -35,6 +35,28 @@ class DocChainCycleTest {
     assertTrue(server.reports.isEmpty())
     assertNull(disk.state)
     assertTrue(disk.files.isEmpty())
+  }
+
+  /**
+   *  ⛔ پرچمِ خاموش = همان همگام‌سازیِ main: یک روزِ کامل دورِ پنج‌دقیقه‌ای (۲۸۸ دور) ⇒ فقط یک پرسش.
+   *  سرورِ کهنه (۴۰۴) یا بی‌شبکه (`status()` ⇐ null) هم همین: پرسش در هر دور تکرار نمی‌شود.
+   */
+  @Test
+  fun flagOffOr404DoesNotAskAgainForADay() {
+    assertEquals(24 * 60 * 60_000L, DocChainCycle.PROBE_MS)
+    for (answer in listOf<DocChainStatus?>(DocChainStatus(enabled = false), null)) {
+      val disk = MemoryDocDisk()
+      val server = FakeChainServer().apply { status = answer }
+      val start = 1_000_000L
+      var g = off
+      for (i in 0 until 288) g = tick(g, start + i * 5 * 60_000L, disk, server, history).first
+      assertEquals(1, server.statusCalls.size, "پاسخ: $answer")
+      assertTrue(server.reports.isEmpty())
+      assertTrue(disk.files.isEmpty())
+      //  پس از یک روز ⇒ پرسشِ دوم
+      tick(g, start + DocChainCycle.PROBE_MS, disk, server, history)
+      assertEquals(2, server.statusCalls.size, "پاسخ: $answer")
+    }
   }
 
   @Test
