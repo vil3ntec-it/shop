@@ -19,6 +19,8 @@ fun PhotoStudioDialog(
   /** خروجی آماده — صدازننده ذخیره می‌کند */
   onSave: (Bitmap) -> Unit,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { PhotoStudioDialogLegacy(source, onDismiss, onSave); return }
   Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
     PhotoStudioScreen(source = source, onBack = onDismiss, onSave = onSave)
   }

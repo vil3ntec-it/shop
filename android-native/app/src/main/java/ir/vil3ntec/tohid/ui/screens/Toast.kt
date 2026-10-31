@@ -11,4 +11,8 @@ import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
  *  عوض نمی‌شود. این نام برای صفحه‌های امروز (پیک) مانده و در فاز ۳ برداشته می‌شود.
  */
 @Composable
-fun TohidSnackbar(host: SnackbarHostState, modifier: Modifier = Modifier) = V3SnackbarHost(host, modifier)
+fun TohidSnackbar(host: SnackbarHostState, modifier: Modifier = Modifier) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { TohidSnackbarLegacy(host, modifier); return }
+  V3SnackbarHost(host, modifier)
+}

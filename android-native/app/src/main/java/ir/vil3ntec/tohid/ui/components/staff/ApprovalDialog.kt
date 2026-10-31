@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.core.perm.ApproverVault
 import ir.vil3ntec.tohid.core.perm.PinGuard
+import ir.vil3ntec.tohid.core.perm.ReturnApprovals
 import ir.vil3ntec.tohid.data.StaffPins
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -62,11 +63,18 @@ fun ApprovalDialog(
   need: ApprovalSlip.Need,
   onApproved: (ApprovalSlip.Slip) -> Unit,
   onDismiss: () -> Unit,
+  /**
+   *  کمترین نقشِ تأییدکننده (`manager` | `owner`)؛ `null` ⇒ هر مدیر یا صاحب (همان تخفیف).
+   *  برگشتِ بالای سقفِ نقش فقط صاحب را نشان می‌دهد (S14؛ `ReturnApprovals.approverCovers`).
+   */
+  minRole: String? = null,
 ) {
   val context = LocalContext.current
   val store = remember { StaffPins(context) }
   val scope = rememberCoroutineScope()
-  val approvers = remember { store.approvers(requesterUserId) }
+  val approvers = remember(minRole) {
+    store.approvers(requesterUserId).filter { minRole == null || ReturnApprovals.approverCovers(it.role, minRole) }
+  }
   var who by remember { mutableStateOf(approvers.firstOrNull()?.userId.orEmpty()) }
   var reason by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }

@@ -145,7 +145,8 @@ jobs:
           S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
-          S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;theme:LIGHT"
+          #  F0-18: پنجرهٔ میان‌برها (F1) و قرض‌داران (DeskCustomers) در شب هم — رنگ‌ها از تم، نه ثابت
+          S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;help:on;wait:1500;shot:19b-shortcuts-F1-dark;help:off;go:debtors;wait:1500;shot:19c-debtors-dark;theme:LIGHT"
           #  گوشی (phone-ui): پنجرهٔ ۳۹۰×۸۴۴ِ `PhonePreview` — عکس فقط از همان پنجره
           S="$S;phone:nav;wait:1500;pshot:20-phone-nav;phone:nav-dark;wait:1500;pshot:20b-phone-nav-dark;phone:settings;wait:1500;pshot:21-phone-settings;phone:settings-dark;wait:1500;pshot:21b-phone-settings-dark;phone:profile;wait:1500;pshot:22-phone-profile;phone:profile-dark;wait:1500;pshot:22b-phone-profile-dark;phone:cart;wait:2000;pshot:23-phone-cart-bar;phone:cart-open;wait:2000;pshot:23b-phone-cart-sheet;phone:cart-open-dark;wait:2000;pshot:23c-phone-cart-sheet-dark;phone:off"
           #  گوشی نسخهٔ ۳: «حساب من» (r4، واردشده و مهمان)، «تنظیمات» (r5: بالا، پایین، صفحهٔ یک بخش) و «بیشتر» (بالا و تهِ «تنظیمات») — روشن و تیره

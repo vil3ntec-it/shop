@@ -206,12 +206,13 @@ internal fun TxComposerSheet(
     Spacer(Modifier.height(16.dp))
 
     AmountField(amount, { amount = it }, StrDebtor.amount)
-    // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد
-    if (receiving && balance > 0) {
+    // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد — همهٔ مانده تا پول، هرگز گردِ افغانی (همان main)
+    val settle = if (receiving) ir.vil3ntec.tohid.core.money.MoneyInput.settleInput(balance) else null
+    if (settle != null) {
       Spacer(Modifier.height(8.dp))
       Box(
         Modifier
-          .v3PressScale({ amount = Math.round(balance).toString() }, StrDebtor.settleAll)
+          .v3PressScale({ amount = settle }, StrDebtor.settleAll)
           .clip(CircleShape)
           .background(dc.settledTint)
           .padding(horizontal = 14.dp, vertical = 8.dp),

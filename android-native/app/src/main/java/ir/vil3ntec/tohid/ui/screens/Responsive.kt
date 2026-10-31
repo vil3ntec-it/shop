@@ -69,7 +69,8 @@ fun PageWidth(
 ) {
   val max = contentMaxWidth()
   if (max == Dp.Unspecified) {
-    Box(modifier.fillMaxSize()) { content() }
+    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) روی گوشی `modifier` را نمی‌گرفت — همان رفتار
+    if (!ir.vil3ntec.tohid.ui.UiV3.on) content() else Box(modifier.fillMaxSize()) { content() }
     return
   }
   Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {

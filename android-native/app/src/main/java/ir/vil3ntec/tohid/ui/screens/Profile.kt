@@ -118,6 +118,8 @@ fun ProfileScreen(
   /** جای نوارِ شناورِ پایین وقتی صفحه زیرِ آن کشیده می‌شود (زمینهٔ مه‌گرفته تا ته) */
   bottomReserve: Dp = 0.dp,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { ProfileScreenLegacy(store, snackbar, onBack, onSignIn, onSubscription); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val state = remember { SyncStore(context) }

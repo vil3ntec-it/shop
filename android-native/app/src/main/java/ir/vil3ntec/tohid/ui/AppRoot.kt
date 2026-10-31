@@ -104,12 +104,17 @@ fun AppRoot(
   theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
   val cartStore = remember { CartStore(context) }
   val nav = rememberV3Nav(V3Modules.table, "home")
+  //  OPS-06: صفحهٔ باز برای راهنمای F1 (پنجرهٔ کامپیوتر بیرونِ همین درخت است)؛ شناسهٔ راهنما همان
+  //  مسیرِ رابطِ امروز است (`ScreenGuides`)، پس «خانه» ِ نسخهٔ ۳ همان `dashboard`
+  LaunchedEffect(nav.current) { AppNav.screen.value = RoutePaths.base(nav.current).let { if (it == "home") "dashboard" else it } }
   var migration by remember { mutableStateOf<String?>(null) }
 
   //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱)

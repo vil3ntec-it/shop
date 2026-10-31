@@ -182,6 +182,14 @@ object StrSettings {
   // بخش‌های جمع‌شو
   val open: String get() = t("باز کردن", "Open", "پرانیستل")
 
+  // پایانِ روزِ کاری (LocaleSection › ShopDayRow، LOC-03)
+  val dayEndNote: String get() = t(
+    "پایانِ روزِ کاری. فروش و هر ثبتی که پس از نیمه‌شب و پیش از این ساعت باشد به نامِ دیروز نوشته می‌شود، تا یک شبِ کاری دو روز نشود. 00:00 یعنی نیمه‌شب، مثلِ همیشه. فقط روی همین دستگاه.",
+    "End of the business day. Sales and other entries made after midnight but before this time are dated to the previous day, so one working night isn't split into two days. 00:00 means midnight, as always. This device only.",
+    "د کاري ورځې پای. هغه پلور او نور ثبتونه چې له نیمې شپې وروسته او له دې وخت مخکې وي د پرون په نوم لیکل کېږي، څو یوه کاري شپه په دوو ورځو ونه وېشل شي. 00:00 یعني نیمه شپه، لکه تل. یوازې په همدې وسیله.",
+  )
+  fun dayEndNow(d: Any): String = t("فروشِ همین حالا به تاریخِ $d ثبت می‌شود", "A sale made right now is dated $d", "همدا اوس پلور د $d په نېټه ثبتېږي")
+
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
   val latinDigits: String get() = t("رقمِ لاتین", "Latin digits", "لاتین عددونه")
@@ -403,4 +411,7 @@ object StrSettings {
   val themeOcean: String get() = t("اقیانوس", "Ocean", "سمندر")
   val themeSunset: String get() = t("غروب", "Sunset", "لمر لوېده")
   val themeOnDevice: String get() = t("تم فقط روی همین دستگاه عوض می‌شود.", "The theme changes on this device only.", "تیم یوازې په همدې وسیله بدلېږي.")
+  /** پرچمِ `UiV3`: کلیدِ برگشت به رابطِ امروز (فقط همین دستگاه) */
+  val uiV3: String get() = t("رابطِ تازه (نسخهٔ ۳)", "New interface (version 3)", "نوې ښودنه (۳ نسخه)")
+  val uiV3Note: String get() = t("آزمایشی و فقط روی همین دستگاه. خاموش ⇐ رابطِ امروز؛ داده و همگام‌سازی دست نمی‌خورند.", "Experimental, this device only. Off ⇒ the current interface; data and sync are untouched.", "ازمایښتي او یوازې په همدې وسیله. بند ⇐ اوسنۍ ښودنه؛ معلومات او همغږي نه بدلېږي.")
 }

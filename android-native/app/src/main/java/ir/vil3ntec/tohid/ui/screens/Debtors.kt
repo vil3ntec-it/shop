@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
+
 import ir.vil3ntec.tohid.data.invoiceLabel
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -97,6 +100,8 @@ fun DebtorsScreen(
   /** باز شده از «بیشتر» ⇒ دکمهٔ برگشتِ سربرگ؛ `null` ⇒ بی دکمه */
   onBack: (() -> Unit)? = null,
 ) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on && !showHeader && onBack == null) { DebtorsScreenLegacy(store, d, snackbar); return }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -109,8 +114,8 @@ fun DebtorsScreen(
   var txFor by remember { mutableStateOf<Pair<String, DebtorEngine.Kind>?>(null) }
   var confirmDelete by remember { mutableStateOf<Debtor?>(null) }
   //  «حذف با برگرداندن»: ردیف/قرض‌دار همین حالا پنهان می‌شود و دفتر فقط وقتی عوض
-  //  می‌شود که «برگرداندن» زده نشود (`DebtorDetailModel.PendingDelete`)
-  var pendingDeletes by remember { mutableStateOf(listOf<DebtorDetailModel.PendingDelete>()) }
+  //  می‌شود که «برگرداندن» زده نشود (`DebtorLedgerModel.PendingDelete`)
+  var pendingDeletes by remember { mutableStateOf(listOf<DebtorLedgerModel.PendingDelete>()) }
   //  جای اسکرولِ فهرست با رفتن به حسابِ یک نفر و برگشتن می‌ماند
   val gridState = rememberLazyGridState()
   //  دفترِ قرض (v3 §22.2-A5): رسیدِ یک ردیف، سررسیدِ یک برد، و بردی که از سقف می‌گذرد
@@ -134,11 +139,11 @@ fun DebtorsScreen(
   }
 
   val latestData = rememberUpdatedState(d)
-  fun deleteResult(data: ShopData, p: DebtorDetailModel.PendingDelete): DebtorEngine.Result = when (p) {
-    is DebtorDetailModel.PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
-    is DebtorDetailModel.PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
+  fun deleteResult(data: ShopData, p: DebtorLedgerModel.PendingDelete): DebtorEngine.Result = when (p) {
+    is DebtorLedgerModel.PendingDelete.Transaction -> DebtorEngine.deleteTransaction(data, p.txId)
+    is DebtorLedgerModel.PendingDelete.Debtor -> DebtorEngine.delete(data, p.debtorId)
   }
-  fun commit(p: DebtorDetailModel.PendingDelete) {
+  fun commit(p: DebtorLedgerModel.PendingDelete) {
     pendingDeletes = pendingDeletes - p
     when (val r = deleteResult(latestData.value, p)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
@@ -146,7 +151,7 @@ fun DebtorsScreen(
     }
   }
   /** پنهان کن، پیامِ «برگرداندن» بده؛ بی‌پاسخ ⇒ حذف، «برگرداندن» ⇒ هیچ چیز پاک نشده است */
-  fun deleteLater(p: DebtorDetailModel.PendingDelete, message: String) {
+  fun deleteLater(p: DebtorLedgerModel.PendingDelete, message: String) {
     pendingDeletes = pendingDeletes + p
     scope.launch {
       val answer = snackbar.showSnackbar(message, actionLabel = StrDebtor.undo, duration = SnackbarDuration.Short)
@@ -169,14 +174,18 @@ fun DebtorsScreen(
       }
     }
   }
-  val hiddenTx = DebtorDetailModel.hiddenTx(pendingDeletes)
-  val hiddenDebtors = DebtorDetailModel.hiddenDebtors(pendingDeletes)
+  val hiddenTx = DebtorLedgerModel.hiddenTx(pendingDeletes)
+  val hiddenDebtors = DebtorLedgerModel.hiddenDebtors(pendingDeletes)
 
   //  پیش‌نمایشِ گوشی (`DevShot`): حسابِ یک نفر و برگهٔ ثبت
   val shotOpen = DebtorDetailShot.open.value
   LaunchedEffect(shotOpen) { if (shotOpen != null) openId = shotOpen }
   val shotComposer = DebtorDetailShot.composer.value
   LaunchedEffect(shotComposer, openId) { if (shotComposer) openId?.let { txFor = it to DebtorEngine.Kind.GIVE } }
+
+  //  ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر برگه ⇒ دو ضربه یک ردیف
+  val txKey = remember(txFor) { newId() }
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
 
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
@@ -198,7 +207,7 @@ fun DebtorsScreen(
       onCompose = { kind -> txFor = account.debtor.id to kind },
       onEdit = { form = DebtorFormState.of(account.debtor) },
       onDelete = { confirmDelete = account.debtor },
-      onDeleteTx = { deleteLater(DebtorDetailModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
+      onDeleteTx = { deleteLater(DebtorLedgerModel.PendingDelete.Transaction(it), StrDebtor.txDeleted) },
       onOpenTx = { receiptFor = it },
       onDue = { dueFor = it },
     )
@@ -368,7 +377,7 @@ fun DebtorsScreen(
           DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
         } else null
         if (credit != null && credit.over) overLimit = pending
-        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
+        else record(pending, over = false)
       },
     )
   }
@@ -382,7 +391,7 @@ fun DebtorsScreen(
       V3MaterialColors { OverLimitDialog(
         credit = credit,
         onConfirm = {
-          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          record(pending, over = true)
           overLimit = null
         },
         onDismiss = { overLimit = null },
@@ -426,7 +435,7 @@ fun DebtorsScreen(
       onConfirm = {
         confirmDelete = null
         openId = null
-        deleteLater(DebtorDetailModel.PendingDelete.Debtor(debtor.id), StrDebtor.debtorDeleted(debtor.name))
+        deleteLater(DebtorLedgerModel.PendingDelete.Debtor(debtor.id), StrDebtor.debtorDeleted(debtor.name))
       },
     )
   }
@@ -515,8 +524,5 @@ private data class PendingTx(
   val notes: String,
   val due: String?,
 ) {
-  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-    dueDate = due, overLimit = overLimit,
-  )
+  fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
 }

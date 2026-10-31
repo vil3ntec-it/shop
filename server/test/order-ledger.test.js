@@ -828,3 +828,116 @@ test('ممیزیِ کنار گذاشتن یک بار: دو afterIngest ِ هم�
   const rows = await many(`SELECT 1 FROM audit_logs WHERE shop_id=$1 AND action='stock.order_stock_retired'`, [a.shopId]);
   assert.equal(rows.length, 1);
 });
+
+/* ══════════════════════ §۳۸.۱۱: ORD-01@38 و ORD-02@38 ══════════════════════ */
+
+const reconciliation = async (owner) => {
+  const r = await h.get('/api/shop/orders/reconciliation', { token: owner.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  return r.body;
+};
+const eventsOf = (id) => many(
+  'SELECT seq, kind, from_status, to_status, actor_type, actor_id, reason FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id]);
+
+test('ORD-01@38: ساخت و لغو ⇒ موجودی و گزارشِ مالی طبقِ سیاست (پیش از تحویل هیچ اثر؛ پس از تحویل لغوِ همان فروش) و سابقه می‌ماند', async () => {
+  const a = await shopWithStock('ساخت-لغو');
+  //  ۱) کارمند پس از قبول و جمع‌آوری لغو می‌کند؛ ۲) «آماده» ولی مشتری نیامد؛ ۳) ردِ سفارشِ تازه
+  const o1 = await newOrder(a);
+  await walk(a, o1.id, ['accepted', 'picking']);
+  let r = await h.post(`/api/shop/orders/${o1.id}/transition`, { to: 'cancelled', reason: 'customer_request' }, { token: a.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const o2 = await newOrder(a);
+  await walk(a, o2.id, ['accepted', 'picking', 'packed', 'ready_for_pickup']);
+  r = await h.post(`/api/shop/orders/${o2.id}/transition`, { to: 'cancelled', reason: 'no_show' }, { token: a.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const o3 = await newOrder(a);
+  r = await h.post(`/api/shop/orders/${o3.id}/transition`, { to: 'rejected', reason: 'out_of_stock' }, { token: a.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+
+  //  سیاست: پیش از تحویل نه موجودی کم می‌شود نه فروشی ثبت ⇒ پس از لغو چیزی برای برگرداندن نیست
+  const h0 = (await handover(a)).body;
+  assert.deepEqual([h0.items, h0.reversals], [[], []], 'هیچ فروشی لازم نیست و هیچ لغوی');
+  assert.equal((await serverOps(a.shopId)).n, 0);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM order_ledger_docs WHERE shop_id=$1', [a.shopId]), 0);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM stock_reservations WHERE shop_id=$1', [a.shopId]), 0);
+  assert.equal((await levels(a)).levels.shop_floor, 10000, 'موجودیِ سرور همان');
+  const view = await devicePull(a.token, DEV_B);
+  assert.equal(view.rows('sales').length, 0, 'گزارشِ فروشِ دستگاه هیچ فروشی ندارد');
+  assert.equal(deviceStock(view, 'p-rice'), 10);
+  const rec = await reconciliation(a);
+  assert.deepEqual([rec.collected.count, rec.collected.totalMinor, rec.netMinor], [0, 0, 0], 'گزارشِ دریافتِ سفارش بی اثر');
+
+  //  سابقه: هر گذار با زمان، کننده و دلیل می‌ماند (فقط افزوده؛ لغو چیزی پاک نمی‌کند)
+  const e1 = await eventsOf(o1.id);
+  assert.deepEqual(e1.map((e) => [e.kind, e.to_status]),
+    [['created', 'new'], ['status', 'accepted'], ['status', 'picking'], ['status', 'cancelled']]);
+  assert.ok(e1.every((e) => e.actor_type === 'user' && e.actor_id === a.user.id));
+  assert.equal(e1.at(-1).reason, 'customer_request');
+  assert.deepEqual((await eventsOf(o2.id)).at(-1).reason, 'no_show');
+  assert.deepEqual((await eventsOf(o3.id)).map((e) => [e.to_status, e.reason]), [['new', ''], ['rejected', 'out_of_stock']]);
+  const detail = (await h.get(`/api/shop/orders/${o1.id}`, { token: a.token })).body.order;
+  assert.equal(detail.status, 'cancelled');
+  assert.equal(detail.events.length, 4, 'خطِ زمانیِ جزئیات همان سابقه');
+  assert.equal(await count(`SELECT COUNT(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action='order.transition'`, [a.shopId]), 9);
+
+  //  ۴) پس از تحویل به پیک دیگر «لغو» نیست؛ برگشت به دکان ⇒ برنامه همان فروشِ o-… را لغو می‌کند و موجودی یک بار برمی‌گردد
+  const r4 = await h.post('/api/shop/orders', { source: 'phone', fulfillment: 'delivery', paymentMethod: 'cod',
+    customer: { name: 'احمد', phone: '0791234567' }, address: { landmark: 'کنارِ مسجد' }, lines: riceLine(1500) },
+  { token: a.token, headers: { 'Idempotency-Key': `ord01-38-${Date.now()}` } });
+  assert.equal(r4.status, 201, JSON.stringify(r4.body));
+  const id4 = r4.body.order.id;
+  await walk(a, id4, ['accepted', 'picking', 'packed', 'out_for_delivery']);
+  const late = await h.post(`/api/shop/orders/${id4}/transition`, { to: 'cancelled', reason: 'customer_request' }, { token: a.token });
+  assert.equal(late.status, 409, 'پس از بیرون رفتن، لغوِ ساده نیست');
+  const o4 = (await h.get(`/api/shop/orders/${id4}`, { token: a.token })).body.order;
+  assert.equal((await push(a.token, DEV_A, appSaleOps(o4))).status, 200);
+  assert.equal((await levels(a)).levels.shop_floor, 8500);
+  await h.post(`/api/shop/orders/${id4}/transition`, { to: 'delivery_failed', reason: 'no_answer' }, { token: a.token });
+  await walk(a, id4, ['retry_scheduled', 'returned_to_store']);
+  assert.deepEqual((await handover(a)).body.reversals.map((x) => x.id), [id4]);
+  const cancel = [{ op_id: opId(), ts: Date.now(), table: 'sales', row_id: `o-${id4}`, type: 'update',
+    fields: { status: 'cancelled', cancelReason: 'سفارشِ اینترنتی به دکان برگشت' } }];
+  assert.equal((await push(a.token, DEV_A, cancel)).status, 200);
+  assert.deepEqual((await handover(a)).body.reversals, []);
+  assert.equal((await levels(a)).levels.shop_floor, 10000, 'موجودی یک بار برگشت');
+  const after = await devicePull(a.token, 'dev-ord01-38');
+  assert.deepEqual(after.rows('sales').map((s) => [s.id, s.status]), [[`o-${id4}`, 'cancelled']], 'فروش لغو شد ولی ردیفش (سابقه) هست');
+  assert.equal(deviceStock(after, 'p-rice'), 10);
+  assert.equal((await reconciliation(a)).collected.count, 0, 'تحویل نشد ⇒ دریافتی نیست');
+});
+
+test('ORD-02@38: درخواستِ تکراری (هم‌زمان و پس از قطعِ پاسخ) ⇒ یک سفارش، یک فروش، یک بار کسر و یک دریافت', async () => {
+  const a = await shopWithStock('تکراری');
+  const key = `ord02-38-${Date.now()}`;
+  const body = { source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'احمد', phone: '0791234567' },
+    lines: riceLine(1500) };
+  const send = () => h.post('/api/shop/orders', body, { token: a.token, headers: { 'Idempotency-Key': key } });
+  const rs = await Promise.all([send(), send(), send(), send()]);
+  assert.ok(rs.every((x) => x.status === 201 || x.status === 200), JSON.stringify(rs.map((x) => x.body)));
+  assert.equal(new Set(rs.map((x) => x.body.order.id)).size, 1);
+  const again = await send();   // پاسخِ گم‌شده و ارسالِ دوباره
+  assert.equal(again.status, 200);
+  assert.equal(again.body.replayed, true);
+  assert.equal(await count('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [a.shopId]), 1);
+  const id = again.body.order.id;
+
+  await walk(a, id, TO_PICKED_UP);
+  const items = (await handover(a)).body.items;
+  assert.deepEqual(items.map((x) => [x.id, x.saleId]), [[id, `o-${id}`]], 'یک فروشِ لازم با شناسهٔ ثابت');
+  const order = (await h.get(`/api/shop/orders/${id}`, { token: a.token })).body.order;
+  const [pa, pb] = await Promise.all([
+    push(a.token, DEV_A, appSaleOps(order, { invoiceNumber: 4, series: 'A1' })),
+    push(a.token, DEV_B, appSaleOps(order, { invoiceNumber: 9, series: 'B1' })),
+  ]);
+  assert.equal(pa.status, 200);
+  assert.equal(pb.status, 200);
+  assert.equal((await push(a.token, DEV_A, appSaleOps(order, { invoiceNumber: 4, series: 'A1' }))).status, 200);
+  const sales = await many(
+    `SELECT row_id FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name='sales' AND data->>'orderId'=$2`, [a.shopId, id]);
+  assert.deepEqual(sales.map((x) => x.row_id), [`o-${id}`], 'یک اثرِ مالی');
+  assert.equal((await levels(a)).levels.shop_floor, 8500, 'یک بار کسر');
+  assert.equal(deviceStock(await devicePull(a.token, 'dev-ord02-38'), 'p-rice'), 8.5);
+  const rec = await reconciliation(a);
+  assert.deepEqual([rec.collected.count, rec.collected.totalMinor], [1, order.totalMinor], 'یک دریافت');
+  assert.deepEqual((await handover(a)).body.items, []);
+});

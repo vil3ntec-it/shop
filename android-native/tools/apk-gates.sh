@@ -9,6 +9,9 @@
 #    • حجم در ±۵٪ِ منتشرشده — سخت فقط وقتی PR فایلِ ساخت را عوض کرده
 #      (build/settings.gradle.kts، gradle.properties، proguard، wrapper)؛
 #      در بقیه فقط هشدار، چون قابلیتِ تازه حق دارد APK را بزرگ کند.
+#      استثنای یک‌باره فقط با تصمیمِ صاحب محصول: خطی در `apk-size-exceptions.txt`
+#      (رشدِ پذیرفته‌شدهٔ یک تغییر = مرجعِ تازه، تا وقتی نسخهٔ منتشرشده آن را ندارد)؛
+#      مرزِ ±۵٪ عوض نمی‌شود و برای هر تغییرِ دیگر همان است.
 #  شمارِ آزمون‌ها هم (اگر پوشهٔ نتیجه داده شود) در خلاصهٔ اجرا می‌آید.
 #
 #  usage: apk-gates.sh <apk> <expected-versionCode> [test-results-dir]
@@ -33,6 +36,13 @@ field() { sed -n "s/.* $1='\([^']*\)'.*/\1/p" <<<"$2"; }
 #  «Signer (minSdkVersion=…) certificate …» یا «V3.0 Signer: certificate …»
 #  می‌نویسد — هر سه پذیرفته است؛ فقط اثر انگشتِ **گواهی** (نه کلیدِ عمومی)
 cert() { { "$apksigner" verify --print-certs -v "$1" 2>&1 || true; } | sed -nE 's/^.*Signer.*certificate SHA-256 digest: *([0-9a-fA-F]{64}).*$/\1/p' | sed -n '1p'; }
+
+#  استثنای یک‌بارهٔ دروازهٔ حجم — هر خط «نام  رشدِ پذیرفته‌شده٪  نشانِ dex  دلیل»؛ فقط با تصمیمِ صاحب محصول
+exceptions="$(dirname "$0")/apk-size-exceptions.txt"
+exception_note=""
+
+#  رشته‌ای در کدِ dexِ یک APK هست؟ (نشانِ تغییرِ استثنا‌شده؛ R8 رشته‌های ثابت را نگه می‌دارد)
+dex_has() { [ -f "$1" ] && ( set +o pipefail; unzip -p "$1" 'classes*.dex' 2>/dev/null | LC_ALL=C grep -a -q -F -- "$2" ); }
 
 fail=0
 err() { echo "::error::$1"; fail=1; }
@@ -84,7 +94,24 @@ if [ -n "$ref" ]; then
   [ "$code" -ge "$ref_code" ] || err "versionCode ($code) از نسخهٔ منتشرشده ($ref_code) کمتر است"
   ratio=$(awk -v a="$size" -v b="$ref_size" 'BEGIN { printf "%+.2f", (a - b) * 100 / b }')
   if awk -v r="$ratio" 'BEGIN { exit !(r > 5 || r < -5) }'; then
-    if [ "$strict" = 1 ]; then
+    #  استثنای یک‌بارهٔ صاحب محصول (`apk-size-exceptions.txt`): رشدِ پذیرفته‌شدهٔ یک تغییرِ مشخص =
+    #  «مرجعِ تازه». فقط وقتی این APK نشانِ آن تغییر را دارد و APKِ منتشرشده هنوز ندارد؛ آن‌وقت
+    #  حجم با مرجع × (۱ + سقف) سنجیده می‌شود و همان مرزِ ±۵٪ از آن‌جا. پس از انتشارِ نسخه‌ای که
+    #  آن تغییر را دارد، نشان در مرجع هست و استثنا خودبه‌خود کنار می‌رود.
+    exc_ratio=""
+    if [ "$strict" = 1 ] && [ -f "$exceptions" ]; then
+      while read -r exc_name exc_pct exc_marker _; do
+        case "$exc_name" in ''|'#'*) continue ;; esac
+        if dex_has "$apk" "$exc_marker" && ! dex_has "$ref" "$exc_marker"; then
+          exc_ratio=$(awk -v a="$size" -v b="$ref_size" -v p="$exc_pct" 'BEGIN { m = b * (1 + p / 100); printf "%+.2f", (a - m) * 100 / m }')
+          exception_note="استثنای یک‌بارهٔ «$exc_name» (+${exc_pct}٪ مرجعِ تازه؛ نسبت به آن ${exc_ratio}٪)"
+          break
+        fi
+      done < "$exceptions"
+    fi
+    if [ -n "$exc_ratio" ] && awk -v r="$exc_ratio" 'BEGIN { exit !(r <= 5 && r >= -5) }'; then
+      echo "::warning::حجمِ APK ${ratio}٪ — $exception_note؛ مرزِ ±۵٪ سر جایش است"
+    elif [ "$strict" = 1 ]; then
       err "حجمِ APK ${ratio}٪ با نسخهٔ منتشرشده فرق دارد (مرز ±۵٪ برای تغییرِ ساخت)"
     else
       echo "::warning::حجمِ APK ${ratio}٪ با نسخهٔ منتشرشده فرق دارد"
@@ -111,7 +138,7 @@ fi
   echo "| versionCode | $code | $ref_code |"
   echo "| امضا SHA-256 | \`$fp\` | \`$ref_fp\` |"
   echo "| حجم (بایت) | $size | $ref_size |"
-  echo "| اختلافِ حجم | ${ratio}٪ (مرزِ سخت: $([ "$strict" = 1 ] && echo بله || echo خیر)) | |"
+  echo "| اختلافِ حجم | ${ratio}٪ (مرزِ سخت: $([ "$strict" = 1 ] && echo بله || echo خیر))${exception_note:+ — $exception_note} | |"
   echo "| آزمون‌ها | $tests | |"
 } >> "$summary"
 

@@ -10,6 +10,7 @@ import { lineCount, findAll, duplicateMigrations } from './lib/measure.mjs';
 import { DUPLICATE_HELPERS, PRODUCT_LITERAL, MAX_LINES, MIGRATION_NUMBER, isSource, globToRegExp } from './rules.mjs';
 import { parseLcov } from './checks/coverage.mjs';
 import { migrationFindings } from './checks/migrations.mjs';
+import { platformHits, measured, run as runPlatformDeps } from './checks/platform-deps.mjs';
 
 const rule = (id) => DUPLICATE_HELPERS.find((r) => r.id === id);
 const hits = (id, text) => findAll(text, rule(id).pattern, rule(id).confirm).length;
@@ -71,6 +72,20 @@ test('helper detectors: real declarations count, comments and look-alikes do not
   assert.equal(hits('html-escape', `${htmlEsc}\n${csvEsc}`), 1);
   assert.equal(hits('secret-derivation', "return config.secrets.api || config.secrets.jwt || 'x';"), 1);
   assert.equal(hits('secret-derivation', 'if (!config.secrets.api || config.secrets.api.length < 24) {}'), 0);
+  assert.equal(hits('express-wrap',
+    "const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);\nrouter.get('/', wrap(h));"), 1);
+  //  هر نامی و هر شکلی از همان پوشاننده؛ `.catch(next)` ِ تنهای یک فراخوانی نه
+  assert.equal(hits('express-wrap', [
+    'const w = (f) => (req, res, next) => Promise.resolve(f(req, res, next)).catch(next);',
+    'const aw = (h) => async (q, s, n) => h(q, s, n).catch(n);',
+    'function asyncHandler(handler) { return function (req, res, next) { return Promise.resolve(handler(req, res, next)).catch(next); }; }',
+    'function ah(h) { return (req, res, next) => { h(req, res, next).catch(next); }; }',
+  ].join('\n')), 4);
+  assert.equal(hits('express-wrap', [
+    "app.get('/store/:slug', (req, res, next) => storePage(req.params.slug, res).catch(next));",
+    '(async () => { await x(); })().catch(next);',
+    'const f = (x) => (a, b, c) => g(x).catch(c);',
+  ].join('\n')), 0);
 });
 
 test("product literals: comparisons and case labels count, plain values do not", () => {
@@ -104,6 +119,67 @@ test('lcov parsing and line counting', () => {
   assert.equal(lineCount(''), 0);
 });
 
+test('platform deps: every forbidden kind counts; comments, Compose and look-alikes do not', () => {
+  const src = [
+    'import android.content.Context',
+    'import androidx.core.content.edit',
+    'import androidx.compose.runtime.Composable',
+    'import java.io.File',
+    'import javax.crypto.Cipher',
+    'import org.json.JSONObject',
+    'fun f(ctx: Context, p: SharedPreferences) {',
+    '  val c = LocalContext.current',
+    '  val t = System.currentTimeMillis()',
+    '  val s = String.format("%d", 1) + "%02d".format(2)',
+    '  synchronized(lock) {}',
+    '}',
+    '@Synchronized fun g() = Foo::class.java.simpleName',
+    '// import java.util.Date',
+    ' * android.graphics در توضیح',
+    'package ir.vil3ntec.tohid.android_like',
+    'val name = item.context ?: myContextual',
+  ].join('\n');
+  assert.deepEqual(platformHits(src), {
+    'android.*': 1, 'androidx (غیرِ Compose)': 1, Context: 2, SharedPreferences: 1, 'java.* / javax.*': 2,
+    'org.json': 1, 'System.currentTimeMillis': 1, 'String.format': 2, synchronized: 2,
+  });
+  assert.deepEqual(platformHits('import kotlinx.coroutines.sync.Mutex\nval now = clock.nowMillis()'), {});
+});
+
+test('platform deps: app and commonMain are measured, boundary folders, tests and jvmMain are not', () => {
+  const app = 'android-native/app/src/main/java/ir/vil3ntec/tohid';
+  assert.ok(measured(`${app}/sale/Cart.kt`));
+  assert.ok(measured(`${app}/ui/screens/DeliveryDesk.kt`));
+  assert.ok(measured('core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/Money.kt'));
+  for (const f of [`${app}/platform/Prefs.kt`, `${app}/data/StoreAndroid.kt`, `${app}/data/Store.desktop.kt`,
+    'core/src/jvmMain/kotlin/ir/vil3ntec/tohid/core/Ulid.kt', 'android-native/app/src/test/java/a/CartTest.kt',
+    'desktop/src/main/kotlin/a/Main.kt']) {
+    assert.equal(measured(f), false, f);
+  }
+});
+
+test('platform deps: a new file is red, an old one may not grow, the boundary and shrinking pass', () => {
+  const app = 'android-native/app/src/main/java/a';
+  const text = {
+    [`${app}/New.kt`]: 'import android.content.Context',
+    [`${app}/Old.kt`]: 'import java.io.File\nimport org.json.JSONObject',
+    [`${app}/Shrunk.kt`]: 'import java.io.File',
+    [`${app}/platform/Prefs.kt`]: 'import android.content.SharedPreferences',
+    [`${app}/Clean.kt`]: 'val x = 1',
+  };
+  const before = { [`${app}/Old.kt`]: 'import java.io.File', [`${app}/Shrunk.kt`]: 'import java.io.File\nimport java.util.Date' };
+  const ctx = {
+    baseline: { platformDeps: { [`${app}/Old.kt`]: 1, [`${app}/Shrunk.kt`]: 2 } },
+    files: Object.keys(text),
+    changed: new Map([[`${app}/New.kt`, null], [`${app}/Old.kt`, `${app}/Old.kt`], [`${app}/platform/Prefs.kt`, null]]),
+    read: (f) => text[f],
+    atBase: (base, fn) => (before[base] == null ? null : fn(before[base])),
+  };
+  const { violations } = runPlatformDeps(ctx);
+  assert.deepEqual(violations.map((v) => [v.file, v.value, v.cap, v.cause]).sort(),
+    [[`${app}/New.kt`, 1, 0, 'introduced'], [`${app}/Old.kt`, 2, 1, 'introduced']]);
+});
+
 test('the committed baseline is well formed', () => {
   const b = JSON.parse(fs.readFileSync(new URL('./baseline.json', import.meta.url), 'utf8'));
   for (const [f, n] of Object.entries(b.fileSize)) assert.ok(Number.isInteger(n) && n > MAX_LINES, f);
@@ -111,4 +187,5 @@ test('the committed baseline is well formed', () => {
   assert.deepEqual(Object.keys(b.duplicateHelpers).sort(), DUPLICATE_HELPERS.map((r) => r.id).sort());
   for (const n of Object.values(b.duplicateHelpers)) assert.ok(Number.isInteger(n) && n >= 0);
   assert.ok(b.frozen['index.html'].lines > 0 && b.frozen['index.html'].bytes > 0);
+  for (const [f, n] of Object.entries(b.platformDeps)) assert.ok(Number.isInteger(n) && n > 0 && measured(f), f);
 });

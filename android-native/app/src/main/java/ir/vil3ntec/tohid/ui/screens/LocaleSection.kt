@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.text.LocaleFormat
@@ -22,7 +23,8 @@ import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05)، زبانِ نامِ ماه‌ها
- *  (LOC-01) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ امروز است: لاتین، دری، «افغانی».
+ *  (LOC-01)، پایانِ روزِ کاری (LOC-03) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ
+ *  امروز است: لاتین، دری، نیمه‌شب، «افغانی».
  *
  *  برچسبِ گزینه‌ها عمداً بی رقم است: وقتی رقمِ فارسی روشن است، فونت هر
  *  «123»ی را «۱۲۳» می‌کشد و نمونهٔ «لاتین» هم فارسی دیده می‌شد.
@@ -84,6 +86,9 @@ fun LocaleSection() {
       selected = calendar,
       onSelect = { LocaleChoice.setCalendar(context, it) },
     )
+    //  LOC-03: پایانِ روزِ کاری — پیش‌فرض نیمه‌شب (هیچ تاریخی جابه‌جا نمی‌شود)
+    Spacer(Modifier.height(14.dp))
+    ShopDayRow(ShopDayChoice.hours) { ShopDayChoice.set(context, it) }
     //  نامِ ماه فقط در فارسی انتخابی است: پشتو همیشه وری، غویی… و انگلیسی Hamal, Sawr…
     Spacer(Modifier.height(14.dp))
     Text(

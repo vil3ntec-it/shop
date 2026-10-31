@@ -309,6 +309,8 @@ private fun GoldBadge(text: String) {
  */
 @Composable
 fun VipScreen(onDismiss: () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { VipScreenLegacy(onDismiss); return }
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val signedIn = !state.accessToken.isNullOrBlank()
@@ -1361,6 +1363,8 @@ private fun PlanCard(
 
 @Composable
 fun VipGate(label: String, content: @Composable () -> Unit) {
+  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
+  if (!ir.vil3ntec.tohid.ui.UiV3.on) { VipGateLegacy(label, content); return }
   val context = LocalContext.current
   val state = remember { SyncStore(context) }
   val enforcing = LOCKING && AppConfig.isConfigured(context)

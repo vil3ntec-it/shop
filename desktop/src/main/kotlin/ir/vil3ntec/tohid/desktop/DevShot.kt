@@ -12,9 +12,15 @@ import javax.imageio.ImageIO
  *  هر چند ثانیه از پنجره عکس می‌گیرد (`shot-1.png`، …) تا برنامهٔ
  *  واقعی روی یک نمایشگرِ مجازی (Xvfb در CI) دیده و سنجیده شود. در
  *  نسخهٔ دستِ کاربر این ویژگی تنظیم نمی‌شود و هیچ کاری نمی‌کند.
+ *
+ *  ⛔ SEC-CLI (۱۴۰۵/۰۸/۰۹): فقط در ساختِ `-Pdev=true` (`BuildConfig.DEBUG`، همان که
+ *  `desktop-shots.yml` می‌سازد). تا ۲.۱۴.۵ در نسخهٔ انتشار هم با یک `-Dtohid.shot…` (مثلاً از
+ *  `JAVA_TOOL_OPTIONS`) روشن می‌شد — با `typecmd` که فرمانِ پوسته اجرا می‌کند و `click`/`type`
+ *  که روی برنامه کار می‌کنند؛ ابزارِ آزمون در دستِ کاربر نمی‌ماند.
  */
 object DevShot {
   fun start() {
+    if (!ir.vil3ntec.tohid.BuildConfig.DEBUG) return
     val dir = System.getProperty("tohid.shot")?.takeIf { it.isNotBlank() }?.let(::File) ?: return
     val every = System.getProperty("tohid.shot.every")?.toLongOrNull() ?: 4000
     val count = System.getProperty("tohid.shot.count")?.toIntOrNull() ?: 3
@@ -99,10 +105,11 @@ object DevShot {
               }
               "shot" -> shot(arg)
               //  پیش‌نمایشِ گوشیِ ۳۹۰×۸۴۴ (`PhonePreview`): phone:nav|nav-dark|off — و عکس فقط از همان پنجره
-              "phone" -> { java.awt.EventQueue.invokeAndWait { PhonePreview.screen.value = arg.takeIf { it.isNotBlank() && it != "off" } }; Thread.sleep(1800) }
+              //  پیش‌نمایشِ گوشی و عکس‌های گروه رابطِ نسخهٔ ۳ را نشان می‌دهند ⇐ پرچمِ `UiV3` فقط در همین اجرا روشن (بی ذخیره)
+              "phone" -> { java.awt.EventQueue.invokeAndWait { val s = arg.takeIf { it.isNotBlank() && it != "off" }; if (s != null) ir.vil3ntec.tohid.ui.UiV3.preview(true); PhonePreview.screen.value = s }; Thread.sleep(1800) }
               //  عکس‌های گروه‌ها: groupshots:<گروه|all|گروه,گروه> ⇒ هر حالت روشن/تیره × فارسی/انگلیسی در
               //  <پوشه>/<گروه>/؛ پایانِ هر گروه با نشانِ `.done` (شمارِ عکس‌ها) تا CI گروهِ نیمه‌کاره را قرمز کند
-              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg)) {
+              "groupshots" -> for (g in ir.vil3ntec.tohid.desktop.shots.ShotRegistry.of(arg).also { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.UiV3.preview(true) } }) {
                 val out = File(dir, g.group).apply { mkdirs() }
                 var saved = 0
                 for (s in g.shots) for (dark in listOf(false, true)) for (en in listOf(false, true)) {
