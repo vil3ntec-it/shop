@@ -356,7 +356,9 @@ private fun PromoEditor(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val c = Shop.colors
-  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule).let { if (isNew) it.copy(name = "") else it }) }
+  //  PRM-02: «سقفِ مصرف» فقط وقتی سرور مصرف را می‌شمارد (پرچمِ `redeem`)
+  val counted = PromoLive.snap.value.redeem
+  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule, uses = counted).let { if (isNew) it.copy(name = "") else it }) }
   var error by remember { mutableStateOf("") }
   var saving by remember { mutableStateOf(false) }
   val categories = remember(d.products) { d.products.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
@@ -478,6 +480,14 @@ private fun PromoEditor(
         TextIn("کدِ تخفیف (اختیاری)", f.code, Modifier.weight(2f)) { f = f.copy(code = it) }
       }
       Hint("بی کد ⇐ خودکار. کد را صندوقدار در سبد می‌زند؛ کدِ هر قاعده در این دکان یکتاست.")
+      val cap = f.maxUses
+      if (cap != null && f.code.isNotBlank()) {
+        NumField("سقفِ مصرفِ کد (خالی = بی سقف)", cap) { f = f.copy(maxUses = it) }
+        Hint(
+          "سرور هر مصرف را می‌شمارد؛ کدِ سقف‌دار فقط با اینترنت در صندوق پذیرفته می‌شود." +
+            if (rule.uses > 0) " تا امروز ${rule.uses} بار مصرف شده." else "",
+        )
+      }
 
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = f.active, onCheckedChange = { f = f.copy(active = it) })

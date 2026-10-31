@@ -365,7 +365,7 @@
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
-| `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | این PR | باز |
+| `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند (`PromoLive.redeemGate`)؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | #450 (سرور)، برنامه در PRِ پشتِ آن | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`

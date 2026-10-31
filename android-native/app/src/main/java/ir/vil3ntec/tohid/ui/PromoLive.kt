@@ -287,6 +287,31 @@ object PromoLive {
     )
   }
 
+  /**
+   *  PRM-02 — پیش از ساختنِ فاکتور (`CartStore.post`، زیرِ قفلِ ثبت): کدهای اعمال‌شدهٔ سقف‌دار از سرور
+   *  گرفته می‌شوند. `null` ⇒ ثبت؛ پیام ⇒ ثبت نه و سبد سرِ جایش.
+   *  ⛔ پرچمِ `redeem` خاموش، کلیدِ دکان خاموش (`outcome == null`) یا بی کدِ سقف‌دار ⇒ هیچ پرسشی، همان امروز.
+   *  ⛔ بی پاسخِ سرور کدِ سقف‌دار پذیرفته نمی‌شود (`PromoRedeem.decide`)؛ کلیدِ همین سبد ⇒ زدنِ دوباره بی‌خطر.
+   */
+  suspend fun redeemGate(context: Context, saleKey: String, outcome: PromoEngine.Outcome?): String? {
+    if (isDemo || outcome == null) return null
+    val s = PromoEngine.forAccount(snap.value, account(context))
+    if (!s.redeem) return null
+    val codes = ir.vil3ntec.tohid.core.promo.PromoRedeem.capped(s.rules, outcome.codes)
+    if (codes.isEmpty()) return null
+    val offline = ir.vil3ntec.tohid.core.i18n.StrPos.couponNeedsOnline(codes.joinToString("، "))
+    if (!Backend.isReady(context)) return offline
+    val r = repository(context).redeem(saleKey, codes)
+    val f = (r as? ApiResult.Failure)?.error
+    return when (ir.vil3ntec.tohid.core.promo.PromoRedeem.decide(f == null, f?.status ?: 0, f?.code.orEmpty())) {
+      //  شمارِ مصرف عوض شد ⇒ تازه‌سازیِ بعدیِ `Host` زودتر (کمتر از یک دقیقه)
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.GO -> { bound.triedAt = 0L; null }
+      //  ظرفیتِ پر/کدِ خاموش ⇒ حالِ تازه تا سبد «تمام شد» را نشان دهد؛ پیامِ خودِ سرور (نام و دلیلِ کد)
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.REJECTED -> { refresh(context); f?.userMessage ?: offline }
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.UNREACHABLE -> offline
+    }
+  }
+
   /** کدهای سبد ⇒ حافظه و پیش‌نویسِ فاکتور (N3) */
   fun setCoupons(codes: List<String>) {
     //  وسطِ جابه‌جاییِ فاکتور (POS-12) سبد قفل است ⇒ کد هم نمی‌نشیند
