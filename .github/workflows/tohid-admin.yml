@@ -2,7 +2,8 @@ name: توحید مدیریت
 
 on:
   push:
-    branches: ['claude/**', main]
+    #  شاخه‌های claude/** فقط از راهِ PR سنجیده می‌شوند (اجرای دوتایی صفِ Actions را چند ساعت عقب انداخت)
+    branches: [main]
     paths:
       - 'admin-android/**'
       - '.github/workflows/tohid-admin.yml'

@@ -24,10 +24,9 @@ const { badRequest, forbidden } = require('../middleware/errors');
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('stock.view'));
 
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const needFlag = wrap(async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); });
+const needFlag = async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); };
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   res.json({
     enabled: await stock.flagOf(req.shopId),
     settings: await stock.settingsOf(req.shopId),
@@ -40,16 +39,16 @@ router.get('/config', wrap(async (req, res) => {
       settings: can(req.role, 'settings.write'),
     },
   });
-}));
+});
 
-router.put('/settings', needFlag, requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/settings', needFlag, requirePermission('settings.write'), async (req, res) => {
   const settings = await stock.saveSettings(req.shopId, req.body, req.user.id, now());
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'stock.settings', targetType: 'catalog_settings',
     targetId: req.shopId, detail: settings, ip: clientIp(req),
   });
   res.json({ settings });
-}));
+});
 
 /**
  * خواندنِ دوبارهٔ دفترِ دستگاه همین حالا (`full: true` ⇒ از اول؛ بی‌خطر چون فقط تفاوت نوشته می‌شود).
@@ -57,54 +56,54 @@ router.put('/settings', needFlag, requirePermission('settings.write'), wrap(asyn
  * ⇒ فقط مالک و مدیر (QA #263). خواندنِ تفاوت همان `stock.move` می‌ماند.
  */
 const FULL_REFRESH_ROLES = new Set(['owner', 'manager']);
-router.post('/refresh', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
+router.post('/refresh', needFlag, requirePermission('stock.move'), async (req, res) => {
   const full = req.body?.full === true;
   if (full && !FULL_REFRESH_ROLES.has(req.role)) {
     throw forbidden('خواندنِ کاملِ دفتر فقط برای مالک و مدیر است', 'full_refresh_forbidden');
   }
   res.json(await catalog.refresh(req.shopId, { full }));
-}));
+});
 
-router.get('/products', needFlag, wrap(async (req, res) => {
+router.get('/products', needFlag, async (req, res) => {
   res.json(await catalog.list(req.shopId, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit }));
-}));
+});
 
-router.get('/products/:id', needFlag, wrap(async (req, res) => {
+router.get('/products/:id', needFlag, async (req, res) => {
   res.json(await catalog.detail(req.shopId, req.params.id));
-}));
+});
 
-router.put('/products/:id/low', needFlag, requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/products/:id/low', needFlag, requirePermission('settings.write'), async (req, res) => {
   res.json(await catalog.setLow(req.shopId, req.params.id, req.body));
-}));
+});
 
-router.get('/moves', needFlag, wrap(async (req, res) => {
+router.get('/moves', needFlag, async (req, res) => {
   res.json(await catalog.moves(req.shopId, {
     productId: req.query.productId, cursor: req.query.cursor, limit: req.query.limit,
   }));
-}));
+});
 
-router.get('/report', needFlag, requirePermission('reports.view'), wrap(async (req, res) => {
+router.get('/report', needFlag, requirePermission('reports.view'), async (req, res) => {
   res.json(await stock.reconcile(req.shopId, { productId: String(req.query.productId || '') }));
-}));
+});
 
-router.get('/tasks', needFlag, wrap(async (req, res) => {
+router.get('/tasks', needFlag, async (req, res) => {
   res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit }) });
-}));
+});
 
-router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), wrap(async (req, res) => {
+router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const out = await catalog.resolveTask(req.shopId, req.params.id, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'stock.task', targetType: 'stock_task',
     targetId: out.id, detail: { status: out.status }, ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
 /**
  * حرکتِ دستی: transfer (stock.move)؛ damage، writeoff، return، adjust، count
  * (stock.adjust، با دلیل). کلیدِ یکتایی: سرآیندِ `Idempotency-Key`.
  */
-router.post('/moves', needFlag, wrap(async (req, res) => {
+router.post('/moves', needFlag, async (req, res) => {
   const spec = catalog.MANUAL[String(req.body?.kind || '')];
   if (!spec) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
   if (!can(req.role, spec.permission)) throw forbidden('این کار در حد دسترسی شما نیست', 'permission_denied');
@@ -125,6 +124,6 @@ router.post('/moves', needFlag, wrap(async (req, res) => {
     });
   }
   res.status(out.unchanged ? 200 : 201).json(out);
-}));
+});
 
 module.exports = router;
