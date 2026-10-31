@@ -96,6 +96,10 @@ val replaced = listOf(
   //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
   "scan/GuidedCapture.kt",
   "data/FileName.kt",
+  //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
+  //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
+  "pay/platform/PayDevice.kt",
+  "pay/platform/HesabPayHceService.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")
