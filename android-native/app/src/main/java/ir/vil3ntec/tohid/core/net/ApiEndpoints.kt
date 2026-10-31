@@ -114,6 +114,9 @@ object ApiEndpoints {
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
 
+    /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
+    const val PHONE_CODE = "/me/phone/code"
+
     /**
      *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.
      *
