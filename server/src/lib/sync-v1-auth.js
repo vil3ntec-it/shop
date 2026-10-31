@@ -14,7 +14,7 @@
  * ناجورش `403 app_mismatch` است، نه یک دفترِ اشتباه.
  */
 const tokens = require('./tokens');
-const { one } = require('../db');
+const { one, many, now } = require('../db');
 const { sectionOf } = require('./tenancy');
 const { can } = require('./permissions');
 const { unauthorized, forbidden } = require('../middleware/errors');
@@ -37,17 +37,21 @@ async function resolveToken(token) {
   if (row) {
     const user = await one('SELECT id, status FROM users WHERE id=$1', [row.subject_id]);
     if (!user || user.status !== 'active') return null;
+    //  SEC-AUTH-14: دستگاهی که این نشست با آن ساخته شد — شناسهٔ دستگاهِ همگام‌سازی باید همین باشد
+    let deviceUid = '';
     if (row.device_id) {
-      const dev = await one('SELECT status FROM devices WHERE id=$1', [row.device_id]);
+      const dev = await one('SELECT status, device_uid FROM devices WHERE id=$1', [row.device_id]);
       if (!dev || dev.status !== 'active') return null;
+      deviceUid = String(dev.device_uid || '');
     }
+    const ctxBase = { deviceUid };
     const app = row.app || 'shop';
     if (app === 'pump') {
       const m = await require('./stations').membershipOf(user.id);
       if (!m) return { app, accountKind: 'station', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_station' };
       return {
         app, accountKind: 'station', accountId: m.station_id, accountName: m.station_name || '',
-        userId: user.id, role: m.role, via: 'user',
+        userId: user.id, role: m.role, via: 'user', ...ctxBase,
       };
     }
     //  ⛔ DLV-01 (§۳.۱۱): توکنِ پیک — یا عضوی که نقشش پیک است — به دفترِ دکان
@@ -66,7 +70,7 @@ async function resolveToken(token) {
     if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
     return {
       app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
-      userId: user.id, role: m.role, via: 'user',
+      userId: user.id, role: m.role, via: 'user', ...ctxBase,
     };
   }
 
@@ -113,12 +117,105 @@ async function requireSyncAccount(req, res, next) {
     if (claimed && claimed !== ctx.app) {
       return next(forbidden('این نشست مالِ بخشِ دیگری است', 'app_mismatch'));
     }
+    const wrongDevice = await checkDevice(req, ctx);
+    if (wrongDevice) return next(wrongDevice);
     req.sync = ctx;
     req.appSection = ctx.app;
     if (ctx.accountKind === 'shop') { req.shopId = ctx.accountId; req.role = ctx.role; }
     else req.stationId = ctx.accountId;
     next();
   } catch (err) { next(err); }
+}
+
+/*
+ *  ── SEC-AUTH-14: شناسهٔ دستگاهِ همگام‌سازی از آنِ همین نشست است ────────────────
+ *
+ *  `device_id`ِ push/pull/status/عکس (و v3) را کلاینت می‌فرستد و سرور تا ۲.۱۴.۴ آن را
+ *  بی سنجش می‌پذیرفت. چند تصمیم به همین شناسه بسته است: «حذف فقط ردیفی که خودِ همین
+ *  دستگاه ساخته» (`sync-v1.authorizeOp`، `data.delete.own`ِ شاگرد)، مکانِ دفترِ هر دستگاه
+ *  (`sync_devices`) و سرِ زنجیرهٔ اسنادِ هر دستگاه (#541). شاگردی که شناسهٔ دستگاهِ صاحب را
+ *  از `GET /status` برمی‌داشت، با فرستادنِ همان ردیف‌های صاحب را پاک می‌کرد.
+ *
+ *  حالا: توکنی که با دستگاهِ ثبت‌شده ساخته شده (`tokens.device_id` ⇐ `devices.device_uid`،
+ *  همان `SyncStore.deviceUid` که برنامه هنگامِ ورود هم می‌فرستد) یا توکنِ کامپیوترِ پمپ
+ *  (`station_devices.device_uid`) فقط با **همان** شناسه همگام می‌شود. هر شناسهٔ دیگری در
+ *  بدنه، querystring یا `X-Device`:
+ *    • پرچمِ `sync.device_bind` (live_config، `all` یا شناسهٔ دکان/پمپ) روشن ⇒ `403 device_mismatch`
+ *    • خاموش (پیش‌فرض) ⇒ فقط ثبت (یک ردیفِ سابقهٔ `sync.device_mismatch` در روز برای هر
+ *      دستگاهِ ادعاشده + هشدار در لاگ) تا صاحبِ سامانه پیش از روشن کردن ببیند برنامه‌ای می‌شکند یا نه.
+ *  نشستِ بی دستگاه (نسخه‌های کهنه‌ای که هنگامِ ورود شناسه نفرستادند) «بسته» نیست؛ با پرچمِ روشن
+ *  فقط شناسه‌ای که مالِ **کاربرِ دیگری** ثبت شده رد می‌شود.
+ */
+const DEVICE_FLAG = 'sync.device_bind';
+const DEVICE_MISMATCH = 'این شناسهٔ دستگاه مالِ این نشست نیست. از برنامه خارج و دوباره وارد شوید.';
+
+/** همهٔ شناسه‌هایی که درخواست برای «دستگاهِ من» آورده — هر مسیر یکی از این‌ها را می‌خواند. */
+function claimedDevices(req) {
+  const b = req.body && typeof req.body === 'object' && !Buffer.isBuffer(req.body) ? req.body : {};
+  const q = req.query || {};
+  const out = [];
+  for (const v of [b.device_id, b.deviceId, q.device_id, q.deviceId, req.headers?.['x-device']]) {
+    const s = typeof v === 'string' ? v.trim().slice(0, 64) : '';
+    if (s && !out.includes(s)) out.push(s);
+  }
+  return out;
+}
+
+function decodeFlag(text) {
+  try { return JSON.parse(text); } catch { return undefined; }
+}
+
+/** پرچمِ حساب بر `all` جلو می‌افتد؛ فقط `true` روشن است (همان قاعدهٔ پرچم‌های دکان). */
+async function bindEnforced(ctx) {
+  const rows = await many(
+    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
+    [DEVICE_FLAG, 'all', String(ctx.accountId || '')]
+  );
+  let v;
+  for (const r of rows) if (r.scope === 'all') v = decodeFlag(r.value);
+  for (const r of rows) if (r.scope !== 'all') v = decodeFlag(r.value);
+  return v === true;
+}
+
+const warned = new Map();
+async function noteMismatch(req, ctx, claimed, enforced) {
+  const key = `${ctx.accountId}|${ctx.deviceUid}|${claimed}`;
+  const t = Date.now();
+  if (!(warned.get(key) > t)) {
+    if (warned.size > 5000) warned.clear();
+    warned.set(key, t + 3_600_000);
+    console.warn(`[sync] شناسهٔ دستگاهِ ناجور ${enforced ? '(رد شد)' : '(فقط ثبت؛ پرچمِ sync.device_bind خاموش)'}: ` +
+      `account=${ctx.accountId} bound=${ctx.deviceUid || '-'} claimed=${claimed} path=${String(req.originalUrl || '').split('?')[0]}`);
+  }
+  await require('./audit').log({
+    shopId: ctx.accountKind === 'shop' ? ctx.accountId : '', actorType: ctx.via === 'device' ? 'system' : 'user',
+    userId: ctx.userId || '', action: 'sync.device_mismatch', targetType: 'device', targetId: claimed,
+    detail: { bound: ctx.deviceUid || '', enforced, app: ctx.app, account: ctx.accountId },
+    once: true, onceSince: now() - 86_400_000,
+  }).catch(() => {});
+}
+
+/** خطای ۴۰۳ اگر باید رد شود؛ وگرنه null (با ثبت در حالتِ «فقط ثبت»). */
+async function checkDevice(req, ctx) {
+  const claims = claimedDevices(req);
+  if (!claims.length) return null;
+  if (ctx.deviceUid) {
+    const other = claims.find((c) => c !== ctx.deviceUid);
+    if (!other) return null;
+    const enforced = await bindEnforced(ctx);
+    await noteMismatch(req, ctx, other, enforced);
+    return enforced ? forbidden(DEVICE_MISMATCH, 'device_mismatch') : null;
+  }
+  //  نشستِ بی دستگاه: فقط با پرچمِ روشن، و فقط شناسه‌ای که دستگاهِ ثبت‌شدهٔ کاربرِ دیگری است
+  if (!ctx.userId || !(await bindEnforced(ctx))) return null;
+  for (const c of claims) {
+    const taken = await one('SELECT 1 AS x FROM devices WHERE device_uid=$1 AND user_id<>$2 LIMIT 1', [c, ctx.userId]);
+    if (taken) {
+      await noteMismatch(req, ctx, c, true);
+      return forbidden(DEVICE_MISMATCH, 'device_mismatch');
+    }
+  }
+  return null;
 }
 
 /**
@@ -149,4 +246,4 @@ function requireSyncWrite(req, res, next) {
   })().catch(next);
 }
 
-module.exports = { resolveToken, requireSyncAccount, requireSyncWrite, tokenOf, appAlias };
+module.exports = { resolveToken, requireSyncAccount, requireSyncWrite, tokenOf, appAlias, claimedDevices, checkDevice, DEVICE_FLAG };
