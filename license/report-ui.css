@@ -61,3 +61,5 @@ p .rf-pill,.rf-note .rf-pill{cursor:default;}
   .rf-seg button{min-height:44px;}
   .rf-kpi .v,.rf-stat .v{font-size:17px;}
 }
+.rf-alerts{border:1px solid var(--danger); border-radius:12px; padding:10px 12px; margin:0 0 12px;}
+.rf-alerts ul{margin:0; padding-inline-start:18px; font-size:13px;}
