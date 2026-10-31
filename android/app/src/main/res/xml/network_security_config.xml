@@ -1,15 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  سرور خانگی ممکن است http ساده روی IP محلی باشد.
-  https همیشه مجاز است؛ http فقط وقتی کاربر خودش آدرس http بدهد.
-  برای دسترسی از بیرون شبکه، https توصیه می‌شود (با هر روشی که دارید:
-  گواهی روی خود سرور، Nginx، یا هر تونل امن).
+  فقط HTTPS، و فقط گواهی‌های خودِ سیستم (هم‌تراز با
+  `android-native/app/src/main/res/xml/network_security.xml`).
+
+  تا ۲.۱۴.۵ این‌جا `cleartextTrafficPermitted="true"` و گواهی‌های «کاربر»
+  باز بود، به این امید که سرورِ خانگیِ بی https روی IP ِ محلی کار کند.
+  ولی این برنامه به چنین سروری نمی‌رسد و نمی‌تواند برسد:
+    • صفحه از `https://appassets.androidplatform.net` بار می‌شود، و WebView
+      از صفحهٔ https درخواستِ `http://`/`ws://` را «محتوای مختلط» می‌داند و
+      می‌بندد (`mixedContentMode` در MainActivity عوض نشده است)؛
+    • CSP ِ `index.html` در `connect-src` فقط `'self'` و
+      `https://api.vill3n.top` / `wss://api.vill3n.top` را می‌پذیرد؛
+    • ورود با نشانی و رمزِ دستیِ سرور از F0-20 برداشته شده است؛
+    • تنها درخواستِ بومی (به‌روزرسانی) به `https://api.github.com` است.
+  پس باز بودنِ http فقط راهِ شنود بود، نه قابلیتی که کسی به کارش ببرد.
+  گواهی‌های کاربر هم یعنی هر کسی که یک CA روی گوشی نصب کند (یا بقبولاند)
+  توکنِ ورود را روی همان وای‌فای می‌خواند.
+
+  نسخهٔ آزمایشی (debug) پروندهٔ خودش را در `src/debug` دارد.
 -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
-            <certificates src="user" />
         </trust-anchors>
     </base-config>
 </network-security-config>
