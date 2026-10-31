@@ -10,7 +10,7 @@ package ir.vil3ntec.tohid.core.hw
  *      و از کاربر پرسیده می‌شود (`needsUser`).
  *    • **چاپِ دوباره هرگز فروش نمی‌سازد**: کارِ صف فقط شناسهٔ فروش و
  *      بایت‌های آماده را دارد؛ صف به دفتر دست نمی‌زند.
- *    • رسیدِ خودکارِ یک فروش دو بار در صف نمی‌نشیند.
+ *    • رسیدِ خودکارِ یک فروش دو بار در صف نمی‌نشیند — هر **نسخه** (`Job.copy`، POS-35) یک بار.
  *    • **کشو هرگز در صف نمی‌نشیند** (HW-03): ضربهٔ کشو «همین حالا یا هرگز»
  *      است — نه در صف، نه در فایل، نه تلاشِ دوباره. وگرنه تلاشِ دوباره یا
  *      بازگشتِ صف پس از بسته شدنِ برنامه کشو را بی فروش باز می‌کرد.
@@ -53,6 +53,8 @@ class PrintQueue(
     val restored: Boolean = false,
     /** فرستادنش دستِ‌کم یک بار آغاز شد (`begin`) — ذخیره می‌شود، پیش از فرستادن */
     val started: Boolean = false,
+    /** شمارهٔ نسخهٔ رسیدِ خودکار، از ۱ (POS-35، `ReceiptCopies`) — هر نسخه کارِ جدا */
+    val copy: Int = 1,
   ) {
     /** این تلاش نسخهٔ «چاپِ دوباره» را می‌برد: رسیدی که پیش‌تر تلاش شده، یا پیش از بسته شدنِ برنامه نیمه‌راه ماند */
     val needsCopyMark: Boolean get() = kind == Kind.RECEIPT && (attempts > 0 || (restored && started))
@@ -77,12 +79,12 @@ class PrintQueue(
   val size: Int get() = jobs.size
   fun all(): List<Job> = jobs.toList()
 
-  /** @return `false` اگر همین رسیدِ خودکار از پیش در صف باشد */
+  /** @return `false` اگر همین نسخهٔ همین رسیدِ خودکار از پیش در صف باشد */
   fun enqueue(job: Job): Boolean {
     require(job.kind != Kind.DRAWER) { "کشو در صف نمی‌رود — همین حالا یا هرگز" }
     require(job.kind != Kind.REPRINT || job.reason.isNotBlank()) { "چاپِ دوباره دلیل می‌خواهد" }
     if (job.kind == Kind.RECEIPT && job.saleId != null &&
-      jobs.any { it.kind == Kind.RECEIPT && it.saleId == job.saleId }
+      jobs.any { it.kind == Kind.RECEIPT && it.saleId == job.saleId && it.copy == job.copy }
     ) return false
     jobs += job
     return true
