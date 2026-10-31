@@ -191,7 +191,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

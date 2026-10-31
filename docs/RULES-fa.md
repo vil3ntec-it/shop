@@ -430,6 +430,7 @@
 | `shop.storefront.notify_area` | دکان / `all` | خاموش | «خبرم کن» ِ بیرونِ محدوده (CHK-10)، فقط روی `shop.storefront.zones`: `POST`/`DELETE /api/store/:slug/area-request` (خاموش ⇒ همان پاسخِ درِ ناشناخته)، `GET /api/shop/storefront/area-requests` و `POST …/:id/notified` (خاموش ⇒ ۴۰۳ `notify_area_disabled`)، و `notifyArea` در «کجا؟» | `claude/part-chk-2` | باز |
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
+| `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
@@ -445,6 +446,7 @@
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۹ (پرداختِ حساب‌پی `payment_intents`/`payment_events`، PAY-21، `claude/payments-hesabpay-1`). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۲ (S5 نمای پیک برای مشتری، `claude/market-s5-courier-view`؛ نخست ۱۲۴ بود و به سهمِ هماهنگ‌کننده جابه‌جا شد، چون ۱۲۴ از آنِ `claude/market-s7-s8-load` است). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 - ۱۷۶: «خبرم کن» ِ بیرونِ محدوده `storefront_area_requests` (CHK-10، `claude/part-chk-2`)؛ ۱۷۴ از آنِ `claude/part-chk-1` (#628) و ۱۷۵ از آنِ `claude/new-rpt-2` است.
+- ۱۸۰ (`180_staff_time.sql`: `staff_punches` و `shop_commission_plans`، STF-07/STF-08، `claude/new-stf-2`؛ ۱۴۰۵/۰۸/۱۰ روی main و همهٔ شاخه‌های باز تا ۱۷۹ گرفته بود).
 
 ### v3 · تعارض‌های حل‌شده
 

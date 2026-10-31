@@ -55,11 +55,14 @@ const FREE = [
   ['پرداختِ حساب‌پی (PAY-21) کلیدِ کاتالوگ ندارد، فقط پرچمِ pay.hesabpay؛ پرداختِ سفارشِ آنلاین اشتراکِ فعال را خودش می‌سنجد '
     + '(online_payment_unavailable)', [
     'POST /shop/payments/intents', 'POST /shop/payments/intents/:id/cancel']],
+  ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
+    + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
+    'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
   'shop.storefront.notify_area',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
