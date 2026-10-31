@@ -141,6 +141,34 @@ test('stamp = پرچمِ shop.promo_stamp ِ live_config — پیش‌فرض خ�
   assert.equal((await h.get('/api/shop/promos', { token: b.staff })).body.stamp, false);
 });
 
+test('POS-19: پلهٔ قیمتِ ثابت فقط با پرچمِ shop.promo_tier_price، مالِ همان دکان؛ پلهٔ درصدی بی پرچم', async () => {
+  const a = await shopWithTeam('پله');
+  const b = await shopWithTeam('پلهٔ دوم');
+  const rule = { name: 'عمده', kind: 'tiers', tiers: [{ min: 3000, unitMinor: 9000 }, { min: 6000, unitMinor: 8000 }] };
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.tierPrice, false);
+  const off = await h.put('/api/shop/promos/rules/tp', { rule }, { token: a.owner });
+  assert.equal(off.status, 403, JSON.stringify(off.body));
+  assert.equal(off.body.error.code, 'tier_price_disabled');
+  assert.deepEqual((await h.get('/api/shop/promos', { token: a.owner })).body.rules, []);
+  //  پلهٔ درصدی همان امروز است و `unitMinor` در دادهٔ ذخیره‌شده‌اش نمی‌نشیند
+  const pct = await h.put('/api/shop/promos/rules/tb', { rule: { name: 'درصدی', kind: 'tiers', tiers: [{ min: 3000, bp: 500 }] } }, { token: a.owner });
+  assert.equal(pct.status, 200, JSON.stringify(pct.body));
+  assert.deepEqual(pct.body.rule.tiers, [{ min: 3000, bp: 500, amountMinor: 0 }]);
+
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.promo_tier_price','true',1)", [a.shopId]);
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.tierPrice, true);
+  const on = await h.put('/api/shop/promos/rules/tp', { rule }, { token: a.owner });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.deepEqual(on.body.rule.tiers, [{ min: 3000, bp: 0, amountMinor: 0, unitMinor: 9000 }, { min: 6000, bp: 0, amountMinor: 0, unitMinor: 8000 }]);
+  //  قیمتِ پلهٔ بالاتر باید کمتر باشد — همان اعتبارسنجیِ هسته
+  const up = await h.put('/api/shop/promos/rules/tq', { rule: { ...rule, tiers: [{ min: 3000, unitMinor: 9000 }, { min: 6000, unitMinor: 9500 }] } }, { token: a.owner });
+  assert.equal(up.status, 400);
+  assert.deepEqual(up.body.error.fields, ['tiers']);
+  //  دکانِ دیگر پرچم ندارد
+  assert.equal((await h.put('/api/shop/promos/rules/tp', { rule }, { token: b.owner })).status, 403);
+  assert.equal((await h.get('/api/shop/promos', { token: b.staff })).body.tierPrice, false);
+});
+
 test('«زیرِ بهای خرید» فقط با صاحب', async () => {
   const t = await shopWithTeam('پ');
   const rule = { ...P10, allowBelowCost: true };

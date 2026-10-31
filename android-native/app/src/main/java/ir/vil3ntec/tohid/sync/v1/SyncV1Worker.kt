@@ -79,6 +79,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     //  F0-03: «سری سند»ِ این دستگاه — یک بار، هنگامِ پیوستن؛ شکستش بی‌صداست
     runCatching { ir.vil3ntec.tohid.sync.DocSeries.ensure(app) }
+    //  SEC-02: زنجیرهٔ هشِ اسنادِ همین سری (پرچمِ خاموشِ shop.doc_chain ⇒ فقط پرسشِ پرچم؛ شکستش بی‌صدا)
+    runCatching { ir.vil3ntec.tohid.sync.platform.DocChainSync.cycle(app, store.data.value) }
 
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
     runCatching {
