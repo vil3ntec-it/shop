@@ -48,9 +48,13 @@ async function resetDatabase() {
   await migrate.run();
 }
 
-async function start() {
+/**
+ * `reset: false` همان دیتابیسِ موجود را برمی‌دارد (بی پاک کردن) — برای آزمونی که دیتابیس را
+ * فرآیندِ دیگری ساخته است (`crash-kill.test.js`: سرورِ کشته‌شده، سپس بازگشتِ سرورِ تازه).
+ */
+async function start({ reset = true } = {}) {
   if (server) return base;
-  await resetDatabase();
+  if (reset) await resetDatabase();
   const app = await createApp({ runMigrations: false });
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', resolve);
