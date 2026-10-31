@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.credit.CreditGate
+import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
@@ -100,6 +102,13 @@ object SalesEngine {
      *  `paidAmount`. با آن، `payment` و `paidAmount` نادیده گرفته می‌شوند.
      */
     val settlement: ir.vil3ntec.tohid.core.pay.Settlement? = null,
+    /**
+     *  CRM-03 / S07 — سقفِ اعتبار در صندوق، فقط با تنظیمِ خاموشِ دکان (`ShopPolicy.creditGate`).
+     *  `false` (پیش‌فرض) ⇒ همان رفتارِ همیشه: فروشِ نسیه سقف را نمی‌سنجد.
+     */
+    val creditGate: Boolean = false,
+    /** تأییدِ مدیر/صاحب برای بردِ بیش از سقف (`CreditGate.Approval`)؛ فقط همین مشتری و تا همین مبلغ */
+    val creditApproval: CreditGate.Approval? = null,
   )
 
   data class Totals(
@@ -365,6 +374,18 @@ object SalesEngine {
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
     val onCredit = credit && remaining > 0
 
+    //  CRM-03 / S07: بردِ بیش از سقفِ مشتری بی تأییدِ مدیر ثبت نمی‌شود (هیچ چیز نوشته نمی‌شود)؛
+    //  با تأیید، ردِ `credit_over_limit` با نامِ تأییدکننده و دلیل کنارِ فروش
+    var creditOk: Pair<CreditGate.Over, CreditGate.Approval>? = null
+    if (checkout.creditGate && onCredit && debtorId != null) {
+      val over = creditOverOf(d, debtorId, remaining)
+      when (CreditGate.state(over, debtorId, checkout.creditApproval)) {
+        CreditGate.State.FREE -> Unit
+        CreditGate.State.NEEDS_APPROVAL -> return Result.Failed(creditOverText(over!!) + " — " + CREDIT_NEEDS_APPROVAL)
+        CreditGate.State.APPROVED -> creditOk = over!! to checkout.creditApproval!!
+      }
+    }
+
     val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
     val invoiceNumber = d.nextInvoiceNo
 
@@ -472,6 +493,23 @@ object SalesEngine {
       refId = saleId,
       notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(t.finalTotal)} افغانی",
       createdAt = now,
+    ) + listOfNotNull(
+      creditOk?.let { (over, ok) ->
+        val who = d.debtors.find { it.id == debtorId }?.name.orEmpty()
+        AuditEntry(
+          id = newId(),
+          type = "credit_over_limit",
+          date = today,
+          refId = saleId,
+          notes = "فروشِ نسیهٔ فاکتور #${sale.invoiceLabel()} برای «$who» بیش از سقف — ${creditOverText(over)}" +
+            " — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",
+          createdAt = now,
+          amount = over.excessMinor.toDouble() / DebtBook.CURRENCY.minorPerMajor,
+          by = checkout.seller.trim().ifEmpty { null },
+          approvedBy = ok.by.trim(),
+          reason = ok.reason.trim(),
+        )
+      },
     )
 
     return Result.Ok(
@@ -486,6 +524,41 @@ object SalesEngine {
       invoiceNumber = invoiceNumber,
       saleId = saleId,
     )
+  }
+
+  /* ========================= سقفِ اعتبار در صندوق (CRM-03) ========================= */
+
+  const val CREDIT_NEEDS_APPROVAL = "تأییدِ مدیر لازم است"
+
+  /** بردِ [add] افغانی برای این مشتری از سقفش می‌گذرد؟ ماندهٔ دفتر همان `DebtBook` است؛ بی سقف ⇒ null */
+  fun creditOverOf(d: ShopData, debtorId: String, add: Double): CreditGate.Over? {
+    val c = DebtBook.creditCheck(d, debtorId, DebtBook.minor(add)) ?: return null
+    return CreditGate.check(c.limit.minor, c.balance.minor, DebtBook.minor(add).minor)
+  }
+
+  /** «۱٬۰۰۰ افغانی بیش از سقفِ اعتبار (۵٬۰۰۰) — ماندهٔ فعلی ۴٬۰۰۰» — همان جملهٔ `DebtBook.overLimitText` */
+  fun creditOverText(o: CreditGate.Over): String {
+    fun show(minor: Long) = DebtBook.show(Money(minor, DebtBook.CURRENCY))
+    return "${show(o.excessMinor)} افغانی بیش از سقفِ اعتبار (${show(o.limitMinor)}) — ماندهٔ فعلی ${show(o.balanceMinor)}"
+  }
+
+  /**
+   *  پیش‌سنجشِ صندوق پیش از ثبت: همین سبد با همین تسویه از سقفِ مشتری می‌گذرد؟ همان حسابِ [record]
+   *  (پرداختی، باقی‌مانده و «نسیه») — [record] خودش هم دوباره می‌سنجد و بی تأیید ثبت نمی‌کند.
+   *  تنظیمِ خاموش، نقدی، بی مشتری یا بی سقف ⇒ null.
+   */
+  fun creditOver(d: ShopData, cart: List<CartLine>, checkout: Checkout): CreditGate.Over? {
+    if (!checkout.creditGate) return null
+    val debtorId = checkout.debtorId?.takeIf { it.isNotBlank() } ?: return null
+    val finalTotal = totals(d, cart, checkout).finalTotal
+    val st = checkout.settlement?.let { PayFlow.saleFields(it) }
+    val credit = if (st != null) st.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
+    if (!credit) return null
+    val paidRaw = st?.paidAmount ?: checkout.paidAmount
+    if (paidRaw.isNaN() || paidRaw < 0) return null
+    val remaining = max(0.0, finalTotal - min(paidRaw, finalTotal))
+    if (remaining <= 0) return null
+    return creditOverOf(d, debtorId, remaining)
   }
 
   /* ========================= لغو فروش و مرجوعی ========================= */
