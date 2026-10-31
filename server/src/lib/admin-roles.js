@@ -47,6 +47,9 @@ const FINANCE = [
   //  جست‌وجوی سراسری — خودِ در برای مالی فقط دکان و پرداخت را می‌گردد (`routes/admin-search.js`)
   ['GET', /^\/admin\/search$/],
   ['GET', /^\/admin\/shop-desk\/groups$/],
+  //  ۴.۶ و ۴.۷: فقط درهای پولیِ بازار و پیک (سفارش، کمیسیون، نقد و تسویهٔ پیک) — نه پرونده و نه آستانه
+  ['GET', /^\/admin\/market\/(overview|orders|commission)$/],
+  ['GET', /^\/admin\/delivery\/(overview|report)$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)$/],
   ['PUT', /^\/admin\/subscriptions\/[^/]+$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)\/[^/]+\/status$/],

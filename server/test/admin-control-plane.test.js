@@ -232,6 +232,9 @@ const MOUNTS = {
   'admin-service-keys.js': '/admin/service-keys',
   //  پوستهٔ کنسول (جست‌وجوی سراسری)
   'admin-search.js': '/admin/search',
+  //  پنلِ مرکزی ۴.۶ و ۴.۷
+  'admin-market.js': '/admin/market',
+  'admin-delivery.js': '/admin/delivery',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -349,6 +352,11 @@ const CAPABILITY_PROBES = {
   'actor.v1': ['GET /admin/me'],
   'admin-sessions.v1': ['GET /admin/admins/x1/sessions', 'POST /admin/admins/x1/sessions/revoke'],
   'search.v1': ['GET /admin/search?q=ab'],
+  'market-admin.v1': ['GET /admin/market/overview', 'GET /admin/market/sellers', 'GET /admin/market/orders',
+    'GET /admin/market/commission', 'GET /admin/market/history'],
+  'delivery-watch.v1': ['GET /admin/delivery/overview', 'GET /admin/delivery/queue', 'GET /admin/delivery/events',
+    'GET /admin/delivery/connectivity', 'GET /admin/delivery/report', 'GET /admin/delivery/thresholds',
+    'PUT /admin/delivery/thresholds'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
