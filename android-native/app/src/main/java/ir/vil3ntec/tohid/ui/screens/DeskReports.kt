@@ -24,7 +24,10 @@ import ir.vil3ntec.tohid.data.ReportKeysPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.ShrinkLoss
+import ir.vil3ntec.tohid.data.ShrinkReportPref
 import ir.vil3ntec.tohid.data.Xlsx
+import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.Platform
@@ -44,11 +47,12 @@ import kotlinx.coroutines.launch
 /**
  *  `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش).
  *  `gaps`: شماره‌های جاافتادهٔ اسناد (RPT-17) — فقط وقتی `DocGapsPref` روشن است (پیش‌فرض خاموش).
+ *  `shrink`: ضایعات و کسری (INV-17) — فقط وقتی `ShrinkReportPref` روشن است.
  *  `text`: عنوانِ سه‌زبانه (جدولِ `Str*`) برای زبانه‌های تازه؛ بی آن همان `label`.
  */
 private enum class Rep(
   val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false,
-  val gaps: Boolean = false, val text: (() -> String)? = null,
+  val gaps: Boolean = false, val shrink: Boolean = false, val text: (() -> String)? = null,
 ) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
@@ -64,6 +68,7 @@ private enum class Rep(
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
   REMINDERS("reminders", "یادآوریِ امروز", false, crm = true),
   GAPS("gaps", "", false, gaps = true, text = { StrReports.gapsTab }),
+  SHRINK("shrink", "", true, shrink = true, text = { StrShrink.title }),
   ;
 
   val title: String get() = text?.invoke() ?: label
@@ -84,7 +89,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
 
   val crm = remember { ShopPolicy.crmReports(context) }
   val gaps = remember { DocGapsPref.on(context) }
-  val reps = remember(crm, gaps) { Rep.values().filter { (crm || !it.crm) && (gaps || !it.gaps) } }
+  //  ارزشِ ضایعات به قیمتِ خرید است — همان سدِ «سود و فروش» ِ گوشی (`ShopRole.canSeeMoney`)
+  val shrink = remember { ShrinkReportPref.on(context) && ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
+  val reps = remember(crm, gaps, shrink) { Rep.values().filter { (crm || !it.crm) && (gaps || !it.gaps) && (shrink || !it.shrink) } }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -228,6 +235,13 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi(StrReports.kpiJumped, "${g.jumped}", Shop.colors.text, Modifier.weight(1f))
           DeskKpi(StrReports.kpiDuplicates, "${g.duplicates}", if (g.duplicates > 0) Shop.colors.warning else Shop.colors.text, Modifier.weight(1f))
           DeskKpi(StrReports.kpiCancelled, "${g.cancelled}", Shop.colors.muted, Modifier.weight(1f))
+        }
+        Rep.SHRINK -> {
+          val r = remember(d, from, to) { ShrinkLoss.report(d, from, to) }
+          DeskKpi(StrShrink.wasteTotal, "${money(r.wasteMinor / 100.0)} ؋", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi(StrShrink.shrinkTotal, "${money(r.shrinkMinor / 100.0)} ؋", if (r.shrinkMinor > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(StrShrink.netLoss, "${money(r.netLossMinor / 100.0)} ؋", if (r.netLossMinor > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(StrShrink.rows(r.rows), r.rateBp?.let { StrShrink.ofSales(shrinkPercent(it)) } ?: StrShrink.noSales, Shop.colors.text, Modifier.weight(1f))
         }
         Rep.REMINDERS -> {
           val due = remember(d, today) { DebtReminder.due(d, today) }
