@@ -102,8 +102,15 @@ export function scan(mode, base) {
   } else {
     for (const f of git(['ls-files', '-z']).split('\0').filter(Boolean)) {
       const h = scanPath(f); if (h) push(f, 1, h);
-      let buf;
-      try { const st = fs.statSync(f); if (!st.isFile() || st.size > MAX_BYTES) continue; buf = fs.readFileSync(f); } catch { continue; }
+      //  یک بار باز، سنجش و خواندن روی همان fd (نه stat روی نام و سپس خواندنِ نام: فایل میانِ این دو عوض نمی‌شود)؛
+      //  O_NONBLOCK تا FIFO مثلِ پیش (stat ⇐ «فایل نیست») رد شود، نه این‌که اسکن را نگه دارد.
+      let buf; let fd;
+      try {
+        fd = fs.openSync(f, fs.constants.O_RDONLY | (fs.constants.O_NONBLOCK ?? 0));
+        const st = fs.fstatSync(fd);
+        if (!st.isFile() || st.size > MAX_BYTES) continue;
+        buf = fs.readFileSync(fd);
+      } catch { continue; } finally { if (fd !== undefined) fs.closeSync(fd); }
       if (buf.subarray(0, 8000).includes(0)) continue;
       const lines = buf.toString('utf8').split('\n');
       for (let i = 0; i < lines.length; i++) for (const x of scanLine(lines[i])) push(f, i + 1, x);
