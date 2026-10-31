@@ -1,27 +1,24 @@
 package ir.vil3ntec.tohid.core.receipt
 
-import java.security.MessageDigest
-import java.security.SecureRandom
+import ir.vil3ntec.tohid.core.platform.secureRandomBytes
+import ir.vil3ntec.tohid.core.platform.sha256
 
 /**
- *  ساختنِ توکنِ فاکتور و نشانِ دکان — آن‌چه به JDK تکیه دارد (`SecureRandom`،
- *  `MessageDigest`)، مثلِ `Ulid`. قالب و سنجش در `ReceiptToken` (commonMain).
+ *  ساختنِ توکنِ فاکتور و نشانِ دکان — تصادفیِ امن و SHA-256 از سکو
+ *  (`core.platform`)، مثلِ `Ulid`. قالب و سنجش در `ReceiptToken`.
  */
 object ReceiptTokens {
 
-  private val random = SecureRandom()
   private val ABSOLUTE = Regex("^https?://[^/\\s]+.*$", RegexOption.IGNORE_CASE)
 
   /** توکنِ تازهٔ فاکتور — فقط هنگامِ ثبتِ فروش */
   fun new(): String {
-    val bytes = ByteArray(ReceiptToken.TOKEN_BYTES)
-    random.nextBytes(bytes)
-    return ReceiptToken.encodeToken(bytes)
+    return ReceiptToken.encodeToken(secureRandomBytes(ReceiptToken.TOKEN_BYTES))
   }
 
   /** نشانِ ۸ نویسه‌ایِ دکان — بی راز، فقط برای جدا کردنِ دکان‌ها */
   fun shopTag(shopId: String): String {
-    val digest = MessageDigest.getInstance("SHA-256").digest((ReceiptToken.TAG_SALT + shopId).encodeToByteArray())
+    val digest = sha256((ReceiptToken.TAG_SALT + shopId).encodeToByteArray())
     return ReceiptToken.tagOf(digest)
   }
 
