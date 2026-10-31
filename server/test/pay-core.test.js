@@ -152,7 +152,6 @@ test('بازپرداخت: روشِ اصلی، نقد یا اعتبار؛ با م
 
 function runSteps(steps, name) {
   let shift = null;
-  let last = null;
   steps.forEach((st, i) => {
     const label = `${name} — گامِ ${i + 1} (${st.op})`;
     let got;
@@ -168,10 +167,7 @@ function runSteps(steps, name) {
     } else if (st.op === 'x' || st.op === 'close' || st.op === 'z') {
       const r = st.op === 'x' ? P.xReport(shift, st.input) : st.op === 'close' ? P.closeShift(shift, st.input) : P.zReport(shift);
       if (r.ok && st.op === 'close') shift = r.shift;
-      if (r.ok && st.op !== 'x') last = r.report;
       got = r.ok ? dup(r, { report: r.report }) : r;
-    } else if (st.op === 'cashierView') {
-      got = { report: P.cashierView(last) };
     } else {
       throw new Error('گامِ ناشناخته: ' + st.op);
     }
