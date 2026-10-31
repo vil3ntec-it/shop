@@ -108,9 +108,11 @@ object DashboardEngine {
     val txByDebtor = d.transactions.groupBy { it.debtorId }
     val debtLines = d.debtors.map { db ->
       val txs = txByDebtor[db.id].orEmpty()
-      val balance = txs.sumOf { if (it.type == "give") it.amount else -it.amount }
-      val change = txs.filter { day(it.date)?.let { x -> x in from..t } == true }
-        .sumOf { if (it.type == "give") it.amount else -it.amount }
+      //  به پول جمع می‌شود (`LedgerBalance`، همان `ShopStore.debt`): تسویهٔ دقیق صفرِ دقیق است
+      val balance = ir.vil3ntec.tohid.core.money.LedgerBalance.sum(txs.map { if (it.type == "give") it.amount else -it.amount })
+      val change = ir.vil3ntec.tohid.core.money.LedgerBalance.sum(
+        txs.filter { day(it.date)?.let { x -> x in from..t } == true }.map { if (it.type == "give") it.amount else -it.amount },
+      )
       DebtLine(db, balance, change, DebtorEngine.debtDays(d, db.id, now))
     }
     val receivables = debtLines.sumOf { it.balance.coerceAtLeast(0.0) }

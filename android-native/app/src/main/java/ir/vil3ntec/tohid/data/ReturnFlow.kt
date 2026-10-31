@@ -289,12 +289,15 @@ object ReturnFlow {
    *    approve | deny)، یا `null` وقتی هسته هنوز این کلید را ندارد (پیش از PRِ
    *    اجرای مجوزها). صفحه آن را با [permDecision] می‌سازد.
    *  @param limitMinor سقفِ دکان برای مدیر و شاگرد (به پول)؛ ۰ = بی سقف.
+   *  @param priorMinor برگشت‌های پیشینِ همین فاکتور ([priorMinor])؛ سقف تجمعی سنجیده می‌شود
+   *    (`ReturnApprovals.overDeviceLimit`، همان قاعدهٔ سقفِ نقش). بی رسید ⇒ ۰.
    */
-  fun gate(role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long): Gate {
+  fun gate(role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long, priorMinor: Long = 0L): Gate {
     val r = roleOf(role)
     if (perm == "deny") return Gate("deny", listOf(WHY_PERM), "owner")
     val why = ArrayList<String>()
-    if (perm == "approve" || (r != "owner" && limitMinor > 0 && amountMinor > limitMinor)) why += WHY_OVER_LIMIT
+    val overLimit = r != "owner" && ir.vil3ntec.tohid.core.perm.ReturnApprovals.overDeviceLimit(priorMinor, amountMinor, limitMinor)
+    if (perm == "approve" || overLimit) why += WHY_OVER_LIMIT
     if (noReceipt && r == "staff") why += WHY_NO_RECEIPT
     if (damaged && r == "staff") why += WHY_DAMAGED
     val approver = if (WHY_OVER_LIMIT in why) "owner" else "manager"
@@ -491,7 +494,7 @@ object ReturnFlow {
       id
     } else null
 
-    val g = gate(req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit))
+    val g = gate(req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit), priorMinor(d, sale?.id))
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)

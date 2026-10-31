@@ -908,10 +908,9 @@ class ShopStore(private val context: Context) {
     /** تمام‌شده | موجودی کم | موجودی کافی */
     fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
-    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده */
-    fun debt(d: ShopData, debtorId: String): Double =
-      d.transactions.filter { it.debtorId == debtorId }
-        .sumOf { if (it.type == "give") it.amount else -it.amount }
+    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — به پول (`LedgerBalance`، همان `DebtBook`): تسویهٔ دقیق صفرِ دقیق است */
+    fun debt(d: ShopData, debtorId: String): Double = ir.vil3ntec.tohid.core.money.LedgerBalance.sum(
+      d.transactions.filter { it.debtorId == debtorId }.map { if (it.type == "give") it.amount else -it.amount })
 
     /**
      *  بدهیِ ما به یک تأمین‌کننده.

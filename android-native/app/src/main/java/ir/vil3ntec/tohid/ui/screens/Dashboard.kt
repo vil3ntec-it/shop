@@ -680,9 +680,8 @@ data class DashboardNumbers(
       val byDebtor = d.transactions.groupBy { it.debtorId }
       val owing = d.debtors
         .map { debtor ->
-          var amount = 0.0
-          byDebtor[debtor.id]?.forEach { amount += if (it.type == "give") it.amount else -it.amount }
-          debtor to amount
+          //  به پول (`LedgerBalance`، همان `ShopStore.debt`): حسابِ تسویه‌شده «بدهکار» نیست
+          debtor to ir.vil3ntec.tohid.core.money.LedgerBalance.sum(byDebtor[debtor.id].orEmpty().map { if (it.type == "give") it.amount else -it.amount })
         }
         .filter { it.second > 0 }
         .sortedByDescending { it.second }

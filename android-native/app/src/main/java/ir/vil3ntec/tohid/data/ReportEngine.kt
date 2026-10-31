@@ -184,14 +184,16 @@ object ReportEngine {
     val byDebtor = d.transactions.groupBy { it.debtorId }
     return d.debtors.map { debtor ->
       val mine = byDebtor[debtor.id].orEmpty()
-      var given = 0.0
-      var received = 0.0
-      mine.forEach { if (it.type == "give") given += it.amount else received += it.amount }
+      //  به پول (`LedgerBalance`، همان `ShopStore.debt`): «مانده»ِ حسابِ تسویه‌شده صفرِ دقیق است،
+      //  نه −9.09e-13 که در گزارش «۰ ؋ موجودی» می‌شد
+      val lb = ir.vil3ntec.tohid.core.money.LedgerBalance
+      val given = lb.minor(mine.filter { it.type == "give" }.map { it.amount })
+      val received = lb.minor(mine.filter { it.type != "give" }.map { it.amount })
       DebtorStat(
         debtor = debtor,
-        given = given,
-        received = received,
-        remaining = given - received,
+        given = lb.major(given),
+        received = lb.major(received),
+        remaining = lb.sum(mine.map { if (it.type == "give") it.amount else -it.amount }),
       )
     }
   }

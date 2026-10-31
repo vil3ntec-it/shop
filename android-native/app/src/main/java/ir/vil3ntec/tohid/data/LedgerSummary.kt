@@ -82,10 +82,10 @@ data class LedgerSummary(
           )
         },
         debts = d.debtors.map { debtor ->
-          var amount = 0.0
-          byDebtor[debtor.id]?.forEach {
-            amount += if (it.type == "give") it.amount else -it.amount
-          }
+          //  به پول (`LedgerBalance`، همان `ShopStore.debt`): حسابِ تسویه‌شده در `owing` نمی‌ماند
+          val amount = ir.vil3ntec.tohid.core.money.LedgerBalance.sum(
+            byDebtor[debtor.id].orEmpty().map { if (it.type == "give") it.amount else -it.amount },
+          )
           DebtLine(id = debtor.id, name = debtor.name, amount = amount)
         },
       )
