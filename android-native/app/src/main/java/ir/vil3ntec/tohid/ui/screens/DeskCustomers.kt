@@ -423,6 +423,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = ::excel) { Text("اکسل  Ctrl+E") }
       StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
+      CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
     }
     entry?.let { kind ->
       Spacer(Modifier.height(8.dp))

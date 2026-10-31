@@ -33,17 +33,29 @@ class AccountRepository(private val api: ApiClient) {
    *  خطای `phone_locked` می‌گیرد؛ برنامه آن را نشان می‌دهد و بس.
    *
    *  @param phone خالی یعنی «دست نزن»، نه «پاک کن».
+   *  @param phoneCode AUTH-08: کدِ همان شماره (`requestPhoneCode`)؛ خالی ⇒ فرستاده نمی‌شود، یعنی همان
+   *    درخواستِ پیشین. با پرچمِ سروریِ روشن، شمارهٔ بی کد ۴۰۰ `phone_code_required` می‌گیرد (`PhoneClaim`).
    */
-  suspend fun updateProfile(name: String, phone: String = ""): ApiResult<UserWrapDto> = result {
+  suspend fun updateProfile(name: String, phone: String = "", phoneCode: String = ""): ApiResult<UserWrapDto> = result {
     ApiJson.decode<UserWrapDto>(
       api.put(
         ApiEndpoints.Me.ROOT,
         buildJsonObject {
           put("name", JsonPrimitive(name.trim()))
           if (phone.isNotBlank()) put("phone", JsonPrimitive(phone.trim()))
+          if (phone.isNotBlank() && phoneCode.isNotBlank()) put("phoneCode", JsonPrimitive(phoneCode))
         },
       )
     )
+  }
+
+  /**
+   *  AUTH-08: کدِ یک‌بارمصرف به همان شماره‌ای که افزوده می‌شود. پرچمِ سروری خاموش ⇒ ۴۰۴
+   *  `phone_code_disabled` (برنامه همان ذخیرهٔ بی کد را می‌کند). «این شماره حسابِ دیگری دارد» این‌جا گفته نمی‌شود.
+   */
+  suspend fun requestPhoneCode(phone: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Me.PHONE_CODE, buildJsonObject { put("phone", JsonPrimitive(phone.trim())) })
+    Unit
   }
 
   /* ------------------------------ دستگاه‌ها ------------------------------ */

@@ -117,6 +117,8 @@ test('وب: با بلیت وصل می‌شود و توکن در آدرس نیس�
   const u = new URL(dialed[0]);
   assert.equal(u.protocol, 'wss:');
   assert.equal(u.searchParams.get('ticket'), 'TICKET-1');
+  //  S78: این نسخه پس از 4403 با توکنِ تازه برمی‌گردد ⇒ اعلام می‌کند تا سرور سرِ انقضا ببندد
+  assert.equal(u.searchParams.get('caps'), 'expiry');
   assert.equal(u.searchParams.get('token'), null);
   assert.ok(!dialed[0].includes('SECRET-ACCESS-TOKEN'));
 });

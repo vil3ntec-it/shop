@@ -26,63 +26,45 @@ package ir.vil3ntec.tohid.scan
  */
 class HidScan(
   /**
-   *  بیشترین فاصلهٔ دو نویسه تا هنوز «یک اسکن» حساب شود.
-   *
-   *  بارکدخوان‌های رایج بینِ ۵ تا ۲۰ میلی‌ثانیه‌اند. پنجاه یعنی جا برای
-   *  دستگاه‌های کند و گوشیِ شلوغ، و هنوز خیلی پایین‌تر از تایپِ آدم:
-   *  تندنویسِ حرفه‌ای هم زیرِ ۱۰۰ میلی‌ثانیه به ازای هر نویسه نمی‌رود.
+   *  تنظیم: آستانهٔ فاصلهٔ نویسه‌ها، کمینهٔ طول، پیشوند و پسوند (`core/hw/KeyScan`، HW-05).
+   *  پیش‌فرض همان ۵۰ میلی‌ثانیه و کمینهٔ ۴ِ همیشگی است؛ با «ابزارهای تازهٔ دستگاه» روشن، تنظیمِ همین
+   *  دستگاه (`ScanPrefs`). هر بار پس از `reset` (بسته شدنِ صفحه) دوباره خوانده می‌شود.
    */
-  private val maxGapMs: Long = 50,
-
-  /**
-   *  کوتاه‌ترین چیزی که بارکد حساب می‌شود.
-   *
-   *  کوتاه‌تر از این تقریباً همیشه یعنی آدم داشته در کادری تایپ می‌کرده
-   *  و اتفاقی سریع بوده. کوتاه‌ترین بارکدِ استاندارد (EAN-8) هشت رقم
-   *  است، ولی کدهای داخلیِ دکان می‌توانند کوتاه‌تر باشند.
-   */
-  private val minLength: Int = 4,
+  private val config: () -> ir.vil3ntec.tohid.core.hw.ScanConfig = { ScanPrefs.current() },
 ) {
 
-  private val buffer = StringBuilder()
-  private var lastAt = 0L
+  /**
+   *  @param maxGapMs بیشترین فاصلهٔ دو نویسه تا هنوز «یک اسکن» حساب شود. بارکدخوان‌های رایج بینِ ۵
+   *    تا ۲۰ میلی‌ثانیه‌اند؛ تندنویسِ حرفه‌ای هم زیرِ ۱۰۰ میلی‌ثانیه به ازای هر نویسه نمی‌رود.
+   *  @param minLength کوتاه‌ترین چیزی که بارکد حساب می‌شود (EAN-8 هشت رقم است، کدِ داخلیِ دکان کوتاه‌تر).
+   */
+  constructor(maxGapMs: Long, minLength: Int = 4) :
+    this({ ir.vil3ntec.tohid.core.hw.ScanConfig(maxGapMs = maxGapMs, minLength = minLength) })
+
+  private var scan: ir.vil3ntec.tohid.core.hw.KeyScan? = null
+  private fun s(): ir.vil3ntec.tohid.core.hw.KeyScan = scan ?: ir.vil3ntec.tohid.core.hw.KeyScan(config()).also { scan = it }
 
   /**
    *  یک نویسه رسید.
    *
-   *  @param now ساعتِ همین لحظه به میلی‌ثانیه — از بیرون داده می‌شود تا
-   *    بشود سنجیدش.
-   *  @return اگر این نویسه یک بارکدِ کامل را تمام کرده باشد، خودِ بارکد؛
-   *    وگرنه `null`.
+   *  @param now ساعتِ همین لحظه به میلی‌ثانیه — از بیرون داده می‌شود تا بشود سنجیدش.
+   *  @return اگر پسوندِ تنظیم‌شده یک بارکدِ کامل را تمام کرده باشد (بارکدخوانی که Enter نمی‌زند)، خودِ
+   *    بارکد؛ وگرنه `null`.
    */
-  fun feed(char: Char, now: Long): String? {
-    //  فاصله که زیاد شد، یعنی آنچه در بافر است مالِ اسکنِ دیگری بوده —
-    //  یا اصلاً تایپِ آدم بوده. از نو.
-    if (now - lastAt > maxGapMs) buffer.setLength(0)
-    lastAt = now
-    buffer.append(char)
-    return null
-  }
+  fun feed(char: Char, now: Long): String? = s().feed(char, now)
 
   /**
    *  Enter رسید — یعنی «تمام شد».
    *
-   *  @return بارکد، اگر آنچه جمع شده به‌قدرِ کافی بلند و به‌قدرِ کافی
-   *    سریع آمده باشد؛ وگرنه `null` و بافر پاک می‌شود.
+   *  @return بارکد (بی پیشوند و پسوند)، اگر آنچه جمع شده به‌قدرِ کافی بلند و به‌قدرِ کافی سریع آمده
+   *    باشد (یا پیشوندِ تنظیم‌شده را داشته باشد)؛ وگرنه `null` و بافر پاک می‌شود.
    */
-  fun submit(now: Long): String? {
-    val code = buffer.toString()
-    buffer.setLength(0)
-    //  Enterِ دیرهنگام یعنی آدم خودش زده، نه دستگاه
-    if (now - lastAt > maxGapMs) { lastAt = now; return null }
-    lastAt = now
-    return code.takeIf { it.length >= minLength }
-  }
+  fun submit(now: Long): String? = s().submit(now)
 
-  /** رها کردنِ هرچه نیمه‌کاره مانده — هنگامِ بسته شدنِ صفحه */
+  /** رها کردنِ هرچه نیمه‌کاره مانده — هنگامِ بسته شدنِ صفحه؛ تنظیمِ تازه دفعهٔ بعد خوانده می‌شود */
   fun reset() {
-    buffer.setLength(0)
-    lastAt = 0
+    scan?.reset()
+    scan = null
   }
 
   /**
@@ -92,5 +74,5 @@ class HidScan(
    *  کادرِ متن برسد: اگر دستگاه دارد می‌فرستد، رقم‌ها نباید وسطِ نامِ
    *  مشتری بنشینند.
    */
-  val busy: Boolean get() = buffer.isNotEmpty()
+  val busy: Boolean get() = scan?.busy == true
 }
