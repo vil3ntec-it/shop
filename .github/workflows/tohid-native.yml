@@ -69,11 +69,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      # کلیدِ امضا از secret می‌آید، نه از داخلِ مخزن.
-      #
-      # تا وقتی secret تنظیم نشده باشد، همان فایلِ داخلِ مخزن استفاده
-      # می‌شود و ساخت نمی‌شکند. بعد از تنظیمِ secret، آن فایل را می‌شود
-      # از مخزن برداشت و از آن لحظه کلید فقط اینجا باز می‌شود.
+      # کلیدِ امضا فقط از secret می‌آید. ⛔ SEC-ART-05: فایلِ کلید و رمزِ پیش‌فرضش از مخزنِ (عمومیِ)
+      # پیشین برداشته شدند و هیچ برگشتی به آن‌ها نیست؛ secret نباشد ⇒ کار قرمز (android-native/KEYSTORE.md).
       - name: کلیدِ امضا
         env:
           KEYSTORE_B64: ${{ secrets.TOHID_KEYSTORE_B64 }}
@@ -83,7 +80,9 @@ jobs:
             echo "TOHID_KEYSTORE=$RUNNER_TEMP/tohid-release.jks" >> "$GITHUB_ENV"
             echo "کلید از secret خوانده شد"
           else
-            echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
+            #  ⛔ SEC-ART-05: کلیدی در مخزن نیست و برگشتی هم نیست — بی secret، ساختِ release ممکن نیست
+            echo "::error::secret به نام TOHID_KEYSTORE_B64 (و TOHID_KEYSTORE_PASSWORD، TOHID_KEY_ALIAS) تنظیم نشده — راهنما: android-native/KEYSTORE.md"
+            exit 1
           fi
 
       #  `:core:jvmTest` = آزمون‌های `core/src/commonTest` (مثلِ «تسویهٔ کامل» بی گردِ افغانی)
