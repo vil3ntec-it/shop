@@ -786,6 +786,7 @@ fun AppRoot(
                 Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
