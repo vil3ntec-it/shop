@@ -7,8 +7,8 @@ const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
-const { notFoundHandler, errorHandler } = require('./middleware/errors');
-const { requireUser, optionalShop } = require('./middleware/auth');
+const { notFoundHandler, errorHandler, notFound } = require('./middleware/errors');
+const { requireUser, optionalShop, requireAdmin } = require('./middleware/auth');
 const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
@@ -391,6 +391,15 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin', require('./routes/admin-sales'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
+    /*
+     *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ
+     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به
+     *  `routes/data` ِ پایین (روی `/`، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
+     *  پنل آن را «نشستِ ارشد تمام شد» می‌خواند. `requireAdmin` همین‌جا دوباره: بی‌توکن و توکنِ دکان
+     *  همان ۴۰۱ ِ همیشه را می‌گیرند تا وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود. هر مسیرِ واقعی
+     *  بالاتر سوار است، پس این خط به هیچ‌کدام نمی‌رسد.
+     */
+    api.use('/admin', requireAdmin, (req, res, next) => next(notFound('این مسیرِ مدیر روی این سرور نیست', 'route_not_found')));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
