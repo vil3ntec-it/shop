@@ -117,7 +117,9 @@ object LedgerMerge {
       if (x.isEmpty() || y.isEmpty()) continue
       val mine: MutableSet<Any?> = Collections.newSetFromMap(IdentityHashMap<Any?, Boolean>(y.size))
       mine.addAll(y)
-      for (r in x) if (r in mine) n++
+      //  ⛔ رشته نشانه نیست: نام‌های پیش‌فرض (`DEFAULT_UNITS`…) و رشته‌ای که از درختِ JSON خوانده شد
+      //  در دو دفترِ جدا همان شیء‌اند — دفترِ بی هیچ ردیفِ مشترک «خویش» دیده می‌شد و پایهٔ رفته پنهان می‌ماند
+      for (r in x) if (r !is String && r in mine) n++
     }
     return n
   }

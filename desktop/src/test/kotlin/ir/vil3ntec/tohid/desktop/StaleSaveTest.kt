@@ -326,7 +326,9 @@ class StaleSaveTest {
   @Test fun `پاک کردنِ همه (ShopData()) با پرچمِ روشن هم دفتر را خالی می‌کند`() {
     val ui = screen()
     workerPulls(fromOther)
-    assertTrue(runBlocking { ui.save(ShopData()) })
+    //  «پاک کردنِ همه» صریح است (`Settings`): `ShopData()` با دفتری که کاربر آخرین کالایش را حذف کرد برابر است
+    //  — حتی شیء‌به‌شیء — و آن یکی ادغام می‌خواهد («حذفِ واقعیِ کاربر هنوز DELETE می‌سازد»)
+    assertTrue(runBlocking { ui.save(ShopData(), replace = true) })
     assertEquals(emptyList<String>(), open().data.value.products.map { it.id })
   }
 }

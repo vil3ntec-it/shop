@@ -249,13 +249,16 @@ class ShopStore(private val context: Context) {
    *  دست‌نخورده می‌ماند و صفحه همان چیزی را نشان می‌دهد که روی دیسک
    *  است. هیچ چیزی پاک نمی‌شود و خروجی و چاپ و پشتیبان باز می‌مانند.
    *
+   *  [replace] ⇒ جایگزینیِ کاملِ دفتر به خواستِ کاربر («پاک کردنِ همه»)، بی ادغام. ⛔ از روی مقدارِ [next]
+   *  حدس زده نمی‌شود: دفتری که کاربر آخرین کالایش را حذف کرد با `ShopData()` برابر است و ادغام می‌خواهد.
+   *
    *  @return آیا نوشته شد. `false` یعنی قفلِ نرم یا خطای دیسک — صفحه
    *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
-  suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+  suspend fun save(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
     //  ⛔ پرچمِ `shop.ledger_merge` خاموش (پیش‌فرض) ⇒ همان رفتارِ `main`: دفترِ صفحه کامل نوشته می‌شود.
-    //  «پاک کردنِ همه» (`ShopData()`) هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
-    if (!follow.on || next == EMPTY) {
+    //  [replace] («پاک کردنِ همه») هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
+    if (!follow.on || replace) {
       if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
         SoftLock.noteBlocked()
         _blocked.tryEmit(Unit)
@@ -819,8 +822,6 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
-    private val EMPTY = ShopData()
-
     /** پیامِ ذخیره‌ای که رد شد چون دفتری که صفحه با آن ساخت دیگر نگه داشته نشده ([LedgerFollow.baseOf]) */
     const val STALE_BASE =
       "ثبت نشد — این صفحه از دفتری ساخته شده بود که در این فاصله چند بار از دستگاه‌های دیگر تازه شد، و ثبتش ردیف‌های تازه را پاک می‌کرد. صفحه را دوباره باز کنید و دوباره ثبت کنید؛ چیزی پاک نشده."
