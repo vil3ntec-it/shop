@@ -53,7 +53,7 @@ class PurchaseOrderBookTest {
   private fun posted(d: ShopData = d0): ShopData =
     (PurchaseOrderBook.post(d, po, r1, "2026-11-01", 1_000) as PurchaseOrderBook.Posting.Ok).data
 
-  @Test fun `S19 — رسید یک فاکتورِ خریدِ سه‌ردیفه می‌سازد: موجودی +۱۰/+۷/+۸ و بدهیِ ۲۸۰۰`() {
+  @Test fun `S19 — رسید یک فاکتورِ خریدِ سه‌ردیفه می‌سازد — موجودی +۱۰، +۷، +۸ و بدهیِ ۲۸۰۰`() {
     val r = PurchaseOrderBook.post(d0, po, r1, "2026-11-01", 1_000) as PurchaseOrderBook.Posting.Ok
     val d = r.data
     assertEquals(1, r.invoiceNo)
@@ -122,7 +122,7 @@ class PurchaseOrderBookTest {
     assertTrue(f is PurchaseOrderBook.Posting.Failed)
   }
 
-  @Test fun `تطبیق: پس از ثبت درست؛ بی ثبت «فاکتور در دفتر نیست»؛ گردِ افغانیِ دفتر در مرز`() {
+  @Test fun `تطبیق — پس از ثبت درست؛ بی ثبت «فاکتور در دفتر نیست»؛ گردِ افغانیِ دفتر در مرز`() {
     assertTrue(PurchaseOrderBook.match(posted(), po).matched)
     val before = PurchaseOrderBook.match(d0, po)
     assertFalse(before.matched)
@@ -141,7 +141,7 @@ class PurchaseOrderBookTest {
     assertTrue(PurchaseOrderBook.match(d, kg).matched)
   }
 
-  @Test fun `پیشنهادِ ردیف: فقط کالاهای خریده از همین تأمین‌کننده، کم‌موجودها بالا، آخرین فیِ او`() {
+  @Test fun `پیشنهادِ ردیف — فقط کالاهای خریده از همین تأمین‌کننده، کم‌موجودها بالا، آخرین فیِ او`() {
     var d = d0
     for ((sup, pid, price) in listOf(Triple("s1", "pA", 120.0), Triple("s1", "pB", 210.0), Triple("s2", "pC", 55.0))) {
       d = (PurchaseBook.record(d, sup, listOf(PurchaseBook.Line(pid, 1.0, price)), 0.0, "2026-10-01", "", "2026-10-01", 1, ::newId)

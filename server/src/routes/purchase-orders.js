@@ -22,58 +22,57 @@ const { clientIp } = require('../middleware/ratelimit');
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('stock.view'));
 
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
-const needFlag = wrap(async (req, res, next) => { await po.requireEnabled(req.shopId); next(); });
+const needFlag = async (req, res, next) => { await po.requireEnabled(req.shopId); next(); };
 
 const log = (req, action, targetId, detail) => audit.log({
   shopId: req.shopId, userId: req.user.id, action, targetType: 'purchase_order', targetId, detail, ip: clientIp(req),
 });
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   res.json({
     enabled: await po.enabled(req.shopId),
     permissions: { manage: can(req.role, 'stock.adjust'), receive: can(req.role, 'stock.move') },
     limits: { lines: require('../lib/purchase-order-core').MAX_LINES, qtyMilli: po.MAX_QTY_MILLI, priceMinor: po.MAX_PRICE_MINOR },
   });
-}));
+});
 
-router.get('/', needFlag, wrap(async (req, res) => {
+router.get('/', needFlag, async (req, res) => {
   res.json(await po.list(req.shopId, {
     state: req.query.state, supplierId: req.query.supplierId, cursor: req.query.cursor, limit: req.query.limit,
   }));
-}));
+});
 
-router.get('/:id', needFlag, wrap(async (req, res) => {
+router.get('/:id', needFlag, async (req, res) => {
   res.json({ order: await po.get(req.shopId, req.params.id) });
-}));
+});
 
-router.post('/', needFlag, requirePermission('stock.adjust'), wrap(async (req, res) => {
+router.post('/', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const key = po.clientKeyOf(req);
   const { order, replayed } = await po.create(req.shopId, { key, body: req.body, userId: req.user.id });
   if (!replayed) await log(req, 'purchase_order.create', order.id, { no: order.no, lines: order.lines.length });
   if (replayed) res.set('Idempotent-Replayed', 'true');
   res.status(replayed ? 200 : 201).json({ order, replayed });
-}));
+});
 
-router.put('/:id', needFlag, requirePermission('stock.adjust'), wrap(async (req, res) => {
+router.put('/:id', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const order = await po.update(req.shopId, req.params.id, { body: req.body });
   await log(req, 'purchase_order.update', order.id, { version: order.version, lines: order.lines.length });
   res.json({ order });
-}));
+});
 
-router.post('/:id/send', needFlag, requirePermission('stock.adjust'), wrap(async (req, res) => {
+router.post('/:id/send', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const { order, changed } = await po.transition(req.shopId, req.params.id, 'send');
   if (changed) await log(req, 'purchase_order.send', order.id, { no: order.no });
   res.json({ order, changed });
-}));
+});
 
-router.post('/:id/cancel', needFlag, requirePermission('stock.adjust'), wrap(async (req, res) => {
+router.post('/:id/cancel', needFlag, requirePermission('stock.adjust'), async (req, res) => {
   const { order, changed } = await po.transition(req.shopId, req.params.id, 'cancel', { reason: req.body?.reason });
   if (changed) await log(req, 'purchase_order.cancel', order.id, { no: order.no, reason: order.cancelReason || '' });
   res.json({ order, changed });
-}));
+});
 
-router.post('/:id/receipts', needFlag, requirePermission('stock.move'), wrap(async (req, res) => {
+router.post('/:id/receipts', needFlag, requirePermission('stock.move'), async (req, res) => {
   const headerKey = typeof req.get === 'function' ? req.get('idempotency-key') : undefined;
   const out = await po.receive(req.shopId, req.params.id, {
     body: req.body, headerKey, userId: req.user.id, role: req.role,
@@ -84,6 +83,6 @@ router.post('/:id/receipts', needFlag, requirePermission('stock.move'), wrap(asy
     });
   } else res.set('Idempotent-Replayed', 'true');
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
 module.exports = router;

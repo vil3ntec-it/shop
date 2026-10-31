@@ -107,7 +107,8 @@ router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async
 
 /**
  * «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
- * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر.
+ * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر. مثلِ هر نوشتنِ
+ * دیگرِ سفارش پشتِ `needWrite` (SUB-10).
  */
 router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), needWrite, wrap(async (req, res) => {
   res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
@@ -202,6 +203,17 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
     ip: clientIp(req),
   });
   res.status(201).json({ order, entry: out.entry });
+}));
+
+/**
+ * RSK-03: سابقهٔ همین مشتری در همین دکان (تحویل، رد، لغو، تحویل‌نشده، برگشت) و نشانه‌های توضیح‌دار
+ * پیش از ارسال — پشتِ پرچمِ `shop.order_risk` (خاموش ⇒ `{enabled:false}`). فقط خواندن؛ بی شماره.
+ * سفارشِ دکانِ دیگر ⇒ ۴۰۴.
+ */
+router.get('/:id/risk', needFlag, wrap(async (req, res) => {
+  const out = await require('../lib/order-risk').riskOf(req.shopId, req.params.id);
+  if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
+  res.json(out);
 }));
 
 module.exports = router;
