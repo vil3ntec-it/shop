@@ -196,9 +196,14 @@ function courierView(r) {
     orderStatus: r.order_status,
     status: r.status,
     live,
+    //  «اول نشانه» (DLV-02): نشانه، ناحیه و رنگِ دروازه؛ `correctedAt` = دکان پس
+    //  از ناموفق نشانی را اصلاح کرد (DLV-09) ⇒ پیک پیش از تلاشِ دوباره می‌بیند
     address: live ? {
-      landmark: addr.landmark || '', text: addr.text || '',
+      //  ناحیه: آن‌چه مشتری نوشت، وگرنه نامِ ناحیهٔ ارسالِ ویترین (CHK-07)
+      landmark: addr.landmark || '', area: addr.area || addr.zone?.name || '', gateColor: addr.gateColor || '',
+      text: addr.text || '',
       ...(addr.lat !== undefined ? { lat: addr.lat, lng: addr.lng } : {}),
+      ...(Number.isSafeInteger(addr.correctedAt) ? { correctedAt: addr.correctedAt } : {}),
     } : null,
     customer: live ? { name: r.customer_name, phoneMasked: orders.maskPhone(r.customer_phone) } : null,
     delivery: live ? { callBeforeArrival: pref.callBeforeArrival === true, leaveWith: pref.leaveWith || '' } : null,
@@ -780,6 +785,86 @@ async function recall(shopId, assignmentId, body, actor, key = '') {
 }
 
 // ════════════════════════════════════════════════════════════════════
+//  اصلاحِ نشانی (DLV-09: کارِ بعدی پس از ناموفق)
+// ════════════════════════════════════════════════════════════════════
+
+/** کلیدهای نشانی که در گزارش می‌آیند — فقط نامِ کلید، هرگز خودِ نشانی. */
+const ADDRESS_KEYS = Object.freeze(['landmark', 'area', 'gateColor', 'text', 'pin']);
+
+function addressFields(prev, next) {
+  const pick = (x, k) => (k === 'pin' ? (x.lat === undefined ? '' : `${x.lat},${x.lng}`) : String(x[k] || ''));
+  return ADDRESS_KEYS.filter((k) => pick(prev, k) !== pick(next, k));
+}
+
+/**
+ * دکان نشانیِ سفارشِ یک مأموریتِ زندهٔ ارسال را درست می‌کند (پیک «پیدا نشد» زده یا
+ * مشتری زنگ زد) تا پیک با نشانیِ درست دوباره برود. کارتِ پیک همین را از سفارش
+ * می‌خواند و `correctedAt` را می‌بیند.
+ *
+ * بدنه: `{address, keepPin?, expectedVersion?}` — `address` همان `orders.parseAddress`.
+ * ⛔ فقط ارسال (shop_courier / external)، فقط مأموریتِ زنده؛ دریافتِ حضوری نشانی ندارد.
+ * ⛔ `expectedVersion` (اختیاری) = نسخهٔ مأموریتی که کارمند دید: اگر میانِ کار عوض
+ *    شده باشد ۴۰۹ `assignment_changed` با وضعِ تازه، نه نوشتن روی وضعِ دیگر.
+ * ⛔ کلیدِ یکتایی (`idem`، سرآیندِ Idempotency-Key): پاسخِ گم‌شده با همان کلید همان
+ *    پاسخ است و نسخه دوباره بالا نمی‌رود.
+ * قفل‌ها به همان ترتیبِ `applyEvent`: اول مأموریت، بعد سفارش.
+ */
+async function fixAddress(shopId, assignmentId, body, idem = null) {
+  const b = body && typeof body === 'object' ? body : {};
+  const address = orders.parseAddress(b.address);
+  if (b.keepPin !== undefined && typeof b.keepPin !== 'boolean') throw badRequest('نامعتبر', 'bad_keep_pin');
+  const expectedVersion = optInt(b.expectedVersion, 'نسخه', { min: 0, max: Number.MAX_SAFE_INTEGER });
+  const idempotency = require('./idempotency');
+
+  return tx(async (c) => {
+    if (idem) {
+      await idempotency.lock(c, idem);
+      const prev = await idempotency.find(idem, idempotency.viaClient(c));
+      if (prev) return { ...prev.response, replayed: true };
+    }
+    const a = (await c.query(
+      'SELECT * FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(assignmentId || '')]
+    )).rows[0];
+    if (!a) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
+    if (a.mode === 'pickup') throw conflict('دریافتِ حضوری نشانی ندارد', 'not_delivery');
+    if (!D.LIVE.includes(a.status)) throw conflict('این مأموریت تمام شده است', 'not_live');
+    if (expectedVersion !== null && Number(a.version) !== expectedVersion) {
+      const err = conflict('این مأموریت همین حالا جای دیگری عوض شد', 'assignment_changed');
+      err.current = staffView(a);
+      throw err;
+    }
+    const order = (await c.query(
+      'SELECT id, address FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, a.order_id]
+    )).rows[0];
+    if (!order) throw notFound('سفارش پیدا نشد', 'order_not_found');
+
+    const at = now();
+    const prev = asJson(order.address);
+    //  `keepPin`: میز نقشه ندارد؛ نشانه را درست می‌کند و پینِ درستِ مشتری می‌ماند.
+    //  بی آن (یا با پینِ تازه) نشانیِ آمده جای کلِ نشانی را می‌گیرد.
+    const kept = b.keepPin === true && address.lat === undefined && prev.lat !== undefined && prev.lat !== null
+      ? { lat: prev.lat, lng: prev.lng } : {};
+    const fixed = { ...kept, ...address };
+    const fields = addressFields(prev, fixed);
+    //  ناحیهٔ ارسالِ ویترین (`zone`، CHK-07) سندِ قیمتِ همان سفارش است و با اصلاحِ
+    //  نشانی عوض نمی‌شود — هزینهٔ ارسالِ گرفته‌شده پس از رخداد بازحساب نمی‌شود
+    const next = { ...fixed, ...(prev.zone && typeof prev.zone === 'object' ? { zone: prev.zone } : {}), correctedAt: at };
+    await c.query(
+      `UPDATE online_orders SET address=$3::jsonb, version=version+1, updated_at=$4 WHERE shop_id=$1 AND id=$2`,
+      [shopId, order.id, JSON.stringify(next), at]
+    );
+    await c.query(
+      'UPDATE delivery_assignments SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2', [shopId, a.id, at]
+    );
+    const fresh = (await c.query('SELECT * FROM delivery_assignments WHERE id=$1', [a.id])).rows[0];
+    //  پاسخ (و نسخهٔ نگه‌داشتهٔ کلیدِ یکتایی) خودِ نشانی را ندارد — یک رونوشتِ کمتر از دادهٔ مشتری
+    const out = { assignment: staffView(fresh), correctedAt: at, fields };
+    if (idem) await idempotency.save(c, idem, { tenantId: shopId, resultId: a.id, response: out });
+    return { ...out, replayed: false };
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
 //  خواندن
 // ════════════════════════════════════════════════════════════════════
 
@@ -1335,7 +1420,7 @@ module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS,
   VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, customerView, putLocation, putEta, purgeLocations,
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
-  assign, regenerateCode, courierEvents, staffEvent, recall, missions, forOrder, board,
+  assign, regenerateCode, courierEvents, staffEvent, recall, fixAddress, missions, forOrder, board,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
   externalCompanies, externalStatement, eventKey,
 };

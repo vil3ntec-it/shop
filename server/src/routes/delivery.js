@@ -146,6 +146,32 @@ router.post('/assignments/:id/recall', requirePermission('delivery.assign'), nee
   res.json(out);
 });
 
+/**
+ * «اصلاحِ نشانی» (DLV-09، کارِ بعدی پس از ناموفق): نشانیِ سفارشِ مأموریتِ زندهٔ ارسال.
+ * بدنه: `{address:{landmark?, area?, gateColor?, text?, lat?, lng?}, keepPin?, expectedVersion?}`.
+ * کلیدِ یکتایی (Idempotency-Key) ⇒ تکرار همان پاسخ. در سابقه فقط نامِ کلیدهای
+ * عوض‌شده می‌آید، نه خودِ نشانی.
+ * دستگیره بی `wrap` است: Express 5 خطای async را خودش به `next` می‌دهد.
+ */
+router.post('/assignments/:id/address', requirePermission('delivery.assign'), needWrite, async (req, res) => {
+  const idem = require('../lib/idempotency').fromRequest(req, `delivery-address:${req.shopId}`);
+  let out;
+  try {
+    out = await delivery.fixAddress(req.shopId, req.params.id, req.body, idem);
+  } catch (err) {
+    if (err.current) return res.status(err.status).json({ error: { code: err.code, message: err.message, current: err.current } });
+    throw err;
+  }
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.json(out);
+  }
+  await log(req, 'delivery.address.fix', 'delivery_assignment', out.assignment.id, {
+    orderId: out.assignment.orderId, status: out.assignment.status, fields: out.fields,
+  });
+  res.json(out);
+});
+
 // ── عکسِ تحویل: فقط صاحب و مدیر ──────────────────────────────────────
 
 router.get('/assignments/:id/photos', requirePermission('delivery.photo'), async (req, res) => {
