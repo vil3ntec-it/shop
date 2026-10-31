@@ -421,21 +421,26 @@ test('در انتظار: درخواستِ خرید با قیمتِ برآورد�
 });
 
 test('درگاه: بی جدول ⇒ BLOCKED-EXTERNAL؛ جدول بی کلید ⇒ همان؛ با کلید ⇒ شمار، بی شمارهٔ تراکنش و «نیازمندِ بررسی»', async () => {
-  const r0 = await get('mali', '/gateway');
-  assert.equal(r0.body.state, 'blocked_external');
-  assert.equal(r0.body.code, 'payment_intents_missing');
-  assert.ok(!('items' in r0.body), 'بی درگاه هیچ فهرست/عددِ ساختگی');
-  //  همان شکلِ مهاجرتِ ۱۳۹ ِ #518 (فقط ستون‌هایی که این‌جا خوانده می‌شوند)
-  await query(`CREATE TABLE payment_intents (
-    id text PRIMARY KEY, shop_id text NOT NULL, kind text NOT NULL, ref_id text NOT NULL, amount_minor bigint NOT NULL,
-    currency text NOT NULL DEFAULT 'AFN', status text NOT NULL, provider text NOT NULL DEFAULT 'hesabpay',
-    provider_ref text NOT NULL DEFAULT '', paid_at bigint, needs_review boolean NOT NULL DEFAULT false,
-    status_reason text NOT NULL DEFAULT '', created_at bigint NOT NULL, updated_at bigint NOT NULL)`);
+  //  جدولِ واقعی حالا از مهاجرتِ ۱۳۹ ِ main است (PAY-21، #518). «بی جدول» (سرورِ پیش از آن) با پنهان کردنِ موقتِ
+  //  همان جدول — نه ساختنِ جدولِ ساختگی و نه DROP ِ جدولِ واقعی
+  await query('ALTER TABLE payment_intents RENAME TO payment_intents_hidden_for_test');
+  try {
+    const r0 = await get('mali', '/gateway');
+    assert.equal(r0.body.state, 'blocked_external');
+    assert.equal(r0.body.code, 'payment_intents_missing');
+    assert.ok(!('items' in r0.body), 'بی درگاه هیچ فهرست/عددِ ساختگی');
+  } finally {
+    await query('ALTER TABLE payment_intents_hidden_for_test RENAME TO payment_intents');
+  }
+  const ids = ['pi_1', 'pi_2', 'pi_3', 'pi_4'];
   try {
     const t = now();
     for (const [id, status, ref, review] of [['pi_1', 'paid', 'TX-1', false], ['pi_2', 'paid', '', false], ['pi_3', 'paid', 'TX-3', true], ['pi_4', 'failed', '', false]]) {
-      await query(`INSERT INTO payment_intents (id, shop_id, kind, ref_id, amount_minor, status, provider_ref, paid_at, needs_review, created_at, updated_at)
-                   VALUES ($1,$2,'online_order','o1',145000,$3,$4,$5,$6,$7,$7)`, [id, S.a.shopId, status, ref, status === 'paid' ? t : null, review, t]);
+      //  ستون‌های اجباریِ مهاجرتِ ۱۳۹ با مقدارِ آزمون؛ بقیه پیش‌فرضِ خودِ جدول
+      await query(`INSERT INTO payment_intents (id, shop_id, kind, ref_id, amount_minor, status, provider, idempotency_key, request_hash,
+                     expires_at, provider_ref, paid_at, needs_review, created_at, updated_at)
+                   VALUES ($1,$2,'online_order','o1',145000,$3,'hesabpay',$1,'test-hash',$7,$4,$5,$6,$7,$7)`,
+      [id, S.a.shopId, status, ref, status === 'paid' ? t : null, review, t]);
     }
     const r1 = await get('mali', '/gateway');
     assert.equal(r1.body.code, 'hesabpay_key_missing');
@@ -459,7 +464,7 @@ test('درگاه: بی جدول ⇒ BLOCKED-EXTERNAL؛ جدول بی کلید �
   } finally {
     delete process.env.HESABPAY_API_KEY;
     delete process.env.HESABPAY_WEBHOOK_SECRET;
-    await query('DROP TABLE payment_intents');
+    await query('DELETE FROM payment_intents WHERE id = ANY($1::text[])', [ids]);
   }
 });
 
