@@ -247,54 +247,80 @@ function windowOf({ from, to } = {}, at = now()) {
  *   net ──────── collected − refunds
  *   issues ───── صفِ اختلاف‌ها (همهٔ زمان‌ها، تازه‌ترین اول، حداکثر ۱۰۰)
  * سفارشِ آزمایشی در جمع‌ها نیست؛ در صفِ اختلاف با `isTest` هست.
+ *
+ * `reportMany(shopIds, query)` همین را برای چند دکان با **همان پرس‌وجوها**
+ * (`shop_id = ANY` + `GROUP BY`) می‌دهد — پنلِ VILL3N (E2E-ADM-15). `report`
+ * خودش `reportMany([shopId])` است، پس برابریِ پنل با گزارشِ دکان ساختاری است.
+ * `{ liveOnly: true }` (پنل): سفارشِ آزمایشی همان‌جا در SQL کنار می‌رود، پس سقفِ
+ * ۱۰۰ اختلاف فقط اختلاف‌های واقعی را می‌شمارد.
  */
-async function report(shopId, query = {}) {
+async function reportMany(shopIds, query = {}, { liveOnly = false } = {}) {
   const w = windowOf(query);
+  const ids = [...new Set((Array.isArray(shopIds) ? shopIds : []).map(String))];
+  const out = new Map();
+  if (!ids.length) return out;
   const collected = (await db.query(
-    `SELECT COUNT(*)::int AS n, COALESCE(SUM(o.total_minor), 0) AS s
+    `SELECT e.shop_id, COUNT(*)::int AS n, COALESCE(SUM(o.total_minor), 0) AS s
        FROM online_order_events e JOIN online_orders o ON o.id = e.order_id
-      WHERE e.shop_id = $1 AND e.kind = 'status' AND e.to_status IN ('delivered','picked_up')
-        AND e.created_at >= $2 AND e.created_at < $3 AND o.is_test = false`,
-    [shopId, w.from, w.to]
-  )).rows[0];
-  const refunds = (await db.query(
-    `SELECT COUNT(*)::int AS n, COALESCE(SUM(r.amount_minor), 0) AS s
-       FROM online_order_refunds r JOIN online_orders o ON o.id = r.order_id
-      WHERE r.shop_id = $1 AND r.created_at >= $2 AND r.created_at < $3 AND o.is_test = false`,
-    [shopId, w.from, w.to]
-  )).rows[0];
-  const rows = (await db.query(
-    `SELECT o.id, o.order_no, o.status, o.total_minor, o.is_test, o.updated_at, COALESCE(r.s, 0) AS refunded
-       FROM online_orders o
-       LEFT JOIN (SELECT order_id, SUM(amount_minor) AS s FROM online_order_refunds
-                   WHERE shop_id = $1 GROUP BY order_id) r ON r.order_id = o.id
-      WHERE o.shop_id = $1
-        AND (o.status IN ('return_requested','refunded_partial','refunded_full') OR r.s IS NOT NULL)
-      ORDER BY o.updated_at DESC, o.id DESC
-      LIMIT 1000`,
-    [shopId]
+      WHERE e.shop_id = ANY($1::text[]) AND e.kind = 'status' AND e.to_status IN ('delivered','picked_up')
+        AND e.created_at >= $2 AND e.created_at < $3 AND o.is_test = false
+      GROUP BY e.shop_id`,
+    [ids, w.from, w.to]
   )).rows;
-  const issues = [];
+  const refunds = (await db.query(
+    `SELECT r.shop_id, COUNT(*)::int AS n, COALESCE(SUM(r.amount_minor), 0) AS s
+       FROM online_order_refunds r JOIN online_orders o ON o.id = r.order_id
+      WHERE r.shop_id = ANY($1::text[]) AND r.created_at >= $2 AND r.created_at < $3 AND o.is_test = false
+      GROUP BY r.shop_id`,
+    [ids, w.from, w.to]
+  )).rows;
+  const rows = (await db.query(
+    `SELECT shop_id, id, order_no, status, total_minor, is_test, updated_at, refunded FROM (
+       SELECT o.shop_id, o.id, o.order_no, o.status, o.total_minor, o.is_test, o.updated_at, COALESCE(r.s, 0) AS refunded,
+              ROW_NUMBER() OVER (PARTITION BY o.shop_id ORDER BY o.updated_at DESC, o.id DESC) AS rn
+         FROM online_orders o
+         LEFT JOIN (SELECT order_id, SUM(amount_minor) AS s FROM online_order_refunds
+                     WHERE shop_id = ANY($1::text[]) GROUP BY order_id) r ON r.order_id = o.id
+        WHERE o.shop_id = ANY($1::text[]) AND ($2::boolean = false OR o.is_test = false)
+          AND (o.status IN ('return_requested','refunded_partial','refunded_full') OR r.s IS NOT NULL)
+     ) x WHERE rn <= 1000
+     ORDER BY shop_id, rn`,
+    [ids, liveOnly === true]
+  )).rows;
+  const col = new Map(collected.map((r) => [r.shop_id, r]));
+  const ref = new Map(refunds.map((r) => [r.shop_id, r]));
+  const issuesOf = new Map(ids.map((id) => [id, []]));
   for (const r of rows) {
+    const list = issuesOf.get(r.shop_id);
+    if (!list || list.length >= MAX_ISSUES) continue;
     const code = issueOf(r.status, r.total_minor, r.refunded);
     if (!code) continue;
-    issues.push({
+    list.push({
       orderId: r.id, orderNo: Number(r.order_no), status: r.status, code, isTest: r.is_test === true,
       totalMinor: Number(r.total_minor), refundedMinor: Number(r.refunded), updatedAt: Number(r.updated_at),
     });
-    if (issues.length >= MAX_ISSUES) break;
   }
-  const collectedMinor = Number(collected.s);
-  const refundedMinor = Number(refunds.s);
-  return {
-    window: w,
-    currency: 'AFN',
-    collected: { count: Number(collected.n), totalMinor: collectedMinor },
-    refunds: { count: Number(refunds.n), totalMinor: refundedMinor },
-    netMinor: collectedMinor - refundedMinor,
-    issues,
-    serverTime: now(),
-  };
+  const t = now();
+  for (const id of ids) {
+    const c = col.get(id);
+    const f = ref.get(id);
+    const collectedMinor = Number(c ? c.s : 0);
+    const refundedMinor = Number(f ? f.s : 0);
+    out.set(id, {
+      window: w,
+      currency: 'AFN',
+      collected: { count: Number(c ? c.n : 0), totalMinor: collectedMinor },
+      refunds: { count: Number(f ? f.n : 0), totalMinor: refundedMinor },
+      netMinor: collectedMinor - refundedMinor,
+      issues: issuesOf.get(id),
+      serverTime: t,
+    });
+  }
+  return out;
 }
 
-module.exports = { FLAG_KEY, flagOf, parse, issueOf, summary, record, report };
+async function report(shopId, query = {}) {
+  return (await reportMany([shopId], query)).get(String(shopId));
+}
+
+module.exports = { FLAG_KEY, flagOf, parse, issueOf, summary, record, report, reportMany };
