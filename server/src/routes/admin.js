@@ -103,6 +103,7 @@ const CAPABILITIES = Object.freeze([
   'market-admin.v1',  //  GET /admin/market/overview|sellers|orders|commission|history (۴.۶، فقط خواندن)
   'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
   ...require('../lib/ops-overview').CAPABILITIES,   //  ops.v1 (+release-stage.v1 با OPS-01) — پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳
+  'finance.v1',       //  ماژولِ ۴.۵: GET /admin/finance/(summary…export) · POST …/adjustments (app.js ⇒ routes/admin-finance.js)
 ]);
 
 router.get('/me', (req, res) => {

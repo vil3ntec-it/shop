@@ -479,3 +479,29 @@
   «در دست» = تحویل‌شدهٔ تسویه‌نشده؛ جمعِ ردیف‌ها = جمعِ کل؛ دیدنش یک ردیفِ سابقه.
 - **مهاجرتِ ۱۷۲:** فقط نمایه برای پرسش‌های بی‌دکانِ مدیر، با خط‌های `rollback:` ِ آزموده.
 
+### ۱۲.۹ مالیِ مرکزی — ماژولِ ۴.۵ (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-finance-api`، مهاجرتِ ۱۷۱)
+
+پولِ اشتراکِ **خودِ پلتفرم**، جدا از حساب‌داریِ داخلیِ دکان‌ها. توانایی: `finance.v1`. همه زیرِ `requireAdmin` و مرزِ
+`lib/admin-roles.js` (finance: همهٔ این درها؛ viewer: فقط GET)؛ نوشتن و خروجی در خودِ در به `superadmin`/`finance`
+بسته است (`requireFinanceWriter`) — مدیرِ عادی (پشتیبانی) نه.
+
+| در | شرح |
+|---|---|
+| `GET /api/admin/finance/summary` | `group=day\|week\|month`، `calendar=persian\|gregorian`، `fromDate`/`toDate` (یا `from`/`to`)، `app` ⇒ جمعِ هر ارز (پرداخت، اصلاح، بازپرداخت، ابطال، خالص)، سطل‌ها به وقتِ `DEFAULT_TIMEZONE` (هفته از شنبه، ماهِ خورشیدی)، به تفکیکِ بخش و روش. حداکثر ۷۳۲ روز و ۴۰۰ سطل |
+| `GET …/breakdown?by=shop\|plan` | تفکیکِ بازه، صفحه‌بندیِ سمتِ سرور (`limit`/`offset`، `total`) |
+| `GET …/payments` · `…/payments/:id` | دفترِ پرداخت با نشانگر (`paid_at`، `id`) و پالایش؛ یک پرداخت + سندها + `sub_payment_revisions` + سابقه |
+| `GET …/adjustments` · `POST …/adjustments` | سندها؛ ساختنِ سند `{paymentId, kind: correction\|refund\|reversal\|reference, amount?, reference?, reason, expectedNet?}` + `Idempotency-Key` |
+| `GET …/receivables` | بدهی = قیمتِ اشتراک (یا قیمتِ پلن در روزِ آغاز، همان قاعدهٔ `/sales/debts`) − (پرداخت + سند) **به همان ارز**؛ فعال/معلق |
+| `GET …/pending` · `…/gateway` | درخواست‌های خرید با قیمتِ برآوردی؛ درگاهِ حساب‌پی (`payment_intents` ِ #518/#529): بی جدول یا بی کلید ⇒ `state: blocked_external` با پیامِ «BLOCKED-EXTERNAL: کلیدِ حساب‌پی نیامده»، وگرنه شمارِ هر وضعیت، «بی شمارهٔ تراکنش» و «نیازمندِ بررسی» |
+| `GET …/discrepancies` | پرداختِ بی اشتراک، اشتراک/دکانِ ناپیدا، ارزِ ناهمسان، رسیدِ تکراری، ویرایش/حذفِ راهِ پیشین، سندِ پرداختِ حذف‌شده، شمارهٔ تراکنشِ تکراری، بیش‌پرداخت، درگاه (اگر زنده) — هر یافته با شمارِ دقیق و تا ۵۰ نمونه |
+| `GET …/history` | ردیف‌های سابقهٔ کارهای مالی با نشانگر |
+| `GET …/export?dataset=payments\|adjustments` | `{csv, rows, nextCursor, filename}` — حداکثر ۵۰۰۰ ردیف در هر صفحه، BOM، خنثیِ فرمول، یک ردیفِ سابقه برای هر صفحه |
+
+- ⛔ **احرازِ دوباره برای سند:** نشستی که در `REAUTH_WINDOW_MIN` ساخته شده، یا `password` ِ همان مدیر (۵ اشتباه در ربع ساعت ⇒ ۴۲۹،
+  هر اشتباه یک ردیفِ `admin.finance_reauth_failed`)؛ پلِ پنل با کلیدِ سرویس ⇒ `X-Actor-Reauth-At` (زمانِ رمزِ پنل، تازه‌تر از همان
+  پنجره) — به همان اندازه معتبر که کلیدِ سرویس. رمز هرگز در هشِ کلیدِ یکتایی یا هیچ ردیفی نمی‌نشیند.
+- ⛔ **جدول‌ها فقط افزودنی** (تریگرِ `finance_refuse_change`)؛ `sub_payments_revision` هر UPDATE/DELETE ِ `sub_payments` را با ردیفِ
+  پیش و پس نگه می‌دارد. **خالص هرگز منفی** (قید + قفلِ ردیفِ پرداخت)؛ ابطال = همهٔ خالصِ همان لحظه.
+- ⚠️ وقتی #582 (`tenant-matrix.test.js`) مرج شد، درهای `GET /api/admin/finance/*` باید در `ADMIN_SUBJECT` رده بگیرند (دادهٔ پولیِ
+  پلتفرم به‌ازای دکان؛ فقط مدیر).
+

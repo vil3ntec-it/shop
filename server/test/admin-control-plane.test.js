@@ -237,6 +237,8 @@ const MOUNTS = {
   'admin-delivery.js': '/admin/delivery',
   //  پنلِ مرکزی، ماژول‌های عملیات (۴.۸–۴.۱۱، ۴.۱۳)
   'admin-ops.js': '/admin/ops',
+  //  ماژولِ ۴.۵ ِ پنلِ مرکزی
+  'admin-finance.js': '/admin/finance',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -364,6 +366,8 @@ const CAPABILITY_PROBES = {
   //  فقط وقتی OPS-01 (#559) در همین نسخه است
   ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
     ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
+  'finance.v1': ['GET /admin/finance/summary', 'GET /admin/finance/payments', 'POST /admin/finance/adjustments',
+    'GET /admin/finance/discrepancies', 'GET /admin/finance/export'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
