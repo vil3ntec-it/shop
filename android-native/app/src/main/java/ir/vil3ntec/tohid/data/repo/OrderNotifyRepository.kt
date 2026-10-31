@@ -3,11 +3,13 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderNotice
+import ir.vil3ntec.tohid.core.orders.OrderNotifyAcks
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.net.URLEncoder
@@ -27,7 +29,11 @@ class OrderNotifyRepository(private val api: ApiClient) {
       val o = e as? JsonObject ?: return@mapNotNull null
       val id = (o["id"] as? JsonPrimitive)?.content ?: return@mapNotNull null
       val orderId = (o["orderId"] as? JsonPrimitive)?.content ?: return@mapNotNull null
-      OrderNotice(id, orderId, (o["orderNo"] as? JsonPrimitive)?.longOrNull ?: 0)
+      OrderNotice(
+        id, orderId, (o["orderNo"] as? JsonPrimitive)?.longOrNull ?: 0,
+        //  `order_created` یا `order_review` (M5)؛ سرورِ کهنه بی `event` ⇒ «سفارشِ تازه»
+        (o["event"] as? JsonPrimitive)?.contentOrNull ?: OrderNotifyAcks.EVENT_CREATED,
+      )
     }
   }
 

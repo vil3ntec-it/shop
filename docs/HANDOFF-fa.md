@@ -54,6 +54,13 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/portable-account-server` (جابه‌جاییِ سرورِ حساب؛ همراهِ `claude/portable-server` در ریپوی server)
+- انجام شد: `server/scripts/move-db.js` (inspect · copy · compare) بینِ PGlite و PostgreSQL در هر دو جهت؛ مبدأ هرگز نوشته
+  نمی‌شود، مقصدِ تازه با Migrationهای همین کد، یک تراکنش با ماشه‌های خاموش، و تطبیقِ شمار/هشِ ردیف/جمعِ مبلغ/sequence.
+  سند: `DISASTER-RECOVERY-fa.md` §۳.۱. آزمون: `test/move-db.test.js` ۸/۸ (PGlite؛ و PGlite ⇐ PostgreSQL ⇐ PGlite روی PostgreSQL 16ِ محلی).
+- نیمه‌کاره: پیوند از `docs/SERVERS-fa.md` (هنوز در PRِ باز #576) به همین ابزار، پس از مرجِ آن.
+- قدمِ بعدی: پس از مرج، پنلِ خانگی `move-server.mjs` را با همین ابزار برای تطبیقِ سرورِ حساب صدا می‌زند (کدش آماده است).
+
 ### ۱۴۰۵/۰۸/۰۹ — پنلِ مرکزیِ مالک در ریپوی `server` و جابه‌جاییِ سرور
 - صاحب محصول: پنلِ مدیریت **همراهِ ساختِ برنامه** ساخته شود، روی «برنامهٔ سرور» (`vil3ntec-it/server`، `homelab-panel`) در **بخشِ
   فروشگاه** (`/shop`)؛ بخشِ جدای «اشتراک‌ها» حذف و اشتراکِ هر برنامه (تانک‌تیل/پمپ، فروشگاه) در بخشِ خودش؛ برنامهٔ سرور قابلِ بردن به
@@ -255,13 +262,18 @@ PRها سرخ می‌ماند. ترتیبِ پیشنهادیِ مرج: #416 ⇐ 
   (فایلِ تازه صفر، موجود فقط کاهشی، سقفِ ۲۱۴ فایل در `baseline.json`، فعلاً گزارش)؛ هدفِ `linuxX64` پشتِ `-Pnative=true` در `core`
   و کارِ `core-native` در `ios-spike.yml` (فعلاً گزارش).
 - قدمِ بعدی: پس از یک هفته بی‌خطا، سنجه برای فایلِ تازه سد شود (برداشتنِ continue-on-error) و `core-native` هم.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-m5-reservation`، سمتِ برنامهٔ مدیریت
 - انجام شد: «سفارش در بررسی» در فهرست (نشان + کادرِ بالای صف) و جزئیات (قلم‌های کم + رد/لغو با «ناموجود»)؛ مهلتِ نگه‌داشتن
   (دقیقه، همان سنجشِ سرور) در «ویترین ⇐ تنظیمات» فقط با رزروِ روشن؛ اعلانِ «سفارش به بررسی رفت» در صفِ `order-notify`
   (رویدادِ `order_review` در مهاجرتِ ۱۳۵) و در برنامه از `summary`. منطق در `core/…/orders/StockHold.kt` با ۱۰ آزمونِ commonTest.
+  پس از ادغامِ M6 (`OrderNotify`): اعلانِ `/order-notify/pending` بر اساسِ `event` برچسب می‌خورد (`OrderNotifyAcks.label`؛
+  `order_review` ⇒ «سفارش به بررسی رفت» در کانالِ «سفارش در بررسی») و با نگهبان یک خبر برای هر سفارش است
+  (`StockHold.claim`/`claims`، `Watchman.claimOrderReview`)؛ آزمون‌ها `StockHoldTest` و `OrderNotifyEventTest`.
 - نیمه‌کاره: ساختِ اندروید/کامپیوتر این‌جا ممکن نبود (dl.google.com بسته) ⇒ CI. برنامه هنوز FCM ندارد؛ اعلانِ برنامه با
   پرسیدنِ `summary` است (باز: هر ۲۰ ثانیه، بسته: هر ۱۵ دقیقه) و لمسِ اعلان فقط برنامه را باز می‌کند، نه همان سفارش.
 - قدمِ بعدی: سبز شدنِ CI، سپس روشن کردنِ آزمایشیِ `shop.stock_reserve` (و `shop.order_notify`) برای یک دکان.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-m5-reservation` (M5، رزروِ نرمِ موجودی)
 - انجام شد: رزروِ نرمِ سفارشِ آنلاین پشتِ پرچمِ خاموشِ `shop.stock_reserve` (و `shop.catalog`، فقط با موجودیِ تازه) در
   `server/src/lib/stock-reserve.js`؛ مهاجرتِ ۱۳۵ (`stock_reservations.kind` و `short_at`)؛ آزمونِ `test/stock-reserve.test.js`

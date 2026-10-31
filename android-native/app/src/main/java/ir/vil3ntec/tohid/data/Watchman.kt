@@ -65,6 +65,10 @@ object Watchman {
   private const val SEEN_SUB = "notified_sub_step"
   private const val SEEN_NEWS = "notified_news_at"
   private const val SEEN_REVIEW = "notified_order_review"
+  /** سفارش‌هایی که اعلانِ M6 «به بررسی رفت» را داد («شناسه|زمان»، `StockHold.claims`) */
+  private const val CLAIMED_REVIEW = "claimed_order_review"
+  /** خواندن‌ونوشتنِ دو مجموعهٔ بالا — کارِ دوره‌ای، `OrdersLive` و M6 هم‌زمان‌اند */
+  private val reviewLock = Any()
 
   private const val WORK = "tohid-watchman"
 
@@ -262,12 +266,44 @@ object Watchman {
    *  و دوباره رفت، دوباره خبر می‌دهد (`StockHold.fresh`). متن بی دادهٔ مشتری، مثلِ اعلانِ سرور.
    */
   fun checkOrderReview(context: Context, review: List<ir.vil3ntec.tohid.core.model.OrderReviewRefDto>) {
-    val seen = prefs(context).getStringSet(SEEN_REVIEW, emptySet()).orEmpty()
-    val out = ir.vil3ntec.tohid.core.orders.StockHold.fresh(
-      review.map { ir.vil3ntec.tohid.core.orders.StockHold.Ref(it.id, it.orderNo) }, seen,
-    )
+    val out = synchronized(reviewLock) {
+      val p = prefs(context)
+      val seen = p.getStringSet(SEEN_REVIEW, emptySet()).orEmpty()
+      val raw = p.getStringSet(CLAIMED_REVIEW, emptySet()).orEmpty()
+      val claims = ir.vil3ntec.tohid.core.orders.StockHold.claims(raw, System.currentTimeMillis())
+      val r = ir.vil3ntec.tohid.core.orders.StockHold.fresh(
+        review.map { ir.vil3ntec.tohid.core.orders.StockHold.Ref(it.id, it.orderNo) }, seen, claims.keys,
+      )
+      val keepClaims = ir.vil3ntec.tohid.core.orders.StockHold.encodeClaims(claims)
+      if (r.keep != seen || keepClaims != raw) {
+        p.edit().putStringSet(SEEN_REVIEW, r.keep).putStringSet(CLAIMED_REVIEW, keepClaims).apply()
+      }
+      r
+    }
     ir.vil3ntec.tohid.core.orders.StockHold.notice(out.fresh)?.let { (title, body) -> notify(context, ORDER_REVIEW, title, body) }
-    if (out.keep != seen) prefs(context).edit().putStringSet(SEEN_REVIEW, out.keep).apply()
+  }
+
+  /**
+   *  M6 (`OrderNotify`) پیش از نشان دادنِ یک `order_review` می‌پرسد — یک سفارش یک خبر (#429 × M6).
+   *  true ⇒ ادعا ثبت شد و نگهبان همین سفارش را دیگر خبر نمی‌دهد؛ false ⇒ نگهبان (یا M6) پیش‌تر خبر داده.
+   */
+  fun claimOrderReview(context: Context, orderId: String, now: Long = System.currentTimeMillis()): Boolean =
+    synchronized(reviewLock) {
+      val p = prefs(context)
+      val seen = p.getStringSet(SEEN_REVIEW, emptySet()).orEmpty()
+      val claims = ir.vil3ntec.tohid.core.orders.StockHold.claims(p.getStringSet(CLAIMED_REVIEW, emptySet()).orEmpty(), now)
+      if (!ir.vil3ntec.tohid.core.orders.StockHold.claim(orderId, seen, claims)) return@synchronized false
+      p.edit()
+        .putStringSet(SEEN_REVIEW, seen + orderId)
+        .putStringSet(CLAIMED_REVIEW, ir.vil3ntec.tohid.core.orders.StockHold.encodeClaims(claims + (orderId to now)))
+        .apply()
+      true
+    }
+
+  /** کانالِ «سفارش در بررسی» — M6 هم اعلانِ `order_review` را همین‌جا می‌گذارد تا خاموش کردنِ کانال هر دو را ببندد */
+  fun orderReviewChannel(context: Context): String {
+    ensureChannels(context)
+    return ORDER_REVIEW.id
   }
 
   /* ------------------------------ کارِ دوره‌ای ------------------------------ */

@@ -116,6 +116,42 @@ class StockHoldTest {
   }
 
   @Test
+  fun m6ClaimMeansOneNoticePerOrder() {
+    val a = Ref("A", 7)
+    //  M6 زودتر رسید ⇒ نگهبان همان سفارش را خبر نمی‌دهد
+    assertTrue(StockHold.claim("A", emptySet(), emptyMap()))
+    val claims = mapOf("A" to 1_000L)
+    val w = StockHold.fresh(listOf(a), setOf("A"), claims.keys)
+    assertEquals(emptyList(), w.fresh)
+    assertEquals(setOf("A"), w.keep)
+    //  `summary` ِ کهنه که هنوز A را ندارد، ادعا را پاک نمی‌کند ⇒ دورِ بعد هم خبرِ دوم نیست
+    val stale = StockHold.fresh(emptyList(), setOf("A"), claims.keys)
+    assertEquals(setOf("A"), stale.keep, "ادعای زنده در حافظه می‌ماند")
+    assertEquals(emptyList(), StockHold.fresh(listOf(a), stale.keep, claims.keys).fresh)
+    //  نگهبان زودتر رسید ⇒ M6 اعلانِ دوم نمی‌دهد؛ ادعای پیشینِ خودِ M6 هم همین‌طور
+    assertFalse(StockHold.claim("A", setOf("A"), emptyMap()))
+    assertFalse(StockHold.claim("A", emptySet(), claims))
+    assertFalse(StockHold.claim("", emptySet(), emptyMap()))
+    //  بی ادعا رفتارِ پیشین می‌ماند: بیرون آمد ⇒ از حافظه بیرون
+    assertEquals(emptySet(), StockHold.fresh(emptyList(), setOf("A")).keep)
+  }
+
+  @Test
+  fun claimsExpireAndRejectGarbage() {
+    val now = 10_000_000L
+    val raw = setOf(
+      "A|${now - 1_000}",
+      "B|${now - StockHold.CLAIM_MS - 1}",   // کهنه
+      "C|${now + 5_000}",                    // آینده ⇒ ساعتِ بد
+      "bad", "|5", "D|x",
+    )
+    val live = StockHold.claims(raw, now)
+    assertEquals(mapOf("A" to now - 1_000), live)
+    assertEquals(live, StockHold.claims(StockHold.encodeClaims(live), now), "رفت‌وبرگشتِ ذخیره")
+    assertEquals(emptyMap(), StockHold.claims(emptySet(), now))
+  }
+
+  @Test
   fun noticeHasNoCustomerData() {
     assertNull(StockHold.notice(emptyList()))
     val (t1, _) = StockHold.notice(listOf(Ref("A", 12)))!!

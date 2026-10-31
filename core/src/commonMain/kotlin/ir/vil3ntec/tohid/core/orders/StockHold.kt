@@ -140,10 +140,47 @@ object StockHold {
    */
   data class Fresh(val fresh: List<Ref>, val keep: Set<String>)
 
-  fun fresh(current: List<Ref>, seen: Set<String>): Fresh {
+  /**
+   *  [claimed]: سفارش‌هایی که اعلانِ M6 (`order_review` ِ `/order-notify/pending`) در [CLAIM_MS] ِ گذشته
+   *  خبرشان را داده ([claims]). خبرِ دوباره نمی‌گیرند و در [Fresh.keep] می‌مانند، حتی اگر این `summary`
+   *  کهنه‌تر از همان `pending` باشد و هنوز آن‌ها را نداشته باشد — وگرنه دورِ بعد همان سفارش دوباره خبر می‌داد.
+   */
+  fun fresh(current: List<Ref>, seen: Set<String>, claimed: Set<String> = emptySet()): Fresh {
     val ids = current.map { it.id }.filter { it.isNotBlank() }.toSet()
-    return Fresh(current.filter { it.id.isNotBlank() && it.id !in seen }.distinctBy { it.id }, ids)
+    val skip = seen + claimed
+    return Fresh(current.filter { it.id.isNotBlank() && it.id !in skip }.distinctBy { it.id }, ids + claimed)
   }
+
+  /*
+   *  ── یک سفارش، یک خبر (#429 × M6) ──────────────────────────────────
+   *  «به بررسی رفت» از دو راه می‌رسد: نگهبان از `summary.review` (برنامهٔ بسته هم) و M6 از ردیفِ
+   *  `order_review` ِ outbox (فقط برنامهٔ باز، با رسیدِ «باز شد»). هر کدام زودتر رسید خبر می‌دهد:
+   *  M6 پیش از نشان دادن [claim] می‌پرسد و اگر بله، سفارش در «خبرداده‌شده»های نگهبان ([seen]) و
+   *  ادعاها می‌نشیند؛ نگهبان سفارشِ ادعاشده را خبر نمی‌دهد ([fresh]).
+   *  ──────────────────────────────────────────────────────────────────
+   */
+
+  /** ادعای M6 تا این مدت نگه داشته می‌شود — بسیار بیشتر از کهنگیِ هر پاسخِ `summary` */
+  const val CLAIM_MS = 30 * 60_000L
+
+  /** M6 این `order_review` را نشان بدهد؟ فقط اگر نگهبان یا خودِ M6 همین سفارش را پیش‌تر خبر نداده باشد. */
+  fun claim(orderId: String, seen: Set<String>, claims: Map<String, Long>): Boolean =
+    orderId.isNotBlank() && orderId !in seen && orderId !in claims
+
+  /** ادعاهای ذخیره‌شده («شناسه|زمان») ⇒ ادعاهای زنده؛ کهنه، آینده‌دار یا بدشکل بیرون. */
+  fun claims(raw: Set<String>, now: Long): Map<String, Long> {
+    val out = HashMap<String, Long>()
+    for (e in raw) {
+      val i = e.lastIndexOf('|')
+      if (i <= 0) continue
+      val at = e.substring(i + 1).toLongOrNull() ?: continue
+      if (at > now || now - at > CLAIM_MS) continue
+      out[e.substring(0, i)] = maxOf(at, out[e.substring(0, i)] ?: 0L)
+    }
+    return out
+  }
+
+  fun encodeClaims(claims: Map<String, Long>): Set<String> = claims.map { (id, at) -> "$id|$at" }.toSet()
 
   /** متنِ اعلان — مثلِ اعلانِ سرور بی دادهٔ مشتری، فقط شمارهٔ سفارش */
   fun notice(fresh: List<Ref>): Pair<String, String>? {
