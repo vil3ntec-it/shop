@@ -141,6 +141,7 @@ object OwnerExport {
     "active" to "فعال",
     "saleUnit" to "واحد فروش",
     "unitFactor" to "ضریب واحد",
+    "brand" to "برند",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",
