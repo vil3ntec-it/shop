@@ -2691,3 +2691,23 @@ STARTTLS روی سرورِ ساختگی، چهل رسید)؛ ریشه در **و�
 - ⛔ کلیدهای `cash-…` و `shift-…`ِ برنامهٔ پمپ (`AlertWatch.ShiftAlerts`، از ورق) ⇒ نوعِ `shift` (`pump-state.kindOf`)، نه `debt`. همان `CloudEvents.KindOf`ِ برنامه.
 - ⛔ `shift` در `PUSH_KINDS` و `ALERT_KINDS`ِ بات است: پولِ گم‌شده خبرِ مهم است. عنوانِ پوش: «کسریِ صندوق یا شیفتِ بسته‌نشده».
 - آزمون: `test/pump-shift-alerts.test.js`. بات: ریپوی پمپ، `telegram-bot/` («💰 کسریِ صندوق»).
+
+## 🛠 پنلِ مرکزی — درهای عملیات `/api/admin/ops/*` (۴.۸ نسخه‌ها · ۴.۹ سلامت · ۴.۱۰ رخداد · ۴.۱۱ هشدار · ۴.۱۳ یکپارچه‌سازی؛ از ۱۴۰۵/۰۸/۱۰، مهاجرتِ ۱۷۳)
+
+- درها: `routes/admin-ops.js` ⇐ `lib/ops-overview.js` · `lib/ops-errors.js` · `lib/ops-alerts.js` · `lib/job-beat.js`. توانایی `ops.v1`؛
+  `release-stage.v1` فقط وقتی `lib/release-stage.js` (OPS-01، #559) هست — همان نامِ پل در ریپوی `server` (`routes/console-ops.js`).
+- ⛔ مرزِ نقش همان `lib/admin-roles.js`: خواندن هر مدیر (viewer هم)، نوشتن admin/superadmin، **finance هیچ** (پیش‌فرض‌بسته). هر نوشتن
+  یک ردیفِ `audit_logs` در همان تراکنش (`admin.ops_incident_*`، `admin.ops_alert_ack|resolved`).
+- ⛔ **۵xx ِ سرور** حالا در `server_errors` می‌نشیند (`errorHandler` ⇒ `recordServer`، بی await، شکستش به پاسخ نمی‌رسد)؛ شناسهٔ ردیف همان
+  «کدِ پیگیری» ِ پیامِ خطاست. پیام پیش از نوشتن پوشانده می‌شود: ایمیل، شماره، توکنِ ۳۲+، نشانیِ دارای رمز، و **خودِ مقدارهای رازِ
+  `config`** و `DATABASE_URL`؛ Stack نه، فقط `src/…:line`. سقف ۱۲۰ در دقیقه (بیشتر فقط شمرده: `dropped`).
+- ⛔ **رخداد = اثرِ انگشت** (منبع + برنامه/مسیرِ الگو + پیامِ عادی‌شده + نخستین قابِ Stack): خطای تکراری یک ردیفِ `ops_incidents` با
+  شمارنده؛ `client_errors.fingerprint` با `ingest()` پر می‌شود (از `ops_cursors`، تک‌پرواز + `pg_try_advisory_xact_lock`). «حل شد» +
+  وقوعِ تازه ⇒ «باز» و رخدادِ «بازگشایی». تاریخچهٔ `ops_incident_events` فقط افزوده می‌شود. نسخهٔ کهنه (`expectedVersion`) ⇒ ۴۰۹.
+- ⛔ **هشدار**: هر قاعده پرس‌وجوی فقط‌خواندنی روی دادهٔ واقعی؛ از هر (قاعده، هدف) یک هشدارِ زنده (`ux_ops_alerts_live`)؛ حداکثر ۵۰ تازه
+  در هر دور و ۲۰ برای هر قاعده ⇒ بقیه یک «و N مورد دیگر»؛ بستنِ خودکار **فقط** پس از اجرای موفقِ همان قاعده (شکست/جدولِ نبوده ⇒
+  هیچ هشداری بسته نمی‌شود)؛ چشمکِ زیرِ ۳۰ دقیقه همان ردیف را باز می‌کند و `live_since` را جلو نمی‌برد (پنل با همین یک بار به تلگرام
+  می‌فرستد). زمان‌بند هر ۵ دقیقه (`index.js`)، و پیش از فهرست حداکثر هر دقیقه.
+- ⛔ **انتشارِ مرحله‌ای**: «برگشت» (پایین آوردنِ نسخهٔ نصب‌شده) نیست و پاسخ همین را می‌گوید (`rollback.supported: false`)؛ زمان‌دار هم نیست.
+- ⛔ «نسخهٔ برنامه»، «نسخهٔ API» و «نسخهٔ طرحِ پایگاه» (`schema_migrations` و `app_schema`) سه فیلدِ جدا‌ند.
+- آزمون: `test/console-ops.test.js` (۱۴، PG و PGlite)، `admin-control-plane.test.js` (نقشهٔ سوارشدن + `ops.v1`).

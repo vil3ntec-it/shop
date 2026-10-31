@@ -102,6 +102,7 @@ const CAPABILITIES = Object.freeze([
   'search.v1',        //  GET /admin/search?q= — دکان، کاربر، پرداخت، سفارش، خطا (و مدیر فقط برای ارشدِ انسانی)، به نقش
   'market-admin.v1',  //  GET /admin/market/overview|sellers|orders|commission|history (۴.۶، فقط خواندن)
   'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
+  ...require('../lib/ops-overview').CAPABILITIES,   //  ops.v1 (+release-stage.v1 با OPS-01) — پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳
 ]);
 
 router.get('/me', (req, res) => {
@@ -889,6 +890,7 @@ router.use('/system', require('./admin-system'));
 //  پنلِ مرکزی ۴.۶ و ۴.۷: مدیریتِ بازار و نظارت بر پیک — فقط خواندن (+ آستانه‌های «گیر کرده»، فقط ارشد)
 router.use('/market', require('./admin-market'));
 router.use('/delivery', require('./admin-delivery'));
+router.use('/ops', require('./admin-ops'));         //  پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳: نسخه، سلامت، رخداد، هشدار، یکپارچه‌سازی
 //  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
 router.use('/release', require('./admin-release'));
 router.use('/', require('./admin-platform'));

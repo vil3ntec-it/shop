@@ -235,6 +235,8 @@ const MOUNTS = {
   //  پنلِ مرکزی ۴.۶ و ۴.۷
   'admin-market.js': '/admin/market',
   'admin-delivery.js': '/admin/delivery',
+  //  پنلِ مرکزی، ماژول‌های عملیات (۴.۸–۴.۱۱، ۴.۱۳)
+  'admin-ops.js': '/admin/ops',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -357,6 +359,11 @@ const CAPABILITY_PROBES = {
   'delivery-watch.v1': ['GET /admin/delivery/overview', 'GET /admin/delivery/queue', 'GET /admin/delivery/events',
     'GET /admin/delivery/connectivity', 'GET /admin/delivery/report', 'GET /admin/delivery/thresholds',
     'PUT /admin/delivery/thresholds'],
+  'ops.v1': ['GET /admin/ops/releases', 'GET /admin/ops/health', 'GET /admin/ops/integrations', 'GET /admin/ops/incidents',
+    'GET /admin/ops/alerts', 'POST /admin/ops/alerts/evaluate', 'POST /admin/ops/incidents/x1/status', 'POST /admin/ops/alerts/x1/ack'],
+  //  فقط وقتی OPS-01 (#559) در همین نسخه است
+  ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
+    ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
