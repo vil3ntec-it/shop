@@ -14,6 +14,8 @@
  *      هرگز از کلِ سفارش بیشتر نیست ⇒ دفتر و درگاه دو بار برنمی‌گردانند.
  *   ۴) بی فروشِ `o-…` ِ زنده، سفارشِ آزمایشی، یا دکانِ دیگر ⇒ هیچ.
  *   ۵) اجازه: شاگردِ بی اشتراکِ چنددستگاهی ⇒ `refundable` نه.
+ *   ۶) ⛔ پرچمِ `shop.orders.refunds` خاموش (پیش‌فرض) ⇒ `refunds` همیشه خالی، حتی برای گذارِ سادهٔ
+ *      «بازپرداختِ کامل» یا بازپرداختِ درگاه — برنامهٔ نصب‌شده بی پرچم سندِ برگشت نمی‌نویسد.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -67,6 +69,9 @@ async function shop(name, { refundsOn = false } = {}) {
   assert.ok(cfg.body.handoverSince > 0, JSON.stringify(cfg.body));
   return { ...u, token: u.accessToken, shopId };
 }
+
+/** «بازپرداختِ کامل» با گذارِ ساده فقط با پرچمِ خاموش ممکن است (روشن ⇒ ۴۰۹ refund_via_ledger)؛ سپس روشن */
+const refundsOn = (owner) => setFlag(owner.shopId, 'shop.orders.refunds', true);
 
 let keySeq = 0;
 async function newOrder(owner, over = {}) {
@@ -152,6 +157,9 @@ test('«بازپرداختِ کامل» ِ سفارشِ دارای فروش ⇒ 
   assert.equal((await push(a.token, DEV_A, saleOps(order))).status, 200);
   assert.deepEqual((await pending(a)).refunds, [], 'پیش از بازپرداخت هیچ');
   await walk(a, order.id, ['return_requested', 'refunded_full']);
+  //  ⛔ پرچم خاموش ⇒ هیچ رویدادی، حتی برای سفارشِ بازپرداخت‌شده با فروشِ زنده
+  assert.deepEqual((await pending(a)).refunds, [], 'بی shop.orders.refunds هیچ');
+  await refundsOn(a);
 
   let r = await pending(a);
   assert.equal(r.refunds.length, 1, JSON.stringify(r));
@@ -248,25 +256,28 @@ test('بی فروشِ o-… ِ زنده، فروشِ لغوشده، سفارشِ
   const a = await shop('بی‌فروش');
   const b = await shop('دکانِ دیگر');
   //  بی فروش: بازپرداخت در فهرستِ بازپرداخت نیست (فروشِ تحویل اول باید ثبت شود)
+  //  (گذارِ سادهٔ «بازپرداختِ کامل» فقط با پرچمِ خاموش؛ پس همه پیش از روشن کردن)
   const noSale = await newOrder(a);
   await walk(a, noSale.id, [...TO_PICKED_UP, 'return_requested', 'refunded_full']);
-  assert.deepEqual((await pending(a)).refunds.map((x) => x.id), []);
   //  فروشِ لغوشده (برگشت به دکان پیش‌تر) ⇒ نه
   const cancelled = await newOrder(a);
   await walk(a, cancelled.id, [...TO_PICKED_UP, 'return_requested', 'refunded_full']);
   const ops = saleOps(cancelled);
   ops[0].fields.status = 'cancelled';
   assert.equal((await push(a.token, DEV_A, ops)).status, 200);
-  assert.deepEqual((await pending(a)).refunds.map((x) => x.id), []);
   //  آزمایشی ⇒ هرگز
   const t = await newOrder(a, { test: true });
   await walk(a, t.id, [...TO_PICKED_UP, 'return_requested', 'refunded_full']);
   assert.equal((await push(a.token, DEV_A, saleOps(t))).status, 200);
-  assert.deepEqual((await pending(a)).refunds.map((x) => x.id), []);
+  await refundsOn(a);
+  await refundsOn(b);
+  assert.deepEqual((await pending(a)).refunds.map((x) => x.id), [], 'بی فروش، فروشِ لغوشده و آزمایشی ⇒ هیچ');
   //  دکانِ دیگر: سفارش و فروشِ A را نمی‌بیند؛ ردیف‌های B فهرستِ A را عوض نمی‌کنند
+  await setFlag(a.shopId, 'shop.orders.refunds', false);
   const real = await newOrder(a);
   await walk(a, real.id, [...TO_PICKED_UP, 'return_requested', 'refunded_full']);
   assert.equal((await push(a.token, DEV_A, saleOps(real))).status, 200);
+  await refundsOn(a);
   assert.deepEqual((await pending(a)).refunds.map((x) => x.id), [real.id]);
   assert.deepEqual((await pending(b)).refunds, []);
   assert.deepEqual((await pending(b, real.id)).refunds, []);
@@ -280,6 +291,7 @@ test('اجازه: شاگرد با دورهٔ آزمایشی ⇒ refundable؛ ب�
   const order = await newOrder(a);
   await walk(a, order.id, [...TO_PICKED_UP, 'return_requested', 'refunded_full']);
   assert.equal((await push(a.token, DEV_A, saleOps(order))).status, 200);
+  await refundsOn(a);
   const u = await h.newUser('شاگردِ بازپرداخت', 'shop');
   await query(
     `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
@@ -290,4 +302,21 @@ test('اجازه: شاگرد با دورهٔ آزمایشی ⇒ refundable؛ ب�
   await query('UPDATE shops SET created_at=$2 WHERE id=$1', [a.shopId, Date.now() - 400 * 24 * 3600 * 1000]);
   assert.equal(await flag(u.accessToken), false);
   assert.equal(await flag(a.token), true, 'صاحب بی اشتراک هم می‌نویسد');
+});
+
+test('⛔ پرچم خاموش: بازپرداختِ درگاه هم سندِ برگشت نمی‌خواهد؛ روشن ⇒ همان یک رویدادِ full', async () => {
+  const a = await shop('درگاهِ بی پرچم');
+  const order = await newOrder(a);
+  await walk(a, order.id, TO_PICKED_UP);
+  assert.equal((await push(a.token, DEV_A, saleOps(order))).status, 200);
+  await query(`UPDATE online_orders SET payment_status='refunded', updated_at=$3 WHERE shop_id=$1 AND id=$2`, [a.shopId, order.id, now()]);
+  let r = await pending(a);
+  assert.deepEqual(r.refunds, [], 'بی shop.orders.refunds هیچ');
+  assert.deepEqual((await pending(a, order.id)).refunds, []);
+  await refundsOn(a);
+  r = await pending(a);
+  assert.deepEqual(r.refunds[0].refundEvents.map((x) => [x.key, x.amountMinor, x.source]), [['full', order.totalMinor, 'gateway']]);
+  //  دوباره خاموش ⇒ فهرست دوباره خالی (کلیدِ قطعِ فوری)
+  await setFlag(a.shopId, 'shop.orders.refunds', false);
+  assert.deepEqual((await pending(a)).refunds, []);
 });

@@ -43,6 +43,7 @@
  *            سرور همان ردیفِ سابقه را در دفترِ همگام‌شده می‌بیند و سفارش از فهرست می‌رود. مبلغ‌ها با
  *            سقفِ کلِ سفارش (جمعِ همهٔ رویدادها هرگز بیشتر نه) ⇒ دو منبع (دفتر و درگاه) دو بار برنمی‌گردانند.
  *            کالا فقط با «کالا به انبار برگشت؟» ِ برنامه (پیش‌فرض نه).
+ *            ⛔ فقط با پرچمِ `shop.orders.refunds` ِ روشن (پیش‌فرض خاموش ⇒ `refunds` همیشه خالی).
  *
  * فاکتورهای W ِ پیش از این تصمیم (`order_ledger_docs`، migration 095، و حلقه‌هایشان در
  * `hash_chain`) دست‌نخورده می‌مانند؛ این پرونده فقط می‌خواندشان (`docsOf`) و برنامه آن‌ها
@@ -450,7 +451,10 @@ async function handoverPending(shopId, { since = 0, after = '', orderId = '', li
   const fparams = [shopId, from];
   let fextra = '';
   if (only) { fparams.push(only); fextra = ` AND o.id = $${fparams.length}`; }
-  const refundRows = cur ? [] : await db.many(
+  //  ⛔ پول در دفترِ دکان: فقط پشتِ `shop.orders.refunds` (پیش‌فرض خاموش). خاموش ⇒ هیچ رویدادی، حتی
+  //  «بازپرداختِ کامل» ِ گذارِ ساده یا بازپرداختِ درگاه — برنامهٔ نصب‌شده بی پرچم سندِ برگشت نمی‌نویسد.
+  const refundsOn = !cur && (await require('./order-refunds').flagOf(shopId));
+  const refundRows = !refundsOn ? [] : await db.many(
     `SELECT o.id FROM online_orders o
       WHERE o.shop_id = $1 AND o.is_test = false AND o.updated_at >= $2 ${fextra}
         --  ردیفِ دفترِ بازپرداخت فقط از «درخواستِ برگشت» به بعد است (پایانی‌ها هم همین‌جا می‌مانند)
