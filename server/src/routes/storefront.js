@@ -19,6 +19,7 @@ const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
+const extras = require('../lib/storefront-extras');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const areas = require('../lib/storefront-area-requests');
@@ -299,6 +300,30 @@ router.put('/:slug/account/addresses/:id', checkoutLimit, store, customer, async
 
 router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, async (req, res) => {
   res.json(await customers.removeAddress(req.customer, req.params.id));
+});
+
+//  ── WEB-11: علاقه‌مندی‌های حسابِ مشتری (پرچمِ خاموشِ `shop.storefront.favorites` ⇒ ۴۰۴) ──
+const favoritesOn = async (req, res, next) => {
+  if (!(await extras.favoritesOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'favorites_disabled');
+  next();
+};
+
+router.get('/:slug/account/favorites', readLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.favorites(req.store.shop_id, req.customer));
+});
+
+router.put('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.addFavorite(req.store.shop_id, req.customer, req.params.productId));
+});
+
+router.delete('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.removeFavorite(req.store.shop_id, req.customer, req.params.productId));
+});
+
+//  ── WEB-24: بنرهای همین لحظه برای ناحیهٔ مشتری (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۴) ──
+router.get('/:slug/banners', readLimit, store, async (req, res) => {
+  if (!(await extras.bannersOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'banners_disabled');
+  res.json({ banners: await extras.activeBanners(req.store.shop_id, { zone: req.query.zone }) });
 });
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {
