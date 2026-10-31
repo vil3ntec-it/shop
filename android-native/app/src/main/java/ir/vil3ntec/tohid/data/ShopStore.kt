@@ -472,6 +472,12 @@ class ShopStore(private val context: Context) {
     writer().edit(LedgerWriter.appendAudit(row))
   }
 
+  /** همان [appendAudit] برای چند ردیف در یک نوشتن (RPT-09: ردیف‌های حذف‌شده از فاکتورِ باز) */
+  suspend fun appendAudits(rows: (ShopData) -> List<AuditEntry>): Boolean = withContext(Dispatchers.IO) {
+    if (!_loaded.value) return@withContext false
+    writer().edit(LedgerWriter.appendAudits(rows))
+  }
+
   /**
    *  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
    *  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا.

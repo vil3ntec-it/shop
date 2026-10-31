@@ -360,6 +360,11 @@ fun AppRoot(
   LaunchedEffect(store, loaded) {
     if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
   }
+  //  RPT-09: ردیفِ حذف‌شده از فاکتورِ باز ⇐ `line_delete` در سابقهٔ دکان، فقط با «سابقهٔ ضدتقلب»ِ روشن
+  //  (`FraudTrailPref`، پیش‌فرض خاموش) — همان نوشتنِ زیرِ قفلِ `appendAudit`، پس از بارِ دفتر
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.data.FraudTrailPref.attach(context, cartStore, store, scope)
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {

@@ -155,6 +155,7 @@
 - تخفیفِ فاکتور با «بزرگ‌ترین باقی‌مانده» پخش می‌شود تا جمعِ هر تفکیک دقیقاً جمعِ کل باشد (RPT-02، #236).
 - تا D-23 باز است سود «تقریبی» است؛ `profitApproximate` فقط با `mavg` + `costApproved` + بی قلمِ بی‌بها `false` می‌شود؛ پیش‌فرضِ بها `line` (#236).
 - کاربرِ هر رویدادِ ضدتقلب فقط از فیلدِ صریحِ خودش می‌آید، نه از فروشندهٔ فاکتور؛ نام‌ها همان `by`/`at`/`approvedBy`ِ pay-core (RPT-09، #236).
+- «سابقهٔ ضدتقلب» (`FraudTrailPref`، `tohid-policy` ‹`fraud_trail`›، پیش‌فرض خاموش، فقط همین دستگاه): روشن ⇒ `by` روی `cancel_sale` و `SaleReturn` ِ پنجرهٔ قدیم و ردیفِ `line_delete` (مبلغ = `SalesEngine.lineTotal` ِ ردیف، `refId` = کلیدِ فاکتورِ باز) برای هر ردیفی که **کاربر** از فاکتورِ باز حذف کرد (`CartStore.set`/`clear` ⇐ `onLinesRemoved`)؛ ثبتِ فروش، `replace` ِ فاکتورِ نگه‌داشته، دور انداختنِ پیش‌نویس و `prune` حذف نیستند. خاموش ⇒ `by` ِ `null` نوشته نمی‌شود و ردیفی ساخته نمی‌شود. هستهٔ گزارش کاربرِ برگشتی را از `by` و بعد `user` می‌خواند (RPT-09، `claude/part-RPT-1`).
 - سنِ بدهی با فاصلهٔ روزِ تقویمی تا `asOf` و ستون‌های قابلِ تنظیمِ ۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۱+ (RPT-06، #236).
 - پایانِ روز (`core/pay/DayClose`، کاتلینِ commonMain): شیفت مالِ روزِ کاریِ **باز شدنش** است؛ Z ِ ذخیره‌شده ثابت می‌ماند و هر پولِ دفترِ همان روز که هیچ X/Z ای نشمرده جدا در «بیرون از شیفت‌ها» می‌آید، نه پخش یا پنهان؛ شیفت‌های هم‌پوشان روز را «بسته» نمی‌کنند؛ «شمرده نشد» null است، نه صفر (RPT-04، `claude/spec-invrpt-1`).
 
@@ -422,7 +423,7 @@
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
 `print_receipt_copies = 1` شمارِ نسخهٔ چاپِ خودکار (POS-35، `claude/spec-pos-b-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
-دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `fraud_trail` = سابقهٔ ضدتقلب: کاربر روی لغو/مرجوعی و ردیفِ `line_delete` (`FraudTrailPref`، RPT-09، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
