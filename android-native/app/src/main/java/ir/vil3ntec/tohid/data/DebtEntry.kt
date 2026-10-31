@@ -55,11 +55,16 @@ object DebtEntry {
 
   /**
    *  ساختنِ ردیف روی دفترِ [cur] (همان دفترِ همین لحظه که `AppendOnce` می‌دهد) با شناسهٔ [key]. خالص؛ ردِ
-   *  `DebtorEngine` ⇒ `null` و پیامش در [fail].
+   *  `DebtorEngine` ⇒ `null` و پیامش در [fail]. [check] قاعدهٔ بیشترِ فراخوان روی **همین** [cur] (صندوق:
+   *  `TillReceiveFlow.check`)؛ پیامِ رد ⇒ همان `null` و [fail]، پیش از ساختنِ ردیف.
    */
-  fun change(e: Entry, today: String, now: Long, newId: () -> String, fail: (String) -> Unit): (ShopData, String) -> ShopData? =
+  fun change(
+    e: Entry, today: String, now: Long, newId: () -> String,
+    check: (ShopData) -> String? = { null },
+    fail: (String) -> Unit,
+  ): (ShopData, String) -> ShopData? =
     { cur, key ->
-      val r = DebtorEngine.addTransaction(
+      val r = check(cur)?.let { DebtorEngine.Result.Failed(it) } ?: DebtorEngine.addTransaction(
         cur, e.debtorId, e.kind, e.amount, e.date, e.notes, today, now, newId,
         dueDate = e.dueDate, overLimit = e.overLimit, txId = key,
       )
@@ -85,10 +90,13 @@ object DebtEntry {
   private fun ledgerNow(store: ShopStore, mem: ShopData): ShopData? =
     if (store.unreadable.value != null || !store.hasData()) mem else store.readDiskLocked()
 
-  /** ثبت روی دفترِ همین لحظهٔ دیسک، یک بار برای [key] (شناسهٔ ردیف). [now] ساعتِ دستگاه از صفحه */
-  suspend fun record(store: ShopStore, key: String, e: Entry, today: String, now: Long): Result {
+  /**
+   *  ثبت روی دفترِ همین لحظهٔ دیسک، یک بار برای [key] (شناسهٔ ردیف). [now] ساعتِ دستگاه از صفحه. [check] — قاعدهٔ
+   *  بیشترِ فراخوان روی همان دفترِ همین لحظه، زیرِ همان قفل و پس از «همین کلید هست؟» ([change])
+   */
+  suspend fun record(store: ShopStore, key: String, e: Entry, today: String, now: Long, check: (ShopData) -> String? = { null }): Result {
     var failed: String? = null
-    val out = AppendOnce.append(key, ::has, change(e, today, now, ::auditId) { failed = it }) { t ->
+    val out = AppendOnce.append(key, ::has, change(e, today, now, ::auditId, check) { failed = it }) { t ->
       store.update { mem -> t(ledgerNow(store, mem)) }
     }
     return result(out, key, failed)
