@@ -17,7 +17,6 @@ const sf = require('../lib/storefront');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'market-read' });
 const searchLimit = rateLimit({ max: config.rateLimit.marketSearchMax, keyPrefix: 'market-search' });
@@ -29,43 +28,43 @@ const feedBurst = rateLimit({ max: config.rateLimit.marketFeedBurstMax, windowMs
 const sendCodeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-verify' });
 const codeLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'store-verify-code' });
 
-const on = wrap(async (req, res, next) => {
+const on = async (req, res, next) => {
   await market.requireOn();
   res.set('Cache-Control', 'no-store');
   next();
+};
+
+router.get('/', readLimit, on, async (req, res) => {
+  res.json(await market.overview());
 });
 
-router.get('/', readLimit, on, wrap(async (req, res) => {
-  res.json(await market.overview());
-}));
-
-router.get('/shops', readLimit, on, wrap(async (req, res) => {
+router.get('/shops', readLimit, on, async (req, res) => {
   const { q, category, lat, lng, limit, offset, first } = req.query;
   res.json(await market.shops({ q, category, lat, lng, limit, offset, first }));
-}));
+});
 
 //  خانه: قفسهٔ دکان‌ها، «پرفروش» و «ارزان‌تر» ِ واقعی؛ `only=lists` ⇒ فقط دو فهرست
-router.get('/products', feedBurst, readLimit, on, wrap(async (req, res) => {
+router.get('/products', feedBurst, readLimit, on, async (req, res) => {
   const { category, lat, lng, limit, only } = req.query;
   res.json(await market.feed({ category, lat, lng, limit, only }));
-}));
+});
 
-router.get('/search', searchBurst, searchLimit, on, wrap(async (req, res) => {
+router.get('/search', searchBurst, searchLimit, on, async (req, res) => {
   const { q, lat, lng, limit } = req.query;
   res.json(await market.search({ q, lat, lng, limit }));
-}));
+});
 
 //  ── ۲۳: تأییدِ شماره بی دکان (برای «سفارش‌های من») — همان بلیتِ ویترین ──
-router.post('/verify/start', sendCodeLimit, on, wrap(async (req, res) => {
+router.post('/verify/start', sendCodeLimit, on, async (req, res) => {
   res.json(await sf.startVerification(req.body, { ip: clientIp(req) }));
-}));
+});
 
-router.post('/verify/check', codeLimit, on, wrap(async (req, res) => {
+router.post('/verify/check', codeLimit, on, async (req, res) => {
   res.json(await sf.checkVerification(req.body));
-}));
+});
 
-router.get('/orders', readLimit, on, wrap(async (req, res) => {
+router.get('/orders', readLimit, on, async (req, res) => {
   res.json({ orders: await market.myOrders(req.get('x-store-ticket') || '') });
-}));
+});
 
 module.exports = router;
