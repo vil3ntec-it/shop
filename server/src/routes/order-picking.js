@@ -28,12 +28,17 @@
  *   POST /pick/shelf/scan                 اسکنِ برچسبِ کیسه روی یک جا ⇒ «آماده» — `orders.manage`
  *   POST /pick/batches                    دستهٔ ۲ تا ۱۰ سفارش با کلیدِ یکتایی — `orders.manage`
  *   GET  /pick/batches/:batchId           فهرستِ یک‌جای دسته به ترتیبِ قفسه
+ *   عکسِ مدرکِ بسته (PCK-08، `lib/pick-photos.js`):
+ *   POST /:id/pick/photos                 عکسِ کیسه‌های بسته (فقط بسته) با کلیدِ یکتا — `orders.manage`
+ *   GET  /:id/pick/photos                 فهرست (بی بایت)
+ *   GET  /:id/pick/photos/:photoId        بایت‌های عکس — هر دیدن در سابقه
  */
 const express = require('express');
 const orders = require('../lib/orders');
 const picking = require('../lib/order-picking');
 const subs = require('../lib/pick-substitutes');
 const shelf = require('../lib/pick-shelf');
+const photos = require('../lib/pick-photos');
 const audit = require('../lib/audit');
 const { requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
@@ -193,6 +198,26 @@ router.post('/pick/batches', needOrders, manage, needWrite, needPick, async (req
 
 router.get('/pick/batches/:batchId', needOrders, needPick, async (req, res) => {
   res.json({ batch: await shelf.batch(req.shopId, req.params.batchId) });
+});
+
+// ── عکسِ مدرکِ بسته (PCK-08) ───────────────────────────────────────
+
+router.post('/:id/pick/photos', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const out = await photos.add(req.shopId, req.params.id, req.body, actorOf(req));
+  if (!out.replayed) await log(req, 'pick.photo', req.params.id, { photoId: out.photo.id, size: out.photo.size });
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.get('/:id/pick/photos', needOrders, needPick, async (req, res) => {
+  res.json(await photos.list(req.shopId, req.params.id));
+});
+
+router.get('/:id/pick/photos/:photoId', needOrders, needPick, async (req, res) => {
+  const p = await photos.get(req.shopId, req.params.id, req.params.photoId);
+  await log(req, 'pick.photo.view', req.params.id, { photoId: req.params.photoId });
+  res.set('Content-Type', p.mime);
+  res.set('Cache-Control', 'private, no-store');
+  res.send(p.data);
 });
 
 module.exports = router;
