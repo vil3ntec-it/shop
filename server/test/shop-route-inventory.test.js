@@ -597,6 +597,35 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
   }
   assert.deepEqual(own, [], own.join('\n'));
 
+  //  AUTH-09، کاربرِ چنددکانی (دکانِ فعالِ نشست، مهاجرتِ ۰۹۷): «م» صاحبِ دکانِ خودش و شاگردِ «الف» است،
+  //  با دو نشست — یکی صریحاً بسته به دکانِ خودش، یکی به «الف». پیش از ردپا، چون نشستِ بسته به «الف»
+  //  ردیفی با shop_id ِ «الف» در `tokens` دارد
+  const m = await owner('میمِ چنددکانی');
+  await query(
+    `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
+     VALUES ($1,$2,$3,'staff','active',$4,$4)`,
+    [newId('mem'), a.shopId, m.user.id, now()]
+  );
+  //  هر نشست دستگاهِ خودش: انتخابِ دکان نشست‌های زندهٔ **همان دستگاه** را هم می‌بندد
+  const bindTo = async (shopId, role) => {
+    const s = await h.post('/api/auth/login', {
+      identifier: m.email, password: m.password,
+      device: { deviceId: fresh('dev-mim'), name: 'تست', platform: 'test' },
+    });
+    assert.equal(s.status, 200, JSON.stringify(s.body));
+    const r = await h.post('/api/shop/active', { shopId }, { token: s.body.accessToken });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.shop.role, role, JSON.stringify(r.body));
+    return s.body.accessToken;
+  };
+  const mOwn = await bindTo(m.shopId, 'owner');
+  const mInA = await bindTo(a.shopId, 'staff');
+  for (const [t, shopId] of [[mOwn, m.shopId], [mInA, a.shopId]]) {
+    const ms = await h.get('/api/shop/memberships', { token: t });
+    assert.equal(ms.body.activeShopId, shopId, JSON.stringify(ms.body));
+    assert.equal(ms.body.explicit, true);
+  }
+
   const before = await footprint(a.shopId);
   const promoOfA = () => one('SELECT * FROM shop_promotions WHERE shop_id=$1 AND id=$2', [a.shopId, ids.promoRule]);
   const promoBefore = await promoOfA();
@@ -628,6 +657,36 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
     }
   }
   assert.deepEqual(failures, [], failures.join('\n'));
+
+  //  و) AUTH-09، «م»ِ چنددکانی با شناسه‌های واقعیِ «الف»:
+  //   - نشستِ بسته به دکانِ خودش (نقشِ صاحب) درست مثلِ «ب» است، حتی با سرآیندِ دکانِ «الف»: عضویتِ
+  //     شاگردیِ «الف» هیچ درِ «الف» را با نقشِ صاحبِ دکانِ دیگر باز نمی‌کند
+  //   - نشستِ بسته به «الف» فقط نقشِ شاگرد دارد: نقشِ صاحب از دکانِ خودش به «الف» نشت نمی‌کند
+  const multi = [];
+  let lacking = 0;
+  for (const r of withIds) {
+    const key = `${r.method} ${r.path}`;
+    const url = `/api${concrete(r)}`;
+    const body = bodyFor(r, ids);
+
+    const cross = await call(r, url, body, mOwn, { 'X-Shop-Id': a.shopId });
+    const ok = PER_SHOP_KEYS.has(key) ? cross.status < 500 : [403, 404].includes(cross.status);
+    if (!ok) multi.push(`${key} «م» بسته به دکانِ خودش ⇒ ${cross.status} ${JSON.stringify(cross.body).slice(0, 160)}`);
+    const text = JSON.stringify(cross.body ?? '');
+    for (const s of secrets) if (text.includes(s)) multi.push(`${key} «م» بسته به دکانِ خودش شناسهٔ «الف» را برگرداند (${s.slice(0, 10)}…)`);
+
+    const lacks = r.perms.filter((p) => !can('staff', p));
+    if (lacks.length) {
+      lacking++;
+      const res = await call(r, url, body, mInA, { 'X-Shop-Id': m.shopId });
+      if (res.status !== 403) multi.push(`${key} «م» بسته به «الف» (شاگرد، بی ${lacks.join('،')}) ⇒ ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+    }
+  }
+  assert.deepEqual(multi, [], multi.join('\n'));
+  assert.ok(lacking >= 10, `فقط ${lacking} مسیرِ شناسه‌دارِ بسته به اجازه برای شاگردِ چنددکانی سنجیده شد`);
+  //  نشستِ «الف» ِ «م» واقعاً به «الف» بسته است: همان GET ِ بی‌اجازه‌ای که شاگرد دارد ۲۰۰ می‌گیرد
+  const mInAOrder = await h.get(`/api/shop/orders/${ids.order}`, { token: mInA });
+  assert.equal(mInAOrder.status, 200, `«م» بسته به «الف» سفارشِ «الف» را نمی‌بیند: ${JSON.stringify(mInAOrder.body).slice(0, 160)}`);
 
   //  قاعدهٔ تخفیف، صریح: PUT/DELETEِ «ب» با شناسهٔ «الف» فقط فضای خودِ «ب» است —
   //  ردیفِ «الف» پس از هر کدام بایت‌به‌بایت همان می‌ماند
