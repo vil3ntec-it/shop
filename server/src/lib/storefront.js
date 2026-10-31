@@ -39,6 +39,7 @@ const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
+const sfs = require('./storefront-seen');
 const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -96,6 +97,7 @@ function normalize(s) {
 /** همان نرمال‌سازی، در SQL، روی نامِ کالا. */
 const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
 
+const { SEARCH_FLAG, SEARCH_KEY, searchWhere } = require('./storefront-search');   //  SRCH-01 (شرح همان‌جا)
 function slugOf(v) {
   const s = str(v).toLowerCase();
   if (!SLUG_RE.test(s) || s.includes('--')) {
@@ -147,77 +149,8 @@ const asJson = (x, def) => {
   try { return JSON.parse(x); } catch { return def; }
 };
 
-/** روز، دقیقه و تاریخِ محلیِ دکان — ساعتِ گوشیِ مشتری مرجع نیست. */
-function localParts(at, timezone) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone, hourCycle: 'h23', weekday: 'short', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit',
-  }).formatToParts(new Date(at)).map((p) => [p.type, p.value]));
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
-  const hour = Number(parts.hour) % 24;
-  return {
-    dow, minutes: hour * 60 + Number(parts.minute),
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    time: `${String(hour).padStart(2, '0')}:${parts.minute}`,
-  };
-}
-
-function scheduleOf(sf, at) {
-  const hours = asJson(sf.weekly_hours, {});
-  const closed = asJson(sf.closed_dates, []);
-  const local = localParts(at, sf.timezone || 'Asia/Kabul');
-  const today = Array.isArray(hours[String(local.dow)]) ? hours[String(local.dow)] : [];
-  const set = Object.keys(hours).length > 0;
-  const holiday = closed.includes(local.date);
-  let open = null;   // null = ساعتِ کاری تنظیم نشده
-  if (holiday) open = false;
-  else if (set) open = today.some(([o, c]) => local.minutes >= o && local.minutes < c);
-  return { set, open, holiday, today, local };
-}
-
-/**
- * سه چیزِ جدا (۳۱.۱؛ ۳۱.۲ بندِ ۷):
- *   badge            — open_online | open_unconfirmed | declared_until | closed | offline
- *   lastConfirmedAt  — آخرین تماسِ واقعیِ یکی از دستگاه‌های دکان با سرور، یا null
- *   orderAcceptance  — accepting | delayed | later. سرور سفارش را در هر سه
- *                      پایدار ثبت می‌کند (۳۱.۲ بندِ ۶)؛ این فقط به مشتری راست
- *                      می‌گوید کی بررسی می‌شود (WEB-03/25).
- */
-function presenceOf(sf, at, lastSeenAt) {
-  let mode = sf.presence_mode || 'auto';
-  const until = sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until);
-  if (mode === 'online_until' && !(until > at)) mode = 'auto';   // پایانِ اعلام ⇒ خودکار منقضی (۳۱.۲ بندِ ۵)
-  const sched = scheduleOf(sf, at);
-  const seen = Number(lastSeenAt) > 0 ? Number(lastSeenAt) : null;
-  const age = seen === null ? Infinity : at - seen;
-  const { staleMs, offlineMs } = config.storefront;
-  const declaredOpen = mode === 'online' || mode === 'online_until';
-
-  let badge;
-  if (mode === 'closed' || (!declaredOpen && sched.open === false)) badge = 'closed';
-  else if (mode === 'offline' || age > offlineMs) badge = 'offline';
-  else if (mode === 'online_until') badge = 'declared_until';
-  else badge = age <= staleMs ? 'open_online' : 'open_unconfirmed';
-
-  const connection = age <= staleMs ? 'confirmed' : (age > offlineMs ? 'lost' : 'unconfirmed');
-  let orderAcceptance = 'delayed';
-  if (badge === 'closed' || mode === 'offline') orderAcceptance = 'later';
-  else if (connection === 'confirmed') orderAcceptance = 'accepting';
-  return {
-    badge,
-    mode,
-    declaredUntil: mode === 'online_until' ? until : null,
-    connection,
-    lastConfirmedAt: seen,
-    orderAcceptance,
-    timezone: sf.timezone || 'Asia/Kabul',
-    localTime: sched.local.time,
-    hoursSet: sched.set,
-    holiday: sched.holiday,
-    today: sched.today,
-    notice: sf.notice || '',
-  };
-}
+//  ساعتِ کار و وضعیت (`localParts`، `scheduleOf`، `presenceOf`): `lib/storefront-hours.js`
+const { localParts, scheduleOf, presenceOf } = require('./storefront-hours');
 
 /** آخرین تماسِ واقعیِ دستگاه‌های دکان با سرور (همگام‌سازی) — یا ۰. */
 async function lastSeenOf(shopId) {
@@ -313,8 +246,10 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
-  const needle = normalize(text(q, 60));
-  if (needle) {
+  const raw = text(q, 60);
+  const needle = normalize(raw);
+  if (raw && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
+  else if (needle) {
     params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
     where += ` AND ${SQL_NAME} LIKE $${params.length}`;
   }
@@ -517,7 +452,7 @@ function parseCheckout(body, sf) {
     return {
       productId,
       qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
-      note: text(x.note, 200),
+      note: text(x.note, 200), ...sfs.expectedOf(x, i),   // CHK-17: فیِ دیده‌شده (اختیاری)
     };
   });
 
@@ -568,7 +503,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       [shopId, ids]
     )).rows;
     const byId = new Map(rows.map((r) => [r.id, productView(r)]));
-    const unavailable = ids.filter((id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
+    const unavailable = await require('./order-picking').unorderable(run, shopId, ids, (id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
     if (unavailable.length) {
       throw withData(conflict('برخی کالاها دیگر در ویترین نیستند', 'product_unavailable'), { unavailable });
     }
@@ -595,10 +530,8 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
         { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
-    //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
-    if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
-      throw withData(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), { quote: quoteOf(lines, fees) });
-    }
+    //  CHK-17/S32: جمع یا فیِ هر قلم با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود؛ برگهٔ تازه و «X از … به …»
+    sfs.assertSeen(input, lines, totalMinor, () => quoteOf(lines, fees));
     return {
       source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
       customerName: input.customerName, customerPhone: input.customerPhone,
@@ -1206,7 +1139,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,

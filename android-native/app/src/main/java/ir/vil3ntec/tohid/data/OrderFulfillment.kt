@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
+import ir.vil3ntec.tohid.core.orders.OrderRefunds
 import ir.vil3ntec.tohid.money
 
 /**
@@ -26,6 +27,8 @@ import ir.vil3ntec.tohid.money
  *    حرکت یا ممیزیِ لغوی که از دستگاهِ دیگر پیش‌تر رسیده دوباره ساخته نمی‌شود (شناسهٔ تکراری نه).
  *    فاکتوری که پیش‌تر «مرجوعیِ» دستی گرفته ([reverseBlock]) ⇒ لغوِ خاموش **نه**: پولِ مرجوعی از دخل
  *    رفته و کالا یک بار برگشته؛ لغو آن را دوباره برمی‌گرداند ⇒ [Result.Review] برای صاحب.
+ *  • بازپرداختِ سفارشِ تحویل‌شده (کامل، ردیفِ دفترِ بازپرداخت، پولِ برگشتهٔ درگاه) ⇒ [refund] سندِ برگشتِ
+ *    همان فروش (مدلِ RET، شناسهٔ ثابتِ `core/orders/OrderRefunds`، روزِ بازپرداخت)؛ کالا فقط با [restock].
  *  • کف: فقط سفارشی که **نخستین** گذارِ تحویلش پس از کفِ دکان است خودکار فروش می‌گیرد؛ «ارسال»
  *    پیش از کف ⇒ فهرستِ بررسیِ صاحب ([REVIEW_BEFORE_FLOOR]).
  *  • قیمت‌ها همانِ سفارش‌اند (به پول، دقیق)؛ هزینهٔ ارسال یک قلمِ آزاد است (بی اثر بر
@@ -368,6 +371,212 @@ object OrderFulfillment {
       d.copy(
         sales = d.sales.map { if (it.id == saleId) updated else it },
         stockMovements = d.stockMovements + back,
+        auditLog = d.auditLog + audit,
+      ),
+      saleId,
+    )
+  }
+
+  /* ===================== بازپرداختِ سفارشِ تحویل‌شده (RET-11، FIN-01) ===================== */
+
+  const val REFUND_REASON = "بازپرداختِ سفارشِ اینترنتی"
+  const val RESTOCK_REASON = "کالای سفارشِ بازپرداخت‌شده به انبار برگشت"
+
+  /** رویدادهای بازپرداختِ ردیفِ `refunds` ِ سرور ⇒ رویدادِ هسته */
+  fun eventsOf(o: OrderDto): List<OrderRefunds.Event> =
+    o.refundEvents.map { OrderRefunds.Event(it.key, it.amountMinor, it.at, it.source) }
+
+  /** کلیدهای بازپرداختی که سندشان (یا ردیفِ سابقه‌شان) در این دفتر هست — از هر دستگاه */
+  fun refundedKeys(d: ShopData, orderId: String): Set<String> {
+    val out = HashSet<String>()
+    d.saleReturns.forEach { r -> OrderRefunds.keyOfDoc(orderId, r.docId)?.let(out::add) }
+    val prefix = OrderRefunds.docPrefixOf(orderId)
+    d.auditLog.forEach { a ->
+      if (a.id.startsWith(prefix) && a.id.endsWith("-a")) OrderRefunds.keyOfDoc(orderId, a.id.removeSuffix("-a"))?.let(out::add)
+    }
+    return out
+  }
+
+  /** پولِ پس‌رفته از یک فروش (همهٔ برگشت‌ها، دستی و آنلاین) — به پول */
+  private fun returnedMinor(d: ShopData, saleId: String): Long =
+    d.saleReturns.filter { it.saleId == saleId }.sumOf { ReturnFlow.minor(it.amount) }
+
+  /** این دستگاه سندِ برگشتِ بازپرداخت را می‌تواند بنویسد؟ پرچمِ سرور (`refundable`)، وگرنه نوشتنِ فروش */
+  fun refundAllowed(o: OrderDto, perms: OrderPermsDto): Boolean = perms.recordSale && (o.refundable ?: true)
+
+  /**
+   *  بازپرداختِ سفارشِ تحویل‌شده ⇒ **سندِ برگشتِ همان فروش**، مثلِ برگشتِ صندوق (`ReturnFlow`):
+   *  ردیفِ `SaleReturn` با `docId` ِ ثابتِ هر رویداد ([OrderRefunds.docIdOf]) و ردیفِ سابقه
+   *  ([OrderRefunds.markIdOf]). فاکتور (قیمت، اقلام، وضعیت) دست نمی‌خورد و هیچ شمارندهٔ `$inc`
+   *  (`returnedQty`، `debtSettled`) بالا نمی‌رود ⇒ دو دستگاه یا تلاشِ دوباره همان ردیف‌ها، یک بار.
+   *  • مبلغ: همان مبلغِ رویداد به پول، با سقفِ ماندهٔ فروش ([OrderRefunds.plan]؛ مرجوعیِ دستیِ پیشین کم
+   *    می‌شود)؛ رویدادِ بی‌مانده ⇒ فقط ردیفِ سابقه (تا سرور دیگر فهرستش نکند).
+   *  • پول به کجا: [ReturnFlow.split] با «روشِ اصلی» — پرداختِ آنلاین/درگاه ⇒ `toMethods` (از دخل نه)؛
+   *    نقد (سرِ پیشخوان یا هنگامِ تحویل) ⇒ نقدِ دخل، همان قاعدهٔ مرجوعیِ صندوق (`CashShift`).
+   *  • روز و زمان = زمانِ سرورِ همان بازپرداخت ([dayOf]) ⇒ گزارش و صندوق در روزِ بازپرداخت، نه روزِ فروش.
+   *  • کالا دست نمی‌خورد؛ «کالا به انبار برگشت؟» جداست ([restock]).
+   *  بی فروشِ `o-…` ⇒ [Result.Failed] (پس از همگام‌سازی دوباره)؛ فروشِ لغوشده یا همه نشسته ⇒ [Result.Already].
+   */
+  fun refund(d: ShopData, o: OrderDto, by: String, dayOf: (Long) -> String): Result {
+    val saleId = saleIdOf(o.id)
+    val sale = d.sales.firstOrNull { it.id == saleId }
+      ?: return Result.Failed("سفارش #${o.orderNo}: فروشِ تحویلِ این سفارش هنوز در این دستگاه نیست؛ پس از همگام‌سازی ثبت می‌شود")
+    if (sale.status == "cancelled") return Result.Already(saleId)
+    val steps = OrderRefunds.plan(ReturnFlow.minor(sale.finalTotal), returnedMinor(d, saleId), refundedKeys(d, o.id), eventsOf(o))
+    if (steps.isEmpty()) return Result.Already(saleId)
+    val label = sale.invoiceLabel() ?: "0"
+    val known = d.auditLog.mapTo(HashSet()) { it.id }
+    val rows = ArrayList<SaleReturn>()
+    val audit = ArrayList<AuditEntry>()
+    for (s in steps) {
+      val docId = OrderRefunds.docIdOf(o.id, s.key)
+      val day = dayOf(s.at)
+      val amount = s.amountMinor / 100.0
+      var where = ""
+      if (s.amountMinor > 0) {
+        val prior = d.saleReturns.filter { it.saleId == saleId } + rows
+        val split = when (val r = ReturnFlow.split(sale, amount, ReturnFlow.ORIGINAL, by.ifBlank { "owner" }, null, prior)) {
+          is ReturnFlow.Outcome.Bad -> return Result.Failed("سفارش #${o.orderNo}: ${r.message}")
+          is ReturnFlow.Outcome.Ok -> r.value
+        }
+        //  فروشِ تحویل نسیه و اعتبار ندارد (`debtGiven = 0`، روشِ اصلی)؛ اگر شد، بی‌صدا نه
+        if (split.account > 0 || split.credit > 0) return Result.Failed("سفارش #${o.orderNo}: بازپرداخت به حسابِ مشتری نمی‌رود؛ دستی بررسی کنید")
+        where = buildList {
+          if (split.cash > 0) add("نقد ${money(split.cash)}")
+          split.methods.forEach { (m, a) -> add("${ReturnFlow.methodName(m)} ${money(a)}") }
+        }.joinToString("، ")
+        rows += SaleReturn(
+          id = "$docId-0", saleId = saleId, quantity = 0.0, amount = amount, reason = REFUND_REASON,
+          date = day, createdAt = s.at, docId = docId, refund = ReturnFlow.ORIGINAL,
+          toMethods = split.methods.takeIf { it.isNotEmpty() }, by = by.trim().ifEmpty { null },
+        )
+      }
+      val markId = OrderRefunds.markIdOf(o.id, s.key)
+      if (markId in known) continue
+      audit += AuditEntry(
+        id = markId, type = "return", date = day, refId = saleId, createdAt = s.at, amount = amount,
+        notes = if (s.amountMinor > 0) {
+          "برگشت ${ReturnFlow.label(docId)} به مبلغ ${money(amount)} افغانی — فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REFUND_REASON" +
+            if (where.isNotEmpty()) " — بازپرداخت: $where" else ""
+        } else {
+          "سفارشِ اینترنتی #${o.orderNo}: بازپرداخت رسید ولی از فاکتور #$label چیزی برای برگشت نمانده بود"
+        },
+      )
+    }
+    if (rows.isEmpty() && audit.isEmpty()) return Result.Already(saleId)
+    return Result.Ok(d.copy(saleReturns = d.saleReturns + rows, auditLog = d.auditLog + audit), saleId)
+  }
+
+  /** مقدارِ یک قلمِ فروشِ تحویل که «کالا به انبار برگشت؟» برگردانده (ردیفِ [OrderRefunds.restockReturnIdOf]) */
+  fun restockedQty(d: ShopData, saleItemId: String): Double =
+    d.saleReturns.filter { it.saleItemId == saleItemId && it.id == "$saleItemId-rsr" }.sumOf { it.quantity }
+
+  private fun lineNoOf(orderId: String, itemId: String): Int? =
+    if (itemId.startsWith("o-$orderId-")) itemId.removePrefix("o-$orderId-").toIntOrNull() else null
+
+  /** قلم‌های کالادارِ فروشِ تحویل از نگاهِ «کالا به انبار برگشت؟» (هزینهٔ ارسال نه) */
+  fun refundLines(d: ShopData, orderId: String): List<OrderRefunds.Line> {
+    val saleId = saleIdOf(orderId)
+    val entries = d.warehouseEntries.mapTo(HashSet()) { it.id }
+    return d.saleItems.filter { it.saleId == saleId }.mapNotNull { item ->
+      val lineNo = lineNoOf(orderId, item.id) ?: return@mapNotNull null
+      OrderRefunds.Line(
+        lineNo = lineNo,
+        productId = item.productId,
+        remaining = item.quantity - item.returnedQty - restockedQty(d, item.id),
+        restocked = OrderRefunds.restockIdOf(orderId, lineNo) in entries,
+      )
+    }.sortedBy { it.lineNo }
+  }
+
+  /** قلم‌هایی که «کالا به انبار برگشت؟» می‌پرسد: (شمارهٔ قلم، نام و مقدارِ مانده) */
+  fun restockChoices(d: ShopData, orderId: String): List<Pair<Int, String>> {
+    val items = d.saleItems.associateBy { it.id }
+    val all = refundLines(d, orderId)
+    return OrderRefunds.restockLines(all, all.mapTo(HashSet()) { it.lineNo }).map { l ->
+      val name = items[itemIdOf(orderId, l.lineNo)]?.let { SalesEngine.itemName(d, it) } ?: "قلمِ ${l.lineNo}"
+      l.lineNo to "$name — ${ir.vil3ntec.tohid.qty(l.remaining)}"
+    }
+  }
+
+  /**
+   *  رویدادهای بازپرداختِ نشسته (با مبلغ) که هنوز «کالا به انبار برگشت؟» نگرفته‌اند — و فقط اگر
+   *  قلمی برای برگرداندن مانده. بازپرداختی که سرور یا دستگاهِ دیگر زد همین‌جا «برگشتِ کالا؟» می‌شود.
+   */
+  fun restockPending(d: ShopData, orderId: String): List<String> {
+    val sale = d.sales.firstOrNull { it.id == saleIdOf(orderId) } ?: return emptyList()
+    if (sale.status == "cancelled") return emptyList()
+    val paid = d.saleReturns.filter { it.saleId == sale.id && it.amount > 0 }.mapNotNull { OrderRefunds.keyOfDoc(orderId, it.docId) }
+    if (paid.isEmpty()) return emptyList()
+    val decided = d.auditLog.mapTo(HashSet()) { it.id }
+    val keys = OrderRefunds.pendingKeys(paid, paid.filterTo(HashSet()) { OrderRefunds.decisionIdOf(orderId, it) in decided })
+    if (keys.isEmpty()) return emptyList()
+    val open = refundLines(d, orderId).any { it.productId.isNotBlank() && !it.restocked && it.remaining > 1e-9 }
+    return if (open) keys else emptyList()
+  }
+
+  /** فروش‌های تحویلی که «برگشتِ کالا؟» دارند — برای هشدارِ فهرستِ «سفارش‌ها» */
+  fun restockPendingSales(d: ShopData): List<Sale> {
+    val withRefund = d.saleReturns.filter { it.amount > 0 && it.docId?.contains("-rf-") == true }.mapTo(HashSet()) { it.saleId }
+    if (withRefund.isEmpty()) return emptyList()
+    return d.sales.filter { s ->
+      val id = s.orderId
+      s.id in withRefund && id != null && s.id == saleIdOf(id) && restockPending(d, id).isNotEmpty()
+    }
+  }
+
+  /**
+   *  «کالا به انبار برگشت؟» ِ رویدادهای [restockPending] ِ سفارشِ [orderId]: فقط قلم‌های [chosen]
+   *  (پیش‌فرضِ سفارشِ تحویل‌شده «نه»، تهی = هیچ کالایی برنگشت) به موجودی برمی‌گردند — همان راهِ
+   *  برگشتِ بی رسیدِ `ReturnFlow` (ورودِ انبارِ اصلاحی، نه `returnedQty` ِ `$inc`) با شناسه‌های ثابت:
+   *  ورودِ انبار [OrderRefunds.restockIdOf]، حرکت [OrderRefunds.restockMoveIdOf] و ردیفِ برگشتِ
+   *  بی‌مبلغ [OrderRefunds.restockReturnIdOf] (گزارش بهای کالای برگشته را همان روز پس می‌دهد).
+   *  هر رویداد یک ردیفِ سابقهٔ تصمیم ([OrderRefunds.decisionIdOf]) می‌گیرد ⇒ دیگر نمی‌پرسد.
+   */
+  fun restock(d: ShopData, orderId: String, orderNo: Long, chosen: Set<Int>, by: String, today: String, now: Long): Result {
+    val saleId = saleIdOf(orderId)
+    val sale = d.sales.firstOrNull { it.id == saleId } ?: return Result.Failed("فروشِ سفارش #$orderNo در این دفتر نیست")
+    val keys = restockPending(d, orderId)
+    if (keys.isEmpty()) return Result.Already(saleId)
+    val doc = OrderRefunds.decisionIdOf(orderId, keys.first())
+    val label = sale.invoiceLabel() ?: "0"
+    val items = d.saleItems.associateBy { it.id }
+    val products = d.products.associateBy { it.id }
+    val entries = ArrayList<WarehouseEntry>()
+    val moves = ArrayList<StockMovement>()
+    val rows = ArrayList<SaleReturn>()
+    val names = ArrayList<String>()
+    for (line in OrderRefunds.restockLines(refundLines(d, orderId), chosen)) {
+      val item = items[itemIdOf(orderId, line.lineNo)] ?: continue
+      val product = products[line.productId]
+      val name = SalesEngine.itemName(d, item)
+      val note = "برگشتِ کالا — فاکتور #$label — سفارشِ اینترنتی #$orderNo — $name"
+      entries += WarehouseEntry(
+        id = OrderRefunds.restockIdOf(orderId, line.lineNo), productId = line.productId, units = line.remaining,
+        unit = product?.unit.orEmpty(), date = today, notes = note, isAdjustment = true, createdAt = now, refId = doc,
+      )
+      moves += StockMovement(
+        id = OrderRefunds.restockMoveIdOf(orderId, line.lineNo), productId = line.productId, type = "customer_return",
+        qty = line.remaining, date = today, notes = note, refId = OrderRefunds.restockReturnIdOf(orderId, line.lineNo), createdAt = now,
+      )
+      rows += SaleReturn(
+        id = OrderRefunds.restockReturnIdOf(orderId, line.lineNo), saleId = saleId, saleItemId = item.id,
+        productId = line.productId, quantity = line.remaining, amount = 0.0, reason = RESTOCK_REASON, date = today,
+        createdAt = now, docId = doc, disposition = ReturnFlow.RESTOCK, by = by.trim().ifEmpty { null },
+      )
+      names += "$name ${ir.vil3ntec.tohid.qty(line.remaining)}"
+    }
+    val known = d.auditLog.mapTo(HashSet()) { it.id }
+    val what = if (names.isEmpty()) "هیچ کالایی به انبار برنگشت" else "به انبار برگشت: ${names.joinToString("، ")}"
+    val audit = keys.map { OrderRefunds.decisionIdOf(orderId, it) }.filter { it !in known }.map {
+      AuditEntry(id = it, type = "return", date = today, refId = saleId, createdAt = now,
+        notes = "برگشتِ کالای سفارشِ اینترنتی #$orderNo (فاکتور #$label): $what" + if (by.isNotBlank()) " — ثبت: ${by.trim()}" else "")
+    }
+    return Result.Ok(
+      d.copy(
+        warehouseEntries = d.warehouseEntries + entries,
+        stockMovements = d.stockMovements + moves,
+        saleReturns = d.saleReturns + rows,
         auditLog = d.auditLog + audit,
       ),
       saleId,
