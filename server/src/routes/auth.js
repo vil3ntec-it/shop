@@ -285,11 +285,15 @@ function publicUser(u) {
 /** پاسخ استاندارد ورود — همراه دکان و نقش، تا برنامه بداند کجاست. */
 async function loginPayload(user, session) {
   const member = await membershipOf(user.id);
+  //  کاربرِ چنددکانی: فهرست هم می‌آید تا برنامه بپرسد «کدام دکان؟» و با
+  //  `POST /api/shop/active` نشست را به آن ببندد (بندِ ۲۹.۲ قاعدهٔ ۱)
+  const all = member ? await require('../lib/shops').membershipsOf(user.id) : [];
   return {
     user: publicUser(user),
     shop: member ? {
       id: member.shop_id, name: member.shop_name || '', role: member.role,
     } : null,
+    shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
     ...session,
   };
 }
@@ -919,13 +923,14 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
     const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
     if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
 
+    //  دکانِ برگزیدهٔ نشست با تازه‌سازی می‌ماند (مهاجرتِ ۰۹۷)
     const acc = await tokens.issue({
       kind: 'access', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
+      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
     });
     const fresh = await tokens.issue({
       kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop',
+      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
     });
     if (await tokens.markRotated(found.hash, fresh.token)) {
       access = acc; refreshToken = fresh.token; refreshExpiresAt = fresh.expiresAt;

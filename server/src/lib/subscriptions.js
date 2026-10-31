@@ -100,9 +100,9 @@ function build(T) {
   const TEN = T.tenantTable;
   const KEY = T.tenantKey;
 
-  /** اشتراک زنده‌ی دکان (active/suspended/pending) — یا null. */
-  async function liveOf(tenantId) {
-    return one(
+  /** اشتراک زنده‌ی دکان (active/suspended/pending) — یا null. `get` ⇐ خواندن در تراکنشِ صدازننده. */
+  async function liveOf(tenantId, get = one) {
+    return get(
       `SELECT * FROM ${TBL}
         WHERE ${KEY}=$1 AND status IN ('active','suspended','pending')
         ORDER BY created_at DESC LIMIT 1`,
@@ -145,10 +145,14 @@ function build(T) {
    *
    * هرگز جلوی کار اصلی را نمی‌گیرد: اگر نوشتن تاریخچه شکست بخورد،
    * اشتراک کاربر نباید صادر نشود. خطا در لاگ می‌ماند.
+   *
+   * `c` (client ِ تراکنشِ اعطا): ردیف در **همان** تراکنش می‌نشیند (DATA-03) و زیرِ یک SAVEPOINT،
+   * تا شکستِ همین INSERT تراکنشِ اعطا را «aborted» نکند و همان قاعدهٔ بالا بماند.
    */
-  async function logChange(row) {
+  async function logChange(row, c = null) {
+    if (c) await c.query('SAVEPOINT sub_history');
     try {
-      await query(
+      await (c ? (t, p) => c.query(t, p) : query)(
         `INSERT INTO ${HIST}
            (id, subscription_id, ${KEY}, action, plan, prev_status, new_status,
             prev_ends_at, new_ends_at, actor, note, created_at)
@@ -160,7 +164,9 @@ function build(T) {
           row.actor || '', row.note || '', now(),
         ]
       );
+      if (c) await c.query('RELEASE SAVEPOINT sub_history');
     } catch (err) {
+      if (c) await c.query('ROLLBACK TO SAVEPOINT sub_history');
       console.error('[subscriptions] تاریخچه ثبت نشد:', err.message);
     }
   }
@@ -234,7 +240,7 @@ function build(T) {
       }
       if (claim && !(await claim(c))) return { skipped: true };
       await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sub-grant:${T.app}:${tenantId}`]);
-      const r = await grantLocked(tenantId, opts);
+      const r = await grantLocked(c, tenantId, opts);
       if (idem) {
         await idempotency.save(c, idem, {
           tenantId, resultId: r.row.id, response: { subscription: r.row, ...extra },
@@ -250,15 +256,23 @@ function build(T) {
     return out;
   }
 
-  async function grantLocked(tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
+  /*
+   *  ⛔ DATA-03: همهٔ خواندن و نوشتن‌های اعطا با `c` (client ِ تراکنشِ `grantTx`).
+   *  تا ۲.۱۴.۴ این‌جا `one`/`query` ِ سراسری بود: روی PGlite همان تراکنش است (AsyncLocalStorage)،
+   *  ولی روی PostgreSQL به استخر می‌رفت و جدا COMMIT می‌شد. شکست یا مرگِ فرآیند پس از نوشتنِ
+   *  اشتراک و پیش از ثبتِ کلیدِ یکتایی (`idempotency.save`) تمدید را نگه می‌داشت و تکرارِ همان کلید
+   *  دورهٔ دوم می‌نشاند. خواندنِ پلن (`plans.getPlan`) پیکربندی است و بیرون می‌ماند.
+   */
+  async function grantLocked(c, tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
     features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '', price = null,
     allowUnsuspend = false } = {}) {
+    const get = async (text, params) => (await c.query(text, params)).rows[0] || null;
 
-    const tenant = await one(`SELECT id FROM ${TEN} WHERE id=$1`, [tenantId]);
+    const tenant = await get(`SELECT id FROM ${TEN} WHERE id=$1`, [tenantId]);
     if (!tenant) throw notFound(T.notFoundMessage, T.notFoundCode);
 
     const t = now();
-    const existing = await liveOf(tenantId);
+    const existing = await liveOf(tenantId, get);
     /*
      *  ⛔ اشتراکِ **معلق** با یک کد باز نمی‌شود.
      *
@@ -340,7 +354,7 @@ function build(T) {
 
     let row;
     if (existing) {
-      row = await one(
+      row = await get(
         `UPDATE ${TBL}
             SET plan=$2, status='active', starts_at=$3, ends_at=$4, features=$5::jsonb,
                 max_devices=$6, grace_days=$7, note=$8, updated_at=$9, created_by=$10,
@@ -354,9 +368,9 @@ function build(T) {
         prevStatus: existing.status, newStatus: row.status,
         prevEndsAt: Number(existing.ends_at), newEndsAt: Number(row.ends_at),
         actor: createdBy, note,
-      });
+      }, c);
     } else {
-      row = await one(
+      row = await get(
         `INSERT INTO ${TBL} (id, ${KEY}, plan, status, starts_at, ends_at, features, max_devices, grace_days, note,
                              created_at, updated_at, created_by, price, currency)
          VALUES ($1,$2,$3,'active',$4,$5,$6::jsonb,$7,$8,$9,$10,$10,$11,$12,$13) RETURNING *`,
@@ -367,7 +381,7 @@ function build(T) {
         subscriptionId: row.id, tenantId, action: 'grant', plan,
         newStatus: row.status, newEndsAt: Number(row.ends_at),
         actor: createdBy, note,
-      });
+      }, c);
     }
     /*
      *  ⛔ دائمیِ تازه (یا تبدیل‌شده به دائمی): سالِ اولِ خدماتِ سرور رایگان،
@@ -377,11 +391,11 @@ function build(T) {
     if (T.app === 'pump') {
       const svc = require('./pump-services');
       if (svc.isPermanent(row, t) && !(existing && svc.isPermanent(existing, t))) {
-        row = await one(`UPDATE ${TBL} SET services_until=$2 WHERE id=$1 RETURNING *`,
+        row = await get(`UPDATE ${TBL} SET services_until=$2 WHERE id=$1 RETURNING *`,
           [row.id, plans.endOfPeriod(t, 1, 'year')]);
       } else if (!svc.isPermanent(row, t) && row.services_until !== null && row.services_until !== undefined) {
         //  دائمی ⇒ زمان‌دار: مهرِ خدماتِ کهنه نمی‌ماند تا «دائمی کنِ» بعدی آن را تازه بگیرد
-        row = await one(`UPDATE ${TBL} SET services_until=NULL WHERE id=$1 RETURNING *`, [row.id]);
+        row = await get(`UPDATE ${TBL} SET services_until=NULL WHERE id=$1 RETURNING *`, [row.id]);
       }
     }
     /*
