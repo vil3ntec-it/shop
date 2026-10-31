@@ -230,6 +230,8 @@ const MOUNTS = {
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
   'admin-service-keys.js': '/admin/service-keys',
+  //  پوستهٔ کنسول (جست‌وجوی سراسری)
+  'admin-search.js': '/admin/search',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -345,6 +347,8 @@ const CAPABILITY_PROBES = {
   'flags.v1': ['GET /admin/flags', 'GET /admin/flags/history'],
   'service-key.v1': ['GET /admin/service-keys', 'POST /admin/service-keys', 'POST /admin/service-keys/x1/revoke'],
   'actor.v1': ['GET /admin/me'],
+  'admin-sessions.v1': ['GET /admin/admins/x1/sessions', 'POST /admin/admins/x1/sessions/revoke'],
+  'search.v1': ['GET /admin/search?q=ab'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

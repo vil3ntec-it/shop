@@ -44,6 +44,8 @@ const FINANCE = [
   ['GET', /^\/admin\/plans\/[^/]+\/price-history$/],
   ['GET', /^\/admin\/campaigns\/[^/]+\/stats$/],
   ['GET', /^\/admin\/flags(\/history)?$/],
+  //  جست‌وجوی سراسری — خودِ در برای مالی فقط دکان و پرداخت را می‌گردد (`routes/admin-search.js`)
+  ['GET', /^\/admin\/search$/],
   ['GET', /^\/admin\/shop-desk\/groups$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)$/],
   ['PUT', /^\/admin\/subscriptions\/[^/]+$/],
