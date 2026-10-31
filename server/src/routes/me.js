@@ -200,38 +200,118 @@ router.delete('/devices/:id', async (req, res) => {
  * ثبتش که شد، دیگر از اینجا دست نمی‌خورد.
  * ────────────────────────────────────────────────────────────────────
  */
+/*
+ *  ══ AUTH-08 — افزودنِ شماره فقط با کدِ همان شماره (پرچمِ `auth.phone_add_code`) ═══════
+ *
+ *  شماره «راهِ ورود» است: `POST /api/auth/login` با شماره و رمز، و `otp/request` +
+ *  `otp/verify` با کدِ پیامکی به همان شماره، هر دو حسابی را باز می‌کنند که آن شماره را
+ *  دارد. تا امروز افزودنِ شماره فقط تأییدِ دوبارهٔ **حساب** می‌خواست، نه اثباتِ مالکیتِ
+ *  **شماره** — یک رقمِ غلط (یا شمارهٔ کسِ دیگر) یعنی صاحبِ آن شماره با «ورود با کد» واردِ
+ *  دکانِ این حساب می‌شد، و صاحبِ واقعیِ شماره دیگر نمی‌توانست با شماره‌اش حساب بسازد.
+ *
+ *  با پرچمِ روشن (scope `security`، کلید `auth.phone_add_code`، پیش‌فرض خاموش):
+ *    ۱) `POST /api/me/phone/code { phone }` — نشستِ تازه (بندِ ۲۱.۱) ⇒ کدِ یک‌بارمصرفِ
+ *       `lib/otp.js` به همان شماره، با هدفِ `phone_add:<شناسهٔ حساب>` (بسته به حساب، شماره
+ *       و هدف؛ CSPRNG، هش‌شده، سقفِ تلاش، فاصلهٔ ارسالِ دوباره، سقفِ روزانه و SEC-06).
+ *       «این شماره حسابِ دیگری دارد» این‌جا گفته **نمی‌شود** (بی شمارش‌پذیری).
+ *    ۲) `PUT /api/me { phone, phoneCode }` — نشستِ تازه + کدِ درستِ همان شماره و همان حساب؛
+ *       فقط پس از کدِ درست ۴۰۹ `phone_taken` (فقط صاحبِ شماره می‌فهمد).
+ *  پرچمِ خاموش ⇒ دقیقاً رفتارِ امروز (فقط تأییدِ دوبارهٔ حساب)، و درِ ۱ ۴۰۴.
+ *  ⚠️ برنامه‌ها هنوز `phoneCode` نمی‌فرستند؛ پرچم پس از آن روشن شود.
+ */
+const PHONE_FLAG_SCOPE = 'security';
+const PHONE_FLAG_KEY = 'auth.phone_add_code';
+const phonePurpose = (userId) => `phone_add:${userId}`;
+
+async function phoneCodeRequired() {
+  const r = await one('SELECT value FROM live_config WHERE scope=$1 AND key=$2', [PHONE_FLAG_SCOPE, PHONE_FLAG_KEY]);
+  if (!r) return false;
+  try { return JSON.parse(r.value) === true; } catch { return false; }
+}
+
+/** در production با راهِ پیامکِ `log` کد به هیچ‌کس نمی‌رسد ⇒ ۵۰۳ ِ صریح، نه «فرستاده شد» (همان قاعدهٔ ویترین) */
+async function smsReachesPhone() {
+  if (require('../config').env !== 'production') return true;
+  const { provider } = await require('../lib/sms-settings').current();
+  return Boolean(provider) && provider !== 'log';
+}
+
+const phoneLocked = (res) => res.status(409).json({
+  error: { code: 'phone_locked', message: 'شماره ثبت‌شده عوض نمی‌شود — با پشتیبانی تماس بگیرید' },
+});
+const phoneTaken = (res) => res.status(409).json({
+  error: { code: 'phone_taken', message: 'این شماره روی حساب دیگری ثبت شده' },
+});
+
+//  هر حساب سطلِ خودش را دارد (کنارِ فاصله و سقفِ روزانهٔ خودِ `otp.request` و SEC-06)
+const phoneCodeLimit = require('../middleware/ratelimit').rateLimit({
+  max: require('../config').rateLimit.otpMax, keyPrefix: 'phone-add',
+  key: (req) => (req.user ? req.user.id : null),
+});
+
+router.post('/phone/code', phoneCodeLimit, async (req, res, next) => {
+  try {
+    if (!(await phoneCodeRequired())) {
+      return res.status(404).json({ error: { code: 'phone_code_disabled', message: 'این سرور برای افزودنِ شماره کد نمی‌فرستد' } });
+    }
+    await reauth.assertFresh(req);
+    const phone = v.phone(req.body?.phone, { required: true });
+    if (req.user.phone) return phoneLocked(res);
+    if (!(await smsReachesPhone())) {
+      return res.status(503).json({ error: { code: 'verification_unavailable', message: 'پیامکِ تأییدِ شماره هنوز روی این سرور راه‌اندازی نشده است' } });
+    }
+    const out = await require('../lib/otp').request(phone, {
+      purpose: phonePurpose(req.user.id), ip: require('../middleware/ratelimit').clientIp(req), app: 'shop', shopId: req.shopId || '',
+    });
+    res.json({
+      ok: true, phone, sent: out.sent === true, expiresAt: out.expiresAt, resendSeconds: out.resendSeconds,
+      ...(out.devCode ? { devCode: out.devCode } : {}),
+    });
+  } catch (err) { next(err); }
+});
+
 router.put('/', async (req, res) => {
   const name = v.text(req.body?.name, { max: 80 });
   const phone = v.phone(req.body?.phone);
 
   //  شماره‌ای که آمده و کاربر از قبل شماره داشته: بی‌صدا نادیده گرفته
   //  نمی‌شود، وگرنه برنامه فکر می‌کند ثبت شد
-  if (phone && req.user.phone && phone !== req.user.phone) {
-    return res.status(409).json({
-      error: { code: 'phone_locked', message: 'شماره ثبت‌شده عوض نمی‌شود — با پشتیبانی تماس بگیرید' },
-    });
-  }
+  if (phone && req.user.phone && phone !== req.user.phone) return phoneLocked(res);
 
   const claiming = phone && !req.user.phone;
   //  شماره «راهِ ورود» است — افزودنش کارِ حساس است (بندِ ۲۱.۱، AUTH-08)
   if (claiming) await reauth.assertFresh(req);
-  if (claiming) {
-    const taken = await one('SELECT id FROM users WHERE phone=$1 AND id<>$2', [phone, req.user.id]);
-    if (taken) {
-      return res.status(409).json({
-        error: { code: 'phone_taken', message: 'این شماره روی حساب دیگری ثبت شده' },
+  const withCode = claiming && await phoneCodeRequired();
+  if (withCode) {
+    const code = String(req.body?.phoneCode ?? '').trim();
+    if (!code) {
+      return res.status(400).json({
+        error: { code: 'phone_code_required', message: 'برای افزودنِ شماره، کدی را که به همان شماره فرستاده شد وارد کنید' },
       });
     }
+    //  ⛔ پیش از «این شماره گرفته شده»: فقط کسی که کدِ همان شماره را دارد آن را می‌فهمد
+    await require('../lib/otp').verify(phone, code, { purpose: phonePurpose(req.user.id) });
+  }
+  if (claiming) {
+    const taken = await one('SELECT id FROM users WHERE phone=$1 AND id<>$2', [phone, req.user.id]);
+    if (taken) return phoneTaken(res);
   }
 
-  const user = await one(
-    `UPDATE users SET name=$2, phone=COALESCE($3, phone), updated_at=$4
-     WHERE id=$1 RETURNING *`,
-    [req.user.id, name, claiming ? phone : null, now()]
-  );
+  let user;
+  try {
+    user = await one(
+      `UPDATE users SET name=$2, phone=COALESCE($3, phone), updated_at=$4
+       WHERE id=$1 RETURNING *`,
+      [req.user.id, name, claiming ? phone : null, now()]
+    );
+  } catch (err) {
+    //  دو حسابِ هم‌زمان با یک شماره: یکتاییِ `users.phone` دومی را رد می‌کند — ۴۰۹، نه ۵۰۰
+    if (claiming && err && err.code === '23505') return phoneTaken(res);
+    throw err;
+  }
   if (claiming) {
     await audit.log({
-      shopId: req.shopId, userId: req.user.id, action: 'account.phone_added', detail: {},
+      shopId: req.shopId, userId: req.user.id, action: 'account.phone_added', detail: withCode ? { method: 'code' } : {},
     });
   }
   res.json({ user: publicUser(user) });

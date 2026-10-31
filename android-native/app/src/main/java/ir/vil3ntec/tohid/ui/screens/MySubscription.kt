@@ -24,6 +24,9 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrSecurity
 
 /**
  *  «اشتراکِ من» — بندِ ۲۱٫۵.
@@ -38,6 +41,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  مشتری در برنامه سبز می‌بیند و در پورتال سرخ.
  *  ⚠️ داده از **تپشِ کش‌شده** می‌آید، پس این صفحه آفلاین هم چیزی برای
  *  نشان دادن دارد.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrSecurity` (LOC-06)؛ نامِ پلن، برچسب و مبلغ همان متنِ سرورند.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,7 +61,7 @@ fun MySubscriptionScreen() {
   var loginOpen by remember { mutableStateOf(false) }
 
   suspend fun refresh() {
-    if (!Backend.isReady(context)) { note = "برای دیدنِ اشتراک، اول با ایمیل وارد شوید."; return }
+    if (!Backend.isReady(context)) { note = StrSecurity.signInToSee; return }
     busy = true
     Backend.codeLogin(context).heartbeat()
       .onSuccess { body ->
@@ -86,7 +91,7 @@ fun MySubscriptionScreen() {
     if (sub == null) {
       EmptyNote(
         if (note.isNotBlank()) note
-        else "هنوز چیزی از سرور نیامده. اینترنت که وصل شد، همین‌جا پر می‌شود.",
+        else StrSecurity.nothingYet,
       )
     } else {
       val permanent = ApiJson.bool(sub, "permanent")
@@ -102,7 +107,7 @@ fun MySubscriptionScreen() {
 
       Panel {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-          Text("پلن", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Text(StrSecurity.plan, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           Text(
             ApiJson.text(sub, "plan").ifBlank { "—" },
             style = MaterialTheme.typography.labelLarge,
@@ -113,7 +118,7 @@ fun MySubscriptionScreen() {
         Spacer(Modifier.height(10.dp))
         Text(
           //  ⚠️ «دائمی ✓» شمارش ندارد — نه صفر، نه «۰ روز مانده»
-          if (permanent) "دائمی ✓" else ApiJson.text(sub, "label").ifBlank { "${days.fa()} روز مانده" },
+          if (permanent) StrSecurity.permanent else ApiJson.text(sub, "label").ifBlank { StrSecurity.daysLeft(days.fa()) },
           style = MaterialTheme.typography.titleMedium,
           color = tint,
           fontWeight = FontWeight.Bold,
@@ -135,9 +140,9 @@ fun MySubscriptionScreen() {
           )
         }
         Spacer(Modifier.height(10.dp))
-        PlanRow("آغاز", stamp(ApiJson.long(sub, "startsAt")))
-        PlanRow("پایان", if (permanent) "دائمی ✓" else stamp(ApiJson.long(sub, "endsAt")))
-        PlanRow("وضعیت", ApiJson.text(sub, "status"))
+        PlanRow(StrSecurity.starts, stamp(ApiJson.long(sub, "startsAt")))
+        PlanRow(StrSecurity.ends, if (permanent) StrSecurity.permanent else stamp(ApiJson.long(sub, "endsAt")))
+        PlanRow(StrNav.status, ApiJson.text(sub, "status"))
       }
 
       //  ⚠️ بنرِ هفت‌روزه — همان قاعدهٔ قفلِ نرم
@@ -145,8 +150,7 @@ fun MySubscriptionScreen() {
         Spacer(Modifier.height(12.dp))
         Panel {
           Text(
-            "${days.fa()} روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود — " +
-              "هیچ داده‌ای پاک نمی‌شود و خروجی و چاپ هم کار می‌کند.",
+            StrSecurity.endsSoon(days.fa()),
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.warning,
           )
@@ -156,8 +160,7 @@ fun MySubscriptionScreen() {
         Spacer(Modifier.height(12.dp))
         Panel {
           Text(
-            "اشتراک تمام شده. برنامه فقط‌خواندنی است — دفترتان دست‌نخورده سرِ جایش " +
-              "است و خروجی و چاپ هم کار می‌کند.",
+            StrSecurity.ended,
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.danger,
           )
@@ -166,9 +169,9 @@ fun MySubscriptionScreen() {
     }
 
     Spacer(Modifier.height(18.dp))
-    SectionTitle("دستگاه‌های فعال")
+    SectionTitle(StrSecurity.activeDevices)
     Panel {
-      if (devices.isEmpty()) EmptyNote("دستگاهی ثبت نشده.")
+      if (devices.isEmpty()) EmptyNote(StrSecurity.noDevices)
       else devices.forEach { d ->
         PlanRow(
           ApiJson.text(d, "name").ifBlank { ApiJson.text(d, "device_uid") },
@@ -178,9 +181,9 @@ fun MySubscriptionScreen() {
     }
 
     Spacer(Modifier.height(18.dp))
-    SectionTitle("پرداخت‌ها")
+    SectionTitle(StrSecurity.payments)
     Panel {
-      if (payments.isEmpty()) EmptyNote("پرداختی ثبت نشده.")
+      if (payments.isEmpty()) EmptyNote(StrSecurity.noPayments)
       //  ⛔ عدد از سرور می‌آید؛ این‌جا هیچ قیمتی ساخته نمی‌شود
       else payments.forEach { p ->
         PlanRow(
@@ -191,9 +194,9 @@ fun MySubscriptionScreen() {
     }
 
     Spacer(Modifier.height(18.dp))
-    SectionTitle("پیام‌های مدیر")
+    SectionTitle(StrSecurity.adminMessages)
     Panel {
-      if (notices.isEmpty()) EmptyNote("پیامی نیست.")
+      if (notices.isEmpty()) EmptyNote(StrSecurity.noMessages)
       else notices.take(10).forEach { n ->
         PlanRow(ApiJson.text(n, "title"), stamp(ApiJson.long(n, "createdAt")))
       }
@@ -204,14 +207,14 @@ fun MySubscriptionScreen() {
       onClick = { scope.launch { refresh() } },
       enabled = !busy,
       modifier = Modifier.fillMaxWidth().height(46.dp),
-    ) { Text(if (busy) "در حالِ خواندن…" else "تازه کردن از سرور") }
+    ) { Text(if (busy) StrSecurity.reading else StrSecurity.refresh) }
 
     if (!Backend.isReady(context)) {
       Spacer(Modifier.height(10.dp))
       OutlinedButton(
         onClick = { loginOpen = true },
         modifier = Modifier.fillMaxWidth().height(46.dp),
-      ) { Text("ورود با ایمیل و کدِ شش‌رقمی") }
+      ) { Text(StrSecurity.signInWithCode) }
     }
 
     if (note.isNotBlank()) {
@@ -285,14 +288,12 @@ fun SubscriptionBanner(onOpen: () -> Unit) {
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
-      if (locked)
-        "اشتراک تمام شده — برنامه فقط‌خواندنی است. دفترتان دست‌نخورده سرِ جایش است و خروجی و چاپ کار می‌کند."
-      else
-        "${(warn ?: 0).fa()} روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود؛ هیچ داده‌ای پاک نمی‌شود.",
+      if (locked) StrSecurity.bannerLocked
+      else StrSecurity.bannerSoon((warn ?: 0).fa()),
       style = MaterialTheme.typography.labelMedium,
       color = tint,
       modifier = Modifier.weight(1f),
     )
-    TextButton(onClick = onOpen) { Text("اشتراکِ من", color = tint) }
+    TextButton(onClick = onOpen) { Text(Str.mySubscription, color = tint) }
   }
 }
