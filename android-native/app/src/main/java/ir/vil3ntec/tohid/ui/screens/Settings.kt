@@ -472,10 +472,20 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
+    item {
+      var rules by remember { mutableStateOf(ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context)) }
+      CheckoutRulesSection(rules) { rules = it; ir.vil3ntec.tohid.data.CheckoutRulesPref.set(context, it) }
+    }
+
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
+    item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
+    /* =============== جست‌وجوی مقاومِ صندوق (POS-04، فقط کامپیوتر، پیش‌فرض خاموش) =============== */
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
@@ -927,12 +937,15 @@ fun SettingsScreen(
           Spacer(Modifier.height(8.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
         }
-        Spacer(Modifier.height(12.dp))
-        TohidDangerButton(
-          text = StrSettings.wipeAll,
-          onClick = { confirmClear = true },
-          modifier = Modifier.fillMaxWidth(),
-        )
+        //  پاک‌سازیِ کامل دفترِ دکان را روی همهٔ دستگاه‌ها و سرور خالی می‌کند ⇒ فقط صاحبِ دکان (نه مدیر)، دو مرحله (`WipeAllDialog`)
+        if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER) {
+          Spacer(Modifier.height(12.dp))
+          TohidDangerButton(
+            text = StrSettings.wipeAll,
+            onClick = { confirmClear = true },
+            modifier = Modifier.fillMaxWidth(),
+          )
+        }
       }
     }
 
@@ -1092,27 +1105,18 @@ fun SettingsScreen(
   }
 
   if (confirmClear) {
-    AlertDialog(
-      onDismissRequest = { confirmClear = false },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text(StrSettings.wipeQ, color = Shop.colors.text) },
-      text = {
-        Text(
-          StrSettings.wipeWarn,
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
+    WipeAllDialog(
+      shopName = storeName,
+      onDismiss = { confirmClear = false },
+      onConfirm = {
+        confirmClear = false
+        //  نقش در این فاصله عوض شد؟ دوباره سنجیده می‌شود
+        if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.OWNER) toast(StrSettings.wipeOwnerOnly)
+        else scope.launch {
+          store.save(ShopData())
+          toast(StrSettings.wiped)
+        }
       },
-      confirmButton = {
-        TextButton(onClick = {
-          confirmClear = false
-          scope.launch {
-            store.save(ShopData())
-            toast(StrSettings.wiped)
-          }
-        }) { Text(StrSettings.wipe, color = Shop.colors.danger) }
-      },
-      dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(Str.cancel) } },
     )
   }
 
