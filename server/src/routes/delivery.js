@@ -74,13 +74,17 @@ router.get('/couriers', async (req, res) => {
 
 router.post('/couriers', requirePermission('delivery.couriers'), needWrite, async (req, res) => {
   const courier = await delivery.createCourier(req.shopId, req.body, delivery.staffActor(req));
-  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, { userId: courier.userId, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, {
+    userId: courier.userId, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.status(201).json({ courier });
 });
 
 const updateCourier = async (req, res) => {
   const courier = await delivery.updateCourier(req.shopId, req.params.id, req.body);
-  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, { active: courier.active, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, {
+    active: courier.active, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.json({ courier });
 };
 router.patch('/couriers/:id', requirePermission('delivery.couriers'), needWrite, updateCourier);

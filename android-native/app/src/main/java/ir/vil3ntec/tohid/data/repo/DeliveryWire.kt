@@ -18,6 +18,7 @@ import ir.vil3ntec.tohid.data.repo.CourierWire.bool
 import ir.vil3ntec.tohid.data.repo.CourierWire.long
 import ir.vil3ntec.tohid.data.repo.CourierWire.str
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -72,6 +73,7 @@ object DeliveryWire {
       cashHeldMinor = long(o, "cashHeldMinor") ?: 0L,
       liveCount = (long(o, "liveCount") ?: 0L).toInt(),
       liveExpectedMinor = long(o, "liveExpectedMinor") ?: 0L,
+      maxLive = long(o, "maxLive")?.toInt(),
     )
   }
 
@@ -329,8 +331,18 @@ object DeliveryWire {
       put("expectedVersion", JsonPrimitive(expectedVersion))
     }
 
-  fun courierUpdateJson(cashCapMinor: Long? = null, active: Boolean? = null): JsonObject = buildJsonObject {
+  /**
+   *  `maxLive` (DLV-03): عدد = سقفِ کارِ هم‌زمان؛ `clearMaxLive` = بی‌سقف (`null` ِ سرور)؛
+   *  هیچ‌کدام = همان قبلی (کلید فرستاده نمی‌شود).
+   */
+  fun courierUpdateJson(
+    cashCapMinor: Long? = null,
+    active: Boolean? = null,
+    maxLive: Int? = null,
+    clearMaxLive: Boolean = false,
+  ): JsonObject = buildJsonObject {
     cashCapMinor?.let { put("cashCapMinor", JsonPrimitive(it)) }
     active?.let { put("active", JsonPrimitive(it)) }
+    if (clearMaxLive) put("maxLive", JsonNull) else maxLive?.let { put("maxLive", JsonPrimitive(it)) }
   }
 }

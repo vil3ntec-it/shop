@@ -255,7 +255,8 @@ internal fun AutoAssignDialog(
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
           is ApiResult.Failure -> {
-            if (r.error.code == "cash_cap_exceeded") { replan = true; break@picks }
+            //  دستگاهِ دیگری زودتر سپرد: سقفِ نقد یا سقفِ کارِ هم‌زمان (DLV-03) پر شد ⇒ تازه و دوباره
+            if (r.error.code == "cash_cap_exceeded" || r.error.code == "courier_busy") { replan = true; break@picks }
             bad += "#${pick.orderNo}: ${r.error.userMessage}"
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
