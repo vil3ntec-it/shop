@@ -20,9 +20,22 @@
  *  کلید یک بار ساخته می‌شود و در `app_config` می‌ماند. اگر
  *  `LICENSE_PRIVATE_KEY` در محیط باشد همان استفاده می‌شود — برای وقتی که
  *  چند سرور باید یک کلید داشته باشند.
+ *
+ *  ⛔ SEC-ART-05 / F0-28 — جای کلیدِ خصوصی (`config.license`):
+ *    • `LICENSE_KEY_MODE=env` (حالتِ امن): کلید **فقط** از `LICENSE_PRIVATE_KEY_FILE` (فایلِ ‎0600‎) یا
+ *      `LICENSE_PRIVATE_KEY`. نه از دیتابیس خوانده می‌شود، نه ساخته؛ نبودنش یعنی سرور بالا نمی‌آید
+ *      (`preflight`) — هرگز برگشت به کلیدِ ذخیره در `app_config` (که در هر پشتیبان هست).
+ *    • پیش‌فرض (`legacy`، برای سرورهای نصب‌شده): محیط/فایل ⇒ `app_config` ⇒ ساختن. ولی اگر
+ *      `license_public_key` هست و خصوصی نیست (یعنی کلیدی بوده و پاک شده)، **کلیدِ تازه ساخته
+ *      نمی‌شود**: کلیدِ تازه یعنی مجوزِ همهٔ نصب‌ها بی‌صدا رد شود. خطا، نه ساختن.
+ *    • `LICENSE_REVOKED_KIDS`: `kid`های لورفته. سرور با کلیدِ باطل‌شده امضا نمی‌کند و بالا نمی‌آید —
+ *      حتی اگر پشتیبانِ قدیم یا `.env` ِ قدیم آن را برگرداند.
+ *  ابزارِ جابه‌جایی و چرخش: `scripts/license-key.js`. مقدارِ کلید هرگز در لاگ یا خطا نمی‌آید.
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const config = require('../config');
 const plans = require('./plans');
 
 const ISSUER = 'tohid-license-server';
@@ -45,6 +58,56 @@ const KEY_PUBLIC = 'license_public_key';
 
 let cached = null;
 
+/** خطای کلید — فقط کد و پیامِ بی‌راز؛ مقدارِ کلید هرگز در آن نیست. */
+class LicenseKeyError extends Error {
+  constructor(code, message) {
+    super(message);
+    this.code = code;
+    this.status = 500;
+    this.expose = false;
+  }
+}
+
+/** کلیدِ PEM از محیط یا فایل؛ ‎{ pem, source }‎ یا ‎null‎. */
+function externalKey() {
+  const lic = config.license;
+  if (lic.file) {
+    let st;
+    try { st = fs.statSync(lic.file); } catch {
+      throw new LicenseKeyError('license_key_file_missing', 'LICENSE_PRIVATE_KEY_FILE پیدا نشد');
+    }
+    //  ‎0600‎: کلیدِ امضای همهٔ مجوزها را هر کاربرِ دیگرِ همان کامپیوتر نخواند (ویندوز ACL دارد، نه mode)
+    if (process.platform !== 'win32' && (st.mode & 0o077) && lic.mode === 'env') {
+      throw new LicenseKeyError('license_key_file_mode', 'LICENSE_PRIVATE_KEY_FILE را فقط صاحبش بخواند (chmod 600)');
+    }
+    return { pem: fs.readFileSync(lic.file, 'utf8'), source: 'file' };
+  }
+  const fromEnv = process.env.LICENSE_PRIVATE_KEY;
+  if (fromEnv && fromEnv.trim()) return { pem: fromEnv.trim().replace(/\\n/g, '\n'), source: 'env' };
+  return null;
+}
+
+function parsePrivate(pem, source) {
+  try {
+    const privateKey = crypto.createPrivateKey(pem);
+    if (privateKey.asymmetricKeyType !== 'ec') throw new Error('not ec');
+    return privateKey;
+  } catch {
+    throw new LicenseKeyError('license_key_invalid', `کلیدِ مجوز (${source}) خوانا نیست یا EC نیست`);
+  }
+}
+
+function kidOf(publicSpki) {
+  return crypto.createHash('sha256').update(Buffer.from(publicSpki, 'base64')).digest('hex').slice(0, 16);
+}
+
+function assertNotRevoked(publicSpki) {
+  const kid = kidOf(publicSpki);
+  if (config.license.revokedKids.includes(kid)) {
+    throw new LicenseKeyError('license_key_revoked', `کلیدِ مجوز (kid ${kid}) در LICENSE_REVOKED_KIDS است — با کلیدِ باطل‌شده امضا نمی‌شود`);
+  }
+}
+
 /**
  *  جفت‌کلید سرور. یک بار ساخته و ذخیره می‌شود.
  *
@@ -53,19 +116,31 @@ let cached = null;
 async function keys() {
   if (cached) return cached;
 
-  const fromEnv = process.env.LICENSE_PRIVATE_KEY;
-  if (fromEnv && fromEnv.trim()) {
-    const privateKey = crypto.createPrivateKey(fromEnv.trim());
-    cached = { privateKey, publicSpki: spkiOf(privateKey) };
+  const ext = externalKey();
+  if (ext) {
+    const privateKey = parsePrivate(ext.pem, ext.source);
+    const publicSpki = spkiOf(privateKey);
+    assertNotRevoked(publicSpki);
+    cached = { privateKey, publicSpki, source: ext.source };
     return cached;
+  }
+  if (config.license.mode === 'env') {
+    //  ⛔ هرگز برگشت به app_config یا ساختنِ کلید: حالتِ env یعنی کلید فقط بیرون از دیتابیس است
+    throw new LicenseKeyError('license_key_missing', 'LICENSE_KEY_MODE=env ولی نه LICENSE_PRIVATE_KEY_FILE هست نه LICENSE_PRIVATE_KEY');
   }
 
   const stored = await plans.getConfig(KEY_PRIVATE, '');
   if (stored) {
-    const privateKey = crypto.createPrivateKey(stored);
+    const privateKey = parsePrivate(stored, 'app_config');
     const publicSpki = (await plans.getConfig(KEY_PUBLIC, '')) || spkiOf(privateKey);
-    cached = { privateKey, publicSpki };
+    assertNotRevoked(publicSpki);
+    cached = { privateKey, publicSpki, source: 'db' };
     return cached;
+  }
+
+  //  کلیدی بوده (عمومی‌اش مانده) و خصوصی‌اش پاک شده: کلیدِ تازه مجوزِ همهٔ نصب‌ها را رد می‌کند — نه
+  if (await plans.getConfig(KEY_PUBLIC, '')) {
+    throw new LicenseKeyError('license_key_lost', 'کلیدِ خصوصیِ مجوز نیست ولی کلیدِ عمومی‌اش هست — کلیدِ تازه ساخته نمی‌شود؛ LICENSE_PRIVATE_KEY_FILE را بدهید');
   }
 
   const pair = crypto.generateKeyPairSync('ec', {
@@ -79,9 +154,36 @@ async function keys() {
   await plans.setConfig(KEY_PRIVATE, pair.privateKey);
   await plans.setConfig(KEY_PUBLIC, publicSpki);
 
-  cached = { privateKey, publicSpki };
+  cached = { privateKey, publicSpki, source: 'db' };
   return cached;
 }
+
+/**
+ *  سنجشِ پیش از listen (‎index.js‎): کلید هست، باطل نیست و حالتِ env واقعاً بیرون از دیتابیس است.
+ *  خطا ⇒ سرور بالا نمی‌آید. خروجی فقط شکلِ کار است، هرگز کلید:
+ *  ‎{ mode, source, kid, dbCopy, dbMatches }‎ — `dbCopy` یعنی نسخه‌ای از خصوصی هنوز در `app_config`
+ *  (و پس در پشتیبان‌ها) است و باید با ‎scripts/license-key.js purge-db‎ برداشته شود.
+ */
+async function preflight() {
+  const k = await keys();
+  const kid = kidOf(k.publicSpki);
+  let dbCopy = false;
+  let dbMatches = null;
+  if (k.source !== 'db') {
+    const stored = await plans.getConfig(KEY_PRIVATE, '');
+    dbCopy = !!stored;
+    if (stored) {
+      try { dbMatches = spkiOf(crypto.createPrivateKey(stored)) === k.publicSpki; } catch { dbMatches = false; }
+    }
+  } else {
+    dbCopy = true;
+    dbMatches = true;
+  }
+  return { mode: config.license.mode, source: k.source, kid, dbCopy, dbMatches };
+}
+
+/** فقط برای آزمون: کلیدِ در حافظه را فراموش کن */
+function _reset() { cached = null; }
 
 /** کلید عمومی به شکل base64 از SPKI DER — همان چیزی که برنامه می‌خواهد */
 function spkiOf(privateKey) {
@@ -105,8 +207,7 @@ async function publicKey() {
  * نمی‌خواهد و دو سرور با یک کلید یک `kid` دارند.
  */
 async function keyId() {
-  const spki = await publicKey();
-  return crypto.createHash('sha256').update(Buffer.from(spki, 'base64')).digest('hex').slice(0, 16);
+  return kidOf(await publicKey());
 }
 
 function b64url(buf) {
@@ -244,6 +345,7 @@ async function verifyBytes(buf, sig) {
 }
 
 module.exports = {
-  issue, publicKey, keyId, signBytes, verifyBytes,
+  issue, publicKey, keyId, signBytes, verifyBytes, preflight, kidOf, spkiOf,
   ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS,
+  KEY_PRIVATE, KEY_PUBLIC, LicenseKeyError, _reset,
 };
