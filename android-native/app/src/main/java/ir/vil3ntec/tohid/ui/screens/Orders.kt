@@ -577,12 +577,8 @@ private fun OrderDetailSheet(
       }
       if (o.fulfillment == "delivery") {
         Section("نشانی")
-        val bits = listOfNotNull(
-          o.address.text.takeIf { it.isNotEmpty() },
-          o.address.landmark.takeIf { it.isNotEmpty() }?.let { "نشانه: $it" },
-          if (o.address.lat != null && o.address.lng != null) "پین: ${o.address.lat}, ${o.address.lng}" else null,
-        )
-        Text(bits.joinToString(" · ").ifEmpty { "—" }, color = c.text)
+        //  نشانی، و دستورِ تحویل با ویرایشش تا پیش از ارسال (CHK-14، CHK-24) — `OrderDeliveryPrefsUi.kt`
+        OrderDeliveryPrefsSection(o, cfg, repo, onUpdated = { order = it; onChanged() })
       }
       if (o.note.isNotEmpty()) { Section("یادداشت"); Text(o.note, color = c.text) }
 
@@ -818,6 +814,7 @@ private fun NewOrderSheet(
         TohidTextField(form.addressText, { form = form.copy(addressText = it.take(300)) }, label = "نشانی")
         TohidTextField(form.landmark, { form = form.copy(landmark = it.take(200)) }, label = "نشانه")
         TohidTextField(form.deliveryFee, { form = form.copy(deliveryFee = it.take(14)) }, label = "هزینهٔ ارسال (افغانی)", keyboardOptions = decimal)
+        CashTenderField(cfg.deliveryPrefs, form.cashTender) { form = form.copy(cashTender = it) }   // CHK-14
       }
       Spacer(Modifier.height(10.dp))
       Text("اقلام (مقدار و فی به افغانی)", style = MaterialTheme.typography.labelLarge, color = c.muted)

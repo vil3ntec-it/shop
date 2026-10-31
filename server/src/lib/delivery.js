@@ -114,7 +114,7 @@ function courierView(r) {
       ...(Number.isSafeInteger(addr.correctedAt) ? { correctedAt: addr.correctedAt } : {}),
     } : null,
     customer: live ? { name: r.customer_name, phoneMasked: orders.maskPhone(r.customer_phone) } : null,
-    delivery: live ? { callBeforeArrival: pref.callBeforeArrival === true, leaveWith: pref.leaveWith || '' } : null,
+    delivery: live ? { callBeforeArrival: pref.callBeforeArrival === true, leaveWith: pref.leaveWith || '', ...require('./delivery-prefs').courierCash(pref, r.expected_collect_minor) } : null,   // CHK-14: اسکناس و پول خرد
     itemsCount: Number(r.items_count),
     paymentMethod: r.payment_method,
     expectedCollectMinor: Number(r.expected_collect_minor),

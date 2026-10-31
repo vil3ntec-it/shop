@@ -220,6 +220,8 @@ object OrderDraft {
     val addressText: String = "",
     val landmark: String = "",
     val deliveryFee: String = "",
+    /** «مشتری با چه مبلغی می‌پردازد؟» (CHK-14) — افغانیِ کامل؛ خالی ⇒ نگفته */
+    val cashTender: String = "",
     val note: String = "",
     val test: Boolean = false,
     val lines: List<LineInput> = listOf(LineInput(qty = "1")),
@@ -237,6 +239,8 @@ object OrderDraft {
     val addressText: String,
     val landmark: String,
     val deliveryFeeMinor: Long,
+    /** CHK-14 — null ⇒ کلید فرستاده نمی‌شود */
+    val cashTenderMinor: Long? = null,
     val lines: List<Line>,
     val note: String,
     val test: Boolean,
@@ -299,6 +303,12 @@ object OrderDraft {
     if (delivery && form.deliveryFee.isNotBlank()) {
       fee = scaled(form.deliveryFee, 2) ?: return err("هزینهٔ ارسال درست نیست")
     }
+    //  CHK-14: قالب این‌جا؛ «نه کمتر از جمع، پول خرد کمتر از یک اسکناسِ ۱۰۰۰» را سرور با جمعِ خودش می‌سنجد
+    val tender = when (val t = if (delivery) DeliveryPrefs.parseTender(form.cashTender) else DeliveryPrefs.Tender.None) {
+      is DeliveryPrefs.Tender.Error -> return err(t.message)
+      is DeliveryPrefs.Tender.Ok -> t.minor
+      DeliveryPrefs.Tender.None -> null
+    }
     return Result.Ok(
       Body(
         source = form.source.ifBlank { "manual" },
@@ -308,6 +318,7 @@ object OrderDraft {
         addressText = if (delivery) addressText else "",
         landmark = if (delivery) landmark else "",
         deliveryFeeMinor = if (delivery) fee else 0L,
+        cashTenderMinor = tender,
         lines = lines,
         note = form.note.trim(),
         test = form.test,

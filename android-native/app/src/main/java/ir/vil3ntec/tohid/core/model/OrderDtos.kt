@@ -33,6 +33,8 @@ data class OrdersConfigDto(
   val reasons: Map<String, List<String>> = emptyMap(),
   val sources: List<String> = emptyList(),
   val permissions: OrderPermsDto = OrderPermsDto(),
+  /** «با اسکناسِ …» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24؛ پرچمِ `shop.orders.delivery_prefs`) */
+  val deliveryPrefs: Boolean = false,
   /** سرور «فروشِ تحویل در برنامه» را دارد — بی این (سرورِ کهنه) برنامه هیچ فروشی نمی‌سازد */
   val saleOnHandover: Boolean = false,
   /**
@@ -67,6 +69,16 @@ data class OrderAddressDto(
   val lng: Double? = null,
   val landmark: String = "",
   val text: String = "",
+)
+
+/** دستورِ تحویلِ سفارش — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، اسکناسِ مشتری (CHK-14/23/24) */
+@Serializable
+data class OrderDeliveryDto(
+  val callBeforeArrival: Boolean = false,
+  val leaveWith: String = "",
+  val photoConsent: Boolean = false,
+  /** مبلغی که مشتری هنگامِ تحویل می‌دهد (یک‌صدم)؛ null ⇒ نگفته */
+  val cashTenderMinor: Long? = null,
 )
 
 @Serializable
@@ -129,6 +141,8 @@ data class OrderDto(
   val subtotalMinor: Long = 0,
   val discountMinor: Long = 0,
   val deliveryFeeMinor: Long = 0,
+  /** دستورِ تحویل (`online_orders.delivery`) — فقط در جزئیات */
+  val delivery: OrderDeliveryDto = OrderDeliveryDto(),
   val lines: List<OrderLineDto> = emptyList(),
   val events: List<OrderEventDto> = emptyList(),
   /** فقط در `GET /shop/orders/handover`: لحظهٔ نخستین تحویل (زمانِ سرور) */

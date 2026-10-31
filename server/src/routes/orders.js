@@ -29,18 +29,17 @@ const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
 
 const actorOf = (req) => ({ type: 'user', id: req.user.id, role: req.role });
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /** پرچم لازم است (خواندن و نوشتن). */
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   if (!(await orders.flagOf(req.shopId))) {
     return next(forbidden('سفارشِ آنلاین برای این دکان روشن نیست', 'orders_disabled'));
   }
   next();
-});
+};
 
 /** نوشتن: پرچم + کلیدِ اشتراک (همان پیام‌های `requireFeature`). */
-const needWrite = wrap(async (req, res, next) => {
+const needWrite = async (req, res, next) => {
   const { entitled, ent } = await orders.entitledOf(req.shopId);
   if (!entitled) {
     const err = ent.trial.used && !ent.trial.active
@@ -49,9 +48,9 @@ const needWrite = wrap(async (req, res, next) => {
     return next(err);
   }
   next();
-});
+};
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   const st = await orders.stateOf(req.shopId);
   const ledger = require('../lib/order-ledger');
   //  برنامه‌ای که «فروشِ تحویل» دارد (`caps=saleOnHandover`) ⇒ کفِ تحویلِ این دکان (یک بار، همین
@@ -66,6 +65,8 @@ router.get('/config', wrap(async (req, res) => {
     refundLedger: await refunds.flagOf(req.shopId),
     //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
     picking: await require('../lib/order-picking').flagOf(req.shopId),
+    //  «با اسکناسِ … پرداخت می‌کنم» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24) — پیش‌فرض خاموش
+    deliveryPrefs: await require('../lib/delivery-prefs').flagOn(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
@@ -85,41 +86,41 @@ router.get('/config', wrap(async (req, res) => {
       ...(await ledger.capsFor(req.shopId, req.role)),
     },
   });
-}));
+});
 
-router.get('/summary', needFlag, wrap(async (req, res) => {
+router.get('/summary', needFlag, async (req, res) => {
   const out = await orders.summary(req.shopId);
   //  ORD-03: همان «باز / بسته» که مشتری در ویترین می‌بیند، در همان پرسشِ ۲۰ثانیه‌ای
   if (await presence.flagOf(req.shopId)) out.presence = await presence.presenceOf(req.shopId, out.serverTime);
   res.json(out);
-}));
+});
 
-router.get('/', needFlag, wrap(async (req, res) => {
+router.get('/', needFlag, async (req, res) => {
   res.json(await orders.list(req.shopId, {
     tab: String(req.query.tab || 'new'), limit: req.query.limit, cursor: req.query.cursor,
   }, actorOf(req)));
-}));
+});
 
 /**
  * تطبیقِ دریافت و بازپرداخت (§۳۸.۷): جمع‌های بازه + صفِ اختلاف‌ها.
  * فقط‌خواندنی؛ هر کس بازپرداخت می‌کند (صاحب و مدیر) آن را می‌بیند.
  * پیش از `/:id` تا با شناسهٔ سفارش اشتباه نشود.
  */
-router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
+router.get('/reconciliation', needFlag, requirePermission('orders.refund'), async (req, res) => {
   res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
-}));
+});
 
 /**
  * RPT-14 — گزارشِ فروشِ اینترنتی (`lib/order-online-report.js`): قیفِ سفارش، زمانِ قبول،
  * آماده‌سازی و تحویل، نرخِ ازدست‌رفته و ناموفق، و جست‌وجوهای بی‌نتیجهٔ ویترین. فقط‌خواندنی؛
  * هر کس گزارش می‌بیند (`reports.view`). پرچمِ خاموشِ `shop.orders.online_report` ⇒ ۴۰۳. پیش از `/:id`.
  */
-router.get('/online-report', needFlag, requirePermission('reports.view'), wrap(async (req, res) => {
+router.get('/online-report', needFlag, requirePermission('reports.view'), async (req, res) => {
   if (!(await onlineReport.flagOf(req.shopId))) {
     throw forbidden('گزارشِ فروشِ اینترنتی برای این دکان روشن نیست', 'online_report_disabled');
   }
   res.json(await onlineReport.report(req.shopId, { from: req.query.from, to: req.query.to }));
-}));
+});
 
 /**
  * سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست (`lib/order-ledger.js`) —
@@ -127,36 +128,36 @@ router.get('/online-report', needFlag, requirePermission('reports.view'), wrap(a
  * که سندِ برگشتشان (`o-<سفارش>-rf-<کلید>`) هنوز در دفتر ننشسته (`refunds`). فقط‌خواندنی؛
  * همان کسی که سفارش را تحویل می‌دهد (`orders.manage`). پیش از `/:id`.
  */
-router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
+router.get('/handover', needFlag, requirePermission('orders.manage'), async (req, res) => {
   res.json(await require('../lib/order-ledger').handoverPending(req.shopId, {
     since: req.query.since, limit: req.query.limit, after: req.query.after, orderId: req.query.orderId,
   }, actorOf(req)));
-}));
+});
 
 /**
  * «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
  * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر. مثلِ هر نوشتنِ
  * دیگرِ سفارش پشتِ `needWrite` (SUB-10).
  */
-router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), needWrite, wrap(async (req, res) => {
+router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), needWrite, async (req, res) => {
   res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
-}));
+});
 
-router.get('/:id', needFlag, wrap(async (req, res) => {
+router.get('/:id', needFlag, async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
   order.refund = await refunds.summary(req.shopId, order.id);
   //  ORD-14: آخرین پیشنهاد/ویرایش — فقط با پرچمِ `shop.orders.amend` (خاموش ⇒ همان پاسخِ پیشین)
   if (await amend.flagOf(req.shopId)) order.amendment = await amend.staffOf(req.shopId, order.id);
   res.json({ order });
-}));
+});
 
 /**
  * سفارشِ دستیِ کارمند — تلفنی، تلگرام، واتس‌اپ یا دستی (ORD-21)؛ با
  * `test: true` «سفارشِ آزمایشی» است تا صف، هشدار و چاپ بی مشتریِ واقعی
  * آزموده شوند. کلیدِ یکتایی لازم است (CHK-19).
  */
-router.post('/', needFlag, requirePermission('orders.create'), needWrite, wrap(async (req, res) => {
+router.post('/', needFlag, requirePermission('orders.create'), needWrite, async (req, res) => {
   const key = orders.clientKeyOf(req);
   const out = await orders.create(req.shopId, { key, body: req.body, actor: actorOf(req) });
   if (out.replayed) {
@@ -170,9 +171,9 @@ router.post('/', needFlag, requirePermission('orders.create'), needWrite, wrap(a
     ip: clientIp(req),
   });
   res.status(201).json({ order: out.order });
-}));
+});
 
-router.post('/:id/transition', needFlag, requirePermission('orders.manage'), needWrite, wrap(async (req, res) => {
+router.post('/:id/transition', needFlag, requirePermission('orders.manage'), needWrite, async (req, res) => {
   //  دفترِ بازپرداخت روشن ⇒ «بازپرداخت‌شده» بی مبلغ پذیرفته نیست؛ فقط از راهِ `/refunds`
   if (S.MONEY_TARGETS.includes(String(req.body?.to || '').trim()) && (await refunds.flagOf(req.shopId))) {
     throw conflict('بازپرداخت را با مبلغش از «ثبتِ بازپرداخت» بزنید', 'refund_via_ledger');
@@ -195,21 +196,40 @@ router.post('/:id/transition', needFlag, requirePermission('orders.manage'), nee
     });
   }
   res.json({ order: out.order, unchanged: out.unchanged });
-}));
+});
+
+/**
+ * ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-24) — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، نشانه و
+ * مبلغِ اسکناسِ مشتری (CHK-14). پشتِ پرچمِ خاموشِ `shop.orders.delivery_prefs` (۴۰۳ در خودِ lib)؛
+ * مثلِ هر نوشتنِ دیگرِ سفارش پشتِ `needWrite` (SUB-10). `expectedVersion` ِ ناهمخوان ⇒ ۴۰۹.
+ * POST و نه PATCH: `HttpURLConnection` ِ برنامهٔ کامپیوتر PATCH نمی‌فرستد.
+ */
+router.post('/:id/delivery', needFlag, requirePermission('orders.manage'), needWrite, async (req, res) => {
+  const out = await require('../lib/delivery-prefs').edit(req.shopId, req.params.id, req.body || {}, actorOf(req));
+  if (!out.unchanged) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.delivery_edit',
+      targetType: 'online_order', targetId: out.order.id,
+      detail: { orderNo: out.order.orderNo, changed: out.changed },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ order: out.order, unchanged: out.unchanged });
+});
 
 /**
  * ثبتِ بازپرداخت با مبلغ (§۳۸.۲/۳۸.۷، FIN-01) — پشتِ پرچمِ خاموشِ
  * `shop.orders.refunds`. کلیدِ یکتایی لازم است؛ تکرارِ همان درخواست
  * ردیفِ دوم نمی‌سازد. سفارش باید «درخواستِ برگشت» باشد.
  */
-const needLedger = wrap(async (req, res, next) => {
+const needLedger = async (req, res, next) => {
   if (!(await refunds.flagOf(req.shopId))) {
     return next(forbidden('دفترِ بازپرداخت برای این دکان روشن نیست', 'refund_ledger_disabled'));
   }
   next();
-});
+};
 
-router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWrite, needLedger, wrap(async (req, res) => {
+router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWrite, needLedger, async (req, res) => {
   const key = orders.clientKeyOf(req);
   let out;
   try {
@@ -233,21 +253,21 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
     ip: clientIp(req),
   });
   res.status(201).json({ order, entry: out.entry });
-}));
+});
 
 /**
  * ORD-07 — عقب انداختنِ زمانِ آماده‌شدنِ سفارشِ قبول‌شده (`lib/order-delay.js`) — پشتِ پرچمِ
  * خاموشِ `shop.orders.delay`، با `orders.manage` و اشتراک (SUB-10: نوشتنِ پولی). کلیدِ یکتایی
  * لازم است؛ تکرارِ همان درخواست دوباره عقب نمی‌برد. `expectedReadyAt` ِ کهنه ⇒ ۴۰۹ `ready_changed`.
  */
-const needDelay = wrap(async (req, res, next) => {
+const needDelay = async (req, res, next) => {
   if (!(await delay.flagOf(req.shopId))) {
     return next(forbidden('عقب انداختنِ سفارش برای این دکان روشن نیست', 'order_delay_disabled'));
   }
   next();
-});
+};
 
-router.post('/:id/delay', needFlag, requirePermission('orders.manage'), needWrite, needDelay, wrap(async (req, res) => {
+router.post('/:id/delay', needFlag, requirePermission('orders.manage'), needWrite, needDelay, async (req, res) => {
   const key = orders.clientKeyOf(req);
   let out;
   try {
@@ -272,7 +292,7 @@ router.post('/:id/delay', needFlag, requirePermission('orders.manage'), needWrit
     ip: clientIp(req),
   });
   res.json({ order: out.order, replayed: false });
-}));
+});
 
 /**
  * ORD-14 — ویرایشِ سفارش پس از ثبت (`lib/order-amend.js`) پشتِ پرچمِ خاموشِ `shop.orders.amend`، با
@@ -327,11 +347,11 @@ router.post('/:id/amendments/:amendId/withdraw', needFlag, requirePermission('or
  * پیش از ارسال — پشتِ پرچمِ `shop.order_risk` (خاموش ⇒ `{enabled:false}`). فقط خواندن؛ بی شماره.
  * سفارشِ دکانِ دیگر ⇒ ۴۰۴.
  */
-router.get('/:id/risk', needFlag, wrap(async (req, res) => {
+router.get('/:id/risk', needFlag, async (req, res) => {
   const out = await require('../lib/order-risk').riskOf(req.shopId, req.params.id);
   if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
-}));
+});
 
 //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
 //  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
