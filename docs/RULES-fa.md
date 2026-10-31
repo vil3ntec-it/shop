@@ -468,6 +468,8 @@
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 | `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
 
+تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
+
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
