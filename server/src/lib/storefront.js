@@ -46,8 +46,6 @@ const { badRequest, notFound, conflict, ApiError } = require('../middleware/erro
 
 const FLAG_KEY = 'shop.storefront';
 const FEATURE_KEY = 'storefront';
-/** E2E-MKT-02: ۴۰۹ ِ `out_of_stock` در ویترین با فهرستِ همهٔ قلم‌های کم و «کم کن به …» (پیش‌فرض خاموش) */
-const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/;
 const PRODUCT_ID_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 /** زیردامنه‌هایی که مالِ خودِ سامانه‌اند یا گمراه می‌کنند. */
@@ -1207,7 +1205,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, STOCK_LIST_FLAG, SLUG_RE, RESERVED,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
