@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.core.money
 
-import kotlin.math.roundToLong
-
 /**
  *  متنِ کادرِ مبلغ از عددِ دفتر — کاتلینِ خالص در commonMain تا اندروید، کامپیوتر و iOS یک حساب داشته باشند.
  *
@@ -28,7 +26,10 @@ object MoneyInput {
    */
   fun settleInput(balance: Double): String? {
     if (!balance.isFinite()) return null
-    val minor = (balance * MINOR_PER_MAJOR).roundToLong()
+    //  ⛔ `mathRound`، نه `roundToLong`: روی Kotlin/Native ِ آیفون `roundToLong` همان floor(x + 0.5) ِ اعشاری
+    //  است و بالای ۲^۵۲ پول (و در لبهٔ 0.49999999999999994) یک پول با JVM و `Money.fromLegacy` فرق می‌کند
+    //  (SEC-DATA-02؛ همان ریشهٔ یافتهٔ #508).
+    val minor = mathRound(balance * MINOR_PER_MAJOR)
     if (minor <= 0) return null
     return ofMinor(minor)
   }

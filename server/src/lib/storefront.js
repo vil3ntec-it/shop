@@ -39,6 +39,7 @@ const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
+const sfs = require('./storefront-seen');
 const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -517,7 +518,7 @@ function parseCheckout(body, sf) {
     return {
       productId,
       qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
-      note: text(x.note, 200),
+      note: text(x.note, 200), ...sfs.expectedOf(x, i),   // CHK-17: فیِ دیده‌شده (اختیاری)
     };
   });
 
@@ -595,10 +596,8 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
         { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
-    //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
-    if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
-      throw withData(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), { quote: quoteOf(lines, fees) });
-    }
+    //  CHK-17/S32: جمع یا فیِ هر قلم با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود؛ برگهٔ تازه و «X از … به …»
+    sfs.assertSeen(input, lines, totalMinor, () => quoteOf(lines, fees));
     return {
       source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
       customerName: input.customerName, customerPhone: input.customerPhone,
@@ -1214,5 +1213,5 @@ module.exports = {
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
-  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
+  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView, PRODUCT_ID_RE,
 };
