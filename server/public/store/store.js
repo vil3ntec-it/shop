@@ -1,11 +1,11 @@
 /*
  * ویترینِ یک دکان — کاتالوگ، برگهٔ کالا، نوار و برگهٔ تیرهٔ سبد (r3/r2)، ثبتِ
- * سفارش با شمارهٔ تأییدشده، رسید و پیگیری، لغو و خریدِ دوباره
+ * سفارش با شمارهٔ تأییدشده، پیگیری و خریدِ دوباره؛ برگهٔ رسید، لغو و پرداختِ آنلاین در `order.js`
  * (WEB، CHK، §۲۳، §۳۱.۱، §۳۲.۳). داده فقط از `/api/store/<slug>`؛ متن از K.t.
  *
  * ⛔ قیمت را سرور می‌گوید؛ جمعِ دیده‌شده (`expectedTotalMinor`) فقط برای این است
  *    که اگر قیمت عوض شده، سفارش ثبت نشود و برگهٔ تازه روشن نشان داده شود (CHK-17).
- * ⛔ پرداختِ آنلاین نیست (D-08) — هیچ دکمهٔ ساختگی.
+ * ⛔ پرداختِ آنلاین فقط «پرداخت با حساب‌پی» ِ واقعیِ سرور (PAY-21، `order.js`) — هیچ دکمهٔ ساختگی.
  * ⛔ −/+ فقط در سبد؛ کارتِ کالا «یک زدن = یک واحد» با نشانِ تعداد (DESIGN v2).
  */
 (function () {
@@ -508,55 +508,14 @@
     renderCheckout();
   }
 
-  // ── رسید و پیگیری (CHK-20/22، S136/S137) ──
-  function renderOrder(o, token) {
-    $('o-title').textContent = t('od.no', { n: K.fa(o.orderNo, 0) });
-    var st = $('o-status');
-    var why = K.reason(o.statusReason);
-    st.className = 'pill ' + K.orderKind(o.status);
-    st.textContent = K.order(o.status) + (why ? ' — ' + why : '');
-    $('o-meta').textContent = (o.fulfillment === 'pickup' ? t('pickup') : t('od.ship')) + t('sep') + K.when(o.createdAt);
-    //  ORD-16: هر تغییر با زمانش (خلاصه در پله‌ها، همه این‌جا)
-    var tl = K.clear($('o-timeline'));
-    (o.timeline || []).forEach(function (e) {
-      tl.appendChild(el('li', {}, el('span', { text: K.order(e.status) }), el('span', { class: 'num', text: K.when(e.at) })));
-    });
-    var steps = K.clear($('o-steps'));
-    K.orderSteps(o).forEach(function (s) {
-      var dot = el('span', { class: 'dot' });
-      if (s.state === 'done') dot.appendChild(K.icon('check'));
-      if (s.state === 'stop') dot.appendChild(K.icon('close'));
-      steps.appendChild(el('li', { class: 'step ' + s.state, attrs: s.state === 'now' ? { 'aria-current': 'step' } : {} },
-        dot, el('span', { class: 'lbl' }, el('b', { text: s.label }), s.at ? el('small', { text: K.when(s.at) }) : null)));
-    });
-    var ul = K.clear($('o-lines'));
-    o.lines.forEach(function (l) {
-      ul.appendChild(el('li', {}, el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.unitPriceMinor) })),
-        el('span', { class: 'amt num', text: K.money(l.lineTotalMinor) })));
-    });
-    var paid = o.paymentStatus === 'paid' ? o.totalMinor : 0;
-    var rows = [['od.sub', K.money(o.subtotalMinor)]];
-    if (o.discountMinor) rows.push(['od.disc', K.money(o.discountMinor)]);
-    if (o.fulfillment === 'delivery') rows.push(['ck.fee', o.deliveryFeeMinor ? K.money(o.deliveryFeeMinor) : t('free')]);
-    rows.push(['od.total', K.money(o.totalMinor)], ['od.paid', K.money(paid)], ['od.due', K.money(o.totalMinor - paid)]);
-    var tt = K.clear($('o-totals'));
-    rows.forEach(function (r) {
-      var g = r[0] === 'od.total';
-      tt.append(el('span', { class: g ? 'grand' : '', text: t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
-    });
-    $('o-cancel').hidden = !o.canCancel;
-    $('o-reorder').hidden = false;
-    $('o-cancel').onclick = function () {
-      K.confirm(t('od.cancel.q'), t('od.cancel.yes')).then(function (yes) {
-        if (!yes) return;
-        api('/orders/' + encodeURIComponent(token) + '/cancel', { method: 'POST', body: {} }).then(function (r) {
-          renderOrder(r.order, token);
-          K.toast(t('od.cancelled'));
-        }).catch(function (e) { K.note($('o-msg'), 'err', e.message); });
-      });
-    };
-    $('o-reorder').onclick = function () { reorder(o); };
-    return o;
+  // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var orderView = null;
+  function loadOrderView() {
+    orderView = orderView || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
+    }).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
+      .catch(function () { orderView = null; throw new Error(t('err.network')); });
+    return orderView;
   }
 
   var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
@@ -568,17 +527,20 @@
     if (K.loadS('placed:' + token)) K.note($('o-placed'), 'ok', t('od.placed'));
     else $('o-placed').hidden = true;
     var load = function () {
-      api('/orders/' + encodeURIComponent(token)).then(function (r) {
-        renderOrder(r.order, token);
+      //  نخستین بار order.js هم‌زمان با خودِ سفارش می‌آید، نه پس از آن
+      Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) {
+        var o = r[1].render(r[0].order, token);
         //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
-        if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
+        //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
+        var pend = o.paymentStatus === 'pending';
+        if (pend || FINAL.indexOf(o.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, pend ? 5000 : 20000);
       }).catch(function (e) {
         $('o-title').textContent = t('od.title');
         K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
         $('o-status').className = 'pill err';
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
-        $('o-cancel').hidden = true; $('o-reorder').hidden = true;
+        $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
       });
     };
     load();
