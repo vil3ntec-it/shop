@@ -784,8 +784,13 @@ fun AppRoot(
                 Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
                 Str.dateAndDigits to androidx.compose.material.icons.Icons.Filled.Event,
                 Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                //  هر بخشِ `SettingsScreen` این‌جاست، وگرنه روی کامپیوتر روشن‌شدنی نیست (`DeskSettingsCoverageTest`)
+                ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle to androidx.compose.material.icons.Icons.Filled.Tune,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
+                StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,

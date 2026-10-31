@@ -526,6 +526,7 @@ fun SettingsScreen(
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
+        DeviceOnlyNote()
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
           options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
