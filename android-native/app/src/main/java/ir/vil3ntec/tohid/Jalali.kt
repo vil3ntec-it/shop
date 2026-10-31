@@ -1,7 +1,9 @@
 package ir.vil3ntec.tohid
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import java.util.Calendar
 
 /**
  *  تبدیلِ تاریخ میلادی به خورشیدی.
@@ -132,13 +134,36 @@ fun formatMillis(at: Long): String {
   return formatDate("$y-$m-$d")
 }
 
-/** تاریخِ امروزِ دستگاه به شکلِ `YYYY-MM-DD` — همان `todayISO` نسخهٔ وب */
-fun todayIso(): String {
-  val c = java.util.Calendar.getInstance()
-  val y = c.get(java.util.Calendar.YEAR)
-  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
-  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
+/**
+ *  تاریخِ امروزِ دستگاه به شکلِ `YYYY-MM-DD` — همان `todayISO` نسخهٔ وب.
+ *
+ *  LOC-03: با «پایانِ روزِ کاری» (`ShopDayChoice`، پیش‌فرض نیمه‌شب) ساعتِ پیش از
+ *  پایان هنوز دیروز است — تاریخِ ثبتِ فروش، برگشت و شیفت از همین‌جا می‌آید.
+ *  نیمه‌شب ⇒ همان تاریخِ تقویمیِ دستگاه، بی هیچ جابه‌جایی.
+ */
+fun todayIso(): String = todayIsoAt(Calendar.getInstance(), ShopDayChoice.hours)
+
+/** همان `todayIso` برای یک لحظهٔ معین و یک پایانِ روزِ کاری (آزمون‌پذیر) */
+internal fun todayIsoAt(now: Calendar, dayEndHours: Int): String {
+  val c = now.clone() as Calendar
+  val shift = ShopDay.dayShift(c.get(Calendar.HOUR_OF_DAY) * 60 + c.get(Calendar.MINUTE), dayEndHours)
+  if (shift != 0) c.add(Calendar.DAY_OF_MONTH, shift)
+  val y = c.get(Calendar.YEAR)
+  val m = (c.get(Calendar.MONTH) + 1).toString().padStart(2, '0')
+  val d = c.get(Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
   return "$y-$m-$d"
+}
+
+/**
+ *  دیروزِ دکان: یک روز پیش از [todayIso] — دکمهٔ «دیروز» ِ کادرهای تاریخ. با «پایانِ روزِ کاری»
+ *  ساعتِ ۱:۳۰ ِ بامداد «امروز» خودش دیروزِ تقویمی است، پس «دیروز» یک روز پیش از آن است، نه همان.
+ */
+fun yesterdayIso(): String = yesterdayIsoAt(Calendar.getInstance(), ShopDayChoice.hours)
+
+/** همان `yesterdayIso` برای یک لحظهٔ معین (آزمون‌پذیر) */
+internal fun yesterdayIsoAt(now: Calendar, dayEndHours: Int): String {
+  val today = todayIsoAt(now, dayEndHours)
+  return CivilDays.addDays(today, -1) ?: today
 }
 
 /**
