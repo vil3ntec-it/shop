@@ -28,6 +28,8 @@ const P = require('./pick-core');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
+//  جایگزینی (PCK-05/06) — دیر بار می‌شود (آن پرونده هم پرچمِ همین‌جا را می‌خواند)
+const subs = () => require('./pick-substitutes');
 
 const FLAG_KEY = 'shop.orders.picking';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -163,12 +165,16 @@ function lineView(l) {
     location: { aisle: l.aisle, shelf: l.shelf, level: l.level },
     scans: Number(l.scans),
     wrongScans: Number(l.wrong_scans),
+    //  PCK-05/06: جایگزینِ پذیرفته‌شده (کالا، مقدار و قیمتِ کمتری که مشتری می‌پردازد)
+    substitute: l.status === 'substituted' ? asJson(l.substitute) : null,
   };
 }
 
 const coreLine = (v) => ({
   lineNo: v.lineNo, name: v.name, status: v.status, orderedQtyMilli: v.orderedQtyMilli,
-  pickedQtyMilli: v.pickedQtyMilli, unitPriceMinor: v.unitPriceMinor, originalTotalMinor: v.originalTotalMinor,
+  pickedQtyMilli: v.pickedQtyMilli,
+  unitPriceMinor: v.status === 'substituted' && v.substitute ? Number(v.substitute.chargedUnitPriceMinor) : v.unitPriceMinor,
+  originalTotalMinor: v.originalTotalMinor,
   aisle: v.location.aisle, shelf: v.location.shelf, level: v.location.level,
 });
 
@@ -212,6 +218,7 @@ async function loadSheet(run, shopId, orderId) {
       deductedMinor: s.deductedMinor,
     },
     labels: packed ? labelsOf(Number(order.order_no), Number(pick.bags)) : [],
+    substitutions: await subs().forSheet(run, orderId),
   };
 }
 
@@ -451,9 +458,11 @@ async function applyEvent(shopId, orderId, ev, actor) {
       }
       case 'reset': {
         if (open && picked === 0 && Number(line.scans) === 0) return reject('nothing_to_reset');
-        if ((line.status === 'not_found' || line.status === 'short') && line.product_id) {
+        if ((line.status === 'not_found' || line.status === 'short' || line.status === 'substituted') && line.product_id) {
           await undoIssue(c, shopId, line.product_id, orderId, at);
         }
+        //  PCK-05: پیشنهادِ باز یا پذیرفتهٔ همین قلم پس گرفته می‌شود
+        await subs().withdrawLine(c, orderId, ev.lineNo, actor.id || '', at);
         detail.from = line.status;
         next = { status: 'pending', picked: 0 };
         await c.query('UPDATE order_pick_lines SET scans = 0 WHERE order_id=$1 AND line_no=$2', [orderId, ev.lineNo]);
@@ -540,6 +549,14 @@ async function pack(shopId, orderId, { key, body }, actor) {
       throw err;
     }
 
+    //  PCK-05: مهلتِ گذشته ⇒ ترجیحِ مشتری؛ پیشنهادِ هنوز در انتظار ⇒ صبر (بی رضایت گران‌تر نمی‌شود)
+    await subs().applyTimeouts(c, id, now());
+    const waiting = await subs().pendingOf(c, id);
+    if (waiting.length) {
+      const err = conflict('مشتری هنوز دربارهٔ جایگزین تصمیم نگرفته است', 'substitution_pending');
+      err.data = { pending: waiting.length, deadlineAt: Number(waiting[0].deadline_at) };
+      throw err;
+    }
     const lines = (await c.query('SELECT * FROM order_pick_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows.map(lineView);
     const s = P.settle({
       lines: lines.map(coreLine), discountMinor: Number(order.discount_minor), deliveryFeeMinor: Number(order.delivery_fee_minor),
@@ -559,8 +576,17 @@ async function pack(shopId, orderId, { key, body }, actor) {
 
     const at = now();
     //  قلم‌های سفارش = آن‌چه واقعاً برداشته شد (برنامه فروشِ تحویل را از همین‌ها می‌سازد)
+    const byNo = new Map(lines.map((l) => [l.lineNo, l]));
     for (const l of s.lines) {
-      if (l.qtyMilli === 0) {
+      const sub = byNo.get(l.lineNo).status === 'substituted' ? byNo.get(l.lineNo).substitute : null;
+      if (sub && l.qtyMilli > 0) {
+        //  PCK-05/06: قلمِ سفارش = کالای جایگزین با قیمتِ کمتر (فروشِ تحویل و موجودیِ برنامه از همین)
+        await c.query(
+          `UPDATE online_order_lines SET product_id=$3, name=$4, unit=$5, qty_milli=$6, unit_price_minor=$7, line_total_minor=$8
+            WHERE order_id=$1 AND line_no=$2`,
+          [id, l.lineNo, sub.productId, text(sub.name, 200), text(sub.unit, 30), l.qtyMilli, Number(sub.chargedUnitPriceMinor), l.totalMinor]
+        );
+      } else if (l.qtyMilli === 0) {
         await c.query('DELETE FROM online_order_lines WHERE order_id=$1 AND line_no=$2', [id, l.lineNo]);
       } else if (s.changedLines.includes(l.lineNo)) {
         await c.query(
@@ -591,6 +617,9 @@ async function pack(shopId, orderId, { key, body }, actor) {
     const pickDetail = {
       originalTotalMinor: Number(order.total_minor), totalMinor: s.totalMinor, deductedMinor: s.deductedMinor,
       removedLines: s.removedLines, changedLines: s.changedLines, bags,
+      substitutions: lines.filter((l) => l.status === 'substituted' && l.substitute).map((l) => ({
+        lineNo: l.lineNo, from: l.productId, to: l.substitute.productId, chargedUnitPriceMinor: Number(l.substitute.chargedUnitPriceMinor),
+      })),
     };
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,

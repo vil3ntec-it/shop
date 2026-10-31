@@ -17,10 +17,17 @@
  *   POST /:id/pick/start                  شروع — `orders.manage`
  *   POST /:id/pick/events                 کارهای جمع‌آور با کلیدِ یکتا — `orders.manage`
  *   POST /:id/pick/pack                   بسته‌بندی با کلیدِ یکتایی — `orders.manage`
+ *
+ *   جایگزینی (PCK-05/06، `lib/pick-substitutes.js`):
+ *   PUT  /pick/products/:productId        حلال بودنِ کالا برای جایگزینِ امن — `stock.adjust`
+ *   GET  /:id/pick/substitutes?lineNo=    دو جایگزینِ امنِ پیشنهادی برای یک قلم
+ *   POST /:id/pick/substitutions          پیشنهاد (با اسکن) برای قلمِ «پیدا نشد» — `orders.manage`
+ *   POST /:id/pick/substitutions/decide   تصمیمِ کارمند پس از تماس/واتس‌اپ — `orders.manage`
  */
 const express = require('express');
 const orders = require('../lib/orders');
 const picking = require('../lib/order-picking');
+const subs = require('../lib/pick-substitutes');
 const audit = require('../lib/audit');
 const { requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
@@ -86,6 +93,16 @@ router.get('/pick/metrics', needOrders, requirePermission('reports.view'), needP
   res.json(await picking.metrics(req.shopId, { from: req.query.from, to: req.query.to }));
 });
 
+//  PCK-06: حلال بودن (جمع‌آور نمی‌تواند برای باز کردنِ جایگزین عوضش کند — انباردار/مدیر)
+router.put('/pick/products/:productId', needOrders, requirePermission('stock.adjust'), needWrite, needPick, async (req, res) => {
+  const out = await subs.setAttrs(req.shopId, req.params.productId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'pick.product_attrs', targetType: 'product', targetId: out.productId,
+    detail: { halal: out.halal }, ip: clientIp(req),
+  });
+  res.json(out);
+});
+
 // ── برگهٔ یک سفارش ─────────────────────────────────────────────────
 
 //  هنوز شروع نشده ⇒ `{ pick: null }`؛ سفارشِ دکانِ دیگر ⇒ ۴۰۴
@@ -102,6 +119,33 @@ router.post('/:id/pick/start', needOrders, manage, needWrite, needPick, async (r
 router.post('/:id/pick/events', needOrders, manage, needWrite, needPick, async (req, res) => {
   const out = await picking.events(req.shopId, req.params.id, req.body, actorOf(req));
   res.json({ results: out.results, pick: out.sheet });
+});
+
+// ── جایگزینی (PCK-05/06) ───────────────────────────────────────────
+
+router.get('/:id/pick/substitutes', needOrders, needPick, async (req, res) => {
+  res.json(await subs.suggestions(req.shopId, req.params.id, req.query.lineNo));
+});
+
+router.post('/:id/pick/substitutions', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const out = await subs.propose(req.shopId, req.params.id, req.body, actorOf(req));
+  if (!out.replayed) {
+    await log(req, 'pick.substitute_propose', req.params.id, {
+      lineNo: out.substitution.lineNo, productId: out.substitution.productId, totalMinor: out.substitution.totalMinor,
+    });
+  }
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.post('/:id/pick/substitutions/decide', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const b = req.body && typeof req.body === 'object' ? req.body : {};
+  const out = await subs.decide(req.shopId, req.params.id, b.substitutionId, b, { by: 'staff', actorId: req.user.id });
+  if (!out.replayed) {
+    await log(req, 'pick.substitute_decide', req.params.id, {
+      substitutionId: out.substitution.id, lineNo: out.substitution.lineNo, status: out.substitution.status,
+    });
+  }
+  res.json(out);
 });
 
 router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, async (req, res) => {
