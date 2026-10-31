@@ -39,6 +39,7 @@ const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
+const sfs = require('./storefront-seen');
 const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -517,7 +518,7 @@ function parseCheckout(body, sf) {
     return {
       productId,
       qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
-      note: text(x.note, 200),
+      note: text(x.note, 200), ...sfs.expectedOf(x, i),   // CHK-17: فیِ دیده‌شده (اختیاری)
     };
   });
 
@@ -595,10 +596,8 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
         { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
-    //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
-    if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
-      throw withData(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), { quote: quoteOf(lines, fees) });
-    }
+    //  CHK-17/S32: جمع یا فیِ هر قلم با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود؛ برگهٔ تازه و «X از … به …»
+    sfs.assertSeen(input, lines, totalMinor, () => quoteOf(lines, fees));
     return {
       source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
       customerName: input.customerName, customerPhone: input.customerPhone,
@@ -634,8 +633,11 @@ function orderIdOf(shopId, token) {
   return a.length === b.length && crypto.timingSafeEqual(a, b) ? m[1] : null;
 }
 
-/** نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی. */
-function publicOrder(o, token) {
+/**
+ * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
+ * `delivery` (S5) فقط وقتی پرچمِ نمای پیک روشن است می‌آید (`delivery.customerView`).
+ */
+function publicOrder(o, token, delivery) {
   return {
     token,
     orderNo: o.orderNo,
@@ -666,6 +668,7 @@ function publicOrder(o, token) {
     timeline: o.events
       .filter((e) => e.kind === 'created' || e.kind === 'status')
       .map((e) => ({ status: e.toStatus, at: e.at })),
+    ...(delivery !== undefined ? { delivery } : {}),
   };
 }
 
@@ -704,7 +707,7 @@ async function track(sf, token) {
   if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return publicOrder(o, token);
+  return publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id));
 }
 
 async function cancel(sf, token) {
