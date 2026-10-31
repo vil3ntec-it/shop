@@ -1829,6 +1829,10 @@ async function openReceipt(id) {
   const w = window.open('', '_blank');
   if (!w) { alert('مرورگر پنجرهٔ تازه را بست؛ اجازهٔ پاپ‌آپ بدهید.'); return; }
   w.document.open(); w.document.write(html); w.document.close();
+  //  پنجرهٔ تازه CSP ِ همین صفحه را به ارث می‌برد و `onclick` ِ درون‌خطیِ دکمهٔ چاپ اجرا نمی‌شود
+  //  (SEC-API-05)؛ دستگیره از این‌جا وصل می‌شود.
+  const btn = w.document.querySelector('.btn');
+  if (btn) { btn.removeAttribute('onclick'); btn.addEventListener('click', () => w.print()); }
 }
 
 async function addPayment() {

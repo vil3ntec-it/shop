@@ -221,8 +221,10 @@ async function providers() {
   for (const p of list) counts[p.state] += 1;
   return {
     checkedAt: now(),
-    //  بیرون از production کدِ راهِ `log` در خودِ پاسخ برمی‌گردد (`devCode`)
+    //  بیرون از production **و** با `OTP_DEV_ECHO`/`NODE_ENV=test`، کدِ راهِ `log` در خودِ پاسخ
+    //  برمی‌گردد (`devCode`) — SEC-API-04. `production: false` روی سرورِ واقعی یعنی `NODE_ENV` را بگذارید.
     production: config.env === 'production',
+    devCodeEcho: config.env !== 'production' && config.otp.devEcho === true,
     counts,
     providers: list,
   };

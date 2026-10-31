@@ -92,7 +92,9 @@ async function pushChanges(ctx, changes) {
 
     for (const raw of changes) {
       const collection = String(raw?.collection || '');
-      const table = TABLES[collection];
+      //  ⛔ SEC-API-06 — فقط کلیدِ خودِ جدول؛ ‎constructor‎/‎__proto__‎ تابع یا شیءِ JS اند و
+      //  تا ۲.۱۴.۴ به‌جای نامِ جدول در SQL می‌نشستند ⇒ خطای نحوی و ۵۰۰ِ کلِ بسته
+      const table = Object.hasOwn(TABLES, collection) ? TABLES[collection] : null;
       const recordId = String(raw?.id || '');
       if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
 
