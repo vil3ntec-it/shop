@@ -45,6 +45,9 @@ const FINANCE = [
   ['GET', /^\/admin\/campaigns\/[^/]+\/stats$/],
   ['GET', /^\/admin\/flags(\/history)?$/],
   ['GET', /^\/admin\/shop-desk\/groups$/],
+  //  ۴.۶ و ۴.۷: فقط درهای پولیِ بازار و پیک (سفارش، کمیسیون، نقد و تسویهٔ پیک) — نه پرونده و نه آستانه
+  ['GET', /^\/admin\/market\/(overview|orders|commission)$/],
+  ['GET', /^\/admin\/delivery\/(overview|report)$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)$/],
   ['PUT', /^\/admin\/subscriptions\/[^/]+$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)\/[^/]+\/status$/],

@@ -278,8 +278,20 @@
 | `GET /admin/service-keys` ◆ | ارشدِ انسانی | سراسری | — | خواندنِ سراسری | — | `admin-service-keys.js` |
 | `POST /admin/service-keys` ◆ | ارشدِ انسانی + دلیل | سراسری | دارد | راز (یک‌بار دیده) | — | `admin-service-keys.js` |
 | `POST /admin/service-keys/:keyId/revoke` ◆ | ارشدِ انسانی + دلیل (کلیدِ مالک: فقط مالک) | سراسری | دارد | راز | — | `admin-service-keys.js` |
+| `GET /admin/market/overview` ▲ | مدیر (+ مالی، فقط‌خواندن) | سراسری | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-market.js` |
+| `GET /admin/market/sellers` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ فراداده | — | `admin-market.js` |
+| `GET /admin/market/orders` ▲ | مدیر (+ مالی) | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی نام/شماره/نشانیِ مشتری) | — | `admin-market.js` |
+| `GET /admin/market/commission` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ مالی | — | `admin-market.js` |
+| `GET /admin/market/history` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سابقه | — | `admin-market.js` |
+| `GET /admin/delivery/overview` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `GET /admin/delivery/queue` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-delivery.js` |
+| `GET /admin/delivery/events` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندن (بی یادداشت و کد) | — | `admin-delivery.js` |
+| `GET /admin/delivery/connectivity` ▲ | مدیر | سراسری | — | خواندنِ فراداده | — | `admin-delivery.js` |
+| `GET /admin/delivery/report` ▲ | مدیر (+ مالی) | سراسری | دارد (`admin.delivery_report_viewed`) | خواندنِ مالی | — | `admin-delivery.js` |
+| `GET /admin/delivery/thresholds` ▲ | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `PUT /admin/delivery/thresholds` ▲ | ارشد + دلیل | سراسری | دارد + تاریخچه (`live_config`) | عملیات | — | `admin-delivery.js` |
 
-◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
+◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). ▲ = ماژول‌های ۴.۶ و ۴.۷ (بند ۱۲.۷). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
 `PUT/DELETE /admin/pump/live-config` و `PUT /admin/release/beta` تاریخچه می‌نویسند (دلیلِ اختیاری).
 
 ---
@@ -430,3 +442,20 @@
 - **مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`** با توکنِ معتبرِ مدیر (پیش‌تر ۴۰۱ `invalid_token` از `routes/data` ⇒ پل
   «نشست تمام شد» می‌خواند). بی‌توکن و توکنِ دکان همان ۴۰۱ (وجودِ مسیر گفته نمی‌شود). خطِ آخرِ درهای `/admin` در `app.js`.
 - **`GET /admin/shops`:** `total` همان `q` و `hold` را می‌شمارد (یک WHERE برای ردیف‌ها و شمار).
+
+### ۱۲.۷ بازار (۴.۶) و نظارت بر پیک (۴.۷) — سمتِ مدیر (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-market-api`)
+
+- **توانایی‌ها:** `market-admin.v1` (`/admin/market/*`) و `delivery-watch.v1` (`/admin/delivery/*`). همه خواندنی‌اند جز
+  `PUT /admin/delivery/thresholds` (فقط ارشد + دلیل؛ تکرارِ همان مقدار ⇒ `unchanged` بی ردیفِ دوم در تاریخچه).
+- **نوشتنِ بازار درِ تازه ندارد:** تعلیقِ فروشنده = حالتِ `service_disabled` با سرویسِ `market.directory` (یا `shop.storefront`)
+  از همان `/admin/shops/:id/holds` (بند ۱۲.۱)؛ تصمیمِ پرونده و برداشتنِ جریمه همان `/admin/trust/*` (فقط ارشد، دلیل).
+- **مدل همان است که هست:** فروشنده = دکانِ VILL3N (فروشندهٔ مستقل در مدل نیست ⇒ `null`)؛ «تأییدِ فروشنده» نیست (بودن در فهرست
+  را صاحبِ دکان روشن می‌کند و سامانه با پرچم/حالت/جریمه می‌بندد ⇒ `gates` و `blockedBy`)؛ سفارشِ بازار تک‌دکانی؛ کمیسیون و
+  سبدِ چنددکانی فقط با ستون‌های مهاجرتِ ۱۳۰ (#432) ⇒ تا آن‌وقت `inModel: false`، نه صفر.
+- **«گیر کرده / ناهم‌خوان / اختلاف»** فقط از `lib/order-watch.js` (خالص؛ همان دو ماشینِ وضعیت). آستانه‌ها در `live_config`
+  (`console.delivery_thresholds`، scope ِ `all`)؛ مقدارِ نامعتبر ⇒ پیش‌فرض و `source: 'default'`.
+- **بی دادهٔ شخصی:** هیچ پاسخی نام، شماره، نشانی یا یادداشتِ مشتری و هیچ کد/هشِ تحویل ندارد (آزمونِ `admin-market-delivery`).
+- **گزارشِ کارکرد** با تعریف‌های RPT-15 (#554) و تطبیقِ مدیر (#411): «گرفته» از `delivered_at`، «تسویه» از `created_at` ِ سند،
+  «در دست» = تحویل‌شدهٔ تسویه‌نشده؛ جمعِ ردیف‌ها = جمعِ کل؛ دیدنش یک ردیفِ سابقه.
+- **مهاجرتِ ۱۷۲:** فقط نمایه برای پرسش‌های بی‌دکانِ مدیر، با خط‌های `rollback:` ِ آزموده.
+

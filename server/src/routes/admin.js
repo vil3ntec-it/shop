@@ -97,6 +97,8 @@ const CAPABILITIES = Object.freeze([
   'flags.v1',         //  GET /admin/flags · GET /admin/flags/history (نوشتن: ارشد + دلیل)
   'actor.v1',         //  سرآیندهای X-Actor-Id/Role/Name با کلیدِ سرویس ⇒ «انجام‌دهنده» در سابقه
   'service-key.v1',   //  Bearer vsk_… · GET|POST /admin/service-keys · POST …/:keyId/revoke
+  'market-admin.v1',  //  GET /admin/market/overview|sellers|orders|commission|history (۴.۶، فقط خواندن)
+  'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
 ]);
 
 router.get('/me', (req, res) => {
@@ -806,6 +808,9 @@ router.use('/flags', require('./admin-flags'));
 router.use('/service-keys', require('./admin-service-keys'));
 //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
 router.use('/system', require('./admin-system'));
+//  پنلِ مرکزی ۴.۶ و ۴.۷: مدیریتِ بازار و نظارت بر پیک — فقط خواندن (+ آستانه‌های «گیر کرده»، فقط ارشد)
+router.use('/market', require('./admin-market'));
+router.use('/delivery', require('./admin-delivery'));
 //  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
 router.use('/release', require('./admin-release'));
 router.use('/', require('./admin-platform'));
