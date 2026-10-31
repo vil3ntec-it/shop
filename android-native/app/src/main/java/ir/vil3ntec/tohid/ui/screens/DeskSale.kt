@@ -164,6 +164,9 @@ fun DeskSaleScreen(
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
   //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
   val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
+  //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض خاموش): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
+  ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
+  var priceCheck by remember { mutableStateOf(false) }
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
   var payOpen by remember { mutableStateOf(false) }
@@ -700,6 +703,7 @@ fun DeskSaleScreen(
           PosAction.EDIT_ROW -> { selected?.let { editLine = it }; true }
           PosAction.FREE_ITEM -> { freeLine = true; true }
           PosAction.REPRINT -> { if (lastInvoice != null) showInvoice = true; true }
+          PosAction.PRICE_CHECK -> if (ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.on.value) { priceCheck = true; true } else false
           else -> false
         }
       }
@@ -822,6 +826,9 @@ fun DeskSaleScreen(
       onConfirm = { st -> finish(st) },
     )
   }
+  if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(
+    d, ir.vil3ntec.tohid.todayIso(), remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }, onDismiss = { priceCheck = false; refocus() },
+  )
   if (showInvoice) lastInvoice?.let { (snap, id) ->
     snap.sales.find { it.id == id }?.let { sale ->
       InvoiceDialog(d = snap, sale = sale, onDismiss = { showInvoice = false; refocus() }, onMessage = ::toast)

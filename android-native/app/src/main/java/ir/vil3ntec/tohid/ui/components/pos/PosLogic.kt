@@ -192,6 +192,8 @@ object PosLayout {
 enum class PosAction {
   FINISH, CUSTOMER, EDIT_ROW, FREE_ITEM, REPRINT,
   SUBMIT, HINT_DOWN, HINT_UP, ROW_DOWN, ROW_UP, CLEAR_QUERY, DELETE_ROW, QTY_UP, QTY_DOWN,
+  /** POS-15 — Ctrl+I (`KeyMap.SALE_PRICE_CHECK`)؛ صفحه فقط با `PosPriceCheckPrefs` روشن آن را می‌خورد */
+  PRICE_CHECK,
 }
 
 /**
@@ -208,6 +210,7 @@ object PosKeys {
     key == KeyName.F3 -> PosAction.EDIT_ROW
     key == KeyName.F4 -> PosAction.FREE_ITEM
     key == KeyName.F8 -> PosAction.REPRINT
+    primary && key == KeyName.I -> PosAction.PRICE_CHECK
     else -> null
   }
 

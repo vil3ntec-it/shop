@@ -205,6 +205,9 @@ class PosLogicTest {
     assertEquals(PosAction.FREE_ITEM, PosKeys.screen(KeyName.F4, false))
     assertEquals(PosAction.REPRINT, PosKeys.screen(KeyName.F8, false))
     assertNull("F10 هیچ کاری ندارد (۵.۱ بند ۴)", PosKeys.screen(KeyName.F10, false))
+    //  POS-15 — Ctrl+I قیمت‌پرسی (صفحه فقط با تنظیمِ روشن می‌خوردش)؛ I ِ تنها مالِ کادر است
+    assertEquals(PosAction.PRICE_CHECK, PosKeys.screen(KeyName.I, primary = true))
+    assertNull(PosKeys.screen(KeyName.I, primary = false))
   }
 
   /** RET-01/05 (S13/S15): Shift+F9 = «حالتِ برگشت» فقط با برگشتِ تازهٔ روشن؛ خاموش همان F9 ِ امروز */
