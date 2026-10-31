@@ -997,6 +997,50 @@ await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» �
   await page.selectOption('#ib-rv-space', 'pending');
 });
 
+// ── E2E-ADM-15: تطبیقِ فروشِ آنلاین — همان عددِ گزارشِ خودِ دکان ──────
+await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ گزارشِ دکان را نشان می‌دهد؛ کارمزد ۰ «فعلاً بی کارمزد»', async () => {
+  const live = require('../src/lib/live-config');
+  for (const key of ['shop.orders', require('../src/lib/order-refunds').FLAG_KEY]) await live.set(owner.shopId, key, true, 'panel-test');
+  const call = async (method, path, body, headers = {}) => {
+    const r = await fetch(base + path, {
+      method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${owner.token}`, ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const made = await call('POST', '/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'احمد', phone: '0791234567' },
+    lines: [{ name: 'برنج', qtyMilli: 2000, unitPriceMinor: 2500 }],
+  }, { 'Idempotency-Key': `panel-recon-${Date.now()}` });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
+    assert.equal((await call('POST', `/api/shop/orders/${made.body.order.id}/transition`, { to })).status, 200, to);
+  }
+
+  await openTab('ops');
+  await page.waitForSelector('#ops-recon-tools:not(.hidden)', { timeout: 10_000 });
+  //  امروزِ کابل برای هر دو؛ پاسخِ پنل بازه را می‌گوید و گزارشِ خودِ دکان با **همان** بازه خوانده می‌شود
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kabul' }).format(new Date());
+  await page.fill('#ops-recon-from', today);
+  await page.fill('#ops-recon-to', today);
+  const [resp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/admin/system/reconciliation')),
+    page.click('#btn-ops-recon'),
+  ]);
+  const win = (await resp.json()).window;
+  const own = (await call('GET', `/api/shop/orders/reconciliation?from=${win.from}&to=${win.to}`)).body;
+  const row = `#ops-recon tr[data-shop="${owner.shopId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  const cells = await page.locator(`${row} td`).allTextContents();
+  assert.match(await page.locator('#ops-recon-checked').textContent(), new RegExp(`^${today} تا ${today} \\(هر دو روز شامل، Asia/Kabul\\)`));
+  assert.equal(own.collected.count, 1);
+  assert.equal(cells[1], `۱ سفارش · ${(own.collected.totalMinor / 100).toLocaleString('fa-AF')} افغانی`);
+  assert.equal(cells[7], '۰ افغانی');
+  assert.match(cells[8], /بی اختلاف/);
+  assert.match(await page.locator('#ops-recon-totals').textContent(), /کارمزد۰ افغانی · فعلاً بی کارمزد/);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/e2e-adm-15.png`, fullPage: true });
+});
+
 // ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────
 await step('عملیات: بررسیِ زنجیرهٔ هش؛ دست‌کاری با نخستین حلقهٔ شکسته و دلیل دیده می‌شود', async () => {
   const store = require('../src/lib/hash-chain-store');
