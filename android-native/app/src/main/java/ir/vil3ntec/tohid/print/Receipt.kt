@@ -248,6 +248,11 @@ object Receipt {
    *  تفاوت» است (S15: یک رسید با دو بخش).
    */
   fun renderReturn(context: Context, d: ShopData, docId: String, storeName: String, width: Int): Bitmap {
+    //  رسیدِ برگشتِ نسخهٔ ۲ (چیدمانِ `core/receipt/ReturnReceiptLayout`، آزمون‌شده در `ReturnReceiptLayoutTest`)
+    //  فقط با پرچمِ `shop.receipt_v2`؛ خاموش ⇒ همین چیدمانِ پیشین، بیت‌به‌بیت
+    if (ReceiptFlag.enabled(context)) {
+      return Receipts.returnBitmap(context, d, docId, width, fallbackName = storeName) ?: error(StrPos.returnDocNotFound)
+    }
     val doc = ir.vil3ntec.tohid.data.ReturnFlow.doc(d, docId) ?: error(StrPos.returnDocNotFound)
     val regular = font(context, R.font.vazirmatn_regular)
     val bold = font(context, R.font.vazirmatn_bold)

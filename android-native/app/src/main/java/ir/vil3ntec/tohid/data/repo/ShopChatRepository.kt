@@ -62,8 +62,8 @@ class ShopChatRepository(private val api: ApiClient) {
   }
 
   /** بارگذاریِ رسانه (`role` = main یا thumb) ⇒ شناسهٔ رسانه. همان بایت ⇒ همان شناسه. */
-  suspend fun upload(convId: String, bytes: ByteArray, mime: String, role: String): String {
-    val out = api.postBytes(ApiEndpoints.ShopChat.conversation(convId) + "/media?role=$role", bytes, mime)
+  suspend fun upload(convId: String, bytes: ByteArray, mime: String, role: String, onProgress: ((Long) -> Unit)? = null): String {
+    val out = api.postBytes(ApiEndpoints.ShopChat.conversation(convId) + "/media?role=$role", bytes, mime, onProgress = onProgress)
     return ApiJson.text(out, "mediaId").ifEmpty { throw ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse() }
   }
 

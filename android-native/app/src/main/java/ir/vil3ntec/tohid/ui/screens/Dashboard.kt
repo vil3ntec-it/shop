@@ -52,15 +52,12 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Brand
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.material3.Icon
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.Str
 
-private fun todayIso(): String =
-  SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+/** «امروز» ِ داشبورد همان روزِ کاریِ دکان است که فروش با آن ثبت می‌شود (LOC-03) */
+private fun todayIso(): String = ir.vil3ntec.tohid.todayIso()
 
 /**
  *  داشبورد — پنل‌به‌پنل همان چیزی که نسخهٔ وب نشان می‌دهد.
@@ -683,9 +680,8 @@ data class DashboardNumbers(
       val byDebtor = d.transactions.groupBy { it.debtorId }
       val owing = d.debtors
         .map { debtor ->
-          var amount = 0.0
-          byDebtor[debtor.id]?.forEach { amount += if (it.type == "give") it.amount else -it.amount }
-          debtor to amount
+          //  همان جمعِ `ShopStore.debt` (`DebtMinorFlag`: با `shop.debt_minor` حسابِ تسویه‌شده «بدهکار» نیست)
+          debtor to ir.vil3ntec.tohid.data.DebtMinorFlag.balance(byDebtor[debtor.id].orEmpty())
         }
         .filter { it.second > 0 }
         .sortedByDescending { it.second }

@@ -151,8 +151,40 @@ object StrSettings {
   val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
   val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
   fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: $v", "Installed version: $v", "نصب شوې نسخه: $v")
+  //  «چه چیزی تازه است» (OPS-05)
+  val whatsNew: String get() = t("چه چیزی تازه است", "What's new", "څه نوي دي")
+  val whatsNewShow: String get() = t("نشان دادن پس از هر به‌روزرسانی", "Show after each update", "له هر تازه کېدو وروسته ښودل")
+  val whatsNewNote: String get() = t(
+    "روشن: پس از هر به‌روزرسانی، تغییرهای همان نسخه یک بار نشان داده می‌شوند و هر قابلیتِ برداشته‌شده با جای تازه‌اش گفته می‌شود. فقط روی همین دستگاه.",
+    "On: after each update, that version's changes are shown once, and any removed feature is announced with where to find it now. Only on this device.",
+    "روښانه: له هر تازه کېدو وروسته، د هماغې نسخې بدلونونه یو ځل ښودل کېږي او هره لرې شوې ځانګړنه د خپل نوي ځای سره ویل کېږي. یوازې په همدې وسیله.",
+  )
+  val whatsNewAll: String get() = t("دیدنِ همهٔ تغییرها", "See all changes", "ټول بدلونونه وګورئ")
+  val whatsNewEmpty: String get() = t("هنوز یادداشتی نیست.", "No notes yet.", "لا یادښت نشته.")
+  fun whatsNewVersion(v: String): String = t("نسخهٔ $v", "Version $v", "نسخه $v")
+  val whatsNewKindNew: String get() = t("تازه", "New", "نوی")
+  val whatsNewKindChanged: String get() = t("تغییر", "Changed", "بدل شوی")
+  val whatsNewKindRemoved: String get() = t("برداشته شد", "Removed", "لرې شو")
+  fun whatsNewInstead(text: String): String = t("به‌جایش: $text", "Instead: $text", "پر ځای یې: $text")
+  val whatsNewGotIt: String get() = t("فهمیدم", "Got it", "پوه شوم")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")
-  val restoreWarn: String get() = t("با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring this file replaces all current data on this device. A copy of the current state is kept so it can be undone if this was a mistake.", "د دې دوتنې په بېرته راګرځولو سره، د دې وسیلې ټول اوسني معلومات بدلېږي. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
+  val restoreWarn: String get() = t("بازیابی فقط روی همین دستگاه است: هیچ چیزی از سرور یا دستگاه‌های دیگر پاک یا عوض نمی‌شود. اگر این دستگاه با سرور همگام است، اطلاعاتی که روی سرور هست — از جمله فروش و دریافت‌هایی که پس از این پشتیبان ثبت شده — دوباره از سرور می‌آید و برای این کار اینترنت لازم است. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring only affects this device: nothing is deleted or changed on the server or on other devices. If this device syncs with the server, the data on the server — including sales and payments recorded after this backup — comes back from the server, so an internet connection is needed. A copy of the current state is kept so it can be undone if this was a mistake.", "بېرته راګرځول یوازې په همدې وسیله اغېز کوي: له سرور یا نورو وسیلو هېڅ شی نه پاکېږي او نه بدلېږي. که دا وسیله له سرور سره همغږې وي، هغه معلومات چې په سرور کې دي — د هغو پلورونو او ترلاسه شویو پیسو په ګډون چې له دې بیک‌اپ وروسته ثبت شوي — بیا له سرور څخه راځي، نو انټرنېټ پکار دی. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
+  //  بازیابی روی دستگاهِ همگام (S143، `ShopStore.restoreBackup`): هرگز چیزی از سرور پاک نمی‌کند
+  val restoreNeedNet: String get() = t("این دستگاه با سرور همگام است و بازیابی اطلاعات را از سرور می‌گیرد تا فروش و اطلاعاتِ تازه‌تر از پشتیبان پاک نشود. به اینترنت وصل شوید و دوباره بازیابی کنید. هیچ چیزی پاک یا عوض نشده.", "This device syncs with the server, so a restore takes the data from the server and sales or data newer than the backup aren't deleted. Connect to the internet and restore again. Nothing was deleted or changed.", "دا وسیله له سرور سره همغږې ده، نو بېرته راګرځول معلومات له سرور څخه اخلي څو هغه پلورونه او معلومات چې له بیک‌اپ نوي دي پاک نه شي. انټرنېټ ته وصل شئ او بیا یې بېرته راوګرځوئ. هېڅ شی نه دی پاک یا بدل شوی.")
+  val restoreSyncFirst: String get() = t("این دستگاه هنوز با حسابِ شما همگام نشده و حساب روی سرور اطلاعات دارد؛ بازیابی آن‌ها را از سرور می‌گیرد تا پشتیبانِ کهنه با اطلاعاتِ تازه‌تر قاطی نشود. اول به اینترنت وصل شوید و همگام کنید، بعد دوباره بازیابی کنید. هیچ چیزی پاک یا عوض نشده.", "This device hasn't synced with your account yet and the account has data on the server; a restore takes that data from the server so an old backup isn't mixed with newer data. Connect to the internet and sync first, then restore again. Nothing was deleted or changed.", "دا وسیله لا ستاسو له حساب سره همغږې شوې نه ده او حساب په سرور کې معلومات لري؛ بېرته راګرځول هغه له سرور څخه اخلي څو زوړ بیک‌اپ له نویو معلوماتو سره ګډ نه شي. لومړی انټرنېټ ته وصل شئ او همغږي یې کړئ، بیا یې بېرته راوګرځوئ. هېڅ شی نه دی پاک یا بدل شوی.")
+  val restoreNotOnV3: String get() = t("بازیابیِ پشتیبان با همگام‌سازیِ نسخهٔ ۳ هنوز ممکن نیست، چون اطلاعاتِ تازه‌ترِ سرور را پاک می‌کرد. هیچ چیزی پاک یا عوض نشده.", "Restoring a backup isn't possible yet with sync version 3, because it would delete newer data on the server. Nothing was deleted or changed.", "د همغږۍ په ۳ نسخه کې د بیک‌اپ بېرته راګرځول لا ممکن نه دي، ځکه چې په سرور کې به یې نوي معلومات پاک کړي وای. هېڅ شی نه دی پاک یا بدل شوی.")
+  fun restoreQueueLeft(n: Int): String = t("$n تغییرِ این دستگاه هنوز به سرور نرسیده؛ اول باید برسند تا گم نشوند. به اینترنت وصل شوید و دوباره بازیابی کنید. هیچ چیزی پاک یا عوض نشده.", "$n ${pl(n, "change", "changes")} on this device ${pl(n, "hasn't", "haven't")} reached the server yet; they must get there first so they aren't lost. Connect to the internet and restore again. Nothing was deleted or changed.", "د دې وسیلې $n ${pl(n, "بدلون", "بدلونونه")} لا سرور ته نه دي رسېدلي؛ لومړی باید ورسېږي څو ورک نه شي. انټرنېټ ته وصل شئ او بیا یې بېرته راوګرځوئ. هېڅ شی نه دی پاک یا بدل شوی.")
+  fun restoreFailed(r: Any): String = t("بازیابی انجام نشد ($r). هیچ چیزی پاک یا عوض نشده؛ دوباره امتحان کنید.", "The restore didn't go through ($r). Nothing was deleted or changed; try again.", "بېرته راګرځول ونه شول ($r). هېڅ شی نه دی پاک یا بدل شوی؛ بیا هڅه وکړئ.")
+  val restoreBusy: String get() = t("بازیابیِ پشتیبان در جریان است؛ این تغییر ثبت نشد. چند لحظهٔ دیگر دوباره امتحان کنید.", "A backup restore is in progress, so this change wasn't saved. Try again in a moment.", "د بیک‌اپ بېرته راګرځول روان دي، نو دا بدلون ثبت نه شو. یو څو شېبې وروسته بیا هڅه وکړئ.")
+  val restoreRaced: String get() = t("در همین لحظه تغییرِ تازه‌ای روی این دستگاه ثبت شد", "a new change was saved on this device at the same moment", "په همدې شېبه کې په دې وسیله یو نوی بدلون ثبت شو")
+  fun restoredFromServer(rows: Int, notOnServer: Int): String = t(
+    "این دستگاه با سرور همگام است: تنظیماتِ پشتیبان نشست و $rows ردیف اطلاعات از سرور آمد؛ از سرور و دستگاه‌های دیگر چیزی پاک نشد." +
+      if (notOnServer > 0) " $notOnServer ردیفِ پشتیبان روی سرور نیست (پس از پشتیبان حذف شده یا هرگز همگام نشده) و افزوده نشد؛ فایلِ پشتیبان دست‌نخورده است." else "",
+    "This device syncs with the server: the backup's settings were restored and $rows ${pl(rows, "row", "rows")} of data came from the server; nothing was deleted on the server or other devices." +
+      if (notOnServer > 0) " $notOnServer backup ${pl(notOnServer, "row isn't", "rows aren't")} on the server (deleted after the backup or never synced) and ${pl(notOnServer, "wasn't", "weren't")} added; the backup file is untouched." else "",
+    "دا وسیله له سرور سره همغږې ده: د بیک‌اپ تنظیمات بېرته راغلل او د معلوماتو $rows ${pl(rows, "کرښه", "کرښې")} له سرور څخه راغلې؛ په سرور او نورو وسیلو کې هېڅ شی پاک نه شو." +
+      if (notOnServer > 0) " د بیک‌اپ $notOnServer ${pl(notOnServer, "کرښه", "کرښې")} په سرور کې نشته (له بیک‌اپ وروسته پاکې شوې یا هېڅکله نه دي همغږې شوې) او ور زیاتې نه شوې؛ د بیک‌اپ دوتنه نه ده بدله شوې." else "",
+  )
   val warehouseEntries: String get() = t("ورودهای انبار", "Warehouse entries", "د ګدام داخلې")
   fun restorePhotos(n: Any): String = t("$n عکس هم در این فایل هست", "This file also has $n ${pl(n, "photo", "photos")}", "په دې دوتنه کې $n ${pl(n, "انځور", "انځورونه")} هم شته")
   val restoreNoPhotos: String get() = t("این فایل عکسی ندارد — عکس‌های فعلی دست‌نخورده می‌مانند", "This file has no photos — current photos stay untouched", "دا دوتنه انځور نه لري — اوسني انځورونه نه بدلېږي")
@@ -166,9 +198,15 @@ object StrSettings {
   fun compactFailed(r: Any): String = t("فشرده کردن انجام نشد: $r", "Compacting failed: $r", "سپکول ونه شول: $r")
   val compactDo: String get() = t("فشرده کن", "Compact", "سپک یې کړه")
   val wipeQ: String get() = t("پاک‌سازی کامل اطلاعات؟", "Erase all data?", "ټول معلومات پاک شي؟")
-  val wipeWarn: String get() = t("همه چیز روی این دستگاه پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "Everything on this device will be erased and can't be recovered. If you haven't made a backup, make one first.", "په دې وسیله کې هر څه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
+  //  ⛔ «پاک کردنِ همه» برای هر ردیف DELETE به سرور می‌فرستد (`ShopStore.save` ⇐ `record`): همهٔ دستگاه‌های دکان، نه فقط این یکی
+  val wipeWarn: String get() = t("همهٔ اطلاعاتِ دکان از همهٔ دستگاه‌ها و سرور پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "All shop data will be erased from every device and the server, and can't be recovered. If you haven't made a backup, make one first.", "د دوکان ټول معلومات له ټولو وسیلو او سرور څخه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
   val wiped: String get() = t("تمام اطلاعات پاک شد", "All data erased", "ټول معلومات پاک شول")
   val wipe: String get() = t("پاک کن", "Erase", "پاک یې کړه")
+  val wipeNext: String get() = t("ادامه", "Continue", "دوام ورکړئ")
+  val wipeNameTitle: String get() = t("نامِ دکان را بنویسید", "Type the shop name", "د دوکان نوم ولیکئ")
+  val wipeNameLabel: String get() = t("نامِ دکان", "Shop name", "د دوکان نوم")
+  fun wipeNameHint(name: Any): String = t("برای پاک کردنِ همهٔ اطلاعات از همهٔ دستگاه‌ها و سرور، بنویسید: «$name»", "To erase all data from every device and the server, type: “$name”", "له ټولو وسیلو او سرور څخه د ټولو معلوماتو د پاکولو لپاره ولیکئ: «$name»")
+  val wipeOwnerOnly: String get() = t("فقط صاحبِ دکان می‌تواند همهٔ اطلاعات را پاک کند", "Only the shop owner can erase all data", "یوازې د دوکان خاوند کولای شي ټول معلومات پاک کړي")
 
   // اشتراک (برچسبِ وضعیت)
   val active: String get() = t("فعال", "Active", "فعال")
@@ -180,6 +218,14 @@ object StrSettings {
 
   // بخش‌های جمع‌شو
   val open: String get() = t("باز کردن", "Open", "پرانیستل")
+
+  // پایانِ روزِ کاری (LocaleSection › ShopDayRow، LOC-03)
+  val dayEndNote: String get() = t(
+    "پایانِ روزِ کاری. فروش و هر ثبتی که پس از نیمه‌شب و پیش از این ساعت باشد به نامِ دیروز نوشته می‌شود، تا یک شبِ کاری دو روز نشود. 00:00 یعنی نیمه‌شب، مثلِ همیشه. فقط روی همین دستگاه.",
+    "End of the business day. Sales and other entries made after midnight but before this time are dated to the previous day, so one working night isn't split into two days. 00:00 means midnight, as always. This device only.",
+    "د کاري ورځې پای. هغه پلور او نور ثبتونه چې له نیمې شپې وروسته او له دې وخت مخکې وي د پرون په نوم لیکل کېږي، څو یوه کاري شپه په دوو ورځو ونه وېشل شي. 00:00 یعني نیمه شپه، لکه تل. یوازې په همدې وسیله.",
+  )
+  fun dayEndNow(d: Any): String = t("فروشِ همین حالا به تاریخِ $d ثبت می‌شود", "A sale made right now is dated $d", "همدا اوس پلور د $d په نېټه ثبتېږي")
 
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
@@ -209,4 +255,12 @@ object StrSettings {
   val calSolar: String get() = t("خورشیدی", "Solar", "لمریز")
   val calGregorian: String get() = t("میلادی", "Gregorian", "میلادي")
   val calNote: String get() = t("خودکار یعنی فارسی و پشتو خورشیدی، انگلیسی میلادی. فقط نمایش است؛ تاریخِ ذخیره‌شده عوض نمی‌شود.", "Automatic means solar for Persian and Pashto, Gregorian for English. Display only; saved dates don't change.", "اتومات یعني فارسي او پښتو لمریز، انګلیسي میلادي. یوازې ښودنه ده؛ خوندي شوې نېټې نه بدلېږي.")
+
+  // POS-39: دریافت از مشتری در صندوق (F7)
+  val tillReceiveTitle: String get() = t("دریافت از مشتری در صندوق (F7)", "Take customer payments at the till (F7)", "په صندوق کې له پیرودونکي پیسې اخیستل (F7)")
+  val tillReceiveNote: String get() = t(
+    "قسط یا بدهیِ مشتری بی رفتن به «قرض‌داران»، با رسید. همان ردیفِ دفترِ قرض است و در دخلِ شیفت شمرده می‌شود. فقط روی همین دستگاه.",
+    "Take an instalment or debt payment without leaving the register, with a receipt. It is the same debt-book entry and counts in the shift's cash. On this device only.",
+    "قسط یا پور پرته له دې چې «پوروړي» ته ولاړ شئ، له رسید سره. همغه د پور دفتر کرښه ده او د شیفټ په نغدو کې شمېرل کېږي. یوازې په همدې وسیله.",
+  )
 }

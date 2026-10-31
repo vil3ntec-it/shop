@@ -12,6 +12,8 @@ import ir.vil3ntec.tohid.ui.screens.WelcomeScreen
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.unit.dp
 
 /*
  *  چرا `FragmentActivity` و نه `ComponentActivity`:
@@ -46,6 +48,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
+    //  OPS-03: پیش از هر کارِ دیگر — خطای گرفته‌نشده گزارشِ بی دادهٔ شخصی با کد می‌شود
+    ir.vil3ntec.tohid.data.platform.CrashReporter.install(applicationContext)
+    lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+      runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(applicationContext) }
+    }
     enableEdgeToEdge()
 
     store = ShopStore(applicationContext)
@@ -70,6 +77,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ShopDayChoice.load(applicationContext)
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
@@ -117,6 +125,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
       TohidTheme(theme) {
         // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
         ir.vil3ntec.tohid.ui.ProvideLang {
+          CrashNotice()
           if (!welcomed) {
             WelcomeScreen(store) {
               prefs.edit().putBoolean("welcomed", true).apply()
@@ -141,6 +150,43 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         }
       }
     }
+  }
+
+  /**
+   *  OPS-03: برنامه دفعهٔ پیش ناگهان بسته شد ⇒ یک بار کدِ گزارش را بگو (برای تماس با پشتیبانی).
+   *  نخواندنِ صف یا هر خطای دیگر ⇒ هیچ.
+   */
+  @Composable
+  private fun CrashNotice() {
+    var code by remember {
+      mutableStateOf(runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.notice(applicationContext) }.getOrNull())
+    }
+    val shown = code ?: return
+    val done = {
+      runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.markShown(applicationContext, shown) }
+      code = null
+    }
+    androidx.compose.material3.AlertDialog(
+      onDismissRequest = done,
+      title = { androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashTitle) },
+      text = {
+        androidx.compose.foundation.layout.Column {
+          androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashBody)
+          androidx.compose.foundation.text.selection.SelectionContainer {
+            androidx.compose.material3.Text(
+              shown,
+              style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
+              modifier = androidx.compose.ui.Modifier.padding(top = 8.dp),
+            )
+          }
+        }
+      },
+      confirmButton = {
+        androidx.compose.material3.TextButton(onClick = done) {
+          androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashOk)
+        }
+      },
+    )
   }
 
   override fun onDestroy() {

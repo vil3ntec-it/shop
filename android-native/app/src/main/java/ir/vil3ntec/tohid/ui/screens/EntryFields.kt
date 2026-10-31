@@ -27,6 +27,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrFields
 
 /**
  *  کادرهای ورودیِ صفحه‌های «محصول جدید» و «ورود کالا به انبار».
@@ -43,6 +45,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  حالتِ فوکوس با دو چیز نشان داده می‌شود: حاشیه پررنگ‌تر و کمی ضخیم‌تر.
  *  فقط رنگ کافی نیست؛ کسی که چشمش رنگ را خوب تشخیص نمی‌دهد هم باید
  *  بفهمد کدام کادر باز است.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrFields` (LOC-06).
  */
 @Composable
 fun EntryField(
@@ -191,7 +195,7 @@ fun EntryFieldBox(
 fun EntryDateField(
   value: String,
   onValueChange: (String) -> Unit,
-  label: String = "تاریخ",
+  label: String = StrFields.date,
   modifier: Modifier = Modifier,
 ) {
   Column(modifier) {
@@ -208,8 +212,8 @@ fun EntryDateField(
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         modifier = Modifier.weight(1f),
       )
-      TextButton(onClick = { onValueChange(todayIso()) }) { Text("امروز") }
-      TextButton(onClick = { onValueChange(entryYesterdayIso()) }) { Text("دیروز") }
+      TextButton(onClick = { onValueChange(todayIso()) }) { Text(Str.today) }
+      TextButton(onClick = { onValueChange(entryYesterdayIso()) }) { Text(StrFields.yesterday) }
     }
     if (value.isNotBlank()) {
       Spacer(Modifier.height(6.dp))
@@ -232,11 +236,5 @@ private fun entryLatinDigits(text: String): String = text.map { c ->
   }
 }.joinToString("")
 
-private fun entryYesterdayIso(): String {
-  val c = java.util.Calendar.getInstance()
-  c.add(java.util.Calendar.DAY_OF_MONTH, -1)
-  val y = c.get(java.util.Calendar.YEAR)
-  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
-  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
-  return "$y-$m-$d"
-}
+/** یک روز پیش از «امروز» ِ دکان (LOC-03: با «پایانِ روزِ کاری» از روزِ کاری، نه از تقویم) */
+private fun entryYesterdayIso(): String = ir.vil3ntec.tohid.yesterdayIso()

@@ -23,7 +23,6 @@ const { many } = require('../db');
 
 const router = express.Router();
 const BASE = '/api/admin/image-bank';
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const raw = express.raw({ type: () => true, limit: bank.DERIV.zoom.bytes + 1024 });
 const bufOf = (req) => (Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
 const num = (x) => {
@@ -38,15 +37,15 @@ router.use(requireAdmin);
  * پنل پیش از هر چیز می‌پرسد بانک روشن است یا نه — بی ۴۰۳، تا زبانهٔ پنل با
  * پرچمِ خاموش پیامِ روشن بدهد نه خطای قرمز (WP-2، پنلِ بانک).
  */
-router.get('/status', wrap(async (req, res) => {
+router.get('/status', async (req, res) => {
   res.set('Cache-Control', 'no-store');
   res.json({ enabled: await bank.centralEnabled(), rows_max: bank.ROWS_MAX, roles: bank.ROLES, licenses: bank.LICENSES });
-}));
+});
 
-router.use(wrap(async (req, res, next) => {
+router.use(async (req, res, next) => {
   if (!(await bank.centralEnabled())) return next(forbidden('بانکِ مرکزیِ تصاویر روشن نیست', 'image_bank_disabled'));
   next();
-}));
+});
 
 //  دلیلِ نوشته (۳ تا ۲۰۰ نویسه) — همان `requireReason`ِ ADMIN-CONTROL-PLANE
 const reasonOf = requireReason;
@@ -56,48 +55,57 @@ const log = (req, action, targetId, detail = {}) => audit.log({
 
 /* ------------------------------------------------------------ کالای بانک */
 
-router.post('/products', wrap(async (req, res) => {
+router.post('/products', async (req, res) => {
   const p = bank.productInput(req.body || {});
   const id = await bank.tx((c) => bank.insertProduct(c, p, req.admin.id));
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_product_created', targetType: 'bank_product', targetId: id });
   res.status(201).json({ id });
-}));
+});
 
-router.patch('/products/:id', wrap(async (req, res) => {
+router.patch('/products/:id', async (req, res) => {
   const p = bank.productInput(req.body || {});
   await bank.tx((c) => bank.updateProduct(c, String(req.params.id).slice(0, 40), p));
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_product_updated', targetType: 'bank_product', targetId: req.params.id });
   res.json({ id: req.params.id });
-}));
+});
 
-router.get('/search', wrap(async (req, res) => {
+router.get('/search', async (req, res) => {
   res.json(await bank.search(req.query || {}, { base: BASE, all: true }));
-}));
+});
 
 /* ------------------------------------------------------------ عکس‌ها */
 
-router.post('/images', raw, wrap(async (req, res) => {
+router.post('/images', raw, async (req, res) => {
   const out = await bank.adminUpload(req.admin.id, bufOf(req), req.query || {});
   await log(req, 'admin.bank_image_uploaded', out.id, { duplicate_of: out.duplicate_of });
   res.status(201).json(out);
-}));
+});
 
-router.get('/queue', wrap(async (req, res) => {
+router.get('/queue', async (req, res) => {
   res.json(await bank.queue(req.query || {}));
-}));
+});
 
 /**
  * صفِ بررسی برای پنل (IMG-02، IMG-PRO-07، IMG-BANK-17، IMG-09): همان `queue` با
  * جزئیاتِ هر عکس — وضعیت و دلیلِ تطبیق، کالای وصل، کالاهای ممکنِ تطبیقِ مبهم
- * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز و نشانیِ فایلِ نسخهٔ جاری.
+ * با SKU/بارکد/نوع/اندازه، نشانِ تکراری و کیفیت، مجوز، نشانیِ فایلِ نسخهٔ جاری و
+ * شمارِ نسخه‌های تازهٔ منتظرِ بررسی (`versions_pending`، IMG-07، IMG-PRO-05).
  * فقط‌خواندنی؛ همان صفحه‌بندیِ `queue` (حداکثر ۵۰).
  */
-router.get('/review', wrap(async (req, res) => {
+router.get('/review', async (req, res) => {
   const q = await bank.queue(req.query || {});
   const details = await Promise.all(q.items.map((i) => bank.adminDetail(i.id, BASE)));
   const candIds = [...new Set(details.flatMap((d) => d?.proposal?.candidates || []))].map(String).slice(0, 500);
   const cands = candIds.length ? await many('SELECT * FROM bank_products WHERE id = ANY($1::text[])', [candIds]) : [];
   const byId = new Map(cands.map((p) => [p.id, bank.productOut(p)]));
+  //  نسخه‌های منتظرِ بررسی جز نسخهٔ جاری (IMG-07، IMG-PRO-05): نسخهٔ تازهٔ عکسِ منتشرشده بی‌صدا جاری
+  //  نمی‌شود، پس مدیر باید ببیند که چیزی منتظرِ مقایسه و پذیرش/رد است
+  const ids = q.items.map((i) => i.id);
+  const waiting = ids.length ? await many(
+    `SELECT v.image_id, COUNT(*)::int AS n FROM image_versions v JOIN images i ON i.id = v.image_id
+      WHERE v.image_id = ANY($1::text[]) AND v.review = 'needs_review' AND v.version <> i.current_version
+      GROUP BY v.image_id`, [ids]) : [];
+  const pendingOf = new Map(waiting.map((w) => [w.image_id, Number(w.n)]));
   res.set('Cache-Control', 'no-store');
   res.json({
     items: q.items.map((i, k) => {
@@ -110,65 +118,66 @@ router.get('/review', wrap(async (req, res) => {
         product: d.product || null,
         candidates: (d.proposal?.candidates || []).map((id) => byId.get(String(id)) || { id: String(id), missing: true }),
         version: d.current_version || null,
+        versions_pending: pendingOf.get(i.id) || 0,
         file: v.urls ? { url: v.urls.thumb || v.urls.original, mime: v.mime, width: v.width, height: v.height } : null,
       };
     }),
     next_cursor: q.next_cursor,
   });
-}));
+});
 
-router.get('/images/:id', wrap(async (req, res) => {
+router.get('/images/:id', async (req, res) => {
   const d = await bank.adminDetail(String(req.params.id).slice(0, 40), BASE);
   if (!d) throw notFound('عکس پیدا نشد');
   res.json(d);
-}));
+});
 
-router.patch('/images/:id', wrap(async (req, res) => {
+router.patch('/images/:id', async (req, res) => {
   const out = await bank.adminPatch(req.admin.id, req.params.id, req.body || {});
   await log(req, 'admin.bank_image_edited', req.params.id, out);
   res.json(out);
-}));
+});
 
-router.post('/images/:id/versions', raw, wrap(async (req, res) => {
+router.post('/images/:id/versions', raw, async (req, res) => {
   const out = await bank.adminVersion(req.admin.id, req.params.id, bufOf(req), req.query || {});
   await log(req, 'admin.bank_image_version', req.params.id, { version: out.version });
   res.status(201).json(out);
-}));
+});
 
-router.put('/images/:id/v/:version/:size', raw, wrap(async (req, res) => {
+router.put('/images/:id/v/:version/:size', raw, async (req, res) => {
   res.json(await bank.adminDerivative(req.params.id, num(req.params.version), req.params.size, bufOf(req)));
-}));
+});
 
-router.post('/images/:id/approve', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/images/:id/approve', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
   const out = await bank.approve(req.admin.id, req.params.id, { reason, version: req.body?.version });
   await log(req, 'admin.bank_image_approved', req.params.id, { reason, version: out.version });
   res.json(out);
-}));
+});
 
-router.post('/images/:id/reject', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/images/:id/reject', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
   const out = await bank.reject(req.admin.id, req.params.id, { reason, version: req.body?.version });
   await log(req, 'admin.bank_image_rejected', req.params.id, { reason, version: req.body?.version ?? null });
   res.json(out);
-}));
+});
 
-router.post('/images/:id/archive', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/images/:id/archive', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
   const out = await bank.archive(req.admin.id, req.params.id, { reason });
   await log(req, 'admin.bank_image_archived', req.params.id, { reason });
   res.json(out);
-}));
+});
 
-router.post('/images/:id/search', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/images/:id/search', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
   const out = await bank.setSearch(req.admin.id, req.params.id, req.body?.enabled === true);
   await log(req, 'admin.bank_image_search', req.params.id, { reason, enabled: out.search_enabled });
   res.json(out);
-}));
+});
 
 /** فایلِ عکسِ central/pending (با اصل) — عکسِ دکان هرگز. */
-router.get('/file/:id/:version/:size', wrap(async (req, res) => {
+router.get('/file/:id/:version/:size', async (req, res) => {
   const size = String(req.params.size);
   const img = bank.SIZES.includes(size) ? await bank.imageRow(req.params.id) : null;
   if (!img || img.space === 'shop') throw notFound('عکس پیدا نشد');
@@ -179,41 +188,41 @@ router.get('/file/:id/:version/:size', wrap(async (req, res) => {
   res.set('Content-Type', file.mime);
   res.set('X-Content-Type-Options', 'nosniff');
   res.send(file.data);
-}));
+});
 
-router.get('/reports', wrap(async (req, res) => {
+router.get('/reports', async (req, res) => {
   res.json({ items: await bank.reportsList(req.query || {}) });
-}));
+});
 
 /* ------------------------------------------------------------ ورودِ گروهی */
 
-router.post('/batches', wrap(async (req, res) => {
+router.post('/batches', async (req, res) => {
   const out = await bank.batchCreate(req.admin.id, req.body || {});
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_batch_created', targetType: 'image_batch', targetId: out.id, detail: out.license });
   res.status(201).json(out);
-}));
+});
 
-router.put('/batches/:id/files/:name', raw, wrap(async (req, res) => {
+router.put('/batches/:id/files/:name', raw, async (req, res) => {
   res.json(await bank.batchFile(req.params.id, req.params.name, bufOf(req)));
-}));
+});
 
 //  ⚠️ CSVِ ۱۰۰۰ ردیفی از سقفِ ۲ مگابایتیِ JSON کوچک‌تر است
-router.post('/batches/:id/rows', wrap(async (req, res) => {
+router.post('/batches/:id/rows', async (req, res) => {
   const out = await bank.batchRows(req.admin.id, req.params.id, req.body || {});
   if (!out.dry_run) {
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_batch_rows', targetType: 'image_batch', targetId: out.batch_id, detail: out.counts });
   }
   res.json(out);
-}));
+});
 
-router.post('/batches/:id/status', wrap(async (req, res) => {
+router.post('/batches/:id/status', async (req, res) => {
   const out = await bank.batchStatus(req.admin.id, req.params.id, req.body?.status);
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.bank_batch_status', targetType: 'image_batch', targetId: out.id, detail: out });
   res.json(out);
-}));
+});
 
 /** دسته‌های اخیر با شمارِ فایل و ردیف — پیشرفتِ دسته در پنل (IMG-01). */
-router.get('/batches', wrap(async (req, res) => {
+router.get('/batches', async (req, res) => {
   const rows = await many(
     `SELECT b.id, b.status, b.license_source, b.license_status, b.commercial_use, b.note, b.created_at, b.updated_at,
             (SELECT COUNT(*)::int FROM image_batch_files f WHERE f.batch_id = b.id) AS files,
@@ -225,9 +234,9 @@ router.get('/batches', wrap(async (req, res) => {
   );
   res.set('Cache-Control', 'no-store');
   res.json({ items: rows.map((r) => ({ ...r, created_at: Number(r.created_at), updated_at: Number(r.updated_at) })) });
-}));
+});
 
-router.get('/batches/:id/report', wrap(async (req, res) => {
+router.get('/batches/:id/report', async (req, res) => {
   const rep = await bank.batchReport(req.params.id);
   if (!rep) throw notFound('دسته پیدا نشد');
   if (req.query?.format === 'csv') {
@@ -236,6 +245,6 @@ router.get('/batches/:id/report', wrap(async (req, res) => {
     return res.send(bank.reportCsv(rep));
   }
   res.json(rep);
-}));
+});
 
 module.exports = router;
