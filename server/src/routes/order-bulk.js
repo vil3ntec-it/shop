@@ -18,14 +18,13 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   if (!(await orders.flagOf(req.shopId))) return next(forbidden('سفارشِ آنلاین برای این دکان روشن نیست', 'orders_disabled'));
   next();
-});
+};
 
-const needWrite = wrap(async (req, res, next) => {
+const needWrite = async (req, res, next) => {
   const { entitled, ent } = await orders.entitledOf(req.shopId);
   if (!entitled) {
     return next(ent.trial.used && !ent.trial.active
@@ -33,14 +32,14 @@ const needWrite = wrap(async (req, res, next) => {
       : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
   }
   next();
-});
+};
 
-const needBulk = wrap(async (req, res, next) => {
+const needBulk = async (req, res, next) => {
   if (!(await bulk.flagOf(req.shopId))) return next(forbidden('کارِ گروهی روی سفارش برای این دکان روشن نیست', 'order_bulk_disabled'));
   next();
-});
+};
 
-router.post('/transition', needFlag, requirePermission('orders.manage'), needWrite, needBulk, wrap(async (req, res) => {
+router.post('/transition', needFlag, requirePermission('orders.manage'), needWrite, needBulk, async (req, res) => {
   const out = await bulk.transition(req.shopId, req.body, { type: 'user', id: req.user.id, role: req.role });
   for (const r of out.results) {
     if (!r.ok || r.unchanged) continue;
@@ -52,6 +51,6 @@ router.post('/transition', needFlag, requirePermission('orders.manage'), needWri
     });
   }
   res.json(out);
-}));
+});
 
 module.exports = router;
