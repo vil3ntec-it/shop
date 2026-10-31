@@ -76,7 +76,8 @@
     "minorOf": 2,
     "StatusPill": 2,
     "html-escape": 12,
-    "secret-derivation": 6
+    "secret-derivation": 6,
+    "express-wrap": 5
   },
   "platformDeps": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/atrest/AtRestEnvelope.kt": 10,
