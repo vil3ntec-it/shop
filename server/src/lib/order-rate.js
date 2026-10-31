@@ -76,12 +76,18 @@ async function check(run, shopId, phone, { at = now(), rules = RULES } = {}) {
   throw err;
 }
 
-/** `price` ِ `orders.create` با سقف پیش از قیمت‌گذاری — همان تراکنش، همان قفل. */
+/**
+ * `price` ِ `orders.create` با سقف پیش از قیمت‌گذاری — همان تراکنش، همان قفل. پس از قیمت‌گذاری،
+ * قاعده‌های ریسکِ ویترین (RSK-02 مشتریِ تازه، RSK-05 تکراری؛ پشتِ پرچمِ خاموشِ `shop.order_risk`،
+ * `lib/order-risk`) با همان قفلِ شماره، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
+ */
 function guard(price, { shopId, phone }) {
   return async (run, at) => {
     await check(run, shopId, phone, { at });
-    return price(run, at);
+    const input = await price(run, at);
+    await require('./order-risk').checkIn(run, shopId, phone, input, { at });
+    return input;
   };
 }
 
-module.exports = { check, guard, canon, RULES, PER_SHOP, ALL_SHOPS };
+module.exports = { check, guard, canon, formsOf, RULES, PER_SHOP, ALL_SHOPS };

@@ -138,6 +138,8 @@ fun AppRootLegacy(
   var editProduct by remember { mutableStateOf<ProductFormState?>(null) }
   val cartStore = remember { CartStore(context) }
   var tab by rememberSaveable { mutableStateOf("dashboard") }
+  //  OPS-06: صفحهٔ باز برای راهنمای F1 (پنجرهٔ کامپیوتر بیرونِ همین درخت است)
+  LaunchedEffect(tab) { AppNav.screen.value = tab }
   var migration by remember { mutableStateOf<String?>(null) }
   // بارکدی که در فروش خوانده شد ولی کالایش ثبت نبود
   var pendingBarcode by remember { mutableStateOf<String?>(null) }
