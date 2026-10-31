@@ -33,6 +33,10 @@ object StrLine {
     "The discount becomes this line's unit price and is checked against your discount limit.",
     "تخفیف د همدې کرښې د هر واحد په بیه اوړي او ستاسو د تخفیف له حد سره سنجول کېږي.",
   )
+  // POS-19 — پلهٔ قیمتِ ثابت در فرمِ تخفیف
+  val tierFixedPrice: String get() = t("قیمتِ ثابت", "Fixed price", "ثابته بیه")
+  val tierUnitPrice: String get() = t("قیمتِ هر واحد (؋)", "Price per unit (؋)", "د هر واحد بیه (؋)")
+  fun tierUnitText(a: Any): String = t("$a ؋ هر واحد", "$a ؋ per unit", "$a ؋ د هر واحد")
   fun afterDiscount(a: Any): String = t("پس از تخفیف: $a ؋", "After discount: $a ؋", "له تخفیف وروسته: $a ؋")
 
   // رد
