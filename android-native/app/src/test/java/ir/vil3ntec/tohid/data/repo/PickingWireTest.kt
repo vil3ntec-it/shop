@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
+import ir.vil3ntec.tohid.core.model.PickShelfDto
+import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
 import ir.vil3ntec.tohid.core.net.ApiJson
 import kotlinx.serialization.json.Json
@@ -81,5 +84,30 @@ class PickingWireTest {
     val b = PickingRepository.newEventId()
     assertTrue(Regex("^[A-Za-z0-9_.:-]{8,128}$").matches(a))
     assertTrue(a != b)
+  }
+
+  @Test fun `قفسهٔ انتظار و دسته — همان کلیدهای pick-shelf`() {
+    val shelf = ApiJson.decode<PickShelfDto>(obj("""
+      {"shelf":[{"orderId":"01JX0000000000000000000000","orderNo":12,"slot":"A2","bags":2,"scanned":2,"ready":true,
+                 "readyAt":5000,"status":"ready_for_pickup","fulfillment":"pickup","futureField":1}]}
+    """))
+    assertEquals("A2", shelf.shelf[0].slot)
+    assertTrue(shelf.shelf[0].ready)
+    val scan = ApiJson.decode<PickShelfScanDto>(obj("""
+      {"orderId":"o","orderNo":12,"slot":"A2","bag":1,"bags":2,"scanned":1,"ready":false,"readyNow":false,"status":"packed"}
+    """))
+    assertEquals(1, scan.scanned)
+    assertFalse(scan.ready)
+    val b = ApiJson.decodeAt<PickBatchDto>(obj("""
+      {"batch":{"batchId":"B0123456789abcdef01234567","orders":[{"orderId":"a","orderNo":3,"bin":1,"status":"picking",
+        "progress":{"total":2,"pending":2,"done":0}}],
+       "lines":[{"orderId":"a","orderNo":3,"bin":1,"lineNo":2,"productId":"tea","name":"چای","unit":"بسته","status":"pending",
+        "orderedQtyMilli":2000,"pickedQtyMilli":0,"weighed":false,"location":{"aisle":"1","shelf":"","level":""}}],
+       "progress":{"total":2,"pending":2,"done":0}},"replayed":false}
+    """), "batch")!!
+    assertEquals(1, b.lines[0].bin)
+    assertEquals("1", b.lines[0].location.aisle)
+    val body = PickingRepository.batchJson(listOf("a", "b"))
+    assertEquals(listOf("a", "b"), (body["orderIds"] as kotlinx.serialization.json.JsonArray).map { it.jsonPrimitive.content })
   }
 }
