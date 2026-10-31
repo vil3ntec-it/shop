@@ -34,6 +34,8 @@ object ReportCsv {
       "rfm" -> CustomerInsight.rfmSheet(d, today)
       "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
       "reminders" -> DebtReminder.dueSheet(d, today)
+      //  INV-17 — فقط وقتی `ShrinkReportPref` روشن است دیده می‌شود
+      "shrink" -> ShrinkLoss.sheet(d, from, to)
       else -> stock(d, today)
     }
 

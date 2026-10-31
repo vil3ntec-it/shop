@@ -20,7 +20,10 @@ import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.ShrinkLoss
+import ir.vil3ntec.tohid.data.ShrinkReportPref
 import ir.vil3ntec.tohid.data.Xlsx
+import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.Platform
@@ -37,8 +40,11 @@ import kotlinx.coroutines.launch
  *
  *  Ctrl+P چاپ، Ctrl+E اکسل — از ثبتِ مرکزیِ کلیدها (`KeyMap.GLOBAL_PRINT` / `GLOBAL_EXPORT`).
  */
-/** `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش) */
-private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false) {
+/**
+ *  `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش).
+ *  `shrink`: ضایعات و کسری (INV-17) — فقط وقتی `ShrinkReportPref` روشن است؛ نامش از `StrShrink` (`title()`).
+ */
+private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false, val shrink: Boolean = false) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
   PURCHASES("purchases", "خرید", true),
@@ -52,7 +58,11 @@ private enum class Rep(val key: String, val label: String, val ranged: Boolean, 
   RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
   REMINDERS("reminders", "یادآوریِ امروز", false, crm = true),
+  SHRINK("shrink", "", true, shrink = true),
 }
+
+/** نامِ زبانه؛ زبانهٔ تازه سه‌زبانه است و هر بار از جدول خوانده می‌شود */
+private fun Rep.title(): String = if (this == Rep.SHRINK) StrShrink.title else label
 
 private enum class Span(val label: String) { TODAY("امروز"), WEEK("۷ روز"), MONTH("این ماه"), JMONTH("ماهِ خورشیدی"), JYEAR("سالِ خورشیدی"), ALL("همه"), CUSTOM("از … تا …") }
 
@@ -68,7 +78,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val j = remember(today) { Jalali.ofIso(today) }
 
   val crm = remember { ShopPolicy.crmReports(context) }
-  val reps = remember(crm) { Rep.values().filter { crm || !it.crm } }
+  //  ارزشِ ضایعات به قیمتِ خرید است — همان سدِ «سود و فروش» ِ گوشی (`ShopRole.canSeeMoney`)
+  val shrink = remember { ShrinkReportPref.on(context) && ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
+  val reps = remember(crm, shrink) { Rep.values().filter { (crm || !it.crm) && (shrink || !it.shrink) } }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -103,7 +115,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   ) {
     //  نوعِ گزارش
     ScrollableTabRow(selectedTabIndex = reps.indexOf(rep).coerceAtLeast(0), containerColor = Shop.colors.surface, edgePadding = 0.dp) {
-      reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.label) }) }
+      reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.title()) }) }
     }
     Spacer(Modifier.height(10.dp))
 
@@ -190,6 +202,13 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           val groups = remember(d) { CustomerMerge.duplicates(d) }
           DeskKpi("گروه‌های تکراری", "${groups.size}", Shop.colors.warning, Modifier.weight(1f))
           DeskKpi("با شمارهٔ یکسان", "${groups.count { it.strong }}", Shop.colors.danger, Modifier.weight(1f))
+        }
+        Rep.SHRINK -> {
+          val r = remember(d, from, to) { ShrinkLoss.report(d, from, to) }
+          DeskKpi(StrShrink.wasteTotal, "${money(r.wasteMinor / 100.0)} ؋", Shop.colors.warning, Modifier.weight(1f))
+          DeskKpi(StrShrink.shrinkTotal, "${money(r.shrinkMinor / 100.0)} ؋", if (r.shrinkMinor > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(StrShrink.netLoss, "${money(r.netLossMinor / 100.0)} ؋", if (r.netLossMinor > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(StrShrink.rows(r.rows), r.rateBp?.let { StrShrink.ofSales(shrinkPercent(it)) } ?: StrShrink.noSales, Shop.colors.text, Modifier.weight(1f))
         }
         Rep.REMINDERS -> {
           val due = remember(d, today) { DebtReminder.due(d, today) }
