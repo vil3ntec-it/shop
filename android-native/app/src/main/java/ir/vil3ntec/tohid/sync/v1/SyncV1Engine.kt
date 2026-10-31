@@ -54,7 +54,13 @@ class SyncV1Engine private constructor(context: Context) {
       if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
     }
     override fun queued(): Set<String> = queue.all().mapTo(HashSet()) { it.opId }
-    override fun push(ops: List<SyncOp>) = queue.push(ops)
+    override fun push(ops: List<SyncOp>) {
+      //  #481: «یادداشتِ» since پیش از رفتنِ op به صف (صفِ خالی ⇒ از نو) — شرح سرِ `PushSince`
+      if (ops.isNotEmpty()) {
+        state.pushSince = ir.vil3ntec.tohid.core.sync.PushSince.note(state.pushSince, queue.size() == 0, state.cursor)
+      }
+      queue.push(ops)
+    }
   }
   private var commit = commitFor(accountKey)
 
@@ -175,6 +181,14 @@ class SyncV1Engine private constructor(context: Context) {
     return made
   }
 
+  /**
+   *  کلاینتِ push با `since` ِ همین حساب (#481): کم‌ترینِ «یادداشت» و cursor — شرح سرِ
+   *  `core/…/core/sync/PushSince.kt`. سرور فقط با پرچمِ دکانِ `sync.cursor_from_since` آن را می‌خواند؛
+   *  بی پرچم (و برای پمپ) همان رفتارِ امروز.
+   */
+  private fun pushClient(): SyncV1Client =
+    SyncV1Client(Backend.api(app)) { ir.vil3ntec.tohid.core.sync.PushSince.since(state.pushSince, state.cursor) }
+
   /* ==========================================================
      ۲) یک دورِ کامل: Push تا ته، بعد Pull
      ========================================================== */
@@ -192,7 +206,7 @@ class SyncV1Engine private constructor(context: Context) {
       try {
         //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
         if (commit.pending()) synchronized(this) { commit.recover(read()) }
-        val client = SyncV1Client(Backend.api(app))
+        val client = pushClient()
         val device = store.deviceUid
 
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
@@ -293,7 +307,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
       synchronized(this) { commit.queueRecorded() }
-      pushQueue(SyncV1Client(Backend.api(app)), store.deviceUid)
+      pushQueue(pushClient(), store.deviceUid)
       Result.success(queue.size())
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
       throw cancelled
@@ -320,7 +334,7 @@ class SyncV1Engine private constructor(context: Context) {
     publish()
     try {
       synchronized(this) { commit.queueRecorded() }
-      val client = SyncV1Client(Backend.api(app))
+      val client = pushClient()
       val device = store.deviceUid
       val out = SyncRebuild(object : SyncRebuild.Io {
         override fun queued(): Int = queue.size()

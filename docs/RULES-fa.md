@@ -170,6 +170,10 @@
   و اندروید `SyncCommit.absorbedShadow`. تغییرِ محلی‌ای که ثبتش نگرفت (حافظهٔ پر) یا هنوز ذخیره نشده در تفاضلِ بعدی می‌ماند؛ وگرنه
   جزوِ سایه می‌شد و هرگز به سرور نمی‌رسید (SYN-01). سنجه: `server/test/sync-web-unrecorded.test.js`.
 - ویرایشِ قدیمی‌تر از حذف ردیف را زنده نمی‌کند و به صندوقِ تعارض می‌رود (#233).
+- push ِ v1 ِ هر دو برنامه `since` می‌فرستد (برای پرچمِ دکانِ `sync.cursor_from_since`، #481): کم‌ترینِ cursor و «یادداشت» = cursor ِ لحظه‌ای
+  که صفِ **خالی** نخستین op را گرفت (تا خالی شدنِ صف فقط پایین). cursor ِ همین حالا نه: op ِ ثبت‌شده وسطِ pull تعارضش گم می‌شد.
+  منطق فقط `core/…/core/sync/PushSince.kt` و `pushSinceNote`/`pushSince` ِ `license/sync-core.js` با `core/test-vectors/push-since-v1.json`؛
+  اندروید در `SyncV1Engine` (`parts.push`، `pushClient`)، وب در `recordChange`/`pushBaseline`/`pushOnce`. sync-core ِ کهنه ⇒ بی `since`، بی خطا.
 - opِ قدیمی مهلت ندارد (D-05، #233).
 - بستنِ تعارض با `data.delete.any` (مالک و مدیر)؛ لغوِ فاکتور با `sales.cancel` (#233).
 - v3 ⇒ v1 خودکار نیست: v3 را برای دکانی بزن که همهٔ دستگاه‌هایش v3اند (#233؛ پلِ v3 ⇒ v1 در #287، باز).
