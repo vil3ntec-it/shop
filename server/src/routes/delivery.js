@@ -14,6 +14,7 @@
 const express = require('express');
 const delivery = require('../lib/delivery');
 const D = require('../lib/delivery-states');
+const { cashReport } = require('../lib/delivery-cash-report');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -200,6 +201,11 @@ router.get('/settlements', requirePermission('delivery.settle'), async (req, res
   res.json(await delivery.listSettlements(req.shopId, {
     courierId: req.query.courierId, from: req.query.from, to: req.query.to, limit: req.query.limit,
   }));
+});
+
+//  RPT-15: نقدِ پیک‌ها و تسویه در یک بازه — فقط خواندن، همان اجازهٔ دفترِ تسویه
+router.get('/cash-report', requirePermission('delivery.settle'), async (req, res) => {
+  res.json(await cashReport(req.shopId, { from: req.query.from, to: req.query.to }));
 });
 
 router.get('/settlements/:id', requirePermission('delivery.settle'), async (req, res) => {
