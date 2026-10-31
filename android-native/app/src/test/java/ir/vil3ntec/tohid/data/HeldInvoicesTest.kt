@@ -286,6 +286,51 @@ class HeldInvoicesTest {
     refused(s.dropStale())
   }
 
+  /**
+   *  POS-12 — پاک‌سازیِ خودکار: خاموش هیچ (حتی خواندنِ فایل)، روشن فقط کهنه‌ها و همان دم روی دیسک؛
+   *  نوشتنِ ناموفق ⇒ ۰ و دفتر همان؛ فاکتورِ جاریِ صندوق هرگز پاک نمی‌شود.
+   */
+  @Test
+  fun `پاک‌سازیِ خودکارِ کهنه‌ها فقط با تنظیم و فقط کهنه‌ها`() = runBlocking<Unit> {
+    val hour = 3_600_000L
+    val old = HeldInvoiceCodec.encode(HeldBook(items = listOf(
+      HeldInvoice(id = "A", number = 1, lines = listOf(SaleDraft.Line("p1", 1.0)), heldAt = now - HeldRules.STALE_HOURS * hour),
+      HeldInvoice(id = "B", number = 2, lines = listOf(SaleDraft.Line("p2", 1.0)), heldAt = now - (HeldRules.STALE_HOURS - 1) * hour),
+    )))
+    var reads = 0
+    var writes = 0
+    val disk = object : HeldDisk {
+      var text: String? = old
+      var fail = false
+      override fun read(): String? { reads++; return text }
+      override fun write(text: String) { writes++; if (fail) throw IOException("دیسک پر است"); this.text = text }
+    }
+    val s = store(disk)
+    assertEquals(0, s.autoDropStale(false))
+    assertEquals("خاموش ⇒ فایل خوانده نمی‌شود", 0, reads)
+    //  «A» درست ۲۴ ساعت دارد ⇒ کهنه؛ «B» نه
+    assertEquals(1, s.autoDropStale(true))
+    assertEquals(listOf("B"), s.book.value.items.map { it.id })
+    assertEquals(listOf("B"), HeldInvoiceCodec.decode(disk.text)!!.items.map { it.id })
+    //  کهنه‌ای نمانده ⇒ هر ساعت نوشتنِ بیهوده نه
+    val wrote = writes
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals(wrote, writes)
+    //  نوشتن نشد ⇒ هیچ چیز گم نمی‌شود
+    now += 2 * hour
+    disk.fail = true
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals(listOf("B"), s.book.value.items.map { it.id })
+    disk.fail = false
+    //  «B» به صندوق برگشت ⇒ فاکتورِ جاری است، نه نگه‌داشته؛ کهنه شدنِ زمان پاکش نمی‌کند
+    val cart = MemCart()
+    done(s.resume(cart, "B", HeldExtras()))
+    now += HeldRules.STALE_HOURS * hour
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals("B", keyOf(cart))
+    assertEquals(listOf("p2"), cart.snapshot().lines.map { it.productId })
+  }
+
   @Test
   fun `کالای غیرفعال هنگامِ بازگرداندن می‌افتد، قلمِ آزاد می‌ماند`() = runBlocking<Unit> {
     val cart = MemCart(); val s = store(MemDisk())

@@ -97,18 +97,28 @@ import ir.vil3ntec.tohid.core.i18n.StrNav
  */
 object HeldInvoicePrefs {
   val on = mutableStateOf(false)
+  /** POS-12 — پاک‌سازیِ خودکارِ کهنه‌ها (`HeldInvoiceStore.autoDropStale`)؛ پیش‌فرض **خاموش**، فقط با [on] اثر دارد */
+  val autoClean = mutableStateOf(false)
   private var loaded = false
   private const val KEY = "held_invoices"
+  private const val AUTO_KEY = "held_auto_clean"
 
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    val p = context.getSharedPreferences("tohid-ui", 0)
+    on.value = p.getBoolean(KEY, false)
+    autoClean.value = p.getBoolean(AUTO_KEY, false)
   }
 
   fun set(context: android.content.Context, value: Boolean) {
     on.value = value
     context.getSharedPreferences("tohid-ui", 0).edit().putBoolean(KEY, value).apply()
+  }
+
+  fun setAutoClean(context: android.content.Context, value: Boolean) {
+    autoClean.value = value
+    context.getSharedPreferences("tohid-ui", 0).edit().putBoolean(AUTO_KEY, value).apply()
   }
 
   val SECTION: String get() = StrPos.heldSection
@@ -191,6 +201,12 @@ class HeldInvoicesUi internal constructor(
   fun discard(h: HeldInvoice) { dialog = null; run { store.discard(h.id) } }
   fun dropStale() { dialog = null; run { store.dropStale() } }
 
+  /** POS-12 — پاک‌سازیِ خودکار؛ پیام فقط وقتی چیزی پاک شد (بی کهنه یا خاموش ⇒ بی‌صدا) */
+  internal suspend fun autoDropStale(on: Boolean) {
+    val n = store.autoDropStale(on)
+    if (n > 0) snackbar.showSnackbar(StrPos.heldAutoCleared(plain(n), plain(HeldRules.STALE_HOURS)))
+  }
+
   /**
    *  کلیدهای صندوق (F6، Shift+F6، Ctrl+PgDn، Ctrl+PgUp) — `true` یعنی خورده شد.
    *  پنجره‌ای باز است ⇒ کلید مالِ همان پنجره است.
@@ -253,6 +269,11 @@ fun rememberHeldInvoices(
   LaunchedEffect(ui, recovering == null) { ui.store.reconcile(cartStore) }
   //  فاکتورِ فروش‌شده از فهرست می‌رود
   LaunchedEffect(ui, d.sales.size) { ui.store.prune(d) }
+  //  POS-12: پاک‌سازیِ خودکارِ کهنه‌ها — با بازشدنِ صندوق و سپس هر ساعت تا صفحه باز است؛ خاموش ⇒ هیچ
+  val autoClean = HeldInvoicePrefs.on.value && HeldInvoicePrefs.autoClean.value
+  LaunchedEffect(ui, autoClean) {
+    while (autoClean) { ui.autoDropStale(true); kotlinx.coroutines.delay(AUTO_CLEAN_EVERY_MS) }
+  }
   return ui
 }
 
@@ -497,8 +518,32 @@ fun HeldInvoiceSettings() {
       selected = if (on) "on" else "off",
       onSelect = { HeldInvoicePrefs.set(context, it == "on") },
     )
+    //  POS-12 «پاک‌سازیِ خودکارِ کهنه‌ها با مجوز»: عوض کردنش همان مجوزِ پاک کردنِ دستیِ کهنه‌ها (لغوِ فاکتور)
+    if (on) {
+      val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(context) }
+      val auto = HeldInvoicePrefs.autoClean.value
+      Spacer(Modifier.height(12.dp))
+      Text(StrPos.heldAutoClean(plain(HeldRules.STALE_HOURS)), style = MaterialTheme.typography.labelMedium, color = Shop.colors.text)
+      Spacer(Modifier.height(4.dp))
+      if (canCancel) {
+        ir.vil3ntec.tohid.ui.screens.SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (auto) "on" else "off",
+          onSelect = { HeldInvoicePrefs.setAutoClean(context, it == "on") },
+        )
+      } else {
+        Text(
+          (if (auto) StrShell.switchOn else StrShell.switchOff) + " — " + StrPos.heldAutoCleanLocked,
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+        )
+      }
+      Text(StrPos.heldAutoCleanNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+    }
   }
 }
+
+/** POS-12 — هر چند وقت کهنه‌ها دوباره سنجیده شوند تا صندوقِ همیشه‌باز هم پاک بماند */
+private const val AUTO_CLEAN_EVERY_MS = 60L * 60 * 1000
 
 private val DIGITS = listOf(KeyName.D1, KeyName.D2, KeyName.D3, KeyName.D4, KeyName.D5, KeyName.D6, KeyName.D7, KeyName.D8, KeyName.D9)
 
