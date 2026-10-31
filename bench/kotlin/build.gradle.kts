@@ -18,9 +18,10 @@ plugins {
 }
 
 val repoRoot = rootDir.resolve("../..")
-//  موتورهای خالص (money، text، calendar) به ماژولِ `core` رفته‌اند (#371)؛ بقیه هنوز در اندرویدند.
+//  موتورهای خالص (money، text، calendar) به ماژولِ `core` رفته‌اند (#371) و از گامِ KMP در `commonMain` ِ آن‌اند
+//  (هیچ expect/actual ندارند)؛ بقیه هنوز در اندرویدند.
 val engineRoots = mapOf(
-  repoRoot.resolve("core/src/jvmMain/kotlin") to listOf(
+  repoRoot.resolve("core/src/commonMain/kotlin") to listOf(
     "ir/vil3ntec/tohid/core/money",
     "ir/vil3ntec/tohid/core/text",
     "ir/vil3ntec/tohid/core/calendar",
