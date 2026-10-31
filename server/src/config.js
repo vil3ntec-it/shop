@@ -202,6 +202,12 @@ const config = {
     apiBase: process.env.RELEASE_API_BASE || 'https://api.github.com',
   },
 
+  //  DLV-05 (§۳.۱۱، §۳.۲): نقشهٔ آفلاینِ شهر برای پیک — فایل‌های `*.pmtiles` (عصارهٔ OSM) که
+  //  گردانندهٔ سرور در این پوشه می‌گذارد؛ سرور فقط همین‌ها را به پیکِ دکانِ پرچم‌دار می‌دهد.
+  courierMap: {
+    dir: process.env.COURIER_MAP_DIR || path.join(ROOT, 'data', 'maps'),
+  },
+
   backup: {
     dir:        process.env.BACKUP_PATH || path.join(ROOT, 'data', 'backups'),
     keepDaily:  num(process.env.BACKUP_KEEP_DAILY, 14),

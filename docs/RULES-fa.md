@@ -263,6 +263,8 @@
 - عکسِ تحویل فقط با `photoConsent`ِ سفارش + `parcelOnly`ِ پیک؛ فقط صاحب و مدیر می‌بینند (#249).
 - شمارهٔ مشتری برای پیک پوشیده است و نشانی و نام پس از پایانِ مأموریت از کارتِ پیک برداشته می‌شود (§۳.۱۱، §۳۸.۴، #249).
 - پیشوندِ `courier` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#249).
+- نقشه و مسیریابِ پیک (DLV-05، `shop.delivery_map`، `lib/courier-map.js`): پیوندِ مسیریاب فقط مختصات (`geo:`، Google Maps، OsmAnd) و فقط تا مأموریت زنده است — هرگز نشانه، نام یا شماره در پیوند. نقشهٔ آفلاین فقط فایلِ معمولیِ `<شناسه>.pmtiles` (`[a-z0-9-]`) با سرآیندِ PMTiles v3 در `COURIER_MAP_DIR` (پیش‌فرض `server/data/maps`)؛ پیوندِ نمادین و فایلِ دیگر فهرست و داده نمی‌شوند؛ هیچ کاشی از `tile.openstreetmap.org` (§۳.۲). گردانندهٔ سرور عصارهٔ شهر (Geofabrik ⇒ PMTiles) را همان‌جا می‌گذارد.
+- «موقعیت فقط در زمانِ مأموریت» (DLV-16): `tracking.location` ِ کارتِ پیک همان شرطِ `putLocation` است (هر دو پرچمِ موقعیت و فقط «در راه»)؛ برنامهٔ پیک سرویسِ پیش‌زمینه را فقط با همین روشن نگه می‌دارد.
 
 ### v3 · اعلان
 
@@ -394,6 +396,7 @@
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
+| `shop.delivery_map` | دکان / `all` | خاموش | DLV-05: `navigation` در کارتِ `/api/courier/missions` و `GET /api/courier/map`، `GET /api/courier/map/:id` (خاموش ⇒ ۴۰۴ `delivery_map_disabled`)؛ با `shop.delivery` | `claude/new-dlv-1` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
