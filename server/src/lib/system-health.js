@@ -191,13 +191,18 @@ async function storage() {
 }
 
 async function backups(t) {
-  const list = await require('./backup').list();
+  const backup = require('./backup');
+  const list = await backup.list();
   const last = list[0] || null;
   const ageMs = last ? ageOf(last.createdAt, t) : null;
   const enabled = config.backup.enabled === true;
   const late = ageMs == null || ageMs > config.backup.intervalMs * LIMITS.backupLateFactor;
+  //  SEC-DATA-05: شکستِ آخر پس از آخرین پشتیبانِ موفق ⇒ قرمز، نه فقط «دیر شده»
+  const failure = backup.status().lastFailure;
+  const failing = !!failure && (!last || Number(failure.at) > Number(last.createdAt));
   return {
-    status: !enabled ? 'warn' : late ? 'warn' : 'ok',
+    status: failing ? 'down' : !enabled ? 'warn' : late ? 'warn' : 'ok',
+    lastFailure: failing ? { at: failure.at, kind: failure.kind, message: failure.message } : null,
     enabled,
     //  فقط «رمز دارد یا نه» — خودِ عبارتِ عبور هرگز
     encryption: Boolean(config.backup.passphrase),
