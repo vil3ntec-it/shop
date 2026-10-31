@@ -1834,7 +1834,7 @@ async function openReceipt(id) {
 async function addPayment() {
   const node = $('pay-msg');
   try {
-    await call('POST', '/admin/payments', {
+    const out = await callOnce('add-payment', 'POST', '/admin/payments', {   // کلیدِ یکتایی: دو کلیک ⇒ یک پرداخت (SEC-API-09)
       app: $('pay-app').value,
       tenantId: $('pay-tenant').value.trim(),
       subscriptionId: $('pay-sub').value.trim(),
@@ -1845,7 +1845,7 @@ async function addPayment() {
       note: $('pay-note').value.trim(),
       ...reasonBody('pay-reason'),
     });
-    msg(node, 'ثبت شد.', 'ok');
+    if (!out) return; msg(node, 'ثبت شد.', 'ok');   //  null ⇒ همان ثبت هنوز در راه است
     $('pay-amount').value = '';
     $('pay-note').value = '';
     $('pay-reason').value = '';
