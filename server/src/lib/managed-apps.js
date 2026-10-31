@@ -29,6 +29,21 @@ function pepper() {
   return serverSecret(['api', 'jwt'], 'shop-managed-apps');
 }
 
+/**
+ * ⛔ SEC-API-03 — نشانیِ برنامه و نشانیِ سلامت فقط http/https، بی نام‌کاربری و رمز در خودِ نشانی.
+ * خالی یعنی «ندارد». هر چیزِ دیگر (‎file:‎، ‎data:‎، ‎javascript:‎، ‎ftp:‎، متنِ بی‌نشانی) ۴۰۰.
+ */
+function cleanUrl(raw, field) {
+  const s = String(raw ?? '').trim();
+  if (!s) return '';
+  let u = null;
+  try { u = new URL(s); } catch { u = null; }
+  if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:') || u.username || u.password || s.length > 300) {
+    throw badRequest(`${field} باید نشانیِ http یا https باشد`, 'bad_url');
+  }
+  return s;
+}
+
 function hashKey(raw) {
   return createHmac('sha256', pepper()).update(String(raw || '')).digest('hex');
 }
@@ -98,8 +113,8 @@ async function create(patch = {}) {
     [newId('app'), slug,
       String(patch.title || slug).slice(0, 80),
       KINDS.includes(patch.kind) ? patch.kind : 'app',
-      String(patch.url || '').slice(0, 300),
-      String(patch.healthUrl || '').slice(0, 300),
+      cleanUrl(patch.url, 'نشانی'),
+      cleanUrl(patch.healthUrl, 'نشانیِ سلامت'),
       String(patch.icon || '').slice(0, 20),
       String(patch.color || '').slice(0, 20),
       String(patch.note || '').slice(0, 500),
@@ -117,8 +132,8 @@ async function update(id, patch = {}) {
     [id,
       patch.title === undefined ? cur.title : String(patch.title).slice(0, 80),
       patch.kind === undefined || !KINDS.includes(patch.kind) ? cur.kind : patch.kind,
-      patch.url === undefined ? cur.url : String(patch.url).slice(0, 300),
-      patch.healthUrl === undefined ? cur.health_url : String(patch.healthUrl).slice(0, 300),
+      patch.url === undefined ? cur.url : cleanUrl(patch.url, 'نشانی'),
+      patch.healthUrl === undefined ? cur.health_url : cleanUrl(patch.healthUrl, 'نشانیِ سلامت'),
       patch.icon === undefined ? cur.icon : String(patch.icon).slice(0, 20),
       patch.color === undefined ? cur.color : String(patch.color).slice(0, 20),
       patch.note === undefined ? cur.note : String(patch.note).slice(0, 500),
@@ -177,6 +192,8 @@ async function checkHealth({ timeoutMs = 8000 } = {}) {
     const started = Date.now();
     let ok = false; let status = null; let error = '';
     try {
+      //  ردیفِ کهنه‌ای که پیش از `cleanUrl` نوشته شده هم فقط http/https سنجیده می‌شود
+      cleanUrl(r.health_url, 'نشانیِ سلامت');
       const res = await fetch(r.health_url, { signal: AbortSignal.timeout(timeoutMs) });
       status = res.status;
       ok = res.ok;

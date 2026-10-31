@@ -419,7 +419,14 @@ router.get('/apps', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.post('/apps', async (req, res, next) => {
+/*
+ *  ⛔ SEC-API-03 — ساختن و ویرایشِ برنامه یعنی گذاشتنِ نشانی‌ای که **سرور** خودش به آن وصل
+ *  می‌شود (`checkHealth`) و وضعیت، زمان و پیامِ خطایش را پس می‌دهد. تا ۲.۱۴.۴ هر مدیرِ معمولی
+ *  می‌توانست `healthUrl` را ‎http://127.0.0.1:5432/‎ یا هر نشانیِ شبکهٔ خانگی بگذارد و با
+ *  «سنجیدنِ سلامت» درگاه‌های پشتِ سرور را بشمارد (SSRF). حالا فقط مدیرِ ارشد — همان کسی که
+ *  کلیدِ برنامه را هم می‌چرخاند — و فقط http/https (`managed-apps.cleanUrl`).
+ */
+router.post('/apps', requireSuperAdmin, async (req, res, next) => {
   try {
     const app = await apps.create(req.body || {});
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.app_created', targetId: app.id, detail: { slug: app.slug } });
@@ -427,7 +434,7 @@ router.post('/apps', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-router.put('/apps/:id', async (req, res, next) => {
+router.put('/apps/:id', requireSuperAdmin, async (req, res, next) => {
   try {
     const app = await apps.update(v.id(req.params.id), req.body || {});
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.app_updated', targetId: app.id });
