@@ -46,6 +46,42 @@ object ReportPrint {
     manager.print(sheet.name, TableAdapter(context.applicationContext, sheet, title), attrs)
   }
 
+  /**
+   *  RPT-11 — فایلِ PDF ِ مستقیم (بی پنجرهٔ چاپ): همان `draw` ِ چاپ روی A4، با `PrintedPdfDocument` ِ خودِ
+   *  اندروید (متنِ برداری، دری/پشتو با قلمِ برنامه). کامپیوتر نسخهٔ خودش را دارد (`ReportPrintDesk.pdf`).
+   */
+  fun pdf(context: Context, sheet: ReportCsv.Sheet, title: String): ByteArray {
+    val attrs = PrintAttributes.Builder()
+      .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+      .setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME)
+      .setResolution(PrintAttributes.Resolution("pdf", "pdf", 300, 300))
+      .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
+      .build()
+    val doc = PrintedPdfDocument(context.applicationContext, attrs)
+    try {
+      TableAdapter(context.applicationContext, sheet, title).draw(doc, null)
+      val out = java.io.ByteArrayOutputStream()
+      doc.writeTo(out)
+      return out.toByteArray()
+    } finally {
+      doc.close()
+    }
+  }
+
+  /** PDF ⇐ «فرستادن» (پوشهٔ `cache/share` و `FileProvider` ِ `.files`، همان راهِ PDF ِ فاکتور)؛ پیام برای صفحه */
+  fun savePdf(context: Context, sheet: ReportCsv.Sheet, title: String): String = runCatching {
+    val dir = java.io.File(context.cacheDir, "share").apply { mkdirs() }
+    val file = java.io.File(dir, "${sheet.name.replace(Regex("[\\\\/:*?\"<>|]"), "-")}.pdf").apply { writeBytes(pdf(context, sheet, title)) }
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+      type = "application/pdf"
+      putExtra(android.content.Intent.EXTRA_STREAM, uri)
+      addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(android.content.Intent.createChooser(send, title).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+    "PDF آماده شد"
+  }.getOrElse { "PDF ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}" }
+
   private class TableAdapter(
     private val context: Context,
     private val sheet: ReportCsv.Sheet,
@@ -89,7 +125,7 @@ object ReportPrint {
       }
     }
 
-    private fun draw(pdf: PrintedPdfDocument, cancel: CancellationSignal?) {
+    fun draw(pdf: PrintedPdfDocument, cancel: CancellationSignal?) {
       val face = runCatching {
         androidx.core.content.res.ResourcesCompat.getFont(context, ir.vil3ntec.tohid.R.font.vazirmatn_regular)
       }.getOrNull() ?: Typeface.DEFAULT
