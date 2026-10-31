@@ -7,4 +7,5 @@
   <exclude domain="sharedpref" path="tohid-session.xml" />
   <exclude domain="sharedpref" path="tohid-session-secure.xml" />
   <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
+  <exclude domain="sharedpref" path="tohid-doc-series.xml" />
 </full-backup-content>

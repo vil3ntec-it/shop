@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.returns.ReturnReasons
 
 /**
  *  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»، انتخابِ خودِ دکان‌دار روی همین دستگاه.
@@ -17,6 +18,7 @@ object ReturnSettings {
   private const val PREFS = "tohid-policy"
   private const val ENABLED = "returns_v2"
   private const val LIMIT = "return_limit"
+  private const val REASONS = "return_reasons"
 
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -34,5 +36,19 @@ object ReturnSettings {
   fun setLimit(context: Context, afghani: Double) {
     val v = if (afghani.isFinite() && afghani > 0) afghani.toFloat() else 0f
     prefs(context).edit().putFloat(LIMIT, v).apply()
+  }
+
+  /**
+   *  RET-08 — فهرستِ دلیل‌های برگشتِ این دکان (هر خط یک دلیل)؛ نانوشته یا خالی ⇒ فهرستِ پیش‌فرض
+   *  (`ReturnReasons.DEFAULT` = `ReturnFlow.REASONS`). پاک‌سازی همیشه با `ReturnReasons.normalize`.
+   */
+  fun reasons(context: Context): List<String> = ReturnReasons.parse(prefs(context).getString(REASONS, null).orEmpty())
+
+  /** ذخیرهٔ متنِ کادرِ تنظیمات؛ فهرستی که همان پیش‌فرض است پاک می‌شود تا تغییرِ پیش‌فرض به آن برسد */
+  fun setReasons(context: Context, text: String) {
+    val list = ReturnReasons.parse(text)
+    prefs(context).edit().apply {
+      if (list == ReturnReasons.DEFAULT) remove(REASONS) else putString(REASONS, ReturnReasons.format(list))
+    }.apply()
   }
 }
