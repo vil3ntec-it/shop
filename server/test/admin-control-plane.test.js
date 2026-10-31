@@ -226,6 +226,7 @@ const MOUNTS = {
   'admin-image-bank.js': '/admin/image-bank',
   'admin-release.js': '/admin/release',
   'admin-trust.js': '/admin/trust',
+  'admin-payments.js': '/admin/payments',
   //  پنلِ مرکزی، فاز ۳
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
