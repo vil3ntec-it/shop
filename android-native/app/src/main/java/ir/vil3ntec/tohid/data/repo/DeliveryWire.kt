@@ -56,6 +56,7 @@ object DeliveryWire {
         settle = bool(perms, "settle"),
         photo = bool(perms, "photo"),
       ),
+      picking = bool(o, "picking"),
     )
   }
 
@@ -303,6 +304,30 @@ object DeliveryWire {
     put("reason", JsonPrimitive(reason))
     if (note.isNotBlank()) put("note", JsonPrimitive(note.trim()))
   }
+
+  /**
+   *  بدنهٔ «اصلاحِ نشانی» (DLV-09): `{address:{landmark?, area?, gateColor?, text?}, keepPin, expectedVersion}`.
+   *  کلیدِ خالی فرستاده نمی‌شود. میز نقشه ندارد: `keepPin = true` ⇒ پینِ مشتری می‌ماند؛
+   *  `false` ⇒ پینِ قبلی پاک می‌شود (پین غلط بود و پیک فقط با نشانه می‌رود).
+   */
+  fun addressJson(
+    landmark: String,
+    area: String,
+    gateColor: String,
+    text: String,
+    keepPin: Boolean,
+    expectedVersion: Long,
+  ): JsonObject =
+    buildJsonObject {
+      put("address", buildJsonObject {
+        landmark.trim().takeIf { it.isNotEmpty() }?.let { put("landmark", JsonPrimitive(it)) }
+        area.trim().takeIf { it.isNotEmpty() }?.let { put("area", JsonPrimitive(it)) }
+        gateColor.trim().takeIf { it.isNotEmpty() }?.let { put("gateColor", JsonPrimitive(it)) }
+        text.trim().takeIf { it.isNotEmpty() }?.let { put("text", JsonPrimitive(it)) }
+      })
+      put("keepPin", JsonPrimitive(keepPin))
+      put("expectedVersion", JsonPrimitive(expectedVersion))
+    }
 
   fun courierUpdateJson(cashCapMinor: Long? = null, active: Boolean? = null): JsonObject = buildJsonObject {
     cashCapMinor?.let { put("cashCapMinor", JsonPrimitive(it)) }

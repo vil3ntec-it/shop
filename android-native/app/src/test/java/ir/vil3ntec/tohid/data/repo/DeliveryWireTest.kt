@@ -39,6 +39,13 @@ class DeliveryWireTest {
     assertFalse(off.perms.view)
   }
 
+  @Test fun `config picking — فقط true ِ سرور QRِ کد را روشن می‌کند — PCK-11`() {
+    assertTrue(DeliveryWire.config(obj("""{"readable":true,"picking":true}""")).picking)
+    assertFalse(DeliveryWire.config(obj("""{"readable":true,"picking":false}""")).picking)
+    //  سرورِ کهنه بی این کلید ⇒ خاموش
+    assertFalse(DeliveryWire.config(obj("""{"readable":true}""")).picking)
+  }
+
   @Test fun `پیک و مأموریتِ تابلو — با نامِ مشتری و وضعیتِ سفارش`() {
     val cr = DeliveryWire.courier(obj("""
       {"id":"01ARZ3NDEKTSV4RRFFQ69G5FAV","userId":"u1","name":"احمد","phone":"","active":true,
