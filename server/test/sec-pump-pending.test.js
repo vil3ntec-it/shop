@@ -7,6 +7,7 @@
  *               سقفِ ۳۴mb ِ ‎/report/‎ (که الگویش در Express 5 مرده بود) زنده است
  *   SEC-API-05  پاسخِ درهای پمپ CSP ِ «صفحه نیست» دارد
  *   SEC-AUTH-09 عوض کردنِ نقش/وضعیتِ عضوِ پمپ و تنظیمِ پمپ ردیفِ سابقه دارد
+ *   TEN-04      دیدنِ پروندهٔ پمپ و خبرهایش به‌دستِ مدیر ردیفِ سابقه دارد (از #582)
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -111,4 +112,37 @@ test('SEC-AUTH-09: نقش و وضعیتِ عضوِ پمپ و تنظیمِ پمپ
   assert.deepEqual({ role: detail.role, status: detail.status, stationId: detail.stationId }, { role: 'manager', status: 'active', stationId });
   assert.equal((await h.patch('/api/pump', { name: 'پمپِ تازه' }, { token: o.accessToken })).status, 200);
   assert.equal((await many(`SELECT 1 FROM audit_logs WHERE action='pump.station_updated' AND target_id=$1`, [stationId])).length, 1);
+});
+
+/* ── TEN-04 (پمپ، از #582) ───────────────────────────────────────── */
+
+test('TEN-04: مدیر پروندهٔ پمپ و خبرهایش را فقط با ردیفِ سابقه می‌بیند (کنشگر، هدف، شناسهٔ پمپ)', async () => {
+  const pw = require('../src/lib/password');
+  await query(`INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+               VALUES ($1,'pump-audit-root','ارشد',$2,'superadmin','active',$3)`, [newId('adm'), await pw.hashPassword('Root!12345'), now()]);
+  const login = await h.post('/api/admin/login', { username: 'pump-audit-root', password: 'Root!12345' });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const adminId = login.body.admin?.id || (await many(`SELECT id FROM admins WHERE username='pump-audit-root'`))[0].id;
+  const o = await h.newUser('صاحبِ پمپِ پرونده', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ پرونده' }, { token: o.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const sid = made.body.station.id;
+  for (const [url, action] of [[`/api/admin/pump/stations/${sid}`, 'admin.station_viewed'],
+    [`/api/admin/pump/stations/${sid}/events`, 'admin.station_events_viewed']]) {
+    const before = now();
+    const r = await h.get(url, { token: login.body.token });
+    assert.equal(r.status, 200, `${url}: ${JSON.stringify(r.body)}`);
+    const rows = await many(`SELECT * FROM audit_logs WHERE action=$1 AND target_id=$2`, [action, sid]);
+    assert.equal(rows.length, 1, `${url} ⇒ ${action}`);
+    assert.equal(rows[0].actor_type, 'admin');
+    assert.equal(rows[0].user_id, adminId);
+    assert.equal(rows[0].target_type, 'station');
+    assert.ok(Number(rows[0].created_at) >= before);
+    const detail = typeof rows[0].detail === 'string' ? JSON.parse(rows[0].detail) : rows[0].detail;
+    assert.equal(detail.tenantId, sid);
+  }
+  //  پمپِ ناموجود ⇒ ۴۰۴ و بی سابقه
+  const n0 = (await many(`SELECT 1 FROM audit_logs WHERE action='admin.station_viewed'`)).length;
+  assert.equal((await h.get('/api/admin/pump/stations/sta_nope', { token: login.body.token })).status, 404);
+  assert.equal((await many(`SELECT 1 FROM audit_logs WHERE action='admin.station_viewed'`)).length, n0);
 });
