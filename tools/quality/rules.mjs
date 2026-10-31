@@ -69,6 +69,18 @@ export const DUPLICATE_HELPERS = [
     home: [],
     pattern: /(?<![!\w.])config\.secrets\.\w+\s*\|\|\s*config\.secrets\.\w+(?![\w.])/g,
   },
+  {
+    id: 'express-wrap',
+    what: 'سرور: پوشانندهٔ `(fn) => (req, res, next) => Promise.resolve(fn(…)).catch(next)` (با هر نامی، پیکانی یا function) — Express 5 خودش promiseِ ردشده را به next(err) می‌دهد؛ تابعِ async را مستقیم بدهید',
+    applies: isServerJs,
+    home: [],
+    //  تابعی که تابعی می‌گیرد و دستگیرهٔ (req, res, next) ای برمی‌گرداند که همان را صدا می‌زند و
+    //  خطایش را به همان next می‌دهد. `.catch(next)` ِ تنها (مثلِ storePage(…).catch(next)) نمی‌شمارد.
+    pattern: new RegExp([
+      String.raw`\(\s*(\w+)\s*\)\s*=>\s*(?:async\s*)?\(\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)\s*=>\s*\{?\s*(?:return\s+)?(?:Promise\.resolve\(\s*)?\1\s*\([^()]*\)\s*\)?\s*\.catch\(\s*\2\s*\)`,
+      String.raw`\bfunction\s*\w*\s*\(\s*(\w+)\s*\)\s*\{\s*return\s+(?:async\s+)?(?:function\s*\w*\s*)?\(\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)\s*(?:=>\s*)?\{?\s*(?:return\s+)?(?:Promise\.resolve\(\s*)?\3\s*\([^()]*\)\s*\)?\s*\.catch\(\s*\4\s*\)`,
+    ].join('|'), 'g'),
+  },
 ];
 
 /** Inline product/role literals in the server (`=== 'pump'`, `case 'shop':` …), AUDIT §1.8. */
