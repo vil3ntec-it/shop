@@ -420,6 +420,8 @@
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
+تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
+
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
