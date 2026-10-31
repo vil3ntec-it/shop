@@ -598,6 +598,8 @@ fun SaleScreenLegacy(
         basePrice = base,
         //  ردیفِ آزاد همیشه قیمتِ خودش را دارد و برگشتی به «قیمتِ کالا» ندارد
         custom = line.free || line.unitPrice != null,
+        free = line.free,
+        linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = product?.saleUnit.orEmpty(),
         unitFactor = product?.unitFactor ?: 1.0,
         onDismiss = { editLine = null },
@@ -615,6 +617,7 @@ fun SaleScreenLegacy(
 
   if (freeLine) {
     FreeLineDialog(
+      linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
       onDismiss = { freeLine = false },
       onConfirm = { label, price, quantity ->
         cartStore.set(SalesEngine.addFreeLine(cart, label, price, quantity, ::newIdLegacy))
