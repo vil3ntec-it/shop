@@ -484,8 +484,8 @@ fun SettingsScreen(
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
-    /* =============== جست‌وجوی مقاومِ صندوق (POS-04، فقط کامپیوتر، پیش‌فرض خاموش) =============== */
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }
+    /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) } }
     /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
     item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
