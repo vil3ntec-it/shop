@@ -148,14 +148,14 @@ fun DebtorsHeader(onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
       ) {
         Icon(
           if (rtl) Icons.Outlined.ChevronRight else Icons.Outlined.ChevronLeft,
-          contentDescription = "بازگشت",
+          contentDescription = ir.vil3ntec.tohid.core.i18n.StrKit.back,
           tint = v3.icon,
           modifier = Modifier.size(24.dp),
         )
       }
     }
     Text(
-      "قرض‌داران",
+      ir.vil3ntec.tohid.core.i18n.Str.debtors,
       style = MaterialTheme.typography.titleMedium.copy(fontSize = 19.sp, lineHeight = 26.sp, fontWeight = FontWeight.SemiBold),
       color = v3.ink,
       maxLines = 1,
@@ -182,9 +182,9 @@ fun DebtorsStatsCard(summary: DebtorListModel.Summary, modifier: Modifier = Modi
       .padding(18.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    StatCell("تعداد قرض‌داران", plain(summary.people), c.ink, c)
-    StatCell("جمع تمام قرض‌ها", money(summary.owed), if (summary.owed > 0) c.owe else c.settled, c)
-    StatCell("رسیدهای همه", money(summary.received), c.settled, c)
+    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statPeople, plain(summary.people), c.ink, c)
+    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statOwed, money(summary.owed), if (summary.owed > 0) c.owe else c.settled, c)
+    StatCell(ir.vil3ntec.tohid.core.i18n.StrMoney.statReceived, money(summary.received), c.settled, c)
   }
 }
 
@@ -228,7 +228,7 @@ fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier:
   OutlinedTextField(
     value = value,
     onValueChange = onValueChange,
-    label = { Text("جستجوی نام یا شماره") },
+    label = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.receivePickHint) },
     //  خانهٔ ۴۸dpِ آیکن‌ها صریح است: گوشی خودش همین را می‌دهد (اندازهٔ لمسیِ کمینه)، ولی
     //  پیش‌نمایشِ کامپیوتر نه — و بی آن ذره‌بین و میکروفون به لبهٔ کادر می‌چسبیدند
     leadingIcon = {
@@ -237,8 +237,8 @@ fun DebtorsSearchField(value: String, onValueChange: (String) -> Unit, modifier:
     trailingIcon = if (value.isBlank() && voice == null) null else {
       {
         Box(Modifier.size(48.dp), contentAlignment = Alignment.Center) {
-          if (value.isNotBlank()) RoundIcon(Icons.Filled.Close, "پاک کردن جستجو", Color.Transparent, c.muted) { onValueChange("") }
-          else if (voice != null) RoundIcon(Icons.Filled.Mic, "جستجوی صوتی", c.accentSoft, c.accentInk) { voice() }
+          if (value.isNotBlank()) RoundIcon(Icons.Filled.Close, ir.vil3ntec.tohid.core.i18n.StrKit.clear, Color.Transparent, c.muted) { onValueChange("") }
+          else if (voice != null) RoundIcon(Icons.Filled.Mic, ir.vil3ntec.tohid.core.i18n.StrKit.voice, c.accentSoft, c.accentInk) { voice() }
         }
       }
     },
@@ -312,7 +312,7 @@ fun DebtorsSortRow(current: DebtorListModel.Sort, count: Int, onPick: (DebtorLis
     ) {
       //  شمارنده تراشه نیست، پس زده نمی‌شود: فقط می‌گوید فهرست چند تاست
       Text(
-        "${plain(count)} مورد",
+        ir.vil3ntec.tohid.core.i18n.StrMoney.itemsCount(plain(count)),
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
         modifier = Modifier.padding(end = 2.dp),
@@ -433,9 +433,9 @@ fun DebtorTile(
       )
   ) {
     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-      DropdownMenuItem(text = { Text("باز کردنِ حساب") }, onClick = { menu = false; onOpen() })
-      DropdownMenuItem(text = { Text("ویرایش") }, onClick = { menu = false; onEdit() })
-      DropdownMenuItem(text = { Text("حذف", color = c.owe) }, onClick = { menu = false; onDelete() })
+      DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.openAccount) }, onClick = { menu = false; onOpen() })
+      DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.edit) }, onClick = { menu = false; onEdit() })
+      DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.delete, color = c.owe) }, onClick = { menu = false; onDelete() })
     }
     Column(
       //  پایین جای بیشتری می‌خواهد: مدادِ ویرایش در همان گوشه می‌نشیند
@@ -443,7 +443,7 @@ fun DebtorTile(
       horizontalAlignment = Alignment.CenterHorizontally,
     ) {
       Text(
-        row.debtor.name.ifBlank { "بی‌نام" },
+        row.debtor.name.ifBlank { ir.vil3ntec.tohid.core.i18n.StrMoney.noName },
         style = MaterialTheme.typography.titleSmall,
         color = c.ink,
         fontWeight = FontWeight.Bold,
@@ -477,7 +477,7 @@ fun DebtorTile(
 
     CornerButton(
       Icons.Filled.Close,
-      "حذف",
+      ir.vil3ntec.tohid.core.i18n.StrMoney.delete,
       onDelete,
       c,
       Modifier.align(Alignment.TopStart).padding(4.dp),
@@ -485,7 +485,7 @@ fun DebtorTile(
     //  در راست‌به‌چپ، `BottomEnd` همان کنجِ پایین-چپ است
     CornerButton(
       Icons.Filled.Edit,
-      "ویرایش",
+      ir.vil3ntec.tohid.core.i18n.StrMoney.edit,
       onEdit,
       c,
       Modifier.align(Alignment.BottomEnd).padding(6.dp),
@@ -620,7 +620,7 @@ fun DebtorsAddButton(
         .clickable(interactionSource = source, indication = LocalIndication.current, role = Role.Button, onClick = onClick),
       contentAlignment = Alignment.Center,
     ) {
-      Icon(Icons.Filled.Add, contentDescription = "قرض‌دار تازه", tint = c.onAccent, modifier = Modifier.size(26.dp))
+      Icon(Icons.Filled.Add, contentDescription = ir.vil3ntec.tohid.core.i18n.StrMoney.newDebtor, tint = c.onAccent, modifier = Modifier.size(26.dp))
     }
   }
 }
