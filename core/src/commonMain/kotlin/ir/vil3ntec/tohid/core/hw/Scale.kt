@@ -45,7 +45,7 @@ interface ScaleProtocol {
 }
 
 object Scales {
-  val all: List<ScaleProtocol> = listOf(NciScale)
+  val all: List<ScaleProtocol> = listOf(NciScale, AndScale)
   fun of(id: String?): ScaleProtocol? = all.firstOrNull { it.id == id }
 }
 
