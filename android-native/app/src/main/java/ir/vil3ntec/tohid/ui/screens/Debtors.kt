@@ -54,7 +54,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -116,6 +118,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
+  val txKey = remember(txFor) { newId() }  // ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر پنجره ⇒ دو ضربه یک ردیف
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
     if (openId != null && d.debtors.none { it.id == openId }) openId = null
@@ -134,6 +138,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
+      onMessage = ::toast,
     )
   } else {
     /*
@@ -309,7 +314,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
         } else null
         if (credit != null && credit.over) overLimit = pending
-        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
+        else record(pending, over = false)
       },
     )
   }
@@ -323,7 +328,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       OverLimitDialog(
         credit = credit,
         onConfirm = {
-          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          record(pending, over = true)
           overLimit = null
         },
         onDismiss = { overLimit = null },
@@ -707,6 +712,7 @@ private fun AccountView(
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
+  onMessage: (String) -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -854,6 +860,7 @@ private fun AccountView(
             Text("چاپ صورت‌حساب")
           }
         }
+        StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
@@ -1047,10 +1054,7 @@ private data class PendingTx(
   val notes: String,
   val due: String?,
 ) {
-  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-    dueDate = due, overLimit = overLimit,
-  )
+  fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
 }
 
 @Composable
@@ -1152,10 +1156,11 @@ private fun TransactionDialog(
         Spacer(Modifier.height(14.dp))
         AmountField(amount, { amount = it }, "مبلغ")
 
-        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد
-        if (receiving && balance > 0) {
+        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد — همهٔ مانده تا پول، هرگز گردِ افغانی
+        val settle = if (receiving) MoneyInput.settleInput(balance) else null
+        if (settle != null) {
           Spacer(Modifier.height(6.dp))
-          TextButton(onClick = { amount = Math.round(balance).toString() }) {
+          TextButton(onClick = { amount = settle }) {
             Text("تسویهٔ کامل", color = Shop.colors.primary)
           }
         }
