@@ -13,7 +13,7 @@ import ir.vil3ntec.tohid.core.money.mulExact
  *  به تفکیکِ روش، رسیدِ حساب، ورود و خروجِ نقد با دلیلِ اجباری، بازکردنِ کشو بی
  *  فروش با مجوز. گزارشِ X عکسِ میانِ شیفت است؛ Z با شمارشِ اسکناس و شمارشِ هر روش
  *  می‌بندد. اختلاف ثبت می‌شود و هرگز خودکار اصلاح نمی‌شود؛ بالای آستانه دلیل
- *  می‌خواهد و هر اختلافی «نیازمند بررسیِ مدیر» است.
+ *  می‌خواهد (جز شمارشِ کور، که پاسخش نباید به اختلاف بسته باشد) و هر اختلافی «نیازمند بررسیِ مدیر» است.
  *
  *  هر عملیات شناسهٔ پایدار (op_id) دارد (بخشِ ۱۵.۲ بندِ ۱ و ۲۹.۵ بندِ ۲): تکرارِ
  *  همان عملیات با همان محتوا همان نتیجه را می‌دهد (`duplicate`) و اثرِ دوم ندارد؛
@@ -333,9 +333,9 @@ object ShiftCore {
       if (v != 0L) review = true
       if ((if (v < 0) -v else v) > s.threshold) over = true
     }
-    if (over && op.reason == null) {
-      return if (op.blind) PayResult.Err("REASON_REQUIRED") else PayResult.Err("REASON_REQUIRED", variance = variance)
-    }
+    //  ⛔ شمارشِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود: ردِ «بالای آستانه» یک پیشگوست (شاگرد با عوض کردنِ عدد
+    //  موردِ انتظار را تا ±آستانه پیدا می‌کرد). بی دلیل هم بسته می‌شود؛ اختلاف در Z و `needsReview` برای مدیر
+    if (over && op.reason == null && !op.blind) return PayResult.Err("REASON_REQUIRED", variance = variance)
     val z = rep.copy(
       counted = counted, denominations = op.counts, variance = variance,
       reason = op.reason, needsReview = review, blind = op.blind,
@@ -346,6 +346,4 @@ object ShiftCore {
   fun zReport(s: Shift?): PayResult<ShiftReport> =
     if (s?.status == "closed" && s.z != null) PayResult.Ok(s.z) else PayResult.Err("SHIFT_OPEN")
 
-  /** شمارشِ کور: صندوقدار نه مبلغِ مورد انتظار را می‌بیند نه اختلاف را */
-  fun cashierView(r: ShiftReport): ShiftReport = if (r.blind == true) r.copy(expected = null, variance = null) else r
 }
