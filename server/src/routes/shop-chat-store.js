@@ -21,6 +21,7 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
+const { goneSignal } = require('../lib/chat-wait');
 const { rateLimit } = require('../middleware/ratelimit');
 const { ApiError, notFound } = require('../middleware/errors');
 
@@ -76,9 +77,10 @@ router.get(`${base}/conversations/:id`, readLimit, customer, async (req, res) =>
 });
 
 router.get(`${base}/conversations/:id/messages`, readLimit, customer, async (req, res) => {
-  res.json(await chat.changes(v(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait,
-  }));
+  const out = await chat.changes(v(req), req.params.id, {
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+  });
+  if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
 });
 
 router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, async (req, res) => {
