@@ -249,7 +249,8 @@ class ShopStore(private val context: Context) {
    *
    *  ⛔ S143 (#455): **بازیابی هرگز op نمی‌سازد** — دیگر «ذخیره»ٔ عادی نیست که تفاضلش با سایه برای
    *  ردیف‌های تازه‌ترِ سرور DELETE و برگرداندن بفرستد. راه از `RestoreRoute.decide` (core، شرح همان‌جا):
-   *  هرگز همگام‌نشده ⇒ پشتیبان جای دفتر و خودش سایه (`resetTo`)؛ همگام ⇒ صف اول، بعد ردیف‌ها فقط از
+   *  هرگز همگام‌نشده و (بی ورود یا حسابِ سرورِ خالی) ⇒ پشتیبان جای دفتر و خودش سایه (`resetTo`)؛ واردشده و
+   *  سرور ردیف دارد ⇒ همان راهِ «از سرور»، Snapshot نیامد ⇒ «اول همگام کنید» (#485)؛ همگام ⇒ صف اول، بعد ردیف‌ها فقط از
    *  سرور و از پشتیبان فقط تنظیمات ([pushedStaging])؛ بی ورود/شبکه یا v3 ⇒ هیچ، با دلیل. دفترِ
    *  خوانده‌نشده همان «بازسازی از سرور» (SEC-01).
    *  @return `message` ِ خالی یعنی نوشته شد و حرفی نیست
@@ -260,9 +261,14 @@ class ShopStore(private val context: Context) {
     engine.rebind()
     val v3 = SyncChoice.isV3(context)
     val synced = if (v3) SyncV3Runner.of(context).initialized() else engine.everSynced()
-    when (RestoreRoute.decide(synced, v3, Backend.isReady(context), Backend.isOnline(context))) {
+    val signedIn = Backend.isReady(context)
+    val online = Backend.isOnline(context)
+    //  #485: واردشده ولی هرگز همگام‌نشده ⇒ سرور چه دارد؟ ردیف دارد ⇒ از سرور؛ نیامد ⇒ «اول همگام کنید»
+    val serverRows = if (!synced && signedIn && online && !v3) serverRowCount(engine) else null
+    when (RestoreRoute.decide(synced, v3, signedIn, online, serverRows)) {
       RestoreRoute.Route.LOCAL -> runCatching { engine.resetTo(next, staging) }
         .fold({ Rebuilt(true, "") }, { sealHalfRestore(); Rebuilt(false, StrSettings.restoreDiskFail) })
+      RestoreRoute.Route.SYNC_FIRST -> Rebuilt(false, StrSettings.restoreSyncFirst)
       RestoreRoute.Route.NEED_SIGN_IN -> Rebuilt(false, NEED_SIGN_IN_SYNCED)
       RestoreRoute.Route.NEED_NET -> Rebuilt(false, StrSettings.restoreNeedNet)
       RestoreRoute.Route.NOT_ON_V3 -> Rebuilt(false, StrSettings.restoreNotOnV3)
@@ -281,6 +287,15 @@ class ShopStore(private val context: Context) {
         Rebuilt(false, StrSettings.restoreFailed(e.message ?: e.toString()))
       }
     }
+  }
+
+  /** شمارِ ردیف‌های Snapshot ِ سرور برای `RestoreRoute.decide`؛ شبکه یا پاسخِ خراب ⇒ `null` (نمی‌دانیم) */
+  private suspend fun serverRowCount(engine: SyncV1Engine): Int? = try {
+    engine.serverRows()
+  } catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    null
   }
 
   /**

@@ -141,4 +141,54 @@ await E.step('S143.gone', 'ردیفی که پس از پشتیبان حذف شد 
   assert.equal(B.stock(rice), 40);
 }, { needs: ['S143'] });
 
+await E.step('S143.fresh', 'دستگاهِ واردشدهٔ هرگز همگام‌نشده پشتیبانِ کهنه را بازیابی می‌کند ⇐ ردیف‌ها از سرور، نه آمیختهٔ پشتیبان و سرور (#485)', async () => {
+  A.offline = false;   //  گامِ S143 A را بی شبکه می‌گذارد و اگر وسطش بشکند همان می‌ماند
+  //  A فاکتورِ ۲۰۰ می‌فروشد (۲ برنج به ۱۰۰)
+  const sold = A.sell({ lines: [{ id: rice, qty: 2 }] });
+  assert.equal(sold.ok, true);
+  await A.drain();
+  const itemId = A.ledger.saleItems.find((i) => i.saleId === sold.saleId).id;
+  //  پشتیبانِ کهنه: گوشیِ دیگری بی اینترنت یکی را پس گرفت (۱۰۰) و هرگز نفرستاد
+  const D = await E.device('D-lost-phone', owner.email, { seller: 'صاحب (گوشیِ گم‌شده)' });
+  assert.equal((await D.firstSync()).ok, true);
+  D.offline = true;
+  assert.equal(D.returnItems(sold.saleId, { [itemId]: 1 }).amount, 100);
+  const stale = JSON.parse(JSON.stringify(D.ledger));
+  //  روی سرور: A همان فاکتور را کامل پس می‌گیرد (۲۰۰)
+  assert.equal(A.returnItems(sold.saleId, { [itemId]: 2 }).amount, 200);
+  await A.drain();
+
+  //  C: کامپیوترِ تازه، وارد شده ولی هرگز همگام نشده ⇒ نه LOCAL: ردیف‌ها از Snapshot
+  const C = await E.device('C-new-desktop', owner.email, { seller: 'صاحب (کامپیوترِ تازه)' });
+  const r = await C.restore(JSON.parse(JSON.stringify(stale)));
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(C.queue.length, 0, 'بازیابی op ساخت');
+  await C.drain();
+  await A.drain();
+  //  مثالِ بازبین: پیش‌تر برگشت‌ها ۱۰۰ + ۲۰۰ = ۳۰۰ برای فاکتورِ ۲۰۰ و returnedQty ۳ از ۲
+  for (const [who, d] of [['C', C.ledger], ['A', A.ledger]]) {
+    const rets = d.returns.filter((x) => x.saleId === sold.saleId);
+    assert.equal(rets.reduce((s, x) => s + x.amount, 0), 200, `${who}: جمعِ برگشتِ فاکتورِ ۲۰۰ = ${rets.map((x) => x.amount).join(' + ')}`);
+    const item = d.saleItems.find((i) => i.id === itemId);
+    assert.equal(item.returnedQty, 2, `${who}: returnedQty ${item.returnedQty} از ${item.quantity}`);
+  }
+  const srvRets = (await live('returns')).map((x) => x.data).filter((x) => x.saleId === sold.saleId);
+  assert.equal(srvRets.reduce((s, x) => s + x.amount, 0), 200, 'برگشتِ کهنهٔ پشتیبان روی سرور نشست');
+  assert.equal(C.stock(rice), A.stock(rice));
+  //  راه همان «از سرور» است و برگشتِ کهنهٔ پشتیبان فقط در پیام شمرده می‌شود
+  assert.equal(r.route, 'from_server', JSON.stringify(r));
+  assert.ok(r.notOnServer >= 1, `برگشتِ کهنهٔ پشتیبان شمرده نشد: ${JSON.stringify(r)}`);
+}, { needs: ['S143.0'] });
+
+await E.step('S143.fresh.offline', 'دستگاهِ واردشدهٔ هرگز همگام‌نشده بی اینترنت ⇐ «اول همگام کنید»؛ هیچ چیزی عوض نمی‌شود', async () => {
+  const F = await E.device('F-new-tablet', owner.email, { seller: 'صاحب (تبلت)' });
+  const ledgerBefore = JSON.stringify(F.ledger);
+  F.offline = true;
+  const r = await F.restore(JSON.parse(JSON.stringify(backup)));
+  F.offline = false;
+  assert.deepEqual([r.ok, r.route], [false, 'sync_first']);
+  assert.equal(F.queue.length, 0);
+  assert.equal(JSON.stringify(F.ledger), ledgerBefore, 'بازیابیِ بی شبکه دفتر را عوض کرد');
+}, { needs: ['S143.0'] });
+
 await E.finish();

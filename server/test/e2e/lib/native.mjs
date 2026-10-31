@@ -208,9 +208,28 @@ export const KOTLIN = {
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
   capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
   //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
-  restoreNoOps: /RestoreRoute\.decide\(/.test(bodyOf('restoreBackup', fs.readFileSync(
+  restoreNoOps: restoreWiredNoOps(bodyOf('restoreBackup', fs.readFileSync(
     path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
 };
+
+/**
+ * `ShopStore.restoreBackup` واقعاً بی op است؟ تنها «decide هست» کافی نبود: `writeInternal` در شاخهٔ
+ * FROM_SERVER سبز می‌ماند (بازبینیِ #485). حالا: بدنه هیچ `writeInternal(`/`save(`/`record(` ندارد،
+ * LOCAL حتماً `engine.resetTo(` و FROM_SERVER حتماً `engine.rebuildFromServer(` است؛ وگرنه هارنس همان
+ * [NativeDevice.save] (تفاضل با سایه) را بازی می‌کند و S143 سرخ می‌شود.
+ */
+export function restoreWiredNoOps(body) {
+  if (!/RestoreRoute\.decide\(/.test(body)) return false;
+  if (/\b(writeInternal|save|record)\(/.test(body)) return false;
+  const branch = (name) => {
+    const at = body.indexOf(`RestoreRoute.Route.${name} ->`);
+    if (at < 0) return '';
+    const next = body.slice(at + 1).search(/RestoreRoute\.Route\.[A-Z_]+ ->/);
+    return body.slice(at, next < 0 ? undefined : at + 1 + next);
+  };
+  return /^RestoreRoute\.Route\.LOCAL -> runCatching \{ engine\.resetTo\(next, staging\) \}/.test(branch('LOCAL'))
+    && /^RestoreRoute\.Route\.FROM_SERVER -> try \{\s*when \(val out = engine\.rebuildFromServer\(next, pushedStaging\)\)/.test(branch('FROM_SERVER'));
+}
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
 export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false, frozenModel: true });
@@ -463,7 +482,8 @@ export class NativeDevice {
   /**
    * «بازیابیِ پشتیبان» = `ShopStore.restoreBackup` (S143، #455) — راه از `RestoreRoute.decide` ِ core
    * (`core/.../backup/RestoreRoute.kt`؛ یکی را عوض کنی، هر دو را). بازیابی **هرگز op نمی‌سازد**:
-   *   • هرگز هم‌تراز نشده ⇒ `SyncV1Engine.resetTo`: پشتیبان جای دفتر و خودش سایه، cursor صفر؛
+   *   • هرگز هم‌تراز نشده و (بی ورود یا Snapshot ِ خالی) ⇒ `SyncV1Engine.resetTo`: پشتیبان جای دفتر و خودش سایه، cursor صفر؛
+   *   • هرگز هم‌تراز نشده، واردشده و Snapshot ردیف دارد ⇒ همان راهِ همگام (پایین)؛ Snapshot نیامد ⇒ `sync_first`، هیچ؛
    *   • همگام، بی ورود یا بی شبکه ⇒ هیچ چیزی عوض نمی‌شود؛
    *   • همگام ⇒ `SyncRebuild.run`: صف تا ته (این‌جا همان دورِ همیشه)، بعد Snapshot — ردیف‌ها فقط از سرور،
    *     از پشتیبان فقط آنچه همگام نمی‌شود (`fromServer`)، کفِ فاکتور (`withInvoiceCursor`)؛ سایه و
@@ -475,13 +495,23 @@ export class NativeDevice {
     if (!this.kotlin.restoreNoOps) { this.save(backup); return { ok: true, route: 'save' }; }
     const shaped = (t) => (this.kotlin.snapshotShaped ? projectLedger(t, this.keepOf) : t);
     const synced = this.cursor > 0 || this.snapshotAt > 0;
-    if (!synced) {
+    const signedIn = !!this.token;
+    //  #485: واردشده ولی هرگز همگام‌نشده ⇒ `SyncV1Engine.serverRows` (Snapshot.rows؛ نیامد ⇒ null)
+    let serverRows = null;
+    if (!synced && signedIn && !this.offline) {
+      const s = await this.api('GET', '/sync/v1/snapshot');
+      const n = s.status === 200 ? Number(s.body?.rows) : NaN;
+      serverRows = Number.isInteger(n) && n >= 0 ? n : null;
+    }
+    //  `RestoreRoute.decide` (v1؛ v3 این‌جا نیست)
+    if (!synced && (!signedIn || serverRows === 0)) {
       this.ledger = this.raw ? backup : projectLedger(backup, this.keepOf);
       this.shadow = core.shadowOf(shaped(backup));
       this.cursor = 0;
       return { ok: true, route: 'local' };
     }
-    if (!this.token) return { ok: false, route: 'need_sign_in' };
+    if (!synced && (serverRows === null || this.offline)) return { ok: false, route: 'sync_first' };
+    if (!signedIn) return { ok: false, route: 'need_sign_in' };
     if (this.offline) return { ok: false, route: 'need_net' };
     const pushed = await this.sync();
     if (!pushed.ok) return { ok: false, route: 'from_server', error: this.lastError };

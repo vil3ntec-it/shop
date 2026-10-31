@@ -17,8 +17,12 @@ package ir.vil3ntec.tohid.core.backup
  *     ردیفی از پشتیبان که سرور ندارد افزوده نمی‌شود — یا پس از پشتیبان حذف شده یا هرگز نرفته، و
  *     دستگاه نمی‌داند کدام (سرور ردیفِ حذف‌شده را با INSERT زنده می‌کند) — فقط شمرده می‌شود
  *     ([notOnServer]) تا پیام بگوید. فایلِ پشتیبان و نسخهٔ ایمنیِ پیش از بازیابی دست نمی‌خورند.
- *   • [Route.LOCAL] (هرگز هم‌تراز نشده): پشتیبان جای دفتر و **خودش سایه** ⇐ باز هم هیچ op؛
- *     نخستین هم‌ترازی با سرور فقط ردیف‌هایی را درج می‌کند که سرور ندارد، هرگز حذف.
+ *   • [Route.LOCAL] (هرگز هم‌تراز نشده **و** بی ورود یا حسابِ سرورِ خالی): پشتیبان جای دفتر و
+ *     **خودش سایه** ⇐ باز هم هیچ op؛ نخستین هم‌ترازی فقط ردیف‌هایی را درج می‌کند که سرور ندارد.
+ *   • هرگز هم‌تراز نشده ولی **وارد شده** و Snapshot ِ سرور ردیف دارد ⇒ همان [Route.FROM_SERVER]؛
+ *     ندانیم سرور چه دارد (بی شبکه، Snapshot نیامد) ⇒ [Route.SYNC_FIRST]: هیچ چیزی عوض نمی‌شود،
+ *     «اول همگام کنید». LOCAL این‌جا پشتیبانِ کهنه را با ردیف‌های تازه‌ترِ سرور می‌آمیخت: فاکتورِ
+ *     ۲۰۰ با برگشتِ ۱۰۰ در پشتیبان و برگشتِ ۲۰۰ روی سرور ⇒ برگشت‌ها ۳۰۰ و `returnedQty` ۳ از ۲.
  *   • همگام ولی بی ورود ([Route.NEED_SIGN_IN]) یا بی شبکه ([Route.NEED_NET])، یا Sync v3 ِ
  *     راه‌افتاده ([Route.NOT_ON_V3]، هنوز راهِ «از سرور» ندارد): هیچ چیزی عوض نمی‌شود، با پیام.
  *
@@ -27,16 +31,21 @@ package ir.vil3ntec.tohid.core.backup
  */
 object RestoreRoute {
 
-  enum class Route { LOCAL, FROM_SERVER, NEED_SIGN_IN, NEED_NET, NOT_ON_V3 }
+  enum class Route { LOCAL, FROM_SERVER, NEED_SIGN_IN, NEED_NET, NOT_ON_V3, SYNC_FIRST }
 
   /**
    *  @param synced این حساب روی این دستگاه با سرور هم‌تراز شده است (v1: `everSynced`؛ v3: راه‌افتاده)
    *  @param v3 همگام‌سازیِ این دستگاه نسخهٔ ۳ است
    *  @param signedIn نشستِ حساب هست
    *  @param online شبکه هست
+   *  @param serverRows شمارِ ردیف‌های Snapshot ِ سرور برای همین حساب؛ `null` = نمی‌دانیم (نپرسیدیم یا
+   *  نیامد). فقط برای دستگاهِ هرگز هم‌تراز نشده و واردشده معنا دارد.
    */
-  fun decide(synced: Boolean, v3: Boolean, signedIn: Boolean, online: Boolean): Route = when {
-    !synced -> Route.LOCAL
+  fun decide(synced: Boolean, v3: Boolean, signedIn: Boolean, online: Boolean, serverRows: Int?): Route = when {
+    !synced && (!signedIn || serverRows == 0) -> Route.LOCAL
+    !synced && v3 -> Route.NOT_ON_V3
+    !synced && (serverRows == null || !online) -> Route.SYNC_FIRST
+    !synced -> Route.FROM_SERVER
     v3 -> Route.NOT_ON_V3
     !signedIn -> Route.NEED_SIGN_IN
     !online -> Route.NEED_NET
