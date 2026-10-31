@@ -792,6 +792,7 @@ fun AppRoot(
                 ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
                 ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
                 ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
+                ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
