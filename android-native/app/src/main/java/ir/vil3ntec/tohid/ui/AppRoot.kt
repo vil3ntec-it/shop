@@ -801,6 +801,7 @@ fun AppRoot(
                 Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }

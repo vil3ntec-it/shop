@@ -12,9 +12,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.keymap.KeyMap
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.CustomerInsight
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtReminder
+import ir.vil3ntec.tohid.data.DocGapsPref
+import ir.vil3ntec.tohid.data.DocGapsSheet
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ReportKeysPref
@@ -38,8 +41,15 @@ import kotlinx.coroutines.launch
  *
  *  Ctrl+P چاپ، Ctrl+E اکسل — از ثبتِ مرکزیِ کلیدها (`KeyMap.GLOBAL_PRINT` / `GLOBAL_EXPORT`).
  */
-/** `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش) */
-private enum class Rep(val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false) {
+/**
+ *  `crm`: گزارشِ مشتری — فقط وقتی `ShopPolicy.crmReports` روشن است (پیش‌فرض خاموش).
+ *  `gaps`: شماره‌های جاافتادهٔ اسناد (RPT-17) — فقط وقتی `DocGapsPref` روشن است (پیش‌فرض خاموش).
+ *  `text`: عنوانِ سه‌زبانه (جدولِ `Str*`) برای زبانه‌های تازه؛ بی آن همان `label`.
+ */
+private enum class Rep(
+  val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false,
+  val gaps: Boolean = false, val text: (() -> String)? = null,
+) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
   PURCHASES("purchases", "خرید", true),
@@ -53,6 +63,10 @@ private enum class Rep(val key: String, val label: String, val ranged: Boolean, 
   RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
   REMINDERS("reminders", "یادآوریِ امروز", false, crm = true),
+  GAPS("gaps", "", false, gaps = true, text = { StrReports.gapsTab }),
+  ;
+
+  val title: String get() = text?.invoke() ?: label
 }
 
 private enum class Span(val label: String) { TODAY("امروز"), WEEK("۷ روز"), MONTH("این ماه"), JMONTH("ماهِ خورشیدی"), JYEAR("سالِ خورشیدی"), ALL("همه"), CUSTOM("از … تا …") }
@@ -69,7 +83,8 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val j = remember(today) { Jalali.ofIso(today) }
 
   val crm = remember { ShopPolicy.crmReports(context) }
-  val reps = remember(crm) { Rep.values().filter { crm || !it.crm } }
+  val gaps = remember { DocGapsPref.on(context) }
+  val reps = remember(crm, gaps) { Rep.values().filter { (crm || !it.crm) && (gaps || !it.gaps) } }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
@@ -119,7 +134,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   ) {
     //  نوعِ گزارش
     ScrollableTabRow(selectedTabIndex = reps.indexOf(rep).coerceAtLeast(0), containerColor = Shop.colors.surface, edgePadding = 0.dp) {
-      reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.label) }) }
+      reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.title) }) }
     }
     Spacer(Modifier.height(10.dp))
 
@@ -139,7 +154,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
         }
         Text(if (span == Span.ALL) "همهٔ تاریخ‌ها" else "${formatDate(from)} تا ${formatDate(to)}", color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
       } else {
-        Text("وضعیتِ همین حالا — بی بازهٔ تاریخ", Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
+        Text(if (rep == Rep.GAPS) StrReports.gapsNow else "وضعیتِ همین حالا — بی بازهٔ تاریخ", Modifier.weight(1f), color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
       }
       Spacer(Modifier.width(12.dp))
       ReportFreshSwitch()
@@ -206,6 +221,13 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           val groups = remember(d) { CustomerMerge.duplicates(d) }
           DeskKpi("گروه‌های تکراری", "${groups.size}", Shop.colors.warning, Modifier.weight(1f))
           DeskKpi("با شمارهٔ یکسان", "${groups.count { it.strong }}", Shop.colors.danger, Modifier.weight(1f))
+        }
+        Rep.GAPS -> {
+          val g = remember(d) { DocGapsSheet.report(d) }
+          DeskKpi(StrReports.kpiMissing, "${g.missing}", if (g.missing > 0) Shop.colors.danger else Shop.colors.success, Modifier.weight(1f))
+          DeskKpi(StrReports.kpiJumped, "${g.jumped}", Shop.colors.text, Modifier.weight(1f))
+          DeskKpi(StrReports.kpiDuplicates, "${g.duplicates}", if (g.duplicates > 0) Shop.colors.warning else Shop.colors.text, Modifier.weight(1f))
+          DeskKpi(StrReports.kpiCancelled, "${g.cancelled}", Shop.colors.muted, Modifier.weight(1f))
         }
         Rep.REMINDERS -> {
           val due = remember(d, today) { DebtReminder.due(d, today) }

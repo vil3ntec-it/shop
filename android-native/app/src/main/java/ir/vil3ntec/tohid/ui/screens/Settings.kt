@@ -599,6 +599,8 @@ fun SettingsScreen(
       }
     }
 
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(
