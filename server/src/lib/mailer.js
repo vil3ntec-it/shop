@@ -417,6 +417,12 @@ async function apiSend(cfg, mail) {
    در دسترسِ بقیه‌ی سرور
    ========================================================== */
 
+/** نشانی برای لاگ: «a***@example.com» — همان شکلِ `otp.redact` */
+function maskAddress(to) {
+  const [name, host] = String(to || '').split('@');
+  return `${String(name || '').slice(0, 1)}***@${host || ''}`;
+}
+
 /**
  * فرستادن یک ایمیل.
  * @param {{to:string, subject:string, text:string, html?:string}} mail
@@ -427,7 +433,18 @@ async function send(mail) {
   if (!to || !to.includes('@')) throw new Error('نشانی ایمیل درست نیست');
 
   if (cfg.provider === 'log') {
-    console.log(`[email] به ${to} — ${mail.subject}\n${mail.text}`);
+    /*
+     *  ⛔ AUTH-10 — در production متنِ نامه در لاگ نمی‌نشیند. «log» پیش‌فرضِ سرورِ تازه است و
+     *  همین‌جا کدِ ورودِ برنامه (صفِ `login-outbox`)، کدِ اشتراکِ VIP و هر نامهٔ دیگر را کامل
+     *  چاپ می‌کرد — همان قاعدهٔ `otp.senders.log` («لاگ جای راز نیست»). کدِ زنده را مدیرِ
+     *  ارشد از میزِ «ورودها» با ثبتِ رخداد می‌بیند. بیرون از production همان متنِ کامل
+     *  (سرورِ توسعه و سنجه‌ها بی آن کار نمی‌کنند). `log-secrets.test.js`.
+     */
+    if (config.env === 'production') {
+      console.log(`[email] به ${maskAddress(to)} — ${mail.subject} (راهِ ارسال «log» است: نامه بیرون نرفت و متنش عمداً نوشته نمی‌شود)`);
+    } else {
+      console.log(`[email] به ${to} — ${mail.subject}\n${mail.text}`);
+    }
     return { delivered: true, via: 'log' };
   }
   const ready = readiness(cfg);
