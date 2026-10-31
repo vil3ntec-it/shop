@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -1152,10 +1153,11 @@ private fun TransactionDialog(
         Spacer(Modifier.height(14.dp))
         AmountField(amount, { amount = it }, "مبلغ")
 
-        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد
-        if (receiving && balance > 0) {
+        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد — همهٔ مانده تا پول، هرگز گردِ افغانی
+        val settle = if (receiving) MoneyInput.settleInput(balance) else null
+        if (settle != null) {
           Spacer(Modifier.height(6.dp))
-          TextButton(onClick = { amount = Math.round(balance).toString() }) {
+          TextButton(onClick = { amount = settle }) {
             Text("تسویهٔ کامل", color = Shop.colors.primary)
           }
         }
