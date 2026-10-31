@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  نسخهٔ پیش‌نمایش (buildTypeِ preview، بستهٔ جدا؛ رابطِ نسخهٔ ۳ پیش‌فرض روشن): برگشتِ پیش‌نمای اندروید ۱۴+
+  (`PredictiveBackHandler` در `V3RouteHost`). بستهٔ اصلی مثلِ main بی آن است (`src/main/AndroidManifest.xml`).
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <application android:enableOnBackInvokedCallback="true" />
+</manifest>

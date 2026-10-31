@@ -115,8 +115,10 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
 
   val parsed = remember(text) { Jalali.parseTyped(text) }
   val broken = text.isNotBlank() && parsed == null
-  //  نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد)
+  //  نسخهٔ ۳: نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد).
+  //  رابطِ امروز (پرچمِ `UiV3` خاموش) همان نمونهٔ ثابتِ main را می‌بیند.
   val sample = remember { formatDate(todayIso()) }
+  val v3 = ir.vil3ntec.tohid.ui.UiV3.on
 
   Text(StrFields.date, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
@@ -127,7 +129,7 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
         text = latinDigits(raw).filter { c -> c.isDigit() || c == '/' || c == '-' }
         Jalali.parseTyped(text)?.let(onValueChange)
       },
-      placeholder = { Text(sample) },
+      placeholder = { Text(if (v3) sample else "۱۴۰۵/۰۶/۰۶") },
       singleLine = true,
       isError = broken,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

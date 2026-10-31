@@ -415,7 +415,7 @@
 `print_receipt_copies = 1` شمارِ نسخهٔ چاپِ خودکار (POS-35، `claude/spec-pos-b-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main).
-`UiV3` / `tohid-ui` › `ui_v3` رابطِ نسخهٔ ۳ (خاموش ⇒ رابطِ امروز از `ui/legacy/*Legacy.kt` و پالتِ سبزآبی؛ پیش‌نمایشِ اندروید پیش‌فرض روشن؛ کلید در تنظیمات و «ظاهر»ِ نسخهٔ ۳) (#359، باز).
+`UiV3` / `tohid-ui` › `ui_v3` رابطِ نسخهٔ ۳ (خاموش ⇒ رابطِ امروز از `ui/legacy/*Legacy.kt` و پالتِ سبزآبی؛ پیش‌نمایشِ اندروید پیش‌فرض روشن؛ کلید در تنظیمات و «ظاهر»ِ نسخهٔ ۳) (#359، باز). مانیفست پرچم‌پذیر نیست، پس: پیوندِ `vill3n://app` روی `AppLinkAlias` ِ پیش‌فرض‌خاموش است و `MainActivity.syncLinkAlias` با همین پرچم روشنش می‌کند؛ `enableOnBackInvokedCallback` (برگشتِ پیش‌نما) فقط در `src/preview/AndroidManifest.xml` است تا روشن شدنِ پرچم برای همه؛ نمونهٔ تاریخِ `DateField` با پرچمِ خاموش همان «۱۴۰۵/۰۶/۰۶» ِ main.
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

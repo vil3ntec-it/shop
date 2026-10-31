@@ -82,6 +82,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
     ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
+    //  پیوندِ vill3n://app فقط با پرچمِ روشن؛ با هر بار عوض شدنِ پرچم (تنظیمات) همان دم
+    lifecycleScope.launch { snapshotFlow { ir.vil3ntec.tohid.ui.UiV3.on }.collect { syncLinkAlias(it) } }
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
@@ -204,6 +206,21 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
       }
     }
     handleLink(intent)
+  }
+
+  /**
+   *  `AppLinkAlias` ِ مانیفست (intent-filter ِ `vill3n://app`) فقط وقتی روشن است که رابطِ نسخهٔ ۳ روشن
+   *  است. خاموش ⇒ همان حالتِ مانیفست (`enabled="false"`)، یعنی مثلِ main هیچ پیوندِ بیرونی برنامه را
+   *  باز نمی‌کند. فقط وقتی حالت فرق دارد چیزی نوشته می‌شود؛ خطا (مثلاً سیاستِ دستگاه) بی‌صدا.
+   */
+  private fun syncLinkAlias(on: Boolean) {
+    runCatching {
+      val alias = android.content.ComponentName(this, "ir.vil3ntec.tohid.AppLinkAlias")
+      val want = if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+      if (packageManager.getComponentEnabledSetting(alias) != want) {
+        packageManager.setComponentEnabledSetting(alias, want, android.content.pm.PackageManager.DONT_KILL_APP)
+      }
+    }
   }
 
   /**
