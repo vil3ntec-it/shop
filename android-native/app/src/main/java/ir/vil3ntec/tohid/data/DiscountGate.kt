@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.core.perm.PermCore
+import ir.vil3ntec.tohid.core.pos.LinePricing
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -57,6 +58,42 @@ object DiscountGate {
       }
       else -> State.DENIED
     }
+  }
+
+  /**
+   *  POS-20/21 — کاهشِ دلخواهِ ردیف‌های سبد (Minor): هر ردیفِ کالا که قیمتِ دستی‌اش زیرِ
+   *  قیمتِ فهرست است (تخفیفِ ردیف هم در همان قیمت می‌نشیند، `LinePricing.unitForNet`).
+   *  قلمِ آزاد فهرست ندارد (سقفش `LinePricing.checkFreeLine`). ردیفی که تخفیفِ خودکار گرفته
+   *  ([promo]) دلخواهِ صندوقدار نیست و شمرده نمی‌شود؛ `PromoEngine` به ردیفِ با قیمتِ دستی
+   *  تخفیفِ خودکار نمی‌دهد، پس در سبدِ پس از تخفیف ([cart] = `priced`) هم این دو جدا می‌مانند.
+   */
+  fun reductionMinor(d: ShopData, cart: List<SalesEngine.CartLine>, promo: PromoEngine.Outcome? = null): Long {
+    var sum = 0L
+    for (line in cart) {
+      val unit = line.unitPrice ?: continue
+      if (line.free || !(line.quantity > 0)) continue
+      if (promo?.tags?.get(line.productId)?.promo?.isNotEmpty() == true) continue
+      val p = d.products.find { it.id == line.productId } ?: continue
+      sum += LinePricing.reductionMinor(minor(p.salePrice), minor(unit), (line.quantity * 1000).roundToLong())
+    }
+    return sum
+  }
+
+  /** آنچه به `req`، `state` و `need` می‌رود (افغانی) — همان دو عددِ `totals` وقتی پرچم خاموش است */
+  data class Basis(val discount: Double, val subtotal: Double)
+
+  /**
+   *  POS-21 — پایهٔ سنجشِ `sales.discount`: پرچمِ [on] (`LinePolicy.on`) خاموش ⇒ دقیقاً
+   *  (`totals.discount`، `totals.subtotal`)ِ امروز. روشن ⇒ کاهش‌های ردیف به هر دو افزوده
+   *  (`LinePricing.basis`)؛ برگه‌ای که با این گرفته شود نیازِ سرور (فقط تخفیفِ فاکتور) را هم
+   *  می‌پوشاند. عددِ بیرون از بازهٔ امن ⇒ «همهٔ فاکتور تخفیف است» تا بی تأیید رد شود، نه آزاد.
+   */
+  fun basis(on: Boolean, d: ShopData, cart: List<SalesEngine.CartLine>, promo: PromoEngine.Outcome?, totals: SalesEngine.Totals): Basis {
+    if (!on) return Basis(totals.discount, totals.subtotal)
+    val b = runCatching {
+      LinePricing.basis(LinePricing.Policy(on = true), minor(totals.discount), minor(totals.subtotal), reductionMinor(d, cart, promo))
+    }.getOrNull() ?: return Basis(maxOf(totals.subtotal, 1.0), totals.subtotal)
+    return Basis(b.discountMinor / 100.0, b.baseMinor / 100.0)
   }
 
   /** برگه ⇐ JSONِ `Sale.approval` (همان کلیدهای سرور) */

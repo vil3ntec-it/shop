@@ -95,6 +95,7 @@
 - ورودِ نقد فقط `deposit` یا `other`؛ خروجِ بیش از نقدِ موردِ انتظار رد می‌شود؛ کشو، بازپرداخت و تبادل تأییدکننده می‌خواهند (#237).
 - جست‌وجوی صندوقِ کامپیوتر نتیجه را در همان شبکه/جدول برجسته می‌کند، نه فهرستِ کشویی؛ ترتیب همان است تا Enter همان کالا را بردارد (#251).
 - با عبارتِ جست‌وجو، همهٔ دسته‌ها گشته می‌شوند و دستهٔ انتخابی تنگش نمی‌کند (#251).
+- جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، پشتِ تنظیمِ خاموشِ همین دستگاه `PosSearchPrefs`): نمایه (`CatalogMatch.index`، کلیدهای `TextNormalizer`) فقط با تغییرِ کالاها ساخته می‌شود، نه با هر حرف؛ ترتیب بارکدِ کامل ⇐ آغازِ نام ⇐ همهٔ کلمه‌ها ⇐ آغازِ بارکد ⇐ غلطِ تایپی (فقط وقتی جورِ دقیق کمتر از ۸ است)، هر گروه به ترتیبِ نام؛ کالای غیرفعال نه (`CatalogMatchTest`، `PosSmartSearchTest`). مترادف از بیرون می‌آید، ثابت نوشته نمی‌شود.
 - «سبدِ تازه» تأیید می‌خواهد و فوکوسِ پیش‌فرض روی «انصراف» است (۵.۱ بند ۱۱، #251).
 - ⛔ تخفیفِ خودکار (PRM): حالِ حافظهٔ `PromoLive` مالِ یک «حساب@دکان» است (`PromoEngine.forAccount`)؛ پاسخِ سرور و نسخهٔ دستگاه فقط وقتی می‌نشینند که حافظه و حسابِ همین لحظه هر دو همان‌اند (`PromoEngine.accepts`). `PromoLive.reset(context)` فقط **پس از** `LedgerOwner.align` و فقط با `SWITCHED`/`ADOPTED` (`LedgerOwner.promoReset`)، و در «خروج از حساب» — شروعِ سردِ همان حساب (`SAME`) کدهای سبد و پیش‌نویس را پاک نمی‌کند (S1، `PromoEngineTest`، `LedgerOwnerPromoTest`، `PromoLiveWiringTest`).
 - ⛔ نشانِ تخفیف روی فاکتور فقط با پرچمِ `shop.promo_stamp` (`live_config`، پیش‌فرض خاموش؛ در پاسخِ `GET /api/shop/promos` به نامِ `stamp`): `PromoEngine.stamp` فیلدهای **اختیاری**، همه به واحدِ کوچک، می‌گذارد — `SaleItem.listPriceMinor`، `SaleItem.promo: [{id, rev, name, discountMinor}]` (نامِ همان لحظه)، `Sale.promoDiscountMinor` و `Sale.coupons` (فقط کدهای اعمال‌شده، حداکثر ۱۰ تا و ۳۲ نویسه). کلیدِ دکان یا پرچم خاموش ⇒ همان شیء و همان JSON (`SalePromoFieldsTest`). فیلدِ پس از A00 است و کف نمی‌خواهد؛ `PRE_A00` دست نمی‌خورد.
@@ -103,6 +104,7 @@
 - رسیدِ دیجیتال (POS-32): متنِ همراهِ تصویر/PDF فقط از `ReceiptShare.caption` — بی پیوند همان یک خطِ «فاکتور #… — دکان»؛ پیوندِ فاکتورِ آنلاین (`Receipts.publicUrl`، یعنی توکن + `shop.receipt_v2` + QR ِ سربرگ) **تنها در خطِ آخر** و فقط `http`/`https` بی فاصله (`ReceiptShare.safeLink`). کامپیوتر برگهٔ اشتراک ندارد: «کپیِ پیوند» با همان شرط (`ReceiptShareTest`).
 - چاپِ خودکار پس از فروش، چند نسخه (POS-35): شمار تنظیمِ همین دستگاه است (`ReceiptCopiesPref`، کلیدِ `print_receipt_copies`، ۱ تا ۳، نبوده یا خراب ⇒ ۱ = همان یک رسید). هر نسخه کارِ جدای صف با `PrintQueue.Job.copy`؛ تکرار با همان فروش **و همان نسخه** پذیرفته نیست. نسخهٔ ۱ بی نشان و بایت‌به‌بایت همان امروز؛ نسخهٔ k>1 «— نسخهٔ k از n —» و تلاشِ دوباره‌اش «— نسخهٔ k از n · چاپِ دوباره —» (`ReceiptCopies`، `ReceiptCopiesTest`). فقط چاپِ **خودکار**؛ دکمهٔ «چاپ» و چاپِ دوباره یک نسخه‌اند.
 - ⛔ «سقفِ مصرفِ کد» تا شمارشِ مصرف نیامده رد می‌شود (`max_uses_unsupported`، `shop-promos.js`): هر `maxUses` جز «نبودن» و `0` پیش از `ruleOf` (رشته، اعشار، منفی…) — مگر همان مقدارِ ذخیره‌شدهٔ ردیفِ قبلی، که آن‌وقت `0` می‌نشیند تا برنامهٔ پیشین ویرایش کند. ویرایشِ قاعده چیزی را که فرم نشان نمی‌دهد (کانالِ خالی، کالاهای دیگرِ «قیمتِ ویژه») عوض نمی‌کند.
+- ⛔ قیمتِ ردیف (POS-08/10/20/21، پشتِ تنظیمِ خاموشِ همین دستگاه `LinePolicy`، هسته `core/…/pos/LinePricing.kt`): قیمتِ دستیِ زیرِ قیمتِ کالا و تخفیفِ ردیف هم **تخفیف**‌اند — `DiscountGate.basis` کاهشِ هر ردیف را به تخفیف و جمعِ فاکتور می‌افزاید و همان سقفِ `sales.discount` و «درخواستِ تأیید» را می‌خواهد (ردیفِ تخفیفِ خودکار و قلمِ آزاد شمرده نمی‌شوند). برگه با (D+R، (D+R)÷(S+R)) گرفته می‌شود و نیازِ سرور (D، D÷S) را همیشه می‌پوشاند؛ خاموش ⇒ همان (D، S). تخفیفِ ردیف به قیمتِ واحدِ ردیف می‌نشیند (`LinePricing.unitForNet`، گرد به افغانی نیمه رو به بالا)، نه در `Sale.discount`. «قاعدهٔ جهت» فقط **قیمتِ تازه** را می‌سنجد و صاحبِ دکان از آن و از سقفِ قلمِ آزاد آزاد است (`LinePricingTest`، `LinePolicyTest`).
 
 ### v3 · پرداخت
 
@@ -130,6 +132,8 @@
 - هر فروش/سفارش حداکثر یک قصدِ زنده (`ux_payment_intents_live_ref`)؛ `ref_id` عوض نمی‌شود؛ فروشِ پرداخت‌شده قصدِ تازه نمی‌گیرد (`already_paid`).
 - برنامه پس از `paid` فروش را با همان `refId` می‌بندد و ردیفِ `payment` ِ پاسخ (`method: hesabpay`، `verification: gateway`) را می‌افزاید.
 - ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط بیرون از `NODE_ENV=production`؛ در تولید نادیده و `/webhook/fake` ۴۰۱.
+- ویترین: `POST /api/store/:slug/orders/:token/pay` (توکنِ پیگیری = اجازه، کلیدِ یکتایی در فضای `sf:`، مبلغ از سفارش، نشانیِ بازگشت را سرور می‌سازد ⇒ بی redirect ِ باز)؛ صفحه «پرداخت‌شده» را فقط از `paymentStatus` ِ پیگیری می‌خواند.
+- تطبیق: `housekeeping` ِ `app.js` هر ۶ ساعت (۴۸ ساعتِ اخیر) و `POST /api/admin/payments/reconcile` (مدیرِ ارشد)؛ فهرست `GET /api/admin/payments/intents` (زبانهٔ «عملیات»)؛ `paid → refunded` فقط `POST /api/admin/payments/intents/:id/refund` (مدیرِ ارشد، پس از برگرداندنِ پول در خودِ حساب‌پی).
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
 
 ### v3 · موجودی و کاتالوگ
@@ -239,7 +243,7 @@
 - ویترین فقط با `shop.orders` + `shop.storefront` + کلیدِ اشتراکِ `storefront`؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب دارند (۴۰۴) (#244).
 - قیمت، نام و واحد را سرور در همان تراکنش از دفتر می‌خواند؛ `unitPriceMinor`، `discountMinor`، `deliveryFeeMinor`، `source` و `test`ِ مشتری خوانده نمی‌شوند (#244).
 - نشانی `{slug}.vill3n.top` (D-06) و `/store/<slug>` همان صفحه است؛ زیردامنه‌های رزرو رفتارِ پیشین را دارند (#244).
-- پرداختِ آنلاین نیست؛ فقط نقد هنگامِ تحویل با جملهٔ روشن و بی دکمه (D-08، #244).
+- پرداختِ آنلاین فقط حساب‌پی و فقط با کلیدهای `HESABPAY_*` + پرچمِ `pay.hesabpay` + اشتراکِ فعال: دکمهٔ «پرداخت با حساب‌پی» در صفحهٔ پیگیریِ سفارش (بخشِ «پرداختِ حساب‌پی»)؛ وگرنه فقط نقد هنگامِ تحویل با جملهٔ روشن و بی دکمه (D-08، #244). نقد هنگامِ تحویل همیشه می‌ماند.
 - حضورِ دکان از آخرین تماسِ واقعیِ همگام‌سازی: ≤۱۰ دقیقه «تأییدشده»، >۶۰ «موقتاً آفلاین»، میانه «تأیید نشده» (D-18، §۳۱.۱، #244).
 - کدِ یک‌بارمصرف همان `lib/otp.js`؛ در تولید با راهِ `log` ⇒ ۵۰۳ `verification_unavailable`، هرگز «فرستاده شد» (#244).
 - توکنِ پیگیری `<ULID>.<HMAC>` و بی ذخیره؛ نمای مشتری شناسهٔ داخلی، شماره، نشانی و یادداشتِ کارمند ندارد (#244).
@@ -407,13 +411,13 @@
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
-تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
 `print_receipt_copies = 1` شمارِ نسخهٔ چاپِ خودکار (POS-35، `claude/spec-pos-b-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
-دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
