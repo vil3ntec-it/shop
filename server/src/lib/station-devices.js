@@ -212,6 +212,8 @@ async function revoke(stationId, deviceId) {
     [deviceId, stationId]
   );
   if (!row) throw notFound('این دستگاه پیدا نشد', 'device_not_found');
+  //  ⛔ S78: سوکتِ زندهٔ همان کامپیوتر همان لحظه بسته می‌شود
+  await require('./sync-v1-live').accessChanged({ accountKind: 'station', accountId: stationId });
   return shape(row);
 }
 
@@ -263,6 +265,7 @@ async function revokeBoundBy(stationId, userId) {
       WHERE station_id=$1 AND bound_by_user_id=$2 AND status='active'`,
     [stationId, userId]
   );
+  if (r.rowCount) await require('./sync-v1-live').accessChanged({ accountKind: 'station', accountId: stationId });
   return r.rowCount || 0;
 }
 

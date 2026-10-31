@@ -27,51 +27,77 @@ function appAlias(raw) {
 }
 
 /**
- * از یک توکنِ خام، بافتِ حساب را می‌سازد — یا null.
- * @returns {null | {app, accountKind, accountId, accountName, userId, role, via}}
+ * بافتِ حساب از ردیفِ توکنی که **پیش‌تر** سنجیده شده (باطل نیست؛ انقضا را صدازننده می‌داند):
+ * کاربرِ فعال، دستگاهِ فعال، عضویت و نقش. همان بخشِ دومِ `resolveToken`، جدا تا سوکتِ زندهٔ
+ * برنامهٔ کهنه پس از پیر شدنِ توکن هم با همین قاعده سنجیده شود (S78، `sync-v1-live`).
+ * @returns {Promise<null | {app, accountKind, accountId, accountName, userId, role, via, expiresAt}>}
  */
-async function resolveToken(token) {
+async function contextOfRow(row) {
+  const user = await one('SELECT id, status FROM users WHERE id=$1', [row.subject_id]);
+  if (!user || user.status !== 'active') return null;
+  if (row.device_id) {
+    const dev = await one('SELECT status FROM devices WHERE id=$1', [row.device_id]);
+    if (!dev || dev.status !== 'active') return null;
+  }
+  const app = row.app || 'shop';
+  //  S78: سوکتِ زنده سرِ همین لحظه بسته می‌شود (`sync-v1-live`، کدِ 4403)
+  const expiresAt = Number(row.expires_at) || 0;
+  if (app === 'pump') {
+    const m = await require('./stations').membershipOf(user.id);
+    if (!m) return { app, accountKind: 'station', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_station' };
+    return {
+      app, accountKind: 'station', accountId: m.station_id, accountName: m.station_name || '',
+      userId: user.id, role: m.role, via: 'user', expiresAt,
+    };
+  }
+  //  ⛔ DLV-01 (§۳.۱۱): توکنِ پیک — یا عضوی که نقشش پیک است — به دفترِ دکان
+  //  راه ندارد: pull، snapshot، push، v3 و سوکتِ زنده همه بسته‌اند.
+  if (row.scope) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'courier_scope' };
+  //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
+  const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
+  if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
+  if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
+  return {
+    app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
+    userId: user.id, role: m.role, via: 'user', expiresAt,
+  };
+}
+
+/**
+ * از یک توکنِ خام، بافتِ حساب و ردیفِ توکن را می‌سازد — یا null. سوکتِ زنده ردیف را
+ * نگه می‌دارد (`sync-v1-live`)؛ درهای HTTP فقط `resolveToken`.
+ * @returns {Promise<null | {ctx: object, row: object|null}>}
+ */
+async function resolveSession(token) {
   if (!token || typeof token !== 'string' || token.length < 20) return null;
 
   const row = await tokens.verify(token, 'access', null, { anyScope: true });
   if (row) {
-    const user = await one('SELECT id, status FROM users WHERE id=$1', [row.subject_id]);
-    if (!user || user.status !== 'active') return null;
-    if (row.device_id) {
-      const dev = await one('SELECT status FROM devices WHERE id=$1', [row.device_id]);
-      if (!dev || dev.status !== 'active') return null;
-    }
-    const app = row.app || 'shop';
-    if (app === 'pump') {
-      const m = await require('./stations').membershipOf(user.id);
-      if (!m) return { app, accountKind: 'station', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_station' };
-      return {
-        app, accountKind: 'station', accountId: m.station_id, accountName: m.station_name || '',
-        userId: user.id, role: m.role, via: 'user',
-      };
-    }
-    //  ⛔ DLV-01 (§۳.۱۱): توکنِ پیک — یا عضوی که نقشش پیک است — به دفترِ دکان
-    //  راه ندارد: pull، snapshot، push، v3 و سوکتِ زنده همه بسته‌اند.
-    if (row.scope) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'courier_scope' };
-    //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
-    const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
-    if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
-    if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
-    return {
-      app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
-      userId: user.id, role: m.role, via: 'user',
-    };
+    const ctx = await contextOfRow(row);
+    return ctx ? { ctx, row } : null;
   }
 
   //  کامپیوترِ پمپ — حساب ندارد، توکنِ دستگاه دارد
   const dev = await require('./station-devices').bySecret(token);
   if (dev) {
     return {
-      app: 'pump', accountKind: 'station', accountId: dev.station_id, accountName: '',
-      userId: '', role: 'device', via: 'device', deviceUid: dev.device_uid || '',
+      ctx: {
+        app: 'pump', accountKind: 'station', accountId: dev.station_id, accountName: '',
+        userId: '', role: 'device', via: 'device', deviceUid: dev.device_uid || '',
+      },
+      row: null,
     };
   }
   return null;
+}
+
+/**
+ * از یک توکنِ خام، بافتِ حساب را می‌سازد — یا null.
+ * @returns {null | {app, accountKind, accountId, accountName, userId, role, via, expiresAt?}}
+ */
+async function resolveToken(token) {
+  const out = await resolveSession(token);
+  return out ? out.ctx : null;
 }
 
 function tokenOf(req) {
@@ -141,4 +167,4 @@ function requireSyncWrite(req, res, next) {
   })().catch(next);
 }
 
-module.exports = { resolveToken, requireSyncAccount, requireSyncWrite, tokenOf, appAlias };
+module.exports = { resolveToken, resolveSession, contextOfRow, requireSyncAccount, requireSyncWrite, tokenOf, appAlias };
