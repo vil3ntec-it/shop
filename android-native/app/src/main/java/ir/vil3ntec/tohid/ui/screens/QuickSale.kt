@@ -118,13 +118,16 @@ fun QuickSaleScreen(
   }
 
   val term = search.trim()
-  val shown = remember(d, term, category) {
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val shown = remember(d, term, category, infoSearch) {
     d.products.filter { p ->
       //  کالای غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند
       p.active &&
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
-          p.barcodes.any { it.contains(term) })
+          p.barcodes.any { it.contains(term) } ||
+          (infoSearch && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term)))
     }
   }
 
@@ -265,7 +268,8 @@ fun QuickSaleScreen(
                 if (added.capped) {
                   scope.launch {
                     snackbar.showSnackbar(
-                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است" +
+                        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, p, infoSearch)
                     )
                   }
                 } else {
@@ -396,7 +400,8 @@ fun QuickSaleScreen(
           if (added.capped) {
             scope.launch {
               snackbar.showSnackbar(
-                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است"
+                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است" +
+                  ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, found, infoSearch)
               )
             }
           } else {

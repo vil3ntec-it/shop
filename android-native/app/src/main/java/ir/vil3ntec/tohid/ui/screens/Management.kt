@@ -91,6 +91,7 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
 
   //  از سرور — اگر وارد نشده یا اینترنت نیست، کارت همین را می‌گوید
   val signedIn = remember { Backend.isReady(context) }
+  val staffTime = rememberStaffTimeConfig()
   var devices by remember { mutableStateOf<List<DeviceDto>?>(null) }
   var members by remember { mutableStateOf<List<MemberDto>?>(null) }
   var sub by remember { mutableStateOf<SubscriptionDto?>(null) }
@@ -214,6 +215,8 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
           }
         }
       }
+      //  STF-07/STF-08: فقط با پرچمِ روشنِ `shop.staff_time` (`StaffTimeAndroid.kt`)؛ خاموش ⇒ فهرستِ کارت‌ها همان پیشین
+      staffTime?.takeIf { it.enabled }?.let { cfg -> add { StaffTimeHub(d, monthFrom, today, cfg) } }
       add {
         HubCard(StrNav.shortcuts, Icons.Filled.Apps, null, {}) {
           val links = listOf(
