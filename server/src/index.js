@@ -46,11 +46,18 @@ async function main() {
   }
 
   const app = await createApp();
-  const server = app.listen(config.port, config.host, () => {
-    const where = config.serverUrl || `http://${config.host}:${config.port}`;
+  //  HTTPS ِ مستقیم فقط با `TLS_*` (سرورِ شبکهٔ دکان)؛ بی آن همان http ِ امروز (پشتِ تونل/Caddy)
+  const tlsListener = require('./lib/tls-listener');
+  const tlsOpts = tlsListener.options(config.tls);
+  const onListen = () => {
+    const where = config.serverUrl || `${tlsOpts ? 'https' : 'http'}://${config.host}:${config.port}`;
     console.log(`سرور فروشگاه روی ${where} بالا آمد (${config.env}، دیتابیس: ${driverName()})`);
     console.log(`بررسی سلامت: ${where.replace(/\/$/, '')}/api/health`);
-  });
+    if (tlsOpts) tlsListener.announce(tlsOpts, config.port, config.host);
+  };
+  const server = tlsOpts
+    ? require('node:https').createServer(tlsOpts, app).listen(config.port, config.host, onListen)
+    : app.listen(config.port, config.host, onListen);
   server.keepAliveTimeout = 65_000;
   server.headersTimeout = 70_000;
 

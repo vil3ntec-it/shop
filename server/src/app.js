@@ -23,6 +23,8 @@ async function createApp({ runMigrations = true } = {}) {
   await pruneExpired();
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
+  //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)
+  await require('./lib/server-identity').serverId().catch(err => console.error('[server-id]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
   await require('./lib/admin-bootstrap').ensureAdmin({
     username: process.env.ADMIN_BOOTSTRAP_USER,
@@ -225,6 +227,9 @@ async function createApp({ runMigrations = true } = {}) {
         });
       } catch (err) { next(err); }
     });
+    //  هویت و توانِ همین سرور (`app.multi_server` ِ برنامه‌ها) — عمومی، فقط خواندنی، بی راز.
+    //  زیرِ پیشوندِ موجودِ `/config` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی دست نمی‌خورد
+    api.use('/config/server', require('./routes/server-info'));
     /**
      * فهرست پلن‌ها و قیمت‌ها — **بی‌نیاز به ورود**.
      *
