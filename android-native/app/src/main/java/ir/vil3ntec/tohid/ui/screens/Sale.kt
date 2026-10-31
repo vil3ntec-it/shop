@@ -91,6 +91,8 @@ fun SaleScreen(
   //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
   val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
   var deliverOpen by remember { mutableStateOf(false) }
+  //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): پیشنهادِ جایگزینِ موجود هنگامِ کمبود
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -261,7 +263,9 @@ fun SaleScreen(
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
-      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")))
+      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")) +
+        //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
+        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoOn))
     } else {
       ScanFeedback.ok(context)
       //  اگر از نیمهٔ بارکد شناخته شد، همان را بگو — فروشنده باید بداند

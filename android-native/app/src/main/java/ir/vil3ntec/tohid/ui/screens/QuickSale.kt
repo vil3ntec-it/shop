@@ -268,7 +268,8 @@ fun QuickSaleScreen(
                 if (added.capped) {
                   scope.launch {
                     snackbar.showSnackbar(
-                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است" +
+                        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, p, infoSearch)
                     )
                   }
                 } else {
@@ -399,7 +400,8 @@ fun QuickSaleScreen(
           if (added.capped) {
             scope.launch {
               snackbar.showSnackbar(
-                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است"
+                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است" +
+                  ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, found, infoSearch)
               )
             }
           } else {

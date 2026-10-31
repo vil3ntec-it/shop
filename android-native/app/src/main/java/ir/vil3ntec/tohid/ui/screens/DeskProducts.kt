@@ -746,7 +746,7 @@ private fun EditPanel(
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
       changedBy = if (tools) me else null,
       reason = if (tools) priceReason else null,
-      info = if (infoOn) info.toInfo() else null,
+      info = if (infoOn) info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), p.id) else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -811,7 +811,7 @@ private fun EditPanel(
       }
       if (infoOn) {
         Spacer(Modifier.height(8.dp))
-        ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info) { info = it }
+        ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info, d, p.id) { info = it }
       }
       Spacer(Modifier.height(10.dp))
       Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text("ذخیره  (Enter / Ctrl+S)") }

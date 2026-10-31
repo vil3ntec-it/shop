@@ -235,7 +235,7 @@ fun ProductDialog(
 
         if (infoOn) {
           Spacer(Modifier.height(14.dp))
-          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info) { form = form.copy(info = it) }
+          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info, d, form.editingId) { form = form.copy(info = it) }
         }
 
         if (d.suppliers.isNotEmpty()) {
@@ -285,7 +285,7 @@ fun ProductDialog(
                   barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
                   changedBy = if (tools) me else null,
                   reason = if (tools) priceReason else null,
-                  info = if (infoOn) form.info.toInfo() else null,
+                  info = if (infoOn) form.info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), form.editingId) else null,
                 )
               )
             },

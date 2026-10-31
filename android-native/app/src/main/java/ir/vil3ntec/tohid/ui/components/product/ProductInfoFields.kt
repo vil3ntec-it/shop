@@ -18,6 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProduct
 import ir.vil3ntec.tohid.core.i18n.StrShell
+import ir.vil3ntec.tohid.core.product.CustomFields
+import ir.vil3ntec.tohid.core.product.ProductAlternatives
 import ir.vil3ntec.tohid.core.product.ProductInfo
 import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
@@ -28,7 +30,10 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  کادرهای فرمِ کالا برای PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو) و PRD-26 (محلِ قفسه).
+ *  کادرهای فرمِ کالا برای PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو)، PRD-26 (محلِ قفسه)،
+ *  PRD-24 (کالاهای جایگزین: نام یا بارکد، با «،») و PRD-25 (فیلدهای سفارشی: هر خط «نام: مقدار»).
+ *  جایگزین‌ها در دفتر شناسه‌اند؛ تا کاربر کادر را عوض نکرده ([alternativesText] تهی) همان شناسه‌ها
+ *  دست‌نخورده می‌مانند، پس ساختنِ فرم نامِ کالاها را لازم ندارد.
  *  متنِ خامِ کادرها این‌جاست؛ تمیز کردن و سقف‌ها کارِ هسته است (`ProductInfo.of`)، تا فرمِ گوشی و
  *  پنلِ کامپیوتر یک قاعده داشته باشند. فقط وقتی `productInfoOn()` روشن است نشان داده می‌شود.
  */
@@ -40,8 +45,17 @@ data class ProductInfoForm(
   val aisle: String = "",
   val shelf: String = "",
   val level: String = "",
+  val alternativeIds: List<String> = emptyList(),
+  /** متنِ کادرِ جایگزین‌ها پس از ویرایش؛ `null` ⇒ ویرایش نشده و [alternativeIds] همان است */
+  val alternativesText: String? = null,
+  val custom: String = "",
 ) {
-  fun toInfo(): ProductInfo = ProductInfo.of(namePs, nameEn, synonyms, keywords, aisle, shelf, level)
+  /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
+  fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
+    namePs, nameEn, synonyms, keywords, aisle, shelf, level,
+    alternatives = alternativesText?.let { ProductAlternatives.resolve(it, selfId, catalog).ids } ?: alternativeIds,
+    custom = custom,
+  )
 
   companion object {
     fun of(info: ProductInfo) = ProductInfoForm(
@@ -52,6 +66,8 @@ data class ProductInfoForm(
       aisle = info.location.aisle,
       shelf = info.location.shelf,
       level = info.location.level,
+      alternativeIds = info.alternatives,
+      custom = CustomFields.format(info.custom),
     )
   }
 }
@@ -66,7 +82,7 @@ fun shelfLabel(loc: ShelfLocation): String = loc.parts().joinToString(" · ") { 
 }
 
 @Composable
-fun ProductInfoFields(form: ProductInfoForm, onChange: (ProductInfoForm) -> Unit) {
+fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
   val c = Shop.colors
   Column(Modifier.fillMaxWidth()) {
     Text(StrProduct.names, style = MaterialTheme.typography.labelMedium, color = c.muted)
@@ -128,6 +144,35 @@ fun ProductInfoFields(form: ProductInfoForm, onChange: (ProductInfoForm) -> Unit
         modifier = Modifier.weight(1f),
       )
     }
+    Spacer(Modifier.height(6.dp))
+    //  PRD-24: نام‌های جایگزین تا ویرایش از همان شناسه‌ها؛ ناشناخته‌ها همان‌جا گفته می‌شوند
+    val altText = form.alternativesText ?: ProductTerms.format(
+      form.alternativeIds.mapNotNull { id -> d.products.firstOrNull { it.id == id }?.name },
+    )
+    val unknown = form.alternativesText?.let { ProductAlternatives.resolve(it, selfId, ProductInfoMap.refs(d)).unknown }.orEmpty()
+    OutlinedTextField(
+      value = altText,
+      onValueChange = { onChange(form.copy(alternativesText = it.take(LIST_INPUT))) },
+      label = { Text(StrProduct.alternatives) },
+      supportingText = {
+        if (unknown.isEmpty()) Text(StrProduct.alternativesHint)
+        else Text(StrProduct.notFound(ProductTerms.format(unknown)), color = c.danger)
+      },
+      modifier = Modifier.fillMaxWidth(),
+    )
+    //  PRD-25: هر خط «نام: مقدار»
+    val badCustom = CustomFields.parse(form.custom).bad
+    OutlinedTextField(
+      value = form.custom,
+      onValueChange = { onChange(form.copy(custom = it.take(CUSTOM_INPUT))) },
+      label = { Text(StrProduct.customFields) },
+      supportingText = {
+        if (badCustom.isEmpty()) Text(StrProduct.customHint)
+        else Text(StrProduct.customBad(badCustom.first()), color = c.danger)
+      },
+      singleLine = false,
+      modifier = Modifier.fillMaxWidth(),
+    )
   }
 }
 
@@ -160,3 +205,6 @@ fun ProductInfoSettings(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** سقفِ نویسهٔ کادرِ فهرست — ۲۰ واژه × ۶۰ نویسه با جداکننده جا می‌شود */
 private const val LIST_INPUT = ProductTerms.MAX_TERMS * (ProductTerms.MAX_TERM + 2)
+
+/** سقفِ نویسهٔ کادرِ فیلدهای سفارشی — ۲۰ خطِ «نام: مقدار» */
+private const val CUSTOM_INPUT = CustomFields.MAX_FIELDS * (CustomFields.MAX_KEY + CustomFields.MAX_VALUE + 3)

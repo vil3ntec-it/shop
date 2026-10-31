@@ -149,6 +149,9 @@ object OwnerExport {
     "aisle" to "راهرو",
     "shelf" to "قفسه",
     "shelfLevel" to "طبقهٔ قفسه",
+    //  PRD-24/PRD-25
+    "alternatives" to "کالاهای جایگزین",
+    "customFields" to "فیلدهای سفارشی",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",

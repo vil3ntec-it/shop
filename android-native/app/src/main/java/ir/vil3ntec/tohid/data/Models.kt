@@ -79,6 +79,17 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val shelfLevel: String? = null,
+  /**
+   *  PRD-24 — شناسهٔ کالاهای جایگزین به ترتیبِ ترجیح، برای پیشنهادِ صندوق هنگامِ ناموجودی؛ PRD-25 —
+   *  فیلدهای سفارشیِ «نام: مقدار» به ترتیبِ ورود (`core/product/ProductExtras`). همان قاعدهٔ بالا: خالی ⇒
+   *  `null` و نوشته نمی‌شود؛ فرم و پیشنهاد فقط با `ProductInfoPrefs`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val alternatives: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val customFields: Map<String, String>? = null,
 )
 
 @Serializable
