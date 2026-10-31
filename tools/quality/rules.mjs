@@ -69,6 +69,18 @@ export const DUPLICATE_HELPERS = [
     home: [],
     pattern: /(?<![!\w.])config\.secrets\.\w+\s*\|\|\s*config\.secrets\.\w+(?![\w.])/g,
   },
+  {
+    id: 'express-wrap',
+    what: 'سرور: پوشانندهٔ `(fn) => (req, res, next) => Promise.resolve(fn(…)).catch(next)` (با هر نامی، پیکانی یا function) — Express 5 خودش promiseِ ردشده را به next(err) می‌دهد؛ تابعِ async را مستقیم بدهید',
+    applies: isServerJs,
+    home: [],
+    //  تابعی که تابعی می‌گیرد و دستگیرهٔ (req, res, next) ای برمی‌گرداند که همان را صدا می‌زند و
+    //  خطایش را به همان next می‌دهد. `.catch(next)` ِ تنها (مثلِ storePage(…).catch(next)) نمی‌شمارد.
+    pattern: new RegExp([
+      String.raw`\(\s*(\w+)\s*\)\s*=>\s*(?:async\s*)?\(\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)\s*=>\s*\{?\s*(?:return\s+)?(?:Promise\.resolve\(\s*)?\1\s*\([^()]*\)\s*\)?\s*\.catch\(\s*\2\s*\)`,
+      String.raw`\bfunction\s*\w*\s*\(\s*(\w+)\s*\)\s*\{\s*return\s+(?:async\s+)?(?:function\s*\w*\s*)?\(\s*\w+\s*,\s*\w+\s*,\s*(\w+)\s*\)\s*(?:=>\s*)?\{?\s*(?:return\s+)?(?:Promise\.resolve\(\s*)?\3\s*\([^()]*\)\s*\)?\s*\.catch\(\s*\4\s*\)`,
+    ].join('|'), 'g'),
+  },
 ];
 
 /** Inline product/role literals in the server (`=== 'pump'`, `case 'shop':` …), AUDIT §1.8. */
@@ -126,4 +138,27 @@ export function globToRegExp(glob) {
 export const matchesAny = (globs) => {
   const res = globs.map(globToRegExp);
   return (file) => res.some((r) => r.test(file));
+};
+
+/**
+ * Platform dependencies in logic (docs/IOS-PLAN-fa.md §۴ گامِ ۰، RULES-fa «v3 · هسته‌های مشترک»):
+ * what keeps a Kotlin file off iPhone. Measured in the Android app and core/commonMain; a new file
+ * may have none, an existing one may only go down. Boundary files (the platform side of an
+ * interface) are not measured. `*Desk.kt` is not a boundary name: ui/screens/DeliveryDesk.kt is a screen.
+ */
+export const PLATFORM_DEPS = {
+  applies: (file) => isKotlinMain(file)
+    && (/^android-native\/app\/src\/main\/java\//.test(file) || /^core\/src\/commonMain\//.test(file)),
+  boundary: (file) => /\/platform\//.test(file) || /(?:Android|Desktop|\.android|\.desktop)\.kt$/.test(file),
+  patterns: [
+    { id: 'android.*', pattern: /(?<![\w.])android\.[a-z]/g },
+    { id: 'androidx (غیرِ Compose)', pattern: /(?<![\w.])androidx\.(?!compose\.)[a-z]/g },
+    { id: 'Context', pattern: /(?<![\w.])(?:Local)?Context\b/g },
+    { id: 'SharedPreferences', pattern: /(?<![\w.])SharedPreferences\b/g },
+    { id: 'java.* / javax.*', pattern: /(?<![\w.])javax?\.[a-z]/g },
+    { id: 'org.json', pattern: /(?<![\w.])org\.json\b/g },
+    { id: 'System.currentTimeMillis', pattern: /\bSystem\.currentTimeMillis\b/g },
+    { id: 'String.format', pattern: /\bString\.format\b|"\.format\s*\(/g },
+    { id: 'synchronized', pattern: /\bsynchronized\s*\(|@Synchronized\b/g },
+  ],
 };
