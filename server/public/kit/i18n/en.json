@@ -159,6 +159,8 @@
   "ps.add": "Add to cart — {p}",
   "ps.more": "One more — {q} in cart",
   "ps.addbtn": "Add to cart",
+  "recent.title": "Recently viewed",
+  "recent.clear": "Clear",
   "bar.label": ", {n} items, total {sum} — open cart",
   "bar.label.1": ", 1 item, total {sum} — open cart",
   "qty.less": "One less {name}",
