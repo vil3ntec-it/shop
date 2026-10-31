@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.delivery.CashReport
+import ir.vil3ntec.tohid.core.delivery.CashReportRow
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.DeskPerms
@@ -16,6 +18,7 @@ import ir.vil3ntec.tohid.data.repo.CourierWire.bool
 import ir.vil3ntec.tohid.data.repo.CourierWire.long
 import ir.vil3ntec.tohid.data.repo.CourierWire.str
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -54,6 +57,7 @@ object DeliveryWire {
         settle = bool(perms, "settle"),
         photo = bool(perms, "photo"),
       ),
+      picking = bool(o, "picking"),
     )
   }
 
@@ -69,6 +73,7 @@ object DeliveryWire {
       cashHeldMinor = long(o, "cashHeldMinor") ?: 0L,
       liveCount = (long(o, "liveCount") ?: 0L).toInt(),
       liveExpectedMinor = long(o, "liveExpectedMinor") ?: 0L,
+      maxLive = long(o, "maxLive")?.toInt(),
     )
   }
 
@@ -169,6 +174,31 @@ object DeliveryWire {
       ),
     )
   }
+
+  /** RPT-15 — یک ردیفِ گزارشِ نقدِ پیک‌ها (یا جمعِ کل، بی شناسه) */
+  fun cashReportRow(o: JsonObject): CashReportRow = CashReportRow(
+    courierId = str(o, "courierId"),
+    name = str(o, "name"),
+    deliveries = (long(o, "deliveries") ?: 0L).toInt(),
+    expectedCashMinor = long(o, "expectedCashMinor") ?: 0L,
+    collectedCashMinor = long(o, "collectedCashMinor") ?: 0L,
+    unsettledMinor = long(o, "unsettledMinor") ?: 0L,
+    settlements = (long(o, "settlements") ?: 0L).toInt(),
+    handoverDueMinor = long(o, "handoverDueMinor") ?: 0L,
+    receivedMinor = long(o, "receivedMinor") ?: 0L,
+    shortageMinor = long(o, "shortageMinor") ?: 0L,
+    excessMinor = long(o, "excessMinor") ?: 0L,
+    fareTotalMinor = long(o, "fareTotalMinor") ?: 0L,
+    inHandMinor = long(o, "inHandMinor") ?: 0L,
+  )
+
+  /** RPT-15 — `GET /shop/delivery/cash-report`؛ ردیفِ بی شناسه کنار گذاشته می‌شود */
+  fun cashReport(o: JsonObject): CashReport = CashReport(
+    from = long(o, "from") ?: 0L,
+    to = long(o, "to") ?: 0L,
+    couriers = rows(o, "couriers") { r -> cashReportRow(r).takeIf { it.courierId.isNotBlank() } },
+    totals = (o["totals"] as? JsonObject)?.let(DeliveryWire::cashReportRow) ?: CashReportRow(),
+  )
 
   fun company(o: JsonObject): ExternalCompany? {
     val name = str(o, "name").ifBlank { return null }
@@ -277,8 +307,42 @@ object DeliveryWire {
     if (note.isNotBlank()) put("note", JsonPrimitive(note.trim()))
   }
 
-  fun courierUpdateJson(cashCapMinor: Long? = null, active: Boolean? = null): JsonObject = buildJsonObject {
+  /**
+   *  بدنهٔ «اصلاحِ نشانی» (DLV-09): `{address:{landmark?, area?, gateColor?, text?}, keepPin, expectedVersion}`.
+   *  کلیدِ خالی فرستاده نمی‌شود. میز نقشه ندارد: `keepPin = true` ⇒ پینِ مشتری می‌ماند؛
+   *  `false` ⇒ پینِ قبلی پاک می‌شود (پین غلط بود و پیک فقط با نشانه می‌رود).
+   */
+  fun addressJson(
+    landmark: String,
+    area: String,
+    gateColor: String,
+    text: String,
+    keepPin: Boolean,
+    expectedVersion: Long,
+  ): JsonObject =
+    buildJsonObject {
+      put("address", buildJsonObject {
+        landmark.trim().takeIf { it.isNotEmpty() }?.let { put("landmark", JsonPrimitive(it)) }
+        area.trim().takeIf { it.isNotEmpty() }?.let { put("area", JsonPrimitive(it)) }
+        gateColor.trim().takeIf { it.isNotEmpty() }?.let { put("gateColor", JsonPrimitive(it)) }
+        text.trim().takeIf { it.isNotEmpty() }?.let { put("text", JsonPrimitive(it)) }
+      })
+      put("keepPin", JsonPrimitive(keepPin))
+      put("expectedVersion", JsonPrimitive(expectedVersion))
+    }
+
+  /**
+   *  `maxLive` (DLV-03): عدد = سقفِ کارِ هم‌زمان؛ `clearMaxLive` = بی‌سقف (`null` ِ سرور)؛
+   *  هیچ‌کدام = همان قبلی (کلید فرستاده نمی‌شود).
+   */
+  fun courierUpdateJson(
+    cashCapMinor: Long? = null,
+    active: Boolean? = null,
+    maxLive: Int? = null,
+    clearMaxLive: Boolean = false,
+  ): JsonObject = buildJsonObject {
     cashCapMinor?.let { put("cashCapMinor", JsonPrimitive(it)) }
     active?.let { put("active", JsonPrimitive(it)) }
+    if (clearMaxLive) put("maxLive", JsonNull) else maxLive?.let { put("maxLive", JsonPrimitive(it)) }
   }
 }

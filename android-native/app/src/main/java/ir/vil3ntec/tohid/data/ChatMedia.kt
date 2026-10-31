@@ -8,6 +8,8 @@ import android.net.Uri
 import android.os.Build
 import ir.vil3ntec.tohid.core.chat.ChatImage
 import ir.vil3ntec.tohid.core.chat.ChatLimits
+import ir.vil3ntec.tohid.core.chat.ChatSpace
+import ir.vil3ntec.tohid.core.i18n.StrChat
 import ir.vil3ntec.tohid.ui.Platform
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -31,7 +33,18 @@ object ChatMedia {
 
   class Prepared(val main: ByteArray, val thumb: ByteArray, val width: Int, val height: Int)
 
+  /**
+   *  CHAT-07: جای دستگاه کم است — پیامِ روشن به‌جای خطای مبهمِ دیسک یا فایلِ نیمه‌کاره. فقط با
+   *  `ShopPolicy.chatMediaGuard` سنجیده می‌شود (`ShopChatSync.room`؛ خاموش ⇒ همان رفتارِ پیش).
+   */
+  class LowStorage : IllegalStateException(StrChat.storageLow)
+
+  internal fun need(context: Context, where: File, bytes: Long) {
+    if (!ShopChatSync.room(context, where, bytes)) throw LowStorage()
+  }
+
   fun prepareImage(context: Context, uri: Uri, limits: ChatLimits): Result<Prepared> = runCatching {
+    need(context, ShopChatSync.outboxDir(context), ChatSpace.imageNeed(limits.imageMax, limits.thumbMax))
     val head = context.contentResolver.openInputStream(uri)?.use { input ->
       val buf = ByteArray(256 * 1024)
       var n = 0
@@ -78,6 +91,7 @@ object ChatMedia {
   val voiceSupported: Boolean get() = !Platform.DESKTOP
 
   const val VOICE_MAX_MS = 5 * 60 * 1000L
+  const val VOICE_BIT_RATE = 24_000
 
   class Recorder(private val context: Context) {
     private var rec: MediaRecorder? = null
@@ -89,6 +103,7 @@ object ChatMedia {
 
     fun start() {
       check(voiceSupported) { "ضبطِ صدا روی این دستگاه نیست" }
+      need(context, context.cacheDir, ChatSpace.voiceNeed(VOICE_MAX_MS, VOICE_BIT_RATE))
       val opus = Build.VERSION.SDK_INT >= 29
       val f = File(context.cacheDir, "chat-voice-${System.currentTimeMillis()}.${if (opus) "ogg" else "m4a"}")
       @Suppress("DEPRECATION")
@@ -104,7 +119,7 @@ object ChatMedia {
         }
         r.setAudioChannels(1)
         r.setAudioSamplingRate(16_000)
-        r.setAudioEncodingBitRate(24_000)
+        r.setAudioEncodingBitRate(VOICE_BIT_RATE)
         r.setMaxDuration(VOICE_MAX_MS.toInt())
         r.setOutputFile(f.absolutePath)
         r.prepare()
@@ -146,6 +161,7 @@ object ChatMedia {
 
     fun play(id: String, bytes: ByteArray, onDone: () -> Unit) {
       stop()
+      need(context, context.cacheDir, bytes.size.toLong())
       val f = File(context.cacheDir, "chat-play-${id.filter { it.isLetterOrDigit() }}")
       f.writeBytes(bytes)
       val p = MediaPlayer()

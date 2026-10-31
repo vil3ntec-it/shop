@@ -94,7 +94,7 @@ class ReportBridgeParityTest {
    */
   @Test
   fun `ضدتقلب از دفترِ برنامه — جمع‌ها همان و کاربرِ بی‌فیلد نامعلوم`() {
-    val c = cases("fraud").single()
+    val c = cases("fraud").single { it.getValue("ledger").jsonPrimitive.content == "kabul" }
     val want = c.getValue("expect").jsonObject.getValue("totals").jsonObject
     val o = opts(c)
     val r = ReportCore.fraud(bridged("kabul"), s(o, "from"), s(o, "to"), clock(o))
@@ -114,6 +114,19 @@ class ReportBridgeParityTest {
     assertEquals(0L, r.totals.approvalCount.toLong())
     //  کاربرِ برگشتی (`returns[].user`) و سابقه در مدل نیست ⇒ «نامعلوم»
     assertTrue(r.rows.any { it.key == "" && it.returnCount > 0 })
+  }
+
+  /**
+   *  RPT-09 — فیلدهایی که برنامه با «سابقهٔ ضدتقلب» می‌نویسد (`SaleReturn.by`/`approvedBy`،
+   *  `AuditEntry.by` ِ `cancel_sale` و `line_delete`) همه در مدل‌اند: از دفترِ برنامه پاسخ **عیناً**
+   *  همان پاسخِ مرجع است، هر ردیف و هر کاربر.
+   */
+  @Test
+  fun `ضدتقلب با فیلدهای برنامه — از دفترِ برنامه عیناً همان پاسخِ مرجع`() {
+    val c = cases("fraud").single { it.getValue("ledger").jsonPrimitive.content == "trail" }
+    val o = opts(c)
+    val r = ReportCore.fraud(bridged("trail"), s(o, "from"), s(o, "to"), clock(o))
+    assertEquals(c.getValue("expect"), json.encodeToJsonElement(ReportCore.FraudReport.serializer(), r))
   }
 
   @Test
