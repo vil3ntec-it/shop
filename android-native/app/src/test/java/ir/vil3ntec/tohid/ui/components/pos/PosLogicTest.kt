@@ -204,6 +204,8 @@ class PosLogicTest {
     assertEquals(PosAction.EDIT_ROW, PosKeys.screen(KeyName.F3, false))
     assertEquals(PosAction.FREE_ITEM, PosKeys.screen(KeyName.F4, false))
     assertEquals(PosAction.REPRINT, PosKeys.screen(KeyName.F8, false))
+    //  POS-39: F7 = دریافت از مشتری (صفحه فقط با کلیدِ همین دستگاه کاری می‌کند)
+    assertEquals(PosAction.RECEIVE, PosKeys.screen(KeyName.F7, false))
     assertNull("F10 هیچ کاری ندارد (۵.۱ بند ۴)", PosKeys.screen(KeyName.F10, false))
     //  POS-15 — Ctrl+I قیمت‌پرسی (صفحه فقط با تنظیمِ روشن می‌خوردش)؛ I ِ تنها مالِ کادر است
     assertEquals(PosAction.PRICE_CHECK, PosKeys.screen(KeyName.I, primary = true))

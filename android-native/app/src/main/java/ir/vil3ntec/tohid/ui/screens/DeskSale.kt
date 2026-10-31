@@ -139,6 +139,13 @@ fun DeskSaleScreen(
   var hint by remember { mutableStateOf(0) }
   var selected by remember { mutableStateOf<String?>(null) }
   var pickDebtor by remember { mutableStateOf(false) }
+  //  POS-39: دریافت از مشتری (F7) — فقط با کلیدِ همین دستگاه (پیش‌فرض خاموش)
+  val tillReceive = remember { ir.vil3ntec.tohid.data.TillReceivePref.on(context) }
+  var receivePick by remember { mutableStateOf(false) }
+  var receiveFor by remember { mutableStateOf<String?>(null) }
+  var receiveKey by remember { mutableStateOf("") }
+  var receiveBusy by remember { mutableStateOf(false) }
+  var receiptOf by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
   var freeLine by remember { mutableStateOf(false) }
   var editLine by remember { mutableStateOf<String?>(null) }
   var lastInvoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
@@ -734,6 +741,10 @@ fun DeskSaleScreen(
           PosAction.FREE_ITEM -> { freeLine = true; true }
           PosAction.REPRINT -> { if (lastInvoice != null) showInvoice = true; true }
           PosAction.PRICE_CHECK -> if (ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.on.value) { priceCheck = true; true } else false
+          //  مشتریِ همین فاکتور ⇒ مستقیم؛ وگرنه اول انتخابِ مشتری. خاموش ⇒ کلید مالِ صندوق نیست
+          PosAction.RECEIVE -> if (!tillReceive) false else {
+            receiveKey = newId(); if (cartDebtorId != null) receiveFor = cartDebtorId else receivePick = true; true
+          }
           else -> false
         }
       }
@@ -793,6 +804,38 @@ fun DeskSaleScreen(
     }
   }
 
+  if (receivePick) {
+    DebtorPicker(d = d, selected = null, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
+  }
+  receiveFor?.let { id ->
+    val name = d.debtors.find { it.id == id }?.name
+    if (name != null) {
+      TillReceiveDialog(
+        name = name,
+        balanceMinor = ir.vil3ntec.tohid.data.TillReceiveFlow.balanceMinor(d, id),
+        busy = receiveBusy,
+        gate = { content -> VipGate(Str.debtors) { content() } },
+        onDismiss = { receiveFor = null; refocus() },
+        onSubmit = { amount, notes, prepay ->
+          receiveBusy = true
+          val key = receiveKey
+          scope.launch {
+            //  ⛔ روی دفترِ همین لحظهٔ دیسک (`DebtEntry.record`)، نه `d` ِ صفحه؛ همان کلید ⇒ یک ردیف، حتی با دو ضربه
+            val r = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, key, prepay)
+            receiveBusy = false
+            //  ضربهٔ دوم (`again`) پیامِ دوم نمی‌گیرد؛ «ثبت نشد» ِ قفل/دیسک از `AppRoot`
+            r.show(::toast, "دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L))} ؋ از «$name» ثبت شد") {
+              receiveFor = null; receiptOf = Triple(store.data.value, id, key)
+            }
+          }
+        },
+      )
+    }
+  }
+  //  رسیدِ همان دریافت — همان رسیدِ دفترِ قرض (چاپ/کپی)، روی دفترِ پس از ثبت
+  receiptOf?.let { (data, debtorId, txId) ->
+    DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
+  }
   if (pickDebtor) {
     DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus() }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus()

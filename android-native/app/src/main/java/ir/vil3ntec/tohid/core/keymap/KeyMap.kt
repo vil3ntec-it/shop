@@ -294,7 +294,7 @@ object KeyMap {
     web = emptyList(),
   )
   val SALE_RECEIVE = KeyAction(
-    "sale.receive", "sale", "دریافتِ وجه یا قسط از مشتری", KeyStatus.PLANNED,
+    "sale.receive", "sale", "دریافتِ وجه یا قسط از مشتری", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.F7)),
     web = listOf(Chord(KeyName.R, alt = true)),
   )

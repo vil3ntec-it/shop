@@ -483,6 +483,11 @@ fun SettingsScreen(
 
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    /* ============== دریافت از مشتری در صندوق (POS-39، پیش‌فرض خاموش) ============== */
+    item {
+      var on by remember { mutableStateOf(ir.vil3ntec.tohid.data.TillReceivePref.on(context)) }
+      TillReceiveSettings(on) { on = it; ir.vil3ntec.tohid.data.TillReceivePref.set(context, it) }
+    }
     /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */

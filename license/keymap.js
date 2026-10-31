@@ -49,7 +49,7 @@
     "sale.heldList": {"scope":"sale","title":"فهرستِ سبدهای نگه‌داشته","status":"partial","page":null,"web":[["G",false,true,true]],"overrides":[]},
     "sale.nextOpen": {"scope":"sale","title":"فاکتورِ بازِ بعدی","status":"partial","page":null,"web":[],"overrides":[]},
     "sale.prevOpen": {"scope":"sale","title":"فاکتورِ بازِ قبلی","status":"partial","page":null,"web":[],"overrides":[]},
-    "sale.receive": {"scope":"sale","title":"دریافتِ وجه یا قسط از مشتری","status":"planned","page":null,"web":[["R",false,false,true]],"overrides":[]},
+    "sale.receive": {"scope":"sale","title":"دریافتِ وجه یا قسط از مشتری","status":"partial","page":null,"web":[["R",false,false,true]],"overrides":[]},
     "sale.reprint": {"scope":"sale","title":"چاپِ دوبارهٔ آخرین رسید","status":"live","page":null,"web":[["P",false,false,true]],"overrides":[]},
     "sale.drawer": {"scope":"sale","title":"باز کردنِ کشوی پول بدون فروش","status":"planned","page":null,"web":[],"overrides":[]},
     "sale.payPanel": {"scope":"sale","title":"پنلِ پرداخت (امروز F9 فروش را فوری می‌بندد)","status":"planned","page":null,"web":[["Enter",false,false,true]],"overrides":[]},
