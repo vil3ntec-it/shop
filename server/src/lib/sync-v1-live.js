@@ -77,9 +77,9 @@ function send(ws, obj) {
   }
 }
 
-function join(ctx, ws, deviceId) {
+function join(ctx, ws, deviceId, tokenHash = '') {
   const key = roomKey(ctx);
-  ws.sync = { key, deviceId, ctx };
+  ws.sync = { key, deviceId, ctx, tokenHash };
   ws.isAlive = true;
   if (!rooms.has(key)) rooms.set(key, new Set());
   rooms.get(key).add(ws);
@@ -195,7 +195,8 @@ function attach(server) {
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);
       if (claimed && claimed !== ctx.app) return reject(socket, 403, 'Forbidden');
-      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId));
+      const tokenHash = ctx.via === 'user' ? require('./tokens').hashToken(token) : '';
+      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, tokenHash));
     }).catch(() => reject(socket, 500, 'Internal Server Error'));
   });
 
@@ -207,6 +208,7 @@ function attach(server) {
       ws.isAlive = false;
       try { ws.ping(); } catch { /* رفته */ }
     }
+    dropRevoked(wss).catch((err) => console.error('[sync-live] نشست‌های باطل:', err.message));
   }, PING_MS);
   if (timer.unref) timer.unref();
   server.on('close', () => {
@@ -219,4 +221,33 @@ function attach(server) {
   return wss;
 }
 
-module.exports = { attach, broadcast, relay, listeners, roomKey, issueTicket, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
+/**
+ * ⛔ TEN-02 (WebSocket) — سوکتِ نشستی که در سرور باطل شد (خروج، خروج از همه‌جا، تعلیق یا
+ * برداشتنِ عضو، دستگاهِ ازکارافتاده — همه `tokens.revoked_at` می‌گذارند) دیگر خبرِ همان
+ * دکان را نمی‌گیرد: «تغییر کرد»، بارکدِ گوشی و نامِ کالای «عکس بگیر» هم دادهٔ دکان‌اند. پیش
+ * از این، سوکتِ باز تا قطعِ خودش همهٔ این‌ها را می‌گرفت. هر تپش (۳۰ ثانیه) یک پرسشِ دسته‌ای
+ * برای همهٔ سوکت‌های کاربری؛ فقط **باطل‌شده** بسته می‌شود (پایانِ عادیِ مهلتِ توکنِ دسترسی نه،
+ * تا برنامه هر ساعت از نو وصل نشود). سوکتِ کامپیوترِ پمپ (توکنِ دستگاه) این‌جا نیست.
+ * @returns {Promise<number>} چند سوکت بسته شد
+ */
+async function dropRevoked(wss) {
+  const open = [...wss.clients].filter((ws) => ws.sync && ws.sync.tokenHash);
+  if (!open.length) return 0;
+  const hashes = [...new Set(open.map((ws) => ws.sync.tokenHash))];
+  const rows = await require('../db').many(
+    'SELECT token_hash FROM tokens WHERE token_hash = ANY($1::text[]) AND revoked_at IS NOT NULL', [hashes]
+  );
+  if (!rows.length) return 0;
+  const dead = new Set(rows.map((r) => r.token_hash));
+  let n = 0;
+  for (const ws of open) {
+    if (!dead.has(ws.sync.tokenHash)) continue;
+    try { ws.close(4401, 'session_revoked'); } catch { /* رفته */ }
+    const room = rooms.get(ws.sync.key);
+    if (room) { room.delete(ws); if (!room.size) rooms.delete(ws.sync.key); }
+    n++;
+  }
+  return n;
+}
+
+module.exports = { attach, broadcast, relay, listeners, roomKey, issueTicket, dropRevoked, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
