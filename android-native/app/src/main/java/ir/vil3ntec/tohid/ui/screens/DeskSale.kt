@@ -292,6 +292,12 @@ fun DeskSaleScreen(
   )
   val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
 
+  //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
+  val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
+  var creditApproval by remember { mutableStateOf<ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>(null) }
+  /** بیش از سقف و تسویهٔ همان لحظه (پنلِ پرداخت) تا پس از تأیید همان ثبت شود */
+  var creditAsk by remember { mutableStateOf<Pair<ir.vil3ntec.tohid.core.credit.CreditGate.Over, ir.vil3ntec.tohid.core.pay.Settlement?>?>(null) }
+
   /** `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null) {
     if (cart.isEmpty()) { toast(Str.cartEmpty); return }
@@ -314,7 +320,16 @@ fun DeskSaleScreen(
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> { toast(ir.vil3ntec.tohid.data.PayFlow.message(r.problem)); return }
     }
-    val sale = checkout.copy(settlement = st, approval = signed)
+    val sale = checkout.copy(settlement = st, approval = signed, creditGate = creditGateOn, creditApproval = creditApproval)
+    //  CRM-03 / S07: بی تأییدِ مدیر هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
+    val over = SalesEngine.creditOver(d, priced, sale)
+    if (over != null && ir.vil3ntec.tohid.core.credit.CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval) ==
+      ir.vil3ntec.tohid.core.credit.CreditGate.State.NEEDS_APPROVAL
+    ) {
+      payOpen = false
+      creditAsk = over to st
+      return
+    }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     scope.launch { when (val posted = cartStore.post(store) { key ->
@@ -327,7 +342,7 @@ fun DeskSaleScreen(
       is SalePost.Outcome.Done -> {
         val r = posted.ok
         ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
-        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null
+        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null; creditApproval = null
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
@@ -696,6 +711,20 @@ fun DeskSaleScreen(
       need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
+    )
+  }
+  creditAsk?.let { (over, pending) ->
+    val debtorId = cartDebtorId
+    if (debtorId != null) ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
+      summary = (debtor?.name?.let { "«$it» — " } ?: "") + SalesEngine.creditOverText(over),
+      debtorId = debtorId,
+      addMinor = over.addMinor,
+      selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) },
+      selfName = seller,
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      //  با تأیید همان فروش (با همان تسویه) ثبت می‌شود؛ انصراف ⇒ هیچ چیز
+      onApproved = { ok -> creditApproval = ok; creditAsk = null; finish(pending) },
+      onDismiss = { creditAsk = null; refocus() },
     )
   }
   if (payOpen) {
