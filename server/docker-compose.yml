@@ -50,6 +50,12 @@ services:
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_PATH: /app/data/backups
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      #  کلیدِ امضای مجوز بیرون از دیتابیس (SEC-ART-05): فایل را با `secrets:` یا volumeِ فقط‌خواندنی
+      #  به همین مسیر برسانید؛ LICENSE_KEY_MODE=env یعنی بی آن بالا نمی‌آید.
+      LICENSE_KEY_MODE: ${LICENSE_KEY_MODE:-legacy}
+      LICENSE_PRIVATE_KEY_FILE: ${LICENSE_PRIVATE_KEY_FILE:-}
+      LICENSE_PRIVATE_KEY: ${LICENSE_PRIVATE_KEY:-}
+      LICENSE_REVOKED_KIDS: ${LICENSE_REVOKED_KIDS:-}
       DEFAULT_COUNTRY_CODE: ${DEFAULT_COUNTRY_CODE:-+93}
     ports:
       #  فقط روی خودِ سرور باز می‌شود، نه روی اینترنت.
