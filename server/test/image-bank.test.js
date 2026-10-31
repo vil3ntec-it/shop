@@ -357,6 +357,46 @@ test('IMG-BANK-16: از مرکزی به عکسِ خود و بازگشت؛ منب
   assert.deepEqual([r2.body.source, r2.body.image_id, r2.body.version], ['central', c.imageId, 1]);
 });
 
+test('IMG-07 / IMG-PRO-05: نسخهٔ تازه بی‌صدا جای نسخهٔ جاری نمی‌نشیند؛ ردِ آن اصل و نسخهٔ جاری را دست‌نخورده نگه می‌دارد', async () => {
+  const c = await centralImage({ name: 'زعفران', brand: 'قائنات' });
+  const orig0 = await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk });
+  const v2 = await ADR('POST', `/images/${c.imageId}/versions?tool=crop`, clerk, F.jpeg(780, 585, { seed: ++seed }));
+  const v3 = await ADR('POST', `/images/${c.imageId}/versions?tool=light`, clerk, F.jpeg(760, 570, { seed: ++seed }));
+  assert.deepEqual([v2.status, v2.body.version, v3.body.version], [201, 2, 3]);
+  //  نسخهٔ تازه فقط «منتظرِ بررسی» است؛ جاری همان ۱ و دکان همان را می‌بیند
+  const d0 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d0.body.current_version, 1);
+  assert.deepEqual(d0.body.versions.map((v) => [v.version, v.review]), [[1, 'approved'], [2, 'needs_review'], [3, 'needs_review']]);
+  //  صفِ بررسی شمارِ نسخه‌های منتظر را می‌گوید تا مدیر نسخهٔ تازهٔ عکسِ منتشرشده را ببیند
+  const rv = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  const item = () => rv.body.items.find((i) => i.id === c.imageId);
+  assert.equal(item().versions_pending, 2);
+  //  رد: فقط مدیرِ ارشد و با دلیل؛ نسخهٔ جاری رد نمی‌شود
+  assert.equal((await AD('POST', `/images/${c.imageId}/reject`, clerk, { reason: 'نور تغییر کرد', version: 3 })).status, 403);
+  assert.equal((await AD('POST', `/images/${c.imageId}/reject`, root, { reason: 'جاری', version: 1 })).body.error.code, 'version_current');
+  const rj = await AD('POST', `/images/${c.imageId}/reject`, root, { reason: 'رنگِ بسته‌بندی عوض شد', version: 3 });
+  assert.deepEqual([rj.status, rj.body.review], [200, 'rejected']);
+  const d1 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d1.body.current_version, 1);
+  const orig1 = await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk });
+  assert.ok(orig1.buffer.equals(orig0.buffer), 'اصل عوض شد');
+  //  نسخهٔ ردشده دوباره جاری نمی‌شود
+  assert.equal((await AD('POST', `/images/${c.imageId}/approve`, root, { reason: 'برگشت', version: 3 })).body.error.code, 'version_rejected');
+  const rv2 = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  assert.equal(rv2.body.items.find((i) => i.id === c.imageId).versions_pending, 1);
+  //  پذیرفتنِ نسخهٔ ۲: جاری ۲، ولی اصل و نسخهٔ ۱ سرِ جایشان
+  assert.equal((await AD('POST', `/images/${c.imageId}/approve`, root, { reason: 'برش درست است', version: 2 })).body.version, 2);
+  const d2 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d2.body.current_version, 2);
+  assert.ok((await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk })).buffer.equals(orig0.buffer));
+  const rv3 = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  assert.equal(rv3.body.items.find((i) => i.id === c.imageId).versions_pending, 0);
+  //  عکسِ در انتظار: خودِ نسخهٔ جاری (اصل) «نسخهٔ تازه» شمرده نمی‌شود
+  const pend = await ADR('POST', '/images?license_status=unknown', clerk, img());
+  const rvp = await AD('GET', '/review?status=NEEDS_REVIEW&space=pending&limit=50', clerk);
+  assert.equal(rvp.body.items.find((i) => i.id === pend.body.id).versions_pending, 0);
+});
+
 test('IMG-04 (بخشِ بی AI) / IMG-08: اصل محفوظ؛ پردازشِ بیرونی ۵۰۳ و هیچ ارسال یا ردیفی', async () => {
   const own = await SR('POST', '/?product_id=x-1', A, F.jpeg(800, 600, { gps: true, seed: ++seed }));
   const before = await count('image_versions');

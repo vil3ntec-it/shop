@@ -61,8 +61,15 @@ object PromoCore {
     val except: List<String> = emptyList(),
   )
 
-  /** `min` = مقدار به هزارم (tiers) یا مبلغ (threshold). */
-  data class Tier(val min: Long = -1, val bp: Long = 0, val amountMinor: Long = 0)
+  /**
+   *  `min` = مقدار به هزارم (tiers) یا مبلغ (threshold).
+   *  `unitMinor` (POS-19، فقط tiers): قیمتِ ثابتِ هر واحد از این پله به بالا؛ `-1` = ندارد (پلهٔ درصدی).
+   *  یک قاعده یا همه‌اش درصدی است یا همه‌اش قیمتِ ثابت — پلهٔ نخست می‌گوید (`tierPrice`).
+   */
+  data class Tier(val min: Long = -1, val bp: Long = 0, val amountMinor: Long = 0, val unitMinor: Long = -1)
+
+  /** POS-19 — پله‌های این قاعده قیمتِ ثابتِ واحد‌اند، نه درصد */
+  fun tierPrice(r: Rule): Boolean = r.kind == "tiers" && r.tiers.isNotEmpty() && r.tiers[0].unitMinor >= 0
 
   data class Price(val productId: String = "", val unitMinor: Long = -1)
 
@@ -221,7 +228,7 @@ object PromoCore {
       scope = scopeOf(o["scope"]), groups = strs(o["groups"]), channels = strs(o["channels"]), window = windowOf(o["window"]),
       bp = int(o["bp"], 0), amountMinor = int(o["amountMinor"], 0),
       prices = objs(o["prices"]).map { Price(str(it["productId"]), int(it["unitMinor"], -1)) },
-      tiers = objs(o["tiers"]).map { Tier(int(it["min"], -1), int(it["bp"], 0), int(it["amountMinor"], 0)) },
+      tiers = objs(o["tiers"]).map { Tier(int(it["min"], -1), int(it["bp"], 0), int(it["amountMinor"], 0), int(it["unitMinor"], -1)) },
       buy = int(o["buy"], 0), get = int(o["get"], 0), qty = int(o["qty"], 0), priceMinor = int(o["priceMinor"], 0),
     )
   }
@@ -344,16 +351,21 @@ object PromoCore {
     if (k == "tiers" || k == "threshold") {
       var bad = r.tiers.isEmpty()
       val useAmt = r.tiers.isNotEmpty() && r.tiers[0].amountMinor > 0
-      val byBp = k == "tiers" || !useAmt
+      //  POS-19: پلهٔ قیمتِ ثابت — قیمتِ هر پلهٔ بالاتر کمتر، بی درصد و بی مبلغ
+      val byPrice = tierPrice(r)
+      val byBp = !byPrice && (k == "tiers" || !useAmt)
       r.tiers.forEachIndexed { i, t ->
         if (t.min <= 0) bad = true
-        if (byBp) {
+        if (byPrice) {
+          if (t.unitMinor < 0 || t.bp != 0L || t.amountMinor != 0L) bad = true
+        } else if (t.unitMinor != -1L) bad = true
+        else if (byBp) {
           if (!validBp(t.bp) || t.amountMinor != 0L) bad = true
         } else if (t.bp != 0L || t.amountMinor <= 0 || t.amountMinor % step != 0L) bad = true
         if (i > 0) {
           val a = r.tiers[i - 1]
           if (t.min <= a.min) bad = true
-          if (if (byBp) t.bp <= a.bp else t.amountMinor <= a.amountMinor) bad = true
+          if (when { byPrice -> t.unitMinor >= a.unitMinor; byBp -> t.bp <= a.bp; else -> t.amountMinor <= a.amountMinor }) bad = true
         }
       }
       if (bad) e += "tiers"
@@ -476,9 +488,14 @@ object PromoCore {
             "price" -> r.prices.firstOrNull { it.productId == l.productId }
               ?.let { maxOf(0L, l.amountMinor - lineTotalMinor(l.qtyMilli, it.unitMinor, step)) } ?: 0L
             else -> {
-              var bp = 0L
-              for (t in r.tiers) if (t.min <= l.qtyMilli) bp = t.bp
-              roundStep(mul(l.amountMinor, bp), FULL_BP, step)
+              var tier: Tier? = null
+              for (t in r.tiers) if (t.min <= l.qtyMilli) tier = t
+              when {
+                tier == null -> 0L
+                //  POS-19: همان راهِ «price» — مبلغِ ردیف با قیمتِ پله، هرگز تخفیفِ منفی
+                tier.unitMinor >= 0 -> maxOf(0L, l.amountMinor - lineTotalMinor(l.qtyMilli, tier.unitMinor, step))
+                else -> roundStep(mul(l.amountMinor, tier.bp), FULL_BP, step)
+              }
             }
           }
           out[i] = minOf(d, roomOf(r, l, rem[i], step))

@@ -840,8 +840,8 @@ async function reject(adminId, id, { reason, version }) {
     if (version != null) {
       const ver = intIn(version, 2, 100000, 0);
       if (!ver || ver === Number(img.current_version)) throw conflict('نسخهٔ جاری رد نمی‌شود — بایگانی کنید', 'version_current');
-      const r = await q1(c, `UPDATE image_versions SET review='rejected' WHERE image_id=$1 AND version=$2 RETURNING version`, [id, ver]);
-      if (!r) throw notFound('این نسخه نیست');
+      const r = await q1(c, `UPDATE image_versions SET review='rejected' WHERE image_id=$1 AND version=$2 AND review <> 'approved' RETURNING version`, [id, ver]);
+      if (!r) throw (await q1(c, 'SELECT 1 FROM image_versions WHERE image_id=$1 AND version=$2', [id, ver])) ? conflict('نسخهٔ تأییدشده رد نمی‌شود — شاید دکانی روی آن باشد؛ برای کنار گذاشتن، عکس را بایگانی کنید', 'version_approved') : notFound('این نسخه نیست');   //  ⛔ IMG-13: تأییدشده شاید سنجاقِ دکانی است؛ کنار گذاشتن = بایگانی
       await c.query(`UPDATE images SET rev=nextval('image_bank_rev'), updated_at=$2 WHERE id=$1`, [id, t]);
       return { id, version: ver, review: 'rejected' };
     }
