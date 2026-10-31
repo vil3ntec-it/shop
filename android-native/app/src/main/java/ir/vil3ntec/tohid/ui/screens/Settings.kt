@@ -538,6 +538,33 @@ fun SettingsScreen(
       }
     }
 
+    /* ====== چتِ دکان: پیشرفتِ فرستادن و جای دستگاه (CHAT-05/07، پیش‌فرض خاموش) ====== */
+    //  فقط وقتی چتِ این دکان روشن است (`shop.chat`)؛ وگرنه کلیدی بی‌اثر نمی‌گذاریم.
+    if (ir.vil3ntec.tohid.data.ShopChatSync.enabled) item {
+      var chatGuard by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.chatMediaGuard(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Storage,
+        title = ir.vil3ntec.tohid.core.i18n.StrChat.guard,
+        subtitle = if (chatGuard) ir.vil3ntec.tohid.core.i18n.StrChat.guardOn else StrSettings.off,
+        tint = if (chatGuard) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          ir.vil3ntec.tohid.core.i18n.StrChat.guardNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (chatGuard) "on" else "off",
+          onSelect = {
+            chatGuard = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setChatMediaGuard(context, chatGuard)
+          },
+        )
+      }
+    }
+
     /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
     //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
     //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
