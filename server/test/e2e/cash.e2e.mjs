@@ -8,10 +8,14 @@
  *   B (کامپیوترِ شاگرد) پس از همگام‌سازی همان ماندهٔ احمد، همان فروش‌ها و همان سابقهٔ صندوق را
  *   می‌بیند؛ سرور هم.
  *
+ * S141 (retry ِ مالی): فروشِ نسیه با پرداختِ جزئی؛ جوابِ push سه بار گم می‌شود، دو تلاشِ هم‌زمان و
+ *   تلاشِ خودِ دستگاه ⇒ یک فروش، یک کسرِ موجودی، یک اثرِ نقد در صندوق و یک قرض — روی سرور و دستگاهِ دوم.
+ *
  * کارها همان `CashShift.kt`، `SalesEngine.record` و `DebtorEngine.addTransaction`اند (lib/native.mjs).
  * اجرا:  node test/e2e/cash.e2e.mjs
  */
 import { boot, assert } from './lib/harness.mjs';
+import { core } from './lib/native.mjs';
 
 const E = await boot({ name: 'cash' });
 const owner = await E.owner('owner-cash@e2e.local', 'صاحبِ صندوق', 'دکانِ صندوق');
@@ -102,5 +106,54 @@ await E.step('E2E-CASH.staff', 'شاگرد روی B صندوقِ خودش را �
   assert.equal(sh.length, 2);
   assert.match(sh[0].close.notes, /بی اختلاف — شاگرد/);
 }, { needs: ['E2E-SYNC.cash'] });
+
+await E.step('S141', 'S141: فروشِ نسیه با پرداختِ جزئی؛ جوابِ push سه بار گم می‌شود، دو تلاشِ هم‌زمان ⇐ یک فروش، یک کسرِ موجودی، یک نقد و یک قرض', async () => {
+  assert.equal(A.openShift(1000).ok, true);
+  await A.drain();
+  await B.drain();
+  const stock0 = B.stock(rice);
+  const debt0 = B.debt(ahmad);
+  const give0 = (await rows('transactions')).filter((r) => r.data.debtorId === ahmad && r.data.type === 'give').length;
+  //  ۴ × ۱۰۰ = ۴۰۰؛ ۱۵۰ نقد، ۲۵۰ قرض
+  const r = A.sell({ lines: [{ id: rice, qty: 4 }], payment: 'credit', debtorId: ahmad, paid: 150 });
+  assert.equal(r.ok, true, r.message);
+  const sent = A.queue.slice();
+  assert.ok(sent.length >= 5, `opهای فروش: ${sent.length}`);
+  const body = { device_id: A.deviceId, schema_version: core.SCHEMA_VERSION, queued: sent.length, ops: sent };
+  //  سه بار همان بدنهٔ `SyncV1Client.push` به سرور می‌رسد و جوابش به دستگاه نمی‌رسد ⇒ صف دست‌نخورده
+  const lost = [];
+  for (let i = 0; i < 3; i++) lost.push(await A.api('POST', '/sync/v1/push', body));
+  assert.equal(lost[0].status, 200);
+  assert.ok(lost[0].body.results.every((x) => x.status === 'applied'), JSON.stringify(lost[0].body.results));
+  for (const l of lost.slice(1)) assert.ok(l.status === 200 && l.body.results.every((x) => x.status === 'duplicate'), JSON.stringify(l.body));
+  assert.equal(A.queue.length, sent.length, 'صف نباید پاک شده باشد');
+  //  دو تلاشِ هم‌زمان (دو زبانه/کارگر) — باز هم فقط «تکراری»
+  const both = await Promise.all([A.api('POST', '/sync/v1/push', body), A.api('POST', '/sync/v1/push', body)]);
+  for (const b of both) assert.ok(b.status === 200 && b.body.results.every((x) => x.status === 'duplicate'), JSON.stringify(b.body));
+  //  و تلاشِ خودِ دستگاه
+  await A.drain();
+  assert.equal(A.queue.length, 0);
+  //  سرور: هر op یک بار؛ یک فاکتور، یک قلم، یک حرکتِ فروش، یک قرض
+  const ids = sent.map((o) => o.op_id);
+  const n = (await E.db.many('SELECT op_id, COUNT(*)::int AS n FROM oplog WHERE account_id=$1 AND op_id = ANY($2::text[]) GROUP BY op_id', [owner.shopId, ids]));
+  assert.equal(n.length, ids.length, 'opی در دفترِ سرور نیست');
+  assert.ok(n.every((x) => x.n === 1), JSON.stringify(n.filter((x) => x.n !== 1)));
+  assert.equal((await rows('sales')).filter((x) => x.row_id === r.saleId).length, 1);
+  assert.equal((await rows('saleItems')).filter((x) => x.data.saleId === r.saleId).length, 1);
+  assert.equal((await rows('stockMovements')).filter((x) => x.data.refId === r.saleId).length, 1);
+  assert.equal((await rows('transactions')).filter((x) => x.data.debtorId === ahmad && x.data.type === 'give').length, give0 + 1, 'قرضِ دوم ساخته شد');
+  //  دستگاهِ دوم: یک فاکتور، موجودی یک بار کم، قرض یک بار زیاد، نقدِ صندوق یک بار
+  await B.drain();
+  assert.equal(B.ledger.sales.filter((x) => x.id === r.saleId).length, 1);
+  assert.equal(B.stock(rice), stock0 - 4);
+  assert.equal(B.debt(ahmad), debt0 + 250);
+  const shift = B.currentShift();
+  assert.ok(shift, 'صندوقِ باز روی B نیست');
+  assert.equal(B.shiftTotals(shift).expected, 1150, 'نقدِ صندوق: ۱٬۰۰۰ + ۱۵۰');
+  const closed = A.closeShift(1150);
+  assert.equal(closed.ok, true);
+  assert.deepEqual([closed.totals.sales, closed.totals.expected, closed.diff], [150, 1150, 0]);
+  await A.drain();
+}, { needs: ['E2E-CASH.staff'] });
 
 await E.finish();

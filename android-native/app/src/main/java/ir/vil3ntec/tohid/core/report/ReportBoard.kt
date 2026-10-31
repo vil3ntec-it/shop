@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.report
 
+import ir.vil3ntec.tohid.core.risk.CashierAlerts
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
@@ -15,7 +16,8 @@ import kotlinx.serialization.json.doubleOrNull
  *  است (v3 §۱۵.۴ بند ۴).
  *
  *  دوقلوی `license/report-board.js`؛ هر دو `core/test-vectors/report-board-v1.json`
- *  را عیناً می‌گذرانند.
+ *  را عیناً می‌گذرانند. هشدارِ رفتارِ غیرعادیِ صندوقدار (RSK-10) از `core/risk/CashierAlerts`
+ *  (commonMain) است و `cashierAlerts` ِ همان پروندهٔ JS هم‌زادش (`cashier-alerts-v1.json`).
  */
 object ReportBoard {
   const val VERSION = 1
@@ -137,8 +139,18 @@ object ReportBoard {
     val events = f.returnCount + f.voidCount + f.lineDeleteCount + f.noSaleCount
     pills += if (events > 0) Pill("fraud", "$events رویداد حساس امروز", "warning", Preset("fraud", "today", ""))
     else Pill("fraud", "رویداد حساسی امروز نیست", "success", Preset("fraud", "today", ""))
+    //  RSK-10: هشدار برای صاحب و مدیر است (همان که زبانهٔ ضدتقلب را می‌بیند)، نه شاگرد
+    val alerts = if (money) alertsOf(fraud) else emptyList()
+    if (alerts.isNotEmpty()) pills += Pill("cashier", "${alerts.size} هشدارِ رفتارِ غیرعادیِ صندوقدار امروز", "danger", Preset("fraud", "today", ""))
     return Home(t.date, kpis, pills)
   }
+
+  /** RSK-10 — هشدارهای یک گزارشِ ضدتقلبِ هسته، با همان ستون‌های `FraudRow` */
+  fun alertsOf(f: ReportCore.FraudReport, policy: CashierAlerts.Policy = CashierAlerts.Policy()): List<CashierAlerts.Alert> =
+    CashierAlerts.alerts(
+      f.rows.map { CashierAlerts.Counts(it.key, it.invoices.toLong(), it.voidCount.toLong(), it.discountCount.toLong(), it.noSaleCount.toLong()) },
+      policy,
+    )
 
   /** از دفتر تا تابلو، با همان هسته */
   fun build(

@@ -15,7 +15,8 @@ class LiveCredentialTest {
     val cred = LiveCredential.from(200, """{"ticket":"T-1","expires_in":60}""", token)
     assertEquals("ticket" to "T-1", cred)
     val url = LiveCredential.url("https://api.example.test", cred!!, "dev 1", "shop")
-    assertEquals("wss://api.example.test/api/sync/v1/live?ticket=T-1&device_id=dev+1&app=shop", url)
+    //  S78: `caps=expiry` — سرور سوکت را سرِ انقضای توکن (4403) می‌بندد چون این نسخه با توکنِ تازه برمی‌گردد
+    assertEquals("wss://api.example.test/api/sync/v1/live?ticket=T-1&device_id=dev+1&app=shop&caps=expiry", url)
     assertFalse(url.contains(token))
   }
 
@@ -32,6 +33,6 @@ class LiveCredentialTest {
 
   @Test fun plainHttpBecomesWs() {
     val url = LiveCredential.url("http://10.0.2.2:3000/", "ticket" to "a+b", "", "shop")
-    assertEquals("ws://10.0.2.2:3000/api/sync/v1/live?ticket=a%2Bb&device_id=&app=shop", url)
+    assertEquals("ws://10.0.2.2:3000/api/sync/v1/live?ticket=a%2Bb&device_id=&app=shop&caps=expiry", url)
   }
 }
