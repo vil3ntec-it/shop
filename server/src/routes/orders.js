@@ -62,6 +62,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
+    //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
+    picking: await require('../lib/order-picking').flagOf(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
@@ -105,7 +107,8 @@ router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap
 
 /**
  * سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست (`lib/order-ledger.js`) —
- * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد. فقط‌خواندنی؛
+ * برنامهٔ دکان برای هر کدام فروشِ عادی با شناسهٔ ثابتِ `o-<سفارش>` می‌سازد؛ و بازپرداخت‌هایی
+ * که سندِ برگشتشان (`o-<سفارش>-rf-<کلید>`) هنوز در دفتر ننشسته (`refunds`). فقط‌خواندنی؛
  * همان کسی که سفارش را تحویل می‌دهد (`orders.manage`). پیش از `/:id`.
  */
 router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async (req, res) => {
@@ -263,5 +266,9 @@ router.get('/:id/risk', needFlag, wrap(async (req, res) => {
   if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
 }));
+
+//  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
+//  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
+router.use(require('./order-picking'));
 
 module.exports = router;
