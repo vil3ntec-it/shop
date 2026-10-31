@@ -15,6 +15,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.math.min
 import kotlin.math.pow
 
@@ -348,6 +349,13 @@ class SyncV1Engine private constructor(context: Context) {
       publish()
     }
   }
+
+  /**
+   *  شمارِ ردیف‌های زندهٔ Snapshot ِ سرور (`rows`) — بازیابیِ دستگاهِ واردشدهٔ هرگز همگام‌نشده (#485).
+   *  `rows` ِ ناخوانا ⇒ `null` (نمی‌دانیم؛ هرگز «خالی» فرض نمی‌شود). پرتاب: شبکه.
+   */
+  internal suspend fun serverRows(): Int? =
+    (SyncV1Client(Backend.api(app)).snapshot()["rows"] as? JsonPrimitive)?.content?.toIntOrNull()?.takeIf { it >= 0 }
 
   /**
    *  همین فرایند وسطِ بازسازی است — `ShopStore.recoverRebuild` ِ نمونهٔ دیگر (کارگرِ پس‌زمینه)

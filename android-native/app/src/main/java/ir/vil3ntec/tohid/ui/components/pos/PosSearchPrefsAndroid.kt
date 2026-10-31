@@ -28,4 +28,6 @@ object PosSearchPrefs {
 fun PosSearchSettingsWired(context: android.content.Context) {
   PosSearchPrefs.load(context)
   PosSearchSettings(PosSearchPrefs.on.value) { PosSearchPrefs.set(context, it) }
+  //  POS-15 — قیمت‌پرسیِ صندوقِ کامپیوتر کنارِ همین بخش (هر دو فقط کامپیوتر، پیش‌فرض خاموش)
+  PosPriceCheckSettingsWired(context)
 }
