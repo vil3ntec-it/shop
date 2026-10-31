@@ -58,8 +58,38 @@ test('پله: بی پرچم همان main (۳)؛ پمپ هرگز عوض نمی�
   assert.equal(migrations.currentVersion('shop', { safeEntries: 'true' }), 3, 'فقط true ِ بولی');
   assert.equal(migrations.currentVersion('shop', { safeEntries: true }), 4);
   assert.equal(migrations.currentVersion('pump', { safeEntries: true }), 1);
-  assert.deepEqual(syncV1.tablesOf('shop').filter((t) => t === 'safeEntries'), []);
-  assert.ok(syncV1.tablesOf('shop', { safeEntries: true }).includes('safeEntries'));
+  assert.ok(!flag.allowed('safeEntries', { safeEntries: false }) && flag.allowed('safeEntries', { safeEntries: true }));
+  assert.ok(flag.allowed('products', null), 'جدولِ بیرون از پرچم همیشه');
+  const all = syncV1.tablesOf('shop');
+  const shopCtx = (on) => ({ app: 'shop', accountKind: 'shop', accountId: 's', safeEntries: on });
+  assert.ok(all.includes('safeEntries'), 'فهرستِ سفیدِ v1 همان main');
+  assert.deepEqual(flag.tablesFor(shopCtx(false), all), all.filter((t) => t !== 'safeEntries'));
+  assert.deepEqual(flag.tablesFor(shopCtx(true), all), all);
+  const pump = syncV1.tablesOf('pump');
+  assert.equal(flag.tablesFor({ app: 'pump', accountKind: 'station', accountId: 'p' }, pump), pump, 'پمپ همان فهرست');
+});
+
+test('`lib/sync-v1.js` ِ مشترک با پمپ دست نمی‌خورد: پله از `ctx` ِ درخواستِ دکان (‎safe-flag.within‎)', async () => {
+  //  قاعدهٔ «sync-v1.js، PUMP_TABLES و /api/pump/* دست نمی‌خورند» (RULES، بخشِ همگام‌سازی)
+  const src = require('fs').readFileSync(require.resolve('../src/lib/sync-v1'), 'utf8');
+  assert.ok(!src.includes('safe-flag') && !src.includes('safeEntries'), 'sync-v1.js پرچمِ گاوصندوق را نمی‌شناسد');
+
+  const shop = (on) => ({ app: 'shop', accountKind: 'shop', accountId: 'scope-shop', safeEntries: on });
+  const inScope = (sync, fn) => new Promise((resolve, reject) => {
+    flag.within({ sync }, null, () => Promise.resolve().then(fn).then(resolve, reject));
+  });
+  assert.equal(await inScope(shop(true), () => migrations.currentVersion('shop')), 4);
+  assert.equal(await inScope(shop(false), () => migrations.currentVersion('shop')), 3);
+  //  پس از await (پرس‌وجو، تراکنش) هم همان درخواست است
+  assert.equal(await inScope(shop(true), async () => {
+    await new Promise((r) => setImmediate(r));
+    return migrations.upgrade('shop', 3, { table: 'products' }) && migrations.currentVersion('shop');
+  }), 4);
+  assert.equal(await inScope(shop(true), () => migrations.currentVersion('shop', { safeEntries: false })), 3, 'ctx ِ صریح جلو می‌افتد');
+  assert.equal(await inScope({ app: 'pump', accountKind: 'station', accountId: 'p1', safeEntries: true },
+    () => migrations.currentVersion('shop')), 3, 'پمپ زیرِ ظرف نمی‌رود');
+  assert.equal(await inScope(shop(true), () => migrations.currentVersion('pump')), 1, 'پمپ هرگز عوض نمی‌شود');
+  assert.equal(migrations.currentVersion('shop'), 3, 'بیرون از درخواست هیچ');
 });
 
 test('خاموش (پیش‌فرض): v1 ِ پلهٔ ۳، برنامهٔ پلهٔ ۴ ۴۲۶، و opِ گاوصندوق «جدولِ ناشناخته»', async () => {
@@ -86,6 +116,9 @@ test('خاموش (پیش‌فرض): v1 ِ پلهٔ ۳، برنامهٔ پلهٔ 
   const pulled = await h.api('GET', '/api/sync/v1/pull?device_id=flag-dev&since=0', auth());
   assert.equal(pulled.status, 200, JSON.stringify(pulled.body));
   assert.equal(pulled.body.schema_version, 3);
+  const snap = await h.api('GET', '/api/sync/v1/snapshot', auth());
+  assert.equal(snap.status, 200, JSON.stringify(snap.body));
+  assert.equal(snap.body.schema_version, 3);
 });
 
 test('خاموش: v3 بی این جدول — /hello، opِ بومی و قالبِ v2', async () => {
@@ -151,6 +184,11 @@ test('مقدارِ دکان بر `all` جلو می‌افتد؛ فقط true رو
   const st = await statusOf();
   assert.equal(st.schema_version, 4);
   assert.ok(st.tables.includes('safeEntries'));
+  for (const path of ['/api/sync/v1/pull?device_id=flag-dev&since=0', '/api/sync/v1/snapshot']) {
+    const r = await h.api('GET', path, auth());
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.schema_version, 4, path);
+  }
   const hello = await h.api('GET', '/api/sync/v3/hello', auth());
   assert.equal(hello.body.accepts.v2_schema_max, 4);
   assert.ok('safeEntries' in hello.body.tables);

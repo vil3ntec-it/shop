@@ -92,10 +92,9 @@ function tableOf(app, raw) {
   return m.get(normName(raw)) || '';
 }
 
-/** فهرستِ جدول‌های مجازِ یک بخش — برای `/status` و مستندات (جدولِ پشتِ پرچمِ خاموش نه، `safe-flag.js`). */
-function tablesOf(app, ctx = null) {
-  const { allowed } = require('./safe-flag');
-  return WHITELIST[app] ? [...WHITELIST[app].values()].filter((t) => app !== 'shop' || allowed(t, ctx)) : [];
+/** فهرستِ جدول‌های مجازِ یک بخش — برای `/status` و مستندات. */
+function tablesOf(app) {
+  return WHITELIST[app] ? [...WHITELIST[app].values()] : [];
 }
 
 // ---------- سقف‌ها ----------
@@ -298,7 +297,7 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
   if (!Array.isArray(ops)) throw badRequest('فهرستِ opها درست نیست', 'bad_ops');
   if (ops.length > MAX_OPS) throw badRequest(`حداکثر ${MAX_OPS} op در هر دسته`, 'batch_too_large');
 
-  const current = migrations.currentVersion(ctx.app, ctx);
+  const current = migrations.currentVersion(ctx.app);
   if (!current) throw badRequest('این بخش همگام‌سازی ندارد', 'no_schema');
   const clientSchema = Number(schemaVersion);
   if (!Number.isInteger(clientSchema) || clientSchema < 1) throw badRequest('schema_version لازم است', 'bad_schema_version');
@@ -333,7 +332,7 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
       const val = validateOp(ctx.app, raw);
       if (!val.ok) { results.push({ op_id: val.op_id, status: 'rejected', reason: val.reason }); continue; }
       let op = val.op;
-      if (upgradeAvailable) op = { ...migrations.upgrade(ctx.app, clientSchema, op, ctx), hash: '' };
+      if (upgradeAvailable) op = { ...migrations.upgrade(ctx.app, clientSchema, op), hash: '' };
 
       //  تکراری؟ همان op_id، همان حساب ⇒ «تکراری»؛ حسابِ دیگر ⇒ رد.
       const dup = (await c.query(
@@ -468,7 +467,7 @@ async function pull(ctx, { since = 0, deviceId, limit = DEFAULT_PULL }) {
       schema_version: r.schema_version, received_at: Number(r.received_at),
     })),
     cursor, has_more: hasMore, head,
-    schema_version: migrations.currentVersion(ctx.app, ctx),
+    schema_version: migrations.currentVersion(ctx.app),
   };
 }
 
@@ -493,7 +492,7 @@ async function snapshot(ctx) {
     }
     return {
       app: ctx.app, account: { kind: ctx.accountKind, id: ctx.accountId },
-      cursor: head, schema_version: migrations.currentVersion(ctx.app, ctx),
+      cursor: head, schema_version: migrations.currentVersion(ctx.app),
       rows: rows.length, tables, serverTime: now(),
     };
   });
@@ -522,8 +521,8 @@ async function status(ctx, deviceId = '') {
   );
   return {
     app: ctx.app, account: { kind: ctx.accountKind, id: ctx.accountId },
-    head, schema_version: migrations.currentVersion(ctx.app, ctx),
-    tables: tablesOf(ctx.app, ctx),
+    head, schema_version: migrations.currentVersion(ctx.app),
+    tables: tablesOf(ctx.app),
     device: dev ? shapeDevice(dev) : null,
     conflicts: counts.conflicts, deleted: counts.deleted, rows: counts.live, devices: counts.devices,
     limits: { max_ops: MAX_OPS, max_batch_bytes: MAX_BATCH_BYTES, max_fields_bytes: MAX_FIELDS_BYTES, max_pull: MAX_PULL },

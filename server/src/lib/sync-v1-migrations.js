@@ -72,10 +72,14 @@ const MIGRATIONS = {
 
 /**
  * نسخهٔ فعلیِ یک بخش؛ بخشِ ناشناخته ۰ (یعنی هیچ opی پذیرفته نمی‌شود).
- * @param ctx بافتِ همگام‌سازی (`req.sync`)؛ بی آن یا با پرچمِ خاموش همان `CURRENT`
+ * @param ctx بافتِ همگام‌سازی (`req.sync`)؛ بی آن، `ctx` ِ درخواستِ Sync v1 ِ دکانِ همین لحظه
+ *            (`safe-flag.within` — `sync-v1.js` ِ مشترک با پمپ ctx را نمی‌رساند). هیچ یا پرچمِ خاموش ⇒ `CURRENT`
  */
 function currentVersion(app, ctx = null) {
-  if (FLAGGED[app] && require('./safe-flag').on(ctx)) return FLAGGED[app];
+  if (FLAGGED[app]) {
+    const flag = require('./safe-flag');
+    if (flag.on(flag.ctxOf(ctx))) return FLAGGED[app];
+  }
   return CURRENT[app] || 0;
 }
 

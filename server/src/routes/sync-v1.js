@@ -36,6 +36,10 @@ const router = express.Router();
 //  اول به‌ازای آی‌پی (برای درخواستِ بی توکن)، بعد به‌ازای **حساب**.
 router.use(rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' }));
 router.use(requireSyncAccount);
+//  گاوصندوق (PAY-18): بقیهٔ درخواستِ دکان زیرِ `ctx` ِ خودش، تا پلهٔ schema ِ پشتِ پرچمِ `sync.safe_entries`
+//  بی رساندنِ `ctx` از `lib/sync-v1.js` خوانده شود — آن پرونده مشترک با پمپ است و دست نمی‌خورد (‎lib/safe-flag.js‎)
+const safeFlag = require('../lib/safe-flag');
+router.use(safeFlag.within);
 router.use(rateLimit({
   max: config.rateLimit.syncMax,
   keyPrefix: 'sync',
@@ -154,7 +158,9 @@ router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
 router.get('/status', async (req, res, next) => {
   try {
     const deviceId = String(req.query?.device_id || req.query?.deviceId || '').slice(0, 64);
-    res.json({ ok: true, ...(await sync.status(req.sync, deviceId)) });
+    const out = await sync.status(req.sync, deviceId);
+    //  جدولِ پشتِ پرچمِ خاموش (گاوصندوق) در فهرستِ دکان نه — همین‌جا، نه در `lib/sync-v1.js` ِ مشترک با پمپ
+    res.json({ ok: true, ...out, tables: safeFlag.tablesFor(req.sync, out.tables) });
   } catch (err) { next(err); }
 });
 

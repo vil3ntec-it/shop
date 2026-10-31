@@ -1427,6 +1427,10 @@ ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
 
 شرحِ کامل: `docs/LOGIN-fa.md` و `docs/SYNC-v1-fa.md`.
 
+- ⛔ **`server/src/lib/sync-v1.js`، `PUMP_TABLES` و `/api/pump/*` در کارِ دکان دست نمی‌خورند** (۱۴۰۵/۰۸/۱۰، #364): راهِ همگام‌سازیِ
+  برنامهٔ پمپِ نصب‌شده همین‌جاست و هر خطِ تازه، حتی بی تغییرِ رفتارِ پمپ، پمپ را با هر PR ِ دکان در خطر می‌گذارد. رفتارِ تازهٔ دکان
+  (پرچم، پلهٔ schema، فهرستِ جدول‌ها) بیرون می‌نشیند: میان‌افزارِ فقط‌دکانِ `routes/sync-v1.js` و `ctx` ِ درخواست با `safe-flag.within`
+  (`AsyncLocalStorage`) برای `sync-v1-migrations`. سنجه: `safe-flag.test.js`.
 - ⛔ **هر جدولِ همگام‌شوندهٔ برنامهٔ پمپ در `PUMP_TABLES` است** (۱۴۰۵/۰۷/۲۸، 2.14.4):
   `HawalaQuota`، `FuelTank`، `TankFill`، `PumpCalibration` و `FuelConversion` نبودند و هر
   opشان «جدولِ ناشناس» می‌گرفت — کامپیوترِ دوم هیچ‌وقت حواله و مخزن‌ها را نمی‌دید. جدولِ
