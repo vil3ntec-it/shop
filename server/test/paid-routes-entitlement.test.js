@@ -58,6 +58,7 @@ const FREE = [
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
+  'shop.storefront.notify_area',
   'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
