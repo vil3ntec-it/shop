@@ -20,6 +20,8 @@ const { requireSuperAdmin } = require('../middleware/auth');
 const { requireReason } = require('../lib/admin-access');
 const { clientIp } = require('../middleware/ratelimit');
 const v = require('../lib/validate');
+const db = require('../db');
+const { badRequest } = require('../middleware/errors');
 
 const router = express.Router();
 
@@ -57,9 +59,35 @@ router.get('/history', async (req, res) => {
   });
 });
 
+/*
+ *  ⛔ پوستهٔ کنسول (۴.۱۲): پرچمِ **شناخته** فقط مقدارِ هم‌نوعِ پیش‌فرضش را می‌پذیرد و فقط در scope ِ خودش —
+ *  «true» ِ رشته‌ای یا پرچمِ دکان روی scope ِ امنیت، بی‌صدا هیچ اثری نداشت (برنامه فقط بولی می‌خواند) و پنل
+ *  «روشن» نشان می‌داد. کلیدِ ناشناخته همان رفتارِ پیشین را دارد (هر JSON) تا هیچ نویسندهٔ امروزی نشکند.
+ */
+const ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
+async function checkKnown(scope, key, value) {
+  const k = KNOWN.find((x) => x.key === String(key || '').trim());
+  if (!k) return;
+  const s = String(scope || 'all').trim();
+  const scopeOk = k.scope === 'shop' ? (s === 'all' || (ID_RE.test(s) && await db.one('SELECT 1 AS x FROM shops WHERE id=$1', [s])))
+    : k.scope === 'all' ? s === 'all' : s === k.scope;
+  if (!scopeOk) {
+    const want = k.scope === 'shop' ? '«all» یا شناسهٔ یک دکان' : `«${k.scope}»`;
+    throw badRequest(`پرچمِ ${k.key} فقط در scope ِ ${want} معنا دارد`, 'bad_flag_scope');
+  }
+  const typeOk = Array.isArray(k.default)
+    ? Array.isArray(value) && value.length <= 500 && value.every((x) => typeof x === 'string' && ID_RE.test(x))
+    : typeof value === typeof k.default;
+  if (!typeOk) {
+    const want = Array.isArray(k.default) ? 'فهرستی از شناسه‌ها' : typeof k.default === 'boolean' ? 'true یا false' : typeof k.default;
+    throw badRequest(`مقدارِ ${k.key} باید ${want} باشد`, 'bad_flag_value');
+  }
+}
+
 router.put('/', requireSuperAdmin, async (req, res) => {
   const reason = requireReason(req);
   const b = req.body || {};
+  await checkKnown(b.scope || 'all', b.key, b.value);
   const out = await liveConfig.set(b.scope || 'all', b.key, b.value, svc.label(req), { reason, actor: svc.actorRecord(req) });
   await audit.log({
     actorType: 'admin', userId: req.admin.id, action: 'admin.flag_set', ip: clientIp(req),

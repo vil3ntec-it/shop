@@ -430,3 +430,25 @@
 - **مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`** با توکنِ معتبرِ مدیر (پیش‌تر ۴۰۱ `invalid_token` از `routes/data` ⇒ پل
   «نشست تمام شد» می‌خواند). بی‌توکن و توکنِ دکان همان ۴۰۱ (وجودِ مسیر گفته نمی‌شود). خطِ آخرِ درهای `/admin` در `app.js`.
 - **`GET /admin/shops`:** `total` همان `q` و `hold` را می‌شمارد (یک WHERE برای ردیف‌ها و شمار).
+
+### ۱۲.۷ پوستهٔ کنسولِ «فروشگاه» ِ پنل (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-shell-api`)
+
+دو «توانایی» ِ تازه برای ماژول‌های ۴.۳ و ۴.۱۲ و جست‌وجوی سراسریِ پنل (ریپوی `server`، شاخهٔ `claude/console-shell`):
+
+- **`admin-sessions.v1`:** `GET /api/admin/admins/:id/sessions` (نشست‌های باز: ۱۶ نویسهٔ آغازِ SHA-256 ِ توکن، `issuedAt`،
+  `expiresAt`، `current` — نه توکن، نه هشِ کامل) و `POST …/sessions/revoke` `{sessionId?, reason}` (یکی یا همه؛ دلیل اجباری؛
+  نشستِ پیدانشده ⇒ ۴۰۴ `session_not_found`). فقط ارشد؛ کلیدِ سرویس هرگز (`SERVICE_DENY`). نشست‌های **مالکِ اصلی** را فقط خودش
+  می‌بندد (`owner_protected`). سابقه: `admin.admin_sessions_revoked` با شمار و دلیل.
+- **`search.v1`:** `GET /api/admin/search?q=&limit=` (`routes/admin-search.js`) — دکان، کاربر، پرداخت، سفارش (فقط شناسه/شمارهٔ
+  سفارش؛ نام و تلفنِ خریدار جست‌وجو نمی‌شود)، خطا، و مدیر فقط برای ارشدِ **انسانی**. نوع‌ها به نقش (`KINDS_BY_ROLE`): مالی
+  فقط دکان و پرداخت (`FINANCE` ِ `lib/admin-roles.js`). `%`/`_` ِ ورودی حرفِ معمولی است؛ کوتاه‌تر از ۲ نویسه ⇒ ۴۰۰.
+- **سابقهٔ نقش و تنظیم:** `PATCH /admin/admins/:id` ⇒ `detail.from` (نقش/وضعیتِ پیشین) و `reason`؛ `POST /admin/admins` بی نقش
+  ⇒ `viewer` (کمینهٔ دسترسی، پیش‌تر `admin`)؛ `PATCH /admin/config` ⇒ `detail.changes` («پیشین ⇒ تازه») و `reason`.
+- **پرچمِ شناخته نوع‌دار:** `PUT /admin/flags` برای کلیدِ کاتالوگ فقط مقدارِ هم‌نوعِ پیش‌فرض (بولی، یا فهرستِ شناسه برای
+  `beta.*`) و فقط در scope ِ خودش (`shop` ⇒ `all` یا دکانِ موجود؛ `all` ⇒ `all`؛ `security`/`release` ⇒ همان) — وگرنه
+  `bad_flag_value` / `bad_flag_scope`. کلیدِ ناشناخته همان رفتارِ پیشین.
+- **برای #582 (ماتریسِ جداسازی)،** هر کدام که دوم مرج شود: `'GET /api/admin/search': { exempt: 'جست‌وجوی سکوی مدیر به نقش؛ فقط
+  شناسه و نامِ نمایشی، بی دفتر یا متنِ دکان' }` و `'GET /api/admin/admins/:id/sessions': { exempt: 'نشستِ مدیرِ سکو، نه دادهٔ دکان' }`.
+
+آزمون: `test/console-shell.test.js` (۶ بند، سرخ روی پایه ⇐ سبز) و `CAPABILITY_PROBES` ِ `admin-control-plane.test.js`.
+

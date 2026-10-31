@@ -21,7 +21,7 @@ const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
-const { reasonOf } = require('../lib/admin-access');
+const { reasonOf, requireReason } = require('../lib/admin-access');
 const { ROLES } = require('../lib/admin-roles');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
@@ -97,6 +97,9 @@ const CAPABILITIES = Object.freeze([
   'flags.v1',         //  GET /admin/flags · GET /admin/flags/history (نوشتن: ارشد + دلیل)
   'actor.v1',         //  سرآیندهای X-Actor-Id/Role/Name با کلیدِ سرویس ⇒ «انجام‌دهنده» در سابقه
   'service-key.v1',   //  Bearer vsk_… · GET|POST /admin/service-keys · POST …/:keyId/revoke
+  //  پوستهٔ کنسول (ریپوی server، ماژولِ ۴.۳ و جست‌وجوی سراسری):
+  'admin-sessions.v1', //  GET /admin/admins/:id/sessions · POST …/sessions/revoke (+ دلیل و «پیشین ⇒ تازه» در سابقهٔ نقش)
+  'search.v1',        //  GET /admin/search?q= — دکان، کاربر، پرداخت، سفارش، خطا (و مدیر فقط برای ارشدِ انسانی)، به نقش
 ]);
 
 router.get('/me', (req, res) => {
@@ -638,10 +641,20 @@ router.patch('/config', requireSuperAdmin, async (req, res) => {
     'trial_days', 'whatsapp_number', 'whatsapp_message', 'currency',
     'pump_trial_days', 'pump_currency',
   ];
+  //  پوستهٔ کنسول (۴.۱۲): سابقه «پیشین ⇒ تازه» و دلیل را هم دارد — بی آن «تاریخچهٔ تنظیمات» فقط می‌گفت «چیزی عوض شد»
+  const before = await plans.allConfig();
+  const changes = {};
   for (const key of allowed) {
-    if (req.body?.[key] !== undefined) await plans.setConfig(key, v.text(req.body[key], { max: 300 }));
+    if (req.body?.[key] === undefined) continue;
+    const next = v.text(req.body[key], { max: 300 });
+    await plans.setConfig(key, next);
+    if (String(before?.[key] ?? '') !== next) changes[key] = { from: before?.[key] ?? null, to: next };
   }
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.config_updated' });
+  const reason = reasonOf(req);
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.config_updated',
+    detail: { changes, ...(reason ? { reason } : {}) },
+  });
   res.json({ config: await plans.publicConfig() });
 });
 
@@ -711,10 +724,12 @@ router.post('/admins', requireSuperAdmin, async (req, res, next) => {
   const row = await one(
     `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
      VALUES ($1,$2,$3,$4,$5,'active',$6) RETURNING id, username, name, role`,
+    //  ⛔ کمینهٔ دسترسی (پوستهٔ کنسول، ۴.۳): نقشِ نگفته «فقط‌خواندن» است، نه «مدیر» — پیش‌فرضِ ناامن نه
     [newId('adm'), username, v.text(req.body?.name, { max: 60 }), await pw.hashPassword(password),
-      v.oneOf(req.body?.role, ROLES, { field: 'نقش', def: 'admin' }), now()]
+      v.oneOf(req.body?.role, ROLES, { field: 'نقش', def: 'viewer' }), now()]
   );
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_created', targetType: 'admin', targetId: row.id, detail: { username, role: row.role } });
+  const reason = reasonOf(req);
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_created', targetType: 'admin', targetId: row.id, detail: { username, role: row.role, ...(reason ? { reason } : {}) } });
   res.status(201).json({ admin: row });
 });
 
@@ -750,8 +765,69 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
   }
   const row = await one('UPDATE admins SET status=$2, role=$3 WHERE id=$1 RETURNING id, username, name, role, status', [id, status, role]);
   if (status === 'disabled') await tokens.revokeAllForSubject(id);
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_updated', targetType: 'admin', targetId: id, detail: { status, role } });
+  //  پوستهٔ کنسول (۴.۳): «پیشین ⇒ تازه» و دلیل در سابقه — فیلدهای پیشینِ `status`/`role` همان‌جا ماندند
+  const reason = reasonOf(req);
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.admin_updated', targetType: 'admin', targetId: id,
+    detail: { status, role, from: { status: target.status, role: target.role }, ...(reason ? { reason } : {}) },
+  });
   res.json({ admin: row });
+});
+
+/*
+ *  ── نشست‌های یک مدیر (پوستهٔ کنسول، ماژولِ ۴.۳ ِ پنل؛ توانایی `admin-sessions.v1`) ──
+ *
+ *  فقط ارشد (و کلیدِ سرویس هرگز — `SERVICE_DENY` همهٔ ‎/admin/admins‎ را می‌بندد). شناسهٔ نشست ۱۶ نویسهٔ
+ *  آغازِ SHA-256 ِ توکن است: خودِ توکن هرگز این‌جا نیست و از هش برنمی‌گردد.
+ *  ⛔ نشست‌های **مالکِ اصلی** را فقط خودش می‌بندد — وگرنه ارشدِ دوم بارها بیرونش می‌انداخت (همان S12).
+ *  ⛔ دلیل اجباری و ردیفِ سابقه با شمار؛ نشستِ پیدانشده ⇒ ۴۰۴، نه «انجام شد» ِ دروغ.
+ */
+const SESSION_ID_RE = /^[0-9a-f]{16}$/;
+
+router.get('/admins/:id/sessions', requireSuperAdmin, async (req, res, next) => {
+  const id = String(req.params.id);
+  const target = await one('SELECT id FROM admins WHERE id=$1', [id]);
+  if (!target) return next(notFound('مدیر پیدا نشد'));
+  const bearer = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  const mine = bearer ? tokens.hashToken(bearer) : '';
+  const rows = await many(
+    `SELECT token_hash, issued_at, expires_at FROM tokens
+      WHERE kind='admin' AND subject_id=$1 AND revoked_at IS NULL AND expires_at>$2
+      ORDER BY issued_at DESC LIMIT 100`, [id, now()]);
+  res.json({
+    sessions: rows.map((r) => ({
+      id: String(r.token_hash).slice(0, 16), issuedAt: Number(r.issued_at), expiresAt: Number(r.expires_at),
+      current: Boolean(mine) && r.token_hash === mine,
+    })),
+    serverTime: now(),
+  });
+});
+
+router.post('/admins/:id/sessions/revoke', requireSuperAdmin, async (req, res, next) => {
+  const id = String(req.params.id);
+  const reason = requireReason(req);
+  const target = await one('SELECT id, username FROM admins WHERE id=$1', [id]);
+  if (!target) return next(notFound('مدیر پیدا نشد'));
+  if (id !== req.admin.id && id === await require('../lib/admin-owner').ownerId()) {
+    return next(forbidden('نشست‌های مالکِ اصلی را فقط خودش می‌بندد', 'owner_protected'));
+  }
+  const sessionId = req.body?.sessionId === undefined || req.body?.sessionId === '' ? '' : String(req.body.sessionId);
+  if (sessionId && !SESSION_ID_RE.test(sessionId)) return next(badRequest('شناسهٔ نشست درست نیست', 'bad_session_id'));
+  let revoked;
+  if (sessionId) {
+    const r = await query(
+      `UPDATE tokens SET revoked_at=$1 WHERE kind='admin' AND subject_id=$2 AND revoked_at IS NULL AND left(token_hash, 16)=$3`,
+      [now(), id, sessionId]);
+    revoked = r.rowCount;
+    if (!revoked) return next(notFound('این نشست باز نیست یا مالِ این مدیر نیست', 'session_not_found'));
+  } else {
+    revoked = await tokens.revokeAllForSubject(id, 'admin');
+  }
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.admin_sessions_revoked', targetType: 'admin', targetId: id,
+    detail: { session: sessionId || 'all', revoked, reason },
+  });
+  res.json({ ok: true, revoked, serverTime: now() });
 });
 
 // ---------- پشتیبان‌گیری ----------
@@ -803,6 +879,8 @@ router.use('/sync', require('./admin-sync'));
 //  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
 router.use('/shops/:id', require('./admin-shop-state'));
 router.use('/flags', require('./admin-flags'));
+//  پوستهٔ کنسول — جست‌وجوی سراسریِ بخشِ «فروشگاه» ِ پنل (توانایی `search.v1`)
+router.use('/search', require('./admin-search'));
 router.use('/service-keys', require('./admin-service-keys'));
 //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
 router.use('/system', require('./admin-system'));

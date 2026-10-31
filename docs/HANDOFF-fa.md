@@ -54,6 +54,13 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۱۰ — شاخهٔ `claude/console-shell-api` (پوستهٔ کنسولِ «فروشگاه»؛ روی `claude/console-glue`)
+- انجام شد: توانایی‌های `admin-sessions.v1` (نشست‌های یک مدیر: فهرست و بستن، مالکِ اصلی فقط خودش) و `search.v1`
+  (`GET /api/admin/search`، به نقش)؛ مدیرِ تازه بی نقش ⇒ `viewer`؛ «پیشین ⇒ تازه» و دلیل در سابقهٔ نقش و `PATCH /config`؛ پرچمِ
+  کاتالوگ نوع‌دار و در scope ِ خودش. بندِ ۱۲.۷ ِ `ADMIN-CONTROL-PLANE.md`؛ آزمون `test/console-shell.test.js`. بی مهاجرت (۱۷۰ آزاد ماند).
+- نیمه‌کاره: هیچ. سمتِ پنل: ریپوی `server`، شاخهٔ `claude/console-shell` (روی #116).
+- قدمِ بعدی: مرج پس از #597 و #598؛ اگر #582 دوم مرج شد، دو خطِ بندِ ۱۲.۷ را به `ADMIN_SUBJECT` بیفزایید.
+
 ### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/console-glue` (چسبِ فاز ۳ ⇄ پنل؛ روی `claude/console-phase3`)
 - انجام شد: `GET /api/admin/me` ⇒ `capabilities` (`shop-health.v1`، `shop-holds.v1`، `flags.v1`، `actor.v1`، `service-key.v1` —
   همان نام‌های پل در ریپوی `server`)؛ مسیرِ ناشناختهٔ `/api/admin/*` با توکنِ معتبرِ مدیر ۴۰۴ `route_not_found` (بی‌توکن همان ۴۰۱)؛
