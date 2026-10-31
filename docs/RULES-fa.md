@@ -237,12 +237,15 @@
 - مبلغِ بازپرداخت هرگز از مانده بیشتر نیست؛ ردیفِ دفتر فقط افزوده می‌شود؛ روش فقط `cash` تا D-08؛ دلیل اجباری و متنِ آزاد (#255).
 - سفارشِ آزمایشی (`test: true`) در جمعِ تطبیق شمرده نمی‌شود (#227، #255).
 - بخشِ «سفارش‌ها»ی کارمند فقط با `enabled`ِ `/config`ِ سرور پیداست و قطعِ گذرا خاموشش نمی‌کند؛ `summary` هر ۲۰ ثانیه و فقط جلوی چشم (#253).
+- «عقب انداختن» (ORD-07) وضعیت را عوض نمی‌کند: رویدادِ `note` با `detail.type = 'ready_delay'` (مهاجرت نمی‌خواهد)، روی زمانِ ذخیره‌شدهٔ سرور، با کلیدِ یکتایی در رویداد و `expectedReadyAt`؛ خطِ زمانیِ مشتری فقط `created`/`status` را می‌بیند (`claude/spec-ord-1`).
+- «باز / بسته» ِ کارمند (ORD-03) همان `storefront.statusOf` ِ ویترین است، نه ساعتِ دستگاه؛ افزونهٔ وب (`license/orders-desk.js`) فقط با `presence`/`delay` ِ `/config` بار می‌شود (`claude/spec-ord-1`).
 - ⛔ ریسکِ سفارش (RSK-02/03/05، `lib/order-risk.js`) فقط در قیمت‌گذارِ ویترین و از راهِ `order-rate.guard` اجرا می‌شود: پس از قفلِ `order-phone:<شماره>` و پس از تکرارِ کلیدِ یکتایی، درونِ تراکنشِ `orders.create`. هیچ قاعدهٔ ریسکی به صندوق، همگام‌سازی یا `POST /api/shop/orders` (سفارشِ کارمند) راه ندارد. هر رد کدِ پایدار و `reason` و عددِ سقف دارد. «تازه» = بی سفارشِ تحویل‌شده در همین دکان. سابقهٔ `…/risk` فقط همین دکان را می‌شمارد و شماره را برنمی‌گرداند.
 
 ### v3 · ویترین
 
 - ویترین فقط با `shop.orders` + `shop.storefront` + کلیدِ اشتراکِ `storefront`؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب دارند (۴۰۴) (#244).
 - قیمت، نام و واحد را سرور در همان تراکنش از دفتر می‌خواند؛ `unitPriceMinor`، `discountMinor`، `deliveryFeeMinor`، `source` و `test`ِ مشتری خوانده نمی‌شوند (#244).
+- «همان که مشتری دید» (`lib/storefront-seen.js`، CHK-17/S32): `expectedTotalMinor` و فیِ هر قلم `expectedUnitPriceMinor` فقط برای «تغییر کرده؟» است؛ هر کدام ناهمخوان ⇒ ۴۰۹ `price_changed` با برگهٔ تازه و `changes` (`productId`، `name`، `fromMinor`، `toMinor`)، حتی اگر جمع از قضا برابر مانده باشد (#543).
 - نشانی `{slug}.vill3n.top` (D-06) و `/store/<slug>` همان صفحه است؛ زیردامنه‌های رزرو رفتارِ پیشین را دارند (#244).
 - پرداختِ آنلاین فقط حساب‌پی و فقط با کلیدهای `HESABPAY_*` + پرچمِ `pay.hesabpay` + اشتراکِ فعال: دکمهٔ «پرداخت با حساب‌پی» در صفحهٔ پیگیریِ سفارش (بخشِ «پرداختِ حساب‌پی»)؛ وگرنه فقط نقد هنگامِ تحویل با جملهٔ روشن و بی دکمه (D-08، #244). نقد هنگامِ تحویل همیشه می‌ماند.
 - حضورِ دکان از آخرین تماسِ واقعیِ همگام‌سازی: ≤۱۰ دقیقه «تأییدشده»، >۶۰ «موقتاً آفلاین»، میانه «تأیید نشده» (D-18، §۳۱.۱، #244).
@@ -398,6 +401,8 @@
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.delivery_map` | دکان / `all` | خاموش | DLV-05: `navigation` در کارتِ `/api/courier/missions` و `GET /api/courier/map`، `GET /api/courier/map/:id` (خاموش ⇒ ۴۰۴ `delivery_map_disabled`)؛ با `shop.delivery` | `claude/new-dlv-1` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
+| `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
+| `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
