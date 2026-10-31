@@ -278,6 +278,46 @@ class SalesFlowModelTest {
   }
 
   @Test
+  fun `شاگرد در گزارشِ X و Z نه مورد انتظار می بیند نه اختلاف، صاحب و مدیر می بینند`() {
+    val x = ir.vil3ntec.tohid.core.pay.ShiftReport(
+      kind = "X", shiftId = "s", currency = "AFN", at = 2L, by = null, openedAt = 1L, openedBy = null, float = 0L,
+      methods = emptyMap(), moves = ir.vil3ntec.tohid.core.pay.Moves(0L, 0L), expected = mapOf("cash" to 445_000L),
+      events = ir.vil3ntec.tohid.core.pay.EventCounts(),
+    )
+    //  شاهدِ نشت: نمای کورِ هسته X را نمی پوشاند
+    assertEquals(445_000L, ir.vil3ntec.tohid.core.pay.ShiftCore.cashierView(x).expected?.get("cash"))
+    assertNull(DrawerModel.forViewer(x, seesExpected = false).expected)
+    val z = x.copy(kind = "Z", variance = mapOf("cash" to -1_000L), blind = false)
+    assertNull(DrawerModel.forViewer(z, seesExpected = false).variance)
+    assertEquals(x, DrawerModel.forViewer(x, seesExpected = true))
+    assertEquals(z, DrawerModel.forViewer(z, seesExpected = true))
+  }
+
+  @Test
+  fun `متنِ سابقهٔ بستنِ کور مورد انتظار و اختلاف را نمی نویسد`() {
+    val blind = ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerNotes.close(445_000L, 4440.0, -1_000L, "کم بود", "علی", blind = true)
+    assertTrue(blind.startsWith("بستنِ صندوق (شمارشِ کور): شمرده"))
+    assertFalse(blind.contains("مورد انتظار"))
+    assertFalse(blind.contains("کسری"))
+    assertFalse(blind.contains("اضافه"))
+    val open = ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerNotes.close(445_000L, 4440.0, -1_000L, "", "", blind = false)
+    assertTrue(open.contains("مورد انتظار") && open.contains("کسری"))
+  }
+
+  @Test
+  fun `برگهٔ برگشتِ نسخهٔ ۳ برگشت های پیشینِ فاکتور را به سقفِ نقش می دهد`() {
+    val rel = "ir/vil3ntec/tohid/ui/v3/sales/returns/ReturnFlowSheet.kt"
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+    assertTrue(src.contains("ReturnFlow.priorMinor(d, sale?.id)"))
+    assertTrue(src.contains("ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor)"))
+    //  سقفِ ۱۰۰ افغانی برای شاگرد: ۳۰ تنها مجاز، ۸۰ِ پیشین + ۳۰ نیازمند تأیید (#552)
+    val layers = listOf(mapOf("returns.create" to mapOf("mode" to "allow", "caps" to mapOf("maxAmount" to 10_000))))
+    assertEquals("allow", ir.vil3ntec.tohid.data.ReturnFlow.permDecision("staff", layers, 3_000L))
+    assertEquals("approve", ir.vil3ntec.tohid.data.ReturnFlow.permDecision("staff", layers, 3_000L, 8_000L))
+  }
+
+  @Test
   fun `شمارشِ اسکناس فقط رقم و نادرست منفی`() {
     assertEquals(mapOf("1000" to 2L, "500" to -1L), DrawerModel.counts(mapOf("1000" to "2", "500" to "x", "100" to " ")))
   }

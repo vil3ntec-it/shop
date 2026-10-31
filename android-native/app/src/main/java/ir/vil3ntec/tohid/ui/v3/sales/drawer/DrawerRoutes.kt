@@ -47,7 +47,7 @@ fun RouteScope.DrawerRoute() {
       totals = totals,
       payV2 = payV2,
       blind = payV2 && staff,
-      expectedMinor = x?.valueOrNull()?.report?.expected?.get(PayFlow.CASH),
+      expectedMinor = x?.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !staff) }?.expected?.get(PayFlow.CASH),
       reportError = (x as? PayFlow.Outcome.Bad)?.let { PayFlow.message(it.problem) },
       skipped = x?.valueOrNull()?.skipped?.size ?: 0,
       history = remember(data) { CashShift.list(data).take(60) },
@@ -133,14 +133,14 @@ fun RouteScope.DrawerCloseRoute() {
   val x = remember(data, shift) { PayFlow.report(data, shift.open, null, System.currentTimeMillis()) }
   DrawerCountSheet(
     blind = staff,
-    expectedMinor = x.valueOrNull()?.report?.expected?.get(PayFlow.CASH),
+    expectedMinor = x.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !staff) }?.expected?.get(PayFlow.CASH),
     error = error,
     onSubmit = { counts, reason ->
       when (val r = PayFlow.closeRow(data, shift.open, PayFlow.Count(counts, by = me, blind = staff, reason = reason), System.currentTimeMillis(), Ulid::next)) {
         is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") StrSale.reasonOver50 else PayFlow.message(r.problem)
         is PayFlow.Outcome.Ok -> {
           val z = r.value.report
-          val notes = DrawerNotes.close(z.expected?.get(PayFlow.CASH) ?: 0, r.value.row.amount, z.variance?.get(PayFlow.CASH) ?: 0L, reason, me)
+          val notes = DrawerNotes.close(z.expected?.get(PayFlow.CASH) ?: 0, r.value.row.amount, z.variance?.get(PayFlow.CASH) ?: 0L, reason, me, blind = staff)
           val row = r.value.row.copy(date = todayIso(), notes = notes)
           //  زیرِ قفلِ نوشتن روی دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد گم نمی‌شود
           scope.launch {

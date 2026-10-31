@@ -84,6 +84,14 @@ object DrawerModel {
   fun counts(texts: Map<String, String>): Map<String, Long> =
     texts.mapNotNull { (k, v) -> v.trim().takeIf { it.isNotEmpty() }?.let { k to (it.toLongOrNull() ?: -1L) } }.toMap()
 
+  /**
+   *  PAY-13 — آنچه بیننده می‌بیند: بی حقِ دیدن (شاگرد، شمارشِ کور) نه «مورد انتظار» نه اختلاف — در Xِ
+   *  میانِ شیفت هم، نه فقط در Zِ کور (`ShiftCore.cashierView` X را دست‌نخورده برمی‌گرداند). همان
+   *  `ShiftSlip.forViewer` ِ #536؛ پس از رسیدنِ آن به این شاخه همان را صدا بزن.
+   */
+  fun forViewer(rep: ShiftReport, seesExpected: Boolean): ShiftReport =
+    if (seesExpected) rep else rep.copy(expected = null, variance = null)
+
   fun shown(m: Long?): String = PhoneSaleText.amount(PayFlow.major(m ?: 0))
 
   /** ردیف‌های گزارشِ X/Z — همان ترتیبِ `ShiftReportLines` ِ پیشین */
@@ -133,8 +141,10 @@ object DrawerNotes {
     "${if (type == "cash_in") "ورود به دخل" else "خروج از دخل"}: ${MOVE[reason] ?: reason} — ${money(amount)} افغانی" +
       (note?.let { " — $it" } ?: "") + (if (me.isNotBlank()) " — $me" else "")
 
-  fun close(expectedMinor: Long, countedMajor: Double, varianceMinor: Long, reason: String, me: String): String {
+  /** [blind] (PAY-13): متنِ سابقه را همه می‌بینند؛ بستنِ کور مورد انتظار و اختلاف را نمی‌نویسد (Zِ کامل برای صاحب/مدیر هست) */
+  fun close(expectedMinor: Long, countedMajor: Double, varianceMinor: Long, reason: String, me: String, blind: Boolean): String {
     val extra = listOf(reason.trim(), me.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
+    if (blind) return "بستنِ صندوق (شمارشِ کور): شمرده ${money(countedMajor)}" + (if (extra.isNotEmpty()) " — $extra" else "")
     return "بستنِ صندوق: مورد انتظار ${money(PayFlow.major(expectedMinor))}، شمرده ${money(countedMajor)}، " +
       (if (varianceMinor == 0L) "بی اختلاف" else if (varianceMinor > 0) "اضافه ${money(PayFlow.major(varianceMinor))}" else "کسری ${money(PayFlow.major(-varianceMinor))}") +
       (if (extra.isNotEmpty()) " — $extra" else "")

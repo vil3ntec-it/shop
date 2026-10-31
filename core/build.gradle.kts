@@ -32,6 +32,7 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
+  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
   if (iosSpike) {
     iosArm64()
     iosSimulatorArm64()

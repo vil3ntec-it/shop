@@ -198,11 +198,11 @@ fun DrawerMoveSheet(
   }
 }
 
-/** گزارشِ X (میانِ شیفت) یا Z (پایانِ شیفت)؛ شاگرد نمای کور (`ShiftCore.cashierView`) */
+/** گزارشِ X (میانِ شیفت) یا Z (پایانِ شیفت)؛ شاگرد نه در X نه در Z مورد انتظار و اختلاف را می‌بیند (`DrawerModel.forViewer`، PAY-13) */
 @Composable
 fun ShiftReportSheet(rep: ShiftReport, staff: Boolean, title: String?, notes: List<String>, onClose: () -> Unit) {
   val c = PhoneV3.colors
-  val shown = if (staff) ShiftCore.cashierView(rep) else rep
+  val shown = DrawerModel.forViewer(rep, seesExpected = !staff)
   V3Sheet(onDismiss = onClose, title = title ?: if (rep.kind == "Z") StrSale.zReport else StrSale.xReportTitle) {
     notes.forEach { Text(it, style = V3Type.footnote, color = c.inkMuted); Spacer(Modifier.height(4.dp)) }
     if (notes.isNotEmpty()) Spacer(Modifier.height(8.dp))

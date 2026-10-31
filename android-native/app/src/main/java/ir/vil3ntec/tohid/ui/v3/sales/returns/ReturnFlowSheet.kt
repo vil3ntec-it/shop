@@ -111,7 +111,9 @@ fun ReturnFlowSheet(
   val q = (quote as? ReturnFlow.Outcome.Ok)?.value
   val total = q?.total ?: 0.0
   val damaged = q?.lines?.any { it.disposition == ReturnFlow.DAMAGED } == true
-  val perm = remember(total) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total)) }
+  //  RET-10 (#552): سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
+  val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
+  val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
   val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
