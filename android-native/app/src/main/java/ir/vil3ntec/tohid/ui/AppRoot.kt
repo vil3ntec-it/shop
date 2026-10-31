@@ -633,6 +633,7 @@ fun AppRoot(
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
       //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
       if (!Platform.DESKTOP) UpdateBanner()
+      ir.vil3ntec.tohid.ui.screens.WhatsNewOnUpdate() //  OPS-05: یک بار پس از به‌روزرسانی، پیش‌فرض خاموش
       }
     },
     /*

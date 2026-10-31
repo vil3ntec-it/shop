@@ -151,6 +151,22 @@ object StrSettings {
   val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
   val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
   fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: $v", "Installed version: $v", "نصب شوې نسخه: $v")
+  //  «چه چیزی تازه است» (OPS-05)
+  val whatsNew: String get() = t("چه چیزی تازه است", "What's new", "څه نوي دي")
+  val whatsNewShow: String get() = t("نشان دادن پس از هر به‌روزرسانی", "Show after each update", "له هر تازه کېدو وروسته ښودل")
+  val whatsNewNote: String get() = t(
+    "روشن: پس از هر به‌روزرسانی، تغییرهای همان نسخه یک بار نشان داده می‌شوند و هر قابلیتِ برداشته‌شده با جای تازه‌اش گفته می‌شود. فقط روی همین دستگاه.",
+    "On: after each update, that version's changes are shown once, and any removed feature is announced with where to find it now. Only on this device.",
+    "روښانه: له هر تازه کېدو وروسته، د هماغې نسخې بدلونونه یو ځل ښودل کېږي او هره لرې شوې ځانګړنه د خپل نوي ځای سره ویل کېږي. یوازې په همدې وسیله.",
+  )
+  val whatsNewAll: String get() = t("دیدنِ همهٔ تغییرها", "See all changes", "ټول بدلونونه وګورئ")
+  val whatsNewEmpty: String get() = t("هنوز یادداشتی نیست.", "No notes yet.", "لا یادښت نشته.")
+  fun whatsNewVersion(v: String): String = t("نسخهٔ $v", "Version $v", "نسخه $v")
+  val whatsNewKindNew: String get() = t("تازه", "New", "نوی")
+  val whatsNewKindChanged: String get() = t("تغییر", "Changed", "بدل شوی")
+  val whatsNewKindRemoved: String get() = t("برداشته شد", "Removed", "لرې شو")
+  fun whatsNewInstead(text: String): String = t("به‌جایش: $text", "Instead: $text", "پر ځای یې: $text")
+  val whatsNewGotIt: String get() = t("فهمیدم", "Got it", "پوه شوم")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")
   val restoreWarn: String get() = t("بازیابی فقط روی همین دستگاه است: هیچ چیزی از سرور یا دستگاه‌های دیگر پاک یا عوض نمی‌شود. اگر این دستگاه با سرور همگام است، اطلاعاتی که روی سرور هست — از جمله فروش و دریافت‌هایی که پس از این پشتیبان ثبت شده — دوباره از سرور می‌آید و برای این کار اینترنت لازم است. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring only affects this device: nothing is deleted or changed on the server or on other devices. If this device syncs with the server, the data on the server — including sales and payments recorded after this backup — comes back from the server, so an internet connection is needed. A copy of the current state is kept so it can be undone if this was a mistake.", "بېرته راګرځول یوازې په همدې وسیله اغېز کوي: له سرور یا نورو وسیلو هېڅ شی نه پاکېږي او نه بدلېږي. که دا وسیله له سرور سره همغږې وي، هغه معلومات چې په سرور کې دي — د هغو پلورونو او ترلاسه شویو پیسو په ګډون چې له دې بیک‌اپ وروسته ثبت شوي — بیا له سرور څخه راځي، نو انټرنېټ پکار دی. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
   //  بازیابی روی دستگاهِ همگام (S143، `ShopStore.restoreBackup`): هرگز چیزی از سرور پاک نمی‌کند
