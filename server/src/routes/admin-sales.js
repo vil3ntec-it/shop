@@ -197,9 +197,13 @@ router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
     if (p.receiptNo && p.receiptNo !== cur.receipt_no && await receiptTaken({ query }, p.receiptNo, cur.id)) {
       return next(RECEIPT_TAKEN());
     }
+    //  شمارهٔ تازه روی ردیفِ کهنه (پیش از ۱۶۷، receipt_unique=false) هم زیرِ قیدِ یکتا می‌رود؛ وگرنه دو
+    //  ویرایشِ هم‌زمان هر دو از سنجشِ بالا رد می‌شدند و یک شماره دو بار می‌نشست. شمارهٔ دست‌نخورده همان می‌ماند
+    //  (تکراریِ کهنه پاک یا عوض نمی‌شود). سمتِ راستِ SET مقدارِ پیشینِ ردیف است.
     try {
       await query(
-        `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8 WHERE id=$1`,
+        `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8,
+                receipt_unique = receipt_unique OR receipt_no IS DISTINCT FROM $6 WHERE id=$1`,
         [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
       );
     } catch (err) {

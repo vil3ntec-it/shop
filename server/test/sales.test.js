@@ -191,6 +191,38 @@ test('SEC-API-09: ده ثبتِ هم‌زمان با یک شمارهٔ رسید�
   assert.equal(n.n, 1);
 });
 
+test('SEC-API-09: ویرایشِ شمارهٔ رسیدِ ردیف‌های کهنه زیرِ قیدِ یکتاست ⇒ ده ویرایشِ هم‌زمان به یک شماره، یکی ۲۰۰ و بقیه ۴۰۹', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('رسیدِ کهنه');
+  //  ردیف‌های پیش از مهاجرتِ ۱۶۷ (receipt_unique=false)، یکی‌شان با شمارهٔ تکراریِ کهنه
+  const ids = [];
+  for (let i = 0; i < 10; i++) {
+    const r = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 10 + i, receiptNo: `R-SEC-OLD-${i}` });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    ids.push(r.body.payment.id);
+  }
+  await query(`UPDATE sub_payments SET receipt_unique=false WHERE id = ANY($1)`, [ids]);
+  await query(`UPDATE sub_payments SET receipt_no='R-SEC-OLD-0' WHERE id=$1`, [ids[1]]);
+
+  //  ویرایشِ بی تغییرِ شماره روی تکراریِ کهنه ⇒ بی خطا، و ردیف کهنه می‌ماند (قید فقط روی شمارهٔ تازه)
+  const keep = await h.put(`/api/admin/payments/${ids[1]}`, { amount: 99 }, { token: t });
+  assert.equal(keep.status, 200, JSON.stringify(keep.body));
+  assert.equal((await one('SELECT receipt_unique FROM sub_payments WHERE id=$1', [ids[1]])).receipt_unique, false);
+
+  //  عوض کردنِ شماره ⇒ receipt_unique=true، تا ایندکسِ یکتا پشتش باشد
+  const moved = await h.put(`/api/admin/payments/${ids[2]}`, { receiptNo: 'R-SEC-OLD-MOVED' }, { token: t });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.equal((await one('SELECT receipt_unique FROM sub_payments WHERE id=$1', [ids[2]])).receipt_unique, true);
+
+  //  هم‌زمان: هر ده ردیفِ کهنه به یک شمارهٔ تازه ⇒ فقط یکی
+  const all = await Promise.all(ids.map((id) => h.put(`/api/admin/payments/${id}`, { receiptNo: 'R-SEC-STALE-RACE' }, { token: t })));
+  const codes = all.map((r) => r.status).sort();
+  assert.equal(codes.filter((c) => c === 200).length, 1, codes.join(','));
+  assert.ok(all.filter((r) => r.status !== 200).every((r) => r.status === 409 && r.body.error.code === 'receipt_no_taken'), codes.join(','));
+  const n = await one(`SELECT COUNT(*)::int AS n FROM sub_payments WHERE receipt_no='R-SEC-STALE-RACE'`);
+  assert.equal(n.n, 1);
+});
+
 test('روشِ ناشناخته و ارزِ ناشناخته پذیرفته نمی‌شوند', async () => {
   const t = await adminToken();
   const u = await shopOwner('بدپرداخت');
