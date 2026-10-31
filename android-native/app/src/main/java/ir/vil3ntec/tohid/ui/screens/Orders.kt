@@ -86,7 +86,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var openId by remember { mutableStateOf<String?>(null) }
-  var creating by remember { mutableStateOf(false) }
+  var creating by remember { mutableStateOf(false) }; var pickFor by remember { mutableStateOf<OrderDto?>(null) }   // + برگهٔ جمع‌آوری (PCK)
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   val rev = OrdersLive.rev.value
@@ -226,11 +226,11 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       }
     }
   }
-
+  pickFor?.let { o -> OrderPickHost(o, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }, onClose = { pickFor = null; openId = o.id }) { reload++; scope.launch { OrdersLive.pollSummary(context) } } }
   openId?.let { id ->
     OrderDetailSheet(
       id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
-      onClose = { openId = null },
+      onClose = { openId = null }, onPick = { o -> openId = null; pickFor = o },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
   }
@@ -369,7 +369,7 @@ private fun OrderDetailSheet(
   store: ShopStore,
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
-  onChanged: () -> Unit,
+  onChanged: () -> Unit, onPick: (OrderDto) -> Unit = {},
 ) {
   val c = Shop.colors
   val context = LocalContext.current
@@ -543,11 +543,11 @@ private fun OrderDetailSheet(
         onRetry = { if (!busy) scope.launch { busy = true; postRefundNotice(snackbar, o) { OrdersLive.postById(context, store, o.id) }; busy = false } },
       )
 
-      val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
-      if (actions.isNotEmpty()) {
+      val (actions, pickable) = orderPickActions(o, cfg)   // جمع‌آوری (PCK): «جمع‌آوری» و «بسته‌بندی» فقط از برگه
+      if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          actions.forEach { to ->
+          if (pickable) OrderPickButton(o, busy) { onPick(o) }; actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)
