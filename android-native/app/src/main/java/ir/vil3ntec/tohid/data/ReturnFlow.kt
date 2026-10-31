@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.core.pay.PaidRow
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
@@ -31,8 +32,8 @@ import kotlin.math.roundToLong
  *  می‌فرستد (`LedgerDiff.INC_FIELDS`)، نه بازنویسی.
  *
  *  ── پول ────────────────────────────────────────────────────────────
- *  مبلغِ هر قلم همان فرمولِ امروز است: قیمتِ همان قلم در همان فاکتور × سهمِ
- *  پرداخت‌شده پس از تخفیف (RET-03)، گرد به افغانیِ کامل. جمعِ همهٔ برگشت‌های
+ *  مبلغِ هر قلم: قیمتِ همان قلم در همان فاکتور × سهمِ پرداخت‌شده پس از تخفیف
+ *  (RET-03)، گرد به افغانیِ کامل و «تجمعی» (`ReturnShare`، SEC-DATA-01). جمعِ همهٔ برگشت‌های
  *  یک فاکتور از مبلغِ نهاییِ آن بیشتر نمی‌شود (اضافهٔ گرد از قلمِ آخر کم می‌شود).
  *  تقسیمِ بازپرداخت با `Pay.refund`ِ هستهٔ پرداخت (#237): اول بدهیِ بازِ همین
  *  فاکتور (مثلِ امروز)، بقیه به روشِ اصلی، نقد یا اعتبارِ فروشگاه.
@@ -221,7 +222,13 @@ object ReturnFlow {
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
       if (product != null) SalesEngine.quantityProblem(product, q)?.let { return Outcome.Bad(Code.BAD_QTY, it) }
-      val amount = if (item.quantity > 0) (item.totalPrice / item.quantity * q * paidRatio).roundToLong().toDouble() else 0.0
+      //  گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکهٔ یک قلم بیش از برگشتِ یک‌جای همان مقدار پس نمی‌دهد؛
+      //  مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586، برگشت‌های کهنهٔ فرمولِ جداجدا)
+      val prior = d.saleReturns.filter { it.saleItemId == item.id }
+      val amount = ReturnShare.amount(
+        item.totalPrice, item.quantity, item.returnedQty, q, paidRatio,
+        refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity },
+      )
       val unit = if (item.quantity > 0) item.totalPrice / item.quantity else item.unitPrice
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }
