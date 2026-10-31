@@ -230,6 +230,36 @@ function alert(intent, reason, detail = {}) {
   });
 }
 
+/**
+ * needs_review و هشدار. هشدار فقط وقتی نشان تازه خورد: تکرارِ همان رویداد طوفانِ هشدار نمی‌سازد و
+ * قصدی که از پیش زیرِ بررسی است همان یک ردیفِ سابقه را دارد. @returns {Promise<boolean>} نشانِ تازه خورد؟
+ */
+async function flagReview(intent, reason, detail = {}) {
+  const r = await one(
+    'UPDATE payment_intents SET needs_review=true, updated_at=$2 WHERE id=$1 AND needs_review=false RETURNING *',
+    [intent.id, now()]
+  );
+  if (r) await alert(r, reason, detail);
+  return Boolean(r);
+}
+
+/**
+ * «paid» ِ امضاشده‌ای که هرگز تأیید نشد (رویدادِ `deferred`) روی قصدی که دیگر زنده نیست: پول شاید نزدِ
+ * ارائه‌دهنده است و دکان باید ببیند ⇒ needs_review و هشدارِ `paid_unconfirmed`. ⛔ هرگز خودکار پرداخت‌شده
+ * نمی‌شود؛ تأییدِ بعدیِ ارائه‌دهنده (ارسالِ دوباره یا تطبیق) همان مسیرِ S35 است.
+ */
+async function flagDeferredPaid(intent, source) {
+  if (!intent || intent.needs_review === true || ['paid', 'refunded'].includes(intent.status)) return false;
+  const ev = await one(
+    `SELECT provider_event_id, received_at FROM payment_events
+      WHERE intent_id=$1 AND type='paid' AND outcome='deferred' ORDER BY received_at LIMIT 1`, [intent.id]
+  );
+  if (!ev) return false;
+  return flagReview(intent, 'paid_unconfirmed', {
+    cause: 'never_confirmed', source, from: intent.status, eventId: ev.provider_event_id, receivedAt: Number(ev.received_at),
+  });
+}
+
 /** گذار به یکی از وضعیت‌های بسته‌ی بی‌پول (failed/expired/cancelled) با اثرش روی سفارش. */
 async function close(row, to, reason) {
   const out = await tx(async (c) => {
@@ -237,7 +267,11 @@ async function close(row, to, reason) {
     if (next) await orderPaymentIn(c, next, 'failed', { reason });
     return next;
   });
-  if (out) nudge(out.id);
+  if (out) {
+    nudge(out.id);
+    //  بسته شد در حالی که «paid» ِ امضاشده‌اش هنوز «بعداً» است ⇒ بی‌صدا منقضی نشود
+    await flagDeferredPaid(out, reason).catch((err) => console.error('[payments] نشانِ بررسی', out.id, err.message));
+  }
   return out;
 }
 
@@ -279,7 +313,7 @@ async function markPaid(id, { providerRef = '', confirmed = false, source = 'web
       nudge(id);
       if (res.late || res.problem) await alert(res.row, res.late ? 'late_payment' : res.problem, { from: res.from, source, problem: res.problem || '' });
     }
-    if (res.outcome === 'unconfirmed' && res.row) await alert(res.row, 'late_payment_unconfirmed', { from: res.row.status, source });
+    if (res.outcome === 'unconfirmed' && res.row) await flagReview(res.row, 'late_payment_unconfirmed', { from: res.row.status, source });
     return res.outcome;
   }
   return 'duplicate_state';
@@ -539,8 +573,10 @@ async function applyEvent(ad, found, ev) {
         return 'mismatch';
       }
       if (!c.ok) {
+        //  امضاشده می‌گوید «paid» و درِ وضعیت قطعاً «نه» (یا درِ وضعیت نیست): تناقض ⇒ بررسیِ دستی، هرگز پرداخت‌شده نه
         console.warn(`[payments] «paid» ِ ${intent.id} تأیید نشد: ${c.reason}`);
-        if (late) await alert(intent, 'late_payment_unconfirmed', { reason: c.reason });
+        await flagReview(intent, late ? 'late_payment_unconfirmed' : 'paid_unconfirmed',
+          { cause: c.reason, eventId: ev.eventId || '' });
         return 'unconfirmed';
       }
       confirmed = true;
@@ -555,11 +591,29 @@ async function applyEvent(ad, found, ev) {
   return 'ignored';
 }
 
+/*
+ *  رویدادِ در حالِ پردازش: `outcome = 'processing:<پایانِ اجاره>'` (ردیفِ پیش از این نسخه: '' با
+ *  `received_at`). ارسالِ دوبارهٔ رویدادی که هنوز در کار است ⇒ ۵۰۳ (نه ۲۰۰ ِ «تکراری» که ارائه‌دهنده را از
+ *  ارسالِ دوباره بازمی‌داشت)؛ اجارهٔ گذشته (فرآیندی که وسطِ کار مُرد) ⇒ همین بار دوباره. گرفتنِ ردیف
+ *  compare-and-set روی همان مقدار است، پس دو پردازشِ هم‌زمانِ یک رویداد پدید نمی‌آید (و markPaid/close هم CAS‌اند).
+ */
+const EVENT_LEASE_MS = 2 * 60 * 1000;   // یک پردازش (تأییدِ دوم با مهلتِ ۱۰ ثانیه) هرگز این‌قدر نمی‌کشد
+const leaseOf = (at) => `processing:${at + EVENT_LEASE_MS}`;
+function processingState(prev, at) {
+  if (prev.outcome === '') return Number(prev.received_at) + EVENT_LEASE_MS <= at ? 'stale' : 'busy';
+  const m = /^processing:(\d+)$/.exec(String(prev.outcome || ''));
+  if (!m) return '';
+  return Number(m[1]) <= at ? 'stale' : 'busy';
+}
+const retryLater = (message = 'تأییدِ پرداخت هنوز ممکن نشد؛ دوباره بفرستید') =>
+  ({ status: 503, body: { error: { code: 'retry_later', message } } });
+
 /**
  * وب‌هوکِ ارائه‌دهنده — همیشه سریع و یک‌باره. @returns {{status:number, body:object}}
  *   امضای بد ⇒ ۴۰۱؛ رویدادِ تکراری ⇒ ۲۰۰؛ قصدِ ناشناخته ⇒ ۲۰۰ و لاگ (بی طوفانِ تکرار)؛
  *   اختلافِ مبلغ/ارز ⇒ ۲۰۰ و هشدار، بی «paid»؛ تأییدِ دومِ دست‌نیافتنی یا هنوز نامعلوم (pending/unknown)
- *   ⇒ ۵۰۳ و رویدادِ «deferred» تا ارائه‌دهنده دوباره بفرستد؛ فقط «نه» ِ قطعی ⇒ ۲۰۰ `unconfirmed`.
+ *   ⇒ ۵۰۳ و رویدادِ «deferred» تا ارائه‌دهنده دوباره بفرستد؛ فقط «نه» ِ قطعی ⇒ ۲۰۰ `unconfirmed` و بررسی.
+ *   همان رویداد هنوز در کار ⇒ ۵۰۳؛ «paid» ِ deferred روی قصدی که دیگر زنده نیست ⇒ needs_review و هشدار.
  */
 async function handleWebhook(name, raw, headers) {
   const ad = P.webhookAdapter(name);
@@ -574,16 +628,20 @@ async function handleWebhook(name, raw, headers) {
   const at = now();
   const ins = await one(
     `INSERT INTO payment_events (id, provider, provider_event_id, type, outcome, raw, received_at)
-     VALUES ($1,$2,$3,$4,'',$5::jsonb,$6) ON CONFLICT (provider_event_id) DO NOTHING RETURNING id`,
-    [newId('pe'), name, eventKey, String(ev.status || '').slice(0, 40), JSON.stringify(ev.raw || {}), at]
+     VALUES ($1,$2,$3,$4,$7,$5::jsonb,$6) ON CONFLICT (provider_event_id) DO NOTHING RETURNING id`,
+    [newId('pe'), name, eventKey, String(ev.status || '').slice(0, 40), JSON.stringify(ev.raw || {}), at, leaseOf(at)]
   );
   let eventRowId = ins && ins.id;
   if (!eventRowId) {
-    const prev = await one('SELECT id, outcome FROM payment_events WHERE provider_event_id=$1', [eventKey]);
-    if (!prev || prev.outcome !== 'deferred') return { status: 200, body: { ok: true, duplicate: true } };
-    //  پیش‌تر «بعداً» شد (تأییدِ دوم نرسید) ⇒ همین بار دوباره
-    const claimed = await one(`UPDATE payment_events SET outcome='' WHERE id=$1 AND outcome='deferred' RETURNING id`, [prev.id]);
-    if (!claimed) return { status: 200, body: { ok: true, duplicate: true } };
+    const prev = await one('SELECT id, outcome, received_at FROM payment_events WHERE provider_event_id=$1', [eventKey]);
+    if (!prev) return { status: 200, body: { ok: true, duplicate: true } };
+    const busy = processingState(prev, at);
+    if (prev.outcome !== 'deferred' && !busy) return { status: 200, body: { ok: true, duplicate: true } };
+    if (busy === 'busy') return retryLater('همین رویداد در حالِ پردازش است؛ کمی بعد دوباره بفرستید');
+    //  پیش‌تر «بعداً» شد (تأییدِ دوم نرسید) یا پردازشش وسطِ کار ماند ⇒ همین بار دوباره؛ فقط یکی برنده
+    const claimed = await one('UPDATE payment_events SET outcome=$3 WHERE id=$1 AND outcome=$2 RETURNING id',
+      [prev.id, prev.outcome, leaseOf(at)]);
+    if (!claimed) return retryLater('همین رویداد در حالِ پردازش است؛ کمی بعد دوباره بفرستید');
     eventRowId = prev.id;
   }
   const setOutcome = (outcome, intentId = null) => query(
@@ -607,7 +665,14 @@ async function handleWebhook(name, raw, headers) {
   }
   await setOutcome(outcome, intent.id);
   if (outcome === 'deferred') {
-    return { status: 503, body: { error: { code: 'retry_later', message: 'تأییدِ پرداخت هنوز ممکن نشد؛ دوباره بفرستید' } } };
+    //  «paid» ِ تأییدنشده روی قصدی که دیگر زنده نیست (دیر رسید، یا در همین پردازش منقضی شد) ⇒ دکان ببیند
+    if (ev.status === 'paid') {
+      const cur = await one('SELECT * FROM payment_intents WHERE id=$1', [intent.id]);
+      if (cur && (!LIVE.includes(cur.status) || Number(cur.expires_at) <= now())) {
+        await flagDeferredPaid(cur, 'webhook').catch((err) => console.error('[payments] نشانِ بررسی', cur.id, err.message));
+      }
+    }
+    return retryLater();
   }
   return { status: 200, body: { ok: true, outcome } };
 }
@@ -620,10 +685,11 @@ async function handleWebhook(name, raw, headers) {
  * برای هر قصدِ created/pending/expired ِ بازهٔ `sinceMs` (پیش‌فرض ۴۸ ساعت) وضعیت را از ارائه‌دهنده
  * می‌پرسد: «paid» ِ تأییدشده ⇒ markPaid (دیر ⇒ هشدار)؛ «failed/expired/cancelled» ⇒ بستنِ زنده؛
  * اختلاف ⇒ هشدار. زنده پیش از منقضی و تازه پیش از کهنه؛ `budgetMs` ⇒ پس از آن زمان بقیه به نوبتِ بعد
- * (`truncated`). @returns {{checked, paid, closed, mismatched, errors, truncated}}
+ * (`truncated`). قصدِ بسته با «paid» ِ deferred ⇒ needs_review و هشدار (`flagged`).
+ * @returns {{checked, paid, closed, mismatched, errors, truncated, flagged}}
  */
 async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500, budgetMs = 0 } = {}) {
-  const out = { checked: 0, paid: 0, closed: 0, mismatched: 0, errors: 0, truncated: false };
+  const out = { checked: 0, paid: 0, closed: 0, mismatched: 0, errors: 0, truncated: false, flagged: 0 };
   const t0 = Date.now();
   const rows = (await query(
     `SELECT * FROM payment_intents WHERE status IN ('created','pending','expired') AND created_at >= $1
@@ -652,6 +718,18 @@ async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500, budgetMs 
     } else if (LIVE.includes(r.status)) {
       if (await expireIfDue(r).then((x) => x && x.status === 'expired')) out.closed++;
     }
+  }
+  //  تورِ ایمنی: قصدِ بسته‌ای که «paid» ِ deferred دارد و هنوز نشانِ بررسی ندارد (مثلاً فرآیند میانِ بستن و
+  //  نشان مُرد) ⇒ needs_review و هشدار. قصدِ زنده‌ای که زمانش گذشته در حلقهٔ بالا بسته و همان‌جا نشان می‌خورد.
+  const stuck = (await query(
+    `SELECT i.* FROM payment_intents i
+      WHERE i.status IN ('expired','failed','cancelled') AND i.needs_review = false AND i.created_at >= $1
+        AND EXISTS (SELECT 1 FROM payment_events e WHERE e.intent_id = i.id AND e.type = 'paid' AND e.outcome = 'deferred')
+      ORDER BY i.created_at DESC LIMIT $2`,
+    [now() - sinceMs, Math.min(5000, Math.max(1, limit))]
+  )).rows;
+  for (const r of stuck) {
+    if (await flagDeferredPaid(r, 'reconcile')) out.flagged++;
   }
   return out;
 }
@@ -711,7 +789,7 @@ async function reconcileTick({ wide } = {}) {
     try {
       const full = wide ?? (reconTicks++ % RECONCILE_FULL_EVERY === 0);
       const out = await reconcile({ ...(full ? {} : { sinceMs: RECONCILE_RECENT_MS }), budgetMs: RECONCILE_BUDGET_MS });
-      if (out.paid || out.closed || out.mismatched || out.errors || out.truncated) {
+      if (out.paid || out.closed || out.mismatched || out.errors || out.truncated || out.flagged) {
         console.log(`[payments] تطبیق: ${JSON.stringify(out)}`);
       }
       return { ...out, wide: full };

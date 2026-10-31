@@ -125,7 +125,9 @@
 - ⛔ پرچمِ `pay.hesabpay` (دکان/`all`، پیش‌فرض خاموش)؛ پرداختِ سفارشِ آنلاین افزون بر آن اشتراکِ فعال (`source = subscription`، نه آزمایشی).
 - ⛔ مبلغ عددِ صحیح به پول؛ برای سفارش همان `total_minor` ِ سرور (ناهمخوان ⇒ ۴۰۹ `amount_mismatch`)؛ ارز فقط AFN؛ تبدیل به دهدهیِ ارائه‌دهنده دقیق و بی گرد (`minorToDecimal`/`decimalToMinor`).
 - ⛔ «paid» فقط از وب‌هوکِ امضاشده (HMAC، زمان‌ثابت) + مبلغ و ارزِ برابر + تأییدِ دومِ ارائه‌دهنده (`PAYMENTS_CONFIRM_WEBHOOK`، پیش‌فرض روشن)؛ هرگز از برگشتِ مرورگر یا گفتهٔ برنامه.
-- ⛔ تأییدِ دومِ دست‌نیافتنی **یا هنوز نامعلوم** (`pending`/`unknown`) ⇒ ۵۰۳ و رویدادِ `deferred` (همان رویداد دوباره‌پذیر است)؛ فقط «نه» ِ قطعی (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ `unconfirmed` ِ نهایی.
+- ⛔ تأییدِ دومِ دست‌نیافتنی **یا هنوز نامعلوم** (`pending`/`unknown`) ⇒ ۵۰۳ و رویدادِ `deferred` (همان رویداد دوباره‌پذیر است)؛ فقط «نه» ِ قطعی (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ `unconfirmed` ِ نهایی، با `needs_review` و هشدار (تناقض).
+- ⛔ «paid» ِ امضاشده هرگز بی‌صدا نمی‌ماند: رویدادِ `deferred` روی قصدی که بسته/منقضی/لغو شد (`close`، وب‌هوکِ دیر، تورِ تطبیق) ⇒ `needs_review` و `payment.review` با `paid_unconfirmed`؛ هرگز خودکار پرداخت‌شده نمی‌شود. هشدار فقط با نشانِ تازه (بی طوفان).
+- رویدادِ در حالِ پردازش `outcome = processing:<پایانِ اجاره>` (۲ دقیقه)؛ ارسالِ دوباره‌اش ۵۰۳، نه ۲۰۰ ِ «تکراری»؛ اجارهٔ گذشته (فرآیندِ مرده) با compare-and-set دوباره گرفته می‌شود.
 - ⛔ تطبیقِ زمان‌بندی‌شده (`startReconciler` در `index.js`): هر ۵ دقیقه قصدهای ۲ ساعتِ اخیر، ساعتی همان ۴۸ ساعت؛ فقط با ارائه‌دهندهٔ پیکربندی‌شده؛ دو نمونهٔ سرور هم‌زمان نه (اجارهٔ `lease:payments.reconcile` در `app_config`).
 - وضعیت فقط `created → pending → paid|failed|expired|cancelled` و `paid → refunded` با compare-and-set روی status؛ پایانی برنمی‌گردد. تنها استثنا S35: `expired|cancelled|failed → paid` فقط با تأییدِ ارائه‌دهنده، همراهِ `needs_review` و سابقهٔ `payment.review`.
 - درستی هرگز به ترتیبِ `created_at` تکیه ندارد (رویدادِ هم‌میلی‌ثانیه)؛ تکرار با `payment_events.provider_event_id` یکتا؛ قصدِ ناشناخته ۲۰۰ و لاگ.

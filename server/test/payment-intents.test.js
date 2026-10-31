@@ -210,8 +210,10 @@ test('وب‌هوکِ تکراری و ترتیبِ بی‌اهمیت: یک با�
   P.fake.settle(sid, { status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'R-1' });
   const ev = { eventId: 'dup-1', sessionId: sid, status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'R-1' };
   const [x, y] = await Promise.all([hook(ev), hook(ev)]);
-  assert.deepEqual([x.status, y.status], [200, 200]);
-  assert.ok([x.body, y.body].some((b) => b.duplicate === true), JSON.stringify([x.body, y.body]));
+  //  یکی اعمال؛ دیگری «تکراری»، یا اگر وسطِ پردازشِ اولی رسید ۵۰۳ ِ «در حالِ پردازش» (ارائه‌دهنده دوباره می‌فرستد)
+  const outs = [x, y].map((r) => (r.status === 503 ? 'retry' : r.body.duplicate ? 'duplicate' : r.body.outcome));
+  assert.equal(outs.filter((o) => o === 'applied').length, 1, JSON.stringify(outs));
+  assert.ok(outs.every((o) => ['applied', 'duplicate', 'retry'].includes(o)), JSON.stringify(outs));
   const v1 = (await rowOf(a.id)).version;
   assert.equal((await hook(ev)).body.duplicate, true);
   //  رویدادِ دیگرِ هم‌میلی‌ثانیه با «failed» و «paid» ِ دوم
@@ -321,6 +323,171 @@ test('تأییدِ دومِ دیرکرده (درِ وضعیت هنوز pending/u
   const r3 = await h.raw('POST', '/api/payments/webhook/fake', spaced,
     { headers: { 'Content-Type': 'application/json', 'x-fake-signature': P.fake.sign(Buffer.from(JSON.stringify(other))) } });
   assert.equal(r3.status, 401);
+});
+
+const reviewsOf = (id, reason) => one(
+  `SELECT COUNT(*)::int AS n FROM audit_logs WHERE action='payment.review' AND target_id=$1 AND detail->>'reason'=$2`, [id, reason]
+).then((r) => Number(r.n));
+const lastReview = (id, reason) => one(
+  `SELECT detail FROM audit_logs WHERE action='payment.review' AND target_id=$1 AND detail->>'reason'=$2
+    ORDER BY created_at DESC LIMIT 1`, [id, reason]
+);
+const eventOutcome = async (eventId) => (await one('SELECT outcome FROM payment_events WHERE provider_event_id=$1', [`fake:${eventId}`])).outcome;
+
+//  بازبینِ مستقل، دورِ ۲: درِ وضعیت همیشه unknown ⇒ تطبیق قصد را expired می‌کرد، needs_review=false، بی هیچ سابقه
+test('«paid» ِ امضاشده‌ای که هرگز تأیید نشد بی‌صدا منقضی نمی‌شود: needs_review و هشدارِ paid_unconfirmed؛ هرگز خودکار پرداخت‌شده نه', async () => {
+  const s = await shop('هرگز-تأیید');
+  const a = (await createPos(s)).body;
+  const sid = (await rowOf(a.id)).provider_session_id;
+  P.fake.settle(sid, { status: 'unknown', amountMinor: null, currency: '' });
+  const ev = { eventId: `nv-${++seq}`, sessionId: sid, status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'TX-NV' };
+  assert.equal((await hook(ev)).status, 503);
+  assert.equal((await rowOf(a.id)).needs_review, false, 'تا قصد زنده است فقط «بعداً»');
+
+  //  زمانِ قصد گذشت؛ زمان‌بندِ تطبیق آن را می‌بندد (ارائه‌دهنده هنوز unknown)
+  await query('UPDATE payment_intents SET expires_at=$2 WHERE id=$1', [a.id, Date.now() - 1000]);
+  const out = await pay.reconcileTick({ wide: false });
+  assert.ok(out && out.closed >= 1, JSON.stringify(out));
+  let row = await rowOf(a.id);
+  assert.equal(row.status, 'expired');
+  assert.equal(row.needs_review, true, 'دکان باید ببیند');
+  const al = await lastReview(a.id, 'paid_unconfirmed');
+  assert.ok(al, 'سابقهٔ payment.review');
+  assert.equal(al.detail.cause, 'never_confirmed');
+  assert.equal(al.detail.eventId, `fake:${ev.eventId}`);
+  assert.equal(await eventOutcome(ev.eventId), 'deferred', 'رویداد هنوز دوباره‌پذیر است');
+
+  //  ارسالِ دوباره با همان unknown ⇒ باز ۵۰۳، بی هشدارِ دوم و بی پرداخت
+  assert.equal((await hook(ev)).status, 503);
+  assert.equal(await reviewsOf(a.id, 'paid_unconfirmed'), 1);
+  assert.equal((await rowOf(a.id)).status, 'expired');
+
+  //  ارائه‌دهنده سرانجام تأیید کرد ⇒ همان مسیرِ S35 (پرداختِ دیر با بررسی)
+  P.fake.settle(sid, { status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'TX-NV' });
+  assert.equal((await hook(ev)).body.outcome, 'applied');
+  row = await rowOf(a.id);
+  assert.equal(row.status, 'paid');
+  assert.equal(row.needs_review, true);
+
+  //  بستن بیرون از تطبیق (لغوِ صندوقدار، یا انقضای تنبل با خواندن) ⇒ همان دم، بی انتظار برای نوبتِ تطبیق
+  for (const how of ['cancel', 'poll']) {
+    const c = (await createPos(s)).body;
+    const csid = (await rowOf(c.id)).provider_session_id;
+    P.fake.settle(csid, { status: 'unknown', amountMinor: null, currency: '' });
+    assert.equal((await hook({ ...ev, eventId: `nv-${++seq}`, sessionId: csid, amountMinor: c.amount })).status, 503);
+    if (how === 'cancel') {
+      assert.equal((await h.post(`${URL_INT}/${c.id}/cancel`, {}, { token: s.t })).status, 200);
+    } else {
+      await query('UPDATE payment_intents SET expires_at=$2 WHERE id=$1', [c.id, Date.now() - 1000]);
+      assert.equal((await h.get(`${URL_INT}/${c.id}`, { token: s.t })).body.status, 'expired');
+    }
+    const cr = await rowOf(c.id);
+    assert.equal(cr.needs_review, true, how);
+    assert.equal((await lastReview(c.id, 'paid_unconfirmed')).detail.source, how === 'cancel' ? 'cancelled_by_staff' : 'timeout', how);
+    assert.notEqual(cr.status, 'paid', how);
+  }
+});
+
+test('«paid» ِ deferred روی قصدی که پیش‌تر بسته شده ⇒ همان دم نشانِ بررسی؛ تورِ ایمنیِ تطبیق برای قصدِ بستهٔ بی‌نشان', async () => {
+  const s = await shop('دیرِ-بعداً');
+  //  قصدِ منقضی که «paid» ِ دیرش می‌رسد و درِ وضعیت هنوز pending است
+  const a = (await createPos(s)).body;
+  await query('UPDATE payment_intents SET expires_at=$2 WHERE id=$1', [a.id, Date.now() - 1000]);
+  assert.equal((await h.get(`${URL_INT}/${a.id}`, { token: s.t })).body.status, 'expired');
+  const sid = (await rowOf(a.id)).provider_session_id;
+  P.fake.settle(sid, { status: 'pending', amountMinor: a.amount, currency: 'AFN' });
+  const r = await hook({ eventId: `lt-${++seq}`, sessionId: sid, status: 'paid', amountMinor: a.amount, currency: 'AFN' });
+  assert.equal(r.status, 503);
+  assert.equal((await rowOf(a.id)).needs_review, true);
+  assert.equal((await lastReview(a.id, 'paid_unconfirmed')).detail.source, 'webhook');
+  assert.equal((await rowOf(a.id)).status, 'expired');
+
+  //  قصدِ بسته‌ای که رویدادِ deferred دارد ولی نشانش نخورده (فرآیند میانِ بستن و نشان مُرد) ⇒ تطبیق نشانش می‌زند
+  const b = (await createPos(s)).body;
+  await query('UPDATE payment_intents SET expires_at=$2 WHERE id=$1', [b.id, Date.now() - 1000]);
+  assert.equal((await h.get(`${URL_INT}/${b.id}`, { token: s.t })).body.status, 'expired');
+  await query(
+    `INSERT INTO payment_events (id, provider, provider_event_id, intent_id, type, outcome, raw, received_at)
+     VALUES ($1,'fake',$2,$3,'paid','deferred','{}'::jsonb,$4)`, [newId('pe'), `fake:stuck-${++seq}`, b.id, Date.now()]
+  );
+  assert.equal((await rowOf(b.id)).needs_review, false);
+  const out = await pay.reconcile({ sinceMs: 60 * 60 * 1000 });
+  assert.ok(out.flagged >= 1, JSON.stringify(out));
+  assert.equal((await rowOf(b.id)).needs_review, true);
+  assert.equal((await lastReview(b.id, 'paid_unconfirmed')).detail.source, 'reconcile');
+  assert.equal((await rowOf(b.id)).status, 'expired', 'هرگز خودکار پرداخت‌شده نه');
+  //  دورِ بعد همان را دوباره نشان نمی‌زند
+  await pay.reconcile({ sinceMs: 60 * 60 * 1000 });
+  assert.equal(await reviewsOf(b.id, 'paid_unconfirmed'), 1);
+});
+
+test('تناقض: «paid» ِ امضاشده و درِ وضعیت قطعاً failed ⇒ unconfirmed با needs_review و هشدار، بی پرداخت', async () => {
+  const s = await shop('تناقض');
+  const a = (await createPos(s)).body;
+  const r = await paid(a, { event: { eventId: `ct-${++seq}` }, status: { status: 'failed' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.outcome, 'unconfirmed');
+  const row = await rowOf(a.id);
+  assert.equal(row.status, 'pending');
+  assert.equal(row.needs_review, true);
+  const al = await lastReview(a.id, 'paid_unconfirmed');
+  assert.ok(al);
+  assert.equal(al.detail.cause, 'provider_says_failed');
+  //  تکرارِ تناقض ⇒ همان یک سابقه
+  await paid(a, { event: { eventId: `ct-${++seq}` }, status: { status: 'failed' } });
+  assert.equal(await reviewsOf(a.id, 'paid_unconfirmed'), 1);
+});
+
+test('رویدادِ در حالِ پردازش: ارسالِ دوباره ۵۰۳ (نه «تکراری»)؛ پردازشی که مُرد پس از اجاره دوباره‌پذیر است، فقط یک بار', async () => {
+  const s = await shop('در-کار');
+  const mk = async () => {
+    const a = (await createPos(s)).body;
+    const sid = (await rowOf(a.id)).provider_session_id;
+    P.fake.settle(sid, { status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'IP' });
+    const ev = { eventId: `ip-${++seq}`, sessionId: sid, status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'IP' };
+    return { a, ev, key: `fake:${ev.eventId}` };
+  };
+  const plant = (key, outcome, receivedAt) => query(
+    `INSERT INTO payment_events (id, provider, provider_event_id, type, outcome, raw, received_at)
+     VALUES ($1,'fake',$2,'paid',$3,'{}'::jsonb,$4)`, [newId('pe'), key, outcome, receivedAt]
+  );
+  const set = (key, outcome, receivedAt) => query(
+    'UPDATE payment_events SET outcome=$2, received_at=$3 WHERE provider_event_id=$1', [key, outcome, receivedAt]
+  );
+
+  const x = await mk();
+  //  فرآیندی که رویداد را گرفته و هنوز در کار است (اجارهٔ زنده)
+  await plant(x.key, `processing:${Date.now() + 60_000}`, Date.now());
+  const r1 = await hook(x.ev);
+  assert.equal(r1.status, 503, JSON.stringify(r1.body));
+  assert.equal(r1.body.error.code, 'retry_later');
+  //  ردیفِ پیش از این نسخه: outcome ِ تهی و تازه ⇒ همان ۵۰۳
+  await set(x.key, '', Date.now());
+  assert.equal((await hook(x.ev)).status, 503);
+  assert.equal((await rowOf(x.a.id)).status, 'pending');
+  //  فرآیند مُرد: پس از اجاره همین ارسال اعمال می‌شود؛ بعد واقعاً تکراری
+  await set(x.key, '', Date.now() - 3 * 60_000);
+  const r3 = await hook(x.ev);
+  assert.equal(r3.status, 200, JSON.stringify(r3.body));
+  assert.equal(r3.body.outcome, 'applied');
+  assert.equal((await rowOf(x.a.id)).status, 'paid');
+  assert.equal(await eventOutcome(x.ev.eventId), 'applied');
+  assert.equal((await hook(x.ev)).body.duplicate, true);
+
+  //  اجارهٔ گذشته با قالبِ تازه
+  const y = await mk();
+  await plant(y.key, `processing:${Date.now() - 1}`, Date.now() - 1000);
+  assert.equal((await hook(y.ev)).body.outcome, 'applied');
+
+  //  دو ارسالِ هم‌زمانِ یک ردیفِ مانده ⇒ فقط یکی می‌گیرد و اعمال می‌کند
+  const z = await mk();
+  await plant(z.key, '', Date.now() - 3 * 60_000);
+  const v0 = (await rowOf(z.a.id)).version;
+  const both = await Promise.all([hook(z.ev), hook(z.ev)]);
+  const outs = both.map((r) => (r.status === 503 ? 'retry' : r.body.duplicate ? 'duplicate' : r.body.outcome));
+  assert.equal(outs.filter((o) => o === 'applied').length, 1, JSON.stringify(outs));
+  assert.ok(outs.every((o) => ['applied', 'retry', 'duplicate'].includes(o)), JSON.stringify(outs));
+  assert.equal((await rowOf(z.a.id)).version, v0 + 1, 'یک گذار');
 });
 
 test('ساختگی فقط با NODE_ENV ِ صریحِ test/development و رازِ داده‌شده؛ وگرنه حساب‌پی و /webhook/fake ۴۰۱', async () => {
