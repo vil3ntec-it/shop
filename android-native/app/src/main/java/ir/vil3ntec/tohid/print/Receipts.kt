@@ -145,6 +145,15 @@ object Receipts {
   fun pdf(context: Context, d: ShopData, sale: Sale, legacyQr: String? = null): ByteArray =
     ReceiptPdf.single(mono(context, d, sale, SHARE_DOTS, legacyQr = legacyQr))
 
+  /**
+   *  POS-34 — رسیدِ هدیهٔ بی قیمت با چیدمانِ هسته (`GiftReceiptLayout`): همان ورودیِ فاکتور، ولی هیچ
+   *  مبلغ، پرداخت، قرض‌دار یا QR به کاغذ نمی‌رسد. فقط از دکمهٔ «رسیدِ هدیه» (`GiftReceiptPrefs`، خاموش).
+   */
+  fun giftBitmap(context: Context, d: ShopData, sale: Sale, widthDots: Int, fallbackName: String = localName(context)): Bitmap {
+    val doc = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.build(input(context, d, sale, widthDots, fallbackName = fallbackName), widthDots, format())
+    return ThermalPrinter.toBitmap(ReceiptRaster.compose(doc, ReceiptPainter(context)))
+  }
+
   /* ---------------------------- رسیدِ برگشت (RET-12) ---------------------------- */
 
   /** برچسب‌های رسیدِ برگشت به زبانِ برنامه — همان نوشته‌های رسیدِ پیشین (`StrPos`) */

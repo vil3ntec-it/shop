@@ -486,6 +486,8 @@ fun InvoiceDialog(
           }
           Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
         }
+        //  POS-34 (پشتِ `GiftReceiptPrefs`، پیش‌فرض خاموش): رسیدِ هدیهٔ بی قیمت
+        ir.vil3ntec.tohid.ui.components.pos.GiftReceiptButton(d, sale, onMessage)
       }
     }
     }
