@@ -18,6 +18,7 @@ const { serverSecret } = require('./server-secret');
 const settings = require('./sms-settings');
 const { sectionOf } = require('./tenancy');
 const { badRequest, tooMany, forbidden, upstream } = require('../middleware/errors');
+const { phoneKey, phoneForms } = require('./validate');
 
 function pepper() {
   return serverSecret(['otp', 'api'], 'shop-otp-pepper');
@@ -378,22 +379,29 @@ const HOME_CC = process.env.DEFAULT_COUNTRY_CODE || '+93';   // همان پیش�
 const smsLimits = () => config.otp.smsGuard;
 const ceilingAlerted = new Set();
 
-/** شمارهٔ آشنا: پیش‌تر کدی را درست زده، یا مشتریِ ویترین است. */
+/** شمارهٔ آشنا: پیش‌تر کدی را درست زده، یا مشتریِ ویترین است (هر شکلِ همان شماره — RSK-07). */
 async function isKnown(destination) {
   const r = await one(
-    `SELECT (EXISTS (SELECT 1 FROM otp_codes WHERE destination = $1 AND consumed_at IS NOT NULL)
-          OR EXISTS (SELECT 1 FROM store_customers WHERE phone = $1)) AS known`,
-    [destination]
+    `SELECT (EXISTS (SELECT 1 FROM otp_codes WHERE destination = ANY($1::text[]) AND consumed_at IS NOT NULL)
+          OR EXISTS (SELECT 1 FROM store_customers WHERE phone = ANY($1::text[]))) AS known`,
+    [phoneForms(destination)]
   );
   return Boolean(r && r.known);
 }
 
+//  کلیدِ یکتای شماره در SQL — همان `phoneKey`: ‎+9300700…‎ ⇒ ‎+93700…‎ (RSK-07)
+const KEY_RE_SQL = `^${HOME_CC.replace(/[+]/g, '\\+')}0+`;
+/**
+ * شمارِ شماره‌های **جدا**ی ساعتِ اخیر جز خودِ `$2` (کلیدِ یکتا). `{key}` در `where` همان کلیدِ ردیف است؛
+ * شکل‌های یک گوشی یک شماره‌اند، پس نه شمارش را بالا می‌برند و نه دسته (`sms_prefix_limit`) را دور می‌زنند.
+ */
 async function distinctPhones(where, params, { failed = true } = {}) {
+  const key = `regexp_replace(destination, $${params.length + 1}, $${params.length + 2})`;
   const r = await one(
-    `SELECT COUNT(DISTINCT destination)::int AS n FROM otp_codes
+    `SELECT COUNT(DISTINCT ${key})::int AS n FROM otp_codes
       WHERE created_at > $1 AND destination NOT LIKE '%@%' AND via <> 'log' ${failed ? '' : "AND via <> 'failed'"}
-        AND destination <> $2 AND ${where}`,
-    params
+        AND ${key} <> $2 AND ${where.replace(/\{key\}/g, key)}`,
+    [...params, KEY_RE_SQL, HOME_CC]
   );
   return r.n;
 }
@@ -433,22 +441,23 @@ async function smsGuard(destination, { ip = '', at = now() } = {}) {
   const lim = smsLimits();
   const known = await isKnown(destination);
   const since = at - HOUR_MS;
+  const key = phoneKey(destination);
   const fresh = !known && !(await one(
-    `SELECT 1 AS x FROM otp_codes WHERE destination = $1 AND created_at > $2 LIMIT 1`, [destination, since]
+    `SELECT 1 AS x FROM otp_codes WHERE destination = ANY($1::text[]) AND created_at > $2 LIMIT 1`, [phoneForms(destination), since]
   ));
   if (fresh) {
-    const block = destination.slice(0, -BLOCK_DIGITS);
-    if (ip && await distinctPhones('ip = $3', [since, destination, ip]) >= lim.ipPhones) {
+    const block = key.slice(0, -BLOCK_DIGITS);
+    if (ip && await distinctPhones('ip = $3', [since, key, ip]) >= lim.ipPhones) {
       throw tooMany('از این شبکه در این ساعت برای شماره‌های تازهٔ زیادی کد خواسته شده است؛ کمی بعد دوباره امتحان کنید', 'sms_ip_limit');
     }
-    if (await distinctPhones('destination LIKE $3', [since, destination, `${block}%`]) >= lim.blockPhones) {
+    if (await distinctPhones('{key} LIKE $3', [since, key, `${block}%`]) >= lim.blockPhones) {
       throw tooMany('فرستادنِ کد به این دسته از شماره‌ها فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_prefix_limit');
     }
   }
   //  خارجی: ناآشنا (تازه) سقفِ کوچک، آشنا سقفِ جدا و بزرگ‌تر؛ تلاشِ ناموفق شمرده نمی‌شود
   const foreignCap = known ? lim.knownForeignPhones : (fresh ? lim.foreignPhones : null);
   if (foreignCap !== null && !destination.startsWith(HOME_CC)
-      && await distinctPhones('destination NOT LIKE $3', [since, destination, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
+      && await distinctPhones('destination NOT LIKE $3', [since, key, `${HOME_CC}%`], { failed: false }) >= foreignCap) {
     throw tooMany('فرستادنِ کد به شماره‌های خارجی فعلاً بسته است؛ کمی بعد دوباره امتحان کنید', 'sms_foreign_limit');
   }
   const full = await dailyCeiling(known, at);
@@ -462,11 +471,16 @@ function recordSms(destination, { shopId = '', app = '', purpose = '', via = '',
     .catch((err) => console.error('[otp] دفترِ پیامک ثبت نشد:', err.message));
 }
 
-/** سقفِ روزانهٔ هر نشانی (ردیف‌های ناموفق شمرده نمی‌شوند). */
+/*
+ * RSK-07: سقفِ روزانه و فاصلهٔ ارسالِ دوباره روی **همهٔ** شکل‌های یک شماره (`phoneForms` ِ validate:
+ * ‎+93…‎، ‎+930…‎، ‎+9300…‎ …). پیش از این فقط یک صفر برداشته می‌شد و هر شکلِ دیگر سقفِ جدا داشت.
+ */
+/** سقفِ روزانهٔ هر نشانی، همهٔ شکل‌هایش با هم (ردیف‌های ناموفق شمرده نمی‌شوند). */
 async function overDailyMax(destination, at) {
   const { n } = await one(
-    `SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination=$1 AND created_at > $2 AND via <> 'failed'`,
-    [destination, at - 24 * 3600 * 1000]
+    `SELECT COUNT(*)::int AS n FROM otp_codes
+      WHERE destination = ANY($1::text[]) AND created_at > $2 AND via <> 'failed'`,
+    [phoneForms(destination), at - 24 * 3600 * 1000]
   );
   return n >= config.otp.dailyMax;
 }
@@ -478,11 +492,11 @@ async function overDailyMax(destination, at) {
 async function request(destination, { purpose = 'login', ip = '', app = '', shopId = '' } = {}) {
   const t = now();
 
-  // فاصله‌ی ارسال دوباره
+  // فاصله‌ی ارسال دوباره (همهٔ شکل‌های همان شماره — RSK-07)
   const last = await one(
-    `SELECT created_at FROM otp_codes WHERE destination=$1 AND purpose=$2 AND via <> 'failed'
+    `SELECT created_at FROM otp_codes WHERE destination = ANY($1::text[]) AND purpose=$2 AND via <> 'failed'
       ORDER BY created_at DESC LIMIT 1`,
-    [destination, purpose]
+    [phoneForms(destination), purpose]
   );
   if (last && t - Number(last.created_at) < config.otp.resendMs) {
     const wait = Math.ceil((config.otp.resendMs - (t - Number(last.created_at))) / 1000);

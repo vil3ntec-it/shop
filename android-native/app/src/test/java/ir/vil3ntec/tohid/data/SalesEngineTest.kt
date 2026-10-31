@@ -391,4 +391,37 @@ class SalesEngineTest {
     assertEquals("117", money(116.55))   // مثل Math.round نسخهٔ وب
     assertEquals("-500", money(-500.0))
   }
+
+  /* ------------------ POS-24: قاعده‌های پیش از پایانِ فاکتور ------------------ */
+
+  @Test
+  fun `قاعدهٔ مشتری از آستانه — فاکتورِ ۶۰۰ بی مشتری رد، زیرِ آستانه یا با مشتری ثبت`() {
+    val d = ledger()
+    val rules = ir.vil3ntec.tohid.core.sale.CheckoutRules(customerFromMinor = 60_000)
+    val message = failed(record(d, twoRice, SalesEngine.Checkout(rules = rules)))
+    assertEquals("قاعدهٔ دکان: فاکتورِ 600 افغانی و بالاتر مشتری می‌خواهد — مشتری را انتخاب کنید", message)
+    //  زیرِ آستانه و با مشتری ثبت می‌شود؛ نقدِ با مشتری بدهی نمی‌سازد
+    ok(record(d, listOf(SalesEngine.CartLine("p1", 1.0)), SalesEngine.Checkout(rules = rules)))
+    val r = ok(record(d, twoRice, SalesEngine.Checkout(rules = rules, debtorId = "d1")))
+    assertEquals(1, r.data.sales.size)
+    assertTrue(r.data.transactions.isEmpty())
+  }
+
+  @Test
+  fun `فاکتورِ صفر فقط با قاعده رد می‌شود — خاموش همان امروز`() {
+    val d = ledger()
+    val all = SalesEngine.Checkout(discountType = SalesEngine.DiscountType.PERCENT, discountValue = 100.0)
+    assertEquals(0.0, SalesEngine.totals(d, twoRice, all).finalTotal, 0.0001)
+    ok(record(d, twoRice, all))
+    val message = failed(record(d, twoRice, all.copy(rules = ir.vil3ntec.tohid.core.sale.CheckoutRules(blockZeroTotal = true))))
+    assertEquals("قاعدهٔ دکان: فاکتورِ با مبلغِ صفر ثبت نمی‌شود", message)
+  }
+
+  @Test
+  fun `قاعده‌های دکان قاعدهٔ ثابتِ نسیه را عوض نمی‌کنند`() {
+    val d = ledger()
+    val rules = ir.vil3ntec.tohid.core.sale.CheckoutRules(customerFromMinor = 0, blockZeroTotal = true)
+    val message = failed(record(d, twoRice, SalesEngine.Checkout(payment = SalesEngine.Payment.CREDIT, paidAmount = 0.0, rules = rules)))
+    assertEquals("برای فروش نسیه، قرض‌دار را انتخاب کنید", message)
+  }
 }

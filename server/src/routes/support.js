@@ -45,7 +45,7 @@ async function who(req) {
     if (row) {
       user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
       if (user) {
-        const member = await membershipOf(user.id);
+        const member = await membershipOf(user.id, { shopId: row.shop_id || null });
         if (member) shopId = member.shop_id;
       }
     }
