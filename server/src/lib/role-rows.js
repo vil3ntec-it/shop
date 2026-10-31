@@ -10,7 +10,10 @@
  *     دسته بیش از یک بار آمده.
  *   • قلم‌های برگشت: برگشتِ همین دسته فقط اگر واقعاً می‌نشیند (`fresh`: نه op_id ِ تکراری، نه ردشده،
  *     نه ردیفِ موجود) — و در v3 فقط از همان واحد (tx، یا بستهٔ `bundleV3`)؛ به‌علاوهٔ برگشتِ ثبت‌شده
- *     (حذف‌نشده، لغونشده) که «خودی» است اگر همین دستگاه/کاربر ثبتش کرده.
+ *     (حذف‌نشده، لغونشده) که «خودی» است اگر **همین کاربر** ساختش — نه شناسهٔ دستگاهی که برنامه
+ *     می‌فرستد (شناسهٔ دستگاهِ دیگران در Pull دیده می‌شود؛ بازبینیِ دومِ #336، ج). v1 و v3: نخستین
+ *     درجِ ردیف (oplog / sync_v3_ops) و نویسندهٔ آن op در `sync_op_authors` (`noteAuthors`، پیش از
+ *     اعمال؛ مهاجرتِ ۱۲۳)؛ راهِ قدیم: `user_id` ِ ردیف (همان سازنده؛ ویرایش عوضش نمی‌کند).
  *   • فاکتورها: درجِ همین دسته و ثبت‌شده‌ها، با قلم‌هایشان (`saleItems`) و لغوشده‌ها (`cancelled`:
  *     لغوِ همین دسته که می‌نشیند، یا ثبت‌شده). در v3 دادهٔ فاکتورِ همین دسته فقط از همان واحد یا
  *     واحدِ پیشینی که ردیفِ ردشده‌ای نداشت.
@@ -156,8 +159,63 @@ async function judge(role, items, db, { v3 = false, perUnit = false } = {}) {
   return out;
 }
 
-/** گردآورندهٔ v1 (`sync_rows` و `oplog`) */
-function v1Db(many, ctx, deviceId) {
+/**
+ * نقشی که «برگشتِ خودی» برایش معنا دارد (اصلاحِ برگشت فقط روی برگشتِ خودش): امروز صندوق‌دار.
+ * فقط برای همین نقش‌ها نویسندهٔ درجِ برگشت ثبت می‌شود.
+ */
+function authorRole(role) {
+  return core.rowRule(role, 'warehouseEntries') === 'return_adjustment';
+}
+
+/**
+ * نویسندهٔ opهای درجِ برگشت (پیش از اعمال، یا درونِ تراکنشِ v3). opی که ننشیند در oplog/sync_v3_ops
+ * نیست و این ردیف اثری ندارد. op_idی که از پیش در oplog یا sync_v3_ops ِ همین حساب هست ثبت نمی‌شود:
+ * وگرنه صندوق‌دار op_id ِ برگشتِ صاحب دکان را (که در Pull می‌بیند) دوباره می‌فرستاد — پاسخش
+ * «تکراری» است — و خودش نویسندهٔ آن ثبت می‌شد. نخستین ثبت می‌ماند.
+ * @param run  `query` یا `c.query` (درونِ تراکنش)
+ */
+async function noteAuthors(run, ctx, opIds) {
+  const ids = uniq((opIds || []).map((x) => String(x || '')));
+  if (!ids.length || !ctx || !isId(ctx.userId) || !isId(ctx.accountId) || !authorRole(ctx.role)) return;
+  await run(
+    `INSERT INTO sync_op_authors (app, account_id, op_id, user_id, created_at)
+     SELECT 'shop', $1, x, $2, $3 FROM unnest($4::text[]) AS x
+      WHERE NOT EXISTS (SELECT 1 FROM oplog WHERE op_id = x)
+        AND NOT EXISTS (SELECT 1 FROM sync_v3_ops WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND op_id = x)
+     ON CONFLICT (app, account_id, op_id) DO NOTHING`,
+    [ctx.accountId, ctx.userId, Date.now(), ids]
+  );
+}
+
+/**
+ * برگشت‌هایی (از `rowIds`) که سازنده‌شان همین کاربر است: نخستین درجِ هر ردیف (کم‌ترین server_seq)
+ * و نویسندهٔ ثبت‌شدهٔ همان op. درجِ بعدیِ همان شناسه (بازنویسی) سازنده را عوض نمی‌کند.
+ */
+async function ownedBy(many, sql, accountId, rowIds, userId) {
+  if (!isId(userId) || !rowIds.length) return new Set();
+  return new Set((await many(sql, [accountId, rowIds, userId])).map((r) => r.row_id));
+}
+const V1_OWNED = `
+  SELECT f.row_id FROM (
+    SELECT DISTINCT ON (o.row_id) o.row_id, a.user_id
+      FROM oplog o
+      LEFT JOIN sync_op_authors a ON a.app = o.app AND a.account_id = o.account_id AND a.op_id = o.op_id
+     WHERE o.app='shop' AND o.account_kind='shop' AND o.account_id=$1 AND o.table_name='returns'
+       AND o.op_type='insert' AND o.row_id = ANY($2::text[])
+     ORDER BY o.row_id, o.server_seq
+  ) f WHERE f.user_id = $3`;
+const V3_OWNED = `
+  SELECT f.row_id FROM (
+    SELECT DISTINCT ON (o.row_id) o.row_id, a.user_id
+      FROM sync_v3_ops o
+      LEFT JOIN sync_op_authors a ON a.app = o.app AND a.account_id = o.account_id AND a.op_id = o.op_id
+     WHERE o.app='shop' AND o.account_kind='shop' AND o.account_id=$1 AND o.table_name='returns'
+       AND o.kind='insert' AND o.status IN ('applied','partial') AND o.row_id = ANY($2::text[])
+     ORDER BY o.row_id, o.server_seq
+  ) f WHERE f.user_id = $3`;
+
+/** گردآورندهٔ v1 (`sync_rows` و `oplog`)؛ «خودی» = ساختهٔ کاربرِ `userId` */
+function v1Db(many, ctx, userId) {
   const base = `app='shop' AND account_kind='shop' AND account_id=$1`;
   return {
     async existing(pairs) {
@@ -174,11 +232,7 @@ function v1Db(many, ctx, deviceId) {
         [ctx.accountId, ids]
       );
       if (!rows.length) return [];
-      const mine = new Set(deviceId ? (await many(
-        `SELECT DISTINCT row_id FROM oplog WHERE ${base} AND table_name='returns' AND op_type='insert'
-            AND device_id=$2 AND row_id = ANY($3::text[])`,
-        [ctx.accountId, deviceId, rows.map((r) => r.row_id)]
-      )).map((r) => r.row_id) : []);
+      const mine = await ownedBy(many, V1_OWNED, ctx.accountId, rows.map((r) => r.row_id), userId);
       return rows.map((r) => ({ ...lineOf(r.row_id, r.data, mine.has(r.row_id), false), qty: numOf(r.data?.quantity) }));
     },
     async sales(ids) {
@@ -212,8 +266,8 @@ function v1Db(many, ctx, deviceId) {
   };
 }
 
-/** گردآورندهٔ v3 (`sync_v3_rows`): فقط ردیفِ درج‌شده، حذف‌نشده و لغونشده */
-function v3Db(many, ctx, deviceId) {
+/** گردآورندهٔ v3 (`sync_v3_rows`): فقط ردیفِ درج‌شده، حذف‌نشده و لغونشده؛ «خودی» = ساختهٔ کاربرِ `userId` */
+function v3Db(many, ctx, userId) {
   const base = `app='shop' AND account_id=$1`;
   const live = `inserted AND deleted_at IS NULL AND COALESCE(data->>'status', '') <> 'cancelled'`;
   return {
@@ -226,12 +280,13 @@ function v3Db(many, ctx, deviceId) {
     },
     async returns(ids) {
       const rows = await many(
-        `SELECT row_id, data, created_by FROM sync_v3_rows WHERE ${base} AND table_name='returns' AND ${live}
+        `SELECT row_id, data FROM sync_v3_rows WHERE ${base} AND table_name='returns' AND ${live}
             AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
         [ctx.accountId, ids]
       );
+      const mine = await ownedBy(many, V3_OWNED, ctx.accountId, rows.map((r) => r.row_id), userId);
       return rows.map((r) => ({
-        ...lineOf(r.row_id, r.data, !!deviceId && r.created_by === deviceId, true),
+        ...lineOf(r.row_id, r.data, mine.has(r.row_id), true),
         qty: numOf(r.data?.quantityMilli) === null ? null : numOf(r.data.quantityMilli) / 1000,
       }));
     },
@@ -327,4 +382,4 @@ function legacyDb(many, shopId, userId, TABLES) {
   };
 }
 
-module.exports = { judge, viewOf, lineOf, saleLineOf, v1Db, v3Db, legacyDb };
+module.exports = { judge, viewOf, lineOf, saleLineOf, v1Db, v3Db, legacyDb, authorRole, noteAuthors };

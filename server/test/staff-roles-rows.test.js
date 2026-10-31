@@ -8,12 +8,17 @@
  *   ۳. برگشتِ شبح: برگشتی که نمی‌نشیند (op_id ِ تکراری، tx ِ دیگر، لغوشده) نشانی نیست.
  *   ۴. حرکتِ انبار: فقط فاکتور و برگشت، با نشانیِ درست.
  *   ۰. (#406) کدِ ثابتِ شاگرد نقشِ حسابدار را «شاگرد» نمی‌کند.
+ * بازبینیِ دوم (همان سناریوهای آزمونِ اثباتِ بازبینِ دوم، وارونه):
+ *   الف/ب. سقفِ حرکتِ سند (۵).
+ *   ج. «برگشتِ خودی» = ساختهٔ همین کاربر، نه `device_id` ِ بدنه (۷).
+ *   د. داوری درونِ تراکنش: Pushهای هم‌زمان سهمِ یک قلم را دو بار خرج نمی‌کنند — v3 و راهِ قدیم (۸)؛
+ *      v1 شکافِ شناختهٔ ثبت‌شده در RULES-fa.md است.
  */
 process.env.SYNC_V3_ENABLED = '1';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query, one, newId, now } = require('../src/db');
+const { query, one, many, newId, now } = require('../src/db');
 const hlc = require('../src/lib/hlc');
 const syncV1 = require('../src/lib/sync-v1');
 
@@ -190,13 +195,13 @@ test('۲ — اصلاحِ برگشت محتوا را می‌بندد: رسیدِ
     v1op('warehouseEntries', 'w-later', adj('rd-later', { units: 1, adjKind: 'customer_return' })),
   ]);
   assert.deepEqual(reasons(later), ['applied'], JSON.stringify(later.body));
-  //  ولی از دستگاهِ دیگرِ همان صندوق‌دار نه (نشانیِ خودی = همین دستگاه)
+  //  و از دستگاهِ دیگرِ همان صندوق‌دار هم: خودی = همین کاربر، نه همین دستگاه (بازبینیِ دوم، ج؛ ۷)
   const other = await h.api('POST', '/api/sync/v1/push', {
     token: T.cashier.accessToken,
     body: { device_id: 'r1-cashier-2', schema_version: 1, ops: [v1op('returns', 'r-dev', ret1('rd-dev'))] },
   });
   assert.deepEqual(reasons(other), ['applied']);
-  assert.deepEqual(reasons(await push1('cashier', [v1op('warehouseEntries', 'w-dev', adj('rd-dev'))])), [DENY]);
+  assert.deepEqual(reasons(await push1('cashier', [v1op('warehouseEntries', 'w-dev', adj('rd-dev'))])), ['applied']);
 });
 
 test('۳ — برگشتِ شبح: برگشتی که نمی‌نشیند (op_id ِ تکراری، tx ِ دیگر، لغوشده) نشانیِ اصلاح نیست', async () => {
@@ -394,6 +399,83 @@ test('۶ — اصلاحِ بی نوعِ نسخهٔ پیش از A16 همان قل
     { collection: 'warehouseEntries', id: 'w6-clgc', updatedAt: Date.now(), data: adj('rd-lg6c', { units: 1, adjKind: 'customer_return' }) },
   ]);
   assert.equal(lgOk.status, 200, JSON.stringify(lgOk.body));
+});
+
+test('۷ — «برگشتِ خودی» = ساختهٔ همین کاربر: شناسهٔ دستگاهِ صاحب دکان (از Pull) یا op_id ِ برگشتِ او آن را خودیِ صندوق‌دار نمی‌کند (v1، v3)', async () => {
+  //  بازبینیِ دوم، ج: شناسهٔ دستگاهِ دیگران در Pull دیده می‌شود
+  const pull = await h.get('/api/sync/v1/pull?device_id=r1-cashier&since=0', { token: T.cashier.accessToken });
+  assert.equal(pull.status, 200);
+  const ownerOp = pull.body.ops.find((o) => o.row_id === 'old-r1');
+  assert.equal(ownerOp.device_id, 'r1-owner', 'شناسهٔ دستگاهِ صاحب دکان در Pull هست');
+  const as = (path, device, ops) => h.api('POST', path, {
+    token: T.cashier.accessToken,
+    body: path.endsWith('/v3/push') ? { device_id: device, protocol: 3, ops } : { device_id: device, schema_version: 1, ops },
+  });
+  //  ۱) همان شناسهٔ دستگاه ⇒ هنوز برگشتِ دیگری است
+  const s1 = await as('/api/sync/v1/push', 'r1-owner', [v1op('warehouseEntries', 'w7-s1', adj('old-rd1'))]);
+  assert.deepEqual(reasons(s1), [DENY], JSON.stringify(s1.body));
+  const s3 = await as('/api/sync/v3/push', 'r3-owner', [v3op('c', 'warehouseEntries', 'w7-s3', adj3('old-rd3'))]);
+  assert.deepEqual(reasons(s3), [DENY], JSON.stringify(s3.body));
+  assert.equal(await v1Exists('warehouseEntries', 'w7-s1'), false);
+  assert.equal(await v3Exists('warehouseEntries', 'w7-s3'), false);
+
+  //  ۲) op_id ِ برگشتِ صاحب دکان دوباره (پاسخ «تکراری») — در همان راه و در راهِ دیگر — نویسنده نمی‌سازد
+  const o1 = v1op('returns', 'r7-o1', ret1('rd7-o1'));
+  const o3 = v3op('o', 'returns', 'r7-o3', ret3('rd7-o3'));
+  assert.deepEqual(reasons(await push1('owner', [o1])), ['applied']);
+  assert.deepEqual(reasons(await push3('owner', [o3])), ['applied']);
+  assert.deepEqual(reasons(await push1('cashier', [o1])), ['duplicate']);
+  assert.deepEqual(reasons(await push3('cashier', [{ ...o3, hlc: H('c') }])), ['duplicate']);
+  //  op_id ِ v1 ِ صاحب از راهِ v3 (پلِ v3 ⇐ v1 خاموش): ردیفِ v3 را می‌سازد، ولی نویسنده‌اش صندوق‌دار نیست
+  const x3 = await push3('cashier', [{ op_id: o1.op_id, hlc: H('c'), table: 'returns', row_id: 'r7-o1', kind: 'insert', fields: ret3('rd7-o1') }]);
+  assert.deepEqual(reasons(x3), ['applied'], JSON.stringify(x3.body));
+  assert.equal((await one(`SELECT count(*)::int AS n FROM sync_op_authors WHERE account_id=$1 AND op_id = ANY($2::text[])`,
+    [shopId, [o1.op_id, o3.op_id]])).n, 0, 'op_id ِ ثبت‌شده نویسنده نمی‌گیرد');
+  //  بازنویسیِ برگشتِ صاحب با «insert» و op_id ِ تازه سازنده را عوض نمی‌کند
+  await push1('cashier', [v1op('returns', 'r7-o1', ret1('rd7-o1'))]);
+  const a1 = await push1('cashier', [v1op('warehouseEntries', 'w7-o1', adj('rd7-o1'))]);
+  assert.deepEqual(reasons(a1), [DENY], JSON.stringify(a1.body));
+  const a3 = await push3('cashier', [v3op('c', 'warehouseEntries', 'w7-o3', adj3('rd7-o3'))]);
+  assert.deepEqual(reasons(a3), [DENY], JSON.stringify(a3.body));
+  const a13 = await push3('cashier', [v3op('c', 'warehouseEntries', 'w7-o13', adj3('rd7-o1'))]);
+  assert.deepEqual(reasons(a13), [DENY], JSON.stringify(a13.body));
+
+  //  ۳) کنترل: برگشتِ خودِ صندوق‌دار از دستگاهِ دیگرش ⇒ خودی (v1 و v3)، با هر شناسهٔ دستگاهی که اصلاح بیاید
+  assert.deepEqual(reasons(await as('/api/sync/v1/push', 'r1-cashier-7', [v1op('returns', 'r7-c1', ret1('rd7-c1'))])), ['applied']);
+  const r3 = await as('/api/sync/v3/push', 'r3-cashier-7', [v3op('c', 'returns', 'r7-c3', ret3('rd7-c3'))]);
+  assert.deepEqual(reasons(r3), ['applied'], JSON.stringify(r3.body));
+  const c1 = await as('/api/sync/v1/push', 'r1-owner', [v1op('warehouseEntries', 'w7-c1', adj('rd7-c1'))]);
+  assert.deepEqual(reasons(c1), ['applied'], JSON.stringify(c1.body));
+  const c3 = await push3('cashier', [v3op('c', 'warehouseEntries', 'w7-c3', adj3('rd7-c3'))]);
+  assert.deepEqual(reasons(c3), ['applied'], JSON.stringify(c3.body));
+});
+
+test('۸ — هم‌زمانی: «یک اصلاح برای هر قلم» با Pushهای هم‌زمان فقط یک بار می‌نشیند (v3 و راهِ قدیم)', async () => {
+  //  بازبینیِ دوم، د. v1: شکافِ شناخته (اعمال در `sync-v1.js` ِ پمپ‌مشترک) — RULES-fa.md، «کارمندان و مجوز».
+  const N = 6;
+  //  v3
+  assert.deepEqual(reasons(await push3('cashier', [v3op('c', 'returns', 'r8-3', ret3('rd8-3'))])), ['applied']);
+  const all3 = await Promise.all(Array.from({ length: N }, (_, i) =>
+    push3('cashier', [v3op('c', 'warehouseEntries', `w8-3-${i}`, adj3('rd8-3'))])));
+  assert.deepEqual(all3.map((r) => r.status), Array(N).fill(200));
+  assert.equal(all3.filter((r) => reasons(r)[0] === 'applied').length, 1, JSON.stringify(all3.map(reasons)));
+  assert.equal((await many(
+    `SELECT row_id FROM sync_v3_rows WHERE app='shop' AND account_id=$1 AND table_name='warehouseEntries'
+        AND inserted AND data->>'refId'='rd8-3'`, [shopId]
+  )).length, 1);
+  //  حرکتِ برگشت هم: قلمِ ۱ عددی، شش حرکتِ هم‌زمانِ -۱ ⇒ یکی
+  const mv3 = await Promise.all(Array.from({ length: N }, (_, i) =>
+    push3('cashier', [v3op('c', 'stockMovements', `m8-3-${i}`, { productId: 'pR', type: 'damage', qtyMilli: -1000, refId: 'r8-3' })])));
+  assert.equal(mv3.filter((r) => reasons(r)[0] === 'applied').length, 1, JSON.stringify(mv3.map(reasons)));
+
+  //  راهِ قدیم (همه یا هیچ ⇒ ۲۰۰ یا ۴۰۳)
+  assert.equal((await legacy('cashier', [{ collection: 'returns', id: 'r8-lg', updatedAt: Date.now(), data: ret1('rd8-lg') }])).status, 200);
+  const allLg = await Promise.all(Array.from({ length: N }, (_, i) => legacy('cashier', [
+    { collection: 'warehouseEntries', id: `w8-lg-${i}`, updatedAt: Date.now(), data: adj('rd8-lg') },
+  ])));
+  assert.equal(allLg.filter((r) => r.status === 200).length, 1, JSON.stringify(allLg.map((r) => r.status)));
+  assert.equal(allLg.filter((r) => r.status === 403).length, N - 1);
+  assert.equal((await many(`SELECT id FROM inventory WHERE shop_id=$1 AND data->>'refId'='rd8-lg'`, [shopId])).length, 1);
 });
 
 test('کنترل — حسابدار: v1/v3/قدیم/عکس هیچ نمی‌نشیند؛ op_id ِ تکراری هم فقط «تکراری» است', async () => {

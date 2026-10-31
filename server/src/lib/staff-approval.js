@@ -585,7 +585,7 @@ function refersTo(parent, op) {
  * (پاسخش «تکراری» است و ردیفی نمی‌سازد)، نه opِ نادرستِ ردشده. برگشتی که پس از این با داوریِ
  * تأیید رد شود همراه‌هایش را با خودش می‌برد (`companionOf`).
  */
-async function offRoleV1(ctx, valid, { deviceId = '', rejected = new Map() } = {}) {
+async function offRoleV1(ctx, valid, { rejected = new Map() } = {}) {
   const off = [];
   let ruled = false;
   for (const x of valid) {
@@ -601,9 +601,25 @@ async function offRoleV1(ctx, valid, { deviceId = '', rejected = new Map() } = {
     fresh: x.op.type === 'insert' && !seen.has(String(x.op.op_id)) && !rejected.has(x.i),
     live: !seen.has(String(x.op.op_id)) && !rejected.has(x.i), fields: x.op.fields, unit: 0,
   }));
-  const res = await roleRows.judge(ctx.role, items, roleRows.v1Db(many, ctx, deviceId));
+  //  «برگشتِ خودی» = ساختهٔ همین کاربر، نه شناسهٔ دستگاهِ بدنه (بازبینیِ دومِ #336، ج)
+  const res = await roleRows.judge(ctx.role, items, roleRows.v1Db(many, ctx, ctx.userId));
   for (const it of items) if (res.has(it) && !res.get(it).ok) off.push(it.x);
   return off;
+}
+
+/**
+ * ج ِ بازبینیِ دومِ #336: نویسندهٔ درجِ برگشتِ صندوق‌دار — تا «برگشتِ خودی» ِ دستهٔ بعد (حتی از
+ * دستگاهِ دیگرِ همین کاربر) به کاربر بسته باشد، نه به `device_id` ِ بدنه. پیش از اعمال: opی که
+ * ننشیند (ردِ این نگهبان یا خودِ v1) در oplog نیست و این ثبت اثری ندارد؛ op_id ِ ثبت‌شده در
+ * oplog (مثلاً برگشتِ صاحب دکان که دوباره فرستاده شود) هرگز (`roleRows.noteAuthors`).
+ */
+async function rememberAuthorsV1(ctx, valid, rejected, off) {
+  if (!roleRows.authorRole(ctx.role)) return;
+  const offSet = new Set(off);
+  const ids = valid
+    .filter((x) => x.op.table === 'returns' && x.op.type === 'insert' && !rejected.has(x.i) && !offSet.has(x))
+    .map((x) => String(x.op.op_id || ''));
+  await roleRows.noteAuthors(query, ctx, ids);
 }
 
 /** ردیفِ پولیِ «بی نشانی» (برنامهٔ پیش از refId): تراکنش، یا اصلاحِ انبار */
@@ -800,7 +816,8 @@ async function v1Guard(req, res, next) {
     //  هیچ). روی همان opِ یک‌دست‌شده‌ای سنجیده می‌شود که به v1 می‌رسد (پس از shopNewerFields).
     //  سه نقشِ قدیم «*»اند و قاعدهٔ ردیف ندارند، پس برایشان این فهرست همیشه خالی است.
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
-    const offTable = await offRoleV1(ctx, valid, { deviceId, rejected });
+    const offTable = await offRoleV1(ctx, valid, { rejected });
+    await rememberAuthorsV1(ctx, valid, rejected, offTable);
     const hasNeed = valid.some((x) => x.need);
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));

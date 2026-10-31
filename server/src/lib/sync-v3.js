@@ -699,12 +699,16 @@ function errorText(v) {
 /**
  * A16: داوریِ ردیف‌های قاعده‌دارِ دسته (`role-rows.judge`) ⇒ Map(op ⇒ {ok, reason})؛ null وقتی
  * نقش قاعدهٔ ردیف ندارد یا چنین opی نیست (سه نقشِ قدیم هرگز این‌جا پرس‌وجو نمی‌کنند).
+ * ⛔ درونِ تراکنشِ push و پس از قفلِ حساب (`c`): وگرنه دو Pushِ هم‌زمان هر دو «جا» می‌دیدند و
+ * «یک اصلاح برای هر قلم» / سقفِ حرکت دو بار خرج می‌شد (بازبینیِ دومِ #336، د). «برگشتِ خودی» =
+ * ساختهٔ همین کاربر، نه `device_id` ِ بدنه (همان، ج).
  */
-async function judgeRows(ctx, plan, deviceId) {
+async function judgeRows(c, ctx, plan) {
   const all = [];
   plan.forEach((u, ui) => u.items.forEach((it) => it.ops.forEach((op) => all.push({ op, ui, broken: !!u.broken }))));
   if (!all.some(({ op }) => permCore.rowRule(ctx.role, op.table))) return null;
-  const dup = new Set((await many(
+  const rows = async (sql, params) => (await c.query(sql, params)).rows;
+  const dup = new Set((await rows(
     `SELECT op_id FROM sync_v3_ops WHERE ${ACC} AND op_id = ANY($4::text[])`, [...acc(ctx), all.map(({ op }) => op.op_id)]
   )).map((r) => r.op_id));
   const items = all.map(({ op, ui, broken }) => ({
@@ -712,7 +716,7 @@ async function judgeRows(ctx, plan, deviceId) {
     fresh: op.kind === 'insert' && !broken && !dup.has(op.op_id), live: !broken && !dup.has(op.op_id),
     cancel: op.kind === 'cancel', fields: op.fields, unit: ui,
   }));
-  const res = await roleRows.judge(ctx.role, items, roleRows.v3Db(many, ctx, deviceId), { v3: true, perUnit: true });
+  const res = await roleRows.judge(ctx.role, items, roleRows.v3Db(rows, ctx, ctx.userId), { v3: true, perUnit: true });
   const out = new Map();
   for (const it of items) if (res.has(it)) out.set(it.op, res.get(it));
   return out;
@@ -790,9 +794,6 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
   const plan = approvals.bundleV3(units, groups);
-  //  A16، قاعدهٔ ردیف: داوریِ ردیف‌های قاعده‌دار پیش از اعمال (فقط وقتی چنین ردیفی هست).
-  //  برگشتِ همین دسته فقط از همان واحد (tx یا بستهٔ `bundleV3`) و فقط اگر op_idاش تازه است.
-  const rowChecks = await judgeRows(ctx, plan, deviceId);
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 
@@ -827,6 +828,16 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
         const again = u.items.some((it) => it.ops.some((o) => heads.has(o.op_id)));
         if (!again) u.broken = true;
       }
+    }
+    //  A16، قاعدهٔ ردیف: داوریِ ردیف‌های قاعده‌دار پیش از اعمال (فقط وقتی چنین ردیفی هست) — درونِ
+    //  همین تراکنش و پس از قفلِ حساب، تا Pushِ هم‌زمان سهمِ هر قلم را دو بار خرج نکند. برگشتِ همین
+    //  دسته فقط از همان واحد (tx یا بستهٔ `bundleV3`) و فقط اگر op_idاش تازه است و واحدش نشکسته.
+    const rowChecks = await judgeRows(c, ctx, plan);
+    //  نویسندهٔ درجِ برگشتِ صندوق‌دار (همان تراکنش؛ opی که ننشیند در sync_v3_ops نیست)
+    if (roleRows.authorRole(ctx.role)) {
+      await roleRows.noteAuthors((sql, p) => c.query(sql, p), ctx, plan.filter((u) => !u.broken)
+        .flatMap((u) => u.items.flatMap((it) => it.ops))
+        .filter((op) => op.table === 'returns' && op.kind === 'insert').map((op) => op.op_id));
     }
 
     for (const unit of plan) {

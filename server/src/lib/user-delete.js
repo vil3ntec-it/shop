@@ -174,6 +174,8 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
     await q('backups', 'DELETE FROM account_backups WHERE user_id=$1 OR tenant_id = ANY($2::text[])', [userId, tenants]);
     await q('sync', 'DELETE FROM sync_rows WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM oplog WHERE account_id = ANY($1::text[])', [accounts]);
+    //  A16: نویسندهٔ درجِ برگشت (مهاجرتِ ۱۲۳) — دفترِ حساب‌های خودش، و نامِ خودش در دکانِ دیگران
+    await q('sync', 'DELETE FROM sync_op_authors WHERE account_id = ANY($1::text[]) OR user_id = $2', [accounts, userId]);
     await q('sync', 'DELETE FROM sync_devices WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_conflicts WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_operations WHERE user_id=$1 OR shop_id = ANY($2::text[])', [userId, shopIds]);
