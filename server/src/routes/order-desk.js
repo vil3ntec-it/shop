@@ -20,16 +20,15 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const actorOf = (req) => ({ type: 'user', id: req.user.id, role: req.role });
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   if (!(await orders.flagOf(req.shopId))) return next(forbidden('سفارشِ آنلاین برای این دکان روشن نیست', 'orders_disabled'));
   next();
-});
+};
 
 /** نوشتن: اشتراک (همان پیام‌های `requireFeature`)، سپس پرچمِ میز. */
-const needWrite = wrap(async (req, res, next) => {
+const needWrite = async (req, res, next) => {
   const { entitled, ent } = await orders.entitledOf(req.shopId);
   if (!entitled) {
     return next(ent.trial.used && !ent.trial.active
@@ -37,14 +36,14 @@ const needWrite = wrap(async (req, res, next) => {
       : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
   }
   next();
-});
+};
 
-const needDesk = wrap(async (req, res, next) => {
+const needDesk = async (req, res, next) => {
   if (!(await desk.flagOf(req.shopId))) return next(forbidden('میزِ سفارش برای این دکان روشن نیست', 'order_desk_disabled'));
   next();
-});
+};
 
-router.get('/', wrap(async (req, res) => {
+router.get('/', async (req, res) => {
   const enabled = (await orders.flagOf(req.shopId)) && (await desk.flagOf(req.shopId));
   if (!enabled) return res.json({ enabled: false });
   res.json({
@@ -53,11 +52,11 @@ router.get('/', wrap(async (req, res) => {
     pauseReasons: desk.PAUSE_REASONS,
     permissions: { manage: can(req.role, 'orders.manage'), settings: can(req.role, 'settings.write') },
   });
-}));
+});
 
 /** پاسخِ یکسانِ هر نوشتن + سابقهٔ عملیات (تکرار ⇒ بی سطرِ دوم). */
 function writer(action, fn, detailOf) {
-  return wrap(async (req, res) => {
+  return async (req, res) => {
     const out = await fn(req.shopId, { body: req.body, actor: actorOf(req) });
     if (out.replayed) {
       res.set('Idempotent-Replayed', 'true');
@@ -68,7 +67,7 @@ function writer(action, fn, detailOf) {
       });
     }
     res.json({ state: out.state, replayed: out.replayed });
-  });
+  };
 }
 
 router.post('/busy', needFlag, requirePermission('orders.manage'), needWrite, needDesk,
