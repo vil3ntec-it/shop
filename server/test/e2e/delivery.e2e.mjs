@@ -1,5 +1,5 @@
 /**
- * سناریوی سرتاسریِ تحویل و پیک — E2E-DLV-07، E2E-DLV-08 (S39)، E2E-CASH-09 (S40).
+ * سناریوی سرتاسریِ تحویل و پیک — E2E-DLV-07، E2E-DLV-08 (S39)، E2E-CASH-09 و S40.
  *
  *   مشتری از ویترین (API ِ همان صفحه) سفارشِ «ارسال» با پرداختِ نقد هنگامِ تحویل می‌دهد؛
  *   A (گوشیِ صاحب) قبول، جمع‌آوری و بسته‌بندی می‌کند و به پیکِ دکان می‌سپارد؛ K (گوشیِ پیک)
@@ -7,7 +7,9 @@
  *   نقد تحویل می‌دهد؛ مشتری «تحویل شد» را می‌بیند و چیزی از پیک و کد نمی‌بیند؛ تسویهٔ پیک
  *   نقد را از کرایه جدا نگه می‌دارد، کسری را با دلیل ثبت می‌کند و تسویهٔ دوباره را رد.
  *   سفارشِ دوم: ناموفق ⇐ تلاشِ دوباره ⇐ ناموفق ⇐ برگشت به دکان ⇐ بازگشت به قفسه؛ پولی گرفته
- *   نشده. ⛔ موجودی (تصمیمِ صاحبِ مخزن): سرور هیچ رزرو و کسری ندارد؛ تحویلِ پیک از
+ *   نشده. S40 با همان عددهای سند: موردِ انتظار ۱۲٬۴۰۰، شمرده ۱۲٬۰۰۰، کسریِ ۴۰۰ با دلیل و تأییدِ مدیر؛
+ *   تا تسویه پیک بالای سقفِ نقد کار نمی‌گیرد و پس از آن می‌گیرد.
+ *   ⛔ موجودی (تصمیمِ صاحبِ مخزن): سرور هیچ رزرو و کسری ندارد؛ تحویلِ پیک از
  *   `GET /shop/orders/handover` به برنامهٔ دکان می‌رسد و همان‌جا فروشِ عادی ثبت می‌شود.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery، shop.catalog.
@@ -20,6 +22,7 @@ const { db } = E;
 const owner = await E.owner('owner-dlv@e2e.local', 'صاحبِ ارسال', 'دکانِ ارسال');
 const courierAcct = await E.staff(owner, 'courier-dlv@e2e.local', 'پیکِ دکان');
 const clerkAcct = await E.staff(owner, 'clerk-dlv@e2e.local', 'شاگردِ انبار');
+const managerAcct = await E.staff(owner, 'manager-dlv@e2e.local', 'مدیرِ دکان', 'manager');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.catalog']) await E.flag(owner.shopId, k, true);
 const SLUG = 'e2e-delivery-store';
 const order = (id) => db.one('SELECT status, cod_status, total_minor FROM online_orders WHERE id=$1', [id]);
@@ -191,5 +194,59 @@ await E.step('E2E-DLV-08', 'S39: ناموفق ⇐ تلاشِ دوباره ⇐ ن
   const rep = E.ok(await A.api('GET', `/shop/catalog/report?productId=${rice}`), 'تطبیقِ موجودی');
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
 }, { needs: ['E2E-DLV-07'] });
+
+await E.step('S40', 'S40: موردِ انتظار ۱۲٬۴۰۰، شمرده ۱۲٬۰۰۰ ⇐ کسریِ ۴۰۰ با دلیل و تأییدِ مدیر؛ تا تسویه پیک بالای سقفِ نقد کار نمی‌گیرد', async () => {
+  const M = await E.device('M-manager-phone', managerAcct.email);
+  //  ۱۰ × ۱٬۲۰۰ = ۱۲٬۰۰۰ کالا + ۴۰۰ ارسال = ۱۲٬۴۰۰ نقد هنگامِ تحویل
+  const oil = A.stockIn({ name: 'روغنِ پنج‌لیتری', price: 1200, cost: 1000, units: 30 });
+  await A.drain();
+  E.ok(await A.api('PUT', `/shop/storefront/products/${oil}`, { published: true }), 'انتشار');
+  E.ok(await A.api('PUT', '/shop/storefront', { slug: SLUG, enabled: true, title: 'ویترینِ ارسال', contactPhone: '0700000003', deliveryFeeMinor: 40000, minOrderMinor: 0 }), 'ارسالِ ۴۰۰');
+  E.ok(await A.api('PATCH', `/shop/delivery/couriers/${courierId}`, { cashCapMinor: 1_500_000 }), 'سقفِ نقدِ پیک ۱۵٬۰۰۰');
+  const place = async (landmark) => {
+    const r = E.ok(await cust.checkout({
+      fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'مشتریِ ارسال', phone: '0791234567' },
+      lines: [{ productId: oil, qtyMilli: 10_000 }], address: { text: 'کارتهٔ چهار', landmark },
+    }), 'سفارشِ ۱۲٬۴۰۰', 201);
+    assert.equal(r.order.totalMinor, 1_240_000);
+    const row = await db.one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [owner.shopId, r.order.orderNo]);
+    await prepare(row.id);
+    return row.id;
+  };
+  const assign = (id) => A.api('POST', `/shop/delivery/orders/${id}/assign`, { mode: 'shop_courier', courierId }, { headers: { 'Idempotency-Key': E.key('asg') } });
+  const held = async () => E.ok(await A.api('GET', '/shop/delivery/couriers'), 'پیک‌ها').items.find((c) => c.id === courierId).cashHeldMinor;
+  assert.equal(await held(), 0, 'پیک پیش از این سفارش نقدِ تسویه‌نشده دارد');
+  //  سفارشِ اول: پیک ۱۲٬۴۰۰ نقد می‌گیرد
+  const o1 = await place('کنارِ پارک');
+  const a1 = E.ok(await assign(o1), 'سپردنِ اول', 201).assignment.id;
+  await courierOk([event(a1, 'assigned'), event(a1, 'picked_up'), event(a1, 'moving'), event(a1, 'arrived'), event(a1, 'delivered', { cashCollectedMinor: 1_240_000 })]);
+  assert.equal(await held(), 1_240_000);
+  //  سفارشِ دوم: ۱۲٬۴۰۰ در دست + ۱۲٬۴۰۰ > سقفِ ۱۵٬۰۰۰ ⇒ تا تسویه به پیک نمی‌رسد
+  const o2 = await place('پشتِ مکتب');
+  const over = await assign(o2);
+  assert.equal(over.status, 409, JSON.stringify(over.body));
+  assert.equal(over.body.error.code, 'cash_cap_exceeded');
+  assert.equal((await db.one('SELECT COUNT(*)::int AS n FROM delivery_assignments WHERE order_id=$1', [o2])).n, 0, 'مأموریت ساخته شد');
+  //  تسویه: موردِ انتظار ۱۲٬۴۰۰، شمرده ۱۲٬۰۰۰
+  const pv = E.ok(await M.api('GET', `/shop/delivery/couriers/${courierId}/settlement-preview`), 'پیش‌نمایشِ تسویه');
+  assert.equal(pv.totals.expectedCashMinor, 1_240_000);
+  const url = `/shop/delivery/couriers/${courierId}/settlements`;
+  const body = { assignmentIds: [a1], handedOverMinor: 1_200_000, receivedMinor: 1_200_000 };
+  const byClerk = await clerk.api('POST', url, { ...body, reason: 'x' }, { headers: { 'Idempotency-Key': E.key('s') } });
+  assert.equal(byClerk.status, 403, 'شاگرد تسویه را تأیید کرد');
+  const noWhy = await M.api('POST', url, body, { headers: { 'Idempotency-Key': E.key('s') } });
+  assert.equal(noWhy.status, 400, JSON.stringify(noWhy.body));
+  assert.equal(noWhy.body.error.code, 'reason_required');
+  const st = E.ok(await M.api('POST', url, { ...body, reason: 'پیک ۴۰۰ کم آورد؛ از مزدش کم می‌شود' }, { headers: { 'Idempotency-Key': E.key('s') } }), 'تسویهٔ مدیر', 201).settlement;
+  assert.deepEqual([st.expectedCashMinor, st.receivedMinor, st.shortageMinor, st.excessMinor], [1_240_000, 1_200_000, 40_000, 0], JSON.stringify(st));
+  assert.equal(st.reason, 'پیک ۴۰۰ کم آورد؛ از مزدش کم می‌شود');
+  assert.equal(st.confirmedBy, managerAcct.user.id, 'تأییدکننده همان مدیر نیست');
+  //  گزارشِ تسویه (RPT-15) همان کسری و دلیل را دارد
+  const one = E.ok(await A.api('GET', `/shop/delivery/settlements/${st.id}`), 'سندِ تسویه').settlement;
+  assert.deepEqual([one.shortageMinor, one.reason], [40_000, st.reason]);
+  //  پس از تسویه نقدِ در دست صفر ⇒ همان سفارشِ دوم حالا به پیک می‌رسد
+  assert.equal(await held(), 0);
+  E.ok(await assign(o2), 'سپردنِ دوم پس از تسویه', 201);
+}, { needs: ['E2E-CASH-09'] });
 
 await E.finish();
