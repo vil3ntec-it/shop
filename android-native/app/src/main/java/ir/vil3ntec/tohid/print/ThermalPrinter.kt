@@ -13,6 +13,8 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import java.io.OutputStream
+import ir.vil3ntec.tohid.core.i18n.StrLocalNet
+import ir.vil3ntec.tohid.hw.LocalNetworkAccess
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
@@ -238,7 +240,7 @@ object ThermalPrinter {
     val err = runCatching {
       when (link) {
         is Link.Bluetooth -> sendBluetooth(context, link.address, bytes, wrote)
-        is Link.Network -> sendNetwork(link.host, link.port, bytes, wrote)
+        is Link.Network -> if (LocalNetworkAccess.blocked(context, link.host)) StrLocalNet.denied else sendNetwork(link.host, link.port, bytes, wrote)
         is Link.Usb -> sendUsb(context, link.deviceName, bytes, wrote)
       }
     }.getOrElse { it.message ?: "چاپ نشد" }
@@ -256,7 +258,7 @@ object ThermalPrinter {
   fun probe(context: Context, link: Link): Probe = wire.withLock { probeNow(context, link) }
 
   private fun probeNow(context: Context, link: Link): Probe = when (link) {
-    is Link.Network -> probeStream(link.label()) {
+    is Link.Network -> if (LocalNetworkAccess.blocked(context, link.host)) Probe(false, StrLocalNet.denied) else probeStream(link.label()) {
       val socket = Socket()
       socket.connect(InetSocketAddress(link.host, link.port), CONNECT_TIMEOUT_MS)
       socket.soTimeout = PROBE_READ_MS
