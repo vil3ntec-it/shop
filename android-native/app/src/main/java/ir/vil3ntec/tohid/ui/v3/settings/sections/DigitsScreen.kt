@@ -14,6 +14,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.ShopDayChoice
+import ir.vil3ntec.tohid.core.calendar.ShopDay
+import ir.vil3ntec.tohid.displayDate
+import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrSettings
@@ -44,8 +48,9 @@ private fun calendarLabel(c: String): String = when (c) {
 }
 
 /**
- *  `settings/general/digits`: رقمِ صفحه و فاکتور (LOC-05)، تقویمِ نمایش و نمادِ پول (LOC-07)، با
- *  نمونهٔ زندهٔ مبلغ. چیزی که ذخیره و همگام می‌شود همیشه رقمِ لاتین است.
+ *  `settings/general/digits`: رقمِ صفحه و فاکتور (LOC-05)، تقویمِ نمایش، پایانِ روزِ کاری (LOC-03، همان
+ *  `ShopDayChoice` ِ رابطِ امروز) و نمادِ پول (LOC-07)، با نمونهٔ زندهٔ مبلغ. چیزی که ذخیره و همگام می‌شود
+ *  همیشه رقمِ لاتین است.
  */
 @Composable
 internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
@@ -73,6 +78,15 @@ internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
         V3Segmented(CALENDARS.map(::calendarLabel), CALENDARS.indexOf(LocaleChoice.calendar).coerceAtLeast(0), { LocaleChoice.setCalendar(context, CALENDARS[it]) })
       }
       SettingsNote(StrSettings.calNote)
+    }
+    //  LOC-03: پایانِ روزِ کاری — نیمه‌شب (پیش‌فرض، رفتارِ امروز) تا ۰۴:۰۰؛ روشن ⇒ تاریخی که فروشِ همین لحظه با آن ثبت می‌شود
+    item(key = "dayEnd") {
+      val hours = ShopDay.clamp(ShopDayChoice.hours)
+      SettingsBlock {
+        V3Segmented(ShopDay.CHOICES.map(ShopDay::label), ShopDay.CHOICES.indexOf(hours).coerceAtLeast(0), { ShopDayChoice.set(context, ShopDay.CHOICES[it]) })
+      }
+      SettingsNote(StrSettings.dayEndNote)
+      if (hours != ShopDay.OFF) SettingsNote(StrSettings.dayEndNow(displayDate(todayIso())))
     }
     item(key = "symbol") {
       SettingsBlock {

@@ -42,8 +42,8 @@ import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
  */
 @Composable
 internal fun RouteScope.DeskSettingsScreen(selected: String?) {
-  //  کامپیوتر دوربین و نوارِ پایینِ گوشی را ندارد؛ تبلتِ پهن دارد
-  val desk = if (Platform.DESKTOP) SettingsLayout.deskSections else SettingsLayout.sections
+  //  کامپیوتر دوربین و نوارِ پایینِ گوشی را ندارد؛ تبلتِ پهن دارد (بی بخش‌های فقط‌کامپیوتر، `PHONE_HIDDEN`)
+  val desk = if (Platform.DESKTOP) SettingsLayout.deskSections else SettingsLayout.sections.filterNot { it in SettingsLayout.PHONE_HIDDEN }
   var pick by rememberSaveable(selected) { mutableStateOf(selected?.takeIf { it in desk } ?: desk.first()) }
   val facts = rememberSettingsFacts(theme)
   val extra = remember(access) { V3Modules.settingsEntries(access) }
