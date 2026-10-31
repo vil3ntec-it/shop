@@ -1045,19 +1045,15 @@ fun SettingsScreen(
             //  می‌کند برنامه خراب است
             val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
-            //  پایانِ اشتراک نباید گروگانش بگیرد.
-            if (!store.applyRestore(fixed)) {
-              //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
-              toast(StrSettings.restoreDiskFail)
-              return@launch
-            }
+            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد.
+            //  S143: هرگز op نمی‌سازد؛ دستگاهِ همگام ⇒ اطلاعات از سرور. نشد (دیسک F0-01، شبکه، صف) ⇒
+            //  دفترِ قبلی دست‌نخورده و دلیلش
+            val r = store.restoreBackup(fixed)
+            if (!r.ok) { toast(r.message); return@launch }
             canUndo = true
             restorePhotos = 0
-            toast(
-              if (moved > 0) StrSettings.restoredWithPhotos(plain(moved))
-              else StrSettings.restored
-            )
+            val done = if (moved > 0) StrSettings.restoredWithPhotos(plain(moved)) else StrSettings.restored
+            toast(if (r.message.isEmpty()) done else "$done\n${r.message}")
           }
         }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },
