@@ -74,6 +74,8 @@
 
   // ---------- ابزار ----------
   const $ = (sel, root) => (root || document).querySelector(sel);
+  //  ⛔ SEC-API-01 — نام/ایمیلِ حساب، شناسهٔ مجوز و منطقهٔ زمانی از سرور و حافظهٔ محلی می‌آیند، نه از کد
+  const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
   function readStore() {
@@ -1176,7 +1178,7 @@
       ];
       $('#lic-status', wrap).innerHTML =
         `<div class="lic-badge lic-badge-${badge[1]}">${badge[0]}</div>` +
-        rows.slice(1).map(r => `<div class="lic-row"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+        rows.slice(1).map(r => `<div class="lic-row"><span>${esc(r[0])}</span><b>${esc(r[1])}</b></div>`).join('');
 
       // قابلیت‌ها
       const items = Object.keys(FEATURE_LABELS).map(k => {
@@ -1186,11 +1188,11 @@
       $('#lic-tech', wrap).innerHTML =
         `<ul class="lic-featlist">${items}</ul>` +
         `<div class="lic-row"><span>شناسه دستگاه</span><b dir="ltr">${getDeviceUid().slice(0, 12)}…</b></div>` +
-        `<div class="lic-row"><span>شناسه مجوز</span><b dir="ltr">${st.licenseId || '—'}</b></div>` +
+        `<div class="lic-row"><span>شناسه مجوز</span><b dir="ltr">${esc(st.licenseId || '—')}</b></div>` +
         `<div class="lic-row"><span>وضعیت ساعت</span><b>${
           { ok: 'عادی', rolled_back: 'عقب‌رفته', jumped_forward: 'جهش جلو' }[State.clock && State.clock.status] || '—'
         }</b></div>` +
-        `<div class="lic-row"><span>منطقه زمانی</span><b dir="ltr">${State.timezone}</b></div>`;
+        `<div class="lic-row"><span>منطقه زمانی</span><b dir="ltr">${esc(State.timezone)}</b></div>`;
     },
 
     async guard(btn, fn) {
