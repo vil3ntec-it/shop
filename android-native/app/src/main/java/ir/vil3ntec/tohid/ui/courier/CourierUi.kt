@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -236,3 +237,7 @@ internal fun CourierBigAmount(label: String, amount: String) {
     Text(amount, style = courierText(34.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, maxLines = 1)
   }
 }
+
+/** متنِ خطای همگام‌سازی برای پیک: بی اینترنت ⇒ `offline`، وگرنه پیامِ خودِ خطا. */
+internal fun courierFailureText(f: ApiFailure, offline: String): String =
+  when (f.code) { "offline", "unreachable", "timeout" -> offline; else -> f.userMessage }

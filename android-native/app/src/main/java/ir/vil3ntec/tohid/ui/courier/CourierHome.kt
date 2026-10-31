@@ -264,19 +264,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
     val out = runCatching { CourierSync.flush(context, store) }.getOrNull()
     syncing = false
     reloadLocal()
-    lastError = out?.failure?.let { f ->
-      when (f.code) {
-        "offline", "unreachable", "timeout" -> "اینترنت نیست — کارها در صفِ گوشی می‌مانند"
-        else -> f.userMessage
-      }
-    }
-    //  «نقدِ من» تازه نشد (کارت‌ها شاید شدند) ⇒ صفحه‌های نقد و آمار می‌گویند
-    summaryError = out?.summaryFailure?.let { f ->
-      when (f.code) {
-        "offline", "unreachable", "timeout" -> "اینترنت نیست"
-        else -> f.userMessage
-      }
-    }
+    lastError = out?.failure?.let { courierFailureText(it, "اینترنت نیست — کارها در صفِ گوشی می‌مانند") }
+    summaryError = out?.summaryFailure?.let { courierFailureText(it, "اینترنت نیست") }   //  «نقدِ من» تازه نشد ⇒ نقد و آمار می‌گویند
     out?.photoErrors?.firstOrNull()?.let { snackbar.showSnackbar(it) }
   }
 
@@ -404,8 +393,7 @@ internal fun CourierBoard(
     .distinctBy { it.id }
   val waitingTotal = queue.pending.size + photosWaiting
   val shopPhone = summary?.shopPhone.orEmpty()
-  //  عددهای نقد و آمار کهنه‌اند اگر خودِ «نقدِ من» یا کلِ همگام‌سازی نشد
-  val staleError = summaryError ?: lastError
+  val staleError = summaryError ?: lastError   //  نقد و آمار کهنه‌اند اگر «نقدِ من» یا کلِ همگام‌سازی نشد
 
   fun act(c: MissionCard, to: String) {
     when (to) {
