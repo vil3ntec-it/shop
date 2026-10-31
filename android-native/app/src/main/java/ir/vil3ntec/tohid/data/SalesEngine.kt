@@ -602,6 +602,8 @@ object SalesEngine {
     newId: () -> String,
     /** رابط بی دلیل اجازه نمی‌دهد؛ این‌جا پیش‌فرضِ خالی فقط برای صدازننده‌های قدیمی است */
     reason: String = "",
+    /** RPT-09: لغوکننده روی ردیفِ `cancel_sale` (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
@@ -655,6 +657,7 @@ object SalesEngine {
           refId = saleId,
           notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
+          by = by,
         ),
       ),
       invoiceNumber = sale.invoiceNumber ?: 0,
@@ -716,6 +719,8 @@ object SalesEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
@@ -752,6 +757,7 @@ object SalesEngine {
         reason = reason,
         date = today,
         createdAt = now,
+        by = by,
       )
       //  قلمِ آزاد کالایی ندارد، پس حرکتِ انبار هم نمی‌سازد — وگرنه ردیفی
       //  با شناسهٔ کالای خالی در گردشِ موجودی می‌نشست

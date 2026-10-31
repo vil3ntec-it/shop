@@ -579,6 +579,32 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== سابقهٔ ضدتقلب (RPT-09، پیش‌فرض خاموش، فقط همین دستگاه) ============== */
+    item {
+      var fraudTrail by remember { mutableStateOf(ir.vil3ntec.tohid.data.FraudTrailPref.enabled(context)) }
+      SettingsSection(
+        icon = Icons.Filled.History,
+        title = StrShell.fraudTrail,
+        subtitle = if (fraudTrail) StrShell.fraudTrailOn else StrSettings.off,
+        tint = if (fraudTrail) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.fraudTrailNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (fraudTrail) "on" else "off",
+          onSelect = {
+            fraudTrail = it == "on"
+            ir.vil3ntec.tohid.data.FraudTrailPref.setEnabled(context, fraudTrail)
+          },
+        )
+      }
+    }
+
     /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
     //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
     //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
