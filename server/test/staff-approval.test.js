@@ -406,7 +406,8 @@ test('Sync v1: بیش از سقف بی برگه در جای خودش «rejected�
 
 /* ------------------------------- v1: تکرارِ opِ ثبت‌شده و «کلِ سند» */
 
-const v1op = (table, rowId, type, fields) => ({ op_id: oid(), table, row_id: rowId, type, ts: Date.now(), fields });
+//  `ts` = مهرِ «ثبت» ِ برنامه: همهٔ opهای یک ثبت یک مهر دارند (`sameSave` ِ نگهبان همین را می‌سنجد)
+const v1op = (table, rowId, type, fields, ts = Date.now()) => ({ op_id: oid(), table, row_id: rowId, type, ts, fields });
 const v1sale = (id, total, discount) => v1op('sales', id, 'insert',
   { total, discount, finalTotal: total - discount, status: 'completed' });
 const inOplog = async (opId) => !!(await one('SELECT 1 FROM oplog WHERE op_id=$1', [opId]));
@@ -494,10 +495,14 @@ test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خود�
   assert.ok(base.body.results.every((x) => x.status === 'applied'), JSON.stringify(base.body));
 
   assert.equal((await setRole('manager', { 'sales.cancel': { mode: 'approve' } })).status, 200);
-  const cancel = v1op('sales', S, 'update', { status: 'cancelled', finalTotal: 300 });
-  const back = v1op('stockMovements', 'm-v1-cx-back', 'insert', { productId: 'p-v1-whole', type: 'sale_cancel', qty: 3, refId: S });
-  const audit = v1op('auditLog', 'a-v1-cx', 'insert', { type: 'cancel_sale', refId: S });
-  const saleMove = v1op('stockMovements', 'm-v1-cx-sale', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -3, refId: S });
+  //  یک ثبت ⇒ یک مهر. با Date.now() ِ جدا برای هر op، روی دستگاهِ کند (CI زیرِ Electron) میانِ دو op یک
+  //  میلی‌ثانیه می‌گذشت و حرکتِ sale_cancel «ثبتِ دیگر» می‌شد و می‌نشست. حرکتِ خودِ فروش هم‌مهر است تا
+  //  روشن باشد که به نوع کنار می‌ماند، نه به مهر.
+  const T1 = Date.now();
+  const cancel = v1op('sales', S, 'update', { status: 'cancelled', finalTotal: 300 }, T1);
+  const back = v1op('stockMovements', 'm-v1-cx-back', 'insert', { productId: 'p-v1-whole', type: 'sale_cancel', qty: 3, refId: S }, T1);
+  const audit = v1op('auditLog', 'a-v1-cx', 'insert', { type: 'cancel_sale', refId: S }, T1);
+  const saleMove = v1op('stockMovements', 'm-v1-cx-sale', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -3, refId: S }, T1);
   const rc = await push1(manager, 'm-cx', [back, cancel, audit, saleMove]);
   assert.deepEqual(rc.body.results.map((x) => x.reason || x.status), ['tx_rejected', 'approval_required', 'tx_rejected', 'applied']);
   assert.equal(await v1row('stockMovements', 'm-v1-cx-back'), null);
@@ -505,9 +510,10 @@ test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خود�
 
   assert.equal((await setRole('staff', { 'returns.create': { caps: { maxAmount: 50000 } } })).status, 200);
   const R = 'r-v1-over';
-  const ret = v1op('returns', R, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 2, amount: 600 });
-  const retMove = v1op('stockMovements', 'm-v1-r', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 2, refId: R });
-  const itemUpd = v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 2 });
+  const T2 = Date.now();                                   //  همان ثبت: returnedQty ِ قلم فقط با مهرِ برابر همراه است
+  const ret = v1op('returns', R, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 2, amount: 600 }, T2);
+  const retMove = v1op('stockMovements', 'm-v1-r', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 2, refId: R }, T2);
+  const itemUpd = v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 2 }, T2);
   const rr = await push1(staff, 's-r1', [ret, retMove, itemUpd]);
   assert.deepEqual(rr.body.results.map((x) => x.reason || x.status), ['approval_required', 'tx_rejected', 'tx_rejected']);
   assert.equal(await v1row('stockMovements', 'm-v1-r'), null);
