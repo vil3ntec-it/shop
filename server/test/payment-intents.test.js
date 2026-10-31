@@ -560,6 +560,26 @@ test('آداپتورِ حساب‌پی فقط https: http ِ بیرونی هرگ
   }
 });
 
+test('مهلتِ هر درخواست به حساب‌پی کف و سقف دارد و همیشه زیرِ اجارهٔ پردازشِ رویداد می‌ماند', () => {
+  const HP = require('../src/lib/payment-hesabpay');
+  const prev = process.env.HESABPAY_TIMEOUT_MS;
+  try {
+    const cases = [
+      [undefined, 10_000], ['', 10_000], ['abc', 10_000], ['0', 10_000],
+      ['-5', 1000], ['500', 1000], ['20000', 20_000], ['30000', 30_000],
+      ['120000', 30_000], ['600000', 30_000], ['Infinity', 30_000],
+    ];
+    for (const [raw, want] of cases) {
+      if (raw === undefined) delete process.env.HESABPAY_TIMEOUT_MS; else process.env.HESABPAY_TIMEOUT_MS = raw;
+      assert.equal(HP.requestTimeoutMs(), want, `HESABPAY_TIMEOUT_MS=${raw}`);
+    }
+  } finally {
+    if (prev === undefined) delete process.env.HESABPAY_TIMEOUT_MS; else process.env.HESABPAY_TIMEOUT_MS = prev;
+  }
+  //  پردازشِ یک رویداد (تأییدِ دوم) با بیشترین مهلت هم پیش از پایانِ اجاره تمام می‌شود
+  assert.ok(HP.MAX_TIMEOUT_MS * 2 < pay.EVENT_LEASE_MS, `${HP.MAX_TIMEOUT_MS} در برابرِ ${pay.EVENT_LEASE_MS}`);
+});
+
 test('S35: وب‌هوکِ دیر پس از انقضا ⇒ paid فقط با تأییدِ ارائه‌دهنده، با هشدارِ تطبیق', async () => {
   const s = await shop('دیر');
   const a = (await createPos(s)).body;

@@ -813,6 +813,6 @@ function stopReconciler() {
 module.exports = {
   FLAG_KEY, METHOD_ID, TRANSITIONS, LATE_PAID_FROM, MAX_WAIT_S,
   canTransition, enabledFor, subscribedFor, configOf, create, get, cancel, handleWebhook, reconcile, markPaid,
-  reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY,
+  reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY, EVENT_LEASE_MS,
   view, paymentRow, _bus: bus,
 };
