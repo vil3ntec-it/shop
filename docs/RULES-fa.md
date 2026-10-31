@@ -429,7 +429,8 @@
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 `hw_tools_v2` «ابزارهای تازهٔ دستگاه» در `tohid-ui` (بررسیِ کاملِ چاپگر با `DLE EOT 1–4` و برگهٔ دوروشیِ HW-01؛ تنظیمِ بارکدخوان
 `scan_gap_ms`/`scan_min_len`/`scan_prefix`/`scan_suffix`، اسکنِ آزمون و نگهبانِ `NumberField` که اسکن را از کادرِ قیمت/تعداد برمی‌گرداند؛
-فقط صاحب/مدیر می‌بیند؛ HW-01/02/05/11، باز).
+کشوی پس از فروش با قاعدهٔ HW-03 (`DrawerRule.opensAfter`: فقط نقدِ دخل)، خاموش ⇒ دقیقاً `paymentMethod == "cash"` و لغونشده (`DrawerRule.decide`)؛
+فقط صاحب/مدیر می‌بیند؛ HW-01/02/03/05/11، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

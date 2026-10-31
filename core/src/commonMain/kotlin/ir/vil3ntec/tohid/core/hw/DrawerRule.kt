@@ -45,6 +45,15 @@ object DrawerRule {
   fun isTillCash(p: Payment): Boolean =
     p.kind == CASH && p.amountMinor > 0 && p.custody.isNullOrEmpty() && p.status !in DEAD_STATUSES
 
+  /**
+   *  درِ `PrintSpooler`: قاعدهٔ تازه فقط با «ابزارهای تازهٔ دستگاه» (`HwTools`، `hw_tools_v2`، پیش‌فرض
+   *  خاموش). خاموش ⇒ دقیقاً رفتارِ main: `paymentMethod == "cash" && status != "cancelled"` (`legacy`).
+   */
+  fun decide(s: Sale, hwTools: Boolean): Boolean = if (hwTools) opensAfter(s) else legacy(s)
+
+  /** رفتارِ پیش از HW-03، بی هیچ تغییری: فقط `cash` و لغونشده — ردیف‌ها، امانت و کانال دیده نمی‌شوند */
+  fun legacy(s: Sale): Boolean = s.paymentMethod == CASH && !s.cancelled
+
   /** کشو پس از این فروش باز شود؟ (فقط وقتی تنظیمِ کشو روشن است صدا زده می‌شود) */
   fun opensAfter(s: Sale): Boolean {
     if (s.cancelled || s.online || s.paymentMethod in NOT_TILL_METHODS) return false

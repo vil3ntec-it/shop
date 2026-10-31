@@ -54,6 +54,27 @@ class PrinterDrawerTest {
     assertTrue(DrawerRule.opensAfter(DrawerRule.Sale("cash", online = false, payments = listOf(cash(100_00)))))
   }
 
+  @Test fun `بی ابزارهای تازه کشو دقیقاً همان رفتار main است - cash و لغونشده`() {
+    //  فروش‌هایی که قاعدهٔ تازه دربارهٔ‌شان نظرِ دیگری دارد
+    val mixed = DrawerRule.Sale("mixed", payments = listOf(cash(50_00), card(150_00)))
+    val courier = DrawerRule.Sale("cash", payments = listOf(cash(100_00, custody = "courier")))
+    val onlineCash = DrawerRule.Sale("cash", online = true, payments = listOf(cash(100_00)))
+    val failedRow = DrawerRule.Sale("cash", payments = listOf(cash(100_00, status = "failed")))
+    val partCredit = DrawerRule.Sale("credit", payments = listOf(cash(20_00), account(80_00)))
+    for (s in listOf(mixed, courier, onlineCash, failedRow, partCredit)) {
+      assertEquals(s.paymentMethod == "cash" && !s.cancelled, DrawerRule.decide(s, hwTools = false), "خاموش: $s")
+      assertEquals(DrawerRule.opensAfter(s), DrawerRule.decide(s, hwTools = true), "روشن: $s")
+    }
+    assertFalse(DrawerRule.decide(mixed, hwTools = false), "نقد + کارت بی پرچم مثلِ پیش باز نمی‌کند")
+    assertTrue(DrawerRule.decide(mixed, hwTools = true))
+    assertTrue(DrawerRule.decide(courier, hwTools = false), "cash بی پرچم مثلِ پیش باز می‌کند")
+    assertFalse(DrawerRule.decide(courier, hwTools = true))
+    assertTrue(DrawerRule.decide(onlineCash, hwTools = false))
+    assertFalse(DrawerRule.decide(onlineCash, hwTools = true))
+    assertFalse(DrawerRule.decide(DrawerRule.Sale("cash", cancelled = true), hwTools = false))
+    assertFalse(DrawerRule.decide(DrawerRule.Sale("card"), hwTools = false))
+  }
+
   /* ---------------- HW-02/HW-11: وضعیتِ چاپگر ---------------- */
 
   /** گفت‌وگو با چاپگرِ ساختگی: `answers[n]` پاسخِ `DLE EOT n` (نبود ⇒ ‎-1) */

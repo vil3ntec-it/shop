@@ -32,6 +32,18 @@ class KeyScanTest {
     assertNull(k.submit(t4 + 200))
   }
 
+  @Test fun `Enter درست در مرز ۵۰ میلی‌ثانیه اسکن است و ۵۱ نیست`() {
+    val k = KeyScan()
+    val (_, t) = k.type("5901234123457", 1_000, 8)
+    assertEquals("5901234123457", k.submit(t + ScanConfig.DEFAULT_GAP_MS), "Enter دقیقاً ۵۰ میلی‌ثانیه پس از نویسهٔ آخر")
+    val (_, t2) = k.type("5901234123457", 5_000, 8)
+    assertNull(k.submit(t2 + ScanConfig.DEFAULT_GAP_MS + 1), "۵۱ میلی‌ثانیه ⇒ تایپِ آدم")
+    //  آستانهٔ تنظیم‌شده هم مرزِ بسته دارد
+    val tuned = KeyScan(ScanConfig(maxGapMs = 120))
+    val (_, t3) = tuned.type("8001234567890", 9_000, 8)
+    assertEquals("8001234567890", tuned.submit(t3 + 120))
+  }
+
   @Test fun `آستانه قابل تنظیم - بلوتوث کند با ۱۲۰ میلی‌ثانیه`() {
     val slow = "8001234567890"
     val def = KeyScan()

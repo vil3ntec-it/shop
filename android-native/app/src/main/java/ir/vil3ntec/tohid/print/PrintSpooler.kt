@@ -253,15 +253,18 @@ object PrintSpooler {
     val auto = autoPrint(context)
     val printer = PrinterRegistry.defaultSaved(context) ?: return
     val sale = data.sales.firstOrNull { it.id == saleId } ?: return
-    //  HW-03: فقط وقتی نقد به دخل آمد — ردیفِ نقدِ بی‌امانت در تسویهٔ نسخهٔ ۲ (نقد + کارت، بخشی نقد)
-    //  یا `cash`ِ فاکتورِ نسخهٔ ۱ (همان رفتارِ همیشگی). قاعده و آزمونش: `core/hw/DrawerRule`
-    val cash = DrawerRule.opensAfter(
+    //  HW-03 (فقط با «ابزارهای تازهٔ دستگاه»): فقط وقتی نقد به دخل آمد — ردیفِ نقدِ بی‌امانت در تسویهٔ
+    //  نسخهٔ ۲ (نقد + کارت، بخشی نقد) یا `cash`ِ فاکتورِ نسخهٔ ۱. خاموش ⇒ دقیقاً `cash` و لغونشده، مثلِ
+    //  پیش. قاعده و آزمونش: `core/hw/DrawerRule.decide`
+    HwTools.load(context)
+    val cash = DrawerRule.decide(
       DrawerRule.Sale(
         paymentMethod = sale.paymentMethod,
         cancelled = sale.status == "cancelled",
         online = ir.vil3ntec.tohid.data.CashShift.isOnline(sale),
         payments = sale.payments?.map { DrawerRule.Payment(it.kind, it.amountMinor, it.status, it.custody) },
       ),
+      hwTools = HwTools.on.value,
     )
     val drawerNow = printer.profile().drawer && cash
     if (!auto && !drawerNow) return
