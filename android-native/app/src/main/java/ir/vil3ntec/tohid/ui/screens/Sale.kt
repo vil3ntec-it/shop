@@ -88,6 +88,9 @@ fun SaleScreen(
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
   val pricedFrom = cart
+  //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
+  val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
+  var deliverOpen by remember { mutableStateOf(false) }
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -530,6 +533,17 @@ fun SaleScreen(
             Spacer(Modifier.height(8.dp))
           }
         }
+        //  POS-38 (پشتِ `DeliverLaterPrefs`، پیش‌فرض خاموش): سبد ⇐ سفارشِ ارسال، بی فروش
+        if (deliverLater) {
+          item(key = "deliver-later") {
+            TohidSecondaryButton(
+              ir.vil3ntec.tohid.core.i18n.StrDeliver.button,
+              onClick = { deliverOpen = true },
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+              icon = Icons.Filled.LocalShipping,
+            )
+          }
+        }
         //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش، و کادرِ کد اگر قاعدهٔ کددار هست
         if (promo != null && promo.applied.isNotEmpty()) {
           item(key = "promo-lines") { ir.vil3ntec.tohid.ui.components.pos.PromoLines(promo.applied) }
@@ -568,6 +582,15 @@ fun SaleScreen(
   }
 
   /* --------------------------- پنجره‌ها --------------------------- */
+  //  POS-38: سفارشِ ارسال از همین سبد (با تخفیفِ خودکار، `priced`)؛ پس از ثبت سبد خالی — هیچ فروشی این‌جا نیست
+  if (deliverOpen) {
+    ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSheetWired(d, priced, onClose = { deliverOpen = false }) { o ->
+      deliverOpen = false
+      cartStore.clear()
+      selectedId = null
+      toast(ir.vil3ntec.tohid.core.i18n.StrDeliver.created(o.orderNo))
+    }
+  }
 
   if (pickDebtor) {
     DebtorPicker(
