@@ -422,7 +422,7 @@
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
 `print_receipt_copies = 1` شمارِ نسخهٔ چاپِ خودکار (POS-35، `claude/spec-pos-b-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
-دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `line_pricing` روشن ⇒ تخفیفِ کلِ فاکتورِ کامپیوتر به مبلغ هم (`HeldInvoice.discountAmount` واحد را با فاکتورِ نگه‌داشته می‌برد؛ POS-20، `claude/part-pos-1`).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

@@ -666,7 +666,7 @@ fun SaleScreen(
       cart = priced,
       promo = promo,
       presetDebtorId = cartDebtorId,
-      presetDiscount = extrasNow().discount,
+      presetDiscount = extrasNow().discount, presetAmount = extrasNow().discountAmount,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
       //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است

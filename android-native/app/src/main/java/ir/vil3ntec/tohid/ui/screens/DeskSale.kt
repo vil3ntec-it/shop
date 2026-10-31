@@ -156,6 +156,11 @@ fun DeskSaleScreen(
   val seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
+  //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`،
+  //  پیش‌فرض خاموش). خاموش ⇒ هرگز `true` نمی‌شود و کادر همان درصدِ امروز است — جز فاکتورِ نگه‌داشته‌ای که
+  //  با تنظیمِ روشن به مبلغ نگه داشته شد: عددش همان مبلغ می‌ماند، نه درصد (۵۰۰ ؋ هرگز ۱۰۰٪ نمی‌شود).
+  val amountChoosable = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
+  var discountAmount by remember { mutableStateOf(false) }
   var paidText by remember { mutableStateOf("") }
   //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
   var switchedDebtor by remember { mutableStateOf<String?>(null) }
@@ -275,7 +280,7 @@ fun DeskSaleScreen(
 
   val checkout = SalesEngine.Checkout(
     seller = seller,
-    discountType = SalesEngine.DiscountType.PERCENT,
+    discountType = if (discountAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT,
     //  F0-06: خالی ⇐ صفر؛ نامعتبر ⇐ خطای کنارِ کادر و `finish` ثبت نمی‌کند
     discountValue = if (canDiscount) parseNumber(discountText) ?: 0.0 else 0.0,
     payment = payment,
@@ -286,7 +291,7 @@ fun DeskSaleScreen(
   )
   val totals = SalesEngine.totals(d, priced, checkout)
   //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
-  val inputsFrom = listOf<Any?>(discountText, paidText, payment)
+  val inputsFrom = listOf<Any?>(discountText, discountAmount, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
 
@@ -313,7 +318,7 @@ fun DeskSaleScreen(
     if (cart.isEmpty()) { toast(Str.cartEmpty); return }
     //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
     if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value) || checkout.debtorId != cartStore.debtorId.value ||
-      inputsFrom != listOf<Any?>(discountText, paidText, payment)
+      inputsFrom != listOf<Any?>(discountText, discountAmount, paidText, payment)
     ) {
       toast(StrPos.cartChangedRetry); return
     }
@@ -352,7 +357,7 @@ fun DeskSaleScreen(
       is SalePost.Outcome.Done -> {
         val r = posted.ok
         ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
-        selected = null; discountText = ""; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null; creditApproval = null
+        selected = null; discountText = ""; discountAmount = false; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null; creditApproval = null
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
@@ -411,9 +416,9 @@ fun DeskSaleScreen(
   val dataLoaded by store.loaded.collectAsState()
   val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
     cartStore, d, snackbar, dataLoaded,
-    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText) },
+    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText, discountAmount) },
     onSwitched = { x ->
-      discountText = x.discount; paidText = x.paid; selected = null
+      discountText = x.discount; discountAmount = x.discountAmount; paidText = x.paid; selected = null
       //  پنلِ پرداخت مالِ فاکتورِ قبلی بود
       payOpen = false
       //  روشِ پرداخت با فاکتور برمی‌گردد (نسیهٔ بی‌مشتری هم: `finish` مشتری می‌خواهد و فهرست را باز می‌کند)
@@ -558,7 +563,17 @@ fun DeskSaleScreen(
       summary = {
         PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
           if (canDiscount) {
-            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, "٪")
+            //  POS-20: درصد یا مبلغ — عددِ نوشته‌شده می‌ماند و فقط واحدش عوض می‌شود (همان پنجرهٔ تسویهٔ گوشی)؛
+            //  ردیفِ «تخفیف» ِ بالای کادر همان دم مبلغِ کم‌شده را نشان می‌دهد
+            if (amountChoosable || discountAmount) {
+              Spacer(Modifier.height(6.dp))
+              SegmentedChoice(
+                options = listOf("percent" to ir.vil3ntec.tohid.core.i18n.StrLine.percent, "amount" to ir.vil3ntec.tohid.core.i18n.StrLine.amount),
+                selected = if (discountAmount) "amount" else "percent",
+                onSelect = { discountAmount = it == "amount"; refocus() },
+              )
+            }
+            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, if (discountAmount) "؋" else "٪")
             //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
             when (gate) {
               DiscountGate.State.NEEDS_APPROVAL -> Row(
