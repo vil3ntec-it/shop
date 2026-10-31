@@ -44,6 +44,35 @@ object Commission {
 
   data class Result(val sellers: List<SellerTotal>, val unassignedBase: Money)
 
+  /**
+   *  درصدِ نوشته‌شده ⇒ پایه‌امتیاز: «۲٫۵» یا «2.5» ⇒ ۲۵۰. ارقامِ فارسی و عربی، `٫` و `,` و `.`
+   *  پذیرفته‌اند؛ حداکثر دو رقمِ اعشار؛ بیرون از ۰ تا ۱۰۰ یا نوشتهٔ نادرست ⇒ `null` (نه گرد کردنِ بی‌صدا).
+   */
+  fun bpOfPercent(text: String): Int? {
+    val s = buildString {
+      for (c in text.trim()) append(
+        when (c) {
+          in '۰'..'۹' -> '0' + (c - '۰')
+          in '٠'..'٩' -> '0' + (c - '٠')
+          '٫', ',' -> '.'
+          else -> c
+        },
+      )
+    }
+    val m = Regex("^([0-9]{1,3})(?:\\.([0-9]{1,2}))?$").matchEntire(s) ?: return null
+    val whole = m.groupValues[1].toInt()
+    val frac = m.groupValues[2].padEnd(2, '0').toInt()
+    val bp = whole * 100 + frac
+    return if (bp in 0..FULL_BP) bp else null
+  }
+
+  /** پایه‌امتیاز ⇒ درصدِ نمایشی با ارقامِ لاتین: ۲۵۰ ⇒ «2.5»، ۳۰۰ ⇒ «3» */
+  fun percentOf(bp: Int): String {
+    val whole = bp / 100
+    val frac = bp % 100
+    return if (frac == 0) "$whole" else "$whole." + frac.toString().padStart(2, '0').trimEnd('0')
+  }
+
   fun compute(lines: List<Line>, plan: Plan, currency: Currency): Result {
     val base = HashMap<String, Long>()
     val scaled = HashMap<String, Long>()          // مبلغ × پایه‌امتیاز، بی گرد کردن

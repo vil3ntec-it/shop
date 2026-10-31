@@ -66,4 +66,18 @@ class CommissionTest {
     }
     assertEquals(Commission.Result(emptyList(), Money.zero(afn)), Commission.compute(emptyList(), Plan(100), afn))
   }
+
+  @Test
+  fun percentTextRoundTrips() {
+    assertEquals(250, Commission.bpOfPercent("2.5"))
+    assertEquals(250, Commission.bpOfPercent("۲٫۵"))
+    assertEquals(5, Commission.bpOfPercent("0,05"))
+    assertEquals(10_000, Commission.bpOfPercent("100"))
+    assertEquals(0, Commission.bpOfPercent(" 0 "))
+    for (bad in listOf("", "-1", "100.01", "2.555", "abc", "1e2", "2.")) assertEquals(null, Commission.bpOfPercent(bad), bad)
+    assertEquals("2.5", Commission.percentOf(250))
+    assertEquals("3", Commission.percentOf(300))
+    assertEquals("0.05", Commission.percentOf(5))
+    for (bp in listOf(0, 1, 99, 250, 333, 10_000)) assertEquals(bp, Commission.bpOfPercent(Commission.percentOf(bp)))
+  }
 }
