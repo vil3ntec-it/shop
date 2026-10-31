@@ -186,7 +186,14 @@ fun DeskSaleScreen(
   val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
   val term = parsed.second.trim()
   //  همان قاعدهٔ پیشنهادها، حالا در شبکه (`PosCatalog`): فعال، نام یا آغازِ بارکد
-  val matches: List<Product> = remember(term, d.products) { PosCatalog.matches(d.products, term) }
+  //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`
+  ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.load(context)
+  val smartSearch = ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.on.value
+  val searchIndex = remember(d.products, smartSearch) { if (smartSearch) PosCatalog.searchIndex(d.products) else null }
+  val byId = remember(d.products) { d.products.associateBy { it.id } }
+  val matches: List<Product> = remember(term, d.products, searchIndex) {
+    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term)
+  }
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
@@ -301,10 +308,13 @@ fun DeskSaleScreen(
   var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
   var askApproval by remember { mutableStateOf(false) }
   val saleKey = remember(cart) { if (cart.isEmpty()) null else cartStore.saleKey() }
+  //  POS-21 (پشتِ `LinePolicy.on`، پیش‌فرض خاموش): قیمتِ دستیِ زیرِ فهرست و تخفیفِ ردیف هم تخفیف‌اند
+  val lineGate = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
+  val basis = DiscountGate.basis(lineGate, d, priced, promo, totals)
   val discountDecision = ir.vil3ntec.tohid.data.ShopRole.decide(
-    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+    context, "sales.discount", DiscountGate.req(basis.discount, basis.subtotal),
   )
-  val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
+  val gate = DiscountGate.state(discountDecision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
@@ -690,7 +700,7 @@ fun DeskSaleScreen(
   if (freeLine) {
     FreeLineDialog(onDismiss = { freeLine = false; refocus() }, onConfirm = { label, price, count ->
       cartStore.set(SalesEngine.addFreeLine(cart, label, price, count, ::newId)); freeLine = false; refocus()
-    })
+    }, linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) })
   }
   editLine?.let { id ->
     val line = cart.find { it.productId == id }
@@ -704,6 +714,8 @@ fun DeskSaleScreen(
         unitPrice = line.unitPrice ?: base,
         basePrice = base,
         custom = line.free || line.unitPrice != null,
+        free = line.free,
+        linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = p?.saleUnit.orEmpty(),
         unitFactor = p?.unitFactor ?: 1.0,
         onDismiss = { editLine = null; refocus() },
@@ -718,11 +730,11 @@ fun DeskSaleScreen(
   if (askApproval && saleKey != null) {
     ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
       title = StrPos.approveDiscount,
-      summary = StrPos.discountSummary(money(totals.discount), money(totals.subtotal)) +
+      summary = StrPos.discountSummary(money(basis.discount), money(basis.subtotal)) +
         if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
-      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
     )
