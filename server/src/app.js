@@ -30,16 +30,16 @@ async function createApp({ runMigrations = true } = {}) {
     log: (m) => console.log(`[admin] ${m}`),
   });
 
-  //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
-  //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
-  //  (پارسرِ اول بدنه را می‌خواند و دومی کاری نمی‌کند).
-  app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
-  //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64
-  app.use(/^\/api(?:\/v1)?\/pump\/device\/report\//, express.json({ limit: '34mb' }));
+  //  ⛔ SEC-API-02 (پمپ): بدنهٔ ‎/pump/device/state‎ و ‎/report/‎ این‌جا خوانده **نمی‌شود** — پایین‌تر،
+  //  پس از سقفِ نرخ و توکنِ دستگاه (`DEVICE_BODY`). بقیهٔ درها همان پیش.
+  const DEVICE_BODY = /^\/api(?:\/v1)?\/pump\/device\/(?:state|report)(?:\/|$)/;
   //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
   //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
   app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
-  app.use(express.json({ limit: '2mb' }));
+  const json2mb = express.json({ limit: '2mb' });
+  app.use(function jsonExceptDeviceBody(req, res, next) {
+    return DEVICE_BODY.test(req.path) ? next() : json2mb(req, res, next);
+  });
 
   /*
    *  بدنه‌ای که JSON نیست.
@@ -58,7 +58,7 @@ async function createApp({ runMigrations = true } = {}) {
    *  می‌ماند — بی بدنه، چون بدنه ممکن است رمز داشته باشد.
    *  ──────────────────────────────────────────────────────────────
    */
-  app.use((err, req, res, next) => {
+  function bodyError(err, req, res, next) {
     if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large')) {
       return next(err);
     }
@@ -70,7 +70,8 @@ async function createApp({ runMigrations = true } = {}) {
         message: tooBig ? 'حجم درخواست بیش از حد مجاز است' : 'بدنه‌ی درخواست درست نبود',
       },
     });
-  });
+  }
+  app.use(bodyError);
 
   // ---- سرآیندهای امنیتی ----
   app.use((req, res, next) => {
@@ -78,6 +79,11 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('X-Frame-Options', 'DENY');
     res.set('Referrer-Policy', 'no-referrer');
     res.set('Cross-Origin-Opener-Policy', 'same-origin');
+    //  ⛔ SEC-API-05 (پمپ): پاسخِ درهای پمپ هرگز صفحه نیست — باز شدنِ مستقیمِ نشانیِ رسانهٔ چتِ کیوآر
+    //  یا هر پاسخِ دیگر در مرورگر: نه اسکریپت، نه قاب، نه فرم. مسیری که CSP ِ خودش را دارد پس از این می‌نویسد.
+    if (/^\/api(?:\/v1)?\/(?:admin\/)?pump(?:\/|$)/.test(req.path)) {
+      res.set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox");
+    }
     //  وقتی درخواست از HTTPS آمده، به مرورگر می‌گوییم از این به بعد
     //  فقط HTTPS. بدون این، اولین درخواستِ هر بازدید می‌تواند روی HTTP
     //  ساده برود و توکن همان‌جا دیده شود. فقط پشت TLS فرستاده می‌شود:
@@ -135,6 +141,22 @@ async function createApp({ runMigrations = true } = {}) {
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
+
+  /*
+   *  ⛔ SEC-API-02 (پمپ) — بدنهٔ بزرگِ کامپیوترِ پمپ **پس از** سقفِ نرخ و **پس از** توکنِ دستگاه.
+   *  پیش از این دو پارسر بالای همه‌چیز بودند: هر کسی بی هیچ توکنی ۴ مگابایت JSON به ‎/pump/device/state‎
+   *  می‌فرستاد و سرور پیش از سقفِ نرخ و پیش از `requireDevice` همه را در حافظه می‌خواند و parse می‌کرد.
+   *  و الگوی RegExp ِ ‎/report/‎ در Express 5 هرگز جور نمی‌شد (اسلشِ پایانی مرزِ پیشوند را می‌خورد) ⇒
+   *  سقفِ ۳۴mb مرده بود و گزارشِ عکس/PDF ِ بیش از ۲mb ِ بات ۴۱۳ می‌گرفت. حالا: سقفِ نرخ ⇐ توکنِ دستگاه
+   *  (همان `requireDevice`، یک بار؛ روتر دوباره نمی‌پرسد) ⇐ پارسرِ بزرگ. `sec-pump-pending.test.js`.
+   *
+   *  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی هیچ سقفی بر شمارِ
+   *  حساب‌ها) — پس سقفِ خودش را می‌گیرد. عکس/PDFِ برنامه برای بات: تا ۴ فایلِ ۶ مگابایتی به base64.
+   */
+  const { requireDevice } = require('./routes/pump-device');
+  app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], requireDevice, express.json({ limit: '4mb' }));
+  app.use(['/api/pump/device/report', '/api/v1/pump/device/report'], requireDevice, express.json({ limit: '34mb' }));
+  app.use(bodyError);
 
   // ---- بررسی سلامت ----
   /*
