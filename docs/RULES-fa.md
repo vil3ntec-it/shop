@@ -411,6 +411,7 @@
 | `auth.phone_add_code` | `security` | خاموش | افزودنِ شماره (راهِ ورود) به حسابِ بی‌شماره فقط با کدِ همان شماره و همان حساب: `POST /api/me/phone/code` و `phoneCode` در `PUT /api/me` (خاموش ⇒ درِ کد ۴۰۴ و رفتارِ امروز)؛ پیش از روشن کردن، برنامه‌ها `phoneCode` بفرستند (AUTH-08) | `claude/spec-auth-3` | باز |
 | `beta.shops`، `beta.devices` | `release` | فهرستِ خالی | کدام دکان/دستگاه نسخهٔ آزمایشی می‌گیرد؛ پنل: `/api/admin/release/beta` | F0-27، #265 | main |
 | `SYNC_V3_ENABLED` (محیط، نه `live_config`) | کلِ سرور | خاموش | `/api/sync/v3/*` (خاموش ⇒ ۴۰۴) | #233 | main |
+| `OTP_SMS_DAILY_COST_MAX_MINOR`، `OTP_SMS_SHOP_DAILY_COST_MAX_MINOR` (محیط) | کلِ سرور / هر دکان، هر کانال | ۰ = خاموش | SEC-06: جمعِ `cost_minor` ِ ۲۴ ساعتِ همان کانال در `sms_usage` ⇒ ۴۲۹ `sms_cost_ceiling` / `sms_shop_cost_ceiling` برای همهٔ شماره‌ها؛ سابقهٔ `sms.cost_ceiling` روزی یک بار هر سهم؛ خطای خواندن ⇒ باز | SEC-06 | باز |
 | `min_app_version_<app>` (پیکربندیِ پلن‌ها) | هر برنامه | خالی | پیامِ قرمزِ «پشتیبانی نمی‌شود»، بی قفل | #260 | main |
 | `shop.order_notify` | دکان / `all` | خاموش | صفِ پایدارِ اعلانِ سفارش، `/pending` و `/ack` | #258 | باز |
 | `shop.catalog` | دکان / `all` | خاموش | کاتالوگِ سرور و رزروِ اتمیِ موجودی با سفارش | #263 | باز |
