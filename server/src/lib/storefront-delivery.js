@@ -440,7 +440,10 @@ async function locate(sf, latRaw, lngRaw) {
   const zones = (await flagOn(sf.shop_id)) ? (await zonesOf(sf.shop_id)).filter((z) => z.active) : [];
   if (!zones.length) return { zoned: false, inZone: true, zone: null, pickup: sf.accept_pickup === true };
   const z = zoneForPin(zones, lat, lng);
-  return { zoned: true, inZone: Boolean(z), zone: z ? publicZone(z) : null, pickup: sf.accept_pickup === true };
+  const out = { zoned: true, inZone: Boolean(z), zone: z ? publicZone(z) : null, pickup: sf.accept_pickup === true };
+  //  CHK-10/S34: «خبرم کن» فقط با پرچمِ خودش و فقط برای پینِ بیرون؛ خاموش ⇒ همان پاسخِ پیشین
+  if (!z && sf.accept_delivery && (await require('./storefront-area-requests').flagOn(sf.shop_id))) out.notifyArea = true;
+  return out;
 }
 
 async function publicSlots(sf, fulfillment, at = db.now()) {
