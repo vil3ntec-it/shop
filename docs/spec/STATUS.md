@@ -29,7 +29,7 @@
 | WEB | ۲۵ | ۲ | ۱۶ | ۵ | ۰ | ۰ | ۲ |
 | CHK | ۲۴ | ۴ | ۱۵ | ۴ | ۰ | ۰ | ۱ |
 | ORD | ۲۳ | ۹ | ۳ | ۱۰ | ۰ | ۰ | ۱ |
-| PCK | ۱۴ | ۰ | ۹ | ۵ | ۰ | ۰ | ۰ |
+| PCK | ۱۴ | ۰ | ۱۳ | ۱ | ۰ | ۰ | ۰ |
 | DLV | ۲۰ | ۱ | ۱۵ | ۴ | ۰ | ۰ | ۰ |
 | NTF | ۱۰ | ۰ | ۱ | ۷ | ۰ | ۰ | ۲ |
 | MKT | ۱۲ | ۰ | ۲ | ۹ | ۰ | ۰ | ۱ |
@@ -41,7 +41,7 @@
 | E2E-MKT | ۲ | ۱ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | E2E-ORD | ۲ | ۲ | ۰ | ۰ | ۰ | ۰ | ۰ |
 | E2E-STK | ۱ | ۱ | ۰ | ۰ | ۰ | ۰ | ۰ |
-| E2E-PCK | ۱ | ۰ | ۰ | ۱ | ۰ | ۰ | ۰ |
+| E2E-PCK | ۱ | ۱ | ۰ | ۰ | ۰ | ۰ | ۰ |
 | E2E-DLV | ۲ | ۰ | ۲ | ۰ | ۰ | ۰ | ۰ |
 | E2E-CASH | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | E2E-PAY | ۱ | ۰ | ۰ | ۰ | ۰ | ۰ | ۱ |
@@ -68,7 +68,7 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۱۷۴ | ۲۸۸ | ۲۰۳ | ۰ | ۷۷ | ۲۲ |
+| **همه** | ۷۶۴ | ۱۷۵ | ۲۹۲ | ۱۹۸ | ۰ | ۷۷ | ۲۲ |
 
 ## خلاصه به تفکیکِ فاز
 
@@ -78,10 +78,10 @@
 | ۱ | ۴۰ | ۱۷ | ۱۷ | ۵ | ۰ | ۱ | ۰ |
 | ۲ | ۱۱۳ | ۱۹ | ۷۱ | ۲۱ | ۰ | ۲ | ۰ |
 | ۳ | ۷۷ | ۱۳ | ۲۴ | ۴۰ | ۰ | ۰ | ۰ |
-| ۴ | ۱۴۱ | ۲۰ | ۷۰ | ۴۳ | ۰ | ۲ | ۶ |
-| ۵ | ۸۲ | ۵ | ۱۴ | ۶۰ | ۰ | ۰ | ۳ |
+| ۴ | ۱۴۱ | ۲۰ | ۷۲ | ۴۱ | ۰ | ۲ | ۶ |
+| ۵ | ۸۲ | ۵ | ۱۶ | ۵۸ | ۰ | ۰ | ۳ |
 | ۶ | ۶ | ۰ | ۰ | ۶ | ۰ | ۰ | ۰ |
-| بی‌فاز در سند | ۲۷۳ | ۷۴ | ۸۹ | ۲۵ | ۰ | ۷۲ | ۱۳ |
+| بی‌فاز در سند | ۲۷۳ | ۷۵ | ۸۹ | ۲۴ | ۰ | ۷۲ | ۱۳ |
 
 ## F0
 
@@ -536,14 +536,14 @@
 | PCK-02 | اسکن هر قلم برای تأیید. کالای اشتباه پذیرفته نمی‌شود. | §۶.۱۷ | ۴ | P0 | PARTIAL | سرور: اسکن فقط با بارکدِ همان کالا (GTINِ هم‌ارز، رقمِ فارسی)؛ اشتباه ⇒ رد با `wrong_item` و شمارش؛ کالای بارکددار تأییدِ دستی ندارد: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ برنامهٔ مدیریت: کادرِ اسکن (بارکدخوانِ HID با Enter یا تایپ) روی قلمِ جاری، ردِ کالای اشتباه با لرزش و پیام، شمارِ اسکنِ اشتباه روی قلم (`PickSheet`، `PickingWireTest`)؛ کامپایلِ برنامه فقط در CI؛ پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
 | PCK-03 | دکمه «پیدا نکردم» همیشه در دسترس است. | §۶.۱۷ | ۴ | P0 | PARTIAL | سرور: «پیدا نکردم» برای هر قلمِ باز همیشه پذیرفته (کمبودِ بخشی ⇒ «کم»)، با کلیدِ یکتای رویداد و «از نو»: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ برنامهٔ مدیریت: «پیدا نکردم» روی هر قلمِ باز همیشه دیده می‌شود و «از نو» (`PickSheet`)؛ کامپایلِ برنامه فقط در CI؛ پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
 | PCK-04 | کالای وزنی: وزن واقعی ثبت می‌شود و قیمت در حد مجاز دوباره محاسبه می‌شود. | §۶.۱۷ | ۴ | P1 | PARTIAL | سرور: کالای وزنی از واحد؛ وزنِ واقعی تا ±۱۰٪ ⇒ قیمت با وزنِ واقعی، بیشتر ⇒ رد با سقف، کمتر ⇒ «کم»: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ برنامهٔ مدیریت: وزنِ واقعی با پیش‌سنجشِ حد (`PickText.weighHint`، PickTextTest)؛ ترازو در برگه هنوز نه؛ کامپایلِ برنامه فقط در CI؛ پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
-| PCK-05 | پیشنهاد جایگزین برای تأیید مشتری با لینک یا واتس‌اپ. پس از مهلت، ترجیح ذخیره‌شده مشتری اع… | §۶.۱۷ | ۴ | P1 | MISSING | جمع‌آوری (picking) جز وضعیتِ «picking» در ماشینِ سفارش نیست | — | — | — |
-| PCK-06 | قاعده‌های جایگزینی امن (نه بین دسته‌های متفاوت، نه بین حلال و غیرحلال). قاعده قیمت شفاف:… | §۶.۱۷ | ۴ | P1 | MISSING | جمع‌آوری (picking) جز وضعیتِ «picking» در ماشینِ سفارش نیست | — | — | — |
+| PCK-05 | پیشنهاد جایگزین برای تأیید مشتری با لینک یا واتس‌اپ. پس از مهلت، ترجیح ذخیره‌شده مشتری اع… | §۶.۱۷ | ۴ | P1 | PARTIAL | سرور: برای قلمِ «پیدا نشد» دو جایگزینِ امن (`GET /shop/orders/:id/pick/substitutes`)، پیشنهاد با اسکن و مهلت (پیش‌فرض ۱۰ دقیقه، ۲ تا ۶۰؛ `POST /shop/orders/:id/pick/substitutions`) با لینکِ پیگیریِ ویترین و لینکِ واتس‌اپ (`wa.me`، فقط نقشِ دارای `orders.contact`)؛ مشتری در صفحهٔ سفارشِ ویترین می‌پذیرد/رد می‌کند (`/api/store/:slug/orders/:token/substitutions`، `store/order.js`، سه‌زبانه)، کارمند پس از تماس (`…/substitutions/decide`)؛ پس از مهلت ترجیحِ قلم (CHK-15: فقط «بهترین مشابه» = پذیرش؛ «جایگزین نه/بازپرداخت» پیشنهاد نمی‌گیرد) و بسته تا تصمیم صبر می‌کند: `pick-substitutes.test.js` ۱۱/۱۱، `pick-sub-core.test.js` ۷/۷ با بردارِ `core/test-vectors/pick-sub-v1.json`، `order-picking` ۱۰/۱۰، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶ (PGlite)؛ سرتاسری `node test/e2e/pick.e2e.mjs` ۶/۶ (کرومیوم)؛ دوقلوی `PickSubstitute` (core) با همان بردار: `gradle -p core jvmTest` ‏PickSubstituteVectorsTest ۶/۶؛ جهش‌آزمایی ۱۰ جهش، همه سرخ؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۷۷؛ صفحهٔ جایگزین در برنامهٔ مدیریت و ترجیحِ کلیِ مشتری (CHK-15) هنوز نه | — | — | `claude/new-pck-1` (روی `claude/spec-pck-2`) |
+| PCK-06 | قاعده‌های جایگزینی امن (نه بین دسته‌های متفاوت، نه بین حلال و غیرحلال). قاعده قیمت شفاف:… | §۶.۱۷ | ۴ | P1 | PARTIAL | سرور و core: فقط جایگزینِ امن — هم‌دسته، هم‌زیردسته اگر اصل دارد، هم‌حلال (نامعلوم با حلال یکی نیست؛ «حلال» با `PUT /shop/orders/pick/products/:productId` و فقط `stock.adjust`)، هم‌نوعِ واحد (وزنی/شمارشی)؛ قیمتِ شفاف: مشتری قیمتِ واحدِ کمتر را می‌پردازد و مقدار هرگز بیش از سفارش؛ بسته ⇒ قلمِ سفارش = جایگزین با همان قیمتِ کمتر، verify-data سالم: `pick-substitutes.test.js` ۱۱/۱۱، `pick-sub-core.test.js` ۷/۷ با بردارِ `core/test-vectors/pick-sub-v1.json`، `order-picking` ۱۰/۱۰، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶ (PGlite)؛ سرتاسری `node test/e2e/pick.e2e.mjs` ۶/۶ (کرومیوم)؛ دوقلوی `PickSubstitute` (core) با همان بردار: `gradle -p core jvmTest` ‏PickSubstituteVectorsTest ۶/۶؛ جهش‌آزمایی ۱۰ جهش، همه سرخ؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۷۷؛ صفحهٔ جایگزین و «حلال» در برنامهٔ مدیریت هنوز نه | — | — | `claude/new-pck-1` (روی `claude/spec-pck-2`) |
 | PCK-07 | بازپرداخت خودکار اقلام حذف‌شده یا ردشده. | §۶.۱۷ | ۴ | P0 | PARTIAL | سرور: بسته‌بندی ⇒ کسرِ خودکارِ قلمِ پیدانشده/کم در قلم‌ها، جمعِ سفارش و نقدِ موردِ انتظارِ مأموریتِ هنوزنرفته در یک تراکنش، با رویدادِ دلیل‌دار؛ verify-data سالم: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ برنامهٔ مدیریت: جمعِ تا این‌جا و کسر پیش از بسته، جمعِ نهایی پس از بسته (`PickSheet`)؛ کامپایلِ برنامه فقط در CI؛ پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED؛ پرداختِ آنلاین نیست (D-08) پس «بازپرداخت» = کسر از نقد | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
 | PCK-08 | عکس سفارش بسته‌بندی‌شده به‌عنوان مدرک. | §۶.۱۷ | ۵ | P2 | PARTIAL | سرور: عکسِ کیسه‌های بسته فقط از بسته (`parcelOnly`)، فقط پس از بسته‌بندی و پیش از تحویل (`packed`/`ready_for_pickup`)، نوعِ واقعیِ عکس (JPEG/PNG/WebP، `product-photos.sniff`) و سقفِ ۶۰۰KB، حداکثر ۳ برای هر سفارش، با کلیدِ یکتا (`POST /shop/orders/:id/pick/photos`)؛ فهرستِ بی‌بایت و بایت‌ها فقط از همان سفارش و دکان، هر دیدن در سابقه (`GET …/pick/photos[/:photoId]`)؛ مدرک فقط افزوده: `pick-photos.test.js` ۴/۴، `order-picking` ۱۰/۱۰، `shop-route-inventory` ۲/۲ (با عکسِ واقعیِ «الف»)، `paid-routes-entitlement` ۶/۶، `role-route-isolation` ۳/۳ (PGlite)؛ جهش‌آزمایی ۷ جهش، همه سرخ؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۷۹؛ گرفتنِ عکس در برنامهٔ مدیریت هنوز نه | — | — | `claude/new-pck-3` (روی `claude/spec-pck-2`) |
 | PCK-09 | برچسب کیسه با QR و تعداد کیسه. | §۶.۱۷ | ۴ | P1 | PARTIAL | سرور: تعدادِ کیسه (۱ تا ۵۰) هنگامِ بسته‌بندی و متنِ QRِ برچسبِ هر کیسه `VLNB-<شماره>-<کیسه>-<همه>`: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ برنامهٔ مدیریت: تعدادِ کیسه و QRِ برچسبِ هر کیسه روی صفحه (`QrBox`)؛ چاپِ برچسب نه | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
-| PCK-10 | قفسه انتظار و اسکن «آماده». | §۶.۱۷ | ۵ | P2 | MISSING | جمع‌آوری (picking) جز وضعیتِ «picking» در ماشینِ سفارش نیست | — | — | — |
+| PCK-10 | قفسه انتظار و اسکن «آماده». | §۶.۱۷ | ۵ | P2 | PARTIAL | سرور: کیسهٔ بسته‌شده با برچسبِ QR ِ خودش (`VLNB-…`، PCK-09) روی جای قفسهٔ انتظار اسکن می‌شود (`POST /shop/orders/pick/shelf/scan`؛ تکرار بی‌اثر، رقمِ فارسی پاک)؛ همهٔ کیسه‌ها ⇒ «آماده» (`ready_scanned_at`) و برای دریافت از دکان `packed ⇒ ready_for_pickup` فقط با `orders.transitionIn`؛ برچسبِ کهنه/بد، بسته‌نشده و دکانِ دیگر رد؛ فهرستِ قفسه به ترتیبِ طبیعیِ جا (`GET /shop/orders/pick/shelf`): `pick-shelf.test.js` ۵/۵، `order-picking` ۱۰/۱۰، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶، `role-route-isolation` ۳/۳ (PGlite)؛ جهش‌آزمایی ۸ جهش، ۷ سرخ (هشتمی — دستهٔ بی شرطِ دکان — را لایهٔ دوم، `order-picking.sheet` ِ دکان‌دار، با ۴۰۴ می‌گیرد)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۷۸؛ صفحهٔ قفسه در برنامهٔ مدیریت هنوز نه | — | — | `claude/new-pck-2` (روی `claude/spec-pck-2`) |
 | PCK-11 | کد تحویل (QR یا عدد) برای تحویل به پیک یا مشتری. | §۶.۱۷ | ۴ | P0 | PARTIAL | کدِ تحویل/دریافت: HMAC، یک‌بارمصرف، قفل پس از ۵ تلاش، فقط سرور. `delivery` ⇒ ۱۰/۱۰؛ رابط: کادرِ کد در «تحویل شد» و «تحویلِ حضوری»ِ میزِ تحویل. QR پشتِ پرچمِ خاموشِ `shop.orders.picking`: متنِ `VLNH-<شماره>-<کد>` کنارِ عدد در برگهٔ «کدِ سفارش»، اسکنِ QR (بارکدخوانِ HID با هر چیدمان، رقمِ فارسی) در کادرِ کد و در جست‌وجوی «دریافتِ حضوری» که برگهٔ تحویلِ همان سفارش را با کد باز می‌کند، و ردِ QRِ سفارشِ دیگر: `gradle -p core jvmTest` ‏HandoverCodeTest ۱۱/۱۱؛ `order-picking.test.js` ۲/۲ (پرچم در هر دو `/config`)؛ کامپایلِ برنامه فقط در CI؛ روی بارکدخوانِ واقعی آزموده نشده؛ پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED | — | — | #249 (1b1842d)، `claude/spec-pck-1` |
-| PCK-12 | جمع‌آوری چند سفارش با هم. | §۶.۱۷ | ۵ | P2 | MISSING | جمع‌آوری (picking) جز وضعیتِ «picking» در ماشینِ سفارش نیست | — | — | — |
+| PCK-12 | جمع‌آوری چند سفارش با هم. | §۶.۱۷ | ۵ | P2 | PARTIAL | سرور: دستهٔ ۲ تا ۱۰ سفارشِ قبول‌شده با کلیدِ یکتایی (`POST /shop/orders/pick/batches`؛ تکرار ⇒ همان دسته) ⇒ برگهٔ هر سفارش با `batch_id` ِ مشترک و فهرستِ یک‌جا به ترتیبِ قفسه با «سبدِ» هر سفارش (`GET /shop/orders/pick/batches/:batchId`)؛ همه پیش از هر نوشتن سنجیده می‌شوند (قبول‌نشده، دستهٔ دیگر، دکانِ دیگر ⇒ هیچ برگه)؛ رویداد، کسر و بسته جدا برای هر سفارش: `pick-shelf.test.js` ۵/۵، `order-picking` ۱۰/۱۰، `shop-route-inventory` ۲/۲، `paid-routes-entitlement` ۶/۶، `role-route-isolation` ۳/۳ (PGlite)؛ جهش‌آزمایی ۸ جهش، ۷ سرخ (هشتمی — دستهٔ بی شرطِ دکان — را لایهٔ دوم، `order-picking.sheet` ِ دکان‌دار، با ۴۰۴ می‌گیرد)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۷۸؛ صفحهٔ دسته در برنامهٔ مدیریت هنوز نه | — | — | `claude/new-pck-2` (روی `claude/spec-pck-2`) |
 | PCK-13 | شاخص‌ها: زمان جمع‌آوری، درصد پیدا شدن و نرخ جایگزینی. | §۶.۱۷ | ۵ | P2 | PARTIAL | سرور: `GET /shop/orders/pick/metrics` — زمانِ جمع‌آوری (میانگین/میانه)، درصدِ پیدا شدن، نرخِ جایگزینی و اسکنِ اشتباه از برگه‌های بسته؛ بی داده null: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ نمایش در برنامه هنوز نه | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
 | PCK-14 | «پیدا نکردم» موجودی ویترین را اصلاح کند و برای مدیر وظیفه بررسی بسازد. | §۶.۱۷ | ۴ | P1 | PARTIAL | سرور: «پیدا نکردم» ⇒ وظیفهٔ بررسیِ مدیر (`pick_issues`، یکی برای هر کالا) و «تمام شده» در ویترین و ردِ ثبتِ سفارشِ ویترین برای همان کالا تا رسیدگی (`stock.adjust`)؛ «از نو» ِ تنها برخورد کنارش می‌گذارد: `order-picking.test.js` ۱۰/۱۰، `pick-core.test.js` ۸/۸ با بردارِ `core/test-vectors/pick-v1.json`، `shop-route-inventory` و `paid-routes-entitlement` سبز (PGlite)؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`، مهاجرتِ ۱۴۲؛ صفحهٔ رسیدگیِ مدیر در برنامه هنوز نه | — | — | `claude/spec-pck-2`، `claude/spec-pck-3`، `claude/spec-pck-4` |
 
@@ -845,7 +845,7 @@
 
 | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
 |---|---|---|---|---|---|---|---|---|---|
-| E2E-PCK-06 | کالای ناموجود هنگام جمع‌آوری طبق سیاست جایگزینی/حذف و با مبلغ نهایی درست مدیریت می‌شود. | §۲۴.۶ | — | — | MISSING | جمع‌آوری و جایگزینی نیست | — | — | — |
+| E2E-PCK-06 | کالای ناموجود هنگام جمع‌آوری طبق سیاست جایگزینی/حذف و با مبلغ نهایی درست مدیریت می‌شود. | §۲۴.۶ | — | — | IMPLEMENTED-VERIFIED | `node test/e2e/pick.e2e.mjs` (کرومیوم + سرورِ واقعی روی PGlite؛ در `npm run test:e2e`) ⇒ ۶ ✅، ۰ ❌ (کدِ خروج ۰): روغن پیدا نشد ⇒ فقط جایگزینِ هم‌دسته پیشنهاد و اسکنِ کالای دیگر رد؛ مشتری در صفحهٔ پیگیری جایگزین را با قیمتِ کمتر (۲ × ۳۰۰، نه ۳۲۰) می‌پذیرد؛ صابونِ بی‌جایگزین حذف؛ بسته ⇒ جمعِ ۶۰۰ و کسرِ ۴۰؛ کالای «پیدا نشد» تا رسیدگی فروخته نمی‌شود؛ مهلتِ گذشته ⇒ ترجیحِ مشتری (حذف) و جمعِ ۸۰؛ verify-data سالم، بی خطای JS. جهش: پذیرشِ مهلتِ گذشته، قیمتِ بیشتر، بستهٔ بی‌انتظار ⇒ سرخ (`pick-substitutes.test.js`). پشتِ پرچمِ خاموش، مستقر نشده | — | — | `claude/new-pck-1` (روی `claude/spec-pck-2`) |
 
 ## E2E-DLV
 
