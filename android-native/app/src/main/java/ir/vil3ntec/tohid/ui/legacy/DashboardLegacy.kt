@@ -59,15 +59,12 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.glassSurface
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Brand
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.material3.Icon
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.Str
 
-private fun todayIsoLegacy(): String =
-  SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+/** «امروز» ِ داشبورد همان روزِ کاریِ دکان است که فروش با آن ثبت می‌شود (LOC-03) */
+private fun todayIsoLegacy(): String = ir.vil3ntec.tohid.todayIso()
 
 /**
  *  داشبورد — پنل‌به‌پنل همان چیزی که نسخهٔ وب نشان می‌دهد.

@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
+import ir.vil3ntec.tohid.core.returns.ReturnReasons
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.money
@@ -61,15 +62,11 @@ object ReturnFlow {
    */
   const val RECEIPT_KIND = CashShift.RETURN_RECEIPT
 
-  /** RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است */
-  val REASONS: List<String> = listOf(
-    "خراب یا معیوب",
-    "اشتباه در فروش",
-    "پشیمانیِ مشتری",
-    "تاریخ گذشته",
-    "اندازه یا مدلِ نامناسب",
-    "دیگر",
-  )
+  /**
+   *  RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است. فهرستِ خودِ دکان `ReturnSettings.reasons`
+   *  است (پاک‌سازی و سنجش در `core/returns/ReturnReasons`) و با [Request.reasons] به [post] می‌رسد.
+   */
+  val REASONS: List<String> = ReturnReasons.DEFAULT
 
   /** کدهای خطا — همان کدهای JS؛ متنِ فارسی با [message] */
   object Code {
@@ -78,6 +75,8 @@ object ReturnFlow {
     const val SALE_NOT_FOUND = "SALE_NOT_FOUND"
     const val SALE_CANCELLED = "SALE_CANCELLED"
     const val REASON_REQUIRED = "REASON_REQUIRED"
+    /** RET-08 — دلیل در فهرستِ دکان نیست */
+    const val REASON_NOT_LISTED = "REASON_NOT_LISTED"
     const val NOTHING_TO_RETURN = "NOTHING_TO_RETURN"
     const val QTY_EXCEEDS = "QTY_EXCEEDS"
     const val BAD_QTY = "BAD_QTY"
@@ -97,6 +96,7 @@ object ReturnFlow {
     Code.SALE_NOT_FOUND -> "فاکتور پیدا نشد"
     Code.SALE_CANCELLED -> "این فاکتور لغو شده است؛ برگشت نمی‌پذیرد"
     Code.REASON_REQUIRED -> "دلیلِ برگشت را انتخاب کنید"
+    Code.REASON_NOT_LISTED -> "دلیلِ برگشت را از فهرستِ دکان انتخاب کنید"
     Code.NOTHING_TO_RETURN -> "مقدار معتبری برای برگشت وارد نشده"
     Code.QTY_EXCEEDS -> "بیش از مقدارِ فروخته‌شده برنمی‌گردد" + if (detail.isNotEmpty()) " ($detail)" else ""
     Code.BAD_QTY -> "مقدار درست نیست" + if (detail.isNotEmpty()) " — $detail" else ""
@@ -449,6 +449,11 @@ object ReturnFlow {
     val picks: Map<String, Pick> = emptyMap(),
     val free: List<FreeLine> = emptyList(),
     val reason: String = "",
+    /**
+     *  RET-08 — فهرستِ دلیل‌های دکان (`ReturnSettings.reasons`)؛ با فهرست، [reason] باید یکی از
+     *  ردیف‌هایش باشد و همان ردیف ثبت می‌شود. `null` ⇒ هر دلیلِ ناخالی (رفتارِ پیشین).
+     */
+    val reasons: List<String>? = null,
     val mode: String = ORIGINAL,
     /** قرض‌دارِ اعتبارِ فروشگاه؛ `null` ⇒ مشتریِ همان فاکتور */
     val customerId: String? = null,
@@ -471,8 +476,9 @@ object ReturnFlow {
   fun post(d: ShopData, req: Request, today: String, now: Long, newId: () -> String): Outcome<Posted> {
     if (req.docId.isBlank()) return Outcome.Bad(Code.BAD_REQUEST)
     if (d.saleReturns.any { it.docId == req.docId }) return Outcome.Bad(Code.ALREADY_POSTED)
-    val reason = req.reason.trim()
-    if (reason.isEmpty()) return Outcome.Bad(Code.REASON_REQUIRED)
+    val typed = req.reason.trim()
+    if (typed.isEmpty()) return Outcome.Bad(Code.REASON_REQUIRED)
+    val reason = if (req.reasons == null) typed else ReturnReasons.pick(typed, req.reasons) ?: return Outcome.Bad(Code.REASON_NOT_LISTED)
 
     val sale = req.saleId?.let { id -> d.sales.find { it.id == id } ?: return Outcome.Bad(Code.SALE_NOT_FOUND) }
     val q = if (sale != null) quote(d, sale.id, req.picks) else quoteNoReceipt(d, req.free)
@@ -489,6 +495,11 @@ object ReturnFlow {
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    //  برگه باید همین سند را تا همین مبلغ بپوشاند (همان `covers` ِ سرور)؛ وگرنه سرور سند را رد می‌کرد
+    val slip = approval?.slip?.takeIf { g.decision == "approve" }
+    if (slip != null && ir.vil3ntec.tohid.core.perm.ReturnApprovals.covers(slip, req.docId, quote.lines.sumOf { minor(it.amount) }) != null) {
+      return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    }
     val approvedBy = if (g.decision == "approve") approval!!.by else req.by.trim()
 
     val prior = if (sale == null) emptyList() else d.saleReturns.filter { it.saleId == sale.id }
@@ -543,6 +554,8 @@ object ReturnFlow {
         by = req.by.trim().ifEmpty { null },
         approvedBy = if (g.decision == "approve") approvedBy else null,
         exchangeSaleId = req.exchangeSaleId,
+        //  برگه فقط روی نخستین ردیفِ سند (سرور از هر ردیفِ سند برمی‌دارد و یک بار مصرف می‌کند)
+        approval = slip?.takeIf { rows.isEmpty() }?.let { DiscountGate.json(it) },
         //  `channel` نه، حتی برای فروشِ آنلاین: `online` روی مرجوعی یعنی «بیرون از دخل» و `CashShift`
         //  کلِ ردیف را نمی‌شمارد، ولی نقدِ این برگشت از همین دخل رفت (#340)؛ درگاه از راهِ `toMethods`
       )

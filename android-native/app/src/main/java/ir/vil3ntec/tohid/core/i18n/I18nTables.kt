@@ -10,6 +10,7 @@ package ir.vil3ntec.tohid.core.i18n
 object I18nTables {
   val all: List<Any> get() = listOf(
     Str, StrNav, StrAuth, StrSettings, StrHome, StrSale, StrShell, StrPos,
+    StrExpenses, StrFields, StrInvoices, StrSecurity,
     StrKit, StrProducts, StrStock, StrMoney, StrReports, StrAccount, StrOnline, StrSearch,
   )
 }

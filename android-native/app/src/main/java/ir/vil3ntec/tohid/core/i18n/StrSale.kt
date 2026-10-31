@@ -73,6 +73,17 @@ object StrSale {
   val noActiveInCategory: String get() = t("در این دسته کالای فعالی نیست.", "No active items in this category.", "په دې ډله کې فعال توکی نشته.")
   val discountPct: String get() = t("تخفیف (٪)", "Discount (%)", "تخفیف (٪)")
   val badNumberShort: String get() = t("عدد درست نیست", "Not a valid number", "عدد سم نه دی")
+
+  // POS-24: قاعده‌های پیش از پایانِ فاکتور (تنظیمات)
+  val checkoutRulesTitle: String get() = t("قاعده‌های پایانِ فاکتور", "Checkout rules", "د بل د بشپړولو قاعدې")
+  val checkoutRulesNote: String get() = t(
+    "پیش از ثبتِ هر فاکتور در صندوقِ همین دستگاه سنجیده می‌شوند. «فروشِ نسیه بی مشتری» همیشه رد است.",
+    "Checked before every invoice is saved at this device's till. A credit sale without a customer is always refused.",
+    "د همدې وسیلې په صندوق کې د هر بل له ثبت مخکې کتل کېږي. پرته له پیرودونکي پور پلور تل ردېږي.",
+  )
+  val zeroTotalRule: String get() = t("فاکتورِ با مبلغِ صفر ثبت نشود", "Refuse invoices with a zero total", "د صفر مبلغ بل دې نه ثبتېږي")
+  val customerFromLabel: String get() = t("مشتری لازم است از مبلغِ (افغانی)", "Customer required from (AFN)", "له دې مبلغ څخه پیرودونکی اړین دی (افغانۍ)")
+  val customerFromHint: String get() = t("خالی = خاموش؛ ۰ = هر فاکتور", "Empty = off; 0 = every invoice", "تش = بند؛ ۰ = هر بل")
   val paidNow: String get() = t("دریافتیِ همین حالا (؋)", "Received now (؋)", "همدا اوس ترلاسه شوې (؋)")
   val freeItemAlt: String get() = t("قلمِ آزاد", "Custom item", "آزاد توکی")
   val editRow: String get() = t("ویرایشِ ردیف", "Edit row", "کرښه سمه کړئ")

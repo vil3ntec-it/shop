@@ -58,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -181,6 +182,10 @@ fun DebtorsScreen(
   LaunchedEffect(shotOpen) { if (shotOpen != null) openId = shotOpen }
   val shotComposer = DebtorDetailShot.composer.value
   LaunchedEffect(shotComposer, openId) { if (shotComposer) openId?.let { txFor = it to DebtorEngine.Kind.GIVE } }
+
+  //  ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر برگه ⇒ دو ضربه یک ردیف
+  val txKey = remember(txFor) { newId() }
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
 
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
@@ -372,7 +377,7 @@ fun DebtorsScreen(
           DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
         } else null
         if (credit != null && credit.over) overLimit = pending
-        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
+        else record(pending, over = false)
       },
     )
   }
@@ -386,7 +391,7 @@ fun DebtorsScreen(
       V3MaterialColors { OverLimitDialog(
         credit = credit,
         onConfirm = {
-          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          record(pending, over = true)
           overLimit = null
         },
         onDismiss = { overLimit = null },
@@ -519,8 +524,5 @@ private data class PendingTx(
   val notes: String,
   val due: String?,
 ) {
-  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-    dueDate = due, overLimit = overLimit,
-  )
+  fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
 }
