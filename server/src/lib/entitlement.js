@@ -50,8 +50,21 @@ function build(T) {
    * @param {string} tenantId شناسه‌ی دکان یا پمپ
    * @returns {{source:string, features:string[], subscription:object, trial:object}}
    */
+  /*
+   *  ⛔ فاز ۳ ِ پنلِ مرکزی — «پایانِ اشتراک» ِ مدیر (`lib/shop-holds.js`، حالتِ `subscription_ended`):
+   *  در همین پرسشِ دکان خوانده می‌شود (رفت‌وبرگشتِ دوم نیست). باز باشد ⇒ فقط قابلیت‌های رایگان و دورهٔ
+   *  آزمایشیِ مصرف‌شده، **بی** دست زدن به ردیفِ اشتراک یا پول؛ برداشتنش همه‌چیز را به حسابِ ساعتِ سرور
+   *  برمی‌گرداند (روزی اضافه نمی‌شود). پمپ این حالت را ندارد.
+   */
+  const TENANT_SQL = T.app === 'shop'
+    ? `SELECT t.*, (SELECT h.placed_at FROM shop_holds h
+                     WHERE h.shop_id = t.id AND h.kind = 'subscription_ended' AND h.lifted_at IS NULL
+                     LIMIT 1) AS hold_sub_ended_at
+         FROM shops t WHERE t.id=$1`
+    : `SELECT * FROM ${T.tenantTable} WHERE id=$1`;
+
   async function entitlementOf(tenantId, at = now()) {
-    const tenant = await one(`SELECT * FROM ${T.tenantTable} WHERE id=$1`, [tenantId]);
+    const tenant = await one(TENANT_SQL, [tenantId]);
     if (!tenant) {
       return {
         app: T.app,
@@ -82,6 +95,22 @@ function build(T) {
      */
     if (sub && sub.status !== 'pending' && trial.active) {
       trial = { ...trial, active: false, used: true, daysLeft: 0, consumed: true };
+    }
+
+    if (tenant.hold_sub_ended_at !== null && tenant.hold_sub_ended_at !== undefined) {
+      const endedAt = Number(tenant.hold_sub_ended_at);
+      return {
+        app: T.app,
+        source: 'free',
+        features: uniq([...cat.CORE_KEYS, ...cat.FREE_KEYS]),
+        subscription: {
+          ...state, status: 'expired', phase: 'expired', active: false,
+          endsAt: state.endsAt ? Math.min(state.endsAt, endedAt) : endedAt, graceEndsAt: endedAt, daysLeft: 0,
+          endedByAdmin: true, endedAt,
+        },
+        trial: { ...trial, active: false, used: true, daysLeft: 0, consumed: true },
+        held: 'subscription_ended',
+      };
     }
 
     if (state.active) {

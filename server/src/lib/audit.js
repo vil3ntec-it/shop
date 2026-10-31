@@ -28,7 +28,15 @@ function scrub(detail) {
  *                    (`pg_advisory_xact_lock`)، تا دو اتصالِ هم‌زمان در READ COMMITTED هر دو
  *                    «نیست» نبینند؛ بود ⇒ null و هیچ نوشتنی.
  */
-async function log(entry) {
+/*
+ *  فاز ۳ ِ پنلِ مرکزی — «انجام‌دهنده»: درخواستی که با کلیدِ سرویسِ پلِ پنل آمده (`lib/admin-service.js`)
+ *  کاربرِ پشتِ پنل را در بافت دارد؛ هر ردیفی که در همان درخواست نوشته شود آن را در `detail.actor` می‌گیرد،
+ *  بی آن‌که صد و چند صدا زدنِ `log` عوض شود. `user_id` همان شناسهٔ کلید می‌ماند (چه ماشینی).
+ *
+ *  `opts.client` (اختیاری): نوشتن در **همان تراکنشِ** کارِ اصلی — و شکستش کار را برمی‌گرداند (کارهایی که
+ *  بی ردیفِ سابقه نباید بمانند، مثلِ حالت‌های دکان). بی آن، همان رفتارِ همیشه: شکستِ سابقه کار را نمی‌شکند.
+ */
+async function log(entry, { client = null } = {}) {
   const {
     shopId = '', actorType = 'user', userId = '', action,
     targetType = '', targetId = '', detail = {}, ip = '', once = false, onceSince = null,
@@ -36,13 +44,22 @@ async function log(entry) {
   if (!action) return null;
   const id = newId('aud');
   const clean = scrub(detail);
+  const actor = require('./admin-service').currentActor();
+  if (actor && clean.actor === undefined) clean.actor = scrub(actor);
   const at = now();
   let r;
   try {
     const params = [id, shopId, actorType, userId, action, targetType, targetId, JSON.stringify(clean), ip, at];
     const since = once && Number.isSafeInteger(onceSince) && onceSince > 0 ? onceSince : 0;
     //  پرچمِ زنجیره (STF-09) با همین INSERT برمی‌گردد — خاموش ⇒ هیچ پرسشِ دیگری
-    r = once
+    r = client && !once
+      ? await client.query(
+        `INSERT INTO audit_logs (id, shop_id, actor_type, user_id, action, target_type, target_id, detail, ip, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         RETURNING ${chain.FLAG_SQL} AS hashchain`,
+        params
+      )
+      : once
       ? await tx(async (c) => {
         await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`audit-once:${shopId}:${action}:${targetId}`]);
         return c.query(
@@ -62,6 +79,7 @@ async function log(entry) {
       );
     if (once && !r.rows.length) return null;
   } catch (err) {
+    if (client) throw err;
     // شکست ثبت سابقه نباید خود عملیات را از کار بیندازد
     console.error('[audit] ثبت نشد:', err.message);
     return id;

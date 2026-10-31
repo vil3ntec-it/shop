@@ -125,6 +125,22 @@ function broadcast(ctx, cursor, exceptDevice = '') {
 }
 
 /**
+ * بستنِ همهٔ سوکت‌های زندهٔ یک حساب — فاز ۳: دکانی که مدیر دسترسی‌اش را بست (تعلیق، بایگانی،
+ * درخواستِ حذف) دیگر خبرِ «changed» یا رلهٔ «scan» نمی‌گیرد. وصلِ دوباره در همان دست‌دادن رد می‌شود
+ * (`resolveToken` ⇒ بی حساب). @returns {number} چند سوکت بسته شد
+ */
+function closeRoom(ctx, code = 4403, reason = 'account_blocked') {
+  const room = rooms.get(roomKey(ctx));
+  if (!room) return 0;
+  let n = 0;
+  for (const ws of [...room]) {
+    try { ws.close(code, reason); } catch { try { ws.terminate(); } catch { /* رفته */ } }
+    n++;
+  }
+  return n;
+}
+
+/**
  * رخدادهایی که دستگاه می‌تواند برای دستگاه‌های دیگرِ حسابش بفرستد.
  *   scan   — گوشی بارکد خواند ⇒ کامپیوتری که «گوشی به‌عنوانِ بارکدخوان»
  *            را با همان کدِ جفت‌شدن باز کرده، آن را در سبد می‌گذارد
@@ -219,4 +235,4 @@ function attach(server) {
   return wss;
 }
 
-module.exports = { attach, broadcast, relay, listeners, roomKey, issueTicket, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
+module.exports = { attach, broadcast, relay, listeners, closeRoom, roomKey, issueTicket, PATHS, PING_MS, RELAY_EVENTS, TICKET_MS };
