@@ -226,7 +226,7 @@ class PurchaseOrderBookTest {
     assertEquals(ir.vil3ntec.tohid.core.purchase.ReorderCore.Confidence.HIGH, plan.single().suggestion.confidence)
   }
 
-  @Test fun `تاریخچهٔ قیمت از دفتر: سندِ کسر بیرون، آخرین فیِ همان تأمین‌کننده (PUR-09)`() {
+  @Test fun `تاریخچهٔ قیمت از دفتر — سندِ کسر بیرون، آخرین فیِ همان تأمین‌کننده (PUR-09)`() {
     var d = d0
     d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line("pA", 1.0, 100.0)), 0.0, "2026-09-01", "", "2026-09-01", 1, ::newId) as PurchaseBook.Result.Ok).data
     d = (PurchaseBook.record(d, "s1", listOf(PurchaseBook.Line("pA", 1.0, 110.0)), 0.0, "2026-10-01", "", "2026-10-01", 2, ::newId) as PurchaseBook.Result.Ok).data
