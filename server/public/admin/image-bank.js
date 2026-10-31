@@ -501,7 +501,7 @@
     [ia.src, ib.src] = await Promise.all([imageData(a.urls.original), imageData(b.urls.original)]);
     ia.alt = 'اصل'; ib.alt = `نسخهٔ ${b.version}`;
     const sup = adminRole === 'superadmin';
-    const open = b.version !== d.current_version && b.review !== 'rejected';
+    const open = b.version !== d.current_version && b.review === 'needs_review';
     $('btn-ib-ver-approve').classList.toggle('hidden', !sup || !open || d.status !== 'APPROVED');
     $('btn-ib-ver-reject').classList.toggle('hidden', !sup || !open || !['NEEDS_REVIEW', 'APPROVED'].includes(d.status));
     $('ib-cmp-note').textContent = b.version === d.current_version ? 'همین نسخه جاری است'
