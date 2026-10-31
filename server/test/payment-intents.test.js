@@ -7,6 +7,8 @@
  * انقضا (S35)، دسترسیِ دکانِ دیگر، قاعدهٔ لغو، سرتاسریِ ساختگی با انتظارِ بلند، جمعِ سفارش.
  */
 process.env.PAYMENTS_PROVIDER = 'fake';
+//  رازِ ساختگی فقط از محیط (پیش‌فرضی در کد نیست)؛ helpers خودش NODE_ENV=test می‌گذارد
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-payment-intents';
 process.env.RATE_PAY_CREATE_MAX = '100000';
 process.env.RATE_PAY_POLL_MAX = '100000';
 const test = require('node:test');
@@ -262,10 +264,11 @@ test('اختلافِ مبلغ یا ارز ⇒ paid نمی‌شود، بررسی 
   }
 });
 
-test('تأییدِ دوم: ارائه‌دهنده «paid» نگوید ⇒ unconfirmed؛ دست‌نیافتنی ⇒ ۵۰۳ و همان رویداد بعداً اعمال می‌شود', async () => {
+test('تأییدِ دوم: «نه» ِ قطعیِ ارائه‌دهنده ⇒ unconfirmed؛ دست‌نیافتنی ⇒ ۵۰۳ و همان رویداد بعداً اعمال می‌شود', async () => {
   const s = await shop('تأیید');
   const a = (await createPos(s)).body;
-  const r1 = await paid(a, { event: { eventId: 'cf-1' }, status: { status: 'pending' } });
+  const r1 = await paid(a, { event: { eventId: 'cf-1' }, status: { status: 'failed' } });
+  assert.equal(r1.status, 200);
   assert.equal(r1.body.outcome, 'unconfirmed');
   assert.equal((await rowOf(a.id)).status, 'pending');
 
@@ -279,6 +282,115 @@ test('تأییدِ دوم: ارائه‌دهنده «paid» نگوید ⇒ uncon
   assert.equal(r3.status, 200);
   assert.equal(r3.body.outcome, 'applied');
   assert.equal((await rowOf(a.id)).status, 'paid');
+});
+
+//  بازبینِ مستقل (وارونهٔ zz-rev-pay): پیش از این «paid» ِ امضاشده‌ای که درِ وضعیت هنوز pending می‌گفت
+//  `unconfirmed` با ۲۰۰ می‌گرفت و رویدادش نهایی می‌شد ⇒ ارسالِ دوباره «تکراری» و پولِ گرفته‌شده بی پرداخت می‌ماند.
+test('تأییدِ دومِ دیرکرده (درِ وضعیت هنوز pending/unknown) ⇒ ۵۰۳ و رویداد نهایی نمی‌شود؛ ارسالِ دوباره پس از هم‌گامی ⇒ paid', async () => {
+  const s = await shop('تأییدِ دیرکرده');
+  const a = (await createPos(s)).body;
+  const sid = (await rowOf(a.id)).provider_session_id;
+  P.fake.settle(sid, { status: 'pending', amountMinor: a.amount, currency: 'AFN', providerRef: 'TX' });
+  const ev = { eventId: `lag-${++seq}`, sessionId: sid, status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'TX' };
+  const outcomeOf = async () => (await one('SELECT outcome FROM payment_events WHERE provider_event_id=$1', [`fake:${ev.eventId}`])).outcome;
+
+  const r1 = await hook(ev);
+  assert.equal(r1.status, 503, JSON.stringify(r1.body));
+  assert.equal(r1.body.error.code, 'retry_later');
+  assert.equal(await outcomeOf(), 'deferred');
+  assert.equal((await rowOf(a.id)).status, 'pending');
+  //  «unknown» (ارائه‌دهنده جلسه را هنوز نمی‌شناسد) هم همین
+  P.fake.settle(sid, { status: 'unknown' });
+  assert.equal((await hook(ev)).status, 503);
+  assert.equal(await outcomeOf(), 'deferred');
+
+  //  هم‌گام شد و همان رویداد دوباره آمد ⇒ اعمال، نه «تکراری»
+  P.fake.settle(sid, { status: 'paid' });
+  const r2 = await hook(ev);
+  assert.equal(r2.status, 200, JSON.stringify(r2.body));
+  assert.notEqual(r2.body.duplicate, true);
+  assert.equal(r2.body.outcome, 'applied');
+  assert.equal((await rowOf(a.id)).status, 'paid');
+  assert.equal(await outcomeOf(), 'applied');
+  //  پس از اعمال، ارسالِ سوم واقعاً تکراری است
+  assert.equal((await hook(ev)).body.duplicate, true);
+
+  //  امضا روی بدنهٔ خام: همان JSON با فاصلهٔ دیگر و امضای بدنهٔ فشرده ⇒ ۴۰۱
+  const other = { ...ev, eventId: `lag-${++seq}` };
+  const spaced = Buffer.from(JSON.stringify(other, null, 1));
+  const r3 = await h.raw('POST', '/api/payments/webhook/fake', spaced,
+    { headers: { 'Content-Type': 'application/json', 'x-fake-signature': P.fake.sign(Buffer.from(JSON.stringify(other))) } });
+  assert.equal(r3.status, 401);
+});
+
+test('ساختگی فقط با NODE_ENV ِ صریحِ test/development و رازِ داده‌شده؛ وگرنه حساب‌پی و /webhook/fake ۴۰۱', async () => {
+  const prevEnv = process.env.NODE_ENV;
+  const prevSecret = process.env.PAYMENTS_FAKE_SECRET;
+  const body = { eventId: `env-${++seq}`, sessionId: 'x', status: 'paid', amountMinor: 1, currency: 'AFN' };
+  const buf = Buffer.from(JSON.stringify(body));
+  const sig = P.fake.sign(buf);
+  const restore = () => {
+    if (prevEnv === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = prevEnv;
+    process.env.PAYMENTS_FAKE_SECRET = prevSecret;
+  };
+  try {
+    for (const env of ['production', undefined, '', 'staging', 'prod', 'Production', 'testing']) {
+      if (env === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = env;
+      assert.equal(P.fakeAllowed(), false, `NODE_ENV=${env}`);
+      assert.equal(P.activeName(), 'hesabpay', `NODE_ENV=${env}`);
+      assert.equal(P.webhookAdapter('fake'), null, `NODE_ENV=${env}`);
+      assert.equal((await hook(body, { sig })).status, 401, `NODE_ENV=${env}`);
+    }
+    process.env.NODE_ENV = 'development';
+    assert.equal(P.fakeAllowed(), true);
+    //  بی راز ⇒ «پیکربندی نشده»؛ رازِ پیش‌فرضِ قدیمی دیگر هیچ دری را باز نمی‌کند
+    delete process.env.PAYMENTS_FAKE_SECRET;
+    assert.equal(P.fake.configured(), false);
+    assert.equal(P.fakeAllowed(), false);
+    assert.equal(P.activeName(), 'hesabpay');
+    assert.throws(() => P.fake.sign(buf), /PAYMENTS_FAKE_SECRET/);
+    const legacy = crypto.createHmac('sha256', 'fake-webhook-secret-dev-only').update(buf).digest('hex');
+    assert.equal((await P.fake.verifyWebhook(buf, { 'x-fake-signature': legacy })).ok, false);
+    assert.equal((await hook(body, { sig: legacy })).status, 401);
+  } finally { restore(); }
+  assert.equal(P.activeName(), 'fake');
+});
+
+test('آداپتورِ حساب‌پی فقط https: http ِ بیرونی هرگز (کلید نمی‌رود)؛ http ِ loopback فقط در آزمون/توسعه', async () => {
+  const HP = require('../src/lib/payment-hesabpay');
+  const names = ['NODE_ENV', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_BASE_URL'];
+  const prev = Object.fromEntries(names.map((k) => [k, process.env[k]]));
+  Object.assign(process.env, { HESABPAY_API_KEY: 'test-key-123', HESABPAY_WEBHOOK_SECRET: 'whsec-test' });
+  try {
+    const cases = [
+      ['https://api.hesab.com/api/v1', 'production', true],
+      ['https://api.hesab.com/api/v1', 'test', true],
+      ['HTTPS://api.hesab.com/api/v1', 'production', true],
+      ['http://api.hesab.com/api/v1', 'production', false],
+      ['http://api.hesab.com/api/v1', 'test', false],
+      ['http://127.0.0.1:9/api/v1', 'test', true],
+      ['http://localhost:9/api/v1', 'development', true],
+      ['http://[::1]:9/api/v1', 'test', true],
+      ['http://127.0.0.1:9/api/v1', 'production', false],
+      ['http://127.0.0.1:9/api/v1', 'staging', false],
+      ['http://localhost.evil.example/api', 'test', false],
+      ['http://127.0.0.1.nip.io/api', 'test', false],
+      ['http://127.0.0.1@evil.example/api', 'test', false],
+      ['ftp://api.hesab.com/api/v1', 'test', false],
+      ['https://', 'production', false],
+    ];
+    for (const [base, env, ok] of cases) {
+      process.env.HESABPAY_BASE_URL = base;
+      process.env.NODE_ENV = env;
+      assert.equal(HP.configured(), ok, `${env} ${base}`);
+    }
+    //  حتی اگر کسی بی configured() صدا بزند: درخواستی با کلید روی http نمی‌رود
+    process.env.NODE_ENV = 'production';
+    process.env.HESABPAY_BASE_URL = 'http://api.hesab.invalid/api/v1';
+    await assert.rejects(HP.fetchStatus('HS-1'), /https/);
+  } finally {
+    for (const [k, v] of Object.entries(prev)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+  }
 });
 
 test('S35: وب‌هوکِ دیر پس از انقضا ⇒ paid فقط با تأییدِ ارائه‌دهنده، با هشدارِ تطبیق', async () => {
@@ -301,13 +413,15 @@ test('S35: وب‌هوکِ دیر پس از انقضا ⇒ paid فقط با تأ
   const al = await one(`SELECT detail FROM audit_logs WHERE action='payment.review' AND target_id=$1 ORDER BY created_at DESC LIMIT 1`, [a.id]);
   assert.equal(al.detail.reason, 'late_payment');
 
-  //  دیر حتی با تأییدِ خاموش هم تأیید می‌خواهد
+  //  دیر حتی با تأییدِ خاموش هم تأیید می‌خواهد: «نه» ِ قطعی ⇒ unconfirmed؛ هنوز pending ⇒ ۵۰۳ (بعداً)
   const b = (await createPos(s)).body;
   await query('UPDATE payment_intents SET expires_at=$2 WHERE id=$1', [b.id, Date.now() - 1000]);
   process.env.PAYMENTS_CONFIRM_WEBHOOK = '0';
   try {
-    const r = await paid(b, { event: { eventId: 'late-2' }, status: { status: 'pending' } });
+    const r = await paid(b, { event: { eventId: 'late-2' }, status: { status: 'cancelled' } });
     assert.equal(r.body.outcome, 'unconfirmed');
+    const w = await paid(b, { event: { eventId: 'late-3' }, status: { status: 'pending' } });
+    assert.equal(w.status, 503);
   } finally { delete process.env.PAYMENTS_CONFIRM_WEBHOOK; }
   assert.equal((await rowOf(b.id)).status, 'expired');
 });
@@ -478,6 +592,39 @@ test('تطبیق: قصدِ زنده/منقضی با «paid» ِ ارائه‌د�
   const cr = await rowOf(c.id);
   assert.equal(cr.status, 'paid');
   assert.equal(cr.needs_review, true);
+});
+
+test('زمان‌بندِ تطبیق: «paid» ِ بی وب‌هوک با یک نوبت درست می‌شود؛ بی پیکربندی، با قفلِ نمونهٔ دیگر یا نوبتِ هم‌زمان ⇒ اجرا نمی‌شود', async () => {
+  const s = await shop('زمان‌بند');
+  const a = (await createPos(s)).body;
+  P.fake.settle((await rowOf(a.id)).provider_session_id, { status: 'paid', amountMinor: a.amount, currency: 'AFN', providerRef: 'SCH-1' });
+  const lease = () => one('SELECT value, updated_at FROM app_config WHERE key=$1', [pay.RECONCILE_LEASE_KEY]);
+
+  //  بی پیکربندی (حساب‌پیِ بی کلید) ⇒ هیچ پرسشی
+  process.env.PAYMENTS_PROVIDER = '';
+  try { assert.equal(await pay.reconcileTick({ wide: false }), null); } finally { process.env.PAYMENTS_PROVIDER = 'fake'; }
+  assert.equal((await rowOf(a.id)).status, 'pending');
+
+  //  نمونهٔ دیگری اجاره دارد ⇒ این نمونه اجرا نمی‌کند
+  await query(
+    `INSERT INTO app_config (key, value, updated_at) VALUES ($1, 'other-instance', $2)
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = EXCLUDED.updated_at`,
+    [pay.RECONCILE_LEASE_KEY, Date.now() + 60_000]
+  );
+  assert.equal(await pay.reconcileTick({ wide: false }), null);
+  assert.equal((await rowOf(a.id)).status, 'pending');
+  assert.equal((await lease()).value, 'other-instance');
+
+  //  اجارهٔ او گذشت (نمونه مُرد) ⇒ این نمونه می‌گیرد، تطبیق می‌کند و آزاد می‌کند
+  await query('UPDATE app_config SET updated_at=$2 WHERE key=$1', [pay.RECONCILE_LEASE_KEY, Date.now() - 1]);
+  const out = await pay.reconcileTick({ wide: false });
+  assert.ok(out && out.paid >= 1 && out.wide === false, JSON.stringify(out));
+  assert.equal((await rowOf(a.id)).status, 'paid');
+  assert.equal(Number((await lease()).updated_at), 0, 'پس از نوبت اجاره آزاد است');
+
+  //  دو نوبتِ هم‌زمان در همین نمونه ⇒ فقط یکی
+  const both = await Promise.all([pay.reconcileTick({ wide: false }), pay.reconcileTick({ wide: false })]);
+  assert.equal(both.filter((x) => x === null).length, 1, JSON.stringify(both));
 });
 
 test('توسعه: رویدادِ ساختگیِ امضاشده با settle (scripts/fake-pay.js) خودش تأییدِ دوم را می‌گذراند', async () => {

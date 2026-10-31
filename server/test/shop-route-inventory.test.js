@@ -18,6 +18,7 @@
  */
 //  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
 process.env.PAYMENTS_PROVIDER = 'fake';
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-route-inventory';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');

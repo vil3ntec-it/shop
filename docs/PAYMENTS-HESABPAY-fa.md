@@ -117,14 +117,21 @@ expired | cancelled | failed → paid   فقط وقتی خودِ حساب‌پی
 - مبلغ **و** ارز باید با قصد یکی باشند؛ نه ⇒ «paid» نمی‌شود، `needsReview` و سابقهٔ `payment.review`.
 - «paid» فقط پس از **تأییدِ دوم** از خودِ حساب‌پی (`fetchStatus`)؛ خاموش کردنش: `PAYMENTS_CONFIRM_WEBHOOK=0`
   (پیشنهاد نمی‌شود). پرداختِ دیر (پس از انقضا/لغو) همیشه تأییدِ دوم می‌خواهد.
-- تأییدِ دوم نرسید (شبکه) ⇒ ۵۰۳ `retry_later` تا حساب‌پی دوباره بفرستد؛ همان رویداد آن بار اعمال می‌شود.
+- تأییدِ دوم نرسید (شبکه) **یا درِ وضعیت هنوز `pending`/`unknown` می‌گوید** (هم‌گامیِ دیرِ حساب‌پی) ⇒ ۵۰۳ `retry_later`
+  تا حساب‌پی دوباره بفرستد؛ رویداد `deferred` می‌ماند و همان رویداد آن بار اعمال می‌شود. فقط «نه» ِ قطعی
+  (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ و `unconfirmed` ِ نهایی.
 - برگشتِ مرورگر از صفحهٔ حساب‌پی هرگز پرداخت را «موفق» نمی‌کند.
 
 ## ۳) تطبیق (PAY-21)
 
 `payment-intents.reconcile({ sinceMs })` قصدهای `created`/`pending`/`expired` ِ ۴۸ ساعتِ اخیر را از حساب‌پی می‌پرسد:
-پرداختِ تأییدشده ⇒ `paid` (دیر ⇒ هشدار)، ناموفق ⇒ بستن، اختلاف ⇒ `needsReview` + سابقه. زمان‌بندِ شبانه و فهرستِ
-پنلِ مدیر در PR ِ بعدی (ویترین + تطبیق + پنل) است.
+پرداختِ تأییدشده ⇒ `paid` (دیر ⇒ هشدار)، ناموفق ⇒ بستن، اختلاف ⇒ `needsReview` + سابقه. زنده پیش از منقضی و تازه
+پیش از کهنه.
+
+زمان‌بند (`startReconciler`، از `index.js`): هر ۵ دقیقه قصدهای ۲ ساعتِ اخیر (زنده و تازه‌منقضی؛ مهلتِ قصد ۱۵ دقیقه)،
+و هر ۱۲ نوبت (≈ ساعتی) همان ۴۸ ساعت؛ هر نوبت حداکثر ۴ دقیقه و بقیه به نوبتِ بعد. فقط وقتی ارائه‌دهندهٔ فعال پیکربندی
+شده (بی کلید هیچ پرسشی نمی‌رود). دو نمونهٔ سرور هم‌زمان اجرا نمی‌کنند: اجارهٔ `lease:payments.reconcile` در `app_config`
+(نمونه‌ای که وسطِ کار بمیرد، پس از ۱۰ دقیقه آزاد می‌شود). فهرستِ پنلِ مدیر در PR ِ بعدی (ویترین + تطبیق + پنل) است.
 
 ## ۴) محیطِ سرور
 
@@ -132,21 +139,23 @@ expired | cancelled | failed → paid   فقط وقتی خودِ حساب‌پی
 |---|---|---|---|
 | `HESABPAY_API_KEY` | ✔ | — | کلیدِ API ِ پذیرنده |
 | `HESABPAY_WEBHOOK_SECRET` | ✔ | — | رازِ امضای وب‌هوک |
-| `HESABPAY_BASE_URL` | | `https://api.hesab.com/api/v1` | نشانیِ API (sandbox اگر حساب‌پی داد) |
+| `HESABPAY_BASE_URL` | | `https://api.hesab.com/api/v1` | نشانیِ API (sandbox اگر حساب‌پی داد)؛ فقط `https` — http ⇒ «پیکربندی نشده» |
 | `HESABPAY_MERCHANT_ID` | | — | اگر حساب‌پی در بدنه خواست |
 | `HESABPAY_CALLBACK_URL` | | `SERVER_URL` + مسیرِ وب‌هوک | نشانیِ وب‌هوک در درخواستِ جلسه |
 | `HESABPAY_TIMEOUT_MS` | | ۱۰۰۰۰ | مهلتِ هر درخواست به حساب‌پی |
 | `PAYMENTS_CONFIRM_WEBHOOK` | | `1` | تأییدِ دوم پیش از «paid» |
-| `PAYMENTS_PROVIDER` | | — | `fake` فقط برای آزمون/توسعه؛ در `NODE_ENV=production` نادیده |
+| `PAYMENTS_PROVIDER` | | — | `fake` فقط با `NODE_ENV` ِ صریحِ `test`/`development`؛ هر محیطِ دیگر ⇒ نادیده |
+| `PAYMENTS_FAKE_SECRET` | | — | رازِ امضای ساختگی (فقط توسعه/آزمون)؛ نبود ⇒ ساختگی خاموش |
 | `RATE_PAY_CREATE_MAX` / `RATE_PAY_POLL_MAX` | | ۳۰ / ۲۴۰ در دقیقه | سقف‌ها |
 
 نبودِ کلید ⇒ «پیکربندی نشده»: `/config` همیشه `enabled: false` و ساختن ۴۰۳ `hesabpay_disabled`.
 پرچم: `pay.hesabpay` در «تنظیماتِ زنده» (`PUT /api/admin/pump/live-config`، scope = شناسهٔ دکان یا `all`)، پیش‌فرض خاموش.
 پرداختِ سفارشِ آنلاین افزون بر این **اشتراکِ فعال** می‌خواهد (دورهٔ آزمایشی نه).
 
-**توسعه با ارائه‌دهندهٔ ساختگی:** سرور را با `PAYMENTS_PROVIDER=fake` بالا بیاورید؛ `checkoutUrl` ساختگی است
-(`https://pay.invalid/fake/…`). پرداخت را با
-`node server/scripts/fake-pay.js --url http://127.0.0.1:3000 --intent pi_… --amount 145000` بزنید (`--status failed` هم).
+**توسعه با ارائه‌دهندهٔ ساختگی:** سرور را با `NODE_ENV=development`، `PAYMENTS_PROVIDER=fake` و یک
+`PAYMENTS_FAKE_SECRET` ِ دلخواه بالا بیاورید؛ `checkoutUrl` ساختگی است (`https://pay.invalid/fake/…`). پرداخت را با
+`PAYMENTS_FAKE_SECRET=<همان> node server/scripts/fake-pay.js --url http://127.0.0.1:3000 --intent pi_… --amount 145000`
+بزنید (`--status failed` هم).
 
 ## ۵) آن‌چه صاحب محصول باید بدهد
 

@@ -125,11 +125,14 @@
 - ⛔ پرچمِ `pay.hesabpay` (دکان/`all`، پیش‌فرض خاموش)؛ پرداختِ سفارشِ آنلاین افزون بر آن اشتراکِ فعال (`source = subscription`، نه آزمایشی).
 - ⛔ مبلغ عددِ صحیح به پول؛ برای سفارش همان `total_minor` ِ سرور (ناهمخوان ⇒ ۴۰۹ `amount_mismatch`)؛ ارز فقط AFN؛ تبدیل به دهدهیِ ارائه‌دهنده دقیق و بی گرد (`minorToDecimal`/`decimalToMinor`).
 - ⛔ «paid» فقط از وب‌هوکِ امضاشده (HMAC، زمان‌ثابت) + مبلغ و ارزِ برابر + تأییدِ دومِ ارائه‌دهنده (`PAYMENTS_CONFIRM_WEBHOOK`، پیش‌فرض روشن)؛ هرگز از برگشتِ مرورگر یا گفتهٔ برنامه.
+- ⛔ تأییدِ دومِ دست‌نیافتنی **یا هنوز نامعلوم** (`pending`/`unknown`) ⇒ ۵۰۳ و رویدادِ `deferred` (همان رویداد دوباره‌پذیر است)؛ فقط «نه» ِ قطعی (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ `unconfirmed` ِ نهایی.
+- ⛔ تطبیقِ زمان‌بندی‌شده (`startReconciler` در `index.js`): هر ۵ دقیقه قصدهای ۲ ساعتِ اخیر، ساعتی همان ۴۸ ساعت؛ فقط با ارائه‌دهندهٔ پیکربندی‌شده؛ دو نمونهٔ سرور هم‌زمان نه (اجارهٔ `lease:payments.reconcile` در `app_config`).
 - وضعیت فقط `created → pending → paid|failed|expired|cancelled` و `paid → refunded` با compare-and-set روی status؛ پایانی برنمی‌گردد. تنها استثنا S35: `expired|cancelled|failed → paid` فقط با تأییدِ ارائه‌دهنده، همراهِ `needs_review` و سابقهٔ `payment.review`.
 - درستی هرگز به ترتیبِ `created_at` تکیه ندارد (رویدادِ هم‌میلی‌ثانیه)؛ تکرار با `payment_events.provider_event_id` یکتا؛ قصدِ ناشناخته ۲۰۰ و لاگ.
 - هر فروش/سفارش حداکثر یک قصدِ زنده (`ux_payment_intents_live_ref`)؛ `ref_id` عوض نمی‌شود؛ فروشِ پرداخت‌شده قصدِ تازه نمی‌گیرد (`already_paid`).
 - برنامه پس از `paid` فروش را با همان `refId` می‌بندد و ردیفِ `payment` ِ پاسخ (`method: hesabpay`، `verification: gateway`) را می‌افزاید.
-- ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط بیرون از `NODE_ENV=production`؛ در تولید نادیده و `/webhook/fake` ۴۰۱.
+- ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط با `NODE_ENV` ِ صریحِ `test`/`development` و `PAYMENTS_FAKE_SECRET` (رازِ پیش‌فرض در کد نیست)؛ هر محیطِ دیگر یا بی راز ⇒ نادیده و `/webhook/fake` ۴۰۱.
+- ⛔ `HESABPAY_BASE_URL` فقط `https` (کلید در سرآیند می‌رود)؛ تنها استثنا http ِ loopback برای سرورِ ساختگیِ آزمون، فقط در `test`/`development`.
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
 
 ### v3 · موجودی و کاتالوگ

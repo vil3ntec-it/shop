@@ -49,11 +49,22 @@ function env() {
   };
 }
 
-const configured = () => { const e = env(); return Boolean(e.apiKey && e.secret && /^https?:\/\//.test(e.base)); };
+/*
+ *  ⛔ فقط https: کلیدِ API در سرآیندِ هر درخواست می‌رود. تنها استثنا سرورِ ساختگیِ آزمون روی loopback
+ *  (127.0.0.1 / localhost / [::1]) و فقط با NODE_ENV ِ صریحِ test/development — هرگز در تولید.
+ */
+const LOOPBACK_HTTP = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?(?:\/|$)/i;
+function baseAllowed(base) {
+  if (/^https:\/\/[^/\s]+/i.test(base)) return true;
+  return P.isTestOrDev() && LOOPBACK_HTTP.test(base);
+}
+
+const configured = () => { const e = env(); return Boolean(e.apiKey && e.secret && baseAllowed(e.base)); };
 
 /** درخواست با مهلت؛ پاسخِ غیر ۲xx یا JSON ِ خراب ⇒ خطا (پیامِ داخلی، بی کلید). */
 async function call(method, path, body) {
   const e = env();
+  if (!baseAllowed(e.base)) throw new Error('hesabpay: HESABPAY_BASE_URL باید https باشد');
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), e.timeoutMs);
   try {
