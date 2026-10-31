@@ -333,6 +333,20 @@ async function seedShop(a) {
   assert.equal(nf.body.results?.[0]?.status, 'accepted', JSON.stringify(nf.body));
   ids.pickIssue = (await h.get('/api/shop/orders/pick/issues', { token: a.accessToken })).body.issues[0]?.id;
   assert.ok(ids.pickIssue, 'وظیفهٔ «پیدا نکردم» ِ الف');
+  //  جمع‌آوریِ گروهی (PCK-12): دو سفارشِ قبول‌شدهٔ دیگرِ «الف» ⇒ یک دسته
+  const bo = [];
+  for (let i = 0; i < 2; i++) {
+    const r = await h.post('/api/shop/orders', {
+      source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: `دسته ${i}` },
+      lines: [{ productId: ids.product, name: 'کالای الف', qtyMilli: 1000, unitPriceMinor: 5000 }],
+    }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('batch-order') } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal((await h.post(`/api/shop/orders/${r.body.order.id}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+    bo.push(r.body.order.id);
+  }
+  const bt = await h.post('/api/shop/orders/pick/batches', { orderIds: bo }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('batch') } });
+  assert.equal(bt.status, 201, JSON.stringify(bt.body));
+  ids.pickBatch = bt.body.batch.batchId;
 
   const courier = await courierOf(a, 'پیکِ الف');
   ids.courier = courier.id;
@@ -422,6 +436,7 @@ function concreteFor(ids) {
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
     [/(\/pick\/products\/):productId/, ids.product],
+    [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
@@ -470,6 +485,9 @@ function bodyFor(r, ids) {
     'PUT /shop/orders/pick/products/:productId': { halal: 'halal' },
     'POST /shop/orders/:id/pick/substitutions': { eventId: fresh('psub'), lineNo: 1, productId: ids.product },
     'POST /shop/orders/:id/pick/substitutions/decide': { substitutionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
+    //  قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12)
+    'POST /shop/orders/pick/shelf/scan': { qr: 'VLNB-1-1-1', slot: 'A1' },
+    'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
