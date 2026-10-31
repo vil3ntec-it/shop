@@ -88,4 +88,24 @@ class ProductPacksTest {
     assertEquals(mapOf("111" to "p1", "222" to "p2", "6260000000024" to "p1"), ShopStore.codeOwners(base))
     assertEquals(ShopStore.barcodeIndex(base), ShopStore.codeOwners(base.copy(products = base.products.map { it.copy(packs = null) })))
   }
+
+  @Test fun `PRD-04 کدی که هم بارکد بسته است و هم بارکد کالا مبهم است - نه ۲۴ دانه نه یک`() {
+    //  تعارضِ آفلاین: دستگاهِ دیگر همان بارکدِ کارتنِ «روغن» را به «نوشابه» داد
+    val clash = base.copy(products = base.products + Product(id = "p3", name = "نوشابه", unit = "دانه", salePrice = 20.0,
+      barcodes = listOf("6260000000024")))
+    val packs = ShopStore.packIndex(clash)
+    val index = ShopStore.barcodeIndex(clash)
+    assertEquals(PosHit.Ambiguous("6260000000024"), PosSearch.resolve("6260000000024", index, clash.products, emptyList(), 0, packs))
+    assertEquals(PosHit.Ambiguous("6260000000024"), PosSearch.resolve("3*6260000000024", index, clash.products, emptyList(), 0, packs))
+    assertEquals(PosHit.Ambiguous("۶۲۶۰۰۰۰۰۰۰۰۲۴"), PosSearch.resolve("۶۲۶۰۰۰۰۰۰۰۰۲۴", index, clash.products, emptyList(), 0, packs))
+    //  پیشنهادِ برجسته هم جای مبهم را نمی‌گیرد
+    assertEquals(PosHit.Ambiguous("6260000000024"), PosSearch.resolve("6260000000024", index, clash.products, clash.products, 0, packs))
+    //  فقط بارکدِ کامل: کالایی که نیمهٔ بارکدِ کارتن را دارد (ITF) کارتن را مبهم نمی‌کند
+    val part = base.copy(products = base.products + Product(id = "p3", name = "نوشابه", unit = "دانه", salePrice = 20.0,
+      barcodes = listOf("626000000002")))
+    assertEquals(PosHit.Add(part.products[0], 24.0),
+      PosSearch.resolve("6260000000024", ShopStore.barcodeIndex(part), part.products, emptyList(), 0, ShopStore.packIndex(part)))
+    assertTrue(PosSearch.isItemCode("۶۲۶۰۰۰۰۰۰۰۰۲۴", index))
+    assertFalse(PosSearch.isItemCode("6260000000024", ShopStore.barcodeIndex(part)))
+  }
 }

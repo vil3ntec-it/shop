@@ -216,8 +216,16 @@ fun SaleScreen(
       }
     }
 
-    //  PRD-04: بارکدِ بسته (کارتنِ ۲۴ دانه‌ای) ⇒ «اندازهٔ بسته» از واحدِ کالا، با همان نگهبانِ موجودی
-    val pack = packIndex.find(code)
+    //  PRD-04: بارکدِ بسته (کارتنِ ۲۴ دانه‌ای) ⇒ «اندازهٔ بسته» از واحدِ کالا، با همان نگهبانِ موجودی؛
+    //  همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم: نه بسته، نه کالا
+    val packLookup = packIndex.lookup(code) { ir.vil3ntec.tohid.ui.components.pos.PosSearch.isItemCode(it, index) }
+    if (packLookup == ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous) {
+      ScanFeedback.unknown(context)
+      manual = code
+      toast(StrSale.ambiguousBarcode(code))
+      return
+    }
+    val pack = (packLookup as? ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack)?.hit
     val packProduct = pack?.let { h -> d.products.firstOrNull { it.id == h.productId } }
     if (pack != null && packProduct != null) {
       if (!packProduct.active) { ScanFeedback.unknown(context); toast(StrSale.inactiveActivate(packProduct.name)); return }

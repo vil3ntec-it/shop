@@ -98,6 +98,14 @@ object PackBarcodes {
   /** بارکدِ بسته ⇐ کالا و بسته */
   data class Hit(val productId: String, val pack: Pack)
 
+  /** نتیجهٔ `Index.lookup` */
+  sealed interface Lookup {
+    data class Pack(val hit: Hit) : Lookup
+    /** هم بارکدِ بسته و هم بارکدِ کالا — نه افزودن، پیامِ روشن */
+    data object Ambiguous : Lookup
+    data object NotPack : Lookup
+  }
+
   /**
    *  جست‌وجوی اسکن: کامل، سپس با رقمِ لاتین. دو کالا با یک بارکدِ بسته (تعارضِ آفلاین) ⇒ هیچ‌کدام
    *  (`find` ⇐ null و `ambiguous`)، تا اسکن کالای اشتباه را به سبد نبرد.
@@ -128,6 +136,16 @@ object PackBarcodes {
     }
 
     fun ambiguous(code: String): Boolean = code.trim().let { it in clash || latin(it) in clash }
+
+    /**
+     *  اسکن در صندوق: بسته، مبهم، یا «بسته نیست» (راهِ بارکدِ کالا). کدی که هم بارکدِ بسته است و هم
+     *  کاملاً بارکدِ کالا (`isItemCode`، همان `barcodeIndex` — نه نیمه؛ تعارضِ آفلاین) ⇒ `Ambiguous`:
+     *  هیچ‌کدام به سبد نمی‌رود، چون ۱ یا ۲۴ دانهٔ اشتباه پولِ اشتباه از مشتری می‌گیرد.
+     */
+    fun lookup(code: String, isItemCode: (String) -> Boolean): Lookup {
+      val hit = find(code) ?: return Lookup.NotPack
+      return if (isItemCode(code.trim())) Lookup.Ambiguous else Lookup.Pack(hit)
+    }
 
     /** همهٔ بارکدهای بسته ⇐ شناسهٔ کالا (برای سنجشِ تکرار در ثبت و ویرایش) */
     fun owners(): Map<String, String> = hits.mapValues { it.value.productId }

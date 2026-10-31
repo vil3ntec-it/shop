@@ -85,4 +85,17 @@ class PackBarcodesTest {
     assertFalse(idx.ambiguous("6260000000024"))
     assertTrue(PackBarcodes.Index(emptyList()).isEmpty)
   }
+
+  @Test fun codeThatIsBothAPackAndAnItemBarcodeIsAmbiguousNotTwentyFour() {
+    val carton = Pack("کارتن", 24_000, listOf("6260000000024"))
+    val idx = PackBarcodes.Index(listOf("soda" to listOf(carton)))
+    //  تعارضِ آفلاین: همان کد بارکدِ «روغن» هم هست ⇒ نه ۲۴ نوشابه، نه یک روغن
+    val items = mapOf("6260000000024" to "oil", "111" to "soda")
+    assertEquals(PackBarcodes.Lookup.Ambiguous, idx.lookup(" 6260000000024 ") { it in items })
+    //  بارکدِ بسته که کالایی آن را ندارد ⇒ همان بسته
+    assertEquals(PackBarcodes.Lookup.Pack(PackBarcodes.Hit("soda", carton)), idx.lookup("6260000000024") { false })
+    //  بارکدِ کالا که بسته نیست ⇒ راهِ کالا
+    assertEquals(PackBarcodes.Lookup.NotPack, idx.lookup("111") { it in items })
+    assertEquals(PackBarcodes.Lookup.NotPack, idx.lookup("") { true })
+  }
 }

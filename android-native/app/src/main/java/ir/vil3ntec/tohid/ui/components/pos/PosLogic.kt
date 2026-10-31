@@ -71,6 +71,8 @@ sealed interface PosHit {
   data class Inactive(val product: Product) : PosHit
   /** نه بارکد و نه پیشنهاد — «پیدا نشد» با راهِ ثبتِ کالا */
   data class Unknown(val code: String) : PosHit
+  /** PRD-04: کد هم بارکدِ بسته است هم بارکدِ کالا (تعارضِ آفلاین) — هیچ‌کدام افزوده نمی‌شود */
+  data class Ambiguous(val code: String) : PosHit
   /** کادرِ خالی، یا بارکدی که کالایش در دفتر نیست — کاری نمی‌شود */
   data object None : PosHit
 }
@@ -92,10 +94,13 @@ object PosSearch {
     val parsed = CartQuery.parse(query)
     val code = parsed.term.trim()
     if (code.isEmpty()) return PosHit.None
-    //  PRD-04: بارکدِ بسته (فقط کامل) ⇒ «۳*کارتن» = ۳ × ۲۴ دانه
-    packs?.find(code)?.let { h ->
-      val p = products.firstOrNull { it.id == h.productId } ?: return@let
-      return if (!p.active) PosHit.Inactive(p) else PosHit.Add(p, parsed.count * h.pack.sizeMilli / 1000.0)
+    //  PRD-04: بارکدِ بسته (فقط کامل) ⇒ «۳*کارتن» = ۳ × ۲۴ دانه؛ همان کد بارکدِ کالا هم ⇒ مبهم
+    when (val l = packs?.lookup(code) { isItemCode(it, index) }) {
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> return PosHit.Ambiguous(code)
+      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> products.firstOrNull { it.id == l.hit.productId }?.let { p ->
+        return if (!p.active) PosHit.Inactive(p) else PosHit.Add(p, parsed.count * l.hit.pack.sizeMilli / 1000.0)
+      }
+      else -> Unit
     }
     val hit = BarcodeMatch.find(code, index)
     if (hit is BarcodeMatch.Hit.Product) {
@@ -105,6 +110,10 @@ object PosSearch {
     val pick = matches.getOrNull(hint)
     return if (pick != null) PosHit.Add(pick, parsed.count) else PosHit.Unknown(code)
   }
+
+  /** کد **کاملاً** بارکدِ کالاست (رقمِ فارسی هم)، نه نیمه — همان «کاملِ» `BarcodeMatch` */
+  fun isItemCode(code: String, index: Map<String, String>): Boolean =
+    (BarcodeMatch.find(code, index) as? BarcodeMatch.Hit.Product)?.exact == true
 }
 
 /** − / تعداد / + روی کاشی، ردیفِ جدول و ردیفِ سبد */
