@@ -34,6 +34,8 @@ object ReportCsv {
       "rfm" -> CustomerInsight.rfmSheet(d, today)
       "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
       "reminders" -> DebtReminder.dueSheet(d, today)
+      //  شماره‌های جاافتادهٔ اسناد (RPT-17) — فقط وقتی `DocGapsPref` روشن است دیده می‌شود
+      "gaps" -> DocGapsSheet.sheet(d, today)
       else -> stock(d, today)
     }
 
