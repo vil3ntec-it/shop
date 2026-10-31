@@ -84,8 +84,11 @@ object ApiEndpoints {
     fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
     /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
     const val LIVE_PATH = "/api/sync/v1/live"
-    /** بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. */
-    const val LIVE_TICKET_PATH = "/api/sync/v1/live/ticket"
+    /**
+     *  بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. نسبت به
+     *  پیشوندِ API و از راهِ `ApiClient`، تا توکنِ پیر (۴۰۱) خودکار تازه شود (S78).
+     */
+    const val LIVE_TICKET = "/sync/v1/live/ticket"
   }
 
   /* ------------------------------ لوکیشن ------------------------------ */
