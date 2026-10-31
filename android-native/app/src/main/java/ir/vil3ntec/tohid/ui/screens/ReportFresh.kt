@@ -171,12 +171,13 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val money = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
-  val tabs = remember(money) { ReportFreshModel.tabs(money) }
+  val tabs = remember(money) { DayEndModel.tabs(ReportFreshModel.tabs(money), money) }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
 
   var tab by remember { mutableStateOf(tabs.first().id) }
+  var day by remember { mutableStateOf(today) }
   var span by remember { mutableStateOf("month") }
   var dim by remember { mutableStateOf("product") }
   //  کلیکِ کارتِ خانه ⇒ همان زبانه، بازه و تفکیک
@@ -191,12 +192,26 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   }
   val def = tabs.firstOrNull { it.id == tab } ?: tabs.first()
   val view = remember(ledger, def.id, span, dim, today) { ReportFreshModel.view(ledger, def.id, span, dim, today, clock) }
+  //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
+  val dayEnd = remember(d, def.id, day) {
+    if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
+  }
+  val tables = dayEnd?.tables ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
-  val name = "گزارش-${def.label}-$today".replace(' ', '-')
+  val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-')
 
-  fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(view.tables))
+  fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(tables))
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name)
   fun excel() { Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar("ذخیره شد: $it") } } }
+  //  RPT-11: PDF ِ مستقیم — همان جدول‌های چاپ، بی پنجرهٔ چاپ (فقط در «گزارشِ تازه»، پشتِ `report_fresh`)
+  //  کامپیوتر: پنجرهٔ ذخیره؛ گوشی: «فرستادن» (همان راهِ PDF ِ فاکتور). ساختنِ صفحه‌ها بیرون از نخِ صفحه.
+  fun pdf() {
+    val s = sheet()
+    scope.launch {
+      val msg = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ir.vil3ntec.tohid.print.ReportPrint.savePdf(context, s, name) }
+      snackbar.showSnackbar(msg)
+    }
+  }
 
   Column(
     Modifier
@@ -224,12 +239,17 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       Spacer(Modifier.width(12.dp))
       OutlinedButton(onClick = ::print) { Text("چاپ  ${KeyMap.GLOBAL_PRINT.hint}") }
       Spacer(Modifier.width(6.dp))
+      OutlinedButton(onClick = ::pdf) { Text("PDF") }
+      Spacer(Modifier.width(6.dp))
       Button(onClick = ::excel) { Text("اکسل  ${KeyMap.GLOBAL_EXPORT.hint}") }
     }
 
     /* ۲ ─ نوارِ ابزار: زبانه، بازه، تفکیک، نما */
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       SegmentedTabs(tabs.map { SegmentTab(it.id, it.label) }, def.id, { tab = it })
+      if (def.id == DayEndModel.TAB_ID) {
+        SegmentedTabs(DayEndModel.days(today).map { SegmentTab(it, DayEndModel.dayLabel(it, today, ::formatDate)) }, day, { day = it })
+      }
       Spacer(Modifier.weight(1f))
       ViewModeToggle(viewMode)
     }
@@ -240,12 +260,12 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
 
     /* ۳ ─ کارت‌های آماریِ همین زبانه */
-    Summary(view, def.id, d, money)
+    if (dayEnd != null) DayEndSummary(dayEnd) else Summary(view, def.id, d, money)
 
     /* ۴ ─ جدول‌ها */
-    if (view.tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)
-    view.tables.forEach { t ->
-      if (view.tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    if (tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)
+    tables.forEach { t ->
+      if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth())
       else FreshCards(t, Modifier.weight(1f).fillMaxWidth())
     }
@@ -418,6 +438,10 @@ fun PhoneFreshReports(d: ShopData) {
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
   val debts = remember(ledger, today) { ReportFreshModel.view(ledger, "debts", "all", "", today, clock) }
   val todayTables = remember(ledger, today, money) { if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock).tables else emptyList() }
+  //  RPT-04: پایانِ امروز فقط برای کسی که پول را می‌بیند
+  val dayEnd = remember(d, today, money) {
+    if (money) DayEndModel.build(d, today, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
+  }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
   LaunchedEffect(ReportFresh.preset.value) { ReportFresh.preset.value = null }
 
@@ -431,12 +455,13 @@ fun PhoneFreshReports(d: ShopData) {
       OutlinedButton(
         onClick = {
           val name = "گزارش-امروز-و-بدهی-$today"
-          ir.vil3ntec.tohid.print.ReportPrint.print(context, ReportCsv.Sheet(name, ReportFreshModel.exportRows(todayTables + debts.tables)), name)
+          ir.vil3ntec.tohid.print.ReportPrint.print(context, ReportCsv.Sheet(name, ReportFreshModel.exportRows(todayTables + debts.tables + dayEnd?.tables.orEmpty())), name)
         },
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
       ) { Text("چاپ / PDF") }
     }
     item { HomeKpis(d, {}, money, columns = 2) }
+    dayEnd?.let { b -> item { DayEndPhone(b) } }
     phoneDebts(this, debts)
   }
 }

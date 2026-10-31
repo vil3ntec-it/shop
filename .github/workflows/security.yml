@@ -1,0 +1,98 @@
+name: امنیت — زنجیرهٔ تأمین
+
+#  §۱۴ برنامهٔ امنیت — شرح و طرحِ سد شدن: docs/security/supply-fa.md
+#  یک کارِ سبک (~۱ دقیقه، بی Gradle و بی نصبِ وابستگی) روی هر PR و هر push به main:
+#   • secret در تغییرهای PR (روی main/زمان‌بندی: همهٔ فایل‌ها) ................. سد
+#   • سنجاقِ actionها به SHA، مجوزِ کمینه، تزریق در run (workflow-guard) ......... سد
+#   • npm audit ِ وابستگی‌های production سرور: critical ........................ سد
+#     high تا ۱۴۰۵/۱۰/۰۱ (2026-12-22) فقط هشدار، از آن روز سد
+#   • actionlint ................................................................ گزارش
+#   • SBOM (CycloneDX و SPDX) ِ سرور + فهرستِ actionها ⇐ artifactِ «sbom»
+#  SASTِ کد (CodeQL) جدا در codeql.yml، فعلاً گزارش.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    #  هفتگی (سه‌شنبه): مشاوره‌های تازه برای وابستگی‌هایی که PRی به آن‌ها دست نزده
+    - cron: '41 3 * * 2'
+  workflow_dispatch:
+
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: اسکنِ secret، وابستگی و ورک‌فلو
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          #  در PR، HEAD همان commitِ ادغام است و HEAD^1 سرِ main ⇒ فقط تغییرهای همین PR
+          fetch-depth: 2
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: آزمونِ خودِ ابزارهای امنیتی
+        run: node --test "tools/security/*.test.mjs"
+
+      - name: secret (سد)
+        if: always()
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = pull_request ]; then
+            node tools/security/secret-scan.mjs --diff HEAD^1
+          else
+            node tools/security/secret-scan.mjs --all
+          fi
+
+      - name: سنجاق، مجوز و تزریق در ورک‌فلوها (سد)
+        if: always()
+        run: node tools/security/workflow-guard.mjs
+
+      - name: npm audit ِ سرور (critical سد)
+        if: always()
+        run: node tools/security/npm-audit-gate.mjs server --json-out "$RUNNER_TEMP/sbom/npm-audit-server.json"
+
+      - name: actionlint (گزارش)
+        if: always()
+        continue-on-error: true
+        env:
+          V: 1.7.7
+          SHA256: 023070a287cd8cccd71515fedc843f1985bf96c436b7effaecce67290e7e0757
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/al.tgz" "https://github.com/rhysd/actionlint/releases/download/v$V/actionlint_${V}_linux_amd64.tar.gz"
+          echo "$SHA256  $RUNNER_TEMP/al.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/al.tgz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -no-color -oneline
+
+      - name: SBOM
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/sbom"
+          (cd server && npm sbom --sbom-format cyclonedx --omit dev --package-lock-only > "$RUNNER_TEMP/sbom/server.cdx.json")
+          (cd server && npm sbom --sbom-format spdx --omit dev --package-lock-only > "$RUNNER_TEMP/sbom/server.spdx.json")
+          grep -hoE 'uses: [^ ]+ # [^ ]+' .github/workflows/*.yml | sort -u > "$RUNNER_TEMP/sbom/github-actions.txt"
+          {
+            echo "### SBOM"
+            echo
+            echo "- سرور (npm، production): $(jq '.components | length' "$RUNNER_TEMP/sbom/server.cdx.json") جزء — CycloneDX و SPDX"
+            echo "- actionهای سنجاق‌شده: $(wc -l < "$RUNNER_TEMP/sbom/github-actions.txt")"
+            echo "- Gradle: هنوز نه (طرح در docs/security/supply-fa.md)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: sbom
+          path: ${{ runner.temp }}/sbom
+          if-no-files-found: warn
+          retention-days: 30

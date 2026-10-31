@@ -14,6 +14,8 @@
 const express = require('express');
 const orders = require('../lib/orders');
 const refunds = require('../lib/order-refunds');
+const delay = require('../lib/order-delay');
+const presence = require('../lib/order-presence');
 const S = require('../lib/order-states');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
@@ -63,6 +65,10 @@ router.get('/config', wrap(async (req, res) => {
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
+    //  ORD-07 «عقب انداختن» (پرچمِ `shop.orders.delay`) و ORD-03 نشانگرِ «باز / بسته» (پرچمِ
+    //  `shop.orders.presence`) — خاموش ⇒ null/false و برنامه هیچ دکمه یا نشانگری نمی‌سازد
+    delay: (await delay.flagOf(req.shopId)) ? delay.configOf() : null,
+    presence: await presence.flagOf(req.shopId),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,
@@ -76,7 +82,10 @@ router.get('/config', wrap(async (req, res) => {
 }));
 
 router.get('/summary', needFlag, wrap(async (req, res) => {
-  res.json(await orders.summary(req.shopId));
+  const out = await orders.summary(req.shopId);
+  //  ORD-03: همان «باز / بسته» که مشتری در ویترین می‌بیند، در همان پرسشِ ۲۰ثانیه‌ای
+  if (await presence.flagOf(req.shopId)) out.presence = await presence.presenceOf(req.shopId, out.serverTime);
+  res.json(out);
 }));
 
 router.get('/', needFlag, wrap(async (req, res) => {
@@ -107,7 +116,8 @@ router.get('/handover', needFlag, requirePermission('orders.manage'), wrap(async
 
 /**
  * «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
- * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر.
+ * `lib/order-ledger.ackReview`؛ ردیف برای همهٔ دستگاه‌ها می‌رود. تکرار بی‌اثر. مثلِ هر نوشتنِ
+ * دیگرِ سفارش پشتِ `needWrite` (SUB-10).
  */
 router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), needWrite, wrap(async (req, res) => {
   res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
@@ -202,6 +212,56 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
     ip: clientIp(req),
   });
   res.status(201).json({ order, entry: out.entry });
+}));
+
+/**
+ * ORD-07 — عقب انداختنِ زمانِ آماده‌شدنِ سفارشِ قبول‌شده (`lib/order-delay.js`) — پشتِ پرچمِ
+ * خاموشِ `shop.orders.delay`، با `orders.manage` و اشتراک (SUB-10: نوشتنِ پولی). کلیدِ یکتایی
+ * لازم است؛ تکرارِ همان درخواست دوباره عقب نمی‌برد. `expectedReadyAt` ِ کهنه ⇒ ۴۰۹ `ready_changed`.
+ */
+const needDelay = wrap(async (req, res, next) => {
+  if (!(await delay.flagOf(req.shopId))) {
+    return next(forbidden('عقب انداختنِ سفارش برای این دکان روشن نیست', 'order_delay_disabled'));
+  }
+  next();
+});
+
+router.post('/:id/delay', needFlag, requirePermission('orders.manage'), needWrite, needDelay, wrap(async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  let out;
+  try {
+    out = await delay.delay(req.shopId, req.params.id, { key, body: req.body, actor: actorOf(req) });
+  } catch (err) {
+    if (err.code === 'ready_changed' || err.code === 'delay_not_allowed') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, current: err.current } });
+    }
+    throw err;
+  }
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.status(200).json({ order: out.order, replayed: true });
+  }
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'order.delay',
+    targetType: 'online_order', targetId: out.order.id,
+    detail: {
+      orderNo: out.orderNo, readyAt: out.readyAt, prevReadyAt: out.prevReadyAt,
+      minutes: req.body.minutes, reason: String(req.body.reason || '').trim(),
+    },
+    ip: clientIp(req),
+  });
+  res.json({ order: out.order, replayed: false });
+}));
+
+/**
+ * RSK-03: سابقهٔ همین مشتری در همین دکان (تحویل، رد، لغو، تحویل‌نشده، برگشت) و نشانه‌های توضیح‌دار
+ * پیش از ارسال — پشتِ پرچمِ `shop.order_risk` (خاموش ⇒ `{enabled:false}`). فقط خواندن؛ بی شماره.
+ * سفارشِ دکانِ دیگر ⇒ ۴۰۴.
+ */
+router.get('/:id/risk', needFlag, wrap(async (req, res) => {
+  const out = await require('../lib/order-risk').riskOf(req.shopId, req.params.id);
+  if (!out) throw require('../middleware/errors').notFound('سفارش پیدا نشد', 'order_not_found');
+  res.json(out);
 }));
 
 module.exports = router;

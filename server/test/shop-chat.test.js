@@ -623,6 +623,10 @@ test('§۳۳.۳: شمارهٔ کامل فقط با orders.contact؛ بلاک د�
   await assert.rejects(chat.putMedia(me, conv, smallJpeg()), (e) => e.code === 'chat_blocked');
   //  گفت‌وگوی تازه (مثلاً به اسمِ سفارش) هم ساخته نمی‌شود؛ خواندنِ گذشته آزاد است
   await assert.rejects(chat.open({ ...me }, { orderNo: 77 }), (e) => e.status === 404 || e.code === 'chat_blocked');
+  //  RSK-07: شکلِ دیگرِ همان گوشی (‎+930…‎، ‎+9300…‎) گفت‌وگوی تازهٔ بی‌بلاک نمی‌سازد
+  for (const alt of ['+930791234567', '+9300791234567']) {
+    await assert.rejects(chat.open(customer(o.shopId, alt), { name: 'مشتری' }), (e) => e.code === 'chat_blocked', alt);
+  }
   assert.equal((await chat.changes(me, conv, {})).messages.length, 1);
   assert.equal((await chat.viewOf(me, conv)).canSend, false);
   await h.del(`${base}/conversations/${conv}/block`, { token: o.token });
