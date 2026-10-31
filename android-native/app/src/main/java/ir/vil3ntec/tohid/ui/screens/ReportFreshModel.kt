@@ -30,6 +30,8 @@ object ReportFreshModel {
     tableId.startsWith("sales.") -> listOf("netSales", "invoices", "qty", "returns")
     tableId.startsWith("debts.") -> listOf("balance", "credit", "oldestDays")
     tableId == "fraud" -> listOf("discount", "returnCount", "voidCount", "lineDeleteCount", "noSaleCount")
+    tableId == "dayend.methods" -> listOf("net", "expected", "counted", "variance", "outside")
+    tableId == "dayend.shifts" -> listOf("status", "net", "expectedCash", "countedCash", "varianceCash")
     else -> emptyList()
   }
 
