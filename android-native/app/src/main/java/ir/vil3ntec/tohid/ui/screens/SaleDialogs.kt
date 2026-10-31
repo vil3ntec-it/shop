@@ -720,7 +720,7 @@ internal fun PrinterDialog(
               style = MaterialTheme.typography.bodySmall,
               color = Shop.colors.muted,
             )
-            Spacer(Modifier.height(8.dp))
+            LocalNetworkNotice(context)  // HW-13: اندروید ۱۷ و هدفِ ۳۷ ⇒ «اجازه دادن»؛ وگرنه همان فاصلهٔ ۸
             OutlinedTextField(
               value = host,
               onValueChange = { host = it },
