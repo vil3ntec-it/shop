@@ -902,8 +902,14 @@ await step('بانکِ تصاویر: ادامهٔ بارگذاری پس از ق�
     await openTab('imgbank');
     await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
     await page.fill('#ib-lic-source', 'آزمونِ ادامه');
+    //  ⛔ شناسهٔ دستهٔ آزمونِ پیشین هنوز روی صفحه است: تا شناسهٔ «دستهٔ تازه» ننشسته نخوان
+    //  (روی PostgreSQL ِ CI ساختنِ دسته کندتر است و شناسهٔ کهنه خوانده می‌شد)
+    const before = (await page.locator('#ib-batch-id').textContent()).trim();
     await page.click('#btn-ib-new');
-    await page.waitForFunction(() => document.getElementById('ib-batch-id').textContent.trim().length > 4, null, { timeout: 10_000 });
+    await page.waitForFunction((prev) => {
+      const t = document.getElementById('ib-batch-id').textContent.trim();
+      return t.length > 4 && t !== prev;
+    }, before, { timeout: 10_000 });
     const off = (await page.locator('#ib-batch-id').textContent()).trim();
     await page.setInputFiles('#ib-files', files.slice(0, 1));
     await page.click('#btn-ib-upload');
