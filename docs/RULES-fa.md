@@ -534,6 +534,12 @@
 - ⛔ کلیدِ خصوصیِ مجوز فقط با **همان** کلیدِ فعلی به `LICENSE_PRIVATE_KEY` منتقل می‌شود؛
   `GET /api/license/public-key` پیش و پس از تغییر باید یکسان باشد (برنامه‌ها سنجاقش کرده‌اند). تا وقتی سرور در نبودِ
   env کلیدِ تازه می‌سازد، ردیفِ `app_config` پاک نمی‌شود.
+- ⛔ **SEC-ART-05:** `LICENSE_KEY_MODE=env` ⇒ کلید فقط از `LICENSE_PRIVATE_KEY_FILE` (‎0600‎) یا `LICENSE_PRIVATE_KEY`؛
+  نبودن، خوانا نبودن یا `kid` ِ درونِ `LICENSE_REVOKED_KIDS` ⇒ سرور بالا نمی‌آید (`license.preflight` در `index.js`). هیچ
+  کدی در این حالت به `app_config` یا ساختنِ کلید برنمی‌گردد. پیش‌فرض (`legacy`) همان رفتارِ امروز است، جز این‌که
+  «`license_public_key` هست و خصوصی نیست» خطاست، نه کلیدِ تازه. جابه‌جایی و چرخش فقط با `scripts/license-key.js`
+  (‎export → purge-db‎؛ `purge-db` کلیدِ عمومی را نگه می‌دارد و فقط با `kid` ِ یکسان پاک می‌کند) — هیچ فرمانی مقدار را
+  چاپ نمی‌کند. سنجه: `server/test/license-key-mode.test.js`.
 - ⛔ پیش از هر چرخشِ کلیدِ امضای اندروید، `Integrity.kt` باید فهرستِ اثرِ انگشتِ قدیم و جدید را بپذیرد؛ وگرنه
   `isGenuine()` false می‌شود و همهٔ اشتراک‌ها بسته می‌شوند.
 

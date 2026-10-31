@@ -65,6 +65,16 @@ const config = {
     otp:  process.env.OTP_SECRET || '',
   },
 
+  /**
+   *  کلیدِ خصوصیِ امضای مجوز (‎lib/license.js‎، SEC-ART-05 / F0-28).
+   *  `mode`: ‎legacy‎ (پیش‌فرض؛ محیط ⇒ app_config ⇒ ساختن) یا ‎env‎ (فقط فایل/محیط؛ نبودن ⇒ سرور بالا نمی‌آید).
+   */
+  license: {
+    mode:        /^env$/i.test(process.env.LICENSE_KEY_MODE || '') ? 'env' : 'legacy',
+    file:        process.env.LICENSE_PRIVATE_KEY_FILE || '',
+    revokedKids: list(process.env.LICENSE_REVOKED_KIDS).map((k) => k.toLowerCase()),
+  },
+
   tokens: {
     accessTtlMs:  num(process.env.ACCESS_TOKEN_TTL_MIN, 60) * 60 * 1000,
     refreshTtlMs: num(process.env.REFRESH_TOKEN_TTL_DAYS, 90) * 24 * 60 * 60 * 1000,
@@ -462,6 +472,13 @@ function validate() {
     if (!config.secrets.otp || config.secrets.otp.length < 24) {
       problems.push('OTP_SECRET باید حداقل ۲۴ کاراکتر باشد');
     }
+  }
+  //  حالتِ امنِ کلیدِ مجوز بی کلید = سرورِ بی امضا؛ بهتر که بالا نیاید تا بی‌صدا به app_config برگردد
+  if (process.env.LICENSE_KEY_MODE && !/^(env|legacy)$/i.test(process.env.LICENSE_KEY_MODE)) {
+    problems.push('LICENSE_KEY_MODE فقط env یا legacy');
+  }
+  if (config.license.mode === 'env' && !config.license.file && !(process.env.LICENSE_PRIVATE_KEY || '').trim()) {
+    problems.push('LICENSE_KEY_MODE=env ولی LICENSE_PRIVATE_KEY_FILE یا LICENSE_PRIVATE_KEY تنظیم نشده است');
   }
   return problems;
 }

@@ -34,6 +34,23 @@ async function main() {
     process.exit(1);
   }
 
+  //  ⛔ SEC-ART-05: کلیدِ امضای مجوز پیش از نخستین درخواست — در حالتِ env بی کلید، با کلیدِ باطل‌شده یا
+  //  وقتی کلیدی بوده و گم شده، سرور بالا نمی‌آید (نه برگشت به app_config، نه کلیدِ تازهٔ بی‌صدا).
+  try {
+    const lic = await require('./lib/license').preflight();
+    console.log(`[license] کلیدِ مجوز: ${lic.source}، kid ${lic.kid}، حالتِ ${lic.mode}`);
+    if (lic.source === 'db') {
+      console.warn('[license] ⚠️ کلیدِ خصوصیِ مجوز در app_config است و با هر پشتیبان می‌رود (F0-28): node scripts/license-key.js export');
+    } else if (lic.dbCopy) {
+      console.warn(lic.dbMatches
+        ? '[license] ⚠️ نسخه‌ای از همین کلید هنوز در app_config (و پس در پشتیبان‌ها) است: node scripts/license-key.js purge-db'
+        : '[license] ⚠️ کلیدِ دیگری در app_config است (kid متفاوت) — node scripts/license-key.js status');
+    }
+  } catch (e) {
+    console.error(`[license] ✖ ${e.message}`);
+    process.exit(1);
+  }
+
   //  کفِ «فروشِ تحویل» برای دکان‌هایی که کدِ پیشین سفارش را خودکار کم می‌کرد (shop.orders.ledger /
   //  shop.catalog) = لحظهٔ همین راه‌اندازی — **پیش از** نخستین درخواست، وگرنه config ِ زودرسِ برنامه کفِ
   //  دیرتری می‌گذاشت و تحویلِ میانِ این دو فروش نمی‌گرفت (lib/order-ledger.js). شکست ⇒ سرور بالا

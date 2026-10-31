@@ -12,8 +12,8 @@
 
 | خانواده | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| F0 | ۲۸ | ۲۴ | ۲ | ۲ | ۰ | ۰ | ۰ |
-| POS | ۴۲ | ۴ | ۱۸ | ۱۹ | ۰ | ۱ | ۰ |
+| F0 | ۲۸ | ۲۴ | ۳ | ۱ | ۰ | ۰ | ۰ |
+| POS | ۴۲ | ۴ | ۱۹ | ۱۸ | ۰ | ۱ | ۰ |
 | PAY | ۲۴ | ۴ | ۱۵ | ۵ | ۰ | ۰ | ۰ |
 | PRD | ۲۷ | ۳ | ۱۲ | ۱۲ | ۰ | ۰ | ۰ |
 | PRM | ۱۸ | ۹ | ۵ | ۴ | ۰ | ۰ | ۰ |
@@ -68,15 +68,15 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۱۶۰ | ۲۸۱ | ۲۲۰ | ۰ | ۸۱ | ۲۲ |
+| **همه** | ۷۶۴ | ۱۶۰ | ۲۸۳ | ۲۱۸ | ۰ | ۸۱ | ۲۲ |
 
 ## خلاصه به تفکیکِ فاز
 
 | فاز | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| ۰ | ۳۲ | ۲۶ | ۳ | ۳ | ۰ | ۰ | ۰ |
+| ۰ | ۳۲ | ۲۶ | ۴ | ۲ | ۰ | ۰ | ۰ |
 | ۱ | ۴۰ | ۱۷ | ۱۶ | ۵ | ۰ | ۲ | ۰ |
-| ۲ | ۱۱۳ | ۱۷ | ۶۹ | ۲۴ | ۰ | ۳ | ۰ |
+| ۲ | ۱۱۳ | ۱۷ | ۷۰ | ۲۳ | ۰ | ۳ | ۰ |
 | ۳ | ۷۷ | ۱۰ | ۲۷ | ۴۰ | ۰ | ۰ | ۰ |
 | ۴ | ۱۴۱ | ۱۷ | ۶۲ | ۵۴ | ۰ | ۲ | ۶ |
 | ۵ | ۸۲ | ۵ | ۱۲ | ۶۲ | ۰ | ۰ | ۳ |
@@ -114,7 +114,7 @@
 | F0-25 | سرور فروش صاحب دکانِ اشتراک‌تمام‌شده را می‌پذیرد، ولی قفل فقط در کلاینت است. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | سیاستِ D-05 در سرور: نوشتنِ دادهٔ خودِ صاحب (فروش، همگام‌سازی) با انقضا گروگان نمی‌شود، کلیدهای پولی (online_orders، storefront، delivery، multi_device) در `requireFeature` ِ سرور بسته‌اند. آزمونِ مستقیمِ **همهٔ** مسیرهای نوشتنیِ /api/shop از سورس با اشتراکِ منقضی/معلق/لغوشده: روی main با PGlite `paid-routes-entitlement.test.js` ۶/۶ و `entitlement-enforcement.test.js` ۷/۷؛ جهش (`requireFeature` بی سنجش) ⇒ ۲/۶ | — | — | #213، #374، #416 |
 | F0-26 | پیش از هر اصلاح، خط پایه گرفته نشده است. | §۲.۳ | ۰ | 🟠 | PARTIAL | #211؛ خطِ پایه روی ماشینِ ایجنت (docs/spec/bench)؛ سخت‌افزارِ مرجع و گوشی مانده | — | — | #211 |
 | F0-27 | هر push به main بی‌درنگ APK، نصب‌کننده و وب تازه منتشر می‌کند و به‌روزرسان در ۶ ساعت آن ر… | §۲.۳ | ۰ | 🔴 | PARTIAL | #188 سرور+CI، #194 برنامه؛ اولین انتشارِ beta سبز (اجرای 38478699893)؛ وب: PR #221 (web-beta-channel ۴/۵ قرمز ⇐ ۵/۵)، پس از آن یک کلیکِ صاحب محصول (OWNER-ACTIONS بخشِ ۵)؛ #221 مرج شد (fdeb48a)؛ #235 (a339283): ساختِ Pages بی برچسبِ tohid-web دیگر قرمز نمی‌شود | — | یک کلیکِ صاحب محصول: Pages ⇐ GitHub Actions (BLOCKERS، بخشِ «ب») | #188، #194، #221، #235 |
-| F0-28 | کلید خصوصی مجوز (license_private_key) در app_config است و داخل پشتیبان‌ها می‌رود. | §۲.۳ | ۰ | 🟠 | MISSING | فقط دستورالعمل: OWNER-ACTIONS-fa.md بخشِ ۳ (نیاز به .env) | — | — | — |
+| F0-28 | کلید خصوصی مجوز (license_private_key) در app_config است و داخل پشتیبان‌ها می‌رود. | §۲.۳ | ۰ | 🟠 | PARTIAL | کد آماده: `LICENSE_KEY_MODE=env` + `LICENSE_PRIVATE_KEY_FILE` (‎0600‎) بی برگشت به app_config، `LICENSE_REVOKED_KIDS`، ‎scripts/license-key.js‎ (export/purge-db/generate)؛ `TEST_DATABASE_URL=pglite:memory node --test test/license-key-mode.test.js` ⇒ ۸/۸ (پیش از اصلاح ۴ سرخ). مانده: جابه‌جاییِ کلیدِ سرورِ زنده (OWNER-ACTIONS بخشِ ۳) | — | کارِ صاحب محصول روی سرورِ زنده | claude/sec-artifacts-license |
 
 ## POS
 
