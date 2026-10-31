@@ -62,6 +62,12 @@ import ir.vil3ntec.tohid.ui.components.pos.PosPayments
 import ir.vil3ntec.tohid.ui.components.pos.PosProductCallbacks
 import ir.vil3ntec.tohid.ui.components.pos.PosSearch
 import ir.vil3ntec.tohid.ui.components.pos.PosShot
+import ir.vil3ntec.tohid.ui.components.pos.GridPageButtons
+import ir.vil3ntec.tohid.ui.components.pos.ListPageButtons
+import ir.vil3ntec.tohid.ui.components.pos.PosTouchPrefs
+import ir.vil3ntec.tohid.ui.components.pos.TouchCartColumn
+import ir.vil3ntec.tohid.ui.components.pos.TouchToggle
+import ir.vil3ntec.tohid.ui.components.pos.rememberTouchPad
 import ir.vil3ntec.tohid.ui.components.pos.PromoCodeField
 import ir.vil3ntec.tohid.ui.components.pos.PromoLines
 import ir.vil3ntec.tohid.ui.components.pos.PromoSummary
@@ -139,8 +145,12 @@ fun DeskSaleScreen(
   val view = rememberViewMode("sale", ScreenKind.SALE)
   val shotView = PosShot.view.value
   LaunchedEffect(shotView) { if (shotView != null) { view.set(shotView); PosShot.view.value = null } }
-  //  لمسی (تبلت/گوشی) ⇐ هدفِ ۴۸؛ کامپیوتر ⇐ ۳۶ (۵.۳)
-  val target = PosLayout.minTarget(touch = !ir.vil3ntec.tohid.ui.Platform.DESKTOP).dp
+  //  لمسی (تبلت/گوشی) ⇐ هدفِ ۴۸؛ کامپیوتر ⇐ ۳۶ (۵.۳). POS-31: کامپیوترِ لمسی (پشتِ `PosTouchPrefs`،
+  //  پیش‌فرض خاموش ⇒ همان `!DESKTOP` ِ امروز) ⇐ ۴۸، دکمه‌های صفحه و صفحه‌کلیدِ عددی (POS-07)
+  PosTouchPrefs.load(context)
+  val touch = PosTouchPrefs.touch()
+  val touchExtras = PosTouchPrefs.extras()
+  val target = PosLayout.minTarget(touch = touch).dp
   PhotoPrefs.load(context)
   val showPhotos = PhotoPrefs.show.value
   val posting by cartStore.posting.collectAsState()
@@ -186,7 +196,14 @@ fun DeskSaleScreen(
   val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
   val term = parsed.second.trim()
   //  همان قاعدهٔ پیشنهادها، حالا در شبکه (`PosCatalog`): فعال، نام یا آغازِ بارکد
-  val matches: List<Product> = remember(term, d.products) { PosCatalog.matches(d.products, term) }
+  //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`
+  ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.load(context)
+  val smartSearch = ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.on.value
+  val searchIndex = remember(d.products, smartSearch) { if (smartSearch) PosCatalog.searchIndex(d.products) else null }
+  val byId = remember(d.products) { d.products.associateBy { it.id } }
+  val matches: List<Product> = remember(term, d.products, searchIndex) {
+    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term)
+  }
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
@@ -287,10 +304,13 @@ fun DeskSaleScreen(
   var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
   var askApproval by remember { mutableStateOf(false) }
   val saleKey = remember(cart) { if (cart.isEmpty()) null else cartStore.saleKey() }
+  //  POS-21 (پشتِ `LinePolicy.on`، پیش‌فرض خاموش): قیمتِ دستیِ زیرِ فهرست و تخفیفِ ردیف هم تخفیف‌اند
+  val lineGate = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
+  val basis = DiscountGate.basis(lineGate, d, priced, promo, totals)
   val discountDecision = ir.vil3ntec.tohid.data.ShopRole.decide(
-    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+    context, "sales.discount", DiscountGate.req(basis.discount, basis.subtotal),
   )
-  val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
+  val gate = DiscountGate.state(discountDecision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
@@ -414,6 +434,9 @@ fun DeskSaleScreen(
     onFocusBack = { refocus() },
   )
 
+  //  POS-07 (فقط کامپیوترِ لمسی): صفحه‌کلیدِ عددی روی ردیفِ انتخاب‌شده — همان راهِ کادرِ ردیف (`PosKeypad`)
+  val pad = rememberTouchPad(remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) }, selected)
+
   /* ─────────── کاتالوگ: کادرِ اسکن (تنها جست‌وجوی صفحه)، تراشهٔ دسته‌ها، کارت‌ها ─────────── */
   @Composable
   fun Catalogue(modifier: Modifier) {
@@ -453,6 +476,11 @@ fun DeskSaleScreen(
         )
         Spacer(Modifier.width(10.dp))
         ViewModeToggle(view)
+        //  POS-31: کلیدِ «حالتِ لمسی» فقط با تنظیمِ روشن (خاموش ⇒ همان نوارِ امروز)
+        if (PosTouchPrefs.showToggle()) {
+          Spacer(Modifier.width(10.dp))
+          TouchToggle(PosTouchPrefs.active.value, target) { PosTouchPrefs.setActive(context, it); refocus() }
+        }
       }
       Spacer(Modifier.height(12.dp))
       if (term.isNotEmpty()) {
@@ -486,10 +514,15 @@ fun DeskSaleScreen(
           view.mode == ViewMode.TABLE -> ProductTable(shown, highlight, target, showPhotos, productCb, tableState, Modifier.fillMaxSize())
           else -> ProductGrid(
             shown, highlight, showPhotos, productCb, gridState,
-            minCell = posCardMin(maxWidth, touch = !ir.vil3ntec.tohid.ui.Platform.DESKTOP),
+            minCell = posCardMin(maxWidth, touch = touch),
             modifier = Modifier.fillMaxSize(),
           )
         }
+      }
+      //  POS-31: کشیدنِ انگشت در Compose Desktop اسکرول نمی‌کند ⇒ دکمهٔ صفحه (فقط کامپیوترِ لمسی)
+      if (touchExtras && shown.isNotEmpty()) {
+        Spacer(Modifier.height(8.dp))
+        if (view.mode == ViewMode.TABLE) ListPageButtons(tableState, target, onDone = { refocus() }) else GridPageButtons(gridState, target, onDone = { refocus() })
       }
       //  یادآوریِ کلیدها — باریک و کم‌رنگ؛ فهرستِ کامل در F1
       PosHintLine(StrPos.keysLineF1)
@@ -607,6 +640,18 @@ fun DeskSaleScreen(
     )
   }
 
+  /** سبد؛ در کامپیوترِ لمسی (POS-31) با دکمه‌های صفحه و صفحه‌کلیدِ عددی (POS-07) زیرش */
+  @Composable
+  fun CartArea(modifier: Modifier) {
+    val line = cart.find { it.productId == selected }
+    val product = line?.let { l -> d.products.find { it.id == l.productId } }
+    if (!touchExtras) Cart(modifier) else TouchCartColumn(
+      pad, listState, line?.let { if (it.free) it.label else product?.name.orEmpty() }, target,
+      onApply = { if (!pad.apply(cart, selected, product) { cartStore.set(it) }) toast(StrPos.cartChangedRetry) },
+      onFocusBack = { refocus() }, modifier = modifier,
+    ) { Cart(it) }
+  }
+
   Column(
     Modifier
       .fillMaxSize()
@@ -637,13 +682,13 @@ fun DeskSaleScreen(
         Row(Modifier.fillMaxSize()) {
           Catalogue(Modifier.weight(1f).fillMaxHeight())
           Spacer(Modifier.width(16.dp))
-          Cart(Modifier.width(PosLayout.cartWidth(w).dp).fillMaxHeight())
+          CartArea(Modifier.width(PosLayout.cartWidth(w).dp).fillMaxHeight())
         }
       } else {
         Column(Modifier.fillMaxSize()) {
           Catalogue(Modifier.weight(1f).fillMaxWidth())
           Spacer(Modifier.height(12.dp))
-          Cart(Modifier.weight(1f).fillMaxWidth())
+          CartArea(Modifier.weight(1f).fillMaxWidth())
         }
       }
     }
@@ -676,7 +721,7 @@ fun DeskSaleScreen(
   if (freeLine) {
     FreeLineDialog(onDismiss = { freeLine = false; refocus() }, onConfirm = { label, price, count ->
       cartStore.set(SalesEngine.addFreeLine(cart, label, price, count, ::newId)); freeLine = false; refocus()
-    })
+    }, linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) })
   }
   editLine?.let { id ->
     val line = cart.find { it.productId == id }
@@ -690,6 +735,8 @@ fun DeskSaleScreen(
         unitPrice = line.unitPrice ?: base,
         basePrice = base,
         custom = line.free || line.unitPrice != null,
+        free = line.free,
+        linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = p?.saleUnit.orEmpty(),
         unitFactor = p?.unitFactor ?: 1.0,
         onDismiss = { editLine = null; refocus() },
@@ -704,11 +751,11 @@ fun DeskSaleScreen(
   if (askApproval && saleKey != null) {
     ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
       title = StrPos.approveDiscount,
-      summary = StrPos.discountSummary(money(totals.discount), money(totals.subtotal)) +
+      summary = StrPos.discountSummary(money(basis.discount), money(basis.subtotal)) +
         if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
-      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
     )

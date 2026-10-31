@@ -175,6 +175,11 @@
               <div class="card card-lg">
                 <div class="spread"><h1 id="o-title" data-t="od.title">سفارش</h1><span id="o-status" class="pill" role="status"></span></div>
                 <p id="o-meta" class="muted"></p>
+                <div id="o-dlv" class="dlv section" hidden>
+                  <p id="o-courier"></p>
+                  <p id="o-eta" class="muted"></p>
+                  <div id="o-code" class="dlv-code" hidden><small data-t="od.code">کدِ تحویل</small><b id="o-code-n" class="num" dir="ltr"></b><small class="muted" data-t="od.code.hint">این کد را فقط هنگامِ گرفتنِ سفارش بگویید.</small></div>
+                </div>
                 <ol id="o-steps" class="steps section" data-ta="a.steps" aria-label="مراحلِ سفارش"></ol>
                 <details class="history section"><summary data-t="od.history">تاریخچهٔ کامل</summary><ol id="o-timeline" class="timeline"></ol></details>
               </div>
@@ -188,6 +193,9 @@
             <aside class="aside stack">
               <div class="card card-lg stack">
                 <div id="o-msg" class="note" hidden role="alert"></div>
+                <div id="o-paynote" class="note" hidden role="status"></div>
+                <button id="o-pay" class="btn btn-accent btn-block" type="button" hidden data-t="od.pay">پرداخت با حساب‌پی</button>
+                <p id="o-payhint" class="muted small" hidden data-t="od.pay.hint">کیف‌پولِ حساب‌پی یا کارتِ بانکیِ AfPay</p>
                 <button id="o-reorder" class="btn btn-block" type="button" hidden data-t="od.reorder">خریدِ دوباره</button>
                 <button id="o-cancel" class="btn btn-danger btn-block" type="button" hidden data-t="od.cancel">لغوِ سفارش</button>
                 <a class="btn btn-ghost btn-block" href="#/" data-t="a.back">بازگشت به کالاها</a>
