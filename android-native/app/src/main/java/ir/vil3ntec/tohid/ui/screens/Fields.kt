@@ -26,12 +26,16 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrFields
 
 /**
  *  کادرهای مشترکِ فرم‌ها.
  *
  *  یک جا نوشته شده‌اند تا همه‌جای برنامه یک‌شکل رفتار کنند: عدد همه‌جا
  *  همان‌طور پذیرفته شود، و تاریخ همه‌جا همان‌طور نوشته و نشان داده شود.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrFields` (LOC-06)؛ برچسبِ هر کادر را صفحهٔ صدازننده می‌دهد.
  */
 
 /**
@@ -148,7 +152,7 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
   val parsed = remember(text) { Jalali.parseTyped(text) }
   val broken = text.isNotBlank() && parsed == null
 
-  Text("تاریخ", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Text(StrFields.date, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
   Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedTextField(
@@ -163,14 +167,14 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
       supportingText = {
         Text(
-          if (broken) "تاریخ خوانده نشد — مثل ۱۴۰۵/۰۶/۰۶ بنویسید" else "تاریخ خورشیدی",
+          if (broken) StrFields.dateUnreadable else StrFields.solarDate,
           style = MaterialTheme.typography.labelSmall,
         )
       },
       modifier = Modifier.weight(1f),
     )
-    TextButton(onClick = { onValueChange(todayIso()) }) { Text("امروز") }
-    TextButton(onClick = { onValueChange(yesterdayIso()) }) { Text("دیروز") }
+    TextButton(onClick = { onValueChange(todayIso()) }) { Text(Str.today) }
+    TextButton(onClick = { onValueChange(yesterdayIso()) }) { Text(StrFields.yesterday) }
   }
 }
 
@@ -205,7 +209,7 @@ fun ChipPicker(
         label = { Text(option) },
       )
     }
-    if (allowNew) AssistChip(onClick = { adding = !adding }, label = { Text("+ تازه") })
+    if (allowNew) AssistChip(onClick = { adding = !adding }, label = { Text(StrFields.addNew) })
   }
 
   if (adding) {
@@ -225,14 +229,14 @@ fun ChipPicker(
           fresh = ""
           adding = false
         }
-      }) { Text("افزودن") }
+      }) { Text(StrFields.add) }
     }
   }
 }
 
 @Composable
 fun CategoryPicker(options: List<String>, selected: String, onSelect: (String) -> Unit) =
-  ChipPicker("دسته‌بندی", options, selected, onSelect, "دسته‌بندی تازه")
+  ChipPicker(StrFields.category, options, selected, onSelect, StrFields.newCategory)
 
 /**
  *  انتخابِ یکی از چند چیزِ نام‌دار — تأمین‌کننده، محصول، قرض‌دار.
@@ -268,7 +272,7 @@ fun <T> NamedPicker(
     onClick = { if (options.isNotEmpty()) open = true },
     modifier = Modifier.fillMaxWidth(),
   ) {
-    Text(current?.let(nameOf) ?: if (options.isEmpty()) emptyNote else "انتخاب کنید")
+    Text(current?.let(nameOf) ?: if (options.isEmpty()) emptyNote else StrFields.choose)
   }
 
   if (open) {
@@ -314,7 +318,7 @@ fun <T> SearchablePicker(
           OutlinedTextField(
             value = search,
             onValueChange = { search = it },
-            placeholder = { Text("جستجو") },
+            placeholder = { Text(StrFields.search) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
           )
@@ -323,7 +327,7 @@ fun <T> SearchablePicker(
 
         if (shown.isEmpty()) {
           Text(
-            "چیزی با این جستجو پیدا نشد",
+            StrFields.noMatch,
             style = MaterialTheme.typography.bodySmall,
             color = Shop.colors.muted,
           )
@@ -345,17 +349,11 @@ fun <T> SearchablePicker(
         }
 
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text("انصراف") }
+        TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) { Text(Str.cancel) }
       }
     }
   }
 }
 
-private fun yesterdayIso(): String {
-  val c = java.util.Calendar.getInstance()
-  c.add(java.util.Calendar.DAY_OF_MONTH, -1)
-  val y = c.get(java.util.Calendar.YEAR)
-  val m = (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0')
-  val d = c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
-  return "$y-$m-$d"
-}
+/** یک روز پیش از «امروز» ِ دکان (LOC-03: با «پایانِ روزِ کاری» از روزِ کاری، نه از تقویم) */
+private fun yesterdayIso(): String = ir.vil3ntec.tohid.yesterdayIso()

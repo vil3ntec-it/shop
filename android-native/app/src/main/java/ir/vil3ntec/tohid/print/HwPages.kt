@@ -68,6 +68,13 @@ object HwPages {
     return MonoImage.fromArgb(px, width, height, width)
   }
 
+  /**
+   *  ردیفِ راست‌چینِ برگهٔ گزارش (PAY-15، گزارشِ X/Z ِ صندوق): «برچسب: مقدار»؛ ردیفِ پررنگ با قلمِ سرخط.
+   *  همان ردیف‌های صفحه (`ShiftSlip.rows`) با `text` تصویر و با `EscPos.document` بایت می‌شوند.
+   */
+  fun reportLine(text: String, strong: Boolean = false): Line =
+    Line(text, if (strong) Style.HEAD else Style.BODY, Layout.Alignment.ALIGN_NORMAL)
+
   /** پهنای پایهٔ اندازهٔ قلم — همان نسبتِ `Receipt` روی ۸۰ میلی‌متر */
   private const val PAPER_FONT_BASE = 576
 

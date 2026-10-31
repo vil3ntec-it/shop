@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.hw.NciScale
 import ir.vil3ntec.tohid.core.hw.PrintQueue
+import ir.vil3ntec.tohid.core.hw.ReceiptCopies
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ScaleLabels
@@ -38,6 +39,7 @@ import ir.vil3ntec.tohid.print.HwPages
 import ir.vil3ntec.tohid.print.HwTools
 import ir.vil3ntec.tohid.print.PrintLog
 import ir.vil3ntec.tohid.print.PrintSpooler
+import ir.vil3ntec.tohid.print.ReceiptCopiesPref
 import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -117,6 +119,7 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
   val lastError by PrintSpooler.lastError
   var auto by remember { mutableStateOf(PrintSpooler.autoPrint(context)) }
   var deferred by remember { mutableStateOf(PrintSpooler.deferred(context)) }
+  var copies by remember { mutableIntStateOf(ReceiptCopiesPref.get(context)) }
   var tick by remember { mutableIntStateOf(0) }
   val reprints = remember(tick, jobs.size) { PrintLog.reprints(context, 5) }
   var dry by remember { mutableStateOf<Pair<String, HwPages.Preview>?>(null) }
@@ -164,11 +167,24 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
       HwSwitchRow("چاپِ خودکارِ فاکتور پس از هر فروش", "روی چاپگرِ پیش‌فرض. خاموش = مثلِ همیشه فقط با دکمهٔ «چاپ».", auto) {
         auto = it; PrintSpooler.setAutoPrint(context, it)
       }
+      //  POS-35: شمارِ نسخهٔ همین دستگاه؛ ۱ = همان یک رسیدِ امروز. نسخهٔ دوم به بعد «نسخهٔ k از n» دارد
+      if (auto) {
+        Text("تعدادِ نسخهٔ چاپِ خودکار", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+          ReceiptCopies.plan(ReceiptCopies.MAX).forEach { n ->
+            TohidFilterChip(LocaleText.digitsIn(n.toString(), LocaleChoice.digits), selected = copies == n, onClick = {
+              copies = n; ReceiptCopiesPref.set(context, n)
+            })
+          }
+        }
+        Text("نسخهٔ دوم به بعد روی کاغذ «نسخهٔ ۲ از …» دارد تا با اصل اشتباه نشود.",
+          style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      }
       HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
         deferred = it; PrintSpooler.setDeferred(context, it)
       }
     } else {
-      Text("چاپِ خودکار: ${if (auto) "روشن" else "خاموش"} · چاپِ معوق: ${if (deferred) "روشن" else "خاموش"} — تنظیمش با صاحب یا مدیرِ دکان است.",
+      Text("چاپِ خودکار: ${if (auto) "روشن" + (if (copies > 1) " (${LocaleText.digitsIn(copies.toString(), LocaleChoice.digits)} نسخه)" else "") else "خاموش"} · چاپِ معوق: ${if (deferred) "روشن" else "خاموش"} — تنظیمش با صاحب یا مدیرِ دکان است.",
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     //  HW-03: کشو بی فروش — فقط با مجوز، با دلیل، و همیشه در سابقهٔ دکان

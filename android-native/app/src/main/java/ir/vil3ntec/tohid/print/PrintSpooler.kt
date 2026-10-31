@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.hw.DrawerRule
 import ir.vil3ntec.tohid.core.hw.KickOnce
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
+import ir.vil3ntec.tohid.core.hw.ReceiptCopies
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
@@ -38,6 +39,8 @@ import java.util.concurrent.ConcurrentHashMap
  *    نمی‌زند، پس هرگز فروش نمی‌سازد.
  *  • «چاپِ خودکار پس از فروش» و «کشو پس از فروشِ نقدی» هر دو پیش‌فرض
  *    **خاموش‌اند** — رفتارِ امروز (چاپ فقط با دکمه) دست نمی‌خورد.
+ *  • شمارِ نسخهٔ چاپِ خودکار (POS-35) تنظیمِ همین دستگاه است، پیش‌فرض ۱
+ *    (`ReceiptCopies`، `ReceiptCopiesPref`): هر نسخه کارِ جدای صف و نسخهٔ دوم به بعد نشان‌دار.
  *  • **کشو «همین حالا یا هرگز»** (HW-03): ضربهٔ کشو هرگز در صف، فایل یا
  *    تلاشِ دوباره نمی‌رود؛ یک بار و جدا فرستاده می‌شود (`kick`). بایتِ هر
  *    کارِ صف هم پیش از فرستادن از ضربه پاک می‌شود (`PrintQueue.payload`).
@@ -164,6 +167,8 @@ object PrintSpooler {
     waiter: CompletableDeferred<String?>? = null,
     /** نسخهٔ «چاپِ دوباره»ِ همین رسید — برای تلاشِ دوباره و پس از بازگشتِ صف؛ رسید بی آن پذیرفته نمی‌شود */
     copyBytes: ByteArray? = null,
+    /** شمارهٔ نسخهٔ رسیدِ خودکار، از ۱ (POS-35) */
+    copy: Int = 1,
   ): Submitted {
     //  کشو «همین حالا یا هرگز» است — هرگز در صف (`kick`)
     if (kind == PrintQueue.Kind.DRAWER) return Submitted(null, "کشو در صف نمی‌رود")
@@ -171,7 +176,7 @@ object PrintSpooler {
     start(context)
     val ctx = app ?: context
     val id = "pj" + System.currentTimeMillis().toString(36) + (1000..9999).random()
-    val job = PrintQueue.Job(id, kind, link, title, System.currentTimeMillis(), saleId, reason)
+    val job = PrintQueue.Job(id, kind, link, title, System.currentTimeMillis(), saleId, reason, copy = copy)
     runCatching {
       binFile(ctx, id).writeBytes(EscPos.withoutDrawerKick(bytes))
       copyBytes?.let { copyFile(ctx, id).writeBytes(EscPos.withoutDrawerKick(it)) }
@@ -240,7 +245,8 @@ object PrintSpooler {
   /**
    *  پس از هر فروشِ ثبت‌شده (`CartStore.post`). هر دو تنظیم خاموش ⇒ هیچ.
    *    • کشو روشن و فروش نقدی ⇒ یک ضربه، همین حالا، بیرون از صف (`kick`)
-   *    • «چاپِ خودکار» روشن ⇒ فاکتور (بی کشو) به صف
+   *    • «چاپِ خودکار» روشن ⇒ فاکتور (بی کشو) به صف — به شمارِ نسخهٔ همین دستگاه
+   *      (POS-35)، هر نسخه کارِ جدا و به ترتیب؛ نتیجهٔ نخستین تلاشِ اصل گفته می‌شود
    *  هر چه نشد روی صفحهٔ فروش گفته می‌شود (`tillNotice`)، نه فقط در صفحهٔ دستگاه‌ها.
    */
   fun afterSale(context: Context, data: ShopData, saleId: String) {
@@ -264,16 +270,27 @@ object PrintSpooler {
     scope.launch {
       if (drawerNow) kick(context, printer.link, printer.profile()).error?.let { notifyTill("کشو باز نشد: $it — با کلید باز کنید") }
       if (!auto) return@launch
-      val (bytes, copy) = runCatching {
-        HwPages.saleBytes(context, data, sale, printer) to HwPages.saleBytes(context, data, sale, printer, copyMark = COPY_MARK)
-      }.getOrElse {
-        val m = "$label کشیده نشد: ${it.message ?: "دلیل نامعلوم"}"
-        lastError.value = m; notifyTill(m); return@launch
+      val copies = ReceiptCopiesPref.get(context)
+      var first: Pair<String, CompletableDeferred<String?>>? = null
+      for (k in ReceiptCopies.plan(copies)) {
+        //  نسخهٔ ۱ با ۱ نسخه = همان دو بایتِ امروز (بی نشان / «چاپِ دوباره»)
+        val built = runCatching {
+          HwPages.saleBytes(context, data, sale, printer, copyMark = ReceiptCopies.mark(k, copies)) to
+            HwPages.saleBytes(context, data, sale, printer, copyMark = ReceiptCopies.retryMark(k, copies, COPY_MARK))
+        }
+        if (built.isFailure) {
+          val m = "$label کشیده نشد: ${built.exceptionOrNull()?.message ?: "دلیل نامعلوم"}"
+          lastError.value = m; notifyTill(m); break
+        }
+        val (bytes, copy) = built.getOrThrow()
+        val title = "فاکتور #$no" + (ReceiptCopies.label(k, copies)?.let { " · $it" } ?: "")
+        val waiter = if (k == 1) CompletableDeferred<String?>() else null
+        val s = submit(context, PrintQueue.Kind.RECEIPT, printer.link, title, bytes, sale.id, waiter = waiter, copyBytes = copy, copy = k)
+        val id = s.id
+        if (id == null) { s.message?.let { notifyTill("$label: $it") }; break }
+        if (waiter != null) first = id to waiter
       }
-      val waiter = CompletableDeferred<String?>()
-      val s = submit(context, PrintQueue.Kind.RECEIPT, printer.link, "فاکتور #$no", bytes, sale.id, waiter = waiter, copyBytes = copy)
-      val id = s.id ?: run { s.message?.let { notifyTill("$label: $it") }; return@launch }
-      firstOutcome(id, waiter)?.let { notifyTill("$label چاپ نشد — $it") }
+      first?.let { (id, waiter) -> firstOutcome(id, waiter)?.let { notifyTill("$label چاپ نشد — $it") } }
     }
   }
 
@@ -453,7 +470,7 @@ object PrintSpooler {
           JSONObject().put("id", j.id).put("kind", j.kind.key).put("link", j.link).put("title", j.title)
             .put("createdAt", j.createdAt).put("saleId", j.saleId ?: "").put("reason", j.reason)
             .put("attempts", j.attempts).put("held", j.held).put("lastError", j.lastError ?: "")
-            .put("started", j.started)
+            .put("started", j.started).put("copy", j.copy)
         )
       }
       runCatching {
@@ -494,6 +511,8 @@ object PrintSpooler {
           lastError = o.optString("lastError").ifBlank { null },
           held = o.optBoolean("held"),
           started = o.optBoolean("started"),
+          //  صفِ نسخهٔ پیشین «copy» ندارد ⇒ ۱
+          copy = o.optInt("copy", 1).coerceAtLeast(1),
         )
       }
   }.getOrDefault(emptyList())

@@ -50,28 +50,23 @@ const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' }
 const sessionLimit = rateLimit({ max: config.rateLimit.sessionMax, keyPrefix: 'session' });
 //  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
-const otpLimit = rateLimit({
-  max: config.rateLimit.otpMax, keyPrefix: 'otp',
-  //  کلید همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس
-  //  ثبت‌نامِ ایمیلی روی IP جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ
-  //  چند نفره) همه را با هم می‌بست.
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+/**
+ * کلیدِ سطلِ کد همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس ثبت‌نامِ ایمیلی روی IP
+ * جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ چند نفره) همه را با هم می‌بست.
+ * شماره با کلیدِ یکتا (RSK-07): ‎0700…‎، ‎+93700…‎، ‎0093700…‎ و ‎+9300700…‎ یک سطل‌اند، نه چهار.
+ */
+function destinationKey(req) {
+  const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) return raw.toLowerCase();
+  try { return v.phoneKey(v.phone(raw)) || null; } catch { return raw.replace(/\D/g, '') || null; }
+}
+
+const otpLimit = rateLimit({ max: config.rateLimit.otpMax, keyPrefix: 'otp', key: destinationKey });
 
 //  ⛔ زدنِ کد سطلِ خودش را دارد — شرح بالای `verifyMax` در `config.js`.
 //  کلید همان ایمیل/شماره است، مثلِ `otpLimit`.
-const verifyLimit = rateLimit({
-  max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify',
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+const verifyLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify', key: destinationKey });
 
 /*
  *  ⛔ F0-16 — سقفِ دوم برای دو درِ «آیا این ایمیل حساب دارد؟»
@@ -285,11 +280,15 @@ function publicUser(u) {
 /** پاسخ استاندارد ورود — همراه دکان و نقش، تا برنامه بداند کجاست. */
 async function loginPayload(user, session) {
   const member = await membershipOf(user.id);
+  //  کاربرِ چنددکانی: فهرست هم می‌آید تا برنامه بپرسد «کدام دکان؟» و با
+  //  `POST /api/shop/active` نشست را به آن ببندد (بندِ ۲۹.۲ قاعدهٔ ۱)
+  const all = member ? await require('../lib/shops').membershipsOf(user.id) : [];
   return {
     user: publicUser(user),
     shop: member ? {
       id: member.shop_id, name: member.shop_name || '', role: member.role,
     } : null,
+    shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
     ...session,
   };
 }
@@ -919,13 +918,14 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
     const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
     if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
 
+    //  دکانِ برگزیدهٔ نشست با تازه‌سازی می‌ماند (مهاجرتِ ۰۹۷)
     const acc = await tokens.issue({
       kind: 'access', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop',
+      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
     });
     const fresh = await tokens.issue({
       kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop',
+      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
     });
     if (await tokens.markRotated(found.hash, fresh.token)) {
       access = acc; refreshToken = fresh.token; refreshExpiresAt = fresh.expiresAt;
