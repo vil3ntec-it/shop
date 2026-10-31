@@ -19,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.qr.QrCode
 import ir.vil3ntec.tohid.pay.CustomerPay
+import ir.vil3ntec.tohid.ui.theme.LightColors
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -55,10 +55,12 @@ fun CustomerPayScreen(storeName: String, v: CustomerPay.View) {
         }
       }
     }
+    //  کادرِ QR در هر دو تم روشن است (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند)؛
+    //  پس رنگ‌ها از پالتِ روزِ Theme.kt می‌آیند، نه از تمِ جاری و نه عددِ ثابت (F0-18)
     val qr: @Composable () -> Unit = {
-      Box(Modifier.size(side).clip(RoundedCornerShape(20.dp)).background(Color.White), contentAlignment = Alignment.Center) {
+      Box(Modifier.size(side).clip(RoundedCornerShape(20.dp)).background(LightColors.surface), contentAlignment = Alignment.Center) {
         if (rows != null && v.stage == CustomerPay.Stage.WAITING) QrImage(rows, Modifier.fillMaxSize().padding(10.dp))
-        else Text("✓", fontSize = 96.sp, color = Color(0xFF15803D))
+        else Text("✓", fontSize = 96.sp, color = LightColors.success)
       }
     }
     if (wide) {
