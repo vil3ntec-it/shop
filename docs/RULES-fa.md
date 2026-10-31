@@ -398,6 +398,7 @@
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
+| `shop.orders.refund_tracking` | دکان / `all` | خاموش | NTF-08: کلیدِ `refund` در `GET /api/store/:slug/orders/:token` (وضعیت، مبلغِ برگشته و مانده، ردیف‌ها بی دلیل و کننده)؛ خاموش ⇒ کلید نیست | `claude/new-ntf-1` | باز |
 | `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
 | `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
