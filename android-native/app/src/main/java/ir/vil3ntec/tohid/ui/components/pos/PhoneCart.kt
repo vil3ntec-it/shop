@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -216,7 +217,7 @@ private fun PopIn(content: @Composable () -> Unit) {
 fun PhoneCartStrip(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, modifier: Modifier = Modifier) {
   val v = PhoneV3.colors
   val density = LocalDensity.current
-  val spoken = "سبد، ${plain(model.count)} قلم، ${PhoneSaleText.amount(model.total)}"
+  val spoken = StrSale.cartSpoken(plain(model.count), PhoneSaleText.amount(model.total))
   val bump = remember { Animatable(1f) }
   val first = remember { pulse }
   LaunchedEffect(pulse) {
@@ -232,7 +233,7 @@ fun PhoneCartStrip(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, mod
         interactionSource = remember { MutableInteractionSource() },
         indication = null,
         role = Role.Button,
-        onClickLabel = "باز کردنِ سبد",
+        onClickLabel = StrSale.openCart,
         onClick = onOpen,
       )
       .semantics(mergeDescendants = true) { contentDescription = spoken }
@@ -240,7 +241,7 @@ fun PhoneCartStrip(model: CartSummary.Model, pulse: Int, onOpen: () -> Unit, mod
       .padding(start = 36.dp, end = 21.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Text("سبد", color = v.onBlack, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    Text(StrSale.cartWord, color = v.onBlack, fontSize = 24.sp, fontWeight = FontWeight.Bold, maxLines = 1)
     Spacer(Modifier.width(24.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
       model.thumbs.forEach { t -> key(t.id) { PopIn { PhoneCartThumb(t, 42.dp) } } }
@@ -398,7 +399,7 @@ fun PhoneSaleFrame(
             .clickable(
               interactionSource = remember { MutableInteractionSource() },
               indication = null,
-              onClickLabel = "بستنِ سبد",
+              onClickLabel = StrSale.closeCart,
               onClick = onClose,
             )
             .draggable(drag, Orientation.Vertical, onDragStopped = { settle(it) }),
@@ -429,7 +430,7 @@ private fun Modifier.reveal(index: Int, revealed: Boolean): Modifier {
 fun PhoneCartTitle() {
   val v = PhoneV3.colors
   Text(
-    "سبد",
+    StrSale.cartWord,
     color = v.onBlack,
     fontSize = 30.sp,
     fontWeight = FontWeight.Bold,
@@ -452,7 +453,8 @@ fun PhoneCartRow(
   onToggle: () -> Unit,
   onMinus: () -> Unit,
   onPlus: () -> Unit,
-  onRemove: () -> Unit,
+  /** نگه داشتنِ ردیف (نسخهٔ ۳: «تعداد و قیمتِ این ردیف») */
+  onHold: () -> Unit,
   onEdit: (() -> Unit)?,
 ) {
   val v = PhoneV3.colors
@@ -463,9 +465,9 @@ fun PhoneCartRow(
       .reveal(index, revealed)
       .clip(RoundedCornerShape(18.dp))
       .combinedClickable(
-        onClickLabel = if (expanded) "بستنِ مقدار" else "کم و زیاد کردن",
-        onLongClickLabel = "حذف از سبد",
-        onLongClick = onRemove,
+        onClickLabel = if (expanded) StrSale.closeQty else StrSale.adjustQty,
+        onLongClickLabel = StrSale.lineDetails,
+        onLongClick = onHold,
         onClick = onToggle,
       )
       .then(if (motion) Modifier.animateContentSize(spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMediumLow)) else Modifier)
@@ -494,7 +496,7 @@ fun PhoneCartRow(
       Row(Modifier.padding(start = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
           "${PhoneSaleText.amount(row.unitPrice)}${if (row.unit.isNotBlank()) " / ${row.unit}" else ""}" +
-            if (row.custom && !row.free) " · قیمتِ دستی" else "",
+            if (row.custom && !row.free) " · ${StrSale.manualPriceTag}" else "",
           color = v.onBlackMuted,
           fontSize = 12.sp,
           maxLines = 2,
@@ -516,7 +518,7 @@ private fun PhoneCartStepper(row: CartSummary.Row, onMinus: () -> Unit, onPlus: 
   ) {
     CartStepButton(
       if (row.lastStep) Icons.Outlined.DeleteOutline else Icons.Outlined.Remove,
-      if (row.lastStep) "حذفِ ${row.name} از سبد" else "یکی کمتر ${row.name}",
+      if (row.lastStep) StrSale.removeNamed(row.name) else StrSale.oneLess(row.name),
       if (row.lastStep) v.negative else v.onBlack,
       onMinus,
     )
@@ -528,10 +530,10 @@ private fun PhoneCartStepper(row: CartSummary.Row, onMinus: () -> Unit, onPlus: 
       maxLines = 1,
       modifier = Modifier
         .clip(RoundedCornerShape(8.dp))
-        .then(if (onEdit != null) Modifier.clickable(role = Role.Button, onClickLabel = "نوشتنِ مقدار و قیمت", onClick = onEdit) else Modifier)
+        .then(if (onEdit != null) Modifier.clickable(role = Role.Button, onClickLabel = StrSale.typeQtyPrice, onClick = onEdit) else Modifier)
         .padding(horizontal = 8.dp, vertical = 10.dp),
     )
-    CartStepButton(Icons.Outlined.Add, "یکی بیشتر ${row.name}", v.onBlack, onPlus)
+    CartStepButton(Icons.Outlined.Add, StrSale.oneMore(row.name), v.onBlack, onPlus)
   }
 }
 
@@ -611,7 +613,7 @@ fun PhoneCartTotal(total: Double) {
   val v = PhoneV3.colors
   val text = PhoneSaleText.amount(total)
   Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-    Text("جمع:", color = v.onBlack, fontSize = 24.sp, fontWeight = FontWeight.Normal, maxLines = 1)
+    Text(StrSale.totalColon, color = v.onBlack, fontSize = 24.sp, fontWeight = FontWeight.Normal, maxLines = 1)
     Spacer(Modifier.width(16.dp))
     Spacer(Modifier.weight(1f))
     Text(

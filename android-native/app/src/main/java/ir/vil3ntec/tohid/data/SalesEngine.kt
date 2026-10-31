@@ -593,6 +593,17 @@ object SalesEngine {
   /** مقداری از یک قلم که هنوز می‌شود برگرداند */
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
+  /** سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود */
+  fun paidRatio(sale: Sale): Double =
+    if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+
+  /**
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) با سهمِ
+   *  تخفیفِ فاکتور. [recordReturn] و پیش‌نمایشِ مرجوعیِ نسخهٔ ۳ هر دو همین را می‌خوانند.
+   */
+  fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double =
+    if (item.quantity > 0) (item.totalPrice / item.quantity * quantity * paidRatio(sale)).roundToLong().toDouble() else 0.0
+
   /**
    * مرجوعیِ جزئی — چند قلم از یک فاکتور، هرکدام به هر مقدار.
    *
@@ -612,10 +623,6 @@ object SalesEngine {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
     if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
-    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
-    val paidRatio =
-      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
-
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
     val movements = d.stockMovements.toMutableList()
@@ -632,9 +639,7 @@ object SalesEngine {
       if (quantity <= 0) return@forEachIndexed
 
       // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز
-      val amount = if (item.quantity > 0) {
-        (item.totalPrice / item.quantity * quantity * paidRatio).roundToLong().toDouble()
-      } else 0.0
+      val amount = returnAmount(sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)
 
