@@ -242,6 +242,8 @@
 - با `shop.orders.refunds` «بازپرداخت‌شده» فقط از راهِ دفتر (`POST …/refunds`) و با مبلغ است؛ گذارِ ساده ۴۰۹ `refund_via_ledger` (FIN-01، #255).
 - مبلغِ بازپرداخت هرگز از مانده بیشتر نیست؛ ردیفِ دفتر فقط افزوده می‌شود؛ روش فقط `cash` تا D-08؛ دلیل اجباری و متنِ آزاد (#255).
 - سفارشِ آزمایشی (`test: true`) در جمعِ تطبیق شمرده نمی‌شود (#227، #255).
+- ⛔ بازپرداختِ سفارشِ تحویل‌شده در دفترِ دکان فقط **سندِ برگشتِ برنامه** است (`OrderFulfillment.refund`، همان مدلِ RET): `SaleReturn` با `docId` ِ ثابتِ `o-<سفارش>-rf-<کلید>` و سابقهٔ `…-a`؛ کلید `r<seq>` (ردیفِ دفترِ بازپرداخت) یا `full` (گذارِ «بازپرداختِ کامل» **و** بازپرداختِ درگاه، `payment_status = refunded` — یک کلید، دو بار نه). سرور فقط `refunds` ِ `GET …/handover` را می‌دهد (`order-ledger.refundEventsOf`، جمع با سقفِ کلِ سفارش)، **فقط با `shop.orders.refunds` ِ روشن** (خاموش ⇒ همیشه خالی، حتی برای گذارِ ساده یا درگاه)، و در دفترِ دکان چیزی نمی‌نویسد (RET-11، FIN-01، DATA-04).
+- سندِ برگشتِ بازپرداخت `returnedQty`/`debtSettled` (`$inc`) را دست نمی‌زند؛ روز و زمان = زمانِ سرورِ همان بازپرداخت؛ پول با `ReturnFlow.split` به «روشِ اصلی» (آنلاین/درگاه ⇒ `toMethods`، بیرونِ دخل؛ نقدِ پیشخوان و پیک ⇒ دخل). کالا فقط با «کالا به انبار برگشت؟» (پیش‌فرض نه) و ورودِ انبارِ اصلاحیِ `o-<سفارش>-<قلم>-rs`؛ بازپرداختِ بی پرسش ⇒ «برگشتِ کالا؟» تا جواب (تصمیم `o-<سفارش>-rs-<کلید>`). شناسه‌ها فقط از `core/orders/OrderRefunds` (RET-11).
 - بخشِ «سفارش‌ها»ی کارمند فقط با `enabled`ِ `/config`ِ سرور پیداست و قطعِ گذرا خاموشش نمی‌کند؛ `summary` هر ۲۰ ثانیه و فقط جلوی چشم (#253).
 - «عقب انداختن» (ORD-07) وضعیت را عوض نمی‌کند: رویدادِ `note` با `detail.type = 'ready_delay'` (مهاجرت نمی‌خواهد)، روی زمانِ ذخیره‌شدهٔ سرور، با کلیدِ یکتایی در رویداد و `expectedReadyAt`؛ خطِ زمانیِ مشتری فقط `created`/`status` را می‌بیند (`claude/spec-ord-1`).
 - «باز / بسته» ِ کارمند (ORD-03) همان `storefront.statusOf` ِ ویترین است، نه ساعتِ دستگاه؛ افزونهٔ وب (`license/orders-desk.js`) فقط با `presence`/`delay` ِ `/config` بار می‌شود (`claude/spec-ord-1`).
@@ -415,6 +417,7 @@
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
 | `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
+| `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger`، و `refunds` ِ `GET …/handover` (سندِ برگشتِ بازپرداخت در دفترِ دکان، #574) | #255، #574 | main |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
@@ -428,7 +431,7 @@
 | `min_app_version_<app>` (پیکربندیِ پلن‌ها) | هر برنامه | خالی | پیامِ قرمزِ «پشتیبانی نمی‌شود»، بی قفل | #260 | main |
 | `shop.order_notify` | دکان / `all` | خاموش | صفِ پایدارِ اعلانِ سفارش، `/pending` و `/ack` | #258 | باز |
 | `shop.catalog` | دکان / `all` | خاموش | کاتالوگِ سرور و رزروِ اتمیِ موجودی با سفارش | #263 | باز |
-| `shop.orders.ledger` | دکان / `all` | خاموش | فاکتورِ سریِ W و سندِ برگشت در دفترِ دکان | #275 | باز |
+| `shop.orders.ledger` | دکان / `all` | خاموش | ⛔ بازنشسته: سرور دیگر فاکتورِ W یا سندِ برگشت نمی‌نویسد؛ فقط کفِ راه‌اندازیِ «فروشِ تحویل» (`order-ledger.LEGACY_FLAGS`) آن را می‌خواند. زنده‌اش نکنید؛ بازپرداخت = سندِ برگشتِ برنامه (بخشِ «سفارش») | #275 | بازنشسته |
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |

@@ -217,7 +217,8 @@ object ReturnFlow {
       if (q.isNaN() || q.isInfinite() || q < 0) return Outcome.Bad(Code.BAD_QTY)
       if (q == 0.0) continue
       if (!okDisposition(pick.disposition)) return Outcome.Bad(Code.BAD_DISPOSITION)
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       val name = SalesEngine.itemName(d, item)
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
