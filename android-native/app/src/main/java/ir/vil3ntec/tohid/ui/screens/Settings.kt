@@ -471,6 +471,7 @@ fun SettingsScreen(
         )
       }
     }
+    item { ShrinkReportSettingsWired(context) } // گزارشِ ضایعات و کسری (INV-17)، پیش‌فرض خاموش
 
     /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
     item {
@@ -484,8 +485,10 @@ fun SettingsScreen(
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
-    /* =============== جست‌وجوی مقاومِ صندوق (POS-04، فقط کامپیوتر، پیش‌فرض خاموش) =============== */
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }
+    /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) } }
+    /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
@@ -526,6 +529,7 @@ fun SettingsScreen(
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
+        DeviceOnlyNote()
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
           options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
@@ -537,6 +541,8 @@ fun SettingsScreen(
         )
       }
     }
+
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ReportKeysSettingsWired(context) } //  کلیدهای دوره در گزارش‌ها (RPT-13)، پیش‌فرض خاموش
 
     /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
     //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
@@ -565,6 +571,36 @@ fun SettingsScreen(
         )
       }
     }
+
+    /* ======== ابزارهای تازهٔ کالا: نامِ مشابه و چند بارکد (PRD-19، PRD-04) — پیش‌فرض خاموش ======== */
+    item {
+      var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Description,
+        title = "ابزارهای تازهٔ کالا",
+        subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
+        tint = if (productTools) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد می‌گیرد (با «،» جدا)، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. فقط روی همین دستگاه.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (productTools) "on" else "off",
+          onSelect = {
+            productTools = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setProductTools(context, productTools)
+          },
+        )
+      }
+    }
+
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
 
     /* ============================== دوربین ============================== */
     item {
@@ -971,6 +1007,7 @@ fun SettingsScreen(
           tint = Shop.colors.primary,
           onClick = onUpdates,
         )
+        WhatsNewSettingsRows() //  OPS-05، پیش‌فرض خاموش
       }
     }
   }
@@ -1016,19 +1053,15 @@ fun SettingsScreen(
             //  می‌کند برنامه خراب است
             val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
-            //  پایانِ اشتراک نباید گروگانش بگیرد.
-            if (!store.applyRestore(fixed)) {
-              //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
-              toast(StrSettings.restoreDiskFail)
-              return@launch
-            }
+            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد.
+            //  S143: هرگز op نمی‌سازد؛ دستگاهِ همگام ⇒ اطلاعات از سرور. نشد (دیسک F0-01، شبکه، صف) ⇒
+            //  دفترِ قبلی دست‌نخورده و دلیلش
+            val r = store.restoreBackup(fixed)
+            if (!r.ok) { toast(r.message); return@launch }
             canUndo = true
             restorePhotos = 0
-            toast(
-              if (moved > 0) StrSettings.restoredWithPhotos(plain(moved))
-              else StrSettings.restored
-            )
+            val done = if (moved > 0) StrSettings.restoredWithPhotos(plain(moved)) else StrSettings.restored
+            toast(if (r.message.isEmpty()) done else "$done\n${r.message}")
           }
         }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },

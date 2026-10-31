@@ -207,6 +207,23 @@ class PosLogicTest {
     assertNull("F10 هیچ کاری ندارد (۵.۱ بند ۴)", PosKeys.screen(KeyName.F10, false))
   }
 
+  /** RET-01/05 (S13/S15): Shift+F9 = «حالتِ برگشت» فقط با برگشتِ تازهٔ روشن؛ خاموش همان F9 ِ امروز */
+  @Test
+  fun `Shift+F9 حالتِ برگشت است فقط با برگشتِ تازه — خاموش همان بستنِ فاکتور`() {
+    assertTrue(PosKeys.returnMode(KeyName.F9, primary = false, shift = true, alt = false, enabled = true))
+    //  خاموش: هرگز؛ صفحه همان `screen` را می‌پرسد و Shift+F9 مثلِ امروز فاکتور را می‌بندد
+    assertFalse(PosKeys.returnMode(KeyName.F9, primary = false, shift = true, alt = false, enabled = false))
+    assertEquals(PosAction.FINISH, PosKeys.screen(KeyName.F9, primary = false))
+    //  پیرایه‌ها دقیق‌اند: F9 ِ تنها، Ctrl+Shift+F9 و Alt+Shift+F9 حالتِ برگشت نیستند
+    assertFalse(PosKeys.returnMode(KeyName.F9, primary = false, shift = false, alt = false, enabled = true))
+    assertFalse(PosKeys.returnMode(KeyName.F9, primary = true, shift = true, alt = false, enabled = true))
+    assertFalse(PosKeys.returnMode(KeyName.F9, primary = false, shift = true, alt = true, enabled = true))
+    assertFalse(PosKeys.returnMode(KeyName.F12, primary = false, shift = true, alt = false, enabled = true))
+    assertFalse(PosKeys.returnMode(null, primary = false, shift = true, alt = false, enabled = true))
+    //  کلید از `keymap.json` می‌آید، نه از کدِ صفحه
+    assertEquals(listOf(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F9, shift = true)), ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_RETURN_MODE.keys)
+  }
+
   @Test
   fun `کلیدهای کادر — Esc هرگز سبد را پاک نمی‌کند و + − Delete فقط با کادرِ خالی`() {
     assertEquals(PosAction.SUBMIT, PosKeys.field(KeyName.Enter, false, queryEmpty = false, hasMatches = true, hasSelection = false))
