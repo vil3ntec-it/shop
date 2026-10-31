@@ -11,11 +11,11 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Debtors.kt": 1380,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskCustomers.kt": 831,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskProducts.kt": 826,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt": 873,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Orders.kt": 853,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt": 886,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Orders.kt": 850,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Profile.kt": 842,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Sale.kt": 1017,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt": 1130,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt": 1138,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SalesHistory.kt": 808,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Settings.kt": 1488,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/TopBar.kt": 1268,
@@ -90,7 +90,7 @@
     "StatusPill": 2,
     "html-escape": 13,
     "secret-derivation": 6,
-    "express-wrap": 5
+    "express-wrap": 4
   },
   "platformDeps": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/atrest/AtRestEnvelope.kt": 10,
