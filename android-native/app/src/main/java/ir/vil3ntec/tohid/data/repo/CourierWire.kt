@@ -63,6 +63,9 @@ object CourierWire {
       photoAllowed = bool(o, "photoAllowed"),
       recallRequested = o["recall"].let { it != null && it !is JsonNull },
       updatedAt = long(o, "updatedAt") ?: 0L,
+      area = addr?.let { str(it, "area") }.orEmpty(),
+      gateColor = addr?.let { str(it, "gateColor") }.orEmpty(),
+      addressCorrectedAt = addr?.let { long(it, "correctedAt") },
     )
   }
 
