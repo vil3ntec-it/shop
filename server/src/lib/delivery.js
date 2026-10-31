@@ -26,6 +26,7 @@ const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
 const config = require('../config');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
+const liveCap = require('./delivery-live-cap');   //  DLV-03: سقفِ کارِ هم‌زمانِ هر پیک (مهاجرتِ ۱۴۸)
 
 const FLAG_KEY = 'shop.delivery';
 const FEATURE_KEY = 'delivery';
@@ -39,8 +40,6 @@ const MAX_SETTLE = 500;
 const MAX_PHOTOS = 3;
 const CODE_MAX_ATTEMPTS = 5;
 const DEFAULT_CASH_CAP_MINOR = 1_000_000;  // D-18 (پیش‌نهاد): ۱۰٬۰۰۰ افغانی
-/** DLV-03: سقفِ کارِ هم‌زمانِ هر پیک (همان CHECKِ مهاجرتِ ۱۴۸)؛ نبودن = بی‌سقف */
-const MAX_LIVE_LIMIT = 50;
 
 //  S5 (قراردادِ بازار §۳): نمای پیک برای مشتری — هر دو پیش‌فرض خاموش
 const VIEW_FLAG = 'shop.delivery_customer_view';
@@ -226,17 +225,10 @@ function eventView(e) {
   };
 }
 
-/** سقفِ کارِ هم‌زمان (DLV-03): `null`/'' = بی‌سقف، وگرنه ۱ تا ۵۰. */
-function maxLiveOf(v) {
-  if (v === null || v === '') return null;
-  return int(v, 'سقفِ کارِ هم‌زمان', { min: 1, max: MAX_LIVE_LIMIT });
-}
-
 function courierRowView(c, stats = {}) {
   return {
     id: c.id, userId: c.user_id, name: c.name, phone: c.phone, active: c.active === true,
-    cashCapMinor: Number(c.cash_cap_minor),
-    maxLive: c.max_live === null || c.max_live === undefined ? null : Number(c.max_live),
+    cashCapMinor: Number(c.cash_cap_minor), maxLive: liveCap.view(c),
     cashHeldMinor: Number(stats.held || 0),
     liveCount: Number(stats.live || 0),
     liveExpectedMinor: Number(stats.live_expected || 0),
@@ -288,13 +280,12 @@ async function createCourier(shopId, body, actor) {
   const v = require('./validate');
   const phone = v.phone(b.phone) || '';
   const cap = int(b.cashCapMinor, 'سقفِ نقد', { min: 0, max: MAX_MONEY_MINOR, def: DEFAULT_CASH_CAP_MINOR });
-  const maxLive = b.maxLive === undefined ? null : maxLiveOf(b.maxLive);
   const at = now();
   const id = ulid(at);
   const r = await db.query(
     `INSERT INTO shop_couriers (id, shop_id, user_id, name, phone, cash_cap_minor, max_live, active, created_by, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$9) ON CONFLICT (shop_id, user_id) DO NOTHING RETURNING *`,
-    [id, shopId, userId, name, phone, cap, maxLive, actor.userId || '', at]
+    [id, shopId, userId, name, phone, cap, b.maxLive === undefined ? null : liveCap.parse(b.maxLive), actor.userId || '', at]
   );
   if (!r.rows[0]) throw conflict('این عضو پیش‌تر پیک ثبت شده است', 'courier_exists');
   return courierRowView(r.rows[0]);
@@ -335,14 +326,12 @@ async function updateCourier(shopId, id, body) {
   const v = require('./validate');
   const phone = b.phone !== undefined ? (v.phone(b.phone) || '') : c.phone;
   const cap = b.cashCapMinor !== undefined ? int(b.cashCapMinor, 'سقفِ نقد') : Number(c.cash_cap_minor);
-  //  `maxLive: null` سقف را برمی‌دارد؛ نیامدن یعنی همان قبلی
-  const maxLive = b.maxLive !== undefined ? maxLiveOf(b.maxLive) : c.max_live;
   if (b.active !== undefined && typeof b.active !== 'boolean') throw badRequest('فعال/غیرفعال نامعتبر است', 'bad_active');
   const active = b.active !== undefined ? b.active : c.active;
   const r = await one(
     `UPDATE shop_couriers SET name=$3, phone=$4, cash_cap_minor=$5, active=$6, max_live=$8, updated_at=$7
       WHERE shop_id=$1 AND id=$2 RETURNING *`,
-    [shopId, c.id, name, phone, cap, active, now(), maxLive]
+    [shopId, c.id, name, phone, cap, active, now(), b.maxLive !== undefined ? liveCap.parse(b.maxLive) : c.max_live]   //  maxLive: null ⇒ بی‌سقف
   );
   return courierRowView(r, await cashStats(viaDb, shopId, c.id));
 }
@@ -387,8 +376,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
   if (mode === 'external' && !externalName) throw badRequest('نامِ شرکتِ پیک لازم است', 'external_name_required');
   const externalRef = mode === 'external' ? text(b.externalRef, 80) : '';
   const requireCode = mode === 'pickup' || b.requireCode === true;
-  if (b.overrideCashCap !== undefined && typeof b.overrideCashCap !== 'boolean') throw badRequest('نامعتبر', 'bad_override');
-  if (b.overrideLiveCap !== undefined && typeof b.overrideLiveCap !== 'boolean') throw badRequest('نامعتبر', 'bad_override');
+  if ([b.overrideCashCap, b.overrideLiveCap].some((x) => x !== undefined && typeof x !== 'boolean')) throw badRequest('نامعتبر', 'bad_override');
   const reqHash = hashOf({ orderId: String(orderId || ''), mode, fareMinor, courierId, externalName, externalRef, requireCode });
   const rebuildable = requireCode && await orders.flagOf(shopId, VIEW_FLAG);
 
@@ -425,8 +413,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
 
     const expected = order.payment_method === 'cod' && order.payment_status !== 'paid' ? Number(order.total_minor) : 0;
 
-    let overCap = false;
-    let overLive = false;
+    let overCap = false; let overLive = false;
     if (mode === 'shop_courier') {
       const cr = (await c.query(
         'SELECT * FROM shop_couriers WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, courierId]
@@ -436,15 +423,8 @@ async function assign(shopId, orderId, body, actor, key = '') {
       const st = await cashStats((t, p) => c.query(t, p), shopId, courierId);
       overCap = st.held + st.live_expected + expected > Number(cr.cash_cap_minor);
       //  DLV-11 / S40: بالای سقفِ نقد کار به پیک نمی‌رود، مگر مدیر آگاهانه بپذیرد
-      if (overCap && b.overrideCashCap !== true) {
-        throw conflict('نقدِ در دستِ این پیک از سقفش بیشتر می‌شود؛ اول تسویه کنید', 'cash_cap_exceeded');
-      }
-      //  DLV-03: سقفِ کارِ هم‌زمان — زیرِ همان قفلِ ردیفِ پیک، پس دو سپردنِ هم‌زمان از سقف
-      //  بیرون نمی‌زنند؛ مدیر می‌تواند آگاهانه بپذیرد (در رویداد ثبت می‌شود)
-      overLive = cr.max_live !== null && cr.max_live !== undefined && st.live >= Number(cr.max_live);
-      if (overLive && b.overrideLiveCap !== true) {
-        throw conflict(`این پیک ${Number(cr.max_live)} مأموریتِ هم‌زمان دارد (سقفش)؛ پیکِ دیگری بسپارید`, 'courier_busy');
-      }
+      if (overCap && b.overrideCashCap !== true) throw conflict('نقدِ در دستِ این پیک از سقفش بیشتر می‌شود؛ اول تسویه کنید', 'cash_cap_exceeded');
+      overLive = liveCap.check(cr, st, b.overrideLiveCap);   //  DLV-03: زیرِ همان قفلِ ردیفِ پیک؛ پذیرشِ آگاهانه در رویداد
     }
 
     const at = now();
@@ -1352,7 +1332,7 @@ function staffActor(req) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS, MAX_LIVE_LIMIT,
+  FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS, MAX_LIVE_LIMIT: liveCap.MAX_LIVE_LIMIT,
   VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, customerView, putLocation, putEta, purgeLocations,
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, missions, forOrder, board,
