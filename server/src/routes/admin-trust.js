@@ -19,38 +19,37 @@ const { clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 router.use(requireAdmin);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const log = (req, entry) => audit.log({ actorType: 'admin', userId: req.admin.id, ip: clientIp(req), ...entry });
 
-router.get('/cases', requireSuperAdmin, wrap(async (req, res) => {
+router.get('/cases', requireSuperAdmin, async (req, res) => {
   const cases = await trust.queue({ status: req.query.status, shopId: req.query.shopId, limit: req.query.limit });
   await log(req, { action: 'admin.trust_queue_viewed', detail: { count: cases.length } });
   res.set('Cache-Control', 'no-store');
   res.json({ cases });
-}));
+});
 
-router.get('/cases/:id', requireSuperAdmin, wrap(async (req, res) => {
+router.get('/cases/:id', requireSuperAdmin, async (req, res) => {
   const c = await trust.adminView(req.params.id);
   await log(req, { shopId: c.shopId, action: 'admin.trust_case_viewed', targetType: 'trust_case', targetId: c.id });
   res.set('Cache-Control', 'no-store');
   res.json({ case: c });
-}));
+});
 
-router.get('/cases/:id/evidence/:evidenceId', requireSuperAdmin, wrap(async (req, res) => {
+router.get('/cases/:id/evidence/:evidenceId', requireSuperAdmin, async (req, res) => {
   const out = await trust.adminEvidence(req.params.id, req.params.evidenceId);
   await log(req, {
     shopId: out.shopId, action: 'admin.trust_evidence_viewed', targetType: 'trust_evidence', targetId: out.media.id,
   });
   require('../lib/shop-chat').sendMedia(res, out.media);
-}));
+});
 
-router.post('/cases/:id/assign', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/cases/:id/assign', requireSuperAdmin, async (req, res) => {
   const out = await trust.assign(req.admin.id, req.params.id);
   await log(req, { shopId: out.shopId, action: 'admin.trust_case_assigned', targetType: 'trust_case', targetId: out.id });
   res.json(out);
-}));
+});
 
-router.post('/cases/:id/decide', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/cases/:id/decide', requireSuperAdmin, async (req, res) => {
   const reason = requireReason(req);
   const out = await trust.decide(req.admin.id, req.params.id, req.body, reason);
   await log(req, {
@@ -58,9 +57,9 @@ router.post('/cases/:id/decide', requireSuperAdmin, wrap(async (req, res) => {
     detail: { outcome: out.outcome, reason, sanction: out.sanction },
   });
   res.json(out);
-}));
+});
 
-router.post('/cases/:id/appeal-decision', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/cases/:id/appeal-decision', requireSuperAdmin, async (req, res) => {
   const reason = requireReason(req);
   const out = await trust.decideAppeal(req.admin.id, req.params.id, req.body, reason);
   await log(req, {
@@ -68,15 +67,15 @@ router.post('/cases/:id/appeal-decision', requireSuperAdmin, wrap(async (req, re
     detail: { outcome: out.outcome, reason, lifted: out.lifted },
   });
   res.json(out);
-}));
+});
 
-router.get('/sanctions', requireSuperAdmin, wrap(async (req, res) => {
+router.get('/sanctions', requireSuperAdmin, async (req, res) => {
   const sanctions = await trust.sanctionsForAdmin({ shopId: req.query.shopId, active: req.query.active, limit: req.query.limit });
   res.set('Cache-Control', 'no-store');
   res.json({ sanctions });
-}));
+});
 
-router.post('/sanctions/:id/lift', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/sanctions/:id/lift', requireSuperAdmin, async (req, res) => {
   const reason = requireReason(req);
   const out = await trust.liftSanction(req.admin.id, req.params.id, reason);
   await log(req, {
@@ -84,6 +83,6 @@ router.post('/sanctions/:id/lift', requireSuperAdmin, wrap(async (req, res) => {
     detail: { kind: out.kind, caseId: out.caseId, reason },
   });
   res.json(out);
-}));
+});
 
 module.exports = router;
