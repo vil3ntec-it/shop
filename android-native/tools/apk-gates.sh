@@ -4,7 +4,8 @@
 #
 #  APKِ تازه با آخرین نسخهٔ منتشرشده (انتشارِ آزمایشی، وگرنه پایدار) سنجیده می‌شود:
 #    • applicationId همان `ir.vil3ntec.tohid`               — همیشه سخت
-#    • versionCode همان «۱۰۰ + شمارهٔ ساخت» و کمتر از منتشرشده نیست — همیشه سخت
+#    • versionCode همان «۱۰۰ + شمارهٔ ساخت» — همیشه سخت؛ کمتر از منتشرشده نیست — سخت بیرون از PR
+#      (در PR فقط هشدار: شمارهٔ ساختِ PR ِ مانده در صف از آخرین انتشار عقب می‌افتد)
 #    • اثر انگشتِ گواهیِ امضا (SHA-256) همان منتشرشده         — همیشه سخت
 #    • حجم در ±۵٪ِ منتشرشده — سخت فقط وقتی PR فایلِ ساخت را عوض کرده
 #      (build/settings.gradle.kts، gradle.properties، هر proguard*.pro، wrapper)؛
@@ -81,7 +82,17 @@ if [ -n "$ref" ]; then
   ref_size=$(stat -c %s "$ref")
   [ "$ref_id" = "$id" ] || err "applicationId با نسخهٔ منتشرشده ($ref_id) یکی نیست"
   [ "$ref_fp" = "$fp" ] || err "اثر انگشتِ امضا با نسخهٔ منتشرشده یکی نیست — به‌روزرسانی روی گوشی‌ها نصب نمی‌شود"
-  [ "$code" -ge "$ref_code" ] || err "versionCode ($code) از نسخهٔ منتشرشده ($ref_code) کمتر است"
+  #  versionCode = ۱۰۰ + `run_number`. اجرای PR شماره‌اش را هنگامِ push می‌گیرد؛ اگر در صفِ CI بماند و
+  #  main پیش از آن یک نسخهٔ آزمایشیِ تازه منتشر کند، PR بی هیچ ایرادی «کمتر» می‌شود (#608، ۱۵۱۳ در
+  #  برابرِ ۱۵۱۴). PR هرگز منتشر نمی‌شود ⇒ آن‌جا فقط هشدار؛ بیرون از PR (push به main و انتشارِ
+  #  پایدار) همچنان سخت، تا APK ِ کمترشماره هرگز به گوشی‌ها نرسد.
+  if [ "$code" -lt "$ref_code" ]; then
+    if [ -n "${PR_NUMBER:-}" ]; then
+      echo "::warning::versionCode ($code) از نسخهٔ منتشرشده ($ref_code) کمتر است — فقط PR (شمارهٔ ساخت پیش از آخرین انتشار گرفته شد)؛ انتشار سخت می‌سنجد"
+    else
+      err "versionCode ($code) از نسخهٔ منتشرشده ($ref_code) کمتر است"
+    fi
+  fi
   ratio=$(awk -v a="$size" -v b="$ref_size" 'BEGIN { printf "%+.2f", (a - b) * 100 / b }')
   if awk -v r="$ratio" 'BEGIN { exit !(r > 5 || r < -5) }'; then
     if [ "$strict" = 1 ]; then
