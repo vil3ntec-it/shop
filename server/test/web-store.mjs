@@ -16,6 +16,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -40,7 +41,7 @@ process.env.OTP_RESEND_SECONDS = '0';
 process.env.OTP_UNIFORM_MS = '0';
 
 const { createApp } = require('../src/app');
-const { query, one, newId, now, closeDb } = require('../src/db');
+const { query, one, many, newId, now, closeDb } = require('../src/db');
 const migrate = require('../src/migrate');
 const pw = require('../src/lib/password');
 
@@ -189,6 +190,8 @@ if (axeSrc) {
   ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
 }
 
+//  WEB-15: رسید و پیگیری (store/order.js) جزوِ بارِ اول نیست — فقط با صفحهٔ سفارش می‌آید
+ok(!(await page.$('script[src="/store/order.js"]')), 'order.js پیش از صفحهٔ سفارش بار نشد');
 await page.click('#submit-order');
 await page.waitForSelector('#view-order:not([hidden])', { timeout: 10000 });
 await page.waitForFunction(() => /شمارهٔ/.test(document.getElementById('o-title').textContent), null, { timeout: 10000 });
@@ -285,6 +288,86 @@ for (const lang of ['fa', 'en']) {
   await rc.close();
 }
 
+//  ── E2E-MKT-02: موجودیِ کم هنگامِ ثبت (۴۰۹ ِ out_of_stock) — دکانِ دوم با موجودیِ دفتر ──
+//  پرچمِ shop.storefront.stock_list خاموش ⇒ همان پیامِ پیشینِ سرور؛ روشن ⇒ همهٔ قلم‌های کم، هر کدام با مقدارِ
+//  موجود و «کم کن به …»؛ تا مشتری کم نکند «ثبت» بسته است و هیچ سفارشی بی‌صدا با مقدارِ دیگر ثبت نمی‌شود.
+{
+  const em2 = 'stock@store.local';
+  const r1 = await call('POST', '/api/auth/register/start', { name: 'صاحبِ دوم', email: em2, password });
+  const r2 = await call('POST', '/api/auth/register/verify', { email: em2, code: r1.body.devCode });
+  const T = (await call('POST', '/api/auth/register/complete', { ticket: r2.body.ticket, name: 'صاحبِ دوم', password,
+    device: { deviceId: 'dev-owner-2', name: 'تست', platform: 'test' }, app: 'shop', terms: { accepted: true } })).body.accessToken;
+  const sid = (await call('POST', '/api/shop', { name: 'دکانِ موجودی' }, T)).body.shop.id;
+  const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: sid, key, value }, A);
+  for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) await flag(key, true);
+  const sslug = 'stock-store';
+  await call('PUT', '/api/shop/storefront', { slug: sslug, enabled: true, title: 'ویترینِ موجودی', contactPhone: '0700000002', minOrderMinor: 0 }, T);
+  const sop = (table, row, fields) => ({ op_id: `op-${row}-${Date.now()}`, ts: Date.now(), table, row_id: row, type: 'insert', fields });
+  const pr = (row, name) => sop('products', row, { name, unit: 'دانه', salePrice: 50, purchasePrice: 40, active: true, barcodes: [], createdAt: Date.now() });
+  const en = (row, pid, units) => sop('warehouseEntries', row, { productId: pid, units, cartons: 0, perCarton: 0, unit: 'دانه', price: 40, createdAt: Date.now() });
+  const sp = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner-2', schema_version: 2, ops: [
+    pr('tea', 'چای'), pr('salt', 'نمک'), en('tea-e', 'tea', 2), en('salt-e', 'salt', 1),
+  ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner-2' });
+  ok(sp.status === 200, 'دکانِ موجودی: کالا و ورودِ انبار رسید', JSON.stringify(sp.body).slice(0, 160));
+  for (const id of ['tea', 'salt']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
+
+  const sc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const sg = await sc.newPage();
+  sg.on('pageerror', (e) => errors.push(String(e)));
+  sg.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  const toCheckout = async () => {
+    await sg.goto(`${base}/store/${sslug}#/checkout`);
+    await sg.reload();   //  همان نشانی با # بار نمی‌شود؛ پرچمِ تازه فقط با بارِ دوباره
+    await sg.waitForSelector('#view-checkout:not([hidden])', { timeout: 15000 });
+    await sg.check('input[name="fulfillment"][value="pickup"]');
+    await sg.fill('#c-name', 'مشتریِ موجودی');
+  };
+  await sg.goto(`${base}/store/${sslug}`);
+  await sg.waitForSelector('#products li[data-id="tea"]', { timeout: 15000 });
+  for (const [id, n] of [['tea', 3], ['salt', 2]]) {
+    for (let i = 0; i < n; i++) await sg.locator(`#products li[data-id="${id}"] .p-add`).click();
+  }
+  await toCheckout();
+  await sg.fill('#c-phone', '0791112244');
+  await sg.click('#verify-send');
+  await sg.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
+  await sg.fill('#v-code', ((await sg.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');
+  await sg.click('#verify-check');
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+
+  //  خاموش: همان پیامِ یک‌قلمیِ سرور، بی «کم کن»
+  await sg.click('#submit-order');
+  await sg.waitForFunction(() => /موجود/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });
+  const offMsg = await sg.textContent('#checkout-msg');
+  ok(!(offMsg.includes('چای') && offMsg.includes('نمک')) && (await sg.locator('#cart-lines .fit').count()) === 0,
+    'E2E-MKT-02 خاموش: همان پیامِ پیشینِ سرور', offMsg);
+
+  //  روشن: فهرستِ هر دو قلم با مقدارِ موجود؛ «ثبت» تا کم کردن بسته
+  ok(!('features' in (await call('GET', `/api/store/${sslug}`)).body), 'E2E-MKT-02 خاموش: پاسخِ ویترین همان پیشین، بی کلیدِ features');
+  await flag('shop.storefront.stock_list', true);
+  ok((await call('GET', `/api/store/${sslug}`)).body.features?.stockList === true, 'E2E-MKT-02 روشن: features.stockList');
+  await toCheckout();
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+  await sg.click('#submit-order');
+  await sg.waitForFunction(() => document.querySelectorAll('#cart-lines .fit').length === 2, null, { timeout: 10000 });
+  const onMsg = await sg.textContent('#checkout-msg');
+  ok(onMsg.includes('چای') && onMsg.includes('نمک') && onMsg.includes('فقط ۲') && onMsg.includes('فقط ۱'),
+    'E2E-MKT-02 روشن: همهٔ قلم‌های کم با مقدارِ موجود', onMsg);
+  ok(await sg.isDisabled('#submit-order'), 'E2E-MKT-02: تا مشتری مقدار را کم نکند «ثبت» بسته است');
+  ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [sid])).n === 0, 'E2E-MKT-02: هیچ سفارشی بی‌صدا ثبت نشد');
+  await sg.locator('#cart-lines .fit').first().click();
+  ok(await sg.isDisabled('#submit-order') && (await sg.locator('#cart-lines .fit').count()) === 1, 'E2E-MKT-02: یک قلم ماند، «ثبت» هنوز بسته');
+  await sg.locator('#cart-lines .fit').first().click();
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 5000 });
+  await sg.click('#submit-order');
+  await sg.waitForSelector('#view-order:not([hidden])', { timeout: 10000 });
+  const placed = await many(`SELECT l.product_id, l.qty_milli FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
+    WHERE o.shop_id=$1 ORDER BY l.product_id`, [sid]);
+  ok(JSON.stringify(placed.map((r) => [r.product_id, Number(r.qty_milli)])) === JSON.stringify([['salt', 1000], ['tea', 2000]]),
+    'E2E-MKT-02: سفارش با همان مقدارِ پذیرفته‌شدهٔ مشتری ثبت شد', JSON.stringify(placed));
+  await sc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
@@ -295,6 +378,10 @@ const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'boot.js')).size;
 ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
+//  صفحهٔ سفارش همان بارِ اول + order.js است؛ سقفِ §۳.۱۰ برای آن هم (با فشرده‌سازیِ سند)
+const orderGz = zlib.gzipSync(Buffer.concat(['store/store.js', 'store/order.js', 'kit/kit.js', 'kit/boot.js']
+  .map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'public', f))))).length;
+ok(orderGz < 75 * 1024, 'جاوااسکریپتِ صفحهٔ سفارش (با order.js) زیرِ ۷۵KB ِ فشرده (۳.۱۰)', `${orderGz} بایتِ gzip`);
 
 await ctx.close();
 await browser.close();

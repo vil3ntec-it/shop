@@ -3,8 +3,9 @@
  * سربرگِ فاکتورِ دکان — `/api/shop/receipt-profile` (فاکتورِ نسخهٔ ۲). منطق در
  * `lib/receipt-profile.js`.
  *
- *   GET    /config       هر عضو ⇒ { enabled } — پرچمِ `shop.receipt_v2` (live_config، پیش‌فرض خاموش):
- *                         تا روشن نشده برنامه همان فاکتورِ پیشین را می‌زند، توکن نمی‌سازد و سربرگ نمی‌پرسد
+ *   GET    /config       هر عضو ⇒ { enabled, debtMinor } — پرچمِ `shop.receipt_v2` (live_config، پیش‌فرض خاموش):
+ *                         تا روشن نشده برنامه همان فاکتورِ پیشین را می‌زند، توکن نمی‌سازد و سربرگ نمی‌پرسد؛
+ *                         `debtMinor` = پرچمِ `shop.debt_minor` (پیش‌فرض خاموش، ماندهٔ حساب در برنامه به پول)
  *   GET    /             هر عضو ⇒ { profile, rev } (دستگاه برای چاپِ بی اینترنت نگه می‌دارد)
  *   PUT    /             `settings.write` ⇒ نام، نشانی، تلفن، متنِ پایین، qr، logoMode، digits، symbol
  *   GET    /logo         هر عضو ⇒ بایت‌های لوگو (ETag = hash)
@@ -35,7 +36,7 @@ const logged = (req, action, detail) => audit.log({
 });
 
 router.get('/config', async (req, res) => {
-  res.json({ enabled: await profiles.enabledFor(req.shopId) });
+  res.json({ enabled: await profiles.enabledFor(req.shopId), debtMinor: await profiles.debtMinorFor(req.shopId) });
 });
 
 router.get('/', async (req, res) => {

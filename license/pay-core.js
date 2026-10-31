@@ -534,7 +534,8 @@
       if (v !== 0) review = true;
       if (Math.abs(v) > s.threshold) over = true;
     });
-    if (over && !op.reason) return op.blind ? fail('REASON_REQUIRED') : fail('REASON_REQUIRED', { variance: variance });
+    /* ⛔ شمارشِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (ردِ «بالای آستانه» پیشگوی موردِ انتظار بود)؛ needsReview برای مدیر */
+    if (over && !op.reason && !op.blind) return fail('REASON_REQUIRED', { variance: variance });
 
     rep.counted = counted;
     rep.denominations = op.counts;
@@ -556,13 +557,7 @@
     return { ok: true, report: s.z };
   }
 
-  /* شمارشِ کور: صندوقدار نه مبلغِ مورد انتظار را می‌بیند نه اختلاف را */
-  function cashierView(report) {
-    var out = {};
-    for (var k in report) if (has(report, k)) out[k] = report[k];
-    if (report.blind) { delete out.expected; delete out.variance; }
-    return out;
-  }
+  /* شمارشِ کور: نمای شاگرد فقط در برنامه (`ShiftSlip.forViewer` ِ core)؛ «نمای صندوقدار» ِ نیمه‌کور این‌جا نیست */
 
   return {
     ACCOUNT: ACCOUNT,
@@ -587,6 +582,5 @@
     xReport: xReport,
     closeShift: closeShift,
     zReport: zReport,
-    cashierView: cashierView,
   };
 });

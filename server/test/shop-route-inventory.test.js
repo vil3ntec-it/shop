@@ -190,7 +190,10 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend'];
+//  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
+FLAGS.push('shop.orders.picking');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -280,6 +283,13 @@ async function seedShop(a) {
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
+  //  «خبرم کن» ِ مشتریِ بیرون از محدوده (CHK-10) — ردیفِ واقعیِ «الف»
+  ids.areaRequest = newId('area');
+  await query(
+    `INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
+     VALUES ($1,$2,'+93791234568',34.62,69.31,$3,$3)`,
+    [ids.areaRequest, a.shopId, now()]
+  );
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -294,6 +304,18 @@ async function seedShop(a) {
   });
   ids.notify = (await one('SELECT id FROM order_notify_outbox WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [a.shopId]))?.id;
   assert.ok(ids.notify, 'ردیفِ اعلانِ سفارشِ الف');
+
+  //  ORD-14: ویرایشِ سفارشِ تلفنیِ دیگرِ «الف» با رضایتِ ثبت‌شده ⇒ شناسهٔ واقعیِ پیشنهاد
+  const amendable = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', customer: { name: 'مشتریِ ویرایش', phone: '0791234567' },
+    lines: [{ name: 'برنج', qtyMilli: 2000, unitPriceMinor: 5000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend-order') } });
+  assert.equal(amendable.status, 201, JSON.stringify(amendable.body));
+  const am = await h.post(`/api/shop/orders/${amendable.body.order.id}/amendments`,
+    { changes: [{ lineNo: 1, qtyMilli: 1000 }], consent: { via: 'phone' } },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend') } });
+  assert.equal(am.status, 201, JSON.stringify(am.body));
+  ids.amend = am.body.amendment.id;
 
   //  سفارشِ تلفنیِ تحویلی ⇒ مأموریتِ پیک ⇒ عکس ⇒ تحویل ⇒ تسویه
   const TOTAL = 1_240_000;
@@ -310,6 +332,53 @@ async function seedShop(a) {
     const t = await h.post(`/api/shop/orders/${ids.order}/transition`, { to }, { token: a.accessToken });
     assert.equal(t.status, 200, `${to}: ${JSON.stringify(t.body)}`);
   }
+  //  جمع‌آوری (PCK): سفارشِ دیگرِ «الف» ⇒ برگه ⇒ «پیدا نکردم» ⇒ وظیفهٔ بررسی
+  const po = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'رحیم' },
+    lines: [{ productId: ids.product, name: 'کالای الف', qtyMilli: 1000, unitPriceMinor: 5000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('pick-order') } });
+  assert.equal(po.status, 201, JSON.stringify(po.body));
+  assert.equal((await h.post(`/api/shop/orders/${po.body.order.id}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+  assert.equal((await h.post(`/api/shop/orders/${po.body.order.id}/pick/start`, {}, { token: a.accessToken })).status, 201);
+  const nf = await h.post(`/api/shop/orders/${po.body.order.id}/pick/events`,
+    { events: [{ eventId: fresh('pick-ev'), lineNo: 1, type: 'not_found' }] }, { token: a.accessToken });
+  assert.equal(nf.body.results?.[0]?.status, 'accepted', JSON.stringify(nf.body));
+  ids.pickIssue = (await h.get('/api/shop/orders/pick/issues', { token: a.accessToken })).body.issues[0]?.id;
+  assert.ok(ids.pickIssue, 'وظیفهٔ «پیدا نکردم» ِ الف');
+  //  جمع‌آوریِ گروهی (PCK-12): دو سفارشِ قبول‌شدهٔ دیگرِ «الف» ⇒ یک دسته
+  const bo = [];
+  for (let i = 0; i < 2; i++) {
+    const r = await h.post('/api/shop/orders', {
+      source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: `دسته ${i}` },
+      lines: [{ productId: ids.product, name: 'کالای الف', qtyMilli: 1000, unitPriceMinor: 5000 }],
+    }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('batch-order') } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    assert.equal((await h.post(`/api/shop/orders/${r.body.order.id}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+    bo.push(r.body.order.id);
+  }
+  const bt = await h.post('/api/shop/orders/pick/batches', { orderIds: bo }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('batch') } });
+  assert.equal(bt.status, 201, JSON.stringify(bt.body));
+  ids.pickBatch = bt.body.batch.batchId;
+
+  //  عکسِ مدرکِ بسته (PCK-08): سفارشِ دیگرِ «الف» با قلمِ دستی ⇒ برگه ⇒ برداشته ⇒ بسته ⇒ عکس
+  const pp = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'عکس' },
+    lines: [{ name: 'کیسهٔ دستی', qtyMilli: 1000, unitPriceMinor: 1000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('photo-order') } });
+  assert.equal(pp.status, 201, JSON.stringify(pp.body));
+  ids.pickPhotoOrder = pp.body.order.id;
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/start`, {}, { token: a.accessToken })).status, 201);
+  const pk = await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/events`,
+    { events: [{ eventId: fresh('pick-ev'), lineNo: 1, type: 'pick', qtyMilli: 1000 }] }, { token: a.accessToken });
+  assert.equal(pk.body.results?.[0]?.status, 'accepted', JSON.stringify(pk.body));
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/pack`, { bags: 1 },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('pick-pack') } })).status, 200);
+  const pph = await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/photos`,
+    { eventId: fresh('pick-photo'), parcelOnly: true, imageBase64: F.jpeg(320, 240, { seed: 41 }).toString('base64') }, { token: a.accessToken });
+  assert.equal(pph.status, 201, JSON.stringify(pph.body));
+  ids.pickPhoto = pph.body.photo.id;
+
   const courier = await courierOf(a, 'پیکِ الف');
   ids.courier = courier.id;
   const asg = await h.post(`/api/shop/delivery/orders/${ids.order}/assign`,
@@ -395,8 +464,15 @@ function concreteFor(ids) {
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
+    [/(\/pick\/issues\/):issueId/, ids.pickIssue],
+    [/(\/pick\/locations\/):productId/, ids.product],
+    [/(\/pick\/products\/):productId/, ids.product],
+    [/(\/pick\/batches\/):batchId/, ids.pickBatch],
+    [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
+    [/(\/amendments\/):amendId/, ids.amend],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
@@ -416,7 +492,10 @@ function concreteFor(ids) {
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
-  const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
+  const QUERY = {
+    'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all',
+    'GET /shop/orders/:id/pick/substitutes': '?lineNo=1',
+  };
   return (r) => {
     let p = r.path;
     for (const [re, v] of rules) p = p.replace(re, `$1${v}`);
@@ -431,10 +510,25 @@ function bodyFor(r, ids) {
   const B = {
     'POST /shop/orders/:id/transition': { to: 'accepted' },
     'POST /shop/orders/:id/refunds': { amountMinor: 1000, reason: 'other', note: 'آزمون', method: 'cash' },
+    'POST /shop/orders/:id/pick/events': { events: [{ eventId: fresh('pev'), lineNo: 1, type: 'not_found' }] },
+    'POST /shop/orders/:id/pick/pack': { bags: 1 },
+    'POST /shop/orders/pick/issues/:issueId/resolve': { action: 'resolved', note: 'آزمون' },
+    'PUT /shop/orders/pick/locations/:productId': { aisle: '1' },
+    //  جایگزینی (PCK-05/06)
+    'PUT /shop/orders/pick/products/:productId': { halal: 'halal' },
+    'POST /shop/orders/:id/pick/substitutions': { eventId: fresh('psub'), lineNo: 1, productId: ids.product },
+    'POST /shop/orders/:id/pick/substitutions/decide': { substitutionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
+    //  قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12)
+    'POST /shop/orders/pick/shelf/scan': { qr: 'VLNB-1-1-1', slot: 'A1' },
+    'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },
+    //  عکسِ مدرکِ بسته (PCK-08)
+    'POST /shop/orders/:id/pick/photos': { eventId: fresh('pphoto'), parcelOnly: true, imageBase64: F.jpeg(200, 150, { seed: 6 }).toString('base64') },
+    'POST /shop/orders/:id/amendments': { changes: [{ lineNo: 1, qtyMilli: 500 }], consent: { via: 'phone' } },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
     'POST /shop/delivery/assignments/:id/recall': { reason: 'other', note: 'آزمون' },
+    'POST /shop/delivery/assignments/:id/address': { address: { landmark: 'آزمون', area: 'ناحیه', gateColor: 'سبز' } },
     'POST /shop/delivery/couriers/:id/settlements': { assignmentIds: [ids.assignment], handedOverMinor: 1, receivedMinor: 1 },
     'PUT /shop/chat/conversations/:id/status': { status: 'closed' },
     'POST /shop/chat/conversations/:id/messages': { clientId: `client-${fresh('x')}-0000`, body: 'سلام' },
