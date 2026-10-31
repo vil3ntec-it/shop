@@ -54,6 +54,7 @@ object DeliveryWire {
         settle = bool(perms, "settle"),
         photo = bool(perms, "photo"),
       ),
+      picking = bool(o, "picking"),
     )
   }
 

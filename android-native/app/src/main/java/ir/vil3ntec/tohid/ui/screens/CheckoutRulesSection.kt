@@ -36,6 +36,7 @@ internal fun CheckoutRulesSection(rules: CheckoutRules, onChange: (CheckoutRules
     tint = if (rules.active) Shop.colors.primary else Shop.colors.muted,
   ) {
     Text(StrSale.checkoutRulesNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+    DeviceOnlyNote()
     Spacer(Modifier.height(8.dp))
     Text(StrSale.zeroTotalRule, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
     SegmentedChoice(
@@ -57,6 +58,18 @@ internal fun CheckoutRulesSection(rules: CheckoutRules, onChange: (CheckoutRules
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
     )
   }
+}
+
+/** خطِ «فقط روی همین دستگاه» کنارِ تنظیم‌هایی که سرور نمی‌سنجد (قاعده‌های پایانِ فاکتور، سقفِ اعتبار) */
+@Composable
+internal fun DeviceOnlyNote() {
+  Spacer(Modifier.height(4.dp))
+  Text(
+    StrShell.thisDeviceOnly,
+    style = MaterialTheme.typography.labelSmall,
+    color = Shop.colors.warning,
+    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+  )
 }
 
 /** پول ⇒ نوشتهٔ افغانی برای کادر: ۱۲۳۴۵۰ ⇒ «1234.5»، ۱۰۰۰۰۰ ⇒ «1000» */

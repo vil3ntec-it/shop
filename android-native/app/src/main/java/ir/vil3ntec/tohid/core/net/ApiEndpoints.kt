@@ -84,8 +84,11 @@ object ApiEndpoints {
     fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
     /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
     const val LIVE_PATH = "/api/sync/v1/live"
-    /** بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. */
-    const val LIVE_TICKET_PATH = "/api/sync/v1/live/ticket"
+    /**
+     *  بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. نسبت به
+     *  پیشوندِ API و از راهِ `ApiClient`، تا توکنِ پیر (۴۰۱) خودکار تازه شود (S78).
+     */
+    const val LIVE_TICKET = "/sync/v1/live/ticket"
   }
 
   /* ------------------------------ لوکیشن ------------------------------ */
@@ -110,6 +113,9 @@ object ApiEndpoints {
     const val SUBSCRIPTION = "/me/subscription"
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
+
+    /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
+    const val PHONE_CODE = "/me/phone/code"
 
     /**
      *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.

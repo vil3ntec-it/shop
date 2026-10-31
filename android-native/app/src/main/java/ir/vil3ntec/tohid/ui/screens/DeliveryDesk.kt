@@ -391,7 +391,7 @@ private fun ColumnScope.AssignTab(
       )
     }
   }
-  shownCode?.let { (no, code) -> CodeOnceDialog(no, code) { shownCode = null } }
+  shownCode?.let { (no, code) -> CodeOnceDialog(no, code, qr = cfg.picking) { shownCode = null } }
 }
 
 internal fun missionWho(m: Mission, d: DeskData): String = when (m.mode) {

@@ -55,6 +55,8 @@ router.get('/config', async (req, res) => {
     modes: { shop_courier: true, external: true, pickup: true, platform: false },
     reasons: D.REASONS,
     defaultCashCapMinor: delivery.DEFAULT_CASH_CAP_MINOR,
+    //  PCK-11: QRِ کدِ تحویل و پذیرشِ اسکنِ آن در برنامه — پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    picking: await require('../lib/order-picking').flagOf(req.shopId),
     permissions: Object.fromEntries(
       ['view', 'assign', 'handover', 'couriers', 'settle', 'photo'].map((k) => [k, can(req.role, `delivery.${k}`)])
     ),
