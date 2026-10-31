@@ -414,6 +414,8 @@
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.storefront.recent` | دکان / `all` | خاموش | کلیدِ `recent: true` در `GET /api/store/:slug` ⇒ ویترین `store/recent.js` را دیر بار می‌کند و «دیده‌شده‌های اخیر» را فقط روی دستگاه نگه می‌دارد (WEB-13، همزادِ `core/product/RecentlyViewed`)؛ خاموش ⇒ کلید نیست و recent.js بار نمی‌شود | `claude/new-web-2` | باز |
+| `shop.storefront.favorites` | دکان / `all` | خاموش | `/api/store/:slug/account/favorites*` (خاموش ⇒ ۴۰۴ `favorites_disabled`، بی نوشتن) — WEB-11، `lib/storefront-extras.js` | `claude/new-web-3` | باز |
+| `shop.storefront.banners` | دکان / `all` | خاموش | `/api/shop/storefront/banners` (خاموش ⇒ ۴۰۳ `banners_disabled`) و `/api/store/:slug/banners` (۴۰۴) — WEB-24 | `claude/new-web-3` | باز |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.delivery_map` | دکان / `all` | خاموش | DLV-05: `navigation` در کارتِ `/api/courier/missions` و `GET /api/courier/map`، `GET /api/courier/map/:id` (خاموش ⇒ ۴۰۴ `delivery_map_disabled`)؛ با `shop.delivery` | `claude/new-dlv-1` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
@@ -461,6 +463,7 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
+- ۱۸۰ (`store_customer_favorites` و `storefront_banners`، WEB-11 و WEB-24، `claude/new-web-3`؛ ۱۴۰۵/۰۸/۱۰ پس از سنجشِ main و همهٔ شاخه‌ها).
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۹ (پرداختِ حساب‌پی `payment_intents`/`payment_events`، PAY-21، `claude/payments-hesabpay-1`). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05)، ۱۳۲ (S5 نمای پیک برای مشتری، `claude/market-s5-courier-view`؛ نخست ۱۲۴ بود و به سهمِ هماهنگ‌کننده جابه‌جا شد، چون ۱۲۴ از آنِ `claude/market-s7-s8-load` است). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.
 - ۱۷۶: «خبرم کن» ِ بیرونِ محدوده `storefront_area_requests` (CHK-10، `claude/part-chk-2`)؛ ۱۷۴ از آنِ `claude/part-chk-1` (#628) و ۱۷۵ از آنِ `claude/new-rpt-2` است.
