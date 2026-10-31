@@ -189,10 +189,12 @@ fun DeskSaleScreen(
   //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`
   ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.load(context)
   val smartSearch = ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.on.value
-  val searchIndex = remember(d.products, smartSearch) { if (smartSearch) PosCatalog.searchIndex(d.products) else null }
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نام‌های دیگر و واژه‌های جست‌وجو هم؛ خاموش ⇒ همان دو راهِ پیشین
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val searchIndex = remember(d.products, smartSearch, infoSearch) { if (smartSearch) PosCatalog.searchIndex(d.products, infoSearch) else null }
   val byId = remember(d.products) { d.products.associateBy { it.id } }
-  val matches: List<Product> = remember(term, d.products, searchIndex) {
-    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term)
+  val matches: List<Product> = remember(term, d.products, searchIndex, infoSearch) {
+    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term, infoSearch)
   }
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }

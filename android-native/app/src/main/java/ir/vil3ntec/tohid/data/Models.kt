@@ -50,6 +50,35 @@ data class Product(
    */
   val saleUnit: String = "",
   val unitFactor: Double = 1.0,
+  /**
+   *  PRD-02 — نامِ پشتو و انگلیسی (نامِ دری همان [name])، مترادف‌ها (نام‌های دیگرِ همین کالا) و
+   *  واژه‌های جست‌وجو؛ PRD-26 — محلِ قفسه (راهرو، قفسه، طبقه) برای جمع‌آوریِ سفارش.
+   *  شکلِ تمیز و جورِ جست‌وجو: `core/product/ProductInfo` (و `ProductInfoMap`). خالی ⇒ `null` و
+   *  **نوشته نمی‌شود**، پس ردیفِ کالایی که این‌ها را ندارد بایت‌به‌بایت همان پیشین است. فرم و
+   *  جست‌وجو فقط با تنظیمِ همین دستگاه (`ProductInfoPrefs`، پیش‌فرض خاموش)؛ ویرایشِ بی آن فرم
+   *  این فیلدها را دست نمی‌زند (`ProductDraft.info = null`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val namePs: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val nameEn: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val synonyms: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val keywords: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val aisle: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val shelf: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val shelfLevel: String? = null,
 )
 
 @Serializable

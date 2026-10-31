@@ -49,6 +49,8 @@ data class ProductFormState(
   val active: Boolean = true,
   val saleUnit: String = "",
   val unitFactor: String = "",
+  /** PRD-02/PRD-26 — فقط با `productInfoOn()` دیده و ذخیره می‌شود */
+  val info: ir.vil3ntec.tohid.ui.components.product.ProductInfoForm = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm(),
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -65,6 +67,7 @@ data class ProductFormState(
       active = p.active,
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
+      info = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -81,6 +84,8 @@ fun ProductDialog(
   onSave: (WarehouseEngine.ProductDraft) -> Unit,
 ) {
   var form by remember(state.editingId, state.barcode) { mutableStateOf(state) }
+  //  PRD-02/PRD-26: خاموش ⇒ همان فرمِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -181,6 +186,11 @@ fun ProductDialog(
           )
         }
 
+        if (infoOn) {
+          Spacer(Modifier.height(14.dp))
+          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info) { form = form.copy(info = it) }
+        }
+
         if (d.suppliers.isNotEmpty()) {
           Spacer(Modifier.height(14.dp))
           val names = d.suppliers.map { it.name }
@@ -225,6 +235,7 @@ fun ProductDialog(
                   saleUnit = form.saleUnit,
                   //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
                   unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
+                  info = if (infoOn) form.info.toInfo() else null,
                 )
               )
             },

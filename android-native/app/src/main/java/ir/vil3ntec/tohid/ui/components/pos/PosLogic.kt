@@ -42,22 +42,28 @@ object PosCatalog {
    *  بارکد (رقمِ فارسی و لاتین یکی)، نامِ آغازشونده با عبارت اول. پیش‌تر
    *  فقط ۹ تای اول در فهرستِ کشویی می‌آمد؛ حالا همه در شبکه دیده می‌شوند و
    *  نخستینِ فهرست همان نخستینِ پیشین است.
+   *
+   *  `extra` (PRD-02، پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ
+   *  جست‌وجو هم (`ProductInfoMap.matches`)؛ ترتیب همان: آغازِ نامِ دری، سپس نام.
    */
-  fun matches(products: List<Product>, term: String): List<Product> =
+  fun matches(products: List<Product>, term: String, extra: Boolean = false): List<Product> =
     if (term.isEmpty()) emptyList()
     else products.asSequence()
       .filter { it.active }
-      .filter { p -> p.name.contains(term, ignoreCase = true) || CartQuery.barcodeStarts(p.barcodes, term) }
+      .filter { p ->
+        p.name.contains(term, ignoreCase = true) || CartQuery.barcodeStarts(p.barcodes, term) ||
+          (extra && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term))
+      }
       .sortedWith(compareBy({ !it.name.startsWith(term, ignoreCase = true) }, { it.name }))
       .toList()
 
   /**
    *  POS-04 — نمایهٔ جست‌وجوی مقاوم (`CatalogMatch`، هستهٔ `TextNormalizer`) از کالاهای فعال؛
-   *  یک بار با هر تغییرِ کالاها، نه با هر حرف.
+   *  یک بار با هر تغییرِ کالاها، نه با هر حرف. `extra` (PRD-02): نام‌های دیگر و واژه‌های جست‌وجو هم.
    */
-  fun searchIndex(products: List<Product>): ir.vil3ntec.tohid.core.text.CatalogMatch.Index =
+  fun searchIndex(products: List<Product>, extra: Boolean = false): ir.vil3ntec.tohid.core.text.CatalogMatch.Index =
     ir.vil3ntec.tohid.core.text.CatalogMatch.index(
-      products.filter { it.active }.map { ir.vil3ntec.tohid.core.text.CatalogMatch.Item(it.id, it.name, it.barcodes) },
+      products.filter { it.active }.map { ir.vil3ntec.tohid.data.ProductInfoMap.searchItem(it, extra) },
     )
 
   /**
@@ -78,8 +84,8 @@ object PosCatalog {
    *  تا Enter همان کالایی را بردارد که پیش از این برمی‌داشت (دستهٔ انتخابی
    *  جست‌وجو را تنگ نمی‌کند).
    */
-  fun shown(products: List<Product>, category: String?, term: String): List<Product> =
-    if (term.isNotEmpty()) matches(products, term) else byCategory(products, category)
+  fun shown(products: List<Product>, category: String?, term: String, extra: Boolean = false): List<Product> =
+    if (term.isNotEmpty()) matches(products, term, extra) else byCategory(products, category)
 }
 
 /** نتیجهٔ Enter در کادرِ صندوق */
