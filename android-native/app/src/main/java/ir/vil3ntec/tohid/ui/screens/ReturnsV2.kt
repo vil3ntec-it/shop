@@ -75,6 +75,7 @@ object ReturnApproval {
       ReturnFlow.WHY_NO_RECEIPT -> "بی رسید"
       ReturnFlow.WHY_DAMAGED -> "ضایعات"
       ReturnFlow.WHY_OVER_LIMIT -> "بالای سقف"
+      ReturnFlow.WHY_POLICY -> ir.vil3ntec.tohid.core.i18n.StrRetPolicy.why
       else -> "مجوز"
     }
   }
@@ -113,6 +114,8 @@ fun ReturnFlowDialog(
   val limit = remember { ReturnSettings.limit(context) }
   //  RET-08 — فهرستِ دلیل‌های همین دکان (تنظیمات)؛ ثبت فقط با یکی از همین‌ها
   val reasons = remember { ReturnSettings.reasons(context) }
+  //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
+  val policy = remember { ir.vil3ntec.tohid.data.ReturnPolicyPrefs.of(context) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { newId() }
@@ -144,8 +147,11 @@ fun ReturnFlowDialog(
   //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
   val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
   val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
+  val verdict = remember(q, policy) {
+    q?.let { ReturnFlow.policyCheck(d, sale, it.lines, policy, todayIso()) } ?: ir.vil3ntec.tohid.core.returns.ReturnPolicy.Verdict()
+  }
   //  RET-10: سقفِ دستگاه هم مثلِ سقفِ نقش تجمعیِ هر فاکتور است — چند سندِ زیرِ سقف یک برگشتِ بزرگ نمی‌سازند
-  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit), priorMinor)
+  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit), priorMinor, policyBreach = !verdict.ok)
   //  تأیید مالِ همان مبلغ و همان دلیل‌هاست: مقدار، ضایعات یا سقف که عوض شد، تأییدِ پیشین کنار می‌رود
   //  (وگرنه «تأیید شد» می‌ماند و دکمهٔ «درخواستِ تأیید» پنهان، ولی `post` با APPROVAL_REQUIRED رد می‌کرد)
   var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }
@@ -293,6 +299,9 @@ fun ReturnFlowDialog(
               val due = cartTotal - (split?.cash ?: 0.0)
               MoneyLine(if (due >= 0) "دریافت از مشتری" else "پرداخت به مشتری", kotlin.math.abs(due), strong = true)
             }
+            ReturnPolicyNotice(
+              verdict, policy, verdict.blockedIds.map { id -> d.products.find { it.id == id }?.name ?: id }, ReturnFlow.roleOf(role) == "staff",
+            )
             if (gate.decision != "allow") {
               Spacer(Modifier.height(8.dp))
               val tone = if (gate.decision == "deny") PillTone.DANGER else if (approved) PillTone.SUCCESS else PillTone.WARNING
@@ -334,7 +343,7 @@ fun ReturnFlowDialog(
                   picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
                   free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
                   reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
-                  by = me, role = role, perm = perm, limit = limit, approval = approval,
+                  by = me, role = role, perm = perm, limit = limit, approval = approval, policy = policy,
                 )
                 val now = System.currentTimeMillis()
                 //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
@@ -517,6 +526,8 @@ fun ReturnSettingsSection() {
         minLines = 3,
         modifier = Modifier.fillMaxWidth(),
       )
+      //  RET-09 — مهلت و اقلامِ غیرقابلِ برگشت (پیش‌فرض خالی = بی سیاست)
+      ReturnPolicySettingsWired(context)
     }
   }
 }
