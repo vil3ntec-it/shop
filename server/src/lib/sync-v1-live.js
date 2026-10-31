@@ -32,7 +32,13 @@
  *      خبر (hello، changed، relay) سنجش با حافظهٔ حداکثر ۵ ثانیه — اگر
  *      لایهٔ ۱ جایی جا ماند، سوکت حداکثر چند ثانیه بعد باز هم بسته است.
  *   ۳) سرِ انقضای توکن، سوکت بسته می‌شود؛ برنامه از راهِ همیشگی (بلیت با
- *      توکنِ تازه‌شده) برمی‌گردد.
+ *      توکنِ تازه‌شده) برمی‌گردد. ⚠️ **فقط برای کلاینتی که می‌تواند**: برنامه با
+ *      `&caps=expiry` در نشانیِ سوکت اعلام می‌کند (`LiveSocket.kt`، `license/sync-engine.js`
+ *      از S78)، یا پرچمِ `sync.live_expiry_close` (پیش‌فرض خاموش؛ `all` یا همان دکان/پمپ)
+ *      برای همه روشنش می‌کند. برنامه‌های کهنهٔ نصب‌شده پاسخِ بستن نمی‌دهند و تا یک دقیقه
+ *      بیرونِ اتاق می‌ماندند (اسکنِ گوشی به صندوق گم می‌شد)، پس برای آن‌ها پیر شدنِ توکن به‌تنهایی
+ *      — مثلِ پیش از S78 — دلیلِ بستن نیست؛ باطل‌شدن، کاربر/دستگاهِ بسته و عضویت/نقش همچنان
+ *      در لایه‌های ۱ و ۲ سنجیده می‌شوند (حتی پس از پاک شدنِ ردیفِ توکنِ پیر).
  *   تورِ ایمنی (TEN-02، #534): `dropRevoked` در هر تپشِ ۳۰ثانیه‌ای هشِ توکنِ
  *      همهٔ سوکت‌های کاربری را یک‌جا می‌سنجد — سوکتِ بی‌کارِ نشستِ باطل هم می‌رود.
  * کدهای بستن (کلاینت‌ها در هر حالت با فاصلهٔ فزاینده دوباره وصل می‌شوند):
@@ -47,7 +53,7 @@
  */
 const crypto = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
-const { resolveToken, appAlias } = require('./sync-v1-auth');
+const { resolveToken, resolveSession, contextOfRow, appAlias } = require('./sync-v1-auth');
 
 const PATHS = ['/sync/live', '/api/sync/live', '/api/sync/v1/live', '/api/v1/sync/v1/live'];
 const PING_MS = 30_000;
@@ -138,6 +144,42 @@ function expiredNow(s) {
   return exp > 0 && Date.now() > exp;
 }
 
+/** پرچمِ `sync.live_expiry_close`: مقدارِ خودِ دکان/پمپ بر `all` جلو می‌افتد؛ فقط `true` روشن است */
+const EXPIRY_FLAG = 'sync.live_expiry_close';
+async function expiryForced(accountId) {
+  const rows = await require('../db').many(
+    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
+    [EXPIRY_FLAG, 'all', String(accountId || '')]
+  );
+  const decode = (x) => { try { return JSON.parse(x); } catch { return null; } };
+  let v;
+  for (const r of rows) if (r.scope === 'all') v = decode(r.value);
+  for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
+  return v === true;
+}
+
+/**
+ * بافتِ امروزِ سوکت. همان `resolveToken` ِ درهای HTTP — جز برای برنامهٔ کهنه (بی `caps=expiry` و
+ * بی پرچم) با توکنِ پیر: آن‌جا پیری دلیلِ بستن نیست، پس فقط «باطل شد؟» از ردیفِ توکن (اگر هنوز
+ * پاک نشده) و کاربر/دستگاه/عضویت/نقش از ردیفِ لحظهٔ وصل (`contextOfRow`).
+ */
+async function currentCtx(ws) {
+  const s = ws.sync;
+  if (s.expiryClose || !s.row || !expiredNow(s)) return resolveToken(secrets.get(ws) || '');
+  const { one: first } = require('../db');
+  const r = s.row;
+  const t = await first('SELECT revoked_at FROM tokens WHERE token_hash=$1', [s.tokenHash]);
+  if (t && t.revoked_at) return null;
+  //  خودِ نشست هنوز زنده است؟ همان دستگاه (بی شناسهٔ دستگاه: همان کس در همان بخش) دست‌کم یک توکنِ
+  //  باطل‌نشده و پیرنشده دارد — خروج، خروج از همه و بیرون‌کردنِ دستگاه همه را باطل می‌کنند، حتی وقتی
+  //  ردیفِ توکنِ پیرِ خودِ سوکت پاک شده (`pruneExpired`) یا خروج با توکنِ تازه‌تری زده شده
+  const args = [r.subject_id, r.app || 'shop', Date.now()];
+  let sql = `SELECT 1 FROM tokens WHERE subject_id=$1 AND COALESCE(app,'shop')=$2 AND revoked_at IS NULL AND expires_at > $3`;
+  if (r.device_id) { args.push(r.device_id); sql += ` AND device_id=$${args.length}`; }
+  if (!await first(`${sql} LIMIT 1`, args)) return null;
+  return contextOfRow(r);
+}
+
 /** از اتاق و فهرست بیرون — بعد از این هیچ خبری به این سوکت نمی‌رسد */
 function forget(ws) {
   const s = ws.sync;
@@ -161,7 +203,7 @@ function kill(ws, why) {
 }
 
 /**
- * سنجشِ دوبارهٔ یک سوکت با توکنِ خودش (همان `resolveToken`ِ درهای HTTP).
+ * سنجشِ دوبارهٔ یک سوکت با توکنِ خودش (`currentCtx`: همان `resolveToken`ِ درهای HTTP).
  * سنجش‌های هم‌زمانِ یک «نسل» یکی می‌شوند. ناجور ⇒ بسته (4401/4403)؛
  * خطا ⇒ بسته (1011). هرگز رد نمی‌شود (reject).
  */
@@ -172,9 +214,9 @@ function check(ws) {
   const gen = s.gen;
   const p = (async () => {
     let now = null;
-    try { now = await resolveToken(secrets.get(ws) || ''); } catch { kill(ws, CLOSE.failed); return false; }
+    try { now = await currentCtx(ws); } catch { kill(ws, CLOSE.failed); return false; }
     if (s.dead) return false;
-    if (!now) { kill(ws, expiredNow(s) ? CLOSE.expired : CLOSE.revoked); return false; }
+    if (!now) { kill(ws, s.expiryClose && expiredNow(s) ? CLOSE.expired : CLOSE.revoked); return false; }
     if (!sameAccess(s.ctx, now)) { kill(ws, CLOSE.changed); return false; }
     //  نتیجه‌ای که پیش از یک «دسترسی عوض شد» شروع شده بود، حافظه نمی‌شود
     if (gen === s.gen) { s.okGen = gen; s.okUntil = Date.now() + RECHECK_MS; }
@@ -213,14 +255,15 @@ function deliver(ws, payload) {
 }
 
 /**
- * لایهٔ ۳: سرِ انقضای توکن بسته شود (4403) — همان قاعدهٔ درهای HTTP (توکنِ پیر ۴۰۱).
+ * لایهٔ ۳: سرِ انقضای توکن بسته شود (4403) — همان قاعدهٔ درهای HTTP (توکنِ پیر ۴۰۱) — فقط
+ * برای سوکتی که `expiryClose` دارد (`caps=expiry` یا پرچمِ `sync.live_expiry_close`).
  * کلاینت‌های این ریپو (`LiveSocket.kt`، `license/sync-engine.js`) پس از آن با توکنِ تازه برمی‌گردند.
- * ⚠️ کلاینت‌های پمپ در ریپوی دیگرند و رفتارشان پس از 4403 این‌جا سنجیده نشده.
+ * ⚠️ کلاینت‌های پمپ در ریپوی دیگرند؛ تا `caps=expiry` نفرستند، رفتارشان همان پیش از S78 است.
  */
 function armExpiry(ws) {
   const s = ws.sync;
   const exp = Number(s.ctx.expiresAt) || 0;
-  if (!exp || s.dead) return;
+  if (!exp || s.dead || !s.expiryClose) return;
   const left = exp - Date.now();
   if (left <= 0) { kill(ws, CLOSE.expired); return; }
   s.expiry = setTimeout(() => {
@@ -230,10 +273,18 @@ function armExpiry(ws) {
   if (s.expiry.unref) s.expiry.unref();
 }
 
-function join(ctx, ws, deviceId, token, seenEpoch) {
+/**
+ * @param {{row?: object|null, expiryClose?: boolean}} [opt] ردیفِ توکن در لحظهٔ وصل (برای سنجشِ
+ *        برنامهٔ کهنه پس از پیری) و اینکه لایهٔ ۳ برای این سوکت روشن است یا نه
+ */
+function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = false } = {}) {
   const key = roomKey(ctx);
   const s = {
-    key, deviceId, ctx,
+    key, deviceId, ctx, expiryClose: !!expiryClose,
+    row: row ? {
+      subject_id: row.subject_id, device_id: row.device_id || null, app: row.app || 'shop',
+      scope: row.scope || null, shop_id: row.shop_id || null, expires_at: row.expires_at,
+    } : null,
     //  برای سنجشِ دسته‌ایِ تپش (`dropRevoked`)؛ کامپیوترِ پمپ توکنِ کاربری ندارد
     tokenHash: ctx.via === 'user' ? require('./tokens').hashToken(token) : '',
     //  همین الان با `resolveToken` سنجیده شد
@@ -408,13 +459,17 @@ function attach(server) {
     const token = ticket != null ? takeTicket(ticket)
       : m ? m[1].trim() : (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
+    //  S78: کلاینتی که پس از 4403 با توکنِ تازه برمی‌گردد، `caps=expiry` می‌فرستد
+    const caps = String(url.searchParams.get('caps') || '').slice(0, 64).split(',').map((c) => c.trim());
     const seen = epoch;
 
-    resolveToken(token).then((ctx) => {
+    resolveSession(token).then(async (out) => {
+      const ctx = out && out.ctx;
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);
       if (claimed && claimed !== ctx.app) return reject(socket, 403, 'Forbidden');
-      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, token, seen));
+      const expiryClose = caps.includes('expiry') || await expiryForced(ctx.accountId);
+      wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, token, seen, { row: out.row, expiryClose }));
     }).catch(() => reject(socket, 500, 'Internal Server Error'));
   });
 
@@ -468,5 +523,5 @@ async function dropRevoked(wss) {
 
 module.exports = {
   attach, broadcast, relay, listeners, roomKey, issueTicket, accessChanged, dropRevoked,
-  PATHS, PING_MS, RELAY_EVENTS, TICKET_MS, RECHECK_MS, CLOSE,
+  PATHS, PING_MS, RELAY_EVENTS, TICKET_MS, RECHECK_MS, CLOSE, EXPIRY_FLAG,
 };

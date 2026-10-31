@@ -506,6 +506,8 @@
       u.searchParams.set(cred[0], cred[1]);
       u.searchParams.set('device_id', acc.deviceId());
       u.searchParams.set('app', acc.appId());
+      //  S78: این نسخه پس از 4403 (انقضای توکن) با توکنِ تازه برمی‌گردد ⇒ سرور سرِ موعد می‌بندد
+      u.searchParams.set('caps', 'expiry');
       url = u.toString();
     } catch (e) { return; }
 

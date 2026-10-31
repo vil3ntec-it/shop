@@ -6,7 +6,8 @@
  *   ۱) `accessChanged` — بستنِ سوکت در **همان درخواستِ** لغو (برداشتن، تغییرِ نقش، خروج، …)
  *   ۲) سنجشِ دوباره پیش از هر پیامِ اثرگذار («scan») و پیش از هر خبر («changed»)، حافظهٔ ≤ ۵ ثانیه
  *      — این‌جا ۲۰۰ میلی‌ثانیه تا آزمون منتظر نماند (`SYNC_LIVE_RECHECK_MS`)
- *   ۳) بستن سرِ انقضای توکن (4403)
+ *   ۳) بستن سرِ انقضای توکن (4403) — فقط برای کلاینتی که `caps=expiry` می‌فرستد یا با پرچمِ
+ *      `sync.live_expiry_close`؛ برنامهٔ کهنه پس از پیری باز می‌ماند ولی لغو هنوز می‌بندد
  * و تورِ ایمنیِ تپش (`dropRevoked`، TEN-02/#534) وقتی هوک دور زده شده.
  *
  * ⛔ بی خواب برای «رسیدن»: هر «نرسیدن» با کنترلِ مثبت روی همان گیرنده سنجیده می‌شود.
@@ -54,15 +55,15 @@ async function shopWithStaff(label, tag) {
   };
 }
 
-/** سوکتِ زنده؛ `legacy` ⇒ راهِ برنامه‌های کهنه (`?token=`) به‌جای بلیت */
-async function socket(token, deviceId, { legacy = false } = {}) {
+/** سوکتِ زنده؛ `legacy` ⇒ راهِ برنامه‌های کهنه (`?token=`) به‌جای بلیت؛ `caps` ⇒ همان که برنامهٔ تازه می‌فرستد */
+async function socket(token, deviceId, { legacy = false, caps = '' } = {}) {
   let cred = `token=${encodeURIComponent(token)}`;
   if (!legacy) {
     const t = await h.api('POST', '/api/sync/v1/live/ticket', { token, body: {}, headers: { 'X-App': 'shop' } });
     assert.equal(t.status, 200, JSON.stringify(t.body));
     cred = `ticket=${encodeURIComponent(t.body.ticket)}`;
   }
-  const ws = new WebSocket(`${base.replace('http', 'ws')}/api/sync/v1/live?${cred}&device_id=${deviceId}&app=shop`);
+  const ws = new WebSocket(`${base.replace('http', 'ws')}/api/sync/v1/live?${cred}&device_id=${deviceId}&app=shop${caps ? `&caps=${caps}` : ''}`);
   opened.push(ws);
   ws.msgs = [];
   ws.closed = null;
@@ -167,13 +168,13 @@ test('باطل‌کردنِ یک نشست (خروج) ⇒ فقط سوکتِ هم�
   w2.close(); desk.close();
 });
 
-test('انقضای توکن ⇒ سوکت سرِ همان لحظه 4403 expired (نه پیش از آن)؛ نشستِ تازه دوباره وصل می‌شود', async () => {
+test('انقضای توکن، کلاینتِ تازه (caps=expiry) ⇒ سوکت سرِ همان لحظه 4403 expired (نه پیش از آن)؛ نشستِ تازه دوباره وصل می‌شود', async () => {
   const s = await shopWithStaff('انقضا', 'exp');
   const tok = await loginOn(s.m, 'exp-M');
   const left = 1200;
   await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
   const t0 = Date.now();
-  const ws = await socket(tok, 'exp-M');
+  const ws = await socket(tok, 'exp-M', { caps: 'expiry' });
   //  پیش از انقضا باز است و کار می‌کند
   ws.send2({ type: 'ping' });
   await ws.until(() => ws.msgs.find((x) => x.event === 'pong'), 'pong پیش از انقضا');
@@ -184,9 +185,79 @@ test('انقضای توکن ⇒ سوکت سرِ همان لحظه 4403 expired (
   //  همان توکن دیگر وصل نمی‌شود؛ نشستِ تازه (همان راهِ همیشگیِ برنامه) می‌شود
   const t = await h.api('POST', '/api/sync/v1/live/ticket', { token: tok, body: {}, headers: { 'X-App': 'shop' } });
   assert.equal(t.status, 401);
-  const fresh = await socket(await loginOn(s.m, 'exp-M'), 'exp-M');
+  const fresh = await socket(await loginOn(s.m, 'exp-M'), 'exp-M', { caps: 'expiry' });
   assert.equal(fresh.closed, null);
   fresh.close();
+});
+
+test('انقضای توکن، برنامهٔ کهنه (بی caps) ⇒ مثلِ پیش از S78 باز می‌ماند و کار می‌کند — حتی پس از پاک شدنِ ردیفِ توکن — ولی برداشتن همان لحظه می‌بندد', async () => {
+  const s = await shopWithStaff('کهنه', 'old');
+  const tok = await loginOn(s.m, 'old-M');
+  const left = 600;
+  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
+  const mWs = await socket(tok, 'old-M');
+  const desk = await socket(s.ownerDesk, 'old-D');
+  //  ⛔ این‌جا خواب لازم است: گذشتِ زمان از انقضا و از حافظهٔ سنجش (۲۰۰ms) خودِ موضوعِ آزمون است
+  await new Promise((r) => setTimeout(r, left + live.RECHECK_MS + 150));
+  assert.equal(mWs.closed, null, 'سوکتِ برنامهٔ کهنه سرِ انقضا بسته شد');
+  //  هنوز کار می‌کند: «scan» به صندوق می‌رسد و «changed» می‌گیرد (هر دو پس از سنجشِ تازهٔ لایهٔ ۲)
+  mWs.send2({ type: 'relay', event: 'scan', code: 'OLD-AFTER-EXPIRY', pair: '' });
+  await desk.until(() => desk.msgs.find((x) => x.code === 'OLD-AFTER-EXPIRY'), 'اسکنِ برنامهٔ کهنه پس از انقضا');
+  await pushFrom(s.ownerPhone, 'old-A');
+  await mWs.until(() => changedCount(mWs) >= 1, '«changed» برای برنامهٔ کهنه پس از انقضا');
+  //  همان «پاک‌سازیِ توکن‌های پیر» (`pruneExpired`): نشست (توکنِ تازه‌سازیِ همان دستگاه) زنده است ⇒ باز
+  await query('DELETE FROM tokens WHERE token_hash=$1', [hashToken(tok)]);
+  await new Promise((r) => setTimeout(r, live.RECHECK_MS + 50));
+  await pushFrom(s.ownerPhone, 'old-A');
+  await mWs.until(() => changedCount(mWs) >= 2, '«changed» پس از پاک شدنِ ردیفِ توکنِ پیر');
+  assert.equal(mWs.closed, null);
+  //  لغو هنوز همان لحظه می‌بندد (لایهٔ ۱)
+  const r = await h.post(`/api/shop/members/${s.mid}/remove`, {}, { token: s.owner.accessToken });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(room(s.shopId), 1, 'سوکتِ برنامهٔ کهنهٔ عضوِ برداشته‌شده هنوز در اتاق است');
+  await mWs.until(() => mWs.closed, 'بسته نشد');
+  assert.deepEqual(mWs.closed, { code: 4401, reason: 'session_revoked' });
+  assert.equal(desk.closed, null);
+  desk.close();
+});
+
+test('برنامهٔ کهنه، توکنِ پیر و ردیفش پاک‌شده ⇒ خروجِ همان نشست (توکنِ تازه‌سازی) سوکت را همان لحظه می‌بندد', async () => {
+  const s = await shopWithStaff('خروجِ کهنه', 'oldout');
+  const login = await h.post('/api/auth/login', { identifier: s.m.email, password: s.m.password, app: 'shop', device: { deviceId: 'oldout-M', name: 'oldout-M', platform: 'test' } });
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const tok = login.body.accessToken;
+  const left = 400;
+  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
+  const mWs = await socket(tok, 'oldout-M');
+  const desk = await socket(s.ownerDesk, 'oldout-D');
+  await new Promise((r) => setTimeout(r, left + 100));
+  await query('DELETE FROM tokens WHERE token_hash=$1', [hashToken(tok)]);   //  `pruneExpired`
+  //  کنترلِ مثبت: هنوز باز و زنده
+  await pushFrom(s.ownerPhone, 'oldout-A');
+  await mWs.until(() => changedCount(mWs) >= 1, '«changed» پیش از خروج');
+  //  خروج با توکنِ تازه‌سازیِ همان دستگاه — ردیفی از توکنِ خودِ سوکت دیگر نیست تا باطل شود
+  const out = await h.post('/api/auth/logout', { refreshToken: login.body.refreshToken });
+  assert.equal(out.status, 200, JSON.stringify(out.body));
+  await mWs.until(() => mWs.closed, 'سوکتِ نشستِ خارج‌شده بسته نشد');
+  assert.deepEqual(mWs.closed, { code: 4401, reason: 'session_revoked' });
+  assert.equal(desk.closed, null);
+  desk.close();
+});
+
+test('پرچمِ sync.live_expiry_close (همین دکان) ⇒ برنامهٔ کهنه هم سرِ انقضا 4403 (بی پرچم: آزمونِ بالا)', async () => {
+  const s = await shopWithStaff('پرچم', 'flag');
+  await query(
+    `INSERT INTO live_config (scope, key, value, updated_at, updated_by) VALUES ($1, $2, 'true', $3, 'test')`,
+    [s.shopId, live.EXPIRY_FLAG, now()]
+  );
+  const tok = await loginOn(s.m, 'flag-M');
+  const left = 800;
+  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
+  const t0 = Date.now();
+  const ws = await socket(tok, 'flag-M');   //  بی caps
+  await ws.until(() => ws.closed, 'با پرچم سرِ انقضا بسته نشد', left + 4000);
+  assert.deepEqual(ws.closed, { code: 4403, reason: 'expired' });
+  assert.ok(Date.now() - t0 >= left - 50, `زودتر از انقضا بسته شد (${Date.now() - t0}ms)`);
 });
 
 test('هوکِ لغو دور زده شد (SQL ِ خام) ⇒ «scan» به صندوقِ صاحب نمی‌رسد، «changed» هم نه، و سوکت بسته می‌شود', async () => {

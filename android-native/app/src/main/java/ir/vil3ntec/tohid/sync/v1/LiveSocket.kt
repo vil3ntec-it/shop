@@ -228,5 +228,11 @@ internal object LiveCredential {
       ApiEndpoints.SyncV1.LIVE_PATH +
       "?" + cred.first + "=" + URLEncoder.encode(cred.second, "UTF-8") +
       "&device_id=" + URLEncoder.encode(device, "UTF-8") +
-      "&app=" + URLEncoder.encode(appId, "UTF-8")
+      "&app=" + URLEncoder.encode(appId, "UTF-8") +
+      //  S78: این نسخه پس از بسته‌شدنِ سرِ انقضای توکن (4403) با توکنِ تازه برمی‌گردد — پس سرور
+      //  سوکتش را سرِ موعد می‌بندد. برنامه‌ای که این را نفرستد، تا لغوِ واقعی باز می‌ماند.
+      "&caps=" + CAPS
+
+  /** توانایی‌هایی که این کلاینت به سرور اعلام می‌کند (فهرستِ جداشده با ویرگول) */
+  const val CAPS = "expiry"
 }
