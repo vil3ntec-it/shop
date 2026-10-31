@@ -16,6 +16,7 @@ const express = require('express');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const areas = require('../lib/storefront-area-requests');
+const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -109,6 +110,25 @@ router.use('/presence', (err, req, res, next) => {
     detail: { status, reason: String(err.code || '') },
     ip: clientIp(req),
   }).catch(() => {}).then(() => next(err));
+});
+
+//  ── WEB-24: بنرهای زمان‌بندی‌شده (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۳) ─────────
+const needBanners = async (req, res, next) => {
+  if (!(await extras.bannersOn(req.shopId))) return next(forbidden('بنرِ ویترین برای این دکان روشن نیست', 'banners_disabled'));
+  next();
+};
+
+router.get('/banners', requirePermission('data.read'), needFlag, needBanners, async (req, res) => {
+  res.json({ banners: await extras.banners(req.shopId), max: extras.MAX_BANNERS });
+});
+
+router.put('/banners', requirePermission('settings.write'), needFlag, needBanners, needWrite, async (req, res) => {
+  const out = await extras.saveBanners(req.shopId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.banners',
+    targetType: 'storefront', targetId: req.shopId, detail: { count: out.length }, ip: clientIp(req),
+  });
+  res.json({ banners: out, max: extras.MAX_BANNERS });
 });
 
 //  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
