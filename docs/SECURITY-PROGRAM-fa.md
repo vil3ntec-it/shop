@@ -59,13 +59,29 @@
 
 وضعیت فقط یکی از: `PASS` (با آزمون و شمارهٔ PR/اجرای CI) · `FIXED-PENDING-MERGE` · `FAIL` · `NOT-TESTED` · `BLOCKED` (با مانع) · `NOT-APPLICABLE` (با دلیل).
 
-| شناسه | وضعیت | شاهد |
+| شناسه | وضعیت (۱۴۰۵/۰۸/۱۰) | شاهد |
 |---|---|---|
-| SEC-AI-01..05 | NOT-TESTED | `claude/sec-ai-access` |
-| SEC-ART-01..05 | NOT-TESTED | `claude/sec-artifacts` |
-| SEC-SUB-01..05 | NOT-TESTED | `claude/sec-client` (SUB-10 روی main پیش‌زمینه است) |
-| TEN-01..04 | ← `docs/spec/STATUS.md` | `claude/sec-tenant`؛ #534 (TEN-02)، #507 (TEN-03) |
-| DATA-01..06 | ← `docs/spec/STATUS.md` | `claude/sec-data` |
+| SEC-AI-01 | BLOCKED — جداسازیِ واقعیِ عاملِ فرانت‌اند تصمیمِ صاحب محصول است (ریپوها عمومی‌اند) | #584 (`docs/security/ai-access-fa.md` §۴)، قراردادِ API در #583 |
+| SEC-AI-02 | FIXED-PENDING-MERGE (قاعدهٔ deny ِ ابزار) + BLOCKED (دور زدن با grep/node؛ sandbox ِ سیستم‌عامل این‌جا نیست) | #584 |
+| SEC-AI-03 | FAIL — کلیدِ امضا در هر workspace و مخزنِ عمومی | #594 (پیش‌نویس، منتظرِ «مرج کن» و چرخشِ کلید) |
+| SEC-AI-04 | FIXED-PENDING-MERGE | #595 (سایت فقط از فهرستِ مجاز) |
+| SEC-AI-05 | FIXED-PENDING-MERGE (env/printenv بسته) · لاگِ CI سالم | #584، #585 |
+| SEC-ART-01 | PASS روی APKهای منتشرشده؛ دروازهٔ همیشگیِ CI: FIXED-PENDING-MERGE | #595 |
+| SEC-ART-02 | FIXED-PENDING-MERGE (deb: ۰ یافته؛ MSI/DMG فقط در CI) | #595 |
+| SEC-ART-03 | FAIL روی سایتِ فعلی؛ رفع FIXED-PENDING-MERGE + تنظیمِ Pages (کارِ صاحب محصول) | #595 |
+| SEC-ART-04 | PASS (سرور و تاریخچه)؛ سایتِ زنده NOT-TESTED | #595 |
+| SEC-ART-05 | FAIL (رخداد: کلیدِ امضای اندروید و ادمین، کلیدِ مجوز در پایگاه) | #593، #594، server#112 |
+| SEC-SUB-01 | PASS | آزمون‌های موجودِ paid-routes و مجوز |
+| SEC-SUB-02 | PASS | #581 (`sec-sub-trial`) |
+| SEC-SUB-03 | FIXED-PENDING-MERGE (جعلِ شناسهٔ دستگاه در مجوز) | #581، #587 (`sync.device_bind`) |
+| SEC-SUB-04 | PASS | #581 (`sec-sub-replay`) |
+| SEC-SUB-05 | PASS (جز `/api/courier/*` پس از انقضا: NOT-TESTED طبقِ §۲۸.۶) | #581 |
+| TEN-01..04 | بی نشتِ میانِ دکان‌ها؛ TEN-04 PARTIAL (مجوزِ زمان‌دارِ پشتیبانی نیست) | #582، #534، #507 |
+| DATA-01..06 | DATA-04 VERIFIED (بازپرداخت)؛ بقیه PARTIAL با شاهدِ تازه | #574، #586، #591، #592، #579 |
+
+**PRهای دیگرِ این برنامه:** ورود و پنل #588 و #587 · API و وب #589 (XSSِ ذخیره‌شده، بالا) و #590 · زنجیرهٔ تأمین #578 (آسیب‌پذیریِ بحرانیِ npm) و #585 · کلاینت #580 و #581 · سوکت #515 (روی #534) · S89 #571 · ریپوی server: #107، #108، #109 (حفره‌های بحرانیِ پنل)، #112.
+
+**کارهای صاحب محصول (جمع):** تصمیمِ عمومی/خصوصی بودنِ ریپوها (پیش از خصوصی شدن، انتشارها و سایت به ریپوی جدا)؛ ساختِ کلیدِ امضای تازه و چرخشِ v3 و گذاشتنِ `TOHID_KEYSTORE_*` و `VILLAIN_ADMIN_*` در secrets؛ Pages ⇐ GitHub Actions؛ `TOHID_UPDATE_SIGNING_KEY` / `TOHID_UPDATE_PUBLIC_KEY` / `TOHID_LICENSE_PUBLIC_KEY`؛ اسکنِ secret با push protection، Dependabot، مجوزِ پیش‌فرضِ Actions = Read، Environment ِ `release`؛ روی سرورِ خانه `NODE_ENV=production`، `API_SECRET`، `OTP_SECRET`، `TRUST_PROXY_FROM`، `BACKUP_PASSPHRASE`، `BACKUP_PATH` روی دیسکِ دیگر؛ TOTP برای خودِ مالک و سپس `ADMIN_2FA_REQUIRED=1`؛ اجرای `create-admin.js` فقط به‌دستِ خودش؛ بازبینیِ `APP_BUILTIN_TOKEN` در ریپوی server (ART-F9)؛ اجرای `restore-drill` پس از ادغام.
 
 ## ۵. حفره‌هایی که پیش از این برنامه پیدا و بسته شدند (۱۴۰۵/۰۸/۰۸ و ۰۹)
 
