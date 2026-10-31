@@ -146,6 +146,7 @@
 - دفترِ حرکت فقط افزودنی است؛ هر سند شناسه، کاربر و زمان دارد؛ اصلاح، شمارش، خراب، منقضی و تعدیلِ بها دلیل هم می‌خواهند (INV-02، #231).
 - حالتِ `local` فروشِ بیش از «موجودی − منقضی − رزرو» را رد می‌کند؛ سندِ آفلاینِ ثبت‌شده (`recorded`) هرگز برای کمبود رد نمی‌شود و `reviewTask` می‌سازد (INV-19، #231).
 - کاتالوگِ واحد و رزروِ موجودیِ سرور در #263 (باز، `shop.catalog`) است؛ تا مرج، موجودی فقط در دفترِ دستگاه است.
+- بارکدِ داخلی فقط `core/product/InternalBarcode`: EAN-13 با ۲۰/۲۹، هرگز هم‌پیشوندِ قاعدهٔ معتبرِ ترازو (هم‌پوشانیِ دوطرفه)، ده رقم از SHA-256 ِ شناسهٔ کالا (یک کالا روی هر دستگاه یک کد) و یکتا با همهٔ بارکدهای دکان؛ فقط به کالای بی‌بارکد و از راهِ `WarehouseEngine.bulkUpdate` (سابقه). برچسب‌ها: ترتیب و سقف (۹۹ هر کالا، ۲۴۰ هر کار، وزنی یکی) فقط `LabelPlan`؛ A4 ِ چندبرگه `Labels.A4.sheets` با همان خانه‌بندیِ `sheet` (PRD-05/23، `claude/new-label-1`).
 
 ### v3 · گزارش
 
@@ -426,7 +427,7 @@
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
 `print_receipt_copies = 1` شمارِ نسخهٔ چاپِ خودکار (POS-35، `claude/spec-pos-b-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
-دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `label_tools` = «چاپِ برچسب و بارکدِ داخلی» در انبار (`LabelToolsPref`، PRD-05/PRD-23، `claude/new-label-1`).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
