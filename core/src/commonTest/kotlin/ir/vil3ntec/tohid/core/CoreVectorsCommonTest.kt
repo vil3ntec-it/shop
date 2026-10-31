@@ -28,7 +28,8 @@ import kotlin.test.assertTrue
  *  با همان بردارهای مرجع — `core/test-vectors/{calendar,locale-format,text-normalize,
  *  receipt-v1}.json` و `license/test-vectors/money-v1.json`. سطرها عیناً از همان فایل‌ها
  *  برداشته شده‌اند (ساخته‌شده با یک اسکریپت از JSON)؛ آزمونِ کاملِ JVM ِ همین‌ها همچنان در
- *  `android-native/app/src/test` است. بردار عوض شد ⇒ این فایل هم.
+ *  `android-native/app/src/test` است. بردار عوض شد ⇒ این فایل هم؛ هم‌خوانی‌اش با JSON را
+ *  `jvmTest/…/CoreVectorsCommonParityTest` سطربه‌سطر می‌سنجد.
  */
 class CoreVectorsCommonTest {
 
