@@ -25,7 +25,6 @@ const { rateLimit } = require('../middleware/ratelimit');
 const { ApiError, notFound } = require('../middleware/errors');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${req.chatViewer.phone}` : '');
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-chat-read' });
@@ -42,7 +41,7 @@ function storefront() {
   }
 }
 
-const customer = wrap(async (req, res, next) => {
+const customer = async (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   const sf = storefront();
   if (!sf || typeof sf.open !== 'function' || typeof sf.verifiedPhoneOfTicket !== 'function') {
@@ -54,70 +53,70 @@ const customer = wrap(async (req, res, next) => {
   if (!phone) throw new ApiError(401, 'verification_required', 'برای چت با دکان، شمارهٔ خود را تأیید کنید');
   req.chatViewer = { side: 'customer', shopId: store.shop_id, phone };
   next();
-});
+};
 
 const base = '/:slug/chat';
 const v = (req) => req.chatViewer;
 
-router.get(`${base}/conversations`, readLimit, customer, wrap(async (req, res) => {
+router.get(`${base}/conversations`, readLimit, customer, async (req, res) => {
   res.json(await chat.list(v(req), { cursor: req.query.cursor, limit: req.query.limit }));
-}));
+});
 
-router.post(`${base}/conversations`, readLimit, customer, sendLimit, wrap(async (req, res) => {
+router.post(`${base}/conversations`, readLimit, customer, sendLimit, async (req, res) => {
   const out = await chat.open(v(req), req.body);
   res.status(out.created ? 201 : 200).json({ conversation: out.conversation });
-}));
+});
 
-router.get(`${base}/search`, readLimit, customer, wrap(async (req, res) => {
+router.get(`${base}/search`, readLimit, customer, async (req, res) => {
   res.json(await chat.search(v(req), req.query.q, { limit: req.query.limit }));
-}));
+});
 
-router.get(`${base}/conversations/:id`, readLimit, customer, wrap(async (req, res) => {
+router.get(`${base}/conversations/:id`, readLimit, customer, async (req, res) => {
   res.json({ conversation: await chat.viewOf(v(req), req.params.id) });
-}));
+});
 
-router.get(`${base}/conversations/:id/messages`, readLimit, customer, wrap(async (req, res) => {
+router.get(`${base}/conversations/:id/messages`, readLimit, customer, async (req, res) => {
   res.json(await chat.changes(v(req), req.params.id, {
     after: req.query.after, limit: req.query.limit, wait: req.query.wait,
   }));
-}));
+});
 
-router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, wrap(async (req, res) => {
+router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, async (req, res) => {
   const out = await chat.send(v(req), req.params.id, req.body);
   if (out.replayed) res.set('Idempotent-Replayed', 'true');
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
-router.patch(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sendLimit, wrap(async (req, res) => {
+router.patch(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sendLimit, async (req, res) => {
   res.json(await chat.edit(v(req), req.params.id, req.params.mid, req.body));
-}));
+});
 
-router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, wrap(async (req, res) => {
+router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, async (req, res) => {
   res.json(await chat.remove(v(req), req.params.id, req.params.mid, req.query.for));
-}));
+});
 
-router.post(`${base}/conversations/:id/receipts`, readLimit, customer, wrap(async (req, res) => {
+router.post(`${base}/conversations/:id/receipts`, readLimit, customer, async (req, res) => {
   res.json(await chat.receipts(v(req), req.params.id, req.body));
-}));
+});
 
-router.post(`${base}/conversations/:id/media`, readLimit, customer, uploadLimit, chat.rawMedia, wrap(async (req, res) => {
+router.post(`${base}/conversations/:id/media`, readLimit, customer, uploadLimit, chat.rawMedia, async (req, res) => {
   res.status(201).json(await chat.putMedia(v(req), req.params.id, req.body, { role: req.query.role }));
-}));
+});
 
-router.get(`${base}/conversations/:id/media/:mediaId`, readLimit, customer, wrap(async (req, res) => {
+router.get(`${base}/conversations/:id/media/:mediaId`, readLimit, customer, async (req, res) => {
   chat.sendMedia(res, await chat.getMedia(v(req), req.params.id, req.params.mediaId));
-}));
+});
 
-router.put(`${base}/conversations/:id/block`, readLimit, customer, wrap(async (req, res) => {
+router.put(`${base}/conversations/:id/block`, readLimit, customer, async (req, res) => {
   res.json({ conversation: await chat.setBlock(v(req), req.params.id, true) });
-}));
+});
 
-router.delete(`${base}/conversations/:id/block`, readLimit, customer, wrap(async (req, res) => {
+router.delete(`${base}/conversations/:id/block`, readLimit, customer, async (req, res) => {
   res.json({ conversation: await chat.setBlock(v(req), req.params.id, false) });
-}));
+});
 
-router.post(`${base}/conversations/:id/reports`, readLimit, customer, sendLimit, wrap(async (req, res) => {
+router.post(`${base}/conversations/:id/reports`, readLimit, customer, sendLimit, async (req, res) => {
   res.status(201).json(await chat.report(v(req), req.params.id, req.body));
-}));
+});
 
 module.exports = router;
