@@ -150,19 +150,24 @@ fun ProductsScreen(
   }
   val table = rememberTableState(tableColumns)
   var bulkCategory by remember { mutableStateOf(false) }
+  var bulkPrice by remember { mutableStateOf(false) }
+  val productTools = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
   var bulkDelete by remember { mutableStateOf(false) }
 
   val term = search.trim()
   //  فیلتر و دو جمعِ انبار، یک بار به ازای هر دفتر و هر عبارتِ جستجو —
   //  نه در هر بار کشیده شدنِ صفحه
-  val shown = remember(d, term, category, sort) {
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val shown = remember(d, term, category, sort, infoSearch) {
     val stock = ShopStore.index(d)
     val list = d.products.filter { p ->
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
           p.category.contains(term, ignoreCase = true) ||
           p.subcategory.contains(term, ignoreCase = true) ||
-          p.barcodes.any { it.contains(term) })
+          p.barcodes.any { it.contains(term) } ||
+          (infoSearch && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term)))
     }
     when (sort) {
       "stock_asc" -> list.sortedBy { stock.stock(it.id) }
@@ -323,6 +328,8 @@ fun ProductsScreen(
                 "غیرفعال شد") { table.selected = emptySet() }
             }) { Text("غیرفعال") }
             OutlinedButton(onClick = { bulkCategory = true }) { Text("تغییر دسته") }
+            //  PRD-21 (پیش‌فرض خاموش): قیمتِ گروهی با پیش‌نمایش، هشدار، تأیید و دلیل
+            if (productTools) OutlinedButton(onClick = { bulkPrice = true }) { Text("قیمت") }
             OutlinedButton(onClick = { bulkDelete = true }) { Text("حذف", color = Shop.colors.danger) }
             TextButton(onClick = { table.selected = emptySet() }) { Text("لغو انتخاب") }
           }
@@ -392,6 +399,12 @@ fun ProductsScreen(
         }
       },
     )
+  }
+
+  if (bulkPrice) {
+    BulkPriceDialog(d, table.selected, onDismiss = { bulkPrice = false }) { r ->
+      apply(r, "قیمتِ ${plain(table.selected.size)} کالا عوض شد") { bulkPrice = false; table.selected = emptySet() }
+    }
   }
 
   if (bulkCategory) {

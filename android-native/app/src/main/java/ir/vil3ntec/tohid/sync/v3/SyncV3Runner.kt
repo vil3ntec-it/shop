@@ -188,6 +188,9 @@ class SyncV3Runner private constructor(context: Context) {
   fun recordOps(ops: List<ir.vil3ntec.tohid.sync.v1.SyncOp>): Int =
     runCatching { engine().recordOps(ops) }.getOrDefault(0).also { publish() }
 
+  /** v3 روی این حساب راه افتاده (از این به بعد ذخیره op می‌سازد) — `ShopStore.restoreBackup`؛ نخوانده ⇒ `true` (امن) */
+  fun initialized(): Boolean = runCatching { engine().meta.initialized }.getOrDefault(true)
+
   fun recover(onDisk: ShopData) {
     runCatching { engine().recover(onDisk) }
     publish()

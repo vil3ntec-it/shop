@@ -1,0 +1,5 @@
+#  پیکربندیِ actionlint (کارِ «امنیت — زنجیرهٔ تأمین»، docs/security/supply-fa.md)
+self-hosted-runner:
+  #  برچسبِ میزبانیِ GitHub که actionlint 1.7.7 هنوز نمی‌شناسد (tohid-desktop.yml)
+  labels:
+    - macos-15-intel
