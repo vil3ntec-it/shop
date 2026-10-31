@@ -166,9 +166,15 @@ object StrSettings {
   fun compactFailed(r: Any): String = t("فشرده کردن انجام نشد: $r", "Compacting failed: $r", "سپکول ونه شول: $r")
   val compactDo: String get() = t("فشرده کن", "Compact", "سپک یې کړه")
   val wipeQ: String get() = t("پاک‌سازی کامل اطلاعات؟", "Erase all data?", "ټول معلومات پاک شي؟")
-  val wipeWarn: String get() = t("همه چیز روی این دستگاه پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "Everything on this device will be erased and can't be recovered. If you haven't made a backup, make one first.", "په دې وسیله کې هر څه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
+  //  ⛔ «پاک کردنِ همه» برای هر ردیف DELETE به سرور می‌فرستد (`ShopStore.save` ⇐ `record`): همهٔ دستگاه‌های دکان، نه فقط این یکی
+  val wipeWarn: String get() = t("همهٔ اطلاعاتِ دکان از همهٔ دستگاه‌ها و سرور پاک می‌شود و برنمی‌گردد. اگر پشتیبان نگرفته‌اید، اول پشتیبان بگیرید.", "All shop data will be erased from every device and the server, and can't be recovered. If you haven't made a backup, make one first.", "د دوکان ټول معلومات له ټولو وسیلو او سرور څخه پاکېږي او بېرته نه راځي. که مو بیک‌اپ نه دی اخیستی، لومړی بیک‌اپ واخلئ.")
   val wiped: String get() = t("تمام اطلاعات پاک شد", "All data erased", "ټول معلومات پاک شول")
   val wipe: String get() = t("پاک کن", "Erase", "پاک یې کړه")
+  val wipeNext: String get() = t("ادامه", "Continue", "دوام ورکړئ")
+  val wipeNameTitle: String get() = t("نامِ دکان را بنویسید", "Type the shop name", "د دوکان نوم ولیکئ")
+  val wipeNameLabel: String get() = t("نامِ دکان", "Shop name", "د دوکان نوم")
+  fun wipeNameHint(name: Any): String = t("برای پاک کردنِ همهٔ اطلاعات از همهٔ دستگاه‌ها و سرور، بنویسید: «$name»", "To erase all data from every device and the server, type: “$name”", "له ټولو وسیلو او سرور څخه د ټولو معلوماتو د پاکولو لپاره ولیکئ: «$name»")
+  val wipeOwnerOnly: String get() = t("فقط صاحبِ دکان می‌تواند همهٔ اطلاعات را پاک کند", "Only the shop owner can erase all data", "یوازې د دوکان خاوند کولای شي ټول معلومات پاک کړي")
 
   // اشتراک (برچسبِ وضعیت)
   val active: String get() = t("فعال", "Active", "فعال")
@@ -180,6 +186,14 @@ object StrSettings {
 
   // بخش‌های جمع‌شو
   val open: String get() = t("باز کردن", "Open", "پرانیستل")
+
+  // پایانِ روزِ کاری (LocaleSection › ShopDayRow، LOC-03)
+  val dayEndNote: String get() = t(
+    "پایانِ روزِ کاری. فروش و هر ثبتی که پس از نیمه‌شب و پیش از این ساعت باشد به نامِ دیروز نوشته می‌شود، تا یک شبِ کاری دو روز نشود. 00:00 یعنی نیمه‌شب، مثلِ همیشه. فقط روی همین دستگاه.",
+    "End of the business day. Sales and other entries made after midnight but before this time are dated to the previous day, so one working night isn't split into two days. 00:00 means midnight, as always. This device only.",
+    "د کاري ورځې پای. هغه پلور او نور ثبتونه چې له نیمې شپې وروسته او له دې وخت مخکې وي د پرون په نوم لیکل کېږي، څو یوه کاري شپه په دوو ورځو ونه وېشل شي. 00:00 یعني نیمه شپه، لکه تل. یوازې په همدې وسیله.",
+  )
+  fun dayEndNow(d: Any): String = t("فروشِ همین حالا به تاریخِ $d ثبت می‌شود", "A sale made right now is dated $d", "همدا اوس پلور د $d په نېټه ثبتېږي")
 
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
