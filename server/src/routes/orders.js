@@ -62,6 +62,8 @@ router.get('/config', wrap(async (req, res) => {
     ...st,
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
+    //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
+    picking: await require('../lib/order-picking').flagOf(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,

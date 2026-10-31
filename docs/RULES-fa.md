@@ -279,6 +279,7 @@
 - پیشوندِ `courier` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#249).
 - نقشه و مسیریابِ پیک (DLV-05، `shop.delivery_map`، `lib/courier-map.js`): پیوندِ مسیریاب فقط مختصات (`geo:`، Google Maps، OsmAnd) و فقط تا مأموریت زنده است — هرگز نشانه، نام یا شماره در پیوند. نقشهٔ آفلاین فقط فایلِ معمولیِ `<شناسه>.pmtiles` (`[a-z0-9-]`) با سرآیندِ PMTiles v3 در `COURIER_MAP_DIR` (پیش‌فرض `server/data/maps`)؛ پیوندِ نمادین و فایلِ دیگر فهرست و داده نمی‌شوند؛ هیچ کاشی از `tile.openstreetmap.org` (§۳.۲). گردانندهٔ سرور عصارهٔ شهر (Geofabrik ⇒ PMTiles) را همان‌جا می‌گذارد.
 - «موقعیت فقط در زمانِ مأموریت» (DLV-16): `tracking.location` ِ کارتِ پیک همان شرطِ `putLocation` است (هر دو پرچمِ موقعیت و فقط «در راه»)؛ برنامهٔ پیک سرویسِ پیش‌زمینه را فقط با همین روشن نگه می‌دارد.
+- QRِ کدِ تحویل/دریافت (PCK-11، پشتِ `shop.orders.picking`): متنِ `VLNH-<شمارهٔ سفارش>-<کد>`؛ خواندن فقط از رقم‌ها (`core/pick/HandoverCode`) تا بارکدخوانِ HID با چیدمانِ فارسی هم درست بخواند؛ سرور همان شش رقم را می‌گیرد و کد هرگز جز همان یک بار نشان داده نمی‌شود؛ QRِ سفارشِ دیگر کادرِ کد را پر نمی‌کند (`claude/spec-pck-1`).
 
 ### v3 · اعلان
 
@@ -418,6 +419,7 @@
 | `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
 | `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger`، و `refunds` ِ `GET …/handover` (سندِ برگشتِ بازپرداخت در دفترِ دکان، #574) | #255، #574 | main |
+| `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ گامِ ۱: QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11) | `claude/spec-pck-1` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
