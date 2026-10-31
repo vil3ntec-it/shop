@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.core.pay.PaidRow
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
@@ -32,8 +33,8 @@ import kotlin.math.roundToLong
  *  می‌فرستد (`LedgerDiff.INC_FIELDS`)، نه بازنویسی.
  *
  *  ── پول ────────────────────────────────────────────────────────────
- *  مبلغِ هر قلم همان فرمولِ امروز است: قیمتِ همان قلم در همان فاکتور × سهمِ
- *  پرداخت‌شده پس از تخفیف (RET-03)، گرد به افغانیِ کامل. جمعِ همهٔ برگشت‌های
+ *  مبلغِ هر قلم: قیمتِ همان قلم در همان فاکتور × سهمِ پرداخت‌شده پس از تخفیف
+ *  (RET-03)، گرد به افغانیِ کامل و «تجمعی» (`ReturnShare`، SEC-DATA-01). جمعِ همهٔ برگشت‌های
  *  یک فاکتور از مبلغِ نهاییِ آن بیشتر نمی‌شود (اضافهٔ گرد از قلمِ آخر کم می‌شود).
  *  تقسیمِ بازپرداخت با `Pay.refund`ِ هستهٔ پرداخت (#237): اول بدهیِ بازِ همین
  *  فاکتور (مثلِ امروز)، بقیه به روشِ اصلی، نقد یا اعتبارِ فروشگاه.
@@ -217,12 +218,19 @@ object ReturnFlow {
       if (q.isNaN() || q.isInfinite() || q < 0) return Outcome.Bad(Code.BAD_QTY)
       if (q == 0.0) continue
       if (!okDisposition(pick.disposition)) return Outcome.Bad(Code.BAD_DISPOSITION)
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       val name = SalesEngine.itemName(d, item)
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
       if (product != null) SalesEngine.quantityProblem(product, q)?.let { return Outcome.Bad(Code.BAD_QTY, it) }
-      val amount = if (item.quantity > 0) (item.totalPrice / item.quantity * q * paidRatio).roundToLong().toDouble() else 0.0
+      //  گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکهٔ یک قلم بیش از برگشتِ یک‌جای همان مقدار پس نمی‌دهد؛
+      //  مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586، برگشت‌های کهنهٔ فرمولِ جداجدا)
+      val prior = d.saleReturns.filter { it.saleItemId == item.id }
+      val amount = ReturnShare.amount(
+        item.totalPrice, item.quantity, item.returnedQty, q, paidRatio,
+        refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity },
+      )
       val unit = if (item.quantity > 0) item.totalPrice / item.quantity else item.unitPrice
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }
@@ -292,17 +300,20 @@ object ReturnFlow {
    *    approve | deny)، یا `null` وقتی هسته هنوز این کلید را ندارد (پیش از PRِ
    *    اجرای مجوزها). صفحه آن را با [permDecision] می‌سازد.
    *  @param limitMinor سقفِ دکان برای مدیر و شاگرد (به پول)؛ ۰ = بی سقف.
+   *  @param priorMinor برگشت‌های پیشینِ همین فاکتور ([priorMinor])؛ سقف تجمعی سنجیده می‌شود
+   *    (`ReturnApprovals.overDeviceLimit`، همان قاعدهٔ سقفِ نقش). بی رسید ⇒ ۰.
    *  @param policyBreach RET-09 — بیرون از سیاستِ برگشت ([policyCheck])؛ شاگرد تأییدِ مدیر می‌خواهد و
    *    مدیر و صاحب خودشان استثنا می‌گذارند (همان قاعدهٔ «بی رسید» و «ضایعات»)
    */
   fun gate(
     role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long,
-    policyBreach: Boolean = false,
+    priorMinor: Long = 0L, policyBreach: Boolean = false,
   ): Gate {
     val r = roleOf(role)
     if (perm == "deny") return Gate("deny", listOf(WHY_PERM), "owner")
     val why = ArrayList<String>()
-    if (perm == "approve" || (r != "owner" && limitMinor > 0 && amountMinor > limitMinor)) why += WHY_OVER_LIMIT
+    val overLimit = r != "owner" && ir.vil3ntec.tohid.core.perm.ReturnApprovals.overDeviceLimit(priorMinor, amountMinor, limitMinor)
+    if (perm == "approve" || overLimit) why += WHY_OVER_LIMIT
     if (noReceipt && r == "staff") why += WHY_NO_RECEIPT
     if (damaged && r == "staff") why += WHY_DAMAGED
     if (policyBreach && r == "staff") why += WHY_POLICY
@@ -513,7 +524,7 @@ object ReturnFlow {
     val verdict = req.policy?.let { policyCheck(d, sale, quote.lines, it, today) } ?: ReturnPolicy.Verdict()
     val g = gate(
       req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit),
-      policyBreach = !verdict.ok,
+      priorMinor(d, sale?.id), policyBreach = !verdict.ok,
     )
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
