@@ -50,6 +50,46 @@ data class Product(
    */
   val saleUnit: String = "",
   val unitFactor: Double = 1.0,
+  /**
+   *  PRD-02 — نامِ پشتو و انگلیسی (نامِ دری همان [name])، مترادف‌ها (نام‌های دیگرِ همین کالا) و
+   *  واژه‌های جست‌وجو؛ PRD-26 — محلِ قفسه (راهرو، قفسه، طبقه) برای جمع‌آوریِ سفارش.
+   *  شکلِ تمیز و جورِ جست‌وجو: `core/product/ProductInfo` (و `ProductInfoMap`). خالی ⇒ `null` و
+   *  **نوشته نمی‌شود**، پس ردیفِ کالایی که این‌ها را ندارد بایت‌به‌بایت همان پیشین است. فرم و
+   *  جست‌وجو فقط با تنظیمِ همین دستگاه (`ProductInfoPrefs`، پیش‌فرض خاموش)؛ ویرایشِ بی آن فرم
+   *  این فیلدها را دست نمی‌زند (`ProductDraft.info = null`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val namePs: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val nameEn: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val synonyms: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val keywords: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val aisle: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val shelf: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val shelfLevel: String? = null,
+  /**
+   *  PRD-24 — شناسهٔ کالاهای جایگزین به ترتیبِ ترجیح، برای پیشنهادِ صندوق هنگامِ ناموجودی؛ PRD-25 —
+   *  فیلدهای سفارشیِ «نام: مقدار» به ترتیبِ ورود (`core/product/ProductExtras`). همان قاعدهٔ بالا: خالی ⇒
+   *  `null` و نوشته نمی‌شود؛ فرم و پیشنهاد فقط با `ProductInfoPrefs`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val alternatives: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val customFields: Map<String, String>? = null,
 )
 
 @Serializable
@@ -546,6 +586,16 @@ data class PriceChange(
   val newPrice: Double = 0.0,
   val date: String = "",
   val createdAt: Long = 0,
+  /*
+   *  PRD-14 — چه کسی و چرا (فقط با `ShopPolicy.productTools`)؛ `null` نوشته نمی‌شود، پس ردیفِ قدیمی و
+   *  ردیفِ پرچمِ خاموش بایت‌به‌بایت همان JSON ِ پیشین‌اند و op ِ تازه‌ای نمی‌سازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
 )
 
 /** شناسهٔ ردیفِ سابقه — ULID، همان `uid()`ِ وب و `newId()`ِ صفحه‌ها (F0-10) */
