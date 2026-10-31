@@ -194,6 +194,20 @@ jobs:
               echo "::error::نسخهٔ بازار هنوز اجازهٔ نصبِ بسته دارد"; exit 1
             fi
           fi
+      #  SEC-ART-01/05: خودِ محتوای هر APK (نه نامِ فایل) — بی کلیدِ خصوصی، انبارِ کلید، .env، پشتیبان،
+      #  .git، سورسِ بک‌اند و رازِ شناخته؛ پیش از upload و انتشار. کلیدِ عمومیِ مجوز اگر در vars هست باید
+      #  واقعاً در APK باشد (خالی ⇒ فقط هشدار). شرح و آزمون: tools/security/، docs/security/artifacts-fa.md
+      - name: دروازهٔ محتوای APK
+        env:
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          apks=(android-native/out/*.apk android-native/out/*.apk.beta)
+          [ ${#apks[@]} -gt 0 ] || { echo "::error::هیچ APKی برای سنجش نیست"; exit 1; }
+          for f in "${apks[@]}"; do
+            node tools/security/artifact-gate.mjs --profile apk --license-pin "$TOHID_LICENSE_PUBLIC_KEY" "$f"
+          done
 
       - uses: actions/upload-artifact@v4
         with:
