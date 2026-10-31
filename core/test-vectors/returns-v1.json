@@ -107,7 +107,11 @@
     { "role": "staff", "perm": "approve", "amountMinor": 100, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" } },
     { "role": "staff", "perm": "allow", "amountMinor": 100, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
     { "role": "", "perm": null, "amountMinor": 5, "noReceipt": true, "damaged": true, "limitMinor": 1, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
-    { "role": "cashier", "perm": null, "amountMinor": 5, "noReceipt": true, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" } }
+    { "role": "cashier", "perm": null, "amountMinor": 5, "noReceipt": true, "damaged": false, "limitMinor": 0, "out": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" } },
+    { "_doc": "سقفِ دستگاه تجمعیِ فاکتور است: ۸۰۰ پیش‌تر + ۳۰۰ = ۱۱۰۰ > ۱۰۰۰، هرچند خودِ سند زیرِ سقف است", "role": "staff", "perm": null, "amountMinor": 30000, "priorMinor": 80000, "noReceipt": false, "damaged": false, "limitMinor": 100000, "out": { "decision": "approve", "reasons": ["over_limit"], "approver": "owner" } },
+    { "_doc": "۷۰۰ + ۳۰۰ = درست همان سقف ⇒ آزاد", "role": "manager", "perm": null, "amountMinor": 30000, "priorMinor": 70000, "noReceipt": false, "damaged": false, "limitMinor": 100000, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "_doc": "صاحب بیرون از سقفِ دستگاه است، با پیشین هم", "role": "owner", "perm": null, "amountMinor": 30000, "priorMinor": 80000, "noReceipt": false, "damaged": false, "limitMinor": 100000, "out": { "decision": "allow", "reasons": [], "approver": "manager" } },
+    { "_doc": "سقفِ ۰ یعنی بی سقف، هر قدر پیشین", "role": "staff", "perm": null, "amountMinor": 30000, "priorMinor": 9000000, "noReceipt": false, "damaged": false, "limitMinor": 0, "out": { "decision": "allow", "reasons": [], "approver": "manager" } }
   ],
   "canApprove": [
     { "gate": { "decision": "approve", "reasons": ["no_receipt"], "approver": "manager" }, "role": "manager", "out": true },
@@ -144,6 +148,15 @@
     { "id": "S13-again", "after": ["S13"], "name": "همان سند دوباره ثبت نمی‌شود", "req": { "docId": "doc-s13", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "ALREADY_POSTED" },
     { "id": "S13-over", "after": ["S13"], "name": "برگشتِ دوباره بیش از فروخته‌شده نه", "req": { "docId": "doc-s13-2", "saleId": "s13", "picks": { "i13b": { "qty": 2 } }, "reason": "دیگر", "mode": "cash", "role": "owner" }, "error": "QTY_EXCEEDS" },
     { "id": "S13-rest", "after": ["S13"], "name": "برگشتِ واحدِ دومِ B به موجودی", "req": { "docId": "doc-s13-3", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "پشیمانیِ مشتری", "mode": "original", "role": "owner" },
+      "out": {
+        "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
+        "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
+        "movements": [{ "productId": "pB", "type": "customer_return", "qty": 1 }],
+        "entries": [], "transactions": [], "returnedQty": { "i13b": 1 }, "debtSettled": 0,
+        "stock": { "pB": 99 }
+      } },
+    { "id": "limit-cumulative", "after": ["S13"], "name": "سقفِ دستگاه تجمعی: ۲۲۵ پیش‌تر + ۲۲۵ > ۳۰۰، هرچند این سند زیرِ سقف است", "req": { "docId": "doc-lim-1", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "پشیمانیِ مشتری", "mode": "original", "role": "manager", "limit": 300 }, "error": "APPROVAL_REQUIRED" },
+    { "id": "limit-cumulative-under", "after": ["S13"], "name": "۲۲۵ + ۲۲۵ = ۴۵۰ زیرِ سقفِ ۵۰۰ ⇒ بی تأیید", "req": { "docId": "doc-lim-2", "saleId": "s13", "picks": { "i13b": { "qty": 1 } }, "reason": "پشیمانیِ مشتری", "mode": "original", "role": "manager", "limit": 500 },
       "out": {
         "total": 225, "split": { "account": 0, "credit": 0, "cash": 225 }, "audit": "return",
         "rows": [{ "saleItemId": "i13b", "productId": "pB", "quantity": 1, "amount": 225, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],

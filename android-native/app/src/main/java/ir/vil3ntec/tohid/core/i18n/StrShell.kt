@@ -66,6 +66,18 @@ object StrShell {
     "On: a credit sale that takes the customer's balance over their credit limit is not recorded without a manager's or the owner's approval. The cashier taps “Request approval” and the manager gives their name, a reason and their PIN; managers and the owner approve their own sales with a reason. A wrong PIN or Cancel records nothing, and every approval is kept in the history with the approver's name and reason. Off: the register does not check the limit (only the debt book does).",
     "روښانه: هغه نسیه پلور چې د پیرودونکي پاتې له سقف څخه ډېروي، د مدیر یا د دوکان د خاوند له تایید پرته نه ثبتېږي. صندوقدار «د تایید غوښتنه» کوي او مدیر خپل نوم، لامل او PIN ورکوي؛ مدیر او خاوند خپل پلور په لامل سره تاییدوي. په غلط PIN یا لغوه کولو هېڅ نه ثبتېږي او هر تایید د تاییدونکي له نوم او لامل سره په تاریخچه کې پاتې کېږي. بند: صندوق سقف نه ګوري (یوازې د پور کتاب).",
   )
+  /** کنارِ تنظیم‌هایی که فقط همین دستگاه را می‌بندند (سقفِ اعتبار، قاعده‌های پایانِ فاکتور) — سرور آن‌ها را نمی‌سنجد */
+  val thisDeviceOnly: String get() = t(
+    "فقط روی همین دستگاه: سرور این را نمی‌سنجد و هر دستگاهِ دیگرِ دکان جدا تنظیم می‌شود.",
+    "This device only: the server does not check it, and each of the shop's other devices is set separately.",
+    "یوازې په همدې وسیله: سرور یې نه ګوري، او د دوکان هره بله وسیله جلا تنظیمېږي.",
+  )
+  //  گزارش ← PDF ِ کامپیوتر (RPT-11): بیش از سقفِ صفحه ⇒ PDF ِ ناقص ساخته نمی‌شود
+  fun pdfTooManyPages(max: Any): String = t(
+    "PDF ساخته نشد: گزارش بیش از $max صفحه است. بازهٔ کوتاه‌تری بگیرید یا خروجیِ Excel بگیرید.",
+    "PDF not created: the report is longer than $max pages. Choose a shorter period or export to Excel.",
+    "PDF جوړ نه شو: راپور له $max پاڼو اوږد دی. لنډه موده وټاکئ یا Excel ته یې وباسئ.",
+  )
   val crmShownInReports: String get() = t("در «گزارش‌ها» دیده می‌شوند", "Shown under “Reports”", "په «راپورونه» کې ښکاري")
   val crmNote: String get() = t("چهار زبانهٔ تازه در «گزارش‌ها»: سنِ بدهی (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ روز)، تحلیلِ خریدِ مشتریان (RFM)، مشتریانِ تکراری و یادآوریِ امروز. خودِ گزارش‌ها فقط خواندنی‌اند. با روشن بودن، اگر مشتری‌ای ادغام شده باشد، فروش یا قرضی که بعداً روی نامِ کهنه‌اش رسید هم پس از هر همگام‌سازی به همان مشتریِ ماندگار می‌رود. در صفحهٔ فعلیِ گزارش‌ها می‌آیند، نه در «گزارشِ تازه». پس از تغییر، «گزارش‌ها» را دوباره باز کنید.", "Four new tabs under “Reports”: debt age (0–30, 31–60, 61–90, 90+ days), customer purchase analysis (RFM), repeat customers and today's reminders. The reports themselves are read-only. While this is on, if a customer has been merged, a sale or credit that later arrives under the old name is moved to the surviving customer after each sync. They appear on the current reports screen, not in “New report”. After changing this, reopen “Reports”.", "په «راپورونه» کې څلور نوې پاڼې: د پور عمر (۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۰+ ورځې)، د پیرودونکو د پېرود شننه (RFM)، تکراري پیرودونکي او د نن یادونې. راپورونه پخپله یوازې د لوستلو دي. کله چې دا روښانه وي، که کوم پیرودونکی یوځای شوی وي، هغه پلور یا پور چې وروسته د هغه په زاړه نوم راشي، له هرې همغږۍ وروسته هماغه پاتې پیرودونکي ته ځي. په اوسني راپورونو پاڼه کې راځي، نه په «نوی راپور» کې. له بدلون وروسته «راپورونه» بیا پرانیزئ.")
   // مشتری ← ادغامِ تکراری‌ها (CRM-10)
