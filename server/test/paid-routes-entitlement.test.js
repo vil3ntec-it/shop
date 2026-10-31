@@ -54,6 +54,9 @@ const FREE = [
     'POST /shop/sync-epoch/deleted']],
   ['دکانِ فعالِ نشست (مهاجرتِ ۰۹۷، #273) دادهٔ دکان نمی‌نویسد؛ پس از پایانِ اشتراکِ یک دکان هم باید بتوان به دکانِ دیگر رفت', [
     'POST /shop/active']],
+  ['پرداختِ حساب‌پی (PAY-21) کلیدِ کاتالوگ ندارد، فقط پرچمِ pay.hesabpay؛ پرداختِ سفارشِ آنلاین اشتراکِ فعال را خودش می‌سنجد '
+    + '(online_payment_unavailable)', [
+    'POST /shop/payments/intents', 'POST /shop/payments/intents/:id/cancel']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',

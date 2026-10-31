@@ -357,11 +357,15 @@
       //  هرگز روی این دستگاه نمی‌نشستند
       if (!data) return 0;
       {
+        var base = shadow();
         var out = core.applyRemote(data, ops);
         ledger.write(out.data);
         //  سایه همین‌جا جلو می‌رود، وگرنه تفاضلِ بعدی همین‌ها را
-        //  دوباره به سرور پس می‌فرستد
-        setShadow(out.data);
+        //  دوباره به سرور پس می‌فرستد — ولی «سایهٔ پیشین + همین opها»، نه کلِ
+        //  دفترِ امروز (همان `SyncCommit.absorbedShadow` ِ اندروید): تغییرِ محلی‌ای
+        //  که ثبتش نگرفت (حافظهٔ پر) باید در تفاضلِ بعدی بماند، وگرنه جزوِ سایه
+        //  می‌شد و هرگز به سرور نمی‌رسید (SYN-01). سایهٔ نبوده ⇒ همان دفتر (پایه).
+        setShadow(base ? core.applyRemote(base, ops).data : out.data);
       }
     }
     patchState({
