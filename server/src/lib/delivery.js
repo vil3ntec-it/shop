@@ -19,6 +19,7 @@ const crypto = require('crypto');
 const db = require('../db');
 const { one, many, now, tx } = db;
 const D = require('./delivery-states');
+const codeRule = require('./delivery-code-rule');   //  DLV-08: «نقد یا گران‌قیمت ⇒ کد»، پشتِ پرچمِ خاموش
 const orders = require('./orders');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
@@ -377,7 +378,8 @@ async function assign(shopId, orderId, body, actor, key = '') {
   const requireCode = mode === 'pickup' || b.requireCode === true;
   if (b.overrideCashCap !== undefined && typeof b.overrideCashCap !== 'boolean') throw badRequest('نامعتبر', 'bad_override');
   const reqHash = hashOf({ orderId: String(orderId || ''), mode, fareMinor, courierId, externalName, externalRef, requireCode });
-  const rebuildable = requireCode && await orders.flagOf(shopId, VIEW_FLAG);
+  const codePolicy = await codeRule.policyOf(shopId);
+  const rebuildable = (requireCode || codePolicy.on) && await orders.flagOf(shopId, VIEW_FLAG);
 
   return tx(async (c) => {
     const order = (await c.query(
@@ -411,6 +413,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
     if (live) throw conflict('این سفارش همین حالا مأموریتِ زنده دارد', 'already_assigned');
 
     const expected = order.payment_method === 'cod' && order.payment_status !== 'paid' ? Number(order.total_minor) : 0;
+    const codeBy = codeRule.requires(codePolicy, { mode, totalMinor: Number(order.total_minor), expectedCollectMinor: expected });   //  DLV-08؛ خاموش ⇒ ''
 
     let overCap = false;
     if (mode === 'shop_courier') {
@@ -432,7 +435,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
     const attempt = Number((await c.query(
       'SELECT COALESCE(MAX(attempt_no), 0) + 1 AS n FROM delivery_assignments WHERE order_id=$1', [order.id]
     )).rows[0].n);
-    const { code, nonce } = requireCode ? codeFor(id, rebuildable) : { code: null, nonce: '' };
+    const { code, nonce } = requireCode || codeBy ? codeFor(id, rebuildable) : { code: null, nonce: '' };
     const status = mode === 'shop_courier' ? 'requested' : 'assigned';
     await c.query(
       `INSERT INTO delivery_assignments (id, shop_id, order_id, attempt_no, mode, courier_id, external_name,
@@ -445,7 +448,8 @@ async function assign(shopId, orderId, body, actor, key = '') {
     await appendEvent(c, a, {
       key: key || `srv:${id}:created`, hash: reqHash, kind: 'created', to: status,
       actorType: 'user', actorId: actor.userId, deviceId: actor.deviceId,
-      detail: { mode, courierId, externalName, fareMinor, expectedCollectMinor: expected, requireCode,
+      detail: { mode, courierId, externalName, fareMinor, expectedCollectMinor: expected, requireCode: requireCode || Boolean(codeBy),
+        ...(codeBy ? { codeRule: codeBy } : {}),
         ...(overCap ? { overCashCap: true } : {}) },
     }, at);
     return { assignment: staffView(a), code, replayed: false };
