@@ -36,6 +36,11 @@ jobs:
         continue-on-error: true
         run: node --test tools/quality/quality.test.mjs
 
+      #  پارسرِ قراردادِ API (docs/api/routes.json ⇐ tools/api-contract)؛ خودِ مولد سرور را بالا می‌آورد و این‌جا اجرا نمی‌شود
+      - name: آزمونِ پارسرِ قراردادِ API (گزارش)
+        continue-on-error: true
+        run: node --test tools/api-contract/extract.test.cjs
+
       - name: سقف‌های فقط‌کاهشی — اندازهٔ فایل، کمکی‌های تکراری، pump/shop، index.html، وابستگیِ پلتفرمی (گزارش)
         continue-on-error: true
         run: node tools/quality/quality.mjs --check ratchet
