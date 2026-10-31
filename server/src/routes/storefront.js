@@ -19,6 +19,7 @@ const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
+const cart = require('../lib/store-cart');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const audit = require('../lib/audit');
@@ -269,6 +270,32 @@ router.put('/:slug/account/addresses/:id', checkoutLimit, store, customer, async
 
 router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, async (req, res) => {
   res.json(await customers.removeAddress(req.customer, req.params.id));
+});
+
+//  ── CHK-03: سبدِ ماندگارِ حساب روی سرور (S140) ─────────────────────
+//  ⛔ پرچمِ خاموشِ `shop.storefront.cart` (یا ویترینِ بسته) ⇒ `next('route')` پیش از هر
+//  سقف و نشست: همان پاسخِ مسیرِ ناشناخته که main می‌دهد (۴۰۱ ِ روترِ پسین)، بیت‌به‌بیت.
+const cartStore = async (req, res, next) => {
+  let s = null;
+  try { s = await sf.open(req.params.slug); } catch (err) { if (err.status !== 404) throw err; }
+  if (!s || !(await cart.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+
+router.get('/:slug/account/cart', cartStore, readLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.get(req.store, req.customer) });
+});
+
+//  جایگزینیِ کامل با نسخهٔ دیده‌شده؛ فهرستِ خالی = خالی کردن (پس از ثبتِ سفارش هم)
+router.put('/:slug/account/cart', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.replace(req.store, req.customer, req.body) });
+});
+
+//  سبدِ مهمانِ همین مرورگر پس از ورود — تکرارش اثرِ دوم ندارد
+router.post('/:slug/account/cart/merge', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.merge(req.store, req.customer, req.body) });
 });
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {

@@ -87,7 +87,7 @@ const flag = (scope, key) => h.put('/api/admin/pump/live-config', { scope, key, 
 async function liveShop(label) {
   const u = await h.newUser(`صاحب-${label}`);
   const shopId = (await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken })).body.shop.id;
-  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat']) await flag(shopId, k);
+  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat', 'shop.storefront.cart']) await flag(shopId, k);
   const slug = `iso-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: u.accessToken });
   assert.equal(put.status, 200, JSON.stringify(put.body));
@@ -204,6 +204,9 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   const kc = await customer(b.slug, '0791230006');
   const addr = await h.post(`/api/store/${a.slug}/account/addresses`, { label: 'خانه', text: 'کوچهٔ رازِ-مشتری' }, as(ka));
   assert.equal(addr.status, 201, JSON.stringify(addr.body));
+  //  CHK-03: سبدِ سروریِ الف با یادداشتِ راز — درِ سبد هم در همین ماتریس است
+  const cart = await h.put(`/api/store/${a.slug}/account/cart`, { version: 0, items: [{ productId: 'oil', qtyMilli: 1000, note: 'رازِ-سبدِ-مشتری' }] }, as(ka));
+  assert.equal(cart.status, 200, JSON.stringify(cart.body));
   const ck = await h.post(`/api/store/${a.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتریِ الف', phone: ka.phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],
   }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Session': ka.session } });
@@ -215,7 +218,7 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   const msg = await h.post(`/api/store/${a.slug}/chat/conversations/${conv.body.conversation.id}/messages`, { body: 'رازِ-چتِ-مشتری', clientId: `m-${uniq()}` }, { headers: AUTH.verification_required(ka) });
   assert.ok(msg.status < 300, JSON.stringify(msg.body));
   const idsOf = (p) => ({ slug: a.slug, id: p.includes('/chat/') ? conv.body.conversation.id : addr.body.address.id, token });
-  const secrets = [addr.body.address.id, 'رازِ-مشتری', 'رازِ-چتِ-مشتری', '791230004', token, ck.body.order?.id, conv.body.conversation.id];
+  const secrets = [addr.body.address.id, 'رازِ-مشتری', 'رازِ-چتِ-مشتری', 'رازِ-سبدِ-مشتری', '791230004', token, ck.body.order?.id, conv.body.conversation.id];
 
   const routes = live().filter((r) => r.path.startsWith('/api/store/'));
   const gated = [];
@@ -243,6 +246,8 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   assert.deepEqual(bad, [], bad.join('\n'));
   //  شناسهٔ واقعیِ الف در دستِ ب: نه می‌بیند، نه عوض می‌کند
   assert.deepEqual((await h.get(`/api/store/${a.slug}/account/addresses`, as(ka))).body.addresses.map((x) => x.text), ['کوچهٔ رازِ-مشتری']);
+  assert.ok(gated.some((r) => r.key === 'PUT /api/store/:slug/account/cart'), 'درِ سبد در ماتریس است');
+  assert.deepEqual((await h.get(`/api/store/${a.slug}/account/cart`, as(ka))).body.cart.lines.map((l) => l.note), ['رازِ-سبدِ-مشتری']);
   //  توکنِ پیگیری: دست‌کاری‌شده یا روی ویترینِ دیگر ⇒ ۴۰۴؛ خودش ⇒ ۲۰۰
   assert.equal((await h.get(`/api/store/${a.slug}/orders/${token}`)).status, 200);
   const flip = token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A');
