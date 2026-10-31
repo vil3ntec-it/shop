@@ -546,6 +546,16 @@ data class PriceChange(
   val newPrice: Double = 0.0,
   val date: String = "",
   val createdAt: Long = 0,
+  /*
+   *  PRD-14 — چه کسی و چرا (فقط با `ShopPolicy.productTools`)؛ `null` نوشته نمی‌شود، پس ردیفِ قدیمی و
+   *  ردیفِ پرچمِ خاموش بایت‌به‌بایت همان JSON ِ پیشین‌اند و op ِ تازه‌ای نمی‌سازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
 )
 
 /** شناسهٔ ردیفِ سابقه — ULID، همان `uid()`ِ وب و `newId()`ِ صفحه‌ها (F0-10) */

@@ -22,7 +22,7 @@ const pub = path.join(__dirname, '..', 'public');
 const read = (f) => fs.readFileSync(path.join(pub, f), 'utf8');
 const LANGS = ['fa', 'en', 'ps'];
 const dict = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'market/index.html', 'store/index.html'];
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/recent.js', 'market/index.html', 'store/index.html'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
