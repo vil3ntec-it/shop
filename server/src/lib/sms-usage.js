@@ -27,6 +27,8 @@
  * ── خواندن ───────────────────────────────────────────────────────────
  *   countSince(sinceMs, { okOnly })   ⇒ شمارِ **تلاش‌ها** (ردیف‌ها، هر راهی، موفق یا نه) از
  *     sinceMs در همهٔ دکان‌ها؛ okOnly ⇒ فقط پذیرفته‌ها — سقفِ روزانهٔ SEC-06؛ نمایهٔ (at)
+ *   costSince({ since, via, shopId }) ⇒ جمعِ cost_minor از since (via/shopId نداده ⇒ همه) — سقفِ
+ *     هزینهٔ روزانهٔ SEC-06 برای هر کانال، کلِ سرور یا یک دکان
  *   totals({ since, until, shopId })  ⇒ { attempts, sent, failed, mock, other, parts, costMinor }
  *     (shopId نداده ⇒ همهٔ دکان‌ها و بی‌دکان — جمعِ روزانهٔ سراسریِ SEC-06)
  *   report({ days, limit })            ⇒ هر دکان جدا، برای پنل؛ `truncated` اگر بیش از سقف
@@ -119,6 +121,16 @@ async function countSince(sinceMs, { okOnly = false } = {}) {
   return Number(r?.n) || 0;
 }
 
+/** جمعِ هزینه (واحدِ خُرد) از `since`؛ `via` و `shopId` اختیاری‌اند (نداده ⇒ همه). */
+async function costSince({ since = 0, via, shopId } = {}) {
+  const args = [intOr(since, 0)];
+  let where = 'at >= $1';
+  if (via !== undefined) { args.push(viaOf(via)); where += ` AND via = $${args.length}`; }
+  if (shopId !== undefined) { args.push(cut(shopId, 80)); where += ` AND shop_id = $${args.length}`; }
+  const r = await one(`SELECT COALESCE(SUM(cost_minor), 0)::bigint AS c FROM sms_usage WHERE ${where}`, args);
+  return Number(r?.c) || 0;
+}
+
 /** جمعِ یک بازه؛ بی shopId ⇒ سراسری. */
 async function totals({ since = 0, until = null, shopId } = {}) {
   const args = [intOr(since, 0), until == null ? Number.MAX_SAFE_INTEGER : intOr(until, Number.MAX_SAFE_INTEGER), [...REAL_VIA]];
@@ -156,4 +168,4 @@ async function report({ days, limit } = {}) {
   };
 }
 
-module.exports = { UNIT_KEY, CURRENCY, REAL_VIA, MOCK_VIA, LIMITS, unitCost, setUnitCost, record, countSince, totals, report };
+module.exports = { UNIT_KEY, CURRENCY, REAL_VIA, MOCK_VIA, LIMITS, unitCost, setUnitCost, record, countSince, costSince, totals, report };

@@ -3,7 +3,6 @@ package ir.vil3ntec.tohid.desktop
 import com.fazecast.jSerialComm.SerialPort
 import ir.vil3ntec.tohid.core.hw.SerialParams
 import ir.vil3ntec.tohid.hw.SerialPorts
-import java.io.ByteArrayOutputStream
 import java.io.IOException
 
 /**
@@ -37,17 +36,15 @@ object DeskSerial : SerialPorts {
     if (!p.openPort(500)) throw IOException("درگاهِ $port باز نشد — در دستِ برنامهٔ دیگری است؟")
     try {
       if (p.writeBytes(request, request.size) < 0) throw IOException("به درگاهِ $port نوشته نشد")
-      val out = ByteArrayOutputStream()
+      //  HW-09: تکه‌ها با `SerialCollect` (آزمون: `ScalePoleTest`) — ترازوی پیوسته بافر را بی‌اندازه بزرگ نمی‌کند
+      val out = ir.vil3ntec.tohid.core.hw.SerialCollect(complete)
       val buf = ByteArray(64)
       val deadline = System.currentTimeMillis() + timeoutMs
       while (System.currentTimeMillis() < deadline) {
         val n = p.readBytes(buf, buf.size)
-        if (n > 0) {
-          out.write(buf, 0, n)
-          if (complete(out.toByteArray())) break
-        }
+        if (n > 0 && out.add(buf, 0, n)) break
       }
-      return out.toByteArray()
+      return out.bytes()
     } finally {
       p.closePort()
     }

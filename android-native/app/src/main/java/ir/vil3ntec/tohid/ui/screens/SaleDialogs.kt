@@ -912,6 +912,8 @@ fun CartLineDialog(
    *  بی تخفیفِ ردیف و بی سنجش
    */
   linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
+  /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
+  why: List<ir.vil3ntec.tohid.core.pos.PriceWhy.Row>? = null,
 ) {
   val policy = linePolicy
   var qtyText by remember { mutableStateOf(qty(quantity)) }
@@ -941,6 +943,10 @@ fun CartLineDialog(
       Column(Modifier.padding(18.dp)) {
         Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
+        if (why != null) {
+          ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel(why) { money(it) }
+          Spacer(Modifier.height(12.dp))
+        }
 
         if (hasSaleUnit) {
           SegmentedChoice(

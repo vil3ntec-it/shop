@@ -20,8 +20,14 @@
 
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!--
+      پشتیبانِ خودکارِ اندروید خاموش است: تنها دادهٔ برنامه `app_webview` است
+      (دفتر و توکنِ ورود در یک localStorage) و توکن نباید با پشتیبانِ گوگل یا
+      `adb backup` بیرون برود. اندروید ۱۲+ انتقالِ گوشی‌به‌گوشی را با
+      `allowBackup` نمی‌بندد؛ `data_extraction_rules` آن را می‌بندد.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
