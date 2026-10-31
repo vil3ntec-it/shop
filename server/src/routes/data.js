@@ -82,7 +82,9 @@ async function writeRecords(req, changes) {
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
     () => sync.pushChanges(
-      { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role }, changes
+      //  S89: درِ مستقیمِ API — با پرچمِ `shop.doc_chain` ویرایش/حذفِ فاکتورِ ثبت‌شده ۴۰۹ (`sale_finalized_edit_forbidden`)
+      { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role, finalized: 'enforce',
+        ip: require('../middleware/ratelimit').clientIp(req) }, changes
     )
   );
   return { ...result, replayed };
