@@ -16,6 +16,7 @@
   var KEY_CART = K.cartKey(slug);
   var KEY_ORDERS = 'store-orders:' + slug;
   var store = null; var marketOn = false; var verifyAvailable = true;
+  var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹ ِ out_of_stock، فقط در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
@@ -227,6 +228,9 @@
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
   function feeFor(f) { return f === 'delivery' && store ? store.deliveryFeeMinor : 0; }
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
+  function short(id) { return cap[id] > 0 && cart[id].qtyMilli > cap[id]; }
+  function hasShort() { return ids().some(short); }
+  function shortText(id) { return t('line.short', { q: K.qty(cap[id]) + ' ' + (cart[id].unit || t('unit')) }); }
 
   function thumb(id, l) {
     var th = el('span', { class: 'thumb' + (l.photo ? ' photo tile' : '') });
@@ -277,7 +281,7 @@
       },
       thumb(id, l),
       el('span', { class: 'q num', text: K.qty(l.qtyMilli) + ' ×' }),
-      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
+      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : short(id) ? shortText(id) : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
       el('span', { class: 'price num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
       ul.appendChild(el('li', { class: 'cline' + (l.unavailable ? ' bad' : '') + (editing === id ? ' editing' : '') },
         main, el('span', { class: 'stepper' }, minus, el('output', { text: K.qty(l.qtyMilli), attrs: { 'aria-live': 'polite' } }), plus)));
@@ -300,6 +304,7 @@
     $('sheet-total').textContent = K.money(sub + fee);
     var block = '';
     if (hasBad()) block = t('cart.bad');
+    else if (hasShort()) block = t('cart.short');
     else if (store && store.minOrderMinor > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
@@ -343,9 +348,14 @@
     var ul = K.clear($('cart-lines'));
     ids().forEach(function (id) {
       var l = cart[id];
-      ul.appendChild(el('li', { class: l.unavailable ? 'bad' : '' }, thumb(id, l),
-        el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.priceMinor) })),
-        el('span', { class: 'amt num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) })));
+      var li = el('li', { class: l.unavailable ? 'bad' : short(id) ? 'short' : '' }, thumb(id, l),
+        el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.priceMinor) + (short(id) ? ' — ' + shortText(id) : '') })),
+        el('span', { class: 'amt num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
+      if (short(id)) {
+        li.appendChild(el('button', { class: 'btn btn-soft btn-sm fit', attrs: { type: 'button' }, on: { click: function () { setQty(id, cap[id]); renderCheckout(); } } },
+          t('line.fit', { q: K.qty(cap[id]) })));
+      }
+      ul.appendChild(li);
     });
     $('cart-empty').hidden = ids().length > 0;
     var f = fulfillment();
@@ -360,7 +370,7 @@
     renderVerify();
     var ok = verifiedFor($('c-phone').value);
     var btn = $('submit-order');
-    btn.disabled = !ids().length || !f || below || hasBad() || !ok;
+    btn.disabled = !ids().length || !f || below || hasBad() || hasShort() || !ok;
     btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
   }
 
@@ -454,7 +464,7 @@
       K.saveS('placed:' + r.order.token, true);
       //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
       K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
-      cart = {}; quoteNote = ''; saveCart();
+      cart = {}; cap = {}; quoteNote = ''; saveCart();
       msg.hidden = true;
       location.hash = '#/o/' + encodeURIComponent(r.order.token);
     }).catch(function (e) {
@@ -471,6 +481,18 @@
         quoteNote = t('ck.repriced', { list: changed.length ? changed.join(t('sep')) + '. ' : '', sum: K.money(d.quote.totalMinor) });
         saveCart();
         K.note(msg, 'warn', quoteNote);
+      } else if (e.code === 'out_of_stock' && stockList && Array.isArray(d.lines)) {
+        //  E2E-MKT-02: همهٔ قلم‌های کم، هر کدام با مقدارِ موجود؛ بی پذیرشِ «کم کن» ثبت نمی‌شود
+        var list = [];
+        d.lines.forEach(function (x) {
+          var l = cart[x.productId];
+          if (!l) return;
+          cap[x.productId] = Math.max(0, Math.floor(Number(x.availableMilli)) || 0);
+          if (!cap[x.productId]) l.unavailable = true;
+          list.push(l.name + ': ' + (l.unavailable ? t('line.gone') : shortText(x.productId)));
+        });
+        saveCart();
+        K.note(msg, 'err', t('ck.short', { list: list.join(t('sep')) }));
       } else if (e.code === 'product_unavailable' && d.unavailable) {
         d.unavailable.forEach(function (id) { if (cart[id]) cart[id].unavailable = true; });
         saveCart();
@@ -623,6 +645,7 @@
     api('').then(function (r) {
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
+      stockList = Boolean(r.features && r.features.stockList);
       verifyAvailable = !r.verification || r.verification.available !== false;
       if (r.recent) {
         var rs = el('script', { attrs: { src: '/store/recent.js' } });
