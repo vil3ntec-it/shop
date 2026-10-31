@@ -97,6 +97,21 @@ object PrintJob {
     }
   }
 
+  /**
+   *  POS-34 — چاپِ رسیدِ هدیهٔ بی قیمت (`Receipts.giftBitmap`)؛ برمی‌گرداند: پیامِ خطا، یا null.
+   *  کاغذِ جداست، نه نسخهٔ دیگرِ فاکتور: نه در `PrintLog`/«چاپِ دوباره» و نه در صفِ چاپِ فاکتور.
+   */
+  suspend fun printGift(context: Context, d: ShopData, sale: Sale, address: String, width: Int): String? = withContext(Dispatchers.IO) {
+    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+    val bitmap = runCatching { Receipts.giftBitmap(context, d, sale, width, fallbackName = storeName.ifBlank { Receipts.localName(context) }) }
+      .getOrElse { return@withContext ir.vil3ntec.tohid.core.i18n.StrGift.failed(it.message ?: "—") }
+    try {
+      ThermalPrinter.print(context, address, bitmap, width)
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
   /** RET-01 — QRِ رسید فقط وقتی «برگشت و تعویضِ تازه» روشن است؛ خاموش ⇒ همان رسیدِ امروز */
   private fun receiptQr(context: Context, sale: Sale): String? =
     if (ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) && sale.status != "cancelled") {
