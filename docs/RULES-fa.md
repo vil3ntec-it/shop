@@ -396,6 +396,7 @@
 |---|---|---|---|---|---|
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
+| `shop.storefront.stock_list` | دکان / `all` | خاموش | E2E-MKT-02: `GET /api/store/:slug` کلیدِ `features.stockList` (خاموش ⇒ بی کلید)؛ ویترین در ۴۰۹ ِ `out_of_stock` همهٔ قلم‌های کم را با مقدارِ موجود و «کم کن به …» نشان می‌دهد و «ثبت» تا کم کردن بسته است؛ خاموش ⇒ همان پیامِ سرور | `claude/part-E2E-1` | باز |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |

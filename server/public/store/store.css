@@ -46,6 +46,10 @@
 .sum-lines .grow small { display: block; color: var(--muted); font-size: 12.5px; }
 .sum-lines .amt { flex: none; font-weight: 700; }
 .sum-lines li.bad .grow { text-decoration: line-through; opacity: .7; }
+/* E2E-MKT-02: بیش از موجودی — با «کم کن به …» */
+.sum-lines li.short { flex-wrap: wrap; }
+.sum-lines li.short .grow small { color: var(--warn); }
+.sum-lines li.short .fit { margin-inline-start: auto; }
 
 .ps-img { aspect-ratio: 4 / 3; border-radius: var(--r-card); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
 .ps-img.tile { padding: 8%; background: var(--tile); }

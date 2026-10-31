@@ -68,6 +68,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
+    //  فقط با پرچمِ روشن (E2E-MKT-02)؛ خاموش ⇒ همان پاسخِ پیشین، بی این کلید
+    ...(await orders.flagOf(req.store.shop_id, sf.STOCK_LIST_FLAG) ? { features: { stockList: true } } : {}),
   });
 });
 
