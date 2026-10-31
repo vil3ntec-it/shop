@@ -267,4 +267,8 @@ router.get('/:id/risk', needFlag, wrap(async (req, res) => {
   res.json(out);
 }));
 
+//  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پشتِ پرچمِ خاموشِ `shop.orders.picking`؛ مسیرها همه
+//  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
+router.use(require('./order-picking'));
+
 module.exports = router;

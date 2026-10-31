@@ -61,6 +61,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.
   'shop.storefront.notify_area', 'shop.storefront.banners',
   'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
+//  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
+FLAGS.push('shop.orders.picking');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

@@ -40,6 +40,8 @@ data class OrdersConfigDto(
    *  نخستین `config?caps=saleOnHandover` می‌گذارد؛ null ⇒ هنوز نه ⇒ هیچ فروشی.
    */
   val handoverSince: Long? = null,
+  /** پرچمِ خاموشِ `shop.orders.picking` (PCK): برگهٔ جمع‌آوری به‌جای گذارهای سادهٔ «جمع‌آوری/بسته‌بندی» */
+  val picking: Boolean = false,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
