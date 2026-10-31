@@ -462,12 +462,25 @@ fun InvoiceDialog(
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("بستن") }
-          //  گوشی: فاکتور به واتساپ/تلگرامِ مشتری — بی چاپگر هم
+          //  گوشی: فاکتور به واتساپ/تلگرامِ مشتری — بی چاپگر هم (با پیوندِ آنلاین اگر باشد، POS-32)
           if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
             OutlinedButton(
               onClick = { scope.launch { ir.vil3ntec.tohid.print.PrintJob.shareSale(context, d, sale)?.let(onMessage) } },
               modifier = Modifier.weight(1f),
             ) { Text("فرستادن") }
+          } else {
+            //  POS-32، کامپیوتر: برگهٔ اشتراکِ سیستم نیست؛ پیوندِ فاکتورِ آنلاین کپی می‌شود تا در واتس‌اپ/تلگرامِ وب بنشیند.
+            //  فقط فروشِ نسخهٔ ۲ با توکن و پرچمِ `shop.receipt_v2` (`Receipts.publicUrl`)؛ وگرنه دکمه‌ای نیست
+            val link = remember(sale.id, sale.receiptToken) {
+              ir.vil3ntec.tohid.core.receipt.ReceiptShare.safeLink(ir.vil3ntec.tohid.print.Receipts.publicUrl(context, sale))
+            }
+            if (link != null) {
+              val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+              OutlinedButton(
+                onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(link)); onMessage("پیوندِ فاکتورِ آنلاین کپی شد") },
+                modifier = Modifier.weight(1f),
+              ) { Text("کپیِ پیوند") }
+            }
           }
           Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
         }
