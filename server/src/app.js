@@ -124,6 +124,9 @@ async function createApp({ runMigrations = true } = {}) {
   //  Express 5 هرگز جور نمی‌شد (اسلشِ پایانی مرزِ پیشوند را می‌خورد) و این سقف مرده بود — بدنهٔ
   //  گزارش زیرِ سقفِ ۲mb ِ همگانی می‌ماند. حالا پس از توکنِ دستگاه، همان ۳۴mb ِ قاعده.
   app.use(['/api/pump/device/report', '/api/v1/pump/device/report'], requireDevice, express.json({ limit: '34mb' }));
+  //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
+  //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
+  app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
   app.use(express.json({ limit: '2mb' }));
 
   /*
@@ -357,6 +360,10 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/courier', require('./routes/courier'));
     //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
     api.use('/shop/promos', require('./routes/shop-promos'));
+    //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
+    //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
+    api.use('/shop/payments', require('./routes/shop-payments'));
+    api.use('/payments', require('./routes/payments-webhook'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
