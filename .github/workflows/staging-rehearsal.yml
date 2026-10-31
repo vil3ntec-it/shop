@@ -53,20 +53,20 @@ jobs:
     env:
       DATABASE_URL: postgres://shop:shoppass@127.0.0.1:5432/shop_staging
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: head
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           path: base
           ref: ${{ github.event.pull_request.base.sha || inputs.base || 'main' }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
       - name: نصبِ وابستگی‌ها (هر دو نسخه)
         run: |
-          (cd base/server && (npm ci || npm install))
-          (cd head/server && (npm ci || npm install))
+          (cd base/server && npm ci)
+          (cd head/server && npm ci)
       - name: تمرین
         env:
           SALES: ${{ inputs.sales || '300' }}
@@ -81,7 +81,7 @@ jobs:
             cat rehearsal-out/migrate.log rehearsal-out/check.log 2>/dev/null || echo 'تمرین پیش از مقایسه ایستاد — لاگِ گام را ببینید'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: staging-rehearsal
