@@ -61,4 +61,17 @@ object ShopPolicy {
   fun setProductTools(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(PRODUCT_TOOLS, on).apply()
   }
+
+  /**
+   *  CRM-03 / S07 — سقفِ اعتبار در صندوق: فروشِ نسیه‌ای که ماندهٔ مشتری را از سقفش می‌گذراند بی تأییدِ
+   *  مدیر/صاحب ثبت نمی‌شود (`SalesEngine.Checkout.creditGate`، `CreditGate`). پیش‌فرض **خاموش**: صندوق
+   *  همان است که بود؛ سقف فقط در دفترِ قرض سنجیده می‌شود. فقط روی همین دستگاه.
+   */
+  private const val CREDIT_GATE = "credit_gate"
+
+  fun creditGate(context: Context): Boolean = prefs(context).getBoolean(CREDIT_GATE, false)
+
+  fun setCreditGate(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(CREDIT_GATE, on).apply()
+  }
 }

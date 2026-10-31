@@ -54,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -134,6 +135,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
+      onMessage = ::toast,
     )
   } else {
     /*
@@ -707,6 +709,7 @@ private fun AccountView(
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
+  onMessage: (String) -> Unit = {},
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -854,6 +857,7 @@ private fun AccountView(
             Text("چاپ صورت‌حساب")
           }
         }
+        StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
@@ -1152,10 +1156,11 @@ private fun TransactionDialog(
         Spacer(Modifier.height(14.dp))
         AmountField(amount, { amount = it }, "مبلغ")
 
-        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد
-        if (receiving && balance > 0) {
+        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد — همهٔ مانده تا پول، هرگز گردِ افغانی
+        val settle = if (receiving) MoneyInput.settleInput(balance) else null
+        if (settle != null) {
           Spacer(Modifier.height(6.dp))
-          TextButton(onClick = { amount = Math.round(balance).toString() }) {
+          TextButton(onClick = { amount = settle }) {
             Text("تسویهٔ کامل", color = Shop.colors.primary)
           }
         }
