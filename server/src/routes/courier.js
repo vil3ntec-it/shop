@@ -20,14 +20,13 @@ const { requireUser, requireShop, allowCourierScope } = require('../middleware/a
 const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /*
  *  DLV-01 (§۳.۱۱): **تنها** دری که توکنِ دامنه‌دارِ پیک را می‌پذیرد. پرچمِ
  *  `req.courierScope` فقط همین‌جا روشن می‌شود و تهِ همین روتر هر نشانیِ
  *  ناشناخته ۴۰۴ است، تا درخواست با پرچمِ روشن به روترِ دیگری سُر نخورد.
  */
-router.use(allowCourierScope, requireUser, requireShop, wrap(async (req, res, next) => {
+router.use(allowCourierScope, requireUser, requireShop, async (req, res, next) => {
   const st = await delivery.stateOf(req.shopId);
   if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
   const courier = await delivery.courierOfUser(req.shopId, req.user.id);
@@ -38,35 +37,35 @@ router.use(allowCourierScope, requireUser, requireShop, wrap(async (req, res, ne
     deviceId: req.device?.id || '',
   };
   next();
-}));
+});
 
-router.get('/me', wrap(async (req, res) => {
+router.get('/me', async (req, res) => {
   const c = req.courier;
   res.json({
     courier: { id: c.id, name: c.name, active: c.active === true, cashCapMinor: Number(c.cash_cap_minor) },
     serverTime: Date.now(),
   });
-}));
+});
 
-router.get('/missions', wrap(async (req, res) => {
+router.get('/missions', async (req, res) => {
   res.json(await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
   }));
-}));
+});
 
 /**
  * صفِ رویدادها (DLV-10): `{deviceId?, events:[{eventId, assignmentId, type,
  * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?}]}`.
  * پاسخ برای هر رویداد: applied | duplicate | unchanged | rejected(code).
  */
-router.post('/events', wrap(async (req, res) => {
+router.post('/events', async (req, res) => {
   res.json(await delivery.courierEvents(req.shopId, req.body, req.courierActor));
-}));
+});
 
-router.post('/missions/:id/photos', wrap(async (req, res) => {
+router.post('/missions/:id/photos', async (req, res) => {
   const out = await delivery.putPhoto(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
 //  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
 router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));

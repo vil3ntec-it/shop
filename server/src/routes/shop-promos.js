@@ -39,7 +39,6 @@ const STAMP_FLAG = 'shop.promo_stamp';
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const MAX_RULES = 200;
 const MAX_BYTES = 16 * 1024;
@@ -65,16 +64,16 @@ async function stateOf(shopId) {
   return { enabled: !!(s && s.enabled), updatedAt: Number(s?.updated_at || 0), rules: rows.map(ruleRow) };
 }
 
-router.get('/', requirePermission('data.read'), wrap(async (req, res) => {
+router.get('/', requirePermission('data.read'), async (req, res) => {
   res.json({
     ...(await stateOf(req.shopId)),
     stamp: await flagOf(req.shopId, STAMP_FLAG),
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
   });
-}));
+});
 
-router.put('/settings', requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/settings', requirePermission('settings.write'), async (req, res) => {
   const on = req.body && req.body.enabled;
   if (typeof on !== 'boolean') throw badRequest('enabled باید true یا false باشد', 'invalid_setting');
   const t = now();
@@ -87,9 +86,9 @@ router.put('/settings', requirePermission('settings.write'), wrap(async (req, re
     targetType: 'shop', targetId: req.shopId, detail: { enabled: on }, ip: clientIp(req),
   });
   res.json({ enabled: on, updatedAt: t });
-}));
+});
 
-router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/rules/:id', requirePermission('settings.write'), async (req, res) => {
   const id = String(req.params.id || '');
   if (!ID_RE.test(id)) throw badRequest('شناسهٔ قاعده نادرست است', 'invalid_id');
   const body = req.body && req.body.rule;
@@ -138,9 +137,9 @@ router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, r
     ip: clientIp(req),
   });
   res.json({ rule: ruleRow(row) });
-}));
+});
 
-router.delete('/rules/:id', requirePermission('settings.write'), wrap(async (req, res) => {
+router.delete('/rules/:id', requirePermission('settings.write'), async (req, res) => {
   const id = String(req.params.id || '');
   const row = await one(
     `UPDATE shop_promotions SET deleted=true, rev=rev+1, updated_at=$3, updated_by=$4
@@ -152,7 +151,7 @@ router.delete('/rules/:id', requirePermission('settings.write'), wrap(async (req
     targetType: 'promotion', targetId: id, detail: {}, ip: clientIp(req),
   });
   res.json({ ok: true });
-}));
+});
 
 module.exports = router;
 module.exports.MESSAGES = MESSAGES;
