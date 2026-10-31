@@ -51,6 +51,24 @@ object PosCatalog {
       .sortedWith(compareBy({ !it.name.startsWith(term, ignoreCase = true) }, { it.name }))
       .toList()
 
+  /**
+   *  POS-04 — نمایهٔ جست‌وجوی مقاوم (`CatalogMatch`، هستهٔ `TextNormalizer`) از کالاهای فعال؛
+   *  یک بار با هر تغییرِ کالاها، نه با هر حرف.
+   */
+  fun searchIndex(products: List<Product>): ir.vil3ntec.tohid.core.text.CatalogMatch.Index =
+    ir.vil3ntec.tohid.core.text.CatalogMatch.index(
+      products.filter { it.active }.map { ir.vil3ntec.tohid.core.text.CatalogMatch.Item(it.id, it.name, it.barcodes) },
+    )
+
+  /**
+   *  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): همان کارِ [matches] با حروفِ هم‌ارز («ي/ی»،
+   *  «ك/ک»)، نیم‌فاصله، رقمِ فارسی در نام و بارکد، کلمه‌ها به هر ترتیب و غلطِ تایپی وقتی جورِ دقیق
+   *  کم است. ترتیب: بارکدِ کامل، آغازِ نام، کلمه‌ها، آغازِ بارکد، غلطِ تایپی — هر گروه به ترتیبِ نام.
+   */
+  fun smartMatches(index: ir.vil3ntec.tohid.core.text.CatalogMatch.Index, byId: Map<String, Product>, term: String): List<Product> =
+    if (term.isEmpty()) emptyList()
+    else ir.vil3ntec.tohid.core.text.CatalogMatch.search(index, term).mapNotNull { id -> byId[id]?.takeIf { it.active } }
+
   /** شبکهٔ بی جست‌وجو: کالاهای فعالِ دستهٔ انتخابی (`null` = همه) به ترتیبِ نام */
   fun byCategory(products: List<Product>, category: String?): List<Product> =
     products.filter { it.active && (category == null || it.category.trim() == category) }.sortedBy { it.name }
