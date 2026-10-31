@@ -100,6 +100,7 @@
     active: 'فعال',
     saleUnit: 'واحد فروش',
     unitFactor: 'ضریب واحد',
+    brand: 'برند',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',
