@@ -50,6 +50,17 @@ data class Product(
    */
   val saleUnit: String = "",
   val unitFactor: Double = 1.0,
+  /*
+   *  PRD-06 — برند و برچسب‌ها (فقط با `ShopPolicy.productTools` نوشته می‌شوند). همان کلیدِ `brand` که
+   *  کاتالوگِ سرور (`lib/catalog.js`) و نمای عمومیِ بازار می‌خوانند. `null` نوشته نمی‌شود ⇒ کالای
+   *  بی برند همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val brand: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val tags: List<String>? = null,
 )
 
 @Serializable
@@ -546,6 +557,16 @@ data class PriceChange(
   val newPrice: Double = 0.0,
   val date: String = "",
   val createdAt: Long = 0,
+  /*
+   *  PRD-14 — چه کسی و چرا (فقط با `ShopPolicy.productTools`)؛ `null` نوشته نمی‌شود، پس ردیفِ قدیمی و
+   *  ردیفِ پرچمِ خاموش بایت‌به‌بایت همان JSON ِ پیشین‌اند و op ِ تازه‌ای نمی‌سازند.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val reason: String? = null,
 )
 
 /** شناسهٔ ردیفِ سابقه — ULID، همان `uid()`ِ وب و `newId()`ِ صفحه‌ها (F0-10) */
