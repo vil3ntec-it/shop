@@ -25,6 +25,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalShipping
@@ -155,6 +156,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var active by remember { mutableStateOf(store.cards("active")) }
   var done by remember { mutableStateOf(store.cards("done")) }
   var name by remember { mutableStateOf(store.courierName) }
+  var callEnabled by remember { mutableStateOf(store.callEnabled) }
   var photosWaiting by remember { mutableStateOf(store.photos().size) }
   var syncing by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
@@ -166,6 +168,31 @@ fun CourierHome(onSignedOut: () -> Unit) {
   fun reloadLocal() {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
     name = store.courierName; photosWaiting = store.photos().size
+    callEnabled = store.callEnabled
+  }
+
+  /**
+   *  «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط همین لحظه از سرور، فقط صفحهٔ شماره‌گیر باز
+   *  می‌شود (تماس را خودِ پیک می‌زند) و شماره جایی نگه داشته نمی‌شود. بی اینترنت ⇒ پیامِ روشن.
+   */
+  fun callCustomer(card: MissionCard) {
+    scope.launch {
+      Backend.courier(context).callNumber(card.id)
+        .onSuccess { phone ->
+          if (phone.isBlank()) { snackbar.showSnackbar("شمارهٔ مشتری نیامد"); return@onSuccess }
+          runCatching {
+            openDialer(context, phone)   //  مرزِ پلتفرم: CourierDialAndroid.kt
+          }.onFailure { snackbar.showSnackbar("برنامهٔ تماس پیدا نشد") }
+        }
+        .onFailure { f ->
+          snackbar.showSnackbar(
+            when (f.code) {
+              "offline", "unreachable", "timeout" -> "تماس فقط با اینترنت — شماره روی گوشی نگه داشته نمی‌شود"
+              else -> f.userMessage
+            },
+          )
+        }
+    }
   }
 
   suspend fun sync() {
@@ -298,7 +325,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
                   "delivered" -> ask = Ask.Deliver(c)
                   else -> record(c, to)
                 }
-              }, onPhoto = { ask = Ask.Photo(c) })
+              }, onPhoto = { ask = Ask.Photo(c) },
+                onCall = if (callEnabled && CourierFlow.canCall(c.status)) ({ callCustomer(c) }) else null)
             } else {
               MissionRow(c, waiting)
             }
@@ -353,7 +381,13 @@ fun CourierHome(onSignedOut: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String) -> Unit, onPhoto: () -> Unit) {
+private fun MissionCardView(
+  c: MissionCard,
+  waiting: Boolean,
+  onAction: (String) -> Unit,
+  onPhoto: () -> Unit,
+  onCall: (() -> Unit)? = null,
+) {
   val colors = Shop.colors
   Column(
     Modifier.fillMaxWidth()
@@ -370,12 +404,20 @@ private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String)
       Spacer(Modifier.height(8.dp))
       Text("دکان این سفارش را پس خواسته است — بسته را برگردانید.", style = MaterialTheme.typography.labelLarge, color = colors.danger)
     }
-    //  DLV-02: «اول نشانه»
-    if (c.landmark.isNotBlank()) {
+    //  DLV-09: دکان پس از ناموفق نشانی را درست کرد ⇒ پیش از تلاشِ دوباره دیده شود
+    if (c.addressCorrectedAt != null && CourierFlow.isLive(c.status)) {
       Spacer(Modifier.height(8.dp))
-      Text(c.landmark, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      Text("دکان نشانی را اصلاح کرد — پیش از رفتن دوباره بخوانید.", style = MaterialTheme.typography.labelLarge, color = colors.primary)
     }
-    if (c.addressText.isNotBlank()) Text(c.addressText, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+    //  DLV-02: «اول نشانه» — نشانه، «ناحیه · دروازهٔ رنگ»، بعد نشانیِ متنی (MissionView.landmarkFirst)
+    MissionView.landmarkFirst(c).forEachIndexed { i, line ->
+      if (i == 0) {
+        Spacer(Modifier.height(8.dp))
+        Text(line, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      } else {
+        Text(line, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+      }
+    }
     if (c.customerName.isNotBlank() || c.phoneMasked.isNotBlank()) {
       Spacer(Modifier.height(6.dp))
       Text(
@@ -403,7 +445,7 @@ private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String)
       )
     }
     val actions = CourierFlow.actions(c.status)
-    if (actions.isNotEmpty() || (c.photoAllowed && c.status == "arrived")) {
+    if (actions.isNotEmpty() || (c.photoAllowed && c.status == "arrived") || onCall != null) {
       Spacer(Modifier.height(10.dp))
       FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.forEach { to ->
@@ -411,6 +453,14 @@ private fun MissionCardView(c: MissionCard, waiting: Boolean, onAction: (String)
             TextButton(onClick = { onAction(to) }) { Text(actionLabel(c.status, to), color = colors.danger) }
           } else {
             TohidButton(text = actionLabel(c.status, to), onClick = { onAction(to) })
+          }
+        }
+        //  DLV-02: «تماس با مشتری» — شمارهٔ کامل فقط با زدنِ همین دکمه از سرور می‌آید
+        if (onCall != null) {
+          TextButton(onClick = onCall) {
+            Icon(Icons.Filled.Call, contentDescription = null, tint = colors.primary)
+            Spacer(Modifier.width(4.dp))
+            Text("تماس با مشتری", color = colors.primary)
           }
         }
         if (c.photoAllowed && c.status == "arrived") {

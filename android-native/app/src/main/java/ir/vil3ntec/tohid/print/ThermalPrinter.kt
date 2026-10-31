@@ -13,6 +13,8 @@ import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
 import java.io.OutputStream
+import ir.vil3ntec.tohid.core.i18n.StrLocalNet
+import ir.vil3ntec.tohid.hw.LocalNetworkAccess
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.UUID
@@ -238,7 +240,7 @@ object ThermalPrinter {
     val err = runCatching {
       when (link) {
         is Link.Bluetooth -> sendBluetooth(context, link.address, bytes, wrote)
-        is Link.Network -> sendNetwork(link.host, link.port, bytes, wrote)
+        is Link.Network -> if (LocalNetworkAccess.blocked(context, link.host)) StrLocalNet.denied else sendNetwork(link.host, link.port, bytes, wrote)
         is Link.Usb -> sendUsb(context, link.deviceName, bytes, wrote)
       }
     }.getOrElse { it.message ?: "چاپ نشد" }
@@ -246,17 +248,19 @@ object ThermalPrinter {
   }
 
   /**
-   *  بررسیِ سلامت (HW-11): وصل می‌شود و `DLE EOT 4` (حسگرِ کاغذ) می‌پرسد.
-   *  چیزی چاپ نمی‌شود. چاپگری که پاسخ ندهد هنوز ممکن است چاپ کند —
-   *  بعضی چاپگرها اصلاً پاسخِ وضعیت نمی‌دهند؛ همین گفته می‌شود.
+   *  بررسیِ سلامت (HW-11، هشدارِ HW-02): وصل می‌شود و `DLE EOT 1/2/3/4` را **یکی‌یکی**
+   *  می‌پرسد (آفلاین، درِ باز، کاغذِ تمام یا رو به پایان، تیغه و خطا). چیزی چاپ نمی‌شود.
+   *  چاپگری که پاسخ ندهد هنوز ممکن است چاپ کند — بعضی چاپگرها اصلاً وضعیت نمی‌گویند؛
+   *  همین گفته می‌شود.
    *
-   *  ⚠️ روی چاپگرِ واقعی آزموده نشده (NOT-VERIFIED)؛ منطقِ خواندنِ پاسخ
-   *  (`EscPos.parsePaperStatus`) آزمون دارد.
+   *  ⚠️ روی چاپگرِ واقعی آزموده نشده (NOT-VERIFIED)؛ ترتیبِ پرسش‌ها، خواندنِ پاسخ و
+   *  پیام (`core/hw/PrinterStatus`) آزمون دارند (`PrinterDrawerTest`).
    */
-  fun probe(context: Context, link: Link): Probe = wire.withLock { probeNow(context, link) }
+  fun probe(context: Context, link: Link, full: Boolean = false): Probe = wire.withLock { probeNow(context, link, full) }
 
-  private fun probeNow(context: Context, link: Link): Probe = when (link) {
-    is Link.Network -> probeStream(link.label()) {
+  /** `full` = «ابزارهای تازهٔ دستگاه» (`HwTools`، پیش‌فرض خاموش): چهار پرسش؛ وگرنه فقط کاغذ، مثلِ پیش */
+  private fun probeNow(context: Context, link: Link, full: Boolean): Probe = when (link) {
+    is Link.Network -> if (LocalNetworkAccess.blocked(context, link.host)) Probe(false, StrLocalNet.denied) else probeStream(link.label(), full) {
       val socket = Socket()
       socket.connect(InetSocketAddress(link.host, link.port), CONNECT_TIMEOUT_MS)
       socket.soTimeout = PROBE_READ_MS
@@ -267,7 +271,7 @@ object ThermalPrinter {
       when {
         adapter == null -> Probe(false, "بلوتوث روی این دستگاه نیست")
         !adapter.isEnabled -> Probe(false, "بلوتوث خاموش است")
-        else -> probeStream(link.address) {
+        else -> probeStream(link.address, full) {
           val s = adapter.getRemoteDevice(link.address).createRfcommSocketToServiceRecord(SPP)
           adapter.cancelDiscovery()
           s.connect()
@@ -290,7 +294,38 @@ object ThermalPrinter {
 
   private const val PROBE_READ_MS = 1_500
 
-  private fun probeStream(label: String, open: () -> java.io.Closeable): Probe {
+  /** رفتارِ پیشین (تنظیمِ تازه خاموش): فقط `DLE EOT 4`، همان پیام‌ها */
+  private fun paperOnly(label: String, input: java.io.InputStream, output: java.io.OutputStream): Probe {
+    output.write(ir.vil3ntec.tohid.core.hw.EscPos.PAPER_STATUS)
+    output.flush()
+    val b = try { input.read() } catch (e: java.io.InterruptedIOException) { -1 }
+    val paper = if (b >= 0) ir.vil3ntec.tohid.core.hw.EscPos.parsePaperStatus(b) else null
+    return when {
+      paper == null -> Probe(true, "وصل شد ($label) — چاپگر وضعیتِ کاغذ را نگفت")
+      paper.out -> Probe(false, "کاغذ تمام شده است", paper)
+      paper.nearEnd -> Probe(true, "وصل است — کاغذ رو به پایان است", paper)
+      else -> Probe(true, "وصل است و کاغذ دارد", paper)
+    }
+  }
+
+  /**
+   *  یک بایت تا `timeoutMs`، وگرنه ‎-1. سوکتِ بلوتوث مهلتِ خواندن ندارد و `read()` ِ
+   *  چاپگرِ بی‌پاسخ برای همیشه می‌ماند؛ پس با `available()` منتظر می‌مانیم.
+   */
+  private fun readByteWithin(input: java.io.InputStream, timeoutMs: Long): Int {
+    val until = System.currentTimeMillis() + timeoutMs
+    return try {
+      while (input.available() <= 0) {
+        if (System.currentTimeMillis() >= until) return -1
+        Thread.sleep(20)
+      }
+      input.read()
+    } catch (e: java.io.InterruptedIOException) {
+      -1
+    }
+  }
+
+  private fun probeStream(label: String, full: Boolean, open: () -> java.io.Closeable): Probe {
     var conn: java.io.Closeable? = null
     return try {
       conn = open()
@@ -299,16 +334,17 @@ object ThermalPrinter {
         is android.bluetooth.BluetoothSocket -> c.inputStream to c.outputStream
         else -> return Probe(true, "وصل شد")
       }
-      output.write(ir.vil3ntec.tohid.core.hw.EscPos.PAPER_STATUS)
-      output.flush()
-      val b = try { input.read() } catch (e: java.io.InterruptedIOException) { -1 }
-      val paper = if (b >= 0) ir.vil3ntec.tohid.core.hw.EscPos.parsePaperStatus(b) else null
-      when {
-        paper == null -> Probe(true, "وصل شد ($label) — چاپگر وضعیتِ کاغذ را نگفت")
-        paper.out -> Probe(false, "کاغذ تمام شده است", paper)
-        paper.nearEnd -> Probe(true, "وصل است — کاغذ رو به پایان است", paper)
-        else -> Probe(true, "وصل است و کاغذ دارد", paper)
+      if (!full) return paperOnly(label, input, output)
+      val ask = ir.vil3ntec.tohid.core.hw.PrinterStatus.Probe()
+      while (true) {
+        val q = ask.next() ?: break
+        output.write(q)
+        output.flush()
+        ask.answer(readByteWithin(input, PROBE_READ_MS.toLong()))
       }
+      val state = ask.state()
+      val v = ir.vil3ntec.tohid.core.hw.PrinterStatus.verdict(state, label)
+      Probe(v.ok, v.message, state.paper)
     } catch (e: SecurityException) {
       Probe(false, "اجازهٔ بلوتوث داده نشده")
     } catch (e: Exception) {

@@ -226,7 +226,11 @@ object OrderDraft {
     val test: Boolean = false,
     val lines: List<LineInput> = listOf(LineInput(qty = "1")),
   )
-  data class Line(val name: String, val qtyMilli: Long, val unitPriceMinor: Long)
+  /**
+   *  [productId]/[unit] (POS-38، `core/pos/DeliverLater`): قلمِ سبدِ صندوق با شناسهٔ کالا و واحد، تا فروشِ
+   *  تحویل همان کالا را کم کند. تهی (پیش‌فرض، فرمِ سفارشِ دستی) ⇒ فرستاده نمی‌شوند و بدنه همان پیشین است.
+   */
+  data class Line(val name: String, val qtyMilli: Long, val unitPriceMinor: Long, val productId: String = "", val unit: String = "")
   data class Body(
     val source: String,
     val fulfillment: String,

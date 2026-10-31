@@ -55,6 +55,14 @@ object CourierFlow {
   val FAIL_REASONS: List<String> = listOf("no_answer", "wrong_address", "refused", "recalled", "other")
   val CASH_REASONS: List<String> = listOf("partial_payment", "refused_amount", "damaged_or_short", "other")
 
+  /**
+   *  «تماس با مشتری» (DLV-02): پس از «قبول» و تا پایان — همان `CALLABLE`ِ سرور
+   *  (`delivery.callCustomer`). پیش از قبول پیک فقط آن‌چه برای تصمیم لازم است را می‌بیند.
+   */
+  val CALLABLE: Set<String> = setOf("assigned", "picked_up", "moving", "arrived", "failed")
+
+  fun canCall(status: String): Boolean = status in CALLABLE
+
   fun isLive(status: String): Boolean = status in LIVE
   fun isTerminal(status: String): Boolean = status in STATUSES && status !in LIVE
 
@@ -281,6 +289,12 @@ data class MissionCard(
   val photoAllowed: Boolean = false,
   val recallRequested: Boolean = false,
   val updatedAt: Long = 0,
+  /** ناحیه (DLV-02، کارتِ «اول نشانه») */
+  val area: String = "",
+  /** رنگِ دروازه (DLV-02) */
+  val gateColor: String = "",
+  /** دکان پس از ناموفق نشانی را اصلاح کرد (DLV-09، زمانِ سرور) */
+  val addressCorrectedAt: Long? = null,
 )
 
 object MissionView {
@@ -300,7 +314,23 @@ object MissionView {
   fun redact(card: MissionCard): MissionCard = card.copy(
     landmark = "", addressText = "", lat = null, lng = null,
     customerName = "", phoneMasked = "", leaveWith = "", callBeforeArrival = false, cashTenderMinor = null,
+    area = "", gateColor = "", addressCorrectedAt = null,
   )
+
+  /**
+   *  کارتِ «اول نشانه» (DLV-02، §۶.۱۸): خطِ اول نشانه (بی نشانه، نشانیِ متنی)،
+   *  خطِ دوم «ناحیه · دروازهٔ رنگ»، خطِ سوم نشانیِ متنی وقتی نشانه هم هست.
+   *  خطِ خالی نمی‌آید؛ پیک پیش از هر چیز چیزی را می‌بیند که از سرِ کوچه پیداست.
+   */
+  fun landmarkFirst(card: MissionCard): List<String> {
+    val landmark = card.landmark.trim()
+    val text = card.addressText.trim()
+    val hint = listOf(
+      card.area.trim().takeIf { it.isNotEmpty() }?.let { "ناحیه: $it" },
+      card.gateColor.trim().takeIf { it.isNotEmpty() }?.let { "دروازهٔ $it" },
+    ).filterNotNull().joinToString(" · ")
+    return listOf(landmark.ifEmpty { text }, hint, if (landmark.isNotEmpty()) text else "").filter { it.isNotEmpty() }
+  }
 
   /**
    *  سپرِ دوم: سرور شمارهٔ پوشیده می‌دهد (`orders.maskPhone`: چهار نویسهٔ اول،
