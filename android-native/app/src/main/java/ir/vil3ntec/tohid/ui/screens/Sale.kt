@@ -165,6 +165,8 @@ fun SaleScreen(
 
   val gate = remember { ScanGate() }
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
+  //  PRD-04: بارکدِ بسته‌ها (کارتن ⇒ ۲۴ دانه) — جدا، فقط کامل
+  val packIndex = remember(d.products) { ShopStore.packIndex(d) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -212,6 +214,25 @@ fun SaleScreen(
         else { ScanFeedback.ok(context); toast(StrPos.weighedAdded(w.product.name, "${qty(w.quantity)} ${w.product.unit}")) }
         return
       }
+    }
+
+    //  PRD-04: بارکدِ بسته (کارتنِ ۲۴ دانه‌ای) ⇒ «اندازهٔ بسته» از واحدِ کالا، با همان نگهبانِ موجودی
+    val pack = packIndex.find(code)
+    val packProduct = pack?.let { h -> d.products.firstOrNull { it.id == h.productId } }
+    if (pack != null && packProduct != null) {
+      if (!packProduct.active) { ScanFeedback.unknown(context); toast(StrSale.inactiveActivate(packProduct.name)); return }
+      val want = multiplier * pack.pack.sizeMilli / 1000.0
+      val added = SalesEngine.addToCartCapped(cartStore.lines.value, packProduct.id, want, ShopStore.stock(d, packProduct.id))
+      if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
+      selectedId = packProduct.id
+      if (added.capped) {
+        ScanFeedback.unknown(context)
+        toast(Str.onlyInStock(packProduct.name, "${qty(added.available)} ${packProduct.unit}"))
+      } else {
+        ScanFeedback.ok(context)
+        toast(StrPos.weighedAdded(packProduct.name, "$multiplier × ${ir.vil3ntec.tohid.core.product.PackBarcodes.label(pack.pack, packProduct.unit)}"))
+      }
+      return
     }
 
     /*

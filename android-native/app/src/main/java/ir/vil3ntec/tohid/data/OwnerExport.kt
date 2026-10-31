@@ -142,6 +142,7 @@ object OwnerExport {
     "saleUnit" to "واحد فروش",
     "unitFactor" to "ضریب واحد",
     "brand" to "برند",
+    "packs" to "بسته‌ها",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",

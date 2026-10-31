@@ -101,6 +101,7 @@
     saleUnit: 'واحد فروش',
     unitFactor: 'ضریب واحد',
     brand: 'برند',
+    packs: 'بسته‌ها',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',
