@@ -1,12 +1,12 @@
 'use strict';
 /**
- * کدِ تحویل (PCK-11، DLV-08، DLV-15) — فقط HMAC در دیتابیس.
- * از `lib/delivery.js` جدا شد تا آن پرونده زیرِ سقفِ اندازه بماند؛ رفتار بایت‌به‌بایت همان است.
+ * کدِ تحویل (PCK-11، DLV-08، DLV-15) — فقط HMAC در دیتابیس. جدا از `lib/delivery.js`، بی تغییرِ رفتار.
  */
 const crypto = require('crypto');
 const config = require('../config');
+const { str } = require('./delivery-input');
 
-const str = (v) => (typeof v === 'string' ? v.trim() : '');
+const CODE_MAX_ATTEMPTS = 5;
 
 function pepper() {
   return config.secrets.api || config.secrets.otp || config.secrets.jwt || 'shop-delivery-code';
@@ -44,4 +44,4 @@ function codeMatches(a, raw) {
   return want.length === got.length && crypto.timingSafeEqual(want, got);
 }
 
-module.exports = { codeHash, newCode, derivedCode, codeFor, codeMatches };
+module.exports = { CODE_MAX_ATTEMPTS, codeHash, newCode, derivedCode, codeFor, codeMatches };

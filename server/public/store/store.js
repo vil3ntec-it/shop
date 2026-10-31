@@ -426,7 +426,7 @@
       expectedTotalMinor: subtotal() + feeFor(f),
     };
     if (f === 'delivery') {
-      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim() };
+      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
       if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
       body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
     }
