@@ -19,7 +19,7 @@
  *    و این سرور عمداً هیچ کتابخانهٔ PDFی ندارد.
  */
 const express = require('express');
-const { query, one, many, newId, now } = require('../db');
+const { query, one, many, tx, newId, now } = require('../db');
 const v = require('../lib/validate');
 const plans = require('../lib/plans');
 const subs = require('../lib/subscriptions');
@@ -30,7 +30,8 @@ const audit = require('../lib/audit');
 const pumpServices = require('../lib/pump-services');
 const { notifyPanel } = require('../lib/panel-live');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
-const { badRequest, notFound } = require('../middleware/errors');
+const { badRequest, notFound, conflict } = require('../middleware/errors');
+const idempotency = require('../lib/idempotency');
 const { reasonOf } = require('../lib/admin-access');
 
 const router = express.Router();
@@ -112,27 +113,78 @@ async function paymentInput(body, cur = null) {
   };
 }
 
+/* ── SEC-API-09: هر پرداخت یک بار، هر شمارهٔ رسید یک بار ──────────────────────────────────────────
+ *  پیش‌تر: بی کلیدِ یکتایی (دو کلیک یا تکرار پس از قطعِ شبکه ⇒ دو پرداخت) و شمارهٔ رسید «سال-(COUNT(*)+1)»
+ *  (دو ثبتِ هم‌زمان ⇒ یک شماره). حالا:
+ *   • `Idempotency-Key` (lib/idempotency.js، همان قاعدهٔ F0-14 ِ اعطای اشتراک): همان کلید ⇒ همان پاسخ،
+ *     کلید زیرِ قفلِ خودش و در همان تراکنشِ ثبت؛ بی کلید ⇒ رفتارِ پیشین (پنلِ قدیمیِ باز مانده).
+ *   • شمارهٔ خودکار از شمارندهٔ `sub_payment_counters` (مهاجرتِ ۱۶۷) در همان تراکنش؛ شمارهٔ دستی یا خودکار
+ *     با همهٔ پرداخت‌ها (حذف‌شده هم) سنجیده می‌شود ⇒ ۴۰۹ `receipt_no_taken`؛ قیدِ یکتای ردیف‌های تازه پشتِ آن.
+ */
+const RECEIPT_TAKEN = () => conflict('این شمارهٔ رسید پیش‌تر ثبت شده است', 'receipt_no_taken');
+
+async function receiptTaken(c, receiptNo, exceptId = '') {
+  return (await c.query('SELECT 1 FROM sub_payments WHERE receipt_no=$1 AND id<>$2 LIMIT 1', [receiptNo, exceptId])).rows.length > 0;
+}
+
+async function nextReceiptNo(c, at) {
+  const year = new Date(at).getUTCFullYear();
+  //  شمارهٔ دستیِ کهنه‌ای که شکلِ «سال-شماره» داشت رد می‌شود، نه دوباره داده
+  for (let i = 0; i < 1000; i++) {
+    const r = await c.query(
+      `INSERT INTO sub_payment_counters (scope, last) VALUES ('receipt', 1)
+       ON CONFLICT (scope) DO UPDATE SET last = sub_payment_counters.last + 1 RETURNING last`
+    );
+    const no = `${year}-${String(Number(r.rows[0].last)).padStart(5, '0')}`;
+    if (!(await receiptTaken(c, no))) return no;
+  }
+  throw RECEIPT_TAKEN();
+}
+
+const isUniqueViolation = (err) => err && (err.code === '23505' || /duplicate key|unique constraint/i.test(String(err.message)));
+
 router.post('/payments', async (req, res, next) => {
   try {
+    const idem = idempotency.fromRequest(req, `payment:${req.admin.id}`);
+    const replay = (response) => { res.set('Idempotent-Replayed', 'true'); return res.status(201).json(response); };
+    if (idem) {
+      const prior = await idempotency.find(idem);
+      if (prior) return replay(prior.response);
+    }
     const p = await paymentInput(req.body);
     const t = now();
-    const id = newId('pay');
-    //  شمارهٔ رسید اگر نیامد، خودمان می‌سازیم: سال-شماره
-    const receiptNo = p.receiptNo || `${new Date(t).getUTCFullYear()}-${String(
-      (await one(`SELECT COUNT(*)::int n FROM sub_payments`)).n + 1
-    ).padStart(5, '0')}`;
-    await query(
-      `INSERT INTO sub_payments (id, app, tenant_kind, tenant_id, subscription_id, amount, currency, method,
-                             receipt_no, note, paid_at, created_by, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [id, p.app, p.tenantKind, p.tenantId, p.subscriptionId, p.amount, p.currency, p.method,
-        receiptNo, p.note, p.paidAt, req.admin.id, t]
-    );
+    let out;
+    try {
+      out = await tx(async (c) => {
+        if (idem) {
+          await idempotency.lock(c, idem);
+          const prior = await idempotency.find(idem, idempotency.viaClient(c));
+          if (prior) return { replayed: prior.response };
+        }
+        if (p.receiptNo && await receiptTaken(c, p.receiptNo)) throw RECEIPT_TAKEN();
+        const receiptNo = p.receiptNo || await nextReceiptNo(c, t);
+        const id = newId('pay');
+        await c.query(
+          `INSERT INTO sub_payments (id, app, tenant_kind, tenant_id, subscription_id, amount, currency, method,
+                                 receipt_no, note, paid_at, created_by, created_at, receipt_unique)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true)`,
+          [id, p.app, p.tenantKind, p.tenantId, p.subscriptionId, p.amount, p.currency, p.method,
+            receiptNo, p.note, p.paidAt, req.admin.id, t]
+        );
+        const row = (await c.query(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [id])).rows[0];
+        const response = { payment: shapePayment(row) };
+        if (idem) await idempotency.save(c, idem, { tenantId: p.tenantId, resultId: id, response });
+        return { response, id };
+      });
+    } catch (err) {
+      if (isUniqueViolation(err)) throw RECEIPT_TAKEN();
+      throw err;
+    }
+    if (out.replayed) return replay(out.replayed);
     const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_created', targetType: 'payment', targetId: id,
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_created', targetType: 'payment', targetId: out.id,
       detail: { app: p.app, amount: p.amount, currency: p.currency, ...(reason ? { reason } : {}) } });
-    const row = await one(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [id]);
-    res.status(201).json({ payment: shapePayment(row) });
+    res.status(201).json(out.response);
   } catch (err) { next(err); }
 });
 
@@ -141,10 +193,19 @@ router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
     const cur = await one('SELECT * FROM sub_payments WHERE id=$1 AND deleted=false', [v.id(req.params.id)]);
     if (!cur) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
     const p = await paymentInput(req.body, cur);
-    await query(
-      `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8 WHERE id=$1`,
-      [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
-    );
+    //  SEC-API-09: شمارهٔ رسیدِ پرداختِ دیگر را نمی‌شود روی این یکی گذاشت
+    if (p.receiptNo && p.receiptNo !== cur.receipt_no && await receiptTaken({ query }, p.receiptNo, cur.id)) {
+      return next(RECEIPT_TAKEN());
+    }
+    try {
+      await query(
+        `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8 WHERE id=$1`,
+        [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
+      );
+    } catch (err) {
+      if (isUniqueViolation(err)) return next(RECEIPT_TAKEN());
+      throw err;
+    }
     const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_updated', targetType: 'payment', targetId: cur.id, detail: reason ? { reason } : {} });
     const row = await one(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [cur.id]);
