@@ -488,6 +488,7 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 کشوی پس از فروش با قاعدهٔ HW-03 (`DrawerRule.opensAfter`: فقط نقدِ دخل)، خاموش ⇒ دقیقاً `paymentMethod == "cash"` و لغونشده (`DrawerRule.decide`)؛
 فقط صاحب/مدیر می‌بیند؛ HW-01/02/03/05/11، باز).
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `doc_gaps` = زبانهٔ «شماره‌های جاافتاده» در «گزارش‌ها»ی کامپیوتر (`DocGapsPref`، RPT-17، `claude/new-rpt-1`، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `line_pricing` روشن ⇒ تخفیفِ کلِ فاکتورِ کامپیوتر به مبلغ هم (`HeldInvoice.discountAmount` واحد را با فاکتورِ نگه‌داشته می‌برد؛ POS-20، `claude/part-pos-1`).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
