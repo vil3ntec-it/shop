@@ -93,6 +93,7 @@
 - ورودِ نقد فقط `deposit` یا `other`؛ خروجِ بیش از نقدِ موردِ انتظار رد می‌شود؛ کشو، بازپرداخت و تبادل تأییدکننده می‌خواهند (#237).
 - جست‌وجوی صندوقِ کامپیوتر نتیجه را در همان شبکه/جدول برجسته می‌کند، نه فهرستِ کشویی؛ ترتیب همان است تا Enter همان کالا را بردارد (#251).
 - با عبارتِ جست‌وجو، همهٔ دسته‌ها گشته می‌شوند و دستهٔ انتخابی تنگش نمی‌کند (#251).
+- جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، پشتِ تنظیمِ خاموشِ همین دستگاه `PosSearchPrefs`): نمایه (`CatalogMatch.index`، کلیدهای `TextNormalizer`) فقط با تغییرِ کالاها ساخته می‌شود، نه با هر حرف؛ ترتیب بارکدِ کامل ⇐ آغازِ نام ⇐ همهٔ کلمه‌ها ⇐ آغازِ بارکد ⇐ غلطِ تایپی (فقط وقتی جورِ دقیق کمتر از ۸ است)، هر گروه به ترتیبِ نام؛ کالای غیرفعال نه (`CatalogMatchTest`، `PosSmartSearchTest`). مترادف از بیرون می‌آید، ثابت نوشته نمی‌شود.
 - «سبدِ تازه» تأیید می‌خواهد و فوکوسِ پیش‌فرض روی «انصراف» است (۵.۱ بند ۱۱، #251).
 - ⛔ تخفیفِ خودکار (PRM): حالِ حافظهٔ `PromoLive` مالِ یک «حساب@دکان» است (`PromoEngine.forAccount`)؛ پاسخِ سرور و نسخهٔ دستگاه فقط وقتی می‌نشینند که حافظه و حسابِ همین لحظه هر دو همان‌اند (`PromoEngine.accepts`). `PromoLive.reset(context)` فقط **پس از** `LedgerOwner.align` و فقط با `SWITCHED`/`ADOPTED` (`LedgerOwner.promoReset`)، و در «خروج از حساب» — شروعِ سردِ همان حساب (`SAME`) کدهای سبد و پیش‌نویس را پاک نمی‌کند (S1، `PromoEngineTest`، `LedgerOwnerPromoTest`، `PromoLiveWiringTest`).
 - ⛔ نشانِ تخفیف روی فاکتور فقط با پرچمِ `shop.promo_stamp` (`live_config`، پیش‌فرض خاموش؛ در پاسخِ `GET /api/shop/promos` به نامِ `stamp`): `PromoEngine.stamp` فیلدهای **اختیاری**، همه به واحدِ کوچک، می‌گذارد — `SaleItem.listPriceMinor`، `SaleItem.promo: [{id, rev, name, discountMinor}]` (نامِ همان لحظه)، `Sale.promoDiscountMinor` و `Sale.coupons` (فقط کدهای اعمال‌شده، حداکثر ۱۰ تا و ۳۲ نویسه). کلیدِ دکان یا پرچم خاموش ⇒ همان شیء و همان JSON (`SalePromoFieldsTest`). فیلدِ پس از A00 است و کف نمی‌خواهد؛ `PRE_A00` دست نمی‌خورد.
@@ -401,7 +402,7 @@
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
-تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).

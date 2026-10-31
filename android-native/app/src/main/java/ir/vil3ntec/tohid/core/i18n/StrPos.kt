@@ -10,6 +10,12 @@ package ir.vil3ntec.tohid.core.i18n
 object StrPos {
 
   // صندوقِ کامپیوتر
+  val smartSearch: String get() = t("جست‌وجوی مقاومِ صندوق", "Forgiving till search", "د صندوق بښونکې لټون")
+  val smartSearchNote: String get() = t(
+    "روشن: «ي/ی» و «ك/ک»، نیم‌فاصله، رقمِ فارسی، کلمه‌ها به هر ترتیب و یک غلطِ تایپی هم پیدا می‌شوند؛ بارکدِ کامل اول، بعد نامی که با نوشته آغاز می‌شود. فقط روی همین دستگاه.",
+    "On: Arabic/Persian letter variants, half-spaces, Persian digits, words in any order and a typo are found too; a full barcode comes first, then names starting with the text. This device only.",
+    "روښانه: د «ي/ی» او «ك/ک» بڼې، نیمه تشه، فارسي عددونه، کلمې په هر ترتیب او یوه ټایپي تېروتنه هم موندل کېږي؛ بشپړ بارکوډ لومړی، بیا هغه نومونه چې په لیکنه پیلېږي. یوازې همدا وسیله.",
+  )
   val discountForbidden: String get() = t("این تخفیف برای شما ممنوع است", "You're not allowed to give this discount", "تاسو ته د دې تخفیف اجازه نشته")
   val cartChangedRetry: String get() = t("سبد همین حالا عوض شد — دوباره بزنید", "The cart just changed — press again", "ټوکرۍ همدا اوس بدله شوه — بیا یې ووهئ")
   fun saleRecorded(a: Any): String = t("فروش $a ؋ ثبت شد", "Sale of $a ؋ recorded", "د $a ؋ پلور ثبت شو")
