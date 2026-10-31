@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
+import ir.vil3ntec.tohid.core.returns.ReturnPolicy
 import ir.vil3ntec.tohid.core.returns.ReturnReasons
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
@@ -274,6 +275,8 @@ object ReturnFlow {
   const val WHY_DAMAGED = "damaged"
   const val WHY_OVER_LIMIT = "over_limit"
   const val WHY_PERM = "perm_denied"
+  /** RET-09 — بیرون از سیاستِ برگشت (مهلت یا قلمِ غیرقابلِ برگشت) */
+  const val WHY_POLICY = "policy"
 
   private val RANK = mapOf("staff" to 1, "manager" to 2, "owner" to 3)
 
@@ -289,16 +292,30 @@ object ReturnFlow {
    *    approve | deny)، یا `null` وقتی هسته هنوز این کلید را ندارد (پیش از PRِ
    *    اجرای مجوزها). صفحه آن را با [permDecision] می‌سازد.
    *  @param limitMinor سقفِ دکان برای مدیر و شاگرد (به پول)؛ ۰ = بی سقف.
+   *  @param policyBreach RET-09 — بیرون از سیاستِ برگشت ([policyCheck])؛ شاگرد تأییدِ مدیر می‌خواهد و
+   *    مدیر و صاحب خودشان استثنا می‌گذارند (همان قاعدهٔ «بی رسید» و «ضایعات»)
    */
-  fun gate(role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long): Gate {
+  fun gate(
+    role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long,
+    policyBreach: Boolean = false,
+  ): Gate {
     val r = roleOf(role)
     if (perm == "deny") return Gate("deny", listOf(WHY_PERM), "owner")
     val why = ArrayList<String>()
     if (perm == "approve" || (r != "owner" && limitMinor > 0 && amountMinor > limitMinor)) why += WHY_OVER_LIMIT
     if (noReceipt && r == "staff") why += WHY_NO_RECEIPT
     if (damaged && r == "staff") why += WHY_DAMAGED
+    if (policyBreach && r == "staff") why += WHY_POLICY
     val approver = if (WHY_OVER_LIMIT in why) "owner" else "manager"
     return Gate(if (why.isEmpty()) "allow" else "approve", why, approver)
+  }
+
+  /** RET-09 — قلم‌های این سند با سیاستِ دکان (`ReturnPolicyPrefs`)؛ سیاستِ خاموش ⇒ همیشه «پذیرفته» */
+  fun policyCheck(d: ShopData, sale: Sale?, lines: List<Line>, policy: ReturnPolicy.Policy, today: String): ReturnPolicy.Verdict {
+    if (!policy.on) return ReturnPolicy.Verdict()
+    val items = lines.mapNotNull { l -> d.products.find { it.id == l.productId } }.distinctBy { it.id }
+      .map { ReturnPolicy.Item(it.id, it.name, it.category, it.subcategory, it.barcodes) }
+    return ReturnPolicy.check(policy, sale?.date, today, items)
   }
 
   /** آیا این نقش این برگشت را تأیید می‌کند */
@@ -464,6 +481,8 @@ object ReturnFlow {
     val limit: Double = 0.0,
     val approval: Approval? = null,
     val exchangeSaleId: String? = null,
+    /** RET-09 — سیاستِ برگشتِ دکان (`ReturnPolicyPrefs.of`)؛ `null` ⇒ بی سیاست (رفتارِ پیشین) */
+    val policy: ReturnPolicy.Policy? = null,
   )
 
   data class Posted(val data: ShopData, val docId: String, val total: Double, val split: Split, val gate: Gate)
@@ -491,7 +510,11 @@ object ReturnFlow {
       id
     } else null
 
-    val g = gate(req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit))
+    val verdict = req.policy?.let { policyCheck(d, sale, quote.lines, it, today) } ?: ReturnPolicy.Verdict()
+    val g = gate(
+      req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit),
+      policyBreach = !verdict.ok,
+    )
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
@@ -622,6 +645,11 @@ object ReturnFlow {
       if (refundText.isNotEmpty()) append(" — بازپرداخت: $refundText")
       if (quote.lines.any { it.disposition == DAMAGED }) append(" — ضایعات")
       if (g.decision == "approve") append(" — تأیید: $approvedBy (${g.reasons.joinToString("+")})")
+      //  RET-09: هر استثنا روی سیاستِ برگشت در سابقهٔ سند می‌ماند (شاگرد با تأیید، مدیر و صاحب خودشان)
+      if (!verdict.ok) append(" — استثنای سیاستِ برگشت: " + buildList {
+        if (verdict.late) add("${verdict.ageDays} روز پس از فاکتور")
+        verdict.blockedIds.forEach { id -> add("غیرقابلِ برگشت: " + (d.products.find { it.id == id }?.name ?: id)) }
+      }.joinToString("، "))
       if (req.by.isNotBlank()) append(" — ثبت: ${req.by.trim()}")
     }
 
