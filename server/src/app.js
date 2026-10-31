@@ -132,6 +132,23 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  /*
+   *  ⛔ TEN-02 (cache) — پاسخِ درخواستِ دارای اعتبارنامه هرگز در کشِ مشترک (CDN، پراکسیِ
+   *  کش‌دار، قاعدهٔ «همه را کش کن») نمی‌نشیند: پیش‌فرضِ `private, no-cache` و `Vary`
+   *  روی همان سرآیندها. مسیری که خودش Cache-Control می‌گذارد (‎no-store‎، ‎private,
+   *  max-age‎، ETag ِ فاکتور…) پس از این می‌نویسد و همان می‌ماند. `tenant-surfaces.test.js`.
+   */
+  const CREDENTIALS = ['authorization', 'x-store-session', 'x-store-ticket'];
+  app.use('/api', (req, res, next) => {
+    if (CREDENTIALS.some((k) => req.headers[k])) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.vary('Authorization');
+      res.vary('X-Store-Session');
+      res.vary('X-Store-Ticket');
+    }
+    next();
+  });
+
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
@@ -340,6 +357,7 @@ async function createApp({ runMigrations = true } = {}) {
     //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
     api.use('/shop/payments', require('./routes/shop-payments'));
     api.use('/payments', require('./routes/payments-webhook'));
+    api.use('/admin/payments', require('./routes/admin-payments'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
@@ -528,6 +546,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
+    //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
+    require('./lib/payment-intents').reconcile()
+      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+      .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است

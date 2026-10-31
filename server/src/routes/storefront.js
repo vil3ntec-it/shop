@@ -21,7 +21,9 @@ const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
+const areas = require('../lib/storefront-area-requests');
 const audit = require('../lib/audit');
+const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
@@ -62,7 +64,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store),
   ]);
   res.json({
-    store: { ...sf.profile(req.store, cats, status), delivery },
+    //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
+    store: { ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -82,6 +85,36 @@ router.get('/:slug/delivery', readLimit, locateLimit, store, async (req, res) =>
 //  ── CHK-12: بازه‌های پیشِ رو — فقط «هست/پر/کم مانده» ─────────────────
 router.get('/:slug/slots', readLimit, store, async (req, res) => {
   res.json(await sfd.publicSlots(req.store, String(req.query.fulfillment || '')));
+});
+
+//  ── CHK-10/S34: «وقتی به محلِ شما رسیدیم خبرم کن» ─────────────────────
+//  ⛔ پرچمِ خاموشِ `shop.storefront.notify_area` (یا ناحیهٔ خاموش، یا ویترینِ بسته) ⇒
+//  `next('route')` پیش از هر سقف و شماره: همان پاسخِ مسیرِ ناشناختهٔ main، بیت‌به‌بیت.
+const areaStore = async (req, res, next) => {
+  //  ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10)،
+  //  پیش از سنجشِ شماره؛ پرچمِ خاموش ⇒ این در نیست.
+  const s = await sf.open(req.params.slug);
+  if (!(await areas.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+//  شمارهٔ تأییدشده: بلیتِ همین چند روز یا نشستِ حساب — همان که دکان با آن خبر می‌دهد
+const verified = async (req, res, next) => {
+  const phone = await sf.verifiedPhone(ticketOf(req), sessionOf(req));
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
+  req.verifiedPhone = phone;
+  next();
+};
+
+router.post('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  const out = await areas.request(req.store, req.verifiedPhone, req.body);
+  res.status(out.created ? 201 : 200).json({ request: out.request });
+});
+
+//  پس گرفتنِ رضایت — تکرارش همان پاسخ
+router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  res.json(await areas.withdraw(req.store, req.verifiedPhone));
 });
 
 router.get('/:slug/products', readLimit, store, async (req, res) => {
@@ -159,7 +192,41 @@ router.get('/:slug/orders', readLimit, store, async (req, res) => {
 });
 
 router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
-  res.json({ order: await sf.track(req.store, req.params.token) });
+  //  PAY-21: قصدِ گذشته از زمان پیش از خواندن بسته می‌شود؛ دکمه فقط وقتی همین حالا پرداختنی است
+  const orderId = sf.orderIdOf(req.store.shop_id, req.params.token);
+  await pay.refreshOrder(req.store.shop_id, orderId);
+  const order = await sf.track(req.store, req.params.token);
+  order.onlinePay = { available: await pay.orderPayable(req.store.shop_id, orderId) };
+  res.json({ order });
+});
+
+/**
+ * PAY-21: پرداختِ سفارشِ ویترین با حساب‌پی — توکنِ پیگیری همان اجازه است؛ مبلغ و نشانیِ بازگشت را
+ * سرور می‌سازد. پاسخ فقط نشانیِ صفحهٔ حساب‌پی است؛ «پرداخت شد» فقط با وب‌هوک و تأییدِ دوم، هرگز با
+ * برگشتِ مرورگر (صفحهٔ پیگیری وضعیت را از همین سرور می‌خواند).
+ */
+router.post('/:slug/orders/:token/pay', checkoutLimit, store, async (req, res) => {
+  await sf.track(req.store, req.params.token);   // توکنِ درست و سفارشِ همین ویترین — وگرنه ۴۰۴
+  const orderId = sf.orderIdOf(req.store.shop_id, req.params.token);
+  const base = String(config.serverUrl || '').trim().replace(/\/+$/, '');
+  const page = base ? `${base}/store/${encodeURIComponent(req.store.slug)}`
+    : `https://${req.store.slug}.${config.storefront.domain}/`;
+  let out;
+  try {
+    out = await pay.createForStorefront(req.store.shop_id, orderId, {
+      key: req.get('idempotency-key') || '', returnUrl: `${page}#/o/${encodeURIComponent(req.params.token)}`,
+      description: String(req.store.title || '').slice(0, 100),
+    });
+  } catch (err) {
+    if (err && err.code === 'provider_unavailable') {
+      return res.status(502).json({ error: { code: err.code, message: err.message } });
+    }
+    throw err;
+  }
+  const p = out.intent;
+  res.status(out.created ? 201 : 200).json({
+    payment: { status: p.status, checkoutUrl: p.checkoutUrl, expiresAt: p.expiresAt, amountMinor: p.amountMinor, currency: p.currency },
+  });
 });
 
 //  WEB-12: «خریدِ دوباره» — همان توکنِ پیگیری؛ فقط خواندن

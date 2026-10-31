@@ -26,7 +26,8 @@ const { ApiError, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
-const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${req.chatViewer.phone}` : '');
+//  شماره با کلیدِ یکتا (RSK-07): شکلِ دیگرِ همان گوشی سطلِ تازه نمی‌گیرد
+const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${require('../lib/validate').phoneKey(req.chatViewer.phone)}` : '');
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-chat-read' });
 const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey });
 const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'store-chat-upload', key: viewerKey });
