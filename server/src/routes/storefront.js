@@ -91,9 +91,10 @@ router.get('/:slug/slots', readLimit, store, async (req, res) => {
 //  ⛔ پرچمِ خاموشِ `shop.storefront.notify_area` (یا ناحیهٔ خاموش، یا ویترینِ بسته) ⇒
 //  `next('route')` پیش از هر سقف و شماره: همان پاسخِ مسیرِ ناشناختهٔ main، بیت‌به‌بیت.
 const areaStore = async (req, res, next) => {
-  let s = null;
-  try { s = await sf.open(req.params.slug); } catch (err) { if (err.status !== 404) throw err; }
-  if (!s || !(await areas.flagOn(s.shop_id))) return next('route');
+  //  ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10)،
+  //  پیش از سنجشِ شماره؛ پرچمِ خاموش ⇒ این در نیست.
+  const s = await sf.open(req.params.slug);
+  if (!(await areas.flagOn(s.shop_id))) return next('route');
   req.store = s;
   res.set('Cache-Control', 'no-store');
   next();
