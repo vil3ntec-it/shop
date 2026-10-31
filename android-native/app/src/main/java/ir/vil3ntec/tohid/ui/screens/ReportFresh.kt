@@ -29,9 +29,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.cost.CostMethod
 import ir.vil3ntec.tohid.core.cost.CostPolicy
+import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportTables
+import ir.vil3ntec.tohid.core.risk.CashierAlerts
 import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
@@ -348,13 +350,43 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     }
     "fraud" -> view.fraud?.let { f ->
       val p = if (f.from == f.to) formatDate(f.from) else if (f.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(f.from)} تا ${formatDate(f.to)}"
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
-        card("برگشتی", f.totals.returnCount.toString(), p, Modifier.weight(1f))
-        card("حذفِ ردیف", f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
-        card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
-        card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
+      val alerts = remember(f) { ReportBoard.alertsOf(f) }
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
+          card("برگشتی", f.totals.returnCount.toString(), p, Modifier.weight(1f))
+          card("حذفِ ردیف", f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
+          card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
+          card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
+        }
+        if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
+    }
+  }
+}
+
+/** RSK-10 — هشدارِ رفتارِ غیرعادیِ صندوقدار: فقط نشان می‌دهد، چیزی را نمی‌بندد */
+@Composable
+private fun CashierAlertBox(alerts: List<CashierAlerts.Alert>) {
+  fun kind(k: CashierAlerts.Kind) = when (k) {
+    CashierAlerts.Kind.VOID -> StrRisk.voids
+    CashierAlerts.Kind.DISCOUNT -> StrRisk.discounts
+    CashierAlerts.Kind.NO_SALE -> StrRisk.noSales
+  }
+  Column(
+    Modifier.fillMaxWidth().clip(Shape.card).border(1.dp, Shop.colors.danger, Shape.card).padding(12.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      StatusPill(StrRisk.title(alerts.size), PillTone.DANGER)
+      Spacer(Modifier.width(8.dp))
+      Text(StrRisk.rule, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    }
+    alerts.forEach { a ->
+      Text(
+        StrRisk.line(a.key, kind(a.kind), a.count, a.invoices, a.peerCount, a.peerInvoices),
+        style = MaterialTheme.typography.bodyMedium,
+      )
     }
   }
 }
