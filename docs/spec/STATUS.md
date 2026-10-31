@@ -172,7 +172,7 @@
 | PAY-03 | دکمه‌های اسکناس ۱۰ تا ۱۰۰۰ افغانی، با کلید. | §۶.۲ | ۲ | P0 | PARTIAL | اسکناس‌ها در هسته (NOTES)؛ دکمه و کلید در صندوق نیست (keymap planned) | — | — | #237 |
 | PAY-04 | «نقد دقیق» با یک کلید (Enter روی مبلغ خالی). | §۶.۲ | ۲ | P0 | PARTIAL | کامپیوتر: F12/Ctrl+Enter پایانِ فوری با نقدِ دقیق؛ exactCash در هسته؛ پنلِ پرداخت با Enter روی مبلغِ خالی نیست (D-20) | — | — | #237 |
 | PAY-05 | پرداخت جزئی. باقی‌مانده به حساب مشتری می‌رود. | §۶.۲ | ۲ | P0 | IMPLEMENTED-VERIFIED | نسیه با پرداختِ جزئی، باقی به حسابِ قرض‌دار: SalesEngineTest «فروش نسیه باقی مانده را به حساب قرض دار می گذارد»، CartLineTest (CIِ اندرویدِ main ‏39268884098 سبز)؛ یکی شدن با پرداختِ ترکیبی با PAY-01 | — | — | پیش از v3؛ #261 |
-| PAY-06 | روش‌های پرداخت قابل تعریف: نقد، HesabPay، e& money، My Money، ATOMA Pay، M-Paisa، کارت Af… | §۶.۲ | ۲ | P0 | PARTIAL | تعریفِ روش‌ها در هسته (DEFAULT_METHODS، defineMethods؛ PayCoreTest)؛ تنظیمات و صندوق فقط نقد/نسیه | — | D-08 (کیف‌پول‌ها) | #237 |
+| PAY-06 | روش‌های پرداخت قابل تعریف: نقد، HesabPay، e& money، My Money، ATOMA Pay، M-Paisa، کارت Af… | §۶.۲ | ۲ | P0 | PARTIAL | تعریفِ روش‌ها در هسته (DEFAULT_METHODS، defineMethods؛ PayCoreTest)؛ تنظیمات و صندوق فقط نقد/نسیه؛ حساب‌پی در صندوقِ گوشی و کامپیوتر (QR، NFC ِ اندروید) با تأییدِ درگاه پشتِ پرچمِ سرورِ `pay.hesabpay`: `gradle :core:jvmTest` (HesabPayClientTest، IntentPollerTest، HesabPayAttemptsTest، NdefTagTest، QrLargeTest، QrLargeVectorsTest) سبز، `node --test server/test/qr-large.test.js` ۲/۲، HesabPaySettleTest در CI ِ اندروید؛ بی آزمون با کلیدِ واقعی و دستگاه | آماده اتصال | D-08 (کیف‌پول‌ها)؛ کلیدِ حساب‌پی و دستگاهِ NFC | #237، `claude/payments-hesabpay-2` |
 | PAY-07 | وضعیت پرداخت: در انتظار، تأییدشده، ناموفق، لغو، نیازمند بررسی، بازپرداخت کامل یا جزئی. | §۶.۲ | ۲ | P0 | PARTIAL | وضعیت‌ها و گذارهای پرداخت در هسته (pay-core.test.js ۱۲/۱۲)؛ وصل نیست | — | — | #237 |
 | PAY-08 | سه سطح تأیید جدا: ثبت دستی، تأیید دستگاه و تأیید ارائه‌دهنده. تا تأیید قابل اتکا نرسیده،… | §۶.۲ | ۲ | P1 | PARTIAL | سطحِ «تأییدِ ارائه‌دهنده» در سرور: «paid» فقط با وب‌هوکِ امضاشده + تأییدِ دومِ `fetchStatus` و ردیفِ `verification: gateway` (`node --test test/payment-intents.test.js` ۱۸/۱۸ روی PostgreSQL و PGlite)؛ «تأییدِ دستگاه» و وصل در برنامه‌ها نیست | آماده اتصال | D-08 | `claude/payments-hesabpay-1` |
 | PAY-09 | گردکردن نقدی به ۵ یا ۱۰ افغانی، به‌صورت یک ردیف جدا. | §۶.۲ | ۲ | P1 | PARTIAL | گردکردن به ۵/۱۰ با ردیفِ جدا در هسته، پیش‌فرض خاموش؛ وصل نیست | — | — | #237 |
@@ -864,7 +864,7 @@
 
 | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
 |---|---|---|---|---|---|---|---|---|---|
-| E2E-PAY-10 | پرداخت pending/failed هیچ‌گاه موفق تلقی نمی‌شود؛ callback تکراری فقط یک اثر دارد. | §۲۴.۶ | — | — | BLOCKED-EXTERNAL | پرداختِ آنلاین و callback نیست | — | D-08 | — |
+| E2E-PAY-10 | پرداخت pending/failed هیچ‌گاه موفق تلقی نمی‌شود؛ callback تکراری فقط یک اثر دارد. | §۲۴.۶ | — | — | BLOCKED-EXTERNAL | سمتِ برنامهٔ صندوق: فروش فقط با `paid` ِ سرور و ردیفِ `gateway` بسته می‌شود؛ pending، failed، expired، cancelled و مهلتِ نامعلوم هرگز (HesabPaySettleTest، IntentPollerTest)؛ یک قصد یک فروش (`refId` = کلیدِ فاکتور، `record(saleId)`)؛ سرتاسری با درگاهِ واقعی آزموده نشده | آماده اتصال | D-08 | `claude/payments-hesabpay-2` |
 
 ## E2E-RET
 

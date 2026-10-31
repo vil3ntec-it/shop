@@ -289,6 +289,10 @@ fun DeskSaleScreen(
   )
   val gate = DiscountGate.state(discountDecision.decision, saleKey, totals.discount, totals.subtotal, approval)
 
+  //  PAY-21: درگاه‌های تسویه (حساب‌پی) — پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
+  val gateways = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) {
+    (SalesEngine.record(d, priced, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message
+  }
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
   var creditApproval by remember { mutableStateOf<ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>(null) }
@@ -304,12 +308,13 @@ fun DeskSaleScreen(
     ) {
       toast(StrPos.cartChangedRetry); return
     }
-    if (discountBad || (!payV2 && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
-    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (discountBad || (!payV2 && settled == null && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
+    if (!payV2 && settled == null && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
     if (gate == DiscountGate.State.DENIED) { toast(StrPos.discountForbidden); return }
     if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
     val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
-    val st = if (!payV2) null else settled ?: when (
+    //  PAY-21: تسویهٔ آمادهٔ حساب‌پی با پرچم و بی آن پذیرفته است
+    val st = settled ?: if (!payV2) null else when (
       val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
         ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
       )
@@ -588,6 +593,12 @@ fun DeskSaleScreen(
           if (payment == SalesEngine.Payment.CREDIT) {
             MiniNumberField(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
           }
+          //  PAY-21: حساب‌پی (کلِ فاکتور؛ با پنلِ ترکیبی در همان پنل و برای باقی‌مانده)
+          ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
+            hook = gateways, total = totals.finalTotal,
+            panel = null, customerId = cartDebtorId, busy = posting, modifier = Modifier.padding(top = 8.dp), onPaid = { st -> finish(st) },
+            enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
+          )
         }
       },
       actions = {
@@ -733,6 +744,8 @@ fun DeskSaleScreen(
       target = target,
       onDismiss = { payOpen = false; refocus() },
       onConfirm = { st -> finish(st) },
+      //  PAY-21: حساب‌پی برای باقی‌ماندهٔ پنل — نه با تخفیفِ تأییدنشده (پول گرفته و فروش رد نشود)
+      gateways = gateways.takeIf { !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED },
     )
   }
   if (showInvoice) lastInvoice?.let { (snap, id) ->
