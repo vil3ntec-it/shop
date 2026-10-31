@@ -25,6 +25,9 @@ on:
       - 'license/test-vectors/**'
       #  گامِ ۵ِ آزمونِ نصاب (`install.ps1` با PowerShell 5.1) — تا امروز در PR اصلاً نمی‌دوید
       - 'install.ps1'
+      #  نشانیِ سرور و AppId ِ ساختِ کامپیوتر از همین پرونده خوانده می‌شود (`desktop/build.gradle.kts`)؛
+      #  بی آن PRی که فقط این را عوض کند دروازه‌های AppId و upgradeUuid را نمی‌گذراند
+      - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از

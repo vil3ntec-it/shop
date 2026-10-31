@@ -7,7 +7,7 @@
 #    • versionCode همان «۱۰۰ + شمارهٔ ساخت» و کمتر از منتشرشده نیست — همیشه سخت
 #    • اثر انگشتِ گواهیِ امضا (SHA-256) همان منتشرشده         — همیشه سخت
 #    • حجم در ±۵٪ِ منتشرشده — سخت فقط وقتی PR فایلِ ساخت را عوض کرده
-#      (build/settings.gradle.kts، gradle.properties، proguard، wrapper)؛
+#      (build/settings.gradle.kts، gradle.properties، هر proguard*.pro، wrapper)؛
 #      در بقیه فقط هشدار، چون قابلیتِ تازه حق دارد APK را بزرگ کند.
 #  شمارِ آزمون‌ها هم (اگر پوشهٔ نتیجه داده شود) در خلاصهٔ اجرا می‌آید.
 #
@@ -54,7 +54,7 @@ fi
 strict=0
 if [ -n "${PR_NUMBER:-}" ]; then
   files=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER/files" --paginate --jq '.[].filename')
-  if grep -qE '(^|/)(build|settings)\.gradle\.kts$|(^|/)gradle\.properties$|(^|/)proguard-rules\.pro$|gradle-wrapper\.properties$|libs\.versions\.toml$' <<<"$files"; then
+  if grep -qE '(^|/)(build|settings)\.gradle\.kts$|(^|/)gradle\.properties$|(^|/)proguard[^/]*\.pro$|gradle-wrapper\.properties$|libs\.versions\.toml$' <<<"$files"; then
     strict=1
   fi
 fi
