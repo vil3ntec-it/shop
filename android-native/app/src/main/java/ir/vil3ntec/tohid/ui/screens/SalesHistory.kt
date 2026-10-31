@@ -694,7 +694,7 @@ private fun ReturnDialog(
 
   val total = items.sumOf { item ->
     val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
-    if (item.quantity > 0) Math.round(item.totalPrice / item.quantity * wanted).toDouble() else 0.0
+    SalesEngine.returnAmount(sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
   }
 
   Dialog(onDismissRequest = onDismiss) {

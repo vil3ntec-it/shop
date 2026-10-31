@@ -163,6 +163,24 @@
     return adjust === 0 ? null : Object.freeze({ type: ROUNDING_LINE_TYPE, amount: money(adjust, total.currency) });
   }
 
+  /* مبلغِ برگشتِ بخشی از یک قلم — «گردِ تجمعی» (SEC-DATA-01). هم‌زادِ `ReturnShare.amount` ِ core؛
+     بردار: `license/test-vectors/return-share-v1.json`. مبلغِ هر برگشت = پس‌دادنیِ تا پایانِ آن − پس‌دادنیِ
+     تا پیش از آن، پس جمعِ برگشت‌های تکه‌تکهٔ یک قلم هرگز از برگشتِ یک‌جای همان مقدار بیشتر نمی‌شود
+     (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶ پس داده می‌شد). عددهای دفترِ امروز (افغانی، Double)؛ گرد به افغانیِ
+     کامل با Math.round — همان mathRound ِ کاتلین، و ترتیبِ عمل یکی، پس خروجی بیت‌به‌بیت یکی است. */
+  function returnShare(lineTotal, quantity, returnedBefore, qty, paidRatio) {
+    if (!(quantity > 0) || !isFinite(quantity) || !isFinite(lineTotal) || !isFinite(paidRatio)) return 0;
+    if (!isFinite(qty) || !(qty > 0)) return 0;
+    var before = isFinite(returnedBefore) && returnedBefore > 0 ? returnedBefore : 0;
+    var net = lineTotal * paidRatio;
+    function upTo(k) {
+      if (k <= 0) return 0;
+      if (k >= quantity) return Math.round(net);
+      return Math.round(net * k / quantity);
+    }
+    return norm(upTo(before + qty) - upTo(before));
+  }
+
   return {
     MAX_EXACT: MAX_EXACT,
     ROUNDING_LINE_TYPE: ROUNDING_LINE_TYPE,
@@ -182,5 +200,6 @@
     lineTotal: lineTotal,
     allocateDiscount: allocateDiscount,
     cashRounding: cashRounding,
+    returnShare: returnShare,
   };
 });

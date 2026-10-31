@@ -199,6 +199,42 @@ class SalesReturnTest {
     assertTrue(returned.data.transactions.isEmpty())
   }
 
+  /**
+   *  SEC-DATA-01 — برگشتِ تکه‌تکه بیش از پولِ گرفته‌شده پس نمی‌دهد. پیش‌تر هر برگشت جدا گرد می‌شد:
+   *  دو عدد به ۲٫۵ (جمعِ ۵) ⇒ ۳ + ۳ = ۶. با تخفیفِ ۱۰٪ (۲ افغانی) سه عدد به ۵ (پرداخت ۱۳) ⇒ ۴ + ۴ + ۴ = ۱۲،
+   *  یعنی برگشتِ یک‌جا و تکه‌تکه دو مبلغِ متفاوت داشتند؛ حالا هر دو ۱۳.
+   */
+  @Test
+  fun `مرجوعی تکه تکه بیش از مبلغ قلم پس نمی دهد`() {
+    val cheap = ledger().copy(products = listOf(rice.copy(salePrice = 2.5)))
+    val sold = (SalesEngine.record(
+      cheap, listOf(SalesEngine.CartLine("p1", 2.0)), SalesEngine.Checkout(), "2026-08-28", 1, ::newId,
+    ) as SalesEngine.Result.Ok)
+    val itemId = sold.data.saleItems.single().id
+    assertEquals(5.0, sold.data.saleItems.single().totalPrice, 0.0)
+
+    var d = ok(SalesEngine.recordReturn(sold.data, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-29", 0, ::newId)).data
+    d = ok(SalesEngine.recordReturn(d, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-30", 0, ::newId)).data
+    assertEquals(listOf(3.0, 2.0), d.saleReturns.map { it.amount })
+  }
+
+  @Test
+  fun `مرجوعی تکه تکه با تخفیف فاکتور همان برگشت یکجاست`() {
+    val five = ledger().copy(products = listOf(rice.copy(salePrice = 5.0)))
+    val sold = (SalesEngine.record(
+      five, listOf(SalesEngine.CartLine("p1", 3.0)),
+      SalesEngine.Checkout(discountType = SalesEngine.DiscountType.PERCENT, discountValue = 10.0),
+      "2026-08-28", 1, ::newId,
+    ) as SalesEngine.Result.Ok)
+    val itemId = sold.data.saleItems.single().id
+    var d = sold.data
+    repeat(3) { d = ok(SalesEngine.recordReturn(d, sold.saleId, mapOf(itemId to 1.0), "", "2026-08-29", 0, ::newId)).data }
+    val oneShot = ok(SalesEngine.recordReturn(sold.data, sold.saleId, mapOf(itemId to 3.0), "", "2026-08-29", 0, ::newId))
+      .data.saleReturns.single().amount
+    assertEquals(oneShot, d.saleReturns.sumOf { it.amount }, 0.0)
+    assertEquals(13.0, oneShot, 0.0)
+  }
+
   @Test
   fun `دو مرجوعی پشت سر هم روی هم جمع می شوند`() {
     val sold = sell(ledger(), 10.0, SalesEngine.Checkout())
