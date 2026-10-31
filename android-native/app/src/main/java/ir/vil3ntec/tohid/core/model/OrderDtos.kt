@@ -40,6 +40,8 @@ data class OrdersConfigDto(
    *  نخستین `config?caps=saleOnHandover` می‌گذارد؛ null ⇒ هنوز نه ⇒ هیچ فروشی.
    */
   val handoverSince: Long? = null,
+  /** پرچمِ خاموشِ `shop.orders.picking` (PCK): برگهٔ جمع‌آوری به‌جای گذارهای سادهٔ «جمع‌آوری/بسته‌بندی» */
+  val picking: Boolean = false,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -136,6 +138,13 @@ data class OrderDto(
   /** فقط در `handover` برای `reverse`: لحظهٔ برگشت به دکان */
   val returnedAt: Long? = null,
   /**
+   *  فقط در `handover` برای `refund`: همهٔ رویدادهای بازپرداختِ همین سفارش با مبلغِ سقف‌دارِ سرور
+   *  (`order-ledger.refundEventsOf`) — برنامه نشسته‌ها را خودش رد می‌کند (`core/orders/OrderRefunds`)
+   */
+  val refundEvents: List<RefundEventDto> = emptyList(),
+  /** فقط در `handover` برای `refund`: همین کاربر سندِ برگشت را می‌تواند بنویسد (`returns.create`) */
+  val refundable: Boolean? = null,
+  /**
    *  فقط در `handover` برای `sale`: همین کاربر (اجازهٔ مؤثرش، با سقفِ درصد/مبلغِ تخفیفِ **همین**
    *  سفارش) فروش را می‌تواند بنویسد. null (سرورِ کهنه) ⇒ اجازهٔ کلیِ نقش.
    */
@@ -146,6 +155,16 @@ data class OrderDto(
   val reviewCode: String? = null,
 )
 
+/** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */
+@Serializable
+data class RefundEventDto(
+  val key: String = "",
+  val amountMinor: Long = 0,
+  val at: Long = 0,
+  /** `ledger` | `status` | `gateway` */
+  val source: String = "",
+)
+
 /** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
 @Serializable
 data class HandoverPageDto(
@@ -154,6 +173,8 @@ data class HandoverPageDto(
   val reversals: List<OrderDto> = emptyList(),
   /** بررسیِ صاحب: پیش از کف بیرون رفت و پس از آن تحویل شد — هرگز خودکار */
   val review: List<OrderDto> = emptyList(),
+  /** بازپرداختِ سفارشِ دارای فروش که سندِ برگشتش هنوز در دفترِ دکان ننشسته (`action = refund`) */
+  val refunds: List<OrderDto> = emptyList(),
   /** صفحهٔ بعد (`after`) — سفارشِ گیرکرده جلوی بقیه را نمی‌گیرد */
   val nextAfter: String? = null,
   val since: Long = 0,

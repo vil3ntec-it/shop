@@ -43,11 +43,22 @@ kotlin {
   jvm {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
+  //  آزمون‌های commonTest (Kotlin ِ خالص، بی دستگاه): روی jvm با `jvmTest` و در آیفون با iosTest.
+  //  فقط kotlin-test از Maven Central — همان قاعدهٔ «بی مخزنِ گوگل» ِ settings.gradle.kts.
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
+  //  بردارهای مرجعِ مشترکِ JS/Kotlin (`core/test-vectors/*.json`) روی JVM — فقط آزمون؛ همان نسخهٔ برنامه، از Maven Central
+  sourceSets.jvmTest.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") }
   if (iosSpike) {
     iosArm64()
     iosSimulatorArm64()
   }
-  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
   if (nativeGuard) linuxX64()
+}
+
+//  همان آزمون JSONها را هنگامِ اجرا می‌خواند؛ بی این ورودی، تغییرِ فقط JSON آزمون را
+//  UP-TO-DATE (سبزِ کهنه) رد می‌کرد
+tasks.named<Test>("jvmTest") {
+  inputs.files(fileTree("test-vectors"), fileTree("../license/test-vectors"))
+    .withPropertyName("testVectors")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
