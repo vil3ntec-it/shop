@@ -121,21 +121,27 @@ fun ProductDetailScreen(
   }
   var bankOpen by remember { mutableStateOf(false) }
   var guidedOpen by remember { mutableStateOf(false) }
+  /** عکسی که روی سرور برای این کالا ثبت شد (انتخاب از بانک، بازگشت یا نسخهٔ دیگرِ مرکزی) ⇒ همین دستگاه */
+  fun saveFromBank(bytes: ByteArray) {
+    PhotoStore.saveBytes(context, product.id, bytes).onSuccess {
+      scope.launch {
+        val cur = store.data.value
+        store.save(cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
+      }
+      //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
+      ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = false)
+      photoVersion++
+    }
+  }
   if (bankOpen) {
     ImageBankPicker(
       productId = product.id, name = product.name, barcode = product.barcodes.firstOrNull().orEmpty(),
       hasPhoto = product.photo, onDismiss = { bankOpen = false },
+      //  IMG-BANK-10: بی نتیجه ⇒ راهِ «عکسِ خودم» همین‌جا
+      onUploadOwn = { bankOpen = false; pickOpen = true },
     ) { bytes ->
       bankOpen = false
-      PhotoStore.saveBytes(context, product.id, bytes).onSuccess {
-        scope.launch {
-          val cur = store.data.value
-          store.save(cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
-        }
-        //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
-        ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = false)
-        photoVersion++
-      }
+      saveFromBank(bytes)
     }
   }
   if (guidedOpen) {
@@ -263,6 +269,14 @@ fun ProductDetailScreen(
             }
           }
         }
+      }
+      //  کدام عکس در ویترین است، نسخهٔ تازهٔ مرکزی، بازگشت و پیشنهاد به بانک (IMG-BANK-08، ۰۹، ۱۶)
+      if (bankOn) {
+        Spacer(Modifier.height(Space.xs))
+        BankPhotoSource(
+          productId = product.id, name = product.name, barcode = product.barcodes.firstOrNull().orEmpty(),
+          refresh = photoVersion, onPhoto = { saveFromBank(it) },
+        )
       }
 
       Spacer(Modifier.height(Space.md))
