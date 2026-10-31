@@ -501,6 +501,7 @@
 | `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
+| `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
@@ -652,6 +653,13 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
   ردیفِ توکنِ پیر: نشستِ همان دستگاه باید توکنِ زنده داشته باشد) همیشه می‌بندد. پرچم را فقط وقتی روشن کن که داشبوردِ نسخه‌ها
   دیگر برنامهٔ پیش از S78 نشان ندهد. برنامه بلیت را از `ApiClient` می‌گیرد (۴۰۱ ⇒ تازه‌سازی)، در `onClosing` پاسخِ بستن می‌دهد و
   با هر `hello` یک Pull می‌زند. سنجه: `server/test/sync-live-revoke.test.js` و `node test/e2e/run.mjs revoke`.
+- ⛔ **SEC-CLI-01 — سقفِ دستگاهِ دکان در `POST /api/license/sync`:** شناسهٔ دستگاهِ بدنه ساختگی‌پذیر است، پس فقط
+  «برچسبِ یک جا» است: شناسهٔ تازه فقط با جای خالی و زیرِ `pg_advisory_xact_lock('shop-devices:<دکان>')` در همان
+  تراکنش **ثبت** می‌شود (`devices`، `platform='license'`، در «دستگاه‌های من» دیده و باطل‌شدنی) و از آن پس شمرده
+  می‌شود؛ شناسهٔ باطل‌شدهٔ همان حساب ⇒ `device_revoked` بی مجوز. تا ۲.۱۴.۵ فقط شمرده می‌شد و نشانده نه ⇒ یک توکن با
+  شناسه‌های پیاپی بی‌شمار مجوز می‌گرفت. «شمردن بی نشاندن» برنگردد. دستگاهِ ثبت‌شده با ورود بیرون از سقف فقط با
+  پرچمِ `shop.device_cap` رد می‌شود (نقشهٔ پرچم‌ها). سنجه: `server/test/sec-sub-device-cap.test.js` (روی PostgreSQL، بی
+  قفل ⇒ سرخ). شرح و بقیهٔ SEC-SUB: `docs/security/client-fa.md`.
 
 ### سنجشِ کارایی
 - **F0-26:** خطِ پایه در `docs/spec/bench/baseline-1405-07-22.md`. هر PR که کارایی را عوض می‌کند

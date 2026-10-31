@@ -188,6 +188,16 @@
 server؛ (۵) Pages ⇐ GitHub Actions، اسکنِ secret، Dependabot، مجوزِ Actions = Read؛ (۶) روی سرورِ خانه: `NODE_ENV=production`،
 `API_SECRET`، `OTP_SECRET`، `TRUST_PROXY_FROM`، `BACKUP_PASSPHRASE`، TOTP برای خودش؛ (۷) کلید و حسابِ حساب‌پی؛ (۸) پرسش‌های محصولیِ جمع‌شده
 (پیشنهادِ پیش‌فرض کنارِ هرکدام در گفت‌وگو داده شد): پایانِ روزِ کاری برای کلِ دکان، روشِ بها (میانگینِ موزون)، مهلتِ لینکِ پیگیری ۳۰ روز، …
+### ۱۴۰۵/۰۸/۰۹ — برنامهٔ امنیت، شاخهٔ `claude/sec-client` (اشتراک در سرور، اندروید، کامپیوتر)
+- انجام شد: SEC-CLI-01 (High) — `POST /api/license/sync` شناسهٔ دستگاهِ ساختگی را فقط می‌شمرد، نمی‌نشاند ⇒ سقفِ دستگاه دور
+  می‌خورد و دستگاهِ باطل‌شده دوباره مجوز می‌گرفت؛ حالا جا زیرِ قفلِ دکان ثبت می‌شود، باطل ⇒ `device_revoked`، سقفِ دستگاه‌های
+  واردشده پشتِ پرچمِ خاموشِ `shop.device_cap`. آزمون‌های `sec-sub-device-cap`، `sec-sub-trial`، `sec-sub-replay` (روی
+  PostgreSQL هم). سند: `docs/security/client-fa.md`. PRِ جدا #580: `DevShot` فقط در ساختِ dev، مبهم‌سازیِ R8 پشتِ
+  `-Ptohid.obfuscate=true`.
+- نیمه‌کاره / کارِ صاحب محصول: SEC-CLI-02 (Critical) کلیدِ امضای انتشار و رمزش در مخزنِ عمومی ⇒ چرخش؛ SEC-CLI-03 کلیدِ امضای
+  به‌روزرسانی گذاشته نشده؛ SEC-CLI-04 DPAPI برای نشستِ کامپیوتر؛ روشن کردنِ `shop.device_cap`.
+- قدمِ بعدی: پس از مرج، ردیفِ SEC-SUB در `SECURITY-PROGRAM-fa.md` (کارِ هماهنگ‌کننده)؛ مهاجرتِ ۱۶۲ مصرف نشد.
+
 
 ### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/portable-account-server` (جابه‌جاییِ سرورِ حساب؛ همراهِ `claude/portable-server` در ریپوی server)
 - انجام شد: `server/scripts/move-db.js` (inspect · copy · compare) بینِ PGlite و PostgreSQL در هر دو جهت؛ مبدأ هرگز نوشته
