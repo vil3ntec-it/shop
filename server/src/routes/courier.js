@@ -14,9 +14,12 @@
  * ⚠️ پیشوندِ تازه است: باید به ACCOUNT_PREFIXESِ پنلِ خانگی (ریپوی دیگر)
  * هم افزوده شود — دستورش در شرحِ PR است.
  */
+const path = require('path');
 const express = require('express');
 const delivery = require('../lib/delivery');
 const audit = require('../lib/audit');
+const orders = require('../lib/orders');
+const courierMap = require('../lib/courier-map');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -53,9 +56,10 @@ router.get('/me', wrap(async (req, res) => {
 }));
 
 router.get('/missions', wrap(async (req, res) => {
-  res.json(await delivery.missions(req.shopId, req.courier.id, {
+  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)
+  res.json(await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
-  }));
+  })));
 }));
 
 /**
@@ -101,6 +105,36 @@ router.post('/missions/:id/eta', wrap(async (req, res) => {
 router.post('/missions/:id/location', wrap(async (req, res) => {
   res.json(await delivery.putLocation(req.shopId, req.params.id, req.body, req.courierActor));
 }));
+
+/*
+ *  DLV-05 (پشتِ پرچمِ خاموشِ `shop.delivery_map`): نقشهٔ آفلاینِ شهر. فهرست با
+ *  اندازه و `sha256`؛ خودِ فایل با `Range` (ادامهٔ دانلودِ بریده). شناسه فقط از
+ *  فهرستِ پوشهٔ نقشهٔ سرور است — هیچ مسیری از درخواست به دیسک نمی‌رسد.
+ */
+async function needMap(req, res, next) {
+  if (!(await orders.flagOf(req.shopId, courierMap.FLAG))) {
+    return next(notFound('نقشهٔ آفلاین برای این دکان روشن نیست', 'delivery_map_disabled'));
+  }
+  next();
+}
+
+router.get('/map', needMap, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    attribution: courierMap.ATTRIBUTION,
+    packs: (await courierMap.packs()).map((p) => ({ ...p, url: `/api/courier/map/${p.id}` })),
+  });
+});
+
+router.get('/map/:id', needMap, async (req, res, next) => {
+  const file = await courierMap.packFile(req.params.id);
+  if (!file) return next(notFound('این نقشه روی سرور نیست', 'map_not_found'));
+  //  `root` + نامِ سنجیده: send خودش هم از بیرون رفتن از پوشه جلوگیری می‌کند
+  res.sendFile(path.basename(file), {
+    root: path.dirname(file), acceptRanges: true, etag: true, lastModified: true,
+    headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' },
+  }, (err) => { if (err && !res.headersSent) next(err); });
+});
 
 //  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
 router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));

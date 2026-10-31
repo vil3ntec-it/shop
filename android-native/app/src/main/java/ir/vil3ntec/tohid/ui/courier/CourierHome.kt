@@ -403,12 +403,20 @@ private fun MissionCardView(
       Spacer(Modifier.height(8.dp))
       Text("دکان این سفارش را پس خواسته است — بسته را برگردانید.", style = MaterialTheme.typography.labelLarge, color = colors.danger)
     }
-    //  DLV-02: «اول نشانه»
-    if (c.landmark.isNotBlank()) {
+    //  DLV-09: دکان پس از ناموفق نشانی را درست کرد ⇒ پیش از تلاشِ دوباره دیده شود
+    if (c.addressCorrectedAt != null && CourierFlow.isLive(c.status)) {
       Spacer(Modifier.height(8.dp))
-      Text(c.landmark, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      Text("دکان نشانی را اصلاح کرد — پیش از رفتن دوباره بخوانید.", style = MaterialTheme.typography.labelLarge, color = colors.primary)
     }
-    if (c.addressText.isNotBlank()) Text(c.addressText, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+    //  DLV-02: «اول نشانه» — نشانه، «ناحیه · دروازهٔ رنگ»، بعد نشانیِ متنی (MissionView.landmarkFirst)
+    MissionView.landmarkFirst(c).forEachIndexed { i, line ->
+      if (i == 0) {
+        Spacer(Modifier.height(8.dp))
+        Text(line, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      } else {
+        Text(line, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+      }
+    }
     if (c.customerName.isNotBlank() || c.phoneMasked.isNotBlank()) {
       Spacer(Modifier.height(6.dp))
       Text(
