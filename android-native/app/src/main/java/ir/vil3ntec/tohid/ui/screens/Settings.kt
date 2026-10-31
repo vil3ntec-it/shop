@@ -474,6 +474,12 @@ fun SettingsScreen(
 
     /* ============== موجودی و بهای تمام‌شده — تنظیمِ دکان، پیش‌فرض خاموش (`StockBook.kt`) ============== */
     item { StockModeSection(store, d) }
+    /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
+    item {
+      var rules by remember { mutableStateOf(ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context)) }
+      CheckoutRulesSection(rules) { rules = it; ir.vil3ntec.tohid.data.CheckoutRulesPref.set(context, it) }
+    }
+
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */

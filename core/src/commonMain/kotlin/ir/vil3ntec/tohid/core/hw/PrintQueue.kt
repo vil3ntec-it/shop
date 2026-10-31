@@ -24,7 +24,10 @@ class PrintQueue(
 ) {
 
   enum class Kind(val key: String) {
-    RECEIPT("receipt"), REPRINT("reprint"), TEST("test"), DRAWER("drawer"), LABEL("label");
+    RECEIPT("receipt"), REPRINT("reprint"), TEST("test"), DRAWER("drawer"), LABEL("label"),
+
+    /** گزارشِ X/Z ِ صندوق (PAY-15): فروش ندارد، نسخهٔ «چاپِ دوباره» نمی‌خواهد و تکراری‌اش رد نمی‌شود */
+    REPORT("report");
 
     companion object {
       fun of(key: String?): Kind = entries.firstOrNull { it.key == key } ?: RECEIPT

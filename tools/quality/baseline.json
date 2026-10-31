@@ -26,6 +26,7 @@
     "server/src/lib/delivery.js": 1341,
     "server/src/lib/image-bank.js": 1211,
     "server/src/lib/notices.js": 820,
+    "server/src/lib/otp.js": 831,
     "server/src/lib/shop-chat.js": 900,
     "server/src/lib/storefront.js": 1218,
     "server/src/lib/sync-v3.js": 1167,

@@ -111,6 +111,11 @@ object SalesEngine {
     val creditGate: Boolean = false,
     /** تأییدِ مدیر/صاحب برای بردِ بیش از سقف (`CreditGate.Approval`)؛ فقط همین مشتری و تا همین مبلغ */
     val creditApproval: CreditGate.Approval? = null,
+    /**
+     *  POS-24 — قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`، فقط صندوق). پیش‌فرض خاموش ⇒
+     *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) و تعویض (`ReturnFlow`) همیشه خاموش می‌فرستند.
+     */
+    val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
   )
 
   data class Totals(
@@ -401,6 +406,20 @@ object SalesEngine {
     val credit = if (settled != null) settled.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
     if (credit && remaining > 0 && debtorId == null) {
       return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
+    }
+    //  POS-24: قاعده‌های دکان پس از قاعدهٔ ثابتِ بالا، روی همان جمع‌ها به پول؛ خاموش ⇒ هیچ
+    if (checkout.rules.active) {
+      val facts = ir.vil3ntec.tohid.core.sale.CheckoutFacts(
+        lines = cart.size,
+        finalTotalMinor = PayFlow.minor(t.finalTotal),
+        remainingMinor = PayFlow.minor(remaining),
+        credit = credit,
+        hasCustomer = debtorId != null,
+      )
+      ir.vil3ntec.tohid.core.sale.CheckoutGuard.check(checkout.rules, facts)?.let { b ->
+        val from = checkout.rules.customerFromMinor?.let { ir.vil3ntec.tohid.money(PayFlow.major(it)) + " افغانی" }.orEmpty()
+        return Result.Failed(ir.vil3ntec.tohid.core.sale.CheckoutGuard.message(b, from))
+      }
     }
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
     val onCredit = credit && remaining > 0
