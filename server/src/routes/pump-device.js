@@ -322,7 +322,7 @@ async function adoptFromDevice(userId, deviceUid, rawToken) {
   const member = await stations.membershipOf(userId);
   if (member && member.station_id === old.station_id) return { action: 'none' };
 
-  const out = await tx(async (c) => {
+  return tx(async (c) => {
     const s = (await c.query('SELECT * FROM stations WHERE id=$1 FOR UPDATE', [old.station_id])).rows[0];
     if (!s) return { action: 'none' };
     const others = Number((await c.query(
@@ -373,11 +373,6 @@ async function adoptFromDevice(userId, deviceUid, rawToken) {
     await c.query(`UPDATE station_devices SET status='revoked' WHERE station_id=$1 AND device_uid=$2`, [s.id, deviceUid]);
     return { action: 'moved', fromStation: s.id, toStation: member.station_id, carried };
   });
-  //  ⛔ S78: پس از تراکنش — سوکتِ زندهٔ کامپیوتر با توکنِ دستگاهِ پمپِ قبلی همان لحظه بسته
-  if (out && out.action === 'moved') {
-    await require('../lib/sync-v1-live').accessChanged({ accountKind: 'station', accountId: out.fromStation });
-  }
-  return out;
 }
 
 /* ══════════════════════════════════════════════════════════════════

@@ -225,8 +225,6 @@ router.post('/stations/:id/status', async (req, res, next) => {
       'UPDATE stations SET status=$2, updated_at=$3 WHERE id=$1 RETURNING *', [id, status, now()]
     );
     if (!row) return next(notFound('پمپ پیدا نشد', 'station_not_found'));
-    //  ⛔ S78: پمپِ خاموش ⇒ سوکتِ کامپیوترهایش همان لحظه بسته (و هر سوکتی که دیگر رد می‌شود)
-    await require('../lib/sync-v1-live').accessChanged({ accountKind: 'station', accountId: id });
     const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     await audit.log({
       actorType: 'admin', userId: req.admin.id, action: 'admin.station_status',

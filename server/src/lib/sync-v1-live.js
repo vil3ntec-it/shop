@@ -350,13 +350,15 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
  *                          revokeAllForDevice — خروج، خروج از همه، تازه‌سازیِ دزدیده (refresh_reused)،
  *                          عوض‌کردن و بازیابیِ رمز، بستنِ کاربر از پنل، از کار انداختنِ دستگاه (STF-10)
  *   lib/shops.js           updateMember — تغییرِ نقش، تعلیق، برداشتن، خروجِ داوطلبانه
- *   lib/stations.js        updateMember — همان برای پمپ
- *   lib/station-devices.js revoke · revokeBoundBy — بیرون‌کردنِ کامپیوترِ پمپ
  *   lib/user-delete.js     remove — حذفِ کاملِ حساب و دکان‌ها/پمپ‌هایش
  *   routes/me.js، routes/portal.js  DELETE /devices/:id — بیرون‌کردنِ دستگاهِ خود
  *   routes/shop.js         POST /active (دکانِ نشست عوض شد) · POST /staff/join (عضو ⇒ پیک)
- *   routes/admin-pump.js   POST /stations/:id/status — خاموش‌کردنِ پمپ
- *   routes/pump-device.js  adoptFromDevice — کامپیوترِ پمپ به پمپِ دیگر رفت
+ *
+ * ⛔ راه‌های پمپ (کدِ مشترکِ پمپ، بی اجازهٔ صاحب‌کار دست نمی‌خورد) هنوز صدا **نمی‌زنند** — وصله‌شان
+ * در #615 (`claude/sec-pump-pending`) منتظرِ اجازه است: `lib/stations.js` updateMember،
+ * `lib/station-devices.js` revoke · revokeBoundBy، `routes/admin-pump.js` POST /stations/:id/status،
+ * `routes/pump-device.js` adoptFromDevice. تا آن‌جا لایهٔ ۲ (سنجشِ دوباره پیش از هر پیام، ≤ ۵ ثانیه)
+ * سوکتِ کامپیوتر یا عضوِ پمپی را که دسترسی‌اش رفته پیش از پیامِ بعدی می‌بندد.
  *
  * @param {{userId?: string, accountKind?: string, accountId?: string}} target
  * @returns {Promise<number>} چند سوکت بسته شد
