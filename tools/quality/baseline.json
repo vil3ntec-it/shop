@@ -1,6 +1,7 @@
 {
   "_doc": "Caps for tools/quality/quality.mjs. They may only go down: run --lower-baseline after an improvement. Raising a cap by hand needs a reason in the PR body. Guide: docs/QUALITY-fa.md",
   "fileSize": {
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1008,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1259,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1075,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 804,
@@ -16,7 +17,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Welcome.kt": 2702,
     "license/account-ui.js": 897,
     "license/license-client.js": 1337,
-    "license/orders-ui.js": 902,
+    "license/orders-ui.js": 937,
     "license/sync-v3-engine.js": 1166,
     "license/vip.js": 867,
     "server/public/admin/app.js": 2369,

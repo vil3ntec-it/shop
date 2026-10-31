@@ -15,6 +15,8 @@
  *   بسته ──── همهٔ قلم‌ها تکلیف‌دار ⇒ جمعِ تازه با `pick-core.settle` (کسرِ خودکارِ قلمِ پیدانشده و کم،
  *             PCK-07)، قلم‌های سفارش و مبلغِ نقدِ موردِ انتظارِ مأموریتِ هنوز‌نرفته در همان تراکنش، و
  *             «بسته‌بندی‌شده» با تعدادِ کیسه و برچسب (PCK-09). مبلغِ پیشین در برگه و رویداد می‌ماند.
+ *             ⛔ سفارشِ پرداخت‌شده: هر تغییرِ مبلغ ⇒ ۴۰۹ (`paid_needs_refund` برای کسر، `paid_total_increase`
+ *             برای افزایش) — دفترِ بازپرداخت حالتِ «معلق» و روشِ آنلاین ندارد، پس کسر بی‌ردپا نمی‌ماند.
  *   شاخص ──── زمانِ جمع‌آوری، درصدِ پیدا شدن و نرخِ جایگزینی از برگه‌های بسته‌شده (PCK-13).
  *
  * ⛔ موجودیِ دکان دست نمی‌خورد (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): فروش را برنامه هنگامِ تحویل با
@@ -28,6 +30,8 @@ const P = require('./pick-core');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
+//  جایگزینی (PCK-05/06) — دیر بار می‌شود (آن پرونده هم پرچمِ همین‌جا را می‌خواند)
+const subs = () => require('./pick-substitutes');
 
 const FLAG_KEY = 'shop.orders.picking';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -40,6 +44,8 @@ const EVENT_TYPES = ['scan', 'pick', 'weigh', 'not_found', 'reset'];
 //  مأموریتی که بسته هنوز از دکان بیرون نرفته — مبلغِ نقدِ موردِ انتظارش با جمعِ تازه عوض می‌شود
 const BEFORE_DISPATCH = ['requested', 'assigned'];
 const DISPATCHED = ['picked_up', 'moving', 'arrived', 'failed'];
+//  پولی که دکان گرفته و هنوز (کامل) برنگشته — جمعِ سفارش در بسته‌بندی دست نمی‌خورد
+const PAID = ['paid', 'partially_refunded'];
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم
@@ -108,34 +114,8 @@ function parseEvent(raw) {
   return out;
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  کالا: بارکد و بودن
-// ════════════════════════════════════════════════════════════════════
-
-function barcodesOfData(d) {
-  const list = Array.isArray(d.barcodes) ? d.barcodes : (typeof d.barcode === 'string' ? [d.barcode] : []);
-  return list.filter((b) => typeof b === 'string' && b.trim()).slice(0, 20);
-}
-
-/**
- * بارکدهای امروزِ کالا: کاتالوگِ سرور اگر هست، وگرنه دفترِ همگام‌سازی (v1، سپس v3).
- * ⇒ `null` اگر کالا هیچ‌جا نیست؛ `[]` اگر هست و بارکد ندارد.
- */
-async function barcodesOf(run, shopId, productId) {
-  if (!productId) return null;
-  const cat = (await run(
-    'SELECT barcodes FROM catalog_products WHERE shop_id=$1 AND product_id=$2 AND NOT deleted', [shopId, productId]
-  )).rows[0];
-  if (cat) return barcodesOfData({ barcodes: asJson(cat.barcodes) });
-  for (const table of ['sync_rows', 'sync_v3_rows']) {
-    const r = (await run(
-      `SELECT data FROM ${table} WHERE app='shop' AND account_kind='shop' AND account_id=$1
-          AND table_name='products' AND row_id=$2 AND deleted_at IS NULL`, [shopId, productId]
-    )).rows[0];
-    if (r) return barcodesOfData(asJson(r.data));
-  }
-  return null;
-}
+//  کالا: بارکد و بودن — `lib/pick-barcodes.js`
+const { barcodesOf } = require('./pick-barcodes');
 
 // ════════════════════════════════════════════════════════════════════
 //  مدلِ خواندنی
@@ -163,12 +143,16 @@ function lineView(l) {
     location: { aisle: l.aisle, shelf: l.shelf, level: l.level },
     scans: Number(l.scans),
     wrongScans: Number(l.wrong_scans),
+    //  PCK-05/06: جایگزینِ پذیرفته‌شده (کالا، مقدار و قیمتِ کمتری که مشتری می‌پردازد)
+    substitute: l.status === 'substituted' ? asJson(l.substitute) : null,
   };
 }
 
 const coreLine = (v) => ({
   lineNo: v.lineNo, name: v.name, status: v.status, orderedQtyMilli: v.orderedQtyMilli,
-  pickedQtyMilli: v.pickedQtyMilli, unitPriceMinor: v.unitPriceMinor, originalTotalMinor: v.originalTotalMinor,
+  pickedQtyMilli: v.pickedQtyMilli,
+  unitPriceMinor: v.status === 'substituted' && v.substitute ? Number(v.substitute.chargedUnitPriceMinor) : v.unitPriceMinor,
+  originalTotalMinor: v.originalTotalMinor,
   aisle: v.location.aisle, shelf: v.location.shelf, level: v.location.level,
 });
 
@@ -212,6 +196,7 @@ async function loadSheet(run, shopId, orderId) {
       deductedMinor: s.deductedMinor,
     },
     labels: packed ? labelsOf(Number(order.order_no), Number(pick.bags)) : [],
+    substitutions: await subs().forSheet(run, orderId),
   };
 }
 
@@ -451,9 +436,11 @@ async function applyEvent(shopId, orderId, ev, actor) {
       }
       case 'reset': {
         if (open && picked === 0 && Number(line.scans) === 0) return reject('nothing_to_reset');
-        if ((line.status === 'not_found' || line.status === 'short') && line.product_id) {
+        if ((line.status === 'not_found' || line.status === 'short' || line.status === 'substituted') && line.product_id) {
           await undoIssue(c, shopId, line.product_id, orderId, at);
         }
+        //  PCK-05: پیشنهادِ باز یا پذیرفتهٔ همین قلم پس گرفته می‌شود
+        await subs().withdrawLine(c, orderId, ev.lineNo, actor.id || '', at);
         detail.from = line.status;
         next = { status: 'pending', picked: 0 };
         await c.query('UPDATE order_pick_lines SET scans = 0 WHERE order_id=$1 AND line_no=$2', [orderId, ev.lineNo]);
@@ -540,6 +527,14 @@ async function pack(shopId, orderId, { key, body }, actor) {
       throw err;
     }
 
+    //  PCK-05: مهلتِ گذشته ⇒ ترجیحِ مشتری؛ پیشنهادِ هنوز در انتظار ⇒ صبر (بی رضایت گران‌تر نمی‌شود)
+    await subs().applyTimeouts(c, id, now());
+    const waiting = await subs().pendingOf(c, id);
+    if (waiting.length) {
+      const err = conflict('مشتری هنوز دربارهٔ جایگزین تصمیم نگرفته است', 'substitution_pending');
+      err.data = { pending: waiting.length, deadlineAt: Number(waiting[0].deadline_at) };
+      throw err;
+    }
     const lines = (await c.query('SELECT * FROM order_pick_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows.map(lineView);
     const s = P.settle({
       lines: lines.map(coreLine), discountMinor: Number(order.discount_minor), deliveryFeeMinor: Number(order.delivery_fee_minor),
@@ -556,11 +551,30 @@ async function pack(shopId, orderId, { key, body }, actor) {
       'SELECT id, status FROM delivery_assignments WHERE order_id=$1 AND status = ANY($2::text[])', [id, DISPATCHED]
     )).rows[0];
     if (live) throw conflict('بسته پیش‌تر به پیک سپرده شده است', 'already_dispatched');
+    //  ⛔ پولِ گرفته‌شده: جمعِ تازه نه کم می‌شود (بازپرداختِ بی‌ردپا) نه زیاد (پولِ بی‌رضایت)
+    const paidMinor = Number(order.total_minor);
+    if (PAID.includes(order.payment_status) && (s.deductedMinor > 0 || s.totalMinor !== paidMinor)) {
+      const down = s.deductedMinor > 0;
+      const err = new ApiError(409, down ? 'paid_needs_refund' : 'paid_total_increase', down
+        ? 'این سفارش پرداخت شده است؛ کم کردنِ مبلغ بازپرداخت می‌خواهد — همهٔ قلم‌ها را بردارید یا سفارش را لغو و بازپرداخت کنید'
+        : 'این سفارش پرداخت شده است؛ مبلغِ بیشتر بی رضایتِ مشتری گرفته نمی‌شود — همان مقدارِ سفارش را بردارید');
+      err.data = { paidMinor, totalMinor: s.totalMinor, deductedMinor: s.deductedMinor };
+      throw err;
+    }
 
     const at = now();
     //  قلم‌های سفارش = آن‌چه واقعاً برداشته شد (برنامه فروشِ تحویل را از همین‌ها می‌سازد)
+    const byNo = new Map(lines.map((l) => [l.lineNo, l]));
     for (const l of s.lines) {
-      if (l.qtyMilli === 0) {
+      const sub = byNo.get(l.lineNo).status === 'substituted' ? byNo.get(l.lineNo).substitute : null;
+      if (sub && l.qtyMilli > 0) {
+        //  PCK-05/06: قلمِ سفارش = کالای جایگزین با قیمتِ کمتر (فروشِ تحویل و موجودیِ برنامه از همین)
+        await c.query(
+          `UPDATE online_order_lines SET product_id=$3, name=$4, unit=$5, qty_milli=$6, unit_price_minor=$7, line_total_minor=$8
+            WHERE order_id=$1 AND line_no=$2`,
+          [id, l.lineNo, sub.productId, text(sub.name, 200), text(sub.unit, 30), l.qtyMilli, Number(sub.chargedUnitPriceMinor), l.totalMinor]
+        );
+      } else if (l.qtyMilli === 0) {
         await c.query('DELETE FROM online_order_lines WHERE order_id=$1 AND line_no=$2', [id, l.lineNo]);
       } else if (s.changedLines.includes(l.lineNo)) {
         await c.query(
@@ -591,6 +605,9 @@ async function pack(shopId, orderId, { key, body }, actor) {
     const pickDetail = {
       originalTotalMinor: Number(order.total_minor), totalMinor: s.totalMinor, deductedMinor: s.deductedMinor,
       removedLines: s.removedLines, changedLines: s.changedLines, bags,
+      substitutions: lines.filter((l) => l.status === 'substituted' && l.substitute).map((l) => ({
+        lineNo: l.lineNo, from: l.productId, to: l.substitute.productId, chargedUnitPriceMinor: Number(l.substitute.chargedUnitPriceMinor),
+      })),
     };
     await c.query(
       `INSERT INTO online_order_events (id, order_id, shop_id, seq, kind, from_status, to_status,

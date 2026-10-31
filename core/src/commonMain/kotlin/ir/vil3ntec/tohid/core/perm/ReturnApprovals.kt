@@ -32,6 +32,14 @@ object ReturnApprovals {
     return if (a > Long.MAX_VALUE - b) Long.MAX_VALUE else a + b
   }
 
+  /**
+   *  سقفِ برگشتِ همین دستگاه (`return_limit`، برای مدیر و شاگرد؛ صاحب بیرون از آن): مثلِ سقفِ نقش
+   *  تجمعیِ هر فاکتور است — برگشت‌های پیشینِ همان فاکتور + همین سند ([cumulative]). وگرنه برگشتِ بزرگ
+   *  در چند سندِ زیرِ سقف زده می‌شد. [limitMinor] ≤ ۰ ⇒ بی سقف.
+   */
+  fun overDeviceLimit(priorMinor: Long, thisMinor: Long, limitMinor: Long): Boolean =
+    limitMinor > 0 && cumulative(priorMinor, thisMinor) > limitMinor
+
   private val APPROVER_RANK = mapOf("manager" to 2, "owner" to 3)
 
   /**

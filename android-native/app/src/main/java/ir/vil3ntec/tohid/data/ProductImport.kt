@@ -22,7 +22,18 @@ object ProductImport {
 
   data class Skip(val row: Int, val name: String, val reason: String)
 
-  data class Plan(val drafts: List<WarehouseEngine.ProductDraft>, val skipped: List<Skip>, val missingName: Boolean)
+  /**
+   *  PRD-19: ردیفی که ثبت می‌شود ولی نامش **مشابهِ** کالای دکان یا ردیفِ پیشینِ همین فایل است
+   *  (فاصله/نیم‌فاصله، ترتیبِ کلمه، غلطِ تایپی؛ `SimilarNames` ِ core) — فقط هشدار در پیش‌نمایش.
+   */
+  data class Similar(val row: Int, val name: String, val other: String, val inFile: Boolean)
+
+  data class Plan(
+    val drafts: List<WarehouseEngine.ProductDraft>,
+    val skipped: List<Skip>,
+    val missingName: Boolean,
+    val similar: List<Similar> = emptyList(),
+  )
 
   private val ALIASES: Map<String, String> = mapOf(
     "نام محصول" to "name", "نام کالا" to "name", "نام" to "name", "کالا" to "name", "name" to "name", "product" to "name",
@@ -86,11 +97,12 @@ object ProductImport {
     val seenNames = HashSet<String>()
     val seenCodes = HashSet<String>()
     val codes = ShopStore.barcodeIndex(d)
+    val rowOf = ArrayList<Int>()   //  شمارهٔ ردیفِ اکسلِ هر draft
     rows.drop(1).forEachIndexed { i, r ->
       val n = i + 2   // شمارهٔ ردیف در اکسل (سرستون ردیفِ ۱ است)
       if (r.all { it.isBlank() }) return@forEachIndexed
       val name = at(r, "name")
-      val key = name.replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+      val key = ir.vil3ntec.tohid.core.product.SimilarNames.exactKey(name)
       val purchase = number(at(r, "purchase"))
       val sale = number(at(r, "sale"))
       val min = number(at(r, "min"))
@@ -105,17 +117,33 @@ object ProductImport {
         barcode.isNotEmpty() && (codes.containsKey(barcode) || !seenCodes.add(barcode)) -> "بارکدِ تکراری"
         else -> null
       }
-      if (reason != null) skipped += Skip(n, name, reason)
-      else drafts += WarehouseEngine.ProductDraft(
-        name = name,
-        category = at(r, "category"),
-        unit = at(r, "unit").ifEmpty { "عدد" },
-        purchasePrice = purchase,
-        salePrice = sale,
-        minStock = min,
-        barcode = barcode,
-      )
+      if (reason != null) {
+        skipped += Skip(n, name, reason)
+      } else {
+        rowOf += n
+        drafts += WarehouseEngine.ProductDraft(
+          name = name,
+          category = at(r, "category"),
+          unit = at(r, "unit").ifEmpty { "عدد" },
+          purchasePrice = purchase,
+          salePrice = sale,
+          minStock = min,
+          barcode = barcode,
+        )
+      }
     }
-    return Plan(drafts, skipped, missingName = false)
+    return Plan(drafts, skipped, missingName = false, similar = similarOf(d, drafts, rowOf))
+  }
+
+  /** نامِ مشابه با کالاهای دکان، و با ردیف‌های پیشینِ همین فایل (هر ردیف حداکثر یک هشدار) */
+  private fun similarOf(d: ShopData, drafts: List<WarehouseEngine.ProductDraft>, rowOf: List<Int>): List<Similar> {
+    if (drafts.isEmpty()) return emptyList()
+    val shop = ir.vil3ntec.tohid.core.product.SimilarNames.Index(d.products.map { it.name })
+    val file = ir.vil3ntec.tohid.core.product.SimilarNames.Index(drafts.map { it.name })
+    return drafts.mapIndexedNotNull { i, dr ->
+      shop.find(dr.name, limit = 1).firstOrNull()?.let { Similar(rowOf[i], dr.name, it.name, inFile = false) }
+        ?: file.find(dr.name, except = i, limit = 3).firstOrNull { it.index < i }
+          ?.let { Similar(rowOf[i], dr.name, it.name, inFile = true) }
+    }
   }
 }

@@ -64,7 +64,8 @@ import kotlinx.coroutines.withContext
  *  گوشی و کامپیوتر («تاریخچهٔ فروش»): باز کردن با موجودی، ورود/خروجِ نقد با
  *  دلیل، کشو بی فروش با تأییدِ صاحب/مدیر، گزارشِ X، بستن با شمارشِ اسکناس و Z.
  *  شمارشِ کور: شاگرد (صندوقدار) مبلغِ مورد انتظار و اختلاف را نمی‌بیند؛ صاحب و مدیر می‌بینند —
- *  در X ِ میانِ شیفت، در Z و در متنِ سابقهٔ بستنِ کور هم (`ShiftSlip.forViewer`، PAY-13).
+ *  در X ِ میانِ شیفت، در Z و در سابقهٔ هر بستن (کور یا مدیر، `PayFlow.closeNote`) هم (`ShiftSlip.forViewer`، PAY-13): در نمای او فروش، رسید،
+ *  مرجوعی و ورود/خروجِ نقد فقط با شمار می‌آیند، و بستنِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (بی پیشگو).
  *  PAY-16: در بستن، هر روشِ غیرنقدی که در شیفت گردش داشت کادرِ شمارشِ خودش را دارد (`ShiftSlip.countable`).
  *  PAY-15: X و Z از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
  *  خاموش ⇒ این‌جا صدا زده نمی‌شود و همان کارتِ `CashShift`ِ امروز در `SalesHistory` است.
@@ -318,7 +319,9 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
             }
           }
           OutlinedTextField(
-            value = reason, onValueChange = { reason = it }, label = { Text("دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)") },
+            value = reason, onValueChange = { reason = it },
+            //  ⛔ کور: نه آستانه، نه «لازم است» — بستنِ کور به‌خاطرِ اختلاف رد نمی‌شود
+            label = { Text(if (staff) "یادداشت برای مدیر (اختیاری)" else "دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)") },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
           )
           error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
@@ -332,7 +335,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           }
           val count = PayFlow.Count(parsed, methodCounts = mc, by = me, blind = staff, reason = reason)
           when (val r = PayFlow.closeRow(d, shift.open, count, System.currentTimeMillis(), ::newId)) {
-            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") "اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید" else PayFlow.message(r.problem)
+            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED" && !staff) "اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید" else PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val z = r.value.report
               val vc = z.variance?.get(PayFlow.CASH) ?: 0L
@@ -380,7 +383,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           shifts.forEach { sh ->
             Text(formatMillis(sh.open.createdAt) + " — " + sh.open.notes, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
             Text(
-              sh.close?.let { formatMillis(it.createdAt) + " — " + it.notes } ?: "هنوز باز است",
+              //  ⛔ PAY-13: شاگرد متنِ بستن (مدیر یا قدیمی: «مورد انتظار» و «اختلاف») را نمی‌بیند — فقط شمرده‌ها
+              sh.close?.let { formatMillis(it.createdAt) + " — " + PayFlow.closeNote(it, seesExpected = !staff) } ?: "هنوز باز است",
               style = MaterialTheme.typography.labelSmall, color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
             )
             sh.close?.z?.let { PayFlow.reportOf(it) }?.let { z ->
@@ -402,6 +406,8 @@ private fun reportTitle(rep: ShiftReport) = if (rep.kind == "Z") "گزارش Z (
 /** PAY-15 — برچسب و مقدارِ یک ردیفِ گزارش؛ صفحه و کاغذ هر دو همین را می‌گیرند */
 private fun slipLine(r: ShiftSlip.Row): Pair<String, String> {
   val name = PayFlow.methodName(r.method.orEmpty())
+  //  نمای کور (`ShiftSlip.forViewer`): فروش، رسید، مرجوعی و ورود/خروج بی روش و بی مبلغ، فقط شمار
+  if (r.amount == null && r.count != null) countLine(r)?.let { return it }
   return when (r.kind) {
     ShiftSlip.Kind.OPENED -> "باز شد" to formatMillis(r.amount ?: 0)
     ShiftSlip.Kind.AT -> "زمانِ گزارش" to formatMillis(r.amount ?: 0)
@@ -423,6 +429,18 @@ private fun slipLine(r: ShiftSlip.Row): Pair<String, String> {
     ShiftSlip.Kind.REASON -> "دلیلِ اختلاف" to r.text.orEmpty()
     ShiftSlip.Kind.NEEDS_REVIEW -> "اختلاف خودکار اصلاح نمی‌شود — برای بررسیِ مدیر ثبت شد" to ""
   }
+}
+
+private fun countLine(r: ShiftSlip.Row): Pair<String, String>? {
+  val label = when (r.kind) {
+    ShiftSlip.Kind.SALES -> "فروش"
+    ShiftSlip.Kind.RECEIPTS -> "رسیدِ قرض‌داران"
+    ShiftSlip.Kind.REFUNDS -> "مرجوعی"
+    ShiftSlip.Kind.CASH_IN -> "ورود به دخل"
+    ShiftSlip.Kind.CASH_OUT -> "خروج از دخل"
+    else -> return null
+  }
+  return label to "${r.count} بار"
 }
 
 @Composable

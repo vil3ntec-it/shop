@@ -190,7 +190,8 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
+  'shop.storefront.zones', 'shop.storefront.notify_area'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 
@@ -282,6 +283,13 @@ async function seedShop(a) {
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
   assert.equal(sf.status, 200, JSON.stringify(sf.body));
+  //  «خبرم کن» ِ مشتریِ بیرون از محدوده (CHK-10) — ردیفِ واقعیِ «الف»
+  ids.areaRequest = newId('area');
+  await query(
+    `INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
+     VALUES ($1,$2,'+93791234568',34.62,69.31,$3,$3)`,
+    [ids.areaRequest, a.shopId, now()]
+  );
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -427,9 +435,11 @@ function concreteFor(ids) {
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
+    [/(\/pick\/products\/):productId/, ids.product],
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
@@ -449,7 +459,10 @@ function concreteFor(ids) {
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
-  const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
+  const QUERY = {
+    'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all',
+    'GET /shop/orders/:id/pick/substitutes': '?lineNo=1',
+  };
   return (r) => {
     let p = r.path;
     for (const [re, v] of rules) p = p.replace(re, `$1${v}`);
@@ -468,6 +481,10 @@ function bodyFor(r, ids) {
     'POST /shop/orders/:id/pick/pack': { bags: 1 },
     'POST /shop/orders/pick/issues/:issueId/resolve': { action: 'resolved', note: 'آزمون' },
     'PUT /shop/orders/pick/locations/:productId': { aisle: '1' },
+    //  جایگزینی (PCK-05/06)
+    'PUT /shop/orders/pick/products/:productId': { halal: 'halal' },
+    'POST /shop/orders/:id/pick/substitutions': { eventId: fresh('psub'), lineNo: 1, productId: ids.product },
+    'POST /shop/orders/:id/pick/substitutions/decide': { substitutionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
     //  قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12)
     'POST /shop/orders/pick/shelf/scan': { qr: 'VLNB-1-1-1', slot: 'A1' },
     'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },
@@ -475,6 +492,7 @@ function bodyFor(r, ids) {
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
     'POST /shop/delivery/assignments/:id/recall': { reason: 'other', note: 'آزمون' },
+    'POST /shop/delivery/assignments/:id/address': { address: { landmark: 'آزمون', area: 'ناحیه', gateColor: 'سبز' } },
     'POST /shop/delivery/couriers/:id/settlements': { assignmentIds: [ids.assignment], handedOverMinor: 1, receivedMinor: 1 },
     'PUT /shop/chat/conversations/:id/status': { status: 'closed' },
     'POST /shop/chat/conversations/:id/messages': { clientId: `client-${fresh('x')}-0000`, body: 'سلام' },

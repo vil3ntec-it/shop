@@ -195,9 +195,9 @@ object PickCore {
     val pending: Int,
   )
 
-  /** مقدارِ فروختنیِ یک قلم پس از جمع‌آوری */
+  /** مقدارِ فروختنیِ یک قلم پس از جمع‌آوری (جایگزینِ پذیرفته‌شده = مقدارِ جایگزین، PCK-05/06) */
   fun finalQty(status: String, pickedQtyMilli: Long): Long =
-    if (status == "picked" || status == "short") maxOf(0L, pickedQtyMilli) else 0L
+    if (status == "picked" || status == "short" || status == "substituted") maxOf(0L, pickedQtyMilli) else 0L
 
   fun settle(lines: List<SettleLine>, discountMinor: Long = 0, deliveryFeeMinor: Long = 0): Settlement {
     val out = ArrayList<SettledLine>(lines.size)
@@ -214,7 +214,8 @@ object PickCore {
       subtotal += total
       original += l.originalTotalMinor
       if (qty == 0L) removed += l.lineNo
-      else if (qty != l.orderedQtyMilli || total != l.originalTotalMinor) changed += l.lineNo
+      //  جایگزین همیشه «تغییر» است — کالا عوض شده، حتی اگر مقدار و مبلغ همان باشد
+      else if (l.status == "substituted" || qty != l.orderedQtyMilli || total != l.originalTotalMinor) changed += l.lineNo
     }
     val discount = discountMinor.coerceAtLeast(0).coerceAtMost(subtotal)
     val fee = deliveryFeeMinor.coerceAtLeast(0)

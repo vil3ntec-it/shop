@@ -78,6 +78,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   val repo = remember(context) { OrdersLive.repository(context) }
   val colors = Shop.colors
   val view = rememberViewMode("orders", ScreenKind.MANAGEMENT)
+  val ledgerNow by store.data.collectAsState()
 
   var tab by rememberSaveable { mutableStateOf("new") }
   var items by remember { mutableStateOf<List<OrderDto>>(emptyList()) }
@@ -144,6 +145,8 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         onAction = { openId = review.first().orderId },
       )
     }
+    //  بازپرداخت‌هایی که «کالا به انبار برگشت؟» نگرفته‌اند، و آن‌ها که در دفتر ننشستند
+    RefundListNotices(ledgerNow, cfg, onOpen = { openId = it }, onRetry = { scope.launch { OrdersLive.reconcile(context, store, force = true) } })
     //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
     val unposted = OrdersLive.unposted.value
     if (unposted.isNotEmpty()) {
@@ -378,6 +381,8 @@ private fun OrderDetailSheet(
   var error by remember(id) { mutableStateOf<String?>(null) }
   var act by remember(id) { mutableStateOf<String?>(null) }
   var busy by remember(id) { mutableStateOf(false) }
+  //  «کالا به انبار برگشت؟» — همان دمِ بازپرداخت، یا برای بازپرداختی که بی پرسش نشست (سرور، دستگاهِ دیگر)
+  var restocking by remember(id) { mutableStateOf(false) }
   var actError by remember(id) { mutableStateOf<String?>(null) }
   val rev = OrdersLive.rev.value
 
@@ -438,6 +443,11 @@ private fun OrderDetailSheet(
           onChanged()
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
           if (it.status in OrderFulfillment.HANDED_OVER || it.status in OrderFulfillment.BACK_IN_SHOP) postSale(it)
+          //  بازپرداخت ⇒ سندِ برگشتِ همان فروش در همین دفتر، و همان دم «کالا به انبار برگشت؟» (پیش‌فرض نه)
+          if (to in OrderStates.MONEY_TARGETS && OrderFulfillment.saleOf(ledger, it.id) != null) {
+            postRefundNotice(snackbar, it) { OrdersLive.postById(context, store, it.id) }
+            if (OrderFulfillment.restockPending(store.data.value, it.id).isNotEmpty()) restocking = true
+          }
         }
         .onFailure { f ->
           if (f.code == "status_changed") {
@@ -526,6 +536,12 @@ private fun OrderDetailSheet(
           },
         )
       }
+
+      RefundDetailNotices(
+        ledger, cfg, o,
+        onRestock = { restocking = true },
+        onRetry = { if (!busy) scope.launch { busy = true; postRefundNotice(snackbar, o) { OrdersLive.postById(context, store, o.id) }; busy = false } },
+      )
 
       val (actions, pickable) = orderPickActions(o, cfg)   // جمع‌آوری (PCK): «جمع‌آوری» و «بسته‌بندی» فقط از برگه
       if (actions.isNotEmpty() || pickable) {
@@ -627,11 +643,16 @@ private fun OrderDetailSheet(
       onConfirm = { reason, note, ready -> send(to, reason, note, ready) },
     )
   }
+  if (o != null && restocking) {
+    RestockDialog(o, OrderFulfillment.restockChoices(ledger, o.id), busy, onDismiss = { restocking = false }) { chosen ->
+      if (!busy) scope.launch { busy = true; restockNotice(snackbar, chosen) { OrdersLive.restock(context, store, o.id, o.orderNo, chosen) }; busy = false; restocking = false }
+    }
+  }
 }
 
 /** هشدارِ «تحویل بی فروش» — رنگِ هشدار + متن، با کارِ بعدی (VISUAL-DIRECTION: هرگز رنگِ تنها) */
 @Composable
-private fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
+internal fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
   val c = Shop.colors
   Column(
     Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.md)).background(c.warningTint).padding(12.dp),
