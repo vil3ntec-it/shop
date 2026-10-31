@@ -44,28 +44,74 @@ const KEY_PRIVATE = 'license_private_key';
 const KEY_PUBLIC = 'license_public_key';
 
 let cached = null;
+/** خطای «کلیدِ محیط با کلیدِ ثبت‌شده نمی‌خواند» از `checkKeyContinuity` — تا روشن شدنِ دوباره */
+let blocked = null;
+let loading = null;
+
+/** چرخاندنِ عمدیِ کلید (SECURITY-AUDIT-fa.md بخشِ I) — فقط با این متغیر */
+const allowNewKey = () => /^(1|true|yes|on)$/i.test(String(process.env.LICENSE_ALLOW_NEW_KEY || '').trim());
+
+/**
+ *  کلیدِ `LICENSE_PRIVATE_KEY`، یا '' — PEM ِ یک‌خطی با `\n` ِ نوشتاری (OWNER-ACTIONS-fa.md بخشِ ۳، گامِ ۴)
+ *  هم پذیرفته است؛ PEM هرگز خودش «\» ندارد.
+ */
+function envPem() {
+  const raw = String(process.env.LICENSE_PRIVATE_KEY || '').trim();
+  return raw.includes('\\n') ? raw.replace(/\\n/g, '\n') : raw;
+}
+
+function keyError(code, message) {
+  const err = new Error(message);
+  err.code = code;
+  err.status = 503;
+  err.expose = true;
+  return err;
+}
 
 /**
  *  جفت‌کلید سرور. یک بار ساخته و ذخیره می‌شود.
  *
  *  کلید عمومی هم ذخیره می‌شود تا برای هر درخواست از روی خصوصی حساب نشود.
+ *
+ *  ⛔ SUB-04 / F0-28: کلیدِ **تازه** فقط روی نصبی ساخته می‌شود که هیچ کلیدِ عمومیِ ثبت‌شده‌ای ندارد.
+ *  برنامه‌ها کلیدِ عمومی را یک بار می‌گیرند و نگه می‌دارند؛ تا ۲.۱۴.۴ پاک شدنِ ردیفِ خصوصی (گامِ ۶ ِ
+ *  OWNER-ACTIONS-fa.md بخشِ ۳) با گم شدنِ `LICENSE_PRIVATE_KEY` بی‌صدا کلیدِ تازه می‌ساخت و مجوزِ همهٔ نصب‌ها
+ *  رد می‌شد. حالا صدور با `license_key_missing` بسته می‌ماند (نصب‌ها تا پایانِ مجوزِ ده‌روزه کار می‌کنند)
+ *  مگر `LICENSE_ALLOW_NEW_KEY=1`.
  */
 async function keys() {
+  if (blocked) throw blocked;
   if (cached) return cached;
+  //  چند درخواستِ هم‌زمان روی نصبِ تازه یک بار می‌سازند، نه هر کدام کلیدِ خودش (آخرین روی بقیه می‌نشست)
+  if (!loading) loading = loadKeys().finally(() => { loading = null; });
+  return loading;
+}
 
-  const fromEnv = process.env.LICENSE_PRIVATE_KEY;
-  if (fromEnv && fromEnv.trim()) {
-    const privateKey = crypto.createPrivateKey(fromEnv.trim());
+async function loadKeys() {
+  const fromEnv = envPem();
+  if (fromEnv) {
+    const privateKey = crypto.createPrivateKey(fromEnv);
     cached = { privateKey, publicSpki: spkiOf(privateKey) };
     return cached;
   }
 
-  const stored = await plans.getConfig(KEY_PRIVATE, '');
-  if (stored) {
-    const privateKey = crypto.createPrivateKey(stored);
+  const useStored = async (pem) => {
+    const privateKey = crypto.createPrivateKey(pem);
     const publicSpki = (await plans.getConfig(KEY_PUBLIC, '')) || spkiOf(privateKey);
     cached = { privateKey, publicSpki };
     return cached;
+  };
+  const stored = await plans.getConfig(KEY_PRIVATE, '');
+  if (stored) return useStored(stored);
+
+  if (!allowNewKey() && await plans.getConfig(KEY_PUBLIC, '')) {
+    //  ساختِ هم‌زمان روی نصبِ تازه: درخواستِ دیگری همین حالا ساخته است (خصوصی پیش از عمومی نوشته می‌شود)
+    const raced = await plans.getConfig(KEY_PRIVATE, '');
+    if (raced) return useStored(raced);
+    console.error('[license] ⛔ کلیدِ خصوصیِ مجوز نیست (نه LICENSE_PRIVATE_KEY، نه app_config) ولی کلیدِ عمومی ثبت شده است؛ '
+      + 'کلیدِ تازه ساخته نمی‌شود چون مجوزِ همهٔ نصب‌ها را رد می‌کند. کلید را در LICENSE_PRIVATE_KEY بگذارید '
+      + '(چرخاندنِ عمدی: LICENSE_ALLOW_NEW_KEY=1).');
+    throw keyError('license_key_missing', 'کلیدِ امضای مجوز روی سرور پیدا نشد؛ صدورِ مجوز تا رسیدگیِ مدیر بسته است');
   }
 
   const pair = crypto.generateKeyPairSync('ec', {
@@ -81,6 +127,41 @@ async function keys() {
 
   cached = { privateKey, publicSpki };
   return cached;
+}
+
+/**
+ *  سنجشِ روشن شدنِ سرور (SUB-04 / F0-28): کلیدِ `LICENSE_PRIVATE_KEY` همان کلیدِ عمومیِ ثبت‌شده است؟
+ *
+ *  • متغیر نیست ⇒ کاری نیست (`keys()` خودش جلوی کلیدِ تازه را می‌گیرد).
+ *  • کلیدِ عمومی ثبت نشده ⇒ ثبت می‌شود (فقط عمومی؛ خصوصیِ محیط هرگز در `app_config` نمی‌رود)، تا اگر روزی
+ *    متغیر گم شد، `keys()` کلیدِ تازه نسازد.
+ *  • ناهمخوان ⇒ صدورِ مجوز تا روشن شدنِ دوباره بسته (`license_key_mismatch`)؛ با `LICENSE_ALLOW_NEW_KEY=1`
+ *    کلیدِ عمومیِ ثبت‌شده با کلیدِ تازه جایگزین می‌شود (چرخاندنِ عمدی).
+ *  فقط `createApp` (با دیتابیس) آن را صدا می‌زند؛ مسیرِ محیطِ `keys()` همچنان بی دیتابیس است (`license-runtime`).
+ *  @returns {Promise<{ok:true}|{ok:false, code:string}>}
+ */
+async function checkKeyContinuity() {
+  blocked = null;
+  const fromEnv = envPem();
+  if (!fromEnv) return { ok: true };
+  const envSpki = spkiOf(crypto.createPrivateKey(fromEnv));
+  const stored = await plans.getConfig(KEY_PUBLIC, '');
+  if (!stored) {
+    await plans.setConfig(KEY_PUBLIC, envSpki);
+    return { ok: true };
+  }
+  if (stored === envSpki) return { ok: true };
+  if (allowNewKey()) {
+    console.warn('[license] ⚠️ LICENSE_ALLOW_NEW_KEY: کلیدِ عمومیِ ثبت‌شده با کلیدِ LICENSE_PRIVATE_KEY جایگزین شد؛ مجوزِ نصب‌های پیشین دیگر پذیرفته نمی‌شود');
+    await plans.setConfig(KEY_PUBLIC, envSpki);
+    cached = null;
+    return { ok: true };
+  }
+  console.error('[license] ⛔ LICENSE_PRIVATE_KEY با کلیدِ عمومیِ ثبت‌شده نمی‌خواند؛ صدورِ مجوز بسته شد. '
+    + 'همان کلیدِ پیشین را بگذارید یا متغیر را بردارید (چرخاندنِ عمدی: LICENSE_ALLOW_NEW_KEY=1).');
+  blocked = keyError('license_key_mismatch', 'کلیدِ امضای مجوزِ سرور با کلیدِ ثبت‌شده نمی‌خواند؛ صدورِ مجوز تا رسیدگیِ مدیر بسته است');
+  cached = null;
+  return { ok: false, code: blocked.code };
 }
 
 /** کلید عمومی به شکل base64 از SPKI DER — همان چیزی که برنامه می‌خواهد */
@@ -244,6 +325,6 @@ async function verifyBytes(buf, sig) {
 }
 
 module.exports = {
-  issue, publicKey, keyId, signBytes, verifyBytes,
+  issue, publicKey, keyId, signBytes, verifyBytes, checkKeyContinuity,
   ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS,
 };
