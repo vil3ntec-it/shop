@@ -519,6 +519,8 @@ fun AppRoot(
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  HW-05: «ابزارهای تازهٔ دستگاه» و تنظیمِ بارکدخوان پیش از نخستین اسکن (`HidScan`، `NumberField`)
+    ir.vil3ntec.tohid.scan.ScanPrefs.load(context)
     //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
     ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }

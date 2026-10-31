@@ -120,6 +120,8 @@ fun DeskSaleScreen(
   val cart by cartStore.lines.collectAsState()
   //  HW-10: نمایشگرِ مشتری (پنجرهٔ دوم) — فقط وقتی باز است کاری می‌کند
   val customerOpen by ir.vil3ntec.tohid.hw.CustomerFacing.open
+  //  نمایشگرِ قطبی (`Pole`) هم از همین‌جا؛ درگاه و پرچمش پیش از نخستین سبد خوانده می‌شود
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.print.HwTools.load(context); ir.vil3ntec.tohid.hw.Pole.load(context) }
   LaunchedEffect(cart, d, customerOpen) { ir.vil3ntec.tohid.hw.CustomerFacing.showCart(d, cart) }
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
