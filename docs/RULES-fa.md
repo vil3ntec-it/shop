@@ -219,6 +219,7 @@
 - اثرِ تحویل روی سفارش فقط با `orders.transitionIn` و COD فقط با `orders.codIn`، در همان تراکنش (#249).
 - ⛔ ساختِ سفارش بی کلیدِ یکتایی (`Idempotency-Key` یا `clientKey`) نیست و ویترین هم فقط `orders.create` را صدا می‌زند (CHK-19، #227، #244).
 - پول فقط `*Minor` و مقدار `qtyMilli`؛ مبلغِ ردیف فقط با `lineTotalMinor`؛ مبلغِ کلاینت نادیده است (#227).
+- کارِ گروهی (ORD-19) قاعدهٔ تازه‌ای ندارد: هر سفارش جدا از `orders.transition`؛ بازپرداخت و ردِ خودکار گروهی نیستند. هشدارِ شروعِ زمان‌بندی‌شده (ORD-18) هر سفارش یک بار، با رویدادِ `note` ِ `start_alert` زیرِ قفلِ ردیف (`claude/spec-ord-4`).
 - شمارهٔ کاملِ مشتری فقط با `orders.contact`؛ فهرست هرگز شمارهٔ کامل ندارد (ORD-17، #227).
 - اشتراکِ تمام‌شده فقط نوشتن را می‌بندد؛ خواندن باز است (#227).
 - تکرارِ همان گذار ⇒ ۲۰۰ `unchanged` بی رویدادِ دوم؛ `from`ِ ناهمخوان ⇒ ۴۰۹ `status_changed` (#227).
@@ -383,6 +384,8 @@
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
+| `shop.orders.start_alert` | دکان / `all` | خاموش | ORD-18: کارگرِ هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (رویدادِ `note` ِ `start_alert`، سابقه، پوش با `shop.order_notify`) | `claude/spec-ord-4` | باز |
+| `shop.orders.bulk` | دکان / `all` | خاموش | ORD-19: `POST /api/shop/orders/bulk/transition` (خاموش ⇒ ۴۰۳ `order_bulk_disabled`) | `claude/spec-ord-4` | باز |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
 | `hashchain.audit` | `security` | خاموش | زنجیرهٔ هشِ سابقه در `hash_chain`؛ روشن با `true` (و `1`، `"true"`، `"on"`) | #242 | main |

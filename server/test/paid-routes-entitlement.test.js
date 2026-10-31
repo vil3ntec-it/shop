@@ -58,7 +58,7 @@ const FREE = [
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.orders.bulk'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
