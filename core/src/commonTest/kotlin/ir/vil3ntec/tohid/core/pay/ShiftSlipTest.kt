@@ -155,13 +155,85 @@ class ShiftSlipTest {
 
   @Test
   fun methodShortfallOverThresholdNeedsReason() {
-    //  HesabPay ۱٬۳۵۰ شمرده شد: کسریِ ۱۰۰ از آستانهٔ ۵۰ بیشتر است ⇒ بی دلیل بسته نمی‌شود (PAY-14)
+    //  HesabPay ۱٬۳۵۰ شمرده شد: کسریِ ۱۰۰ از آستانهٔ ۵۰ بیشتر است ⇒ مدیر بی دلیل نمی‌بندد (PAY-14)؛ کور: بخشِ پایین
     val counts = ok(ShiftSlip.methodCounts(mapOf("hesabpay" to "1350"), ShiftSlip.countable(x())))
     val exact = mapOf("100000" to 16L, "50000" to 1L, "10000" to 3L)
-    val r = ShiftCore.close(s12(), CloseShiftInput(id = "c", at = 9_000, counts = exact, methodCounts = counts, blind = true))
+    val r = ShiftCore.close(s12(), CloseShiftInput(id = "c", at = 9_000, counts = exact, methodCounts = counts))
     assertEquals("REASON_REQUIRED", (r as PayResult.Err).code)
+    assertEquals(-10_000L, r.variance!!["hesabpay"])
     val z = ok(ShiftCore.close(s12(), CloseShiftInput(id = "c", at = 9_000, counts = exact, methodCounts = counts, reason = "رسیدِ گم‌شده"))).z!!
     assertEquals(-10_000L, z.variance!!["hesabpay"])
     assertEquals(0L, z.variance!![Pay.CASH])
+  }
+
+  /* ── ⛔ شمارشِ کور بی نشت (پس از #536): نه از X، نه از پاسخِ بستن، نه از Z ── */
+
+  /** نقدِ موردِ انتظارِ S12 = ۲٬۰۰۰ + ۱۵٬۳۰۰ − ۵۰۰ */
+  private val s12Expected = 1_680_000L
+
+  /** شمرده‌ای که با موردِ انتظار [delta] پول فاصله دارد (اسکناسِ ۱ پولی نیست؛ هر ۵۰ پول = یک ۵۰ پولی) */
+  private fun cashOff(delta: Long): Map<String, Long> = mapOf("5000" to (s12Expected + delta) / 5_000)
+
+  private fun blindClose(cashDelta: Long, hesabpay: Long? = null) = ShiftCore.close(
+    s12(), CloseShiftInput(id = "c", at = 9_000, counts = cashOff(cashDelta), methodCounts = hesabpay?.let { mapOf("hesabpay" to it) }.orEmpty(), blind = true),
+  )
+
+  @Test
+  fun blindXCarriesNoShiftMoneyOnlyCounts() {
+    val rows = ShiftSlip.rows(ShiftSlip.forViewer(x(), seesExpected = false))
+    val money = setOf(Kind.FLOAT, Kind.SALES, Kind.RECEIPTS, Kind.REFUNDS, Kind.CASH_IN, Kind.CASH_OUT, Kind.EXPECTED, Kind.VARIANCE)
+    //  اولِ صندوق + فروش/رسید/مرجوعیِ هر روش + ورود − خروج همان «مورد انتظار» است ⇒ هیچ‌کدام مبلغ ندارند
+    assertEquals(emptyList(), rows.filter { it.kind in money && it.amount != null })
+    assertTrue(rows.none { it.kind == Kind.FLOAT || it.method != null })
+    assertEquals(
+      listOf(
+        Row(Kind.SALES, count = 3), Row(Kind.RECEIPTS, count = 0), Row(Kind.REFUNDS, count = 0),
+        Row(Kind.CASH_IN, count = 0), Row(Kind.CASH_OUT, count = 1), Row(Kind.NO_SALE, count = 0),
+      ),
+      rows.filter { it.kind in money || it.kind == Kind.NO_SALE },
+    )
+    //  همان نما برای هر فیلدِ پولی که برنامه مستقیم بخواند
+    val seen = ShiftSlip.forViewer(x(), seesExpected = false)
+    assertEquals(0L, seen.float)
+    assertEquals(emptyMap(), seen.methods)
+    assertEquals(Moves(0, 0), seen.moves)
+  }
+
+  @Test
+  fun blindCloseAnswersAlikeWhateverTheVariance() {
+    //  آستانه ۵۰ افغانی (۵٬۰۰۰ پول): زیر، روی و بالای آن، نقد یا HesabPay — پاسخ یکی است، پس عوض کردنِ عدد چیزی را پیدا نمی‌کند
+    val answers = listOf(
+      blindClose(0), blindClose(-5_000), blindClose(-10_000), blindClose(+500_000), blindClose(0, hesabpay = 135_000), blindClose(0, hesabpay = 145_000),
+    )
+    assertTrue(answers.all { it is PayResult.Ok }, "$answers")
+    //  بالای آستانه بی دلیل ⇒ پذیرفته، ولی برای مدیر علامت می‌خورد و اختلاف در Zِ کامل می‌ماند
+    val z = ok(blindClose(-10_000)).z!!
+    assertEquals(-10_000L, z.variance!![Pay.CASH])
+    assertEquals(true, z.needsReview)
+    assertNull(z.reason)
+    //  بستنِ مدیر (نه کور) همان PAY-14 است
+    val manager = ShiftCore.close(s12(), CloseShiftInput(id = "c", at = 9_000, counts = cashOff(-10_000)))
+    assertEquals(PayResult.Err("REASON_REQUIRED", variance = mapOf(Pay.CASH to -10_000L, "hesabpay" to null)), manager)
+  }
+
+  @Test
+  fun blindZShowsNeitherReviewNorReason() {
+    for (delta in listOf(0L, -5_000L, -10_000L)) {
+      val z = ok(
+        ShiftCore.close(s12(), CloseShiftInput(id = "c", at = 9_000, counts = cashOff(delta), blind = true, reason = "پولِ خرد")),
+      ).z!!
+      val seen = ShiftSlip.forViewer(z, seesExpected = false)
+      assertNull(seen.needsReview)
+      assertNull(seen.reason)
+      val rows = ShiftSlip.rows(seen)
+      assertTrue(rows.none { it.kind == Kind.NEEDS_REVIEW || it.kind == Kind.REASON || it.kind == Kind.VARIANCE }, "$delta: $rows")
+      assertEquals(Row(Kind.COUNTED, Pay.CASH, s12Expected + delta, strong = true), rows.single { it.kind == Kind.COUNTED })
+      //  مدیر همه را می‌بیند
+      assertEquals(delta != 0L, ShiftSlip.rows(z).any { it.kind == Kind.NEEDS_REVIEW })
+      assertEquals(Row(Kind.REASON, text = "پولِ خرد"), ShiftSlip.rows(z).single { it.kind == Kind.REASON })
+    }
+    //  نمای کورِ هسته (`cashierView`) هم در ردیف‌ها نه بررسی را لو می‌دهد نه دلیل را
+    val core = ShiftCore.cashierView(ok(blindClose(-10_000)).z!!)
+    assertTrue(ShiftSlip.rows(core).none { it.kind == Kind.NEEDS_REVIEW || it.kind == Kind.REASON || it.kind == Kind.FLOAT })
   }
 }

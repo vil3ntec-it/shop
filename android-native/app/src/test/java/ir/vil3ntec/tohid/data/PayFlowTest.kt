@@ -328,12 +328,17 @@ class PayFlowTest {
     assertNull(view.variance)
   }
 
-  @Test fun `S12b - کسریِ ۱۰۰ بالای آستانه بی دلیل بسته نمی‌شود`() {
+  @Test fun `S12b - کسریِ ۱۰۰ بالای آستانه — مدیر بی دلیل نمی‌بندد، شمارشِ کور بی پیشگو بسته می‌شود`() {
     val (d, open) = s12()
     val counts = mapOf("100000" to 10L, "50000" to 12L, "10000" to 7L)
-    val p = bad(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true), 1300, newId))
+    val p = bad(PayFlow.closeRow(d, open, PayFlow.Count(counts), 1300, newId))
     assertEquals("REASON_REQUIRED", p.code)
-    assertNull("شمارشِ کور اختلاف را لو نمی‌دهد", p.variance)
+    assertEquals(-10000L, p.variance!!["cash"])
+    //  ⛔ کور: ردِ «بالای آستانه» پیشگوی موردِ انتظار بود ⇒ بی دلیل هم بسته می‌شود و برای مدیر علامت می‌خورد
+    val blind = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true), 1300, newId))
+    assertEquals(-10000L, blind.report.variance!!["cash"])
+    assertEquals(true, blind.report.needsReview)
+    assertNull(blind.report.reason)
     val r = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true, reason = "پولِ خرد کم بود"), 1300, newId))
     assertEquals(-10000L, r.report.variance!!["cash"])
     assertEquals("پولِ خرد کم بود", r.row.reason)

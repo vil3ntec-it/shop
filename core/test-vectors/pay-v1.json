@@ -241,11 +241,10 @@
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 0, "noSale": 0 },
           "counted": { "cash": 144000 }, "denominations": { "100000": 1, "10000": 4, "2000": 2 }, "variance": { "cash": -6000 }, "reason": "اسکناسِ پاره", "needsReview": true, "blind": false } } }
       ] },
-    { "name": "شمارشِ کور: اضافه هم دلیل می‌خواهد و صندوقدار عددِ مورد انتظار را نمی‌بیند",
+    { "name": "شمارشِ کور: اضافهٔ بالای آستانه با دلیلِ اختیاری ثبت می‌شود و صندوقدار عددِ مورد انتظار را نمی‌بیند",
       "steps": [
         { "op": "open", "input": { "id": "sh-1", "at": 0, "float": 100000 }, "expect": { "ok": true } },
         { "op": "record", "input": { "id": "e12", "type": "sale", "at": 10, "rows": [{ "method": "cash", "amount": 50000 }] }, "expect": { "ok": true } },
-        { "op": "close", "input": { "id": "c7", "at": 20, "blind": true, "counts": { "100000": 1, "50000": 1, "5000": 1, "1000": 1 } }, "expect": { "ok": false, "error": "REASON_REQUIRED" } },
         { "op": "close", "input": { "id": "c8", "at": 20, "by": "sara", "blind": true, "counts": { "100000": 1, "50000": 1, "5000": 1, "1000": 1 }, "reason": "اضافه از دیروز" }, "expect": { "ok": true, "report": {
           "kind": "Z", "shiftId": "sh-1", "currency": "AFN", "at": 20, "by": "sara", "openedAt": 0, "openedBy": null, "float": 100000,
           "methods": { "cash": { "sales": 50000, "refunds": 0, "receipts": 0, "net": 50000 } }, "moves": { "in": 0, "out": 0 }, "expected": { "cash": 150000 },
@@ -359,24 +358,36 @@
           "counted": { "cash": 1679000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7, "5000": 1, "2000": 2 },
           "variance": { "cash": -1000 }, "reason": null, "needsReview": true, "blind": true } } }
       ] },
-    { "name": "S12b · همان شیفت با کسریِ ۱۰۰ افغانی: بی دلیل بسته نمی‌شود",
+    { "name": "S12b · همان شیفت با کسریِ ۱۰۰ افغانی در شمارشِ کور: بی دلیل هم بسته می‌شود (پاسخ اندازهٔ اختلاف را لو نمی‌دهد)؛ اختلاف و needsReview برای مدیر",
       "steps": [
         { "op": "open", "input": { "id": "s12b", "at": 0, "float": 200000 }, "expect": { "ok": true } },
         { "op": "record", "input": { "id": "s12b-sale", "type": "sale", "at": 10, "rows": [{ "method": "cash", "amount": 1530000 }] }, "expect": { "ok": true } },
         { "op": "record", "input": { "id": "s12b-milk", "type": "cash_out", "at": 20, "amount": 50000, "reason": "petty_expense", "note": "خرید شیر" }, "expect": { "ok": true } },
-        { "op": "close", "input": { "id": "s12b-close", "at": 30, "blind": true, "counts": { "100000": 10, "50000": 12, "10000": 7 } }, "expect": { "ok": false, "error": "REASON_REQUIRED" } },
-        { "op": "close", "input": { "id": "s12b-close", "at": 30, "blind": true, "counts": { "100000": 10, "50000": 12, "10000": 7 }, "reason": "یک اسکناسِ صدی گم شد" }, "expect": { "ok": true, "report": {
+        { "op": "close", "input": { "id": "s12b-close", "at": 30, "blind": true, "counts": { "100000": 10, "50000": 12, "10000": 7 } }, "expect": { "ok": true, "report": {
           "kind": "Z", "shiftId": "s12b", "currency": "AFN", "at": 30, "by": null, "openedAt": 0, "openedBy": null, "float": 200000,
           "methods": { "cash": { "sales": 1530000, "refunds": 0, "receipts": 0, "net": 1530000 } }, "moves": { "in": 0, "out": 50000 }, "expected": { "cash": 1680000 },
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 },
           "counted": { "cash": 1670000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7 },
-          "variance": { "cash": -10000 }, "reason": "یک اسکناسِ صدی گم شد", "needsReview": true, "blind": true } } },
+          "variance": { "cash": -10000 }, "reason": null, "needsReview": true, "blind": true } } },
         { "op": "cashierView", "expect": { "report": {
           "kind": "Z", "shiftId": "s12b", "currency": "AFN", "at": 30, "by": null, "openedAt": 0, "openedBy": null, "float": 200000,
           "methods": { "cash": { "sales": 1530000, "refunds": 0, "receipts": 0, "net": 1530000 } }, "moves": { "in": 0, "out": 50000 },
           "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 },
           "counted": { "cash": 1670000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7 },
-          "reason": "یک اسکناسِ صدی گم شد", "needsReview": true, "blind": true } } }
+          "reason": null, "needsReview": true, "blind": true } } }
+      ] },
+    { "name": "S12b · همان کسریِ ۱۰۰ در بستنِ مدیر (نه کور): بی دلیل بسته نمی‌شود و اختلاف را می‌گوید",
+      "steps": [
+        { "op": "open", "input": { "id": "s12m", "at": 0, "float": 200000 }, "expect": { "ok": true } },
+        { "op": "record", "input": { "id": "s12m-sale", "type": "sale", "at": 10, "rows": [{ "method": "cash", "amount": 1530000 }] }, "expect": { "ok": true } },
+        { "op": "record", "input": { "id": "s12m-milk", "type": "cash_out", "at": 20, "amount": 50000, "reason": "petty_expense", "note": "خرید شیر" }, "expect": { "ok": true } },
+        { "op": "close", "input": { "id": "s12m-close", "at": 30, "counts": { "100000": 10, "50000": 12, "10000": 7 } }, "expect": { "ok": false, "error": "REASON_REQUIRED", "variance": { "cash": -10000 } } },
+        { "op": "close", "input": { "id": "s12m-close", "at": 30, "counts": { "100000": 10, "50000": 12, "10000": 7 }, "reason": "یک اسکناسِ صدی گم شد" }, "expect": { "ok": true, "report": {
+          "kind": "Z", "shiftId": "s12m", "currency": "AFN", "at": 30, "by": null, "openedAt": 0, "openedBy": null, "float": 200000,
+          "methods": { "cash": { "sales": 1530000, "refunds": 0, "receipts": 0, "net": 1530000 } }, "moves": { "in": 0, "out": 50000 }, "expected": { "cash": 1680000 },
+          "events": { "sales": 1, "refunds": 0, "receipts": 0, "cashIn": 0, "cashOut": 1, "noSale": 0 },
+          "counted": { "cash": 1670000 }, "denominations": { "100000": 10, "50000": 12, "10000": 7 },
+          "variance": { "cash": -10000 }, "reason": "یک اسکناسِ صدی گم شد", "needsReview": true, "blind": false } } }
       ] },
     { "name": "شناسهٔ عملیات (بخشِ ۱۵.۲): تکرارِ همان رویداد یا بستن اثرِ دوم ندارد",
       "steps": [

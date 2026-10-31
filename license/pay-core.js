@@ -534,7 +534,8 @@
       if (v !== 0) review = true;
       if (Math.abs(v) > s.threshold) over = true;
     });
-    if (over && !op.reason) return op.blind ? fail('REASON_REQUIRED') : fail('REASON_REQUIRED', { variance: variance });
+    /* ⛔ شمارشِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (ردِ «بالای آستانه» پیشگوی موردِ انتظار بود)؛ needsReview برای مدیر */
+    if (over && !op.reason && !op.blind) return fail('REASON_REQUIRED', { variance: variance });
 
     rep.counted = counted;
     rep.denominations = op.counts;
