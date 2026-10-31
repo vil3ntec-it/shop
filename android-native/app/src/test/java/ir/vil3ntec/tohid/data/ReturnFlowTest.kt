@@ -276,6 +276,29 @@ class ReturnFlowTest {
   }
 
   @Test
+  fun `RET-08 فهرستِ دلیلِ دکان — بیرون از فهرست رد و دفتر دست‌نخورده، درون فهرست با متنِ خودِ فهرست`() {
+    val d = ledger()
+    val shop = listOf("رنگِ نامناسب", "خراب")
+    fun post(reason: String, list: List<String>?) = ReturnFlow.post(
+      d, ReturnFlow.Request(docId = "rr", saleId = "s30", picks = mapOf("i30" to ReturnFlow.Pick(1.0)), reason = reason, reasons = list),
+      today, now, ::newId,
+    )
+    //  دلیلِ پیش‌فرضی که دکان برداشته ⇒ رد
+    val out = post("خراب یا معیوب", shop)
+    assertEquals(ReturnFlow.Code.REASON_NOT_LISTED, (out as ReturnFlow.Outcome.Bad).code)
+    assertTrue(d.saleReturns.isEmpty())
+    //  خالی هنوز «دلیل را انتخاب کنید» است
+    assertEquals(ReturnFlow.Code.REASON_REQUIRED, (post("  ", shop) as ReturnFlow.Outcome.Bad).code)
+    //  «رنگ نامناسب» (بی کسره) همان ردیفِ فهرست است و با متنِ فهرست ثبت می‌شود
+    val ok = (post("رنگ نامناسب", shop) as ReturnFlow.Outcome.Ok).value
+    assertEquals(listOf("رنگِ نامناسب"), ok.data.saleReturns.map { it.reason })
+    //  بی فهرست (`null`) همان رفتارِ پیشین: هر دلیلِ ناخالی
+    assertTrue(post("هر چه", null) is ReturnFlow.Outcome.Ok)
+    //  فهرستِ پیش‌فرض همان `REASONS` است
+    assertEquals(ir.vil3ntec.tohid.core.returns.ReturnReasons.DEFAULT, ReturnFlow.REASONS)
+  }
+
+  @Test
   fun `صندوق — نقد کم می‌شود، اعتبار و کسر از بدهی نه`() {
     val d = ledger()
     val cash = (ReturnFlow.post(d, ReturnFlow.Request(docId = "a", saleId = "s13", picks = mapOf("i13b" to ReturnFlow.Pick(1.0, ReturnFlow.DAMAGED)), reason = "خراب یا معیوب", mode = ReturnFlow.CASH), today, now, ::newId) as ReturnFlow.Outcome.Ok).value
