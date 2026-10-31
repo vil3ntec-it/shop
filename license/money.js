@@ -167,8 +167,12 @@
      بردار: `license/test-vectors/return-share-v1.json`. مبلغِ هر برگشت = پس‌دادنیِ تا پایانِ آن − پس‌دادنیِ
      تا پیش از آن، پس جمعِ برگشت‌های تکه‌تکهٔ یک قلم هرگز از برگشتِ یک‌جای همان مقدار بیشتر نمی‌شود
      (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶ پس داده می‌شد). عددهای دفترِ امروز (افغانی، Double)؛ گرد به افغانیِ
-     کامل با Math.round — همان mathRound ِ کاتلین، و ترتیبِ عمل یکی، پس خروجی بیت‌به‌بیت یکی است. */
-  function returnShare(lineTotal, quantity, returnedBefore, qty, paidRatio) {
+     کامل با Math.round — همان mathRound ِ کاتلین، و ترتیبِ عمل یکی، پس خروجی بیت‌به‌بیت یکی است.
+     refundedBefore/refundedQty (اختیاری، #586، تاریخچهٔ قاطی): جمعِ amount و quantity ِ برگشت‌های پیشینِ همین
+     saleItemId. برگشت‌های پیش از به‌روزرسانی با فرمولِ جداجدا ثبت شده‌اند، پس مبنا پولِ واقعاً پس‌داده است:
+     max(0, upTo(پایان) − refundedBefore) — قلمِ ۲ افغانی برای ۳ عدد با دو برگشتِ کهنهٔ ۱ + ۱ دیگر یکِ سوم
+     نمی‌دهد. ردیف‌ها کمتر از returnedBefore (ردیفِ کهنه بی saleItemId) ⇒ بخشِ بی‌ردیف upTo(پیش) فرض می‌شود. */
+  function returnShare(lineTotal, quantity, returnedBefore, qty, paidRatio, refundedBefore, refundedQty) {
     if (!(quantity > 0) || !isFinite(quantity) || !isFinite(lineTotal) || !isFinite(paidRatio)) return 0;
     if (!isFinite(qty) || !(qty > 0)) return 0;
     var before = isFinite(returnedBefore) && returnedBefore > 0 ? returnedBefore : 0;
@@ -178,7 +182,11 @@
       if (k >= quantity) return Math.round(net);
       return Math.round(net * k / quantity);
     }
-    return norm(upTo(before + qty) - upTo(before));
+    if (refundedBefore === undefined && refundedQty === undefined) return norm(upTo(before + qty) - upTo(before));
+    var paid = isFinite(refundedBefore) && refundedBefore > 0 ? refundedBefore : 0;
+    var rowsQty = isFinite(refundedQty) && refundedQty > 0 ? refundedQty : 0;
+    var base = rowsQty + 1e-9 < before ? Math.max(paid, upTo(before)) : paid;
+    return norm(Math.max(0, upTo(before + qty) - base));
   }
 
   return {

@@ -701,7 +701,7 @@ private fun ReturnDialog(
 
   val total = items.sumOf { item ->
     val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
-    SalesEngine.returnAmount(sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
+    SalesEngine.returnAmount(d, sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
   }
 
   Dialog(onDismissRequest = onDismiss) {

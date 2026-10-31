@@ -222,8 +222,13 @@ object ReturnFlow {
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
       if (product != null) SalesEngine.quantityProblem(product, q)?.let { return Outcome.Bad(Code.BAD_QTY, it) }
-      //  گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکهٔ یک قلم بیش از برگشتِ یک‌جای همان مقدار پس نمی‌دهد
-      val amount = ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, q, paidRatio)
+      //  گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکهٔ یک قلم بیش از برگشتِ یک‌جای همان مقدار پس نمی‌دهد؛
+      //  مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586، برگشت‌های کهنهٔ فرمولِ جداجدا)
+      val prior = d.saleReturns.filter { it.saleItemId == item.id }
+      val amount = ReturnShare.amount(
+        item.totalPrice, item.quantity, item.returnedQty, q, paidRatio,
+        refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity },
+      )
       val unit = if (item.quantity > 0) item.totalPrice / item.quantity else item.unitPrice
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }

@@ -235,6 +235,27 @@ class SalesReturnTest {
     assertEquals(13.0, oneShot, 0.0)
   }
 
+  /**
+   *  #586 — تاریخچهٔ قاطی: قلمِ ۲ افغانی برای ۳ عدد، دو برگشتِ پیش از به‌روزرسانی با فرمولِ جداجدا
+   *  (۱ + ۱ = ۲، همهٔ پولِ قلم). برگشتِ سوم پس از به‌روزرسانی با `upTo(3) − upTo(2)` یکِ دیگر می‌داد ⇒ ۳ > ۲.
+   */
+  @Test
+  fun `مرجوعی پس از برگشت های کهنه بیش از مبلغ قلم پس نمی دهد`() {
+    val sold = sell(ledger(), 3.0, SalesEngine.Checkout())
+    val item = sold.data.saleItems.single()
+    val legacy = sold.data.copy(
+      sales = sold.data.sales.map { it.copy(total = 2.0, finalTotal = 2.0, paidAmount = 2.0) },
+      saleItems = listOf(item.copy(totalPrice = 2.0, returnedQty = 2.0)),
+      saleReturns = listOf(1, 2).map {
+        SaleReturn(id = "old$it", saleId = sold.saleId, saleItemId = item.id, productId = "p1", quantity = 1.0, amount = 1.0)
+      },
+    )
+    val d = ok(SalesEngine.recordReturn(legacy, sold.saleId, mapOf(item.id to 1.0), "", "2026-08-30", 0, ::newId)).data
+    assertEquals(listOf(1.0, 1.0, 0.0), d.saleReturns.map { it.amount })
+    assertEquals(2.0, d.saleReturns.sumOf { it.amount }, 0.0)
+    assertEquals(3.0, d.saleItems.single().returnedQty, 0.0)
+  }
+
   @Test
   fun `دو مرجوعی پشت سر هم روی هم جمع می شوند`() {
     val sold = sell(ledger(), 10.0, SalesEngine.Checkout())

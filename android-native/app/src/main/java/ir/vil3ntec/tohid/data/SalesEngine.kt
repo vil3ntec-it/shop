@@ -690,12 +690,15 @@ object SalesEngine {
    *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) × سهمِ پرداخت‌شده
    *  پس از تخفیفِ فاکتور، با گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکه بیش از برگشتِ یک‌جای همان مقدار پس
    *  نمی‌دهد (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶). پیش‌نمایشِ پنجرهٔ مرجوعی هم همین را نشان می‌دهد.
+   *  مبنا پولِ واقعاً پس‌دادهٔ همین قلم است، چون برگشت‌های کهنه جداجدا گرد شده‌اند (#586).
    */
-  fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double {
+  fun returnAmount(d: ShopData, sale: Sale, item: SaleItem, quantity: Double): Double {
     //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
     val paidRatio =
       if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
-    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio)
+    val prior = d.saleReturns.filter { it.saleItemId == item.id }
+    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio,
+      refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity })
   }
 
   /**
@@ -733,7 +736,7 @@ object SalesEngine {
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
-      val amount = returnAmount(sale, item, quantity)
+      val amount = returnAmount(d, sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)
 

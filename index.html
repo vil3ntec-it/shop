@@ -13456,10 +13456,15 @@
       if(qty>returnable) qty = returnable;
       if(qty<=0) return;
       // گردِ تجمعی (SEC-DATA-01): جمعِ برگشت‌های تکه‌تکهٔ یک قلم = برگشتِ یک‌جای همان مقدار، نه بیشتر.
-      // money.js ِ کهنهٔ کشِ سرویس‌ورکر (یک بارِ نخست پس از به‌روزرسانی) returnShare ندارد ⇒ همان فرمولِ پیشین
+      // مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586): برگشت‌های کهنه با فرمولِ جداجدا ثبت شده‌اند.
+      const prior = returns.filter(r=>r.saleItemId===si.id);
+      const priorAmount = prior.reduce((s,r)=>s+(r.amount||0), 0);
+      const priorQty = prior.reduce((s,r)=>s+(r.quantity||0), 0);
+      // money.js ِ کهنهٔ کشِ سرویس‌ورکر (یک بارِ نخست پس از به‌روزرسانی) returnShare ندارد ⇒ فرمولِ پیشین،
+      // ولی هرگز بیش از «پولِ قلم منهای پس‌داده»
       const amount = typeof TohidMoney.returnShare === 'function'
-        ? TohidMoney.returnShare(si.totalPrice, si.quantity, si.returnedQty||0, qty, paidRatio)
-        : Math.round((si.totalPrice/si.quantity) * qty * paidRatio);
+        ? TohidMoney.returnShare(si.totalPrice, si.quantity, si.returnedQty||0, qty, paidRatio, priorAmount, priorQty)
+        : Math.max(0, Math.min(Math.round((si.totalPrice/si.quantity) * qty * paidRatio), Math.round(si.totalPrice * paidRatio) - priorAmount));
       si.returnedQty = (si.returnedQty||0) + qty;
       const retId = uid();
       returns.push({
