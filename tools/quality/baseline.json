@@ -90,7 +90,7 @@
     "StatusPill": 2,
     "html-escape": 13,
     "secret-derivation": 6,
-    "express-wrap": 4
+    "express-wrap": 3
   },
   "platformDeps": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/atrest/AtRestEnvelope.kt": 10,
@@ -135,7 +135,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/GoogleSignIn.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoiceFile.kt": 5,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoices.kt": 2,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ImageBank.kt": 31,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ImageBank.kt": 42,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ImageBulk.kt": 13,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/LedgerArchive.kt": 11,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/LedgerEngine.kt": 1,
@@ -266,7 +266,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Expenses.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Fields.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Haptics.kt": 10,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/ImageBankPicker.kt": 6,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/ImageBankPicker.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/ImageBulkImport.kt": 4,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/LocaleSection.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Management.kt": 4,

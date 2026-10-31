@@ -89,6 +89,9 @@ fun ImageBankPicker(
   var hasImage by remember { mutableStateOf(true) }
   val items = remember { mutableStateListOf<ImageBank.Hit>() }
   var next by remember { mutableStateOf<String?>(null) }
+  /** نتیجه‌های روی صفحه از کشِ بی‌اینترنتی‌اند (IMG-BANK-11): برچسبِ «قدیمی» و انتخاب نه */
+  var stale by remember { mutableStateOf(false) }
+  var scanOpen by remember { mutableStateOf(false) }
   var state by remember { mutableStateOf("") }
   var stateTone by remember { mutableStateOf(PillTone.NEUTRAL) }
   var loading by remember { mutableStateOf(false) }
@@ -112,10 +115,17 @@ fun ImageBankPicker(
         val note = if (page.barcodeValid == false) "این بارکد معتبر نیست — نتیجه‌ها با نام است. " else ""
         state = note + if (items.isEmpty()) "چیزی پیدا نشد. می‌توانید عکسِ خودتان را بگذارید." else "${items.size} نتیجه" + if (next != null) " (بیشتر هم هست)" else ""
         stateTone = if (page.barcodeValid == false) PillTone.WARNING else PillTone.NEUTRAL
+        stale = page.stale
+        if (page.stale) {
+          //  ⛔ هرگز «جست‌وجوی زنده» نیست: سن و «آخرین همگام‌سازی» پیدا، و انتخاب فقط با اینترنت
+          state = "بی اینترنت — نتیجه‌های ذخیره‌شده از ${ago(System.currentTimeMillis() - page.savedAtMs)} (آخرین همگام‌سازی). " +
+            "ممکن است بانک از آن زمان عوض شده باشد؛ انتخاب فقط با اینترنت. " + state
+          stateTone = PillTone.WARNING
+        }
       } catch (f: ApiFailure) {
         stateTone = PillTone.DANGER
         state = when {
-          f is ApiFailure.Offline || f is ApiFailure.Timeout -> "اینترنت قطع است یا سرور در دسترس نیست — بانکِ تصاویر بی اینترنت کار نمی‌کند."
+          f is ApiFailure.Offline || f is ApiFailure.Timeout -> { stale = false; "اینترنت قطع است یا سرور در دسترس نیست — برای این جست‌وجو نتیجهٔ ذخیره‌شده‌ای هم روی این دستگاه نیست." }
           f is ApiFailure.Forbidden -> { ImageBank.enabled.value = false; "بانکِ تصاویر برای این دکان روشن نیست." }
           else -> "خطای سرور: ${f.userMessage}"
         }
@@ -143,6 +153,8 @@ fun ImageBankPicker(
             label = { Text("بارکد یا نامِ کالا") }, modifier = Modifier.weight(1f),
           )
           Spacer(Modifier.width(Space.xs))
+          //  IMG-BANK-03: بارکد با دوربین (کامپیوتر: بارکدخوان) ⇒ همان جست‌وجو؛ فقط نتیجه باز می‌شود، چیزی ثبت نمی‌شود
+          TextButton(onClick = { scanOpen = true }, enabled = !loading) { Text("اسکن") }
           Button(onClick = { search(false) }, enabled = !loading) { Text("جست‌وجو") }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { hasImage = !hasImage; search(false) }) {
@@ -166,9 +178,26 @@ fun ImageBankPicker(
           }
         }
       } else {
-        HitDetail(hit, productId, name, barcode, hasPhoto, onBack = { open = null }, onChosen = onChosen)
+        HitDetail(hit, productId, name, barcode, hasPhoto, stale, onBack = { open = null }, onChosen = onChosen)
       }
     }
+  }
+  if (scanOpen) {
+    BarcodeScanSheet(
+      onDismiss = { scanOpen = false },
+      onCode = { code -> query = code; search(false) },
+    )
+  }
+}
+
+/** سنِ نتیجهٔ کش برای برچسبِ «قدیمی» */
+private fun ago(ms: Long): String {
+  val m = (ms.coerceAtLeast(0) / 60_000L)
+  return when {
+    m < 1 -> "کمتر از یک دقیقه پیش"
+    m < 60 -> "$m دقیقه پیش"
+    m < 24 * 60 -> "${m / 60} ساعت پیش"
+    else -> "${m / (24 * 60)} روز پیش"
   }
 }
 
@@ -241,7 +270,8 @@ private fun HitCard(h: ImageBank.Hit, onOpen: () -> Unit) {
     verticalAlignment = Alignment.Top,
   ) {
     val img = h.images.firstOrNull()
-    BankImage(img?.thumb ?: img?.display, 64.dp, "بی عکس")
+    //  «بی عکس» فقط وقتی واقعاً عکسی نیست؛ عکسی که هنوز نیامده (یا بی اینترنت) «…» است
+    BankImage(img?.thumb ?: img?.display, 64.dp, if (img == null) "بی عکس" else "…")
     Spacer(Modifier.width(Space.sm))
     Column(Modifier.weight(1f)) {
       Text(h.name, style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
@@ -261,6 +291,7 @@ private fun HitDetail(
   name: String,
   barcode: String,
   hasPhoto: Boolean,
+  stale: Boolean,
   onBack: () -> Unit,
   onChosen: (ByteArray) -> Unit,
 ) {
@@ -310,6 +341,7 @@ private fun HitDetail(
       }
     }
     problem?.let { StatusPill(it, PillTone.DANGER) }
+    if (stale) StatusPill("این نتیجه از کشِ بی‌اینترنتی است؛ برای انتخاب، با اینترنت دوباره جست‌وجو کنید", PillTone.WARNING)
     Spacer(Modifier.height(Space.xs))
     Button(
       onClick = {
@@ -334,7 +366,7 @@ private fun HitDetail(
           }
         }
       },
-      enabled = !busy && h.images.isNotEmpty() && a.block.isEmpty() && (!needs || confirm),
+      enabled = !busy && !stale && h.images.isNotEmpty() && a.block.isEmpty() && (!needs || confirm),
       modifier = Modifier.fillMaxWidth(),
     ) { Text(if (busy) "در حالِ ثبت…" else "انتخاب این عکس") }
   }

@@ -332,10 +332,15 @@ test('IMG-11 / IMG-12: نسخهٔ کوچک سنجیده، بی EXIF، یک‌ب�
 test('IMG-BANK-15: بایگانی ⇒ انتخابِ تازه نه، از جست‌وجو بیرون؛ سنجاقِ قبلی سالم', async () => {
   const c = await centralImage({ name: 'پنیر', brand: 'کابل', gtin: F.ean13('400000000001') });
   await S('POST', '/select', A, { product_id: 'cheese-1', source: 'central', image_id: c.imageId, expect: { barcode: F.ean13('400000000001') } });
+  const before = await S('GET', '/search?q=پنیر', B);
+  assert.equal(before.body.items[0].images.length, 1);
   const arch = await AD('POST', `/images/${c.imageId}/archive`, root, { reason: 'بستهٔ قدیمی' });
   assert.equal(arch.status, 200, JSON.stringify(arch.body));
   const s = await S('GET', '/search?q=پنیر', B);
   assert.equal(s.body.items[0].images.length, 0);
+  //  «cache باطل»: نسخهٔ بانک عوض می‌شود ⇒ کشِ بی‌اینترنتیِ برنامه (`BankSearchCache.observe`) صفحه‌های قبلی را دور می‌ریزد
+  assert.ok(Number(s.body.bank_rev) > Number(before.body.bank_rev), `${before.body.bank_rev} → ${s.body.bank_rev}`);
+  assert.equal(s.body.live, true);
   const sel = await S('POST', '/select', B, { product_id: 'c', source: 'central', image_id: c.imageId, confirm: true });
   assert.equal(sel.body.error.code, 'image_not_selectable');
   const a = await S('GET', '/products/cheese-1', A);
