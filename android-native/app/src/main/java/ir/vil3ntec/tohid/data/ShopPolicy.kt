@@ -74,4 +74,17 @@ object ShopPolicy {
   fun setCreditGate(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(CREDIT_GATE, on).apply()
   }
+
+  /**
+   *  CHAT-05 / CHAT-07 — چتِ دکان: نوارِ پیشرفتِ فرستادنِ عکس و صدا، و پیش از ضبط، پخش یا آماده
+   *  کردنِ عکس سنجشِ جای دستگاه با پیامِ روشن (`ChatSpace`، `ChatProgress` در `core`). پیش‌فرض
+   *  **خاموش**: چت همان است که بود (بدنهٔ رسانه یک‌جا نوشته می‌شود، بی سنجشِ جا). فقط روی همین دستگاه.
+   */
+  private const val CHAT_MEDIA_GUARD = "chat_media_guard"
+
+  fun chatMediaGuard(context: Context): Boolean = prefs(context).getBoolean(CHAT_MEDIA_GUARD, false)
+
+  fun setChatMediaGuard(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(CHAT_MEDIA_GUARD, on).apply()
+  }
 }
