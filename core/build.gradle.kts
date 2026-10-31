@@ -50,6 +50,13 @@ kotlin {
     iosArm64()
     iosSimulatorArm64()
   }
-  sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
   if (nativeGuard) linuxX64()
+}
+
+//  همان آزمون JSONها را هنگامِ اجرا می‌خواند؛ بی این ورودی، تغییرِ فقط JSON آزمون را
+//  UP-TO-DATE (سبزِ کهنه) رد می‌کرد
+tasks.named<Test>("jvmTest") {
+  inputs.files(fileTree("test-vectors"), fileTree("../license/test-vectors"))
+    .withPropertyName("testVectors")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
 }
