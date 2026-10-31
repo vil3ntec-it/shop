@@ -87,7 +87,7 @@ const flag = (scope, key) => h.put('/api/admin/pump/live-config', { scope, key, 
 async function liveShop(label) {
   const u = await h.newUser(`صاحب-${label}`);
   const shopId = (await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken })).body.shop.id;
-  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat', 'shop.storefront.cart']) await flag(shopId, k);
+  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat', 'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.storefront.cart']) await flag(shopId, k);
   const slug = `iso-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: u.accessToken });
   assert.equal(put.status, 200, JSON.stringify(put.body));
@@ -246,6 +246,8 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   assert.deepEqual(bad, [], bad.join('\n'));
   //  شناسهٔ واقعیِ الف در دستِ ب: نه می‌بیند، نه عوض می‌کند
   assert.deepEqual((await h.get(`/api/store/${a.slug}/account/addresses`, as(ka))).body.addresses.map((x) => x.text), ['کوچهٔ رازِ-مشتری']);
+  //  CHK-10: «خبرم کن» با برگهٔ شماره در همین ماتریس است
+  assert.ok(gated.some((r) => r.key === 'POST /api/store/:slug/area-request'), 'درِ «خبرم کن» در ماتریس است');
   assert.ok(gated.some((r) => r.key === 'PUT /api/store/:slug/account/cart'), 'درِ سبد در ماتریس است');
   assert.deepEqual((await h.get(`/api/store/${a.slug}/account/cart`, as(ka))).body.cart.lines.map((l) => l.note), ['رازِ-سبدِ-مشتری']);
   //  توکنِ پیگیری: دست‌کاری‌شده یا روی ویترینِ دیگر ⇒ ۴۰۴؛ خودش ⇒ ۲۰۰

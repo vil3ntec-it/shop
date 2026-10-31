@@ -105,17 +105,17 @@ test('CHK-03 ⛔: پرچمِ خاموش ⇒ همان پاسخِ مسیرِ نا�
     assert.deepEqual(r.body, unknown.body, 'همان پاسخِ درِ ناشناخته');
   }
   assert.equal(await rows(s.shopId), 0);
-  //  روشن ⇒ همان درها کار می‌کنند؛ ویترینِ بسته ⇒ دوباره همان ۴۰۴
+  //  روشن ⇒ همان درها کار می‌کنند
   await setFlag(s.shopId, 'shop.storefront.cart', true);
   assert.equal((await h.get(url(s.slug), A)).status, 200);
   const noSession = await h.get(url(s.slug));
   assert.equal(noSession.status, 401);
   assert.equal(noSession.body.error.code, 'session_required', 'روشن و بی نشست ⇒ ۴۰۱ ِ حساب');
-  //  ویترینِ بسته ⇒ دوباره همان پاسخِ درِ ناشناخته
+  //  ویترینِ بسته ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10، #684)، پیش از نشست
   await setFlag(s.shopId, 'shop.storefront', false);
   const off = await h.get(url(s.slug), A);
-  assert.equal(off.status, unknown.status);
-  assert.deepEqual(off.body, unknown.body);
+  assert.equal(off.status, 404);
+  assert.equal(off.body.error.code, 'store_not_found');
 });
 
 test('CHK-03: سبد روی سرور می‌ماند و دستگاهِ دوم همان را می‌بیند؛ قیمتِ امروز؛ کالای بیرون‌رفته «نیست»؛ ورودیِ بد ۴۰۰', async () => {

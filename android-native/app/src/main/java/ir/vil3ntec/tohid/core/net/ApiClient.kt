@@ -95,9 +95,10 @@ class ApiClient(
     bytes: ByteArray,
     contentType: String = "application/octet-stream",
     headers: Map<String, String> = emptyMap(),
+    onProgress: ((Long) -> Unit)? = null,
   ): JsonObject = authorized(
     "POST", path, null, idempotent = false,
-    raw = RawBody(bytes, contentType, headers),
+    raw = RawBody(bytes, contentType, headers, onProgress),
   )
 
   /**
