@@ -466,6 +466,7 @@ function bodyFor(r, ids) {
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
     'POST /shop/delivery/assignments/:id/recall': { reason: 'other', note: 'آزمون' },
+    'POST /shop/delivery/assignments/:id/address': { address: { landmark: 'آزمون', area: 'ناحیه', gateColor: 'سبز' } },
     'POST /shop/delivery/couriers/:id/settlements': { assignmentIds: [ids.assignment], handedOverMinor: 1, receivedMinor: 1 },
     'PUT /shop/chat/conversations/:id/status': { status: 'closed' },
     'POST /shop/chat/conversations/:id/messages': { clientId: `client-${fresh('x')}-0000`, body: 'سلام' },

@@ -114,6 +114,9 @@ object ApiEndpoints {
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
 
+    /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
+    const val PHONE_CODE = "/me/phone/code"
+
     /**
      *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.
      *
@@ -180,6 +183,8 @@ object ApiEndpoints {
     fun status(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/status"
     fun code(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/code"
     fun recall(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/recall"
+    /** «اصلاحِ نشانی» پس از ناموفق (DLV-09) */
+    fun address(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/address"
     /** POST (همان PATCHِ سرور) — JVMِ کامپیوتر PATCH نمی‌فرستد */
     fun courier(id: String) = "$COURIERS/${enc(id)}"
     fun settlementPreview(courierId: String) = "$COURIERS/${enc(courierId)}/settlement-preview"
@@ -204,6 +209,8 @@ object ApiEndpoints {
     const val EVENTS = "/courier/events"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
+    /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */
+    fun call(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/call"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

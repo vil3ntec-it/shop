@@ -58,7 +58,7 @@ const FREE = [
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
-  'shop.storefront.notify_area',
+  'shop.storefront.notify_area', 'shop.storefront.banners',
   'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
