@@ -14,9 +14,14 @@
  * ⚠️ پیشوندِ تازه است: باید به ACCOUNT_PREFIXESِ پنلِ خانگی (ریپوی دیگر)
  * هم افزوده شود — دستورش در شرحِ PR است.
  */
+const path = require('path');
 const express = require('express');
 const delivery = require('../lib/delivery');
+const audit = require('../lib/audit');
+const orders = require('../lib/orders');
+const courierMap = require('../lib/courier-map');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
+const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -44,14 +49,17 @@ router.get('/me', wrap(async (req, res) => {
   const c = req.courier;
   res.json({
     courier: { id: c.id, name: c.name, active: c.active === true, cashCapMinor: Number(c.cash_cap_minor) },
+    //  DLV-02: دکمهٔ «تماس با مشتری» فقط وقتی دیده می‌شود که دکان روشنش کرده باشد
+    callEnabled: await delivery.callFlagOf(req.shopId),
     serverTime: Date.now(),
   });
 }));
 
 router.get('/missions', wrap(async (req, res) => {
-  res.json(await delivery.missions(req.shopId, req.courier.id, {
+  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)
+  res.json(await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
-  }));
+  })));
 }));
 
 /**
@@ -68,6 +76,23 @@ router.post('/missions/:id/photos', wrap(async (req, res) => {
   res.status(out.replayed ? 200 : 201).json(out);
 }));
 
+/**
+ * «تماس با مشتری» (DLV-02، §۳۸): شمارهٔ کامل فقط همین لحظه و فقط برای مأموریتِ پذیرفته و
+ * زندهٔ همین پیک، پشتِ پرچمِ خاموشِ `shop.delivery_courier_call`. POST است چون هر بار در
+ * سابقهٔ دکان می‌نشیند (بی خودِ شماره) و نباید پیش‌واکشی یا نگه داشته شود.
+ * دستگیره بی `wrap` است: Express 5 خطای async را خودش به `next` می‌دهد.
+ */
+router.post('/missions/:id/call', async (req, res) => {
+  const out = await delivery.callCustomer(req.shopId, req.params.id, req.courierActor);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'delivery.courier.call',
+    targetType: 'delivery_assignment', targetId: out.assignmentId,
+    detail: { orderId: out.orderId, courierId: req.courier.id, status: out.status }, ip: clientIp(req),
+  });
+  res.set('Cache-Control', 'no-store');
+  res.json({ phone: out.phone, status: out.status });
+});
+
 /*
  *  S5 (پشتِ پرچم‌های خاموشِ `shop.delivery_customer_view` و جدای
  *  `shop.delivery_live_location`): «تقریباً کی می‌رسم» و آخرین نقطه — فقط
@@ -80,6 +105,36 @@ router.post('/missions/:id/eta', wrap(async (req, res) => {
 router.post('/missions/:id/location', wrap(async (req, res) => {
   res.json(await delivery.putLocation(req.shopId, req.params.id, req.body, req.courierActor));
 }));
+
+/*
+ *  DLV-05 (پشتِ پرچمِ خاموشِ `shop.delivery_map`): نقشهٔ آفلاینِ شهر. فهرست با
+ *  اندازه و `sha256`؛ خودِ فایل با `Range` (ادامهٔ دانلودِ بریده). شناسه فقط از
+ *  فهرستِ پوشهٔ نقشهٔ سرور است — هیچ مسیری از درخواست به دیسک نمی‌رسد.
+ */
+async function needMap(req, res, next) {
+  if (!(await orders.flagOf(req.shopId, courierMap.FLAG))) {
+    return next(notFound('نقشهٔ آفلاین برای این دکان روشن نیست', 'delivery_map_disabled'));
+  }
+  next();
+}
+
+router.get('/map', needMap, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({
+    attribution: courierMap.ATTRIBUTION,
+    packs: (await courierMap.packs()).map((p) => ({ ...p, url: `/api/courier/map/${p.id}` })),
+  });
+});
+
+router.get('/map/:id', needMap, async (req, res, next) => {
+  const file = await courierMap.packFile(req.params.id);
+  if (!file) return next(notFound('این نقشه روی سرور نیست', 'map_not_found'));
+  //  `root` + نامِ سنجیده: send خودش هم از بیرون رفتن از پوشه جلوگیری می‌کند
+  res.sendFile(path.basename(file), {
+    root: path.dirname(file), acceptRanges: true, etag: true, lastModified: true,
+    headers: { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'private, max-age=3600' },
+  }, (err) => { if (err && !res.headersSent) next(err); });
+});
 
 //  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
 router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));
