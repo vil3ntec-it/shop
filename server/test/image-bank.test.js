@@ -332,10 +332,15 @@ test('IMG-11 / IMG-12: نسخهٔ کوچک سنجیده، بی EXIF، یک‌ب�
 test('IMG-BANK-15: بایگانی ⇒ انتخابِ تازه نه، از جست‌وجو بیرون؛ سنجاقِ قبلی سالم', async () => {
   const c = await centralImage({ name: 'پنیر', brand: 'کابل', gtin: F.ean13('400000000001') });
   await S('POST', '/select', A, { product_id: 'cheese-1', source: 'central', image_id: c.imageId, expect: { barcode: F.ean13('400000000001') } });
+  const before = await S('GET', '/search?q=پنیر', B);
+  assert.equal(before.body.items[0].images.length, 1);
   const arch = await AD('POST', `/images/${c.imageId}/archive`, root, { reason: 'بستهٔ قدیمی' });
   assert.equal(arch.status, 200, JSON.stringify(arch.body));
   const s = await S('GET', '/search?q=پنیر', B);
   assert.equal(s.body.items[0].images.length, 0);
+  //  «cache باطل»: نسخهٔ بانک عوض می‌شود ⇒ کشِ بی‌اینترنتیِ برنامه (`BankSearchCache.observe`) صفحه‌های قبلی را دور می‌ریزد
+  assert.ok(Number(s.body.bank_rev) > Number(before.body.bank_rev), `${before.body.bank_rev} → ${s.body.bank_rev}`);
+  assert.equal(s.body.live, true);
   const sel = await S('POST', '/select', B, { product_id: 'c', source: 'central', image_id: c.imageId, confirm: true });
   assert.equal(sel.body.error.code, 'image_not_selectable');
   const a = await S('GET', '/products/cheese-1', A);
@@ -355,6 +360,46 @@ test('IMG-BANK-16: از مرکزی به عکسِ خود و بازگشت؛ منب
   assert.equal(back.status, 200, JSON.stringify(back.body));
   const r2 = await S('GET', '/products/sugar', B);
   assert.deepEqual([r2.body.source, r2.body.image_id, r2.body.version], ['central', c.imageId, 1]);
+});
+
+test('IMG-07 / IMG-PRO-05: نسخهٔ تازه بی‌صدا جای نسخهٔ جاری نمی‌نشیند؛ ردِ آن اصل و نسخهٔ جاری را دست‌نخورده نگه می‌دارد', async () => {
+  const c = await centralImage({ name: 'زعفران', brand: 'قائنات' });
+  const orig0 = await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk });
+  const v2 = await ADR('POST', `/images/${c.imageId}/versions?tool=crop`, clerk, F.jpeg(780, 585, { seed: ++seed }));
+  const v3 = await ADR('POST', `/images/${c.imageId}/versions?tool=light`, clerk, F.jpeg(760, 570, { seed: ++seed }));
+  assert.deepEqual([v2.status, v2.body.version, v3.body.version], [201, 2, 3]);
+  //  نسخهٔ تازه فقط «منتظرِ بررسی» است؛ جاری همان ۱ و دکان همان را می‌بیند
+  const d0 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d0.body.current_version, 1);
+  assert.deepEqual(d0.body.versions.map((v) => [v.version, v.review]), [[1, 'approved'], [2, 'needs_review'], [3, 'needs_review']]);
+  //  صفِ بررسی شمارِ نسخه‌های منتظر را می‌گوید تا مدیر نسخهٔ تازهٔ عکسِ منتشرشده را ببیند
+  const rv = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  const item = () => rv.body.items.find((i) => i.id === c.imageId);
+  assert.equal(item().versions_pending, 2);
+  //  رد: فقط مدیرِ ارشد و با دلیل؛ نسخهٔ جاری رد نمی‌شود
+  assert.equal((await AD('POST', `/images/${c.imageId}/reject`, clerk, { reason: 'نور تغییر کرد', version: 3 })).status, 403);
+  assert.equal((await AD('POST', `/images/${c.imageId}/reject`, root, { reason: 'جاری', version: 1 })).body.error.code, 'version_current');
+  const rj = await AD('POST', `/images/${c.imageId}/reject`, root, { reason: 'رنگِ بسته‌بندی عوض شد', version: 3 });
+  assert.deepEqual([rj.status, rj.body.review], [200, 'rejected']);
+  const d1 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d1.body.current_version, 1);
+  const orig1 = await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk });
+  assert.ok(orig1.buffer.equals(orig0.buffer), 'اصل عوض شد');
+  //  نسخهٔ ردشده دوباره جاری نمی‌شود
+  assert.equal((await AD('POST', `/images/${c.imageId}/approve`, root, { reason: 'برگشت', version: 3 })).body.error.code, 'version_rejected');
+  const rv2 = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  assert.equal(rv2.body.items.find((i) => i.id === c.imageId).versions_pending, 1);
+  //  پذیرفتنِ نسخهٔ ۲: جاری ۲، ولی اصل و نسخهٔ ۱ سرِ جایشان
+  assert.equal((await AD('POST', `/images/${c.imageId}/approve`, root, { reason: 'برش درست است', version: 2 })).body.version, 2);
+  const d2 = await AD('GET', `/images/${c.imageId}`, clerk);
+  assert.equal(d2.body.current_version, 2);
+  assert.ok((await h.download(`/api/admin/image-bank/file/${c.imageId}/1/original`, { token: clerk })).buffer.equals(orig0.buffer));
+  const rv3 = await AD('GET', '/review?status=APPROVED&space=central&limit=50', clerk);
+  assert.equal(rv3.body.items.find((i) => i.id === c.imageId).versions_pending, 0);
+  //  عکسِ در انتظار: خودِ نسخهٔ جاری (اصل) «نسخهٔ تازه» شمرده نمی‌شود
+  const pend = await ADR('POST', '/images?license_status=unknown', clerk, img());
+  const rvp = await AD('GET', '/review?status=NEEDS_REVIEW&space=pending&limit=50', clerk);
+  assert.equal(rvp.body.items.find((i) => i.id === pend.body.id).versions_pending, 0);
 });
 
 test('IMG-04 (بخشِ بی AI) / IMG-08: اصل محفوظ؛ پردازشِ بیرونی ۵۰۳ و هیچ ارسال یا ردیفی', async () => {
@@ -482,4 +527,66 @@ test('IMG-BANK-01 / IMG-01 / IMG-02 / IMG-03 / IMG-09: ۱۰۰۰ ردیفِ CSV �
   const cancel = await AD('POST', `/batches/${id}/status`, clerk, { status: 'cancelled' });
   assert.equal(cancel.body.rejected, N - 4);
   assert.equal(await count('images') , imagesBefore);                      // رد شدند، پاک نه
+});
+
+test('IMG-14 / IMG-PRO-06: sha256 ِ کلاینت سنجیده می‌شود، فایلِ نیمه‌رسیده جای نسخهٔ سالم نمی‌نشیند و دسته از همان‌جا ادامه می‌یابد', async () => {
+  const sha = (b) => require('crypto').createHash('sha256').update(b).digest('hex');
+  const H = (b) => ({ headers: { 'X-Content-SHA256': sha(b) } });
+  const PUTF = (id, name, buf, opt = {}) => h.raw('PUT', `/api/admin/image-bank/batches/${id}/files/${name}`, buf, { token: clerk, ...opt });
+  //  پرچمِ ادامه پیش‌فرض خاموش؛ /status آن را به پنل می‌گوید
+  assert.equal((await AD('GET', '/status', clerk)).body.resume, false);
+  await setFlag('all', 'image_bank.resume', true);
+  assert.equal((await AD('GET', '/status', clerk)).body.resume, true);
+
+  const batch = await AD('POST', '/batches', clerk, { license_source: 'آزمونِ شبکهٔ ضعیف', license_status: 'unknown' });
+  const id = batch.body.id;
+  const files = Array.from({ length: 5 }, () => img());
+  const blobs0 = await count('image_blobs');
+  //  «شبکهٔ ضعیف»: سه فایل رسید، بعد اتصال افتاد
+  for (let i = 0; i < 3; i++) {
+    const r = await PUTF(id, `p${i}.jpg`, files[i], H(files[i]));
+    assert.deepEqual([r.status, r.body.status, r.body.sha256], [200, 'ok', sha(files[i])]);
+  }
+  //  فایلِ نیمه‌رسیده با sha256 ِ کامل ⇒ ۴۲۲، هیچ نوشتنی؛ نسخهٔ سالمِ همان نام دست نمی‌خورد
+  const half = files[2].subarray(0, 120);
+  const cut = await PUTF(id, 'p2.jpg', half, H(files[2]));
+  assert.deepEqual([cut.status, cut.body.error?.code], [422, 'checksum_mismatch']);
+  const cut2 = await PUTF(id, 'p3.jpg', files[3].subarray(0, 120), H(files[3]));
+  assert.equal(cut2.status, 422);
+  assert.equal((await PUTF(id, 'p4.jpg', files[4], { headers: { 'X-Content-SHA256': 'not-a-hash' } })).body.error?.code, 'bad_checksum');
+  assert.equal(await count('image_blobs'), blobs0 + 3);
+
+  //  ادامه: فهرستِ رسیده‌ها با sha256، صفحه‌به‌صفحه
+  const p1 = await AD('GET', `/batches/${id}/files?limit=2`, clerk);
+  assert.equal(p1.status, 200, JSON.stringify(p1.body));
+  assert.deepEqual(p1.body.items.map((f) => [f.name, f.status, f.sha256]), [['p0.jpg', 'ok', sha(files[0])], ['p1.jpg', 'ok', sha(files[1])]]);
+  assert.equal(p1.body.next_after, 'p1.jpg');
+  const p2 = await AD('GET', `/batches/${id}/files?limit=2&after=${encodeURIComponent(p1.body.next_after)}`, clerk);
+  assert.deepEqual(p2.body.items.map((f) => [f.name, f.sha256]), [['p2.jpg', sha(files[2])]]);
+  assert.equal(p2.body.next_after, null);
+  const have = new Map([...p1.body.items, ...p2.body.items].map((f) => [f.name, f.sha256]));
+  for (let i = 0; i < 5; i++) {
+    if (have.get(`p${i}.jpg`) === sha(files[i])) continue;                    // رسیده ⇒ دوباره نه
+    const r = await PUTF(id, `p${i}.jpg`, files[i], H(files[i]));
+    assert.equal(r.body.status, 'ok');
+  }
+  assert.equal(await count('image_blobs'), blobs0 + 5);
+  const all = await AD('GET', `/batches/${id}/files`, clerk);
+  assert.deepEqual(all.body.items.map((f) => f.sha256), files.map(sha));
+  //  بی سرآیند همان رفتارِ پیشین (برنامه‌های کهنه)
+  assert.equal((await PUTF(id, 'old.jpg', img())).body.status, 'ok');
+  assert.equal((await AD('GET', '/batches/ibt_nist/files', clerk)).status, 404);
+
+  //  درِ دکان و درِ نسخهٔ کوچک هم همان سرآیند را می‌سنجند
+  const shopBuf = img();
+  const imgs0 = await count('images');
+  const bad = await h.raw('POST', '/api/shop/images?product_id=sum-1', shopBuf.subarray(0, 200), { token: A.token, ...H(shopBuf) });
+  assert.deepEqual([bad.status, bad.body.error?.code], [422, 'checksum_mismatch']);
+  assert.equal(await count('images'), imgs0);
+  const good = await h.raw('POST', '/api/shop/images?product_id=sum-1', shopBuf, { token: A.token, ...H(shopBuf) });
+  assert.equal(good.status, 201, JSON.stringify(good.body));
+  const thumb = F.jpeg(400, 300, { seed: ++seed });
+  const tcut = await h.raw('PUT', `/api/shop/images/${good.body.id}/v/1/thumb`, thumb.subarray(0, 100), { token: A.token, ...H(thumb) });
+  assert.equal(tcut.status, 422);
+  await setFlag('all', 'image_bank.resume', false);
 });

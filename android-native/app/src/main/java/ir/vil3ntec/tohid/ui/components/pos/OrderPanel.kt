@@ -39,6 +39,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -205,6 +206,8 @@ fun OrderLines(
   modifier: Modifier = Modifier,
   /** تهِ همان فهرست (با اسکرولِ اقلام) — مثلاً ردیف‌های تخفیف و کادرِ کد؛ null ⇒ هیچ */
   footer: (@Composable () -> Unit)? = null,
+  /** POS-41: برچسبِ کلیدهای ردیفِ انتخاب‌شده (F3، +/−، Delete)؛ خالی ⇒ هیچ (پیش‌فرض، همان پیشین) */
+  rowHints: List<String> = emptyList(),
 ) {
   val c = Shop.colors
   if (lines.isEmpty()) {
@@ -258,6 +261,9 @@ fun OrderLines(
               Spacer(Modifier.width(4.dp))
               Icon(Icons.Filled.Edit, contentDescription = null, tint = c.primaryDark, modifier = Modifier.size(12.dp))
             }
+          }
+          if (on && rowHints.isNotEmpty()) {
+            Row(Modifier.padding(top = 2.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) { rowHints.forEach { PosKeyHint(it) } }
           }
         }
         QtyStepper(line.quantity, line.name, onMinus = { onMinus(line.id) }, onPlus = { onPlus(line.id) }, target = target, unit = line.unit)
@@ -314,7 +320,11 @@ fun PaymentSummary(
  *  کادرِ متریالِ ۵۶ پیکسلی. خطا: لبهٔ سرخ و «عدد درست نیست» (متن + رنگ).
  */
 @Composable
-fun MiniNumberField(label: String, value: String, onValue: (String) -> Unit, isError: Boolean, suffix: String) {
+fun MiniNumberField(
+  label: String, value: String, onValue: (String) -> Unit, isError: Boolean, suffix: String,
+  /** POS-41: Shift+F5 فوکوس را به همین کادر می‌آورد؛ null ⇒ همان پیشین */
+  focus: androidx.compose.ui.focus.FocusRequester? = null,
+) {
   val c = Shop.colors
   Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
     Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = c.muted, maxLines = 1)
@@ -334,7 +344,7 @@ fun MiniNumberField(label: String, value: String, onValue: (String) -> Unit, isE
         singleLine = true,
         textStyle = MaterialTheme.typography.bodyMedium.tabular().copy(color = c.text, textAlign = TextAlign.End),
         cursorBrush = SolidColor(c.primary),
-        modifier = Modifier.weight(1f).semantics { contentDescription = label },
+        modifier = Modifier.weight(1f).let { m -> if (focus != null) m.focusRequester(focus) else m }.semantics { contentDescription = label },
       )
       Spacer(Modifier.width(6.dp))
       Text(suffix, style = MaterialTheme.typography.labelMedium, color = c.muted)
