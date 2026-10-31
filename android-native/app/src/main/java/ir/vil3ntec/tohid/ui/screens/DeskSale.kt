@@ -186,7 +186,14 @@ fun DeskSaleScreen(
   val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
   val term = parsed.second.trim()
   //  همان قاعدهٔ پیشنهادها، حالا در شبکه (`PosCatalog`): فعال، نام یا آغازِ بارکد
-  val matches: List<Product> = remember(term, d.products) { PosCatalog.matches(d.products, term) }
+  //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`
+  ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.load(context)
+  val smartSearch = ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.on.value
+  val searchIndex = remember(d.products, smartSearch) { if (smartSearch) PosCatalog.searchIndex(d.products) else null }
+  val byId = remember(d.products) { d.products.associateBy { it.id } }
+  val matches: List<Product> = remember(term, d.products, searchIndex) {
+    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term)
+  }
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
