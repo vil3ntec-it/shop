@@ -17,10 +17,16 @@
  *   POST /:id/pick/start                  شروع — `orders.manage`
  *   POST /:id/pick/events                 کارهای جمع‌آور با کلیدِ یکتا — `orders.manage`
  *   POST /:id/pick/pack                   بسته‌بندی با کلیدِ یکتایی — `orders.manage`
+ *
+ *   عکسِ مدرکِ بسته (PCK-08، `lib/pick-photos.js`):
+ *   POST /:id/pick/photos                 عکسِ کیسه‌های بسته (فقط بسته) با کلیدِ یکتا — `orders.manage`
+ *   GET  /:id/pick/photos                 فهرست (بی بایت)
+ *   GET  /:id/pick/photos/:photoId        بایت‌های عکس — هر دیدن در سابقه
  */
 const express = require('express');
 const orders = require('../lib/orders');
 const picking = require('../lib/order-picking');
+const photos = require('../lib/pick-photos');
 const audit = require('../lib/audit');
 const { requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
@@ -116,6 +122,26 @@ router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, async (re
     originalTotalMinor: out.sheet.totals.originalTotalMinor, deductedMinor: out.deductedMinor,
   });
   res.json({ pick: out.sheet, replayed: false });
+});
+
+// ── عکسِ مدرکِ بسته (PCK-08) ───────────────────────────────────────
+
+router.post('/:id/pick/photos', needOrders, manage, needWrite, needPick, async (req, res) => {
+  const out = await photos.add(req.shopId, req.params.id, req.body, actorOf(req));
+  if (!out.replayed) await log(req, 'pick.photo', req.params.id, { photoId: out.photo.id, size: out.photo.size });
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.get('/:id/pick/photos', needOrders, needPick, async (req, res) => {
+  res.json(await photos.list(req.shopId, req.params.id));
+});
+
+router.get('/:id/pick/photos/:photoId', needOrders, needPick, async (req, res) => {
+  const p = await photos.get(req.shopId, req.params.id, req.params.photoId);
+  await log(req, 'pick.photo.view', req.params.id, { photoId: req.params.photoId });
+  res.set('Content-Type', p.mime);
+  res.set('Cache-Control', 'private, no-store');
+  res.send(p.data);
 });
 
 module.exports = router;

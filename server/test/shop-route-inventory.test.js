@@ -325,6 +325,24 @@ async function seedShop(a) {
   assert.equal(nf.body.results?.[0]?.status, 'accepted', JSON.stringify(nf.body));
   ids.pickIssue = (await h.get('/api/shop/orders/pick/issues', { token: a.accessToken })).body.issues[0]?.id;
   assert.ok(ids.pickIssue, 'وظیفهٔ «پیدا نکردم» ِ الف');
+  //  عکسِ مدرکِ بسته (PCK-08): سفارشِ دیگرِ «الف» با قلمِ دستی ⇒ برگه ⇒ برداشته ⇒ بسته ⇒ عکس
+  const pp = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'عکس' },
+    lines: [{ name: 'کیسهٔ دستی', qtyMilli: 1000, unitPriceMinor: 1000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('photo-order') } });
+  assert.equal(pp.status, 201, JSON.stringify(pp.body));
+  ids.pickPhotoOrder = pp.body.order.id;
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/transition`, { to: 'accepted' }, { token: a.accessToken })).status, 200);
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/start`, {}, { token: a.accessToken })).status, 201);
+  const pk = await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/events`,
+    { events: [{ eventId: fresh('pick-ev'), lineNo: 1, type: 'pick', qtyMilli: 1000 }] }, { token: a.accessToken });
+  assert.equal(pk.body.results?.[0]?.status, 'accepted', JSON.stringify(pk.body));
+  assert.equal((await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/pack`, { bags: 1 },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('pick-pack') } })).status, 200);
+  const pph = await h.post(`/api/shop/orders/${ids.pickPhotoOrder}/pick/photos`,
+    { eventId: fresh('pick-photo'), parcelOnly: true, imageBase64: F.jpeg(320, 240, { seed: 41 }).toString('base64') }, { token: a.accessToken });
+  assert.equal(pph.status, 201, JSON.stringify(pph.body));
+  ids.pickPhoto = pph.body.photo.id;
 
   const courier = await courierOf(a, 'پیکِ الف');
   ids.courier = courier.id;
@@ -413,6 +431,7 @@ function concreteFor(ids) {
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
+    [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
@@ -453,6 +472,8 @@ function bodyFor(r, ids) {
     'POST /shop/orders/:id/pick/pack': { bags: 1 },
     'POST /shop/orders/pick/issues/:issueId/resolve': { action: 'resolved', note: 'آزمون' },
     'PUT /shop/orders/pick/locations/:productId': { aisle: '1' },
+    //  عکسِ مدرکِ بسته (PCK-08)
+    'POST /shop/orders/:id/pick/photos': { eventId: fresh('pphoto'), parcelOnly: true, imageBase64: F.jpeg(200, 150, { seed: 6 }).toString('base64') },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },
