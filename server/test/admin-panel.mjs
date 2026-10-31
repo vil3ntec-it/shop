@@ -886,6 +886,87 @@ await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ ج�
   await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
 });
 
+// ── IMG-14 / IMG-PRO-06: ادامهٔ بارگذاری پس از قطع — رسیده‌ها دوباره نمی‌روند، sha256 سنجیده می‌شود ──
+await step('بانکِ تصاویر: ادامهٔ بارگذاری پس از قطعِ اینترنت؛ فایلِ رسیده دوباره نمی‌رود و هر فایل sha256 دارد', async () => {
+  const F = require('./image-fixtures');
+  const crypto = require('node:crypto');
+  const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  const LC = require('../src/lib/live-config');
+  const files = [701, 702, 703, 704].map((seed) => ({ name: `r${seed}.jpg`, mimeType: 'image/jpeg', buffer: F.jpeg(800, 600, { seed }) }));
+  const puts = [];
+  const errorsBefore = consoleErrors.length;
+  const onReq = (r) => { if (r.method() === 'PUT' && /\/image-bank\/batches\/.+\/files\//.test(r.url())) puts.push(r); };
+  page.on('request', onReq);
+  try {
+    //  پرچمِ خاموش (پیش‌فرض): همان بارگذاریِ پیشین — بی sha256 و بی پرسیدنِ رسیده‌ها
+    await openTab('imgbank');
+    await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ib-lic-source', 'آزمونِ ادامه');
+    //  ⛔ شناسهٔ دستهٔ آزمونِ پیشین هنوز روی صفحه است: تا شناسهٔ «دستهٔ تازه» ننشسته نخوان
+    //  (روی PostgreSQL ِ CI ساختنِ دسته کندتر است و شناسهٔ کهنه خوانده می‌شد)
+    const before = (await page.locator('#ib-batch-id').textContent()).trim();
+    await page.click('#btn-ib-new');
+    await page.waitForFunction((prev) => {
+      const t = document.getElementById('ib-batch-id').textContent.trim();
+      return t.length > 4 && t !== prev;
+    }, before, { timeout: 10_000 });
+    const off = (await page.locator('#ib-batch-id').textContent()).trim();
+    await page.setInputFiles('#ib-files', files.slice(0, 1));
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۱ از ۱ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.equal(puts.length, 1);
+    assert.equal(puts[0].headers()['x-content-sha256'], undefined, 'پرچمِ خاموش sha256 فرستاد');
+    assert.ok(off);
+
+    await LC.set('all', 'image_bank.resume', true, 'panel-test');
+    await openTab('imgbank');
+    await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ib-lic-source', 'آزمونِ ادامه ۲');
+    await page.click('#btn-ib-new');
+    await page.waitForFunction((prev) => {
+      const t = document.getElementById('ib-batch-id').textContent.trim();
+      return t.length > 4 && t !== prev;
+    }, off, { timeout: 10_000 });
+    const batchId = (await page.locator('#ib-batch-id').textContent()).trim();
+    puts.length = 0;
+    //  «اینترنت قطع شد»: نخستین تلاشِ فایلِ سوم می‌افتد، تلاشِ دوباره می‌رسد
+    let dropped = 0;
+    await page.route('**/image-bank/batches/*/files/r703.jpg', (route) => (dropped++ ? route.continue() : route.abort('internetdisconnected')));
+    await page.setInputFiles('#ib-files', files.slice(0, 3));
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۳ از ۳ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    await page.unroute('**/image-bank/batches/*/files/r703.jpg');
+    assert.equal(dropped, 2, 'تلاشِ دوباره نشد');
+    for (const r of puts) {
+      const f = files.find((x) => r.url().endsWith(`/files/${x.name}`));
+      assert.equal(r.headers()['x-content-sha256'], sha(f.buffer), r.url());
+    }
+
+    //  همان پوشه دوباره با یک فایلِ تازه: فقط تازه می‌رود
+    puts.length = 0;
+    await page.setInputFiles('#ib-files', files);
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۴ از ۴ فایل · ۰ ناموفق · ۳ از پیش رسیده$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.deepEqual(puts.map((r) => r.url().split('/').pop()), ['r704.jpg']);
+    const rows = await many('SELECT name, blob_hash, status FROM image_batch_files WHERE batch_id=$1 ORDER BY name', [batchId]);
+    assert.deepEqual(rows.map((r) => [r.name, r.status, r.blob_hash]), files.map((f) => [f.name, 'ok', sha(f.buffer)]));
+    //  همان نام با محتوای دیگر «رسیده» نیست و دوباره می‌رود
+    puts.length = 0;
+    const changed = { name: 'r701.jpg', mimeType: 'image/jpeg', buffer: F.jpeg(800, 600, { seed: 799 }) };
+    await page.setInputFiles('#ib-files', [changed]);
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۱ از ۱ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.deepEqual(puts.map((r) => r.url().split('/').pop()), ['r701.jpg']);
+    assert.equal((await one('SELECT blob_hash FROM image_batch_files WHERE batch_id=$1 AND name=$2', [batchId, 'r701.jpg'])).blob_hash, sha(changed.buffer));
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-resume.png`, fullPage: true });
+    //  تنها خطای کنسول همان قطعِ ساختگیِ اینترنت است
+    assert.deepEqual(consoleErrors.splice(errorsBefore).filter((m) => !/ERR_INTERNET_DISCONNECTED/.test(m)), []);
+  } finally {
+    page.off('request', onReq);
+    await LC.set('all', 'image_bank.resume', false, 'panel-test');
+  }
+});
+
 // ── IMG-02 / IMG-PRO-07 / IMG-BANK-17 / IMG-09: صفِ بررسی — مبهم فقط با انتخابِ انسانی ──
 await step('بانکِ تصاویر: تطبیقِ مبهم با دلیل و اندازهٔ هر کالا؛ انتخابِ انسانی وصل می‌کند و ارشد منتشر می‌کند', async () => {
   const F = require('./image-fixtures');

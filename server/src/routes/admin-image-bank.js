@@ -14,6 +14,7 @@
  */
 const express = require('express');
 const bank = require('../lib/image-bank');
+const upload = require('../lib/image-upload');
 const audit = require('../lib/audit');
 const { requireReason } = require('../lib/admin-access');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
@@ -24,7 +25,12 @@ const { many } = require('../db');
 const router = express.Router();
 const BASE = '/api/admin/image-bank';
 const raw = express.raw({ type: () => true, limit: bank.DERIV.zoom.bytes + 1024 });
-const bufOf = (req) => (Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+//  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر کلاینت فرستاده باشد (IMG-14)
+const bufOf = (req) => {
+  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  upload.verifyDigest(buf, req.get('x-content-sha256'));
+  return buf;
+};
 const num = (x) => {
   const n = Number(x);
   if (!Number.isInteger(n) || n < 1 || n > 100000) throw badRequest('نسخه درست نیست', 'bad_version');
@@ -39,7 +45,10 @@ router.use(requireAdmin);
  */
 router.get('/status', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json({ enabled: await bank.centralEnabled(), rows_max: bank.ROWS_MAX, roles: bank.ROLES, licenses: bank.LICENSES });
+  res.json({
+    enabled: await bank.centralEnabled(), rows_max: bank.ROWS_MAX, roles: bank.ROLES, licenses: bank.LICENSES,
+    resume: await upload.resumeEnabled(),
+  });
 });
 
 router.use(async (req, res, next) => {
@@ -204,6 +213,12 @@ router.post('/batches', async (req, res) => {
 
 router.put('/batches/:id/files/:name', raw, async (req, res) => {
   res.json(await bank.batchFile(req.params.id, req.params.name, bufOf(req)));
+});
+
+/** فایل‌های رسیدهٔ دسته با sha256 — ادامهٔ بارگذاری پس از قطع (IMG-14، IMG-PRO-06). فقط‌خواندنی. */
+router.get('/batches/:id/files', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await upload.batchFiles(req.params.id, { after: req.query?.after || '', limit: req.query?.limit }));
 });
 
 //  ⚠️ CSVِ ۱۰۰۰ ردیفی از سقفِ ۲ مگابایتیِ JSON کوچک‌تر است
