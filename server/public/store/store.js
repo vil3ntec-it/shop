@@ -1,11 +1,11 @@
 /*
  * ویترینِ یک دکان — کاتالوگ، برگهٔ کالا، نوار و برگهٔ تیرهٔ سبد (r3/r2)، ثبتِ
- * سفارش با شمارهٔ تأییدشده، رسید و پیگیری، لغو و خریدِ دوباره
+ * سفارش با شمارهٔ تأییدشده، پیگیری و خریدِ دوباره؛ برگهٔ رسید، لغو و پرداختِ آنلاین در `order.js`
  * (WEB، CHK، §۲۳، §۳۱.۱، §۳۲.۳). داده فقط از `/api/store/<slug>`؛ متن از K.t.
  *
  * ⛔ قیمت را سرور می‌گوید؛ جمعِ دیده‌شده (`expectedTotalMinor`) فقط برای این است
  *    که اگر قیمت عوض شده، سفارش ثبت نشود و برگهٔ تازه روشن نشان داده شود (CHK-17).
- * ⛔ پرداختِ آنلاین نیست (D-08) — هیچ دکمهٔ ساختگی.
+ * ⛔ پرداختِ آنلاین فقط «پرداخت با حساب‌پی» ِ واقعیِ سرور (PAY-21، `order.js`) — هیچ دکمهٔ ساختگی.
  * ⛔ −/+ فقط در سبد؛ کارتِ کالا «یک زدن = یک واحد» با نشانِ تعداد (DESIGN v2).
  */
 (function () {
@@ -16,9 +16,11 @@
   var KEY_CART = K.cartKey(slug);
   var KEY_ORDERS = 'store-orders:' + slug;
   var store = null; var marketOn = false; var verifyAvailable = true;
+  var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹ ِ out_of_stock، فقط در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
+  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -173,6 +175,7 @@
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
       renderAddSheet(x);
+      if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
     if (p) return fill(p);
@@ -225,6 +228,9 @@
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
   function feeFor(f) { return f === 'delivery' && store ? store.deliveryFeeMinor : 0; }
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
+  function short(id) { return cap[id] > 0 && cart[id].qtyMilli > cap[id]; }
+  function hasShort() { return ids().some(short); }
+  function shortText(id) { return t('line.short', { q: K.qty(cap[id]) + ' ' + (cart[id].unit || t('unit')) }); }
 
   function thumb(id, l) {
     var th = el('span', { class: 'thumb' + (l.photo ? ' photo tile' : '') });
@@ -275,7 +281,7 @@
       },
       thumb(id, l),
       el('span', { class: 'q num', text: K.qty(l.qtyMilli) + ' ×' }),
-      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
+      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : short(id) ? shortText(id) : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
       el('span', { class: 'price num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
       ul.appendChild(el('li', { class: 'cline' + (l.unavailable ? ' bad' : '') + (editing === id ? ' editing' : '') },
         main, el('span', { class: 'stepper' }, minus, el('output', { text: K.qty(l.qtyMilli), attrs: { 'aria-live': 'polite' } }), plus)));
@@ -298,6 +304,7 @@
     $('sheet-total').textContent = K.money(sub + fee);
     var block = '';
     if (hasBad()) block = t('cart.bad');
+    else if (hasShort()) block = t('cart.short');
     else if (store && store.minOrderMinor > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
@@ -341,9 +348,14 @@
     var ul = K.clear($('cart-lines'));
     ids().forEach(function (id) {
       var l = cart[id];
-      ul.appendChild(el('li', { class: l.unavailable ? 'bad' : '' }, thumb(id, l),
-        el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.priceMinor) })),
-        el('span', { class: 'amt num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) })));
+      var li = el('li', { class: l.unavailable ? 'bad' : short(id) ? 'short' : '' }, thumb(id, l),
+        el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.priceMinor) + (short(id) ? ' — ' + shortText(id) : '') })),
+        el('span', { class: 'amt num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
+      if (short(id)) {
+        li.appendChild(el('button', { class: 'btn btn-soft btn-sm fit', attrs: { type: 'button' }, on: { click: function () { setQty(id, cap[id]); renderCheckout(); } } },
+          t('line.fit', { q: K.qty(cap[id]) })));
+      }
+      ul.appendChild(li);
     });
     $('cart-empty').hidden = ids().length > 0;
     var f = fulfillment();
@@ -358,7 +370,7 @@
     renderVerify();
     var ok = verifiedFor($('c-phone').value);
     var btn = $('submit-order');
-    btn.disabled = !ids().length || !f || below || hasBad() || !ok;
+    btn.disabled = !ids().length || !f || below || hasBad() || hasShort() || !ok;
     btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
   }
 
@@ -424,7 +436,7 @@
       expectedTotalMinor: subtotal() + feeFor(f),
     };
     if (f === 'delivery') {
-      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim() };
+      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
       if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
       body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
     }
@@ -452,7 +464,7 @@
       K.saveS('placed:' + r.order.token, true);
       //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
       K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
-      cart = {}; quoteNote = ''; saveCart();
+      cart = {}; cap = {}; quoteNote = ''; saveCart();
       msg.hidden = true;
       location.hash = '#/o/' + encodeURIComponent(r.order.token);
     }).catch(function (e) {
@@ -469,6 +481,18 @@
         quoteNote = t('ck.repriced', { list: changed.length ? changed.join(t('sep')) + '. ' : '', sum: K.money(d.quote.totalMinor) });
         saveCart();
         K.note(msg, 'warn', quoteNote);
+      } else if (e.code === 'out_of_stock' && stockList && Array.isArray(d.lines)) {
+        //  E2E-MKT-02: همهٔ قلم‌های کم، هر کدام با مقدارِ موجود؛ بی پذیرشِ «کم کن» ثبت نمی‌شود
+        var list = [];
+        d.lines.forEach(function (x) {
+          var l = cart[x.productId];
+          if (!l) return;
+          cap[x.productId] = Math.max(0, Math.floor(Number(x.availableMilli)) || 0);
+          if (!cap[x.productId]) l.unavailable = true;
+          list.push(l.name + ': ' + (l.unavailable ? t('line.gone') : shortText(x.productId)));
+        });
+        saveCart();
+        K.note(msg, 'err', t('ck.short', { list: list.join(t('sep')) }));
       } else if (e.code === 'product_unavailable' && d.unavailable) {
         d.unavailable.forEach(function (id) { if (cart[id]) cart[id].unavailable = true; });
         saveCart();
@@ -506,55 +530,14 @@
     renderCheckout();
   }
 
-  // ── رسید و پیگیری (CHK-20/22، S136/S137) ──
-  function renderOrder(o, token) {
-    $('o-title').textContent = t('od.no', { n: K.fa(o.orderNo, 0) });
-    var st = $('o-status');
-    var why = K.reason(o.statusReason);
-    st.className = 'pill ' + K.orderKind(o.status);
-    st.textContent = K.order(o.status) + (why ? ' — ' + why : '');
-    $('o-meta').textContent = (o.fulfillment === 'pickup' ? t('pickup') : t('od.ship')) + t('sep') + K.when(o.createdAt);
-    //  ORD-16: هر تغییر با زمانش (خلاصه در پله‌ها، همه این‌جا)
-    var tl = K.clear($('o-timeline'));
-    (o.timeline || []).forEach(function (e) {
-      tl.appendChild(el('li', {}, el('span', { text: K.order(e.status) }), el('span', { class: 'num', text: K.when(e.at) })));
-    });
-    var steps = K.clear($('o-steps'));
-    K.orderSteps(o).forEach(function (s) {
-      var dot = el('span', { class: 'dot' });
-      if (s.state === 'done') dot.appendChild(K.icon('check'));
-      if (s.state === 'stop') dot.appendChild(K.icon('close'));
-      steps.appendChild(el('li', { class: 'step ' + s.state, attrs: s.state === 'now' ? { 'aria-current': 'step' } : {} },
-        dot, el('span', { class: 'lbl' }, el('b', { text: s.label }), s.at ? el('small', { text: K.when(s.at) }) : null)));
-    });
-    var ul = K.clear($('o-lines'));
-    o.lines.forEach(function (l) {
-      ul.appendChild(el('li', {}, el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.unitPriceMinor) })),
-        el('span', { class: 'amt num', text: K.money(l.lineTotalMinor) })));
-    });
-    var paid = o.paymentStatus === 'paid' ? o.totalMinor : 0;
-    var rows = [['od.sub', K.money(o.subtotalMinor)]];
-    if (o.discountMinor) rows.push(['od.disc', K.money(o.discountMinor)]);
-    if (o.fulfillment === 'delivery') rows.push(['ck.fee', o.deliveryFeeMinor ? K.money(o.deliveryFeeMinor) : t('free')]);
-    rows.push(['od.total', K.money(o.totalMinor)], ['od.paid', K.money(paid)], ['od.due', K.money(o.totalMinor - paid)]);
-    var tt = K.clear($('o-totals'));
-    rows.forEach(function (r) {
-      var g = r[0] === 'od.total';
-      tt.append(el('span', { class: g ? 'grand' : '', text: t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
-    });
-    $('o-cancel').hidden = !o.canCancel;
-    $('o-reorder').hidden = false;
-    $('o-cancel').onclick = function () {
-      K.confirm(t('od.cancel.q'), t('od.cancel.yes')).then(function (yes) {
-        if (!yes) return;
-        api('/orders/' + encodeURIComponent(token) + '/cancel', { method: 'POST', body: {} }).then(function (r) {
-          renderOrder(r.order, token);
-          K.toast(t('od.cancelled'));
-        }).catch(function (e) { K.note($('o-msg'), 'err', e.message); });
-      });
-    };
-    $('o-reorder').onclick = function () { reorder(o); };
-    return o;
+  // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var orderView = null;
+  function loadOrderView() {
+    orderView = orderView || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
+    }).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
+      .catch(function () { orderView = null; throw new Error(t('err.network')); });
+    return orderView;
   }
 
   var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
@@ -566,17 +549,21 @@
     if (K.loadS('placed:' + token)) K.note($('o-placed'), 'ok', t('od.placed'));
     else $('o-placed').hidden = true;
     var load = function () {
-      api('/orders/' + encodeURIComponent(token)).then(function (r) {
-        renderOrder(r.order, token);
+      //  نخستین بار order.js هم‌زمان با خودِ سفارش می‌آید، نه پس از آن
+      Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) {
+        var o = r[1].render(r[0].order, token);
         //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
-        if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
+        //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
+        var pend = o.paymentStatus === 'pending';
+        if (pend || FINAL.indexOf(o.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, pend ? 5000 : 20000);
       }).catch(function (e) {
         $('o-title').textContent = t('od.title');
         K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
         $('o-status').className = 'pill err';
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
-        $('o-cancel').hidden = true; $('o-reorder').hidden = true;
+        $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
+        $('o-dlv').hidden = true;
       });
     };
     load();
@@ -658,7 +645,13 @@
     api('').then(function (r) {
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
+      stockList = Boolean(r.features && r.features.stockList);
       verifyAvailable = !r.verification || r.verification.available !== false;
+      if (r.recent) {
+        var rs = el('script', { attrs: { src: '/store/recent.js' } });
+        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
+        document.head.appendChild(rs);
+      }
       renderHead();
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;

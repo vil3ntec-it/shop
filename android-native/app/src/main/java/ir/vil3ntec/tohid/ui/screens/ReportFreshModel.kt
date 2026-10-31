@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.cost.CostMethod
+import ir.vil3ntec.tohid.core.cost.CostPolicy
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportClock
 import ir.vil3ntec.tohid.core.report.ReportCore
@@ -13,7 +15,8 @@ import kotlinx.serialization.json.longOrNull
  *  «گزارشِ تازه» — کدام جدول برای کدام زبانه، بی Compose (آزمون: `ReportFreshModelTest`).
  *
  *  همهٔ عددها از `ReportCore`/`ReportTables`اند؛ این‌جا فقط انتخاب، برش و قالب است.
- *  سود همیشه با برچسبِ «تقریبی» می‌آید تا D-23 (v3 §۱۵.۴ بند ۴).
+ *  سود همیشه با برچسبِ «تقریبی» می‌آید تا D-23 (v3 §۱۵.۴ بند ۴). روشِ بها (RPT-03) راهبردِ
+ *  `CostPolicy` ِ core است: پیش‌فرض همان قیمتِ خریدِ روی قلم (رفتارِ پیشین)، میانگینِ موزون فقط پیش‌نمایش.
  */
 object ReportFreshModel {
   /** شاگرد (`canSeeMoney = false`) فقط سنِ بدهی را می‌بیند — همان قاعدهٔ صفحهٔ امروز */
@@ -30,6 +33,8 @@ object ReportFreshModel {
     tableId.startsWith("sales.") -> listOf("netSales", "invoices", "qty", "returns")
     tableId.startsWith("debts.") -> listOf("balance", "credit", "oldestDays")
     tableId == "fraud" -> listOf("discount", "returnCount", "voidCount", "lineDeleteCount", "noSaleCount")
+    tableId == "dayend.methods" -> listOf("net", "expected", "counted", "variance", "outside")
+    tableId == "dayend.shifts" -> listOf("status", "net", "expectedCash", "countedCash", "varianceCash")
     else -> emptyList()
   }
 
@@ -41,22 +46,29 @@ object ReportFreshModel {
     )
   }
 
+  /** روشِ بهای `CostPolicy` ⇒ `costing` ِ هستهٔ گزارش (همان شناسه‌ها؛ ناشناخته ⇒ رفتارِ امروز) */
+  fun costingOf(m: CostMethod): ReportCore.Costing =
+    ReportCore.Costing.entries.firstOrNull { it.id == m.id } ?: ReportCore.Costing.LINE
+
   /** نتیجهٔ یک زبانه: جدول‌ها و اینکه سود تقریبی است یا نه */
   data class View(val tables: List<ReportTables.Table>, val sales: ReportCore.SalesReport?, val debts: ReportCore.DebtReport?, val fraud: ReportCore.FraudReport?)
 
-  fun view(l: ReportLedger, tab: String, span: String, dim: String, today: String, clock: ReportClock?): View {
+  fun view(
+    l: ReportLedger, tab: String, span: String, dim: String, today: String, clock: ReportClock?,
+    costing: ReportCore.Costing = ReportCore.Costing.LINE,
+  ): View {
     val r = ReportBoard.range(span, today)
     val d = if (dim in ReportBoard.DIMS) dim else "product"
     return when (tab) {
-      "today" -> View(ReportTables.today(ReportCore.today(l, today, clock)), null, null, null)
+      "today" -> View(ReportTables.today(ReportCore.today(l, today, clock, costing)), null, null, null)
       "sales" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing)
         View(ReportTables.sales(s).filter { it.id == "sales.$d" }, s, null, null)
       }
       "profit" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing)
         val t = ReportTables.sales(s).first { it.id == "sales.$d" }
-        val title = "سود و حاشیه به تفکیک ${ReportBoard.DIM_LABELS.getValue(d)} (تقریبی)"
+        val title = CostPolicy.label("سود و حاشیه به تفکیک ${ReportBoard.DIM_LABELS.getValue(d)}", CostPolicy.parse(costing.id))
         View(listOf(project(t, "profit", title, PROFIT_KEYS)), s, null, null)
       }
       "debts" -> {

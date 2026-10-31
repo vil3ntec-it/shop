@@ -1,10 +1,13 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.core.pay.PaidRow
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
+import ir.vil3ntec.tohid.core.returns.ReturnPolicy
+import ir.vil3ntec.tohid.core.returns.ReturnReasons
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.money
@@ -30,8 +33,8 @@ import kotlin.math.roundToLong
  *  می‌فرستد (`LedgerDiff.INC_FIELDS`)، نه بازنویسی.
  *
  *  ── پول ────────────────────────────────────────────────────────────
- *  مبلغِ هر قلم همان فرمولِ امروز است: قیمتِ همان قلم در همان فاکتور × سهمِ
- *  پرداخت‌شده پس از تخفیف (RET-03)، گرد به افغانیِ کامل. جمعِ همهٔ برگشت‌های
+ *  مبلغِ هر قلم: قیمتِ همان قلم در همان فاکتور × سهمِ پرداخت‌شده پس از تخفیف
+ *  (RET-03)، گرد به افغانیِ کامل و «تجمعی» (`ReturnShare`، SEC-DATA-01). جمعِ همهٔ برگشت‌های
  *  یک فاکتور از مبلغِ نهاییِ آن بیشتر نمی‌شود (اضافهٔ گرد از قلمِ آخر کم می‌شود).
  *  تقسیمِ بازپرداخت با `Pay.refund`ِ هستهٔ پرداخت (#237): اول بدهیِ بازِ همین
  *  فاکتور (مثلِ امروز)، بقیه به روشِ اصلی، نقد یا اعتبارِ فروشگاه.
@@ -61,15 +64,11 @@ object ReturnFlow {
    */
   const val RECEIPT_KIND = CashShift.RETURN_RECEIPT
 
-  /** RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است */
-  val REASONS: List<String> = listOf(
-    "خراب یا معیوب",
-    "اشتباه در فروش",
-    "پشیمانیِ مشتری",
-    "تاریخ گذشته",
-    "اندازه یا مدلِ نامناسب",
-    "دیگر",
-  )
+  /**
+   *  RET-08 — فهرستِ پیش‌فرضِ دلیل‌ها؛ دلیل اجباری است. فهرستِ خودِ دکان `ReturnSettings.reasons`
+   *  است (پاک‌سازی و سنجش در `core/returns/ReturnReasons`) و با [Request.reasons] به [post] می‌رسد.
+   */
+  val REASONS: List<String> = ReturnReasons.DEFAULT
 
   /** کدهای خطا — همان کدهای JS؛ متنِ فارسی با [message] */
   object Code {
@@ -78,6 +77,8 @@ object ReturnFlow {
     const val SALE_NOT_FOUND = "SALE_NOT_FOUND"
     const val SALE_CANCELLED = "SALE_CANCELLED"
     const val REASON_REQUIRED = "REASON_REQUIRED"
+    /** RET-08 — دلیل در فهرستِ دکان نیست */
+    const val REASON_NOT_LISTED = "REASON_NOT_LISTED"
     const val NOTHING_TO_RETURN = "NOTHING_TO_RETURN"
     const val QTY_EXCEEDS = "QTY_EXCEEDS"
     const val BAD_QTY = "BAD_QTY"
@@ -97,6 +98,7 @@ object ReturnFlow {
     Code.SALE_NOT_FOUND -> "فاکتور پیدا نشد"
     Code.SALE_CANCELLED -> "این فاکتور لغو شده است؛ برگشت نمی‌پذیرد"
     Code.REASON_REQUIRED -> "دلیلِ برگشت را انتخاب کنید"
+    Code.REASON_NOT_LISTED -> "دلیلِ برگشت را از فهرستِ دکان انتخاب کنید"
     Code.NOTHING_TO_RETURN -> "مقدار معتبری برای برگشت وارد نشده"
     Code.QTY_EXCEEDS -> "بیش از مقدارِ فروخته‌شده برنمی‌گردد" + if (detail.isNotEmpty()) " ($detail)" else ""
     Code.BAD_QTY -> "مقدار درست نیست" + if (detail.isNotEmpty()) " — $detail" else ""
@@ -216,12 +218,19 @@ object ReturnFlow {
       if (q.isNaN() || q.isInfinite() || q < 0) return Outcome.Bad(Code.BAD_QTY)
       if (q == 0.0) continue
       if (!okDisposition(pick.disposition)) return Outcome.Bad(Code.BAD_DISPOSITION)
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       val name = SalesEngine.itemName(d, item)
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
       if (product != null) SalesEngine.quantityProblem(product, q)?.let { return Outcome.Bad(Code.BAD_QTY, it) }
-      val amount = if (item.quantity > 0) (item.totalPrice / item.quantity * q * paidRatio).roundToLong().toDouble() else 0.0
+      //  گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکهٔ یک قلم بیش از برگشتِ یک‌جای همان مقدار پس نمی‌دهد؛
+      //  مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586، برگشت‌های کهنهٔ فرمولِ جداجدا)
+      val prior = d.saleReturns.filter { it.saleItemId == item.id }
+      val amount = ReturnShare.amount(
+        item.totalPrice, item.quantity, item.returnedQty, q, paidRatio,
+        refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity },
+      )
       val unit = if (item.quantity > 0) item.totalPrice / item.quantity else item.unitPrice
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }
@@ -274,6 +283,8 @@ object ReturnFlow {
   const val WHY_DAMAGED = "damaged"
   const val WHY_OVER_LIMIT = "over_limit"
   const val WHY_PERM = "perm_denied"
+  /** RET-09 — بیرون از سیاستِ برگشت (مهلت یا قلمِ غیرقابلِ برگشت) */
+  const val WHY_POLICY = "policy"
 
   private val RANK = mapOf("staff" to 1, "manager" to 2, "owner" to 3)
 
@@ -289,16 +300,33 @@ object ReturnFlow {
    *    approve | deny)، یا `null` وقتی هسته هنوز این کلید را ندارد (پیش از PRِ
    *    اجرای مجوزها). صفحه آن را با [permDecision] می‌سازد.
    *  @param limitMinor سقفِ دکان برای مدیر و شاگرد (به پول)؛ ۰ = بی سقف.
+   *  @param priorMinor برگشت‌های پیشینِ همین فاکتور ([priorMinor])؛ سقف تجمعی سنجیده می‌شود
+   *    (`ReturnApprovals.overDeviceLimit`، همان قاعدهٔ سقفِ نقش). بی رسید ⇒ ۰.
+   *  @param policyBreach RET-09 — بیرون از سیاستِ برگشت ([policyCheck])؛ شاگرد تأییدِ مدیر می‌خواهد و
+   *    مدیر و صاحب خودشان استثنا می‌گذارند (همان قاعدهٔ «بی رسید» و «ضایعات»)
    */
-  fun gate(role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long): Gate {
+  fun gate(
+    role: String?, perm: String?, amountMinor: Long, noReceipt: Boolean, damaged: Boolean, limitMinor: Long,
+    priorMinor: Long = 0L, policyBreach: Boolean = false,
+  ): Gate {
     val r = roleOf(role)
     if (perm == "deny") return Gate("deny", listOf(WHY_PERM), "owner")
     val why = ArrayList<String>()
-    if (perm == "approve" || (r != "owner" && limitMinor > 0 && amountMinor > limitMinor)) why += WHY_OVER_LIMIT
+    val overLimit = r != "owner" && ir.vil3ntec.tohid.core.perm.ReturnApprovals.overDeviceLimit(priorMinor, amountMinor, limitMinor)
+    if (perm == "approve" || overLimit) why += WHY_OVER_LIMIT
     if (noReceipt && r == "staff") why += WHY_NO_RECEIPT
     if (damaged && r == "staff") why += WHY_DAMAGED
+    if (policyBreach && r == "staff") why += WHY_POLICY
     val approver = if (WHY_OVER_LIMIT in why) "owner" else "manager"
     return Gate(if (why.isEmpty()) "allow" else "approve", why, approver)
+  }
+
+  /** RET-09 — قلم‌های این سند با سیاستِ دکان (`ReturnPolicyPrefs`)؛ سیاستِ خاموش ⇒ همیشه «پذیرفته» */
+  fun policyCheck(d: ShopData, sale: Sale?, lines: List<Line>, policy: ReturnPolicy.Policy, today: String): ReturnPolicy.Verdict {
+    if (!policy.on) return ReturnPolicy.Verdict()
+    val items = lines.mapNotNull { l -> d.products.find { it.id == l.productId } }.distinctBy { it.id }
+      .map { ReturnPolicy.Item(it.id, it.name, it.category, it.subcategory, it.barcodes) }
+    return ReturnPolicy.check(policy, sale?.date, today, items)
   }
 
   /** آیا این نقش این برگشت را تأیید می‌کند */
@@ -313,14 +341,27 @@ object ReturnFlow {
    *  `PermCore` نیست. ⛔ قلابِ تأیید (STF-02): وقتی PRِ «اجرای مجوزها» برسد، همین
    *  تابع سقفِ نقش را از لایه‌های سرور می‌خواند و `ReturnApproval` برگهٔ امضاشده را.
    */
-  fun permDecision(role: String?, layers: List<Any?>?, amountMinor: Long): String? {
+  fun permDecision(role: String?, layers: List<Any?>?, amountMinor: Long, priorMinor: Long = 0L): String? {
     val core = ir.vil3ntec.tohid.core.perm.PermCore
     if ("returns.create" !in core.keys()) return null
-    return core.evaluate(roleOf(role), layers, "returns.create", mapOf("amount" to amountMinor.toDouble())).decision
+    //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور (`cumulativeNeed`) — پیشین + همین سند
+    val amount = ir.vil3ntec.tohid.core.perm.ReturnApprovals.cumulative(priorMinor, amountMinor)
+    return core.evaluate(roleOf(role), layers, "returns.create", mapOf("amount" to amount.toDouble())).decision
   }
 
-  /** چه کسی تأیید کرد — نام و نقش */
-  data class Approval(val by: String, val role: String)
+  /** جمعِ برگشت‌های پیشینِ یک فاکتور به پول (هر ردیف جدا گرد، همان سرور)؛ بی رسید ⇒ ۰ */
+  fun priorMinor(d: ShopData, saleId: String?): Long =
+    if (saleId.isNullOrBlank()) 0L else d.saleReturns.filter { it.saleId == saleId }.sumOf { minor(it.amount) }
+
+  /**
+   *  چه کسی تأیید کرد — نام و نقش، و [slip] «برگهٔ امضاشده»ی همین سند (`ReturnApproval.requester`،
+   *  PINِ تأییدکننده). با برگه، [post] آن را روی نخستین ردیفِ سند می‌گذارد تا سرور هم بپذیرد.
+   */
+  data class Approval(
+    val by: String,
+    val role: String,
+    val slip: ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip? = null,
+  )
 
   /* ============================ بازپرداخت ============================ */
 
@@ -436,6 +477,11 @@ object ReturnFlow {
     val picks: Map<String, Pick> = emptyMap(),
     val free: List<FreeLine> = emptyList(),
     val reason: String = "",
+    /**
+     *  RET-08 — فهرستِ دلیل‌های دکان (`ReturnSettings.reasons`)؛ با فهرست، [reason] باید یکی از
+     *  ردیف‌هایش باشد و همان ردیف ثبت می‌شود. `null` ⇒ هر دلیلِ ناخالی (رفتارِ پیشین).
+     */
+    val reasons: List<String>? = null,
     val mode: String = ORIGINAL,
     /** قرض‌دارِ اعتبارِ فروشگاه؛ `null` ⇒ مشتریِ همان فاکتور */
     val customerId: String? = null,
@@ -446,6 +492,8 @@ object ReturnFlow {
     val limit: Double = 0.0,
     val approval: Approval? = null,
     val exchangeSaleId: String? = null,
+    /** RET-09 — سیاستِ برگشتِ دکان (`ReturnPolicyPrefs.of`)؛ `null` ⇒ بی سیاست (رفتارِ پیشین) */
+    val policy: ReturnPolicy.Policy? = null,
   )
 
   data class Posted(val data: ShopData, val docId: String, val total: Double, val split: Split, val gate: Gate)
@@ -458,8 +506,9 @@ object ReturnFlow {
   fun post(d: ShopData, req: Request, today: String, now: Long, newId: () -> String): Outcome<Posted> {
     if (req.docId.isBlank()) return Outcome.Bad(Code.BAD_REQUEST)
     if (d.saleReturns.any { it.docId == req.docId }) return Outcome.Bad(Code.ALREADY_POSTED)
-    val reason = req.reason.trim()
-    if (reason.isEmpty()) return Outcome.Bad(Code.REASON_REQUIRED)
+    val typed = req.reason.trim()
+    if (typed.isEmpty()) return Outcome.Bad(Code.REASON_REQUIRED)
+    val reason = if (req.reasons == null) typed else ReturnReasons.pick(typed, req.reasons) ?: return Outcome.Bad(Code.REASON_NOT_LISTED)
 
     val sale = req.saleId?.let { id -> d.sales.find { it.id == id } ?: return Outcome.Bad(Code.SALE_NOT_FOUND) }
     val q = if (sale != null) quote(d, sale.id, req.picks) else quoteNoReceipt(d, req.free)
@@ -472,10 +521,19 @@ object ReturnFlow {
       id
     } else null
 
-    val g = gate(req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit))
+    val verdict = req.policy?.let { policyCheck(d, sale, quote.lines, it, today) } ?: ReturnPolicy.Verdict()
+    val g = gate(
+      req.role, req.perm, minor(quote.total), sale == null, quote.lines.any { it.disposition == DAMAGED }, minor(req.limit),
+      priorMinor(d, sale?.id), policyBreach = !verdict.ok,
+    )
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    //  برگه باید همین سند را تا همین مبلغ بپوشاند (همان `covers` ِ سرور)؛ وگرنه سرور سند را رد می‌کرد
+    val slip = approval?.slip?.takeIf { g.decision == "approve" }
+    if (slip != null && ir.vil3ntec.tohid.core.perm.ReturnApprovals.covers(slip, req.docId, quote.lines.sumOf { minor(it.amount) }) != null) {
+      return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    }
     val approvedBy = if (g.decision == "approve") approval!!.by else req.by.trim()
 
     val prior = if (sale == null) emptyList() else d.saleReturns.filter { it.saleId == sale.id }
@@ -530,6 +588,8 @@ object ReturnFlow {
         by = req.by.trim().ifEmpty { null },
         approvedBy = if (g.decision == "approve") approvedBy else null,
         exchangeSaleId = req.exchangeSaleId,
+        //  برگه فقط روی نخستین ردیفِ سند (سرور از هر ردیفِ سند برمی‌دارد و یک بار مصرف می‌کند)
+        approval = slip?.takeIf { rows.isEmpty() }?.let { DiscountGate.json(it) },
         //  `channel` نه، حتی برای فروشِ آنلاین: `online` روی مرجوعی یعنی «بیرون از دخل» و `CashShift`
         //  کلِ ردیف را نمی‌شمارد، ولی نقدِ این برگشت از همین دخل رفت (#340)؛ درگاه از راهِ `toMethods`
       )
@@ -596,6 +656,11 @@ object ReturnFlow {
       if (refundText.isNotEmpty()) append(" — بازپرداخت: $refundText")
       if (quote.lines.any { it.disposition == DAMAGED }) append(" — ضایعات")
       if (g.decision == "approve") append(" — تأیید: $approvedBy (${g.reasons.joinToString("+")})")
+      //  RET-09: هر استثنا روی سیاستِ برگشت در سابقهٔ سند می‌ماند (شاگرد با تأیید، مدیر و صاحب خودشان)
+      if (!verdict.ok) append(" — استثنای سیاستِ برگشت: " + buildList {
+        if (verdict.late) add("${verdict.ageDays} روز پس از فاکتور")
+        verdict.blockedIds.forEach { id -> add("غیرقابلِ برگشت: " + (d.products.find { it.id == id }?.name ?: id)) }
+      }.joinToString("، "))
       if (req.by.isNotBlank()) append(" — ثبت: ${req.by.trim()}")
     }
 

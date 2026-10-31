@@ -63,6 +63,27 @@ function phone(v, { required = false } = {}) {
   return s;
 }
 
+/*
+ * RSK-07 — کلیدِ یکتای **شمردن و قفل** برای شماره. validate.phone ‎+930…‎، ‎+9300…‎ و … را هم می‌پذیرد
+ * و همان را ذخیره می‌کند؛ این‌ها با ‎+93…‎ یک گوشی‌اند. هر سقف، فاصله یا قفلی که شماره کلیدش است با
+ * `phoneKey` (کلیدِ یکتا) یا `phoneForms` (همهٔ شکل‌های ذخیره‌شدنی برای `= ANY($1)`) بشمارد، وگرنه
+ * هر شکل سقفِ جدا می‌گیرد. ⛔ فقط برای شمردن: خودِ validate.phone و دادهٔ ذخیره‌شده دست نمی‌خورند
+ * (حسابِ موجود با شکلِ قدیمی نباید دو تا شود).
+ */
+const CC_ZEROS = new RegExp(`^${DEFAULT_CC.replace(/[+]/g, '\\+')}0+`);
+const CC_DIGITS = DEFAULT_CC.replace(/\D/g, '').length;
+/** ‎+9300700…‎ ⇒ ‎+93700…‎؛ هر چیزِ دیگر (ایمیل، کدِ کشورِ دیگر) همان. */
+function phoneKey(v) { return String(v || '').replace(CC_ZEROS, DEFAULT_CC); }
+/** همهٔ شکل‌هایی که validate.phone برای همین کلید می‌پذیرد (‎+93‎ + ۰ تا n صفر + بقیه، تا ۱۵ رقم). */
+function phoneForms(v) {
+  const key = phoneKey(v);
+  if (!key.startsWith(DEFAULT_CC) || key.length === DEFAULT_CC.length) return [key];
+  const rest = key.slice(DEFAULT_CC.length);
+  const out = [];
+  for (let zeros = 0; CC_DIGITS + zeros + rest.length <= 15; zeros++) out.push(DEFAULT_CC + '0'.repeat(zeros) + rest);
+  return out.length ? out : [key];
+}
+
 /** شناسه‌ی رکورد — فقط حروف، رقم و چند نشانه‌ی بی‌خطر. */
 function id(v, { field = 'شناسه', required = true, max = 80 } = {}) {
   const s = str(v);
@@ -125,6 +146,6 @@ function payload(v, { max = 64 * 1024, field = 'داده' } = {}) {
 }
 
 module.exports = {
-  text, email, phone, id, amount, integer, timestamp, bool, oneOf, payload,
+  text, email, phone, phoneKey, phoneForms, id, amount, integer, timestamp, bool, oneOf, payload,
   stripControl, DEFAULT_CC,
 };
