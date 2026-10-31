@@ -58,7 +58,7 @@ const FREE = [
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.doc_chain'];
 
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
@@ -120,6 +120,9 @@ const DATA_WRITES = {
   'POST /sync/v1/push': (t, dev) => h.api('POST', '/api/sync/v1/push', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
     body: { device_id: dev, schema_version: 2, ops: [op()] } }),
   'POST /sync/v3/push': (t, dev) => h.post('/api/sync/v3/push', { device_id: dev, protocol: 3, ops: [] }, { token: t }),
+  //  SEC-02: گزارشِ زنجیرهٔ اسنادِ دستگاه — همان قاعدهٔ push (`requireSyncWrite`)؛ پرچمِ `shop.doc_chain` روشن است
+  'POST /sync/v1/chain': (t, dev) => h.api('POST', '/api/sync/v1/chain', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: { device_id: dev, format: 'tohid-hashchain-v1', heads: [], links: [] } }),
   'POST /products': (t) => h.post('/api/products', { data: { name: 'کالا' } }, { token: t }),
 };
 
