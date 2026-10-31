@@ -554,7 +554,44 @@
       });
     };
     $('o-reorder').onclick = function () { reorder(o); };
+    renderPay(o, token);
     return o;
+  }
+
+  //  PAY-21: «پرداخت با حساب‌پی» — نشانی و مبلغ را سرور می‌سازد؛ «پرداخت شد» فقط از وضعیتِ سرور
+  //  (وب‌هوک + تأییدِ دوم)، هرگز از برگشت از صفحهٔ حساب‌پی. نقد هنگامِ تحویل همان می‌ماند.
+  function renderPay(o, token) {
+    var st = o.paymentStatus;
+    //  «در انتظار» هم: مشتریِ برگشته بی پرداخت همان جلسه را دوباره باز می‌کند (همان کلید ⇒ همان نشانی)
+    var can = Boolean(o.onlinePay && o.onlinePay.available) && (st === 'unpaid' || st === 'failed' || st === 'pending');
+    $('o-pay').hidden = !can;
+    $('o-payhint').hidden = !can;
+    $('o-pay').disabled = false;
+    if (o.paymentMethod === 'online' && st === 'paid') K.note($('o-paynote'), 'ok', t('od.pay.paid'));
+    else if (st === 'pending') K.note($('o-paynote'), 'warn', t('od.pay.pending'));
+    else if (st === 'failed' && can) K.note($('o-paynote'), 'warn', t('od.pay.failed'));
+    else $('o-paynote').hidden = true;
+    $('o-pay').onclick = function () { payOnline(token, true); };
+  }
+
+  function payOnline(token, retry) {
+    var scope = 'pay:' + slug + ':' + token;
+    $('o-pay').disabled = true;
+    K.note($('o-paynote'), 'ok', t('od.pay.redirect'));
+    api('/orders/' + encodeURIComponent(token) + '/pay', { method: 'POST', body: {}, key: K.keyFor(scope, { token: token }) }).then(function (r) {
+      var p = r.payment || {};
+      //  تلاشِ پیشینِ همین کلید بسته شده (ناموفق/منقضی/لغو) ⇒ یک بار با کلیدِ تازه
+      if (p.status !== 'pending' && p.status !== 'created') {
+        K.dropKey(scope);
+        if (retry) return payOnline(token, false);
+        throw new Error(t('od.pay.failed'));
+      }
+      if (!/^https:\/\//.test(p.checkoutUrl || '')) throw new Error(t('err.generic'));
+      location.assign(p.checkoutUrl);
+    }).catch(function (e) {
+      $('o-pay').disabled = false;
+      K.note($('o-paynote'), 'err', e.message);
+    });
   }
 
   var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
@@ -569,14 +606,16 @@
       api('/orders/' + encodeURIComponent(token)).then(function (r) {
         renderOrder(r.order, token);
         //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
-        if (FINAL.indexOf(r.order.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, 20000);
+        //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
+        var every = r.order.paymentStatus === 'pending' ? 5000 : 20000;
+        if (FINAL.indexOf(r.order.status) < 0 || r.order.paymentStatus === 'pending') pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, every);
       }).catch(function (e) {
         $('o-title').textContent = t('od.title');
         K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
         $('o-status').className = 'pill err';
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
-        $('o-cancel').hidden = true; $('o-reorder').hidden = true;
+        $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
       });
     };
     load();
