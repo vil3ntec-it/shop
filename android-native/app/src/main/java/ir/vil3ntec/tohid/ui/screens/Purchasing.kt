@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -517,9 +518,11 @@ private fun PaymentDialog(
         Spacer(Modifier.height(14.dp))
         AmountField(amount, { amount = it }, "مبلغ پرداختی")
 
-        if (debt > 0) {
+        //  «تسویهٔ کامل»: همهٔ بدهیِ ما تا پول، هرگز گردِ افغانی
+        val settle = MoneyInput.settleInput(debt)
+        if (settle != null) {
           Spacer(Modifier.height(6.dp))
-          TextButton(onClick = { amount = Math.round(debt).toString() }) {
+          TextButton(onClick = { amount = settle }) {
             Text("تسویهٔ کامل", color = Shop.colors.primary)
           }
         }

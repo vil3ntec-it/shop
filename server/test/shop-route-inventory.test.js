@@ -16,6 +16,8 @@
  *   ۴) در پایان، همهٔ ردیف‌های «الف» در **هر** جدولی که ستونِ `shop_id` دارد
  *      بایت‌به‌بایت همان پیش از آزمون‌اند — توکنِ «ب» چیزی از «الف» عوض نکرد
  */
+//  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
+process.env.PAYMENTS_PROVIDER = 'fake';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -188,7 +190,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
    مسیرِ شناسه‌دارِ تازه‌ای که ردیفِ واقعی برایش این‌جا ساخته نشود، آزمون را سرخ می‌کند. */
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
-  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.purchase_orders'];
+  'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay', 'shop.purchase_orders'];
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -385,6 +387,13 @@ async function seedShop(a) {
     { body: 'پوزش؛ پیگیری شد', clientId: `client-${fresh('t')}-0000` }, { token: a.accessToken });
   assert.equal(resp.status, 201, JSON.stringify(resp.body));
 
+  //  قصدِ پرداختِ حساب‌پی (QR ِ صندوق) — از همان درِ برنامهٔ دکان
+  const pi = await h.post('/api/shop/payments/intents',
+    { kind: 'pos_sale', refId: 'inv-sale-a1', amount: 5000, currency: 'AFN', idempotencyKey: fresh('pay-intent') },
+    { token: a.accessToken });
+  assert.equal(pi.status, 201, JSON.stringify(pi.body));
+  ids.paymentIntent = pi.body.id;
+
   return { ids, staff, courier };
 }
 
@@ -417,6 +426,7 @@ function concreteFor(ids) {
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
+    [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
   const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
   return (r) => {

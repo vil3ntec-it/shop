@@ -56,7 +56,7 @@ router.post('/', visitLimit, async (req, res, next) => {
             const st = await require('../lib/stations').membershipOf(user.id);
             if (st) stationId = st.station_id;
           } else {
-            const member = await membershipOf(user.id);
+            const member = await membershipOf(user.id, { shopId: row.shop_id || null });
             if (member) shopId = member.shop_id;
           }
         }

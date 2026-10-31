@@ -53,6 +53,11 @@ const FREE = [
   ['سفارشِ خرید زیرِ کلیدِ رایگانِ purchasing است (FREE_KEYS)؛ فقط پرچمِ shop.purchase_orders و مجوزِ نقش (PUR-02/04)', [
     'POST /shop/purchase-orders', 'PUT /shop/purchase-orders/:id', 'POST /shop/purchase-orders/:id/send',
     'POST /shop/purchase-orders/:id/cancel', 'POST /shop/purchase-orders/:id/receipts']],
+  ['دکانِ فعالِ نشست (مهاجرتِ ۰۹۷، #273) دادهٔ دکان نمی‌نویسد؛ پس از پایانِ اشتراکِ یک دکان هم باید بتوان به دکانِ دیگر رفت', [
+    'POST /shop/active']],
+  ['پرداختِ حساب‌پی (PAY-21) کلیدِ کاتالوگ ندارد، فقط پرچمِ pay.hesabpay؛ پرداختِ سفارشِ آنلاین اشتراکِ فعال را خودش می‌سنجد '
+    + '(online_payment_unavailable)', [
+    'POST /shop/payments/intents', 'POST /shop/payments/intents/:id/cancel']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
