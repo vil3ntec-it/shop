@@ -237,6 +237,8 @@
 - مبلغِ بازپرداخت هرگز از مانده بیشتر نیست؛ ردیفِ دفتر فقط افزوده می‌شود؛ روش فقط `cash` تا D-08؛ دلیل اجباری و متنِ آزاد (#255).
 - سفارشِ آزمایشی (`test: true`) در جمعِ تطبیق شمرده نمی‌شود (#227، #255).
 - بخشِ «سفارش‌ها»ی کارمند فقط با `enabled`ِ `/config`ِ سرور پیداست و قطعِ گذرا خاموشش نمی‌کند؛ `summary` هر ۲۰ ثانیه و فقط جلوی چشم (#253).
+- «عقب انداختن» (ORD-07) وضعیت را عوض نمی‌کند: رویدادِ `note` با `detail.type = 'ready_delay'` (مهاجرت نمی‌خواهد)، روی زمانِ ذخیره‌شدهٔ سرور، با کلیدِ یکتایی در رویداد و `expectedReadyAt`؛ خطِ زمانیِ مشتری فقط `created`/`status` را می‌بیند (`claude/spec-ord-1`).
+- «باز / بسته» ِ کارمند (ORD-03) همان `storefront.statusOf` ِ ویترین است، نه ساعتِ دستگاه؛ افزونهٔ وب (`license/orders-desk.js`) فقط با `presence`/`delay` ِ `/config` بار می‌شود (`claude/spec-ord-1`).
 - ⛔ ریسکِ سفارش (RSK-02/03/05، `lib/order-risk.js`) فقط در قیمت‌گذارِ ویترین و از راهِ `order-rate.guard` اجرا می‌شود: پس از قفلِ `order-phone:<شماره>` و پس از تکرارِ کلیدِ یکتایی، درونِ تراکنشِ `orders.create`. هیچ قاعدهٔ ریسکی به صندوق، همگام‌سازی یا `POST /api/shop/orders` (سفارشِ کارمند) راه ندارد. هر رد کدِ پایدار و `reason` و عددِ سقف دارد. «تازه» = بی سفارشِ تحویل‌شده در همین دکان. سابقهٔ `…/risk` فقط همین دکان را می‌شمارد و شماره را برنمی‌گرداند.
 
 ### v3 · ویترین
@@ -396,6 +398,8 @@
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
+| `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
+| `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
