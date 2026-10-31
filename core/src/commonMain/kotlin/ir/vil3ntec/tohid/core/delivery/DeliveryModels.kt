@@ -48,6 +48,8 @@ data class CourierRow(
   val liveCount: Int = 0,
   /** نقدی که از مأموریت‌های زنده باید بگیرد */
   val liveExpectedMinor: Long = 0,
+  /** سقفِ کارِ هم‌زمانِ همین پیک (DLV-03، سرور: `max_live`)؛ null = بی‌سقف */
+  val maxLive: Int? = null,
 )
 
 /** یک مأموریتِ تحویل از دیدِ دکان (`staffView` + نامِ مشتری و وضعیتِ سفارش) */
