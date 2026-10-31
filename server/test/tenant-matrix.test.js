@@ -88,6 +88,8 @@ const NO_TENANT = {
   'POST /api/auth/reauth': 'تأییدِ دوباره', 'POST /api/auth/password': 'تغییرِ رمز', 'POST /api/auth/password/forgot': 'بازیابی',
   'POST /api/auth/password/reset': 'بازیابی', 'POST /api/auth/:app/request-code': 'ورودِ برنامه با کد',
   'GET /api/auth/:app/request-status': 'ورودِ برنامه با کد', 'POST /api/auth/:app/verify': 'ورودِ برنامه با کد',
+  'POST /api/payments/webhook/hesabpay': 'وب‌هوکِ ارائه‌دهندهٔ پرداخت — بی توکنِ کاربر؛ اعتبار فقط امضای بدنهٔ خام (بد ⇒ ۴۰۱) و دکان از ردیفِ قصدِ پرداخت، نه از درخواست (payment-intents.test.js)',
+  'POST /api/payments/webhook/fake': 'ارائه‌دهندهٔ ساختگی، فقط بیرون از تولید؛ همان قاعدهٔ وب‌هوک (payment-intents.test.js)',
 };
 
 /* ── دادهٔ واقعیِ دکان‌ها ─────────────────────────────────────────────── */
@@ -287,6 +289,8 @@ function casesFor(I) {
   add('DELETE /api/me/devices/:id', { url: `/api/me/devices/${I.deviceRow}` });
   add('POST /api/me/push', { url: '/api/me/push', body: () => ({ token: `push-${uniq()}` }) });
   add('DELETE /api/me/push', { url: '/api/me/push', body: () => ({ token: `push-${uniq()}` }) });
+  //  AUTH-08 (#498): کدِ افزودنِ شماره — فقط حسابِ خودِ صدا زننده؛ پرچمِ خاموش ⇒ ۴۰۴
+  add('POST /api/me/phone/code', { url: '/api/me/phone/code', body: { phone: '0790000999' } });
   add('GET /api/me/backups', { url: '/api/me/backups', own: ['backupId'] });
   add('POST /api/me/backups', { url: '/api/me/backups?ext=json', raw: true });
   add('GET /api/me/backups/:id', { url: `/api/me/backups/${I.backup}`, own: ['backup'] });

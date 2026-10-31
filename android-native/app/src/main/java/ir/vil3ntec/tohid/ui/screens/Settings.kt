@@ -472,8 +472,16 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
+    item {
+      var rules by remember { mutableStateOf(ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context)) }
+      CheckoutRulesSection(rules) { rules = it; ir.vil3ntec.tohid.data.CheckoutRulesPref.set(context, it) }
+    }
+
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
+    item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
@@ -497,6 +505,32 @@ fun SettingsScreen(
           onSelect = {
             payV2 = it == "v2"
             ir.vil3ntec.tohid.data.ShopPolicy.setPayV2(context, payV2)
+          },
+        )
+      }
+    }
+
+    /* ============== سقفِ اعتبار در صندوق (CRM-03، S07، پیش‌فرض خاموش) ============== */
+    item {
+      var creditGate by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Lock,
+        title = StrShell.creditGate,
+        subtitle = if (creditGate) StrShell.creditGateOn else StrSettings.off,
+        tint = if (creditGate) Shop.colors.warning else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.creditGateNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (creditGate) "on" else "off",
+          onSelect = {
+            creditGate = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setCreditGate(context, creditGate)
           },
         )
       }
