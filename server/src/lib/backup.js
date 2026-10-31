@@ -54,9 +54,45 @@ const UNENCRYPTED_WARNING = 'BACKUP_PASSPHRASE تنظیم نشده است: پش�
  */
 function warnUnencrypted(kind) {
   console.warn(`[backup] ⚠️ ${kind}: ${UNENCRYPTED_WARNING}`);
-  require('./audit').log({
+  return require('./audit').log({
     actorType: 'system', action: 'backup.unencrypted', detail: { kind },
   }).catch(() => {});
+}
+
+/**
+ * اثرِ انگشتِ دیتابیس برای `meta.json` (`lib/restore-drill.js`: شمار، جمعِ پول و مقدار) در **همان**
+ * snapshot ای که pg_dump می‌خواند (`pg_export_snapshot` ⇒ `pg_dump --snapshot`)؛ پس تمرینِ بازیابی
+ * بعدها بی دیتابیسِ زنده می‌داند فایل باید دقیقاً چه چیزی را برگرداند.
+ * ⛔ هیچ‌وقت پشتیبان را نمی‌خواباند: شکستِ این بخش ⇒ پشتیبانِ بی manifest، همان رفتارِ پیشین.
+ */
+async function openSnapshot() {
+  let client = null;
+  try {
+    client = await db.getPool().connect();
+    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    const id = (await client.query('SELECT pg_export_snapshot() AS id')).rows[0].id;
+    const manifest = await require('./restore-drill').fingerprint((t, p) => client.query(t, p));
+    const c = client;
+    return {
+      id, manifest,
+      async close() {
+        try { await c.query('COMMIT'); } catch { /* اتصال رفته */ }
+        c.release();
+      },
+    };
+  } catch (err) {
+    console.warn(`[backup] manifest ساخته نشد (پشتیبان بی آن ادامه می‌دهد): ${err.message}`);
+    if (client) { try { await client.query('ROLLBACK'); } catch { /* بی‌اهمیت */ } client.release(); }
+    return null;
+  }
+}
+
+/** همان، برای PGlite: پیش و پس از برداشتن؛ یکی نبود ⇒ «ناسازگار» علامت می‌خورد، نه پنهان */
+async function pgliteManifest() {
+  try { return await require('./restore-drill').fingerprint((t, p) => db.query(t, p)); } catch (err) {
+    console.warn(`[backup] manifest ساخته نشد: ${err.message}`);
+    return null;
+  }
 }
 
 async function run({ kind = 'manual', dir = null } = {}) {
@@ -64,15 +100,28 @@ async function run({ kind = 'manual', dir = null } = {}) {
   await ensureDirs();
 
   const encrypted = !!config.backup.passphrase;
-  if (!encrypted) warnUnencrypted(kind);
-  if (db.isPglite()) return runPglite({ kind, dir, encrypted });
+  const warned = encrypted ? null : warnUnencrypted(kind);
+  //  PGlite: ردیفِ همین هشدار نباید میانِ دو اثرِ انگشتِ manifest بنشیند (شکستش هم چیزی را نمی‌خواباند)
+  if (db.isPglite()) { await warned; return runPglite({ kind, dir, encrypted }); }
   const base = `shop-${stamp()}.sql.gz${encrypted ? '.enc' : ''}`;
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
 
+  //  ⚠️ پیش از spawn (قاعدهٔ «هیچ await میانِ spawn و وصل شدن به stdout» در `runPg`)
+  const snap = await openSnapshot();
+  try {
+    return await runPg({ kind, encrypted, base, target, tmp, snap });
+  } finally {
+    if (snap) await snap.close();
+  }
+}
+
+/** pg_dump ⇒ gzip ⇒ (رمز) ⇒ فایل؛ با `snap` همان snapshot ِ manifest را می‌خواند */
+async function runPg({ kind, encrypted, base, target, tmp, snap }) {
   const dump = spawn(config.backup.pgDump, [
     config.db.url,
     '--no-owner', '--no-privileges', '--format=plain', '--encoding=UTF8',
+    ...(snap ? [`--snapshot=${snap.id}`] : []),
   ], { stdio: ['ignore', 'pipe', 'pipe'] });
 
   let stderr = '';
@@ -144,10 +193,13 @@ async function run({ kind = 'manual', dir = null } = {}) {
   await fsp.writeFile(`${target}.meta.json`, JSON.stringify({
     file: base, kind, createdAt: Date.now(), bytes: stat.size,
     encrypted, sha256: sha, format: 'pg_dump-plain-gzip', app: 'shop-server', version: 2,
+    //  فقط شمار و جمع — بی هیچ دادهٔ شخصی (lib/restore-drill.js)
+    ...(snap ? { manifest: snap.manifest, manifestConsistent: true } : {}),
   }, null, 2));
 
   await prune(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
+  noteSuccess(kind);
+  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: snap ? snap.manifest.digest : null };
 }
 
 /**
@@ -163,8 +215,18 @@ async function runPglite({ kind, dir, encrypted }) {
   const target = path.join(dir || dirFor(kind), base);
   const tmp = `${target}.part`;
 
-  const raw = await db.dumpPglite();
+  //  یک اتصال، بی snapshot: اثرِ انگشت پیش و پس از برداشتن؛ نوشتنی در میانه ⇒ یک بارِ دیگر، و باز
+  //  ناسازگار ⇒ پشتیبان بی manifest (تمرین «بی manifest» می‌گوید، نه «برابر»)
+  let before = await pgliteManifest();
+  let raw = await db.dumpPglite();
+  let after = before ? await pgliteManifest() : null;
+  if (before && after && before.digest !== after.digest) {
+    before = after;
+    raw = await db.dumpPglite();
+    after = await pgliteManifest();
+  }
   if (raw.length < 100) throw new Error('PGlite چیزی نداد — پشتیبان ساخته نشد.');
+  const consistent = !!(before && after && before.digest === after.digest);
 
   let out = raw;
   if (encrypted) {
@@ -180,9 +242,12 @@ async function runPglite({ kind, dir, encrypted }) {
   await fsp.writeFile(`${target}.meta.json`, JSON.stringify({
     file: base, kind, createdAt: Date.now(), bytes: stat.size,
     encrypted, sha256: sha, format: 'pglite-datadir-tar-gzip', app: 'shop-server', version: 2,
+    //  دیتابیس میانِ دو اثرِ انگشت عوض شد ⇒ manifest نمی‌آید (تمرین «بی manifest» می‌گوید، نه «برابر»)
+    ...(consistent ? { manifest: before, manifestConsistent: true } : (before ? { manifestConsistent: false } : {})),
   }, null, 2));
   await prune(kind);
-  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha };
+  noteSuccess(kind);
+  return { file: target, bytes: stat.size, kind, createdAt: Date.now(), encrypted, sha256: sha, manifest: consistent ? before.digest : null };
 }
 
 /** نگه داشتن تعداد مشخصی از هر نوع و پاک کردن قدیمی‌ترها. */
@@ -268,22 +333,59 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
   });
 }
 
+/* ───────────── شکستِ پشتیبان بی‌صدا نمی‌ماند (SEC-DATA-05) ───────────── */
+
+/**
+ * تا پیش از این شکستِ پشتیبانِ خودکار فقط یک خطِ `console.error` بود: نه سابقه، نه پنل. سرور
+ * می‌توانست هفته‌ها بی پشتیبان بدود و «سلامت» فقط «دیر شده» (زرد) می‌گفت. حالا هر شکست:
+ *   • سابقهٔ سامانه `backup.failed` (همان راهِ `backup.unencrypted`)،
+ *   • `status()` ⇒ `lib/system-health.js` «پشتیبان» را قرمز (`down`) می‌کند تا موفقِ بعدی،
+ *   • و `setAlertHandler` برای راهِ دیگرِ خبر (همان الگوی `login-outbox`).
+ * پیام کوتاه و بی نشانیِ دیتابیس است (`postgres://…` پاک می‌شود).
+ */
+const state = { lastFailure: null, lastSuccess: null };
+let alertHandler = null;
+function setAlertHandler(fn) { alertHandler = typeof fn === 'function' ? fn : null; }
+
+function safeMessage(err) {
+  return String(err?.message || err || '').replace(/\b(postgres(ql)?|pglite):\/\/\S+/gi, '<db>').slice(0, 300);
+}
+
+function noteSuccess(kind) { state.lastSuccess = { at: Date.now(), kind }; }
+
+function noteFailure(kind, err) {
+  const entry = { at: Date.now(), kind, message: safeMessage(err) };
+  state.lastFailure = entry;
+  console.error(`[backup] ⛔ ${kind} شکست خورد: ${entry.message}`);
+  require('./audit').log({ actorType: 'system', action: 'backup.failed', detail: { kind, message: entry.message } }).catch(() => {});
+  if (alertHandler) { try { alertHandler(entry); } catch { /* هشداردهنده خودش خراب بود */ } }
+  return entry;
+}
+
+function status() { return { lastFailure: state.lastFailure, lastSuccess: state.lastSuccess }; }
+
+/** نوبتِ خودکار: نوعِ امروز، و هر شکست ⇒ `noteFailure` (هرگز throw نمی‌کند) */
+async function tick(d = new Date()) {
+  const kind = d.getUTCDate() === 1 ? 'monthly' : (d.getUTCDay() === 0 ? 'weekly' : 'daily');
+  try {
+    const done = await run({ kind });
+    console.log(`[backup] ${kind}: ${path.basename(done.file)} (${Math.round(done.bytes / 1024)}KB)`);
+    return done;
+  } catch (err) {
+    noteFailure(kind, err);
+    return null;
+  }
+}
+
 /** زمان‌بندی خودکار: روزانه، هفتگی (یکشنبه) و ماهانه (اول ماه). */
 function schedule() {
   if (!config.backup.enabled) return null;
-  const tick = async () => {
-    try {
-      const d = new Date();
-      const kind = d.getUTCDate() === 1 ? 'monthly' : (d.getUTCDay() === 0 ? 'weekly' : 'daily');
-      const done = await run({ kind });
-      console.log(`[backup] ${kind}: ${path.basename(done.file)} (${Math.round(done.bytes / 1024)}KB)`);
-    } catch (err) {
-      console.error('[backup] شکست خورد:', err.message);
-    }
-  };
-  const timer = setInterval(tick, config.backup.intervalMs);
+  const timer = setInterval(() => { tick(); }, config.backup.intervalMs);
   if (timer.unref) timer.unref();
   return timer;
 }
 
-module.exports = { run, list, prune, restore, decode, schedule, KINDS, dirFor, UNENCRYPTED_WARNING };
+module.exports = {
+  run, list, prune, restore, decode, schedule, tick, status, setAlertHandler, noteFailure,
+  KINDS, dirFor, UNENCRYPTED_WARNING,
+};
