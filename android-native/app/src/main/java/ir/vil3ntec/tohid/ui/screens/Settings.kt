@@ -471,6 +471,9 @@ fun SettingsScreen(
         )
       }
     }
+    item { ShrinkReportSettingsWired(context) } // گزارشِ ضایعات و کسری (INV-17)، پیش‌فرض خاموش
+    item { LabelToolsSettingsWired(context) } // برچسب و بارکدِ داخلی (PRD-23، PRD-05)، پیش‌فرض خاموش
+    item { CountToolsSettingsWired(context) } // انبارگردانیِ تازه: اسکن، چند دستگاه، کور (INV-06/07/08)، پیش‌فرض خاموش
 
     /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
     item {
@@ -484,8 +487,16 @@ fun SettingsScreen(
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
-    /* =============== جست‌وجوی مقاومِ صندوق (POS-04، فقط کامپیوتر، پیش‌فرض خاموش) =============== */
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }
+    /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysSettingsWired(context) } }
+    /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
+    /* ======================== رسیدِ هدیهٔ بی قیمت (POS-34، پیش‌فرض خاموش) ======================== */
+    item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }
+    /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
+    item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }
+    /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
+    item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
@@ -526,6 +537,7 @@ fun SettingsScreen(
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
+        DeviceOnlyNote()
         Spacer(Modifier.height(8.dp))
         SegmentedChoice(
           options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
@@ -533,6 +545,61 @@ fun SettingsScreen(
           onSelect = {
             creditGate = it == "on"
             ir.vil3ntec.tohid.data.ShopPolicy.setCreditGate(context, creditGate)
+          },
+        )
+      }
+    }
+
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ReportKeysSettingsWired(context) } //  کلیدهای دوره در گزارش‌ها (RPT-13)، پیش‌فرض خاموش
+
+    /* ====== چتِ دکان: پیشرفتِ فرستادن و جای دستگاه (CHAT-05/07، پیش‌فرض خاموش) ====== */
+    //  فقط وقتی چتِ این دکان روشن است (`shop.chat`)؛ وگرنه کلیدی بی‌اثر نمی‌گذاریم.
+    if (ir.vil3ntec.tohid.data.ShopChatSync.enabled) item {
+      var chatGuard by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.chatMediaGuard(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Storage,
+        title = ir.vil3ntec.tohid.core.i18n.StrChat.guard,
+        subtitle = if (chatGuard) ir.vil3ntec.tohid.core.i18n.StrChat.guardOn else StrSettings.off,
+        tint = if (chatGuard) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          ir.vil3ntec.tohid.core.i18n.StrChat.guardNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (chatGuard) "on" else "off",
+          onSelect = {
+            chatGuard = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setChatMediaGuard(context, chatGuard)
+          },
+        )
+      }
+    }
+
+    /* ============== سابقهٔ ضدتقلب (RPT-09، پیش‌فرض خاموش، فقط همین دستگاه) ============== */
+    item {
+      var fraudTrail by remember { mutableStateOf(ir.vil3ntec.tohid.data.FraudTrailPref.enabled(context)) }
+      SettingsSection(
+        icon = Icons.Filled.History,
+        title = StrShell.fraudTrail,
+        subtitle = if (fraudTrail) StrShell.fraudTrailOn else StrSettings.off,
+        tint = if (fraudTrail) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.fraudTrailNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (fraudTrail) "on" else "off",
+          onSelect = {
+            fraudTrail = it == "on"
+            ir.vil3ntec.tohid.data.FraudTrailPref.setEnabled(context, fraudTrail)
           },
         )
       }
@@ -563,8 +630,49 @@ fun SettingsScreen(
             ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
           },
         )
+        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود
+        if (crmReports) {
+          var reminderText by remember { mutableStateOf(ir.vil3ntec.tohid.data.DebtReminderPref.template(context)) }
+          Spacer(Modifier.height(12.dp))
+          DebtReminderTemplateEditor(
+            saved = reminderText,
+            onSave = { t -> ir.vil3ntec.tohid.data.DebtReminderPref.set(context, t).also { if (it == null) reminderText = ir.vil3ntec.tohid.data.DebtReminderPref.template(context) } },
+            onReset = { ir.vil3ntec.tohid.data.DebtReminderPref.reset(context); reminderText = ir.vil3ntec.tohid.data.DebtReminderPref.template(context) },
+            onMessage = ::toast,
+          )
+        }
       }
     }
+
+    /* ======== ابزارهای تازهٔ کالا: نامِ مشابه و چند بارکد (PRD-19، PRD-04) — پیش‌فرض خاموش ======== */
+    item {
+      var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Description,
+        title = "ابزارهای تازهٔ کالا",
+        subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
+        tint = if (productTools) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد می‌گیرد (با «،» جدا)، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. فقط روی همین دستگاه.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (productTools) "on" else "off",
+          onSelect = {
+            productTools = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setProductTools(context, productTools)
+          },
+        )
+      }
+    }
+
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
 
     /* ============================== دوربین ============================== */
     item {
@@ -971,6 +1079,7 @@ fun SettingsScreen(
           tint = Shop.colors.primary,
           onClick = onUpdates,
         )
+        WhatsNewSettingsRows() //  OPS-05، پیش‌فرض خاموش
       }
     }
   }
@@ -1016,19 +1125,15 @@ fun SettingsScreen(
             //  می‌کند برنامه خراب است
             val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
-            //  پایانِ اشتراک نباید گروگانش بگیرد.
-            if (!store.applyRestore(fixed)) {
-              //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
-              toast(StrSettings.restoreDiskFail)
-              return@launch
-            }
+            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد.
+            //  S143: هرگز op نمی‌سازد؛ دستگاهِ همگام ⇒ اطلاعات از سرور. نشد (دیسک F0-01، شبکه، صف) ⇒
+            //  دفترِ قبلی دست‌نخورده و دلیلش
+            val r = store.restoreBackup(fixed)
+            if (!r.ok) { toast(r.message); return@launch }
             canUndo = true
             restorePhotos = 0
-            toast(
-              if (moved > 0) StrSettings.restoredWithPhotos(plain(moved))
-              else StrSettings.restored
-            )
+            val done = if (moved > 0) StrSettings.restoredWithPhotos(plain(moved)) else StrSettings.restored
+            toast(if (r.message.isEmpty()) done else "$done\n${r.message}")
           }
         }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },
