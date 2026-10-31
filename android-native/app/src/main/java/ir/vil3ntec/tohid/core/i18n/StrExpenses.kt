@@ -75,4 +75,6 @@ object StrExpenses {
   val auditMarketingConsent: String get() = t("رضایتِ پیامِ تبلیغاتی", "Marketing consent", "د تبلیغاتي پیغام رضایت")
   val auditPriceListSet: String get() = t("لیستِ قیمتِ مشتری", "Customer price list", "د پیرودونکي د بیو لړلیک")
   val auditDebtReminder: String get() = t("یادآوریِ بدهی", "Debt reminder", "د پور یادونه")
+  /** RPT-09 — ردیفی که از فاکتورِ باز حذف شد («سابقهٔ ضدتقلب») */
+  val auditLineDelete: String get() = t("حذفِ ردیف از فاکتور", "Line removed from invoice", "له بل څخه د کرښې لرې کول")
 }

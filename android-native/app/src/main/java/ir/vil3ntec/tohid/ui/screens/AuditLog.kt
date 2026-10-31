@@ -144,6 +144,7 @@ private fun auditLabel(type: String): String = when (type) {
   "marketing_consent" -> StrExpenses.auditMarketingConsent
   "price_list_set" -> StrExpenses.auditPriceListSet
   "debt_reminder" -> StrExpenses.auditDebtReminder
+  "line_delete" -> StrExpenses.auditLineDelete
   else -> type
 }
 
@@ -151,7 +152,7 @@ private fun auditLabel(type: String): String = when (type) {
 private fun auditTint(type: String): Color = when (type) {
   "sale", "customer_payment" -> Shop.colors.success
   "cancel_sale", "delete_product", "debtor_delete", "debt_tx_delete", "expense_delete" -> Shop.colors.danger
-  "return", "supplier_return", "stock_adjustment", "credit_over_limit" -> Shop.colors.warning
+  "return", "supplier_return", "stock_adjustment", "credit_over_limit", "line_delete" -> Shop.colors.warning
   else -> Shop.colors.primary
 }
 
