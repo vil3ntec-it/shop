@@ -633,8 +633,11 @@ function orderIdOf(shopId, token) {
   return a.length === b.length && crypto.timingSafeEqual(a, b) ? m[1] : null;
 }
 
-/** نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی. */
-function publicOrder(o, token) {
+/**
+ * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
+ * `delivery` (S5) فقط وقتی پرچمِ نمای پیک روشن است می‌آید (`delivery.customerView`).
+ */
+function publicOrder(o, token, delivery) {
   return {
     token,
     orderNo: o.orderNo,
@@ -665,6 +668,7 @@ function publicOrder(o, token) {
     timeline: o.events
       .filter((e) => e.kind === 'created' || e.kind === 'status')
       .map((e) => ({ status: e.toStatus, at: e.at })),
+    ...(delivery !== undefined ? { delivery } : {}),
   };
 }
 
@@ -703,7 +707,7 @@ async function track(sf, token) {
   if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return publicOrder(o, token);
+  return publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id));
 }
 
 async function cancel(sf, token) {

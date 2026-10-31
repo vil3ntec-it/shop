@@ -126,6 +126,61 @@ class WarehouseEngineTest {
     assertEquals(emptyList<String>(), r.data.products.single().barcodes)  // بارکد برداشته شد
   }
 
+  /* ------------- از دست رفتنِ داده: بارکدهای دوم به بعد در ویرایش ------------- */
+
+  private val multi = ShopData(
+    products = listOf(
+      Product(id = "p1", name = "برنج", unit = "کیلو", purchasePrice = 200.0, salePrice = 300.0, barcodes = listOf("111", "222", "333")),
+      Product(id = "p2", name = "روغن", unit = "عدد", salePrice = 500.0, barcodes = listOf("444")),
+    ),
+  )
+
+  @Test
+  fun `ویرایشِ کالا با فرمِ تک‌بارکدی بارکدهای دوم به بعد را پاک نمی‌کند`() {
+    //  روی main پیش از رفع: barcodes = [111] — «222» و «333» بی‌صدا می‌افتادند
+    val r = ok(
+      WarehouseEngine.editProduct(
+        multi, "p1",
+        WarehouseEngine.ProductDraft(name = "برنج", unit = "کیلو", purchasePrice = 200.0, salePrice = 320.0, barcode = "111"),
+        today = "2026-10-30", now = 0, newId = ::newId,
+      )
+    )
+    assertEquals(listOf("111", "222", "333"), r.data.products.first { it.id == "p1" }.barcodes)
+    //  بارکد عوض نشد ⇒ سابقه هم «بارکد عوض شد» نمی‌گوید
+    assertTrue(r.data.auditLog.none { "بارکد" in it.notes })
+  }
+
+  @Test
+  fun `ویرایشِ بارکدِ نخست فقط همان را عوض یا پاک می‌کند`() {
+    val changed = ok(
+      WarehouseEngine.editProduct(
+        multi, "p1",
+        WarehouseEngine.ProductDraft(name = "برنج", unit = "کیلو", purchasePrice = 200.0, salePrice = 300.0, barcode = "999"),
+        today = "2026-10-30", now = 0, newId = ::newId,
+      )
+    )
+    assertEquals(listOf("999", "222", "333"), changed.data.products.first { it.id == "p1" }.barcodes)
+    val cleared = ok(
+      WarehouseEngine.editProduct(
+        multi, "p1",
+        WarehouseEngine.ProductDraft(name = "برنج", unit = "کیلو", purchasePrice = 200.0, salePrice = 300.0, barcode = ""),
+        today = "2026-10-30", now = 0, newId = ::newId,
+      )
+    )
+    assertEquals(listOf("222", "333"), cleared.data.products.first { it.id == "p1" }.barcodes)
+    //  بارکدِ تازه‌ای که مالِ کالای دیگر است همچنان رد می‌شود
+    assertEquals(
+      "این بارکد قبلاً برای کالای دیگری ثبت شده",
+      failed(
+        WarehouseEngine.editProduct(
+          multi, "p1",
+          WarehouseEngine.ProductDraft(name = "برنج", unit = "کیلو", purchasePrice = 200.0, salePrice = 300.0, barcode = "444"),
+          today = "2026-10-30", now = 0, newId = ::newId,
+        )
+      ),
+    )
+  }
+
   /* --------------------------- ورودِ کالا --------------------------- */
 
   @Test
