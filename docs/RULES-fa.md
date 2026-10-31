@@ -373,6 +373,7 @@
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `shop.storefront.search` | دکان / `all` | خاموش | جست‌وجوی ویترین در `GET /api/store/:slug/products?q=`: رقمِ فارسی/عربی، نامِ دسته ⇒ همان دسته (`jump`)، غلطِ تایپی با بودجهٔ `text-core` (سقفِ اسکنِ ۱۰۰۰؛ ناموجود و منتشرنشده نه) و `suggest` ِ «پیدا نشد»؛ خاموش ⇒ پاسخِ پیشین (WEB-05/06) | #454 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`

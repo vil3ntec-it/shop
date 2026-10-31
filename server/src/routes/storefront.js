@@ -89,6 +89,7 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
+      contactPhone: req.store.contact_phone,
     });
   //  ۳۲.۳: با پرچمِ `shop.catalog` وضعیتِ موجودی از دفترِ سرور (#263)؛ خاموش ⇒ null
   //  و همان «در حال بررسی». موجودیِ نامعلوم/کهنه هرگز «موجود» نیست (`badgeOf`).
