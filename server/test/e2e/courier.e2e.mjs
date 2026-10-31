@@ -11,6 +11,8 @@
  *   DEL-02        مشتری کمتر از مبلغ می‌دهد ⇐ بی دلیل سرور رد می‌کند و ردشده در گوشی پیداست (پنهان نه)؛
  *                 با دلیل ثبت ⇐ پیش‌نمایشِ تسویه «اختلافِ مشتری» را جدا از کسریِ پیک نشان می‌دهد؛ تسویه
  *                 بی دلیل رد، با دلیل ثبت و اختلاف در سندِ تسویه و گزارش می‌ماند.
+ *   E2E-DLV-08    ناموفق از گوشی ⇐ دوباره ⇐ ناموفق ⇐ دکان بسته را پس می‌گیرد ⇐ قفسه؛ فروشِ تحویلِ برنامه
+ *                 یک بار لغو، پولی گرفته نشده، نقدِ پیک و تسویه دست‌نخورده.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery.
  * اجرا:  node test/e2e/courier.e2e.mjs
@@ -213,5 +215,56 @@ await E.step('DEL-02', 'مشتری کمتر می‌دهد ⇐ بی دلیل رد
   const cs = E.ok(await A.api('GET', '/shop/delivery/couriers'), 'پیک‌ها').items.find((c) => c.id === c2);
   assert.equal(cs.cashHeldMinor, 0);
 }, { needs: ['E2E-SYNC-12.courier'] });
+
+await E.step('E2E-DLV-08.app', 'ناموفق از برنامهٔ پیک (بی دلیل نه) ⇐ دوباره ⇐ ناموفق ⇐ دکان بسته را پس می‌گیرد ⇐ قفسه؛ فروشِ تحویل یک بار لغو، پولی گرفته نشده، نقدِ پیک دست‌نخورده', async () => {
+  const o = await deliveryOrder(1, 'کنارِ داروخانه');
+  await packed(o.id);
+  const a = (await assign(o.id, c2, { requireCode: false })).assignment.id;
+  await flushed(K2);
+  K2.record(a, 'assigned').record(a, 'picked_up');
+  await flushed(K2);
+  //  کالا با پیک رفت ⇐ برنامهٔ دکان فروشِ تحویل (نقد در دستِ پیک) را ثبت می‌کند
+  const ask = async () => E.ok(await A.api('GET', `/shop/orders/handover?since=0&orderId=${o.id}`), 'تحویل؟');
+  const sent = (await ask()).items.find((x) => x.id === o.id);
+  assert.equal(sent?.action, 'sale', JSON.stringify(sent));
+  const stock0 = A.stock(rice);
+  assert.equal(A.fulfillOrder(sent).ok, true);
+  await A.drain();
+  assert.equal(A.stock(rice), stock0 - 1);
+  assert.throws(() => K2.record(a, 'failed'), (e) => e.code === 'reason_required');
+  K2.record(a, 'failed', { reason: 'no_answer' });
+  await flushed(K2);
+  assert.equal((await order(o.id)).status, 'delivery_failed');
+  K2.record(a, 'moving');
+  await flushed(K2);
+  assert.equal((await order(o.id)).status, 'out_for_delivery');
+  K2.record(a, 'failed', { reason: 'refused' });
+  //  «برگشت» کارِ دکان است، نه پیک: گوشی آن را اصلاً نمی‌سازد
+  assert.throws(() => K2.record(a, 'returned'), (e) => e.code === 'bad_event_type');
+  await flushed(K2);
+  E.ok(await A.api('POST', `/shop/delivery/assignments/${a}/status`, { to: 'returned', from: 'failed' }, { headers: { 'Idempotency-Key': E.key('st') } }), 'دریافتِ بسته در دکان');
+  let row = await order(o.id);
+  assert.deepEqual([row.status, row.cod_status], ['returned_to_store', 'to_collect'], 'پولی گرفته نشد');
+  E.ok(await A.api('POST', `/shop/orders/${o.id}/transition`, { to: 'restocked', from: 'returned_to_store' }), 'بازگشت به قفسه');
+  row = await order(o.id);
+  assert.equal(row.status, 'restocked');
+  //  برنامه همان فروش را لغو می‌کند؛ دستگاهِ دوم و تلاشِ دوباره اثرِ دوم ندارند
+  const back = (await ask()).reversals.find((x) => x.id === o.id);
+  assert.equal(back?.action, 'reverse', JSON.stringify(back));
+  assert.equal(A.reverseOrder(back).ok, true);
+  assert.equal(A.reverseOrder(back).already, true);
+  await A.drain();
+  const B = await E.device('B-owner-desktop', owner.email);
+  assert.equal((await B.firstSync()).ok, true);
+  assert.equal(B.reverseOrder(back).already, true);
+  assert.deepEqual([A.stock(rice), B.stock(rice)], [stock0, stock0], 'موجودی دقیقاً برگشت');
+  assert.equal(B.ledger.sales.find((s) => s.orderId === o.id)?.status, 'cancelled');
+  assert.deepEqual((await ask()).reversals.filter((x) => x.id === o.id), [], 'پس از لغو هنوز «برگشتِ بی‌لغو» است');
+  const pv = E.ok(await A.api('GET', `/shop/delivery/couriers/${c2}/settlement-preview`), 'پیش‌نمایشِ تسویه');
+  assert.equal(pv.rows.some((x) => x.assignmentId === a), false, 'مأموریتِ برگشتی در تسویهٔ پیک آمد');
+  const cs = E.ok(await A.api('GET', '/shop/delivery/couriers'), 'پیک‌ها').items.find((c) => c.id === c2);
+  assert.equal(cs.cashHeldMinor, 0, 'نقدِ پیک برای سفارشِ برگشتی');
+  assert.match((await track(o.token)).status, /restocked|returned_to_store/);
+}, { needs: ['DEL-01'] });
 
 await E.finish();
