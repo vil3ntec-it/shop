@@ -22,8 +22,18 @@ package ir.vil3ntec.tohid.core.orders
  *  همین را می‌گیرد و آزمونش (`OrderNotifyAcksTest`) بی دستگاه اجرا می‌شود.
  */
 
-/** اعلانی که سرور می‌گوید هنوز باز نشده — فقط آن‌چه برای نشان دادن و لمس لازم است. */
-data class OrderNotice(val id: String, val orderId: String, val orderNo: Long)
+/**
+ *  اعلانی که سرور می‌گوید هنوز باز نشده — فقط آن‌چه برای نشان دادن و لمس لازم است.
+ *  [event]: `order_created` (سفارشِ تازه) یا `order_review` (M5: «سفارش به بررسی رفت»)؛ ناشناخته ⇒ همان «تازه».
+ */
+data class OrderNotice(
+  val id: String,
+  val orderId: String,
+  val orderNo: Long,
+  val event: String = OrderNotifyAcks.EVENT_CREATED,
+) {
+  val isReview: Boolean get() = event == OrderNotifyAcks.EVENT_REVIEW
+}
 
 /** یک لمسِ در صف. */
 data class PendingAck(
@@ -53,7 +63,26 @@ object OrderNotifyAcks {
 
   enum class Outcome { ACKED, GONE, RETRY }
 
+  /** همان `EVENT` و `REVIEW_EVENT` ِ `server/src/lib/order-notify.js` */
+  const val EVENT_CREATED = "order_created"
+  const val EVENT_REVIEW = "order_review"
+
   fun validId(s: String): Boolean = ID.matches(s)
+
+  /**
+   *  عنوان و متنِ اعلان بر اساسِ رویداد — همان `messageFor` ِ سرور، بی دادهٔ مشتری (§۳۰.۱ بندِ ۴).
+   *  `order_review` «در بررسی» است، نه «سفارشِ تازه».
+   */
+  fun label(n: OrderNotice): Pair<String, String> {
+    val known = n.orderNo > 0
+    //  عنوانِ «در بررسی» همان `StockHold.notice` ِ نگهبان است
+    return if (n.isReview) {
+      (if (known) "سفارش به بررسی رفت — #${n.orderNo}" else "سفارش به بررسی رفت") to
+        "فروشِ حضوری کالای نگه‌داشتهٔ این سفارش را برد؛ برای تصمیم لمس کنید"
+    } else {
+      (if (known) "سفارشِ تازه #${n.orderNo}" else "سفارشِ تازه") to "برای دیدن و پذیرفتن لمس کنید"
+    }
+  }
 
   /** لمسِ اعلان ⇒ رسید در صف (تکراری ⇒ همان صف). شناسهٔ بدشکل ⇒ بی اثر. */
   fun tap(state: AckState, notifId: String, orderId: String, now: Long): AckState {

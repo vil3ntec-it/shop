@@ -388,6 +388,8 @@ private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepos
         saving = false
       }
     }, enabled = !saving, busy = saving, modifier = Modifier.fillMaxWidth())
+    //  M5: فقط با رزروِ نرمِ روشن دیده می‌شود؛ ذخیرهٔ جدا (تنظیمِ موجودی، نه ویترین)
+    ReserveTtlPanel(snackbar)
   }
 }
 

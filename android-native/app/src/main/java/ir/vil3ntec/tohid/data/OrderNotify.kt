@@ -34,6 +34,8 @@ import ir.vil3ntec.tohid.data.repo.OrderNotifyRepository
  *  ⛔ لمسِ اعلان ⇒ رسید همان لحظه در صفِ روی دستگاه ([OrderNotifyAcks]، آفلاین هم) و
  *  سفارش تازه از سرور باز می‌شود؛ صف با هر دورِ [tick] خالی می‌شود.
  *  ⛔ متنِ اعلان فقط شمارهٔ سفارش است — هیچ دادهٔ مشتری (§۳۰.۱ بندِ ۴).
+ *  ⛔ رویدادِ `order_review` (M5) «سفارش به بررسی رفت» است، نه «سفارشِ تازه» ([OrderNotifyAcks.label])، در
+ *  کانالِ «سفارش در بررسی» ِ نگهبان؛ و هر سفارش یک خبر، از هر راهی زودتر رسید ([Watchman.claimOrderReview]).
  */
 object OrderNotify {
 
@@ -112,7 +114,11 @@ object OrderNotify {
     val list = repository(context).pending().valueOrNull() ?: return
     var fresh: List<OrderNotice> = emptyList()
     update(context) { s -> OrderNotifyAcks.fresh(s, list).also { fresh = it.second }.first }
-    fresh.forEach { show(context, it) }
+    for (n in fresh) {
+      //  «به بررسی رفت» را نگهبان هم از `summary` می‌دهد: هر سفارش یک خبر، هر کدام زودتر (#429 × M6)
+      if (n.isReview && !Watchman.claimOrderReview(context, n.orderId)) continue
+      show(context, n)
+    }
   }
 
   private fun allowed(context: Context): Boolean =
@@ -122,7 +128,9 @@ object OrderNotify {
 
   private fun show(context: Context, n: OrderNotice) {
     if (!allowed(context)) return
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    //  «در بررسی» در کانالِ خودِ نگهبان، تا خاموش کردنِ آن کانال هر دو راه را ببندد
+    val channel = if (n.isReview) Watchman.orderReviewChannel(context) else CHANNEL
+    if (!n.isReview && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
       context.getSystemService(NotificationManager::class.java)?.createNotificationChannel(
         NotificationChannel(CHANNEL, "سفارشِ تازه", NotificationManager.IMPORTANCE_HIGH)
           .apply { description = "سفارشِ تازهٔ مشتری از ویترین" }
@@ -137,11 +145,11 @@ object OrderNotify {
     val pending = open?.let {
       PendingIntent.getActivity(context, noteId, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
-    val title = if (n.orderNo > 0) "سفارشِ تازه #${n.orderNo}" else "سفارشِ تازه"
-    val note = NotificationCompat.Builder(context, CHANNEL)
+    val (title, text) = OrderNotifyAcks.label(n)
+    val note = NotificationCompat.Builder(context, channel)
       .setSmallIcon(android.R.drawable.ic_dialog_info)
       .setContentTitle(title)
-      .setContentText("برای دیدن و پذیرفتن لمس کنید")
+      .setContentText(text)
       .setAutoCancel(true)
       .apply { pending?.let { setContentIntent(it) } }
       .build()

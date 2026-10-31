@@ -29,6 +29,7 @@ const { toMinor, toMilli } = require('./sync-v3-convert');
 const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
+const reserve = () => require('./stock-reserve');   // M5: رزروِ نرم (موجودیِ آزاد = دفتر − رزروِ فعال)
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
 const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems'];
 const PAGE = 5000;
@@ -374,8 +375,8 @@ async function retireOrderStock(c, shopId, at) {
   const touched = new Set();
   const none = { changed: false, touched: [], audit: null };
   const legacy = (await c.query(
-    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1)
-         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order') AS any`, [shopId]
+    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND kind='legacy')
+         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order' AND type='sale') AS any`, [shopId]
   )).rows[0];
   if (!legacy || !legacy.any) return none;
   let undoneMilli = 0;
@@ -398,7 +399,7 @@ async function retireOrderStock(c, shopId, at) {
   }
   const held = (await c.query(
     `UPDATE stock_reservations SET status='released', closed_at=$2, close_reason='reservations_retired'
-      WHERE shop_id=$1 AND status='held' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
+      WHERE shop_id=$1 AND status='held' AND kind='legacy' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
   )).rows;
   for (const r of held) {
     await stock.insertMove(c, shopId, {
@@ -411,7 +412,7 @@ async function retireOrderStock(c, shopId, at) {
   const tasks = await c.query(
     `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
             note=$3
-      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at, RETIRED_NOTE]
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed') AND dedupe NOT LIKE 'soft-short:%'`, [shopId, at, RETIRED_NOTE]
   );
   const undone = sold.length - keptWithW;
   const dismissed = tasks.rowCount || 0;
@@ -522,11 +523,10 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids)]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), reserve().heldOf(null, shopId, ids, at)]);
   const out = new Map();
-  //  فقط دفترِ همگام‌شدهٔ دستگاه‌ها — سفارشِ آنلاین هیچ رزرو و کسری ندارد
   for (const id of ids) {
-    out.set(id, badgeOf(ps.get(id), lvs.get(id), 0, settings, fr, settings.showQty === 'exact'));
+    out.set(id, badgeOf(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr, settings.showQty === 'exact'));
   }
   return out;
 }
@@ -585,8 +585,8 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page)]);
-  const items = page.map((id) => productView(ps.get(id), lvs.get(id), 0, settings, fr));
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page)]);
+  const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
   const last = items[items.length - 1];
   return {
     items, freshness: fr,
@@ -605,7 +605,7 @@ async function detail(shopId, productId) {
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  return { product: productView(p, lv, 0, settings, fr), lowByLocation: lows, freshness: fr };
+  return { product: productView(p, lv, (await reserve().heldOf(null, shopId, [id])).get(id) || 0, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
 function moveView(r) {
@@ -892,16 +892,16 @@ async function toStockLines(c, shopId, lines) {
  * **فقط سنجیده** می‌شوند — کالای ناموجود/غیرفعال/حذف‌شده (`product_unavailable`)، واحدِ
  * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
  * ⛔ هیچ رزرو، هیچ حرکت و هیچ نوشتنی (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل
- * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null.
+ * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null. M5 (`lib/stock-reserve.js`) ⇒ `hold`.
  */
-async function checkOrder(c, shopId, { lines, isTest = false }) {
+async function checkOrder(c, shopId, { lines, isTest = false, at = now() }) {
   if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
   const settings = await stock.settingsOf(shopId, c);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  return stock.check(c, shopId, { lines: sl, settings, names });
+  return reserve().checkOrderIn(c, shopId, { lines: sl, settings, names, at });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */

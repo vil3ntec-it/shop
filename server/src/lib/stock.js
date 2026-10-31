@@ -14,8 +14,9 @@
  *            می‌کند نه کم**. دکان کالا را از برنامهٔ خودش تحویل می‌دهد و همان‌جا فروشِ
  *            عادی ثبت می‌شود؛ این دفتر فقط آن‌چه دستگاه‌ها ثبت کرده‌اند را می‌خواند.
  *            «قابل‌فروش» = جمعِ موجودیِ مکان‌های قابل‌فروش (بخشِ ۳.۶). ساختِ سفارش فقط
- *            می‌سنجد (`check`)، بی نوشتن. جدولِ `stock_reservations` (migration 082)
- *            می‌ماند ولی دیگر نوشته یا شمرده نمی‌شود.
+ *            می‌سنجد (`check`)، بی نوشتن. استثنا (M5، تصمیمِ صاحب محصول ۱۴۰۵/۰۸/۰۸): با پرچمِ
+ *            خاموشِ `shop.stock_reserve` و موجودیِ تازه، رزروِ «نرم» با انقضا در
+ *            `stock_reservations` (`kind = soft`) — `lib/stock-reserve.js`.
  *   هم‌زمانی  همهٔ نوشتن‌های موجودیِ یک دکان پشتِ یک قفلِ تراکنشی (`catalog:<shop>`).
  *   دستگاه ── فروشِ ثبت‌شدهٔ دستگاه (آفلاین) با حالتِ `recorded` می‌نشیند:
  *            هرگز رد نمی‌شود؛ منفی شدن «وظیفهٔ بررسی» می‌سازد (INV-19).
@@ -29,6 +30,8 @@ const { ulid } = require('./ulid');
 const { ApiError, badRequest, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.catalog';
+//  M5: رزروِ نرمِ سفارشِ آنلاین (lib/stock-reserve.js) — جدا و پیش‌فرض خاموش
+const RESERVE_FLAG_KEY = 'shop.stock_reserve';
 const LOCATIONS = Object.freeze(['shop_floor', 'warehouse', 'damaged', 'in_transit']);
 //  فقط این دو می‌توانند «قابل‌فروش» باشند — خراب و در‌راه هرگز (§۳۲.۱)
 const SELLABLE_CHOICES = Object.freeze(['shop_floor', 'warehouse']);
@@ -56,9 +59,9 @@ function decode(v) {
 // ════════════════════════════════════════════════════════════════════
 
 /** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
-async function flagOf(shopId, c) {
+async function flagOf(shopId, c, key = FLAG_KEY) {
   const rows = (await runOf(c)(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [FLAG_KEY, 'all', String(shopId)]
+    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [key, 'all', String(shopId)]
   )).rows;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
@@ -105,7 +108,9 @@ async function saveSettings(shopId, body, userId, at) {
     }
     next.sellableLocations = [...b.sellableLocations];
   }
-  //  `reserveTtlSec` دیگر معنایی ندارد (سفارش رزرو نمی‌کند) — آمدنش نادیده گرفته می‌شود
+  //  `reserveTtlSec` فقط با رزروِ نرمِ روشن (M5، `shop.stock_reserve`) معنا دارد؛ خاموش ⇒ مثلِ پیش نادیده
+  const reserveOn = b.reserveTtlSec !== undefined && await flagOf(shopId, null, RESERVE_FLAG_KEY);
+  const ttl = reserveOn ? intIn(b.reserveTtlSec, 'مهلتِ نگه‌داشتنِ سفارشِ آنلاین (ثانیه)', 60, 86400) : null;
   if (b.staleAfterSec !== undefined) next.staleAfterSec = intIn(b.staleAfterSec, 'مهلتِ تازگیِ موجودی (ثانیه)', 60, 604800);
   if (b.showQty !== undefined) {
     if (!['hidden', 'exact'].includes(b.showQty)) throw badRequest('نمایشِ عدد: hidden یا exact', 'bad_setting');
@@ -133,6 +138,10 @@ async function saveSettings(shopId, body, userId, at) {
     [shopId, JSON.stringify(next.sellableLocations), next.staleAfterSec, next.showQty,
       next.prepMinutes, next.deviceLocation, next.syncSource, userId || '', at]
   );
+  if (ttl !== null) {
+    await query('UPDATE catalog_settings SET reserve_ttl_sec=$2 WHERE shop_id=$1', [shopId, ttl]);
+    next.reserveTtlSec = ttl;
+  }
   return next;
 }
 
@@ -298,8 +307,8 @@ async function postMove(c, shopId, m, at) {
 }
 
 /**
- * پس از هر دسته حرکت: «موجودیِ کم» (§۳۲.۲ بندِ ۷) وظیفه می‌سازد. (سفارش دیگر رزرو
- * نمی‌کند، پس «رزروِ بی‌پشتوانه» هم دیگر نیست.)
+ * پس از هر دسته حرکت: «موجودیِ کم» (§۳۲.۲ بندِ ۷) وظیفه می‌سازد، و با رزروِ نرمِ M5
+ * (`lib/stock-reserve.js`، پرچمِ خاموشِ `shop.stock_reserve`) «رزروِ بی‌پشتوانه» را به بررسی می‌برد.
  */
 async function checkProducts(c, shopId, ids, settings, at) {
   if (!ids.length) return;
@@ -326,6 +335,9 @@ async function checkProducts(c, shopId, ids, settings, at) {
       }
     }
   }
+  //  M5: رزروِ نرم — فروشِ تحویلِ رسیده ⇒ «انجام‌شده»؛ فروشِ حضوری که رزرو را برد ⇒ سفارش به بررسی
+  //  (فروش هرگز رد نمی‌شود، INV-19). بی رزروِ نرم ⇒ یک پرسشِ خالی.
+  await require('./stock-reserve').afterMovesIn(c, shopId, ids, settings, at);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -340,12 +352,12 @@ function fmtMilli(m) {
 function outOfStock(short) {
   const s = short[0];
   const what = s.name ? `«${s.name}»` : 'یکی از کالاها';
-  const err = conflict(
-    s.availableMilli > 0
-      ? `موجودیِ ${what} کافی نیست؛ اکنون فقط ${fmtMilli(s.availableMilli)} ${s.unit || 'واحد'} قابلِ سفارش است`
-      : `${what} اکنون موجود نیست`,
-    'out_of_stock'
-  );
+  let msg;
+  if (s.availableMilli > 0) msg = `موجودیِ ${what} کافی نیست؛ اکنون فقط ${fmtMilli(s.availableMilli)} ${s.unit || 'واحد'} قابلِ سفارش است`;
+  //  M5: موجودی هست ولی برای سفارشِ دیگری نگه داشته شده (رزروِ نرم، با انقضا)
+  else if (s.heldMilli > 0) msg = `${what} همین حالا برای سفارشِ دیگری نگه داشته شده است؛ اگر آزاد شود دوباره می‌توانید سفارش دهید`;
+  else msg = `${what} اکنون موجود نیست`;
+  const err = conflict(msg, 'out_of_stock');
   err.data = { lines: short };
   return err;
 }
@@ -360,14 +372,16 @@ function outOfStock(short) {
  * بیش از موجودی نمی‌فروشد (همان سیاستِ صندوق).
  * lines: [{ lineNo, productId, qtyMilli }] به واحدِ موجودی. کمبود ⇒ `out_of_stock` (۴۰۹).
  */
-async function check(c, shopId, { lines, settings, names = new Map() }) {
+async function check(c, shopId, { lines, settings, names = new Map(), held = null }) {
   const ids = [...new Set(lines.map((l) => l.productId))].sort();
   const lvs = await levelsOf(c, shopId, ids);
   const need = new Map();
   for (const l of lines) need.set(l.productId, (need.get(l.productId) || 0) + l.qtyMilli);
   const short = [];
   for (const pid of ids) {
-    const d = decide(pid, AGG, sellableOnHand(lvs.get(pid), settings), 0, {
+    //  M5 (`held`، فقط با رزروِ نرمِ روشن و موجودیِ تازه): رزروِ فعالِ سفارش‌های دیگر از آزاد کم می‌شود
+    const h = held ? Math.max(0, held.get(pid) || 0) : 0;
+    const d = decide(pid, AGG, sellableOnHand(lvs.get(pid), settings), h, {
       id: `check:${pid}`, type: 'reserve', qtyMilli: need.get(pid), userId: 'check', at: 1,
     }, 'local');
     if (!d.result.ok) {
@@ -376,6 +390,7 @@ async function check(c, shopId, { lines, settings, names = new Map() }) {
         productId: pid, name: n.name || '', unit: n.unit || '',
         lineNos: lines.filter((l) => l.productId === pid).map((l) => l.lineNo),
         requestedMilli: need.get(pid), availableMilli: d.result.availableMilli || 0,
+        ...(h > 0 && sellableOnHand(lvs.get(pid), settings) > 0 ? { heldMilli: h } : {}),
       });
     }
   }
@@ -472,7 +487,7 @@ async function reconcile(shopId, { productId = '' } = {}) {
 }
 
 module.exports = {
-  FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
+  FLAG_KEY, RESERVE_FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
   flagOf, settingsOf, saveSettings, lock, decide,
   levelsOf, freeOf, sellableOnHand, onHandAt, fmtMilli,
   insertMove, postMove, openTask, checkProducts,

@@ -36,6 +36,7 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
+import ir.vil3ntec.tohid.core.orders.StockHold
 import ir.vil3ntec.tohid.data.OrderFulfillment
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.invoiceLabel
@@ -89,6 +90,8 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   val rev = OrdersLive.rev.value
+  //  M5: بررسی ردیفِ سفارش را عوض نمی‌کند ⇒ با عوض شدنِ فهرستِ «در بررسی» هم تازه شود
+  val stockReview = OrdersLive.stockReview.value
 
   suspend fun load(reset: Boolean) {
     loading = true
@@ -102,7 +105,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       .onFailure { error = it.userMessage }
     loading = false
   }
-  LaunchedEffect(tab, rev, reload) { load(reset = true) }
+  LaunchedEffect(tab, rev, reload, stockReview) { load(reset = true) }
 
   //  راهِ ورودِ اعلان: سفارشِ خواسته‌شده باز می‌شود (جزئیات تازه از سرور)
   val pending = OrdersLive.pendingOrderId.value
@@ -132,6 +135,8 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       Spacer(Modifier.height(8.dp))
       FulfillNotice(title = OrdersLive.ROLLOUT_NOTE, body = "", action = null, onAction = {})
     }
+    //  M5: سفارشِ در بررسی (فروشِ حضوری کالای نگه‌داشته را برد) — `OrderStockReview.kt`
+    StockReviewBanner(stockReview, { openId = it }) { t, b, a, f -> FulfillNotice(t, b, a, f) }
     //  بررسیِ صاحب: کاری که خودکار نشد و نباید بشود (تحویلِ پیش از راه‌اندازی، برگشت پس از مرجوعی)
     val review = OrdersLive.review.value
     if (review.isNotEmpty() && cfg.permissions.refund) {
@@ -299,6 +304,7 @@ private fun OrderCard(o: OrderDto, now: Long, onOpen: () -> Unit) {
       Tag(OrderText.pay(o.paymentStatus, o.paymentMethod))
       Tag(OrderText.source(o.source))
       if (o.isTest) Tag("آزمایشی", warn = true)
+      if (o.stockReview) Tag(StockHold.label(StockHold.Phase.REVIEW), warn = true)
     }
     Spacer(Modifier.height(8.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -339,7 +345,7 @@ private fun OrderTableRow(o: OrderDto, now: Long, onOpen: () -> Unit) {
       Text(o.customer.name, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
       if (o.customer.phoneMasked.isNotEmpty()) Text(o.customer.phoneMasked, color = c.muted, style = MaterialTheme.typography.labelSmall)
     }
-    Box(Modifier.weight(COLS[2].second)) { OrderStatusPill(o.status) }
+    Column(Modifier.weight(COLS[2].second)) { OrderStatusPill(o.status); if (o.stockReview) Tag(StockHold.label(StockHold.Phase.REVIEW), warn = true) }
     cell(fulfillmentLabel(o), COLS[3].second, false)
     cell(o.itemsCount.toString(), COLS[4].second, false)
     cell(OrderText.pay(o.paymentStatus, o.paymentMethod), COLS[5].second, false)
@@ -379,10 +385,13 @@ private fun OrderDetailSheet(
   var act by remember(id) { mutableStateOf<String?>(null) }
   var busy by remember(id) { mutableStateOf(false) }
   var actError by remember(id) { mutableStateOf<String?>(null) }
+  //  دلیلِ ازپیش‌برگزیده برای پنجرهٔ گذار (M5: «ناموجود» برای سفارشِ در بررسی)
+  var actReason by remember(id) { mutableStateOf("") }
   val rev = OrdersLive.rev.value
+  val stockReview = OrdersLive.stockReview.value
 
   //  صفِ زنده: اگر کسِ دیگری وضعیت را عوض کرد، همین‌جا تازه می‌شود
-  LaunchedEffect(id, rev) {
+  LaunchedEffect(id, rev, stockReview) {
     repo.get(id)
       .onSuccess { order = it; error = null }
       .onFailure { if (order == null) { error = it.userMessage } }
@@ -483,6 +492,13 @@ private fun OrderDetailSheet(
         if (o.isTest) Tag("آزمایشی", warn = true)
       }
 
+      val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
+      o.stockHold?.let { hold ->
+        StockHoldNotice(o, hold, actions, ::orderStamp, { t, w -> Tag(t, w) }, { t, b, a, f -> FulfillNotice(t, b, a, f) }) { to, why ->
+          actError = null; actReason = why; act = to
+        }
+      }
+
       //  فروشِ تحویل در دفترِ دکان (موجودی فقط این‌جا کم می‌شود)
       val sold = OrderFulfillment.saleOf(ledger, o.id)
       if (sold != null) {
@@ -527,13 +543,12 @@ private fun OrderDetailSheet(
         )
       }
 
-      val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
       if (actions.isNotEmpty()) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
-            val click = { if (needsDialog) { actError = null; act = to } else send(to) }
+            val click = { if (needsDialog) { actError = null; actReason = ""; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)
             else TohidButton(OrderText.action(to), onClick = click, enabled = !busy)
           }
@@ -622,7 +637,7 @@ private fun OrderDetailSheet(
   val to = act
   if (o != null && to != null) {
     OrderActionDialog(
-      order = o, to = to, busy = busy, error = actError,
+      order = o, to = to, busy = busy, error = actError, initialReason = actReason,
       onDismiss = { act = null },
       onConfirm = { reason, note, ready -> send(to, reason, note, ready) },
     )
@@ -674,12 +689,13 @@ private fun OrderActionDialog(
   to: String,
   busy: Boolean,
   error: String?,
+  initialReason: String = "",
   onDismiss: () -> Unit,
   onConfirm: (reason: String, note: String, ready: Int?) -> Unit,
 ) {
   val c = Shop.colors
   val choices = remember(order.status, to) { OrderStates.reasonChoices(order.status, to) }
-  var reason by remember(to) { mutableStateOf(if (choices.size == 1) choices[0] else "") }
+  var reason by remember(to) { mutableStateOf(if (initialReason in choices) initialReason else if (choices.size == 1) choices[0] else "") }
   var note by remember(to) { mutableStateOf("") }
   var ready by remember(to) { mutableStateOf<Int?>(15) }
   val needReason = OrderStates.needsReason(to)

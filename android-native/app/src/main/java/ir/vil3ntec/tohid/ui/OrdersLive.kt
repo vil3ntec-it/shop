@@ -58,6 +58,12 @@ object OrdersLive {
   /** نشانگرِ تغییرِ صف — صفحهٔ باز با عوض شدنش فهرست را تازه می‌کند */
   val rev = mutableStateOf(0L)
 
+  /**
+   *  M5: سفارش‌های «در بررسی» از `summary` (فروشِ حضوری رزروِ نرمشان را برد). عوض شدنش هم فهرست و جزئیاتِ
+   *  باز را تازه می‌کند (بررسی ردیفِ سفارش را عوض نمی‌کند ⇒ [rev] تکان نمی‌خورد).
+   */
+  val stockReview = mutableStateOf<List<ir.vil3ntec.tohid.core.model.OrderReviewRefDto>>(emptyList())
+
   /** سفارشی که باید باز شود — راهِ ورودِ اعلان (§۳۰.۱ بندِ ۵): جزئیات همیشه تازه از سرور */
   val pendingOrderId = mutableStateOf<String?>(null)
 
@@ -378,6 +384,7 @@ object OrdersLive {
     if (cfg == null) {
       counts.value = emptyMap(); rev.value = 0
       unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList(); review.value = emptyList()
+      stockReview.value = emptyList()
     }
   }
 
@@ -387,6 +394,9 @@ object OrdersLive {
       .onSuccess {
         counts.value = it.counts
         rev.value = it.rev
+        if (it.review != stockReview.value) stockReview.value = it.review
+        //  «سفارش به بررسی رفت» — یک بار برای هر سفارش (Watchman حافظه دارد)
+        ir.vil3ntec.tohid.data.Watchman.checkOrderReview(context, it.review)
       }
       .onFailure { if (it.code == "orders_disabled") refreshConfig(context) }
   }

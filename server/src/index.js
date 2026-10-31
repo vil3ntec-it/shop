@@ -66,6 +66,8 @@ async function main() {
   orderNotify.start();
   //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
   require('./lib/order-timeout').start();
+  //  M5: جاروی رزروِ نرمِ گذشته (بی رزروِ نرم ⇒ یک پرسشِ خالی در دقیقه)
+  require('./lib/stock-reserve').start();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
