@@ -502,7 +502,7 @@ ok(size('kit/boot.js', 'kit/kit.js', 'market/market.js') < 75 * 1024, 'JS ِ ب�
 ok(size('kit/boot.js', 'kit/kit.js', 'store/store.js') < 75 * 1024, 'JS ِ ویترین زیرِ ۷۵KB', `${size('kit/boot.js', 'kit/kit.js', 'store/store.js')} بایت`);
 //  واژه‌نامه دادهٔ JSON است (نه اسکریپت) و فقط زبانِ همان صفحه بار می‌شود
 for (const l of ['fa', 'en', 'ps']) ok(size(`kit/i18n/${l}.json`) < 24 * 1024, `واژه‌نامهٔ ${l} کوچک است`, `${size(`kit/i18n/${l}.json`)} بایت`);
-const html = ['market/index.html', 'market/market.js', 'store/index.html', 'store/store.js', 'kit/kit.js'].map((f) => fs.readFileSync(path.join(pub, f), 'utf8')).join('\n');
+const html = ['market/index.html', 'market/market.js', 'store/index.html', 'store/store.js', 'store/order.js', 'kit/kit.js'].map((f) => fs.readFileSync(path.join(pub, f), 'utf8')).join('\n');
 ok(!/index\.html|\/admin\b|\/portal\b|\/pos\b/.test(html), 'هیچ پیوندی به برنامهٔ مدیریتِ دکان، پنل یا صندوق');
 ok(!/<script(?![^>]*\bsrc=)[^>]*>/i.test(html) && !/\sstyle=/.test(html) && !/\son[a-z]+=/i.test(html), 'بی اسکریپت، style یا رویدادِ درون‌خطی');
 const csp = (await fetch(`${base}/market/`)).headers.get('content-security-policy') || '';
