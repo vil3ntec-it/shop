@@ -31,6 +31,8 @@ data class DeskConfig(
   val reasons: Map<String, List<String>> = emptyMap(),
   val defaultCashCapMinor: Long = 0,
   val perms: DeskPerms = DeskPerms(),
+  /** پرچمِ خاموشِ `shop.orders.picking` (PCK): QRِ کدِ تحویل و پذیرشِ اسکنِ آن (PCK-11) */
+  val picking: Boolean = false,
 )
 
 /** پیکِ دکان با نقدِ در دستش (DLV-11) */

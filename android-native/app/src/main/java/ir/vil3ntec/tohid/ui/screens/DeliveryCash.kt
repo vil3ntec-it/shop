@@ -61,6 +61,7 @@ internal fun ColumnScope.CouriersTab(
   var settleFor by remember { mutableStateOf<CourierRow?>(null) }
   var ledgerFor by remember { mutableStateOf<CourierRow?>(null) }
   var capFor by remember { mutableStateOf<CourierRow?>(null) }
+  var reportOpen by remember { mutableStateOf(false) }
 
   if (d.couriers.isEmpty()) {
     TohidEmptyState(
@@ -72,6 +73,10 @@ internal fun ColumnScope.CouriersTab(
   }
   if (!cfg.perms.settle) {
     Text("تسویه و دفترِ تسویه‌ها فقط با صاحب یا مدیرِ دکان است.", style = MaterialTheme.typography.bodySmall, color = c.muted)
+    Spacer(Modifier.height(6.dp))
+  } else {
+    //  RPT-15: گزارشِ نقدِ همهٔ پیک‌ها در یک بازه
+    TohidSecondaryButton("گزارشِ نقدِ پیک‌ها", onClick = { reportOpen = true })
     Spacer(Modifier.height(6.dp))
   }
   LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -119,6 +124,7 @@ internal fun ColumnScope.CouriersTab(
     })
   }
   ledgerFor?.let { cr -> LedgerSheet(cr, repo) { ledgerFor = null } }
+  if (reportOpen) CashReportSheet(repo) { reportOpen = false }
   capFor?.let { cr ->
     CourierCapDialog(cr, repo, onDismiss = { capFor = null }, onDone = {
       capFor = null
