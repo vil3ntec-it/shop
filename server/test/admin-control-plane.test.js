@@ -230,6 +230,17 @@ const MOUNTS = {
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
   'admin-service-keys.js': '/admin/service-keys',
+  //  پوستهٔ کنسول (جست‌وجوی سراسری)
+  'admin-search.js': '/admin/search',
+  //  پنلِ مرکزی ۴.۶ و ۴.۷
+  'admin-market.js': '/admin/market',
+  'admin-delivery.js': '/admin/delivery',
+  //  پنلِ مرکزی، ماژول‌های عملیات (۴.۸–۴.۱۱، ۴.۱۳)
+  'admin-ops.js': '/admin/ops',
+  //  ماژولِ ۴.۵ ِ پنلِ مرکزی
+  'admin-finance.js': '/admin/finance',
+  //  مدیرانِ سکو (از `admin.js` جدا شد تا زیرِ سقفِ ۸۰۰ خط بماند؛ همان مسیرها)
+  'admin-admins.js': '/admin/admins',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -345,6 +356,20 @@ const CAPABILITY_PROBES = {
   'flags.v1': ['GET /admin/flags', 'GET /admin/flags/history'],
   'service-key.v1': ['GET /admin/service-keys', 'POST /admin/service-keys', 'POST /admin/service-keys/x1/revoke'],
   'actor.v1': ['GET /admin/me'],
+  'admin-sessions.v1': ['GET /admin/admins/x1/sessions', 'POST /admin/admins/x1/sessions/revoke'],
+  'search.v1': ['GET /admin/search?q=ab'],
+  'market-admin.v1': ['GET /admin/market/overview', 'GET /admin/market/sellers', 'GET /admin/market/orders',
+    'GET /admin/market/commission', 'GET /admin/market/history'],
+  'delivery-watch.v1': ['GET /admin/delivery/overview', 'GET /admin/delivery/queue', 'GET /admin/delivery/events',
+    'GET /admin/delivery/connectivity', 'GET /admin/delivery/report', 'GET /admin/delivery/thresholds',
+    'PUT /admin/delivery/thresholds'],
+  'ops.v1': ['GET /admin/ops/releases', 'GET /admin/ops/health', 'GET /admin/ops/integrations', 'GET /admin/ops/incidents',
+    'GET /admin/ops/alerts', 'POST /admin/ops/alerts/evaluate', 'POST /admin/ops/incidents/x1/status', 'POST /admin/ops/alerts/x1/ack'],
+  //  فقط وقتی OPS-01 (#559) در همین نسخه است
+  ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
+    ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
+  'finance.v1': ['GET /admin/finance/summary', 'GET /admin/finance/payments', 'POST /admin/finance/adjustments',
+    'GET /admin/finance/discrepancies', 'GET /admin/finance/export'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

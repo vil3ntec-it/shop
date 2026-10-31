@@ -135,9 +135,11 @@
 | `POST /admin/purchase-requests/:id/approve` | مدیر | درخواستِ یک دکان | دارد | مالی/اشتراک | G2, G3 | `admin.js:604` |
 | `POST /admin/purchase-requests/:id/reject` | مدیر | درخواستِ یک دکان | دارد (+دلیلِ اختیاری) ★ | مالی/اشتراک | G3 | `admin.js:618` |
 | `GET /admin/audit` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:635` |
-| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin.js:645` |
-| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin.js:662` |
-| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin.js:671` |
+| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin-admins.js` |
+| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins/:id/sessions` | ارشد | سراسری | — | خواندنِ سراسری (بی توکن، فقط ۱۶ نویسهٔ هش) | — | `admin-admins.js` |
+| `POST /admin/admins/:id/sessions/revoke` | ارشد | سراسری | دارد (+دلیل) | عملیات | — | `admin-admins.js` |
 | `GET /admin/backups` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:690` |
 | `POST /admin/backups` | ارشد | سراسری | دارد | خروجی/بازگردانی | — | `admin.js:700` |
 | `GET /admin/2fa` | مدیر | سراسری | — | نشست | G5 | `admin-2fa.js:49` |
@@ -278,8 +280,20 @@
 | `GET /admin/service-keys` ◆ | ارشدِ انسانی | سراسری | — | خواندنِ سراسری | — | `admin-service-keys.js` |
 | `POST /admin/service-keys` ◆ | ارشدِ انسانی + دلیل | سراسری | دارد | راز (یک‌بار دیده) | — | `admin-service-keys.js` |
 | `POST /admin/service-keys/:keyId/revoke` ◆ | ارشدِ انسانی + دلیل (کلیدِ مالک: فقط مالک) | سراسری | دارد | راز | — | `admin-service-keys.js` |
+| `GET /admin/market/overview` ▲ | مدیر (+ مالی، فقط‌خواندن) | سراسری | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-market.js` |
+| `GET /admin/market/sellers` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ فراداده | — | `admin-market.js` |
+| `GET /admin/market/orders` ▲ | مدیر (+ مالی) | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی نام/شماره/نشانیِ مشتری) | — | `admin-market.js` |
+| `GET /admin/market/commission` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ مالی | — | `admin-market.js` |
+| `GET /admin/market/history` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سابقه | — | `admin-market.js` |
+| `GET /admin/delivery/overview` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `GET /admin/delivery/queue` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-delivery.js` |
+| `GET /admin/delivery/events` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندن (بی یادداشت و کد) | — | `admin-delivery.js` |
+| `GET /admin/delivery/connectivity` ▲ | مدیر | سراسری | — | خواندنِ فراداده | — | `admin-delivery.js` |
+| `GET /admin/delivery/report` ▲ | مدیر (+ مالی) | سراسری | دارد (`admin.delivery_report_viewed`) | خواندنِ مالی | — | `admin-delivery.js` |
+| `GET /admin/delivery/thresholds` ▲ | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `PUT /admin/delivery/thresholds` ▲ | ارشد + دلیل | سراسری | دارد + تاریخچه (`live_config`) | عملیات | — | `admin-delivery.js` |
 
-◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
+◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). ▲ = ماژول‌های ۴.۶ و ۴.۷ (بند ۱۲.۸). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
 `PUT/DELETE /admin/pump/live-config` و `PUT /admin/release/beta` تاریخچه می‌نویسند (دلیلِ اختیاری).
 
 ---
@@ -430,3 +444,66 @@
 - **مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`** با توکنِ معتبرِ مدیر (پیش‌تر ۴۰۱ `invalid_token` از `routes/data` ⇒ پل
   «نشست تمام شد» می‌خواند). بی‌توکن و توکنِ دکان همان ۴۰۱ (وجودِ مسیر گفته نمی‌شود). خطِ آخرِ درهای `/admin` در `app.js`.
 - **`GET /admin/shops`:** `total` همان `q` و `hold` را می‌شمارد (یک WHERE برای ردیف‌ها و شمار).
+
+### ۱۲.۷ پوستهٔ کنسولِ «فروشگاه» ِ پنل (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-shell-api`)
+
+دو «توانایی» ِ تازه برای ماژول‌های ۴.۳ و ۴.۱۲ و جست‌وجوی سراسریِ پنل (ریپوی `server`، شاخهٔ `claude/console-shell`):
+
+- **`admin-sessions.v1`:** `GET /api/admin/admins/:id/sessions` (نشست‌های باز: ۱۶ نویسهٔ آغازِ SHA-256 ِ توکن، `issuedAt`،
+  `expiresAt`، `current` — نه توکن، نه هشِ کامل) و `POST …/sessions/revoke` `{sessionId?, reason}` (یکی یا همه؛ دلیل اجباری؛
+  نشستِ پیدانشده ⇒ ۴۰۴ `session_not_found`). فقط ارشد؛ کلیدِ سرویس هرگز (`SERVICE_DENY`). نشست‌های **مالکِ اصلی** را فقط خودش
+  می‌بندد (`owner_protected`). سابقه: `admin.admin_sessions_revoked` با شمار و دلیل.
+- **`search.v1`:** `GET /api/admin/search?q=&limit=` (`routes/admin-search.js`) — دکان، کاربر، پرداخت، سفارش (فقط شناسه/شمارهٔ
+  سفارش؛ نام و تلفنِ خریدار جست‌وجو نمی‌شود)، خطا، و مدیر فقط برای ارشدِ **انسانی**. نوع‌ها به نقش (`KINDS_BY_ROLE`): مالی
+  فقط دکان و پرداخت (`FINANCE` ِ `lib/admin-roles.js`). `%`/`_` ِ ورودی حرفِ معمولی است؛ کوتاه‌تر از ۲ نویسه ⇒ ۴۰۰.
+- **سابقهٔ نقش و تنظیم:** `PATCH /admin/admins/:id` ⇒ `detail.from` (نقش/وضعیتِ پیشین) و `reason`؛ `POST /admin/admins` بی نقش
+  ⇒ `viewer` (کمینهٔ دسترسی، پیش‌تر `admin`)؛ `PATCH /admin/config` ⇒ `detail.changes` («پیشین ⇒ تازه») و `reason`.
+- **پرچمِ شناخته نوع‌دار:** `PUT /admin/flags` برای کلیدِ کاتالوگ فقط مقدارِ هم‌نوعِ پیش‌فرض (بولی، یا فهرستِ شناسه برای
+  `beta.*`) و فقط در scope ِ خودش (`shop` ⇒ `all` یا دکانِ موجود؛ `all` ⇒ `all`؛ `security`/`release` ⇒ همان) — وگرنه
+  `bad_flag_value` / `bad_flag_scope`. کلیدِ ناشناخته همان رفتارِ پیشین.
+- **برای #582 (ماتریسِ جداسازی)،** هر کدام که دوم مرج شود: `'GET /api/admin/search': { exempt: 'جست‌وجوی سکوی مدیر به نقش؛ فقط
+  شناسه و نامِ نمایشی، بی دفتر یا متنِ دکان' }` و `'GET /api/admin/admins/:id/sessions': { exempt: 'نشستِ مدیرِ سکو، نه دادهٔ دکان' }`.
+
+آزمون: `test/console-shell.test.js` (۶ بند، سرخ روی پایه ⇐ سبز) و `CAPABILITY_PROBES` ِ `admin-control-plane.test.js`.
+### ۱۲.۸ بازار (۴.۶) و نظارت بر پیک (۴.۷) — سمتِ مدیر (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-market-api`)
+
+- **توانایی‌ها:** `market-admin.v1` (`/admin/market/*`) و `delivery-watch.v1` (`/admin/delivery/*`). همه خواندنی‌اند جز
+  `PUT /admin/delivery/thresholds` (فقط ارشد + دلیل؛ تکرارِ همان مقدار ⇒ `unchanged` بی ردیفِ دوم در تاریخچه).
+- **نوشتنِ بازار درِ تازه ندارد:** تعلیقِ فروشنده = حالتِ `service_disabled` با سرویسِ `market.directory` (یا `shop.storefront`)
+  از همان `/admin/shops/:id/holds` (بند ۱۲.۱)؛ تصمیمِ پرونده و برداشتنِ جریمه همان `/admin/trust/*` (فقط ارشد، دلیل).
+- **مدل همان است که هست:** فروشنده = دکانِ VILL3N (فروشندهٔ مستقل در مدل نیست ⇒ `null`)؛ «تأییدِ فروشنده» نیست (بودن در فهرست
+  را صاحبِ دکان روشن می‌کند و سامانه با پرچم/حالت/جریمه می‌بندد ⇒ `gates` و `blockedBy`)؛ سفارشِ بازار تک‌دکانی؛ کمیسیون و
+  سبدِ چنددکانی فقط با ستون‌های مهاجرتِ ۱۳۰ (#432) ⇒ تا آن‌وقت `inModel: false`، نه صفر.
+- **«گیر کرده / ناهم‌خوان / اختلاف»** فقط از `lib/order-watch.js` (خالص؛ همان دو ماشینِ وضعیت). آستانه‌ها در `live_config`
+  (`console.delivery_thresholds`، scope ِ `all`)؛ مقدارِ نامعتبر ⇒ پیش‌فرض و `source: 'default'`.
+- **بی دادهٔ شخصی:** هیچ پاسخی نام، شماره، نشانی یا یادداشتِ مشتری و هیچ کد/هشِ تحویل ندارد (آزمونِ `admin-market-delivery`).
+- **گزارشِ کارکرد** با تعریف‌های RPT-15 (#554) و تطبیقِ مدیر (#411): «گرفته» از `delivered_at`، «تسویه» از `created_at` ِ سند،
+  «در دست» = تحویل‌شدهٔ تسویه‌نشده؛ جمعِ ردیف‌ها = جمعِ کل؛ دیدنش یک ردیفِ سابقه.
+- **مهاجرتِ ۱۷۲:** فقط نمایه برای پرسش‌های بی‌دکانِ مدیر، با خط‌های `rollback:` ِ آزموده.
+
+### ۱۲.۹ مالیِ مرکزی — ماژولِ ۴.۵ (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-finance-api`، مهاجرتِ ۱۷۱)
+
+پولِ اشتراکِ **خودِ پلتفرم**، جدا از حساب‌داریِ داخلیِ دکان‌ها. توانایی: `finance.v1`. همه زیرِ `requireAdmin` و مرزِ
+`lib/admin-roles.js` (finance: همهٔ این درها؛ viewer: فقط GET)؛ نوشتن و خروجی در خودِ در به `superadmin`/`finance`
+بسته است (`requireFinanceWriter`) — مدیرِ عادی (پشتیبانی) نه.
+
+| در | شرح |
+|---|---|
+| `GET /api/admin/finance/summary` | `group=day\|week\|month`، `calendar=persian\|gregorian`، `fromDate`/`toDate` (یا `from`/`to`)، `app` ⇒ جمعِ هر ارز (پرداخت، اصلاح، بازپرداخت، ابطال، خالص)، سطل‌ها به وقتِ `DEFAULT_TIMEZONE` (هفته از شنبه، ماهِ خورشیدی)، به تفکیکِ بخش و روش. حداکثر ۷۳۲ روز و ۴۰۰ سطل |
+| `GET …/breakdown?by=shop\|plan` | تفکیکِ بازه، صفحه‌بندیِ سمتِ سرور (`limit`/`offset`، `total`) |
+| `GET …/payments` · `…/payments/:id` | دفترِ پرداخت با نشانگر (`paid_at`، `id`) و پالایش؛ یک پرداخت + سندها + `sub_payment_revisions` + سابقه |
+| `GET …/adjustments` · `POST …/adjustments` | سندها؛ ساختنِ سند `{paymentId, kind: correction\|refund\|reversal\|reference, amount?, reference?, reason, expectedNet?}` + `Idempotency-Key` |
+| `GET …/receivables` | بدهی = قیمتِ اشتراک (یا قیمتِ پلن در روزِ آغاز، همان قاعدهٔ `/sales/debts`) − (پرداخت + سند) **به همان ارز**؛ فعال/معلق |
+| `GET …/pending` · `…/gateway` | درخواست‌های خرید با قیمتِ برآوردی؛ درگاهِ حساب‌پی (`payment_intents` ِ #518/#529): بی جدول یا بی کلید ⇒ `state: blocked_external` با پیامِ «BLOCKED-EXTERNAL: کلیدِ حساب‌پی نیامده»، وگرنه شمارِ هر وضعیت، «بی شمارهٔ تراکنش» و «نیازمندِ بررسی» |
+| `GET …/discrepancies` | پرداختِ بی اشتراک، اشتراک/دکانِ ناپیدا، ارزِ ناهمسان، رسیدِ تکراری، ویرایش/حذفِ راهِ پیشین، سندِ پرداختِ حذف‌شده، شمارهٔ تراکنشِ تکراری، بیش‌پرداخت، درگاه (اگر زنده) — هر یافته با شمارِ دقیق و تا ۵۰ نمونه |
+| `GET …/history` | ردیف‌های سابقهٔ کارهای مالی با نشانگر |
+| `GET …/export?dataset=payments\|adjustments` | `{csv, rows, nextCursor, filename}` — حداکثر ۵۰۰۰ ردیف در هر صفحه، BOM، خنثیِ فرمول، یک ردیفِ سابقه برای هر صفحه |
+
+- ⛔ **احرازِ دوباره برای سند:** نشستی که در `REAUTH_WINDOW_MIN` ساخته شده، یا `password` ِ همان مدیر (۵ اشتباه در ربع ساعت ⇒ ۴۲۹،
+  هر اشتباه یک ردیفِ `admin.finance_reauth_failed`)؛ پلِ پنل با کلیدِ سرویس ⇒ `X-Actor-Reauth-At` (زمانِ رمزِ پنل، تازه‌تر از همان
+  پنجره) — به همان اندازه معتبر که کلیدِ سرویس. رمز هرگز در هشِ کلیدِ یکتایی یا هیچ ردیفی نمی‌نشیند.
+- ⛔ **جدول‌ها فقط افزودنی** (تریگرِ `finance_refuse_change`)؛ `sub_payments_revision` هر UPDATE/DELETE ِ `sub_payments` را با ردیفِ
+  پیش و پس نگه می‌دارد. **خالص هرگز منفی** (قید + قفلِ ردیفِ پرداخت)؛ ابطال = همهٔ خالصِ همان لحظه.
+- ⚠️ وقتی #582 (`tenant-matrix.test.js`) مرج شد، درهای `GET /api/admin/finance/*` باید در `ADMIN_SUBJECT` رده بگیرند (دادهٔ پولیِ
+  پلتفرم به‌ازای دکان؛ فقط مدیر).
+
