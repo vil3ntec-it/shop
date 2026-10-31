@@ -337,6 +337,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
+    //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    api.use('/store', require('./routes/pick-substitutes-store'));
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)

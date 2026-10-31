@@ -15,6 +15,8 @@
  *   حساب (PCK-07) ──── پیدانشده/حذف ⇒ صفر؛ «کم» ⇒ مقدارِ برداشته. کسرِ خودکار = جمعِ پیشین − جمعِ تازه؛
  *                     تخفیفِ سفارش از جمعِ تازه بیشتر نمی‌شود؛ هزینهٔ ارسال همان. مشتری هرگز بیش از
  *                     آن‌چه برداشته شده نمی‌پردازد.
+ *   جایگزین (PCK-05/06) ─ فقط هم‌دسته، هم‌حلال، هم‌نوعِ واحد؛ قیمتِ واحدِ کمتر؛ پس از مهلت ترجیحِ مشتری
+ *                     (فقط «بهترین مشابه» = پذیرش). بردارِ جدا: `core/test-vectors/pick-sub-v1.json`.
  */
 
 /** همان قاعدهٔ یگانهٔ گردکردنِ §۳.۴ (`order-states.lineTotalMinor`): گرد به یک افغانی، نیمه به سمتِ +∞. */
@@ -152,9 +154,9 @@ function weighVerdict(orderedMilli, actualMilli, toleranceBp = DEFAULT_TOLERANCE
 //  PCK-07 — حسابِ پس از جمع‌آوری
 // ════════════════════════════════════════════════════════════════════
 
-/** مقدارِ فروختنیِ یک قلم پس از جمع‌آوری */
+/** مقدارِ فروختنیِ یک قلم پس از جمع‌آوری (جایگزینِ پذیرفته‌شده = مقدارِ جایگزین، PCK-05/06) */
 function finalQty(l) {
-  if (l.status === 'picked' || l.status === 'short') return Math.max(0, Number(l.pickedQtyMilli) || 0);
+  if (l.status === 'picked' || l.status === 'short' || l.status === 'substituted') return Math.max(0, Number(l.pickedQtyMilli) || 0);
   return 0;
 }
 
@@ -178,7 +180,8 @@ function settle({ lines, discountMinor = 0, deliveryFeeMinor = 0 }) {
     subtotal += total;
     original += Number(l.originalTotalMinor) || 0;
     if (qty === 0) removed.push(Number(l.lineNo));
-    else if (qty !== Number(l.orderedQtyMilli) || total !== Number(l.originalTotalMinor)) changed.push(Number(l.lineNo));
+    //  جایگزین همیشه «تغییر» است — کالا عوض شده، حتی اگر مقدار و مبلغ همان باشد
+    else if (l.status === 'substituted' || qty !== Number(l.orderedQtyMilli) || total !== Number(l.originalTotalMinor)) changed.push(Number(l.lineNo));
   }
   const discount = Math.min(Math.max(Number(discountMinor) || 0, 0), subtotal);
   const fee = Math.max(Number(deliveryFeeMinor) || 0, 0);
@@ -194,6 +197,88 @@ function settle({ lines, discountMinor = 0, deliveryFeeMinor = 0 }) {
     changedLines: changed,
     pending,
   };
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  PCK-05/06 — جایگزینِ امن، قیمتِ شفاف و ترجیحِ مشتری پس از مهلت
+//  ⛔ دوقلوی `core/.../core/pick/PickSubstitute.kt` با بردارِ `core/test-vectors/pick-sub-v1.json`.
+// ════════════════════════════════════════════════════════════════════
+
+/** حلال بودن: `halal`، `non_halal` یا '' (نامعلوم). هر چیزِ دیگر نامعلوم است. */
+function halalOf(v) {
+  const s = String(v == null ? '' : v).trim().toLowerCase();
+  return s === 'halal' || s === 'non_halal' ? s : '';
+}
+
+/** دسته برای سنجش: رقمِ لاتین، یک فاصله، بی فاصلهٔ دو سر، حروفِ کوچک */
+function normCategory(v) {
+  return latin(v).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+/**
+ * آیا `cand` جایگزینِ امنِ `orig` است؟ ⇒ null (مجاز) یا کدِ دلیل. هر دو:
+ * `{productId, category, subcategory, halal, unit, priceMinor}` (`priceMinor` ِ اصل = قیمتِ واحدِ سفارش).
+ *   • همان کالا نه؛ دسته باید معلوم و یکی باشد؛ اگر اصل زیردسته دارد، جایگزین همان زیردسته را؛
+ *   • حلال/غیرحلال/نامعلوم باید یکی باشد (نامعلوم با حلال یکی نیست — اثبات نشده)؛
+ *   • وزنی با شمارشی جایگزین نمی‌شود؛ جایگزینِ بی قیمت نه.
+ */
+function substituteBlock(orig, cand) {
+  if (!cand || !cand.productId) return 'not_found';
+  if (orig.productId && String(cand.productId) === String(orig.productId)) return 'same_product';
+  const ca = normCategory(orig.category);
+  const cb = normCategory(cand.category);
+  if (!ca || !cb) return 'category_unknown';
+  if (ca !== cb) return 'category_mismatch';
+  const sa = normCategory(orig.subcategory);
+  if (sa && normCategory(cand.subcategory) !== sa) return 'subcategory_mismatch';
+  if (halalOf(orig.halal) !== halalOf(cand.halal)) return 'halal_mismatch';
+  if (isWeighedUnit(orig.unit) !== isWeighedUnit(cand.unit)) return 'unit_mismatch';
+  const p = cand.priceMinor;
+  if (typeof p !== 'number' || !Number.isSafeInteger(p) || p <= 0) return 'no_price';
+  return null;
+}
+
+/**
+ * قاعدهٔ قیمتِ شفاف: مشتری قیمتِ واحدِ **کمتر** را می‌پردازد (اصلِ سفارش یا جایگزین)، با همان
+ * گردکردنِ §۳.۴. مقدار هرگز بیش از سفارش نیست (فراخواننده می‌سنجد) ⇒ جمع هرگز بیش از قلمِ اصل.
+ */
+function substituteCharge(origUnitPriceMinor, candUnitPriceMinor, qtyMilli) {
+  const unit = Math.min(Number(origUnitPriceMinor), Number(candUnitPriceMinor));
+  return { chargedUnitPriceMinor: unit, totalMinor: lineTotalMinor(qtyMilli, unit) };
+}
+
+/**
+ * پیشنهادِ جایگزین‌ها (S37: دو تا): فقط امن‌ها؛ هم‌برند پیش‌تر، سپس نزدیک‌ترین قیمت، سپس نام و شناسه.
+ * ⇒ شناسه‌ها به ترتیب.
+ */
+function rankSubstitutes(orig, cands, limit = 2) {
+  const brand = normCategory(orig.brand);
+  const price = Number(orig.priceMinor) || 0;
+  const ok = (cands || []).filter((c) => substituteBlock(orig, c) === null).map((c) => ({
+    id: String(c.productId), name: String(c.name || ''),
+    same: brand !== '' && normCategory(c.brand) === brand ? 0 : 1,
+    gap: Math.abs(Number(c.priceMinor) - price),
+  }));
+  ok.sort((a, b) => (a.same - b.same) || (a.gap - b.gap)
+    || (a.name === b.name ? 0 : (a.name < b.name ? -1 : 1)) || (a.id === b.id ? 0 : (a.id < b.id ? -1 : 1)));
+  const n = Math.max(0, Math.trunc(Number(limit) || 0));
+  return ok.slice(0, n).map((c) => c.id);
+}
+
+/** ترجیحِ جایگزینیِ مشتری (CHK-15): ''، best_match، specific، none، refund */
+const PREFERENCES = Object.freeze(['', 'best_match', 'specific', 'none', 'refund']);
+
+/** مشتری گفته «جایگزین نه» ⇒ پیشنهاد فرستاده نمی‌شود؛ قلم حذف و کسر می‌شود (PCK-07). */
+function proposable(preference) {
+  return preference !== 'none' && preference !== 'refund';
+}
+
+/**
+ * مشتری تا پایانِ مهلت جواب نداد ⇒ ترجیحِ ذخیره‌شده: فقط «بهترین مشابه» یعنی پذیرش؛ «کالای مشخص»
+ * (سرور نمی‌داند همین است)، بی ترجیح و بقیه ⇒ رد (حذف و کسر). هرگز بی رضایت گران‌تر نمی‌شود.
+ */
+function timeoutDecision(preference) {
+  return preference === 'best_match' ? 'accept' : 'reject';
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -243,4 +328,5 @@ module.exports = {
   DEFAULT_TOLERANCE_BP, MAX_TOLERANCE_BP, WEIGHT_UNITS,
   lineTotalMinor, latin, locPart, compareNatural, pickOrder, normBarcode, barcodeMatches,
   isWeighedUnit, weighVerdict, finalQty, settle, metrics,
+  PREFERENCES, halalOf, normCategory, substituteBlock, substituteCharge, rankSubstitutes, proposable, timeoutDecision,
 };

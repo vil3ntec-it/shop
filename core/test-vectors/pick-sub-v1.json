@@ -1,0 +1,162 @@
+{
+  "version": 1,
+  "about": "PCK-05/06 — جایگزینِ امن، قیمتِ شفاف و ترجیحِ مشتری پس از مهلت. خوانندگان: server/test/pick-sub-core.test.js (pick-core.js) و PickSubstituteVectorsTest (PickSubstitute.kt). هر تغییر در هر دو.",
+  "block": [
+    { "name": "هم‌دسته، هر دو نامعلومِ حلال، هر دو شمارشی ⇒ مجاز",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000 },
+      "want": null },
+    { "name": "همان کالا",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "want": "same_product" },
+    { "name": "شناسهٔ خالی",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "want": "not_found" },
+    { "name": "اصل بی دسته",
+      "orig": { "productId": "x", "category": "  ", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000 },
+      "want": "category_unknown" },
+    { "name": "جایگزین بی دسته",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "y", "category": "", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000 },
+      "want": "category_unknown" },
+    { "name": "دستهٔ دیگر",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "soap", "category": "بهداشتی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 4000 },
+      "want": "category_mismatch" },
+    { "name": "دسته با فاصله و حروفِ بزرگ همان است",
+      "orig": { "productId": "a", "category": " Food   Items ", "subcategory": "", "halal": "", "unit": "pcs", "priceMinor": 1000 },
+      "cand": { "productId": "b", "category": "food items", "subcategory": "", "halal": "", "unit": "pcs", "priceMinor": 900 },
+      "want": null },
+    { "name": "رقمِ فارسی در دسته همان رقمِ لاتین است",
+      "orig": { "productId": "a", "category": "قفسه ۲", "subcategory": "", "halal": "", "unit": "دانه", "priceMinor": 1000 },
+      "cand": { "productId": "b", "category": "قفسه 2", "subcategory": "", "halal": "", "unit": "دانه", "priceMinor": 1000 },
+      "want": null },
+    { "name": "زیردستهٔ دیگر",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "روغن", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "vin", "category": "خوراکی", "subcategory": "سرکه", "halal": "", "unit": "بوتل", "priceMinor": 9000 },
+      "want": "subcategory_mismatch" },
+    { "name": "اصل زیردسته دارد و جایگزین ندارد ⇒ اثبات نشده",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "روغن", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000 },
+      "want": "subcategory_mismatch" },
+    { "name": "اصل بی زیردسته ⇒ فقط دسته",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "روغن", "halal": "", "unit": "بوتل", "priceMinor": 32000 },
+      "want": null },
+    { "name": "حلال با غیرحلال نه",
+      "orig": { "productId": "m1", "category": "گوشت", "subcategory": "", "halal": "halal", "unit": "کیلو", "priceMinor": 50000 },
+      "cand": { "productId": "m2", "category": "گوشت", "subcategory": "", "halal": "non_halal", "unit": "کیلو", "priceMinor": 40000 },
+      "want": "halal_mismatch" },
+    { "name": "حلال با نامعلوم نه",
+      "orig": { "productId": "m1", "category": "گوشت", "subcategory": "", "halal": "halal", "unit": "کیلو", "priceMinor": 50000 },
+      "cand": { "productId": "m3", "category": "گوشت", "subcategory": "", "halal": "", "unit": "کیلو", "priceMinor": 40000 },
+      "want": "halal_mismatch" },
+    { "name": "نامعلوم با غیرحلال نه",
+      "orig": { "productId": "m4", "category": "گوشت", "subcategory": "", "halal": "", "unit": "کیلو", "priceMinor": 50000 },
+      "cand": { "productId": "m2", "category": "گوشت", "subcategory": "", "halal": "non_halal", "unit": "کیلو", "priceMinor": 40000 },
+      "want": "halal_mismatch" },
+    { "name": "هر دو حلال (حروف و فاصله بی‌اثر)",
+      "orig": { "productId": "m1", "category": "گوشت", "subcategory": "", "halal": " HALAL ", "unit": "کیلو", "priceMinor": 50000 },
+      "cand": { "productId": "m5", "category": "گوشت", "subcategory": "", "halal": "halal", "unit": "kg", "priceMinor": 52000 },
+      "want": null },
+    { "name": "مقدارِ ناشناختهٔ حلال = نامعلوم",
+      "orig": { "productId": "a", "category": "خوراکی", "subcategory": "", "halal": "yes", "unit": "دانه", "priceMinor": 1000 },
+      "cand": { "productId": "b", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "دانه", "priceMinor": 1000 },
+      "want": null },
+    { "name": "وزنی با شمارشی نه",
+      "orig": { "productId": "rice", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "کیلو", "priceMinor": 12050 },
+      "cand": { "productId": "rice-pack", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بسته", "priceMinor": 60000 },
+      "want": "unit_mismatch" },
+    { "name": "جایگزینِ بی قیمت",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": null },
+      "want": "no_price" },
+    { "name": "جایگزینِ قیمتِ صفر",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
+      "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 0 },
+      "want": "no_price" }
+  ],
+  "charge": [
+    { "origUnitPriceMinor": 12000, "candUnitPriceMinor": 10000, "qtyMilli": 1000, "want": { "chargedUnitPriceMinor": 10000, "totalMinor": 10000 } },
+    { "origUnitPriceMinor": 10000, "candUnitPriceMinor": 12000, "qtyMilli": 1000, "want": { "chargedUnitPriceMinor": 10000, "totalMinor": 10000 } },
+    { "origUnitPriceMinor": 12050, "candUnitPriceMinor": 13000, "qtyMilli": 1500, "want": { "chargedUnitPriceMinor": 12050, "totalMinor": 18100 } },
+    { "origUnitPriceMinor": 5000, "candUnitPriceMinor": 5000, "qtyMilli": 2000, "want": { "chargedUnitPriceMinor": 5000, "totalMinor": 10000 } },
+    { "origUnitPriceMinor": 1999, "candUnitPriceMinor": 2500, "qtyMilli": 333, "want": { "chargedUnitPriceMinor": 1999, "totalMinor": 700 } }
+  ],
+  "rank": [
+    { "name": "هم‌برند پیش‌تر؛ سپس نزدیک‌ترین قیمت؛ برابر ⇒ نام؛ ناامن‌ها بیرون",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000, "brand": "آفتاب" },
+      "cands": [
+        { "productId": "oil2", "name": "روغنِ دوم", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000, "brand": "" },
+        { "productId": "oil3", "name": "روغنِ آفتاب کوچک", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 45000, "brand": "آفتاب" },
+        { "productId": "soap", "name": "صابون", "category": "بهداشتی", "subcategory": "", "halal": "", "unit": "دانه", "priceMinor": 4000, "brand": "" },
+        { "productId": "oil", "name": "روغن", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000, "brand": "آفتاب" },
+        { "productId": "oil4", "name": "روغنِ ارزان", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 28000, "brand": "" },
+        { "productId": "rice", "name": "برنج", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "کیلو", "priceMinor": 12000, "brand": "" }
+      ],
+      "limit": 2, "want": ["oil3", "oil4"] },
+    { "name": "همان، بی سقفِ دو",
+      "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000, "brand": "آفتاب" },
+      "cands": [
+        { "productId": "oil2", "name": "روغنِ دوم", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 32000, "brand": "" },
+        { "productId": "oil3", "name": "روغنِ آفتاب کوچک", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 45000, "brand": "آفتاب" },
+        { "productId": "oil4", "name": "روغنِ ارزان", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 28000, "brand": "" }
+      ],
+      "limit": 5, "want": ["oil3", "oil4", "oil2"] },
+    { "name": "نام و قیمتِ برابر ⇒ شناسه",
+      "orig": { "productId": "a", "category": "c", "subcategory": "", "halal": "", "unit": "u", "priceMinor": 1000, "brand": "" },
+      "cands": [
+        { "productId": "z9", "name": "همان", "category": "c", "subcategory": "", "halal": "", "unit": "u", "priceMinor": 1100, "brand": "" },
+        { "productId": "b1", "name": "همان", "category": "c", "subcategory": "", "halal": "", "unit": "u", "priceMinor": 900, "brand": "" }
+      ],
+      "limit": 2, "want": ["b1", "z9"] },
+    { "name": "سقفِ صفر",
+      "orig": { "productId": "a", "category": "c", "subcategory": "", "halal": "", "unit": "u", "priceMinor": 1000, "brand": "" },
+      "cands": [
+        { "productId": "b1", "name": "ب", "category": "c", "subcategory": "", "halal": "", "unit": "u", "priceMinor": 900, "brand": "" }
+      ],
+      "limit": 0, "want": [] }
+  ],
+  "timeout": [
+    { "preference": "best_match", "want": "accept" },
+    { "preference": "specific", "want": "reject" },
+    { "preference": "", "want": "reject" },
+    { "preference": "none", "want": "reject" },
+    { "preference": "refund", "want": "reject" },
+    { "preference": "garbage", "want": "reject" }
+  ],
+  "proposable": [
+    { "preference": "", "want": true },
+    { "preference": "best_match", "want": true },
+    { "preference": "specific", "want": true },
+    { "preference": "none", "want": false },
+    { "preference": "refund", "want": false }
+  ],
+  "settle": [
+    { "name": "جایگزینِ ارزان‌تر، جایگزینِ هم‌قیمت (باز هم «تغییر»)، جایگزینِ کمتر و قلمِ پیدانشده",
+      "input": {
+        "lines": [
+          { "lineNo": 1, "status": "picked", "orderedQtyMilli": 2000, "pickedQtyMilli": 2000, "unitPriceMinor": 30000, "originalTotalMinor": 60000 },
+          { "lineNo": 2, "status": "substituted", "orderedQtyMilli": 1000, "pickedQtyMilli": 1000, "unitPriceMinor": 10000, "originalTotalMinor": 12000 },
+          { "lineNo": 3, "status": "substituted", "orderedQtyMilli": 2000, "pickedQtyMilli": 2000, "unitPriceMinor": 5000, "originalTotalMinor": 10000 },
+          { "lineNo": 4, "status": "substituted", "orderedQtyMilli": 3000, "pickedQtyMilli": 2000, "unitPriceMinor": 1500, "originalTotalMinor": 6000 },
+          { "lineNo": 5, "status": "not_found", "orderedQtyMilli": 1000, "pickedQtyMilli": 0, "unitPriceMinor": 3000, "originalTotalMinor": 3000 }
+        ],
+        "discountMinor": 5000, "deliveryFeeMinor": 2000
+      },
+      "want": {
+        "lines": [
+          { "lineNo": 1, "qtyMilli": 2000, "totalMinor": 60000 },
+          { "lineNo": 2, "qtyMilli": 1000, "totalMinor": 10000 },
+          { "lineNo": 3, "qtyMilli": 2000, "totalMinor": 10000 },
+          { "lineNo": 4, "qtyMilli": 2000, "totalMinor": 3000 },
+          { "lineNo": 5, "qtyMilli": 0, "totalMinor": 0 }
+        ],
+        "subtotalMinor": 83000, "discountMinor": 5000, "deliveryFeeMinor": 2000, "totalMinor": 80000,
+        "deductedMinor": 8000, "removedLines": [5], "changedLines": [2, 3, 4], "pending": 0
+      } }
+  ]
+}
