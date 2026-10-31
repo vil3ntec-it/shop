@@ -25,10 +25,10 @@ jobs:
     timeout-minutes: 5
     steps:
       #  دو کامیت: HEAD^1 پایهٔ PR (یا کامیتِ قبلیِ main) است ⇒ «همین تغییر» از «از پیش» جدا می‌شود
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
 
@@ -60,17 +60,17 @@ jobs:
     timeout-minutes: 10
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 2
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: server/package-lock.json
       - name: وابستگی‌های سرور
         working-directory: server
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: پوششِ آزمون‌های بی پایگاه‌داده (گزارش)
         continue-on-error: true
         run: node tools/quality/quality.mjs --check coverage
