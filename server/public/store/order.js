@@ -1,5 +1,6 @@
 /*
- * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16) و «پرداخت با حساب‌پی» (PAY-21).
+ * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
+ * تأییدِ جایگزینِ کالای پیدانشده (PCK-05).
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
  * سقفِ ۷۵KB بماند (WEB-15، §۳.۱۰)؛ خواندنِ سفارش، پیگیریِ زنده و مسیر همان store.js است.
  *
@@ -63,7 +64,40 @@
       $('o-reorder').onclick = function () { ctx.reorder(o); };
       renderDelivery(o.delivery);
       renderPay(o, token);
+      renderSubs(o, token);
       return o;
+    }
+
+    //  PCK-05: کالایی که پیدا نشد و دکان جایگزینِ هم‌دسته‌اش را پیشنهاد داده — مشتری همین‌جا می‌پذیرد یا رد
+    //  می‌کند. مبلغ را سرور می‌سازد (قیمتِ کمتر)؛ پس از مهلت ترجیحِ خودِ مشتری. پرچمِ خاموش ⇒ ۴۰۴ ⇒ پنهان.
+    function renderSubs(o, token) {
+      var box = $('o-subs');
+      if (o.status !== 'picking') { box.hidden = true; return; }
+      api('/orders/' + encodeURIComponent(token) + '/substitutions').then(function (r) {
+        var list = r.substitutions || [];
+        box.hidden = !list.length;
+        var ul = K.clear($('o-sub-list'));
+        list.forEach(function (s) {
+          var was = s.original || {}; var n = s.substitute || {};
+          ul.appendChild(el('li', {}, el('span', { class: 'grow' }, t('od.sub.line', { a: was.name || '', b: n.name || '' }),
+            el('small', { text: K.qty(n.qtyMilli) + ' ' + (n.unit || '') + ' × ' + K.money(n.unitPriceMinor) })),
+            el('span', { class: 'amt num', text: K.money(n.totalMinor) })));
+          if (s.status === 'pending' && !s.expired) {
+            ul.appendChild(el('li', {}, el('small', { class: 'grow muted', text: t('od.sub.until', { t: K.clock(s.deadlineAt) }) }),
+              el('button', { class: 'btn btn-accent', attrs: { type: 'button' }, text: t('od.sub.yes'), on: { click: function () { choose(o, token, s.id, 'accept'); } } }),
+              el('button', { class: 'btn btn-ghost', attrs: { type: 'button' }, text: t('od.sub.no'), on: { click: function () { choose(o, token, s.id, 'reject'); } } })));
+          } else {
+            var yes = s.status === 'accepted' || s.willApply === 'accept';
+            ul.appendChild(el('li', {}, el('small', { class: 'muted', text: t(yes ? 'od.sub.accepted' : 'od.sub.rejected') })));
+          }
+        });
+      }).catch(function () { box.hidden = true; });
+    }
+
+    function choose(o, token, id, decision) {
+      api('/orders/' + encodeURIComponent(token) + '/substitutions/' + encodeURIComponent(id), { method: 'POST', body: { decision: decision } })
+        .then(function () { renderSubs(o, token); })
+        .catch(function (e) { K.note($('o-msg'), 'err', e.message); renderSubs(o, token); });
     }
 
     //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):

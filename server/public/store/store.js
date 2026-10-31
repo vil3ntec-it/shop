@@ -19,6 +19,7 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
+  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -173,6 +174,7 @@
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
       renderAddSheet(x);
+      if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
     if (p) return fill(p);
@@ -424,7 +426,7 @@
       expectedTotalMinor: subtotal() + feeFor(f),
     };
     if (f === 'delivery') {
-      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim() };
+      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
       if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
       body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
     }
@@ -622,6 +624,11 @@
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
       verifyAvailable = !r.verification || r.verification.available !== false;
+      if (r.recent) {
+        var rs = el('script', { attrs: { src: '/store/recent.js' } });
+        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
+        document.head.appendChild(rs);
+      }
       renderHead();
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;
