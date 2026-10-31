@@ -396,10 +396,10 @@ object DebtorEngine {
   /** کسری‌های ریزِ اعشار، «صفر» حساب می‌شوند */
   private const val EPSILON = 0.001
 
-  /** حالِ حساب، با همان جمله‌های نسخهٔ وب */
-  fun stateText(balance: Double): String = when {
-    balance > 0 -> "${money(balance)} افغانی بدهکار"
-    balance < 0 -> "${money(-balance)} افغانی موجودی دارد"
+  /** حالِ حساب، با همان جمله‌های نسخهٔ وب — با `shop.debt_minor` صفر و نشانه به پول (`DebtMinorFlag.sign`) */
+  fun stateText(balance: Double): String = when (DebtMinorFlag.sign(balance)) {
+    1 -> "${money(balance)} افغانی بدهکار"
+    -1 -> "${money(-balance)} افغانی موجودی دارد"
     else -> "حساب صاف است"
   }
 }

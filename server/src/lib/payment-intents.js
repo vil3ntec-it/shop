@@ -179,6 +179,9 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
   } else if (to === 'pending') {
     if (!S.canPayment(o.payment_status, 'pending')) return '';
     steps = ['pending'];
+  } else if (to === 'refunded') {
+    if (!S.canPayment(o.payment_status, 'refunded')) return 'order_not_paid';
+    steps = ['refunded'];
   } else {
     if (o.payment_status !== 'pending') return '';
     //  قصدِ زندهٔ دیگری برای همین سفارش؟ ⇒ همچنان «در انتظار»
@@ -214,6 +217,7 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {
+    //  pending | failed | refunded — روش و نقد همان می‌ماند
     await c.query('UPDATE online_orders SET payment_status=$3, version=version+1, updated_at=$4 WHERE shop_id=$1 AND id=$2',
       [intent.shop_id, o.id, steps[steps.length - 1], at]);
   }
@@ -643,8 +647,127 @@ async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500 } = {}) {
   return out;
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ویترین (سفارشِ آنلاینِ مشتری)
+// ════════════════════════════════════════════════════════════════════
+
+const OFF = Object.freeze({ methods: ['cod'], online: { available: false, decision: 'D-08' } });
+
+/** `store.payment` ِ ویترین: «حساب‌پی» فقط با کلید + پرچم + اشتراکِ فعال؛ وگرنه همان نقدِ هنگامِ تحویل. */
+async function storefrontPayment(shopId) {
+  if (!(await enabledFor(shopId)) || !(await subscribedFor(shopId))) return OFF;
+  return { methods: ['cod', METHOD_ID], online: { available: true, provider: METHOD_ID } };
+}
+
+/**
+ * قصدهای زندهٔ این سفارش که زمانشان گذشته ⇒ «expired» (و پرداختِ سفارش «ناموفق») — پیش از خواندنِ پیگیری،
+ * تا مشتریِ برگشته از حساب‌پی تا تطبیقِ بعدی «در انتظار» نماند.
+ */
+async function refreshOrder(shopId, orderId) {
+  if (!orderId) return;
+  const rows = (await query(
+    `SELECT * FROM payment_intents WHERE shop_id=$1 AND kind='online_order' AND ref_id=$2
+        AND status IN ('created','pending') AND expires_at <= $3`, [shopId, String(orderId), now()]
+  )).rows;
+  for (const r of rows) await expireIfDue(r);
+}
+
+/** این سفارش همین حالا با حساب‌پی پرداختنی است؟ (برای دکمهٔ ویترین؛ تصمیمِ نهایی همان `create`) */
+async function orderPayable(shopId, orderId) {
+  if (!orderId || !(await storefrontPayment(shopId)).online.available) return false;
+  const o = await one(
+    'SELECT status, is_test, payment_status, cod_status FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, String(orderId)]
+  );
+  return Boolean(o) && !o.is_test && !S.isTerminal(o.status) && ['', 'to_collect'].includes(o.cod_status)
+    && ['unpaid', 'pending', 'failed'].includes(o.payment_status);
+}
+
+/**
+ * پرداختِ سفارشِ ویترین — مبلغ و ارز از خودِ سفارش (سرور)، کلید در فضای جدای `sf:`؛
+ * `returnUrl` را مسیرِ سرور می‌سازد، هرگز مشتری (بی redirect ِ باز).
+ */
+async function createForStorefront(shopId, orderId, { key, returnUrl, description = '' }) {
+  if (!(await enabledFor(shopId))) throw forbidden('پرداختِ آنلاین برای این فروشگاه روشن نیست', 'online_payment_unavailable');
+  const k = String(key || '').trim();
+  if (!k) throw badRequest('کلیدِ یکتایی (Idempotency-Key) لازم است', 'idempotency_key_required');
+  if (!/^[A-Za-z0-9_.:-]{8,120}$/.test(k)) throw badRequest('کلیدِ یکتایی نامعتبر است', 'bad_idempotency_key');
+  const o = await one('SELECT total_minor, currency FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, String(orderId || '')]);
+  if (!o) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  return create(shopId, {
+    body: { kind: 'online_order', refId: String(orderId), amount: Number(o.total_minor), currency: o.currency, idempotencyKey: `sf:${k}`, description },
+    actor: { id: 'customer' }, returnUrl,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  مدیرِ سامانه: فهرست، «بازپرداخت شد»
+// ════════════════════════════════════════════════════════════════════
+
+/** فهرستِ قصدها برای پنل — تازه‌ترین بالا، صفحه‌بندی با (created_at، id)؛ بی نشانیِ پرداخت. */
+async function list({ status = '', review = false, shopId = '', limit = 50, before = '' } = {}) {
+  const where = [];
+  const params = [];
+  if (status) {
+    if (!Object.prototype.hasOwnProperty.call(TRANSITIONS, status)) throw badRequest('وضعیت نامعتبر است', 'bad_status');
+    params.push(status);
+    where.push(`pi.status = $${params.length}`);
+  }
+  if (review) where.push('pi.needs_review = true');
+  if (shopId) { params.push(String(shopId)); where.push(`pi.shop_id = $${params.length}`); }
+  const m = /^(\d{1,16})~([A-Za-z0-9_]{1,64})$/.exec(String(before || ''));
+  if (m) { params.push(Number(m[1]), m[2]); where.push(`(pi.created_at, pi.id) < ($${params.length - 1}::bigint, $${params.length}::text)`); }
+  const n = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 50));
+  params.push(n + 1);
+  const rows = (await query(
+    `SELECT pi.*, s.name AS shop_name FROM payment_intents pi JOIN shops s ON s.id = pi.shop_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY pi.created_at DESC, pi.id DESC LIMIT $${params.length}`,
+    params
+  )).rows;
+  const page = rows.slice(0, n);
+  const last = page[page.length - 1];
+  const counts = Object.fromEntries((await query(
+    'SELECT status, COUNT(*)::int AS n FROM payment_intents GROUP BY status'
+  )).rows.map((r) => [r.status, Number(r.n)]));
+  counts.review = Number((await one('SELECT COUNT(*)::int AS n FROM payment_intents WHERE needs_review = true')).n);
+  return {
+    items: page.map((r) => {
+      const { checkoutUrl: _c, qrPayload: _q, payment: _p, ...v } = view(r);
+      return { ...v, shopId: r.shop_id, shopName: r.shop_name, provider: r.provider, statusReason: r.status_reason, updatedAt: num(r.updated_at) };
+    }),
+    next: rows.length > n && last ? `${last.created_at}~${last.id}` : null,
+    counts,
+  };
+}
+
+/** paid → refunded — فقط مدیر، پس از بازگرداندنِ پول در خودِ حساب‌پی؛ پرداختِ سفارشِ آنلاین هم «بازپرداخت». */
+async function markRefunded(id, { adminId = '', note = '' } = {}) {
+  const out = await tx(async (c) => {
+    const row = (await c.query('SELECT * FROM payment_intents WHERE id=$1 FOR UPDATE', [String(id || '')])).rows[0];
+    if (!row) throw notFound('پرداخت پیدا نشد', 'payment_not_found');
+    if (row.status === 'refunded') return { row, unchanged: true };
+    if (row.status !== 'paid') {
+      const err = conflict('فقط پرداختِ «پرداخت‌شده» بازپرداختنی است', 'not_refundable');
+      err.data = { status: row.status };
+      throw err;
+    }
+    const next = await casIn(c, row, 'refunded', { status_reason: 'refunded_by_admin' });
+    if (!next) throw conflict('وضعیت همین حالا عوض شد؛ دوباره بخوانید', 'status_changed');
+    await orderPaymentIn(c, next, 'refunded', { reason: 'refunded_by_admin' });
+    return { row: next, unchanged: false };
+  });
+  if (!out.unchanged) {
+    nudge(out.row.id);
+    await audit.log({ shopId: out.row.shop_id, actorType: 'admin', userId: adminId, action: 'payment.refunded',
+      targetType: 'payment_intent', targetId: out.row.id,
+      detail: { kind: out.row.kind, refId: out.row.ref_id, amountMinor: Number(out.row.amount_minor), note: String(note || '').slice(0, 300) } });
+  }
+  return { ...view(out.row), unchanged: out.unchanged };
+}
+
 module.exports = {
   FLAG_KEY, METHOD_ID, TRANSITIONS, LATE_PAID_FROM, MAX_WAIT_S,
   canTransition, enabledFor, subscribedFor, configOf, create, get, cancel, handleWebhook, reconcile, markPaid,
+  storefrontPayment, refreshOrder, orderPayable, createForStorefront, list, markRefunded,
   view, paymentRow, _bus: bus,
 };
+

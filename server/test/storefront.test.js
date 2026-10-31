@@ -308,6 +308,49 @@ test('جمعِ عوض‌شده ⇒ ۴۰۹ با برگهٔ تازه و بی سف�
   assert.equal(ok.body.order.totalMinor, 55100);
 });
 
+test('S32: فیِ هر قلمِ دیده‌شده ⇒ «X از … به …» در changes؛ جمعِ برابر با قیمتِ عوض‌شده هم ثبت نمی‌شود (CHK-17)', async () => {
+  const s = await liveStore('فیِ دیده‌شده');
+  const t = await ticketFor(s.slug, PHONE);
+  //  برنج ۱۲۰٫۵ × ۲ + روغن ۳۰۰ = ۵۴۱
+  const seenLines = (rice, oil) => [
+    { productId: 'rice', qtyMilli: 2000, expectedUnitPriceMinor: rice },
+    { productId: 'oil', qtyMilli: 1000, expectedUnitPriceMinor: oil },
+  ];
+  //  فیِ درست ⇒ ثبت؛ فیِ نفرستاده هم همان رفتارِ پیشین
+  const ok = await checkout(s.slug, cart({ lines: seenLines(12050, 30000), expectedTotalMinor: 54100 }), { ticket: t });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+
+  //  روغن ۳۰۰ ⇒ ۳۱۰ و برنج ۱۲۰٫۵ ⇒ ۱۱۵٫۵: جمعِ تازه ۲۳۱ + ۳۱۰ = ۵۴۱ — همان جمعِ دیده‌شده
+  await h.put('/api/shop/storefront/products/oil', { published: true, onlinePriceMinor: 31000 }, { token: s.token });
+  await h.put('/api/shop/storefront/products/rice', { published: true, onlinePriceMinor: 11550 }, { token: s.token });
+  const n0 = await count(s.shopId);
+  const r = await checkout(s.slug, cart({ lines: seenLines(12050, 30000), expectedTotalMinor: 54100 }), { ticket: t });
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'price_changed');
+  assert.equal(r.body.error.quote.totalMinor, 54100, 'جمع از قضا همان است');
+  assert.deepEqual(r.body.error.changes, [
+    { productId: 'rice', name: 'برنج', fromMinor: 12050, toMinor: 11550 },
+    { productId: 'oil', name: 'روغن', fromMinor: 30000, toMinor: 31000 },
+  ]);
+  assert.equal(await count(s.shopId), n0, 'هرگز با قیمتِ تأییدنشده ثبت نمی‌شود');
+
+  //  فقط جمع (صفحهٔ امروزِ ویترین) ⇒ همان ۴۰۹ ِ پیشین با changes ِ خالی
+  const total = await checkout(s.slug, cart({ expectedTotalMinor: 1 }), { ticket: t });
+  assert.equal(total.body.error.code, 'price_changed');
+  assert.deepEqual(total.body.error.changes, []);
+
+  //  مشتری تغییر را دید و تأیید کرد ⇒ ثبت با قیمتِ تازه
+  const again = await checkout(s.slug, cart({ lines: seenLines(11550, 31000), expectedTotalMinor: 54100 }), { ticket: t });
+  assert.equal(again.status, 201, JSON.stringify(again.body));
+  assert.deepEqual(again.body.order.lines.map((l) => l.unitPriceMinor), [11550, 31000]);
+
+  for (const bad of [-1, 1.5, '12050', 100_000_000_001]) {
+    const b = await checkout(s.slug, cart({ lines: [{ productId: 'rice', qtyMilli: 1000, expectedUnitPriceMinor: bad }] }), { ticket: t });
+    assert.equal(b.status, 400, JSON.stringify(bad));
+    assert.equal(b.body.error.code, 'bad_lines');
+  }
+});
+
 test('کالای بیرون از ویترین، سقفِ تعداد، حداقلِ سفارش، روشِ تحویل و پرداخت', async () => {
   const s = await liveStore('قواعد', { minOrderMinor: 30000, deliveryFeeMinor: 5000 });
   const t = await ticketFor(s.slug, PHONE);
