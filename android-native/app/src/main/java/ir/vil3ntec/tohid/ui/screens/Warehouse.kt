@@ -369,6 +369,7 @@ fun WarehouseScreen(
   if (imageBulk) ImageBulkImportSheet(store, d) { imageBulk = false }
 
   importPlan?.let { plan ->
+    val similarWarn = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
     AlertDialog(
       onDismissRequest = { importPlan = null },
       containerColor = Shop.colors.surfaceSolid,
@@ -390,6 +391,21 @@ fun WarehouseScreen(
           }
           if (plan.skipped.size > 50) {
             Text("و ${plain(plan.skipped.size - 50)} ردیفِ دیگر", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          }
+          //  PRD-19 (پیش‌فرض خاموش): ثبت می‌شوند، ولی شاید همان کالای دیگرند
+          if (similarWarn && plan.similar.isNotEmpty()) {
+            Text(
+              "${plain(plan.similar.size)} ردیف ثبت می‌شود ولی نامش مشابه است — اگر همان کالاست، از فایل بردارید:",
+              style = MaterialTheme.typography.bodySmall,
+              color = Shop.colors.warning,
+            )
+            plan.similar.take(50).forEach { sm ->
+              Text(
+                "ردیف ${plain(sm.row)} «${sm.name}» ≈ «${sm.other}»${if (sm.inFile) " (در همین فایل)" else ""}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.warning,
+              )
+            }
           }
         }
       },

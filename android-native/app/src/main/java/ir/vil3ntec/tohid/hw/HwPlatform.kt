@@ -65,6 +65,8 @@ object CustomerFacing {
   val view = mutableStateOf(View())
 
   fun showCart(d: ShopData, cart: List<SalesEngine.CartLine>) {
+    //  HW-10: نمایشگرِ قطبی (اگر تنظیم شده) مستقل از پنجرهٔ دوم
+    Pole.cart(cart.size, Math.round(SalesEngine.cartTotal(d, cart) * 100))
     if (!open.value) return
     //  سبدِ خالیِ پس از فروش «سپاس» را پاک نکند؛ نخستین کالای سبدِ بعدی پاکش می‌کند
     if (cart.isEmpty() && view.value.paid != null) return
@@ -78,7 +80,54 @@ object CustomerFacing {
 
   /** پس از ثبتِ فروش: «سپاس» و مبلغ، تا سبدِ بعدی */
   fun sold(total: Double) {
+    Pole.paid(Math.round(total * 100))
     if (!open.value) return
     view.value = View(emptyList(), total, paid = total)
+  }
+}
+
+/**
+ *  HW-10 — نمایشگرِ قطبیِ مشتری (VFD دوخطی) روی درگاهِ سریالِ کامپیوتر؛ بایت‌ها از `core/hw/PoleDisplay`
+ *  (آزمون: `ScalePoleTest`). فقط با «ابزارهای تازهٔ دستگاه» (`HwTools`) و درگاهِ انتخاب‌شده؛ هر فرستادن
+ *  بیرون از نخِ صفحه و «آخرین برنده» است (صفحهٔ کهنه پشتِ هم صف نمی‌کشد). روی نمایشگرِ واقعی آزموده نشده.
+ */
+object Pole {
+  /** ۹۶۰۰ و 8N1 — پیش‌فرضِ رایجِ نمایشگرهای قطبی */
+  val PARAMS = SerialParams(baud = 9600, dataBits = 8, parity = "none", stopBits = 1)
+
+  /** درگاهِ انتخاب‌شده (`pole_port` در `tohid`)؛ خالی ⇒ خاموش */
+  @Volatile var port: String = ""
+  private val pending = java.util.concurrent.atomic.AtomicReference<ByteArray?>(null)
+  private val worker = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "pole-display").apply { isDaemon = true } }
+
+  fun load(context: android.content.Context) {
+    port = runCatching { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE).getString("pole_port", "") }.getOrNull().orEmpty()
+  }
+
+  fun save(context: android.content.Context, name: String) {
+    port = name
+    runCatching { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE).edit().putString("pole_port", name).apply() }
+  }
+
+  private fun on(): Boolean = port.isNotBlank() && HwPlatform.serial != null && ir.vil3ntec.tohid.print.HwTools.on.value
+
+  fun cart(items: Int, totalMinor: Long) { if (on()) send(ir.vil3ntec.tohid.core.hw.PoleDisplay.cart(items, totalMinor)) }
+  fun paid(totalMinor: Long) { if (on()) send(ir.vil3ntec.tohid.core.hw.PoleDisplay.paid(totalMinor)) }
+
+  /** فرستادنِ همین حالا (آزمونِ «دستگاه‌ها») — خطا را برمی‌گرداند */
+  fun test(name: String): String? {
+    val serial = HwPlatform.serial ?: return "درگاهِ سریال فقط روی برنامهٔ کامپیوتر است"
+    return runCatching {
+      serial.exchange(name, PARAMS, ir.vil3ntec.tohid.core.hw.PoleDisplay.frame("VILL3N  TEST", "0123456789 ABC xyz"), { true }, 50)
+      null
+    }.getOrElse { it.message ?: "به نمایشگر نرسید" }
+  }
+
+  private fun send(bytes: ByteArray) {
+    if (pending.getAndSet(bytes) != null) return  // کارگر هنوز آخرین را برمی‌دارد
+    worker.execute {
+      val b = pending.getAndSet(null) ?: return@execute
+      runCatching { HwPlatform.serial?.exchange(port, PARAMS, b, { true }, 50) }
+    }
   }
 }
