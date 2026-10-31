@@ -64,6 +64,14 @@
   IMG-PRO-05/06 تعارض می‌دهند: هر دو خط بماند. ساختِ Gradle ِ اندروید/کامپیوتر فقط در CI.
 - قدمِ بعدی: پس از #433، فرستادنِ `X-Content-SHA256` از `ImageBank.uploadOwn` ِ برنامه.
 
+### ۱۴۰۵/۰۸/۰۸ — تکمیلِ PARTIALهای CRM و RET (سه برش)
+- انجام شد: #435 (RET-08 فهرستِ قابلِ تنظیمِ دلیل، RET-12 رسیدِ برگشت از `core/receipt/ReturnReceiptLayout` پشتِ `shop.receipt_v2`)؛
+  #436 (سرتاسریِ `S13.waste` و `S13.credit.v2`، شکافِ شناختهٔ RET-07 بسته شد)؛ #451 (CRM-03/S07: سقفِ اعتبار در صندوق با تأییدِ
+  مدیر، `core/credit/CreditGate`، پشتِ `ShopPolicy.creditGate`). منطقِ تازه در `core` commonMain با `commonTest` (محلی `jvmTest` سبز).
+- نیمه‌کاره: کامپایل و آزمون‌های اندروید/کامپیوتر فقط در CI (این‌جا Gradle ِ اندروید اجرا نمی‌شود). کنار ماند: CRM-02/05/07/10/11
+  (رابطشان در #393)، CRM-15 (کلیدِ مجوزِ تازه؛ برخورد با #336 و تصمیمِ صاحب محصول)، RET-01/04/05/10 (فقط روشن شدنِ تنظیم مانده).
+- قدمِ بعدی: سبز شدنِ CI ِ سه PR؛ پس از #391 همان `CreditGate` و فهرستِ دلیل در صندوق و برگشتِ v3.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
 - انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
   BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
