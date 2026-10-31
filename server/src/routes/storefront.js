@@ -24,6 +24,7 @@ const cart = require('../lib/store-cart');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const areas = require('../lib/storefront-area-requests');
+const onlineReport = require('../lib/order-online-report');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -132,6 +133,10 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
     });
+  //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
+  if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {
+    await onlineReport.noteMiss(req.store.shop_id, req.query.q);
+  }
   //  ۳۲.۳: با پرچمِ `shop.catalog` وضعیتِ موجودی از دفترِ سرور (#263)؛ خاموش ⇒ null
   //  و همان «در حال بررسی». موجودیِ نامعلوم/کهنه هرگز «موجود» نیست (`badgeOf`).
   const stock = out.items.length

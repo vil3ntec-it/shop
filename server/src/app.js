@@ -537,6 +537,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
     //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
+    //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
+    require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.

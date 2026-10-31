@@ -16,6 +16,7 @@ const orders = require('../lib/orders');
 const refunds = require('../lib/order-refunds');
 const delay = require('../lib/order-delay');
 const presence = require('../lib/order-presence');
+const onlineReport = require('../lib/order-online-report');
 const S = require('../lib/order-states');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
@@ -103,6 +104,18 @@ router.get('/', needFlag, wrap(async (req, res) => {
  */
 router.get('/reconciliation', needFlag, requirePermission('orders.refund'), wrap(async (req, res) => {
   res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
+}));
+
+/**
+ * RPT-14 — گزارشِ فروشِ اینترنتی (`lib/order-online-report.js`): قیفِ سفارش، زمانِ قبول،
+ * آماده‌سازی و تحویل، نرخِ ازدست‌رفته و ناموفق، و جست‌وجوهای بی‌نتیجهٔ ویترین. فقط‌خواندنی؛
+ * هر کس گزارش می‌بیند (`reports.view`). پرچمِ خاموشِ `shop.orders.online_report` ⇒ ۴۰۳. پیش از `/:id`.
+ */
+router.get('/online-report', needFlag, requirePermission('reports.view'), wrap(async (req, res) => {
+  if (!(await onlineReport.flagOf(req.shopId))) {
+    throw forbidden('گزارشِ فروشِ اینترنتی برای این دکان روشن نیست', 'online_report_disabled');
+  }
+  res.json(await onlineReport.report(req.shopId, { from: req.query.from, to: req.query.to }));
 }));
 
 /**
