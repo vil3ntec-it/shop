@@ -24,14 +24,13 @@ const { forbidden, badRequest } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   const st = await sf.stateOf(req.shopId);
   if (!st.flag) return next(forbidden('ویترین برای این دکان روشن نیست', 'storefront_disabled'));
   req.storeState = st;
   next();
-});
+};
 
 const needWrite = (req, res, next) => {
   const { entitled, ent } = req.storeState;
@@ -41,7 +40,7 @@ const needWrite = (req, res, next) => {
     : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
 };
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   const { ent, ...st } = await sf.stateOf(req.shopId);
   res.json({
     ...st,
@@ -52,9 +51,9 @@ router.get('/config', wrap(async (req, res) => {
     //  انتشارِ گروهی در یک درخواست (M2) فقط با پرچمِ جدای `shop.storefront.bulk`
     bulk: st.flag ? await sf.bulkFlagOn(req.shopId) : false,
   });
-}));
+});
 
-router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const settings = await sf.saveSettings(req.shopId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.settings',
@@ -62,7 +61,7 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
     detail: { slug: settings.slug, enabled: settings.enabled }, ip: clientIp(req),
   });
   res.json({ settings });
-}));
+});
 
 //  PRES-10: نامِ دکانِ دیگر در بدنه ⇒ ۴۰۳ (پیش‌تر نادیده گرفته می‌شد و
 //  اعلام روی دکانِ خودِ توکن می‌نشست). خودِ دکان همیشه از عضویت است.
@@ -75,12 +74,12 @@ const ownShopOnly = (req, res, next) => {
   next();
 };
 
-router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await sf.declarePresence(req.shopId, req.body, {
     userId: req.user.id, deviceId: req.get('x-device') || '',
   });
   res.json(out);
-}));
+});
 
 /**
  * PRES-10: اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
@@ -115,16 +114,16 @@ router.use('/presence', (err, req, res, next) => {
 });
 
 //  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
-const needZones = wrap(async (req, res, next) => {
+const needZones = async (req, res, next) => {
   if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
   next();
+};
+
+router.get('/delivery', requirePermission('data.read'), needFlag, needZones, async (req, res) => {
+  res.json(await sfd.settingsOf(req.shopId));
 });
 
-router.get('/delivery', requirePermission('data.read'), needFlag, needZones, wrap(async (req, res) => {
-  res.json(await sfd.settingsOf(req.shopId));
-}));
-
-router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, wrap(async (req, res) => {
+router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, async (req, res) => {
   const out = await sfd.saveSettings(req.shopId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.delivery',
@@ -133,21 +132,21 @@ router.put('/delivery', requirePermission('settings.write'), needFlag, needZones
     ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
-router.get('/products', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
+router.get('/products', requirePermission('data.read'), needFlag, async (req, res) => {
   const page = await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit });
   //  M2: دلیلِ «در بازار نمی‌آید» فقط با پرچمِ گروهی؛ بی آن پاسخ همان قبلی است
   res.json(await sf.bulkFlagOn(req.shopId) ? await sf.withReasons(req.shopId, page) : page);
-}));
-
-//  ── انتشارِ گروهی (M2): تا ۵۰۰ کالا در یک درخواست، کلیدِ یکتایی اجباری ──
-const needBulk = wrap(async (req, res, next) => {
-  if (!(await sf.bulkFlagOn(req.shopId))) return next(forbidden('انتشارِ گروهی برای این دکان روشن نیست', 'bulk_disabled'));
-  next();
 });
 
-router.put('/products', requirePermission('settings.write'), needFlag, needBulk, needWrite, wrap(async (req, res) => {
+//  ── انتشارِ گروهی (M2): تا ۵۰۰ کالا در یک درخواست، کلیدِ یکتایی اجباری ──
+const needBulk = async (req, res, next) => {
+  if (!(await sf.bulkFlagOn(req.shopId))) return next(forbidden('انتشارِ گروهی برای این دکان روشن نیست', 'bulk_disabled'));
+  next();
+};
+
+router.put('/products', requirePermission('settings.write'), needFlag, needBulk, needWrite, async (req, res) => {
   const idem = idempotency.fromRequest(req, `storefront-bulk:${req.shopId}`);
   if (!idem) throw badRequest('کلیدِ یکتایی (Idempotency-Key) لازم است', 'idempotency_key_required');
   const out = await sf.setProducts(req.shopId, req.body, req.user.id, idem);
@@ -160,9 +159,9 @@ router.put('/products', requirePermission('settings.write'), needFlag, needBulk,
     });
   }
   res.json(out);
-}));
+});
 
-router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await sf.setProduct(req.shopId, req.params.productId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.product',
@@ -170,7 +169,7 @@ router.put('/products/:productId', requirePermission('settings.write'), needFlag
     detail: { published: out.published, onlinePriceMinor: out.onlinePriceMinor }, ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
 module.exports = router;
 module.exports.resetRejectAudit = () => lastRejectAudit.clear();
