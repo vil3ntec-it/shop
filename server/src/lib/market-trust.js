@@ -689,6 +689,11 @@ async function decide(adminId, id, body, reason) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [sanction.id, row.shop_id, row.id, sanction.kind, sanction.productId, reason, adminId, at]
       );
+      //  S6: جریانِ تغییرِ بازار (پرچمِ `market.changes`) — «پنهان کردن» و «تعلیق» همان دم در کشِ بازار
+      await require('./market-changes').record(c, row.shop_id, {
+        entity: 'sanction', entityId: sanction.id, kind: 'impose', at,
+        state: { kind: sanction.kind, productId: sanction.productId, lifted: false },
+      });
       await addEvent(c, row, 'admin', adminId, 'sanction_applied', reason,
         { sanctionId: sanction.id, kind: sanction.kind, ...(sanction.productId ? { productId: sanction.productId } : {}) });
     }
@@ -702,6 +707,10 @@ async function liftIn(c, row, s, adminId, reason, at) {
     'UPDATE trust_sanctions SET lifted_at=$2, lifted_by=$3, lift_reason=$4 WHERE id=$1 AND lifted_at IS NULL',
     [s.id, at, adminId, reason]
   );
+  await require('./market-changes').record(c, s.shop_id, {
+    entity: 'sanction', entityId: s.id, kind: 'lift', at,
+    state: { kind: s.kind, productId: s.product_id || '', lifted: true },
+  });
   await addEvent(c, row, 'admin', adminId, 'sanction_lifted', reason,
     { sanctionId: s.id, kind: s.kind, ...(s.product_id ? { productId: s.product_id } : {}) });
 }
