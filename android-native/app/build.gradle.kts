@@ -279,6 +279,13 @@ android {
       isMinifyEnabled = true
       isShrinkResources = true
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      /*
+       *  SEC-CLI: مبهم‌سازیِ کدِ خودِ برنامه فقط با `-Ptohid.obfuscate=true` (پیش‌فرض خاموش).
+       *  خاموش ⇒ `proguard-keep-app.pro` (همان `-keep class ir.vil3ntec.tohid.**`ِ پیشین) و خروجی
+       *  بی‌تغییر؛ روشن ⇒ `proguard-obfuscate.pro`. پیش از روشن کردن: سنجش‌های همان پرونده.
+       */
+      val obfuscate = (project.findProperty("tohid.obfuscate") as String?)?.trim() == "true"
+      proguardFiles(if (obfuscate) "proguard-obfuscate.pro" else "proguard-keep-app.pro")
     }
     /*
      *  نسخهٔ پیش‌نمایش — `assemblePreview`، فقط از `tohid-native-preview.yml`.
