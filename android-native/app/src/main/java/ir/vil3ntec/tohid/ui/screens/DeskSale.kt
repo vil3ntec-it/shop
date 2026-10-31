@@ -176,6 +176,7 @@ fun DeskSaleScreen(
   }
 
   val searchFocus = remember { FocusRequester() }
+  val moreKeys = ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.isOn(context); val discountFocus = remember { FocusRequester() } // POS-41، خاموش ⇒ همان
   LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
   fun refocus() { runCatching { searchFocus.requestFocus() } }
 
@@ -460,6 +461,7 @@ fun DeskSaleScreen(
             .focusRequester(searchFocus)
             .onPreviewKeyEvent { e ->
               if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+              if (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.field(moreKeys, e, query.isEmpty(), cart.isEmpty()) != null) { confirmClear = true; return@onPreviewKeyEvent true }
               when (PosKeys.field(keyName(e.key), e.isPrimaryModifier, query.isEmpty(), matches.isNotEmpty(), selected != null)) {
                 PosAction.SUBMIT -> { submit(); true }
                 PosAction.HINT_DOWN -> { hint = (hint + 1).coerceAtMost(matches.size - 1); true }
@@ -537,7 +539,7 @@ fun DeskSaleScreen(
       modifier = modifier,
       headerActions = {
         CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
-        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
+        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, if (moreKeys) KeyMap.SALE_CLEAR.hint else null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
       },
       customer = {
         CustomerRow(
@@ -560,6 +562,7 @@ fun DeskSaleScreen(
           onEdit = { editLine = it },
           onMinus = { step(it, -1); refocus() },
           onPlus = { step(it, 1); refocus() },
+          rowHints = if (moreKeys) listOf(KeyMap.SALE_EDIT_ROW.hint, "${KeyMap.SALE_QTY_UP.hint} ${KeyMap.SALE_QTY_DOWN.hint}", KeyMap.SALE_DELETE_ROW.hint) else emptyList(),
           //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
           //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
           footer = if (promoSnap.active) {
@@ -581,7 +584,7 @@ fun DeskSaleScreen(
       summary = {
         PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
           if (canDiscount) {
-            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, "٪")
+            MiniNumberField(if (moreKeys) Str.discount + " · " + KeyMap.SALE_DISCOUNT_INVOICE.hint else Str.discount, discountText, { discountText = numericInput(it) }, discountBad, "٪", discountFocus)
             //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
             when (gate) {
               DiscountGate.State.NEEDS_APPROVAL -> Row(
@@ -659,6 +662,7 @@ fun DeskSaleScreen(
         //  POS-12: پیش از هر شرطی — وسطِ جابه‌جاییِ فاکتور همهٔ کلیدها خورده می‌شوند
         if (held.onKey(e)) return@onPreviewKeyEvent true
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        if (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e) != null) { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
