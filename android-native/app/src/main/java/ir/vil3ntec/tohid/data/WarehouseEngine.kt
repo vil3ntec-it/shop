@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -248,9 +249,15 @@ object WarehouseEngine {
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
 
     val barcode = draft.barcode.trim()
-    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد
-    val owner = if (barcode.isEmpty()) null else ShopStore.barcodeIndex(d)[barcode]
-    if (owner != null && owner != id) return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    //  ⛔ از دست رفتنِ داده (رفع): فرم فقط بارکدِ نخست را نشان می‌دهد؛ ویرایش فقط همان را عوض می‌کند و
+    //  بارکدهای دوم به بعدِ کالا (از وب، ورود یا همگام‌سازی) نمی‌افتند. پیش از این همه به یکی کم می‌شد.
+    val codes = ProductBarcodes.mergePrimary(barcode, existing.barcodes)
+    // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
+    // بارکدی که همین حالا روی همین کالاست (حتی با تعارضِ آفلاینِ قدیمی، §۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
+    val index = ShopStore.barcodeIndex(d)
+    if (ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] } != null) {
+      return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    }
 
     val updated = existing.copy(
       name = name,
@@ -259,7 +266,7 @@ object WarehouseEngine {
       purchasePrice = draft.purchasePrice,
       salePrice = draft.salePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       subcategory = draft.subcategory?.trim() ?: existing.subcategory,
       supplierId = draft.supplierId ?: existing.supplierId,
       active = draft.active ?: existing.active,

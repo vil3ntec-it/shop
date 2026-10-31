@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.print
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.core.receipt.ReceiptShare
 import android.content.Context
 import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
@@ -20,7 +21,8 @@ object PrintJob {
   /**
    *  فرستادنِ فاکتور به مشتری — همان تصویرِ چاپِ حرارتی، پهنِ ۵۷۶ نقطه، به
    *  واتساپ یا تلگرام یا هر برنامه‌ای که کاربر بخواهد. برای دکان‌داری که
-   *  چاپگر ندارد (گزارشِ ممیزی: «راهی برای فرستادنِ فاکتور نیست»).
+   *  چاپگر ندارد (گزارشِ ممیزی: «راهی برای فرستادنِ فاکتور نیست»). متنِ همراه
+   *  (`ReceiptShare.caption`) پیوندِ فاکتورِ آنلاین را هم دارد اگر فروش داشته باشد (POS-32).
    *
    *  @return پیامِ خطا یا null
    */
@@ -61,7 +63,9 @@ object PrintJob {
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = mime
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
-        putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceLabel() ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        //  POS-32: پیوندِ فاکتورِ آنلاین در خطِ آخر — فقط فروشِ نسخهٔ ۲ با توکن، پرچمِ `shop.receipt_v2` و QR ِ روشن
+        //  (`Receipts.publicUrl`)؛ وگرنه همان یک خطِ امروز
+        putExtra(android.content.Intent.EXTRA_TEXT, ReceiptShare.caption(sale.invoiceLabel(), storeName, Receipts.publicUrl(context, sale)))
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(
