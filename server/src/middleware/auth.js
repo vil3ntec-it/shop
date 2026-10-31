@@ -13,7 +13,7 @@ const { one, query, now } = require('../db');
 const { unauthorized, forbidden } = require('./errors');
 const { isCoreFeature } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement');
-const { membershipOf } = require('../lib/shops');
+const { membershipOf, sessionShopOf } = require('../lib/shops');
 const { can } = require('../lib/permissions');
 
 function bearer(req) {
@@ -150,11 +150,25 @@ async function requireAnyUser(req, res, next) {
   } catch (err) { next(err); }
 }
 
+/**
+ * دکانِ این نشست — اگر نشست دکانی را برگزیده (`tokens.shop_id`، مهاجرتِ ۰۹۷)
+ * فقط عضویتِ فعال در همان، وگرنه همان قاعدهٔ همیشگی. دکانی که دیگر عضوش
+ * نیست ⇒ خطای روشن، **نه** افتادنِ بی‌صدا به دکانِ دیگر (بندِ ۲۹.۲ قاعدهٔ ۱).
+ */
+async function shopOfSession(req) {
+  const bound = sessionShopOf(req.tokenRow);
+  const member = await membershipOf(req.user.id, { shopId: bound });
+  if (!member && bound) {
+    throw forbidden('دکانی که برای این نشست برگزیده شده دیگر در دسترسِ شما نیست؛ دکان را دوباره انتخاب کنید', 'active_shop_unavailable');
+  }
+  return member;
+}
+
 /** عضویت در دکان لازم است — shop_id از همین‌جا می‌آید. */
 async function requireShop(req, res, next) {
   try {
     if (!req.user) return next(unauthorized());
-    const member = await membershipOf(req.user.id);
+    const member = await shopOfSession(req);
     if (!member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
     //  نقشِ پیک — حتی با توکنی که پیش از پیک شدن گرفته شده
     if (member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
@@ -234,7 +248,7 @@ function requireStationFeature(featureKey) {
 async function optionalShop(req, res, next) {
   try {
     if (req.user) {
-      const member = await membershipOf(req.user.id);
+      const member = await shopOfSession(req);
       if (member && member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
       if (member) {
         req.member = member;
