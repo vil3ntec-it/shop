@@ -160,6 +160,9 @@ async function updateMember(shopId, memberId, patch) {
     await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
       [now(), m.user_id]);
   }
+  //  ⛔ S78: سوکتِ زندهٔ او هم در همین درخواست — برداشتن/تعلیق (نشست رفت) و
+  //  تغییرِ نقش (دسترسی عوض شد) هر دو؛ دکان‌های دیگرش با همان نقش دست نمی‌خورند
+  await require('./sync-v1-live').accessChanged({ userId: m.user_id });
   return row;
 }
 
