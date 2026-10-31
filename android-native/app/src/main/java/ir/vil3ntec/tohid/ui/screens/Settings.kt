@@ -1114,8 +1114,8 @@ fun SettingsScreen(
         TextButton(onClick = {
           confirmClear = false
           scope.launch {
-            store.save(ShopData(), replace = true)
-            toast(StrSettings.wiped)
+            //  نوشته نشد (قفلِ نرم، خطای دیسک) ⇒ پیامش را `AppRoot` می‌دهد؛ «پاک شد» دروغ نگوید
+            if (store.save(ShopData(), replace = true)) toast(StrSettings.wiped)
           }
         }) { Text(StrSettings.wipe, color = Shop.colors.danger) }
       },
