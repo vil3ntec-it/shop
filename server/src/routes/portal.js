@@ -76,6 +76,8 @@ function subscriptionView(ent, at = now()) {
   else if (ent.source === 'trial') color = 'yellow';
   return {
     source: ent.source, status: s.status || 'none', active: !!s.active, plan: s.plan || '',
+    //  SUB-01 (docs/SUB-STATES-fa.md): مرحلهٔ رفتاری، «مهلت» جدا از «فعال» — فقط افزوده؛ متنِ `label` همان
+    phase: s.phase || 'none', graceEndsAt: s.graceEndsAt || 0,
     startsAt: s.startsAt || 0, endsAt: s.endsAt || 0, daysLeft: permanent ? null : days,
     totalDays: total, progress: permanent ? 100 : (total ? Math.max(0, Math.min(100, Math.round(days / total * 100))) : 0),
     permanent, color,
