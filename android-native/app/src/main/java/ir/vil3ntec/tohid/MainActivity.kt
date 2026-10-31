@@ -70,6 +70,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
+    ShopDayChoice.load(applicationContext)
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────

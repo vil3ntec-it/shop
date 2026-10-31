@@ -109,6 +109,7 @@
 
 - منطقِ پرداخت و شیفت فقط در `license/pay-core.js` و `core/pay/{Payment,Shift}.kt`، هر دو با `core/test-vectors/pay-v1.json`؛ یکی را عوض کنی، دیگری و بردار هم (#237).
 - پولِ پس فقط از نقد است و بیش‌پرداختِ غیرنقد رد می‌شود (#237).
+- دکمه و کلیدِ اسکناس (Shift+1 تا Shift+6، از `KeyMap.SALE_PAYMENT_NOTE*`) هر بار **یک** اسکناس به نقدِ دریافتی می‌افزایند، دقیق تا پول و از `CashKeys` ِ core (فهرست = `Pay.NOTES`)؛ متن رقم‌به‌رقم و بی Double خوانده می‌شود (Double ِ Kotlin/Native در آیفون نزدیکِ ۲^۵۳ با JVM یکی نیست)؛ متنِ نامعتبر یا با بیش از دو رقمِ اعشار دست نمی‌خورد. Enter ِ پنلِ پرداخت تا ۴۰۰ میلی‌ثانیه پس از باز شدن خورده می‌شود (`CashKeys.enterArmed`، ساعتِ یکنواخت) (PAY-03، PAY-04، claude/spec-pay-1).
 - گردکردنِ نقدی ردیفِ جدای `rounding` و پیش‌فرض خاموش است (`cashRounding = 0`)؛ روشن کردنش تأییدِ حسابدار می‌خواهد (D-11، #237).
 - کیف پول، کارت و حواله نقد شمرده نمی‌شوند، شمارهٔ مرجع می‌خواهند و تا تأیید `pending`اند، هرگز «موفق» (`verification: "manual"`، #237).
 - ارزِ هر مبلغ صریح است؛ ارزِ دیگر فقط با تبادل (نرخِ صحیح، منبع، زمان، تأییدکننده)؛ نتیجه به یک افغانی گرد و در رکورد ثابت (#237).
@@ -206,6 +207,7 @@
 - دکمه‌های حساسِ برنامه از `PermCore` تعیین می‌شوند، نه `!isStaff`؛ «سابقهٔ عملیات» پشتِ `audit.view` است (#248).
 - کدِ ثابتِ شاگرد «خاموش» می‌شود و تا «کدِ تازه» خودبه‌خود ساخته نمی‌شود؛ شاگردهای فعلی بیرون نمی‌افتند (STF-11، #243).
 - کلیدهای تازه: `orders.view/create/manage` همه، `orders.contact` و `orders.refund` صاحب و مدیر (#227)؛ `delivery.view/handover` همه، `delivery.assign/couriers/settle/photo` صاحب و مدیر (#249)؛ `chat.view/reply` همه، `chat.moderate` صاحب و مدیر (#259).
+- ⛔ `device_id`ِ همگام‌سازی (v1/v3، بدنه، querystring و `X-Device`) فقط همان دستگاهِ نشست است (`tokens.device_id` ⇐ `devices.device_uid`، یا `station_devices.device_uid`ِ کامپیوترِ پمپ) — وگرنه شاگرد با شناسهٔ دستگاهِ صاحب «حذفِ ردیفِ خودم» را دور می‌زد. پرچمِ `sync.device_bind` (live_config، `all` یا دکان/پمپ) روشن ⇒ `403 device_mismatch`؛ خاموش (پیش‌فرض) ⇒ فقط سابقهٔ `sync.device_mismatch` (روزی یک بار) تا پیش از روشن کردن دیده شود برنامه‌ای می‌شکند یا نه. سنجه: `sync-device-bind.test.js` (SEC-AUTH-14).
 
 ### v3 · سابقهٔ عملیات و زنجیرهٔ هش
 
@@ -390,6 +392,7 @@
 | `shop.image_bank` | دکان / `all` | خاموش | `/api/shop/images/*` (۴۰۳ `image_bank_disabled`، بی هیچ نوشتن) | #262 | main |
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
 | `hashchain.audit` | `security` | خاموش | زنجیرهٔ هشِ سابقه در `hash_chain`؛ روشن با `true` (و `1`، `"true"`، `"on"`) | #242 | main |
+| `auth.phone_add_code` | `security` | خاموش | افزودنِ شماره (راهِ ورود) به حسابِ بی‌شماره فقط با کدِ همان شماره و همان حساب: `POST /api/me/phone/code` و `phoneCode` در `PUT /api/me` (خاموش ⇒ درِ کد ۴۰۴ و رفتارِ امروز)؛ پیش از روشن کردن، برنامه‌ها `phoneCode` بفرستند (AUTH-08) | `claude/spec-auth-3` | باز |
 | `beta.shops`، `beta.devices` | `release` | فهرستِ خالی | کدام دکان/دستگاه نسخهٔ آزمایشی می‌گیرد؛ پنل: `/api/admin/release/beta` | F0-27، #265 | main |
 | `SYNC_V3_ENABLED` (محیط، نه `live_config`) | کلِ سرور | خاموش | `/api/sync/v3/*` (خاموش ⇒ ۴۰۴) | #233 | main |
 | `min_app_version_<app>` (پیکربندیِ پلن‌ها) | هر برنامه | خالی | پیامِ قرمزِ «پشتیبانی نمی‌شود»، بی قفل | #260 | main |
