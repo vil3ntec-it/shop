@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddBox
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,6 +73,7 @@ import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
 
 /**
  *  صندوقِ فروشِ کامپیوتر — برای صفحه‌کلید و بارکدخوان، نه برای انگشت.
@@ -164,6 +166,12 @@ fun DeskSaleScreen(
     switchedDebtor = null
     if (cartDebtorId != null && !fromSwitch) payment = SalesEngine.Payment.CREDIT
   }
+
+  //  RET-01/05 (S13/S15): «حالتِ برگشت» با Shift+F9 — فقط با برگشت و تعویضِ تازهٔ روشن (`ReturnSettings`)؛
+  //  خاموش ⇒ کلید همان کارِ امروز را می‌کند و دکمه‌ای نیست
+  val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) }
+  val myReceiptTag = remember { ir.vil3ntec.tohid.core.receipt.ReceiptTokens.shopTag(ir.vil3ntec.tohid.data.LedgerOwner.currentShop(context)) }
+  var returnMode by remember { mutableStateOf(false) }
 
   val searchFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
@@ -514,6 +522,7 @@ fun DeskSaleScreen(
       modifier = modifier,
       headerActions = {
         CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
+        if (returnsV2) CartHeaderAction(StrInvoices.returnItems, Icons.Filled.SwapHoriz, KeyMap.SALE_RETURN_MODE.hint) { returnMode = true }
         CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
       },
       customer = {
@@ -624,6 +633,10 @@ fun DeskSaleScreen(
         //  POS-12: پیش از هر شرطی — وسطِ جابه‌جاییِ فاکتور همهٔ کلیدها خورده می‌شوند
         if (held.onKey(e)) return@onPreviewKeyEvent true
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+        if (PosKeys.returnMode(keyName(e.key), e.isPrimaryModifier, e.isShiftPressed, e.isAltPressed, returnsV2)) {
+          returnMode = true
+          return@onPreviewKeyEvent true
+        }
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
@@ -754,6 +767,9 @@ fun DeskSaleScreen(
     snap.sales.find { it.id == id }?.let { sale ->
       InvoiceDialog(d = snap, sale = sale, onDismiss = { showInvoice = false; refocus() }, onMessage = ::toast)
     } ?: run { showInvoice = false }
+  }
+  if (returnMode) {
+    ReturnModeHost(d = d, store = store, shopTag = myReceiptTag, onClose = { returnMode = false; refocus() }, onMessage = ::toast)
   }
 }
 
