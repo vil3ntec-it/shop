@@ -290,9 +290,9 @@ async function providers() {
       return emailState(await mailer.current(), mailer.readiness);
     }),
     providerSafe('push', async () => pushState(await require('./push').current())),
-    //  پرداختِ آنلاین نیست (D-08): `orders.create` و ویترین جز `cod` را ۴۰۰ می‌کنند
-    //  و ویترین دکمهٔ پرداخت ندارد (#244). «none» است، نه «mock».
-    providerSafe('payment', async () => ({ mode: 'cod', state: 'none', missing: [], decision: 'D-08' })),
+    //  پرداختِ آنلاین: بی کلیدِ حساب‌پی «none» (فقط نقدِ هنگامِ تحویل، D-08)؛ کلیدها ⇒ live پشتِ پرچمِ
+    //  `pay.hesabpay` ِ هر دکان؛ ساختگی (فقط بیرون از تولید) ⇒ mock — `payment-providers.providerState`
+    providerSafe('payment', async () => require('./payment-providers').providerState()),
     //  مرحله‌های بیرونیِ عکس ۵۰۳ `step_unavailable` می‌دهند و هیچ چیزی نمی‌فرستند
     providerSafe('image_ai', async () => ({
       mode: '', state: 'none', missing: [],
