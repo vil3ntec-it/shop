@@ -96,7 +96,7 @@ const CAPABILITIES = Object.freeze([
   'shop-holds.v1',    //  GET|POST /admin/shops/:id/holds · POST …/holds/:holdId/lift (چهار حالت + بایگانی)
   'flags.v1',         //  GET /admin/flags · GET /admin/flags/history (نوشتن: ارشد + دلیل)
   'actor.v1',         //  سرآیندهای X-Actor-Id/Role/Name با کلیدِ سرویس ⇒ «انجام‌دهنده» در سابقه
-  'service-key.v1',   //  Bearer vsk_… · GET|POST /admin/service-keys · POST …/:keyId/revoke
+  'service-key.v1', ...require('../lib/ops-overview').CAPABILITIES,   //  vsk_ (/admin/service-keys) · ops.v1 (+release-stage.v1 با OPS-01)
 ]);
 
 router.get('/me', (req, res) => {
@@ -804,8 +804,8 @@ router.use('/sync', require('./admin-sync'));
 router.use('/shops/:id', require('./admin-shop-state'));
 router.use('/flags', require('./admin-flags'));
 router.use('/service-keys', require('./admin-service-keys'));
-//  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
-router.use('/system', require('./admin-system'));
+router.use('/system', require('./admin-system'));   //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
+router.use('/ops', require('./admin-ops'));         //  پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳: نسخه، سلامت، رخداد، هشدار، یکپارچه‌سازی
 //  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
 router.use('/release', require('./admin-release'));
 router.use('/', require('./admin-platform'));
