@@ -168,6 +168,8 @@ test('SEC-API-04: بی خواستِ صریح، کد در پاسخ نمی‌آی�
 test('SEC-API-04: `devEcho` از محیط — نبودِ NODE_ENV یعنی خاموش', () => {
   const read = (env) => {
     const clean = { PATH: process.env.PATH, ENV_FILE: path.join(__dirname, 'no-such.env') };
+    //  زیرِ Electron ‏`process.execPath` باینریِ Electron است؛ بی این متغیر Chromium بالا می‌آید، نه Node
+    if (process.env.ELECTRON_RUN_AS_NODE) clean.ELECTRON_RUN_AS_NODE = process.env.ELECTRON_RUN_AS_NODE;
     const r = spawnSync(process.execPath, ['-e', "process.stdout.write(String(require('./src/config').otp.devEcho))"],
       { cwd: path.join(__dirname, '..'), env: { ...clean, ...env }, encoding: 'utf8' });
     assert.equal(r.status, 0, r.stderr);
