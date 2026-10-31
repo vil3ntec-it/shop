@@ -205,6 +205,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   await pay.refreshOrder(req.store.shop_id, orderId);
   const order = await sf.track(req.store, req.params.token);
   order.onlinePay = { available: await pay.orderPayable(req.store.shop_id, orderId) };
+  //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
+  const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
+  if (refund !== undefined) order.refund = refund;
   res.json({ order });
 });
 
