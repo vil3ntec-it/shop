@@ -10,6 +10,12 @@ package ir.vil3ntec.tohid.core.i18n
 object StrPos {
 
   // صندوقِ کامپیوتر
+  val smartSearch: String get() = t("جست‌وجوی مقاومِ صندوق", "Forgiving till search", "د صندوق بښونکې لټون")
+  val smartSearchNote: String get() = t(
+    "روشن: «ي/ی» و «ك/ک»، نیم‌فاصله، رقمِ فارسی، کلمه‌ها به هر ترتیب و یک غلطِ تایپی هم پیدا می‌شوند؛ بارکدِ کامل اول، بعد نامی که با نوشته آغاز می‌شود. فقط روی همین دستگاه.",
+    "On: Arabic/Persian letter variants, half-spaces, Persian digits, words in any order and a typo are found too; a full barcode comes first, then names starting with the text. This device only.",
+    "روښانه: د «ي/ی» او «ك/ک» بڼې، نیمه تشه، فارسي عددونه، کلمې په هر ترتیب او یوه ټایپي تېروتنه هم موندل کېږي؛ بشپړ بارکوډ لومړی، بیا هغه نومونه چې په لیکنه پیلېږي. یوازې همدا وسیله.",
+  )
   val discountForbidden: String get() = t("این تخفیف برای شما ممنوع است", "You're not allowed to give this discount", "تاسو ته د دې تخفیف اجازه نشته")
   val cartChangedRetry: String get() = t("سبد همین حالا عوض شد — دوباره بزنید", "The cart just changed — press again", "ټوکرۍ همدا اوس بدله شوه — بیا یې ووهئ")
   fun saleRecorded(a: Any): String = t("فروش $a ؋ ثبت شد", "Sale of $a ؋ recorded", "د $a ؋ پلور ثبت شو")
@@ -23,6 +29,9 @@ object StrPos {
   val mixedPayHint: String get() = t("پرداختِ ترکیبی: F9 پنلِ پرداخت (نقد، کیف پول، کارت، حواله، به حسابِ مشتری) — F12 نقدِ دقیق", "Mixed payment: F9 payment panel (cash, wallet, card, transfer, customer account) — F12 exact cash", "ګډه ورکړه: F9 د ورکړې پاڼه (نغد، بټوه، کارت، حواله، د پیرودونکي حساب) — F12 دقیق نغد")
   val paidNowShort: String get() = t("دریافتیِ همین حالا", "Received now", "همدا اوس ترلاسه شوې")
   val approveDiscount: String get() = t("تأییدِ تخفیف", "Approve discount", "د تخفیف تایید")
+  //  CRM-03 / S07 — فروشِ نسیه بیش از سقفِ اعتبار
+  val creditOverTitle: String get() = t("فروشِ نسیه بیش از سقف", "Credit sale over the limit", "له سقف پورته نسیه پلور")
+  val creditApproveSelf: String get() = t("تأیید با این دلیل", "Approve with this reason", "په دې لامل تایید")
   fun discountSummary(d: Any, s: Any): String = t("تخفیفِ $d ؋ روی فاکتورِ $s ؋", "Discount of $d ؋ on an invoice of $s ؋", "د $s ؋ بل باندې $d ؋ تخفیف")
   fun cashierCap(p: Any): String = t("سقفِ صندوقدار $p٪", "cashier limit $p%", "د صندوقدار حد $p٪")
   fun weighedAdded(n: Any, q: Any): String = t("$n — $q به سبد اضافه شد", "$n — $q added to the cart", "$n — $q ټوکرۍ ته اضافه شو")
@@ -32,6 +41,7 @@ object StrPos {
   val cashReceived: String get() = t("نقدِ دریافتی", "Cash received", "ترلاسه شوې نغدې")
   val enterExactHint: String get() = t("Enter روی کادرِ خالی = نقدِ دقیق", "Enter on an empty box = exact cash", "په تش بکس کې Enter = دقیق نغد")
   val exactCash: String get() = t("نقدِ دقیق", "Exact cash", "دقیق نغد")
+  val notesKeysHint: String get() = t("اسکناس: Shift+1 تا Shift+6 = ۱۰، ۲۰، ۵۰، ۱۰۰، ۵۰۰ و ۱۰۰۰ — هر بار یکی به نقدِ دریافتی", "Banknotes: Shift+1 to Shift+6 = 10, 20, 50, 100, 500 and 1000 — each adds one to cash received", "نوټونه: Shift+1 تر Shift+6 = ۱۰، ۲۰، ۵۰، ۱۰۰، ۵۰۰ او ۱۰۰۰ — هر ځل یو په ترلاسه شویو نغدو ورزیاتوي")
   val reference: String get() = t("شمارهٔ مرجع", "Reference number", "د مرجع شمېره")
   val amount: String get() = t("مبلغ", "Amount", "مبلغ")
   val removeMethod: String get() = t("حذفِ این روش", "Remove this method", "دا لاره لرې کړئ")

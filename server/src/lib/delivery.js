@@ -40,6 +40,15 @@ const MAX_PHOTOS = 3;
 const CODE_MAX_ATTEMPTS = 5;
 const DEFAULT_CASH_CAP_MINOR = 1_000_000;  // D-18 (پیش‌نهاد): ۱۰٬۰۰۰ افغانی
 
+//  S5 (قراردادِ بازار §۳): نمای پیک برای مشتری — هر دو پیش‌فرض خاموش
+const VIEW_FLAG = 'shop.delivery_customer_view';
+const LOCATION_FLAG = 'shop.delivery_live_location';
+/** «در راه» — تنها بازه‌ای که موقعیت گرفته و نشان داده می‌شود (پیش از «رسیدم»). */
+const ON_THE_WAY = Object.freeze(['picked_up', 'moving']);
+const LOCATION_TTL_MS = 10 * 60_000;        // نقطهٔ کهنه‌تر نشان داده نمی‌شود و پاک می‌شود
+const LOCATION_MIN_INTERVAL_MS = 5_000;     // نقطه‌های تندتر نادیده
+const MAX_ETA_MINUTES = 240;
+
 // ════════════════════════════════════════════════════════════════════
 //  پرچم و اشتراک
 // ════════════════════════════════════════════════════════════════════
@@ -112,6 +121,22 @@ function codeHash(assignmentId, code) {
 
 function newCode() {
   return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+}
+
+/**
+ * کدِ قابلِ بازسازی (فقط با پرچمِ نمای مشتری): از دانهٔ تصادفیِ مأموریت و رمزِ
+ * سرور ساخته می‌شود، تا مشتری کد را ببیند بی آن‌که خودِ کد جایی نوشته شود.
+ */
+function derivedCode(assignmentId, nonce) {
+  const mac = crypto.createHmac('sha256', pepper()).update(`delivery-code:${assignmentId}:${nonce}`).digest();
+  return String(mac.readUIntBE(0, 6) % 1_000_000).padStart(6, '0');
+}
+
+/** کد + دانه: با پرچم قابلِ بازسازی، وگرنه همان کدِ تصادفیِ یک‌بار-دیدنی. */
+function codeFor(assignmentId, rebuildable) {
+  if (!rebuildable) return { code: newCode(), nonce: '' };
+  const nonce = crypto.randomBytes(16).toString('base64url');
+  return { code: derivedCode(assignmentId, nonce), nonce };
 }
 
 function codeMatches(a, raw) {
@@ -352,6 +377,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
   const requireCode = mode === 'pickup' || b.requireCode === true;
   if (b.overrideCashCap !== undefined && typeof b.overrideCashCap !== 'boolean') throw badRequest('نامعتبر', 'bad_override');
   const reqHash = hashOf({ orderId: String(orderId || ''), mode, fareMinor, courierId, externalName, externalRef, requireCode });
+  const rebuildable = requireCode && await orders.flagOf(shopId, VIEW_FLAG);
 
   return tx(async (c) => {
     const order = (await c.query(
@@ -406,14 +432,14 @@ async function assign(shopId, orderId, body, actor, key = '') {
     const attempt = Number((await c.query(
       'SELECT COALESCE(MAX(attempt_no), 0) + 1 AS n FROM delivery_assignments WHERE order_id=$1', [order.id]
     )).rows[0].n);
-    const code = requireCode ? newCode() : null;
+    const { code, nonce } = requireCode ? codeFor(id, rebuildable) : { code: null, nonce: '' };
     const status = mode === 'shop_courier' ? 'requested' : 'assigned';
     await c.query(
       `INSERT INTO delivery_assignments (id, shop_id, order_id, attempt_no, mode, courier_id, external_name,
-         external_ref, status, expected_collect_minor, fare_minor, code_hash, created_by, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$14)`,
+         external_ref, status, expected_collect_minor, fare_minor, code_hash, code_nonce, created_by, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`,
       [id, shopId, order.id, attempt, mode, courierId, externalName, externalRef, status, expected, fareMinor,
-        code ? codeHash(id, code) : '', actor.userId || '', at]
+        code ? codeHash(id, code) : '', nonce, actor.userId || '', at]
     );
     const a = (await c.query('SELECT * FROM delivery_assignments WHERE id=$1', [id])).rows[0];
     await appendEvent(c, a, {
@@ -428,18 +454,20 @@ async function assign(shopId, orderId, body, actor, key = '') {
 
 /** کدِ تازه (کدِ قبلی باطل، شمارِ تلاش صفر) — کد فقط همین یک بار دیده می‌شود. */
 async function regenerateCode(shopId, assignmentId, actor) {
+  const rebuildable = await orders.flagOf(shopId, VIEW_FLAG);
   return tx(async (c) => {
     const a = (await c.query(
       'SELECT * FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(assignmentId || '')]
     )).rows[0];
     if (!a) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
     if (!D.LIVE.includes(a.status) || a.status === 'failed') throw conflict('این مأموریت کدِ تازه نمی‌پذیرد', 'not_live');
-    const code = newCode();
+    const { code, nonce } = codeFor(a.id, rebuildable);
     const at = now();
     await c.query(
-      `UPDATE delivery_assignments SET code_hash=$3, code_attempts=0, code_used_at=NULL, version=version+1, updated_at=$4
+      `UPDATE delivery_assignments SET code_hash=$3, code_nonce=$5, code_attempts=0, code_used_at=NULL,
+              version=version+1, updated_at=$4
         WHERE shop_id=$1 AND id=$2`,
-      [shopId, a.id, codeHash(a.id, code), at]
+      [shopId, a.id, codeHash(a.id, code), at, nonce]
     );
     await appendEvent(c, a, {
       key: `srv:${ulid(at)}:code`, kind: 'code', from: a.status, to: a.status,
@@ -621,10 +649,15 @@ async function applyEvent(c, shopId, ev, actor) {
             cash_collected_minor = CASE WHEN $3 = 'delivered' THEN $5::bigint ELSE cash_collected_minor END,
             cash_review=$6::boolean, delivered_at = CASE WHEN $3 = 'delivered' THEN $7::bigint ELSE delivered_at END,
             code_used_at = CASE WHEN $8::boolean THEN $7::bigint ELSE code_used_at END,
+            --  S5: کدِ مصرف‌شده یا مأموریتِ پایان‌یافته دیگر بازسازی نمی‌شود
+            code_nonce = CASE WHEN $8::boolean OR NOT ($3 = ANY($10::text[])) THEN '' ELSE code_nonce END,
+            eta_at = CASE WHEN $3 = ANY($11::text[]) THEN eta_at ELSE NULL END,
             recall_outcome=$9, version=version+1, updated_at=$7
       WHERE shop_id=$1 AND id=$2`,
-    [shopId, a.id, ev.to, reason, collected, cashReview, at, codeUsed, recallOutcome]
+    [shopId, a.id, ev.to, reason, collected, cashReview, at, codeUsed, recallOutcome, D.LIVE, ON_THE_WAY]
   );
+  //  S5: موقعیت فقط «در راه» می‌ماند — هر گذارِ دیگر (رسیدم، تحویل، …) همین‌جا پاکش می‌کند
+  if (!ON_THE_WAY.includes(ev.to)) await c.query('DELETE FROM delivery_locations WHERE assignment_id=$1', [a.id]);
   await appendEvent(c, a, {
     key: ev.key || `srv:${ulid(at)}:${ev.to}`, hash, kind: 'status', from: a.status, to: ev.to,
     actorType: actor.kind === 'courier' ? 'courier' : 'user', actorId: actor.userId,
@@ -1163,6 +1196,133 @@ async function getSettlement(shopId, id) {
   return { settlement: settlementView(s), rows: rows.map(settleRowView) };
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  S5: نمای پیک برای مشتری (قراردادِ بازار §۳، §۴۰.۱)
+// ════════════════════════════════════════════════════════════════════
+
+/** وضعیتِ عمومی — مشتری گذارهای درونیِ دکان و پیک را نمی‌بیند. */
+const PUBLIC_STATUS = Object.freeze({
+  requested: 'waiting', rejected: 'waiting', withdrawn: 'waiting', assigned: 'assigned',
+  picked_up: 'on_the_way', moving: 'on_the_way', arrived: 'arrived',
+  delivered: 'delivered', failed: 'failed', returned: 'returned',
+});
+const ACCEPTED = Object.freeze(['assigned', 'picked_up', 'moving', 'arrived', 'failed']);
+
+const firstName = (name) => text(name, 80).split(/\s+/)[0].slice(0, 30);
+//  ۳ رقمِ اعشار ≈ ۱۱۰ متر: «تقریبی»، نه درِ خانه
+const approx = (x) => Math.round(Number(x) * 1000) / 1000;
+
+/** کدِ زنده برای مشتری — فقط اگر دانه هنوز هست و با هشِ ذخیره‌شده جور است. */
+function liveCode(a) {
+  if (!a.code_nonce || !a.code_hash || a.code_used_at != null) return null;
+  if (!D.LIVE.includes(a.status) || Number(a.code_attempts) >= CODE_MAX_ATTEMPTS) return null;
+  const code = derivedCode(a.id, a.code_nonce);
+  return codeMatches(a, code) ? code : null;
+}
+
+/**
+ * نمای پیک برای مشتریِ همین سفارش (فراخواننده سفارش را با توکنِ پیگیری پیدا
+ * کرده است). `undefined` = پرچم خاموش ⇒ پاسخِ مشتری همان شکلِ پیشین را دارد؛
+ * `null` = هنوز مأموریتی نیست. ⛔ نه شماره، نه شناسهٔ پیک، نه نشانیِ دقیق.
+ */
+async function customerView(shopId, orderId) {
+  const st = await stateOf(shopId);
+  if (!st.readable || !(await orders.flagOf(shopId, VIEW_FLAG))) return undefined;
+  const a = await one(
+    `SELECT a.*, c.name AS courier_name FROM delivery_assignments a
+       LEFT JOIN shop_couriers c ON c.shop_id = a.shop_id AND c.id = a.courier_id
+      WHERE a.shop_id=$1 AND a.order_id=$2 ORDER BY a.attempt_no DESC LIMIT 1`,
+    [shopId, String(orderId || '')]
+  );
+  if (!a) return null;
+  const live = D.LIVE.includes(a.status);
+  const onTheWay = ON_THE_WAY.includes(a.status);
+  let location = null;
+  if (onTheWay && await orders.flagOf(shopId, LOCATION_FLAG)) {
+    const p = await one(
+      'SELECT lat, lng, server_time FROM delivery_locations WHERE assignment_id=$1 AND server_time >= $2',
+      [a.id, now() - LOCATION_TTL_MS]
+    );
+    if (p) location = { lat: approx(p.lat), lng: approx(p.lng), at: Number(p.server_time), approximate: true };
+  }
+  const chatOn = live && await require('./shop-chat').flagOf(shopId);
+  return {
+    status: PUBLIC_STATUS[a.status],
+    carrier: a.mode === 'pickup' ? 'pickup' : a.mode === 'external' ? 'external' : 'courier',
+    courierName: a.mode === 'shop_courier' && ACCEPTED.includes(a.status) ? firstName(a.courier_name) || null : null,
+    //  «تماس با پیک» از راهِ گفت‌وگوی پوشیدهٔ همین سفارش — هرگز شمارهٔ خام
+    contact: { via: 'order_chat', available: chatOn },
+    code: liveCode(a),
+    etaAt: onTheWay && a.eta_at != null ? Number(a.eta_at) : null,
+    location,
+    deliveredAt: n(a.delivered_at),
+    updatedAt: Number(a.updated_at),
+  };
+}
+
+/** مأموریتِ «در راهِ» همین پیک، قفل‌شده — یا رد. */
+async function onTheWayOf(c, shopId, assignmentId, actor) {
+  const a = (await c.query(
+    'SELECT id, shop_id, status, courier_id FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE',
+    [shopId, String(assignmentId || '')]
+  )).rows[0];
+  if (!a || a.courier_id !== actor.courierId) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
+  if (actor.active !== true) throw new ApiError(403, 'courier_inactive', 'این پیک غیرفعال است');
+  if (!ON_THE_WAY.includes(a.status)) throw conflict('این مأموریت «در راه» نیست', 'not_on_the_way');
+  return a;
+}
+
+/** نقطه‌های کهنه‌تر از نگهداری می‌روند (هر نوشتن و هر آزمون صدایش می‌کند). */
+async function purgeLocations(run = (t, p) => db.query(t, p)) {
+  await run('DELETE FROM delivery_locations WHERE server_time < $1', [now() - LOCATION_TTL_MS]);
+}
+
+/**
+ * پیک آخرین نقطه‌اش را می‌فرستد (`/api/courier`). فقط با هر دو پرچم، فقط
+ * مأموریتِ خودش و فقط «در راه». فقط آخرین نقطه نگه داشته می‌شود.
+ */
+async function putLocation(shopId, assignmentId, body, actor) {
+  if (!(await orders.flagOf(shopId, VIEW_FLAG)) || !(await orders.flagOf(shopId, LOCATION_FLAG))) {
+    throw notFound('موقعیتِ زنده برای این دکان روشن نیست', 'live_location_disabled');
+  }
+  const b = body && typeof body === 'object' ? body : {};
+  const coord = (v, max, field) => {
+    if (typeof v !== 'number' || !Number.isFinite(v) || Math.abs(v) > max) throw badRequest(`${field} نامعتبر است`, 'bad_location');
+    return v;
+  };
+  const lat = coord(b.lat, 90, 'عرض');
+  const lng = coord(b.lng, 180, 'طول');
+  const accuracyM = optInt(b.accuracyM, 'دقت', { min: 0, max: 100_000 });
+  const deviceTime = optInt(b.deviceTime, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
+  return tx(async (c) => {
+    const a = await onTheWayOf(c, shopId, assignmentId, actor);
+    const at = now();
+    const r = await c.query(
+      `INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, accuracy_m, device_time, server_time)
+       VALUES ($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT (assignment_id) DO UPDATE SET lat=EXCLUDED.lat, lng=EXCLUDED.lng, accuracy_m=EXCLUDED.accuracy_m,
+              device_time=EXCLUDED.device_time, server_time=EXCLUDED.server_time
+        WHERE delivery_locations.server_time <= $8`,
+      [a.id, shopId, lat, lng, accuracyM, deviceTime, at, at - LOCATION_MIN_INTERVAL_MS]
+    );
+    await purgeLocations((t, p) => c.query(t, p));
+    return { accepted: r.rowCount > 0, serverTime: at };
+  });
+}
+
+/** «تقریباً N دقیقهٔ دیگر» از خودِ پیک — فقط با پرچمِ نمای مشتری و فقط «در راه». */
+async function putEta(shopId, assignmentId, body, actor) {
+  if (!(await orders.flagOf(shopId, VIEW_FLAG))) throw notFound('نمای پیک برای مشتری روشن نیست', 'customer_view_disabled');
+  const b = body && typeof body === 'object' ? body : {};
+  const minutes = int(b.minutes, 'دقیقه', { min: 1, max: MAX_ETA_MINUTES });
+  return tx(async (c) => {
+    const a = await onTheWayOf(c, shopId, assignmentId, actor);
+    const etaAt = now() + minutes * 60_000;
+    await c.query('UPDATE delivery_assignments SET eta_at=$2 WHERE id=$1', [a.id, etaAt]);
+    return { etaAt };
+  });
+}
+
 /** دسترسی‌های کارمند برای `D.check`. */
 function staffActor(req) {
   return {
@@ -1173,6 +1333,7 @@ function staffActor(req) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS,
+  VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, customerView, putLocation, putEta, purgeLocations,
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
   assign, regenerateCode, courierEvents, staffEvent, recall, missions, forOrder, board,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
