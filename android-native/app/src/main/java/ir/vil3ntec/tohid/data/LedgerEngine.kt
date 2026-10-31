@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
 
 /**
  *  مصارف، خرید و تأمین‌کننده‌ها.
@@ -28,9 +29,9 @@ object LedgerEngine {
   )
 
   fun addExpense(d: ShopData, draft: ExpenseDraft, today: String, now: Long, newId: () -> String): Result {
-    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed(StrExpenses.amountInvalid)
     val category = draft.category.trim().ifBlank { d.expenseCategories.firstOrNull().orEmpty() }
-    if (category.isBlank()) return Result.Failed("دسته‌بندی را انتخاب کنید")
+    if (category.isBlank()) return Result.Failed(StrExpenses.pickCategory)
 
     // «بابت چی؟» اختیاری است: نامِ دسته‌بندی به‌جایش می‌نشیند تا فهرستِ
     // مصارف ردیفِ بی‌عنوان نداشته باشد — همان کارِ نسخهٔ وب
@@ -55,8 +56,8 @@ object LedgerEngine {
   }
 
   fun editExpense(d: ShopData, id: String, draft: ExpenseDraft, today: String): Result {
-    val existing = d.expenses.find { it.id == id } ?: return Result.Failed("مصرف پیدا نشد")
-    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    val existing = d.expenses.find { it.id == id } ?: return Result.Failed(StrExpenses.expenseNotFound)
+    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed(StrExpenses.amountInvalid)
     val category = draft.category.trim().ifBlank { existing.category }
     val title = draft.title.trim().ifBlank { category }
 
@@ -83,7 +84,7 @@ object LedgerEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val e = d.expenses.find { it.id == id } ?: return Result.Failed("مصرف پیدا نشد")
+    val e = d.expenses.find { it.id == id } ?: return Result.Failed(StrExpenses.expenseNotFound)
     //  ردپا: هزینهٔ پاک‌شده سودِ خالص را بالا می‌برد و باید معلوم بماند
     val trace = AuditEntry(
       id = newId(), type = "expense_delete", date = today, refId = id, createdAt = now,
