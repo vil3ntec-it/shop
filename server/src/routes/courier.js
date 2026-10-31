@@ -89,6 +89,19 @@ router.post('/missions/:id/call', async (req, res) => {
   res.json({ phone: out.phone, status: out.status });
 });
 
+/*
+ *  S5 (پشتِ پرچم‌های خاموشِ `shop.delivery_customer_view` و جدای
+ *  `shop.delivery_live_location`): «تقریباً کی می‌رسم» و آخرین نقطه — فقط
+ *  مأموریتِ خودِ پیک و فقط «در راه». مشتری فقط از سرور می‌خواند.
+ */
+router.post('/missions/:id/eta', wrap(async (req, res) => {
+  res.json(await delivery.putEta(req.shopId, req.params.id, req.body, req.courierActor));
+}));
+
+router.post('/missions/:id/location', wrap(async (req, res) => {
+  res.json(await delivery.putLocation(req.shopId, req.params.id, req.body, req.courierActor));
+}));
+
 //  ⛔ تهِ درِ پیک: هیچ نشانیِ دیگری از این‌جا به روترهای بعدی نمی‌رود
 router.use((req, res, next) => next(notFound('این نشانی در درِ پیک نیست', 'not_found')));
 
