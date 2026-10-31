@@ -36,6 +36,17 @@ async function hashWithP(plain, p) {
 }
 const pOf = (stored) => Number(String(stored).split('$')[3]);
 
+/**
+ * محیطِ خالیِ فرزند (بی NODE_ENV و بی تنظیمِ آزمون) — فقط PATH، و `ELECTRON_RUN_AS_NODE` اگر
+ * خودِ آزمون زیرِ Electron است: `process.execPath` آن‌جا باینریِ Electron است و بی این متغیر به‌جای
+ * Node، Chromium بالا می‌آید و سرِ sandbox می‌افتد (کارِ «آزمون‌های سرور زیرِ Electron»).
+ */
+function bareEnv(extra = {}) {
+  const env = { PATH: process.env.PATH };
+  if (process.env.ELECTRON_RUN_AS_NODE) env.ELECTRON_RUN_AS_NODE = process.env.ELECTRON_RUN_AS_NODE;
+  return { ...env, ...extra };
+}
+
 /* ── SEC-AUTH-01 ─────────────────────────────────────────────────── */
 
 test('SEC-AUTH-01: هشِ تازه N=16384، r=8، p=5؛ در production محیط آن را پایین نمی‌آورد', async () => {
@@ -49,11 +60,11 @@ test('SEC-AUTH-01: هشِ تازه N=16384، r=8، p=5؛ در production محی�
   //  production (و بی NODE_ENV): کمتر از پیش‌فرض پذیرفته نمی‌شود
   const out = execFileSync(process.execPath, ['-e',
     "process.env.PASSWORD_SCRYPT_P='1'; console.log(require('./src/lib/password').currentP())"],
-  { cwd: require('node:path').join(__dirname, '..'), env: { PATH: process.env.PATH, NODE_ENV: 'production' } }).toString().trim();
+  { cwd: require('node:path').join(__dirname, '..'), env: bareEnv({ NODE_ENV: 'production' }) }).toString().trim();
   assert.equal(out, '5');
   const bare = execFileSync(process.execPath, ['-e',
     "process.env.PASSWORD_SCRYPT_P='1'; console.log(require('./src/lib/password').currentP())"],
-  { cwd: require('node:path').join(__dirname, '..'), env: { PATH: process.env.PATH } }).toString().trim();
+  { cwd: require('node:path').join(__dirname, '..'), env: bareEnv() }).toString().trim();
   assert.equal(bare, '5', 'بی NODE_ENV هم production حساب می‌شود');
 });
 
@@ -167,7 +178,7 @@ test('SEC-AUTH-05: سرآیندِ ساختگیِ تازه در هر درخواس
 test('SEC-AUTH-06: سرورِ بی NODE_ENV کد را نه در پاسخ می‌دهد نه در لاگ؛ فقط development/test', async (t) => {
   const bare = execFileSync(process.execPath, ['-e',
     "const c=require('./src/config'); console.log(JSON.stringify({env:c.env,dev:c.devCodes}))"],
-  { cwd: require('node:path').join(__dirname, '..'), env: { PATH: process.env.PATH } }).toString().trim();
+  { cwd: require('node:path').join(__dirname, '..'), env: bareEnv() }).toString().trim();
   assert.deepEqual(JSON.parse(bare.split('\n').pop()), { env: 'development', dev: false });
 
   //  همان سرور در آزمون (NODE_ENV=test) کد را پس می‌دهد — پس آزمون بی‌اثر نیست
