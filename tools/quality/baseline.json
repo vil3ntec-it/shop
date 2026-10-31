@@ -3,7 +3,7 @@
   "fileSize": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1008,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1259,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1075,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1148,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 804,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Dashboard.kt": 1147,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Debtors.kt": 1370,
@@ -11,7 +11,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Profile.kt": 816,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Sale.kt": 858,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt": 924,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Settings.kt": 1289,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Settings.kt": 1410,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/TopBar.kt": 1265,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Vip.kt": 1692,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Welcome.kt": 2702,
