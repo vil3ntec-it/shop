@@ -410,7 +410,6 @@ private fun OrderDetailSheet(
       is OrdersLive.Posted.Review -> snackbar.showSnackbar(r.message)
     }
   }
-
   /** «بررسی شد» ِ صاحب برای ردیفِ بررسیِ همین سفارش — برای همهٔ دستگاه‌ها */
   suspend fun ackReview(o: OrderDto) {
     val err = OrdersLive.ackReview(context, o.id)
@@ -441,6 +440,7 @@ private fun OrderDetailSheet(
           order = it
           act = null
           onChanged()
+          scope.launch { ir.vil3ntec.tohid.print.OrderSlipPrint.afterTransition(context, o.status, it)?.let { m -> snackbar.showSnackbar(m) } } // ORD-10
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
           if (it.status in OrderFulfillment.HANDED_OVER || it.status in OrderFulfillment.BACK_IN_SHOP) postSale(it)
           //  بازپرداخت ⇒ سندِ برگشتِ همان فروش در همین دفتر، و همان دم «کالا به انبار برگشت؟» (پیش‌فرض نه)

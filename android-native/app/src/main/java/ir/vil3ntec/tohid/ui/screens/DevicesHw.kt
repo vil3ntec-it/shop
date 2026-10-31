@@ -28,6 +28,7 @@ import ir.vil3ntec.tohid.core.hw.NciScale
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.ReceiptCopies
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
+import ir.vil3ntec.tohid.core.i18n.StrOrderSlip
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ScaleLabels
 import ir.vil3ntec.tohid.data.ShopData
@@ -37,6 +38,7 @@ import ir.vil3ntec.tohid.hw.HwPlatform
 import ir.vil3ntec.tohid.hw.ScaleReader
 import ir.vil3ntec.tohid.print.HwPages
 import ir.vil3ntec.tohid.print.HwTools
+import ir.vil3ntec.tohid.print.OrderSlipPrint
 import ir.vil3ntec.tohid.print.PrintLog
 import ir.vil3ntec.tohid.print.PrintSpooler
 import ir.vil3ntec.tohid.print.ReceiptCopiesPref
@@ -120,6 +122,7 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
   var auto by remember { mutableStateOf(PrintSpooler.autoPrint(context)) }
   var deferred by remember { mutableStateOf(PrintSpooler.deferred(context)) }
   var copies by remember { mutableIntStateOf(ReceiptCopiesPref.get(context)) }
+  var slipAuto by remember { mutableStateOf(OrderSlipPrint.auto(context)) }
   var tick by remember { mutableIntStateOf(0) }
   val reprints = remember(tick, jobs.size) { PrintLog.reprints(context, 5) }
   var dry by remember { mutableStateOf<Pair<String, HwPages.Preview>?>(null) }
@@ -180,6 +183,8 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
         Text("نسخهٔ دوم به بعد روی کاغذ «نسخهٔ ۲ از …» دارد تا با اصل اشتباه نشود.",
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
+      //  ORD-10: برگهٔ سفارش پس از قبول روی همین دستگاه — تنظیمِ همین دستگاه، پیش‌فرض خاموش
+      HwSwitchRow(StrOrderSlip.setting, StrOrderSlip.settingNote, slipAuto) { slipAuto = it; OrderSlipPrint.setAuto(context, it) }
       HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
         deferred = it; PrintSpooler.setDeferred(context, it)
       }
