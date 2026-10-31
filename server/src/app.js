@@ -389,6 +389,8 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  ماژولِ ۴.۵ ِ پنلِ مرکزی: مالیِ مرکزی (درآمدِ اشتراک، سندِ اصلاحی، بدهی، مغایرت، خروجی) — `requireAdmin` ِ خودش
+    api.use('/admin/finance', require('./routes/admin-finance'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     /*
