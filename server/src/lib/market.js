@@ -722,7 +722,7 @@ async function myOrders(ticket) {
   const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
-    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
+    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at, o.track_gen,
             sf.slug, sf.title, sf.accent
        FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
       WHERE o.source = 'storefront' AND o.customer_phone = $1
@@ -731,10 +731,12 @@ async function myOrders(ticket) {
   );
   const slugs = [...new Set(rows.map((r) => r.slug))];
   const open = new Set(await filterAsync(slugs, storeOpen));
+  //  TEN-03: لینکِ زمان‌دار به‌ازای پرچمِ هر دکان
+  const linked = new Set(await filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn));
   return rows.filter((r) => open.has(r.slug)).map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
-    token: sf.tokenOf(r.shop_id, r.id),
+    token: sf.listTokenOf(r.shop_id, r, linked.has(r.shop_id)),
     store: { slug: r.slug, title: r.title, accent: r.accent },
   }));
 }

@@ -114,6 +114,21 @@ router.post('/:id/review-ack', needFlag, requirePermission('orders.refund'), nee
   res.json(await require('../lib/order-ledger').ackReview(req.shopId, req.params.id, req.body?.kind, actorOf(req)));
 }));
 
+/**
+ * TEN-03 — «باطل کردنِ لینکِ پیگیری» ِ سفارشِ ویترین (پرچمِ `shop.storefront.link_expiry`):
+ * هر لینکِ پیشینِ مشتری ۴۱۰ `link_revoked` می‌گیرد و لینکِ تازه برمی‌گردد تا دکان دوباره بفرستد.
+ * فقط صاحب و مدیر (`orders.contact`، همان‌ها که شمارهٔ مشتری را می‌بینند)؛ مثلِ هر نوشتنِ
+ * سفارش پشتِ `needWrite` (SUB-10، دستهٔ PAID).
+ */
+router.post('/:id/track-link/revoke', needFlag, requirePermission('orders.contact'), needWrite, wrap(async (req, res) => {
+  const out = await require('../lib/storefront').revokeLink(req.shopId, String(req.params.id || '').slice(0, 40));
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'order.track_link_revoked',
+    targetType: 'online_order', targetId: String(req.params.id), detail: { gen: out.gen }, ip: clientIp(req),
+  });
+  res.json({ ok: true, token: out.token });
+}));
+
 router.get('/:id', needFlag, wrap(async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
