@@ -132,6 +132,7 @@
 - تا D-23 باز است سود «تقریبی» است؛ `profitApproximate` فقط با `mavg` + `costApproved` + بی قلمِ بی‌بها `false` می‌شود؛ پیش‌فرضِ بها `line` (#236).
 - کاربرِ هر رویدادِ ضدتقلب فقط از فیلدِ صریحِ خودش می‌آید، نه از فروشندهٔ فاکتور؛ نام‌ها همان `by`/`at`/`approvedBy`ِ pay-core (RPT-09، #236).
 - سنِ بدهی با فاصلهٔ روزِ تقویمی تا `asOf` و ستون‌های قابلِ تنظیمِ ۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۱+ (RPT-06، #236).
+- پایانِ روز (`core/pay/DayClose`، کاتلینِ commonMain): شیفت مالِ روزِ کاریِ **باز شدنش** است؛ Z ِ ذخیره‌شده ثابت می‌ماند و هر پولِ دفترِ همان روز که هیچ X/Z ای نشمرده جدا در «بیرون از شیفت‌ها» می‌آید، نه پخش یا پنهان؛ شیفت‌های هم‌پوشان روز را «بسته» نمی‌کنند؛ «شمرده نشد» null است، نه صفر (RPT-04، `claude/spec-invrpt-1`).
 
 ### v3 · قرض‌داران
 
@@ -366,11 +367,14 @@
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
+| `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
+`tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
@@ -2049,6 +2053,7 @@ DELETE /api/admin/users/:id  {confirmEmail}  فقط سوپرادمین، با ا
   دفترِ جدا، همان قاعدهٔ همیشگی.
 - آزمون: سه بندِ آخرِ `test/pump.test.js` — و دندانش سنجیده شد (بی
   `user_apps` بندِ اول سرخ می‌شود).
+
 ## ⛔ زدنِ کد سطلِ خودش را دارد — جدا از فرستادنِ ایمیل (از ۱۴۰۵/۰۷/۱۳، نسخهٔ ۲.۱۰.۷)
 
 سنجهٔ `linkstates`ِ برنامهٔ پمپ روی سرورِ واقعی گرفتش: کاربری که ثبت‌نام کرده
@@ -2218,6 +2223,7 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
   آی‌پی (`syncIpMax`، ۶٬۰۰۰). بی‌سقف نیست؛ فقط دیگر دستگاه‌های همسایه را
   نمی‌بندد.
 - آزمون: `test/sync-v1-ratelimit.test.js` (هر دو سمت؛ روی کدِ پیشین سرخ).
+
 ## ⛔ مجوز زیرِ Electron امضا نمی‌شد — ریشهٔ «اشتراک به برنامه نمی‌رسد» (از ۱۴۰۵/۰۷/۱۵، نسخهٔ ۲.۱۱.۱۰)
 
 گزارشِ صاحبِ سامانه با عکس: پنل «VIP تا ۱۴۰۶/۰۸/۰۵»، پیامِ «تمدید شد» رسید، ولی
