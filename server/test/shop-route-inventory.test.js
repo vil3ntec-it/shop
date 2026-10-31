@@ -435,6 +435,7 @@ function concreteFor(ids) {
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
+    [/(\/pick\/products\/):productId/, ids.product],
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
@@ -458,7 +459,10 @@ function concreteFor(ids) {
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
-  const QUERY = { 'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all' };
+  const QUERY = {
+    'DELETE /shop/chat/conversations/:id/messages/:mid': '?for=all',
+    'GET /shop/orders/:id/pick/substitutes': '?lineNo=1',
+  };
   return (r) => {
     let p = r.path;
     for (const [re, v] of rules) p = p.replace(re, `$1${v}`);
@@ -477,6 +481,10 @@ function bodyFor(r, ids) {
     'POST /shop/orders/:id/pick/pack': { bags: 1 },
     'POST /shop/orders/pick/issues/:issueId/resolve': { action: 'resolved', note: 'آزمون' },
     'PUT /shop/orders/pick/locations/:productId': { aisle: '1' },
+    //  جایگزینی (PCK-05/06)
+    'PUT /shop/orders/pick/products/:productId': { halal: 'halal' },
+    'POST /shop/orders/:id/pick/substitutions': { eventId: fresh('psub'), lineNo: 1, productId: ids.product },
+    'POST /shop/orders/:id/pick/substitutions/decide': { substitutionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV', decision: 'accept' },
     //  قفسهٔ انتظار و جمع‌آوریِ گروهی (PCK-10/12)
     'POST /shop/orders/pick/shelf/scan': { qr: 'VLNB-1-1-1', slot: 'A1' },
     'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },
