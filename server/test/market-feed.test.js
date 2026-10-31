@@ -131,8 +131,12 @@ test('⛔ جداییِ دکان‌ها: فقط کالای منتشرشدهٔ د�
   assert.deepEqual(r.body.shops.map((s) => s.slug).sort(), [a.slug, b.slug].sort());
   assert.ok(r.body.shops.every((s) => s.cover === null), 'بی عکس ⇒ بی جلد');
   const txt = JSON.stringify(r.body);
-  for (const secret of [a.shopId, b.shopId, c.shopId, c.slug, '0700000001', '34.531', '3453']) {
+  for (const secret of [a.shopId, b.shopId, c.shopId, c.slug, '0700000001']) {
     assert.ok(!txt.includes(secret), `پاسخ «${secret}» را ندارد`);
+  }
+  const coords = h.withoutEpochs(txt, r.body.shops.map((s) => s.slug));
+  for (const secret of ['34.531', '3453', '69.172', '6917']) {
+    assert.ok(!coords.includes(secret), `پاسخ مختصاتِ «${secret}» را ندارد`);
   }
 
   //  حذف ⇒ همان دم بیرون (قفسه با feedCacheMs=0)

@@ -32,12 +32,14 @@ async function applyStock(shopId, items) {
   const lib = catalogLib();
   if (!lib || !items.length) return items;
   const badges = await lib.publicStock(shopId, items.map((p) => p.id));
-  if (!badges) return items;
-  for (const p of items) {
-    const b = badges.get(p.id);
-    if (b) p.stock = b;
+  if (badges) {
+    for (const p of items) {
+      const b = badges.get(p.id);
+      if (b) p.stock = b;
+    }
   }
-  return items;
+  //  PCK-14: «پیدا نکردم» ِ جمع‌آور تا رسیدگیِ مدیر ⇒ «تمام شده» (پرچمِ `shop.orders.picking`؛ خاموش ⇒ هیچ)
+  return require('./order-picking').applyHolds(shopId, items);
 }
 
 /** ناموجود هرگز پیشنهاد نمی‌شود (WEB-09). */
