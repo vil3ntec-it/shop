@@ -427,7 +427,7 @@ private class SheetFlow(
   suspend fun start(): Step = when (val plan = HesabPayAttempts.plan(env.pending.of(saleKey), saleKey, amountMinor, env.now())) {
     is HesabPayAttempts.Plan.Resume -> resume(plan.pending)
     is HesabPayAttempts.Plan.Replace -> replace(plan.old, plan.fresh)
-    is HesabPayAttempts.Plan.Fresh -> create(plan.fresh)
+    is HesabPayAttempts.Plan.Fresh -> create(plan.pending)
   }
 
   /** همان قصد: بی شناسه (پاسخِ ساختن گم شد) ⇐ همان کلید دوباره؛ با شناسه ⇐ خواندن */
