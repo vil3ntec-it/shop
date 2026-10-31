@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
+const areas = require('../lib/storefront-area-requests');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -87,6 +88,36 @@ router.get('/:slug/delivery', readLimit, locateLimit, store, async (req, res) =>
 //  ── CHK-12: بازه‌های پیشِ رو — فقط «هست/پر/کم مانده» ─────────────────
 router.get('/:slug/slots', readLimit, store, async (req, res) => {
   res.json(await sfd.publicSlots(req.store, String(req.query.fulfillment || '')));
+});
+
+//  ── CHK-10/S34: «وقتی به محلِ شما رسیدیم خبرم کن» ─────────────────────
+//  ⛔ پرچمِ خاموشِ `shop.storefront.notify_area` (یا ناحیهٔ خاموش، یا ویترینِ بسته) ⇒
+//  `next('route')` پیش از هر سقف و شماره: همان پاسخِ مسیرِ ناشناختهٔ main، بیت‌به‌بیت.
+const areaStore = async (req, res, next) => {
+  //  ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10)،
+  //  پیش از سنجشِ شماره؛ پرچمِ خاموش ⇒ این در نیست.
+  const s = await sf.open(req.params.slug);
+  if (!(await areas.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+//  شمارهٔ تأییدشده: بلیتِ همین چند روز یا نشستِ حساب — همان که دکان با آن خبر می‌دهد
+const verified = async (req, res, next) => {
+  const phone = await sf.verifiedPhone(ticketOf(req), sessionOf(req));
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
+  req.verifiedPhone = phone;
+  next();
+};
+
+router.post('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  const out = await areas.request(req.store, req.verifiedPhone, req.body);
+  res.status(out.created ? 201 : 200).json({ request: out.request });
+});
+
+//  پس گرفتنِ رضایت — تکرارش همان پاسخ
+router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  res.json(await areas.withdraw(req.store, req.verifiedPhone));
 });
 
 router.get('/:slug/products', readLimit, store, async (req, res) => {

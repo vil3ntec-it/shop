@@ -541,6 +541,7 @@
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
         $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
+        $('o-dlv').hidden = true;
       });
     };
     load();

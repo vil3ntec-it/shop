@@ -16,23 +16,23 @@ const { clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 router.use(requireAdmin);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-router.get('/intents', wrap(async (req, res) => {
+//  Express 5 خودش promiseِ ردشدهٔ دستگیرهٔ async را به next(err) و errorHandler می‌دهد
+router.get('/intents', async (req, res) => {
   res.json(await pay.list({
     status: String(req.query.status || ''), review: req.query.review === '1' || req.query.review === 'true',
     shopId: String(req.query.shopId || ''), limit: req.query.limit, before: String(req.query.before || ''),
   }));
-}));
+});
 
-router.post('/reconcile', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/reconcile', requireSuperAdmin, async (req, res) => {
   const out = await pay.reconcile();
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payments_reconcile', detail: out, ip: clientIp(req) });
   res.json(out);
-}));
+});
 
-router.post('/intents/:id/refund', requireSuperAdmin, wrap(async (req, res) => {
+router.post('/intents/:id/refund', requireSuperAdmin, async (req, res) => {
   res.json(await pay.markRefunded(req.params.id, { adminId: req.admin.id, note: req.body?.note }));
-}));
+});
 
 module.exports = router;
