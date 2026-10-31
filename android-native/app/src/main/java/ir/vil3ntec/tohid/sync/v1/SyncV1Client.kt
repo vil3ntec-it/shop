@@ -35,6 +35,8 @@ class SyncV1Client(private val api: ApiClient) {
     val seen: List<ReplayBook.Sent> = emptyList(),
     /** §۹.۵: دورانِ سرور — فقط با پرچمِ روشنِ `SYNC_EPOCH_ENABLED` (`V1Restore.pulled`) */
     val epoch: RestoreReplay.Epoch? = null,
+    /** پرچمِ دکانِ `sync.keep_pending`: opها پیش از نشاندن از صافیِ «تغییرِ در صف» می‌گذرند (`LedgerDiff.keepPending`) */
+    val keepPending: Boolean = false,
   )
 
   /**
@@ -92,6 +94,7 @@ class SyncV1Client(private val api: ApiClient) {
       serverSchema = (num(res, "schema_version") ?: 0L).toInt(),
       seen = seen,
       epoch = RestoreReplay.Epoch.from(res["epoch"]),
+      keepPending = (res["keep_pending"] as? JsonPrimitive)?.content == "true",
     )
   }
 

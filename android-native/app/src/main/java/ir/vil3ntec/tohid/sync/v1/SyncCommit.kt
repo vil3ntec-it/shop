@@ -435,7 +435,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         put("shadow", JsonPrimitive(e.shadow))
         put("ledger", JsonPrimitive(e.ledger))
         e.cursor?.let { put("cursor", JsonPrimitive(it)) }
-        put("ops", JsonArray(e.ops.map { it.toJson() }))
+        put("ops", JsonArray(e.ops.map { it.toJournalJson() }))
         if (e.from.isNotEmpty()) put("from", JsonPrimitive(e.from))
         if (e.next.isNotEmpty()) put("next", JsonPrimitive(e.next))
       }.toString().toByteArray(Charsets.UTF_8)

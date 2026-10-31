@@ -29,6 +29,7 @@ const { requireSyncAccount, requireSyncWrite, tokenOf } = require('../lib/sync-v
 const live = require('../lib/sync-v1-live');
 const v = require('../lib/validate');
 const syncEpoch = require('../lib/sync-epoch');
+const syncKeep = require('../lib/sync-v1-keep');
 const { SHOP } = require('../lib/tenancy');
 
 const gzip = promisify(zlib.gzip);
@@ -140,8 +141,20 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     const since = Number(req.query?.since || 0);
     const limit = Number(req.query?.limit || 0) || undefined;
     const out = await sync.pull(req.sync, { since, deviceId, limit });
+    //  دکان، پرچم‌های `sync.keep_pending` / `sync.revive_full_row` / `sync.gzip_pull` (`lib/sync-v1-keep.js`)
+    const keep = await syncKeep.pullExtras(req.sync, out.ops);
     const epoch = await epochFor(req.sync);
-    res.json({ ok: true, ...out, ...(epoch ? { epoch } : {}) });
+    const reply = { ok: true, ...out, ...(keep ? keep.body : {}), ...(epoch ? { epoch } : {}) };
+    if (keep && keep.gzip && String(req.headers['accept-encoding'] || '').includes('gzip')) {
+      const text = JSON.stringify(reply);
+      if (Buffer.byteLength(text, 'utf8') > syncKeep.GZIP_MIN_BYTES) {
+        res.set('Content-Encoding', 'gzip');
+        res.set('Content-Type', 'application/json; charset=utf-8');
+        res.set('Vary', 'Accept-Encoding');
+        return res.send(await gzip(Buffer.from(text, 'utf8')));
+      }
+    }
+    res.json(reply);
   } catch (err) { next(err); }
 });
 
