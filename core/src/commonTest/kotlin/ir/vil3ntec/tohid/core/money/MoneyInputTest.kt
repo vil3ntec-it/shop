@@ -100,4 +100,17 @@ class MoneyInputTest {
       assertEquals(0.0, balance - text.toDouble(), "مانده پس از تسویهٔ $balance")
     }
   }
+
+  @Test
+  fun minorToTextIsExactFromZeroUp() {
+    assertEquals("0", MoneyInput.ofMinor(0))
+    assertEquals("0.05", MoneyInput.ofMinor(5))
+    assertEquals("0.5", MoneyInput.ofMinor(50))
+    assertEquals("899.6", MoneyInput.ofMinor(89_960))
+    assertEquals("1200", MoneyInput.ofMinor(120_000))
+    assertEquals("90071992547409.91", MoneyInput.ofMinor(9_007_199_254_740_991))
+    assertNull(MoneyInput.ofMinor(9_007_199_254_740_992))
+    assertNull(MoneyInput.ofMinor(-1))
+    for (m in 0L..20_000L) assertEquals(m, (MoneyInput.ofMinor(m)!!.toDouble() * 100).roundToLong(), "پولِ $m")
+  }
 }

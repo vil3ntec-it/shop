@@ -17,7 +17,6 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { ApiError } = require('../middleware/errors');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-trust-read' });
 const fileIpLimit = rateLimit({ max: config.trust.fileIpMax, keyPrefix: 'store-trust-file-ip' });
@@ -26,11 +25,11 @@ const filePhoneLimit = rateLimit({
 });
 const uploadLimit = rateLimit({ max: config.trust.uploadMax, keyPrefix: 'store-trust-upload' });
 
-const store = wrap(async (req, res, next) => {
+const store = async (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   req.trustStore = await trust.storeOf(req.params.slug);
   next();
-});
+};
 
 /**
  * شمارهٔ تأییدشده از بلیتِ ویترین. ⛔ #301 بلیت را با «نسلِ» شماره لغوشدنی
@@ -42,12 +41,12 @@ async function ticketPhone(ticket) {
   return typeof sf.verifiedPhoneOfTicket === 'function' ? sf.verifiedPhoneOfTicket(ticket) : sf.phoneOfTicket(ticket);
 }
 
-const verified = wrap(async (req, res, next) => {
+const verified = async (req, res, next) => {
   const phone = await ticketPhone(req.get('x-store-ticket') || '');
   if (!phone) throw new ApiError(401, 'verification_required', 'برای ثبتِ شکایت، شمارهٔ خود را تأیید کنید');
   req.trustViewer = { phone, ip: clientIp(req) };
   next();
-});
+};
 
 const base = '/:slug/trust';
 
@@ -59,29 +58,29 @@ router.get(`${base}/config`, readLimit, store, (req, res) => {
   });
 });
 
-const filer = (kind) => wrap(async (req, res) => {
+const filer = (kind) => async (req, res) => {
   const out = await trust.file(req.trustStore, req.trustViewer, req.body, kind);
   res.status(out.duplicate ? 200 : 201).json(out);
-});
+};
 
 router.post(`${base}/complaints`, readLimit, store, verified, fileIpLimit, filePhoneLimit, filer('complaint'));
 router.post(`${base}/reports`, readLimit, store, verified, fileIpLimit, filePhoneLimit, filer('report'));
 
-router.get(`${base}/cases`, readLimit, store, verified, wrap(async (req, res) => {
+router.get(`${base}/cases`, readLimit, store, verified, async (req, res) => {
   res.json({ cases: await trust.myCases(req.trustStore, req.trustViewer) });
-}));
+});
 
-router.get(`${base}/cases/:token`, readLimit, store, wrap(async (req, res) => {
+router.get(`${base}/cases/:token`, readLimit, store, async (req, res) => {
   res.json({ case: await trust.track(req.trustStore, req.params.token) });
-}));
+});
 
-router.post(`${base}/cases/:token/evidence`, readLimit, store, uploadLimit, trust.rawEvidence, wrap(async (req, res) => {
+router.post(`${base}/cases/:token/evidence`, readLimit, store, uploadLimit, trust.rawEvidence, async (req, res) => {
   const out = await trust.putEvidence(req.trustStore, req.params.token, req.body);
   res.status(out.reused ? 200 : 201).json(out);
-}));
+});
 
-router.get(`${base}/cases/:token/evidence/:evidenceId`, readLimit, store, wrap(async (req, res) => {
+router.get(`${base}/cases/:token/evidence/:evidenceId`, readLimit, store, async (req, res) => {
   require('../lib/shop-chat').sendMedia(res, await trust.customerEvidence(req.trustStore, req.params.token, req.params.evidenceId));
-}));
+});
 
 module.exports = router;

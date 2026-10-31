@@ -30,7 +30,16 @@ object MoneyInput {
     //  است و بالای ۲^۵۲ پول (و در لبهٔ 0.49999999999999994) یک پول با JVM و `Money.fromLegacy` فرق می‌کند
     //  (SEC-DATA-02؛ همان ریشهٔ یافتهٔ #508).
     val minor = mathRound(balance * MINOR_PER_MAJOR)
-    if (minor <= 0 || minor > MAX_EXACT_MINOR) return null
+    if (minor <= 0) return null
+    return ofMinor(minor)
+  }
+
+  /**
+   *  متنِ کادر از مبلغِ پول، دقیقاً تا پول و بی نمادِ علمی: 89960 ⇒ "899.6"، 120000 ⇒ "1200"، 5 ⇒ "0.05"، 0 ⇒ "0".
+   *  منفی یا بیرون از بازهٔ دقیق (۲^۵۳−۱ پول) ⇒ null. (دکمه‌های اسکناسِ پنلِ پرداخت، `CashKeys.addNote`.)
+   */
+  fun ofMinor(minor: Long): String? {
+    if (minor < 0 || minor > MAX_EXACT_MINOR) return null
     val frac = (minor % MINOR_PER_MAJOR).toString().padStart(DECIMALS, '0').trimEnd('0')
     return (minor / MINOR_PER_MAJOR).toString() + if (frac.isEmpty()) "" else ".$frac"
   }

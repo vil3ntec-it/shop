@@ -315,14 +315,27 @@ object ReturnFlow {
    *  `PermCore` نیست. ⛔ قلابِ تأیید (STF-02): وقتی PRِ «اجرای مجوزها» برسد، همین
    *  تابع سقفِ نقش را از لایه‌های سرور می‌خواند و `ReturnApproval` برگهٔ امضاشده را.
    */
-  fun permDecision(role: String?, layers: List<Any?>?, amountMinor: Long): String? {
+  fun permDecision(role: String?, layers: List<Any?>?, amountMinor: Long, priorMinor: Long = 0L): String? {
     val core = ir.vil3ntec.tohid.core.perm.PermCore
     if ("returns.create" !in core.keys()) return null
-    return core.evaluate(roleOf(role), layers, "returns.create", mapOf("amount" to amountMinor.toDouble())).decision
+    //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور (`cumulativeNeed`) — پیشین + همین سند
+    val amount = ir.vil3ntec.tohid.core.perm.ReturnApprovals.cumulative(priorMinor, amountMinor)
+    return core.evaluate(roleOf(role), layers, "returns.create", mapOf("amount" to amount.toDouble())).decision
   }
 
-  /** چه کسی تأیید کرد — نام و نقش */
-  data class Approval(val by: String, val role: String)
+  /** جمعِ برگشت‌های پیشینِ یک فاکتور به پول (هر ردیف جدا گرد، همان سرور)؛ بی رسید ⇒ ۰ */
+  fun priorMinor(d: ShopData, saleId: String?): Long =
+    if (saleId.isNullOrBlank()) 0L else d.saleReturns.filter { it.saleId == saleId }.sumOf { minor(it.amount) }
+
+  /**
+   *  چه کسی تأیید کرد — نام و نقش، و [slip] «برگهٔ امضاشده»ی همین سند (`ReturnApproval.requester`،
+   *  PINِ تأییدکننده). با برگه، [post] آن را روی نخستین ردیفِ سند می‌گذارد تا سرور هم بپذیرد.
+   */
+  data class Approval(
+    val by: String,
+    val role: String,
+    val slip: ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip? = null,
+  )
 
   /* ============================ بازپرداخت ============================ */
 
@@ -484,6 +497,11 @@ object ReturnFlow {
     if (g.decision == "deny") return Outcome.Bad(Code.RETURN_DENIED)
     val approval = req.approval?.takeIf { it.by.isNotBlank() }
     if (g.decision == "approve" && (approval == null || !canApprove(g, approval.role))) return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    //  برگه باید همین سند را تا همین مبلغ بپوشاند (همان `covers` ِ سرور)؛ وگرنه سرور سند را رد می‌کرد
+    val slip = approval?.slip?.takeIf { g.decision == "approve" }
+    if (slip != null && ir.vil3ntec.tohid.core.perm.ReturnApprovals.covers(slip, req.docId, quote.lines.sumOf { minor(it.amount) }) != null) {
+      return Outcome.Bad(Code.APPROVAL_REQUIRED)
+    }
     val approvedBy = if (g.decision == "approve") approval!!.by else req.by.trim()
 
     val prior = if (sale == null) emptyList() else d.saleReturns.filter { it.saleId == sale.id }
@@ -538,6 +556,8 @@ object ReturnFlow {
         by = req.by.trim().ifEmpty { null },
         approvedBy = if (g.decision == "approve") approvedBy else null,
         exchangeSaleId = req.exchangeSaleId,
+        //  برگه فقط روی نخستین ردیفِ سند (سرور از هر ردیفِ سند برمی‌دارد و یک بار مصرف می‌کند)
+        approval = slip?.takeIf { rows.isEmpty() }?.let { DiscountGate.json(it) },
         //  `channel` نه، حتی برای فروشِ آنلاین: `online` روی مرجوعی یعنی «بیرون از دخل» و `CashShift`
         //  کلِ ردیف را نمی‌شمارد، ولی نقدِ این برگشت از همین دخل رفت (#340)؛ درگاه از راهِ `toMethods`
       )

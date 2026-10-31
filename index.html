@@ -7407,8 +7407,9 @@
     const hit = DATE_MEMO.get(iso);
     if(hit !== undefined) return hit;
     let out;
-    try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : iso; }
-    catch(e){ out = iso; }
+    //  ⛔ SEC-API-01: تاریخِ ناجور (از همگام‌سازی یا پشتیبان) پیش‌تر خام برمی‌گشت و در innerHTML می‌نشست
+    try{ out = DATE_FMT ? DATE_FMT.format(new Date(iso+'T00:00:00')) : plainText(iso); }
+    catch(e){ out = plainText(iso); }
     if(DATE_MEMO.size > 5000) DATE_MEMO.clear();
     DATE_MEMO.set(iso, out);
     return out;
@@ -7471,6 +7472,14 @@
   function escapeHtml(s){
     return (s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
+  /* ⛔ SEC-API-01 — هر مقدارِ دفتر که در HTML می‌نشیند (شناسه، نوع، مقدار، برچسبِ ناشناخته) از این
+     می‌گذرد، حتی وقتی «همیشه عدد/شناسهٔ ماشینی» به‌نظر می‌رسد: دفتر از همگام‌سازی، پشتیبان و دستگاهِ
+     دیگرِ همان دکان پر می‌شود و شناسهٔ ردیف تا ۸۰ نویسهٔ دلخواه است. عدد هم String می‌شود (escapeHtml
+     فقط رشته می‌گیرد). `server/test/web-xss-sync.mjs`. */
+  function escAttr(v){ return v == null ? '' : escapeHtml(String(v)); }
+  /* همان برای متنی که هم در HTML و هم در textContent/CSV می‌رود (تاریخِ ناجور، مقدارِ غیرعددی):
+     نویسهٔ HTML حذف می‌شود، نه رمز — تا در متنِ ساده «&lt;» دیده نشود. */
+  function plainText(v){ return v == null ? '' : String(v).replace(/[&<>"']/g, ''); }
   /* نمایهٔ بدهی — یک گذر به ازای هر تغییرِ دفتر؛ پیش‌تر `getDebt` داخلِ
      مرتب‌سازیِ قرض‌داران صدا زده می‌شد و هر بار کلِ تراکنش‌ها را می‌گشت. */
   /* شمارندهٔ تغییرِ دفتر — هر نمایهٔ کش‌شده (موجودی، بدهی) با آن باطل می‌شود.
@@ -7584,8 +7593,8 @@
       const credit = debt < 0;
       const settled = debt === 0;
       return `
-      <div class="debtor-card ${settled ? 'is-settled' : ''} ${credit ? 'is-credit' : ''}" data-debtor-id="${d.id}">
-        <button class="debtor-card-close" data-del-debtor="${d.id}" aria-label="حذف">
+      <div class="debtor-card ${settled ? 'is-settled' : ''} ${credit ? 'is-credit' : ''}" data-debtor-id="${escAttr(d.id)}">
+        <button class="debtor-card-close" data-del-debtor="${escAttr(d.id)}" aria-label="حذف">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <div class="debtor-info">
@@ -7597,7 +7606,7 @@
             : `<span class="debtor-amount ${credit ? 'credit' : ''}">${formatMoney(Math.abs(debt))}</span>`}
           <div class="debtor-meta">${d.phone ? `<span>${escapeHtml(phoneShow(d.phone))}</span>` : ''}</div>
         </div>
-        <button class="debtor-card-edit" data-edit-debtor="${d.id}" aria-label="ویرایش">
+        <button class="debtor-card-edit" data-edit-debtor="${escAttr(d.id)}" aria-label="ویرایش">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         </button>
       </div>`;
@@ -7930,12 +7939,12 @@
     syncBottomBarHeight();
     // ردیف: تاریخ · توضیحات · برد یا رسید · مبلغ
     txList.innerHTML = visible.map(t=> `
-      <div class="tx-item ${t.type}" data-tx-receipt="${t.id}">
+      <div class="tx-item ${escAttr(t.type)}" data-tx-receipt="${escAttr(t.id)}">
         <span class="tx-date-col">${formatDate(t.date)}</span>
         <span class="tx-note-col${t.notes ? '' : ' empty'}">${t.notes ? escapeHtml(t.notes) : '—'}</span>
         <span class="tx-kind">${t.type==='give' ? 'برد' : 'رسید'}</span>
         <span class="tx-money">${formatMoney(t.amount)}</span>
-        <button class="tx-del" data-del-tx="${t.id}" aria-label="حذف تراکنش">
+        <button class="tx-del" data-del-tx="${escAttr(t.id)}" aria-label="حذف تراکنش">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         ${debtEntryHtml(book, book && book.entry(t.id))}
@@ -7955,7 +7964,7 @@
       const left = !cancelled && Number(s.remaining) > 0 ? ` · <b style="color:var(--danger)">مانده ${formatMoney(s.remaining)}</b>` : '';
       return `<div class="tx-item${cancelled ? ' muted' : ''}">
         <span class="tx-date-col">${formatDate(s.date)}</span>
-        <span class="tx-note-col"><button type="button" class="tx-receipt-btn" data-view-invoice="${s.id}">فاکتور ${s.invoiceNumber != null ? escapeHtml(invoiceLabel(s)) : '—'}</button>${cancelled ? ' (لغوشده)' : ''}${left}</span>
+        <span class="tx-note-col"><button type="button" class="tx-receipt-btn" data-view-invoice="${escAttr(s.id)}">فاکتور ${s.invoiceNumber != null ? escapeHtml(invoiceLabel(s)) : '—'}</button>${cancelled ? ' (لغوشده)' : ''}${left}</span>
         <span class="tx-money">${formatMoney(s.finalTotal)}</span>
       </div>`;
     });
@@ -8059,7 +8068,7 @@
       pills.push(e.paid ? `<span class="tx-pill paid">تسویه شد</span>` : `<span class="tx-pill open">باز ${moneyMinor(e.openMinor)}</span>`);
     }
     if(!e.give && e.openMinor > 0) pills.push(`<span class="tx-pill paid">پیش‌پرداخت ${moneyMinor(e.openMinor)}</span>`);
-    pills.push(`<button type="button" class="tx-receipt-btn" data-open-receipt="${e.tx.id}">رسید${e.give ? ' / سررسید' : ''}</button>`);
+    pills.push(`<button type="button" class="tx-receipt-btn" data-open-receipt="${escAttr(e.tx.id)}">رسید${e.give ? ' / سررسید' : ''}</button>`);
     out.push(`<div class="tx-pills">${pills.join('')}</div>`);
     out.push(`<div>مانده پس از این ردیف: ${debtState(e.balanceAfterMinor)}</div>`);
     return `<div class="tx-sub">${out.join('')}</div>`;
@@ -8194,13 +8203,13 @@
       const last = getLastTx(d.id);
       const lim = (typeof d.creditLimit === 'number' && isFinite(d.creditLimit)) ? formatMoney(d.creditLimit) : '—';
       const cls = debt > 0 ? 'is-debt' : debt < 0 ? 'is-credit' : '';
-      return `<tr class="debtor-row" data-debtor-id="${d.id}">
-        <td><button type="button" class="debtor-open" data-open-debtor="${d.id}">${escapeHtml(d.name)}</button></td>
+      return `<tr class="debtor-row" data-debtor-id="${escAttr(d.id)}">
+        <td><button type="button" class="debtor-open" data-open-debtor="${escAttr(d.id)}">${escapeHtml(d.name)}</button></td>
         <td class="debtor-meta">${d.phone ? `<span>${escapeHtml(phoneShow(d.phone))}</span>` : '—'}</td>
         <td class="num ${cls}">${debt === 0 ? 'صاف' : formatMoney(Math.abs(debt)) + (debt < 0 ? ' (موجودی)' : '')}</td>
         <td>${last ? escapeHtml(formatDate(last.date)) : '—'}</td>
         <td class="num">${lim}</td>
-        <td><button type="button" class="icon-btn-sm" data-edit-debtor="${d.id}" aria-label="ویرایشِ ${escapeHtml(d.name)}">
+        <td><button type="button" class="icon-btn-sm" data-edit-debtor="${escAttr(d.id)}" aria-label="ویرایشِ ${escapeHtml(d.name)}">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         </button></td>
       </tr>`;
@@ -8829,13 +8838,13 @@
   function expenseRowHTML(title='', amount='', removable=true, category=''){
     const rid = 'r' + (++expRowSeq);
     return `
-    <div class="exp-row" data-row-id="${rid}">
+    <div class="exp-row" data-row-id="${escAttr(rid)}">
       <div class="exp-row-main">
         <div class="exp-row-title">
           <input class="form-input" type="text" placeholder="بابت چی؟ (اختیاری)" data-role="title" value="${escapeHtml(title)}">
         </div>
         <div class="exp-row-amount">
-          <input class="form-input" type="number" min="1" step="1" placeholder="مبلغ" data-role="amount" value="${amount}">
+          <input class="form-input" type="number" min="1" step="1" placeholder="مبلغ" data-role="amount" value="${escAttr(amount)}">
           <div class="field-error">مبلغ معتبر وارد کنید.</div>
         </div>
       </div>
@@ -8985,10 +8994,10 @@
           <div class="exp-date">${formatDate(ex.date)}</div>
         </div>
         <div class="exp-actions">
-          <button class="icon-btn-sm" data-edit-expense="${ex.id}" aria-label="ویرایش">
+          <button class="icon-btn-sm" data-edit-expense="${escAttr(ex.id)}" aria-label="ویرایش">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
           </button>
-          <button class="icon-btn-sm danger" data-del-expense="${ex.id}" aria-label="حذف">
+          <button class="icon-btn-sm danger" data-del-expense="${escAttr(ex.id)}" aria-label="حذف">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </button>
         </div>
@@ -9352,11 +9361,11 @@
     const sel = document.getElementById('in-warehouse-product');
     const filterSel = document.getElementById('warehouse-filter-product');
     const current = sel.value;
-    sel.innerHTML = products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
+    sel.innerHTML = products.map(p=>`<option value="${escAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('')
       + `<option value="__new__">افزودن محصول جدید…</option>`;
     if(products.find(p=>p.id===current) || current==='__new__') sel.value = current;
     const filterCurrent = filterSel.value;
-    filterSel.innerHTML = `<option value="">همه محصولات</option>` + products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    filterSel.innerHTML = `<option value="">همه محصولات</option>` + products.map(p=>`<option value="${escAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
     if(products.find(p=>p.id===filterCurrent)) filterSel.value = filterCurrent;
   }
 
@@ -9392,7 +9401,7 @@
     document.getElementById('bp-extras').style.display = '';
     document.getElementById('in-bp-subcategory').value = p.subcategory || '';
     const supSel = document.getElementById('in-bp-supplier');
-    supSel.innerHTML = '<option value="">—</option>' + suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+    supSel.innerHTML = '<option value="">—</option>' + suppliers.map(s=>`<option value="${escAttr(s.id)}">${escapeHtml(s.name)}</option>`).join('');
     supSel.value = p.supplierId || '';
     document.getElementById('in-bp-sale-unit').value = p.saleUnit || '';
     document.getElementById('in-bp-factor').value = p.saleUnit ? (p.unitFactor || '') : '';
@@ -9476,10 +9485,10 @@
       /* دکمه‌ها روی کارت نیستند؛ با نگه‌داشتن، شیت تمام‌صفحه باز می‌شود.
          نوشته‌های ریز همه در یک ردیف پایین کارت می‌نشینند. */
       return `
-      <div class="exp-card prod-card" data-prod-card="${p.id}">
+      <div class="exp-card prod-card" data-prod-card="${escAttr(p.id)}">
         <div class="prod-top">
           ${p.photo
-            ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
+            ? `<div class="prod-thumb"><img alt="" data-product-photo="${escAttr(p.id)}"></div>`
             : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
           <div class="prod-name">${escapeHtml(p.name)}</div>
           <div class="prod-price">
@@ -9670,10 +9679,10 @@
           <div class="exp-date">${formatDate(w.date)}</div>
         </div>
         <div class="exp-actions">
-          <button class="icon-btn-sm" data-edit-warehouse="${w.id}" aria-label="ویرایش">
+          <button class="icon-btn-sm" data-edit-warehouse="${escAttr(w.id)}" aria-label="ویرایش">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
           </button>
-          <button class="icon-btn-sm danger" data-del-warehouse="${w.id}" aria-label="حذف">
+          <button class="icon-btn-sm danger" data-del-warehouse="${escAttr(w.id)}" aria-label="حذف">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
           </button>
         </div>
@@ -10183,7 +10192,7 @@
     const units = bpUnitOptions(row).map(u=>
       `<button type="button" class="bulk-unit${row.unit===u?' on':''}" data-bp-unit="${escapeHtml(u)}">${escapeHtml(u)}</button>`).join('');
     return `
-      <div class="bulk-row" data-bp-key="${row.key}">
+      <div class="bulk-row" data-bp-key="${escAttr(row.key)}">
         <div class="bulk-row-head">
           <span class="bulk-row-no">${formatMoney(index+1)}</span>
           <input class="form-input" data-bp-name type="text" placeholder="نام محصول، مثلاً بیسکویت شکلاتی" value="${escapeHtml(row.name||'')}">
@@ -10644,11 +10653,11 @@
 
   function bulkRowHtml(row, index){
     const prodOptions = products.map(p=>
-      `<option value="${p.id}"${row.productId===p.id?' selected':''}>${escapeHtml(p.name)}</option>`).join('');
+      `<option value="${escAttr(p.id)}"${row.productId===p.id?' selected':''}>${escapeHtml(p.name)}</option>`).join('');
     const units = bulkUnitOptions(row).map(u=>
       `<button type="button" class="bulk-unit${row.unit===u?' on':''}" data-bulk-unit="${escapeHtml(u)}">${escapeHtml(u)}</button>`).join('');
     return `
-      <div class="bulk-row" data-bulk-key="${row.key}">
+      <div class="bulk-row" data-bulk-key="${escAttr(row.key)}">
         <div class="bulk-row-head">
           <span class="bulk-row-no">${formatMoney(index+1)}</span>
           <select class="form-input" data-bulk-product>
@@ -10978,7 +10987,7 @@
     const sel = document.getElementById('in-purchase-supplier');
     const current = sel.value;
     sel.innerHTML = suppliers.length
-      ? suppliers.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')
+      ? suppliers.map(s=>`<option value="${escAttr(s.id)}">${escapeHtml(s.name)}</option>`).join('')
       : '<option value="">— ابتدا یک تأمین‌کننده اضافه کنید —</option>';
     if(suppliers.find(s=>s.id===current)) sel.value = current;
   }
@@ -10986,7 +10995,7 @@
     const sel = document.getElementById('in-purchase-product');
     const current = sel.value;
     sel.innerHTML = products.length
-      ? products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
+      ? products.map(p=>`<option value="${escAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('')
       : '<option value="">— ابتدا یک محصول اضافه کنید —</option>';
     if(products.find(p=>p.id===current)) sel.value = current;
   }
@@ -11015,8 +11024,8 @@
       const debt = getSupplierDebt(s.id);
       const settled = debt<=0;
       return `
-      <div class="debtor-card ${settled ? 'is-settled' : ''}" data-supplier-id="${s.id}">
-        <button class="debtor-card-close" data-del-supplier="${s.id}" aria-label="حذف">
+      <div class="debtor-card ${settled ? 'is-settled' : ''}" data-supplier-id="${escAttr(s.id)}">
+        <button class="debtor-card-close" data-del-supplier="${escAttr(s.id)}" aria-label="حذف">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
         <div class="debtor-info"><div class="debtor-name">${escapeHtml(s.name)}</div></div>
@@ -11024,7 +11033,7 @@
           ${settled ? `<span class="debtor-amount settled">بدون بدهی</span>` : `<span class="debtor-amount">${formatMoney(debt)} افغانی</span>`}
           <div class="debtor-meta">${s.phone ? `<span>${escapeHtml(phoneShow(s.phone))}</span>` : ''}</div>
         </div>
-        <button class="debtor-card-edit" data-edit-supplier="${s.id}" aria-label="ویرایش">
+        <button class="debtor-card-edit" data-edit-supplier="${escAttr(s.id)}" aria-label="ویرایش">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         </button>
       </div>`;
@@ -11337,7 +11346,7 @@
   function populateAdjProductSelect(){
     const sel = document.getElementById('in-adj-product');
     const current = sel.value;
-    sel.innerHTML = products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    sel.innerHTML = products.map(p=>`<option value="${escAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
     if(products.find(p=>p.id===current)) sel.value = current;
   }
   function openStockAdjModal(type){
@@ -11496,7 +11505,7 @@
       return `<div class="exp-card" style="padding:8px 10px;">
         <div class="exp-info"><div class="exp-title">${escapeHtml(p.name)}</div>
           <div class="exp-meta" style="${tone}">برنامه: ${formatCartQty(sys, p.unit)} ${escapeHtml(p.unit||'')}${dtxt}</div></div>
-        <input class="form-input" data-sc-id="${p.id}" inputmode="decimal" placeholder="شمرده" style="width:110px;${c !== undefined && !(Number.isFinite(c) && c >= 0) ? 'border-color:var(--danger)' : ''}" value="${escapeHtml(scCounts[p.id]||'')}">
+        <input class="form-input" data-sc-id="${escAttr(p.id)}" inputmode="decimal" placeholder="شمرده" style="width:110px;${c !== undefined && !(Number.isFinite(c) && c >= 0) ? 'border-color:var(--danger)' : ''}" value="${escapeHtml(scCounts[p.id]||'')}">
       </div>`;
     }).join('') || '<div class="empty-sub" style="padding:16px;">کالایی پیدا نشد</div>';
     scSummary();
@@ -11778,7 +11787,7 @@
   function populateStockReportProductFilter(){
     const sel = document.getElementById('rep-stock-product-filter');
     const current = sel.value;
-    sel.innerHTML = '<option value="">همه محصولات</option>' + products.map(p=>`<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('');
+    sel.innerHTML = '<option value="">همه محصولات</option>' + products.map(p=>`<option value="${escAttr(p.id)}">${escapeHtml(p.name)}</option>`).join('');
     if(products.find(p=>p.id===current)) sel.value = current;
   }
   function renderStockLedger(){
@@ -11793,7 +11802,7 @@
       <div class="exp-card">
         <div>
           <div class="exp-title">${escapeHtml(p?p.name:'(محصول حذف‌شده)')}</div>
-          <div class="exp-meta"><span>${formatDate(m.date)}</span><span>${STOCK_MOVEMENT_LABELS[m.type]||m.type}</span>${m.notes?`<span>— ${escapeHtml(m.notes)}</span>`:''}</div>
+          <div class="exp-meta"><span>${formatDate(m.date)}</span><span>${escAttr(STOCK_MOVEMENT_LABELS[m.type]||m.type)}</span>${m.notes?`<span>— ${escapeHtml(m.notes)}</span>`:''}</div>
         </div>
         <div class="exp-amount">${m.qty>0?'+':''}${formatMoney(m.qty)}</div>
       </div>`;
@@ -11881,7 +11890,7 @@
     list.innerHTML = sorted.map(a=> `
       <div class="exp-card">
         <div>
-          <div class="exp-title">${AUDIT_TYPE_LABELS[a.type]||a.type}</div>
+          <div class="exp-title">${escAttr(AUDIT_TYPE_LABELS[a.type]||a.type)}</div>
           <div class="exp-meta"><span>${formatDate(a.date)}</span>${a.notes?`<span>— ${escapeHtml(a.notes)}</span>`:''}</div>
         </div>
       </div>`).join('');
@@ -12115,7 +12124,7 @@
     return (unit==='گرم' || unit==='میلی‌لیتر') ? 10 : isFractionalUnit(unit) ? 0.1 : 1;
   }
   function formatCartQty(qty, unit){
-    if(!isFractionalUnit(unit)) return String(qty);
+    if(!isFractionalUnit(unit)) return plainText(qty);   // SEC-API-01: مقدارِ غیرعددیِ دفتر
     // تا ۳ رقم اعشار، بدون صفرهای اضافی
     return String(Math.round(qty*1000)/1000);
   }
@@ -12212,9 +12221,9 @@
     if(!p) return '';
     const lineSum = lineTotal(p.salePrice, item.quantity);
     return `
-      <div class="exp-card cart-row${selectedCartId===p.id ? ' picked' : ''}" data-cart-row="${p.id}">
+      <div class="exp-card cart-row${selectedCartId===p.id ? ' picked' : ''}" data-cart-row="${escAttr(p.id)}">
         ${p.photo
-          ? `<div class="prod-thumb"><img alt="" data-product-photo="${p.id}"></div>`
+          ? `<div class="prod-thumb"><img alt="" data-product-photo="${escAttr(p.id)}"></div>`
           : `<div class="exp-icon">${escapeHtml((p.name||'؟')[0])}</div>`}
         <div class="cart-row-name">${escapeHtml(p.name)}</div>
         <div class="cart-row-qty" data-cart-qty>${formatCartQtyFa(item.quantity, p.unit)} ${escapeHtml(p.unit)}</div>
@@ -12350,7 +12359,7 @@
     listEl.innerHTML = list.map(d=>{
       const st = debtStateText(d.id);
       return `
-      <button type="button" class="pick-debtor-item" data-pick="${d.id}">
+      <button type="button" class="pick-debtor-item" data-pick="${escAttr(d.id)}">
         <span class="pick-debtor-av">${escapeHtml(initials(d.name) || (d.name||'؟')[0])}</span>
         <span class="pick-debtor-name">${escapeHtml(d.name)}</span>
         <span class="pick-debtor-bal ${st.cls}">${st.txt}</span>
@@ -12415,11 +12424,11 @@
     grid.innerHTML = list.map(p=>{
       const qty = quickSelectQtyFor(p.id);
       return `
-      <div class="quick-select-tile${qty>0?' has-qty':''}" data-qs-tile="${p.id}">
-        ${p.photo ? `<div class="qs-thumb on"><img alt="" data-product-photo="${p.id}"></div>` : ''}
+      <div class="quick-select-tile${qty>0?' has-qty':''}" data-qs-tile="${escAttr(p.id)}">
+        ${p.photo ? `<div class="qs-thumb on"><img alt="" data-product-photo="${escAttr(p.id)}"></div>` : ''}
         <div class="qs-name">${escapeHtml(p.name)}</div>
         <div class="qs-price">${formatMoney(p.salePrice)} افغانی</div>
-        ${qty>0 ? `<div class="qs-qty-badge" data-qs-qty="${p.id}">${formatCartQtyFa(qty, p.unit)} در سبد</div>` : ''}
+        ${qty>0 ? `<div class="qs-qty-badge" data-qs-qty="${escAttr(p.id)}">${formatCartQtyFa(qty, p.unit)} در سبد</div>` : ''}
       </div>`;
     }).join('');
     hydrateProductPhotos(grid);
@@ -12909,7 +12918,7 @@
   function populateCheckoutDebtorSelect(){
     const sel = document.getElementById('co-debtor-select');
     sel.innerHTML = debtors.length
-      ? debtors.map(d=>`<option value="${d.id}">${escapeHtml(d.name)}</option>`).join('')
+      ? debtors.map(d=>`<option value="${escAttr(d.id)}">${escapeHtml(d.name)}</option>`).join('')
       : '<option value="">— ابتدا یک قرض‌دار اضافه کنید —</option>';
   }
 
@@ -13317,9 +13326,9 @@
           <div class="exp-amount">${formatMoney(sale.finalTotal)} افغانی</div>
         </div>
         <div class="sale-card-actions">
-          <button type="button" class="btn btn-secondary btn-sm" data-view-invoice="${sale.id}">مشاهده فاکتور</button>
-          ${canReturn ? `<button type="button" class="btn btn-secondary btn-sm" data-return-sale="${sale.id}">مرجوعی</button>` : ''}
-          ${sale.status!=='cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-sale="${sale.id}">لغو فروش</button>` : ''}
+          <button type="button" class="btn btn-secondary btn-sm" data-view-invoice="${escAttr(sale.id)}">مشاهده فاکتور</button>
+          ${canReturn ? `<button type="button" class="btn btn-secondary btn-sm" data-return-sale="${escAttr(sale.id)}">مرجوعی</button>` : ''}
+          ${sale.status!=='cancelled' ? `<button type="button" class="btn btn-danger btn-sm" data-cancel-sale="${escAttr(sale.id)}">لغو فروش</button>` : ''}
         </div>
       </div>`;
   }
@@ -13414,9 +13423,9 @@
     const returnable = si.quantity - (si.returnedQty||0);
     if(returnable<=0) return '';
     return `
-      <div class="form-group" data-return-row="${si.id}">
+      <div class="form-group" data-return-row="${escAttr(si.id)}">
         <label>${escapeHtml(name)} — قابل مرجوعی: ${formatMoney(returnable)}</label>
-        <input class="form-input" type="number" min="0" max="${returnable}" step="${p && isFractionalUnit(p.unit) ? 'any' : 1}" value="0" data-return-qty-input="${si.id}">
+        <input class="form-input" type="number" min="0" max="${returnable}" step="${p && isFractionalUnit(p.unit) ? 'any' : 1}" value="0" data-return-qty-input="${escAttr(si.id)}">
       </div>`;
   }
   function openReturnModal(saleId){
@@ -14455,7 +14464,7 @@
   PAGES.forEach(p=>{
     if(p.inSidebar){
       const li = document.createElement('li');
-      li.innerHTML = `<a class="nav-item" data-page="${p.id}" href="#${p.id}"><span class="ic">${p.icon}</span>${p.title || p.label}</a>`;
+      li.innerHTML = `<a class="nav-item" data-page="${escAttr(p.id)}" href="#${escAttr(p.id)}"><span class="ic">${p.icon}</span>${p.title || p.label}</a>`;
       sidebarNav.appendChild(li);
     }
     if(p.inBottomNav){
