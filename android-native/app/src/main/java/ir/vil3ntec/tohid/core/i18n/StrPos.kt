@@ -23,6 +23,9 @@ object StrPos {
   val mixedPayHint: String get() = t("پرداختِ ترکیبی: F9 پنلِ پرداخت (نقد، کیف پول، کارت، حواله، به حسابِ مشتری) — F12 نقدِ دقیق", "Mixed payment: F9 payment panel (cash, wallet, card, transfer, customer account) — F12 exact cash", "ګډه ورکړه: F9 د ورکړې پاڼه (نغد، بټوه، کارت، حواله، د پیرودونکي حساب) — F12 دقیق نغد")
   val paidNowShort: String get() = t("دریافتیِ همین حالا", "Received now", "همدا اوس ترلاسه شوې")
   val approveDiscount: String get() = t("تأییدِ تخفیف", "Approve discount", "د تخفیف تایید")
+  //  CRM-03 / S07 — فروشِ نسیه بیش از سقفِ اعتبار
+  val creditOverTitle: String get() = t("فروشِ نسیه بیش از سقف", "Credit sale over the limit", "له سقف پورته نسیه پلور")
+  val creditApproveSelf: String get() = t("تأیید با این دلیل", "Approve with this reason", "په دې لامل تایید")
   fun discountSummary(d: Any, s: Any): String = t("تخفیفِ $d ؋ روی فاکتورِ $s ؋", "Discount of $d ؋ on an invoice of $s ؋", "د $s ؋ بل باندې $d ؋ تخفیف")
   fun cashierCap(p: Any): String = t("سقفِ صندوقدار $p٪", "cashier limit $p%", "د صندوقدار حد $p٪")
   fun weighedAdded(n: Any, q: Any): String = t("$n — $q به سبد اضافه شد", "$n — $q added to the cart", "$n — $q ټوکرۍ ته اضافه شو")
