@@ -247,6 +247,9 @@
 - سندِ `posted` ویرایش نمی‌شود؛ اصلاح فقط با سندِ معکوس (`reverses`، `reason`، `by` اجباری؛ معکوسِ معکوس رد) (SEC-03، #242).
 - بررسی با `npm run verify-chain` (خروجِ ۰ سالم، ۲ شکسته، ۱ خطا) (#242).
 - هر خروجیِ کاملِ مالک یک ردیفِ سابقهٔ `data_export` می‌سازد (§۲۱.۲، #247).
+- ⛔ SEC-02 (زنجیرهٔ اسنادِ دستگاه، پرچمِ `shop.doc_chain`): منطق فقط در `core/src/commonMain/.../core/audit` (`Sha256` ِ خالص با بردارِ NIST، `HashChain`، `PostedDocument`، `DocChain`، `DocChainCycle`)؛ برنامه فقط مرزِ `sync/platform/DocChainSync.kt` (دیسک، شبکه، ساعت). سند بی دادهٔ شخصی و فقط بخش‌های تغییرناپذیرِ فاکتور (مبلغ پول، مقدار هزارم)، با `chain` و `seq` ِ خودش؛ شکلِ سند با `core/test-vectors/doc-chain-v1.json` (سازنده: `server/scripts/doc-chain-vectors.js`) قفل است — شکلِ تازه ⇐ `"v": 2`.
+- ⛔ گزارشِ زنجیره جدا از push است (`GET`/`POST /api/sync/v1/chain`): هرگز op یا فروشی را رد نمی‌کند؛ هر ناهمخوانی (`fork`، `rollback`، `prev_mismatch`، `hash_mismatch`، `not_canonical`، `body_mismatch`، `series_owner`، `local_broken`/`truncated`، `restarted`) یک رویدادِ `security.doc_chain` در سابقه است، نه هر دور؛ جهشِ دوره بیش از ۱۶ (`bad_epoch`) بی ردیف و بی رویداد رد می‌شود و دستگاه دورهٔ درست را از نو می‌گیرد. حلقه‌های سالم در `hash_chain` (`doc/<دکان>/<سری>/<دوره>`) می‌نشینند و ابزارِ «بررسیِ زنجیره» ِ پنل همان‌ها را می‌سنجد.
+- زنجیرهٔ دستگاه از لحظهٔ روشن شدن است (`startNo`)؛ زنجیرهٔ شکسته ادامه نمی‌یابد و «دورهٔ» تازه می‌گیرد (دورهٔ کهنه شاهد می‌ماند)؛ فایل‌ها در `noBackupFilesDir` تا گوشیِ بازیابی‌شده زنجیرهٔ کهنه را ادامه ندهد (روحِ DATA-06).
 
 ### v3 · سفارش
 
@@ -484,6 +487,7 @@
 | `shop.delivery_code_rule` | دکان / `all` | خاموش | کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل است (DLV-08)؛ خاموش ⇒ کد فقط با `requireCode`، بیت‌به‌بیت همان پیشین | `claude/part-dlv-1` | باز |
 | `shop.delivery_code_rule.min_total_minor` | دکان / `all` | نبود (= خاموش) | آستانهٔ «گران‌قیمت» به واحدِ خرد برای همان قاعده؛ فقط با پرچمِ بالا؛ ۰ یا نامعتبر ⇒ خاموش (آستانهٔ پیش‌فرض با صاحب‌کار) | `claude/part-dlv-1` | باز |
 | `hashchain.audit` | `security` | خاموش | زنجیرهٔ هشِ سابقه در `hash_chain`؛ روشن با `true` (و `1`، `"true"`، `"on"`) | #242 | main |
+| `shop.doc_chain` | دکان / `all` | خاموش | زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه (SEC-02): `GET`/`POST /api/sync/v1/chain`، جدولِ `device_chain_heads` و حلقه‌ها در `hash_chain`؛ خاموش ⇒ `{enabled:false}`، هیچ نوشتنی و برنامه هیچ حلقه‌ای نمی‌سازد (فقط پرسشِ پرچم، حداکثر روزی یک بار؛ بی‌پاسخ یا ۴۰۴ هم یک روز صبر) | SEC-02 | باز |
 | `auth.phone_add_code` | `security` | خاموش | افزودنِ شماره (راهِ ورود) به حسابِ بی‌شماره فقط با کدِ همان شماره و همان حساب: `POST /api/me/phone/code` و `phoneCode` در `PUT /api/me` (خاموش ⇒ درِ کد ۴۰۴ و رفتارِ امروز)؛ پیش از روشن کردن، برنامه‌ها `phoneCode` بفرستند (AUTH-08) | `claude/spec-auth-3` | باز |
 | `beta.shops`، `beta.devices` | `release` | فهرستِ خالی | کدام دکان/دستگاه نسخهٔ آزمایشی می‌گیرد؛ پنل: `/api/admin/release/beta` | F0-27، #265 | main |
 | `stage.tohid-native`، `stage.tohid-desktop` | `release` | نیست | انتشارِ مرحله‌ای: `{version, percent}`؛ دستگاهِ درونِ درصد با `staged=1` از برچسبِ `<برچسب>-v<نسخه>`؛ ناجور ⇒ نیست؛ پنل: `/api/admin/release/stage` | OPS-01 | باز |

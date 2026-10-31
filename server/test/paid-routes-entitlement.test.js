@@ -62,7 +62,7 @@ const FREE = [
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
   'shop.storefront.notify_area', 'shop.storefront.banners',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.orders.desk', 'shop.orders.bulk'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain'];
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');
@@ -126,6 +126,9 @@ const DATA_WRITES = {
   'POST /sync/v1/push': (t, dev) => h.api('POST', '/api/sync/v1/push', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
     body: { device_id: dev, schema_version: 2, ops: [op()] } }),
   'POST /sync/v3/push': (t, dev) => h.post('/api/sync/v3/push', { device_id: dev, protocol: 3, ops: [] }, { token: t }),
+  //  SEC-02: گزارشِ زنجیرهٔ اسنادِ دستگاه — همان قاعدهٔ push (`requireSyncWrite`)؛ پرچمِ `shop.doc_chain` روشن است
+  'POST /sync/v1/chain': (t, dev) => h.api('POST', '/api/sync/v1/chain', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: { device_id: dev, format: 'tohid-hashchain-v1', heads: [], links: [] } }),
   'POST /products': (t) => h.post('/api/products', { data: { name: 'کالا' } }, { token: t }),
 };
 
