@@ -30,13 +30,15 @@ import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
 
 /**
  *  مصارف.
@@ -44,6 +46,8 @@ import kotlinx.coroutines.launch
  *  خرجِ دکان: کرایه، برق، معاش، ترانسپورت. جمعِ ماه و تقسیمش بین
  *  دسته‌بندی‌ها همان‌جا دیده می‌شود، چون همین دو عدد است که معلوم می‌کند
  *  سودِ فروش کجا رفته.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrExpenses` (LOC-06)؛ عنوان، دسته و تاریخِ مصرف داده‌اند.
  */
 @Composable
 fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
@@ -89,7 +93,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 96.dp)) {
       item {
         Text(
-          "هزینه‌های ثبت‌شده فروشگاه",
+          StrExpenses.subtitle,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -109,10 +113,10 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
       item {
         StatTile(
-          label = "جمع مصارف ${monthLabel(month)}",
+          label = StrExpenses.monthTotal(monthLabel(month)),
           value = "${money(total)} ؋",
           tint = Shop.colors.danger,
-          hint = "${plain(shown.size)} ردیف",
+          hint = StrExpenses.rows(plain(shown.size)),
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
@@ -130,8 +134,8 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
            */
           SettingsRow(
             icon = Icons.Filled.PieChart,
-            title = "به تفکیک دسته‌بندی",
-            description = "${plain(byCategory.size)} دسته در ${monthLabel(month)}",
+            title = StrExpenses.byCategory,
+            description = StrExpenses.categoriesIn(plain(byCategory.size), monthLabel(month)),
             tint = Shop.colors.primary,
             onClick = { breakdown = true },
           )
@@ -140,11 +144,11 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       }
 
       item {
-        SectionTitle(if (category == null) "همهٔ مصارف" else "مصارف «$category»")
+        SectionTitle(category?.let { StrExpenses.expensesOf(it) } ?: StrExpenses.allExpenses)
       }
 
       if (shown.isEmpty()) {
-        item { Panel { EmptyNote("در این ماه مصرفی ثبت نشده است.") } }
+        item { Panel { EmptyNote(StrExpenses.noneThisMonth) } }
       } else {
         itemsIndexed(shown, key = { _, e -> e.id }) { index, expense ->
           StaggeredItem(index) {
@@ -162,7 +166,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     // دکمهٔ کوچکِ گِرد، نه دکمهٔ پهنِ متن‌دار: آن یکی روی ردیف‌های
     // پایینِ فهرست می‌نشست و زیرش قابلِ زدن نبود
     AddFab(
-      label = "مصرف تازه",
+      label = StrExpenses.newExpense,
       containerColor = Shop.colors.button.primary.bg,
       onClick = { form = ExpenseFormState(date = todayIso()) },
       modifier = Modifier.align(Alignment.BottomStart).padding(16.dp).popIn(),
@@ -171,7 +175,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
 
   if (breakdown) {
     BreakdownSheet(
-      title = "مصارف ${monthLabel(month)} به تفکیک دسته",
+      title = StrExpenses.byCategoryTitle(monthLabel(month)),
       rows = byCategory,
       total = total,
       selected = category,
@@ -191,7 +195,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         } else {
           LedgerEngine.editExpense(d, state.editingId, draft, todayIso())
         }
-        apply(result, if (state.editingId == null) "با موفقیت ثبت شد" else "با موفقیت ویرایش شد") {
+        apply(result, if (state.editingId == null) StrExpenses.saved else StrExpenses.edited) {
           form = null
         }
       },
@@ -202,20 +206,20 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     AlertDialog(
       onDismissRequest = { confirmDelete = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("حذف مصرف؟", color = Shop.colors.text) },
+      title = { Text(StrExpenses.deleteTitle, color = Shop.colors.text) },
       text = {
         Text(
-          "«${expense.title}» به مبلغ ${money(expense.amount)} ؋ حذف می‌شود.",
+          StrExpenses.deleteBody(expense.title, money(expense.amount)),
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
       },
       confirmButton = {
         TextButton(onClick = {
-          apply(LedgerEngine.deleteExpense(d, expense.id), "با موفقیت حذف شد") { confirmDelete = null }
-        }) { Text("حذف", color = Shop.colors.danger) }
+          apply(LedgerEngine.deleteExpense(d, expense.id), StrExpenses.deleted) { confirmDelete = null }
+        }) { Text(StrExpenses.delete, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(Str.cancel) } },
     )
   }
 }
@@ -237,7 +241,7 @@ private fun ExpenseRow(expense: Expense, onEdit: () -> Unit, onDelete: () -> Uni
       Text(expense.title, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
       Spacer(Modifier.height(3.dp))
       Text(
-        "${expense.category} — ${formatDate(expense.date)}",
+        "${expense.category} — ${displayDate(expense.date)}",
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted,
       )
@@ -248,10 +252,10 @@ private fun ExpenseRow(expense: Expense, onEdit: () -> Unit, onDelete: () -> Uni
       color = Shop.colors.danger,
     )
     IconButton(onClick = onEdit) {
-      Icon(Icons.Filled.Edit, contentDescription = "ویرایش", tint = Shop.colors.muted)
+      Icon(Icons.Filled.Edit, contentDescription = StrExpenses.edit, tint = Shop.colors.muted)
     }
     IconButton(onClick = onDelete) {
-      Icon(Icons.Filled.DeleteOutline, contentDescription = "حذف", tint = Shop.colors.muted)
+      Icon(Icons.Filled.DeleteOutline, contentDescription = StrExpenses.delete, tint = Shop.colors.muted)
     }
   }
 }
@@ -330,7 +334,7 @@ private fun ExpenseDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          if (form.editingId == null) "مصرف تازه" else "ویرایش مصرف",
+          if (form.editingId == null) StrExpenses.newExpense else StrExpenses.editExpense,
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
@@ -339,7 +343,7 @@ private fun ExpenseDialog(
         OutlinedTextField(
           value = form.title,
           onValueChange = { form = form.copy(title = it) },
-          label = { Text("بابت چی؟ (اختیاری)") },
+          label = { Text(StrExpenses.forWhat) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
@@ -348,7 +352,7 @@ private fun ExpenseDialog(
         AmountField(
           value = form.amount,
           onValueChange = { form = form.copy(amount = it) },
-          label = "مبلغ (افغانی)",
+          label = StrExpenses.amountAfn,
         )
 
         Spacer(Modifier.height(14.dp))
@@ -363,7 +367,7 @@ private fun ExpenseDialog(
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             onClick = {
               onSave(
@@ -376,7 +380,7 @@ private fun ExpenseDialog(
               )
             },
             modifier = Modifier.weight(1f),
-          ) { Text("ذخیره") }
+          ) { Text(StrExpenses.save) }
         }
       }
     }
@@ -413,7 +417,7 @@ private fun MonthPicker(
       onValueChange = {},
       readOnly = true,
       singleLine = true,
-      label = { Text("ماه") },
+      label = { Text(StrExpenses.month) },
       shape = RoundedCornerShape(Radius.sm),
       trailingIcon = { Icon(Icons.Filled.KeyboardArrowDown, contentDescription = null) },
       modifier = Modifier.menuAnchor(MenuAnchorType.PrimaryNotEditable).fillMaxWidth(),
@@ -451,7 +455,7 @@ private fun BreakdownSheet(
       Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
       Spacer(Modifier.height(4.dp))
       Text(
-        "روی هر دسته بزنید تا فقط مصارفِ همان دیده شود",
+        StrExpenses.tapCategory,
         style = MaterialTheme.typography.labelSmall,
         color = Shop.colors.muted2,
       )
@@ -467,7 +471,7 @@ private fun BreakdownSheet(
       }
       if (selected != null) {
         Spacer(Modifier.height(10.dp))
-        TextButton(onClick = { onPick(null) }) { Text("نمایش همهٔ دسته‌ها") }
+        TextButton(onClick = { onPick(null) }) { Text(StrExpenses.showAllCategories) }
       }
     }
   }
