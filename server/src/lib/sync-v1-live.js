@@ -41,6 +41,10 @@
  *      در لایه‌های ۱ و ۲ سنجیده می‌شوند (حتی پس از پاک شدنِ ردیفِ توکنِ پیر).
  *   تورِ ایمنی (TEN-02، #534): `dropRevoked` در هر تپشِ ۳۰ثانیه‌ای هشِ توکنِ
  *      همهٔ سوکت‌های کاربری را یک‌جا می‌سنجد — سوکتِ بی‌کارِ نشستِ باطل هم می‌رود.
+ * ⛔ **فقط حسابِ دکان** (`s78(ctx)`). سوکتِ پمپ — کامپیوترِ پمپ با توکنِ دستگاه و کاربرِ پمپ —
+ *   بیت‌به‌بیت همان پیش از S78 است: بی سنجشِ دوباره، بی صف، بی بستن سرِ انقضا، بیرون از
+ *   `accessChanged` و تپشِ `dropRevoked`. کدِ مشترکِ پمپ بی اجازهٔ صاحب‌کار عوض نمی‌شود؛
+ *   روشن کردنِ همین سه لایه برای پمپ در #615 (`claude/sec-pump-pending`) منتظرِ اجازه است.
  * کدهای بستن (کلاینت‌ها در هر حالت با فاصلهٔ فزاینده دوباره وصل می‌شوند):
  *   4401 `session_revoked` — نشست باطل شد (خروج، برداشتن/تعلیق، رمز، دستگاه، …)
  *   4401 `access_changed`  — نشست زنده است ولی دسترسی عوض شد (نقش، دکانِ نشست)
@@ -112,6 +116,13 @@ let epoch = 0;
 const rooms = new Map();
 
 function roomKey(ctx) { return `${ctx.app}:${ctx.accountKind}:${ctx.accountId}`; }
+
+/**
+ * لایه‌های S78 (و تپشِ `dropRevoked`) روی کدام سوکت؟ فقط حسابِ دکان در بخشِ دکان — همان قاعدهٔ
+ * `isShop` ِ `lib/safe-flag.js` (#364؛ حسابِ پمپ `station` است). ⛔ پمپ این‌جا اضافه نشود مگر با
+ * اجازهٔ صاحب‌کار (#615).
+ */
+const s78 = (ctx) => Boolean(ctx && ctx.app === 'shop' && ctx.accountKind === 'shop');
 
 function reject(socket, status, text) {
   try {
@@ -251,6 +262,7 @@ function enqueue(ws, job) {
 
 /** رساندنِ یک خبر به یک سوکت — فقط اگر هنوز همان دسترسی را دارد */
 function deliver(ws, payload) {
+  if (!ws.sync.guarded) { send(ws, payload); return; }   // پمپ: همان پیش از S78
   allowed(ws).then((ok) => { if (ok) send(ws, payload); }, () => { /* بسته */ });
 }
 
@@ -279,14 +291,15 @@ function armExpiry(ws) {
  */
 function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = false } = {}) {
   const key = roomKey(ctx);
+  const guarded = s78(ctx);
   const s = {
-    key, deviceId, ctx, expiryClose: !!expiryClose,
-    row: row ? {
+    key, deviceId, ctx, guarded, expiryClose: guarded && !!expiryClose,
+    row: guarded && row ? {
       subject_id: row.subject_id, device_id: row.device_id || null, app: row.app || 'shop',
       scope: row.scope || null, shop_id: row.shop_id || null, expires_at: row.expires_at,
     } : null,
     //  برای سنجشِ دسته‌ایِ تپش (`dropRevoked`)؛ کامپیوترِ پمپ توکنِ کاربری ندارد
-    tokenHash: ctx.via === 'user' ? require('./tokens').hashToken(token) : '',
+    tokenHash: guarded && ctx.via === 'user' ? require('./tokens').hashToken(token) : '',
     //  همین الان با `resolveToken` سنجیده شد
     gen: 0, okGen: 0, okUntil: Date.now() + RECHECK_MS,
     inflight: null, inflightGen: -1,
@@ -295,10 +308,12 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
   };
   ws.sync = s;
   ws.isAlive = true;
-  secrets.set(ws, token);
-  //  میانِ سنجش و همین‌جا دسترسی‌ای عوض شد ⇒ پیش از نخستین کار دوباره سنجیده شود
-  if (seenEpoch !== epoch) s.gen++;
-  sockets.add(ws);
+  if (guarded) {
+    secrets.set(ws, token);
+    //  میانِ سنجش و همین‌جا دسترسی‌ای عوض شد ⇒ پیش از نخستین کار دوباره سنجیده شود
+    if (seenEpoch !== epoch) s.gen++;
+    sockets.add(ws);
+  }
   if (!rooms.has(key)) rooms.set(key, new Set());
   rooms.get(key).add(ws);
   armExpiry(ws);
@@ -313,6 +328,12 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
     //  (گوشی به‌عنوانِ بارکدخوانِ کامپیوتر). هیچ داده‌ای ذخیره نمی‌شود.
     const payload = !ping && msg.type === 'relay' && RELAY_EVENTS.has(msg.event) ? cleanRelay(msg) : null;
     if (!ping && !payload) return;
+    //  پمپ: همان پیش از S78 — بی سنجشِ دوباره و بی صف
+    if (!s.guarded) {
+      if (ping) headOf(s.ctx).then((cursor) => send(ws, { event: 'pong', cursor, serverTime: Date.now() }));
+      else relay(s.ctx, payload, deviceId);
+      return;
+    }
     enqueue(ws, async () => {
       if (!(await allowed(ws))) return;
       if (ping) {
@@ -326,6 +347,10 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
   ws.on('close', () => { s.dead = true; forget(ws); });
   ws.on('error', () => { try { ws.terminate(); } catch { /* بسته شد */ } });
 
+  if (!s.guarded) {
+    headOf(ctx).then((cursor) => send(ws, { event: 'hello', cursor, device_id: deviceId, serverTime: Date.now() }));
+    return;
+  }
   if (s.dead) return;   // توکن همان لحظهٔ وصل پیر بود
   allowed(ws).then(async (ok) => {
     if (!ok) return;
@@ -343,7 +368,8 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
  *
  * هدف: `{ userId }` (همهٔ سوکت‌های یک کاربر، در هر دکان/پمپ) یا
  * `{ accountKind, accountId }` (همهٔ سوکت‌های یک دکان/پمپ، از جمله
- * کامپیوترهای پمپ که کاربر ندارند)؛ هر دو با هم = اشتراکشان.
+ * کامپیوترهای پمپ که کاربر ندارند)؛ هر دو با هم = اشتراکشان. ⛔ تا #615 فقط سوکت‌های دکان
+ * هدف‌اند (`s78`)؛ سوکتِ پمپ در `sockets` نیست و این‌جا دست نمی‌خورد.
  *
  * صدازننده‌ها (هر راهِ تازهٔ بستن/کم‌کردنِ دسترسی باید به این فهرست بپیوندد):
  *   lib/tokens.js          revoke · revokeFamily · revokeAllForSubject · revokeOthersForSubject ·
@@ -357,8 +383,8 @@ function join(ctx, ws, deviceId, token, seenEpoch, { row = null, expiryClose = f
  * ⛔ راه‌های پمپ (کدِ مشترکِ پمپ، بی اجازهٔ صاحب‌کار دست نمی‌خورد) هنوز صدا **نمی‌زنند** — وصله‌شان
  * در #615 (`claude/sec-pump-pending`) منتظرِ اجازه است: `lib/stations.js` updateMember،
  * `lib/station-devices.js` revoke · revokeBoundBy، `routes/admin-pump.js` POST /stations/:id/status،
- * `routes/pump-device.js` adoptFromDevice. تا آن‌جا لایهٔ ۲ (سنجشِ دوباره پیش از هر پیام، ≤ ۵ ثانیه)
- * سوکتِ کامپیوتر یا عضوِ پمپی را که دسترسی‌اش رفته پیش از پیامِ بعدی می‌بندد.
+ * `routes/pump-device.js` adoptFromDevice — و خودِ لایه‌های ۱ تا ۳ برای سوکتِ پمپ (`s78`). تا آن‌جا
+ * سوکتِ پمپ همان پیش از S78 است.
  *
  * @param {{userId?: string, accountKind?: string, accountId?: string}} target
  * @returns {Promise<number>} چند سوکت بسته شد
@@ -470,7 +496,7 @@ function attach(server) {
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);
       if (claimed && claimed !== ctx.app) return reject(socket, 403, 'Forbidden');
-      const expiryClose = caps.includes('expiry') || await expiryForced(ctx.accountId);
+      const expiryClose = s78(ctx) && (caps.includes('expiry') || await expiryForced(ctx.accountId));
       wss.handleUpgrade(req, socket, head, (ws) => join(ctx, ws, deviceId, token, seen, { row: out.row, expiryClose }));
     }).catch(() => reject(socket, 500, 'Internal Server Error'));
   });
@@ -501,8 +527,8 @@ function attach(server) {
  * از همه‌جا، تعلیق یا برداشتنِ عضو، دستگاهِ ازکارافتاده — همه `tokens.revoked_at` می‌گذارند)
  * حتی اگر راهی `accessChanged` را صدا نزده باشد و سوکت بی‌کار باشد، در تپشِ بعدی بسته می‌شود.
  * هر تپش (۳۰ ثانیه) یک پرسشِ دسته‌ای برای همهٔ سوکت‌های کاربری؛ فقط **باطل‌شده** این‌جا بسته
- * می‌شود (پایانِ مهلتِ توکن کارِ لایهٔ ۳ است، با 4403). سوکتِ کامپیوترِ پمپ (توکنِ دستگاه) این‌جا
- * نیست؛ لایه‌های ۱ و ۲ آن را می‌سنجند.
+ * می‌شود (پایانِ مهلتِ توکن کارِ لایهٔ ۳ است، با 4403). سوکتِ پمپ (کامپیوتر با توکنِ دستگاه و
+ * کاربرِ پمپ) این‌جا نیست: `tokenHash` فقط برای سوکتِ دکان پر می‌شود (`s78`؛ پمپ ⇐ #615).
  * @returns {Promise<number>} چند سوکت بسته شد
  */
 async function dropRevoked(wss) {
@@ -524,6 +550,6 @@ async function dropRevoked(wss) {
 }
 
 module.exports = {
-  attach, broadcast, relay, listeners, roomKey, issueTicket, accessChanged, dropRevoked,
+  attach, broadcast, relay, listeners, roomKey, issueTicket, accessChanged, dropRevoked, s78,
   PATHS, PING_MS, RELAY_EVENTS, TICKET_MS, RECHECK_MS, CLOSE, EXPIRY_FLAG,
 };

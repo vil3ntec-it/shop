@@ -56,14 +56,14 @@ async function shopWithStaff(label, tag) {
 }
 
 /** سوکتِ زنده؛ `legacy` ⇒ راهِ برنامه‌های کهنه (`?token=`) به‌جای بلیت؛ `caps` ⇒ همان که برنامهٔ تازه می‌فرستد */
-async function socket(token, deviceId, { legacy = false, caps = '' } = {}) {
+async function socket(token, deviceId, { legacy = false, caps = '', app = 'shop' } = {}) {
   let cred = `token=${encodeURIComponent(token)}`;
   if (!legacy) {
-    const t = await h.api('POST', '/api/sync/v1/live/ticket', { token, body: {}, headers: { 'X-App': 'shop' } });
+    const t = await h.api('POST', '/api/sync/v1/live/ticket', { token, body: {}, headers: { 'X-App': app } });
     assert.equal(t.status, 200, JSON.stringify(t.body));
     cred = `ticket=${encodeURIComponent(t.body.ticket)}`;
   }
-  const ws = new WebSocket(`${base.replace('http', 'ws')}/api/sync/v1/live?${cred}&device_id=${deviceId}&app=shop${caps ? `&caps=${caps}` : ''}`);
+  const ws = new WebSocket(`${base.replace('http', 'ws')}/api/sync/v1/live?${cred}&device_id=${deviceId}&app=${app}${caps ? `&caps=${caps}` : ''}`);
   opened.push(ws);
   ws.msgs = [];
   ws.closed = null;
@@ -303,4 +303,52 @@ test('تورِ ایمنیِ تپش (TEN-02): نشستِ باطلِ سوکتِ ب
   assert.equal(desk.closed, null);
   assert.equal(room(s.shopId), 1);
   desk.close();
+});
+
+/* ── پمپ: همان پیش از S78 (کدِ مشترکِ پمپ؛ روشن کردنِ لایه‌ها برای پمپ ⇐ #615) ───── */
+
+test('پمپ همان پیش از S78: کامپیوترِ پمپِ بیرون‌شده/خاموش و کاربرِ پمپِ خارج‌شده باز می‌مانند و خبر می‌گیرند؛ کامپیوترِ دکان در همان حال بسته می‌شود', async () => {
+  const s = await shopWithStaff('کنارِ پمپ', 'pmp');
+  const desk = await socket(s.ownerDesk, 'pmp-D');
+  const u = await h.newUser('صاحبِ پمپِ S78', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ S78' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const sid = made.body.station.id;
+  const bound = await h.post('/api/pump/device/bind',
+    { device: { uid: 'pc-s78', name: 'کامپیوتر', platform: 'windows' } }, { token: u.accessToken });
+  assert.equal(bound.status, 201, JSON.stringify(bound.body));
+  const pc = await socket(bound.body.deviceToken, 'pc-s78', { legacy: true, app: 'pump' });
+  const phone = await socket(u.accessToken, 'pump-phone', { legacy: true, app: 'pump' });
+  const pumpCtx = { app: 'pump', accountKind: 'station', accountId: sid };
+  assert.equal(live.listeners(pumpCtx), 2);
+
+  //  بی هوک (SQL ِ خام): نشستِ کامپیوترِ دکان باطل؛ کامپیوترِ پمپ بیرون، کاربرِ پمپ خارج، پمپ خاموش
+  await query('UPDATE tokens SET revoked_at=$1 WHERE token_hash=$2', [now(), hashToken(s.ownerDesk)]);
+  await query(`UPDATE station_devices SET status='revoked' WHERE station_id=$1`, [sid]);
+  await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL', [now(), u.user.id]);
+  await query(`UPDATE stations SET status='disabled' WHERE id=$1`, [sid]);
+  await new Promise((r) => setTimeout(r, live.RECHECK_MS + 50));   //  حافظهٔ سنجش گذشت
+
+  //  لایهٔ ۲: دکان پیش از «changed» بسته؛ پمپ مثلِ main خبر می‌گیرد
+  live.broadcast({ app: 'shop', accountKind: 'shop', accountId: s.shopId }, 7);
+  live.broadcast(pumpCtx, 7);
+  await desk.until(() => desk.closed, 'کامپیوترِ دکانِ باطل بسته نشد');
+  assert.deepEqual(desk.closed, { code: 4401, reason: 'session_revoked' });
+  assert.equal(changedCount(desk), 0, 'نشستِ باطلِ دکان «changed» گرفت');
+  const got = (ws, cursor) => ws.until(() => ws.msgs.find((x) => x.event === 'changed' && x.cursor === cursor), `«changed» ${cursor}`);
+  await got(pc, 7); await got(phone, 7);
+
+  //  لایهٔ ۱ و تپش هم سوکتِ پمپ را هدف نمی‌گیرند
+  assert.equal(await live.accessChanged({ accountKind: 'station', accountId: sid }), 0);
+  assert.equal(await live.accessChanged({ userId: u.user.id }), 0);
+  await live.dropRevoked(h.server().__syncLive);
+  live.broadcast(pumpCtx, 8);
+  await got(pc, 8); await got(phone, 8);
+  for (const ws of [pc, phone]) {
+    ws.send2({ type: 'ping' });
+    await ws.until(() => ws.msgs.find((x) => x.event === 'pong'), 'pong');
+    assert.equal(ws.closed, null);
+  }
+  assert.equal(live.listeners(pumpCtx), 2);
+  pc.close(); phone.close();
 });
