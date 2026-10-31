@@ -23,9 +23,25 @@ import ir.vil3ntec.tohid.core.qr.QrCode
 @Composable
 internal fun HandoverQr(orderNo: Long, code: String, modifier: Modifier = Modifier, side: Dp = 168.dp) {
   val rows = remember(orderNo, code) { HandoverCode.matrix(orderNo, code) } ?: return
+  QrMatrix(rows, "QRِ کدِ سفارش #$orderNo", modifier, side)
+}
+
+/**
+ *  QRِ هر متنِ کوتاه (برچسبِ کیسهٔ سفارش `VLNB-…`، PCK-09) با همان رمزگذارِ `core/qr/QrCode` (تا ۱۰۶
+ *  بایت). ساخته نشد ⇒ هیچ (متن همیشه کنارش هست).
+ */
+@Composable
+internal fun QrBox(text: String, modifier: Modifier = Modifier, side: Dp = 120.dp) {
+  val rows = remember(text) { runCatching { QrCode.encode(text) }.getOrNull() } ?: return
+  QrMatrix(rows, "QR: $text", modifier, side)
+}
+
+/** ماتریس ⇒ تصویر: سیاه روی سفید با حاشیهٔ استاندارد؛ بی آینه شدن در راست‌به‌چپ */
+@Composable
+private fun QrMatrix(rows: Array<BooleanArray>, label: String, modifier: Modifier, side: Dp) {
   val cells = rows.size + 2 * QrCode.QUIET_ZONE
   Canvas(
-    modifier.size(side).semantics { contentDescription = "QRِ کدِ سفارش #$orderNo" },
+    modifier.size(side).semantics { contentDescription = label },
   ) {
     drawRect(Color.White)
     val cell = size.minDimension / cells

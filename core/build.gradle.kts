@@ -40,6 +40,8 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
   }
   sourceSets.commonTest.dependencies { implementation(kotlin("test")) }
+  //  بردارهای مرجعِ مشترکِ JS/Kotlin (`core/test-vectors/*.json`) روی JVM — فقط آزمون؛ همان نسخهٔ برنامه، از Maven Central
+  sourceSets.jvmTest.dependencies { implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") }
   if (iosSpike) {
     iosArm64()
     iosSimulatorArm64()
