@@ -43,9 +43,15 @@ export function entropy(s) {
 export function looksSecret(v) {
   if (!v || v.length < 16 || v.length > 512) return false;
   if (PLACEHOLDER.test(v) || v.includes('${') || v.includes('#{')) return false;
-  //  نامِ کلیدِ ذخیره یا شناسه: ‎tohid-api-key-v1‎ — بیشترِ تکه‌ها واژه‌اند (UUID و رازِ تصادفی نه)
+  //  نامِ کلیدِ ذخیره یا شناسه: ‎tohid-api-key-v1‎، ‎com.vil3ntec.tohid‎ — بیشترِ تکه‌ها واژه‌اند و بقیه تکهٔ
+  //  شناسه‌وار (کوتاه، یک‌دست یا واژه‌ورقم مثلِ ‎v1‎، ‎vil3ntec‎، ‎Value123‎). UUID و رازِ تصادفی نه. «واژه» یک‌دست است (همه کوچک، همه
+  //  بزرگ، یا فقط حرفِ اول بزرگ)؛ تکهٔ بلندِ کوچک‌وبزرگِ درهم (base64) شناسه نیست.
+  //  ⛔ پیش از این هر تکهٔ تمام‌حرفی «واژه» بود: رازِ base64 با یک ‎/‎ و تکهٔ کوتاهِ ‎aB‎ کنارش (۸٫۶٪ ِ رازهای
+  //  ۲۴بایتیِ تصادفی) «شناسه» دیده و رد می‌شد (artifact-gate.test.mjs › «انتسابِ مشکوک»).
   const parts = v.split(/[-_.:/]/).filter(Boolean);
-  if (parts.length >= 2 && parts.filter((x) => /^[A-Za-z]{2,}$/.test(x)).length * 2 >= parts.length) return false;
+  const word = (x) => /^(?:[a-z]{2,}|[A-Z]{2,}|[A-Z][a-z]+)$/.test(x);
+  const idLike = (x) => word(x) || x.length <= 4 || /^[a-z0-9]+$/.test(x) || /^[A-Z0-9]+$/.test(x) || /^[A-Z]?[a-z]+\d+$/.test(x);
+  if (parts.length >= 2 && parts.filter(word).length * 2 >= parts.length && parts.every(idLike)) return false;
   //  نامِ کلید یا شناسه: فقط حروفِ کوچک/بزرگ و `_`، `-`، `.`، `/`
   if (/^[a-z_.\-/]+$/.test(v) || /^[A-Z_.\-/]+$/.test(v)) return false;
   //  نشانی بی رمز

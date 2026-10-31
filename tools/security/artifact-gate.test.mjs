@@ -113,11 +113,17 @@ test('توکن‌های شناخته روی دودویی هم؛ انتسابِ �
   assert.deepEqual(scanContent(bin).map((f) => f.rule), ['github-token']);
   const strong = crypto.randomBytes(24).toString('base64');
   assert.deepEqual(scanContent(Buffer.from(`const apiKey = "${strong}";\n`)).map((f) => f.rule), ['secret-assignment']);
-  //  نامِ کلیدِ ذخیره، جای‌نگهدار و قالب راز نیستند
-  for (const v of ['tohid-api-key-v1', '${API_SECRET}', 'change-me-please-now', 'license_private_key', 'xxxxxxxxxxxxxxxxxxxx']) {
+  //  نامِ کلیدِ ذخیره، شناسهٔ بسته، جای‌نگهدار و قالب راز نیستند
+  for (const v of ['tohid-api-key-v1', '${API_SECRET}', 'change-me-please-now', 'license_private_key', 'xxxxxxxxxxxxxxxxxxxx',
+    'com.vil3ntec.tohid.release', 'ir.vil3ntec.tohid.fileprovider']) {
     assert.equal(looksSecret(v), false, v);
   }
   assert.equal(looksSecret(strong), true);
+  //  رازِ base64 با «/» و تکهٔ کوتاهِ تمام‌حرفی کنارش «شناسه» نیست — پیش از این ۸٫۶٪ ِ رازهای ۲۴بایتیِ تصادفی
+  //  این شکل را داشتند و آزمونِ بالا (با `strong` ِ تصادفی) گاه‌به‌گاه سرخ می‌شد
+  for (const v of ['k3Jq9ZtR2mXw7VbP0sLd4HcY8nFg6TaE/aB', 'Ab/x9QmZ2kL7wR4tV8nB1cX6yH3jP0sD5fG', 'M2xQ9kLw7RtZ3vB8nC1pXy6hJ4sD0fGa/xYz']) {
+    assert.equal(looksSecret(v), true, v);
+  }
   //  رمز در نشانی، نه متغیرِ محیط
   assert.deepEqual(scanContent(Buffer.from(`db = "postgres://u:${strong.replace(/[/+=]/g, 'a')}@h/x"`)).map((f) => f.rule), ['url-credentials']);
   assert.deepEqual(scanContent(Buffer.from('postgres://${U}:${P}@db:5432/x')), []);
