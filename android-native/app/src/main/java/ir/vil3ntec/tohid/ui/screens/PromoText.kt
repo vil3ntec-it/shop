@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -40,7 +41,7 @@ object PromoText {
     "code" to "کد باید ۳ تا ۳۲ حرف یا رقمِ لاتین باشد", "uses" to "سقفِ مصرف نادرست است",
     "channel" to "کانال نادرست است", "window" to "بازهٔ زمانی نادرست است (از ≤ تا، ساعتِ شروع ≠ پایان)",
     "bp" to "درصد باید بیش از ۰ و حداکثر ۱۰۰ باشد", "amount" to "مبلغ باید مثبت و افغانیِ کامل باشد",
-    "prices" to "کالا و قیمتِ ویژه را بدهید", "tiers" to "پله‌ها باید صعودی باشند — هم آستانه، هم تخفیف",
+    "prices" to "کالا و قیمتِ ویژه را بدهید", "tiers" to "پله‌ها باید صعودی باشند — هم آستانه، هم تخفیف؛ قیمتِ ثابتِ هر پله کمتر از پلهٔ پیش",
     "bxgy" to "«بخر» و «بگیر» دست‌کم ۱، تخفیفِ بخشِ «بگیر» بینِ ۱ تا ۱۰۰٪",
     "bundle" to "بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل",
   )
@@ -64,7 +65,7 @@ object PromoText {
     "percent" -> pct(r.bp)
     "amount" -> "${af(r.amountMinor)} ؋ از هر واحد"
     "price" -> r.prices.firstOrNull()?.let { "${af(it.unitMinor)} ؋ هر واحد" } ?: "—"
-    "tiers" -> r.tiers.joinToString("، ") { "${qty(it.min)}+ ⇐ ${pct(it.bp)}" }
+    "tiers" -> r.tiers.joinToString("، ") { "${qty(it.min)}+ ⇐ " + if (it.unitMinor >= 0) StrLine.tierUnitText(af(it.unitMinor)) else pct(it.bp) }
     "bxgy" -> "بخر ${r.buy} بگیر ${r.get}" + if (r.bp >= 10_000) " رایگان" else " با ${pct(r.bp)} تخفیف"
     "bundle" -> "${r.qty} تا ${af(r.priceMinor)} ؋"
     "threshold" -> r.tiers.joinToString("، ") { t -> "از ${af(t.min)} ⇐ " + if (t.amountMinor > 0) "${af(t.amountMinor)} ؋" else pct(t.bp) }
@@ -132,7 +133,7 @@ data class PromoForm(
   val priceUnit: String = "",
   /** هر پله: آستانه (تعداد یا افغانی) و تخفیف (درصد یا افغانی) */
   val tiers: List<Pair<String, String>> = listOf("" to ""),
-  /** آستانهٔ مبلغ: تخفیفِ هر پله افغانی است، نه درصد */
+  /** آستانهٔ مبلغ: تخفیفِ هر پله افغانی است، نه درصد؛ پله‌ای بر تعداد (POS-19): قیمتِ ثابتِ هر واحد به افغانی */
   val tierAmount: Boolean = false,
   val buy: String = "2",
   val get: String = "1",
@@ -164,10 +165,10 @@ data class PromoForm(
       priceUnit = r.prices.firstOrNull()?.let { num(it.unitMinor / 100.0) }.orEmpty(),
       tiers = if (r.tiers.isEmpty()) listOf("" to "") else r.tiers.map { t ->
         val min = if (r.kind == "threshold") num(t.min / 100.0) else num(t.min / 1000.0)
-        val v = if (t.amountMinor > 0) num(t.amountMinor / 100.0) else num(t.bp / 100.0)
+        val v = if (t.unitMinor >= 0) num(t.unitMinor / 100.0) else if (t.amountMinor > 0) num(t.amountMinor / 100.0) else num(t.bp / 100.0)
         min to v
       },
-      tierAmount = r.kind == "threshold" && r.tiers.any { it.amountMinor > 0 },
+      tierAmount = (r.kind == "threshold" && r.tiers.any { it.amountMinor > 0 }) || PromoCore.tierPrice(r),
       buy = if (r.buy > 0) r.buy.toString() else "2",
       get = if (r.get > 0) r.get.toString() else "1",
       bundleQty = if (r.qty > 0) r.qty.toString() else "3",
@@ -245,7 +246,10 @@ data class PromoForm(
         first + rest
       },
       tiers = when (kind) {
-        "tiers" -> tierRows.map { (a, b) -> PromoCore.Tier(min = dbl(a)?.let { (it * 1000).roundToLong() } ?: -1, bp = bp(b)) }
+        "tiers" -> tierRows.map { (a, b) ->
+          val min = dbl(a)?.let { (it * 1000).roundToLong() } ?: -1
+          if (tierAmount) PromoCore.Tier(min = min, unitMinor = minor(b)) else PromoCore.Tier(min = min, bp = bp(b))
+        }
         "threshold" -> tierRows.map { (a, b) ->
           if (tierAmount) PromoCore.Tier(min = minor(a), amountMinor = minor(b)) else PromoCore.Tier(min = minor(a), bp = bp(b))
         }

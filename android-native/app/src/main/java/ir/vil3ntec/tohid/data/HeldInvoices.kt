@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -63,6 +65,14 @@ data class HeldInvoice(
   val paid: String = "",
   /** کدهای تخفیفِ زده‌شده (`SaleDraft.coupons`) — با فاکتور برمی‌گردند؛ نگه‌داشتهٔ نسخهٔ پیش ندارد */
   val coupons: List<String> = emptyList(),
+  /**
+   *  POS-20: `discount` مبلغ (افغانی) است، نه درصد — فقط تخفیفِ کلِ فاکتورِ کامپیوتر به مبلغ
+   *  (پشتِ `LinePolicyPrefs.on`). ⛔ `false` نوشته نمی‌شود (`EncodeDefault.NEVER`)، پس فایلِ
+   *  نگه‌داشته‌های درصدی بایت‌به‌بایت همان امروز است و نگه‌داشتهٔ نسخهٔ پیش ⇒ درصد.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val discountAmount: Boolean = false,
 ) {
   fun draft(): SaleDraft = SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt, coupons = coupons)
 }
@@ -71,7 +81,13 @@ data class HeldInvoice(
  *  حالتِ صفحه که با هر فاکتور جابه‌جا می‌شود ولی در `CartStore` نیست.
  *  `payment` `null` ⇒ فاکتورِ تازه یا نگه‌داشتهٔ نسخهٔ پیش: صفحه از مشتری می‌سازد (مشتری ⇒ نسیه).
  */
-data class HeldExtras(val discount: String = "", val payment: SalesEngine.Payment? = null, val paid: String = "")
+data class HeldExtras(
+  val discount: String = "",
+  val payment: SalesEngine.Payment? = null,
+  val paid: String = "",
+  /** POS-20: `discount` به مبلغ (افغانی) است، نه درصد — بی آن عددِ مبلغ پس از جابه‌جایی درصد خوانده می‌شد */
+  val discountAmount: Boolean = false,
+)
 
 /** شماره، نام و یادداشتِ فاکتورِ **جاری** — تا با هر جابه‌جایی عوض نشوند */
 @Serializable
@@ -153,10 +169,12 @@ object HeldRules {
       payment = extras.payment?.name.orEmpty(),
       paid = extras.paid.trim(),
       coupons = active.coupons,
+      //  کادرِ خالی واحد ندارد — نگه‌داشتهٔ بی تخفیف همان شکلِ امروز را می‌گیرد
+      discountAmount = extras.discountAmount && extras.discount.isNotBlank(),
     )
 
   private fun extrasOf(h: HeldInvoice) =
-    HeldExtras(h.discount, SalesEngine.Payment.values().firstOrNull { it.name == h.payment }, h.paid)
+    HeldExtras(h.discount, SalesEngine.Payment.values().firstOrNull { it.name == h.payment }, h.paid, h.discountAmount)
 
   /** F6 — فاکتورِ جاری نگه داشته می‌شود و صندوق خالی. `label`/`note` `null` ⇒ همان قبلی. */
   fun hold(book: HeldBook, active: SaleDraft, extras: HeldExtras, label: String?, note: String?, now: Long, device: String): Result {

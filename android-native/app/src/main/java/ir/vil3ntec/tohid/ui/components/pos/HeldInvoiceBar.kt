@@ -291,7 +291,8 @@ fun HeldInvoiceBar(ui: HeldInvoicesUi, modifier: Modifier = Modifier) {
   val active = ui.cart.snapshot()
   val activeNo = HeldRules.activeNumber(book, active)
   val tag = HeldRules.activeTag(book, active)
-  val target = PosLayout.minTarget(touch = !ir.vil3ntec.tohid.ui.Platform.DESKTOP).dp
+  //  POS-31: کامپیوترِ لمسی هم ۴۸ (`PosTouchPrefs`؛ خاموش ⇒ همان `!DESKTOP`)
+  val target = PosLayout.minTarget(touch = PosTouchPrefs.touch()).dp
   val now = System.currentTimeMillis()
   val stale = HeldRules.stale(book, now).mapTo(HashSet()) { it.id }
 

@@ -436,6 +436,35 @@ class HeldInvoicesTest {
     assertNull(HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A").let { (it as HeldRules.Result.Ok).extras.payment })
   }
 
+  /**
+   *  POS-20 — تخفیفِ کلِ فاکتور به مبلغ با فاکتور می‌رود و برمی‌گردد. بی آن «۵۰۰» ِ مبلغ پس از
+   *  جابه‌جایی درصد خوانده و ۱۰۰٪ می‌شد. درصدی (و نگه‌داشتهٔ نسخهٔ پیش) بایت‌به‌بایت همان امروز.
+   */
+  @Test
+  fun `تخفیفِ مبلغیِ فاکتور با فاکتور می‌رود و برمی‌گردد و درصدی همان شکلِ امروز است`() = runBlocking<Unit> {
+    val disk = MemDisk(); val cart = MemCart(); val s = store(disk)
+    cart.put("A", "p1" to 2.0)
+    done(s.hold(cart, HeldExtras(" 500 ", discountAmount = true)))
+    assertTrue(disk.text!!.contains("\"discountAmount\":true"))
+    cart.put("B", "p2" to 1.0)
+    done(s.hold(cart, HeldExtras("10")))
+    //  درصدی: کلیدِ تازه اصلاً نوشته نمی‌شود — فقط همان یکِ «A»
+    assertEquals(1, Regex("discountAmount").findAll(disk.text!!).count())
+    assertEquals(HeldInvoiceCodec.encode(HeldBook(items = listOf(HeldInvoice(id = "X", number = 1, discount = "10")))),
+      """{"v":1,"items":[{"id":"X","number":1,"label":"","lines":[],"debtorId":null,"discount":"10","note":"","heldAt":0,"device":"","payment":"","paid":"","coupons":[]}],"current":null}""")
+    assertEquals(HeldExtras("500", discountAmount = true), done(s.resume(cart, "A", HeldExtras())).extras)
+    assertEquals(HeldExtras("10"), done(s.resume(cart, "B", HeldExtras("700", discountAmount = true))).extras)
+    //  همان که با «B» کنار رفت: «A» با مبلغش نگه داشته شد
+    assertTrue(HeldInvoiceCodec.decode(disk.text)!!.items.single { it.id == "A" }.let { it.discount == "700" && it.discountAmount })
+    //  کادرِ خالی واحد ندارد
+    cart.put("C", "p1" to 1.0)
+    done(s.hold(cart, HeldExtras("  ", discountAmount = true)))
+    assertFalse(HeldInvoiceCodec.decode(disk.text)!!.items.single { it.id == "C" }.discountAmount)
+    //  نگه‌داشتهٔ نسخهٔ پیش ⇒ درصد
+    val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}],"discount":"5"}]}""")!!
+    assertEquals(HeldExtras("5"), (HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A") as HeldRules.Result.Ok).extras)
+  }
+
   /** نسیهٔ بی‌مشتری نسیه می‌ماند (ثبت خودش مشتری می‌خواهد)؛ نبودِ روش ⇒ مشتری دارد ⇒ نسیه */
   @Test
   fun `روشِ پرداخت پس از جابه‌جایی`() {
