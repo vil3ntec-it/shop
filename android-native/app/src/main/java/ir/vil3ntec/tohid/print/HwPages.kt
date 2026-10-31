@@ -68,6 +68,13 @@ object HwPages {
     return MonoImage.fromArgb(px, width, height, width)
   }
 
+  /**
+   *  ردیفِ راست‌چینِ برگهٔ گزارش (PAY-15، گزارشِ X/Z ِ صندوق): «برچسب: مقدار»؛ ردیفِ پررنگ با قلمِ سرخط.
+   *  همان ردیف‌های صفحه (`ShiftSlip.rows`) با `text` تصویر و با `EscPos.document` بایت می‌شوند.
+   */
+  fun reportLine(text: String, strong: Boolean = false): Line =
+    Line(text, if (strong) Style.HEAD else Style.BODY, Layout.Alignment.ALIGN_NORMAL)
+
   /** پهنای پایهٔ اندازهٔ قلم — همان نسبتِ `Receipt` روی ۸۰ میلی‌متر */
   private const val PAPER_FONT_BASE = 576
 
@@ -184,6 +191,21 @@ object HwPages {
       return labelBytes(s, img, 1)
     }
     return EscPos.document(testImage(context, s), s.profile())
+  }
+
+  /**
+   *  HW-01 — برگهٔ دوروشی: نمونهٔ «۱» با `ESC *` (ستونی) و نمونهٔ «۲» با `GS v 0` (رستری).
+   *  کاربر می‌گوید کدام درست درآمد و روش در پروفایلِ همین چاپگر ذخیره می‌شود (`ModeProbe.choose`).
+   *  ترتیب و بایت‌ها در `core/hw/ModeProbe` (آزمون: `PrinterDrawerTest`)؛ روی چاپگرِ واقعی آزموده نشده.
+   */
+  fun modeTestBytes(context: Context, s: PrinterRegistry.Saved): ByteArray {
+    val p = s.profile()
+    val w = p.paperDots
+    fun sample(no: String, how: String): MonoImage = stack(w, listOf(
+      text(context, w, listOf(Line("نمونهٔ $no", Style.TITLE), Line("$how — دری و پښتو: ښه راغلاست ۱۲۳", Style.BODY))),
+      ruler(w),
+    ), gap = 6)
+    return ir.vil3ntec.tohid.core.hw.ModeProbe.page(sample("۱", "ستونی ESC *"), sample("۲", "رستری GS v 0"), p)
   }
 
   /* ============================ برچسبِ کالا ============================ */

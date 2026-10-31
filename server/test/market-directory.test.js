@@ -238,8 +238,10 @@ test('دسته، جست‌وجو در نام و ناحیه، عبارتِ هم�
   //  وضعیتِ هر سه یکی است ⇒ ترتیب با فاصله؛ بی مکان آخر
   const order = geo.body.shops.map((s) => s.slug);
   assert.ok(order.indexOf(near.slug) < order.indexOf(far.slug) && order.indexOf(far.slug) < order.indexOf(nowhere.slug), order.join());
-  const txt = JSON.stringify(geo.body);
-  assert.ok(!txt.includes('34.5') && !txt.includes('69.1') && !txt.includes('3453'), 'مختصاتِ دکان بیرون نمی‌رود');
+  const txt = h.withoutEpochs(JSON.stringify(geo.body), order);
+  for (const secret of ['34.5', '69.1', '3453', '6916', '6912']) {
+    assert.ok(!txt.includes(secret), `مختصاتِ دکان بیرون نمی‌رود («${secret}»)`);
+  }
   assert.equal((await h.get('/api/market/shops?lat=95&lng=10')).status, 400);
   assert.equal((await h.get('/api/market/shops?lat=34')).status, 400);
 

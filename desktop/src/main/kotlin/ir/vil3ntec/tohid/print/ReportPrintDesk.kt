@@ -29,6 +29,12 @@ import java.text.AttributedString
  */
 object ReportPrint {
 
+  /** سقفِ صفحه‌های PDF ِ مستقیم؛ گزارشِ بلندتر PDF ِ ناقص نمی‌سازد ([TooManyPages]) */
+  private const val MAX_PDF_PAGES = 500
+
+  /** گزارش از سقفِ صفحه بلندتر است — پیامش همان متنِ سه‌زبانه‌ای است که صفحه نشان می‌دهد */
+  internal class TooManyPages(max: Int) : IllegalStateException(ir.vil3ntec.tohid.core.i18n.StrShell.pdfTooManyPages(ir.vil3ntec.tohid.plain(max)))
+
   fun print(@Suppress("UNUSED_PARAMETER") context: Context, sheet: ReportCsv.Sheet, title: String) {
     //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد
     //  اول پیش‌نمایش (همان صفحه‌هایی که به چاپگر می‌روند)، بعد پنجرهٔ چاپِ سیستم
@@ -37,6 +43,52 @@ object ReportPrint {
         .onFailure { DesktopNotify.show("چاپ", "پیش‌نمایش ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
     }
   }
+
+  /**
+   *  RPT-11 — فایلِ PDF ِ مستقیم (بی پنجرهٔ چاپ): همان صفحه‌های `TablePrintable` روی کاغذِ A4 در ۱۵۰ نقطه،
+   *  سیاه‌وسفید، با `core/pdf/ImagePdf` (آزمون: `ImagePdfTest`). دری/پشتو با همان قلمِ چاپ کشیده می‌شود.
+   */
+  fun pdf(@Suppress("UNUSED_PARAMETER") context: Context, sheet: ReportCsv.Sheet, title: String): ByteArray =
+    render(sheet, title, MAX_PDF_PAGES)
+
+  /** همان [pdf] با سقفِ صفحهٔ دلخواه (آزمون: `ReportPdfPagesDeskTest`)؛ بلندتر ⇒ [TooManyPages] */
+  internal fun render(sheet: ReportCsv.Sheet, title: String, maxPages: Int): ByteArray {
+    val dpi = 150
+    val pf = PageFormat().apply {
+      paper = java.awt.print.Paper().apply {
+        setSize(595.2756, 841.8898)                 // A4 به پوینت
+        setImageableArea(28.0, 28.0, 595.2756 - 56, 841.8898 - 56)
+      }
+    }
+    val printable = TablePrintable(sheet, title)
+    val w = Math.round(pf.width * dpi / 72).toInt()
+    val h = Math.round(pf.height * dpi / 72).toInt()
+    val pages = ArrayList<ir.vil3ntec.tohid.core.hw.MonoImage>()
+    var i = 0
+    while (true) {
+      val img = java.awt.image.BufferedImage(w, h, java.awt.image.BufferedImage.TYPE_BYTE_GRAY)
+      val g = img.createGraphics()
+      g.color = Color.WHITE
+      g.fillRect(0, 0, w, h)
+      g.scale(dpi / 72.0, dpi / 72.0)
+      val r = printable.print(g, pf, i)
+      g.dispose()
+      if (r != Printable.PAGE_EXISTS) break
+      //  صفحهٔ ۵۰۱ هم هست ⇒ پیش‌تر بی‌صدا بریده می‌شد و PDF ِ ناقص «ذخیره شد» می‌گفت؛ حالا خطای روشن
+      if (i >= maxPages) throw TooManyPages(maxPages)
+      val mono = ir.vil3ntec.tohid.core.hw.MonoImage(w, h)
+      val px = (img.raster.dataBuffer as java.awt.image.DataBufferByte).data
+      for (y in 0 until h) for (x in 0 until w) if ((px[y * w + x].toInt() and 0xFF) < 160) mono[x, y] = true
+      pages += mono
+      i++
+    }
+    return ir.vil3ntec.tohid.core.pdf.ImagePdf.write(pages, dpi, title)
+  }
+
+  /** PDF ⇐ پنجرهٔ «ذخیره» (`Platform.saveFile`)؛ پیام برای صفحه */
+  fun savePdf(context: Context, sheet: ReportCsv.Sheet, title: String): String = runCatching {
+    ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.pdf", pdf(context, sheet, title))?.let { "ذخیره شد: $it" } ?: "ذخیره نشد"
+  }.getOrElse { if (it is TooManyPages) it.message.orEmpty() else "PDF ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}" }
 
   private fun send(sheet: ReportCsv.Sheet, title: String) {
     //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد

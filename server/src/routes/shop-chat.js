@@ -14,6 +14,7 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
+const { goneSignal } = require('../lib/chat-wait');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/ratelimit');
@@ -22,20 +23,19 @@ const { notFound } = require('../middleware/errors');
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('chat.view'));
 
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const viewerOf = (req) => ({ side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role });
 const reply = requirePermission('chat.reply');
 const moderate = requirePermission('chat.moderate');
 const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'shop-chat-send', key: (req) => req.user && req.user.id });
 const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'shop-chat-upload', key: (req) => req.user && req.user.id });
 
-const on = wrap(async (req, res, next) => {
+const on = async (req, res, next) => {
   if (!(await chat.flagOf(req.shopId))) throw notFound('چت برای این دکان روشن نیست', 'chat_disabled');
   res.set('Cache-Control', 'no-store');
   next();
-});
+};
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   const s = config.shopChat;
   res.json({
     enabled: await chat.flagOf(req.shopId),
@@ -48,73 +48,74 @@ router.get('/config', wrap(async (req, res) => {
       ['reply', 'moderate'].map((k) => [k, can(req.role, `chat.${k}`)]).concat([['contact', can(req.role, 'orders.contact')]])
     ),
   });
-}));
+});
 
-router.get('/conversations', on, wrap(async (req, res) => {
+router.get('/conversations', on, async (req, res) => {
   res.json(await chat.list(viewerOf(req), {
     cursor: req.query.cursor, limit: req.query.limit, status: req.query.status, q: req.query.q,
   }));
-}));
+});
 
-router.post('/conversations', on, reply, wrap(async (req, res) => {
+router.post('/conversations', on, reply, async (req, res) => {
   const out = await chat.open(viewerOf(req), req.body);
   res.status(out.created ? 201 : 200).json({ conversation: out.conversation });
-}));
+});
 
-router.get('/search', on, wrap(async (req, res) => {
+router.get('/search', on, async (req, res) => {
   res.json(await chat.search(viewerOf(req), req.query.q, { limit: req.query.limit }));
-}));
+});
 
-router.get('/conversations/:id', on, wrap(async (req, res) => {
+router.get('/conversations/:id', on, async (req, res) => {
   res.json({ conversation: await chat.viewOf(viewerOf(req), req.params.id) });
-}));
+});
 
-router.put('/conversations/:id/status', on, reply, wrap(async (req, res) => {
+router.put('/conversations/:id/status', on, reply, async (req, res) => {
   res.json({ conversation: await chat.setStatus(viewerOf(req), req.params.id, req.body?.status) });
-}));
+});
 
-router.get('/conversations/:id/messages', on, wrap(async (req, res) => {
-  res.json(await chat.changes(viewerOf(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait,
-  }));
-}));
+router.get('/conversations/:id/messages', on, async (req, res) => {
+  const out = await chat.changes(viewerOf(req), req.params.id, {
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+  });
+  if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
+});
 
-router.post('/conversations/:id/messages', on, reply, sendLimit, wrap(async (req, res) => {
+router.post('/conversations/:id/messages', on, reply, sendLimit, async (req, res) => {
   const out = await chat.send(viewerOf(req), req.params.id, req.body);
   if (out.replayed) res.set('Idempotent-Replayed', 'true');
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
-router.patch('/conversations/:id/messages/:mid', on, reply, wrap(async (req, res) => {
+router.patch('/conversations/:id/messages/:mid', on, reply, async (req, res) => {
   res.json(await chat.edit(viewerOf(req), req.params.id, req.params.mid, req.body));
-}));
+});
 
-router.delete('/conversations/:id/messages/:mid', on, wrap(async (req, res) => {
+router.delete('/conversations/:id/messages/:mid', on, async (req, res) => {
   res.json(await chat.remove(viewerOf(req), req.params.id, req.params.mid, req.query.for));
-}));
+});
 
-router.post('/conversations/:id/receipts', on, wrap(async (req, res) => {
+router.post('/conversations/:id/receipts', on, async (req, res) => {
   res.json(await chat.receipts(viewerOf(req), req.params.id, req.body));
-}));
+});
 
-router.post('/conversations/:id/media', on, reply, uploadLimit, chat.rawMedia, wrap(async (req, res) => {
+router.post('/conversations/:id/media', on, reply, uploadLimit, chat.rawMedia, async (req, res) => {
   res.status(201).json(await chat.putMedia(viewerOf(req), req.params.id, req.body, { role: req.query.role }));
-}));
+});
 
-router.get('/conversations/:id/media/:mediaId', on, wrap(async (req, res) => {
+router.get('/conversations/:id/media/:mediaId', on, async (req, res) => {
   chat.sendMedia(res, await chat.getMedia(viewerOf(req), req.params.id, req.params.mediaId));
-}));
+});
 
-router.put('/conversations/:id/block', on, moderate, wrap(async (req, res) => {
+router.put('/conversations/:id/block', on, moderate, async (req, res) => {
   res.json({ conversation: await chat.setBlock(viewerOf(req), req.params.id, true) });
-}));
+});
 
-router.delete('/conversations/:id/block', on, moderate, wrap(async (req, res) => {
+router.delete('/conversations/:id/block', on, moderate, async (req, res) => {
   res.json({ conversation: await chat.setBlock(viewerOf(req), req.params.id, false) });
-}));
+});
 
-router.post('/conversations/:id/reports', on, wrap(async (req, res) => {
+router.post('/conversations/:id/reports', on, async (req, res) => {
   res.status(201).json(await chat.report(viewerOf(req), req.params.id, req.body));
-}));
+});
 
 module.exports = router;

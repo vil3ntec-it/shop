@@ -27,7 +27,7 @@ class DeskActionsTest {
   @Test fun `شرکتِ بیرونی — دادن به شرکت ⇐ تحویل یا ناموفق ⇐ تلاشِ دوباره یا برگشت`() {
     assertEquals(listOf(Act.HAND_TO_COMPANY, Act.WITHDRAW), DeskActions.of(m("external", "assigned"), manager))
     assertEquals(listOf(Act.DELIVER, Act.FAIL, Act.RETURN), DeskActions.of(m("external", "picked_up"), manager))
-    assertEquals(listOf(Act.RETRY, Act.RETURN), DeskActions.of(m("external", "failed"), manager))
+    assertEquals(listOf(Act.RETRY, Act.RETURN, Act.FIX_ADDRESS), DeskActions.of(m("external", "failed"), manager))
     assertEquals("شاگرد فقط برگشتِ بسته را تأیید می‌کند", listOf(Act.RETURN), DeskActions.of(m("external", "moving"), staff))
     assertTrue(DeskActions.of(m("external", "assigned"), staff).isEmpty())
   }
@@ -36,7 +36,7 @@ class DeskActionsTest {
     assertEquals(listOf(Act.WITHDRAW), DeskActions.of(m("shop_courier", "requested"), manager))
     assertEquals(listOf(Act.DELIVER, Act.FAIL, Act.RECALL, Act.RETURN), DeskActions.of(m("shop_courier", "moving"), manager))
     assertEquals("فراخوانیِ دوباره نیست", listOf(Act.DELIVER, Act.FAIL, Act.RETURN), DeskActions.of(m("shop_courier", "arrived", recall = true), manager))
-    assertEquals(listOf(Act.RECALL, Act.RETURN), DeskActions.of(m("shop_courier", "failed"), manager))
+    assertEquals(listOf(Act.RECALL, Act.RETURN, Act.FIX_ADDRESS), DeskActions.of(m("shop_courier", "failed"), manager))
     assertTrue(DeskActions.needsNote(m("shop_courier", "moving"), Act.DELIVER))
     assertTrue(!DeskActions.needsNote(m("external", "moving"), Act.DELIVER))
   }

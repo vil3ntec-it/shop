@@ -133,6 +133,8 @@ fun AppRoot(
   var editProduct by remember { mutableStateOf<ProductFormState?>(null) }
   val cartStore = remember { CartStore(context) }
   var tab by rememberSaveable { mutableStateOf("dashboard") }
+  //  OPS-06: صفحهٔ باز برای راهنمای F1 (پنجرهٔ کامپیوتر بیرونِ همین درخت است)
+  LaunchedEffect(tab) { AppNav.screen.value = tab }
   var migration by remember { mutableStateOf<String?>(null) }
   // بارکدی که در فروش خوانده شد ولی کالایش ثبت نبود
   var pendingBarcode by remember { mutableStateOf<String?>(null) }
@@ -358,6 +360,11 @@ fun AppRoot(
   LaunchedEffect(store, loaded) {
     if (loaded) ir.vil3ntec.tohid.print.PrintSpooler.attachAudit { row -> store.appendAudit(row) }
   }
+  //  RPT-09: ردیفِ حذف‌شده از فاکتورِ باز ⇐ `line_delete` در سابقهٔ دکان، فقط با «سابقهٔ ضدتقلب»ِ روشن
+  //  (`FraudTrailPref`، پیش‌فرض خاموش) — همان نوشتنِ زیرِ قفلِ `appendAudit`، پس از بارِ دفتر
+  LaunchedEffect(store, loaded) {
+    if (loaded) ir.vil3ntec.tohid.data.FraudTrailPref.attach(context, cartStore, store, scope)
+  }
   //  نوشتنی که قفلِ نرمِ پایانِ اشتراک ردش کرد ⇐ پیامِ «ثبت شد»ِ صفحه برداشته
   //  می‌شود و راستش گفته می‌شود، با راهِ تمدید
   LaunchedEffect(store) {
@@ -517,6 +524,8 @@ fun AppRoot(
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
     PhotoPrefs.load(context)
+    //  HW-05: «ابزارهای تازهٔ دستگاه» و تنظیمِ بارکدخوان پیش از نخستین اسکن (`HidScan`، `NumberField`)
+    ir.vil3ntec.tohid.scan.ScanPrefs.load(context)
     //  چتِ دکان: پرچم را بپرس و پیام‌های مانده در صف را (اگر هست) بفرست
     ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
@@ -629,6 +638,7 @@ fun AppRoot(
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
       //  کوچکِ سربرگ (`UpdateChip` در `DeskHeader`)، نه نوارِ تمام‌عرض
       if (!Platform.DESKTOP) UpdateBanner()
+      ir.vil3ntec.tohid.ui.screens.WhatsNewOnUpdate() //  OPS-05: یک بار پس از به‌روزرسانی، پیش‌فرض خاموش
       }
     },
     /*
@@ -782,14 +792,28 @@ fun AppRoot(
                 Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
                 Str.dateAndDigits to androidx.compose.material.icons.Icons.Filled.Event,
                 Str.expiredGoods to androidx.compose.material.icons.Icons.Filled.EventBusy,
+                //  هر بخشِ `SettingsScreen` این‌جاست، وگرنه روی کامپیوتر روشن‌شدنی نیست (`DeskSettingsCoverageTest`)
+                ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle to androidx.compose.material.icons.Icons.Filled.Tune,
+                ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
+                ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
+                ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
+                StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
+                ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard,
+                ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
+                ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
                 Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }

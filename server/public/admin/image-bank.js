@@ -11,8 +11,17 @@
  * دلیلِ تطبیق، کالای وصل یا کالاهای ممکن با SKU/بارکد/نوع/اندازه؛ تطبیقِ مبهم
  * فقط با انتخابِ انسانی وصل می‌شود و انتشار فقط کارِ مدیرِ ارشد با دلیل است.
  *
+ * ادامهٔ بارگذاری (IMG-14، IMG-PRO-06؛ پشتِ پرچمِ `image_bank.resume`، پیش‌فرض خاموش): پیش
+ * از فرستادن فهرستِ رسیده‌ها پرسیده می‌شود و فایلی که با همان نام و همان sha256 رسیده دوباره
+ * نمی‌رود؛ هر فایل با `X-Content-SHA256` می‌رود (نیمه‌رسیده ⇒ ۴۲۲) و خطای شبکه/۵xx/sha256
+ * دو بار دوباره تلاش می‌شود. پرچمِ خاموش ⇒ همان بارگذاریِ پیشین.
+ *
  * تکراری (IMG-BANK-13) فقط نشان و صافی است — نه حذف، نه ادغام. بایگانی
  * (IMG-BANK-15) فقط عکسِ منتشرشده، فقط مدیرِ ارشد با دلیل.
+ *
+ * مقایسه (IMG-PRO-05، IMG-07): اصل (نسخهٔ ۱) کنارِ هر نسخهٔ دیگر، با «اندازهٔ واقعی» و
+ * پیمایشِ هم‌گامِ دو قاب و زمینهٔ شطرنجی؛ نسخهٔ تازه بی‌صدا جاری نمی‌شود — مدیرِ ارشد با
+ * دلیل جاری یا ردش می‌کند و رد، اصل و نسخهٔ جاری را دست‌نخورده نگه می‌دارد.
  *
  * پس از `app.js` بار می‌شود ($، el، call، msg، fa، dateTime، token، logout، LOADERS).
  * ⛔ همه درونِ یک تابعِ بی‌نام: نامِ هم‌سان با `app.js` کلِ فایل را می‌خواباند.
@@ -20,6 +29,7 @@
 (() => {
   const IB = '/admin/image-bank';
   const UPLOAD_PARALLEL = 4;
+  const RETRY_WAIT = [600, 2000];   // دو تلاشِ دوباره پس از قطعِ شبکه، ۵xx یا sha256 ِ ناجور
 
   //  برچسبِ آدمیزادِ کدهای خطا و نشان‌ها (همان کدهای `lib/image-bank.js`)
   const ERR_FA = {
@@ -40,6 +50,9 @@
     batch_done: 'دسته بسته بود',
     row_error: 'خطای پیش‌بینی‌نشده',
     upload_failed: 'بارگذاری نشد',
+    checksum_mismatch: 'فایل کامل نرسید (sha256)',
+    bad_checksum: 'sha256 ِ نادرست',
+    network: 'اینترنت قطع شد',
   };
   const FLAG_FA = { extension_mismatch: 'پسوند با نوع نمی‌خواند', too_small: 'عکسِ کوچک' };
   const ROW_FA = {
@@ -76,22 +89,69 @@
   const badge = (cls, text) => el('span', `badge ${cls}`, text);
   const td = (text, cls = '') => el('td', cls, text);
 
-  /** PUT با بدنهٔ خام (فایل) — `call()` بدنه را JSON می‌کند. */
-  async function putFile(path, file) {
-    const res = await fetch(API + path, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/octet-stream', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      body: file,
-    });
+  /** PUT با بدنهٔ خام (فایل) — `call()` بدنه را JSON می‌کند. `sum`: sha256 برای `X-Content-SHA256`. */
+  async function putFile(path, file, sum = '') {
+    let res;
+    try {
+      res = await fetch(API + path, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/octet-stream',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...(sum ? { 'X-Content-SHA256': sum } : {}),
+        },
+        body: file,
+      });
+    } catch {
+      const err = new Error('اینترنت قطع شد');
+      err.code = 'network';
+      throw err;
+    }
     if (res.status === 401) { logout(); throw new Error('نشست تمام شد، دوباره وارد شوید'); }
     let json = null;
     try { json = await res.json(); } catch { json = null; }
     if (!res.ok) {
       const err = new Error(json?.error?.message || `خطای ${res.status}`);
       err.code = json?.error?.code || (res.status === 413 ? 'too_large' : 'upload_failed');
+      err.status = res.status;
       throw err;
     }
     return json;
+  }
+
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  /** همان PUT با تلاشِ دوباره فقط برای خطای گذرا؛ ۴xx ِ دیگر (حجم، دستهٔ متوقف) دوباره نمی‌رود. */
+  async function putRetry(path, body, sum) {
+    for (let k = 0; ; k++) {
+      try {
+        return await putFile(path, body, sum);
+      } catch (err) {
+        const again = err.code === 'network' || err.code === 'checksum_mismatch' || err.status >= 500;
+        if (!again || k >= RETRY_WAIT.length) throw err;
+        await sleep(RETRY_WAIT[k]);
+      }
+    }
+  }
+
+  /** sha256 ِ هگز در مرورگر؛ بی `crypto.subtle` (http ِ غیرِ محلی) ⇒ '' و همان بارگذاریِ ساده. */
+  async function sha256Hex(buf) {
+    if (!globalThis.crypto?.subtle) return '';
+    const d = new Uint8Array(await crypto.subtle.digest('SHA-256', buf));
+    return Array.from(d, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** فایل‌های «موفق» ِ رسیدهٔ همین دسته: نام ⇐ sha256 (صفحه‌به‌صفحه). */
+  async function receivedFiles() {
+    const have = new Map();
+    let after = '';
+    for (let page = 0; page < 100; page++) {
+      const out = await call('GET', `${IB}/batches/${encodeURIComponent(batchId)}/files?after=${encodeURIComponent(after)}`);
+      for (const f of out.items) if (f.status === 'ok' && f.sha256) have.set(f.name, f.sha256);
+      if (!out.next_after) break;
+      after = out.next_after;
+    }
+    return have;
   }
 
   function counts(box, c) {
@@ -160,15 +220,42 @@
     const progress = $('ib-progress');
     let done = 0;
     let failed = 0;
+    let skipped = 0;
     let i = 0;
-    const show = () => { progress.textContent = `${fa(done)} از ${fa(picked.length)} فایل · ${fa(failed)} ناموفق`; };
+    const show = () => {
+      progress.textContent = `${fa(done)} از ${fa(picked.length)} فایل · ${fa(failed)} ناموفق` +
+        (skipped ? ` · ${fa(skipped)} از پیش رسیده` : '');
+    };
     show();
     $('btn-ib-upload').disabled = true;
+    const resume = status?.resume === true;
+    let have = new Map();
+    try {
+      if (resume) have = await receivedFiles();
+    } catch (err) {
+      $('btn-ib-upload').disabled = false;
+      throw err;
+    }
     const worker = async () => {
       while (i < picked.length) {
         const f = picked[i++];
+        const path = `${IB}/batches/${encodeURIComponent(batchId)}/files/${encodeURIComponent(f.name)}`;
         try {
-          const out = await putFile(`${IB}/batches/${encodeURIComponent(batchId)}/files/${encodeURIComponent(f.name)}`, f);
+          let out;
+          if (resume) {
+            const buf = await f.arrayBuffer();
+            const sum = await sha256Hex(buf);
+            if (sum && have.get(f.name) === sum) {      // همان فایل پیش‌تر کامل رسیده
+              skipped++;
+              localFails.delete(f.name);
+              done++;
+              show();
+              continue;
+            }
+            out = await putRetry(path, buf, sum);
+          } else {
+            out = await putFile(path, f);
+          }
           if (out.status === 'failed') failed++;
           else localFails.delete(f.name);
         } catch (err) {
@@ -313,6 +400,7 @@
       if (it.duplicate_of.length) flags.appendChild(badge('b-warn', `تکراری × ${fa(it.duplicate_of.length)}`));
       for (const f of it.quality_flags) flags.appendChild(badge('b-mute', FLAG_FA[f] || f));
       if (it.from_shop) flags.appendChild(badge('b-mute', 'از دکان'));
+      if (it.versions_pending) flags.appendChild(badge('b-warn', `نسخهٔ تازه × ${fa(it.versions_pending)}`));
       tr.appendChild(flags);
       tr.appendChild(td(it.license ? `${it.license.status}${it.license.commercial_use ? ' · تجاری' : ''}` : '—'));
       const act = el('td');
@@ -393,6 +481,147 @@
       img.src = await imageData(it.file.url);
       img.alt = `عکسِ ${it.id}`;
     } else img.alt = 'فایلی نیست';
+    await showVersions(it);
+  }
+
+  // ---------- مقایسهٔ اصل و نسخه (IMG-PRO-05، IMG-07) ----------
+  const REVIEW_FA = { approved: 'پذیرفته', needs_review: 'منتظرِ بررسی', rejected: 'ردشده' };
+  let cmp = null;   // { id, d (adminDetail), pick }
+
+  /**
+   * قابِ مقایسه زیرِ جزئیاتِ عکس — همین‌جا ساخته می‌شود تا `index.html` (بالای سقفِ اندازه) بزرگ‌تر نشود.
+   * اصل در قابِ اول (راست)، نسخه در دوم؛ زمینهٔ شطرنجی و ۱:۱ در `admin.css` (`.ib-cmp`).
+   */
+  function buildCompareBox() {
+    const box = el('div', 'hidden');
+    box.id = 'ib-dt-cmp-box';
+    const h = el('h2', '', 'مقایسهٔ اصل و نسخه — اصل هرگز عوض نمی‌شود');
+    h.style.marginTop = '14px';
+    box.appendChild(h);
+    const vers = el('div', 'row');
+    vers.id = 'ib-dt-versions';
+    vers.style.cssText = 'flex-wrap:wrap;gap:6px;';
+    box.appendChild(vers);
+    const zr = el('div', 'row');
+    zr.style.marginTop = '8px';
+    const zl = el('label');
+    zl.style.margin = '0';
+    const zoom = el('input');
+    zoom.type = 'checkbox';
+    zoom.id = 'ib-cmp-zoom';
+    zl.append(zoom, ' اندازهٔ واقعی (۱:۱) — دو قاب با هم می‌چرخند');
+    zr.appendChild(zl);
+    box.appendChild(zr);
+    const grid = el('div', 'grid grid-2');
+    grid.style.marginTop = '8px';
+    for (const k of ['a', 'b']) {
+      const fig = el('figure');
+      fig.style.margin = '0';
+      const cap = el('figcaption', 'muted');
+      cap.id = `ib-cmp-${k}-cap`;
+      const pane = el('div', 'ib-cmp');
+      pane.id = `ib-cmp-${k}`;
+      const img = el('img');
+      img.id = `ib-cmp-${k}-img`;
+      img.alt = '';
+      pane.appendChild(img);
+      fig.append(cap, pane);
+      grid.appendChild(fig);
+    }
+    box.appendChild(grid);
+    const act = el('div', 'row');
+    act.style.marginTop = '8px';
+    const ok = el('button', 'btn btn-sm', 'جاری کردنِ این نسخه');
+    ok.id = 'btn-ib-ver-approve';
+    const no = el('button', 'btn btn-sm btn-danger', 'ردِ این نسخه');
+    no.id = 'btn-ib-ver-reject';
+    const note = el('span', 'muted');
+    note.id = 'ib-cmp-note';
+    act.append(ok, no, note);
+    box.appendChild(act);
+    $('ib-detail').appendChild(box);
+  }
+
+  /** نسخه‌های عکس؛ فقط وقتی بیش از یکی هست. پیش‌فرض: تازه‌ترین نسخهٔ منتظر، وگرنه جاری. */
+  async function showVersions(it) {
+    const box = $('ib-dt-cmp-box');
+    const d = await call('GET', `${IB}/images/${encodeURIComponent(it.id)}`);
+    const vs = d.versions || [];
+    if (vs.length < 2) { box.classList.add('hidden'); cmp = null; return; }
+    const waiting = vs.filter((v) => v.review === 'needs_review' && v.version !== d.current_version);
+    const def = (waiting[waiting.length - 1] || vs.find((v) => v.version === d.current_version && v.version !== 1) || vs[vs.length - 1]).version;
+    cmp = { id: it.id, d, pick: def };
+    box.classList.remove('hidden');
+    renderVersions();
+    await renderCompare();
+  }
+
+  function versionLabel(v) {
+    const kind = v.version === 1 ? 'اصل' : `پردازش‌شده${v.tool ? ` (${v.tool})` : ''}`;
+    return `نسخهٔ ${fa(v.version)} · ${kind} · ${REVIEW_FA[v.review] || v.review}${v.version === cmp.d.current_version ? ' · جاری' : ''}`;
+  }
+
+  function renderVersions() {
+    const row = $('ib-dt-versions');
+    row.innerHTML = '';
+    for (const v of cmp.d.versions) {
+      if (v.version === 1) continue;                     // اصل همیشه در قابِ راست است
+      const b = el('button', `btn btn-sm btn-ghost ib-ver${v.version === cmp.pick ? ' on' : ''}`, versionLabel(v));
+      b.dataset.version = String(v.version);
+      b.onclick = () => { cmp.pick = v.version; renderVersions(); renderCompare().catch((err) => msg($('ib-dt-msg'), err.message, 'bad')); };
+      row.appendChild(b);
+    }
+  }
+
+  async function renderCompare() {
+    const { d } = cmp;
+    const a = d.versions.find((v) => v.version === 1);
+    const b = d.versions.find((v) => v.version === cmp.pick);
+    $('ib-cmp-a-cap').textContent = `${versionLabel(a)} — ${fa(a.width)}×${fa(a.height)}`;
+    $('ib-cmp-b-cap').textContent = `${versionLabel(b)} — ${fa(b.width)}×${fa(b.height)}`;
+    const [ia, ib] = [$('ib-cmp-a-img'), $('ib-cmp-b-img')];
+    ia.removeAttribute('src'); ib.removeAttribute('src');
+    [ia.src, ib.src] = await Promise.all([imageData(a.urls.original), imageData(b.urls.original)]);
+    ia.alt = 'اصل'; ib.alt = `نسخهٔ ${b.version}`;
+    const sup = adminRole === 'superadmin';
+    const open = b.version !== d.current_version && b.review === 'needs_review';
+    $('btn-ib-ver-approve').classList.toggle('hidden', !sup || !open || d.status !== 'APPROVED');
+    $('btn-ib-ver-reject').classList.toggle('hidden', !sup || !open || !['NEEDS_REVIEW', 'APPROVED'].includes(d.status));
+    $('ib-cmp-note').textContent = b.version === d.current_version ? 'همین نسخه جاری است'
+      : b.review === 'rejected' ? 'این نسخه رد شده است؛ نسخهٔ جاری همان ماند'
+        : sup ? '' : 'جاری کردن یا ردِ نسخه فقط با مدیرِ ارشد است';
+  }
+
+  /** دو قاب با هم: پیمایشِ یکی همان نسبت را به دیگری می‌دهد؛ قفلِ مشترک ⇒ بی حلقه. */
+  function syncScroll(a, b) {
+    let busy = false;
+    const follow = (from, to) => () => {
+      if (busy) return;
+      busy = true;
+      const fx = from.scrollWidth - from.clientWidth;
+      const fy = from.scrollHeight - from.clientHeight;
+      to.scrollLeft = fx > 0 ? (from.scrollLeft / fx) * (to.scrollWidth - to.clientWidth) : 0;
+      to.scrollTop = fy > 0 ? (from.scrollTop / fy) * (to.scrollHeight - to.clientHeight) : 0;
+      requestAnimationFrame(() => { busy = false; });
+    };
+    a.addEventListener('scroll', follow(a, b));
+    b.addEventListener('scroll', follow(b, a));
+  }
+
+  /** جاری کردن یا ردِ نسخهٔ انتخاب‌شده — همان approve/reject ِ سرور با `version` و دلیل. */
+  async function decideVersion(kind) {
+    if (!cmp) return;
+    const v = cmp.pick;
+    const reason = askReason(kind === 'approve'
+      ? `دلیلِ جاری کردنِ نسخهٔ ${fa(v)}؟ (دکان‌های سنجاق‌شده فقط «به‌روزرسانیِ موجود» می‌بینند)`
+      : `دلیلِ ردِ نسخهٔ ${fa(v)}؟ (اصل و نسخهٔ جاری دست نمی‌خورند)`);
+    if (!reason) return;
+    await call('POST', `${IB}/images/${encodeURIComponent(cmp.id)}/${kind}`, { reason, version: v });
+    //  فهرست (نشانِ «نسخهٔ تازه»)، عکسِ جاری و نسخه‌ها از نو؛ پیام پس از بازشدنِ دوباره
+    await refreshCurrent();
+    msg($('ib-dt-msg'), kind === 'approve'
+      ? `نسخهٔ ${fa(v)} جاری شد؛ اصل و نسخه‌های دیگر سرِ جایشان‌اند.`
+      : `نسخهٔ ${fa(v)} رد شد؛ نسخهٔ جاری همان ماند.`, 'ok');
   }
 
   /** هر عکسِ هم‌فایل با وضعیت و فضایش — فقط خواندن (IMG-BANK-13). */
@@ -473,6 +702,13 @@
     $('btn-ib-archive').onclick = dt(() => decide('archive'));
     $('ib-rv-dups').onchange = rv(() => loadReview(true));
     $('btn-ib-dt-close').onclick = () => { $('ib-detail').classList.add('hidden'); current = null; };
+    buildCompareBox();
+    $('btn-ib-ver-approve').onclick = dt(() => decideVersion('approve'));
+    $('btn-ib-ver-reject').onclick = dt(() => decideVersion('reject'));
+    $('ib-cmp-zoom').onchange = () => {
+      for (const id of ['ib-cmp-a', 'ib-cmp-b']) $(id).classList.toggle('zoom', $('ib-cmp-zoom').checked);
+    };
+    syncScroll($('ib-cmp-a'), $('ib-cmp-b'));
   });
 
   LOADERS.imgbank = loadImageBank;

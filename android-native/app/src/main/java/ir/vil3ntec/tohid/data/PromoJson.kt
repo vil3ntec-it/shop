@@ -31,6 +31,7 @@ object PromoJson {
       belowCost = bool(perms?.get("belowCost")),
       at = at,
       stamp = bool(o["stamp"]),
+      tierPrice = bool(o["tierPrice"]),
       revs = rules.zip(raw).mapNotNull { (r, e) -> (e as? JsonObject)?.let { rev(it) }?.takeIf { it > 0 }?.let { r.id to it } }.toMap(),
     )
   }
@@ -41,6 +42,8 @@ object PromoJson {
   fun toJson(s: PromoEngine.Snapshot): JsonObject = buildJsonObject {
     put("enabled", s.enabled)
     put("stamp", s.stamp)
+    //  POS-19: فقط روشن نوشته می‌شود — نسخهٔ ذخیره‌شدهٔ دستگاه با پرچمِ خاموش همان پیشین
+    if (s.tierPrice) put("tierPrice", true)
     //  `rev` فقط برای همین نسخهٔ دستگاه — `PUT` ِ قاعده آن را نمی‌فرستد
     put("rules", JsonArray(s.rules.map { r -> s.revs[r.id]?.let { JsonObject(toJson(r) + ("rev" to JsonPrimitive(it))) } ?: toJson(r) }))
     put("permissions", buildJsonObject { put("manage", s.manage); put("belowCost", s.belowCost) })
@@ -77,7 +80,8 @@ object PromoJson {
     put("bp", r.bp)
     put("amountMinor", r.amountMinor)
     put("prices", JsonArray(r.prices.map { p -> buildJsonObject { put("productId", p.productId); put("unitMinor", p.unitMinor) } }))
-    put("tiers", JsonArray(r.tiers.map { t -> buildJsonObject { put("min", t.min); put("bp", t.bp); put("amountMinor", t.amountMinor) } }))
+    //  POS-19: `unitMinor` فقط برای پلهٔ قیمتِ ثابت — قاعدهٔ درصدی همان شکلِ پیشین
+    put("tiers", JsonArray(r.tiers.map { t -> buildJsonObject { put("min", t.min); put("bp", t.bp); put("amountMinor", t.amountMinor); if (t.unitMinor >= 0) put("unitMinor", t.unitMinor) } }))
     put("buy", r.buy)
     put("get", r.get)
     put("qty", r.qty)

@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.image.BankPhotoCard
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,9 +31,11 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.io.File
 import java.net.URLEncoder
 import java.security.MessageDigest
 
@@ -83,7 +87,14 @@ object ImageBank {
     val certain: Boolean, val kind: String, val reasons: List<String>,
     val ambiguous: Boolean, val distinguish: List<String>, val images: List<Img>,
   )
-  data class Page(val items: List<Hit>, val next: String?, val barcodeValid: Boolean?)
+  /**
+   *  `stale` = بی اینترنت از کشِ همین دستگاه (IMG-BANK-11): `savedAtMs` زمانِ آخرین پاسخِ زنده است و
+   *  رابط آن را «قدیمی» نشان می‌دهد؛ نتیجهٔ کش هرگز «جست‌وجوی زنده» نیست و انتخاب اینترنت می‌خواهد.
+   */
+  data class Page(
+    val items: List<Hit>, val next: String?, val barcodeValid: Boolean?,
+    val stale: Boolean = false, val savedAtMs: Long = 0L,
+  )
 
   val KIND = mapOf(
     "barcode_exact" to "بارکدِ دقیق", "sku_exact" to "SKUِ دقیق", "name_exact" to "نامِ کاملِ یکسان",
@@ -103,7 +114,23 @@ object ImageBank {
     if (digits.length >= 8 && digits.length == text.replace(Regex("[\\s-]"), "").length) params.append("&barcode=").append(digits)
     if (hasImage) params.append("&has_image=1")
     if (cursor != null) params.append("&cursor=").append(enc(cursor))
-    val r = Backend.api(context).get("$BASE/search?$params")
+    val key = cache.keyOf(text, hasImage, cursor)
+    loadCache(context)
+    val r = try {
+      Backend.api(context).get("$BASE/search?$params")
+    } catch (f: ApiFailure) {
+      //  فقط بی اینترنت/مهلت؛ خطای دیگرِ سرور همان خطاست، نه کشِ قدیمی
+      if (f !is ApiFailure.Offline && f !is ApiFailure.Timeout) throw f
+      val old = synchronized(cache) { cache.offline(key, System.currentTimeMillis()) } ?: throw f
+      return parsePage(Json.parseToJsonElement(old.payload).jsonObject).copy(stale = true, savedAtMs = old.savedAtMs)
+    }
+    val rev = r["bank_rev"]?.jsonPrimitive?.longOrNull ?: -1L
+    synchronized(cache) { cache.put(key, r.toString(), System.currentTimeMillis(), rev) }
+    saveCache(context)
+    return parsePage(r)
+  }
+
+  private fun parsePage(r: JsonObject): Page {
     val items = (r["items"] as? JsonArray).orEmpty().map { e ->
       val o = e.jsonObject
       val p = o["product"]?.jsonObject ?: JsonObject(emptyMap())
@@ -124,6 +151,56 @@ object ImageBank {
       )
     }
     return Page(items, r["next_cursor"]?.jsonPrimitive?.contentOrNull, r["barcode_valid"]?.jsonPrimitive?.booleanOrNull)
+  }
+
+  /* ---------- کشِ جست‌وجو روی دیسک (`BankSearchCache` ِ core؛ فقط متادیتای بانکِ مرکزی) ---------- */
+
+  private val cache = ir.vil3ntec.tohid.core.image.BankSearchCache()
+  @Volatile private var cacheLoaded = false
+  private fun cacheFile(context: Context) = File(context.applicationContext.cacheDir, "imgbank-search.json")
+
+  private suspend fun loadCache(context: Context) {
+    if (cacheLoaded) return
+    withContext(Dispatchers.IO) {
+      val saved = try {
+        val f = cacheFile(context)
+        if (!f.isFile) emptyList() else (Json.parseToJsonElement(f.readText()) as? JsonArray).orEmpty().mapNotNull { e ->
+          val o = e as? JsonObject ?: return@mapNotNull null
+          ir.vil3ntec.tohid.core.image.BankSearchCache.Entry(
+            key = o.s("k"), payload = o.s("p"),
+            savedAtMs = o["t"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,
+            bankRev = o["r"]?.jsonPrimitive?.longOrNull ?: return@mapNotNull null,
+          )
+        }
+      } catch (c: CancellationException) {
+        throw c
+      } catch (_: Exception) {
+        emptyList()   //  کشِ خراب فقط کش است: از نو
+      }
+      synchronized(cache) {
+        if (!cacheLoaded) { cache.restore(saved, System.currentTimeMillis()); cacheLoaded = true }
+      }
+    }
+  }
+
+  private suspend fun saveCache(context: Context) {
+    val text = synchronized(cache) {
+      JsonArray(cache.entries().map { e ->
+        buildJsonObject { put("k", e.key); put("p", e.payload); put("t", e.savedAtMs); put("r", e.bankRev) }
+      }).toString()
+    }
+    try {
+      withContext(Dispatchers.IO) {
+        val f = cacheFile(context)
+        val tmp = File(f.parentFile, f.name + ".tmp")
+        tmp.writeText(text)
+        if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
+      }
+    } catch (c: CancellationException) {
+      throw c
+    } catch (_: Exception) {
+      //  نوشتنِ کش شکست خورد ⇒ فقط بی‌اینترنتیِ بعدی کش ندارد
+    }
   }
 
   /** نشانیِ فایلی که سرور داد (`/api/shop/images/file/…`) ⇒ بایت‌ها با نشستِ کاربر */
@@ -175,6 +252,71 @@ object ImageBank {
       if (confirm) put("confirm", true)
     })
     return bytes
+  }
+
+  /* --------------- منبعِ عکسِ کالا (۳۷.۷؛ IMG-BANK-08، ۰۹، ۱۶) --------------- */
+
+  /** `GET /products/:id` + پیشنهادهای عکسِ خودِ دکان (`/mine`) ⇒ کارتِ منبع (`BankPhotoCard`ِ core) */
+  data class SourceState(val resolved: BankPhotoCard.Resolved, val proposals: List<BankPhotoCard.Proposal>)
+
+  suspend fun source(context: Context, productId: String): SourceState {
+    val api = Backend.api(context)
+    val r = api.get("$BASE/products/${enc(productId)}")
+    val central = r["central"] as? JsonObject
+    val resolved = BankPhotoCard.Resolved(
+      source = BankPhotoCard.sourceOf(r["source"]?.jsonPrimitive?.contentOrNull),
+      imageId = r.s("image_id"),
+      version = r["version"]?.jsonPrimitive?.intOrNull ?: 0,
+      archived = r["archived"]?.jsonPrimitive?.booleanOrNull == true,
+      updateAvailable = r["update_available"]?.jsonPrimitive?.intOrNull ?: 0,
+      centralImageId = central?.s("image_id").orEmpty(),
+      centralVersion = central?.get("version")?.jsonPrimitive?.intOrNull ?: 0,
+      userConfirmed = r["confirmed_by_user"]?.jsonPrimitive?.booleanOrNull == true,
+    )
+    if (resolved.source != BankPhotoCard.Source.SHOP || resolved.imageId.isEmpty()) return SourceState(resolved, emptyList())
+    val mine = api.get("$BASE/mine?product_id=${enc(productId)}")
+    val proposals = (mine["items"] as? JsonArray).orEmpty()
+      .map { it.jsonObject }
+      .filter { it.s("id") == resolved.imageId }
+      .flatMap { (it["proposals"] as? JsonArray).orEmpty() }
+      .map { p -> p.jsonObject.let { BankPhotoCard.Proposal(it.s("id"), it.s("status")) } }
+    return SourceState(resolved, proposals)
+  }
+
+  /** نسخهٔ نمایشِ عکسی که حالا برای این کالا ثبت است — همان که ویترین نشان می‌دهد */
+  private suspend fun shownBytes(context: Context, productId: String): ByteArray {
+    val r = Backend.api(context).get("$BASE/products/${enc(productId)}")
+    val urls = r["urls"] as? JsonObject
+    val url = urls?.get("display")?.jsonPrimitive?.contentOrNull ?: urls?.get("thumb")?.jsonPrimitive?.contentOrNull
+      ?: error("این عکس هنوز نسخهٔ نمایش ندارد")
+    return file(context, url)
+  }
+
+  /**
+   *  کارِ کارتِ منبع روی سرور، بعد بایت‌های عکسی که حالا ثبت است (برای گذاشتن روی دستگاه).
+   *  بازگشت/نسخه: `select`؛ سرور باز تطبیق و تأییدِ نسخه را می‌سنجد (`needs_confirmation`،
+   *  `version_not_approved`، `image_not_selectable` همان‌طور بالا می‌روند).
+   */
+  suspend fun applySource(context: Context, productId: String, action: BankPhotoCard.Action, name: String, barcode: String): ByteArray? {
+    val api = Backend.api(context)
+    when (action) {
+      is BankPhotoCard.Action.RevertToCentral ->
+        api.post("$BASE/select", buildJsonObject { put("product_id", productId); put("source", "central") })
+      is BankPhotoCard.Action.UseCentralVersion -> api.post("$BASE/select", buildJsonObject {
+        put("product_id", productId); put("source", "central"); put("image_id", action.imageId); put("version", action.version)
+        put("expect", buildJsonObject { put("barcode", barcode); put("name", name) })
+        if (action.confirm) put("confirm", true)
+      })
+      is BankPhotoCard.Action.Propose -> {
+        //  ⛔ فقط با تیکِ اجازهٔ صریح در رابط صدا زده می‌شود؛ اصلِ عکس خصوصی می‌ماند
+        api.post("$BASE/${enc(action.imageId)}/propose", buildJsonObject {
+          put("consent", true)
+          put("product", buildJsonObject { put("name", name); put("barcode", barcode) })
+        })
+        return null
+      }
+    }
+    return shownBytes(context, productId)
   }
 
   /* ------------------------- آماده‌سازی روی دستگاه ------------------------- */
