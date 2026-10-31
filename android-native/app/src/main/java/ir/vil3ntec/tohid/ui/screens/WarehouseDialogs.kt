@@ -55,6 +55,8 @@ data class ProductFormState(
   val unitFactor: String = "",
   /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
   val barcodes: String = barcode,
+  /** PRD-02/PRD-26 — فقط با `productInfoOn()` دیده و ذخیره می‌شود */
+  val info: ir.vil3ntec.tohid.ui.components.product.ProductInfoForm = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm(),
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -72,6 +74,7 @@ data class ProductFormState(
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
       barcodes = p.barcodes.joinToString("، "),
+      info = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -99,6 +102,8 @@ fun ProductDialog(
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   var priceReason by remember(state.editingId) { mutableStateOf("") }
   val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
+  //  PRD-02/PRD-26: خاموش ⇒ همان فرمِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -228,6 +233,11 @@ fun ProductDialog(
           )
         }
 
+        if (infoOn) {
+          Spacer(Modifier.height(14.dp))
+          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info) { form = form.copy(info = it) }
+        }
+
         if (d.suppliers.isNotEmpty()) {
           Spacer(Modifier.height(14.dp))
           val names = d.suppliers.map { it.name }
@@ -275,6 +285,7 @@ fun ProductDialog(
                   barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
                   changedBy = if (tools) me else null,
                   reason = if (tools) priceReason else null,
+                  info = if (infoOn) form.info.toInfo() else null,
                 )
               )
             },

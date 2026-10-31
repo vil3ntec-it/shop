@@ -495,6 +495,7 @@
 `order_slip_auto = false` چاپِ خودکارِ برگهٔ سفارش پس از «قبول» ِ همین دستگاه و `order_slip_printed` حافظهٔ یک‌باره‌اش (ORD-10، `OrderSlipPrint`، `claude/new-ord-1`)؛
 `tohid-ui:gift_receipt = false` دکمهٔ «رسیدِ هدیه» زیرِ فاکتور: چیدمانِ بی قیمت و بی QR ِ `GiftReceiptLayout`، کاغذِ جدا و بیرون از چاپِ دوباره (POS-34، `GiftReceiptPrefs`، `claude/new-pos-2`)؛
 `tohid-ui:deliver_later = false` «تحویلِ بعدی» ِ صندوق: سبد ⇐ سفارشِ ارسالِ کارمند بی فروش، فروش و کسر همان فروشِ تحویلِ سفارش (POS-38، `DeliverLaterPrefs`، فقط با `shop.orders` و `orders.create`، `claude/new-pos-1`)؛
+`tohid-ui:product_info = false` نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجوی کالا (PRD-02) و محلِ قفسه (PRD-26) در فرم، جست‌وجو و اقلامِ سفارش (`ProductInfoPrefs`؛ خاموش ⇒ همان JSON و همان نتیجه، `claude/new-prd-1`)؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_window_days` و `return_blocked` = سیاستِ برگشت (`ReturnPolicyPrefs`، RET-09، `claude/new-ret-1`)، `return_reasons` = فهرستِ
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).

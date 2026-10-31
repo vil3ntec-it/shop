@@ -592,6 +592,8 @@ private fun OrderDetailSheet(
           Column(Modifier.weight(1f)) {
             Text(l.name, color = c.text)
             if (l.note.isNotEmpty()) Text(l.note, style = MaterialTheme.typography.labelSmall, color = c.muted)
+            //  PRD-26 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): محلِ قفسه برای جمع‌آوری
+            ir.vil3ntec.tohid.ui.components.product.OrderLineShelf(ledger, l.productId)
           }
           Text("${OrderText.qty(l.qtyMilli)}${if (l.unit.isNotEmpty()) " ${l.unit}" else ""} × ${OrderText.money(l.unitPriceMinor)}", color = c.muted, style = MaterialTheme.typography.bodySmall)
           Spacer(Modifier.width(10.dp))

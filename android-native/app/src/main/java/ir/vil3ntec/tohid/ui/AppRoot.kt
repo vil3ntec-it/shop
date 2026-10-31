@@ -801,6 +801,7 @@ fun AppRoot(
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard,
                 ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
+                ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,

@@ -41,6 +41,11 @@ object WarehouseEngine {
      */
     val changedBy: String? = null,
     val reason: String? = null,
+    /**
+     *  PRD-02/PRD-26 — نام‌های دیگر، واژه‌ها و محلِ قفسه. `null` ⇒ دست نمی‌خورد (فرمی که این بخش را
+     *  نشان نمی‌دهد، یعنی تنظیمِ خاموش، ورود از فایل و ثبتِ گروهی)؛ وگرنه همه از همین.
+     */
+    val info: ir.vil3ntec.tohid.core.product.ProductInfo? = null,
   )
 
   data class EntryDraft(
@@ -161,6 +166,11 @@ object WarehouseEngine {
     if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
     if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
     if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+    //  PRD-02/PRD-26 — فقط وقتی فرمِ همین بخش چیزی را عوض کرد (خاموش ⇒ هرگز)
+    if (a.namePs != b.namePs || a.nameEn != b.nameEn || a.synonyms != b.synonyms || a.keywords != b.keywords) {
+      add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
+    }
+    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
   }
 
   /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */
@@ -231,7 +241,7 @@ object WarehouseEngine {
       active = draft.active ?: true,
       saleUnit = draft.saleUnit?.trim().orEmpty(),
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
-    )
+    ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
 
     return Result.Ok(
       d.copy(
@@ -289,7 +299,7 @@ object WarehouseEngine {
         (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
         else -> draft.unitFactor ?: existing.unitFactor
       },
-    )
+    ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
     var history = d.priceHistory

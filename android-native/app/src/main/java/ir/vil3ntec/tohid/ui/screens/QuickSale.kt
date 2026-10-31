@@ -118,13 +118,16 @@ fun QuickSaleScreen(
   }
 
   val term = search.trim()
-  val shown = remember(d, term, category) {
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val shown = remember(d, term, category, infoSearch) {
     d.products.filter { p ->
       //  کالای غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند
       p.active &&
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
-          p.barcodes.any { it.contains(term) })
+          p.barcodes.any { it.contains(term) } ||
+          (infoSearch && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term)))
     }
   }
 
