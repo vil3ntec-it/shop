@@ -53,7 +53,7 @@ object BusinessDay {
   /** همان، از ساعتِ میلی‌ثانیه‌ای و اختلافِ ساعتِ دکان با UTC (کابل: ۲۷۰ دقیقه) */
   fun businessDateAt(epochMs: Long, utcOffsetMinutes: Int, dayStartMinutes: Int): String {
     val local = epochMs + utcOffsetMinutes * 60_000L
-    val days = Math.floorDiv(local, 86_400_000L)
+    val days = local.floorDiv(86_400_000L)
     val minutes = (local - days * 86_400_000L) / 60_000L
     val jdn = 2440588 + days.toInt() - if (minutes < dayStartMinutes) 1 else 0
     return CivilDays.isoOf(jdn)
