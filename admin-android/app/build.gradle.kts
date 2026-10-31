@@ -24,24 +24,41 @@ android {
   }
 
   /*
-   *  کلید امضا — همان کلید برنامه‌ی مشتری، از محیط.
+   *  کلید امضا — همان کلید برنامه‌ی مشتری، فقط از محیط (secretِ CI).
    *
    *  بسته‌ی این برنامه جداست، پس یک کلید برای هر دو مشکلی ندارد و یک
-   *  چیز کمتر برای گم کردن است.
+   *  چیز کمتر برای گم کردن است. ⛔ SEC-ART-05: هیچ پیش‌فرضی در مخزن نیست (پیش‌تر فایلِ کلید و
+   *  رمزش در مخزنِ عمومی بودند)؛ بسته‌بندیِ release بی این متغیرها شکست می‌خورد.
    */
   fun env(name: String): String? = System.getenv(name)?.takeIf { it.isNotBlank() }
 
-  val keystorePath: String = env("TOHID_KEYSTORE") ?: "../../android-native/app/tohid-release.jks"
-  val keystorePass: String = env("TOHID_KEYSTORE_PASSWORD") ?: "tohid-shop"
-  val keystoreAlias: String = env("TOHID_KEY_ALIAS") ?: "tohid"
-  val keystoreKeyPass: String = env("TOHID_KEY_PASSWORD") ?: keystorePass
+  val keystorePath: String? = env("TOHID_KEYSTORE")
+  val keystorePass: String? = env("TOHID_KEYSTORE_PASSWORD")
+  val keystoreAlias: String? = env("TOHID_KEY_ALIAS")
+  val keystoreKeyPass: String? = env("TOHID_KEY_PASSWORD") ?: keystorePass
+  val releaseSigning: Boolean = keystorePath != null && keystorePass != null && keystoreAlias != null &&
+    file(keystorePath).isFile
 
   signingConfigs {
     create("release") {
-      storeFile = file(keystorePath)
-      storePassword = keystorePass
-      keyAlias = keystoreAlias
-      keyPassword = keystoreKeyPass
+      if (releaseSigning) {
+        storeFile = file(keystorePath!!)
+        storePassword = keystorePass
+        keyAlias = keystoreAlias
+        keyPassword = keystoreKeyPass
+      }
+    }
+  }
+
+  val missingSigning = !releaseSigning
+  project.tasks.matching { it.name.matches(Regex("(package|bundle)Release")) }.configureEach {
+    doFirst {
+      if (missingSigning) {
+        throw GradleException(
+          "⛔ کلیدِ امضا نیست: TOHID_KEYSTORE، TOHID_KEYSTORE_PASSWORD و TOHID_KEY_ALIAS را بدهید " +
+            "(در CI از secretها؛ android-native/KEYSTORE.md). کلیدی در مخزن نیست و نباید باشد."
+        )
+      }
     }
   }
 

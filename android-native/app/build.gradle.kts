@@ -158,46 +158,45 @@ android {
   }
 
   /*
-   *  کلیدِ امضا — از محیط، نه از داخلِ مخزن.
+   *  کلیدِ امضا — فقط از محیط (secretِ CI یا متغیرهای خودِ سازنده)؛ هیچ پیش‌فرضی در مخزن نیست.
    *
-   *  تا امروز خودِ فایلِ کلید و رمزش هر دو در مخزن بودند. هر کسی که به
-   *  مخزن دسترسی داشت می‌توانست نسخه‌ای بسازد که گوشی‌ها آن را «همان
-   *  برنامه» بدانند و روی نصبِ کاربر بنشیند. کلیدِ امضا تنها چیزی است
-   *  که اندروید برای شناختنِ سازنده دارد.
-   *
-   *  حالا از متغیرهای محیط خوانده می‌شود. اگر نبودند، همان فایلِ قبلی
-   *  استفاده می‌شود — تا روزی که کلید هنوز به CI منتقل نشده، هیچ ساختی
-   *  نشکند. برداشتنِ آن فایل، آخرین گام است نه اولین.
+   *  ⛔ SEC-ART-05: تا ۱۴۰۵/۰۸/۱۰ فایلِ کلید و رمزش هر دو در مخزن بودند و مخزن **عمومی** است — هر
+   *  کسی می‌توانست نسخه‌ای بسازد که گوشی‌ها «همان برنامه» بدانند (رخداد؛ KEYSTORE.md). دیگر هیچ برگشتی
+   *  به فایلی در مخزن یا رمزِ پیش‌فرض نیست: ساختِ release/preview بی این متغیرها شکست می‌خورد
+   *  (پایین، `packageRelease`). debug و آزمون‌های واحد بی کلید کار می‌کنند.
    */
-  val keystorePath: String = env("TOHID_KEYSTORE") ?: "tohid-release.jks"
-  val keystorePass: String = env("TOHID_KEYSTORE_PASSWORD") ?: "tohid-shop"
-  val keystoreAlias: String = env("TOHID_KEY_ALIAS") ?: "tohid"
-  val keystoreKeyPass: String = env("TOHID_KEY_PASSWORD") ?: keystorePass
+  val keystorePath: String? = env("TOHID_KEYSTORE")
+  val keystorePass: String? = env("TOHID_KEYSTORE_PASSWORD")
+  val keystoreAlias: String? = env("TOHID_KEY_ALIAS")
+  val keystoreKeyPass: String? = env("TOHID_KEY_PASSWORD") ?: keystorePass
+  val releaseSigning: Boolean = keystorePath != null && keystorePass != null && keystoreAlias != null &&
+    file(keystorePath).isFile
 
   /*
    *  اثرِ انگشتِ گواهی، در زمانِ ساخت خوانده می‌شود.
    *
    *  برنامه هنگامِ اجرا امضای خودش را با همین می‌سنجد؛ نسخهٔ دست‌کاری‌شده
-   *  اجرا می‌شود ولی اشتراک نمی‌گیرد. اگر خواندن نشد، خالی می‌ماند و
-   *  بررسی خاموش می‌شود — ساختِ برنامه نباید به این گیر کند.
+   *  اجرا می‌شود ولی اشتراک نمی‌گیرد. ⛔ اگر کلید هست ولی خوانده نشد، ساخت می‌شکند: «خالی» یعنی
+   *  `Integrity.isGenuine()` همیشه true — همان بازِ بی‌صدایی که نباید باشد. بی کلید (debug) خالی است.
    */
-  val signingFingerprint: String = runCatching {
-    val store = KeyStore.getInstance("JKS")
-    file(keystorePath).inputStream().use { input ->
-      store.load(input, keystorePass.toCharArray())
-    }
+  val signingFingerprint: String = if (!releaseSigning) "" else {
+    val store = KeyStore.getInstance("JKS") // keystore.type.compat ⇒ PKCS12 هم خوانده می‌شود
+    file(keystorePath!!).inputStream().use { input -> store.load(input, keystorePass!!.toCharArray()) }
     val cert = store.getCertificate(keystoreAlias)
+      ?: throw GradleException("TOHID_KEY_ALIAS در انبارِ کلیدِ TOHID_KEYSTORE نیست")
     MessageDigest.getInstance("SHA-256")
       .digest(cert.encoded)
       .joinToString("") { byte -> "%02x".format(byte) }
-  }.getOrDefault("")
+  }
 
   signingConfigs {
     create("release") {
-      storeFile = file(keystorePath)
-      storePassword = keystorePass
-      keyAlias = keystoreAlias
-      keyPassword = keystoreKeyPass
+      if (releaseSigning) {
+        storeFile = file(keystorePath!!)
+        storePassword = keystorePass
+        keyAlias = keystoreAlias
+        keyPassword = keystoreKeyPass
+      }
 
       /*
        *  طرحِ امضا — صریح نوشته شده، نه به امیدِ پیش‌فرض.
@@ -214,6 +213,19 @@ android {
       enableV1Signing = false
       enableV2Signing = true
       enableV3Signing = true
+    }
+  }
+
+  //  ⛔ SEC-ART-05: بسته‌بندیِ release/preview بی کلیدِ امضا شکست می‌خورد — نه APKِ بی‌امضا، نه کلیدِ دیگر
+  val missingSigning = !releaseSigning
+  project.tasks.matching { it.name.matches(Regex("(package|bundle)(Release|Preview)")) }.configureEach {
+    doFirst {
+      if (missingSigning) {
+        throw GradleException(
+          "⛔ کلیدِ امضا نیست: TOHID_KEYSTORE (فایل)، TOHID_KEYSTORE_PASSWORD و TOHID_KEY_ALIAS را بدهید " +
+            "(در CI از secretها؛ android-native/KEYSTORE.md). کلیدی در مخزن نیست و نباید باشد."
+        )
+      }
     }
   }
 

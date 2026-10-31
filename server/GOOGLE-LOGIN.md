@@ -54,12 +54,12 @@ Web است، نه Android**. توکنی که گوشی می‌دهد روی نا�
 | SHA-1 certificate fingerprint | `29:36:A0:E2:69:4E:89:47:A4:AB:AA:D5:3F:73:74:55:EB:EC:BB:CA` |
 
 این SHA-1 مالِ همان کلیدی است که نسخه‌های منتشرشده با آن امضا می‌شوند
-(`android-native/app/tohid-release.jks`). اگر روزی کلیدِ امضا را عوض
+(فایلِ کلیدِ secretِ `TOHID_KEYSTORE_B64` — ⛔ دیگر در مخزن نیست، `android-native/KEYSTORE.md`). اگر روزی کلیدِ امضا را عوض
 کردید، این را هم باید عوض کنید — وگرنه ورود با گوگل روی نسخه‌های تازه
 کار نمی‌کند. برای گرفتنِ دوباره‌اش:
 
 ```bash
-keytool -list -v -keystore android-native/app/tohid-release.jks -alias tohid | grep SHA1
+keytool -list -v -keystore <فایلِ کلیدِ امضا، بیرون از مخزن> -alias <TOHID_KEY_ALIAS> | grep SHA1
 ```
 
 اگر می‌خواهید نسخه‌ی `debug` هم روی رایانه‌ی خودتان کار کند، یک کلاینتِ

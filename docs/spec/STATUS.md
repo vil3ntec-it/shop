@@ -12,7 +12,7 @@
 
 | خانواده | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| F0 | ۲۸ | ۲۴ | ۲ | ۲ | ۰ | ۰ | ۰ |
+| F0 | ۲۸ | ۲۴ | ۳ | ۱ | ۰ | ۰ | ۰ |
 | POS | ۴۲ | ۲ | ۱۹ | ۲۰ | ۰ | ۱ | ۰ |
 | PAY | ۲۴ | ۲ | ۱۵ | ۶ | ۰ | ۰ | ۱ |
 | PRD | ۲۷ | ۳ | ۱۲ | ۱۲ | ۰ | ۰ | ۰ |
@@ -68,13 +68,13 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۱۱۵ | ۳۰۵ | ۲۳۱ | ۰ | ۹۰ | ۲۳ |
+| **همه** | ۷۶۴ | ۱۱۵ | ۳۰۶ | ۲۳۰ | ۰ | ۹۰ | ۲۳ |
 
 ## خلاصه به تفکیکِ فاز
 
 | فاز | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| ۰ | ۳۲ | ۲۶ | ۳ | ۳ | ۰ | ۰ | ۰ |
+| ۰ | ۳۲ | ۲۶ | ۴ | ۲ | ۰ | ۰ | ۰ |
 | ۱ | ۴۰ | ۱۷ | ۱۶ | ۵ | ۰ | ۲ | ۰ |
 | ۲ | ۱۱۳ | ۱۰ | ۷۴ | ۲۶ | ۰ | ۳ | ۰ |
 | ۳ | ۷۷ | ۱۰ | ۲۷ | ۴۰ | ۰ | ۰ | ۰ |
@@ -95,7 +95,7 @@
 | F0-06 | ورودی‌های عددی ارقام فارسی را خراب می‌کنند: (۱) در DeskSale، فیلدهای «دریافتیِ همین حالا»… | §۲.۳ | ۰ | 🔴 | IMPLEMENTED-VERIFIED | BarcodeMatchTest روی main ۲ قرمز ⇐ ۹/۹؛ web-digits.mjs (کرومیوم) روی main ۴/۶ قرمز ⇐ ۶/۶ | — | — | #199 (مرج 2f4e675) |
 | F0-07 | LocationPing هر ۶ ساعت حتی بدون حساب موقعیت می‌فرستد، در حالی که privacy.html می‌گوید فقط… | §۲.۳ | ۰ | 🟠 | IMPLEMENTED-VERIFIED | #208؛ LocationPingTest؛ بی رضایت هیچ ارسالی نیست (تا D-04) | — | — | #208 |
 | F0-08 | BACKUP_PASSPHRASE پیش‌فرض خالی است، پس پشتیبان سرور رمز ندارد، در حالی که privacy.html خل… | §۲.۳ | ۰ | 🟠 | IMPLEMENTED-VERIFIED | #203؛ backup-passphrase-warning.test.js ۵/۵ قرمز ⇐ سبز؛ پنل ۲۷/۲۷؛ گذاشتنِ رمز کارِ صاحب محصول | — | — | #203 |
-| F0-09 | کلید امضای انتشار tohid-release.jks با رمز پیش‌فرض در ریپوی عمومی است و ساخت در نبود secr… | §۲.۳ | ۰ | 🔴 | MISSING | فقط دستورالعمل: docs/spec/OWNER-ACTIONS-fa.md بخشِ ۲ (کارِ صاحب محصول) | — | D-02 | — |
+| F0-09 | کلید امضای انتشار tohid-release.jks با رمز پیش‌فرض در ریپوی عمومی است و ساخت در نبود secr… | §۲.۳ | ۰ | 🔴 | PARTIAL | کدِ ساخت آماده (پیش‌نویس، منتظرِ «مرج کن» و secretها): بی پیش‌فرض و بی فایلِ کلید در مخزن، `packageRelease` و گامِ «کلیدِ امضا» بی secret قرمز، اثرِ انگشتِ نخوانده ⇒ شکست. مانده: secretها، اصلاحِ Integrity.kt و چرخش (OWNER-ACTIONS بخشِ ۲، android-native/KEYSTORE.md)؛ کلیدِ امروز در تاریخچهٔ مخزنِ عمومی ⇒ لورفته | — | D-02 | claude/sec-artifacts-signing |
 | F0-10 | ردیف‌های جدید اندروید ULID نیستند (Math.random). | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #190 (مرج)؛ NewIdTest ۲/۲ قرمز ⇐ سبز | — | — | #190 |
 | F0-11 | توکن دسترسی WebSocket در آدرس (?token=) فرستاده می‌شود و در لاگ‌ها می‌ماند. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #202 (مرج)؛ sync-live-ticket ۹/۹ (پیش: ۴ قرمز)؛ LiveCredentialTest ۴/۴ | — | — | #202 |
 | F0-12 | tohid-admin.yml از شاخه‌های claude/ هم منتشر می‌کند و مرحله آزمون ندارد. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | #192؛ انتشار فقط از main + testReleaseUnitTest؛ CI سبز | — | — | #192 |
