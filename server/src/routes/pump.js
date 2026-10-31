@@ -182,10 +182,6 @@ router.patch('/', requireStationOwner, async (req, res, next) => {
     if (req.body?.name !== undefined) patch.name = v.text(req.body.name, { max: 80 });
     if (req.body?.homeUrl !== undefined) patch.homeUrl = v.text(req.body.homeUrl, { max: 300 });
     const st = await stations.updateStation(req.stationId, patch);
-    await audit.log({
-      userId: req.user.id, action: 'pump.station_updated', targetType: 'station', targetId: req.stationId,
-      detail: { fields: Object.keys(patch) }, ip: clientIp(req),
-    });
     res.json({ station: stations.shape(st), serverTime: now() });
   } catch (err) { next(err); }
 });
@@ -252,11 +248,6 @@ router.patch('/members/:id', requireStationOwner, async (req, res, next) => {
   try {
     const row = await stations.updateMember(req.stationId, req.params.id, {
       role: req.body?.role, status: req.body?.status,
-    });
-    //  SEC-AUTH-09: نقش و وضعیتِ عضو = دسترسی ⇒ ردیفِ سابقه (همان `member.updated`ِ دکان)
-    await audit.log({
-      userId: req.user.id, action: 'pump.member_updated', targetType: 'station_member', targetId: row.id,
-      detail: { stationId: req.stationId, role: row.role, status: row.status }, ip: clientIp(req),
     });
     res.json({ member: row, serverTime: now() });
   } catch (err) { next(err); }

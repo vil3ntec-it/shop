@@ -9,7 +9,7 @@
  *   SEC-AUTH-05  `X-Forwarded-For` فقط از پروکسیِ مطمئن؛ سرآیندِ ساختگی سقفِ نرخ را دور نمی‌زند
  *   SEC-AUTH-06  کدِ یک‌بارمصرف فقط با `NODE_ENV`ِ صریحِ development/test در پاسخ می‌آید
  *   SEC-AUTH-07  توکنِ گوگلِ بی `exp`/`iat` پذیرفته نمی‌شود (سنجاقِ RS256، iss، aud سرِ جایش)
- *   SEC-AUTH-09  عوض کردنِ نقش/وضعیتِ عضوِ پمپ ردیفِ سابقه دارد
+ *   (SEC-AUTH-09 کدِ پمپ است ⇒ #615، `claude/sec-pump-pending`، نیازمندِ اجازهٔ صاحب‌کار)
  */
 //  این پرونده هزینهٔ **واقعیِ** production را می‌سنجد (helpers پیش‌فرضِ تندِ آزمون را ۱ می‌گذارد)
 process.env.PASSWORD_SCRYPT_P = '5';
@@ -235,30 +235,6 @@ test('SEC-AUTH-07: توکنِ گوگل بی exp یا iat، با الگوریتم
   assert.equal(await code(make({ ...base, aud: 'other.apps.googleusercontent.com' })), 'bad_audience');
   assert.equal(await code(make(base, { alg: 'HS256', kid: 'k-sec-auth' })), 'bad_google_token');
   assert.equal(await code(`${b64({ alg: 'none', kid: 'k-sec-auth' })}.${b64(base)}.`), 'bad_google_token');
-});
-
-/* ── SEC-AUTH-09 ─────────────────────────────────────────────────── */
-
-test('SEC-AUTH-09: نقش و وضعیتِ عضوِ پمپ و تنظیمِ پمپ ردیفِ سابقه دارند (کنشگر، زمانِ سرور، هدف)', async () => {
-  const o = await h.newUser('صاحبِ پمپِ سابقه', 'pump');
-  const made = await h.post('/api/pump', { name: 'پمپِ سابقه' }, { token: o.accessToken });
-  assert.equal(made.status, 201, JSON.stringify(made.body));
-  const stationId = made.body.station.id;
-  const s = await h.newUser('کارمندِ پمپ', 'pump');
-  const mem = newId('mem');
-  await query(`INSERT INTO station_members (id, station_id, user_id, role, status, created_at, updated_at)
-               VALUES ($1,$2,$3,'staff','active',$4,$4)`, [mem, stationId, s.user.id, now()]);
-  const before = now();
-  const r = await h.patch(`/api/pump/members/${mem}`, { role: 'manager' }, { token: o.accessToken });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  const rows = await many(`SELECT * FROM audit_logs WHERE action='pump.member_updated' AND target_id=$1`, [mem]);
-  assert.equal(rows.length, 1);
-  assert.equal(rows[0].user_id, o.user.id);
-  assert.ok(Number(rows[0].created_at) >= before);
-  const detail = typeof rows[0].detail === 'string' ? JSON.parse(rows[0].detail) : rows[0].detail;
-  assert.deepEqual({ role: detail.role, status: detail.status, stationId: detail.stationId }, { role: 'manager', status: 'active', stationId });
-  assert.equal((await h.patch('/api/pump', { name: 'پمپِ تازه' }, { token: o.accessToken })).status, 200);
-  assert.equal((await many(`SELECT 1 FROM audit_logs WHERE action='pump.station_updated' AND target_id=$1`, [stationId])).length, 1);
 });
 
 /* ── SEC-AUTH-12: تأییدِ دومرحله‌ایِ اجباری پشتِ پرچم ─────────────── */
