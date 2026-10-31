@@ -21,33 +21,20 @@ const { one, many, now, tx } = db;
 const D = require('./delivery-states');
 const orders = require('./orders');
 const { ulid } = require('./ulid');
-const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
-const config = require('../config');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.delivery';
 const FEATURE_KEY = 'delivery';
-const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
-const ID_RE = /^[0-9A-Z]{26}$/;
 
-const MAX_MONEY_MINOR = 100_000_000_000;   // یک میلیارد افغانی (همان سقفِ سفارش)
 const MAX_FARE_MINOR = 100_000_000;        // یک میلیون افغانی
 const MAX_BATCH = 100;
 const MAX_SETTLE = 500;
 const MAX_PHOTOS = 3;
-const CODE_MAX_ATTEMPTS = 5;
 const DEFAULT_CASH_CAP_MINOR = 1_000_000;  // D-18 (پیش‌نهاد): ۱۰٬۰۰۰ افغانی
 
-//  S5 (قراردادِ بازار §۳): نمای پیک برای مشتری — هر دو پیش‌فرض خاموش
-const VIEW_FLAG = 'shop.delivery_customer_view';
-const LOCATION_FLAG = 'shop.delivery_live_location';
-/** «در راه» — تنها بازه‌ای که موقعیت گرفته و نشان داده می‌شود (پیش از «رسیدم»). */
-const ON_THE_WAY = Object.freeze(['picked_up', 'moving']);
-const LOCATION_TTL_MS = 10 * 60_000;        // نقطهٔ کهنه‌تر نشان داده نمی‌شود و پاک می‌شود
-const LOCATION_MIN_INTERVAL_MS = 5_000;     // نقطه‌های تندتر نادیده
-const MAX_ETA_MINUTES = 240;
+const { VIEW_FLAG, LOCATION_FLAG, ON_THE_WAY, LOCATION_TTL_MS } = require('./delivery-live');
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم و اشتراک
@@ -62,90 +49,9 @@ async function stateOf(shopId) {
   return { ordersFlag, flag, readable: ordersFlag && flag, entitled, enabled: ordersFlag && flag && entitled, ent };
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  ورودی
-// ════════════════════════════════════════════════════════════════════
-
-const str = (v) => (typeof v === 'string' ? v.trim() : '');
-
-function text(v, max) {
-  const { stripControl } = require('./validate');
-  return stripControl(str(v)).slice(0, max);
-}
-
-function int(v, field, { min = 0, max = MAX_MONEY_MINOR, def } = {}) {
-  if ((v === undefined || v === null || v === '') && def !== undefined) return def;
-  if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw badRequest(`${field} باید عددِ صحیح باشد`, 'bad_number');
-  if (v < min || v > max) throw badRequest(`${field} در بازهٔ مجاز نیست`, 'bad_number');
-  return v;
-}
-
-function optInt(v, field, opts) {
-  return v === undefined || v === null || v === '' ? null : int(v, field, opts);
-}
-
-function eventKey(raw, { required = true } = {}) {
-  const k = str(raw);
-  if (!k) {
-    if (required) throw badRequest('شناسهٔ یکتای رویداد لازم است', 'event_id_required');
-    return '';
-  }
-  if (!KEY_RE.test(k)) throw badRequest('شناسهٔ رویداد نامعتبر است', 'bad_event_id');
-  return k;
-}
-
-function idOf(raw, code = 'bad_id') {
-  const id = str(raw);
-  if (!ID_RE.test(id)) throw notFound('پیدا نشد', code);
-  return id;
-}
-
-const n = (x) => (x === null || x === undefined ? null : Number(x));
-const asJson = (x) => {
-  if (x && typeof x === 'object') return x;
-  try { return JSON.parse(x) || {}; } catch { return {}; }
-};
-const hashOf = (obj) => crypto.createHash('sha256').update(stable(obj)).digest('hex');
-
-// ════════════════════════════════════════════════════════════════════
-//  کدِ تحویل (PCK-11، DLV-08، DLV-15) — فقط HMAC در دیتابیس
-// ════════════════════════════════════════════════════════════════════
-
-function pepper() {
-  return config.secrets.api || config.secrets.otp || config.secrets.jwt || 'shop-delivery-code';
-}
-
-function codeHash(assignmentId, code) {
-  return crypto.createHmac('sha256', pepper()).update(`delivery:${assignmentId}:${code}`).digest('hex');
-}
-
-function newCode() {
-  return String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
-}
-
-/**
- * کدِ قابلِ بازسازی (فقط با پرچمِ نمای مشتری): از دانهٔ تصادفیِ مأموریت و رمزِ
- * سرور ساخته می‌شود، تا مشتری کد را ببیند بی آن‌که خودِ کد جایی نوشته شود.
- */
-function derivedCode(assignmentId, nonce) {
-  const mac = crypto.createHmac('sha256', pepper()).update(`delivery-code:${assignmentId}:${nonce}`).digest();
-  return String(mac.readUIntBE(0, 6) % 1_000_000).padStart(6, '0');
-}
-
-/** کد + دانه: با پرچم قابلِ بازسازی، وگرنه همان کدِ تصادفیِ یک‌بار-دیدنی. */
-function codeFor(assignmentId, rebuildable) {
-  if (!rebuildable) return { code: newCode(), nonce: '' };
-  const nonce = crypto.randomBytes(16).toString('base64url');
-  return { code: derivedCode(assignmentId, nonce), nonce };
-}
-
-function codeMatches(a, raw) {
-  const code = str(raw).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0));
-  if (!/^\d{6}$/.test(code)) return false;
-  const want = Buffer.from(a.code_hash, 'hex');
-  const got = Buffer.from(codeHash(a.id, code), 'hex');
-  return want.length === got.length && crypto.timingSafeEqual(want, got);
-}
+//  ورودی (`delivery-input`) و کدِ تحویل (`delivery-codes`، PCK-11، DLV-08، DLV-15) — ماژول‌های کنار
+const { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, int, optInt, eventKey, idOf, n, asJson, hashOf } = require('./delivery-input');
+const { CODE_MAX_ATTEMPTS, codeHash, codeFor, codeMatches } = require('./delivery-codes');
 
 // ════════════════════════════════════════════════════════════════════
 //  مدلِ خواندنی
@@ -889,85 +795,7 @@ async function board(shopId, { scope = 'live', limit, before } = {}) {
   };
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  شرکتِ پیکِ بیرونی (DLV-19) — فهرست و صورت‌حساب از خودِ مأموریت‌ها
-// ════════════════════════════════════════════════════════════════════
-
-const MAX_STATEMENT = 1000;
-
-/**
- * شرکت‌هایی که این دکان تا امروز به آن‌ها سفارش سپرده — از
- * `delivery_assignments` (روشِ external)، بی جدولِ تازه. کرایهٔ آخرین
- * سپردن «کرایهٔ هر سفارشِ» پیش‌فرضِ فرمِ سپردن است.
- */
-async function externalCompanies(shopId) {
-  const rows = await many(
-    `SELECT external_name AS name,
-            COUNT(*)::int AS assignments,
-            COUNT(*) FILTER (WHERE status IN ('requested','assigned','picked_up','moving','arrived','failed'))::int AS live,
-            COUNT(*) FILTER (WHERE status = 'delivered')::int AS delivered,
-            (ARRAY_AGG(fare_minor ORDER BY created_at DESC, id DESC))[1] AS last_fare,
-            MAX(created_at) AS last_used_at
-       FROM delivery_assignments
-      WHERE shop_id=$1 AND mode='external' AND external_name <> ''
-      GROUP BY external_name
-      ORDER BY MAX(created_at) DESC, external_name
-      LIMIT 100`,
-    [shopId]
-  );
-  return {
-    items: rows.map((r) => ({
-      name: r.name, assignments: Number(r.assignments), live: Number(r.live), delivered: Number(r.delivered),
-      lastFareMinor: Number(r.last_fare || 0), lastUsedAt: Number(r.last_used_at),
-    })),
-  };
-}
-
-/**
- * صورت‌حسابِ یک شرکت در یک بازه (زمانِ سپردن، به زمانِ سرور) — برای
- * تطبیق با صورت‌حسابی که شرکت می‌فرستد. «پس‌گرفته» (withdrawn) هرگز به
- * شرکت نرسیده و نمی‌آید؛ ناموفق/برگشت می‌آید تا اگر شرکت آن را هم حساب
- * کرده بود، دیده شود.
- */
-async function externalStatement(shopId, { name, from, to } = {}) {
-  const company = text(name, 80);
-  if (!company) throw badRequest('نامِ شرکتِ پیک لازم است', 'external_name_required');
-  const params = [shopId, company];
-  let where = `a.shop_id=$1 AND a.mode='external' AND a.external_name=$2 AND a.status <> 'withdrawn'`;
-  for (const [v, op] of [[from, '>='], [to, '<']]) {
-    if (v === undefined || v === '') continue;
-    const x = Number(v);
-    if (!Number.isSafeInteger(x) || x < 0) throw badRequest('بازهٔ زمانی معتبر نیست', 'bad_range');
-    params.push(x);
-    where += ` AND a.created_at ${op} $${params.length}`;
-  }
-  const rows = await many(
-    `SELECT a.id, a.order_id, a.external_ref, a.status, a.fare_minor, a.expected_collect_minor,
-            a.cash_collected_minor, a.delivered_at, a.created_at, o.order_no
-       FROM delivery_assignments a JOIN online_orders o ON o.id = a.order_id
-      WHERE ${where} ORDER BY a.created_at, a.id LIMIT ${MAX_STATEMENT + 1}`,
-    params
-  );
-  const truncated = rows.length > MAX_STATEMENT;
-  const list = rows.slice(0, MAX_STATEMENT).map((r) => ({
-    assignmentId: r.id, orderId: r.order_id, orderNo: Number(r.order_no), externalRef: r.external_ref || '',
-    status: r.status, fareMinor: Number(r.fare_minor), expectedCollectMinor: Number(r.expected_collect_minor),
-    cashCollectedMinor: n(r.cash_collected_minor), deliveredAt: n(r.delivered_at), createdAt: Number(r.created_at),
-  }));
-  const delivered = list.filter((r) => r.status === 'delivered');
-  return {
-    name: company,
-    rows: list,
-    truncated,
-    totals: {
-      count: list.length,
-      delivered: delivered.length,
-      deliveredFareMinor: delivered.reduce((s, r) => s + r.fareMinor, 0),
-      deliveredCashMinor: delivered.reduce((s, r) => s + (r.cashCollectedMinor || 0), 0),
-    },
-    serverTime: now(),
-  };
-}
+const { externalCompanies, externalStatement } = require('./delivery-external');   //  DLV-19
 
 // ════════════════════════════════════════════════════════════════════
 //  عکسِ تحویل (۲۲.۲ C بندِ ۴، DLV-08)
@@ -1232,132 +1060,7 @@ async function getSettlement(shopId, id) {
   return { settlement: settlementView(s), rows: rows.map(settleRowView) };
 }
 
-// ════════════════════════════════════════════════════════════════════
-//  S5: نمای پیک برای مشتری (قراردادِ بازار §۳، §۴۰.۱)
-// ════════════════════════════════════════════════════════════════════
-
-/** وضعیتِ عمومی — مشتری گذارهای درونیِ دکان و پیک را نمی‌بیند. */
-const PUBLIC_STATUS = Object.freeze({
-  requested: 'waiting', rejected: 'waiting', withdrawn: 'waiting', assigned: 'assigned',
-  picked_up: 'on_the_way', moving: 'on_the_way', arrived: 'arrived',
-  delivered: 'delivered', failed: 'failed', returned: 'returned',
-});
-const ACCEPTED = Object.freeze(['assigned', 'picked_up', 'moving', 'arrived', 'failed']);
-
-const firstName = (name) => text(name, 80).split(/\s+/)[0].slice(0, 30);
-//  ۳ رقمِ اعشار ≈ ۱۱۰ متر: «تقریبی»، نه درِ خانه
-const approx = (x) => Math.round(Number(x) * 1000) / 1000;
-
-/** کدِ زنده برای مشتری — فقط اگر دانه هنوز هست و با هشِ ذخیره‌شده جور است. */
-function liveCode(a) {
-  if (!a.code_nonce || !a.code_hash || a.code_used_at != null) return null;
-  if (!D.LIVE.includes(a.status) || Number(a.code_attempts) >= CODE_MAX_ATTEMPTS) return null;
-  const code = derivedCode(a.id, a.code_nonce);
-  return codeMatches(a, code) ? code : null;
-}
-
-/**
- * نمای پیک برای مشتریِ همین سفارش (فراخواننده سفارش را با توکنِ پیگیری پیدا
- * کرده است). `undefined` = پرچم خاموش ⇒ پاسخِ مشتری همان شکلِ پیشین را دارد؛
- * `null` = هنوز مأموریتی نیست. ⛔ نه شماره، نه شناسهٔ پیک، نه نشانیِ دقیق.
- */
-async function customerView(shopId, orderId) {
-  const st = await stateOf(shopId);
-  if (!st.readable || !(await orders.flagOf(shopId, VIEW_FLAG))) return undefined;
-  const a = await one(
-    `SELECT a.*, c.name AS courier_name FROM delivery_assignments a
-       LEFT JOIN shop_couriers c ON c.shop_id = a.shop_id AND c.id = a.courier_id
-      WHERE a.shop_id=$1 AND a.order_id=$2 ORDER BY a.attempt_no DESC LIMIT 1`,
-    [shopId, String(orderId || '')]
-  );
-  if (!a) return null;
-  const live = D.LIVE.includes(a.status);
-  const onTheWay = ON_THE_WAY.includes(a.status);
-  let location = null;
-  if (onTheWay && await orders.flagOf(shopId, LOCATION_FLAG)) {
-    const p = await one(
-      'SELECT lat, lng, server_time FROM delivery_locations WHERE assignment_id=$1 AND server_time >= $2',
-      [a.id, now() - LOCATION_TTL_MS]
-    );
-    if (p) location = { lat: approx(p.lat), lng: approx(p.lng), at: Number(p.server_time), approximate: true };
-  }
-  const chatOn = live && await require('./shop-chat').flagOf(shopId);
-  return {
-    status: PUBLIC_STATUS[a.status],
-    carrier: a.mode === 'pickup' ? 'pickup' : a.mode === 'external' ? 'external' : 'courier',
-    courierName: a.mode === 'shop_courier' && ACCEPTED.includes(a.status) ? firstName(a.courier_name) || null : null,
-    //  «تماس با پیک» از راهِ گفت‌وگوی پوشیدهٔ همین سفارش — هرگز شمارهٔ خام
-    contact: { via: 'order_chat', available: chatOn },
-    code: liveCode(a),
-    etaAt: onTheWay && a.eta_at != null ? Number(a.eta_at) : null,
-    location,
-    deliveredAt: n(a.delivered_at),
-    updatedAt: Number(a.updated_at),
-  };
-}
-
-/** مأموریتِ «در راهِ» همین پیک، قفل‌شده — یا رد. */
-async function onTheWayOf(c, shopId, assignmentId, actor) {
-  const a = (await c.query(
-    'SELECT id, shop_id, status, courier_id FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE',
-    [shopId, String(assignmentId || '')]
-  )).rows[0];
-  if (!a || a.courier_id !== actor.courierId) throw notFound('مأموریت پیدا نشد', 'assignment_not_found');
-  if (actor.active !== true) throw new ApiError(403, 'courier_inactive', 'این پیک غیرفعال است');
-  if (!ON_THE_WAY.includes(a.status)) throw conflict('این مأموریت «در راه» نیست', 'not_on_the_way');
-  return a;
-}
-
-/** نقطه‌های کهنه‌تر از نگهداری می‌روند (هر نوشتن و هر آزمون صدایش می‌کند). */
-async function purgeLocations(run = (t, p) => db.query(t, p)) {
-  await run('DELETE FROM delivery_locations WHERE server_time < $1', [now() - LOCATION_TTL_MS]);
-}
-
-/**
- * پیک آخرین نقطه‌اش را می‌فرستد (`/api/courier`). فقط با هر دو پرچم، فقط
- * مأموریتِ خودش و فقط «در راه». فقط آخرین نقطه نگه داشته می‌شود.
- */
-async function putLocation(shopId, assignmentId, body, actor) {
-  if (!(await orders.flagOf(shopId, VIEW_FLAG)) || !(await orders.flagOf(shopId, LOCATION_FLAG))) {
-    throw notFound('موقعیتِ زنده برای این دکان روشن نیست', 'live_location_disabled');
-  }
-  const b = body && typeof body === 'object' ? body : {};
-  const coord = (v, max, field) => {
-    if (typeof v !== 'number' || !Number.isFinite(v) || Math.abs(v) > max) throw badRequest(`${field} نامعتبر است`, 'bad_location');
-    return v;
-  };
-  const lat = coord(b.lat, 90, 'عرض');
-  const lng = coord(b.lng, 180, 'طول');
-  const accuracyM = optInt(b.accuracyM, 'دقت', { min: 0, max: 100_000 });
-  const deviceTime = optInt(b.deviceTime, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
-  return tx(async (c) => {
-    const a = await onTheWayOf(c, shopId, assignmentId, actor);
-    const at = now();
-    const r = await c.query(
-      `INSERT INTO delivery_locations (assignment_id, shop_id, lat, lng, accuracy_m, device_time, server_time)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (assignment_id) DO UPDATE SET lat=EXCLUDED.lat, lng=EXCLUDED.lng, accuracy_m=EXCLUDED.accuracy_m,
-              device_time=EXCLUDED.device_time, server_time=EXCLUDED.server_time
-        WHERE delivery_locations.server_time <= $8`,
-      [a.id, shopId, lat, lng, accuracyM, deviceTime, at, at - LOCATION_MIN_INTERVAL_MS]
-    );
-    await purgeLocations((t, p) => c.query(t, p));
-    return { accepted: r.rowCount > 0, serverTime: at };
-  });
-}
-
-/** «تقریباً N دقیقهٔ دیگر» از خودِ پیک — فقط با پرچمِ نمای مشتری و فقط «در راه». */
-async function putEta(shopId, assignmentId, body, actor) {
-  if (!(await orders.flagOf(shopId, VIEW_FLAG))) throw notFound('نمای پیک برای مشتری روشن نیست', 'customer_view_disabled');
-  const b = body && typeof body === 'object' ? body : {};
-  const minutes = int(b.minutes, 'دقیقه', { min: 1, max: MAX_ETA_MINUTES });
-  return tx(async (c) => {
-    const a = await onTheWayOf(c, shopId, assignmentId, actor);
-    const etaAt = now() + minutes * 60_000;
-    await c.query('UPDATE delivery_assignments SET eta_at=$2 WHERE id=$1', [a.id, etaAt]);
-    return { etaAt };
-  });
-}
+const { customerView, putLocation, putEta, purgeLocations } = require('./delivery-live');   //  S5: نمای پیک برای مشتری
 
 /** دسترسی‌های کارمند برای `D.check`. */
 function staffActor(req) {
