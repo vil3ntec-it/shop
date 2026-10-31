@@ -203,8 +203,8 @@ class ShopStore(private val context: Context) {
     }
   }
 
-  /** دفترِ همین لحظهٔ دیسک؛ فراخوان قفلِ نوشتن (`synchronized(engine)`) را دارد. `null` ⇒ نبود یا خوانده نشد */
-  private fun readDiskLocked(): ShopData? = runCatching {
+  /** دفترِ همین لحظهٔ دیسک؛ فراخوان قفلِ نوشتن (`synchronized(engine)`، یا تبدیلِ [update]) را دارد. `null` ⇒ نبود یا خوانده نشد */
+  internal fun readDiskLocked(): ShopData? = runCatching {
     if (!file.exists()) null else json.decodeFromString<ShopData>(AtRest.readText(context, file))
   }.getOrNull()
 
