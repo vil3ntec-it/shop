@@ -151,6 +151,22 @@ object StrSettings {
   val aboutText: String get() = td("فروشگاه من — برنامهٔ اندروید.\nتمام اطلاعات روی همین گوشی ذخیره می‌شود؛ هر چند وقت یک‌بار پشتیبان بگیرید.", "My Shop — Android app.\nAll data is stored on this phone; take a backup every now and then.", "زما دوکان — د اندروید اپ.\nټول معلومات په همدې موبایل کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.", "My Shop — computer app.\nAll data is stored on this computer; take a backup every now and then.", "زما دوکان — د کمپیوټر اپ.\nټول معلومات په همدې کمپیوټر کې خوندي کېږي؛ وخت ناوخت بیک‌اپ واخلئ.")
   val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
   fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: $v", "Installed version: $v", "نصب شوې نسخه: $v")
+  //  «چه چیزی تازه است» (OPS-05)
+  val whatsNew: String get() = t("چه چیزی تازه است", "What's new", "څه نوي دي")
+  val whatsNewShow: String get() = t("نشان دادن پس از هر به‌روزرسانی", "Show after each update", "له هر تازه کېدو وروسته ښودل")
+  val whatsNewNote: String get() = t(
+    "روشن: پس از هر به‌روزرسانی، تغییرهای همان نسخه یک بار نشان داده می‌شوند و هر قابلیتِ برداشته‌شده با جای تازه‌اش گفته می‌شود. فقط روی همین دستگاه.",
+    "On: after each update, that version's changes are shown once, and any removed feature is announced with where to find it now. Only on this device.",
+    "روښانه: له هر تازه کېدو وروسته، د هماغې نسخې بدلونونه یو ځل ښودل کېږي او هره لرې شوې ځانګړنه د خپل نوي ځای سره ویل کېږي. یوازې په همدې وسیله.",
+  )
+  val whatsNewAll: String get() = t("دیدنِ همهٔ تغییرها", "See all changes", "ټول بدلونونه وګورئ")
+  val whatsNewEmpty: String get() = t("هنوز یادداشتی نیست.", "No notes yet.", "لا یادښت نشته.")
+  fun whatsNewVersion(v: String): String = t("نسخهٔ $v", "Version $v", "نسخه $v")
+  val whatsNewKindNew: String get() = t("تازه", "New", "نوی")
+  val whatsNewKindChanged: String get() = t("تغییر", "Changed", "بدل شوی")
+  val whatsNewKindRemoved: String get() = t("برداشته شد", "Removed", "لرې شو")
+  fun whatsNewInstead(text: String): String = t("به‌جایش: $text", "Instead: $text", "پر ځای یې: $text")
+  val whatsNewGotIt: String get() = t("فهمیدم", "Got it", "پوه شوم")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")
   val restoreWarn: String get() = t("با بازیابی این فایل، تمام اطلاعات فعلی این دستگاه جایگزین می‌شود. یک نسخه از وضعیت فعلی نگه داشته می‌شود تا اگر اشتباه شد، برگردانده شود.", "Restoring this file replaces all current data on this device. A copy of the current state is kept so it can be undone if this was a mistake.", "د دې دوتنې په بېرته راګرځولو سره، د دې وسیلې ټول اوسني معلومات بدلېږي. د اوسني حالت یوه کاپي ساتل کېږي څو که غلطي وه، بېرته وګرځول شي.")
   val warehouseEntries: String get() = t("ورودهای انبار", "Warehouse entries", "د ګدام داخلې")

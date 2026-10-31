@@ -971,6 +971,7 @@ fun SettingsScreen(
           tint = Shop.colors.primary,
           onClick = onUpdates,
         )
+        WhatsNewSettingsRows() //  OPS-05، پیش‌فرض خاموش
       }
     }
   }
