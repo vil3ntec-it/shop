@@ -191,7 +191,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 
@@ -304,6 +304,18 @@ async function seedShop(a) {
   });
   ids.notify = (await one('SELECT id FROM order_notify_outbox WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [a.shopId]))?.id;
   assert.ok(ids.notify, 'ردیفِ اعلانِ سفارشِ الف');
+
+  //  ORD-14: ویرایشِ سفارشِ تلفنیِ دیگرِ «الف» با رضایتِ ثبت‌شده ⇒ شناسهٔ واقعیِ پیشنهاد
+  const amendable = await h.post('/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', customer: { name: 'مشتریِ ویرایش', phone: '0791234567' },
+    lines: [{ name: 'برنج', qtyMilli: 2000, unitPriceMinor: 5000 }],
+  }, { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend-order') } });
+  assert.equal(amendable.status, 201, JSON.stringify(amendable.body));
+  const am = await h.post(`/api/shop/orders/${amendable.body.order.id}/amendments`,
+    { changes: [{ lineNo: 1, qtyMilli: 1000 }], consent: { via: 'phone' } },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('amend') } });
+  assert.equal(am.status, 201, JSON.stringify(am.body));
+  ids.amend = am.body.amendment.id;
 
   //  سفارشِ تلفنیِ تحویلی ⇒ مأموریتِ پیک ⇒ عکس ⇒ تحویل ⇒ تسویه
   const TOTAL = 1_240_000;
@@ -457,6 +469,7 @@ function concreteFor(ids) {
     [/(\/pick\/products\/):productId/, ids.product],
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
+    [/(\/amendments\/):amendId/, ids.amend],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
@@ -510,6 +523,7 @@ function bodyFor(r, ids) {
     'POST /shop/orders/pick/batches': { orderIds: [ids.order, ids.order.replace(/.$/, '0')] },
     //  عکسِ مدرکِ بسته (PCK-08)
     'POST /shop/orders/:id/pick/photos': { eventId: fresh('pphoto'), parcelOnly: true, imageBase64: F.jpeg(200, 150, { seed: 6 }).toString('base64') },
+    'POST /shop/orders/:id/amendments': { changes: [{ lineNo: 1, qtyMilli: 500 }], consent: { via: 'phone' } },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },

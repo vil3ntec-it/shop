@@ -267,6 +267,8 @@
 - «باز / بسته» ِ کارمند (ORD-03) همان `storefront.statusOf` ِ ویترین است، نه ساعتِ دستگاه؛ افزونهٔ وب (`license/orders-desk.js`) فقط با `presence`/`delay` ِ `/config` بار می‌شود (`claude/spec-ord-1`).
 - ⛔ ریسکِ سفارش (RSK-02/03/05، `lib/order-risk.js`) فقط در قیمت‌گذارِ ویترین و از راهِ `order-rate.guard` اجرا می‌شود: پس از قفلِ `order-phone:<شماره>` و پس از تکرارِ کلیدِ یکتایی، درونِ تراکنشِ `orders.create`. هیچ قاعدهٔ ریسکی به صندوق، همگام‌سازی یا `POST /api/shop/orders` (سفارشِ کارمند) راه ندارد. هر رد کدِ پایدار و `reason` و عددِ سقف دارد. «تازه» = بی سفارشِ تحویل‌شده در همین دکان. سابقهٔ `…/risk` فقط همین دکان را می‌شمارد و شماره را برنمی‌گرداند.
 
+- ⛔ ویرایشِ سفارش پس از ثبت (ORD-14) فقط با `lib/order-amend.js`: فقط «تازه»/«قبول‌شده» و پرداخت‌نشده؛ قیمتِ واحد هرگز از کلاینت؛ سفارشِ ویترین فقط با پذیرشِ خودِ مشتری (توکنِ پیگیری، مهلتِ ۳۰ دقیقه، اثرِ انگشتِ قلم‌ها)، سفارشِ کارمند فقط با رضایتِ ثبت‌شده؛ سابقه رویدادِ `note` با `detail.type = amend_*`.
+
 ### v3 · ویترین
 
 - ویترین فقط با `shop.orders` + `shop.storefront` + کلیدِ اشتراکِ `storefront`؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب دارند (۴۰۴) (#244).
@@ -448,6 +450,7 @@
 | `shop.delivery_courier_call` | دکان / `all` | خاموش | «تماس با مشتری» روی کارتِ پیک (`POST /api/courier/missions/:id/call`، شمارهٔ کامل فقط برای همان تماس)؛ خاموش ⇒ ۴۰۴ `courier_call_disabled` و دکمه پنهان؛ با `shop.delivery` | DLV-02 | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger` | #255 | main |
 | `shop.orders.refund_tracking` | دکان / `all` | خاموش | NTF-08: کلیدِ `refund` در `GET /api/store/:slug/orders/:token` (وضعیت، مبلغِ برگشته و مانده، ردیف‌ها بی دلیل و کننده)؛ خاموش ⇒ کلید نیست | `claude/new-ntf-1` | باز |
+| `shop.orders.amend` | دکان / `all` | خاموش | ORD-14: `POST /api/shop/orders/:id/amendments` و `…/:amendId/withdraw` (خاموش ⇒ ۴۰۳ `order_amend_disabled`)، کلیدِ `amend` در `/config` و `amendment` در جزئیات و پیگیری، درِ مشتری `POST /api/store/:slug/orders/:token/amendments/:amendId/{accept,reject}` (خاموش ⇒ ۴۰۴) | `claude/new-ord-2` | باز |
 | `shop.orders.delay` | دکان / `all` | خاموش | ORD-07: `POST /api/shop/orders/:id/delay` (خاموش ⇒ ۴۰۳ `order_delay_disabled`)، `delay` ِ `/config` و دکمهٔ «عقب انداختن» ِ وب (`license/orders-desk.js`) | `claude/spec-ord-1` | باز |
 | `shop.orders.presence` | دکان / `all` | خاموش | ORD-03: `presence` در `GET /api/shop/orders/summary` و نشانگرِ «باز / بسته» با هشدارِ قطعِ اتصال در وب؛ خاموش ⇒ همان پاسخِ پیشین | `claude/spec-ord-1` | باز |
 | `shop.orders.refunds` | دکان / `all` | خاموش | `POST /api/shop/orders/:id/refunds` (خاموش ⇒ ۴۰۳ `refund_ledger_disabled`)؛ روشن ⇒ گذارِ سادهٔ `refunded_*` ۴۰۹ `refund_via_ledger`، و `refunds` ِ `GET …/handover` (سندِ برگشتِ بازپرداخت در دفترِ دکان، #574) | #255، #574 | main |
