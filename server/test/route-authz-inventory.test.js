@@ -51,6 +51,8 @@ const PUBLIC = [
     'POST /api/pump/public/:code/acct/:id/chat', 'POST /api/pump/public/:code/acct/:id/chat/media',
     'DELETE /api/pump/public/:code/acct/:id/chat/:msg', 'POST /api/pump/public/:code/acct/:id/chat/seen',
     'POST /api/pump/public/:code/acct/:id/chat/push']],
+  ['وب‌هوکِ ارائه‌دهندهٔ پرداخت: بی توکنِ کاربر؛ اعتبار فقط امضای بدنهٔ خام، امضای بد ⇒ ۴۰۱ و هیچ تغییری؛ `fake` فقط بیرون از تولید (routes/payments-webhook.js، PAY-21)', [
+    'POST /api/payments/webhook/hesabpay', 'POST /api/payments/webhook/fake']],
 ];
 const CUSTOMER = /^(POST|PUT|PATCH|DELETE) \/api\/(store|market)\//;
 const SELF = [
@@ -59,7 +61,7 @@ const SELF = [
   ['صفحهٔ «من» و پرتال: فقط ردیف‌های همین کاربر (دستگاهِ دیگری ⇒ S15، رمزِ دوباره ⇒ reauth)', [
     'POST /api/me/notices/:id/read', 'PUT /api/me/settings', 'POST /api/me/redeem', 'POST /api/me/errors',
     'POST /api/me/purchase-request', 'DELETE /api/me/devices/:id', 'PUT /api/me', 'POST /api/me/push', 'DELETE /api/me/push',
-    'POST /api/me/backups', 'DELETE /api/me/backups/:id',
+    'POST /api/me/backups', 'DELETE /api/me/backups/:id', 'POST /api/me/phone/code',
     'DELETE /api/portal/devices/:id', 'POST /api/portal/support/messages', 'POST /api/portal/notices/:id/read',
     'PUT /api/portal/settings', 'POST /api/portal/redeem', 'POST /api/portal/errors',
     'POST /api/license/sync', 'POST /api/billing/request']],

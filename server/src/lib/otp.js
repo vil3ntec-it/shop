@@ -462,11 +462,24 @@ function recordSms(destination, { shopId = '', app = '', purpose = '', via = '',
     .catch((err) => console.error('[otp] دفترِ پیامک ثبت نشد:', err.message));
 }
 
-/** سقفِ روزانهٔ هر نشانی (ردیف‌های ناموفق شمرده نمی‌شوند). */
+/**
+ * RSK-07: شکل‌های یک شماره برای **شمردن** — ‎+930…‎ و ‎+93…‎ یک شماره‌اند (همان قاعدهٔ
+ * `lib/order-rate`؛ validate.phone صفرِ پس از کدِ کشور را برنمی‌دارد). بی این، شکلِ دوم
+ * سقفِ روزانه و فاصلهٔ ارسالِ دوبارهٔ همان گوشی را دو برابر می‌کرد. دادهٔ ذخیره‌شده دست نمی‌خورد.
+ */
+function formsOf(destination) {
+  const d = String(destination || '');
+  if (!d.startsWith(HOME_CC)) return [d];
+  const rest = d.slice(HOME_CC.length).replace(/^0/, '');
+  return [`${HOME_CC}${rest}`, `${HOME_CC}0${rest}`];
+}
+
+/** سقفِ روزانهٔ هر نشانی، همهٔ شکل‌هایش با هم (ردیف‌های ناموفق شمرده نمی‌شوند). */
 async function overDailyMax(destination, at) {
   const { n } = await one(
-    `SELECT COUNT(*)::int AS n FROM otp_codes WHERE destination=$1 AND created_at > $2 AND via <> 'failed'`,
-    [destination, at - 24 * 3600 * 1000]
+    `SELECT COUNT(*)::int AS n FROM otp_codes
+      WHERE destination = ANY($1::text[]) AND created_at > $2 AND via <> 'failed'`,
+    [formsOf(destination), at - 24 * 3600 * 1000]
   );
   return n >= config.otp.dailyMax;
 }
@@ -478,11 +491,11 @@ async function overDailyMax(destination, at) {
 async function request(destination, { purpose = 'login', ip = '', app = '', shopId = '' } = {}) {
   const t = now();
 
-  // فاصله‌ی ارسال دوباره
+  // فاصله‌ی ارسال دوباره (همهٔ شکل‌های همان شماره — RSK-07)
   const last = await one(
-    `SELECT created_at FROM otp_codes WHERE destination=$1 AND purpose=$2 AND via <> 'failed'
+    `SELECT created_at FROM otp_codes WHERE destination = ANY($1::text[]) AND purpose=$2 AND via <> 'failed'
       ORDER BY created_at DESC LIMIT 1`,
-    [destination, purpose]
+    [formsOf(destination), purpose]
   );
   if (last && t - Number(last.created_at) < config.otp.resendMs) {
     const wait = Math.ceil((config.otp.resendMs - (t - Number(last.created_at))) / 1000);
