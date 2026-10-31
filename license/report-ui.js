@@ -186,21 +186,9 @@
     if (v.fraud) {
       var f = v.fraud.totals, w = periodOf(v.fraud.from, v.fraud.to, E);
       return '<div class="rf-stats">' + stat('لغوِ فاکتور', String(f.voidCount), w) + stat('برگشتی', String(f.returnCount), w) +
-        stat('حذفِ ردیف', String(f.lineDeleteCount), w) + stat('کشو بی فروش', String(f.noSaleCount), w) + stat('نیازمندِ تأیید', String(f.overrideCount), w) + '</div>' +
-        alertsHtml(board().alertsOf(v.fraud));
+        stat('حذفِ ردیف', String(f.lineDeleteCount), w) + stat('کشو بی فروش', String(f.noSaleCount), w) + stat('نیازمندِ تأیید', String(f.overrideCount), w) + '</div>';
     }
     return '';
-  }
-
-  /** RSK-10 — هشدارِ رفتارِ غیرعادیِ صندوقدار (هم‌زادِ CashierAlertBox ِ برنامه): فقط نشان می‌دهد */
-  var ALERT_KIND = { 'void': 'لغوِ فاکتور', discount: 'تخفیف', no_sale: 'کشو بی فروش' };
-  function alertsHtml(alerts) {
-    if (!alerts.length) return '';
-    return '<div class="rf-alerts" role="status"><p class="rf-note"><span class="rf-pill rf-danger"><span class="dot" aria-hidden="true"></span>' +
-      alerts.length + ' هشدارِ رفتارِ غیرعادیِ صندوقدار</span> سنجش با بقیهٔ کاربرانِ همین بازه: دستِ کم ۳ بار و دو برابرِ نرخِ آن‌ها</p><ul>' +
-      alerts.map(function (a) {
-        return '<li>' + esc(a.key) + ': ' + a.count + ' ' + ALERT_KIND[a.kind] + ' در ' + a.invoices + ' فاکتور — بقیه ' + a.peerCount + ' در ' + a.peerInvoices + '</li>';
-      }).join('') + '</ul></div>';
   }
 
   function tableHtml(t, E) {

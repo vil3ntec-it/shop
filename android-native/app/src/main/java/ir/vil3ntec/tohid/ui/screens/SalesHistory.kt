@@ -81,6 +81,8 @@ fun SalesHistoryScreen(
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  //  RPT-09 — «سابقهٔ ضدتقلب» (`FraudTrailPref`، پیش‌فرض خاموش): نامِ همین کاربر روی لغو و مرجوعی؛ خاموش ⇒ null
+  val trailBy = remember { ir.vil3ntec.tohid.data.FraudTrailPref.by(roleContext) }
   //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
   val returnsShot = ReturnsShot.open.value
   val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(roleContext) } || returnsShot != null
@@ -478,7 +480,7 @@ fun SalesHistoryScreen(
       onDismiss = { returnFor = null },
       onConfirm = { quantities, reason ->
         apply(
-          SalesEngine.recordReturn(d, sale.id, quantities, reason, todayIso(), System.currentTimeMillis(), ::newId),
+          SalesEngine.recordReturn(d, sale.id, quantities, reason, todayIso(), System.currentTimeMillis(), ::newId, by = trailBy),
           StrInvoices.returnRecorded,
         ) { returnFor = null }
       },
@@ -528,7 +530,7 @@ fun SalesHistoryScreen(
               )
             }
           apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد"), // داده: دلیلِ لغو در فاکتور و سابقه می‌ماند
+            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد", by = trailBy), // داده: دلیلِ لغو در فاکتور و سابقه می‌ماند
             StrInvoices.reopenedToCart,
           ) {
             cartStore.set(lines)
@@ -571,7 +573,7 @@ fun SalesHistoryScreen(
           enabled = reason.isNotBlank(),
           onClick = {
             apply(
-              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason),
+              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason, by = trailBy),
               StrInvoices.saleCancelled,
             ) { cancelFor = null }
           },
@@ -701,7 +703,7 @@ private fun ReturnDialog(
 
   val total = items.sumOf { item ->
     val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
-    if (item.quantity > 0) Math.round(item.totalPrice / item.quantity * wanted).toDouble() else 0.0
+    SalesEngine.returnAmount(d, sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
   }
 
   Dialog(onDismissRequest = onDismiss) {
