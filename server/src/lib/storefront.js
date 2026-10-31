@@ -1139,8 +1139,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY,
-  PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
