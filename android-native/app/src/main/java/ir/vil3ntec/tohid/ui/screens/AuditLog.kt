@@ -16,13 +16,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
 
 /**
  *  سابقهٔ عملیات.
@@ -33,6 +35,8 @@ import java.util.Locale
  *  این دفتر فقط اضافه می‌شود؛ نه پاک می‌شود نه ویرایش. اگر بشود دستکاری‌اش
  *  کرد، دیگر به دردِ همان کاری که برایش هست نمی‌خورد — یعنی جوابِ «این
  *  عدد کِی و چرا عوض شد؟».
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrExpenses` (LOC-06)؛ یادداشتِ هر رویداد داده است و همان می‌ماند.
  */
 @Composable
 fun AuditLogScreen(d: ShopData) {
@@ -48,7 +52,7 @@ fun AuditLogScreen(d: ShopData) {
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
       Text(
-        "${plain(d.auditLog.size)} رویداد ثبت‌شده",
+        StrExpenses.eventsCount(plain(d.auditLog.size)),
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -59,7 +63,7 @@ fun AuditLogScreen(d: ShopData) {
           Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
           horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-          FilterChip(selected = type == null, onClick = { type = null }, label = { Text("همه") })
+          FilterChip(selected = type == null, onClick = { type = null }, label = { Text(Str.all) })
           types.forEach { t ->
             FilterChip(
               selected = type == t,
@@ -73,7 +77,7 @@ fun AuditLogScreen(d: ShopData) {
     }
 
     if (rows.isEmpty()) {
-      item { Panel { EmptyNote("هنوز رویدادی ثبت نشده است.") } }
+      item { Panel { EmptyNote(StrExpenses.noEvents) } }
     } else {
       items(rows, key = { it.id }) { entry ->
         Row(
@@ -101,7 +105,7 @@ fun AuditLogScreen(d: ShopData) {
             Text(entry.notes, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
             Spacer(Modifier.height(3.dp))
             Text(
-              "${formatDate(entry.date)}${timeOf(entry.createdAt)?.let { " — $it" } ?: ""}",
+              "${displayDate(entry.date)}${timeOf(entry.createdAt)?.let { " — $it" } ?: ""}",
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )
@@ -115,31 +119,31 @@ fun AuditLogScreen(d: ShopData) {
 
 /** همان AUDIT_TYPE_LABELS نسخهٔ وب */
 private fun auditLabel(type: String): String = when (type) {
-  "sale" -> "ثبت فروش"
-  "cancel_sale" -> "لغو فروش"
-  "return" -> "مرجوعی"
-  "return_no_receipt" -> "برگشتِ بی رسید"
-  "purchase" -> "ثبت خرید"
-  "customer_payment" -> "پرداخت مشتری"
-  "supplier_payment" -> "پرداخت تأمین‌کننده"
-  "stock_adjustment" -> "اصلاح موجودی"
-  "supplier_return" -> "برگشت به تأمین‌کننده"
-  "price_change" -> "تغییر قیمت"
-  "product_edit" -> "ویرایش کالا"
-  "shift_open" -> "باز کردن صندوق"
-  "shift_close" -> "بستن صندوق"
-  "delete_product" -> "حذف محصول"
-  "debtor_delete" -> "حذف قرض‌دار"
-  "debt_tx_delete" -> "حذف تراکنش بدهی"
-  "expense_delete" -> "حذف مصرف"
-  "data_export" -> "خروجی کامل داده"
-  "debt_due_set" -> "سررسیدِ قرض"
-  "credit_over_limit" -> "برد بیش از سقفِ اعتبار"
-  "credit_limit_set" -> "سقفِ اعتبار"
-  "customer_merge" -> "ادغامِ مشتری"
-  "marketing_consent" -> "رضایتِ پیامِ تبلیغاتی"
-  "price_list_set" -> "لیستِ قیمتِ مشتری"
-  "debt_reminder" -> "یادآوریِ بدهی"
+  "sale" -> StrExpenses.auditSale
+  "cancel_sale" -> StrExpenses.auditCancelSale
+  "return" -> StrExpenses.auditReturn
+  "return_no_receipt" -> StrExpenses.auditReturnNoReceipt
+  "purchase" -> StrExpenses.auditPurchase
+  "customer_payment" -> StrExpenses.auditCustomerPayment
+  "supplier_payment" -> StrExpenses.auditSupplierPayment
+  "stock_adjustment" -> StrExpenses.auditStockAdjustment
+  "supplier_return" -> StrExpenses.auditSupplierReturn
+  "price_change" -> StrExpenses.auditPriceChange
+  "product_edit" -> StrExpenses.auditProductEdit
+  "shift_open" -> StrExpenses.auditShiftOpen
+  "shift_close" -> StrExpenses.auditShiftClose
+  "delete_product" -> StrExpenses.auditDeleteProduct
+  "debtor_delete" -> StrExpenses.auditDebtorDelete
+  "debt_tx_delete" -> StrExpenses.auditDebtTxDelete
+  "expense_delete" -> StrExpenses.auditExpenseDelete
+  "data_export" -> StrExpenses.auditDataExport
+  "debt_due_set" -> StrExpenses.auditDebtDueSet
+  "credit_over_limit" -> StrExpenses.auditCreditOverLimit
+  "credit_limit_set" -> StrExpenses.auditCreditLimitSet
+  "customer_merge" -> StrExpenses.auditCustomerMerge
+  "marketing_consent" -> StrExpenses.auditMarketingConsent
+  "price_list_set" -> StrExpenses.auditPriceListSet
+  "debt_reminder" -> StrExpenses.auditDebtReminder
   else -> type
 }
 

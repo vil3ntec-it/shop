@@ -178,6 +178,8 @@ object DebtorEngine {
     newId: () -> String,
     dueDate: String? = null,
     overLimit: Boolean = false,
+    /** شناسهٔ ردیف که پیش از ثبت ساخته شد — کلیدِ «یک بار» ِ `DebtEntry`؛ `null` ⇒ [newId] */
+    txId: String? = null,
   ): Result {
     val debtor = d.debtors.find { it.id == debtorId } ?: return Result.Failed("قرض‌دار پیدا نشد")
     if (amount.isNaN() || amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
@@ -190,7 +192,7 @@ object DebtorEngine {
     val credit = if (kind == Kind.GIVE) DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount)) else null
     if (credit != null && credit.over && !overLimit) return Result.Failed(DebtBook.overLimitText(credit))
 
-    val id = newId()
+    val id = txId ?: newId()
     val transaction = DebtTransaction(
       id = id,
       debtorId = debtorId,

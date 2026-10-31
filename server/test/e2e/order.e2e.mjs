@@ -200,6 +200,42 @@ await E.step('E2E-RET-11', 'مرجوعی ⇐ بازپرداختِ جزئی با 
   await E.shot(C, '05-customer-refunded-partial');
 }, { needs: ['E2E-ORD-04'] });
 
+await E.step('E2E-ORD-03.effect', 'S41: همان سفارشِ دوبار زده‌شده تا «مشتری گرفت» ⇐ برنامه یک فروش و یک کسرِ موجودی؛ تلاشِ دوباره و دستگاهِ دوم اثرِ دوم ندارند', async () => {
+  //  اثرِ مالی/موجودیِ سفارش (تصمیمِ صاحبِ مخزن ۱۴۰۵/۰۷/۲۷، `lib/order-ledger.js`): فروشِ عادیِ برنامهٔ دکان
+  //  هنگامِ تحویل — نه چیزی در سرور هنگامِ ثبت
+  const dup = (await orders())[1];
+  assert.equal(dup.source, 'storefront');
+  assert.ok(E.ok(await A.ordersConfig(), 'config ِ سفارش‌ها').handoverSince > 0);
+  const oil0 = A.stock(oil);
+  const salesOf = async () => Number((await db.one(
+    "SELECT COUNT(*)::int AS n FROM sync_rows WHERE account_id=$1 AND table_name='sales' AND deleted_at IS NULL AND data->>'orderId'=$2",
+    [owner.shopId, dup.id],
+  )).n);
+  assert.equal(await salesOf(), 0, 'ثبتِ سفارش پیش از تحویل فروش ساخت');
+  for (const [to, from] of [['accepted', 'new'], ['picking', 'accepted'], ['packed', 'picking'], ['ready_for_pickup', 'packed'], ['picked_up', 'ready_for_pickup']]) {
+    E.ok(await go(A, dup.id, to, from), `${from} ⇐ ${to}`);
+  }
+  //  `OrdersLive.postById`: پیش از ثبت از سرور — همین سفارش در «تحویل‌های بی‌فروش»
+  const item = E.ok(await A.api('GET', `/shop/orders/handover?since=0&orderId=${dup.id}`), 'تحویل؟').items.find((x) => x.id === dup.id);
+  assert.ok(item, 'سفارشِ تحویل‌شده در فهرستِ تحویل‌های بی‌فروش نیست');
+  const f = A.fulfillOrder(item);
+  assert.equal(f.ok, true, f.message);
+  assert.equal(A.fulfillOrder(item).already, true, 'تلاشِ دوبارهٔ همان دستگاه');
+  await A.drain();
+  const A2 = await E.device('A2-owner-desktop', owner.email);
+  assert.equal((await A2.firstSync()).ok, true);
+  assert.equal(A2.fulfillOrder(item).already, true, 'دستگاهِ دوم دوباره فروخت');
+  await A2.drain();
+  await A.drain();
+  assert.equal(await salesOf(), 1, 'یک سفارش ⇒ یک فروش');
+  const sale = A2.ledger.sales.find((s) => s.orderId === dup.id);
+  assert.equal(Math.round(sale.finalTotal * 100), Number(dup.total_minor), 'مبلغِ فروش = مبلغِ همان یک سفارش');
+  assert.equal(A2.ledger.stockMovements.filter((m) => m.refId === sale.id).length, 1, 'یک حرکتِ انبار');
+  assert.deepEqual([A.stock(oil), A2.stock(oil)], [oil0 - 1, oil0 - 1], 'یک واحد کم شد، نه دو');
+  const left = E.ok(await A.api('GET', `/shop/orders/handover?since=0&orderId=${dup.id}`), 'تحویل؟').items;
+  assert.equal(left.some((x) => x.id === dup.id), false, 'پس از فروش هنوز «بی‌فروش» است');
+}, { needs: ['E2E-ORD-03'] });
+
 await E.step('E2E-ORD.errors', 'بی خطای جاوااسکریپت در ویترین', async () => { assert.deepEqual(E.pageErrors, []); });
 
 await E.finish();

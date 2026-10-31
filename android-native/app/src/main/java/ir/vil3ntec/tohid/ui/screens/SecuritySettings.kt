@@ -37,9 +37,12 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrSecurity
 
-/** عنوانِ بخش — همان که فهرستِ بخش‌های تنظیماتِ کامپیوتر (`AppRoot`) نشان می‌دهد */
-const val SECURITY_SECTION_TITLE = "امنیت"
+/** عنوانِ بخش — همان که فهرستِ بخش‌های تنظیماتِ کامپیوتر (`AppRoot`) نشان می‌دهد؛ به زبانِ صفحه */
+val SECURITY_SECTION_TITLE: String get() = StrSecurity.security
 
 /**
  *  تنظیمات ← امنیت: «رمزگذاریِ دفتر روی همین دستگاه» (SEC-01، فاز ۱).
@@ -47,6 +50,8 @@ const val SECURITY_SECTION_TITLE = "امنیت"
  *  یک ردیفِ کمینه، خودبسنده و بی‌وابستگی به چیدمانِ تنظیمات تا چیدمانِ تازهٔ
  *  تنظیمات هر جا خواست بگذاردش. پیش‌فرض **خاموش**؛ روشن/خاموش کردن همان لحظه
  *  فایل‌ها را کوچ می‌دهد (`ShopStore.convergeAtRest`) و نتیجه را راست می‌گوید.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrSecurity` (LOC-06)؛ `AtRestKeys.note()` و پیامِ بازسازی هنوز از لایهٔ داده‌اند.
  */
 @Composable
 fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
@@ -77,10 +82,10 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
       tick++
       toast(
         when {
-          r == null -> "تنظیم ذخیره نشد"
-          !r.ok -> "${r.failed.size} فایل کوچ نشد و دست‌نخورده ماند؛ دوباره امتحان کنید"
-          want -> "رمزگذاری روشن شد (${r.converted} فایل رمز شد)"
-          else -> "رمزگذاری خاموش شد (${r.converted} فایل ساده شد)"
+          r == null -> StrSecurity.settingNotSaved
+          !r.ok -> StrSecurity.filesNotConverted(r.failed.size)
+          want -> StrSecurity.encTurnedOn(r.converted)
+          else -> StrSecurity.encTurnedOff(r.converted)
         },
       )
     }
@@ -89,12 +94,11 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
   SettingsSection(
     icon = Icons.Filled.Security,
     title = SECURITY_SECTION_TITLE,
-    subtitle = if (on) "رمزگذاریِ دفتر: روشن" else "رمزگذاریِ دفتر: خاموش",
+    subtitle = if (on) StrSecurity.encSubtitleOn else StrSecurity.encSubtitleOff,
     tint = if (unreadable != null) colors.danger else if (on) colors.success else colors.muted,
   ) {
     Text(
-      "دفترِ دکان، دفترِ حساب‌های دیگرِ همین دستگاه، بایگانی، نسخهٔ ایمنیِ پیش از بازیابی و نسخه‌های خودکار " +
-        "روی همین دستگاه رمز می‌شوند؛ کسی که فقط این فایل‌ها را بردارد، بی کلیدِ همین دستگاه چیزی نمی‌خواند.",
+      StrSecurity.whatIsEncrypted,
       style = MaterialTheme.typography.bodySmall,
       color = colors.muted,
     )
@@ -107,12 +111,12 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text("رمزگذاریِ دفتر روی این دستگاه", style = MaterialTheme.typography.labelLarge, color = colors.text)
+        Text(StrSecurity.encOnThisDevice, style = MaterialTheme.typography.labelLarge, color = colors.text)
         Text(
           when {
-            busy -> "در حالِ کوچِ فایل‌ها…"
+            busy -> StrSecurity.converting
             status == null -> "…"
-            else -> "${status!!.sealed} فایلِ رمزدار، ${status!!.plain} فایلِ ساده"
+            else -> StrSecurity.filesState(status!!.sealed, status!!.plain)
           },
           style = MaterialTheme.typography.labelSmall,
           color = colors.muted,
@@ -121,7 +125,7 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
       Switch(
         checked = on,
         enabled = !busy && status != null,
-        modifier = Modifier.semantics { contentDescription = "رمزگذاریِ دفتر روی این دستگاه" },
+        modifier = Modifier.semantics { contentDescription = StrSecurity.encOnThisDevice },
         //  روشن کردن پس از پرسشِ روشن (بازبینیِ #331)؛ خاموش کردن همان لحظه — راهِ برگشت است
         onCheckedChange = { want -> if (want) askOn = true else setEncryption(false) },
       )
@@ -132,10 +136,10 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
     if (s != null && s.wanted) {
       val keyLine = when (val k = s.key) {
         is AtRestKeyring.State.Ready -> null
-        is AtRestKeyring.State.Unavailable -> "کلیدِ رمز همین حالا در دسترس نیست (${k.reason}) — دفتر فعلاً ساده نوشته می‌شود."
-        is AtRestKeyring.State.Lost -> "کلیدِ رمزِ قبلی روی این دستگاه نیست (${k.reason})."
-        AtRestKeyring.State.None -> "کلیدِ رمز هنوز ساخته نشده — دفتر فعلاً ساده نوشته می‌شود."
-      } ?: s.sealError?.let { "آخرین ذخیره رمز نشد: $it" }
+        is AtRestKeyring.State.Unavailable -> StrSecurity.keyUnavailable(k.reason)
+        is AtRestKeyring.State.Lost -> StrSecurity.keyLost(k.reason)
+        AtRestKeyring.State.None -> StrSecurity.keyNone
+      } ?: s.sealError?.let { StrSecurity.lastSaveNotSealed(it) }
       if (keyLine != null) {
         Spacer(Modifier.height(8.dp))
         Text(keyLine, style = MaterialTheme.typography.labelSmall, color = colors.warning)
@@ -144,7 +148,7 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
 
     Spacer(Modifier.height(8.dp))
     Text(
-      AtRestKeys.note() + " فایل‌های پشتیبانی که بیرون می‌روند (فایل، پوشه، ابر) رمزِ این دستگاه را ندارند.",
+      AtRestKeys.note() + " " + StrSecurity.backupsNotSealed,
       style = MaterialTheme.typography.labelSmall,
       color = colors.muted,
     )
@@ -154,8 +158,10 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
     if (left.isNotEmpty()) {
       Spacer(Modifier.height(8.dp))
       Text(
-        "${left.size} فایلِ کنارگذاشته روی دستگاه مانده (پاک نشده‌اند): " + left.take(4).joinToString("، ") +
-          if (left.size > 4) "، …" else "",
+        StrSecurity.leftovers(
+          left.size,
+          left.take(4).joinToString(Str.listSep + " ") + if (left.size > 4) Str.listSep + " …" else "",
+        ),
         style = MaterialTheme.typography.labelSmall,
         color = colors.muted,
       )
@@ -175,7 +181,7 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
       )
       Spacer(Modifier.height(8.dp))
       TohidSecondaryButton(
-        text = "دوباره امتحان",
+        text = StrSecurity.retry,
         enabled = !busy,
         onClick = {
           busy = true
@@ -183,7 +189,7 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
             store.loadAndSummarize()
             busy = false
             tick++
-            toast(if (store.unreadable.value == null) "دفتر باز شد" else "هنوز باز نشد")
+            toast(if (store.unreadable.value == null) StrSecurity.ledgerOpened else StrSecurity.stillNotOpened)
           }
         },
         modifier = Modifier.fillMaxWidth(),
@@ -195,12 +201,12 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
     AlertDialog(
       onDismissRequest = { askOn = false },
       containerColor = colors.bg,
-      title = { Text("رمزگذاریِ دفتر روشن شود؟", color = colors.text) },
+      title = { Text(StrSecurity.askOnTitle, color = colors.text) },
       text = { Text(enableWarning(), color = colors.muted) },
       confirmButton = {
-        TextButton(onClick = { askOn = false; setEncryption(true) }) { Text("روشن کن", color = colors.primary) }
+        TextButton(onClick = { askOn = false; setEncryption(true) }) { Text(StrSecurity.turnOn, color = colors.primary) }
       },
-      dismissButton = { TextButton(onClick = { askOn = false }) { Text("نه", color = colors.muted) } },
+      dismissButton = { TextButton(onClick = { askOn = false }) { Text(StrPos.no, color = colors.muted) } },
     )
   }
 
@@ -221,39 +227,25 @@ fun SecuritySection(store: ShopStore, toast: (String) -> Unit) {
   }
 }
 
-/** نامِ راهِ برگشت — همان در صفحهٔ امنیت و پنجرهٔ «دفتر باز نشد» */
-const val REBUILD = "بازسازی از سرور"
+/** نامِ راهِ برگشت — همان در صفحهٔ امنیت و پنجرهٔ «دفتر باز نشد»؛ به زبانِ صفحه */
+val REBUILD: String get() = StrSecurity.rebuild
 
 /** چه چیزی در فاز ۱ ساده می‌ماند — بی تعارف (بازبینیِ #331؛ شرح سرِ `AtRestScope`) */
-const val PLAIN_IN_PHASE_1 =
-  "ساده می‌ماند (فاز ۱): صفِ تغییرهای همگام‌سازی، ژورنال‌ها و سایهٔ همگام‌سازی (نسخه‌ای از ردیف‌های همگام‌شده)، " +
-    "خلاصهٔ دفتر (ledger-summary.json) و سبدِ نیمه‌کاره (sale-draft.json). توکن‌های ورود از پیش جدا رمزند."
+val PLAIN_IN_PHASE_1: String get() = StrSecurity.plainInPhase1
 
 private fun unreadableText(kind: AtRestException.Kind?): String = when (kind) {
-  AtRestException.Kind.KEY_UNAVAILABLE ->
-    "دفترِ رمزدار همین حالا باز نشد (کلید در دسترس نبود). دوباره امتحان کنید؛ اگر نشد، «$REBUILD» دفتر را از سرور می‌گیرد."
+  AtRestException.Kind.KEY_UNAVAILABLE -> StrSecurity.unreadableKeyUnavailable(REBUILD)
   AtRestException.Kind.KEY_MISSING ->
-    "دفترِ این دستگاه رمزدار است ولی کلیدش روی این دستگاه نیست (نصبِ دوباره، انتقال به " +
-      "${if (Platform.DESKTOP) "کامپیوترِ" else "گوشیِ"} تازه یا از کار افتادنِ کلید). هیچ چیزی پاک نشده. " +
-      "«$REBUILD» اول تغییرهای نرفتهٔ این دستگاه را می‌فرستد و بعد دفتر را از سرور می‌سازد؛ " +
-      "بازیابیِ پشتیبان هم از همین راه است و فقط ردیف‌هایی را می‌افزاید که هرگز به سرور نرفته بودند؛ ردیفِ حذف‌شده زنده نمی‌شود."
-  AtRestException.Kind.IO ->
-    "بازسازیِ قبلی نیمه‌کاره ماند و دفترِ تازه جا نیفتاد؛ برای اینکه دفترِ قدیم کنارِ همگام‌سازیِ تازه ذخیره نشود، ثبت بسته است. " +
-      "«دوباره امتحان» همان جابه‌جایی را تمام می‌کند؛ اگر نشد، «$REBUILD» را دوباره بزنید. هیچ چیزی پاک نشده."
-  else ->
-    "فایلِ دفترِ رمزدار خراب است و باز نشد. هیچ چیزی پاک نشده؛ «$REBUILD» دفتر را از سرور می‌سازد."
+    StrSecurity.unreadableKeyMissing(if (Platform.DESKTOP) StrSecurity.newComputerOf else StrSecurity.newPhoneOf, REBUILD)
+  AtRestException.Kind.IO -> StrSecurity.unreadableIo(REBUILD)
+  else -> StrSecurity.unreadableDamaged(REBUILD)
 }
 
 private fun enableWarning(): String = buildString {
-  append("کلید فقط روی همین ${if (Platform.DESKTOP) "کامپیوتر" else "گوشی"} است. ")
+  append(StrSecurity.keyOnlyHere(if (Platform.DESKTOP) StrSecurity.thisComputer else StrSecurity.thisPhone))
   append(AtRestKeys.note())
-  append(" اگر کلید از دست برود، دفتر با «$REBUILD» برمی‌گردد — پس پیش از روشن کردن مطمئن شوید همگام‌سازی کار می‌کند.")
-  if (Platform.DESKTOP) {
-    append(
-      "\n\n⚠️ پیش از نصبِ نسخهٔ قدیمی‌ترِ برنامه این را خاموش کنید. نسخه‌های پیش از این، دفترِ رمزدار را نمی‌شناسند: " +
-        "دفتر را خالی نشان می‌دهند و نخستین ذخیره‌شان دفترِ رمزدار را رونویسی می‌کند و همهٔ ردیف‌ها را از سرور هم پاک می‌کند.",
-    )
-  }
+  append(StrSecurity.keyLostComesBack(REBUILD))
+  if (Platform.DESKTOP) append(StrSecurity.desktopDowngradeWarn)
 }
 
 /** پرسشِ پیش از «بازسازی از سرور» */
@@ -263,16 +255,15 @@ private fun RebuildDialog(onDismiss: () -> Unit, onConfirm: () -> Unit) {
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.bg,
-    title = { Text("$REBUILD؟", color = colors.text) },
+    title = { Text(StrSecurity.rebuildAsk(REBUILD), color = colors.text) },
     text = {
       Text(
-        "اول تغییرهایی که هنوز از این دستگاه نرفته‌اند فرستاده می‌شوند؛ اگر نرسیدند، هیچ چیزی عوض نمی‌شود. " +
-          "بعد دفتر از روی سرور ساخته می‌شود. دفترِ رمزدارِ فعلی پاک نمی‌شود، کنار می‌رود. اینترنت لازم است.",
+        StrSecurity.rebuildBody,
         color = colors.muted,
       )
     },
     confirmButton = { TextButton(onClick = onConfirm) { Text(REBUILD, color = colors.primary) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("نه", color = colors.muted) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(StrPos.no, color = colors.muted) } },
   )
 }
 
@@ -295,22 +286,22 @@ fun UnreadableLedgerDialog(
   AlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     containerColor = colors.bg,
-    title = { Text("دفترِ رمزدار باز نشد", color = colors.text) },
+    title = { Text(StrSecurity.unreadableTitle, color = colors.text) },
     text = {
       Text(
-        "برای اینکه دفترِ واقعی رونویسی نشود، ثبت بسته است. " + unreadableText(kind),
+        StrSecurity.recordingBlocked + unreadableText(kind),
         color = colors.muted,
       )
     },
     confirmButton = {
       TextButton(enabled = !busy, onClick = { ask = true }) {
-        Text(if (busy) "در حالِ بازسازی…" else REBUILD, color = colors.primary)
+        Text(if (busy) StrSecurity.rebuilding else REBUILD, color = colors.primary)
       }
     },
     dismissButton = {
       Row {
         TextButton(enabled = !busy, onClick = onOpenSecurity) { Text(SECURITY_SECTION_TITLE, color = colors.muted) }
-        TextButton(enabled = !busy, onClick = onDismiss) { Text("بعداً", color = colors.muted) }
+        TextButton(enabled = !busy, onClick = onDismiss) { Text(StrSecurity.later, color = colors.muted) }
       }
     },
   )
