@@ -38,11 +38,11 @@ class ProductInfoMapTest {
   @Test
   fun `کالای بی این فیلدها همان JSON ِ پیشین را دارد`() {
     val row = rowOf(base, "p1")
-    for (k in listOf("namePs", "nameEn", "synonyms", "keywords", "aisle", "shelf", "shelfLevel")) {
+    for (k in listOf("namePs", "nameEn", "synonyms", "keywords", "aisle", "shelf", "shelfLevel", "alternatives", "customFields")) {
       assertFalse("$k نوشته شد", row.containsKey(k))
     }
     //  فرمِ خالی هم چیزی نمی‌نویسد
-    val empty = ProductInfoMap.apply(potato, ProductInfoForm().toInfo())
+    val empty = ProductInfoMap.apply(potato, ProductInfoForm().toInfo(emptyList(), null))
     assertEquals(potato, empty)
   }
 
@@ -91,7 +91,36 @@ class ProductInfoMapTest {
   fun `فرم همان مقدار را برمی‌گرداند`() {
     val form = ProductInfoForm.of(info)
     assertEquals("سیب‌زمینی، آلو", form.synonyms)
-    assertEquals(info, form.toInfo())
+    assertEquals(info, form.toInfo(emptyList(), null))
+  }
+
+  @Test
+  fun `جایگزین‌ها شناسه‌اند و فیلدهای سفارشی به ترتیب می‌مانند`() {
+    val d = base.copy(
+      products = base.products + Product(id = "p3", name = "پاتاتو", unit = "بسته", salePrice = 25.0),
+      warehouseEntries = listOf(WarehouseEntry(id = "w2", productId = "p2", units = 5.0)),
+    )
+    //  کادرِ ویرایش‌شده: نام یا بارکد ⇐ شناسه؛ ناشناخته کنار
+    val form = ProductInfoForm(alternativesText = "چیپس، پاتاتو، نیست", custom = "گارانتی: ۱۲ ماه\nکشور: ایران")
+    val info = form.toInfo(ProductInfoMap.refs(d), "p1")
+    assertEquals(listOf("p2", "p3"), info.alternatives)
+    val p = ProductInfoMap.apply(potato, info)
+    assertEquals(listOf("p2", "p3"), p.alternatives)
+    assertEquals(listOf("گارانتی", "کشور"), p.customFields!!.keys.toList())
+    val row = rowOf(d.copy(products = listOf(p) + d.products.drop(1)), "p1")
+    assertEquals(listOf("گارانتی", "کشور"), row["customFields"]!!.jsonObject.keys.toList())
+    //  کادرِ ویرایش‌نشده همان شناسه‌ها را نگه می‌دارد، حتی بی فهرستِ کالا
+    assertEquals(listOf("p2", "p3"), ProductInfoForm.of(ProductInfoMap.of(p)).toInfo(emptyList(), "p1").alternatives)
+    //  جست‌وجو در مقدارِ فیلدِ سفارشی
+    assertTrue(ProductInfoMap.matches(p, "ایران"))
+
+    //  صندوق: فقط جایگزینِ موجود (p2 پنج بسته؛ p3 موجودی ندارد)، و فقط با تنظیمِ روشن
+    val withAlt = d.copy(products = listOf(p) + d.products.drop(1))
+    assertEquals(listOf("p2"), ProductInfoMap.suggestions(withAlt, p).map { it.first.id })
+    val hint = ProductInfoMap.insteadSuffix(withAlt, p, on = true)
+    assertTrue(hint, hint.contains("چیپس (") && hint.contains("بسته)") && !hint.contains("پاتاتو"))
+    assertEquals("", ProductInfoMap.insteadSuffix(withAlt, p, on = false))
+    assertEquals("", ProductInfoMap.insteadSuffix(withAlt, chips, on = true))
   }
 
   @Test

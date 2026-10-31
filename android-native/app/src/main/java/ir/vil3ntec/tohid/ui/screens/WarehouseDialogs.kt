@@ -188,7 +188,7 @@ fun ProductDialog(
 
         if (infoOn) {
           Spacer(Modifier.height(14.dp))
-          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info) { form = form.copy(info = it) }
+          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info, d, form.editingId) { form = form.copy(info = it) }
         }
 
         if (d.suppliers.isNotEmpty()) {
@@ -235,7 +235,7 @@ fun ProductDialog(
                   saleUnit = form.saleUnit,
                   //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
                   unitFactor = if (form.saleUnit.isBlank()) 1.0 else form.unitFactor.toDoubleOrNull() ?: Double.NaN,
-                  info = if (infoOn) form.info.toInfo() else null,
+                  info = if (infoOn) form.info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), form.editingId) else null,
                 )
               )
             },

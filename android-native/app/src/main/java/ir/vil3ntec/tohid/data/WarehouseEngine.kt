@@ -159,6 +159,8 @@ object WarehouseEngine {
       add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
     }
     if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
+    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
+    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
   }
 
   /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */

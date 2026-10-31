@@ -109,15 +109,23 @@ data class ProductInfo(
   val synonyms: List<String> = emptyList(),
   val keywords: List<String> = emptyList(),
   val location: ShelfLocation = ShelfLocation(),
+  /** PRD-24 — شناسهٔ کالاهای جایگزین به ترتیبِ ترجیح (`ProductAlternatives`) */
+  val alternatives: List<String> = emptyList(),
+  /** PRD-25 — فیلدهای سفارشی «نام: مقدار» به ترتیبِ ورود (`CustomFields`) */
+  val custom: List<Pair<String, String>> = emptyList(),
 ) {
   val isEmpty: Boolean
-    get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty
+    get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty &&
+      alternatives.isEmpty() && custom.isEmpty()
 
   /** نام‌های دیگرِ کالا (پشتو، انگلیسی، مترادف‌ها) — در جست‌وجو هم‌پایهٔ نام */
   val aliases: List<String> get() = listOfNotNull(namePs.ifEmpty { null }, nameEn.ifEmpty { null }) + synonyms
 
-  /** پرس‌وجو در یکی از نام‌های دیگر یا واژه‌های جست‌وجو هست؟ (نامِ دری کارِ همان جست‌وجوی پیشین است) */
-  fun matches(query: String): Boolean = ProductTerms.matchesAny(aliases + keywords, query)
+  /** واژه‌های جست‌وجو و مقدارِ فیلدهای سفارشی — در جست‌وجو «همهٔ کلمه‌ها» */
+  val searchWords: List<String> get() = keywords + custom.map { it.second }
+
+  /** پرس‌وجو در یکی از نام‌های دیگر، واژه‌ها یا مقدارِ فیلدِ سفارشی هست؟ (نامِ دری کارِ همان جست‌وجوی پیشین است) */
+  fun matches(query: String): Boolean = ProductTerms.matchesAny(aliases + searchWords, query)
 
   companion object {
     fun of(
@@ -128,12 +136,16 @@ data class ProductInfo(
       aisle: String?,
       shelf: String?,
       level: String?,
+      alternatives: List<String> = emptyList(),
+      custom: String? = null,
     ): ProductInfo = ProductInfo(
       namePs = ProductTerms.cleanName(namePs.orEmpty()),
       nameEn = ProductTerms.cleanName(nameEn.orEmpty()),
       synonyms = ProductTerms.parse(synonyms.orEmpty()),
       keywords = ProductTerms.parse(keywords.orEmpty()),
       location = ShelfLocation.of(aisle, shelf, level),
+      alternatives = alternatives.distinct().take(ProductAlternatives.MAX),
+      custom = CustomFields.parse(custom.orEmpty()).fields,
     )
   }
 }

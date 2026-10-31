@@ -209,7 +209,9 @@ fun DeskSaleScreen(
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
-      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")))
+      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")) +
+        //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
+        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoSearch))
     } else ScanFeedback.ok(context)
   }
   fun add(product: Product, count: Double) =
