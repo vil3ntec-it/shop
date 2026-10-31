@@ -19,7 +19,8 @@ object ReportCsv {
     val isEmpty: Boolean get() = rows.size <= 1
   }
 
-  fun of(section: String, d: ShopData, from: String, to: String, today: String): Sheet =
+  /** @param reminderTemplate متنِ یادآوریِ همین دستگاه (`DebtReminderPref`، CRM-06)؛ پیش‌فرض همان جملهٔ امروز */
+  fun of(section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE): Sheet =
     when (section) {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
@@ -33,7 +34,7 @@ object ReportCsv {
       "aging" -> CustomerInsight.agingSheet(d, today)
       "rfm" -> CustomerInsight.rfmSheet(d, today)
       "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
-      "reminders" -> DebtReminder.dueSheet(d, today)
+      "reminders" -> DebtReminder.dueSheet(d, today, template = reminderTemplate)
       else -> stock(d, today)
     }
 
