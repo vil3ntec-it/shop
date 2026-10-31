@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
+import ir.vil3ntec.tohid.core.model.PickShelfDto
+import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
@@ -8,6 +11,7 @@ import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -45,6 +49,28 @@ class PickingRepository(private val api: ApiClient) {
     })
     Unit
   }
+
+  // ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) ─────────────────
+
+  suspend fun shelf(): ApiResult<PickShelfDto> = result { ApiJson.decode<PickShelfDto>(api.get("$ROOT/pick/shelf")) }
+
+  /** اسکنِ برچسبِ کیسه روی جای قفسه — تکرارِ همان کیسه بی‌اثر است (سرور) */
+  suspend fun shelfScan(qr: String, slot: String): ApiResult<PickShelfScanDto> = result {
+    ApiJson.decode<PickShelfScanDto>(api.post("$ROOT/pick/shelf/scan", buildJsonObject {
+      put("qr", qr.trim())
+      put("slot", slot.trim())
+    }))
+  }
+
+  /** دستهٔ ۲ تا ۱۰ سفارش؛ همان کلید ⇒ همان دسته */
+  suspend fun createBatch(orderIds: List<String>, key: String): ApiResult<PickBatchDto> = result {
+    batchOf(api.postKeyed("$ROOT/pick/batches", batchJson(orderIds), key))
+  }
+
+  suspend fun batch(batchId: String): ApiResult<PickBatchDto> = result { batchOf(api.get("$ROOT/pick/batches/${enc(batchId)}")) }
+
+  private fun batchOf(body: JsonObject): PickBatchDto =
+    ApiJson.decodeAt<PickBatchDto>(body, "batch") ?: throw ApiFailure.InvalidResponse()
 
   private fun sheetOf(body: JsonObject): PickSheetDto =
     ApiJson.decodeAt<PickSheetDto>(body, "pick") ?: throw ApiFailure.InvalidResponse()
@@ -85,5 +111,9 @@ class PickingRepository(private val api: ApiClient) {
       }
 
     fun packJson(bags: Int): JsonObject = buildJsonObject { put("bags", bags) }
+
+    fun batchJson(orderIds: List<String>): JsonObject = buildJsonObject {
+      put("orderIds", JsonArray(orderIds.map { JsonPrimitive(it) }))
+    }
   }
 }

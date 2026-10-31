@@ -272,3 +272,18 @@ test('PCK-12: همه پیش از نوشتن سنجیده می‌شوند — «�
   const cross = await h.get(`/api/shop/orders/pick/batches/${(await one(`SELECT batch_id FROM order_picks WHERE order_id=$1`, [a.id])).batch_id}`, { token: other.token });
   assert.equal(cross.status, 404, 'دستهٔ «الف» برای «ب» نیست');
 });
+
+test('PCK-10 pick-shelf-v1: برچسبِ کیسه و ترتیبِ جای قفسه — همان بردارِ PickDesk.kt', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const shelfLib = require('../src/lib/pick-shelf');
+  const P = require('../src/lib/pick-core');
+  const V = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'pick-shelf-v1.json'), 'utf8'));
+  assert.equal(V.version, 1);
+  for (const c of V.label) {
+    let got = null;
+    try { got = shelfLib.parseLabel(c.raw); } catch (e) { assert.equal(e.code, 'bad_label', c.raw); }
+    assert.deepEqual(got, c.want, c.raw);
+  }
+  for (const c of V.slotOrder) assert.deepEqual([...c.slots].sort(P.compareNatural), c.want);
+});

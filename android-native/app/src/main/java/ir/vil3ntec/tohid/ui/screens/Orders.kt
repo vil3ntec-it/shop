@@ -117,7 +117,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         Text("سفارش‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.text)
         Text("ویترین، تلفن، تلگرام و واتس‌اپ — در یک صف", style = MaterialTheme.typography.bodySmall, color = colors.muted)
       }
-      ViewModeToggle(view)
+      ViewModeToggle(view); PickDeskEntry(cfg, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }) { reload++ }   // قفسه و دسته (PCK-10/12)
       if (cfg.permissions.create) {
         Spacer(Modifier.width(8.dp))
         TohidButton("+ سفارشِ دستی", onClick = { creating = true })

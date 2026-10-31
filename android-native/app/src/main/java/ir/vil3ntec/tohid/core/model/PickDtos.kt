@@ -82,3 +82,71 @@ data class PickResultDto(
 
 @Serializable
 data class PickEventsDto(val results: List<PickResultDto> = emptyList(), val pick: PickSheetDto? = null)
+
+// ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) — `lib/pick-shelf.js` ─────────────────
+
+/** یک سفارش روی قفسهٔ انتظار */
+@Serializable
+data class PickShelfItemDto(
+  val orderId: String = "",
+  val orderNo: Long = 0,
+  val slot: String = "",
+  val bags: Int = 0,
+  val scanned: Int = 0,
+  val ready: Boolean = false,
+  val readyAt: Long? = null,
+  val status: String = "",
+  val fulfillment: String = "",
+)
+
+@Serializable
+data class PickShelfDto(val shelf: List<PickShelfItemDto> = emptyList())
+
+/** نتیجهٔ اسکنِ یک کیسه روی قفسه */
+@Serializable
+data class PickShelfScanDto(
+  val orderId: String = "",
+  val orderNo: Long = 0,
+  val slot: String = "",
+  val bag: Int = 0,
+  val bags: Int = 0,
+  val scanned: Int = 0,
+  val ready: Boolean = false,
+  val readyNow: Boolean = false,
+  val status: String = "",
+)
+
+@Serializable
+data class PickBatchOrderDto(
+  val orderId: String = "",
+  val orderNo: Long = 0,
+  /** «سبدِ» این سفارش در دسته (۱..n به ترتیبِ شمارهٔ سفارش) */
+  val bin: Int = 0,
+  val status: String = "",
+  val progress: PickProgressDto = PickProgressDto(),
+)
+
+@Serializable
+data class PickBatchLineDto(
+  val orderId: String = "",
+  val orderNo: Long = 0,
+  val bin: Int = 0,
+  val lineNo: Int = 0,
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val status: String = "",
+  val orderedQtyMilli: Long = 0,
+  val pickedQtyMilli: Long = 0,
+  val weighed: Boolean = false,
+  val location: PickLocDto = PickLocDto(),
+)
+
+/** دسته: سفارش‌ها و فهرستِ یک‌جا به ترتیبِ قفسه */
+@Serializable
+data class PickBatchDto(
+  val batchId: String = "",
+  val orders: List<PickBatchOrderDto> = emptyList(),
+  val lines: List<PickBatchLineDto> = emptyList(),
+  val progress: PickProgressDto = PickProgressDto(),
+)
