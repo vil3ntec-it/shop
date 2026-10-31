@@ -209,6 +209,99 @@ const man = await (await fetch(`${base}/store/${slug}/manifest.webmanifest`)).js
 ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${slug}` && man.icons.length === 3, 'وب‌اپِ قابلِ نصبِ همین دکان (WEB-14)');
 ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');
 
+//  ── WEB-08: برگهٔ کالا (توضیح، مشخصاتِ عمومی، مشابه، مکمل) و WEB-02: پرفروش، «ارزان‌تر» و تازه‌ها ──
+//  همه از دادهٔ واقعیِ سرور: توضیح و مشخصات از تنظیمِ صاحب دکان؛ «مکمل» و «پرفروش» از سه سفارشِ سه
+//  شمارهٔ جدا (k-گمنامی)؛ «ارزان‌تر» فقط پس از `showDeals` ِ صاحب دکان. پایانِ بخش: صابون دوباره بیرون.
+{
+  ok((await call('PUT', '/api/shop/storefront/products/rice', { published: true,
+    description: 'برنجِ دانه‌بلند، پخت‌وپزِ آسان', specs: [{ name: 'وزن', value: '۱ کیلو' }, { name: 'کشور', value: 'افغانستان' }] }, T)).status === 200,
+  'توضیح و مشخصاتِ برنج از تنظیمِ صاحب دکان');
+  //  صابون: دستهٔ دیگر (مشابهِ برنج نیست)، قیمتِ آنلاینِ ۳۰ کمتر از ۴۰ ِ دفتر
+  await call('PUT', '/api/shop/storefront/products/soap', { published: true, onlinePriceMinor: 3000 }, T);
+  for (const phone of ['0792223344', '0793334455', '0794445566']) {
+    const st = await call('POST', `/api/store/${slug}/verify/start`, { phone });
+    const ck = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: st.body && st.body.devCode });
+    const r = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone },
+      lines: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'soap', qtyMilli: 1000 }] }, null,
+    { 'Idempotency-Key': `web08-${phone}-key`, 'X-Store-Ticket': ck.body && ck.body.ticket });
+    ok(r.status === 201, `سفارشِ واقعیِ ${phone}`, JSON.stringify(r.body).slice(0, 120));
+  }
+  const ids = async (sel) => page.$$eval(`${sel} li[data-id]`, (li) => li.map((x) => x.dataset.id));
+
+  //  پیش از «ارزان‌تر» ِ صاحب دکان: هیچ قیمتِ دفتری در صفحه نیست
+  //  صفحه روی «#/o/…» است؛ goto ِ همان نشانی با هشِ دیگر بار نمی‌کند ⇒ reload
+  await page.goto(`${base}/store/${slug}#/`);
+  await page.reload();
+  await page.waitForSelector('#fresh:not([hidden])', { timeout: 15000 });
+  ok(JSON.stringify(await ids('#picks-list')) === '["rice","soap"]' && (await page.textContent('#picks-why')).includes('پرفروش'),
+    'WEB-02: پرفروش‌ها از سه سفارشِ سه شماره', JSON.stringify(await ids('#picks-list')));
+  ok(JSON.stringify(await ids('#fresh-list')) === '["oil"]' && await page.isVisible('#fresh'),
+    'WEB-02: «تازه‌ها» کنارِ پرفروش، بی تکرارِ همان کالا', JSON.stringify(await ids('#fresh-list')));
+  ok(await page.isHidden('#deals') && (await page.locator('.p-was').count()) === 0, 'بی خواستِ صاحب دکان «ارزان‌تر» و قیمتِ دفتر نیست');
+  ok((await call('PUT', '/api/shop/market', { showDeals: true }, T)).status === 200, 'صاحب دکان «ارزان‌تر از قیمتِ دکان» را روشن کرد');
+  await page.reload();
+  await page.waitForSelector('#deals:not([hidden])', { timeout: 15000 });
+  const deal = page.locator('#deals-list li[data-id="soap"]');
+  ok((await ids('#deals-list')).join() === 'soap' && (await deal.locator('.p-was').textContent()).includes('۴۰')
+    && (await deal.locator('.p-price').textContent()).includes('۳۰'), 'WEB-02: «ارزان‌تر» با قیمتِ دفتر و قیمتِ آنلاینِ واقعی', await deal.textContent());
+
+  //  برگهٔ کالا از کارتِ کاتالوگ
+  await page.locator('#products li[data-id="rice"] .p-open').click();
+  await page.waitForSelector('#ps-sim:not([hidden])', { timeout: 10000 });
+  ok((await page.textContent('#ps-name')) === 'برنج' && (await page.textContent('#ps-desc')) === 'برنجِ دانه‌بلند، پخت‌وپزِ آسان',
+    'WEB-08: نام و توضیح', await page.textContent('#ps-desc'));
+  ok(JSON.stringify(await page.$$eval('#ps-specs dt, #ps-specs dd', (x) => x.map((e) => e.textContent)))
+    === JSON.stringify(['وزن', '۱ کیلو', 'کشور', 'افغانستان']), 'WEB-08: مشخصاتِ عمومی');
+  ok((await page.textContent('#ps-price')).includes('۱۲۰') && await page.isVisible('#ps-stock .pill') && await page.isEnabled('#ps-add'),
+    'WEB-08: قیمت، واحد، وضعیتِ موجودی و افزودن', await page.textContent('#ps-price'));
+  ok((await ids('#ps-sim-list')).join() === 'oil' && (await ids('#ps-comp-list')).join() === 'soap',
+    'WEB-08: مشابه (همان دسته) و مکمل (هم‌سفارشیِ k-گمنام)', `${await ids('#ps-sim-list')} | ${await ids('#ps-comp-list')}`);
+  await page.setViewportSize({ width: 320, height: 760 });
+  const over = await page.evaluate(() => {
+    const s = document.getElementById('product-sheet');
+    return Math.max(document.documentElement.scrollWidth - document.documentElement.clientWidth, s.scrollWidth - s.clientWidth);
+  });
+  ok(over <= 0, 'برگهٔ کالا در ۳۲۰ بی بیرون‌زدگی', `${over}px`);
+  await page.setViewportSize({ width: 360, height: 760 });
+
+  //  کارتِ «مشابه» همان برگه را با کالای دیگر پر می‌کند؛ بخشِ بی‌داده پنهان است
+  await page.locator('#ps-sim-list li[data-id="oil"] .p-open').click();
+  await page.waitForFunction(() => document.getElementById('ps-name').textContent === 'روغن'
+    && document.querySelector('#ps-sim-list li[data-id="rice"]'), null, { timeout: 10000 });
+  ok(await page.isHidden('#ps-desc') && await page.isHidden('#ps-specs') && await page.isHidden('#ps-comp'),
+    'روغن: بی توضیح، بی مشخصات و بی مکملِ k-گمنام ⇒ آن بخش‌ها پنهان');
+  //  پاسخِ دیررسِ کالای پیشین برگه را دوباره باز نمی‌کند
+  await page.route('**/api/store/*/products/soap', async (r) => { await new Promise((x) => setTimeout(x, 600)); await r.continue(); });
+  await page.evaluate(() => { location.hash = '#/p/soap'; });
+  await page.waitForTimeout(80);
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.waitForTimeout(900);
+  ok(await page.isHidden('#product-sheet') || !(await page.evaluate(() => document.getElementById('product-sheet').classList.contains('on'))),
+    'پاسخِ دیررس پس از بستن برگه را باز نمی‌کند');
+  await page.unroute('**/api/store/*/products/soap');
+  //  کالایی که دیگر در ویترین نیست ⇒ «دیگر نیست»، نه برگهٔ کهنه
+  await call('PUT', '/api/shop/storefront/products/soap', { published: false }, T);
+  await page.evaluate(() => { location.hash = '#/p/soap'; });
+  await page.waitForFunction(() => location.hash === '#/', null, { timeout: 10000 });
+  ok(true, 'کالای برداشته‌شده: پیام و بازگشت به ویترین');
+
+  if (axeSrc) {
+    const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
+    const ap = await ac.newPage();
+    await ap.goto(`${base}/store/${slug}#/p/rice`);
+    await ap.waitForSelector('#ps-sim:not([hidden])', { timeout: 15000 });
+    await ap.waitForTimeout(400);
+    await ap.addScriptTag({ content: axeSrc });
+    const v = await ap.evaluate(async () => (await window.axe.run(document.getElementById('product-sheet'),
+      { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name', 'definition-list', 'dlitem'] })).violations
+      .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+    ok(v.length === 0, 'دسترس‌پذیری (axe-core): برگهٔ کالا', v.join(' | '));
+    await ac.close();
+  }
+  await page.goto(`${base}/store/${slug}#/`);
+  await page.waitForSelector('#products li[data-id]', { timeout: 15000 });
+}
+
 //  سه زبان (دودی): en چپ‌به‌راست و ps راست‌به‌چپ — ویترین، سبد، ثبت؛ axe در هر دو جهت
 for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'Checkout'], ['ps', 'rtl', 'موجودي لا کتل کېږي', 'فرمایش ثبتول']]) {
   const lc = await browser.newContext({ viewport: { width: 390, height: 844 }, bypassCSP: Boolean(axeSrc) });

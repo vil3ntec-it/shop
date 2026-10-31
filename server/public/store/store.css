@@ -23,7 +23,7 @@
 .toolbar { display: grid; gap: var(--s3); }
 .stock-note { margin-top: var(--s3); font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .stock-note::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-#picks .p-card { height: 100%; }
+#picks .p-card, #deals .p-card, #fresh .p-card, .sheet .rail .p-card { height: 100%; }
 
 .plain-set { border: 1px solid var(--line); margin: 0; min-width: 0; }
 .plain-set > * + * { margin-top: var(--s4); }
@@ -53,6 +53,11 @@
 .ps-img .ph { font-size: 56px; font-weight: 700; color: var(--faint); }
 .ps-price { font-size: 22px; font-weight: 700; }
 .ps-price small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.ps-desc { margin-top: var(--s3); overflow-wrap: anywhere; }
+.ps-specs { margin: var(--s3) 0 0; display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr); gap: var(--s1) var(--s4); font-size: 14px; }
+.ps-specs dt { color: var(--muted); overflow-wrap: anywhere; }
+.ps-specs dd { margin: 0; overflow-wrap: anywhere; }
+.ps-h { margin-bottom: var(--s2); }
 
 #o-title { font-size: 20px; }
 #o-steps { margin-top: var(--s5); }
