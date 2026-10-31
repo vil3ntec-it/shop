@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.sync.v1
 
-import java.security.SecureRandom
+import ir.vil3ntec.tohid.core.platform.currentTimeMillis
+import ir.vil3ntec.tohid.core.platform.locked
+import ir.vil3ntec.tohid.core.platform.secureRandomBytes
 
 /**
  *  ULID — شناسهٔ ردیف و شناسهٔ op.
@@ -20,13 +22,13 @@ import java.security.SecureRandom
 object Ulid {
 
   private const val B32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
-  private val random = SecureRandom()
 
   private var lastMs = -1L
   private var lastRand = ByteArray(0)
 
-  @Synchronized
-  fun next(nowMs: Long = System.currentTimeMillis()): String {
+  fun next(nowMs: Long = currentTimeMillis()): String = locked { build(nowMs) }
+
+  private fun build(nowMs: Long): String {
     val time = StringBuilder(10)
     var rest = nowMs
     val digits = CharArray(10)
@@ -45,7 +47,7 @@ object Ulid {
         rnd[k] = 0
       }
     } else {
-      rnd = ByteArray(10).also { random.nextBytes(it) }
+      rnd = secureRandomBytes(10)
     }
     lastMs = nowMs
     lastRand = rnd
