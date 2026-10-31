@@ -34,9 +34,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.hw.EscPos
+import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.pay.Pay
+import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.ShiftCore
 import ir.vil3ntec.tohid.core.pay.ShiftReport
+import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
@@ -45,10 +49,15 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.numericInput
+import ir.vil3ntec.tohid.print.HwPages
+import ir.vil3ntec.tohid.print.PrintSpooler
+import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrShift
 
@@ -56,15 +65,18 @@ import ir.vil3ntec.tohid.core.i18n.StrShift
  *  صندوقِ شیفت با هستهٔ pay-core (PAY-11..15، 19؛ S12) — فقط با پرچمِ `ShopPolicy.payV2`.
  *  گوشی و کامپیوتر («تاریخچهٔ فروش»): باز کردن با موجودی، ورود/خروجِ نقد با
  *  دلیل، کشو بی فروش با تأییدِ صاحب/مدیر، گزارشِ X، بستن با شمارشِ اسکناس و Z.
- *  شمارشِ کور: شاگرد (صندوقدار) مبلغِ مورد انتظار و اختلاف را نمی‌بیند؛ صاحب و مدیر می‌بینند.
+ *  شمارشِ کور: شاگرد (صندوقدار) مبلغِ مورد انتظار و اختلاف را نمی‌بیند؛ صاحب و مدیر می‌بینند —
+ *  در X ِ میانِ شیفت، در Z و در سابقهٔ هر بستن (کور یا مدیر، `PayFlow.closeNote`) هم (`ShiftSlip.forViewer`، PAY-13): در نمای او فروش، رسید،
+ *  مرجوعی و ورود/خروجِ نقد فقط با شمار می‌آیند، و بستنِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (بی پیشگو).
+ *  PAY-16: در بستن، هر روشِ غیرنقدی که در شیفت گردش داشت کادرِ شمارشِ خودش را دارد (`ShiftSlip.countable`).
+ *  PAY-15: X و Z از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
  *  خاموش ⇒ این‌جا صدا زده نمی‌شود و همان کارتِ `CashShift`ِ امروز در `SalesHistory` است.
- *
  *  // i18n: سه‌زبانه — نوشته‌ها در `StrShift` (LOC-06)؛ یادداشتِ سابقه و «تأیید» ِ ذخیره‌شده داده‌اند و فارسی می‌مانند.
  */
 
 /** نامِ دلیل در یادداشتِ سابقه (داده، همیشه فارسی)؛ برای صفحه [moveLabel] */
 private val MOVE_LABEL = mapOf(
-  "deposit" to "واریز به دخل", "owner_withdrawal" to "برداشتِ مالک", "petty_expense" to "پرداختِ کوچک", "other" to "دیگر", // داده: یادداشتِ سابقهٔ صندوق
+  "deposit" to "واریز به دخل", "owner_withdrawal" to "برداشتِ مالک", "petty_expense" to "پرداختِ کوچک", "other" to "دیگر",  // داده: یادداشتِ سابقهٔ صندوق
 )
 
 /** نامِ دلیلِ ورود/خروج روی دکمه، به زبانِ صفحه */
@@ -95,6 +107,23 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
 
   fun save(row: AuditEntry, done: String) {
     scope.launch { if (store.save(d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
+  }
+
+  /** PAY-15 — چاپِ همان نمایی که روی صفحه است، روی چاپگرِ فاکتور و از صفِ چاپ */
+  fun printReport(rep: ShiftReport) {
+    val printer = PrinterRegistry.defaultSaved(context) ?: return toast(StrShift.noReceiptPrinter)
+    val title = reportTitle(rep)
+    scope.launch {
+      val bytes = withContext(Dispatchers.IO) {
+        runCatching {
+          val p = printer.profile()
+          val lines = listOf(HwPages.Line(title, HwPages.Style.TITLE)) +
+            ShiftSlip.rows(rep).map { r -> slipLine(r).let { (l, v) -> HwPages.reportLine(if (v.isEmpty()) l else "$l: $v", r.strong) } }
+          EscPos.document(HwPages.text(context, p.paperDots, lines), p)
+        }
+      }.getOrElse { toast(StrShift.reportNotPrinted(it.message ?: Str.unknownReason)); return@launch }
+      toast(PrintSpooler.submitAndWait(context, PrintQueue.Kind.REPORT, printer.link, title, bytes, done = StrShift.reportPrinted))
+    }
   }
 
   Panel {
@@ -169,6 +198,8 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     var note by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val noSale = mode == "no_sale"
+    //  PAY-19: کشوی وصل به چاپگرِ پیش‌فرض (HW-03) — اگر هست، «ثبت» واقعاً بازش می‌کند
+    val drawer = remember { PrinterRegistry.defaultSaved(context)?.takeIf { it.drawer } }
     AlertDialog(
       onDismissRequest = { moveMode = null },
       containerColor = Shop.colors.surfaceSolid,
@@ -204,6 +235,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
             Spacer(Modifier.height(6.dp))
             Text(
               if (staff) StrShift.noSaleNeedsApproval
+              else if (drawer != null) StrShift.noSaleApproverDrawer(me.ifBlank { StrShift.thisAccount }, drawer.name)
               else StrShift.noSaleApprover(me.ifBlank { StrShift.thisAccount }),
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
             )
@@ -212,15 +244,24 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         }
       },
       confirmButton = {
-        TextButton(enabled = !(noSale && staff), onClick = {
-          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = if (staff) "" else me.ifBlank { "صاحب/مدیر" }) // داده: «تأیید» ِ ذخیره‌شده در ردیفِ کشو
+        TextButton(enabled = !(noSale && staff), onClick = move@{
+          //  PAY-19: همان راهِ «باز کردنِ کشو» ِ دستگاه‌ها (`PrintSpooler.openDrawer`): مجوزِ drawer.open، دلیل، و ردیفِ
+          //  no_sale ِ همین صندوق فقط وقتی ضربه به چاپگر رسید — نه ردیفی بی کشو، نه کشویی بی ردیف
+          if (noSale && drawer != null) {
+            if (note.isBlank()) { error = PayFlow.message(PayFlow.Problem("REASON_REQUIRED")); return@move }
+            scope.launch { toast(PrintSpooler.openDrawer(context, drawer, note)) }
+            moveMode = null
+            return@move
+          }
+          //  تأییدکننده نامِ همین کاربر است؛ بی نام «policy» (سیاستِ دکان اجازه داده)، هرگز «صاحب/مدیر»ِ ساختگی — همان HW-03
+          val m = if (noSale) PayFlow.Move("no_sale", reason = note, by = me, approvedBy = if (staff) "" else me.ifBlank { "policy" })
           else PayFlow.Move(mode, amount, reason, note, by = me)
           when (val r = PayFlow.moveRow(d, sh.open, m, System.currentTimeMillis(), ::newId)) {
             is PayFlow.Outcome.Bad -> error = PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val row = r.value
-              val notes = if (noSale) "کشو بی فروش — ${note.trim()}" + (row.approvedBy?.let { " — تأیید: $it" } ?: "") // داده: یادداشتِ سابقهٔ صندوق
-              else "${if (mode == "cash_in") "ورود به دخل" else "خروج از دخل"}: ${MOVE_LABEL[row.reason] ?: row.reason} — ${money(row.amount)} افغانی" + // داده: یادداشتِ سابقهٔ صندوق
+              val notes = if (noSale) "کشو بی فروش — ${note.trim()}" + (row.approvedBy?.let { " — تأیید: $it" } ?: "")  // داده: یادداشتِ سابقهٔ صندوق
+              else "${if (mode == "cash_in") "ورود به دخل" else "خروج از دخل"}: ${MOVE_LABEL[row.reason] ?: row.reason} — ${money(row.amount)} افغانی" +  // داده: یادداشتِ سابقهٔ صندوق
                 (row.note?.let { " — $it" } ?: "") + (if (me.isNotBlank()) " — $me" else "")
               save(row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), if (noSale) StrShift.noSaleRecorded else StrShift.recorded)
               moveMode = null
@@ -235,6 +276,10 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   /* ── بستن با شمارشِ اسکناس (PAY-13، 14) ── */
   if (closeDialog && shift != null) {
     val counts = remember { mutableStateMapOf<String, String>() }
+    //  PAY-16: شمرده‌شدهٔ هر روشِ غیرنقد (جمعِ رسیدهای دستگاهِ کارت یا کیف پول)؛ خالی = شمرده نشد
+    val methodTexts = remember { mutableStateMapOf<String, String>() }
+    val full = x?.valueOrNull()?.report
+    val methods = remember(full) { full?.let(ShiftSlip::countable).orEmpty() }
     var reason by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     val parsed: Map<String, Long> = counts.mapNotNull { (k, v) -> v.trim().takeIf { it.isNotEmpty() }?.let { k to (it.toLongOrNull() ?: -1L) } }.toMap()
@@ -268,23 +313,50 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
             Text(StrShift.countedCash, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
             Text(afn(PayFlow.countTotal(parsed)), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
           }
+          if (methods.isNotEmpty()) {
+            Text(
+              StrShift.methodCountsNote,
+              style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
+            )
+            methods.forEach { id ->
+              OutlinedTextField(
+                value = methodTexts[id].orEmpty(),
+                onValueChange = { methodTexts[id] = numericInput(it) },
+                label = {
+                  Text(PayFlow.methodName(id) + if (staff) "" else StrShift.expectedSuffix(afn(full?.expected?.get(id))))
+                },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                modifier = Modifier.fillMaxWidth(),
+              )
+            }
+          }
           OutlinedTextField(
-            value = reason, onValueChange = { reason = it }, label = { Text(StrShift.varianceReasonLabel) },
+            value = reason, onValueChange = { reason = it },
+            //  ⛔ کور: نه آستانه، نه «لازم است» — بستنِ کور به‌خاطرِ اختلاف رد نمی‌شود
+            label = { Text(if (staff) StrShift.noteForManager else StrShift.varianceReasonLabel) },
             singleLine = true, modifier = Modifier.fillMaxWidth(),
           )
           error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
         }
       },
       confirmButton = {
-        TextButton(onClick = {
-          when (val r = PayFlow.closeRow(d, shift.open, PayFlow.Count(parsed, by = me, blind = staff, reason = reason), System.currentTimeMillis(), ::newId)) {
-            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") StrShift.varianceReasonRequired else PayFlow.message(r.problem)
+        TextButton(onClick = close@{
+          val mc = when (val m = ShiftSlip.methodCounts(methodTexts, methods)) {
+            is PayResult.Ok -> m.value
+            is PayResult.Err -> { error = StrShift.badMethodCount(PayFlow.methodName(m.method.orEmpty())); return@close }
+          }
+          val count = PayFlow.Count(parsed, methodCounts = mc, by = me, blind = staff, reason = reason)
+          when (val r = PayFlow.closeRow(d, shift.open, count, System.currentTimeMillis(), ::newId)) {
+            is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED" && !staff) StrShift.varianceReasonRequired else PayFlow.message(r.problem)
             is PayFlow.Outcome.Ok -> {
               val z = r.value.report
               val vc = z.variance?.get(PayFlow.CASH) ?: 0L
               val extra = listOf(reason.trim(), me.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
-              val notes = "بستنِ صندوق: مورد انتظار ${money(PayFlow.major(z.expected?.get(PayFlow.CASH) ?: 0))}، شمرده ${money(r.value.row.amount)}، " + // داده: یادداشتِ سابقهٔ صندوق
-                (if (vc == 0L) "بی اختلاف" else if (vc > 0) "اضافه ${money(PayFlow.major(vc))}" else "کسری ${money(PayFlow.major(-vc))}") + // داده: یادداشتِ سابقهٔ صندوق
+              //  PAY-13: متنِ سابقه را همه می‌بینند؛ بستنِ کور در آن مورد انتظار و اختلاف را نمی‌نویسد (Zِ کامل برای مدیر هست)
+              val notes = (if (staff) "بستنِ صندوق (شمارشِ کور): شمرده ${money(r.value.row.amount)}"  // داده: یادداشتِ سابقهٔ صندوق
+              else "بستنِ صندوق: مورد انتظار ${money(PayFlow.major(z.expected?.get(PayFlow.CASH) ?: 0))}، شمرده ${money(r.value.row.amount)}، " +  // داده: یادداشتِ سابقهٔ صندوق
+                (if (vc == 0L) "بی اختلاف" else if (vc > 0) "اضافه ${money(PayFlow.major(vc))}" else "کسری ${money(PayFlow.major(-vc))}")) +  // داده: یادداشتِ سابقهٔ صندوق
                 (if (extra.isNotEmpty()) " — $extra" else "")
               save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), StrShift.registerClosedNow)
               closeDialog = false
@@ -299,12 +371,15 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
 
   /* ── گزارشِ X / Z (PAY-15) ── */
   showReport?.let { rep ->
+    //  PAY-13: شاگرد نه در X و نه در Z مورد انتظار و اختلاف را می‌بیند؛ چاپ هم همین نماست
+    val seen = ShiftSlip.forViewer(rep, seesExpected = !staff)
     AlertDialog(
       onDismissRequest = { showReport = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text(if (rep.kind == "Z") StrShift.zReportTitle else StrShift.xReportTitle, color = Shop.colors.text) },
-      text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) { ShiftReportLines(if (staff) ShiftCore.cashierView(rep) else rep) } },
+      title = { Text(reportTitle(rep), color = Shop.colors.text) },
+      text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) { ShiftReportLines(seen) } },
       confirmButton = { TextButton(onClick = { showReport = null }) { Text(Str.close) } },
+      dismissButton = { TextButton(onClick = { printReport(seen) }) { Text(StrShift.print) } },
     )
   }
 
@@ -321,10 +396,13 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
           shifts.forEach { sh ->
             Text(formatMillis(sh.open.createdAt) + " — " + sh.open.notes, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
             Text(
-              sh.close?.let { formatMillis(it.createdAt) + " — " + it.notes } ?: StrShift.stillOpen,
+              //  ⛔ PAY-13: شاگرد متنِ بستن (مدیر یا قدیمی: «مورد انتظار» و «اختلاف») را نمی‌بیند — فقط شمرده‌ها
+              sh.close?.let { formatMillis(it.createdAt) + " — " + PayFlow.closeNote(it, seesExpected = !staff) } ?: StrShift.stillOpen,
               style = MaterialTheme.typography.labelSmall, color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
             )
             sh.close?.z?.let { PayFlow.reportOf(it) }?.let { z ->
+              //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد
+              if (!staff && z.needsReview == true) StatusPill(StrShift.needsReview, PillTone.WARNING)
               TextButton(onClick = { history = false; showReport = z }) { Text(StrShift.zReport) }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
@@ -336,44 +414,61 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   }
 }
 
+private fun reportTitle(rep: ShiftReport) = if (rep.kind == "Z") StrShift.zReportTitle else StrShift.xReportTitle
+
+/** PAY-15 — برچسب و مقدارِ یک ردیفِ گزارش؛ صفحه و کاغذ هر دو همین را می‌گیرند */
+private fun slipLine(r: ShiftSlip.Row): Pair<String, String> {
+  val name = PayFlow.methodName(r.method.orEmpty())
+  //  نمای کور (`ShiftSlip.forViewer`): فروش، رسید، مرجوعی و ورود/خروج بی روش و بی مبلغ، فقط شمار
+  if (r.amount == null && r.count != null) countLine(r)?.let { return it }
+  return when (r.kind) {
+    ShiftSlip.Kind.OPENED -> StrShift.opened to formatMillis(r.amount ?: 0)
+    ShiftSlip.Kind.AT -> StrShift.reportTime to formatMillis(r.amount ?: 0)
+    ShiftSlip.Kind.CLOSED -> StrShift.closed to formatMillis(r.amount ?: 0)
+    ShiftSlip.Kind.BY -> StrShift.user to r.text.orEmpty()
+    ShiftSlip.Kind.FLOAT -> StrShift.openingFloat to afn(r.amount)
+    ShiftSlip.Kind.SALES -> StrShift.methodSales(name) to afn(r.amount)
+    ShiftSlip.Kind.RECEIPTS -> StrShift.methodReceipts(name) to afn(r.amount)
+    ShiftSlip.Kind.REFUNDS -> StrShift.methodRefunds(name) to "−" + afn(r.amount)
+    ShiftSlip.Kind.CASH_IN -> StrShift.intoDrawer to afn(r.amount)
+    ShiftSlip.Kind.CASH_OUT -> StrShift.outOfDrawer to "−" + afn(r.amount)
+    ShiftSlip.Kind.NO_SALE -> StrShift.noSale to StrShift.times(r.count ?: 0)
+    ShiftSlip.Kind.EXPECTED -> StrShift.expectedOf(name) to afn(r.amount)
+    ShiftSlip.Kind.DENOMINATION -> "${money(PayFlow.major(r.note ?: 0))} × ${r.count ?: 0}" to afn(r.amount)
+    ShiftSlip.Kind.COUNTED -> (if (r.method == PayFlow.CASH) StrShift.countedCash else StrShift.countedOf(name)) to afn(r.amount)
+    ShiftSlip.Kind.VARIANCE -> StrShift.varianceOf(name) to r.amount.let { v ->
+      when { v == null -> StrShift.notCounted; v == 0L -> StrShift.noDifference; v > 0 -> StrShift.over(afn(v)); else -> StrShift.shortBy(afn(-v)) }
+    }
+    ShiftSlip.Kind.REASON -> StrShift.varianceReason to r.text.orEmpty()
+    ShiftSlip.Kind.NEEDS_REVIEW -> StrShift.notAutoFixed to ""
+  }
+}
+
+private fun countLine(r: ShiftSlip.Row): Pair<String, String>? {
+  val label = when (r.kind) {
+    ShiftSlip.Kind.SALES -> StrShift.sales
+    ShiftSlip.Kind.RECEIPTS -> StrShift.receipts
+    ShiftSlip.Kind.REFUNDS -> StrShift.refunds
+    ShiftSlip.Kind.CASH_IN -> StrShift.intoDrawer
+    ShiftSlip.Kind.CASH_OUT -> StrShift.outOfDrawer
+    else -> return null
+  }
+  return label to StrShift.times(r.count ?: 0)
+}
+
 @Composable
 private fun ShiftReportLines(rep: ShiftReport) {
-  @Composable
-  fun line(label: String, value: String, strong: Boolean = false) {
+  ShiftSlip.rows(rep).forEach { r ->
+    val (label, value) = slipLine(r)
+    if (r.kind == ShiftSlip.Kind.NEEDS_REVIEW) {
+      Spacer(Modifier.height(4.dp))
+      StatusPill(label, PillTone.WARNING)
+      return@forEach
+    }
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), horizontalArrangement = Arrangement.SpaceBetween) {
       Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted, modifier = Modifier.weight(1f))
       Spacer(Modifier.width(8.dp))
-      Text(value, style = if (strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall, color = Shop.colors.text)
-    }
-  }
-  line(StrShift.opened, formatMillis(rep.openedAt))
-  line(if (rep.kind == "Z") StrShift.closed else StrShift.reportTime, formatMillis(rep.at))
-  rep.by?.let { line(StrShift.user, it) }
-  line(StrShift.openingFloat, afn(rep.float))
-  rep.methods.forEach { (id, m) ->
-    if (m.sales != 0L) line(StrShift.methodSales(PayFlow.methodName(id)), afn(m.sales))
-    if (m.receipts != 0L) line(StrShift.methodReceipts(PayFlow.methodName(id)), afn(m.receipts))
-    if (m.refunds != 0L) line(StrShift.methodRefunds(PayFlow.methodName(id)), "−" + afn(m.refunds))
-  }
-  line(StrShift.intoDrawer, afn(rep.moves.cashIn))
-  line(StrShift.outOfDrawer, "−" + afn(rep.moves.cashOut))
-  line(StrShift.noSale, StrShift.times(rep.events.noSale))
-  rep.expected?.forEach { (id, v) -> line(StrShift.expectedOf(PayFlow.methodName(id)), afn(v), id == PayFlow.CASH) }
-  if (rep.kind == "Z") {
-    rep.denominations?.entries?.sortedByDescending { it.key.toLongOrNull() ?: 0 }?.forEach { (k, n) ->
-      line("${money(PayFlow.major(k.toLongOrNull() ?: 0))} × $n", afn((k.toLongOrNull() ?: 0) * n))
-    }
-    line(StrShift.countedCash, afn(rep.counted?.get(PayFlow.CASH)), true)
-    rep.variance?.forEach { (id, v) ->
-      line(
-        StrShift.varianceOf(PayFlow.methodName(id)),
-        when { v == null -> StrShift.notCounted; v == 0L -> StrShift.noDifference; v > 0 -> StrShift.over(afn(v)); else -> StrShift.shortBy(afn(-v)) },
-      )
-    }
-    rep.reason?.let { line(StrShift.varianceReason, it) }
-    if (rep.needsReview == true) {
-      Spacer(Modifier.height(4.dp))
-      StatusPill(StrShift.notAutoFixed, PillTone.WARNING)
+      Text(value, style = if (r.strong) MaterialTheme.typography.titleSmall else MaterialTheme.typography.bodySmall, color = Shop.colors.text)
     }
   }
 }

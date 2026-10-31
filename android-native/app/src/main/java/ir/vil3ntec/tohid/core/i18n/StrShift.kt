@@ -35,6 +35,16 @@ object StrShift {
   val openRegister: String get() = t("باز کردن", "Open", "پرانیستل")
   val saveFailed: String get() = t("ذخیره نشد", "Not saved", "خوندي نه شو")
 
+  // چاپِ گزارش (PAY-15)
+  val noReceiptPrinter: String get() = t(
+    "چاپگرِ فاکتور تعریف نشده — تنظیمات › دستگاه‌ها",
+    "No receipt printer is set up — Settings › Devices",
+    "د بل پرنټر نه دی ټاکل شوی — امستنې › وسایل",
+  )
+  fun reportNotPrinted(why: Any): String = t("گزارش کشیده نشد: $why", "The report couldn't be laid out: $why", "راپور جوړ نه شو: $why")
+  val reportPrinted: String get() = t("گزارش چاپ شد", "Report printed", "راپور چاپ شو")
+  val print: String get() = t("چاپ", "Print", "چاپ")
+
   // باز کردن
   val openRegisterTitle: String get() = t("باز کردنِ صندوق", "Open the register", "د صندوق پرانیستل")
   val openingCash: String get() = t("پولِ اولِ صندوق", "Opening cash", "د صندوق لومړنۍ پیسې")
@@ -59,9 +69,14 @@ object StrShift {
     "بې پلوره د دراز پرانیستل د مالک یا مدیر تایید غواړي؛ د مالک یا مدیر په حساب ننوځئ.",
   )
   fun noSaleApprover(name: Any): String = t(
-    "تأییدکننده: $name — کشوِ برقی هنوز وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.",
-    "Approver: $name — the electric drawer isn't connected yet; this only records it with a reason and approval.",
-    "تاییدوونکی: $name — برېښنايي دراز لا نه دی نښلول شوی؛ دلته یوازې له لامل او تایید سره ثبتېږي.",
+    "تأییدکننده: $name — کشوِ برقی به چاپگرِ پیش‌فرض وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.",
+    "Approver: $name — no electric drawer is connected to the default printer; this only records it with a reason and approval.",
+    "تاییدوونکی: $name — برېښنايي دراز له اصلي پرنټر سره نه دی نښلول شوی؛ دلته یوازې له لامل او تایید سره ثبتېږي.",
+  )
+  fun noSaleApproverDrawer(name: Any, printer: Any): String = t(
+    "تأییدکننده: $name — کشوی چاپگرِ «$printer» باز می‌شود و با دلیل در سابقهٔ همین صندوق می‌ماند.",
+    "Approver: $name — the drawer of printer “$printer” opens and is kept with the reason in this register's history.",
+    "تاییدوونکی: $name — د «$printer» پرنټر دراز پرانیستل کېږي او له لامل سره د همدې صندوق په تاریخچه کې پاتې کېږي.",
   )
   val thisAccount: String get() = t("همین حساب", "this account", "همدا حساب")
   val noSaleRecorded: String get() = t("باز کردنِ کشو ثبت شد", "Drawer opening recorded", "د دراز پرانیستل ثبت شول")
@@ -77,6 +92,14 @@ object StrShift {
   )
   fun expectedCash(a: Any): String = t("نقدِ مورد انتظار: $a", "Expected cash: $a", "د تمې وړ نغدې: $a")
   val countedCash: String get() = t("نقدِ شمرده", "Cash counted", "شمېرل شوې نغدې")
+  val methodCountsNote: String get() = t(
+    "شمارشِ هر روش — جمعِ رسیدهای دستگاهِ کارت یا کیف پول؛ خالی یعنی «شمرده نشد»",
+    "Count per method — the total of the card terminal or wallet receipts; empty means “not counted”",
+    "د هرې لارې شمېرل — د کارت ماشین یا بټوې د رسیدونو ټولګه؛ خالي یعنې «ونه شمېرل شو»",
+  )
+  fun expectedSuffix(a: Any): String = t(" — مورد انتظار $a", " — expected $a", " — د تمې وړ $a")
+  val noteForManager: String get() = t("یادداشت برای مدیر (اختیاری)", "Note for the manager (optional)", "مدیر ته یادښت (اختیاري)")
+  fun badMethodCount(m: Any): String = t("شمرده‌شدهٔ «$m» درست نیست", "The count for “$m” isn't valid", "د «$m» شمېرل سم نه دي")
   val varianceReasonLabel: String get() = t("دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)", "Reason for the difference (required above 50 AFN)", "د توپیر لامل (له 50 افغانیو پورته اړین دی)")
   val varianceReasonRequired: String get() = t("اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید", "The count is off by more than 50 AFN; write a reason", "د شمېرلو توپیر له 50 افغانیو زیات دی؛ لامل ولیکئ")
   val registerClosedNow: String get() = t("صندوق بسته شد", "Register closed", "صندوق بند شو")
@@ -88,6 +111,7 @@ object StrShift {
   val registerHistory: String get() = t("سابقهٔ صندوق", "Register history", "د صندوق تاریخچه")
   val noShiftsYet: String get() = t("هنوز صندوقی باز نشده.", "No register has been opened yet.", "لا تر اوسه هېڅ صندوق نه دی پرانیستل شوی.")
   val stillOpen: String get() = t("هنوز باز است", "Still open", "لا خلاص دی")
+  val needsReview: String get() = t("اختلاف — نیازمند بررسیِ مدیر", "Difference — needs manager review", "توپیر — د مدیر کتنې ته اړتیا لري")
   val opened: String get() = t("باز شد", "Opened", "پرانیستل شو")
   val closed: String get() = t("بسته شد", "Closed", "بند شو")
   val reportTime: String get() = t("زمانِ گزارش", "Report time", "د راپور وخت")
@@ -97,6 +121,11 @@ object StrShift {
   fun methodReceipts(m: Any): String = t("$m — رسیدِ قرض‌داران", "$m — debtor payments", "$m — د پوروړو ورکړې")
   fun methodRefunds(m: Any): String = t("$m — مرجوعی", "$m — returns", "$m — بېرته ورکړې")
   fun times(n: Any): String = t("$n بار", "$n ${pl(n, "time", "times")}", "$n ځله")
+  fun countedOf(m: Any): String = t("شمرده — $m", "Counted — $m", "شمېرل شوي — $m")
+  //  نمای کور (`ShiftSlip.forViewer`): فقط شمار، بی روش
+  val sales: String get() = t("فروش", "Sales", "پلور")
+  val receipts: String get() = t("رسیدِ قرض‌داران", "Debtor payments", "د پوروړو ورکړې")
+  val refunds: String get() = t("مرجوعی", "Returns", "بېرته ورکړې")
   fun expectedOf(m: Any): String = t("مورد انتظار — $m", "Expected — $m", "د تمې وړ — $m")
   fun varianceOf(m: Any): String = t("اختلاف — $m", "Difference — $m", "توپیر — $m")
   val notCounted: String get() = t("شمرده نشد", "Not counted", "ونه شمېرل شو")
