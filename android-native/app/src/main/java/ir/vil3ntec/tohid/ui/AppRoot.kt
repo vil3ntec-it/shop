@@ -112,6 +112,9 @@ fun AppRoot(
   val loaded by store.loaded.collectAsState()
   val cartStore = remember { CartStore(context) }
   val nav = rememberV3Nav(V3Modules.table, "home")
+  //  OPS-06: صفحهٔ باز برای راهنمای F1 (پنجرهٔ کامپیوتر بیرونِ همین درخت است)؛ شناسهٔ راهنما همان
+  //  مسیرِ رابطِ امروز است (`ScreenGuides`)، پس «خانه» ِ نسخهٔ ۳ همان `dashboard`
+  LaunchedEffect(nav.current) { AppNav.screen.value = RoutePaths.base(nav.current).let { if (it == "home") "dashboard" else it } }
   var migration by remember { mutableStateOf<String?>(null) }
 
   //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱)

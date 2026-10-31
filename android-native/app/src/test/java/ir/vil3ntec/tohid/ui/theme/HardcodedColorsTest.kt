@@ -78,6 +78,9 @@ class HardcodedColorsTest {
     "desk:scan/BarcodeScannerDesk.kt" to 6,
     //  چاپ — کاغذ همیشه سفید است
     "desk:print/ReportPrintDesk.kt" to 1,
+    //  QR ِ پیوندِ ویترین (MKT-10): مربع‌های سیاه روی زمینهٔ سفید در هر دو تم —
+    //  QR ِ وارونه روی زمینهٔ تیره را بیشترِ دوربین‌ها نمی‌خوانند
+    "ui/screens/StorefrontCampaigns.kt" to 1,
   )
 
   private fun count(f: File): Int =
