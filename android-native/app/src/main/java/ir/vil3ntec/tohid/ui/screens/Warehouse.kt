@@ -81,6 +81,8 @@ fun WarehouseScreen(
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
   val context = androidx.compose.ui.platform.LocalContext.current
+  //  انبارگردانیِ تازه با اسکن، چند دستگاه و شمارشِ کور (INV-06/07/08) — پشتِ `CountToolsPref`، پیش‌فرض خاموش
+  val countTools = remember { ir.vil3ntec.tohid.data.CountToolsPref.on(context) }
   var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
   val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
@@ -394,18 +396,16 @@ fun WarehouseScreen(
   }
 
   if (stockCount) {
-    StockCountSheet(
-      d = d,
-      onDismiss = { stockCount = false },
-      onExport = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") },
-      onSave = { counted, note ->
-        val n = WarehouseEngine.countLines(d, counted).size
-        apply(
-          WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
-          "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
-        ) { stockCount = false }
-      },
-    )
+    val onCountSave: (Map<String, Double>, String) -> Unit = { counted, note ->
+      val n = WarehouseEngine.countLines(d, counted).size
+      apply(
+        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
+        "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
+      ) { stockCount = false }
+    }
+    val onCountExport: (ir.vil3ntec.tohid.data.ReportCsv.Sheet) -> Unit = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
+    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
   }
 
   if (bulkEntry) {
