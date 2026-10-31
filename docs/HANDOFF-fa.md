@@ -62,6 +62,17 @@
 - نیمه‌کاره/رهاشده: E2E-PCK-06 (جمع‌آوری و جایگزینی؛ فاز ۴، طرحِ «ترجیحِ خالی» و حذفِ قلم با ناوردایی‌های verify-data لازم)، SRCH-01 (صندوق؛ `ShopPolicy.kt`/`Settings.kt` نقطهٔ برخوردِ هشت PR ِ باز؛ ویترین در #454)، E2E-MKT-02 (موجودی، هم‌پوشان با #429)، E2E-OPS-14 (#335)، E2E-ADM-15 (#411)، ABUSE-01 (رابط)، DATA-08 (پشتِ payV2).
 - قدمِ بعدی: ثبتِ بازپرداختِ سفارش در دفترِ دکان به شکلِ مرجوعیِ `channel = online` (سرور: فهرستِ بازپرداخت‌ها در `handover`؛ برنامه: `OrderFulfillment`) پشتِ پرچمِ خاموش، با تصمیمِ صاحب محصول دربارهٔ اثرِ موجودیِ `refunded_full`.
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/core-common-ios` (core کامل برای آیفون؛ بازسازی پس از گم شدنِ شاخهٔ push‌نشده)
+- انجام شد: ۱۳ از ۱۵ فایلِ `core/jvmMain` به commonMain رفت (Money، Rounding، Ulid، ReceiptTokens، تقویم‌ها، متن، Payment، Shift،
+  BackupRetention)؛ مرزِ سکو فقط `core/platform/Platform.kt` (JVM همان JDK؛ iOS: SecRandomCopyBytes/CC_SHA256/NSDate/NSLock؛
+  linuxX64 فقط برای نگهبانِ #415)؛ `mathRound` = برگردانِ بیت‌به‌بیتِ `Math.round`. `PinCrypto` و `ApproverVault` ماندند.
+  آزمون: `core` allTests روی JVM سبز (۱۳)، کامپایلِ klib ِ iOS (main و test) روی لینوکس سبز، سنجهٔ platform-deps ِ #415 سبز.
+- اجرانشده این‌جا: آزمونِ desktop/android (dl.google.com بسته، Maven Central 429)، `iosSimulatorArm64Test` (فقط macOS)، کامپایلِ linuxX64
+  (download.jetbrains.com بسته) ⇒ به CI سپرده شد.
+- همچنین: `tools/shop-migrate` (کپیِ فایل از مسیرِ jvmMain) به commonMain و یک جانشینِ JVM ِ `core/platform` رفت (آزمون: ۲۶ سبز)؛
+  main (#414، #415) ادغام شد و جدولِ §۲.۳ ِ `docs/IOS-PLAN-fa.md` به‌روز شد. PR #426.
+- قدمِ بعدی: سبز شدنِ CI ِ #426 و بازبینیِ مدیر؛ سپس برشِ جدا برای `PinCrypto`/`ApproverVault` روی iOS (پلِ Swift/CryptoKit با بردار).
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/ios-step0-guard` (گامِ ۰ِ آیفون)
 - انجام شد: قاعدهٔ کدِ تازه برای آیفون در `RULES-fa.md` (بخشِ «v3 · هسته‌های مشترک»)؛ سنجهٔ `tools/quality/checks/platform-deps.mjs`
   (فایلِ تازه صفر، موجود فقط کاهشی، سقفِ ۲۱۴ فایل در `baseline.json`، فعلاً گزارش)؛ هدفِ `linuxX64` پشتِ `-Pnative=true` در `core`
