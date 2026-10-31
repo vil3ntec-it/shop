@@ -21,7 +21,7 @@ const router = express.Router();
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-trust-read' });
 const fileIpLimit = rateLimit({ max: config.trust.fileIpMax, keyPrefix: 'store-trust-file-ip' });
 const filePhoneLimit = rateLimit({
-  max: config.trust.fileMax, keyPrefix: 'store-trust-file', key: (req) => (req.trustViewer ? req.trustViewer.phone : ''),
+  max: config.trust.fileMax, keyPrefix: 'store-trust-file', key: (req) => (req.trustViewer ? require('../lib/validate').phoneKey(req.trustViewer.phone) : ''),
 });
 const uploadLimit = rateLimit({ max: config.trust.uploadMax, keyPrefix: 'store-trust-upload' });
 
