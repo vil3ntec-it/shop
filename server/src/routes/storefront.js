@@ -276,9 +276,9 @@ router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res
 });
 
 //  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
-router.post('/:slug/orders/:token/delivery', checkoutLimit, store, wrap(async (req, res) => {
+router.post('/:slug/orders/:token/delivery', checkoutLimit, store, async (req, res) => {
   res.json(await require('../lib/delivery-prefs').editByToken(req.store, req.params.token, req.body));
-}));
+});
 
 /** خطایی که دادهٔ همراه دارد (برگهٔ قیمتِ تازه، کالای ناموجود، …) — همه‌اش برود. */
 // eslint-disable-next-line no-unused-vars
