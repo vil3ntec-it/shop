@@ -28,6 +28,11 @@ object ReportBridge {
    *  فاکتور همان تاریخی است که موقعِ ثبت روی همین دستگاه دیده شد؛ فقط تفکیکِ
    *  «ساعت» از آن درمی‌آید (بی ساعت، همه «نامعلوم» می‌شدند).
    */
-  fun deviceClock(now: Long = System.currentTimeMillis()): ReportClock =
-    ReportClock.fixed(java.util.TimeZone.getDefault().getOffset(now) / 60_000, 0)
+  fun deviceClock(now: Long = nowMs()): ReportClock = ReportClock.fixed(offsetMinutes(now), 0)
+
+  /** همین لحظه (میلی‌ثانیهٔ UTC) — برای X ِ شیفتِ باز در «پایانِ روز» */
+  fun nowMs(): Long = System.currentTimeMillis()
+
+  /** اختلافِ این دستگاه با UTC در همان لحظه (دقیقه) — همان عددِ [deviceClock] */
+  fun offsetMinutes(now: Long = nowMs()): Int = java.util.TimeZone.getDefault().getOffset(now) / 60_000
 }
