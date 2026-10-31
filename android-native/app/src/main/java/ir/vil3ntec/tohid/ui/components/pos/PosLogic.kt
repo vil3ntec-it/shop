@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyName
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.CartQuery
@@ -197,6 +198,8 @@ object PosLayout {
 enum class PosAction {
   FINISH, CUSTOMER, EDIT_ROW, FREE_ITEM, REPRINT,
   SUBMIT, HINT_DOWN, HINT_UP, ROW_DOWN, ROW_UP, CLEAR_QUERY, DELETE_ROW, QTY_UP, QTY_DOWN,
+  /** POS-15 — Ctrl+I (`KeyMap.SALE_PRICE_CHECK`)؛ صفحه فقط با `PosPriceCheckPrefs` روشن آن را می‌خورد */
+  PRICE_CHECK,
 }
 
 /**
@@ -213,8 +216,17 @@ object PosKeys {
     key == KeyName.F3 -> PosAction.EDIT_ROW
     key == KeyName.F4 -> PosAction.FREE_ITEM
     key == KeyName.F8 -> PosAction.REPRINT
+    primary && key == KeyName.I -> PosAction.PRICE_CHECK
     else -> null
   }
+
+  /**
+   *  RET-01/05 (S13/S15) — «حالتِ برگشت» (`sale.returnMode`، Shift+F9 از `keymap.json`)، پیش از [screen]:
+   *  فقط با برگشت و تعویضِ تازهٔ روشن (`ReturnSettings`). خاموش ⇒ `false` و همان کارِ امروزِ کلید
+   *  (Shift+F9 مثلِ F9 فاکتور را می‌بندد)، بیت‌به‌بیت.
+   */
+  fun returnMode(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
+    enabled && key != null && KeyMap.SALE_RETURN_MODE.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
 
   /** کادرِ اسکن/جست‌وجو */
   fun field(key: KeyName?, primary: Boolean, queryEmpty: Boolean, hasMatches: Boolean, hasSelection: Boolean): PosAction? = when (key) {
