@@ -36,13 +36,10 @@ import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.OrderDraft
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
-import ir.vil3ntec.tohid.core.pick.PickText
 import ir.vil3ntec.tohid.data.OrderFulfillment
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.invoiceLabel
-import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
-import ir.vil3ntec.tohid.data.repo.PickingRepository
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
@@ -88,9 +85,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var openId by remember { mutableStateOf<String?>(null) }
-  var creating by remember { mutableStateOf(false) }
-  //  برگهٔ جمع‌آوری (PCK، پرچمِ `shop.orders.picking`)
-  var pickFor by remember { mutableStateOf<OrderDto?>(null) }
+  var creating by remember { mutableStateOf(false) }; var pickFor by remember { mutableStateOf<OrderDto?>(null) }   // + برگهٔ جمع‌آوری (PCK)
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   val rev = OrdersLive.rev.value
@@ -228,20 +223,11 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       }
     }
   }
-
+  pickFor?.let { o -> OrderPickHost(o, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }, onClose = { pickFor = null; openId = o.id }) { reload++; scope.launch { OrdersLive.pollSummary(context) } } }
   openId?.let { id ->
     OrderDetailSheet(
       id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
-      onClose = { openId = null },
-      onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
-      onPick = { o -> openId = null; pickFor = o },
-    )
-  }
-  pickFor?.let { o ->
-    PickSheet(
-      orderId = o.id, orderNo = o.orderNo, repo = remember(context) { PickingRepository(Backend.api(context)) },
-      buzz = { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) },
-      onClose = { pickFor = null; openId = o.id },
+      onClose = { openId = null }, onPick = { o -> openId = null; pickFor = o },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
   }
@@ -380,8 +366,7 @@ private fun OrderDetailSheet(
   store: ShopStore,
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
-  onChanged: () -> Unit,
-  onPick: (OrderDto) -> Unit = {},
+  onChanged: () -> Unit, onPick: (OrderDto) -> Unit = {},
 ) {
   val c = Shop.colors
   val context = LocalContext.current
@@ -542,16 +527,11 @@ private fun OrderDetailSheet(
         )
       }
 
-      //  جمع‌آوری (PCK): با پرچم، «جمع‌آوری» و «بسته‌بندی» فقط از برگه (کسرِ خودکار، برچسب)
-      val actions = PickText.orderActions(
-        OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund), cfg.picking,
-      )
-      val pickable = cfg.picking && PickText.canPick(o.status, cfg.permissions.manage)
+      val (actions, pickable) = orderPickActions(o, cfg)   // جمع‌آوری (PCK): «جمع‌آوری» و «بسته‌بندی» فقط از برگه
       if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          if (pickable) TohidButton(PickText.pickAction(o.status), onClick = { onPick(o) }, enabled = !busy)
-          actions.forEach { to ->
+          if (pickable) OrderPickButton(o, busy) { onPick(o) }; actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)

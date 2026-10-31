@@ -29,18 +29,17 @@ const { forbidden } = require('../middleware/errors');
 const router = express.Router();
 
 const actorOf = (req) => ({ type: 'user', id: req.user.id, role: req.role });
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /** درِ سفارش باید روشن باشد (همان پیامِ `routes/orders.js`). */
-const needOrders = wrap(async (req, res, next) => {
+const needOrders = async (req, res, next) => {
   if (!(await orders.flagOf(req.shopId))) {
     return next(forbidden('سفارشِ آنلاین برای این دکان روشن نیست', 'orders_disabled'));
   }
   next();
-});
+};
 
 /** نوشتن: کلیدِ اشتراکِ `online_orders` (همان پیام‌های `requireFeature`). */
-const needWrite = wrap(async (req, res, next) => {
+const needWrite = async (req, res, next) => {
   const { entitled, ent } = await orders.entitledOf(req.shopId);
   if (!entitled) {
     return next(ent.trial.used && !ent.trial.active
@@ -48,15 +47,15 @@ const needWrite = wrap(async (req, res, next) => {
       : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
   }
   next();
-});
+};
 
 /** پرچمِ جمع‌آوری — پیش‌فرض خاموش. */
-const needPick = wrap(async (req, res, next) => {
+const needPick = async (req, res, next) => {
   if (!(await picking.flagOf(req.shopId))) {
     return next(forbidden('جمع‌آوری و بسته‌بندی برای این دکان روشن نیست', 'picking_disabled'));
   }
   next();
-});
+};
 
 const manage = requirePermission('orders.manage');
 
@@ -66,46 +65,46 @@ const log = (req, action, targetId, detail) => audit.log({
 
 // ── مسیرهای بی شناسهٔ سفارش (پیش از `/:id/…`) ─────────────────────────
 
-router.get('/pick/issues', needOrders, needPick, wrap(async (req, res) => {
+router.get('/pick/issues', needOrders, needPick, async (req, res) => {
   res.json(await picking.issues(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit }));
-}));
+});
 
-router.post('/pick/issues/:issueId/resolve', needOrders, requirePermission('stock.adjust'), needWrite, needPick, wrap(async (req, res) => {
+router.post('/pick/issues/:issueId/resolve', needOrders, requirePermission('stock.adjust'), needWrite, needPick, async (req, res) => {
   const out = await picking.resolveIssue(req.shopId, req.params.issueId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'pick.issue_resolve', targetType: 'pick_issue', targetId: out.issue.id,
     detail: { productId: out.issue.productId, status: out.issue.status }, ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
-router.put('/pick/locations/:productId', needOrders, manage, needWrite, needPick, wrap(async (req, res) => {
+router.put('/pick/locations/:productId', needOrders, manage, needWrite, needPick, async (req, res) => {
   res.json(await picking.setLocation(req.shopId, req.params.productId, req.body, req.user.id));
-}));
+});
 
-router.get('/pick/metrics', needOrders, requirePermission('reports.view'), needPick, wrap(async (req, res) => {
+router.get('/pick/metrics', needOrders, requirePermission('reports.view'), needPick, async (req, res) => {
   res.json(await picking.metrics(req.shopId, { from: req.query.from, to: req.query.to }));
-}));
+});
 
 // ── برگهٔ یک سفارش ─────────────────────────────────────────────────
 
 //  هنوز شروع نشده ⇒ `{ pick: null }`؛ سفارشِ دکانِ دیگر ⇒ ۴۰۴
-router.get('/:id/pick', needOrders, needPick, wrap(async (req, res) => {
+router.get('/:id/pick', needOrders, needPick, async (req, res) => {
   res.json({ pick: await picking.sheet(req.shopId, req.params.id) });
-}));
+});
 
-router.post('/:id/pick/start', needOrders, manage, needWrite, needPick, wrap(async (req, res) => {
+router.post('/:id/pick/start', needOrders, manage, needWrite, needPick, async (req, res) => {
   const out = await picking.start(req.shopId, req.params.id, actorOf(req));
   if (!out.replayed) await log(req, 'pick.start', out.sheet.orderId, { orderNo: out.sheet.orderNo, lines: out.sheet.progress.total });
   res.status(out.replayed ? 200 : 201).json({ pick: out.sheet, replayed: out.replayed });
-}));
+});
 
-router.post('/:id/pick/events', needOrders, manage, needWrite, needPick, wrap(async (req, res) => {
+router.post('/:id/pick/events', needOrders, manage, needWrite, needPick, async (req, res) => {
   const out = await picking.events(req.shopId, req.params.id, req.body, actorOf(req));
   res.json({ results: out.results, pick: out.sheet });
-}));
+});
 
-router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, wrap(async (req, res) => {
+router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, async (req, res) => {
   const key = orders.clientKeyOf(req);
   const out = await picking.pack(req.shopId, req.params.id, { key, body: req.body }, actorOf(req));
   if (out.replayed) {
@@ -117,6 +116,6 @@ router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, wrap(asyn
     originalTotalMinor: out.sheet.totals.originalTotalMinor, deductedMinor: out.deductedMinor,
   });
   res.json({ pick: out.sheet, replayed: false });
-}));
+});
 
 module.exports = router;

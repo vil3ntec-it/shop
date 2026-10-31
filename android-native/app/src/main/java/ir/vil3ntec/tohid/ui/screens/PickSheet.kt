@@ -28,8 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.PickLineDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
+import ir.vil3ntec.tohid.core.net.ApiClient
+import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.core.pick.PickText
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
@@ -317,4 +321,27 @@ private fun PickLineCard(
       TohidButton("ثبتِ جا", onClick = { onLocation(aisle, shelf, level); editLoc = false }, enabled = !busy)
     }
   }
+}
+
+// ── اتصال به صفحهٔ «سفارش‌ها» (این‌جا، تا `Orders.kt` که بالای سقفِ ۸۰۰ خط است بزرگ‌تر نشود) ──────
+
+/** میزبانِ برگهٔ جمع‌آوری روی صفحهٔ سفارش‌ها؛ `api` و لرزش از خودِ صفحه می‌آیند (این فایل بی Context می‌ماند). */
+@Composable
+internal fun OrderPickHost(o: OrderDto, api: ApiClient, buzz: (Boolean) -> Unit, onClose: () -> Unit, onChanged: () -> Unit) {
+  PickSheet(
+    orderId = o.id, orderNo = o.orderNo, repo = remember(api) { PickingRepository(api) },
+    buzz = buzz, onClose = onClose, onChanged = onChanged,
+  )
+}
+
+/** کارهای میزِ سفارش با پرچمِ جمع‌آوری: «جمع‌آوری» و «بسته‌بندی» فقط از برگه (کسرِ خودکار، برچسب)؛ دومی = دکمهٔ برگه. */
+internal fun orderPickActions(o: OrderDto, cfg: OrdersConfigDto): Pair<List<String>, Boolean> = Pair(
+  PickText.orderActions(OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund), cfg.picking),
+  cfg.picking && PickText.canPick(o.status, cfg.permissions.manage),
+)
+
+/** دکمهٔ «جمع‌آوری» / «ادامهٔ جمع‌آوری» در جزئیاتِ سفارش. */
+@Composable
+internal fun OrderPickButton(o: OrderDto, busy: Boolean, onPick: () -> Unit) {
+  TohidButton(PickText.pickAction(o.status), onClick = onPick, enabled = !busy)
 }
