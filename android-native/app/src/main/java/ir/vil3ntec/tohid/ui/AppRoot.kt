@@ -792,6 +792,7 @@ fun AppRoot(
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
                 StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
                 StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
