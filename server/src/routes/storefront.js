@@ -30,6 +30,7 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
+const RECENT_FLAG = 'shop.storefront.recent';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -70,6 +71,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
+    //  WEB-13: «دیده‌شده‌های اخیر» (`recent.js`، فقط روی دستگاه) با پرچمِ `shop.storefront.recent`؛ خاموش ⇒ این کلید نیست
+    ...((await orders.flagOf(req.store.shop_id, RECENT_FLAG)) ? { recent: true } : {}),
   });
 });
 
@@ -92,9 +95,10 @@ router.get('/:slug/slots', readLimit, store, async (req, res) => {
 //  ⛔ پرچمِ خاموشِ `shop.storefront.notify_area` (یا ناحیهٔ خاموش، یا ویترینِ بسته) ⇒
 //  `next('route')` پیش از هر سقف و شماره: همان پاسخِ مسیرِ ناشناختهٔ main، بیت‌به‌بیت.
 const areaStore = async (req, res, next) => {
-  let s = null;
-  try { s = await sf.open(req.params.slug); } catch (err) { if (err.status !== 404) throw err; }
-  if (!s || !(await areas.flagOn(s.shop_id))) return next('route');
+  //  ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10)،
+  //  پیش از سنجشِ شماره؛ پرچمِ خاموش ⇒ این در نیست.
+  const s = await sf.open(req.params.slug);
+  if (!(await areas.flagOn(s.shop_id))) return next('route');
   req.store = s;
   res.set('Cache-Control', 'no-store');
   next();
