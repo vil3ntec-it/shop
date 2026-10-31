@@ -17,6 +17,7 @@ import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtReminder
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportEngine
+import ir.vil3ntec.tohid.data.ReportKeysPref
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
@@ -73,8 +74,12 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   var span by remember { mutableStateOf(Span.MONTH) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
   var toText by remember { mutableStateOf(formatDate(today)) }
+  //  RPT-13: − / + دوره و Ctrl+Shift+C مقایسه — فقط با `ReportKeysPref` روشن (پیش‌فرض خاموش)
+  val keys = remember { ReportKeysPref.on(context) }
+  var shift by remember(span) { mutableStateOf(0) }
+  var compare by remember { mutableStateOf(false) }
 
-  val (from, to) = when (span) {
+  val (baseFrom, baseTo) = when (span) {
     Span.TODAY -> ReportEngine.rangeOf(ReportEngine.Range.TODAY, today)
     Span.WEEK -> ReportEngine.rangeOf(ReportEngine.Range.WEEK, today)
     Span.MONTH -> ReportEngine.rangeOf(ReportEngine.Range.MONTH, today)
@@ -83,6 +88,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
     Span.ALL -> ReportEngine.rangeOf(ReportEngine.Range.ALL, today)
     Span.CUSTOM -> (Jalali.parseTyped(fromText) ?: "0000-01-01") to (Jalali.parseTyped(toText) ?: "9999-12-31")
   }
+  val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
   val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today) }
 
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name)
@@ -96,6 +102,16 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
         when {
           e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
           e.matches(KeyMap.GLOBAL_EXPORT) -> { excel(); true }
+          //  «از … تا …» کادرِ نوشتنِ تاریخ دارد: − و + آن‌جا نوشته می‌شوند، نه دوره
+          keys && rep.ranged && span != Span.CUSTOM && e.matches(KeyMap.REPORTS_PREV_PERIOD) -> {
+            if (ReportKeys.can(span.name, baseFrom, baseTo, shift - 1, today)) shift -= 1
+            true
+          }
+          keys && rep.ranged && span != Span.CUSTOM && e.matches(KeyMap.REPORTS_NEXT_PERIOD) -> {
+            if (ReportKeys.can(span.name, baseFrom, baseTo, shift + 1, today)) shift += 1
+            true
+          }
+          keys && rep.ranged && e.matches(KeyMap.REPORTS_COMPARE) -> { compare = !compare; true }
           else -> false
         }
       }
@@ -198,6 +214,10 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi("جمعِ مانده", "${money(due.sumOf { it.balance })} ؋", Shop.colors.text, Modifier.weight(1f))
         }
       }
+    }
+    if (keys && compare && rep.ranged) {
+      Spacer(Modifier.height(6.dp))
+      ReportCompareLine(d, rep.key, span.name, from, to, today)
     }
     Spacer(Modifier.height(10.dp))
     SheetTable(sheet, Modifier.weight(1f))
