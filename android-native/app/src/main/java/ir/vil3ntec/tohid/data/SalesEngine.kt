@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
@@ -594,6 +595,18 @@ object SalesEngine {
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
   /**
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) × سهمِ پرداخت‌شده
+   *  پس از تخفیفِ فاکتور، با گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکه بیش از برگشتِ یک‌جای همان مقدار پس
+   *  نمی‌دهد (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶). پیش‌نمایشِ پنجرهٔ مرجوعی هم همین را نشان می‌دهد.
+   */
+  fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double {
+    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
+    val paidRatio =
+      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio)
+  }
+
+  /**
    * مرجوعیِ جزئی — چند قلم از یک فاکتور، هرکدام به هر مقدار.
    *
    * مبلغِ هر قلم از قیمتِ واقعیِ همان قلم در همان فاکتور حساب می‌شود، نه
@@ -612,9 +625,6 @@ object SalesEngine {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
     if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
-    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
-    val paidRatio =
-      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
 
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
@@ -631,10 +641,7 @@ object SalesEngine {
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
-      // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز
-      val amount = if (item.quantity > 0) {
-        (item.totalPrice / item.quantity * quantity * paidRatio).roundToLong().toDouble()
-      } else 0.0
+      val amount = returnAmount(sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)
 

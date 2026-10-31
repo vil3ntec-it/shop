@@ -56,6 +56,27 @@ class MoneyInputTest {
     assertNull(MoneyInput.settleInput(Double.MAX_VALUE))
   }
 
+  /**
+   *  SEC-DATA-02 — همان پولِ `Money.fromLegacy` روی هر سکو. `roundToLong` روی Kotlin/Native (آیفون) همان
+   *  floor(x + 0.5) ِ اعشاری است: بالای ۲^۵۲ پول هر پولِ فرد یکی بالا می‌رفت (…704.97 ⇒ …704.98) و
+   *  0.49999999999999994 پول «یک پول» می‌شد. روی JVM همیشه سبز بود؛ سرخی‌اش فقط روی Native دیده می‌شود.
+   */
+  @Test
+  fun samePulAsTheLedgerOnEveryPlatformAboveTwoToTheFiftyTwo() {
+    assertEquals("45035996273704.97", MoneyInput.settleInput(45035996273704.97))
+    assertEquals("45035996273704.99", MoneyInput.settleInput(45035996273704.99))
+    assertEquals("45035996273705.01", MoneyInput.settleInput(45035996273705.01))
+    assertNull(MoneyInput.settleInput(0.004999999999999999))   //  ×۱۰۰ = 0.49999999999999994 ⇒ صفر پول
+    fun text(m: Long): String {
+      val frac = (m % 100).toString().padStart(2, '0').trimEnd('0')
+      return (m / 100).toString() + if (frac.isEmpty()) "" else ".$frac"
+    }
+    for (b in listOf(45035996273704.97, 45035996273705.03, 0.004999999999999999, 899.6, 12_345_678.91)) {
+      val ledger = Money.fromLegacy(b, Currency.AFN).minor
+      assertEquals(if (ledger > 0) text(ledger) else null, MoneyInput.settleInput(b), "مانده $b")
+    }
+  }
+
   @Test
   fun zeroNegativeAndNonFiniteHaveNoShortcut() {
     assertNull(MoneyInput.settleInput(0.0))

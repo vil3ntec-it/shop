@@ -91,6 +91,7 @@
 - اختلافِ صندوق را خودکار اصلاح نکن؛ اختلافِ اکیداً بیش از ۵۰ افغانی (۵۰۰۰ پول، D-18) دلیل می‌خواهد (#237).
 - مصارف و پرداخت به تأمین‌کننده خودکار از کشو کم نمی‌شوند؛ فقط `cash_out`ِ صریح (`owner_withdrawal`، `petty_expense`، `other` با یادداشت) (#237).
 - ورودِ نقد فقط `deposit` یا `other`؛ خروجِ بیش از نقدِ موردِ انتظار رد می‌شود؛ کشو، بازپرداخت و تبادل تأییدکننده می‌خواهند (#237).
+- ⛔ مبلغِ برگشتِ قلم فقط از `ReturnShare.amount` ِ core (هم‌زاد: `returnShare` ِ `license/money.js`، بردار `license/test-vectors/return-share-v1.json`) با «گردِ تجمعی»: پس‌دادنیِ تا پایانِ این برگشت منهای تا پیش از آن. `round(جمع ÷ مقدار × q × سهم)` ِ جدا برای هر برگشت برنمی‌گردد — دو عدد به ۲٫۵ را ۳ + ۳ = ۶ پس می‌داد (SEC-DATA-01).
 - جست‌وجوی صندوقِ کامپیوتر نتیجه را در همان شبکه/جدول برجسته می‌کند، نه فهرستِ کشویی؛ ترتیب همان است تا Enter همان کالا را بردارد (#251).
 - با عبارتِ جست‌وجو، همهٔ دسته‌ها گشته می‌شوند و دستهٔ انتخابی تنگش نمی‌کند (#251).
 - «سبدِ تازه» تأیید می‌خواهد و فوکوسِ پیش‌فرض روی «انصراف» است (۵.۱ بند ۱۱، #251).
@@ -308,6 +309,7 @@
 - هر منطقِ مشترکِ Kotlin و JS یک فایلِ بردارِ مرجع دارد (`core/test-vectors/*` یا `license/test-vectors/*`)؛ یکی را بی دیگری و بردار عوض نکن (#224، #231، #236، #237، #261).
 - Kotlinِ خالص در `core/` است (includeBuild در هر دو برنامه)؛ `jvmMain` فقط برای چیزی که به JDK تکیه دارد (#223).
 - **کدِ تازه برای آیفون** (`docs/IOS-PLAN-fa.md` §۴ گامِ ۰): منطقِ تازه (موتور، قاعده، محاسبه، تبدیلِ داده) در `core/src/commonMain`، نه در `android-native/app`. در منطق ممنوع: `android.*`، androidxِ غیرِ Compose، `Context`/`LocalContext`، `SharedPreferences`، `java.*`، `javax.*`، `org.json`، `System.currentTimeMillis`، `String.format`/`"…".format`، `synchronized`؛ به‌جایش `Clock` ِ تزریق‌شده، `KeyValueStore`، okio، kotlinx.serialization، `Mutex`. نیازِ پلتفرمی پشتِ رابط (`interface`/`expect`) در commonMain؛ پیاده‌سازی فقط در پوشهٔ مرزیِ `…/platform/` یا فایلِ `*Android.kt`/`*Desktop.kt`. صفحهٔ تازه `LocalContext` نمی‌گیرد. وابستگیِ تازهٔ Gradle فقط با نسخهٔ iOS یا پشتِ رابط. سنجه: `tools/quality/checks/platform-deps.mjs` (فایلِ تازه صفر، فایلِ موجود فقط کاهشی، سقف در `baseline.json`، فعلاً گزارش) و کارِ `core-native` (`-Pnative=true`، linuxX64).
+- ⛔ در commonMain پول را با `mathRound` گرد کن، نه `roundToLong`/`roundToInt`: روی Kotlin/Native ِ آیفون آن‌ها `floor(x + 0.5)` ِ اعشاری‌اند و بالای ۲^۵۲ پول (و در 0.49999999999999994) با JVM یک پول فرق می‌کنند (SEC-DATA-02، همان ریشهٔ #508).
 - هستهٔ JSی که سرور لازم دارد، کپیِ بایت‌به‌بایت در `server/src/lib` با آزمونِ برابری است (#243).
 - `keymap.json` تنها منبعِ میان‌برهاست؛ `gen-keymap.mjs --check` فایلِ کهنه را رد می‌کند؛ پیرایه‌ها دقیق سنجیده می‌شوند (#225).
 - `Mod` یعنی Ctrl در ویندوز/لینوکس/اندروید و Cmd در مک؛ Cmd+Tab، Cmd+Space، Cmd+Q و Cmd+H رزروند (#225).
