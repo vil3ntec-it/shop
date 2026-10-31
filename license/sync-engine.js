@@ -312,6 +312,7 @@
      */
     var q = queue();
     var before = q.all();
+    notePushSince(!before.length);
     if (q.push(out.ops) < 0) {
       patchState({ lastError: 'حافظهٔ مرورگر پر است؛ تغییرها روی همین دستگاه مانده‌اند و هنوز به سرور نرفته‌اند' });
       announce();
@@ -328,6 +329,23 @@
     announce();
     schedulePush(reason);
     return out.ops.length;
+  }
+
+  /**
+   *  `since` ِ push (پرچمِ سرورِ `sync.cursor_from_since`، #481): «یادداشت» پیش از رفتنِ op به صف —
+   *  صفِ خالی ⇒ cursor ِ همین حالا، وگرنه فقط پایین می‌آید (شرح سرِ `pushSince` در sync-core.js).
+   *  ⚠️ پوسته stale-while-revalidate است و sync-core.js ِ کهنه شاید هنوز این تابع را نداشته باشد ⇒
+   *  بی یادداشت و بی `since` (سرور همان تأییدِ pull ِ پیشین را می‌گیرد: محتاط)، هرگز خطا در ثبت.
+   */
+  function notePushSince(queueWasEmpty) {
+    if (typeof core.pushSinceNote !== 'function') return;
+    var st = state();
+    patchState({ pushSince: core.pushSinceNote(st.pushSince, queueWasEmpty, st.cursor) });
+  }
+  function sinceForPush() {
+    if (typeof core.pushSince !== 'function') return undefined;
+    var st = state();
+    return core.pushSince(st.pushSince, st.cursor);
   }
 
   /**
@@ -367,7 +385,7 @@
     var data = ledger.read();
     if (!data) return 0;
     var out = core.diff({}, data);
-    if (out.ops.length) queue().push(out.ops);
+    if (out.ops.length) { notePushSince(queue().size() === 0); queue().push(out.ops); }
     forgetCounts();
     setShadow(data);
     announce();
@@ -424,6 +442,8 @@
       //  A00: وب ردیفِ JSON ِ خام را نگه می‌دارد و null اش پاک کردنِ واقعی است — سرور
       //  تورِ «ساختِ پیش از A00» را برایش کنار می‌گذارد (server/src/lib/newer-fields.js)
       client: 'web',
+      //  #481: «تا این‌جا را دیده بودم» — فقط با پرچمِ دکانِ `sync.cursor_from_since` خوانده می‌شود
+      since: sinceForPush(),
     };
     var r;
     try {
