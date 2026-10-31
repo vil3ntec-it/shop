@@ -74,8 +74,9 @@ fun CheckoutDialog(
   promo: ir.vil3ntec.tohid.data.PromoEngine.Outcome? = null,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
-  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر؛ [presetAmount] ⇒ مبلغ به افغانی، POS-20) */
   presetDiscount: String = "",
+  presetAmount: Boolean = false,
   /** شناسهٔ فاکتورِ همین سبد (`CartStore.saleKey`) — برگهٔ تأیید به آن بسته است */
   saleKey: String? = null,
 ) {
@@ -86,7 +87,7 @@ fun CheckoutDialog(
   // باز می‌شود؛ وگرنه «نقدی». تخفیف هم پیش‌فرض درصدی است.
   val preset = presetDebtorId?.takeIf { id -> d.debtors.any { it.id == id } }
 
-  var discountType by remember { mutableStateOf(SalesEngine.DiscountType.PERCENT) }
+  var discountType by remember { mutableStateOf(if (presetAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT) }
   var payment by remember { mutableStateOf(if (preset != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf(presetDiscount.ifBlank { "0" }) }
   var debtorId by remember { mutableStateOf(preset) }
@@ -912,6 +913,8 @@ fun CartLineDialog(
    *  بی تخفیفِ ردیف و بی سنجش
    */
   linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
+  /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
+  why: List<ir.vil3ntec.tohid.core.pos.PriceWhy.Row>? = null,
 ) {
   val policy = linePolicy
   var qtyText by remember { mutableStateOf(qty(quantity)) }
@@ -941,6 +944,10 @@ fun CartLineDialog(
       Column(Modifier.padding(18.dp)) {
         Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
+        if (why != null) {
+          ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel(why) { money(it) }
+          Spacer(Modifier.height(12.dp))
+        }
 
         if (hasSaleUnit) {
           SegmentedChoice(
