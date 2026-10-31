@@ -1,6 +1,6 @@
 'use strict';
 /**
- * فهرستِ سیاه و سفیدِ سفارشِ ویترینِ هر دکان — RSK-04 (§۶.۲۱)؛ جدول در ‎migrations/146_shop_risk_lists.sql‎.
+ * فهرستِ سیاه و سفیدِ سفارشِ ویترینِ هر دکان — RSK-04 (§۶.۲۱)؛ جدول در ‎migrations/166_shop_risk_lists.sql‎.
  *
  *   دکان (صاحب و مدیر، `orders.contact`) ─▶ GET/POST /api/shop/orders/risk/lists، DELETE …/:entryId
  *   ثبتِ ویترین ─▶ order-risk.checkIn ─▶ matchIn: بسته ⇒ ۴۰۳ ِ خنثی؛ مطمئن ⇒ بی سقفِ مشتریِ تازه
