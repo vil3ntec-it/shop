@@ -20,8 +20,8 @@
  *     در PGlite همه‌چیز یک اتصال است و خودبه‌خود پشتِ هم.
  * ⛔ تکرارِ همان کلیدِ یکتایی (CHK-19) پیش از `price` پاسخ داده می‌شود و هرگز ۴۲۹
  * نمی‌گیرد.
- * کلیدِ سقف صفرِ پس از ‎+93‎ را برمی‌دارد (‎+930700…‎ همان ‎+93700…‎ است) —
- * فقط برای شمردن؛ دادهٔ ذخیره‌شده دست نمی‌خورد.
+ * کلیدِ سقف همهٔ صفرهای پس از ‎+93‎ را برمی‌دارد (‎+930700…‎ و ‎+9300700…‎ همان ‎+93700…‎اند؛
+ * `phoneKey`/`phoneForms` ِ validate) — فقط برای شمردن؛ دادهٔ ذخیره‌شده دست نمی‌خورد.
  */
 const { now } = require('../db');
 const { ApiError } = require('../middleware/errors');
@@ -31,9 +31,8 @@ const PER_SHOP = Object.freeze({ scope: 'shop', windowMs: HOUR_MS, max: 10 });
 const ALL_SHOPS = Object.freeze({ scope: 'all', windowMs: 24 * HOUR_MS, max: 40 });
 const RULES = Object.freeze([PER_SHOP, ALL_SHOPS]);
 
-/** کلیدِ سقف و هر دو شکلِ ذخیره‌شده‌اش. */
-const canon = (phone) => String(phone || '').replace(/^\+930/, '+93');
-const formsOf = (key) => (key.startsWith('+93') ? [key, `+930${key.slice(3)}`] : [key]);
+/** کلیدِ سقف و همهٔ شکل‌های ذخیره‌شدنی‌اش (RSK-07). */
+const { phoneKey: canon, phoneForms: formsOf } = require('./validate');
 
 /**
  * زمانِ ساختِ max-امین سفارشِ تازه در پنجره — یا null اگر هنوز زیرِ سقف است.
@@ -76,12 +75,18 @@ async function check(run, shopId, phone, { at = now(), rules = RULES } = {}) {
   throw err;
 }
 
-/** `price` ِ `orders.create` با سقف پیش از قیمت‌گذاری — همان تراکنش، همان قفل. */
+/**
+ * `price` ِ `orders.create` با سقف پیش از قیمت‌گذاری — همان تراکنش، همان قفل. پس از قیمت‌گذاری،
+ * قاعده‌های ریسکِ ویترین (RSK-02 مشتریِ تازه، RSK-05 تکراری؛ پشتِ پرچمِ خاموشِ `shop.order_risk`،
+ * `lib/order-risk`) با همان قفلِ شماره، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
+ */
 function guard(price, { shopId, phone }) {
   return async (run, at) => {
     await check(run, shopId, phone, { at });
-    return price(run, at);
+    const input = await price(run, at);
+    await require('./order-risk').checkIn(run, shopId, phone, input, { at });
+    return input;
   };
 }
 
-module.exports = { check, guard, canon, RULES, PER_SHOP, ALL_SHOPS };
+module.exports = { check, guard, canon, formsOf, RULES, PER_SHOP, ALL_SHOPS };

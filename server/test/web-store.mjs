@@ -16,6 +16,7 @@ import { missingTool, PLAYWRIGHT_INSTALL, SKIP } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -210,6 +211,8 @@ if (axeSrc) {
   ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
 }
 
+//  WEB-15: رسید و پیگیری (store/order.js) جزوِ بارِ اول نیست — فقط با صفحهٔ سفارش می‌آید
+ok(!(await page.$('script[src="/store/order.js"]')), 'order.js پیش از صفحهٔ سفارش بار نشد');
 await page.click('#submit-order');
 await page.waitForSelector('#view-order:not([hidden])', { timeout: 10000 });
 await page.waitForFunction(() => /شمارهٔ/.test(document.getElementById('o-title').textContent), null, { timeout: 10000 });
@@ -316,6 +319,10 @@ const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'boot.js')).size;
 ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
+//  صفحهٔ سفارش همان بارِ اول + order.js است؛ سقفِ §۳.۱۰ برای آن هم (با فشرده‌سازیِ سند)
+const orderGz = zlib.gzipSync(Buffer.concat(['store/store.js', 'store/order.js', 'kit/kit.js', 'kit/boot.js']
+  .map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'public', f))))).length;
+ok(orderGz < 75 * 1024, 'جاوااسکریپتِ صفحهٔ سفارش (با order.js) زیرِ ۷۵KB ِ فشرده (۳.۱۰)', `${orderGz} بایتِ gzip`);
 
 await ctx.close();
 await browser.close();
