@@ -5,8 +5,8 @@
  *   hash = hex( SHA-256( ASCII(prevHash) ‖ UTF-8(canonicalJson(doc)) ) )
  *   prevHash ِ نخستین حلقه = GENESIS (۶۴ صفر)
  *
- * ⛔ این فایل، `license/hash-chain.js` (وب) و `core/audit/HashChain.kt`
- * (اندروید و کامپیوتر) **یک قرارداد**اند و هر سه با همان بردارهای
+ * ⛔ این فایل، `license/hash-chain.js` (وب) و `core/src/commonMain/.../core/audit/HashChain.kt`
+ * (اندروید، کامپیوتر و آیفون؛ Kotlin ِ خالص) **یک قرارداد**اند و هر سه با همان بردارهای
  * `license/test-vectors/hashchain-v1.json` سنجیده می‌شوند. یکی را عوض کنی
  * و بقیه را نه، زنجیرهٔ ساخته‌شده روی یک سکو روی دیگری «شکسته» دیده می‌شود.
  * قالب عوض شد؟ فایلِ بردارِ تازه (v2) بساز؛ v1 هرگز دست نمی‌خورد.

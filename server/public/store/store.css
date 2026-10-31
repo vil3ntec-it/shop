@@ -46,6 +46,10 @@
 .sum-lines .grow small { display: block; color: var(--muted); font-size: 12.5px; }
 .sum-lines .amt { flex: none; font-weight: 700; }
 .sum-lines li.bad .grow { text-decoration: line-through; opacity: .7; }
+/* E2E-MKT-02: بیش از موجودی — با «کم کن به …» */
+.sum-lines li.short { flex-wrap: wrap; }
+.sum-lines li.short .grow small { color: var(--warn); }
+.sum-lines li.short .fit { margin-inline-start: auto; }
 
 .ps-img { aspect-ratio: 4 / 3; border-radius: var(--r-card); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
 .ps-img.tile { padding: 8%; background: var(--tile); }
@@ -68,3 +72,8 @@
   .toolbar { grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); align-items: center; }
   .ps-img { aspect-ratio: 16 / 10; }
 }
+
+/* DLV-06: پیک برای مشتری — نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل */
+.dlv { display: flex; flex-direction: column; gap: var(--s2); }
+.dlv-code { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); padding: var(--s3) var(--s4); border: 1px dashed var(--line); border-radius: var(--surface-radius); }
+.dlv-code b { font-size: 28px; letter-spacing: .2em; }

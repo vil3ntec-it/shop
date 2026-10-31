@@ -14,6 +14,7 @@
 const express = require('express');
 const delivery = require('../lib/delivery');
 const D = require('../lib/delivery-states');
+const { cashReport } = require('../lib/delivery-cash-report');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -55,6 +56,8 @@ router.get('/config', async (req, res) => {
     modes: { shop_courier: true, external: true, pickup: true, platform: false },
     reasons: D.REASONS,
     defaultCashCapMinor: delivery.DEFAULT_CASH_CAP_MINOR,
+    //  PCK-11: QRِ کدِ تحویل و پذیرشِ اسکنِ آن در برنامه — پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    picking: await require('../lib/order-picking').flagOf(req.shopId),
     permissions: Object.fromEntries(
       ['view', 'assign', 'handover', 'couriers', 'settle', 'photo'].map((k) => [k, can(req.role, `delivery.${k}`)])
     ),
@@ -71,13 +74,17 @@ router.get('/couriers', async (req, res) => {
 
 router.post('/couriers', requirePermission('delivery.couriers'), needWrite, async (req, res) => {
   const courier = await delivery.createCourier(req.shopId, req.body, delivery.staffActor(req));
-  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, { userId: courier.userId, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, {
+    userId: courier.userId, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.status(201).json({ courier });
 });
 
 const updateCourier = async (req, res) => {
   const courier = await delivery.updateCourier(req.shopId, req.params.id, req.body);
-  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, { active: courier.active, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, {
+    active: courier.active, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.json({ courier });
 };
 router.patch('/couriers/:id', requirePermission('delivery.couriers'), needWrite, updateCourier);
@@ -146,6 +153,32 @@ router.post('/assignments/:id/recall', requirePermission('delivery.assign'), nee
   res.json(out);
 });
 
+/**
+ * «اصلاحِ نشانی» (DLV-09، کارِ بعدی پس از ناموفق): نشانیِ سفارشِ مأموریتِ زندهٔ ارسال.
+ * بدنه: `{address:{landmark?, area?, gateColor?, text?, lat?, lng?}, keepPin?, expectedVersion?}`.
+ * کلیدِ یکتایی (Idempotency-Key) ⇒ تکرار همان پاسخ. در سابقه فقط نامِ کلیدهای
+ * عوض‌شده می‌آید، نه خودِ نشانی.
+ * دستگیره بی `wrap` است: Express 5 خطای async را خودش به `next` می‌دهد.
+ */
+router.post('/assignments/:id/address', requirePermission('delivery.assign'), needWrite, async (req, res) => {
+  const idem = require('../lib/idempotency').fromRequest(req, `delivery-address:${req.shopId}`);
+  let out;
+  try {
+    out = await delivery.fixAddress(req.shopId, req.params.id, req.body, idem);
+  } catch (err) {
+    if (err.current) return res.status(err.status).json({ error: { code: err.code, message: err.message, current: err.current } });
+    throw err;
+  }
+  if (out.replayed) {
+    res.set('Idempotent-Replayed', 'true');
+    return res.json(out);
+  }
+  await log(req, 'delivery.address.fix', 'delivery_assignment', out.assignment.id, {
+    orderId: out.assignment.orderId, status: out.assignment.status, fields: out.fields,
+  });
+  res.json(out);
+});
+
 // ── عکسِ تحویل: فقط صاحب و مدیر ──────────────────────────────────────
 
 router.get('/assignments/:id/photos', requirePermission('delivery.photo'), async (req, res) => {
@@ -200,6 +233,11 @@ router.get('/settlements', requirePermission('delivery.settle'), async (req, res
   res.json(await delivery.listSettlements(req.shopId, {
     courierId: req.query.courierId, from: req.query.from, to: req.query.to, limit: req.query.limit,
   }));
+});
+
+//  RPT-15: نقدِ پیک‌ها و تسویه در یک بازه — فقط خواندن، همان اجازهٔ دفترِ تسویه
+router.get('/cash-report', requirePermission('delivery.settle'), async (req, res) => {
+  res.json(await cashReport(req.shopId, { from: req.query.from, to: req.query.to }));
 });
 
 router.get('/settlements/:id', requirePermission('delivery.settle'), async (req, res) => {
