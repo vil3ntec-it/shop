@@ -509,8 +509,13 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(errorHandler);
 
   // ---- کارهای دوره‌ای ----
+  const HOUSEKEEPING_MS = 6 * 60 * 60 * 1000;
+  //  پنلِ مرکزی ۴.۹: «خانه‌تکانی اجرا شد» + شکستِ هر زیرکار (`lib/job-beat.js`)؛ رفتار همان
+  const beat = require('./lib/job-beat');
+  const beatFail = (err) => beat.failed('housekeeping', err);
   const housekeeping = setInterval(() => {
-    pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    beat.ran('housekeeping', HOUSEKEEPING_MS);
+    pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
@@ -532,8 +537,9 @@ async function createApp({ runMigrations = true } = {}) {
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
-  }, 6 * 60 * 60 * 1000);
+  }, HOUSEKEEPING_MS);
   if (housekeeping.unref) housekeeping.unref();
+  beat.register('housekeeping', HOUSEKEEPING_MS);
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
   setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
   setImmediate(() => require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message)));

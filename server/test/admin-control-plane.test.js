@@ -230,6 +230,8 @@ const MOUNTS = {
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',
   'admin-service-keys.js': '/admin/service-keys',
+  //  پنلِ مرکزی، ماژول‌های عملیات (۴.۸–۴.۱۱، ۴.۱۳)
+  'admin-ops.js': '/admin/ops',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -345,6 +347,11 @@ const CAPABILITY_PROBES = {
   'flags.v1': ['GET /admin/flags', 'GET /admin/flags/history'],
   'service-key.v1': ['GET /admin/service-keys', 'POST /admin/service-keys', 'POST /admin/service-keys/x1/revoke'],
   'actor.v1': ['GET /admin/me'],
+  'ops.v1': ['GET /admin/ops/releases', 'GET /admin/ops/health', 'GET /admin/ops/integrations', 'GET /admin/ops/incidents',
+    'GET /admin/ops/alerts', 'POST /admin/ops/alerts/evaluate', 'POST /admin/ops/incidents/x1/status', 'POST /admin/ops/alerts/x1/ack'],
+  //  فقط وقتی OPS-01 (#559) در همین نسخه است
+  ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
+    ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
