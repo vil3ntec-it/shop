@@ -54,6 +54,19 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۱۰ — شاخهٔ `claude/console-integrated-api` (کنسولِ یکپارچهٔ «فروشگاه» — سمتِ سرورِ حساب؛ روی `claude/console-glue`)
+- انجام شد: چهار شاخهٔ هم‌زمان در یک مسیرِ مرج: پوسته (#601، بی مهاجرت) + بازار/پیک (#600، ۱۷۲) + عملیات (#602، ۱۷۳) + مالی (#603، ۱۷۱).
+  تعارض‌ها: `CAPABILITIES` ِ `routes/admin.js` (همه، به همان نام‌های پل؛ `ops.v1`/`release-stage.v1` از `lib/ops-overview`)، `MOUNTS` و
+  `CAPABILITY_PROBES` ِ `admin-control-plane.test.js`، `lib/admin-roles.js` (درهای مالیِ بازار/پیک + مالیِ مرکزی)، `app.js` (`/admin/finance`
+  و نبضِ خانه‌تکانی)، بندهای ۱۲.۷ پوسته · ۱۲.۸ بازار/پیک · ۱۲.۹ مالی ِ `ADMIN-CONTROL-PLANE.md` (هر سه ۱۲.۷ بودند)، «سهم‌بندی» ِ `RULES`
+  (۱۷۰ بی‌مصرف، ۱۷۱ مالی، ۱۷۲ بازار/پیک، ۱۷۳ عملیات؛ آزادِ بعدی ۱۷۴). `routes/admin.js` از ۹۰۱ خط به ۷۸۶: بخشِ «مدیران» (ساختن،
+  نقش/وضعیت، نشست‌ها) بی تغییرِ رفتار به `routes/admin-admins.js` (سوار روی `/admins`؛ `MOUNTS` و جدولِ بندِ ۶). `STATUS.md` با
+  `spec.mjs status` بی تغییر ماند. جانشینِ #600، #601، #602، #603؛ سمتِ پنل: ریپوی `server`، شاخهٔ `claude/console-integrated` (server#121).
+  آزمون: کلِ سرور روی PGlite ۱۷۳۵/۱۷۳۶ (۱ رد) و PG ۱۷۵۶/۱۷۶۲ (۶ رد) + auto-backup ۹/۹، بی شکست؛ quality (ratchet، eslint، migrations) و `spec.mjs check` سبز.
+- نیمه‌کاره: #582 (`ADMIN_SUBJECT`) هنوز روی main نیست ⇒ رده‌بندیِ درهای تازه (`/admin/search`، `/admin/admins/:id/sessions`،
+  `/admin/market/*`، `/admin/delivery/*`، `/admin/ops/*`، `/admin/finance/*`) همان روزِ مرجِ #582؛ متنِ پیشنهادی در بندهای ۱۲.۷ و ۱۲.۹.
+- قدمِ بعدی: مرجِ #597 ⇐ #598 ⇐ همین (به‌جای چهار PR)، هم‌زمان با PRِ یکپارچهٔ ریپوی `server`؛ بعد بستنِ #600–#603.
+
 ### ۱۴۰۵/۰۸/۱۰ — شاخهٔ `claude/console-shell-api` (پوستهٔ کنسولِ «فروشگاه»؛ روی `claude/console-glue`)
 - انجام شد: توانایی‌های `admin-sessions.v1` (نشست‌های یک مدیر: فهرست و بستن، مالکِ اصلی فقط خودش) و `search.v1`
   (`GET /api/admin/search`، به نقش)؛ مدیرِ تازه بی نقش ⇒ `viewer`؛ «پیشین ⇒ تازه» و دلیل در سابقهٔ نقش و `PATCH /config`؛ پرچمِ

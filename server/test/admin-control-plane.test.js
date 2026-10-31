@@ -239,6 +239,8 @@ const MOUNTS = {
   'admin-ops.js': '/admin/ops',
   //  ماژولِ ۴.۵ ِ پنلِ مرکزی
   'admin-finance.js': '/admin/finance',
+  //  مدیرانِ سکو (از `admin.js` جدا شد تا زیرِ سقفِ ۸۰۰ خط بماند؛ همان مسیرها)
+  'admin-admins.js': '/admin/admins',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 

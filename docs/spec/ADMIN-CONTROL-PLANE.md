@@ -135,9 +135,11 @@
 | `POST /admin/purchase-requests/:id/approve` | مدیر | درخواستِ یک دکان | دارد | مالی/اشتراک | G2, G3 | `admin.js:604` |
 | `POST /admin/purchase-requests/:id/reject` | مدیر | درخواستِ یک دکان | دارد (+دلیلِ اختیاری) ★ | مالی/اشتراک | G3 | `admin.js:618` |
 | `GET /admin/audit` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:635` |
-| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin.js:645` |
-| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin.js:662` |
-| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin.js:671` |
+| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin-admins.js` |
+| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins/:id/sessions` | ارشد | سراسری | — | خواندنِ سراسری (بی توکن، فقط ۱۶ نویسهٔ هش) | — | `admin-admins.js` |
+| `POST /admin/admins/:id/sessions/revoke` | ارشد | سراسری | دارد (+دلیل) | عملیات | — | `admin-admins.js` |
 | `GET /admin/backups` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:690` |
 | `POST /admin/backups` | ارشد | سراسری | دارد | خروجی/بازگردانی | — | `admin.js:700` |
 | `GET /admin/2fa` | مدیر | سراسری | — | نشست | G5 | `admin-2fa.js:49` |
