@@ -369,6 +369,14 @@ data class SaleReturn(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val channel: String? = null,
+  /**
+   *  «برگهٔ امضاشده»ی تأییدِ همین سندِ برگشت (RET-04، RET-10، STF-02؛ `core/perm/ReturnApprovals`):
+   *  سند `returns/<docId>`، مبلغ = جمعِ ردیف‌های سند. فقط روی **نخستین** ردیفِ سند و فقط وقتی تأیید
+   *  لازم بوده؛ سرور برگه را از هر ردیفِ سند برمی‌دارد (`groupReturns`). `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val approval: kotlinx.serialization.json.JsonObject? = null,
 )
 
 @Serializable
