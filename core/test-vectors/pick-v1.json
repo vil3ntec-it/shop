@@ -1,0 +1,144 @@
+{
+  "about": "بردارِ مرجعِ جمع‌آوری و بسته‌بندی (PCK، v3 §۶.۱۷) — server/src/lib/pick-core.js و core/pick/PickCore.kt هر دو باید همین خروجی‌ها را بدهند. پول به واحدِ کوچک (*Minor)، مقدار به هزارم (*Milli)، نرخ به ده‌هزارم (bp).",
+  "version": 1,
+  "lineTotal": [
+    { "qtyMilli": 1000, "unitPriceMinor": 1200000, "want": 1200000 },
+    { "qtyMilli": 1250, "unitPriceMinor": 8000, "want": 10000 },
+    { "qtyMilli": 333, "unitPriceMinor": 15050, "want": 5000 },
+    { "qtyMilli": 1, "unitPriceMinor": 50000, "want": 100 },
+    { "qtyMilli": 950, "unitPriceMinor": 10000, "want": 9500 }
+  ],
+  "pickOrder": [
+    {
+      "name": "راهرو، قفسه و طبقه؛ عددی نه متنی؛ بی‌جا آخر",
+      "lines": [
+        { "lineNo": 1, "name": "شیر", "aisle": "10", "shelf": "1", "level": "" },
+        { "lineNo": 2, "name": "برنج", "aisle": "2", "shelf": "3", "level": "1" },
+        { "lineNo": 3, "name": "نان", "aisle": "", "shelf": "", "level": "" },
+        { "lineNo": 4, "name": "روغن", "aisle": "2", "shelf": "3", "level": "" },
+        { "lineNo": 5, "name": "قند", "aisle": "۲", "shelf": "۱۲", "level": "۲" },
+        { "lineNo": 6, "name": "چای", "aisle": "2", "shelf": "3", "level": "1" }
+      ],
+      "want": [2, 6, 4, 5, 1, 3]
+    },
+    {
+      "name": "حرف و عدد با هم؛ A02 = A2 و جای پُرتر جلو؛ حرفِ بزرگ پیش از کوچک؛ بی‌جاها به نام و شماره",
+      "lines": [
+        { "lineNo": 1, "name": "ب", "aisle": "A10", "shelf": "", "level": "" },
+        { "lineNo": 2, "name": "ب", "aisle": "A2", "shelf": "", "level": "" },
+        { "lineNo": 3, "name": "الف", "aisle": "", "shelf": "", "level": "" },
+        { "lineNo": 4, "name": "ب", "aisle": "B1", "shelf": "", "level": "" },
+        { "lineNo": 5, "name": "ب", "aisle": "a1", "shelf": "", "level": "" },
+        { "lineNo": 6, "name": "الف", "aisle": "", "shelf": "", "level": "" },
+        { "lineNo": 7, "name": "ب", "aisle": "A02", "shelf": "1", "level": "" }
+      ],
+      "want": [7, 2, 1, 4, 5, 3, 6]
+    }
+  ],
+  "barcode": [
+    { "barcodes": ["6261234567890"], "scanned": "6261234567890", "want": true },
+    { "barcodes": ["6261234567890"], "scanned": "۶۲۶۱۲۳۴۵۶۷۸۹۰", "want": true },
+    { "barcodes": ["6261234567890"], "scanned": " 626-1234567890\n", "want": true },
+    { "barcodes": ["036000291452"], "scanned": "0036000291452", "want": true },
+    { "barcodes": ["0036000291452"], "scanned": "036000291452", "want": true },
+    { "barcodes": ["6261234567890"], "scanned": "6261234567891", "want": false },
+    { "barcodes": ["ab-12"], "scanned": "AB12", "want": true },
+    { "barcodes": [], "scanned": "6261234567890", "want": false },
+    { "barcodes": ["6261234567890"], "scanned": "", "want": false },
+    { "barcodes": ["", "  "], "scanned": "", "want": false },
+    { "barcodes": ["0000000"], "scanned": "0", "want": false }
+  ],
+  "weighedUnit": [
+    { "unit": "کیلو", "want": true },
+    { "unit": " کیلوگرم ", "want": true },
+    { "unit": "KG", "want": true },
+    { "unit": "گرم", "want": true },
+    { "unit": "دانه", "want": false },
+    { "unit": "بسته", "want": false },
+    { "unit": "", "want": false }
+  ],
+  "weigh": [
+    { "orderedMilli": 1000, "actualMilli": 1000, "toleranceBp": 1000, "want": "ok" },
+    { "orderedMilli": 1000, "actualMilli": 1100, "toleranceBp": 1000, "want": "ok" },
+    { "orderedMilli": 1000, "actualMilli": 1101, "toleranceBp": 1000, "want": "over" },
+    { "orderedMilli": 1000, "actualMilli": 900, "toleranceBp": 1000, "want": "ok" },
+    { "orderedMilli": 1000, "actualMilli": 899, "toleranceBp": 1000, "want": "short" },
+    { "orderedMilli": 2500, "actualMilli": 2749, "toleranceBp": 1000, "want": "ok" },
+    { "orderedMilli": 2500, "actualMilli": 2751, "toleranceBp": 1000, "want": "over" },
+    { "orderedMilli": 1000, "actualMilli": 1001, "toleranceBp": 0, "want": "over" },
+    { "orderedMilli": 1000, "actualMilli": 1500, "toleranceBp": 9000, "want": "ok" },
+    { "orderedMilli": 1000, "actualMilli": 1501, "toleranceBp": 9000, "want": "over" },
+    { "orderedMilli": 333, "actualMilli": 366, "toleranceBp": 1000, "want": "ok" },
+    { "orderedMilli": 333, "actualMilli": 367, "toleranceBp": 1000, "want": "over" }
+  ],
+  "settle": [
+    {
+      "name": "همه برداشته شد ⇒ همان جمع",
+      "input": {
+        "discountMinor": 0, "deliveryFeeMinor": 40000,
+        "lines": [
+          { "lineNo": 1, "status": "picked", "orderedQtyMilli": 2000, "pickedQtyMilli": 2000, "unitPriceMinor": 50000, "originalTotalMinor": 100000 },
+          { "lineNo": 2, "status": "picked", "orderedQtyMilli": 1000, "pickedQtyMilli": 1000, "unitPriceMinor": 1200000, "originalTotalMinor": 1200000 }
+        ]
+      },
+      "want": {
+        "lines": [ { "lineNo": 1, "qtyMilli": 2000, "totalMinor": 100000 }, { "lineNo": 2, "qtyMilli": 1000, "totalMinor": 1200000 } ],
+        "subtotalMinor": 1300000, "discountMinor": 0, "deliveryFeeMinor": 40000, "totalMinor": 1340000,
+        "deductedMinor": 0, "removedLines": [], "changedLines": [], "pending": 0
+      }
+    },
+    {
+      "name": "پیدا نشد + کم + وزنِ بیشتر در حدِ مجاز ⇒ کسرِ خودکار، تخفیف تا جمعِ تازه",
+      "input": {
+        "discountMinor": 150000, "deliveryFeeMinor": 40000,
+        "lines": [
+          { "lineNo": 1, "status": "not_found", "orderedQtyMilli": 1000, "pickedQtyMilli": 0, "unitPriceMinor": 1200000, "originalTotalMinor": 1200000 },
+          { "lineNo": 2, "status": "short", "orderedQtyMilli": 3000, "pickedQtyMilli": 2000, "unitPriceMinor": 50000, "originalTotalMinor": 150000 },
+          { "lineNo": 3, "status": "picked", "orderedQtyMilli": 1000, "pickedQtyMilli": 1080, "unitPriceMinor": 25000, "originalTotalMinor": 25000 }
+        ]
+      },
+      "want": {
+        "lines": [ { "lineNo": 1, "qtyMilli": 0, "totalMinor": 0 }, { "lineNo": 2, "qtyMilli": 2000, "totalMinor": 100000 }, { "lineNo": 3, "qtyMilli": 1080, "totalMinor": 27000 } ],
+        "subtotalMinor": 127000, "discountMinor": 127000, "deliveryFeeMinor": 40000, "totalMinor": 40000,
+        "deductedMinor": 1248000, "removedLines": [1], "changedLines": [2, 3], "pending": 0
+      }
+    },
+    {
+      "name": "قلمِ باقی‌مانده شمرده می‌شود (بسته‌بندی پیش از پایان ممنوع است)",
+      "input": {
+        "discountMinor": 0, "deliveryFeeMinor": 0,
+        "lines": [
+          { "lineNo": 1, "status": "pending", "orderedQtyMilli": 1000, "pickedQtyMilli": 0, "unitPriceMinor": 10000, "originalTotalMinor": 10000 },
+          { "lineNo": 2, "status": "removed", "orderedQtyMilli": 1000, "pickedQtyMilli": 0, "unitPriceMinor": 10000, "originalTotalMinor": 10000 }
+        ]
+      },
+      "want": {
+        "lines": [ { "lineNo": 1, "qtyMilli": 0, "totalMinor": 0 }, { "lineNo": 2, "qtyMilli": 0, "totalMinor": 0 } ],
+        "subtotalMinor": 0, "discountMinor": 0, "deliveryFeeMinor": 0, "totalMinor": 0,
+        "deductedMinor": 20000, "removedLines": [1, 2], "changedLines": [], "pending": 1
+      }
+    }
+  ],
+  "metrics": [
+    {
+      "name": "دو برگهٔ بسته‌شده و یکی باز",
+      "picks": [
+        { "startedAt": 1000, "packedAt": 61000, "lines": [ { "status": "picked" }, { "status": "not_found" }, { "status": "short" } ] },
+        { "startedAt": 5000, "packedAt": 185000, "lines": [ { "status": "picked" }, { "status": "substituted" } ] },
+        { "startedAt": 7000, "packedAt": null, "lines": [ { "status": "pending" } ] }
+      ],
+      "want": {
+        "orders": 2, "lines": 5, "found": 3, "notFound": 1, "short": 1, "substituted": 1,
+        "avgPickMs": 120000, "medianPickMs": 120000, "foundRateBp": 6000, "substitutionRateBp": 2000
+      }
+    },
+    {
+      "name": "بی داده ⇒ null، نه صفرِ ساختگی",
+      "picks": [],
+      "want": {
+        "orders": 0, "lines": 0, "found": 0, "notFound": 0, "short": 0, "substituted": 0,
+        "avgPickMs": null, "medianPickMs": null, "foundRateBp": null, "substitutionRateBp": null
+      }
+    }
+  ]
+}

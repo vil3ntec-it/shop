@@ -109,6 +109,52 @@ test('ثبت، ویرایش و حذفِ پرداخت — و شمارهٔ رسی�
   assert.ok(!after.body.payments.some(p => p.id === id), 'پرداختِ حذف‌شده در فهرست نیست');
 });
 
+test('⛔ پرداخت بی سابقه نمی‌ماند: نوشتنِ سابقه شکست ⇒ ثبت، ویرایش و حذف همه برمی‌گردند', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('سابقهٔ پرداخت');
+  const made = await h.post('/api/admin/payments', { app: 'shop', tenantId: u.shopId, amount: 1500 }, { token: t });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const id = made.body.payment.id;
+  const rowOf = async () => {
+    const r = await one('SELECT amount, deleted FROM sub_payments WHERE id=$1', [id]);
+    return { amount: Number(r.amount), deleted: r.deleted };
+  };
+  const logs = async (action) => (await one(
+    'SELECT COUNT(*)::int AS n FROM audit_logs WHERE action=$1 AND target_id=$2', [action, id])).n;
+  const NOTE = 'پرداختِ بی‌سابقه';
+  const orphans = async () => (await one('SELECT COUNT(*)::int AS n FROM sub_payments WHERE note=$1', [NOTE])).n;
+  assert.equal(await logs('admin.payment_created'), 1);
+
+  //  نوشتنِ سابقهٔ پرداخت در خودِ دیتابیس شکست می‌خورد
+  await query(`CREATE OR REPLACE FUNCTION test_audit_down() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW.action LIKE 'admin.payment_%' THEN RAISE EXCEPTION 'audit down'; END IF; RETURN NEW; END $$`);
+  await query('CREATE TRIGGER test_audit_down BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION test_audit_down()');
+  try {
+    const del = await h.del(`/api/admin/payments/${id}`, { token: t, body: { reason: 'رسیدِ تکراری' } });
+    assert.equal(del.status, 500, JSON.stringify(del.body));
+    assert.deepEqual(await rowOf(), { amount: 1500, deleted: false }, 'حذف بی سابقه برگشت');
+
+    const put = await h.put(`/api/admin/payments/${id}`, { amount: 1800 }, { token: t });
+    assert.equal(put.status, 500, JSON.stringify(put.body));
+    assert.deepEqual(await rowOf(), { amount: 1500, deleted: false }, 'ویرایش بی سابقه برگشت');
+
+    const post = await h.post('/api/admin/payments', { app: 'shop', tenantId: u.shopId, amount: 900, note: NOTE }, { token: t });
+    assert.equal(post.status, 500, JSON.stringify(post.body));
+    assert.equal(await orphans(), 0, 'ثبت بی سابقه برگشت');
+  } finally {
+    await query('DROP TRIGGER IF EXISTS test_audit_down ON audit_logs');
+    await query('DROP FUNCTION IF EXISTS test_audit_down()');
+  }
+  assert.equal(await logs('admin.payment_deleted'), 0);
+  assert.equal(await logs('admin.payment_updated'), 0);
+
+  //  سابقه برگشت ⇒ همان حذف این بار با سابقه‌اش می‌نشیند
+  const del = await h.del(`/api/admin/payments/${id}`, { token: t, body: { reason: 'رسیدِ تکراری' } });
+  assert.equal(del.status, 200, JSON.stringify(del.body));
+  assert.deepEqual(await rowOf(), { amount: 1500, deleted: true });
+  assert.equal(await logs('admin.payment_deleted'), 1);
+});
+
 test('روشِ ناشناخته و ارزِ ناشناخته پذیرفته نمی‌شوند', async () => {
   const t = await adminToken();
   const u = await shopOwner('بدپرداخت');

@@ -29,6 +29,8 @@ object DeskActions {
     RETURN,
     /** لغو پس از حرکتِ پیکِ دکان */
     RECALL,
+    /** ناموفق ⇒ اصلاحِ نشانیِ سفارش تا پیک دوباره برود (DLV-09؛ `POST /assignments/:id/address`) */
+    FIX_ADDRESS,
   }
 
   private val DEPARTED = setOf("picked_up", "moving", "arrived", "failed")
@@ -60,6 +62,9 @@ object DeskActions {
         if (m.status in DEPARTED && p.handover) out += Act.RETURN
       }
     }
+    //  کارِ بعدی پس از ناموفق (DLV-09): تلاشِ دوباره، اصلاحِ نشانی یا برگشت. سرور
+    //  اصلاح را برای هر مأموریتِ زندهٔ ارسال می‌پذیرد؛ میز فقط پس از ناموفق پیشنهادش می‌کند.
+    if (m.status == "failed" && m.mode != "pickup" && p.assign) out += Act.FIX_ADDRESS
     return out
   }
 
@@ -75,7 +80,7 @@ object DeskActions {
     Act.FAIL -> "failed"
     Act.RETRY -> "moving"
     Act.RETURN -> "returned"
-    Act.NEW_CODE, Act.RECALL -> null
+    Act.NEW_CODE, Act.RECALL, Act.FIX_ADDRESS -> null
   }
 
   fun label(act: Act): String = when (act) {
@@ -88,5 +93,6 @@ object DeskActions {
     Act.RETRY -> "تلاشِ دوباره"
     Act.RETURN -> "بسته برگشت"
     Act.RECALL -> "فراخوانی"
+    Act.FIX_ADDRESS -> "اصلاحِ نشانی"
   }
 }

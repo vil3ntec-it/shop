@@ -318,6 +318,34 @@ test('⛔ بکاپِ پُر با چند بکاپِ خالیِ تازه‌تر پ
   assert.equal(back.buffer.length, 8192);
 });
 
+test('⛔ پایانِ اشتراک بکاپِ پُر را پاک نمی‌کند، حتی وقتی از سهمِ رایگان بزرگ‌تر است (SEC-DATA-06)', async () => {
+  //  پیش‌تر «بزرگ‌ترین» فقط «اگر در سهم جا شود» می‌ماند: پشتیبانِ پُرِ دورهٔ اشتراک (بزرگ‌تر از سهمِ رایگان)
+  //  با نخستین پشتیبانِ کوچکِ پس از پایانِ اشتراک پاک می‌شد — یعنی پاک شدنِ خودکارِ دادهٔ کاربر با پایانِ اشتراک.
+  const cfg = require('../src/config').backup.account;
+  const realFree = cfg.freeBytes;
+  const o = await shopOwner('پایانِ اشتراک');
+  await withTrial();
+  try {
+    cfg.freeBytes = 4096;
+    const full = await h.raw('POST', '/api/me/backups', blob(8192, 0x41), { token: o.accessToken });
+    assert.equal(full.status, 201, JSON.stringify(full.body));
+    assert.ok(full.body.stats.quotaBytes > 8192, 'با اشتراک/آزمایشی سهمِ بزرگ');
+    await noTrial();
+    const small = await h.raw('POST', '/api/me/backups', blob(64, 0x42), { token: o.accessToken });
+    assert.equal(small.status, 201, JSON.stringify(small.body));
+    assert.equal(small.body.stats.quotaBytes, 4096, 'حالا پلهٔ رایگان');
+    const ids = (await h.get('/api/me/backups', { token: o.accessToken })).body.backups.map((b) => b.id);
+    assert.ok(ids.includes(full.body.backup.id), 'بکاپِ پُر باید بماند');
+    assert.equal(ids[0], small.body.backup.id);
+    const back = await h.download(`/api/me/backups/${full.body.backup.id}`, { token: o.accessToken });
+    assert.equal(back.status, 200);
+    assert.equal(back.buffer.length, 8192);
+  } finally {
+    cfg.freeBytes = realFree;
+    await withTrial();
+  }
+});
+
 test('فایلِ بزرگ‌تر از سقف رد می‌شود و پیامش می‌گوید چرا', async () => {
   const o = await shopOwner('بزرگ');
   await noTrial();
