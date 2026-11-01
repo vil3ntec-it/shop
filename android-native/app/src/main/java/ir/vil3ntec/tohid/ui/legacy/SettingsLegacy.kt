@@ -508,7 +508,7 @@ fun SettingsScreenLegacy(
     /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
     item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* ======================== رسیدِ هدیهٔ بی قیمت (POS-34، پیش‌فرض خاموش) ======================== */
-    item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }
+    item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.AutoFeesSettingsWired(context, d) } // هزینهٔ خودکار (POS-36)، پیش‌فرض بی قاعده
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context) } // پیش‌فاکتور (POS-25)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.components.pos.PosNotesSettingsWired(context) } // یادداشتِ ردیف و فاکتور (POS-11)، پیش‌فرض خاموش
