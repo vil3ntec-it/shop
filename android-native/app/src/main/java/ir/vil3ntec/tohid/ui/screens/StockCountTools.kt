@@ -89,7 +89,7 @@ fun StockCountToolsSheet(
   val countedAt = remember(at, imported, ownSheetId) {
     CountDuringSales.latest(imported.filter { it.sheetId != ownSheetId }.map { it.at to it.counts.keys } + at.map { (id, t) -> t to setOf(id) })
   }
-  val lines = remember(d, counted, blind, countedAt) { if (blind) emptyList() else WarehouseEngine.countLines(d, counted, countedAt) }
+  val lines = remember(d, counted, blind, countedAt) { if (blind) emptyList() else WarehouseEngine.countLines(d, counted, ir.vil3ntec.tohid.data.CountShift.of(d, countedAt)) }
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val others = remember(imported, ownSheetId) { CountMerge.merge(imported.filter { it.sheetId != ownSheetId }).counts }
   val term = search.trim()
