@@ -238,7 +238,7 @@ class SalesFlowModelTest {
     assertEquals(3.0, line.left, 0.0)
     assertEquals(75.0, ReturnModel.total(sale, listOf(line), mapOf("ri" to "2")), 0.0)
     //  همان که موتور ثبت می‌کند
-    val ok = SalesEngine.recordReturn(d, "r", mapOf("ri" to 2.0), "", "2026-10-24", 1L) { "x" } as SalesEngine.Result.Ok
+    val ok = SalesEngine.recordReturn(d, "r", mapOf("ri" to 2.0), "", "2026-10-24", 1L, newId = { "x" }) as SalesEngine.Result.Ok
     assertEquals(75.0, ok.data.saleReturns.sumOf { it.amount }, 0.0)
   }
 
@@ -284,8 +284,7 @@ class SalesFlowModelTest {
       methods = emptyMap(), moves = ir.vil3ntec.tohid.core.pay.Moves(0L, 0L), expected = mapOf("cash" to 445_000L),
       events = ir.vil3ntec.tohid.core.pay.EventCounts(),
     )
-    //  شاهدِ نشت: نمای کورِ هسته X را نمی پوشاند
-    assertEquals(445_000L, ir.vil3ntec.tohid.core.pay.ShiftCore.cashierView(x).expected?.get("cash"))
+    //  نمای کورِ صندوق‌دار از `DrawerModel.forViewer` است (`ShiftCore.cashierView` ِ نشت‌دار در #612 برداشته شد)
     assertNull(DrawerModel.forViewer(x, seesExpected = false).expected)
     val z = x.copy(kind = "Z", variance = mapOf("cash" to -1_000L), blind = false)
     assertNull(DrawerModel.forViewer(z, seesExpected = false).variance)
