@@ -311,7 +311,7 @@ const K_ANON = 3;
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
  * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
- * ۳۰ روز. هیچ‌کدام عددِ ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. بی عددِ ساختگی؛ نبودِ داده ⇒ خالی.
  */
 async function highlights(shopId, at = now()) {
   const since = at - RECENT_MS;
@@ -337,10 +337,10 @@ async function highlights(shopId, at = now()) {
     const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
     return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
   };
-  const [bestsellers, newArrivals] = await Promise.all([
-    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
+  const [bestsellers, newArrivals, deals] = await Promise.all([
+    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), require('./storefront-deals').deals(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId, shelfOf),
   ]);
-  return { bestsellers, newArrivals, windowDays: 30 };
+  return { bestsellers, newArrivals, deals, windowDays: 30 };
 }
 
 function specsOf(v) {

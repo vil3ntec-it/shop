@@ -57,7 +57,7 @@ test('پوسته: بی اسکریپت/style ِ درون‌خطی، بی پیون
   const html = fs.readFileSync(path.join(PUB, 'market', 'index.html'), 'utf8');
   assert.doesNotMatch(html, /<script(?![^>]*\ssrc=)[^>]*>/i);
   assert.doesNotMatch(html, /\sstyle=|\son[a-z]+=/i);
-  const all = ['market/index.html', 'market/market.js', 'kit/kit.js', 'kit/boot.js', 'store/index.html', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/share.js', 'store/recent.js']
+  const all = ['market/index.html', 'market/market.js', 'kit/kit.js', 'kit/boot.js', 'store/index.html', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js']
     .map((f) => fs.readFileSync(path.join(PUB, f), 'utf8')).join('\n');
   assert.doesNotMatch(all, /index\.html|\/admin\b|\/portal\b/, 'هیچ پیوندی به برنامهٔ مدیریتِ دکان یا پنل');
   assert.doesNotMatch(all, /\.(innerHTML|outerHTML)\s*=|insertAdjacentHTML\(|document\.write\(|\beval\(|new Function\(/, 'دادهٔ سرور فقط با textContent');
