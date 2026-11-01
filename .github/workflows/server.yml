@@ -56,7 +56,8 @@ jobs:
   # چکی که منتظرش هستیم عوض نمی‌شود.
   pg:
     name: آزمون‌های سرور روی PostgreSQL
-    runs-on: ubuntu-latest
+    #  pg_dump ِ ubuntu-latest (۲۶٫۰۴) `SET transaction_timeout` می‌نویسد که Postgres ِ سرویس نمی‌شناسد (backup / pump-isolation)
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
 
     services:
