@@ -268,6 +268,31 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 const po = await one('SELECT subtotal_minor, discount_minor, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
 ok(Number(po.discount_minor) === 3500 && Number(po.total_minor) === 31500, 'ثبت ⇒ همان تخفیفِ دیده‌شده (۳۵) و جمعِ ۳۱۵ در سرور', JSON.stringify(po));
 
+//  CHK-08: شمارهٔ دوم و Plus Code (پرچمِ `shop.storefront.address_extra`)؛ نادرست ⇒ پیامِ سرور و بی سفارش
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+ok(await page.isHidden('#addr-extra'), 'پرچمِ نشانیِ بیشتر خاموش ⇒ همان فرم');
+await flag('shop.storefront.address_extra', true);
+await open();
+await toCheckout();
+ok(await page.isVisible('#addr-extra'), 'روشن ⇒ «شمارهٔ دوم» و «Plus Code»');
+await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
+await page.fill('#a-text', 'کارته‌سه، کوچهٔ سوم');
+await page.fill('#a-phone2', '۰۷۹۹ ۸۸۸ ۷۷۷');
+await page.fill('#a-plus', 'ABC+12');
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+const m0 = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n;
+await page.click('#submit-order');
+await page.waitForFunction(() => /Plus Code/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });   //  `err.bad_plus_code`
+ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === m0, 'Plus Code ِ نادرست ⇒ پیام و بی سفارش', await text('#checkout-msg'));
+await page.fill('#a-plus', '9g8f+6w کابل');
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+const ax = await one('SELECT address FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+const aj = typeof ax.address === 'string' ? JSON.parse(ax.address) : ax.address;
+ok(aj.phone2 === '+93799888777' && aj.plusCode === '9G8F+6W کابل', 'CHK-08: شمارهٔ دوم و Plus Code در نشانیِ سفارش', JSON.stringify(aj));
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

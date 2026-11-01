@@ -11,5 +11,10 @@
   "promo.st.inactive": "دا د تخفیف کوډ اوس فعال نه دی.",
   "promo.st.used_up": "د دې تخفیف کوډ ظرفیت ډک شوی دی.",
   "promo.st.no_effect": "دا د تخفیف کوډ په دې ټوکرۍ اغېز نه لري.",
-  "err.promo_code_rejected": "د تخفیف کوډ ونه منل شو؛ ټوکرۍ بې له هغه بیا حساب شوه."
+  "err.promo_code_rejected": "د تخفیف کوډ ونه منل شو؛ ټوکرۍ بې له هغه بیا حساب شوه.",
+  "ck.phone2.l": "دویمه شمېره (اختیاري)",
+  "ck.plus.l": "Plus Code (اختیاري)",
+  "ck.plus.ph": "لکه 9G8F+6W کابل",
+  "err.bad_plus_code": "Plus Code سم نه دی؛ لکه 9G8F+6W کابل.",
+  "err.bad_phone2": "دویمه شمېره سمه نه ده."
 }
