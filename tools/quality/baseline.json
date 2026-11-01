@@ -248,6 +248,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/ApprovalDialog.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/CreditApprovalDialog.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/ReturnApprovalRequest.kt": 1,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/courier/CourierChecksUi.kt": 4,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/courier/CourierHome.kt": 9,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/LangUi.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/OrdersLive.kt": 25,
