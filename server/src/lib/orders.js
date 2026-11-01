@@ -411,6 +411,11 @@ async function create(shopId, { key, body, actor, price, notify }) {
     const hook = notify !== undefined ? notify
       : (actor.type === 'customer' ? require('./order-notify').enqueueIn : null);
     if (hook) await hook(run, { shopId, orderId: id, orderNo: no, at });
+    //  NTF-01/03: زبانِ مشتری روی سفارش و رویدادِ «ثبت شد» برای خودِ او (پرچمِ `shop.customer_notify`؛
+    //  فقط ویترین) — همین تراکنش؛ خطایش کلِ سفارش را برمی‌گرداند، مثلِ صفِ اعلانِ دکان
+    if (actor.type === 'customer') {
+      await require('./customer-notify').onCreatedIn(run, { shopId, orderId: id, lang: body && body.lang, at });
+    }
     return { order: await loadDetail(run, shopId, id, actor), replayed: false };
   });
 }
@@ -512,6 +517,8 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
       [ulid(at), row.id, shopId, seq, row.status, to, actor.type, actor.id || '', reason, note,
         JSON.stringify(readyAt ? { readyAt } : {}), at]
     );
+    //  NTF-01: پیامِ وضعیت به مشتری (پرچمِ `shop.customer_notify`؛ فقط سفارشِ ویترین) — همین تراکنش
+    await require('./customer-notify').onStatusIn(run, { shopId, order: row, to, at });
     return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
   }
 }

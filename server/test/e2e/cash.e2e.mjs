@@ -119,7 +119,7 @@ await E.step('S141', 'S141: فروشِ نسیه با پرداختِ جزئی؛ �
   assert.equal(r.ok, true, r.message);
   const sent = A.queue.slice();
   assert.ok(sent.length >= 5, `opهای فروش: ${sent.length}`);
-  const body = { device_id: A.deviceId, schema_version: core.SCHEMA_VERSION, queued: sent.length, ops: sent };
+  const body = { device_id: A.deviceId, schema_version: core.BASE_SCHEMA, queued: sent.length, ops: sent };
   //  سه بار همان بدنهٔ `SyncV1Client.push` به سرور می‌رسد و جوابش به دستگاه نمی‌رسد ⇒ صف دست‌نخورده
   const lost = [];
   for (let i = 0; i < 3; i++) lost.push(await A.api('POST', '/sync/v1/push', body));

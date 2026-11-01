@@ -94,14 +94,14 @@ function requireShop(ctx) {
  *        «ویرایشِ قدیمی» روی سندِ فقط‌افزودنی دارند، که به صندوق می‌رود.
  * @returns {{ok:true, op} | {ok:false, reason, op_id}}
  */
-function validate(raw, origin = 'v3') {
+function validate(raw, origin = 'v3', ctx = undefined) {
   const r = isPlainObject(raw) ? raw : {};
   const opId = typeof r.op_id === 'string' ? r.op_id : '';
   const bad = (reason) => ({ ok: false, reason, op_id: opId.slice(0, 80) });
   const relaxed = origin !== 'v3';
 
   if (!OP_ID_RE.test(opId)) return bad('bad_op_id');
-  const spec = schema.specOf(r.table);
+  const spec = schema.specOf(r.table, ctx);   // درِ دستگاه (ctx): جدولِ پشتِ پرچمِ خاموش (گاوصندوق) همان ناشناختهٔ main
   if (!spec) return bad('unknown_table');
   if (typeof r.row_id !== 'string' || !r.row_id || r.row_id.length > 80) return bad('bad_row_id');
   //  `srv.` مالِ opها و ردیف‌های خودِ سرور است (تعدیلِ شمارش، برگرداندن): دستگاهی
@@ -173,12 +173,6 @@ function emptyRow() {
     data: {}, field_hlc: {}, field_src: {}, row_hlc: '', inserted: false, created_by: '',
     deleted_hlc: null, deleted_at: null,
   };
-}
-
-function maxHlc(map) {
-  let best = '';
-  for (const h of Object.values(map || {})) if (h && (!best || cmp(h, best) > 0)) best = h;
-  return best;
 }
 
 /**
@@ -269,7 +263,7 @@ function merge(row, op, { seq, deviceId, cursor = 0, t, skewed = false }) {
   const wasAlive = !!row && !cur.deleted_at;
 
   if (op.kind === 'delete') {
-    const newest = maxHlc(cur.field_hlc);
+    const newest = hlc.newestOf(cur.field_hlc);
     const deletedHlc = !cur.deleted_hlc || cmp(op.hlc, cur.deleted_hlc) > 0 ? op.hlc : cur.deleted_hlc;
     if (newest && cmp(newest, deletedHlc) > 0) {
       //  ویرایشی تازه‌تر از این حذف هست ⇒ ردیف می‌ماند
@@ -434,6 +428,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
+  if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row);   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {
@@ -710,7 +705,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   const origin = format === 'v2' ? 'v2' : 'v3';
   if (origin === 'v2') {
     const sv = Number(schemaVersion);
-    const cur = v1migrations.currentVersion('shop');
+    const cur = v1migrations.currentVersion('shop', ctx);
     if (!Number.isInteger(sv) || sv < 1) throw badRequest('schema_version لازم است', 'bad_schema_version');
     if (sv > cur) {
       throw new ApiError(426, 'UPGRADE_REQUIRED', `سرور schema نسخهٔ ${cur} را می‌شناسد و برنامه نسخهٔ ${sv} می‌فرستد`);
@@ -726,13 +721,13 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
         results[i] = { op_id: rawId(raw), status: 'applied', converted: [], dropped: conv.dropped };
         return;
       }
-      list = conv.ops.map((o) => validate(o, 'v2'));
+      list = conv.ops.map((o) => validate(o, 'v2', ctx));
       const bad = list.find(v => !v.ok);
       if (bad) { results[i] = { op_id: rawId(raw), status: 'rejected', reason: bad.reason }; return; }
       units.push({ tx: '', items: [{ i, ops: list.map(v => v.op), v2: true, dropped: conv.dropped }] });
       return;
     }
-    const v = validate(raw, 'v3');
+    const v = validate(raw, 'v3', ctx);
     if (!v.ok) {
       results[i] = { op_id: v.op_id, status: 'rejected', reason: v.reason };
       //  یک op ِ نادرست کلِ tx را رد می‌کند
@@ -1175,16 +1170,16 @@ async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
   });
 }
 
-/** آنچه برنامه برای راه افتادن لازم دارد — `/hello`. */
-function describe() {
+/** آنچه برنامه برای راه افتادن لازم دارد — `/hello` (جدولِ پشتِ پرچمِ خاموش نه، `safe-flag.js`). */
+function describe(ctx = null) {
   return {
     protocol: PROTOCOL,
-    accepts: { v3: true, v2_schema_max: v1migrations.currentVersion('shop') },
+    accepts: { v3: true, v2_schema_max: v1migrations.currentVersion('shop', ctx) },
     skew_limit_ms: hlc.SKEW_MS,
     max_ops: MAX_OPS, max_batch_bytes: MAX_BATCH_BYTES,
     pull_bytes: { min: PULL_MIN_BYTES, max: PULL_MAX_BYTES },
     units: { money: 'Minor (1/100 AFN, integer)', qty: 'Milli (1/1000, integer)' },
-    tables: schema.describe(),
+    tables: schema.describe(ctx),
     server_time: now(), hlc: clock.peek(),
   };
 }
