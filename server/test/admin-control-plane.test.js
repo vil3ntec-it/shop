@@ -227,6 +227,7 @@ const MOUNTS = {
   'admin-release.js': '/admin/release',
   'admin-trust.js': '/admin/trust',
   'admin-payments.js': '/admin/payments',
+  'admin-calendar.js': '/admin/calendar',
   //  پنلِ مرکزی، فاز ۳
   'admin-shop-state.js': '/admin/shops/:id',
   'admin-flags.js': '/admin/flags',

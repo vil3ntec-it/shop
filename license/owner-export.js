@@ -100,6 +100,19 @@
     active: 'فعال',
     saleUnit: 'واحد فروش',
     unitFactor: 'ضریب واحد',
+    //  PRD-02/PRD-26 و PRD-24/PRD-25 (#653، #674) — همان ستون‌های OwnerExport.kt
+    namePs: 'نام پشتو',
+    nameEn: 'نام انگلیسی',
+    synonyms: 'مترادف‌ها',
+    keywords: 'واژه‌های جست‌وجو',
+    aisle: 'راهرو',
+    shelf: 'قفسه',
+    shelfLevel: 'طبقهٔ قفسه',
+    alternatives: 'کالاهای جایگزین',
+    customFields: 'فیلدهای سفارشی',
+    brand: 'برند',
+    reorderPoint: 'نقطهٔ سفارش',
+    maxStock: 'حداکثر موجودی',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',
@@ -164,7 +177,15 @@
     qty: 'مقدار',
     oldPrice: 'قیمت قبلی',
     newPrice: 'قیمت تازه',
-    nextInvoiceNo: 'شمارهٔ فاکتور بعدی'
+    nextInvoiceNo: 'شمارهٔ فاکتور بعدی',
+    //  موتورِ تازهٔ موجودی و بها (برنامهٔ نصبی؛ افزودنی، فقط وقتی تنظیمِ دکان روشن است)
+    landedCost: 'هزینهٔ جانبی',
+    landedCostMinor: 'هزینهٔ جانبی (صدم افغانی)',
+    locationId: 'محل',
+    toLocationId: 'محلِ مقصد',
+    userId: 'کاربر',
+    lotId: 'سری'
+    //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری برچسبِ آن‌ها را عوض می‌کرد
   };
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

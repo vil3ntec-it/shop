@@ -194,14 +194,26 @@ async function revokeFamily(row) {
               WHERE subject_id=$2 AND COALESCE(app,'shop')=$3 AND revoked_at IS NULL`;
   if (row.device_id) { args.push(row.device_id); sql += ` AND device_id=$${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(row.subject_id);
   return r.rowCount || 0;
+}
+
+/**
+ * ⛔ S78: هر باطل‌کردن ⇒ سوکت‌های زندهٔ همان کس همان لحظه دوباره سنجیده و
+ * اگر نشستشان رفته بسته می‌شوند (`sync-v1-live.accessChanged`، تنها درِ آن).
+ * دستگاهِ دیگرِ همان آدم که نشستش زنده است دست نمی‌خورد.
+ */
+function liveRecheck(subjectId) {
+  if (!subjectId) return Promise.resolve(0);
+  return require('./sync-v1-live').accessChanged({ userId: String(subjectId) });
 }
 
 async function revoke(token, kind) {
   const r = await query(
-    'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL',
+    'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL RETURNING subject_id',
     [now(), hashToken(token), kind]
   );
+  if (r.rowCount > 0 && r.rows[0]) await liveRecheck(r.rows[0].subject_id);
   return r.rowCount > 0;
 }
 
@@ -226,6 +238,7 @@ async function revokeAllForSubject(subjectId, kind = null, app = null) {
   if (kind) { args.push(kind); sql += ` AND kind=$${args.length}`; }
   if (app) { args.push(app); sql += ` AND COALESCE(app,'shop')=$${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(subjectId);
   return r.rowCount;
 }
 
@@ -246,13 +259,15 @@ async function revokeOthersForSubject(subjectId, { keepDeviceId = null, keepToke
   if (keepDeviceId) { args.push(keepDeviceId); sql += ` AND COALESCE(device_id,'') <> $${args.length}`; }
   else if (keepTokenHash) { args.push(keepTokenHash); sql += ` AND token_hash <> $${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(subjectId);
   return r.rowCount;
 }
 
 async function revokeAllForDevice(deviceId) {
   const r = await query(
-    'UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL', [now(), deviceId]
+    'UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL RETURNING subject_id', [now(), deviceId]
   );
+  for (const subject of new Set(r.rows.map((x) => x.subject_id))) await liveRecheck(subject);
   return r.rowCount;
 }
 

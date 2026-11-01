@@ -467,14 +467,14 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = await authorize(c, ctx, op, row, deviceId, origin, groups);
+  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -805,7 +805,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, plan });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }

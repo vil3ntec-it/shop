@@ -37,7 +37,9 @@ async function pushHandler(req, res) {
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
     () => sync.pushChanges(
-      { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role },
+      //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد، هرگز رد (F0-02)
+      { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role, finalized: 'log',
+        ip: require('../middleware/ratelimit').clientIp(req) },
       changes
     )
   );
@@ -61,7 +63,8 @@ router.get('/status', async (req, res) => {
     shopId: req.shopId,
     rev: await sync.currentRev(req.shopId),
     collections: sync.COLLECTIONS,
-    role: req.role,
+    role: require('../lib/permissions').legacyRole(req.role),
+    actualRole: req.role,
     subscription: ent.subscription,
     serverTime: now(),
   });

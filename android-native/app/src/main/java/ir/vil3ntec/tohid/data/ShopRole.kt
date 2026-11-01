@@ -36,6 +36,14 @@ object ShopRole {
    *  اصلاً راه نمی‌اندازد (سرور هم `403 courier_scope` می‌دهد).
    */
   const val COURIER = "courier"
+  /**
+   *  چهار نقشِ تازهٔ کارمند (STF-01، A16). آنچه هر کدام می‌کند در `PermCore`
+   *  (پیش‌فرض‌ها و `canWrite`) و سرور است؛ شرحِ فارسی در `RoleInfo`.
+   */
+  const val CASHIER = "cashier"
+  const val STOREKEEPER = "storekeeper"
+  const val PICKER = "picker"
+  const val ACCOUNTANT = "accountant"
 
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -105,8 +113,27 @@ object ShopRole {
   /** هر بار نقش یا `policy` عوض شد یک بالا می‌رود — صفحه‌ای که مجوز را `remember` کرده دوباره می‌سنجد */
   val policyVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
 
-  /** شاگرد است — نه صاحب، نه مدیر */
-  fun isStaff(context: Context): Boolean = current(context) == STAFF
+  /**
+   *  کارمند است — نه صاحب، نه مدیر: شاگرد یا یکی از نقش‌های تازه (A16).
+   *  برای سه نقشِ قدیم همان `== STAFF`ِ پیشین است؛ صندوق‌دار، انباردار،
+   *  جمع‌آور و حسابدار هم مثلِ شاگرد «حذفِ همه» و «خروجیِ کامل» ندارند.
+   */
+  fun isStaff(context: Context): Boolean = current(context).let { it != OWNER && it != MANAGER }
+
+  /**
+   *  این نقش این بخشِ دفتر (نامِ جدولِ همگام‌سازی) را می‌نویسد؟ — همان
+   *  `canWrite`ی که سرور در هر سه راهِ همگام‌سازی اجرا می‌کند. نقشی که این
+   *  نسخه نمی‌شناسد این‌جا بسته نمی‌شود؛ سرور خودش می‌سنجد.
+   */
+  fun canWrite(context: Context, table: String): Boolean {
+    val role = current(context)
+    return role !in ir.vil3ntec.tohid.core.perm.PermCore.ROLES ||
+      ir.vil3ntec.tohid.core.perm.PermCore.canWrite(role, table)
+  }
+
+  /** حسابدار: همه را می‌بیند، هیچ نمی‌نویسد */
+  fun isReadOnly(context: Context): Boolean =
+    ir.vil3ntec.tohid.core.perm.PermCore.writable(current(context)) == emptyList<String>()
 
   /**
    *  حق دیدنِ عددهای مالی: درآمد، فایده، ضرر.

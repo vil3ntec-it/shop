@@ -101,10 +101,7 @@ const CAPABILITIES = Object.freeze([
 
 router.get('/me', (req, res) => {
   res.json({
-    admin: {
-      id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role,
-      isOwner: req.admin.is_owner === true,
-    },
+    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role, isOwner: req.admin.is_owner === true },
     //  فاز ۳: درخواستِ پلِ پنل با کلیدِ سرویس ⇒ «انجام‌دهنده» و نقشِ مؤثرش (نه خودِ کلید)
     ...(req.actor ? { actor: req.actor, service: { keyId: req.service.keyId, name: req.service.keyName, roleCap: req.service.roleCap } } : {}),
     capabilities: CAPABILITIES,
@@ -740,11 +737,7 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
   if (id === req.admin.id) return next(badRequest('نقش یا وضعیتِ خودتان را نمی‌توانید عوض کنید', 'admin_self'));
   const target = await one('SELECT id, role, status FROM admins WHERE id=$1', [id]);
   if (!target) return next(notFound('مدیر پیدا نشد'));
-  /*
-   *  ⛔ فاز ۳ (یافتهٔ S12): **مالکِ اصلی** را هیچ مدیرِ دیگری — حتی ارشد — غیرفعال یا تنزل نمی‌دهد؛
-   *  وگرنه ارشدِ دوم صاحبِ سامانه (و پلِ پنلش) را بیرون می‌گذاشت. راهِ بازیابی فقط از پوستهٔ سرور
-   *  (`lib/admin-owner.js`). خودِ مالک هم نقشِ خودش را عوض نمی‌کند (`admin_self` ِ بالا).
-   */
+  //  ⛔ فاز ۳ (S12): مالکِ اصلی را هیچ مدیرِ دیگری غیرفعال یا تنزل نمی‌دهد — بازیابی فقط از پوسته (`lib/admin-owner.js`)
   if (id === await require('../lib/admin-owner').ownerId()) {
     return next(forbidden('مالکِ اصلیِ سامانه را هیچ مدیرِ دیگری غیرفعال یا تنزل نمی‌دهد', 'owner_protected'));
   }
@@ -766,9 +759,14 @@ router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
   //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
   const configured = !!config.backup.passphrase;
+  //  SEC-07: `required` = پرچمِ `security / backup.require_encryption` (بی رمز ⇒ پشتیبان نمی‌سازد)
+  const required = await backup.encryptionRequired();
   res.json({
     backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
-    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+    encryption: {
+      configured, required,
+      warning: configured ? '' : (required ? backup.REFUSED_WARNING : backup.UNENCRYPTED_WARNING),
+    },
   });
 });
 

@@ -54,7 +54,7 @@ const step = async (name, fn) => {
   try { await fn(); console.log(`✅  ${name}`); } catch (e) { failed++; console.log(`❌  ${name}\n    ${e.message}`); }
 };
 
-async function open(width = 1366, fresh = null) {
+async function open(width = 1366, fresh = null, ledger = LEDGER) {
   const ctx = await browser.newContext({ viewport: { width, height: 900 }, timezoneId: 'Asia/Kabul', locale: 'fa-AF' });
   const pg = await ctx.newPage();
   //  «امروز» = ۱۴ مهر ۲۰۲۶، ۱۰:۰۰ کابل — تاریخِ دفترِ آزمون‌های مرجع
@@ -65,7 +65,7 @@ async function open(width = 1366, fresh = null) {
   await pg.evaluate(([d, f]) => {
     localStorage.setItem('tohid-shop-data-v1', JSON.stringify(d));
     if (f !== null) localStorage.setItem('tohid-report-fresh', f);
-  }, [LEDGER, fresh]);
+  }, [ledger, fresh]);
   await pg.reload();
   await pg.waitForTimeout(1200);
   const skip = pg.getByText('ادامه بدون حساب');
@@ -186,6 +186,31 @@ await step('خانه: کارت‌ها از همان هسته، نشان‌های
   assert.equal(await footCell(pg, 'لغو (بار)'), String(fr.voidCount));
   assert.deepEqual(errors, []);
   await ctx.close();
+});
+
+await step('RSK-10: هشدارِ رفتارِ غیرعادیِ صندوقدار — نشانِ خانه و فهرستِ زبانهٔ ضدتقلب، همان هستهٔ تابلو', async () => {
+  //  همان دفتر + چهار «کشو بی فروش» ِ دیگرِ کریم در همان روز ⇒ ۵ در برابرِ ۰ ِ بقیه
+  const L = JSON.parse(JSON.stringify(LEDGER));
+  for (let i = 0; i < 4; i++) L.auditLog.push({ id: `rsk${i}`, type: 'no_sale', by: 'کریم', reason: 'change', at: 1791966600000 + i * 60000 });
+  const want = B.alertsOf(C.fraud(C.ledger(L), { from: DATE, to: DATE, clock: CLOCK }));
+  assert.equal(want.length, 1);
+  assert.ok(!HOME.pills.some((p) => p.id === 'cashier'), 'دفترِ مرجع هشداری ندارد');
+  const { pg, ctx, errors } = await open(1366, '1', L);
+  await go(pg, 'dashboard');
+  assert.equal(await pg.locator('#dash-fresh .rf-pill[data-pill="cashier"].rf-danger').count(), 1);
+  await pg.click('#dash-fresh .rf-pill[data-pill="cashier"]');
+  await pg.waitForTimeout(200);
+  assert.deepEqual(await pressed(pg, 'data-rtab'), ['fraud']);
+  const items = await pg.locator('#rep-fresh .rf-alerts li').allTextContents();
+  assert.deepEqual(items, ['کریم: 5 کشو بی فروش در 1 فاکتور — بقیه 0 در 3']);
+  //  دفترِ بی هشدار: نه نشان، نه کادر
+  await ctx.close();
+  const quiet = await open(1366, '1');
+  await go(quiet.pg, 'reports');
+  await quiet.pg.click('#rep-fresh button[data-rtab="fraud"]');
+  assert.equal(await quiet.pg.locator('#rep-fresh .rf-alerts').count(), 0);
+  assert.deepEqual([...errors, ...quiet.errors], []);
+  await quiet.ctx.close();
 });
 
 await step('سود و حاشیه همیشه «تقریبی»؛ مرتب‌سازی با سرستون؛ کارت/جدول؛ CSV', async () => {

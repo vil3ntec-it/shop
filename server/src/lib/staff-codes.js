@@ -59,7 +59,7 @@ const COURIER_INVITE = Object.freeze({ maxUses: 1, defaultTtlMs: 72 * 3600 * 100
 async function create(shopId, createdBy, { role = 'staff', expiresAt = null, maxUses = 1 } = {}) {
   //  'courier' (DLV-01) فقط کدِ یک‌بارِ دعوت است — کدِ ثابت همیشه شاگرد/مدیر.
   //  پرچمِ `shop.delivery` را مسیرِ `/api/shop/invite` پیش از این می‌سنجد.
-  if (!['manager', 'staff', 'courier'].includes(role)) throw badRequest('نقش کد معتبر نیست');
+  if (![...require('./permissions').STAFF_ROLES, 'courier'].includes(role)) throw badRequest('نقش کد معتبر نیست');
   if (maxUses < 0 || maxUses > 500) throw badRequest('تعداد استفاده معتبر نیست');
   if (expiresAt !== null && (!Number.isFinite(expiresAt) || expiresAt <= now())) {
     throw badRequest('تاریخ انقضا باید در آینده باشد');
