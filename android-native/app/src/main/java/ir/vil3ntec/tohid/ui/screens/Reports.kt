@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.ShrinkReportPref
+import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
@@ -96,6 +98,9 @@ fun ReportsScreen(d: ShopData) {
     //  خرید هم قیمتِ خریدِ دکان است — همان قاعدهٔ «سود و فروش»
     if (canSeeMoney) SECTION_TITLES else SECTION_TITLES.filterKeys { it != "sales" && it != "purchases" }
   }
+  //  INV-17 — «ضایعات و کسری» (پیش‌فرض خاموش). ارزش به قیمتِ خرید است، پس فقط با `canSeeMoney`
+  val shrinkOn = remember { ShrinkReportPref.on(context) } && canSeeMoney
+  val shown = if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
@@ -123,7 +128,7 @@ fun ReportsScreen(d: ShopData) {
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        sections.forEach { (id, label) ->
+        shown.forEach { (id, label) ->
           FilterChip(selected = section == id, onClick = { section = id }, label = { Text(label) })
         }
       }
@@ -146,7 +151,7 @@ fun ReportsScreen(d: ShopData) {
         OutlinedButton(
           onClick = {
             val sheet = ReportCsv.of(section, d, from, to, todayIso())
-            ReportPrint.print(context, sheet, SECTION_TITLES[section] ?: "گزارش")
+            ReportPrint.print(context, sheet, shown[section] ?: SECTION_TITLES[section] ?: "گزارش")
           },
           modifier = Modifier.weight(1f),
         ) {
@@ -167,6 +172,7 @@ fun ReportsScreen(d: ShopData) {
       "debtors" -> debtorsSection(this, d)
       "purchases" -> if (canSeeMoney) purchasesSection(this, d, from, to)
       "expiry" -> expirySection(this, d)
+      "shrink" -> if (shrinkOn) shrinkSection(this, d, range, from, to) { range = it }
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }
