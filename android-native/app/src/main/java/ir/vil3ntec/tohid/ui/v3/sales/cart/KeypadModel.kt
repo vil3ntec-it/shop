@@ -2,9 +2,9 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ProductInfoMap
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.KeypadInput
 
@@ -32,7 +32,7 @@ object KeypadModel {
 
   fun item(d: ShopData, productId: String, lines: List<SalesEngine.CartLine>): KeypadItem? {
     val p = d.products.find { it.id == productId } ?: return null
-    return KeypadItem(p, ShopStore.stock(d, p.id), lines.filter { it.productId == p.id }.sumOf { it.quantity })
+    return KeypadItem(p, ProductInfoMap.sellable(d, p.id), lines.filter { it.productId == p.id }.sumOf { it.quantity })
   }
 
   fun start(item: KeypadItem): String = if (item.inCart > 0) qty(item.inCart) else ""

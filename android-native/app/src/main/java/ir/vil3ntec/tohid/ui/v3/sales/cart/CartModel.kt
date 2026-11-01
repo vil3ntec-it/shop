@@ -3,9 +3,9 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ProductInfoMap
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.CartSummary
 
@@ -30,7 +30,7 @@ object CartModel {
   fun addOne(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String): Step {
     val p = d.products.find { it.id == productId } ?: return Step(null, null, false)
     val step = SalesEngine.cartStep(p.unit)
-    val added = SalesEngine.addToCartCapped(lines, p.id, step, ShopStore.stock(d, p.id))
+    val added = SalesEngine.addToCartCapped(lines, p.id, step, ProductInfoMap.sellable(d, p.id))
     if (!added.capped) return Step(added.cart, null, false)
     val note = if (added.available <= 0) SalesEngine.shortageMessage(p, step, added.available)
     else StrSale.onlyLeftOf(p.name, stockLeft(p, added.available))
@@ -51,7 +51,7 @@ object CartModel {
   fun step(d: ShopData, lines: List<SalesEngine.CartLine>, row: CartSummary.Row, sign: Int): Step {
     if (sign > 0 && row.hasProduct) {
       val p = d.products.find { it.id == row.id } ?: return Step(null, null, false)
-      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ShopStore.stock(d, p.id))
+      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ProductInfoMap.sellable(d, p.id))
       val note = if (added.capped) StrSale.onlyLeftOf(p.name, stockLeft(p, added.available)) else null
       return Step(added.cart.takeIf { it !== lines }, note, added.capped)
     }
@@ -105,7 +105,7 @@ object CartModel {
       is BarcodeMatch.Hit.Product -> {
         val p = d.products.find { it.id == hit.id } ?: return Scan.Unknown(code)
         if (!p.active) return Scan.Inactive(p)
-        val added = SalesEngine.addToCartCapped(lines, p.id, multiplier, ShopStore.stock(d, p.id))
+        val added = SalesEngine.addToCartCapped(lines, p.id, multiplier, ProductInfoMap.sellable(d, p.id))
         Scan.Added(added.cart, p, hit.exact, added.capped, added.available)
       }
       BarcodeMatch.Hit.None -> Scan.Unknown(code)
@@ -117,7 +117,7 @@ object CartModel {
    *  قاعده‌هایش با `ScaleLabels` است؛ این‌جا فقط افزودن.
    */
   fun weighed(d: ShopData, lines: List<SalesEngine.CartLine>, product: Product, quantity: Double): Scan.Added {
-    val added = SalesEngine.addToCartCapped(lines, product.id, quantity, ShopStore.stock(d, product.id))
+    val added = SalesEngine.addToCartCapped(lines, product.id, quantity, ProductInfoMap.sellable(d, product.id))
     return Scan.Added(added.cart, product, whole = true, capped = added.capped, available = added.available, weighed = quantity)
   }
 
