@@ -32,7 +32,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const inventory = require('./route-inventory');
 
-inventory.trackMounts();   //  پیش از ساختنِ برنامه
+inventory.tapMounts();   //  پیش از ساختنِ برنامه
 
 const h = require('./helpers');
 const F = require('./image-fixtures');
@@ -400,7 +400,7 @@ async function getWorld() {
 }
 
 test('ردهٔ مسیرها: هر درِ /api دقیقاً یک خانوادهٔ جداسازی دارد؛ مسیرِ تازهٔ بی‌رده سرخ است', async () => {
-  const routes = inventory.live(h.server());
+  const routes = inventory.live(h.server().listeners('request')[0]);
   assert.ok(routes.length > 600, `فقط ${routes.length} در`);
   const cases = casesFor({ data: Object.fromEntries(Object.keys(DATA).map((k) => [k, 'x'])) });
   const bad = [];
@@ -425,7 +425,7 @@ test('ردهٔ مسیرها: هر درِ /api دقیقاً یک خانوادهٔ
 
 test('TEN-01/02: هر درِ نشست‌دارِ بیرون از /api/shop — صاحبِ «ب» (شاگردِ «الف» هم) با شناسه، سرآیند، querystring، بدنه و opهای «الف» هیچ دادهٔ «الف» نمی‌گیرد و هیچ ردیفش را عوض نمی‌کند', async () => {
   const { a, b } = await getWorld();
-  const routes = inventory.live(h.server());
+  const routes = inventory.live(h.server().listeners('request')[0]);
   const casesA = casesFor(a.I);
   const keyed = new Map(routes.map((r) => [r.key, r]));
   const specs = Object.entries(casesA).map(([key, spec]) => ({ key, ...spec, method: key.split(' ')[0], route: keyed.get(key) }));
@@ -575,6 +575,12 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/image-bank/file/:id/:version/:size': { exempt: 'بانکِ مشترکِ تصویر' },
   'GET /api/admin/image-bank/batches/:id/report': { exempt: 'بانکِ مشترکِ تصویر' },
   'GET /api/admin/image-bank/batches/:id/files': { exempt: 'بانکِ مشترکِ تصویر — فایل‌های رسیدهٔ دستهٔ مدیر برای ادامهٔ بارگذاری (IMG-14)، فقط‌خواندنی' },
+  //  پنلِ مرکزی (#597، #605): فراداده یا دفترِ خودِ پلتفرم، نه دفترِ دکان
+  'GET /api/admin/shops/:id/health': { exempt: 'سلامتِ همگام‌سازی و اشتراک — فقط شمار و زمان؛ بی ردیفِ فروش، مشتری، متنِ خطا یا IP (`lib/shop-health.js`)' },
+  'GET /api/admin/shops/:id/holds': { exempt: 'حالت‌های مدیریتیِ خودِ پلتفرم روی دکان (تعلیق، بایگانی…) — نه دادهٔ دکان' },
+  'GET /api/admin/admins/:id/sessions': { exempt: 'نشست‌های مدیرِ خودِ پلتفرم — فقط ارشد؛ نه دادهٔ دکان' },
+  'GET /api/admin/ops/incidents/:id': { exempt: 'رخدادِ عملیاتیِ خودِ سرور' },
+  'GET /api/admin/finance/payments/:id': { exempt: 'پرداختِ اشتراک — صورت‌حسابِ خودِ پلتفرم' },
 };
 /** درهای GETی که محتوای خصوصیِ یک دکان را **می‌توانند** بدهند، بی سابقه، با دلیل. */
 const CONTENT_LIST_OK = {
@@ -589,7 +595,7 @@ test('TEN-04: هر درِ GETِ مدیر با شناسهٔ موضوع سابقه
   assert.equal(st.status, 201, JSON.stringify(st.body));
   const stationId = st.body.station.id;
 
-  const routes = inventory.live(h.server()).filter((r) => r.method === 'GET' && r.path.startsWith('/api/admin/'));
+  const routes = inventory.live(h.server().listeners('request')[0]).filter((r) => r.method === 'GET' && r.path.startsWith('/api/admin/'));
   const subject = routes.filter((r) => r.path.includes(':'));
   const unclassified = subject.filter((r) => !ADMIN_SUBJECT[r.key]).map((r) => r.key);
   assert.deepEqual(unclassified, [], `درِ موضوع‌دارِ تازهٔ مدیر — سابقه بنویسد یا با دلیل کنار رود:\n${unclassified.join('\n')}`);
