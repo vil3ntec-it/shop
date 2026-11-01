@@ -268,6 +268,8 @@ function casesFor(I) {
   add('GET /api/sync/v3/snapshot', { url: '/api/sync/v3/snapshot?device_id=v3-reader', own: ['v3'] });
   add('GET /api/sync/v3/status', { url: '/api/sync/v3/status?device_id=v3-a' });
   add('POST /api/sync/v3/report', { url: '/api/sync/v3/report', body: { device_id: 'v3-other', kind: 'stats' } });
+  //  §۹.۵ (#335): «کدام ردیفِ تنهای دستگاه این‌جا حذف شده؟» — فقط خواندن، از حسابِ همان نشست؛ پرچمِ `syncEpoch` خاموش ⇒ ۴۰۴
+  add('POST /api/sync/v3/deleted', { url: '/api/sync/v3/deleted', body: { device_id: 'v3-other', rows: [{ table: 'products', row_id: 'x1' }] } });
   add('GET /api/sync/v3/conflicts', { url: '/api/sync/v3/conflicts?status=open', own: ['v3conflict'] });
   add('POST /api/sync/v3/conflicts/:id/resolve', { url: `/api/sync/v3/conflicts/${I.v3conflict}/resolve`, body: { action: 'keep' } });
 
