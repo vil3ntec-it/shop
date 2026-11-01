@@ -90,7 +90,7 @@
     "StatusPill": 2,
     "html-escape": 13,
     "secret-derivation": 6,
-    "express-wrap": 3
+    "express-wrap": 2
   },
   "platformDeps": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/atrest/AtRestEnvelope.kt": 10,
@@ -244,7 +244,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/OrdersLive.kt": 25,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt": 6,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/PreviewBanner.kt": 2,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/PromoLive.kt": 28,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/PromoLive.kt": 29,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/ReauthHost.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/AppLock.kt": 3,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/AuditLog.kt": 3,
