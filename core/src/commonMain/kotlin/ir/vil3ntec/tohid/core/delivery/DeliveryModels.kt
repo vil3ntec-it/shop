@@ -33,6 +33,8 @@ data class DeskConfig(
   val perms: DeskPerms = DeskPerms(),
   /** پرچمِ خاموشِ `shop.orders.picking` (PCK): QRِ کدِ تحویل و پذیرشِ اسکنِ آن (PCK-11) */
   val picking: Boolean = false,
+  /** پرچمِ خاموشِ `shop.delivery_ratings` (DLV-18): دکمهٔ «امتیازِ تحویل‌ها» برای صاحب و مدیر */
+  val ratings: Boolean = false,
 )
 
 /** پیکِ دکان با نقدِ در دستش (DLV-11) */

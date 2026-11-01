@@ -174,4 +174,22 @@ class DeliveryWireTest {
     assertEquals(7 * 86_400_000L, week.second - week.first)
     assertEquals(day.second, week.second)
   }
+
+  @Test fun `DLV-18: امتیازِ تحویل‌ها — جمعِ هر پیک، تازه‌ها و پرچمِ دکمه؛ کلیدِ ناجور ⇒ خالی، نه کرش`() {
+    val b = DeliveryWire.ratings(obj("""{"couriers":[{"courierId":"c1","name":"احمد",
+      "fromCustomers":{"count":2,"avgTenths":45,"tags":{"on_time":2,"polite":1}},
+      "byCourier":{"count":1,"avgTenths":20,"tags":{"not_ready":1}}}],
+      "recent":[{"orderNo":12,"rater":"customer","stars":5,"tags":["on_time","polite"],"courierId":"c1"}]}"""))
+    assertEquals(1, b.couriers.size)
+    assertEquals(45, b.couriers[0].fromCustomers.avgTenths)
+    assertEquals(mapOf("on_time" to 2, "polite" to 1), b.couriers[0].fromCustomers.tags)
+    assertEquals(1, b.couriers[0].byCourier.count)
+    assertEquals(listOf("on_time", "polite"), b.recent.single().tags)
+    assertEquals(12L, b.recent.single().orderNo)
+    val empty = DeliveryWire.ratings(obj("""{"couriers":"x","recent":null}"""))
+    assertTrue(empty.couriers.isEmpty() && empty.recent.isEmpty())
+    assertTrue(DeliveryWire.config(obj("""{"ratings":true}""")).ratings)
+    assertFalse(DeliveryWire.config(obj("""{}""")).ratings)
+    assertEquals("/shop/delivery/ratings", ApiEndpoints.Delivery.RATINGS)
+  }
 }

@@ -20,8 +20,14 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class CourierRepository(private val api: ApiClient) {
 
-  /** `callEnabled`: دکان دکمهٔ «تماس با مشتری» را روشن کرده (`shop.delivery_courier_call`) */
-  data class Me(val id: String, val name: String, val active: Boolean, val cashCapMinor: Long, val callEnabled: Boolean = false)
+  /**
+   *  `callEnabled`: دکان دکمهٔ «تماس با مشتری» را روشن کرده (`shop.delivery_courier_call`)؛
+   *  `routeEnabled`/`ratingsEnabled`: «مسیرِ پیشنهادی» (DLV-04) و «امتیاز» (DLV-18) — پرچم‌های خاموشِ دکان
+   */
+  data class Me(
+    val id: String, val name: String, val active: Boolean, val cashCapMinor: Long, val callEnabled: Boolean = false,
+    val routeEnabled: Boolean = false, val ratingsEnabled: Boolean = false,
+  )
 
   suspend fun me(): ApiResult<Me> = result {
     val out = api.get(ApiEndpoints.Courier.ME)
@@ -29,6 +35,7 @@ class CourierRepository(private val api: ApiClient) {
     Me(
       CourierWire.str(c, "id"), CourierWire.str(c, "name"), CourierWire.bool(c, "active"),
       CourierWire.long(c, "cashCapMinor") ?: 0L, CourierWire.bool(out, "callEnabled"),
+      CourierWire.bool(out, "routeEnabled"), CourierWire.bool(out, "ratingsEnabled"),
     )
   }
 
@@ -38,6 +45,21 @@ class CourierRepository(private val api: ApiClient) {
    */
   suspend fun callNumber(assignmentId: String): ApiResult<String> = result {
     CourierWire.str(api.post(ApiEndpoints.Courier.call(assignmentId), JsonObject(emptyMap())), "phone")
+  }
+
+  /**
+   *  امتیازِ پیک به یک تحویل (DLV-18) — فقط آنلاین، یک بار؛ همان امتیاز دوباره ⇒ همان پاسخ.
+   *  ⇒ `true` وقتی ثبت شد یا پیش‌تر ثبت شده بود.
+   */
+  suspend fun rate(assignmentId: String, stars: Int, tags: List<String>): ApiResult<Boolean> = result {
+    api.post(
+      ApiEndpoints.Courier.rating(assignmentId),
+      buildJsonObject {
+        put("stars", JsonPrimitive(stars))
+        put("tags", JsonArray(tags.map { JsonPrimitive(it) }))
+      },
+    )
+    true
   }
 
   /** `scope`: «active» (زنده) یا «done» (پایان‌یافته؛ سرور نشانی را نمی‌دهد) */

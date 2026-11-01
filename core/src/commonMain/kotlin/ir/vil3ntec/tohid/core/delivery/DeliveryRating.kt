@@ -39,6 +39,21 @@ object DeliveryRating {
     return Rating(s.toInt(), allowed.filter { it in set }) to ""
   }
 
+  /** پیک: دکمهٔ امتیاز فقط برای «تحویل شد» و یک بار؛ مهلتِ ۷ روز را سرور می‌سنجد (`rating_closed`) */
+  fun courierCanRate(status: String, assignmentId: String, rated: Set<String>): Boolean =
+    status == "delivered" && assignmentId !in rated
+
+  /** میانگین به دهم ⇒ «4.3» (رقمِ لاتین؛ رقمِ صفحه از فونت)؛ بی امتیاز ⇒ «—» */
+  fun avgText(avgTenths: Int?): String = if (avgTenths == null) "—" else "${avgTenths / 10}.${avgTenths % 10}"
+
+  /** یک ردیفِ `couriers` ِ `GET /shop/delivery/ratings` */
+  data class CourierRatings(val courierId: String, val name: String, val fromCustomers: Summary, val byCourier: Summary)
+
+  /** یک ردیفِ `recent` (بی نام و شمارهٔ مشتری) */
+  data class Recent(val orderNo: Long, val rater: String, val stars: Int, val tags: List<String>, val courierId: String)
+
+  data class Board(val couriers: List<CourierRatings>, val recent: List<Recent>)
+
   data class Summary(val count: Int, val avgTenths: Int?, val tags: Map<String, Int>)
 
   /** میانگین به دهم (۴٫۳ ⇒ ۴۳، نیمه به بالا) با عددِ صحیح، و شمارِ هر برچسب. */

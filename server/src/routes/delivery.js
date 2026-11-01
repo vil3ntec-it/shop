@@ -58,6 +58,8 @@ router.get('/config', async (req, res) => {
     defaultCashCapMinor: delivery.DEFAULT_CASH_CAP_MINOR,
     //  PCK-11: QRِ کدِ تحویل و پذیرشِ اسکنِ آن در برنامه — پشتِ پرچمِ خاموشِ `shop.orders.picking`
     picking: await require('../lib/order-picking').flagOf(req.shopId),
+    //  DLV-18: «امتیازِ تحویل‌ها» برای صاحب و مدیر — پشتِ پرچمِ خاموشِ `shop.delivery_ratings`
+    ratings: await require('../lib/orders').flagOf(req.shopId, require('../lib/delivery-ratings').FLAG),
     permissions: Object.fromEntries(
       ['view', 'assign', 'handover', 'couriers', 'settle', 'photo'].map((k) => [k, can(req.role, `delivery.${k}`)])
     ),

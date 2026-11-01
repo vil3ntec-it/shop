@@ -196,6 +196,8 @@ object ApiEndpoints {
     fun settlements(courierId: String, limit: Int) = "$SETTLEMENTS?courierId=${enc(courierId)}&limit=$limit"
     /** RPT-15 — گزارشِ نقدِ پیک‌ها در [from، to) */
     fun cashReport(from: Long, to: Long) = "$ROOT/cash-report?from=$from&to=$to"
+    /** DLV-18 — امتیازِ تحویل‌ها (۹۰ روزِ گذشته)، صاحب و مدیر */
+    const val RATINGS = "$ROOT/ratings"
     fun statement(name: String, from: Long?, to: Long?) = buildString {
       append("$EXTERNAL/statement?name=").append(enc(name))
       if (from != null) append("&from=").append(from)
@@ -217,6 +219,8 @@ object ApiEndpoints {
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
     /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */
     fun call(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/call"
+    /** امتیازِ پیک به تحویل (DLV-18) */
+    fun rating(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/rating"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

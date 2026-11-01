@@ -53,6 +53,9 @@ router.get('/me', async (req, res) => {
     courier: { id: c.id, name: c.name, active: c.active === true, cashCapMinor: Number(c.cash_cap_minor) },
     //  DLV-02: دکمهٔ «تماس با مشتری» فقط وقتی دیده می‌شود که دکان روشنش کرده باشد
     callEnabled: await delivery.callFlagOf(req.shopId),
+    //  DLV-04/DLV-18: دکمه‌های «مسیرِ پیشنهادی» و «امتیاز» فقط با پرچمِ خودِ دکان دیده می‌شوند
+    routeEnabled: await orders.flagOf(req.shopId, courierRoute.FLAG),
+    ratingsEnabled: await orders.flagOf(req.shopId, ratings.FLAG),
     serverTime: Date.now(),
   });
 });
