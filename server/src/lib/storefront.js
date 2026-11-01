@@ -42,6 +42,7 @@ const sfd = require('./storefront-delivery');
 const sfs = require('./storefront-seen');
 const subst = require('./order-substitution');
 const shelf = require('./storefront-shelf');
+const sfDeals = require('./storefront-deals');   //  WEB-02 «پیشنهادها» (شرح همان‌جا)
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -311,10 +312,8 @@ const K_ANON = 3;
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
  * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
- * ۳۰ روز؛ «پیشنهادها» (`deals`): همان «ارزان‌تر از قیمتِ دکان» ِ بازارچه
- * (`lib/market.js`، `loadDeals`) — قیمتِ آنلاین کمتر از قیمتِ فروشِ دفتر و ⛔ فقط
- * وقتی صاحبِ دکان `showDeals` را روشن کرده (پیش‌فرض خاموش ⇒ قیمتِ دفتر هرگز
- * بیرون نمی‌رود). هیچ‌کدام عددِ ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. هیچ‌کدام عددِ
+ * ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
  */
 async function highlights(shopId, at = now()) {
   const since = at - RECENT_MS;
@@ -335,16 +334,7 @@ async function highlights(shopId, at = now()) {
         ORDER BY published_at DESC, product_id LIMIT 40`,
       [shopId, since]
     ),
-    many(
-      `SELECT sp.product_id, ROUND((r.data->>'salePrice')::numeric * 100)::bigint AS regular_minor
-         FROM ${PRODUCT_FROM}
-         JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
-        WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND sp.online_price_minor IS NOT NULL
-          AND (r.data->>'salePrice') ~ '^[0-9]{1,12}([.][0-9]{1,4})?$'
-          AND sp.online_price_minor < ROUND((r.data->>'salePrice')::numeric * 100)
-        ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), sp.product_id LIMIT 40`,
-      [shopId]
-    ),
+    sfDeals.dealRows(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId),
   ]);
   const shelfOf = async (ids) => {
     const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
@@ -354,8 +344,7 @@ async function highlights(shopId, at = now()) {
   const [bestsellers, newArrivals, offered] = await Promise.all([
     shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), shelfOf([...regular.keys()]),
   ]);
-  //  قیمتِ امروزِ همان پاسخ دوباره سنجیده می‌شود: «تخفیف» فقط وقتی هنوز ارزان‌تر است
-  const deals = offered.filter((p) => regular.get(p.id) > p.priceMinor).map((p) => ({ ...p, regularPriceMinor: regular.get(p.id) }));
+  const deals = sfDeals.withRegular(offered, regular);
   return { bestsellers, newArrivals, deals, windowDays: 30 };
 }
 
