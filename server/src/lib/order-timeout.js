@@ -138,7 +138,8 @@ async function tick() {
 }
 function start() {
   if (timer) return;
-  timer = setInterval(() => tick().catch((err) => console.error('[order-timeout]', err.message)), TICK_MS);
+  const run = require('./job-beat').wrap('order-timeout', TICK_MS, tick);   //  پنلِ مرکزی ۴.۹
+  timer = setInterval(() => run().catch((err) => console.error('[order-timeout]', err.message)), TICK_MS);
   if (timer.unref) timer.unref();
 }
 function stop() {
