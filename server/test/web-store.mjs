@@ -160,6 +160,8 @@ ok(await page.isVisible('#cart-bar'), 'نوارِ سبد پیدا شد');
 await page.reload();
 await page.waitForSelector('#products li[data-id]');
 ok((await page.textContent('#open-cart')).includes('۲'), 'سبدِ مهمان با تازه‌سازی می‌ماند (S132)');
+//  WEB-15: ثبتِ سفارش (store/checkout.js) جزوِ بارِ اول نیست — با بازشدنِ سبد می‌آید
+ok(!(await page.$('script[src="/store/checkout.js"]')), 'checkout.js پیش از بازشدنِ سبد بار نشد');
 
 await page.click('#open-cart');
 //  نوارِ تیره ⇐ برگهٔ تیرهٔ سبد (ref-5/6) ⇐ «ادامه»
