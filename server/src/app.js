@@ -352,6 +352,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
+    //  PAY-20/RPT-12: گزارشِ خودکار برای صاحبِ دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.owner_report`
+    api.use('/shop/owner-report', require('./routes/owner-report'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`

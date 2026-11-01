@@ -88,6 +88,8 @@ async function main() {
   require('./lib/order-desk').start();
   //  ORD-18: هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (فقط دکانِ با پرچمِ `shop.orders.start_alert`)
   require('./lib/order-start-alert').start();
+  //  PAY-20/RPT-12: گزارشِ خودکارِ صاحبِ دکان (فقط دکانِ با پرچمِ `shop.owner_report` و تنظیمِ روشنِ صاحب)
+  require('./lib/owner-report').start();
   //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
   const payments = require('./lib/payment-intents');
   payments.startReconciler();
@@ -124,6 +126,7 @@ async function main() {
     outbox.stop();
     orderNotify.stop();
     require('./lib/customer-notify').stop();
+    require('./lib/owner-report').stop();
     payments.stopReconciler();
     notices.stopRunner();
     opsAlerts.stop();

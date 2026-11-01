@@ -166,6 +166,7 @@ class SettingsPortTest {
       "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setOn" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
+      "OwnerReportLive.set" to "$PENDING — گزارشِ خودکار برای صاحب (تنظیمِ سروریِ فقط صاحب)، PAY-20/RPT-12",
       "PosMoreKeysPrefs.set" to "$PENDING — کلیدهای بیشترِ صندوق، فقط کامپیوتر",
       "PosNotesPrefs.set" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
       "PosNotesPrefs.setTemplates" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
