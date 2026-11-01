@@ -50,6 +50,8 @@ object ProductImportPlan {
     val saleMinor: Long,
     val minMilli: Long,
     val barcodes: List<String>,
+    /** PRD-04: بارکدهای بسته‌های همین کالا (کارتن…) — مالِ کالا هستند ولی بارکدِ «یک واحد» نمی‌شوند */
+    val reserved: List<String> = emptyList(),
   )
 
   sealed interface Change {
@@ -137,6 +139,7 @@ object ProductImportPlan {
     val byName = HashMap<String, Existing>()
     existing.forEach { e -> byName.getOrPut(key(e.name)) { e } }
     val owner = HashMap<String, Existing>()
+    existing.forEach { e -> e.reserved.forEach { owner[it] = e } }
     existing.forEach { e -> e.barcodes.forEach { owner[it] = e } }
 
     val seenName = HashMap<String, Int>()
@@ -240,6 +243,7 @@ object ProductImportPlan {
     codes.firstOrNull { it.length > MAX_BARCODE }?.let { return "بارکد بیش از $MAX_BARCODE نویسه است" }
     if (codes.size > ProductBarcodes.MAX) return "حداکثر ${ProductBarcodes.MAX} بارکد برای یک کالا"
     repeated?.let { (code, line) -> return "بارکدِ $code در ردیفِ $line هم آمده" }
+    match?.let { m -> codes.firstOrNull { it in m.reserved } }?.let { return "بارکدِ $it بارکدِ بسته‌ای از همین کالاست، نه یک واحد" }
     codes.firstNotNullOfOrNull { c -> owner[c]?.takeIf { it.id != match?.id }?.let { c to it } }?.let { (code, other) ->
       return "بارکدِ $code مالِ کالای «${other.name}» است"
     }

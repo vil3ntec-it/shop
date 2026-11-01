@@ -124,6 +124,22 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val tags: List<String>? = null,
+  /*
+   *  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با
+   *  `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته «اندازهٔ بسته» از `unit` به سبد می‌برد.
+   *  `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val packs: List<ProductPack>? = null,
+)
+
+/** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
+@Serializable
+data class ProductPack(
+  val name: String = "",
+  val sizeMilli: Long = 0,
+  val barcodes: List<String> = emptyList(),
 )
 
 @Serializable
