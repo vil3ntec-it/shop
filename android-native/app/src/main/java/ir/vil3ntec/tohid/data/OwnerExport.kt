@@ -153,6 +153,20 @@ object OwnerExport {
     //  PRD-24/PRD-25
     "alternatives" to "کالاهای جایگزین",
     "customFields" to "فیلدهای سفارشی",
+    //  PRD-03/PRD-09
+    "sku" to "کد کالا (SKU)",
+    "stockless" to "خدماتی یا بی موجودی",
+    //  PRD-10/PRD-13
+    "kit" to "اجزای کیت",
+    "priceWindows" to "قیمت‌های زمان‌بندی‌شده",
+    "parts" to "اجزای کیت هنگام فروش",
+    //  PRD-11
+    "variantAxes" to "ویژگی‌های تنوع",
+    "variantOf" to "شناسهٔ کالای مدل",
+    "variant" to "ترکیبِ تنوع",
+    //  POS-28
+    "serialTracked" to "سریال‌دار",
+    "serials" to "سریال‌ها",
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",
@@ -199,6 +213,8 @@ object OwnerExport {
     "fromMethod" to "روش پیشین",
     "toMethod" to "روش تازه",
     "payRef" to "مرجع روش تازه",
+    //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
+    "specialOrder" to "سفارش ویژه",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",

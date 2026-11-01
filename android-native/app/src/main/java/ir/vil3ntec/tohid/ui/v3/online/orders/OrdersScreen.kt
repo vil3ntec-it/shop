@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.online.orders
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,6 +75,10 @@ fun OrdersScreen(
   onBack: (() -> Unit)?,
   modifier: Modifier = Modifier,
   selectedId: String? = null,
+  /** میزِ سفارش، هشدارها و نوارِ گروهی (ORD-03/04/08/09/18/19) — زیرِ یادداشتِ زنده */
+  header: (@Composable () -> Unit)? = null,
+  /** انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه کارت تیک دارد و دکمهٔ گام ندارد */
+  picked: Set<String>? = null,
 ) {
   val stagger = rememberV3Stagger(state.tab)
   V3Scaffold(
@@ -97,6 +102,7 @@ fun OrdersScreen(
       verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
       item(key = "live-note") { V3Message(V3Tone.INFO, StrOnline.liveNote) }
+      if (header != null) item(key = "desk") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { header() } }
       items(state.notes, key = { "ff-" + it.key }) { n ->
         V3Message(
           V3Tone.WARNING, n.title, body = n.body.takeIf { it.isNotBlank() },
@@ -120,10 +126,11 @@ fun OrdersScreen(
             OrderCard(
               o = o,
               now = state.now,
-              step = OrdersModel.nextStep(o, state.perms),
+              step = if (picked != null) null else OrdersModel.nextStep(o, state.perms),
               onOpen = { actions.onOpen(o) },
               onStep = { to -> actions.onStep(o, to) },
-              selected = o.id == selectedId,
+              selected = o.id == selectedId || picked?.contains(o.id) == true,
+              checked = picked?.let { o.id in it },
               flash = o.id in state.fresh,
               modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, o.id, i),
             )

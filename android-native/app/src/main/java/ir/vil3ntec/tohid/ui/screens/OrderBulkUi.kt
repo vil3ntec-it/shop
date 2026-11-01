@@ -61,6 +61,63 @@ internal class OrderBulkState {
   }
 }
 
+/** گذارهای گروهیِ مجاز برای انتخابِ همین لحظه (فقط `orders.manage`) — همان در هر دو رابط */
+internal fun OrderBulkState.targets(cfg: OrdersConfigDto, selected: List<OrderDto>): List<String> =
+  if (cfg.permissions.manage) OrderBulk.targets(selected.map { it.status to orderPickActions(it, cfg).first }) else emptyList()
+
+/** برگه جزئیات (اقلام) می‌خواهد؛ کارتِ فهرست ندارد ⇒ هر سفارش تازه از سرور */
+private suspend fun fullOrders(repo: OrdersRepository, ids: List<String>): List<OrderDto> =
+  ids.mapNotNull { (repo.get(it) as? ApiResult.Success)?.value }
+
+/** «چاپِ برگه‌ها» ِ انتخاب‌شده‌ها ⇒ پیامِ صفحه */
+internal suspend fun OrderBulkState.print(repo: OrdersRepository, printer: OrderSlipPrint.Bulk, selected: List<OrderDto>): String {
+  val got = fullOrders(repo, selected.map { it.id })
+  return printer.print(got) + if (got.size < selected.size) "\n" + StrOrderOps.bulkFetchFailed(selected.size - got.size) else ""
+}
+
+/**
+ *  گذارِ گروهی: سرور هر سفارش را جدا می‌سنجد؛ پیامِ نتیجه (با چرایی تا سه ناموفق) و برگهٔ «قبول» (ORD-10) با
+ *  [onMessage]. انجام‌شده‌ها از انتخاب برداشته می‌شوند. `true` ⇒ سرور پاسخ داد.
+ */
+internal suspend fun OrderBulkState.send(
+  repo: OrdersRepository,
+  printer: OrderSlipPrint.Bulk,
+  items: List<OrderDto>,
+  selected: List<OrderDto>,
+  to: String,
+  reason: String,
+  note: String,
+  ready: Int?,
+  onMessage: (String) -> Unit,
+  onChanged: () -> Unit,
+): Boolean {
+  val from = selected.firstOrNull()?.status ?: return false
+  var ok = false
+  repo.bulkTransition(selected.map { it.id }, to, from, reason, note, ready)
+    .onSuccess { out ->
+      ok = true
+      val results = out.results.map { OrderBulk.Result(it.id, it.ok, it.unchanged, it.orderNo, it.code) }
+      val sum = OrderBulk.summarize(results)
+      val why = out.results.filter { !it.ok }.take(3).joinToString("\n") { r ->
+        val no = items.firstOrNull { it.id == r.id }?.orderNo ?: r.orderNo
+        StrOrderOps.bulkFailed(no.toString(), when (r.code) {
+          "status_changed" -> StrOrderOps.bulkWhyChanged
+          "order_not_found" -> StrOrderOps.bulkWhyMissing
+          else -> r.message.ifBlank { r.code }
+        })
+      }
+      onMessage(StrOrderOps.bulkResult(sum.changed, sum.unchanged, sum.failed.size) + if (why.isEmpty()) "" else "\n$why")
+      ids = OrderBulk.remaining(ids, results)
+      onChanged()
+      //  ORD-10: «یک قبول، یک برگه» برای هر سفارشی که همین حالا پذیرفته شد (تنظیمِ خاموش ⇒ هیچ پرسشی)
+      if (to == "accepted") {
+        printer.accepted(from, results.filter { it.ok && !it.unchanged }.map { it.id }) { id -> fullOrders(repo, listOf(id)).firstOrNull() }?.let(onMessage)
+      }
+    }
+    .onFailure { f -> onMessage(f.userMessage) }
+  return ok
+}
+
 /** حالتِ انتخابِ صفحه؛ عوض شدنِ برگه انتخاب را پاک می‌کند، پرچمِ خاموش حالت را می‌بندد */
 @Composable
 internal fun rememberOrderBulk(cfg: OrdersConfigDto, tab: String): OrderBulkState {
@@ -113,38 +170,15 @@ internal fun OrderBulkBar(
   var busy by remember { mutableStateOf(false) }
   var confirm by remember { mutableStateOf<String?>(null) }
   val selected = items.filter { it.id in s.ids }
-  val targets = if (cfg.permissions.manage) OrderBulk.targets(selected.map { it.status to orderPickActions(it, cfg).first }) else emptyList()
-  //  برگه جزئیات (اقلام) می‌خواهد؛ کارتِ فهرست ندارد ⇒ هر سفارش تازه از سرور
-  suspend fun full(ids: List<String>): List<OrderDto> = ids.mapNotNull { (repo.get(it) as? ApiResult.Success)?.value }
+  val targets = s.targets(cfg, selected)
 
   fun send(to: String, reason: String, note: String, ready: Int?) {
-    val from = selected.firstOrNull()?.status ?: return
-    val ids = selected.map { it.id }
-    if (busy) return
+    if (busy || selected.isEmpty()) return
     busy = true
     scope.launch {
-      repo.bulkTransition(ids, to, from, reason, note, ready)
-        .onSuccess { out ->
-          val results = out.results.map { OrderBulk.Result(it.id, it.ok, it.unchanged, it.orderNo, it.code) }
-          val sum = OrderBulk.summarize(results)
-          val why = out.results.filter { !it.ok }.take(3).joinToString("\n") { r ->
-            val no = items.firstOrNull { it.id == r.id }?.orderNo ?: r.orderNo
-            StrOrderOps.bulkFailed(no.toString(), when (r.code) {
-              "status_changed" -> StrOrderOps.bulkWhyChanged
-              "order_not_found" -> StrOrderOps.bulkWhyMissing
-              else -> r.message.ifBlank { r.code }
-            })
-          }
-          onMessage(StrOrderOps.bulkResult(sum.changed, sum.unchanged, sum.failed.size) + if (why.isEmpty()) "" else "\n$why")
-          s.ids = OrderBulk.remaining(s.ids, results)
-          confirm = null
-          onChanged()
-          //  ORD-10: «یک قبول، یک برگه» برای هر سفارشی که همین حالا پذیرفته شد (تنظیمِ خاموش ⇒ هیچ پرسشی)
-          if (to == "accepted") {
-            printer.accepted(from, results.filter { it.ok && !it.unchanged }.map { it.id }) { id -> full(listOf(id)).firstOrNull() }?.let(onMessage)
-          }
-        }
-        .onFailure { f -> onMessage(f.userMessage); confirm = null }
+      //  مثلِ پیش: برگهٔ تأیید پیش از تازه‌شدنِ فهرست (و چاپِ برگهٔ قبول) بسته می‌شود
+      s.send(repo, printer, items, selected, to, reason, note, ready, onMessage) { confirm = null; onChanged() }
+      confirm = null
       busy = false
     }
   }
@@ -162,8 +196,7 @@ internal fun OrderBulkBar(
         if (!busy) {
           busy = true
           scope.launch {
-            val got = full(selected.map { it.id })
-            onMessage(printer.print(got) + if (got.size < selected.size) "\n" + StrOrderOps.bulkFetchFailed(selected.size - got.size) else "")
+            onMessage(s.print(repo, printer, selected))
             busy = false
           }
         }

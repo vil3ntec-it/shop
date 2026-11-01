@@ -150,7 +150,7 @@ object CustomerCrm {
    */
   fun unitPrice(product: Product, debtor: Debtor?): Double =
     if (priceListOf(debtor) == PRICE_WHOLESALE && product.wholesalePrice > 0) product.wholesalePrice
-    else product.salePrice
+    else ProductPlansMap.price(product) // PRD-13
 
   /* ------------------------------ ویرایشِ پرونده ------------------------------ */
 

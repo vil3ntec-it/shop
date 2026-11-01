@@ -84,7 +84,14 @@ class DetailActions(
  *  چسبانِ پایین فقط گذارهای مجازِ `OrderStates` را دارد. روی پهن همین در ستونِ دوم.
  */
 @Composable
-fun OrderDetailScreen(state: DetailState, actions: DetailActions, onBack: (() -> Unit)?, modifier: Modifier = Modifier) {
+fun OrderDetailScreen(
+  state: DetailState,
+  actions: DetailActions,
+  onBack: (() -> Unit)?,
+  modifier: Modifier = Modifier,
+  /** زیرِ سرِ صفحه: «عقب انداختن» (ORD-07) */
+  extra: (@Composable () -> Unit)? = null,
+) {
   val o = state.order
   val bar = o?.let { OrdersModel.bar(it, state.perms) }
   V3Scaffold(
@@ -107,6 +114,7 @@ fun OrderDetailScreen(state: DetailState, actions: DetailActions, onBack: (() ->
           V3Message(V3Tone.WARNING, StrOnline.staleStatus, Modifier.padding(top = 8.dp), action = StrOnline.reload, onAction = actions.onReload)
         }
         HeaderCard(o, state.now)
+        extra?.invoke()
         state.notes.forEach { n ->
           V3Message(
             if (n.warn) V3Tone.WARNING else V3Tone.INFO, n.title, Modifier.padding(top = 8.dp),

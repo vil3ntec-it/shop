@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -54,6 +55,7 @@ import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.courier.TrackRow
+import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -118,6 +120,7 @@ internal fun CourierDetailPage(
   onPhoto: () -> Unit,
   onNavigate: () -> Unit,
   seen: V3StaggerState,
+  onRate: (() -> Unit)? = null,
 ) {
   val p = PhoneV3.colors
   val live = CourierFlow.isLive(c.status)
@@ -162,6 +165,10 @@ internal fun CourierDetailPage(
       }
       val actions = if (live) CourierFlow.actions(c.status) else emptyList()
       if (actions.isNotEmpty()) ActionArea(c, actions, onAction, onPhoto)
+      //  DLV-18: امتیازِ پیک به تحویلِ انجام‌شده — فقط با پرچمِ دکان و یک بار
+      if (onRate != null) {
+        CourierOnDark { CourierSecondary(StrCourier.rate, onRate, Modifier.fillMaxWidth().padding(16.dp), icon = Icons.Outlined.Star) }
+      }
     }
   }
 }

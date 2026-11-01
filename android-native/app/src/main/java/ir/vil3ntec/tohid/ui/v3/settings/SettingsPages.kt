@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
@@ -18,7 +19,9 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.PublishedWithChanges
 import androidx.compose.material.icons.outlined.QrCodeScanner
+import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Sync
@@ -46,7 +49,10 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.HeldInvoicesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LanguageScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.NavBarScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PasswordScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PayFixSettingsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PaySettingsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PriceListSettingsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.QuoteSettingsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ReturnsSettingsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SessionsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StaffCodeScreen
@@ -97,8 +103,11 @@ internal object SettingsPages {
     Page(SettingsLayout.HELD, Icons.Outlined.ViewAgenda) { HeldInvoicesScreen(it) },
     Page(SettingsLayout.RETURNS, Icons.Outlined.SwapVert) { ReturnsSettingsScreen(it) },
     Page(SettingsLayout.PAY, Icons.Outlined.Payments) { PaySettingsScreen(it) },
+    Page(SettingsLayout.PAY_FIX, Icons.Outlined.PublishedWithChanges) { PayFixSettingsScreen(it) },
     Page(SettingsLayout.CREDIT_GATE, Icons.Outlined.CreditCardOff) { CreditGateScreen(it) },
     Page(SettingsLayout.CRM_REPORTS, Icons.Outlined.TableChart) { CrmReportsScreen(it) },
+    Page(SettingsLayout.PRICE_LIST, Icons.Outlined.LocalOffer) { PriceListSettingsScreen(it) },
+    Page(SettingsLayout.QUOTE, Icons.Outlined.RequestQuote) { QuoteSettingsScreen(it) },
     Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
     Page(SettingsLayout.STOCK_MODE, Icons.Outlined.SwapHoriz) { StockModeScreen(it) },
     Page(SettingsLayout.STOCK_INSIGHT, Icons.Outlined.Inventory2) { StockInsightScreen(it) },

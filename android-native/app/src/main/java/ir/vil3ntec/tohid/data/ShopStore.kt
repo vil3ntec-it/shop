@@ -954,18 +954,18 @@ class ShopStore(private val context: Context) {
      *  در جستجو زده می‌شد از نو. دکانی با چند صد کالا و چند هزار فاکتور،
      *  همان‌جا می‌ایستاد.
      *
-     *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد
-     *  هر پرسش یک خواندن است. نتیجه‌ها مو‌به‌مو همان‌اند — فقط راهش عوض
-     *  شده.
+     *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد هر پرسش یک خواندن است.
+     *  PRD-10: کیت موجودیِ خودش را ندارد — ورود/فروش/برگشتِ آن به اجزا پخش می‌شود (`ProductPlansMap`).
      */
     class StockIndex(d: ShopData) {
       private val entered = HashMap<String, Double>()
       private val cartonsIn = HashMap<String, Double>()
       private val sold = HashMap<String, Double>()
+      private val kits: Map<String, List<KitPart>> = d.products.mapNotNull { p -> p.kit?.ifEmpty { null }?.let { p.id to it } }.toMap()
 
       init {
         d.warehouseEntries.forEach { e ->
-          entered[e.productId] = (entered[e.productId] ?: 0.0) + e.units
+          (kits[e.productId]?.map { it.productId to e.units * it.qty } ?: listOf(e.productId to e.units)).forEach { (id, u) -> entered[id] = (entered[id] ?: 0.0) + u }
           cartonsIn[e.productId] = (cartonsIn[e.productId] ?: 0.0) + e.cartons
         }
         // وضعیتِ فاکتورها یک بار در یک نگاشت می‌نشیند تا برای هر قلم
@@ -974,20 +974,20 @@ class ShopStore(private val context: Context) {
         d.sales.forEach { if (it.status == "cancelled") cancelled += it.id }
         d.saleItems.forEach { item ->
           if (item.saleId in cancelled) return@forEach
-          sold[item.productId] =
-            (sold[item.productId] ?: 0.0) + (item.quantity - item.returnedQty)
+          sold[item.productId] = (sold[item.productId] ?: 0.0) + (item.quantity - item.returnedQty)
+          item.parts?.forEach { k -> sold[k.productId] = (sold[k.productId] ?: 0.0) + (item.quantity - item.returnedQty) * k.qty }
         }
       }
 
       fun soldQty(productId: String): Double = sold[productId] ?: 0.0
 
-      fun stock(productId: String): Double =
-        (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0)
+      fun stock(productId: String): Double = kits[productId]?.let { k -> ProductPlansMap.kitStock(k) { raw(it) } } ?: raw(productId)
+      private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0)
 
       fun cartons(productId: String): Double = cartonsIn[productId] ?: 0.0
 
       fun status(product: Product): String {
-        val s = stock(product.id)
+        val s = if (product.stockless == true) Double.MAX_VALUE else stock(product.id) // PRD-09: خدماتی همیشه «کافی»
         return when {
           s <= 0 -> "out"
           s <= product.minStock -> "low"

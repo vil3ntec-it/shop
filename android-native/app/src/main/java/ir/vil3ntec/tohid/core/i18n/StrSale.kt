@@ -506,4 +506,16 @@ object StrSale {
   //  تخفیفِ خودکار روی فاکتور (پرچمِ `shop.promo_stamp`) — آگاهی است، از «جمع اقلام» کم نمی‌شود
   fun lineAutoDiscount(a: Any): String = t("− $a تخفیفِ خودکار", "− $a automatic discount", "− $a اتومات تخفیف")
   fun includesAutoDiscount(names: Any): String = t("شاملِ تخفیفِ خودکار$names", "Includes automatic discount$names", "اتومات تخفیف پکې شامل دی$names")
+
+  // هزینهٔ خودکارِ ردیف یا فاکتور (POS-36)
+  val feesTitle: String get() = t("هزینهٔ خودکار", "Automatic charges", "اتومات لګښتونه")
+  fun feesCount(a: Any): String = t("$a قاعده", "$a rules", "$a قاعدې")
+  val feesNote: String get() = t(
+    "هر خط یک هزینه: «کیسه = 5» برای هر فاکتور، یا «برنج، شکر: بسته‌بندی = 2» برای هر واحدِ همین کالاها (نام یا بارکد). هزینه خودکار ته سبد می‌آید و با سبد عوض می‌شود. خالی یعنی خاموش. فقط روی همین دستگاه.",
+    "One charge per line: \"Bag = 5\" for every invoice, or \"Rice, Sugar: Packing = 2\" for each unit of those items (name or barcode). The charge is added to the end of the cart and follows the cart. Empty means off. This device only.",
+    "هره کرښه یو لګښت: «کڅوړه = 5» د هر بل لپاره، یا «وريجې، بوره: بسته بندي = 2» د همدې توکو د هر واحد لپاره (نوم یا بارکوډ). لګښت پخپله د ټوکرۍ پای ته ورځي او له ټوکرۍ سره بدلېږي. تش یعنې بند. یوازې همدا وسیله.",
+  )
+  fun feesBad(a: Any): String = t("این خط درست نیست، مبلغش صفر است یا کالایش پیدا نشد: $a", "This line is wrong, has a zero amount or its item was not found: $a", "دا کرښه سمه نه ده، اندازه یې صفر ده یا یې توکی ونه موندل شو: $a")
+  val feesSave: String get() = t("ذخیره", "Save", "ثبت")
+  val feesSaved: String get() = t("ذخیره شد", "Saved", "ثبت شو")
 }

@@ -127,8 +127,10 @@ private fun StepButton(icon: androidx.compose.ui.graphics.vector.ImageVector, la
 
 /** وضعیتِ موجودی: همیشه نقطه + نوشته + رنگ (۱۹.۱۱)، نه رنگِ تنها */
 @Composable
-fun StockLine(stock: Double, minStock: Double, unit: String, modifier: Modifier = Modifier) {
+fun StockLine(stock: Double, minStock: Double, unit: String, modifier: Modifier = Modifier, stockless: Boolean = false) {
   val (color, text) = when {
+    //  PRD-09: کالای خدماتی موجودی ندارد که تمام شود
+    stockless -> Shop.colors.success to ir.vil3ntec.tohid.core.i18n.StrProduct.serviceTag
     stock <= 0 -> Shop.colors.danger to Str.outOfStock
     minStock > 0 && stock <= minStock -> Shop.colors.warning to StrSale.lowQty(qty(stock) + (if (unit.isNotBlank()) " $unit" else ""))
     else -> Shop.colors.success to StrSale.inStockQty(qty(stock) + (if (unit.isNotBlank()) " $unit" else ""))
@@ -136,7 +138,7 @@ fun StockLine(stock: Double, minStock: Double, unit: String, modifier: Modifier 
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
     Box(Modifier.size(7.dp).clip(CircleShape).background(color))
     Spacer(Modifier.width(5.dp))
-    Text(text, style = MaterialTheme.typography.labelSmall, color = if (stock <= 0) Shop.colors.danger else Shop.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(text, style = MaterialTheme.typography.labelSmall, color = if (stock <= 0 && !stockless) Shop.colors.danger else Shop.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
   }
 }
 
@@ -187,7 +189,7 @@ fun ProductCard(
 ) {
   val c = Shop.colors
   val label = buildString {
-    append(product.name); append(Str.listSep + " "); append(money(product.salePrice)); append(" " + Str.afghani)
+    append(product.name); append(Str.listSep + " "); append(money(ir.vil3ntec.tohid.data.ProductPlansMap.price(product))); append(" " + Str.afghani)
     if (inCart > 0) { append(Str.listSep + " " + StrPos.inCartColon + " "); append(qty(inCart)) }
   }
   Column(
@@ -216,13 +218,13 @@ fun ProductCard(
           minLines = 2, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
         Spacer(Modifier.height(2.dp))
-        StockLine(stock, product.minStock, product.unit)
+        StockLine(stock, product.minStock, product.unit, stockless = product.stockless == true)
       }
     }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        "${money(product.salePrice)} ؋",
+        "${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(product))} ؋",
         Modifier.weight(1f),
         style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.Bold, color = c.text, maxLines = 1,
       )
@@ -328,9 +330,9 @@ fun ProductTable(
             if (p.category.isNotBlank()) Text(p.category, style = MaterialTheme.typography.labelSmall, color = c.muted, maxLines = 1)
           }
           Text(p.barcodes.firstOrNull().orEmpty(), Modifier.width(112.dp), style = MaterialTheme.typography.bodySmall.tabular(), color = c.muted, maxLines = 1)
-          Text("${money(p.salePrice)} ؋", Modifier.width(110.dp), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.End, maxLines = 1)
+          Text("${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(p))} ؋", Modifier.width(110.dp), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.End, maxLines = 1)
           Spacer(Modifier.width(16.dp))
-          StockLine(cb.stockOf(p.id), p.minStock, p.unit, Modifier.width(130.dp))
+          StockLine(cb.stockOf(p.id), p.minStock, p.unit, Modifier.width(130.dp), stockless = p.stockless == true)
           Box(Modifier.width(64.dp), contentAlignment = Alignment.Center) {
             if (inCart > 0) Text(
               "×${qty(inCart)}",

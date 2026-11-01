@@ -54,14 +54,16 @@ data class SaleDraft(
     val lotId: String? = null,
     /** یادداشتِ ردیف (POS-11، افزودنی) */
     val note: String? = null,
+    /** سریال‌های ردیف (POS-28، افزودنی) */
+    val serials: List<String>? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials) }
 
   companion object {
     fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note) },
+      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials) },
       debtorId = debtorId,
       savedAt = now,
       //  کد بی سبد معنا ندارد

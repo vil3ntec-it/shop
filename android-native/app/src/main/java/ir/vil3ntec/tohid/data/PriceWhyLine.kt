@@ -26,7 +26,7 @@ object PriceWhyLine {
     val after = priced.find { it.productId == id } ?: line
     val product = if (line.free) null else d.products.find { it.id == id } ?: return null
     val qtyMilli = Math.round(line.quantity * 1000.0)
-    val list = product?.let { minor(it.salePrice) }
+    val list = product?.let { minor(ProductPlansMap.price(it)) } // PRD-13: قیمتِ زمان‌بندی‌شدهٔ امروز
     val manual = line.unitPrice?.let(::minor)
     val promos = promo?.tags?.get(id)?.promo.orEmpty().map { PriceWhy.Promo(it.name, it.discountMinor) }
     val final = minor(SalesEngine.lineTotal(SalesEngine.linePrice(d, after), after.quantity))
