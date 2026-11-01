@@ -142,8 +142,10 @@ test('WEB-24 بنر: خاموش ۴۰۳/۴۰۴، بازهٔ اکنون، ناحی
   assert.equal(off.body.error.code, 'banners_disabled');
   assert.equal((await h.put(adminUrl, { banners: [] }, { token: s.token })).status, 403);
   assert.equal((await pub()).status, 404);
+  assert.equal('features' in (await h.get(`/api/store/${s.slug}`)).body, false, 'خاموش ⇒ پاسخِ ویترین همان پیشین');
 
   await flag(s.shopId, 'shop.storefront.banners', true);
+  assert.deepEqual((await h.get(`/api/store/${s.slug}`)).body.features, { banners: true }, 'روشن ⇒ بنرِ وب (`features.banners`)');
   const t = now();
   const H = 3600 * 1000;
   const put = await h.put(adminUrl, {

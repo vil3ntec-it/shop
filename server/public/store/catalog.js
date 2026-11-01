@@ -1,13 +1,16 @@
 /*
  * ویترین — بخش‌های دیربارِ کاتالوگ: ردیف‌های «پیشنهادِ همین دکان»، «ارزان‌تر از قیمتِ دکان» و «تازه در ویترین»
- * (WEB-02)، راه‌اندازیِ «دیده‌شده‌های اخیر» (WEB-13، `recent.js`) و دلخواه‌ها و فهرستِ خرید (WEB-11). پس از بارِ
+ * (WEB-02)، راه‌اندازیِ «دیده‌شده‌های اخیر» (WEB-13، `recent.js`)، دلخواه‌ها و فهرستِ خرید (WEB-11) و بنرها (WEB-24). پس از بارِ
  * نخست و هم‌زمان با کالاها بار می‌شود (`loadMore` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ سقفِ ۷۵KB بماند (WEB-15،
  * §۳.۱۰)؛ کارت، دسته، جست‌وجو، برگهٔ کالا و سبد همان store.js است. نیامد (شبکه) ⇒ همان کاتالوگ، بی این بخش‌ها.
  *
  * WEB-11 فقط با `features.favorites` ِ سرور (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ‌کدام): ♥ روی کارت و در
  * برگهٔ کالا و ردیفِ «دلخواه‌ها»؛ «فهرستِ خرید» شناسه و مقدارِ سبد را نگه می‌دارد و «همه به سبد» همان «خریدِ دوباره»
  * ِ store.js است (قیمت و موجودیِ امروز). هر دو مثلِ سبدِ مهمان (S132) و دلخواه‌های بازارچه فقط روی همین دستگاه‌اند.
- * متن‌ها در واژه‌نامهٔ جدای `kit/i18n/catalog.<زبان>.json`؛ نیامد ⇒ این بخش نیست (کلیدِ خام هرگز).
+ * WEB-24 فقط با `features.banners` (پرچمِ `shop.storefront.banners`): بنرهای همین لحظه برای ناحیهٔ مشتری از
+ * `GET /banners?zone=` (ساعت، ناحیه و کالای فروختنی را سرور می‌سنجد)، ردیفِ افقی بی چرخشِ خودکار؛ پیوندِ کالا ⇒ برگهٔ
+ * کالا، پیوندِ دسته ⇒ همان دسته (فقط اگر دسته در ویترین هست)؛ ناحیه عوض شد ⇒ دوباره، با برگشت به کاتالوگ.
+ * متن‌ها در واژه‌نامهٔ جدای `kit/i18n/catalog.<زبان>.json`؛ نیامد ⇒ این بخش‌ها نیستند (کلیدِ خام هرگز).
  *
  * ⛔ فقط دادهٔ واقعیِ سرور؛ نبود ⇒ بخش پنهان. قیمت هرگز ذخیره نمی‌شود. متن فقط با textContent.
  */
@@ -30,7 +33,7 @@
   }
 
   /**
-   * ctx = { api, slug, store, cart (getter‌ها)، rail, card, items, ids, setQty, reorder, recent, favorites } از store.js.
+   * ctx = { api, slug, store, cart, zone (getter‌ها)، rail, card, items, ids, reorder, category, recent, features } از store.js.
    * برمی‌گرداند { picks, seen, card, cart }: `picks()` ردیف‌ها را پر می‌کند و هرگز رد نمی‌شود؛ `seen(p)` کالای برگهٔ
    * باز؛ `card(li, p)` ♥ ِ کارت؛ `cart()` پس از هر تغییرِ سبد.
    */
@@ -145,7 +148,42 @@
       drawList();
       fetchMissing().then(function () { drawFavs(); drawList(); });
     }
-    if (ctx.favorites) K.part('catalog', $('saved')).then(function (ok) { if (ok) start(); });
+
+    // ── WEB-24: بنرها ──
+    var bnZone = null;
+    function banners() {
+      var z = ctx.zone ? ctx.zone.id : '';
+      if (bnZone === z) return;
+      bnZone = z;
+      api('/banners' + (z ? '?zone=' + encodeURIComponent(z) : '')).then(function (r) {
+        if (bnZone !== z) return;
+        var cats = ctx.store.categories || [];
+        var ul = K.clear($('banners-list'));
+        (r.banners || []).forEach(function (b) {
+          var go = null;
+          if (b.link.type === 'product') go = el('a', { class: 'btn btn-sm', text: t('bn.product'), attrs: { href: '#/p/' + encodeURIComponent(b.link.value) } });
+          else if (b.link.type === 'category' && cats.indexOf(b.link.value) >= 0) {
+            go = el('button', { class: 'btn btn-sm', text: t('bn.category'), attrs: { type: 'button' },
+              on: { click: function () { ctx.category(b.link.value); $('cats').scrollIntoView({ block: 'start' }); } } });
+          }
+          ul.appendChild(el('li', { class: 'banner card' }, el('b', { text: b.title }), b.body ? el('p', { text: b.body }) : null, go));
+        });
+        $('banners').hidden = !ul.children.length;
+      }).catch(function () { if (bnZone === z) bnZone = null; });
+    }
+    function startBanners() {
+      $('banners').setAttribute('aria-label', t('bn.title'));
+      banners();
+      window.addEventListener('hashchange', function () { if (/^#?\/?$/.test(location.hash)) banners(); });
+    }
+
+    var f = ctx.features;
+    if (f.favorites || f.banners) {
+      K.part('catalog', $('saved')).then(function (ok) {
+        if (ok && f.favorites) start();
+        if (ok && f.banners) startBanners();
+      });
+    }
 
     return {
       picks: picks,

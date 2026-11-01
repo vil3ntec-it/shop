@@ -9,5 +9,8 @@
   "list.clear": "Clear the list",
   "list.saved": "Cart saved as your shopping list.",
   "list.cleared": "Shopping list cleared.",
-  "list.remove": "Remove {name} from the shopping list"
+  "list.remove": "Remove {name} from the shopping list",
+  "bn.title": "Shop announcements",
+  "bn.product": "View product",
+  "bn.category": "View category"
 }

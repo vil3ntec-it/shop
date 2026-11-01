@@ -117,7 +117,16 @@ const set = await call('PUT', '/api/shop/storefront/delivery', { zones: [{
   feeMinor: 3000, minOrderMinor: 60000, freeOverMinor: 100000, smallBasketFeeMinor: 1500,
 }] }, T);
 ok(set.status === 200, 'ناحیه ذخیره شد', JSON.stringify(set.body).slice(0, 160));
+//  WEB-24: بنری که فقط برای همین ناحیه است، تا ناحیه دانسته نیست دیده نمی‌شود
+await flag('shop.storefront.banners', true);
+{
+  const zid = (set.body.zones || (set.body.delivery || {}).zones || [])[0].id;
+  const H = 3600 * 1000;
+  const bn = await call('PUT', '/api/shop/storefront/banners', { banners: [{ title: 'ویژهٔ کارته‌سه', startAt: Date.now() - H, endAt: Date.now() + H, zoneIds: [zid] }] }, T);
+  ok(bn.status === 200, 'بنرِ ناحیه نوشته شد', JSON.stringify(bn.body).slice(0, 120));
+}
 await open();
+ok(await page.isHidden('#banners'), 'WEB-24: ناحیهٔ ندانسته ⇒ بنرِ ناحیه نیست');
 ok((await text('#store-meta')).includes('ارسال از ۳۰ افغانی'), 'روشن ⇒ «ارسال از ۳۰»', await text('#store-meta'));
 await page.evaluate(() => { location.hash = '#/cart'; });
 await page.waitForSelector('#sheet-deliv .txt', { timeout: 10000 });
@@ -164,6 +173,8 @@ await page.check('input[name="fulfillment"][value="delivery"]');
 await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
 ok((await text('#zone-msg')).includes('کارته‌سه'), 'ناحیهٔ برگزیده', await text('#zone-msg'));
 await page.evaluate(() => { location.hash = '#/'; });
+await page.waitForSelector('#banners:not([hidden]) .banner', { timeout: 10000 });
+ok((await text('#banners-list')).includes('ویژهٔ کارته‌سه'), 'WEB-24: با برگشت به کاتالوگ پس از گزینشِ ناحیه ⇒ بنرِ همان ناحیه');
 for (let i = 0; i < 2; i++) await page.locator('#products li[data-id="rice"] .p-add').first().click();
 await page.evaluate(() => { location.hash = '#/cart'; });
 await page.waitForFunction(() => /تا ارسالِ رایگان/.test(document.getElementById('sheet-deliv').textContent), null, { timeout: 10000 });

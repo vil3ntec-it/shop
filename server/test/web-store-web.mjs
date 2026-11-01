@@ -7,6 +7,7 @@
  *   • WEB-13: «دیده‌شده‌های اخیر» (پرچمِ `shop.storefront.recent`) پس از دیدنِ کالا و بارِ دوباره، فقط روی همین دستگاه؛
  *   • WEB-20: دکمهٔ «فرستادنِ نشانیِ کالا» (پرچمِ `shop.storefront.seo`) نشانیِ `/p/…` را کپی می‌کند؛
  *   • WEB-11: ♥ روی کارت و برگهٔ کالا، «دلخواه‌ها» و «فهرستِ خرید» (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ)؛
+ *   • WEB-24: بنرهای همین لحظه (پرچمِ `shop.storefront.banners`)، پیوندِ کالا و دسته؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -153,11 +154,39 @@ await page.click('#list-add');
 await page.waitForFunction(() => location.hash === '#/cart', null, { timeout: 5000 });
 ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store-cart:${slug}`)), '«همه به سبد» ⇒ همان اقلام با قیمتِ امروز در سبد');
 
+//  WEB-24: بنرها — خاموش ⇒ هیچ؛ روشن ⇒ فقط بنرِ اکنون و همه‌جا (بی ناحیهٔ دانسته)، پیوندِ کالا و دسته
+ok(await page.isHidden('#banners'), 'WEB-24 خاموش: بی بنر');
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.banners', value: true }, A);
+{
+  const now = Date.now(); const H = 3600 * 1000;
+  const bn = await call('PUT', '/api/shop/storefront/banners', { banners: [
+    { title: 'روغنِ تازه رسید', body: 'تا پایانِ هفته', startAt: now - H, endAt: now + H, sort: 9, link: { type: 'product', value: 'oil' } },
+    { title: 'همهٔ خوراکی‌ها', startAt: now - H, endAt: now + H, sort: 5, link: { type: 'category', value: 'خوراکی' } },
+    { title: 'دستهٔ نبوده', startAt: now - H, endAt: now + H, sort: 1, link: { type: 'category', value: 'نیست' } },
+    { title: 'فقط یک ناحیه', startAt: now - H, endAt: now + H, zoneIds: ['01HZZZZZZZZZZZZZZZZZZZZZZ1'] },
+    { title: 'گذشته', startAt: now - 3 * H, endAt: now - H },
+  ] }, T);
+  ok(bn.status === 200, 'بنرها نوشته شدند', JSON.stringify(bn.body).slice(0, 120));
+}
+await open();
+await page.waitForSelector('#banners:not([hidden]) .banner', { timeout: 10000 });
+const titles = await page.locator('#banners-list .banner b').allTextContents();
+ok(JSON.stringify(titles) === JSON.stringify(['روغنِ تازه رسید', 'همهٔ خوراکی‌ها', 'دستهٔ نبوده']), 'فقط بنرِ اکنون و همه‌جا، به ترتیبِ اولویت', JSON.stringify(titles));
+ok(await page.locator('#banners-list .banner').nth(2).locator('.btn').count() === 0 && (await page.getAttribute('#banners', 'aria-label')) === 'اعلان‌های دکان',
+  'دستهٔ نبوده ⇒ بی دکمه؛ بخش نامِ خودش را دارد');
+await page.locator('#banners-list .banner').first().getByRole('link').click();
+await page.waitForSelector('#product-sheet:not([hidden])', { timeout: 10000 });
+ok((await page.textContent('#ps-name')) === 'روغن', 'پیوندِ کالا ⇒ برگهٔ همان کالا');
+await page.click('#ps-close');
+await page.locator('#banners-list .banner').nth(1).getByRole('button').click();
+await page.waitForSelector('#cats [aria-pressed="true"]:has-text("خوراکی")', { timeout: 5000 });
+ok(true, 'پیوندِ دسته ⇒ همان دسته در کاتالوگ');
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 await ctx.close();
 await browser.close();
 server.close();
 await closeDb();
-console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر، فرستادنِ نشانی، دلخواه‌ها و فهرستِ خرید');
+console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر، فرستادنِ نشانی، دلخواه‌ها، فهرستِ خرید و بنرها');
 process.exit(bad ? 1 : 0);

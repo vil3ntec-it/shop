@@ -138,15 +138,16 @@
     $(id).hidden = !list.length;
   }
 
-  // ── پیشنهادها (WEB-02)، دیده‌شده‌های اخیر (WEB-13) و دلخواه‌ها/فهرستِ خرید (WEB-11): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  // ── پیشنهادها (WEB-02)، اخیر (WEB-13)، دلخواه‌ها/فهرستِ خرید (WEB-11) و بنرها (WEB-24): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var more = null;
   function loadMore(r) {
     return new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
     }).then(function () {
       more = window.StoreCatalog({
-        api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, rail: rail, card: card, items: catalog.items, ids: ids, reorder: reorder,
-        recent: Boolean(r.recent), favorites: Boolean(r.features && r.features.favorites),
+        api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, get zone() { return zone; }, rail: rail, card: card, items: catalog.items,
+        ids: ids, reorder: reorder, recent: Boolean(r.recent), features: r.features || {},
+        category: function (c) { catalog.category = c; renderCats(); loadProducts(false); },
       });
       return more.picks();
     }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
