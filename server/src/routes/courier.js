@@ -20,6 +20,7 @@ const delivery = require('../lib/delivery');
 const audit = require('../lib/audit');
 const orders = require('../lib/orders');
 const courierMap = require('../lib/courier-map');
+const courierChecks = require('../lib/courier-checks');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -56,15 +57,16 @@ router.get('/me', wrap(async (req, res) => {
 }));
 
 router.get('/missions', wrap(async (req, res) => {
-  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)
-  res.json(await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
+  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)؛
+  //  DLV-07/DLV-17: شمارِ کیسه‌های اسکنی و فاصلهٔ مجاز از پین، هم فقط با پرچم (`courierChecks.decorate`)
+  res.json(await courierChecks.decorate(req.shopId, await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
-  })));
+  }))));
 }));
 
 /**
  * صفِ رویدادها (DLV-10): `{deviceId?, events:[{eventId, assignmentId, type,
- * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?}]}`.
+ * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?, bags? (DLV-07), position? (DLV-17)}]}`.
  * پاسخ برای هر رویداد: applied | duplicate | unchanged | rejected(code).
  */
 router.post('/events', wrap(async (req, res) => {
