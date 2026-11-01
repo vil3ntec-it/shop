@@ -67,6 +67,7 @@ const REINDEX_PER_PASS = 25;
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const text = (v, max) => stripControl(str(v)).slice(0, max);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+const m4 = require('./market-details')({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES });   // بازار M4
 
 // ════════════════════════════════════════════════════════════════════
 //  روشن یا خاموش
@@ -149,12 +150,7 @@ async function reindex(sigs, ids) {
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
-      await c.query(
-        `INSERT INTO market_search (shop_id, product_id, name_norm)
-         SELECT sp.shop_id, sp.product_id, ${sf.SQL_NAME} FROM ${sf.PRODUCT_FROM}
-          WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
-        [id]
-      );
+      await m4.indexShop(c, id);   // M4: برند، بارکد و `bank_product_id` کنارِ نام
       await c.query(
         `INSERT INTO market_search_shops (shop_id, sig, indexed_at) VALUES ($1,$2,$3)
          ON CONFLICT (shop_id) DO UPDATE SET sig = EXCLUDED.sig, indexed_at = EXCLUDED.indexed_at`,
@@ -184,8 +180,8 @@ async function buildSnapshot() {
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
-              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${sf.PRODUCT_FROM}
+              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME} || chr(31) || ${m4.DETAIL_SIG}, chr(30) ORDER BY sp.product_id)) AS sig
+         FROM ${sf.PRODUCT_FROM} ${m4.JOINS}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -383,27 +379,27 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     const bySlug = new Map(cards.map((c) => [c.slug, c]));
     const slugOfShop = new Map(list.map((e) => [e.row.shop_id, e.row.slug]));
     const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    //  M4 (پرچمِ `market.product_details`): برند (بخشی از نام) و بارکد (برابرِ کامل) هم
+    const { more, code } = await m4.searchMode(raw);
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
          FROM market_search ms JOIN (${sf.PRODUCT_FROM}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
-        WHERE ms.shop_id = ANY($1::text[]) AND ms.name_norm LIKE $2
-          AND sp.published AND ${sf.LIVE_PRODUCT} AND ${sf.SQL_NAME} LIKE $2
+        WHERE ms.shop_id = ANY($1::text[])
+          AND (ms.name_norm LIKE $2 OR ($4::boolean AND (ms.brand_norm LIKE $2 OR ms.barcodes @> ARRAY[$5::text])))
+          AND sp.published AND ${sf.LIVE_PRODUCT} AND ($4::boolean OR ${sf.SQL_NAME} LIKE $2)
         ORDER BY COALESCE(r.data->>'name', ''), sp.shop_id, r.row_id LIMIT $3`,
-      [list.map((e) => e.row.shop_id), like, lim * 2]
+      [list.map((e) => e.row.shop_id), like, lim * 2, more, code]
     );
-    products = rows
-      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), p: sf.productView(r) }))
-      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name)
+    const found = rows
+      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), shopId: r.shop_id, p: sf.productView(r) }))
+      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name);
+    //  ⛔ نمایه فقط نامزد است: با پرچم، نام/برند/بارکد دوباره با دادهٔ زنده
+    const live = more ? await m4.liveMatch(found, needle, code) : { found, extra: new Map() };
+    products = live.found
       .sort((a, b) => rank(near)(a.shop, b.shop) || a.p.name.localeCompare(b.p.name, 'fa'))
       .slice(0, lim)
-      .map(({ shop, p }) => ({
-        id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor, photo: p.photo,
-        shop: {
-          slug: shop.slug, title: shop.title, accent: shop.accent,
-          badge: shop.status.badge, orderAcceptance: shop.status.orderAcceptance, distanceKm: shop.distanceKm,
-        },
-      }));
+      .map((x) => m4.offerView(x, live.extra));
   }
   return { q: raw, category: matched ? matched.key : '', shops: shopHits, products };
 }
@@ -743,8 +739,9 @@ async function myOrders(ticket) {
 //  سمتِ دکان: «در بازارچه چگونه دیده شوم»
 // ════════════════════════════════════════════════════════════════════
 
-function listingView(row) {
+function listingView(row, withMap = false) {
   return {
+    ...m4.mapView(row, withMap),   // M4: نگاشتِ دسته — فقط با `market.product_details`
     listed: row ? row.listed === true : false,
     category: row ? row.category : '',
     area: row ? row.area : '',
@@ -759,7 +756,7 @@ function listingView(row) {
 }
 
 async function listingOf(shopId) {
-  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]));
+  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]), await m4.on());
 }
 
 /** فقط فیلدهای آمده عوض می‌شوند. `showDeals` را فقط صاحبِ دکان عوض می‌کند. */
@@ -775,6 +772,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
     lng: cur && cur.geo_lng !== null ? Number(cur.geo_lng) : null,
     showDeals: cur ? cur.show_deals === true : false,
   };
+  const { withMap, catMap } = await m4.listingInput(b, has, cur);   // M4: نگاشتِ دسته
   if (has('listed')) {
     if (typeof b.listed !== 'boolean') throw badRequest('«در فهرست» باید بله یا نه باشد', 'bad_listed');
     v.listed = b.listed;
@@ -808,10 +806,11 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
      RETURNING *`,
     [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
   );
+  if (catMap) row.category_map = await m4.saveMap(shopId, catMap);
   gates.delete(shopId);
   deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم
   invalidate();   // «در فهرست باشم» ِ صاحب دکان همان دم دیده شود
-  return listingView(row);
+  return listingView(row, withMap);
 }
 
 /** برای مسیرِ دکان: بی ویترینِ روشن (پرچم) تنظیمِ بازارچه معنا ندارد. */
@@ -823,6 +822,6 @@ async function requireStorefrontFlag(shopId) {
 
 module.exports = {
   FLAG_KEY, CATEGORIES,
-  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
+  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, sameProduct: m4.sameProduct, feed, myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };

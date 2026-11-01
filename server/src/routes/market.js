@@ -54,6 +54,12 @@ router.get('/search', searchBurst, searchLimit, on, async (req, res) => {
   res.json(await market.search({ q, lat, lng, limit }));
 });
 
+//  M4: «همین کالا در دکان‌های دیگر» با شناسهٔ کالای بانک (پرچمِ `market.product_details`)
+router.get('/same/:bankProductId', searchBurst, readLimit, on, async (req, res) => {
+  const { lat, lng, limit, exclude } = req.query;
+  res.json(await market.sameProduct(req.params.bankProductId, { lat, lng, limit, exclude }));
+});
+
 //  ── ۲۳: تأییدِ شماره بی دکان (برای «سفارش‌های من») — همان بلیتِ ویترین ──
 router.post('/verify/start', sendCodeLimit, on, async (req, res) => {
   res.json(await sf.startVerification(req.body, { ip: clientIp(req) }));
