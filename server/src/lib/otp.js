@@ -648,7 +648,6 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
     resendAfter: t + config.otp.resendMs,
     resendSeconds: Math.ceil(config.otp.resendMs / 1000),
   };
-  // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
   //  SEC-AUTH-06: فقط با `NODE_ENV`ِ صریحِ development/test — نبودنش production حساب می‌شود

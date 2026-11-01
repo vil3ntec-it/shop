@@ -23,9 +23,10 @@ const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
 const guard = require('../lib/admin-guard');
 const reauth = require('../lib/reauth');
+const hardening = require('../lib/auth-session-hardening');
 const { reasonOf } = require('../lib/admin-access');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, unauthorized, notFound, forbidden } = require('../middleware/errors');
+const { badRequest, unauthorized, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 const adminLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'admin-auth' });
@@ -70,7 +71,7 @@ router.post('/login', adminLimit, async (req, res, next) => {
   if (!passOk) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
   if (!ok) return next(unauthorized('کدِ تأیید درست نیست', 'totp_invalid'));
   //  SEC-AUTH-01: هشِ کهنهٔ مدیر هم پس از ورودِ درست به هزینهٔ امروز می‌رسد
-  await require('./auth').upgradeHash('admins', admin, password);
+  await hardening.upgradeHash('admins', admin, password);
 
   const t = await tokens.issue({ kind: 'admin', subjectId: admin.id, ttlMs: config.tokens.adminTtlMs });
   await query('UPDATE admins SET last_login_at=$2 WHERE id=$1', [admin.id, now()]);
@@ -90,34 +91,8 @@ router.post('/login', adminLimit, async (req, res, next) => {
 
 router.use(requireAdmin);
 
-/**
- *  SEC-AUTH-13 — تأییدِ دوبارهٔ نشستِ مدیر: رمز (+ کدِ TOTP یا کدِ بازیابی اگر روشن است).
- *  همان قفلِ «نام + IP»ِ ورود؛ شکست ۴۰۳ است نه ۴۰۱ (۴۰۱ نشستِ پنل را می‌بندد).
- */
-router.post('/reauth', adminLimit, async (req, res, next) => {
-  const admin = await one('SELECT * FROM admins WHERE id=$1', [req.admin.id]);
-  const ip = clientIp(req);
-  await require('./auth').assertNotLocked('admin', admin.username, ip);
-  const password = typeof req.body?.password === 'string' ? req.body.password : '';
-  const passOk = !!password && await pw.verifyPassword(password, admin.password_hash);
-  const totpCode = typeof req.body?.totp === 'string' ? req.body.totp.trim() : '';
-  const recoveryCode = typeof req.body?.recovery_code === 'string' ? req.body.recovery_code.trim() : '';
-  const twoStep = !!admin.totp_enabled_at;
-  if (passOk && twoStep && !totpCode && !recoveryCode) {
-    return next(forbidden('کدِ برنامهٔ تأیید (یا یک کدِ بازیابی) را بنویسید', 'totp_required'));
-  }
-  const second = passOk && twoStep ? await checkSecondFactor(admin, { code: totpCode, recovery: recoveryCode }) : null;
-  const ok = passOk && (!twoStep || !!second);
-  await query(
-    `INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ('admin',$1,$2,$3,$4)`,
-    [admin.username, ip, ok, now()]
-  );
-  if (!passOk) return next(forbidden('رمزِ کنونی درست نیست', 'bad_password'));
-  if (!ok) return next(forbidden('کدِ تأیید درست نیست', 'totp_invalid'));
-  await reauth.markFresh({ tokenHash: req.tokenRow.token_hash, ip });
-  await audit.log({ actorType: 'admin', userId: admin.id, action: 'admin.reauth', ip, ...(second ? { detail: { second_factor: second } } : {}) });
-  res.json({ ok: true, freshUntil: await reauth.freshUntil(req.tokenRow.token_hash) });
-});
+//  SEC-AUTH-13: تأییدِ دوبارهٔ نشستِ مدیر — بدنه در `lib/auth-session-hardening.js`
+router.post('/reauth', adminLimit, hardening.adminReauth);
 
 router.post('/logout', async (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
