@@ -66,6 +66,7 @@
       renderPay(o, token);
       renderSubs(o, token);
       renderRate(o, token);
+      renderPrefs(o, token);
       return o;
     }
 
@@ -146,6 +147,33 @@
 
     //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):
     //  نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل — نه شماره، نه شناسه. بی کلید یا چیزی برای گفتن ⇒ پنهان.
+    // ── CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال — فقط با `o.deliveryPrefs` (پرچمِ `shop.orders.delivery_prefs`) ──
+    //  پیگیری هر ۲۰ ثانیه دوباره می‌کشد: کادرها فقط با نسخهٔ تازه از سرور پر می‌شوند تا نوشتهٔ مشتری پاک نشود
+    function renderPrefs(o, token) {
+      var p = o.deliveryPrefs; var f = $('o-prefs'); var msg = $('op-msg');
+      f.hidden = !p;
+      if (!p) return;
+      if (f.getAttribute('data-v') !== String(p.version)) {
+        $('op-call').checked = p.callBeforeArrival; $('op-leave').value = p.leaveWith; $('op-lm').value = '';
+        f.setAttribute('data-v', String(p.version));
+      }
+      ['op-call', 'op-leave', 'op-lm', 'op-save'].forEach(function (id) { $(id).disabled = !p.editable; });
+      if (!p.editable) K.note(msg, 'info', t('od.prefs.locked'));
+      else if (msg.getAttribute('data-ok') !== String(p.version)) msg.hidden = true;
+      f.onsubmit = function (ev) {
+        ev.preventDefault();
+        var body = { delivery: { callBeforeArrival: $('op-call').checked, leaveWith: $('op-leave').value.trim() }, expectedVersion: p.version };
+        var lm = $('op-lm').value.trim();
+        if (lm) body.address = { landmark: lm };
+        $('op-save').disabled = true;
+        api('/orders/' + encodeURIComponent(token) + '/delivery', { method: 'POST', body: body }).then(function (r) {
+          var np = r.order && r.order.deliveryPrefs;
+          if (np) { msg.setAttribute('data-ok', String(np.version)); f.setAttribute('data-v', ''); o.deliveryPrefs = np; renderPrefs(o, token); }
+          K.note(msg, 'ok', t('od.prefs.saved'));
+        }).catch(function (e) { K.note(msg, 'err', e.message); $('op-save').disabled = false; });
+      };
+    }
+
     function renderDelivery(d) {
       var name = d && d.courierName ? String(d.courierName) : '';
       var eta = d && d.etaAt ? K.clock(d.etaAt) : '';

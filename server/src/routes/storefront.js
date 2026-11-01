@@ -271,6 +271,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
   const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
   if (refund !== undefined) order.refund = refund;
+  //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
+  const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
+  if (prefs !== undefined) order.deliveryPrefs = prefs;
   res.json({ order });
 });
 
@@ -431,7 +434,11 @@ router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res
 
 //  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
 router.post('/:slug/orders/:token/delivery', checkoutLimit, store, async (req, res) => {
-  res.json(await require('../lib/delivery-prefs').editByToken(req.store, req.params.token, req.body));
+  const P = require('../lib/delivery-prefs');
+  const out = await P.editByToken(req.store, req.params.token, req.body);
+  const prefs = await P.customerPrefs(req.store.shop_id, sf.orderIdOf(req.store.shop_id, req.params.token));
+  if (prefs !== undefined) out.order.deliveryPrefs = prefs;
+  res.json(out);
 });
 
 /** خطایی که دادهٔ همراه دارد (برگهٔ قیمتِ تازه، کالای ناموجود، …) — همه‌اش برود. */

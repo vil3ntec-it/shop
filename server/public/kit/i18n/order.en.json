@@ -38,5 +38,12 @@
   "od.rt.careful": "Careful",
   "od.rt.late": "Late",
   "od.rt.rude": "Rude",
-  "od.rt.damaged": "Items damaged"
+  "od.rt.damaged": "Items damaged",
+  "od.prefs": "Delivery instructions",
+  "od.prefs.lm": "New landmark (optional)",
+  "od.prefs.save": "Save instructions",
+  "od.prefs.saved": "Saved; the courier sees these instructions.",
+  "od.prefs.locked": "The order has left the shop; contact the courier to change this.",
+  "err.delivery_locked": "The order has left the shop; contact the courier to change this.",
+  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again."
 }
