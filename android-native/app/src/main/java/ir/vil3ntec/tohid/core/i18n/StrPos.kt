@@ -212,4 +212,12 @@ object StrPos {
     "At the till, the cart is saved and printed as a quote with today's prices and a “valid until” day, and can go back to the cart at those prices until that day to be sold. Quotes stay on this device only.",
     "په صندوق کې ټوکرۍ د همدې شېبې په بیو او «تر … معتبر» سره د مخکني بل په توګه خوندي او چاپېږي او تر وروستۍ ورځې په همغو بیو ټوکرۍ ته راګرځي چې وپلورل شي. مخکني بلونه یوازې په همدې وسیله دي.",
   )
+
+  // لیستِ قیمت در صندوق (POS-18، همین دستگاه) — همان متنِ `PriceListSettingsWired`
+  val priceListTitle: String get() = t("لیستِ قیمت در صندوق (خرده/عمده)", "Price list at the till (retail/wholesale)", "په صندوق کې د بیو لېست (پرچون/عمده)")
+  val priceListNote: String get() = t(
+    "روشن ⇒ مشتریِ «عمده» قیمتِ عمده می‌گیرد و نشانِ «لیستِ قیمت» در صندوق لیستِ همین فاکتور را عوض می‌کند؛ فیِ دستی دست نمی‌خورد.",
+    "On ⇒ a “wholesale” customer gets wholesale prices and the “Price list” chip at the till switches this invoice's list; a manually typed price is left alone.",
+    "روښانه ⇒ «عمده» پیرودونکی عمده بیه اخلي او په صندوق کې د «د بیو لېست» نښه د همدې بل لېست بدلوي؛ په لاس لیکل شوې بیه نه بدلېږي.",
+  )
 }

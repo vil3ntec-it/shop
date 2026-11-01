@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.online.orders
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ReceiptLong
@@ -23,10 +24,15 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
+import ir.vil3ntec.tohid.core.model.OrdersConfigDto
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
+import ir.vil3ntec.tohid.print.OrderSlipPrint
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.OrdersLive
 import ir.vil3ntec.tohid.ui.screens.Haptics
+import ir.vil3ntec.tohid.ui.screens.rememberOrderBulk
+import ir.vil3ntec.tohid.ui.screens.rememberOrderDesk
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3TwoPane
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -64,9 +70,24 @@ internal fun RouteScope.OrdersRoute() {
     waiting = OrdersLive.waiting.value, shortfalls = OrdersLive.shortfalls.value, canRefund = perms.refund,
   )
   val state = ctl.state.copy(perms = perms, counts = OrdersLive.counts.value, notes = notes)
+  fun openOrder(id: String) { if (wide) selected = id else nav.open(OnlinePaths.order(id)) }
+  //  میزِ سفارش، هشدارها و انتخابِ چندتایی (ORD-03/04/08/09/18/19) — هر کدام فقط با پرچمِ خودش
+  val deskCtl = rememberOrderDesk(remember(context) { Backend.api(context) })
+  val bulk = rememberOrderBulk(cfg ?: OrdersConfigDto(), state.tab)
+  val printer = remember(context) { OrderSlipPrint.Bulk(context) }
+  val header: @Composable () -> Unit = {
+    OrderDeskStrip(deskCtl)
+    cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }
+    if (cfg?.bulk == true) Row { OrderBulkToggleV3(bulk, cfg) }
+    OrderBulkBarV3(bulk, cfg, state.items, OrdersHub.repo(context), printer, { toasts.show(it) }) {
+      ctl.reload()
+      scope.launch { OrdersLive.pollSummary(context) }
+    }
+  }
+  val picked = if (bulk.on) bulk.ids else null
   val actions = QueueActions(
     onTab = ctl::selectTab,
-    onOpen = { o -> if (wide) selected = o.id else nav.open(OnlinePaths.order(o.id)) },
+    onOpen = { o -> if (!bulk.tap(o.id)) openOrder(o.id) },
     onStep = { o, to -> nav.open(OnlinePaths.action(o.id, to)) },
     onNew = { nav.open(OnlinePaths.NEW_ORDER) },
     onRetry = ctl::reload,
@@ -87,11 +108,11 @@ internal fun RouteScope.OrdersRoute() {
     onDispose { if (AppNav.addAction.value === action) AppNav.addAction.value = null }
   }
   if (!wide) {
-    OrdersScreen(state, actions, backOrNull)
+    OrdersScreen(state, actions, backOrNull, header = header, picked = picked)
     return
   }
   V3TwoPane(
-    list = { OrdersScreen(state, actions, backOrNull, selectedId = selected) },
+    list = { OrdersScreen(state, actions, backOrNull, selectedId = selected, header = header, picked = picked) },
     detail = {
       val id = selected
       if (id == null) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -177,7 +198,17 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       }
     },
   )
-  OrderDetailScreen(state, actions, onBack = if (embedded) null else backOrNull)
+  //  ORD-07: «عقب انداختن» زیرِ سرِ صفحه — فقط با پرچم، وضعیتِ مجاز و `orders.manage`
+  val extra: (@Composable () -> Unit)? = order?.let { o ->
+    {
+      OrderDelayEntryV3(o, cfg, OrdersHub.repo(context)) { fresh, msg ->
+        OrdersHub.put(fresh)
+        OrdersHub.changed.value++
+        toasts.show(msg)
+      }
+    }
+  }
+  OrderDetailScreen(state, actions, onBack = if (embedded) null else backOrNull, extra = extra)
 }
 
 /** `orders/{id}/action?to=` — برگه روی جزئیات (یا صف) */

@@ -33,14 +33,23 @@ import kotlinx.coroutines.launch
 
 private val SWITCH: List<String> get() = listOf(StrShell.switchOff, StrShell.switchOn)
 
-/** یک کلیدِ خاموش | روشن با توضیح؛ `save` همان نوشتنِ رابطِ امروز */
+/** یک کلیدِ خاموش | روشن با توضیح؛ `save` همان نوشتنِ رابطِ امروز؛ `deviceOnly` ⇒ «فقط همین دستگاه» زیرِ توضیح */
 @Composable
-private fun RouteScope.ToggleScreen(key: String, onBack: (() -> Unit)?, initial: Boolean, onText: String, note: String, save: (Boolean) -> Unit) {
+internal fun RouteScope.ToggleScreen(
+  key: String,
+  onBack: (() -> Unit)?,
+  initial: Boolean,
+  onText: String,
+  note: String,
+  deviceOnly: Boolean = false,
+  save: (Boolean) -> Unit,
+) {
   var on by remember { mutableStateOf(initial) }
   SettingsPageFrame(title = SettingsLayout.labelOf(key), subtitle = if (on) onText else StrSettings.off, onBack = onBack) {
     item(key = "choice") {
       SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { on = it == 1; save(on) }) }
       SettingsNote(note)
+      if (deviceOnly) SettingsNote(StrShell.thisDeviceOnly)
     }
   }
 }

@@ -20,12 +20,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -34,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.RoutePlan
-import ir.vil3ntec.tohid.core.delivery.DeliveryRating
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.core.i18n.StrPick
@@ -50,8 +43,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *    • موقعیتِ همین لحظه پیش از «تحویل شد» (DLV-17، `MissionCard.nearPinMaxM`)
  *    • مسیرِ پیشنهادی (DLV-04) — روی خودِ دستگاه با `RoutePlan.forCards`، بی اینترنت
  *    • امتیازِ پیک به تحویل (DLV-18)
- *  قاعده‌ها همه در core‌اند (`CourierChecks`، `RoutePlan`، `DeliveryRating`) و سرور تصمیمِ آخر را می‌گیرد؛
- *  این‌جا فقط پیش‌سنجش تا پیک پیش از فرستادن بداند چه کم است.
+ *  حالت و پیش‌سنجش در `CourierChecksState.kt` است (همان که برگه‌های نسخهٔ ۳ می‌کشند)؛ این‌جا فقط کادرهای رابطِ امروز.
  */
 
 /** کلیدِ برچسبِ امتیازِ سرور ⇒ نوشتهٔ سه‌زبانه (کلید همان می‌ماند و به سرور می‌رود) */
@@ -70,39 +62,15 @@ internal fun ratingTagLabel(tag: String): String = when (tag) {
   else -> tag
 }
 
-/** فاصله برای صفحه: زیرِ هزار متر «متر»، وگرنه کیلومتر */
-private fun distanceText(m: Long): String = if (m < 1000) StrCourier.meters(m) else StrCourier.km(RoutePlan.km(m))
-
 /* ============================== اسکنِ کیسه‌ها ============================== */
 
-/**
- *  DLV-07: برچسبِ هر کیسه (بارکدخوانِ HID با Enter، یا تایپ). کیسهٔ سفارشِ دیگر یا برچسبِ کهنه همین‌جا رد
- *  می‌شود و کیسه‌های پیشین می‌مانند (`CourierChecks.scanOne`). «بسته را گرفتم» فقط با همهٔ کیسه‌ها؛ صف همان
- *  برچسب‌های سرور (`labelOf`) را می‌برد.
- */
+/** DLV-07: اسکنِ همهٔ کیسه‌ها پیش از «بسته را گرفتم» (`BagScanState`) */
 @Composable
 internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<String>) -> Unit) {
   val colors = Shop.colors
-  val bags = c.bagScanBags ?: 0
-  var scanned by remember { mutableStateOf(emptySet<Int>()) }
-  var input by remember { mutableStateOf("") }
-  var note by remember { mutableStateOf<String?>(null) }
-
-  fun submit() {
-    val raw = input.trim()
-    if (raw.isEmpty()) return
-    input = ""
-    val (next, code) = CourierChecks.scanOne(scanned, raw, c.orderNo, bags)
-    scanned = next
-    note = when (code) {
-      "" -> null
-      "bag_wrong_order" -> StrCourier.wrongOrder
-      "label_mismatch" -> StrCourier.mismatch
-      else -> StrPick.notLabel
-    }
-  }
-
-  val missing = CourierChecks.missing(scanned, bags)
+  val s = rememberBagScan(c)
+  val bags = s.bags
+  val missing = s.missing
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
@@ -113,29 +81,27 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           OutlinedTextField(
-            value = input,
-            onValueChange = { input = it.take(64) },
+            value = s.input,
+            onValueChange = s::edit,
             label = { Text(StrCourier.scanBag) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-            keyboardActions = KeyboardActions(onSend = { submit() }, onDone = { submit() }, onGo = { submit() }),
+            keyboardActions = KeyboardActions(onSend = { s.submit() }, onDone = { s.submit() }, onGo = { s.submit() }),
             modifier = Modifier.weight(1f),
           )
           Spacer(Modifier.width(8.dp))
-          TextButton(enabled = input.isNotBlank(), onClick = { submit() }) { Text(StrCourier.add, color = colors.primary) }
+          TextButton(enabled = s.input.isNotBlank(), onClick = { s.submit() }) { Text(StrCourier.add, color = colors.primary) }
         }
-        note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.danger) }
+        s.note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = colors.danger) }
         Spacer(Modifier.height(6.dp))
-        Text(StrPick.bags(scanned.size, bags), style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
+        Text(StrPick.bags(s.scanned.size, bags), style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
         if (missing.isNotEmpty()) {
           Text(StrCourier.missing(missing.joinToString("، ")), style = MaterialTheme.typography.bodySmall, color = colors.muted)
         }
       }
     },
     confirmButton = {
-      TextButton(enabled = bags > 0 && missing.isEmpty(), onClick = {
-        onDone(scanned.sorted().map { CourierChecks.labelOf(c.orderNo, it, bags) })
-      }) { Text(StrCourier.pickedUp, color = colors.primary) }
+      TextButton(enabled = s.ready, onClick = { onDone(s.labels()) }) { Text(StrCourier.pickedUp, color = colors.primary) }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
@@ -143,85 +109,38 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
 
 /* ============================== نزدیکِ پین ============================== */
 
-/** موقعیتِ «همین لحظه»: نقطهٔ کهنه‌تر از یک دقیقه (مثلاً هنوز از دکان) پذیرفته نیست */
-private const val FIX_MAX_AGE_MS = 60_000L
-
-/** مسیر فقط پیشنهاد است: نقطهٔ تا پنج دقیقه کهنه بس است */
-private const val ROUTE_MAX_AGE_MS = 5 * 60_000L
-
-/**
- *  DLV-17: پیش از «تحویل شد» موقعیتِ همین لحظه گرفته و با پینِ کارت سنجیده می‌شود. نزدیک ⇒ همان دم `onReady`؛
- *  دور ⇒ فاصله و «دوباره بسنج». بی اجازه یا بی مکان‌یاب ⇒ پیامِ روشن (سرور هم بی موقعیت رد می‌کرد).
- *  اجازه و خودِ مکان‌یاب پشتِ مرزِ پلتفرم‌اند (`rememberCourierFix`).
- *  ⛔ موقعیت فقط به همین رویداد می‌رود؛ سرور فقط فاصلهٔ گرد را نگه می‌دارد.
- */
+/** DLV-17: موقعیتِ همین لحظه پیش از «تحویل شد»؛ نزدیک ⇒ همان دم `onReady` (`NearPinState`) */
 @Composable
 internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (CourierChecks.Point) -> Unit) {
   val colors = Shop.colors
-  val maxM = c.nearPinMaxM ?: CourierChecks.DEFAULT_MAX_M
-  val la = c.lat
-  val ln = c.lng
-  val pin = if (la != null && ln != null) CourierChecks.Point(la, ln) else null
-  var busy by remember { mutableStateOf(true) }
-  var message by remember { mutableStateOf("") }
-
-  //  مرزِ پلتفرم: `CourierLocationAndroid.kt` (اجازه و `DeviceLocation`)
-  val locate = rememberCourierFix(FIX_MAX_AGE_MS, ask = true) { here ->
-    busy = false
-    if (here == null) {
-      message = StrCourier.noLocation
-    } else {
-      val v = CourierChecks.nearPin(here, pin, maxM)
-      if (v.ok) onReady(here) else message = StrCourier.tooFar(v.distanceM ?: 0L, maxM)
-    }
-  }
-  fun start() {
-    busy = true
-    message = ""
-    locate()
-  }
-  LaunchedEffect(Unit) { start() }
-
+  val s = rememberNearPin(c, onReady)
+  val busy = s.busy
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
     title = { Text(StrCourier.pinTitle, color = colors.text) },
     text = {
       Text(
-        if (busy) StrCourier.locating else message,
+        if (busy) StrCourier.locating else s.message,
         style = MaterialTheme.typography.bodyMedium, color = if (busy) colors.muted else colors.text,
       )
     },
-    confirmButton = { TextButton(enabled = !busy, onClick = { start() }) { Text(StrCourier.checkAgain, color = colors.primary) } },
+    confirmButton = { TextButton(enabled = !busy, onClick = { s.start() }) { Text(StrCourier.checkAgain, color = colors.primary) } },
     dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )
 }
 
 /* ============================== مسیرِ پیشنهادی ============================== */
 
-/**
- *  DLV-04: ترتیبِ پیشنهادیِ مأموریت‌های پذیرفته، از جای همین لحظهٔ پیک (اگر بود) — همان الگوریتمِ سرور
- *  (`RoutePlan.forCards`)، روی دستگاه و بی اینترنت. فقط نمایش است؛ هیچ وضعیتی عوض نمی‌شود.
- */
+/** DLV-04: ترتیبِ پیشنهادیِ مأموریت‌های پذیرفته، روی دستگاه و بی اینترنت (`RouteState`) */
 @Composable
 internal fun RouteSheet(cards: List<MissionCard>, onDismiss: () -> Unit) {
   val colors = Shop.colors
-  var start by remember { mutableStateOf<CourierChecks.Point?>(null) }
-  var looked by remember { mutableStateOf(false) }
-  //  بی اجازه نمی‌پرسد: مسیر بی موقعیت هم ساخته می‌شود (از یکی از ایستگاه‌ها)
-  val locate = rememberCourierFix(ROUTE_MAX_AGE_MS, ask = false) { here -> start = here; looked = true }
-  LaunchedEffect(Unit) { locate() }
-  val route = RoutePlan.forCards(start, cards)
+  val rs = rememberRoute()
+  val route = rs.plan(cards)
   TohidBottomSheet(title = StrCourier.routeTitle, onDismiss = onDismiss) {
     SheetBody {
-      Text(
-        when {
-          !looked -> StrCourier.locating
-          start == null -> StrCourier.routeNoStart
-          else -> StrCourier.routeHint
-        },
-        style = MaterialTheme.typography.bodySmall, color = colors.muted,
-      )
+      Text(rs.hint, style = MaterialTheme.typography.bodySmall, color = colors.muted)
       if (route.stops.isEmpty() && route.unpinned.isEmpty()) {
         Text(StrCourier.routeEmpty, style = MaterialTheme.typography.bodyMedium, color = colors.muted)
       }
@@ -246,18 +165,12 @@ internal fun RouteSheet(cards: List<MissionCard>, onDismiss: () -> Unit) {
 
 /* ============================== امتیاز ============================== */
 
-/**
- *  DLV-18: امتیازِ پیک به یک تحویل — ستارهٔ ۱ تا ۵ و حداکثر ۴ برچسب از فهرستِ ثابتِ پیک (بی متنِ آزاد).
- *  همان سنجشِ سرور پیش از فرستادن (`DeliveryRating.parse`).
- */
+/** DLV-18: امتیازِ پیک به یک تحویل (`RatingState`) */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun RateDialog(onDismiss: () -> Unit, onDone: (stars: Int, tags: List<String>) -> Unit) {
   val colors = Shop.colors
-  val allowed = DeliveryRating.TAGS.getValue("courier")
-  var stars by remember { mutableIntStateOf(0) }
-  var tags by remember { mutableStateOf(emptySet<String>()) }
-  val ok = DeliveryRating.parse(stars, tags.toList(), "courier").second.isEmpty()
+  val s = rememberRating()
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = colors.surfaceSolid,
@@ -265,24 +178,16 @@ internal fun RateDialog(onDismiss: () -> Unit, onDone: (stars: Int, tags: List<S
     text = {
       Column(Modifier.verticalScroll(rememberScrollState())) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          (1..5).forEach { n -> TohidFilterChip(StrCourier.stars(n), selected = stars == n, onClick = { stars = n }) }
+          (1..5).forEach { n -> TohidFilterChip(StrCourier.stars(n), selected = s.stars == n, onClick = { s.stars = n }) }
         }
         Spacer(Modifier.height(10.dp))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-          allowed.forEach { tag ->
-            TohidFilterChip(ratingTagLabel(tag), selected = tag in tags, onClick = {
-              tags = when {
-                tag in tags -> tags - tag
-                tags.size < DeliveryRating.MAX_TAGS -> tags + tag
-                else -> tags
-              }
-            })
-          }
+          s.allowed.forEach { tag -> TohidFilterChip(ratingTagLabel(tag), selected = tag in s.tags, onClick = { s.toggle(tag) }) }
         }
       }
     },
     confirmButton = {
-      TextButton(enabled = ok, onClick = { onDone(stars, allowed.filter { it in tags }) }) { Text(StrCourier.send, color = colors.primary) }
+      TextButton(enabled = s.ok, onClick = { onDone(s.stars, s.chosen()) }) { Text(StrCourier.send, color = colors.primary) }
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel, color = colors.muted) } },
   )

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPayFix
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
@@ -75,6 +76,12 @@ object SettingsLayout {
   const val FRAUD_TRAIL = "سابقه ضدتقلب"
   /** پیشرفت و جای دستگاه در گفت‌وگو (`ShopPolicy.chatMediaGuard`) */
   const val CHAT_GUARD = "جای گفت‌وگو"
+  /** اصلاحِ روشِ پرداخت پس از فروش (POS-40، `PayFixPref`) — همان عنوانِ `PayFixSettingsWired` */
+  const val PAY_FIX = "اصلاحِ روشِ پرداخت پس از فروش"
+  /** لیستِ قیمت در صندوق (POS-18، `PriceListPrefs`) — همان `PRICE_LIST_SETTINGS_TITLE` */
+  const val PRICE_LIST = "لیستِ قیمت در صندوق (خرده/عمده)"
+  /** پیش‌فاکتور (POS-25، `QuotePref`) — همان عنوانِ `QuoteSettingsWired` */
+  const val QUOTE = "پیش‌فاکتور (قیمت‌دهی)"
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
@@ -88,8 +95,8 @@ object SettingsLayout {
     Group(
       SALES,
       listOf(
-        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, TILL_RECEIVE, CREDIT_GATE, CRM_REPORTS,
-        STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, PRODUCT_TOOLS, PRINTER,
+        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, CREDIT_GATE, CRM_REPORTS,
+        PRICE_LIST, QUOTE, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, PRODUCT_TOOLS, PRINTER,
       ),
     ),
     Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
@@ -124,8 +131,11 @@ object SettingsLayout {
     HELD to "held-invoices",
     RETURNS to "returns",
     PAY to "payments",
+    PAY_FIX to "payment-fix",
     CREDIT_GATE to "credit-limit",
     CRM_REPORTS to "customer-reports",
+    PRICE_LIST to "price-lists",
+    QUOTE to "quotes",
     TILL_RECEIVE to "till-receive",
     STOCK_MODE to "stock-mode",
     STOCK_INSIGHT to "stock-insight",
@@ -165,8 +175,11 @@ object SettingsLayout {
     HELD -> StrPos.heldSection
     RETURNS -> StrSettings.returnsRow
     PAY -> StrShell.payAndRegister
+    PAY_FIX -> StrPayFix.settingsTitle
     CREDIT_GATE -> StrShell.creditGate
     CRM_REPORTS -> StrShell.crmReports
+    PRICE_LIST -> StrPos.priceListTitle
+    QUOTE -> StrPos.quoteSettingsTitle
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE
     STOCK_INSIGHT -> StrShell.stockInsight
