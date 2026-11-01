@@ -255,4 +255,34 @@ router.delete('/photo-inbox/:id', requireSyncWrite, async (req, res, next) => {
   try { res.json({ ok: true, removed: await photos.inboxDelete(req.sync, req.params.id) }); } catch (err) { next(err); }
 });
 
+/* ------------------------------------------- زنجیرهٔ اسناد (SEC-02) */
+/*
+ *  «سر» ِ زنجیرهٔ اسنادِ مالیِ هر سریِ دستگاه، در هر دورِ همگام‌سازی پس از push/pull (بخشِ ۱۰.۳).
+ *  ⛔ عمداً جدا از push: هیچ op ای را رد نمی‌کند، شکستش همگام‌سازی و فروش را نمی‌خواباند و بدنهٔ
+ *  push دست نمی‌خورد. فقط دکان (پمپ ۴۰۴). پرچمِ خاموشِ `shop.doc_chain` ⇒ `{enabled:false}` و
+ *  هیچ نوشتنی. شرح و قاعده‌ها: `lib/doc-chain.js`. نوشتن همان قاعدهٔ push (`requireSyncWrite`، SUB-10).
+ */
+function shopChainOnly(req, res, next) {
+  if (!req.sync || req.sync.accountKind !== require('../lib/tenancy').SHOP.app) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'زنجیرهٔ اسناد فقط برای دکان است' });
+  }
+  next();
+}
+
+router.get('/chain', shopChainOnly, async (req, res, next) => {
+  try {
+    const deviceId = v.id(req.query?.device_id, { field: 'شناسه دستگاه', required: true, max: 64 });
+    res.set('Cache-Control', 'no-store');
+    res.json({ ok: true, ...(await require('../lib/doc-chain').status(req.sync, deviceId)) });
+  } catch (err) { next(err); }
+});
+
+router.post('/chain', shopChainOnly, requireSyncWrite, async (req, res, next) => {
+  try {
+    const deviceId = v.id(req.body?.device_id, { field: 'شناسه دستگاه', required: true, max: 64 });
+    const ip = require('../middleware/ratelimit').clientIp(req);
+    res.json({ ok: true, ...(await require('../lib/doc-chain').report(req.sync, deviceId, req.body, { ip })) });
+  } catch (err) { next(err); }
+});
+
 module.exports = router;

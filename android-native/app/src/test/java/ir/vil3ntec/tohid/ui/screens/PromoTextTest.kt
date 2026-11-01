@@ -29,6 +29,21 @@ class PromoTextTest {
     roundTrip(base.copy(name = "بسته", kind = "bundle", qty = 3, priceMinor = 25000, active = false, window = PromoCore.Window(start = 1200, end = 1440)))
   }
 
+  /** POS-19 — پلهٔ قیمتِ ثابتِ هر واحد: فرم رفت‌وبرگشت دارد، متنش قیمت است و قیمتِ بالارونده رد می‌شود */
+  @Test fun `پلهٔ قیمتِ ثابت — فرم، متن و داوری`() {
+    val r = base.copy(name = "عمده", kind = "tiers", tiers = listOf(PromoCore.Tier(min = 3000, unitMinor = 9000), PromoCore.Tier(min = 6000, unitMinor = 8000)))
+    roundTrip(r)
+    assertTrue(PromoForm.of(r).tierAmount)
+    assertEquals(listOf("3" to "90", "6" to "80"), PromoForm.of(r).tiers)
+    assertEquals("3+ ⇐ " + ir.vil3ntec.tohid.core.i18n.StrLine.tierUnitText("90"), PromoText.valueText(r).substringBefore("، "))
+    //  درصدی همان درصدی می‌ماند (unitMinor = -1)
+    val pct = base.copy(name = "پله", kind = "tiers", tiers = listOf(PromoCore.Tier(3000, 500)))
+    assertEquals(false, PromoForm.of(pct).tierAmount)
+    assertEquals(-1L, PromoForm.of(pct).toRule(base).tiers.single().unitMinor)
+    assertEquals(listOf("tiers"), PromoCore.validate(PromoForm(name = "n", kind = "tiers", tierAmount = true, tiers = listOf("3" to "90", "6" to "95")).toRule(base)))
+    assertEquals(listOf("tiers"), PromoCore.validate(PromoForm(name = "n", kind = "tiers", tierAmount = true, tiers = listOf("3" to "")).toRule(base)))
+  }
+
   @Test fun `فرمِ نادرست را validate می‌گیرد`() {
     val f = PromoForm(name = "زیاد", kind = "percent", pct = "150")
     assertEquals(listOf("bp"), PromoCore.validate(f.toRule(base)))
@@ -39,6 +54,26 @@ class PromoTextTest {
     assertEquals(listOf("tiers"), PromoCore.validate(PromoForm(name = "n", kind = "tiers", tiers = listOf("5" to "10", "3" to "20")).toRule(base)))
     assertEquals(listOf("amount"), PromoCore.validate(PromoForm(name = "n", kind = "amount", amount = "12.5").toRule(base)))
     assertEquals(listOf("prices"), PromoCore.validate(PromoForm(name = "n", kind = "price").toRule(base)))
+  }
+
+  @Test fun `PRM-02 — سقفِ مصرف فقط با پرچمِ redeem و فقط برای کد؛ بی پرچم همان سقفِ پایه`() {
+    val coded = PromoCore.Rule(id = "c", name = "کد", kind = "percent", bp = 1000, code = "CAP10", maxUses = 3, uses = 2, channels = listOf("pos"))
+    //  بی پرچم: فرم سقف را نمی‌شناسد و دست نمی‌زند (رفتارِ پیشین)
+    assertEquals(null, PromoForm.of(coded).maxUses)
+    assertEquals(3L, PromoForm.of(coded).copy(pct = "15").toRule(coded).maxUses)
+    //  با پرچم: نشان داده و نوشته می‌شود؛ خالی = بی سقف؛ uses ِ سرور دست نمی‌خورد
+    assertEquals("3", PromoForm.of(coded, uses = true).maxUses)
+    assertEquals(25L, PromoForm.of(coded, uses = true).copy(maxUses = "۲۵").toRule(coded).maxUses)
+    assertEquals(0L, PromoForm.of(coded, uses = true).copy(maxUses = " ").toRule(coded).maxUses)
+    assertEquals(2L, PromoForm.of(coded, uses = true).copy(maxUses = "25").toRule(coded).uses)
+    assertEquals("", PromoForm.of(coded.copy(maxUses = 0), uses = true).maxUses)
+    //  بی کد (خودکار) سقف نمی‌گیرد — سرور فقط کد را می‌شمارد
+    assertEquals(0L, PromoForm.of(coded, uses = true).copy(code = "", maxUses = "25").toRule(coded).maxUses)
+    //  عددِ نادرست ⇒ validate («uses»)، نه بی‌صدا صفر
+    for (bad in listOf("2.5", "-1", "ده")) {
+      val r = PromoForm.of(coded, uses = true).copy(maxUses = bad).toRule(coded)
+      assertTrue(bad, "uses" in PromoCore.validate(r))
+    }
   }
 
   @Test fun `دقیقه از متن، با ارقامِ فارسی`() {

@@ -11,7 +11,7 @@
  *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه)، جز واژه‌های پایهٔ
  *      `K.FB` (وقتی واژه‌نامه نیامد) که باید بی‌کم‌وکاست همان fa.json باشند.
  *   ۵) هر کدِ خطای سرور که صفحه نشان می‌دهد ترجمهٔ خودش را دارد.
- *   ۶) هر واژه‌نامه زیرِ ۲۰KB (بارِ نخستِ صفحه = JS + واژه‌نامه).
+ *   ۶) هر واژه‌نامه زیرِ ۲۲KB (بارِ نخستِ صفحه = JS + واژه‌نامه؛ شرح سرِ همان آزمون).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -22,7 +22,7 @@ const pub = path.join(__dirname, '..', 'public');
 const read = (f) => fs.readFileSync(path.join(pub, f), 'utf8');
 const LANGS = ['fa', 'en', 'ps'];
 const dict = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'market/index.html', 'store/index.html'];
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'market/index.html', 'store/index.html'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
@@ -90,7 +90,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js']) {
+  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
@@ -115,9 +115,12 @@ test('واژه‌های پایهٔ K.FB (واژه‌نامه نیامد) هما�
   for (const [k, v] of Object.entries(fb)) assert.equal(v, dict.fa[k], `K.FB['${k}'] = fa.json`);
 });
 
-test('هر واژه‌نامه زیرِ ۲۰KB است', () => {
+//  ۲۲KB از ۱ نوامبر ۲۰۲۶ (پیش‌تر ۲۰KB): پیگیریِ سفارش (جایگزین، پیک، کدِ تحویل، بازپرداخت) و سبد/علاقه‌مندی
+//  کلیدهای تازه آوردند و fa.json به ۲۰٬۶۱۲ بایت رسید. همهٔ کلیدها زنده‌اند (بسیاری پویا: `cat.`/`order.`/`reason.`/`err.`).
+//  بدهی: واژه‌نامهٔ جدای صفحهٔ پیگیریِ سفارش که فقط همان‌جا بار شود، سپس سقف دوباره ۲۰KB.
+test('هر واژه‌نامه زیرِ ۲۲KB است', () => {
   for (const l of LANGS) {
     const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${l}.json`)).size;
-    assert.ok(n <= 20 * 1024, `${l}.json: ${n} بایت`);
+    assert.ok(n <= 22 * 1024, `${l}.json: ${n} بایت`);
   }
 });

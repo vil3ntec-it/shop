@@ -811,6 +811,32 @@ test('۳۲.۳ + WEB-09: کاتالوگِ روشن (`shop.catalog`) ⇒ موجو�
   assert.equal((await h.get(`/api/store/${s.slug}/products/oil`)).body.product.stock.status, 'out_of_stock');
 });
 
+test('WEB-12 + ۳۲.۳: خریدِ دوباره با موجودیِ امروز — ناموجود «out_of_stock» و بی قیمت، موجود با نشانِ موجودی', async () => {
+  const s = await liveStore('خرید-دوباره-موجودی');
+  //  سفارشِ دیروز (کاتالوگ هنوز خاموش): برنج + روغن
+  const first = await checkout(s.slug, body({ fulfillment: 'pickup', address: undefined }), { ticket: await ticketFor(s.slug, PHONE) });
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  //  امروز: کاتالوگ روشن، فقط برنج در انبار
+  await setFlag(s.shopId, 'shop.catalog', true);
+  const p = await push(s.token, [{
+    op_id: `op-${uniq()}`, ts: Date.now(), table: 'warehouseEntries', row_id: `we-${uniq()}`, type: 'insert',
+    fields: { productId: 'rice', units: 10, cartons: 0, perCarton: 0, unit: 'کیلو', price: 100, createdAt: Date.now() },
+  }]);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  const before = await count(s.shopId);
+  const re = await h.get(`/api/store/${s.slug}/orders/${first.body.order.token}/reorder`);
+  assert.equal(re.status, 200, JSON.stringify(re.body));
+  const rice = re.body.lines.find((l) => l.productId === 'rice');
+  assert.equal(rice.available, true);
+  assert.equal(rice.priceMinor, 12050, 'قیمتِ امروز');
+  assert.ok(['in_stock', 'in_warehouse'].includes(rice.stock && rice.stock.status), JSON.stringify(rice.stock));
+  const oil = re.body.lines.find((l) => l.productId === 'oil');
+  assert.deepEqual([oil.available, oil.priceMinor, oil.reason, oil.stock], [false, null, 'out_of_stock', null],
+    'ناموجودِ امروز به سبد نمی‌رود و قیمتِ کهنه نشان نمی‌دهد');
+  assert.equal(oil.previousPriceMinor, 30000, 'قیمتِ سفارشِ قبلی برای مقایسه می‌ماند');
+  assert.equal(await count(s.shopId), before, 'خریدِ دوباره سفارشی نمی‌سازد');
+});
+
 test('WEB-16: عکسِ کوچکِ بانک فقط با پرچمِ دکان؛ وگرنه عکسِ همگام‌شده؛ منتشرنشده هرگز', async () => {
   const s = await liveStore('عکس');
   const legacy = F.jpeg(320, 320, { seed: 71 });

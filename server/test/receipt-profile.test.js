@@ -180,8 +180,27 @@ test('پرچمِ shop.receipt_v2: پیش‌فرض خاموش؛ روشن برای
   const t = await shopWithTeam('ذ');
   const u = await shopWithTeam('ر');
   const C = `${P}/config`;
-  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false });
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false, debtMinor: false });
   await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.receipt_v2','true',1)", [t.shopId]);
-  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: true });
-  assert.deepEqual((await h.get(C, { token: u.owner })).body, { enabled: false });
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: true, debtMinor: false });
+  assert.deepEqual((await h.get(C, { token: u.owner })).body, { enabled: false, debtMinor: false });
+});
+
+test('پرچمِ shop.debt_minor: پیش‌فرض خاموش؛ روشن برای همین دکان یا all؛ دکان بر all؛ جدا از shop.receipt_v2', async () => {
+  const t = await shopWithTeam('ز');
+  const u = await shopWithTeam('ژ');
+  const C = `${P}/config`;
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false, debtMinor: false });
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.debt_minor','true',1)", [t.shopId]);
+  assert.deepEqual((await h.get(C, { token: t.staff })).body, { enabled: false, debtMinor: true });
+  assert.deepEqual((await h.get(C, { token: u.owner })).body, { enabled: false, debtMinor: false });
+  //  `all` روشن، ولی دکانِ t صریحاً خاموش ⇒ دکان بر all
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ('all','shop.debt_minor','true',1)");
+  await query("UPDATE live_config SET value='false' WHERE scope=$1 AND key='shop.debt_minor'", [t.shopId]);
+  assert.equal((await h.get(C, { token: u.owner })).body.debtMinor, true);
+  assert.equal((await h.get(C, { token: t.staff })).body.debtMinor, false);
+  //  فقط `true` ِ JSON روشن است (همان `flagOf`)
+  await query("UPDATE live_config SET value='\"true\"' WHERE scope='all' AND key='shop.debt_minor'");
+  assert.equal((await h.get(C, { token: u.owner })).body.debtMinor, false);
+  await query("DELETE FROM live_config WHERE key='shop.debt_minor'");
 });
