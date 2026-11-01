@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPick
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.PickLineDto
@@ -81,6 +82,8 @@ internal fun PickSheet(
   //  کارِ در راه: امضای کار ⇒ شناسهٔ رویداد (پاسخِ گم‌شده ⇒ همان شناسه)
   var inflight by remember(orderId) { mutableStateOf<Pair<String, String>?>(null) }
   val packKey = remember(orderId) { DeliveryRepository.OnceKey { PickingRepository.newEventId() } }
+  //  PCK-05/06: برگهٔ جایگزینِ یک قلمِ «پیدا نشد» (`PickSubstituteUi.kt`)
+  var subFor by remember(orderId) { mutableStateOf<PickLineDto?>(null) }
 
   fun load() {
     loadError = null
@@ -192,6 +195,7 @@ internal fun PickSheet(
             }
           },
           onReset = { act("reset:${l.lineNo}:${l.status}:${l.pickedQtyMilli}") { PickingRepository.event(it, "reset", l.lineNo) } },
+          onSubstitute = if (open && l.status == "not_found") ({ subFor = l }) else null,
         )
       }
 
@@ -248,6 +252,9 @@ internal fun PickSheet(
       if (s.status == "packed") PickPackedTools(s, repo)
     }
   }
+  subFor?.let { l ->
+    PickSubstituteSheet(orderId, l, sheet?.substitutions.orEmpty(), repo, buzz, onClose = { subFor = null }, onChanged = { load() })
+  }
 }
 
 @Composable
@@ -266,6 +273,8 @@ private fun PickLineCard(
   onReset: () -> Unit,
   /** جای قفسه برای برگه‌های بعدی (PCK-01)؛ قلمِ دستیِ بی‌کالا ⇒ null */
   onLocation: ((String, String, String) -> Unit)? = null,
+  /** PCK-05: «جایگزین» برای قلمِ «پیدا نشد»؛ null ⇒ دکمه نیست */
+  onSubstitute: (() -> Unit)? = null,
 ) {
   val c = Shop.colors
   val pending = l.status == "pending"
@@ -315,6 +324,7 @@ private fun PickLineCard(
       //  PCK-03: «پیدا نکردم» همیشه روی قلمِ باز
       if (pending) TohidDangerButton("پیدا نکردم", onClick = onNotFound, enabled = !busy)
       if (!pending || l.pickedQtyMilli > 0 || l.scans > 0) TohidSecondaryButton("از نو", onClick = onReset, enabled = !busy)
+      onSubstitute?.let { TohidSecondaryButton(StrPick.substitute, onClick = it, enabled = !busy) }
       if (onLocation != null) TohidSecondaryButton(if (editLoc) "بستنِ جا" else "جای قفسه", onClick = { editLoc = !editLoc })
     }
     if (editLoc && onLocation != null) {

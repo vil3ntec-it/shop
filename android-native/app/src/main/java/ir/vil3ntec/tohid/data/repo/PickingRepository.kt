@@ -4,6 +4,8 @@ import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
 import ir.vil3ntec.tohid.core.model.PickPhotoDto
 import ir.vil3ntec.tohid.core.model.PickPhotosDto
+import ir.vil3ntec.tohid.core.model.PickProposedDto
+import ir.vil3ntec.tohid.core.model.PickSuggestionsDto
 import ir.vil3ntec.tohid.core.model.PickShelfDto
 import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
@@ -49,6 +51,36 @@ class PickingRepository(private val api: ApiClient) {
       put("shelf", shelf.trim())
       put("level", level.trim())
     })
+    Unit
+  }
+
+  // ── جایگزین (PCK-05) و حلال (PCK-06) ─────────────────────────────────
+
+  suspend fun suggestions(orderId: String, lineNo: Int): ApiResult<PickSuggestionsDto> =
+    result { ApiJson.decode<PickSuggestionsDto>(api.get("$ROOT/${enc(orderId)}/pick/substitutes?lineNo=$lineNo")) }
+
+  /** پیشنهاد برای قلمِ «پیدا نشد»؛ کالای بارکددار با بارکدِ خودش. همان `eventId` ⇒ همان پیشنهاد */
+  suspend fun propose(orderId: String, eventId: String, lineNo: Int, productId: String, barcode: String): ApiResult<PickProposedDto> = result {
+    ApiJson.decode<PickProposedDto>(api.post("$ROOT/${enc(orderId)}/pick/substitutions", buildJsonObject {
+      put("eventId", eventId)
+      put("lineNo", lineNo)
+      put("productId", productId)
+      if (barcode.isNotBlank()) put("barcode", barcode.trim())
+    }))
+  }
+
+  /** تصمیمِ کارمند پس از تماس/واتس‌اپ: `accept` یا `reject` */
+  suspend fun decide(orderId: String, substitutionId: String, decision: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(orderId)}/pick/substitutions/decide", buildJsonObject {
+      put("substitutionId", substitutionId)
+      put("decision", decision)
+    })
+    Unit
+  }
+
+  /** حلالِ کالا (PCK-06): `halal`، `non_halal` یا خالی (نامعلوم) — فقط `stock.adjust` */
+  suspend fun setHalal(productId: String, halal: String): ApiResult<Unit> = result {
+    api.put("$ROOT/pick/products/${enc(productId)}", buildJsonObject { put("halal", halal) })
     Unit
   }
 

@@ -54,6 +54,36 @@ object StrPick {
   )
   val retry: String get() = t("دوباره بزنید؛ همان کار یک بار حساب می‌شود", "Try again; it is counted once", "بیا یې وکړئ؛ یو ځل حسابېږي")
 
+  // جایگزین (PCK-05) و حلال (PCK-06)
+  val substitute: String get() = t("جایگزین", "Substitute", "بدیل")
+  fun subTitle(name: String): String = t("جایگزینِ «$name»", "Substitute for “$name”", "د «$name» بدیل")
+  val subHint: String get() = t(
+    "فقط هم‌دسته و هم‌حلال؛ مشتری قیمتِ کمتر را می‌پردازد و تأیید با خودِ اوست.",
+    "Same category and halal status only; the customer pays the lower price and decides.",
+    "یوازې ورته ډله او ورته حلال حالت؛ پېرودونکی ټیټه بیه ورکوي او پرېکړه د هغه ده.",
+  )
+  val subNone: String get() = t("مشتری جایگزین نخواسته است", "The customer does not want substitutes", "پېرودونکي بدیل نه دی غوښتی")
+  val subNoCategory: String get() = t("دستهٔ این کالا معلوم نیست؛ جایگزینِ امن ساخته نمی‌شود", "This item has no category; no safe substitute", "د دې توکي ډله نه ده معلومه؛ خوندي بدیل نه جوړېږي")
+  val subEmpty: String get() = t("جایگزینِ امنی در دکان نیست", "No safe substitute in the shop", "په دوکان کې خوندي بدیل نشته")
+  fun subLine(name: String, price: String, total: String): String = t("$name · $price · جمع $total", "$name · $price · total $total", "$name · $price · ټول $total")
+  val subScan: String get() = t("اسکنِ بارکدِ جایگزین", "Scan the substitute's barcode", "د بدیل بارکوډ سکن کړئ")
+  val subPropose: String get() = t("پیشنهاد به مشتری", "Offer to customer", "پېرودونکي ته وړاندیز")
+  val subSent: String get() = t("پیشنهاد ثبت شد؛ پیوند را برای مشتری بفرستید", "Offer saved; send the link to the customer", "وړاندیز ثبت شو؛ پېرودونکي ته لینک ولېږئ")
+  val subWhatsapp: String get() = t("فرستادن در واتس‌اپ", "Send on WhatsApp", "په واټس‌اپ کې لېږل")
+  val subAccept: String get() = t("مشتری پذیرفت", "Customer accepted", "پېرودونکي ومنله")
+  val subReject: String get() = t("مشتری رد کرد", "Customer declined", "پېرودونکي رد کړه")
+  val subPending: String get() = t("در انتظارِ مشتری", "Waiting for the customer", "د پېرودونکي په تمه")
+  val subAccepted: String get() = t("پذیرفته شد", "Accepted", "ومنل شو")
+  val subRejected: String get() = t("رد شد", "Declined", "رد شو")
+  val subWithdrawn: String get() = t("پس گرفته شد", "Withdrawn", "بېرته واخیستل شو")
+  val subWillAccept: String get() = t("مهلت گذشت؛ پذیرفته می‌شود", "Time is up; it will be accepted", "وخت تېر شو؛ منل کېږي")
+  val subWillReject: String get() = t("مهلت گذشت؛ رد می‌شود", "Time is up; it will be declined", "وخت تېر شو؛ ردېږي")
+  val halalOf: String get() = t("حلالِ کالای اصل", "Halal status of the original item", "د اصلي توکي حلال حالت")
+  val halal: String get() = t("حلال", "Halal", "حلال")
+  val nonHalal: String get() = t("غیرحلال", "Not halal", "ناحلال")
+  val halalUnknown: String get() = t("نامعلوم", "Unknown", "نامعلوم")
+  val halalSaved: String get() = t("حلالِ کالا ثبت شد", "Halal status saved", "حلال حالت ثبت شو")
+
   // عکسِ بسته (PCK-08)
   val photoTitle: String get() = t("عکسِ بسته", "Parcel photo", "د بستې انځور")
   val photoConsent: String get() = t(
