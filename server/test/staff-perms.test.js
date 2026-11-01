@@ -96,7 +96,7 @@ test('هیچ لایه‌ای بیش از نقش نمی‌دهد و چیزِ اج
     ['/api/shop/permissions/roles/manager', { 'settings.write': { mode: 'approve' } }, 'not_approvable'],
     ['/api/shop/permissions/roles/manager', { 'data.write': { mode: 'deny' } }, 'unknown_permission'],
     ['/api/shop/permissions/roles/owner', { 'settings.write': { mode: 'deny' } }, 'owner_fixed'],
-    ['/api/shop/permissions/roles/cashier', { 'settings.write': { mode: 'deny' } }, 'unknown_role'],
+    ['/api/shop/permissions/roles/janitor', { 'settings.write': { mode: 'deny' } }, 'unknown_role'],
     ['/api/shop/permissions/roles/manager', { 'settings.write': 'deny' }, 'bad_override'],
   ];
   for (const [url, perms, code] of cases) {

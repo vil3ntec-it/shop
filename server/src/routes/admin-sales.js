@@ -153,6 +153,7 @@ router.post('/payments', async (req, res, next) => {
     }
     const p = await paymentInput(req.body);
     const t = now();
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     let out;
     try {
       out = await tx(async (c) => {
@@ -171,19 +172,20 @@ router.post('/payments', async (req, res, next) => {
           [id, p.app, p.tenantKind, p.tenantId, p.subscriptionId, p.amount, p.currency, p.method,
             receiptNo, p.note, p.paidAt, req.admin.id, t]
         );
+        //  پرداخت و سابقه‌اش در یک تراکنش: سابقه ننشست ⇒ پرداخت هم نمی‌نشیند
+        const logged = await audit.logIn(c, { actorType: 'admin', userId: req.admin.id, action: 'admin.payment_created', targetType: 'payment', targetId: id,
+          detail: { app: p.app, amount: p.amount, currency: p.currency, ...(reason ? { reason } : {}) } });
         const row = (await c.query(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [id])).rows[0];
         const response = { payment: shapePayment(row) };
         if (idem) await idempotency.save(c, idem, { tenantId: p.tenantId, resultId: id, response });
-        return { response, id };
+        return { response, id, logged };
       });
     } catch (err) {
       if (isUniqueViolation(err)) throw RECEIPT_TAKEN();
       throw err;
     }
     if (out.replayed) return replay(out.replayed);
-    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_created', targetType: 'payment', targetId: out.id,
-      detail: { app: p.app, amount: p.amount, currency: p.currency, ...(reason ? { reason } : {}) } });
+    await out.logged.afterCommit();
     res.status(201).json(out.response);
   } catch (err) { next(err); }
 });
@@ -197,21 +199,25 @@ router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
     if (p.receiptNo && p.receiptNo !== cur.receipt_no && await receiptTaken({ query }, p.receiptNo, cur.id)) {
       return next(RECEIPT_TAKEN());
     }
+    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
     //  شمارهٔ تازه روی ردیفِ کهنه (پیش از ۱۶۷، receipt_unique=false) هم زیرِ قیدِ یکتا می‌رود؛ وگرنه دو
     //  ویرایشِ هم‌زمان هر دو از سنجشِ بالا رد می‌شدند و یک شماره دو بار می‌نشست. شمارهٔ دست‌نخورده همان می‌ماند
     //  (تکراریِ کهنه پاک یا عوض نمی‌شود). سمتِ راستِ SET مقدارِ پیشینِ ردیف است.
+    let logged;
     try {
-      await query(
-        `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8,
-                receipt_unique = receipt_unique OR receipt_no IS DISTINCT FROM $6 WHERE id=$1`,
-        [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
-      );
+      logged = await tx(async (c) => {
+        await c.query(
+          `UPDATE sub_payments SET subscription_id=$2, amount=$3, currency=$4, method=$5, receipt_no=$6, note=$7, paid_at=$8,
+                  receipt_unique = receipt_unique OR receipt_no IS DISTINCT FROM $6 WHERE id=$1`,
+          [cur.id, p.subscriptionId, p.amount, p.currency, p.method, p.receiptNo, p.note, p.paidAt]
+        );
+        return audit.logIn(c, { actorType: 'admin', userId: req.admin.id, action: 'admin.payment_updated', targetType: 'payment', targetId: cur.id, detail: reason ? { reason } : {} });
+      });
     } catch (err) {
       if (isUniqueViolation(err)) return next(RECEIPT_TAKEN());
       throw err;
     }
-    const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_updated', targetType: 'payment', targetId: cur.id, detail: reason ? { reason } : {} });
+    await logged.afterCommit();
     const row = await one(`SELECT ${PAYMENT_COLS} FROM sub_payments p ${PAYMENT_JOIN} WHERE p.id=$1`, [cur.id]);
     res.json({ payment: shapePayment(row) });
   } catch (err) { next(err); }
@@ -219,10 +225,17 @@ router.put('/payments/:id', requireSuperAdmin, async (req, res, next) => {
 
 router.delete('/payments/:id', requireSuperAdmin, async (req, res, next) => {
   try {
-    const row = await one(`UPDATE sub_payments SET deleted=true WHERE id=$1 AND deleted=false RETURNING id`, [v.id(req.params.id)]);
-    if (!row) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
+    const id = v.id(req.params.id);
     const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
-    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.payment_deleted', targetType: 'payment', targetId: row.id, detail: reason ? { reason } : {} });
+    //  حذف و سابقه‌اش در یک تراکنش: هر که `deleted=true` را ببیند سابقه را هم می‌بیند،
+    //  و سابقه ننشست ⇒ حذف هم برمی‌گردد
+    const logged = await tx(async (c) => {
+      const row = (await c.query(`UPDATE sub_payments SET deleted=true WHERE id=$1 AND deleted=false RETURNING id`, [id])).rows[0];
+      if (!row) return null;
+      return audit.logIn(c, { actorType: 'admin', userId: req.admin.id, action: 'admin.payment_deleted', targetType: 'payment', targetId: row.id, detail: reason ? { reason } : {} });
+    });
+    if (!logged) return next(notFound('پرداخت پیدا نشد', 'payment_not_found'));
+    await logged.afterCommit();
     res.json({ ok: true });
   } catch (err) { next(err); }
 });
