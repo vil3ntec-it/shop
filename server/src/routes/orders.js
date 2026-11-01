@@ -374,4 +374,44 @@ router.get('/:id/risk', needFlag, async (req, res) => {
 //  دو بخشی یا بیشترند (`/pick/…`، `/:id/pick…`) و با `/:id`ِ بالا قاطی نمی‌شوند.
 router.use(require('./order-picking'));
 
+/**
+ * RSK-04: فهرستِ سیاه و سفیدِ ویترینِ همین دکان (شماره یا پین، با دلیل و انقضا) — فقط صاحب و مدیر
+ * (`orders.contact`، همان‌ها که شمارهٔ کامل را می‌بینند). نوشتن مثلِ هر نوشتنِ سفارش پشتِ `needWrite`
+ * (SUB-10، دستهٔ PAID). پرچمِ `shop.order_risk` خاموش ⇒ ۴۰۳ `order_risk_disabled` (پس از سدِ اشتراک).
+ * ثبت و برداشتن در سابقهٔ عملیات، بی شماره و بی دلیل.
+ */
+const riskLists = () => require('../lib/risk-lists');
+const needRisk = async (req) => {
+  if (!(await require('../lib/order-risk').flagIn((t, p) => require('../db').query(t, p), req.shopId))) {
+    throw forbidden('ریسکِ سفارش برای این دکان روشن نیست', 'order_risk_disabled');
+  }
+};
+
+router.get('/risk/lists', needFlag, requirePermission('orders.contact'), async (req, res) => {
+  await needRisk(req);
+  res.json(await riskLists().list(req.shopId));
+});
+
+router.post('/risk/lists', needFlag, requirePermission('orders.contact'), needWrite, async (req, res) => {
+  await needRisk(req);
+  const entry = await riskLists().add(req.shopId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'order.risk_list_add', targetType: 'risk_list', targetId: entry.id,
+    detail: { list: entry.list, kind: entry.kind, expiresAt: entry.expiresAt }, ip: clientIp(req),
+  });
+  res.status(201).json({ entry });
+});
+
+router.delete('/risk/lists/:entryId', needFlag, requirePermission('orders.contact'), needWrite, async (req, res) => {
+  await needRisk(req);
+  const out = await riskLists().remove(req.shopId, req.params.entryId, req.user.id);
+  if (out.removed) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.risk_list_remove', targetType: 'risk_list', targetId: out.id,
+      detail: {}, ip: clientIp(req),
+    });
+  }
+  res.json(out);
+});
+
 module.exports = router;
