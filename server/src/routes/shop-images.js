@@ -43,7 +43,12 @@ router.use(async (req, res, next) => {
   next();
 });
 
-const write = requirePermission('data.write');
+//  A16: نوشتن در بانکِ تصویر یعنی عکسِ کالا ⇐ همان `canWrite(role, 'products')`ِ هسته
+const write = [
+  requirePermission('data.write'),
+  (req, res, next) => (require('../lib/perm-core').canWrite(req.role, 'products')
+    ? next() : next(forbidden('عکسِ کالا در حدِ نقشِ شما نیست', 'table_not_allowed'))),
+];
 //  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر برنامه فرستاده باشد (IMG-14؛ بی سرآیند همان پیشین)
 const bufOf = (req) => {
   const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);

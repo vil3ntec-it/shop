@@ -276,6 +276,14 @@ class ShopStore(private val context: Context) {
       _notice.tryEmit(STALE_BASE)
       return@withContext false
     }
+    //  A16: نقشی که این بخشِ دفتر را نمی‌نویسد (صندوق‌دار خرید، انباردار فروش،
+    //  حسابدار هیچ) ⇐ پیش از دیسک و پیش از op می‌ایستد؛ سرور هم ردش می‌کرد و
+    //  دفترِ این دستگاه از دکان جدا می‌ماند. صاحب، مدیر و شاگرد هرگز.
+    val role = ShopRole.current(context)
+    RoleGate.blocked(role, _data.value, next)?.let { table ->
+      _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
+      return@withContext false
+    }
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
     //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
     //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
@@ -313,6 +321,10 @@ class ShopStore(private val context: Context) {
    */
   private val _blocked = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 4)
   val blocked: kotlinx.coroutines.flow.SharedFlow<Unit> = _blocked
+
+  /** نوشتنی که سدِ نقش (A16) ردش کرد: (بخشِ دفتر، نامِ نقش) — `AppRoot` راستش را می‌گوید */
+  private val _roleBlocked = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 4)
+  val roleBlocked: kotlinx.coroutines.flow.SharedFlow<Pair<String, String>> = _roleBlocked
 
   private fun touchesPaid(cur: ShopData, next: ShopData): Boolean =
     cur.sales != next.sales || cur.saleItems != next.saleItems ||
