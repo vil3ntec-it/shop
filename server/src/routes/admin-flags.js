@@ -22,6 +22,8 @@ const { clientIp } = require('../middleware/ratelimit');
 const v = require('../lib/validate');
 const db = require('../db');
 const { badRequest } = require('../middleware/errors');
+//  دامنهٔ پرچمی که برای «همه یا یک دکان» است (`live_config.scope`) — نامِ دامنه، نه مقایسهٔ برنامه
+const SHOP_SCOPE = 'shop';
 
 const router = express.Router();
 
@@ -69,10 +71,10 @@ async function checkKnown(scope, key, value) {
   const k = KNOWN.find((x) => x.key === String(key || '').trim());
   if (!k) return;
   const s = String(scope || 'all').trim();
-  const scopeOk = k.scope === 'shop' ? (s === 'all' || (ID_RE.test(s) && await db.one('SELECT 1 AS x FROM shops WHERE id=$1', [s])))
+  const scopeOk = k.scope === SHOP_SCOPE ? (s === 'all' || (ID_RE.test(s) && await db.one('SELECT 1 AS x FROM shops WHERE id=$1', [s])))
     : k.scope === 'all' ? s === 'all' : s === k.scope;
   if (!scopeOk) {
-    const want = k.scope === 'shop' ? '«all» یا شناسهٔ یک دکان' : `«${k.scope}»`;
+    const want = k.scope === SHOP_SCOPE ? '«all» یا شناسهٔ یک دکان' : `«${k.scope}»`;
     throw badRequest(`پرچمِ ${k.key} فقط در scope ِ ${want} معنا دارد`, 'bad_flag_scope');
   }
   const typeOk = Array.isArray(k.default)
