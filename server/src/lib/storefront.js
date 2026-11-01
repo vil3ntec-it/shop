@@ -42,7 +42,6 @@ const sfd = require('./storefront-delivery');
 const sfs = require('./storefront-seen');
 const subst = require('./order-substitution');
 const shelf = require('./storefront-shelf');
-const sfDeals = require('./storefront-deals');   //  WEB-02 «پیشنهادها» (شرح همان‌جا)
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -312,12 +311,11 @@ const K_ANON = 3;
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
  * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
- * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. هیچ‌کدام عددِ
- * ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. بی عددِ ساختگی؛ نبودِ داده ⇒ خالی.
  */
 async function highlights(shopId, at = now()) {
   const since = at - RECENT_MS;
-  const [best, fresh, deal] = await Promise.all([
+  const [best, fresh] = await Promise.all([
     many(
       `SELECT l.product_id, COUNT(DISTINCT l.order_id)::int AS orders, SUM(l.qty_milli)::bigint AS qty
          FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
@@ -334,17 +332,14 @@ async function highlights(shopId, at = now()) {
         ORDER BY published_at DESC, product_id LIMIT 40`,
       [shopId, since]
     ),
-    sfDeals.dealRows(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId),
   ]);
   const shelfOf = async (ids) => {
     const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
     return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
   };
-  const regular = new Map(deal.map((r) => [r.product_id, Number(r.regular_minor)]));
-  const [bestsellers, newArrivals, offered] = await Promise.all([
-    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), shelfOf([...regular.keys()]),
+  const [bestsellers, newArrivals, deals] = await Promise.all([
+    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), require('./storefront-deals').deals(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId, shelfOf),
   ]);
-  const deals = sfDeals.withRegular(offered, regular);
   return { bestsellers, newArrivals, deals, windowDays: 30 };
 }
 

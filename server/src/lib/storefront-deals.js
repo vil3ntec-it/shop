@@ -25,4 +25,10 @@ function withRegular(offered, regular) {
   return offered.filter((p) => regular.get(p.id) > p.priceMinor).map((p) => ({ ...p, regularPriceMinor: regular.get(p.id) }));
 }
 
-module.exports = { dealRows, withRegular };
+/** فهرستِ «پیشنهادها»: نامزدها ⇐ همان قفسهٔ `shelfOf` ِ ویترین ⇐ سنجشِ دوباره با قیمتِ دفتر. */
+async function deals(many, sql, shopId, shelfOf) {
+  const regular = new Map((await dealRows(many, sql, shopId)).map((r) => [r.product_id, Number(r.regular_minor)]));
+  return withRegular(await shelfOf([...regular.keys()]), regular);
+}
+
+module.exports = { dealRows, withRegular, deals };
