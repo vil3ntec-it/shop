@@ -62,7 +62,8 @@ class ProductPlansMapTest {
     //  بهای قلم = ۲ × ۱۰۰ + ۵ × ۲۰
     assertEquals(300.0, item.purchasePrice, 1e-9)
     assertEquals(400.0, item.unitPrice, 0.0)
-    assertEquals(setOf("oil" to -4.0, "rice" to -10.0), ok.data.stockMovements.map { it.productId to it.qty }.toSet())
+    //  حرکتِ انبارِ فاکتور همان قلم است (قاعدهٔ ردیفِ صندوق‌دار در سرور)؛ اجزا از `parts` کم می‌شوند
+    assertEquals(listOf("kit" to -2.0), ok.data.stockMovements.map { it.productId to it.qty })
     //  تغییرِ بعدیِ ترکیب فاکتورِ گذشته را عوض نمی‌کند
     val changed = ok.data.copy(products = ok.data.products.map { if (it.id == "kit") it.copy(kit = listOf(KitPart("oil", 1.0))) else it })
     assertEquals(3.0, ShopStore.stock(changed, "oil"), 1e-9)
