@@ -253,6 +253,24 @@
       "slip": {
         "v": 1,
         "shop": "shp_test",
+        "doc": "auditLog/pf-0001",
+        "perm": "sales.pay_fix",
+        "pct_bp": null,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-JJJJKKKKLLLL",
+        "reason": "مشتری با HesabPay داد",
+        "sig": "x"
+      },
+      "out": null
+    },
+    {
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
         "doc": "sales/s-0001",
         "perm": "sales.discount",
         "pct_bp": 10001,

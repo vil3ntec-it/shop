@@ -17,6 +17,7 @@
    - شیفت: باز کردن با موجودی، ورود/خروجِ نقد با دلیل، بازکردنِ کشو بی فروش،
      گزارشِ X، بستن با شمارشِ اسکناس و شمارشِ هر روش (Z)، اختلاف با دلیل.
      اختلاف هرگز خودکار اصلاح نمی‌شود.
+   - اصلاحِ روشِ پرداخت پس از فروش (POS-40): `payFix`، `payFixApply`، `payFixClosed`.
 
    هنوز هیچ صفحه‌ای آن را بار نمی‌کند؛ `shiftTotals` و فروشِ `index.html`
    همان حسابِ امروز را می‌کنند (گامِ بعدی، با پرچم).
@@ -559,6 +560,112 @@
 
   /* شمارشِ کور: نمای شاگرد فقط در برنامه (`ShiftSlip.forViewer` ِ core)؛ «نمای صندوقدار» ِ نیمه‌کور این‌جا نیست */
 
+  // ── اصلاحِ روشِ پرداخت پس از فروش (POS-40) ─────────────────
+  /* هم‌زادِ `core/pay/PayFix.kt`، با بخشِ `payFix` ِ بردار. فاکتور ویرایش نمی‌شود: اصلاح سندِ جدای `pay_fix`
+     است و فقط مبلغی را میانِ دو روشِ همان فاکتور جابه‌جا می‌کند (جمع همان). */
+  var FIX_REASON_MIN = 3, FIX_REASON_MAX = 120, FIX_REF_MAX = 64;
+  function oneLine(s) { return s.indexOf('\n') < 0 && s.indexOf('\r') < 0; }
+
+  /** روزِ فاکتور بسته است؟ در پنجرهٔ صندوقِ بسته، یا پیش از آخرین بستنِ صندوق‌های همان روز */
+  function payFixClosed(saleAt, saleDay, shifts) {
+    var list = shifts || [], last = null, day = text(saleDay);
+    for (var i = 0; i < list.length; i++) {
+      var w = list[i];
+      if (w.closedAt === null || w.closedAt === undefined) continue;
+      if (saleAt >= w.openedAt && saleAt <= w.closedAt) return true;
+      if (day && text(w.day) === day && (last === null || w.closedAt > last)) last = w.closedAt;
+    }
+    return last !== null && saleAt <= last;
+  }
+
+  /** ردیف‌های فاکتور پس از اصلاح‌های تا `until` به ترتیبِ (زمان، شناسه)؛ اصلاحِ بی‌جا کنار می‌رود */
+  function payFixApply(saleId, rows, fixes, until) {
+    var order = [], sums = {};
+    function put(k, v) { if (!has(sums, k)) { order.push(k); sums[k] = 0; } sums[k] = add(sums[k], v); }
+    (rows || []).forEach(function (r) { if (r.amount > 0) put(r.method, r.amount); });
+    var lim = until === null || until === undefined ? Infinity : until;
+    var list = (fixes || []).filter(function (f) { return f.saleId === saleId && f.at <= lim; }).slice();
+    list.sort(function (a, b) { return a.at !== b.at ? a.at - b.at : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
+    var applied = [], skipped = [], seen = {};
+    list.forEach(function (f) {
+      if (has(seen, f.id)) return;
+      seen[f.id] = 1;
+      var have = has(sums, f.from) ? sums[f.from] : 0;
+      if (!posInt(f.amount) || f.from === f.to || f.from === ACCOUNT || f.to === ACCOUNT || f.amount > have) {
+        skipped.push(f.id);
+        return;
+      }
+      sums[f.from] = have - f.amount;
+      put(f.to, f.amount);
+      applied.push(f.id);
+    });
+    var out = [];
+    order.forEach(function (k) { if (sums[k] > 0) out.push({ method: k, amount: sums[k] }); });
+    return { rows: out, applied: applied, skipped: skipped };
+  }
+
+  function payFix(p) {
+    var id = text(p.id);
+    if (!id) return fail('ID_REQUIRED');
+    var sale = p.sale || {};
+    var saleId = text(sale.id);
+    if (!saleId) return fail('SALE_REQUIRED');
+    var by = text(p.by), reason = text(p.reason), refText = text(p.ref);
+    var existing = p.existing || [];
+    for (var i = 0; i < existing.length; i++) {
+      var old = existing[i];
+      if (old.id !== id) continue;
+      var same = old.saleId === saleId && old.from === p.from && old.to === p.to && old.amount === p.amount &&
+        old.by === by && old.reason === reason && (old.ref || '') === refText;
+      return same ? { ok: true, duplicate: true, fix: old } : fail('ID_CONFLICT');
+    }
+    if (sale.cancelled) return fail('SALE_CANCELLED');
+    if (sale.online) return fail('SALE_ONLINE');
+    if (sale.returned) return fail('SALE_RETURNED');
+    if (p.closed) return fail('DAY_CLOSED');
+    if (p.decision !== 'allow' && p.decision !== 'approve') return fail('PERM_DENIED');
+    if (!by) return fail('BY_REQUIRED');
+    var approver = text(p.approvedBy);
+    if (p.decision === 'approve') {
+      if (!approver) return fail('APPROVAL_REQUIRED');
+      if (approver === by) return fail('SELF_APPROVAL');
+    }
+    if (reason.length < FIX_REASON_MIN) return fail('REASON_REQUIRED');
+    if (reason.length > FIX_REASON_MAX) return fail('REASON_TOO_LONG');
+    if (!oneLine(reason)) return fail('BAD_REASON');
+    var t = table(p.methods);
+    if (!t.ok) return t;
+    function usable(mid) {
+      var x = mid === ACCOUNT || !has(t.by, mid) ? null : t.by[mid];
+      return x && has(COUNTABLE, x.kind) ? x : null;
+    }
+    var from = usable(p.from);
+    if (!from) return fail('UNKNOWN_METHOD', { field: 'from' });
+    var to = usable(p.to);
+    if (!to) return fail('UNKNOWN_METHOD', { field: 'to' });
+    if (!to.enabled) return fail('METHOD_DISABLED', { field: 'to' });
+    if (from.id === to.id) return fail('SAME_METHOD');
+    if (!posInt(p.amount)) return fail('INVALID_AMOUNT');
+    if (!posInt(p.at)) return fail('INVALID_TIME');
+    var rows = sale.rows || [];
+    for (var r = 0; r < rows.length; r++) if (!nonNeg(rows[r].amount)) return fail('INVALID_AMOUNT', { field: 'rows' });
+    var now = payFixApply(saleId, rows, existing).rows;
+    function haveOf(mid) { return now.reduce(function (a, x) { return x.method === mid ? add(a, x.amount) : a; }, 0); }
+    if (p.amount > haveOf(from.id)) return fail('FIX_EXCEEDS', { method: from.id });
+    var ref = to.kind === 'cash' ? '' : refText;
+    if (to.needsRef && !ref) return fail('REF_REQUIRED', { method: to.id });
+    if (ref.length > FIX_REF_MAX || !oneLine(ref)) return fail('BAD_REF', { method: to.id });
+    if (to.limit !== null && add(haveOf(to.id), p.amount) > to.limit) return fail('METHOD_LIMIT', { method: to.id });
+    return {
+      ok: true,
+      duplicate: false,
+      fix: {
+        id: id, saleId: saleId, from: from.id, to: to.id, amount: p.amount, at: p.at, by: by,
+        approvedBy: p.decision === 'approve' ? approver : (approver || by), reason: reason, ref: ref || null,
+      },
+    };
+  }
+
   return {
     ACCOUNT: ACCOUNT,
     KINDS: KINDS,
@@ -582,5 +689,8 @@
     xReport: xReport,
     closeShift: closeShift,
     zReport: zReport,
+    payFix: payFix,
+    payFixApply: payFixApply,
+    payFixClosed: payFixClosed,
   };
 });

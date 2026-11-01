@@ -14,7 +14,8 @@ import ir.vil3ntec.tohid.money
  *  ── نقدِ مورد انتظار ──────────────────────────────────────────────
  *  اول صندوق
  *   + نقدِ هر فاکتورِ لغونشده (`finalTotal − debtGiven`: نقدی کامل، نسیه فقط پیش‌پرداخت؛
- *     فاکتورِ با `payments` فقط ردیف‌های نقد — همان نقدِ ماندهٔ پس از پولِ پس — [saleCash])
+ *     فاکتورِ با `payments` فقط ردیف‌های نقد — همان نقدِ ماندهٔ پس از پولِ پس — [saleCash]؛
+ *     با اصلاحِ روشِ پرداختِ `pay_fix` تا پایانِ پنجره، نقدِ پس از اصلاح — POS-40، `PayFixFlow`)
  *   + رسیدِ قرض‌داران (`receive`) — جز رسیدی که سیستم هنگامِ لغوِ فروشِ نسیه ساخت
  *     ([isCashReceipt]؛ پولی نیامده، فقط بدهی بسته شد)
  *   + ورودِ نقد − خروجِ نقد (`cash_in`/`cash_out`ِ همین صندوق، `refId` = بازکردن) — داده‌اند،
@@ -129,11 +130,13 @@ object CashShift {
    *  نقدی که این فاکتور به دخل آورد. با `payments` (PAY v3 A4) فقط ردیف‌های نوعِ نقد —
    *  مبلغِ آن‌ها خودش پس از کمِ پولِ پس است؛ کیف پول، کارت، حواله و «به حساب» نقدِ دخل نیستند.
    *  بی `payments` همان حسابِ امروز. فاکتورِ اینترنتی ([isOnline]) همیشه صفر — حتی ردیفِ
-   *  `cash`ِ «نقد هنگامِ تحویل» (`custody = courier`).
+   *  `cash`ِ «نقد هنگامِ تحویل» (`custody = courier`). با [fixes] (POS-40) نقدِ همان ردیف‌ها پس از اصلاح‌های روشِ
+   *  پرداختِ تا [until] (`PayFlow.saleRows`)؛ بی اصلاح همان حسابِ امروز.
    */
-  fun saleCash(s: Sale): Double {
+  fun saleCash(s: Sale, fixes: List<ir.vil3ntec.tohid.core.pay.PayFix.Fix> = emptyList(), until: Long = Long.MAX_VALUE): Double {
     //  فاکتورِ اینترنتیِ سرور (W): نه آنلاین و نه «نقد هنگامِ تحویل»ِ دستِ پیک پولِ دخل است
     if (isOnline(s)) return 0.0
+    if (fixes.isNotEmpty()) return PayFlow.saleRows(s, fixes, until).filter { it.method == PayFlow.CASH }.sumOf { it.amount } / 100.0
     s.payments?.takeIf { it.isNotEmpty() }?.let { list ->
       //  ردیفِ نقدی که امانتِ کسِ دیگری است (`custody`، مثلاً پیک) هم در دخل نیست
       return list.filter { it.kind == PayFlow.CASH && it.custody == null && it.amountMinor > 0 }.sumOf { it.amountMinor } / 100.0
@@ -149,10 +152,11 @@ object CashShift {
     fun inWindow(at: Long) = at in from..to
     val online = d.sales.filter(::isOnline).mapTo(HashSet()) { it.id }
     val moves = if (shiftId == null) emptyList() else d.auditLog.filter { it.type in MOVES && it.refId == shiftId && it.amount > 0 }
+    val fixes = PayFixFlow.bySale(d)
     return Totals(
       opening = opening,
       sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && inWindow(it.createdAt) }
-        .sumOf { saleCash(it) },
+        .sumOf { saleCash(it, fixes[it.id].orEmpty(), to) },
       receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && inWindow(it.createdAt) }.sumOf { it.amount },
       //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛
       //  ردیفِ قدیمی آن را ندارد ⇒ همان `amount`ِ امروز

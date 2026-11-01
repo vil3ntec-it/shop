@@ -76,6 +76,9 @@ object PermCore {
   val CATALOG: Map<String, Spec> = mapOf(
     "sales.discount" to Spec(OMD, "restrict", true, listOf("maxPct", "maxAmount"), false),
     "sales.cancel" to Spec(OMD, "restrict", true, emptyList(), false),
+    // POS-40: اصلاحِ روشِ پرداخت پس از فروش (`core/pay/PayFix`) — کارِ تازه: صاحب و مدیر خودشان، شاگرد و صندوق‌دار
+    // «نیازمند تأیید»، بقیه نه؛ همان `d()` ِ JS. سرور هنوز اجرایش نمی‌کند (not_enforceable_yet)
+    "sales.pay_fix" to Spec(d("allow", "allow", "approve", "approve", "deny", "deny", "deny"), "restrict", true, emptyList(), false),
     // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند؛ از نقش‌های تازه فقط صندوق‌دار
     "returns.create" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),

@@ -487,7 +487,7 @@ fun SettingsScreen(
     }
 
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
-    item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }; item { PayFixSettingsWired(context) } // اصلاحِ روشِ پرداخت پس از فروش (POS-40)، پیش‌فرض خاموش
     /* ============== دریافت از مشتری در صندوق (POS-39، پیش‌فرض خاموش) ============== */
     item {
       var on by remember { mutableStateOf(ir.vil3ntec.tohid.data.TillReceivePref.on(context)) }

@@ -85,9 +85,9 @@ object DebtEntry {
   /**
    *  دفترِ همین لحظه برای تبدیلِ `ShopStore.update` (زیرِ همان قفلِ موتور): **دیسک**، نه [mem] ِ این نمونه که
    *  پس از Pull ِ کارگر کهنه است. فایل نیست یا دفترِ رمزدارِ خوانده‌نشده (SEC-01) ⇒ همان [mem] (`writeToDisk`
-   *  دومی را خودش رد می‌کند)؛ فایل هست ولی خوانده نشد ⇒ `null`: هیچ نوشتنی.
+   *  دومی را خودش رد می‌کند)؛ فایل هست ولی خوانده نشد ⇒ `null`: هیچ نوشتنی. همان راهِ `PayFixPref.record` (POS-40).
    */
-  private fun ledgerNow(store: ShopStore, mem: ShopData): ShopData? =
+  internal fun ledgerNow(store: ShopStore, mem: ShopData): ShopData? =
     if (store.unreadable.value != null || !store.hasData()) mem else store.readDiskLocked()
 
   /**
