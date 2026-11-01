@@ -23,6 +23,15 @@ async function main() {
   }
   //  هشدار — نه توقف: پشتیبانِ کلِ دیتابیس بی رمز روی همان دیسکی می‌نشیند
   //  که خودِ دیتابیس هست؛ هر کس به پوشهٔ پشتیبان برسد، همه‌چیز را دارد.
+  //  SEC-AUTH-06/15: سرورِ بی NODE_ENV رفتارِ production دارد (کد در پاسخ نیست) ولی سنجشِ رازهای
+  //  `validate()` را نمی‌گذراند؛ بی API_SECRET/OTP_SECRET کدِ ثابتِ شاگرد و کدهای دیگر با رشتهٔ ثابتِ
+  //  سورس مهر می‌شوند و از روی شناسهٔ دکان ساختنی‌اند. نمی‌ایستیم (سرورِ نصب‌شده بیرون نیفتد)، می‌گوییم.
+  if (config.env !== 'production' && !config.devCodes) {
+    console.warn('⚠️ NODE_ENV تنظیم نشده است؛ روی سرورِ واقعی NODE_ENV=production بگذارید تا سنجشِ رازها اجرا شود.');
+  }
+  if (!config.devCodes && (!config.secrets.api || !config.secrets.otp)) {
+    console.warn('⚠️ API_SECRET یا OTP_SECRET خالی است؛ کدهای شاگرد و یک‌بارمصرف با رازِ ثابتِ سورس مهر می‌شوند. هر دو را (۲۴+ نویسه) بگذارید.');
+  }
   if (config.env === 'production' && config.backup.enabled && !config.backup.passphrase) {
     console.warn('⚠️ BACKUP_PASSPHRASE خالی است؛ پشتیبان‌های دیتابیس رمز نمی‌شوند.');
   }
@@ -85,6 +94,10 @@ async function main() {
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
+  require('./lib/job-beat').register('notices', 60_000);   //  پنلِ مرکزی ۴.۹: «زمان‌بندی شد» از همین لحظه
+  //  هشدارهای مرکزیِ پنلِ مالک (۴.۱۱): هر ۵ دقیقه، با یکی کردنِ تکرار و سقفِ سیل (`lib/ops-alerts.js`)
+  const opsAlerts = require('./lib/ops-alerts');
+  opsAlerts.start();
   //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
@@ -103,6 +116,7 @@ async function main() {
     orderNotify.stop();
     payments.stopReconciler();
     notices.stopRunner();
+    opsAlerts.stop();
     telegram.stop();
     server.close(async () => {
       await closeDb();

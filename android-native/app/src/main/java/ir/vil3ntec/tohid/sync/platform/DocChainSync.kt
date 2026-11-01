@@ -11,6 +11,7 @@ import ir.vil3ntec.tohid.core.audit.DocChainReport
 import ir.vil3ntec.tohid.core.audit.DocChainServer
 import ir.vil3ntec.tohid.core.audit.DocChainStatus
 import ir.vil3ntec.tohid.core.audit.HashChain
+import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.data.DiskWrite
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.SaleChainFacts
@@ -82,6 +83,48 @@ object DocChainSync {
         )
         if (next != gate) prefs.edit().putBoolean("on:$key", next.enabled).putLong("at:$key", next.probedAt).apply()
       }
+    }
+  }
+
+  /**
+   *  SEC-03: لغو یا «اصلاح» ِ فاکتورِ [saleId] که همین حالا در دفتر نشست ⇐ سندِ معکوس در زنجیرهٔ
+   *  همین دستگاه (`DocChainCycle.recordVoid`). [before] دفترِ **پیش از لغو** است (فاکتورِ اصلی و
+   *  فاکتورهای حلقه‌نشدهٔ همین سری). پرچمِ خاموش یا زنجیرهٔ نساخته ⇐ هیچ؛ هر شکست بی‌صدا — لغو
+   *  پیش‌تر نشسته و به این بسته نیست. صفحهٔ نسخهٔ ۳ (`CancelSheet`، #391) هم پس از `store.save` همین را
+   *  صدا بزند.
+   */
+  suspend fun recordVoid(context: Context, before: ShopData, saleId: String, kind: InvoiceVoid.Kind, reason: String) {
+    val app = context.applicationContext ?: context
+    val account = SyncStateV1.currentAccount(app)
+    val shop = LedgerOwner.currentShop(app)
+    val series = DocSeries.current(app)
+    if (account.isBlank() || shop.isBlank() || series.isBlank()) return
+    val original = before.sales.find { it.id == saleId } ?: return
+    try {
+      lock.withLock {
+        withContext(Dispatchers.IO) {
+          val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+          val key = safe(account) + "@" + safe(shop)
+          val gate = DocChainCycle.Gate(prefs.getBoolean("on:$key", false), prefs.getLong("at:$key", 0L))
+          val facts = SaleChainFacts.facts(original, before.saleItems.filter { it.saleId == saleId })
+          DocChainCycle.recordVoid(
+            gate = gate,
+            book = DocChainBook(DocChainFiles(File(app.noBackupFilesDir, "doc-chain/${safe(account)}/${safe(shop)}-$series"))),
+            shopId = shop,
+            series = series,
+            by = account,
+            ownSales = SaleChainFacts.of(before, series),
+            original = facts,
+            at = System.currentTimeMillis(),
+            kind = kind,
+            reason = reason,
+          )
+        }
+      }
+    } catch (c: CancellationException) {
+      throw c
+    } catch (e: Exception) {
+      //  زنجیره نباید لغوِ نشسته را خراب کند؛ دورِ بعدِ همگام‌سازی هر ناهمخوانی را گزارش می‌کند
     }
   }
 

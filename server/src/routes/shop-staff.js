@@ -24,7 +24,7 @@ const audit = require('../lib/audit');
 const perms = require('../lib/staff-perms');
 const deviceBlock = require('../lib/device-block');
 const approvals = require('../lib/staff-approval');
-const { can } = require('../lib/permissions');
+const { can, legacyRole } = require('../lib/permissions');
 const { requireShop, requirePermission } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { requireRecentAuth } = require('../lib/reauth');
@@ -33,7 +33,7 @@ const router = express.Router();
 
 router.get('/permissions', requireShop, async (req, res) => {
   const { permissions, policy } = await perms.policyOf(req.shopId, req.member);
-  const out = { role: req.member.role, permissions, policy };
+  const out = { role: legacyRole(req.member.role), actualRole: req.member.role, permissions, policy };
   if (can(req.member.role, 'members.view')) out.shop = await perms.overview(req.shopId);
   res.json(out);
 });

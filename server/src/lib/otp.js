@@ -170,7 +170,7 @@ const senders = {
    *  ──────────────────────────────────────────────────────────────────
    */
   async log(to, code) {
-    if (config.env === 'production') {
+    if (config.env === 'production' || !config.devCodes) {
       console.warn(
         `[otp] کدی برای ${redact(to)} صادر شد ولی راهِ ارسالی تنظیم نیست، ` +
         'پس به دستِ کسی نمی‌رسد. EMAIL_API_URL یا SMS_API_URL را تنظیم کنید. ' +
@@ -648,10 +648,10 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
     resendAfter: t + config.otp.resendMs,
     resendSeconds: Math.ceil(config.otp.resendMs / 1000),
   };
-  // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  if (config.env !== 'production' && via === 'log') out.devCode = code;
+  //  SEC-AUTH-06: فقط با `NODE_ENV`ِ صریحِ development/test — نبودنش production حساب می‌شود
+  if (config.env !== 'production' && config.devCodes && via === 'log') out.devCode = code;
   return out;
 }
 

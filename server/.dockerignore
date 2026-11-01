@@ -4,3 +4,13 @@ data
 .git
 *.log
 test
+.env.*
+!.env.example
+*.pem
+*.key
+*.jks
+*.keystore
+*.p12
+*.sql.gz*
+*.dump
+backups
