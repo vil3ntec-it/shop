@@ -23,6 +23,7 @@ const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
 const cart = require('../lib/store-cart');
 const storeSeo = require('../lib/store-seo');
+const views = require('../lib/public-views');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const campaigns = require('../lib/campaigns');
@@ -36,6 +37,8 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
+//  S2: پرچمِ `market.public_views` پیش از هر پاسخ (خاموش ⇒ پاسخِ بی بُرش، همان main)
+router.use(views.gate);
 const RECENT_FLAG = 'shop.storefront.recent';
 /** E2E-MKT-02: ۴۰۹ ِ `out_of_stock` در ویترین با فهرستِ همهٔ قلم‌های کم و «کم کن به …» (پیش‌فرض خاموش) */
 const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
@@ -96,12 +99,12 @@ router.get('/:slug', readLimit, store, async (req, res) => {
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
-    store: {
+    store: views.pub('shop', {
       ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery, media,
       ...(pid ? { publicId: req.store.public_id } : {}),
       //  shop.orders.subscribers_only روشن ⇒ `ordering` («سفارش می‌پذیرد؟»)؛ ثبت را `orders.create` می‌بندد. خاموش ⇒ کلید نیست (پاسخِ main)
       ...require('../lib/storefront-intake').orderingOf(req.store),
-    },
+    }),
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -175,7 +178,7 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
   const stock = out.items.length
     ? await require('../lib/catalog').publicStock(req.store.shop_id, out.items.map((p) => p.id)) : null;
   if (stock) out.items = out.items.map((p) => ({ ...p, stock: stock.get(p.id) || p.stock }));
-  res.json(out);
+  res.json({ ...out, items: views.pubList('product', out.items) });
 });
 
 //  ── WEB-08: صفحهٔ کالا ───────────────────────────────────────────────
