@@ -123,7 +123,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         TohidButton("+ سفارشِ دستی", onClick = { creating = true })
       }
     }
-    Spacer(Modifier.height(6.dp)); OrderDeskPanel(ir.vil3ntec.tohid.data.repo.Backend.api(context))   // میزِ سفارش (ORD-03/04/08/09)، پشتِ پرچمِ خاموش
+    Spacer(Modifier.height(6.dp)); OrderDeskPanel(ir.vil3ntec.tohid.data.repo.Backend.api(context)); OrderAlertBanners(cfg) { openId = it }   // میزِ سفارش (ORD-03/04/08/09) و نشانِ قطع/زمان‌بندی‌شده (ORD-03/18)، پشتِ پرچمِ خاموش
     Text(
       "اعلانِ فوری (وقتی برنامه بسته است) هنوز وصل نیست؛ تا برنامه باز است، صف هر چند ثانیه خودش تازه می‌شود.",
       style = MaterialTheme.typography.labelSmall, color = colors.muted,

@@ -48,6 +48,8 @@ data class OrdersConfigDto(
   val substitution: Boolean = false,
   /** ORD-07 «عقب انداختن» (پرچمِ `shop.orders.delay`) — خاموش ⇒ null و هیچ دکمه‌ای */
   val delay: OrderDelayCfgDto? = null,
+  /** ORD-03 «باز / بسته» و هشدارِ قطعِ اتصال (پرچمِ `shop.orders.presence`) */
+  val presence: Boolean = false,
 )
 
 /** `delay` ِ `/config` (`order-delay.configOf`): وضعیت‌های مجاز، دلیل‌ها و سقفِ دقیقه */
@@ -65,6 +67,18 @@ data class OrdersSummaryDto(
   val oldestNewAt: Long? = null,
   val rev: Long = 0,
   val serverTime: Long = 0,
+  /** ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ تهی) */
+  val startAlerts: List<OrderStartAlertDto> = emptyList(),
+)
+
+/** یک هشدارِ ORD-18 — بی نام، شماره یا نشانی (`order-start-alert.pendingOf`) */
+@Serializable
+data class OrderStartAlertDto(
+  val id: String = "",
+  val orderNo: Long = 0,
+  val status: String = "",
+  val scheduledFor: Long = 0,
+  val alertAt: Long = 0,
 )
 
 @Serializable

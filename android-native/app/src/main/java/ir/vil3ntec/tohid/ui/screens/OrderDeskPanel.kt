@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderDesk
 import ir.vil3ntec.tohid.data.repo.OrderDeskRepository
 import ir.vil3ntec.tohid.data.repo.OrderDeskRepository.Desk
+import ir.vil3ntec.tohid.ui.OrderAlertsLive
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -59,7 +60,7 @@ internal fun OrderDeskPanel(api: ApiClient) {
   //  هر نیم دقیقه از سرور؛ «دقیقهٔ دیگر» با زمانِ همان پاسخِ سرور (ساعتِ دستگاه مرجع نیست)
   LaunchedEffect(Unit) {
     while (true) {
-      repo.state().onSuccess { desk = it }
+      repo.state().onSuccess { desk = it; OrderAlertsLive.deskOn.value = it.enabled }
       delay(30_000)
     }
   }

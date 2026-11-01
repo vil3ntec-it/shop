@@ -29,4 +29,14 @@ object StrOrderOps {
   val delayRetry: String get() = t("اتصال قطع شد؛ دوباره «تأیید» را بزنید — دو بار عقب نمی‌رود", "Connection lost; press Confirm again — it will not be delayed twice", "اړیکه پرې شوه؛ بیا «تایید» ووهئ — دوه ځله نه ځنډول کېږي")
   fun delayEvent(at: String): String = t("عقب افتاد: آماده تا $at", "Delayed: ready by $at", "وځنډول شو: تر $at پورې چمتو")
   fun delayEventPrev(at: String): String = t("پیش‌تر $at", "was $at", "مخکې $at")
+
+  // ORD-03 «اتصال قطع است» و ORD-18 «وقتِ شروعِ سفارشِ زمان‌بندی‌شده» (`ui/screens/OrderAlertsUi.kt`)
+  val netDown: String get() = t("اتصال قطع است — سفارشِ تازه دیده نمی‌شود", "Connection lost — new orders are not showing", "اړیکه پرې ده — نوي فرمایشونه نه ښکاري")
+  fun netLastOk(min: Int): String = t("آخرین به‌روزرسانی: $min دقیقه پیش.", "Last update: $min min ago.", "وروستی تازه کېدل: $min دقیقې مخکې.")
+  val netBack: String get() = t("با برگشتِ اینترنت صف خودش تازه می‌شود.", "The queue refreshes by itself when the internet is back.", "کله چې انټرنېټ راشي، کتار پخپله تازه کېږي.")
+  fun startTitle(orderNo: String): String = t("سفارشِ زمان‌بندی‌شده #$orderNo — وقتِ شروع", "Scheduled order #$orderNo — time to start", "مهالوېشل شوی فرمایش #$orderNo — د پیل وخت")
+  fun startIn(min: Int): String = t("تا $min دقیقهٔ دیگر وقتش است؛ آماده‌سازی را شروع کنید.", "Due in $min min; start preparing.", "تر $min دقیقو پورې یې وخت دی؛ چمتو کول پیل کړئ.")
+  val startDue: String get() = t("وقتش رسیده و هنوز شروع نشده است.", "It is due and has not started yet.", "وخت یې رسېدلی او لا نه دی پیل شوی.")
+  val startOpen: String get() = t("باز کن", "Open", "پرانیزه")
+  val startSeen: String get() = t("دیدم", "Got it", "ومې لید")
 }

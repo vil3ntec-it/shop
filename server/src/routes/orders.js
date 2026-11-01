@@ -94,6 +94,9 @@ router.get('/summary', needFlag, async (req, res) => {
   const out = await orders.summary(req.shopId);
   //  ORD-03: همان «باز / بسته» که مشتری در ویترین می‌بیند، در همان پرسشِ ۲۰ثانیه‌ای
   if (await presence.flagOf(req.shopId)) out.presence = await presence.presenceOf(req.shopId, out.serverTime);
+  //  ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ بی کلید)
+  const sa = require('../lib/order-start-alert');
+  if (await sa.flagOf(req.shopId)) out.startAlerts = await sa.pendingOf(req.shopId, out.serverTime);
   res.json(out);
 });
 
