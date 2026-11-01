@@ -13,6 +13,7 @@
  *      کنار می‌زند؛ سقفِ هر مشتری.
  *   ۵) بی دادهٔ حساس: متن بی نام، شماره، نشانی و مبلغ؛ نمای دکان بی شماره و متن؛ دکانِ دیگر ۴۰۴.
  *   ۶) امروز هیچ سرویس‌دهنده‌ای وصل نیست ⇒ no_channel ِ صادقانه (هیچ پیامِ واقعی).
+ *   ۷) NTF-02: سقفِ روزانهٔ هزینهٔ هر دکان و هر کانال (`notify-cost`) ⇒ cost_cap و کانالِ پولی صدا زده نمی‌شود.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '200';
 const test = require('node:test');
@@ -350,6 +351,40 @@ test('پیامک فقط برای رویدادِ فوری: تنها پیامک و
   assert.equal(row.status, 'sent');
   assert.equal(row.channel, 'sms');
   assert.deepEqual(sms.calls.map((c) => c.event), ['order_cancelled']);
+});
+
+test('NTF-02: سقفِ روزانهٔ هزینهٔ پیامکِ هر دکان ⇒ کانالِ پولی صدا زده نمی‌شود (cost_cap)؛ دکانِ دیگر آزاد؛ هزینه روی tried', async () => {
+  const a = await liveShop('هزینه');
+  const b = await liveShop('هزینه ب');
+  const sms = fake();
+  N.setProviders({ sms });
+  const at = Date.now();
+  //  ۲ دلار پیامکِ پذیرفتهٔ همین دکان در همین روز (پیامی دیگر = ۰٫۴۴۶ دلار ⇒ از سقفِ ۲٫۲۳ می‌گذرد)
+  const prior = await placeOrder(a, { phone: '+93795551001' });
+  await query(
+    `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status, channel, tried,
+       next_attempt_at, sent_at, created_at, updated_at)
+     VALUES ($1,$2,$3,'order_ready','fa','k','sent','sms',$4::jsonb,$5,$5,$5,$5)`,
+    [`c${uniq()}`.padEnd(26, '0').slice(0, 26), a.shopId, prior.id,
+      JSON.stringify([{ channel: 'sms', result: 'accepted', costMicros: 2_000_000 }]), at - 60_000]
+  );
+  const capped = await placeOrder(a, { phone: '+93795551002' });
+  const free = await placeOrder(b, { phone: '+93795551003' });
+  for (const [o, order] of [[a, capped], [b, free]]) {
+    await go(o, order, 'accepted');
+    await go(o, order, 'cancelled', { reason: 'out_of_stock' });
+  }
+  await N.tick();
+  const row = await rowOf(capped.id, 'order_cancelled');
+  assert.equal(row.status, 'no_channel');
+  assert.deepEqual(row.tried.map((t) => t.result), ['not_configured', 'not_configured', 'not_configured', 'cost_cap']);
+  const ok = await rowOf(free.id, 'order_cancelled');
+  assert.equal(ok.status, 'sent');
+  assert.equal(ok.channel, 'sms');
+  assert.equal(ok.tried.at(-1).costMicros, 446_000);
+  assert.deepEqual(sms.calls.map((c) => c.to.phone), ['+93795551003']);
+  //  نمای دکان نتیجه را دارد، نه مبلغ
+  assert.deepEqual(N.shape(row).tried.at(-1), { channel: 'sms', result: 'cost_cap' });
 });
 
 /* ══════════════════════════════════════════════════════════════════
