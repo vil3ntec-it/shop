@@ -54,7 +54,7 @@ function makeDevice(deviceId, token, ledger) {
       const batch = this.queue.batch();
       const r = await h.api('POST', '/api/sync/v1/push', {
         token: this.token,
-        body: { device_id: this.id, schema_version: core.SCHEMA_VERSION, ops: batch },
+        body: { device_id: this.id, schema_version: core.wireSchema(0), ops: batch },
         headers: { 'X-App': 'shop', 'X-Device': this.id },
       });
       assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -124,7 +124,11 @@ test('سرور: سه فهرست در TABLES هستند و هر کدام جدول
 
 test('برنامه: ساختنِ دسته یک opِ insert با شناسهٔ sha256ِ نام می‌سازد؛ حذفش یک delete', () => {
   for (const key of LISTS) assert.ok(core.LIST_COLLECTIONS.includes(key), key);
-  assert.equal(core.SCHEMA_VERSION, 3, 'جدولِ تازه = یک پله بالاتر، این‌جا و روی سرور');
+  assert.ok(core.SCHEMA_VERSION >= 3, 'جدولِ تازه = یک پله بالاتر، این‌جا و روی سرور');
+  const mig = require('../src/lib/sync-v1-migrations');
+  assert.equal(core.SCHEMA_VERSION, mig.currentVersion('shop', { safeEntries: true }), 'وب و سرور یک پله');
+  assert.equal(core.BASE_SCHEMA, mig.currentVersion('shop'), 'پایهٔ وب = پلهٔ سرورِ بی پرچم');
+  assert.deepEqual([0, 2, 3, 4, 9].map(core.wireSchema), [3, 3, 3, 4, 4], 'پلهٔ همان سرور، نه بیشتر');
   assert.equal(core.listRowId('نوشیدنی'), idOf('نوشیدنی'));
 
   const shadow = core.shadowOf({ productCategories: ['لبنیات'], productUnits: [], expenseCategories: [] });

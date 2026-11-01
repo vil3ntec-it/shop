@@ -58,7 +58,10 @@ fun WarehouseScreen(
   openProductId: String? = null,
   newBarcode: String? = null,
   onConsumed: () -> Unit = {},
+  /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
+  onStockBook: () -> Unit = {},
 ) {
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -80,6 +83,9 @@ fun WarehouseScreen(
   var imageBulk by remember { mutableStateOf(false) }
   //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
   var importPlan by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Plan?>(null) }
+  //  PRD-20 (پشتِ `ShopPolicy.productTools`): xlsx یا CSV، پیش‌نمایشِ کامل، فایلِ ردیف‌های رد و سابقه
+  var importFile by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Picked?>(null) }
+  var importHistory by remember { mutableStateOf(false) }
   //  فیلترِ انقضا: null همه، "expired" منقضی، "near" نزدیک به انقضا
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -107,6 +113,26 @@ fun WarehouseScreen(
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
+  }
+
+  val productTools = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
+  var pendingReport by remember { mutableStateOf<ByteArray?>(null) }
+  val saveReport = androidx.activity.compose.rememberLauncherForActivityResult(
+    androidx.activity.result.contract.ActivityResultContracts.CreateDocument(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+  ) { uri ->
+    val bytes = pendingReport
+    pendingReport = null
+    if (uri == null || bytes == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      val ok = runCatching {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+          context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("فایل ساخته نشد")
+        }
+      }.isSuccess
+      toast(if (ok) "فایلِ ردیف‌های رد ذخیره شد — درستش کنید و دوباره وارد کنید" else "فایل ذخیره نشد")
+    }
   }
 
   /** یک نتیجه را می‌نویسد یا دلیلِ ردش را می‌گوید */
@@ -141,6 +167,35 @@ fun WarehouseScreen(
     androidx.activity.result.contract.ActivityResultContracts.GetContent()
   ) { uri ->
     if (uri == null) return@rememberLauncherForActivityResult
+    if (productTools) {
+      scope.launch {
+        //  بیش از سقف خوانده نمی‌شود — فایلِ بزرگ پیش از رسیدن به حافظه رد می‌شود
+        val read = runCatching {
+          kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+              val out = java.io.ByteArrayOutputStream()
+              val buf = ByteArray(64 * 1024)
+              var total = 0
+              while (total <= ir.vil3ntec.tohid.core.product.ImportTable.MAX_FILE_BYTES) {
+                val n = input.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                total += n
+              }
+              out.toByteArray()
+            } ?: error("فایل خوانده نشد")
+            ir.vil3ntec.tohid.data.FileName.of(context, uri) to ir.vil3ntec.tohid.data.ProductImport.read(bytes)
+          }
+        }.getOrNull()
+        if (read == null) { toast("فایل خوانده نشد"); return@launch }
+        when (val r = read.second) {
+          is ir.vil3ntec.tohid.core.product.ImportTable.Read.Failed -> toast(r.reason)
+          is ir.vil3ntec.tohid.core.product.ImportTable.Read.Table ->
+            importFile = ir.vil3ntec.tohid.data.ProductImport.Picked(read.first.ifBlank { "فایل" }, r.rows)
+        }
+      }
+      return@rememberLauncherForActivityResult
+    }
     scope.launch {
       val text = runCatching {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -189,7 +244,11 @@ fun WarehouseScreen(
           Text("ورود کالا به انبار")
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { stockCount = true }, modifier = Modifier.fillMaxWidth()) {
+        //  موتورِ تازه روشن ⇒ شمارش با بازبینی در «دفترِ موجودی» (INV-09/10)؛ خاموش ⇒ همان برگهٔ امروز
+        OutlinedButton(
+          onClick = { if (stockOn) { StockBookNav.tab.value = "count"; onStockBook() } else stockCount = true },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
@@ -202,6 +261,16 @@ fun WarehouseScreen(
             Text(ir.vil3ntec.tohid.core.i18n.StrLabel.openButton)
           }
         }
+        if (stockOn) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = onStockBook, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("دفترِ موجودی — بها، سری، محل و دفترِ حرکت")
+          }
+          Spacer(Modifier.height(8.dp))
+          StockStrip(d, onStockBook)
+        }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
           onClick = { openCsv.launch("*/*") },
@@ -209,7 +278,13 @@ fun WarehouseScreen(
         ) {
           Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
-          Text("ورود کالا از فایل اکسل (CSV)")
+          Text(if (productTools) "ورود کالا از فایل اکسل (xlsx یا CSV)" else "ورود کالا از فایل اکسل (CSV)")
+        }
+        val imported = remember(d.auditLog) { d.auditLog.any { it.type == ir.vil3ntec.tohid.data.ProductImport.AUDIT_TYPE } }
+        if (productTools && imported) {
+          TextButton(onClick = { importHistory = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("سابقهٔ ورود از فایل")
+          }
         }
         if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.STAFF) {
           Spacer(Modifier.height(8.dp))
@@ -370,6 +445,22 @@ fun WarehouseScreen(
 
   if (imageBulk) ImageBulkImportSheet(store, d) { imageBulk = false }
 
+  importFile?.let { file ->
+    ProductImportDialog(
+      d = d,
+      file = file,
+      onDismiss = { importFile = null },
+      onErrorReport = { bytes, name -> pendingReport = bytes; saveReport.launch(name) },
+      onDone = { result ->
+        importFile = null
+        apply(result, "ورود از فایل ثبت شد")
+      },
+    )
+  }
+  if (importHistory) {
+    ProductImportHistoryDialog(ir.vil3ntec.tohid.data.ProductImport.history(d)) { importHistory = false }
+  }
+
   importPlan?.let { plan ->
     val similarWarn = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
     AlertDialog(
@@ -490,11 +581,13 @@ fun WarehouseScreen(
       d = d,
       productId = productId,
       onDismiss = { adjustFor = null },
-      onSave = { quantity, increase, reason, kind ->
+      onSave = { quantity, increase, reason, kind, adjKind ->
         apply(
           WarehouseEngine.adjustStock(
             d, productId, quantity, increase, reason, kind,
             todayIso(), System.currentTimeMillis(), ::newId,
+            adjKind = adjKind,
+            userId = if (adjKind != null) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null,
           ),
           "با موفقیت ثبت شد",
         ) { adjustFor = null }
@@ -752,5 +845,9 @@ private fun movementLabel(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }

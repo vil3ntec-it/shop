@@ -30,7 +30,7 @@ const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 const FREE = [
   ['هستهٔ دکان (core: settings): نام، تنظیمات، شماره‌گذاری و بستنِ دسترسیِ دیگران پس از پایانِ اشتراک هم باز است', [
     'POST /shop', 'POST /shop/create', 'PUT /shop', 'PUT /shop/settings', 'POST /shop/series',
-    'PATCH /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove', 'POST /shop/leave',
+    'PATCH /shop/members/:id', 'PUT /shop/members/:id', 'DELETE /shop/members/:id', 'POST /shop/members/:id/remove', 'POST /shop/leave',
     'POST /shop/staff-code/disable', 'DELETE /shop/staff-codes/:id',
     'PUT /shop/permissions/roles/:role', 'PUT /shop/permissions/members/:id',
     'POST /shop/devices/:id/disable', 'POST /shop/devices/:id/enable',
@@ -40,6 +40,7 @@ const FREE = [
     'PATCH /shop/chat/conversations/:id/messages/:mid', 'DELETE /shop/chat/conversations/:id/messages/:mid',
     'POST /shop/chat/conversations/:id/receipts', 'POST /shop/chat/conversations/:id/media',
     'PUT /shop/chat/conversations/:id/block', 'DELETE /shop/chat/conversations/:id/block', 'POST /shop/chat/conversations/:id/reports',
+    'PUT /shop/chat/conversations/:id/pins/:mid', 'DELETE /shop/chat/conversations/:id/pins/:mid',
     'POST /shop/trust/cases/:id/responses', 'POST /shop/trust/cases/:id/appeal']],
   ['موجودیِ سرور، بانکِ عکس، قاعده و مصرفِ کدِ تخفیف (بخشی از صندوقِ پایه، PRM-02) و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
     'PUT /shop/catalog/settings', 'POST /shop/catalog/refresh', 'PUT /shop/catalog/products/:id/low',
@@ -52,6 +53,8 @@ const FREE = [
     'POST /shop/order-notify/:id/ack']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
+  ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
+    'POST /shop/sync-epoch/deleted']],
   ['سفارشِ خرید زیرِ کلیدِ رایگانِ purchasing است (FREE_KEYS)؛ فقط پرچمِ shop.purchase_orders و مجوزِ نقش (PUR-02/04)', [
     'POST /shop/purchase-orders', 'PUT /shop/purchase-orders/:id', 'POST /shop/purchase-orders/:id/send',
     'POST /shop/purchase-orders/:id/cancel', 'POST /shop/purchase-orders/:id/receipts']],

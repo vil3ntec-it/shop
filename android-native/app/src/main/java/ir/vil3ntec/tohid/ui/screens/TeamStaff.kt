@@ -81,6 +81,7 @@ private fun permLabel(key: String): String = when (key) {
   "sales.cancel" -> "لغوِ فاکتور"
   "returns.create" -> "برگشت و بازپرداخت"
   "shift.report" -> ir.vil3ntec.tohid.core.i18n.StrShiftReview.permReports
+  "safe.move" -> "گاوصندوق: شمارش و جابه‌جاییِ پول"
   else -> key
 }
 

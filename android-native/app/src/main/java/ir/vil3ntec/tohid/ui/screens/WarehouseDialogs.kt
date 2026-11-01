@@ -19,8 +19,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
-import ir.vil3ntec.tohid.core.product.SimilarNames
-import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
@@ -68,6 +66,13 @@ data class ProductFormState(
   /** INV-12 — فقط وقتی «نقطهٔ سفارش و بیشینه» روشن است دیده و فرستاده می‌شوند؛ خالی = تعریف نشده */
   val reorder: String = "",
   val max: String = "",
+  /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
+  val barcodes: String = barcode,
+  /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
+  val brand: String = "",
+  val tags: String = "",
+  /** PRD-04 (همان پرچم): بسته‌ها با بارکدِ هر واحد */
+  val packs: List<ir.vil3ntec.tohid.core.product.PackBarcodes.Draft> = emptyList(),
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -91,6 +96,10 @@ data class ProductFormState(
       tags = p.tags.orEmpty().joinToString("، "),
       reorder = p.reorderPoint?.let { numberText(it) }.orEmpty(),
       max = p.maxStock?.let { numberText(it) }.orEmpty(),
+      barcodes = p.barcodes.joinToString("، "),
+      brand = p.brand.orEmpty(),
+      tags = p.tags.orEmpty().joinToString("، "),
+      packs = p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ir.vil3ntec.tohid.data.ShopStore.coreOf(it)) },
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -133,6 +142,17 @@ fun ProductDialog(
   val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
   val context = androidx.compose.ui.platform.LocalContext.current
   val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(form.name, similarIndex) {
+    similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
+  }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember(state.editingId) { mutableStateOf("") }
+  val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -280,6 +300,11 @@ fun ProductDialog(
           }
         }
 
+        if (tools) {
+          Spacer(Modifier.height(10.dp))
+          PackEditor(form.packs, form.unit) { form = form.copy(packs = it) }
+        }
+
         //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -361,6 +386,12 @@ fun ProductDialog(
                   editLevels = levelsOn,
                   reorderPoint = if (levelsOn) levelNumber(form.reorder) else null,
                   maxStock = if (levelsOn) levelNumber(form.max) else null,
+                  barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
+                  changedBy = if (tools) me else null,
+                  reason = if (tools) priceReason else null,
+                  brand = if (tools) form.brand else null,
+                  tags = if (tools) ProductLabels.tags(form.tags) else null,
+                  packs = if (tools) form.packs else null,
                 )
               )
             },
@@ -396,6 +427,11 @@ fun EntryDialog(
   var expiry by remember { mutableStateOf("") }
   var batch by remember { mutableStateOf("") }
   var made by remember { mutableStateOf("") }
+  //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبی (PUR-06) و محل (INV-20)؛ خاموش ⇒ فرمِ امروز
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  var landed by remember { mutableStateOf("") }
+  var location by remember { mutableStateOf(ir.vil3ntec.tohid.data.StockActions.MAIN_LABEL) }
+  val context = androidx.compose.ui.platform.LocalContext.current
 
   /*
    * «۴ کارتن × ۲۵ تا» یعنی ۱۰۰ واحد. حساب کردنش دستِ خودِ برنامه است تا
@@ -484,6 +520,24 @@ fun EntryDialog(
           modifier = Modifier.fillMaxWidth(),
         )
 
+        if (stockOn) {
+          Spacer(Modifier.height(10.dp))
+          NumberField(landed, { landed = it }, "هزینهٔ جانبی (کرایه، گمرک) — اختیاری، کلِ همین ورود", Modifier.fillMaxWidth())
+          Text(
+            "به بهای همین کالا اضافه می‌شود (میانگینِ موزون)؛ جدا در «مصارف» ثبتش نکنید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(10.dp))
+          ChipPicker(
+            title = "محلِ نگه‌داری",
+            options = ir.vil3ntec.tohid.data.StockLedger.locations(d).map { ir.vil3ntec.tohid.data.StockActions.locationLabel(it) },
+            selected = location,
+            onSelect = { location = it },
+            placeholder = "محلِ تازه",
+          )
+        }
+
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
           value = notes,
@@ -510,6 +564,10 @@ fun EntryDialog(
                   expiryDate = if (expiry.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(expiry) ?: "?",
                   batch = batch.trim(),
                   productionDate = if (made.isBlank()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(made) ?: "?",
+                  //  خاموش ⇒ null: ردیف دقیقاً مثلِ امروز
+                  landedCost = if (!stockOn) null else if (landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: -1.0,
+                  locationId = if (!stockOn) null else ir.vil3ntec.tohid.data.StockActions.locationOf(location),
+                  userId = if (!stockOn) null else runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(),
                 )
               )
             },
@@ -529,9 +587,12 @@ fun AdjustDialog(
   d: ShopData,
   productId: String,
   onDismiss: () -> Unit,
-  onSave: (Double, Boolean, String, WarehouseEngine.AdjustKind) -> Unit,
+  /** آخری: نوعِ اصلاح (INV-04) وقتی موتورِ تازهٔ موجودی روشن است؛ خاموش ⇒ null */
+  onSave: (Double, Boolean, String, WarehouseEngine.AdjustKind, String?) -> Unit,
 ) {
   val product = d.products.find { it.id == productId }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  var adjKind by remember { mutableStateOf("other") }
   var kind by remember { mutableStateOf(WarehouseEngine.AdjustKind.ADJUSTMENT) }
   var increase by remember { mutableStateOf(true) }
   var amount by remember { mutableStateOf("") }
@@ -552,14 +613,24 @@ fun AdjustDialog(
         }
 
         Spacer(Modifier.height(14.dp))
-        Segment(
-          options = listOf(
-            "اصلاح موجودی" to WarehouseEngine.AdjustKind.ADJUSTMENT,
-            "برگشت به تأمین‌کننده" to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
-          ),
-          selected = kind,
-          onSelect = { kind = it },
-        )
+        if (stockOn) {
+          //  موتورِ تازه روشن: برگشت به تأمین‌کننده فقط از «خرید و تأمین‌کننده» با سندِ کسر
+          //  (`PurchaseBook.supplierReturn`) — دو راه یعنی موجودیِ دو بار کم‌شده و بدهیِ کم‌نشده
+          Text(
+            "برگشت به تأمین‌کننده: از «خرید و تأمین‌کننده» ⇐ همان تأمین‌کننده ⇐ «برگشت (سندِ کسر)»؛ هم کالا کم می‌شود هم بدهی.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        } else {
+          Segment(
+            options = listOf(
+              "اصلاح موجودی" to WarehouseEngine.AdjustKind.ADJUSTMENT,
+              "برگشت به تأمین‌کننده" to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
+            ),
+            selected = kind,
+            onSelect = { kind = it },
+          )
+        }
 
         Spacer(Modifier.height(12.dp))
         Segment(
@@ -567,6 +638,18 @@ fun AdjustDialog(
           selected = increase,
           onSelect = { increase = it },
         )
+
+        if (stockOn && kind == WarehouseEngine.AdjustKind.ADJUSTMENT) {
+          Spacer(Modifier.height(12.dp))
+          Text("نوعِ اصلاح", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+          Spacer(Modifier.height(6.dp))
+          Segment(
+            options = ir.vil3ntec.tohid.data.StockActions.ADJ_KINDS.map { it.second to it.first },
+            selected = adjKind,
+            onSelect = { adjKind = it },
+          )
+          Text("خراب و منقضی در گزارشِ ضایعات جمع می‌شوند.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        }
 
         Spacer(Modifier.height(12.dp))
         NumberField(amount, { amount = it }, "مقدار", Modifier.fillMaxWidth())
@@ -586,7 +669,12 @@ fun AdjustDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(amount.toDoubleOrNull() ?: 0.0, increase, reason, kind) },
+            onClick = {
+              onSave(
+                amount.toDoubleOrNull() ?: 0.0, increase, reason,
+                if (stockOn) WarehouseEngine.AdjustKind.ADJUSTMENT else kind, if (stockOn) adjKind else null,
+              )
+            },
             modifier = Modifier.weight(1f),
           ) { Text("ثبت") }
         }

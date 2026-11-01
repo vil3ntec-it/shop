@@ -69,6 +69,8 @@ object V3Schema {
       cancel = "data.delete.any"),
     V3TableSpec("priceHistory", "log", money = listOf("oldPrice", "newPrice")),
     V3TableSpec("auditLog", "log", money = listOf("amount")),
+    //  گاوصندوق (PAY-18): مبلغ از اول `amountMinor`ِ صحیح است، تبدیل ندارد
+    V3TableSpec("safeEntries", "log"),
     V3TableSpec("stockMovements", "moves", qty = listOf("qty")),
     V3TableSpec("stockCounts", "count", qty = listOf("countedQty"), v3only = true),
   ).associateBy { it.name }

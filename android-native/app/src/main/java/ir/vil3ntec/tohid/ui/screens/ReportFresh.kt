@@ -273,13 +273,14 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     /* ۲ ─ نوارِ ابزار: زبانه، بازه، تفکیک، نما */
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       SegmentedTabs(tabs.map { SegmentTab(it.id, it.label) }, def.id, { tab = it })
-      if (def.ranged) SegmentedTabs(ReportBoard.SPANS.map { SegmentTab(it, ReportBoard.SPAN_LABELS.getValue(it)) }, span, { span = it })
       if (def.id == DayEndModel.TAB_ID) {
         SegmentedTabs(DayEndModel.days(today).map { SegmentTab(it, DayEndModel.dayLabel(it, today, ::formatDate)) }, day, { day = it })
       }
       Spacer(Modifier.weight(1f))
       ViewModeToggle(viewMode)
     }
+    //  بازه در ردیفِ خودش: با دو سه‌ماههٔ مالی (LOC-02) شش گزینه است و کنارِ پنج زبانه در ۱۲۸۰ جا نمی‌شد
+    if (def.ranged) SegmentedTabs(ReportBoard.SPANS.map { SegmentTab(it, ReportBoard.SPAN_LABELS.getValue(it)) }, span, { span = it })
     if (def.id == "sales" || def.id == "profit") {
       SegmentedTabs(ReportBoard.DIMS.map { SegmentTab(it, ReportBoard.DIM_LABELS.getValue(it)) }, dim, { dim = it })
     }

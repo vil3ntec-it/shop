@@ -77,6 +77,14 @@
             <div class="section-head"><h2 id="picks-title" data-i="flame" data-t="picks.title">پیشنهادِ همین دکان</h2><p id="picks-why"></p></div>
             <ul id="picks-list" class="rail products"></ul>
           </section>
+          <section id="deals" class="section" hidden aria-labelledby="deals-title">
+            <div class="section-head"><h2 id="deals-title" data-t="deals.title">ارزان‌تر از قیمتِ دکان</h2></div>
+            <ul id="deals-list" class="rail products"></ul>
+          </section>
+          <section id="fresh" class="section" hidden aria-labelledby="fresh-title">
+            <div class="section-head"><h2 id="fresh-title" data-t="picks.new">تازه در ویترین</h2></div>
+            <ul id="fresh-list" class="rail products"></ul>
+          </section>
 
           <section id="recent" class="section" hidden aria-labelledby="recent-title">
             <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
@@ -279,7 +287,18 @@
   <h2 id="ps-name" class="section"></h2>
   <div class="spread"><p id="ps-price" class="ps-price"></p><span id="ps-stock"></span></div>
   <p id="ps-note" class="muted small"></p>
+  <p id="ps-desc" class="ps-desc" hidden></p>
+  <dl id="ps-specs" class="ps-specs" hidden></dl>
   <button id="ps-add" class="btn btn-block section" type="button" data-autofocus data-t="ps.addbtn">افزودن به سبد</button>
+  <button id="ps-share" class="btn btn-ghost btn-block" type="button" data-t="ps.share" hidden>فرستادنِ نشانیِ کالا</button>
+  <section id="ps-sim" class="section" hidden aria-labelledby="ps-sim-t">
+    <h3 id="ps-sim-t" class="ps-h" data-t="ps.similar">کالاهای مشابه</h3>
+    <ul id="ps-sim-list" class="rail products"></ul>
+  </section>
+  <section id="ps-comp" class="section" hidden aria-labelledby="ps-comp-t">
+    <h3 id="ps-comp-t" class="ps-h" data-t="ps.comp">معمولاً همراهِ این خریده می‌شود</h3>
+    <ul id="ps-comp-list" class="rail products"></ul>
+  </section>
 </div>
 </body>
 </html>

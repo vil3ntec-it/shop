@@ -35,7 +35,7 @@ const config = require('../config');
 const sf = require('./storefront');
 const orders = require('./orders');
 const { stripControl } = require('./validate');
-const { badRequest, notFound, forbidden, ApiError } = require('../middleware/errors');
+const { badRequest, notFound, forbidden } = require('../middleware/errors');
 
 const FLAG_KEY = 'market.directory';
 
@@ -67,16 +67,27 @@ const REINDEX_PER_PASS = 25;
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const text = (v, max) => stripControl(str(v)).slice(0, max);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+const m4 = require('./market-details')({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES });   // بازار M4
+const mine = require('./market-orders')({ storeOpen, filterAsync });   // «سفارش‌های من» (S138، S9)
 
 // ════════════════════════════════════════════════════════════════════
 //  روشن یا خاموش
 // ════════════════════════════════════════════════════════════════════
 
-async function directoryOn() {
-  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [FLAG_KEY]);
+async function globalFlag(key) {
+  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
   if (!r) return false;
   try { return JSON.parse(r.value) === true; } catch { return false; }
 }
+
+const directoryOn = () => globalFlag(FLAG_KEY);
+
+/**
+ * حسابِ مشتریِ بازار بی دکان (S9): `/api/market/account/*` و نشستِ حساب در چتِ
+ * ویترین. پرچمِ سراسریِ `market.account`، پیش‌فرض خاموش.
+ */
+const ACCOUNT_FLAG = 'market.account';
+const accountOn = () => globalFlag(ACCOUNT_FLAG);
 
 /** «بازارچه نیست» — همان جوابِ نشانیِ ناموجود. */
 async function requireOn() {
@@ -149,12 +160,7 @@ async function reindex(sigs, ids, from) {
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
-      await c.query(
-        `INSERT INTO market_search (shop_id, product_id, name_norm)
-         SELECT sp.shop_id, sp.product_id, ${sf.SQL_NAME} FROM ${from}
-          WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
-        [id]
-      );
+      await m4.indexShop(c, id, from);   // M4: برند، بارکد و `bank_product_id` کنارِ نام؛ S1: از همان منبعِ کالا
       await c.query(
         `INSERT INTO market_search_shops (shop_id, sig, indexed_at) VALUES ($1,$2,$3)
          ON CONFLICT (shop_id) DO UPDATE SET sig = EXCLUDED.sig, indexed_at = EXCLUDED.indexed_at`,
@@ -184,8 +190,8 @@ async function buildSnapshot() {
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
-              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${await sf.productFrom(ids)}
+              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME} || chr(31) || ${m4.DETAIL_SIG}, chr(30) ORDER BY sp.product_id)) AS sig
+         FROM ${await sf.productFrom(ids)} ${m4.JOINS}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -383,27 +389,27 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     const bySlug = new Map(cards.map((c) => [c.slug, c]));
     const slugOfShop = new Map(list.map((e) => [e.row.shop_id, e.row.slug]));
     const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    //  M4 (پرچمِ `market.product_details`): برند (بخشی از نام) و بارکد (برابرِ کامل) هم
+    const { more, code } = await m4.searchMode(raw);
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
          FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
-        WHERE ms.shop_id = ANY($1::text[]) AND ms.name_norm LIKE $2
-          AND sp.published AND ${sf.LIVE_PRODUCT} AND ${sf.SQL_NAME} LIKE $2
+        WHERE ms.shop_id = ANY($1::text[])
+          AND (ms.name_norm LIKE $2 OR ($4::boolean AND (ms.brand_norm LIKE $2 OR ms.barcodes @> ARRAY[$5::text])))
+          AND sp.published AND ${sf.LIVE_PRODUCT} AND ($4::boolean OR ${sf.SQL_NAME} LIKE $2)
         ORDER BY COALESCE(r.data->>'name', ''), sp.shop_id, r.row_id LIMIT $3`,
-      [list.map((e) => e.row.shop_id), like, lim * 2]
+      [list.map((e) => e.row.shop_id), like, lim * 2, more, code]
     );
-    products = rows
-      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), p: sf.productView(r) }))
-      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name)
+    const found = rows
+      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), shopId: r.shop_id, p: sf.productView(r) }))
+      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name);
+    //  ⛔ نمایه فقط نامزد است: با پرچم، نام/برند/بارکد دوباره با دادهٔ زنده
+    const live = more ? await m4.liveMatch(found, needle, code) : { found, extra: new Map() };
+    products = live.found
       .sort((a, b) => rank(near)(a.shop, b.shop) || a.p.name.localeCompare(b.p.name, 'fa'))
       .slice(0, lim)
-      .map(({ shop, p }) => ({
-        id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor, photo: p.photo,
-        shop: {
-          slug: shop.slug, title: shop.title, accent: shop.accent,
-          badge: shop.status.badge, orderAcceptance: shop.status.orderAcceptance, distanceKm: shop.distanceKm,
-        },
-      }));
+      .map((x) => m4.offerView(x, live.extra));
   }
   return { q: raw, category: matched ? matched.key : '', shops: shopHits, products };
 }
@@ -714,37 +720,12 @@ async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  «سفارش‌های من» از همهٔ ویترین‌ها (S138)
-// ════════════════════════════════════════════════════════════════════
-
-async function myOrders(ticket) {
-  //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
-  const phone = await sf.verifiedPhoneOfTicket(ticket);
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
-  const rows = await many(
-    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at, o.track_gen,
-            sf.slug, sf.title, sf.accent
-       FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
-      WHERE o.source = 'storefront' AND o.customer_phone = $1
-      ORDER BY o.created_at DESC, o.id DESC LIMIT 50`,
-    [phone]
-  );
-  const slugs = [...new Set(rows.map((r) => r.slug))];
-  const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
-  return rows.filter((r) => open.has(r.slug)).map((r) => ({
-    orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
-    token: sf.listTokenOf(r.shop_id, r, linked.has(r.shop_id)),
-    store: { slug: r.slug, title: r.title, accent: r.accent },
-  }));
-}
-
-// ════════════════════════════════════════════════════════════════════
 //  سمتِ دکان: «در بازارچه چگونه دیده شوم»
 // ════════════════════════════════════════════════════════════════════
 
-function listingView(row) {
+function listingView(row, withMap = false) {
   return {
+    ...m4.mapView(row, withMap),   // M4: نگاشتِ دسته — فقط با `market.product_details`
     listed: row ? row.listed === true : false,
     category: row ? row.category : '',
     area: row ? row.area : '',
@@ -759,7 +740,7 @@ function listingView(row) {
 }
 
 async function listingOf(shopId) {
-  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]));
+  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]), await m4.on());
 }
 
 /** فقط فیلدهای آمده عوض می‌شوند. `showDeals` را فقط صاحبِ دکان عوض می‌کند. */
@@ -775,6 +756,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
     lng: cur && cur.geo_lng !== null ? Number(cur.geo_lng) : null,
     showDeals: cur ? cur.show_deals === true : false,
   };
+  const { withMap, catMap } = await m4.listingInput(b, has, cur);   // M4: نگاشتِ دسته
   if (has('listed')) {
     if (typeof b.listed !== 'boolean') throw badRequest('«در فهرست» باید بله یا نه باشد', 'bad_listed');
     v.listed = b.listed;
@@ -808,10 +790,11 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
      RETURNING *`,
     [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
   );
+  if (catMap) row.category_map = await m4.saveMap(shopId, catMap);
   gates.delete(shopId);
   deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم
   invalidate();   // «در فهرست باشم» ِ صاحب دکان همان دم دیده شود
-  return listingView(row);
+  return listingView(row, withMap);
 }
 
 /** برای مسیرِ دکان: بی ویترینِ روشن (پرچم) تنظیمِ بازارچه معنا ندارد. */
@@ -822,7 +805,8 @@ async function requireStorefrontFlag(shopId) {
 }
 
 module.exports = {
-  FLAG_KEY, CATEGORIES,
-  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
+  FLAG_KEY, ACCOUNT_FLAG, CATEGORIES,
+  directoryOn, accountOn, requireOn, ordersOfPhone: mine.ordersOfPhone, clearCache, stats, eligible, overview, shops, search,
+  sameProduct: m4.sameProduct, feed, myOrders: mine.myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };

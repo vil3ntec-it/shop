@@ -281,12 +281,12 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   };
 }
 
-/** عکسِ بانک (اگر هست) و وضعیتِ موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
+/** عکسِ بانک (اگر هست)، جزئیاتِ M4 (برند، بارکد، واحد، variant، `bankProductId`؛ فقط با `market.product_details`) و موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
 async function decorate(shopId, items) {
   if (!items.length) return items;
   const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
   for (const p of items) if (bank.has(p.id)) p.photo = true;
-  return shelf.applyStock(shopId, items);
+  return shelf.applyStock(shopId, await require('./product-details').attach(shopId, items));
 }
 
 /** کالاهای منتشرشده، زنده و قیمت‌دار با همین شناسه‌ها — به همان ترتیب. */
@@ -312,7 +312,7 @@ const K_ANON = 3;
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
  * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
- * ۳۰ روز. هیچ‌کدام عددِ ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. بی عددِ ساختگی؛ نبودِ داده ⇒ خالی.
  */
 async function highlights(shopId, at = now()) {
   const since = at - RECENT_MS;
@@ -338,10 +338,10 @@ async function highlights(shopId, at = now()) {
     const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
     return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
   };
-  const [bestsellers, newArrivals] = await Promise.all([
-    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
+  const [bestsellers, newArrivals, deals] = await Promise.all([
+    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), require('./storefront-deals').deals(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId, shelfOf),
   ]);
-  return { bestsellers, newArrivals, windowDays: 30 };
+  return { bestsellers, newArrivals, deals, windowDays: 30 };
 }
 
 function specsOf(v) {

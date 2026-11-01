@@ -15,7 +15,7 @@
  */
 const tokens = require('./tokens');
 const { one, many, now } = require('../db');
-const { sectionOf } = require('./tenancy');
+const { sectionOf, SHOP } = require('./tenancy');
 const { can } = require('./permissions');
 const { unauthorized, forbidden } = require('../middleware/errors');
 
@@ -58,7 +58,14 @@ async function contextOfRow(row) {
   if (row.scope) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'courier_scope' };
   //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
   const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
-  if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
+  if (!m) {
+    //  فاز ۳: دکانِ بسته‌شده به دستِ مدیر خطای روشنِ خودش را دارد (فقط در راهِ شکست)
+    const block = await require('./shop-holds').blockFor(user.id, row.shop_id || null);
+    return {
+      app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user',
+      missing: block ? block.code : 'no_shop', ...(block ? { blockMessage: block.message } : {}),
+    };
+  }
   if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
   return {
     app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
@@ -126,7 +133,8 @@ async function requireSyncAccount(req, res, next) {
         return next(forbidden(require('../middleware/auth').COURIER_SCOPE_MESSAGE, 'courier_scope'));
       }
       return next(forbidden(
-        ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است',
+        ctx.blockMessage
+          || (ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است'),
         ctx.missing || 'no_account'
       ));
     }
@@ -136,12 +144,24 @@ async function requireSyncAccount(req, res, next) {
     }
     const wrongDevice = await checkDevice(req, ctx);
     if (wrongDevice) return next(wrongDevice);
+    //  گاوصندوق (PAY-18): پرچمِ `sync.safe_entries` یک بار برای همین درخواست (‎lib/safe-flag.js‎)
+    if (ctx.app === SHOP.app && ctx.accountKind === SHOP.app) ctx.safeEntries = await require('./safe-flag').enabledFor(ctx.accountId);
     req.sync = ctx;
     req.appSection = ctx.app;
     if (ctx.accountKind === 'shop') { req.shopId = ctx.accountId; req.role = ctx.role; }
     else req.stationId = ctx.accountId;
     next();
   } catch (err) { next(err); }
+}
+
+/** Pushِ Sync v1 و v3 (هر دو روتر `/push` دارند) — نه عکس، نه تعارض */
+function isPush(req) {
+  return req.method === 'POST' && req.path === '/push';
+}
+
+/** نوشتنِ عکسِ کالا و صندوقِ عکس در `routes/sync-v1.js` */
+function isPhotoWrite(req) {
+  return /^\/(photos|photo-inbox)(\/|$)/.test(String(req.path || ''));
 }
 
 /*
@@ -247,8 +267,19 @@ function requireSyncWrite(req, res, next) {
   const ctx = req.sync;
   if (!ctx) return next(unauthorized());
   if (ctx.accountKind !== 'shop') return next();
+  const permCore = require('./perm-core');
   if (!can(ctx.role, 'data.write')) {
+    //  A16: Pushِ نقشی که فهرستِ جدولِ مشخص دارد ولی هیچ نمی‌نویسد (حسابدار) یکجا ۴۰۳
+    //  نمی‌گیرد: opهای ماندهٔ دستگاهش (پیش از تغییرِ نقش، یا بازیابیِ پشتیبان) در
+    //  v1Guard / authorizeِ v3 op به op «table_not_allowed» می‌گیرند، دستگاه آن‌ها را از
+    //  صف بیرون می‌اندازد و Pullاش نمی‌خوابد. درهای دیگرِ نوشتن (عکس، تعارض) همان ۴۰۳.
+    if (isPush(req) && Array.isArray(permCore.writable(ctx.role))) return next();
     return next(forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied'));
+  }
+  //  A16: عکسِ کالا و صندوقِ عکس یعنی «کالا» — همان `canWrite`ِ هسته (صندوق‌دار و جمع‌آور نه).
+  //  سه نقشِ قدیم «*»اند و این‌جا هرگز گیر نمی‌کنند.
+  if (isPhotoWrite(req) && !permCore.canWrite(ctx.role, 'products')) {
+    return next(forbidden('عکسِ کالا در حدِ نقشِ شما نیست', 'table_not_allowed'));
   }
   if (ctx.role === 'owner' || ctx.role === 'manager') return next();
   (async () => {

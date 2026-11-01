@@ -218,6 +218,8 @@ fun DeskSaleScreen(
   }
 
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
+  //  PRD-04: بارکدِ بسته‌ها (کارتن ⇒ ۲۴ دانه) — جدا، فقط کامل
+  val packIndex = remember(d.products) { ShopStore.packIndex(d) }
 
   //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)
   val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
@@ -240,9 +242,10 @@ fun DeskSaleScreen(
     if (term.isNotEmpty()) matches else PosCatalog.byCategory(d.products, category)
   }
 
-  fun applyAdded(product: Product, added: SalesEngine.Added) {
+  /** `false` ⇒ سبد قفل بود و چیزی اضافه نشد (پیامِ «اضافه شد» نباید بیاید) */
+  fun applyAdded(product: Product, added: SalesEngine.Added): Boolean {
     //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد؛ بوقِ خطا تا دوباره اسکن شود
-    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return false }
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -250,9 +253,22 @@ fun DeskSaleScreen(
         //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
         ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoSearch))
     } else ScanFeedback.ok(context)
+    return true
   }
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
+
+  /**
+   *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
+   *  سری برداشته می‌شود (`StockActions.lotForCode`). خاموش یا ناشناس ⇒ false (رفتارِ امروز).
+   */
+  fun addLot(code: String, dd: ShopData = d): Boolean {
+    val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
+    val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
+    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ShopStore.stock(dd, pid))
+    if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast("${product.name} — سری $lot به سبد اضافه شد")
+    return true
+  }
 
   /**
    *  POS-29: برچسبِ ترازو (فقط اگر دکان قاعده‌اش را روشن کرده باشد) — وزن
@@ -270,11 +286,12 @@ fun DeskSaleScreen(
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
     if (scaleLabel(query, d)) { query = ""; return }
-    when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
+    when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
+      is PosHit.Ambiguous -> { ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(hit.code)) }
       is PosHit.Add -> { add(hit.product, hit.count); query = "" }
-      is PosHit.Unknown -> {
+      is PosHit.Unknown -> if (addLot(hit.code)) query = "" else {
         ScanFeedback.unknown(context)
         scope.launch {
           val r = snackbar.showSnackbar(StrSale.notFound(hit.code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
@@ -293,11 +310,23 @@ fun DeskSaleScreen(
   fun fromScanner(code: String): Boolean {
     val dd = latestD
     if (scaleLabel(code, dd)) return true
-    when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
+    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
+    val items = ShopStore.barcodeIndex(dd)
+    when (val l = ShopStore.packIndex(dd).lookup(code) { PosSearch.isItemCode(it, items) }) {
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> {
+        ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(code.trim())); return true
+      }
+      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> dd.products.firstOrNull { it.id == l.hit.productId }?.let { p ->
+        if (!p.active) toast(StrSale.inactive(p.name)) else add(p, l.hit.pack.sizeMilli / 1000.0)
+        return true
+      }
+      else -> Unit
+    }
+    when (val hit = BarcodeMatch.find(code, items)) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
-      else -> scope.launch {
+      else -> if (!addLot(code, dd)) scope.launch {
         ScanFeedback.unknown(context)
         val r = snackbar.showSnackbar(StrSale.barcodeUnregistered(code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)

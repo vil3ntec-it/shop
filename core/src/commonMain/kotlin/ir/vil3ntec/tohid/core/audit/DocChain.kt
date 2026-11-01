@@ -396,6 +396,31 @@ class DocChainBook(private val disk: DocChainDisk) {
     return save(state.copy(halted = "local_broken"))
   }
 
+  /**
+   *  SEC-03: سندِ معکوسِ لغو یا اصلاحِ [original] (`InvoiceVoid.reversalDoc`) — حلقهٔ `void` با
+   *  `ref` = شناسهٔ فاکتورِ اصلی. صدازننده **پس از** نشستنِ لغو در دفتر صدا می‌زند. ایستاده یا سندِ
+   *  ناساز (فاکتورِ بی شماره) ⇐ هیچ حلقه‌ای؛ فروش و لغو هرگز به این بسته نیستند.
+   */
+  fun appendVoid(
+    state: DocChainState,
+    by: String,
+    original: SaleFacts,
+    at: Long,
+    kind: InvoiceVoid.Kind,
+    reason: String,
+  ): DocChainState {
+    if (state.halted.isNotEmpty()) return state
+    val l = try {
+      DocChain.link(state, "void", original.id, original.no,
+        InvoiceVoid.reversalDoc(state.chain, state.seq + 1, by, original, at, kind, reason))
+    } catch (e: IllegalArgumentException) {
+      return state
+    }
+    val line = l.line()
+    disk.append(state.epoch, listOf(line))
+    return save(DocChain.adopt(state, l, DocChain.lineBytes(line)))
+  }
+
   /** پاسخِ سرور: این دوره ایستاد (کدِ مشکل) */
   fun halt(state: DocChainState, problem: String): DocChainState =
     if (state.halted.isNotEmpty() || problem.isBlank()) state else save(state.copy(halted = problem))

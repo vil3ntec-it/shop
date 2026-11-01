@@ -911,7 +911,7 @@ async function requireEnabled(shopId) {
 
 module.exports = {
   MANUAL, TRANSFER_LOCS, TABLES, PAGE, upsertProduct,   //  آخری‌ها برای catalog-products.js (S1)
-  ingestTx, refresh, hasNewer, retireOrderStock, afterIngest, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
+  barcodesOf, ingestTx, refresh, hasNewer, retireOrderStock, afterIngest, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
   list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,
   toStockLines, checkOrder, requireEnabled,

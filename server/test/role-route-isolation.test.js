@@ -14,49 +14,21 @@
  *      بی‌نشست، با توکنِ دکان/پیک/مدیر ⇒ ۴۰۱؛
  *      مشتریِ دیگر (و مشتریِ ویترینِ دیگر) با شناسه‌های واقعیِ مشتریِ اول هیچ دادهٔ او را نمی‌گیرد؛
  *      توکنِ پیگیریِ دست‌کاری‌شده یا روی ویترینِ دیگر ⇒ ۴۰۴.
+ *   کارمندانِ دکان (شاگرد و چهار نقشِ تازهٔ A16: صندوق‌دار، انباردار، جمع‌آور، حسابدار) در هر سه
+ *   ماتریس همان انتظارِ صاحبِ دکان را دارند: هیچ‌کدام بازتر از شاگرد نیست (STF-01).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const express = require('express');
 
-//  نقشهٔ سوارشدن از روترِ زنده — پیش از ساختنِ برنامه (همان شگردِ courier-scope)
-const RouterProto = express.Router.prototype;
-const origUse = RouterProto.use;
-RouterProto.use = function patchedUse(...args) {
-  const before = this.stack.length;
-  const out = origUse.apply(this, args);
-  const p = typeof args[0] === 'string' || Array.isArray(args[0]) ? args[0] : '/';
-  for (let i = before; i < this.stack.length; i++) this.stack[i].__mount = p;
-  return out;
-};
-
+//  نقشهٔ سوارشدن از روترِ زنده — پیش از ساختنِ برنامه (`route-inventory.tapMounts`، همان شگردِ courier-scope)
+const inv = require('./route-inventory');
+inv.tapMounts();
 const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 
-/** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان. */
-function live() {
-  const app = h.server().listeners('request')[0];
-  const out = [];
-  const join = (a, b) => (a + (b === '/' ? '' : b)).replace(/\/+/g, '/');
-  const walk = (router, prefix, pre) => {
-    const names = [...pre];
-    for (const layer of router.stack || []) {
-      if (layer.route) {
-        const chain = [...names, ...layer.route.stack.map((l) => l.handle.name)];
-        for (const p of [layer.route.path].flat()) {
-          if (typeof p !== 'string') continue;
-          for (const m of Object.keys(layer.route.methods)) if (m !== '_all') out.push({ method: m.toUpperCase(), path: join(prefix, p), chain });
-        }
-      } else if (layer.handle && Array.isArray(layer.handle.stack)) {
-        for (const mp of [layer.__mount || '/'].flat()) if (typeof mp === 'string') walk(layer.handle, join(prefix, mp), names);
-      } else names.push(layer.handle?.name || '');
-    }
-  };
-  for (const layer of app.router.stack) if (layer.__mount === '/api' && layer.handle?.stack) walk(layer.handle, '/api', []);
-  const seen = new Set();
-  return out.filter((r) => { const k = `${r.method} ${r.path}`; r.key = k; return !seen.has(k) && seen.add(k); });
-}
+/** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان (`route-inventory.live`). */
+const live = () => inv.live(h.server().listeners('request')[0]);
 const fill = (p, ids = {}) => p.replace(/:([A-Za-z_]+)/g, (_, k) => ids[k] ?? 'x1');
 const noBody = (m) => m === 'GET' || m === 'DELETE';
 //  سقف‌های درخواست (۴۲۹) این‌جا موضوع نیستند — هر درخواستِ فهرست با شمارندهٔ پاک
@@ -116,6 +88,28 @@ async function customer(slug, phone) {
   return { session: a.body.session, ticket: c.body.ticket, phone };
 }
 const as = (k) => ({ headers: { 'X-Store-Session': k.session } });
+
+/** شاگرد و چهار نقشِ تازهٔ A16 — هر کدام با نقشِ واقعی‌اش وارد شده (`actualRole`) */
+const STAFF = [['staff', 'شاگرد'], ['cashier', 'صندوق‌دار'], ['storekeeper', 'انباردار'], ['picker', 'جمع‌آور'], ['accountant', 'حسابدار']];
+async function members(owner) {
+  const fresh = await h.signIn(owner, 'shop');          //  دعوتِ نقش‌های تازه هویتِ تازه می‌خواهد
+  const out = [];
+  for (const [role, name] of STAFF) {
+    resetAll();
+    const inv = await h.post('/api/shop/invite', { role }, { token: fresh.accessToken });
+    assert.equal(inv.status, 201, `${role}: ${JSON.stringify(inv.body)}`);
+    const u = await h.newUser(`${name}-${uniq()}`, 'shop');
+    const j = await h.post('/api/shop/join', { code: inv.body.code }, { token: u.accessToken });
+    assert.ok([200, 201].includes(j.status), `${role}: ${JSON.stringify(j.body)}`);
+    const s = await h.signIn(u, 'shop');
+    assert.equal(s.shop.actualRole, role, `${role}: نقشِ واقعی`);
+    //  توکنِ زنده — آزمون بی‌اثر نیست
+    assert.equal((await h.get('/api/me', { token: s.accessToken })).status, 200, `${role}: /api/me`);
+    out.push([name, { token: s.accessToken }]);
+  }
+  resetAll();
+  return out;
+}
 /** درِ مشتری با نشستِ حساب (session_required) یا با برگهٔ تأییدِ شماره (verification_required، چت و شکایت). */
 const AUTH = { session_required: (k) => ({ 'X-Store-Session': k.session }), verification_required: (k) => ({ 'X-Store-Ticket': k.ticket }) };
 
@@ -124,6 +118,7 @@ test('E2E-SEC-13 (مدیر): توکنِ دکان، پمپ، پیک و نشستِ
   const pump = await h.signIn(a, 'pump');
   const c = await courier(a, 'پیکِ مدیر');
   const k = await customer(a.slug, '0791230001');
+  const staff = await members(a);
   const made = await h.post('/api/admin/admins', { username: 'clerk', password: 'Clerk!12345', role: 'admin' }, { token: admin });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const clerk = (await h.post('/api/admin/login', { username: 'clerk', password: 'Clerk!12345' })).body.token;
@@ -139,7 +134,7 @@ test('E2E-SEC-13 (مدیر): توکنِ دکان، پمپ، پیک و نشستِ
     if (PUBLIC.has(r.key)) continue;
     const body = noBody(r.method) ? null : {};
     for (const [who, opts] of [['بی‌توکن', {}], ['دکان', { token: a.token }], ['پمپ', { token: pump.accessToken }],
-      ['پیک', { token: c.token }], ['مشتری', as(k)]]) {
+      ['پیک', { token: c.token }], ['مشتری', as(k)], ...staff]) {
       const res = await call(r.method, fill(r.path), { body, ...opts });
       if (res.status !== 401) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
     }
@@ -173,12 +168,13 @@ test('E2E-SEC-13 (پیک): نقش‌های دیگر به درِ پیک نمی‌
   const routes = live().filter((r) => r.path.startsWith('/api/courier/'));
   assert.ok(routes.length >= 4, `درهای پیک: ${routes.length}`);
   const k = await customer(a.slug, '0791230003');
+  const staff = await members(a);
   const secrets = [asgId, order.body.order.id, 'رازِ-پیک', '791230002'];
   const bad = [];
   for (const r of routes) {
     const url = fill(r.path, { id: asgId });
     const body = noBody(r.method) ? null : { deviceId: 'x', events: [{ eventId: `e-${uniq()}`, assignmentId: asgId, type: 'accept', deviceTime: Date.now(), deviceSeq: 1 }] };
-    for (const [who, opts] of [['بی‌توکن', {}], ['صاحبِ دکان', { token: a.token }], ['مدیر', { token: admin }], ['مشتری', as(k)]]) {
+    for (const [who, opts] of [['بی‌توکن', {}], ['صاحبِ دکان', { token: a.token }], ['مدیر', { token: admin }], ['مشتری', as(k)], ...staff]) {
       const res = await call(r.method, url, { body, ...opts });
       if (res.status < 400 || res.status >= 500) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
       if (leaks(res, secrets).length) bad.push(`${r.key} با ${who} دادهٔ مأموریت را داد`);
@@ -202,6 +198,7 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   const ka = await customer(a.slug, '0791230004');
   const kb = await customer(a.slug, '0791230005');
   const kc = await customer(b.slug, '0791230006');
+  const staff = await members(a);
   const addr = await h.post(`/api/store/${a.slug}/account/addresses`, { label: 'خانه', text: 'کوچهٔ رازِ-مشتری' }, as(ka));
   assert.equal(addr.status, 201, JSON.stringify(addr.body));
   //  CHK-03: سبدِ سروریِ الف با یادداشتِ راز — درِ سبد هم در همین ماتریس است
@@ -233,7 +230,7 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
     if (/logout|DELETE \/api\/store\/:slug\/account$/.test(r.key)) continue;   // نشستِ فرستنده را می‌بندند
     const url = fill(r.path, idsOf(r.path));
     const body = noBody(r.method) ? null : { label: 'دزدی', text: 'x' };
-    for (const [who, opts] of [['صاحبِ دکان', { token: a.token }], ['پیک', { token: c.token }], ['مدیر', { token: admin }]]) {
+    for (const [who, opts] of [['صاحبِ دکان', { token: a.token }], ['پیک', { token: c.token }], ['مدیر', { token: admin }], ...staff]) {
       const res = await call(r.method, url, { body, ...opts });
       if (res.status !== 401) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
     }
