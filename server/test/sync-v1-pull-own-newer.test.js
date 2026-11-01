@@ -75,7 +75,7 @@ function device(id, token, disk = new Map()) {
         const batch = q.batch();
         const r = await h.api('POST', '/api/sync/v1/push', {
           token, headers: { 'X-App': 'shop', 'X-Device': id },
-          body: { device_id: id, schema_version: core.SCHEMA_VERSION, ops: batch, queued: q.size(), client: 'web' },
+          body: { device_id: id, schema_version: core.BASE_SCHEMA, ops: batch, queued: q.size(), client: 'web' },
         });
         assert.equal(r.status, 200, JSON.stringify(r.body));
         if (lose) return r.body;
