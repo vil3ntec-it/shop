@@ -393,10 +393,7 @@ async function productDetail(shopId, productId) {
   const [similar, complementary] = await Promise.all([
     shelfOf(sameCat.map((r) => r.product_id)), shelfOf(together.map((r) => r.product_id)),
   ]);
-  return {
-    product: views.pub('product', product),
-    similar: views.pubList('product', similar), complementary: views.pubList('product', complementary),
-  };
+  return { product: views.pub('product', product), similar: views.pubList('product', similar), complementary: views.pubList('product', complementary) };
 }
 
 /**
@@ -774,8 +771,7 @@ async function myOrders(sf, ticket, session = '') {
   const on = await linkPolicyOn(sf.shop_id);
   return views.pubList('orderSummary', rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on),
-  })));
+    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on) })));
 }
 
 /**

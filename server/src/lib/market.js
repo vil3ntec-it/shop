@@ -713,9 +713,7 @@ async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
     popular: popular.map(out),
     deals: dealList.map(out),
     windowDays: POPULAR_DAYS,
-    shops: top.slice(0, 6).map((x, j) => views.pub('shopCard', {
-      ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null,
-    })),
+    shops: top.slice(0, 6).map((x, j) => views.pub('shopCard', { ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
     shopTotal: inCat.length,
   };
 }
