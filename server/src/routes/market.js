@@ -24,7 +24,10 @@ const audit = require('../lib/audit');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
 
+const views = require('../lib/public-views');
 const router = express.Router();
+//  S2: پرچمِ `market.public_views` پیش از هر پاسخ (خاموش ⇒ پاسخِ بی بُرش، همان main)
+router.use(views.gate);
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'market-read' });
 const searchLimit = rateLimit({ max: config.rateLimit.marketSearchMax, keyPrefix: 'market-search' });
