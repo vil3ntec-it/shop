@@ -103,6 +103,10 @@ object StrInvoices {
   val cancelSaleTitle: String get() = t("لغو فروش؟", "Cancel this sale?", "دا پلور لغوه کړئ؟")
   val cancelReason: String get() = t("دلیلِ لغو", "Reason for cancelling", "د لغوه کولو لامل")
   val saleCancelled: String get() = t("فروش لغو شد", "Sale cancelled", "پلور لغوه شو")
+  val alreadyCancelled: String get() = t("این فاکتور قبلاً لغو شده است", "This invoice is already cancelled", "دا بل مخکې لغوه شوی دی")
+  val reasonRequired: String get() = t("دلیلِ لغو لازم است", "A reason for cancelling is required", "د لغوه کولو لامل اړین دی")
+  fun reasonTooLong(max: Any): String = t("دلیلِ لغو حداکثر $max نویسه است", "The reason can be at most $max characters", "لامل تر $max تورو زیات نه شي کېدای")
+  val invoiceNotFound: String get() = t("فاکتور پیدا نشد", "Invoice not found", "بل ونه موندل شو")
 
   // جدولِ فاکتورهای کامپیوتر
   val backToTable: String get() = t("← برگشت به جدولِ فاکتورها", "← Back to the invoice table", "← د بلونو جدول ته شاته")

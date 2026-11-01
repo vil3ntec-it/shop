@@ -1,6 +1,10 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.cost.CostMethod
+import ir.vil3ntec.tohid.core.cost.CostPolicy
 import ir.vil3ntec.tohid.core.report.ReportBoard
+import ir.vil3ntec.tohid.core.report.ReportClock
+import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.core.report.ReportCoreVectorsTest
 import ir.vil3ntec.tohid.core.report.ReportLedger
 import kotlinx.serialization.json.Json
@@ -95,5 +99,42 @@ class ReportFreshModelTest {
         assertTrue(t.id, keys.all { k -> t.columns.any { it.key == k } })
       }
     }
+  }
+
+  /**
+   *  RPT-03 و D-23: روشِ بها راهبرد است. پیش‌فرض دقیقاً رفتارِ پیشین (قیمتِ خریدِ روی قلم)؛
+   *  میانگینِ موزون همان عددِ بردارِ مرجعِ `report-v1.json` (مورد «فروشِ بازه — میانگینِ موزونِ
+   *  متحرک»: بها ۹۲٬۶۰۵ در برابرِ ۹۹٬۰۰۰ ِ قیمتِ روی قلم) و هر دو «تقریبی».
+   */
+  @Test
+  fun `روش بها راهبرد است و پیش‌فرض همان قیمت خرید روی قلم`() {
+    val kabul = ReportClock.fixed(270, 240)
+    val before = ReportFreshModel.view(l, "profit", "month", "product", today, kabul)
+    val byDefault = ReportFreshModel.view(l, "profit", "month", "product", today, kabul, ReportFreshModel.costingOf(CostPolicy.DEFAULT))
+    assertEquals(before, byDefault)
+    assertEquals("line", before.sales!!.costing)
+    assertEquals(99000L, before.sales!!.totals.cogs)
+    assertTrue(before.tables.single().title.endsWith("(تقریبی)"))
+
+    val mavg = ReportFreshModel.view(l, "profit", "month", "product", today, kabul, ReportFreshModel.costingOf(CostMethod.MOVING_AVERAGE))
+    assertEquals("mavg", mavg.sales!!.costing)
+    assertEquals(92605L, mavg.sales!!.totals.cogs)
+    assertEquals(ReportCore.sales(l, "2026-10-01", today, kabul, ReportCore.Costing.MAVG).totals, mavg.sales!!.totals)
+    assertEquals(before.sales!!.totals.netSales, mavg.sales!!.totals.netSales)
+    assertTrue(mavg.sales!!.totals.profitApproximate)
+    assertTrue(mavg.tables.single().title.contains("تقریبی"))
+    assertTrue(mavg.tables.single().title.contains("میانگین موزون"))
+    //  جمعِ جدول همان جمعِ هسته با همان روش
+    assertEquals(mavg.sales!!.totals.grossProfit, mavg.tables.single().total!![3].long)
+
+    //  زبانهٔ امروز هم با همان روش
+    val todayLine = ReportFreshModel.view(l, "today", "today", "", today, kabul)
+    val todayMavg = ReportFreshModel.view(l, "today", "today", "", today, kabul, ReportCore.Costing.MAVG)
+    val gp = todayLine.tables.single().columns.indexOfFirst { it.key == "grossProfit" }
+    assertEquals(ReportCore.today(l, today, kabul, ReportCore.Costing.MAVG).today.grossProfit, todayMavg.tables.single().rows[0][gp].long)
+    assertEquals(ReportCore.today(l, today, kabul).today.grossProfit, todayLine.tables.single().rows[0][gp].long)
+
+    //  هر شناسهٔ روش همان `costing` ِ هسته است
+    CostMethod.entries.forEach { assertEquals(it.id, ReportFreshModel.costingOf(it).id) }
   }
 }
