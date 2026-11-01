@@ -201,6 +201,8 @@ FLAGS.push('shop.storefront.media');
 FLAGS.push('shop.storefront.campaigns');
 //  ORD-16: «فرستادنِ دوبارهٔ» پیامِ مشتری
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
+//  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
+FLAGS.push('shop.orders.amend_paid');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -577,6 +579,7 @@ function bodyFor(r, ids) {
     //  عکسِ مدرکِ بسته (PCK-08)
     'POST /shop/orders/:id/pick/photos': { eventId: fresh('pphoto'), parcelOnly: true, imageBase64: F.jpeg(200, 150, { seed: 6 }).toString('base64') },
     'POST /shop/orders/:id/amendments': { changes: [{ lineNo: 1, qtyMilli: 500 }], consent: { via: 'phone' } },
+    'POST /shop/orders/:id/amendments/:amendId/settlement': { method: 'cash' },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },

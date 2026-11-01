@@ -77,7 +77,10 @@ router.get('/config', async (req, res) => {
     delay: (await delay.flagOf(req.shopId)) ? delay.configOf() : null,
     presence: await presence.flagOf(req.shopId),
     //  ORD-14 ویرایشِ سفارش (پرچمِ `shop.orders.amend`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
-    ...((await amend.flagOf(req.shopId)) ? { amend: amend.configOf() } : {}),
+    //  + سفارشِ پرداخت‌شده (پرچمِ جدای `shop.orders.amend_paid`): `paid` و روشِ تسویه؛ خاموش ⇒ همان شیءِ پیشین
+    ...((await amend.flagOf(req.shopId))
+      ? { amend: { ...amend.configOf(), ...((await amend.paidFlagOf(req.shopId)) ? { paid: true, settleMethods: [...amend.SETTLE_METHODS] } : {}) } }
+      : {}),
     //  ORD-19 کارِ گروهی (پرچمِ `shop.orders.bulk`) — خاموش ⇒ کلید نیست و برنامه انتخابِ چندتایی نمی‌سازد
     ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
     //  ORD-16 «فرستادنِ دوبارهٔ» پیامِ نرفته (پرچمِ `shop.orders.notice_resend`) — خاموش ⇒ کلید نیست
@@ -116,7 +119,10 @@ router.get('/', needFlag, async (req, res) => {
  * پیش از `/:id` تا با شناسهٔ سفارش اشتباه نشود.
  */
 router.get('/reconciliation', needFlag, requirePermission('orders.refund'), async (req, res) => {
-  res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
+  const out = await refunds.report(req.shopId, { from: req.query.from, to: req.query.to });
+  //  ORD-14: تسویهٔ ویرایشِ سفارشِ پرداخت‌شده — بدهیِ باز و تسویهٔ بازه (پرچمِ `shop.orders.amend_paid`؛ خاموش ⇒ بی کلید)
+  if (await amend.paidFlagOf(req.shopId)) out.amendSettlements = await amend.settlementsOf(req.shopId, out.window);
+  res.json(out);
 });
 
 /**
@@ -402,6 +408,24 @@ router.post('/:id/amendments/:amendId/withdraw', needFlag, requirePermission('or
     return res.status(409).json({ error: { code: out.code, message: 'این پیشنهاد دیگر باز نیست', status: out.status } });
   }
   res.json({ status: out.status, unchanged: out.unchanged, order: await orders.get(req.shopId, req.params.id, actorOf(req)) });
+});
+
+/**
+ * ORD-14 — تسویهٔ تفاوتِ ویرایشِ سفارشِ **پرداخت‌شده** (`amend.settle`؛ پرچمِ خاموشِ `shop.orders.amend_paid`،
+ * ۴۰۳ در خودِ lib): فقط ثبت، نقد، بی درگاه؛ پول جابه‌جا می‌شود ⇒ `orders.refund` (صاحب و مدیر) و اشتراک.
+ */
+router.post('/:id/amendments/:amendId/settlement', needFlag, requirePermission('orders.refund'), needWrite, needAmend, async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  const out = await amend.settle(req.shopId, req.params.id, req.params.amendId, { key, body: req.body, actor: actorOf(req) });
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.amend_settle', targetType: 'online_order', targetId: out.order.id,
+      detail: { orderNo: out.orderNo, amendId: req.params.amendId, kind: out.kind, amountMinor: out.amountMinor, method: req.body.method },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ amendment: out.amendment, order: out.order, replayed: out.replayed });
 });
 
 /**

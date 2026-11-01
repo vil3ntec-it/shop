@@ -22,6 +22,11 @@
  *           در پیشنهاد ⇒ اگر قلم یا مبلغ از آن پس عوض شد، پذیرفتن «کهنه» است و هیچ تغییری.
  *   سابقه ─ رویدادهای `note` (نوعِ موجود، مهاجرت نمی‌خواهد) با `detail.type` ∈ [TYPES] (ORD-16).
  *           مشتری فقط نام، مقدار و مبلغ را می‌بیند — نه کارمند، نه توضیحِ داخلی.
+ *   پرداخت‌شده (پرچمِ جدای `shop.orders.amend_paid`؛ ⛔ پیش‌فرض خاموش ⇒ همان ۴۰۹ `amend_paid_order`) ── فقط
+ *           `payment_status = paid` (در جریان یا بخشی‌بازپرداخت‌شده نه). اعمالِ ویرایش تفاوت را **ثبت** می‌کند
+ *           (`settlement`: `refund` = دکان به مشتری بدهکار، `charge` = مشتری بدهکار، با مبلغ؛ بی درگاه، بی تغییرِ
+ *           وضعیتِ پرداخت یا نقدِ پیک). تسویه با `settle` (`POST …/amendments/:amendId/settlement`): فقط نقد (D-08)،
+ *           یک بار برای هر ویرایش، با کلیدِ یکتایی و `orders.refund`؛ رویدادِ `amend_settled` و سابقه.
  */
 const crypto = require('crypto');
 const db = require('../db');
@@ -31,7 +36,7 @@ const S = require('./order-states');
 const orders = require('./orders');
 const { stable } = require('./idempotency');
 const { stripControl } = require('./validate');
-const { badRequest, notFound, conflict } = require('../middleware/errors');
+const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders.amend';
 const AMEND_STATUSES = Object.freeze(['new', 'accepted']);
@@ -40,10 +45,13 @@ const CONSENT_VIA = Object.freeze(['phone', 'in_person', 'telegram', 'whatsapp']
 const TTL_MS = 30 * 60_000;
 const MAX_QTY_MILLI = 10_000_000;
 const MAX_CHANGES = orders.MAX_LINES;
-const TYPES = Object.freeze({ proposed: 'amend_proposed', applied: 'amend_applied', closed: 'amend_closed' });
+const TYPES = Object.freeze({ proposed: 'amend_proposed', applied: 'amend_applied', closed: 'amend_closed', settled: 'amend_settled' });
+const PAID_FLAG_KEY = 'shop.orders.amend_paid';
+const SETTLE_METHODS = Object.freeze(['cash']);
 const AMEND_ID_RE = /^am_[0-9A-Z]{26}$/;
 
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG_KEY);
+const paidFlagOf = (shopId) => orders.flagOf(shopId, PAID_FLAG_KEY);
 /** آنچه برنامه برای «ویرایشِ سفارش» لازم دارد (`GET /orders/config`، فقط با پرچم). */
 const configOf = () => ({
   statuses: [...AMEND_STATUSES], reasons: [...REASONS], consentVia: [...CONSENT_VIA], ttlMinutes: TTL_MS / 60_000,
@@ -138,6 +146,9 @@ function ledgerOf(events, at) {
       const it = items.get(d.amendId);
       it.status = d.outcome;
       it.closedAt = Number(e.created_at);
+      if (d.settlement) it.settlement = d.settlement;
+    } else if (d.type === TYPES.settled && items.has(d.amendId)) {
+      items.get(d.amendId).settled = { at: Number(e.created_at), method: d.method, amountMinor: d.amountMinor, key: d.key, hash: d.hash };
     }
   }
   for (const it of items.values()) if (it.status === 'pending' && at >= it.expiresAt) it.status = 'expired';
@@ -166,10 +177,17 @@ async function event(c, shopId, row, actor, detail, { reason = '', note = '' } =
 }
 
 /** دلیلِ «دیگر نمی‌شود» برای سفارشِ همین حالا؛ `null` = ویرایش‌پذیر. */
-function blockerOf(row) {
+function blockerOf(row, paidOn = false) {
   if (!AMEND_STATUSES.includes(row.status)) return 'amend_not_allowed';
-  if (row.payment_status !== 'unpaid') return 'amend_paid_order';
+  if (row.payment_status !== 'unpaid' && !(paidOn && row.payment_status === 'paid')) return 'amend_paid_order';
   return null;
+}
+
+/** سفارشِ پرداخت‌شده ⇒ تفاوتی که باید تسویه شود (فقط ثبت)؛ پرداخت‌نشده ⇒ `undefined` (همان رویدادِ پیشین) */
+function settlementOf(row, p) {
+  if (row.payment_status !== 'paid') return undefined;
+  const d = Number(p.differenceMinor);
+  return { kind: d < 0 ? 'refund' : d > 0 ? 'charge' : 'none', amountMinor: Math.abs(d), paidTotalMinor: Number(p.prevTotalMinor) };
 }
 const BLOCK_MESSAGE = {
   amend_not_allowed: 'این سفارش دیگر ویرایش‌پذیر نیست (جمع‌آوری شروع شده یا پایان یافته)',
@@ -207,6 +225,16 @@ function staffView(it) {
     id: it.amendId, status: it.status, reason: it.reason || '', consent: it.consent || null,
     changes: it.changes, prevTotalMinor: it.prevTotalMinor, totalMinor: it.totalMinor, differenceMinor: it.differenceMinor,
     expiresAt: it.expiresAt ?? null, createdAt: it.createdAt, closedAt: it.closedAt ?? null,
+    //  ویرایشِ سفارشِ پرداخت‌شده (پرچمِ `shop.orders.amend_paid`) — بی آن کلید نیست (همان پاسخِ پیشین)
+    ...(it.settlement ? { settlement: settlementView(it) } : {}),
+  };
+}
+
+function settlementView(it) {
+  const s = it.settlement;
+  return {
+    kind: s.kind, amountMinor: s.amountMinor, paidTotalMinor: s.paidTotalMinor,
+    settledAt: it.settled ? it.settled.at : null, method: it.settled ? it.settled.method : null,
   };
 }
 
@@ -221,6 +249,7 @@ function customerView(it) {
     })),
     prevTotalMinor: it.prevTotalMinor, totalMinor: it.totalMinor, differenceMinor: it.differenceMinor,
     expiresAt: it.expiresAt ?? null, createdAt: it.createdAt,
+    ...(it.settlement ? { settlement: { kind: it.settlement.kind, amountMinor: it.settlement.amountMinor, settled: !!it.settled } } : {}),
   };
 }
 
@@ -232,6 +261,7 @@ async function propose(shopId, id, { key, body, actor }) {
   const p = parse(body);
   const hash = orders.hashOf(body);
   const oid = String(id || '');
+  const paidOn = await paidFlagOf(shopId);
   const out = await tx(async (c) => {
     const { row, lines, events } = await lockOrder(c, shopId, oid);
     const at = now();
@@ -243,7 +273,7 @@ async function propose(shopId, id, { key, body, actor }) {
         return { replayed: true, amendId: d.amendId };
       }
     }
-    const blocked = blockerOf(row);
+    const blocked = blockerOf(row, paidOn);
     if (blocked) {
       const err = conflict(BLOCK_MESSAGE[blocked], blocked);
       err.current = row.status;
@@ -264,7 +294,9 @@ async function propose(shopId, id, { key, body, actor }) {
       }, p, at);
     } else {
       await applyIn(c, shopId, row, pl, at);
-      await event(c, shopId, row, actor, { type: TYPES.applied, ...common, consent: { ...p.consent, by: 'staff' } }, p, at);
+      await event(c, shopId, row, actor, {
+        type: TYPES.applied, ...common, consent: { ...p.consent, by: 'staff' }, settlement: settlementOf(row, pl),
+      }, p, at);
     }
     return { replayed: false, amendId };
   });
@@ -287,6 +319,7 @@ async function viewOf(shopId, oid, amendId, actor) {
 async function decide(shopId, id, amendId, decision, actor) {
   if (!AMEND_ID_RE.test(String(amendId || ''))) throw notFound('پیشنهاد پیدا نشد', 'amend_not_found');
   if (!['accept', 'reject', 'withdraw'].includes(decision)) throw badRequest('تصمیم معتبر نیست', 'bad_decision');
+  const paidOn = await paidFlagOf(shopId);
   return tx(async (c) => {
     const { row, lines, events } = await lockOrder(c, shopId, id);
     const at = now();
@@ -306,12 +339,14 @@ async function decide(shopId, id, amendId, decision, actor) {
       await close(wanted);
       return { status: wanted, unchanged: false };
     }
-    if (blockerOf(row) || fingerprint(row, lines) !== it.base) {
+    if (blockerOf(row, paidOn) || fingerprint(row, lines) !== it.base) {
       await close('stale');
       return { status: 'stale', unchanged: false, code: 'order_changed' };
     }
     await applyIn(c, shopId, row, it, at);
-    await event(c, shopId, row, actor, { type: TYPES.closed, amendId, outcome: 'applied', consent: { via: 'link', by: 'customer' } }, {}, at);
+    await event(c, shopId, row, actor, {
+      type: TYPES.closed, amendId, outcome: 'applied', consent: { via: 'link', by: 'customer' }, settlement: settlementOf(row, it),
+    }, {}, at);
     return { status: 'applied', unchanged: false };
   });
 }
@@ -339,7 +374,91 @@ async function withAmendment(shopId, orderId, view) {
   return { ...view, amendment: customerView(last) };
 }
 
+function parseSettle(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const method = str(b.method);
+  if (!SETTLE_METHODS.includes(method)) throw badRequest('روشِ تسویه فقط نقد است (بی درگاه)', 'bad_method');
+  return { method, note: clean(b.note, 300) };
+}
+
+/**
+ * تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده — فقط **ثبت** (نقد؛ نه درگاه، نه وضعیتِ پرداخت، نه نقدِ پیک):
+ * `refund` = دکان به مشتری پس داد، `charge` = از مشتری گرفت. یک بار برای هر ویرایش؛ تکرارِ همان درخواست ⇒ همان
+ * نتیجه؛ همان کلید با بدنهٔ دیگر یا برای ویرایشِ دیگر ⇒ ۴۰۹ `idempotency_key_reused`.
+ * @returns {Promise<{replayed:boolean, kind?:string, amountMinor?:number, orderNo?:number, amendment:object, order:object}>}
+ */
+async function settle(shopId, id, amendId, { key, body, actor }) {
+  if (!(await paidFlagOf(shopId))) throw forbidden('ویرایشِ سفارشِ پرداخت‌شده برای این دکان روشن نیست', 'amend_paid_disabled');
+  if (!AMEND_ID_RE.test(String(amendId || ''))) throw notFound('ویرایش پیدا نشد', 'amend_not_found');
+  const p = parseSettle(body);
+  const hash = orders.hashOf(body);
+  const oid = String(id || '');
+  const out = await tx(async (c) => {
+    const { row, events } = await lockOrder(c, shopId, oid);
+    for (const e of events) {
+      const d = e.kind === 'note' ? asJson(e.detail) : {};
+      if (d.type !== TYPES.settled || d.key !== key) continue;
+      if (d.amendId !== amendId || d.hash !== hash) throw conflict('این کلیدِ یکتایی پیش‌تر برای درخواستِ دیگری به کار رفته است', 'idempotency_key_reused');
+      return { replayed: true };
+    }
+    const it = ledgerOf(events, now()).list.find((x) => x.amendId === amendId);
+    if (!it || it.status !== 'applied' || !it.settlement) throw notFound('ویرایشِ پرداخت‌شده‌ای با این شناسه نیست', 'amend_not_found');
+    if (it.settled) throw conflict('تفاوتِ این ویرایش پیش‌تر تسویه شده است', 'already_settled');
+    if (it.settlement.kind === 'none' || !(it.settlement.amountMinor > 0)) throw conflict('این ویرایش تفاوتی ندارد', 'nothing_to_settle');
+    const at = now();
+    await c.query('UPDATE online_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2', [shopId, row.id, at]);
+    await event(c, shopId, row, actor, {
+      type: TYPES.settled, amendId, kind: it.settlement.kind, amountMinor: it.settlement.amountMinor, method: p.method, key, hash,
+    }, { note: p.note }, at);
+    return { replayed: false, orderNo: Number(row.order_no), kind: it.settlement.kind, amountMinor: it.settlement.amountMinor };
+  });
+  return { ...out, ...(await viewOf(shopId, oid, amendId, actor)) };
+}
+
+const MAX_OPEN_SETTLEMENTS = 100;
+
+/**
+ * حسابِ تسویهٔ ویرایشِ سفارش‌های پرداخت‌شدهٔ دکان (برای «تطبیقِ دریافت و بازپرداخت»): `open` ── تفاوت‌هایی که هنوز
+ * تسویه نشده‌اند (همهٔ زمان‌ها، کهنه‌ترین اول، حداکثر ۱۰۰)، `settled` ── جمعِ تسویه‌های بازهٔ [w] به تفکیکِ نوع.
+ * سفارشِ آزمایشی شمرده نمی‌شود.
+ */
+async function settlementsOf(shopId, w) {
+  const evs = (await db.query(
+    `SELECT e.order_id, o.order_no, e.detail, e.created_at
+       FROM online_order_events e JOIN online_orders o ON o.id = e.order_id AND o.shop_id = e.shop_id
+      WHERE e.shop_id = $1 AND e.kind = 'note' AND o.is_test = false
+        AND (e.detail->>'type' = $2 OR (e.detail->>'type' = ANY($3::text[]) AND e.detail->'settlement' IS NOT NULL))
+      ORDER BY e.created_at, e.seq`,
+    [String(shopId), TYPES.settled, [TYPES.applied, TYPES.closed]]
+  )).rows;
+  const due = new Map();
+  const settled = { refundMinor: 0, chargeMinor: 0, count: 0 };
+  for (const e of evs) {
+    const d = asJson(e.detail);
+    if (d.type === TYPES.settled) {
+      due.delete(d.amendId);
+      const at = Number(e.created_at);
+      if (at >= w.from && at < w.to) {
+        settled.count++;
+        if (d.kind === 'refund') settled.refundMinor += Number(d.amountMinor); else settled.chargeMinor += Number(d.amountMinor);
+      }
+    } else if ((d.type === TYPES.applied || d.outcome === 'applied') && d.settlement.kind !== 'none' && d.settlement.amountMinor > 0) {
+      due.set(d.amendId, {
+        orderId: e.order_id, orderNo: Number(e.order_no), amendId: d.amendId, kind: d.settlement.kind,
+        amountMinor: Number(d.settlement.amountMinor), appliedAt: Number(e.created_at),
+      });
+    }
+  }
+  const open = [...due.values()];
+  return {
+    open: open.slice(0, MAX_OPEN_SETTLEMENTS),
+    openRefundMinor: open.filter((x) => x.kind === 'refund').reduce((a, x) => a + x.amountMinor, 0),
+    openChargeMinor: open.filter((x) => x.kind === 'charge').reduce((a, x) => a + x.amountMinor, 0),
+    settled,
+  };
+}
+
 module.exports = {
-  FLAG_KEY, AMEND_STATUSES, REASONS, CONSENT_VIA, TTL_MS, TYPES,
-  flagOf, configOf, parse, plan, ledgerOf, propose, decide, staffOf, withAmendment,
+  FLAG_KEY, PAID_FLAG_KEY, AMEND_STATUSES, REASONS, CONSENT_VIA, SETTLE_METHODS, TTL_MS, TYPES,
+  flagOf, paidFlagOf, configOf, parse, plan, ledgerOf, propose, decide, settle, settlementsOf, staffOf, withAmendment,
 };
