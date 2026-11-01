@@ -1,0 +1,60 @@
+{
+  "_doc": "POS-27 — فروشِ امانی و اقساطی (Layaway در core/pos/Layaway.kt؛ LayawayVectorsTest). هر ردیف یک خط؛ -1 = کادرِ خالی/null؛ امروز = today. قسط: no:due:amountMinor؛ پیشرفت: no:state:paidMinor. با مولدِ مستقلِ پایتون ساخته شد؛ ⛔ دستی عوض شود فقط هم‌راه با پیاده‌سازی.",
+  "today": "2026-11-01",
+  "draft": [
+    {"name": "اقساطیِ درست", "kind": "installment", "customer": true, "total": 1200000, "deposit": 200000, "count": 4, "every": 30, "due": "2026-12-01", "want": ""},
+    {"name": "امانیِ درست بی پیش‌پرداخت", "kind": "layaway", "customer": true, "total": 500000, "deposit": 0, "count": 5, "every": 7, "due": "2026-11-01", "want": ""},
+    {"name": "یک قسط بی فاصله", "kind": "layaway", "customer": true, "total": 300000, "deposit": 100000, "count": 1, "every": -1, "due": "2026-11-15", "want": ""},
+    {"name": "نوعِ ناشناخته", "kind": "rent", "customer": true, "total": 300000, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "BAD_KIND"},
+    {"name": "بی مشتری", "kind": "installment", "customer": false, "total": 300000, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "NO_CUSTOMER"},
+    {"name": "جمعِ صفر", "kind": "installment", "customer": true, "total": 0, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "BAD_TOTAL"},
+    {"name": "جمعِ خالی", "kind": "installment", "customer": true, "total": -1, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "BAD_TOTAL"},
+    {"name": "بیش از سقف", "kind": "installment", "customer": true, "total": 10000000100, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "BAD_TOTAL"},
+    {"name": "پیش‌پرداختِ منفی", "kind": "installment", "customer": true, "total": 300000, "deposit": -100, "count": 2, "every": 7, "due": "2026-11-15", "want": "BAD_DEPOSIT"},
+    {"name": "نه افغانیِ درست", "kind": "installment", "customer": true, "total": 300050, "deposit": 0, "count": 2, "every": 7, "due": "2026-11-15", "want": "NOT_WHOLE"},
+    {"name": "پیش‌پرداخت برابرِ جمع", "kind": "installment", "customer": true, "total": 300000, "deposit": 300000, "count": 2, "every": 7, "due": "2026-11-15", "want": "DEPOSIT_OVER_TOTAL"},
+    {"name": "بی قسط", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 0, "every": 7, "due": "2026-11-15", "want": "BAD_COUNT"},
+    {"name": "بیش از ۳۶ قسط", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 37, "every": 7, "due": "2026-11-15", "want": "BAD_COUNT"},
+    {"name": "چند قسط بی فاصله", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 3, "every": -1, "due": "2026-11-15", "want": "BAD_EVERY"},
+    {"name": "فاصلهٔ بیش از ۹۲ روز", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 3, "every": 93, "due": "2026-11-15", "want": "BAD_EVERY"},
+    {"name": "تاریخِ نادرست", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 3, "every": 30, "due": "2026-13-01", "want": "BAD_DUE"},
+    {"name": "سررسیدِ گذشته", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 3, "every": 30, "due": "2026-10-31", "want": "DUE_PAST"},
+    {"name": "سررسیدِ بیش از یک سال", "kind": "installment", "customer": true, "total": 300000, "deposit": 0, "count": 3, "every": 30, "due": "2027-11-03", "want": "DUE_TOO_FAR"},
+    {"name": "قسطِ کمتر از یک افغانی", "kind": "installment", "customer": true, "total": 300, "deposit": 0, "count": 4, "every": 30, "due": "2026-11-15", "want": "PART_TOO_SMALL"}
+  ],
+  "schedule": [
+    {"name": "چهار قسطِ ماهانه، بخشِ دقیق", "kind": "installment", "customer": true, "total": 1200000, "deposit": 200000, "count": 4, "every": 30, "due": "2026-12-01", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"]},
+    {"name": "افغانیِ باقی روی قسط‌های اول", "kind": "installment", "customer": true, "total": 100000, "deposit": 0, "count": 3, "every": 14, "due": "2026-11-01", "lines": ["1:2026-11-01:33400", "2:2026-11-15:33300", "3:2026-11-29:33300"]},
+    {"name": "یک قسط", "kind": "layaway", "customer": true, "total": 300000, "deposit": 100000, "count": 1, "every": -1, "due": "2026-11-15", "lines": ["1:2026-11-15:200000"]},
+    {"name": "گذر از سالِ میلادی و ماهِ کوتاه", "kind": "layaway", "customer": true, "total": 1000100, "deposit": 100, "count": 4, "every": 31, "due": "2026-12-30", "lines": ["1:2026-12-30:250000", "2:2027-01-30:250000", "3:2027-03-02:250000", "4:2027-04-02:250000"]},
+    {"name": "پیش‌نویسِ نادرست ⇒ خالی", "kind": "installment", "customer": true, "total": 300000, "deposit": 300000, "count": 2, "every": 7, "due": "2026-11-15", "lines": []}
+  ],
+  "progress": [
+    {"name": "هیچ پرداخت، پیش از سررسید", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "today": "2026-11-20", "out": ["1:due:0", "2:due:0", "3:due:0", "4:due:0"], "remaining": 1000000, "late": 0, "next": 1, "over": 0},
+    {"name": "خودِ روزِ سررسید دیر نیست", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "today": "2026-12-01", "out": ["1:due:0", "2:due:0", "3:due:0", "4:due:0"], "remaining": 1000000, "late": 0, "next": 1, "over": 0},
+    {"name": "یک روز پس از سررسید دیر", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "today": "2026-12-02", "out": ["1:late:0", "2:due:0", "3:due:0", "4:due:0"], "remaining": 1000000, "late": 250000, "next": 1, "over": 0},
+    {"name": "پرداختِ نیمهٔ قسطِ اول", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 100000, "today": "2026-11-20", "out": ["1:partial:100000", "2:due:0", "3:due:0", "4:due:0"], "remaining": 900000, "late": 0, "next": 1, "over": 0},
+    {"name": "قسطِ اول کامل، دومی نیمه و دیر", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 350000, "today": "2027-01-15", "out": ["1:paid:250000", "2:late:100000", "3:due:0", "4:due:0"], "remaining": 650000, "late": 150000, "next": 2, "over": 0},
+    {"name": "همه دیر جز پرداخته", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 250000, "today": "2027-06-01", "out": ["1:paid:250000", "2:late:0", "3:late:0", "4:late:0"], "remaining": 750000, "late": 750000, "next": 2, "over": 0},
+    {"name": "تسویه", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 1000000, "today": "2027-06-01", "out": ["1:paid:250000", "2:paid:250000", "3:paid:250000", "4:paid:250000"], "remaining": 0, "late": 0, "next": -1, "over": 0},
+    {"name": "بیش از جمع در حساب می‌ماند", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 1000500, "today": "2027-06-01", "out": ["1:paid:250000", "2:paid:250000", "3:paid:250000", "4:paid:250000"], "remaining": 0, "late": 0, "next": -1, "over": 500},
+    {"name": "مبلغِ منفی صفر", "lines": ["1:2026-11-01:33400", "2:2026-11-15:33300", "3:2026-11-29:33300"], "paid": -500, "today": "2026-11-01", "out": ["1:due:0", "2:due:0", "3:due:0"], "remaining": 100000, "late": 0, "next": 1, "over": 0},
+    {"name": "قسط‌های نابرابر", "lines": ["1:2026-11-01:33400", "2:2026-11-15:33300", "3:2026-11-29:33300"], "paid": 66700, "today": "2026-11-30", "out": ["1:paid:33400", "2:paid:33300", "3:late:0"], "remaining": 33300, "late": 33300, "next": 3, "over": 0},
+    {"name": "امروزِ نادرست هیچ را دیر نمی‌کند", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "today": "x", "out": ["1:due:0", "2:due:0", "3:due:0", "4:due:0"], "remaining": 1000000, "late": 0, "next": 1, "over": 0}
+  ],
+  "pay": [
+    {"name": "قسطِ کامل", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "amount": 250000, "want": ""},
+    {"name": "همهٔ مانده", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 250000, "amount": 750000, "want": ""},
+    {"name": "بیش از مانده", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 250000, "amount": 750100, "want": "OVER_REMAINING"},
+    {"name": "صفر", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "amount": 0, "want": "BAD_AMOUNT"},
+    {"name": "نه افغانیِ درست", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 0, "amount": 250050, "want": "NOT_WHOLE"},
+    {"name": "تسویه‌شده", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "paid": 1000000, "amount": 100, "want": "SETTLED"}
+  ],
+  "end": [
+    {"name": "امانیِ تسویه تحویل می‌شود", "kind": "layaway", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "deposit": 200000, "paid": 1000000, "deliver": "", "refund": 1200000},
+    {"name": "امانیِ ناتمام تحویل نمی‌شود", "kind": "layaway", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "deposit": 200000, "paid": 999900, "deliver": "NOT_SETTLED", "refund": 1199900},
+    {"name": "اقساطی تحویلِ جدا ندارد", "kind": "installment", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "deposit": 200000, "paid": 1000000, "deliver": "NOT_LAYAWAY", "refund": -1},
+    {"name": "لغوِ امانی همهٔ پرداختی را پس می‌دهد", "kind": "layaway", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "deposit": 200000, "paid": 300000, "deliver": "NOT_SETTLED", "refund": 500000},
+    {"name": "لغوِ امانی با بیش‌پرداخت", "kind": "layaway", "lines": ["1:2026-12-01:250000", "2:2026-12-31:250000", "3:2027-01-30:250000", "4:2027-03-01:250000"], "deposit": 200000, "paid": 1000500, "deliver": "", "refund": 1200500}
+  ]
+}
