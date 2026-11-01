@@ -89,6 +89,7 @@ router.get('/me', (req, res) => {
     admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role, isOwner: req.admin.is_owner === true },
     //  فاز ۳: درخواستِ پلِ پنل با کلیدِ سرویس ⇒ «انجام‌دهنده» و نقشِ مؤثرش (نه خودِ کلید)
     ...(req.actor ? { actor: req.actor, service: { keyId: req.service.keyId, name: req.service.keyName, roleCap: req.service.roleCap } } : {}),
+    capabilities: require('../lib/admin-capabilities').CAPABILITIES,
     serverTime: now(),
   });
 });
@@ -228,6 +229,7 @@ router.get('/shops', async (req, res) => {
   const like = `%${q.toLowerCase()}%`;
   //  فاز ۳: حالت‌های مدیریتیِ باز (`lib/shop-holds.js`) کنارِ هر دکان، و پالایشِ سمتِ سرور با `?hold=`
   const hold = req.query?.hold ? v.oneOf(req.query.hold, [...require('../lib/shop-holds').KINDS, 'none'], { field: 'حالت' }) : '';
+  const where = require('../lib/admin-capabilities').SHOP_WHERE;   //  یک WHERE برای ردیف‌ها و `total` (بندِ ۱۲.۶)
   const rows = await many(
     `SELECT s.id, s.name, s.status, s.created_at, s.owner_user_id,
             u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email,
@@ -241,17 +243,11 @@ router.get('/shops', async (req, res) => {
          SELECT * FROM subscriptions x WHERE x.shop_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
-      --  ⛔ ایمیل هم گشته می‌شود — همان قاعدهٔ admin-pump.js: صاحبِ
-      --  سامانه معمولاً فقط ایمیلِ طرف را دارد، نه نامِ دکانش.
-      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2
-             OR lower(coalesce(u.email,'')) LIKE $2
-             OR coalesce(u.phone,'') LIKE $2)
-        AND ($5 = '' OR ($5 = 'none' AND NOT EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL))
-             OR EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL AND h.kind=$5))
-      ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
-    [q, like, limit, offset, hold]
+      ${where}
+      ORDER BY s.created_at DESC LIMIT $4 OFFSET $5`,
+    [q, like, hold, limit, offset]
   );
-  const total = await one('SELECT COUNT(*)::int n FROM shops');
+  const total = await one(`SELECT COUNT(*)::int n FROM shops s JOIN users u ON u.id = s.owner_user_id ${where}`, [q, like, hold]);
   // دکانی که هنوز اشتراک نخریده ولی در دوره‌ی آزمایشی است، «آزمایشی» نشان داده شود
   const trialDays = await plans.trialDaysOf('shop');
   const t = now();
