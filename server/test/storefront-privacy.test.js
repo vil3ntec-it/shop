@@ -83,7 +83,9 @@ test('WEB-23: GET /api/store/:slug نام، ایمیل، تلفن، شهر و م
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.store.title, 'ویترینِ عمومی');
   assert.equal(r.body.store.contactPhone, '+93700000001', 'تلفنِ تماسِ خودِ ویترین (نه حساب) دیده می‌شود');
-  const { delivery: _d, ...store } = r.body.store;
+  //  M3: لوگو/تصویرِ سرِ خودِ دکان (نه عکسِ شخص) — بی پرچمِ `shop.storefront.media` تهی
+  const { delivery: _d, media, ...store } = r.body.store;
+  assert.deepEqual(media, { logo: null, header: null });
   assert.deepEqual(Object.keys(store).sort(), PROFILE_KEYS);
   const json = JSON.stringify(r.body);
   for (const v of [ownerName, u.email, '0788123456', 'شهرِ-خصوصی-WEB23', '34.5553', '69.2075', u.user.id]) {

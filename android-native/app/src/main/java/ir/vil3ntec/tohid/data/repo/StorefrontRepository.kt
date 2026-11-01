@@ -116,6 +116,8 @@ data class StorefrontConfigDto(
   val zones: Boolean = false,
   /** M2: انتشارِ گروهی در یک درخواست (`shop.storefront.bulk`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val bulk: Boolean = false,
+  /** M3: پرچمِ جدای لوگو و تصویرِ سر (`shop.storefront.media`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val media: Boolean = false,
 )
 
 @Serializable

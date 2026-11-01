@@ -15,14 +15,16 @@
 const express = require('express');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
+const sfm = require('../lib/storefront-media');
+const config = require('../config');
 const areas = require('../lib/storefront-area-requests');
 const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
 const idempotency = require('../lib/idempotency');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
-const { clientIp } = require('../middleware/ratelimit');
-const { forbidden, badRequest } = require('../middleware/errors');
+const { rateLimit, clientIp } = require('../middleware/ratelimit');
+const { ApiError, forbidden, notFound, badRequest } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -52,6 +54,8 @@ router.get('/config', async (req, res) => {
     zones: st.flag ? await sfd.flagOn(req.shopId) : false,
     //  انتشارِ گروهی در یک درخواست (M2) فقط با پرچمِ جدای `shop.storefront.bulk`
     bulk: st.flag ? await sf.bulkFlagOn(req.shopId) : false,
+    //  M3: لوگو و تصویرِ سر فقط با پرچمِ جدای `shop.storefront.media`
+    media: st.flag ? await sfm.flagOn(req.shopId) : false,
   });
 });
 
@@ -213,6 +217,63 @@ router.put('/products/:productId', requirePermission('settings.write'), needFlag
     detail: { published: out.published, onlinePriceMinor: out.onlinePriceMinor }, ip: clientIp(req),
   });
   res.json(out);
+});
+
+//  ── M3: لوگو و تصویرِ سرِ ویترین (قراردادِ بازار §۱.۱) ──────────────
+//  ⛔ پرچمِ `shop.storefront.media` (پیش‌فرض خاموش ⇒ ۴۰۳ `media_disabled`، بی هیچ نوشتن).
+//  نوشتن: `settings.write` (صاحب/مدیر یا کارمندی که صاحب اجازه داده) + اشتراک (needWrite).
+//  نوع فقط از محتوا (`image-pipeline`)، سقفِ حجم و ابعادِ ثابت در `lib/storefront-media.js`.
+const MEDIA_BASE = '/api/shop/storefront/media';
+const needMedia = async (req, res, next) => {
+  if (!(await sfm.flagOn(req.shopId))) return next(forbidden('لوگو و تصویرِ ویترین برای این دکان روشن نیست', 'media_disabled'));
+  next();
+};
+const mediaLimit = rateLimit({
+  max: config.rateLimit.storefrontMediaDailyMax, windowMs: 24 * 60 * 60 * 1000,
+  keyPrefix: 'storefront-media-day', key: (req) => req.shopId,
+});
+const rawMedia = (req, res, next) => express.raw({ type: () => true, limit: sfm.MAX_BYTES + 1024 })(req, res, (err) => {
+  if (err && err.type === 'entity.too.large') return next(new ApiError(413, 'too_large', 'عکس بیش از اندازه بزرگ است'));
+  next(err);
+});
+
+router.get('/media', requirePermission('data.read'), needFlag, needMedia, async (req, res) => {
+  res.set('Cache-Control', 'private, no-cache');
+  res.json({ enabled: true, specs: sfm.SPECS, types: sfm.MIMES, ...(await sfm.staffView(req.shopId, MEDIA_BASE)) });
+});
+
+router.get('/media/:kind/:version', requirePermission('data.read'), needFlag, needMedia, async (req, res) => {
+  const f = await sfm.file(req.shopId, sfm.kindOf(req.params.kind), req.params.version);
+  if (!f) throw notFound('این عکس نیست', 'media_not_found');
+  res.set('Cache-Control', 'private, max-age=31536000, immutable');
+  res.set('ETag', `"${f.hash}"`);
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.get('if-none-match') === `"${f.hash}"`) return res.status(304).end();
+  res.type(f.mime).send(f.data);
+});
+
+router.put('/media/:kind', requirePermission('settings.write'), needFlag, needMedia, needWrite, mediaLimit, rawMedia, async (req, res) => {
+  const kind = sfm.kindOf(req.params.kind);
+  const out = await sfm.put(req.shopId, kind, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), req.user.id);
+  if (!out.replayed) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'storefront.media', targetType: 'storefront', targetId: req.shopId,
+      detail: { kind, version: out.version }, ip: clientIp(req),
+    });
+  }
+  res.json({ ...out, ...(await sfm.staffView(req.shopId, MEDIA_BASE)) });
+});
+
+router.delete('/media/:kind', requirePermission('settings.write'), needFlag, needMedia, needWrite, async (req, res) => {
+  const kind = sfm.kindOf(req.params.kind);
+  const out = await sfm.remove(req.shopId, kind);
+  if (out.removed) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'storefront.media_removed', targetType: 'storefront', targetId: req.shopId,
+      detail: { kind }, ip: clientIp(req),
+    });
+  }
+  res.json({ ...out, ...(await sfm.staffView(req.shopId, MEDIA_BASE)) });
 });
 
 module.exports = router;

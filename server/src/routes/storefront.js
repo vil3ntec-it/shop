@@ -18,6 +18,7 @@ const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
+const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
 const cart = require('../lib/store-cart');
@@ -68,13 +69,13 @@ const customer = async (req, res, next) => {
 };
 
 router.get('/:slug', readLimit, store, async (req, res) => {
-  const [cats, status, delivery, seo] = await Promise.all([
+  const [cats, status, delivery, seo, media] = await Promise.all([
     sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
-    storeSeo.publicInfo(req.store),
+    storeSeo.publicInfo(req.store), sfm.publicView(req.store),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
-    store: { ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery },
+    store: { ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery, media },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
@@ -167,6 +168,19 @@ const picture = (size) => async (req, res) => {
   if (req.get('if-none-match') === etag) return res.status(304).end();
   res.type(p.mime || sniff(p.data) || 'application/octet-stream').send(p.data);
 };
+//  ── M3: لوگو و تصویرِ سر — فقط نسخهٔ جاری. نشانی نسخه‌دار است ولی کشِ عمومی
+//  یک روز می‌ماند (نه immutable) تا «برداشتنِ» عکس دیر یا زود به همه برسد ──
+router.get('/:slug/media/:kind/:version', readLimit, store, async (req, res) => {
+  const kind = String(req.params.kind);
+  const f = sfm.KINDS.includes(kind) && await sfm.flagOn(req.store.shop_id)
+    ? await sfm.file(req.store.shop_id, kind, req.params.version, { onlyCurrent: true }) : null;
+  if (!f) throw notFound('عکس نیست', 'media_not_found');
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('ETag', `"${f.hash}"`);
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.get('if-none-match') === `"${f.hash}"`) return res.status(304).end();
+  res.type(f.mime).send(f.data);
+});
 router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
 router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
 

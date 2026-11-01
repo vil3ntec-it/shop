@@ -346,6 +346,8 @@ private fun SettingsPane(serverSettings: StorefrontSettingsDto?, repo: Storefron
       TohidTextField(notice, { notice = it }, "پیامِ کوتاه کنارِ وضعیت (اختیاری)", error = errors["notice"])
       SwitchRow("ویترین روشن باشد", enabled) { enabled = it }
     }
+    //  M3: لوگو و تصویرِ سر — پرچمِ جدای `shop.storefront.media`؛ ذخیرهٔ جدا (`StorefrontMediaPanel.kt`)
+    if (settings != null && StorefrontGate.config.value?.media == true) StorefrontMediaPanel(snackbar)
     Panel {
       Text("تحویل و هزینه", style = MaterialTheme.typography.titleSmall)
       SwitchRow("ارسال به نشانیِ مشتری", delivery) { delivery = it }

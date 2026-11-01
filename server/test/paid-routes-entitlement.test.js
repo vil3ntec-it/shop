@@ -76,6 +76,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.
 FLAGS.push('shop.orders.picking');
 //  M2: انتشارِ گروهیِ ویترین (`PUT /shop/storefront/products`) با پرچمِ خودش
 FLAGS.push('shop.storefront.bulk');
+//  M3: لوگو و تصویرِ سرِ ویترین (`/shop/storefront/media/*`) با پرچمِ خودش
+FLAGS.push('shop.storefront.media');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
