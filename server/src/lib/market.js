@@ -24,7 +24,7 @@
  *           برای دکانی که امضای کالاهایش عوض شده، تازه می‌کند؛ با `pg_trgm` نمایهٔ
  *           GIN دارد، بی آن (PGlite) پیمایشِ همان جدولِ باریک. هر نتیجه دوباره
  *           با دادهٔ زنده (منتشرشده، فعال، همان نام) سنجیده می‌شود.
- *   کالا ── فقط از راهِ `PRODUCT_FROM` و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
+ *   کالا ── فقط از راهِ `productFrom()` (`PRODUCT_FROM`، یا با پرچمِ S1 کاتالوگ) و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
  *           حذف‌نشده، فعال، قیمت‌دار) — همان چیزی که ثبتِ سفارش می‌پذیرد.
  *   حریم ── هیچ شناسهٔ داخلی، شماره، ایمیل، نامِ صاحب یا مختصات در پاسخ نیست؛
  *           «نزدیکِ من» فقط فاصلهٔ گردشده می‌دهد و مکانِ مشتری ذخیره یا لاگ نمی‌شود
@@ -35,7 +35,7 @@ const config = require('../config');
 const sf = require('./storefront');
 const orders = require('./orders');
 const { stripControl } = require('./validate');
-const { badRequest, notFound, forbidden, ApiError } = require('../middleware/errors');
+const { badRequest, notFound, forbidden } = require('../middleware/errors');
 
 const FLAG_KEY = 'market.directory';
 
@@ -67,16 +67,27 @@ const REINDEX_PER_PASS = 25;
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const text = (v, max) => stripControl(str(v)).slice(0, max);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+const m4 = require('./market-details')({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES });   // بازار M4
+const mine = require('./market-orders')({ storeOpen, filterAsync });   // «سفارش‌های من» (S138، S9)
 
 // ════════════════════════════════════════════════════════════════════
 //  روشن یا خاموش
 // ════════════════════════════════════════════════════════════════════
 
-async function directoryOn() {
-  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [FLAG_KEY]);
+async function globalFlag(key) {
+  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
   if (!r) return false;
   try { return JSON.parse(r.value) === true; } catch { return false; }
 }
+
+const directoryOn = () => globalFlag(FLAG_KEY);
+
+/**
+ * حسابِ مشتریِ بازار بی دکان (S9): `/api/market/account/*` و نشستِ حساب در چتِ
+ * ویترین. پرچمِ سراسریِ `market.account`، پیش‌فرض خاموش.
+ */
+const ACCOUNT_FLAG = 'market.account';
+const accountOn = () => globalFlag(ACCOUNT_FLAG);
 
 /** «بازارچه نیست» — همان جوابِ نشانیِ ناموجود. */
 async function requireOn() {
@@ -135,7 +146,7 @@ const LISTED_WHERE = "sf.enabled AND s.status = 'active' AND COALESCE(ml.listed,
  * `market_search` ِ دکان‌هایی که امضای کالاهایشان عوض شده، از نو؛ ردیفِ دکانِ
  * بیرون‌رفته پاک. هر دکان در تراکنشِ خودش.
  */
-async function reindex(sigs, ids) {
+async function reindex(sigs, ids, from) {
   const known = new Map((await many('SELECT shop_id, sig FROM market_search_shops')).map((r) => [r.shop_id, r.sig]));
   const keep = new Set(ids);
   const gone = [...known.keys()].filter((id) => !keep.has(id));
@@ -149,12 +160,7 @@ async function reindex(sigs, ids) {
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
-      await c.query(
-        `INSERT INTO market_search (shop_id, product_id, name_norm)
-         SELECT sp.shop_id, sp.product_id, ${sf.SQL_NAME} FROM ${sf.PRODUCT_FROM}
-          WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
-        [id]
-      );
+      await m4.indexShop(c, id, from);   // M4: برند، بارکد و `bank_product_id` کنارِ نام؛ S1: از همان منبعِ کالا
       await c.query(
         `INSERT INTO market_search_shops (shop_id, sig, indexed_at) VALUES ($1,$2,$3)
          ON CONFLICT (shop_id) DO UPDATE SET sig = EXCLUDED.sig, indexed_at = EXCLUDED.indexed_at`,
@@ -164,7 +170,7 @@ async function reindex(sigs, ids) {
   }
 }
 
-const counters = { builds: 0, shelves: 0, popular: 0, deals: 0 };
+const counters = { builds: 0, shelves: 0, popular: 0, deals: 0, changes: 0 };
 
 /** برای پایش و آزمون: چند بار برش از نو ساخته شد. */
 function stats() { return { ...counters }; }
@@ -180,12 +186,12 @@ async function buildSnapshot() {
       ORDER BY sf.slug LIMIT ${MAX_CANDIDATES}`
   );
   const open = await filterAsync(rows, gateOf);
-  const ids = open.map((r) => r.shop_id);
+  const ids = open.map((r) => r.shop_id);   //  S1: کاتالوگ منبع ⇒ `productFrom(ids)` کاتالوگِ هر دکانِ باز را پیش از شمردن تازه می‌کند
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
-              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${sf.PRODUCT_FROM}
+              md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME} || chr(31) || ${m4.DETAIL_SIG}, chr(30) ORDER BY sp.product_id)) AS sig
+         FROM ${await sf.productFrom(ids)} ${m4.JOINS}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -198,7 +204,7 @@ async function buildSnapshot() {
       [ids]
     ),
   ]) : [[], []];
-  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id));
+  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id), await sf.productFrom());
   const n = new Map(counts.map((r) => [r.shop_id, Number(r.n)]));
   const last = new Map(seen.map((r) => [r.account_id, r.t === null || r.t === undefined ? 0 : Number(r.t)]));
   const out = new Map();
@@ -232,7 +238,7 @@ function invalidate() { snapGen++; snap = null; }
  * `listed` با یک پرسشِ باریک در همین درخواست (بیرون رفتن همان دم است).
  */
 async function eligible(at = now()) {
-  const data = await snapshot();
+  const data = await require('./market-changes').sync({ all: clearCache, forget: [gates, shelves, stocks], reset: () => { deals = null; invalidate(); } }, counters).then(snapshot);   //  S6: دکانِ تغییرکرده (seq) پیش از برش از حافظه بیرون
   if (!data.size) return [];
   const live = new Set((await many(
     `SELECT sf.shop_id FROM ${LISTED_FROM} WHERE sf.shop_id = ANY($1::text[]) AND ${LISTED_WHERE}`,
@@ -383,27 +389,27 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     const bySlug = new Map(cards.map((c) => [c.slug, c]));
     const slugOfShop = new Map(list.map((e) => [e.row.shop_id, e.row.slug]));
     const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    //  M4 (پرچمِ `market.product_details`): برند (بخشی از نام) و بارکد (برابرِ کامل) هم
+    const { more, code } = await m4.searchMode(raw);
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
-         FROM market_search ms JOIN (${sf.PRODUCT_FROM}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
-        WHERE ms.shop_id = ANY($1::text[]) AND ms.name_norm LIKE $2
-          AND sp.published AND ${sf.LIVE_PRODUCT} AND ${sf.SQL_NAME} LIKE $2
+         FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
+        WHERE ms.shop_id = ANY($1::text[])
+          AND (ms.name_norm LIKE $2 OR ($4::boolean AND (ms.brand_norm LIKE $2 OR ms.barcodes @> ARRAY[$5::text])))
+          AND sp.published AND ${sf.LIVE_PRODUCT} AND ($4::boolean OR ${sf.SQL_NAME} LIKE $2)
         ORDER BY COALESCE(r.data->>'name', ''), sp.shop_id, r.row_id LIMIT $3`,
-      [list.map((e) => e.row.shop_id), like, lim * 2]
+      [list.map((e) => e.row.shop_id), like, lim * 2, more, code]
     );
-    products = rows
-      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), p: sf.productView(r) }))
-      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name)
+    const found = rows
+      .map((r) => ({ shop: bySlug.get(slugOfShop.get(r.shop_id)), shopId: r.shop_id, p: sf.productView(r) }))
+      .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name);
+    //  ⛔ نمایه فقط نامزد است: با پرچم، نام/برند/بارکد دوباره با دادهٔ زنده
+    const live = more ? await m4.liveMatch(found, needle, code) : { found, extra: new Map() };
+    products = live.found
       .sort((a, b) => rank(near)(a.shop, b.shop) || a.p.name.localeCompare(b.p.name, 'fa'))
       .slice(0, lim)
-      .map(({ shop, p }) => ({
-        id: p.id, name: p.name, unit: p.unit, category: p.category, priceMinor: p.priceMinor, photo: p.photo,
-        shop: {
-          slug: shop.slug, title: shop.title, accent: shop.accent,
-          badge: shop.status.badge, orderAcceptance: shop.status.orderAcceptance, distanceKm: shop.distanceKm,
-        },
-      }));
+      .map((x) => m4.offerView(x, live.extra));
   }
   return { q: raw, category: matched ? matched.key : '', shops: shopHits, products };
 }
@@ -486,7 +492,7 @@ function shelfOf(shopId) {
 async function loadShelf(shopId) {
   counters.shelves++;
   const rows = await many(
-    `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT ${sf.PRODUCT_COLS} FROM ${await sf.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
     [shopId, SHELF * 2]
@@ -504,7 +510,7 @@ async function liveViews(pairs) {
   const uniq = [...new Map(pairs.map((x) => [pairKey(x.shopId, x.id), x])).values()];
   if (!uniq.length) return out;
   const rows = await many(
-    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${await sf.productFrom()}
       WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
         AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
     [uniq.map((x) => x.shopId), uniq.map((x) => x.id)]
@@ -592,7 +598,7 @@ async function loadDeals(ids) {
        SELECT sp.shop_id, r.row_id AS id,
               ROW_NUMBER() OVER (PARTITION BY sp.shop_id
                 ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), r.row_id) AS n
-         FROM ${sf.PRODUCT_FROM}
+         FROM ${await sf.productFrom()}
          JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL
@@ -714,37 +720,12 @@ async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  «سفارش‌های من» از همهٔ ویترین‌ها (S138)
-// ════════════════════════════════════════════════════════════════════
-
-async function myOrders(ticket) {
-  //  ناهم‌گام: نسلِ بلیتِ شماره (خروج از همه‌جا / پاک کردنِ حساب) هم سنجیده می‌شود
-  const phone = await sf.verifiedPhoneOfTicket(ticket);
-  if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
-  const rows = await many(
-    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
-            sf.slug, sf.title, sf.accent
-       FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
-      WHERE o.source = 'storefront' AND o.customer_phone = $1
-      ORDER BY o.created_at DESC, o.id DESC LIMIT 50`,
-    [phone]
-  );
-  const slugs = [...new Set(rows.map((r) => r.slug))];
-  const open = new Set(await filterAsync(slugs, storeOpen));
-  return rows.filter((r) => open.has(r.slug)).map((r) => ({
-    orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
-    token: sf.tokenOf(r.shop_id, r.id),
-    store: { slug: r.slug, title: r.title, accent: r.accent },
-  }));
-}
-
-// ════════════════════════════════════════════════════════════════════
 //  سمتِ دکان: «در بازارچه چگونه دیده شوم»
 // ════════════════════════════════════════════════════════════════════
 
-function listingView(row) {
+function listingView(row, withMap = false) {
   return {
+    ...m4.mapView(row, withMap),   // M4: نگاشتِ دسته — فقط با `market.product_details`
     listed: row ? row.listed === true : false,
     category: row ? row.category : '',
     area: row ? row.area : '',
@@ -759,7 +740,7 @@ function listingView(row) {
 }
 
 async function listingOf(shopId) {
-  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]));
+  return listingView(await one('SELECT * FROM market_listings WHERE shop_id = $1', [shopId]), await m4.on());
 }
 
 /** فقط فیلدهای آمده عوض می‌شوند. `showDeals` را فقط صاحبِ دکان عوض می‌کند. */
@@ -775,6 +756,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
     lng: cur && cur.geo_lng !== null ? Number(cur.geo_lng) : null,
     showDeals: cur ? cur.show_deals === true : false,
   };
+  const { withMap, catMap } = await m4.listingInput(b, has, cur);   // M4: نگاشتِ دسته
   if (has('listed')) {
     if (typeof b.listed !== 'boolean') throw badRequest('«در فهرست» باید بله یا نه باشد', 'bad_listed');
     v.listed = b.listed;
@@ -799,7 +781,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
       v.lat = g.lat; v.lng = g.lng;
     }
   }
-  const row = await one(
+  const row = await require('./market-changes').within(shopId, { entity: 'listing', kind: 'update', state: v }, async (c) => (await c.query(   //  S6: همان تراکنش
     `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
@@ -807,11 +789,12 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
        show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
      RETURNING *`,
     [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
-  );
+  )).rows[0]);
+  if (catMap) row.category_map = await m4.saveMap(shopId, catMap);
   gates.delete(shopId);
   deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم
   invalidate();   // «در فهرست باشم» ِ صاحب دکان همان دم دیده شود
-  return listingView(row);
+  return listingView(row, withMap);
 }
 
 /** برای مسیرِ دکان: بی ویترینِ روشن (پرچم) تنظیمِ بازارچه معنا ندارد. */
@@ -822,7 +805,8 @@ async function requireStorefrontFlag(shopId) {
 }
 
 module.exports = {
-  FLAG_KEY, CATEGORIES,
-  directoryOn, requireOn, clearCache, stats, eligible, overview, shops, search, feed, myOrders,
+  FLAG_KEY, ACCOUNT_FLAG, CATEGORIES,
+  directoryOn, accountOn, requireOn, ordersOfPhone: mine.ordersOfPhone, clearCache, stats, eligible, overview, shops, search,
+  sameProduct: m4.sameProduct, feed, myOrders: mine.myOrders,
   geoOf, distanceKm, listingOf, saveListing, requireStorefrontFlag,
 };

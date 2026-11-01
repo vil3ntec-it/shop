@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -139,6 +140,18 @@ class PromoEngineTest {
     val snap = PromoEngine.Snapshot(enabled = true, rules = listOf(full, r2), manage = true, belowCost = false, at = 42, stamp = true)
     assertEquals(snap, PromoJson.snapshotOf(PromoJson.toJson(snap), 42))
     assertEquals(PromoEngine.Snapshot(at = 7), PromoJson.snapshotOf(kotlinx.serialization.json.JsonObject(emptyMap()), 7))
+    //  POS-19: پلهٔ قیمتِ ثابت و پرچمش رفت‌وبرگشت دارند؛ پلهٔ درصدی و پرچمِ خاموش کلیدِ تازه نمی‌نویسند
+    val priced = r1.copy(kind = "tiers", bp = 0, tiers = listOf(PromoCore.Tier(min = 3000, unitMinor = 9000)))
+    assertEquals(priced, PromoCore.ruleOf(PermPolicy.tree(PromoJson.toJson(priced))))
+    assertTrue(PromoJson.toJson(priced).toString().contains("\"unitMinor\":9000"))
+    assertFalse(PromoJson.toJson(full)["tiers"].toString().contains("unitMinor"))
+    val flagged = snap.copy(tierPrice = true)
+    assertEquals(flagged, PromoJson.snapshotOf(PromoJson.toJson(flagged), 42))
+    assertFalse(PromoJson.toJson(snap).toString().contains("tierPrice"))
+    //  PRM-02: پرچمِ `redeem` ِ سرور هم رفت‌وبرگشت دارد؛ پاسخِ سرورِ قدیم (بی کلید) ⇒ خاموش
+    val counted = snap.copy(redeem = true)
+    assertEquals(counted, PromoJson.snapshotOf(PromoJson.toJson(counted), 42))
+    assertEquals(false, PromoJson.snapshotOf(PromoJson.toJson(snap), 42).redeem)
   }
 
   /* ---------------- S2: فیلدهای تازهٔ فاکتور ---------------- */

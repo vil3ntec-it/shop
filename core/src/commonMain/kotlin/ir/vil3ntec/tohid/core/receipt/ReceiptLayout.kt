@@ -37,6 +37,8 @@ object ReceiptLayout {
     row(labels.invoiceNo, "#" + fmt.digits(input.invoiceNo.ifBlank { "—" }))
     val date = fmt.date(input.dateIso)
     row(labels.date, if (input.time.isBlank()) date else "$date — ${fmt.digits(input.time)}")
+    //  LOC-01: قمری فقط اگر دکان خواسته باشد (ReceiptFormat.lunarDate ِ پیش‌فرض null است)
+    fmt.lunarDate(input.dateIso)?.takeIf { it.isNotBlank() }?.let { row(labels.lunarDate, it) }
     if (input.cashier.isNotBlank()) row(labels.cashier, input.cashier.trim())
     row(labels.kind, input.kind)
     b += ReceiptBlock.Rule()

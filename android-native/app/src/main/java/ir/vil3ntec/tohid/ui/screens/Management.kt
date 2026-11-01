@@ -32,12 +32,17 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAdmin
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 
 /**
  *  مرکزِ مدیریت — همه‌چیزِ دکان در یک صفحه.
@@ -55,6 +60,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *
  *  روی کامپیوتر چهار ستونِ عدد و سه ستونِ کارت؛ روی گوشی یک‌ستونه.
  *  ──────────────────────────────────────────────────────────────────
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrAdmin` (LOC-06)؛ نامِ دستگاه، کارمند، پلن و یادداشتِ سابقه داده‌اند.
  */
 @Composable
 fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
@@ -84,6 +91,7 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
 
   //  از سرور — اگر وارد نشده یا اینترنت نیست، کارت همین را می‌گوید
   val signedIn = remember { Backend.isReady(context) }
+  val staffTime = rememberStaffTimeConfig()
   var devices by remember { mutableStateOf<List<DeviceDto>?>(null) }
   var members by remember { mutableStateOf<List<MemberDto>?>(null) }
   var sub by remember { mutableStateOf<SubscriptionDto?>(null) }
@@ -100,18 +108,18 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
-    Text("همهٔ دکان در یک نگاه — هر کارت به صفحهٔ کاملش می‌رود", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    Text(StrAdmin.subtitle, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
 
     /* ------------------------------ عددهای اصلی ------------------------------ */
     val kpis = buildList {
-      add(Triple("فروشِ امروز", "${money(todayR.net)} ؋", "${plain(todayR.count)} فاکتور"))
-      add(Triple("فروشِ این ماه", "${money(monthR.net)} ؋", "${plain(monthR.count)} فاکتور"))
-      if (canMoney) add(Triple(if (monthR.netProfit < 0) "ضررِ خالصِ ماه" else "سودِ خالصِ ماه", "${money(kotlin.math.abs(monthR.netProfit))} ؋", "پس از مصارف"))
-      if (canMoney) add(Triple("ارزشِ انبار", "${money(stock.value)} ؋", "${plain(stock.products)} قلم کالا"))
-      add(Triple("طلب از قرض‌داران", "${money(owed)} ؋", "${plain(d.debtors.count { ShopStore.debt(d, it.id) > 0 })} نفر"))
-      if (canMoney) add(Triple("بدهی به تأمین‌کننده", "${money(weOwe)} ؋", "${plain(d.suppliers.size)} تأمین‌کننده"))
-      add(Triple("نقدِ مورد انتظار در دخل", shift?.let { if (blind) "شمارشِ کور" else "${money(expectedCash(it))} ؋" } ?: "صندوق بسته", shift?.let { "باز از ${formatMillis(it.open.createdAt)}" } ?: "از «تاریخچهٔ فروش» باز کنید"))
-      add(Triple("هشدارِ انبار", "${plain(stock.out + stock.low)}", "${plain(stock.out)} تمام‌شده · ${plain(stock.low)} کم"))
+      add(Triple(StrHome.todaySales, "${money(todayR.net)} ؋", Str.invoicesCount(plain(todayR.count))))
+      add(Triple(StrAdmin.monthSales, "${money(monthR.net)} ؋", Str.invoicesCount(plain(monthR.count))))
+      if (canMoney) add(Triple(if (monthR.netProfit < 0) StrAdmin.monthLoss else StrAdmin.monthProfit, "${money(kotlin.math.abs(monthR.netProfit))} ؋", StrAdmin.afterExpenses))
+      if (canMoney) add(Triple(StrAdmin.stockValue, "${money(stock.value)} ؋", StrAdmin.itemLines(plain(stock.products))))
+      add(Triple(StrAdmin.owedByDebtors, "${money(owed)} ؋", StrAdmin.people(plain(d.debtors.count { ShopStore.debt(d, it.id) > 0 }))))
+      if (canMoney) add(Triple(StrNav.supplierDebt, "${money(weOwe)} ؋", StrAdmin.suppliers(plain(d.suppliers.size))))
+      add(Triple(StrAdmin.expectedInDrawer, shift?.let { if (blind) StrAdmin.blindCount else "${money(expectedCash(it))} ؋" } ?: StrNav.registerClosed, shift?.let { StrAdmin.openSince(formatMillis(it.open.createdAt)) } ?: StrAdmin.openFromHistory))
+      add(Triple(StrAdmin.stockAlerts, "${plain(stock.out + stock.low)}", StrAdmin.outAndLow(plain(stock.out), plain(stock.low))))
     }
     val perRow = when (size) { Screen.WIDE -> 4; Screen.TABLET -> 3; else -> 2 }
     kpis.chunked(perRow).forEach { row ->
@@ -126,93 +134,95 @@ fun ManagementScreen(d: ShopData, onOpen: (String) -> Unit) {
     /* ------------------------------ کارت‌ها ------------------------------ */
     val cards = buildList<@Composable () -> Unit> {
       add {
-        HubCard("هشدارها", Icons.Filled.WarningAmber, "انبار", { onOpen("warehouse") }) {
-          HubLine("تمام‌شده", plain(stock.out), Shop.colors.danger)
-          HubLine("موجودیِ کم", plain(stock.low), Shop.colors.warning)
-          HubLine("منقضی", plain(expiry.count { it.expired }), Shop.colors.danger)
-          HubLine("نزدیک به انقضا", plain(expiry.count { !it.expired }), Shop.colors.warning)
+        HubCard(Str.alerts, Icons.Filled.WarningAmber, Str.warehouse, { onOpen("warehouse") }) {
+          HubLine(Str.finished, plain(stock.out), Shop.colors.danger)
+          HubLine(StrAdmin.lowStock, plain(stock.low), Shop.colors.warning)
+          HubLine(StrAdmin.expired, plain(expiry.count { it.expired }), Shop.colors.danger)
+          HubLine(StrAdmin.nearExpiry, plain(expiry.count { !it.expired }), Shop.colors.warning)
           val late = d.debtors.count { ShopStore.debt(d, it.id) > 0 }
-          HubLine("قرض‌دارِ بدهکار", plain(late), Shop.colors.text)
+          HubLine(StrAdmin.debtorsOwing, plain(late), Shop.colors.text)
         }
       }
       add {
-        HubCard("صندوق", Icons.Filled.PointOfSale, "صندوق و فاکتورها", { onOpen("sales") }) {
+        HubCard(StrAdmin.register, Icons.Filled.PointOfSale, StrAdmin.registerAndInvoices, { onOpen("sales") }) {
           if (shift == null) {
-            Text("صندوق بسته است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            Text(StrAdmin.registerClosedNote, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           } else if (payV2) {
             //  PAY (v3 A4): همان عددِ هسته — کیف پول و کارت نقدِ دخل نیستند
-            HubLine("اول صندوق", money(shift.open.amount))
-            HubLine("مورد انتظار (نقد)", if (blind) "شمارشِ کور" else money(expectedCash(shift)), Shop.colors.primary)
+            HubLine(StrAdmin.openingFloat, money(shift.open.amount))
+            HubLine(StrAdmin.expectedCash, if (blind) StrAdmin.blindCount else money(expectedCash(shift)), Shop.colors.primary)
           } else {
             val t = CashShift.totalsOf(d, shift, System.currentTimeMillis())
-            HubLine("اول صندوق", money(t.opening))
-            HubLine("فروشِ نقدی", money(t.sales))
-            HubLine("رسیدِ قرض‌داران", money(t.receipts))
-            HubLine("مرجوعی و مصارف", "−" + money(t.returns + t.expenses + t.suppliers))
-            if (t.cashIn > 0 || t.cashOut > 0) HubLine("ورود و خروجِ نقد", (if (t.cashIn - t.cashOut < 0) "−" else "") + money(kotlin.math.abs(t.cashIn - t.cashOut)))
-            HubLine("مورد انتظار", money(t.expected), Shop.colors.primary)
+            HubLine(StrAdmin.openingFloat, money(t.opening))
+            HubLine(StrAdmin.cashSales, money(t.sales))
+            HubLine(StrAdmin.debtorReceipts, money(t.receipts))
+            HubLine(StrAdmin.returnsAndExpenses, "−" + money(t.returns + t.expenses + t.suppliers))
+            if (t.cashIn > 0 || t.cashOut > 0) HubLine(StrAdmin.cashInAndOut, (if (t.cashIn - t.cashOut < 0) "−" else "") + money(kotlin.math.abs(t.cashIn - t.cashOut)))
+            HubLine(StrAdmin.expected, money(t.expected), Shop.colors.primary)
           }
         }
       }
       if (canMoney) add {
-        HubCard("فروشنده‌ها (این ماه)", Icons.Filled.Leaderboard, "گزارش‌ها", { onOpen("reports") }) {
-          if (sellers.isEmpty()) Text("فروشی ثبت نشده.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        HubCard(StrAdmin.sellersThisMonth, Icons.Filled.Leaderboard, Str.reports, { onOpen("reports") }) {
+          if (sellers.isEmpty()) Text(StrAdmin.noSales, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           sellers.take(6).forEach { HubLine("${it.seller} · ${plain(it.count)}", money(it.net)) }
         }
       }
       add {
-        HubCard("دستگاه‌های حساب", Icons.Filled.Devices, if (canAdmin) "تنظیمات" else null, { onOpen("settings") }) {
+        HubCard(StrAdmin.accountDevices, Icons.Filled.Devices, if (canAdmin) Str.settings else null, { onOpen("settings") }) {
           when {
-            !signedIn -> Text("بی حساب کار می‌کنید — دفتر فقط روی همین دستگاه است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-            devices == null -> Text(if (offline) "سرور در دسترس نیست." else "…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            !signedIn -> Text(StrAdmin.noAccountLocal, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            devices == null -> Text(if (offline) StrAdmin.serverUnreachable else "…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             else -> devices!!.take(6).forEach { dv ->
-              HubLine(dv.label + if (dv.status == "revoked") " (بسته)" else "", dv.lastSeenAt?.let { formatMillis(it) } ?: "—")
+              HubLine(dv.label + if (dv.status == "revoked") StrAdmin.revokedSuffix else "", dv.lastSeenAt?.let { formatMillis(it) } ?: "—")
             }
           }
         }
       }
       add {
-        HubCard("کارمندان", Icons.Filled.Badge, "کارمندان", { onOpen("team") }) {
+        HubCard(StrNav.staffShort, Icons.Filled.Badge, StrNav.staffShort, { onOpen("team") }) {
           when {
-            !signedIn -> Text("برای کارمندان، وارد حساب شوید.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            !signedIn -> Text(StrAdmin.signInForStaff, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             members == null -> Text("…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-            members!!.isEmpty() -> Text("هنوز کارمندی نیست.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            members!!.isEmpty() -> Text(StrAdmin.noStaffYet, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             else -> members!!.take(6).forEach { m ->
-              HubLine(m.name.ifBlank { m.email.ifBlank { m.phone } }, when (m.role) { "owner" -> "صاحب"; "manager" -> "مدیر"; else -> "فروشنده" })
+              HubLine(m.name.ifBlank { m.email.ifBlank { m.phone } }, when (m.role) { "owner" -> StrAdmin.roleOwner; "manager" -> StrNav.roleManager; else -> StrAdmin.roleSeller })
             }
           }
         }
       }
       add {
-        HubCard("اشتراک", Icons.Filled.WorkspacePremium, "اشتراکِ من", { onOpen("myplan") }) {
+        HubCard(StrNav.subscription, Icons.Filled.WorkspacePremium, Str.mySubscription, { onOpen("myplan") }) {
           val s = sub
           when {
-            !signedIn -> Text("بی حساب.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            !signedIn -> Text(StrAdmin.noAccount, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             s == null -> Text("…", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             else -> {
-              HubLine("پلن", s.plan ?: "—")
-              HubLine("وضعیت", when (s.status) { "active" -> "فعال"; "expired" -> "منقضی"; "suspended" -> "معلق"; else -> s.status },
+              HubLine(StrAdmin.plan, s.plan ?: "—")
+              HubLine(StrNav.status, when (s.status) { "active" -> StrSettings.active; "expired" -> StrAdmin.expired; "suspended" -> StrAdmin.suspended; else -> s.status },
                 if (s.status == "active") Shop.colors.success else Shop.colors.danger)
-              HubLine("روزِ مانده", plain(s.daysLeft), if (s.daysLeft <= 7) Shop.colors.warning else Shop.colors.text)
+              HubLine(StrAdmin.daysLeft, plain(s.daysLeft), if (s.daysLeft <= 7) Shop.colors.warning else Shop.colors.text)
             }
           }
         }
       }
       if (canAdmin) add {
-        HubCard("سابقهٔ اخیر", Icons.Filled.History, "سابقهٔ عملیات", { onOpen("audit") }) {
-          if (recent.isEmpty()) Text("هنوز چیزی ثبت نشده.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        HubCard(StrAdmin.recentActivity, Icons.Filled.History, StrNav.auditLogAlt, { onOpen("audit") }) {
+          if (recent.isEmpty()) Text(StrAdmin.nothingRecorded, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           recent.forEach { a ->
-            Text("${formatDate(a.date)} — ${a.notes}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.text,
+            Text("${displayDate(a.date)} — ${a.notes}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.text,
               maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 2.dp))
           }
         }
       }
+      //  STF-07/STF-08: فقط با پرچمِ روشنِ `shop.staff_time` (`StaffTimeAndroid.kt`)؛ خاموش ⇒ فهرستِ کارت‌ها همان پیشین
+      staffTime?.takeIf { it.enabled }?.let { cfg -> add { StaffTimeHub(d, monthFrom, today, cfg) } }
       add {
-        HubCard("میان‌بُرها", Icons.Filled.Apps, null, {}) {
+        HubCard(StrNav.shortcuts, Icons.Filled.Apps, null, {}) {
           val links = listOf(
-            "sale" to "فروش", "warehouse" to "انبار", "products" to "محصولات", "purchasing" to "خرید",
-            "reports" to "گزارش‌ها", "receipts" to "رسیدها", "expenses" to "مصارف", "debtors" to "قرض‌داران",
-          ) + if (canAdmin) listOf("settings" to "تنظیمات و پشتیبان") else emptyList()
+            "sale" to Str.sale, "warehouse" to Str.warehouse, "products" to Str.products, "purchasing" to Str.purchases,
+            "reports" to Str.reports, "receipts" to Str.receipts, "expenses" to Str.expenses, "debtors" to Str.debtors,
+          ) + if (canAdmin) listOf("settings" to StrAdmin.settingsAndBackup) else emptyList()
           links.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               row.forEach { (id, label) ->

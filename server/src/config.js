@@ -47,8 +47,23 @@ const config = {
   host: process.env.HOST || '0.0.0.0',
   port: num(process.env.PORT, 3000),
 
-  /** آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها. */
-  serverUrl: process.env.SERVER_URL || '',
+  /**
+   *  آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها، و `publicUrl` ِ
+   *  `GET /api/v1/config/server`. `PUBLIC_URL` نامِ دومِ همین است (docs/SERVERS-fa.md).
+   */
+  serverUrl: process.env.SERVER_URL || process.env.PUBLIC_URL || '',
+
+  /**
+   *  HTTPS ِ مستقیم، بی Caddy و بی تونل — برای سرورِ شبکهٔ دکان (برنامه‌ها `http` ِ شبکه را
+   *  نمی‌پذیرند؛ گواهیِ خودامضا در برنامه سنجاق می‌شود). یا `TLS_CERT_FILE` + `TLS_KEY_FILE`
+   *  (PEM)، یا `TLS_PFX_FILE` (+ `TLS_PFX_PASSPHRASE`، خروجیِ ویندوز). خالی ⇒ همان http ِ امروز.
+   */
+  tls: {
+    certFile:   process.env.TLS_CERT_FILE || '',
+    keyFile:    process.env.TLS_KEY_FILE || '',
+    pfxFile:    process.env.TLS_PFX_FILE || '',
+    passphrase: process.env.TLS_PFX_PASSPHRASE || '',
+  },
 
   db: {
     url:              databaseUrl(),
@@ -112,6 +127,9 @@ const config = {
       knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
       dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
       knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+      //  SEC-06، سقفِ **هزینه** (واحدِ خُردِ sms_usage.cost_minor) در ۲۴ ساعت برای هر کانال؛ ۰ = خاموش
+      dailyCostMax:     num(process.env.OTP_SMS_DAILY_COST_MAX_MINOR, 0),      // کلِ سرور
+      shopDailyCostMax: num(process.env.OTP_SMS_SHOP_DAILY_COST_MAX_MINOR, 0), // هر دکان (ویترین)
     },
   },
 
@@ -200,6 +218,12 @@ const config = {
     dir:     process.env.RELEASE_CACHE_PATH || path.join(ROOT, 'data', 'releases'),
     ttlMs:   num(process.env.RELEASE_CACHE_MINUTES, 10) * 60 * 1000,
     apiBase: process.env.RELEASE_API_BASE || 'https://api.github.com',
+  },
+
+  //  DLV-05 (§۳.۱۱، §۳.۲): نقشهٔ آفلاینِ شهر برای پیک — فایل‌های `*.pmtiles` (عصارهٔ OSM) که
+  //  گردانندهٔ سرور در این پوشه می‌گذارد؛ سرور فقط همین‌ها را به پیکِ دکانِ پرچم‌دار می‌دهد.
+  courierMap: {
+    dir: process.env.COURIER_MAP_DIR || path.join(ROOT, 'data', 'maps'),
   },
 
   backup: {
@@ -333,6 +357,8 @@ const config = {
     receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
     //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
     receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
+    //  M3: بارگذاریِ لوگو/تصویرِ سرِ ویترین به‌ازای دکان در شبانه‌روز (دو نسخهٔ آخر می‌مانند؛ سقف بارِ دیسک را می‌بندد)
+    storefrontMediaDailyMax: num(process.env.RATE_STOREFRONT_MEDIA_DAILY_MAX, 30),
   },
 
   /**
@@ -355,6 +381,8 @@ const config = {
     accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
     //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
+    //  TEN-03 — لینکِ پیگیریِ سفارش (پرچمِ `shop.storefront.link_expiry`) چند روز پس از صدور کار می‌کند
+    trackLinkTtlMs: num(process.env.STORE_TRACK_LINK_DAYS, 30) * 24 * 60 * 60 * 1000,
   },
 
   /**
@@ -369,6 +397,10 @@ const config = {
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
     //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
     feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
+    //  S6: جریانِ تغییر (`market_changes`، پرچمِ `market.changes`) — هر چند وقت یک بار `seq` ِ تازه
+    //  خوانده شود (۰ ⇒ هر درخواست) و ردیف‌ها چند روز بمانند
+    changesPollMs: num(process.env.MARKET_CHANGES_POLL_MS, 2 * 1000),
+    changesKeepMs: num(process.env.MARKET_CHANGES_KEEP_DAYS, 14) * 24 * 60 * 60 * 1000,
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
@@ -435,6 +467,27 @@ const config = {
   //  پلهٔ اولِ ثبت‌نام برمی‌گرداند (رفتارِ پیش از 2.14.2). پیش‌فرض خاموش.
   signupLegacyConflict: bool(process.env.SIGNUP_LEGACY_CONFLICT, false),
   trustProxy:        bool(process.env.TRUST_PROXY, false),
+  /*
+   *  دو قفلِ نشستِ مدیر — هر دو پیش‌فرض خاموش؛ روشن کردن فقط با صاحبِ سامانه (F0-15، `lib/admin-guard.js`).
+   *  `ADMIN_2FA_REQUIRED=1`: مدیرِ بی TOTP فقط به درهای روشن کردنِ همان می‌رسد (SEC-AUTH-12).
+   *  `ADMIN_REAUTH=1`: نوشتنِ مدیرِ ارشد فقط چند دقیقه پس از ورود یا `/api/admin/reauth` (SEC-AUTH-13).
+   */
+  admin: {
+    twoFactorRequired: bool(process.env.ADMIN_2FA_REQUIRED, false),
+    reauthRequired:    bool(process.env.ADMIN_REAUTH, false),
+  },
+  /*
+   *  SEC-AUTH-05: `X-Forwarded-For` فقط وقتی خوانده می‌شود که **همسایهٔ مستقیمِ** سوکت
+   *  پروکسیِ مطمئن باشد. خالی ⇒ loopback و نشانی‌های خصوصی (پنلِ خانگی روی 127.0.0.1،
+   *  Caddy در شبکهٔ docker). فهرست ⇒ فقط همان‌ها (IP یا CIDRِ IPv4، با ویرگول).
+   */
+  trustProxyFrom:    list(process.env.TRUST_PROXY_FROM),
+  /*
+   *  SEC-AUTH-06: کدِ یک‌بارمصرف در **پاسخ** (`devCode`) و در لاگ فقط وقتی `NODE_ENV`
+   *  صریحاً `development` یا `test` است. تا ۲.۱۴.۴ «هر چه production نیست» بود، پس سروری
+   *  که بی `NODE_ENV` بالا می‌آمد کدِ ورودِ هر شماره را به هر درخواست‌کننده‌ای پس می‌داد.
+   */
+  devCodes:          ['development', 'test'].includes(String(process.env.NODE_ENV || '').trim()),
   defaults: {
     timezone:  process.env.DEFAULT_TIMEZONE || 'Asia/Kabul',
     //  ⛔ F0-13: `TRIAL_DAYS` برداشته شد — هیچ جا خوانده نمی‌شد و فقط عددِ دومی
@@ -449,12 +502,36 @@ const config = {
   syncV3: {
     enabled: bool(process.env.SYNC_V3_ENABLED, false),
   },
+
+  /**
+   * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ پیش‌فرض `local` (سرورِ تک‌نمونه،
+   * بی اتصالِ اضافه). فقط با `SAFE_LOCK_SCOPE=db` (چند نمونهٔ سرور روی یک پایگاه) قفلِ advisory هم،
+   * روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). روی PGlite همیشه `local`.
+   */
+  accountLock: {
+    scope: String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase() === 'db' ? 'db' : 'local',
+    poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
+  },
+  /*
+   *  «دورانِ» همگام‌سازی پس از بازیابی (§۹.۵، `lib/sync-epoch.js`) — فقط دکان.
+   *  پیش‌فرض خاموش (قاعدهٔ همگام‌سازی: رفتارِ تازه فقط پشتِ پرچمِ خاموش). خاموش ⇒ نه دوران
+   *  در بالا آمدن و بازیابی، نه نشانِ پشتیبان، `/api/shop/sync-epoch*` و `/api/sync/v3/deleted`
+   *  ۴۰۴ و pull ِ v3 و pull/Snapshot ِ v1 بی دوران ⇒ برنامه دفترچه نمی‌نویسد، درِ دوران را هم نمی‌زند
+   *  (فقط پس از pull ِ دوران‌دار می‌پرسد) و همان رفتارِ پیشین را دارد.
+   *  ⚠️ پشتیبانی که با پرچمِ خاموش گرفته شده نشان ندارد؛ بازیابی از آن را فقط
+   *  `scripts/restore.js` (با پرچمِ روشن) یا «cursor جلوتر از سرِ دفترِ سرور» می‌شناسد.
+   */
+  syncEpoch: {
+    enabled: bool(process.env.SYNC_EPOCH_ENABLED, false),
+  },
 };
 
 /** بررسی پیکربندی هنگام راه‌اندازی — بهتر است سرور بالا نیاید تا ناامن کار کند. */
 function validate() {
   const problems = [];
   if (!config.db.url) problems.push('DATABASE_URL تنظیم نشده است');
+  if (config.tls.certFile && !config.tls.keyFile) problems.push('TLS_CERT_FILE بی TLS_KEY_FILE است');
+  if (config.tls.keyFile && !config.tls.certFile) problems.push('TLS_KEY_FILE بی TLS_CERT_FILE است');
   if (config.env === 'production') {
     if (!config.secrets.api || config.secrets.api.length < 24) {
       problems.push('API_SECRET باید حداقل ۲۴ کاراکتر باشد');

@@ -23,7 +23,7 @@
 .toolbar { display: grid; gap: var(--s3); }
 .stock-note { margin-top: var(--s3); font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
 .stock-note::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
-#picks .p-card { height: 100%; }
+#picks .p-card, #deals .p-card, #fresh .p-card, .sheet .rail .p-card { height: 100%; }
 
 .plain-set { border: 1px solid var(--line); margin: 0; min-width: 0; }
 .plain-set > * + * { margin-top: var(--s4); }
@@ -46,6 +46,10 @@
 .sum-lines .grow small { display: block; color: var(--muted); font-size: 12.5px; }
 .sum-lines .amt { flex: none; font-weight: 700; }
 .sum-lines li.bad .grow { text-decoration: line-through; opacity: .7; }
+/* E2E-MKT-02: بیش از موجودی — با «کم کن به …» */
+.sum-lines li.short { flex-wrap: wrap; }
+.sum-lines li.short .grow small { color: var(--warn); }
+.sum-lines li.short .fit { margin-inline-start: auto; }
 
 .ps-img { aspect-ratio: 4 / 3; border-radius: var(--r-card); background: var(--surface-2); display: grid; place-items: center; overflow: hidden; }
 .ps-img.tile { padding: 8%; background: var(--tile); }
@@ -53,6 +57,11 @@
 .ps-img .ph { font-size: 56px; font-weight: 700; color: var(--faint); }
 .ps-price { font-size: 22px; font-weight: 700; }
 .ps-price small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.ps-desc { margin-top: var(--s3); overflow-wrap: anywhere; }
+.ps-specs { margin: var(--s3) 0 0; display: grid; grid-template-columns: fit-content(45%) minmax(0, 1fr); gap: var(--s1) var(--s4); font-size: 14px; }
+.ps-specs dt { color: var(--muted); overflow-wrap: anywhere; }
+.ps-specs dd { margin: 0; overflow-wrap: anywhere; }
+.ps-h { margin-bottom: var(--s2); }
 
 #o-title { font-size: 20px; }
 #o-steps { margin-top: var(--s5); }
@@ -68,3 +77,8 @@
   .toolbar { grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); align-items: center; }
   .ps-img { aspect-ratio: 16 / 10; }
 }
+
+/* DLV-06: پیک برای مشتری — نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل */
+.dlv { display: flex; flex-direction: column; gap: var(--s2); }
+.dlv-code { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); padding: var(--s3) var(--s4); border: 1px dashed var(--line); border-radius: var(--surface-radius); }
+.dlv-code b { font-size: 28px; letter-spacing: .2em; }

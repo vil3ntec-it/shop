@@ -46,6 +46,9 @@ function errorHandler(err, req, res, _next) {
   if (status >= 500) {
     console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method,
       require('../lib/log-redact').redactPath(req.originalUrl || req.path), err);
+    //  پنلِ مرکزی ۴.۱۰: همان خطا با همان «کدِ پیگیری» در `server_errors` (پوشانده از راز، بی await؛
+    //  شکستِ ثبت هرگز به پاسخ نمی‌رسد) ⇒ مرکزِ رخدادِ پنل آن را می‌بیند، نه فقط لاگِ کنسول
+    require('../lib/ops-errors').recordServer({ ref, err, req, status });
   }
   res.status(status).json({
     error: {

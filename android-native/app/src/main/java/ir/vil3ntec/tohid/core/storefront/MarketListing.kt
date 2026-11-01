@@ -30,7 +30,7 @@ object MarketListing {
   const val ROOT = "/shop/market"
 
   /** همان `text(b.area, 60)` ِ سرور */
-  const val AREA_MAX = 60
+  const val AREA_MAX = StorefrontRules.AREA_MAX
 
   /** همان `CATEGORIES` ِ سرور — اگر پاسخ فهرست نداشت (سرورِ قدیمی‌تر) */
   val CATEGORIES: List<MarketCategoryDto> = listOf(
@@ -65,30 +65,15 @@ object MarketListing {
 
   /* ------------------------------ ورودی ------------------------------ */
 
-  /** همان `stripControl(str(v))` ِ سرور: اول trim، بعد بی نویسهٔ کنترلی */
-  fun cleanArea(s: String): String = buildString {
-    var i = 0
-    val t = s.trim()
-    while (i < t.length) {
-      val cp = t.codePointAt(i)
-      if (cp > 31 && cp != 127) appendCodePoint(cp)
-      i += Character.charCount(cp)
-    }
-  }
+  /** قاعده‌ها در `core` (`StorefrontRules`، commonMain) — همان سرور */
+  fun cleanArea(s: String): String = StorefrontRules.cleanArea(s)
 
-  fun areaError(area: String): String? {
-    val n = cleanArea(area).length
-    return if (n > AREA_MAX) "ناحیه حداکثر ${toFa(AREA_MAX)} نویسه است (الان ${toFa(n)})" else null
-  }
+  fun areaError(area: String): String? = StorefrontRules.areaError(area)
 
-  fun categoryError(key: String, listed: Boolean, categories: List<MarketCategoryDto>): String? = when {
-    key.isBlank() -> if (listed) "برای نمایش در بازارچه، دستهٔ دکان را انتخاب کنید" else null
-    categories.none { it.key == key } -> "این دسته در فهرستِ بازارچه نیست"
-    else -> null
-  }
+  fun categoryError(key: String, listed: Boolean, categories: List<MarketCategoryDto>): String? =
+    StorefrontRules.categoryError(key, listed, categories.map { it.key })
 
-  /** همان `Math.round(v * 100)` ِ سرور (نیمه رو به بالا، نه رو به زوج) */
-  fun coarse(v: Double): Double = Math.floor(v * 100 + 0.5) / 100
+  fun coarse(v: Double): Double = StorefrontRules.coarse(v)
 
   /** نقطهٔ دستگاه ⇒ موقعیتِ درشت؛ نقطهٔ بی‌معنا ⇒ null */
   fun coarseOf(lat: Double, lng: Double): MarketLocationDto? {

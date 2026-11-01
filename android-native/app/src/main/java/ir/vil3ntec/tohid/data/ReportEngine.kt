@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.money.Currency
+import ir.vil3ntec.tohid.core.money.Money
+import ir.vil3ntec.tohid.core.money.Qty
+import ir.vil3ntec.tohid.core.stock.StockAnalysis
 
 /**
  *  گزارش‌ها.
@@ -168,6 +172,81 @@ object ReportEngine {
     )
   }
 
+  /* ----------------------- تحلیلِ موجودی (INV-15، INV-16) ----------------------- */
+
+  /** یک کالا در تحلیل: موجودیِ امروز، فروشِ خالصِ بازه (افغانی) و ردهٔ ABC */
+  data class InsightRow(
+    val product: Product,
+    val onHand: Double,
+    val sales: Double,
+    val abc: StockAnalysis.Abc,
+    val shareBp: Long,
+    val cumulativeBp: Long,
+  )
+
+  data class StockInsight(
+    val from: String,
+    val to: String,
+    /** ارزش به بها و به قیمتِ فروش، و سودِ بالقوه — بها همان قیمتِ خریدِ ثبت‌شدهٔ کالا */
+    val valuation: StockAnalysis.Valuation,
+    val abc: StockAnalysis.AbcResult,
+    /** همان ترتیبِ ABC: پرفروش اول */
+    val rows: List<InsightRow>,
+  ) {
+    fun names(ids: List<String>): List<String> {
+      val by = rows.associate { it.product.id to it.product.name }
+      return ids.map { by[it] ?: it }
+    }
+  }
+
+  /**
+   *  ارزشِ موجودی و سودِ بالقوه (INV-16) و تحلیلِ ABC بر پایهٔ فروشِ خالصِ `from..to` (INV-15).
+   *  حساب در `core` (`StockAnalysis`، commonMain) است؛ این‌جا فقط دفتر به ورودیِ آن تبدیل می‌شود.
+   *
+   *  - فروشِ خالصِ هر کالا = Σ (مقدار − برگشتی) × قیمتِ واحدِ قلم، فاکتورِ لغوشده بیرون — همان
+   *    پایهٔ «پرفروش‌ترین» در `salesIndex`، ولی فقط در بازه. تخفیفِ کلِ فاکتور پخش نمی‌شود (برای
+   *    رتبه‌بندی بس است و عددِ فروشِ گزارشِ فروش را عوض نمی‌کند).
+   *  - کالاها: فعال‌ها، و غیرفعالی که در بازه فروش یا امروز موجودی دارد.
+   *  - بها = `purchasePrice` ِ کالا (همان پایهٔ «ارزش موجودی» ِ امروز). ⚠️ روشِ بهای تمام‌شده
+   *    هنوز تصمیمِ باز است (D-23)؛ پس عدد «تقریبی» است و صفحه همین را می‌گوید.
+   *  - فقط خواندن؛ هیچ داده‌ای نوشته نمی‌شود.
+   */
+  fun stockInsight(d: ShopData, from: String, to: String): StockInsight {
+    val stock = ShopStore.index(d)
+    val salesById = d.sales.associateBy { it.id }
+    val perProduct = HashMap<String, Double>()
+    d.saleItems.forEach { item ->
+      if (item.productId.isEmpty()) return@forEach
+      val sale = salesById[item.saleId] ?: return@forEach
+      if (sale.status == "cancelled" || sale.date !in from..to) return@forEach
+      val net = item.quantity - item.returnedQty
+      perProduct[item.productId] = (perProduct[item.productId] ?: 0.0) + net * item.unitPrice
+    }
+    val products = d.products.filter { it.active || (perProduct[it.id] ?: 0.0) > 0.0 || stock.stock(it.id) > 0.0 }
+    val byId = products.associateBy { it.id }
+    val abc = StockAnalysis.abc(products.map { StockAnalysis.AbcInput(it.id, minorOf(perProduct[it.id] ?: 0.0)) })
+    val valuation = StockAnalysis.valuation(
+      products.map { StockAnalysis.ValueLine(it.id, milliOf(stock.stock(it.id)), minorOf(it.purchasePrice), minorOf(it.salePrice)) },
+    )
+    val rows = abc.rows.mapNotNull { r ->
+      val p = byId[r.id] ?: return@mapNotNull null
+      InsightRow(p, stock.stock(p.id), perProduct[p.id] ?: 0.0, r.cls, r.shareBp, r.cumulativeBp)
+    }
+    return StockInsight(from, to, valuation, abc, rows)
+  }
+
+  /** افغانی (Double) ⇒ واحدِ کوچک با همان گردکردنِ `Money.fromLegacy`؛ نامعتبر ⇒ ۰، بیرون از بازه ⇒ سقف */
+  private fun minorOf(v: Double): Long =
+    if (!v.isFinite()) 0L
+    else runCatching { Money.fromLegacy(v, Currency.AFN).minor }
+      .getOrDefault(if (v > 0) Long.MAX_VALUE else Long.MIN_VALUE)
+
+  /** مقدار (Double) ⇒ هزارم با همان `Qty.fromLegacy`؛ بیرون از بازه ⇒ سقف (تحلیل «حساب نشد» می‌گوید) */
+  private fun milliOf(v: Double): Long =
+    if (!v.isFinite()) 0L
+    else runCatching { Qty.fromLegacy(v).milli }
+      .getOrDefault(if (v > 0) Long.MAX_VALUE else Long.MIN_VALUE)
+
   /* ---------------------------- قرض‌داران ---------------------------- */
 
   data class DebtorStat(
@@ -184,6 +263,17 @@ object ReportEngine {
     val byDebtor = d.transactions.groupBy { it.debtorId }
     return d.debtors.map { debtor ->
       val mine = byDebtor[debtor.id].orEmpty()
+      //  `shop.debt_minor` (`DebtMinorFlag`): به پول، مثلِ `DebtBook` — «داده»، «گرفته» و «مانده» هم‌خوان و
+      //  ماندهٔ حسابِ تسویه‌شده صفرِ دقیق (نه −9.09e-13 که «۰ ؋ موجودی» می‌شد)
+      if (DebtMinorFlag.on) {
+        val lb = ir.vil3ntec.tohid.core.money.LedgerBalance
+        return@map DebtorStat(
+          debtor = debtor,
+          given = lb.sum(mine.filter { it.type == "give" }, plus = { true }, amount = { it.amount }),
+          received = lb.sum(mine.filter { it.type != "give" }, plus = { true }, amount = { it.amount }),
+          remaining = lb.sum(mine, plus = { it.type == "give" }, amount = { it.amount }),
+        )
+      }
       var given = 0.0
       var received = 0.0
       mine.forEach { if (it.type == "give") given += it.amount else received += it.amount }

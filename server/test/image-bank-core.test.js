@@ -43,6 +43,45 @@ test('IMG-03: نوع از محتوا؛ پسوندِ جعلی، فایلِ خرا
   assert.equal(bytes.extensionMatches('a.PNG', 'image/png'), true);
 });
 
+test('IMG-PRO-09: ابعادِ بسیار بزرگ و بمبِ فشرده پیش از هر رمزگشایی رد می‌شوند؛ مرزها دقیق', () => {
+  //  مرزِ ضلع (۱۰٬۰۰۰) و پیکسل (۴۰ مگاپیکسل) — دقیق، تا جابه‌جاییِ سقف یا «>» به «>=» قرمز شود
+  assert.equal(bytes.inspect(F.png(10000, 4000)).width, 10000);
+  assert.equal(bytes.inspect(F.png(8000, 5000)).height, 5000);
+  assert.equal(code(() => bytes.inspect(F.png(10001, 10))), 'image_too_large_dimensions');
+  assert.equal(code(() => bytes.inspect(F.png(10, 10001))), 'image_too_large_dimensions');
+  assert.equal(code(() => bytes.inspect(F.png(8000, 5001))), 'image_too_large_dimensions');
+  //  هر سه قالب، از سرآیندِ خودشان
+  assert.equal(code(() => bytes.inspect(F.jpeg(40000, 40000))), 'image_too_large_dimensions');
+  assert.equal(code(() => bytes.inspect(F.webp(16000, 16000))), 'image_too_large_dimensions');       // VP8X
+  assert.equal(code(() => bytes.inspect(F.webpLossy(16000, 16000))), 'image_too_large_dimensions');  // VP8
+  assert.equal(bytes.inspect(F.webpLossy(640, 480)).width, 640);
+
+  //  بمبِ واقعی (IDATِ درست): ۳۱ کیلوبایت ⇒ ۲۵۶ مگاپیکسل. سنجش فقط سرآیند است و zlib هرگز باز نمی‌شود.
+  const bomb = F.pngBomb(16000, 16000);
+  assert.ok(bomb.length < 64 * 1024, String(bomb.length));
+  const zlib = require('zlib');
+  const names = ['inflateSync', 'inflate', 'unzipSync', 'unzip', 'inflateRawSync', 'inflateRaw'];
+  const saved = names.map((n) => zlib[n]);
+  names.forEach((n) => { zlib[n] = () => { throw new Error('inflate called: ' + n); }; });
+  try {
+    assert.equal(code(() => bytes.inspect(bomb)), 'image_too_large_dimensions');
+  } finally {
+    names.forEach((n, i) => { zlib[n] = saved[i]; });
+  }
+
+  //  دور زدنِ سقف با سرآیندِ دوم: رمزگشا فریم/جریانِ دیگری را می‌خواند تا آن‌چه این‌جا سنجیده شد
+  assert.equal(code(() => bytes.inspect(F.jpeg(100, 100, { sof: [40000, 40000] }))), 'image_corrupt');  // دو SOF
+  assert.equal(code(() => bytes.inspect(F.jpeg(100, 100, { sof: [100, 100] }))), 'image_corrupt');
+  assert.equal(code(() => bytes.inspect(F.webp(100, 100, { bits: [16000, 16000] }))), 'image_corrupt');  // بومِ کوچک، جریانِ بزرگ
+  assert.equal(code(() => bytes.inspect(F.webp(100, 100, { bits: [101, 100] }))), 'image_corrupt');
+  assert.equal(bytes.inspect(F.webp(100, 100, { bits: [100, 100] })).width, 100);
+  assert.equal(code(() => bytes.inspect(F.webpLossy(640, 480, { start: false }))), 'image_corrupt');
+  //  IHDRِ کوتاه (۸ بایت به‌جای ۱۳) — ابعاد از بیرونِ IHDR خوانده نمی‌شود
+  const short = Buffer.alloc(8); short.writeUInt32BE(100, 0); short.writeUInt32BE(100, 4);
+  const shortPng = Buffer.concat([F.png(1, 1).subarray(0, 8), F.pngChunk('IHDR', short), F.pngChunk('IEND', Buffer.alloc(0))]);
+  assert.equal(code(() => bytes.inspect(shortPng)), 'image_corrupt');
+});
+
 test('فرادادهٔ حساس (EXIF/GPS، متن، XMP) برداشته می‌شود؛ ICC و ابعاد می‌مانند', () => {
   const j = F.jpeg(800, 600, { gps: true });
   const js = bytes.stripMetadata(j);

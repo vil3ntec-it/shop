@@ -275,6 +275,7 @@ object Watchman {
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
       val app = applicationContext
+      ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(app)
       runCatching {
         //  خلاصهٔ کوچک به‌جای کلِ دفتر — شرحش سرِ `LedgerSummary`
         val summary = LedgerSummary.require(app)

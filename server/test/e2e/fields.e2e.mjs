@@ -157,7 +157,7 @@ await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ س
   assert.ok(bad && bad.fields.orderId === null, `ساختِ پیش از A00 باید همان null را بسازد: ${JSON.stringify(P.queue)}`);
   assert.deepEqual(P.marks(), {}, 'ساختِ پیش از A00 نشانِ caps ندارد');
   const r = E.ok(await P.api('POST', '/sync/v1/push', {
-    device_id: P.deviceId, schema_version: core.SCHEMA_VERSION, queued: P.queue.length, ops: P.queue,
+    device_id: P.deviceId, schema_version: P.wireSchema(), queued: P.queue.length, ops: P.queue,
   }), 'push');
   const res = r.results.find((x) => x.op_id === bad.op_id);
   assert.equal(res.status, 'applied');
@@ -169,7 +169,7 @@ await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ س
   const clear = (dev, fields = { channel: null }) => {
     const op = { op_id: core.ulid(Date.now()), ts: Date.now(), table: 'sales', row_id: saleId, type: 'update', fields };
     return dev.api('POST', '/sync/v1/push', {
-      device_id: dev.deviceId, schema_version: core.SCHEMA_VERSION, queued: 1, ops: [{ ...op, hash: core.hashOf(op) }], ...dev.marks(),
+      device_id: dev.deviceId, schema_version: dev.wireSchema(), queued: 1, ops: [{ ...op, hash: core.hashOf(op) }], ...dev.marks(),
     });
   };
   E.ok(await clear(P), 'push');

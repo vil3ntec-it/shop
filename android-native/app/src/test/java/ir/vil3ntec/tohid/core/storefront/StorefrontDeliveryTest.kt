@@ -95,8 +95,69 @@ class StorefrontDeliveryTest {
     assertTrue(StorefrontSpecs.parse((1..21).joinToString("\n") { "n$it: v" }).second != null)
   }
 
+  @Test fun small_basket_fee_needs_a_minimum_and_blank_means_refuse() {
+    val poly = "34.50,69.12\n34.50,69.22\n34.56,69.22"
+    val ok = D.check(
+      listOf(
+        ZoneDraft(name = "با هزینه", fee = "30", min = "600", small = "۲۵", polygon = poly),
+        ZoneDraft(name = "بی هزینه", fee = "30", min = "600", small = "", polygon = poly),
+        ZoneDraft(name = "صفر", fee = "30", min = "600", small = "0", polygon = poly),
+      ),
+      emptyList(), "3",
+    )
+    assertTrue(ok.errors.toString(), ok.errors.isEmpty())
+    assertEquals(2500L, ok.zones[0].smallBasketFeeMinor)
+    assertNull(ok.zones[1].smallBasketFeeMinor)
+    //  صفر یعنی «نه» — سرور صفر را رد می‌کند، پس null فرستاده می‌شود
+    assertNull(ok.zones[2].smallBasketFeeMinor)
+
+    val bad = D.check(
+      listOf(
+        ZoneDraft(name = "بی حداقل", fee = "30", min = "0", small = "25", polygon = poly),
+        ZoneDraft(name = "منفی", fee = "30", min = "600", small = "-5", polygon = poly),
+        ZoneDraft(name = "بزرگ", fee = "30", min = "600", small = "1000001", polygon = poly),
+      ),
+      emptyList(), "3",
+    )
+    for (k in listOf("z0.small", "z1.small", "z2.small")) assertTrue("$k در ${bad.errors}", bad.errors.containsKey(k))
+  }
+
+  @Test fun slot_fee_only_for_delivery_and_pickup_always_zero() {
+    val c = D.check(
+      emptyList(),
+      listOf(
+        RuleDraft(fulfillment = "delivery", weekdays = setOf(5), range = "18:00-20:00", fee = "۲۰"),
+        RuleDraft(fulfillment = "pickup", weekdays = setOf(5), range = "18:00-20:00", fee = "50"),
+        RuleDraft(fulfillment = "delivery", weekdays = setOf(4), range = "10:00-12:00", fee = ""),
+      ),
+      "3",
+    )
+    assertTrue(c.errors.toString(), c.errors.isEmpty())
+    assertEquals(listOf(2000L, 0L, 0L), c.rules.map { it.feeMinor })
+    val bad = D.check(emptyList(), listOf(RuleDraft(fulfillment = "delivery", fee = "x")), "3")
+    assertTrue(bad.errors.toString(), bad.errors.containsKey("r0.fee"))
+  }
+
+  @Test fun server_body_always_carries_fee_keys_so_null_means_clear() {
+    val c = D.check(
+      listOf(ZoneDraft(name = "الف", kind = "radius", fee = "30", min = "600", center = "34.5,69.1")),
+      listOf(RuleDraft(fulfillment = "delivery", weekdays = setOf(1), range = "10:00-12:00", fee = "15")),
+      "3",
+    )
+    val body = ir.vil3ntec.tohid.data.repo.StorefrontDeliveryRepository.body(c, allowAsap = true).toString()
+    assertTrue(body, body.contains("\"smallBasketFeeMinor\":null"))
+    assertTrue(body, body.contains("\"feeMinor\":1500"))
+    //  و بازگشت از پاسخِ سرور همان کادرها را پر می‌کند
+    val z = ir.vil3ntec.tohid.data.repo.StorefrontZoneDto(name = "الف", minOrderMinor = 60000, smallBasketFeeMinor = 2550).draft()
+    assertEquals("25.5", z.small)
+    assertEquals("20", ir.vil3ntec.tohid.data.repo.StorefrontSlotRuleDto(feeMinor = 2000).draft().fee)
+    assertEquals("", ir.vil3ntec.tohid.data.repo.StorefrontZoneDto().draft().small)
+  }
+
   @Test fun zone_summary_is_persian() {
     val z = D.check(listOf(ZoneDraft(name = "مرکز", kind = "radius", fee = "30", min = "200", free = "1000", center = "34.5,69.1")), emptyList(), "3").zones[0]
     assertEquals("مرکز · ارسال ۳۰ افغانی · حداقل ۲۰۰ · رایگان از ۱۰۰۰", D.zoneSummary(z))
+    val small = D.check(listOf(ZoneDraft(name = "مرکز", kind = "radius", fee = "30", min = "200", small = "15", center = "34.5,69.1")), emptyList(), "3").zones[0]
+    assertEquals("مرکز · ارسال ۳۰ افغانی · حداقل ۲۰۰ · سبدِ کوچک ۱۵", D.zoneSummary(small))
   }
 }

@@ -25,8 +25,10 @@ concurrency:
   group: desktop-shots-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+#  ⛔ §۱۴ (docs/security/supply-fa.md): اجرای برنامه (کدِ PR و وابستگی‌های Gradle) فقط توکنِ خواندنی
+#  دارد؛ pushِ شاخهٔ عکس‌ها در کارِ جدای «انتشار» که فقط artifactِ عکس‌ها را می‌گیرد.
 permissions:
-  contents: write
+  contents: read
   #  فهرستِ فایل‌های PR برای گزینشِ گروه‌های نسخهٔ ۳ (`plan`)
   pull-requests: read
 
@@ -43,7 +45,7 @@ jobs:
     outputs:
       shards: ${{ steps.plan.outputs.shards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: plan
         env:
           GH_TOKEN: ${{ github.token }}
@@ -81,12 +83,12 @@ jobs:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       - name: قلم و نمایشگرِ مجازی
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb fonts-noto-core >/dev/null
@@ -143,6 +145,11 @@ jobs:
           S="$S;go:vip;wait:1500;shot:15c-subscription-offline-code"
           #  تخفیف‌ها (PRM): پنج قاعدهٔ نمونه (`PromoLive.demo`)، سبدِ همان ۰۲b با ردیف‌های تخفیف و کادرِ کد، صفحهٔ مدیر و ویرایشگر
           S="$S;promo:demo;go:sale;wait:1500;shot:20-sale-promos;go:promos;wait:1500;shot:21-promos-table;new:;wait:1200;shot:22-promo-editor;key:ESCAPE;wait:800"
+          #  دفترِ موجودی (موتورِ تازهٔ موجودی و بها): خاموش ⇐ روشن با همان راهِ تنظیمات ⇐ زبانه‌ها، انتقال، انبار
+          S="$S;go:stockbook;wait:1500;shot:20-stockbook-off;stock:on;wait:3000;shot:20b-stockbook-positions"
+          S="$S;stocktab:ledger;wait:1500;shot:20c-stockbook-ledger;stocktab:review;wait:1200;shot:20d-stockbook-review"
+          S="$S;stockcount:4;stocktab:count;wait:1800;shot:20e-stockbook-count;stock:transfer;wait:1200;shot:20f-stockbook-transfer;key:ESCAPE;wait:800"
+          S="$S;go:warehouse;wait:1800;shot:20g-warehouse-stock-on"
           S="$S;go:dashboard;key:F11;wait:2000;shot:16-fullscreen-dashboard"
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           #  F0-18: پنجرهٔ میان‌برها (F1) و قرض‌داران (DeskCustomers) در شب هم — رنگ‌ها از تم، نه ثابت
@@ -197,7 +204,7 @@ jobs:
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: shots-legacy
           path: ${{ runner.temp }}/shots
@@ -219,13 +226,12 @@ jobs:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
-
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
       - name: قلم و نمایشگرِ مجازی
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb fonts-noto-core >/dev/null
 
@@ -258,7 +264,7 @@ jobs:
           done
           if [ -n "$bad" ]; then echo "::error::عکسِ این گروه‌ها کامل نشد:$bad (کدِ خروج $rc)"; exit 1; fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: shots-v3-${{ strategy.job-index }}
@@ -268,8 +274,8 @@ jobs:
 
   #  همهٔ عکس‌ها یک‌جا ⇐ شاخهٔ desktop-screenshots. اگر تکه‌ای قرمز شد، باز هم هرچه هست منتشر می‌شود
   #  (و کارِ همان تکه قرمز می‌ماند)، تا عکس‌های گروه‌های سالم از دست نروند.
-  publish:
-    name: انتشارِ عکس‌ها
+  collect:
+    name: گردآوریِ عکس‌ها
     needs: [shots, v3]
     if: ${{ always() && needs.shots.result == 'success' }}
     runs-on: ubuntu-latest
@@ -278,7 +284,7 @@ jobs:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: shots-*
           merge-multiple: true
@@ -287,11 +293,26 @@ jobs:
       - name: نشان‌های پایانِ گروه بیرون
         run: find "$RUNNER_TEMP/shots" \( -name .done -o -name .partial \) -delete
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: desktop-screenshots
           path: ${{ runner.temp }}/shots
+          if-no-files-found: error
           retention-days: 14
+
+  #  فقط این کار توکنِ نوشتنی دارد؛ هیچ کدِ مخزن یا ساختی اجرا نمی‌کند — فقط PNGهای artifact را می‌فرستد.
+  publish:
+    name: انتشار در شاخهٔ desktop-screenshots
+    needs: collect
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: desktop-screenshots
+          path: ${{ runner.temp }}/shots
 
       #  شاخهٔ جدای desktop-screenshots:
       #   • ریشه = عکس‌ها و README ِ آخرین اجرا، مثلِ پیش (خطِ ۳ِ README شاخهٔ منبع را می‌گوید)؛

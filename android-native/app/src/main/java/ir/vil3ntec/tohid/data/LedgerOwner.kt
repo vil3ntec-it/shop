@@ -60,7 +60,8 @@ object LedgerOwner {
   /** دکانی که دفترِ روی میز مالِ اوست — خالی یعنی هنوز دکانی نداشته */
   fun currentShop(context: Context): String = prefs(context).getString(SHOP, "").orEmpty()
 
-  private fun remember(context: Context, userId: String, shopId: String) {
+  /** درونی تا هنگامِ عوض شدنِ سرور (`ServerSwitchAndroid.applyPending`) صاحبِ دفترِ بازشدهٔ آن سرور را بنویسد */
+  internal fun remember(context: Context, userId: String, shopId: String) {
     prefs(context).edit().putString(OWNER, userId).putString(SHOP, shopId).apply()
   }
 
@@ -70,8 +71,9 @@ object LedgerOwner {
    *  دکان در شناسه هست ولی حساب همیشه هم هست، پس دفترِ دو حساب حتی اگر
    *  به یک دکان وصل شوند هم قاطی نمی‌شود.
    */
-  private fun key(userId: String, shopId: String): String =
-    if (shopId.isBlank()) userId else "$userId@$shopId"
+  private fun key(scope: String, userId: String, shopId: String): String =
+    //  سرورِ پیش‌فرض (و پرچمِ خاموشِ `app.multi_server`) ⇒ همان نامِ امروز؛ سرورِ دیگر ⇒ نامِ جدای خودش
+    ir.vil3ntec.tohid.core.server.DataPartition.keyIn(scope, userId, shopId)
 
   /** نتیجهٔ ورود — برای اینکه صفحه بداند چه چیزی به کاربر بگوید */
   enum class Result {
@@ -126,6 +128,8 @@ object LedgerOwner {
 
   private fun afterAlign(context: Context, r: Result) {
     if (promoReset(r)) runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset(context) }
+    //  پرچمِ `shop.stock_v2` مالِ دکان است ⇒ با هر هم‌ترازی همان دکانِ تازه خوانده شود
+    runCatching { StockFlag.load(context) }
   }
 
   private suspend fun align(
@@ -160,8 +164,9 @@ object LedgerOwner {
     }
 
     // حسابِ دیگری است، یا دکانِ دیگری — دفترِ قبلی می‌رود کنار
-    val from = key(previousUser, previousShop)
-    val to = key(user, shop)
+    val scope = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scope(context)
+    val from = key(scope, previousUser, previousShop)
+    val to = key(scope, user, shop)
 
     store.stashTo(from)
     state.forgetAccountState()
