@@ -21,6 +21,7 @@
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
   var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
+  var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -190,6 +191,8 @@
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
+      $('ps-share').hidden = !share;
+      $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
       if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
@@ -484,7 +487,15 @@
     renderBar();
   }
 
+  /** صفحهٔ کالا (`/p/<id>` یا `/store/<slug>/p/<id>`، WEB-20) ⇒ همان مسیرِ `#/p/<id>` ِ همین پوسته. */
+  function fromProductPath() {
+    var m = /^(.*?)\/p\/([^/]+)\/?$/.exec(location.pathname);
+    if (!m || (location.hash && location.hash !== '#/')) return;
+    history.replaceState(null, '', (m[1] || '/') + location.search + '#/p/' + m[2]);
+  }
+
   function boot() {
+    fromProductPath();
     K.offline();
     $('to-market').appendChild(K.icon('back'));
     $('to-catalog').appendChild(K.icon('back'));
@@ -505,6 +516,12 @@
         var rs = el('script', { attrs: { src: '/store/recent.js' } });
         rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
         document.head.appendChild(rs);
+      }
+      if (r.seo && typeof r.seo.productBase === 'string') {
+        var ss = el('script', { attrs: { src: '/store/share.js' } });
+        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
+        ss.onload = function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; };
+        document.head.appendChild(ss);
       }
       renderHead();
       renderCats();

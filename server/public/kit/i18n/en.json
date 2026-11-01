@@ -164,6 +164,8 @@
   "ps.addbtn": "Add to cart",
   "recent.title": "Recently viewed",
   "recent.clear": "Clear",
+  "ps.share": "Share product link",
+  "ps.copied": "Link copied.",
   "bar.label": ", {n} items, total {sum} — open cart",
   "bar.label.1": ", 1 item, total {sum} — open cart",
   "qty.less": "One less {name}",

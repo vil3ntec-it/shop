@@ -481,13 +481,42 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
-  const storePage = async (slug, res) => {
+  //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با
+  //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
+  const storeSeo = require('./lib/store-seo');
+  const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
+  const storePage = async (slug, res, lang) => {
     let status = 200;
-    try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    let sf = null;
+    try { sf = await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
+    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
+  //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
+  const seoOnly = (slugOf, fn) => (req, res, next) => {
+    const slug = slugOf(req);
+    if (!slug) return next();
+    storefront.open(slug).then(async (sf) => {
+      if (!(await storeSeo.on(sf))) return next();
+      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
+    }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
+  };
+  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
+    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(p.body)));
+  const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
+  const robotsOf = (sf, req, res) => storeSeo.robots(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
+  const hostSlug = (req) => storefront.slugFromHost(req.hostname);
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
-  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
+  app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
+  app.get('/store/:slug/sitemap.xml', seoOnly((req) => req.params.slug, sitemapOf));
+  app.get('/p/:id', seoOnly(hostSlug, productPage));
+  app.get('/sitemap.xml', seoOnly(hostSlug, sitemapOf));
+  app.get('/robots.txt', seoOnly(hostSlug, robotsOf));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
   app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
     const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
@@ -506,7 +535,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, req.query.lang).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته
@@ -567,8 +596,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
     //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
-    require('./lib/payment-intents').reconcile()
-      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
