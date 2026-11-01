@@ -476,6 +476,8 @@ fun SettingsScreen(
     item { LabelToolsSettingsWired(context) } // برچسب و بارکدِ داخلی (PRD-23، PRD-05)، پیش‌فرض خاموش
     item { CountToolsSettingsWired(context) } // انبارگردانیِ تازه: اسکن، چند دستگاه، کور (INV-06/07/08)، پیش‌فرض خاموش
 
+    /* ============== موجودی و بهای تمام‌شده — تنظیمِ دکان، پیش‌فرض خاموش (`StockBook.kt`) ============== */
+    item { StockModeSection(store, d) }
     /* ============== قاعده‌های پیش از پایانِ فاکتور (POS-24، پیش‌فرض خاموش) ============== */
     item {
       var rules by remember { mutableStateOf(ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context)) }
