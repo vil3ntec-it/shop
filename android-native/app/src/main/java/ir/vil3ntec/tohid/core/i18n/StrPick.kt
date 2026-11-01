@@ -53,4 +53,25 @@ object StrPick {
     "د هر فرمایش تلل او بسته‌بندي د همغه فرمایش په پاڼه کې دي.",
   )
   val retry: String get() = t("دوباره بزنید؛ همان کار یک بار حساب می‌شود", "Try again; it is counted once", "بیا یې وکړئ؛ یو ځل حسابېږي")
+
+  // عکسِ بسته (PCK-08)
+  val photoTitle: String get() = t("عکسِ بسته", "Parcel photo", "د بستې انځور")
+  val photoConsent: String get() = t(
+    "عکس فقط از کیسه‌های بسته است؛ چهرهٔ کسی در عکس نیست",
+    "The photo shows only the packed bags; no one's face",
+    "انځور یوازې د بسته شویو کڅوړو دی؛ د هېچا مخ په کې نشته",
+  )
+  val photoTake: String get() = t("گرفتنِ عکس", "Take photo", "انځور اخیستل")
+  val photoNote: String get() = t("فقط کیسه‌های بسته؛ حداکثر ۳ عکس", "Packed bags only; up to 3 photos", "یوازې بسته شوې کڅوړې؛ تر ۳ انځورونو پورې")
+  fun photos(n: Int, max: Int): String = t("عکسِ بسته: $n از $max", "Parcel photos: $n of $max", "د بستې انځورونه: $n له $max څخه")
+  val photoSaved: String get() = t("عکسِ بسته ثبت شد", "Parcel photo saved", "د بستې انځور ثبت شو")
+  val photoBad: String get() = t("عکس خوانده نشد؛ دوباره بگیرید", "The photo could not be read; take it again", "انځور ونه لوستل شو؛ بیا یې واخلئ")
+
+  // چاپِ برچسبِ کیسه‌ها (PCK-09)
+  val printLabels: String get() = t("چاپِ برچسبِ کیسه‌ها", "Print bag labels", "د کڅوړو لیبلونه چاپ کړئ")
+  val noPrinter: String get() = t("چاپگرِ رسید تنظیم نشده است", "No receipt printer is set up", "د رسید چاپګر نه دی ټاکل شوی")
+  val printed: String get() = t("برچسب‌ها چاپ شد", "Labels printed", "لیبلونه چاپ شول")
+  fun printFailed(why: String): String = t("چاپ نشد: $why", "Not printed: $why", "چاپ نه شو: $why")
+  fun labelCaption(orderNo: Long, bag: Int, of: Int): String = t("#$orderNo · کیسهٔ $bag از $of", "#$orderNo · bag $bag of $of", "#$orderNo · کڅوړه $bag له $of څخه")
+  fun labelsJob(orderNo: Long): String = t("برچسبِ کیسه‌های #$orderNo", "Bag labels #$orderNo", "د #$orderNo کڅوړو لیبلونه")
 }

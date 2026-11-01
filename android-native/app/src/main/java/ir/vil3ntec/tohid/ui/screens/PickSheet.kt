@@ -38,6 +38,7 @@ import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.core.pick.PickText
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.PickingRepository
+import ir.vil3ntec.tohid.ui.components.pos.ScaleWeighButton
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -243,6 +244,8 @@ internal fun PickSheet(
           }
         }
       }
+      //  PCK-08/09: عکسِ بسته و چاپِ برچسب‌ها — فقط برای برگهٔ بسته‌شده (`PickSheetTools.kt`)
+      if (s.status == "packed") PickPackedTools(s, repo)
     }
   }
 }
@@ -298,6 +301,8 @@ private fun PickLineCard(
         supporting = hint ?: "اول کالا را اسکن کنید، سپس وزنِ ترازو",
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
       )
+      //  PCK-04: «وزن از ترازو» — همان دکمهٔ صندوق، فقط با تنظیمِ روشنِ همین دستگاه و درگاهِ سریال
+      ScaleWeighButton(l.unit) { q -> onWeight(PickText.scaleText(q)) }
     }
     Spacer(Modifier.height(4.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

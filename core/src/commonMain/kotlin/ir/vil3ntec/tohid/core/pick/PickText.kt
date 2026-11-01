@@ -47,6 +47,18 @@ object PickText {
   fun weightMilli(text: String): Long? = OrderDraft.scaled(text.trim(), 3)?.takeIf { it > 0 }
 
   /**
+   *  وزنِ ترازو (PCK-04) ⇒ متنِ کادرِ «وزنِ واقعی»: مقدار به واحدِ کالا با حداکثر سه رقمِ اعشار و بی صفرِ ته
+   *  (۱٫۲۵۰ کیلو ⇒ «1.25»، ۷۵۰ گرم ⇒ «750»)؛ همان را [weightMilli] می‌خواند. نامعتبر ⇒ «».
+   */
+  fun scaleText(quantity: Double): String {
+    if (!quantity.isFinite() || quantity <= 0.0) return ""
+    val milli = kotlin.math.round(quantity * 1000).toLong()
+    val whole = milli / 1000
+    val frac = (milli % 1000).toString().padStart(3, '0').trimEnd('0')
+    return if (frac.isEmpty()) "$whole" else "$whole.$frac"
+  }
+
+  /**
    *  پیش‌سنجشِ وزن پیش از فرستادن: بیش از حد ⇒ پیامِ «کمتر بردارید» با سقف (سرور هم همین را رد می‌کند)؛
    *  کمتر از حد ⇒ هشدار که قلم «کم» ثبت می‌شود؛ در حد ⇒ null.
    */
