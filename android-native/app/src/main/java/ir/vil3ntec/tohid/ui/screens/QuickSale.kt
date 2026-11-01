@@ -71,6 +71,24 @@ fun QuickSaleScreen(
   snackbar: SnackbarHostState,
   onBack: () -> Unit,
 ) {
+  /*
+   *  گوشی (نسخهٔ ۳): صندوقِ گوشی خودش همین کاتالوگ است (r3 + سبدِ r2) — همان صفحه با
+   *  پیکانِ برگشتِ همین‌جا. دو کاتالوگِ جدا برای یک کار، همان «تکراری»ای بود که رد شد.
+   */
+  //  پرچمِ نسخهٔ ۳ خاموش (`UiV3`) ⇒ گوشی همان صندوقِ سریعِ امروز را دارد
+  if (ir.vil3ntec.tohid.ui.UiV3.on && screenSize() == Screen.PHONE) {
+    SaleScreen(
+      store = store,
+      cartStore = cartStore,
+      d = d,
+      snackbar = snackbar,
+      onQuickSale = {},
+      onBack = onBack,
+      onRegisterBarcode = null,
+    )
+    return
+  }
+
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
 
@@ -95,6 +113,9 @@ fun QuickSaleScreen(
   var newCategory by rememberSaveable { mutableStateOf<String?>(null) }
   var confirmDeleteCategory by remember { mutableStateOf<String?>(null) }
   var cartOpen by rememberSaveable { mutableStateOf(false) }
+  //  گوشی بالاتر به `SaleScreen` رفت؛ این‌جا فقط تبلت است
+  val phone = false
+  LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
   var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
   var pickDebtor by rememberSaveable { mutableStateOf(false) }
   var checkout by rememberSaveable { mutableStateOf(false) }
@@ -135,7 +156,7 @@ fun QuickSaleScreen(
     LazyVerticalGrid(
       columns = GridCells.Adaptive(minSize = gridMinSize(phone = 112.dp, tablet = 140.dp)),
       modifier = Modifier.fillMaxSize(),
-      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else 180.dp),
+      contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, if (cart.isEmpty()) 24.dp else if (phone) 104.dp else 180.dp),
       horizontalArrangement = Arrangement.spacedBy(8.dp),
       verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -285,7 +306,7 @@ fun QuickSaleScreen(
     }
 
     /* --------------------------- سبد پایین --------------------------- */
-    AnimatedVisibility(
+    if (!phone) AnimatedVisibility(
       visible = cart.isNotEmpty(),
       enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
       exit = slideOutVertically(tween(180)) { it } + fadeOut(tween(180)),
@@ -348,6 +369,7 @@ fun QuickSaleScreen(
         }
       }
     }
+
   }
 
   /* ---------------------------- پنجره‌ها ---------------------------- */

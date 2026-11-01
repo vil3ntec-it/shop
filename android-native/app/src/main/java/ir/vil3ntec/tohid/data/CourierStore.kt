@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.courier.CourierQueue
+import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
 import ir.vil3ntec.tohid.core.courier.QueueState
@@ -39,6 +40,10 @@ class CourierStore(context: Context) {
   var courierName: String
     get() = prefs.getString(K_NAME, "").orEmpty()
     set(v) { prefs.edit().putString(K_NAME, v).apply() }
+
+  /** «نقدِ من»، آمار و نام/شمارهٔ دکان — آخرین پاسخِ سرور؛ null = هنوز نیامده */
+  fun summary(): CourierSummary? = CourierCodec.summary(prefs.getString(K_SUMMARY, null))
+  fun saveSummary(x: CourierSummary) { prefs.edit().putString(K_SUMMARY, CourierCodec.summaryJson(x)).apply() }
 
   /** دکان «تماس با مشتری» را روشن کرده؟ (از `/courier/me`؛ آفلاین همان آخرین پاسخ) */
   var callEnabled: Boolean
@@ -115,6 +120,7 @@ class CourierStore(context: Context) {
     private const val K_RATED = "rated"
     private const val K_LAST = "last_sync"
     private const val K_PHOTOS = "photos"
+    private const val K_SUMMARY = "summary"
   }
 }
 
@@ -131,6 +137,8 @@ object CourierSync {
     val sent: Int = 0,
     val failure: ApiFailure? = null,
     val photoErrors: List<String> = emptyList(),
+    /** «نقدِ من»/آمار تازه نشد (کارت‌ها شاید شدند) — صفحه باید بگوید، نه عددِ کهنه را «همین حالا» نشان دهد */
+    val summaryFailure: ApiFailure? = null,
   ) {
     val ok: Boolean get() = failure == null
   }
@@ -148,6 +156,7 @@ object CourierSync {
     val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid }.getOrDefault("")
     var sent = 0
     var failure: ApiFailure? = null
+    var summaryFailure: ApiFailure? = null
 
     //  ۱) صفِ رویدادها، بسته به بسته
     while (failure == null) {
@@ -188,9 +197,16 @@ object CourierSync {
       val cards = a.valueOrNull()
       if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)
       if (failure == null) repo.missions("done").onSuccess { store.saveCards("done", it) }
+      //  «نقدِ من» و آمار — مرزِ روز و هفته با سرور (وقتِ دکان). شکست پنهان نمی‌ماند:
+      //  آخرین پاسخ با زمانِ خودِ سرور می‌ماند و خطا به صفحه می‌رسد
+      if (failure == null) {
+        val r = repo.summary()
+        val x = r.valueOrNull()
+        if (x != null) store.saveSummary(x) else summaryFailure = errorOf(r)
+      }
       if (failure == null) store.lastSyncAt = System.currentTimeMillis()
     }
-    Outcome(sent, failure, photoErrors)
+    Outcome(sent, failure, photoErrors, summaryFailure)
   }
 
   private fun errorOf(r: ApiResult<*>): ApiFailure =

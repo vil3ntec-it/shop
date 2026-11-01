@@ -304,7 +304,7 @@ fun ReturnFlowDialog(
             )
             if (gate.decision != "allow") {
               Spacer(Modifier.height(8.dp))
-              val tone = if (gate.decision == "deny") PillTone.DANGER else if (approved) PillTone.SUCCESS else PillTone.WARNING
+              val tone = if (gate.decision == "deny") PillTone.DANGER else if (approved) PillTone.SUCCESS else PillTone.AWAITING
               StatusPill(
                 when {
                   gate.decision == "deny" -> "این برگشت برای شما مجاز نیست"

@@ -69,6 +69,8 @@ fun CameraScanner(
   isKnown: (String) -> Boolean = { false },
   /** همان APIِ اندروید (QRِ رسید)؛ بارکدخوانِ سخت‌افزاری QR را هم مثلِ متن تایپ می‌کند */
   @Suppress("UNUSED_PARAMETER") qr: Boolean = false,
+  /** همان APIِ اندروید (`scan?kind=qr`)؛ کامپیوتر دوربین ندارد و مسیرش «در دسترس نیست» نشان می‌دهد */
+  @Suppress("UNUSED_PARAMETER") qrOnly: Boolean = false,
 ) {
   val latest by rememberUpdatedState(onCode)
   val status by rememberUpdatedState(onStatus)

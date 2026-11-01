@@ -73,7 +73,7 @@ fun Modifier.segmentTrack(colors: ShopColors): Modifier =
 fun avatarPalette(c: ShopColors): List<Pair<Color, Color>> = listOf(
   c.surfaceSelected to c.brandText,
   c.status.inDelivery.bg to c.status.inDelivery.fg,
-  c.status.awaitingApproval.bg to c.status.awaitingApproval.fg,
+  c.status.warning.bg to c.status.warning.fg,
   c.status.needsReview.bg to c.status.needsReview.fg,
   c.status.preparing.bg to c.status.preparing.fg,
   c.status.inactive.bg to c.status.inactive.fg,

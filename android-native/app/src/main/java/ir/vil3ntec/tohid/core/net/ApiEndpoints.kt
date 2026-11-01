@@ -215,6 +215,8 @@ object ApiEndpoints {
     const val ME = "/courier/me"
     const val MISSIONS = "/courier/missions"
     const val EVENTS = "/courier/events"
+    //  مرزِ روز و هفته را سرور به وقتِ دکان می‌سازد؛ ساعتِ گوشی فرستاده نمی‌شود
+    const val SUMMARY = "/courier/summary"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
     /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */
@@ -328,6 +330,44 @@ object ApiEndpoints {
     const val CONVERSATIONS = "/shop/chat/conversations"
 
     fun conversation(id: String): String = "$CONVERSATIONS/${enc(id)}"
+  }
+
+  /* ------------------------------ خریدار (بی‌توکن) ------------------------------ */
+
+  /**
+   *  بازارچهٔ عمومی (`server/src/routes/market.js`). ⛔ پیش‌فرض خاموش: بی پرچمِ
+   *  `market.directory` همه ۴۰۴ `market_not_found` است. «سفارش‌های من» فقط با
+   *  بلیتِ شمارهٔ تأییدشده (سرآیندِ `X-Store-Ticket`).
+   */
+  object Market {
+    const val HOME = "/market"
+    const val SHOPS = "/market/shops"
+    const val SEARCH = "/market/search"
+
+    /** خانهٔ «اول کالا» — فقط سرورِ تازه‌تر؛ قدیمی ⇒ ۴۰۴ `not_found` */
+    const val PRODUCTS = "/market/products"
+    const val VERIFY_START = "/market/verify/start"
+    const val VERIFY_CHECK = "/market/verify/check"
+    const val ORDERS = "/market/orders"
+  }
+
+  /** ویترینِ هر دکان (`server/src/routes/storefront.js`) — همه با `slug`. */
+  object Store {
+    fun home(slug: String): String = "/store/${enc(slug)}"
+    fun highlights(slug: String): String = home(slug) + "/highlights"
+    fun delivery(slug: String): String = home(slug) + "/delivery"
+    fun slots(slug: String): String = home(slug) + "/slots"
+    fun products(slug: String): String = home(slug) + "/products"
+    fun product(slug: String, id: String): String = products(slug) + "/" + enc(id)
+    fun photo(slug: String, id: String): String = product(slug, id) + "/photo"
+    fun thumb(slug: String, id: String): String = product(slug, id) + "/thumb"
+    fun verifyStart(slug: String): String = home(slug) + "/verify/start"
+    fun verifyCheck(slug: String): String = home(slug) + "/verify/check"
+    fun checkout(slug: String): String = home(slug) + "/checkout"
+    fun orders(slug: String): String = home(slug) + "/orders"
+    fun order(slug: String, token: String): String = orders(slug) + "/" + enc(token)
+    fun cancel(slug: String, token: String): String = order(slug, token) + "/cancel"
+    fun reorder(slug: String, token: String): String = order(slug, token) + "/reorder"
   }
 
   /* ------------------------------ تپشِ بازدید ------------------------------ */

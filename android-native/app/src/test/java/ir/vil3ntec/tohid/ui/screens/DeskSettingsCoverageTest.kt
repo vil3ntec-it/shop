@@ -29,16 +29,32 @@ class DeskSettingsCoverageTest {
   /** `ir.vil3ntec.tohid.ui.screens.X` و `X` یکی‌اند: پیشوندِ بسته (بخش‌های کوچک‌حرف) کنار می‌رود */
   private fun norm(expr: String): String = expr.trim().replace(Regex("""^(?:[a-z][a-z0-9_]*\.)+"""), "")
 
+  /**
+   *  نسخهٔ ۳ (`ui/v3`) تنظیماتِ کامپیوترِ خودش را دارد (`SettingsLayout`، `SettingsPortTest`)؛ با پرچمِ خاموش
+   *  رابطِ امروز از `ui/legacy` کشیده می‌شود: `AppRootLegacy` ⇐ `DeskSettingsLegacy(…)` و `SettingsScreenLegacy`.
+   *  پس این‌جا همان رابطِ امروز سنجیده می‌شود: بی `ui/v3` و بی بدنهٔ نسخهٔ ۳ (`ui/screens/Settings.kt`).
+   */
+  private val legacy: Boolean get() = File(root, "ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt").isFile
+
+  private fun counted(f: File): Boolean {
+    if (!legacy) return true
+    val rel = f.relativeTo(File(root, "ir/vil3ntec/tohid")).invariantSeparatorsPath
+    return !rel.startsWith("ui/v3/") && rel != "ui/screens/Settings.kt"
+  }
+
   /** عنوانِ هر بخشِ تنظیمات ⇒ پرونده‌اش */
   private fun sections(): Map<String, String> {
     val out = LinkedHashMap<String, String>()
-    val call = Regex("""(?<![\w])SettingsSection\(""")
+    val call = Regex("""(?<![\w])SettingsSection(?:Legacy)?\(""")
     val title = Regex("""\btitle\s*=\s*([^,\n]+),""")
-    root.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { f ->
+    //  فرستادنِ بی‌نام (`SettingsSectionLegacy(icon, title, …)` درونِ خودِ `SettingsSection`) بخشِ تازه‌ای نیست
+    val named = Regex("""^\s*\w+\s*=""")
+    root.walkTopDown().filter { it.isFile && it.extension == "kt" && counted(it) }.forEach { f ->
       val text = f.readText()
       for (m in call.findAll(text)) {
         if (text.substring(maxOf(0, m.range.first - 4), m.range.first) == "fun ") continue
-        val window = text.substring(m.range.last, minOf(text.length, m.range.last + 600))
+        val window = text.substring(m.range.last + 1, minOf(text.length, m.range.last + 600))
+        if (!named.containsMatchIn(window)) continue
         val t = title.find(window) ?: error("${f.name}: SettingsSection بی `title =`")
         out[norm(t.groupValues[1])] = f.name
       }
@@ -47,9 +63,9 @@ class DeskSettingsCoverageTest {
   }
 
   private fun deskList(): List<String> {
-    val app = File(root, "ir/vil3ntec/tohid/ui/AppRoot.kt").readText()
-    val from = app.indexOf("DeskSettings(")
-    val to = app.indexOf("{ SettingsScreen(", from)
+    val app = File(root, if (legacy) "ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt" else "ir/vil3ntec/tohid/ui/AppRoot.kt").readText()
+    val from = app.indexOf(if (legacy) "DeskSettingsLegacy(" else "DeskSettings(")
+    val to = app.indexOf(if (legacy) "{ SettingsScreenLegacy(" else "{ SettingsScreen(", from)
     assertTrue("فهرستِ DeskSettings در AppRoot پیدا نشد", from >= 0 && to > from)
     return Regex("""([\w.]+)\s+to\s+[\w.]*Icons\.Filled\.\w+""").findAll(app.substring(from, to)).map { norm(it.groupValues[1]) }.toList()
   }

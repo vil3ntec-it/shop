@@ -533,7 +533,7 @@ fun TohidTopBar(
  *  اکتیویتی روی همان دستگاه‌ها `null` می‌داد و رنگِ نوارِ وضعیت بی‌صدا
  *  عوض نمی‌شد.
  */
-private fun hostWindow(context: android.content.Context): android.view.Window? {
+internal fun hostWindow(context: android.content.Context): android.view.Window? {
   var cursor: android.content.Context? = context
   while (cursor != null) {
     if (cursor is android.app.Activity) return cursor.window

@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
 import java.io.File
 
 /**
@@ -42,44 +43,43 @@ class DeskMenuTest {
     }
   }
 
+  /** مسیرها حالا در فهرستِ ماژول‌ها (`V3Modules`) ثبت‌اند، نه در `when` ِ AppRoot */
+  private fun routed(id: String) = V3Modules.table.resolve(id) != null
+
   @Test
   fun `هر بخشِ زنده به مسیری در AppRoot می‌رود — پیوندِ مرده نیست`() {
-    val root = File(ui!!, "AppRoot.kt").readText()
     val live = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.filter { it.state == DeskMenu.State.LIVE }
-    val missing = live.filterNot { Regex("""\n\s*"${it.id}"\s*->""").containsMatchIn(root) }.map { it.id }
+    val missing = live.filterNot { routed(it.id) }.map { it.id }
     assertEquals("مسیرِ AppRoot ندارند", emptyList<String>(), missing)
   }
 
   @Test
   fun `ویترین فقط با روشن بودنِ بخش زنده است و به مسیرِ AppRoot می‌رود`() {
-    val root = File(ui!!, "AppRoot.kt").readText()
     val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
     assertTrue("soon:storefront" in off && "storefront" !in off)
     val on = DeskMenu.groups(true, shortcuts(), storefrontLive = true).flatMap { it.items }
     assertEquals(DeskMenu.State.LIVE, on.single { it.id == "storefront" }.state)
-    assertTrue(Regex("""\n\s*"storefront"\s*->""").containsMatchIn(root))
+    assertTrue(routed("storefront"))
   }
 
   @Test
   fun `میزِ تحویل فقط با روشن بودنِ shop_delivery زنده است و به مسیرِ AppRoot می‌رود`() {
-    val root = File(ui!!, "AppRoot.kt").readText()
     val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
     assertTrue("soon:delivery" in off && "delivery" !in off)
     val on = DeskMenu.groups(true, shortcuts(), deliveryLive = true).flatMap { it.items }
     assertEquals(DeskMenu.State.LIVE, on.single { it.id == "delivery" }.state)
     assertTrue("soon:delivery" !in on.map { it.id })
-    assertTrue(Regex("""\n\s*"delivery"\s*->""").containsMatchIn(root))
+    assertTrue(routed("delivery"))
   }
 
   @Test
   fun `سفارش‌ها فقط با روشن بودنِ بخش زنده است و به مسیرِ AppRoot می‌رود`() {
-    val root = File(ui!!, "AppRoot.kt").readText()
     val off = DeskMenu.groups(true, shortcuts()).flatMap { it.items }.map { it.id }
     assertTrue("soon:orders" in off && "orders" !in off)
     val on = DeskMenu.groups(true, shortcuts(), ordersLive = true).flatMap { it.items }
     val orders = on.single { it.id == "orders" }
     assertEquals(DeskMenu.State.LIVE, orders.state)
-    assertTrue(Regex("""\n\s*"orders"\s*->""").containsMatchIn(root))
+    assertTrue(routed("orders"))
   }
 
   @Test

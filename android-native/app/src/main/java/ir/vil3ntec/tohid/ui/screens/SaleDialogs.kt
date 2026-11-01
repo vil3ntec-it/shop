@@ -184,7 +184,7 @@ fun CheckoutDialog(
           DiscountGate.State.NEEDS_APPROVAL -> {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              StatusPill("نیازمند تأیید", PillTone.WARNING)
+              StatusPill("نیازمند تأیید", PillTone.AWAITING)
               Text(
                 if (decision.cap == "maxPct") "بیش از سقفِ ${qty(decision.limit ?: 0.0)}٪ِ شما"
                 else "بیش از اختیارِ شما",

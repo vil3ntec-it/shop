@@ -17,6 +17,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import ir.vil3ntec.tohid.core.nav.DeepLinks
+import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.money
 import java.util.concurrent.TimeUnit
 
@@ -137,7 +139,17 @@ object Watchman {
     }
   }
 
-  private fun notify(context: Context, channel: Channel, title: String, text: String) {
+  /*
+   *  هر اعلان مستقیم سرِ کادرِ خودش (`vill3n://app/<مسیر>`، `DeepLinks`؛ NAV-MAP «Direct-landing
+   *  fixes» ۶) — نه فقط بازکردنِ برنامه. آزمون: `ShellTargetsTest` (هر مسیر ثبت است).
+   */
+  const val LINK_STOCK_OUT = "products?filter=out"
+  const val LINK_DEBTS = "debtors?sort=most"
+  const val LINK_SUBSCRIPTION = "subscription"
+  const val LINK_NEWS = "notifications?tab=news"
+  fun linkDebtor(id: String): String = "debtors/" + RoutePaths.encode(id)
+
+  private fun notify(context: Context, channel: Channel, title: String, text: String, path: String) {
     if (!allowed(context)) return
     ensureChannels(context)
 
@@ -145,7 +157,11 @@ object Watchman {
     val pending = open?.let {
       PendingIntent.getActivity(
         context, channel.noteId,
-        it.apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP },
+        it.apply {
+          flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+          action = Intent.ACTION_VIEW
+          data = android.net.Uri.parse(DeepLinks.appLink(path))
+        },
         PendingIntent.FLAG_IMMUTABLE,
       )
     }
@@ -178,7 +194,7 @@ object Watchman {
     val fresh = out.filter { it.id !in known }
     if (fresh.isNotEmpty()) {
       val title = if (fresh.size == 1) "${fresh[0].name} تمام شد" else "${fresh.size} کالا تمام شد"
-      notify(context, STOCK, title, fresh.take(4).joinToString("، ") { it.name })
+      notify(context, STOCK, title, fresh.take(4).joinToString("، ") { it.name }, LINK_STOCK_OUT)
     }
     if (ids != known) prefs(context).edit().putStringSet(SEEN_OUT, ids).apply()
   }
@@ -205,7 +221,7 @@ object Watchman {
       val text = fresh.take(4).joinToString("، ") {
         "${it.name}: ${money(it.amount)} افغانی"
       }
-      notify(context, DEBT, title, text)
+      notify(context, DEBT, title, text, fresh.singleOrNull()?.let { linkDebtor(it.id) } ?: LINK_DEBTS)
     }
     if (ids != known) prefs(context).edit().putStringSet(SEEN_DEBT, ids).apply()
   }
@@ -240,7 +256,7 @@ object Watchman {
       1 -> "اشتراک فردا تمام می‌شود" to "پیش از تمام شدن تمدید کنید تا کارتان نخوابد."
       else -> "اشتراک تا ${step} روز دیگر تمام می‌شود" to "همین حالا تمدید کنید تا بعداً عجله نشود."
     }
-    notify(context, SUB, title, text)
+    notify(context, SUB, title, text, LINK_SUBSCRIPTION)
     prefs(context).edit().putInt(SEEN_SUB, step).apply()
   }
 
@@ -248,7 +264,7 @@ object Watchman {
   fun notifyNews(context: Context, title: String, body: String, at: Long) {
     val last = prefs(context).getLong(SEEN_NEWS, 0)
     if (at <= last) return
-    notify(context, NEWS, title, body)
+    notify(context, NEWS, title, body, LINK_NEWS)
     prefs(context).edit().putLong(SEEN_NEWS, at).apply()
   }
 

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.courier.CourierEvent
+import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.net.ApiClient
@@ -60,6 +61,14 @@ class CourierRepository(private val api: ApiClient) {
       },
     )
     true
+  }
+
+  /**
+   *  «نقدِ من» و آمار (`GET /api/courier/summary`) — فقط دادهٔ همین پیک. «امروز»
+   *  و «این هفته» را سرور به وقتِ دکان می‌سازد، نه ساعتِ گوشی.
+   */
+  suspend fun summary(): ApiResult<CourierSummary> = result {
+    CourierWire.summary(api.get(ApiEndpoints.Courier.SUMMARY))
   }
 
   /** `scope`: «active» (زنده) یا «done» (پایان‌یافته؛ سرور نشانی را نمی‌دهد) */

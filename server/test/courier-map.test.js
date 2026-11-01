@@ -185,7 +185,7 @@ test('⛔ پیش‌فرض خاموش: درِ نقشه ۴۰۴ و کارتِ مأ�
   assert.deepEqual(Object.keys(m).sort(), [
     'address', 'cashCollectedMinor', 'customer', 'delivery', 'expectedCollectMinor', 'fareMinor', 'id', 'itemsCount',
     'live', 'orderId', 'orderNo', 'orderStatus', 'paymentMethod', 'photoAllowed', 'recall', 'requiresCode', 'status',
-    'updatedAt', 'version',
+    'timeline', 'updatedAt', 'version',   //  `timeline`: خطِ زمانیِ پیک (DLV، بی پرچم؛ ‎lib/courier-summary.js‎)
   ]);
 });
 
