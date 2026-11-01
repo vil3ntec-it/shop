@@ -567,6 +567,27 @@ for (const lang of ['fa', 'en']) {
   await wc.close();
 }
 
+//  shop.orders.subscribers_only: دکانِ آزمایشی (بی اشتراکِ فعال) ⇒ ویترین باز، ثبت بسته با همان پیام
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.subscribers_only', value: true }, A);
+{
+  const OFF = 'این فروشگاه فعلاً سفارشِ آنلاین نمی‌پذیرد';
+  const gc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const gp = await gc.newPage();
+  gp.on('pageerror', (e) => errors.push(String(e)));
+  await gp.goto(`${base}/store/${slug}`);
+  await gp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await gp.textContent('#store-status')).includes(OFF), 'بی اشتراکِ فعال: «سفارش نمی‌پذیرد» در وضعیتِ دکان');
+  await gp.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
+  await gp.click('#open-cart');
+  await gp.waitForSelector('#sheet-msg:not([hidden])', { timeout: 5000 });
+  ok(await gp.isDisabled('#cart-next') && (await gp.textContent('#sheet-msg')).includes(OFF), 'سبد: «ادامه» بسته با همان پیام');
+  await gp.goto(`${base}/store/${slug}#/checkout`);
+  await gp.waitForSelector('#view-checkout:not([hidden])', { timeout: 5000 });
+  ok(await gp.isDisabled('#submit-order') && (await gp.textContent('#accept-line')).includes(OFF), 'ثبت: دکمه بسته و همان پیام زیرش');
+  await gc.close();
+}
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.subscribers_only', value: null }, A);
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');

@@ -86,6 +86,8 @@ test('WEB-23: GET /api/store/:slug نام، ایمیل، تلفن، شهر و م
   //  M3: لوگو/تصویرِ سرِ خودِ دکان (نه عکسِ شخص) — بی پرچمِ `shop.storefront.media` تهی
   const { delivery: _d, media, ...store } = r.body.store;
   assert.deepEqual(media, { logo: null, header: null });
+  //  پرچمِ خاموشِ `shop.orders.subscribers_only` ⇒ بی `ordering` (همان پاسخِ main)
+  assert.equal('ordering' in r.body.store, false);
   assert.deepEqual(Object.keys(store).sort(), PROFILE_KEYS);
   const json = JSON.stringify(r.body);
   for (const v of [ownerName, u.email, '0788123456', 'شهرِ-خصوصی-WEB23', '34.5553', '69.2075', u.user.id]) {

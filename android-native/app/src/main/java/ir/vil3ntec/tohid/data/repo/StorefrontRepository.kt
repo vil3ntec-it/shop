@@ -118,6 +118,10 @@ data class StorefrontConfigDto(
   val bulk: Boolean = false,
   /** M3: پرچمِ جدای لوگو و تصویرِ سر (`shop.storefront.media`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val media: Boolean = false,
+  /** پرچمِ `shop.orders.subscribers_only`: سفارشِ آنلاینِ تازه فقط با اشتراکِ فعال؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val subscribersOnly: Boolean = false,
+  /** اشتراکِ فعالِ همین لحظه به گفتهٔ سرور (دورهٔ آزمایشی نه) */
+  val subscribed: Boolean = false,
 )
 
 @Serializable
