@@ -65,7 +65,7 @@ class CourierWireTest {
     assertEquals("bad_code", r.code)
   }
 
-  @Test fun `DLV-07 و DLV-17: برچسبِ کیسه با «گرفتم» و موقعیت با «تحویل شد»، و کارت شمارِ کیسه و فاصلهٔ مجاز را می‌خواند`() {
+  @Test fun `DLV-07 و DLV-17 — برچسبِ کیسه با «گرفتم» و موقعیت با «تحویل شد»، و کارت شمارِ کیسه و فاصلهٔ مجاز را می‌خواند`() {
     val (_, p) = CourierQueue.enqueue(QueueState(), "cev-cccccccc-7", "A", "picked_up", 1, bags = listOf("VLNB-12-1-2", "VLNB-12-2-2"))
     val pj = CourierWire.eventJson(p)
     assertEquals("""["VLNB-12-1-2","VLNB-12-2-2"]""", pj["bags"].toString())
