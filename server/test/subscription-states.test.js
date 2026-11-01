@@ -178,3 +178,72 @@ test('معلق و شروع‌نشده: معلق بی دسترسی و کد باز
   assert.equal((await entitlementOf(s2.shopId, start + DAY)).subscription.phase, 'active');
   assert.equal(subs.stateOf(null).phase, 'none');
 });
+
+test('SUB-01: /api/me/subscription و /api/me/heartbeat مرحله را می‌گویند — «مهلت» با پایانِ مهلت، نه «فعال»', async () => {
+  const s = await shop('مهلتِ-API');
+  const row = await subs.grant(s.shopId, { plan: 'custom', days: 30, graceDays: 3 });
+  let r = await h.get('/api/me/subscription', { token: s.token });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['active', 'active', true]);
+  assert.equal(r.body.graceEndsAt, Number(row.ends_at) + 3 * DAY);
+
+  //  پایانِ دوره دیروز گذشته ⇒ مهلت (ستونِ status همان active می‌ماند و دسترسی باز است)
+  const endsAt = now() - DAY;
+  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [row.id, endsAt]);
+  r = await h.get('/api/me/subscription', { token: s.token });
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['active', 'grace', true]);
+  assert.equal(r.body.endsAt, endsAt);
+  assert.equal(r.body.graceEndsAt, endsAt + 3 * DAY);
+  assert.equal(r.body.daysLeft, 2, 'روزهای ماندهٔ مهلت');
+
+  const hb = await h.get('/api/me/heartbeat', { token: s.token });
+  assert.equal(hb.status, 200, JSON.stringify(hb.body));
+  assert.equal(hb.body.subscription.status, 'active', 'سازگاری: status همان');
+  assert.equal(hb.body.subscription.phase, 'grace');
+  assert.equal(hb.body.subscription.graceEndsAt, endsAt + 3 * DAY);
+
+  //  پس از مهلت ⇒ منقضی در هر دو
+  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [row.id, now() - 4 * DAY]);
+  r = await h.get('/api/me/subscription', { token: s.token });
+  assert.deepEqual([r.body.status, r.body.phase, r.body.active], ['expired', 'expired', false]);
+  assert.equal((await h.get('/api/me/heartbeat', { token: s.token })).body.subscription.phase, 'expired');
+});
+
+/**
+ * ⛔ SUB-01 فقط دکان: `phase` و `graceEndsAt` به نمای پمپ اضافه نمی‌شوند — پاسخِ `/api/pump/heartbeat`
+ * (کدِ مشترکِ پمپ) کلید‌به‌کلید و به همان ترتیبِ main است، حتی در مهلت؛ نمای پورتال برای عضویتِ پمپ هم.
+ */
+test('SUB-01: پاسخِ تپشِ پمپ همان شکلِ main است — بی phase و graceEndsAt، حتی در مهلت', async () => {
+  //  کلیدهای main (پیش از SUB-01)، به همان ترتیب
+  const MAIN_HEARTBEAT = ['app', 'tenantId', 'subscription', 'entitlement', 'unreadNotices', 'latest', 'serverTime'];
+  const MAIN_VIEW = ['source', 'status', 'active', 'plan', 'startsAt', 'endsAt', 'daysLeft', 'totalDays', 'progress',
+    'permanent', 'color', 'label', 'features', 'addons', 'trial'];
+
+  const u = await h.newUser('پمپِ-مهلت', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ مهلت' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const stationId = made.body.station.id;
+  const row = await subs.pump.grant(stationId, { plan: 'custom', days: 30, graceDays: 3 });
+  //  پایانِ دوره دیروز ⇒ مهلت (همان حالتی که دکان در آن phase='grace' می‌گیرد)
+  await query('UPDATE station_subscriptions SET ends_at=$2 WHERE id=$1', [row.id, now() - DAY]);
+
+  const hb = await h.get('/api/pump/heartbeat', { token: u.accessToken });
+  assert.equal(hb.status, 200, JSON.stringify(hb.body));
+  assert.deepEqual(Object.keys(hb.body), MAIN_HEARTBEAT);
+  assert.deepEqual(Object.keys(hb.body.subscription), MAIN_VIEW);
+  assert.equal(hb.body.subscription.status, 'active');
+  assert.equal(hb.body.subscription.daysLeft, 2, 'روزهای ماندهٔ مهلت همان حسابِ main');
+
+  //  نمای پورتال: عضویتِ پمپ همان شکل؛ تابع بی app یا با pump همان خروجی
+  const me = await h.get('/api/portal/me', { token: u.accessToken });
+  assert.equal(me.status, 200, JSON.stringify(me.body));
+  const pumpM = me.body.memberships.find((m) => m.app === 'pump' || m.tenantId === stationId);
+  assert.ok(pumpM, JSON.stringify(me.body.memberships));
+  assert.deepEqual(Object.keys(pumpM.subscription), MAIN_VIEW);
+
+  const { subscriptionView } = require('../src/routes/portal');
+  const ent = await require('../src/lib/entitlement').forApp('pump').entitlementOf(stationId);
+  const at = now();
+  assert.equal(JSON.stringify(subscriptionView(ent, at, 'pump')), JSON.stringify(subscriptionView(ent, at)));
+  assert.deepEqual(Object.keys(subscriptionView(ent, at, 'shop')).filter((k) => !MAIN_VIEW.includes(k)), ['phase', 'graceEndsAt']);
+});
