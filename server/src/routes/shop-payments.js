@@ -21,7 +21,6 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 router.use(requireUser, requireShop, requirePermission('data.write'));
 
@@ -33,18 +32,19 @@ const pollLimit = rateLimit({
   max: Number(process.env.RATE_PAY_POLL_MAX) || 240, windowMs: 60 * 1000, keyPrefix: 'pay-poll', key: perUser,
 });
 
-const needEnabled = wrap(async (req, res, next) => {
+//  Express 5 خودش promiseِ ردشدهٔ دستگیره و میان‌افزارِ async را به next(err) و errorHandler می‌دهد
+const needEnabled = async (req, res, next) => {
   if (!(await pay.enabledFor(req.shopId))) {
     return next(forbidden('پرداخت با حساب‌پی برای این دکان روشن نیست', 'hesabpay_disabled'));
   }
   next();
+};
+
+router.get('/config', async (req, res) => {
+  res.json(await pay.configOf(req.shopId));
 });
 
-router.get('/config', wrap(async (req, res) => {
-  res.json(await pay.configOf(req.shopId));
-}));
-
-router.post('/intents', createLimit, needEnabled, wrap(async (req, res) => {
+router.post('/intents', createLimit, needEnabled, async (req, res) => {
   let out;
   try {
     out = await pay.create(req.shopId, {
@@ -60,16 +60,16 @@ router.post('/intents', createLimit, needEnabled, wrap(async (req, res) => {
   }
   if (!out.created) res.set('Idempotent-Replayed', 'true');
   res.status(out.created ? 201 : 200).json(out.intent);
-}));
+});
 
-router.get('/intents/:id', pollLimit, wrap(async (req, res) => {
+router.get('/intents/:id', pollLimit, async (req, res) => {
   const ctl = new AbortController();
   res.on('close', () => ctl.abort());
   res.json(await pay.get(req.shopId, req.params.id, { wait: req.query.wait, signal: ctl.signal }));
-}));
+});
 
-router.post('/intents/:id/cancel', createLimit, wrap(async (req, res) => {
+router.post('/intents/:id/cancel', createLimit, async (req, res) => {
   res.json(await pay.cancel(req.shopId, req.params.id, { id: req.user.id, ip: clientIp(req) }));
-}));
+});
 
 module.exports = router;
