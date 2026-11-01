@@ -25,6 +25,7 @@
  * خطای push (۴۰۰، ۴۲۶، …) cursor ِ پیشین را برمی‌گرداند — «هیچ چیزی اعمال نشد».
  */
 const { query } = require('../db');
+const { SHOP } = require('./tenancy');
 
 const FLAG = 'sync.cursor_from_since';
 
@@ -32,7 +33,7 @@ const ACC = 'app=$1 AND account_kind=$2 AND account_id=$3';
 const accArgs = (ctx) => [ctx.app, ctx.accountKind, ctx.accountId];
 
 /** حسابِ دکان (حسابِ پمپ `station` است) */
-const isShop = (ctx) => Boolean(ctx && ctx.app === 'shop' && ctx.accountKind === 'shop' && ctx.accountId);
+const isShop = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
 
 /** پرچمِ همین دکان (یا `all`) — همان `orders.flagOf`؛ پمپ هرگز نمی‌پرسد */
 async function on(ctx) {
