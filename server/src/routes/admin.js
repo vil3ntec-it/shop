@@ -22,8 +22,9 @@ const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
 const { reasonOf } = require('../lib/admin-access');
+const { ROLES } = require('../lib/admin-roles');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, unauthorized, notFound, tooMany } = require('../middleware/errors');
+const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
 
 const router = express.Router();
 const adminLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'admin-auth' });
@@ -85,7 +86,10 @@ router.post('/logout', async (req, res) => {
 
 router.get('/me', (req, res) => {
   res.json({
-    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role },
+    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role, isOwner: req.admin.is_owner === true },
+    //  فاز ۳: درخواستِ پلِ پنل با کلیدِ سرویس ⇒ «انجام‌دهنده» و نقشِ مؤثرش (نه خودِ کلید)
+    ...(req.actor ? { actor: req.actor, service: { keyId: req.service.keyId, name: req.service.keyName, roleCap: req.service.roleCap } } : {}),
+    capabilities: require('../lib/admin-capabilities').CAPABILITIES,
     serverTime: now(),
   });
 });
@@ -223,26 +227,27 @@ router.get('/shops', async (req, res) => {
   const offset = v.integer(req.query?.offset, { min: 0, max: 1e6, def: 0 });
   const q = v.text(req.query?.q, { max: 60 });
   const like = `%${q.toLowerCase()}%`;
+  //  فاز ۳: حالت‌های مدیریتیِ باز (`lib/shop-holds.js`) کنارِ هر دکان، و پالایشِ سمتِ سرور با `?hold=`
+  const hold = req.query?.hold ? v.oneOf(req.query.hold, [...require('../lib/shop-holds').KINDS, 'none'], { field: 'حالت' }) : '';
+  const where = require('../lib/admin-capabilities').SHOP_WHERE;   //  یک WHERE برای ردیف‌ها و `total` (بندِ ۱۲.۶)
   const rows = await many(
     `SELECT s.id, s.name, s.status, s.created_at, s.owner_user_id,
             u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email,
             (SELECT COUNT(*)::int FROM shop_members m WHERE m.shop_id=s.id AND m.status='active') AS members,
-            sub.id AS subscription_id, sub.plan, sub.status AS sub_status, sub.starts_at, sub.ends_at
+            sub.id AS subscription_id, sub.plan, sub.status AS sub_status, sub.starts_at, sub.ends_at,
+            COALESCE((SELECT array_agg(DISTINCT h.kind) FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL),
+                     ARRAY[]::text[]) AS holds
        FROM shops s
        JOIN users u ON u.id = s.owner_user_id
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.shop_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
-      --  ⛔ ایمیل هم گشته می‌شود — همان قاعدهٔ admin-pump.js: صاحبِ
-      --  سامانه معمولاً فقط ایمیلِ طرف را دارد، نه نامِ دکانش.
-      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2
-             OR lower(coalesce(u.email,'')) LIKE $2
-             OR coalesce(u.phone,'') LIKE $2)
-      ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
-    [q, like, limit, offset]
+      ${where}
+      ORDER BY s.created_at DESC LIMIT $4 OFFSET $5`,
+    [q, like, hold, limit, offset]
   );
-  const total = await one('SELECT COUNT(*)::int n FROM shops');
+  const total = await one(`SELECT COUNT(*)::int n FROM shops s JOIN users u ON u.id = s.owner_user_id ${where}`, [q, like, hold]);
   // دکانی که هنوز اشتراک نخریده ولی در دوره‌ی آزمایشی است، «آزمایشی» نشان داده شود
   const trialDays = await plans.trialDaysOf('shop');
   const t = now();
@@ -687,14 +692,15 @@ router.post('/admins', requireSuperAdmin, async (req, res, next) => {
     `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
      VALUES ($1,$2,$3,$4,$5,'active',$6) RETURNING id, username, name, role`,
     [newId('adm'), username, v.text(req.body?.name, { max: 60 }), await pw.hashPassword(password),
-      v.oneOf(req.body?.role, ['admin', 'superadmin'], { field: 'نقش', def: 'admin' }), now()]
+      v.oneOf(req.body?.role, ROLES, { field: 'نقش', def: 'admin' }), now()]
   );
   await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_created', targetType: 'admin', targetId: row.id, detail: { username, role: row.role } });
   res.status(201).json({ admin: row });
 });
 
 router.get('/admins', requireSuperAdmin, async (req, res) => {
-  res.json({ admins: await many('SELECT id, username, name, role, status, created_at FROM admins ORDER BY created_at') });
+  await require('../lib/admin-owner').ownerId();
+  res.json({ admins: await many('SELECT id, username, name, role, status, is_owner, created_at FROM admins ORDER BY created_at') });
 });
 
 /**
@@ -707,8 +713,12 @@ router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
   if (id === req.admin.id) return next(badRequest('نقش یا وضعیتِ خودتان را نمی‌توانید عوض کنید', 'admin_self'));
   const target = await one('SELECT id, role, status FROM admins WHERE id=$1', [id]);
   if (!target) return next(notFound('مدیر پیدا نشد'));
+  //  ⛔ فاز ۳ (S12): مالکِ اصلی را هیچ مدیرِ دیگری غیرفعال یا تنزل نمی‌دهد — بازیابی فقط از پوسته (`lib/admin-owner.js`)
+  if (id === await require('../lib/admin-owner').ownerId()) {
+    return next(forbidden('مالکِ اصلیِ سامانه را هیچ مدیرِ دیگری غیرفعال یا تنزل نمی‌دهد', 'owner_protected'));
+  }
   const status = req.body?.status === undefined ? target.status : v.oneOf(req.body.status, ['active', 'disabled'], { field: 'وضعیت' });
-  const role = req.body?.role === undefined ? target.role : v.oneOf(req.body.role, ['admin', 'superadmin'], { field: 'نقش' });
+  const role = req.body?.role === undefined ? target.role : v.oneOf(req.body.role, ROLES, { field: 'نقش' });
   const losesSuper = target.role === 'superadmin' && target.status === 'active' && (role !== 'superadmin' || status !== 'active');
   if (losesSuper) {
     const left = await one(`SELECT COUNT(*)::int AS n FROM admins WHERE role='superadmin' AND status='active' AND id<>$1`, [id]);
@@ -771,6 +781,10 @@ router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
  */
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
+//  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
+router.use('/shops/:id', require('./admin-shop-state'));
+router.use('/flags', require('./admin-flags'));
+router.use('/service-keys', require('./admin-service-keys'));
 //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
 router.use('/system', require('./admin-system'));
 //  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
