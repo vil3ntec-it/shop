@@ -45,6 +45,8 @@ data class ReceiptInput(
    *  کم نمی‌شوند: [subtotal] همان جمعِ ستونِ قلم‌هاست و مبلغ‌ها همان پرداختی. صفرها نمی‌آیند.
    */
   val included: List<DiscountLine> = emptyList(),
+  /** یادداشتِ فاکتور (POS-11، `SaleNotes.clean`)؛ null یا خالی ⇒ چاپ نمی‌شود */
+  val note: String? = null,
 )
 
 data class ShopHeader(
@@ -63,6 +65,8 @@ data class LineView(
   val returnedQty: Double = 0.0,
   /** قیمتِ پیش از تخفیفِ ویژه (پیگیریِ #307)؛ null یا ≤ قیمتِ واحد ⇒ چاپ نمی‌شود */
   val listPrice: Double? = null,
+  /** یادداشتِ همین ردیف (POS-11)؛ null یا خالی ⇒ چاپ نمی‌شود */
+  val note: String? = null,
 )
 
 data class DiscountLine(val label: String, val amount: Double)
@@ -121,6 +125,7 @@ data class ReceiptLabels(
   val cash: String = "نقدی",
   val credit: String = "نسیه",
   val online: String = "آنلاین",
+  val note: String = "یادداشت",
 ) {
   companion object {
     val FA = ReceiptLabels()

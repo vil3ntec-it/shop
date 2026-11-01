@@ -40,6 +40,8 @@ data class SaleDraft(
   val savedAt: Long = 0,
   /** کدهای تخفیفِ زده‌شده (نرمال‌شده) — با پیش‌نویس برمی‌گردند (N3)؛ پیش‌نویسِ قدیمی ندارد */
   val coupons: List<String> = emptyList(),
+  /** یادداشتِ فاکتور (POS-11) — با پیش‌نویس و فاکتورِ نگه‌داشته برمی‌گردد؛ پیش‌نویسِ قدیمی ندارد */
+  val note: String? = null,
 ) {
   /** همان شکلِ ردیفِ پیش‌نویسِ قدیمی؛ فیلدهای تازه پیش‌فرض دارند */
   @Serializable
@@ -50,18 +52,22 @@ data class SaleDraft(
     val label: String = "",
     /** سریِ اسکن‌شده (افزودنی) */
     val lotId: String? = null,
+    /** یادداشتِ ردیف (POS-11، افزودنی) */
+    val note: String? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note) }
 
   companion object {
-    fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList()) = SaleDraft(
+    fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId) },
+      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note) },
       debtorId = debtorId,
       savedAt = now,
       //  کد بی سبد معنا ندارد
       coupons = if (cart.isEmpty()) emptyList() else coupons,
+      //  یادداشتِ فاکتور هم
+      note = if (cart.isEmpty()) null else note,
     )
   }
 }

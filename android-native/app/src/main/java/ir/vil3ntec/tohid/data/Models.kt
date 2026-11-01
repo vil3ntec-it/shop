@@ -311,6 +311,14 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val coupons: List<String> = emptyList(),
+  /**
+   *  یادداشتِ فاکتور (POS-11، `SaleNotes.clean`: یک خط، حداکثر ۱۲۰ نویسه) — روی رسید چاپ
+   *  می‌شود. فقط با تنظیمِ «یادداشت» ِ صندوق (`PosNotesPrefs`)؛ ⛔ `null` نوشته نمی‌شود، پس
+   *  فاکتورِ بی یادداشت بایت‌به‌بایت همان. محتوای مالی نیست (`finalized-sales.js`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val note: String? = null,
 )
 
 /**
@@ -419,6 +427,10 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val promo: List<SalePromo> = emptyList(),
+  /** یادداشتِ همین قلم (POS-11) — مثلِ `Sale.note`، `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val note: String? = null,
 )
 
 @Serializable
