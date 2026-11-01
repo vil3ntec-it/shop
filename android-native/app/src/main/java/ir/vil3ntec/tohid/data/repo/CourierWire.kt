@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.courier.CourierEvent
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -31,6 +32,9 @@ object CourierWire {
     e.cashCollectedMinor?.let { put("cashCollectedMinor", JsonPrimitive(it)) }
     if (e.cashReason.isNotEmpty()) put("cashReason", JsonPrimitive(e.cashReason))
     if (e.code.isNotEmpty()) put("code", JsonPrimitive(e.code))
+    //  DLV-07/17: فقط وقتی آمده‌اند — رویدادِ بی آن‌ها همان بدنهٔ پیشین است
+    if (e.bags.isNotEmpty()) put("bags", JsonArray(e.bags.map { JsonPrimitive(it) }))
+    e.position?.let { p -> put("position", buildJsonObject { put("lat", JsonPrimitive(p.lat)); put("lng", JsonPrimitive(p.lng)) }) }
   }
 
   fun result(o: JsonObject): EventResult =
@@ -67,6 +71,9 @@ object CourierWire {
       area = addr?.let { str(it, "area") }.orEmpty(),
       gateColor = addr?.let { str(it, "gateColor") }.orEmpty(),
       addressCorrectedAt = addr?.let { long(it, "correctedAt") },
+      //  DLV-07/17: فقط با پرچمِ دکان در کارت می‌آیند
+      bagScanBags = (o["bagScan"] as? JsonObject)?.let { long(it, "bags") }?.toInt(),
+      nearPinMaxM = (o["nearPin"] as? JsonObject)?.let { long(it, "maxM") }?.toInt(),
     )
   }
 
