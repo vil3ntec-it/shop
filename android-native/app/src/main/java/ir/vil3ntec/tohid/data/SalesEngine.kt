@@ -515,11 +515,11 @@ object SalesEngine {
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
       )
-      for ((pid, q) in ProductPlansMap.moves(p, line.quantity)) movements += StockMovement( // PRD-10: کیت ⇒ هر جزء
+      movements += StockMovement(
         id = newId(),
-        productId = pid,
+        productId = p.id,
         type = "sale",
-        qty = -q,
+        qty = -line.quantity,
         date = today,
         notes = "فاکتور #${sale.invoiceLabel()}",
         refId = saleId,
