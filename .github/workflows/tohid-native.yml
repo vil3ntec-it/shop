@@ -96,16 +96,13 @@ jobs:
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
 
-      #  `:core:jvmTest` = آزمون‌های `core/src/commonTest` (مثلِ «تسویهٔ کامل» بی گردِ افغانی)
+      #  `:core:jvmTest` = همهٔ آزمون‌های core (`core/src/commonTest` و `core/src/jvmTest`: «تسویهٔ کامل»
+      #  بی گردِ افغانی، کشو، وضعیتِ چاپگر، برگهٔ دوروشی، هم‌خوانیِ CoreVectorsCommonTest با JSON…)؛
+      #  همان کارِ دستورِ محلیِ `gradle -p core jvmTest`. testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)،
+      #  پس فقط همین‌جا و فقط یک بار اجرا می‌شوند؛ گامِ جدا برایشان نگذار (همین‌ها را دوباره می‌دواند).
       - name: سنجشِ حساب‌ها
         working-directory: android-native
         run: gradle --no-daemon testReleaseUnitTest :core:jvmTest
-
-      #  آزمون‌های commonTest ِ core (منطقِ خالص و بی اندروید: کشو، وضعیتِ چاپگر، برگهٔ دوروشی…)
-      #  همان دستورِ محلیِ `gradle -p core jvmTest`؛ testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)
-      - name: آزمون‌های core
-        working-directory: core
-        run: gradle --no-daemon jvmTest
 
       #  آزمون‌های commonTest ِ core (منطقِ خالص و بی اندروید: کشو، وضعیتِ چاپگر، برگهٔ دوروشی…)
       #  همان دستورِ محلیِ `gradle -p core jvmTest`؛ testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)
