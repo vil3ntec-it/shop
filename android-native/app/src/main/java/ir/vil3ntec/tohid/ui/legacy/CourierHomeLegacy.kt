@@ -87,7 +87,7 @@ import ir.vil3ntec.tohid.ui.screens.TohidButton
 import ir.vil3ntec.tohid.ui.screens.TohidConfirmDialog
 import ir.vil3ntec.tohid.ui.screens.TohidSnackbarLegacy
 import ir.vil3ntec.tohid.ui.screens.TohidTextField
-import ir.vil3ntec.tohid.ui.screens.parcelJpegLegacy
+import ir.vil3ntec.tohid.ui.screens.parcelJpeg
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -692,7 +692,7 @@ private fun PhotoFlowLegacy(c: MissionCard, onDismiss: () -> Unit, onReady: (Byt
   ) { uri ->
     busy = true
     scope.launch {
-      val bytes = withContext(Dispatchers.IO) { runCatching { parcelJpegLegacy(context, uri) }.getOrNull() }
+      val bytes = withContext(Dispatchers.IO) { runCatching { parcelJpeg(context, uri) }.getOrNull() }
       busy = false
       if (bytes == null) error = "عکس خوانده نشد؛ دوباره بگیرید" else onReady(bytes)
     }
