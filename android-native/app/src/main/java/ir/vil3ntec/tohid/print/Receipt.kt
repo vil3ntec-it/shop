@@ -167,6 +167,8 @@ object Receipt {
       else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale)
     }
     line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(sale.date), digits)} — ${LocaleText.digitsIn(time, digits)}   ($kind)", small, Layout.Alignment.ALIGN_CENTER)
+    //  LOC-01: تاریخِ قمری فقط با تنظیمِ دکان (پیش‌فرض خاموش)
+    LocaleChoice.lunarOn(sale.date)?.let { line(StrSale.hijriDate(it), small, Layout.Alignment.ALIGN_CENTER) }
 
     rule(thick = true)
 
@@ -246,6 +248,11 @@ object Receipt {
    *  تفاوت» است (S15: یک رسید با دو بخش).
    */
   fun renderReturn(context: Context, d: ShopData, docId: String, storeName: String, width: Int): Bitmap {
+    //  رسیدِ برگشتِ نسخهٔ ۲ (چیدمانِ `core/receipt/ReturnReceiptLayout`، آزمون‌شده در `ReturnReceiptLayoutTest`)
+    //  فقط با پرچمِ `shop.receipt_v2`؛ خاموش ⇒ همین چیدمانِ پیشین، بیت‌به‌بیت
+    if (ReceiptFlag.enabled(context)) {
+      return Receipts.returnBitmap(context, d, docId, width, fallbackName = storeName) ?: error(StrPos.returnDocNotFound)
+    }
     val doc = ir.vil3ntec.tohid.data.ReturnFlow.doc(d, docId) ?: error(StrPos.returnDocNotFound)
     val regular = font(context, R.font.vazirmatn_regular)
     val bold = font(context, R.font.vazirmatn_bold)
@@ -315,6 +322,7 @@ object Receipt {
     )
     val time = runCatching { SimpleDateFormat("HH:mm", Locale.US).format(Date(if (doc.createdAt > 0) doc.createdAt else System.currentTimeMillis())) }.getOrDefault("")
     line("${LocaleText.digitsIn(ir.vil3ntec.tohid.displayDate(doc.date), digits)} — ${LocaleText.digitsIn(time, digits)}", p.small, Layout.Alignment.ALIGN_CENTER)
+    LocaleChoice.lunarOn(doc.date)?.let { line(StrSale.hijriDate(it), p.small, Layout.Alignment.ALIGN_CENTER) }
     rule(thick = true)
 
     doc.rows.forEach { r ->

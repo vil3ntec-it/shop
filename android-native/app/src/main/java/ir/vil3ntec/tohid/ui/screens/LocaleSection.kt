@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.text.LocaleFormat
@@ -22,7 +23,8 @@ import ir.vil3ntec.tohid.core.i18n.Str
 
 /**
  *  «تاریخ و رقم» در تنظیمات — رقمِ صفحه و فاکتور (LOC-05)، زبانِ نامِ ماه‌ها
- *  (LOC-01) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ امروز است: لاتین، دری، «افغانی».
+ *  (LOC-01)، پایانِ روزِ کاری (LOC-03) و نمادِ پولِ فاکتور (LOC-07). پیش‌فرض‌ها رفتارِ
+ *  امروز است: لاتین، دری، نیمه‌شب، «افغانی».
  *
  *  برچسبِ گزینه‌ها عمداً بی رقم است: وقتی رقمِ فارسی روشن است، فونت هر
  *  «123»ی را «۱۲۳» می‌کشد و نمونهٔ «لاتین» هم فارسی دیده می‌شد.
@@ -82,6 +84,9 @@ fun LocaleSection() {
       selected = calendar,
       onSelect = { LocaleChoice.setCalendar(context, it) },
     )
+    //  LOC-03: پایانِ روزِ کاری — پیش‌فرض نیمه‌شب (هیچ تاریخی جابه‌جا نمی‌شود)
+    Spacer(Modifier.height(14.dp))
+    ShopDayRow(ShopDayChoice.hours) { ShopDayChoice.set(context, it) }
     //  نامِ ماه فقط در فارسی انتخابی است: پشتو همیشه وری، غویی… و انگلیسی Hamal, Sawr…
     Spacer(Modifier.height(14.dp))
     Text(
@@ -109,5 +114,30 @@ fun LocaleSection() {
       selected = symbol,
       onSelect = { LocaleChoice.setSymbol(context, it) },
     )
+    //  LOC-01: تاریخِ قمریِ اختیاری روی فاکتور و رسیدِ برگشت — پیش‌فرض خاموش
+    Spacer(Modifier.height(14.dp))
+    Text(
+      StrSettings.lunarNote,
+      style = MaterialTheme.typography.labelSmall,
+      color = Shop.colors.muted2,
+    )
+    Spacer(Modifier.height(8.dp))
+    SegmentedChoice(
+      options = listOf("off" to StrSettings.lunarOff, "on" to StrSettings.lunarOn),
+      selected = if (LocaleChoice.lunar) "on" else "off",
+      onSelect = { LocaleChoice.setLunar(context, it == "on") },
+    )
+    if (LocaleChoice.lunar) {
+      Spacer(Modifier.height(8.dp))
+      SegmentedChoice(
+        options = listOf("-1" to StrSettings.lunarEarlier, "0" to StrSettings.lunarAsIs, "1" to StrSettings.lunarLater),
+        selected = LocaleChoice.lunarAdjust.toString(),
+        onSelect = { LocaleChoice.setLunarAdjust(context, it.toIntOrNull() ?: 0) },
+      )
+      LocaleChoice.lunarOn(todayIso())?.let {
+        Spacer(Modifier.height(6.dp))
+        Text(StrSettings.lunarToday(it), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      }
+    }
   }
 }

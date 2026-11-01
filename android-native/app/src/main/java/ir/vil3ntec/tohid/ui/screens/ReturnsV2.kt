@@ -50,10 +50,11 @@ import kotlinx.coroutines.launch
  *  ⛔ قلابِ تأیید (STF-02، RET-04/07/10).
  *
  *  وقتی برگشت تأیید لازم دارد (بی رسید یا ضایعات برای شاگرد، بالای سقف برای همه
- *  جز صاحب) و نقشِ همین کاربر بس نیست، این‌جا صدا زده می‌شود. پنجرهٔ «درخواستِ
- *  تأیید» با PINِ مدیر (PRِ تأییدِ کارمندان) خودش را این‌جا می‌گذارد و با
- *  `ReturnFlow.Approval(by, role)` جواب می‌دهد؛ تا آن روز `null` است و فرم
- *  به‌جای دکمهٔ بی‌اثر، روشن می‌گوید چه کسی باید ثبت کند.
+ *  جز صاحب) و نقشِ همین کاربر بس نیست، این‌جا صدا زده می‌شود: پنجرهٔ «درخواستِ
+ *  تأیید» با PINِ مدیر یا صاحب (`ReturnApprovalRequest`، همان `ApprovalDialog` ِ تخفیف)
+ *  و جوابِ `ReturnFlow.Approval(by, role, slip)` با «برگهٔ امضاشده»ی همین سند. فرمِ
+ *  قدیم و برگهٔ نسخهٔ ۳ هر دو همین را می‌خوانند. `null` (فقط آزمون/عکس) ⇒ فرم به‌جای
+ *  دکمه می‌گوید چه کسی باید ثبت کند.
  */
 object ReturnApproval {
   data class Need(
@@ -66,13 +67,15 @@ object ReturnApproval {
     val approver: String,
   )
 
-  var requester: (@Composable (need: Need, onResult: (ReturnFlow.Approval?) -> Unit) -> Unit)? = null
+  var requester: (@Composable (need: Need, onResult: (ReturnFlow.Approval?) -> Unit) -> Unit)? =
+    { need, onResult -> ir.vil3ntec.tohid.ui.components.staff.ReturnApprovalRequest(need, onResult) }
 
   fun whyText(reasons: List<String>): String = reasons.joinToString("، ") {
     when (it) {
       ReturnFlow.WHY_NO_RECEIPT -> "بی رسید"
       ReturnFlow.WHY_DAMAGED -> "ضایعات"
       ReturnFlow.WHY_OVER_LIMIT -> "بالای سقف"
+      ReturnFlow.WHY_POLICY -> ir.vil3ntec.tohid.core.i18n.StrRetPolicy.why
       else -> "مجوز"
     }
   }
@@ -109,6 +112,10 @@ fun ReturnFlowDialog(
   val role = remember { ShopRole.current(context) }
   val layers = remember { ShopRole.layers(context) }
   val limit = remember { ReturnSettings.limit(context) }
+  //  RET-08 — فهرستِ دلیل‌های همین دکان (تنظیمات)؛ ثبت فقط با یکی از همین‌ها
+  val reasons = remember { ReturnSettings.reasons(context) }
+  //  RET-09 — سیاستِ برگشتِ همین دستگاه (مهلت و غیرقابلِ برگشت)؛ خالی ⇒ بی اثر
+  val policy = remember { ir.vil3ntec.tohid.data.ReturnPolicyPrefs.of(context) }
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   //  شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش (§۱۵.۲ بندِ ۱)
   val docId = remember { newId() }
@@ -118,12 +125,11 @@ fun ReturnFlowDialog(
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<FreeRow>()) }
-  var reason by remember { mutableStateOf<String?>(if (prefill) ReturnFlow.REASONS.first() else null) }
+  var reason by remember { mutableStateOf<String?>(if (prefill) reasons.first() else null) }
   var mode by remember { mutableStateOf(ReturnFlow.ORIGINAL) }
   var customerId by remember { mutableStateOf(sale?.debtorId) }
   var exchange by remember { mutableStateOf(false) }
   var cart by remember { mutableStateOf(listOf<SalesEngine.CartLine>()) }
-  var approval by remember { mutableStateOf<ReturnFlow.Approval?>(null) }
   var asking by remember { mutableStateOf(false) }
   var error by remember { mutableStateOf<String?>(null) }
   //  تا ذخیره تمام نشده، دکمه دوباره کار نمی‌کند (دو بار زدن = یک سند)
@@ -138,8 +144,17 @@ fun ReturnFlowDialog(
   val q = (quote as? ReturnFlow.Outcome.Ok)?.value
   val total = q?.total ?: 0.0
   val damaged = q?.lines?.any { it.disposition == ReturnFlow.DAMAGED } == true
-  val perm = remember(total) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total)) }
-  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
+  //  RET-10: سقفِ نقش تجمعیِ هر فاکتور است، همان سرور — برگشت‌های پیشینِ همین فاکتور + همین سند
+  val priorMinor = remember(d, sale) { ReturnFlow.priorMinor(d, sale?.id) }
+  val perm = remember(total, priorMinor) { ReturnFlow.permDecision(role, layers, ReturnFlow.minor(total), priorMinor) }
+  val verdict = remember(q, policy) {
+    q?.let { ReturnFlow.policyCheck(d, sale, it.lines, policy, todayIso()) } ?: ir.vil3ntec.tohid.core.returns.ReturnPolicy.Verdict()
+  }
+  //  RET-10: سقفِ دستگاه هم مثلِ سقفِ نقش تجمعیِ هر فاکتور است — چند سندِ زیرِ سقف یک برگشتِ بزرگ نمی‌سازند
+  val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit), priorMinor, policyBreach = !verdict.ok)
+  //  تأیید مالِ همان مبلغ و همان دلیل‌هاست: مقدار، ضایعات یا سقف که عوض شد، تأییدِ پیشین کنار می‌رود
+  //  (وگرنه «تأیید شد» می‌ماند و دکمهٔ «درخواستِ تأیید» پنهان، ولی `post` با APPROVAL_REQUIRED رد می‌کرد)
+  var approval by remember(ReturnFlow.minor(total), gate) { mutableStateOf<ReturnFlow.Approval?>(null) }
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
   val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior) as? ReturnFlow.Outcome.Ok)?.value
@@ -221,7 +236,7 @@ fun ReturnFlowDialog(
           /* ----------------------------- دلیل ----------------------------- */
           Section("دلیلِ برگشت (اجباری)") {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-              ReturnFlow.REASONS.forEach { r ->
+              reasons.forEach { r ->
                 FilterChip(selected = reason == r, onClick = { reason = r }, label = { Text(r) }, shape = Shape.chip)
               }
             }
@@ -284,6 +299,9 @@ fun ReturnFlowDialog(
               val due = cartTotal - (split?.cash ?: 0.0)
               MoneyLine(if (due >= 0) "دریافت از مشتری" else "پرداخت به مشتری", kotlin.math.abs(due), strong = true)
             }
+            ReturnPolicyNotice(
+              verdict, policy, verdict.blockedIds.map { id -> d.products.find { it.id == id }?.name ?: id }, ReturnFlow.roleOf(role) == "staff",
+            )
             if (gate.decision != "allow") {
               Spacer(Modifier.height(8.dp))
               val tone = if (gate.decision == "deny") PillTone.DANGER else if (approved) PillTone.SUCCESS else PillTone.WARNING
@@ -324,8 +342,8 @@ fun ReturnFlowDialog(
                   docId = docId, saleId = sale?.id,
                   picks = items.associate { it.id to ReturnFlow.Pick(number(qtys[it.id]), disp[it.id] ?: ReturnFlow.RESTOCK) },
                   free = free.map { ReturnFlow.FreeLine(it.productId, number(it.qty), number(it.price), it.disposition) },
-                  reason = reason.orEmpty(), mode = mode, customerId = creditTo,
-                  by = me, role = role, perm = perm, limit = limit, approval = approval,
+                  reason = reason.orEmpty(), reasons = reasons, mode = mode, customerId = creditTo,
+                  by = me, role = role, perm = perm, limit = limit, approval = approval, policy = policy,
                 )
                 val now = System.currentTimeMillis()
                 //  دفترِ تازه و پیامِ موفقیت، یا خطا — «ثبت شد» فقط پس از نوشتنِ واقعی
@@ -457,6 +475,8 @@ fun ReturnSettingsSection() {
   val context = LocalContext.current
   var on by remember { mutableStateOf(ReturnSettings.enabled(context)) }
   var limit by remember { mutableStateOf(ReturnSettings.limit(context).let { if (it > 0) money(it).replace(",", "") else "" }) }
+  //  RET-08 — متنِ کادر همان نوشتهٔ کاربر می‌ماند (خطِ خالیِ وسطِ نوشتن پاک نمی‌شود)؛ ذخیره پاک‌شده است
+  var reasonsText by remember { mutableStateOf(ir.vil3ntec.tohid.core.returns.ReturnReasons.format(ReturnSettings.reasons(context))) }
   val c = Shop.colors
   SettingsSection(
     icon = Icons.Filled.SwapHoriz,
@@ -492,6 +512,22 @@ fun ReturnSettingsSection() {
         label = "سقف (؋)",
         modifier = Modifier.fillMaxWidth(),
       )
+      Spacer(Modifier.height(12.dp))
+      Text(
+        "دلیل‌های برگشت — هر خط یک دلیل (حداکثر ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_COUNT}، هر کدام تا ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_LENGTH} نویسه). صندوق فقط از همین فهرست دلیل می‌پذیرد؛ خالی = فهرستِ پیش‌فرض.",
+        style = MaterialTheme.typography.labelSmall,
+        color = c.muted,
+      )
+      Spacer(Modifier.height(6.dp))
+      OutlinedTextField(
+        value = reasonsText,
+        onValueChange = { v -> reasonsText = v; ReturnSettings.setReasons(context, v) },
+        label = { Text("دلیل‌ها") },
+        minLines = 3,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      //  RET-09 — مهلت و اقلامِ غیرقابلِ برگشت (پیش‌فرض خالی = بی سیاست)
+      ReturnPolicySettingsWired(context)
     }
   }
 }

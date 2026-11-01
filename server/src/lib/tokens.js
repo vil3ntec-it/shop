@@ -18,15 +18,16 @@ function hashToken(token) { return createHash('sha256').update(String(token)).di
  *  خالی یعنی «نگفت» — نسخه‌های امروزِ دستِ کاربر چیزی نمی‌فرستند و
  *  نباید هم از کار بیفتند. شرحش سرِ `migrations/015`.
  */
-async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '' }) {
+async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '', shopId = null }) {
   const token = generateToken();
   const issuedAt = now();
   const expiresAt = issuedAt + ttlMs;
   const scope = (kind === 'access' || kind === 'refresh') ? await scopeFor(subjectId, app) : '';
+  //  `shopId`: دکانِ برگزیدهٔ نشست (مهاجرتِ ۰۹۷) — تهی یعنی «همان قاعدهٔ همیشگی»
   await query(
-    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, scope)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), scope]
+    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, scope, shop_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), scope, shopId || null]
   );
   if (kind === 'access' || kind === 'refresh') await rememberApp(subjectId, app, issuedAt);
   return { token, expiresAt, app, scope };
@@ -193,14 +194,26 @@ async function revokeFamily(row) {
               WHERE subject_id=$2 AND COALESCE(app,'shop')=$3 AND revoked_at IS NULL`;
   if (row.device_id) { args.push(row.device_id); sql += ` AND device_id=$${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(row.subject_id);
   return r.rowCount || 0;
+}
+
+/**
+ * ⛔ S78: هر باطل‌کردن ⇒ سوکت‌های زندهٔ همان کس همان لحظه دوباره سنجیده و
+ * اگر نشستشان رفته بسته می‌شوند (`sync-v1-live.accessChanged`، تنها درِ آن).
+ * دستگاهِ دیگرِ همان آدم که نشستش زنده است دست نمی‌خورد.
+ */
+function liveRecheck(subjectId) {
+  if (!subjectId) return Promise.resolve(0);
+  return require('./sync-v1-live').accessChanged({ userId: String(subjectId) });
 }
 
 async function revoke(token, kind) {
   const r = await query(
-    'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL',
+    'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL RETURNING subject_id',
     [now(), hashToken(token), kind]
   );
+  if (r.rowCount > 0 && r.rows[0]) await liveRecheck(r.rows[0].subject_id);
   return r.rowCount > 0;
 }
 
@@ -225,6 +238,7 @@ async function revokeAllForSubject(subjectId, kind = null, app = null) {
   if (kind) { args.push(kind); sql += ` AND kind=$${args.length}`; }
   if (app) { args.push(app); sql += ` AND COALESCE(app,'shop')=$${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(subjectId);
   return r.rowCount;
 }
 
@@ -245,13 +259,15 @@ async function revokeOthersForSubject(subjectId, { keepDeviceId = null, keepToke
   if (keepDeviceId) { args.push(keepDeviceId); sql += ` AND COALESCE(device_id,'') <> $${args.length}`; }
   else if (keepTokenHash) { args.push(keepTokenHash); sql += ` AND token_hash <> $${args.length}`; }
   const r = await query(sql, args);
+  await liveRecheck(subjectId);
   return r.rowCount;
 }
 
 async function revokeAllForDevice(deviceId) {
   const r = await query(
-    'UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL', [now(), deviceId]
+    'UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND revoked_at IS NULL RETURNING subject_id', [now(), deviceId]
   );
+  for (const subject of new Set(r.rows.map((x) => x.subject_id))) await liveRecheck(subject);
   return r.rowCount;
 }
 
