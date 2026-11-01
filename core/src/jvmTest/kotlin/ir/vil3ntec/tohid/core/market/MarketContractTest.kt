@@ -39,6 +39,8 @@ class MarketContractTest {
     val fields = root.getValue("fields").jsonObject
     val models: Map<String, Pair<KSerializer<*>, Set<String>>> = mapOf(
       "shop" to (PublicShop.serializer() to setOf("delivery")),
+      "shopMedia" to (ShopMedia.serializer() to emptySet()),
+      "mediaFile" to (MediaFile.serializer() to emptySet()),
       "presence" to (PublicPresence.serializer() to emptySet()),
       "cardPresence" to (PublicPresence.serializer() to emptySet()),
       "product" to (PublicProduct.serializer() to emptySet()),
@@ -67,6 +69,12 @@ class MarketContractTest {
     assertEquals(false, s.payment.online.available)
     assertTrue(s.fulfillment.delivery && s.fulfillment.pickup)
     assertEquals(listOf("خوراکی", "شوینده"), s.categories)
+    //  M3 (#428): `media` از مسیر می‌آید، نه از `profile`؛ نبودش ⇒ هر دو null
+    assertNull(s.media.logo)
+    val withMedia = MarketContract.shop(sample("shop").dropLast(1) +
+      ",\"media\":{\"logo\":{\"version\":3,\"width\":512,\"height\":512,\"mime\":\"image/webp\",\"url\":\"/api/store/x/media/logo/3\"},\"header\":null}}")
+    assertEquals(3L, withMedia.media.logo!!.version)
+    assertNull(withMedia.media.header)
     val p = s.status!!
     assertEquals(PublicPresence.OPEN_ONLINE, p.badge)
     assertEquals(PublicPresence.ACCEPTING, p.orderAcceptance)
@@ -119,6 +127,15 @@ class MarketContractTest {
     assertEquals("شهرِ نو", o.zoneName)
     assertNull(o.scheduledFor)
     assertEquals(1761807200000L, o.slotEndsAt)
+    //  افزوده به v1 از main: CHK-15/16 (#525)، CHK-06/07 (#494)، PAY-21 (#529)
+    assertEquals("best_match", o.substitution)
+    assertEquals(listOf("", "specific"), o.lines.map { it.substitution })
+    assertEquals("روغنِ کوچک", o.lines[1].substituteName)
+    assertEquals(0L, o.smallBasketFeeMinor)
+    assertEquals(1000L, o.slotFeeMinor)
+    assertNull(o.onlinePay)
+    val tracked = MarketContract.order(sample("order").dropLast(1) + ",\"onlinePay\":{\"available\":true}}")
+    assertEquals(true, tracked.onlinePay!!.available)
     assertEquals(PublicDelivery("picked_up", "shop_courier"), MarketContract.delivery(sample("delivery")))
   }
 

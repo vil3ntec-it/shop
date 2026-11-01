@@ -38,12 +38,13 @@ const DAY = 24 * 60 * 60 * 1000;
    ========================================================== */
 
 /** عضویتِ این کاربر در یک بخش — یا null. */
-async function membership(app, userId) {
+async function membership(app, userId, tokenRow = null) {
   if (app === 'pump') {
     const m = await stations.membershipOf(userId);
     return m ? { app, tenantId: m.station_id, name: m.station_name || '', role: m.role, code: m.station_code || '' } : null;
   }
-  const m = await shops.membershipOf(userId);
+  //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷) — از ردیفِ توکن، نه از درخواست
+  const m = await shops.membershipOf(userId, { shopId: shops.sessionShopOf(tokenRow) });
   return m ? { app: 'shop', tenantId: m.shop_id, name: m.shop_name || '', role: m.role } : null;
 }
 
@@ -51,7 +52,7 @@ async function membership(app, userId) {
 async function tenantOf(app, req) {
   if (app === 'shop' && req.shopId !== undefined) return req.shopId || '';
   if (app === 'pump' && req.stationId !== undefined) return req.stationId || '';
-  const m = await membership(app, req.user.id);
+  const m = await membership(app, req.user.id, req.tokenRow);
   return m ? m.tenantId : '';
 }
 
@@ -62,8 +63,12 @@ async function cloudSyncOf(app, tenantId) {
   return !!(r && r.cloud_sync);
 }
 
-/** نمای اشتراک برای «اشتراکِ من»: روزِ مانده، رنگ، دائمی. */
-function subscriptionView(ent, at = now()) {
+/**
+ * نمای اشتراک برای «اشتراکِ من»: روزِ مانده، رنگ، دائمی.
+ * SUB-01 (docs/SUB-STATES-fa.md): `phase` و `graceEndsAt` فقط برای دکان (`app = 'shop'`)؛ برای پمپ
+ * (و هر صدازنندهٔ بی `app`) نما بیت‌به‌بیت همان پیشین است — کدِ مشترکِ پمپ (`/api/pump/heartbeat`) دست نمی‌خورد.
+ */
+function subscriptionView(ent, at = now(), app = '') {
   const s = ent.subscription || {};
   const permanent = !!s.endsAt && (s.plan === 'perm' || s.endsAt - at > 10 * 365 * DAY);
   const days = s.endsAt ? Math.max(0, Math.ceil(((s.graceEndsAt || s.endsAt) - at) / DAY)) : 0;
@@ -75,6 +80,8 @@ function subscriptionView(ent, at = now()) {
   else if (ent.source === 'trial') color = 'yellow';
   return {
     source: ent.source, status: s.status || 'none', active: !!s.active, plan: s.plan || '',
+    //  SUB-01: مرحلهٔ رفتاری، «مهلت» جدا از «فعال» — فقط افزوده و فقط دکان؛ متنِ `label` همان
+    ...(app === tenancy.SHOP.app ? { phase: s.phase || 'none', graceEndsAt: s.graceEndsAt || 0 } : {}),
     startsAt: s.startsAt || 0, endsAt: s.endsAt || 0, daysLeft: permanent ? null : days,
     totalDays: total, progress: permanent ? 100 : (total ? Math.max(0, Math.min(100, Math.round(days / total * 100))) : 0),
     permanent, color,
@@ -223,7 +230,7 @@ async function heartbeatHandler(app, req, res, next) {
       await query('UPDATE tokens SET app_version=$2 WHERE token_hash=$1', [req.tokenRow.token_hash, String(req.query.version).slice(0, 32)]).catch(() => {});
     }
     res.json({
-      app, tenantId, subscription: ent ? subscriptionView(ent) : null,
+      app, tenantId, subscription: ent ? subscriptionView(ent, undefined, app) : null,
       entitlement: ent ? { source: ent.source, features: ent.features } : null,
       unreadNotices: inbox.unread, latest: dl.downloads[0] || null, serverTime: now(),
     });
@@ -243,13 +250,13 @@ router.get('/me', async (req, res, next) => {
     const at = now();
     const memberships = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (!m) continue;
       await subs.forApp(app).expireDue(at);
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId, at);
       memberships.push({
         ...m,
-        subscription: subscriptionView(ent, at),
+        subscription: subscriptionView(ent, at, app),
         cloudSync: await cloudSyncOf(app, m.tenantId),
         addons: await discounts.listAddons({ app, tenantId: m.tenantId }),
         history: (await subs.forApp(app).changeLog(m.tenantId, 20)).map(r => ({
@@ -272,10 +279,10 @@ router.get('/subscriptions', async (req, res, next) => {
   try {
     const out = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (!m) continue;
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId);
-      out.push({ ...m, subscription: subscriptionView(ent) });
+      out.push({ ...m, subscription: subscriptionView(ent, undefined, app) });
     }
     res.json({ subscriptions: out, serverTime: now() });
   } catch (err) { next(err); }
@@ -285,7 +292,7 @@ router.get('/payments', async (req, res, next) => {
   try {
     const out = [];
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (m) out.push(...await paymentsOf(app, m.tenantId));
     }
     res.json({ payments: out.sort((a, b) => b.paidAt - a.paidAt), serverTime: now() });
@@ -298,7 +305,7 @@ router.get('/payments/:id/receipt', async (req, res, next) => {
     const row = await one(`SELECT ${sales().PAYMENT_COLS} FROM sub_payments p ${sales().PAYMENT_JOIN} WHERE p.id=$1 AND p.deleted=false`,
       [v.id(req.params.id)]);
     if (!row) return next(notFound('رسید پیدا نشد', 'payment_not_found'));
-    const m = await membership(row.app, req.user.id);
+    const m = await membership(row.app, req.user.id, req.tokenRow);
     if (!m || m.tenantId !== row.tenant_id) return next(notFound('رسید پیدا نشد', 'payment_not_found'));
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(await sales().receiptHtml(row));
@@ -327,6 +334,8 @@ router.delete('/devices/:id', async (req, res, next) => {
     if (r.rowCount) {
       await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
         [now(), id, req.user.id]);
+      //  ⛔ S78: سوکتِ زندهٔ همان دستگاه هم در همین درخواست
+      await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
     }
     res.json({ ok: true });
   } catch (err) { next(err); }
@@ -335,7 +344,7 @@ router.delete('/devices/:id', async (req, res, next) => {
 /** پشتیبانی — همان رشتهٔ همیشگیِ همین کاربر در بخشِ نشست. */
 async function supportIdentity(req) {
   const app = req.appSection === 'pump' ? 'pump' : 'shop';
-  const m = await membership(app, req.user.id);
+  const m = await membership(app, req.user.id, req.tokenRow);
   return {
     app, userId: req.user.id,
     shopId: app === 'shop' && m ? m.tenantId : '',
@@ -370,7 +379,7 @@ router.get('/settings', async (req, res, next) => {
   try {
     const out = {};
     for (const app of ['shop', 'pump']) {
-      const m = await membership(app, req.user.id);
+      const m = await membership(app, req.user.id, req.tokenRow);
       if (m) out[app] = { cloudSync: await cloudSyncOf(app, m.tenantId) };
     }
     res.json({ settings: out });

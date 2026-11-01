@@ -6,7 +6,8 @@
  * کاربرِ توکن پیدا می‌شود.
  */
 const express = require('express');
-const { one, many, now, newId } = require('../db');
+const { one, many, now, newId, query } = require('../db');
+const { hashToken } = require('../lib/tokens');
 const config = require('../config');
 const v = require('../lib/validate');
 const shops = require('../lib/shops');
@@ -19,7 +20,7 @@ const { requireRecentAuth, assertFresh } = require('../lib/reauth');
 const INVITE_WITHOUT_REAUTH = new Set(['staff', 'courier']);
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
-const { permissionsOf } = require('../lib/permissions');
+const { permissionsOf, STAFF_ROLES, legacyRole } = require('../lib/permissions');
 const { requireUser, requireShop, optionalShop, requirePermission, requireFeature } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
@@ -36,7 +37,9 @@ function shopPayload(shop, member, extra = {}) {
       ownerUserId: shop.owner_user_id, createdAt: Number(shop.created_at),
       maxMembers: shop.max_members,
     },
-    role: member.role,
+    //  A16: نسخهٔ قدیم فقط `role` را می‌خواند ⇐ نقشِ تازه آن‌جا «staff»؛ نقشِ واقعی در `actualRole`
+    role: legacyRole(member.role),
+    actualRole: member.role,
     isOwner: member.role === 'owner',
     permissions: permissionsOf(member.role),
     ...extra,
@@ -63,9 +66,57 @@ router.get(['/', '/me'], optionalShop, async (req, res) => {
 router.post(['/', '/create'], async (req, res) => {
   const name = v.text(req.body?.name, { max: 80 }) || 'دکان من';
   const shop = await shops.createShop(req.user.id, name);
-  const member = await shops.membershipOf(req.user.id);
+  const member = await shops.membershipOf(req.user.id, { shopId: shop.id });
   await audit.log({ shopId: shop.id, userId: req.user.id, action: 'shop.created', detail: { name }, ip: clientIp(req) });
   res.status(201).json(shopPayload(shop, member, { memberCount: 1 }));
+});
+
+/* ---------- دکانِ فعالِ نشست — کاربرِ چنددکانی (بندِ ۲۹.۲ قاعدهٔ ۱، ۲۱.۱) ----------
+ *
+ *  ⛔ شناسهٔ دکان فقط **یک بار** و فقط این‌جا از بدنه خوانده می‌شود، و فقط
+ *  پس از سنجیدنِ عضویتِ فعالِ همین کاربر در همان دکان. از آن پس دکان از
+ *  ردیفِ توکن می‌آید (`tokens.shop_id`)، نه از درخواست؛ و هر پرسشِ دکان
+ *  (`requireShop`) باز هم عضویت را در همان دکان می‌سنجد.
+ */
+router.get('/memberships', async (req, res) => {
+  const bound = shops.sessionShopOf(req.tokenRow);
+  const current = await shops.membershipOf(req.user.id, { shopId: bound });
+  const all = await shops.membershipsOf(req.user.id);
+  res.json({
+    activeShopId: current ? current.shop_id : null,
+    explicit: !!bound,
+    shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
+  });
+});
+
+router.post('/active', async (req, res, next) => {
+  const shopId = v.id(req.body?.shopId || req.body?.shop_id, { field: 'شناسهٔ دکان' });
+  const member = await shops.membershipOf(req.user.id, { shopId });
+  //  همان پاسخ برای «دکان نیست» و «عضوش نیستی» — وجودِ دکانِ دیگران لو نمی‌رود
+  if (!member) return next(forbidden('شما عضوِ فعالِ این دکان نیستید', 'not_member'));
+
+  /*
+   *  «نشست» = توکنِ همین درخواست، به‌علاوهٔ توکن‌های زندهٔ دکانِ **همین
+   *  دستگاه** (تا تازه‌سازی همان دکان را نگه دارد) و توکنِ تازه‌سازی‌ای که
+   *  برنامه در بدنه فرستاده (برای نشستِ بی شناسهٔ دستگاه). نشستِ دستگاه‌های
+   *  دیگرِ همین آدم دست نمی‌خورد.
+   */
+  const t = req.tokenRow;
+  const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
+  const r = await query(
+    `UPDATE tokens SET shop_id=$1
+      WHERE subject_id=$2 AND app='shop' AND revoked_at IS NULL AND kind IN ('access','refresh')
+        AND (token_hash=$3 OR token_hash=$4 OR ($5::text IS NOT NULL AND device_id=$5::text))`,
+    [shopId, req.user.id, t.token_hash, refresh ? hashToken(refresh) : '', t.device_id || null]
+  );
+  //  ⛔ S78: سوکتی که هنوز در اتاقِ دکانِ قبلیِ همین نشست است بسته می‌شود (4401) و
+  //  برنامه در اتاقِ دکانِ تازه برمی‌گردد؛ دستگاه‌های دیگرِ همین آدم دست نمی‌خورند
+  await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
+  await audit.log({
+    shopId, userId: req.user.id, action: 'auth.active_shop',
+    detail: { sessions: r.rowCount }, ip: clientIp(req),
+  });
+  res.json({ ok: true, activeShopId: shopId, shop: { id: shopId, name: member.shop_name || '', role: member.role } });
 });
 
 // ---------- ویرایش دکان ----------
@@ -91,16 +142,20 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
 });
 
 //  ⛔ نقشِ کارمند = مجوزهایش ⇒ فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
-router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
+async function updateMemberRoute(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
-    role: req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : undefined,
+    role: req.body?.role ? v.oneOf(req.body.role, STAFF_ROLES, { field: 'نقش' }) : undefined,
     status: req.body?.status ? v.oneOf(req.body.status, ['active', 'suspended'], { field: 'وضعیت' }) : undefined,
   };
   const row = await shops.updateMember(req.shopId, id, patch);
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.updated', targetType: 'member', targetId: id, detail: patch });
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
-});
+}
+router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
+//  برنامهٔ نصبی (HttpURLConnection) PATCH ندارد — «تغییرِ نقش» (A16) همین در را با PUT می‌زند،
+//  با همان تأییدِ دوبارهٔ هویت
+router.put('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
 
 /**
  * برداشتنِ یک عضو.
@@ -173,11 +228,13 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 // «چند کاربر روی یک دکان» قابلیت اشتراکی است؛ بررسی‌اش اینجا سمت سرور
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
-  const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
+  const role = req.body?.role ? v.oneOf(req.body.role, [...STAFF_ROLES, 'courier'], { field: 'نقش' }) : 'staff';
   //  ⛔ کدِ دعوتِ نقشِ **بالاتر از شاگرد** یک درِ پشتیِ ماندگار است: نشستِ کهنهٔ
   //  صاحب دکان (گوشیِ باز، توکنِ دزدیده) با آن مدیرِ تازه می‌ساخت که پس از
   //  بیرون کردنِ نشست هم می‌ماند. پس همان تأییدِ دوبارهٔ «عوض کردنِ نقش»
   //  (`PATCH /members/:id`) را می‌خواهد. شاگرد و پیک مثلِ پیش (یافتهٔ ۳).
+  //  A16: نقش‌های تازه هم تأیید می‌خواهند — انباردار اصلاحِ موجودی و حسابدار
+  //  سابقه و عددِ مالی دارد که شاگرد ندارد؛ یک قاعده برای همه، نه فهرستِ استثنا.
   if (!INVITE_WITHOUT_REAUTH.has(role)) await assertFresh(req);
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
@@ -223,6 +280,8 @@ router.delete('/staff-codes/:id', requireShop, requirePermission('staffcode.revo
 router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
   const code = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
   const { shop, role, unchanged } = await staffCodes.redeem(code, req.user.id, clientIp(req));
+  //  ⛔ S78: پیک‌شدن نشست‌های بی‌دامنه را درونِ تراکنشِ `redeem` بست؛ سوکت‌هایشان پس از آن، همین‌جا
+  if (!unchanged) await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
   const member = await shops.membershipOf(req.user.id);
   const ent = await entitlementOf(shop.id);
   //  عضوِ فعالی که کد را دوباره زد: هیچ چیز عوض نشد (نقش فقط از PATCH/PUT /members/:id)

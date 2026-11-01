@@ -40,7 +40,7 @@
 | `fulfillment` (ارسال/تحویل در دکان)، `deliveryFeeMinor`، `minOrderMinor`، `currency` | `storefronts` | ✅ (ارز ثابتِ `AFN`) |
 | `payment.methods` | ثابت `['cod']` در `profile()` ِ `lib/storefront.js` | 🟡 پرداختِ آنلاین منتظرِ D-08 |
 | **لوگو و تصویرِ سرِ صفحه** | — | ❌ هیچ ستونی نیست |
-| **شناسهٔ عمومیِ پایدارِ دکان** (جدا از `slug`) | — | ❌ `slug` قابلِ تغییر است؛ لینکِ کهنه، تبلیغ و API باید به شناسهٔ ثابت تکیه کنند |
+| **شناسهٔ عمومیِ پایدارِ دکان** (جدا از `slug`) | `storefronts.public_id` (ULID، تغییرناپذیر) و `storefront_slug_redirects` (مهاجرت ۱۳۱)؛ `GET /api/store?id=` و ۳۰۸/۳۰۱ از نشانیِ کهنه | 🟡 پشتِ پرچمِ خاموشِ `market.public_id` (S3) |
 | **امتیاز/نظرِ مشتری** | — | ❌ (فقط شکایت/گزارش در `trust_cases`) |
 | **وضعیتِ اعتماد** (جریمهٔ فعال) | `trust_sanctions` (۱۰۱) با `suspend_storefront` | ✅ اثر می‌گذارد، ولی در نمای عمومی فیلدِ صریح ندارد |
 
@@ -199,6 +199,19 @@
 | **S2** | **ماژولِ نمای عمومی** (`lib/public-views.js`): همهٔ شکل‌های عمومی (دکان، حضور، کالا، موجودی، سفارش، پیک) یک‌جا با فهرستِ سفیدِ فیلدها و `schemaVersion`؛ مسیرهای `/store` و `/market` فقط از آن استفاده کنند (بُرشِ پاسخِ زنده پشتِ پرچمِ `market.public_views`، پیش‌فرض خاموش، تا فیلدِ تازهٔ شاخه‌های دیگر بی‌صدا بریده نشود). | `server/src/lib/` | آزمونِ قرارداد (snapshot) که اگر فیلدی بی تغییرِ نسخه اضافه/حذف شود سرخ شود؛ آزمونِ «هیچ شناسهٔ داخلی، شماره یا مختصاتِ دقیق در پاسخ نیست». |
 | **S3** | **شناسهٔ عمومیِ پایدارِ دکان** (`public_id`، ULID، تغییرناپذیر) و جدولِ «نشانیِ پیشین ⇐ نشانیِ تازه» برای وقتی `slug` عوض می‌شود. | مهاجرتِ تازه روی `storefronts` | لینکِ کهنه به نشانیِ تازه می‌رسد؛ API و تبلیغ به `public_id` تکیه می‌کنند. |
 | **S4** | **مدل‌های قرارداد در `core`**: `PublicShop`، `PublicPresence`، `PublicProduct`، `StockBadge`، `PublicOrder`، `PublicDelivery` (فقط داده + تجزیهٔ JSON)، تا برنامهٔ خرید (اندروید/آیفون) و برنامهٔ مدیریت (پیش‌نمایشِ «مشتری چه می‌بیند») یک تعریف داشته باشند. | `core/src/commonMain/.../market/` | آزمونِ `core` با نمونهٔ JSON ِ همان آزمونِ قراردادِ سرور (یک فایلِ نمونهٔ مشترک). |
+
+**افزوده‌های v1 پیش از نخستین انتشار (۱۴۰۵/۰۸/۱۰، شاخهٔ #418):** فیلدهایی که main همین حالا در پاسخِ عمومی می‌فرستد، با همان شکلِ main به همین نسخه (`schemaVersion = 1`) افزوده شدند، نه v2 — v1 هنوز منتشر نشده بود و برنامه‌ای با آن ساخته نشده است. فهرستِ سفید (`lib/public-views.js`)، `core/test-vectors/market-public-v1.json` (`_v1Additions`) و `MarketContract.kt` هم‌گام‌اند.
+
+| شکل | فیلد | منبع |
+|---|---|---|
+| `order` | `substitution` (ترجیحِ کلیِ جایگزینی: `''` \| `best_match` \| `none` \| `refund`) | CHK-15، #525 |
+| `orderLine` | `substitution`، `substituteName` (ترجیحِ هر قلم و نامِ «کالای مشخص») | CHK-16، #525 |
+| `order` | `smallBasketFeeMinor`، `slotFeeMinor` (ریزِ هزینهٔ ارسال، هر دو درونِ `deliveryFeeMinor`) | CHK-06/07، #494 |
+| `order` | `onlinePay?` = `{ available }` — فقط در پیگیری (`GET /api/store/:slug/orders/:token`) | PAY-21، #529 |
+| `product` | `regularPriceMinor?` — فقط در `highlights.deals` («ارزان‌تر از قیمتِ دکان») | WEB-02، #626 |
+| `shop` | `media?` = `{ logo, header }`، هر کدام `null` یا `{ version, width, height, mime, url }` (پرچمِ خاموش ⇒ هر دو `null`) | M3، #428 |
+
+فیلدهای پشتِ پرچم‌های خاموشِ دیگر (`order.delivery` ِ S5، `order.refund` ِ NTF-08، `store.publicId` ِ S3، جزئیاتِ M4 در جست‌وجو) هنوز در این فهرست نیستند؛ تا آن‌ها نیامده‌اند پرچمِ `market.public_views` خاموش بماند.
 
 ### اولویتِ ۲ — داده‌ای که بازار به آن نیاز دارد و فقط دکان می‌تواند بسازد
 

@@ -98,6 +98,45 @@ class ReleaseFeedTest {
     ))
   }
 
+  // ── OPS-01: انتشارِ مرحله‌ای با برچسبِ نسخه‌دار ──────────────────────
+
+  @Test
+  fun `برنامه به سرور می‌گوید برچسبِ نسخه‌دار را می‌شناسد`() {
+    assertEquals(
+      "https://api.example/api/releases/tohid-native/latest?shop=shopA&device=dev1&staged=1",
+      ReleaseFeed.latestUrl("https://api.example/", "tohid-native", "shopA", "dev1"),
+    )
+    //  شناسهٔ ناجور فرستاده نمی‌شود؛ staged همیشه
+    assertEquals(
+      "https://api.example/api/releases/tohid-native/latest?staged=1",
+      ReleaseFeed.latestUrl("https://api.example", "tohid-native", " ", "a b"),
+    )
+  }
+
+  @Test
+  fun `برچسبِ نسخه‌دارِ همان نسخه پذیرفته می‌شود و فایل‌ها از همان برچسب می‌آیند`() {
+    val r = ReleaseFeed.parseLatest(
+      """{"tag":"tohid-native-v3.2.70","channel":"staged","version":"3.2.70","notes":"s",
+         "assets":[{"name":"SHA256SUMS.txt","size":1},{"name":"Tohid-Native-3.2.70.apk","size":9}]}""",
+      "tohid-native",
+    )!!
+    assertEquals("tohid-native-v3.2.70", r.tag)
+    assertTrue(r.hasSums)
+    assertEquals(
+      "https://api.example/api/releases/tohid-native-v3.2.70/file/Tohid-Native-3.2.70.apk",
+      ReleaseFeed.fileUrl("https://api.example", r.tag, ReleaseFeed.androidInstaller(r.assets)!!.name),
+    )
+  }
+
+  @Test
+  fun `برچسبِ نسخه‌دارِ نسخهٔ دیگر یا پایهٔ دیگر پذیرفته نمی‌شود`() {
+    val body = { tag: String, v: String -> """{"tag":"$tag","version":"$v","assets":[{"name":"Tohid-Native-$v.apk","size":5}]}""" }
+    assertNull(ReleaseFeed.parseLatest(body("tohid-native-v3.2.71", "3.2.70"), "tohid-native"))
+    assertNull(ReleaseFeed.parseLatest(body("tohid-desktop-v3.2.70", "3.2.70"), "tohid-native"))
+    assertNull(ReleaseFeed.parseLatest(body("tohid-native-vx", "3.2.70"), "tohid-native"))
+    assertNull(ReleaseFeed.parseLatest(body("tohid-native-v", "3.2.70"), "tohid-native"))
+  }
+
   // ── §۳۸.۹: حداقل نسخهٔ پشتیبانی‌شده ────────────────────────────────
 
   @Test
@@ -148,16 +187,16 @@ class ReleaseFeedTest {
   @Test
   fun `شناسهٔ دکان و دستگاه فقط وقتی هست و درست است فرستاده می‌شود`() {
     assertEquals(
-      "https://api.example/api/releases/tohid-native/latest?shop=shop_ab12&device=0f9e",
+      "https://api.example/api/releases/tohid-native/latest?shop=shop_ab12&device=0f9e&staged=1",
       ReleaseFeed.latestUrl("https://api.example/", "tohid-native", "shop_ab12", "0f9e"),
     )
     assertEquals(
-      "https://api.example/api/releases/tohid-desktop/latest",
+      "https://api.example/api/releases/tohid-desktop/latest?staged=1",
       ReleaseFeed.latestUrl("https://api.example", "tohid-desktop", "", ""),
     )
     //  شناسهٔ خراب هرگز پرسش را نمی‌شکند
     assertEquals(
-      "https://api.example/api/releases/tohid-native/latest?device=0f9e",
+      "https://api.example/api/releases/tohid-native/latest?device=0f9e&staged=1",
       ReleaseFeed.latestUrl("https://api.example", "tohid-native", "a&b=c", "0f9e"),
     )
   }

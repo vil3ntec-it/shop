@@ -2,33 +2,46 @@
 const path = require('path');
 const express = require('express');
 const config = require('./config');
-const { healthy, pruneExpired, now, driverName } = require('./db');
+const { healthy, pruneExpired, now } = require('./db');
 const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
-const { notFoundHandler, errorHandler } = require('./middleware/errors');
-const { requireUser, optionalShop } = require('./middleware/auth');
+const { notFoundHandler, errorHandler, notFound } = require('./middleware/errors');
+const { requireUser, optionalShop, requireAdmin } = require('./middleware/auth');
 const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
-  if (config.trustProxy) app.set('trust proxy', true);
+  //  SEC-AUTH-05: فقط پروکسیِ مطمئن (همان قاعدهٔ `clientIp`)، نه هر همسایه‌ای
+  if (config.trustProxy) app.set('trust proxy', (addr) => require('./middleware/ratelimit').trustedPeer(addr));
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
   await plans.seedDefaults();
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
   await pruneExpired();
+  //  §۹.۵: هر بالا آمدن یک «دورانِ» همگام‌سازیِ تازه — پس از بازیابی از پشتیبان، برنامه‌ها
+  //  از همین می‌فهمند سرور به عقب رفته و opهای «اعمال‌شده»ی گم‌شده را دوباره می‌فرستند
+  //  (`lib/sync-epoch.js`). شکستش بالا آمدن را نمی‌خواباند؛ فقط آن تشخیص نمی‌شود.
+  //  پشتِ پرچمِ خاموشِ `SYNC_EPOCH_ENABLED`
+  if (config.syncEpoch.enabled) {
+    await require('./lib/sync-epoch').rotate('boot')
+      .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
+  }
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
+  //  شناسهٔ پایدارِ این سرور — در نخستین راه‌اندازی ساخته می‌شود (`lib/server-identity.js`)
+  await require('./lib/server-identity').serverId().catch(err => console.error('[server-id]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
   await require('./lib/admin-bootstrap').ensureAdmin({
     username: process.env.ADMIN_BOOTSTRAP_USER,
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     log: (m) => console.log(`[admin] ${m}`),
   });
+  //  فاز ۳: «مالکِ اصلی» (پیشین‌ترین ارشد) نشان بخورد — مدیرِ دیگری غیرفعال یا تنزلش نمی‌دهد
+  await require('./lib/admin-owner').ownerId();
 
   //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
   //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
@@ -36,6 +49,9 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
   //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64
   app.use(/^\/api(?:\/v1)?\/pump\/device\/report\//, express.json({ limit: '34mb' }));
+  //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
+  //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
+  app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
   app.use(express.json({ limit: '2mb' }));
 
   /*
@@ -126,6 +142,23 @@ async function createApp({ runMigrations = true } = {}) {
         console.log(`${req.method} ${redactPath(req.originalUrl)} ${res.statusCode} ${ms}ms`);
       }
     });
+    next();
+  });
+
+  /*
+   *  ⛔ TEN-02 (cache) — پاسخِ درخواستِ دارای اعتبارنامه هرگز در کشِ مشترک (CDN، پراکسیِ
+   *  کش‌دار، قاعدهٔ «همه را کش کن») نمی‌نشیند: پیش‌فرضِ `private, no-cache` و `Vary`
+   *  روی همان سرآیندها. مسیری که خودش Cache-Control می‌گذارد (‎no-store‎، ‎private,
+   *  max-age‎، ETag ِ فاکتور…) پس از این می‌نویسد و همان می‌ماند. `tenant-surfaces.test.js`.
+   */
+  const CREDENTIALS = ['authorization', 'x-store-session', 'x-store-ticket'];
+  app.use('/api', (req, res, next) => {
+    if (CREDENTIALS.some((k) => req.headers[k])) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.vary('Authorization');
+      res.vary('X-Store-Session');
+      res.vary('X-Store-Ticket');
+    }
     next();
   });
 
@@ -222,6 +255,9 @@ async function createApp({ runMigrations = true } = {}) {
         });
       } catch (err) { next(err); }
     });
+    //  هویت و توانِ همین سرور (`app.multi_server` ِ برنامه‌ها) — عمومی، فقط خواندنی، بی راز.
+    //  زیرِ پیشوندِ موجودِ `/config` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی دست نمی‌خورد
+    api.use('/config/server', require('./routes/server-info'));
     /**
      * فهرست پلن‌ها و قیمت‌ها — **بی‌نیاز به ورود**.
      *
@@ -293,6 +329,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));
+    //  «دورانِ» همگام‌سازیِ v1 پس از بازیابی (§۹.۵) — فقط دکان، جدا از `routes/sync-v1.js`
+    //  ِ مشترک با پمپ؛ پیش از `/shop` (همان دلیلِ `/shop/orders`)
+    api.use('/shop/sync-epoch', require('./routes/shop-sync-epoch'));
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
@@ -309,18 +348,31 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/trust', require('./routes/admin-trust'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
+    //  سفارشِ خرید از تأمین‌کننده (PUR-02/04) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.purchase_orders`
+    api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
+    api.use('/shop/orders/desk', require('./routes/order-desk'));
+    //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
+    api.use('/shop/orders/bulk', require('./routes/order-bulk'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
+    //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
+    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
     api.use('/shop/storefront', require('./routes/storefront-admin'));
+    //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    api.use('/store', require('./routes/pick-substitutes-store'));
+    api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/receipt-profile', require('./routes/shop-receipt'));
+    //  ذخیرهٔ کهنه (#407): فقط پرچمِ `shop.ledger_merge` (پیش‌فرض خاموش) برای برنامه — پیش از `/shop`
+    api.use('/shop/ledger-merge', require('./routes/shop-ledger-merge'));
     api.use('/receipt', require('./routes/receipt-public'));
     //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
     //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
@@ -333,6 +385,15 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/courier', require('./routes/courier'));
     //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
     api.use('/shop/promos', require('./routes/shop-promos'));
+    //  STF-07/STF-08: ورود و خروجِ کارمند و نرخ‌های پورسانت — پشتِ `shop.staff_time`، پیش‌فرض خاموش
+    api.use('/shop/staff-time', require('./routes/staff-time'));
+    //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
+    api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
+    //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
+    //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
+    api.use('/shop/payments', require('./routes/shop-payments'));
+    api.use('/payments', require('./routes/payments-webhook'));
+    api.use('/admin/payments', require('./routes/admin-payments'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
@@ -387,8 +448,22 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  ماژولِ ۴.۵ ِ پنلِ مرکزی: مالیِ مرکزی (درآمدِ اشتراک، سندِ اصلاحی، بدهی، مغایرت، خروجی) — `requireAdmin` ِ خودش
+    api.use('/admin/finance', require('./routes/admin-finance'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
+    //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
+    api.use('/calendar', require('./routes/calendar'));
+    api.use('/admin/calendar', require('./routes/admin-calendar'));
+    /*
+     *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ
+     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به
+     *  `routes/data` ِ پایین (روی `/`، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
+     *  پنل آن را «نشستِ ارشد تمام شد» می‌خواند. `requireAdmin` همین‌جا دوباره: بی‌توکن و توکنِ دکان
+     *  همان ۴۰۱ ِ همیشه را می‌گیرند تا وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود. هر مسیرِ واقعی
+     *  بالاتر سوار است، پس این خط به هیچ‌کدام نمی‌رسد.
+     */
+    api.use('/admin', requireAdmin, (req, res, next) => next(notFound('این مسیرِ مدیر روی این سرور نیست', 'route_not_found')));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
@@ -438,13 +513,78 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
-  const storePage = async (slug, res) => {
+  //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با
+  //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
+  const storeSeo = require('./lib/store-seo');
+  const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
+  const storePage = async (slug, res, lang, onHost = false) => {
     let status = 200;
-    try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    let sf = null;
+    try { sf = await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    //  S3 (پرچمِ `market.public_id`): نشانیِ پیشین ⇒ نشانیِ تازهٔ همان دکان؛ خاموش ⇒ همان ۴۰۴
+    const moved = status === 404 ? await storefront.movedTo(slug) : null;
+    if (moved) {
+      return res.set('Cache-Control', 'no-store')
+        .redirect(301, onHost ? `//${moved}.${config.storefront.domain}/` : `/store/${moved}`);
+    }
+    const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
+    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  S3: پیوندِ پایدار (تبلیغ، API) — `/store?id=<ULID>` ⇒ نشانیِ امروز؛ نبود ⇒ همان راهِ امروز (پیش از static، که `/store` را به `/store/` می‌برد)
+  app.get('/store', (req, res, next) => (typeof req.query.id !== 'string' ? next()
+    : storefront.byPublicId(req.query.id).then((hit) => (hit
+      ? res.set('Cache-Control', 'no-store').redirect(302, `/store/${hit.slug}`) : next())).catch(next)));
+  //  پیوندِ کمپین و QR ِ دکان (MKT-10/11، `lib/campaigns.js`): `/store/go/<کد>` ⇒ ویترینِ
+  //  همان دکان با `?c=<کد>`. «go» هرگز slug نیست (کمینه ۳ نویسه) و زیرِ همان پیشوندِ
+  //  `/store` است ⇒ ACCOUNT_PREFIXES ِ پنلِ خانگی چیزِ تازه‌ای نمی‌خواهد. پرچمِ خاموش،
+  //  کدِ ناشناخته و ویترینِ بسته همان پوستهٔ ۴۰۴ ِ ویترین‌اند. برنامه با
+  //  `Accept: application/json` همان را JSON می‌گیرد. HEAD بازدید نمی‌شمارد.
+  const campaigns = require('./lib/campaigns');
+  const { clientIp } = require('./middleware/ratelimit');
+  const goLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-go' });
+  app.get('/store/go/:code', storeHeaders, goLimit, (req, res, next) => {
+    const wantsJson = req.accepts(['html', 'json']) === 'json';
+    res.set('Cache-Control', 'no-store');
+    campaigns.resolve(req.params.code).then(async ({ campaign, store }) => {
+      const live = campaign.archived !== true;
+      if (req.method === 'GET') {
+        await campaigns.recordVisit(campaign, store, { ip: clientIp(req), ua: req.get('user-agent') || '' })
+          .catch((err) => console.error('[campaigns] visit', err.message));
+      }
+      const target = `/store/${store.slug}`;
+      if (wantsJson) return res.json({ store: { slug: store.slug, path: target }, campaign: live ? campaign.code : null });
+      res.redirect(302, live ? `${target}?c=${campaign.code}` : target);
+    }).catch((err) => {
+      if (err.status !== 404) return next(err);
+      if (wantsJson) return res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } });
+      res.status(404).sendFile('index.html', { root: storeDir });
+    });
+  });
+  //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
+  //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
+  const seoOnly = (slugOf, fn) => (req, res, next) => {
+    const slug = slugOf(req);
+    if (!slug) return next();
+    storefront.open(slug).then(async (sf) => {
+      if (!(await storeSeo.on(sf))) return next();
+      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
+    }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
+  };
+  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
+    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(p.body)));
+  const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
+  const robotsOf = (sf, req, res) => storeSeo.robots(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
+  const hostSlug = (req) => storefront.slugFromHost(req.hostname);
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
-  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
+  app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
+  app.get('/store/:slug/sitemap.xml', seoOnly((req) => req.params.slug, sitemapOf));
+  app.get('/p/:id', seoOnly(hostSlug, productPage));
+  app.get('/sitemap.xml', seoOnly(hostSlug, sitemapOf));
+  app.get('/robots.txt', seoOnly(hostSlug, robotsOf));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
   app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
     const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
@@ -463,7 +603,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, req.query.lang, true).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته
@@ -498,13 +638,22 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(errorHandler);
 
   // ---- کارهای دوره‌ای ----
+  const HOUSEKEEPING_MS = 6 * 60 * 60 * 1000;
+  //  پنلِ مرکزی ۴.۹: «خانه‌تکانی اجرا شد» + شکستِ هر زیرکار (`lib/job-beat.js`)؛ رفتار همان
+  const beat = require('./lib/job-beat');
+  const beatFail = (err) => beat.failed('housekeeping', err);
   const housekeeping = setInterval(() => {
-    pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    beat.ran('housekeeping', HOUSEKEEPING_MS);
+    pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
+    //  S6: جریانِ تغییرِ بازار فقط MARKET_CHANGES_KEEP_DAYS روز می‌ماند (`lib/market-changes.js`)
+    require('./lib/market-changes').prune().catch(err => console.error('[market-changes]', err.message));
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
     //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
+    //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
+    require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
@@ -521,8 +670,13 @@ async function createApp({ runMigrations = true } = {}) {
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
-  }, 6 * 60 * 60 * 1000);
+    //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
+      .catch(err => console.error('[payments] تطبیق', err.message));
+  }, HOUSEKEEPING_MS);
   if (housekeeping.unref) housekeeping.unref();
+  beat.register('housekeeping', HOUSEKEEPING_MS);
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
   setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
   setImmediate(() => require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message)));

@@ -1,5 +1,6 @@
 {
   "_doc": "قراردادِ نمای عمومیِ دکان ⇐ بازار (docs/MARKETPLACE-CONTRACT-fa.md، S2/S4). ⛔ با تغییرِ fields، schemaVersion و نامِ پرونده بالا می‌رود (market-public-v2.json). سرور: server/test/public-views.test.js و server/src/lib/public-views.js؛ core: MarketContractTest.kt. inputs = ورودیِ سازنده‌های سرور (با فیلدهای داخلی که نباید بیرون بیایند)، samples = نمای عمومیِ همان.",
+  "_v1Additions": "پیش از نخستین انتشارِ v1 (شاخهٔ #418)، فیلدهایی که main همین حالا عمومی می‌فرستد به همین نسخه افزوده شد — بی v2: order.substitution و orderLine.substitution/substituteName (CHK-15/16 #525)، order.smallBasketFeeMinor/slotFeeMinor (CHK-06/07 #494)، order.onlinePay = {available} فقط در پیگیری (PAY-21 #529)، product.regularPriceMinor? در highlights.deals (WEB-02 #626)، shop.media = {logo, header} با هر کدام null یا {version, width, height, mime, url} (M3 #428).",
   "schemaVersion": 1,
   "fields": {
     "shop": [
@@ -15,7 +16,19 @@
       "currency",
       "payment",
       "categories",
-      "delivery?"
+      "delivery?",
+      "media?"
+    ],
+    "shopMedia": [
+      "logo",
+      "header"
+    ],
+    "mediaFile": [
+      "version",
+      "width",
+      "height",
+      "mime",
+      "url"
     ],
     "presence": [
       "badge",
@@ -76,6 +89,7 @@
       "unit",
       "category",
       "priceMinor",
+      "regularPriceMinor?",
       "maxQtyMilli",
       "photo",
       "stock",
@@ -118,6 +132,7 @@
       "orderNo",
       "status",
       "statusReason",
+      "substitution",
       "fulfillment",
       "paymentMethod",
       "paymentStatus",
@@ -132,10 +147,13 @@
       "scheduledFor",
       "slotEndsAt",
       "zoneName",
+      "smallBasketFeeMinor",
+      "slotFeeMinor",
       "createdAt",
       "updatedAt",
       "canCancel",
-      "timeline"
+      "timeline",
+      "onlinePay?"
     ],
     "orderLine": [
       "productId",
@@ -144,7 +162,12 @@
       "qtyMilli",
       "unitPriceMinor",
       "lineTotalMinor",
-      "note"
+      "note",
+      "substitution",
+      "substituteName"
+    ],
+    "onlinePay": [
+      "available"
     ],
     "orderEvent": [
       "status",
@@ -284,6 +307,7 @@
       "orderNo": 42,
       "status": "accepted",
       "statusReason": "",
+      "substitution": "best_match",
       "fulfillment": "delivery",
       "paymentMethod": "cod",
       "paymentStatus": "unpaid",
@@ -297,7 +321,8 @@
       "scheduledFor": null,
       "delivery": {
         "slot": {
-          "endsAt": "1761807200000"
+          "endsAt": "1761807200000",
+          "feeMinor": 1000
         }
       },
       "createdAt": 1761799400000,
@@ -324,7 +349,9 @@
           "qtyMilli": 1000,
           "unitPriceMinor": 12000,
           "lineTotalMinor": 12000,
-          "note": "بزرگ"
+          "note": "بزرگ",
+          "substitution": "specific",
+          "substituteName": "روغنِ کوچک"
         }
       ],
       "events": [
@@ -564,6 +591,7 @@
       "orderNo": 42,
       "status": "accepted",
       "statusReason": "",
+      "substitution": "best_match",
       "fulfillment": "delivery",
       "paymentMethod": "cod",
       "paymentStatus": "unpaid",
@@ -577,7 +605,9 @@
           "qtyMilli": 2000,
           "unitPriceMinor": 12000,
           "lineTotalMinor": 24000,
-          "note": ""
+          "note": "",
+          "substitution": "",
+          "substituteName": ""
         },
         {
           "productId": "oil",
@@ -586,7 +616,9 @@
           "qtyMilli": 1000,
           "unitPriceMinor": 12000,
           "lineTotalMinor": 12000,
-          "note": "بزرگ"
+          "note": "بزرگ",
+          "substitution": "specific",
+          "substituteName": "روغنِ کوچک"
         }
       ],
       "subtotalMinor": 36000,
@@ -597,6 +629,8 @@
       "scheduledFor": null,
       "slotEndsAt": 1761807200000,
       "zoneName": "شهرِ نو",
+      "smallBasketFeeMinor": 0,
+      "slotFeeMinor": 1000,
       "createdAt": 1761799400000,
       "updatedAt": 1761799700000,
       "canCancel": false,

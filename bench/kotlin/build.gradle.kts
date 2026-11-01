@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
  *  bench/kotlin — ریزسنجشِ JVMِ موتورهای مشترکِ اندروید و کامپیوتر.
  *
  *  ‌• موتورها کپی نمی‌شوند و بازنویسی هم نمی‌شوند: همان فایل‌های
- *    `android-native/.../core/{money,stock,report,text,audit,calendar}` پیش از
+ *    `android-native/.../core/{stock,report,audit}` و `core/src/commonMain/.../core/{money,text,calendar}` پیش از
  *    ساخت به `build/generated/engines` همگام می‌شوند — پس سنجه همیشه همان کدی
  *    است که در برنامه اجرا می‌شود.
  *  ‌• نسخهٔ Kotlin همان `android-native`، `desktop` و `core` است (2.2.20).
@@ -18,7 +18,11 @@ plugins {
 }
 
 val repoRoot = rootDir.resolve("../..")
-val engineRoot = repoRoot.resolve("android-native/app/src/main/java")
+//  money، text و calendar به `core` (commonMain ِ KMP) رفته‌اند؛ هر پوشه از همان ریشه‌ای که دارَدَش
+val engineRoots = listOf(
+  repoRoot.resolve("android-native/app/src/main/java"),
+  repoRoot.resolve("core/src/commonMain/kotlin"),
+)
 val engineDirs = listOf(
   "ir/vil3ntec/tohid/core/money",
   "ir/vil3ntec/tohid/core/stock",
@@ -29,12 +33,12 @@ val engineDirs = listOf(
 )
 
 val engineSources by tasks.registering(Sync::class) {
-  inputs.files(engineDirs.map { engineRoot.resolve(it) })
+  inputs.files(engineRoots.flatMap { root -> engineDirs.map { root.resolve(it) } })
   doFirst {
-    val missing = engineDirs.filterNot { engineRoot.resolve(it).isDirectory }
+    val missing = engineDirs.filter { d -> engineRoots.none { it.resolve(d).isDirectory } }
     check(missing.isEmpty()) { "پوشهٔ موتور جابه‌جا شده؛ فهرستِ engineDirs را درست کنید: $missing" }
   }
-  from(engineRoot) { engineDirs.forEach { include("$it/*.kt") } }
+  engineRoots.forEach { root -> from(root) { engineDirs.forEach { include("$it/*.kt") } } }
   into(layout.buildDirectory.dir("generated/engines"))
 }
 

@@ -70,13 +70,24 @@ object LedgerArchive {
   fun cutoff(now: Long, keepDays: Int = KEEP_DAYS): Long =
     now - keepDays.toLong() * 24L * 60L * 60L * 1000L
 
+  /**
+   *  ردیف‌هایی که هرگز بایگانی نمی‌شوند، هر چه کهنه: دفترِ موجودی و بها (`StockLedger`) **از
+   *  خودِ آن‌ها** حساب می‌شود و از فروش و ورودی دوباره ساخته نمی‌شوند —
+   *   • تنظیمِ دکان (`stock_mode`): بی آن موتور پس از ۴۰۰ روز خودبه‌خود خاموش می‌شد؛
+   *   • «بررسی شد» (`stock_review_ack`): بی آن وظیفه‌های بسته دوباره باز می‌شدند؛
+   *   • انتقال بین محل‌ها: بی آن موجودیِ هر محل غلط می‌شد.
+   *  شمارشان کم است و وزنی ندارند.
+   */
+  fun pinned(m: StockMovement): Boolean = m.type in StockLedger.TRANSFER_TYPES
+  fun pinned(a: AuditEntry): Boolean = a.type == StockLedger.MODE_TYPE || a.type == StockLedger.ACK_TYPE
+
   /** بدونِ دست زدن به چیزی، فقط می‌شمارد */
   fun plan(d: ShopData, now: Long = System.currentTimeMillis(), keepDays: Int = KEEP_DAYS): Plan {
     val edge = cutoff(now, keepDays)
     return Plan(
-      movements = d.stockMovements.count { it.createdAt in 1 until edge },
+      movements = d.stockMovements.count { it.createdAt in 1 until edge && !pinned(it) },
       prices = d.priceHistory.count { it.createdAt in 1 until edge },
-      audits = d.auditLog.count { it.createdAt in 1 until edge },
+      audits = d.auditLog.count { it.createdAt in 1 until edge && !pinned(it) },
     )
   }
 
@@ -93,14 +104,17 @@ object LedgerArchive {
     val edge = cutoff(now, keepDays)
     fun old(at: Long) = at in 1 until edge
 
-    val oldMoves = d.stockMovements.filter { old(it.createdAt) }
+    fun goMove(m: StockMovement) = old(m.createdAt) && !pinned(m)
+    fun goAudit(a: AuditEntry) = old(a.createdAt) && !pinned(a)
+
+    val oldMoves = d.stockMovements.filter(::goMove)
     val oldPrices = d.priceHistory.filter { old(it.createdAt) }
-    val oldAudits = d.auditLog.filter { old(it.createdAt) }
+    val oldAudits = d.auditLog.filter(::goAudit)
 
     val kept = d.copy(
-      stockMovements = d.stockMovements.filterNot { old(it.createdAt) },
+      stockMovements = d.stockMovements.filterNot(::goMove),
       priceHistory = d.priceHistory.filterNot { old(it.createdAt) },
-      auditLog = d.auditLog.filterNot { old(it.createdAt) },
+      auditLog = d.auditLog.filterNot(::goAudit),
     )
     return kept to Archive(oldMoves, oldPrices, oldAudits)
   }
@@ -204,6 +218,18 @@ object LedgerArchive {
     }
     return runCatching { json.decodeFromString<Archive>(text) }.getOrDefault(Archive())
   }
+
+  /**
+   *  §۹.۵: شناسهٔ ردیف‌های بایگانی‌شده، هر مجموعه — ساختنِ دوبارهٔ دفتر از Snapshot پس از
+   *  بازیابیِ سرور (`V1Restore`، `SyncV3Engine.rebuild`) آن‌ها را به دفتر برنمی‌گرداند؛ وگرنه
+   *  هم در دفتر بودند هم در بایگانی و «خروجیِ صاحب» دو بار می‌شمرد. ورودی: `readArchive`.
+   */
+  fun archivedIds(a: Archive): Map<String, Set<String>> =
+    mapOf(
+      "stockMovements" to a.stockMovements.mapTo(HashSet()) { it.id },
+      "priceHistory" to a.priceHistory.mapTo(HashSet()) { it.id },
+      "auditLog" to a.auditLog.mapTo(HashSet()) { it.id },
+    )
 
   /** اندازهٔ فایلِ بایگانی، برای نشان دادن در تنظیمات */
   fun archiveBytes(context: Context): Long = file(context).let { if (it.exists()) it.length() else 0L }

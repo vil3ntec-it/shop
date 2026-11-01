@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.core.i18n.StrExpenses
 
 /**
  *  مصارف، خرید و تأمین‌کننده‌ها.
@@ -28,9 +29,9 @@ object LedgerEngine {
   )
 
   fun addExpense(d: ShopData, draft: ExpenseDraft, today: String, now: Long, newId: () -> String): Result {
-    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed(StrExpenses.amountInvalid)
     val category = draft.category.trim().ifBlank { d.expenseCategories.firstOrNull().orEmpty() }
-    if (category.isBlank()) return Result.Failed("دسته‌بندی را انتخاب کنید")
+    if (category.isBlank()) return Result.Failed(StrExpenses.pickCategory)
 
     // «بابت چی؟» اختیاری است: نامِ دسته‌بندی به‌جایش می‌نشیند تا فهرستِ
     // مصارف ردیفِ بی‌عنوان نداشته باشد — همان کارِ نسخهٔ وب
@@ -55,8 +56,8 @@ object LedgerEngine {
   }
 
   fun editExpense(d: ShopData, id: String, draft: ExpenseDraft, today: String): Result {
-    val existing = d.expenses.find { it.id == id } ?: return Result.Failed("مصرف پیدا نشد")
-    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    val existing = d.expenses.find { it.id == id } ?: return Result.Failed(StrExpenses.expenseNotFound)
+    if (draft.amount.isNaN() || draft.amount <= 0) return Result.Failed(StrExpenses.amountInvalid)
     val category = draft.category.trim().ifBlank { existing.category }
     val title = draft.title.trim().ifBlank { category }
 
@@ -83,7 +84,7 @@ object LedgerEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val e = d.expenses.find { it.id == id } ?: return Result.Failed("مصرف پیدا نشد")
+    val e = d.expenses.find { it.id == id } ?: return Result.Failed(StrExpenses.expenseNotFound)
     //  ردپا: هزینهٔ پاک‌شده سودِ خالص را بالا می‌برد و باید معلوم بماند
     val trace = AuditEntry(
       id = newId(), type = "expense_delete", date = today, refId = id, createdAt = now,
@@ -170,6 +171,12 @@ object LedgerEngine {
     /** تاریخِ انقضا و تولیدِ همین محموله (اختیاری) — روی ورودِ انبار می‌نشیند */
     val expiryDate: String = "",
     val productionDate: String = "",
+    /*  موتورِ تازهٔ موجودی (`StockLedger`) — `null` = فرمِ امروز (خاموش) */
+    /** هزینهٔ جانبیِ همین خرید (کرایه، گمرک) به افغانی — روی بهای کالا، نه بدهیِ تأمین‌کننده (PUR-06) */
+    val landedCost: Double? = null,
+    val userId: String? = null,
+    /** سررسیدِ پرداخت (`yyyy-MM-dd`، PUR-07)؛ `null` یا خالی = ندارد */
+    val dueDate: String? = null,
   )
 
   /**
@@ -191,8 +198,13 @@ object LedgerEngine {
       ?: return Result.Failed("محصول را انتخاب کنید")
     if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed("هزینهٔ جانبی درست نیست")
+    val due = draft.dueDate?.trim()?.ifEmpty { null }
+    if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed("سررسید درست نیست")
+    val landed = draft.landedCost?.takeIf { it > 0 }
 
     val date = draft.date.ifBlank { today }
+    if (due != null && due < date) return Result.Failed(PurchaseBook.DUE_BEFORE_DATE)
     val unit = draft.unit.ifBlank { product.unit }
     // گِرد کردن دقیقاً همان‌جای نسخهٔ وب است
     val totalAmount = Math.round(draft.quantity * draft.purchasePrice).toDouble()
@@ -257,6 +269,9 @@ object LedgerEngine {
           createdAt = now,
           expiryDate = draft.expiryDate,
           productionDate = draft.productionDate,
+          landedCost = landed,
+          landedCostMinor = landed?.let(StockLedger::minor),
+          userId = draft.userId?.trim()?.ifEmpty { null },
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId,
@@ -272,6 +287,10 @@ object LedgerEngine {
           debt = totalAmount - paid,
           warehouseEntryId = entryId,
           createdAt = now,
+          dueDate = due,
+          //  خریدِ تکی: هزینهٔ جانبی روی ردیفِ خرید هم (مثلِ فاکتورِ چندردیفه، `PurchaseBook`)
+          landedCost = landed,
+          landedCostMinor = landed?.let(StockLedger::minor),
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),

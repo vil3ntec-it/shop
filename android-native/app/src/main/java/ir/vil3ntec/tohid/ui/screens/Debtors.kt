@@ -54,10 +54,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.money.MoneyInput
+import ir.vil3ntec.tohid.data.CustomerCrm
+import ir.vil3ntec.tohid.data.CustomerProfileForm
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -100,6 +105,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   var receiptFor by remember { mutableStateOf<String?>(null) }
   var dueFor by remember { mutableStateOf<String?>(null) }
   var overLimit by remember { mutableStateOf<PendingTx?>(null) }
+  //  پروندهٔ CRM (CRM-02/10/11) — فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض خاموش)
+  val crm = ShopPolicy.crmReports(LocalContext.current)
+  var tagFilter by rememberSaveable { mutableStateOf<String?>(null) }
+  var mergeOpen by remember { mutableStateOf(false) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -116,6 +125,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
+  val txKey = remember(txFor) { newId() }  // ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر پنجره ⇒ دو ضربه یک ردیف
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
     if (openId != null && d.debtors.none { it.id == openId }) openId = null
@@ -134,6 +145,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDelete = { confirmDelete = account.debtor },
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
+      onMessage = ::toast,
+      store = store,
     )
   } else {
     /*
@@ -144,11 +157,9 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
      *  اسکرول را کند می‌کرد.
      */
     val term = search.trim()
-    val rows = remember(d, term, sort) {
-      d.debtors
-        .filter {
-          term.isBlank() || it.name.contains(term, ignoreCase = true) || ir.vil3ntec.tohid.LocaleText.phoneMatches(it.phone, term)
-        }
+    //  ادغام‌شده‌ها بیرون (CRM-10)؛ با CRM روشن جست‌وجو روی هر دو شماره و برچسب و صافیِ برچسب
+    val rows = remember(d, term, sort, tagFilter, crm) {
+      CustomerProfileForm.visible(d, term, tagFilter, crm)
         .map { DebtorRow(it, ShopStore.debt(d, it.id), DebtorEngine.debtDays(d, it.id)) }
         .sortedWith(sort.order)
     }
@@ -188,7 +199,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               d.transactions.filter { it.type == "receive" }.sumOf { it.amount }
             }
             DebtorsSummary(
-              people = d.debtors.size,
+              people = CustomerCrm.active(d).size,
               owed = owed,
               received = received,
             )
@@ -200,6 +211,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
               label = "جستجوی نام یا شماره",
             )
             Spacer(Modifier.height(10.dp))
+            if (crm) CrmListTools(d, tagFilter, { tagFilter = it }, onMerge = { mergeOpen = true })
 
             /*
              *  ترتیبِ فهرست، در دسترسِ همان صفحه.
@@ -282,9 +294,13 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
   form?.let { state ->
     DebtorDialog(
       state = state,
+      crm = crm,
       onDismiss = { form = null },
-      onSave = { draft ->
-        val result = if (state.editingId == null) {
+      onSave = { draft, phone2, tags ->
+        val result = if (crm) {
+          //  CRM روشن: قرض‌دار، شمارهٔ دوم و برچسب‌ها با هم — همه یا هیچ
+          CustomerProfileForm.save(d, state.editingId, draft, phone2, tags, System.currentTimeMillis(), ::newId)
+        } else if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)
         } else {
           DebtorEngine.editWithLimit(d, state.editingId, draft)
@@ -294,6 +310,10 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
         }
       },
     )
+  }
+
+  if (mergeOpen && crm) {
+    CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = ::toast)
   }
 
   txFor?.let { (debtorId, kind) ->
@@ -309,7 +329,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
         } else null
         if (credit != null && credit.over) overLimit = pending
-        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
+        else record(pending, over = false)
       },
     )
   }
@@ -323,7 +343,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       OverLimitDialog(
         credit = credit,
         onConfirm = {
-          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          record(pending, over = true)
           overLimit = null
         },
         onDismiss = { overLimit = null },
@@ -707,6 +727,9 @@ private fun AccountView(
   onDelete: () -> Unit,
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
+  onMessage: (String) -> Unit = {},
+  /** CRM-08/12: دکمهٔ «گروه، لیستِ قیمت و رضایت» (`CrmPricingButton`)؛ null ⇒ نیست */
+  store: ShopStore? = null,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -771,6 +794,7 @@ private fun AccountView(
         Spacer(Modifier.height(4.dp))
         Text(account.debtor.notes, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
       }
+      CrmExtraLine(account.debtor)
 
       //  «چند وقت است بدهکار است» — با تاریخِ همان قرض، تا بشود سرش حرف زد
       account.since?.let { since ->
@@ -812,10 +836,11 @@ private fun AccountView(
           "کل رسید", money(account.received), "؋",
           Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
         )
+        val settled = ir.vil3ntec.tohid.data.DebtMinorFlag.settled(account.balance)
         AccountTile(
           "الباقی",
-          if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
-          if (account.balance == 0.0) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          if (settled) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (settled) "حساب صاف" else DebtorEngine.stateText(account.balance),
           when {
             account.balance > 0 -> Shop.colors.warning
             account.balance < 0 -> Shop.colors.success
@@ -854,7 +879,9 @@ private fun AccountView(
             Text("چاپ صورت‌حساب")
           }
         }
+        StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
+      if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {
@@ -1032,9 +1059,13 @@ data class DebtorFormState(
   val notes: String = "",
   /** سقفِ اعتبار (CRM-03) — خالی یعنی بی سقف */
   val creditLimit: String = "",
+  /** شمارهٔ دوم (CRM-02) — فقط با CRM روشن دیده و ذخیره می‌شود */
+  val phone2: String = "",
+  /** برچسب‌ها با «،» (CRM-11) — فقط با CRM روشن */
+  val tags: String = "",
 ) {
   companion object {
-    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit))
+    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit), d.phone2.orEmpty(), CustomerProfileForm.tagsText(d))
   }
 }
 
@@ -1047,17 +1078,16 @@ private data class PendingTx(
   val notes: String,
   val due: String?,
 ) {
-  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-    dueDate = due, overLimit = overLimit,
-  )
+  fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
 }
 
 @Composable
 private fun DebtorDialog(
   state: DebtorFormState,
   onDismiss: () -> Unit,
-  onSave: (DebtorEngine.DebtorDraft) -> Unit,
+  onSave: (draft: DebtorEngine.DebtorDraft, phone2: String, tags: String) -> Unit,
+  /** «گزارش‌های مشتری» روشن ⇒ کادرهای شمارهٔ دوم و برچسب؛ خاموش ⇒ همان فرمِ امروز */
+  crm: Boolean = false,
 ) {
   var form by remember(state.editingId) { mutableStateOf(state) }
 
@@ -1082,12 +1112,16 @@ private fun DebtorDialog(
           modifier = Modifier.fillMaxWidth())
         Spacer(Modifier.height(10.dp))
         CreditLimitField(form.creditLimit) { form = form.copy(creditLimit = it) }
+        if (crm) {
+          Spacer(Modifier.height(10.dp))
+          CrmProfileFields(form.phone2, { form = form.copy(phone2 = it) }, form.tags, { form = form.copy(tags = it) })
+        }
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes, parseLimit(form.creditLimit))) },
+            onClick = { onSave(DebtorEngine.DebtorDraft(form.name, form.phone, form.notes, parseLimit(form.creditLimit)), form.phone2, form.tags) },
             modifier = Modifier.weight(1f),
           ) { Text("ذخیره") }
         }
@@ -1152,10 +1186,11 @@ private fun TransactionDialog(
         Spacer(Modifier.height(14.dp))
         AmountField(amount, { amount = it }, "مبلغ")
 
-        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد
-        if (receiving && balance > 0) {
+        // میان‌بُرِ «تسویهٔ کامل» فقط وقتی معنی دارد که بدهکار باشد — همهٔ مانده تا پول، هرگز گردِ افغانی
+        val settle = if (receiving) MoneyInput.settleInput(balance) else null
+        if (settle != null) {
           Spacer(Modifier.height(6.dp))
-          TextButton(onClick = { amount = Math.round(balance).toString() }) {
+          TextButton(onClick = { amount = settle }) {
             Text("تسویهٔ کامل", color = Shop.colors.primary)
           }
         }

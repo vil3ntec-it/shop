@@ -34,7 +34,10 @@ const PRESENCE = ['badge', 'mode', 'declaredUntil', 'connection', 'lastConfirmed
 const FIELDS = Object.freeze({
   //  §۱.۱ — `GET /api/store/:slug` ⇒ store
   shop: ['slug', 'title', 'tagline', 'contactPhone', 'accent', 'status', 'fulfillment', 'deliveryFeeMinor',
-    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?'],
+    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?', 'media?'],
+  //  لوگو و تصویرِ سرِ ویترین (M3 #428): main همیشه می‌فرستد؛ پرچمِ خاموش ⇒ هر دو null. افزوده به v1.
+  shopMedia: ['logo', 'header'],
+  mediaFile: ['version', 'width', 'height', 'mime', 'url'],
   //  §۱.۲ — حضور و ساعتِ کاری
   presence: PRESENCE,
   //  کارتِ دکان در بازار: همان حضور بی `mode`
@@ -44,18 +47,26 @@ const FIELDS = Object.freeze({
   //  ارجاعِ کوتاه به دکان روی کالای بازار
   shopRef: ['slug', 'title', 'accent', 'badge', 'orderAcceptance', 'distanceKm'],
   //  §۱.۳ — کالا در ویترین (`description`/`specs` فقط در صفحهٔ کالا)
-  product: ['id', 'name', 'unit', 'category', 'priceMinor', 'maxQtyMilli', 'photo', 'stock', 'description?', 'specs?'],
+  //  `regularPriceMinor` فقط در «ارزان‌تر از قیمتِ دکان» (`highlights.deals`، WEB-02 #626)
+  product: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo', 'stock',
+    'description?', 'specs?'],
   //  کالا در خانهٔ بازار (`regularPriceMinor` فقط با `showDeals` ِ صاحب دکان)
   marketProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo',
     'stock', 'shop'],
   searchProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'photo', 'shop'],
   //  §۱.۴ — موجودی؛ عددها فقط با `show_qty = exact`
   stock: ['status', 'reason?', 'checkedAt?', 'unit?', 'prepMinutes?', 'sellableMilli?', 'readyMilli?', 'laterMilli?'],
-  //  §۱.۷ — سفارش (پیگیری با توکن)
-  order: ['token', 'orderNo', 'status', 'statusReason', 'fulfillment', 'paymentMethod', 'paymentStatus', 'currency',
-    'itemsCount', 'lines', 'subtotalMinor', 'discountMinor', 'deliveryFeeMinor', 'totalMinor', 'readyAt',
-    'scheduledFor', 'slotEndsAt', 'zoneName', 'createdAt', 'updatedAt', 'canCancel', 'timeline'],
-  orderLine: ['productId', 'name', 'unit', 'qtyMilli', 'unitPriceMinor', 'lineTotalMinor', 'note'],
+  //  §۱.۷ — سفارش (پیگیری با توکن). افزوده به v1 از main (همان شکلِ main): `substitution` (CHK-15 #525)،
+  //  `smallBasketFeeMinor`/`slotFeeMinor` (CHK-06/07 #494)، `onlinePay` فقط در پیگیری (PAY-21 #529)
+  order: ['token', 'orderNo', 'status', 'statusReason', 'substitution', 'fulfillment', 'paymentMethod', 'paymentStatus',
+    'currency', 'itemsCount', 'lines', 'subtotalMinor', 'discountMinor', 'deliveryFeeMinor', 'totalMinor', 'readyAt',
+    'scheduledFor', 'slotEndsAt', 'zoneName', 'smallBasketFeeMinor', 'slotFeeMinor', 'createdAt', 'updatedAt',
+    'canCancel', 'timeline', 'onlinePay?'],
+  //  `substitution`/`substituteName` ِ هر قلم: CHK-16 #525
+  orderLine: ['productId', 'name', 'unit', 'qtyMilli', 'unitPriceMinor', 'lineTotalMinor', 'note', 'substitution',
+    'substituteName'],
+  //  دکمهٔ «پرداخت با حساب‌پی» در پیگیری (PAY-21 #529)
+  onlinePay: ['available'],
   orderEvent: ['status', 'at'],
   //  فهرستِ «سفارش‌های من» (ویترین، حسابِ مشتری، بازار)
   orderSummary: ['orderNo', 'status', 'fulfillment?', 'totalMinor', 'itemsCount', 'createdAt', 'scheduledFor?',
@@ -68,12 +79,13 @@ const FIELDS = Object.freeze({
 });
 
 const NESTED = Object.freeze({
-  shop: { status: 'presence' },
+  shop: { status: 'presence', media: 'shopMedia' },
+  shopMedia: { logo: 'mediaFile', header: 'mediaFile' },
   shopCard: { status: 'cardPresence' },
   product: { stock: 'stock' },
   marketProduct: { stock: 'stock', shop: 'shopRef' },
   searchProduct: { shop: 'shopRef' },
-  order: { lines: 'orderLine', timeline: 'orderEvent' },
+  order: { lines: 'orderLine', timeline: 'orderEvent', onlinePay: 'onlinePay' },
   orderSummary: { store: 'storeRef' },
   reorderLine: { stock: 'stock' },
 });

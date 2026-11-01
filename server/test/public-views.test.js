@@ -231,8 +231,14 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
     [(b) => b.product, 'product'], [(b) => b.similar, 'product'], [(b) => b.complementary, 'product'],
   ]);
   assert.equal(detail.product.description, 'برنجِ خوب');
-  await check(`/api/store/${slug}/highlights`, {}, [[(b) => b.bestsellers, 'product'], [(b) => b.newArrivals, 'product']]);
+  //  `deals` (WEB-02 #626): همان کالا + `regularPriceMinor`
+  const hl = await check(`/api/store/${slug}/highlights`, {}, [
+    [(b) => b.bestsellers, 'product'], [(b) => b.newArrivals, 'product'], [(b) => b.deals, 'product'],
+  ]);
+  assert.ok(hl.deals.some((p) => p.id === 'oil' && p.regularPriceMinor > p.priceMinor), 'روغن ارزان‌تر از قیمتِ دکان');
   const tracked = await check(`/api/store/${slug}/orders/${orderToken}`, {}, [[(b) => b.order, 'order']]);
+  //  PAY-21 (#529): پیگیری دکمهٔ پرداخت را با همین شکل دارد
+  assert.deepEqual(Object.keys(tracked.order.onlinePay), ['available']);
   assert.equal(tracked.order.orderNo, placed.body.order.orderNo);
   const re = await check(`/api/store/${slug}/orders/${orderToken}/reorder`, {}, [[(b) => b.lines, 'reorderLine']]);
   assert.equal(re.lines.length, 1);
@@ -260,6 +266,19 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
     const r = await h.get(url, opts);
     assert.equal(r.status, 200, url);
     assert.deepEqual(r.body, body, `${url}: پرچمِ خاموش همان پاسخ`);
+  }
+  //  همهٔ نشانی‌های بالا، به شکل (نه مقدار): فیلدی که main همیشه می‌فرستد و در فهرست نیست، با پرچمِ
+  //  روشن بی‌صدا بریده می‌شود ⇒ این‌جا سرخ (مثلِ `store.media` ِ M3 #428)
+  const paths = (v, p = '$', out = new Set()) => {
+    if (Array.isArray(v)) v.forEach((x) => paths(x, `${p}[]`, out));
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { out.add(`${p}.${k}`); paths(x, `${p}.${k}`, out); }
+    return out;
+  };
+  for (const [url, { opts, body }] of seen) {
+    const r = await h.get(url, opts);
+    assert.equal(r.status, 200, url);
+    const cut = paths(body);
+    assert.deepEqual([...paths(r.body)].filter((x) => !cut.has(x)), [], `${url}: فیلدِ عمومیِ بیرون از فهرست`);
   }
   await setFlag('all', 'market.directory', false);
 });

@@ -49,14 +49,18 @@ object ReleaseFeed {
 
   private fun str(o: JSONObject, key: String): String = if (o.isNull(key)) "" else o.optString(key, "")
 
-  /** `<سرور>/api/releases/<برچسب>/latest` — شناسهٔ خالی یا نادرست فرستاده نمی‌شود */
+  /**
+   *  `<سرور>/api/releases/<برچسب>/latest` — شناسهٔ خالی یا نادرست فرستاده نمی‌شود.
+   *  OPS-01: `staged=1` یعنی «این برنامه برچسبِ نسخه‌دار (`<برچسب>-v<نسخه>`) را می‌شناسد»؛
+   *  سرور فقط آن‌وقت دستگاهِ درونِ انتشارِ مرحله‌ای را به آن برچسب می‌فرستد.
+   */
   fun latestUrl(server: String, tag: String, shop: String, device: String): String {
     val q = listOfNotNull(
       shop.trim().takeIf { ID.matches(it) }?.let { "shop=$it" },
       device.trim().takeIf { ID.matches(it) }?.let { "device=$it" },
+      "staged=1",
     )
-    val base = "${server.trimEnd('/')}/api/releases/$tag/latest"
-    return if (q.isEmpty()) base else base + "?" + q.joinToString("&")
+    return "${server.trimEnd('/')}/api/releases/$tag/latest?" + q.joinToString("&")
   }
 
   /** نشانیِ یک فایلِ همان انتشار روی سرورِ خودمان */
@@ -67,9 +71,10 @@ object ReleaseFeed {
   fun parseLatest(body: String, requested: String): Latest? {
     val r = JSONObject(body)
     val tag = str(r, "tag").ifBlank { requested }
-    if (tag != requested && tag != "$requested-beta") return null
     val version = str(r, "version")
     if (!VERSION.matches(version)) return null
+    //  برچسبِ روان، آزمایشی، یا (OPS-01) نسخه‌دارِ همین نسخه — هیچ برچسبِ دیگری
+    if (tag != requested && tag != "$requested-beta" && tag != "$requested-v$version") return null
     val list = r.optJSONArray("assets") ?: return null
     val assets = (0 until list.length()).map { list.getJSONObject(it) }
       .map { Asset(it.getString("name"), it.optLong("size")) }

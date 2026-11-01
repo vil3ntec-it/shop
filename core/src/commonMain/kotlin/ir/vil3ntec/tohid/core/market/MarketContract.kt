@@ -51,11 +51,20 @@ data class PublicPresence(
 @Serializable
 data class Fulfillment(val delivery: Boolean = false, val pickup: Boolean = false)
 
+/** `payment.online` ِ دکان؛ همان شکل (بی `decision`) = `onlinePay` ِ پیگیریِ سفارش (PAY-21 #529). */
 @Serializable
 data class OnlinePayment(val available: Boolean = false, val decision: String = "")
 
 @Serializable
 data class Payment(val methods: List<String> = emptyList(), val online: OnlinePayment = OnlinePayment())
+
+/** یک تصویرِ ویترین (M3 #428)؛ `url` نسخه‌دار است. */
+@Serializable
+data class MediaFile(val version: Long, val width: Int = 0, val height: Int = 0, val mime: String = "", val url: String)
+
+/** لوگو و تصویرِ سرِ ویترین (M3 #428)؛ پرچمِ خاموش ⇒ هر دو null. */
+@Serializable
+data class ShopMedia(val logo: MediaFile? = null, val header: MediaFile? = null)
 
 /**
  * §۱.۱ — پروفایلِ عمومیِ دکان (`GET /api/store/:slug` ⇒ `store`).
@@ -75,6 +84,7 @@ data class PublicShop(
   val currency: String = "AFN",
   val payment: Payment = Payment(),
   val categories: List<String> = emptyList(),
+  val media: ShopMedia = ShopMedia(),
 )
 
 /** §۱.۴ — نشانِ موجودی. عددها فقط وقتی دکان «دقیق» را خواسته. */
@@ -141,6 +151,9 @@ data class PublicOrderLine(
   val unitPriceMinor: Long,
   val lineTotalMinor: Long,
   val note: String = "",
+  /** CHK-16 (#525): ترجیحِ جایگزینیِ همین قلم ('' | best_match | specific | none | refund) و نامِ «کالای مشخص» */
+  val substitution: String = "",
+  val substituteName: String = "",
 )
 
 @Serializable
@@ -153,6 +166,8 @@ data class PublicOrder(
   val orderNo: Long,
   val status: String,
   val statusReason: String = "",
+  /** CHK-15 (#525): ترجیحِ کلیِ جایگزینی ('' | best_match | none | refund) */
+  val substitution: String = "",
   val fulfillment: String,
   val paymentMethod: String = "cod",
   val paymentStatus: String = "",
@@ -167,10 +182,15 @@ data class PublicOrder(
   val scheduledFor: Long? = null,
   val slotEndsAt: Long? = null,
   val zoneName: String = "",
+  /** CHK-06/07 (#494): ریزِ هزینهٔ ارسال، هر دو درونِ `deliveryFeeMinor` */
+  val smallBasketFeeMinor: Long = 0,
+  val slotFeeMinor: Long = 0,
   val createdAt: Long,
   val updatedAt: Long,
   val canCancel: Boolean = false,
   val timeline: List<PublicOrderEvent> = emptyList(),
+  /** فقط در پیگیری (`GET /api/store/:slug/orders/:token`، PAY-21 #529) */
+  val onlinePay: OnlinePayment? = null,
 )
 
 /** §۱.۸ — پیک برای مشتری (S5 وصلش می‌کند؛ امروز سرور در پاسخی نمی‌دهد). */

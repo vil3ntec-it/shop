@@ -24,22 +24,33 @@ val repoRoot = rootDir.resolve("../..")
 val legacyRoot = repoRoot.resolve("android-native/app/src/main/java")
 val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
+  //  `ShopData.safeEntries` (#364): مدلِ گاوصندوق در پروندهٔ جدای خودش است
+  "ir/vil3ntec/tohid/data/SafeEntry.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
+  //  LOC-03: `todayIso` روزِ کاری را از `ShopDay` می‌گیرد؛ `ShopDayChoice` (حالتِ Compose و Context)
+  //  این‌جا جانشینِ JVMِ خودش را در src/main دارد — همیشه نیمه‌شب، پس خروجی همان دیروز است
+  "ir/vil3ntec/tohid/core/calendar/ShopDay.kt",
   "ir/vil3ntec/tohid/Format.kt",
   //  Jalali.kt از LOC-01 به هستهٔ تقویم و متن تکیه دارد؛ LocaleChoice (حالتِ Compose)
   //  این‌جا جانشینِ JVMِ خودش را در src/main دارد
   "ir/vil3ntec/tohid/LocaleText.kt",
   "ir/vil3ntec/tohid/core/calendar/SolarHijri.kt",
+  //  LocaleText.kt تاریخِ قمری را از `LunarHijri` (کاتلینِ خالصِ core) می‌گیرد
+  "ir/vil3ntec/tohid/core/calendar/LunarHijri.kt",
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
+  //  LocaleFormat گرد کردن را از `mathRound` (برگردانِ دقیقِ Math.round، کاتلینِ خالص) می‌گیرد
+  "ir/vil3ntec/tohid/core/money/MathRound.kt",
   //  Format.kt و Jalali.kt نوشته‌ها و تاریخِ نمایشی را از جدولِ سه‌زبانه می‌گیرند (کاتلینِ خالص)؛
   //  ابزار همیشه فارسی است (LocaleChoice ِ src/main)، پس خروجی همان دیروز است
   "ir/vil3ntec/tohid/core/i18n/I18n.kt",
   "ir/vil3ntec/tohid/core/i18n/Str.kt",
 )
-//  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته
-val coreRoot = repoRoot.resolve("core/src/jvmMain/kotlin")
+//  Ulid.kt از قدم صفرِ ۳.۳ (#223) در ماژولِ مشترکِ core است، با همان بسته؛ از ۱۴۰۵/۰۸/۰۸ در commonMain.
+//  مرزِ سکوی آن (`core/platform`: expect/actual) این‌جا جانشینِ JVMِ خودش را در src/main دارد،
+//  چون این پروژه KMP نیست — همان API ِ JDK که actual ِ JVM ِ core دارد.
+val coreRoot = repoRoot.resolve("core/src/commonMain/kotlin")
 val coreFiles = listOf(
   "ir/vil3ntec/tohid/sync/v1/Ulid.kt",
 )

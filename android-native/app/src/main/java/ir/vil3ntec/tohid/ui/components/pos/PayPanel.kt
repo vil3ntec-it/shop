@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,15 +54,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.keymap.KeyMap
+import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.numericInput
+import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatusPill
+import ir.vil3ntec.tohid.ui.screens.matches
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import kotlin.time.TimeSource
 
 /*
  *  پنلِ پرداختِ ترکیبی (PAY-01، 02، 04، 05، 06، 07؛ S01، S06) — فقط با پرچمِ
@@ -71,7 +77,17 @@ import ir.vil3ntec.tohid.core.i18n.StrPos
  *
  *  کلیدها: Enter روی نقدِ خالی = نقدِ دقیق، وگرنه ثبت؛ Enter در مرجع ⇒ مبلغ؛ Enter
  *  در مبلغ ⇒ ثبت؛ PgDn در نقد ⇒ ردیفِ تازه (HesabPay)، در ردیف ⇒ روشِ بعدی؛ PgUp ⇒ قبلی.
+ *  PAY-03: دکمه‌های اسکناسِ ۱۰ تا ۱۰۰۰، و Shift+1 تا Shift+6 (کدِ فیزیکی، `KeyMap.SALE_PAYMENT_NOTE*`) در
+ *  هر کادرِ پنل، هر کدام یک اسکناس به «نقدِ دریافتی» می‌افزایند (`CashKeys.addNote`).
+ *  PAY-04: Enter تا ۴۰۰ میلی‌ثانیه پس از باز شدنِ پنل خورده می‌شود و کاری نمی‌کند (`CashKeys.enterArmed`):
+ *  Enterِ بارکدخوان یا دستِ جامانده فاکتور را نمی‌بندد.
  */
+
+/** کلیدِ هر اسکناس، به ترتیبِ `CashKeys.NOTES` (۱۰ … ۱۰۰۰) */
+private val NOTE_KEYS = listOf(
+  KeyMap.SALE_PAYMENT_NOTE10, KeyMap.SALE_PAYMENT_NOTE20, KeyMap.SALE_PAYMENT_NOTE50,
+  KeyMap.SALE_PAYMENT_NOTE100, KeyMap.SALE_PAYMENT_NOTE500, KeyMap.SALE_PAYMENT_NOTE1000,
+).zip(CashKeys.NOTES)
 
 /** متنِ کادرهای پنل؛ مشتری از صفحه می‌آید */
 class PayPanelState {
@@ -90,6 +106,12 @@ class PayPanelState {
     if (ids.isEmpty() || i !in rows.indices) return
     val at = ids.indexOf(rows[i].method)
     rows[i] = rows[i].copy(method = ids[(at + step + ids.size) % ids.size])
+  }
+
+  /** PAY-03 — یک اسکناس به نقدِ دریافتی؛ متنِ نامعتبر دست نمی‌خورد (`false`) */
+  fun addNote(note: Long): Boolean {
+    cash = CashKeys.addNote(cash, note) ?: return false
+    return true
   }
 
   /** «نقدِ دقیق»: نقدی که با ردیف‌های غیرنقدِ فعلی فاکتور را می‌بندد */
@@ -125,6 +147,16 @@ fun PaySplitSection(
   }
   fun addRow() { focusRef = state.addRow() }
   val preview = PayFlow.preview(state.draft(total, customerId))
+  //  PAY-04: زمانِ باز شدنِ پنل (ساعتِ یکنواخت، نه ساعتِ دیواری)
+  val opened = remember { TimeSource.Monotonic.markNow() }
+  fun armed() = CashKeys.enterArmed(opened.elapsedNow().inWholeMilliseconds)
+  fun enterOnCash() { if (state.cash.isBlank()) state.fillExact(total, customerId) else onSubmit() }
+  //  PAY-03: Shift+رقم پیش از کادر می‌رسد، پس «!@#…» در کادر نوشته نمی‌شود
+  val noteKeys = Modifier.onPreviewKeyEvent { e ->
+    val hit = NOTE_KEYS.firstOrNull { e.matches(it.first) } ?: return@onPreviewKeyEvent false
+    state.addNote(hit.second)
+    true
+  }
 
   Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedTextField(
@@ -134,10 +166,10 @@ fun PaySplitSection(
       supportingText = { Text(StrPos.enterExactHint) },
       singleLine = true,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-      keyboardActions = KeyboardActions(onDone = { if (state.cash.isBlank()) state.fillExact(total, customerId) else onSubmit() }),
-      modifier = Modifier.weight(1f).focusRequester(cashFocus).onPreviewKeyEvent { e ->
+      keyboardActions = KeyboardActions(onDone = { if (armed()) enterOnCash() }),
+      modifier = Modifier.weight(1f).focusRequester(cashFocus).then(noteKeys).onPreviewKeyEvent { e ->
         when {
-          e.down(Key.Enter, Key.NumPadEnter) -> { if (state.cash.isBlank()) state.fillExact(total, customerId) else onSubmit(); true }
+          e.down(Key.Enter, Key.NumPadEnter) -> { if (armed()) enterOnCash(); true }
           e.down(Key.PageDown) -> { addRow(); true }
           else -> false
         }
@@ -149,12 +181,26 @@ fun PaySplitSection(
     ) { Text(StrPos.exactCash) }
   }
 
+  //  PAY-03: دکمه‌های اسکناس — هر لمس یک اسکناس به نقدِ دریافتی
+  Row(
+    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(top = 4.dp),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    CashKeys.NOTES.forEach { note ->
+      OutlinedButton(
+        onClick = { state.addNote(note) },
+        modifier = Modifier.heightIn(min = maxOf(target, 44.dp)),
+      ) { Text(money(PayFlow.major(note))) }
+    }
+  }
+  if (Platform.DESKTOP) Text(StrPos.notesKeysHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+
   state.rows.forEachIndexed { i, row ->
     val bad = preview is PayFlow.Outcome.Bad && preview.problem.index == i
     Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
       MethodPicker(row.method, target, Modifier.weight(1.2f)) { m -> state.rows[i] = row.copy(method = m) }
-      val keys = Modifier.onPreviewKeyEvent { e ->
+      val keys = noteKeys.onPreviewKeyEvent { e ->
         when {
           e.down(Key.PageDown) -> { state.cycle(i, 1); true }
           e.down(Key.PageUp) -> { state.cycle(i, -1); true }
@@ -180,9 +226,9 @@ fun PaySplitSection(
         singleLine = true,
         isError = bad,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+        keyboardActions = KeyboardActions(onDone = { if (armed()) onSubmit() }),
         modifier = Modifier.weight(1f).focusRequester(amountFocus[i]).then(keys).onPreviewKeyEvent { e ->
-          if (e.down(Key.Enter, Key.NumPadEnter)) { onSubmit(); true } else false
+          if (e.down(Key.Enter, Key.NumPadEnter)) { if (armed()) onSubmit(); true } else false
         },
       )
       IconButton(onClick = { state.rows.removeAt(i); refFocus.removeAt(i); amountFocus.removeAt(i); runCatching { cashFocus.requestFocus() } }) {
@@ -262,6 +308,8 @@ fun PayPanelDialog(
   target: Dp,
   onDismiss: () -> Unit,
   onConfirm: (Settlement) -> Unit,
+  /** PAY-21: درگاه‌ها (حساب‌پی) برای باقی‌ماندهٔ همین پنل — فقط با پرچمِ سرور و نت دیده می‌شوند */
+  gateways: GatewayHook? = null,
 ) {
   val state = remember { PayPanelState() }
   val cashFocus = remember { FocusRequester() }
@@ -288,6 +336,10 @@ fun PayPanelDialog(
         )
         Spacer(Modifier.height(10.dp))
         PaySplitSection(state, total, customerId, customerName, target, cashFocus, ::submit)
+        if (gateways != null) CheckoutGateways(
+          hook = gateways, total = total, panel = state, customerId = customerId, enabled = true, busy = busy,
+          onPaid = onConfirm, modifier = Modifier.padding(top = 8.dp),
+        )
         error?.let {
           Spacer(Modifier.height(4.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)

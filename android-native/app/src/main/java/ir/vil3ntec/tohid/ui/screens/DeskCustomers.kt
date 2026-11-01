@@ -33,13 +33,17 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.CustomerEngine
+import ir.vil3ntec.tohid.data.CustomerProfileForm
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.Xlsx
 import ir.vil3ntec.tohid.formatDate
@@ -115,11 +119,16 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
   //  نمای کارتی/جدولی (VISUAL-DIRECTION §۱٫۵) — پیش‌فرضِ مدیریت جدول؛ جست‌وجو،
   //  صافی و ترتیب با عوض‌شدنِ نما دست نمی‌خورند
   val view = rememberViewMode("customers", ScreenKind.MANAGEMENT)
+  //  پروندهٔ CRM (CRM-02/10/11) — فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض خاموش)
+  val crm = ShopPolicy.crmReports(context)
+  var tagFilter by remember { mutableStateOf<String?>(null) }
+  var mergeOpen by remember { mutableStateOf(false) }
 
-  val all = remember(d) { CustomerEngine.summaries(d) }
-  val list = remember(all, search, filter, sort) {
-    val q = search.trim()
-    all.filter { q.isEmpty() || it.name.contains(q, true) || ir.vil3ntec.tohid.LocaleText.phoneMatches(it.phone, q) }
+  //  ادغام‌شده‌ها بیرون (CRM-10)؛ با CRM روشن جست‌وجو روی هر دو شماره و برچسب و صافیِ برچسب
+  val all = remember(d) { CustomerCrm.active(d).map { it.id }.toSet().let { on -> CustomerEngine.summaries(d).filter { it.id in on } } }
+  val list = remember(all, search, filter, sort, tagFilter, crm) {
+    val shown = CustomerProfileForm.visible(d, search, tagFilter, crm).map { it.id }.toSet()
+    all.filter { it.id in shown }
       .filter {
         when (filter) {
           Filter.ALL -> true
@@ -196,6 +205,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
       OutlinedButton(onClick = ::excel) { Text("اکسل  Ctrl+E") }
     }
     Spacer(Modifier.height(8.dp))
+    if (crm) CrmListTools(d, tagFilter, { tagFilter = it }, onMerge = { mergeOpen = true })
     NewCustomerRow(store, d, ::toast) { onOpen(it) }
     Spacer(Modifier.height(4.dp))
     Text(
@@ -245,6 +255,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
       }
     }
   }
+  if (mergeOpen && crm) CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = ::toast)
 }
 
 @Composable
@@ -338,6 +349,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
   var tab by remember { mutableStateOf(FileTab.LEDGER) }
   var entry by remember { mutableStateOf<DebtorEngine.Kind?>(null) }
+  val entryKey = remember(entry) { newId() }  // شناسهٔ ردیفِ قرض، یکی برای هر ورود ⇒ دو Enter یا تأییدِ «بیش از سقف» یک ردیف
   var picked by remember { mutableStateOf<String?>(null) }
   var showInvoice by remember { mutableStateOf<Sale?>(null) }
   //  دفترِ قرض (v3 §22.2-A5): ردیفِ انتخاب‌شدهٔ صورت‌حساب، رسید، سررسید، سقفِ اعتبار
@@ -347,15 +359,14 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   var dueFor by remember { mutableStateOf<String?>(null) }
   var limitOpen by remember { mutableStateOf(false) }
   var overLimit by remember { mutableStateOf<Triple<Double, String, String?>?>(null) }
+  val crm = ShopPolicy.crmReports(context)
+  var profileOpen by remember { mutableStateOf(false) }
   fun record(kind: DebtorEngine.Kind, amount: Double, notes: String, due: String?, over: Boolean) {
-    when (val r = DebtorEngine.addTransaction(d, id, kind, amount, today, notes, today, System.currentTimeMillis(), ::newId, dueDate = due, overLimit = over)) {
-      is DebtorEngine.Result.Failed -> toast(r.message)
-      is DebtorEngine.Result.Ok -> {
-        scope.launch { store.save(r.data) }
-        entry = null
-        tab = FileTab.LEDGER
-        toast(if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد")
-      }
+    val e = DebtEntry.Entry(id, kind, amount, today, notes, due, over)
+    val done = if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد"
+    //  ⛔ روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه: ردیفی که Pull در این فاصله آورده گم نمی‌شود
+    scope.launch {
+      DebtEntry.record(store, entryKey, e, today, System.currentTimeMillis()).show(::toast, done) { if (entry == kind) entry = null; tab = FileTab.LEDGER }
     }
   }
   val shotTab = DeskCustomersShot.tab.value
@@ -379,7 +390,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
           e.key == Key.F6 -> { entry = DebtorEngine.Kind.GIVE; true }
           e.isPrimaryModifier && e.key == Key.P -> { print(); true }
           e.isPrimaryModifier && e.key == Key.E -> { excel(); true }
-          e.key == Key.Escape && entry == null && showInvoice == null && receiptFor == null && dueFor == null && !limitOpen && overLimit == null -> { onBack(); true }
+          e.key == Key.Escape && entry == null && showInvoice == null && receiptFor == null && dueFor == null && !limitOpen && !profileOpen && overLimit == null -> { onBack(); true }
           else -> false
         }
       }
@@ -397,6 +408,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         Text(debtor.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         Text(listOf(ir.vil3ntec.tohid.LocaleText.phoneDisplay(debtor.phone), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        CrmExtraLine(debtor)
       }
       Text("Esc برگشت", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
@@ -419,10 +431,13 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       OutlinedButton(onClick = { entry = DebtorEngine.Kind.GIVE }) { Text("قرضِ دستی  F6") }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = { limitOpen = true }) { Text("سقفِ اعتبار") }
+      if (crm) { Spacer(Modifier.width(6.dp)); OutlinedButton(onClick = { profileOpen = true }) { Text("شمارهٔ دوم و برچسب") } }
       Spacer(Modifier.weight(1f))
       OutlinedButton(onClick = ::print) { Text("چاپِ «${tab.label}»  Ctrl+P") }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = ::excel) { Text("اکسل  Ctrl+E") }
+      StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
+      CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
     }
     entry?.let { kind ->
       Spacer(Modifier.height(8.dp))
@@ -621,6 +636,14 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       },
       dismissButton = { TextButton(onClick = { limitOpen = false }) { Text("انصراف") } },
     )
+  }
+  if (profileOpen && crm) {
+    CrmProfileDialog(debtor, onDismiss = { profileOpen = false }) { phone2, tags ->
+      when (val r = CustomerProfileForm.setProfile(d, id, phone2, tags)) {
+        is DebtorEngine.Result.Failed -> toast(r.message)
+        is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; profileOpen = false; toast("پرونده ذخیره شد") }
+      }
+    }
   }
 }
 

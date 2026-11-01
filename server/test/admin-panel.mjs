@@ -886,6 +886,87 @@ await step('بانکِ تصاویر: پوشه + CSV از پنل؛ فایلِ ج�
   await page.waitForFunction(() => document.getElementById('btn-ib-run').disabled === false, null, { timeout: 10_000 });
 });
 
+// ── IMG-14 / IMG-PRO-06: ادامهٔ بارگذاری پس از قطع — رسیده‌ها دوباره نمی‌روند، sha256 سنجیده می‌شود ──
+await step('بانکِ تصاویر: ادامهٔ بارگذاری پس از قطعِ اینترنت؛ فایلِ رسیده دوباره نمی‌رود و هر فایل sha256 دارد', async () => {
+  const F = require('./image-fixtures');
+  const crypto = require('node:crypto');
+  const sha = (b) => crypto.createHash('sha256').update(b).digest('hex');
+  const LC = require('../src/lib/live-config');
+  const files = [701, 702, 703, 704].map((seed) => ({ name: `r${seed}.jpg`, mimeType: 'image/jpeg', buffer: F.jpeg(800, 600, { seed }) }));
+  const puts = [];
+  const errorsBefore = consoleErrors.length;
+  const onReq = (r) => { if (r.method() === 'PUT' && /\/image-bank\/batches\/.+\/files\//.test(r.url())) puts.push(r); };
+  page.on('request', onReq);
+  try {
+    //  پرچمِ خاموش (پیش‌فرض): همان بارگذاریِ پیشین — بی sha256 و بی پرسیدنِ رسیده‌ها
+    await openTab('imgbank');
+    await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ib-lic-source', 'آزمونِ ادامه');
+    //  ⛔ شناسهٔ دستهٔ آزمونِ پیشین هنوز روی صفحه است: تا شناسهٔ «دستهٔ تازه» ننشسته نخوان
+    //  (روی PostgreSQL ِ CI ساختنِ دسته کندتر است و شناسهٔ کهنه خوانده می‌شد)
+    const before = (await page.locator('#ib-batch-id').textContent()).trim();
+    await page.click('#btn-ib-new');
+    await page.waitForFunction((prev) => {
+      const t = document.getElementById('ib-batch-id').textContent.trim();
+      return t.length > 4 && t !== prev;
+    }, before, { timeout: 10_000 });
+    const off = (await page.locator('#ib-batch-id').textContent()).trim();
+    await page.setInputFiles('#ib-files', files.slice(0, 1));
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۱ از ۱ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.equal(puts.length, 1);
+    assert.equal(puts[0].headers()['x-content-sha256'], undefined, 'پرچمِ خاموش sha256 فرستاد');
+    assert.ok(off);
+
+    await LC.set('all', 'image_bank.resume', true, 'panel-test');
+    await openTab('imgbank');
+    await page.waitForSelector('#ib-on:not(.hidden)', { timeout: 10_000 });
+    await page.fill('#ib-lic-source', 'آزمونِ ادامه ۲');
+    await page.click('#btn-ib-new');
+    await page.waitForFunction((prev) => {
+      const t = document.getElementById('ib-batch-id').textContent.trim();
+      return t.length > 4 && t !== prev;
+    }, off, { timeout: 10_000 });
+    const batchId = (await page.locator('#ib-batch-id').textContent()).trim();
+    puts.length = 0;
+    //  «اینترنت قطع شد»: نخستین تلاشِ فایلِ سوم می‌افتد، تلاشِ دوباره می‌رسد
+    let dropped = 0;
+    await page.route('**/image-bank/batches/*/files/r703.jpg', (route) => (dropped++ ? route.continue() : route.abort('internetdisconnected')));
+    await page.setInputFiles('#ib-files', files.slice(0, 3));
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۳ از ۳ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    await page.unroute('**/image-bank/batches/*/files/r703.jpg');
+    assert.equal(dropped, 2, 'تلاشِ دوباره نشد');
+    for (const r of puts) {
+      const f = files.find((x) => r.url().endsWith(`/files/${x.name}`));
+      assert.equal(r.headers()['x-content-sha256'], sha(f.buffer), r.url());
+    }
+
+    //  همان پوشه دوباره با یک فایلِ تازه: فقط تازه می‌رود
+    puts.length = 0;
+    await page.setInputFiles('#ib-files', files);
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۴ از ۴ فایل · ۰ ناموفق · ۳ از پیش رسیده$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.deepEqual(puts.map((r) => r.url().split('/').pop()), ['r704.jpg']);
+    const rows = await many('SELECT name, blob_hash, status FROM image_batch_files WHERE batch_id=$1 ORDER BY name', [batchId]);
+    assert.deepEqual(rows.map((r) => [r.name, r.status, r.blob_hash]), files.map((f) => [f.name, 'ok', sha(f.buffer)]));
+    //  همان نام با محتوای دیگر «رسیده» نیست و دوباره می‌رود
+    puts.length = 0;
+    const changed = { name: 'r701.jpg', mimeType: 'image/jpeg', buffer: F.jpeg(800, 600, { seed: 799 }) };
+    await page.setInputFiles('#ib-files', [changed]);
+    await page.click('#btn-ib-upload');
+    await page.waitForFunction(() => /^۱ از ۱ فایل · ۰ ناموفق$/.test(document.getElementById('ib-progress').textContent), null, { timeout: 15_000 });
+    assert.deepEqual(puts.map((r) => r.url().split('/').pop()), ['r701.jpg']);
+    assert.equal((await one('SELECT blob_hash FROM image_batch_files WHERE batch_id=$1 AND name=$2', [batchId, 'r701.jpg'])).blob_hash, sha(changed.buffer));
+    if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-resume.png`, fullPage: true });
+    //  تنها خطای کنسول همان قطعِ ساختگیِ اینترنت است
+    assert.deepEqual(consoleErrors.splice(errorsBefore).filter((m) => !/ERR_INTERNET_DISCONNECTED/.test(m)), []);
+  } finally {
+    page.off('request', onReq);
+    await LC.set('all', 'image_bank.resume', false, 'panel-test');
+  }
+});
+
 // ── IMG-02 / IMG-PRO-07 / IMG-BANK-17 / IMG-09: صفِ بررسی — مبهم فقط با انتخابِ انسانی ──
 await step('بانکِ تصاویر: تطبیقِ مبهم با دلیل و اندازهٔ هر کالا؛ انتخابِ انسانی وصل می‌کند و ارشد منتشر می‌کند', async () => {
   const F = require('./image-fixtures');
@@ -995,6 +1076,144 @@ await step('بانکِ تصاویر: صافیِ «فقط تکراری‌ها» �
   assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.bank_image_archived' AND target_id=$1`, [pub.id]), 'بایگانی سابقه نداشت');
   await page.selectOption('#ib-rv-status', 'NEEDS_REVIEW');
   await page.selectOption('#ib-rv-space', 'pending');
+});
+
+// ── IMG-PRO-05 / IMG-07: اصل کنارِ نسخه با ۱:۱ ِ هم‌گام؛ ردِ نسخه اصل و نسخهٔ جاری را نگه می‌دارد ──
+await step('بانکِ تصاویر: اصل کنارِ نسخهٔ تازه با بزرگ‌نماییِ هم‌گام؛ ردِ نسخه اصل و نسخهٔ جاری را نگه می‌دارد', async () => {
+  const zlib = require('node:zlib');
+  const tok = await page.evaluate(() => sessionStorage.getItem('shop-admin-token'));
+  const api = async (method, path, body, raw) => {
+    const r = await fetch(`${base}/api/admin/image-bank${path}`, {
+      method,
+      headers: { Authorization: `Bearer ${tok}`, 'Content-Type': raw ? 'application/octet-stream' : 'application/json' },
+      body: raw || (body === undefined ? undefined : JSON.stringify(body)),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  //  PNGِ واقعی و رمزگشاشدنی (رنگِ یک‌دست) تا مرورگر ابعادِ واقعی بدهد و قاب پیمایش شود
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type, 'latin1'), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(zlib.crc32(td) >>> 0);
+    return Buffer.concat([len, td, crc]);
+  };
+  const realPng = (w, h, [r, g, b]) => {
+    const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+    const row = Buffer.alloc(1 + w * 3);
+    for (let x = 0; x < w; x++) { row[1 + 3 * x] = r; row[2 + 3 * x] = g; row[3 + 3 * x] = b; }
+    return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', ihdr),
+      chunk('IDAT', zlib.deflateSync(Buffer.concat(Array.from({ length: h }, () => row)))), chunk('IEND', Buffer.alloc(0))]);
+  };
+  const p = await api('POST', '/products', { name: 'زعفرانِ پنل', brand: 'قائنات', sku: 'PANEL-SAF' });
+  const up = await api('POST', `/images?bank_product_id=${p.body.id}&license_status=licensed&commercial_use=true&license_source=supplier`,
+    undefined, realPng(1600, 1200, [200, 40, 40]));
+  assert.equal(up.status, 201, JSON.stringify(up.body));
+  const id = up.body.id;
+  assert.equal((await api('POST', `/images/${id}/approve`, { reason: 'مجوزِ تأمین‌کننده' })).status, 200);
+  assert.equal((await api('POST', `/images/${id}/versions?tool=crop`, undefined, realPng(1600, 1200, [40, 160, 40]))).body.version, 2);
+  assert.equal((await api('POST', `/images/${id}/versions?tool=light`, undefined, realPng(1600, 1200, [40, 40, 200]))).body.version, 3);
+  const origHash = (await one('SELECT blob_hash FROM image_versions WHERE image_id=$1 AND version=1', [id])).blob_hash;
+
+  await openTab('imgbank');
+  await page.selectOption('#ib-rv-status', 'APPROVED');
+  await page.selectOption('#ib-rv-space', 'central');
+  await page.click('#btn-ib-rv-load');
+  const row = `#ib-review tr[data-image="${id}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  assert.match(await page.locator(`${row} td:nth-child(6)`).textContent(), /نسخهٔ تازه × ۲/);
+  await page.click(`${row} button`);
+  await page.waitForSelector('#ib-dt-cmp-box:not(.hidden)', { timeout: 10_000 });
+  //  پیش‌فرض: تازه‌ترین نسخهٔ منتظر، کنارِ اصل
+  assert.equal(await page.locator('#ib-dt-versions .ib-ver.on').getAttribute('data-version'), '3');
+  assert.match(await page.locator('#ib-cmp-a-cap').textContent(), /نسخهٔ ۱ · اصل · پذیرفته · جاری/);
+  assert.match(await page.locator('#ib-cmp-b-cap').textContent(), /نسخهٔ ۳ · پردازش‌شده \(light\) · منتظرِ بررسی/);
+  await page.waitForFunction(() => ['ib-cmp-a-img', 'ib-cmp-b-img'].every((i) => document.getElementById(i).naturalWidth === 1600), null, { timeout: 10_000 });
+
+  //  اندازهٔ واقعی: هر دو قاب ۱:۱ و پیمایشِ یکی دیگری را می‌برد
+  await page.check('#ib-cmp-zoom');
+  assert.equal(Math.round(await page.locator('#ib-cmp-a-img').evaluate((e) => e.getBoundingClientRect().width)), 1600);
+  assert.equal(Math.round(await page.locator('#ib-cmp-b-img').evaluate((e) => e.getBoundingClientRect().width)), 1600);
+  await page.locator('#ib-cmp-a').evaluate((e) => { e.scrollTop = 300; });
+  await page.waitForFunction(() => Math.abs(document.getElementById('ib-cmp-b').scrollTop - 300) <= 2, null, { timeout: 5_000 });
+  await page.locator('#ib-cmp-b').evaluate((e) => { e.scrollTop = 120; });
+  await page.waitForFunction(() => Math.abs(document.getElementById('ib-cmp-a').scrollTop - 120) <= 2, null, { timeout: 5_000 });
+  await page.uncheck('#ib-cmp-zoom');
+
+  //  ردِ نسخهٔ ۳: نسخهٔ جاری همان ۱، اصل دست‌نخورده
+  page.once('dialog', (d) => d.accept('رنگِ بسته‌بندی عوض شده'));
+  await page.click('#btn-ib-ver-reject');
+  await page.waitForFunction(() => /نسخهٔ ۳ رد شد؛ نسخهٔ جاری همان ماند/.test(document.getElementById('ib-dt-msg').textContent), null, { timeout: 10_000 });
+  const v = async () => (await many('SELECT version, review FROM image_versions WHERE image_id=$1 ORDER BY version', [id])).map((r) => `${r.version}:${r.review}`);
+  assert.deepEqual(await v(), ['1:approved', '2:needs_review', '3:rejected']);
+  assert.equal(Number((await one('SELECT current_version FROM images WHERE id=$1', [id])).current_version), 1);
+  //  حالا نسخهٔ ۲ (منتظر) کنارِ اصل؛ نسخهٔ ردشده دکمه ندارد
+  assert.equal(await page.locator('#ib-dt-versions .ib-ver.on').getAttribute('data-version'), '2');
+  await page.click('#ib-dt-versions .ib-ver[data-version="3"]');
+  await page.waitForFunction(() => /رد شده است/.test(document.getElementById('ib-cmp-note').textContent), null, { timeout: 10_000 });
+  assert.ok(await page.locator('#btn-ib-ver-approve').isHidden() && await page.locator('#btn-ib-ver-reject').isHidden());
+
+  //  جاری کردنِ نسخهٔ ۲ با دلیل: اصل و نسخه‌های دیگر سرِ جایشان
+  await page.click('#ib-dt-versions .ib-ver[data-version="2"]');
+  await page.waitForFunction(() => !document.getElementById('btn-ib-ver-approve').classList.contains('hidden'), null, { timeout: 10_000 });
+  page.once('dialog', (d) => d.accept('برشِ درست'));
+  await page.click('#btn-ib-ver-approve');
+  await page.waitForFunction(() => /نسخهٔ ۲ جاری شد/.test(document.getElementById('ib-dt-msg').textContent), null, { timeout: 10_000 });
+  assert.equal(Number((await one('SELECT current_version FROM images WHERE id=$1', [id])).current_version), 2);
+  assert.deepEqual(await v(), ['1:approved', '2:approved', '3:rejected']);
+  assert.equal((await one('SELECT blob_hash FROM image_versions WHERE image_id=$1 AND version=1', [id])).blob_hash, origHash);
+  assert.ok(await one(`SELECT 1 FROM audit_logs WHERE action='admin.bank_image_rejected' AND target_id=$1`, [id]), 'رد سابقه نداشت');
+  //  فهرست تازه شد: دیگر نسخهٔ منتظری نیست و نسخهٔ جاری (۲) کنارِ اصل است
+  assert.doesNotMatch(await page.locator(`${row} td:nth-child(6)`).textContent(), /نسخهٔ تازه/);
+  assert.equal(await page.locator('#ib-dt-versions .ib-ver.on').getAttribute('data-version'), '2');
+  assert.match(await page.locator('#ib-cmp-note').textContent(), /همین نسخه جاری است/);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/img-bank-compare.png`, fullPage: true });
+  await page.click('#btn-ib-dt-close');
+  await page.selectOption('#ib-rv-status', 'NEEDS_REVIEW');
+  await page.selectOption('#ib-rv-space', 'pending');
+});
+
+// ── E2E-ADM-15: تطبیقِ فروشِ آنلاین — همان عددِ گزارشِ خودِ دکان ──────
+await step('عملیات: تطبیقِ فروشِ آنلاین همان عددِ گزارشِ دکان را نشان می‌دهد؛ کارمزد ۰ «فعلاً بی کارمزد»', async () => {
+  const live = require('../src/lib/live-config');
+  for (const key of ['shop.orders', require('../src/lib/order-refunds').FLAG_KEY]) await live.set(owner.shopId, key, true, 'panel-test');
+  const call = async (method, path, body, headers = {}) => {
+    const r = await fetch(base + path, {
+      method, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${owner.token}`, ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  };
+  const made = await call('POST', '/api/shop/orders', {
+    source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'احمد', phone: '0791234567' },
+    lines: [{ name: 'برنج', qtyMilli: 2000, unitPriceMinor: 2500 }],
+  }, { 'Idempotency-Key': `panel-recon-${Date.now()}` });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
+    assert.equal((await call('POST', `/api/shop/orders/${made.body.order.id}/transition`, { to })).status, 200, to);
+  }
+
+  await openTab('ops');
+  await page.waitForSelector('#ops-recon-tools:not(.hidden)', { timeout: 10_000 });
+  //  امروزِ کابل برای هر دو؛ پاسخِ پنل بازه را می‌گوید و گزارشِ خودِ دکان با **همان** بازه خوانده می‌شود
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kabul' }).format(new Date());
+  await page.fill('#ops-recon-from', today);
+  await page.fill('#ops-recon-to', today);
+  const [resp] = await Promise.all([
+    page.waitForResponse((r) => r.url().includes('/api/admin/system/reconciliation')),
+    page.click('#btn-ops-recon'),
+  ]);
+  const win = (await resp.json()).window;
+  const own = (await call('GET', `/api/shop/orders/reconciliation?from=${win.from}&to=${win.to}`)).body;
+  const row = `#ops-recon tr[data-shop="${owner.shopId}"]`;
+  await page.waitForSelector(row, { timeout: 10_000 });
+  const cells = await page.locator(`${row} td`).allTextContents();
+  assert.match(await page.locator('#ops-recon-checked').textContent(), new RegExp(`^${today} تا ${today} \\(هر دو روز شامل، Asia/Kabul\\)`));
+  assert.equal(own.collected.count, 1);
+  assert.equal(cells[1], `۱ سفارش · ${(own.collected.totalMinor / 100).toLocaleString('fa-AF')} افغانی`);
+  assert.equal(cells[7], '۰ افغانی');
+  assert.match(cells[8], /بی اختلاف/);
+  assert.match(await page.locator('#ops-recon-totals').textContent(), /کارمزد۰ افغانی · فعلاً بی کارمزد/);
+  if (process.env.PANEL_SHOTS) await page.screenshot({ path: `${process.env.PANEL_SHOTS}/e2e-adm-15.png`, fullPage: true });
 });
 
 // ── SEC-02: بررسیِ زنجیرهٔ هش از پنل — سالم، بعد دست‌کاری‌شده ──────────

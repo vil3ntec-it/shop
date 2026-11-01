@@ -13,7 +13,7 @@ const { one, query, now } = require('../db');
 const { unauthorized, forbidden } = require('./errors');
 const { isCoreFeature } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement');
-const { membershipOf } = require('../lib/shops');
+const { membershipOf, sessionShopOf } = require('../lib/shops');
 const { can } = require('../lib/permissions');
 
 function bearer(req) {
@@ -33,7 +33,8 @@ function bearer(req) {
  * یک چیز با دو در.
  */
 function requireUserOf(app) {
-  return async function (req, res, next) {
+  //  نام‌دار، تا فهرستِ زندهٔ درها (`test/route-inventory.js` ⇐ `route-authz-inventory`) احراز را ببیند
+  return async function requireAppUser(req, res, next) {
     try {
       const token = bearer(req);
       if (!token) return next(unauthorized());
@@ -150,11 +151,32 @@ async function requireAnyUser(req, res, next) {
   } catch (err) { next(err); }
 }
 
+/**
+ * دکانِ این نشست — اگر نشست دکانی را برگزیده (`tokens.shop_id`، مهاجرتِ ۰۹۷)
+ * فقط عضویتِ فعال در همان، وگرنه همان قاعدهٔ همیشگی. دکانی که دیگر عضوش
+ * نیست ⇒ خطای روشن، **نه** افتادنِ بی‌صدا به دکانِ دیگر (بندِ ۲۹.۲ قاعدهٔ ۱).
+ */
+async function shopOfSession(req, { explain = false } = {}) {
+  const bound = sessionShopOf(req.tokenRow);
+  const member = await membershipOf(req.user.id, { shopId: bound });
+  //  فاز ۳: دکانی که مدیر بسته (تعلیق، بایگانی، درخواستِ حذف) خطای روشنِ خودش را دارد، نه «دکانی نیست»
+  //  — فقط در راهِ شکست یک پرسش (`lib/shop-holds.blockFor`).
+  if (!member && explain) {
+    const holds = require('../lib/shop-holds');
+    const block = await holds.blockFor(req.user.id, bound);
+    if (block) throw holds.blockError(block);
+  }
+  if (!member && bound) {
+    throw forbidden('دکانی که برای این نشست برگزیده شده دیگر در دسترسِ شما نیست؛ دکان را دوباره انتخاب کنید', 'active_shop_unavailable');
+  }
+  return member;
+}
+
 /** عضویت در دکان لازم است — shop_id از همین‌جا می‌آید. */
 async function requireShop(req, res, next) {
   try {
     if (!req.user) return next(unauthorized());
-    const member = await membershipOf(req.user.id);
+    const member = await shopOfSession(req, { explain: true });
     if (!member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
     //  نقشِ پیک — حتی با توکنی که پیش از پیک شدن گرفته شده
     if (member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
@@ -234,7 +256,7 @@ function requireStationFeature(featureKey) {
 async function optionalShop(req, res, next) {
   try {
     if (req.user) {
-      const member = await membershipOf(req.user.id);
+      const member = await shopOfSession(req);
       if (member && member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
       if (member) {
         req.member = member;
@@ -337,27 +359,65 @@ function requireFeature(featureKey) {
   };
 }
 
-/** مدیر سامانه — کاملاً جدا از کاربران عادی. */
+/**
+ * مدیر سامانه — کاملاً جدا از کاربران عادی.
+ *
+ * فاز ۳ ِ پنلِ مرکزی: (۱) نقش‌های باریک (`finance`، `viewer`) مرزِ خودشان را **همین‌جا** در سرور دارند
+ * (`lib/admin-roles.check`)؛ (۲) پلِ پنل به‌جای رمزِ ارشدِ مشترک می‌تواند با **کلیدِ سرویس** بیاید
+ * (`Bearer vsk_…` + «انجام‌دهنده» در سرآیند، `lib/admin-service.js`). راهِ پیشین دست نخورده است.
+ */
 async function requireAdmin(req, res, next) {
   try {
     const token = bearer(req);
     if (!token) return next(unauthorized());
+    const svc = require('../lib/admin-service');
+    if (svc.isServiceKey(token)) return await serviceAdmin(req, res, next, token);
     const row = await tokens.verify(token, 'admin');
     if (!row) return next(unauthorized('نشست مدیر منقضی شده است', 'invalid_token'));
     const admin = await one('SELECT * FROM admins WHERE id=$1', [row.subject_id]);
     if (!admin || admin.status !== 'active') {
       return next(forbidden('حساب مدیر غیرفعال است', 'admin_disabled'));
     }
+    //  SEC-AUTH-12: تأییدِ دومرحله‌ایِ اجباری (پرچمِ خاموشِ `ADMIN_2FA_REQUIRED`) — از ردیفِ زنده، هر درخواست
+    const blocked = require('../lib/admin-guard').enrollmentBlock(req, admin);
+    if (blocked) return next(blocked);
     req.admin = admin;
     req.tokenRow = row;
+    const denied = require('../lib/admin-roles').check(req);
+    if (denied) return next(denied);
     next();
   } catch (err) { next(err); }
 }
 
+/** درخواستِ پلِ پنل با کلیدِ سرویس: نقشِ مؤثر = کم‌رتبه‌ترِ انجام‌دهنده و سقفِ کلید. */
+async function serviceAdmin(req, res, next, token) {
+  const svc = require('../lib/admin-service');
+  const roles = require('../lib/admin-roles');
+  const key = await svc.verify(token);
+  if (!key) return next(unauthorized('کلیدِ سرویس معتبر نیست یا باطل شده است', 'invalid_service_key'));
+  const actor = svc.actorOf(req);
+  const role = roles.lower(actor.role, key.role_cap);
+  req.admin = {
+    id: key.id, username: `svc:${key.name}`, name: actor.name || actor.id, role,
+    status: 'active', is_owner: false, totp_enabled_at: null, service: true,
+  };
+  req.service = { keyId: key.id, keyName: key.name, roleCap: key.role_cap };
+  req.actor = { kind: 'panel', id: actor.id, name: actor.name, role: actor.role, effectiveRole: role, via: key.id };
+  req.tokenRow = null;
+  const denied = roles.check(req);
+  if (denied) return next(denied);
+  return svc.run(req.actor, () => next());
+}
+
+/**
+ *  فقط مدیرِ ارشد. SEC-AUTH-13: با پرچمِ خاموشِ `ADMIN_REAUTH`، **نوشتنِ** ارشد فقط از نشستی که
+ *  همین چند دقیقه رمز را زده (`lib/admin-guard.assertFresh`). خواندن مثلِ پیش.
+ */
 function requireSuperAdmin(req, res, next) {
   if (!req.admin) return next(unauthorized());
   if (req.admin.role !== 'superadmin') return next(forbidden('فقط مدیر ارشد'));
-  next();
+  if (req.method === 'GET' || req.method === 'HEAD') return next();
+  require('../lib/admin-guard').assertFresh(req).then(() => next(), next);
 }
 
 module.exports = {
