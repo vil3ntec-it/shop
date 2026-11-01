@@ -108,18 +108,30 @@ fun ScaleAtPosSettings(rules: List<WeightBarcode.Rule>, onRules: (List<WeightBar
   val context = LocalContext.current
   ScaleAtPos.load(context)
   if (rules.isNotEmpty()) {
-    val kind = rules.first().kind
+    //  POS-29: نوع، طولِ کدِ کالا و رقمِ اعشار — همیشه قاعدهٔ EAN-13 ِ درست از `ScaleSale.rules`
+    val first = rules.first()
+    val kind = first.kind
     SegmentedTabs(
       listOf(SegmentTab(WeightBarcode.Kind.WEIGHT, "برچسبِ وزنی"), SegmentTab(WeightBarcode.Kind.PRICE, "برچسبِ قیمتی")),
       kind,
-      { k -> onRules(rules.map { it.copy(kind = k, decimals = if (k == WeightBarcode.Kind.PRICE) 0 else 3) }) },
+      { k -> onRules(ScaleSale.rules(k, first.itemDigits, ScaleSale.decimalsFor(k).first())) },
     )
-    if (kind == WeightBarcode.Kind.PRICE) {
-      Text(
-        "پنج رقمِ آخر مبلغ به افغانی است؛ مقدار = مبلغ ÷ قیمتِ کالا، و برچسبی که مبلغِ ردیف را دقیقاً همان نکند رد می‌شود.",
-        style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
-      )
-    }
+    SegmentedTabs(
+      ScaleSale.ITEM_DIGITS.map { SegmentTab(it, "کدِ کالا $it رقم") },
+      first.itemDigits,
+      { n -> onRules(ScaleSale.rules(kind, n, first.decimals)) },
+    )
+    SegmentedTabs(
+      ScaleSale.decimalsFor(kind).map { SegmentTab(it, decimalsLabel(kind, it)) },
+      first.decimals,
+      { dec -> onRules(ScaleSale.rules(kind, first.itemDigits, dec)) },
+    )
+    val sample = ScaleSale.sample(rules)
+    Text(
+      (if (kind == WeightBarcode.Kind.PRICE) "مقدار = مبلغ ÷ قیمتِ کالا، و برچسبی که مبلغِ ردیف را دقیقاً همان نکند رد می‌شود. " else "") +
+        "${first.valueDigits} رقمِ مقدار پس از ${first.itemDigits} رقمِ کد" + (sample?.let { "؛ نمونه: $it" } ?: ""),
+      style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
+    )
   }
   if (HwPlatform.serial == null) return
   Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
@@ -132,4 +144,11 @@ fun ScaleAtPosSettings(rules: List<WeightBarcode.Rule>, onRules: (List<WeightBar
     }
     Switch(checked = ScaleAtPos.on.value, onCheckedChange = { ScaleAtPos.set(context, it) })
   }
+}
+
+private fun decimalsLabel(kind: WeightBarcode.Kind, decimals: Int): String = when {
+  kind == WeightBarcode.Kind.PRICE && decimals == 0 -> "مبلغ به افغانی"
+  kind == WeightBarcode.Kind.PRICE -> "مبلغ با دو رقمِ پول"
+  decimals == 3 -> "وزن به گرم"
+  else -> "وزن به ده گرم"
 }

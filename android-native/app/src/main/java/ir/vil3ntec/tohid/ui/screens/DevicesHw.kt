@@ -570,7 +570,7 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
     Text("ترازو", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
     HwSwitchRow(
       "برچسبِ ترازو در صندوق",
-      "بارکدِ ۱۳ رقمیِ ۲۰ تا ۲۹: کدِ کالای ترازو ۵ رقم و وزن ۵ رقم به گرم. کدِ ترازو را به بارکدهای همان کالا بیفزایید.",
+      "بارکدِ ۱۳ رقمیِ ۲۰ تا ۲۹ (پیش‌فرض: کدِ کالای ترازو ۵ رقم و وزن ۵ رقم به گرم؛ نوع و طول‌ها زیرِ همین کلید). کدِ ترازو را به بارکدهای همان کالا بیفزایید.",
       rules.isNotEmpty(),
     ) { on ->
       val next = if (on) WeightBarcode.standardRules() else emptyList()
