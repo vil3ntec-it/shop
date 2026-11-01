@@ -22,22 +22,26 @@ class CountDuringSalesWiringTest {
 
   @Test fun saleDuringCountMakesNoDifference() {
     assertEquals(17.0, ShopStore.stock(d, "x"), 0.0)
-    val lines = WarehouseEngine.countLines(d, mapOf("x" to 20.0), mapOf("x" to 1_000L))
-    assertTrue(lines.isEmpty())
-    val r = WarehouseEngine.stockCountAt(d, mapOf("x" to 20.0), mapOf("x" to 1_000L), "", "2026-10-26", 3_000, ::id)
+    //  انتقالِ ساعتِ ۱۵۰۰ جمع را عوض نمی‌کند و بیرون است؛ فقط فروشِ ساعتِ ۲۰۰۰
+    val shift = CountShift.of(d, mapOf("x" to 1_000L))
+    assertEquals(mapOf("x" to -3.0), shift)
+    assertTrue(WarehouseEngine.countLines(d, mapOf("x" to 20.0), shift).isEmpty())
+    val r = WarehouseEngine.stockCount(d, mapOf("x" to 20.0), "", "2026-10-26", 3_000, ::id, shift)
     assertTrue(r is WarehouseEngine.Result.Failed)
   }
 
   @Test fun withoutInstantTheSaleLooksLikeASurplus() {
     val lines = WarehouseEngine.countLines(d, mapOf("x" to 20.0))
     assertEquals(3.0, lines.single().diff, 1e-9)
+    assertEquals(emptyMap<String, Double>(), CountShift.of(d, emptyMap()))
   }
 
   @Test fun realShortageIsOnlyTheMissingUnit() {
-    val lines = WarehouseEngine.countLines(d, mapOf("x" to 19.0), mapOf("x" to 1_000L))
+    val shift = CountShift.of(d, mapOf("x" to 1_000L))
+    val lines = WarehouseEngine.countLines(d, mapOf("x" to 19.0), shift)
     assertEquals(20.0, lines.single().system, 1e-9)
     assertEquals(-1.0, lines.single().diff, 1e-9)
-    val r = WarehouseEngine.stockCountAt(d, mapOf("x" to 19.0), mapOf("x" to 1_000L), "", "2026-10-26", 3_000, ::id) as WarehouseEngine.Result.Ok
+    val r = WarehouseEngine.stockCount(d, mapOf("x" to 19.0), "", "2026-10-26", 3_000, ::id, shift) as WarehouseEngine.Result.Ok
     assertEquals(16.0, ShopStore.stock(r.data, "x"), 1e-9)
   }
 }

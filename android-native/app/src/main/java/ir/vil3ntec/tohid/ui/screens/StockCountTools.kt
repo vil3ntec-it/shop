@@ -48,7 +48,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *
  *  // i18n: سه‌زبانه — نوشته‌ها در `StrCount` (LOC-06)؛ نام و واحدِ کالا داده‌اند و همان می‌مانند.
  *
- *  حساب در `core/stock/CountTools` و `CountSheetModel` است؛ ثبت همان `WarehouseEngine.stockCountAt`
+ *  حساب در `core/stock/CountTools` و `CountSheetModel` است؛ ثبت همان `WarehouseEngine.stockCount`
  *  (`onSave`)، پس شمرده‌نشده دست نمی‌خورد و هر اختلاف «اصلاحِ موجودی» با دلیلِ «انبارگردانی» می‌شود.
  *  فروش‌های حینِ شمارش (INV-10): لحظهٔ شمردنِ هر کالا همراهِ شمرده‌ها می‌رود (`core/stock/CountDuringSales`)؛
  *  پیش‌نویسِ بازگردانده‌شده لحظه ندارد و همان مقایسهٔ امروز را دارد.

@@ -515,24 +515,17 @@ fun WarehouseScreen(
   }
 
   if (stockCount) {
-    val onCountSave: (Map<String, Double>, String) -> Unit = { counted, note ->
-      val n = WarehouseEngine.countLines(d, counted).size
+    val onCountSave: (Map<String, Double>, Map<String, Long>, String) -> Unit = { counted, at, note ->
+      val shift = ir.vil3ntec.tohid.data.CountShift.of(d, at) // INV-10: پنجرهٔ قدیم بی لحظه ⇒ همان امروز
+      val n = WarehouseEngine.countLines(d, counted, shift).size
       apply(
-        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
+        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId, shift),
         "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
       ) { stockCount = false }
     }
     val onCountExport: (ir.vil3ntec.tohid.data.ReportCsv.Sheet) -> Unit = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
-    //  INV-10: برگهٔ تازه لحظهٔ شمردنِ هر کالا را هم می‌دهد تا فروش‌های حینِ شمارش اختلاف نسازند
-    val onToolsSave: (Map<String, Double>, Map<String, Long>, String) -> Unit = { counted, at, note ->
-      val n = WarehouseEngine.countLines(d, counted, at).size
-      apply(
-        WarehouseEngine.stockCountAt(d, counted, at, note, todayIso(), System.currentTimeMillis(), ::newId),
-        "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
-      ) { stockCount = false }
-    }
-    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onToolsSave)
-    else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = { c, note -> onCountSave(c, emptyMap(), note) })
   }
 
   if (labels) LabelSheetWired(context, d, onDismiss = { labels = false }) { r, done -> apply(r, done) }
