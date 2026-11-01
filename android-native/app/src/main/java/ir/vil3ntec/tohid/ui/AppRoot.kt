@@ -847,7 +847,7 @@ fun AppRoot(
                 StrShell.stockInsight to androidx.compose.material.icons.Icons.Filled.Inventory,
                 StrShell.stockLevels to androidx.compose.material.icons.Icons.Filled.Inventory,
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
-                ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard,
+                ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrSale.feesTitle to androidx.compose.material.icons.Icons.Filled.ShoppingBag, // POS-36
                 ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
                 ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.core.i18n.StrPos.notesSection to androidx.compose.material.icons.Icons.Filled.Edit, // POS-11

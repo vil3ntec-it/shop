@@ -102,15 +102,16 @@ class CartStore(context: Context) : HeldCart {
 
   private fun removed(before: List<SalesEngine.CartLine>, after: List<SalesEngine.CartLine>, draftKey: String?) {
     val hook = onLinesRemoved ?: return
-    val gone = FraudTrail.removed(before, after)
+    val gone = FraudTrail.removed(before, after).filterNot(AutoFeeLines::isFee) // POS-36: هزینهٔ خودکار ردِ حذف نیست
     if (gone.isNotEmpty()) runCatching { hook(gone, draftKey) }
   }
 
   /** `false` ⇒ وسطِ جابه‌جاییِ فاکتور بود و چیزی عوض نشد — صفحه باید بگوید (`NOT_ADDED`) */
   fun set(lines: List<SalesEngine.CartLine>): Boolean = put(lines, byUser = true)
 
-  private fun put(lines: List<SalesEngine.CartLine>, byUser: Boolean): Boolean {
+  private fun put(input: List<SalesEngine.CartLine>, byUser: Boolean): Boolean {
     if (frozen) return false
+    val lines = AutoFeeLines.apply(input, AutoFeesPref.rules(app)) // POS-36؛ بی قاعده همان فهرست
     val before = _lines.value
     val draftKey = key
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
