@@ -118,13 +118,16 @@ fun QuickSaleScreen(
   }
 
   val term = search.trim()
-  val shown = remember(d, term, category) {
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val shown = remember(d, term, category, infoSearch) {
     d.products.filter { p ->
       //  کالای غیرفعال در فروش نمی‌آید — سابقه‌اش در گزارش‌ها می‌ماند
       p.active &&
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
-          p.barcodes.any { it.contains(term) })
+          p.barcodes.any { it.contains(term) } ||
+          (infoSearch && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term)))
     }
   }
 
@@ -265,7 +268,8 @@ fun QuickSaleScreen(
                 if (added.capped) {
                   scope.launch {
                     snackbar.showSnackbar(
-                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است"
+                      "${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است" +
+                        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, p, infoSearch)
                     )
                   }
                 } else {
@@ -396,7 +400,8 @@ fun QuickSaleScreen(
           if (added.capped) {
             scope.launch {
               snackbar.showSnackbar(
-                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است"
+                "${found.name} فقط ${qty(added.available)}${if (found.unit.isNotBlank()) " ${found.unit}" else ""} موجود است" +
+                  ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, found, infoSearch)
               )
             }
           } else {
@@ -418,6 +423,50 @@ fun QuickSaleScreen(
     )
   }
 
+  //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
+  val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
+  /** فاکتوری که از سقفِ مشتری می‌گذرد و منتظرِ تأیید است (گزینه‌های پنجرهٔ پرداخت + مقدارِ بیش از سقف) */
+  var creditAsk by remember { mutableStateOf<Pair<SalesEngine.Checkout, ir.vil3ntec.tohid.core.credit.CreditGate.Over>?>(null) }
+
+  /**
+   *  ثبتِ همین سبد با گزینه‌های پنجرهٔ پرداخت — مستقیم، یا پس از تأییدِ سقفِ اعتبار.
+   *  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود.
+   *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
+   */
+  fun postSale(options: SalesEngine.Checkout) {
+    scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+      SalesEngine.record(
+      d, priced, options,
+      today = todayIso(),
+      now = System.currentTimeMillis(),
+      newId = ::newId,
+      //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
+      saleId = key,
+      //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
+      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
+    ), promo) }) {
+      SalePost.Outcome.Busy -> Unit
+      SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
+      is SalePost.Outcome.Refused -> toast(posted.message)
+      is SalePost.Outcome.Done -> {
+        val result = posted.ok
+        selectedId = null
+        checkout = false
+        cartOpen = false
+        Haptics.success(context)
+        val sold = result.data.sales.last()
+        toast("فروش به مبلغ ${money(sold.finalTotal)} ؋ ثبت شد")
+        //  بقیهٔ اعضای دکان همان لحظه خبردار می‌شوند — صاحب دکانی
+        //  که خانه است نباید تا همگام‌سازیِ بعدی بی‌خبر بماند
+        ir.vil3ntec.tohid.sync.ShopNews.sale(
+          context, sold.finalTotal, cart.size,
+        )
+        invoice = result.data to result.saleId
+      }
+    } }
+  }
+
   if (checkout) {
     CheckoutDialog(
       d = d,
@@ -431,40 +480,28 @@ fun QuickSaleScreen(
       saleKey = remember(cart) { cartStore.saleKey() },
       onConfirm = { options ->
         if (!checkout) return@CheckoutDialog
-        //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
-        //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
-        scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
-          SalesEngine.record(
-          d, priced, options,
-          today = todayIso(),
-          now = System.currentTimeMillis(),
-          newId = ::newId,
-          //  F0-03: «سری سند»ِ این دستگاه — `{سری}-{شماره}`
-          series = ir.vil3ntec.tohid.sync.DocSeries.current(context),
-          saleId = key,
-          //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
-          receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
-        ), promo) }) {
-          SalePost.Outcome.Busy -> Unit
-          SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
-          is SalePost.Outcome.Refused -> toast(posted.message)
-          is SalePost.Outcome.Done -> {
-            val result = posted.ok
-            selectedId = null
-            checkout = false
-            cartOpen = false
-            Haptics.success(context)
-            val sold = result.data.sales.last()
-            toast("فروش به مبلغ ${money(sold.finalTotal)} ؋ ثبت شد")
-            //  بقیهٔ اعضای دکان همان لحظه خبردار می‌شوند — صاحب دکانی
-            //  که خانه است نباید تا همگام‌سازیِ بعدی بی‌خبر بماند
-            ir.vil3ntec.tohid.sync.ShopNews.sale(
-              context, sold.finalTotal, cart.size,
-            )
-            invoice = result.data to result.saleId
-          }
-        } }
+        //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید
+        //  هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
+        val sale = options.copy(creditGate = creditGateOn)
+        val over = SalesEngine.creditOver(d, priced, sale)
+        if (over != null) { creditAsk = sale to over; return@CheckoutDialog }
+        postSale(sale)
       },
+    )
+  }
+
+  creditAsk?.let { (pending, over) ->
+    val debtorId = pending.debtorId
+    if (debtorId != null) ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
+      summary = (d.debtors.find { it.id == debtorId }?.name?.let { "«$it» — " } ?: "") + SalesEngine.creditOverText(over),
+      debtorId = debtorId,
+      addMinor = over.addMinor,
+      selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) },
+      selfName = pending.seller,
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      //  با تأیید همان فاکتور با همان گزینه‌ها ثبت می‌شود؛ PINِ غلط یا انصراف ⇒ هیچ چیز
+      onApproved = { ok -> creditAsk = null; postSale(pending.copy(creditApproval = ok)) },
+      onDismiss = { creditAsk = null },
     )
   }
 

@@ -139,7 +139,8 @@ class ReturnFlowTest {
   fun `gate و canApprove — بی رسید، ضایعات، سقفِ نقش`() {
     v.arr("gate").forEach {
       val c = it.jsonObject
-      val g = ReturnFlow.gate(c.str("role"), c.str("perm"), c.long("amountMinor"), c.bool("noReceipt"), c.bool("damaged"), c.long("limitMinor"))
+      //  `priorMinor` نبود ⇒ ۰ (برگشتِ نخستِ فاکتور، یا بی رسید)
+      val g = ReturnFlow.gate(c.str("role"), c.str("perm"), c.long("amountMinor"), c.bool("noReceipt"), c.bool("damaged"), c.long("limitMinor"), c.long("priorMinor"))
       val out = c.obj("out")
       assertEquals(c.toString(), out.str("decision"), g.decision)
       assertEquals(c.toString(), out.arr("reasons").map { x -> x.jsonPrimitive.content }, g.reasons)
@@ -273,6 +274,29 @@ class ReturnFlowTest {
     val ok = ReturnFlow.exchange(d, req, listOf(SalesEngine.CartLine("p42", 1.0)), SalesEngine.Checkout(), "sale-y", today, now, ::newId)
     val again = ReturnFlow.exchange((ok as ReturnFlow.Outcome.Ok).value.data, req.copy(docId = "doc-z"), listOf(SalesEngine.CartLine("p42", 1.0)), SalesEngine.Checkout(), "sale-y", today, now, ::newId)
     assertEquals(ReturnFlow.Code.ALREADY_POSTED, (again as ReturnFlow.Outcome.Bad).code)
+  }
+
+  @Test
+  fun `RET-08 فهرستِ دلیلِ دکان — بیرون از فهرست رد و دفتر دست‌نخورده، درون فهرست با متنِ خودِ فهرست`() {
+    val d = ledger()
+    val shop = listOf("رنگِ نامناسب", "خراب")
+    fun post(reason: String, list: List<String>?) = ReturnFlow.post(
+      d, ReturnFlow.Request(docId = "rr", saleId = "s30", picks = mapOf("i30" to ReturnFlow.Pick(1.0)), reason = reason, reasons = list),
+      today, now, ::newId,
+    )
+    //  دلیلِ پیش‌فرضی که دکان برداشته ⇒ رد
+    val out = post("خراب یا معیوب", shop)
+    assertEquals(ReturnFlow.Code.REASON_NOT_LISTED, (out as ReturnFlow.Outcome.Bad).code)
+    assertTrue(d.saleReturns.isEmpty())
+    //  خالی هنوز «دلیل را انتخاب کنید» است
+    assertEquals(ReturnFlow.Code.REASON_REQUIRED, (post("  ", shop) as ReturnFlow.Outcome.Bad).code)
+    //  «رنگ نامناسب» (بی کسره) همان ردیفِ فهرست است و با متنِ فهرست ثبت می‌شود
+    val ok = (post("رنگ نامناسب", shop) as ReturnFlow.Outcome.Ok).value
+    assertEquals(listOf("رنگِ نامناسب"), ok.data.saleReturns.map { it.reason })
+    //  بی فهرست (`null`) همان رفتارِ پیشین: هر دلیلِ ناخالی
+    assertTrue(post("هر چه", null) is ReturnFlow.Outcome.Ok)
+    //  فهرستِ پیش‌فرض همان `REASONS` است
+    assertEquals(ir.vil3ntec.tohid.core.returns.ReturnReasons.DEFAULT, ReturnFlow.REASONS)
   }
 
   @Test

@@ -17,6 +17,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.audit.InvoiceVoid
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -25,7 +27,7 @@ import ir.vil3ntec.tohid.data.isOnlineOrder
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /*
- *  دو پنجرهٔ لغو و «اصلاح» ِ تاریخچهٔ فروشِ امروز (`SalesHistoryScreen`) — همان متن و همان ظاهرِ پیشین،
+ *  دو پنجرهٔ لغو و «اصلاح» ِ تاریخچهٔ فروشِ امروز (`SalesHistoryScreen`) — همان متن (سه‌زبانه، `StrInvoices`) و همان ظاهرِ پیشین،
  *  جدا شده تا SEC-03 فایلِ تاریخچه را از ۸۰۰ خط بزرگ‌تر نکند. کنترل و اثر در صفحه است
  *  (`InvoiceVoid.check` ⇐ `SalesEngine.cancel` ⇐ سندِ معکوس)؛ این‌ها فقط می‌پرسند.
  *  نسخهٔ ۳ (`CancelSheet`، #391) همین کنترل را از core می‌خواند.
@@ -44,17 +46,16 @@ internal fun ReopenInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
-    title = { Text("اصلاح فاکتور؟", color = Shop.colors.text) },
+    title = { Text(StrInvoices.reopenTitle, color = Shop.colors.text) },
     text = {
       Text(
-        "فاکتور #${sale.invoiceLabel() ?: "0"} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. " +
-          "بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
+        StrInvoices.reopenBody(sale.invoiceLabel() ?: "0"),
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
     },
-    confirmButton = { TextButton(onClick = onConfirm) { Text("لغو و بردن به سبد") } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("بازگشت") } },
+    confirmButton = { TextButton(onClick = onConfirm) { Text(StrInvoices.cancelAndToCart) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
 
@@ -65,7 +66,7 @@ internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
-    title = { Text("لغو فروش؟", color = Shop.colors.text) },
+    title = { Text(StrInvoices.cancelSaleTitle, color = Shop.colors.text) },
     text = {
       Column {
         Text(
@@ -77,7 +78,7 @@ internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
         OutlinedTextField(
           value = reason,
           onValueChange = { reason = it.take(InvoiceVoid.REASON_MAX) },
-          label = { Text("دلیلِ لغو") },
+          label = { Text(StrInvoices.cancelReason) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
@@ -85,10 +86,10 @@ internal fun CancelInvoiceDialog(sale: Sale, onDismiss: () -> Unit, onConfirm: (
     },
     confirmButton = {
       TextButton(enabled = reason.isNotBlank(), onClick = { onConfirm(reason) }) {
-        Text("لغو فروش", color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted)
+        Text(StrInvoices.cancelSale, color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("بازگشت") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.goBack) } },
   )
 }
 
@@ -100,11 +101,11 @@ internal object SalesVoid {
 
   /** ردِ `InvoiceVoid.check` ⇐ همان پیام‌های امروزِ صفحه و موتور */
   fun denied(code: String, noPermission: String): String = when (code) {
-    "already_cancelled" -> "این فاکتور قبلاً لغو شده است"
+    "already_cancelled" -> StrInvoices.alreadyCancelled
     "online_order" -> SalesEngine.ONLINE_ORDER_LOCKED
     "no_permission" -> noPermission
-    "reason_required" -> "دلیلِ لغو لازم است"
-    "reason_too_long" -> "دلیلِ لغو حداکثر ${InvoiceVoid.REASON_MAX} نویسه است"
-    else -> "فاکتور پیدا نشد"
+    "reason_required" -> StrInvoices.reasonRequired
+    "reason_too_long" -> StrInvoices.reasonTooLong(InvoiceVoid.REASON_MAX)
+    else -> StrInvoices.invoiceNotFound
   }
 }

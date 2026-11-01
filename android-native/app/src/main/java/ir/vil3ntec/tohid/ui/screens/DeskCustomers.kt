@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CustomerEngine
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.Sale
@@ -338,6 +339,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
 
   var tab by remember { mutableStateOf(FileTab.LEDGER) }
   var entry by remember { mutableStateOf<DebtorEngine.Kind?>(null) }
+  val entryKey = remember(entry) { newId() }  // شناسهٔ ردیفِ قرض، یکی برای هر ورود ⇒ دو Enter یا تأییدِ «بیش از سقف» یک ردیف
   var picked by remember { mutableStateOf<String?>(null) }
   var showInvoice by remember { mutableStateOf<Sale?>(null) }
   //  دفترِ قرض (v3 §22.2-A5): ردیفِ انتخاب‌شدهٔ صورت‌حساب، رسید، سررسید، سقفِ اعتبار
@@ -348,14 +350,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   var limitOpen by remember { mutableStateOf(false) }
   var overLimit by remember { mutableStateOf<Triple<Double, String, String?>?>(null) }
   fun record(kind: DebtorEngine.Kind, amount: Double, notes: String, due: String?, over: Boolean) {
-    when (val r = DebtorEngine.addTransaction(d, id, kind, amount, today, notes, today, System.currentTimeMillis(), ::newId, dueDate = due, overLimit = over)) {
-      is DebtorEngine.Result.Failed -> toast(r.message)
-      is DebtorEngine.Result.Ok -> {
-        scope.launch { store.save(r.data) }
-        entry = null
-        tab = FileTab.LEDGER
-        toast(if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد")
-      }
+    val e = DebtEntry.Entry(id, kind, amount, today, notes, due, over)
+    val done = if (kind == DebtorEngine.Kind.RECEIVE) "دریافتِ ${money(amount)} ؋ ثبت شد" else "قرضِ ${money(amount)} ؋ ثبت شد"
+    //  ⛔ روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه: ردیفی که Pull در این فاصله آورده گم نمی‌شود
+    scope.launch {
+      DebtEntry.record(store, entryKey, e, today, System.currentTimeMillis()).show(::toast, done) { if (entry == kind) entry = null; tab = FileTab.LEDGER }
     }
   }
   val shotTab = DeskCustomersShot.tab.value
@@ -423,6 +422,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       OutlinedButton(onClick = ::print) { Text("چاپِ «${tab.label}»  Ctrl+P") }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = ::excel) { Text("اکسل  Ctrl+E") }
+      StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
+      CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
     }
     entry?.let { kind ->
       Spacer(Modifier.height(8.dp))

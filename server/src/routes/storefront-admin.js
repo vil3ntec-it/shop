@@ -15,6 +15,8 @@
 const express = require('express');
 const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
+const areas = require('../lib/storefront-area-requests');
+const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -23,14 +25,13 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   const st = await sf.stateOf(req.shopId);
   if (!st.flag) return next(forbidden('ویترین برای این دکان روشن نیست', 'storefront_disabled'));
   req.storeState = st;
   next();
-});
+};
 
 const needWrite = (req, res, next) => {
   const { entitled, ent } = req.storeState;
@@ -40,7 +41,7 @@ const needWrite = (req, res, next) => {
     : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
 };
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   const { ent, ...st } = await sf.stateOf(req.shopId);
   res.json({
     ...st,
@@ -49,9 +50,9 @@ router.get('/config', wrap(async (req, res) => {
     //  برگهٔ «ارسال و زمان» فقط با پرچمِ جدای `shop.storefront.zones`
     zones: st.flag ? await sfd.flagOn(req.shopId) : false,
   });
-}));
+});
 
-router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const settings = await sf.saveSettings(req.shopId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.settings',
@@ -59,7 +60,7 @@ router.put('/', requirePermission('settings.write'), needFlag, needWrite, wrap(a
     detail: { slug: settings.slug, enabled: settings.enabled }, ip: clientIp(req),
   });
   res.json({ settings });
-}));
+});
 
 //  PRES-10: نامِ دکانِ دیگر در بدنه ⇒ ۴۰۳ (پیش‌تر نادیده گرفته می‌شد و
 //  اعلام روی دکانِ خودِ توکن می‌نشست). خودِ دکان همیشه از عضویت است.
@@ -72,12 +73,12 @@ const ownShopOnly = (req, res, next) => {
   next();
 };
 
-router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.post('/presence', ownShopOnly, requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await sf.declarePresence(req.shopId, req.body, {
     userId: req.user.id, deviceId: req.get('x-device') || '',
   });
   res.json(out);
-}));
+});
 
 /**
  * PRES-10: اعلامِ ردشدهٔ کاربرِ واردشده (دکانِ دیگر، بدنهٔ دست‌کاری‌شده،
@@ -111,17 +112,36 @@ router.use('/presence', (err, req, res, next) => {
   }).catch(() => {}).then(() => next(err));
 });
 
-//  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
-const needZones = wrap(async (req, res, next) => {
-  if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
+//  ── WEB-24: بنرهای زمان‌بندی‌شده (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۳) ─────────
+const needBanners = async (req, res, next) => {
+  if (!(await extras.bannersOn(req.shopId))) return next(forbidden('بنرِ ویترین برای این دکان روشن نیست', 'banners_disabled'));
   next();
+};
+
+router.get('/banners', requirePermission('data.read'), needFlag, needBanners, async (req, res) => {
+  res.json({ banners: await extras.banners(req.shopId), max: extras.MAX_BANNERS });
 });
 
-router.get('/delivery', requirePermission('data.read'), needFlag, needZones, wrap(async (req, res) => {
-  res.json(await sfd.settingsOf(req.shopId));
-}));
+router.put('/banners', requirePermission('settings.write'), needFlag, needBanners, needWrite, async (req, res) => {
+  const out = await extras.saveBanners(req.shopId, req.body, req.user.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.banners',
+    targetType: 'storefront', targetId: req.shopId, detail: { count: out.length }, ip: clientIp(req),
+  });
+  res.json({ banners: out, max: extras.MAX_BANNERS });
+});
 
-router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, wrap(async (req, res) => {
+//  ── ناحیه‌های ارسال و بازه‌های زمان‌بندی (CHK-06/07/10/12) ─────────────
+const needZones = async (req, res, next) => {
+  if (!(await sfd.flagOn(req.shopId))) return next(forbidden('ناحیه و زمان‌بندی برای این دکان روشن نیست', 'zones_disabled'));
+  next();
+};
+
+router.get('/delivery', requirePermission('data.read'), needFlag, needZones, async (req, res) => {
+  res.json(await sfd.settingsOf(req.shopId));
+});
+
+router.put('/delivery', requirePermission('settings.write'), needFlag, needZones, needWrite, async (req, res) => {
   const out = await sfd.saveSettings(req.shopId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.delivery',
@@ -130,13 +150,36 @@ router.put('/delivery', requirePermission('settings.write'), needFlag, needZones
     ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
-router.get('/products', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
+//  ── CHK-10/S34: «خبرم کن» ِ بیرونِ محدوده ─────────────────────────────
+//  تقاضا به ازای خانهٔ شبکه (بی شماره) و شمارهٔ کسانی که ناحیهٔ امروز پوشانده است.
+//  ⛔ شمارهٔ مشتری ⇒ فقط صاحب و مدیر (`settings.write`)، نه هر عضو.
+const needArea = async (req, res, next) => {
+  if (!(await areas.flagOn(req.shopId))) return next(forbidden('«خبرم کن» برای این دکان روشن نیست', 'notify_area_disabled'));
+  next();
+};
+
+router.get('/area-requests', requirePermission('settings.write'), needFlag, needZones, needArea, async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await areas.forShop(req.shopId));
+});
+
+//  «خبر دادم» ⇒ درخواست پاک می‌شود؛ در سابقه نامِ ناحیه، هرگز شماره
+router.post('/area-requests/:id/notified', requirePermission('settings.write'), needFlag, needZones, needArea, needWrite, async (req, res) => {
+  const out = await areas.markNotified(req.shopId, req.params.id);
+  await audit.log({
+    shopId: req.shopId, userId: req.user.id, action: 'storefront.area_request_notified',
+    targetType: 'storefront', targetId: req.shopId, detail: { zone: out.zone }, ip: clientIp(req),
+  });
+  res.json(out);
+});
+
+router.get('/products', requirePermission('data.read'), needFlag, async (req, res) => {
   res.json(await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit }));
-}));
+});
 
-router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await sf.setProduct(req.shopId, req.params.productId, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.product',
@@ -144,7 +187,7 @@ router.put('/products/:productId', requirePermission('settings.write'), needFlag
     detail: { published: out.published, onlinePriceMinor: out.onlinePriceMinor }, ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
 module.exports = router;
 module.exports.resetRejectAudit = () => lastRejectAudit.clear();
