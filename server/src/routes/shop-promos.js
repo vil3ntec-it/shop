@@ -71,7 +71,6 @@ const redeemLimit = rateLimit({
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 const MAX_RULES = 200;
 const MAX_BYTES = 16 * 1024;
@@ -150,7 +149,7 @@ async function mayCancel(req) {
 
 const deviceOf = (req) => (req.device ? String(req.device.device_uid || req.device.id || '') : '');
 
-router.get('/', requirePermission('data.read'), wrap(async (req, res) => {
+router.get('/', requirePermission('data.read'), async (req, res) => {
   res.json({
     ...(await stateOf(req.shopId)),
     stamp: await flagOf(req.shopId, STAMP_FLAG),
@@ -159,9 +158,9 @@ router.get('/', requirePermission('data.read'), wrap(async (req, res) => {
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
   });
-}));
+});
 
-router.put('/settings', requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/settings', requirePermission('settings.write'), async (req, res) => {
   const on = req.body && req.body.enabled;
   if (typeof on !== 'boolean') throw badRequest('enabled باید true یا false باشد', 'invalid_setting');
   const t = now();
@@ -174,9 +173,9 @@ router.put('/settings', requirePermission('settings.write'), wrap(async (req, re
     targetType: 'shop', targetId: req.shopId, detail: { enabled: on }, ip: clientIp(req),
   });
   res.json({ enabled: on, updatedAt: t });
-}));
+});
 
-router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, res) => {
+router.put('/rules/:id', requirePermission('settings.write'), async (req, res) => {
   const id = String(req.params.id || '');
   if (!ID_RE.test(id)) throw badRequest('شناسهٔ قاعده نادرست است', 'invalid_id');
   const body = req.body && req.body.rule;
@@ -237,9 +236,9 @@ router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, r
     ip: clientIp(req),
   });
   res.json({ rule: ruleRow(row, (await liveUses(req.shopId, id)).get(id) || 0) });
-}));
+});
 
-router.delete('/rules/:id', requirePermission('settings.write'), wrap(async (req, res) => {
+router.delete('/rules/:id', requirePermission('settings.write'), async (req, res) => {
   const id = String(req.params.id || '');
   const row = await one(
     `UPDATE shop_promotions SET deleted=true, rev=rev+1, updated_at=$3, updated_by=$4
@@ -251,11 +250,11 @@ router.delete('/rules/:id', requirePermission('settings.write'), wrap(async (req
     targetType: 'promotion', targetId: id, detail: {}, ip: clientIp(req),
   });
   res.json({ ok: true });
-}));
+});
 
 /* ── PRM-02: دفترِ مصرفِ کد ─────────────────────────────────────────── */
 
-router.post('/redeem', requirePermission('data.write'), redeemLimit, wrap(async (req, res) => {
+router.post('/redeem', requirePermission('data.write'), redeemLimit, async (req, res) => {
   await needUses(req);
   const saleId = saleIdOf(req.body);
   const codes = codesOf(req.body);
@@ -315,9 +314,9 @@ router.post('/redeem', requirePermission('data.write'), redeemLimit, wrap(async 
     });
   }
   res.json({ codes: out.results });
-}));
+});
 
-router.post('/redeem/release', requirePermission('data.write'), wrap(async (req, res) => {
+router.post('/redeem/release', requirePermission('data.write'), async (req, res) => {
   await needUses(req);
   const saleId = saleIdOf(req.body);
   const codes = codesOf(req.body, { optional: true });
@@ -342,7 +341,7 @@ router.post('/redeem/release', requirePermission('data.write'), wrap(async (req,
     });
   }
   res.json({ released: done.length });
-}));
+});
 
 module.exports = router;
 module.exports.MESSAGES = MESSAGES;
