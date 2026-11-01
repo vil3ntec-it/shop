@@ -42,6 +42,7 @@ object CatalogModel {
     hasPhoto = p.photo,
     inCart = inCart,
     weighed = SalesEngine.isFractionalUnit(p.unit),
+    stockless = p.stockless == true,
   )
 
   /** کاشی‌های جورشده به ترتیبِ نمایش */

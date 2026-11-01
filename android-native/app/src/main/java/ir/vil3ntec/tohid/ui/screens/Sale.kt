@@ -453,7 +453,7 @@ fun SaleScreen(
   fun phoneAdd(productId: String) {
     val p = d.products.find { it.id == productId } ?: return
     val added = SalesEngine.addToCartCapped(
-      cartStore.lines.value, p.id, SalesEngine.cartStep(p.unit), ShopStore.stock(d, p.id),
+      cartStore.lines.value, p.id, SalesEngine.cartStep(p.unit), ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, p.id),
     )
     if (added.capped) {
       Haptics.confirm(context)
@@ -473,7 +473,7 @@ fun SaleScreen(
     val lines = cartStore.lines.value
     if (sign > 0 && row.hasProduct) {
       val p = d.products.find { it.id == row.id } ?: return
-      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ShopStore.stock(d, p.id))
+      val added = SalesEngine.addToCartCapped(lines, p.id, row.step, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, p.id))
       if (added.capped) {
         toast("${p.name} فقط ${qty(added.available)}${if (p.unit.isNotBlank()) " ${p.unit}" else ""} موجود است")
       }
@@ -510,6 +510,7 @@ fun SaleScreen(
     hasPhoto = p.photo,
     inCart = inCartQty[p.id] ?: 0.0,
     weighed = SalesEngine.isFractionalUnit(p.unit),
+    stockless = p.stockless == true,
   )
   val shownIds = remember(searchIndex, phoneSearch, category) { CatalogSearch.search(searchIndex, phoneSearch, category) }
   val catalogItems = remember(shownIds, productById, inCartQty, d) { shownIds.mapNotNull { productById[it]?.let(::catalogItem) } }
