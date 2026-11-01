@@ -35,6 +35,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
@@ -132,8 +134,10 @@ fun DeskProductsScreen(
   val kpis = remember(d) { ProductListModel.kpis(d.products, stockOf, System.currentTimeMillis()) }
   val counts = remember(d) { ProductListModel.counts(d.products, stockOf) }
   val categories = remember(d.products) { ProductListModel.categories(d.products) }
-  val rows = remember(d.products, index, search, tab, category, sortBy, asc) {
-    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc)
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نام‌های دیگر و واژه‌های جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val rows = remember(d.products, index, search, tab, category, sortBy, asc, infoSearch) {
+    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc, infoSearch)
   }
   //  کالایی که رفته (حذف یا همگام‌سازی) از انتخاب بیرون می‌رود
   LaunchedEffect(d.products) { selected = Selection.prune(selected, d.products.mapTo(HashSet()) { it.id }) }
@@ -734,6 +738,11 @@ private fun EditPanel(
   var sell by remember { mutableStateOf(qty(p.salePrice)) }
   var min by remember { mutableStateOf(qty(p.minStock)) }
   var active by remember { mutableStateOf(p.active) }
+  //  PRD-02/PRD-26: خاموش ⇒ همان پنلِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  var info by remember {
+    mutableStateOf(ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)))
+  }
 
   fun save() {
     val draft = WarehouseEngine.ProductDraft(
@@ -743,6 +752,7 @@ private fun EditPanel(
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
       changedBy = if (tools) me else null,
       reason = if (tools) priceReason else null,
+      info = if (infoOn) info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), p.id) else null,
       brand = if (tools) brand else null,
       tags = if (tools) ProductLabels.tags(tags) else null,
     )
@@ -810,6 +820,10 @@ private fun EditPanel(
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = active, onCheckedChange = { active = it })
         Text("فعال (در فروش دیده می‌شود)", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+      }
+      if (infoOn) {
+        Spacer(Modifier.height(8.dp))
+        ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info, d, p.id) { info = it }
       }
       Spacer(Modifier.height(10.dp))
       Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text("ذخیره  (Enter / Ctrl+S)") }

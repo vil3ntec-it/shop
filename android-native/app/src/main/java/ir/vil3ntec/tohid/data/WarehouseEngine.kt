@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.money
@@ -31,6 +32,22 @@ object WarehouseEngine {
     val active: Boolean? = null,
     val saleUnit: String? = null,
     val unitFactor: Double? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
+    /**
+     *  PRD-02/PRD-26 — نام‌های دیگر، واژه‌ها و محلِ قفسه. `null` ⇒ دست نمی‌خورد (فرمی که این بخش را
+     *  نشان نمی‌دهد، یعنی تنظیمِ خاموش، ورود از فایل و ثبتِ گروهی)؛ وگرنه همه از همین.
+     */
+    val info: ir.vil3ntec.tohid.core.product.ProductInfo? = null,
     /**
      *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
      *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
@@ -165,6 +182,13 @@ object WarehouseEngine {
     if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
     if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
     if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+    //  PRD-02/PRD-26 — فقط وقتی فرمِ همین بخش چیزی را عوض کرد (خاموش ⇒ هرگز)
+    if (a.namePs != b.namePs || a.nameEn != b.nameEn || a.synonyms != b.synonyms || a.keywords != b.keywords) {
+      add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
+    }
+    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
+    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
+    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
     if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
     if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
   }
@@ -244,7 +268,7 @@ object WarehouseEngine {
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
       brand = brandOf(draft.brand, null),
       tags = tagsOf(draft.tags, null),
-    )
+    ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
 
     return Result.Ok(
       d.copy(
@@ -304,7 +328,7 @@ object WarehouseEngine {
       },
       brand = brandOf(draft.brand, existing.brand),
       tags = tagsOf(draft.tags, existing.tags),
-    )
+    ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
     var history = d.priceHistory
