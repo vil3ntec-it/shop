@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,7 +58,10 @@ fun WarehouseScreen(
   openProductId: String? = null,
   newBarcode: String? = null,
   onConsumed: () -> Unit = {},
+  /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
+  onStockBook: () -> Unit = {},
 ) {
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -73,6 +77,8 @@ fun WarehouseScreen(
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
   var stockCount by remember { mutableStateOf(false) }
+  //  چاپِ برچسب و بارکدِ داخلی (PRD-23، PRD-05) — پشتِ `LabelToolsPref`، پیش‌فرض خاموش
+  var labels by remember { mutableStateOf(false) }
   //  ورودِ گروهیِ عکس (v3 ۳۶.۸) — کارِ صاحب/مدیر
   var imageBulk by remember { mutableStateOf(false) }
   //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
@@ -84,6 +90,9 @@ fun WarehouseScreen(
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
   val context = androidx.compose.ui.platform.LocalContext.current
+  val labelTools = remember { ir.vil3ntec.tohid.data.LabelToolsPref.on(context) }
+  //  انبارگردانیِ تازه با اسکن، چند دستگاه و شمارشِ کور (INV-06/07/08) — پشتِ `CountToolsPref`، پیش‌فرض خاموش
+  val countTools = remember { ir.vil3ntec.tohid.data.CountToolsPref.on(context) }
   var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
   val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
@@ -235,10 +244,32 @@ fun WarehouseScreen(
           Text("ورود کالا به انبار")
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { stockCount = true }, modifier = Modifier.fillMaxWidth()) {
+        //  موتورِ تازه روشن ⇒ شمارش با بازبینی در «دفترِ موجودی» (INV-09/10)؛ خاموش ⇒ همان برگهٔ امروز
+        OutlinedButton(
+          onClick = { if (stockOn) { StockBookNav.tab.value = "count"; onStockBook() } else stockCount = true },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
+        }
+        if (labelTools) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = { labels = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(ir.vil3ntec.tohid.core.i18n.StrLabel.openButton)
+          }
+        }
+        if (stockOn) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = onStockBook, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("دفترِ موجودی — بها، سری، محل و دفترِ حرکت")
+          }
+          Spacer(Modifier.height(8.dp))
+          StockStrip(d, onStockBook)
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -484,19 +515,19 @@ fun WarehouseScreen(
   }
 
   if (stockCount) {
-    StockCountSheet(
-      d = d,
-      onDismiss = { stockCount = false },
-      onExport = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") },
-      onSave = { counted, note ->
-        val n = WarehouseEngine.countLines(d, counted).size
-        apply(
-          WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
-          "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
-        ) { stockCount = false }
-      },
-    )
+    val onCountSave: (Map<String, Double>, String) -> Unit = { counted, note ->
+      val n = WarehouseEngine.countLines(d, counted).size
+      apply(
+        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
+        "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
+      ) { stockCount = false }
+    }
+    val onCountExport: (ir.vil3ntec.tohid.data.ReportCsv.Sheet) -> Unit = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
+    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
   }
+
+  if (labels) LabelSheetWired(context, d, onDismiss = { labels = false }) { r, done -> apply(r, done) }
 
   if (bulkEntry) {
     BulkEntrySheet(
@@ -550,11 +581,13 @@ fun WarehouseScreen(
       d = d,
       productId = productId,
       onDismiss = { adjustFor = null },
-      onSave = { quantity, increase, reason, kind ->
+      onSave = { quantity, increase, reason, kind, adjKind ->
         apply(
           WarehouseEngine.adjustStock(
             d, productId, quantity, increase, reason, kind,
             todayIso(), System.currentTimeMillis(), ::newId,
+            adjKind = adjKind,
+            userId = if (adjKind != null) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null,
           ),
           "با موفقیت ثبت شد",
         ) { adjustFor = null }
@@ -812,5 +845,9 @@ private fun movementLabel(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }

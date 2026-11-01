@@ -49,6 +49,47 @@ object ShopPolicy {
   }
 
   /*
+   *  ابزارهای تازهٔ کالا (PRD-19، PRD-04، PRD-14، PRD-21، PRD-06): هشدارِ «نامِ مشابه» در فرمِ کالا و پیش‌نمایشِ
+   *  ورود از فایل (ثبت را نمی‌بندد؛ نامِ عیناً یکسان همیشه رد می‌شود)، کادرِ «بارکدها» برای چند بارکد، برند و برچسب،
+   *  نام و دلیل در سابقهٔ تغییرِ قیمت، و «قیمتِ گروهی» با پیش‌نمایشِ رنگی و تأیید.
+   *  پیش‌فرض **خاموش**: فرم همان تک‌بارکدیِ امروز. فقط روی همین دستگاه.
+   */
+  private const val PRODUCT_TOOLS = "product_tools"
+
+  fun productTools(context: Context): Boolean = prefs(context).getBoolean(PRODUCT_TOOLS, false)
+
+  fun setProductTools(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(PRODUCT_TOOLS, on).apply()
+  }
+
+  /**
+   *  «تحلیلِ موجودی» در گزارشِ کالاها: ارزش به بها و به قیمتِ فروش، سودِ بالقوه (INV-16) و تحلیلِ
+   *  ABC (INV-15) — `ReportEngine.stockInsight` روی `core` (`StockAnalysis`). پیش‌فرض **خاموش**: تا
+   *  دکان‌دار خودش روشن نکند، گزارش‌ها همان است که بود. فقط خواندنی؛ هیچ داده‌ای نمی‌نویسد. فقط همین دستگاه.
+   */
+  private const val STOCK_INSIGHT = "stock_insight"
+
+  fun stockInsight(context: Context): Boolean = prefs(context).getBoolean(STOCK_INSIGHT, false)
+
+  fun setStockInsight(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(STOCK_INSIGHT, on).apply()
+  }
+
+  /**
+   *  «نقطهٔ سفارش و بیشینه» (INV-12): دو کادرِ تازه در فرمِ کالا، ویرایشِ گروهیِ «حدِ موجودی» در فهرستِ
+   *  کالاهای کامپیوتر و فهرستِ «نیاز به سفارش» با پیشنهادِ «تا بیشینه» در گزارش‌ها. پیش‌فرض **خاموش**:
+   *  فرم و فهرست همان امروزند. روشن ⇒ فقط دو فیلدِ افزودنیِ کالا (`reorderPoint`، `maxStock`) نوشته
+   *  می‌شوند و همگام می‌شوند؛ دستگاهی که خاموش است آن‌ها را نمی‌بیند ولی پاکشان هم نمی‌کند. فقط همین دستگاه.
+   */
+  private const val STOCK_LEVELS = "stock_levels"
+
+  fun stockLevels(context: Context): Boolean = prefs(context).getBoolean(STOCK_LEVELS, false)
+
+  fun setStockLevels(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(STOCK_LEVELS, on).apply()
+  }
+
+  /*
    *  ابزارهای تازهٔ کالا (PRD-19، PRD-04، PRD-14، PRD-21، PRD-06، PRD-20): هشدارِ «نامِ مشابه» در فرمِ کالا و پیش‌نمایشِ
    *  ورود از فایل (ثبت را نمی‌بندد؛ نامِ عیناً یکسان همیشه رد می‌شود)، کادرِ «بارکدها» برای چند بارکد، برند و برچسب،
    *  نام و دلیل در سابقهٔ تغییرِ قیمت، و «قیمتِ گروهی» با پیش‌نمایشِ رنگی و تأیید.
@@ -77,5 +118,18 @@ object ShopPolicy {
 
   fun setCreditGate(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(CREDIT_GATE, on).apply()
+  }
+
+  /**
+   *  CHAT-05 / CHAT-07 — چتِ دکان: نوارِ پیشرفتِ فرستادنِ عکس و صدا، و پیش از ضبط، پخش یا آماده
+   *  کردنِ عکس سنجشِ جای دستگاه با پیامِ روشن (`ChatSpace`، `ChatProgress` در `core`). پیش‌فرض
+   *  **خاموش**: چت همان است که بود (بدنهٔ رسانه یک‌جا نوشته می‌شود، بی سنجشِ جا). فقط روی همین دستگاه.
+   */
+  private const val CHAT_MEDIA_GUARD = "chat_media_guard"
+
+  fun chatMediaGuard(context: Context): Boolean = prefs(context).getBoolean(CHAT_MEDIA_GUARD, false)
+
+  fun setChatMediaGuard(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(CHAT_MEDIA_GUARD, on).apply()
   }
 }

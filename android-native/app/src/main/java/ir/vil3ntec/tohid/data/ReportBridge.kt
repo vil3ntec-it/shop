@@ -13,9 +13,10 @@ import kotlinx.serialization.json.jsonObject
  *  `encodeDefaults` تا «نقد» و «تکمیل‌شده»ِ پیش‌فرض گم نشوند (همان تنظیمِ
  *  `ShopStore`). هیچ عددی این‌جا حساب نمی‌شود.
  *
- *  ⚠️ فیلدهایی که مدلِ امروزِ برنامه ندارد به هسته نمی‌رسند (تأییدکنندهٔ تخفیف،
- *  کاربرِ برگشتی و سابقه)؛ هسته آن‌ها را «نامعلوم» می‌شمارد. کانالِ فروش (`Sale.channel`)
- *  از #275 در مدل هست و عیناً می‌رسد. آزمونِ `ReportBridgeParityTest` همین را با عدد می‌پاید.
+ *  ⚠️ فیلدهایی که مدلِ امروزِ برنامه ندارد به هسته نمی‌رسند (تأییدکنندهٔ تخفیف و `user` ِ
+ *  برگشتیِ دفترِ وب)؛ هسته آن‌ها را «نامعلوم» می‌شمارد. کانالِ فروش (`Sale.channel`) از #275،
+ *  و `by`/`approvedBy` ِ برگشتی و `by` ِ سابقه (لغو، حذفِ ردیف — «سابقهٔ ضدتقلب»، RPT-09) در مدل
+ *  هستند و عیناً می‌رسند. آزمونِ `ReportBridgeParityTest` همین را با عدد می‌پاید.
  */
 object ReportBridge {
   private val json = Json { encodeDefaults = true }
@@ -24,11 +25,16 @@ object ReportBridge {
     ReportLedger.parse(json.encodeToJsonElement(ShopData.serializer(), d).jsonObject)
 
   /**
-   *  ساعتِ همین دستگاه: اختلافِ امروزش با UTC و روزِ کاری از نیمه‌شب. روزِ هر
-   *  فاکتور همان تاریخی است که موقعِ ثبت روی همین دستگاه دیده شد؛ فقط تفکیکِ
+   *  ساعتِ همین دستگاه: اختلافِ امروزش با UTC و روزِ کاری از «پایانِ روزِ کاری»
+   *  (`ShopDayChoice`، LOC-03؛ پیش‌فرض نیمه‌شب). روزِ هر فاکتور همان تاریخی است که
+   *  موقعِ ثبت روی همین دستگاه دیده شد (`todayIso` با همان پایان)؛ فقط تفکیکِ
    *  «ساعت» از آن درمی‌آید (بی ساعت، همه «نامعلوم» می‌شدند).
    */
-  fun deviceClock(now: Long = nowMs()): ReportClock = ReportClock.fixed(offsetMinutes(now), 0)
+  fun deviceClock(
+    now: Long = nowMs(),
+    dayEndHours: Int = ir.vil3ntec.tohid.ShopDayChoice.hours,
+  ): ReportClock =
+    ReportClock.fixed(offsetMinutes(now), ir.vil3ntec.tohid.core.calendar.ShopDay.dayStartMinutes(dayEndHours))
 
   /** همین لحظه (میلی‌ثانیهٔ UTC) — برای X ِ شیفتِ باز در «پایانِ روز» */
   fun nowMs(): Long = System.currentTimeMillis()

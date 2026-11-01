@@ -42,6 +42,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
+import ir.vil3ntec.tohid.core.stock.StockLevelRules
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
@@ -102,6 +103,10 @@ fun DeskProductsScreen(
   var priceOpen by remember { mutableStateOf(false) }
   val productTools = remember { ShopPolicy.productTools(context) }
   var results by remember { mutableStateOf<Pair<String, List<BulkRowResult>>?>(null) }
+  //  INV-12: ویرایشِ گروهیِ حدها — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+  val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+  var levelsInput by remember { mutableStateOf(false) }
+  var levelsPatch by remember { mutableStateOf<StockLevelRules.Patch?>(null) }
   val searchFocus = remember { FocusRequester() }
   val addFocus = remember { FocusRequester() }
   val view = rememberViewMode("products", ScreenKind.MANAGEMENT)
@@ -132,8 +137,10 @@ fun DeskProductsScreen(
   val kpis = remember(d) { ProductListModel.kpis(d.products, stockOf, System.currentTimeMillis()) }
   val counts = remember(d) { ProductListModel.counts(d.products, stockOf) }
   val categories = remember(d.products) { ProductListModel.categories(d.products) }
-  val rows = remember(d.products, index, search, tab, category, sortBy, asc) {
-    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc)
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نام‌های دیگر و واژه‌های جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val rows = remember(d.products, index, search, tab, category, sortBy, asc, infoSearch) {
+    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc, infoSearch)
   }
   //  کالایی که رفته (حذف یا همگام‌سازی) از انتخاب بیرون می‌رود
   LaunchedEffect(d.products) { selected = Selection.prune(selected, d.products.mapTo(HashSet()) { it.id }) }
@@ -289,6 +296,7 @@ fun DeskProductsScreen(
                 if (productTools) add(BulkAction("قیمت", Icons.Filled.Sell) { priceOpen = true })
                 add(BulkAction("فعال", Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
                 add(BulkAction("غیرفعال", Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
+                if (levelsOn) add(BulkAction("حدِ موجودی", Icons.Filled.Tune) { levelsInput = true })
                 if (canDelete) add(BulkAction("حذف", Icons.Filled.Delete, destructive = true) { confirm = BulkKind.DELETE })
               },
               onClose = { selected = emptySet() },
@@ -384,7 +392,108 @@ fun DeskProductsScreen(
       }
     }
   }
+  /* ─────────── حدهای موجودی (INV-12): ورودی ⇐ پیش‌نمایشِ هر ردیف ⇐ نتیجه ─────────── */
+  if (levelsInput) {
+    LevelsInputDialog(selected.size, onDismiss = { levelsInput = false }) { patch -> levelsInput = false; levelsPatch = patch }
+  }
+  levelsPatch?.let { patch ->
+    val plan = remember(d, selected, patch) { WarehouseEngine.previewLevels(d, selected, patch) }
+    val names = remember(d) { d.products.associate { it.id to it.name } }
+    val hidden = Selection.hiddenCount(selected, rows.map { it.id })
+    BulkConfirmDialog(
+      title = "حدِ موجودیِ ${plain(plan.size)} کالا",
+      confirmLabel = "ذخیره کن",
+      rows = plan.map { BulkPreviewRow(it.id, names[it.id].orEmpty(), changes = it.changes, note = levelsNote(it)) },
+      note = "ترتیبِ درست: حد کم بودن ≤ نقطهٔ سفارش < بیشینه. کالایی که با این عددها جور نیست عوض نمی‌شود. برگشت‌پذیر است.",
+      warnings = if (hidden > 0) listOf("${plain(hidden)} مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند ولی در این کار هستند.") else emptyList(),
+      onDismiss = { levelsPatch = null },
+      onConfirm = { _ ->
+        val r = WarehouseEngine.bulkLevels(d, selected, patch, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
+        val error = (r as? WarehouseEngine.Result.Failed)?.message
+        if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(r.data) }; selected = emptySet() }
+        results = "نتیجهٔ حدِ موجودی" to plan.map { p ->
+          val label = names[p.id].orEmpty()
+          when {
+            !p.ok -> BulkRowResult(p.id, label, ok = false, note = p.problems.joinToString("، ") { it.fa })
+            error != null && p.changes -> BulkRowResult(p.id, label, ok = false, note = error)
+            p.changes -> BulkRowResult(p.id, label, ok = true, note = "ذخیره شد — ${levelsNote(p)}")
+            else -> BulkRowResult(p.id, label, ok = true, note = "بی‌تغییر — از قبل همین است")
+          }
+        }
+        levelsPatch = null
+      },
+    )
+  }
   results?.let { (title, list) -> BulkResultDialog(title, list) { results = null } }
+}
+
+/** «کمینه ۵ ⇐ ۱۰، نقطهٔ سفارش — ⇐ ۲۰» یا ایرادِ ردیف */
+private fun levelsNote(p: StockLevelRules.Planned): String {
+  if (!p.ok) return p.problems.joinToString("، ") { it.fa }
+  fun t(m: Long?) = m?.let { qty(it / 1000.0) } ?: "—"
+  val parts = buildList {
+    if (p.before.minMilli != p.after.minMilli) add("حد کم بودن ${t(p.before.minMilli)} ⇐ ${t(p.after.minMilli)}")
+    if (p.before.reorderMilli != p.after.reorderMilli) add("نقطهٔ سفارش ${t(p.before.reorderMilli)} ⇐ ${t(p.after.reorderMilli)}")
+    if (p.before.maxMilli != p.after.maxMilli) add("بیشینه ${t(p.before.maxMilli)} ⇐ ${t(p.after.maxMilli)}")
+  }
+  return if (parts.isEmpty()) "از قبل همین است" else parts.joinToString("، ")
+}
+
+/**
+ *  ورودیِ ویرایشِ گروهیِ حدها (INV-12): کادرِ خالی ⇒ «بی‌تغییر»؛ تیکِ «پاک» آن حد را برمی‌دارد؛
+ *  حد کم بودنِ ۰ همان «بی هشدار» ِ امروز است. عددِ نادرست دکمه را خاموش نگه می‌دارد.
+ */
+@Composable
+private fun LevelsInputDialog(count: Int, onDismiss: () -> Unit, onNext: (StockLevelRules.Patch) -> Unit) {
+  var min by remember { mutableStateOf("") }
+  var reorder by remember { mutableStateOf("") }
+  var max by remember { mutableStateOf("") }
+  var clearMin by remember { mutableStateOf(false) }
+  var clearReorder by remember { mutableStateOf(false) }
+  var clearMax by remember { mutableStateOf(false) }
+  val patch = StockLevelRules.Patch(
+    min = levelEdit(min, clearMin, zeroClears = true) ?: StockLevelRules.Edit.Keep,
+    reorder = levelEdit(reorder, clearReorder) ?: StockLevelRules.Edit.Keep,
+    max = levelEdit(max, clearMax) ?: StockLevelRules.Edit.Keep,
+  )
+  val bad = listOf(min to clearMin, reorder to clearReorder, max to clearMax).any { (t, c) -> !c && t.isNotBlank() && levelEdit(t, false) == null }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = Shop.colors.surfaceSolid,
+    title = { Text("حدِ موجودی برای ${plain(count)} کالا", color = Shop.colors.text) },
+    text = {
+      Column(Modifier.widthIn(min = 340.dp, max = 480.dp)) {
+        Text("کادرِ خالی دست نمی‌خورد. مقدار به واحدِ خودِ هر کالا است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Spacer(Modifier.height(8.dp))
+        @Composable fun Line(v: String, set: (String) -> Unit, label: String, clear: Boolean, setClear: (Boolean) -> Unit) {
+          Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+              value = v, onValueChange = { set(ir.vil3ntec.tohid.numericInput(it)) }, enabled = !clear,
+              label = { Text(label) }, singleLine = true, modifier = Modifier.weight(1f),
+            )
+            Spacer(Modifier.width(6.dp))
+            Checkbox(checked = clear, onCheckedChange = setClear)
+            Text("پاک شود", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          }
+          Spacer(Modifier.height(6.dp))
+        }
+        Line(min, { min = it }, "حد کم بودن", clearMin) { clearMin = it }
+        Line(reorder, { reorder = it }, "نقطهٔ سفارش", clearReorder) { clearReorder = it }
+        Line(max, { max = it }, "بیشینهٔ موجودی", clearMax) { clearMax = it }
+        if (bad) Text("عدد درست نیست", style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
+      }
+    },
+    confirmButton = { Button(onClick = { onNext(patch) }, enabled = !bad && !patch.isNoop) { Text("پیش‌نمایش") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+  )
+}
+
+/** متنِ کادر ⇒ تغییرِ حد؛ `null` یعنی خالی (بی‌تغییر) یا نادرست — `bad` این دو را جدا می‌کند */
+private fun levelEdit(text: String, clear: Boolean, zeroClears: Boolean = false): StockLevelRules.Edit? {
+  if (clear) return StockLevelRules.Edit.Clear
+  val v = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: return null
+  if (zeroClears && v == 0.0) return StockLevelRules.Edit.Clear
+  return runCatching { StockLevelRules.Edit.To(ir.vil3ntec.tohid.core.money.Qty.fromLegacy(v).milli) }.getOrNull()
 }
 
 /** کارِ گروهیِ در انتظارِ تأیید */
@@ -738,6 +847,16 @@ private fun EditPanel(
   var sell by remember { mutableStateOf(qty(p.salePrice)) }
   var min by remember { mutableStateOf(qty(p.minStock)) }
   var active by remember { mutableStateOf(p.active) }
+  //  PRD-02/PRD-26: خاموش ⇒ همان پنلِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  var info by remember {
+    mutableStateOf(ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)))
+  }
+  //  INV-12 — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+  val context = LocalContext.current
+  val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+  var reorder by remember { mutableStateOf(p.reorderPoint?.let { qty(it) }.orEmpty()) }
+  var maxStock by remember { mutableStateOf(p.maxStock?.let { qty(it) }.orEmpty()) }
 
   fun save() {
     val draft = WarehouseEngine.ProductDraft(
@@ -747,9 +866,13 @@ private fun EditPanel(
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
       changedBy = if (tools) me else null,
       reason = if (tools) priceReason else null,
+      info = if (infoOn) info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), p.id) else null,
       brand = if (tools) brand else null,
       tags = if (tools) ProductLabels.tags(tags) else null,
       packs = if (tools) packs else null,
+      editLevels = levelsOn,
+      reorderPoint = if (levelsOn) levelNumber(reorder) else null,
+      maxStock = if (levelsOn) levelNumber(maxStock) else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -816,9 +939,20 @@ private fun EditPanel(
         F(priceReason, { priceReason = it }, "دلیلِ تغییرِ قیمت (با نامِ شما در سابقه)")
       }
       F(min, { min = it }, "حدِ هشدارِ موجودی", true)
+      if (levelsOn) {
+        Row {
+          Box(Modifier.weight(1f)) { F(reorder, { reorder = it }, "نقطهٔ سفارش", true) }
+          Spacer(Modifier.width(6.dp))
+          Box(Modifier.weight(1f)) { F(maxStock, { maxStock = it }, "بیشینهٔ موجودی", true) }
+        }
+      }
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = active, onCheckedChange = { active = it })
         Text("فعال (در فروش دیده می‌شود)", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+      }
+      if (infoOn) {
+        Spacer(Modifier.height(8.dp))
+        ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info, d, p.id) { info = it }
       }
       Spacer(Modifier.height(10.dp))
       Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text("ذخیره  (Enter / Ctrl+S)") }

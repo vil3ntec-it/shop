@@ -38,6 +38,7 @@ const staffPerms = require('./staff-perms');
 const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
+const roleV1 = require('./staff-role-v1');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -751,17 +752,16 @@ async function v1Guard(req, res, next) {
         rejected.set(i, { op_id: v.op_id, status: 'rejected', reason: v.reason });
       }
     });
-    const hasNeed = valid.some((x) => x.need);
-    if (!hasNeed && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const offTable = await roleV1.offRole(ctx, valid, rejected);
+    const hasNeed = valid.some((x) => x.need);
+    if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
-    if (!hasNeed && !held0.length) return finish();
+    if (!hasNeed && !held0.length && !offTable.length) return finish();
     //  op_idِ ثبت‌شده (هر حسابی — op_id در oplog یکتاست) را خودِ v1 جواب می‌دهد:
     //  «تکراری» برای همین حساب، op_id_taken برای دیگری. نه داوری، نه همراه، نه صندوق.
-    const seen = new Set((await many(
-      'SELECT op_id FROM oplog WHERE op_id = ANY($1::text[])', [valid.map((x) => String(x.op.op_id))]
-    )).map((r) => r.op_id));
-    const live = valid.filter((x) => !seen.has(String(x.op.op_id)));
+    const seen = await roleV1.seenOps(valid);
+    const live = roleV1.dropOff(valid, offTable, seen, rejected);
     const liveOps = live.map((x) => x.op);
     //  دفترِ پایه: چند سند زیرِ یک ts
     const heads = new Map();

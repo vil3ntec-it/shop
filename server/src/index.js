@@ -66,6 +66,13 @@ async function main() {
   orderNotify.start();
   //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
   require('./lib/order-timeout').start();
+  //  ORD-09: توقفِ خودکارِ سفارش‌گیری (فقط دکانِ با پرچمِ `shop.orders.desk` و توقفِ خودکارِ روشن)
+  require('./lib/order-desk').start();
+  //  ORD-18: هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (فقط دکانِ با پرچمِ `shop.orders.start_alert`)
+  require('./lib/order-start-alert').start();
+  //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
+  const payments = require('./lib/payment-intents');
+  payments.startReconciler();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
@@ -78,6 +85,10 @@ async function main() {
   //  «رو به پایان / منقضی»
   const notices = require('./lib/notices');
   notices.startRunner();
+  require('./lib/job-beat').register('notices', 60_000);   //  پنلِ مرکزی ۴.۹: «زمان‌بندی شد» از همین لحظه
+  //  هشدارهای مرکزیِ پنلِ مالک (۴.۱۱): هر ۵ دقیقه، با یکی کردنِ تکرار و سقفِ سیل (`lib/ops-alerts.js`)
+  const opsAlerts = require('./lib/ops-alerts');
+  opsAlerts.start();
   //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
@@ -94,7 +105,9 @@ async function main() {
     if (pgliteStats) pgliteStats.stop();
     outbox.stop();
     orderNotify.stop();
+    payments.stopReconciler();
     notices.stopRunner();
+    opsAlerts.stop();
     telegram.stop();
     server.close(async () => {
       await closeDb();

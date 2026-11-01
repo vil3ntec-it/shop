@@ -157,14 +157,17 @@ fun ProductsScreen(
   val term = search.trim()
   //  فیلتر و دو جمعِ انبار، یک بار به ازای هر دفتر و هر عبارتِ جستجو —
   //  نه در هر بار کشیده شدنِ صفحه
-  val shown = remember(d, term, category, sort) {
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val shown = remember(d, term, category, sort, infoSearch) {
     val stock = ShopStore.index(d)
     val list = d.products.filter { p ->
       (category == null || p.category == category) &&
         (term.isBlank() || p.name.contains(term, ignoreCase = true) ||
           p.category.contains(term, ignoreCase = true) ||
           p.subcategory.contains(term, ignoreCase = true) ||
-          p.barcodes.any { it.contains(term) })
+          p.barcodes.any { it.contains(term) } ||
+          (infoSearch && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term)))
     }
     when (sort) {
       "stock_asc" -> list.sortedBy { stock.stock(it.id) }

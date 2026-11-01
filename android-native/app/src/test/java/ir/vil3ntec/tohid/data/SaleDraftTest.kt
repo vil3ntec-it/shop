@@ -210,4 +210,43 @@ class SaleDraftTest {
     assertEquals(1, saves)
     assertFalse("پس از پایان، دکمه دوباره باز است", post.busy.value)
   }
+
+  /* ---------------- PRM-02: کارِ پیش از ثبت (گرفتنِ کدِ سقف‌دار از سرور) ---------------- */
+
+  @Test
+  fun `پیش از ثبت رد شد ⇒ نه فاکتور، نه دفتر، نه پاک کردنِ سبد؛ پیامِ همان`() = runBlocking {
+    val post = SalePost()
+    val order = mutableListOf<String>()
+    val out = post.run("K", { key -> order += "record"; sell(ledger(), key) }, { order += "save"; true },
+      before = { key -> order += "before:$key"; "کدِ CAP10 ظرفیتش پر شده" }) { order += "done" }
+    assertEquals(SalePost.Outcome.Refused("کدِ CAP10 ظرفیتش پر شده"), out)
+    assertEquals(listOf("before:K"), order)
+    assertFalse("پس از رد، دکمه دوباره باز است", post.busy.value)
+  }
+
+  @Test
+  fun `پیش از ثبت پذیرفت ⇒ همان ثبتِ همیشه، به ترتیب و با همان کلید`() = runBlocking {
+    val order = mutableListOf<String>()
+    val out = SalePost().run("K", { key -> order += "record:$key"; sell(ledger(), key) }, { order += "save"; true },
+      before = { key -> order += "before:$key"; null }) { order += "done:$it" }
+    assertTrue(out is SalePost.Outcome.Done)
+    assertEquals(listOf("before:K", "record:K", "save", "done:K"), order)
+  }
+
+  @Test
+  fun `ضربهٔ دوم وسطِ پرسشِ سرور هم نادیده — یک پرسش و یک فروش`() = runBlocking {
+    val post = SalePost()
+    val wait = CompletableDeferred<Unit>()
+    var asked = 0
+    var saves = 0
+    val first = async {
+      post.run("K", { key -> sell(ledger(), key) }, { saves++; true }, before = { asked++; wait.await(); null }) { }
+    }
+    while (!post.busy.value) yield()
+    assertEquals(SalePost.Outcome.Busy, post.run("K", { key -> sell(ledger(), key) }, { saves++; true }, before = { asked++; null }) { })
+    wait.complete(Unit)
+    assertTrue(first.await() is SalePost.Outcome.Done)
+    assertEquals(1, asked)
+    assertEquals(1, saves)
+  }
 }
