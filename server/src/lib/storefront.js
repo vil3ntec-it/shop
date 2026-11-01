@@ -280,14 +280,12 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   };
 }
 
-/** عکسِ بانک (اگر هست)، جزئیاتِ M4 و وضعیتِ موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
+/** عکسِ بانک (اگر هست)، جزئیاتِ M4 (برند، بارکد، واحد، variant، `bankProductId`؛ فقط با `market.product_details`) و موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
 async function decorate(shopId, items) {
   if (!items.length) return items;
   const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
   for (const p of items) if (bank.has(p.id)) p.photo = true;
-  //  M4: برند، بارکد، واحدِ فروش، variant و `bankProductId` — فقط با `market.product_details`
-  await require('./product-details').attach(shopId, items);
-  return shelf.applyStock(shopId, items);
+  return shelf.applyStock(shopId, await require('./product-details').attach(shopId, items));
 }
 
 /** کالاهای منتشرشده، زنده و قیمت‌دار با همین شناسه‌ها — به همان ترتیب. */
