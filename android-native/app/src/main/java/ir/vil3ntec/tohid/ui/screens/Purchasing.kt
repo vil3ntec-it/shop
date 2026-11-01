@@ -54,6 +54,10 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
   var supplierForm by remember { mutableStateOf<SupplierFormState?>(null) }
   var purchaseFor by remember { mutableStateOf<String?>(null) }
   var payFor by remember { mutableStateOf<String?>(null) }
+  //  برگشت به تأمین‌کننده با سندِ کسر (PUR-08) — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است
+  var returnFor by remember { mutableStateOf<String?>(null) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  val context = androidx.compose.ui.platform.LocalContext.current
   var confirmDelete by remember { mutableStateOf<Supplier?>(null) }
 
   fun toast(text: String) {
@@ -94,6 +98,9 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(16.dp))
+        //  یادآورِ سررسید (PUR-07) — فقط وقتی فاکتوری سررسید دارد
+        SupplierDueReminder(d, todayIso()) { openSupplier = it }
+        Spacer(Modifier.height(8.dp))
       }
 
       if (d.suppliers.isEmpty()) {
@@ -108,6 +115,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
             onClick = { openSupplier = if (openSupplier == supplier.id) null else supplier.id },
             onPurchase = { purchaseFor = supplier.id },
             onPay = { payFor = supplier.id },
+            onReturn = if (stockOn) ({ returnFor = supplier.id }) else null,
             onEdit = { supplierForm = SupplierFormState.of(supplier) },
             onDelete = { confirmDelete = supplier },
           )
@@ -140,6 +148,18 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
         apply(result, "با موفقیت ثبت شد") { supplierForm = null }
       },
     )
+  }
+
+  returnFor?.let { supplierId ->
+    SupplierReturnDialog(d, supplierId, onDismiss = { returnFor = null }) { productId, q, price, reason, date, key ->
+      when (val r = ir.vil3ntec.tohid.data.PurchaseBook.supplierReturn(
+        d, supplierId, productId, q, price, reason, date, todayIso(), System.currentTimeMillis(), ::newId,
+        userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
+      )) {
+        is ir.vil3ntec.tohid.data.PurchaseBook.Result.Failed -> toast(r.message)
+        is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; toast("برگشت و سندِ کسر ثبت شد"); returnFor = null }
+      }
+    }
   }
 
   purchaseFor?.let { supplierId ->
@@ -205,6 +225,8 @@ private fun SupplierRow(
   onClick: () -> Unit,
   onPurchase: () -> Unit,
   onPay: () -> Unit,
+  /** برگشت به تأمین‌کننده (PUR-08)؛ `null` ⇒ دکمه نیست (موتورِ تازه خاموش) */
+  onReturn: (() -> Unit)? = null,
   onEdit: () -> Unit,
   onDelete: () -> Unit,
 ) {
@@ -258,6 +280,10 @@ private fun SupplierRow(
           Button(onClick = onPurchase, modifier = Modifier.weight(1f)) { Text("ثبت خرید") }
           OutlinedButton(onClick = onPay, modifier = Modifier.weight(1f)) { Text("پرداخت") }
         }
+        if (onReturn != null) {
+          Spacer(Modifier.height(6.dp))
+          OutlinedButton(onClick = onReturn, modifier = Modifier.fillMaxWidth()) { Text("برگشت به تأمین‌کننده (سندِ کسر)") }
+        }
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
           OutlinedButton(onClick = onEdit, modifier = Modifier.weight(1f)) { Text("ویرایش") }
@@ -273,12 +299,16 @@ private fun SupplierRow(
           Text("خریدها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
           purchases.take(10).forEach { purchase ->
             val product = d.products.find { it.id == purchase.productId }
+            val back = purchase.totalAmount < 0
             HistoryLine(
-              title = "${product?.name ?: "(محصول حذف‌شده)"} — ${qty(purchase.quantity)} ${purchase.unit}",
-              detail = formatDate(purchase.date) +
-                if (purchase.debt > 0) " — ${money(purchase.debt)} ؋ باقی" else " — تسویه",
-              amount = "${money(purchase.totalAmount)} ؋",
-              tint = Shop.colors.text,
+              title = (if (back) "برگشت — " else "") + "${product?.name ?: "(محصول حذف‌شده)"} — ${qty(kotlin.math.abs(purchase.quantity))} ${purchase.unit}",
+              detail = formatDate(purchase.date) + when {
+                back -> " — سندِ کسر"
+                purchase.debt > 0 -> " — ${money(purchase.debt)} ؋ باقی" + (purchase.dueDate?.let { " — سررسید ${formatDate(it)}" } ?: "")
+                else -> " — تسویه"
+              },
+              amount = "${money(kotlin.math.abs(purchase.totalAmount))} ؋",
+              tint = if (back) Shop.colors.success else Shop.colors.text,
             )
           }
           if (purchases.size > 10) {
@@ -388,6 +418,10 @@ private fun PurchaseDialog(
   onSave: (LedgerEngine.PurchaseDraft) -> Unit,
 ) {
   var productId by remember { mutableStateOf<String?>(null) }
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
+  var landed by remember { mutableStateOf("") }
+  var due by remember { mutableStateOf("") }
+  val context = androidx.compose.ui.platform.LocalContext.current
   var quantity by remember { mutableStateOf("") }
   var price by remember { mutableStateOf("") }
   var paid by remember { mutableStateOf("") }
@@ -456,6 +490,20 @@ private fun PurchaseDialog(
         Spacer(Modifier.height(12.dp))
         AmountField(paid, { paid = it }, "پرداخت‌شده (خالی یعنی نسیه)")
 
+        //  موتورِ تازهٔ موجودی (روشن): هزینهٔ جانبی (PUR-06) — روی بهای کالا، نه بدهیِ تأمین‌کننده
+        if (stockOn) {
+          Spacer(Modifier.height(12.dp))
+          NumberField(landed, { landed = it }, "هزینهٔ جانبی (کرایه، گمرک) — اختیاری", Modifier.fillMaxWidth())
+          Text(
+            "به بهای همین کالا اضافه می‌شود (میانگینِ موزون)؛ جدا در «مصارف» ثبتش نکنید.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+          Spacer(Modifier.height(10.dp))
+          OutlinedTextField(due, { due = it }, label = { Text("سررسیدِ پرداخت (اختیاری)") }, placeholder = { Text("۱۴۰۵/۰۸/۳۰") },
+            singleLine = true, modifier = Modifier.fillMaxWidth())
+        }
+
         Spacer(Modifier.height(12.dp))
         DateField(date) { date = it }
 
@@ -478,6 +526,9 @@ private fun PurchaseDialog(
                   paidAmount = paid.toDoubleOrNull() ?: 0.0,
                   date = date,
                   notes = notes.trim(),
+                  landedCost = if (!stockOn) null else if (landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: -1.0,
+                  userId = if (!stockOn) null else runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(),
+                  dueDate = if (!stockOn || due.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(due) ?: "?",
                 )
               )
             },
