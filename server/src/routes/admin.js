@@ -215,6 +215,8 @@ router.get('/users/:id/delete-preview', async (req, res, next) => {
   const id = v.id(req.params.id);
   const out = await require('../lib/user-delete').preview(id);
   if (!out) return next(notFound('کاربر پیدا نشد'));
+  //  TEN-04: پیش‌نمایش همهٔ دادهٔ یک حساب را می‌شمارد — مثلِ پروندهٔ کاربر، سابقه دارد
+  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.user_delete_previewed', targetType: 'user', targetId: id, ip: clientIp(req) });
   res.json(out);
 });
 
@@ -293,7 +295,10 @@ router.get('/shops/:id', async (req, res, next) => {
    *  UNION بر شناسه: ردیفی که در هر دو دفتر هست (کوچ) یک بار شمرده می‌شود.
    */
   const counts = {};
-  for (const [col, table] of Object.entries(require('../lib/sync').TABLES)) {
+  //  مجموعه‌های فقط‌v1 (گاوصندوق، `V1_ONLY`) این‌جا شمرده نمی‌شوند — همان فهرستِ راهِ قدیم
+  const { TABLES, LEGACY_COLLECTIONS } = require('../lib/sync');
+  for (const col of LEGACY_COLLECTIONS) {
+    const table = TABLES[col];
     const r = await one(
       `SELECT COUNT(*)::int n FROM (
          SELECT id FROM ${table} WHERE shop_id=$1 AND deleted=false

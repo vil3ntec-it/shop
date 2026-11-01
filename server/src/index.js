@@ -55,11 +55,18 @@ async function main() {
   }
 
   const app = await createApp();
-  const server = app.listen(config.port, config.host, () => {
-    const where = config.serverUrl || `http://${config.host}:${config.port}`;
+  //  HTTPS ِ مستقیم فقط با `TLS_*` (سرورِ شبکهٔ دکان)؛ بی آن همان http ِ امروز (پشتِ تونل/Caddy)
+  const tlsListener = require('./lib/tls-listener');
+  const tlsOpts = tlsListener.options(config.tls);
+  const onListen = () => {
+    const where = config.serverUrl || `${tlsOpts ? 'https' : 'http'}://${config.host}:${config.port}`;
     console.log(`سرور فروشگاه روی ${where} بالا آمد (${config.env}، دیتابیس: ${driverName()})`);
     console.log(`بررسی سلامت: ${where.replace(/\/$/, '')}/api/health`);
-  });
+    if (tlsOpts) tlsListener.announce(tlsOpts, config.port, config.host);
+  };
+  const server = tlsOpts
+    ? require('node:https').createServer(tlsOpts, app).listen(config.port, config.host, onListen)
+    : app.listen(config.port, config.host, onListen);
   server.keepAliveTimeout = 65_000;
   server.headersTimeout = 70_000;
 
@@ -73,6 +80,8 @@ async function main() {
   //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
   const orderNotify = require('./lib/order-notify');
   orderNotify.start();
+  //  NTF-01: اعلانِ وضعیت به مشتری (بی پرچمِ `shop.customer_notify` ⇒ صفِ خالی، یک پرسشِ کوچک)
+  require('./lib/customer-notify').start();
   //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
   require('./lib/order-timeout').start();
   //  ORD-09: توقفِ خودکارِ سفارش‌گیری (فقط دکانِ با پرچمِ `shop.orders.desk` و توقفِ خودکارِ روشن)
@@ -114,6 +123,7 @@ async function main() {
     if (pgliteStats) pgliteStats.stop();
     outbox.stop();
     orderNotify.stop();
+    require('./lib/customer-notify').stop();
     payments.stopReconciler();
     notices.stopRunner();
     opsAlerts.stop();

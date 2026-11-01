@@ -147,6 +147,42 @@ async function signOutAll(customer) {
 }
 
 /**
+ * تغییرِ شماره (S9، §۲۳.۴ و §۲۹.۲ بندِ ۱۰): دو اثبات — نشستِ همین حساب (شمارهٔ
+ * پیشین) و بلیتِ تازهٔ شمارهٔ نو (`phone` از همان). در یک تراکنش:
+ *   گفت‌وگوهای شمارهٔ پیشین به همین حساب گره می‌خورند (`shop-chat.adoptForPhoneChange`)،
+ *   بلیت‌های شمارهٔ پیشین بی‌اعتبار و نشست‌های دیگرِ حساب لغو می‌شوند؛ همین نشست می‌ماند.
+ * شمارهٔ نو با حسابِ دیگر ⇒ ۴۰۹ (درخواست‌کننده مالکیتِ آن شماره را همین حالا اثبات کرده).
+ * ⛔ سفارش‌ها سندِ دکان‌اند و شماره‌شان عوض نمی‌شود.
+ */
+async function changePhone(customer, sessionId, phone) {
+  if (!/^\+[1-9]\d{7,14}$/.test(String(phone || ''))) throw badRequest('شماره معتبر نیست', 'bad_phone');
+  return tx(async (c) => {
+    const cur = (await c.query('SELECT * FROM store_customers WHERE id = $1 FOR UPDATE', [customer.id])).rows[0];
+    if (!cur || cur.status !== 'active') throw forbidden('این حساب مسدود است؛ با دکان تماس بگیرید', 'customer_blocked');
+    if (cur.phone === phone) throw badRequest('این همان شمارهٔ کنونیِ حساب است', 'same_phone');
+    if ((await c.query('SELECT 1 FROM store_customers WHERE phone = $1', [phone])).rows[0]) {
+      throw conflict('این شماره حسابِ دیگری دارد', 'phone_taken');
+    }
+    const at = now();
+    const adopted = await require('./shop-chat').adoptForPhoneChange(c, cur.id, cur.phone, phone);
+    let up;
+    try {
+      up = (await c.query('UPDATE store_customers SET phone = $2, updated_at = $3 WHERE id = $1 RETURNING *',
+        [cur.id, phone, at])).rows[0];
+    } catch (err) {
+      if (err && err.code === '23505') throw conflict('این شماره حسابِ دیگری دارد', 'phone_taken');
+      throw err;
+    }
+    await revokeTickets(cur.phone, (sql, params) => c.query(sql, params));
+    const r = await c.query(
+      'UPDATE store_customer_sessions SET revoked_at = $3 WHERE customer_id = $1 AND id <> $2 AND revoked_at IS NULL RETURNING id',
+      [cur.id, String(sessionId || ''), at]
+    );
+    return { customer: view(up), previousPhone: cur.phone, conversations: adopted, sessionsRevoked: r.rows.length };
+  });
+}
+
+/**
  * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade) و همهٔ بلیت‌های این شماره؛
  * سفارش‌ها سندِ دکان‌اند و می‌مانند.
  */
@@ -229,5 +265,5 @@ async function removeAddress(customer, id) {
 
 module.exports = {
   MAX_ADDRESSES, MAX_SESSIONS, TOKEN_RE,
-  view, signIn, auth, signOut, signOutAll, rename, remove, ticketGen, revokeTickets, addresses, addAddress, updateAddress, removeAddress,
+  view, signIn, auth, signOut, signOutAll, rename, changePhone, remove, ticketGen, revokeTickets, addresses, addAddress, updateAddress, removeAddress,
 };

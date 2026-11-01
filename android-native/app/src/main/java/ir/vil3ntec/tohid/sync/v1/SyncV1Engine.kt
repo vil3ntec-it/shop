@@ -2,6 +2,10 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.sync.OpBacklog
+import ir.vil3ntec.tohid.core.sync.RestoreReplay
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
+import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -68,6 +72,14 @@ class SyncV1Engine private constructor(context: Context) {
   private fun commitFor(key: String) =
     SyncCommit(SyncCommit.Journal(java.io.File(app.filesDir, "sync-journal-${OpQueue.fileKey(key)}.json")), parts)
 
+  /** §۹.۵: سرور از پشتیبان برگشت — شرح سرِ `V1Restore` و `core/sync/RestoreReplay.kt` */
+  private var restore = restoreFor(accountKey)
+
+  private fun restoreFor(key: String) =
+    V1Restore(state, queue, FileReplayStore.inDir(app.filesDir, "sync-replay-${OpQueue.fileKey(key)}"), commit, ::clock) {
+      LedgerArchive.archivedIds(LedgerArchive.readArchive(app))
+    }
+
   private val gate = Mutex()
   private val _status = MutableStateFlow(snapshotStatus())
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
@@ -81,10 +93,12 @@ class SyncV1Engine private constructor(context: Context) {
    *  کلیدِ حساب — شناسهٔ کاربر اگر معلوم باشد، وگرنه نامِ حساب، وگرنه
    *  خودِ دستگاه. هر سه پایدارند و هیچ‌کدام بینِ دو حساب مشترک نیست.
    */
-  private fun keyOf(): String =
+  private fun keyOf(): String = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scopedKey(
+    app,
     SyncStateV1.currentAccount(app)
       .ifBlank { store.accountName }
-      .ifBlank { store.deviceUid }
+      .ifBlank { store.deviceUid },
+  )
 
   /** پس از ورود یا خروج صدا زده می‌شود — کلیدها عوض می‌شوند. */
   fun rebind() {
@@ -94,6 +108,7 @@ class SyncV1Engine private constructor(context: Context) {
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
     commit = commitFor(accountKey)
+    restore = restoreFor(accountKey)
     publish()
   }
 
@@ -138,7 +153,15 @@ class SyncV1Engine private constructor(context: Context) {
      *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد.
      *  شرح سرِ `SyncCommit`.
      */
-    val made = commit.record(data)
+    val made = try {
+      commit.record(data)
+    } catch (e: Exception) {
+      //  صف (یا ژورنالش) روی حافظه ننشست — معمولاً حافظهٔ پر. دفتر پیش‌تر نشسته و سایه جلو نرفته، پس
+      //  همین تغییر با ثبتِ بعدی دوباره op می‌شود؛ ولی بی‌صدا نه (هیچ opی هم دور ریخته نمی‌شود: `OpBacklog`)
+      state.lastError = "$QUEUE_NOT_WRITTEN (${e.message ?: e::class.simpleName})"
+      publish()
+      throw e
+    }
     publish()
     return made
   }
@@ -210,6 +233,9 @@ class SyncV1Engine private constructor(context: Context) {
         val client = pushClient()
         val device = store.deviceUid
 
+        //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
+        checkEpoch(client)
+
         //  صف را تا ته خالی می‌کنیم، دسته‌دسته
         try {
           pushQueue(client, device)
@@ -217,21 +243,56 @@ class SyncV1Engine private constructor(context: Context) {
           return@withLock Result.failure(upgrade)
         }
 
+        /*
+         *  §۹.۵: سرور برگشته و صف خالی شد ⇒ دفتر از Snapshot از نو، ردیف‌های تنهای همین دستگاه
+         *  (جز آنچه سرور حذف‌شده می‌داند) می‌مانند و «درج» می‌روند. تا آن وقت Pull نه — opِ
+         *  دوباره‌فرستادهٔ دستگاهِ دیگر روی دفترِ کهنه دو بار می‌نشست.
+         */
+        if (state.restorePending && queue.size() == 0) {
+          val snapshot = client.snapshot()
+          val ask = locked { restore.localOnly(snapshot, read()) }
+          val gone = if (ask.isEmpty()) emptySet() else client.deleted(ask)
+          val built = locked {
+            if (commit.pending()) commit.recover(read())
+            try {
+              restore.rebuild(snapshot, read(), gone, write)
+            } catch (e: Throwable) {
+              //  نیمه‌کاره در همین اجرا: همان‌جا با دفترِ همین حالا تمام یا برگردانده می‌شود
+              //  (همان کارِ `absorbRemote`) — ژورنالِ ساختنِ دوباره هیچ‌گاه بی‌صدا پاک نمی‌شود
+              runCatching { commit.recover(read()) }
+              throw e
+            }
+          }
+          if (built) {
+            state.snapshotAt = clock()
+            //  ردیف‌های تنها (اگر بود) همین حالا بروند
+            try {
+              pushQueue(client, device)
+            } catch (upgrade: SyncV1Client.UpgradeRequired) {
+              return@withLock Result.failure(upgrade)
+            }
+          }
+        }
+
         //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
         var rounds = 0
-        while (rounds < 50) {
+        while (!state.restorePending && rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
-          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor)
+          //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
+          if (got.seen.isNotEmpty()) restore.seen(got.seen)
+          //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ سرور روشن ⇒ دورِ بعد درِ دوران پرسیده می‌شود، وگرنه هرگز
+          restore.pulled(got.epoch)
+          if (got.ops.isNotEmpty()) absorbRemote(got.ops, read, write, got.cursor, keepPending = got.keepPending)
           state.cursor = got.cursor
-          state.lastPullAt = System.currentTimeMillis()
+          state.lastPullAt = clock()
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
           if (!got.hasMore) break
         }
 
         attempt = 0
         state.lastError = ""
-        state.lastOkAt = System.currentTimeMillis()
+        state.lastOkAt = clock()
         Result.success(Unit)
       } catch (cancelled: kotlinx.coroutines.CancellationException) {
         throw cancelled
@@ -247,7 +308,10 @@ class SyncV1Engine private constructor(context: Context) {
 
   /**
    *  فرستادنِ صف تا ته، دسته‌دسته — همان حلقهٔ همیشگیِ `runOnce`، جدا تا دفترِ رمزدارِ
-   *  خوانده‌نشده هم بتواند صفش را بفرستد (`pushPending`). صدازننده `gate` را دارد.
+   *  خوانده‌نشده هم بتواند صفش را بفرستد (`pushPending`، `rebuildFromServer`). صدازننده `gate` را دارد.
+   *
+   *  ⛔ §۹.۵: پذیرفته‌شده‌ها با server_seq کنارِ صف (`V1Restore.accepted`) **پیش از** بیرون رفتن
+   *  از آن — تا اگر سرور از پشتیبان برگشت، با همان op_id دوباره بروند؛ ردِ opِ دوباره‌فرستاده بی‌صدا.
    *
    *  @throws SyncV1Client.UpgradeRequired سرور عقب‌تر است: هیچ opی پاک نمی‌شود
    */
@@ -260,10 +324,17 @@ class SyncV1Engine private constructor(context: Context) {
       //  A00: opهای ساختِ پیش از A00 بی `caps` می‌روند تا تورِ سرور null ِ کهنه‌شان را بپالاید
       val legacy = state.legacyOpsUpTo
       if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
+      //  §۹.۵: opِ دوباره‌فرستاده (شاید از ساختِ دیگری و پیش از A00) هم بی `caps` — بدترین اثرِ تور «کهنه ماندن» است
+      val caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo) && batch.none { restore.isReplay(it.opId) }
       val out = try {
-        client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
+        client.push(
+          device, batch, queue.size(), caps = caps,
+          schema = LedgerDiff.wireSchema(state.serverSchema),
+        )
       } catch (upgrade: SyncV1Client.UpgradeRequired) {
-        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود. پلهٔ بالاتر از پایه را دیگر نمی‌شناسد (پرچمِ
+        //  گاوصندوقِ دکان خاموش شد)؟ بارِ بعد با پایه — `LedgerDiff.wireSchema`
+        if (LedgerDiff.wireSchema(state.serverSchema) > LedgerDiff.BASE_SCHEMA) state.serverSchema = 0
         state.holding = true
         state.lastError = upgrade.reason
         publish()
@@ -275,15 +346,21 @@ class SyncV1Engine private constructor(context: Context) {
 
       val accepted = out.results.filter { it.accepted }.map { it.opId }
       val rejected = out.results.filter { !it.accepted }
-      if (accepted.isNotEmpty()) queue.ack(accepted)
-      if (rejected.isNotEmpty()) {
+      if (accepted.isNotEmpty()) {
+        restore.accepted(batch, out.results)
+        queue.ack(accepted)
+      }
+      //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته یا گرفته شده بود) ردشده‌ای نیست که کاربر ببیند
+      val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
+      if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
+      if (refused.isNotEmpty()) {
         //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
         //  می‌کند — ولی بی‌صدا نه.
-        val ids = rejected.map { it.opId }.toHashSet()
+        val ids = refused.map { it.opId }.toHashSet()
         queue.drop(batch.filter { it.opId in ids }, "rejected")
         queue.ack(ids)
       }
-      state.lastPushAt = System.currentTimeMillis()
+      state.lastPushAt = clock()
     }
   }
 
@@ -337,6 +414,9 @@ class SyncV1Engine private constructor(context: Context) {
       synchronized(this) { commit.queueRecorded() }
       val client = pushClient()
       val device = store.deviceUid
+      //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
+      //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد
+      checkEpoch(client)
       val out = SyncRebuild(object : SyncRebuild.Io {
         override fun queued(): Int = queue.size()
         override suspend fun push() = pushQueue(client, device)
@@ -349,7 +429,9 @@ class SyncV1Engine private constructor(context: Context) {
         override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
       }).run(base)
       if (out is SyncRebuild.Outcome.Done) {
-        val now = System.currentTimeMillis()
+        val now = clock()
+        //  دفتر حالا همان سرور است (با opهای دوباره‌رفته) ⇒ ساختنِ دوبارهٔ §۹.۵ دیگر لازم نیست
+        if (state.restorePending) state.commitRestore(state.epoch, false)
         state.snapshotAt = now
         state.reconciledAt = now
         state.lastOkAt = now
@@ -442,7 +524,7 @@ class SyncV1Engine private constructor(context: Context) {
           write(LedgerDiff.fromJson(next))
           writeShadow(next)
           state.cursor = serverCursor
-          state.snapshotAt = System.currentTimeMillis()
+          state.snapshotAt = clock()
         } else {
           val missing = LedgerDiff.diff(server, local).filter { it.type == SyncOp.INSERT }
           if (missing.isNotEmpty()) queue.push(missing)
@@ -454,7 +536,7 @@ class SyncV1Engine private constructor(context: Context) {
             state.cursor = serverCursor
           }
         }
-        state.reconciledAt = System.currentTimeMillis()
+        state.reconciledAt = clock()
       }
     }
     publish()
@@ -471,6 +553,10 @@ class SyncV1Engine private constructor(context: Context) {
    *
    *  سایه هم به‌جای «کلِ دفترِ امروز»، خودِ سایه به‌اضافهٔ همین opهاست؛
    *  تغییرِ محلی‌ای که هنوز op نشده، با این کار گم نمی‌شود.
+   *
+   *  [keepPending] (پرچمِ دکانِ `sync.keep_pending`، از پاسخِ همان pull): تغییرِ محلی‌ای که **در صف** است
+   *  (مثلاً ثبت‌شده وسطِ همین pull) با opِ رسیده بازنویسی نمی‌شود — opها پیش از نشاندن از
+   *  `LedgerDiff.keepPending` می‌گذرند؛ همان opها روی دفتر، سایه و ژورنال می‌نشینند.
    */
   @Synchronized
   internal fun absorbRemote(
@@ -478,14 +564,23 @@ class SyncV1Engine private constructor(context: Context) {
     read: () -> ShopData,
     write: (ShopData) -> Unit,
     cursor: Long? = null,
+    keepPending: Boolean = false,
   ) {
+    var use = ops
+    if (keepPending) {
+      //  ژورنالِ «ثبتِ» نیمه‌مانده اول، تا opهایش هم در صف دیده شوند
+      if (commit.pending()) commit.recover(read())
+      use = LedgerDiff.keepPending(ops, queue.all())
+      //  همه نباید بنشینند ⇒ دفتر و سایه دست نمی‌خورند؛ cursor را صدازننده جلو می‌برد
+      if (use.isEmpty()) return
+    }
     /*
      *  ⛔ دفتر، سایه و cursor با هم (F0-05): اگر دفتر نوشته شود و سایه و
      *  cursor نه، همان opها دوباره گرفته و روی دفتر جمع می‌شدند و تفاضلِ
      *  بعدی آن‌ها را «تغییرِ من» به سرور پس می‌فرستاد.
      */
     try {
-      commit.absorb(ops, read(), cursor, write)
+      commit.absorb(use, read(), cursor, write)
     } catch (e: Throwable) {
       //  نیمه‌کاره در همین اجرا (نه بسته شدن): همان‌جا با دفترِ همین حالا
       //  تمام یا برگردانده می‌شود، پیش از آنکه ذخیرهٔ محلی‌ای برسد
@@ -501,14 +596,19 @@ class SyncV1Engine private constructor(context: Context) {
   suspend fun restoreFromServer(read: () -> ShopData, write: suspend (ShopData) -> Unit): Int {
     val client = SyncV1Client(Backend.api(app))
     val body = client.snapshot()
+    //  §۹.۵: دورانِ پیش از Snapshot کنارِ خودش (فقط با پرچمِ روشن) — دفتر حالا همان سرور است، پس همان
+    //  دوران و دیگر «در انتظار» نه؛ بی درِ جدای دوران
+    val epoch = RestoreReplay.Epoch.from(body["epoch"])
+    restore.pulled(epoch)
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
     writeShadow(next)
     state.cursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
       ?.content?.toLongOrNull() ?: 0L
-    state.snapshotAt = System.currentTimeMillis()
-    state.lastOkAt = System.currentTimeMillis()
+    state.snapshotAt = clock()
+    state.lastOkAt = clock()
     state.lastError = ""
+    if (epoch != null) state.commitRestore(epoch.id, false)
     publish()
     return (body["rows"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toIntOrNull() ?: 0
   }
@@ -564,7 +664,9 @@ class SyncV1Engine private constructor(context: Context) {
       dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
       cursor = state.cursor,
       lastOkAt = state.lastOkAt,
-      lastError = state.lastError,
+      //  §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی چراغ را قرمز نمی‌کند
+      //  صفِ بزرگ (`OpBacklog.WARN_AT`): «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ
+      lastError = state.lastError.ifBlank { notice() }.ifBlank { OpBacklog.warning(queued) },
       holding = state.holding,
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
@@ -574,6 +676,35 @@ class SyncV1Engine private constructor(context: Context) {
   }
 
   internal fun publish() { _status.value = snapshotStatus() }
+
+  /**
+   *  §۹.۵: دورانِ سرور و `V1Restore.check` — فقط وقتی آخرین pull دوران آورد (`V1Restore.asks`)؛
+   *  پرچمِ خاموشِ `SYNC_EPOCH_ENABLED` ⇒ هیچ درخواستی (نه ۴۰۴ در هر دور). ۴۰۴ ⇒ `closed`؛ خطای
+   *  شبکه ⇒ این دور بی دوران (همان رفتارِ پیشین).
+   */
+  private suspend fun checkEpoch(client: SyncV1Client) {
+    if (!restore.asks()) return
+    val epoch = try {
+      client.epoch() ?: return restore.closed()
+    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+      throw cancelled
+    } catch (_: Throwable) {
+      return
+    }
+    locked { restore.check(epoch) }
+  }
+
+  /** قفلِ دفتر و حالِ همگام‌سازی (`synchronized` روی همین موتور) — یک جا، برای کارهای §۹.۵ */
+  private inline fun <T> locked(block: () -> T): T = synchronized(this) { block() }
+
+  /** ساعتِ همگام‌سازی — یک جا (نگهبانِ آیفون: جایِ `Clock` ِ تزریق‌شده) */
+  private fun clock(): Long = System.currentTimeMillis()
+
+  /** §۹.۵: پس از بازیابیِ سروری که دفترچه همهٔ پنجره‌اش را نداشت، چند روز دیده شود */
+  private fun notice(): String {
+    val at = runCatching { state.restoreNoticeAt }.getOrDefault(0L)
+    return if (at > 0 && clock() - at < RESTORE_NOTICE_MS) RESTORE_NOTICE else ""
+  }
 
   fun queueSize(): Int = queue.size()
   fun droppedOps(): List<JsonObject> = queue.dropped()
@@ -600,6 +731,17 @@ class SyncV1Engine private constructor(context: Context) {
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
     const val MAX_BACKOFF_MS = 5 * 60_000L
+
+    /** §۹.۵: هشدارِ پوششِ دفترچه، سه روز */
+    const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
+    const val RESTORE_NOTICE =
+      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
+        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
+
+    /** صف (یا ژورنالش) ننشست — تغییر روی دفترِ همین دستگاه می‌ماند و با ثبتِ بعدی دوباره op می‌شود */
+    const val QUEUE_NOT_WRITTEN =
+      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +
+        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"
 
     @Volatile private var instance: SyncV1Engine? = null
 

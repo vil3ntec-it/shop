@@ -845,6 +845,11 @@ fun AppRoot(
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
                 ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
+              ) + (
+                //  «سرورها» (پرچمِ `app.multi_server`) فقط برای صاحبِ دکان
+                if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER)
+                  listOf(ir.vil3ntec.tohid.ui.screens.SERVERS_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Dns)
+                else emptyList()
               ),
             ) { SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") } }
             else SettingsScreen(store, data, snackbar, theme, onTheme) { open("more") }

@@ -62,6 +62,28 @@ test('خورشیدی: تاریخ‌های شناخته‌شده، کبیسه، �
   for (const v of CAL.fiscalYear) assert.deepEqual(C.fiscalYearRange(v.y), { from: v.from, to: v.to });
 });
 
+test('LOC-02: سه‌ماههٔ مالی (حمل–جوزا … جدی–حوت) و سه‌ماههٔ یک روز', () => {
+  for (const v of CAL.fiscalQuarter) {
+    assert.deepEqual(C.fiscalQuarterRange(v.y, v.q), v.from === null ? null : { from: v.from, to: v.to }, JSON.stringify(v));
+  }
+  for (const v of CAL.fiscalQuarterOf) {
+    assert.deepEqual(C.fiscalQuarterOf(v.iso), v.y === null ? null : { y: v.y, q: v.q }, v.iso);
+  }
+  //  چهار سه‌ماهه بی شکاف و بی هم‌پوشانی همان سالِ مالی را می‌پوشانند (۱۳۰۰ تا ۱۵۰۰)
+  for (let y = 1300; y <= 1500; y++) {
+    const year = C.fiscalYearRange(y);
+    const qs = [1, 2, 3, 4].map((q) => C.fiscalQuarterRange(y, q));
+    assert.equal(qs[0].from, year.from, String(y));
+    assert.equal(qs[3].to, year.to, String(y));
+    for (let q = 1; q < 4; q++) assert.equal(C.addDays(qs[q - 1].to, 1), qs[q].from, `${y}/${q}`);
+    for (let q = 1; q <= 4; q++) {
+      assert.deepEqual(C.fiscalQuarterOf(qs[q - 1].from), { y, q });
+      assert.deepEqual(C.fiscalQuarterOf(qs[q - 1].to), { y, q });
+    }
+  }
+  assert.equal(C.fiscalQuarterRange(1405, 2.5), null, 'سه‌ماههٔ غیرِ صحیح');
+});
+
 test('قمری، روزِ هفته و روزِ کاری', () => {
   for (const v of CAL.lunar) assert.deepEqual(ymd(C.toLunar(v.iso, v.adjust)), v.lunar, JSON.stringify(v));
   for (const v of CAL.formatLunarLong) assert.equal(C.formatLunarLong(v.iso, v.digits, v.adjust), v.out, JSON.stringify(v));

@@ -53,6 +53,8 @@ const FREE = [
     'POST /shop/order-notify/:id/ack']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
+  ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
+    'POST /shop/sync-epoch/deleted']],
   ['سفارشِ خرید زیرِ کلیدِ رایگانِ purchasing است (FREE_KEYS)؛ فقط پرچمِ shop.purchase_orders و مجوزِ نقش (PUR-02/04)', [
     'POST /shop/purchase-orders', 'PUT /shop/purchase-orders/:id', 'POST /shop/purchase-orders/:id/send',
     'POST /shop/purchase-orders/:id/cancel', 'POST /shop/purchase-orders/:id/receipts']],
@@ -72,6 +74,12 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');
+//  M2: انتشارِ گروهیِ ویترین (`PUT /shop/storefront/products`) با پرچمِ خودش
+FLAGS.push('shop.storefront.bulk');
+//  M3: لوگو و تصویرِ سرِ ویترین (`/shop/storefront/media/*`) با پرچمِ خودش
+FLAGS.push('shop.storefront.media');
+//  MKT-10/11: پیوندِ کمپین و QR (`/shop/storefront/campaigns`) با پرچمِ خودش
+FLAGS.push('shop.storefront.campaigns');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

@@ -54,8 +54,8 @@ for (const [name, file] of [['وب', WEB], ['سرور', SRV]]) {
 test('آزمونِ مرجع: پیش‌فرضِ هسته = MATRIXِ امروز برای هر نقش و هر کلیدِ مشترک', () => {
   const P = require(SRV);
   const shared = P.keys().filter((k) => MATRIX[k]);
-  //  چهار کلید از هسته در MATRIX هستند؛ `reports.money` فقط در برنامه است
-  assert.deepEqual(shared, ['audit.view', 'sales.cancel', 'sales.discount', 'settings.write']);
+  //  پنج کلید از هسته در MATRIX هستند؛ `reports.money` فقط در برنامه است
+  assert.deepEqual(shared, ['audit.view', 'safe.move', 'sales.cancel', 'sales.discount', 'settings.write']);
   for (const role of ROLES) {
     for (const k of shared) {
       assert.equal(P.allows(role, [], k), can(role, k), `${role} / ${k}`);

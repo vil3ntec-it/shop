@@ -47,8 +47,23 @@ const config = {
   host: process.env.HOST || '0.0.0.0',
   port: num(process.env.PORT, 3000),
 
-  /** آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها. */
-  serverUrl: process.env.SERVER_URL || '',
+  /**
+   *  آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها، و `publicUrl` ِ
+   *  `GET /api/v1/config/server`. `PUBLIC_URL` نامِ دومِ همین است (docs/SERVERS-fa.md).
+   */
+  serverUrl: process.env.SERVER_URL || process.env.PUBLIC_URL || '',
+
+  /**
+   *  HTTPS ِ مستقیم، بی Caddy و بی تونل — برای سرورِ شبکهٔ دکان (برنامه‌ها `http` ِ شبکه را
+   *  نمی‌پذیرند؛ گواهیِ خودامضا در برنامه سنجاق می‌شود). یا `TLS_CERT_FILE` + `TLS_KEY_FILE`
+   *  (PEM)، یا `TLS_PFX_FILE` (+ `TLS_PFX_PASSPHRASE`، خروجیِ ویندوز). خالی ⇒ همان http ِ امروز.
+   */
+  tls: {
+    certFile:   process.env.TLS_CERT_FILE || '',
+    keyFile:    process.env.TLS_KEY_FILE || '',
+    pfxFile:    process.env.TLS_PFX_FILE || '',
+    passphrase: process.env.TLS_PFX_PASSPHRASE || '',
+  },
 
   db: {
     url:              databaseUrl(),
@@ -342,6 +357,8 @@ const config = {
     receiptReadBurstMax: num(process.env.RATE_RECEIPT_READ_BURST_MAX, 10),
     //  بارگذاریِ لوگوی فاکتور به‌ازای دکان در شبانه‌روز (لوگوی پیشین پاک می‌شود؛ این سقف بارِ دیسک را می‌بندد)
     receiptLogoDailyMax: num(process.env.RATE_RECEIPT_LOGO_DAILY_MAX, 20),
+    //  M3: بارگذاریِ لوگو/تصویرِ سرِ ویترین به‌ازای دکان در شبانه‌روز (دو نسخهٔ آخر می‌مانند؛ سقف بارِ دیسک را می‌بندد)
+    storefrontMediaDailyMax: num(process.env.RATE_STOREFRONT_MEDIA_DAILY_MAX, 30),
   },
 
   /**
@@ -380,6 +397,10 @@ const config = {
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
     //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
     feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
+    //  S6: جریانِ تغییر (`market_changes`، پرچمِ `market.changes`) — هر چند وقت یک بار `seq` ِ تازه
+    //  خوانده شود (۰ ⇒ هر درخواست) و ردیف‌ها چند روز بمانند
+    changesPollMs: num(process.env.MARKET_CHANGES_POLL_MS, 2 * 1000),
+    changesKeepMs: num(process.env.MARKET_CHANGES_KEEP_DAYS, 14) * 24 * 60 * 60 * 1000,
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS
@@ -481,12 +502,36 @@ const config = {
   syncV3: {
     enabled: bool(process.env.SYNC_V3_ENABLED, false),
   },
+
+  /**
+   * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ پیش‌فرض `local` (سرورِ تک‌نمونه،
+   * بی اتصالِ اضافه). فقط با `SAFE_LOCK_SCOPE=db` (چند نمونهٔ سرور روی یک پایگاه) قفلِ advisory هم،
+   * روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). روی PGlite همیشه `local`.
+   */
+  accountLock: {
+    scope: String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase() === 'db' ? 'db' : 'local',
+    poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
+  },
+  /*
+   *  «دورانِ» همگام‌سازی پس از بازیابی (§۹.۵، `lib/sync-epoch.js`) — فقط دکان.
+   *  پیش‌فرض خاموش (قاعدهٔ همگام‌سازی: رفتارِ تازه فقط پشتِ پرچمِ خاموش). خاموش ⇒ نه دوران
+   *  در بالا آمدن و بازیابی، نه نشانِ پشتیبان، `/api/shop/sync-epoch*` و `/api/sync/v3/deleted`
+   *  ۴۰۴ و pull ِ v3 و pull/Snapshot ِ v1 بی دوران ⇒ برنامه دفترچه نمی‌نویسد، درِ دوران را هم نمی‌زند
+   *  (فقط پس از pull ِ دوران‌دار می‌پرسد) و همان رفتارِ پیشین را دارد.
+   *  ⚠️ پشتیبانی که با پرچمِ خاموش گرفته شده نشان ندارد؛ بازیابی از آن را فقط
+   *  `scripts/restore.js` (با پرچمِ روشن) یا «cursor جلوتر از سرِ دفترِ سرور» می‌شناسد.
+   */
+  syncEpoch: {
+    enabled: bool(process.env.SYNC_EPOCH_ENABLED, false),
+  },
 };
 
 /** بررسی پیکربندی هنگام راه‌اندازی — بهتر است سرور بالا نیاید تا ناامن کار کند. */
 function validate() {
   const problems = [];
   if (!config.db.url) problems.push('DATABASE_URL تنظیم نشده است');
+  if (config.tls.certFile && !config.tls.keyFile) problems.push('TLS_CERT_FILE بی TLS_KEY_FILE است');
+  if (config.tls.keyFile && !config.tls.certFile) problems.push('TLS_KEY_FILE بی TLS_CERT_FILE است');
   if (config.env === 'production') {
     if (!config.secrets.api || config.secrets.api.length < 24) {
       problems.push('API_SECRET باید حداقل ۲۴ کاراکتر باشد');
