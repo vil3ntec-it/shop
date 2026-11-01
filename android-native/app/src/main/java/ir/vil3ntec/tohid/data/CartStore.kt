@@ -166,11 +166,18 @@ class CartStore(context: Context) : HeldCart {
    *  ثبتِ همین سبد (POS-14): یک ثبت در هر لحظه، با کلیدِ فاکتور؛ سبد فقط
    *  وقتی پاک می‌شود که `save` بگوید دفتر به دیسک رسید.
    */
-  suspend fun post(store: ShopStore, record: (key: String) -> SalesEngine.Result): SalePost.Outcome {
+  /**
+   *  @param gate پیش از ساختنِ فاکتور با کلیدِ همین سبد (PRM-02، `PromoLive.redeemGate`)؛ پیام ⇒ ثبت نه.
+   */
+  suspend fun post(
+    store: ShopStore,
+    gate: (suspend (key: String) -> String?)? = null,
+    record: (key: String) -> SalesEngine.Result,
+  ): SalePost.Outcome {
     //  ضربه‌ای که پس از پایانِ ثبتِ قبلی رسید سبدِ کهنهٔ صفحه را در دست دارد، نه سبدِ تازه را
     //  POS-12: F9/F12ِ وسطِ جابه‌جاییِ فاکتور ثبت نمی‌شود (سبد نیمه‌جابه‌جا است)
     if (frozen || _lines.value.isEmpty()) return SalePost.Outcome.Busy
-    val out = poster.run(saleKey(), record, { store.save(it) }) { done -> if (key == done) wipe() }
+    val out = poster.run(saleKey(), record, { store.save(it) }, gate) { done -> if (key == done) wipe() }
     //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
     if (out is SalePost.Outcome.Done) {
       runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }

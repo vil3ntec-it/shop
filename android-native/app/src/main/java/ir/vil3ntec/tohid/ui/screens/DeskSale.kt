@@ -393,7 +393,7 @@ fun DeskSaleScreen(
     }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
-    scope.launch { when (val posted = cartStore.post(store) { key ->
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
       ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo) }) {

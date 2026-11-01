@@ -536,6 +536,9 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+| `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند (`PromoLive.redeemGate`)؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | #450 (سرور)، برنامه در PRِ پشتِ آن | باز |
+
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
