@@ -100,7 +100,9 @@ fun ReportsScreen(d: ShopData) {
   }
   //  INV-17 — «ضایعات و کسری» (پیش‌فرض خاموش). ارزش به قیمتِ خرید است، پس فقط با `canSeeMoney`
   val shrinkOn = remember { ShrinkReportPref.on(context) } && canSeeMoney
-  val shown = if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections
+  //  CRM-04/14 — «سنِ بدهی» و «تحلیلِ خرید» (`CustomerReportsPhone.kt`)، همان تنظیمِ خاموشِ «گزارش‌های مشتری»
+  val crmOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context) }
+  val shown = (if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections) + crmTabs(crmOn, canSeeMoney)
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
@@ -173,6 +175,8 @@ fun ReportsScreen(d: ShopData) {
       "purchases" -> if (canSeeMoney) purchasesSection(this, d, from, to)
       "expiry" -> expirySection(this, d)
       "shrink" -> if (shrinkOn) shrinkSection(this, d, range, from, to) { range = it }
+      "aging" -> if (crmOn) agingSection(this, d, todayIso())
+      "rfm" -> if (crmOn && canSeeMoney) rfmSection(this, d, todayIso())
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }
