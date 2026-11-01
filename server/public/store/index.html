@@ -118,6 +118,25 @@
             </form>
             <div id="cats" class="chips" role="group" data-ta="a.cats" aria-label="دسته‌ها"></div>
           </div>
+          <details id="filters" class="filters section" hidden>
+            <summary><span data-t="fl.title">فیلتر</span> <span id="fl-count" class="pill plain"></span></summary>
+            <form id="fl-form" class="fl-form" novalidate>
+              <label id="fl-brand-l" hidden><span data-t="fl.brand">برند</span>
+                <select id="fl-brand"><option value="" data-t="fl.any">همه</option></select></label>
+              <fieldset id="fl-price" hidden><legend data-t="fl.price">قیمت (افغانی)</legend>
+                <label><span data-t="fl.min">از</span> <input id="fl-min" type="text" inputmode="numeric" maxlength="10" autocomplete="off"></label>
+                <label><span data-t="fl.max">تا</span> <input id="fl-max" type="text" inputmode="numeric" maxlength="10" autocomplete="off"></label>
+              </fieldset>
+              <label id="fl-attr-l" hidden><span data-t="fl.attr">مشخصه</span>
+                <select id="fl-attr"><option value="" data-t="fl.anyattr">هر مشخصه</option></select></label>
+              <label id="fl-stock-l" class="fl-check" hidden><input id="fl-stock" type="checkbox"> <span data-t="fl.instock">فقط کالای موجود</span></label>
+              <div class="fl-actions">
+                <button class="btn btn-sm" type="submit" data-t="fl.apply">نمایش</button>
+                <button id="fl-clear" class="btn btn-sm btn-ghost" type="button" data-t="fl.clear">پاک کردنِ فیلتر</button>
+              </div>
+              <p id="fl-msg" class="note" hidden role="alert"></p>
+            </form>
+          </details>
           <p id="stock-note" class="stock-note" hidden data-t="stock.note">موجودی در حال بررسی است؛ دکان هنگامِ قبولِ سفارش آن را تأیید می‌کند.</p>
           <div id="catalog-msg" class="note section" hidden role="status"></div>
           <div id="catalog-empty" class="empty" hidden>
@@ -354,6 +373,7 @@
   <p id="ps-desc" class="ps-desc" hidden></p>
   <dl id="ps-specs" class="ps-specs" hidden></dl>
   <button id="ps-add" class="btn btn-block section" type="button" data-autofocus data-t="ps.addbtn">افزودن به سبد</button>
+  <div id="ps-alerts" class="ps-alerts" hidden aria-live="polite"></div>
   <button id="ps-share" class="btn btn-ghost btn-block" type="button" data-t="ps.share" hidden>فرستادنِ نشانیِ کالا</button>
   <section id="ps-sim" class="section" hidden aria-labelledby="ps-sim-t">
     <h3 id="ps-sim-t" class="ps-h" data-t="ps.similar">کالاهای مشابه</h3>

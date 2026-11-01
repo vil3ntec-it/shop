@@ -148,6 +148,7 @@
         api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, get zone() { return zone; }, rail: rail, card: card, items: catalog.items,
         ids: ids, reorder: reorder, recent: Boolean(r.recent), features: r.features || {},
         category: function (c) { catalog.category = c; renderCats(); loadProducts(false); },
+        filter: function (qs) { catalog.extra = qs; loadProducts(false); }, // WEB-07: store/filters.js
       });
       return more.picks();
     }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
@@ -157,7 +158,7 @@
     var ul = $('products');
     var qs = '?limit=40' + (catalog.q ? '&q=' + encodeURIComponent(catalog.q) : '') +
       (catalog.category ? '&category=' + encodeURIComponent(catalog.category) : '') +
-      (more && catalog.cursor ? '&cursor=' + encodeURIComponent(catalog.cursor) : '');
+      (catalog.extra || '') + (more && catalog.cursor ? '&cursor=' + encodeURIComponent(catalog.cursor) : '');
     if (!more) {
       K.clear(ul);
       for (var i = 0; i < 8; i++) ul.appendChild(el('li', { class: 'skel tall', attrs: { 'aria-hidden': 'true' } }));

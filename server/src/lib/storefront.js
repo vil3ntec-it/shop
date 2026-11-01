@@ -246,7 +246,7 @@ function decodeCursor(raw) {
 }
 
 /** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی؛ با `shop.storefront.search` (WEB-05/06) پرش به دسته، غلطِ تایپی و «پیدا نشد» ِ مفید. */
-async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' } = {}) {
+async function catalog(shopId, { q, category, cursor, limit, contactPhone = '', filters = null } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
@@ -258,10 +258,9 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
     where += ` AND ${p.name} LIKE $${params.length}`;
   }
   const cat = p.jump || text(category, 80);
-  if (cat) {
-    params.push(cat);
-    where += ` AND r.data->>'category' = $${params.length}`;
-  }
+  if (cat) where += ` AND r.data->>'category' = $${params.push(cat)}`;
+  //  WEB-07 (`storefront-filters.js`، پرچمِ `shop.storefront.filters`): خاموش ⇒ `filters` تهی و همان پرس‌وجو
+  if (filters) where += await filters.where(shopId, params);
   if (cursor) {
     const c = decodeCursor(cursor);
     params.push(c.name, c.id);
@@ -278,7 +277,7 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
   const last = page[page.length - 1];
   return searchFinish({
     //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
-    items: await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name)),
+    items: (filters ? filters.keep : (x) => x)(await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name))),
     nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
   }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
