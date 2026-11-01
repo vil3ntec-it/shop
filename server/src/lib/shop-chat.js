@@ -87,22 +87,19 @@ const viewerKey = (v) => (v.side === 'customer' ? 'customer' : `user:${v.userId}
 const peerOf = (side) => (side === 'customer' ? 'shop' : 'customer');
 const gone = () => notFound('این گفت‌وگو پیدا نشد', 'conversation_not_found');
 const isAuthor = (v, m) => m.sender === v.side && (v.side === 'customer' || m.sender_user_id === v.userId);
+//  سنجاقِ پیام (CHAT-14) — `lib/shop-chat-pins.js`؛ تابع‌های این پرونده hoist می‌شوند
+const pins = require('./shop-chat-pins')({ rowOf, lockedMessage, viewerKey, viewOf, n, asJson });
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم
 // ════════════════════════════════════════════════════════════════════
 
-/** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
+/**
+ * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. همان قاعدهٔ `orders.flagOf`
+ * (فاز ۳: «غیرفعال کردنِ سرویسِ» `shop.chat` برای همین دکان هم آن‌جا سنجیده می‌شود).
+ */
 async function flagOf(shopId) {
-  const rows = await many(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
-    [FLAG_KEY, 'all', String(shopId || '')]
-  );
-  const decode = (x) => { try { return JSON.parse(x); } catch { return null; } };
-  let v;
-  for (const r of rows) if (r.scope === 'all') v = decode(r.value);
-  for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
-  return v === true;
+  return require('./orders').flagOf(String(shopId || ''), FLAG_KEY);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -143,7 +140,8 @@ function viewSql(viewer) {
                AND b.customer_phone = c.customer_phone AND b.blocker = 'customer') AS blocked_by_customer,
       (SELECT json_build_object('kind', m.kind, 'body', LEFT(m.body, 80), 'sender', m.sender,
                                 'deleted', m.deleted_at IS NOT NULL, 'at', m.created_at)
-         FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last
+         FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last,
+      ${pins.pinnedSql(mine)}
     FROM shop_chat_conversations c
     JOIN shops s ON s.id = c.shop_id
     LEFT JOIN online_orders o ON o.id = c.order_id AND o.shop_id = c.shop_id`;
@@ -157,6 +155,7 @@ function conversationView(viewer, r) {
     seq: n(r.seq),
     rev: n(r.rev),
     unread: n(r.unread),
+    pinned: pins.pinnedView(r.pinned),
     orderNo: r.order_no == null ? null : Number(r.order_no),
     lastMessage: last ? {
       kind: last.kind, sender: last.sender, at: n(last.at),
@@ -585,6 +584,7 @@ async function remove(viewer, id, messageId, scope) {
         [m.id, viewerKey(viewer), now()]
       )).rows[0];
       if (!ins) return { changed: false };
+      await pins.dropHidden(c, viewer, conv.id, m.id);
       const rev = await bumpRev(c, conv.id);
       await c.query('UPDATE shop_chat_messages SET rev=$2 WHERE id=$1', [m.id, rev]);
       return { changed: true, convId: conv.id };
@@ -602,6 +602,7 @@ async function remove(viewer, id, messageId, scope) {
               deleted_at=$2, deleted_by=$3, rev=$4 WHERE id=$1`,
       [m.id, t, viewerKey(viewer), rev]
     );
+    await pins.dropAll(c, m.id);
     //  رسانه‌ای که دیگر هیچ پیامِ زنده‌ای به آن اشاره نمی‌کند همین حالا می‌رود
     for (const mid of [m.media_id, m.thumb_id].filter(Boolean)) {
       await c.query(
@@ -704,18 +705,6 @@ async function getMedia(viewer, id, mediaId) {
     if (!ref) throw lost();
   }
   return { id: m.id, mime: m.mime, size: n(m.size), kind: m.kind, data: Buffer.from(m.data) };
-}
-
-/** بایت‌ها به بیننده — هرگز صفحه نمی‌شود، کش نمی‌شود؛ PDF فقط دانلود. */
-function sendMedia(res, m) {
-  res.set('Content-Type', m.mime);
-  res.set('Content-Length', String(m.data.length));
-  res.set('Cache-Control', 'private, no-store');
-  res.set('X-Content-Type-Options', 'nosniff');
-  res.set('Content-Security-Policy', "default-src 'none'; sandbox");
-  res.set('Cross-Origin-Resource-Policy', 'same-origin');
-  res.set('Content-Disposition', m.kind === 'file' ? `attachment; filename="chat-${m.id}.pdf"` : 'inline');
-  res.end(m.data);
 }
 
 /** خوانندهٔ بدنهٔ خامِ بارگذاری — بزرگ‌تر از بزرگ‌ترین سقف پیش از خواندن رد می‌شود. */
@@ -875,8 +864,8 @@ module.exports = {
   FLAG_KEY, KINDS, REASONS, MAX_BODY,
   flagOf, list, open, viewOf, setStatus, adoptForPhoneChange: acct.adoptForPhoneChange,
   send, changes, edit, remove, receipts,
-  putMedia, getMedia, sendMedia, rawMedia,
-  setBlock, report, search,
+  putMedia, getMedia, sendMedia: chatMedia.send, rawMedia,
+  setBlock, report, search, pin: pins.pin, MAX_PINS: pins.MAX_PINS,
   reportsForAdmin, reviewReport,
   sweep, maskPhone, waiting,
 };

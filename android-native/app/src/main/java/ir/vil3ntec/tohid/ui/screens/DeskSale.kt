@@ -218,6 +218,8 @@ fun DeskSaleScreen(
   }
 
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
+  //  PRD-04: بارکدِ بسته‌ها (کارتن ⇒ ۲۴ دانه) — جدا، فقط کامل
+  val packIndex = remember(d.products) { ShopStore.packIndex(d) }
 
   //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)
   val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
@@ -284,9 +286,10 @@ fun DeskSaleScreen(
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
     if (scaleLabel(query, d)) { query = ""; return }
-    when (val hit = PosSearch.resolve(query, index, d.products, matches, hint)) {
+    when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
+      is PosHit.Ambiguous -> { ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(hit.code)) }
       is PosHit.Add -> { add(hit.product, hit.count); query = "" }
       is PosHit.Unknown -> if (addLot(hit.code)) query = "" else {
         ScanFeedback.unknown(context)
@@ -307,7 +310,19 @@ fun DeskSaleScreen(
   fun fromScanner(code: String): Boolean {
     val dd = latestD
     if (scaleLabel(code, dd)) return true
-    when (val hit = BarcodeMatch.find(code, ShopStore.barcodeIndex(dd))) {
+    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
+    val items = ShopStore.barcodeIndex(dd)
+    when (val l = ShopStore.packIndex(dd).lookup(code) { PosSearch.isItemCode(it, items) }) {
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> {
+        ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(code.trim())); return true
+      }
+      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> dd.products.firstOrNull { it.id == l.hit.productId }?.let { p ->
+        if (!p.active) toast(StrSale.inactive(p.name)) else add(p, l.hit.pack.sizeMilli / 1000.0)
+        return true
+      }
+      else -> Unit
+    }
+    when (val hit = BarcodeMatch.find(code, items)) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
