@@ -445,6 +445,7 @@ fun InvoiceDialog(
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
+              item.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) } // POS-11
             }
             Text(money(item.totalPrice), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
@@ -469,6 +470,7 @@ fun InvoiceDialog(
             Text(debtor.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
         }
+        sale.note?.takeIf { it.isNotBlank() }?.let { Text("${ir.vil3ntec.tohid.core.i18n.StrSale.invoiceNote}: $it", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text, modifier = Modifier.padding(vertical = 3.dp)) } // POS-11
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
