@@ -161,4 +161,21 @@ class LocaleTextTest {
       as LedgerEngine.Result.Ok
     assertEquals("", e.data.suppliers.single().phone)
   }
+
+  @Test
+  fun `LOC-01 تاریخِ قمری برای سند — رقم، جابه‌جاییِ هلال و تاریخِ نادرست`() {
+    //  همان بردارهای formatLunarLong ِ core/test-vectors/calendar.json
+    assertEquals("2 جمادی\u200cالاول 1448", LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, 0))
+    assertEquals("۱ شوال ۱۴۴۷", LocaleText.lunar("2026-03-20", LocaleFormat.DIGITS_FA, 0))
+    assertEquals("3 جمادی\u200cالاول 1448", LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, 1))
+    assertEquals("1 جمادی\u200cالاول 1448", LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, -1))
+    //  جابه‌جاییِ بیرون از −۲..+۲ ⇒ ۰؛ رقمِ ناشناخته ⇒ لاتین
+    assertEquals(LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, 0), LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, 9))
+    assertEquals(LocaleText.lunar("2026-10-14", LocaleFormat.DIGITS_LATN, 0), LocaleText.lunar("2026-10-14", "xx", 0))
+    assertNull("تاریخِ نادرست چاپ نمی‌شود", LocaleText.lunar("2026-02-30", LocaleFormat.DIGITS_LATN, 0))
+    assertNull(LocaleText.lunar("", LocaleFormat.DIGITS_LATN, 0))
+    assertEquals(0, LocaleText.lunarAdjustOf(null))
+    assertEquals(-2, LocaleText.lunarAdjustOf(-2))
+    assertEquals(0, LocaleText.lunarAdjustOf(3))
+  }
 }

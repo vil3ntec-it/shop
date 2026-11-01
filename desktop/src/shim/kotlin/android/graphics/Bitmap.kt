@@ -82,6 +82,19 @@ class Bitmap(val image: BufferedImage) {
   }
 }
 
+/**
+ *  `BitmapFactory`ِ اندروید روی کامپیوتر — با همان قراردادِ اندروید (IMG-PRO-09):
+ *
+ *  • `inJustDecodeBounds` فقط **سرآیند** را می‌خواند (`ImageReader.getWidth/Height`)؛
+ *    پیش‌تر کلِ تصویر رمزگشایی می‌شد و سنجشِ «بیش از اندازه بزرگ» ِ `ImageBank.prepare`
+ *    پس از پر شدنِ حافظه می‌آمد.
+ *  • `inSampleSize` تصویرِ بزرگ را **هنگامِ خواندن** نمونه می‌گیرد (`setSourceSubsampling`)،
+ *    پس آرایهٔ تمام‌اندازه ساخته نمی‌شود. تا `SAMPLE_FULL_BUDGET` همان راهِ پیشین
+ *    (خواندنِ کامل + bicubic) می‌ماند تا کیفیتِ عکسِ معمولی عوض نشود.
+ *  • رمزگشاییِ بی نمونه‌گیری بیش از `MAX_FULL_PIXELS` ⇒ null، مثلِ «خوانده نشد» (به‌جای
+ *    خالی کردنِ heapِ کلِ برنامه). همهٔ خطاها مثلِ پیش null می‌دهند.
+ *  `outWidth/outHeight`: با `inJustDecodeBounds` ابعادِ اصل، وگرنه ابعادِ خروجی (همان اندروید).
+ */
 object BitmapFactory {
   class Options {
     var inJustDecodeBounds = false
@@ -90,25 +103,60 @@ object BitmapFactory {
     var outHeight = 0
   }
 
-  fun decodeStream(stream: InputStream?): Bitmap? =
-    stream?.let { runCatching { ImageIO.read(it) }.getOrNull() }?.let(::Bitmap)
+  /** ۶۴ مگاپیکسل ≈ ۲۵۶ مگابایت در ARGB — بیشتر، بی `inSampleSize`، خوانده نمی‌شود */
+  const val MAX_FULL_PIXELS = 64_000_000L
+  /** تا این‌جا کوچک‌کردن مثلِ پیش: خواندنِ کامل و bicubic؛ بیشتر ⇒ نمونه‌گیری هنگامِ خواندن */
+  const val SAMPLE_FULL_BUDGET = 24_000_000L
+
+  fun decodeStream(stream: InputStream?): Bitmap? = decodeStream(stream, null, null)
 
   fun decodeStream(stream: InputStream?, pad: Any?, opts: Options?): Bitmap? {
-    val bmp = decodeStream(stream) ?: return null
-    if (opts != null) { opts.outWidth = bmp.width; opts.outHeight = bmp.height }
-    if (opts?.inJustDecodeBounds == true) return null
-    val s = opts?.inSampleSize?.coerceAtLeast(1) ?: 1
-    return if (s > 1) Bitmap.createScaledBitmap(bmp, bmp.width / s, bmp.height / s, true) else bmp
+    if (stream == null) return null
+    return runCatching {
+      ImageIO.createImageInputStream(stream)?.use { iis -> read(iis, opts) }
+    }.getOrNull()
   }
 
-  fun decodeFile(path: String?): Bitmap? =
-    path?.let { runCatching { ImageIO.read(java.io.File(it)) }.getOrNull() }?.let(::Bitmap)
+  private fun read(iis: javax.imageio.stream.ImageInputStream, opts: Options?): Bitmap? {
+    val readers = ImageIO.getImageReaders(iis)
+    if (!readers.hasNext()) return null
+    val reader = readers.next()
+    try {
+      reader.setInput(iis, true, true)
+      val w = reader.getWidth(0)
+      val h = reader.getHeight(0)
+      if (w <= 0 || h <= 0) return null
+      if (opts != null) { opts.outWidth = w; opts.outHeight = h }
+      if (opts?.inJustDecodeBounds == true) return null
+      val s = (opts?.inSampleSize ?: 1).coerceAtLeast(1)
+      //  دورهٔ نمونه‌گیریِ هنگامِ خواندن: توانِ ۲، هرگز بیش از s، تا حافظه زیرِ بودجه بماند
+      var p = 1
+      while (p * 2 <= s && pixels(w, h, p) > SAMPLE_FULL_BUDGET) p *= 2
+      if (pixels(w, h, p) > MAX_FULL_PIXELS) return null
+      val param = reader.defaultReadParam
+      if (p > 1) param.setSourceSubsampling(p, p, 0, 0)
+      var bmp = Bitmap(reader.read(0, param))
+      if (s > 1 && p < s) bmp = Bitmap.createScaledBitmap(bmp, (w / s).coerceAtLeast(1), (h / s).coerceAtLeast(1), true)
+      if (opts != null) { opts.outWidth = bmp.width; opts.outHeight = bmp.height }
+      return bmp
+    } finally {
+      reader.dispose()
+    }
+  }
+
+  /** پیکسل‌های خروجیِ نمونه‌گیری با دورهٔ p (گرد به بالا، همان `setSourceSubsampling`) */
+  private fun pixels(w: Int, h: Int, p: Int): Long = ((w + p - 1L) / p) * ((h + p - 1L) / p)
+
+  fun decodeFile(path: String?): Bitmap? = decodeFile(path, null)
 
   fun decodeFile(path: String?, opts: Options?): Bitmap? =
     path?.let { java.io.File(it) }?.takeIf { it.isFile }?.inputStream()?.use { decodeStream(it, null, opts) }
 
   fun decodeByteArray(data: ByteArray, offset: Int, length: Int): Bitmap? =
     decodeStream(data.inputStream(offset, length))
+
+  fun decodeByteArray(data: ByteArray, offset: Int, length: Int, opts: Options?): Bitmap? =
+    decodeStream(data.inputStream(offset, length), null, opts)
 }
 
 object Color {
