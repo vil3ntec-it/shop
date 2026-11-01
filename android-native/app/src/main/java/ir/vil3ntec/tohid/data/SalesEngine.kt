@@ -723,6 +723,17 @@ object SalesEngine {
   /** مقداری از یک قلم که هنوز می‌شود برگرداند */
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
+  /** سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود */
+  fun paidRatio(sale: Sale): Double =
+    if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+
+  /**
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) با سهمِ
+   *  تخفیفِ فاکتور. [recordReturn] و پیش‌نمایشِ مرجوعیِ نسخهٔ ۳ هر دو همین را می‌خوانند.
+   */
+  fun returnAmount(sale: Sale, item: SaleItem, quantity: Double): Double =
+    if (item.quantity > 0) (item.totalPrice / item.quantity * quantity * paidRatio(sale)).roundToLong().toDouble() else 0.0
+
   /**
    *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) × سهمِ پرداخت‌شده
    *  پس از تخفیفِ فاکتور، با گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکه بیش از برگشتِ یک‌جای همان مقدار پس
@@ -776,6 +787,7 @@ object SalesEngine {
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
+      // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز — با گردِ تجمعیِ SEC-DATA-01
       val amount = returnAmount(d, sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)

@@ -1030,7 +1030,7 @@ fun SaleScreen(
                     onToggle = { expandedLine = if (expandedLine == r.id) null else r.id },
                     onMinus = { phoneStep(r, -1) },
                     onPlus = { phoneStep(r, +1) },
-                    onRemove = {
+                    onHold = {
                       Haptics.confirm(context)
                       cartStore.set(SalesEngine.setCartQty(cartStore.lines.value, r.id, 0.0))
                       if (selectedId == r.id) selectedId = null

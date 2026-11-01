@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 
@@ -163,6 +164,6 @@ object PhoneSaleText {
 
   /** خطِ کوچکِ خاکستریِ کاشی — موجودی با واحد، یا «تمام شد» (سرخ) */
   fun stock(stock: Double, unit: String): String =
-    if (stock <= 0) "تمام شد"
-    else "${ir.vil3ntec.tohid.qty(stock)}${if (unit.isNotBlank()) " $unit" else ""} مانده"
+    if (stock <= 0) StrSale.soldOut
+    else StrSale.leftQty("${ir.vil3ntec.tohid.qty(stock)}${if (unit.isNotBlank()) " $unit" else ""}")
 }
