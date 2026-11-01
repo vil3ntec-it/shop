@@ -89,6 +89,22 @@ object ShopPolicy {
     prefs(context).edit().putBoolean(STOCK_LEVELS, on).apply()
   }
 
+  /*
+   *  ابزارهای تازهٔ کالا (PRD-19، PRD-04، PRD-14، PRD-21، PRD-06، PRD-20): هشدارِ «نامِ مشابه» در فرمِ کالا و پیش‌نمایشِ
+   *  ورود از فایل (ثبت را نمی‌بندد؛ نامِ عیناً یکسان همیشه رد می‌شود)، کادرِ «بارکدها» برای چند بارکد، برند و برچسب،
+   *  نام و دلیل در سابقهٔ تغییرِ قیمت، و «قیمتِ گروهی» با پیش‌نمایشِ رنگی و تأیید.
+   *  PRD-20: ورود از فایل با xlsx یا CSV، پیش‌نمایشِ تازه/بی تغییر/در دکان/رد، به‌روزرسانیِ کالای موجود فقط با تیکِ
+   *  خودِ صاحب/مدیر و بی پاک کردن، فایلِ ردیف‌های رد و سابقهٔ واردسازی (`ProductImportDialog`).
+   *  پیش‌فرض **خاموش**: فرم همان تک‌بارکدیِ امروز و ورود همان CSV ِ امروز. فقط روی همین دستگاه.
+   */
+  private const val PRODUCT_TOOLS = "product_tools"
+
+  fun productTools(context: Context): Boolean = prefs(context).getBoolean(PRODUCT_TOOLS, false)
+
+  fun setProductTools(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(PRODUCT_TOOLS, on).apply()
+  }
+
   /**
    *  CRM-03 / S07 — سقفِ اعتبار در صندوق: فروشِ نسیه‌ای که ماندهٔ مشتری را از سقفش می‌گذراند بی تأییدِ
    *  مدیر/صاحب ثبت نمی‌شود (`SalesEngine.Checkout.creditGate`، `CreditGate`). پیش‌فرض **خاموش**: صندوق

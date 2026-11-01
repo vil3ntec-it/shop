@@ -3,8 +3,9 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.core.money.Qty
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
-import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductImportPlan
 import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.core.stock.StockLevelRules
 import ir.vil3ntec.tohid.core.stock.StockLevels
 import ir.vil3ntec.tohid.money
@@ -72,6 +73,20 @@ object WarehouseEngine {
     val editLevels: Boolean = false,
     val reorderPoint: Double? = null,
     val maxStock: Double? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
+    /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
+    val brand: String? = null,
+    val tags: List<String>? = null,
   )
 
   data class EntryDraft(
@@ -215,6 +230,8 @@ object WarehouseEngine {
     if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
     if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
     if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
+    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
+    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
     if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
     if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
   }
@@ -640,6 +657,60 @@ object WarehouseEngine {
       .toList()
   }
 
+  /** کالاهای انتخاب‌شده به زبانِ `BulkPrice` ِ core (پول به یک‌صدمِ افغانی) */
+  private fun minorOf(x: Double): Long = Math.round(x * 100)
+
+  /**
+   *  PRD-21: پیش‌نمایشِ قیمتِ گروهی — همان که رابط رنگی نشان می‌دهد و همان که `bulkPrice` اعمال می‌کند.
+   */
+  fun bulkPricePreview(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long = 100,
+  ): BulkPrice.Preview = BulkPrice.preview(
+    d.products.filter { it.id in ids }.map { BulkPrice.Item(it.id, it.name, minorOf(it.salePrice), minorOf(it.purchasePrice)) },
+    field, op, roundToMinor,
+  )
+
+  /**
+   *  PRD-21 و PRD-14: قیمتِ گروهی. فقط ردیف‌های `applies` ِ پیش‌نمایش؛ ردیفِ «رد» (منفی) دست نمی‌خورد.
+   *  ⛔ پیش‌نمایشِ هشدارداده (زیرِ بها، صفر، تغییرِ ۵۰٪) بی `confirmed` اعمال نمی‌شود؛ دلیل اجباری است.
+   *  هر کالا ردیفِ سابقه با کاربر و دلیل دارد؛ تغییرِ قیمتِ خرید در `priceHistory` هم می‌نشیند.
+   */
+  fun bulkPrice(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long,
+    confirmed: Boolean, by: String, reason: String, today: String, now: Long, newId: () -> String,
+  ): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    if (!BulkPrice.valid(op)) return Result.Failed("مقدار درست نیست")
+    val why = reason.trim()
+    if (why.isEmpty()) return Result.Failed("دلیلِ تغییرِ قیمت را بنویسید")
+    val preview = bulkPricePreview(d, ids, field, op, roundToMinor)
+    if (preview.changed == 0) return Result.Failed("چیزی عوض نشد")
+    if (preview.needsConfirm && !confirmed) return Result.Failed("هشدارهای پیش‌نمایش را ببینید و تأیید کنید")
+    val who = by.trim().ifEmpty { null }
+    val rows = preview.rows.filter { it.applies }.associateBy { it.id }
+    val audit = ArrayList<AuditEntry>()
+    val history = ArrayList<PriceChange>()
+    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"
+    val products = d.products.map { p ->
+      val r = rows[p.id] ?: return@map p
+      val value = r.newMinor / 100.0
+      val old = r.oldMinor / 100.0
+      if (field == BulkPrice.Field.PURCHASE) {
+        history += PriceChange(id = newId(), productId = p.id, oldPrice = p.purchasePrice, newPrice = value,
+          date = today, createdAt = now, by = who, reason = why)
+      }
+      audit += AuditEntry(
+        id = newId(), type = if (field == BulkPrice.Field.PURCHASE) "price_change" else "product_edit", date = today, refId = p.id,
+        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,
+      )
+      if (field == BulkPrice.Field.SALE) p.copy(salePrice = value) else p.copy(purchasePrice = value)
+    }
+    return Result.Ok(
+      d.copy(products = products, priceHistory = d.priceHistory + history, auditLog = d.auditLog + audit),
+      id = rows.keys.first(),
+    )
+  }
+
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
   fun bulkDelete(d: ShopData, ids: Set<String>, today: String, now: Long, newId: () -> String): Result {
     if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
@@ -934,6 +1005,86 @@ object WarehouseEngine {
       }
     }
     return Result.Ok(data, lastId)
+  }
+
+  /**
+   *  PRD-20: ورودِ کالا از Excel/CSV با پیش‌نمایش (فقط با `ShopPolicy.productTools`).
+   *
+   *  • پیش‌نمایش دوباره روی **همین** دفتر ساخته و با آنچه کاربر دید (`previewed`) سنجیده می‌شود؛ هر فرقی
+   *    (همگام‌سازی در این فاصله کالایی آورد، یا دکمه دو بار زده شد) ⇒ رد، بی هیچ نوشتن. پس همان پیش‌نمایش
+   *    هرگز دو بار نوشته نمی‌شود و ورودِ دوبارهٔ همان فایل چیزی برای نوشتن ندارد (همه SAME).
+   *  • NEW با همان `addProduct` ِ فرم؛ UPDATE با همان `editProduct` و **فقط** `changes` ِ پیش‌نمایش (خانهٔ
+   *    خالی، قیمتِ گردشدهٔ خروجیِ خودِ برنامه و واحد دست نمی‌خورند؛ بارکد فقط افزوده)، با کاربر و دلیلِ
+   *    «ورود از فایلِ …» در سابقه و `priceHistory` (PRD-14). یا همه یا هیچ.
+   *  • یک ردیفِ `product_import` در سابقه (سابقهٔ واردسازی): نامِ فایل، شمارها و اثرِ انگشت در `refId`.
+   */
+  fun importProducts(
+    d: ShopData,
+    rows: List<List<String>>,
+    previewed: ProductImportPlan.Plan,
+    fileName: String,
+    by: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    val plan = ProductImport.planOf(d, rows, previewed.update)
+    if (plan != previewed) return Result.Failed("کالاهای دکان در این فاصله عوض شد — پیش‌نمایش را دوباره ببینید")
+    plan.problem?.let { return Result.Failed(it) }
+    if (plan.writes == 0) return Result.Failed("چیزی برای ثبت نیست — کالاهای این فایل از قبل در دکان‌اند")
+    val who = by.trim().ifEmpty { null }
+    val file = fileName.trim().ifEmpty { "بی‌نام" }
+    var data = d
+    var lastId = ""
+    for (r in plan.rows) {
+      val step = when (r.status) {
+        ProductImportPlan.Status.NEW -> addProduct(data, ProductDraft(
+          name = r.name,
+          category = r.category.orEmpty(),
+          unit = r.unit.orEmpty(),
+          purchasePrice = (r.purchaseMinor ?: 0L) / 100.0,
+          salePrice = (r.saleMinor ?: 0L) / 100.0,
+          minStock = (r.minMilli ?: 0L) / 1000.0,
+          barcodes = r.barcodes,
+        ), now, newId)
+        ProductImportPlan.Status.UPDATE -> {
+          val p = data.products.firstOrNull { it.id == r.existingId }
+            ?: return Result.Failed("ردیفِ ${plain(r.line)}: کالا پیدا نشد")
+          var category = p.category
+          var buy = p.purchasePrice
+          var sell = p.salePrice
+          var min = p.minStock
+          var codes = p.barcodes
+          for (c in r.changes) when (c) {
+            is ProductImportPlan.Change.Text -> if (c.col == ProductImportPlan.Col.CATEGORY) category = c.new
+            is ProductImportPlan.Change.Price ->
+              if (c.col == ProductImportPlan.Col.PURCHASE) buy = c.newMinor / 100.0 else sell = c.newMinor / 100.0
+            is ProductImportPlan.Change.MinStock -> min = c.newMilli / 1000.0
+            is ProductImportPlan.Change.AddBarcodes -> codes = codes + c.codes
+          }
+          editProduct(data, p.id, ProductDraft(
+            name = p.name, category = category, unit = p.unit, purchasePrice = buy, salePrice = sell, minStock = min,
+            barcodes = codes, changedBy = who, reason = "ورود از فایلِ «$file»",
+          ), today, now, newId)
+        }
+        else -> continue
+      }
+      when (step) {
+        is Result.Failed -> return Result.Failed("ردیفِ ${plain(r.line)}: ${step.message}")
+        is Result.Ok -> { data = step.data; lastId = step.id }
+      }
+    }
+    val n = { s: ProductImportPlan.Status -> plain(plan.count(s)) }
+    val notes = "ورود از فایلِ «$file»: ${n(ProductImportPlan.Status.NEW)} کالای تازه، ${n(ProductImportPlan.Status.UPDATE)} به‌روز، " +
+      "${plain(plan.count(ProductImportPlan.Status.SAME) + plan.count(ProductImportPlan.Status.KEPT))} از پیش در دکان، " +
+      "${n(ProductImportPlan.Status.ERROR)} ردیفِ رد"
+    return Result.Ok(
+      data.copy(auditLog = data.auditLog + AuditEntry(
+        id = newId(), type = ProductImport.AUDIT_TYPE, date = today, refId = ProductImport.refOf(plan.fingerprint),
+        notes = notes, createdAt = now, by = who,
+      )),
+      id = lastId,
+    )
   }
 
   /**

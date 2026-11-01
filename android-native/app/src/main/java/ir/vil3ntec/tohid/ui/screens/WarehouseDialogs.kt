@@ -19,8 +19,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
-import ir.vil3ntec.tohid.core.product.SimilarNames
-import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
@@ -68,6 +66,11 @@ data class ProductFormState(
   /** INV-12 — فقط وقتی «نقطهٔ سفارش و بیشینه» روشن است دیده و فرستاده می‌شوند؛ خالی = تعریف نشده */
   val reorder: String = "",
   val max: String = "",
+  /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
+  val barcodes: String = barcode,
+  /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
+  val brand: String = "",
+  val tags: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -91,6 +94,9 @@ data class ProductFormState(
       tags = p.tags.orEmpty().joinToString("، "),
       reorder = p.reorderPoint?.let { numberText(it) }.orEmpty(),
       max = p.maxStock?.let { numberText(it) }.orEmpty(),
+      barcodes = p.barcodes.joinToString("، "),
+      brand = p.brand.orEmpty(),
+      tags = p.tags.orEmpty().joinToString("، "),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -133,6 +139,17 @@ fun ProductDialog(
   val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
   val context = androidx.compose.ui.platform.LocalContext.current
   val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(form.name, similarIndex) {
+    similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
+  }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember(state.editingId) { mutableStateOf("") }
+  val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -361,6 +378,11 @@ fun ProductDialog(
                   editLevels = levelsOn,
                   reorderPoint = if (levelsOn) levelNumber(form.reorder) else null,
                   maxStock = if (levelsOn) levelNumber(form.max) else null,
+                  barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
+                  changedBy = if (tools) me else null,
+                  reason = if (tools) priceReason else null,
+                  brand = if (tools) form.brand else null,
+                  tags = if (tools) ProductLabels.tags(form.tags) else null,
                 )
               )
             },

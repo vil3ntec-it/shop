@@ -113,6 +113,7 @@
     brand: 'برند',
     reorderPoint: 'نقطهٔ سفارش',
     maxStock: 'حداکثر موجودی',
+    brand: 'برند',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',
