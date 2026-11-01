@@ -123,10 +123,12 @@ data class ProductInfo(
   val prices: List<PriceSchedule.Window> = emptyList(),
   /** PRD-11 — ویژگی‌های مدل (`ProductVariants`)؛ تهی ⇒ مدل نیست */
   val axes: List<ProductVariants.Axis> = emptyList(),
+  /** POS-28 — کالای سریال‌دار: هر دانه سریال می‌خواهد */
+  val serialTracked: Boolean = false,
 ) {
   val isEmpty: Boolean
     get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty &&
-      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless && kit.isEmpty() && prices.isEmpty() && axes.isEmpty()
+      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless && kit.isEmpty() && prices.isEmpty() && axes.isEmpty() && !serialTracked
 
   /** نام‌های دیگرِ کالا (پشتو، انگلیسی، مترادف‌ها) — در جست‌وجو هم‌پایهٔ نام */
   val aliases: List<String> get() = listOfNotNull(namePs.ifEmpty { null }, nameEn.ifEmpty { null }) + synonyms

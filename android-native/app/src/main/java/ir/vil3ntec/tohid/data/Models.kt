@@ -114,6 +114,8 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variantAxes: List<VariantAxis>? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variantOf: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variant: Map<String, String>? = null,
+  /** POS-28 — `true` = کالای سریال‌دار: هر دانه سریال می‌خواهد و فاکتور بی سریالِ کامل بسته نمی‌شود (`SerialSale`) */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serialTracked: Boolean? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -409,6 +411,8 @@ data class SaleItem(
   val locationId: String? = null,
   /** PRD-10 — رونوشتِ اجزای کیت هنگامِ فروش (`ProductPlansMap.parts`)؛ کالای عادی `null` و نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val parts: List<KitPart>? = null,
+  /** POS-28 — سریال‌های همین قلم به ترتیبِ ثبت؛ کالای بی سریال `null` و نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serials: List<String>? = null,
   /**
    *  قیمتِ فهرستِ کالا هنگامِ فروش، پیش از تخفیفِ خودکار و قیمتِ دستی، به **واحدِ
    *  کوچک** — تا سرور تخفیفِ خودکار (`promo`) را از پایین آوردنِ دستیِ قیمت جدا

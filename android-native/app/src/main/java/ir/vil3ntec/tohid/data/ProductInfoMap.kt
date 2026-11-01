@@ -21,7 +21,7 @@ object ProductInfoMap {
     p.namePs.isNullOrEmpty() && p.nameEn.isNullOrEmpty() && p.synonyms.isNullOrEmpty() &&
       p.keywords.isNullOrEmpty() && p.aisle.isNullOrEmpty() && p.shelf.isNullOrEmpty() && p.shelfLevel.isNullOrEmpty() &&
       p.alternatives.isNullOrEmpty() && p.customFields.isNullOrEmpty() && p.sku.isNullOrEmpty() && p.stockless != true &&
-      p.kit.isNullOrEmpty() && p.priceWindows.isNullOrEmpty() && p.variantAxes.isNullOrEmpty()
+      p.kit.isNullOrEmpty() && p.priceWindows.isNullOrEmpty() && p.variantAxes.isNullOrEmpty() && p.serialTracked != true
 
   fun of(p: Product): ProductInfo = ProductInfo(
     namePs = p.namePs.orEmpty(),
@@ -36,6 +36,7 @@ object ProductInfoMap {
     kit = ProductPlansMap.kitOf(p),
     prices = ProductPlansMap.windowsOf(p),
     axes = ProductVariantsMap.axesOf(p),
+    serialTracked = p.serialTracked == true,
   )
 
   fun shelf(p: Product): ShelfLocation = ShelfLocation.of(p.aisle, p.shelf, p.shelfLevel)
@@ -57,6 +58,7 @@ object ProductInfoMap {
     kit = ProductPlansMap.kitModel(info.kit),
     priceWindows = ProductPlansMap.windowsModel(info.prices),
     variantAxes = ProductVariantsMap.axesModel(info.axes),
+    serialTracked = if (info.serialTracked) true else null,
   ).let { u ->
     //  PRD-09: خدماتی حدِ موجودی ندارد ⇒ هشدارِ کم‌موجودی و پیشنهادِ سفارش هرگز
     if (info.stockless) u.copy(minStock = 0.0, reorderPoint = null, maxStock = null) else u
@@ -81,6 +83,7 @@ object ProductInfoMap {
     if ((a.stockless == true) != (b.stockless == true)) add(if (b.stockless == true) "خدماتی (بی موجودی) شد" else "دیگر خدماتی نیست")
     addAll(ProductPlansMap.changes(a, b))
     if (a.variantAxes.orEmpty() != b.variantAxes.orEmpty()) add("ویژگی‌های تنوع عوض شد")
+    if ((a.serialTracked == true) != (b.serialTracked == true)) add(if (b.serialTracked == true) "سریال‌دار شد" else "دیگر سریال‌دار نیست")
   }
 
   /**

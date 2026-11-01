@@ -48,8 +48,8 @@ object SalesEngine {
     val label: String = "",
     /** سریِ اسکن‌شده (موتورِ تازهٔ موجودی، `StockLedger`) — فروش اول از همین برداشته می‌شود */
     val lotId: String? = null,
-    /** یادداشتِ ردیف (POS-11، `CartNotes`) — به `SaleItem.note` می‌رود */
-    val note: String? = null,
+    val note: String? = null, // یادداشتِ ردیف (POS-11، `CartNotes`) — به `SaleItem.note` می‌رود
+    val serials: List<String>? = null, // سریال‌های ردیف (POS-28، `CartSerials`) — به `SaleItem.serials` می‌رود
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -342,7 +342,7 @@ object SalesEngine {
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
-      ProductPlansMap.kitShortage(d, cart, p)?.let { return Result.Failed(it) } // PRD-10: نیازِ همهٔ سبد به اجزای کیت
+      (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
       var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
@@ -511,7 +511,7 @@ object SalesEngine {
         unitPrice = unit,
         purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: ProductPlansMap.cost(d, p),
         totalPrice = lineTotal(unit, line.quantity),
-        returnedQty = 0.0, parts = ProductPlansMap.parts(p),
+        returnedQty = 0.0, parts = ProductPlansMap.parts(p), serials = SerialSale.forItem(line, p),
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
       )

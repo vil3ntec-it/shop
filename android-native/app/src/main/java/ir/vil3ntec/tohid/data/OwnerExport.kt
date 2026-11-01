@@ -164,6 +164,9 @@ object OwnerExport {
     "variantAxes" to "ویژگی‌های تنوع",
     "variantOf" to "شناسهٔ کالای مدل",
     "variant" to "ترکیبِ تنوع",
+    //  POS-28
+    "serialTracked" to "سریال‌دار",
+    "serials" to "سریال‌ها",
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",

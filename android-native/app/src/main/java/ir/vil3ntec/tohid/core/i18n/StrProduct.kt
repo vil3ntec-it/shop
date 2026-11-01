@@ -90,4 +90,15 @@ object StrProduct {
   fun variantsBad(a: Any): String = t("این خط درست نیست یا ترکیب‌ها بیش از ۱۰۰ است: $a", "This line is wrong or there are over 100 combinations: $a", "دا کرښه سمه نه ده یا ترکیبونه له ۱۰۰ ډېر دي: $a")
   fun variantsNew(a: Any): String = t("با ذخیره $a تنوعِ تازه ساخته می‌شود", "Saving creates $a new variants", "په ثبت سره $a نوي ډولونه جوړېږي")
   val variantsMatrix: String get() = t("تنوع‌ها: قیمت · موجودی", "Variants: price · stock", "ډولونه: بیه · موجودي")
+
+  // کالای سریال‌دار (POS-28)
+  val serialTracked: String get() = t("کالای سریال‌دار", "Serial-numbered item", "سریال لرونکی توکی")
+  val serialTrackedHint: String get() = t("هر دانه هنگامِ فروش سریال می‌خواهد؛ بی سریالِ کامل فاکتور بسته نمی‌شود", "Each unit needs a serial at sale; the invoice cannot finish without all serials", "هره دانه د پلور پر وخت سریال غواړي؛ له بشپړ سریال پرته بل نه بندېږي")
+  val serials: String get() = t("سریال‌ها (هر کدام یک خط)", "Serial numbers (one per line)", "سریالونه (هر یو یوه کرښه)")
+  fun serialCount(have: Any, need: Any): String = t("$have از $need سریال", "$have of $need serials", "له $need څخه $have سریالونه")
+  fun serialMissing(name: Any, have: Any, need: Any): String = t("سریالِ «$name» کامل نیست: $have از $need — روی ردیف بزنید و سریال‌ها را بنویسید", "Serials for \"$name\" are incomplete: $have of $need — tap the line and enter them", "د «$name» سریالونه بشپړ نه دي: له $need څخه $have — پر کتار ووهئ او سریالونه ولیکئ")
+  fun serialTooMany(name: Any, have: Any, need: Any): String = t("«$name» $have سریال دارد ولی مقدار $need است", "\"$name\" has $have serials but the quantity is $need", "«$name» $have سریالونه لري خو اندازه $need ده")
+  fun serialDuplicate(a: Any): String = t("سریالِ «$a» دو بار آمده", "Serial \"$a\" appears twice", "سریال «$a» دوه ځله راغلی")
+  fun serialSold(a: Any): String = t("سریالِ «$a» پیش‌تر فروخته شده", "Serial \"$a\" was already sold", "سریال «$a» مخکې پلورل شوی")
+  fun serialWhole(a: Any): String = t("«$a» سریال‌دار است و فقط دانه‌ای فروخته می‌شود", "\"$a\" is serial-numbered and sells only in whole units", "«$a» سریال لري او یوازې په دانه پلورل کېږي")
 }

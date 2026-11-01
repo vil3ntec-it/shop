@@ -67,6 +67,8 @@ data class ProductInfoForm(
   val pricesText: String? = null,
   /** PRD-11 — ویژگی‌های مدل، هر خط «ویژگی: مقدار، مقدار» */
   val axes: String = "",
+  /** POS-28 — کالای سریال‌دار */
+  val serialTracked: Boolean = false,
 ) {
   /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
   fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
@@ -79,6 +81,7 @@ data class ProductInfoForm(
     kit = kitText?.let { ProductKit.parse(it, selfId, ProductKit.resolver(catalog)) { false }.parts } ?: kitParts,
     prices = pricesText?.let { PriceSchedule.parse(it, ::dayOf).windows } ?: prices,
     axes = ProductVariants.parse(axes).axes,
+    serialTracked = serialTracked,
   )
 
   companion object {
@@ -97,6 +100,7 @@ data class ProductInfoForm(
       kitParts = info.kit,
       prices = info.prices,
       axes = ProductVariants.format(info.axes),
+      serialTracked = info.serialTracked,
     )
   }
 }
@@ -145,6 +149,14 @@ fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onCha
       Column(Modifier.weight(1f)) {
         Text(StrProduct.stockless, style = MaterialTheme.typography.bodyMedium)
         Text(StrProduct.stocklessHint, style = MaterialTheme.typography.labelSmall, color = c.muted)
+      }
+    }
+    //  POS-28: کالای سریال‌دار
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Checkbox(checked = form.serialTracked, onCheckedChange = { onChange(form.copy(serialTracked = it)) })
+      Column(Modifier.weight(1f)) {
+        Text(StrProduct.serialTracked, style = MaterialTheme.typography.bodyMedium)
+        Text(StrProduct.serialTrackedHint, style = MaterialTheme.typography.labelSmall, color = c.muted)
       }
     }
     Spacer(Modifier.height(6.dp))
