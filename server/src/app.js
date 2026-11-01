@@ -440,6 +440,8 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  ماژولِ ۴.۵ ِ پنلِ مرکزی: مالیِ مرکزی (درآمدِ اشتراک، سندِ اصلاحی، بدهی، مغایرت، خروجی) — `requireAdmin` ِ خودش
+    api.use('/admin/finance', require('./routes/admin-finance'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
@@ -592,8 +594,13 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(errorHandler);
 
   // ---- کارهای دوره‌ای ----
+  const HOUSEKEEPING_MS = 6 * 60 * 60 * 1000;
+  //  پنلِ مرکزی ۴.۹: «خانه‌تکانی اجرا شد» + شکستِ هر زیرکار (`lib/job-beat.js`)؛ رفتار همان
+  const beat = require('./lib/job-beat');
+  const beatFail = (err) => beat.failed('housekeeping', err);
   const housekeeping = setInterval(() => {
-    pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    beat.ran('housekeeping', HOUSEKEEPING_MS);
+    pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
@@ -621,8 +628,9 @@ async function createApp({ runMigrations = true } = {}) {
     //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
     require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
-  }, 6 * 60 * 60 * 1000);
+  }, HOUSEKEEPING_MS);
   if (housekeeping.unref) housekeeping.unref();
+  beat.register('housekeeping', HOUSEKEEPING_MS);
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
   setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
   setImmediate(() => require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message)));
