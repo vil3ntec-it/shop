@@ -27,6 +27,7 @@ const loginAlerts = require('../lib/login-alerts');
 const terms = require('../lib/terms');
 const audit = require('../lib/audit');
 const reauth = require('../lib/reauth');
+const hardening = require('../lib/auth-session-hardening');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -50,28 +51,23 @@ const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' }
 const sessionLimit = rateLimit({ max: config.rateLimit.sessionMax, keyPrefix: 'session' });
 //  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
-const otpLimit = rateLimit({
-  max: config.rateLimit.otpMax, keyPrefix: 'otp',
-  //  کلید همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس
-  //  ثبت‌نامِ ایمیلی روی IP جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ
-  //  چند نفره) همه را با هم می‌بست.
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+/**
+ * کلیدِ سطلِ کد همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس ثبت‌نامِ ایمیلی روی IP
+ * جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ چند نفره) همه را با هم می‌بست.
+ * شماره با کلیدِ یکتا (RSK-07): ‎0700…‎، ‎+93700…‎، ‎0093700…‎ و ‎+9300700…‎ یک سطل‌اند، نه چهار.
+ */
+function destinationKey(req) {
+  const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) return raw.toLowerCase();
+  try { return v.phoneKey(v.phone(raw)) || null; } catch { return raw.replace(/\D/g, '') || null; }
+}
+
+const otpLimit = rateLimit({ max: config.rateLimit.otpMax, keyPrefix: 'otp', key: destinationKey });
 
 //  ⛔ زدنِ کد سطلِ خودش را دارد — شرح بالای `verifyMax` در `config.js`.
 //  کلید همان ایمیل/شماره است، مثلِ `otpLimit`.
-const verifyLimit = rateLimit({
-  max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify',
-  key: (req) => {
-    const raw = String(req.body?.phone || req.body?.email || req.body?.destination || '').trim();
-    if (!raw) return null;
-    return raw.includes('@') ? raw.toLowerCase() : raw.replace(/\D/g, '') || null;
-  },
-});
+const verifyLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'otp-verify', key: destinationKey });
 
 /*
  *  ⛔ F0-16 — سقفِ دوم برای دو درِ «آیا این ایمیل حساب دارد؟»
@@ -291,7 +287,7 @@ async function loginPayload(user, session) {
   return {
     user: publicUser(user),
     shop: member ? {
-      id: member.shop_id, name: member.shop_name || '', role: member.role,
+      id: member.shop_id, name: member.shop_name || '', role: require('../lib/permissions').legacyRole(member.role), actualRole: member.role, // A16
     } : null,
     shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
     ...session,
@@ -593,15 +589,14 @@ router.post('/login', authLimit, async (req, res, next) => {
     isEmail ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
     [identifier]
   );
-  //  حساب نبود؟ باز هم همان‌قدر وقت می‌گیرد — شرحش سرِ `pw.burnTime`
-  let ok = false;
-  if (user && user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
-  else await pw.burnTime(password);
+  //  حساب نبود یا هشِ کهنه؟ باز هم همان‌قدر وقت می‌گیرد (SEC-AUTH-01، `lib/auth-session-hardening`)
+  const ok = await hardening.checkPassword(user, password);
 
   await noteAttempt('user', identifier, clientIp(req), ok);
   if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
   await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
+  await hardening.upgradeHash('users', user, password);
 
   const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.login', detail: { method: 'password' }, ip: clientIp(req) });

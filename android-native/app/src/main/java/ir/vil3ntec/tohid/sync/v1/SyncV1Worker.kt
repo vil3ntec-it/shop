@@ -38,6 +38,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
   override suspend fun doWork(): Result {
     val app = applicationContext
+    //  درِ ورودِ فرآیند: «سرورِ بعدی» پیش از هر دفتر و درخواستی (`ServerSwitchAndroid`)
+    ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(app)
     if (!Backend.isReady(app)) return Result.success()
     //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
     if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()
@@ -79,14 +81,18 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
     //  F0-03: «سری سند»ِ این دستگاه — یک بار، هنگامِ پیوستن؛ شکستش بی‌صداست
     runCatching { ir.vil3ntec.tohid.sync.DocSeries.ensure(app) }
+    //  SEC-02: زنجیرهٔ هشِ اسنادِ همین سری (پرچمِ خاموشِ shop.doc_chain ⇒ فقط پرسشِ پرچم؛ شکستش بی‌صدا)
+    runCatching { ir.vil3ntec.tohid.sync.platform.DocChainSync.cycle(app, store.data.value) }
 
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
+    //  ⛔ `read` دفترِ همین لحظهٔ دیسک است (`ledgerNow`)، نه دفتری که این نمونه هنگامِ `load` خواند:
+    //  نشاندنِ opها روی آن فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد
     runCatching {
-      engine.prepare(read = { store.data.value }, write = { next -> store.applyFromServerNow(next) })
+      engine.prepare(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
     }
 
     val outcome = engine.runOnce(
-      read = { store.data.value },
+      read = { store.ledgerNow() },
       write = { next -> store.applyFromServerNow(next) },
     )
     sweepAfterPull(store)

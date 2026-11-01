@@ -14,9 +14,10 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
+const { goneSignal } = require('../lib/chat-wait');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
-const { rateLimit } = require('../middleware/ratelimit');
+const { rateLimit, refund } = require('../middleware/ratelimit');
 const { notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -25,8 +26,9 @@ router.use(requireUser, requireShop, requirePermission('chat.view'));
 const viewerOf = (req) => ({ side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role });
 const reply = requirePermission('chat.reply');
 const moderate = requirePermission('chat.moderate');
-const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'shop-chat-send', key: (req) => req.user && req.user.id });
-const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'shop-chat-upload', key: (req) => req.user && req.user.id });
+//  تکرارِ همان پیام/همان بایت سهمیه را پس می‌دهد (CHAT-11) ⇒ `refundable`
+const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'shop-chat-send', key: (req) => req.user && req.user.id, refundable: true });
+const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'shop-chat-upload', key: (req) => req.user && req.user.id, refundable: true });
 
 const on = async (req, res, next) => {
   if (!(await chat.flagOf(req.shopId))) throw notFound('چت برای این دکان روشن نیست', 'chat_disabled');
@@ -73,14 +75,15 @@ router.put('/conversations/:id/status', on, reply, async (req, res) => {
 });
 
 router.get('/conversations/:id/messages', on, async (req, res) => {
-  res.json(await chat.changes(viewerOf(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait,
-  }));
+  const out = await chat.changes(viewerOf(req), req.params.id, {
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+  });
+  if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
 });
 
 router.post('/conversations/:id/messages', on, reply, sendLimit, async (req, res) => {
   const out = await chat.send(viewerOf(req), req.params.id, req.body);
-  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  if (out.replayed) { res.set('Idempotent-Replayed', 'true'); refund(req, 'shop-chat-send'); }
   res.status(out.replayed ? 200 : 201).json(out);
 });
 
@@ -92,12 +95,23 @@ router.delete('/conversations/:id/messages/:mid', on, async (req, res) => {
   res.json(await chat.remove(viewerOf(req), req.params.id, req.params.mid, req.query.for));
 });
 
+//  سنجاقِ طرفِ دکان (CHAT-14) — همهٔ کارمندانِ همین دکان می‌بینند، مشتری نه
+router.put('/conversations/:id/pins/:mid', on, reply, async (req, res) => {
+  res.json({ conversation: await chat.pin(viewerOf(req), req.params.id, req.params.mid, true) });
+});
+
+router.delete('/conversations/:id/pins/:mid', on, reply, async (req, res) => {
+  res.json({ conversation: await chat.pin(viewerOf(req), req.params.id, req.params.mid, false) });
+});
+
 router.post('/conversations/:id/receipts', on, async (req, res) => {
   res.json(await chat.receipts(viewerOf(req), req.params.id, req.body));
 });
 
 router.post('/conversations/:id/media', on, reply, uploadLimit, chat.rawMedia, async (req, res) => {
-  res.status(201).json(await chat.putMedia(viewerOf(req), req.params.id, req.body, { role: req.query.role }));
+  const out = await chat.putMedia(viewerOf(req), req.params.id, req.body, { role: req.query.role });
+  if (out.reused) refund(req, 'shop-chat-upload');
+  res.status(201).json(out);
 });
 
 router.get('/conversations/:id/media/:mediaId', on, async (req, res) => {

@@ -75,10 +75,15 @@ fun main() {
   DevShot.start()
 
   val context = DesktopContext
+  //  OPS-03: خطای گرفته‌نشده ⇒ گزارشِ بی دادهٔ شخصی با کد؛ صفِ اجرای پیش فرستاده می‌شود
+  ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
+  //  «سرورِ بعدی» (پرچمِ `app.multi_server`) فقط این‌جا، پیش از هر دفتر و درخواستی
+  ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }
+  scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
   //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
@@ -199,7 +204,11 @@ fun main() {
         } else {
           //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
           val ch = e.scanChar()
-          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch, now); true } else false
+          //  HW-05: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) اسکن را همین‌جا تمام می‌کند
+          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) {
+            windowHid.feed(ch, now)?.let { code -> ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") } }
+            true
+          } else false
         }
       },
       onPreviewKeyEvent = { e ->
@@ -229,6 +238,8 @@ fun main() {
           //  Ctrl+K ⇒ جست‌وجوی سریع (صفحه، کالا، بارکد، قرض‌دار)
           mod && e.key == Key.K -> { ir.vil3ntec.tohid.ui.AppNav.palette.value = !ir.vil3ntec.tohid.ui.AppNav.palette.value; true }
           mod && e.key == Key.M -> { ir.vil3ntec.tohid.ui.AppNav.go("admin"); true }
+          //  Ctrl+L ⇒ قفلِ صندوق (STF-04)؛ سبدِ نیمه‌کاره می‌ماند
+          mod && e.key == Key.L -> { ir.vil3ntec.tohid.ui.AppNav.lock(); true }
           //  Ctrl+N ⇒ «تازه»ِ همین صفحه (قرض‌دار، کالا، مصرف، تأمین‌کننده)
           mod && e.key == Key.N -> ir.vil3ntec.tohid.ui.AppNav.addAction.value?.let { it(); true } ?: false
           e.key == Key.Escape -> BackDispatcher.dispatch()
