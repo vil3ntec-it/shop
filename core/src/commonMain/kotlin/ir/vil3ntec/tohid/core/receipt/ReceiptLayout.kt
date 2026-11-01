@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.receipt
 
+import ir.vil3ntec.tohid.core.marketing.CampaignLinks
 import ir.vil3ntec.tohid.core.qr.QrCode
 
 /**
@@ -85,6 +86,14 @@ object ReceiptLayout {
     val qr = input.qrUrl?.let { url -> runCatching { url to QrCode.encode(url) }.getOrNull() }
     qr?.let { (url, modules) ->
       if (input.qrCaption) text(labels.scan, TextStyle.SMALL)
+      b += ReceiptBlock.Gap(m.gap / 2)
+      b += ReceiptBlock.Qr(url, modules)
+      b += ReceiptBlock.Gap(m.gap / 2)
+    }
+    //  MKT-10: QR ِ ویترینِ دکان — فقط نشانیِ درستِ پیوندِ کمپین؛ نشدنی ⇒ بی QR، چاپ نمی‌شکند
+    val store = input.storeQrUrl?.takeIf { CampaignLinks.receiptUrlOk(it) }?.let { url -> runCatching { url to QrCode.encode(url) }.getOrNull() }
+    store?.let { (url, modules) ->
+      text(labels.storeScan, TextStyle.SMALL)
       b += ReceiptBlock.Gap(m.gap / 2)
       b += ReceiptBlock.Qr(url, modules)
       b += ReceiptBlock.Gap(m.gap / 2)

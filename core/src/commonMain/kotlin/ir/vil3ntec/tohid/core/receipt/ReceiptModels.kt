@@ -36,6 +36,11 @@ data class ReceiptInput(
   val qrUrl: String? = null,
   /** «برای دیدنِ این خرید اسکن کنید» زیرِ QR — فقط برای نشانیِ عمومی، نه کدِ داخلیِ برگشت */
   val qrCaption: Boolean = true,
+  /**
+   *  MKT-10: QR ِ ویترینِ دکان (پیوندِ کمپینِ «QR ِ رسید»، `/store/go/<کد>`) زیرِ فاکتورِ فروش؛ null ⇒ همان رسیدِ امروز.
+   *  تنظیمِ همین دستگاه است (پیش‌فرض خاموش) و فقط نشانیِ درست (`CampaignLinks.receiptUrlOk`) چاپ می‌شود.
+   */
+  val storeQrUrl: String? = null,
   /** لوگوی یک‌بیتیِ همین کاغذ (`LogoDither`)؛ null ⇒ بی لوگو */
   val logo: MonoImage? = null,
   /** «نسخهٔ دوم» و مانندِ آن (#300) */
@@ -121,6 +126,8 @@ data class ReceiptLabels(
   val debtor: String = "قرض‌دار",
   val phone: String = "تلفن",
   val scan: String = "برای دیدنِ این خرید اسکن کنید",
+  /** MKT-10: نوشتهٔ بالای QR ِ ویترین */
+  val storeScan: String = "سفارشِ اینترنتی از همین دکان — اسکن کنید",
   val footer: String = "تشکر از خرید شما",
   val cash: String = "نقدی",
   val credit: String = "نسیه",
