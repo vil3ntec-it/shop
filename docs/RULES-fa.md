@@ -216,6 +216,10 @@
   اندروید در `SyncV1Engine` (`parts.push`، `pushClient`)، وب در `recordChange`/`pushBaseline`/`pushOnce`. sync-core ِ کهنه ⇒ بی `since`، بی خطا.
 - opِ قدیمی مهلت ندارد (D-05، #233).
 - بستنِ تعارض با `data.delete.any` (مالک و مدیر)؛ لغوِ فاکتور با `sales.cancel` (#233).
+- cursor ِ `sync_devices` ِ v1 ملاکِ «دیده بود؟» ِ تعارض است. بی پرچم = آنچه pull فرستاد (پاسخِ گم‌شده ⇒ تعارضِ بعدی ثبت نمی‌شود، «۳-ب» ِ #449)؛
+  با `sync.cursor_from_since` = آنچه دستگاه تأیید کرد: `since` ِ pull یا `since` ِ اختیاریِ بدنهٔ push، بریده به سرِ دفتر و **دقیق** (نه GREATEST).
+  پاسخِ pull دست نمی‌خورد (جز `since` ِ بزرگ‌تر از سرِ دفتر که پیش از pull بریده می‌شود) و پمپ پرچم را نمی‌خواند. فقط در
+  `lib/sync-v1-ack.js` و `routes/sync-v1.js`؛ ⛔ `lib/sync-v1.js` ِ مشترک با پمپ دست نمی‌خورد. سنجه: `server/test/sync-v1-ack-cursor.test.js` (#481).
 - v3 ⇒ v1 خودکار نیست: v3 را برای دکانی بزن که همهٔ دستگاه‌هایش v3اند (#233؛ پلِ v3 ⇒ v1 در #287، باز).
 - `broadcast`ِ v1 را از v3 صدا نزن تا cursorِ v1 قاطی نشود (#233).
 - قطع و بازگشت (PERF-05): `server/test/outage-recovery.test.js` با پراکسیِ TCPِ واقعی بدنه یا پاسخِ push/pull را می‌بُرد، سرور را خاموش/روشن
@@ -551,6 +555,7 @@
 | `shop.catalog` | دکان / `all` | خاموش | کاتالوگِ سرور و رزروِ اتمیِ موجودی با سفارش | #263 | باز |
 | `shop.orders.ledger` | دکان / `all` | خاموش | ⛔ بازنشسته: سرور دیگر فاکتورِ W یا سندِ برگشت نمی‌نویسد؛ فقط کفِ راه‌اندازیِ «فروشِ تحویل» (`order-ledger.LEGACY_FLAGS`) آن را می‌خواند. زنده‌اش نکنید؛ بازپرداخت = سندِ برگشتِ برنامه (بخشِ «سفارش») | #275 | بازنشسته |
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
+| `sync.cursor_from_since` | دکان / `all` | خاموش | cursor ِ هر دستگاهِ Sync v1 = آنچه دستگاه تأیید کرد (`since` ِ pull، یا `since` ِ اختیاریِ بدنهٔ push)، نه آنچه سرور فرستاد؛ پاسخِ گم‌شدهٔ pull دیگر تعارضِ بعدی را پنهان نمی‌کند. برنامهٔ بی `since` در push ⇒ تعارضِ اضافه ممکن (کم هرگز)؛ پیش از روشن کردن، برنامه‌های آن دکان `since` بفرستند. پمپ هرگز | #481 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
 | `shop.ledger_merge` | دکان / `all` | خاموش | ذخیرهٔ کهنه در برنامه: همتاها (`LedgerPeers`)، سنجشِ دیسک پیش از نوشتن و ادغامِ سه‌طرفهٔ `ShopStore.save` (`LedgerMerge`)؛ برنامه از `GET /api/shop/ledger-merge/config` می‌خواند (`LedgerMergeFlag`)؛ خاموش ⇒ همان رفتارِ پیشین | #407 | باز |
 | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |
