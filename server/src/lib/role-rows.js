@@ -215,6 +215,8 @@ const V3_OWNED = `
   ) f WHERE f.user_id = $3`;
 
 /** گردآورندهٔ v1 (`sync_rows` و `oplog`)؛ «خودی» = ساختهٔ کاربرِ `userId` */
+//  ⛔ داوریِ `core.checkRows` به ترتیبِ ردیف‌ها حساس است؛ بی ORDER BY ترتیب همان ترتیبِ ایندکس بود و با collation ِ
+//  پایگاه (en_US در برابرِ C) عوض می‌شد (`r3-csh` / `r3b-csh`) ⇒ برگشتِ درست رد می‌شد. پس همه‌جا `COLLATE "C"`.
 function v1Db(many, ctx, userId) {
   const base = `app='shop' AND account_kind='shop' AND account_id=$1`;
   return {
@@ -228,7 +230,7 @@ function v1Db(many, ctx, userId) {
     async returns(ids) {
       const rows = await many(
         `SELECT row_id, data FROM sync_rows WHERE ${base} AND table_name='returns' AND deleted_at IS NULL
-            AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+            AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[])) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, ids]
       );
       if (!rows.length) return [];
@@ -245,21 +247,21 @@ function v1Db(many, ctx, userId) {
     async saleItems(saleIds) {
       return (await many(
         `SELECT row_id, data FROM sync_rows WHERE ${base} AND table_name='saleItems' AND deleted_at IS NULL
-            AND data->>'saleId' = ANY($2::text[])`,
+            AND data->>'saleId' = ANY($2::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, saleIds]
       )).map((r) => ({ ...saleLineOf(r.row_id, r.data, false), qty: numOf(r.data?.quantity) }));
     },
     async moved(refIds) {
       return (await many(
         `SELECT data FROM sync_rows WHERE ${base} AND table_name='stockMovements' AND deleted_at IS NULL
-            AND data->>'refId' = ANY($2::text[]) AND data->>'type' = ANY($3::text[])`,
+            AND data->>'refId' = ANY($2::text[]) AND data->>'type' = ANY($3::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, refIds, Object.keys(core.DOC_MOVE_TYPES)]
       )).map((r) => ({ refId: r.data.refId, productId: r.data.productId, type: r.data.type, qty: numOf(r.data.qty) }));
     },
     async taken(ids) {
       return (await many(
         `SELECT data FROM sync_rows WHERE ${base} AND table_name='warehouseEntries' AND deleted_at IS NULL
-            AND data->>'refId' = ANY($2::text[])`,
+            AND data->>'refId' = ANY($2::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, ids]
       )).map((r) => ({ refId: r.data.refId, productId: r.data.productId, units: numOf(r.data.units) }));
     },
@@ -281,7 +283,7 @@ function v3Db(many, ctx, userId) {
     async returns(ids) {
       const rows = await many(
         `SELECT row_id, data FROM sync_v3_rows WHERE ${base} AND table_name='returns' AND ${live}
-            AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+            AND (row_id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[])) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, ids]
       );
       const mine = await ownedBy(many, V3_OWNED, ctx.accountId, rows.map((r) => r.row_id), userId);
@@ -300,7 +302,7 @@ function v3Db(many, ctx, userId) {
     async saleItems(saleIds) {
       return (await many(
         `SELECT row_id, data FROM sync_v3_rows WHERE ${base} AND table_name='saleItems' AND inserted AND deleted_at IS NULL
-            AND data->>'saleId' = ANY($2::text[])`,
+            AND data->>'saleId' = ANY($2::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, saleIds]
       )).map((r) => {
         const q = numOf(r.data?.quantityMilli);
@@ -310,7 +312,7 @@ function v3Db(many, ctx, userId) {
     async moved(refIds) {
       return (await many(
         `SELECT data FROM sync_v3_rows WHERE ${base} AND table_name='stockMovements' AND inserted AND deleted_at IS NULL
-            AND data->>'refId' = ANY($2::text[]) AND data->>'type' = ANY($3::text[])`,
+            AND data->>'refId' = ANY($2::text[]) AND data->>'type' = ANY($3::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, refIds, Object.keys(core.DOC_MOVE_TYPES)]
       )).map((r) => {
         const q = numOf(r.data.qtyMilli);
@@ -320,7 +322,7 @@ function v3Db(many, ctx, userId) {
     async taken(ids) {
       return (await many(
         `SELECT data FROM sync_v3_rows WHERE ${base} AND table_name='warehouseEntries' AND ${live}
-            AND data->>'refId' = ANY($2::text[])`,
+            AND data->>'refId' = ANY($2::text[]) ORDER BY row_id COLLATE "C"`,
         [ctx.accountId, ids]
       )).map((r) => {
         const u = numOf(r.data.unitsMilli);
@@ -346,7 +348,7 @@ function legacyDb(many, shopId, userId, TABLES) {
     async returns(ids) {
       return (await many(
         `SELECT id, data, user_id FROM ${TABLES.returns}
-          WHERE shop_id=$1 AND deleted=false AND (id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[]))`,
+          WHERE shop_id=$1 AND deleted=false AND (id = ANY($2::text[]) OR data->>'docId' = ANY($2::text[])) ORDER BY id COLLATE "C"`,
         [shopId, ids]
       )).map((r) => ({ ...lineOf(r.id, r.data, !!userId && r.user_id === userId, false), qty: numOf(r.data?.quantity) }));
     },
@@ -358,7 +360,7 @@ function legacyDb(many, shopId, userId, TABLES) {
     },
     async saleItems(saleIds) {
       return (await many(
-        `SELECT id, data FROM ${TABLES.saleItems} WHERE shop_id=$1 AND deleted=false AND data->>'saleId' = ANY($2::text[])`,
+        `SELECT id, data FROM ${TABLES.saleItems} WHERE shop_id=$1 AND deleted=false AND data->>'saleId' = ANY($2::text[]) ORDER BY id COLLATE "C"`,
         [shopId, saleIds]
       )).map((r) => ({ ...saleLineOf(r.id, r.data, false), qty: numOf(r.data?.quantity) }));
     },
@@ -366,7 +368,7 @@ function legacyDb(many, shopId, userId, TABLES) {
       //  `/api/sales/full` حرکت را با `saleId` می‌نشاند، نه `refId`
       return (await many(
         `SELECT data FROM ${TABLES.stockMovements} WHERE shop_id=$1 AND deleted=false
-            AND COALESCE(data->>'refId', data->>'saleId') = ANY($2::text[]) AND data->>'type' = ANY($3::text[])`,
+            AND COALESCE(data->>'refId', data->>'saleId') = ANY($2::text[]) AND data->>'type' = ANY($3::text[]) ORDER BY id COLLATE "C"`,
         [shopId, refIds, Object.keys(core.DOC_MOVE_TYPES)]
       )).map((r) => ({
         refId: r.data.refId ?? r.data.saleId, productId: r.data.productId, type: r.data.type, qty: numOf(r.data.qty),
@@ -375,7 +377,7 @@ function legacyDb(many, shopId, userId, TABLES) {
     async taken(ids) {
       return (await many(
         `SELECT data FROM ${TABLES.warehouseEntries} WHERE shop_id=$1 AND deleted=false
-            AND data->>'refId' = ANY($2::text[])`,
+            AND data->>'refId' = ANY($2::text[]) ORDER BY id COLLATE "C"`,
         [shopId, ids]
       )).map((r) => ({ refId: r.data.refId, productId: r.data.productId, units: numOf(r.data.units) }));
     },
