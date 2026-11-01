@@ -54,6 +54,57 @@ data class OrdersConfigDto(
   val bulk: Boolean = false,
   /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
   val noticeResend: OrderNoticeResendCfgDto? = null,
+  /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
+  val amend: OrderAmendCfgDto? = null,
+)
+
+/** `amend` ِ `/config` (`order-amend.configOf` + `paid`/`settleMethods`) */
+@Serializable
+data class OrderAmendCfgDto(
+  val statuses: List<String> = emptyList(),
+  val reasons: List<String> = emptyList(),
+  val consentVia: List<String> = emptyList(),
+  val ttlMinutes: Int = 0,
+  val paid: Boolean = false,
+  val settleMethods: List<String> = emptyList(),
+)
+
+/** آخرین پیشنهاد/ویرایشِ سفارش (`amendment` ِ `GET /:id`، `order-amend.staffView`) */
+@Serializable
+data class OrderAmendmentDto(
+  val id: String = "",
+  val status: String = "",
+  val reason: String = "",
+  val changes: List<OrderAmendChangeDto> = emptyList(),
+  val prevTotalMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val differenceMinor: Long = 0,
+  val expiresAt: Long? = null,
+  val createdAt: Long = 0,
+  val closedAt: Long? = null,
+  /** فقط سفارشِ پرداخت‌شده (پرچمِ `shop.orders.amend_paid`) */
+  val settlement: OrderAmendSettlementDto? = null,
+)
+
+@Serializable
+data class OrderAmendChangeDto(
+  val lineNo: Int = 0,
+  val name: String = "",
+  val unit: String = "",
+  val fromQtyMilli: Long = 0,
+  val toQtyMilli: Long = 0,
+  val fromLineTotalMinor: Long = 0,
+  val toLineTotalMinor: Long = 0,
+)
+
+/** `refund` = دکان بدهکار، `charge` = مشتری بدهکار؛ `settledAt` ⇒ تسویه ثبت شد */
+@Serializable
+data class OrderAmendSettlementDto(
+  val kind: String = "",
+  val amountMinor: Long = 0,
+  val paidTotalMinor: Long = 0,
+  val settledAt: Long? = null,
+  val method: String? = null,
 )
 
 /** `noticeResend` ِ `/config` (`notice-resend.configOf`) */
@@ -259,6 +310,8 @@ data class OrderDto(
   val reversible: Boolean? = null,
   /** فقط در `handover` برای `review`: چرا خودکار نه (`before_floor`: نخستین تحویل پیش از کفِ دکان) */
   val reviewCode: String? = null,
+  /** ORD-14: آخرین پیشنهاد/ویرایش — فقط در جزئیات و فقط با پرچمِ `shop.orders.amend` */
+  val amendment: OrderAmendmentDto? = null,
 )
 
 /** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */

@@ -547,7 +547,7 @@ private fun OrderDetailSheet(
       if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          if (pickable) OrderPickButton(o, busy) { onPick(o) }; OrderDelayEntry(o, cfg, repo, ::orderStamp) { f, m -> order = f; onChanged(); scope.launch { snackbar.showSnackbar(m) } }; actions.forEach { to ->
+          if (pickable) OrderPickButton(o, busy) { onPick(o) }; OrderDelayEntry(o, cfg, repo, ::orderStamp) { f, m -> order = f; onChanged(); scope.launch { snackbar.showSnackbar(m) } }; OrderAmendEntry(o, cfg, repo) { m -> onChanged(); scope.launch { repo.get(o.id).onSuccess { order = it }; snackbar.showSnackbar(m) } }; actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)
@@ -556,7 +556,7 @@ private fun OrderDetailSheet(
         }
       }
 
-      Section("مشتری")
+      OrderAmendCard(o, cfg, repo, ::orderStamp) { m -> onChanged(); scope.launch { repo.get(o.id).onSuccess { order = it }; snackbar.showSnackbar(m) } }; Section("مشتری")   // + ویرایش و تسویهٔ تفاوت (ORD-14)
       Text(o.customer.name, color = c.text, fontWeight = FontWeight.SemiBold)
       val phone = o.customer.phone
       if (o.canContact && !phone.isNullOrEmpty()) {
@@ -614,7 +614,7 @@ private fun OrderDetailSheet(
               when (e.kind) {
                 "created" -> "ثبت شد"
                 "cod" -> "نقد: ${OrderText.COD[e.toStatus] ?: e.toStatus}"
-                else -> orderDelayEventTitle(e, cfg.delay != null, ::orderStamp) ?: orderNoticeEventTitle(e, cfg.noticeResend != null) ?: "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
+                else -> orderDelayEventTitle(e, cfg.delay != null, ::orderStamp) ?: orderNoticeEventTitle(e, cfg.noticeResend != null) ?: orderAmendEventTitle(e, cfg.amend != null) ?: "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
               },
               color = c.text, fontWeight = FontWeight.SemiBold,
             )
