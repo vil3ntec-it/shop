@@ -14,6 +14,7 @@
  *   ۴) فقط کالای فروختنیِ ویترین: منتشرنشده یا ناموجود ⇒ ۴۰۴ با برچسب‌های خودِ دکان.
  *   ۵) نقشهٔ سایت فقط کالاهای فروختنی را با سه زبان دارد؛ robots ِ میزبانِ دکان به آن اشاره می‌کند.
  *   ۶) نشانیِ مطلق از دامنهٔ پیکربندی است، نه از سرآیندِ Host.
+ *   ۷) دکمهٔ «فرستادنِ نشانی» در `store/share.js` ِ دیربار است، نه در بارِ نخست (WEB-15).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -181,6 +182,11 @@ test('روشن: صفحهٔ کالا با Open Graph، hreflang و JSON-LD؛ مت
   //  API ِ ویترین پایهٔ پیوند را می‌گوید
   const api = await h.get(`/api/store/${s.slug}`);
   assert.deepEqual(api.body.seo, { productBase: `${origin}/p/` });
+  //  WEB-15: «فرستادنِ نشانی» (share.js) از همان مبدأ و جدا از بارِ نخست
+  const js = await fetch(`${h.base()}/store/share.js`);
+  assert.equal(js.status, 200);
+  assert.match(js.headers.get('content-type') || '', /javascript/);
+  assert.doesNotMatch(SHELL, /share\.js/, 'share.js در بارِ نخست نیست');
 });
 
 test('روشن: زبان، عکس، کالای منتشرنشده و صفحهٔ دکان', async () => {

@@ -21,8 +21,7 @@
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
   var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
-  //  WEB-20: پیوندِ کالا با پیش‌نمایش — فقط وقتی سرور صفحهٔ کالا را می‌دهد (پرچمِ `shop.storefront.seo`)
-  var shareBase = null;
+  var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -177,8 +176,8 @@
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
-      $('ps-share').hidden = !shareBase;
-      $('ps-share').onclick = function () { shareProduct(x); };
+      $('ps-share').hidden = !share;
+      $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
       if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
@@ -188,16 +187,6 @@
       if (r.items[0]) fill(r.items[0]);
       else { K.toast(t('p.gone')); closeToCatalog(); }
     }).catch(function (e) { K.toast(e.message); });
-  }
-  /** WEB-20 — نشانیِ واقعیِ کالا (`…/p/<id>`) که واتس‌اپ و فیسبوک پیش‌نمایشش را می‌سازند. */
-  function shareProduct(p) {
-    var url = shareBase + encodeURIComponent(p.id);
-    if (navigator.share) { navigator.share({ title: p.name, url: url }).catch(function () { /* لغو */ }); return; }
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () { K.toast(t('ps.copied')); }, function () { K.toast(url); });
-      return;
-    }
-    K.toast(url);
   }
   function renderAddSheet(p) {
     var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
@@ -506,7 +495,12 @@
         rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
         document.head.appendChild(rs);
       }
-      shareBase = r.seo && typeof r.seo.productBase === 'string' ? r.seo.productBase : null;
+      if (r.seo && typeof r.seo.productBase === 'string') {
+        var ss = el('script', { attrs: { src: '/store/share.js' } });
+        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
+        ss.onload = function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; };
+        document.head.appendChild(ss);
+      }
       renderHead();
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;
