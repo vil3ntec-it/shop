@@ -132,6 +132,23 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  /*
+   *  ⛔ TEN-02 (cache) — پاسخِ درخواستِ دارای اعتبارنامه هرگز در کشِ مشترک (CDN، پراکسیِ
+   *  کش‌دار، قاعدهٔ «همه را کش کن») نمی‌نشیند: پیش‌فرضِ `private, no-cache` و `Vary`
+   *  روی همان سرآیندها. مسیری که خودش Cache-Control می‌گذارد (‎no-store‎، ‎private,
+   *  max-age‎، ETag ِ فاکتور…) پس از این می‌نویسد و همان می‌ماند. `tenant-surfaces.test.js`.
+   */
+  const CREDENTIALS = ['authorization', 'x-store-session', 'x-store-ticket'];
+  app.use('/api', (req, res, next) => {
+    if (CREDENTIALS.some((k) => req.headers[k])) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.vary('Authorization');
+      res.vary('X-Store-Session');
+      res.vary('X-Store-Ticket');
+    }
+    next();
+  });
+
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
@@ -312,18 +329,29 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/trust', require('./routes/admin-trust'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
+    //  سفارشِ خرید از تأمین‌کننده (PUR-02/04) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.purchase_orders`
+    api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
+    api.use('/shop/orders/desk', require('./routes/order-desk'));
+    //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
+    api.use('/shop/orders/bulk', require('./routes/order-bulk'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
+    //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    api.use('/store', require('./routes/pick-substitutes-store'));
+    api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/receipt-profile', require('./routes/shop-receipt'));
+    //  ذخیرهٔ کهنه (#407): فقط پرچمِ `shop.ledger_merge` (پیش‌فرض خاموش) برای برنامه — پیش از `/shop`
+    api.use('/shop/ledger-merge', require('./routes/shop-ledger-merge'));
     api.use('/receipt', require('./routes/receipt-public'));
     //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
     //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
@@ -336,6 +364,10 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/courier', require('./routes/courier'));
     //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
     api.use('/shop/promos', require('./routes/shop-promos'));
+    //  STF-07/STF-08: ورود و خروجِ کارمند و نرخ‌های پورسانت — پشتِ `shop.staff_time`، پیش‌فرض خاموش
+    api.use('/shop/staff-time', require('./routes/staff-time'));
+    //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
+    api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
     //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
     api.use('/shop/payments', require('./routes/shop-payments'));
@@ -397,6 +429,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin', require('./routes/admin-sales'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
+    //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
+    api.use('/calendar', require('./routes/calendar'));
+    api.use('/admin/calendar', require('./routes/admin-calendar'));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
@@ -446,13 +481,42 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
-  const storePage = async (slug, res) => {
+  //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با
+  //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
+  const storeSeo = require('./lib/store-seo');
+  const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
+  const storePage = async (slug, res, lang) => {
     let status = 200;
-    try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    let sf = null;
+    try { sf = await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
+    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
+  //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
+  const seoOnly = (slugOf, fn) => (req, res, next) => {
+    const slug = slugOf(req);
+    if (!slug) return next();
+    storefront.open(slug).then(async (sf) => {
+      if (!(await storeSeo.on(sf))) return next();
+      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
+    }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
+  };
+  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
+    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(p.body)));
+  const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
+  const robotsOf = (sf, req, res) => storeSeo.robots(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
+  const hostSlug = (req) => storefront.slugFromHost(req.hostname);
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
-  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
+  app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
+  app.get('/store/:slug/sitemap.xml', seoOnly((req) => req.params.slug, sitemapOf));
+  app.get('/p/:id', seoOnly(hostSlug, productPage));
+  app.get('/sitemap.xml', seoOnly(hostSlug, sitemapOf));
+  app.get('/robots.txt', seoOnly(hostSlug, robotsOf));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
   app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
     const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
@@ -471,7 +535,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, req.query.lang).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته
@@ -513,6 +577,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
     //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
+    //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
+    require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
@@ -530,8 +596,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
     //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
-    require('./lib/payment-intents').reconcile()
-      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();

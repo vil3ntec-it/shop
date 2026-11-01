@@ -41,25 +41,36 @@ const FREE = [
     'POST /shop/chat/conversations/:id/receipts', 'POST /shop/chat/conversations/:id/media',
     'PUT /shop/chat/conversations/:id/block', 'DELETE /shop/chat/conversations/:id/block', 'POST /shop/chat/conversations/:id/reports',
     'POST /shop/trust/cases/:id/responses', 'POST /shop/trust/cases/:id/appeal']],
-  ['موجودیِ سرور، بانکِ عکس، قاعدهٔ تخفیف و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
+  ['موجودیِ سرور، بانکِ عکس، قاعده و مصرفِ کدِ تخفیف (بخشی از صندوقِ پایه، PRM-02) و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
     'PUT /shop/catalog/settings', 'POST /shop/catalog/refresh', 'PUT /shop/catalog/products/:id/low',
     'POST /shop/catalog/tasks/:id/resolve', 'POST /shop/catalog/moves',
+    'POST /shop/catalog/transfers', 'POST /shop/catalog/transfers/:id/receive', 'POST /shop/catalog/transfers/:id/reject',
     'POST /shop/images/select', 'POST /shop/images', 'POST /shop/images/:id/versions', 'PUT /shop/images/:id/v/:version/:size',
     'POST /shop/images/:id/propose', 'POST /shop/images/:id/report', 'POST /shop/images/:id/process',
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+    'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
+  ['سفارشِ خرید زیرِ کلیدِ رایگانِ purchasing است (FREE_KEYS)؛ فقط پرچمِ shop.purchase_orders و مجوزِ نقش (PUR-02/04)', [
+    'POST /shop/purchase-orders', 'PUT /shop/purchase-orders/:id', 'POST /shop/purchase-orders/:id/send',
+    'POST /shop/purchase-orders/:id/cancel', 'POST /shop/purchase-orders/:id/receipts']],
   ['دکانِ فعالِ نشست (مهاجرتِ ۰۹۷، #273) دادهٔ دکان نمی‌نویسد؛ پس از پایانِ اشتراکِ یک دکان هم باید بتوان به دکانِ دیگر رفت', [
     'POST /shop/active']],
   ['پرداختِ حساب‌پی (PAY-21) کلیدِ کاتالوگ ندارد، فقط پرچمِ pay.hesabpay؛ پرداختِ سفارشِ آنلاین اشتراکِ فعال را خودش می‌سنجد '
     + '(online_payment_unavailable)', [
     'POST /shop/payments/intents', 'POST /shop/payments/intents/:id/cancel']],
+  ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
+    + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
+    'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust'];
+  'shop.storefront.notify_area', 'shop.storefront.banners',
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
 
+//  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
+FLAGS.push('shop.orders.picking');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
@@ -120,6 +131,9 @@ const DATA_WRITES = {
   'POST /sync/v1/push': (t, dev) => h.api('POST', '/api/sync/v1/push', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
     body: { device_id: dev, schema_version: 2, ops: [op()] } }),
   'POST /sync/v3/push': (t, dev) => h.post('/api/sync/v3/push', { device_id: dev, protocol: 3, ops: [] }, { token: t }),
+  //  SEC-02: گزارشِ زنجیرهٔ اسنادِ دستگاه — همان قاعدهٔ push (`requireSyncWrite`)؛ پرچمِ `shop.doc_chain` روشن است
+  'POST /sync/v1/chain': (t, dev) => h.api('POST', '/api/sync/v1/chain', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: { device_id: dev, format: 'tohid-hashchain-v1', heads: [], links: [] } }),
   'POST /products': (t) => h.post('/api/products', { data: { name: 'کالا' } }, { token: t }),
 };
 
