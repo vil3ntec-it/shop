@@ -138,6 +138,13 @@ data class PickIssueDto(
 @Serializable
 data class PickIssuesDto(val issues: List<PickIssueDto> = emptyList())
 
+/** PCK-08 — عکسِ بسته (بی بایت؛ `GET/POST /shop/orders/:id/pick/photos`) */
+@Serializable
+data class PickPhotoDto(val id: String = "", val size: Int = 0, val bags: Int = 0, val createdAt: Long = 0)
+
+@Serializable
+data class PickPhotosDto(val photos: List<PickPhotoDto> = emptyList())
+
 /** نتیجهٔ اسکنِ یک کیسه روی قفسه */
 @Serializable
 data class PickShelfScanDto(

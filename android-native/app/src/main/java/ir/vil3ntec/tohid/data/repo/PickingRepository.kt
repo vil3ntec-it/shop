@@ -4,6 +4,8 @@ import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
 import ir.vil3ntec.tohid.core.model.PickIssuesDto
 import ir.vil3ntec.tohid.core.model.PickMetricsDto
+import ir.vil3ntec.tohid.core.model.PickPhotoDto
+import ir.vil3ntec.tohid.core.model.PickPhotosDto
 import ir.vil3ntec.tohid.core.model.PickShelfDto
 import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
@@ -66,6 +68,24 @@ class PickingRepository(private val api: ApiClient) {
       put("note", note.trim())
     })
     Unit
+  }
+
+  // ── عکسِ بسته (PCK-08) ───────────────────────────────────────────────
+
+  suspend fun photos(orderId: String): ApiResult<PickPhotosDto> =
+    result { ApiJson.decode<PickPhotosDto>(api.get("$ROOT/${enc(orderId)}/pick/photos")) }
+
+  /** فقط از بسته (`parcelOnly` همیشه true، کاربر پیش از دوربین تأیید کرده)؛ همان `eventId` ⇒ همان عکس */
+  suspend fun addPhoto(orderId: String, eventId: String, imageBase64: String, deviceTime: Long): ApiResult<PickPhotoDto> = result {
+    ApiJson.decodeAt<PickPhotoDto>(
+      api.post("$ROOT/${enc(orderId)}/pick/photos", buildJsonObject {
+        put("eventId", eventId)
+        put("imageBase64", imageBase64)
+        put("parcelOnly", true)
+        put("deviceTime", deviceTime)
+      }),
+      "photo",
+    ) ?: throw ApiFailure.InvalidResponse()
   }
 
   // ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) ─────────────────

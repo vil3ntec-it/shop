@@ -1,8 +1,5 @@
 package ir.vil3ntec.tohid.ui.courier
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -85,13 +82,13 @@ import ir.vil3ntec.tohid.ui.screens.TohidButton
 import ir.vil3ntec.tohid.ui.screens.TohidConfirmDialog
 import ir.vil3ntec.tohid.ui.screens.TohidSnackbar
 import ir.vil3ntec.tohid.ui.screens.TohidTextField
+import ir.vil3ntec.tohid.ui.screens.parcelJpeg
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 
 /*
  *  حالتِ پیک — DLV-01/02/08/09/10/11، v3 §۳.۱۱.
@@ -695,20 +692,4 @@ private fun PhotoFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (ByteArray
       if (bytes == null) error = "عکس خوانده نشد؛ دوباره بگیرید" else onReady(bytes)
     }
   }
-}
-
-/** کوچک و فشرده — زیرِ سقفِ ۶۰۰ کیلوبایتِ سرور */
-private fun parcelJpeg(context: Context, uri: Uri): ByteArray? {
-  val bmp = PhotoStore.decode(context, uri) ?: return null
-  val edge = maxOf(bmp.width, bmp.height)
-  val scaled = if (edge > 1280) Bitmap.createScaledBitmap(bmp, bmp.width * 1280 / edge, bmp.height * 1280 / edge, true) else bmp
-  var quality = 80
-  var out: ByteArray
-  do {
-    out = ByteArrayOutputStream().use { s -> scaled.compress(Bitmap.CompressFormat.JPEG, quality, s); s.toByteArray() }
-    quality -= 15
-  } while (out.size > 550 * 1024 && quality >= 35)
-  if (scaled !== bmp) scaled.recycle()
-  bmp.recycle()
-  return out.takeIf { it.size in 100..(600 * 1024) }
 }
