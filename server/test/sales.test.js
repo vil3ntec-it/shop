@@ -109,6 +109,166 @@ test('ثبت، ویرایش و حذفِ پرداخت — و شمارهٔ رسی�
   assert.ok(!after.body.payments.some(p => p.id === id), 'پرداختِ حذف‌شده در فهرست نیست');
 });
 
+test('⛔ پرداخت بی سابقه نمی‌ماند: نوشتنِ سابقه شکست ⇒ ثبت، ویرایش و حذف همه برمی‌گردند', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('سابقهٔ پرداخت');
+  const made = await h.post('/api/admin/payments', { app: 'shop', tenantId: u.shopId, amount: 1500 }, { token: t });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const id = made.body.payment.id;
+  const rowOf = async () => {
+    const r = await one('SELECT amount, deleted FROM sub_payments WHERE id=$1', [id]);
+    return { amount: Number(r.amount), deleted: r.deleted };
+  };
+  const logs = async (action) => (await one(
+    'SELECT COUNT(*)::int AS n FROM audit_logs WHERE action=$1 AND target_id=$2', [action, id])).n;
+  const NOTE = 'پرداختِ بی‌سابقه';
+  const orphans = async () => (await one('SELECT COUNT(*)::int AS n FROM sub_payments WHERE note=$1', [NOTE])).n;
+  assert.equal(await logs('admin.payment_created'), 1);
+
+  //  نوشتنِ سابقهٔ پرداخت در خودِ دیتابیس شکست می‌خورد
+  await query(`CREATE OR REPLACE FUNCTION test_audit_down() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN IF NEW.action LIKE 'admin.payment_%' THEN RAISE EXCEPTION 'audit down'; END IF; RETURN NEW; END $$`);
+  await query('CREATE TRIGGER test_audit_down BEFORE INSERT ON audit_logs FOR EACH ROW EXECUTE FUNCTION test_audit_down()');
+  try {
+    const del = await h.del(`/api/admin/payments/${id}`, { token: t, body: { reason: 'رسیدِ تکراری' } });
+    assert.equal(del.status, 500, JSON.stringify(del.body));
+    assert.deepEqual(await rowOf(), { amount: 1500, deleted: false }, 'حذف بی سابقه برگشت');
+
+    const put = await h.put(`/api/admin/payments/${id}`, { amount: 1800 }, { token: t });
+    assert.equal(put.status, 500, JSON.stringify(put.body));
+    assert.deepEqual(await rowOf(), { amount: 1500, deleted: false }, 'ویرایش بی سابقه برگشت');
+
+    const post = await h.post('/api/admin/payments', { app: 'shop', tenantId: u.shopId, amount: 900, note: NOTE }, { token: t });
+    assert.equal(post.status, 500, JSON.stringify(post.body));
+    assert.equal(await orphans(), 0, 'ثبت بی سابقه برگشت');
+  } finally {
+    await query('DROP TRIGGER IF EXISTS test_audit_down ON audit_logs');
+    await query('DROP FUNCTION IF EXISTS test_audit_down()');
+  }
+  assert.equal(await logs('admin.payment_deleted'), 0);
+  assert.equal(await logs('admin.payment_updated'), 0);
+
+  //  سابقه برگشت ⇒ همان حذف این بار با سابقه‌اش می‌نشیند
+  const del = await h.del(`/api/admin/payments/${id}`, { token: t, body: { reason: 'رسیدِ تکراری' } });
+  assert.equal(del.status, 200, JSON.stringify(del.body));
+  assert.deepEqual(await rowOf(), { amount: 1500, deleted: true });
+  assert.equal(await logs('admin.payment_deleted'), 1);
+});
+
+/* ── SEC-API-09: ثبتِ پرداخت یک بار، و شمارهٔ رسیدِ یکتا (docs/security/data-fa.md) ─────────────── */
+//  مبلغ‌ها کوچک‌اند تا درآمدِ «امروز» ِ آزمونِ «پرداختِ پارسال…» زیرِ ۹۹۹۹ بماند
+
+const payWithKey = (t, key, body) => h.api('POST', '/api/admin/payments', {
+  token: t, body, headers: key ? { 'Idempotency-Key': key } : {},
+});
+
+test('SEC-API-09: همان Idempotency-Key ⇒ یک پرداخت و همان پاسخ؛ بدنهٔ دیگر با همان کلید ⇒ ۴۰۹', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('تکرار‌کننده');
+  const body = { app: 'shop', tenantId: u.shopId, amount: 13, method: 'cash' };
+  const first = await payWithKey(t, 'pay-key-0001-aaaa', body);
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const again = await payWithKey(t, 'pay-key-0001-aaaa', body);
+  assert.equal(again.status, 201);
+  assert.equal(again.headers.get('idempotent-replayed'), 'true');
+  assert.equal(again.body.payment.id, first.body.payment.id);
+  assert.equal(again.body.payment.receiptNo, first.body.payment.receiptNo);
+  const other = await payWithKey(t, 'pay-key-0001-aaaa', { ...body, amount: 99 });
+  assert.equal(other.status, 409);
+  assert.equal(other.body.error.code, 'idempotency_key_reused');
+  const n = await one('SELECT COUNT(*)::int AS n FROM sub_payments WHERE tenant_id=$1', [u.shopId]);
+  assert.equal(n.n, 1, 'فقط یک پرداخت');
+});
+
+test('SEC-API-09: ده ثبتِ هم‌زمان با یک کلید (قطعِ شبکه و تکرار) ⇒ یک پرداخت', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('شبکهٔ لرزان');
+  const body = { app: 'shop', tenantId: u.shopId, amount: 21, method: 'hawala' };
+  const all = await Promise.all(Array.from({ length: 10 }, () => payWithKey(t, 'pay-key-0002-bbbb', body)));
+  assert.ok(all.every((r) => r.status === 201), all.map((r) => r.status).join(','));
+  assert.equal(new Set(all.map((r) => r.body.payment.id)).size, 1);
+  const n = await one('SELECT COUNT(*)::int AS n FROM sub_payments WHERE tenant_id=$1', [u.shopId]);
+  assert.equal(n.n, 1);
+});
+
+test('SEC-API-09: ده ثبتِ هم‌زمانِ بی شمارهٔ رسید ⇒ ده شمارهٔ رسیدِ یکتا', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('صف‌دار');
+  const all = await Promise.all(Array.from({ length: 10 }, (_, i) =>
+    payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 1 + i })));
+  assert.ok(all.every((r) => r.status === 201), all.map((r) => `${r.status}:${JSON.stringify(r.body).slice(0, 80)}`).join(' '));
+  const nos = all.map((r) => r.body.payment.receiptNo);
+  assert.equal(new Set(nos).size, 10, `شماره‌ها: ${nos.join(' ')}`);
+  for (const no of nos) assert.match(no, /^\d{4}-\d{5,}$/);
+});
+
+test('SEC-API-09: شمارهٔ رسیدِ دستیِ تکراری ⇒ ۴۰۹، در ثبت و در ویرایش', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('رسیدِ دستی');
+  const a = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 5, receiptNo: 'R-SEC-0042' });
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const dup = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 6, receiptNo: 'R-SEC-0042' });
+  assert.equal(dup.status, 409, JSON.stringify(dup.body));
+  assert.equal(dup.body.error.code, 'receipt_no_taken');
+  //  شمارهٔ خودکارِ دیگری را هم دستی نمی‌شود دوباره زد
+  const auto = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 7 });
+  const dupAuto = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 8, receiptNo: auto.body.payment.receiptNo });
+  assert.equal(dupAuto.status, 409);
+  //  ویرایش به شمارهٔ رسیدِ پرداختِ دیگر
+  const ed = await h.put(`/api/admin/payments/${auto.body.payment.id}`, { receiptNo: 'R-SEC-0042' }, { token: t });
+  assert.equal(ed.status, 409, JSON.stringify(ed.body));
+  assert.equal(ed.body.error.code, 'receipt_no_taken');
+  //  همان شمارهٔ خودش ⇒ بی خطا
+  const same = await h.put(`/api/admin/payments/${a.body.payment.id}`, { receiptNo: 'R-SEC-0042', amount: 4 }, { token: t });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+  const n = await one(`SELECT COUNT(*)::int AS n FROM sub_payments WHERE receipt_no='R-SEC-0042'`);
+  assert.equal(n.n, 1);
+});
+
+test('SEC-API-09: ده ثبتِ هم‌زمان با یک شمارهٔ رسیدِ دستی ⇒ یکی ۲۰۱، بقیه ۴۰۹ (نه ۵۰۰، نه تکراری)', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('رسیدِ هم‌زمان');
+  const all = await Promise.all(Array.from({ length: 10 }, (_, i) =>
+    payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 1 + i, receiptNo: 'R-SEC-RACE-1' })));
+  const codes = all.map((r) => r.status).sort();
+  assert.equal(codes.filter((c) => c === 201).length, 1, codes.join(','));
+  assert.ok(all.filter((r) => r.status !== 201).every((r) => r.status === 409 && r.body.error.code === 'receipt_no_taken'), codes.join(','));
+  const n = await one(`SELECT COUNT(*)::int AS n FROM sub_payments WHERE receipt_no='R-SEC-RACE-1'`);
+  assert.equal(n.n, 1);
+});
+
+test('SEC-API-09: ویرایشِ شمارهٔ رسیدِ ردیف‌های کهنه زیرِ قیدِ یکتاست ⇒ ده ویرایشِ هم‌زمان به یک شماره، یکی ۲۰۰ و بقیه ۴۰۹', async () => {
+  const t = await adminToken();
+  const u = await shopOwner('رسیدِ کهنه');
+  //  ردیف‌های پیش از مهاجرتِ ۱۶۷ (receipt_unique=false)، یکی‌شان با شمارهٔ تکراریِ کهنه
+  const ids = [];
+  for (let i = 0; i < 10; i++) {
+    const r = await payWithKey(t, '', { app: 'shop', tenantId: u.shopId, amount: 10 + i, receiptNo: `R-SEC-OLD-${i}` });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    ids.push(r.body.payment.id);
+  }
+  await query(`UPDATE sub_payments SET receipt_unique=false WHERE id = ANY($1)`, [ids]);
+  await query(`UPDATE sub_payments SET receipt_no='R-SEC-OLD-0' WHERE id=$1`, [ids[1]]);
+
+  //  ویرایشِ بی تغییرِ شماره روی تکراریِ کهنه ⇒ بی خطا، و ردیف کهنه می‌ماند (قید فقط روی شمارهٔ تازه)
+  const keep = await h.put(`/api/admin/payments/${ids[1]}`, { amount: 99 }, { token: t });
+  assert.equal(keep.status, 200, JSON.stringify(keep.body));
+  assert.equal((await one('SELECT receipt_unique FROM sub_payments WHERE id=$1', [ids[1]])).receipt_unique, false);
+
+  //  عوض کردنِ شماره ⇒ receipt_unique=true، تا ایندکسِ یکتا پشتش باشد
+  const moved = await h.put(`/api/admin/payments/${ids[2]}`, { receiptNo: 'R-SEC-OLD-MOVED' }, { token: t });
+  assert.equal(moved.status, 200, JSON.stringify(moved.body));
+  assert.equal((await one('SELECT receipt_unique FROM sub_payments WHERE id=$1', [ids[2]])).receipt_unique, true);
+
+  //  هم‌زمان: هر ده ردیفِ کهنه به یک شمارهٔ تازه ⇒ فقط یکی
+  const all = await Promise.all(ids.map((id) => h.put(`/api/admin/payments/${id}`, { receiptNo: 'R-SEC-STALE-RACE' }, { token: t })));
+  const codes = all.map((r) => r.status).sort();
+  assert.equal(codes.filter((c) => c === 200).length, 1, codes.join(','));
+  assert.ok(all.filter((r) => r.status !== 200).every((r) => r.status === 409 && r.body.error.code === 'receipt_no_taken'), codes.join(','));
+  const n = await one(`SELECT COUNT(*)::int AS n FROM sub_payments WHERE receipt_no='R-SEC-STALE-RACE'`);
+  assert.equal(n.n, 1);
+});
+
 test('روشِ ناشناخته و ارزِ ناشناخته پذیرفته نمی‌شوند', async () => {
   const t = await adminToken();
   const u = await shopOwner('بدپرداخت');

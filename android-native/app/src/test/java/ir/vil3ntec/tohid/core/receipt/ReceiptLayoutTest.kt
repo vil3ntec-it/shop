@@ -70,6 +70,19 @@ class ReceiptLayoutTest {
     assertEquals(TextStyle.TOTAL, (doc.blocks.first { it is ReceiptBlock.Row && it.label == "مبلغ نهایی" } as ReceiptBlock.Row).style)
   }
 
+  @Test fun `LOC-01 تاریخِ قمری فقط وقتی قالب می‌دهد، درست زیرِ تاریخ؛ خالی چاپ نمی‌شود`() {
+    val plain = texts(ReceiptLayout.build(input(), PrinterProfile.WIDTH_58MM, fmt))
+    val lunar = object : ReceiptFormat by fmt {
+      override fun lunarDate(iso: String) = if (iso == "2026-10-24") "12 جمادی\u200cالاول 1448" else null
+    }
+    val t = texts(ReceiptLayout.build(input(), PrinterProfile.WIDTH_58MM, lunar))
+    val i = t.indexOf("R:تاریخ=1405/08/02 — 14:35")
+    assertEquals("R:تاریخِ قمری=12 جمادی\u200cالاول 1448", t[i + 1])
+    assertEquals(plain, t.filterIndexed { k, _ -> k != i + 1 })
+    val blank = object : ReceiptFormat by fmt { override fun lunarDate(iso: String) = " " }
+    assertEquals("خالی ⇒ بی ردیف", plain, texts(ReceiptLayout.build(input(), PrinterProfile.WIDTH_58MM, blank)))
+  }
+
   @Test fun `ردیفِ آگاهیِ تخفیفِ خودکار زیرِ «جمع اقلام» — بی «−» و بی کسر؛ صفر نمی‌آید (پیگیریِ #307)`() {
     val base = input().copy(discounts = emptyList(), total = 600.0)
     val t = texts(ReceiptLayout.build(base.copy(included = listOf(DiscountLine("شاملِ تخفیفِ خودکار (ده درصد)", 50.0))), PrinterProfile.WIDTH_58MM, fmt))

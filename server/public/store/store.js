@@ -1,6 +1,6 @@
 /*
- * ویترینِ یک دکان — کاتالوگ، برگهٔ کالا، نوار و برگهٔ تیرهٔ سبد (r3/r2)، ثبتِ
- * سفارش با شمارهٔ تأییدشده، پیگیری و خریدِ دوباره؛ برگهٔ رسید، لغو و پرداختِ آنلاین در `order.js`
+ * ویترینِ یک دکان — کاتالوگ، برگهٔ کالا، نوار و برگهٔ تیرهٔ سبد (r3/r2)، پیگیری و خریدِ دوباره؛
+ * ثبتِ سفارش با شمارهٔ تأییدشده در `checkout.js`؛ برگهٔ رسید، لغو و پرداختِ آنلاین در `order.js`
  * (WEB، CHK، §۲۳، §۳۱.۱، §۳۲.۳). داده فقط از `/api/store/<slug>`؛ متن از K.t.
  *
  * ⛔ قیمت را سرور می‌گوید؛ جمعِ دیده‌شده (`expectedTotalMinor`) فقط برای این است
@@ -16,14 +16,26 @@
   var KEY_CART = K.cartKey(slug);
   var KEY_ORDERS = 'store-orders:' + slug;
   var store = null; var marketOn = false; var verifyAvailable = true;
+  var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹ ِ out_of_stock، فقط در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
-  var pin = null; var pollTimer = 0; var searchTimer = 0; var quoteNote = '';
+  var pollTimer = 0; var searchTimer = 0;
+  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
+  var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
+  //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
+  var campaign = campaignOfPage();
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
     if (parts[0] === 'store' && parts[1]) return parts[1].toLowerCase();
     return location.hostname.split('.')[0].toLowerCase();
+  }
+  function campaignOfPage() {
+    var key = 'store-campaign:' + slug;
+    var m = /[?&]c=([0-9A-Za-z]{10})(?:&|#|$)/.exec(location.search);
+    if (m) { K.saveS(key, m[1].toUpperCase()); return m[1].toUpperCase(); }
+    var v = K.loadS(key);
+    return typeof v === 'string' ? v : '';
   }
   function sanitize(c) {
     var out = {};
@@ -35,7 +47,8 @@
     return out;
   }
   function api(path, opts) { return K.api(BASE + path, opts); }
-  function photoUrl(id) { return BASE + '/products/' + encodeURIComponent(id) + '/photo'; }
+  //  WEB-16: کارت و سبد thumb؛ برگهٔ کالا photo
+  function photoUrl(id, big) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb'); }
 
   var VIEWS = ['view-missing', 'view-catalog', 'view-checkout', 'view-order', 'view-orders'];
   function show(id) {
@@ -115,18 +128,24 @@
     });
   }
 
-  /** «پیشنهادِ همین دکان»: فقط پرفروش/تازهٔ واقعیِ سرور (#301)؛ نبودِ داده ⇒ هیچ. */
+  /** ردیفِ کارت (`<id>-list`)؛ خالی ⇒ پنهان */
+  function rail(id, list) {
+    var ul = K.clear($(id + '-list'));
+    list.forEach(function (p) { catalog.items[p.id] = catalog.items[p.id] || p; ul.appendChild(card(p)); });
+    $(id).hidden = !list.length;
+  }
+
+  /** WEB-02: پرفروش (یا تازه)، «ارزان‌تر» و تازه‌ها — فقط دادهٔ واقعیِ سرور (#301)؛ نبود ⇒ هیچ */
   function loadPicks() {
     //  سرورِ بی #301 این مسیر را ندارد؛ #301 همراهِ `store.delivery` می‌آید
     if (!store.delivery) return Promise.resolve();
     return api('/highlights').then(function (r) {
-      var best = (r.bestsellers || []).length > 0;
-      var list = best ? r.bestsellers : (r.newArrivals || []);
-      var ul = K.clear($('picks-list'));
-      list.forEach(function (p) { catalog.items[p.id] = catalog.items[p.id] || p; ul.appendChild(card(p)); });
-      $('picks-why').textContent = best ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
-      $('picks').hidden = list.length === 0;
-    }).catch(function () { $('picks').hidden = true; });
+      var best = r.bestsellers || []; var fresh = r.newArrivals || [];
+      rail('picks', best.length ? best : fresh);
+      $('picks-why').textContent = best.length ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
+      rail('deals', r.deals || []);
+      rail('fresh', best.length ? fresh.filter(function (p) { return !best.some(function (b) { return b.id === p.id; }); }) : []);
+    }).catch(function () { $('picks').hidden = true; $('deals').hidden = true; $('fresh').hidden = true; });
   }
 
   function loadProducts(more) {
@@ -156,15 +175,24 @@
     }).then(function () { ul.setAttribute('aria-busy', 'false'); });
   }
 
-  // ── برگهٔ کالا ──
+  // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل در store/product.js، با نخستین بازشدن (WEB-08، WEB-15) ──
+  var detail = null; var detailP = null;
+  function loadProductView() {
+    detailP = detailP || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/product.js' }, on: { load: ok, error: no } }));
+    }).then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
+    return detailP;
+  }
   function openProduct(id) {
     var p = catalog.items[id];
+    //  پاسخِ دیررس (کالای دیگر یا پس از بستن) برگه را باز نمی‌کند
+    var here = function () { return location.hash === '#/p/' + encodeURIComponent(id); };
     var fill = function (x) {
       catalog.items[x.id] = x;
       var st = K.stockOf(x);
       $('ps-cat').textContent = x.category || '';
       $('ps-cat').hidden = !x.category;
-      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id), alt: '', width: '300', height: '300' } })
+      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1), alt: '', width: '300', height: '300' } })
         : el('span', { class: 'ph', text: String(x.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
       $('ps-img').classList.toggle('tile', Boolean(x.photo));
@@ -172,14 +200,24 @@
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
+      $('ps-share').hidden = !share;
+      $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
+      if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
-    if (p) return fill(p);
-    api('/products?ids=' + encodeURIComponent(id)).then(function (r) {
-      if (r.items[0]) fill(r.items[0]);
-      else { K.toast(t('p.gone')); closeToCatalog(); }
-    }).catch(function (e) { K.toast(e.message); });
+    if (detail) detail(null);
+    if (p) fill(p);
+    //  بی product.js (شبکه) برگه همان باز می‌شود، فقط بی جزئیات
+    Promise.all([api('/products/' + encodeURIComponent(id)), loadProductView().catch(function () { return null; })]).then(function (r) {
+      if (!here()) return;
+      fill(r[0].product);
+      if (r[1]) r[1](r[0]);
+    }).catch(function (e) {
+      if (!here()) return;
+      if (e.status === 404) { K.toast(t('p.gone')); closeToCatalog(); }
+      else if (!p) K.toast(e.message);
+    });
   }
   function renderAddSheet(p) {
     var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
@@ -194,7 +232,7 @@
     if (store) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
     renderBar();
     if (K.cartIsOpen()) renderSheet();
-    if (!$('view-checkout').hidden) renderCheckout();
+    if (checkout && !$('view-checkout').hidden) checkout.render();
   }
   function addOne(p) {
     var cur = cart[p.id] ? cart[p.id].qtyMilli : 0;
@@ -225,6 +263,9 @@
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
   function feeFor(f) { return f === 'delivery' && store ? store.deliveryFeeMinor : 0; }
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
+  function short(id) { return cap[id] > 0 && cart[id].qtyMilli > cap[id]; }
+  function hasShort() { return ids().some(short); }
+  function shortText(id) { return t('line.short', { q: K.qty(cap[id]) + ' ' + (cart[id].unit || t('unit')) }); }
 
   function thumb(id, l) {
     var th = el('span', { class: 'thumb' + (l.photo ? ' photo tile' : '') });
@@ -239,6 +280,7 @@
   function openCart() {
     renderSheet();
     if (!ids().length) return;
+    loadCheckout().catch(function () { /* «بعدی» دوباره می‌کوشد */ });
     K.cartOpen(function () { closeCart(); closeToCatalog(); });
     renderBar();
   }
@@ -275,7 +317,7 @@
       },
       thumb(id, l),
       el('span', { class: 'q num', text: K.qty(l.qtyMilli) + ' ×' }),
-      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
+      el('span', { class: 'name' }, l.name, el('small', { text: l.unavailable ? t('line.gone') : short(id) ? shortText(id) : K.money(l.priceMinor) + (l.unit ? ' / ' + l.unit : '') })),
       el('span', { class: 'price num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) }));
       ul.appendChild(el('li', { class: 'cline' + (l.unavailable ? ' bad' : '') + (editing === id ? ' editing' : '') },
         main, el('span', { class: 'stepper' }, minus, el('output', { text: K.qty(l.qtyMilli), attrs: { 'aria-live': 'polite' } }), plus)));
@@ -298,6 +340,7 @@
     $('sheet-total').textContent = K.money(sub + fee);
     var block = '';
     if (hasBad()) block = t('cart.bad');
+    else if (hasShort()) block = t('cart.short');
     else if (store && store.minOrderMinor > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
@@ -330,180 +373,28 @@
     renderBar();
   }
 
-  // ── ثبتِ سفارش (۲۳.۳، CHK) ──
-  function fulfillment() {
-    var r = document.querySelector('input[name="fulfillment"]:checked');
-    return r ? r.value : '';
+  // ── ثبتِ سفارش: store/checkout.js، فقط با بازشدنِ سبد یا صفحهٔ ثبت (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var checkout = null; var checkoutP = null;
+  function loadCheckout() {
+    checkoutP = checkoutP || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/checkout.js' }, on: { load: ok, error: no } }));
+    }).then(function () {
+      checkout = window.StoreCheckout({
+        api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
+        ids: ids, subtotal: subtotal, feeFor: feeFor, defaultFulfillment: defaultFulfillment, hasBad: hasBad,
+        short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
+        get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
+        empty: function () { cart = {}; cap = {}; saveCart(); },
+        campaign: campaign,
+      });
+      return checkout;
+    }).catch(function () { checkoutP = null; throw new Error(t('err.network')); });
+    return checkoutP;
   }
-  function verifiedFor(phone) { var tk = K.ticket(); return Boolean(tk && phone && tk.phone === K.normPhone(phone)); }
-
-  function renderCheckout() {
-    var ul = K.clear($('cart-lines'));
-    ids().forEach(function (id) {
-      var l = cart[id];
-      ul.appendChild(el('li', { class: l.unavailable ? 'bad' : '' }, thumb(id, l),
-        el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.priceMinor) })),
-        el('span', { class: 'amt num', text: K.money(K.lineTotal(l.qtyMilli, l.priceMinor)) })));
-    });
-    $('cart-empty').hidden = ids().length > 0;
-    var f = fulfillment();
-    var sub = subtotal(); var fee = feeFor(f);
-    $('t-subtotal').textContent = K.money(sub);
-    $('t-fee').textContent = f === 'delivery' ? (fee > 0 ? K.money(fee) : t('free')) : '—';
-    $('t-fee-label').textContent = f === 'pickup' ? t('pickup') : t('ck.fee');
-    $('t-total').textContent = K.money(sub + fee);
-    $('address-box').hidden = f !== 'delivery';
-    var below = store.minOrderMinor > sub;
-    if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(store.minOrderMinor) })); else $('min-order').hidden = true;
-    renderVerify();
-    var ok = verifiedFor($('c-phone').value);
-    var btn = $('submit-order');
-    btn.disabled = !ids().length || !f || below || hasBad() || !ok;
-    btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
-  }
-
-  function renderVerify() {
-    var ok = verifiedFor($('c-phone').value);
-    $('verify-send').hidden = ok || !verifyAvailable;
-    if (ok) { K.note($('verify-msg'), 'ok', t('v.ok')); $('verify-code-row').hidden = true; $('verify-text').hidden = true; }
-    else {
-      $('verify-text').hidden = false;
-      if (!verifyAvailable) {
-        K.note($('verify-msg'), 'warn', store.contactPhone ? t('v.off.call', { phone: K.localPhone(store.contactPhone) }) : t('v.off.shop'));
-      } else if ($('verify-msg').className.indexOf(' ok') >= 0) $('verify-msg').hidden = true;
-    }
-  }
-
-  function sendCode() {
-    var phone = $('c-phone').value;
-    if (!phone.trim()) { K.note($('verify-msg'), 'err', t('v.need')); $('c-phone').focus(); return; }
-    var b = $('verify-send'); b.disabled = true;
-    api('/verify/start', { method: 'POST', body: { phone: phone } }).then(function (r) {
-      $('verify-code-row').hidden = false;
-      K.note($('verify-msg'), 'info', t('v.sent') + (r.devCode ? ' ' + t('v.dev', { code: r.devCode }) : ''));
-      $('v-code').focus();
-    }).catch(function (e) {
-      if (e.code === 'verification_unavailable') verifyAvailable = false;
-      K.note($('verify-msg'), e.code === 'verification_unavailable' ? 'warn' : 'err', e.code === 'bad_request' ? t('err.bad_phone') : e.message);
-    }).then(function () { b.disabled = false; renderCheckout(); });
-  }
-
-  function checkCode() {
-    var b = $('verify-check'); b.disabled = true;
-    api('/verify/check', { method: 'POST', body: { phone: $('c-phone').value, code: $('v-code').value } }).then(function (r) {
-      K.setTicket(r);
-      K.account();
-      $('v-code').value = '';
-      renderCheckout();
-    }).catch(function (e) {
-      //  ۲۳.۴: خطای شبکه «کدِ اشتباه» نیست
-      K.note($('verify-msg'), 'err', e.message);
-    }).then(function () { b.disabled = false; });
-  }
-
-  function takePin() {
-    if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
-    $('pin-text').textContent = t('pin.wait');
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      pin = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
-      $('pin-text').textContent = t('pin.ok', { m: K.fa(Math.round(pos.coords.accuracy || 0), 0) });
-      $('pin-btn').textContent = t('pin.again');
-    }, function () {
-      pin = null;
-      $('pin-text').textContent = t('pin.fail');
-    }, { enableHighAccuracy: true, timeout: 10000 });
-  }
-
-  function orderBody() {
-    var f = fulfillment();
-    var body = {
-      fulfillment: f, paymentMethod: 'cod',
-      customer: { name: $('c-name').value.trim(), phone: $('c-phone').value.trim() },
-      lines: ids().map(function (id) { return { productId: id, qtyMilli: cart[id].qtyMilli }; }),
-      note: $('c-note').value.trim(),
-      expectedTotalMinor: subtotal() + feeFor(f),
-    };
-    if (f === 'delivery') {
-      body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim() };
-      if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
-      body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
-    }
-    return body;
-  }
-
-  function submitOrder(ev) {
-    ev.preventDefault();
-    var msg = $('checkout-msg');
-    var body = orderBody();
-    if (!body.customer.name) { K.note(msg, 'err', t('ck.name')); $('c-name').focus(); return; }
-    if (body.fulfillment === 'delivery' && !body.address.text && !body.address.landmark && !pin) {
-      K.note(msg, 'err', t('ck.addr')); $('a-text').focus(); return;
-    }
-    var btn = $('submit-order');
-    btn.disabled = true;
-    K.note(msg, 'info', t('ck.sending'));
-    api('/checkout', { method: 'POST', body: body, key: K.keyFor('checkout:' + slug, body) }).then(function (r) {
-      K.dropKey('checkout:' + slug);
-      var list = K.load(KEY_ORDERS, []) || [];
-      if (!list.some(function (o) { return o.token === r.order.token; })) {
-        list.unshift({ token: r.order.token, orderNo: r.order.orderNo, at: r.order.createdAt, totalMinor: r.order.totalMinor, storeTitle: store.title });
-        K.save(KEY_ORDERS, list.slice(0, 30));
-      }
-      K.saveS('placed:' + r.order.token, true);
-      //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
-      K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
-      cart = {}; quoteNote = ''; saveCart();
-      msg.hidden = true;
-      location.hash = '#/o/' + encodeURIComponent(r.order.token);
-    }).catch(function (e) {
-      var d = e.data || {};
-      if (e.code === 'price_changed' && d.quote) {
-        //  S135: تغییر روشن نشان داده می‌شود؛ بی پذیرشِ دوباره ثبت نمی‌شود
-        var changed = [];
-        d.quote.lines.forEach(function (l) {
-          if (cart[l.productId] && cart[l.productId].priceMinor !== l.unitPriceMinor) {
-            changed.push(l.name + ': ' + K.money(cart[l.productId].priceMinor) + ' ← ' + K.money(l.unitPriceMinor));
-            cart[l.productId].priceMinor = l.unitPriceMinor;
-          }
-        });
-        quoteNote = t('ck.repriced', { list: changed.length ? changed.join(t('sep')) + '. ' : '', sum: K.money(d.quote.totalMinor) });
-        saveCart();
-        K.note(msg, 'warn', quoteNote);
-      } else if (e.code === 'product_unavailable' && d.unavailable) {
-        d.unavailable.forEach(function (id) { if (cart[id]) cart[id].unavailable = true; });
-        saveCart();
-        K.note(msg, 'err', e.message);
-      } else if (e.code === 'qty_over_limit') {
-        K.note(msg, 'err', e.message + ' (' + t('maxq', { q: K.qty(d.maxQtyMilli) }) + ')');
-      } else if (e.code === 'below_min_order') {
-        K.note(msg, 'err', t('err.below_min_order') + ' (' + K.money(d.minOrderMinor) + ')');
-      } else if (e.code === 'verification_required' || e.code === 'phone_not_verified') {
-        K.setTicket(null);
-        K.note(msg, 'err', e.message);
-      } else {
-        K.note(msg, 'err', e.message);
-      }
-    }).then(function () { if (!$('view-checkout').hidden) renderCheckout(); });
-  }
-
   function openCheckout() {
-    if (!ids().length) { location.hash = '#/'; return; }
-    show('view-checkout');
-    document.title = t('ck.title') + ' — ' + store.title;
-    if (!fulfillment()) {
-      var f = defaultFulfillment();
-      var r = document.querySelector('input[name="fulfillment"][value="' + f + '"]');
-      if (r) r.checked = true;
-    }
-    var tk = K.ticket();
-    if (tk && !$('c-phone').value) $('c-phone').value = K.localPhone(tk.phone);
-    var me = K.load('store-customer', null);
-    if (me) {
-      if (!$('c-name').value && me.name) $('c-name').value = me.name;
-      if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
-      if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
-    }
-    renderCheckout();
+    //  بی اینترنت در نخستین باز شدن ⇒ برگشت به سبد با پیام؛ «بعدی» دوباره می‌کوشد
+    loadCheckout().then(function (c) { if (location.hash === '#/checkout') c.open(); })
+      .catch(function (e) { K.toast(e.message); if (location.hash === '#/checkout') location.replace('#/cart'); });
   }
 
   // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
@@ -539,6 +430,7 @@
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
         $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
+        $('o-dlv').hidden = true;
       });
     };
     load();
@@ -605,7 +497,15 @@
     renderBar();
   }
 
+  /** صفحهٔ کالا (`/p/<id>` یا `/store/<slug>/p/<id>`، WEB-20) ⇒ همان مسیرِ `#/p/<id>` ِ همین پوسته. */
+  function fromProductPath() {
+    var m = /^(.*?)\/p\/([^/]+)\/?$/.exec(location.pathname);
+    if (!m || (location.hash && location.hash !== '#/')) return;
+    history.replaceState(null, '', (m[1] || '/') + location.search + '#/p/' + m[2]);
+  }
+
   function boot() {
+    fromProductPath();
     K.offline();
     $('to-market').appendChild(K.icon('back'));
     $('to-catalog').appendChild(K.icon('back'));
@@ -620,7 +520,19 @@
     api('').then(function (r) {
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
+      stockList = Boolean(r.features && r.features.stockList);
       verifyAvailable = !r.verification || r.verification.available !== false;
+      if (r.recent) {
+        var rs = el('script', { attrs: { src: '/store/recent.js' } });
+        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
+        document.head.appendChild(rs);
+      }
+      if (r.seo && typeof r.seo.productBase === 'string') {
+        var ss = el('script', { attrs: { src: '/store/share.js' } });
+        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
+        ss.onload = function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; };
+        document.head.appendChild(ss);
+      }
       renderHead();
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;
@@ -651,13 +563,6 @@
     K.onPhone(function () { if (document.body.classList.contains('cart-open')) { closeCart(); closeToCatalog(); } renderBar(); });
     $('ps-close').addEventListener('click', function () { K.closeSheet(); });
     $('cart-next').addEventListener('click', function () { closeCart(); location.hash = '#/checkout'; });
-    Array.prototype.forEach.call(document.querySelectorAll('input[name="fulfillment"]'), function (r) { r.addEventListener('change', renderCheckout); });
-    $('c-phone').addEventListener('input', renderCheckout);
-    $('verify-send').addEventListener('click', sendCode);
-    $('verify-check').addEventListener('click', checkCode);
-    $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
-    $('pin-btn').addEventListener('click', takePin);
-    $('checkout-form').addEventListener('submit', submitOrder);
     window.addEventListener('hashchange', route);
     window.addEventListener('storage', function (e) { if (e.key === KEY_CART) { cart = sanitize(K.load(KEY_CART, {})); renderBar(); } });
     boot();

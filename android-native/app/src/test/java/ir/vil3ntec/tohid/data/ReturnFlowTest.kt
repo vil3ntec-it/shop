@@ -139,7 +139,8 @@ class ReturnFlowTest {
   fun `gate و canApprove — بی رسید، ضایعات، سقفِ نقش`() {
     v.arr("gate").forEach {
       val c = it.jsonObject
-      val g = ReturnFlow.gate(c.str("role"), c.str("perm"), c.long("amountMinor"), c.bool("noReceipt"), c.bool("damaged"), c.long("limitMinor"))
+      //  `priorMinor` نبود ⇒ ۰ (برگشتِ نخستِ فاکتور، یا بی رسید)
+      val g = ReturnFlow.gate(c.str("role"), c.str("perm"), c.long("amountMinor"), c.bool("noReceipt"), c.bool("damaged"), c.long("limitMinor"), c.long("priorMinor"))
       val out = c.obj("out")
       assertEquals(c.toString(), out.str("decision"), g.decision)
       assertEquals(c.toString(), out.arr("reasons").map { x -> x.jsonPrimitive.content }, g.reasons)

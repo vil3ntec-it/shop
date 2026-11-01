@@ -170,7 +170,7 @@ const senders = {
    *  ──────────────────────────────────────────────────────────────────
    */
   async log(to, code) {
-    if (config.env === 'production') {
+    if (config.env === 'production' || !config.devCodes) {
       console.warn(
         `[otp] کدی برای ${redact(to)} صادر شد ولی راهِ ارسالی تنظیم نیست، ` +
         'پس به دستِ کسی نمی‌رسد. EMAIL_API_URL یا SMS_API_URL را تنظیم کنید. ' +
@@ -437,7 +437,49 @@ async function dailyCeiling(known, at) {
   return tooMany('سقفِ روزانهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_daily_ceiling');
 }
 
-async function smsGuard(destination, { ip = '', at = now() } = {}) {
+/**
+ * SEC-06، سقفِ **هزینه** (بخشِ ۳.۱۲: «سقف روزانه هزینه برای هر فروشگاه و هر کانال»): جمعِ
+ * `cost_minor` ِ ۲۴ ساعتِ همین کانال (راهِ ارسال) در دفترِ sms_usage، یک بار برای کلِ سرور
+ * (dailyCostMax ⇒ sms_cost_ceiling) و یک بار برای دکانِ همین درخواست (shopDailyCostMax ⇒
+ * sms_shop_cost_ceiling). ۰ = خاموش (پیش‌فرض). برای همهٔ شماره‌ها، آشنا یا نه: این بودجهٔ
+ * سخت است و راهِ ایمیل باز می‌ماند. خطای خواندن ⇒ باز (همان دلیلِ dailyCeiling).
+ * @returns {Promise<Error|null>}
+ */
+async function costCeiling({ shopId = '', via = '', at = now() } = {}) {
+  const lim = smsLimits();
+  const shares = [];
+  if (lim.dailyCostMax > 0) shares.push({ scope: 'all', cap: lim.dailyCostMax });
+  if (lim.shopDailyCostMax > 0 && shopId) shares.push({ scope: 'shop', cap: lim.shopDailyCostMax, shopId: String(shopId) });
+  for (const sh of shares) {
+    let spent;
+    try {
+      spent = await require('./sms-usage').costSince({ since: at - 24 * HOUR_MS, via, shopId: sh.shopId });
+    } catch (err) {
+      console.error('[otp] دفترِ پیامک خوانده نشد؛ سقفِ هزینه این بار سنجیده نشد:', err.message);
+      continue;
+    }
+    if (spent < sh.cap) continue;
+    const day = new Date(at).toISOString().slice(0, 10);
+    const tag = `${day}|cost|${sh.scope}|${sh.shopId || ''}|${via}`;
+    if (!ceilingAlerted.has(tag)) {
+      //  حافظه بی‌مرز نشود: برچسب‌های روزهای پیش کنار می‌روند
+      if (ceilingAlerted.size > 1000) for (const t of ceilingAlerted) if (!t.startsWith(day)) ceilingAlerted.delete(t);
+      ceilingAlerted.add(tag);
+      console.error(`[otp] ⛔ سقفِ هزینهٔ روزانهٔ پیامک (${sh.scope}، ${via}: ${spent}/${sh.cap}) پر شد`);
+      await require('./audit').log({
+        actorType: 'system', action: 'sms.cost_ceiling', targetType: sh.scope === 'shop' ? 'shop' : '', targetId: sh.shopId || '',
+        detail: { scope: sh.scope, via, cap: sh.cap, spent },
+      }).catch(() => {});
+      try { require('./panel-live').notifyPanel('codes'); } catch (err) { console.error('[otp] پنل', err.message); }
+    }
+    return sh.scope === 'shop'
+      ? tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ این دکان پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_shop_cost_ceiling')
+      : tooMany('سقفِ روزانهٔ هزینهٔ پیامکِ سرور پر شده است؛ فعلاً با ایمیل وارد شوید یا بعداً امتحان کنید', 'sms_cost_ceiling');
+  }
+  return null;
+}
+
+async function smsGuard(destination, { ip = '', at = now(), shopId = '', via = '' } = {}) {
   const lim = smsLimits();
   const known = await isKnown(destination);
   const since = at - HOUR_MS;
@@ -462,6 +504,8 @@ async function smsGuard(destination, { ip = '', at = now() } = {}) {
   }
   const full = await dailyCeiling(known, at);
   if (full) throw full;
+  const broke = await costCeiling({ shopId, via, at });
+  if (broke) throw broke;
 }
 
 /** SEC-06: هر تلاشِ پیامک (نه ایمیل) در دفترِ یگانهٔ sms_usage — شکستش ورود را نمی‌شکند. */
@@ -513,7 +557,7 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
   const send = await sender(destination, smsCfg);
   //  SEC-06: فقط پیامکِ واقعی (نه ایمیل، نه log)
   if (!isEmail(destination) && send !== senders.log) {
-    await smsGuard(destination, { ip, at: t });
+    await smsGuard(destination, { ip, at: t, shopId, via: smsCfg.provider });
   }
 
   const code = randomCode(config.otp.digits);
@@ -604,10 +648,10 @@ async function request(destination, { purpose = 'login', ip = '', app = '', shop
     resendAfter: t + config.otp.resendMs,
     resendSeconds: Math.ceil(config.otp.resendMs / 1000),
   };
-  // فقط بیرون از حالت production و فقط وقتی راه ارسالی تنظیم نشده
   //  فقط بیرون از production و فقط وقتی هیچ راه ارسالی تنظیم نشده — وگرنه
   //  کد در پاسخ HTTP برمی‌گشت و کسی که شماره‌ی دیگری را می‌زد کدش را می‌دید.
-  if (config.env !== 'production' && via === 'log') out.devCode = code;
+  //  SEC-AUTH-06: فقط با `NODE_ENV`ِ صریحِ development/test — نبودنش production حساب می‌شود
+  if (config.env !== 'production' && config.devCodes && via === 'log') out.devCode = code;
   return out;
 }
 
@@ -775,7 +819,8 @@ async function resend(id) {
     if (await overDailyMax(row.destination, t)) {
       return { ok: false, error: 'otp_daily_limit', message: 'امروز درخواست کد برای این نشانی زیاد بوده است' };
     }
-    const full = await dailyCeiling(await isKnown(row.destination), t);
+    const full = await dailyCeiling(await isKnown(row.destination), t)
+      || await costCeiling({ via: smsCfg.provider, at: t });
     if (full) return { ok: false, error: full.code, message: full.message };
   }
 

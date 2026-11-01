@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
+import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyName
 import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.CartQuery
@@ -42,22 +43,28 @@ object PosCatalog {
    *  بارکد (رقمِ فارسی و لاتین یکی)، نامِ آغازشونده با عبارت اول. پیش‌تر
    *  فقط ۹ تای اول در فهرستِ کشویی می‌آمد؛ حالا همه در شبکه دیده می‌شوند و
    *  نخستینِ فهرست همان نخستینِ پیشین است.
+   *
+   *  `extra` (PRD-02، پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ
+   *  جست‌وجو هم (`ProductInfoMap.matches`)؛ ترتیب همان: آغازِ نامِ دری، سپس نام.
    */
-  fun matches(products: List<Product>, term: String): List<Product> =
+  fun matches(products: List<Product>, term: String, extra: Boolean = false): List<Product> =
     if (term.isEmpty()) emptyList()
     else products.asSequence()
       .filter { it.active }
-      .filter { p -> p.name.contains(term, ignoreCase = true) || CartQuery.barcodeStarts(p.barcodes, term) }
+      .filter { p ->
+        p.name.contains(term, ignoreCase = true) || CartQuery.barcodeStarts(p.barcodes, term) ||
+          (extra && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, term))
+      }
       .sortedWith(compareBy({ !it.name.startsWith(term, ignoreCase = true) }, { it.name }))
       .toList()
 
   /**
    *  POS-04 — نمایهٔ جست‌وجوی مقاوم (`CatalogMatch`، هستهٔ `TextNormalizer`) از کالاهای فعال؛
-   *  یک بار با هر تغییرِ کالاها، نه با هر حرف.
+   *  یک بار با هر تغییرِ کالاها، نه با هر حرف. `extra` (PRD-02): نام‌های دیگر و واژه‌های جست‌وجو هم.
    */
-  fun searchIndex(products: List<Product>): ir.vil3ntec.tohid.core.text.CatalogMatch.Index =
+  fun searchIndex(products: List<Product>, extra: Boolean = false): ir.vil3ntec.tohid.core.text.CatalogMatch.Index =
     ir.vil3ntec.tohid.core.text.CatalogMatch.index(
-      products.filter { it.active }.map { ir.vil3ntec.tohid.core.text.CatalogMatch.Item(it.id, it.name, it.barcodes) },
+      products.filter { it.active }.map { ir.vil3ntec.tohid.data.ProductInfoMap.searchItem(it, extra) },
     )
 
   /**
@@ -78,8 +85,8 @@ object PosCatalog {
    *  تا Enter همان کالایی را بردارد که پیش از این برمی‌داشت (دستهٔ انتخابی
    *  جست‌وجو را تنگ نمی‌کند).
    */
-  fun shown(products: List<Product>, category: String?, term: String): List<Product> =
-    if (term.isNotEmpty()) matches(products, term) else byCategory(products, category)
+  fun shown(products: List<Product>, category: String?, term: String, extra: Boolean = false): List<Product> =
+    if (term.isNotEmpty()) matches(products, term, extra) else byCategory(products, category)
 }
 
 /** نتیجهٔ Enter در کادرِ صندوق */
@@ -89,6 +96,8 @@ sealed interface PosHit {
   data class Inactive(val product: Product) : PosHit
   /** نه بارکد و نه پیشنهاد — «پیدا نشد» با راهِ ثبتِ کالا */
   data class Unknown(val code: String) : PosHit
+  /** PRD-04: کد هم بارکدِ بسته است هم بارکدِ کالا (تعارضِ آفلاین) — هیچ‌کدام افزوده نمی‌شود */
+  data class Ambiguous(val code: String) : PosHit
   /** کادرِ خالی، یا بارکدی که کالایش در دفتر نیست — کاری نمی‌شود */
   data object None : PosHit
 }
@@ -99,10 +108,25 @@ object PosSearch {
    *  (`matches[hint]`)؛ وگرنه «پیدا نشد». «۳*» پیش از بارکد یا نام ⇐ سه تا
    *  (`CartQuery`، رقمِ فارسی هم — F0-06).
    */
-  fun resolve(query: String, index: Map<String, String>, products: List<Product>, matches: List<Product>, hint: Int): PosHit {
+  fun resolve(
+    query: String,
+    index: Map<String, String>,
+    products: List<Product>,
+    matches: List<Product>,
+    hint: Int,
+    packs: ir.vil3ntec.tohid.core.product.PackBarcodes.Index? = null,
+  ): PosHit {
     val parsed = CartQuery.parse(query)
     val code = parsed.term.trim()
     if (code.isEmpty()) return PosHit.None
+    //  PRD-04: بارکدِ بسته (فقط کامل) ⇒ «۳*کارتن» = ۳ × ۲۴ دانه؛ همان کد بارکدِ کالا هم ⇒ مبهم
+    when (val l = packs?.lookup(code) { isItemCode(it, index) }) {
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> return PosHit.Ambiguous(code)
+      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> products.firstOrNull { it.id == l.hit.productId }?.let { p ->
+        return if (!p.active) PosHit.Inactive(p) else PosHit.Add(p, parsed.count * l.hit.pack.sizeMilli / 1000.0)
+      }
+      else -> Unit
+    }
     val hit = BarcodeMatch.find(code, index)
     if (hit is BarcodeMatch.Hit.Product) {
       val p = products.firstOrNull { it.id == hit.id } ?: return PosHit.None
@@ -111,6 +135,10 @@ object PosSearch {
     val pick = matches.getOrNull(hint)
     return if (pick != null) PosHit.Add(pick, parsed.count) else PosHit.Unknown(code)
   }
+
+  /** کد **کاملاً** بارکدِ کالاست (رقمِ فارسی هم)، نه نیمه — همان «کاملِ» `BarcodeMatch` */
+  fun isItemCode(code: String, index: Map<String, String>): Boolean =
+    (BarcodeMatch.find(code, index) as? BarcodeMatch.Hit.Product)?.exact == true
 }
 
 /** − / تعداد / + روی کاشی، ردیفِ جدول و ردیفِ سبد */
@@ -190,7 +218,11 @@ object PosLayout {
 /** کارِ هر کلید در صندوق */
 enum class PosAction {
   FINISH, CUSTOMER, EDIT_ROW, FREE_ITEM, REPRINT,
+  /** F7 — دریافتِ قسط/بدهی از مشتری (POS-39)؛ صفحه فقط با `TillReceivePref` روشن کاری می‌کند */
+  RECEIVE,
   SUBMIT, HINT_DOWN, HINT_UP, ROW_DOWN, ROW_UP, CLEAR_QUERY, DELETE_ROW, QTY_UP, QTY_DOWN,
+  /** POS-15 — Ctrl+I (`KeyMap.SALE_PRICE_CHECK`)؛ صفحه فقط با `PosPriceCheckPrefs` روشن آن را می‌خورد */
+  PRICE_CHECK,
 }
 
 /**
@@ -206,9 +238,19 @@ object PosKeys {
     key == KeyName.F2 -> PosAction.CUSTOMER
     key == KeyName.F3 -> PosAction.EDIT_ROW
     key == KeyName.F4 -> PosAction.FREE_ITEM
+    key == KeyName.F7 -> PosAction.RECEIVE
     key == KeyName.F8 -> PosAction.REPRINT
+    primary && key == KeyName.I -> PosAction.PRICE_CHECK
     else -> null
   }
+
+  /**
+   *  RET-01/05 (S13/S15) — «حالتِ برگشت» (`sale.returnMode`، Shift+F9 از `keymap.json`)، پیش از [screen]:
+   *  فقط با برگشت و تعویضِ تازهٔ روشن (`ReturnSettings`). خاموش ⇒ `false` و همان کارِ امروزِ کلید
+   *  (Shift+F9 مثلِ F9 فاکتور را می‌بندد)، بیت‌به‌بیت.
+   */
+  fun returnMode(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
+    enabled && key != null && KeyMap.SALE_RETURN_MODE.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
 
   /** کادرِ اسکن/جست‌وجو */
   fun field(key: KeyName?, primary: Boolean, queryEmpty: Boolean, hasMatches: Boolean, hasSelection: Boolean): PosAction? = when (key) {

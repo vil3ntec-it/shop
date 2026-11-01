@@ -34,6 +34,9 @@ process.env.RATE_PROBE_IP_MAX ||= '10000';
 //  پیامِ همگانی سقفِ ۵تایی دارد و چند آزمون پشتِ سرِ هم می‌زنندش؛
 //  خودِ سقف در `pump-support.test.js` جدا و با عددِ کوچک سنجیده می‌شود.
 process.env.RATE_BROADCAST_MAX = '10000';
+//  SEC-AUTH-01: هزینهٔ scrypt در production `p=5` است (~۲۰۰ms)؛ صدها حسابِ آزمون با آن
+//  دقیقه‌ها کند می‌شوند. خودِ پیش‌فرض و بازنویسیِ هشِ کهنه در `auth-hardening.test.js` با p=5 سنجیده می‌شوند.
+process.env.PASSWORD_SCRYPT_P ||= '1';
 
 const { createApp } = require('../src/app');
 const { query, closeDb } = require('../src/db');
@@ -48,9 +51,13 @@ async function resetDatabase() {
   await migrate.run();
 }
 
-async function start() {
+/**
+ * `reset: false` همان دیتابیسِ موجود را برمی‌دارد (بی پاک کردن) — برای آزمونی که دیتابیس را
+ * فرآیندِ دیگری ساخته است (`crash-kill.test.js`: سرورِ کشته‌شده، سپس بازگشتِ سرورِ تازه).
+ */
+async function start({ reset = true } = {}) {
   if (server) return base;
-  await resetDatabase();
+  if (reset) await resetDatabase();
   const app = await createApp({ runMigrations: false });
   await new Promise((resolve) => {
     server = app.listen(0, '127.0.0.1', resolve);
@@ -177,7 +184,23 @@ async function signIn(user, app = 'shop') {
   return { ...user, ...r.body, app };
 }
 
+/*
+ *  متن برای جست‌وجوی **مختصات** در پاسخ: زمان‌های epoch (عددِ صحیحِ میلی‌ثانیه یا ثانیهٔ میانِ ۲۰۲۰ و ۲۰۳۹،
+ *  مثلِ `lastConfirmedAt`) و نشانِ دکان‌ها (base36 ِ تصادفی) کنار می‌روند. بی این، خودِ `Date.now()` گاهی
+ *  «…3453…» است (مثلاً ۳۱ اکتبر ۲۰۲۶، ۱۳:۲۳ تا ۱۳:۴۰ UTC) و سنجهٔ نشتِ مختصات بی هیچ نشتی سرخ می‌شد.
+ *  هر شکلِ دیگرِ مختصات می‌ماند: `m_lat` ِ صدمِ درجه (3453)، 34.531، 34.5310000000001، E7 و E10 —
+ *  رقمِ پس از ممیز و عددِ بیرون از بازهٔ زمان دست نمی‌خورد.
+ *  ⛔ فقط برای مختصات؛ شناسه و شماره را روی متنِ خام بسنجید.
+ */
+function withoutEpochs(text, slugs = []) {
+  const epoch = (n) => (n >= 1.6e12 && n < 2.2e12) || (n >= 1.6e9 && n < 2.2e9);
+  let out = String(text).replace(/(?<![\d.])\d{10,13}(?![\d.])/g, (m) => (epoch(Number(m)) ? '#' : m));
+  for (const s of slugs) if (s) out = out.split(String(s)).join('#');
+  return out;
+}
+
 module.exports = {
+  withoutEpochs,
   start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
   //  سرورِ HTTPِ آزمون — برای سوار کردنِ سوکتِ زنده (‎index.js‎ در تولید همین کار را می‌کند)

@@ -185,6 +185,24 @@
     return from && to ? { from: from, to: to } : null;
   }
 
+  /**
+   * سه‌ماههٔ مالی (LOC-02) ⇒ {from, to} میلادی: ۱ = حمل–جوزا، ۲ = سرطان–سنبله،
+   * ۳ = میزان–قوس، ۴ = جدی–حوت (حوتِ کبیسه ۳۰ روز). سه‌ماههٔ نادرست یا سالِ بیرونِ بازه ⇒ null
+   */
+  function fiscalQuarterRange(jy, q) {
+    if (q !== 1 && q !== 2 && q !== 3 && q !== 4) return null;
+    var m1 = (q - 1) * 3 + 1;
+    var from = fromSolar(jy, m1, 1);
+    var to = fromSolar(jy, m1 + 2, solarMonthLength(jy, m1 + 2));
+    return from && to ? { from: from, to: to } : null;
+  }
+
+  /** سه‌ماههٔ مالیِ یک روزِ میلادی ⇒ {y, q}؛ تاریخِ نادرست ⇒ null */
+  function fiscalQuarterOf(iso) {
+    var j = toSolar(iso);
+    return j ? { y: j.y, q: div(j.m - 1, 3) + 1 } : null;
+  }
+
   /* ---------- هجری قمری (جدولیِ مدنی، اختیاری روی اسناد) ----------
      ماهِ واقعی با دیدنِ هلال است؛ جدولی تا یکی‌دو روز می‌لغزد، پس
      `adjust` (روز، مثبت یا منفی) را تنظیمِ فروشگاه می‌دهد. */
@@ -287,6 +305,8 @@
     formatSolarNumeric: formatSolarNumeric,
     formatSolarLong: formatSolarLong,
     fiscalYearRange: fiscalYearRange,
+    fiscalQuarterRange: fiscalQuarterRange,
+    fiscalQuarterOf: fiscalQuarterOf,
     toLunar: toLunar,
     lunarMonthName: lunarMonthName,
     formatLunarLong: formatLunarLong,

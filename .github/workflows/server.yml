@@ -17,8 +17,12 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # سنجهٔ بانکِ تصاویر در اندازهٔ کوچک (image-bank-bench.test.js)
+      - 'bench/image-bank.mjs'
       # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
+      # شاخهٔ «ضایعات» ِ برگشتِ تازه را آزمونِ سرتاسریِ return.e2e.mjs از خودِ کاتلین می‌خواند (S13.waste)
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
@@ -27,8 +31,12 @@ on:
       - 'sw.js'
       - 'license/**'
       - 'core/test-vectors/**'
+      # سنجهٔ بانکِ تصاویر در اندازهٔ کوچک (image-bank-bench.test.js)
+      - 'bench/image-bank.mjs'
       # نام‌های فارسیِ خروجیِ کاملِ مالک با نسخهٔ وب سنجیده می‌شوند (owner-export.test.js)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
+      # شاخهٔ «ضایعات» ِ برگشتِ تازه را آزمونِ سرتاسریِ return.e2e.mjs از خودِ کاتلین می‌خواند (S13.waste)
+      - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
@@ -82,7 +90,19 @@ jobs:
 
       - name: آزمون‌های سرور
         working-directory: server
+        env:
+          # GATE-NEW-05: هر آزمون یک خطِ شواهد (شناسه، commit، محیط، نتیجه، دستورِ بازتولید) — scripts/test-evidence.js
+          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-postgres.jsonl
         run: npm test
+
+      - name: شواهدِ آزمون‌های سرور (PostgreSQL)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-evidence-postgres
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: ignore
+          retention-days: 30
 
   pglite:
     name: آزمون‌های سرور روی PGlite
@@ -105,7 +125,18 @@ jobs:
       # این‌جا سرخ می‌شود، نه روی کامپیوترِ صاحبِ سامانه.
       - name: آزمون‌های سرور روی PGlite
         working-directory: server
+        env:
+          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-pglite.jsonl
         run: npm run test:pglite
+
+      - name: شواهدِ آزمون‌های سرور (PGlite)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-evidence-pglite
+          path: ${{ runner.temp }}/evidence
+          if-no-files-found: ignore
+          retention-days: 30
 
   electron:
     name: آزمون‌های سرور زیرِ Electron

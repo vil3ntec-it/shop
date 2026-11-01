@@ -17,7 +17,11 @@ import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery.RuleDraft
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery.ZoneDraft
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
+import ir.vil3ntec.tohid.core.storefront.SendOutcome
+import ir.vil3ntec.tohid.core.storefront.StorefrontChange
+import ir.vil3ntec.tohid.core.storefront.StorefrontOutbox
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.StorefrontQueue
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryDto
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryRepository
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -25,8 +29,8 @@ import kotlinx.coroutines.launch
 
 /**
  *  برگهٔ «ارسال و زمان» ِ ویترین (CHK-06/07/10/12) — ناحیه‌های ارسال
- *  (چندضلعی یا دایره، هزینه، حداقل، «رایگان از…») و بازه‌های زمان‌بندی با
- *  ظرفیت. همان قاعده‌های وب و سرور (`core/storefront/StorefrontDelivery.kt`)؛
+ *  (چندضلعی یا دایره، هزینه، حداقل، «رایگان از…»، هزینهٔ سبدِ کوچک) و بازه‌های
+ *  زمان‌بندی با ظرفیت و هزینهٔ اضافهٔ بازه. همان قاعده‌های وب و سرور (`core/storefront/StorefrontDelivery.kt`)؛
  *  «ذخیره شد» فقط پس از پاسخِ سرور. بی نقشهٔ پولی: نقطه‌ها «عرض، طول» نوشته
  *  می‌شوند و مرکزِ دایره را موقعیتِ فعلیِ کاربر هم می‌تواند بدهد.
  */
@@ -44,15 +48,27 @@ fun StorefrontDeliveryPane(snackbar: SnackbarHostState) {
     repo.load().onSuccess { loaded = it; version++ }.onFailure { loadError = it.userMessage }
   }
   LaunchedEffect(Unit) { load() }
+  //  پس از «ثبت شد» ِ سرور (گزارشِ صف) دادهٔ تازهٔ سرور خوانده می‌شود
+  LaunchedEffect(Unit) {
+    StorefrontQueue.reports.collect { r -> if (r.change == StorefrontChange.DELIVERY && r.outcome == SendOutcome.CONFIRMED) load() }
+  }
 
-  val d = loaded
+  val server = loaded
+  //  ویرایشِ نرسیده (صفِ آفلاین) روی دادهٔ سرور
+  val pendingEntry = StorefrontQueue.entries.value.let { StorefrontQueue.pending(context, StorefrontChange.DELIVERY) }
   when {
-    d == null && loadError == null -> TohidLoadingState(rows = 3)
-    d == null -> TohidErrorState("ارسال و زمان باز نشد", loadError ?: "اتصال را بررسی کنید.", onRetry = { scope.launch { load() } })
-    else -> DeliveryEditor(d, version, snackbar, onSave = { checked, asap ->
-      repo.save(checked, asap).onSuccess { loaded = it; version++; snackbar.showSnackbar("ارسال و زمان ذخیره شد") }
-        .onFailure { snackbar.showSnackbar(it.userMessage) }
-    })
+    server == null && loadError == null -> TohidLoadingState(rows = 3)
+    server == null -> TohidErrorState("ارسال و زمان باز نشد", loadError ?: "اتصال را بررسی کنید.", onRetry = { scope.launch { load() } })
+    else -> {
+      val d = StorefrontQueue.deliveryWithPending(server, pendingEntry)
+      DeliveryEditor(d, version, snackbar, pendingEntry?.let { StorefrontOutbox.statusLine(it) }, onSave = { checked, asap ->
+        //  اول روی دیسک (صف)، بعد سرور؛ «ثبت شد» فقط از پاسخِ سرور
+        val e = StorefrontQueue.enqueue(context, StorefrontChange.DELIVERY, StorefrontDeliveryRepository.body(checked, asap).toString(),
+          pendingEntry?.base ?: StorefrontQueue.deliveryBase(server))
+        if (e == null) snackbar.showSnackbar("دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید.")
+        else StorefrontQueue.flush(context, force = true)
+      })
+    }
   }
 }
 
@@ -61,6 +77,7 @@ private fun DeliveryEditor(
   d: StorefrontDeliveryDto,
   version: Int,
   snackbar: SnackbarHostState,
+  pendingNote: String?,
   onSave: suspend (StorefrontDelivery.Checked, Boolean) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
@@ -91,7 +108,8 @@ private fun DeliveryEditor(
       rules.forEachIndexed { i, r -> RuleCard(i, r, errors, onChange = { rules[i] = it }, onRemove = { rules.removeAt(i); errors.clear() }) }
       TohidSecondaryButton("افزودنِ بازه", onClick = { rules.add(RuleDraft()) })
     }
-    TohidButton(if (saving) "در حالِ ذخیره…" else "ذخیرهٔ ارسال و زمان", onClick = {
+    pendingNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.warning) }
+    TohidButton(if (saving) "در حالِ فرستادن…" else "ذخیرهٔ ارسال و زمان", onClick = {
       val c = StorefrontDelivery.check(zones.toList(), rules.toList(), slotDays)
       errors.clear(); errors.putAll(c.errors)
       if (c.errors.isNotEmpty()) { scope.launch { snackbar.showSnackbar("چند کادر درست نیست؛ پیامِ کنارِ هر کادر را ببینید") }; return@TohidButton }
@@ -120,6 +138,9 @@ private fun ZoneCard(i: Int, z: ZoneDraft, errors: Map<String, String>, onChange
       TohidTextField(z.fee, { onChange(z.copy(fee = it)) }, "هزینهٔ ارسال (افغانی)", error = errors["$k.fee"], keyboardOptions = num)
       TohidTextField(z.min, { onChange(z.copy(min = it)) }, "حداقلِ سفارش (افغانی)", error = errors["$k.min"], keyboardOptions = num)
       TohidTextField(z.free, { onChange(z.copy(free = it)) }, "ارسالِ رایگان از (اختیاری)", error = errors["$k.free"], keyboardOptions = num)
+      //  CHK-06: به‌جای ردِ سبدِ زیرِ حداقل
+      TohidTextField(z.small, { onChange(z.copy(small = it)) }, "هزینهٔ سبدِ کوچک (اختیاری؛ زیرِ حداقل به‌جای رد)",
+        error = errors["$k.small"], keyboardOptions = num)
       DeliverySwitch("این ناحیه فعال باشد", z.active) { onChange(z.copy(active = it)) }
       TohidSecondaryButton("حذفِ ناحیه", onClick = onRemove)
     }
@@ -144,6 +165,11 @@ private fun RuleCard(i: Int, r: RuleDraft, errors: Map<String, String>, onChange
       TohidTextField(r.range, { onChange(r.copy(range = it)) }, "ساعت (مثلِ 10:00-12:00)", error = errors["$k.range"])
       TohidTextField(r.capacity, { onChange(r.copy(capacity = it)) }, "ظرفیت (چند سفارش)", error = errors["$k.capacity"], keyboardOptions = num)
       TohidTextField(r.cutoff, { onChange(r.copy(cutoff = it)) }, "مهلتِ سفارش (دقیقه پیش از آغاز)", error = errors["$k.cutoff"], keyboardOptions = num)
+      //  CHK-07: هزینهٔ زمانِ تحویل — فقط ارسال
+      if (r.fulfillment != "pickup") {
+        TohidTextField(r.fee, { onChange(r.copy(fee = it)) }, "هزینهٔ اضافهٔ این بازه (افغانی؛ ۰ = بی هزینه)", error = errors["$k.fee"],
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+      }
       DeliverySwitch("این بازه فعال باشد", r.active) { onChange(r.copy(active = it)) }
       TohidSecondaryButton("حذفِ بازه", onClick = onRemove)
     }
