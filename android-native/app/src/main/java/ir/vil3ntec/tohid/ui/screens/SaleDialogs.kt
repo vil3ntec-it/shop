@@ -74,8 +74,9 @@ fun CheckoutDialog(
   promo: ir.vil3ntec.tohid.data.PromoEngine.Outcome? = null,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
-  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر؛ [presetAmount] ⇒ مبلغ به افغانی، POS-20) */
   presetDiscount: String = "",
+  presetAmount: Boolean = false,
   /** شناسهٔ فاکتورِ همین سبد (`CartStore.saleKey`) — برگهٔ تأیید به آن بسته است */
   saleKey: String? = null,
 ) {
@@ -86,7 +87,7 @@ fun CheckoutDialog(
   // باز می‌شود؛ وگرنه «نقدی». تخفیف هم پیش‌فرض درصدی است.
   val preset = presetDebtorId?.takeIf { id -> d.debtors.any { it.id == id } }
 
-  var discountType by remember { mutableStateOf(SalesEngine.DiscountType.PERCENT) }
+  var discountType by remember { mutableStateOf(if (presetAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT) }
   var payment by remember { mutableStateOf(if (preset != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf(presetDiscount.ifBlank { "0" }) }
   var debtorId by remember { mutableStateOf(preset) }
@@ -287,6 +288,14 @@ fun CheckoutDialog(
           )
         }
 
+        //  PAY-21: حساب‌پی — فقط با پرچمِ سرور (`pay.hesabpay`) و نت؛ پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
+        ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
+          hook = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) { (SalesEngine.record(d, cart, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message },
+          total = totals.finalTotal, panel = if (payV2) payState else null, customerId = debtorId, busy = busy, modifier = Modifier.padding(top = 12.dp),
+          enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
+          onPaid = { st -> onConfirm(checkout.copy(settlement = st, debtorId = debtorId, approval = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null)) },
+        )
+
         Spacer(Modifier.height(16.dp))
         Panel {
           //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
@@ -486,6 +495,8 @@ fun InvoiceDialog(
           }
           Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
         }
+        //  POS-34 (پشتِ `GiftReceiptPrefs`، پیش‌فرض خاموش): رسیدِ هدیهٔ بی قیمت
+        ir.vil3ntec.tohid.ui.components.pos.GiftReceiptButton(d, sale, onMessage)
       }
     }
     }
@@ -720,7 +731,7 @@ internal fun PrinterDialog(
               style = MaterialTheme.typography.bodySmall,
               color = Shop.colors.muted,
             )
-            Spacer(Modifier.height(8.dp))
+            LocalNetworkNotice(context)  // HW-13: اندروید ۱۷ و هدفِ ۳۷ ⇒ «اجازه دادن»؛ وگرنه همان فاصلهٔ ۸
             OutlinedTextField(
               value = host,
               onValueChange = { host = it },
@@ -913,6 +924,8 @@ fun CartLineDialog(
    *  بی تخفیفِ ردیف و بی سنجش
    */
   linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
+  /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
+  why: List<ir.vil3ntec.tohid.core.pos.PriceWhy.Row>? = null,
 ) {
   val policy = linePolicy
   var qtyText by remember { mutableStateOf(qty(quantity)) }
@@ -942,6 +955,10 @@ fun CartLineDialog(
       Column(Modifier.padding(18.dp)) {
         Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
+        if (why != null) {
+          ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel(why) { money(it) }
+          Spacer(Modifier.height(12.dp))
+        }
 
         if (hasSaleUnit) {
           SegmentedChoice(
