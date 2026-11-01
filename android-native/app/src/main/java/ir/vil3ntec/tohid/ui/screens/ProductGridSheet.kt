@@ -41,8 +41,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.isCtrlPressed
-import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -176,7 +174,7 @@ fun ProductGridSheet(store: ShopStore, d: ShopData, ids: List<String>, by: Strin
               e.key == androidx.compose.ui.input.key.Key.DirectionLeft -> { move(0, if (rtl) 1 else -1); true }
               e.key == androidx.compose.ui.input.key.Key.DirectionRight -> { move(0, if (rtl) -1 else 1); true }
               //  تایپِ حرف ⇒ ویرایش با همان حرف
-              !e.isCtrlPressed && !e.isMetaPressed && !e.isAltPressed && e.utf16CodePoint > 31 && e.utf16CodePoint != 127 -> {
+              !e.isPrimaryModifier && !e.isAltPressed && e.utf16CodePoint > 31 && e.utf16CodePoint != 127 -> {
                 startEdit(e.utf16CodePoint.toChar().toString()); true
               }
               else -> false

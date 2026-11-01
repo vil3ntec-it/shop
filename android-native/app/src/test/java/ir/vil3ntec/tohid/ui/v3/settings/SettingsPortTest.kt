@@ -156,6 +156,7 @@ class SettingsPortTest {
      *  از این‌جا برداشته شود («استثنای کهنه» قرمز است). بخشِ تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود.
      */
     val EXCEPTIONS: Map<String, String> = mapOf(
+      "AutoFeesPref.set" to "$PENDING — هزینهٔ خودکارِ فاکتور، POS-36",
       "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
       "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
@@ -177,6 +178,7 @@ class SettingsPortTest {
       "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
+      "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
     )
   }
 }
