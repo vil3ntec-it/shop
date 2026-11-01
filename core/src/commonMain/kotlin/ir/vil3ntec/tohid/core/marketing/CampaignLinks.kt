@@ -102,6 +102,15 @@ object CampaignLinks {
 
   private val PATH_RE = Regex("^/store/go/[0-9A-HJKMNP-TV-Z]{10}$")
 
+  /**
+   *  MKT-10: نشانی‌ای که زیرِ رسید چاپ می‌شود فقط پیوندِ کمپینِ همین سرور است: `https://<میزبان>/store/go/<کد>`
+   *  (یا `http://` برای سرورِ محلی)، بی پرسش و بی بخشِ دیگر — هر چیزِ دیگری (نشانیِ دلخواه، QR ِ ساختگی) نه.
+   */
+  fun receiptUrlOk(url: String): Boolean {
+    val m = Regex("^https?://([A-Za-z0-9.-]{1,253})(:[0-9]{1,5})?(/store/go/[0-9A-HJKMNP-TV-Z]{10})$").matchEntire(url) ?: return false
+    return m.groupValues[1].isNotEmpty() && PATH_RE.matches(m.groupValues[3])
+  }
+
   /* ------------------------------ چاپ ------------------------------ */
 
   const val CAPTION = "سفارشِ اینترنتی از همین دکان"

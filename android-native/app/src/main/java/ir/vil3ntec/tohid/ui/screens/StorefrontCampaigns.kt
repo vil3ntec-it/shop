@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.PrintQueue
+import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.marketing.CampaignLinks
 import ir.vil3ntec.tohid.core.qr.QrCode
 import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
@@ -39,6 +40,7 @@ import ir.vil3ntec.tohid.print.LabelSheetPrint
 import ir.vil3ntec.tohid.print.PrintSpooler
 import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.print.ReceiptPainter
+import ir.vil3ntec.tohid.print.ReceiptStoreQr
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -267,6 +269,15 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
               busy = false
             }
           }) { Text("برگهٔ A4") }
+          //  MKT-10: پیوندِ «QR ِ رسید» ⇒ زیرِ هر فاکتورِ فروشِ همین دستگاه (پیش‌فرض خاموش)
+          if (CampaignLinks.Source.of(c.source) == CampaignLinks.Source.QR_RECEIPT && !c.archived) {
+            var onReceipt by remember(url) { mutableStateOf(ReceiptStoreQr.url(context) == url) }
+            OutlinedButton(onClick = {
+              ReceiptStoreQr.set(context, if (onReceipt) null else url)
+              onReceipt = !onReceipt
+              report(if (onReceipt) StrLabel.storeQrSet else StrLabel.storeQrCleared)
+            }) { Text(if (onReceipt) StrLabel.storeQrOff else StrLabel.storeQrOn) }
+          }
         }
       }
     },
