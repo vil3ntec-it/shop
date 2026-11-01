@@ -163,6 +163,10 @@ object PhoneSaleText {
   }
 
   /** خطِ کوچکِ خاکستریِ کاشی — موجودی با واحد، یا «تمام شد» (سرخ) */
+  /** متنِ موجودیِ کاشی — کالای خدماتی (PRD-09) «خدماتی»، نه عددِ بی‌سقف */
+  fun stock(item: PhoneCatalogItem): String =
+    if (item.stockless) ir.vil3ntec.tohid.core.i18n.StrProduct.serviceTag else stock(item.stock, item.unit)
+
   fun stock(stock: Double, unit: String): String =
     if (stock <= 0) StrSale.soldOut
     else StrSale.leftQty("${ir.vil3ntec.tohid.qty(stock)}${if (unit.isNotBlank()) " $unit" else ""}")
