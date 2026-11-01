@@ -111,7 +111,9 @@ const expenses = [
 
 const suppliers = [{ id: 'sp1', name: 'شرکت پخش البرز', phone: '0791112233', address: 'کابل، مندوی', notes: '', createdAt: now - 35 * day }];
 const purchases = [{ id: 'pu1', productId: 'p1', supplierId: 'sp1', quantity: 20, unit: 'کیلوگرم', purchasePrice: 95, totalAmount: 1900,
-  date: iso(now - 8 * day), notes: '', paidAmount: 1000, debt: 900, warehouseEntryId: null, createdAt: now - 8 * day }];
+  date: iso(now - 8 * day), notes: '', paidAmount: 1000, debt: 900, warehouseEntryId: null, createdAt: now - 8 * day,
+  //  سررسیدِ پرداخت (PUR-07، افزودنی) — یادآورِ «سررسید گذشته» در صفحهٔ خرید
+  dueDate: iso(now - 2 * day) }];
 
 //  صندوقِ باز از امروز صبح
 const shiftOpen = new Date(); shiftOpen.setHours(8, 0, 0, 0);

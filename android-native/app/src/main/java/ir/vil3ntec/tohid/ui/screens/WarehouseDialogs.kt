@@ -582,14 +582,24 @@ fun AdjustDialog(
         }
 
         Spacer(Modifier.height(14.dp))
-        Segment(
-          options = listOf(
-            "اصلاح موجودی" to WarehouseEngine.AdjustKind.ADJUSTMENT,
-            "برگشت به تأمین‌کننده" to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
-          ),
-          selected = kind,
-          onSelect = { kind = it },
-        )
+        if (stockOn) {
+          //  موتورِ تازه روشن: برگشت به تأمین‌کننده فقط از «خرید و تأمین‌کننده» با سندِ کسر
+          //  (`PurchaseBook.supplierReturn`) — دو راه یعنی موجودیِ دو بار کم‌شده و بدهیِ کم‌نشده
+          Text(
+            "برگشت به تأمین‌کننده: از «خرید و تأمین‌کننده» ⇐ همان تأمین‌کننده ⇐ «برگشت (سندِ کسر)»؛ هم کالا کم می‌شود هم بدهی.",
+            style = MaterialTheme.typography.labelSmall,
+            color = Shop.colors.muted,
+          )
+        } else {
+          Segment(
+            options = listOf(
+              "اصلاح موجودی" to WarehouseEngine.AdjustKind.ADJUSTMENT,
+              "برگشت به تأمین‌کننده" to WarehouseEngine.AdjustKind.SUPPLIER_RETURN,
+            ),
+            selected = kind,
+            onSelect = { kind = it },
+          )
+        }
 
         Spacer(Modifier.height(12.dp))
         Segment(
@@ -628,7 +638,12 @@ fun AdjustDialog(
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
           Button(
-            onClick = { onSave(amount.toDoubleOrNull() ?: 0.0, increase, reason, kind, if (stockOn) adjKind else null) },
+            onClick = {
+              onSave(
+                amount.toDoubleOrNull() ?: 0.0, increase, reason,
+                if (stockOn) WarehouseEngine.AdjustKind.ADJUSTMENT else kind, if (stockOn) adjKind else null,
+              )
+            },
             modifier = Modifier.weight(1f),
           ) { Text("ثبت") }
         }

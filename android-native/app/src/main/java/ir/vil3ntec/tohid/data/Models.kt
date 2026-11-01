@@ -625,6 +625,10 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val landedCostMinor: Long? = null,
+  /** سررسیدِ پرداختِ همین فاکتور (`yyyy-MM-dd`، PUR-07، افزودنی) — یادآورِ «سررسید گذشته» */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val dueDate: String? = null,
 )
 
 @Serializable
