@@ -24,6 +24,8 @@ val repoRoot = rootDir.resolve("../..")
 val legacyRoot = repoRoot.resolve("android-native/app/src/main/java")
 val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
+  //  `ShopData.safeEntries` (#364): مدلِ گاوصندوق در پروندهٔ جدای خودش است
+  "ir/vil3ntec/tohid/data/SafeEntry.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
   //  LOC-03: `todayIso` روزِ کاری را از `ShopDay` می‌گیرد؛ `ShopDayChoice` (حالتِ Compose و Context)
   //  این‌جا جانشینِ JVMِ خودش را در src/main دارد — همیشه نیمه‌شب، پس خروجی همان دیروز است
@@ -33,6 +35,8 @@ val legacyFiles = listOf(
   //  این‌جا جانشینِ JVMِ خودش را در src/main دارد
   "ir/vil3ntec/tohid/LocaleText.kt",
   "ir/vil3ntec/tohid/core/calendar/SolarHijri.kt",
+  //  LocaleText.kt تاریخِ قمری را از `LunarHijri` (کاتلینِ خالصِ core) می‌گیرد
+  "ir/vil3ntec/tohid/core/calendar/LunarHijri.kt",
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
