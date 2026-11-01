@@ -93,17 +93,12 @@ const pins = require('./shop-chat-pins')({ rowOf, lockedMessage, viewerKey, view
 //  پرچم
 // ════════════════════════════════════════════════════════════════════
 
-/** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
+/**
+ * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. همان قاعدهٔ `orders.flagOf`
+ * (فاز ۳: «غیرفعال کردنِ سرویسِ» `shop.chat` برای همین دکان هم آن‌جا سنجیده می‌شود).
+ */
 async function flagOf(shopId) {
-  const rows = await many(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
-    [FLAG_KEY, 'all', String(shopId || '')]
-  );
-  const decode = (x) => { try { return JSON.parse(x); } catch { return null; } };
-  let v;
-  for (const r of rows) if (r.scope === 'all') v = decode(r.value);
-  for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
-  return v === true;
+  return require('./orders').flagOf(String(shopId || ''), FLAG_KEY);
 }
 
 // ════════════════════════════════════════════════════════════════════
