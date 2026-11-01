@@ -119,6 +119,8 @@
         lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }),
         note: $('c-note').value.trim(),
         expectedTotalMinor: subtotal() + feeFor(f),
+        //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
+        lang: K.lang,
       };
       if (c.campaign) body.campaign = c.campaign;   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {

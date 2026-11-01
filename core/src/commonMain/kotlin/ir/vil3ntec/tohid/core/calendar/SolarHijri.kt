@@ -114,4 +114,22 @@ object SolarHijri {
     val last = fromSolar(jy, 12, monthLength(jy, 12)) ?: return null
     return Pair(first, last)
   }
+
+  /**
+   *  سه‌ماههٔ مالی (LOC-02) ⇒ (از، تا) میلادی: ۱ = حمل–جوزا، ۲ = سرطان–سنبله،
+   *  ۳ = میزان–قوس، ۴ = جدی–حوت (حوتِ کبیسه ۳۰ روز). سه‌ماههٔ نادرست یا سالِ بیرونِ بازه ⇒ null
+   */
+  fun fiscalQuarterRange(jy: Int, q: Int): Pair<String, String>? {
+    if (q !in 1..4) return null
+    val m1 = (q - 1) * 3 + 1
+    val first = fromSolar(jy, m1, 1) ?: return null
+    val last = fromSolar(jy, m1 + 2, monthLength(jy, m1 + 2)) ?: return null
+    return Pair(first, last)
+  }
+
+  /** سه‌ماههٔ مالیِ یک روزِ میلادی ⇒ (سالِ خورشیدی، ۱ تا ۴)؛ تاریخِ نادرست ⇒ null */
+  fun fiscalQuarterOf(iso: String): Pair<Int, Int>? {
+    val j = toSolar(iso) ?: return null
+    return Pair(j.year, (j.month - 1) / 3 + 1)
+  }
 }

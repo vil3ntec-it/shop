@@ -116,7 +116,7 @@
 | `GET /admin/users` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:117` |
 | `GET /admin/users/:id` | مدیر | کاربر | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin.js:140` |
 | `POST /admin/users/:id/status` | مدیر | کاربر | دارد | عملیات | G2 | `admin.js:178` |
-| `GET /admin/users/:id/delete-preview` | مدیر | کاربر | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:193` |
+| `GET /admin/users/:id/delete-preview` | مدیر | کاربر | دارد ★ (`admin.user_delete_previewed`) | خواندنِ دادهٔ شخصی | — (TEN-04) | `admin.js:193` |
 | `DELETE /admin/users/:id` | ارشد | کاربر | دارد | حذف | G2 | `admin.js:200` |
 | `GET /admin/shops` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:214` |
 | `GET /admin/shops/:id` | مدیر | دکان | دارد ★ | خواندنِ دادهٔ شخصی | — | `admin.js:251` |
@@ -135,9 +135,11 @@
 | `POST /admin/purchase-requests/:id/approve` | مدیر | درخواستِ یک دکان | دارد | مالی/اشتراک | G2, G3 | `admin.js:604` |
 | `POST /admin/purchase-requests/:id/reject` | مدیر | درخواستِ یک دکان | دارد (+دلیلِ اختیاری) ★ | مالی/اشتراک | G3 | `admin.js:618` |
 | `GET /admin/audit` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin.js:635` |
-| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin.js:645` |
-| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin.js:662` |
-| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin.js:671` |
+| `POST /admin/admins` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins` | ارشد | سراسری | — | خواندنِ سراسری | — | `admin-admins.js` |
+| `PATCH /admin/admins/:id` | ارشد | سراسری | دارد | عملیات | — | `admin-admins.js` |
+| `GET /admin/admins/:id/sessions` | ارشد | سراسری | — | خواندنِ سراسری (بی توکن، فقط ۱۶ نویسهٔ هش) | — | `admin-admins.js` |
+| `POST /admin/admins/:id/sessions/revoke` | ارشد | سراسری | دارد (+دلیل) | عملیات | — | `admin-admins.js` |
 | `GET /admin/backups` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:690` |
 | `POST /admin/backups` | ارشد | سراسری | دارد | خروجی/بازگردانی | — | `admin.js:700` |
 | `GET /admin/2fa` | مدیر | سراسری | — | نشست | G5 | `admin-2fa.js:49` |
@@ -173,7 +175,7 @@
 | `POST /admin/vip-codes/:id/revoke` | مدیر | سراسری | دارد | مالی/اشتراک | G3 | `admin-platform.js:166` |
 | `GET /admin/visitors` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin-platform.js:178` |
 | `GET /admin/support/threads` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin-platform.js:197` |
-| `GET /admin/support/threads/:id` | مدیر | گفت‌وگوی یک حساب | — | خواندنِ دادهٔ شخصی | G4 | `admin-platform.js:214` |
+| `GET /admin/support/threads/:id` | مدیر | گفت‌وگوی یک حساب | دارد ★ (`admin.support_thread_viewed`، فقط «باز کردن»، نه `after`) | خواندنِ دادهٔ شخصی | — (TEN-04) | `admin-platform.js:214` |
 | `POST /admin/support/threads/:id/messages` | مدیر | گفت‌وگوی یک حساب | در خودِ پیام (فرستنده = مدیر) | عملیات | — | `admin-platform.js:230` |
 | `POST /admin/support/threads/:id/media` | مدیر | گفت‌وگوی یک حساب | در خودِ پیام (فرستنده = مدیر) | عملیات | — | `admin-platform.js:255` |
 | `GET /admin/support/media/:mid` | مدیر | گفت‌وگوی یک حساب | — | خواندنِ دادهٔ شخصی | G4 | `admin-platform.js:269` |
@@ -205,8 +207,8 @@
 | `PUT /admin/pump/live-config` | ارشد | سراسری | دارد | راز/پیکربندی | — | `admin-pump.js:48` |
 | `DELETE /admin/pump/live-config` | ارشد | سراسری | دارد | راز/پیکربندی | — | `admin-pump.js:60` |
 | `GET /admin/pump/stations` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-pump.js:78` |
-| `GET /admin/pump/stations/:id` | مدیر | پمپ | — | خواندنِ دادهٔ شخصی | G4 | `admin-pump.js:130` |
-| `GET /admin/pump/stations/:id/events` | مدیر | پمپ | — | خواندنِ دادهٔ شخصی | G4 | `admin-pump.js:169` |
+| `GET /admin/pump/stations/:id` | مدیر | پمپ | — (`admin.station_viewed` در #615، کدِ پمپ، نیازمندِ اجازهٔ صاحب‌کار) | خواندنِ دادهٔ شخصی | G4 (`accessCode` هنوز برای مدیرِ عادی: SEC-TEN-02) | `admin-pump.js:130` |
+| `GET /admin/pump/stations/:id/events` | مدیر | پمپ | — (`admin.station_events_viewed` در #615، کدِ پمپ، نیازمندِ اجازهٔ صاحب‌کار) | خواندنِ دادهٔ شخصی | G4 | `admin-pump.js:169` |
 | `GET /admin/pump/stations/:id/history` | مدیر | پمپ | — | خواندنِ دادهٔ شخصی | G4 | `admin-pump.js:183` |
 | `POST /admin/pump/stations/:id/devices/:deviceId/:action` | مدیر | پمپ | دارد | عملیات | G2 | `admin-pump.js:195` |
 | `POST /admin/pump/stations/:id/status` | مدیر | پمپ | دارد | عملیات | G2 | `admin-pump.js:215` |
@@ -278,8 +280,20 @@
 | `GET /admin/service-keys` ◆ | ارشدِ انسانی | سراسری | — | خواندنِ سراسری | — | `admin-service-keys.js` |
 | `POST /admin/service-keys` ◆ | ارشدِ انسانی + دلیل | سراسری | دارد | راز (یک‌بار دیده) | — | `admin-service-keys.js` |
 | `POST /admin/service-keys/:keyId/revoke` ◆ | ارشدِ انسانی + دلیل (کلیدِ مالک: فقط مالک) | سراسری | دارد | راز | — | `admin-service-keys.js` |
+| `GET /admin/market/overview` ▲ | مدیر (+ مالی، فقط‌خواندن) | سراسری | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-market.js` |
+| `GET /admin/market/sellers` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ فراداده | — | `admin-market.js` |
+| `GET /admin/market/orders` ▲ | مدیر (+ مالی) | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی نام/شماره/نشانیِ مشتری) | — | `admin-market.js` |
+| `GET /admin/market/commission` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ مالی | — | `admin-market.js` |
+| `GET /admin/market/history` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سابقه | — | `admin-market.js` |
+| `GET /admin/delivery/overview` ▲ | مدیر (+ مالی) | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `GET /admin/delivery/queue` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندنِ سراسری (بی دادهٔ شخصی) | — | `admin-delivery.js` |
+| `GET /admin/delivery/events` ▲ | مدیر | سراسری (پالایشِ دکان) | — | خواندن (بی یادداشت و کد) | — | `admin-delivery.js` |
+| `GET /admin/delivery/connectivity` ▲ | مدیر | سراسری | — | خواندنِ فراداده | — | `admin-delivery.js` |
+| `GET /admin/delivery/report` ▲ | مدیر (+ مالی) | سراسری | دارد (`admin.delivery_report_viewed`) | خواندنِ مالی | — | `admin-delivery.js` |
+| `GET /admin/delivery/thresholds` ▲ | مدیر | سراسری | — | خواندنِ سراسری | — | `admin-delivery.js` |
+| `PUT /admin/delivery/thresholds` ▲ | ارشد + دلیل | سراسری | دارد + تاریخچه (`live_config`) | عملیات | — | `admin-delivery.js` |
 
-◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
+◆ = فاز ۳ ِ پنلِ مرکزی (بند ۱۲). ▲ = ماژول‌های ۴.۶ و ۴.۷ (بند ۱۲.۸). `GET /admin/shops` حالا ستونِ `holds` و پالایشِ `?hold=` هم دارد؛
 `PUT/DELETE /admin/pump/live-config` و `PUT /admin/release/beta` تاریخچه می‌نویسند (دلیلِ اختیاری).
 
 ---
@@ -291,7 +305,7 @@
 | G1 | مجوزِ موقتِ پشتیبانی (مدتِ محدود، رضایتِ فروشگاه، قابلِ لغو) و «ورود به‌جای کاربر» | MISSING | طرحِ ۸.۱؛ مهاجرتِ `079` برایش رزرو است و هنوز ساخته نشده |
 | G2 | دلیلِ اجباری برای غیرفعال‌کردنِ کاربر/پمپ، دادن/تغییرِ اشتراک، تأییدِ خرید، ثبت/ویرایش/حذفِ پرداخت، حذفِ کاربر (۱۹.۱۰-۳) | PARTIAL (همه سابقه دارند، دلیل نه) | اول پنلِ وب و `admin-android` فیلدِ «دلیل» بگیرند و بفرستند (اختیاری، ثبت در سابقه)؛ نسخهٔ بعد سرور با `requireReason` اجباری‌اش کند — بی این ترتیب برنامهٔ مدیرِ نصب‌شده می‌شکند |
 | G3 | نقشِ `admin` یکی است: پشتیبانی هم می‌تواند اشتراک بدهد، پرداخت ثبت کند، کدِ تخفیف و نماینده بسازد | PARTIAL | طرحِ ۸.۲ (ماتریسِ نقشِ مدیر)؛ `admin`ِ امروز ⇒ `ops_admin` با همان اختیارات تا رفتار عوض نشود |
-| G4 | خواندن‌های شخصیِ بی‌سابقه: فهرستِ کاربران، درخواست‌های خرید (شماره)، گفت‌وگوها و رسانهٔ پشتیبانی، فهرستِ OTP/ورود (نشانیِ گیرنده)، پمپ‌ها و رویدادهایشان، پرداخت‌ها و رسید، بدهی‌ها، گزارشِ اعلان و مخاطبان، خودِ سابقه | PARTIAL | برای پرونده‌ها (یک موضوع) سابقه بنویسید، نه برای فهرست‌های پرتکرار؛ گفت‌وگوی پشتیبانی فقط هنگامِ «باز کردن» (`after` خالی) — همان الگوی `admin.user_viewed` |
+| G4 | خواندن‌های شخصیِ بی‌سابقه: فهرستِ کاربران، درخواست‌های خرید (شماره)، گفت‌وگوها و رسانهٔ پشتیبانی، فهرستِ OTP/ورود (نشانیِ گیرنده)، پمپ‌ها و رویدادهایشان، پرداخت‌ها و رسید، بدهی‌ها، گزارشِ اعلان و مخاطبان، خودِ سابقه | PARTIAL | برای پرونده‌ها (یک موضوع) سابقه بنویسید، نه برای فهرست‌های پرتکرار؛ گفت‌وگوی پشتیبانی فقط هنگامِ «باز کردن» (`after` خالی) — همان الگوی `admin.user_viewed`. **پرونده‌ها انجام شد (TEN-04، `docs/security/tenant-fa.md`):** گفت‌وگوی پشتیبانی، اجازه‌ها/دستگاه‌های دکان، پیش‌نمایشِ حذف (پروندهٔ پمپ و خبرهایش: کدِ پمپ ⇐ #615، نیازمندِ اجازهٔ صاحب‌کار)؛ آزمونِ `tenant-matrix.test.js` هر درِ GETِ موضوع‌دارِ تازه را تا ردهٔ «سابقه‌دار/کنار با دلیل» سرخ می‌کند. فهرست‌ها همچنان بی‌سابقه (عمداً) |
 | G5 | TOTP اختیاری است؛ step-up/تأییدِ دوم برای پرخطر نیست؛ نشست/ورود | PARTIAL — **مالک: عاملِ ممیزیِ ورود/نشست** | این سند رفتارِ ورود را عوض نکرد. پیشنهاد: TOTP برای `superadmin` اجباری؛ تأییدِ دوباره (TOTP) پیش از خروجی، بازگردانی، حذفِ کاربر و تغییرِ مدیران |
 | G6 | زمان‌بندیِ اعلانِ جمعی ردیفِ سابقه ندارد (خودِ ارسال دارد: `notice.sent`) | PARTIAL (کم‌خطر) | یک `audit.log` در `admin-notices.js` (مسیرِ `schedule`) |
 | G7 | اعلان و پیامِ همگانی برای هر مدیر باز است (سقفِ نرخ و سابقه دارد) | PARTIAL | در ماتریسِ ۸.۲ به `ops_admin`/`sales_manager` محدود شود |
@@ -417,9 +431,15 @@
 
 ### ۱۲.۵ رده‌بندیِ درهای تازه برای ماتریسِ جداسازی (#582، `tenant-matrix.test.js` → `ADMIN_SUBJECT`)
 
-هر کدام از #582 و این PR که **دوم** مرج شود این دو خط را به `ADMIN_SUBJECT` می‌افزاید:
+هر کدام از #582 و کنسولِ یکپارچه (#597 ⇐ #598 ⇐ #605) که **دوم** مرج شود **این پنج خط** را به `ADMIN_SUBJECT` می‌افزاید — همهٔ درهای
+`GET /api/admin/*` ِ شناسه‌دارِ تازهٔ این سه PR (درهای بی‌شناسه، مثلِ `/admin/search` و فهرست‌های `/admin/market|delivery|ops|finance/*`، در
+`ADMIN_SUBJECT` نمی‌آیند و فقط سنجشِ «دفترِ دکان و محتوای خصوصی بیرون نمی‌آید» را می‌گذرانند). وارسی‌شده (۱۴۰۵/۰۸/۱۰): `tenant-matrix.test.js` ِ
+#582 روی کدِ #605 ⇒ بی این خط‌ها همین پنج در «بی‌رده»اند؛ با آن‌ها TEN-04 سبز است (بی نشتِ دفتر/محتوای خصوصی، بی ۵xx).
 - `'GET /api/admin/shops/:id/health': { exempt: 'فقط فراداده (زمانِ همگام‌سازی، نسخهٔ دستگاه، شمارِ خطا، وضعِ اشتراک)؛ بی دفتر و متنِ دکان' }`
 - `'GET /api/admin/shops/:id/holds': { exempt: 'تصمیم‌های خودِ پلتفرم روی دکان (حالت و دلیلِ مدیر)، نه دادهٔ دکان' }`
+- `'GET /api/admin/admins/:id/sessions': { exempt: 'نشستِ مدیرِ سکو، نه دادهٔ دکان' }` (بندِ ۱۲.۷)
+- `'GET /api/admin/ops/incidents/:id': { exempt: 'رخدادِ فنیِ سکو: گروهِ خطا با پیامِ پالوده، شناسهٔ دکان و چهار نویسهٔ آخرِ دستگاه؛ بی دفتر و متنِ دکان' }`
+- `'GET /api/admin/finance/payments/:id': { exempt: 'پرداختِ اشتراک و بازنگری‌هایش — صورت‌حسابِ خودِ پلتفرم، نه دفترِ دکان' }` (بندِ ۱۲.۹)
 
 ### ۱۲.۶ چسبِ پل ⇄ سرورِ حساب (۱۴۰۵/۰۸/۰۹، شاخهٔ `claude/console-glue`)
 
@@ -430,3 +450,66 @@
 - **مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`** با توکنِ معتبرِ مدیر (پیش‌تر ۴۰۱ `invalid_token` از `routes/data` ⇒ پل
   «نشست تمام شد» می‌خواند). بی‌توکن و توکنِ دکان همان ۴۰۱ (وجودِ مسیر گفته نمی‌شود). خطِ آخرِ درهای `/admin` در `app.js`.
 - **`GET /admin/shops`:** `total` همان `q` و `hold` را می‌شمارد (یک WHERE برای ردیف‌ها و شمار).
+
+### ۱۲.۷ پوستهٔ کنسولِ «فروشگاه» ِ پنل (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-shell-api`)
+
+دو «توانایی» ِ تازه برای ماژول‌های ۴.۳ و ۴.۱۲ و جست‌وجوی سراسریِ پنل (ریپوی `server`، شاخهٔ `claude/console-shell`):
+
+- **`admin-sessions.v1`:** `GET /api/admin/admins/:id/sessions` (نشست‌های باز: ۱۶ نویسهٔ آغازِ SHA-256 ِ توکن، `issuedAt`،
+  `expiresAt`، `current` — نه توکن، نه هشِ کامل) و `POST …/sessions/revoke` `{sessionId?, reason}` (یکی یا همه؛ دلیل اجباری؛
+  نشستِ پیدانشده ⇒ ۴۰۴ `session_not_found`). فقط ارشد؛ کلیدِ سرویس هرگز (`SERVICE_DENY`). نشست‌های **مالکِ اصلی** را فقط خودش
+  می‌بندد (`owner_protected`). سابقه: `admin.admin_sessions_revoked` با شمار و دلیل.
+- **`search.v1`:** `GET /api/admin/search?q=&limit=` (`routes/admin-search.js`) — دکان، کاربر، پرداخت، سفارش (فقط شناسه/شمارهٔ
+  سفارش؛ نام و تلفنِ خریدار جست‌وجو نمی‌شود)، خطا، و مدیر فقط برای ارشدِ **انسانی**. نوع‌ها به نقش (`KINDS_BY_ROLE`): مالی
+  فقط دکان و پرداخت (`FINANCE` ِ `lib/admin-roles.js`). `%`/`_` ِ ورودی حرفِ معمولی است؛ کوتاه‌تر از ۲ نویسه ⇒ ۴۰۰.
+- **سابقهٔ نقش و تنظیم:** `PATCH /admin/admins/:id` ⇒ `detail.from` (نقش/وضعیتِ پیشین) و `reason`؛ `POST /admin/admins` بی نقش
+  ⇒ `viewer` (کمینهٔ دسترسی، پیش‌تر `admin`)؛ `PATCH /admin/config` ⇒ `detail.changes` («پیشین ⇒ تازه») و `reason`.
+- **پرچمِ شناخته نوع‌دار:** `PUT /admin/flags` برای کلیدِ کاتالوگ فقط مقدارِ هم‌نوعِ پیش‌فرض (بولی، یا فهرستِ شناسه برای
+  `beta.*`) و فقط در scope ِ خودش (`shop` ⇒ `all` یا دکانِ موجود؛ `all` ⇒ `all`؛ `security`/`release` ⇒ همان) — وگرنه
+  `bad_flag_value` / `bad_flag_scope`. کلیدِ ناشناخته همان رفتارِ پیشین.
+- **برای #582 (ماتریسِ جداسازی)،** هر کدام که دوم مرج شود: `'GET /api/admin/search': { exempt: 'جست‌وجوی سکوی مدیر به نقش؛ فقط
+  شناسه و نامِ نمایشی، بی دفتر یا متنِ دکان' }` و `'GET /api/admin/admins/:id/sessions': { exempt: 'نشستِ مدیرِ سکو، نه دادهٔ دکان' }`.
+
+آزمون: `test/console-shell.test.js` (۶ بند، سرخ روی پایه ⇐ سبز) و `CAPABILITY_PROBES` ِ `admin-control-plane.test.js`.
+### ۱۲.۸ بازار (۴.۶) و نظارت بر پیک (۴.۷) — سمتِ مدیر (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-market-api`)
+
+- **توانایی‌ها:** `market-admin.v1` (`/admin/market/*`) و `delivery-watch.v1` (`/admin/delivery/*`). همه خواندنی‌اند جز
+  `PUT /admin/delivery/thresholds` (فقط ارشد + دلیل؛ تکرارِ همان مقدار ⇒ `unchanged` بی ردیفِ دوم در تاریخچه).
+- **نوشتنِ بازار درِ تازه ندارد:** تعلیقِ فروشنده = حالتِ `service_disabled` با سرویسِ `market.directory` (یا `shop.storefront`)
+  از همان `/admin/shops/:id/holds` (بند ۱۲.۱)؛ تصمیمِ پرونده و برداشتنِ جریمه همان `/admin/trust/*` (فقط ارشد، دلیل).
+- **مدل همان است که هست:** فروشنده = دکانِ VILL3N (فروشندهٔ مستقل در مدل نیست ⇒ `null`)؛ «تأییدِ فروشنده» نیست (بودن در فهرست
+  را صاحبِ دکان روشن می‌کند و سامانه با پرچم/حالت/جریمه می‌بندد ⇒ `gates` و `blockedBy`)؛ سفارشِ بازار تک‌دکانی؛ کمیسیون و
+  سبدِ چنددکانی فقط با ستون‌های مهاجرتِ ۱۳۰ (#432) ⇒ تا آن‌وقت `inModel: false`، نه صفر.
+- **«گیر کرده / ناهم‌خوان / اختلاف»** فقط از `lib/order-watch.js` (خالص؛ همان دو ماشینِ وضعیت). آستانه‌ها در `live_config`
+  (`console.delivery_thresholds`، scope ِ `all`)؛ مقدارِ نامعتبر ⇒ پیش‌فرض و `source: 'default'`.
+- **بی دادهٔ شخصی:** هیچ پاسخی نام، شماره، نشانی یا یادداشتِ مشتری و هیچ کد/هشِ تحویل ندارد (آزمونِ `admin-market-delivery`).
+- **گزارشِ کارکرد** با تعریف‌های RPT-15 (#554) و تطبیقِ مدیر (#411): «گرفته» از `delivered_at`، «تسویه» از `created_at` ِ سند،
+  «در دست» = تحویل‌شدهٔ تسویه‌نشده؛ جمعِ ردیف‌ها = جمعِ کل؛ دیدنش یک ردیفِ سابقه.
+- **مهاجرتِ ۱۷۲:** فقط نمایه برای پرسش‌های بی‌دکانِ مدیر، با خط‌های `rollback:` ِ آزموده.
+
+### ۱۲.۹ مالیِ مرکزی — ماژولِ ۴.۵ (۱۴۰۵/۰۸/۱۰، شاخهٔ `claude/console-finance-api`، مهاجرتِ ۱۷۱)
+
+پولِ اشتراکِ **خودِ پلتفرم**، جدا از حساب‌داریِ داخلیِ دکان‌ها. توانایی: `finance.v1`. همه زیرِ `requireAdmin` و مرزِ
+`lib/admin-roles.js` (finance: همهٔ این درها؛ viewer: فقط GET)؛ نوشتن و خروجی در خودِ در به `superadmin`/`finance`
+بسته است (`requireFinanceWriter`) — مدیرِ عادی (پشتیبانی) نه.
+
+| در | شرح |
+|---|---|
+| `GET /api/admin/finance/summary` | `group=day\|week\|month`، `calendar=persian\|gregorian`، `fromDate`/`toDate` (یا `from`/`to`)، `app` ⇒ جمعِ هر ارز (پرداخت، اصلاح، بازپرداخت، ابطال، خالص)، سطل‌ها به وقتِ `DEFAULT_TIMEZONE` (هفته از شنبه، ماهِ خورشیدی)، به تفکیکِ بخش و روش. حداکثر ۷۳۲ روز و ۴۰۰ سطل |
+| `GET …/breakdown?by=shop\|plan` | تفکیکِ بازه، صفحه‌بندیِ سمتِ سرور (`limit`/`offset`، `total`) |
+| `GET …/payments` · `…/payments/:id` | دفترِ پرداخت با نشانگر (`paid_at`، `id`) و پالایش؛ یک پرداخت + سندها + `sub_payment_revisions` + سابقه |
+| `GET …/adjustments` · `POST …/adjustments` | سندها؛ ساختنِ سند `{paymentId, kind: correction\|refund\|reversal\|reference, amount?, reference?, reason, expectedNet?}` + `Idempotency-Key` |
+| `GET …/receivables` | بدهی = قیمتِ اشتراک (یا قیمتِ پلن در روزِ آغاز، همان قاعدهٔ `/sales/debts`) − (پرداخت + سند) **به همان ارز**؛ فعال/معلق |
+| `GET …/pending` · `…/gateway` | درخواست‌های خرید با قیمتِ برآوردی؛ درگاهِ حساب‌پی (`payment_intents` ِ #518/#529): بی جدول یا بی کلید ⇒ `state: blocked_external` با پیامِ «BLOCKED-EXTERNAL: کلیدِ حساب‌پی نیامده»، وگرنه شمارِ هر وضعیت، «بی شمارهٔ تراکنش» و «نیازمندِ بررسی» |
+| `GET …/discrepancies` | پرداختِ بی اشتراک، اشتراک/دکانِ ناپیدا، ارزِ ناهمسان، رسیدِ تکراری، ویرایش/حذفِ راهِ پیشین، سندِ پرداختِ حذف‌شده، شمارهٔ تراکنشِ تکراری، بیش‌پرداخت، درگاه (اگر زنده) — هر یافته با شمارِ دقیق و تا ۵۰ نمونه |
+| `GET …/history` | ردیف‌های سابقهٔ کارهای مالی با نشانگر |
+| `GET …/export?dataset=payments\|adjustments` | `{csv, rows, nextCursor, filename}` — حداکثر ۵۰۰۰ ردیف در هر صفحه، BOM، خنثیِ فرمول، یک ردیفِ سابقه برای هر صفحه |
+
+- ⛔ **احرازِ دوباره برای سند:** نشستی که در `REAUTH_WINDOW_MIN` ساخته شده، یا `password` ِ همان مدیر (۵ اشتباه در ربع ساعت ⇒ ۴۲۹،
+  هر اشتباه یک ردیفِ `admin.finance_reauth_failed`)؛ پلِ پنل با کلیدِ سرویس ⇒ `X-Actor-Reauth-At` (زمانِ رمزِ پنل، تازه‌تر از همان
+  پنجره) — به همان اندازه معتبر که کلیدِ سرویس. رمز هرگز در هشِ کلیدِ یکتایی یا هیچ ردیفی نمی‌نشیند.
+- ⛔ **جدول‌ها فقط افزودنی** (تریگرِ `finance_refuse_change`)؛ `sub_payments_revision` هر UPDATE/DELETE ِ `sub_payments` را با ردیفِ
+  پیش و پس نگه می‌دارد. **خالص هرگز منفی** (قید + قفلِ ردیفِ پرداخت)؛ ابطال = همهٔ خالصِ همان لحظه.
+- ⚠️ وقتی #582 (`tenant-matrix.test.js`) مرج شد، `GET /api/admin/finance/payments/:id` (تنها درِ شناسه‌دارِ مالی) در `ADMIN_SUBJECT`
+  رده می‌گیرد — خطِ آماده در بندِ ۱۲.۵؛ بقیهٔ `GET /api/admin/finance/*` بی‌شناسه‌اند (دادهٔ پولیِ پلتفرم به‌ازای دکان؛ فقط مدیر).
+

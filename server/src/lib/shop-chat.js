@@ -6,8 +6,8 @@
  *   پرچم ── `shop.chat` در «تنظیماتِ زنده» (scope = شناسهٔ دکان، یا `all`).
  *           ⛔ پیش‌فرض خاموش ⇒ همهٔ درها ۴۰۴ و هیچ ردیفی ساخته نمی‌شود.
  *   بیننده ─ `{ side: 'shop', shopId, userId, role }` (کارمند؛ shop_id فقط از
- *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone }` (مشتری؛
- *           شمارهٔ تأییدشده از بلیتِ ویترین). هر پرسش با همین دو قفل می‌شود:
+ *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ بلیتِ
+ *           ویترین، یا نشستِ حسابِ بازار — `shop-chat-account.js`). هر پرسش با همین دو قفل می‌شود:
  *           شناسهٔ گفت‌وگو/پیام/رسانهٔ دیگری ⇒ همان ۴۰۴ ِ «نیست» (CHAT-09).
  *   ارسال ─ با `clientId` ِ خودِ دستگاه، زیرِ قفلِ ردیفِ گفت‌وگو: تکرار ⇒ همان
  *           پیام، نه دومی (CHAT-02/11)؛ همان شناسه با بدنهٔ دیگر ⇒ ۴۰۹.
@@ -32,6 +32,7 @@ const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const chatMedia = require('./chat-media');
 const { notify, listen, waiting } = require('./chat-wait');
+const acct = require('./shop-chat-account');
 const { ApiError, badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.chat';
@@ -86,6 +87,8 @@ const viewerKey = (v) => (v.side === 'customer' ? 'customer' : `user:${v.userId}
 const peerOf = (side) => (side === 'customer' ? 'shop' : 'customer');
 const gone = () => notFound('این گفت‌وگو پیدا نشد', 'conversation_not_found');
 const isAuthor = (v, m) => m.sender === v.side && (v.side === 'customer' || m.sender_user_id === v.userId);
+//  سنجاقِ پیام (CHAT-14) — `lib/shop-chat-pins.js`؛ تابع‌های این پرونده hoist می‌شوند
+const pins = require('./shop-chat-pins')({ rowOf, lockedMessage, viewerKey, viewOf, n, asJson });
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم
@@ -108,8 +111,8 @@ async function rowOf(viewer, id, { c = null, lock = false } = {}) {
   const cid = String(id || '');
   if (!ID_RE.test(cid)) throw gone();
   const args = [cid, viewer.shopId];
-  let sql = 'SELECT * FROM shop_chat_conversations WHERE id=$1 AND shop_id=$2';
-  if (viewer.side === 'customer') { args.push(viewer.phone); sql += ' AND customer_phone=$3'; }
+  let sql = 'SELECT * FROM shop_chat_conversations c WHERE c.id=$1 AND c.shop_id=$2';
+  if (viewer.side === 'customer') sql += ` AND ${acct.mineSql(viewer, args)}`;
   if (lock) sql += ' FOR UPDATE';
   const row = c ? (await c.query(sql, args)).rows[0] : await one(sql, args);
   if (!row) throw gone();
@@ -137,7 +140,8 @@ function viewSql(viewer) {
                AND b.customer_phone = c.customer_phone AND b.blocker = 'customer') AS blocked_by_customer,
       (SELECT json_build_object('kind', m.kind, 'body', LEFT(m.body, 80), 'sender', m.sender,
                                 'deleted', m.deleted_at IS NOT NULL, 'at', m.created_at)
-         FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last
+         FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last,
+      ${pins.pinnedSql(mine)}
     FROM shop_chat_conversations c
     JOIN shops s ON s.id = c.shop_id
     LEFT JOIN online_orders o ON o.id = c.order_id AND o.shop_id = c.shop_id`;
@@ -151,6 +155,7 @@ function conversationView(viewer, r) {
     seq: n(r.seq),
     rev: n(r.rev),
     unread: n(r.unread),
+    pinned: pins.pinnedView(r.pinned),
     orderNo: r.order_no == null ? null : Number(r.order_no),
     lastMessage: last ? {
       kind: last.kind, sender: last.sender, at: n(last.at),
@@ -219,7 +224,7 @@ async function list(viewer, { cursor, limit, status, q } = {}) {
   const args = [viewer.shopId];
   const where = ['c.shop_id = $1'];
   if (viewer.side === 'customer') {
-    args.push(viewer.phone); where.push(`c.customer_phone = $${args.length}`);
+    where.push(acct.mineSql(viewer, args));
   } else {
     where.push("(c.seq > 0 OR c.order_id <> '')");
     const st = str(status);
@@ -292,10 +297,8 @@ async function open(viewer, body) {
     orderId = o.id;
     name = shortText(o.customer_name, 60);
   }
-  const find = () => one(
-    'SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=$3',
-    [viewer.shopId, phone, orderId]
-  );
+  const find = () => (viewer.side === 'customer' ? acct.findForCustomer(viewer, orderId)
+    : one('SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=$3', [viewer.shopId, phone, orderId]));
   let row = await find();
   let created = false;
   if (!row) {
@@ -305,15 +308,16 @@ async function open(viewer, body) {
     }
     const t = now();
     const ins = await one(
-      `INSERT INTO shop_chat_conversations (id, shop_id, customer_phone, customer_name, order_id, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$6)
+      `INSERT INTO shop_chat_conversations (id, shop_id, customer_phone, customer_name, order_id, customer_id, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$7)
        ON CONFLICT (shop_id, customer_phone, order_id) DO NOTHING RETURNING id`,
-      [newId('sch'), viewer.shopId, phone, name, orderId, t]
+      [newId('sch'), viewer.shopId, phone, name, orderId, viewer.customerId || null, t]
     );
     created = !!ins;
-    row = ins || await find();
-  } else if (viewer.side === 'customer' && name) {
-    await query("UPDATE shop_chat_conversations SET customer_name=$2 WHERE id=$1 AND customer_name=''", [row.id, name]);
+    row = ins || await find();   // نبود ⇒ کلیدِ یکتا (شماره) را گفت‌وگوی حسابی گرفته که شماره‌اش را عوض کرده
+    if (!row) throw conflict('گفت‌وگو با این دکان از این شماره ممکن نیست؛ با حسابِ خود وارد شوید', 'chat_unavailable');
+  } else if (viewer.side === 'customer') {
+    await acct.reopen(viewer, row, name);   // نامِ خالی، و با نشستِ حساب گره به همان حساب
   }
   return { conversation: await viewOf(viewer, row.id), created };
 }
@@ -580,6 +584,7 @@ async function remove(viewer, id, messageId, scope) {
         [m.id, viewerKey(viewer), now()]
       )).rows[0];
       if (!ins) return { changed: false };
+      await pins.dropHidden(c, viewer, conv.id, m.id);
       const rev = await bumpRev(c, conv.id);
       await c.query('UPDATE shop_chat_messages SET rev=$2 WHERE id=$1', [m.id, rev]);
       return { changed: true, convId: conv.id };
@@ -597,6 +602,7 @@ async function remove(viewer, id, messageId, scope) {
               deleted_at=$2, deleted_by=$3, rev=$4 WHERE id=$1`,
       [m.id, t, viewerKey(viewer), rev]
     );
+    await pins.dropAll(c, m.id);
     //  رسانه‌ای که دیگر هیچ پیامِ زنده‌ای به آن اشاره نمی‌کند همین حالا می‌رود
     for (const mid of [m.media_id, m.thumb_id].filter(Boolean)) {
       await c.query(
@@ -701,18 +707,6 @@ async function getMedia(viewer, id, mediaId) {
   return { id: m.id, mime: m.mime, size: n(m.size), kind: m.kind, data: Buffer.from(m.data) };
 }
 
-/** بایت‌ها به بیننده — هرگز صفحه نمی‌شود، کش نمی‌شود؛ PDF فقط دانلود. */
-function sendMedia(res, m) {
-  res.set('Content-Type', m.mime);
-  res.set('Content-Length', String(m.data.length));
-  res.set('Cache-Control', 'private, no-store');
-  res.set('X-Content-Type-Options', 'nosniff');
-  res.set('Content-Security-Policy', "default-src 'none'; sandbox");
-  res.set('Cross-Origin-Resource-Policy', 'same-origin');
-  res.set('Content-Disposition', m.kind === 'file' ? `attachment; filename="chat-${m.id}.pdf"` : 'inline');
-  res.end(m.data);
-}
-
 /** خوانندهٔ بدنهٔ خامِ بارگذاری — بزرگ‌تر از بزرگ‌ترین سقف پیش از خواندن رد می‌شود. */
 function rawMedia(req, res, next) {
   const s = config.shopChat;
@@ -797,7 +791,7 @@ async function search(viewer, q, { limit } = {}) {
   const lim = intIn(limit, { min: 1, max: 50, def: 30 });
   const args = [viewer.shopId, `%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`, viewerKey(viewer)];
   let scope = '';
-  if (viewer.side === 'customer') { args.push(viewer.phone); scope = ` AND c.customer_phone = $${args.length}`; }
+  if (viewer.side === 'customer') scope = ` AND ${acct.mineSql(viewer, args)}`;
   args.push(lim);
   const rows = await many(
     `SELECT m.id, m.conversation_id, m.seq, m.sender, m.sender_user_id, m.kind, m.body, m.created_at
@@ -868,10 +862,10 @@ async function sweep({ at = now(), retentionDays = config.shopChat.retentionDays
 
 module.exports = {
   FLAG_KEY, KINDS, REASONS, MAX_BODY,
-  flagOf, list, open, viewOf, setStatus,
+  flagOf, list, open, viewOf, setStatus, adoptForPhoneChange: acct.adoptForPhoneChange,
   send, changes, edit, remove, receipts,
-  putMedia, getMedia, sendMedia, rawMedia,
-  setBlock, report, search,
+  putMedia, getMedia, sendMedia: chatMedia.send, rawMedia,
+  setBlock, report, search, pin: pins.pin, MAX_PINS: pins.MAX_PINS,
   reportsForAdmin, reviewReport,
   sweep, maskPhone, waiting,
 };

@@ -10,12 +10,7 @@
  *   • باگِ واقعی فقط با PR ِ اصلاحِ باز (شماره در `ref`) یا blocker ِ صریح (مثلاً پروندهٔ
  *     ممنوعِ مشترک با پمپ) این‌جا می‌آید؛ پس از مرجِ اصلاح «xpass» می‌شود و ردیف پاک.
  */
-export const KNOWN_GAPS = [
-  {
-    scenario: 'ops', step: 'E2E-OPS-14.replay', match: /فروشِ پس از پشتیبان روی سرورِ بازیابی‌شده نیست/,
-    ref: '§۹.۵ — MISSING: پس از بازیابیِ سرور، برنامه cursor ِ جلوتر از سرِ دفترِ سرور را تشخیص نمی‌دهد و opهای «اعمال‌شده» را دوباره نمی‌فرستد',
-  },
-];
+export const KNOWN_GAPS = [];
 
 /**
  * @returns {{status:'pass'|'fail'|'known-gap'|'xpass', ref?:string}}

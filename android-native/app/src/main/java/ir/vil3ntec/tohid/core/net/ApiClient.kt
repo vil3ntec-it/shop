@@ -77,6 +77,17 @@ class ApiClient(
   suspend fun put(path: String, body: JsonObject = EMPTY): JsonObject =
     authorized("PUT", path, body, idempotent = false)
 
+  /** همان `postKeyed` برای `PUT` (انتشارِ گروهیِ ویترین) */
+  suspend fun putKeyed(path: String, body: JsonObject, idempotencyKey: String): JsonObject =
+    authorized(
+      "PUT", path, null, idempotent = true,
+      raw = RawBody(
+        body.toString().toByteArray(Charsets.UTF_8),
+        "application/json; charset=utf-8",
+        mapOf("Idempotency-Key" to idempotencyKey),
+      ),
+    )
+
   suspend fun delete(path: String): JsonObject = authorized("DELETE", path, null, idempotent = false)
 
   /**
