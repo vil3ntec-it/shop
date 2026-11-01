@@ -539,6 +539,9 @@
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+| `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند (`PromoLive.redeemGate`)؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | #450 (سرور)، برنامه در PRِ پشتِ آن | باز |
+
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
@@ -573,6 +576,8 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 `ShopPolicy.productTools` (`tohid-policy` ⇐ `product_tools`، پیش‌فرض خاموش؛ «تنظیمات ⇐ ابزارهای تازهٔ کالا»): هشدارِ «نامِ مشابه» در فرم
 و ورود از فایل و کادرِ «بارکدها» (PRD-19، PRD-04؛ #459، باز)، نام و دلیلِ تغییرِ قیمت و «قیمتِ گروهی» با پیش‌نمایش و تأیید (PRD-14،
 PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ رفعِ «ویرایش بارکدهای دیگر را پاک می‌کرد» (#476) پشتِ هیچ پرچمی نیست.
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛
+`ShopPolicy.stockInsight` / `tohid-policy:stock_insight` «تحلیلِ موجودی» در گزارشِ کالاها: ارزش، سودِ بالقوه و ABC، فقط خواندنی (INV-15/16، #438، باز)؛ `ShopPolicy.stockLevels` / `tohid-policy:stock_levels` «نقطهٔ سفارش و بیشینه»: دو کادرِ فرمِ کالا، ویرایشِ گروهیِ حدها و «نیاز به سفارش»؛ فیلدهای افزودنیِ `Product.reorderPoint`/`maxStock` (`NEVER`) فقط با روشن بودن نوشته می‌شوند (INV-12، #438، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

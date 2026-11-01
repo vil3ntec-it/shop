@@ -32,6 +32,7 @@ object PromoJson {
       at = at,
       stamp = bool(o["stamp"]),
       tierPrice = bool(o["tierPrice"]),
+      redeem = bool(o["redeem"]),
       revs = rules.zip(raw).mapNotNull { (r, e) -> (e as? JsonObject)?.let { rev(it) }?.takeIf { it > 0 }?.let { r.id to it } }.toMap(),
     )
   }
@@ -44,6 +45,7 @@ object PromoJson {
     put("stamp", s.stamp)
     //  POS-19: فقط روشن نوشته می‌شود — نسخهٔ ذخیره‌شدهٔ دستگاه با پرچمِ خاموش همان پیشین
     if (s.tierPrice) put("tierPrice", true)
+    put("redeem", s.redeem)
     //  `rev` فقط برای همین نسخهٔ دستگاه — `PUT` ِ قاعده آن را نمی‌فرستد
     put("rules", JsonArray(s.rules.map { r -> s.revs[r.id]?.let { JsonObject(toJson(r) + ("rev" to JsonPrimitive(it))) } ?: toJson(r) }))
     put("permissions", buildJsonObject { put("manage", s.manage); put("belowCost", s.belowCost) })

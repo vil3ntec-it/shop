@@ -74,6 +74,8 @@ object StrPos {
   // تخفیف
   val autoDiscount: String get() = t("تخفیفِ خودکار", "Automatic discount", "اتومات تخفیف")
   fun promoA11y(n: Any, a: Any): String = t("تخفیفِ $n: $a افغانی", "Discount $n: $a AFN", "تخفیف $n: $a افغانۍ")
+  //  PRM-02: کدِ سقف‌دار بی پاسخِ سرور پذیرفته نمی‌شود
+  fun couponNeedsOnline(c: Any): String = t("کدِ $c سقفِ مصرف دارد و فقط با اینترنت پذیرفته می‌شود — وصل شوید یا کد را بردارید", "Code $c has a usage limit and is accepted only online — connect or remove the code", "کوډ $c د کارونې حد لري او یوازې له انټرنېټ سره منل کېږي — وصل شئ یا کوډ لرې کړئ")
   val discountCode: String get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
   val apply: String get() = t("اعمال", "Apply", "پلي کړئ")
   fun removeCode(c: Any): String = t("برداشتنِ کدِ $c", "Remove code $c", "$c کوډ لرې کړئ")

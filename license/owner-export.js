@@ -111,6 +111,8 @@
     alternatives: 'کالاهای جایگزین',
     customFields: 'فیلدهای سفارشی',
     brand: 'برند',
+    reorderPoint: 'نقطهٔ سفارش',
+    maxStock: 'حداکثر موجودی',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',
