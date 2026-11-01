@@ -205,6 +205,18 @@ server؛ (۵) Pages ⇐ GitHub Actions، اسکنِ secret، Dependabot، مجو
   سند: `DISASTER-RECOVERY-fa.md` §۳.۱. آزمون: `test/move-db.test.js` ۸/۸ (PGlite؛ و PGlite ⇐ PostgreSQL ⇐ PGlite روی PostgreSQL 16ِ محلی).
 - نیمه‌کاره: پیوند از `docs/SERVERS-fa.md` (هنوز در PRِ باز #576) به همین ابزار، پس از مرجِ آن.
 - قدمِ بعدی: پس از مرج، پنلِ خانگی `move-server.mjs` را با همین ابزار برای تطبیقِ سرورِ حساب صدا می‌زند (کدش آماده است).
+### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/console-phase3` (پنلِ مرکزی، فاز ۳ — سمتِ سرورِ حساب)
+- انجام شد: `GET /api/admin/shops/:id/health` (فقط دادهٔ واقعی؛ نبود ⇒ null)؛ چهار حالتِ جدای دکان + بایگانی
+  (`lib/shop-holds.js`، مهاجرتِ ۱۶۵) — تعلیقِ دسترسی، غیرفعال کردنِ سرویس، پایانِ اشتراک (فقط مالی/ارشد، با Idempotency-Key)،
+  درخواستِ حذف (حذفِ واقعی همان راهِ تأییدشدهٔ پیشین) و بایگانی؛ هیچ‌کدام چیزی پاک نمی‌کند، دلیل اجباری، سابقه در همان تراکنش.
+  نقش‌های `finance` و `viewer` (پیش‌فرض‌بسته، `lib/admin-roles.js`)؛ کلیدِ سرویس + «انجام‌دهنده» برای پلِ پنل (راهِ ارشدِ پیشین
+  هنوز کار می‌کند)؛ تاریخچهٔ `live_config` و `GET/PUT/DELETE /api/admin/flags`؛ مالکِ اصلی (`is_owner`) را ارشدِ دیگر نمی‌بندد
+  (مهاجرت‌های ۱۶۸–۱۶۹). شرح: بندِ ۱۲ ِ `docs/spec/ADMIN-CONTROL-PLANE.md`. آزمون: `test/console-phase3.test.js`.
+- نیمه‌کاره: سمتِ پنل (ریپوی `server`) هنوز با رمزِ ارشد می‌آید — جابه‌جایی به کلیدِ سرویس کارِ PRِ بعدیِ همان ریپو است
+  (راهش در بندِ ۱۲.۲). رده‌بندیِ دو درِ تازه در `tenant-matrix.test.js` (#582) و «تازه» شمردنِ کلیدِ سرویس در `assertFresh` (#588)
+  با هر کدام که دوم مرج شود (بندِ ۱۲.۲ و ۱۲.۵).
+- قدمِ بعدی: PRِ پل در ریپوی `server`؛ رابطِ «حالت‌ها»، «سلامت» و «پرچم‌ها» در `ShopDesk`.
+
 
 ### ۱۴۰۵/۰۸/۰۹ — شاخهٔ `claude/console-glue` (چسبِ فاز ۳ ⇄ پنل؛ روی `claude/console-phase3`)
 - انجام شد: `GET /api/admin/me` ⇒ `capabilities` (`shop-health.v1`، `shop-holds.v1`، `flags.v1`، `actor.v1`، `service-key.v1` —
