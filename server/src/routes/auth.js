@@ -27,6 +27,7 @@ const loginAlerts = require('../lib/login-alerts');
 const terms = require('../lib/terms');
 const audit = require('../lib/audit');
 const reauth = require('../lib/reauth');
+const hardening = require('../lib/auth-session-hardening');
 const { membershipOf } = require('../lib/shops');
 const staffCodes = require('../lib/staff-codes');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -286,7 +287,7 @@ async function loginPayload(user, session) {
   return {
     user: publicUser(user),
     shop: member ? {
-      id: member.shop_id, name: member.shop_name || '', role: member.role,
+      id: member.shop_id, name: member.shop_name || '', role: require('../lib/permissions').legacyRole(member.role), actualRole: member.role, // A16
     } : null,
     shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
     ...session,
@@ -588,15 +589,14 @@ router.post('/login', authLimit, async (req, res, next) => {
     isEmail ? 'SELECT * FROM users WHERE email=$1' : 'SELECT * FROM users WHERE phone=$1',
     [identifier]
   );
-  //  حساب نبود؟ باز هم همان‌قدر وقت می‌گیرد — شرحش سرِ `pw.burnTime`
-  let ok = false;
-  if (user && user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
-  else await pw.burnTime(password);
+  //  حساب نبود یا هشِ کهنه؟ باز هم همان‌قدر وقت می‌گیرد (SEC-AUTH-01، `lib/auth-session-hardening`)
+  const ok = await hardening.checkPassword(user, password);
 
   await noteAttempt('user', identifier, clientIp(req), ok);
   if (!ok) return next(unauthorized('ایمیل/شماره یا رمز درست نیست', 'bad_credentials'));
   await clearAttempts('user', identifier);
   if (user.status !== 'active') return next(forbidden('این حساب غیرفعال است', 'account_disabled'));
+  await hardening.upgradeHash('users', user, password);
 
   const session = await issueSession(user, req.body?.device, clientIp(req), appOf(req), appVersionOf(req));
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.login', detail: { method: 'password' }, ip: clientIp(req) });

@@ -24,6 +24,19 @@
    • سقف (caps) فقط وقتی اثر دارد که حالت allow باشد؛ عددِ بالاتر از
      سقف ⇐ approve (اگر مجوز تأییدپذیر است) وگرنه deny.
 
+   ── نقش‌ها (STF-01، بخشِ ۱۰.۱) ─────────────────────────────────────
+   owner/manager/staff همان سه نقشِ قدیم‌اند و رفتارشان عوض نمی‌شود. چهار
+   نقشِ تازه (A16) فقط وقتی کسی را می‌گیرند که صاحب دکان خودش بدهد:
+     cashier     صندوق‌دار — فروش، قرض و برگشت؛ نه انبار، نه خرید
+     storekeeper انباردار — کالا، رسیدِ انبار، خرید و شمارش؛ نه فروش و پول
+     picker      جمع‌آور — سفارشِ اینترنتی را آماده می‌کند؛ دفتر نمی‌نویسد
+     accountant  حسابدار — همه را می‌بیند (عددِ مالی و سابقه هم)، هیچ نمی‌نویسد
+   پیک (courier) عمداً این‌جا نیست: توکنش دامنهٔ خودش را دارد.
+
+   `canWrite(role, table)` = کدام جدولِ همگام‌سازی را این نقش می‌نویسد.
+   سه نقشِ قدیم «*» (همه، همان امروز)؛ نقشِ ناشناخته هیچ. سرور در هر سه
+   راهِ همگام‌سازی همین را اجرا می‌کند و برنامه پیش از ذخیره همین را می‌پرسد.
+
    این فایل هیچ چیزی از مرورگر نمی‌خواهد؛ همان کد در Node هم می‌دود.
    ========================================================== */
 (function (factory) {
@@ -38,10 +51,25 @@
   var VERSION = 1;
   var MODES = ['allow', 'approve', 'deny'];
   var RANK = { deny: 0, approve: 1, allow: 2 };
-  var ROLES = ['owner', 'manager', 'staff'];
+  var ROLES = ['owner', 'manager', 'staff', 'cashier', 'storekeeper', 'picker', 'accountant'];
 
   /** نامِ سقف ⇐ نامِ فیلدِ درخواست */
   var CAP_FIELDS = { maxPct: 'pct', maxAmount: 'amount' };
+
+  /**
+   *  پیش‌فرض‌ها به ترتیبِ `ROLES` — هر هفت نقش، صریح. کلیدی که کمتر بدهد (مثلاً فقط سه نقشِ قدیم)
+   *  همین‌جا هنگامِ بارگذاری می‌شکند: نقشِ بی پیش‌فرض در `evaluate` به «allow» می‌رسید (بازبینی، یافتهٔ ۴).
+   */
+  function d(owner, manager, staff, cashier, storekeeper, picker, accountant) {
+    if (arguments.length !== ROLES.length) throw new Error('perm-core: d() needs ' + ROLES.length + ' modes');
+    for (var a = 0; a < arguments.length; a++) {
+      if (MODES.indexOf(arguments[a]) < 0) throw new Error('perm-core: bad mode ' + arguments[a]);
+    }
+    return {
+      owner: owner, manager: manager, staff: staff,
+      cashier: cashier, storekeeper: storekeeper, picker: picker, accountant: accountant,
+    };
+  }
 
   /*
    *  فهرستِ مجوزهایی که از هسته می‌گذرند. پیش‌فرض‌ها = رفتارِ امروز:
@@ -53,45 +81,297 @@
    */
   var CATALOG = {
     'sales.discount': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxPct', 'maxAmount'], display: false,
     },
     'sales.cancel': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,
     },
     //  برگشتِ کالا و بازپرداخت (STF-03 «مبلغِ برگشت»): امروز هر عضوِ نویسنده
-    //  ثبت می‌کند، پس پیش‌فرض برای همه allow است
+    //  ثبت می‌کند، پس پیش‌فرض برای همه allow است؛ از نقش‌های تازه فقط صندوق‌دار
     'returns.create': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'allow' },
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
     },
     'settings.write': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,
     },
+    //  حسابدار سابقه و عددِ مالی را می‌بیند — کارش همین است
     'audit.view': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'allow'),
       edit: 'restrict', approvable: false, caps: [], display: false,
     },
     'reports.money': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'allow'),
       edit: 'full', approvable: false, caps: [], display: true,
     },
-    //  HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286
+    //  HW-03: باز کردنِ دستیِ کشو بی فروش (`no_sale`)؛ شاگرد فقط با تأییدکننده — همان no_sale ِ #286.
+    //  نقش‌های تازه هم «ممنوع» (صندوق‌دار هم: لایهٔ نقش می‌تواند «با تأیید» کند، مثلِ شاگرد)
     'drawer.open': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'deny' },
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,
     },
     //  PAY-15: گزارشِ X (میانِ شیفت) و Z (پایانِ شیفت) ِ صندوقِ شیفت — امروز همه می‌بینند (شاگرد نمای کور،
-    //  PAY-13)، پس پیش‌فرض برای همه allow است؛ فقط نمایش است (Z روی دستگاه هست)، تنگ‌شدنی و بی تأیید
+    //  PAY-13)، پس پیش‌فرض برای همه allow است؛ فقط نمایش است (Z روی دستگاه هست)، تنگ‌شدنی و بی تأیید.
+    //  نقش‌های تازه: صندوق‌دار (صندوقِ خودش) و حسابدار (عددِ مالی) می‌بینند؛ انباردار و جمع‌آور نه
     'shift.report': {
-      defaults: { owner: 'allow', manager: 'allow', staff: 'allow' },
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'allow'),
       edit: 'restrict', approvable: false, caps: [], display: true,
     },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
+
+  /*
+   *  جدول‌های همگام‌سازی که هر نقش می‌نویسد (نام‌های Sync v1/v3، همان
+   *  `SyncEngine.COLLECTIONS`ِ برنامه). «*» = همه — رفتارِ امروزِ سه نقشِ قدیم.
+   *  `auditLog` برای هر نقشِ نویسنده است: سابقهٔ همان کاری که کرده.
+   *  فروش با قلم، حرکتِ انبار، پرداختِ قرض و سابقه یک‌جا می‌نشیند؛ رسیدِ خرید
+   *  با کالا، تاریخچهٔ قیمت، رسیدِ انبار و حرکتِ انبار.
+   *  صندوق‌دار `warehouseEntries` و `stockMovements` را فقط با «قاعدهٔ ردیف» دارد (`ROW_RULES`
+   *  پایین): اصلاحِ موجودیِ قلمِ برگشت (RET، #318) و حرکتِ انبارِ فاکتور و برگشت — نه رسیدِ
+   *  انبارِ دستی، نه اصلاح یا خریدِ آزاد.
+   */
+  var WRITES = {
+    owner: '*',
+    manager: '*',
+    staff: '*',
+    cashier: ['auditLog', 'debtors', 'returns', 'saleItems', 'sales', 'stockMovements', 'transactions', 'warehouseEntries'],
+    storekeeper: ['auditLog', 'priceHistory', 'productCategories', 'productUnits', 'products', 'purchases',
+      'stockCounts', 'stockMovements', 'suppliers', 'warehouseEntries'],
+    picker: ['auditLog'],
+    accountant: [],
+    //  گاوصندوق (`safeEntries`، #364) عمداً در فهرستِ هیچ نقشِ تازه‌ای نیست: صندوق‌دار دخل را می‌بندد ولی
+    //  پول به/از گاوصندوق نمی‌برد. با مرجِ #364، `safe.move` هم برای هر چهار نقشِ تازه صریحاً «deny» است.
+  };
+
+  /** این نقش این جدولِ همگام‌سازی را می‌نویسد؟ نقشِ ناشناخته ⇐ نه (بسته‌به‌خطا) */
+  function canWrite(role, table) {
+    if (typeof role !== 'string' || !has(WRITES, role) || typeof table !== 'string' || !table) return false;
+    var w = WRITES[role];
+    return w === '*' || w.indexOf(table) >= 0;
+  }
+
+  /*
+   *  قاعدهٔ ردیف: جدولی که نقش فقط ردیف‌های تازهٔ معینی از آن را می‌نویسد. ویرایش و حذف
+   *  هرگز؛ «insert» روی ردیفِ موجود هم ویرایش است (گردآورنده آن را null می‌دهد).
+   *    return_adjustment  اصلاحِ موجودیِ یک قلمِ برگشت (#318): `isAdjustment` = true، بی قیمت و
+   *                       کارتن، `adjKind` یکی از RETURN_ADJ_KINDS با علامتِ همان نوع (ضایعات منفی،
+   *                       برگشتِ بی‌رسید مثبت)، `refId` = شناسه یا `docId`ِ برگشتی که مالِ خودِ
+   *                       نویسنده است (همین دسته، یا ثبت‌شده با همین دستگاه/کاربر)، `productId`
+   *                       یکی از قلم‌های همان برگشت و |units| نه بیش از مقدارِ آن قلم. هر قلم فقط
+   *                       یک اصلاح (اصلاح‌های ثبت‌شده در `taken`).
+   *    doc_movement       حرکتِ انبارِ یک سند: `type` یکی از DOC_MOVE_TYPES با علامتِ همان نوع،
+   *                       `refId` = فاکتور (sale، sale_cancel) یا قلمِ برگشت (customer_return،
+   *                       damage) از همین دسته یا ثبت‌شده، و `productId` یکی از قلم‌های همان سند
+   *                       (`saleItems` یا قلمِ برگشت). جمعِ |qty| ِ هر نوع برای هر قلم — حرکت‌های
+   *                       ثبت‌شده (`moved`) و پذیرفته‌های پیشینِ همین دسته — نه بیش از مقدارِ قلم.
+   *                       `sale_cancel` فقط برای فاکتورِ لغوشده (`cancelled`: همین دسته یا ثبت‌شده).
+   *  ردیف (`row`) نمای یک‌دستِ درج است با یکاهای برنامه (v3: Milli/Minor ÷ ۱۰۰۰/۱۰۰، کارِ گردآورنده).
+   *  refs = { returns: [{id, docId, productId, qty, own}], sales: [id], taken: [{refId, productId, units}],
+   *           saleItems: [{id, saleId, productId, qty}], cancelled: [saleId], moved: [{refId, productId, type, qty}] }
+   */
+  var RETURN_ADJ_KINDS = ['customer_return', 'damage'];
+  /** نوعِ حرکت ⇐ سندی که `refId` به آن اشاره می‌کند */
+  var DOC_MOVE_TYPES = { sale: 'sale', sale_cancel: 'sale', customer_return: 'return', damage: 'return' };
+  /** نوع‌هایی که مقدارشان منفی است (بیرون رفتن از موجودی)؛ بقیه مثبت */
+  var NEGATIVE_KINDS = ['damage', 'sale'];
+  var ROW_RULES = { cashier: { warehouseEntries: 'return_adjustment', stockMovements: 'doc_movement' } };
+
+  /** نامِ قاعدهٔ ردیفِ این نقش برای این جدول، یا null (یعنی همهٔ ردیف‌ها، اگر `canWrite`) */
+  function rowRule(role, table) {
+    if (typeof role !== 'string' || !has(ROW_RULES, role)) return null;
+    return typeof table === 'string' && has(ROW_RULES[role], table) ? ROW_RULES[role][table] : null;
+  }
+
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function isId(v) { return typeof v === 'string' && v !== ''; }
+  function num(v) { return typeof v === 'number' && isFinite(v) ? v : null; }
+  function signOk(kind, v) { return v !== null && (NEGATIVE_KINDS.indexOf(kind) >= 0 ? v < 0 : v > 0); }
+  /** قلم‌های برگشتی که `ref` شناسه یا `docId`ِ آن است */
+  function linesOf(refs, ref) {
+    var out = [];
+    var list = isObj(refs) && Array.isArray(refs.returns) ? refs.returns : [];
+    for (var i = 0; i < list.length; i++) {
+      var r = list[i];
+      if (isObj(r) && isId(r.id) && (r.id === ref || r.docId === ref)) out.push(r);
+    }
+    return out;
+  }
+  /** کوچک‌ترین قلمِ آزادی که مقدارِ `need` در آن جا می‌شود (اولی در برابری) */
+  function bestFit(lines, need, used) {
+    var best = null;
+    for (var i = 0; i < lines.length; i++) {
+      var q = num(lines[i].qty);
+      if (used[lines[i].id] === true || q === null || q < need) continue;
+      if (best === null || q < num(best.qty)) best = lines[i];
+    }
+    return best;
+  }
+  function fits(lines, need) {
+    for (var i = 0; i < lines.length; i++) {
+      var q = num(lines[i].qty);
+      if (q !== null && q >= need) return true;
+    }
+    return false;
+  }
+  function ofProduct(lines, productId) {
+    if (!isId(productId)) return [];
+    return lines.filter(function (r) { return r.productId === productId; });
+  }
+
+  function no(reason) { return { ok: false, reason: reason }; }
+  function yes() { return { ok: true, reason: '' }; }
+
+  function checkAdjustment(row, refs, used) {
+    if (row.isAdjustment !== true) return no('adjustment');
+    var money = ['price', 'cartons', 'perCarton'];
+    for (var i = 0; i < money.length; i++) {
+      var m = row[money[i]];
+      if (m !== undefined && m !== null && m !== 0) return no('price');
+    }
+    if (RETURN_ADJ_KINDS.indexOf(row.adjKind) < 0) return no('kind');
+    var units = num(row.units);
+    if (!signOk(row.adjKind, units)) return no('sign');
+    if (!isId(row.refId)) return no('ref');
+    var lines = linesOf(refs, row.refId);
+    if (!lines.length) return no('ref');
+    lines = lines.filter(function (r) { return r.own === true; });
+    if (!lines.length) return no('owner');
+    lines = ofProduct(lines, row.productId);
+    if (!lines.length) return no('product');
+    var need = Math.abs(units);
+    if (!fits(lines, need)) return no('qty');
+    var line = bestFit(lines, need, used);
+    if (!line) return no('used');
+    used[line.id] = true;
+    return yes();
+  }
+
+  /** ریزِ گرد کردنِ جمعِ اعشاری (۰٫۱ + ۰٫۲)؛ همان در کاتلین */
+  var EPS = 1e-9;
+  function listOf(refs, k) { return isObj(refs) && Array.isArray(refs[k]) ? refs[k] : []; }
+  /** قلم‌هایی که حرکتِ این نوع با این نشانی و این کالا از آن‌ها برمی‌دارد: {key, qty} */
+  function moveLines(refs, type, ref, productId) {
+    var doc = DOC_MOVE_TYPES[type];
+    if (!isId(productId)) return [];
+    if (doc === 'sale') {
+      var items = listOf(refs, 'saleItems');
+      var out = [];
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (isObj(it) && isId(it.id) && it.saleId === ref && it.productId === productId) {
+          out.push({ key: type + '\u0000s\u0000' + it.id, qty: num(it.qty) });
+        }
+      }
+      return out;
+    }
+    return ofProduct(linesOf(refs, ref), productId)
+      .map(function (r) { return { key: type + '\u0000r\u0000' + r.id, qty: num(r.qty) }; });
+  }
+  function room(lines, spent) {
+    var free = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var q = lines[i].qty;
+      if (q !== null && q > 0) free += Math.max(0, q - (spent[lines[i].key] || 0));
+    }
+    return free;
+  }
+  /** `need` را به ترتیب از قلم‌ها برمی‌دارد (ثبت‌شده‌ها بیش از جا را هم نمی‌گیرند) */
+  function spend(lines, need, spent) {
+    for (var i = 0; i < lines.length && need > EPS; i++) {
+      var q = lines[i].qty;
+      if (q === null || q <= 0) continue;
+      var take = Math.min(need, Math.max(0, q - (spent[lines[i].key] || 0)));
+      spent[lines[i].key] = (spent[lines[i].key] || 0) + take;
+      need -= take;
+    }
+  }
+  /** آنچه حرکت‌های ثبت‌شده (`moved`) از قلم‌ها برداشته‌اند */
+  function spentLines(refs) {
+    var spent = Object.create(null);
+    var moved = listOf(refs, 'moved');
+    for (var i = 0; i < moved.length; i++) {
+      var m = moved[i];
+      if (!isObj(m) || typeof m.type !== 'string' || !has(DOC_MOVE_TYPES, m.type) || !isId(m.refId)) continue;
+      var q = num(m.qty);
+      if (q === null) continue;
+      spend(moveLines(refs, m.type, m.refId, m.productId), Math.abs(q), spent);
+    }
+    return spent;
+  }
+
+  function checkMovement(row, refs, spent) {
+    var doc = typeof row.type === 'string' && has(DOC_MOVE_TYPES, row.type) ? DOC_MOVE_TYPES[row.type] : null;
+    if (!doc) return no('kind');
+    var qty = num(row.qty);
+    if (!signOk(row.type, qty)) return no('sign');
+    if (!isId(row.refId)) return no('ref');
+    if (doc === 'sale') {
+      if (listOf(refs, 'sales').indexOf(row.refId) < 0) return no('ref');
+      if (row.type === 'sale_cancel' && listOf(refs, 'cancelled').indexOf(row.refId) < 0) return no('cancel');
+    } else if (!linesOf(refs, row.refId).length) return no('ref');
+    var lines = moveLines(refs, row.type, row.refId, row.productId);
+    if (!lines.length) return no('product');
+    var need = Math.abs(qty);
+    if (need > room(lines, spent) + EPS) return no('qty');
+    spend(lines, need, spent);
+    return yes();
+  }
+
+  /** قلم‌هایی که اصلاحِ ثبت‌شده دارند (`refs.taken`): هر اصلاح یک قلم، با همان قاعدهٔ جا شدن */
+  function usedLines(refs) {
+    var used = Object.create(null);   //  شناسهٔ «__proto__» هم کلیدِ ساده است
+    var taken = isObj(refs) && Array.isArray(refs.taken) ? refs.taken : [];
+    for (var i = 0; i < taken.length; i++) {
+      var t = taken[i];
+      if (!isObj(t) || !isId(t.refId)) continue;
+      var lines = ofProduct(linesOf(refs, t.refId), t.productId);
+      var u = num(t.units);
+      var line = bestFit(lines, u === null ? 0 : Math.abs(u), used) || bestFit(lines, 0, used);
+      if (line) used[line.id] = true;
+    }
+    return used;
+  }
+
+  /**
+   *  داوریِ ردیف‌های یک دسته، به ترتیب (قلمی که اصلاحِ یک ردیف گرفت برای بعدی آزاد نیست).
+   *  @param {Array<{table: string, row: Object|null}>} rows  `row` = نمای درجِ تازه؛ null =
+   *         ویرایش، حذف، ردیفِ موجود یا شناسهٔ تکراریِ دسته
+   *  @returns {Array<{ok: boolean, reason: string}>}  reason: '' | table | not_insert |
+   *         adjustment | price | kind | sign | ref | cancel | owner | product | qty | used | rule
+   */
+  function checkRows(role, rows, refs) {
+    var used = usedLines(refs);
+    var spent = spentLines(refs);
+    var out = [];
+    var list = Array.isArray(rows) ? rows : [];
+    for (var i = 0; i < list.length; i++) {
+      var it = isObj(list[i]) ? list[i] : {};
+      if (!canWrite(role, it.table)) { out.push(no('table')); continue; }
+      var rule = rowRule(role, it.table);
+      if (!rule) { out.push(yes()); continue; }
+      if (!isObj(it.row)) { out.push(no('not_insert')); continue; }
+      if (rule === 'return_adjustment') out.push(checkAdjustment(it.row, refs, used));
+      else if (rule === 'doc_movement') out.push(checkMovement(it.row, refs, spent));
+      else out.push(no('rule'));
+    }
+    return out;
+  }
+
+  /** این نقش همین یک ردیف را می‌نویسد؟ — `checkRows` با یک ردیف */
+  function canWriteRow(role, table, row, refs) {
+    return checkRows(role, [{ table: table, row: row }], refs)[0].ok;
+  }
+
+  /** فهرستِ جدول‌های نوشتنیِ یک نقش: «*»، فهرستِ مرتب، یا null برای نقشِ ناشناخته */
+  function writable(role) {
+    if (typeof role !== 'string' || !has(WRITES, role)) return null;
+    var w = WRITES[role];
+    return w === '*' ? '*' : w.slice().sort();
+  }
   function isCapValue(v) { return typeof v === 'number' && isFinite(v) && v >= 0; }
   function keys() { return Object.keys(CATALOG).sort(); }
 
@@ -99,7 +379,8 @@
   function defaultMode(role, key) {
     var spec = CATALOG[key];
     if (!spec || !has(spec.defaults, role)) return null;
-    return spec.defaults[role];
+    //  مقدارِ نامعتبر (undefined، غلطِ املایی) ⇐ null ⇐ «deny» — بسته‌به‌خطا
+    return MODES.indexOf(spec.defaults[role]) >= 0 ? spec.defaults[role] : null;
   }
 
   /**
@@ -244,6 +525,14 @@
     allows: allows,
     effective: effective,
     validate: validate,
+    WRITES: WRITES,
+    canWrite: canWrite,
+    writable: writable,
+    RETURN_ADJ_KINDS: RETURN_ADJ_KINDS,
+    DOC_MOVE_TYPES: DOC_MOVE_TYPES,
+    rowRule: rowRule,
+    checkRows: checkRows,
+    canWriteRow: canWriteRow,
     ROUNDING_MINOR: ROUNDING_MINOR,
     discountBp: discountBp,
     discountPct: discountPct,

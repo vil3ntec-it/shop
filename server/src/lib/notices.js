@@ -807,7 +807,7 @@ let timer = null;
 function startRunner({ intervalMs = 60_000 } = {}) {
   if (timer) return timer;
   timer = setInterval(() => {
-    tick().catch(err => console.error('[notices:runner]', err.message));
+    require('./job-beat').wrap('notices', intervalMs, tick)().catch(err => console.error('[notices:runner]', err.message));
   }, intervalMs);
   if (timer.unref) timer.unref();
   return timer;

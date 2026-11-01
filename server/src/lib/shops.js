@@ -66,6 +66,11 @@ function assertCan(member, permission) {
 async function createShop(userId, name) {
   const existing = await membershipOf(userId);
   if (existing) throw conflict('این حساب از قبل عضو یک دکان است', 'already_member');
+  //  فاز ۳: عضوِ دکانی که مدیر بسته (تعلیق، بایگانی، درخواستِ حذف) با ساختنِ دکانِ تازه دورش نمی‌زند
+  //  (دورهٔ آزمایشیِ تازه). همان قاعدهٔ «هر کاربر یک دکان».
+  const holds = require('./shop-holds');
+  const block = await holds.blockFor(userId);
+  if (block) throw holds.blockError(block);
 
   return tx(async (c) => {
     const t = now();
@@ -147,7 +152,7 @@ async function updateMember(shopId, memberId, patch) {
   memberId = m.id;
   if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
 
-  const role = patch.role && ['manager', 'staff'].includes(patch.role) ? patch.role : m.role;
+  const role = patch.role && require('./permissions').STAFF_ROLES.includes(patch.role) ? patch.role : m.role;
   const status = patch.status && ['active', 'suspended', 'removed'].includes(patch.status)
     ? patch.status : m.status;
 

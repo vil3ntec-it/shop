@@ -53,4 +53,49 @@ function routes(prefix) {
   return out;
 }
 
-module.exports = { mounts, routes };
+/*
+ *  ── فهرستِ **زنده** (از روترِ ساخته‌شده، نه از متن) ─────────────────
+ *  `tapMounts()` باید **پیش از** ساختنِ برنامه صدا زده شود تا هر `router.use`
+ *  نشانیِ سوارشدنش را نگه دارد؛ بعد `live(app)` همهٔ درهای زیرِ `/api` را با نامِ
+ *  میان‌افزارهای زنجیره‌شان می‌دهد. (از `role-route-isolation.test.js` به این‌جا آمد
+ *  تا `route-authz-inventory.test.js` هم همان را بخواند.)
+ */
+let tapped = false;
+function tapMounts() {
+  if (tapped) return;
+  tapped = true;
+  const RouterProto = require('express').Router.prototype;
+  const origUse = RouterProto.use;
+  RouterProto.use = function patchedUse(...args) {
+    const before = this.stack.length;
+    const out = origUse.apply(this, args);
+    const p = typeof args[0] === 'string' || Array.isArray(args[0]) ? args[0] : '/';
+    for (let i = before; i < this.stack.length; i++) this.stack[i].__mount = p;
+    return out;
+  };
+}
+
+/** همهٔ درهای زیرِ `/api` با نامِ میان‌افزارهای زنجیره‌شان: [{ method, path, key, chain }] */
+function live(app) {
+  const out = [];
+  const join = (a, b) => (a + (b === '/' ? '' : b)).replace(/\/+/g, '/');
+  const walk = (router, prefix, pre) => {
+    const names = [...pre];
+    for (const layer of router.stack || []) {
+      if (layer.route) {
+        const chain = [...names, ...layer.route.stack.map((l) => l.handle.name)];
+        for (const p of [layer.route.path].flat()) {
+          if (typeof p !== 'string') continue;
+          for (const m of Object.keys(layer.route.methods)) if (m !== '_all') out.push({ method: m.toUpperCase(), path: join(prefix, p), chain });
+        }
+      } else if (layer.handle && Array.isArray(layer.handle.stack)) {
+        for (const mp of [layer.__mount || '/'].flat()) if (typeof mp === 'string') walk(layer.handle, join(prefix, mp), names);
+      } else names.push(layer.handle?.name || '');
+    }
+  };
+  for (const layer of app.router.stack) if (layer.__mount === '/api' && layer.handle?.stack) walk(layer.handle, '/api', []);
+  const seen = new Set();
+  return out.filter((r) => { const k = `${r.method} ${r.path}`; r.key = k; return !seen.has(k) && seen.add(k); });
+}
+
+module.exports = { mounts, routes, tapMounts, live };

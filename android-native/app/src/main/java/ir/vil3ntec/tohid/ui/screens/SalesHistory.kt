@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -488,99 +489,63 @@ fun SalesHistoryScreen(
   }
 
   /*
-   *  اصلاحِ فاکتور.
-   *
-   *  ویرایشِ مستقیمِ فاکتورِ ثبت‌شده ممکن نیست و نباید هم باشد: فاکتور
-   *  سند است و شمارهٔ آن در حسابِ قرض‌دار و سابقهٔ عملیات نوشته شده.
-   *
-   *  ولی تا دیروز راهی هم برای اشتباهِ ساده نبود: فروشنده باید فاکتور را
-   *  لغو می‌کرد و کلِ سبد را از نو می‌ساخت. حالا همان کار یک دکمه است —
-   *  فاکتور لغو می‌شود (پس موجودی برمی‌گردد) و اقلامش با همان قیمتِ
-   *  همان فاکتور دوباره در سبد می‌نشینند.
+   *  SEC-03 — لغو و «اصلاح»: کنترل از `InvoiceVoid.check` (core؛ همان که `CancelSheet` ِ نسخهٔ ۳ می‌خواند)،
+   *  اثرِ دفتری همان `SalesEngine.cancel`، و فقط پس از نشستنِ لغو در دفتر (نه با قفلِ نرم) سندِ معکوس در
+   *  زنجیرهٔ اسنادِ دستگاه (`DocChainSync.recordVoid`؛ پرچمِ خاموشِ `shop.doc_chain` ⇒ هیچ).
    */
-  reopenFor?.let { sale ->
-    AlertDialog(
-      onDismissRequest = { reopenFor = null },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text(StrInvoices.reopenTitle, color = Shop.colors.text) },
-      text = {
-        Text(
-          StrInvoices.reopenBody(sale.invoiceLabel() ?: "0"),
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-      },
-      confirmButton = {
-        TextButton(onClick = {
-          val lines = d.saleItems
-            .filter { it.saleId == sale.id }
-            .mapNotNull { item ->
-              val left = item.quantity - item.returnedQty
-              if (left <= 0) null
-              else if (item.productId.isBlank()) SalesEngine.CartLine(
-                productId = newId(),
-                quantity = left,
-                unitPrice = item.unitPrice,
-                label = item.name.ifBlank { "قلم آزاد" }, // داده: نامِ قلمِ آزاد در فاکتورِ تازه ذخیره می‌شود
-              )
-              else SalesEngine.CartLine(
-                productId = item.productId,
-                quantity = left,
-                unitPrice = item.unitPrice,
-              )
+  fun voidSale(sale: Sale, kind: InvoiceVoid.Kind, reason: String, done: String, after: () -> Unit) {
+    when (val check = InvoiceVoid.check(SalesVoid.facts(d, sale.id), canCancel, kind, reason)) {
+      is InvoiceVoid.Decision.Denied -> toast(SalesVoid.denied(check.code, StrInvoices.cancelDenied))
+      is InvoiceVoid.Decision.Allowed ->
+        when (val r = SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = check.reason, by = trailBy)) {
+          is SalesEngine.Result.Failed -> toast(r.message)
+          is SalesEngine.Result.Ok -> {
+            val before = d
+            scope.launch {
+              if (store.save(r.data)) {
+                ir.vil3ntec.tohid.sync.platform.DocChainSync.recordVoid(roleContext, before, sale.id, kind, check.reason)
+              }
             }
-          apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد", by = trailBy), // داده: دلیلِ لغو در فاکتور و سابقه می‌ماند
-            StrInvoices.reopenedToCart,
-          ) {
-            cartStore.set(lines)
-            cartStore.setDebtor(sale.debtorId)
-            reopenFor = null
-            onEditInCart()
+            toast(done)
+            after()
           }
-        }) { Text(StrInvoices.cancelAndToCart) }
-      },
-      dismissButton = { TextButton(onClick = { reopenFor = null }) { Text(Str.goBack) } },
-    )
+        }
+    }
+  }
+
+  //  اصلاحِ فاکتور: لغو (سندِ معکوس) و بردنِ اقلام با همان قیمت به سبد — شرح سرِ `ReopenInvoiceDialog`
+  reopenFor?.let { sale ->
+    ReopenInvoiceDialog(sale, onDismiss = { reopenFor = null }) {
+      val lines = d.saleItems
+        .filter { it.saleId == sale.id }
+        .mapNotNull { item ->
+          val left = item.quantity - item.returnedQty
+          if (left <= 0) null
+          else if (item.productId.isBlank()) SalesEngine.CartLine(
+            productId = newId(),
+            quantity = left,
+            unitPrice = item.unitPrice,
+            label = item.name.ifBlank { "قلم آزاد" }, // داده: نامِ قلمِ آزاد در فاکتورِ تازه ذخیره می‌شود
+          )
+          else SalesEngine.CartLine(
+            productId = item.productId,
+            quantity = left,
+            unitPrice = item.unitPrice,
+          )
+        }
+      voidSale(sale, InvoiceVoid.Kind.CORRECTION, InvoiceVoid.CORRECTION_REASON, StrInvoices.reopenedToCart) {
+        cartStore.set(lines)
+        cartStore.setDebtor(sale.debtorId)
+        reopenFor = null
+        onEditInCart()
+      }
+    }
   }
 
   cancelFor?.let { sale ->
-    //  لغو بی دلیل ثبت نمی‌شود — دلیل در فاکتور و سابقه می‌ماند
-    var reason by remember(sale.id) { mutableStateOf("") }
-    AlertDialog(
-      onDismissRequest = { cancelFor = null },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text(StrInvoices.cancelSaleTitle, color = Shop.colors.text) },
-      text = {
-        Column {
-          Text(
-            SalesEngine.cancelWarning(sale),
-            style = MaterialTheme.typography.bodySmall,
-            color = Shop.colors.muted,
-          )
-          Spacer(Modifier.height(10.dp))
-          OutlinedTextField(
-            value = reason,
-            onValueChange = { reason = it.take(120) },
-            label = { Text(StrInvoices.cancelReason) },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
-      },
-      confirmButton = {
-        TextButton(
-          enabled = reason.isNotBlank(),
-          onClick = {
-            apply(
-              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason, by = trailBy),
-              StrInvoices.saleCancelled,
-            ) { cancelFor = null }
-          },
-        ) { Text(StrInvoices.cancelSale, color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted) }
-      },
-      dismissButton = { TextButton(onClick = { cancelFor = null }) { Text(Str.goBack) } },
-    )
+    CancelInvoiceDialog(sale, onDismiss = { cancelFor = null }) { reason ->
+      voidSale(sale, InvoiceVoid.Kind.VOID, reason, StrInvoices.saleCancelled) { cancelFor = null }
+    }
   }
 }
 
