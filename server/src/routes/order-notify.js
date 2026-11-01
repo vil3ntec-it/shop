@@ -21,23 +21,22 @@ const { can } = require('../lib/permissions');
 const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
 
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const deviceOf = (req) => (req.device ? String(req.device.device_uid || req.device.id || '') : '');
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   if (!(await notify.flagOf(req.shopId))) {
     return next(forbidden('اعلانِ سفارش برای این دکان روشن نیست', 'order_notify_disabled'));
   }
   next();
+};
+
+router.get('/config', async (req, res) => {
+  res.json(await notify.config(req.shopId, { userId: req.user.id, deviceUid: deviceOf(req) }));
 });
 
-router.get('/config', wrap(async (req, res) => {
-  res.json(await notify.config(req.shopId, { userId: req.user.id, deviceUid: deviceOf(req) }));
-}));
-
-router.get('/pending', needFlag, wrap(async (req, res) => {
+router.get('/pending', needFlag, async (req, res) => {
   res.json({ notifications: await notify.pending(req.shopId, { limit: req.query.limit }) });
-}));
+});
 
 //  A16: «باز شد» اعلان را برای همهٔ دکان می‌بندد (یادآوری دیگر نمی‌رود) ⇐ فقط رسیدگی‌کنندهٔ
 //  سفارش (`orders.manage`). «رسید» فقط ثبت است و برای هر بینندهٔ سفارش باز می‌ماند.
@@ -49,11 +48,11 @@ function needOpenRight(req, res, next) {
   next();
 }
 
-router.post('/:id/ack', needOpenRight, needFlag, wrap(async (req, res) => {
+router.post('/:id/ack', needOpenRight, needFlag, async (req, res) => {
   const out = await notify.ack(req.shopId, req.params.id, {
     kind: req.body?.kind, userId: req.user.id, deviceUid: deviceOf(req),
   });
   res.json(out);
-}));
+});
 
 module.exports = router;
