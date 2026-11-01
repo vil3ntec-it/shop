@@ -4,12 +4,14 @@
  * پشتِ پرچمِ `shop.orders.subscribers_only` (پیش‌فرض خاموش). `orders.intakeOf`، درِ `orders.create`.
  *
  * آن‌چه این پرونده قفل می‌کند:
- *   ۱) پرچم خاموش ⇒ همان رفتارِ پیشین (دورهٔ آزمایشی سفارش می‌گیرد، `ordering.accepting` = true).
- *   ۲) پرچم روشن: اشتراکِ فعال ⇒ سفارش ۲۰۱ و در بازارچه؛ آزمایشی، بی اشتراک، منقضی (زمان و
- *      وضعیت)، معلق و لغوشده ⇒ ۴۰۳ `store_not_accepting_orders` با پیامِ فارسی، **هیچ ردیف**،
- *      ویترین فقط‌خواندنی با `ordering.accepting: false`، و بیرون از فهرست/جست‌وجوی بازارچه.
- *   ۳) سفارشِ پیش از پایانِ اشتراک لغو نمی‌شود: پیگیری، تکرارِ همان کلید (۲۰۰ همان سفارش، نه ۴۰۳)،
- *      لغوِ مشتری، و گذارِ کارمند تا «تحویل شد» — و بخشِ «سفارش‌ها» برای دکان پیداست.
+ *   ۱) پرچم خاموش ⇒ همان رفتارِ main (دورهٔ آزمایشی سفارش می‌گیرد، پاسخِ ویترین بی `ordering`).
+ *   ۲) پرچم روشن: اشتراکِ فعال ⇒ سفارش ۲۰۱ و در بازارچه. دکانی که ویترینش طبقِ SUB-10 باز است ولی
+ *      اشتراکِ پولیِ فعال ندارد (دورهٔ آزمایشی) ⇒ ۴۰۳ `store_not_accepting_orders` با پیامِ فارسی،
+ *      **هیچ ردیف**، ویترین فقط‌خواندنی با `ordering.accepting: false`، و بیرون از فهرست/جست‌وجوی بازارچه.
+ *      ⛔ SUB-10 (#621) دست نمی‌خورد: بی اشتراک، منقضی (زمان و وضعیت)، معلق، لغوشده و بی کلیدِ ویترین
+ *      ⇒ همان ۴۰۴ ِ `store_not_found` پیش از هر سنجشِ نشست و شماره، با پرچم یا بی پرچم.
+ *   ۳) سفارشِ پیشینِ دکانِ آزمایشی لغو نمی‌شود: پیگیری، تکرارِ همان کلید (۲۰۰ همان سفارش، نه ۴۰۳)،
+ *      لغوِ مشتری، و گذارِ کارمند تا «تحویل شد». اشتراکِ تمام‌شده با پرچمِ روشن همان SUB-10 است.
  *   ۴) سفارشِ دستیِ کارمند به این دروازه بسته نیست (همان قاعدهٔ اشتراکِ پیشین)؛ برنامهٔ دکان
  *      `subscribersOnly`/`subscribed` را از `/api/shop/storefront/config` می‌گیرد.
  *   ۵) تصمیم فقط با ساعتِ سرور؛ هیچ سرآیند یا بدنه‌ای از مشتری آن را عوض نمی‌کند.
@@ -88,9 +90,12 @@ async function subscribe(s, features) {
 const setStatus = (s, status) => h.post(`/api/admin/subscriptions/${s.subId}/status`, { status }, { token: admin })
   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
 
-/** هر حالتِ «بی اشتراکِ فعال»، روی دکانی که `liveStore` ساخته. */
-const NOT_SUBSCRIBED = {
+/** ویترین طبقِ SUB-10 باز، ولی بی اشتراکِ پولیِ فعال ⇒ فقط‌خواندنی (روی دکانی که `liveStore` ساخته). */
+const OPEN_UNPAID = {
   'دورهٔ آزمایشی (هرگز اشتراک نداشته)': async () => {},
+};
+/** ویترینی که SUB-10 می‌بندد (۴۰۴) — پرچمِ این دروازه آن را باز نمی‌کند. */
+const CLOSED = {
   'بی اشتراک، آزمایشی تمام‌شده': (s) => query('UPDATE shops SET created_at=$2 WHERE id=$1', [s.shopId, Date.now() - 400 * DAY]),
   'منقضی با گذشتِ زمان': async (s) => { await subscribe(s); await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [s.subId, Date.now() - 1000]); },
   'منقضی (وضعیتِ expired)': async (s) => { await subscribe(s); await setStatus(s, 'expired'); },
@@ -145,7 +150,7 @@ test('پرچمِ خاموش: دکانِ آزمایشی همچنان سفارش �
   const s = await liveStore('خاموش');
   const pub = await h.get(`/api/store/${s.slug}`);
   assert.equal(pub.status, 200);
-  assert.deepEqual(pub.body.store.ordering, { accepting: true });
+  assert.equal('ordering' in pub.body.store, false, 'پرچمِ خاموش ⇒ پاسخِ main، بی `ordering`');
   const r = await checkout(s);
   assert.equal(r.status, 201, JSON.stringify(r.body));
   const cfg = (await h.get('/api/shop/storefront/config', { token: s.token })).body;
@@ -177,7 +182,7 @@ test('پرچمِ روشن + اشتراکِ فعال: سفارش ۲۰۱، نما�
   assert.equal((await checkout(s)).status, 201);
 });
 
-for (const [name, apply] of Object.entries(NOT_SUBSCRIBED)) {
+for (const [name, apply] of Object.entries(OPEN_UNPAID)) {
   test(`پرچمِ روشن + ${name}: ثبت ۴۰۳ بی ردیف، ویترین فقط‌خواندنی، بیرون از بازارچه`, async () => {
     await setFlag('all', 'market.directory', true);
     const s = await liveStore(name);
@@ -197,6 +202,35 @@ for (const [name, apply] of Object.entries(NOT_SUBSCRIBED)) {
     assert.ok(!(await searchSlugs()).includes(s.slug), 'بیرون از جست‌وجوی بازارچه');
 
     const cfg = (await h.get('/api/shop/storefront/config', { token: s.token })).body;
+    assert.equal(cfg.subscribersOnly, true);
+    assert.equal(cfg.subscribed, false);
+    assert.equal(cfg.accepting, false);
+  });
+}
+
+for (const [name, apply] of Object.entries(CLOSED)) {
+  test(`پرچمِ روشن + ${name}: SUB-10 دست نمی‌خورد — ویترین و ثبت ۴۰۴ ِ store_not_found، بیرون از بازارچه`, async () => {
+    await setFlag('all', 'market.directory', true);
+    const s = await liveStore(name);
+    await setFlag(s.shopId, GATE, true);
+    await apply(s);
+
+    //  ۴۰۴ پیش از هر سنجشِ نشست و شماره: ثبت بی بلیت هم همان ۴۰۴ است، نه ۴۰۱ و نه ۴۰۳
+    const phone = nextPhone();
+    for (const r of [
+      await h.get(`/api/store/${s.slug}`), await h.get(`/api/store/${s.slug}/products`),
+      await h.post(`/api/store/${s.slug}/verify/start`, { phone }),
+      await h.post(`/api/store/${s.slug}/checkout`, cart(phone), { headers: { 'Idempotency-Key': `ck-${uniq()}-key` } }),
+    ]) {
+      assert.equal(r.status, 404, JSON.stringify(r.body));
+      assert.equal(r.body.error.code, 'store_not_found');
+    }
+    assert.equal(await count(s.shopId), 0, 'هیچ سفارشی ساخته نشد');
+    assert.ok(!(await marketSlugs()).includes(s.slug), 'بیرون از فهرستِ بازارچه');
+    assert.ok(!(await searchSlugs()).includes(s.slug), 'بیرون از جست‌وجوی بازارچه');
+
+    const cfg = (await h.get('/api/shop/storefront/config', { token: s.token })).body;
+    assert.equal(cfg.enabled, false, 'ویترین طبقِ SUB-10 بسته');
     assert.equal(cfg.subscribersOnly, true);
     assert.equal(cfg.subscribed, false);
     assert.equal(cfg.accepting, false);
@@ -232,16 +266,15 @@ test('ساعت و دادهٔ مشتری اثری ندارد: سرآیند، بد
    ۳) سفارشِ پیشین جلو می‌رود
    ══════════════════════════════════════════════════════════════════ */
 
-test('سفارشِ پیش از پایانِ اشتراک: پیگیری، تکرارِ همان کلید، لغوِ مشتری و گذارِ کارمند تا «تحویل شد»', async () => {
+test('دورهٔ آزمایشی + پرچمِ روشن: سفارشِ پیشین جلو می‌رود — پیگیری، تکرارِ همان کلید، لغوِ مشتری و گذارِ کارمند تا «تحویل شد»', async () => {
   const s = await liveStore('پیشین');
-  await setFlag(s.shopId, GATE, true);
-  await subscribe(s);
+  //  پیش از روشن شدنِ دروازه، دکانِ آزمایشی سفارش می‌گیرد (همان main)
   const first = await checkout(s);
   assert.equal(first.status, 201, JSON.stringify(first.body));
   const second = await checkout(s);
   assert.equal(second.status, 201, JSON.stringify(second.body));
 
-  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [s.subId, Date.now() - 1000]);
+  await setFlag(s.shopId, GATE, true);
   assertRejected(await checkout(s));
 
   //  تکرارِ همان درخواست (همان کلید و بدنه) ⇒ همان سفارش، نه ۴۰۳
@@ -263,8 +296,10 @@ test('سفارشِ پیش از پایانِ اشتراک: پیگیری، تکر�
 
   //  بخشِ «سفارش‌ها» پیداست و کارمند سفارش را تا پایان می‌برد
   const cfg = (await h.get('/api/shop/orders/config', { token: s.token })).body;
-  assert.equal(cfg.entitled, false);
-  assert.equal(cfg.enabled, true, 'سفارشِ پیشین ⇒ بخش پیداست');
+  assert.equal(cfg.entitled, true, 'دورهٔ آزمایشی کلیدِ اشتراک را دارد (SUB-10)');
+  assert.equal(cfg.enabled, true);
+  assert.equal(cfg.subscribersOnly, true);
+  assert.equal(cfg.subscribed, false);
   assert.equal(cfg.accepting, false);
   const list = (await h.get('/api/shop/orders?tab=new', { token: s.token })).body.items;
   const id = list.find((o) => o.orderNo === first.body.order.orderNo).id;
@@ -290,6 +325,26 @@ test('پرچمِ خاموش و اشتراکِ تمام‌شده: همان قاع
   const id = (await h.get('/api/shop/orders?tab=new', { token: s.token })).body.items[0].id;
   const r = await h.post(`/api/shop/orders/${id}/transition`, { to: 'accepted', from: 'new' }, { token: s.token });
   assert.equal(r.status, 403);
+  assert.match(r.body.error.code, /^subscription_(expired|required)$/);
+});
+
+test('پرچمِ روشن و اشتراکِ تمام‌شده: همان SUB-10 (ویترین و پیگیری ۴۰۴، بخشِ «سفارش‌ها» پنهان، گذار ۴۰۳)', async () => {
+  const s = await liveStore('پیشینِ روشن');
+  await setFlag(s.shopId, GATE, true);
+  await subscribe(s);
+  const first = await checkout(s);
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  await query('UPDATE subscriptions SET ends_at=$2 WHERE id=$1', [s.subId, Date.now() - 1000]);
+  for (const url of [`/api/store/${s.slug}`, `/api/store/${s.slug}/orders/${first.body.order.token}`]) {
+    const r = await h.get(url);
+    assert.equal(r.status, 404, `${url}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'store_not_found');
+  }
+  const cfg = (await h.get('/api/shop/orders/config', { token: s.token })).body;
+  assert.equal(cfg.enabled, false);
+  const id = (await h.get('/api/shop/orders?tab=new', { token: s.token })).body.items[0].id;
+  const r = await h.post(`/api/shop/orders/${id}/transition`, { to: 'accepted', from: 'new' }, { token: s.token });
+  assert.equal(r.status, 403, JSON.stringify(r.body));
   assert.match(r.body.error.code, /^subscription_(expired|required)$/);
 });
 

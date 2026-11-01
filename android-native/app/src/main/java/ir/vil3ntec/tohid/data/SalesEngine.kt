@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.credit.CreditGate
+import ir.vil3ntec.tohid.core.money.Money
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
@@ -43,6 +46,8 @@ object SalesEngine {
     val quantity: Double,
     val unitPrice: Double? = null,
     val label: String = "",
+    /** سریِ اسکن‌شده (موتورِ تازهٔ موجودی، `StockLedger`) — فروش اول از همین برداشته می‌شود */
+    val lotId: String? = null,
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -100,6 +105,18 @@ object SalesEngine {
      *  `paidAmount`. با آن، `payment` و `paidAmount` نادیده گرفته می‌شوند.
      */
     val settlement: ir.vil3ntec.tohid.core.pay.Settlement? = null,
+    /**
+     *  CRM-03 / S07 — سقفِ اعتبار در صندوق، فقط با تنظیمِ خاموشِ دکان (`ShopPolicy.creditGate`).
+     *  `false` (پیش‌فرض) ⇒ همان رفتارِ همیشه: فروشِ نسیه سقف را نمی‌سنجد.
+     */
+    val creditGate: Boolean = false,
+    /** تأییدِ مدیر/صاحب برای بردِ بیش از سقف (`CreditGate.Approval`)؛ فقط همین مشتری و تا همین مبلغ */
+    val creditApproval: CreditGate.Approval? = null,
+    /**
+     *  POS-24 — قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`، فقط صندوق). پیش‌فرض خاموش ⇒
+     *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) و تعویض (`ReturnFlow`) همیشه خاموش می‌فرستند.
+     */
+    val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
   )
 
   data class Totals(
@@ -218,6 +235,10 @@ object SalesEngine {
     return cart.map { if (it.productId == productId) it.copy(unitPrice = clean) else it }
   }
 
+  /** سریِ ترجیحیِ یک ردیف (اسکنِ سری)؛ `null` یعنی همان FEFO */
+  fun setLineLot(cart: List<CartLine>, productId: String, lotId: String?): List<CartLine> =
+    cart.map { if (it.productId == productId) it.copy(lotId = lotId?.takeIf { l -> l.isNotEmpty() }) else it }
+
   /** تعیینِ تعداد. صفر یا کمتر یعنی حذفِ ردیف. */
   fun setCartQty(cart: List<CartLine>, productId: String, quantity: Double): List<CartLine> {
     if (quantity <= 0) return cart.filter { it.productId != productId }
@@ -333,6 +354,31 @@ object SalesEngine {
       if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
     }
 
+    /*
+     *  موتورِ تازهٔ موجودی و بها (`StockLedger`، تنظیمِ دکان؛ پیش‌فرض خاموش ⇒ `null`):
+     *  سنجشِ هسته در حالتِ local — بیش از موجودیِ **سالم** و سریِ منقضی بسته است
+     *  (INV-19، بخشِ ۳.۶)؛ بهای موقتِ هر قلم به میانگینِ موزون؛ سریِ اسکن‌شده اول.
+     */
+    val stockPlan: Map<Int, StockLedger.Check>? = if (!StockLedger.isOn(d)) null else {
+      val idx = cart.indices.filter { i -> !cart[i].free && d.products.any { it.id == cart[i].productId } }
+      val view = StockLedger.replay(d, idx.map { cart[it].productId }.distinct())
+      val checks = StockLedger.checkCart(
+        view, idx.map { i -> StockLedger.Line(cart[i].productId, StockLedger.milli(cart[i].quantity), cart[i].lotId) }, today,
+      )
+      idx.zip(checks).toMap()
+    }
+    stockPlan?.forEach { (i, c) ->
+      if (c.ok) return@forEach
+      val p = d.products.first { it.id == cart[i].productId }
+      val avail = (c.availableMilli ?: 0L) / 1000.0
+      return Result.Failed(
+        if (c.error == "expired_stock") {
+          "از «${p.name}» ${ir.vil3ntec.tohid.qty((c.expiredMilli ?: 0L) / 1000.0)} واحد منقضی است؛ " +
+            "فقط ${ir.vil3ntec.tohid.qty(avail)} واحدِ سالم مانده"
+        } else shortageMessage(p, cart[i].quantity, avail)
+      )
+    }
+
     val t = totals(d, cart, checkout)
 
     //  PAY (v3 A4): با پرچم، پرداخت از تسویهٔ هسته می‌آید — همان مبلغِ همین فاکتور، بی ناتمام
@@ -362,8 +408,34 @@ object SalesEngine {
     if (credit && remaining > 0 && debtorId == null) {
       return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
     }
+    //  POS-24: قاعده‌های دکان پس از قاعدهٔ ثابتِ بالا، روی همان جمع‌ها به پول؛ خاموش ⇒ هیچ
+    if (checkout.rules.active) {
+      val facts = ir.vil3ntec.tohid.core.sale.CheckoutFacts(
+        lines = cart.size,
+        finalTotalMinor = PayFlow.minor(t.finalTotal),
+        remainingMinor = PayFlow.minor(remaining),
+        credit = credit,
+        hasCustomer = debtorId != null,
+      )
+      ir.vil3ntec.tohid.core.sale.CheckoutGuard.check(checkout.rules, facts)?.let { b ->
+        val from = checkout.rules.customerFromMinor?.let { ir.vil3ntec.tohid.money(PayFlow.major(it)) + " افغانی" }.orEmpty()
+        return Result.Failed(ir.vil3ntec.tohid.core.sale.CheckoutGuard.message(b, from))
+      }
+    }
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
     val onCredit = credit && remaining > 0
+
+    //  CRM-03 / S07: بردِ بیش از سقفِ مشتری بی تأییدِ مدیر ثبت نمی‌شود (هیچ چیز نوشته نمی‌شود)؛
+    //  با تأیید، ردِ `credit_over_limit` با نامِ تأییدکننده و دلیل کنارِ فروش
+    var creditOk: Pair<CreditGate.Over, CreditGate.Approval>? = null
+    if (checkout.creditGate && onCredit && debtorId != null) {
+      val over = creditOverOf(d, debtorId, remaining)
+      when (CreditGate.state(over, debtorId, checkout.creditApproval)) {
+        CreditGate.State.FREE -> Unit
+        CreditGate.State.NEEDS_APPROVAL -> return Result.Failed(creditOverText(over!!) + " — " + CREDIT_NEEDS_APPROVAL)
+        CreditGate.State.APPROVED -> creditOk = over!! to checkout.creditApproval!!
+      }
+    }
 
     val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
     val invoiceNumber = d.nextInvoiceNo
@@ -398,7 +470,7 @@ object SalesEngine {
 
     val items = mutableListOf<SaleItem>()
     val movements = mutableListOf<StockMovement>()
-    cart.forEach { line ->
+    cart.forEachIndexed { lineIndex, line ->
       /*
        *  قلمِ آزاد: نه کالایی دارد، نه حرکتِ انبار می‌سازد، نه بهای
        *  تمام‌شده. سودش برابرِ کلِ مبلغش حساب می‌شود، چون خریدش جای دیگری
@@ -417,21 +489,24 @@ object SalesEngine {
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
         )
-        return@forEach
+        return@forEachIndexed
       }
 
-      val p = d.products.find { it.id == line.productId } ?: return@forEach
+      val p = d.products.find { it.id == line.productId } ?: return@forEachIndexed
       //  قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا
       val unit = line.unitPrice ?: p.salePrice
+      //  موتورِ تازه: بهای موقت = میانگینِ موزون؛ نامعلوم (کالای بی ورود) ⇒ همان قیمتِ خریدِ امروز
+      val planned = stockPlan?.get(lineIndex)?.takeIf { it.ok && !it.unknownCost }
       items += SaleItem(
         id = newId(),
         saleId = saleId,
         productId = p.id,
         quantity = line.quantity,
         unitPrice = unit,
-        purchasePrice = p.purchasePrice,
+        purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: p.purchasePrice,
         totalPrice = lineTotal(unit, line.quantity),
         returnedQty = 0.0,
+        lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
       )
       movements += StockMovement(
         id = newId(),
@@ -472,6 +547,23 @@ object SalesEngine {
       refId = saleId,
       notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(t.finalTotal)} افغانی",
       createdAt = now,
+    ) + listOfNotNull(
+      creditOk?.let { (over, ok) ->
+        val who = d.debtors.find { it.id == debtorId }?.name.orEmpty()
+        AuditEntry(
+          id = newId(),
+          type = "credit_over_limit",
+          date = today,
+          refId = saleId,
+          notes = "فروشِ نسیهٔ فاکتور #${sale.invoiceLabel()} برای «$who» بیش از سقف — ${creditOverText(over)}" +
+            " — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",
+          createdAt = now,
+          amount = over.excessMinor.toDouble() / DebtBook.CURRENCY.minorPerMajor,
+          by = checkout.seller.trim().ifEmpty { null },
+          approvedBy = ok.by.trim(),
+          reason = ok.reason.trim(),
+        )
+      },
     )
 
     return Result.Ok(
@@ -486,6 +578,41 @@ object SalesEngine {
       invoiceNumber = invoiceNumber,
       saleId = saleId,
     )
+  }
+
+  /* ========================= سقفِ اعتبار در صندوق (CRM-03) ========================= */
+
+  const val CREDIT_NEEDS_APPROVAL = "تأییدِ مدیر لازم است"
+
+  /** بردِ [add] افغانی برای این مشتری از سقفش می‌گذرد؟ ماندهٔ دفتر همان `DebtBook` است؛ بی سقف ⇒ null */
+  fun creditOverOf(d: ShopData, debtorId: String, add: Double): CreditGate.Over? {
+    val c = DebtBook.creditCheck(d, debtorId, DebtBook.minor(add)) ?: return null
+    return CreditGate.check(c.limit.minor, c.balance.minor, DebtBook.minor(add).minor)
+  }
+
+  /** «۱٬۰۰۰ افغانی بیش از سقفِ اعتبار (۵٬۰۰۰) — ماندهٔ فعلی ۴٬۰۰۰» — همان جملهٔ `DebtBook.overLimitText` */
+  fun creditOverText(o: CreditGate.Over): String {
+    fun show(minor: Long) = DebtBook.show(Money(minor, DebtBook.CURRENCY))
+    return "${show(o.excessMinor)} افغانی بیش از سقفِ اعتبار (${show(o.limitMinor)}) — ماندهٔ فعلی ${show(o.balanceMinor)}"
+  }
+
+  /**
+   *  پیش‌سنجشِ صندوق پیش از ثبت: همین سبد با همین تسویه از سقفِ مشتری می‌گذرد؟ همان حسابِ [record]
+   *  (پرداختی، باقی‌مانده و «نسیه») — [record] خودش هم دوباره می‌سنجد و بی تأیید ثبت نمی‌کند.
+   *  تنظیمِ خاموش، نقدی، بی مشتری یا بی سقف ⇒ null.
+   */
+  fun creditOver(d: ShopData, cart: List<CartLine>, checkout: Checkout): CreditGate.Over? {
+    if (!checkout.creditGate) return null
+    val debtorId = checkout.debtorId?.takeIf { it.isNotBlank() } ?: return null
+    val finalTotal = totals(d, cart, checkout).finalTotal
+    val st = checkout.settlement?.let { PayFlow.saleFields(it) }
+    val credit = if (st != null) st.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
+    if (!credit) return null
+    val paidRaw = st?.paidAmount ?: checkout.paidAmount
+    if (paidRaw.isNaN() || paidRaw < 0) return null
+    val remaining = max(0.0, finalTotal - min(paidRaw, finalTotal))
+    if (remaining <= 0) return null
+    return creditOverOf(d, debtorId, remaining)
   }
 
   /* ========================= لغو فروش و مرجوعی ========================= */
@@ -509,6 +636,8 @@ object SalesEngine {
     newId: () -> String,
     /** رابط بی دلیل اجازه نمی‌دهد؛ این‌جا پیش‌فرضِ خالی فقط برای صدازننده‌های قدیمی است */
     reason: String = "",
+    /** RPT-09: لغوکننده روی ردیفِ `cancel_sale` (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
@@ -562,6 +691,7 @@ object SalesEngine {
           refId = saleId,
           notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
+          by = by,
         ),
       ),
       invoiceNumber = sale.invoiceNumber ?: 0,
@@ -594,6 +724,21 @@ object SalesEngine {
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
   /**
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) × سهمِ پرداخت‌شده
+   *  پس از تخفیفِ فاکتور، با گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکه بیش از برگشتِ یک‌جای همان مقدار پس
+   *  نمی‌دهد (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶). پیش‌نمایشِ پنجرهٔ مرجوعی هم همین را نشان می‌دهد.
+   *  مبنا پولِ واقعاً پس‌دادهٔ همین قلم است، چون برگشت‌های کهنه جداجدا گرد شده‌اند (#586).
+   */
+  fun returnAmount(d: ShopData, sale: Sale, item: SaleItem, quantity: Double): Double {
+    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
+    val paidRatio =
+      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+    val prior = d.saleReturns.filter { it.saleItemId == item.id }
+    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio,
+      refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity })
+  }
+
+  /**
    * مرجوعیِ جزئی — چند قلم از یک فاکتور، هرکدام به هر مقدار.
    *
    * مبلغِ هر قلم از قیمتِ واقعیِ همان قلم در همان فاکتور حساب می‌شود، نه
@@ -608,13 +753,12 @@ object SalesEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
     if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
-    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
-    val paidRatio =
-      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
 
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
@@ -627,14 +771,12 @@ object SalesEngine {
       var quantity = quantities[item.id] ?: return@forEachIndexed
       if (quantity.isNaN() || quantity <= 0) return@forEachIndexed
 
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
-      // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز
-      val amount = if (item.quantity > 0) {
-        (item.totalPrice / item.quantity * quantity * paidRatio).roundToLong().toDouble()
-      } else 0.0
+      val amount = returnAmount(d, sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)
 
@@ -649,6 +791,7 @@ object SalesEngine {
         reason = reason,
         date = today,
         createdAt = now,
+        by = by,
       )
       //  قلمِ آزاد کالایی ندارد، پس حرکتِ انبار هم نمی‌سازد — وگرنه ردیفی
       //  با شناسهٔ کالای خالی در گردشِ موجودی می‌نشست

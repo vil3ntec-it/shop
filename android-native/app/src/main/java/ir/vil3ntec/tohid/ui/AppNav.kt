@@ -31,6 +31,9 @@ object AppNav {
   /** پنجرهٔ «میان‌برهای صفحه‌کلید» (F1 یا دکمهٔ ⌨ در سربرگ) — فقط کامپیوتر */
   val help = mutableStateOf(false)
 
+  /** صفحهٔ باز (مسیرِ `AppRoot`) — برای راهنمای همان صفحه در F1 (OPS-06، `core/guide/ScreenGuides`) */
+  val screen = mutableStateOf("dashboard")
+
   /** جست‌وجوی سریع (Ctrl+K روی کامپیوتر، دکمهٔ ذره‌بین در سربرگ) */
   val palette = mutableStateOf(false)
 
@@ -42,4 +45,11 @@ object AppNav {
 
   /** درخواستِ تم از نوارِ منوی کامپیوتر: "LIGHT" / "DARK" / "SYSTEM" */
   val theme = mutableStateOf<String?>(null)
+
+  /**
+   *  Ctrl+L — «قفلِ صندوق» (STF-04، S46). هر بار یکی بالا می‌رود و `AppRoot`
+   *  همان لحظه قفلِ برنامه را می‌اندازد؛ سبدِ نیمه‌کاره در `CartStore` می‌ماند.
+   */
+  val lockNow = androidx.compose.runtime.mutableIntStateOf(0)
+  fun lock() { lockNow.intValue++ }
 }

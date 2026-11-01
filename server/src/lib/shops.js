@@ -10,15 +10,41 @@ const { query, one, many, tx, newId, now } = require('../db');
 const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
 const { can } = require('./permissions');
 
-/** عضویت فعال کاربر — کاربر فقط در یک دکان فعال است. */
-async function membershipOf(userId) {
+/**
+ * عضویتِ فعالِ کاربر.
+ *
+ * ── دکانِ فعالِ نشست (بندِ ۲۹.۲ قاعدهٔ ۱، مهاجرتِ ۰۹۷) ────────────────
+ * بی `shopId`: همان قاعدهٔ همیشگی — اول دکانی که صاحبش است، بعد قدیمی‌ترین.
+ * با `shopId` (از `tokens.shop_id`ِ نشست، **هرگز** از بدنه/سرآیندِ
+ * درخواست): فقط عضویتِ فعال در **همان** دکان، وگرنه null — هیچ‌وقت
+ * بی‌صدا به دکانِ دیگر نمی‌افتد.
+ */
+async function membershipOf(userId, { shopId = null } = {}) {
   return one(
     `SELECT m.*, s.name AS shop_name, s.status AS shop_status, s.owner_user_id
        FROM shop_members m
        JOIN shops s ON s.id = m.shop_id
       WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active'
+        AND ($2::text IS NULL OR m.shop_id = $2::text)
       ORDER BY (m.role = 'owner') DESC, m.created_at ASC
       LIMIT 1`,
+    [userId, shopId || null]
+  );
+}
+
+/** دکانی که این نشست برگزیده — فقط از ردیفِ خودِ توکن. */
+function sessionShopOf(tokenRow) {
+  return (tokenRow && tokenRow.shop_id) || null;
+}
+
+/** همهٔ دکان‌هایی که کاربر عضوِ فعالشان است — برای «انتخابِ دکان». */
+async function membershipsOf(userId) {
+  return many(
+    `SELECT m.shop_id, m.role, s.name AS shop_name
+       FROM shop_members m
+       JOIN shops s ON s.id = m.shop_id
+      WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active'
+      ORDER BY (m.role = 'owner') DESC, m.created_at ASC`,
     [userId]
   );
 }
@@ -40,6 +66,11 @@ function assertCan(member, permission) {
 async function createShop(userId, name) {
   const existing = await membershipOf(userId);
   if (existing) throw conflict('این حساب از قبل عضو یک دکان است', 'already_member');
+  //  فاز ۳: عضوِ دکانی که مدیر بسته (تعلیق، بایگانی، درخواستِ حذف) با ساختنِ دکانِ تازه دورش نمی‌زند
+  //  (دورهٔ آزمایشیِ تازه). همان قاعدهٔ «هر کاربر یک دکان».
+  const holds = require('./shop-holds');
+  const block = await holds.blockFor(userId);
+  if (block) throw holds.blockError(block);
 
   return tx(async (c) => {
     const t = now();
@@ -121,7 +152,7 @@ async function updateMember(shopId, memberId, patch) {
   memberId = m.id;
   if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
 
-  const role = patch.role && ['manager', 'staff'].includes(patch.role) ? patch.role : m.role;
+  const role = patch.role && require('./permissions').STAFF_ROLES.includes(patch.role) ? patch.role : m.role;
   const status = patch.status && ['active', 'suspended', 'removed'].includes(patch.status)
     ? patch.status : m.status;
 
@@ -134,10 +165,13 @@ async function updateMember(shopId, memberId, patch) {
     await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
       [now(), m.user_id]);
   }
+  //  ⛔ S78: سوکتِ زندهٔ او هم در همین درخواست — برداشتن/تعلیق (نشست رفت) و
+  //  تغییرِ نقش (دسترسی عوض شد) هر دو؛ دکان‌های دیگرش با همان نقش دست نمی‌خورند
+  await require('./sync-v1-live').accessChanged({ userId: m.user_id });
   return row;
 }
 
 module.exports = {
-  membershipOf, requireMembership, assertCan, createShop, getShop, updateShop,
+  membershipOf, membershipsOf, sessionShopOf, requireMembership, assertCan, createShop, getShop, updateShop,
   members, memberCount, updateMember, findMember,
 };

@@ -18,6 +18,8 @@
       می‌دید و داخلِ دکانِ نفرِ بعدی می‌فرستاد.
    ⚠️ **اعمالِ opهای رسیده باید سایه را هم جلو ببرد**، وگرنه تفاضلِ
       بعدی همان‌ها را دوباره به سرور پس می‌فرستد — حلقهٔ بی‌پایان.
+   ⛔ **یک برگه نویسنده است** (`TohidTabLock`، پایین‌تر). سایه، صف و cursor
+      میانِ برگه‌های یک مرورگر مشترک‌اند ولی دفترِ حافظه نه.
    ========================================================== */
 (function () {
   'use strict';
@@ -26,9 +28,131 @@
   var acc = window.TohidAccount;
   if (!core || !acc) return;
 
+  /* ==========================================================
+     یک برگهٔ نویسنده — دو برگه، یک دفتر
+     ----------------------------------------------------------
+     سایه، صف و cursor در حافظهٔ مشترکِ مرورگرند ولی هر برگه دفترِ حافظهٔ
+     خودش را دارد. برگهٔ کهنه (B) که پس از ثبتِ کالای تازه در برگهٔ A ذخیره
+     کند، آن کالا را «حذف‌شده» می‌بیند و DELETE ِ آن به سرور و همهٔ
+     دستگاه‌ها می‌رود؛ `saveState` ِ همان برگه هم دفترِ ذخیره‌شده را با
+     نسخهٔ کهنه‌اش رونویسی می‌کند.
+     ⛔ پس فقط یک برگه نویسنده است (Web Locks، `tohid-ledger-writer`، تا
+     بسته شدنِ برگه). بقیه فقط‌خواندنی‌اند: موتور نه ثبت می‌کند، نه
+     push/pull، و `saveState` ِ صفحه (`readOnly()`) چیزی نمی‌نویسد؛ نوار و
+     پیامِ روشن. نویسنده که بسته شد، برگهٔ منتظر خودش تازه می‌شود (دفترش
+     کهنه است) و نویسنده می‌شود.
+     تا پاسخِ قفل (چند میلی‌ثانیه پس از بار شدن) همان رفتارِ امروز؛ v1 هر
+     اثر را همان دم می‌سنجد (پس از هر درخواستِ شبکه هم)، v3 پشتِ `guardTabs`.
+     بی Web Locks (مرورگرِ خیلی کهنه) یا خطای آن ⇒ همان رفتارِ پیشین.
+     ========================================================== */
+  var TAB_LOCK = 'tohid-ledger-writer';
+  var TAB_MSG = 'این برنامه در برگهٔ دیگری از همین مرورگر باز است. این برگه فقط برای دیدن است و '
+    + 'چیزی در آن ذخیره یا همگام نمی‌شود؛ همان برگه را به کار ببرید یا آن را ببندید.';
+  var tabLock = (function () {
+    var role = 'writer';
+    var ready = Promise.resolve(role);
+    var locks = (typeof navigator !== 'undefined' && navigator && navigator.locks) || null;
+    function showBanner() {
+      try {
+        if (typeof document === 'undefined' || !document.body || document.getElementById('tohid-tab-reader')) return;
+        var el = document.createElement('div');
+        el.id = 'tohid-tab-reader';
+        el.setAttribute('role', 'alert');
+        el.dir = 'rtl';
+        el.textContent = TAB_MSG;
+        el.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:2147483000;padding:10px 16px;'
+          + 'background:#b42318;color:#fff;font-weight:600;line-height:1.6;text-align:center';
+        document.body.appendChild(el);
+      } catch (e) { /* بی صفحه */ }
+    }
+    function waitTurn() {
+      //  نویسنده بسته شد ⇒ دفترِ این برگه کهنه است: تازه‌سازی (پس از آن همین برگه نویسنده است)
+      try {
+        locks.request(TAB_LOCK, function () {
+          try { location.reload(); } catch (e) { /* بیرون از مرورگر */ }
+          return new Promise(function () { });
+        }).catch(function () { });
+      } catch (e) { /* هیچ */ }
+    }
+    if (locks && typeof locks.request === 'function') {
+      role = 'pending';
+      ready = new Promise(function (resolve) {
+        function settle(r) {
+          if (role !== 'pending') return;
+          role = r;
+          resolve(r);
+          if (r === 'reader') { showBanner(); waitTurn(); }
+          try { window.dispatchEvent(new CustomEvent('tohid-tab-role', { detail: { role: r } })); } catch (e) { /* قدیمی */ }
+        }
+        try {
+          locks.request(TAB_LOCK, { ifAvailable: true }, function (lock) {
+            if (!lock) { settle('reader'); return undefined; }
+            settle('writer');
+            return new Promise(function () { });   // تا بسته شدنِ برگه نگه داشته می‌شود
+          }).catch(function () { settle('writer'); });
+        } catch (e) { settle('writer'); }
+      });
+    }
+    return {
+      LOCK: TAB_LOCK,
+      message: TAB_MSG,
+      ready: ready,
+      role: function () { return role; },
+      /** صفحه: فقط برگهٔ نویسنده (و تا روشن شدن، برگهٔ تازه) دفتر را ذخیره می‌کند */
+      readOnly: function () { return role === 'reader'; },
+    };
+  })();
+  window.TohidTabLock = tabLock;
+
+  /** خطای درِ «گرفتنِ نسخهٔ سرور» در برگهٔ فقط‌خواندنی */
+  function otherTabError() { var e = new Error(TAB_MSG); e.code = 'other_tab'; return e; }
+
+  /**
+   *  درهای v3 (`window.TohidSync` ِ sync-v3-engine) پشتِ قفلِ برگه: زمان‌سنج‌های v3 درونِ خودش‌اند،
+   *  پس برگهٔ فقط‌خواندنی آن را راه نمی‌اندازد و تا روشن شدنِ نقش (چند میلی‌ثانیه) صبر می‌کند.
+   *  تفاضل‌محور است، پس ثبتِ عقب‌افتاده چیزی را گم نمی‌کند.
+   */
+  function guardTabs(api) {
+    if (!api) return;
+    ['start', 'onSignedIn', 'sync', 'pullOnce', 'restoreFromServer', 'firstSync', 'pushBaseline', 'connectLive'].forEach(function (n) {
+      var orig = api[n];
+      if (typeof orig !== 'function') return;
+      api[n] = function () {
+        var args = arguments;
+        if (tabLock.role() === 'writer') return orig.apply(api, args);
+        return tabLock.ready.then(function (r) {
+          if (r === 'writer') return orig.apply(api, args);
+          if (n === 'restoreFromServer') throw otherTabError();
+          if (n === 'firstSync') return { did: 'other_tab' };
+          return n === 'pullOnce' ? 0 : undefined;
+        });
+      };
+    });
+    var rec = api.recordChange;
+    if (typeof rec === 'function') {
+      api.recordChange = function () {
+        var args = arguments;
+        if (tabLock.role() === 'writer') return rec.apply(api, args);
+        if (tabLock.role() === 'pending') tabLock.ready.then(function (r) { if (r === 'writer') rec.apply(api, args); });
+        return 0;
+      };
+    }
+    var st = api.status;
+    if (typeof st === 'function') {
+      api.status = function () {
+        var s = st.apply(api, arguments);
+        if (s && tabLock.role() === 'reader') { s.otherTab = true; s.lastError = TAB_MSG; }
+        return s;
+      };
+    }
+  }
+
   //  Sync v3 پشتِ تنظیمِ هر دستگاه (`tohid-sync-engine`، پیش‌فرض v1) — `license/sync-v3-engine.js`.
   //  خاموش (پیش‌فرض) ⇒ همین موتورِ v1، بی هیچ تغییری؛ روشن ⇒ همان رابطِ `window.TohidSync` را v3 می‌سازد.
-  if (window.TohidSyncV3 && window.TohidSyncV3.choice() === 'v3' && window.TohidSyncV3.install(acc)) return;
+  if (window.TohidSyncV3 && window.TohidSyncV3.choice() === 'v3' && window.TohidSyncV3.install(acc)) {
+    guardTabs(window.TohidSync);
+    return;
+  }
 
   var PUSH_DEBOUNCE_MS = 500;      // بندِ ۲۰.۲
   var PUSH_TICK_MS = 2000;         // تا وقتی صف خالی نشده
@@ -126,7 +250,9 @@
   function status() {
     var st = state();
     var n = queueCounts();
+    var other = tabLock.readOnly();
     return {
+      otherTab: other,
       configured: acc.configured(),
       signedIn: acc.isSignedIn(),
       online: navigator.onLine !== false,
@@ -137,7 +263,9 @@
       lastOkAt: Number(st.lastOkAt || 0),
       lastPushAt: Number(st.lastPushAt || 0),
       lastPullAt: Number(st.lastPullAt || 0),
-      lastError: st.lastError || '',
+      //  صفِ بزرگ: «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ (هیچ opی دور ریخته نمی‌شود)؛
+      //  زبانهٔ دیگر صاحبِ همگام‌سازی است ⇒ پیامِ همان (TAB_MSG) جلوتر
+      lastError: other ? TAB_MSG : (st.lastError || (typeof core.backlogWarning === 'function' ? core.backlogWarning(n.queued) : '')),
       lastErrorAt: Number(st.lastErrorAt || 0),
       holding: !!st.holding,
       needsShop: !!st.needsShop,
@@ -163,6 +291,7 @@
   var pushTimer = null;
 
   function recordChange(reason) {
+    if (tabLock.readOnly()) return 0;   // برگهٔ دیگر نویسنده است: تفاضلِ دفترِ کهنه با سایهٔ مشترک «حذف» می‌سازد
     var data = ledger.read();
     if (!data) return 0;
     var base = shadow();
@@ -185,6 +314,7 @@
      */
     var q = queue();
     var before = q.all();
+    notePushSince(!before.length);
     if (q.push(out.ops) < 0) {
       patchState({ lastError: 'حافظهٔ مرورگر پر است؛ تغییرها روی همین دستگاه مانده‌اند و هنوز به سرور نرفته‌اند' });
       announce();
@@ -201,6 +331,23 @@
     announce();
     schedulePush(reason);
     return out.ops.length;
+  }
+
+  /**
+   *  `since` ِ push (پرچمِ سرورِ `sync.cursor_from_since`، #481): «یادداشت» پیش از رفتنِ op به صف —
+   *  صفِ خالی ⇒ cursor ِ همین حالا، وگرنه فقط پایین می‌آید (شرح سرِ `pushSince` در sync-core.js).
+   *  ⚠️ پوسته stale-while-revalidate است و sync-core.js ِ کهنه شاید هنوز این تابع را نداشته باشد ⇒
+   *  بی یادداشت و بی `since` (سرور همان تأییدِ pull ِ پیشین را می‌گیرد: محتاط)، هرگز خطا در ثبت.
+   */
+  function notePushSince(queueWasEmpty) {
+    if (typeof core.pushSinceNote !== 'function') return;
+    var st = state();
+    patchState({ pushSince: core.pushSinceNote(st.pushSince, queueWasEmpty, st.cursor) });
+  }
+  function sinceForPush() {
+    if (typeof core.pushSince !== 'function') return undefined;
+    var st = state();
+    return core.pushSince(st.pushSince, st.cursor);
   }
 
   /**
@@ -236,10 +383,11 @@
    *  می‌گیرد، نه از این راه.
    */
   function pushBaseline() {
+    if (tabLock.readOnly()) return 0;
     var data = ledger.read();
     if (!data) return 0;
     var out = core.diff({}, data);
-    if (out.ops.length) queue().push(out.ops);
+    if (out.ops.length) { notePushSince(queue().size() === 0); queue().push(out.ops); }
     forgetCounts();
     setShadow(data);
     announce();
@@ -290,12 +438,15 @@
 
     var body = {
       device_id: acc.deviceId(),
-      schema_version: core.SCHEMA_VERSION,
+      //  پلهٔ همان سرور، نه بیشتر (`wireSchema` ِ sync-core.js، پرچمِ گاوصندوق)
+      schema_version: core.wireSchema(state().serverSchema),
       ops: batch,
       queued: q.size(),
       //  A00: وب ردیفِ JSON ِ خام را نگه می‌دارد و null اش پاک کردنِ واقعی است — سرور
       //  تورِ «ساختِ پیش از A00» را برایش کنار می‌گذارد (server/src/lib/newer-fields.js)
       client: 'web',
+      //  #481: «تا این‌جا را دیده بودم» — فقط با پرچمِ دکانِ `sync.cursor_from_since` خوانده می‌شود
+      since: sinceForPush(),
     };
     var r;
     try {
@@ -304,7 +455,10 @@
       if (e.status === 426) {
         //  سرور عقب‌تر است. هیچ opی اعمال نشده و هیچ opی هم پاک
         //  نمی‌شود؛ منتظر می‌مانیم تا سرور به‌روز شود.
-        patchState({ holding: true, lastError: e.message || 'سرور باید به‌روز شود' });
+        //  پلهٔ بالاتر از پایه را سرور دیگر نمی‌شناسد (پرچمِ دکان خاموش شد)؟ بارِ بعد با پایه
+        var sent = body.schema_version;
+        patchState({ holding: true, lastError: e.message || 'سرور باید به‌روز شود',
+          serverSchema: sent > core.BASE_SCHEMA ? 0 : state().serverSchema });
         announce();
         throw e;
       }
@@ -346,27 +500,38 @@
      ۳) Pull — تغییرهای دستگاه‌های دیگر
      ========================================================== */
   async function pullOnce() {
+    if (tabLock.readOnly()) return 0;
     var st = state();
     var since = Number(st.cursor || 0);
     var r = await acc.authFetch('/api/sync/v1/pull?device_id='
       + encodeURIComponent(acc.deviceId()) + '&since=' + since);
+    if (tabLock.readOnly()) return 0;   // نقش در همین فاصله روشن شد
     var ops = Array.isArray(r.ops) ? r.ops : [];
+    //  پرچمِ دکانِ `sync.keep_pending`: تغییرِ محلیِ «در صف» (مثلاً ذخیره‌شده وسطِ همین pull) با opِ رسیده
+    //  بازنویسی نمی‌شود — همان opها روی دفتر و سایه (`core.keepPending`؛ sync-core ِ کهنه ⇒ همان پیشین)
+    if (r.keep_pending === true && ops.length && typeof core.keepPending === 'function') ops = core.keepPending(ops, queue().all());
     if (ops.length) {
       var data = ledger.read();
       //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود، وگرنه همین opها
       //  هرگز روی این دستگاه نمی‌نشستند
       if (!data) return 0;
       {
+        var base = shadow();
         var out = core.applyRemote(data, ops);
         ledger.write(out.data);
         //  سایه همین‌جا جلو می‌رود، وگرنه تفاضلِ بعدی همین‌ها را
-        //  دوباره به سرور پس می‌فرستد
-        setShadow(out.data);
+        //  دوباره به سرور پس می‌فرستد — ولی «سایهٔ پیشین + همین opها»، نه کلِ
+        //  دفترِ امروز (همان `SyncCommit.absorbedShadow` ِ اندروید): تغییرِ محلی‌ای
+        //  که ثبتش نگرفت (حافظهٔ پر) باید در تفاضلِ بعدی بماند، وگرنه جزوِ سایه
+        //  می‌شد و هرگز به سرور نمی‌رسید (SYN-01). سایهٔ نبوده ⇒ همان دفتر (پایه).
+        setShadow(base ? core.applyRemote(base, ops).data : out.data);
       }
     }
     patchState({
       cursor: Number(r.cursor || since), lastPullAt: Date.now(),
       serverSchema: Number(r.schema_version || st.serverSchema || 0),
+      //  §۹.۵: دوران کنارِ pull ⇔ پرچمِ `SYNC_EPOCH_ENABLED` ِ سرور روشن ⇒ دورِ بعد `checkEpoch` می‌پرسد
+      epochLive: !!epochOf(r),
     });
     //  صفحه بیش از یک بسته داشت ⇒ همان‌جا بقیه را هم بیاور
     if (r.has_more) return (await pullOnce()) + ops.length;
@@ -374,16 +539,108 @@
   }
 
   /* ==========================================================
+     §۹.۵ — سرور از پشتیبان برگشت (`server/src/lib/sync-epoch.js`)
+     ----------------------------------------------------------
+     «دورانِ بازیابی» فقط با بازیابی عوض می‌شود. عوض شده و این مرورگر پس از پایه چیزی
+     دیده ⇒ «در انتظار»: Pull نه (opِ دوباره‌فرستادهٔ برنامه‌های دیگر روی دفترِ کهنه دو بار
+     می‌نشست)، صف فرستاده می‌شود و بعد دفتر از نو — «نگه‌دارِ محلی» (`core.restoreMerge`):
+     Snapshot + ردیف‌هایی که فقط این‌جا هستند (جز آنچه سرور حذف‌شده می‌داند) ⇒ فروشِ پس از
+     پشتیبانِ همین مرورگر «درج» دوباره می‌رود، پاک نمی‌شود.
+     ⚠️ وب دفترچهٔ opهای فرستاده ندارد (سهمیهٔ localStorage با دفترِ خودِ دکان شریک است)، پس
+     ویرایشِ «اعمال‌شده»ی گم‌شدهٔ همین مرورگر روی ردیفی که سرور دارد (مثلاً دریافتِ دیگری روی
+     فاکتورِ پیش از پشتیبان) دوباره نمی‌رود — ردیفِ تازه می‌ماند و می‌رود.
+     سرورِ کهنه یا خاموش (۴۰۴) ⇒ همان رفتارِ پیشین.
+     ⛔ درِ `/api/shop/sync-epoch` فقط وقتی زده می‌شود که pull ِ پیشین دوران آورد (`epochLive`)؛
+     پرچمِ خاموش ⇒ هیچ درخواستی که هر دور ۴۰۴ بگیرد. ۴۰۴ ⇒ تا pull ِ دوران‌دارِ بعدی دیگر نه.
+     ========================================================== */
+  function epochOf(r) {
+    var ep = r && r.epoch;
+    if (!ep || typeof ep.id !== 'string' || !ep.id) return null;
+    var base = Number(ep.base);
+    var head = Number(ep.head);
+    if (!Number.isFinite(base) || !Number.isFinite(head) || base < 0 || head < 0) return null;
+    return { id: ep.id, base: Math.min(base, head), head: head };
+  }
+
+  async function checkEpoch() {
+    if (!state().epochLive) return;
+    var ep;
+    try {
+      ep = epochOf(await acc.authFetch('/api/shop/sync-epoch'));
+    } catch (e) {
+      if (e && e.status === 404) patchState({ epochLive: false });
+      return;
+    }
+    if (!ep) return;
+    var st = state();
+    var known = st.epoch || '';
+    var cursor = Number(st.cursor || 0);
+    var restored = (known !== '' && known !== ep.id) || cursor > ep.head;
+    if (restored && cursor > ep.base) patchState({ epoch: ep.id, restorePending: true });
+    else if (known !== ep.id) patchState({ epoch: ep.id });
+  }
+
+  /** از ردیف‌های تنهای این مرورگر کدام روی سرور حذف‌شده است؛ ۴۰۴ ⇒ هیچ (نگه داشتن بهتر از گم کردن) */
+  async function deletedOf(rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i += 500) {
+      var r;
+      try {
+        r = await acc.authFetch('/api/shop/sync-epoch/deleted', { method: 'POST', body: { rows: rows.slice(i, i + 500) } });
+      } catch (e) {
+        if (e && e.status === 404) return out;
+        throw e;
+      }
+      if (r && Array.isArray(r.deleted)) out = out.concat(r.deleted);
+    }
+    return out;
+  }
+
+  /**
+   *  پس از خالی شدنِ صف: دفتر = Snapshot + ردیف‌های تنهای این مرورگر؛ سایه = Snapshot ⇒ تنهاها
+   *  «درج» می‌روند. ⛔ فقط با صفِ خالی و تفاضلِ هیچ (پس از ثبتِ همین لحظه): تغییرِ ثبت‌نشده
+   *  (حافظهٔ پر) زیرِ Snapshot نمی‌رود. ⛔ اول سایه، بعد دفتر: شکستِ هر کدام ⇒ هیچ چیزی عوض نشده.
+   */
+  async function rebuildFromServer() {
+    var r = await acc.authFetch('/api/sync/v1/snapshot');
+    var data = ledger.read();
+    if (!data) return false;
+    var gone = [];
+    var ask = core.restoreLocalOnly(r, data);
+    if (ask.length) gone = await deletedOf(ask);
+    //  هر چه وسطِ این درخواست‌ها رسید اول ثبت شود
+    recordChange('restore');
+    if (queue().size() > 0) return false;
+    data = ledger.read();
+    var base = shadow();
+    if (!data || !base || core.diff(base, data).ops.length) return false;
+    var merged = core.restoreMerge(r, data, gone);
+    if (!setShadow(merged.shadow)) return false;
+    try {
+      ledger.write(merged.ledger);
+    } catch (e) {
+      setShadow(base);
+      throw e;
+    }
+    patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), restorePending: false });
+    //  ردیف‌های تنهای این مرورگر ⇒ «درج»
+    recordChange('restore');
+    return true;
+  }
+
+  /* ==========================================================
      ۴) حلقهٔ اصلی
      ========================================================== */
   async function pump() {
     if (busy) return;
+    if (tabLock.readOnly()) { announce(); return; }
     if (!acc.configured() || !acc.isSignedIn()) { announce(); return; }
     if (navigator.onLine === false) { announce(); return; }
     busy = true;
     announce();
     try {
       ensureListShadow();
+      await checkEpoch();
       var head = 0;
       var q = queue();
       var guard = 0;
@@ -394,7 +651,15 @@
         if (!out.sent) break;
         head = out.head;
       }
-      var pulled = await pullOnce();
+      if (state().restorePending && queue().size() === 0 && await rebuildFromServer()) {
+        head = 1;
+        //  ردیف‌های تنها همین حالا بروند
+        for (var again = 0; queue().size() > 0 && again < 200; again++) {
+          var sent = await pushOnce();
+          if (!sent.sent) break;
+        }
+      }
+      var pulled = state().restorePending ? 0 : await pullOnce();
       succeeded();
       if (pulled || head) announce();
     } catch (e) {
@@ -410,12 +675,19 @@
      ۵) Snapshot — گوشیِ نو، یک بار
      ========================================================== */
   async function restoreFromServer() {
+    if (tabLock.readOnly()) throw otherTabError();
     var r = await acc.authFetch('/api/sync/v1/snapshot');
+    if (tabLock.readOnly()) throw otherTabError();
+    //  §۹.۵: دورانِ پیش از Snapshot کنارِ خودش (فقط با پرچمِ روشن) — دفتر حالا همان سرور است، پس همان
+    //  دوران؛ بی درِ جدای دوران
+    var ep = epochOf(r);
     var data = ledger.read() || {};
     var next = core.fromSnapshot(r, data);
     ledger.write(next);
     setShadow(next);
     patchState({ cursor: Number(r.cursor || 0), snapshotAt: Date.now(), lastOkAt: Date.now(), lastError: '' });
+    patchState({ epochLive: !!ep });
+    if (ep) patchState({ epoch: ep.id, restorePending: false });
     announce();
     return { rows: Number(r.rows || 0), cursor: Number(r.cursor || 0) };
   }
@@ -427,6 +699,7 @@
    *  یک بار، چون این مرورگر تا امروز آفلاین کار می‌کرده.
    */
   async function firstSync() {
+    if (tabLock.readOnly()) return { did: 'other_tab' };
     var st = state();
     if (st.snapshotAt || st.cursor) return { did: 'none' };
     var data = ledger.read() || {};
@@ -488,7 +761,7 @@
   }
 
   async function connectLive() {
-    if (socket || socketDialing || !acc.configured() || !acc.isSignedIn()) return;
+    if (socket || socketDialing || !acc.configured() || !acc.isSignedIn() || tabLock.readOnly()) return;
     var cred = null;
     socketDialing = true;
     try { cred = await liveCredential(); } catch (e) {
@@ -506,6 +779,8 @@
       u.searchParams.set(cred[0], cred[1]);
       u.searchParams.set('device_id', acc.deviceId());
       u.searchParams.set('app', acc.appId());
+      //  S78: این نسخه پس از 4403 (انقضای توکن) با توکنِ تازه برمی‌گردد ⇒ سرور سرِ موعد می‌بندد
+      u.searchParams.set('caps', 'expiry');
       url = u.toString();
     } catch (e) { return; }
 
@@ -515,8 +790,10 @@
     socket.onmessage = function (ev) {
       var msg = null;
       try { msg = JSON.parse(ev.data); } catch (e) { return; }
-      //  فقط «چیزی عوض شد» می‌آید؛ خودِ داده هرگز از این در نمی‌رود
-      if (msg && msg.event === 'changed') pump();
+      //  فقط «چیزی عوض شد» می‌آید؛ خودِ داده هرگز از این در نمی‌رود.
+      //  «hello» هم: هر وصل (از جمله پس از بسته‌شدنِ 4401/4403 ِ سرور، S78) یک pump —
+      //  خبری که در فاصلهٔ قطع آمد گم نشود
+      if (msg && (msg.event === 'changed' || msg.event === 'hello')) pump();
       //  عکسِ کالا و بارکدِ گوشی — ‎license/photo-studio.js‎ گوش می‌دهد
       if (msg && (msg.event === 'photos' || msg.event === 'scan' || msg.event === 'hello' || msg.event === 'photo-request' || msg.event === 'inbox')) {
         try { window.dispatchEvent(new CustomEvent('tohid:live', { detail: msg })); } catch (e) { /* مرورگرِ کهنه */ }

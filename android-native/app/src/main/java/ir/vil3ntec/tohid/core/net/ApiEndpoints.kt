@@ -82,10 +82,17 @@ object ApiEndpoints {
     const val SNAPSHOT = "/sync/v1/snapshot"
     const val STATUS = "/sync/v1/status"
     fun pull(deviceId: String, since: Long) = "/sync/v1/pull?device_id=$deviceId&since=$since"
+    /** «دورانِ» سرور پس از بازیابی (§۹.۵) — فقط دکان، جدا از مسیرهای مشترک با پمپ */
+    const val EPOCH = "/shop/sync-epoch"
+    /** از ردیف‌های تنهای دستگاه کدام روی سرور حذف‌شده است (§۹.۵، پیش از ساختنِ دوبارهٔ دفتر) */
+    const val DELETED = "/shop/sync-epoch/deleted"
     /** مسیرِ سوکتِ زنده — نسبت به ریشهٔ سرور، نه به پیشوندِ API. */
     const val LIVE_PATH = "/api/sync/v1/live"
-    /** بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. */
-    const val LIVE_TICKET_PATH = "/api/sync/v1/live/ticket"
+    /**
+     *  بلیتِ یک‌بارمصرفِ ۶۰ ثانیه‌ای برای سوکت (F0-11) — توکن دیگر در آدرس نمی‌رود. نسبت به
+     *  پیشوندِ API و از راهِ `ApiClient`، تا توکنِ پیر (۴۰۱) خودکار تازه شود (S78).
+     */
+    const val LIVE_TICKET = "/sync/v1/live/ticket"
   }
 
   /* ------------------------------ لوکیشن ------------------------------ */
@@ -110,6 +117,9 @@ object ApiEndpoints {
     const val SUBSCRIPTION = "/me/subscription"
     const val PLANS = "/me/plans"
     const val PURCHASE_REQUEST = "/me/purchase-request"
+
+    /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
+    const val PHONE_CODE = "/me/phone/code"
 
     /**
      *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.
@@ -177,11 +187,15 @@ object ApiEndpoints {
     fun status(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/status"
     fun code(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/code"
     fun recall(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/recall"
+    /** «اصلاحِ نشانی» پس از ناموفق (DLV-09) */
+    fun address(assignmentId: String) = "$ROOT/assignments/${enc(assignmentId)}/address"
     /** POST (همان PATCHِ سرور) — JVMِ کامپیوتر PATCH نمی‌فرستد */
     fun courier(id: String) = "$COURIERS/${enc(id)}"
     fun settlementPreview(courierId: String) = "$COURIERS/${enc(courierId)}/settlement-preview"
     fun settle(courierId: String) = "$COURIERS/${enc(courierId)}/settlements"
     fun settlements(courierId: String, limit: Int) = "$SETTLEMENTS?courierId=${enc(courierId)}&limit=$limit"
+    /** RPT-15 — گزارشِ نقدِ پیک‌ها در [from، to) */
+    fun cashReport(from: Long, to: Long) = "$ROOT/cash-report?from=$from&to=$to"
     fun statement(name: String, from: Long?, to: Long?) = buildString {
       append("$EXTERNAL/statement?name=").append(enc(name))
       if (from != null) append("&from=").append(from)
@@ -201,6 +215,8 @@ object ApiEndpoints {
     const val EVENTS = "/courier/events"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
+    /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */
+    fun call(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/call"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

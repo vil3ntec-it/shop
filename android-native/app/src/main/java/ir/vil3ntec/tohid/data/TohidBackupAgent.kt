@@ -48,7 +48,11 @@ class TohidBackupAgent : BackupAgent() {
   }
 
   private companion object {
-    /** همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، و PINهای شاگرد (STF-02/04) */
-    val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml")
+    /**
+     *  همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، PINهای شاگرد (STF-02/04) و سریِ سندِ همین
+     *  دستگاه (DATA-06، `DocSeries`) — گوشیِ بازیابی‌شده سریِ خودش را از سرور می‌گیرد.
+     */
+    val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml",
+      "tohid-doc-series.xml")
   }
 }

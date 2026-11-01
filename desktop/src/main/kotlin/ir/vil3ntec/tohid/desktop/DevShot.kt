@@ -12,9 +12,15 @@ import javax.imageio.ImageIO
  *  هر چند ثانیه از پنجره عکس می‌گیرد (`shot-1.png`، …) تا برنامهٔ
  *  واقعی روی یک نمایشگرِ مجازی (Xvfb در CI) دیده و سنجیده شود. در
  *  نسخهٔ دستِ کاربر این ویژگی تنظیم نمی‌شود و هیچ کاری نمی‌کند.
+ *
+ *  ⛔ SEC-CLI (۱۴۰۵/۰۸/۰۹): فقط در ساختِ `-Pdev=true` (`BuildConfig.DEBUG`، همان که
+ *  `desktop-shots.yml` می‌سازد). تا ۲.۱۴.۵ در نسخهٔ انتشار هم با یک `-Dtohid.shot…` (مثلاً از
+ *  `JAVA_TOOL_OPTIONS`) روشن می‌شد — با `typecmd` که فرمانِ پوسته اجرا می‌کند و `click`/`type`
+ *  که روی برنامه کار می‌کنند؛ ابزارِ آزمون در دستِ کاربر نمی‌ماند.
  */
 object DevShot {
   fun start() {
+    if (!ir.vil3ntec.tohid.BuildConfig.DEBUG) return
     val dir = System.getProperty("tohid.shot")?.takeIf { it.isNotBlank() }?.let(::File) ?: return
     val every = System.getProperty("tohid.shot.every")?.toLongOrNull() ?: 4000
     val count = System.getProperty("tohid.shot.count")?.toIntOrNull() ?: 3
@@ -86,6 +92,21 @@ object DevShot {
                 Thread.sleep(1500)
               }
               "prodsel" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.DeskProductsShot.select.value = arg.toInt() }; Thread.sleep(1000) }
+              //  دفترِ موجودی: stock:on (روشن کردنِ تنظیم با همان راهِ کارتِ تنظیمات) · stock:transfer (پنجرهٔ انتقال)
+              //  · stocktab:pos|ledger|review|count · stockcount:n (شمارشِ نمونهٔ n کالا)
+              "stock" -> {
+                java.awt.EventQueue.invokeAndWait {
+                  if (arg == "transfer") ir.vil3ntec.tohid.ui.screens.StockBookNav.transfer.value = true
+                  else {
+                    //  عکس: پرچمِ سرورِ `shop.stock_v2` را هم روشن فرض کن (در برنامهٔ واقعی از `StockFlag`)
+                    if (arg == "on") ir.vil3ntec.tohid.data.StockLedger.serverFlag = true
+                    ir.vil3ntec.tohid.ui.screens.StockBookNav.enable.value = arg == "on"
+                  }
+                }
+                Thread.sleep(1500)
+              }
+              "stocktab" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.StockBookNav.tab.value = arg }; Thread.sleep(1200) }
+              "stockcount" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.screens.StockBookNav.count.value = arg.toInt() }; Thread.sleep(1200) }
               //  تم: theme:DARK|LIGHT|SYSTEM — همان درخواستِ نوارِ منو (`AppNav.theme`)
               "theme" -> { java.awt.EventQueue.invokeAndWait { ir.vil3ntec.tohid.ui.AppNav.theme.value = arg }; Thread.sleep(1500) }
               "scroll" -> { robot.mouseWheel(arg.toInt()); Thread.sleep(600) }
