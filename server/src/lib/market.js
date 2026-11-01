@@ -730,9 +730,7 @@ async function myOrders(ticket) {
     [phone]
   );
   const slugs = [...new Set(rows.map((r) => r.slug))];
-  const open = new Set(await filterAsync(slugs, storeOpen));
-  //  TEN-03: لینکِ زمان‌دار به‌ازای پرچمِ هر دکان
-  const linked = new Set(await filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn));
+  const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
   return rows.filter((r) => open.has(r.slug)).map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
