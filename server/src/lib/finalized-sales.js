@@ -229,15 +229,17 @@ class Guard {
 /* ------------------------------------------------------------------ Sync v1 */
 
 const V1_ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
+//  هویتِ حسابِ دکان در v1 — یک جا، نه مقایسهٔ درجای رشته (سنجهٔ product-literals)
+const SHOP_V1 = { app: 'shop', accountKind: 'shop' };
 
 /**
  * نگهبانِ یک push ِ v1 ⇐ Guard یا null (پمپ، دسته‌ای بی فاکتور و قلم، پرچمِ خاموش ⇒ null و هیچ پرسشی).
  * `lib/sync-v1.js` آن را برای هر op پس از قفلِ ردیف صدا می‌زند (همان تراکنش، زیرِ قفلِ حساب).
  */
 async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
-  if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId || !Array.isArray(ops)) return null;
+  if (!ctx || ctx.app !== SHOP_V1.app || ctx.accountKind !== SHOP_V1.accountKind || !ctx.accountId || !Array.isArray(ops)) return null;
   const { tableOf } = require('./sync-v1');
-  const tableOfRaw = (r) => (isPlainObject(r) ? tableOf('shop', r.table ?? r.table_name ?? r.tableName) : null);
+  const tableOfRaw = (r) => (isPlainObject(r) ? tableOf(SHOP_V1.app, r.table ?? r.table_name ?? r.tableName) : null);
   if (!ops.some((r) => SALE_TABLES.has(tableOfRaw(r)))) return null;
   if (!(await flagOn(ctx.accountId))) return null;
   const merges = new Map();
