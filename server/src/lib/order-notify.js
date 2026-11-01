@@ -163,10 +163,12 @@ function messageFor(row, reminder) {
   };
 }
 
-const RECIPIENT_PERMISSION = 'orders.view';
+//  A16: `orders.manage` نه `orders.view` — حسابدار سفارش را می‌بیند ولی رسیدگی نمی‌کند،
+//  پس اعلانِ «سفارشِ تازه» و یادآوری‌اش برای او نیست. صاحب، مدیر و شاگرد هر دو را دارند.
+const RECIPIENT_PERMISSION = 'orders.manage';
 
 /**
- * کاربرانی که اعلانِ سفارش می‌گیرند: عضوِ فعالِ دکان که `orders.view` دارد
+ * کاربرانی که اعلانِ سفارش می‌گیرند: عضوِ فعالِ دکان که `orders.manage` دارد
  * (همان سنجشِ `requirePermission`: سقفِ نقش، سپس لایه‌ها اگر کلید لایه‌پذیر
  * باشد) + صاحبِ دکان همیشه. پیک (`courier`) و عضوِ بسته‌شده بیرون‌اند.
  */
