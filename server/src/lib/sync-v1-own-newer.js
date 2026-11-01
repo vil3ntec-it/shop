@@ -28,6 +28,7 @@
  * می‌گیرد — همان شیء، بی هیچ پرس‌وجوی دیگری؛ پمپ حتی پرچم را نمی‌خواند.
  */
 const { many } = require('../db');
+const { SHOP } = require('./tenancy');
 
 const FLAG = 'sync.pull_own_newer';
 
@@ -39,7 +40,7 @@ const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArr
 const isInc = (v) => isPlainObject(v) && Object.keys(v).length === 1 && Number.isFinite(v.$inc);
 
 /** حسابِ دکان (حسابِ پمپ `station` است) */
-const isShop = (ctx) => Boolean(ctx && ctx.app === 'shop' && ctx.accountKind === 'shop' && ctx.accountId);
+const isShop = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
 
 async function on(ctx) {
   if (!isShop(ctx)) return false;
