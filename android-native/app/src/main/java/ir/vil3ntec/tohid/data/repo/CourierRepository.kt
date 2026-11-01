@@ -20,11 +20,24 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class CourierRepository(private val api: ApiClient) {
 
-  data class Me(val id: String, val name: String, val active: Boolean, val cashCapMinor: Long)
+  /** `callEnabled`: دکان دکمهٔ «تماس با مشتری» را روشن کرده (`shop.delivery_courier_call`) */
+  data class Me(val id: String, val name: String, val active: Boolean, val cashCapMinor: Long, val callEnabled: Boolean = false)
 
   suspend fun me(): ApiResult<Me> = result {
-    val c = api.get(ApiEndpoints.Courier.ME)["courier"] as? JsonObject ?: JsonObject(emptyMap())
-    Me(CourierWire.str(c, "id"), CourierWire.str(c, "name"), CourierWire.bool(c, "active"), CourierWire.long(c, "cashCapMinor") ?: 0L)
+    val out = api.get(ApiEndpoints.Courier.ME)
+    val c = out["courier"] as? JsonObject ?: JsonObject(emptyMap())
+    Me(
+      CourierWire.str(c, "id"), CourierWire.str(c, "name"), CourierWire.bool(c, "active"),
+      CourierWire.long(c, "cashCapMinor") ?: 0L, CourierWire.bool(out, "callEnabled"),
+    )
+  }
+
+  /**
+   *  شمارهٔ کاملِ مشتری برای همین یک تماس (DLV-02). ⛔ جایی نگه داشته نمی‌شود: فقط به
+   *  صفحهٔ شماره‌گیر داده می‌شود؛ کارت و فهرست همان شمارهٔ پوشیده را دارند.
+   */
+  suspend fun callNumber(assignmentId: String): ApiResult<String> = result {
+    CourierWire.str(api.post(ApiEndpoints.Courier.call(assignmentId), JsonObject(emptyMap())), "phone")
   }
 
   /** `scope`: «active» (زنده) یا «done» (پایان‌یافته؛ سرور نشانی را نمی‌دهد) */

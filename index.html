@@ -88,7 +88,7 @@
      همین بالا: اگر دفتر در IndexedDB باشد، خواندنش از همین لحظه شروع می‌شود -->
 <script src="license/ledger-store.js?v=1"></script>
 <!-- دفترِ قرض‌داران (v3 §22.2-A5): پول به واحدِ کوچک و همان حسابِ DebtBook.kt — بی defer، پیش از اسکریپتِ برنامه -->
-<script src="license/money.js?v=1"></script>
+<script src="license/money.js?v=2"></script>
 <script src="license/debt-book.js?v=1"></script>
 <!-- نوارِ وضعیتِ گوشی هم‌رنگِ سربرگ می‌شود — همان آبیِ نیتیو، در هر تم -->
 <meta name="theme-color" id="meta-theme-color" content="#0F62B4">
@@ -109,7 +109,7 @@
 <link rel="stylesheet" href="license/vip.css?v=16">
 <link rel="stylesheet" href="license/support.css?v=17">
 <link rel="stylesheet" href="license/account-ui.css?v=2">
-<link rel="stylesheet" href="license/orders-ui.css?v=1">
+<link rel="stylesheet" href="license/orders-ui.css?v=2">
 <!-- «گزارشِ تازه» (RPT-01/02/03/06/09/11) — پیش‌فرض خاموش؛ شرح در license/report-ui.js -->
 <link rel="stylesheet" href="license/report-ui.css?v=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13455,7 +13455,16 @@
       const returnable = si.quantity - (si.returnedQty||0);
       if(qty>returnable) qty = returnable;
       if(qty<=0) return;
-      const amount = Math.round((si.totalPrice/si.quantity) * qty * paidRatio);
+      // گردِ تجمعی (SEC-DATA-01): جمعِ برگشت‌های تکه‌تکهٔ یک قلم = برگشتِ یک‌جای همان مقدار، نه بیشتر.
+      // مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586): برگشت‌های کهنه با فرمولِ جداجدا ثبت شده‌اند.
+      const prior = returns.filter(r=>r.saleItemId===si.id);
+      const priorAmount = prior.reduce((s,r)=>s+(r.amount||0), 0);
+      const priorQty = prior.reduce((s,r)=>s+(r.quantity||0), 0);
+      // money.js ِ کهنهٔ کشِ سرویس‌ورکر (یک بارِ نخست پس از به‌روزرسانی) returnShare ندارد ⇒ فرمولِ پیشین،
+      // ولی هرگز بیش از «پولِ قلم منهای پس‌داده»
+      const amount = typeof TohidMoney.returnShare === 'function'
+        ? TohidMoney.returnShare(si.totalPrice, si.quantity, si.returnedQty||0, qty, paidRatio, priorAmount, priorQty)
+        : Math.max(0, Math.min(Math.round((si.totalPrice/si.quantity) * qty * paidRatio), Math.round(si.totalPrice * paidRatio) - priorAmount));
       si.returnedQty = (si.returnedQty||0) + qty;
       const retId = uid();
       returns.push({
@@ -14046,6 +14055,8 @@
 
   function saveState(){
     if(ledgerInMemory === false) return;   // دفتر هنوز از IndexedDB نرسیده: دفترِ خالی روی دفترِ واقعی نوشته نشود
+    /* دو برگه، یک دفتر: برگهٔ فقط‌خواندنی (`TohidTabLock`، license/sync-engine.js) دفترِ ذخیره‌شده را با نسخهٔ کهنه‌اش رونویسی نکند */
+    if(window.TohidTabLock && window.TohidTabLock.readOnly()){ try{ showToast(window.TohidTabLock.message, 'danger'); }catch(e){} return; }
     touchLedger();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify({
@@ -15803,9 +15814,9 @@
      اگر پیش از آن‌ها بیاید، بی‌صدا هیچ کاری نمی‌کند. -->
 <script src="license/sync-core.js?v=3" defer></script>
 <script src="license/account-code.js?v=2" defer></script>
-<script src="license/money.js?v=1" defer></script>
+<script src="license/money.js?v=2" defer></script>
 <script src="license/sync-v3-engine.js?v=1" defer></script>
-<script src="license/sync-engine.js?v=6" defer></script>
+<script src="license/sync-engine.js?v=7" defer></script>
 <script src="license/license-client.js?v=17" defer></script>
 <script src="license/shop-sync.js?v=20" defer></script>
 <script src="license/shop-ui.js?v=15" defer></script>
@@ -15817,7 +15828,7 @@
 <script src="license/photo-studio.js?v=2" defer></script>
 <script src="license/owner-export.js?v=1" defer></script>
 <!-- بخشِ «سفارش‌ها» — فقط وقتی سرور بگوید برای این دکان روشن است، ساخته می‌شود -->
-<script src="license/orders-ui.js?v=1" defer></script>
+<script src="license/orders-ui.js?v=2" defer></script>
 
 </body>
 </html>

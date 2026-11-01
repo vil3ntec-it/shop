@@ -86,6 +86,10 @@
             <ul id="fresh-list" class="rail products"></ul>
           </section>
 
+          <section id="recent" class="section" hidden aria-labelledby="recent-title">
+            <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
+            <ul id="recent-list" class="rail products"></ul>
+          </section>
           <div class="toolbar section">
             <form id="search-form" class="search" role="search">
               <label for="q" class="sr-only" data-t="s.label">جست‌وجوی کالا در این دکان</label>
@@ -122,6 +126,8 @@
                 <div id="address-box" class="stack" hidden>
                   <label class="field"><span data-t="ck.addr.l">نشانی</span><textarea id="a-text" maxlength="300" autocomplete="street-address" data-tp="ck.addr.ph" placeholder="ناحیه، سرک، کوچه، شمارهٔ خانه"></textarea></label>
                   <label class="field"><span data-t="ck.lm.l">نشانهٔ نزدیک</span><input id="a-landmark" type="text" maxlength="200" data-tp="ck.lm.ph" placeholder="مثلاً «پشتِ مسجد»"></label>
+                  <label class="field"><span data-t="ck.area.l">ناحیه (اختیاری)</span><input id="a-area" type="text" maxlength="80" data-tp="ck.area.ph" placeholder="مثلاً «کارتهٔ چهار»"></label>
+                  <label class="field"><span data-t="ck.gate.l">رنگِ دروازه (اختیاری)</span><input id="a-gate" type="text" maxlength="40" data-tp="ck.gate.ph" placeholder="مثلاً «سبز»"></label>
                   <div class="pin-row">
                     <button id="pin-btn" class="btn btn-soft btn-sm" type="button" data-t="pin.btn">پین با موقعیتِ فعلیِ من</button>
                     <span id="pin-text" class="muted small" data-t="pin.hint">پین اختیاری است؛ فقط برای پیدا کردنِ دقیق‌ترِ در.</span>
@@ -183,8 +189,17 @@
               <div class="card card-lg">
                 <div class="spread"><h1 id="o-title" data-t="od.title">سفارش</h1><span id="o-status" class="pill" role="status"></span></div>
                 <p id="o-meta" class="muted"></p>
+                <div id="o-dlv" class="dlv section" hidden>
+                  <p id="o-courier"></p>
+                  <p id="o-eta" class="muted"></p>
+                  <div id="o-code" class="dlv-code" hidden><small data-t="od.code">کدِ تحویل</small><b id="o-code-n" class="num" dir="ltr"></b><small class="muted" data-t="od.code.hint">این کد را فقط هنگامِ گرفتنِ سفارش بگویید.</small></div>
+                </div>
                 <ol id="o-steps" class="steps section" data-ta="a.steps" aria-label="مراحلِ سفارش"></ol>
                 <details class="history section"><summary data-t="od.history">تاریخچهٔ کامل</summary><ol id="o-timeline" class="timeline"></ol></details>
+              </div>
+              <div id="o-subs" class="card card-lg" hidden>
+                <h2 data-t="od.sub.title">کالای جایگزین</h2>
+                <ul id="o-sub-list" class="sum-lines"></ul>
               </div>
               <div class="card card-lg">
                 <h2 data-t="od.items">اقلام</h2>
