@@ -3,11 +3,7 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.product.ProductVariants
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.core.product.VariantCombo
-import kotlinx.serialization.Serializable
 
-/** PRD-11 — یک ویژگیِ مدل («رنگ»: قرمز، آبی) روی `Product.variantAxes` */
-@Serializable
-data class VariantAxis(val name: String = "", val values: List<String> = emptyList())
 
 /**
  *  PRD-11 — تنوع با ماتریس در دفتر: کالای «مدل» ویژگی‌ها را دارد (`Product.variantAxes`)، هر تنوع کالای

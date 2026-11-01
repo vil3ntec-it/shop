@@ -2,9 +2,6 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.pos.SpecialOrder
 import ir.vil3ntec.tohid.core.pos.SpecialOrder.Status
-import kotlinx.serialization.EncodeDefault
-import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.Serializable
 
 /**
  *  POS-26 — سفارشِ ویژهٔ مشتری با پیش‌پرداخت، روی دفترِ دکان. خالص: نه فایل، نه ساعت، نه Android؛ ثبت فقط با
@@ -256,25 +253,3 @@ object SpecialOrders {
     return Built.Ok(data.copy(transactions = txs, auditLog = data.auditLog + row), saleId = key)
   }
 }
-
-/**
- *  POS-26 — سفارشِ ویژه روی ردیفِ سابقه (`SpecialOrders`): سند روی `special_order` (مشتری، کالا یا شرح، مقدار، جمع،
- *  پیش‌پرداخت، روزِ تحویل) و وضعیتِ تازه روی `special_order_status` (`to`، و فاکتورِ تحویل در `saleId`). پول به پول
- *  (یک‌صدمِ افغانی). هر فیلدِ خالی نوشته نمی‌شود — ردیفِ وضعیت فقط `to` (و `saleId`) دارد.
- */
-@Serializable
-@OptIn(ExperimentalSerializationApi::class)
-data class SpecialOrderDoc(
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val debtorId: String? = null,
-  /** کالای فهرست؛ `null` ⇒ شرحِ دلخواه (قلمِ آزادِ فاکتورِ تحویل) */
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val productId: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val item: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val qtyMilli: Long? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val totalMinor: Long? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val depositMinor: Long? = null,
-  /** روزِ تحویل (`yyyy-MM-dd`) */
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val due: String? = null,
-  /** وضعیتِ تازه (`SpecialOrder.Status.code`) — فقط ردیفِ `special_order_status` */
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val to: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER) val saleId: String? = null,
-)

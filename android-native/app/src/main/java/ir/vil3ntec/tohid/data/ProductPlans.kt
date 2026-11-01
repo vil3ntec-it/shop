@@ -2,15 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.product.PriceSchedule
 import ir.vil3ntec.tohid.core.product.ProductKit
-import kotlinx.serialization.Serializable
 
-/** PRD-10 — یک جزءِ کیت: کالا و مقدار به `unit` ِ همان کالا (`Product.kit`، و رونوشتش روی `SaleItem.parts`) */
-@Serializable
-data class KitPart(val productId: String = "", val qty: Double = 0.0)
-
-/** PRD-13 — یک بازهٔ قیمتِ زمان‌بندی‌شده: از و تا (هر دو شامل، `yyyy-MM-dd`) و قیمتِ فروش (`Product.priceWindows`) */
-@Serializable
-data class PriceWindow(val from: String = "", val to: String = "", val price: Double = 0.0)
 
 /**
  *  کیت (PRD-10) و قیمتِ زمان‌بندی‌شده (PRD-13) در دفتر و فروش — منطقِ خالص در `core/product/ProductPlans`.
