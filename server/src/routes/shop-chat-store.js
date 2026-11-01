@@ -4,6 +4,8 @@
  *
  * هویتِ مشتری = شمارهٔ تأییدشده با بلیتِ ویترین (سرآیندِ `X-Store-Ticket`)،
  * همان که ویترین (PR #244، `lib/storefront.js`) پس از کدِ یک‌بارمصرف می‌دهد.
+ * با پرچمِ سراسریِ `market.account` (پیش‌فرض خاموش) نشستِ حساب (`X-Store-Session`)
+ * هم پذیرفته است و گفت‌وگو به شناسهٔ حساب گره می‌خورد (S9).
  * قراردادی که این‌جا از ویترین لازم است، فقط دو تابع:
  *
  *   open(slug)            ⇒ ردیفِ ویترینِ روشن با `shop_id` — یا خطای ۴۰۴
@@ -51,6 +53,14 @@ const customer = async (req, res, next) => {
   }
   const store = await sf.open(req.params.slug);
   if (!(await chat.flagOf(store.shop_id))) throw notFound('چت برای این دکان روشن نیست', 'chat_disabled');
+  //  S9: با پرچمِ `market.account` نشستِ حساب هم ⇒ گفت‌وگو به `customer_id` گره می‌خورد
+  const session = req.get('x-store-session') || '';
+  if (session && (await require('../lib/market').accountOn())) {
+    const a = await require('../lib/store-customers').auth(session);
+    if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
+    req.chatViewer = { side: 'customer', shopId: store.shop_id, phone: a.customer.phone, customerId: a.customer.id };
+    return next();
+  }
   const phone = await sf.verifiedPhoneOfTicket(req.get('x-store-ticket') || '');
   if (!phone) throw new ApiError(401, 'verification_required', 'برای چت با دکان، شمارهٔ خود را تأیید کنید');
   req.chatViewer = { side: 'customer', shopId: store.shop_id, phone };
