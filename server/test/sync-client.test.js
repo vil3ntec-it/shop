@@ -90,7 +90,7 @@ function makeDevice(deviceId, token) {
         if (!batch.length) break;
         const r = await h.api('POST', '/api/sync/v1/push', {
           token: this.token,
-          body: { device_id: this.id, schema_version: core.SCHEMA_VERSION, ops: batch, queued: this.queue.size() },
+          body: { device_id: this.id, schema_version: core.wireSchema(0), ops: batch, queued: this.queue.size() },
           headers: { 'X-App': 'shop', 'X-Device': this.id },
         });
         last = r;
@@ -189,7 +189,7 @@ test('حذف = یک opِ بی فیلد، و بدنهٔ کاملِ درخواست
   assert.equal(ops.length, 1);
   assert.equal(ops[0].type, 'delete');
   assert.equal(ops[0].fields, undefined);
-  const body = { device_id: 'x', schema_version: core.SCHEMA_VERSION, ops };
+  const body = { device_id: 'x', schema_version: core.wireSchema(0), ops };
   const bytes = Buffer.byteLength(JSON.stringify(body), 'utf8');
   assert.ok(bytes < 1024, `بدنهٔ حذف ${bytes} بایت شد`);
 });
@@ -578,7 +578,7 @@ test('فرستادنِ دوبارهٔ یک دسته (اینترنتِ نصفه) 
   const A = makeDevice(DEV_A, owner.accessToken);
   A.write((L) => { L.suppliers = [{ id: 'sup-1', name: 'تأمین‌کننده', phone: '077' }]; });
   const batch = A.queue.batch();
-  const body = { device_id: DEV_A, schema_version: core.SCHEMA_VERSION, ops: batch };
+  const body = { device_id: DEV_A, schema_version: core.wireSchema(0), ops: batch };
   const first = await h.api('POST', '/api/sync/v1/push', { token: owner.accessToken, body, headers: { 'X-App': 'shop' } });
   const again = await h.api('POST', '/api/sync/v1/push', { token: owner.accessToken, body, headers: { 'X-App': 'shop' } });
   assert.equal(first.body.results[0].status, 'applied');

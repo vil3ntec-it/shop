@@ -98,6 +98,10 @@ async function versionOf(data) {
   return '';
 }
 
+//  پنلِ مرکزی ۴.۸ (`lib/ops-overview.js`): همان خواننده و همان کش — نسخهٔ پایدار/آزمایشیِ هر سکو در پنل
+router._release = release;
+router._versionOf = versionOf;
+
 /** فایلِ یک دارایی روی دیسک — با شناسه و زمانِ به‌روزشدنش، پس نسخهٔ کهنه دوباره داده نمی‌شود */
 async function cached(tag, asset) {
   const dir = path.join(config.releases.dir, tag);

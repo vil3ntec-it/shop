@@ -17,6 +17,12 @@ data class SyncOp(
   val rowId: String,
   val type: String,
   val fields: JsonObject?,
+  /**
+   *  فقط در op ِ **رسیده** با پرچمِ سرورِ `sync.revive_full_row`: ردیفِ کاملِ سرور پس از همین op، وقتی
+   *  این op ردیفِ حذف‌شده را زنده کرد. دستگاهی که ردیف را ندارد (حذف را دیده) آن را کامل می‌سازد، نه فقط
+   *  با فیلدهای همین op (`LedgerDiff.applyRemote`). هرگز به سرور فرستاده نمی‌شود (نه در [toJson]).
+   */
+  val row: JsonObject? = null,
 ) {
   val hash: String get() = OpHash.of(table, rowId, type, fields)
 
@@ -29,6 +35,10 @@ data class SyncOp(
     if (type != DELETE) put("fields", fields ?: JsonObject(emptyMap()))
     put("hash", JsonPrimitive(hash))
   }
+
+  /** همان [toJson] به‌اضافهٔ [row] — فقط ژورنالِ `SyncCommit` (بازیابیِ «نشاندن» همان دفتر را از نو می‌سازد) */
+  fun toJournalJson(): JsonObject =
+    if (row == null) toJson() else JsonObject(toJson() + ("row" to row))
 
   companion object {
     const val INSERT = "insert"
@@ -47,12 +57,17 @@ data class SyncOp(
         rowId = rowId,
         type = type,
         fields = o["fields"] as? JsonObject,
+        row = if (type == DELETE) null else o["row"] as? JsonObject,
       )
     }
   }
 }
 
-/** نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected`. */
-data class OpResult(val opId: String, val status: String, val reason: String = "") {
+/**
+ *  نتیجهٔ هر op در پاسخِ `push` — `applied | duplicate | rejected`.
+ *  `seq` همان `server_seq` (برای `applied` و `duplicate`؛ نبود ⇒ ۰) — دفترچهٔ
+ *  `ReplayBook` با آن می‌فهمد پس از بازیابیِ سرور کدام op باید دوباره برود (§۹.۵).
+ */
+data class OpResult(val opId: String, val status: String, val reason: String = "", val seq: Long = 0L) {
   val accepted: Boolean get() = status == "applied" || status == "duplicate"
 }

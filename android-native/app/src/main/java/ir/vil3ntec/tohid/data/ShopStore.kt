@@ -1132,5 +1132,29 @@ class ShopStore(private val context: Context) {
     fun barcodeIndex(d: ShopData): Map<String, String> = buildMap {
       d.products.forEach { p -> p.barcodes.forEach { code -> put(code, p.id) } }
     }
+
+    /**
+     *  PRD-04: بارکدِ بسته‌ها (کارتن، شل…) ⇐ کالا و بسته — جدا از `barcodeIndex` تا هیچ راهِ اسکنی که
+     *  بسته را نمی‌شناسد کارتن را «یک دانه» نخواند (آن‌جا «ناشناس» است، نه مقدارِ غلط).
+     */
+    fun packIndex(d: ShopData): ir.vil3ntec.tohid.core.product.PackBarcodes.Index =
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Index(
+        d.products.mapNotNull { p -> p.packs?.takeIf { it.isNotEmpty() }?.let { p.id to it.map(::coreOf) } }
+      )
+
+    fun coreOf(p: ProductPack) = ir.vil3ntec.tohid.core.product.PackBarcodes.Pack(p.name, p.sizeMilli, p.barcodes)
+
+    /**
+     *  همهٔ بارکدهای دکان (کالا و بسته) ⇐ شناسهٔ کالا — برای سنجشِ «بارکد بین کالاها تکراری نمی‌شود» (§۳.۴).
+     *  تا بسته‌ای نباشد همان `barcodeIndex` است.
+     */
+    fun codeOwners(d: ShopData): Map<String, String> {
+      val main = barcodeIndex(d)
+      if (d.products.none { !it.packs.isNullOrEmpty() }) return main
+      return buildMap {
+        d.products.forEach { p -> p.packs.orEmpty().forEach { pk -> pk.barcodes.forEach { put(it, p.id) } } }
+        putAll(main)
+      }
+    }
   }
 }

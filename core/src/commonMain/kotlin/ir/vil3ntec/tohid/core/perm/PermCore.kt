@@ -87,6 +87,8 @@ object PermCore {
     // PAY-15: گزارشِ X و Z ِ صندوقِ شیفت — امروز همه (شاگرد نمای کور)؛ فقط نمایش، تنگ‌شدنی و بی تأیید.
     // نقش‌های تازه: صندوق‌دار و حسابدار می‌بینند؛ انباردار و جمع‌آور نه — همان `d()` ِ JS
     "shift.report" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "allow"), "restrict", false, emptyList(), true),
+    // گاوصندوق (PAY-18): شمارش، ورود، خروج، به بانک و به دخل؛ «از دخل» فقط نوشتن می‌خواهد
+    "safe.move" to Spec(OMD, "restrict", false, emptyList(), false),
   )
 
   /** «همه» — رفتارِ امروزِ سه نقشِ قدیم */

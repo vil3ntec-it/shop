@@ -6,6 +6,7 @@
  *   POST /api/sync/v3/push                  opهای v3 (یا صفِ v2 با format=v2)
  *   GET  /api/sync/v3/pull                  اثرِ opهای دستگاه‌های دیگر (gzip)
  *   GET  /api/sync/v3/snapshot              ردیف‌های زنده + cursor (gzip)
+ *   POST /api/sync/v3/deleted               §۹.۵: کدام ردیفِ تنهای دستگاه این‌جا حذف‌شده است
  *   GET  /api/sync/v3/status                نقطهٔ وضعیت (SYN-08) و دستگاه‌ها (SYN-10)
  *   POST /api/sync/v3/report                تعدادِ منتظر، خطای آخر، اختلافِ ساعت
  *   GET  /api/sync/v3/conflicts             صندوقِ تعارض و وظیفه‌ها (SYN-07)
@@ -22,10 +23,12 @@ const zlib = require('zlib');
 const { promisify } = require('util');
 const config = require('../config');
 const sync = require('../lib/sync-v3');
+const syncEpoch = require('../lib/sync-epoch');
 const newerFields = require('../lib/newer-fields');
+const safeLedger = require('../lib/safe-ledger');
 const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
-const { forbidden, notFoundHandler } = require('../middleware/errors');
+const { forbidden, badRequest, notFoundHandler } = require('../middleware/errors');
 const v = require('../lib/validate');
 
 const gzip = promisify(zlib.gzip);
@@ -62,12 +65,16 @@ async function send(req, res, payload) {
 }
 
 router.get('/hello', (req, res) => {
-  res.json({ ok: true, enabled: true, ...sync.describe() });
+  res.json({ ok: true, enabled: true, ...sync.describe(req.sync) });
 });
 
 router.post('/push', requireSyncWrite, async (req, res, next) => {
   try {
     const b = req.body || {};
+    //  گاوصندوق (PAY-18): همان قفلِ نگهبانِ v1 تا پایانِ پاسخ — پلِ v3⇒v1 همان `sync_rows` را
+    //  می‌نویسد که آن نگهبان «ردیف هست؟» را از آن می‌خواند (‎lib/safe-ledger.js‎)
+    //  پرچمِ خاموش ⇒ بی قفل، همان main (opِ گاوصندوق «جدولِ ناشناخته» می‌گیرد، ‎lib/safe-flag.js‎)
+    if (require('../lib/safe-flag').on(req.sync) && safeLedger.touches(b.ops) && !(await safeLedger.hold(res, req.sync))) return;
     const appVersion = String(req.headers['x-app-version'] || '').slice(0, 32);
     //  A00: `null` ِ ساختِ پیش از A00 برای فیلدی که نمی‌شناسد کنار می‌رود (‎lib/newer-fields.js‎)
     const fl = newerFields.filterOps(b.ops, {
@@ -105,12 +112,31 @@ router.get('/pull', async (req, res, next) => {
       maxBytes: Number(req.query?.max_bytes || 0) || undefined,
       limit: Number(req.query?.limit || 0) || undefined,
     });
+    //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
+    //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
+    if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(req.sync, 'v3');
     await send(req, res, { ok: true, ...out });
   } catch (err) { next(err); }
 });
 
 router.get('/snapshot', async (req, res, next) => {
   try { await send(req, res, { ok: true, ...(await sync.snapshot(req.sync)) }); } catch (err) { next(err); }
+});
+
+/**
+ * §۹.۵: پس از بازیابیِ سرور، پیش از ساختنِ دوبارهٔ دفتر — از ردیف‌های تنهای دستگاه (نه در
+ * Snapshot) کدام این‌جا حذف‌شده است؟ همان‌ها کنار می‌روند و بقیه «درج» می‌روند
+ * (`SyncV3Engine.rebuild`، وبِ v3). فقط خواندن. `{rows:[{table,row_id}]}` (≤ ۵۰۰) ⇐ `{deleted}`
+ */
+router.post('/deleted', async (req, res, next) => {
+  try {
+    if (!config.syncEpoch.enabled) return notFoundHandler(req, res);
+    const rows = req.body && req.body.rows;
+    if (!Array.isArray(rows) || rows.length > syncEpoch.MAX_ASK) {
+      return next(badRequest(`فهرستِ ردیف‌ها لازم است (حداکثر ${syncEpoch.MAX_ASK})`, 'bad_rows'));
+    }
+    res.json({ ok: true, deleted: await syncEpoch.deletedRows(req.sync, 'v3', rows), server_time: Date.now() });
+  } catch (err) { next(err); }
 });
 
 router.get('/status', async (req, res, next) => {

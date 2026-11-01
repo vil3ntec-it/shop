@@ -42,6 +42,9 @@ const server = http.createServer((req, res) => {
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
+/** مجموعه‌هایی که فقط برنامه‌های نصبی دارند و دفترِ وب نگه نمی‌دارد */
+const APP_ONLY = ['safeEntries'];
+
 const LEDGER = {
   debtors: [{ id: 'd1', name: 'احمد آزمون', phone: '0700123456', notes: 'a < b & c', createdAt: 1700000000000 }],
   transactions: [{ id: 't1', debtorId: 'd1', type: 'give', amount: 5000, date: '2026-10-01', notes: '', createdAt: 1700000000000 }],
@@ -105,9 +108,11 @@ await step('دکمهٔ «خروجی کامل — اکسل»: فایلِ ‎.xlsx
   [...files.entries()]);
   assert.deepEqual(bad, [], `XMLِ خراب: ${bad.join(', ')}`);
   const names = sheetNames(files);
-  assert.deepEqual(names, [X.INFO_SHEET, ...X.SHEETS.map((s) => s[1])]);
+  //  گاوصندوق (PAY-18) فقط در برنامه‌های نصبی است؛ دفترِ وب آن را ندارد، پس برگه‌اش این‌جا نیست
+  const sheets = X.SHEETS.filter(([key]) => !APP_ONLY.includes(key));
+  assert.deepEqual(names, [X.INFO_SHEET, ...sheets.map((s) => s[1])]);
   const rows = (label) => sheetRows(files.get(`xl/worksheets/sheet${names.indexOf(label) + 1}.xml`));
-  for (const [key, label] of X.SHEETS) {
+  for (const [key, label] of sheets) {
     assert.equal(rows(label).length, LEDGER[key].length ? LEDGER[key].length + 1 : 1, label);
   }
   const products = rows('کالاها');
