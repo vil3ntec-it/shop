@@ -349,19 +349,25 @@ async function create(shopId, { key, body, actor, price, notify }) {
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
     )).rows[0].n);
     const id = ulid(at);
+    //  S10 (مهاجرتِ ۱۳۰): درِ ورودِ مشتری را سرور می‌گذارد، نه بدنه؛ امروز فقط ویترین.
+    //  سفارشِ کارمند ⇒ '' (منبعش `source` است). کارمزد و کمیسیون همین‌جا یک بار از سیاستِ
+    //  `market-fees` (live_config، پیش‌فرض ۰) حساب می‌شوند و دیگر هرگز بازنویسی نمی‌شوند.
+    const channel = input.source === 'storefront' ? 'storefront' : '';
+    const fees = await require('./market-fees').forNewOrder(run, shopId, { ...input, channel });
     await c.query(
       `INSERT INTO online_orders (
          id, shop_id, order_no, client_key, request_hash, source, is_test, status, fulfillment,
          payment_method, payment_status, cod_status, customer_name, customer_phone, address, delivery,
          note, items_count, subtotal_minor, discount_minor, delivery_fee_minor, total_minor,
-         scheduled_for, created_by, created_at, updated_at)
+         scheduled_for, created_by, created_at, updated_at, channel, platform_fee_minor, commission_minor)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,'unpaid',$10,$11,$12,$13::jsonb,$14::jsonb,
-               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23)`,
+               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23,$24,$25,$26)`,
       [id, shopId, no, key, hash, input.source, input.isTest, input.fulfillment,
         input.paymentMethod, input.paymentMethod === 'cod' ? 'to_collect' : '',
         input.customerName, input.customerPhone, JSON.stringify(input.address), JSON.stringify(input.delivery),
         input.note, input.itemsCount, input.subtotalMinor, input.discountMinor, input.deliveryFeeMinor,
-        input.totalMinor, input.scheduledFor, actor.id || '', at]
+        input.totalMinor, input.scheduledFor, actor.id || '', at,
+        channel, fees.platformFeeMinor, fees.commissionMinor]
     );
     for (const l of input.lines) {
       await c.query(
