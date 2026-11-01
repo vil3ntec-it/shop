@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
 const cart = require('../lib/store-cart');
+const storeSeo = require('../lib/store-seo');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const areas = require('../lib/storefront-area-requests');
@@ -67,8 +68,9 @@ const customer = async (req, res, next) => {
 };
 
 router.get('/:slug', readLimit, store, async (req, res) => {
-  const [cats, status, delivery] = await Promise.all([
+  const [cats, status, delivery, seo] = await Promise.all([
     sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
+    storeSeo.publicInfo(req.store),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
@@ -80,6 +82,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     ...((await orders.flagOf(req.store.shop_id, RECENT_FLAG)) ? { recent: true } : {}),
     //  فقط با پرچمِ روشن (E2E-MKT-02)؛ خاموش ⇒ همان پاسخِ پیشین، بی این کلید
     ...(await orders.flagOf(req.store.shop_id, STOCK_LIST_FLAG) ? { features: { stockList: true } } : {}),
+    //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
+    ...(seo ? { seo } : {}),
   });
 });
 

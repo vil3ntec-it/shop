@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.storefront.BulkPublish
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.core.storefront.StorefrontSpecs
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner.Tone
@@ -150,7 +151,7 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
           "campaigns" -> CampaignsPane(settings?.title.orEmpty(), snackbar)
           else -> if (settings == null) {
             TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
-          } else ProductsPane(repo, snackbar)
+          } else ProductsPane(repo, snackbar, bulkOn = c.bulk)
         }
       }
     }
@@ -391,7 +392,7 @@ internal fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> U
    ══════════════════════════════════════════════════════════════════ */
 
 @Composable
-private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState) {
+private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState, bulkOn: Boolean = false) {
   val scope = rememberCoroutineScope()
   val view = rememberViewMode("storefront-products", ScreenKind.MANAGEMENT)
   var items by remember { mutableStateOf<List<StorefrontProductDto>?>(null) }
@@ -402,6 +403,9 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
   var editing by remember { mutableStateOf<StorefrontProductDto?>(null) }
   var bulkBusy by remember { mutableStateOf(false) }
   var bulkReport by remember { mutableStateOf<StorefrontOwner.BulkReport?>(null) }
+  //  M2 (پرچمِ `bulk`): یک درخواست برای همه، با کلیدِ پایدارِ هر بخش؛ بخشِ نرسیده می‌ماند تا «دوباره بفرست»
+  var queue by remember { mutableStateOf<BulkPublish.Queue?>(null) }
+  var bulkEditing by remember { mutableStateOf(false) }
 
   suspend fun load() {
     val all = mutableListOf<StorefrontProductDto>()
@@ -435,8 +439,35 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
     return err
   }
 
+  fun drain(start: BulkPublish.Queue) {
+    bulkBusy = true
+    scope.launch {
+      var q = start
+      while (true) {
+        val part = q.next ?: break
+        val outcome = repo.setProducts(part)
+        q = q.after(part, outcome)
+        queue = q
+        if (outcome is BulkPublish.Outcome.Retry) break
+      }
+      if (q.done) selected.clear()
+      bulkBusy = false
+      load()
+      snackbar.showSnackbar(BulkPublish.summarize(q).text + (q.lastError?.let { " ($it)" } ?: ""))
+    }
+  }
+
+  fun sendBulk(changes: List<BulkPublish.Change>) {
+    val (q, invalid) = BulkPublish.queueOf(ir.vil3ntec.tohid.sync.v1.Ulid.next(), changes)
+    queue = q
+    bulkReport = null
+    if (invalid.isNotEmpty()) scope.launch { snackbar.showSnackbar(invalid.first().second) }
+    if (!q.done) drain(q)
+  }
+
   fun bulk(publish: Boolean) {
     val list = items.orEmpty().filter { it.id in selected }
+    if (bulkOn) { sendBulk(list.map { BulkPublish.Change(it.id, published = publish) }); return }
     bulkBusy = true
     scope.launch {
       val results = list.map { p -> p.id to saveOne(p, publish, p.onlinePriceMinor, p.maxQtyMilli) }
@@ -472,7 +503,19 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
             Text("${StorefrontOwner.toFa(selected.size.toString())} انتخاب‌شده", Modifier.weight(1f), fontWeight = FontWeight.Bold)
             TohidButton("انتشار", onClick = { bulk(true) }, enabled = !bulkBusy)
             TohidSecondaryButton("برداشتن", onClick = { bulk(false) }, enabled = !bulkBusy)
+            if (bulkOn) TextButton(onClick = { bulkEditing = true }, enabled = !bulkBusy) { Text("قیمت و سقف") }
             TextButton(onClick = { selected.clear() }) { Text("×") }
+          }
+        }
+        queue?.let { q ->
+          val sum = BulkPublish.summarize(q)
+          Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+              if (bulkBusy) "در حالِ فرستادن… " + sum.text else sum.text,
+              Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+              color = if (sum.waiting + sum.failed + sum.notFound + sum.notLive == 0) Shop.colors.success else Shop.colors.warning,
+            )
+            if (!q.done && !bulkBusy) TohidSecondaryButton("دوباره بفرست", onClick = { drain(q) })
           }
         }
         bulkReport?.let { r ->
@@ -497,6 +540,18 @@ private fun ProductsPane(repo: StorefrontRepository, snackbar: SnackbarHostState
           }
         }
       }
+    }
+  }
+
+  if (bulkEditing) {
+    BulkEditDialog(selected.size, onDismiss = { bulkEditing = false }) { price, max, description ->
+      bulkEditing = false
+      sendBulk(selected.toList().map { id ->
+        BulkPublish.Change(
+          id, setOnlinePrice = price != null, onlinePriceMinor = price?.getOrNull(),
+          setMaxQty = max != null, maxQtyMilli = max?.getOrNull(), description = description,
+        )
+      })
     }
   }
 
@@ -539,6 +594,7 @@ private fun ProductCard(p: StorefrontProductDto, selected: Boolean, onSelect: ()
       Column(Modifier.weight(1f)) {
         Text(p.name, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(listOf(p.category, p.unit).filter { it.isNotBlank() }.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        NotLiveLine(p)
       }
       Switch(checked = p.published, onCheckedChange = onPublish, modifier = Modifier.semantics { contentDescription = "در ویترین: ${p.name}" })
     }
@@ -572,6 +628,7 @@ private fun ProductRow(p: StorefrontProductDto, selected: Boolean, onSelect: () 
     Column(Modifier.weight(2.2f)) {
       Text(p.name, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
       Text(p.category.ifBlank { "—" }, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      NotLiveLine(p)
     }
     Text(priceText(p), Modifier.weight(1.4f), style = MaterialTheme.typography.bodySmall)
     Text(p.maxQtyMilli?.let { StorefrontOwner.toFa(StorefrontOwner.formatQtyMilli(it)) } ?: "—", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
@@ -579,6 +636,57 @@ private fun ProductRow(p: StorefrontProductDto, selected: Boolean, onSelect: () 
     Switch(checked = p.published, onCheckedChange = onPublish, modifier = Modifier.semantics { contentDescription = "در ویترین: ${p.name}" })
     TextButton(onClick = onEdit) { Text("قیمت و سقف") }
   }
+}
+
+/** M2: «در بازار نمی‌آید: …» — فقط وقتی سرور دلیل فرستاده (پرچمِ گروهی) */
+@Composable
+private fun NotLiveLine(p: StorefrontProductDto) {
+  val line = p.notLive?.let { BulkPublish.reasonLine(it) } ?: return
+  Text(line, style = MaterialTheme.typography.bodySmall, color = Shop.colors.warning, maxLines = 2, overflow = TextOverflow.Ellipsis)
+}
+
+/**
+ *  قیمت، سقف و توضیحِ یکسان برای همهٔ انتخاب‌شده‌ها. هر بخش جدا «عوض شود» دارد؛
+ *  بی آن همان قبلیِ هر کالا می‌ماند. `Result` ِ تهی = «قیمتِ دفتر» / «بی سقف».
+ */
+@Composable
+private fun BulkEditDialog(
+  count: Int,
+  onDismiss: () -> Unit,
+  onSave: (Result<Long?>?, Result<Long?>?, String?) -> Unit,
+) {
+  var setPrice by remember { mutableStateOf(false) }
+  var price by remember { mutableStateOf("") }
+  var setMax by remember { mutableStateOf(false) }
+  var max by remember { mutableStateOf("") }
+  var setDesc by remember { mutableStateOf(false) }
+  var description by remember { mutableStateOf("") }
+  var err by remember { mutableStateOf<String?>(null) }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    title = { Text("${StorefrontOwner.toFa(count.toString())} کالا") },
+    text = {
+      Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SwitchRow("قیمتِ آنلاین را عوض کن", setPrice) { setPrice = it; err = null }
+        if (setPrice) TohidTextField(price, { price = it; err = null }, "قیمتِ آنلاین (خالی = قیمتِ دفتر)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+        SwitchRow("سقفِ هر سفارش را عوض کن", setMax) { setMax = it; err = null }
+        if (setMax) TohidTextField(max, { max = it; err = null }, "سقفِ هر سفارش (خالی = بی سقف)", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+        SwitchRow("توضیح را عوض کن", setDesc) { setDesc = it; err = null }
+        if (setDesc) TohidTextField(description, { description = it.take(BulkPublish.MAX_DESCRIPTION); err = null }, "توضیح برای مشتری", singleLine = false)
+        err?.let { Text(it, color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall) }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = {
+        val o = if (setPrice) runCatching { StorefrontOwner.parseMinor(price) } else null
+        val m = if (setMax) runCatching { StorefrontOwner.parseQtyMilli(max) } else null
+        err = o?.exceptionOrNull()?.message ?: m?.exceptionOrNull()?.message
+          ?: if (!setPrice && !setMax && !setDesc) "یکی را برای عوض کردن روشن کنید" else null
+        if (err == null) onSave(o, m, if (setDesc) description.trim() else null)
+      }) { Text("ذخیره برای همه") }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+  )
 }
 
 @Composable

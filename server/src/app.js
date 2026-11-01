@@ -7,20 +7,29 @@ const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
 const { rateLimit } = require('./middleware/ratelimit');
-const { notFoundHandler, errorHandler } = require('./middleware/errors');
-const { requireUser, optionalShop } = require('./middleware/auth');
+const { notFoundHandler, errorHandler, notFound } = require('./middleware/errors');
+const { requireUser, optionalShop, requireAdmin } = require('./middleware/auth');
 const { redactPath } = require('./lib/log-redact');
 
 async function createApp({ runMigrations = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
-  if (config.trustProxy) app.set('trust proxy', true);
+  //  SEC-AUTH-05: فقط پروکسیِ مطمئن (همان قاعدهٔ `clientIp`)، نه هر همسایه‌ای
+  if (config.trustProxy) app.set('trust proxy', (addr) => require('./middleware/ratelimit').trustedPeer(addr));
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
   await plans.seedDefaults();
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
   await pruneExpired();
+  //  §۹.۵: هر بالا آمدن یک «دورانِ» همگام‌سازیِ تازه — پس از بازیابی از پشتیبان، برنامه‌ها
+  //  از همین می‌فهمند سرور به عقب رفته و opهای «اعمال‌شده»ی گم‌شده را دوباره می‌فرستند
+  //  (`lib/sync-epoch.js`). شکستش بالا آمدن را نمی‌خواباند؛ فقط آن تشخیص نمی‌شود.
+  //  پشتِ پرچمِ خاموشِ `SYNC_EPOCH_ENABLED`
+  if (config.syncEpoch.enabled) {
+    await require('./lib/sync-epoch').rotate('boot')
+      .catch(err => console.error('[sync-epoch] دورانِ تازه ساخته نشد:', err.message));
+  }
   //  سرور فقط رلهٔ پیام است: پیام و رسانهٔ کهنه‌تر از CHAT_RELAY_DAYS می‌رود
   await require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
   //  مدیر از محیط — نصبی که پنلِ خانگی خودش بالا می‌آورد و ترمینالی در کار نیست
@@ -29,6 +38,8 @@ async function createApp({ runMigrations = true } = {}) {
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     log: (m) => console.log(`[admin] ${m}`),
   });
+  //  فاز ۳: «مالکِ اصلی» (پیشین‌ترین ارشد) نشان بخورد — مدیرِ دیگری غیرفعال یا تنزلش نمی‌دهد
+  await require('./lib/admin-owner').ownerId();
 
   //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
   //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی
@@ -313,6 +324,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));
+    //  «دورانِ» همگام‌سازیِ v1 پس از بازیابی (§۹.۵) — فقط دکان، جدا از `routes/sync-v1.js`
+    //  ِ مشترک با پمپ؛ پیش از `/shop` (همان دلیلِ `/shop/orders`)
+    api.use('/shop/sync-epoch', require('./routes/shop-sync-epoch'));
     api.use('/errors', require('./routes/errors'));
     api.use('/location', require('./routes/location'));
     api.use('/me', require('./routes/me'));
@@ -427,11 +441,22 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/admin', require('./routes/admin-notices'));
     api.use('/admin', require('./routes/admin-sales'));
+    //  ماژولِ ۴.۵ ِ پنلِ مرکزی: مالیِ مرکزی (درآمدِ اشتراک، سندِ اصلاحی، بدهی، مغایرت، خروجی) — `requireAdmin` ِ خودش
+    api.use('/admin/finance', require('./routes/admin-finance'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
     //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
     api.use('/calendar', require('./routes/calendar'));
     api.use('/admin/calendar', require('./routes/admin-calendar'));
+    /*
+     *  ⛔ مسیرِ ناشناختهٔ مدیر ⇒ ۴۰۴ `route_not_found`، نه ۴۰۱ (چسبِ پنلِ مرکزی، بندِ ۱۲.۶ ِ
+     *  ADMIN-CONTROL-PLANE). بی این خط، درخواستِ مدیرِ **معتبر** به مسیری که این سرور ندارد به
+     *  `routes/data` ِ پایین (روی `/`، با `requireUser`) می‌افتاد و ۴۰۱ `invalid_token` می‌گرفت؛ پلِ
+     *  پنل آن را «نشستِ ارشد تمام شد» می‌خواند. `requireAdmin` همین‌جا دوباره: بی‌توکن و توکنِ دکان
+     *  همان ۴۰۱ ِ همیشه را می‌گیرند تا وجود/نبودِ مسیرِ مدیر به بیرون گفته نشود. هر مسیرِ واقعی
+     *  بالاتر سوار است، پس این خط به هیچ‌کدام نمی‌رسد.
+     */
+    api.use('/admin', requireAdmin, (req, res, next) => next(notFound('این مسیرِ مدیر روی این سرور نیست', 'route_not_found')));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
@@ -481,13 +506,42 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
   };
-  const storePage = async (slug, res) => {
+  //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با
+  //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
+  const storeSeo = require('./lib/store-seo');
+  const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
+  const storePage = async (slug, res, lang) => {
     let status = 200;
-    try { await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    let sf = null;
+    try { sf = await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
+    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
+  //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
+  const seoOnly = (slugOf, fn) => (req, res, next) => {
+    const slug = slugOf(req);
+    if (!slug) return next();
+    storefront.open(slug).then(async (sf) => {
+      if (!(await storeSeo.on(sf))) return next();
+      return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
+    }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
+  };
+  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
+    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(p.body)));
+  const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
+  const robotsOf = (sf, req, res) => storeSeo.robots(sf)
+    .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
+  const hostSlug = (req) => storefront.slugFromHost(req.hostname);
   app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
-  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res).catch(next));
+  app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
+  app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
+  app.get('/store/:slug/sitemap.xml', seoOnly((req) => req.params.slug, sitemapOf));
+  app.get('/p/:id', seoOnly(hostSlug, productPage));
+  app.get('/sitemap.xml', seoOnly(hostSlug, sitemapOf));
+  app.get('/robots.txt', seoOnly(hostSlug, robotsOf));
   //  وب‌اپِ قابلِ نصبِ همان دکان (WEB-14): نام از ویترینِ باز، شروع از نشانیِ خودش
   app.get('/store/:slug/manifest.webmanifest', (req, res, next) => storefront.open(req.params.slug).then((sf) => {
     const onHost = storefront.slugFromHost(req.hostname) === sf.slug;
@@ -506,7 +560,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, req.query.lang).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته
@@ -541,8 +595,13 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(errorHandler);
 
   // ---- کارهای دوره‌ای ----
+  const HOUSEKEEPING_MS = 6 * 60 * 60 * 1000;
+  //  پنلِ مرکزی ۴.۹: «خانه‌تکانی اجرا شد» + شکستِ هر زیرکار (`lib/job-beat.js`)؛ رفتار همان
+  const beat = require('./lib/job-beat');
+  const beatFail = (err) => beat.failed('housekeeping', err);
   const housekeeping = setInterval(() => {
-    pruneExpired().catch(err => console.error('[housekeeping]', err.message));
+    beat.ran('housekeeping', HOUSEKEEPING_MS);
+    pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
@@ -567,11 +626,12 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
     //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
-    require('./lib/payment-intents').reconcile()
-      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
-  }, 6 * 60 * 60 * 1000);
+  }, HOUSEKEEPING_MS);
   if (housekeeping.unref) housekeeping.unref();
+  beat.register('housekeeping', HOUSEKEEPING_MS);
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است
   setImmediate(() => require('./lib/trial-sweep').sweep().catch(err => console.error('[trial-sweep]', err.message)));
   setImmediate(() => require('./lib/station-access').sweep().catch(err => console.error('[access-sweep]', err.message)));

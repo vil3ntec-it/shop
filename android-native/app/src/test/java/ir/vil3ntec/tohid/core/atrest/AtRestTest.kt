@@ -523,7 +523,7 @@ class AtRestTest {
   }
 
   @Test fun `صفِ opها و ژورنال‌ها رمز نمی‌شوند؛ با رمزِ روشن، دفتر و حالِ همگام‌سازی با هم از پشتیبانِ اندروید بیرون`() {
-    for (n in listOf("oplog-u1.json", "oplog-u1-dropped.json", "sync-journal-u1.json", "sync-v3-u1/queue.json", "ledger-summary.json", "sale-draft.json")) {
+    for (n in listOf("oplog-u1.json", "oplog-u1-dropped.json", "sync-journal-u1.json", "sync-v3-u1/queue.json", "ledger-summary.json", "sale-draft.json", "sync-replay-u1-sent.jsonl")) {
       assertFalse(n, AtRestScope.sealable(n))
     }
     for (n in listOf("shop-data.json", "before-restore.json", "ledger-u1.json", "ledger-archive.json", "auto-backups/auto-14050801-1200.json")) {
@@ -533,6 +533,8 @@ class AtRestTest {
     for (n in listOf(
       "shop-data.json", "ledger-u1.json", "auto-backups/auto-1.json", "atrest/keyring", "atrest/keyring.bak",
       "oplog-u1.json", "sync-journal-u1.json", "sync-v3-u1/state.json", "ledger-summary.json", "shop-data.json.unreadable-1",
+      //  §۹.۵: دفترچهٔ opهای پذیرفته/گرفته‌شده همان حالِ همگام‌سازی است — ساده، و با رمز در پشتیبان نه
+      "sync-replay-u1-sent.jsonl", "sync-v3-u1/replay-sent.jsonl",
     )) assertTrue(n, AtRestScope.skipInDeviceBackup(n))
     for (n in listOf("sale-draft.json", "product-photos/p1.jpg", "chat-outbox/1.json")) assertFalse(n, AtRestScope.skipInDeviceBackup(n))
     assertTrue("tohid-sync-v1.xml" in AtRestScope.SYNC_PREFS)

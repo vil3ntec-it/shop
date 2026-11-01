@@ -214,14 +214,15 @@ const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_
             AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo`;
 //  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
 //  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
-const PRODUCT_FROM = `storefront_products sp
-  JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id
-   AND NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
+const NOT_HIDDEN = `NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
                      AND ts.kind = 'hide_listing' AND ts.lifted_at IS NULL)`;
+const PRODUCT_FROM = `storefront_products sp
+  JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id AND ${NOT_HIDDEN}`;
+const sfc = require('./storefront-catalog')({ SHOP_ROWS, PRODUCT_FROM, NOT_HIDDEN, PRODUCT_ID_RE, MAX_PRICE_MINOR, MAX_QTY_MILLI, obj, int, bool, text, isActive, priceOf });   //  S1 و M2 (شرح همان‌جا)
 
 async function categories(shopId) {
   const rows = await many(
-    `SELECT DISTINCT r.data->>'category' AS c FROM ${PRODUCT_FROM}
+    `SELECT DISTINCT r.data->>'category' AS c FROM ${await sfc.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''
       ORDER BY 1 LIMIT 60`,
     [shopId]
@@ -266,7 +267,7 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
   }
   params.push(lim + 1);
   const rows = await many(
-    `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM} WHERE ${where}
+    `SELECT ${PRODUCT_COLS} FROM ${await sfc.productFrom(shopId)} WHERE ${where}
       ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT $${params.length}`,
     params
   );
@@ -280,18 +281,18 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
   }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
 
-/** عکسِ بانک (اگر هست) و وضعیتِ موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
+/** عکسِ بانک (اگر هست)، جزئیاتِ M4 (برند، بارکد، واحد، variant، `bankProductId`؛ فقط با `market.product_details`) و موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
 async function decorate(shopId, items) {
   if (!items.length) return items;
   const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
   for (const p of items) if (bank.has(p.id)) p.photo = true;
-  return shelf.applyStock(shopId, items);
+  return shelf.applyStock(shopId, await require('./product-details').attach(shopId, items));
 }
 
 /** کالاهای منتشرشده، زنده و قیمت‌دار با همین شناسه‌ها — به همان ترتیب. */
 async function liveByIds(shopId, ids, run) {
   if (!ids.length) return [];
-  const sql = `SELECT ${PRODUCT_COLS}, sp.description, sp.specs FROM ${PRODUCT_FROM}
+  const sql = `SELECT ${PRODUCT_COLS}, sp.description, sp.specs FROM ${await sfc.productFrom(shopId)}
     WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`;
   const rows = run ? (await run(sql, [shopId, ids])).rows : await many(sql, [shopId, ids]);
   const byId = new Map(rows.map((r) => [r.id, r]));
@@ -311,7 +312,7 @@ const K_ANON = 3;
 /**
  * WEB-02 — «پرفروش‌ها»: بیشترین سفارشِ واقعیِ ویترینِ همین دکان در ۳۰ روزِ
  * گذشته (بی آزمایشی و بی ردشده/لغوشده)؛ «تازه‌ها»: تازه‌ترین انتشارها در
- * ۳۰ روز. هیچ‌کدام عددِ ساختگی ندارد؛ نبودِ داده ⇒ فهرستِ خالی.
+ * ۳۰ روز؛ «پیشنهادها» (`deals`) در `storefront-deals.js`. بی عددِ ساختگی؛ نبودِ داده ⇒ خالی.
  */
 async function highlights(shopId, at = now()) {
   const since = at - RECENT_MS;
@@ -337,10 +338,10 @@ async function highlights(shopId, at = now()) {
     const items = (await liveByIds(shopId, ids)).map(productView).filter((p) => p.priceMinor !== null && p.name);
     return (await decorate(shopId, items)).filter(shelf.suggestable).slice(0, SHELF);
   };
-  const [bestsellers, newArrivals] = await Promise.all([
-    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)),
+  const [bestsellers, newArrivals, deals] = await Promise.all([
+    shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), require('./storefront-deals').deals(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId, shelfOf),
   ]);
-  return { bestsellers, newArrivals, windowDays: 30 };
+  return { bestsellers, newArrivals, deals, windowDays: 30 };
 }
 
 function specsOf(v) {
@@ -365,7 +366,7 @@ async function productDetail(shopId, productId) {
 
   const [sameCat, together] = await Promise.all([
     p.category ? many(
-      `SELECT sp.product_id FROM ${PRODUCT_FROM}
+      `SELECT sp.product_id FROM ${await sfc.productFrom(shopId)}
         WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND r.data->>'category' = $2 AND sp.product_id <> $3
         ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT 24`,
       [shopId, p.category, p.id]
@@ -401,7 +402,7 @@ async function catalogByIds(shopId, raw) {
   const ids = [...new Set(String(raw || '').split(',').map((s) => s.trim()).filter((s) => PRODUCT_ID_RE.test(s)))].slice(0, MAX_PAGE);
   if (!ids.length) return { items: [], nextCursor: null };
   const rows = await many(
-    `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
+    `SELECT ${PRODUCT_COLS} FROM ${await sfc.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
     [shopId, ids]
   );
@@ -416,7 +417,7 @@ async function catalogByIds(shopId, raw) {
 async function photo(shopId, productId, size = 'display') {
   if (!PRODUCT_ID_RE.test(String(productId || ''))) return null;
   const live = await one(
-    `SELECT 1 FROM ${PRODUCT_FROM} WHERE sp.shop_id = $1 AND sp.product_id = $2 AND sp.published AND ${LIVE_PRODUCT}`,
+    `SELECT 1 FROM ${await sfc.productFrom(shopId)} WHERE sp.shop_id = $1 AND sp.product_id = $2 AND sp.published AND ${LIVE_PRODUCT}`,
     [shopId, productId]
   );
   if (!live) return null;
@@ -496,11 +497,11 @@ function withData(err, data) {
  * قیمت‌گذاریِ سرور درونِ تراکنشِ `orders.create` — قیمت و «هنوز در ویترین»
  * همان لحظه از دفتر خوانده می‌شود.
  */
-function pricer(shopId, sf, input, { zonesOn = false } = {}) {
+function pricer(shopId, sf, input, { zonesOn = false, from = PRODUCT_FROM } = {}) {
   return async (run, at) => {
     const ids = input.lines.map((l) => l.productId);
     const rows = (await run(
-      `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
+      `SELECT ${PRODUCT_COLS} FROM ${from}
         WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
       [shopId, subst.withSubstitutes(ids, input.lines)]
     )).rows;
@@ -615,10 +616,10 @@ async function checkout(sf, { key, body, ticket, session }) {
     throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
   }
   tokenKey();   // سرورِ بی رمز سفارش نمی‌گیرد که بعد پیگیری‌اش ممکن نباشد
-  //  پرچمِ ناحیه/بازه پیش از تراکنش خوانده می‌شود (قفلِ سفارش کوتاه بماند)
-  const zonesOn = await sfd.flagOn(sf.shop_id);
+  //  پرچمِ ناحیه/بازه و کاتالوگِ S1 (اگر منبع است: بی مهلت تازه؛ قیمت درونِ تراکنش از همان جدول) پیش از تراکنش (قفلِ سفارش کوتاه بماند)
+  const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
-  const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn }), { shopId: sf.shop_id, phone: verified });
+  const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn, from }), { shopId: sf.shop_id, phone: verified });
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
@@ -1042,7 +1043,8 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
 async function staffProducts(shopId, { cursor, limit } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
-  let where = `${SHOP_ROWS} AND r.account_id = $1 AND r.deleted_at IS NULL`;
+  const src = await sfc.ledgerSource(shopId, { strict: false });   //  S1: همان منبعِ ویترین
+  let where = src.where;
   if (cursor) {
     if (!PRODUCT_ID_RE.test(String(cursor))) throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
     params.push(String(cursor));
@@ -1051,7 +1053,7 @@ async function staffProducts(shopId, { cursor, limit } = {}) {
   params.push(lim + 1);
   const rows = await many(
     `SELECT r.row_id AS id, r.data, sp.published, sp.online_price_minor, sp.max_qty_milli, sp.description, sp.specs
-       FROM sync_rows r
+       FROM ${src.from}
        LEFT JOIN storefront_products sp ON sp.shop_id = r.account_id AND sp.product_id = r.row_id
       WHERE ${where} ORDER BY r.row_id LIMIT $${params.length}`,
     params
@@ -1093,10 +1095,8 @@ async function setProduct(shopId, productId, body, userId) {
     if (!Array.isArray(b.specs) || b.specs.length > 20) throw badRequest('حداکثر ۲۰ مشخصه', 'bad_specs');
     specs = specsOf(b.specs);
   }
-  const exists = await one(
-    `SELECT 1 FROM sync_rows r WHERE ${SHOP_ROWS} AND r.account_id = $1 AND r.row_id = $2 AND r.deleted_at IS NULL`,
-    [shopId, id]
-  );
+  const src = await sfc.ledgerSource(shopId);
+  const exists = await one(`SELECT 1 FROM ${src.from} WHERE ${src.where} AND r.row_id = $2`, [shopId, id]);
   if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
   const at = now();
   const row = await one(
@@ -1137,7 +1137,7 @@ module.exports = {
   localParts, presenceOf, statusOf,
   parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
-  settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
+  settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
   PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
 };

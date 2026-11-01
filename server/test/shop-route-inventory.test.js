@@ -18,6 +18,7 @@
  */
 //  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
 process.env.PAYMENTS_PROVIDER = 'fake';
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-route-inventory';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -482,6 +483,7 @@ function concreteFor(ids) {
   const rules = [
     [/^(\/shop\/chat\/conversations\/):id/, ids.conv],
     [/(\/messages\/):mid/, ids.message],
+    [/(\/pins\/):mid/, ids.message],
     [/(\/media\/):mediaId/, ids.media],
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
