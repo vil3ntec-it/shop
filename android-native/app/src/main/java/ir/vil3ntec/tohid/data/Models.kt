@@ -736,11 +736,8 @@ data class AuditEntry(
   val createdAt: Long = 0,
   /** مبلغِ ردیف — فعلاً فقط صندوق (`shift_open`/`shift_close`)؛ بقیه صفر */
   val amount: Double = 0.0,
-  /*
-   *  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و
-   *  `shift_close`ِ با شمارش). همان نام‌های رویدادِ pay-core و `ReportLedger`؛
-   *  `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند.
-   */
+  /*  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و `shift_close`ِ با شمارش) و `pay_fix` (POS-40).
+   *  همان نام‌های رویدادِ pay-core و `ReportLedger`؛ `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند. */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val by: String? = null,
@@ -758,14 +755,15 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val z: kotlinx.serialization.json.JsonObject? = null,
-  /**
-   *  ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) —
-   *  فعلاً فقط `customer_merge` (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر
-   *  `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود.
-   */
+  /** ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) — فعلاً فقط `customer_merge`
+   *  (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود. */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val refIds: List<String>? = null,
+  /** POS-40 — فقط `pay_fix` (`PayFixFlow`؛ `refId` = فاکتور، `amount` = مبلغ): روشِ پیشین، روشِ تازه و مرجعِ روشِ تازه */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fromMethod: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toMethod: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payRef: String? = null,
 )
 
 /**

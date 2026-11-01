@@ -88,6 +88,13 @@
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,
     },
+    //  POS-40: اصلاحِ روشِ پرداخت پس از فروش (سندِ جدای `pay_fix`، `core/pay/PayFix`). کارِ تازه است، پس
+    //  «رفتارِ امروز» ندارد: صاحب و مدیر خودشان؛ شاگرد و صندوق‌دار فقط «نیازمند تأیید» (PIN ِ مدیر یا صاحب)؛
+    //  انباردار، جمع‌آور و حسابدار نه. سرور این کلید را هنوز اجرا نمی‌کند (`staff-perms`: not_enforceable_yet)
+    'sales.pay_fix': {
+      defaults: d('allow', 'allow', 'approve', 'approve', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: true, caps: [], display: false,
+    },
     //  برگشتِ کالا و بازپرداخت (STF-03 «مبلغِ برگشت»): امروز هر عضوِ نویسنده
     //  ثبت می‌کند، پس پیش‌فرض برای همه allow است؛ از نقش‌های تازه فقط صندوق‌دار
     'returns.create': {

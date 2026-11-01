@@ -227,3 +227,43 @@ test('هسته خالص است: نه DOM، نه ساعت، نه ذخیره، ن�
     assert.ok(!src.includes(bad), 'pay-core.js نباید ' + bad + ' داشته باشد');
   }
 });
+
+// ── POS-40: اصلاحِ روشِ پرداخت پس از فروش ─────────────────
+test('POS-40 اصلاحِ روشِ پرداخت: سنجشِ سندِ تازه (بردارِ payFix.check)', () => {
+  for (const c of V.payFix.check) {
+    const r = P.payFix(c.input);
+    assert.equal(r.ok, c.expect.ok, c.name + ' ⇐ ' + JSON.stringify(r));
+    if (!c.expect.ok) {
+      assert.equal(r.error, c.expect.error, c.name);
+      for (const k of ['field', 'method']) if (k in c.expect) assert.equal(r[k], c.expect[k], c.name + ' — ' + k);
+      continue;
+    }
+    assert.equal(r.duplicate, c.expect.duplicate, c.name);
+    assert.deepEqual(r.fix, c.expect.fix, c.name);
+  }
+});
+
+test('POS-40 اصلاحِ روشِ پرداخت: ردیف‌ها پس از اصلاح، جمعِ فاکتور همان (بردارِ payFix.apply)', () => {
+  for (const c of V.payFix.apply) {
+    const r = P.payFixApply(c.saleId, c.rows, c.fixes, c.until);
+    assert.deepEqual(r, c.expect, c.name);
+    assert.equal(sum(r.rows, (x) => x.amount), sum(c.rows, (x) => x.amount), c.name + ' — جمع');
+    for (const row of r.rows) assert.ok(row.amount > 0, c.name + ' — بی ردیفِ صفر یا منفی');
+  }
+});
+
+test('POS-40 اصلاحِ روشِ پرداخت: روزِ بسته (بردارِ payFix.closed)', () => {
+  for (const c of V.payFix.closed) assert.equal(P.payFixClosed(c.saleAt, c.saleDay, c.shifts), c.expect, c.name);
+});
+
+test('POS-40: سندِ پذیرفته روی ردیف‌های همان فاکتور همان چیزی است که apply می‌سازد', () => {
+  //  هر check ِ پذیرفته (نه تکراری) بر ردیف‌های پس از اصلاح‌های پیشین می‌نشیند و جمع را نگه می‌دارد
+  for (const c of V.payFix.check) {
+    if (!c.expect.ok || c.expect.duplicate) continue;
+    const before = P.payFixApply(c.expect.fix.saleId, c.input.sale.rows, c.input.existing || []);
+    const after = P.payFixApply(c.expect.fix.saleId, c.input.sale.rows, (c.input.existing || []).concat([c.expect.fix]));
+    assert.deepEqual(after.skipped, before.skipped, c.name);
+    assert.ok(after.applied.includes(c.expect.fix.id), c.name);
+    assert.equal(sum(after.rows, (x) => x.amount), sum(before.rows, (x) => x.amount), c.name);
+  }
+});
