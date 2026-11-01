@@ -41,6 +41,7 @@ services:
       SAFE_LOCK_SCOPE: ${SAFE_LOCK_SCOPE:-local}
       SAFE_LOCK_POOL_MAX: ${SAFE_LOCK_POOL_MAX:-10}
       SERVER_URL: ${SERVER_URL:-}
+      SERVER_NAME: ${SERVER_NAME:-}
       API_SECRET: ${API_SECRET:?API_SECRET را در .env بگذارید}
       JWT_SECRET: ${JWT_SECRET:-}
       OTP_SECRET: ${OTP_SECRET:?OTP_SECRET را در .env بگذارید}
