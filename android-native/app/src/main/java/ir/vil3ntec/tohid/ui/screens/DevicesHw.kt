@@ -576,6 +576,7 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
       val next = if (on) WeightBarcode.standardRules() else emptyList()
       ScaleLabels.saveRules(context, next); rules = next
     }
+    ir.vil3ntec.tohid.ui.components.pos.ScaleAtPosSettings(rules) { next -> ScaleLabels.saveRules(context, next); rules = next }
     OutlinedTextField(test, { test = it.take(20) }, singleLine = true, label = { Text("آزمون: یک برچسبِ ترازو این‌جا اسکن کنید") },
       modifier = Modifier.fillMaxWidth())
     result?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text) }

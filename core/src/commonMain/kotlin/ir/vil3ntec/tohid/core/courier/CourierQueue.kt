@@ -5,7 +5,8 @@ package ir.vil3ntec.tohid.core.courier
  *
  *  ── قراردادِ سرور (`POST /api/courier/events`) ───────────────────────
  *  `{deviceId, events:[{eventId, assignmentId, type, deviceTime, deviceSeq,
- *     from?, reason?, note?, cashCollectedMinor?, cashReason?, code?}]}`
+ *     from?, reason?, note?, cashCollectedMinor?, cashReason?, code?,
+ *     bags? (DLV-07: فقط picked_up)، position? (DLV-17: فقط delivered)}]}`
  *  پاسخ برای هر رویداد: applied | duplicate | unchanged | rejected(code).
  *    • eventId یکتا و پایدار است ⇒ فرستادنِ دوباره بی‌خطر است (duplicate).
  *    • deviceSeq ترتیبِ خودِ دستگاه است؛ سرور یک بسته را با آن مرتب می‌کند.
@@ -111,6 +112,10 @@ data class CourierEvent(
   val cashCollectedMinor: Long? = null,
   val cashReason: String = "",
   val code: String = "",
+  /** DLV-07: برچسب‌های کیسه‌های اسکن‌شده هنگامِ گرفتن (`CourierChecks.bagsCheck`) */
+  val bags: List<String> = emptyList(),
+  /** DLV-17: موقعیتِ همان لحظهٔ «تحویل شد» — فقط برای همین رویداد؛ سرور فقط فاصلهٔ گرد را نگه می‌دارد */
+  val position: CourierChecks.Point? = null,
 )
 
 /** پاسخِ سرور برای یک رویداد */
@@ -145,6 +150,9 @@ object CourierQueue {
   private val REASON = Regex("^[a-z_]{1,40}$")
   const val MAX_BATCH = 100
   const val MAX_NOTE = 300
+  /** همان `MAX_LABELS` و درازای برچسبِ `server/src/lib/courier-checks.js` */
+  const val MAX_BAGS = 100
+  const val MAX_LABEL = 40
   /** همان سقفِ سرور (یک میلیارد افغانی به واحدِ کوچک) */
   const val MAX_MONEY_MINOR = 100_000_000_000L
   /** صف بی‌پایان رشد نمی‌کند؛ پیکی که روزها آفلاین است هم بیش از این ندارد */
@@ -168,6 +176,8 @@ object CourierQueue {
     cashCollectedMinor: Long? = null,
     cashReason: String = "",
     code: String = "",
+    bags: List<String> = emptyList(),
+    position: CourierChecks.Point? = null,
   ): Pair<QueueState, CourierEvent> {
     if (!EVENT_ID.matches(eventId)) throw CourierInputError("bad_event_id", "شناسهٔ رویداد نامعتبر است")
     if (assignmentId.isBlank()) throw CourierInputError("assignment_not_found", "مأموریت پیدا نشد")
@@ -192,6 +202,12 @@ object CourierQueue {
     if (cleanCashReason.isNotEmpty() && cleanCashReason !in CourierFlow.CASH_REASONS) {
       throw CourierInputError("bad_reason", "دلیلِ اختلافِ نقد معتبر نیست")
     }
+    val cleanBags = if (type == "picked_up") bags.map { it.trim() } else emptyList()
+    if (cleanBags.size > MAX_BAGS || cleanBags.any { it.length > MAX_LABEL }) throw CourierInputError("bad_bags", "برچسب‌های کیسه معتبر نیستند")
+    val pos = if (type == "delivered") position else null
+    if (pos != null && !(pos.lat.isFinite() && pos.lng.isFinite() && pos.lat in -90.0..90.0 && pos.lng in -180.0..180.0)) {
+      throw CourierInputError("bad_position", "موقعیت معتبر نیست")
+    }
     if (state.pending.any { it.eventId == eventId }) throw CourierInputError("event_key_reused", "این شناسه در صف هست")
     val ev = CourierEvent(
       eventId = eventId,
@@ -205,6 +221,8 @@ object CourierQueue {
       cashCollectedMinor = if (type == "delivered") cashCollectedMinor else null,
       cashReason = if (type == "delivered") cleanCashReason else "",
       code = if (type == "delivered") latinDigits(code).take(12) else "",
+      bags = cleanBags,
+      position = pos,
     )
     return state.copy(nextSeq = state.nextSeq + 1, pending = state.pending + ev) to ev
   }
@@ -297,6 +315,10 @@ data class MissionCard(
   val gateColor: String = "",
   /** دکان پس از ناموفق نشانی را اصلاح کرد (DLV-09، زمانِ سرور) */
   val addressCorrectedAt: Long? = null,
+  /** DLV-07: «گرفتم» برچسبِ این‌همه کیسه را می‌خواهد (`bagScan.bags` ِ سرور، فقط با پرچم)؛ null ⇒ بی اسکن */
+  val bagScanBags: Int? = null,
+  /** DLV-17: «تحویل شد» فقط در این فاصله از پین (`nearPin.maxM`، فقط با پرچم)؛ null ⇒ بی سنجش */
+  val nearPinMaxM: Int? = null,
 )
 
 object MissionView {

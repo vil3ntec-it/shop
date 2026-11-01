@@ -137,6 +137,8 @@ object StrSale {
   val paid: String get() = t("پرداختی", "Paid", "ورکړل شوي")
   val remaining: String get() = t("باقی‌مانده", "Balance", "پاتې")
   val thanks: String get() = t("تشکر از خرید شما", "Thank you for your purchase", "له پېرود څخه مو مننه")
+  /** POS-11 — برچسبِ یادداشتِ فاکتور روی رسید */
+  val invoiceNote: String get() = t("یادداشت", "Note", "یادښت")
 
   // ───────────── نسخهٔ ۳ (VILL3N، G5) ─────────────
 

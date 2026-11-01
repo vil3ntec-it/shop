@@ -20,6 +20,9 @@ const delivery = require('../lib/delivery');
 const audit = require('../lib/audit');
 const orders = require('../lib/orders');
 const courierMap = require('../lib/courier-map');
+const courierChecks = require('../lib/courier-checks');
+const courierRoute = require('../lib/courier-route');
+const ratings = require('../lib/delivery-ratings');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -67,15 +70,30 @@ router.get('/summary', async (req, res) => {
 });
 
 router.get('/missions', async (req, res) => {
-  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)
-  res.json(await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
+  //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)؛
+  //  DLV-07/DLV-17: شمارِ کیسه‌های اسکنی و فاصلهٔ مجاز از پین، هم فقط با پرچم (`courierChecks.decorate`)
+  res.json(await courierChecks.decorate(req.shopId, await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
-  })));
+  }))));
+});
+
+/*
+ *  DLV-04 (پشتِ پرچمِ خاموشِ `shop.delivery_route`): ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ همین پیک در یک مسیر.
+ *  `?lat=&lng=` موقعیتِ همین لحظه است و فقط برای همین پاسخ خوانده می‌شود (نگه داشته نمی‌شود، DLV-16).
+ */
+router.get('/route', async (req, res, next) => {
+  if (!(await orders.flagOf(req.shopId, courierRoute.FLAG))) {
+    return next(notFound('مسیرِ پیشنهادی برای این دکان روشن نیست', 'delivery_route_disabled'));
+  }
+  const start = courierRoute.startOf(req.query);
+  const list = await delivery.missions(req.shopId, req.courier.id, { scope: 'active', limit: 100 });
+  res.set('Cache-Control', 'no-store');
+  res.json({ ...courierRoute.routeOf(list.items, start), serverTime: list.serverTime });
 });
 
 /**
  * صفِ رویدادها (DLV-10): `{deviceId?, events:[{eventId, assignmentId, type,
- * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?}]}`.
+ * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?, bags? (DLV-07), position? (DLV-17)}]}`.
  * پاسخ برای هر رویداد: applied | duplicate | unchanged | rejected(code).
  */
 router.post('/events', async (req, res) => {
@@ -102,6 +120,15 @@ router.post('/missions/:id/call', async (req, res) => {
   });
   res.set('Cache-Control', 'no-store');
   res.json({ phone: out.phone, status: out.status });
+});
+
+/*
+ *  DLV-18 (پشتِ پرچمِ خاموشِ `shop.delivery_ratings`): پیک پس از «تحویل شد» به همان تحویل امتیاز می‌دهد
+ *  (`{stars, tags}`، فقط برچسبِ فهرستِ ثابت). یک بار؛ همان امتیاز دوباره ⇒ همان پاسخ.
+ */
+router.post('/missions/:id/rating', async (req, res) => {
+  const out = await ratings.rateByCourier(req.shopId, req.params.id, req.body, req.courierActor);
+  res.status(out.replayed ? 200 : 201).json(out);
 });
 
 /*

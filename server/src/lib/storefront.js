@@ -42,6 +42,7 @@ const sfd = require('./storefront-delivery');
 const sfs = require('./storefront-seen');
 const subst = require('./order-substitution');
 const shelf = require('./storefront-shelf');
+const views = require('./public-views');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
@@ -119,7 +120,7 @@ async function stateOf(shopId) {
   ]);
   const flag = ordersFlag && storefrontFlag;
   const entitled = ent.features.includes(FEATURE_KEY) && ent.features.includes(orders.FEATURE_KEY);
-  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ent };
+  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ...(await require('./storefront-intake').stateOf(shopId, ent, flag && entitled, FEATURE_KEY)), ent };   //  SUB-10 همین `enabled`؛ #467: accepting و…
 }
 
 /** ویترینِ عمومی — یا ۴۰۴؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب‌اند. */
@@ -136,7 +137,7 @@ async function open(slug) {
     [s]
   );
   if (!row || row.enabled !== true || row.shop_status !== 'active' || row.trust_suspended === true) throw gone();
-  if (!(await stateOf(row.shop_id)).enabled) throw gone();
+  if (!require('./storefront-intake').onRow(row, await stateOf(row.shop_id)).enabled) throw gone();   //  SUB-10: بسته ⇒ ۴۰۴؛ #467: accepting روی ردیف
   return row;
 }
 
@@ -168,7 +169,7 @@ async function statusOf(sf, at = now()) {
 }
 
 function profile(sf, categories = [], status = null) {
-  return {
+  return views.pub('shop', {
     slug: sf.slug,
     title: sf.title,
     tagline: sf.tagline,
@@ -182,7 +183,7 @@ function profile(sf, categories = [], status = null) {
     //  پرداختِ آنلاین منتظرِ D-08 است (🔌) — تا آن روز هیچ دکمه‌ای نیست
     payment: { methods: ['cod'], online: { available: false, decision: 'D-08' } },
     categories,
-  };
+  });
 }
 
 /** قیمتِ واحد به یک‌صدمِ افغانی — قیمتِ آنلاین، وگرنه قیمتِ فروشِ دفتر؛ نبود ⇒ null. */
@@ -197,7 +198,7 @@ function priceOf(row) {
 
 function productView(row) {
   const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
-  return {
+  return views.pub('product', {
     id: row.id,
     name: text(d.name, 200),
     unit: text(d.unit, 30),
@@ -207,7 +208,7 @@ function productView(row) {
     photo: row.has_photo === true,
     //  ۳۲.۱/۳۲.۳: سرور هنوز دفترِ موجودی ندارد ⇒ «در حال بررسی»، هرگز «موجود»
     stock: { status: 'unverified', checkedAt: null },
-  };
+  });
 }
 
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
@@ -342,7 +343,7 @@ async function highlights(shopId, at = now()) {
   const [bestsellers, newArrivals, deals] = await Promise.all([
     shelfOf(best.map((r) => r.product_id)), shelfOf(fresh.map((r) => r.product_id)), require('./storefront-deals').deals(many, { PRODUCT_FROM, LIVE_PRODUCT }, shopId, shelfOf),
   ]);
-  return { bestsellers, newArrivals, deals, windowDays: 30 };
+  return { bestsellers: views.pubList('product', bestsellers), newArrivals: views.pubList('product', newArrivals), deals: views.pubList('product', deals), windowDays: 30 };
 }
 
 function specsOf(v) {
@@ -392,7 +393,7 @@ async function productDetail(shopId, productId) {
   const [similar, complementary] = await Promise.all([
     shelfOf(sameCat.map((r) => r.product_id)), shelfOf(together.map((r) => r.product_id)),
   ]);
-  return { product, similar, complementary };
+  return { product: views.pub('product', product), similar: views.pubList('product', similar), complementary: views.pubList('product', complementary) };
 }
 
 /**
@@ -566,7 +567,7 @@ const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, orderIdOf, orderIdOfLink,
  * `delivery` (S5) فقط وقتی پرچمِ نمای پیک روشن است می‌آید (`delivery.customerView`).
  */
 function publicOrder(o, token, delivery) {
-  return {
+  return views.pub('order', {
     token,
     orderNo: o.orderNo, status: o.status, statusReason: o.statusReason,
     substitution: o.substitution || '',   // CHK-15: ترجیحِ کلی
@@ -595,7 +596,7 @@ function publicOrder(o, token, delivery) {
       .filter((e) => e.kind === 'created' || e.kind === 'status')
       .map((e) => ({ status: e.toStatus, at: e.at })),
     ...(delivery !== undefined ? { delivery } : {}),
-  };
+  });
 }
 
 const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
@@ -621,7 +622,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
   const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn, from }), { shopId: sf.shop_id, phone: verified });
-  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
+  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
   return {
@@ -768,10 +769,9 @@ async function myOrders(sf, ticket, session = '') {
     [sf.shop_id, phone]
   );
   const on = await linkPolicyOn(sf.shop_id);
-  return rows.map((r) => ({
+  return views.pubList('orderSummary', rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on),
-  }));
+    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on) })));
 }
 
 /**
@@ -804,13 +804,13 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
   const last = page[page.length - 1];
   const on = await linkPolicyOn(sf.shop_id);
   return {
-    orders: page.map((r) => ({
+    orders: views.pubList('orderSummary', page.map((r) => ({
       orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
       scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
       preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
       token: listTokenOf(sf.shop_id, r, on),
-    })),
+    }))),
     nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
   };
 }
@@ -827,7 +827,7 @@ async function reorder(sf, token) {
   const byId = new Map(live.map((p) => [p.id, p]));
   return {
     orderNo: o.orderNo,
-    lines: o.lines.map((l) => {
+    lines: views.pubList('reorderLine', o.lines.map((l) => {
       const p = byId.get(l.productId);
       const ok = Boolean(p && p.priceMinor !== null && p.name) && shelf.suggestable(p);
       const qtyMilli = ok && p.maxQtyMilli !== null ? Math.min(l.qtyMilli, p.maxQtyMilli) : l.qtyMilli;
@@ -840,7 +840,7 @@ async function reorder(sf, token) {
         reason: ok ? '' : (p && p.priceMinor !== null ? 'out_of_stock' : 'not_in_store'),
         stock: ok ? p.stock : null,
       };
-    }),
+    })),
   };
 }
 
@@ -1135,7 +1135,7 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن

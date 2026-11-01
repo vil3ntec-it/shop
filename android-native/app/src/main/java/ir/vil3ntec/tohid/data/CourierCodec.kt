@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierEvent
 import ir.vil3ntec.tohid.core.courier.CourierSettlement
 import ir.vil3ntec.tohid.core.courier.CourierSummary
@@ -21,6 +22,9 @@ object CourierCodec {
     .put("from", e.from).put("reason", e.reason).put("note", e.note)
     .put("cashCollectedMinor", e.cashCollectedMinor ?: JSONObject.NULL)
     .put("cashReason", e.cashReason).put("code", e.code)
+    //  DLV-07/17: صفِ آفلاین برچسب‌ها و موقعیت را تا فرستادن نگه می‌دارد (بی آن‌ها سرور رد می‌کرد)
+    .put("bags", JSONArray(e.bags))
+    .put("position", e.position?.let { JSONObject().put("lat", it.lat).put("lng", it.lng) } ?: JSONObject.NULL)
 
   fun event(o: JSONObject): CourierEvent = CourierEvent(
     eventId = o.optString("eventId"),
@@ -34,6 +38,8 @@ object CourierCodec {
     cashCollectedMinor = if (o.isNull("cashCollectedMinor")) null else o.optLong("cashCollectedMinor"),
     cashReason = o.optString("cashReason"),
     code = o.optString("code"),
+    bags = o.optJSONArray("bags")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty(),
+    position = o.optJSONObject("position")?.let { CourierChecks.Point(it.optDouble("lat"), it.optDouble("lng")) },
   )
 
   fun queueJson(q: QueueState): String {
@@ -78,6 +84,8 @@ object CourierCodec {
     })
     .put("area", c.area).put("gateColor", c.gateColor)
     .put("addressCorrectedAt", c.addressCorrectedAt ?: JSONObject.NULL)
+    .put("bagScanBags", c.bagScanBags ?: JSONObject.NULL)
+    .put("nearPinMaxM", c.nearPinMaxM ?: JSONObject.NULL)
 
   fun card(o: JSONObject): MissionCard = MissionCard(
     id = o.optString("id"),
@@ -112,6 +120,8 @@ object CourierCodec {
     gateColor = o.optString("gateColor"),
     //  کارتِ کهنه‌تر این کلید را ندارد ⇒ null (isNull برای کلیدِ نبوده هم true است)
     addressCorrectedAt = if (o.isNull("addressCorrectedAt")) null else o.optLong("addressCorrectedAt"),
+    bagScanBags = if (o.isNull("bagScanBags")) null else o.optInt("bagScanBags"),
+    nearPinMaxM = if (o.isNull("nearPinMaxM")) null else o.optInt("nearPinMaxM"),
   )
 
   /** «نقدِ من» و آمار، برای دیدن بی اینترنت (آخرین پاسخِ سرور) */

@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "about": "DLV-18 — امتیازِ دوطرفهٔ تحویل: ورودی (ستاره ۱ تا ۵، برچسب از فهرستِ ثابتِ هر سو، حداکثر ۴) و جمع (میانگین به دهم، نیمه به بالا، عددِ صحیح). خوانندگان: server/test/delivery-ratings.test.js (lib/delivery-ratings) و DeliveryRatingVectorsTest (core/delivery/DeliveryRating.kt). هر تغییر در هر دو.",
+  "tags": {
+    "customer": [
+      "on_time",
+      "polite",
+      "careful",
+      "late",
+      "rude",
+      "damaged"
+    ],
+    "courier": [
+      "easy_to_find",
+      "ready",
+      "hard_to_find",
+      "not_ready",
+      "wrong_pin"
+    ]
+  },
+  "maxTags": 4,
+  "parse": [
+    {
+      "name": "ستاره و برچسب",
+      "rater": "customer",
+      "body": {
+        "stars": 5,
+        "tags": [
+          "polite",
+          "on_time"
+        ]
+      },
+      "want": {
+        "stars": 5,
+        "tags": [
+          "on_time",
+          "polite"
+        ]
+      }
+    },
+    {
+      "name": "برچسبِ تکراری و فاصله یکی می‌شود؛ ترتیبِ فهرست",
+      "rater": "courier",
+      "body": {
+        "stars": 2,
+        "tags": [
+          " wrong_pin",
+          "hard_to_find",
+          "wrong_pin"
+        ]
+      },
+      "want": {
+        "stars": 2,
+        "tags": [
+          "hard_to_find",
+          "wrong_pin"
+        ]
+      }
+    },
+    {
+      "name": "بی برچسب",
+      "rater": "customer",
+      "body": {
+        "stars": 3
+      },
+      "want": {
+        "stars": 3,
+        "tags": []
+      }
+    },
+    {
+      "name": "tags=null",
+      "rater": "customer",
+      "body": {
+        "stars": 1,
+        "tags": null
+      },
+      "want": {
+        "stars": 1,
+        "tags": []
+      }
+    },
+    {
+      "name": "ستارهٔ صفر",
+      "rater": "customer",
+      "body": {
+        "stars": 0
+      },
+      "want": {
+        "error": "bad_stars"
+      }
+    },
+    {
+      "name": "ستارهٔ شش",
+      "rater": "customer",
+      "body": {
+        "stars": 6
+      },
+      "want": {
+        "error": "bad_stars"
+      }
+    },
+    {
+      "name": "ستارهٔ اعشاری",
+      "rater": "customer",
+      "body": {
+        "stars": 4.5
+      },
+      "want": {
+        "error": "bad_stars"
+      }
+    },
+    {
+      "name": "ستارهٔ متنی",
+      "rater": "customer",
+      "body": {
+        "stars": "5"
+      },
+      "want": {
+        "error": "bad_stars"
+      }
+    },
+    {
+      "name": "بی ستاره",
+      "rater": "courier",
+      "body": {},
+      "want": {
+        "error": "bad_stars"
+      }
+    },
+    {
+      "name": "برچسبِ سوی دیگر",
+      "rater": "customer",
+      "body": {
+        "stars": 4,
+        "tags": [
+          "ready"
+        ]
+      },
+      "want": {
+        "error": "bad_tags"
+      }
+    },
+    {
+      "name": "برچسبِ ناشناخته",
+      "rater": "courier",
+      "body": {
+        "stars": 4,
+        "tags": [
+          "rude"
+        ]
+      },
+      "want": {
+        "error": "bad_tags"
+      }
+    },
+    {
+      "name": "بیش از ۴ برچسب",
+      "rater": "customer",
+      "body": {
+        "stars": 4,
+        "tags": [
+          "on_time",
+          "polite",
+          "careful",
+          "late",
+          "rude"
+        ]
+      },
+      "want": {
+        "error": "bad_tags"
+      }
+    },
+    {
+      "name": "برچسبِ غیرمتنی",
+      "rater": "customer",
+      "body": {
+        "stars": 4,
+        "tags": [
+          1
+        ]
+      },
+      "want": {
+        "error": "bad_tags"
+      }
+    },
+    {
+      "name": "برچسب نه فهرست",
+      "rater": "customer",
+      "body": {
+        "stars": 4,
+        "tags": "polite"
+      },
+      "want": {
+        "error": "bad_tags"
+      }
+    }
+  ],
+  "summarize": [
+    {
+      "name": "تهی",
+      "list": [],
+      "want": {
+        "count": 0,
+        "avgTenths": null,
+        "tags": {}
+      }
+    },
+    {
+      "name": "۴، ۴، ۵ ⇒ ۴٫۳",
+      "list": [
+        {
+          "stars": 4,
+          "tags": [
+            "on_time"
+          ]
+        },
+        {
+          "stars": 4,
+          "tags": []
+        },
+        {
+          "stars": 5,
+          "tags": [
+            "on_time",
+            "polite"
+          ]
+        }
+      ],
+      "want": {
+        "count": 3,
+        "avgTenths": 43,
+        "tags": {
+          "on_time": 2,
+          "polite": 1
+        }
+      }
+    },
+    {
+      "name": "نیمه به بالا: ۴، ۴، ۴، ۵ ⇒ ۴٫۳ (۴٫۲۵)",
+      "list": [
+        {
+          "stars": 4,
+          "tags": []
+        },
+        {
+          "stars": 4,
+          "tags": []
+        },
+        {
+          "stars": 4,
+          "tags": []
+        },
+        {
+          "stars": 5,
+          "tags": []
+        }
+      ],
+      "want": {
+        "count": 4,
+        "avgTenths": 43,
+        "tags": {}
+      }
+    },
+    {
+      "name": "۱ و ۲ ⇒ ۱٫۵",
+      "list": [
+        {
+          "stars": 1,
+          "tags": [
+            "late"
+          ]
+        },
+        {
+          "stars": 2,
+          "tags": [
+            "late",
+            "rude"
+          ]
+        }
+      ],
+      "want": {
+        "count": 2,
+        "avgTenths": 15,
+        "tags": {
+          "late": 2,
+          "rude": 1
+        }
+      }
+    },
+    {
+      "name": "۵ ⇒ ۵٫۰",
+      "list": [
+        {
+          "stars": 5,
+          "tags": []
+        }
+      ],
+      "want": {
+        "count": 1,
+        "avgTenths": 50,
+        "tags": {}
+      }
+    }
+  ]
+}
