@@ -36,7 +36,7 @@ const { badRequest, forbidden } = require('../middleware/errors');
  * @param {(req)=>string} tenantOf شناسهٔ حساب، فقط از میان‌افزار
  * @param {object} opts
  */
-function makeRouter(app, tenantOf, { actor = () => ({}), canDelete = () => true } = {}) {
+function makeRouter(app, tenantOf, { actor = () => ({}), canDelete = () => true, canUpload = () => true } = {}) {
   const store = backups.forApp(app);
   const router = express.Router();
 
@@ -72,6 +72,7 @@ function makeRouter(app, tenantOf, { actor = () => ({}), canDelete = () => true 
     async (req, res, next) => {
       try {
         const id = need(req);
+        if (!canUpload(req)) throw forbidden('فرستادنِ پشتیبان در حدِ نقشِ شما نیست', 'permission_denied');
         const data = Buffer.isBuffer(req.body) ? req.body : null;
         if (!data || data.length === 0) throw badRequest('فایلِ پشتیبان خالی است', 'empty_backup');
 

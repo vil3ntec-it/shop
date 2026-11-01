@@ -25,6 +25,9 @@ on:
       - 'license/test-vectors/**'
       #  گامِ ۵ِ آزمونِ نصاب (`install.ps1` با PowerShell 5.1) — تا امروز در PR اصلاً نمی‌دوید
       - 'install.ps1'
+      #  نشانیِ سرور و AppId ِ ساختِ کامپیوتر از همین پرونده خوانده می‌شود (`desktop/build.gradle.kts`)؛
+      #  بی آن PRی که فقط این را عوض کند دروازه‌های AppId و upgradeUuid را نمی‌گذراند
+      - 'android-native/gradle.properties'
       - '.github/workflows/tohid-desktop.yml'
   #  ⛔ F0-27: push به main فقط کانالِ آزمایشی (`tohid-desktop-beta`). برچسبِ پایدار
   #  (`tohid-desktop`، همان که همهٔ کامپیوترها و صفحهٔ دانلود می‌خوانند) فقط از
@@ -157,7 +160,8 @@ jobs:
         working-directory: desktop
         shell: bash
         #  SEC-01: کوچِ رمزِ دفتر (جایگزینیِ اتمی، کنار گذاشتنِ دفترِ خوانده‌نشده) روی ویندوزِ واقعی
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest'
+        #  ذخیرهٔ کهنه: مُهرِ فایل (زمان و اندازه) و ادغامِ سه‌طرفه روی NTFS ِ واقعی (`StaleSaveTest`)
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest' --tests 'ir.vil3ntec.tohid.desktop.StaleSaveTest'
 
   #  ⛔ ۱۴۰۵/۰۷/۲۷: پنج نصاب (دو ویندوز، دو مک، لینوکس؛ هر کدام تا ۴۰ دقیقه با نصبِ واقعی) روی
   #  **هر** pushِ هر PRِ برنامه گلوگاهِ صفِ Actions بودند. حالا در PR فقط وقتی ساخته می‌شوند که
@@ -188,7 +192,9 @@ jobs:
             task: createDistributable
             inno: true
             fixed: Tohid-Windows-Inno
-          - os: macos-14
+          #  ⛔ macos-14 از ۲ نوامبر ۲۰۲۶ بازنشسته است (و پیش از آن خاموشی‌های زمان‌بندی‌شده دارد:
+          #  actions/runner-images#13518) ⇒ همان arm64 روی macos-15
+          - os: macos-15
             label: مک (Apple Silicon)
             task: packageDmg
             glob: 'build/compose/binaries/main/dmg/*.dmg'
@@ -221,6 +227,38 @@ jobs:
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
+
+      #  SEC-ART-02: خودِ محتوای نصاب — همان فایل‌هایی که روی کامپیوترِ دکان می‌نشینند — بی credentialِ
+      #  سرور، کلیدِ خصوصی، .env، پشتیبان، سورسِ بک‌اند و رازِ شناخته (tools/security/artifact-gate.mjs).
+      #  Inno (‎.7z‎ و Setup) و dmg از پوشهٔ createDistributable ساخته می‌شوند و همان سنجیده می‌شود؛ msi و deb
+      #  را jpackage مستقیم می‌سازد، پس همان فایلِ نهایی باز می‌شود (‎msiexec /a‎، ‎dpkg-deb -x‎).
+      - name: باز کردنِ msi برای دروازه
+        if: ${{ endsWith(matrix.glob, '.msi') }}
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = (Get-ChildItem build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          $dst = Join-Path $env:RUNNER_TEMP 'artifact-view'
+          New-Item -ItemType Directory -Force $dst | Out-Null
+          $p = Start-Process msiexec.exe -ArgumentList @('/a', "`"$msi`"", '/qn', "TARGETDIR=`"$dst`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msiexec /a: $($p.ExitCode)" }
+          #  نسخهٔ اداریِ خودِ msi (فقط جدول‌ها) کنارِ فایل‌ها می‌نشیند؛ فایل‌ها همین‌جا باز شده‌اند
+          Get-ChildItem $dst -Filter *.msi | Remove-Item -Force
+      - name: دروازهٔ محتوای نصاب
+        shell: bash
+        env:
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
+          PKG_GLOB: ${{ matrix.glob }}
+        run: |
+          set -euo pipefail
+          view="$RUNNER_TEMP/artifact-view"
+          case "${PKG_GLOB:-}" in
+            *.deb) rm -rf "$view"; dpkg-deb -x "$(ls desktop/$PKG_GLOB | head -n1)" "$view" ;;
+            *.msi) ;;
+            *) view=desktop/build/compose/binaries/main/app ;;
+          esac
+          node tools/security/artifact-gate.mjs --profile desktop --license-pin "$TOHID_LICENSE_PUBLIC_KEY" "$view"
 
       #  نصابِ آنلاینِ کوچک + نسخهٔ Offline + بستهٔ برنامه (‎.7z‎) — شرحِ
       #  سناریوها سرِ ‎desktop/installer/Tohid.iss‎. بعد نصبِ واقعی روی همین

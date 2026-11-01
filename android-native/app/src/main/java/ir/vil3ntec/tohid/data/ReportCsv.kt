@@ -19,7 +19,8 @@ object ReportCsv {
     val isEmpty: Boolean get() = rows.size <= 1
   }
 
-  fun of(section: String, d: ShopData, from: String, to: String, today: String): Sheet =
+  /** @param reminderTemplate متنِ یادآوریِ همین دستگاه (`DebtReminderPref`، CRM-06)؛ پیش‌فرض همان جملهٔ امروز */
+  fun of(section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE): Sheet =
     when (section) {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
@@ -33,7 +34,15 @@ object ReportCsv {
       "aging" -> CustomerInsight.agingSheet(d, today)
       "rfm" -> CustomerInsight.rfmSheet(d, today)
       "duplicates" -> CustomerMerge.duplicatesSheet(d, today)
-      "reminders" -> DebtReminder.dueSheet(d, today)
+      "reminders" -> DebtReminder.dueSheet(d, today, template = reminderTemplate)
+      //  شماره‌های جاافتادهٔ اسناد (RPT-17) — فقط وقتی `DocGapsPref` روشن است دیده می‌شود
+      "gaps" -> DocGapsSheet.sheet(d, today)
+      //  INV-17 — فقط وقتی `ShrinkReportPref` روشن است دیده می‌شود
+      "shrink" -> ShrinkLoss.sheet(d, from, to)
+      //  «تحلیلِ موجودی» (INV-15، INV-16) — فقط وقتی `ShopPolicy.stockInsight` روشن است دیده می‌شود
+      "insight" -> insight(d, from, to)
+      //  «نیاز به سفارش» (INV-12) — فقط وقتی `ShopPolicy.stockLevels` روشن است دیده می‌شود
+      "reorder" -> reorder(d, today)
       else -> stock(d, today)
     }
 
@@ -117,6 +126,55 @@ object ReportCsv {
       }
     return Sheet("گزارش-فروش-$from-تا-$to", rows)
   }
+
+  /**
+   *  تحلیلِ موجودی: ردهٔ ABC بر پایهٔ فروشِ خالصِ `from..to` و ارزشِ موجودیِ همین حالا به قیمتِ خرید
+   *  و فروش — همان عددهای `ReportEngine.stockInsight` (حساب در `core`)؛ جمعِ ستون‌های ارزش همان جمعِ کاشی‌هاست.
+   *  کالای بی موجودیِ مثبت ستونِ ارزش ندارد. سهم‌ها با «٪» نوشته می‌شوند تا جدول جمعشان نزند.
+   */
+  private fun insight(d: ShopData, from: String, to: String): Sheet {
+    val s = ReportEngine.stockInsight(d, from, to)
+    val values = s.valuation.lines.associateBy { it.id }
+    val rows = mutableListOf(
+      listOf(
+        "ردیف", "نام محصول", "دسته", "ردهٔ ABC", "فروشِ خالصِ بازه", "سهم از فروش", "سهمِ انباشته",
+        "موجودی", "ارزشِ خرید", "ارزشِ فروش",
+      )
+    )
+    s.rows.forEachIndexed { i, r ->
+      val v = values[r.product.id]
+      rows += listOf(
+        (i + 1).toString(), r.product.name, r.product.category, r.abc.name, round(r.sales),
+        pct(r.shareBp), pct(r.cumulativeBp), trim(r.onHand),
+        v?.let { round(it.costMinor / 100.0) }.orEmpty(), v?.let { round(it.retailMinor / 100.0) }.orEmpty(),
+      )
+    }
+    return Sheet("تحلیل-موجودی-$from-تا-$to", rows)
+  }
+
+  /** کالاهایی که به نقطهٔ سفارش، حد کم بودن یا صفر رسیده‌اند، با پیشنهادِ «تا بیشینه» — `WarehouseEngine.reorderList` */
+  private fun reorder(d: ShopData, today: String): Sheet {
+    val rows = mutableListOf(
+      listOf("نام محصول", "دسته", "واحد", "موجودی", "حد کم بودن", "نقطهٔ سفارش", "بیشینه", "وضعیت", "مقدارِ پیشنهادی")
+    )
+    WarehouseEngine.reorderList(d).forEach { r ->
+      val p = r.product
+      rows += listOf(
+        p.name, p.category, p.unit, trim(r.onHand),
+        if (p.minStock > 0) trim(p.minStock) else "", p.reorderPoint?.let { trim(it) }.orEmpty(), p.maxStock?.let { trim(it) }.orEmpty(),
+        when (r.state) {
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> "تمام‌شده"
+          ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> "زیرِ حد کم بودن"
+          else -> "وقتِ سفارش"
+        },
+        r.suggest?.let { trim(it) } ?: "بیشینه تعریف نشده",
+      )
+    }
+    return Sheet("نیاز-به-سفارش-$today", rows)
+  }
+
+  /** بیسیس‌پوینت ⇒ «۲۶.۸٪» */
+  private fun pct(bp: Long): String = "${bp / 100}.${(bp % 100) / 10}٪"
 
   private fun products(d: ShopData, today: String): Sheet {
     val rows = mutableListOf(
@@ -230,6 +288,10 @@ object ReportCsv {
     "supplier_return" -> "برگشت به تأمین‌کننده"
     "adjustment" -> "اصلاح موجودی"
     "damage" -> "ضایعات"
+    //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+    "transfer_out" -> "انتقالِ خروجی"
+    "transfer_in" -> "انتقالِ ورودی"
+    "transfer" -> "انتقال"
     else -> type
   }
 }

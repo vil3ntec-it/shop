@@ -19,8 +19,6 @@
  *           باریک «روشن»، «فعال» و `listed` را زنده می‌سنجد (بیرون رفتن همان دم).
  *           نشان/ساعت و شمارِ کالا تا همان مدت کهنه‌اند. نتیجهٔ پرچم/اشتراکِ هر
  *           دکان هم `config.market.gateCacheMs` می‌ماند.
- *           S6: با پرچمِ `market.changes` هر تغییر ردیفی در `market_changes` دارد و این
- *           حافظه‌ها برای همان دکان با `seq` (نه زمان) باطل می‌شوند (`syncChanges`).
  *   جست‌وجو ─ نه `LIKE '%q%'` روی کلِ کالاهای همهٔ ویترین‌ها: جدولِ باریکِ
  *           `market_search` (نامِ یکدست‌شدهٔ هر کالای منتشرشده) که همان برش، فقط
  *           برای دکانی که امضای کالاهایش عوض شده، تازه می‌کند؛ با `pg_trgm` نمایهٔ
@@ -229,49 +227,12 @@ function snapshot() {
 
 function invalidate() { snapGen++; snap = null; }
 
-// ── S6: بی‌اعتبارسازی با `seq` ِ `market_changes` (پرچمِ `market.changes`) ─────
-//  هر `changesPollMs` یک پرسشِ باریک «ردیف‌های پس از seq»؛ هر دکانِ تغییرکرده از
-//  حافظه بیرون می‌رود و برش (و با آن نمایهٔ `market_search`) از نو ساخته می‌شود.
-//  بی ردیف (پرچم خاموش) ⇒ هیچ چیز عوض نمی‌شود و همان کشِ زمانی می‌ماند. خطا ⇒ همان کشِ زمانی.
-const CHANGES_BATCH = 1000;
-const changes = { seq: null, at: 0, flight: null };
-
-function forgetShop(shopId) {
-  gates.delete(shopId);
-  shelves.delete(shopId);
-  const pre = `${shopId}\u0000`;
-  for (const k of stocks.keys()) if (k.startsWith(pre)) stocks.delete(k);
-}
-
-async function pullChanges() {
-  const mc = require('./market-changes');
-  if (changes.seq === null) { changes.seq = await mc.head(); return; }
-  const rows = await mc.since(changes.seq, CHANGES_BATCH);
-  if (!rows.length) return;
-  if (rows.length >= CHANGES_BATCH) clearCache();
-  else { for (const id of new Set(rows.map((r) => r.shopId))) forgetShop(id); deals = null; invalidate(); }
-  changes.seq = rows[rows.length - 1].seq;
-  counters.changes += rows.length;
-}
-
-function syncChanges() {
-  if (changes.flight) return changes.flight;
-  const every = Math.max(0, Number(config.market.changesPollMs) || 0);
-  if (every > 0 && Date.now() - changes.at < every) return Promise.resolve();
-  changes.at = Date.now();
-  changes.flight = pullChanges()
-    .catch((err) => { console.error('[market-changes]', err.message); })
-    .finally(() => { changes.flight = null; });
-  return changes.flight;
-}
-
 /**
  * دکان‌های در فهرست، با وضعیت و شمارِ کالا — از برش؛ «روشن»، «فعال» و
  * `listed` با یک پرسشِ باریک در همین درخواست (بیرون رفتن همان دم است).
  */
 async function eligible(at = now()) {
-  await syncChanges();
-  const data = await snapshot();
+  const data = await require('./market-changes').sync({ all: clearCache, forget: [gates, shelves, stocks], reset: () => { deals = null; invalidate(); } }, counters).then(snapshot);   //  S6: دکانِ تغییرکرده (seq) پیش از برش از حافظه بیرون
   if (!data.size) return [];
   const live = new Set((await many(
     `SELECT sf.shop_id FROM ${LISTED_FROM} WHERE sf.shop_id = ANY($1::text[]) AND ${LISTED_WHERE}`,
@@ -761,7 +722,7 @@ async function myOrders(ticket) {
   const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
-    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
+    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at, o.track_gen,
             sf.slug, sf.title, sf.accent
        FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
       WHERE o.source = 'storefront' AND o.customer_phone = $1
@@ -769,11 +730,11 @@ async function myOrders(ticket) {
     [phone]
   );
   const slugs = [...new Set(rows.map((r) => r.slug))];
-  const open = new Set(await filterAsync(slugs, storeOpen));
+  const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
   return rows.filter((r) => open.has(r.slug)).map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
-    token: sf.tokenOf(r.shop_id, r.id),
+    token: sf.listTokenOf(r.shop_id, r, linked.has(r.shop_id)),
     store: { slug: r.slug, title: r.title, accent: r.accent },
   }));
 }
@@ -838,23 +799,15 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
       v.lat = g.lat; v.lng = g.lng;
     }
   }
-  const row = await tx(async (c) => {
-    const saved = (await c.query(
-      `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-       ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
-         area = EXCLUDED.area, geo_lat = EXCLUDED.geo_lat, geo_lng = EXCLUDED.geo_lng,
-         show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
-       RETURNING *`,
-      [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
-    )).rows[0];
-    //  S6: جابه‌جاییِ موقعیت هم «تغییر» است؛ مختصات فقط درونِ امضای sha1، نه خام در جدول
-    await require('./market-changes').record(c, shopId, {
-      entity: 'listing', kind: 'update',
-      state: { listed: v.listed, category: v.category, area: v.area, lat: v.lat, lng: v.lng, showDeals: v.showDeals },
-    });
-    return saved;
-  });
+  const row = await require('./market-changes').within(shopId, { entity: 'listing', kind: 'update', state: v }, async (c) => (await c.query(   //  S6: همان تراکنش
+    `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
+       area = EXCLUDED.area, geo_lat = EXCLUDED.geo_lat, geo_lng = EXCLUDED.geo_lng,
+       show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
+     RETURNING *`,
+    [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
+  )).rows[0]);
   gates.delete(shopId);
   deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم
   invalidate();   // «در فهرست باشم» ِ صاحب دکان همان دم دیده شود

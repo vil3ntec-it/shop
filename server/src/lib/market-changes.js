@@ -8,12 +8,20 @@
  *           برمی‌گردد. `state` امضا (`sig`) می‌شود و اگر آخرین ردیفِ همان موجودیت همان
  *           امضا را دارد چیزی نوشته نمی‌شود ⇒ تکرارِ درخواست ردیفِ دوم نمی‌سازد. قفلِ
  *           مشورتیِ همان موجودیت دو تراکنشِ هم‌زمان را پشتِ هم می‌گذارد.
- *   خواندن ─ `since(seq)` برای `lib/market.js` (بی‌اعتبارسازیِ کش با `seq` به‌جای زمان).
+ *   خواندن ─ `since(seq)` برای `lib/market.js` (بی‌اعتبارسازیِ کش با `seq` به‌جای زمان):
+ *           `sync` هر `changesPollMs` یک پرسشِ باریک «ردیف‌های پس از seq»؛ هر دکانِ تغییرکرده
+ *           از حافظه‌های بازار بیرون می‌رود و برش (و با آن نمایهٔ `market_search`) از نو ساخته
+ *           می‌شود. بی ردیف (پرچم خاموش) ⇒ هیچ چیز عوض نمی‌شود و همان کشِ زمانی می‌ماند؛ خطا ⇒
+ *           همان کشِ زمانی.
+ *   سیم‌ها ─ از `lib/storefront.js`، `lib/market.js` و `lib/catalog.js` جدا شد تا آن‌ها زیرِ سقفِ
+ *           اندازه بمانند: `within` (نوشتن + ردیف در یک تراکنش، مثلِ «فهرستِ بازار»؛ مختصات فقط
+ *           درونِ امضای sha1، نه خام در جدول)، `productTx` (انتشار/قیمتِ کالای ویترین) و
+ *           `catalogProduct` (کالای کاتالوگ در همان تراکنشِ همگام‌سازی).
  *   نگهداری ─ `prune()` در کارِ دوره‌ای: ردیف‌های کهنه‌تر از `config.market.changesKeepMs`،
  *           دسته‌ای و محدود.
  */
 const crypto = require('crypto');
-const { query, many, one, now } = require('../db');
+const { query, many, one, now, tx } = require('../db');
 const config = require('../config');
 
 const FLAG_KEY = 'market.changes';
@@ -93,4 +101,87 @@ async function prune({ keepMs = config.market.changesKeepMs, at = now(), maxBatc
   return { removed };
 }
 
-module.exports = { FLAG_KEY, enabled, record, head, since, prune, sigOf };
+// ── سیم‌ها ─────────────────────────────────────────────────────────────
+
+/** نوشتنِ `fn(c)` و ردیفِ تغییرِ `change` در یک تراکنش ⇒ همان خروجیِ `fn`. */
+function within(shopId, change, fn) {
+  return tx(async (c) => {
+    const out = await fn(c);
+    await record(c, shopId, change);
+    return out;
+  });
+}
+
+/**
+ * انتشار/برداشتن، قیمت یا بقیهٔ کالای ویترین: `fn(c)` ردیفِ `storefront_products` را می‌نویسد و
+ * `stateOf(ردیف)` حالتِ تازه را می‌دهد؛ نوعِ تغییر از حالتِ پیشینِ قفل‌شده. تکرارِ همان درخواست
+ * ردیفِ دوم نمی‌سازد (امضای حالت).
+ */
+function productTx(shopId, id, at, fn, stateOf) {
+  return tx(async (c) => {
+    const prev = (await c.query(
+      'SELECT published, online_price_minor FROM storefront_products WHERE shop_id = $1 AND product_id = $2 FOR UPDATE',
+      [shopId, id]
+    )).rows[0];
+    const saved = await fn(c);
+    const state = stateOf(saved);
+    const wasPub = prev ? prev.published === true : false;
+    const prevPrice = prev && prev.online_price_minor !== null ? Number(prev.online_price_minor) : null;
+    const kind = wasPub !== state.published ? (state.published ? 'publish' : 'unpublish')
+      : prevPrice !== state.onlinePriceMinor ? 'price' : 'update';
+    await record(c, shopId, { entity: 'product', entityId: id, kind, at, state });
+    return saved;
+  });
+}
+
+/**
+ * کالای کاتالوگ (نام، قیمت، فعال/حذف) در همان تراکنشِ همگام‌سازی (`catalog.upsertProduct`، فقط وقتی
+ * `ingestTx` پرچم را یک بار برای کلِ همان خواندن روشن دیده). همان حالت ⇒ بی ردیف.
+ */
+function catalogProduct(c, shopId, row, name, price, active, at) {
+  const deleted = row.deleted_at !== null && row.deleted_at !== undefined;
+  return record(c, shopId, {
+    entity: 'product', entityId: row.row_id, kind: deleted ? 'unpublish' : 'update', at,
+    state: { source: 'catalog', name, priceMinor: price !== null && price > 0 ? price : null, active, deleted },
+  }, { on: true });
+}
+
+const CHANGES_BATCH = 1000;
+const changes = { seq: null, at: 0, flight: null };
+
+/**
+ * `cache`: حافظه‌های بازار — `forget` (Mapهای کلیدخورده با شناسهٔ دکان یا `دکان\0…`)، `reset` (برش و
+ * «ارزان‌تر») و `all` (همه، پس از بیش از یک دسته).
+ */
+async function pullChanges(cache, counters) {
+  if (changes.seq === null) { changes.seq = await head(); return; }
+  const rows = await since(changes.seq, CHANGES_BATCH);
+  if (!rows.length) return;
+  if (rows.length >= CHANGES_BATCH) cache.all();
+  else {
+    for (const id of new Set(rows.map((r) => r.shopId))) {
+      const pre = `${id}\u0000`;
+      for (const m of cache.forget) {
+        m.delete(id);
+        for (const k of m.keys()) if (typeof k === 'string' && k.startsWith(pre)) m.delete(k);
+      }
+    }
+    cache.reset();
+  }
+  changes.seq = rows[rows.length - 1].seq;
+  counters.changes = (counters.changes || 0) + rows.length;
+}
+
+/** پیش از برشِ بازار: تغییرهای تازه (یک‌پرواز، هر `changesPollMs`). */
+function sync(cache, counters) {
+  if (changes.flight) return changes.flight;
+  const every = Math.max(0, Number(config.market.changesPollMs) || 0);
+  if (every > 0 && Date.now() - changes.at < every) return Promise.resolve();
+  changes.at = Date.now();
+  changes.flight = pullChanges(cache, counters)
+    .catch((err) => { console.error('[market-changes]', err.message); })
+    .finally(() => { changes.flight = null; });
+  return changes.flight;
+}
+
+module.exports = { FLAG_KEY, enabled, record, head, since, prune, sigOf, within, productTx, catalogProduct, sync };

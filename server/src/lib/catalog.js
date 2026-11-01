@@ -96,16 +96,7 @@ async function upsertProduct(c, shopId, row, fmt, at, track = false) {
       price !== null && price > 0 ? price : null, Math.max(0, rd.qty(d, 'minStock')),
       d.active !== false, row.deleted_at !== null && row.deleted_at !== undefined,
       fmt, num(row.updated_seq), at]
-  );
-  //  S6: نام، قیمت، فعال/حذف ⇒ جریانِ تغییرِ بازار (همان تراکنشِ همگام‌سازی؛ همان حالت ⇒ بی ردیف)
-  if (track) {
-    const deleted = row.deleted_at !== null && row.deleted_at !== undefined;
-    const p = price !== null && price > 0 ? price : null;
-    await require('./market-changes').record(c, shopId, {
-      entity: 'product', entityId: row.row_id, kind: deleted ? 'unpublish' : 'update', at,
-      state: { source: 'catalog', name: text(d.name, 200), priceMinor: p, active: d.active !== false, deleted },
-    }, { on: true });
-  }
+  ).then(() => track && require('./market-changes').catalogProduct(c, shopId, row, text(d.name, 200), price, d.active !== false, at));   //  S6
 }
 
 const isDeleted = (row) => row.deleted_at !== null && row.deleted_at !== undefined;
@@ -138,12 +129,10 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   //  منبع عوض شد ⇒ از اول خوانده می‌شود؛ سهم‌ها کلیدِ مستقل از قالب دارند، پس دوباره کم نمی‌شود
   let wm = !st || st.source !== fmt || full ? 0 : num(st.watermark);
   const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
-
+  const track = await require('./market-changes').enabled(shopId, c);   //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
   let products = 0;
   let moves = 0;
   const touched = new Set();
-  //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
-  const track = await require('./market-changes').enabled(shopId, c);
   for (;;) {
     const page = (await c.query(
       `SELECT table_name, row_id, data, deleted_at, updated_seq FROM ${T}

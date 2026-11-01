@@ -72,6 +72,10 @@ jobs:
           TOHID_KEY_ALIAS: ${{ secrets.TOHID_KEY_ALIAS }}
           TOHID_KEY_PASSWORD: ${{ secrets.TOHID_KEY_PASSWORD }}
         run: gradle --no-daemon assembleRelease -PbuildNumber=${{ github.run_number }}
+      #  SEC-ART-01/05: خودِ محتوای APKِ مدیر — بی کلیدِ خصوصی، انبارِ کلید، .env، پشتیبان، سورسِ بک‌اند و
+      #  رازِ شناخته (tools/security/artifact-gate.mjs)؛ پیش از upload و انتشار.
+      - name: دروازهٔ محتوای APK
+        run: node tools/security/artifact-gate.mjs --profile apk admin-android/app/build/outputs/apk/release/app-release.apk
 
       # نامِ ثابت کنارِ نامِ نسخه‌دار: لینکِ دانلود با هر ساخت نمی‌میرد.
       - name: نام‌گذاری و جمع کنترلی
