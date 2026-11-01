@@ -293,12 +293,12 @@ async function removeAddon(id, { app, subscriptionId = '' } = {}) {
 }
 
 /** کلیدهای افزونهٔ زندهٔ یک اشتراک — همان که `entitlement.js` می‌خواند. */
-async function addonKeysOf(app, subscriptionId) {
+async function addonKeysOf(app, subscriptionId, run = null) {
   if (!subscriptionId) return [];
-  const rows = await many(
-    'SELECT feature FROM subscription_addons WHERE app=$1 AND subscription_id=$2 AND removed_at IS NULL',
-    [appOf(app), String(subscriptionId)]
-  );
+  //  `run` = اتصالِ تراکنشِ صدازننده (`entitlementOf` درونِ `staffCodes.redeem`)؛ نیامده ⇒ استخر
+  const sql = 'SELECT feature FROM subscription_addons WHERE app=$1 AND subscription_id=$2 AND removed_at IS NULL';
+  const params = [appOf(app), String(subscriptionId)];
+  const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   return rows.map(r => r.feature);
 }
 

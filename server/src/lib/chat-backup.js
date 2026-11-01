@@ -47,15 +47,15 @@ const TABLES = [
 const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
 const stamp = () => new Date().toISOString().replace(/[-:]/g, '').replace(/\..*$/, '').replace('T', '-');
 
-async function tableExists(name) {
-  return !!(await one("SELECT 1 AS x FROM information_schema.tables WHERE table_schema='public' AND table_name=$1", [name]));
+//  `run` = اتصالِ تراکنشِ بازگردانی (`(sql, params) ⇒ {rows}`)؛ نیامده ⇒ استخر
+async function tableExists(name, run = null) {
+  const sql = "SELECT 1 AS x FROM information_schema.tables WHERE table_schema='public' AND table_name=$1";
+  return !!(run ? (await run(sql, [name])).rows[0] : await one(sql, [name]));
 }
 
-async function columnsOf(name) {
-  const rows = await many(
-    "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='public' AND table_name=$1",
-    [name]
-  );
+async function columnsOf(name, run = null) {
+  const sql = "SELECT column_name, data_type FROM information_schema.columns WHERE table_schema='public' AND table_name=$1";
+  const rows = run ? (await run(sql, [name])).rows : await many(sql, [name]);
   return new Map(rows.map((r) => [r.column_name, r.data_type]));
 }
 
@@ -177,11 +177,12 @@ async function restoreMessages(file) {
   }
   const restored = {};
   await tx(async (c) => {
+    const run = (s, p) => c.query(s, p);
     for (const t of TABLES) {
       const rows = doc.tables[t.name];
       if (!rows) continue;
-      if (t.optional && !(await tableExists(t.name))) { restored[t.name] = 0; continue; }
-      restored[t.name] = await insertRows(c, t.name, rows, await columnsOf(t.name));
+      if (t.optional && !(await tableExists(t.name, run))) { restored[t.name] = 0; continue; }
+      restored[t.name] = await insertRows(c, t.name, rows, await columnsOf(t.name, run));
     }
   });
   return { restored, media: (doc.media || []).length };
