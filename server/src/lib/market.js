@@ -135,7 +135,7 @@ const LISTED_WHERE = "sf.enabled AND s.status = 'active' AND COALESCE(ml.listed,
  * `market_search` ِ دکان‌هایی که امضای کالاهایشان عوض شده، از نو؛ ردیفِ دکانِ
  * بیرون‌رفته پاک. هر دکان در تراکنشِ خودش.
  */
-async function reindex(sigs, ids) {
+async function reindex(sigs, ids, from) {
   const known = new Map((await many('SELECT shop_id, sig FROM market_search_shops')).map((r) => [r.shop_id, r.sig]));
   const keep = new Set(ids);
   const gone = [...known.keys()].filter((id) => !keep.has(id));
@@ -146,7 +146,6 @@ async function reindex(sigs, ids) {
     });
   }
   const stale = [...sigs].filter(([id, sig]) => known.get(id) !== sig).slice(0, REINDEX_PER_PASS);
-  const from = stale.length ? await sf.productFrom() : '';
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
@@ -181,15 +180,12 @@ async function buildSnapshot() {
       ORDER BY sf.slug LIMIT ${MAX_CANDIDATES}`
   );
   const open = await filterAsync(rows, gateOf);
-  const ids = open.map((r) => r.shop_id);
-  //  S1: کاتالوگ منبع است ⇒ کاتالوگِ هر دکانِ باز پیش از شمردن تازه (هر کدام یک پرسشِ «تازه؟»)
-  if (ids.length && await sf.catalogOn()) for (const id of ids) await sf.fillCatalog(id);
-  const from = await sf.productFrom();
+  const ids = open.map((r) => r.shop_id);   //  S1: کاتالوگ منبع ⇒ `productFrom(ids)` کاتالوگِ هر دکانِ باز را پیش از شمردن تازه می‌کند
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
               md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${from}
+         FROM ${await sf.productFrom(ids)}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -202,7 +198,7 @@ async function buildSnapshot() {
       [ids]
     ),
   ]) : [[], []];
-  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id));
+  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id), await sf.productFrom());
   const n = new Map(counts.map((r) => [r.shop_id, Number(r.n)]));
   const last = new Map(seen.map((r) => [r.account_id, r.t === null || r.t === undefined ? 0 : Number(r.t)]));
   const out = new Map();
@@ -388,10 +384,9 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     const slugOfShop = new Map(list.map((e) => [e.row.shop_id, e.row.slug]));
     const like = `%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
-    const from = await sf.productFrom();
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
-         FROM market_search ms JOIN (${from}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
+         FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
         WHERE ms.shop_id = ANY($1::text[]) AND ms.name_norm LIKE $2
           AND sp.published AND ${sf.LIVE_PRODUCT} AND ${sf.SQL_NAME} LIKE $2
         ORDER BY COALESCE(r.data->>'name', ''), sp.shop_id, r.row_id LIMIT $3`,
@@ -490,9 +485,8 @@ function shelfOf(shopId) {
 
 async function loadShelf(shopId) {
   counters.shelves++;
-  const from = await sf.productFrom(shopId);
   const rows = await many(
-    `SELECT ${sf.PRODUCT_COLS} FROM ${from}
+    `SELECT ${sf.PRODUCT_COLS} FROM ${await sf.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
     [shopId, SHELF * 2]
@@ -509,9 +503,8 @@ async function liveViews(pairs) {
   const out = new Map();
   const uniq = [...new Map(pairs.map((x) => [pairKey(x.shopId, x.id), x])).values()];
   if (!uniq.length) return out;
-  const from = await sf.productFrom();
   const rows = await many(
-    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${from}
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${await sf.productFrom()}
       WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
         AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
     [uniq.map((x) => x.shopId), uniq.map((x) => x.id)]
@@ -594,13 +587,12 @@ async function popularOf(ids, at) {
 /** «ارزان‌تر» ِ دکان‌هایی که صاحبشان خواسته (`market_listings.show_deals`)، تا PER_SHOP از هر دکان. */
 async function loadDeals(ids) {
   counters.deals++;
-  const from = await sf.productFrom();
   const rows = ids.length ? await many(
     `SELECT shop_id, id FROM (
        SELECT sp.shop_id, r.row_id AS id,
               ROW_NUMBER() OVER (PARTITION BY sp.shop_id
                 ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), r.row_id) AS n
-         FROM ${from}
+         FROM ${await sf.productFrom()}
          JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL
@@ -730,7 +722,7 @@ async function myOrders(ticket) {
   const phone = await sf.verifiedPhoneOfTicket(ticket);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
-    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at,
+    `SELECT o.id, o.shop_id, o.order_no, o.status, o.total_minor, o.items_count, o.fulfillment, o.created_at, o.track_gen,
             sf.slug, sf.title, sf.accent
        FROM online_orders o JOIN storefronts sf ON sf.shop_id = o.shop_id
       WHERE o.source = 'storefront' AND o.customer_phone = $1
@@ -738,11 +730,11 @@ async function myOrders(ticket) {
     [phone]
   );
   const slugs = [...new Set(rows.map((r) => r.slug))];
-  const open = new Set(await filterAsync(slugs, storeOpen));
+  const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
   return rows.filter((r) => open.has(r.slug)).map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
     itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
-    token: sf.tokenOf(r.shop_id, r.id),
+    token: sf.listTokenOf(r.shop_id, r, linked.has(r.shop_id)),
     store: { slug: r.slug, title: r.title, accent: r.accent },
   }));
 }

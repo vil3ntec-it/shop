@@ -48,6 +48,20 @@ object ShopPolicy {
     prefs(context).edit().putBoolean(CRM_REPORTS, on).apply()
   }
 
+  /*
+   *  ابزارهای تازهٔ کالا (PRD-19، PRD-04، PRD-14، PRD-21، PRD-06): هشدارِ «نامِ مشابه» در فرمِ کالا و پیش‌نمایشِ
+   *  ورود از فایل (ثبت را نمی‌بندد؛ نامِ عیناً یکسان همیشه رد می‌شود)، کادرِ «بارکدها» برای چند بارکد، برند و برچسب،
+   *  نام و دلیل در سابقهٔ تغییرِ قیمت، و «قیمتِ گروهی» با پیش‌نمایشِ رنگی و تأیید.
+   *  پیش‌فرض **خاموش**: فرم همان تک‌بارکدیِ امروز. فقط روی همین دستگاه.
+   */
+  private const val PRODUCT_TOOLS = "product_tools"
+
+  fun productTools(context: Context): Boolean = prefs(context).getBoolean(PRODUCT_TOOLS, false)
+
+  fun setProductTools(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(PRODUCT_TOOLS, on).apply()
+  }
+
   /**
    *  CRM-03 / S07 — سقفِ اعتبار در صندوق: فروشِ نسیه‌ای که ماندهٔ مشتری را از سقفش می‌گذراند بی تأییدِ
    *  مدیر/صاحب ثبت نمی‌شود (`SalesEngine.Checkout.creditGate`، `CreditGate`). پیش‌فرض **خاموش**: صندوق
@@ -59,5 +73,18 @@ object ShopPolicy {
 
   fun setCreditGate(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(CREDIT_GATE, on).apply()
+  }
+
+  /**
+   *  CHAT-05 / CHAT-07 — چتِ دکان: نوارِ پیشرفتِ فرستادنِ عکس و صدا، و پیش از ضبط، پخش یا آماده
+   *  کردنِ عکس سنجشِ جای دستگاه با پیامِ روشن (`ChatSpace`، `ChatProgress` در `core`). پیش‌فرض
+   *  **خاموش**: چت همان است که بود (بدنهٔ رسانه یک‌جا نوشته می‌شود، بی سنجشِ جا). فقط روی همین دستگاه.
+   */
+  private const val CHAT_MEDIA_GUARD = "chat_media_guard"
+
+  fun chatMediaGuard(context: Context): Boolean = prefs(context).getBoolean(CHAT_MEDIA_GUARD, false)
+
+  fun setChatMediaGuard(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(CHAT_MEDIA_GUARD, on).apply()
   }
 }

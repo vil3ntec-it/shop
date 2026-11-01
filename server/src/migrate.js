@@ -42,8 +42,13 @@ function files() {
   return fs.readdirSync(DIR).filter(f => f.endsWith('.sql')).sort();
 }
 
-async function run({ log = () => {} } = {}) {
-  const client = await getPool().connect();
+/**
+ * @param {object} [o]
+ * @param {object} [o.pool]  استخرِ دیگری جز دیتابیسِ همین سرور — فقط برای کپیِ تمرینِ بازیابی
+ *                           (`lib/restore-drill.js`: «مهاجرت روی کپی، با تطبیق»)
+ */
+async function run({ log = () => {}, pool = null } = {}) {
+  const client = await (pool || getPool()).connect();
   try {
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
