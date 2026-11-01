@@ -20,7 +20,6 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
-  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
   var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
   //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
   var campaign = campaignOfPage();
@@ -137,17 +136,15 @@
     $(id).hidden = !list.length;
   }
 
-  /** WEB-02: پرفروش (یا تازه)، «ارزان‌تر» و تازه‌ها — فقط دادهٔ واقعیِ سرور (#301)؛ نبود ⇒ هیچ */
-  function loadPicks() {
-    //  سرورِ بی #301 این مسیر را ندارد؛ #301 همراهِ `store.delivery` می‌آید
-    if (!store.delivery) return Promise.resolve();
-    return api('/highlights').then(function (r) {
-      var best = r.bestsellers || []; var fresh = r.newArrivals || [];
-      rail('picks', best.length ? best : fresh);
-      $('picks-why').textContent = best.length ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
-      rail('deals', r.deals || []);
-      rail('fresh', best.length ? fresh.filter(function (p) { return !best.some(function (b) { return b.id === p.id; }); }) : []);
-    }).catch(function () { $('picks').hidden = true; $('deals').hidden = true; $('fresh').hidden = true; });
+  // ── پیشنهادها (WEB-02) و دیده‌شده‌های اخیر (WEB-13): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var more = null;
+  function loadMore(r) {
+    return new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
+    }).then(function () {
+      more = window.StoreCatalog({ api: api, slug: slug, get store() { return store; }, rail: rail, card: card, items: catalog.items, recent: Boolean(r.recent) });
+      return more.picks();
+    }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
   }
 
   function loadProducts(more) {
@@ -205,7 +202,7 @@
       $('ps-share').hidden = !share;
       $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
-      if (recent) recent.seen(x);
+      if (more) more.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
     if (detail) detail(null);
@@ -569,11 +566,6 @@
       stockList = Boolean(r.features && r.features.stockList);
       store.addressExtra = Boolean(r.features && r.features.addressExtra);
       verifyAvailable = !r.verification || r.verification.available !== false;
-      if (r.recent) {
-        var rs = el('script', { attrs: { src: '/store/recent.js' } });
-        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
-        document.head.appendChild(rs);
-      }
       if (r.seo && typeof r.seo.productBase === 'string') {
         var ss = el('script', { attrs: { src: '/store/share.js' } });
         //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
@@ -589,7 +581,7 @@
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
-      return Promise.all([loadProducts(false), refreshCart(), loadPicks()]);
+      return Promise.all([loadProducts(false), refreshCart(), loadMore(r)]);
     }).then(route).catch(function (e) {
       if (e.status === 404) {
         show('view-missing');
