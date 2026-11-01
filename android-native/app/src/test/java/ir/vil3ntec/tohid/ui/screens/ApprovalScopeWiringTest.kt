@@ -45,6 +45,6 @@ class ApprovalScopeWiringTest {
     //  کلید پس از ساختنِ gate است، نه پیش از آن
     assertTrue(s.indexOf("val gate = ReturnFlow.gate(") in 0 until s.indexOf(keyed))
     //  سقفِ دستگاه هم تجمعی سنجیده می‌شود
-    assertTrue(s.contains("ReturnFlow.minor(limit), priorMinor)"))
+    assertTrue(s.contains("ReturnFlow.minor(limit), priorMinor"))
   }
 }
