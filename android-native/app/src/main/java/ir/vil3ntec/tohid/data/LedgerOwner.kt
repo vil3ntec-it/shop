@@ -126,6 +126,8 @@ object LedgerOwner {
 
   private fun afterAlign(context: Context, r: Result) {
     if (promoReset(r)) runCatching { ir.vil3ntec.tohid.ui.PromoLive.reset(context) }
+    //  پرچمِ `shop.stock_v2` مالِ دکان است ⇒ با هر هم‌ترازی همان دکانِ تازه خوانده شود
+    runCatching { StockFlag.load(context) }
   }
 
   private suspend fun align(

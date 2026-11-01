@@ -4,6 +4,7 @@
  * پیگیری که «پرداخت‌شده» را فقط از سرور می‌گیرد، فهرست/تطبیق/بازپرداختِ مدیر و حالِ سرویس در پنل.
  */
 process.env.PAYMENTS_PROVIDER = 'fake';
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-payment-storefront';   //  #609: رازِ پیش‌فرض در کد نیست
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');

@@ -96,6 +96,11 @@ async function pushChanges(ctx, changes) {
   }
   const ruled = changes.some((ch) => permCore.rowRule(role, String(ch?.collection || '')));
 
+  //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
+  const guard = ctx.finalized
+    ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, ip: ctx.ip || '' }, ctx.finalized, changes)
+    : null;
+  //  رویداد پس از تراکنش — در `enforce` همان ردی که تراکنش را برگرداند هم ثبت می‌شود
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);
     //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت؛ `role-rows.js`).
@@ -171,6 +176,14 @@ async function pushChanges(ctx, changes) {
         // حذف رکوردی که سرور ندیده — سنگ قبر ثبت می‌شود تا بقیه هم خبردار شوند
       }
 
+      //  فاکتورِ ثبت‌شده: `enforce` ⇒ ۴۰۹ و کلِ دسته برمی‌گردد؛ `log` ⇒ همان امروز + رویداد
+      if (guard) {
+        const g = await guard.check(c, {
+          table: collection, rowId: recordId, type: deleted ? 'delete' : 'update', fields: data, full: true,
+        }, existing && !existing.deleted ? existing.data : null);
+        if (g && g.reject) throw require('./finalized-sales').forbiddenError();
+      }
+
       rev++;
       await c.query(
         `INSERT INTO ${table} (shop_id, id, rev, version, created_at, updated_at, deleted, device_id, user_id, data)
@@ -192,7 +205,7 @@ async function pushChanges(ctx, changes) {
       const r = (await c.query('SELECT last_rev FROM shop_rev WHERE shop_id=$1', [shopId])).rows[0];
       return Number(r.last_rev);
     })() };
-  });
+  }).finally(() => (guard ? guard.finish() : null));
 }
 
 /** ساخت پرس‌وجوی خواندن تفاضلی روی همه‌ی مجموعه‌ها. */

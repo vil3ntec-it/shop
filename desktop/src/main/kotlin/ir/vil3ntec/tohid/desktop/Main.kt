@@ -75,10 +75,13 @@ fun main() {
   DevShot.start()
 
   val context = DesktopContext
+  //  OPS-03: خطای گرفته‌نشده ⇒ گزارشِ بی دادهٔ شخصی با کد؛ صفِ اجرای پیش فرستاده می‌شود
+  ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }
+  scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
   //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
@@ -197,7 +200,11 @@ fun main() {
         } else {
           //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
           val ch = e.scanChar()
-          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch, now); true } else false
+          //  HW-05: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) اسکن را همین‌جا تمام می‌کند
+          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) {
+            windowHid.feed(ch, now)?.let { code -> ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") } }
+            true
+          } else false
         }
       },
       onPreviewKeyEvent = { e ->

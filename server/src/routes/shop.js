@@ -109,6 +109,9 @@ router.post('/active', async (req, res, next) => {
         AND (token_hash=$3 OR token_hash=$4 OR ($5::text IS NOT NULL AND device_id=$5::text))`,
     [shopId, req.user.id, t.token_hash, refresh ? hashToken(refresh) : '', t.device_id || null]
   );
+  //  ⛔ S78: سوکتی که هنوز در اتاقِ دکانِ قبلیِ همین نشست است بسته می‌شود (4401) و
+  //  برنامه در اتاقِ دکانِ تازه برمی‌گردد؛ دستگاه‌های دیگرِ همین آدم دست نمی‌خورند
+  await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
   await audit.log({
     shopId, userId: req.user.id, action: 'auth.active_shop',
     detail: { sessions: r.rowCount }, ip: clientIp(req),
@@ -277,6 +280,8 @@ router.delete('/staff-codes/:id', requireShop, requirePermission('staffcode.revo
 router.post(['/staff/join', '/join'], joinLimit, async (req, res) => {
   const code = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
   const { shop, role, unchanged } = await staffCodes.redeem(code, req.user.id, clientIp(req));
+  //  ⛔ S78: پیک‌شدن نشست‌های بی‌دامنه را درونِ تراکنشِ `redeem` بست؛ سوکت‌هایشان پس از آن، همین‌جا
+  if (!unchanged) await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
   const member = await shops.membershipOf(req.user.id);
   const ent = await entitlementOf(shop.id);
   //  عضوِ فعالی که کد را دوباره زد: هیچ چیز عوض نشد (نقش فقط از PATCH/PUT /members/:id)

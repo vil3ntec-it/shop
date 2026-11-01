@@ -22,6 +22,7 @@
  */
 const express = require('express');
 const bank = require('../lib/image-bank');
+const upload = require('../lib/image-upload');
 const pipeline = require('../lib/image-pipeline');
 const audit = require('../lib/audit');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -31,17 +32,16 @@ const config = require('../config');
 
 const router = express.Router();
 const BASE = '/api/shop/images';
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 const body = (max) => express.raw({ type: () => true, limit: max + 1024 });
 
 router.use(requireUser, requireShop, requirePermission('data.read'));
 router.use(rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => req.shopId }));
-router.use(wrap(async (req, res, next) => {
+router.use(async (req, res, next) => {
   if (!(await bank.shopEnabled(req.shopId))) {
     return next(forbidden('بانکِ تصاویر برای این دکان روشن نیست', 'image_bank_disabled'));
   }
   next();
-}));
+});
 
 //  A16: نوشتن در بانکِ تصویر یعنی عکسِ کالا ⇐ همان `canWrite(role, 'products')`ِ هسته
 const write = [
@@ -49,7 +49,12 @@ const write = [
   (req, res, next) => (require('../lib/perm-core').canWrite(req.role, 'products')
     ? next() : next(forbidden('عکسِ کالا در حدِ نقشِ شما نیست', 'table_not_allowed'))),
 ];
-const bufOf = (req) => (Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0));
+//  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر برنامه فرستاده باشد (IMG-14؛ بی سرآیند همان پیشین)
+const bufOf = (req) => {
+  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  upload.verifyDigest(buf, req.get('x-content-sha256'));
+  return buf;
+};
 const version = (v) => {
   const n = Number(v);
   if (!Number.isInteger(n) || n < 1 || n > 100000) throw badRequest('نسخه درست نیست', 'bad_version');
@@ -60,57 +65,57 @@ router.get('/config', (req, res) => {
   res.json({ enabled: true, sizes: bank.DERIV, roles: bank.ROLES, report_kinds: bank.REPORT_KINDS, pipeline: pipeline.describe() });
 });
 
-router.get('/search', wrap(async (req, res) => {
+router.get('/search', async (req, res) => {
   res.set('Cache-Control', 'private, no-cache');
   res.json(await bank.search(req.query || {}, { base: BASE }));
-}));
+});
 
-router.post('/select', write, wrap(async (req, res) => {
+router.post('/select', write, async (req, res) => {
   const out = await bank.select(req.shopId, req.user.id, req.body || {});
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'image.selected', targetType: 'product', targetId: out.product_id,
     ip: clientIp(req), detail: { source: out.source, image_id: out.image_id, version: out.version, match: out.match_status },
   });
   res.json(out);
-}));
+});
 
-router.get('/products/:productId', wrap(async (req, res) => {
+router.get('/products/:productId', async (req, res) => {
   res.json(await bank.resolve(req.shopId, req.params.productId, BASE));
-}));
+});
 
-router.get('/mine', wrap(async (req, res) => {
+router.get('/mine', async (req, res) => {
   res.json(await bank.shopList(req.shopId, {
     productId: req.query?.product_id || '', cursor: req.query?.cursor || '', limit: req.query?.limit, base: BASE,
   }));
-}));
+});
 
-router.post('/', write, body(bank.DERIV.display.bytes), wrap(async (req, res) => {
+router.post('/', write, body(bank.DERIV.display.bytes), async (req, res) => {
   const out = await bank.shopUpload(req.shopId, req.user.id, bufOf(req), {
     productId: req.query?.product_id || '', role: req.query?.role || 'main',
   });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'image.uploaded', targetType: 'image', targetId: out.id, ip: clientIp(req) });
   res.status(201).json(out);
-}));
+});
 
-router.post('/:id/versions', write, body(bank.DERIV.display.bytes), wrap(async (req, res) => {
+router.post('/:id/versions', write, body(bank.DERIV.display.bytes), async (req, res) => {
   const out = await bank.shopVersion(req.shopId, req.user.id, req.params.id, bufOf(req));
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'image.version_added', targetType: 'image', targetId: out.image_id, detail: { version: out.version } });
   res.status(201).json(out);
-}));
+});
 
-router.put('/:id/v/:version/:size', write, body(bank.DERIV.zoom.bytes), wrap(async (req, res) => {
+router.put('/:id/v/:version/:size', write, body(bank.DERIV.zoom.bytes), async (req, res) => {
   res.json(await bank.shopDerivative(req.shopId, req.params.id, version(req.params.version), req.params.size, bufOf(req)));
-}));
+});
 
 //  ⛔ اشتراکِ عکسِ دکان با بانک تصمیمِ صاحبِ دکان است (shop.update = فقط owner)
-router.post('/:id/propose', requirePermission('shop.update'), wrap(async (req, res) => {
+router.post('/:id/propose', requirePermission('shop.update'), async (req, res) => {
   const out = await bank.propose(req.shopId, req.user.id, req.params.id, req.body || {});
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'image.proposed_to_bank', targetType: 'image', targetId: req.params.id,
     ip: clientIp(req), detail: { pending_id: out.id, consent: true },
   });
   res.status(out.existing ? 200 : 201).json(out);
-}));
+});
 
 /** عکسی که این دکان می‌بیند — وگرنه همان ۴۰۴ و سابقهٔ امنیتی. */
 async function readable(req, id, ver, size) {
@@ -125,14 +130,14 @@ async function readable(req, id, ver, size) {
   throw notFound('عکس پیدا نشد');
 }
 
-router.post('/:id/report', write, wrap(async (req, res) => {
+router.post('/:id/report', write, async (req, res) => {
   const img = await bank.imageRow(req.params.id);
   const ok = img && await readable(req, img.id, Number(img.current_version), 'thumb');
   if (!ok) throw notFound('عکس پیدا نشد');
   res.status(201).json(await bank.report(req.shopId, req.user.id, img, req.body || {}));
-}));
+});
 
-router.post('/:id/process', write, wrap(async (req, res) => {
+router.post('/:id/process', write, async (req, res) => {
   const step = String(req.body?.step || '');
   //  مرحلهٔ بیرونی/ناموجود پیش از هر خواندنی رد می‌شود: هیچ بایتی جابه‌جا نمی‌شود
   const s = pipeline.stepOf(step);
@@ -146,9 +151,9 @@ router.post('/:id/process', write, wrap(async (req, res) => {
   }
   const result = pipeline.run(step, file.data);
   res.json({ step, result });
-}));
+});
 
-router.get('/file/:id/:version/:size', wrap(async (req, res) => {
+router.get('/file/:id/:version/:size', async (req, res) => {
   const size = String(req.params.size);
   if (!bank.SIZES.includes(size)) throw notFound('عکس پیدا نشد');
   const ver = version(req.params.version);
@@ -162,6 +167,6 @@ router.get('/file/:id/:version/:size', wrap(async (req, res) => {
   res.set('X-Content-Type-Options', 'nosniff');
   if (req.headers['if-none-match'] === '"' + file.hash + '"') return res.status(304).end();
   res.send(file.data);
-}));
+});
 
 module.exports = router;

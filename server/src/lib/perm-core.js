@@ -113,6 +113,13 @@
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: [], display: false,
     },
+    //  PAY-15: گزارشِ X (میانِ شیفت) و Z (پایانِ شیفت) ِ صندوقِ شیفت — امروز همه می‌بینند (شاگرد نمای کور،
+    //  PAY-13)، پس پیش‌فرض برای همه allow است؛ فقط نمایش است (Z روی دستگاه هست)، تنگ‌شدنی و بی تأیید.
+    //  نقش‌های تازه: صندوق‌دار (صندوقِ خودش) و حسابدار (عددِ مالی) می‌بینند؛ انباردار و جمع‌آور نه
+    'shift.report': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'allow'),
+      edit: 'restrict', approvable: false, caps: [], display: true,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

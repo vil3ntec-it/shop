@@ -15,7 +15,7 @@
  *   HESABPAY_WEBHOOK_SECRET  رازِ امضای وب‌هوک                     — لازم
  *   HESABPAY_BASE_URL        پیش‌فرض https://api.hesab.com/api/v1
  *   HESABPAY_MERCHANT_ID     اختیاری؛ اگر حساب‌پی خواست در بدنه می‌رود
- *   HESABPAY_TIMEOUT_MS      مهلتِ هر درخواست به حساب‌پی (پیش‌فرض ۱۰ ثانیه)
+ *   HESABPAY_TIMEOUT_MS      مهلتِ هر درخواست به حساب‌پی (پیش‌فرض ۱۰ ثانیه؛ کف ۱ و سقف ۳۰ ثانیه)
  * نبودِ یکی از دو کلیدِ لازم ⇒ `configured() = false` و بخش برای همه خاموش است.
  */
 const crypto = require('crypto');
@@ -39,21 +39,39 @@ const STATUS_MAP = {
   cancelled: 'cancelled', canceled: 'cancelled',
 };
 
+/*
+ *  سقفِ مهلتِ هر درخواست. باید خیلی کمتر از اجارهٔ پردازشِ رویداد (`EVENT_LEASE_MS` = ۲ دقیقه در
+ *  `payment-intents.js`) بماند؛ وگرنه پردازشِ دوم ِ همان رویداد پیش از پایانِ اولی شروع می‌شود (پول امن
+ *  می‌ماند — compare-and-set ِ `markPaid` — ولی outcome ِ رویدادها بازنویسی می‌شود).
+ */
+const MAX_TIMEOUT_MS = 30_000;
+
 function env() {
   return {
     apiKey: String(process.env.HESABPAY_API_KEY || '').trim(),
     secret: String(process.env.HESABPAY_WEBHOOK_SECRET || '').trim(),
     base: String(process.env.HESABPAY_BASE_URL || DEFAULT_BASE).trim().replace(/\/+$/, ''),
     merchantId: String(process.env.HESABPAY_MERCHANT_ID || '').trim(),
-    timeoutMs: Math.max(1000, Number(process.env.HESABPAY_TIMEOUT_MS) || 10_000),
+    timeoutMs: Math.min(MAX_TIMEOUT_MS, Math.max(1000, Number(process.env.HESABPAY_TIMEOUT_MS) || 10_000)),
   };
 }
 
-const configured = () => { const e = env(); return Boolean(e.apiKey && e.secret && /^https?:\/\//.test(e.base)); };
+/*
+ *  ⛔ فقط https: کلیدِ API در سرآیندِ هر درخواست می‌رود. تنها استثنا سرورِ ساختگیِ آزمون روی loopback
+ *  (127.0.0.1 / localhost / [::1]) و فقط با NODE_ENV ِ صریحِ test/development — هرگز در تولید.
+ */
+const LOOPBACK_HTTP = /^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?(?:\/|$)/i;
+function baseAllowed(base) {
+  if (/^https:\/\/[^/\s]+/i.test(base)) return true;
+  return P.isTestOrDev() && LOOPBACK_HTTP.test(base);
+}
+
+const configured = () => { const e = env(); return Boolean(e.apiKey && e.secret && baseAllowed(e.base)); };
 
 /** درخواست با مهلت؛ پاسخِ غیر ۲xx یا JSON ِ خراب ⇒ خطا (پیامِ داخلی، بی کلید). */
 async function call(method, path, body) {
   const e = env();
+  if (!baseAllowed(e.base)) throw new Error('hesabpay: HESABPAY_BASE_URL باید https باشد');
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), e.timeoutMs);
   try {
@@ -171,5 +189,6 @@ async function fetchStatus(sessionId) {
 module.exports = {
   name: 'hesabpay',
   configured, createSession, verifyWebhook, fetchStatus,
-  SIG_HEADER: SIG_HEADERS[0], DEFAULT_BASE,
+  SIG_HEADER: SIG_HEADERS[0], DEFAULT_BASE, MAX_TIMEOUT_MS,
+  requestTimeoutMs: () => env().timeoutMs,
 };

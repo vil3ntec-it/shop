@@ -180,6 +180,8 @@ router.delete('/devices/:id', async (req, res) => {
   if (r.rowCount) {
     await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
       [now(), id, req.user.id]);
+    //  ⛔ S78: سوکتِ زندهٔ همان دستگاه هم در همین درخواست
+    await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
   }
   res.json({ ok: true });
 });
@@ -217,7 +219,8 @@ router.delete('/devices/:id', async (req, res) => {
  *    ۲) `PUT /api/me { phone, phoneCode }` — نشستِ تازه + کدِ درستِ همان شماره و همان حساب؛
  *       فقط پس از کدِ درست ۴۰۹ `phone_taken` (فقط صاحبِ شماره می‌فهمد).
  *  پرچمِ خاموش ⇒ دقیقاً رفتارِ امروز (فقط تأییدِ دوبارهٔ حساب)، و درِ ۱ ۴۰۴.
- *  ⚠️ برنامه‌ها هنوز `phoneCode` نمی‌فرستند؛ پرچم پس از آن روشن شود.
+ *  برنامهٔ مدیریت (اندروید و کامپیوتر) گامِ کد را دارد (`core/account/PhoneClaim`، `PhoneClaimStep.kt`)؛
+ *  ⚠️ برنامهٔ وبِ یخ‌زده (`index.html`) `phoneCode` نمی‌فرستد — با پرچمِ روشن آن‌جا شماره افزوده نمی‌شود.
  */
 const PHONE_FLAG_SCOPE = 'security';
 const PHONE_FLAG_KEY = 'auth.phone_add_code';

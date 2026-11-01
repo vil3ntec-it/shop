@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "doc": "RSK-10 — هشدارِ رفتارِ غیرعادیِ صندوقدار. هم‌زادها: core/risk/CashierAlerts.kt (commonMain) و cashierAlerts در license/report-board.js. rows: [key, invoices, voids, discounts, noSales]؛ policy اختیاری.",
+  "cases": [
+    {
+      "name": "یک صندوقدار با لغوِ زیاد؛ دیگران زیرِ کمینه",
+      "rows": [["علی",40,5,0,0], ["سارا",160,2,0,0], ["رضا",100,1,0,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":5,"invoices":40,"peerCount":3,"peerInvoices":260,"ratioPct":1083}
+      ]
+    },
+    {
+      "name": "زیرِ کمینه (۲ بار) هشدار نیست، حتی وقتی بقیه هیچ‌بار",
+      "rows": [["علی",5,2,2,2], ["سارا",500,0,0,0]],
+      "expect": []
+    },
+    {
+      "name": "کمتر از دو برابرِ بقیه هشدار نیست",
+      "rows": [["علی",100,4,0,0], ["سارا",100,3,0,0]],
+      "expect": []
+    },
+    {
+      "name": "درست دو برابر هشدار است (مرز)",
+      "rows": [["علی",100,6,0,0], ["سارا",100,3,0,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":6,"invoices":100,"peerCount":3,"peerInvoices":100,"ratioPct":200}
+      ]
+    },
+    {
+      "name": "بقیه هیچ‌بار با چند فاکتورِ انگشت‌شمار هشدار نمی‌سازد (شمارِ بقیه کمِ کم ۱)",
+      "rows": [["علی",100,0,3,0], ["سارا",10,0,0,0]],
+      "expect": []
+    },
+    {
+      "name": "بقیه هیچ‌بار با فاکتورِ بسیار ⇒ هشدار",
+      "rows": [["علی",100,0,3,0], ["سارا",200,0,0,0]],
+      "expect": [
+        {"key":"علی","kind":"discount","count":3,"invoices":100,"peerCount":0,"peerInvoices":200,"ratioPct":600}
+      ]
+    },
+    {
+      "name": "کشو بی فروشِ کسی که نمی‌فروشد (مخرجِ ۱)",
+      "rows": [["مدیر",0,0,0,4], ["سارا",50,0,0,1]],
+      "expect": [
+        {"key":"مدیر","kind":"no_sale","count":4,"invoices":0,"peerCount":1,"peerInvoices":50,"ratioPct":20000}
+      ]
+    },
+    {
+      "name": "دکانِ یک‌نفره «معمولی» ندارد",
+      "rows": [["علی",100,9,9,9]],
+      "expect": []
+    },
+    {
+      "name": "همکارِ بی فاکتور «معمولی» نمی‌سازد",
+      "rows": [["علی",100,9,0,0], ["مدیر",0,1,0,0]],
+      "expect": []
+    },
+    {
+      "name": "کلیدِ خالی هشدار نمی‌گیرد ولی در بقیه شمرده می‌شود",
+      "rows": [["",100,10,0,0], ["علی",100,3,0,0]],
+      "expect": []
+    },
+    {
+      "name": "کلیدِ خالیِ بی رویداد نرخِ بقیه را پایین می‌آورد",
+      "rows": [["",300,0,0,0], ["علی",100,3,0,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":3,"invoices":100,"peerCount":0,"peerInvoices":300,"ratioPct":900}
+      ]
+    },
+    {
+      "name": "چند نوع و چند کاربر: ترتیبِ نوع، نسبت، شمار، کلید",
+      "rows": [["ب",50,4,8,3], ["الف",50,4,8,0], ["ج",400,1,2,0], ["د",0,0,0,3]],
+      "expect": [
+        {"key":"الف","kind":"void","count":4,"invoices":50,"peerCount":5,"peerInvoices":450,"ratioPct":720},
+        {"key":"ب","kind":"void","count":4,"invoices":50,"peerCount":5,"peerInvoices":450,"ratioPct":720},
+        {"key":"الف","kind":"discount","count":8,"invoices":50,"peerCount":10,"peerInvoices":450,"ratioPct":720},
+        {"key":"ب","kind":"discount","count":8,"invoices":50,"peerCount":10,"peerInvoices":450,"ratioPct":720},
+        {"key":"د","kind":"no_sale","count":3,"invoices":0,"peerCount":3,"peerInvoices":500,"ratioPct":50000},
+        {"key":"ب","kind":"no_sale","count":3,"invoices":50,"peerCount":3,"peerInvoices":450,"ratioPct":900}
+      ]
+    },
+    {
+      "name": "سیاستِ دیگر: کمینه ۵ و ضریبِ ۳۰۰٪",
+      "policy": {"minCount":5,"factorPct":300},
+      "rows": [["علی",100,5,4,0], ["سارا",100,1,1,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":5,"invoices":100,"peerCount":1,"peerInvoices":100,"ratioPct":500}
+      ]
+    },
+    {
+      "name": "سیاستِ نامعتبر بریده می‌شود: کمینهٔ ۰ ⇒ ۱، ضریبِ ۵۰ ⇒ ۱۰۰",
+      "policy": {"minCount":0,"factorPct":50},
+      "rows": [["علی",100,1,0,0], ["سارا",100,1,0,0]],
+      "expect": [
+        {"key":"سارا","kind":"void","count":1,"invoices":100,"peerCount":1,"peerInvoices":100,"ratioPct":100},
+        {"key":"علی","kind":"void","count":1,"invoices":100,"peerCount":1,"peerInvoices":100,"ratioPct":100}
+      ]
+    },
+    {
+      "name": "ضریبِ بیش از ۱۰۰۰ همان ۱۰۰۰ است",
+      "policy": {"factorPct":5000},
+      "rows": [["علی",100,10,0,0], ["سارا",100,1,0,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":10,"invoices":100,"peerCount":1,"peerInvoices":100,"ratioPct":1000}
+      ]
+    },
+    {
+      "name": "شمارِ منفی صفر است",
+      "rows": [["علی",-5,-3,3,0], ["سارا",100,0,0,0]],
+      "expect": [
+        {"key":"علی","kind":"discount","count":3,"invoices":0,"peerCount":0,"peerInvoices":100,"ratioPct":30000}
+      ]
+    },
+    {
+      "name": "شمارِ بسیار بزرگ بریده می‌شود (رویداد ۱۰۰٬۰۰۰، فاکتور ۱۰٬۰۰۰٬۰۰۰)",
+      "rows": [["علی",20000000,200000,0,0], ["سارا",30000000,1,0,0], ["رضا",1,0,0,0]],
+      "expect": [
+        {"key":"علی","kind":"void","count":100000,"invoices":10000000,"peerCount":1,"peerInvoices":10000000,"ratioPct":10000000}
+      ]
+    }
+  ]
+}
