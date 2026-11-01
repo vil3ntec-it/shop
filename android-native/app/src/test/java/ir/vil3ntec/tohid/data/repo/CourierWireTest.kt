@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.QueueState
 import kotlinx.serialization.json.Json
@@ -62,5 +63,22 @@ class CourierWireTest {
     val r = CourierWire.result(obj("""{"eventId":"cev-x","status":"rejected","code":"bad_code","message":"کد درست نیست"}"""))
     assertEquals("rejected", r.status)
     assertEquals("bad_code", r.code)
+  }
+
+  @Test fun `DLV-07 و DLV-17: برچسبِ کیسه با «گرفتم» و موقعیت با «تحویل شد»، و کارت شمارِ کیسه و فاصلهٔ مجاز را می‌خواند`() {
+    val (_, p) = CourierQueue.enqueue(QueueState(), "cev-cccccccc-7", "A", "picked_up", 1, bags = listOf("VLNB-12-1-2", "VLNB-12-2-2"))
+    val pj = CourierWire.eventJson(p)
+    assertEquals("""["VLNB-12-1-2","VLNB-12-2-2"]""", pj["bags"].toString())
+    assertFalse(pj.containsKey("position"))
+    val (_, d) = CourierQueue.enqueue(QueueState(), "cev-cccccccc-8", "A", "delivered", 1, cashCollectedMinor = 0, position = CourierChecks.Point(34.5, 69.2))
+    val dj = CourierWire.eventJson(d)
+    assertEquals("""{"lat":34.5,"lng":69.2}""", dj["position"].toString())
+    assertFalse(dj.containsKey("bags"))
+    val c = CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"assigned","bagScan":{"bags":2},"nearPin":{"maxM":150}}"""))!!
+    assertEquals(2, c.bagScanBags)
+    assertEquals(150, c.nearPinMaxM)
+    val plain = CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"assigned"}"""))!!
+    assertNull(plain.bagScanBags)
+    assertNull(plain.nearPinMaxM)
   }
 }
