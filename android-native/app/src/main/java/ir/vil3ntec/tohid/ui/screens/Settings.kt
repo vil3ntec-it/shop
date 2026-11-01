@@ -674,7 +674,7 @@ fun SettingsScreen(
         /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
         ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings()
         //  پیش‌فاکتور (POS-25)، اصلاحِ روشِ پرداخت (POS-40) و لیستِ قیمت (POS-18) — هر سه پیش‌فرض خاموش؛ همان رابطِ امروز
-        ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context)
+        ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context); ir.vil3ntec.tohid.ui.components.pos.SpecialOrderSettingsWired(context) // و سفارشِ ویژه (POS-26)
         PayFixSettingsWired(context)
         ir.vil3ntec.tohid.ui.components.pos.PriceListSettingsWired(context)
 

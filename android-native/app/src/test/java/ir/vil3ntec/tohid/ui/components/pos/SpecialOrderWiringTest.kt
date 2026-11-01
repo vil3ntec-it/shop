@@ -40,6 +40,7 @@ class SpecialOrderWiringTest {
     assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SaleLegacy.kt", call))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", call))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SettingsLegacy.kt", "SpecialOrderSettingsWired(context)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Settings.kt", "SpecialOrderSettingsWired(context)"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt", "StrSpecialOrder.settingsTitle to"))
   }
 }
