@@ -77,6 +77,8 @@ fun main() {
   val context = DesktopContext
   //  OPS-03: خطای گرفته‌نشده ⇒ گزارشِ بی دادهٔ شخصی با کد؛ صفِ اجرای پیش فرستاده می‌شود
   ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
+  //  «سرورِ بعدی» (پرچمِ `app.multi_server`) فقط این‌جا، پیش از هر دفتر و درخواستی
+  ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

@@ -114,17 +114,6 @@ data class Product(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val maxStock: Double? = null,
   /*
-   *  PRD-06 — برند و برچسب‌ها (فقط با `ShopPolicy.productTools` نوشته می‌شوند). همان کلیدِ `brand` که
-   *  کاتالوگِ سرور (`lib/catalog.js`) و نمای عمومیِ بازار می‌خوانند. `null` نوشته نمی‌شود ⇒ کالای
-   *  بی برند همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
-   */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val brand: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val tags: List<String>? = null,
-  /*
    *  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با
    *  `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته «اندازهٔ بسته» از `unit` به سبد می‌برد.
    *  `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
@@ -796,6 +785,8 @@ data class ShopData(
   val stockMovements: List<StockMovement> = emptyList(),
   val priceHistory: List<PriceChange> = emptyList(),
   val auditLog: List<AuditEntry> = emptyList(),
+  /** گاوصندوق (PAY-18) — مجموعهٔ پلهٔ ۴ِ Sync v1 */
+  val safeEntries: List<SafeEntry> = emptyList(),
 )
 
 val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")

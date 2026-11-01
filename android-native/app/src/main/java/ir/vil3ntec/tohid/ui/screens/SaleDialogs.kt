@@ -251,7 +251,8 @@ fun CheckoutDialog(
         if (debtorMenu) {
           SearchablePicker(
             title = if (payment == SalesEngine.Payment.CREDIT) "انتخاب قرض‌دار" else "انتخاب مشتری",
-            options = d.debtors,
+            //  ادغام‌شده دوباره انتخاب نمی‌شود (CRM-10)؛ بی ادغام همان فهرستِ امروز
+            options = ir.vil3ntec.tohid.data.CustomerCrm.active(d),
             idOf = { it.id },
             nameOf = { it.name },
             onClose = { debtorMenu = false },
@@ -841,7 +842,7 @@ fun DebtorPicker(
   onPick: (String?) -> Unit,
 ) {
   var search by remember { mutableStateOf("") }
-  val shown = d.debtors.filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
+  val shown = ir.vil3ntec.tohid.data.CustomerCrm.active(d).filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
 
   Dialog(onDismissRequest = onClose) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {

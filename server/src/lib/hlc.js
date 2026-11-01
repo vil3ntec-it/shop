@@ -62,6 +62,13 @@ function compare(a, b) {
   return x.node < y.node ? -1 : 1;
 }
 
+/** تازه‌ترین HLC ِ مقدارهای یک نقشه (مثلِ `field_hlc` ِ ردیفِ v3)؛ خالی ⇒ ''. (پیش‌تر `maxHlc` ِ sync-v3.js) */
+function newestOf(map) {
+  let best = '';
+  for (const h of Object.values(map || {})) if (h && (!best || compare(h, best) > 0)) best = h;
+  return best;
+}
+
 /** زمانِ سادهٔ op v2 (`ts`) ⇒ HLC. عددِ نادرست یا منفی ⇒ صفر (همیشه بازنده). */
 function fromTs(ts, counter, node) {
   const n = Number(ts);
@@ -124,4 +131,4 @@ function createClock({ node = 'server', now = Date.now, skewMs = SKEW_MS } = {})
   };
 }
 
-module.exports = { SKEW_MS, parse, format, canonical, compare, fromTs, createClock };
+module.exports = { SKEW_MS, parse, format, canonical, compare, newestOf, fromTs, createClock };

@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import ir.vil3ntec.tohid.platform.ServerSwitchAndroid
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -196,10 +197,8 @@ class HttpEngine(
     anonymous: Boolean = false,
   ): JsonObject {
     val base = baseUrl()
-    ApiConfig.reject(base, allowInsecure)?.let { reason ->
-      throw if (reason == ApiConfig.Rejection.MISSING) ApiFailure.NotConfigured()
-      else ApiFailure.BadConfiguration(reason.message)
-    }
+    //  همان `ApiConfig.reject` ِ امروز؛ فقط نشانیِ پروفایلِ سرور (پرچمِ `app.multi_server`) قاعدهٔ خودش را دارد
+    ServerSwitchAndroid.reject(base, allowInsecure)?.let { throw it }
     //  نت که نیست، رفتن سراغِ شبکه فقط چند ثانیه انتظارِ بی‌فایده است
     if (!online()) throw ApiFailure.Offline()
 
@@ -208,6 +207,8 @@ class HttpEngine(
 
     val connection = runCatching { url.openConnection() as HttpURLConnection }.getOrNull()
       ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
+    //  گواهیِ سنجاق‌شدهٔ سرورِ شبکهٔ دکان — فقط اگر این نشانی چنین گواهی‌ای دارد
+    ServerSwitchAndroid.prepare(connection, base)
 
     try {
       connection.requestMethod = method
@@ -267,6 +268,8 @@ class HttpEngine(
     } catch (failure: ApiFailure) {
       throw failure
     } catch (error: Throwable) {
+      //  نشانیِ دیگرِ همان سرور (شبکهٔ دکان ⇐ اینترنت) دفعهٔ بعد از نو سنجیده شود
+      ServerSwitchAndroid.reportFailure(base)
       //  هیچ استثنای خامی از این لایه بیرون نمی‌رود
       throw ApiFailure.fromException(error)
     } finally {
@@ -316,15 +319,13 @@ class HttpEngine(
   ): ByteArray =
     withContext(Dispatchers.IO) {
       val base = baseUrl()
-      ApiConfig.reject(base, allowInsecure)?.let { reason ->
-        throw if (reason == ApiConfig.Rejection.MISSING) ApiFailure.NotConfigured()
-        else ApiFailure.BadConfiguration(reason.message)
-      }
+      ServerSwitchAndroid.reject(base, allowInsecure)?.let { throw it }
       if (!online()) throw ApiFailure.Offline()
       val url = runCatching { URL(ApiConfig.urlOf(base, path, prefix)) }.getOrNull()
         ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
       val connection = runCatching { url.openConnection() as HttpURLConnection }.getOrNull()
         ?: throw ApiFailure.BadConfiguration("نشانی سرور درست نیست")
+      ServerSwitchAndroid.prepare(connection, base)
       try {
         connection.requestMethod = "GET"
         connection.connectTimeout = ApiConfig.CONNECT_TIMEOUT_MS

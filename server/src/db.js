@@ -44,13 +44,11 @@ let shuttingDown = false;
 
 // ── PostgreSQL ──────────────────────────────────────────────────────────────
 
-function getPool() {
-  if (isPglite()) return litePool();
-  if (pool) return pool;
-  const { Pool } = require('pg');
-  pool = new Pool({
+/** گزینه‌های هر استخرِ PostgreSQL — استخرِ اصلی و استخرهای کوچکِ کمکی ([extraPool]) */
+function poolOptions(max) {
+  return {
     connectionString: config.db.url,
-    max: config.db.poolMax,
+    max,
     idleTimeoutMillis: config.db.idleTimeoutMs,
     connectionTimeoutMillis: config.db.connectTimeoutMs,
     ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
@@ -58,7 +56,14 @@ function getPool() {
     //  پس از `closeDb` برسد استخرِ تازه‌ای می‌سازد؛ بی این، اتصالِ آن هرگز ۳۰ ثانیه بیکار
     //  نمی‌ماند و فرآیند (پرونده‌ای از آزمون‌ها) تا ابد باز می‌ماند. سرور را شنوندهٔ HTTP زنده نگه می‌دارد.
     allowExitOnIdle: true,
-  });
+  };
+}
+
+function getPool() {
+  if (isPglite()) return litePool();
+  if (pool) return pool;
+  const { Pool } = require('pg');
+  pool = new Pool(poolOptions(config.db.poolMax));
   // یک اتصال خراب نباید کل سرور را بخواباند
   pool.on('error', (err) => console.error('[db] اتصال بیکار خطا داد:', err.message));
   return pool;
@@ -231,7 +236,19 @@ async function pruneExpired() {
   return { tokens: t.rowCount, otp: o.rowCount, attempts: a.rowCount, operations: s.rowCount };
 }
 
+/**
+ * استخرِ کوچکِ جدا (مثلاً برای قفلِ نشستی که تا پایانِ یک درخواست می‌ماند) تا اتصالِ استخرِ
+ * اصلی گرفته نماند. فقط PostgreSQL؛ روی PGlite null. با `closeDb` بسته نمی‌شود — `allowExitOnIdle`.
+ */
+function extraPool(max) {
+  if (isPglite()) return null;
+  const { Pool } = require('pg');
+  const p = new Pool(poolOptions(max));
+  p.on('error', (err) => console.error('[db] اتصالِ بیکارِ استخرِ کمکی خطا داد:', err.message));
+  return p;
+}
+
 module.exports = {
-  getPool, query, one, many, tx, healthy, closeDb, newId, now, pruneExpired,
+  getPool, extraPool, query, one, many, tx, healthy, closeDb, newId, now, pruneExpired,
   isPglite, pgliteDir, driverName, dumpPglite,
 };

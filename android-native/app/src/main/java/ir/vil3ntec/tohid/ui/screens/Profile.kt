@@ -878,7 +878,7 @@ private fun ProfileEditPage(
               label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
               placeholder = { Text("07XXXXXXXX") },
               singleLine = true,
-              keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
+              keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
               colors = v3FieldColors(c),
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier.fillMaxWidth(),

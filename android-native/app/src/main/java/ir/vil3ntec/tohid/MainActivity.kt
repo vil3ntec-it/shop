@@ -63,6 +63,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     }
     enableEdgeToEdge()
 
+    //  «سرورِ بعدی» (پرچمِ `app.multi_server`) فقط این‌جا، پیش از هر دفتر و درخواستی، عوض می‌شود
+    ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(applicationContext)
     store = ShopStore(applicationContext)
     lifecycleScope.launch { store.loadAndSummarize() }
 

@@ -120,6 +120,12 @@
       defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'allow'),
       edit: 'restrict', approvable: false, caps: [], display: true,
     },
+    //  گاوصندوق (PAY-18): شمارش، ورود، خروج، به بانک و به دخل؛ «از دخل» فقط نوشتن می‌خواهد؛
+    //  نقش‌های تازه همه «ممنوع» (جابه‌جاییِ پول، مثلِ drawer.open؛ همان OMD ِ PermCore.kt)
+    'safe.move': {
+      defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: false, caps: [], display: false,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

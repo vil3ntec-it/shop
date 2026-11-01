@@ -29,8 +29,8 @@ import kotlinx.coroutines.launch
 
 /**
  *  برگهٔ «ارسال و زمان» ِ ویترین (CHK-06/07/10/12) — ناحیه‌های ارسال
- *  (چندضلعی یا دایره، هزینه، حداقل، «رایگان از…») و بازه‌های زمان‌بندی با
- *  ظرفیت. همان قاعده‌های وب و سرور (`core/storefront/StorefrontDelivery.kt`)؛
+ *  (چندضلعی یا دایره، هزینه، حداقل، «رایگان از…»، هزینهٔ سبدِ کوچک) و بازه‌های
+ *  زمان‌بندی با ظرفیت و هزینهٔ اضافهٔ بازه. همان قاعده‌های وب و سرور (`core/storefront/StorefrontDelivery.kt`)؛
  *  «ذخیره شد» فقط پس از پاسخِ سرور. بی نقشهٔ پولی: نقطه‌ها «عرض، طول» نوشته
  *  می‌شوند و مرکزِ دایره را موقعیتِ فعلیِ کاربر هم می‌تواند بدهد.
  */
@@ -138,6 +138,9 @@ private fun ZoneCard(i: Int, z: ZoneDraft, errors: Map<String, String>, onChange
       TohidTextField(z.fee, { onChange(z.copy(fee = it)) }, "هزینهٔ ارسال (افغانی)", error = errors["$k.fee"], keyboardOptions = num)
       TohidTextField(z.min, { onChange(z.copy(min = it)) }, "حداقلِ سفارش (افغانی)", error = errors["$k.min"], keyboardOptions = num)
       TohidTextField(z.free, { onChange(z.copy(free = it)) }, "ارسالِ رایگان از (اختیاری)", error = errors["$k.free"], keyboardOptions = num)
+      //  CHK-06: به‌جای ردِ سبدِ زیرِ حداقل
+      TohidTextField(z.small, { onChange(z.copy(small = it)) }, "هزینهٔ سبدِ کوچک (اختیاری؛ زیرِ حداقل به‌جای رد)",
+        error = errors["$k.small"], keyboardOptions = num)
       DeliverySwitch("این ناحیه فعال باشد", z.active) { onChange(z.copy(active = it)) }
       TohidSecondaryButton("حذفِ ناحیه", onClick = onRemove)
     }
@@ -162,6 +165,11 @@ private fun RuleCard(i: Int, r: RuleDraft, errors: Map<String, String>, onChange
       TohidTextField(r.range, { onChange(r.copy(range = it)) }, "ساعت (مثلِ 10:00-12:00)", error = errors["$k.range"])
       TohidTextField(r.capacity, { onChange(r.copy(capacity = it)) }, "ظرفیت (چند سفارش)", error = errors["$k.capacity"], keyboardOptions = num)
       TohidTextField(r.cutoff, { onChange(r.copy(cutoff = it)) }, "مهلتِ سفارش (دقیقه پیش از آغاز)", error = errors["$k.cutoff"], keyboardOptions = num)
+      //  CHK-07: هزینهٔ زمانِ تحویل — فقط ارسال
+      if (r.fulfillment != "pickup") {
+        TohidTextField(r.fee, { onChange(r.copy(fee = it)) }, "هزینهٔ اضافهٔ این بازه (افغانی؛ ۰ = بی هزینه)", error = errors["$k.fee"],
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+      }
       DeliverySwitch("این بازه فعال باشد", r.active) { onChange(r.copy(active = it)) }
       TohidSecondaryButton("حذفِ بازه", onClick = onRemove)
     }

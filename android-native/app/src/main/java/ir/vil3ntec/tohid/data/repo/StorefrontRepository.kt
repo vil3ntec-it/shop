@@ -3,7 +3,9 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.core.storefront.BulkPublish
 import ir.vil3ntec.tohid.core.storefront.PresenceDeclaration
+import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -65,8 +67,32 @@ class StorefrontRepository(private val api: ApiClient) {
     Unit
   }
 
+  /**
+   *  M2: یک بخش از انتشارِ گروهی با کلیدِ یکتاییِ خودش (فقط با پرچمِ `bulk` ِ `config`).
+   *  همان کلید در تکرار ⇒ سرور پاسخِ اول را برمی‌گرداند و چیزی دوباره نمی‌نویسد.
+   */
+  suspend fun setProducts(part: BulkPublish.Part): BulkPublish.Outcome {
+    val body = buildJsonObject { put("items", JsonArray(part.items.map { bulkItemJson(it) })) }
+    val r = result { ApiJson.decode<BulkResultDto>(api.putKeyed("$ROOT/products", body, part.key)) }
+    r.valueOrNull()?.let { v ->
+      return BulkPublish.Outcome.Done(v.results.map { BulkPublish.ItemResult(it.productId, it.ok, it.error, it.notLive) })
+    }
+    var out: BulkPublish.Outcome = BulkPublish.Outcome.Retry("نرسید")
+    r.onFailure { out = if (it.retryable) BulkPublish.Outcome.Retry(it.userMessage) else BulkPublish.Outcome.Rejected(it.userMessage) }
+    return out
+  }
+
   companion object {
     const val ROOT = "/shop/storefront"
+
+    /** فقط فیلدهای خواسته‌شده — نیامده یعنی «همان قبلی» در سرور */
+    fun bulkItemJson(c: BulkPublish.Change): JsonObject = buildJsonObject {
+      put("productId", c.productId)
+      c.published?.let { put("published", it) }
+      if (c.setOnlinePrice) put("onlinePriceMinor", c.onlinePriceMinor?.let { JsonPrimitive(it) } ?: JsonNull)
+      if (c.setMaxQty) put("maxQtyMilli", c.maxQtyMilli?.let { JsonPrimitive(it) } ?: JsonNull)
+      c.description?.let { put("description", it) }
+    }
 
     /** ساعت‌های هفته برای سرور: {"0":[[480,1200]], …} */
     fun weeklyHoursJson(days: Map<Int, List<Pair<Int, Int>>>): JsonObject = buildJsonObject {
@@ -88,6 +114,10 @@ data class StorefrontConfigDto(
   val permissions: StorefrontPermsDto = StorefrontPermsDto(),
   /** پرچمِ جدای ناحیه و زمان‌بندی (`shop.storefront.zones`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val zones: Boolean = false,
+  /** M2: انتشارِ گروهی در یک درخواست (`shop.storefront.bulk`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val bulk: Boolean = false,
+  /** M3: پرچمِ جدای لوگو و تصویرِ سر (`shop.storefront.media`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
+  val media: Boolean = false,
 )
 
 @Serializable
@@ -158,6 +188,8 @@ data class StorefrontProductDto(
   /** WEB-08: توضیح و مشخصاتِ عمومی (سرورِ قدیمی‌تر نمی‌فرستد ⇒ خالی) */
   val description: String = "",
   val specs: List<StorefrontSpecDto> = emptyList(),
+  /** M2: چرا در بازار نمی‌آید (`no_price`، `inactive`، `hidden_listing`…)؛ فقط با پرچمِ گروهی */
+  val notLive: List<String>? = null,
 )
 
 @Serializable
@@ -167,4 +199,24 @@ data class StorefrontSpecDto(val name: String = "", val value: String = "")
 data class StorefrontProductPageDto(
   val items: List<StorefrontProductDto> = emptyList(),
   val nextCursor: String? = null,
+)
+
+@Serializable
+data class BulkItemResultDto(
+  val productId: String,
+  val ok: Boolean = false,
+  val error: String? = null,
+  val published: Boolean = false,
+  val onlinePriceMinor: Long? = null,
+  val maxQtyMilli: Long? = null,
+  val notLive: List<String> = emptyList(),
+)
+
+@Serializable
+data class BulkResultDto(
+  val results: List<BulkItemResultDto> = emptyList(),
+  val applied: Int = 0,
+  val notFound: Int = 0,
+  val published: Int = 0,
+  val replayed: Boolean = false,
 )
