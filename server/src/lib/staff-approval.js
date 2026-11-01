@@ -269,10 +269,7 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   return prev && prev.op_id === String(opId || '') ? null : 'approval_replayed';
 }
 
-/**
- * لایه‌های همان کاربرِ توکن — یک بار برای هر دسته. `q` (کلاینتِ تراکنشِ v3) ⇒ با همان اتصال، نه استخر:
- * پوش‌های هم‌زمانِ پشتِ قفلِ حساب (`sync-v3`) همهٔ استخر را نگه می‌دارند و پرسشِ دوم اتصال نمی‌گیرد.
- */
+/** لایه‌های همان کاربرِ توکن — یک بار برای هر دسته؛ `q` (تراکنشِ v3، پشتِ قفلِ حساب) ⇒ همان اتصال، نه استخر */
 async function requesterLayers(ctx, q = null) {
   if (!ctx._permLayers) {
     ctx._permLayers = staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId, q ? (s, p) => q.query(s, p) : null);
