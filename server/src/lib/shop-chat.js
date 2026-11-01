@@ -6,9 +6,8 @@
  *   پرچم ── `shop.chat` در «تنظیماتِ زنده» (scope = شناسهٔ دکان، یا `all`).
  *           ⛔ پیش‌فرض خاموش ⇒ همهٔ درها ۴۰۴ و هیچ ردیفی ساخته نمی‌شود.
  *   بیننده ─ `{ side: 'shop', shopId, userId, role }` (کارمند؛ shop_id فقط از
- *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛
- *           شمارهٔ تأییدشده از بلیتِ ویترین؛ با پرچمِ `market.account` نشستِ
- *           حساب هم، با `customerId` — مهاجرتِ ۱۲۹). هر پرسش با همین دو قفل می‌شود:
+ *           عضویتِ توکن) یا `{ side: 'customer', shopId, phone, customerId? }` (مشتری؛ بلیتِ
+ *           ویترین، یا نشستِ حسابِ بازار — `shop-chat-account.js`). هر پرسش با همین دو قفل می‌شود:
  *           شناسهٔ گفت‌وگو/پیام/رسانهٔ دیگری ⇒ همان ۴۰۴ ِ «نیست» (CHAT-09).
  *   ارسال ─ با `clientId` ِ خودِ دستگاه، زیرِ قفلِ ردیفِ گفت‌وگو: تکرار ⇒ همان
  *           پیام، نه دومی (CHAT-02/11)؛ همان شناسه با بدنهٔ دیگر ⇒ ۴۰۹.
@@ -33,6 +32,7 @@ const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const chatMedia = require('./chat-media');
 const { notify, listen, waiting } = require('./chat-wait');
+const acct = require('./shop-chat-account');
 const { ApiError, badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.chat';
@@ -109,52 +109,13 @@ async function flagOf(shopId) {
 //  گفت‌وگو
 // ════════════════════════════════════════════════════════════════════
 
-/**
- * تغییرِ شمارهٔ حساب (S9؛ در تراکنشِ `store-customers.changePhone`): گفت‌وگوهای
- * بی‌حسابِ شمارهٔ پیشین مالِ همین حساب می‌شوند و بستن‌های آن شماره روی شمارهٔ
- * تازه هم می‌نشیند (بستنِ دکان با عوض کردنِ شماره دور زده نمی‌شود). شمارهٔ
- * گفت‌وگوها (`customer_phone`) برای سازگاری همان می‌ماند.
- */
-async function adoptForPhoneChange(c, customerId, fromPhone, toPhone) {
-  const r = await c.query(
-    'UPDATE shop_chat_conversations SET customer_id=$1 WHERE customer_id IS NULL AND customer_phone=$2',
-    [customerId, fromPhone]
-  );
-  await c.query(
-    `INSERT INTO shop_chat_blocks (shop_id, customer_phone, blocker, by_user_id, created_at)
-     SELECT shop_id, $2, blocker, by_user_id, created_at FROM shop_chat_blocks WHERE customer_phone=$1
-     ON CONFLICT DO NOTHING`,
-    [fromPhone, toPhone]
-  );
-  return r.rowCount;
-}
-
-/**
- * «مالِ همین مشتری» (S9، مهاجرتِ ۱۲۹) — شرطِ SQL، با افزودنِ پارامترها به `args`.
- *   حساب (`customerId`) ⇒ گفت‌وگوی همین حساب، یا گفت‌وگوی بی‌حسابِ شمارهٔ کنونی؛
- *                          پس تغییرِ شماره گفت‌وگوهای پیشین را گم نمی‌کند.
- *   بلیت (فقط شماره)    ⇒ همان امروز، مگر گفت‌وگو مالِ حسابی شده باشد که شماره‌اش
- *                          دیگر این نیست (دارندهٔ تازهٔ شمارهٔ کهنه چیزی نمی‌بیند).
- * پرچمِ خاموش ⇒ `customer_id` همیشه NULL و هر دو شرط همان «customer_phone = شماره».
- */
-function mineSql(viewer, args, a = 'c') {
-  args.push(viewer.phone);
-  const p = `$${args.length}`;
-  if (viewer.customerId) {
-    args.push(viewer.customerId);
-    return `(${a}.customer_id = $${args.length} OR (${a}.customer_id IS NULL AND ${a}.customer_phone = ${p}))`;
-  }
-  return `(${a}.customer_phone = ${p} AND (${a}.customer_id IS NULL OR EXISTS (`
-    + `SELECT 1 FROM store_customers sc WHERE sc.id = ${a}.customer_id AND sc.phone = ${p})))`;
-}
-
 /** ردیفِ گفت‌وگو از دیدِ بیننده — یا ۴۰۴ (نبودن و مالِ دیگری بودن یک جواب‌اند). */
 async function rowOf(viewer, id, { c = null, lock = false } = {}) {
   const cid = String(id || '');
   if (!ID_RE.test(cid)) throw gone();
   const args = [cid, viewer.shopId];
   let sql = 'SELECT * FROM shop_chat_conversations c WHERE c.id=$1 AND c.shop_id=$2';
-  if (viewer.side === 'customer') sql += ` AND ${mineSql(viewer, args)}`;
+  if (viewer.side === 'customer') sql += ` AND ${acct.mineSql(viewer, args)}`;
   if (lock) sql += ' FOR UPDATE';
   const row = c ? (await c.query(sql, args)).rows[0] : await one(sql, args);
   if (!row) throw gone();
@@ -264,7 +225,7 @@ async function list(viewer, { cursor, limit, status, q } = {}) {
   const args = [viewer.shopId];
   const where = ['c.shop_id = $1'];
   if (viewer.side === 'customer') {
-    where.push(mineSql(viewer, args));
+    where.push(acct.mineSql(viewer, args));
   } else {
     where.push("(c.seq > 0 OR c.order_id <> '')");
     const st = str(status);
@@ -337,19 +298,8 @@ async function open(viewer, body) {
     orderId = o.id;
     name = shortText(o.customer_name, 60);
   }
-  const find = () => {
-    if (viewer.side !== 'customer') {
-      return one('SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=$3',
-        [viewer.shopId, phone, orderId]);
-    }
-    //  حساب ممکن است دو تا ببیند (یکی با شمارهٔ پیشین): گفت‌وگوی خودِ حساب جلوتر
-    const args = [viewer.shopId, orderId];
-    return one(
-      `SELECT c.id, c.customer_id FROM shop_chat_conversations c WHERE c.shop_id=$1 AND c.order_id=$2
-         AND ${mineSql(viewer, args)} ORDER BY (c.customer_id IS NULL), c.created_at, c.id LIMIT 1`,
-      args
-    );
-  };
+  const find = () => (viewer.side === 'customer' ? acct.findForCustomer(viewer, orderId)
+    : one('SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=$3', [viewer.shopId, phone, orderId]));
   let row = await find();
   let created = false;
   if (!row) {
@@ -365,16 +315,10 @@ async function open(viewer, body) {
       [newId('sch'), viewer.shopId, phone, name, orderId, viewer.customerId || null, t]
     );
     created = !!ins;
-    row = ins || await find();
-    //  کلیدِ یکتا (شماره) را گفت‌وگوی حسابی گرفته که شماره‌اش را عوض کرده
+    row = ins || await find();   // نبود ⇒ کلیدِ یکتا (شماره) را گفت‌وگوی حسابی گرفته که شماره‌اش را عوض کرده
     if (!row) throw conflict('گفت‌وگو با این دکان از این شماره ممکن نیست؛ با حسابِ خود وارد شوید', 'chat_unavailable');
-  } else {
-    if (viewer.customerId && !row.customer_id) {
-      await query('UPDATE shop_chat_conversations SET customer_id=$2 WHERE id=$1 AND customer_id IS NULL', [row.id, viewer.customerId]);
-    }
-    if (viewer.side === 'customer' && name) {
-      await query("UPDATE shop_chat_conversations SET customer_name=$2 WHERE id=$1 AND customer_name=''", [row.id, name]);
-    }
+  } else if (viewer.side === 'customer') {
+    await acct.reopen(viewer, row, name);   // نامِ خالی، و با نشستِ حساب گره به همان حساب
   }
   return { conversation: await viewOf(viewer, row.id), created };
 }
@@ -858,7 +802,7 @@ async function search(viewer, q, { limit } = {}) {
   const lim = intIn(limit, { min: 1, max: 50, def: 30 });
   const args = [viewer.shopId, `%${term.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`, viewerKey(viewer)];
   let scope = '';
-  if (viewer.side === 'customer') scope = ` AND ${mineSql(viewer, args)}`;
+  if (viewer.side === 'customer') scope = ` AND ${acct.mineSql(viewer, args)}`;
   args.push(lim);
   const rows = await many(
     `SELECT m.id, m.conversation_id, m.seq, m.sender, m.sender_user_id, m.kind, m.body, m.created_at
@@ -929,7 +873,7 @@ async function sweep({ at = now(), retentionDays = config.shopChat.retentionDays
 
 module.exports = {
   FLAG_KEY, KINDS, REASONS, MAX_BODY,
-  flagOf, list, open, viewOf, setStatus, adoptForPhoneChange,
+  flagOf, list, open, viewOf, setStatus, adoptForPhoneChange: acct.adoptForPhoneChange,
   send, changes, edit, remove, receipts,
   putMedia, getMedia, sendMedia, rawMedia,
   setBlock, report, search,
