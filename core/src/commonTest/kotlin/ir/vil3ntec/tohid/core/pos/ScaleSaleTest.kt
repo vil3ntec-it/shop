@@ -138,4 +138,37 @@ class ScaleSaleTest {
     assertEquals(ScaleSale.Weigh.Rejected(ScaleSale.ReadWhy.NO_WEIGHT), ScaleSale.fromScale(reading(null), "کیلو"))
     assertEquals(ScaleSale.Weigh.Rejected(ScaleSale.ReadWhy.NO_WEIGHT), ScaleSale.fromScale(reading(0.0004), "کیلو"))
   }
+
+  @Test
+  fun configurableLengthsAlwaysMakeValidRulesAndReadTheirOwnSample() {
+    for (kind in WeightBarcode.Kind.entries) for (n in ScaleSale.ITEM_DIGITS) for (dec in ScaleSale.decimalsFor(kind)) {
+      val rs = ScaleSale.rules(kind, n, dec)
+      assertEquals((20..29).map { it.toString() }, rs.map { it.prefix })
+      assertEquals(true, rs.all { it.valid && it.itemDigits == n && it.valueDigits == 10 - n && it.decimals == dec && it.kind == kind })
+      val code = ScaleSale.sample(rs)!!
+      val hit = assertIs<WeightBarcode.Result.Hit>(WeightBarcode.parse(code, rs))
+      assertEquals("150".padStart(n, '0'), hit.itemCode)
+      if (kind == WeightBarcode.Kind.PRICE) assertEquals(true, hit.value == 150.0 || hit.value == 15.0, "$n/$dec: ${hit.value}")
+      else assertEquals(1.25, hit.value, 1e-9)
+    }
+    //  S04 با پیش‌فرض همان برچسبِ سند است
+    assertEquals("2100150012507", ScaleSale.sample(ScaleSale.rules(WeightBarcode.Kind.WEIGHT, 5, 3)))
+  }
+
+  @Test
+  fun outOfRangeLengthsFallBackToDefaultsNotBrokenRules() {
+    val rs = ScaleSale.rules(WeightBarcode.Kind.WEIGHT, 9, 7)
+    assertEquals(true, rs.all { it.valid && it.itemDigits == 5 && it.decimals == 3 })
+    assertEquals(true, ScaleSale.rules(WeightBarcode.Kind.PRICE, 3, 3).all { it.itemDigits == 5 && it.decimals == 0 })
+    assertNull(ScaleSale.sample(emptyList()))
+  }
+
+  @Test
+  fun sixDigitPluWithTenGramWeightFindsTheItem() {
+    val rs = ScaleSale.rules(WeightBarcode.Kind.WEIGHT, 6, 2)
+    //  کدِ ۰۰۰۱۵۰، ۱۲۵ ده‌گرم = ۱٫۲۵ کیلو؛ کالا با همان کدِ شش‌رقمی ثبت شده
+    val idx = mapOf("000150" to "rice")
+    val m = assertIs<ScaleSale.Label.Weighed>(ScaleSale.label(rs, WeightBarcode.build(rs[1], "150", 125), idx::get, items::get))
+    assertEquals(1.25, m.quantity, 1e-9)
+  }
 }
