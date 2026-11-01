@@ -21,6 +21,7 @@ const audit = require('../lib/audit');
 const orders = require('../lib/orders');
 const courierMap = require('../lib/courier-map');
 const courierChecks = require('../lib/courier-checks');
+const courierRoute = require('../lib/courier-route');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -61,6 +62,20 @@ router.get('/missions', async (req, res) => {
   res.json(await courierChecks.decorate(req.shopId, await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
   }))));
+});
+
+/*
+ *  DLV-04 (پشتِ پرچمِ خاموشِ `shop.delivery_route`): ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ همین پیک در یک مسیر.
+ *  `?lat=&lng=` موقعیتِ همین لحظه است و فقط برای همین پاسخ خوانده می‌شود (نگه داشته نمی‌شود، DLV-16).
+ */
+router.get('/route', async (req, res, next) => {
+  if (!(await orders.flagOf(req.shopId, courierRoute.FLAG))) {
+    return next(notFound('مسیرِ پیشنهادی برای این دکان روشن نیست', 'delivery_route_disabled'));
+  }
+  const start = courierRoute.startOf(req.query);
+  const list = await delivery.missions(req.shopId, req.courier.id, { scope: 'active', limit: 100 });
+  res.set('Cache-Control', 'no-store');
+  res.json({ ...courierRoute.routeOf(list.items, start), serverTime: list.serverTime });
 });
 
 /**
