@@ -1,0 +1,18 @@
+{
+  "promo.disc": "Discount",
+  "promo.code.l": "Discount code",
+  "promo.apply": "Apply",
+  "promo.clear": "Remove code",
+  "promo.ok": "Code “{code}” applied: {d} off",
+  "promo.days": "{n} days left",
+  "promo.hours": "{n} hours left",
+  "promo.mins": "{n} minutes left",
+  "promo.st.unknown": "This discount code is not valid in this shop.",
+  "promo.st.inactive": "This discount code is not active now.",
+  "promo.st.used_up": "This discount code has been used up.",
+  "promo.st.no_effect": "This discount code does not apply to this basket.",
+  "err.promo_code_rejected": "The discount code was not accepted; the basket was recalculated without it.",
+  "promo.days.1": "1 day left",
+  "promo.hours.1": "1 hour left",
+  "promo.mins.1": "1 minute left"
+}

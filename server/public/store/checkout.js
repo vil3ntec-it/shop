@@ -27,6 +27,61 @@
     //  CHK-07/10 (فقط با `store.delivery.zoned`): پینِ بیرون از محدوده ⇒ «دریافت از دکان» یا «خبرم کن»
     var area = null;
 
+    // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
+    //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
+    //  تا پیش‌نمایشِ همین سبد نرسیده «ثبت» بسته است. کدی که اعمال نشود ⇒ پیامِ روشن، نه سفارشِ بی‌صدا.
+    var promos;                 // undefined = در راه، false = خاموش، وگرنه پاسخِ GET /promos
+    var code = '';              // کدی که مشتری زد
+    var quoted = null; var qKey = ''; var qTimer = null; var skew = 0;
+    function promoKey() { return JSON.stringify([ids().map(function (id) { return [id, c.cart[id].qtyMilli, c.cart[id].priceMinor]; }), code]); }
+    function discount() { return promos && quoted && quoted.key === promoKey() ? quoted.discountMinor : 0; }
+    function pending() { return promos === undefined || Boolean(promos && ids().length && !(quoted && quoted.key === promoKey())); }
+    function promoNote(kind, text) { K.note($('promo-msg'), kind, text); }
+    function reason(st) { var s = st && st.status; return K.has('promo.st.' + s) ? t('promo.st.' + s) : t('promo.st.unknown'); }
+    function loadPromos() {
+      if (promos !== undefined) return;
+      api('/promos').then(function (r) { promos = r; skew = (r.serverTime || Date.now()) - Date.now(); })
+        .catch(function () { promos = false; }).then(renderCheckout);
+    }
+    function requote() {
+      if (!promos || !ids().length) return;
+      var key = promoKey();
+      if (key === qKey) return;
+      qKey = key;
+      clearTimeout(qTimer);
+      qTimer = setTimeout(function () {
+        var body = { lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }) };
+        if (code) body.promoCode = code;
+        api('/promos/quote', { method: 'POST', body: body }).then(function (r) {
+          if (key !== promoKey()) return;
+          if (code && !(r.code && r.code.status === 'applied')) { var why = reason(r.code); code = ''; qKey = ''; renderCheckout(); promoNote('warn', why); return; }
+          quoted = { key: key, discountMinor: r.discountMinor || 0, applied: r.applied || [] };
+          renderCheckout();
+        }).catch(function (e) { qKey = ''; promoNote('err', e.message); });
+      }, 250);
+    }
+    //  MKT-09: «تا پایان …» — پایانِ همان روزِ `endsOn` به وقتِ کابل، با ساعتِ سرور
+    function leftText(endsOn) {
+      var ms = Date.parse(endsOn + 'T23:59:59+04:30') - (Date.now() + skew);
+      var d = Math.floor(ms / 864e5); var h = Math.floor(ms / 36e5);
+      if (d >= 1) return t('promo.days', { n: K.fa(d, 0) });
+      if (h >= 1) return t('promo.hours', { n: K.fa(h, 0) });
+      return t('promo.mins', { n: K.fa(Math.max(1, Math.ceil(ms / 6e4)), 0) });
+    }
+    function renderPromos() {
+      $('promo-box').hidden = !promos;
+      if (!promos) return;
+      var ul = K.clear($('promo-auto'));
+      promos.promos.forEach(function (p) {
+        ul.appendChild(el('li', { text: p.endsOn ? p.name + ' — ' + leftText(p.endsOn) : p.name }));
+      });
+      $('promo-row').hidden = !promos.codes || Boolean(code);
+      $('promo-clear').hidden = !code;
+      if (code && quoted && quoted.key === promoKey()) promoNote('ok', t('promo.ok', { code: code, d: K.money(quoted.discountMinor) }));
+      else if (!code && $('promo-msg').className.indexOf('ok') >= 0) $('promo-msg').hidden = true;
+      requote();
+    }
+
     function fulfillment() {
       var r = document.querySelector('input[name="fulfillment"]:checked');
       return r ? r.value : '';
@@ -53,7 +108,10 @@
       var unknown = f === 'delivery' && c.zones() && !c.zone;
       $('t-fee').textContent = f === 'delivery' && !unknown ? (fee > 0 ? K.money(fee) : t('free')) : '—';
       $('t-fee-label').textContent = f === 'pickup' ? t('pickup') : t('ck.fee');
-      $('t-total').textContent = K.money(sub + fee);
+      var disc = discount();
+      $('t-disc-label').hidden = $('t-disc').hidden = !(disc > 0);
+      $('t-disc').textContent = '−' + K.money(disc);
+      $('t-total').textContent = K.money(sub - disc + fee);
       $('address-box').hidden = f !== 'delivery';
       var min = c.minFor(f);
       var below = min > sub;
@@ -62,8 +120,9 @@
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');
-      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok;
-      btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
+      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok || pending();
+      btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub - disc + fee) });
+      renderPromos();
     }
 
     function renderVerify() {
@@ -161,11 +220,12 @@
         //  CHK-17/S32: فیِ هر قلم که مشتری دید — ناهمخوان ⇒ ۴۰۹ `price_changed` حتی اگر جمع از قضا برابر بماند
         lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor }; }),
         note: $('c-note').value.trim(),
-        expectedTotalMinor: subtotal() + feeFor(f),
+        expectedTotalMinor: subtotal() - discount() + feeFor(f),
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
         lang: K.lang,
       };
-      if (c.campaign) body.campaign = c.campaign;   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
+      if (c.campaign) body.campaign = c.campaign;
+      if (code) body.promoCode = code;   //  MKT-01: سرور در همان تراکنش می‌سنجد؛ اعمال نشد ⇒ ۴۰۹ `promo_code_rejected`   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
@@ -202,7 +262,10 @@
         location.hash = '#/o/' + encodeURIComponent(r.order.token);
       }).catch(function (e) {
         var d = e.data || {};
-        if (e.code === 'price_changed' && d.quote) {
+        if (e.code === 'promo_code_rejected') {
+          code = ''; quoted = null; qKey = '';
+          K.note(msg, 'err', reason(d.promo));
+        } else if (e.code === 'price_changed' && d.quote) {
           //  S135: تغییر روشن نشان داده می‌شود؛ بی پذیرشِ دوباره ثبت نمی‌شود
           var changed = [];
           d.quote.lines.forEach(function (l) {
@@ -264,6 +327,7 @@
         if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }
+      loadPromos();
       renderCheckout();
     }
 
@@ -285,6 +349,16 @@
       if (r) { r.checked = true; renderCheckout(); }
     });
     $('zone-notify').addEventListener('click', notifyMe);
+    var applyCode = function () {
+      var v = $('promo-code').value.trim();
+      if (!v) return;
+      code = v.slice(0, 32); quoted = null; $('promo-code').value = ''; renderCheckout();
+    };
+    $('promo-apply').addEventListener('click', applyCode);
+    $('promo-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } });
+    $('promo-clear').addEventListener('click', function () { code = ''; quoted = null; $('promo-msg').hidden = true; renderCheckout(); });
+    //  شمارشِ معکوس فقط وقتی برگهٔ ثبت جلوی چشم است
+    setInterval(function () { if (promos && !$('view-checkout').hidden) renderPromos(); }, 30000);
 
     return { open: openCheckout, render: renderCheckout };
   };

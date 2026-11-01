@@ -172,10 +172,20 @@
                 <div class="spread"><h2 data-t="ck.cart">سبدِ شما</h2><a href="#/cart" id="edit-cart" class="small" data-t="ck.edit">ویرایش</a></div>
                 <ul id="cart-lines" class="sum-lines"></ul>
                 <p id="cart-empty" class="muted" hidden data-t="ck.empty">سبد خالی است.</p>
+                <div id="promo-box" class="stack section" hidden>
+                  <ul id="promo-auto" class="promo-auto"></ul>
+                  <div id="promo-row" class="pin-row" hidden>
+                    <input id="promo-code" type="text" maxlength="32" autocomplete="off" aria-label="کدِ تخفیف" data-ta="promo.code.l" data-tp="promo.code.l" placeholder="کدِ تخفیف">
+                    <button id="promo-apply" class="btn btn-soft btn-sm" type="button" data-t="promo.apply">اعمال</button>
+                  </div>
+                  <div id="promo-msg" class="note" hidden role="status"></div>
+                  <button id="promo-clear" class="btn btn-ghost btn-sm" type="button" hidden data-t="promo.clear">برداشتنِ کد</button>
+                </div>
                 <hr class="divider">
                 <div class="sums">
                   <span data-t="od.sub">جمعِ کالاها</span><span id="t-subtotal" class="num"></span>
                   <span id="t-fee-label" data-t="ck.fee">هزینهٔ ارسال</span><span id="t-fee" class="num"></span>
+                  <span id="t-disc-label" hidden data-t="promo.disc">تخفیف</span><span id="t-disc" class="num" hidden></span>
                   <span class="grand" data-t="od.total">مبلغِ نهایی</span><span id="t-total" class="grand num"></span>
                 </div>
                 <div id="min-order" class="note warn section" hidden></div>
