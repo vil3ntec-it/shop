@@ -27,9 +27,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.cost.CostMethod
+import ir.vil3ntec.tohid.core.cost.CostPolicy
+import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportTables
+import ir.vil3ntec.tohid.core.risk.CashierAlerts
 import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
@@ -64,8 +68,16 @@ import kotlinx.serialization.json.JsonNull
 object ReportFresh {
   private const val PREFS = "tohid-ui"
   private const val KEY = "report_fresh"
+  private const val COST_KEY = "report_cost"
 
   val on = mutableStateOf(false)
+
+  /**
+   *  RPT-03: روشِ بهای سود و حاشیه (`CostPolicy` ِ core) — همین دستگاه، همگام نمی‌شود؛ پیش‌فرض
+   *  همان رفتارِ امروز (قیمتِ خریدِ روی قلم). تا D-23 هر روشی «تقریبی» است.
+   */
+  val cost = mutableStateOf(CostPolicy.DEFAULT)
+  private var saveCost: (CostMethod) -> Unit = {}
 
   /** مقصدِ کلیکِ کارت/نشانِ خانه — صفحهٔ گزارش آن را برمی‌دارد و پاک می‌کند */
   val preset = mutableStateOf<ReportBoard.Preset?>(null)
@@ -75,6 +87,14 @@ object ReportFresh {
     if (loaded) return
     loaded = true
     on.value = runCatching { context.getSharedPreferences(PREFS, 0).getBoolean(KEY, false) }.getOrDefault(false)
+    val app = context.applicationContext
+    cost.value = CostPolicy.parse(runCatching { app.getSharedPreferences(PREFS, 0).getString(COST_KEY, null) }.getOrNull())
+    saveCost = { m -> runCatching { app.getSharedPreferences(PREFS, 0).edit().putString(COST_KEY, m.id).apply() } }
+  }
+
+  fun setCost(m: CostMethod) {
+    cost.value = m
+    saveCost(m)
   }
 
   fun set(context: android.content.Context, value: Boolean) {
@@ -125,7 +145,10 @@ private fun kpiDelta(k: ReportBoard.Kpi): StatDelta? {
 @Composable
 private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
   val today = ir.vil3ntec.tohid.todayIso()
-  return remember(d, today, showMoney) { ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), money = showMoney) }
+  val cost = ReportFresh.cost.value
+  return remember(d, today, showMoney, cost) {
+    ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), money = showMoney)
+  }
 }
 
 /**
@@ -191,7 +214,10 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
   }
   val def = tabs.firstOrNull { it.id == tab } ?: tabs.first()
-  val view = remember(ledger, def.id, span, dim, today) { ReportFreshModel.view(ledger, def.id, span, dim, today, clock) }
+  val cost = ReportFresh.cost.value
+  val view = remember(ledger, def.id, span, dim, today, cost) {
+    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost))
+  }
   //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
   val dayEnd = remember(d, def.id, day) {
     if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
@@ -289,18 +315,24 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     }
     "profit" -> view.sales?.let { s ->
       val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(s.from)} تا ${formatDate(s.to)}"
+      //  RPT-03: روشِ بها همان که هسته با آن حساب کرد (`s.costing`)، نه حدسِ صفحه
+      val m = CostPolicy.parse(s.costing)
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           card("فروش خالص", af(s.totals.netSales), p, Modifier.weight(1f))
-          card("بهای تمام‌شده (تقریبی)", af(s.totals.cogs), p, Modifier.weight(1f))
-          card("سود ناخالص (تقریبی)", af(s.totals.grossProfit), p, Modifier.weight(1f))
-          card("حاشیه (تقریبی)", s.totals.marginBp?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
+          card(CostPolicy.label("بهای تمام‌شده", m), af(s.totals.cogs), p, Modifier.weight(1f))
+          card(CostPolicy.label("سود ناخالص", m), af(s.totals.grossProfit), p, Modifier.weight(1f))
+          card(CostPolicy.label("حاشیه", m), s.totals.marginBp?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          Text("روش بها", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+          SegmentedTabs(CostMethod.entries.map { SegmentTab(it, it.label) }, m, { ReportFresh.setCost(it) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-          StatusPill("سود تقریبی", PillTone.WARNING)
+          if (s.totals.profitApproximate) StatusPill("سود تقریبی", PillTone.WARNING) else StatusPill("سود قطعی", PillTone.SUCCESS)
           Spacer(Modifier.width(8.dp))
           Text(
-            "بهای فروش از قیمتِ خریدِ ثبت‌شده روی هر قلم است، نه روشِ مصوب (تصمیمِ D-23). " +
+            CostPolicy.explain(m) + " " +
               (if (s.totals.costEstimatedLines > 0) "${s.totals.costEstimatedLines} قلم بی بهای خرید است." else ""),
             style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
           )
@@ -318,13 +350,43 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     }
     "fraud" -> view.fraud?.let { f ->
       val p = if (f.from == f.to) formatDate(f.from) else if (f.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(f.from)} تا ${formatDate(f.to)}"
-      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
-        card("برگشتی", f.totals.returnCount.toString(), p, Modifier.weight(1f))
-        card("حذفِ ردیف", f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
-        card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
-        card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
+      val alerts = remember(f) { ReportBoard.alertsOf(f) }
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+          card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
+          card("برگشتی", f.totals.returnCount.toString(), p, Modifier.weight(1f))
+          card("حذفِ ردیف", f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
+          card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
+          card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
+        }
+        if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
+    }
+  }
+}
+
+/** RSK-10 — هشدارِ رفتارِ غیرعادیِ صندوقدار: فقط نشان می‌دهد، چیزی را نمی‌بندد */
+@Composable
+private fun CashierAlertBox(alerts: List<CashierAlerts.Alert>) {
+  fun kind(k: CashierAlerts.Kind) = when (k) {
+    CashierAlerts.Kind.VOID -> StrRisk.voids
+    CashierAlerts.Kind.DISCOUNT -> StrRisk.discounts
+    CashierAlerts.Kind.NO_SALE -> StrRisk.noSales
+  }
+  Column(
+    Modifier.fillMaxWidth().clip(Shape.card).border(1.dp, Shop.colors.danger, Shape.card).padding(12.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      StatusPill(StrRisk.title(alerts.size), PillTone.DANGER)
+      Spacer(Modifier.width(8.dp))
+      Text(StrRisk.rule, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    }
+    alerts.forEach { a ->
+      Text(
+        StrRisk.line(a.key, kind(a.kind), a.count, a.invoices, a.peerCount, a.peerInvoices),
+        style = MaterialTheme.typography.bodyMedium,
+      )
     }
   }
 }
@@ -436,7 +498,10 @@ fun PhoneFreshReports(d: ShopData) {
   val clock = remember { ReportBridge.deviceClock() }
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
   val debts = remember(ledger, today) { ReportFreshModel.view(ledger, "debts", "all", "", today, clock) }
-  val todayTables = remember(ledger, today, money) { if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock).tables else emptyList() }
+  val cost = ReportFresh.cost.value
+  val todayTables = remember(ledger, today, money, cost) {
+    if (money) ReportFreshModel.view(ledger, "today", "today", "", today, clock, ReportFreshModel.costingOf(cost)).tables else emptyList()
+  }
   //  RPT-04: پایانِ امروز فقط برای کسی که پول را می‌بیند
   val dayEnd = remember(d, today, money) {
     if (money) DayEndModel.build(d, today, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null

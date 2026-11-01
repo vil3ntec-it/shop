@@ -81,6 +81,36 @@ class CatalogMatchTest {
   }
 
   @Test
+  fun aliasesRankLikeTheNameAndKeywordsLikeWords() {
+    //  PRD-02: نامِ پشتو/انگلیسی و مترادفِ همان کالا هم‌پایهٔ نام‌اند؛ واژهٔ جست‌وجو فقط «همهٔ کلمه‌ها»
+    val idx = CatalogMatch.index(
+      listOf(
+        Item("potato", "کچالو", aliases = listOf("Potato", "سیب‌زمینی")),
+        Item("chips", "چیپس پاتاتو", keywords = listOf("potato", "تنقلات")),
+        Item("coke", "کوکاکولا ۱ لیتری", aliases = listOf("Coke"), keywords = listOf("نوشابه گازدار")),
+      ),
+    )
+    //  آغازِ نامِ دیگر (گروهِ ۲) پیش از واژه (گروهِ ۳)
+    assertEquals(listOf("potato", "chips"), CatalogMatch.search(idx, "potato"))
+    assertEquals(listOf("potato"), CatalogMatch.search(idx, "سیب زمینی"))
+    assertEquals(listOf("coke"), CatalogMatch.search(idx, "COKE"))
+    //  کلمه‌ها به هر ترتیب، هر کدام در نام یا واژه — «گازدار» از واژه و «لیتری» از نام
+    assertEquals(listOf("coke"), CatalogMatch.search(idx, "گازدار لیتری", fuzzyBelow = 0))
+    assertEquals(listOf("chips"), CatalogMatch.search(idx, "تنقلات"))
+    //  غلطِ تایپی روی واژه هم: «گازدارر» (یک حرفِ اضافه)
+    assertEquals(listOf("coke"), CatalogMatch.search(idx, "گازدارر"))
+  }
+
+  @Test
+  fun noAliasesMeansExactlyTheEarlierResults() {
+    //  خاموش (فهرست‌های تهی) ⇒ همان نتیجهٔ پیشین برای همهٔ پرس‌وجوهای این آزمون
+    val same = CatalogMatch.index(items.map { Item(it.id, it.name, it.barcodes, aliases = emptyList(), keywords = emptyList()) })
+    for (q in listOf("كوكا", "چای سبز", "احمد چای", "۶۲۶", "روغنن", "روغنن زیتونن", "بنج", "potato", "")) {
+      assertEquals(CatalogMatch.search(index, q), CatalogMatch.search(same, q), q)
+    }
+  }
+
+  @Test
   fun localDistanceIsTheSameAsTheNormalizerOne() {
     val words = listOf("", "روغن", "روغنن", "رغن", "کچالو", "کچالوو", "برنج", "بنج", "abc", "abd", "kitten", "sitting")
     for (a in words) for (b in words) for (max in 0..2) {

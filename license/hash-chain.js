@@ -9,7 +9,7 @@
        hash = hex( SHA-256( ASCII(prevHash) ‖ UTF-8(canonicalJson(doc)) ) )
        prevHash ِ نخستین حلقه = GENESIS (۶۴ صفر)
    ⛔ همین قرارداد در `server/src/lib/hash-chain.js` و
-   `android-native/.../core/audit/HashChain.kt` هست و هر سه با بردارهای
+   `core/src/commonMain/.../core/audit/HashChain.kt` هست و هر سه با بردارهای
    `license/test-vectors/hashchain-v1.json` سنجیده می‌شوند. قالب عوض شد؟
    بردارِ v2 بساز؛ v1 دست نمی‌خورد.
 

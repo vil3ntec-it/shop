@@ -555,6 +555,68 @@ test('در دیتابیس شماره و IP ِ شاکی نیست — فقط HMAC 
   assert.equal(ev.n, 0, 'رویدادِ مشتری شناسه ندارد');
 });
 
+/* ══════════════════════════════════════════════════════════════════
+   ترتیبِ تاریخچه: رویدادهای هم‌میلی‌ثانیه به ترتیبِ نوشتن (ABUSE-01)
+   ══════════════════════════════════════════════════════════════════ */
+
+test('تاریخچهٔ پرونده: رویدادهای هم‌میلی‌ثانیه به ترتیبِ نوشتن، نه به ترتیبِ شناسهٔ تصادفی', async () => {
+  const trust = require('../src/lib/market-trust');
+  const s = await liveStore('ترتیب');
+  const PHONE = '0790000291';
+  const order = await placeOrder(s, PHONE);
+  const t = await ticketFor(s.slug, PHONE);
+  const made = await pub(s.slug, 'POST', '/complaints', { subject: 'order', orderNo: order.orderNo, category: 'damaged', body: 'کالای خراب رسید' }, t);
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const caseId = (await shopApi(s.token, 'GET', '/cases')).body.cases[0].id;
+
+  //  ساعتِ ایستاده: همهٔ رویدادهای پس از این یک میلی‌ثانیه دارند. ترتیبِ «created_at, id» با شناسهٔ
+  //  تصادفی (`newId`) هر بار یکی از ۷۲۰ چینش بود؛ ترتیبِ درست فقط ترتیبِ نوشتن است.
+  const realNow = Date.now;
+  const T = realNow() + 60_000;
+  Date.now = () => T;
+  try {
+    await trust.assign('adm_order', caseId);
+    await trust.decide('adm_order', caseId, { outcome: 'upheld', sanction: { kind: 'warning' } }, 'خرابیِ کالا ثابت شد');
+    await trust.appeal({ shopId: s.shopId, userId: s.userId || 'usr_owner' }, caseId, { body: 'کالا هنگامِ تحویل سالم بود' });
+    await trust.decideAppeal('adm_order', caseId, { outcome: 'reversed' }, 'رسیدِ تحویل درست است');
+  } finally {
+    Date.now = realNow;
+  }
+  const hist = (await trust.adminView(caseId)).history;
+  assert.deepEqual(hist.map((e) => e.type).filter((x) => x !== 'evidence_added' && x !== 'flagged'),
+    ['filed', 'assigned', 'decided', 'sanction_applied', 'appealed', 'sanction_lifted', 'appeal_decided']);
+  //  زمان‌ها یکنوا و فقط به اندازهٔ لازم جلو رفته‌اند (نه ساعتِ دیگری)
+  const at = (await query('SELECT created_at FROM trust_case_events WHERE case_id=$1 ORDER BY created_at, id', [caseId])).rows
+    .map((r) => Number(r.created_at));
+  for (let i = 1; i < at.length; i++) assert.ok(at[i] > at[i - 1], `یکنوا: ${at}`);
+  assert.ok(at[at.length - 1] - T < 10, `جابه‌جاییِ زمان فقط چند میلی‌ثانیه: ${at}`);
+});
+
+test('تاریخچه به ترتیبِ رخداد است — «تصمیم» پیش از «جریمه»، حتی هر دو در یک میلی‌ثانیه', async (t) => {
+  //  دو رویدادِ یک تراکنش با همان `now()` و شناسهٔ تصادفی پیش‌تر به ترتیبِ شناسه خوانده می‌شدند
+  //  (ABUSE-01 در CI ِ تند گاهی «جریمه» را پیش از «تصمیم» دید)
+  const trust = require('../src/lib/market-trust');
+  const o = await shopOwner('ترتیبِ رویداد');
+  const at = now();
+  const ids = [];
+  for (let i = 0; i < 16; i++) {
+    const id = newId('tc');
+    await query(
+      `INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, reporter_key, created_at, updated_at)
+       VALUES ($1,$2,'complaint','shop','fraud','medium',$3,$4,$4)`,
+      [id, o.shopId, `order-${i}`, at]
+    );
+    ids.push(id);
+  }
+  t.mock.method(Date, 'now', () => at);
+  try {
+    for (const id of ids) await trust.decide('adm_order', id, { outcome: 'upheld', sanction: { kind: 'warning' } }, 'آزمونِ ترتیب');
+  } finally { t.mock.restoreAll(); }
+  for (const id of ids) {
+    assert.deepEqual((await trust.adminView(id)).history.map((e) => e.type), ['decided', 'sanction_applied'], id);
+  }
+});
+
 test('تاریخچه به ترتیبِ رخداد است — «تصمیم» پیش از «جریمه»، حتی هر دو در یک میلی‌ثانیه', async (t) => {
   //  دو رویدادِ یک تراکنش با همان `now()` و شناسهٔ تصادفی پیش‌تر به ترتیبِ شناسه خوانده می‌شدند
   //  (ABUSE-01 در CI ِ تند گاهی «جریمه» را پیش از «تصمیم» دید)
