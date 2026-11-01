@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.print
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.core.receipt.ReceiptShare
 import android.content.Context
 import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
@@ -20,7 +21,8 @@ object PrintJob {
   /**
    *  فرستادنِ فاکتور به مشتری — همان تصویرِ چاپِ حرارتی، پهنِ ۵۷۶ نقطه، به
    *  واتساپ یا تلگرام یا هر برنامه‌ای که کاربر بخواهد. برای دکان‌داری که
-   *  چاپگر ندارد (گزارشِ ممیزی: «راهی برای فرستادنِ فاکتور نیست»).
+   *  چاپگر ندارد (گزارشِ ممیزی: «راهی برای فرستادنِ فاکتور نیست»). متنِ همراه
+   *  (`ReceiptShare.caption`) پیوندِ فاکتورِ آنلاین را هم دارد اگر فروش داشته باشد (POS-32).
    *
    *  @return پیامِ خطا یا null
    */
@@ -61,7 +63,9 @@ object PrintJob {
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = mime
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
-        putExtra(android.content.Intent.EXTRA_TEXT, "فاکتور #${sale.invoiceLabel() ?: ""}${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        //  POS-32: پیوندِ فاکتورِ آنلاین در خطِ آخر — فقط فروشِ نسخهٔ ۲ با توکن، پرچمِ `shop.receipt_v2` و QR ِ روشن
+        //  (`Receipts.publicUrl`)؛ وگرنه همان یک خطِ امروز
+        putExtra(android.content.Intent.EXTRA_TEXT, ReceiptShare.caption(sale.invoiceLabel(), storeName, Receipts.publicUrl(context, sale)))
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(
@@ -86,6 +90,21 @@ object PrintJob {
     val bitmap = runCatching { Receipt.render(context, d, sale, storeName, width, qr = receiptQr(context, sale)) }
       .getOrElse { return@withContext "فاکتور کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
 
+    try {
+      ThermalPrinter.print(context, address, bitmap, width)
+    } finally {
+      bitmap.recycle()
+    }
+  }
+
+  /**
+   *  POS-34 — چاپِ رسیدِ هدیهٔ بی قیمت (`Receipts.giftBitmap`)؛ برمی‌گرداند: پیامِ خطا، یا null.
+   *  کاغذِ جداست، نه نسخهٔ دیگرِ فاکتور: نه در `PrintLog`/«چاپِ دوباره» و نه در صفِ چاپِ فاکتور.
+   */
+  suspend fun printGift(context: Context, d: ShopData, sale: Sale, address: String, width: Int): String? = withContext(Dispatchers.IO) {
+    val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
+    val bitmap = runCatching { Receipts.giftBitmap(context, d, sale, width, fallbackName = storeName.ifBlank { Receipts.localName(context) }) }
+      .getOrElse { return@withContext ir.vil3ntec.tohid.core.i18n.StrGift.failed(it.message ?: "—") }
     try {
       ThermalPrinter.print(context, address, bitmap, width)
     } finally {

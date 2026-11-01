@@ -17,7 +17,11 @@ import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery.RuleDraft
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery.ZoneDraft
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
+import ir.vil3ntec.tohid.core.storefront.SendOutcome
+import ir.vil3ntec.tohid.core.storefront.StorefrontChange
+import ir.vil3ntec.tohid.core.storefront.StorefrontOutbox
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.StorefrontQueue
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryDto
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryRepository
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -44,15 +48,27 @@ fun StorefrontDeliveryPane(snackbar: SnackbarHostState) {
     repo.load().onSuccess { loaded = it; version++ }.onFailure { loadError = it.userMessage }
   }
   LaunchedEffect(Unit) { load() }
+  //  پس از «ثبت شد» ِ سرور (گزارشِ صف) دادهٔ تازهٔ سرور خوانده می‌شود
+  LaunchedEffect(Unit) {
+    StorefrontQueue.reports.collect { r -> if (r.change == StorefrontChange.DELIVERY && r.outcome == SendOutcome.CONFIRMED) load() }
+  }
 
-  val d = loaded
+  val server = loaded
+  //  ویرایشِ نرسیده (صفِ آفلاین) روی دادهٔ سرور
+  val pendingEntry = StorefrontQueue.entries.value.let { StorefrontQueue.pending(context, StorefrontChange.DELIVERY) }
   when {
-    d == null && loadError == null -> TohidLoadingState(rows = 3)
-    d == null -> TohidErrorState("ارسال و زمان باز نشد", loadError ?: "اتصال را بررسی کنید.", onRetry = { scope.launch { load() } })
-    else -> DeliveryEditor(d, version, snackbar, onSave = { checked, asap ->
-      repo.save(checked, asap).onSuccess { loaded = it; version++; snackbar.showSnackbar("ارسال و زمان ذخیره شد") }
-        .onFailure { snackbar.showSnackbar(it.userMessage) }
-    })
+    server == null && loadError == null -> TohidLoadingState(rows = 3)
+    server == null -> TohidErrorState("ارسال و زمان باز نشد", loadError ?: "اتصال را بررسی کنید.", onRetry = { scope.launch { load() } })
+    else -> {
+      val d = StorefrontQueue.deliveryWithPending(server, pendingEntry)
+      DeliveryEditor(d, version, snackbar, pendingEntry?.let { StorefrontOutbox.statusLine(it) }, onSave = { checked, asap ->
+        //  اول روی دیسک (صف)، بعد سرور؛ «ثبت شد» فقط از پاسخِ سرور
+        val e = StorefrontQueue.enqueue(context, StorefrontChange.DELIVERY, StorefrontDeliveryRepository.body(checked, asap).toString(),
+          pendingEntry?.base ?: StorefrontQueue.deliveryBase(server))
+        if (e == null) snackbar.showSnackbar("دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید.")
+        else StorefrontQueue.flush(context, force = true)
+      })
+    }
   }
 }
 
@@ -61,6 +77,7 @@ private fun DeliveryEditor(
   d: StorefrontDeliveryDto,
   version: Int,
   snackbar: SnackbarHostState,
+  pendingNote: String?,
   onSave: suspend (StorefrontDelivery.Checked, Boolean) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
@@ -91,7 +108,8 @@ private fun DeliveryEditor(
       rules.forEachIndexed { i, r -> RuleCard(i, r, errors, onChange = { rules[i] = it }, onRemove = { rules.removeAt(i); errors.clear() }) }
       TohidSecondaryButton("افزودنِ بازه", onClick = { rules.add(RuleDraft()) })
     }
-    TohidButton(if (saving) "در حالِ ذخیره…" else "ذخیرهٔ ارسال و زمان", onClick = {
+    pendingNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.warning) }
+    TohidButton(if (saving) "در حالِ فرستادن…" else "ذخیرهٔ ارسال و زمان", onClick = {
       val c = StorefrontDelivery.check(zones.toList(), rules.toList(), slotDays)
       errors.clear(); errors.putAll(c.errors)
       if (c.errors.isNotEmpty()) { scope.launch { snackbar.showSnackbar("چند کادر درست نیست؛ پیامِ کنارِ هر کادر را ببینید") }; return@TohidButton }

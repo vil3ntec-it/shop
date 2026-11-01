@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.model.MemberDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
+import ir.vil3ntec.tohid.core.perm.RoleInfo
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -61,6 +62,8 @@ fun TeamScreen(snackbar: SnackbarHostState) {
   var fresh by remember { mutableStateOf<String?>(null) }
   var askNew by remember { mutableStateOf(false) }
   var removing by remember { mutableStateOf<MemberDto?>(null) }
+  /** A16: عضوی که صاحب دکان نقشش را عوض می‌کند */
+  var roleFor by remember { mutableStateOf<MemberDto?>(null) }
 
   /** کدِ ثابتِ دکان — همیشه همان است، پس هر بار نشان داده می‌شود */
   var standing by remember { mutableStateOf("") }
@@ -291,7 +294,11 @@ fun TeamScreen(snackbar: SnackbarHostState) {
         EmptyNote("هنوز کسی به دکان نپیوسته است.")
       } else {
         members.forEach { member ->
-          MemberRow(member) { removing = member }
+          MemberRow(
+            member,
+            //  نقشِ صاحب و پیک از این‌جا عوض نمی‌شود (پیک توکنِ دامنه‌دارِ خودش را دارد)
+            onRole = if (isOwner && member.role != "owner" && member.role != "courier") ({ roleFor = member }) else null,
+          ) { removing = member }
         }
       }
     }
@@ -369,6 +376,25 @@ fun TeamScreen(snackbar: SnackbarHostState) {
     )
   }
 
+  roleFor?.let { member ->
+    RoleDialog(
+      name = member.name.ifBlank { "این کارمند" },
+      current = member.role,
+      busy = busy,
+      onDismiss = { roleFor = null },
+      onSave = { role ->
+        roleFor = null
+        busy = true
+        scope.launch {
+          shops.changeRole(member.id, role)
+            .onSuccess { snackbar.showSnackbar("نقش شد «${RoleInfo.title(role)}»"); reload() }
+            .onFailure { snackbar.showSnackbar(it.userMessage) }
+          busy = false
+        }
+      },
+    )
+  }
+
   removing?.let { member ->
     TohidConfirmDialog(
       title = "برداشتنِ ${member.name.ifBlank { "این کارمند" }}",
@@ -391,7 +417,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
 /* ============================== ردیف‌ها ============================== */
 
 @Composable
-private fun MemberRow(member: MemberDto, onRemove: () -> Unit) {
+private fun MemberRow(member: MemberDto, onRole: (() -> Unit)? = null, onRemove: () -> Unit) {
   val colors = Shop.colors
   Row(
     Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -424,7 +450,7 @@ private fun MemberRow(member: MemberDto, onRemove: () -> Unit) {
         color = colors.muted2,
       )
     }
-    RoleChip(member.role, member.status)
+    RoleChip(member.role, member.status, onClick = onRole)
     // صاحبِ دکان را نمی‌شود برداشت — وگرنه دکان بی‌صاحب می‌ماند
     if (member.role != "owner") {
       Spacer(Modifier.width(6.dp))
@@ -493,7 +519,7 @@ private fun CodeRow(code: StaffCodeDto, onRevoke: () -> Unit) {
 }
 
 @Composable
-private fun RoleChip(role: String, status: String) {
+private fun RoleChip(role: String, status: String, onClick: (() -> Unit)? = null) {
   val colors = Shop.colors
   val tint = when {
     status != "active" -> colors.muted2
@@ -506,10 +532,11 @@ private fun RoleChip(role: String, status: String) {
     Modifier
       .clip(RoundedCornerShape(9.dp))
       .background(tint.copy(alpha = 0.15f))
+      .then(if (onClick != null) Modifier.clickable(onClickLabel = "تغییرِ نقش", onClick = onClick) else Modifier)
       .padding(horizontal = 8.dp, vertical = 4.dp)
   ) {
     Text(
-      if (status != "active") "بسته" else roleText(role),
+      if (status != "active") "بسته" else roleText(role) + if (onClick != null) " ▾" else "",
       style = MaterialTheme.typography.labelSmall,
       color = tint,
       fontWeight = FontWeight.Bold,
@@ -517,12 +544,8 @@ private fun RoleChip(role: String, status: String) {
   }
 }
 
-private fun roleText(role: String): String = when (role) {
-  "owner" -> "صاحب دکان"
-  "manager" -> "مدیر"
-  "courier" -> "پیک"
-  else -> "شاگرد"
-}
+/** نامِ فارسیِ نقش — از `RoleInfo` (صاحب، مدیر، شاگرد، پیک و چهار نقشِ تازهٔ A16) */
+private fun roleText(role: String): String = RoleInfo.title(role)
 
 /* ============================== کادرِ ساخت ============================== */
 
@@ -543,21 +566,18 @@ private fun NewCodeDialog(
     containerColor = colors.surfaceSolid,
     title = { Text("کد پیوستن تازه", color = colors.text) },
     text = {
-      Column {
+      Column(Modifier.verticalScroll(rememberScrollState())) {
         Text(
           if (role == "courier")
             "پیک این کد را در «ورود با کدِ شاگرد» می‌زند. حسابش فقط مأموریت‌های خودش را می‌بیند — نه دفتر، نه کالا، نه گزارش."
-          else "شاگرد این کد را در صفحهٔ ورود می‌زند و به همین دکان می‌پیوندد.",
+          else "${roleText(role)} این کد را در صفحهٔ ورود می‌زند و به همین دکان می‌پیوندد.",
           style = MaterialTheme.typography.bodySmall,
           color = colors.muted,
         )
         Spacer(Modifier.height(14.dp))
         Text("نقش", style = MaterialTheme.typography.labelMedium, color = colors.muted)
         Spacer(Modifier.height(6.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          RoleOption("شاگرد", "فروش و ثبت", role == "staff", Modifier.weight(1f)) { role = "staff" }
-          RoleOption("مدیر", "همه‌کاره جز حذف دکان", role == "manager", Modifier.weight(1f)) { role = "manager" }
-        }
+        RolePicker(selected = role, showDetails = role != "courier") { role = it }
         if (courierAllowed) {
           Spacer(Modifier.height(8.dp))
           RoleOption("پیک", "فقط مأموریت‌های خودش", role == "courier", Modifier.fillMaxWidth()) {
@@ -577,6 +597,96 @@ private fun NewCodeDialog(
           onCreate(role, uses.toIntOrNull() ?: 1, days.toIntOrNull() ?: 0)
         },
       ) { Text("بساز", color = colors.primary) }
+    },
+    dismissButton = {
+      TextButton(onClick = onDismiss) { Text("انصراف", color = colors.muted) }
+    },
+  )
+}
+
+/**
+ *  انتخابِ نقش (STF-01، A16): شاگرد، مدیر، صندوق‌دار، انباردار، جمع‌آور و
+ *  حسابدار، دو به دو، و زیرش شرحِ «می‌تواند / نمی‌تواند»ِ نقشِ انتخاب‌شده —
+ *  همان `RoleInfo` که با هسته آزموده می‌شود.
+ */
+@Composable
+private fun RolePicker(selected: String, showDetails: Boolean = true, onSelect: (String) -> Unit) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    RoleInfo.PICKABLE.chunked(2).forEach { pair ->
+      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        pair.forEach { id ->
+          val info = RoleInfo.of(id) ?: return@forEach
+          RoleOption(info.title, info.short, selected == id, Modifier.weight(1f)) { onSelect(id) }
+        }
+        if (pair.size == 1) Spacer(Modifier.weight(1f))
+      }
+    }
+    if (showDetails) RoleDetails(selected)
+  }
+}
+
+/** «می‌تواند / نمی‌تواند»ِ یک نقش — متن، نه فقط رنگ */
+@Composable
+private fun RoleDetails(role: String) {
+  val info = RoleInfo.of(role) ?: return
+  val colors = Shop.colors
+  Column(
+    Modifier
+      .fillMaxWidth()
+      .clip(RoundedCornerShape(Radius.sm))
+      .background(colors.surface2)
+      .padding(10.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
+  ) {
+    Text(info.title, style = MaterialTheme.typography.labelLarge, color = colors.text, fontWeight = FontWeight.Bold)
+    Text(
+      "می‌تواند: " + info.can.joinToString("، "),
+      style = MaterialTheme.typography.labelSmall,
+      color = colors.text,
+    )
+    if (info.cannot.isNotEmpty()) {
+      Text(
+        "نمی‌تواند: " + info.cannot.joinToString("، "),
+        style = MaterialTheme.typography.labelSmall,
+        color = colors.muted,
+      )
+    }
+    if (info.note.isNotEmpty()) {
+      Text(info.note, style = MaterialTheme.typography.labelSmall, color = colors.muted2)
+    }
+  }
+}
+
+/** تغییرِ نقشِ یک کارمند — فقط صاحب دکان (`members.role`) */
+@Composable
+private fun RoleDialog(
+  name: String,
+  current: String,
+  busy: Boolean,
+  onDismiss: () -> Unit,
+  onSave: (String) -> Unit,
+) {
+  var role by remember { mutableStateOf(if (current in RoleInfo.PICKABLE) current else "staff") }
+  val colors = Shop.colors
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = colors.surfaceSolid,
+    title = { Text("نقشِ $name", color = colors.text) },
+    text = {
+      Column(Modifier.verticalScroll(rememberScrollState())) {
+        Text(
+          "از همین حالا در همهٔ دستگاه‌هایش همین نقش اجرا می‌شود؛ کارهایی که تا حالا ثبت کرده سرِ جایشان می‌مانند.",
+          style = MaterialTheme.typography.bodySmall,
+          color = colors.muted,
+        )
+        Spacer(Modifier.height(12.dp))
+        RolePicker(selected = role) { role = it }
+      }
+    },
+    confirmButton = {
+      TextButton(enabled = !busy && role != current, onClick = { onSave(role) }) {
+        Text("ذخیره", color = if (!busy && role != current) colors.primary else colors.muted2)
+      }
     },
     dismissButton = {
       TextButton(onClick = onDismiss) { Text("انصراف", color = colors.muted) }

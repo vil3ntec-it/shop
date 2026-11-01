@@ -12,11 +12,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import ir.vil3ntec.tohid.core.atrest.AtRestException
+import ir.vil3ntec.tohid.core.backup.RestoreRoute
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.atrest.AtRestMigration
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.v1.SyncRebuild
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
+import ir.vil3ntec.tohid.sync.v3.SyncV3Runner
 import java.io.File
 
 /**
@@ -29,6 +32,7 @@ import java.io.File
  *  عددی که فروشنده روی کاغذ دارد نباید با به‌روزرسانی عوض شود.
  */
 class ShopStore(private val context: Context) {
+  init { DebtMinorFlag.bind(context) }  //  `shop.debt_minor`: `debt` و موتورهای خالص پرچمِ همین دکان را از `DebtMinorFlag` می‌خوانند
 
   private val file = File(context.filesDir, "shop-data.json")
   private val json = Json {
@@ -58,6 +62,8 @@ class ShopStore(private val context: Context) {
    */
   suspend fun load(sweep: Boolean = false) {
     withContext(Dispatchers.IO) {
+      //  نشانِ دیسک **پیش از** خواندن — نوشتنی که میانِ خواندن برسد پایین دیده می‌شود
+      val mark = follow.mark()
       //  SEC-01: بازسازیِ نیمه‌کاره پیش از خواندنِ دفتر تمام یا دور ریخته می‌شود (`SyncRebuild.atLoad`)
       val stuck = runCatching { recoverRebuild() }.getOrElse { rebuildMark.exists() && rebuildSide.exists() }
       if (stuck) {
@@ -82,12 +88,15 @@ class ShopStore(private val context: Context) {
         }
         if (text != null) {
           runCatching { json.decodeFromString<ShopData>(text) }
-            .onSuccess { _data.value = it; recoverSync(it) }
+            .onSuccess { follow.replace(it); recoverSync(it) }
         }
       } else {
         _unreadable.value = null
         recoverSync(ShopData())
       }
+      //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو.
+      //  پرچمِ خاموش ⇒ هیچ خواندنِ دوباره، پس بی قفلِ موتور (همان `main`)
+      if (follow.on) synchronized(SyncV1Engine.of(context)) { follow.loadedLocked(mark) } else follow.loadedLocked(mark)
     }
     if (sweep) quietly { sweepNow(requireLoaded = false) }
     _loaded.value = true
@@ -106,6 +115,36 @@ class ShopStore(private val context: Context) {
    */
   private val _unreadable = MutableStateFlow<AtRestException.Kind?>(null)
   val unreadable: StateFlow<AtRestException.Kind?> = _unreadable.asStateFlow()
+
+  /* ------- چند نمونه روی یک دفتر: صفحه و کارگرِ پس‌زمینه — شرح سرِ `LedgerFollow` ------- */
+
+  private val follow = LedgerFollow(
+    file, _data,
+    unreadable = { _unreadable.value != null },
+    readDisk = { runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() },
+    enabled = { LedgerMergeFlag.enabled(context) },
+  )
+
+  /** [LedgerFollow.freshLocked] برای نوشتنِ صفحه؛ `null` با پیامِ روشن */
+  private fun currentForWrite(): ShopData? =
+    follow.freshLocked() ?: run { _diskError.tryEmit(STALE_UNREADABLE); null }
+
+  /**
+   *  دفترِ همین لحظهٔ دیسک — `read` ِ موتورهای همگام‌سازی (`SyncV1Worker`، `SyncV3Runner`)، زیرِ
+   *  همان قفلِ نوشتن. ⛔ نشاندنِ opهای سرور روی دفترِ کهنهٔ این نمونه فروشی را که صفحه در این
+   *  فاصله ثبت کرده بود از دیسک پاک می‌کرد.
+   *
+   *  پرچمِ `shop.ledger_merge` خاموش ⇒ همان `data.value` ِ همیشه، بی قفل (همان `main`).
+   *
+   *  @throws StaleLedger دیسک جلوتر است و خوانده نشد — هیچ چیزی نشانده نمی‌شود
+   */
+  fun ledgerNow(): ShopData {
+    if (!follow.on) return _data.value
+    return synchronized(SyncV1Engine.of(context)) { follow.freshLocked() ?: throw StaleLedger(STALE_UNREADABLE) }
+  }
+
+  /** دیسکِ جلوترِ خوانده‌نشده یا دفترِ حسابِ دیگر ([ledgerNow]، [applyFromServerNow]) — فقط با پرچمِ روشن */
+  class StaleLedger(message: String) : java.io.IOException(message)
 
   /**
    *  هم‌سو کردنِ فایل‌های دفتر با تنظیمِ «رمزگذاریِ داده» — زیرِ همان قفلِ
@@ -175,7 +214,9 @@ class ShopStore(private val context: Context) {
     if (SyncChoice.isV3(context)) return@withContext null
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
-      if ((requireLoaded && !_loaded.value) || _unreadable.value != null) return@synchronized null
+      if ((requireLoaded && !_loaded.value) || _unreadable.value != null || engine.rebuilding) return@synchronized null
+      //  نمونه‌ای که پیش از عوضِ حساب بار شده روی دفترِ حسابِ تازه نمی‌نویسد (`LedgerFollow.movedLocked`)
+      if (!follow.sameAccount()) return@synchronized null
       val disk = readDiskLocked() ?: return@synchronized null
       val next = CustomerMerge.sweep(disk) ?: return@synchronized null
       val ops = CustomerMerge.sweepOps(disk, next) ?: return@synchronized null
@@ -200,8 +241,8 @@ class ShopStore(private val context: Context) {
     }
   }
 
-  /** دفترِ همین لحظهٔ دیسک؛ فراخوان قفلِ نوشتن (`synchronized(engine)`) را دارد. `null` ⇒ نبود یا خوانده نشد */
-  private fun readDiskLocked(): ShopData? = runCatching {
+  /** دفترِ همین لحظهٔ دیسک؛ فراخوان قفلِ نوشتن (`synchronized(engine)`، یا تبدیلِ [update]) را دارد. `null` ⇒ نبود یا خوانده نشد */
+  internal fun readDiskLocked(): ShopData? = runCatching {
     if (!file.exists()) null else json.decodeFromString<ShopData>(AtRest.readText(context, file))
   }.getOrNull()
 
@@ -212,18 +253,66 @@ class ShopStore(private val context: Context) {
    *  دست‌نخورده می‌ماند و صفحه همان چیزی را نشان می‌دهد که روی دیسک
    *  است. هیچ چیزی پاک نمی‌شود و خروجی و چاپ و پشتیبان باز می‌مانند.
    *
+   *  [replace] ⇒ جایگزینیِ کاملِ دفتر به خواستِ کاربر («پاک کردنِ همه»)، بی ادغام. ⛔ از روی مقدارِ [next]
+   *  حدس زده نمی‌شود: دفتری که کاربر آخرین کالایش را حذف کرد با `ShopData()` برابر است و ادغام می‌خواهد.
+   *
    *  @return آیا نوشته شد. `false` یعنی قفلِ نرم یا خطای دیسک — صفحه
    *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
-  suspend fun save(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+  suspend fun save(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
+    //  ⛔ پرچمِ `shop.ledger_merge` خاموش (پیش‌فرض) ⇒ همان رفتارِ `main`: دفترِ صفحه کامل نوشته می‌شود.
+    //  [replace] («پاک کردنِ همه») هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
+    if (!follow.on || replace) {
+      if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
+        SoftLock.noteBlocked()
+        _blocked.tryEmit(Unit)
+        return@withContext false
+      }
+      return@withContext writeInternal(next)
+    }
+    //  دفتری که صفحه با آن ساخت — نه لزوماً دفترِ همین حالا (شرح سرِ `LedgerMerge`)
+    val base = follow.baseOf(next) ?: run {
+      //  ⛔ پایه دیگر نگه داشته نشده: ادغام با دفترِ همین حالا ردیف‌های تازه را DELETE می‌کرد
+      _notice.tryEmit(STALE_BASE)
+      return@withContext false
+    }
+    //  A16: نقشی که این بخشِ دفتر را نمی‌نویسد (صندوق‌دار خرید، انباردار فروش،
+    //  حسابدار هیچ) ⇐ پیش از دیسک و پیش از op می‌ایستد؛ سرور هم ردش می‌کرد و
+    //  دفترِ این دستگاه از دکان جدا می‌ماند. صاحب، مدیر و شاگرد هرگز.
+    val role = ShopRole.current(context)
+    RoleGate.blocked(role, _data.value, next)?.let { table ->
+      _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
+      return@withContext false
+    }
     //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
     //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
-    if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
+    //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
+    if (touchesPaid(base, next) && SoftLock.isLocked(context)) {
       SoftLock.noteBlocked()
       _blocked.tryEmit(Unit)
       return@withContext false
     }
-    writeInternal(next)
+    val engine = SyncV1Engine.of(context)
+    synchronized(engine) {
+      val theirs = currentForWrite() ?: return@synchronized false
+      //  دیسک همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام
+      if (theirs === base) return@synchronized writeLocked(engine, next)
+      //  ⛔ دیسک جلوتر است: فقط تغییرِ صفحه نسبت به پایه روی دیسک می‌نشیند. نوشتنِ کاملِ دفترِ
+      //  کهنه برای ردیف‌های تازهٔ دیسک DELETE و برای ویرایش‌های تازه‌اش برگرداندن می‌ساخت.
+      val outcome = runCatching { LedgerMerge.mergeReport(base, next, theirs) }.getOrElse {
+        _diskError.tryEmit(it.message ?: STALE_UNREADABLE)
+        return@synchronized false
+      }
+      val merged = outcome.data
+      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد.
+      //  ⛔ خودِ [next] پایه نمی‌شود: ذخیرهٔ دومی که صفحه هم‌زمان از همان پایه ساخته (دو کلیکِ پیاپی) با آن هم‌امتیاز
+      //  است و ردیف‌های این ذخیره را «حذفِ کاربر» می‌دید — DELETE روی همهٔ دستگاه‌ها
+      if (merged !== next) follow.remember(theirs)
+      val ok = writeLocked(engine, merged)
+      //  ⛔ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست بی‌صدا گم نمی‌شود
+      if (ok && outcome.dropped.isNotEmpty()) _notice.tryEmit(editsDropped(outcome.dropped.size))
+      ok
+    }
   }
 
   /**
@@ -233,18 +322,80 @@ class ShopStore(private val context: Context) {
   private val _blocked = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 4)
   val blocked: kotlinx.coroutines.flow.SharedFlow<Unit> = _blocked
 
+  /** نوشتنی که سدِ نقش (A16) ردش کرد: (بخشِ دفتر، نامِ نقش) — `AppRoot` راستش را می‌گوید */
+  private val _roleBlocked = kotlinx.coroutines.flow.MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 4)
+  val roleBlocked: kotlinx.coroutines.flow.SharedFlow<Pair<String, String>> = _roleBlocked
+
   private fun touchesPaid(cur: ShopData, next: ShopData): Boolean =
     cur.sales != next.sales || cur.saleItems != next.saleItems ||
       cur.saleReturns != next.saleReturns || cur.transactions != next.transactions || cur.debtors != next.debtors
 
-  /**
-   *  بازیابیِ پشتیبان — بیرونِ قفلِ نرم.
-   *
-   *  ⛔ دادهٔ خودِ کاربر است و گروگان گرفتنش سریع‌ترین راهِ از دست دادنِ
-   *  اعتماد. همان قاعده‌ای که برای خروجی و چاپ هم هست.
-   */
+  /** همان [restoreBackup] با پیامش در [notice] — برای جاهایی که خودشان پیام ندارند (وارد کردن، برگرداندن) */
   suspend fun applyRestore(next: ShopData): Boolean =
-    if (_unreadable.value != null) restoreUnreadable(next) else writeInternal(next)
+    restoreBackup(next).also { if (it.message.isNotEmpty()) _notice.tryEmit(it.message) }.ok
+
+  /**
+   *  بازیابیِ پشتیبان — بیرونِ قفلِ نرم (دادهٔ خودِ کاربر است؛ گروگان گرفتنش یعنی از دست دادنِ اعتماد).
+   *
+   *  ⛔ S143 (#455): **بازیابی هرگز op نمی‌سازد** — دیگر «ذخیره»ٔ عادی نیست که تفاضلش با سایه برای
+   *  ردیف‌های تازه‌ترِ سرور DELETE و برگرداندن بفرستد. راه از `RestoreRoute.decide` (core، شرح همان‌جا):
+   *  هرگز همگام‌نشده و (بی ورود یا حسابِ سرورِ خالی) ⇒ پشتیبان جای دفتر و خودش سایه (`resetTo`)؛ واردشده و
+   *  سرور ردیف دارد ⇒ همان راهِ «از سرور»، Snapshot نیامد ⇒ «اول همگام کنید» (#485)؛ همگام ⇒ صف اول، بعد ردیف‌ها فقط از
+   *  سرور و از پشتیبان فقط تنظیمات ([pushedStaging])؛ بی ورود/شبکه یا v3 ⇒ هیچ، با دلیل. دفترِ
+   *  خوانده‌نشده همان «بازسازی از سرور» (SEC-01).
+   *  @return `message` ِ خالی یعنی نوشته شد و حرفی نیست
+   */
+  suspend fun restoreBackup(next: ShopData): Rebuilt = withContext(Dispatchers.IO) {
+    if (_unreadable.value != null) return@withContext rebuildFromServer(next)
+    val engine = SyncV1Engine.of(context)
+    engine.rebind()
+    val v3 = SyncChoice.isV3(context)
+    val synced = if (v3) SyncV3Runner.of(context).initialized() else engine.everSynced()
+    val signedIn = Backend.isReady(context)
+    val online = Backend.isOnline(context)
+    //  #485: واردشده ولی هرگز همگام‌نشده ⇒ سرور چه دارد؟ ردیف دارد ⇒ از سرور؛ نیامد ⇒ «اول همگام کنید»
+    val serverRows = if (!synced && signedIn && online && !v3) serverRowCount(engine) else null
+    when (RestoreRoute.decide(synced, v3, signedIn, online, serverRows)) {
+      RestoreRoute.Route.LOCAL -> runCatching { engine.resetTo(next, staging) }
+        .fold({ Rebuilt(true, "") }, { sealHalfRestore(); Rebuilt(false, StrSettings.restoreDiskFail) })
+      RestoreRoute.Route.SYNC_FIRST -> Rebuilt(false, StrSettings.restoreSyncFirst)
+      RestoreRoute.Route.NEED_SIGN_IN -> Rebuilt(false, NEED_SIGN_IN_SYNCED)
+      RestoreRoute.Route.NEED_NET -> Rebuilt(false, StrSettings.restoreNeedNet)
+      RestoreRoute.Route.NOT_ON_V3 -> Rebuilt(false, StrSettings.restoreNotOnV3)
+      RestoreRoute.Route.FROM_SERVER -> try {
+        when (val out = engine.rebuildFromServer(next, pushedStaging)) {
+          is SyncRebuild.Outcome.QueueLeft -> Rebuilt(false, StrSettings.restoreQueueLeft(out.count))
+          is SyncRebuild.Outcome.Done -> Rebuilt(
+            true,
+            StrSettings.restoredFromServer(out.rows, RestoreRoute.notOnServer(SyncRebuild.rowIds(next), SyncRebuild.rowIds(out.ledger))),
+          )
+        }
+      } catch (e: kotlinx.coroutines.CancellationException) {
+        throw e
+      } catch (e: Exception) {
+        sealHalfRestore()
+        Rebuilt(false, StrSettings.restoreFailed(e.message ?: e.toString()))
+      }
+    }
+  }
+
+  /** شمارِ ردیف‌های Snapshot ِ سرور برای `RestoreRoute.decide`؛ شبکه یا پاسخِ خراب ⇒ `null` (نمی‌دانیم) */
+  private suspend fun serverRowCount(engine: SyncV1Engine): Int? = try {
+    engine.serverRows()
+  } catch (e: kotlinx.coroutines.CancellationException) {
+    throw e
+  } catch (e: Exception) {
+    null
+  }
+
+  /**
+   *  بازیابی‌ای که پس از نشستنِ سایه، پیش از جابه‌جایی شکست (دیسک): همین حالا تمام می‌شود، وگرنه نوشتن
+   *  بسته می‌ماند — همان کارِ `load`؛ دفترِ پیشین هرگز با سایهٔ تازه تفاضل نمی‌شود.
+   */
+  private fun sealHalfRestore() {
+    val stuck = runCatching { recoverRebuild() }.getOrElse { rebuildMark.exists() && rebuildSide.exists() }
+    if (stuck) { _unreadable.value = AtRestException.Kind.IO; _data.value = ShopData() }
+  }
 
   /* ------------- SEC-01: دفترِ رمزدارِ خوانده‌نشده (بازبینیِ #331) ------------- */
 
@@ -252,8 +403,9 @@ class ShopStore(private val context: Context) {
   data class Rebuilt(val ok: Boolean, val message: String)
 
   /**
-   *  پیامِ روشنِ کارهایی که از صفحهٔ خودشان بیرون می‌افتند (بازیابی در حالِ دفترِ خوانده‌نشده)
-   *  — `AppRoot` نشانش می‌دهد. با دفترِ ساده (پیش‌فرض) هرگز چیزی نمی‌فرستد.
+   *  پیامِ روشنِ کارهایی که از صفحهٔ خودشان بیرون می‌افتند (بازیابی در حالِ دفترِ خوانده‌نشده؛ و با پرچمِ
+   *  `shop.ledger_merge`: ذخیره‌ای که پایه‌اش دیگر نگه داشته نشده بود، یا ویرایشی که روی ردیفِ حذف‌شده در
+   *  دستگاهِ دیگر ننشست) — `AppRoot` نشانش می‌دهد. با دفترِ ساده و پرچمِ خاموش (پیش‌فرض) هرگز چیزی نمی‌فرستد.
    */
   private val _notice = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
   val notice: kotlinx.coroutines.flow.SharedFlow<String> = _notice
@@ -320,13 +472,6 @@ class ShopStore(private val context: Context) {
     }
   }
 
-  /** بازیابیِ پشتیبان وقتی دفترِ رمزدار باز نمی‌شود — همیشه از راهِ «بازسازی از سرور» */
-  private suspend fun restoreUnreadable(backup: ShopData): Boolean {
-    val r = rebuildFromServer(backup)
-    _notice.tryEmit(r.message)
-    return r.ok
-  }
-
   /** کناری و نشانِ «بازسازیِ نیمه‌کاره» — شرح سرِ `SyncRebuild` */
   private val rebuildSide: File get() = File(file.absoluteFile.parentFile, file.name + ".rebuild")
   private val rebuildMark: File get() = File(file.absoluteFile.parentFile, file.name + ".rebuild-pending")
@@ -351,11 +496,26 @@ class ShopStore(private val context: Context) {
       val onDisk = if (!side && !mark) runCatching { json.decodeFromString<ShopData>(AtRest.readText(context, file)) }.getOrNull() else null
       if (SyncRebuild.swappedElsewhere(side, mark, onDisk, staged)) {
         _unreadable.value = null
-        _data.value = onDisk!!
+        follow.replace(onDisk!!)
+        //  همان دفترِ دیسک، زیرِ قفلِ موتور — این نمونه دوباره همتاها را دنبال می‌کند
+        follow.syncedLocked()
         staged = null
         return
       }
       throw java.io.IOException("دفترِ بازسازی‌شده جا نیفتاد؛ با «دوباره امتحان» یا باز شدنِ دوبارهٔ برنامه تمام می‌شود")
+    }
+  }
+
+  /**
+   *  [staging] ِ بازیابیِ دستگاهِ همگام (S143). Snapshot پس از فرستادنِ صف و بیرونِ قفلِ نوشتن گرفته
+   *  می‌شود؛ `stage` زیرِ همان قفل است: opی که در این فاصله ثبت شد (صف دیگر خالی نیست) ⇒ هیچ چیزی
+   *  عوض نمی‌شود — وگرنه آن تغییر از دفترِ همین دستگاه می‌افتاد. از `stage` تا جابه‌جایی هم
+   *  [writeLocked] با `engine.rebuilding` هیچ نوشتنی نمی‌پذیرد، تا دفترِ پیشین با سایهٔ تازه تفاضل نشود.
+   */
+  private val pushedStaging = object : SyncRebuild.Staging by staging {
+    override fun stage(next: ShopData, shadowSha: String) {
+      check(SyncV1Engine.of(context).queueSize() == 0) { StrSettings.restoreRaced }
+      staging.stage(next, shadowSha)
     }
   }
 
@@ -374,7 +534,8 @@ class ShopStore(private val context: Context) {
     if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
     rebuildMark.delete()
     _unreadable.value = null
-    _data.value = next
+    follow.replace(next)
+    follow.publishedLocked(next)
     runCatching { LedgerSummary.write(context, next) }
     return true
   }
@@ -413,7 +574,7 @@ class ShopStore(private val context: Context) {
   suspend fun update(transform: (ShopData) -> ShopData?): Boolean? = withContext(Dispatchers.IO) {
     val engine = SyncV1Engine.of(context)
     synchronized(engine) {
-      val cur = _data.value
+      val cur = currentForWrite() ?: return@synchronized false
       val next = transform(cur) ?: return@synchronized null
       if (touchesPaid(cur, next) && SoftLock.isLocked(context)) {
         SoftLock.noteBlocked()
@@ -456,7 +617,11 @@ class ShopStore(private val context: Context) {
    *
    *  @return آیا به دیسک رسید
    */
-  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) { writer().save(next) }
+  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    //  جایگزینیِ کامل (بازیابی، بازسازی): صفحه‌ای که هنوز با دفترِ پیشین می‌سازد، روی همین می‌نشیند
+    follow.remember(_data.value)
+    writer().save(next)
+  }
 
   /**
    *  ردیفِ سابقه (`auditLog`) روی دفترِ **همان لحظه** — خواندن و نوشتن زیرِ
@@ -472,17 +637,25 @@ class ShopStore(private val context: Context) {
     writer().edit(LedgerWriter.appendAudit(row))
   }
 
+  /** همان [appendAudit] برای چند ردیف در یک نوشتن (RPT-09: ردیف‌های حذف‌شده از فاکتورِ باز) */
+  suspend fun appendAudits(rows: (ShopData) -> List<AuditEntry>): Boolean = withContext(Dispatchers.IO) {
+    if (!_loaded.value) return@withContext false
+    writer().edit(LedgerWriter.appendAudits(rows))
+  }
+
   /**
    *  نوشتن و op ساختن زیرِ همان قفلی که نشاندنِ opهای رسیده دارد
    *  (`SyncV1Engine.absorbRemote`) — شرحش همان‌جا.
    */
   private fun writer(): LedgerWriter {
     val engine = SyncV1Engine.of(context)
-    return LedgerWriter(engine, { _data.value }) { next -> writeLocked(engine, next) }
+    return LedgerWriter(engine, { currentForWrite() }) { next -> writeLocked(engine, next) }
   }
 
   /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */
   private fun writeLocked(engine: SyncV1Engine, next: ShopData): Boolean {
+    //  وسطِ بازیابی/بازسازی از سرور هیچ نوشتنی — شرح سرِ [pushedStaging]
+    if (engine.rebuilding) { _diskError.tryEmit(StrSettings.restoreBusy); return false }
     /*
      *  ⛔ دفتری که به دیسک نرسید op نمی‌سازد (F0-01). وگرنه opها به سرور
      *  می‌رفتند و سایه جلو می‌رفت، ولی پس از بستن و باز کردن دفترِ کهنه
@@ -529,7 +702,17 @@ class ShopStore(private val context: Context) {
    *  ببرد؛ همان opها دورِ بعد دوباره گرفته می‌شوند.
    */
   fun applyFromServerNow(next: ShopData) {
-    if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+    //  پرچمِ خاموش ⇒ همان `main`
+    if (!follow.on) {
+      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      return
+    }
+    synchronized(SyncV1Engine.of(context)) {
+      //  ⛔ دفترِ حسابِ دیگری جای این نشسته (خروج/ورود در میانهٔ همگام‌سازی): opهای حسابِ پیشین
+      //  روی آن نمی‌نشینند؛ cursor جلو نمی‌رود و دورِ بعد با کلیدِ درست
+      if (!follow.sameAccount()) throw StaleLedger(STALE_UNREADABLE)
+      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+    }
   }
 
   /**
@@ -563,6 +746,8 @@ class ShopStore(private val context: Context) {
     }
     _unreadable.value = null
     _data.value = next
+    //  همتاها (صفحه یا کارگر) همین دفتر را می‌گیرند؛ این نمونه نسخهٔ تازه را
+    follow.publishedLocked(next)
     //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
     //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
     //  `LedgerSummary`.
@@ -665,17 +850,18 @@ class ShopStore(private val context: Context) {
   /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
   suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
     //  زیرِ قفلِ نوشتنِ دفتر و قفلِ کوچِ رمز (`AtRest.converge`): کوچ میانِ کپی و پاک کردن نمی‌نشیند
-    runCatching {
-      synchronized(SyncV1Engine.of(context)) {
+    synchronized(SyncV1Engine.of(context)) {
+      runCatching {
         synchronized(AtRest.lock) {
           if (file.exists()) file.copyTo(vault(key), overwrite = true)
           file.delete()
         }
       }
+      //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
+      follow.movedLocked(stop = false, next = ShopData())
+      _unreadable.value = null
     }
     LedgerSummary.clear(context)
-    _data.value = ShopData()
-    _unreadable.value = null
     Unit
   }
 
@@ -683,14 +869,14 @@ class ShopStore(private val context: Context) {
   suspend fun openFrom(key: String) {
     withContext(Dispatchers.IO) {
       val saved = vault(key)
-      runCatching {
-        synchronized(SyncV1Engine.of(context)) {
+      synchronized(SyncV1Engine.of(context)) {
+        runCatching {
           synchronized(AtRest.lock) { if (saved.exists()) saved.copyTo(file, overwrite = true) else file.delete() }
         }
+        follow.movedLocked(stop = true, next = ShopData())
       }
     }
     _loaded.value = false
-    _data.value = ShopData()
     //  خلاصهٔ حسابِ قبلی نباید روی حسابِ تازه بماند؛ با خواندنِ دفتر از نو
     //  ساخته می‌شود
     LedgerSummary.clear(context)
@@ -724,6 +910,18 @@ class ShopStore(private val context: Context) {
   }
 
   companion object {
+    /** پیامِ ذخیره‌ای که رد شد چون دفتری که صفحه با آن ساخت دیگر نگه داشته نشده ([LedgerFollow.baseOf]) */
+    const val STALE_BASE =
+      "ثبت نشد — این صفحه از دفتری ساخته شده بود که در این فاصله چند بار از دستگاه‌های دیگر تازه شد، و ثبتش ردیف‌های تازه را پاک می‌کرد. صفحه را دوباره باز کنید و دوباره ثبت کنید؛ چیزی پاک نشده."
+
+    /** پیامِ ویرایش‌هایی که چون ردیفشان در دستگاهِ دیگر حذف شده بود ننشستند ([LedgerMerge.Outcome.dropped]) */
+    fun editsDropped(n: Int): String =
+      "ثبت شد، جز ویرایشِ شما روی $n ردیف که در همین فاصله در دستگاهِ دیگری حذف شده بود؛ آن ردیف‌ها حذف‌شده می‌مانند. اگر لازم‌اند، دوباره بسازیدشان."
+
+    /** پیامِ نوشتنی که رد شد چون دفترِ دیسک جلوتر بود و خوانده نشد (یا دفترِ حسابِ دیگری بود) */
+    const val STALE_UNREADABLE =
+      "دفترِ روی دیسک در این فاصله عوض شده بود و دوباره خوانده نشد، پس این تغییر ثبت نشد تا چیزی از آن رونویسی نشود. دوباره امتحان کنید."
+
     /** پیامِ نوشتنی که به‌خاطرِ دفترِ رمزدارِ خوانده‌نشده رد شد */
     const val UNREADABLE =
       "دفترِ رمزدارِ این دستگاه باز نشد، پس این تغییر ثبت نشد تا دفترِ واقعی رونویسی نشود. از «تنظیمات ← امنیت» دوباره امتحان یا «بازسازی از سرور» را بزنید."
@@ -908,10 +1106,8 @@ class ShopStore(private val context: Context) {
     /** تمام‌شده | موجودی کم | موجودی کافی */
     fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
-    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده */
-    fun debt(d: ShopData, debtorId: String): Double =
-      d.transactions.filter { it.debtorId == debtorId }
-        .sumOf { if (it.type == "give") it.amount else -it.amount }
+    /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — با `shop.debt_minor` به پول (`DebtMinorFlag`)، خاموش همان جمعِ Double */
+    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(d.transactions.filter { it.debtorId == debtorId })
 
     /**
      *  بدهیِ ما به یک تأمین‌کننده.
@@ -935,6 +1131,30 @@ class ShopStore(private val context: Context) {
 
     fun barcodeIndex(d: ShopData): Map<String, String> = buildMap {
       d.products.forEach { p -> p.barcodes.forEach { code -> put(code, p.id) } }
+    }
+
+    /**
+     *  PRD-04: بارکدِ بسته‌ها (کارتن، شل…) ⇐ کالا و بسته — جدا از `barcodeIndex` تا هیچ راهِ اسکنی که
+     *  بسته را نمی‌شناسد کارتن را «یک دانه» نخواند (آن‌جا «ناشناس» است، نه مقدارِ غلط).
+     */
+    fun packIndex(d: ShopData): ir.vil3ntec.tohid.core.product.PackBarcodes.Index =
+      ir.vil3ntec.tohid.core.product.PackBarcodes.Index(
+        d.products.mapNotNull { p -> p.packs?.takeIf { it.isNotEmpty() }?.let { p.id to it.map(::coreOf) } }
+      )
+
+    fun coreOf(p: ProductPack) = ir.vil3ntec.tohid.core.product.PackBarcodes.Pack(p.name, p.sizeMilli, p.barcodes)
+
+    /**
+     *  همهٔ بارکدهای دکان (کالا و بسته) ⇐ شناسهٔ کالا — برای سنجشِ «بارکد بین کالاها تکراری نمی‌شود» (§۳.۴).
+     *  تا بسته‌ای نباشد همان `barcodeIndex` است.
+     */
+    fun codeOwners(d: ShopData): Map<String, String> {
+      val main = barcodeIndex(d)
+      if (d.products.none { !it.packs.isNullOrEmpty() }) return main
+      return buildMap {
+        d.products.forEach { p -> p.packs.orEmpty().forEach { pk -> pk.barcodes.forEach { put(it, p.id) } } }
+        putAll(main)
+      }
     }
   }
 }

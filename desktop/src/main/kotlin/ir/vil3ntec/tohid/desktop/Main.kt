@@ -75,10 +75,13 @@ fun main() {
   DevShot.start()
 
   val context = DesktopContext
+  //  OPS-03: خطای گرفته‌نشده ⇒ گزارشِ بی دادهٔ شخصی با کد؛ صفِ اجرای پیش فرستاده می‌شود
+  ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }
+  scope.launch(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(context) } }
 
   runCatching { ir.vil3ntec.tohid.sync.SavedLogins.purgeTokens(context) }
   //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
@@ -86,6 +89,7 @@ fun main() {
   ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
+  ir.vil3ntec.tohid.ShopDayChoice.load(context)
 
   var live: LiveSocket? = null
   runCatching {
@@ -196,7 +200,11 @@ fun main() {
         } else {
           //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
           val ch = e.scanChar()
-          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) { windowHid.feed(ch, now); true } else false
+          //  HW-05: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) اسکن را همین‌جا تمام می‌کند
+          if (ch != null && !e.isCtrlPressed && !e.isAltPressed) {
+            windowHid.feed(ch, now)?.let { code -> ir.vil3ntec.tohid.scan.ScanRouter.dispatch(code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") } }
+            true
+          } else false
         }
       },
       onPreviewKeyEvent = { e ->
@@ -226,6 +234,8 @@ fun main() {
           //  Ctrl+K ⇒ جست‌وجوی سریع (صفحه، کالا، بارکد، قرض‌دار)
           mod && e.key == Key.K -> { ir.vil3ntec.tohid.ui.AppNav.palette.value = !ir.vil3ntec.tohid.ui.AppNav.palette.value; true }
           mod && e.key == Key.M -> { ir.vil3ntec.tohid.ui.AppNav.go("admin"); true }
+          //  Ctrl+L ⇒ قفلِ صندوق (STF-04)؛ سبدِ نیمه‌کاره می‌ماند
+          mod && e.key == Key.L -> { ir.vil3ntec.tohid.ui.AppNav.lock(); true }
           //  Ctrl+N ⇒ «تازه»ِ همین صفحه (قرض‌دار، کالا، مصرف، تأمین‌کننده)
           mod && e.key == Key.N -> ir.vil3ntec.tohid.ui.AppNav.addAction.value?.let { it(); true } ?: false
           e.key == Key.Escape -> BackDispatcher.dispatch()
@@ -384,6 +394,17 @@ private fun ShortcutsHelp() {
       androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)
         .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)
     ) {
+      //  OPS-06: راهنمای همین صفحه — فقط وقتی متنش آماده است (امروز هیچ صفحه‌ای؛ جای خالی دیده نمی‌شود)
+      val guide = ir.vil3ntec.tohid.core.guide.ScreenGuides.forScreen(ir.vil3ntec.tohid.ui.AppNav.screen.value)
+      if (guide != null) {
+        val lang = ir.vil3ntec.tohid.LocaleChoice.lang.code
+        androidx.compose.material3.Text(guide.title.of(lang), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+          color = Shop.colors.primary, modifier = androidx.compose.ui.Modifier.padding(bottom = 4.dp))
+        guide.steps.forEachIndexed { i, step ->
+          androidx.compose.material3.Text("${i + 1}. ${step.of(lang)}", color = Shop.colors.text,
+            modifier = androidx.compose.ui.Modifier.padding(vertical = 2.dp))
+        }
+      }
       groups.forEach { (title, rows) ->
         androidx.compose.material3.Text(title, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
           color = Shop.colors.primary, modifier = androidx.compose.ui.Modifier.padding(top = 10.dp, bottom = 4.dp))

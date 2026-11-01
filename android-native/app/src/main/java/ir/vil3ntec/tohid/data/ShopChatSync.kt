@@ -2,10 +2,13 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import ir.vil3ntec.tohid.core.chat.ChatConfig
 import ir.vil3ntec.tohid.core.chat.ChatMessage
+import ir.vil3ntec.tohid.core.chat.ChatProgress
 import ir.vil3ntec.tohid.core.chat.ChatQueue
+import ir.vil3ntec.tohid.core.chat.ChatSpace
 import ir.vil3ntec.tohid.core.chat.OutboxItem
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiJson
@@ -61,6 +64,24 @@ object ShopChatSync {
   /** پیامی که از صف رفت — صفحهٔ باز آن را بی انتظارِ long-poll نشان می‌دهد */
   @Volatile var onSent: ((String, ChatMessage) -> Unit)? = null
 
+  /**
+   *  CHAT-05: درصدِ فرستادنِ رسانهٔ هر پیامِ صف (کلید = clientId)؛ فقط با `ShopPolicy.chatMediaGuard`
+   *  (پیش‌فرض خاموش ⇒ همیشه خالی و بدنه یک‌جا نوشته می‌شود، مثلِ پیش).
+   */
+  val progress = mutableStateMapOf<String, Int>()
+
+  fun guard(context: Context): Boolean = ShopPolicy.chatMediaGuard(context.applicationContext)
+
+  /**
+   *  CHAT-07: آیا برای `need` بایت در پوشهٔ `where` جا هست (با ذخیرهٔ `ChatSpace.RESERVE_BYTES`)؟
+   *  تنظیمِ خاموش ⇒ همیشه بله (همان رفتارِ پیش). جای نامعلوم کار را نمی‌بندد.
+   */
+  fun room(context: Context, where: File, need: Long): Boolean =
+    !guard(context) || ChatSpace.fits(runCatching { where.usableSpace }.getOrNull(), need)
+
+  /** پوشهٔ صفِ ارسال — جایی که بایت‌های عکس و صدا تا رفتن می‌مانند */
+  fun outboxDir(context: Context): File = dir(context)
+
   private fun user(context: Context): String =
     runCatching { SyncStore(context).accountId }.getOrDefault("").filter { it.isLetterOrDigit() || it == '_' || it == '-' }
 
@@ -71,6 +92,19 @@ object ShopChatSync {
     File(dir(context), "blob-" + key.map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString(""))
 
   fun putBlob(context: Context, key: String, bytes: ByteArray) = DiskWrite.bytes(blobFile(context, key), bytes)
+
+  /**
+   *  CHAT-07: بایت‌های یک پیام در صف ⇒ null، یا پیامِ خطا اگر نوشته نشد (دیسکِ پر ⇒ «جا کم است»)؛
+   *  نیمه‌نوشته‌ها پاک می‌شوند. تنظیمِ خاموش ⇒ همان `putBlob` ِ پیش، خطا همان‌طور بالا می‌رود.
+   */
+  fun putBlobs(context: Context, vararg blobs: Pair<String, ByteArray>): String? {
+    if (!guard(context)) { blobs.forEach { (k, b) -> putBlob(context, k, b) }; return null }
+    val failed = runCatching { blobs.forEach { (k, b) -> putBlob(context, k, b) } }.exceptionOrNull() ?: return null
+    blobs.forEach { (k, _) -> runCatching { delBlob(context, k) } }
+    val need = blobs.sumOf { it.second.size.toLong() }
+    return if (!ChatSpace.fits(runCatching { dir(context).usableSpace }.getOrNull(), need)) ir.vil3ntec.tohid.core.i18n.StrChat.storageLow
+    else failed.message ?: ir.vil3ntec.tohid.core.i18n.StrChat.storageLow
+  }
   fun blob(context: Context, key: String): ByteArray? = blobFile(context, key).takeIf { it.exists() }?.readBytes()
   fun delBlob(context: Context, key: String) { blobFile(context, key).delete() }
 
@@ -117,20 +151,35 @@ object ShopChatSync {
   private suspend fun sendItem(context: Context, q: ChatQueue, item: OutboxItem): ChatMessage {
     val repo = Backend.shopChat(context)
     var cur = item
-    if (cur.kind != "text" && cur.mediaId == null) {
-      val bytes = cur.blobKey?.let { blob(context, it) }
+    val key = cur.clientId
+    val main = if (cur.kind != "text" && cur.mediaId == null) {
+      cur.blobKey?.let { blob(context, it) }
         ?: throw ApiFailure.Invalid("فایلِ این پیام روی این دستگاه نمانده", "local_media_gone")
-      val mime = if (cur.kind == "image") "image/jpeg" else "application/octet-stream"
-      val id = repo.upload(cur.convId, bytes, mime, "main")
-      cur = q.patch(cur.clientId) { it.copy(mediaId = id) } ?: cur
+    } else null
+    val thumb = if (cur.kind == "image" && cur.thumbKey != null && cur.thumbId == null) blob(context, cur.thumbKey!!) else null
+    //  CHAT-05: یک نوار برای هر دو بارگذاری؛ تنظیمِ خاموش ⇒ بی گزارش، همان یک write
+    val meter = if (guard(context) && (main != null || thumb != null)) ChatProgress(listOfNotNull(main, thumb).map { it.size.toLong() }) else null
+    val thumbPart = if (main != null) 1 else 0
+    fun track(part: Int): ((Long) -> Unit)? {
+      val m = meter ?: return null
+      return { sent: Long -> val p = m.at(part, sent); if (p != null) progress[key] = p }
     }
-    if (cur.kind == "image" && cur.thumbKey != null && cur.thumbId == null) {
-      blob(context, cur.thumbKey!!)?.let { bytes ->
-        val id = repo.upload(cur.convId, bytes, "image/jpeg", "thumb")
+    try {
+      if (main != null) {
+        val mime = if (cur.kind == "image") "image/jpeg" else "application/octet-stream"
+        val id = repo.upload(cur.convId, main, mime, "main", track(0))
+        meter?.done(0)?.let { progress[key] = it }
+        cur = q.patch(cur.clientId) { it.copy(mediaId = id) } ?: cur
+      }
+      if (thumb != null) {
+        val id = repo.upload(cur.convId, thumb, "image/jpeg", "thumb", track(thumbPart))
+        meter?.done(thumbPart)?.let { progress[key] = it }
         cur = q.patch(cur.clientId) { it.copy(thumbId = id) } ?: cur
       }
+      return repo.send(cur)
+    } finally {
+      if (meter != null) progress.remove(key)
     }
-    return repo.send(cur)
   }
 
   fun flush(context: Context, convId: String) {

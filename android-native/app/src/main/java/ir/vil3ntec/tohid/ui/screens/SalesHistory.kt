@@ -30,11 +30,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.displayDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.qty
@@ -43,6 +44,12 @@ import ir.vil3ntec.tohid.ui.pressMenu
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 
 /**
  *  تاریخچهٔ فروش.
@@ -50,6 +57,8 @@ import kotlinx.coroutines.launch
  *  هر فاکتوری که ثبت شده اینجاست — از جمله لغوشده‌ها. فاکتور هیچ‌وقت پاک
  *  نمی‌شود، فقط لغو می‌شود؛ فروشی که افتاده حقیقتی است که در گزارشِ سود و
  *  حسابِ قرض‌دار اثر گذاشته، و برداشتنش آن عددها را عوض می‌کند.
+ *
+ *  // i18n: سه‌زبانه — نوشته‌ها در `StrInvoices` (LOC-06)؛ دلیلِ لغو و نامِ قلمِ آزاد داده‌اند.
  */
 @Composable
 fun SalesHistoryScreen(
@@ -73,6 +82,8 @@ fun SalesHistoryScreen(
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  //  RPT-09 — «سابقهٔ ضدتقلب» (`FraudTrailPref`، پیش‌فرض خاموش): نامِ همین کاربر روی لغو و مرجوعی؛ خاموش ⇒ null
+  val trailBy = remember { ir.vil3ntec.tohid.data.FraudTrailPref.by(roleContext) }
   //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
   val returnsShot = ReturnsShot.open.value
   val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(roleContext) } || returnsShot != null
@@ -163,7 +174,7 @@ fun SalesHistoryScreen(
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
       Text(
-        "فاکتورهای ثبت‌شده، مرجوعی و لغو فروش",
+        StrNav.salesHistorySub,
         style = MaterialTheme.typography.bodySmall,
         color = Shop.colors.muted,
       )
@@ -172,9 +183,9 @@ fun SalesHistoryScreen(
 
     item {
       StatTile(
-        label = "جمع فروش",
+        label = StrInvoices.salesTotal,
         value = "${money(active.sumOf { it.finalTotal })} ؋",
-        hint = "${plain(active.size)} فاکتور — ${plain(d.sales.size - active.size)} لغوشده",
+        hint = StrInvoices.invoicesHint(plain(active.size), plain(d.sales.size - active.size)),
         modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(12.dp))
@@ -188,21 +199,21 @@ fun SalesHistoryScreen(
         Row(verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {
             Text(
-              if (shift == null) "صندوق بسته است" else "صندوق باز — از ${ir.vil3ntec.tohid.formatMillis(shift.open.createdAt)}",
+              if (shift == null) StrInvoices.registerClosed else StrInvoices.registerOpenSince(ir.vil3ntec.tohid.formatMillis(shift.open.createdAt)),
               style = MaterialTheme.typography.titleSmall,
               color = Shop.colors.text,
             )
             if (shift != null) {
               val t = ir.vil3ntec.tohid.data.CashShift.totalsOf(d, shift, System.currentTimeMillis())
               Text(
-                "نقدِ مورد انتظار در دخل: ${money(t.expected)} ؋",
+                StrInvoices.expectedInDrawer(money(t.expected)),
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
             }
           }
-          TextButton(onClick = { shiftHistory = true }) { Text("سابقه") }
-          Button(onClick = { shiftDialog = true }) { Text(if (shift == null) "باز کردن" else "بستن صندوق") }
+          TextButton(onClick = { shiftHistory = true }) { Text(StrInvoices.history) }
+          Button(onClick = { shiftDialog = true }) { Text(if (shift == null) StrSettings.open else StrInvoices.closeRegister) }
         }
       }
       Spacer(Modifier.height(12.dp))
@@ -212,13 +223,13 @@ fun SalesHistoryScreen(
       OutlinedTextField(
         value = search,
         onValueChange = { search = ir.vil3ntec.tohid.latinDigits(it) },
-        placeholder = { Text("شمارهٔ فاکتور یا نام مشتری") },
+        placeholder = { Text(StrInvoices.searchHint) },
         singleLine = true,
         leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null, tint = Shop.colors.muted) },
         trailingIcon = {
           if (search.isNotEmpty()) {
             IconButton(onClick = { search = "" }) {
-              Icon(Icons.Filled.Close, contentDescription = "پاک کردن جستجو", tint = Shop.colors.muted)
+              Icon(Icons.Filled.Close, contentDescription = StrInvoices.clearSearch, tint = Shop.colors.muted)
             }
           } else if (returnsV2 && !ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
             //  گوشی: QRِ رسید با دوربین؛ کامپیوتر: اسکنرِ دستی همین کادر را پر می‌کند
@@ -231,12 +242,12 @@ fun SalesHistoryScreen(
         Spacer(Modifier.height(8.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
-            "برای برگشت، QRِ رسید را اسکن کنید یا شماره و نامِ مشتری را بنویسید.",
+            StrInvoices.returnHint,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
             modifier = Modifier.weight(1f),
           )
-          OutlinedButton(onClick = { noReceipt = true }) { Text("برگشتِ بی رسید") }
+          OutlinedButton(onClick = { noReceipt = true }) { Text(StrPos.returnNoReceipt) }
         }
       }
       Spacer(Modifier.height(10.dp))
@@ -247,7 +258,7 @@ fun SalesHistoryScreen(
         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
       ) {
-        listOf("all" to "همه", "cash" to "نقدی", "credit" to "نسیه", ir.vil3ntec.tohid.data.PayFlow.NON_CASH to "غیرنقد", "cancelled" to "لغوشده").forEach { (id, label) ->
+        listOf("all" to Str.all, "cash" to Str.cashSale, "credit" to Str.credit, ir.vil3ntec.tohid.data.PayFlow.NON_CASH to StrInvoices.nonCash, "cancelled" to StrSale.cancelled).forEach { (id, label) ->
           FilterChip(selected = filter == id, onClick = { filter = id }, label = { Text(label) })
         }
       }
@@ -260,7 +271,7 @@ fun SalesHistoryScreen(
           FilterChip(
             selected = month == m,
             onClick = { month = m },
-            label = { Text(if (m == ALL_MONTHS) "همهٔ ماه‌ها" else ir.vil3ntec.tohid.formatMonth(m)) },
+            label = { Text(if (m == ALL_MONTHS) StrInvoices.allMonths else ir.vil3ntec.tohid.formatMonth(m)) },
           )
         }
       }
@@ -268,7 +279,7 @@ fun SalesHistoryScreen(
     }
 
     if (shown.isEmpty()) {
-      item { Panel { EmptyNote("فاکتوری با این جستجو یا فیلتر پیدا نشد.") } }
+      item { Panel { EmptyNote(StrInvoices.noMatch) } }
     } else {
       /*
        *  جدولِ فاکتورها.
@@ -286,11 +297,11 @@ fun SalesHistoryScreen(
             .background(Shop.colors.surface2)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         ) {
-          InvoiceCell("شماره", 0.7f, head = true)
-          InvoiceCell("تاریخ", 1.1f, head = true)
-          InvoiceCell("نام", 1.3f, head = true)
-          InvoiceCell("نوع", 0.8f, head = true)
-          InvoiceCell("مبلغ", 1.2f, head = true, end = true)
+          InvoiceCell(StrInvoices.colNumber, 0.7f, head = true)
+          InvoiceCell(StrInvoices.colDate, 1.1f, head = true)
+          InvoiceCell(StrInvoices.colName, 1.3f, head = true)
+          InvoiceCell(StrInvoices.colKind, 0.8f, head = true)
+          InvoiceCell(StrPos.amount, 1.2f, head = true, end = true)
           Spacer(Modifier.width(28.dp))
         }
       }
@@ -307,8 +318,8 @@ fun SalesHistoryScreen(
           onReturnReceipt = { receiptFor = it },
           //  لغو و «ویرایش در سبد» (که خودش لغو است) فقط با صاحب و مدیر —
           //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
-          onCancel = { if (canCancel) cancelFor = sale else toast(CANCEL_DENIED) },
-          onReopen = { if (canCancel) reopenFor = sale else toast(CANCEL_DENIED) },
+          onCancel = { if (canCancel) cancelFor = sale else toast(StrInvoices.cancelDenied) },
+          onReopen = { if (canCancel) reopenFor = sale else toast(StrInvoices.cancelDenied) },
         )
       }
     }
@@ -323,17 +334,17 @@ fun SalesHistoryScreen(
     AlertDialog(
       onDismissRequest = { shiftDialog = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text(if (shift == null) "باز کردنِ صندوق" else "بستنِ صندوق", color = Shop.colors.text) },
+      title = { Text(if (shift == null) StrInvoices.openRegisterTitle else StrInvoices.closeRegisterTitle, color = Shop.colors.text) },
       text = {
         Column {
           if (t != null) {
             (listOf(
-              "اول صندوق" to t.opening, "فروش نقدی" to t.sales, "رسید قرض‌داران" to t.receipts,
-              "مرجوعی" to -t.returns, "مصارف" to -t.expenses, "پرداخت به تأمین‌کننده و خرید" to -t.suppliers,
+              StrInvoices.openingFloat to t.opening, StrInvoices.cashSales to t.sales, StrInvoices.debtorReceipts to t.receipts,
+              StrInvoices.returns to -t.returns, Str.expenses to -t.expenses, StrInvoices.supplierPayments to -t.suppliers,
             ) + listOfNotNull(
               //  PAY: ورود/خروجِ نقدِ صندوقِ pay v2 — داده است، با پرچمِ خاموش هم شمرده می‌شود
-              ("ورودِ نقد" to t.cashIn).takeIf { t.cashIn > 0 },
-              ("خروجِ نقد" to -t.cashOut).takeIf { t.cashOut > 0 },
+              (StrInvoices.cashIn to t.cashIn).takeIf { t.cashIn > 0 },
+              (StrInvoices.cashOut to -t.cashOut).takeIf { t.cashOut > 0 },
             )).forEach { (label, v) ->
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
@@ -341,14 +352,14 @@ fun SalesHistoryScreen(
               }
             }
             Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-              Text("مورد انتظار", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+              Text(StrInvoices.expected, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
               Text("${money(t.expected)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
             }
           }
           OutlinedTextField(
             value = amount,
             onValueChange = { amount = ir.vil3ntec.tohid.latinDigits(it) },
-            label = { Text(if (shift == null) "پولِ اولِ صندوق" else "پولِ شمرده‌شده در دخل") },
+            label = { Text(if (shift == null) StrInvoices.openingCash else StrInvoices.countedCash) },
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
               keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
@@ -361,9 +372,9 @@ fun SalesHistoryScreen(
               val diff = counted - t.expected
               Text(
                 when {
-                  kotlin.math.abs(diff) < 0.5 -> "بی اختلاف"
-                  diff > 0 -> "اضافه: ${money(diff)} ؋"
-                  else -> "کسری: ${money(-diff)} ؋"
+                  kotlin.math.abs(diff) < 0.5 -> StrInvoices.noDifference
+                  diff > 0 -> StrInvoices.overBy(money(diff))
+                  else -> StrInvoices.shortBy(money(-diff))
                 },
                 style = MaterialTheme.typography.labelMedium,
                 color = if (kotlin.math.abs(diff) < 0.5) Shop.colors.success else Shop.colors.danger,
@@ -371,7 +382,7 @@ fun SalesHistoryScreen(
             }
             OutlinedTextField(
               value = note, onValueChange = { note = it },
-              label = { Text("یادداشت (اختیاری)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+              label = { Text(StrInvoices.noteOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
             )
           }
         }
@@ -388,13 +399,13 @@ fun SalesHistoryScreen(
             is ir.vil3ntec.tohid.data.CashShift.Result.Failed -> toast(r.message)
             is ir.vil3ntec.tohid.data.CashShift.Result.Ok -> {
               scope.launch { store.save(r.data) }
-              toast(if (shift == null) "صندوق باز شد" else "صندوق بسته شد")
+              toast(if (shift == null) StrInvoices.registerOpened else StrInvoices.registerClosedNow)
               shiftDialog = false
             }
           }
-        }) { Text(if (shift == null) "باز کن" else "ببند") }
+        }) { Text(if (shift == null) StrInvoices.openIt else StrInvoices.closeIt) }
       },
-      dismissButton = { TextButton(onClick = { shiftDialog = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { shiftDialog = false }) { Text(Str.cancel) } },
     )
   }
 
@@ -403,17 +414,17 @@ fun SalesHistoryScreen(
     AlertDialog(
       onDismissRequest = { shiftHistory = false },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("سابقهٔ صندوق", color = Shop.colors.text) },
+      title = { Text(StrInvoices.registerHistory, color = Shop.colors.text) },
       text = {
         Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-          if (shifts.isEmpty()) Text("هنوز صندوقی باز نشده.", color = Shop.colors.muted)
+          if (shifts.isEmpty()) Text(StrInvoices.noShiftsYet, color = Shop.colors.muted)
           shifts.forEach { sh ->
             Text(
               ir.vil3ntec.tohid.formatMillis(sh.open.createdAt) + " — " + sh.open.notes,
               style = MaterialTheme.typography.bodySmall, color = Shop.colors.text,
             )
             Text(
-              sh.close?.let { ir.vil3ntec.tohid.formatMillis(it.createdAt) + " — " + it.notes } ?: "هنوز باز است",
+              sh.close?.let { ir.vil3ntec.tohid.formatMillis(it.createdAt) + " — " + it.notes } ?: StrInvoices.stillOpen,
               style = MaterialTheme.typography.labelSmall,
               color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
             )
@@ -421,7 +432,7 @@ fun SalesHistoryScreen(
           }
         }
       },
-      confirmButton = { TextButton(onClick = { shiftHistory = false }) { Text("بستن") } },
+      confirmButton = { TextButton(onClick = { shiftHistory = false }) { Text(Str.close) } },
     )
   }
 
@@ -457,7 +468,7 @@ fun SalesHistoryScreen(
           //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
           ir.vil3ntec.tohid.data.ReturnFlow.find(d, code, shopTag = myReceiptTag).singleOrNull()?.takeIf { it.status != "cancelled" }?.let { returnFor = it }
         },
-        title = "اسکنِ QRِ رسید",
+        title = StrInvoices.scanReceiptQr,
         qr = true,
       )
     }
@@ -470,108 +481,71 @@ fun SalesHistoryScreen(
       onDismiss = { returnFor = null },
       onConfirm = { quantities, reason ->
         apply(
-          SalesEngine.recordReturn(d, sale.id, quantities, reason, todayIso(), System.currentTimeMillis(), ::newId),
-          "مرجوعی با موفقیت ثبت شد",
+          SalesEngine.recordReturn(d, sale.id, quantities, reason, todayIso(), System.currentTimeMillis(), ::newId, by = trailBy),
+          StrInvoices.returnRecorded,
         ) { returnFor = null }
       },
     )
   }
 
   /*
-   *  اصلاحِ فاکتور.
-   *
-   *  ویرایشِ مستقیمِ فاکتورِ ثبت‌شده ممکن نیست و نباید هم باشد: فاکتور
-   *  سند است و شمارهٔ آن در حسابِ قرض‌دار و سابقهٔ عملیات نوشته شده.
-   *
-   *  ولی تا دیروز راهی هم برای اشتباهِ ساده نبود: فروشنده باید فاکتور را
-   *  لغو می‌کرد و کلِ سبد را از نو می‌ساخت. حالا همان کار یک دکمه است —
-   *  فاکتور لغو می‌شود (پس موجودی برمی‌گردد) و اقلامش با همان قیمتِ
-   *  همان فاکتور دوباره در سبد می‌نشینند.
+   *  SEC-03 — لغو و «اصلاح»: کنترل از `InvoiceVoid.check` (core؛ همان که `CancelSheet` ِ نسخهٔ ۳ می‌خواند)،
+   *  اثرِ دفتری همان `SalesEngine.cancel`، و فقط پس از نشستنِ لغو در دفتر (نه با قفلِ نرم) سندِ معکوس در
+   *  زنجیرهٔ اسنادِ دستگاه (`DocChainSync.recordVoid`؛ پرچمِ خاموشِ `shop.doc_chain` ⇒ هیچ).
    */
-  reopenFor?.let { sale ->
-    AlertDialog(
-      onDismissRequest = { reopenFor = null },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text("اصلاح فاکتور؟", color = Shop.colors.text) },
-      text = {
-        Text(
-          "فاکتور #${sale.invoiceLabel() ?: "0"} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. " +
-            "بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
-      },
-      confirmButton = {
-        TextButton(onClick = {
-          val lines = d.saleItems
-            .filter { it.saleId == sale.id }
-            .mapNotNull { item ->
-              val left = item.quantity - item.returnedQty
-              if (left <= 0) null
-              else if (item.productId.isBlank()) SalesEngine.CartLine(
-                productId = newId(),
-                quantity = left,
-                unitPrice = item.unitPrice,
-                label = item.name.ifBlank { "قلم آزاد" },
-              )
-              else SalesEngine.CartLine(
-                productId = item.productId,
-                quantity = left,
-                unitPrice = item.unitPrice,
-              )
+  fun voidSale(sale: Sale, kind: InvoiceVoid.Kind, reason: String, done: String, after: () -> Unit) {
+    when (val check = InvoiceVoid.check(SalesVoid.facts(d, sale.id), canCancel, kind, reason)) {
+      is InvoiceVoid.Decision.Denied -> toast(SalesVoid.denied(check.code, StrInvoices.cancelDenied))
+      is InvoiceVoid.Decision.Allowed ->
+        when (val r = SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = check.reason, by = trailBy)) {
+          is SalesEngine.Result.Failed -> toast(r.message)
+          is SalesEngine.Result.Ok -> {
+            val before = d
+            scope.launch {
+              if (store.save(r.data)) {
+                ir.vil3ntec.tohid.sync.platform.DocChainSync.recordVoid(roleContext, before, sale.id, kind, check.reason)
+              }
             }
-          apply(
-            SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = "ویرایش در سبد"),
-            "فاکتور لغو شد و اقلامش در سبد است",
-          ) {
-            cartStore.set(lines)
-            cartStore.setDebtor(sale.debtorId)
-            reopenFor = null
-            onEditInCart()
+            toast(done)
+            after()
           }
-        }) { Text("لغو و بردن به سبد") }
-      },
-      dismissButton = { TextButton(onClick = { reopenFor = null }) { Text("بازگشت") } },
-    )
+        }
+    }
+  }
+
+  //  اصلاحِ فاکتور: لغو (سندِ معکوس) و بردنِ اقلام با همان قیمت به سبد — شرح سرِ `ReopenInvoiceDialog`
+  reopenFor?.let { sale ->
+    ReopenInvoiceDialog(sale, onDismiss = { reopenFor = null }) {
+      val lines = d.saleItems
+        .filter { it.saleId == sale.id }
+        .mapNotNull { item ->
+          val left = item.quantity - item.returnedQty
+          if (left <= 0) null
+          else if (item.productId.isBlank()) SalesEngine.CartLine(
+            productId = newId(),
+            quantity = left,
+            unitPrice = item.unitPrice,
+            label = item.name.ifBlank { "قلم آزاد" }, // داده: نامِ قلمِ آزاد در فاکتورِ تازه ذخیره می‌شود
+          )
+          else SalesEngine.CartLine(
+            productId = item.productId,
+            quantity = left,
+            unitPrice = item.unitPrice,
+          )
+        }
+      voidSale(sale, InvoiceVoid.Kind.CORRECTION, InvoiceVoid.CORRECTION_REASON, StrInvoices.reopenedToCart) {
+        cartStore.set(lines)
+        cartStore.setDebtor(sale.debtorId)
+        reopenFor = null
+        onEditInCart()
+      }
+    }
   }
 
   cancelFor?.let { sale ->
-    //  لغو بی دلیل ثبت نمی‌شود — دلیل در فاکتور و سابقه می‌ماند
-    var reason by remember(sale.id) { mutableStateOf("") }
-    AlertDialog(
-      onDismissRequest = { cancelFor = null },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text("لغو فروش؟", color = Shop.colors.text) },
-      text = {
-        Column {
-          Text(
-            SalesEngine.cancelWarning(sale),
-            style = MaterialTheme.typography.bodySmall,
-            color = Shop.colors.muted,
-          )
-          Spacer(Modifier.height(10.dp))
-          OutlinedTextField(
-            value = reason,
-            onValueChange = { reason = it.take(120) },
-            label = { Text("دلیلِ لغو") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth(),
-          )
-        }
-      },
-      confirmButton = {
-        TextButton(
-          enabled = reason.isNotBlank(),
-          onClick = {
-            apply(
-              SalesEngine.cancel(d, sale.id, todayIso(), System.currentTimeMillis(), ::newId, reason = reason),
-              "فروش لغو شد",
-            ) { cancelFor = null }
-          },
-        ) { Text("لغو فروش", color = if (reason.isNotBlank()) Shop.colors.danger else Shop.colors.muted) }
-      },
-      dismissButton = { TextButton(onClick = { cancelFor = null }) { Text("بازگشت") } },
-    )
+    CancelInvoiceDialog(sale, onDismiss = { cancelFor = null }) { reason ->
+      voidSale(sale, InvoiceVoid.Kind.VOID, reason, StrInvoices.saleCancelled) { cancelFor = null }
+    }
   }
 }
 
@@ -629,13 +603,13 @@ private fun SaleRow(
       verticalAlignment = Alignment.CenterVertically,
     ) {
       InvoiceCell(sale.invoiceLabel() ?: "0", 0.7f, bold = true)
-      InvoiceCell(formatDate(sale.date), 1.1f)
-      InvoiceCell(debtor?.name ?: "نقدی", 1.3f)
+      InvoiceCell(displayDate(sale.date), 1.1f)
+      InvoiceCell(debtor?.name ?: Str.cashSale, 1.3f)
       InvoiceCell(
         when {
-          cancelled -> "لغوشده"
-          online -> "اینترنتی"
-          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")
+          cancelled -> StrSale.cancelled
+          online -> StrInvoices.online
+          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale)
         },
         0.8f,
         tint = kindTint,
@@ -651,26 +625,26 @@ private fun SaleRow(
         IconButton(onClick = { menu = true }, modifier = Modifier.size(28.dp)) {
           Icon(
             Icons.Filled.MoreVert,
-            contentDescription = "کارها",
+            contentDescription = StrInvoices.actions,
             tint = Shop.colors.muted2,
             modifier = Modifier.size(17.dp),
           )
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-          DropdownMenuItem(text = { Text("دیدن فاکتور") }, onClick = { menu = false; onInvoice() })
+          DropdownMenuItem(text = { Text(StrInvoices.viewInvoice) }, onClick = { menu = false; onInvoice() })
           if (canReturn) {
-            DropdownMenuItem(text = { Text(if (returnsV2) "برگشت یا تعویض" else "مرجوعی") }, onClick = { menu = false; onReturn() })
+            DropdownMenuItem(text = { Text(if (returnsV2) StrInvoices.returnOrExchange else StrInvoices.returnItems) }, onClick = { menu = false; onReturn() })
           }
           returnDocs.forEach { id ->
             DropdownMenuItem(
-              text = { Text("رسیدِ برگشت ${ir.vil3ntec.tohid.data.ReturnFlow.label(id)}") },
+              text = { Text(StrInvoices.returnReceiptOf(ir.vil3ntec.tohid.data.ReturnFlow.label(id))) },
               onClick = { menu = false; onReturnReceipt(id) },
             )
           }
           if (!cancelled && !online) {
-            DropdownMenuItem(text = { Text("اصلاح فاکتور") }, onClick = { menu = false; onReopen() })
+            DropdownMenuItem(text = { Text(StrInvoices.correctInvoice) }, onClick = { menu = false; onReopen() })
             DropdownMenuItem(
-              text = { Text("لغو فروش", color = Shop.colors.danger) },
+              text = { Text(StrInvoices.cancelSale, color = Shop.colors.danger) },
               onClick = { menu = false; onCancel() },
             )
           }
@@ -694,26 +668,26 @@ private fun ReturnDialog(
 
   val total = items.sumOf { item ->
     val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
-    if (item.quantity > 0) Math.round(item.totalPrice / item.quantity * wanted).toDouble() else 0.0
+    SalesEngine.returnAmount(d, sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
   }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text("مرجوعی — فاکتور #${sale.invoiceLabel() ?: "0"}",
+        Text(StrInvoices.returnTitle(sale.invoiceLabel() ?: "0"),
           style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
 
         if (items.isEmpty()) {
-          EmptyNote("موردی برای مرجوعی وجود ندارد.")
+          EmptyNote(StrInvoices.nothingToReturn)
         } else {
           items.forEach { item ->
             val product = d.products.find { it.id == item.productId }
             val allowed = SalesEngine.returnable(item)
             Column(Modifier.padding(bottom = 12.dp)) {
               Text(
-                "${SalesEngine.itemName(d, item)} — قابل مرجوعی: ${qty(allowed)}${product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""}",
+                StrInvoices.returnable(SalesEngine.itemName(d, item), qty(allowed)) + (product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""),
                 style = MaterialTheme.typography.bodySmall,
                 color = Shop.colors.muted,
               )
@@ -721,7 +695,7 @@ private fun ReturnDialog(
               NumberField(
                 value = quantities[item.id].orEmpty(),
                 onValueChange = { quantities = quantities + (item.id to it) },
-                label = "مقدار مرجوعی",
+                label = StrInvoices.returnQty,
                 modifier = Modifier.fillMaxWidth(),
               )
             }
@@ -730,7 +704,7 @@ private fun ReturnDialog(
           if (total > 0) {
             Panel {
               Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("مبلغ مرجوعی", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+                Text(StrInvoices.returnAmount, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
                 Text("${money(total)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
               }
             }
@@ -740,14 +714,14 @@ private fun ReturnDialog(
           OutlinedTextField(
             value = reason,
             onValueChange = { reason = it },
-            label = { Text("دلیل (اختیاری)") },
+            label = { Text(StrInvoices.reasonOptional) },
             modifier = Modifier.fillMaxWidth(),
           )
         }
 
         Spacer(Modifier.height(18.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             enabled = items.isNotEmpty(),
             onClick = {
@@ -759,7 +733,7 @@ private fun ReturnDialog(
               )
             },
             modifier = Modifier.weight(1f),
-          ) { Text("ثبت مرجوعی") }
+          ) { Text(StrInvoices.recordReturn) }
         }
       }
     }
@@ -797,5 +771,3 @@ private fun RowScope.InvoiceCell(
 
 /** «همهٔ ماه‌ها» — کلیدی که هیچ ماهی نمی‌تواند باشد */
 private const val ALL_MONTHS = "*"
-
-private const val CANCEL_DENIED = "لغوِ فاکتور با صاحب یا مدیرِ دکان است"

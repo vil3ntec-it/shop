@@ -57,6 +57,11 @@ object StrSale {
   fun inactive(n: Any): String = t("«$n» غیرفعال است", "“$n” is inactive", "«$n» غیرفعال دی")
   fun notFound(c: Any): String = t("«$c» پیدا نشد", "“$c” not found", "«$c» ونه موندل شو")
   val registerItemAlt: String get() = t("ثبتِ کالا", "Add item", "توکی ثبت کړئ")
+  fun ambiguousBarcode(c: Any): String = t(
+    "بارکدِ «$c» هم بارکدِ یک کالاست و هم بارکدِ یک بسته — به سبد نرفت. در «محصولات» یکی را عوض کنید",
+    "Barcode “$c” belongs to both an item and a pack — nothing was added. Change one of them in “Products”",
+    "«$c» بارکوډ د یوه توکي هم دی او د یوې بستې هم — ټوکرۍ ته ورنه غی. په «توکي» برخه کې یو یې بدل کړئ",
+  )
   fun barcodeUnregistered(c: Any): String = t("بارکدِ «$c» ثبت نشده", "Barcode “$c” isn't registered", "«$c» بارکوډ نه دی ثبت شوی")
   val received: String get() = t("دریافتی", "Received", "ترلاسه شوې")
   fun badNumber(f: Any): String = t("عددِ «$f» درست نیست", "The “$f” number isn't valid", "د «$f» عدد سم نه دی")
@@ -73,6 +78,17 @@ object StrSale {
   val noActiveInCategory: String get() = t("در این دسته کالای فعالی نیست.", "No active items in this category.", "په دې ډله کې فعال توکی نشته.")
   val discountPct: String get() = t("تخفیف (٪)", "Discount (%)", "تخفیف (٪)")
   val badNumberShort: String get() = t("عدد درست نیست", "Not a valid number", "عدد سم نه دی")
+
+  // POS-24: قاعده‌های پیش از پایانِ فاکتور (تنظیمات)
+  val checkoutRulesTitle: String get() = t("قاعده‌های پایانِ فاکتور", "Checkout rules", "د بل د بشپړولو قاعدې")
+  val checkoutRulesNote: String get() = t(
+    "پیش از ثبتِ هر فاکتور در صندوقِ همین دستگاه سنجیده می‌شوند. «فروشِ نسیه بی مشتری» همیشه رد است.",
+    "Checked before every invoice is saved at this device's till. A credit sale without a customer is always refused.",
+    "د همدې وسیلې په صندوق کې د هر بل له ثبت مخکې کتل کېږي. پرته له پیرودونکي پور پلور تل ردېږي.",
+  )
+  val zeroTotalRule: String get() = t("فاکتورِ با مبلغِ صفر ثبت نشود", "Refuse invoices with a zero total", "د صفر مبلغ بل دې نه ثبتېږي")
+  val customerFromLabel: String get() = t("مشتری لازم است از مبلغِ (افغانی)", "Customer required from (AFN)", "له دې مبلغ څخه پیرودونکی اړین دی (افغانۍ)")
+  val customerFromHint: String get() = t("خالی = خاموش؛ ۰ = هر فاکتور", "Empty = off; 0 = every invoice", "تش = بند؛ ۰ = هر بل")
   val paidNow: String get() = t("دریافتیِ همین حالا (؋)", "Received now (؋)", "همدا اوس ترلاسه شوې (؋)")
   val freeItemAlt: String get() = t("قلمِ آزاد", "Custom item", "آزاد توکی")
   val editRow: String get() = t("ویرایشِ ردیف", "Edit row", "کرښه سمه کړئ")
@@ -112,6 +128,8 @@ object StrSale {
   // فاکتورِ چاپی
   val storeFallback: String get() = t("فروشگاه", "Shop", "دوکان")
   fun saleInvoiceNo(n: Any): String = t("فاکتور فروش #$n", "Sales invoice #$n", "د پلور بل #$n")
+  /** LOC-01: ردیفِ تاریخِ قمری زیرِ تاریخِ فاکتور (فقط با تنظیمِ دکان) */
+  fun hijriDate(d: Any): String = t("قمری: $d", "Hijri: $d", "قمري: $d")
   val cancelled: String get() = t("لغوشده", "Cancelled", "لغوه شوی")
   fun returned(q: Any): String = t("مرجوعی: $q", "Returned: $q", "بېرته راګرځېدلي: $q")
   val itemsTotal: String get() = t("جمع اقلام", "Items total", "د توکو ټول")
