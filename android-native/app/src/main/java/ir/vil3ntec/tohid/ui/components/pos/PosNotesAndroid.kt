@@ -137,7 +137,7 @@ fun PosNotesSettingsWired(context: android.content.Context) {
   val on = PosNotesPrefs.on.value
   SettingsSection(
     icon = Icons.Filled.Edit,
-    title = "یادداشتِ ردیف و فاکتور",
+    title = ir.vil3ntec.tohid.core.i18n.StrPos.notesSection,
     subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
     tint = if (on) Shop.colors.success else Shop.colors.muted,
   ) {
