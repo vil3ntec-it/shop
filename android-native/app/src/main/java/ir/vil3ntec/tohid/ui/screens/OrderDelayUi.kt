@@ -9,6 +9,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,12 +32,58 @@ import kotlinx.coroutines.launch
  *  زمانِ تازه را سرور روی زمانِ ذخیره‌شدهٔ خودش می‌سازد؛ کلیدِ یکتایی یک بار برای هر پنجره.
  */
 
-private fun delayReasonText(r: String): String = when (r) {
+internal fun delayReasonText(r: String): String = when (r) {
   "busy" -> StrOrderOps.delayReasonBusy
   "out_of_stock" -> StrOrderOps.delayReasonStock
   "courier" -> StrOrderOps.delayReasonCourier
   "customer_request" -> StrOrderOps.delayReasonCustomer
   else -> StrOrderOps.delayReasonOther
+}
+
+/**
+ *  حالتِ برگهٔ «عقب انداختن» برای هر دو رابط (این‌جا و `OrderDelayV3` ِ نسخهٔ ۳). یک کلید برای همین پنجره:
+ *  «تأیید» ِ دوباره (قطعِ نت پس از ثبت) همان پاسخ است، نه عقب‌انداختنِ دوم.
+ */
+@Stable
+internal class OrderDelayForm(o: OrderDto, val maxMinutes: Int, val reasons: List<String>) {
+  val key = OrdersRepository.newKey()
+  var seen by mutableStateOf(o)
+    private set
+  var minutes by mutableStateOf(OrderDelay.minutes(maxMinutes).getOrElse(1) { 0 })
+  var reason by mutableStateOf("")
+    private set
+  var note by mutableStateOf("")
+    private set
+  var busy by mutableStateOf(false)
+    private set
+  var error by mutableStateOf<String?>(null)
+    private set
+
+  val valid: Boolean get() = OrderDelay.valid(minutes, reason, note, maxMinutes, reasons)
+
+  fun pick(r: String) { reason = if (reason == r) "" else r }
+  fun edit(raw: String) { note = raw.take(300) }
+
+  /** ثبت؛ موفق ⇒ سفارشِ تازهٔ سرور و پیامِ صفحه، وگرنه null و `error` */
+  suspend fun submit(repo: OrdersRepository, stamp: (Long) -> String): Pair<OrderDto, String>? {
+    if (busy) return null
+    busy = true
+    error = null
+    var out: Pair<OrderDto, String>? = null
+    repo.delay(seen.id, key, minutes, reason, note, seen.readyAt)
+      .onSuccess { fresh -> out = fresh to StrOrderOps.delayDone(fresh.orderNo.toString(), fresh.readyAt?.let(stamp).orEmpty()) }
+      .onFailure { f ->
+        error = when (f.code) {
+          "ready_changed" -> StrOrderOps.delayChanged
+          "delay_not_allowed" -> StrOrderOps.delayNotAllowed
+          else -> if (f.retryable) StrOrderOps.delayRetry else f.userMessage
+        }
+        //  زمانِ تازهٔ سرور ⇒ «اکنون آماده تا …» و `expectedReadyAt` ِ تلاشِ بعدی همان
+        if (f.code == "ready_changed" || f.code == "delay_not_allowed") repo.get(seen.id).onSuccess { seen = it }
+      }
+    busy = false
+    return out
+  }
 }
 
 /** دکمهٔ «عقب انداختن» کنارِ «آماده تا …»؛ [onDone] سفارشِ تازهٔ سرور، [stamp] زمانِ محلیِ صفحهٔ سفارش‌ها */
@@ -64,49 +111,24 @@ private fun OrderDelaySheet(
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
-  //  یک کلید برای همین پنجره: «تأیید» ِ دوباره (قطعِ نت پس از ثبت) همان پاسخ است، نه عقب‌انداختنِ دوم
-  val key = remember(o.id) { OrdersRepository.newKey() }
-  var seen by remember(o.id) { mutableStateOf(o) }
-  var minutes by remember(o.id) { mutableStateOf(OrderDelay.minutes(maxMinutes).getOrElse(1) { 0 }) }
-  var reason by remember(o.id) { mutableStateOf("") }
-  var note by remember(o.id) { mutableStateOf("") }
-  var busy by remember(o.id) { mutableStateOf(false) }
-  var error by remember(o.id) { mutableStateOf<String?>(null) }
-  val valid = OrderDelay.valid(minutes, reason, note, maxMinutes, reasons)
+  val f = remember(o.id) { OrderDelayForm(o, maxMinutes, reasons) }
 
   TohidBottomSheet(title = StrOrderOps.delayTitle(o.orderNo.toString()), onDismiss = onClose) {
     SheetBody {
-      val now = seen.readyAt
+      val now = f.seen.readyAt
       Text(if (now != null) StrOrderOps.delayNow(stamp(now)) else StrOrderOps.delayNoTime, style = MaterialTheme.typography.bodySmall, color = c.muted)
       Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (m in OrderDelay.minutes(maxMinutes)) TohidFilterChip(label = StrOrderOps.delayMinutes(m), selected = minutes == m, onClick = { minutes = m })
+        for (m in OrderDelay.minutes(maxMinutes)) TohidFilterChip(label = StrOrderOps.delayMinutes(m), selected = f.minutes == m, onClick = { f.minutes = m })
       }
       Text(StrOrderOps.delayReason, style = MaterialTheme.typography.labelLarge, color = c.muted)
       Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        for (r in reasons) TohidFilterChip(label = delayReasonText(r), selected = reason == r, onClick = { reason = if (reason == r) "" else r })
+        for (r in reasons) TohidFilterChip(label = delayReasonText(r), selected = f.reason == r, onClick = { f.pick(r) })
       }
-      TohidTextField(note, { note = it.take(300) }, label = StrOrderOps.delayNote, supporting = StrOrderOps.delayNoteHint, singleLine = false)
-      error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.danger) }
+      TohidTextField(f.note, f::edit, label = StrOrderOps.delayNote, supporting = StrOrderOps.delayNoteHint, singleLine = false)
+      f.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = c.danger) }
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        TohidButton(StrOrderOps.delayConfirm, enabled = valid && !busy, busy = busy, onClick = {
-          if (!busy) {
-            busy = true
-            error = null
-            scope.launch {
-              repo.delay(seen.id, key, minutes, reason, note, seen.readyAt)
-                .onSuccess { fresh -> onDone(fresh, StrOrderOps.delayDone(fresh.orderNo.toString(), fresh.readyAt?.let(stamp).orEmpty())) }
-                .onFailure { f ->
-                  error = when (f.code) {
-                    "ready_changed" -> StrOrderOps.delayChanged
-                    "delay_not_allowed" -> StrOrderOps.delayNotAllowed
-                    else -> if (f.retryable) StrOrderOps.delayRetry else f.userMessage
-                  }
-                  //  زمانِ تازهٔ سرور ⇒ «اکنون آماده تا …» و `expectedReadyAt` ِ تلاشِ بعدی همان
-                  if (f.code == "ready_changed" || f.code == "delay_not_allowed") repo.get(seen.id).onSuccess { seen = it }
-                }
-              busy = false
-            }
-          }
+        TohidButton(StrOrderOps.delayConfirm, enabled = f.valid && !f.busy, busy = f.busy, onClick = {
+          scope.launch { f.submit(repo, stamp)?.let { (fresh, msg) -> onDone(fresh, msg) } }
         })
         TohidSecondaryButton(StrOrderOps.delayCancel, onClick = onClose)
       }

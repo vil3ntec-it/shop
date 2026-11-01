@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Payments
+import androidx.compose.material.icons.outlined.RadioButtonUnchecked
+import androidx.compose.material3.Icon
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.ShoppingBag
@@ -63,6 +66,8 @@ fun OrderCard(
   modifier: Modifier = Modifier,
   selected: Boolean = false,
   flash: Boolean = false,
+  /** حالتِ انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه نشانِ تیک کنارِ شماره، نه فقط رنگِ مرز */
+  checked: Boolean? = null,
 ) {
   val c = PhoneV3.colors
   val awaiting = PhoneV3Roles.status(c, V3Status.AWAITING)
@@ -83,6 +88,13 @@ fun OrderCard(
       .padding(16.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
+      if (checked != null) {
+        Icon(
+          if (checked) Icons.Outlined.CheckCircle else Icons.Outlined.RadioButtonUnchecked, contentDescription = null,
+          tint = if (checked) PhoneV3Roles.focus(c) else c.inkMuted,
+        )
+        Spacer(Modifier.width(8.dp))
+      }
       Text(OnlineFmt.orderNo(o.orderNo), style = V3Type.headline, color = c.ink)
       Spacer(Modifier.weight(1f))
       OrderStatusPill(o.status)
