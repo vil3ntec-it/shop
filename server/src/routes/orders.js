@@ -67,6 +67,8 @@ router.get('/config', async (req, res) => {
     picking: await require('../lib/order-picking').flagOf(req.shopId),
     //  «با اسکناسِ … پرداخت می‌کنم» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24) — پیش‌فرض خاموش
     deliveryPrefs: await require('../lib/delivery-prefs').flagOn(req.shopId),
+    //  ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی و نامِ «کالای مشخص» (CHK-15) — پیش‌فرض خاموش
+    substitution: await require('../lib/order-substitution').flagOn(req.shopId),
     tabs: S.TABS,
     reasons: S.REASONS,
     sources: orders.STAFF_SOURCES,
