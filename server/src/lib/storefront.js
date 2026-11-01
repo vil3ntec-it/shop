@@ -39,6 +39,8 @@ const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
 const sfd = require('./storefront-delivery');
+const sfs = require('./storefront-seen');
+const subst = require('./order-substitution');
 const shelf = require('./storefront-shelf');
 const { stripControl } = require('./validate');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -96,6 +98,7 @@ function normalize(s) {
 /** همان نرمال‌سازی، در SQL، روی نامِ کالا. */
 const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
 
+const { SEARCH_FLAG, SEARCH_KEY, searchWhere } = require('./storefront-search');   //  SRCH-01 (شرح همان‌جا)
 function slugOf(v) {
   const s = str(v).toLowerCase();
   if (!SLUG_RE.test(s) || s.includes('--')) {
@@ -147,77 +150,8 @@ const asJson = (x, def) => {
   try { return JSON.parse(x); } catch { return def; }
 };
 
-/** روز، دقیقه و تاریخِ محلیِ دکان — ساعتِ گوشیِ مشتری مرجع نیست. */
-function localParts(at, timezone) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone, hourCycle: 'h23', weekday: 'short', year: 'numeric', month: '2-digit',
-    day: '2-digit', hour: '2-digit', minute: '2-digit',
-  }).formatToParts(new Date(at)).map((p) => [p.type, p.value]));
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
-  const hour = Number(parts.hour) % 24;
-  return {
-    dow, minutes: hour * 60 + Number(parts.minute),
-    date: `${parts.year}-${parts.month}-${parts.day}`,
-    time: `${String(hour).padStart(2, '0')}:${parts.minute}`,
-  };
-}
-
-function scheduleOf(sf, at) {
-  const hours = asJson(sf.weekly_hours, {});
-  const closed = asJson(sf.closed_dates, []);
-  const local = localParts(at, sf.timezone || 'Asia/Kabul');
-  const today = Array.isArray(hours[String(local.dow)]) ? hours[String(local.dow)] : [];
-  const set = Object.keys(hours).length > 0;
-  const holiday = closed.includes(local.date);
-  let open = null;   // null = ساعتِ کاری تنظیم نشده
-  if (holiday) open = false;
-  else if (set) open = today.some(([o, c]) => local.minutes >= o && local.minutes < c);
-  return { set, open, holiday, today, local };
-}
-
-/**
- * سه چیزِ جدا (۳۱.۱؛ ۳۱.۲ بندِ ۷):
- *   badge            — open_online | open_unconfirmed | declared_until | closed | offline
- *   lastConfirmedAt  — آخرین تماسِ واقعیِ یکی از دستگاه‌های دکان با سرور، یا null
- *   orderAcceptance  — accepting | delayed | later. سرور سفارش را در هر سه
- *                      پایدار ثبت می‌کند (۳۱.۲ بندِ ۶)؛ این فقط به مشتری راست
- *                      می‌گوید کی بررسی می‌شود (WEB-03/25).
- */
-function presenceOf(sf, at, lastSeenAt) {
-  let mode = sf.presence_mode || 'auto';
-  const until = sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until);
-  if (mode === 'online_until' && !(until > at)) mode = 'auto';   // پایانِ اعلام ⇒ خودکار منقضی (۳۱.۲ بندِ ۵)
-  const sched = scheduleOf(sf, at);
-  const seen = Number(lastSeenAt) > 0 ? Number(lastSeenAt) : null;
-  const age = seen === null ? Infinity : at - seen;
-  const { staleMs, offlineMs } = config.storefront;
-  const declaredOpen = mode === 'online' || mode === 'online_until';
-
-  let badge;
-  if (mode === 'closed' || (!declaredOpen && sched.open === false)) badge = 'closed';
-  else if (mode === 'offline' || age > offlineMs) badge = 'offline';
-  else if (mode === 'online_until') badge = 'declared_until';
-  else badge = age <= staleMs ? 'open_online' : 'open_unconfirmed';
-
-  const connection = age <= staleMs ? 'confirmed' : (age > offlineMs ? 'lost' : 'unconfirmed');
-  let orderAcceptance = 'delayed';
-  if (badge === 'closed' || mode === 'offline') orderAcceptance = 'later';
-  else if (connection === 'confirmed') orderAcceptance = 'accepting';
-  return {
-    badge,
-    mode,
-    declaredUntil: mode === 'online_until' ? until : null,
-    connection,
-    lastConfirmedAt: seen,
-    orderAcceptance,
-    timezone: sf.timezone || 'Asia/Kabul',
-    localTime: sched.local.time,
-    hoursSet: sched.set,
-    holiday: sched.holiday,
-    today: sched.today,
-    notice: sf.notice || '',
-  };
-}
+//  ساعتِ کار و وضعیت (`localParts`، `scheduleOf`، `presenceOf`): `lib/storefront-hours.js`
+const { localParts, presenceOf } = require('./storefront-hours');
 
 /** آخرین تماسِ واقعیِ دستگاه‌های دکان با سرور (همگام‌سازی) — یا ۰. */
 async function lastSeenOf(shopId) {
@@ -313,8 +247,10 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
-  const needle = normalize(text(q, 60));
-  if (needle) {
+  const raw = text(q, 60);
+  const needle = normalize(raw);
+  if (raw && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
+  else if (needle) {
     params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
     where += ` AND ${SQL_NAME} LIKE $${params.length}`;
   }
@@ -493,7 +429,7 @@ async function photo(shopId, productId, size = 'display') {
 //  ثبتِ سفارش
 // ════════════════════════════════════════════════════════════════════
 
-function parseCheckout(body, sf) {
+function parseCheckout(body, sf, { substitution: subOn = false } = {}) {
   const b = obj(body);
   const fulfillment = str(b.fulfillment);
   if (!['delivery', 'pickup'].includes(fulfillment)) throw badRequest('ارسال یا دریافت از دکان؟', 'bad_fulfillment');
@@ -517,7 +453,7 @@ function parseCheckout(body, sf) {
     return {
       productId,
       qtyMilli: int(x.qtyMilli, `مقدارِ قلمِ ${i + 1}`, { min: 1, max: MAX_QTY_MILLI }),
-      note: text(x.note, 200),
+      note: text(x.note, 200), ...sfs.expectedOf(x, i), ...subst.storeLine(x, productId, subOn, i),   // CHK-17 فیِ دیده‌شده، CHK-15 جایگزینی
     };
   });
 
@@ -533,6 +469,7 @@ function parseCheckout(body, sf) {
     ? null : int(b.slotStartsAt, 'بازهٔ زمانی', { min: 1, max: 4102444800000 });
   return {
     fulfillment, paymentMethod, ...contact, note: text(b.note, 500), lines, expectedTotalMinor, zoneId, slotStartsAt,
+    substitution: subst.orderOf(b, subOn),
   };
 }
 
@@ -565,10 +502,10 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
     const rows = (await run(
       `SELECT ${PRODUCT_COLS} FROM ${PRODUCT_FROM}
         WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
-      [shopId, ids]
+      [shopId, subst.withSubstitutes(ids, input.lines)]
     )).rows;
     const byId = new Map(rows.map((r) => [r.id, productView(r)]));
-    const unavailable = ids.filter((id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
+    const unavailable = await require('./order-picking').unorderable(run, shopId, ids, (id) => !byId.has(id) || byId.get(id).priceMinor === null || !byId.get(id).name);
     if (unavailable.length) {
       throw withData(conflict('برخی کالاها دیگر در ویترین نیستند', 'product_unavailable'), { unavailable });
     }
@@ -581,7 +518,7 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       return {
         lineNo: i + 1, productId: p.id, name: p.name, unit: p.unit, qtyMilli: l.qtyMilli,
         unitPriceMinor: p.priceMinor, lineTotalMinor: S.lineTotalMinor(l.qtyMilli, p.priceMinor),
-        note: l.note, substitution: '',
+        note: l.note, ...subst.storeResolved(l, byId, input.substitution),
       };
     });
     const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
@@ -595,16 +532,14 @@ function pricer(shopId, sf, input, { zonesOn = false } = {}) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
         { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
-    //  CHK-17: جمعِ امروز با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود، تغییر نشان داده می‌شود
-    if (input.expectedTotalMinor !== null && input.expectedTotalMinor !== totalMinor) {
-      throw withData(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), { quote: quoteOf(lines, fees) });
-    }
+    //  CHK-17/S32: جمع یا فیِ هر قلم با آن‌چه مشتری دید فرق دارد ⇒ ثبت نمی‌شود؛ برگهٔ تازه و «X از … به …»
+    sfs.assertSeen(input, lines, totalMinor, () => quoteOf(lines, fees));
     return {
       source: 'storefront', fulfillment: input.fulfillment, paymentMethod: input.paymentMethod,
       customerName: input.customerName, customerPhone: input.customerPhone,
       address: d.address, delivery: d.delivery, note: input.note, isTest: false,
       lines, subtotalMinor, discountMinor: 0, deliveryFeeMinor, totalMinor,
-      scheduledFor: d.scheduledFor, itemsCount: lines.length,
+      scheduledFor: d.scheduledFor, itemsCount: lines.length, substitution: input.substitution,
     };
   };
 }
@@ -621,18 +556,8 @@ function macOf(shopId, orderId) {
   return crypto.createHmac('sha256', tokenKey()).update(`${shopId}\n${orderId}`).digest('base64url').slice(0, 32);
 }
 
-function tokenOf(shopId, orderId) {
-  return `${orderId}.${macOf(shopId, orderId)}`;
-}
-
-/** شناسهٔ سفارش از توکن — یا null (زمان‌ثابت). */
-function orderIdOf(shopId, token) {
-  const m = /^([0-9A-Z]{26})\.([A-Za-z0-9_-]{32})$/.exec(String(token || ''));
-  if (!m) return null;
-  const a = Buffer.from(m[2]);
-  const b = Buffer.from(macOf(shopId, m[1]));
-  return a.length === b.length && crypto.timingSafeEqual(a, b) ? m[1] : null;
-}
+//  TEN-03: لینکِ پیگیریِ زمان‌دار و باطل‌شدنی — `lib/storefront-links.js` (شرح همان‌جا)
+const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
 
 /**
  * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
@@ -641,17 +566,15 @@ function orderIdOf(shopId, token) {
 function publicOrder(o, token, delivery) {
   return {
     token,
-    orderNo: o.orderNo,
-    status: o.status,
-    statusReason: o.statusReason,
+    orderNo: o.orderNo, status: o.status, statusReason: o.statusReason,
+    substitution: o.substitution || '',   // CHK-15: ترجیحِ کلی
     fulfillment: o.fulfillment,
-    paymentMethod: o.paymentMethod,
-    paymentStatus: o.paymentStatus,
+    paymentMethod: o.paymentMethod, paymentStatus: o.paymentStatus,
     currency: o.currency,
     itemsCount: o.itemsCount,
     lines: o.lines.map((l) => ({
       productId: l.productId, name: l.name, unit: l.unit, qtyMilli: l.qtyMilli,
-      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor, note: l.note,
+      unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor, note: l.note, ...subst.publicLine(l),
     })),
     subtotalMinor: o.subtotalMinor,
     discountMinor: o.discountMinor,
@@ -687,7 +610,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
   const verified = await verifiedPhone(ticket, session);
   if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
-  const input = parseCheckout(body, sf);
+  const input = parseCheckout(body, sf, { substitution: await subst.flagOn(sf.shop_id) });
   if (input.customerPhone !== verified) {
     throw new ApiError(403, 'phone_not_verified', 'این شماره تأیید نشده است؛ همان شمارهٔ تأییدشده را بنویسید');
   }
@@ -697,23 +620,23 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
   const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn }), { shopId: sf.shop_id, phone: verified });
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
+  //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
+  const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
   return {
-    order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id)), replayed: out.replayed,
+    order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id, link)), replayed: out.replayed,
     orderId: out.order.id,
   };
 }
 
 async function track(sf, token) {
-  const id = orderIdOf(sf.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id));
+  return require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)));
 }
 
 async function cancel(sf, token) {
-  const id = orderIdOf(sf.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
   try {
@@ -837,14 +760,15 @@ async function myOrders(sf, ticket, session = '') {
   const phone = await verifiedPhone(ticket, session);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
-    `SELECT id, order_no, status, total_minor, items_count, created_at FROM online_orders
+    `SELECT id, order_no, status, total_minor, items_count, created_at, track_gen FROM online_orders
       WHERE shop_id = $1 AND source = 'storefront' AND customer_phone = $2
       ORDER BY created_at DESC, id DESC LIMIT 20`,
     [sf.shop_id, phone]
   );
+  const on = await linkPolicyOn(sf.shop_id);
   return rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
+    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on),
   }));
 }
 
@@ -864,7 +788,7 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
   }
   params.push(lim + 1);
   const rows = await many(
-    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at FROM online_orders
+    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at, track_gen FROM online_orders
       WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${params.length}`,
     params
   );
@@ -876,13 +800,14 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
     [sf.shop_id, page.map((r) => r.id)]
   ) : [];
   const last = page[page.length - 1];
+  const on = await linkPolicyOn(sf.shop_id);
   return {
     orders: page.map((r) => ({
       orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
       scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
       preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
-      token: tokenOf(sf.shop_id, r.id),
+      token: listTokenOf(sf.shop_id, r, on),
     })),
     nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
   };
@@ -1206,11 +1131,11 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن

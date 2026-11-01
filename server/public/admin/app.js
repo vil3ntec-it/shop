@@ -1079,6 +1079,19 @@ function ago(ms) {
   return `${fa(Math.round(ms / 86_400_000))} روز`;
 }
 
+/**
+ * تأخیرِ همگام‌سازی (OPS-04) — فقط وقتی سرور `lag` بفرستد (پرچمِ `ops.sync_lag` ِ scope ‏`ops`)؛
+ * نبودش ⇒ کارت همان پیشین. فقط عدد، بی شناسهٔ دستگاه یا دکان.
+ */
+function syncLagLine(lag) {
+  if (!lag) return '';
+  if (lag.status === 'unknown') return ' · تأخیر: نامعلوم';
+  return ` · ${numOr(lag.devices)} دستگاهِ فعال، ${numOr(lag.behindDevices)} عقب (بیشینه ${numOr(lag.maxBehindOps)} تغییر)`
+    + `، ${numOr(lag.queuedOps)} تغییر در صفِ دستگاه‌ها، ${numOr(lag.stale24h)} بی همگام‌سازی بیش از ۲۴ ساعت`
+    + (lag.stuck ? `، ${numOr(lag.stuck)} گیرکرده (آنلاین ولی بی دریافت)` : '')
+    + (lag.lastSyncAgeP50Ms == null ? '' : ` · میانهٔ آخرین همگام‌سازی ${ago(lag.lastSyncAgeP50Ms)} پیش`);
+}
+
 async function loadSystemHealth() {
   const box = $('sys-health');
   const overall = $('sys-overall');
@@ -1100,7 +1113,8 @@ async function loadSystemHealth() {
     ['صفِ ایمیلِ ورود', q.email, `${numOr(q.email?.queued)} در صف · ${numOr(q.email?.failed24h)} ناموفق (۲۴ ساعت)`
       + (q.email?.worker === 'down' ? ' · کارگزار خاموش' : '')],
     ['صفِ تلگرام', q.telegram, `${numOr(q.telegram?.pending)} در صف · قدیمی‌ترین ${ago(q.telegram?.oldestAgeMs)}`],
-    ['همگام‌سازی (۲۴ ساعت)', s.sync, `${numOr(s.sync?.clientErrors24h)} خطای برنامه · ${numOr(s.sync?.conflicts24h)} تعارض`],
+    ['همگام‌سازی (۲۴ ساعت)', s.sync, `${numOr(s.sync?.clientErrors24h)} خطای برنامه · ${numOr(s.sync?.conflicts24h)} تعارض`
+      + syncLagLine(s.sync?.lag)],
     ['فضای دیسک', s.storage, s.storage?.freePct == null ? '—' : `${fa(s.storage.freePct)}٪ آزاد`],
     ['پشتیبانِ سرور', s.backups, !s.backups?.enabled ? 'خودکار خاموش است'
       : s.backups?.last ? `آخرین: ${ago(s.backups.ageMs)} پیش${s.backups.encryption ? '' : ' · بی‌رمز'}` : 'هنوز پشتیبانی نیست'],
