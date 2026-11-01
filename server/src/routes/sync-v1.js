@@ -79,6 +79,11 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
  *  داخلِ تراکنشِ push و زیرِ قفلِ ردیف سنجیده می‌شود، نه در میان‌افزار: درجِ همان دسته را هم می‌بیند.
  */
 const finalized = require('../lib/finalized-sales');
+/*
+ *  دکان: pull بی opِ کهنه‌ترِ دیگران روی نوشتهٔ تازه‌ترِ همین دستگاه، پشتِ پرچمِ خاموشِ
+ *  `sync.pull_own_newer` (#501) — ‎lib/sync-v1-own-newer.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد.
+ */
+const ownNewer = require('../lib/sync-v1-own-newer');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
@@ -130,7 +135,10 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     });
     const since = Number(req.query?.since || 0);
     const limit = Number(req.query?.limit || 0) || undefined;
-    res.json({ ok: true, ...(await sync.pull(req.sync, { since, deviceId, limit })) });
+    const out = await sync.pull(req.sync, { since, deviceId, limit });
+    //  فقط دکان با پرچم: فیلد یا opی کم می‌شود؛ cursor، has_more و head همان
+    out.ops = await ownNewer.view(req.sync, deviceId, since, out.ops);
+    res.json({ ok: true, ...out });
   } catch (err) { next(err); }
 });
 
