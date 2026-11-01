@@ -14,5 +14,10 @@
   "err.promo_code_rejected": "The discount code was not accepted; the basket was recalculated without it.",
   "promo.days.1": "1 day left",
   "promo.hours.1": "1 hour left",
-  "promo.mins.1": "1 minute left"
+  "promo.mins.1": "1 minute left",
+  "ck.phone2.l": "Second phone (optional)",
+  "ck.plus.l": "Plus Code (optional)",
+  "ck.plus.ph": "e.g. 9G8F+6W Kabul",
+  "err.bad_plus_code": "The Plus Code is not valid, e.g. 9G8F+6W Kabul.",
+  "err.bad_phone2": "The second phone number is not valid."
 }

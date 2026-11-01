@@ -113,6 +113,7 @@
       $('t-disc').textContent = '−' + K.money(disc);
       $('t-total').textContent = K.money(sub - disc + fee);
       $('address-box').hidden = f !== 'delivery';
+      $('addr-extra').hidden = !c.store.addressExtra;
       var min = c.minFor(f);
       var below = min > sub;
       if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(min) })); else $('min-order').hidden = true;
@@ -228,6 +229,8 @@
       if (code) body.promoCode = code;   //  MKT-01: سرور در همان تراکنش می‌سنجد؛ اعمال نشد ⇒ ۴۰۹ `promo_code_rejected`   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
+        //  CHK-08 (پرچمِ `shop.storefront.address_extra`): شمارهٔ دوم و Plus Code — نادرست ⇒ ۴۰۰ ِ سرور با پیامِ روشن
+        if (c.store.addressExtra) { body.address.phone2 = $('a-phone2').value.trim(); body.address.plusCode = $('a-plus').value.trim(); }
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;

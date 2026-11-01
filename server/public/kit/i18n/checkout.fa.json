@@ -11,5 +11,10 @@
   "promo.st.inactive": "این کدِ تخفیف الان فعال نیست.",
   "promo.st.used_up": "ظرفیتِ این کدِ تخفیف پر شده است.",
   "promo.st.no_effect": "این کدِ تخفیف روی این سبد اثری ندارد.",
-  "err.promo_code_rejected": "کدِ تخفیف پذیرفته نشد؛ سبد بی آن دوباره حساب شد."
+  "err.promo_code_rejected": "کدِ تخفیف پذیرفته نشد؛ سبد بی آن دوباره حساب شد.",
+  "ck.phone2.l": "شمارهٔ دوم (اختیاری)",
+  "ck.plus.l": "Plus Code (اختیاری)",
+  "ck.plus.ph": "مثلاً 9G8F+6W کابل",
+  "err.bad_plus_code": "Plus Code درست نیست؛ مثلاً 9G8F+6W کابل.",
+  "err.bad_phone2": "شمارهٔ دوم درست نیست."
 }

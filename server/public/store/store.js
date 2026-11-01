@@ -567,6 +567,7 @@
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
       stockList = Boolean(r.features && r.features.stockList);
+      store.addressExtra = Boolean(r.features && r.features.addressExtra);
       verifyAvailable = !r.verification || r.verification.available !== false;
       if (r.recent) {
         var rs = el('script', { attrs: { src: '/store/recent.js' } });

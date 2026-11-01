@@ -234,12 +234,29 @@ function parseAddress(raw) {
   const addrText = text(a.text, 300);
   const area = text(a.area, 80);
   const gateColor = text(a.gateColor, 40);
+  //  CHK-08: شمارهٔ دوم (کارتِ پیک فقط کلیدهای خودش را برمی‌دارد، پس پوشیده می‌ماند) و Plus Code (فقط متن، بی ژئوکدر)
+  let phone2 = null;
+  if (text(a.phone2, 40)) {
+    try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
+  }
+  const plusCode = plusCodeOf(a.plusCode);
   //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
   if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
   return {
     ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
-    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}),
+    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}), ...(phone2 ? { phone2 } : {}), ...(plusCode ? { plusCode } : {}),
   };
+}
+
+/** Plus Code (Open Location Code): کامل (۸+۲/۳) یا کوتاه (۴/۶+۲/۳) با نامِ شهرِ اختیاری؛ نادرست ⇒ ۴۰۰ `bad_plus_code` */
+const OLC = /^(?:[23456789CFGHJMPQRVWX]{8}|[23456789CFGHJMPQRVWX]{6}|[23456789CFGHJMPQRVWX]{4})\+[23456789CFGHJMPQRVWX]{2,3}$/;
+function plusCodeOf(raw) {
+  const s = text(raw, 60).replace(/\s+/g, ' ');
+  if (!s) return '';
+  const [head, ...rest] = s.split(' ');
+  const code = head.toUpperCase();
+  if (!OLC.test(code)) throw badRequest('Plus Code معتبر نیست (مثلاً 8FVC9G8F+6W یا 9G8F+6W کابل)', 'bad_plus_code');
+  return [code, ...rest].join(' ').slice(0, 60);
 }
 
 /**
