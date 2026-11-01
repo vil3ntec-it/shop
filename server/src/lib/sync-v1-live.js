@@ -422,6 +422,20 @@ function broadcast(ctx, cursor, exceptDevice = '') {
 }
 
 /**
+ * بستنِ همهٔ سوکت‌های زندهٔ یک حساب — فاز ۳: دکانی که مدیر دسترسی‌اش را بست (تعلیق، بایگانی،
+ * درخواستِ حذف) دیگر خبرِ «changed» یا رلهٔ «scan» نمی‌گیرد. وصلِ دوباره در همان دست‌دادن رد می‌شود
+ * (`resolveToken` ⇒ بی حساب). @returns {number} چند سوکت بسته شد
+ */
+function closeRoom(ctx, code = 4403, reason = 'account_blocked') {
+  const room = rooms.get(roomKey(ctx));
+  if (!room) return 0;
+  //  همان `kill` ِ TEN-02: همان لحظه از اتاق و فهرستِ سوکت‌ها بیرون، و قطعِ کامل اگر کلاینت جواب نداد
+  const all = [...room];
+  for (const ws of all) kill(ws, { code, reason });
+  return all.length;
+}
+
+/**
  * رخدادهایی که دستگاه می‌تواند برای دستگاه‌های دیگرِ حسابش بفرستد.
  *   scan   — گوشی بارکد خواند ⇒ کامپیوتری که «گوشی به‌عنوانِ بارکدخوان»
  *            را با همان کدِ جفت‌شدن باز کرده، آن را در سبد می‌گذارد
@@ -550,6 +564,6 @@ async function dropRevoked(wss) {
 }
 
 module.exports = {
-  attach, broadcast, relay, listeners, roomKey, issueTicket, accessChanged, dropRevoked, s78,
+  attach, broadcast, relay, listeners, closeRoom, roomKey, issueTicket, accessChanged, dropRevoked, s78,
   PATHS, PING_MS, RELAY_EVENTS, TICKET_MS, RECHECK_MS, CLOSE, EXPIRY_FLAG,
 };

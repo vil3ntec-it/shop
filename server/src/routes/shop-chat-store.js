@@ -98,6 +98,15 @@ router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, as
   res.json(await chat.remove(v(req), req.params.id, req.params.mid, req.query.for));
 });
 
+//  سنجاقِ مشتری (CHAT-14) — فقط برای خودش؛ دکان نمی‌بیند
+router.put(`${base}/conversations/:id/pins/:mid`, readLimit, customer, sendLimit, async (req, res) => {
+  res.json({ conversation: await chat.pin(v(req), req.params.id, req.params.mid, true) });
+});
+
+router.delete(`${base}/conversations/:id/pins/:mid`, readLimit, customer, sendLimit, async (req, res) => {
+  res.json({ conversation: await chat.pin(v(req), req.params.id, req.params.mid, false) });
+});
+
 router.post(`${base}/conversations/:id/receipts`, readLimit, customer, async (req, res) => {
   res.json(await chat.receipts(v(req), req.params.id, req.body));
 });
