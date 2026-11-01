@@ -835,7 +835,7 @@ fun AppRootLegacy(
                 if (ir.vil3ntec.tohid.data.StockLedger.serverFlag) ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz else null,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
-                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
+                StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale, ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle to androidx.compose.material.icons.Icons.Filled.AccountBalance, // PAY-18
                 StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
                 StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
                 //  صندوق: قیمت و تخفیفِ ردیف، جست‌وجوی مقاوم، قیمت‌پرسی، حالتِ لمسی، کلیدهای بیشتر، دریافت از مشتری (POS-04/08/15/31/39/41)

@@ -4,7 +4,7 @@ import ir.vil3ntec.tohid.core.promo.PromoCore
 import kotlin.math.roundToLong
 
 /**
- *  تخفیف‌های خودکار در صندوق (PRM-01..09، 12، 17، 18) — پلِ `PromoCore` و سبدِ
+ *  تخفیف‌های خودکار در صندوق (PRM-01..10، 12، 17، 18) — پلِ `PromoCore` و سبدِ
  *  `SalesEngine`.
  *
  *  ⛔ پیش‌فرض خاموش: کلیدِ دکان خاموش، بی قاعدهٔ فعال یا سبدِ خالی ⇒ `null`، و
@@ -55,6 +55,11 @@ object PromoEngine {
      *  خاموش ⇒ همان رفتارِ پیشین.
      */
     val redeem: Boolean = false,
+    /**
+     *  PRM-10 — پرچمِ `shop.promo_expiry` ِ سرور (`expiry` در پاسخ، پیش‌فرض خاموش): فرمِ قاعده نوعِ
+     *  «تخفیفِ نزدیکِ انقضا» را نشان می‌دهد. خاموش ⇒ همان فرمِ پیشین.
+     */
+    val expiry: Boolean = false,
   ) {
     val active: Boolean get() = enabled && rules.any { it.active }
     val hasCodes: Boolean get() = rules.any { it.active && it.code.isNotBlank() }
@@ -131,11 +136,25 @@ object PromoEngine {
     }
   }
 
-  /** ردیف‌های سبد ⇒ ورودیِ هسته. مبلغِ هر ردیف همان `SalesEngine.lineTotal`ِ امروز است. */
-  fun lines(d: ShopData, cart: List<SalesEngine.CartLine>): List<PromoCore.Line> = cart.map { line ->
+  /**
+   *  ردیف‌های سبد ⇒ ورودیِ هسته. مبلغِ هر ردیف همان `SalesEngine.lineTotal`ِ امروز است.
+   *
+   *  @param today PRM-10 — تاریخِ محلیِ دکان؛ داده شود ⇒ هر ردیفِ کالایی ماندهٔ محموله‌های انقضادارِ
+   *    همان کالا را به FEFO می‌گیرد (`ExpiryEngine.lots`، به هزارم). `null` ⇒ بی محموله، همان پیشین.
+   */
+  fun lines(d: ShopData, cart: List<SalesEngine.CartLine>, today: String? = null): List<PromoCore.Line> {
+    //  تاریخِ خرابِ یک محموله فروش را نمی‌خواباند — فقط بی تخفیفِ انقضا
+    val lots = today?.let { t ->
+      runCatching { ExpiryEngine.lots(d, t) }.getOrDefault(emptyList())
+        .groupBy({ it.product.id }) { PromoCore.Lot(it.daysLeft, (it.remaining * 1000).roundToLong()) }
+    }.orEmpty()
+    return cart.map { line -> line(d, line, lots) }
+  }
+
+  private fun line(d: ShopData, line: SalesEngine.CartLine, lots: Map<String, List<PromoCore.Lot>>): PromoCore.Line {
     val qtyMilli = (line.quantity * 1000).roundToLong()
     val p = if (line.free) null else d.products.find { it.id == line.productId }
-    if (p == null) {
+    return if (p == null) {
       val price = line.unitPrice ?: 0.0
       PromoCore.Line(
         key = line.productId, productId = "", qtyMilli = qtyMilli, unitMinor = (price * 100).roundToLong(),
@@ -153,6 +172,7 @@ object PromoEngine {
         category = p.category,
         supplierId = p.supplierId,
         noPromo = line.unitPrice != null,
+        lots = lots[p.id].orEmpty(),
       )
     }
   }
@@ -173,7 +193,9 @@ object PromoEngine {
     minute: Int,
   ): Outcome? {
     if (!snap.active || cart.isEmpty()) return null
-    val input = PromoCore.Cart(lines(d, cart), coupons, group = "", channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100)
+    //  PRM-10: محموله‌ها فقط وقتی قاعدهٔ فعالِ «نزدیکِ انقضا» هست — وگرنه همان ورودیِ پیشین
+    val expiry = snap.rules.any { it.active && it.kind == "expiry" }
+    val input = PromoCore.Cart(lines(d, cart, if (expiry) date else null), coupons, group = "", channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100)
     val r = runCatching { PromoCore.evaluate(input, snap.rules) }.getOrNull() ?: return null
     val net = r.lines.associate { it.key to it }
     val parts = runCatching { split(input, snap.rules, r) }.getOrNull()

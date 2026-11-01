@@ -1,7 +1,7 @@
 package ir.vil3ntec.tohid.core.promo
 
 /**
- *  هستهٔ تخفیف و قاعده‌های قیمت — PRM-01..09، 11، 12، 17 (بخشِ ۶.۴ِ مشخصات).
+ *  هستهٔ تخفیف و قاعده‌های قیمت — PRM-01..12، 17 (بخشِ ۶.۴ِ مشخصات).
  *
  *  همتای دقیقِ `license/promo-core.js` (وب). هر دو با یک فایلِ مرجع سنجیده
  *  می‌شوند: `core/test-vectors/promo-v1.json` (آزمونش:
@@ -25,17 +25,26 @@ package ir.vil3ntec.tohid.core.promo
  *  باقی‌مانده» پخش می‌شود. هیچ ردیفی زیرِ بهای خرید (گرد رو به بالا) نمی‌رود مگر
  *  قاعده `allowBelowCost` داشته باشد؛ زیرِ صفر هرگز.
  *
+ *  ── نزدیکِ انقضا (PRM-10، نوعِ `expiry`) ───────────────────────
+ *  درصدِ `bp` فقط روی واحدهایی از ردیف که در محموله‌های «تا `nearDays` روز مانده به
+ *  انقضا» نشسته‌اند (۰ ≤ روزِ مانده ≤ `nearDays`). محمولهٔ منقضی تخفیف نمی‌گیرد —
+ *  فروشش با سیاستِ موجودِ دکان است. شمارِ واحدها به FEFO: کمینهٔ مقدارِ ردیف و ماندهٔ
+ *  نزدیکِ انقضای همان کالا (`Line.lots`)؛ ردیف‌های یک کالا به ترتیبِ سبد از همان مانده
+ *  برمی‌دارند. ردیفِ بی محموله ⇒ هیچ. سبدی که `lots` ندارد (وب، فروشگاهِ اینترنتی) هیچ.
+ *
  *  Kotlin خالص است — بی android.*، بی کتابخانه.
  */
 object PromoCore {
 
   const val VERSION = 1
 
-  val KINDS: List<String> = listOf("percent", "amount", "price", "tiers", "bxgy", "bundle", "threshold")
+  val KINDS: List<String> = listOf("percent", "amount", "price", "tiers", "bxgy", "bundle", "threshold", "expiry")
   val STACKS: List<String> = listOf("exclusive", "best", "combine")
   val CHANNELS: List<String> = listOf("pos", "online")
 
   private const val FULL_BP = 10_000L
+  /** PRM-10 — بیشترین «روز پیش از انقضا»ی قاعدهٔ `expiry` */
+  const val MAX_NEAR_DAYS = 365L
   private const val MAX = 9_007_199_254_740_991L
 
   // ── مدل ─────────────────────────────────────────────────
@@ -96,7 +105,12 @@ object PromoCore {
     val get: Long = 0,
     val qty: Long = 0,
     val priceMinor: Long = 0,
+    /** PRM-10 — فقط `expiry`: چند روز پیش از انقضا (۱ تا [MAX_NEAR_DAYS]) */
+    val nearDays: Long = 0,
   )
+
+  /** PRM-10 — ماندهٔ یک محمولهٔ همین کالا (FEFO) به هزارم و روزِ مانده تا انقضا (منفی = گذشته) */
+  data class Lot(val daysLeft: Long, val qtyMilli: Long)
 
   /** `amountMinor`: مبلغِ ردیف از موتورِ صندوق؛ null ⇒ مقدار × قیمت با گردکردنِ ۳.۴. */
   data class Line(
@@ -110,6 +124,8 @@ object PromoCore {
     val supplierId: String = "",
     val brand: String = "",
     val noPromo: Boolean = false,
+    /** PRM-10 — محموله‌های انقضادارِ همین کالا؛ خالی ⇒ قاعدهٔ `expiry` روی این ردیف هیچ */
+    val lots: List<Lot> = emptyList(),
   )
 
   /** زمانِ محلیِ دکان: تاریخِ «YYYY-MM-DD» و دقیقه از نیمه‌شب. */
@@ -230,6 +246,7 @@ object PromoCore {
       prices = objs(o["prices"]).map { Price(str(it["productId"]), int(it["unitMinor"], -1)) },
       tiers = objs(o["tiers"]).map { Tier(int(it["min"], -1), int(it["bp"], 0), int(it["amountMinor"], 0), int(it["unitMinor"], -1)) },
       buy = int(o["buy"], 0), get = int(o["get"], 0), qty = int(o["qty"], 0), priceMinor = int(o["priceMinor"], 0),
+      nearDays = int(o["nearDays"], 0),
     )
   }
 
@@ -244,6 +261,7 @@ object PromoCore {
           unitMinor = int(it["unitMinor"], 0), amountMinor = intOrNull(it["amountMinor"]), costMinor = int(it["costMinor"], 0),
           category = str(it["category"]), supplierId = str(it["supplierId"]), brand = str(it["brand"]),
           noPromo = bool(it["noPromo"], false),
+          lots = objs(it["lots"]).map { x -> Lot(int(x["daysLeft"], -1), int(x["qtyMilli"], 0)) },
         )
       },
       coupons = strs(o["coupons"]), group = str(o["group"]),
@@ -372,6 +390,10 @@ object PromoCore {
     }
     if (k == "bxgy" && (r.buy < 1 || r.get < 1 || r.buy > 1000 || r.get > 1000 || !validBp(r.bp))) e += "bxgy"
     if (k == "bundle" && (r.qty < 2 || r.qty > 1000 || r.priceMinor <= 0 || r.priceMinor % step != 0L)) e += "bundle"
+    if (k == "expiry") {
+      if (!validBp(r.bp)) e += "bp"
+      if (r.nearDays < 1 || r.nearDays > MAX_NEAR_DAYS) e += "expiry"
+    }
     return e
   }
 
@@ -382,7 +404,7 @@ object PromoCore {
   private class L(
     val key: String, val productId: String, val qtyMilli: Long, val unitMinor: Long, val amountMinor: Long,
     val category: String, val supplierId: String, val brand: String,
-    val units: Long, val costFloor: Long, val open: Boolean,
+    val units: Long, val costFloor: Long, val open: Boolean, val lots: List<Lot>,
   )
 
   private class Cx(val step: Long, val lines: List<L>, val codes: List<String>, val group: String, val channel: String, val at: At?)
@@ -400,6 +422,7 @@ object PromoCore {
         units = if (qty > 0) div(qty, 1000) else 0,
         costFloor = if (cost > 0 && qty > 0) ceilStep(mul(qty, cost), 1000, step) else 0,
         open = l.productId != "" && !l.noPromo && qty > 0 && amount > 0,
+        lots = l.lots,
       )
     }
     val codes = LinkedHashSet<String>()
@@ -550,6 +573,22 @@ object PromoCore {
         val amt = if (tier.amountMinor > 0) minOf(tier.amountMinor, floorStep(base, step))
         else roundStep(mul(base, tier.bp), FULL_BP, step)
         return allocate(amt, w, cp, step)
+      }
+      "expiry" -> {
+        //  PRM-10 — FEFO: ردیف‌های یک کالا به ترتیبِ سبد از همان ماندهٔ نزدیکِ انقضا برمی‌دارند
+        val used = HashMap<String, Long>()
+        for (i in idx) {
+          val l = lines[i]
+          var near = 0L
+          for (lot in l.lots) if (lot.daysLeft >= 0 && lot.daysLeft <= r.nearDays && lot.qtyMilli > 0) near = add(near, lot.qtyMilli)
+          val prior = used[l.productId] ?: 0L
+          val n = minOf(l.qtyMilli, maxOf(0L, near - prior))
+          used[l.productId] = prior + n
+          if (n <= 0) continue
+          //  همهٔ ردیف ⇒ همان «percent»؛ بخشی ⇒ مبلغِ همان واحدها، نه بیش از مبلغِ ردیف
+          val base = if (n >= l.qtyMilli) l.amountMinor else minOf(l.amountMinor, lineTotalMinor(n, l.unitMinor, step))
+          out[i] = minOf(roundStep(mul(base, r.bp), FULL_BP, step), roomOf(r, l, rem[i], step))
+        }
       }
     }
     return out
