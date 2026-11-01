@@ -18,6 +18,10 @@
  *    سقف را نشان نمی‌دهد و از قاعدهٔ پایه نگه می‌دارد) باید بتواند ویرایش کند ⇒ `0` می‌نشیند.
  * ⛔ `stamp` در پاسخِ GET = پرچمِ `shop.promo_stamp` (`live_config`، پیش‌فرض خاموش): نشانِ
  *    تخفیف روی فاکتور و ردیف‌های تازهٔ فاکتور در برنامه، و ردیفِ آگاهیِ فاکتورِ عمومی.
+ * ⛔ POS-19: پلهٔ «قیمتِ ثابتِ هر واحد» (`tiers[].unitMinor`) فقط با پرچمِ `shop.promo_tier_price`
+ *    (`live_config`، پیش‌فرض خاموش) نوشته می‌شود — خاموش ⇒ ۴۰۳ `tier_price_disabled`؛ `tierPrice`
+ *    در پاسخِ GET همان پرچم است تا برنامه گزینه‌اش را نشان دهد. برنامهٔ پیشین چنین قاعده‌ای را
+ *    «نامعتبر» می‌بیند و نادیده می‌گیرد، پس پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند.
  * ⛔ PRM-02، دفترِ مصرف (`shop_promo_redemptions`، مهاجرتِ ۱۳۶) پشتِ پرچمِ `shop.promo_uses`
  *    (`live_config`، پیش‌فرض خاموش؛ `redeem` در پاسخِ GET). خاموش ⇒ همان رفتارِ بالا و redeem/release
  *    ۴۰۳ `promo_uses_disabled`. روشن ⇒ `maxUses` (عددِ صحیحِ ۰ تا ۱٬۰۰۰٬۰۰۰) پذیرفته است و:
@@ -50,6 +54,8 @@ const { flagOf } = require('../lib/orders');
 
 /** پرچمِ `live_config` ِ نشانِ تخفیف روی فاکتور — همان `receipt-public.js` */
 const STAMP_FLAG = 'shop.promo_stamp';
+/** POS-19 — پلهٔ قیمتِ ثابت */
+const TIER_PRICE_FLAG = 'shop.promo_tier_price';
 /** پرچمِ `live_config` ِ دفترِ مصرفِ کد (PRM-02) */
 const USES_FLAG = 'shop.promo_uses';
 const MAX_USES = 1000000;
@@ -77,7 +83,7 @@ const MESSAGES = {
   priority: 'اولویت باید بینِ ‎-۱۰۰۰ و ۱۰۰۰ باشد', code: 'کد باید ۳ تا ۳۲ حرف یا رقمِ لاتین باشد', uses: 'سقفِ مصرف نادرست است',
   channel: 'کانال ناشناخته است', window: 'بازهٔ زمانی نادرست است', bp: 'درصد باید بیش از ۰ و حداکثر ۱۰۰ باشد',
   amount: 'مبلغ باید مثبت و افغانیِ کامل باشد', prices: 'فهرستِ قیمت‌های ویژه نادرست است',
-  tiers: 'پله‌ها باید صعودی باشند (هم آستانه، هم تخفیف)', bxgy: '«بخر» و «بگیر» دست‌کم ۱ و درصدِ معتبر', bundle: 'بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل',
+  tiers: 'پله‌ها باید صعودی باشند (هم آستانه، هم تخفیف؛ قیمتِ ثابتِ هر پله کمتر از پلهٔ پیش)', bxgy: '«بخر» و «بگیر» دست‌کم ۱ و درصدِ معتبر', bundle: 'بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل',
 };
 
 /** `uses` همیشه از دفترِ مصرف (PRM-02) — عددِ ذخیره‌شده در `data` و عددِ برنامه هیچ‌کدام مرجع نیستند */
@@ -148,6 +154,7 @@ router.get('/', requirePermission('data.read'), wrap(async (req, res) => {
   res.json({
     ...(await stateOf(req.shopId)),
     stamp: await flagOf(req.shopId, STAMP_FLAG),
+    tierPrice: await flagOf(req.shopId, TIER_PRICE_FLAG),
     redeem: await flagOf(req.shopId, USES_FLAG),
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
@@ -200,6 +207,9 @@ router.put('/rules/:id', requirePermission('settings.write'), wrap(async (req, r
     return res.status(400).json({
       error: { code: 'invalid_rule', message: errors.map((e) => MESSAGES[e] || e).join('؛ '), fields: errors },
     });
+  }
+  if (P.tierPrice(rule) && !(await flagOf(req.shopId, TIER_PRICE_FLAG))) {
+    throw forbidden('پلهٔ «قیمتِ ثابتِ هر واحد» برای این دکان هنوز روشن نیست', 'tier_price_disabled');
   }
   if (rule.allowBelowCost && req.role !== 'owner') {
     throw forbidden('فروشِ زیرِ بهای خرید را فقط صاحبِ دکان اجازه می‌دهد', 'below_cost_owner_only');

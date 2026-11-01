@@ -31,7 +31,14 @@ import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PresenceStatusDto
 import ir.vil3ntec.tohid.data.repo.StorefrontConfigDto
 import ir.vil3ntec.tohid.data.repo.StorefrontProductDto
+import ir.vil3ntec.tohid.data.repo.StorefrontQueue
 import ir.vil3ntec.tohid.data.repo.StorefrontRepository
+import ir.vil3ntec.tohid.core.storefront.OutboxEntry
+import ir.vil3ntec.tohid.core.storefront.PresenceDeclaration
+import ir.vil3ntec.tohid.core.storefront.SendOutcome
+import ir.vil3ntec.tohid.core.storefront.StorefrontChange
+import ir.vil3ntec.tohid.core.storefront.StorefrontOutbox
+import ir.vil3ntec.tohid.core.storefront.StorefrontRules
 import ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
@@ -57,20 +64,23 @@ object StorefrontGate {
   suspend fun refresh(context: android.content.Context): StorefrontConfigDto? {
     if (!Backend.isReady(context)) { config.value = null; return null }
     val r = StorefrontRepository(Backend.api(context)).config().valueOrNull()
-    if (r != null) config.value = r
+    if (r != null) {
+      config.value = r
+      //  هر ویرایشِ ویترین/بازار که بی اینترنت ماند، با باز شدنِ برنامه دوباره فرستاده می‌شود
+      if (r.flag) StorefrontQueue.flush(context)
+    }
     return r
   }
 }
 
-private const val PREFS = "tohid-storefront"
-private const val PENDING_KEY = "pending-presence"
 
 /**
  *  ویترینِ اینترنتی — صفحهٔ صاحب دکان (WEB-01/03، PRD-27، §۳۱ PRES).
  *
- *  پنج برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
+ *  شش برگه: «وضعیت» (همان که مشتری می‌بیند + اعلامِ آنلاین/آفلاین)،
  *  «تنظیمات»، «کالاها» (انتشار، قیمتِ آنلاین، سقفِ تعداد، توضیح و مشخصات، گروهی)،
- *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`)
+ *  «بازارچه» (نمایش در فهرستِ عمومیِ دکان‌ها، `StorefrontMarket.kt`)،
+ *  «پیوند و QR» (پیوندِ کمپین و QR ِ دیوار/رسید، `StorefrontCampaigns.kt`)
  *  و «ارسال و زمان» (ناحیه‌ها و بازه‌ها — `StorefrontDelivery.kt`).
  *  هر کار فقط پس از پاسخِ سرور «ثبت شد» می‌گوید (PRES-09).
  */
@@ -92,6 +102,17 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
     loading = false
   }
   LaunchedEffect(Unit) { reload() }
+  //  صفِ آفلاین: هر ۱۵ ثانیه تا صفحه باز است (پس‌کشیِ خودِ صف جلوی تکرارِ بی‌جا را می‌گیرد)
+  LaunchedEffect(Unit) {
+    while (true) {
+      runCatching { StorefrontQueue.flush(context) }
+      kotlinx.coroutines.delay(15_000)
+    }
+  }
+  //  «ثبت شد» فقط از پاسخِ سرور (§۳۱.۲ بندِ ۲)
+  LaunchedEffect(Unit) {
+    StorefrontQueue.reports.collect { r -> if (r.outcome != SendOutcome.HOLD || r.message == StorefrontOutbox.CONFLICT_NOTE) snackbar.showSnackbar(r.message) }
+  }
 
   val c = StorefrontGate.config.value
   Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -108,11 +129,12 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
         }
         TohidFilterRow(
           //  «ارسال و زمان» فقط وقتی سرور پرچمِ جدای `shop.storefront.zones` را روشن گفته
-          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه") +
+          options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه", "campaigns" to "پیوند و QR") +
             (if (c.zones) listOf("delivery" to "ارسال و زمان") else emptyList()),
           selected = tab,
           onSelect = { tab = it },
         )
+        OutboxBanner()
         val settings = c.settings
         when (tab) {
           "status" -> PresencePane(settings, repo, snackbar) { tab = "settings" }
@@ -124,6 +146,8 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
           } else StorefrontDeliveryPane(snackbar)
           //  «نمایش در بازارچه» — دادهٔ جدا و ذخیرهٔ جدا (`StorefrontMarket.kt`)
           "market" -> MarketPane(c, snackbar)
+          //  «پیوند و QR» (MKT-10/11) — پرچمِ جدا و دادهٔ جدا (`StorefrontCampaigns.kt`)
+          "campaigns" -> CampaignsPane(settings?.title.orEmpty(), snackbar)
           else -> if (settings == null) {
             TohidEmptyState("اول ویترین را بسازید", "در «تنظیمات» نشانی و نام را بنویسید و ذخیره کنید.", actionText = "رفتن به تنظیمات", onAction = { tab = "settings" })
           } else ProductsPane(repo, snackbar)
@@ -166,12 +190,17 @@ private fun PresencePane(
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  val prefs = remember(context) { context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE) }
-  var pending by remember { mutableStateOf(StorefrontOwner.decode(prefs.getString(PENDING_KEY, null))) }
-  var sending by remember { mutableStateOf(false) }
+  //  اعلامِ نرسیده در صفِ پایدارِ ویترین (core/StorefrontOutbox) — همان eventId دوباره می‌رود (PRES-08/09)
+  val pendingEntry = StorefrontQueue.entries.value.let { StorefrontQueue.pending(context, StorefrontChange.PRESENCE) }
+  val pending = pendingEntry?.let { PresenceDeclaration.decode(it.body) }
+  val sending = StorefrontQueue.sending.value
   var notice by remember { mutableStateOf<String?>(null) }
   var untilText by remember { mutableStateOf("") }
   var untilError by remember { mutableStateOf<String?>(null) }
+
+  LaunchedEffect(Unit) {
+    StorefrontQueue.reports.collect { r -> if (r.change == StorefrontChange.PRESENCE && r.outcome != SendOutcome.HOLD) notice = r.message }
+  }
 
   if (settings == null) {
     TohidEmptyState("هنوز ویترینی ساخته نشده", "نشانی و نامِ ویترین را در «تنظیمات» بنویسید.", icon = Icons.Filled.Storefront,
@@ -180,40 +209,18 @@ private fun PresencePane(
   }
   val tz = settings.timezone
 
-  /** فرستادنِ اعلامِ در صف — همان شناسه و همان زمانِ دستگاه (PRES-02/08/09) */
-  suspend fun flush() {
-    val p = pending ?: return
-    sending = true
-    repo.declare(p, "")
-      .onSuccess { r ->
-        prefs.edit().remove(PENDING_KEY).apply()
-        pending = null
-        StorefrontGate.config.value = StorefrontGate.config.value?.let { c -> c.copy(settings = c.settings?.copy(status = r.status, presenceMode = r.status.mode, declaredUntil = r.status.declaredUntil)) }
-        notice = when (r.applied) {
-          false -> "ثبت شد، ولی وضعیتِ تازه‌تری از دستگاهِ دیگر جلوتر است؛ همان می‌ماند."
-          else -> "ثبت شد — زمانِ سرور: ${StorefrontOwner.toFa(StorefrontOwner.clock(r.serverReceivedAt, tz))}"
-        }
-        snackbar.showSnackbar("وضعیتِ ویترین روی سرور ثبت شد")
-      }
-      .onFailure { e ->
-        if (!e.retryable) {
-          //  سرور رد کرد — در صف نمی‌ماند، ولی هیچ «ثبت شد» ی هم نیست
-          prefs.edit().remove(PENDING_KEY).apply()
-          pending = null
-          notice = e.userMessage
-        } else notice = StorefrontOwner.NOT_CONFIRMED
-      }
-    sending = false
-  }
+  suspend fun flush() { StorefrontQueue.flush(context, force = true) }
 
   fun declare(mode: String, until: Long? = null) {
-    val p = StorefrontOwner.pending(mode, until, System.currentTimeMillis(), kotlin.random.Random.nextLong())
-    prefs.edit().putString(PENDING_KEY, StorefrontOwner.encode(p)).apply()
-    pending = p
+    val p = PresenceDeclaration.create(mode, until, System.currentTimeMillis(), kotlin.random.Random.nextLong())
+    if (StorefrontQueue.enqueue(context, StorefrontChange.PRESENCE, PresenceDeclaration.encode(p), "", id = p.eventId) == null) {
+      notice = "دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید."
+      return
+    }
+    notice = null
     scope.launch { flush() }
   }
 
-  LaunchedEffect(Unit) { if (pending != null) flush() }
 
   val st = settings.status
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -284,62 +291,46 @@ private fun PresencePane(
    ══════════════════════════════════════════════════════════════════ */
 
 @Composable
-private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepository, snackbar: SnackbarHostState) {
+private fun SettingsPane(serverSettings: StorefrontSettingsDto?, repo: StorefrontRepository, snackbar: SnackbarHostState) {
+  val context = LocalContext.current
   val scope = rememberCoroutineScope()
+  //  ویرایشِ نرسیده (صفِ آفلاین) روی دادهٔ سرور نشان داده می‌شود تا کاربر کارِ خودش را ببیند، نه مقدارِ کهنه
+  val pendingEntry = StorefrontQueue.entries.value.let { StorefrontQueue.pending(context, StorefrontChange.SETTINGS) }
+  val settings = StorefrontQueue.settingsWithPending(serverSettings, pendingEntry)
   val s = settings ?: StorefrontSettingsDto()
-  var slug by remember(s.updatedAt) { mutableStateOf(s.slug) }
-  var title by remember(s.updatedAt) { mutableStateOf(s.title) }
-  var tagline by remember(s.updatedAt) { mutableStateOf(s.tagline) }
-  var phone by remember(s.updatedAt) { mutableStateOf(s.contactPhone.replace(Regex("^\\+93"), "0")) }
-  var accent by remember(s.updatedAt) { mutableStateOf(s.accent) }
-  var notice by remember(s.updatedAt) { mutableStateOf(s.notice) }
-  var enabled by remember(s.updatedAt) { mutableStateOf(s.enabled) }
-  var delivery by remember(s.updatedAt) { mutableStateOf(s.fulfillment.delivery) }
-  var pickup by remember(s.updatedAt) { mutableStateOf(s.fulfillment.pickup) }
-  var fee by remember(s.updatedAt) { mutableStateOf(if (settings == null) "" else StorefrontOwner.formatMinor(s.deliveryFeeMinor)) }
-  var minOrder by remember(s.updatedAt) { mutableStateOf(if (settings == null) "" else StorefrontOwner.formatMinor(s.minOrderMinor)) }
-  var tz by remember(s.updatedAt) { mutableStateOf(s.timezone) }
-  val days = remember(s.updatedAt) {
+  //  پس از ردِ سرور هم فرم همان نوشتهٔ کاربر را نگه می‌دارد؛ فقط «ثبت شد» (updatedAt ِ تازه) از نو پرش می‌کند
+  val formKey = s.updatedAt
+  var slug by remember(formKey) { mutableStateOf(s.slug) }
+  var title by remember(formKey) { mutableStateOf(s.title) }
+  var tagline by remember(formKey) { mutableStateOf(s.tagline) }
+  var phone by remember(formKey) { mutableStateOf(s.contactPhone.replace(Regex("^\\+93"), "0")) }
+  var accent by remember(formKey) { mutableStateOf(s.accent) }
+  var notice by remember(formKey) { mutableStateOf(s.notice) }
+  var enabled by remember(formKey) { mutableStateOf(s.enabled) }
+  var delivery by remember(formKey) { mutableStateOf(s.fulfillment.delivery) }
+  var pickup by remember(formKey) { mutableStateOf(s.fulfillment.pickup) }
+  var fee by remember(formKey) { mutableStateOf(if (settings == null) "" else StorefrontOwner.formatMinor(s.deliveryFeeMinor)) }
+  var minOrder by remember(formKey) { mutableStateOf(if (settings == null) "" else StorefrontOwner.formatMinor(s.minOrderMinor)) }
+  var tz by remember(formKey) { mutableStateOf(s.timezone) }
+  val days = remember(formKey) {
     mutableStateMapOf<Int, String>().apply {
-      for (d in 0..6) put(d, StorefrontOwner.formatDay(s.weeklyHours[d.toString()].orEmpty().map { it[0] to it[1] }))
+      for (d in 0..6) put(d, StorefrontOwner.formatDay(s.weeklyHours[d.toString()].orEmpty().filter { it.size == 2 }.map { it[0] to it[1] }))
     }
   }
-  var closed by remember(s.updatedAt) { mutableStateOf(s.closedDates.joinToString("، ")) }
+  var closed by remember(formKey) { mutableStateOf(s.closedDates.joinToString("، ")) }
   val errors = remember { mutableStateMapOf<String, String>() }
-  var saving by remember { mutableStateOf(false) }
+  val saving = StorefrontQueue.sending.value
 
+  /** سنجش در core (`StorefrontRules.checkSettings`) — همان قاعده‌های سرور؛ نادرست ⇒ null و خطا کنارِ کادر */
   fun build(): kotlinx.serialization.json.JsonObject? {
+    val draft = StorefrontRules.SettingsDraft(
+      slug = slug, title = title, tagline = tagline, phone = phone, accent = accent, notice = notice, enabled = enabled,
+      delivery = delivery, pickup = pickup, fee = fee, minOrder = minOrder, timezone = tz,
+      days = (0..6).associateWith { days[it].orEmpty() }, closed = closed,
+    )
     errors.clear()
-    StorefrontOwner.slugError(slug)?.let { errors["slug"] = it }
-    if (enabled && title.isBlank()) errors["title"] = "برای روشن کردن، نامِ ویترین لازم است"
-    if (accent.isNotBlank() && !Regex("^#[0-9a-fA-F]{6}$").matches(accent.trim())) errors["accent"] = "مثلِ #2c5ce6"
-    if (!delivery && !pickup) errors["fulfillment"] = "دست‌کم یکی از ارسال یا دریافت از دکان"
-    val feeMinor = runCatching { StorefrontOwner.parseMinor(fee, StorefrontOwner.MAX_FEE_MINOR) ?: 0L }.getOrElse { errors["fee"] = it.message ?: "مبلغ درست نیست"; 0L }
-    val minMinor = runCatching { StorefrontOwner.parseMinor(minOrder) ?: 0L }.getOrElse { errors["min"] = it.message ?: "مبلغ درست نیست"; 0L }
-    val hours = mutableMapOf<Int, List<Pair<Int, Int>>>()
-    for (d in 0..6) {
-      val r = StorefrontOwner.parseDay(days[d].orEmpty())
-      if (r.error != null) errors["day$d"] = r.error else hours[d] = r.ranges
-    }
-    val (closedList, closedErr) = StorefrontOwner.parseClosedDates(closed)
-    closedErr?.let { errors["closed"] = it }
-    if (errors.isNotEmpty()) return null
-    return buildJsonObject {
-      put("slug", slug.trim().lowercase())
-      put("enabled", enabled)
-      put("title", title.trim())
-      put("tagline", tagline.trim())
-      put("contactPhone", phone.trim())
-      put("accent", accent.trim().lowercase())
-      put("notice", notice.trim())
-      put("timezone", tz.trim())
-      put("weeklyHours", StorefrontRepository.weeklyHoursJson(hours))
-      put("closedDates", JsonArray(closedList.map { JsonPrimitive(it) }))
-      put("acceptDelivery", delivery)
-      put("acceptPickup", pickup)
-      put("deliveryFeeMinor", feeMinor)
-      put("minOrderMinor", minMinor)
-    }
+    errors.putAll(StorefrontRules.checkSettings(draft).errors)
+    return if (errors.isEmpty()) StorefrontQueue.settingsBody(draft) else null
   }
 
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -348,10 +339,10 @@ private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepos
       TohidTextField(slug, { slug = it }, "نشانی (زیرِ vill3n.top)", placeholder = "my-shop", error = errors["slug"],
         supporting = "نشانیِ مشتری: ${slug.ifBlank { "…" }}.vill3n.top")
       TohidTextField(title, { title = it }, "نامِ ویترین (نامِ کسب‌وکار، نه نامِ شخص)", error = errors["title"])
-      TohidTextField(tagline, { tagline = it }, "یک جملهٔ کوتاه (اختیاری)")
+      TohidTextField(tagline, { tagline = it }, "یک جملهٔ کوتاه (اختیاری)", error = errors["tagline"])
       TohidTextField(phone, { phone = it }, "شمارهٔ تماسِ دکان", keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
       TohidTextField(accent, { accent = it }, "رنگِ ویترین (اختیاری)", placeholder = "#2c5ce6", error = errors["accent"])
-      TohidTextField(notice, { notice = it }, "پیامِ کوتاه کنارِ وضعیت (اختیاری)")
+      TohidTextField(notice, { notice = it }, "پیامِ کوتاه کنارِ وضعیت (اختیاری)", error = errors["notice"])
       SwitchRow("ویترین روشن باشد", enabled) { enabled = it }
     }
     Panel {
@@ -366,24 +357,23 @@ private fun SettingsPane(settings: StorefrontSettingsDto?, repo: StorefrontRepos
       Text("ساعتِ کاری", style = MaterialTheme.typography.titleSmall)
       Text("هر روز مثلِ 08:00-12:00، 14:00-20:00؛ خالی = تعطیل. شبِ پس از ۲۴ را در روزِ بعد بنویسید. همه خالی = ساعت تنظیم نشده.",
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
-      TohidTextField(tz, { tz = it }, "منطقهٔ زمانیِ دکان", placeholder = "Asia/Kabul")
+      TohidTextField(tz, { tz = it }, "منطقهٔ زمانیِ دکان", placeholder = "Asia/Kabul", error = errors["timezone"])
       for (d in StorefrontOwner.DISPLAY_DAYS) {
         TohidTextField(days[d].orEmpty(), { days[d] = it }, StorefrontOwner.DAY_NAMES[d], error = errors["day$d"])
       }
       TohidTextField(closed, { closed = it }, "تعطیلیِ استثنایی (تاریخ‌ها مثلِ 2026-10-20)", error = errors["closed"], singleLine = false)
     }
-    TohidButton(if (saving) "در حالِ ذخیره…" else "ذخیرهٔ ویترین", onClick = {
-      val body = build() ?: return@TohidButton
-      saving = true
-      scope.launch {
-        repo.save(body)
-          .onSuccess { saved ->
-            StorefrontGate.config.value = StorefrontGate.config.value?.copy(settings = saved)
-            snackbar.showSnackbar("ویترین ذخیره شد")
-          }
-          .onFailure { snackbar.showSnackbar(it.userMessage) }
-        saving = false
-      }
+    if (pendingEntry != null) {
+      Text(StorefrontOutbox.statusLine(pendingEntry), color = Shop.colors.warning, style = MaterialTheme.typography.bodySmall)
+    }
+    TohidButton(if (saving) "در حالِ فرستادن…" else "ذخیرهٔ ویترین", onClick = {
+      val body = build()
+      if (body == null) { scope.launch { snackbar.showSnackbar("چند کادر درست نیست؛ پیامِ کنارِ هر کادر را ببینید") }; return@TohidButton }
+      //  اول روی دیسک (صف)، بعد سرور؛ «ثبت شد» فقط از پاسخِ سرور می‌آید (گزارشِ صف ⇒ snackbar ِ صفحه)
+      val e = StorefrontQueue.enqueue(context, StorefrontChange.SETTINGS, body.toString(),
+        pendingEntry?.base ?: StorefrontQueue.settingsBase(serverSettings))
+      if (e == null) { scope.launch { snackbar.showSnackbar("دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید.") }; return@TohidButton }
+      scope.launch { StorefrontQueue.flush(context, force = true) }
     }, enabled = !saving, busy = saving, modifier = Modifier.fillMaxWidth())
   }
 }
@@ -627,4 +617,55 @@ private fun ProductEditDialog(
     },
     dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
   )
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   صفِ آفلاین (M1، §۳۱.۲ بندِ ۲) — آنچه هنوز به سرور نرسیده
+   ══════════════════════════════════════════════════════════════════ */
+
+/**
+ *  بالای صفحه: هر ویرایشِ نرسیده با حالِ راستش (هرگز «ثبت شد»)، «دوباره بفرست»، و برای
+ *  ناسازگاری با دستگاهِ دیگر دو راه: «بفرست و جایگزین کن» یا «کنار بگذار» (با تأیید).
+ */
+@Composable
+internal fun OutboxBanner() {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val items: List<OutboxEntry> = StorefrontQueue.entries.value.let { StorefrontQueue.pendingAll(context) }
+  val sending = StorefrontQueue.sending.value
+  var discarding by remember { mutableStateOf<OutboxEntry?>(null) }
+  if (items.isEmpty()) return
+
+  Panel {
+    Text(StorefrontOutbox.NOT_CONFIRMED, color = Shop.colors.warning, style = MaterialTheme.typography.bodyMedium)
+    Spacer(Modifier.height(6.dp))
+    for (e in items) {
+      Text(StorefrontOutbox.statusLine(e), style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+      if (e.conflict) {
+        Text(StorefrontOutbox.CONFLICT_NOTE, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          TohidSecondaryButton("بفرست و جایگزین کن", onClick = {
+            StorefrontQueue.keepMine(context, e.id)
+            scope.launch { StorefrontQueue.flush(context, force = true) }
+          }, enabled = !sending)
+          TohidSecondaryButton("کنار بگذار", onClick = { discarding = e }, enabled = !sending)
+        }
+      }
+      Spacer(Modifier.height(4.dp))
+    }
+    if (items.any { !it.conflict }) {
+      TohidSecondaryButton(if (sending) "در حالِ فرستادن…" else "دوباره بفرست",
+        onClick = { scope.launch { StorefrontQueue.flush(context, force = true) } }, enabled = !sending)
+    }
+  }
+
+  discarding?.let { e ->
+    TohidConfirmDialog(
+      title = "کنار گذاشتنِ «${e.change.label}»؟",
+      message = "این ویرایش هرگز به سرور نرسیده و پس از کنار گذاشتن برنمی‌گردد. آنچه روی سرور است می‌ماند.",
+      confirmText = "کنار بگذار", danger = true,
+      onConfirm = { StorefrontQueue.discard(context, e.id); discarding = null },
+      onDismiss = { discarding = null },
+    )
+  }
 }

@@ -60,11 +60,14 @@ object CourierCodec {
     .put("lat", c.lat ?: JSONObject.NULL).put("lng", c.lng ?: JSONObject.NULL)
     .put("customerName", c.customerName).put("phoneMasked", c.phoneMasked)
     .put("callBeforeArrival", c.callBeforeArrival).put("leaveWith", c.leaveWith)
+    .put("cashTenderMinor", c.cashTenderMinor ?: JSONObject.NULL)
     .put("itemsCount", c.itemsCount).put("paymentMethod", c.paymentMethod)
     .put("expectedCollectMinor", c.expectedCollectMinor)
     .put("cashCollectedMinor", c.cashCollectedMinor ?: JSONObject.NULL)
     .put("fareMinor", c.fareMinor).put("requiresCode", c.requiresCode).put("photoAllowed", c.photoAllowed)
     .put("recallRequested", c.recallRequested).put("updatedAt", c.updatedAt)
+    .put("area", c.area).put("gateColor", c.gateColor)
+    .put("addressCorrectedAt", c.addressCorrectedAt ?: JSONObject.NULL)
 
   fun card(o: JSONObject): MissionCard = MissionCard(
     id = o.optString("id"),
@@ -78,6 +81,7 @@ object CourierCodec {
     phoneMasked = o.optString("phoneMasked"),
     callBeforeArrival = o.optBoolean("callBeforeArrival"),
     leaveWith = o.optString("leaveWith"),
+    cashTenderMinor = if (o.isNull("cashTenderMinor")) null else o.optLong("cashTenderMinor"),
     itemsCount = o.optInt("itemsCount"),
     paymentMethod = o.optString("paymentMethod"),
     expectedCollectMinor = o.optLong("expectedCollectMinor"),
@@ -87,6 +91,10 @@ object CourierCodec {
     photoAllowed = o.optBoolean("photoAllowed"),
     recallRequested = o.optBoolean("recallRequested"),
     updatedAt = o.optLong("updatedAt"),
+    area = o.optString("area"),
+    gateColor = o.optString("gateColor"),
+    //  کارتِ کهنه‌تر این کلید را ندارد ⇒ null (isNull برای کلیدِ نبوده هم true است)
+    addressCorrectedAt = if (o.isNull("addressCorrectedAt")) null else o.optLong("addressCorrectedAt"),
   )
 
   fun cardsJson(cards: List<MissionCard>): String = JSONArray().also { a -> cards.forEach { a.put(cardJson(it)) } }.toString()
