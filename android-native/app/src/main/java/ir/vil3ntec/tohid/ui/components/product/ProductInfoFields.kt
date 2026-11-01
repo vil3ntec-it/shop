@@ -10,17 +10,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProduct
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.product.CustomFields
 import ir.vil3ntec.tohid.core.product.ProductAlternatives
+import ir.vil3ntec.tohid.core.product.PriceSchedule
 import ir.vil3ntec.tohid.core.product.ProductInfo
+import ir.vil3ntec.tohid.core.product.ProductKit
+import ir.vil3ntec.tohid.core.product.ProductVariants
+import ir.vil3ntec.tohid.core.product.ProductSku
 import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
 import ir.vil3ntec.tohid.data.ProductInfoMap
@@ -30,7 +37,8 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  کادرهای فرمِ کالا برای PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو)، PRD-26 (محلِ قفسه)،
+ *  کادرهای فرمِ کالا برای PRD-03 (کدِ کالا با ساختِ خودکار)، PRD-09 (خدماتی یا بی موجودی)،
+ *  PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو)، PRD-26 (محلِ قفسه)،
  *  PRD-24 (کالاهای جایگزین: نام یا بارکد، با «،») و PRD-25 (فیلدهای سفارشی: هر خط «نام: مقدار»).
  *  جایگزین‌ها در دفتر شناسه‌اند؛ تا کاربر کادر را عوض نکرده ([alternativesText] تهی) همان شناسه‌ها
  *  دست‌نخورده می‌مانند، پس ساختنِ فرم نامِ کالاها را لازم ندارد.
@@ -49,12 +57,31 @@ data class ProductInfoForm(
   /** متنِ کادرِ جایگزین‌ها پس از ویرایش؛ `null` ⇒ ویرایش نشده و [alternativeIds] همان است */
   val alternativesText: String? = null,
   val custom: String = "",
+  val sku: String = "",
+  val stockless: Boolean = false,
+  /** PRD-10 — اجزای کیت؛ [kitText] `null` ⇒ کادر ویرایش نشده و همین اجزا می‌مانند (مثلِ جایگزین‌ها) */
+  val kitParts: List<ProductKit.Part> = emptyList(),
+  val kitText: String? = null,
+  /** PRD-13 — بازه‌های قیمت؛ [pricesText] `null` ⇒ ویرایش نشده */
+  val prices: List<PriceSchedule.Window> = emptyList(),
+  val pricesText: String? = null,
+  /** PRD-11 — ویژگی‌های مدل، هر خط «ویژگی: مقدار، مقدار» */
+  val axes: String = "",
+  /** POS-28 — کالای سریال‌دار */
+  val serialTracked: Boolean = false,
 ) {
   /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
   fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
     namePs, nameEn, synonyms, keywords, aisle, shelf, level,
     alternatives = alternativesText?.let { ProductAlternatives.resolve(it, selfId, catalog).ids } ?: alternativeIds,
     custom = custom,
+    sku = sku,
+    stockless = stockless,
+  ).copy(
+    kit = kitText?.let { ProductKit.parse(it, selfId, ProductKit.resolver(catalog)) { false }.parts } ?: kitParts,
+    prices = pricesText?.let { PriceSchedule.parse(it, ::dayOf).windows } ?: prices,
+    axes = ProductVariants.parse(axes).axes,
+    serialTracked = serialTracked,
   )
 
   companion object {
@@ -68,9 +95,18 @@ data class ProductInfoForm(
       level = info.location.level,
       alternativeIds = info.alternatives,
       custom = CustomFields.format(info.custom),
+      sku = info.sku,
+      stockless = info.stockless,
+      kitParts = info.kit,
+      prices = info.prices,
+      axes = ProductVariants.format(info.axes),
+      serialTracked = info.serialTracked,
     )
   }
 }
+
+/** تاریخِ کادر (خورشیدی یا میلادی، رقمِ فارسی هم) ⇒ `yyyy-MM-dd` — همان قاعدهٔ `DateField` */
+private fun dayOf(text: String): String? = ir.vil3ntec.tohid.Jalali.parseTyped(ir.vil3ntec.tohid.latinDigits(text.trim()))
 
 /** «راهرو ۳ · قفسه B» — فقط بخش‌های پُر، با زبانِ صفحه */
 fun shelfLabel(loc: ShelfLocation): String = loc.parts().joinToString(" · ") { (part, v) ->
@@ -85,6 +121,45 @@ fun shelfLabel(loc: ShelfLocation): String = loc.parts().joinToString(" · ") { 
 fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
   val c = Shop.colors
   Column(Modifier.fillMaxWidth()) {
+    //  PRD-03: کدِ کالا — ایرادِ شکل یا کدِ کالای دیگر همان‌جا (ذخیره هم همین را رد می‌کند)
+    val skuProblem = ProductSku.problem(form.sku)
+    val skuOwner = ProductSku.owner(form.sku, selfId, ProductInfoMap.skus(d))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedTextField(
+        value = form.sku,
+        onValueChange = { onChange(form.copy(sku = it.take(ProductSku.MAX + 8))) },
+        label = { Text(StrProduct.sku) },
+        singleLine = true,
+        isError = skuProblem != null || skuOwner != null,
+        supportingText = {
+          when {
+            skuProblem == ProductSku.Problem.BAD_CHAR -> Text(StrProduct.skuBadChar, color = c.danger)
+            skuProblem == ProductSku.Problem.TOO_LONG -> Text(StrProduct.skuTooLong(ProductSku.MAX), color = c.danger)
+            skuOwner != null -> Text(StrProduct.skuTaken(ProductSku.clean(form.sku), d.products.firstOrNull { it.id == skuOwner }?.name.orEmpty()), color = c.danger)
+            else -> Text(StrProduct.skuHint)
+          }
+        },
+        modifier = Modifier.weight(1f),
+      )
+      TextButton(onClick = { onChange(form.copy(sku = ProductSku.next(ProductInfoMap.skus(d).values))) }) { Text(StrProduct.skuAuto) }
+    }
+    //  PRD-09: خدماتی یا بی موجودی
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Checkbox(checked = form.stockless, onCheckedChange = { onChange(form.copy(stockless = it)) })
+      Column(Modifier.weight(1f)) {
+        Text(StrProduct.stockless, style = MaterialTheme.typography.bodyMedium)
+        Text(StrProduct.stocklessHint, style = MaterialTheme.typography.labelSmall, color = c.muted)
+      }
+    }
+    //  POS-28: کالای سریال‌دار
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Checkbox(checked = form.serialTracked, onCheckedChange = { onChange(form.copy(serialTracked = it)) })
+      Column(Modifier.weight(1f)) {
+        Text(StrProduct.serialTracked, style = MaterialTheme.typography.bodyMedium)
+        Text(StrProduct.serialTrackedHint, style = MaterialTheme.typography.labelSmall, color = c.muted)
+      }
+    }
+    Spacer(Modifier.height(6.dp))
     Text(StrProduct.names, style = MaterialTheme.typography.labelMedium, color = c.muted)
     Spacer(Modifier.height(6.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -173,7 +248,56 @@ fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onCha
       singleLine = false,
       modifier = Modifier.fillMaxWidth(),
     )
+    KitAndPriceFields(form, d, selfId, onChange)
+    VariantFields(form, d, selfId, onChange)
   }
+}
+
+/** PRD-10 و PRD-13 — اجزای کیت و قیمتِ زمان‌بندی‌شده، با ایرادِ هر خط همان‌جا */
+@Composable
+private fun KitAndPriceFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
+  val c = Shop.colors
+  val byId = d.products.associateBy { it.id }
+  val kitText = form.kitText ?: ProductKit.format(form.kitParts, { byId[it]?.name ?: it }, { ir.vil3ntec.tohid.qty(it / 1000.0) })
+  val kitParsed = form.kitText?.let { t ->
+    ProductKit.parse(t, selfId, ProductKit.resolver(ProductInfoMap.refs(d))) { id -> ir.vil3ntec.tohid.data.ProductPlansMap.isKit(byId[id]) }
+  }
+  val kitBad = kitParsed?.problems.orEmpty()
+  val parts = kitParsed?.parts ?: form.kitParts
+  val kits = if (parts.isEmpty()) null else ProductKit.available(parts) { Math.round(ir.vil3ntec.tohid.data.ShopStore.stock(d, it) * 1000.0) }
+  OutlinedTextField(
+    value = kitText,
+    onValueChange = { onChange(form.copy(kitText = it.take(KIT_INPUT))) },
+    label = { Text(StrProduct.kit) },
+    supportingText = {
+      when {
+        kitBad.isNotEmpty() -> Text(StrProduct.kitBad(kitBad.first().first), color = c.danger)
+        kits != null -> Text(StrProduct.kitStock(ir.vil3ntec.tohid.qty(kits.toDouble())), color = c.primary)
+        else -> Text(StrProduct.kitHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  val pricesText = form.pricesText ?: PriceSchedule.format(form.prices, { ir.vil3ntec.tohid.formatDate(it) }, { ir.vil3ntec.tohid.qty(it / 100.0) })
+  val parsed = form.pricesText?.let { PriceSchedule.parse(it, ::dayOf) }
+  val windows = parsed?.windows ?: form.prices
+  val today = PriceSchedule.active(windows, ir.vil3ntec.tohid.todayIso())
+  OutlinedTextField(
+    value = pricesText,
+    onValueChange = { onChange(form.copy(pricesText = it.take(PRICES_INPUT))) },
+    label = { Text(StrProduct.prices) },
+    supportingText = {
+      val bad = parsed?.problems.orEmpty()
+      when {
+        bad.isNotEmpty() -> Text(StrProduct.pricesBad(bad.first().first), color = c.danger)
+        today != null -> Text(StrProduct.priceToday(ir.vil3ntec.tohid.money(today.priceMinor / 100.0)), color = c.primary)
+        else -> Text(StrProduct.pricesHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
 }
 
 /** PRD-26 — محلِ قفسهٔ کالای یک قلمِ سفارش، زیرِ نامش؛ تنظیمِ خاموش، قلمِ بی کالا یا کالای بی محل ⇒ هیچ */
@@ -205,6 +329,49 @@ fun ProductInfoSettings(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** سقفِ نویسهٔ کادرِ فهرست — ۲۰ واژه × ۶۰ نویسه با جداکننده جا می‌شود */
 private const val LIST_INPUT = ProductTerms.MAX_TERMS * (ProductTerms.MAX_TERM + 2)
+
+/** PRD-11 — ویژگی‌های مدل و ماتریسِ تنوع‌های موجود (قیمت · موجودی)؛ ترکیبِ تازه با ذخیرهٔ فرم ساخته می‌شود */
+@Composable
+private fun VariantFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
+  val c = Shop.colors
+  val parsed = ProductVariants.parse(form.axes)
+  val existing = selfId?.let { id -> ir.vil3ntec.tohid.data.ProductVariantsMap.children(d.products, id) }.orEmpty()
+  val fresh = ProductVariants.missing(parsed.axes, existing.map(ir.vil3ntec.tohid.data.ProductVariantsMap::comboOf)).size
+  OutlinedTextField(
+    value = form.axes,
+    onValueChange = { onChange(form.copy(axes = it.take(AXES_INPUT))) },
+    label = { Text(StrProduct.variants) },
+    supportingText = {
+      when {
+        parsed.problems.isNotEmpty() -> Text(StrProduct.variantsBad(parsed.problems.first().first), color = c.danger)
+        fresh > 0 -> Text(StrProduct.variantsNew(ir.vil3ntec.tohid.plain(fresh)), color = c.primary)
+        else -> Text(StrProduct.variantsHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  if (selfId == null || existing.isEmpty() || parsed.axes.isEmpty()) return
+  val (m, byId) = ir.vil3ntec.tohid.data.ProductVariantsMap.matrix(d.products, parsed.axes, selfId)
+  Text(StrProduct.variantsMatrix, style = MaterialTheme.typography.labelMedium, color = c.muted)
+  Row { Text("", Modifier.weight(1f)); m.cols.forEach { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = c.muted) } }
+  m.rows.forEachIndexed { i, r ->
+    Row {
+      Text(r, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = c.text)
+      m.cols.indices.forEach { j ->
+        val p = m.cells[i to j]?.let { byId[it] }
+        val cell = if (p == null) "—" else "${ir.vil3ntec.tohid.money(p.salePrice)} · ${ir.vil3ntec.tohid.qty(ir.vil3ntec.tohid.data.ShopStore.stock(d, p.id))}"
+        Text(cell, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = if (p == null) c.muted else c.text)
+      }
+    }
+  }
+}
+
+private const val AXES_INPUT = ProductVariants.MAX_AXES * 1300
+
+/** سقفِ نویسهٔ کادرِ کیت و قیمت‌های زمان‌بندی‌شده */
+private const val KIT_INPUT = ProductKit.MAX_PARTS * 100
+private const val PRICES_INPUT = PriceSchedule.MAX * 60
 
 /** سقفِ نویسهٔ کادرِ فیلدهای سفارشی — ۲۰ خطِ «نام: مقدار» */
 private const val CUSTOM_INPUT = CustomFields.MAX_FIELDS * (CustomFields.MAX_KEY + CustomFields.MAX_VALUE + 3)

@@ -259,7 +259,7 @@ fun SaleScreen(
       null -> Unit
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Rejected -> { ScanFeedback.unknown(context); toast(w.message); return }
       is ir.vil3ntec.tohid.data.ScaleLabels.Match.Weighed -> {
-        val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ShopStore.stock(d, w.product.id))
+        val added = SalesEngine.addToCartCapped(cartStore.lines.value, w.product.id, w.quantity, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, w.product.id))
         //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
         if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
         selectedId = w.product.id
@@ -283,7 +283,7 @@ fun SaleScreen(
     if (pack != null && packProduct != null) {
       if (!packProduct.active) { ScanFeedback.unknown(context); toast(StrSale.inactiveActivate(packProduct.name)); return }
       val want = multiplier * pack.pack.sizeMilli / 1000.0
-      val added = SalesEngine.addToCartCapped(cartStore.lines.value, packProduct.id, want, ShopStore.stock(d, packProduct.id))
+      val added = SalesEngine.addToCartCapped(cartStore.lines.value, packProduct.id, want, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, packProduct.id))
       if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
       selectedId = packProduct.id
       if (added.capped) {
@@ -335,7 +335,7 @@ fun SaleScreen(
     // اسکنِ پشتِ سرِ هم نباید همدیگر را پاک کنند.
     // و سبد از موجودی جلو نمی‌زند — خطا نباید سرِ ثبت درآید.
     val added = SalesEngine.addToCartCapped(
-      cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
+      cartStore.lines.value, productId, multiplier.toDouble(), ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, productId),
     )
     //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
     val next = if (lotHit != null) SalesEngine.setLineLot(added.cart, productId, lotHit.second) else added.cart
@@ -1210,7 +1210,7 @@ fun SaleScreen(
         unitFactor = product?.unitFactor ?: 1.0,
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
-        note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) },
+        note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
         onDismiss = { editLine = null },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)

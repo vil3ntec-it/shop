@@ -142,7 +142,7 @@ object PromoEngine {
         amountMinor = (SalesEngine.lineTotal(price, line.quantity) * 100).roundToLong(),
       )
     } else {
-      val price = line.unitPrice ?: p.salePrice
+      val price = line.unitPrice ?: ProductPlansMap.price(p) // PRD-13
       PromoCore.Line(
         key = line.productId,
         productId = p.id,
@@ -190,7 +190,7 @@ object PromoEngine {
       //  تقسیم نشد (هرگز نباید) ⇒ جمعِ ردیف درست می‌ماند، فقط بی نامِ قاعده
       else parts?.get(line.productId)?.map { (id, minor) -> SalePromo(id, snap.revs[id] ?: 0, nameOf[id].orEmpty(), minor) }
         ?: listOf(SalePromo(discountMinor = o.discountMinor))
-      line.productId to LineTag(p?.let { (it.salePrice * 100).roundToLong() }, promo)
+      line.productId to LineTag(p?.let { (ProductPlansMap.price(it) * 100).roundToLong() }, promo)
     }
     return Outcome(
       gross = SalesEngine.cartTotal(d, cart),

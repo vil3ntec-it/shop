@@ -84,12 +84,11 @@ data class Product(
    *  فیلدهای سفارشیِ «نام: مقدار» به ترتیبِ ورود (`core/product/ProductExtras`). همان قاعدهٔ بالا: خالی ⇒
    *  `null` و نوشته نمی‌شود؛ فرم و پیشنهاد فقط با `ProductInfoPrefs`.
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val alternatives: List<String>? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val customFields: Map<String, String>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val alternatives: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val customFields: Map<String, String>? = null,
+  /** PRD-03 کدِ کالا (`ProductSku`)؛ PRD-09 `true` = خدماتی/بی موجودی (`ProductInfoMap.sellable`) — همان قاعده و همان تنظیم */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val sku: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val stockless: Boolean? = null,
   /*
    *  PRD-06 — برند و برچسب‌ها (فقط با `ShopPolicy.productTools` نوشته می‌شوند). همان کلیدِ `brand` که
    *  کاتالوگِ سرور (`lib/catalog.js`) و نمای عمومیِ بازار می‌خوانند. `null` نوشته نمی‌شود ⇒ کالای
@@ -101,26 +100,22 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val tags: List<String>? = null,
-  /*
-   *  INV-12 — نقطهٔ سفارش و بیشینهٔ موجودی (به همان `unit`). افزودنی: `null` = تعریف نشده و
-   *  نوشته نمی‌شود (`NEVER`) تا ردیفِ قدیمی بایت‌به‌بایت همان بماند. فقط وقتی «نقطهٔ سفارش و
-   *  بیشینه» در تنظیمات روشن است ویرایش می‌شوند (`ShopPolicy.stockLevels`)؛ قاعده‌ها در `core`
-   *  (`StockLevelRules`). «حد کم بودن» همان `minStock` می‌ماند.
-   */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val reorderPoint: Double? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val maxStock: Double? = null,
-  /*
-   *  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با
-   *  `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته «اندازهٔ بسته» از `unit` به سبد می‌برد.
-   *  `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
-   */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val packs: List<ProductPack>? = null,
+  /*  INV-12 — نقطهٔ سفارش و بیشینهٔ موجودی (به همان `unit`). افزودنی: `null` = تعریف نشده و نوشته نمی‌شود (`NEVER`) تا ردیفِ قدیمی بایت‌به‌بایت
+   *  همان بماند. فقط با «نقطهٔ سفارش و بیشینه» در تنظیمات (`ShopPolicy.stockLevels`)؛ قاعده‌ها در `core` (`StockLevelRules`). «حد کم بودن» همان `minStock`. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val reorderPoint: Double? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val maxStock: Double? = null,
+  /*  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته
+   *  «اندازهٔ بسته» از `unit` به سبد می‌برد. `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val packs: List<ProductPack>? = null,
+  /** PRD-10 اجزای کیت؛ PRD-13 بازه‌های قیمتِ زمان‌بندی‌شده (`ProductPlansMap`) — خالی ⇒ `null` و نوشته نمی‌شود؛ فرم فقط با `ProductInfoPrefs` */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val kit: List<KitPart>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceWindows: List<PriceWindow>? = null,
+  /** PRD-11 ویژگی‌های مدل؛ تنوع: شناسهٔ مدل و ترکیبش (`ProductVariantsMap`) — همان قاعده: خالی ⇒ `null` و نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variantAxes: List<VariantAxis>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variantOf: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variant: Map<String, String>? = null,
+  /** POS-28 — `true` = کالای سریال‌دار: هر دانه سریال می‌خواهد و فاکتور بی سریالِ کامل بسته نمی‌شود (`SerialSale`) */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serialTracked: Boolean? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -414,6 +409,10 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val locationId: String? = null,
+  /** PRD-10 — رونوشتِ اجزای کیت هنگامِ فروش (`ProductPlansMap.parts`)؛ کالای عادی `null` و نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val parts: List<KitPart>? = null,
+  /** POS-28 — سریال‌های همین قلم به ترتیبِ ثبت؛ کالای بی سریال `null` و نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serials: List<String>? = null,
   /**
    *  قیمتِ فهرستِ کالا هنگامِ فروش، پیش از تخفیفِ خودکار و قیمتِ دستی، به **واحدِ
    *  کوچک** — تا سرور تخفیفِ خودکار (`promo`) را از پایین آوردنِ دستیِ قیمت جدا

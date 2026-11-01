@@ -654,6 +654,19 @@
 `tohid-ui:deliver_later = false` «تحویلِ بعدی» ِ صندوق: سبد ⇐ سفارشِ ارسالِ کارمند بی فروش، فروش و کسر همان فروشِ تحویلِ سفارش (POS-38، `DeliverLaterPrefs`، فقط با `shop.orders` و `orders.create`، `claude/new-pos-1`)؛
 `tohid-ui:product_info = false` نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجوی کالا (PRD-02) و محلِ قفسه (PRD-26) در فرم، جست‌وجو و اقلامِ سفارش (`ProductInfoPrefs`؛ خاموش ⇒ همان JSON و همان نتیجه، `claude/new-prd-1`)؛
 `tohid-ui:product_info = false` نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجوی کالا (PRD-02)، محلِ قفسه (PRD-26)، کالای جایگزین با پیشنهادِ صندوق هنگامِ کمبود (PRD-24، شناسه نه نام) و فیلدهای سفارشی (PRD-25) در فرم، جست‌وجو و اقلامِ سفارش (`ProductInfoPrefs`؛ خاموش ⇒ همان JSON و همان نتیجه، `claude/new-prd-1`)؛
+همان `tohid-ui:product_info` کدِ کالا (PRD-03: `core/product/ProductSku`، یکتا با کلیدِ `clean`، فقط کدِ **تازه** سنجیده و تعارضِ آفلاین قفل نمی‌کند، «ساختِ خودکار» ِ `SKU-` + یکی بیش از بزرگ‌ترین شماره، در جست‌وجو مثلِ بارکد) و کالای خدماتی یا بی موجودی (PRD-09: `Product.stockless`؛ سقفِ سبد فقط `ShopStore.sellable`، ثبتِ فروش و `StockLedger` موجودی نمی‌خواهند، حدِ موجودی صفر و هرگز «ناموجود») را هم دارد؛ رفتارِ خدماتی از دادهٔ کالاست نه از تنظیم، و کالای بی پرچم بایت‌به‌بایت همان (`claude/prd-sku`)؛
+همان `tohid-ui:product_info` کیت (PRD-10) و قیمتِ زمان‌بندی‌شده (PRD-13) را هم دارد (`claude/prd-kit`): منطق فقط `core/product/ProductPlans`
+(`ProductKit`: موجودی = کمینهٔ «موجودیِ جزء ÷ مقدار» رو به پایین، بی کیتِ تو در تو؛ `PriceSchedule`: بازه‌های «از تا» هر دو شامل، بی هم‌پوشانی) و
+`ProductPlansMap`؛ موجودیِ کیت ساختگی در `ShopStore.StockIndex` (ورود/اصلاحِ کیت به اجزا پخش، فروش از `SaleItem.parts` ِ رونوشت‌شده)، ثبتِ فروش نیازِ
+همهٔ سبد به اجزا را می‌سنجد و با `StockLedger` ِ روشن کیت را رد می‌کند؛ قیمتِ فهرست همه‌جا `ProductPlansMap.price` (linePrice، جمعِ سبد، ثبت،
+PromoEngine، DiscountGate، PriceWhyLine، CustomerCrm، کاشیِ صندوق) — کالای بی `kit`/`priceWindows` دقیقاً همان؛ ویترینِ سرور قیمتِ زمان‌بندی‌شده را نمی‌شناسد؛
+همان `tohid-ui:product_info` تنوع با ماتریس را هم دارد (PRD-11، `claude/prd-variants`): هر ترکیب کالای جداست (`variantOf` + `variant`؛ بارکد، قیمت و
+موجودیِ خودش)، مدل فقط `variantAxes` دارد؛ منطق فقط `core/product/ProductVariants` (حداکثر ۳ ویژگی و ۱۰۰ ترکیب، ترکیب با کلیدِ مقایسه) و ساختن فقط
+`ProductVariantsMap.withChildren` در ثبت/ویرایشِ کالا: ترکیبِ موجود دوباره ساخته نمی‌شود، مقدارِ برداشته تنوع را پاک نمی‌کند، نامِ ساخته‌شدهٔ گرفته‌شده ساخته نمی‌شود؛
+همان `tohid-ui:product_info` تیکِ «کالای سریال‌دار» را هم دارد (POS-28، `claude/pos-serials`): رفتار از دادهٔ کالاست (`Product.serialTracked`)؛ سریال‌ها روی
+ردیفِ سبد (`CartLine.serials`، با پیش‌نویس) و قلمِ فاکتور (`SaleItem.serials`)؛ ثبت فقط با `SerialSale.problem` (منطقِ `core/pos/SerialNumbers`: هر دانه یک
+سریال، بی تکرار، بی اعشار، سریالِ فروخته‌شدهٔ برنگشته رد؛ قلمِ برگشت‌خورده سریال‌هایش را آزاد می‌کند)؛ کادرِ سریال فقط در کادرِ ردیفِ صندوقِ گوشی و
+کامپیوتر (`posLineSerials`)؛ فروشِ سریع کادرِ ردیف ندارد پس کالای سریال‌دار آن‌جا با پیامِ ثبت رد می‌شود؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_window_days` و `return_blocked` = سیاستِ برگشت (`ReturnPolicyPrefs`، RET-09، `claude/new-ret-1`)، `return_reasons` = فهرستِ
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).

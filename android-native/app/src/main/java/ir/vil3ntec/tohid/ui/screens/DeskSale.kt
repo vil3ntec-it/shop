@@ -256,7 +256,7 @@ fun DeskSaleScreen(
     return true
   }
   fun add(product: Product, count: Double) =
-    applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
+    applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, product.id)))
 
   /**
    *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
@@ -265,7 +265,7 @@ fun DeskSaleScreen(
   fun addLot(code: String, dd: ShopData = d): Boolean {
     val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
     val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
-    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ShopStore.stock(dd, pid))
+    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(dd, pid))
     if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast("${product.name} — سری $lot به سبد اضافه شد")
     return true
   }
@@ -895,7 +895,7 @@ fun DeskSaleScreen(
         unitFactor = p?.unitFactor ?: 1.0,
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
-        note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) },
+        note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
         onDismiss = { editLine = null; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)

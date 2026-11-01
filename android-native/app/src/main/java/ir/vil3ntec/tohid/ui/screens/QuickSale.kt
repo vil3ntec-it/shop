@@ -284,7 +284,7 @@ fun QuickSaleScreen(
               onClick = {
                 // سبد از موجودی جلو نمی‌زند؛ خطا سرِ پیشخوان درنمی‌آید
                 val added = SalesEngine.addToCartCapped(
-                  cart, p.id, SalesEngine.cartStep(p.unit), ShopStore.stock(d, p.id),
+                  cart, p.id, SalesEngine.cartStep(p.unit), ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, p.id),
                 )
                 if (added.capped) {
                   scope.launch {
@@ -418,7 +418,7 @@ fun QuickSaleScreen(
           scope.launch { snackbar.showSnackbar("بارکد ناشناس — این کالا هنوز ثبت نشده است") }
         } else {
           val added = SalesEngine.addToCartCapped(
-            cart, found.id, SalesEngine.cartStep(found.unit), ShopStore.stock(d, found.id),
+            cart, found.id, SalesEngine.cartStep(found.unit), ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, found.id),
           )
           if (added.capped) {
             scope.launch {
