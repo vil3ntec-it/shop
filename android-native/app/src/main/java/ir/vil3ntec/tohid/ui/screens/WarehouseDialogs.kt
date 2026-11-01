@@ -71,6 +71,8 @@ data class ProductFormState(
   /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
   val brand: String = "",
   val tags: String = "",
+  /** PRD-04 (همان پرچم): بسته‌ها با بارکدِ هر واحد */
+  val packs: List<ir.vil3ntec.tohid.core.product.PackBarcodes.Draft> = emptyList(),
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -97,6 +99,7 @@ data class ProductFormState(
       barcodes = p.barcodes.joinToString("، "),
       brand = p.brand.orEmpty(),
       tags = p.tags.orEmpty().joinToString("، "),
+      packs = p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ir.vil3ntec.tohid.data.ShopStore.coreOf(it)) },
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -297,6 +300,11 @@ fun ProductDialog(
           }
         }
 
+        if (tools) {
+          Spacer(Modifier.height(10.dp))
+          PackEditor(form.packs, form.unit) { form = form.copy(packs = it) }
+        }
+
         //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -383,6 +391,7 @@ fun ProductDialog(
                   reason = if (tools) priceReason else null,
                   brand = if (tools) form.brand else null,
                   tags = if (tools) ProductLabels.tags(form.tags) else null,
+                  packs = if (tools) form.packs else null,
                 )
               )
             },

@@ -122,6 +122,17 @@ class ProductImportPlanTest {
     assertEquals(Status.ERROR, many.status)
   }
 
+  @Test fun packBarcodesAreNeitherAnotherProductsNorAUnitOfTheirOwn() {
+    //  PRD-04: کارتنِ «برنج» بارکدِ 777 دارد
+    val withPack = shop.map { if (it.id == "p1") it.copy(reserved = listOf("777")) else it }
+    val other = ProductImportPlan.plan(listOf(head, listOf("قند", "", "", "", "", "", "777")), withPack, true).at(2)
+    assertEquals(Status.ERROR, other.status)
+    assertTrue(other.reason.contains("برنج"), other.reason)
+    val own = ProductImportPlan.plan(listOf(head, listOf("برنج", "", "", "", "", "", "777")), withPack, true).at(2)
+    assertEquals(Status.ERROR, own.status)
+    assertTrue(own.reason.contains("بسته"), own.reason)
+  }
+
   @Test fun headerSchemaIsChecked() {
     assertTrue(ProductImportPlan.plan(listOf(listOf("a", "b"), listOf("1", "2")), shop, false).problem!!.contains("نام"))
     assertTrue(ProductImportPlan.plan(emptyList(), shop, false).problem!!.contains("نام"))
