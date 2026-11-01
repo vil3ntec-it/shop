@@ -228,6 +228,38 @@ jobs:
           TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
         run: ./gradlew --no-daemon ${{ matrix.task }} -PbuildNumber=${{ github.run_number }}
 
+      #  SEC-ART-02: خودِ محتوای نصاب — همان فایل‌هایی که روی کامپیوترِ دکان می‌نشینند — بی credentialِ
+      #  سرور، کلیدِ خصوصی، .env، پشتیبان، سورسِ بک‌اند و رازِ شناخته (tools/security/artifact-gate.mjs).
+      #  Inno (‎.7z‎ و Setup) و dmg از پوشهٔ createDistributable ساخته می‌شوند و همان سنجیده می‌شود؛ msi و deb
+      #  را jpackage مستقیم می‌سازد، پس همان فایلِ نهایی باز می‌شود (‎msiexec /a‎، ‎dpkg-deb -x‎).
+      - name: باز کردنِ msi برای دروازه
+        if: ${{ endsWith(matrix.glob, '.msi') }}
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $msi = (Get-ChildItem build/compose/binaries/main/msi/*.msi | Select-Object -First 1).FullName
+          $dst = Join-Path $env:RUNNER_TEMP 'artifact-view'
+          New-Item -ItemType Directory -Force $dst | Out-Null
+          $p = Start-Process msiexec.exe -ArgumentList @('/a', "`"$msi`"", '/qn', "TARGETDIR=`"$dst`"") -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "msiexec /a: $($p.ExitCode)" }
+          #  نسخهٔ اداریِ خودِ msi (فقط جدول‌ها) کنارِ فایل‌ها می‌نشیند؛ فایل‌ها همین‌جا باز شده‌اند
+          Get-ChildItem $dst -Filter *.msi | Remove-Item -Force
+      - name: دروازهٔ محتوای نصاب
+        shell: bash
+        env:
+          TOHID_LICENSE_PUBLIC_KEY: ${{ vars.TOHID_LICENSE_PUBLIC_KEY }}
+          PKG_GLOB: ${{ matrix.glob }}
+        run: |
+          set -euo pipefail
+          view="$RUNNER_TEMP/artifact-view"
+          case "${PKG_GLOB:-}" in
+            *.deb) rm -rf "$view"; dpkg-deb -x "$(ls desktop/$PKG_GLOB | head -n1)" "$view" ;;
+            *.msi) ;;
+            *) view=desktop/build/compose/binaries/main/app ;;
+          esac
+          node tools/security/artifact-gate.mjs --profile desktop --license-pin "$TOHID_LICENSE_PUBLIC_KEY" "$view"
+
       #  نصابِ آنلاینِ کوچک + نسخهٔ Offline + بستهٔ برنامه (‎.7z‎) — شرحِ
       #  سناریوها سرِ ‎desktop/installer/Tohid.iss‎. بعد نصبِ واقعی روی همین
       #  ویندوز: هر سه راه (Offline، فایلِ کنارِ نصاب، دانلود و سنجشِ hash)

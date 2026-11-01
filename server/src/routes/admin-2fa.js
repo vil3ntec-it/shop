@@ -41,8 +41,8 @@ function state(admin) {
     enabled: !!admin.totp_enabled_at,
     enabled_at: admin.totp_enabled_at ? Number(admin.totp_enabled_at) : null,
     recovery_left: recoveryLeft(admin),
-    //  اجباری نیست (تصمیمِ صاحب محصول) — پنل فقط پیشنهاد می‌دهد
-    enforced: false,
+    //  پیش‌فرض اجباری نیست (تصمیمِ صاحب محصول)؛ `ADMIN_2FA_REQUIRED=1` ⇒ اجباری (SEC-AUTH-12)
+    enforced: require('../lib/admin-guard').twoFactorRequired(),
   };
 }
 
