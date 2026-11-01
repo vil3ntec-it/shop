@@ -547,7 +547,7 @@ private fun OrderDetailSheet(
       if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          if (pickable) OrderPickButton(o, busy) { onPick(o) }; actions.forEach { to ->
+          if (pickable) OrderPickButton(o, busy) { onPick(o) }; OrderDelayEntry(o, cfg, repo, ::orderStamp) { f, m -> order = f; onChanged(); scope.launch { snackbar.showSnackbar(m) } }; actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)
@@ -614,7 +614,7 @@ private fun OrderDetailSheet(
               when (e.kind) {
                 "created" -> "ثبت شد"
                 "cod" -> "نقد: ${OrderText.COD[e.toStatus] ?: e.toStatus}"
-                else -> "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
+                else -> orderDelayEventTitle(e, cfg.delay != null, ::orderStamp) ?: "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
               },
               color = c.text, fontWeight = FontWeight.SemiBold,
             )

@@ -46,6 +46,16 @@ data class OrdersConfigDto(
   val picking: Boolean = false,
   /** ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی (CHK-15، پرچمِ `shop.orders.substitution`) */
   val substitution: Boolean = false,
+  /** ORD-07 «عقب انداختن» (پرچمِ `shop.orders.delay`) — خاموش ⇒ null و هیچ دکمه‌ای */
+  val delay: OrderDelayCfgDto? = null,
+)
+
+/** `delay` ِ `/config` (`order-delay.configOf`): وضعیت‌های مجاز، دلیل‌ها و سقفِ دقیقه */
+@Serializable
+data class OrderDelayCfgDto(
+  val statuses: List<String> = emptyList(),
+  val reasons: List<String> = emptyList(),
+  val maxMinutes: Int = 0,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -98,8 +108,14 @@ data class OrderLineDto(
   val substituteName: String = "",
 )
 
+/** `detail` ِ رویداد — `type` فقط برای رویدادِ `note` (`ready_delay` ِ ORD-07، `start_alert` ِ ORD-18، …) */
 @Serializable
-data class OrderEventDetailDto(val readyAt: Long? = null)
+data class OrderEventDetailDto(
+  val readyAt: Long? = null,
+  val type: String = "",
+  val prevReadyAt: Long? = null,
+  val scheduledFor: Long? = null,
+)
 
 @Serializable
 data class OrderEventDto(

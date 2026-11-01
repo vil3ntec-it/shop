@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderDraft
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -97,6 +98,22 @@ class OrdersRepository(private val api: ApiClient) {
       if (readyInMinutes != null) put("readyInMinutes", readyInMinutes)
     }
     order(api.post("$ROOT/${enc(id)}/transition", body))
+  }
+
+  /**
+   *  ORD-07 «عقب انداختن» (`POST /:id/delay`، پرچمِ `shop.orders.delay`): [key] یک بار برای هر پنجره ⇒
+   *  «تأیید» ِ دوباره پس از قطعِ نت دو بار عقب نمی‌برد. [expectedReadyAt] همان زمانی است که کاربر دید
+   *  (`null` = «بی زمان»)؛ کسِ دیگری زودتر عوضش کرده ⇒ ۴۰۹ `ready_changed` و هیچ تغییری.
+   */
+  suspend fun delay(id: String, key: String, minutes: Int, reason: String, note: String, expectedReadyAt: Long?): ApiResult<OrderDto> = result {
+    val body = buildJsonObject {
+      put("clientKey", key)
+      put("minutes", minutes)
+      put("expectedReadyAt", expectedReadyAt?.let { JsonPrimitive(it) } ?: JsonNull)
+      if (reason.isNotEmpty()) put("reason", reason)
+      if (note.isNotBlank()) put("note", note.trim().take(300))
+    }
+    order(api.post("$ROOT/${enc(id)}/delay", body))
   }
 
   private fun order(body: JsonObject): OrderDto =

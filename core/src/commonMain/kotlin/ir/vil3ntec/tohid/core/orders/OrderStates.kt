@@ -145,7 +145,7 @@ object OrderText {
     "out_of_stock" to "ناموجود", "closed" to "دکان بسته است", "busy" to "شلوغ", "out_of_area" to "خارج از محدوده",
     "other" to "دلیلِ دیگر", "timeout" to "پایانِ مهلت", "customer_request" to "درخواستِ مشتری", "no_show" to "مشتری نیامد",
     "no_answer" to "جواب نداد", "wrong_address" to "نشانیِ غلط", "refused" to "مشتری نپذیرفت",
-    "recalled" to "دکان پس از حرکتِ پیک برگرداند",
+    "recalled" to "دکان پس از حرکتِ پیک برگرداند", "courier" to "منتظرِ پیک",
   )
   /** ماشینِ جدای «نقد هنگامِ تحویل» (رویدادِ `cod` در خطِ زمانی) */
   val COD = mapOf(
