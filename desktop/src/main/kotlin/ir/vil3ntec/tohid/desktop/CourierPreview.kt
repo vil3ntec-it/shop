@@ -21,7 +21,8 @@ import ir.vil3ntec.tohid.ui.courier.CourierJoinScreen
  *  این‌جا به صف یا سرور نمی‌روند (پیش‌نمایش است)، ولی صفحه همان `CourierBoard`ِ
  *  برنامهٔ گوشی است.
  *
- *  نوع‌ها: join · home · route · cash · track · ship · stats · account · cod
+ *  نوع‌ها: join · home · route · cash · cash0 · track · ship · stats · account · cod
+ *  (`cash0`: سقفِ صفر = «نقد نگیرد»، ۵۷ تحویلِ تسویه‌نشده و «تازه نشد»)
  */
 @Composable
 internal fun CourierPreview(kind: String) {
@@ -44,7 +45,8 @@ internal fun CourierPreview(kind: String) {
     syncing = false,
     lastError = null,
     snackbar = snackbar,
-    summary = DEMO_SUMMARY,
+    summary = if (kind == "cash0") DEMO_SUMMARY.copy(cashCapMinor = 0, headroomMinor = 0, unsettledCount = 57) else DEMO_SUMMARY,
+    summaryError = if (kind == "cash0") "اینترنت نیست" else null,
     lastSyncAt = at(9, 52),
     onRefresh = {},
     onDismissRejected = {},
@@ -59,7 +61,7 @@ internal fun CourierPreview(kind: String) {
       "account" -> "account"
       else -> "home"
     },
-    initialPage = if (kind == "cash") "cash" else null,
+    initialPage = if (kind == "cash" || kind == "cash0") "cash" else null,
     initialOpen = when (kind) {
       "track", "ship" -> "demo-1043"
       "cod" -> "demo-1044"
@@ -153,6 +155,7 @@ private val DEMO_SUMMARY = CourierSummary(
     UnsettledDelivery(1038, at(8, 17), 98_000, 98_000, 5_000),
     UnsettledDelivery(1035, at(7, 10), 0, 0, 6_000),
   ),
+  unsettledCount = 2,
   settlements = listOf(
     CourierSettlement(12, at(20, 5, 1), "confirmed", 6, 1_845_000, 41_000, 1_845_000, 1_845_000, 0, 0),
     CourierSettlement(11, at(19, 40, 2), "confirmed", 4, 920_000, 28_000, 920_000, 900_000, 20_000, 0, "کسریِ شمارش"),

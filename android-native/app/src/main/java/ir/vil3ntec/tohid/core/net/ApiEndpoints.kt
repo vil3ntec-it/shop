@@ -213,8 +213,8 @@ object ApiEndpoints {
     const val ME = "/courier/me"
     const val MISSIONS = "/courier/missions"
     const val EVENTS = "/courier/events"
+    //  مرزِ روز و هفته را سرور به وقتِ دکان می‌سازد؛ ساعتِ گوشی فرستاده نمی‌شود
     const val SUMMARY = "/courier/summary"
-    fun summary(today: Long, week: Long) = "$SUMMARY?today=$today&week=$week"
     fun missions(scope: String) = "$MISSIONS?scope=${enc(scope)}"
     fun photos(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/photos"
     /** «تماس با مشتری» (DLV-02): شمارهٔ کامل فقط برای همین یک تماس */

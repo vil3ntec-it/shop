@@ -1163,7 +1163,7 @@ module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, DEFAULT_CASH_CAP_MINOR, CODE_MAX_ATTEMPTS, MAX_LIVE_LIMIT: liveCap.MAX_LIVE_LIMIT,
   VIEW_FLAG, LOCATION_FLAG, LOCATION_TTL_MS, LOCATION_MIN_INTERVAL_MS, ON_THE_WAY, customerView, putLocation, putEta, purgeLocations,
   stateOf, staffActor, courierOfUser, listCouriers, createCourier, updateCourier, enrollCourierMember,
-  assign, regenerateCode, courierEvents, staffEvent, recall, fixAddress, missions, forOrder, board, courierSummary: (...a) => require('./courier-summary').summary(...a),
+  assign, regenerateCode, courierEvents, staffEvent, recall, fixAddress, missions, forOrder, board, courierSummary: (...a) => require('./courier-summary').summary(...a), periodStarts: (...a) => require('./courier-summary').periodStarts(...a),
   CALL_FLAG, CALLABLE, callFlagOf, callCustomer,
   putPhoto, listPhotos, getPhoto, settlementPreview, settle, listSettlements, getSettlement,
   externalCompanies, externalStatement, eventKey, _forSummary: { cashStats, viaDb, SETTLE_ROWS, settleRowView },

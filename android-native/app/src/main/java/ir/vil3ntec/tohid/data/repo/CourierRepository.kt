@@ -42,11 +42,11 @@ class CourierRepository(private val api: ApiClient) {
   }
 
   /**
-   *  «نقدِ من» و آمار (`GET /api/courier/summary`) — فقط دادهٔ همین پیک.
-   *  `today`/`week` = آغازِ روز و هفتهٔ گوشی به میلی‌ثانیه.
+   *  «نقدِ من» و آمار (`GET /api/courier/summary`) — فقط دادهٔ همین پیک. «امروز»
+   *  و «این هفته» را سرور به وقتِ دکان می‌سازد، نه ساعتِ گوشی.
    */
-  suspend fun summary(today: Long, week: Long): ApiResult<CourierSummary> = result {
-    CourierWire.summary(api.get(ApiEndpoints.Courier.summary(today, week)))
+  suspend fun summary(): ApiResult<CourierSummary> = result {
+    CourierWire.summary(api.get(ApiEndpoints.Courier.SUMMARY))
   }
 
   /** `scope`: «active» (زنده) یا «done» (پایان‌یافته؛ سرور نشانی را نمی‌دهد) */

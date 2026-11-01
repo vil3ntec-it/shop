@@ -250,6 +250,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var photosWaiting by remember { mutableStateOf(store.photos().size) }
   var syncing by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
+  var summaryError by remember { mutableStateOf<String?>(null) }
 
   fun reloadLocal() {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
@@ -263,12 +264,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
     val out = runCatching { CourierSync.flush(context, store) }.getOrNull()
     syncing = false
     reloadLocal()
-    lastError = out?.failure?.let { f ->
-      when (f.code) {
-        "offline", "unreachable", "timeout" -> "اینترنت نیست — کارها در صفِ گوشی می‌مانند"
-        else -> f.userMessage
-      }
-    }
+    lastError = out?.failure?.let { courierFailureText(it, "اینترنت نیست — کارها در صفِ گوشی می‌مانند") }
+    summaryError = out?.summaryFailure?.let { courierFailureText(it, "اینترنت نیست") }   //  «نقدِ من» تازه نشد ⇒ نقد و آمار می‌گویند
     out?.photoErrors?.firstOrNull()?.let { snackbar.showSnackbar(it) }
   }
 
@@ -308,6 +305,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
     snackbar = snackbar,
     summary = summary,
     lastSyncAt = lastSyncAt,
+    summaryError = summaryError,
     onRefresh = { scope.launch { sync() } },
     onDismissRejected = { eventId ->
       val next = CourierQueue.dismissRejected(store.queue(), eventId)
@@ -371,6 +369,7 @@ internal fun CourierBoard(
   initialPage: String? = null,
   initialDetailTab: String = "track",
   initialDeliver: Boolean = false,
+  summaryError: String? = null,
 ) {
   val p = PhoneV3.colors
   var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -394,6 +393,7 @@ internal fun CourierBoard(
     .distinctBy { it.id }
   val waitingTotal = queue.pending.size + photosWaiting
   val shopPhone = summary?.shopPhone.orEmpty()
+  val staleError = summaryError ?: lastError   //  نقد و آمار کهنه‌اند اگر «نقدِ من» یا کلِ همگام‌سازی نشد
 
   fun act(c: MissionCard, to: String) {
     when (to) {
@@ -473,7 +473,7 @@ internal fun CourierBoard(
                 )
               }
             }
-            key == "cash" -> CourierCashPage(summary, lastSyncAt, syncing, onBack = { page = null }, onRefresh = onRefresh)
+            key == "cash" -> CourierCashPage(summary, staleError, syncing, onBack = { page = null }, onRefresh = onRefresh)
             key == "t:route" -> RouteTab(
               live = live, finished = finished, queue = queue, routeTab = routeTab, onRouteTab = { routeTab = it },
               syncing = syncing, waitingTotal = waitingTotal, lastError = lastError, view = view.mode,
@@ -492,7 +492,7 @@ internal fun CourierBoard(
               onOpen = { open(it) }, onAction = { c, to -> act(c, to) },
             )
             key == "t:stats" -> CourierStatsTab(
-              summary = summary, week = statsWeek, onWeek = { statsWeek = it }, lastSyncAt = lastSyncAt,
+              summary = summary, week = statsWeek, onWeek = { statsWeek = it }, staleError = staleError,
               syncing = syncing, onRefresh = onRefresh, onCash = { page = "cash" },
             )
             key == "t:account" -> CourierAccountTab(

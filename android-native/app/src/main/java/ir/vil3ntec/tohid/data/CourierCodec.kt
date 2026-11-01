@@ -129,6 +129,7 @@ object CourierCodec {
             .put("fareMinor", u.fareMinor))
         }
       })
+      .put("unsettledCount", x.unsettledCount)
       .put("settlements", JSONArray().also { a ->
         x.settlements.forEach { t ->
           a.put(JSONObject().put("settleNo", t.settleNo).put("at", t.at).put("status", t.status)
@@ -160,6 +161,7 @@ object CourierCodec {
         val x = u.getJSONObject(it)
         UnsettledDelivery(x.optLong("orderNo"), x.optLong("deliveredAt"), x.optLong("expectedCollectMinor"), x.optLong("cashCollectedMinor"), x.optLong("fareMinor"))
       },
+      unsettledCount = o.optInt("unsettledCount", u.length()),
       settlements = (0 until t.length()).map {
         val x = t.getJSONObject(it)
         CourierSettlement(

@@ -57,14 +57,13 @@ router.get('/me', async (req, res) => {
 /**
  * «نقدِ من» و آمار (DLV-11/12، فقط خواندن): نقدِ در دست، سقف و جای خالی،
  * تحویل‌شده‌های تسویه‌نشده، تسویه‌های خودش، شمارِ امروز/هفته و نام و شمارهٔ
- * دکان (برای «تماس با دکان»). `?today=&week=` = آغازِ بازه به میلی‌ثانیه.
+ * دکان (برای «تماس با دکان»). مرزِ روز و هفته را سرور به وقتِ دکان می‌سازد؛
+ * `?today=&week=` ِ برنامهٔ کهنه نادیده گرفته می‌شود (ساعتِ گوشی مرجع نیست).
  * ⛔ فقط دادهٔ همین پیک؛ پیکِ دیگر یا دکانِ دیگر هیچ‌چیزِ این را نمی‌بیند.
  */
 router.get('/summary', async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json(await delivery.courierSummary(req.shopId, req.courier, {
-    today: req.query.today, week: req.query.week,
-  }));
+  res.json(await delivery.courierSummary(req.shopId, req.courier));   //  مرزِ روز و هفته را سرور به وقتِ دکان می‌سازد
 });
 
 router.get('/missions', async (req, res) => {
