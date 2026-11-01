@@ -112,14 +112,12 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val maxStock: Double? = null,
-  /*
-   *  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با
-   *  `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته «اندازهٔ بسته» از `unit` به سبد می‌برد.
-   *  `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد.
-   */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val packs: List<ProductPack>? = null,
+  /*  PRD-04 — بارکدِ هر واحد: بسته‌ها (کارتنِ ۲۴ دانه‌ای با بارکدِ خودش؛ `PackBarcodes` ِ core). فقط با `ShopPolicy.productTools` نوشته می‌شود؛ اسکنِ بارکدِ بسته
+   *  «اندازهٔ بسته» از `unit` به سبد می‌برد. `null` نوشته نمی‌شود ⇒ کالای بی بسته همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val packs: List<ProductPack>? = null,
+  /** PRD-10 اجزای کیت؛ PRD-13 بازه‌های قیمتِ زمان‌بندی‌شده (`ProductPlansMap`) — خالی ⇒ `null` و نوشته نمی‌شود؛ فرم فقط با `ProductInfoPrefs` */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val kit: List<KitPart>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceWindows: List<PriceWindow>? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -413,6 +411,8 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val locationId: String? = null,
+  /** PRD-10 — رونوشتِ اجزای کیت هنگامِ فروش (`ProductPlansMap.parts`)؛ کالای عادی `null` و نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val parts: List<KitPart>? = null,
   /**
    *  قیمتِ فهرستِ کالا هنگامِ فروش، پیش از تخفیفِ خودکار و قیمتِ دستی، به **واحدِ
    *  کوچک** — تا سرور تخفیفِ خودکار (`promo`) را از پایین آوردنِ دستیِ قیمت جدا

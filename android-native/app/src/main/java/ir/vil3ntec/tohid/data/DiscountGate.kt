@@ -74,7 +74,7 @@ object DiscountGate {
       if (line.free || !(line.quantity > 0)) continue
       if (promo?.tags?.get(line.productId)?.promo?.isNotEmpty() == true) continue
       val p = d.products.find { it.id == line.productId } ?: continue
-      sum += LinePricing.reductionMinor(minor(p.salePrice), minor(unit), (line.quantity * 1000).roundToLong())
+      sum += LinePricing.reductionMinor(minor(ProductPlansMap.price(p)), minor(unit), (line.quantity * 1000).roundToLong())
     }
     return sum
   }

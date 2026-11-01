@@ -20,7 +20,8 @@ object ProductInfoMap {
   fun hasNone(p: Product): Boolean =
     p.namePs.isNullOrEmpty() && p.nameEn.isNullOrEmpty() && p.synonyms.isNullOrEmpty() &&
       p.keywords.isNullOrEmpty() && p.aisle.isNullOrEmpty() && p.shelf.isNullOrEmpty() && p.shelfLevel.isNullOrEmpty() &&
-      p.alternatives.isNullOrEmpty() && p.customFields.isNullOrEmpty() && p.sku.isNullOrEmpty() && p.stockless != true
+      p.alternatives.isNullOrEmpty() && p.customFields.isNullOrEmpty() && p.sku.isNullOrEmpty() && p.stockless != true &&
+      p.kit.isNullOrEmpty() && p.priceWindows.isNullOrEmpty()
 
   fun of(p: Product): ProductInfo = ProductInfo(
     namePs = p.namePs.orEmpty(),
@@ -32,6 +33,8 @@ object ProductInfoMap {
     custom = p.customFields.orEmpty().toList(),
     sku = p.sku.orEmpty(),
     stockless = p.stockless == true,
+    kit = ProductPlansMap.kitOf(p),
+    prices = ProductPlansMap.windowsOf(p),
   )
 
   fun shelf(p: Product): ShelfLocation = ShelfLocation.of(p.aisle, p.shelf, p.shelfLevel)
@@ -50,6 +53,8 @@ object ProductInfoMap {
     customFields = if (info.custom.isEmpty()) null else LinkedHashMap<String, String>().apply { info.custom.forEach { (k, v) -> put(k, v) } },
     sku = info.sku.ifEmpty { null },
     stockless = if (info.stockless) true else null,
+    kit = ProductPlansMap.kitModel(info.kit),
+    priceWindows = ProductPlansMap.windowsModel(info.prices),
   ).let { u ->
     //  PRD-09: خدماتی حدِ موجودی ندارد ⇒ هشدارِ کم‌موجودی و پیشنهادِ سفارش هرگز
     if (info.stockless) u.copy(minStock = 0.0, reorderPoint = null, maxStock = null) else u
@@ -72,6 +77,22 @@ object ProductInfoMap {
     if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
     if (a.sku.orEmpty() != b.sku.orEmpty()) add("کدِ کالا «${a.sku.orEmpty()}» ⇐ «${b.sku.orEmpty()}»")
     if ((a.stockless == true) != (b.stockless == true)) add(if (b.stockless == true) "خدماتی (بی موجودی) شد" else "دیگر خدماتی نیست")
+    addAll(ProductPlansMap.changes(a, b))
+  }
+
+  /**
+   *  PRD-10 — کیتِ [info] برای ذخیره: جزءِ ناموجود، خودِ کالا، جزءِ کیت، یا کیت شدنِ کالایی که خودش جزءِ
+   *  کیتِ دیگری است (تو در تو) ⇒ رد. کالای بی کیت ⇒ `null`.
+   */
+  fun kitProblem(d: ShopData, info: ProductInfo, selfId: String?): String? {
+    if (info.kit.isEmpty()) return null
+    val byId = d.products.associateBy { it.id }
+    for (part in info.kit) {
+      val q = byId[part.productId] ?: return ir.vil3ntec.tohid.core.i18n.StrProduct.kitPartGone
+      if (q.id == selfId || ProductPlansMap.isKit(q)) return ir.vil3ntec.tohid.core.i18n.StrProduct.kitNested(q.name)
+    }
+    val usedIn = selfId?.let { id -> d.products.firstOrNull { k -> k.kit.orEmpty().any { it.productId == id } } }
+    return usedIn?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.kitNested(it.name) }
   }
 
   /** PRD-03 — کدِ کالاهای دیگرِ دفتر (شناسه ⇒ کد)، برای یکتایی و کدِ خودکار */
@@ -82,6 +103,7 @@ object ProductInfoMap {
    *  سنجیده می‌شود ([before] = کدِ پیشینِ همین کالا): تعارضِ آفلاین ویرایشِ کالا را قفل نمی‌کند.
    */
   fun skuProblem(d: ShopData, info: ProductInfo, selfId: String?, before: String?): String? {
+    kitProblem(d, info, selfId)?.let { return it }
     if (info.sku.isEmpty() || ProductSku.key(info.sku) == ProductSku.key(before.orEmpty())) return null
     val other = ProductSku.owner(info.sku, selfId, skus(d)) ?: return null
     return ir.vil3ntec.tohid.core.i18n.StrProduct.skuTaken(info.sku, d.products.firstOrNull { it.id == other }?.name.orEmpty())

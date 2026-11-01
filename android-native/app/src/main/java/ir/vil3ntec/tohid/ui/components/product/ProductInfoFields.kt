@@ -23,7 +23,9 @@ import ir.vil3ntec.tohid.core.i18n.StrProduct
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.product.CustomFields
 import ir.vil3ntec.tohid.core.product.ProductAlternatives
+import ir.vil3ntec.tohid.core.product.PriceSchedule
 import ir.vil3ntec.tohid.core.product.ProductInfo
+import ir.vil3ntec.tohid.core.product.ProductKit
 import ir.vil3ntec.tohid.core.product.ProductSku
 import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
@@ -56,6 +58,12 @@ data class ProductInfoForm(
   val custom: String = "",
   val sku: String = "",
   val stockless: Boolean = false,
+  /** PRD-10 — اجزای کیت؛ [kitText] `null` ⇒ کادر ویرایش نشده و همین اجزا می‌مانند (مثلِ جایگزین‌ها) */
+  val kitParts: List<ProductKit.Part> = emptyList(),
+  val kitText: String? = null,
+  /** PRD-13 — بازه‌های قیمت؛ [pricesText] `null` ⇒ ویرایش نشده */
+  val prices: List<PriceSchedule.Window> = emptyList(),
+  val pricesText: String? = null,
 ) {
   /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
   fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
@@ -64,6 +72,9 @@ data class ProductInfoForm(
     custom = custom,
     sku = sku,
     stockless = stockless,
+  ).copy(
+    kit = kitText?.let { ProductKit.parse(it, selfId, ProductKit.resolver(catalog)) { false }.parts } ?: kitParts,
+    prices = pricesText?.let { PriceSchedule.parse(it, ::dayOf).windows } ?: prices,
   )
 
   companion object {
@@ -79,9 +90,14 @@ data class ProductInfoForm(
       custom = CustomFields.format(info.custom),
       sku = info.sku,
       stockless = info.stockless,
+      kitParts = info.kit,
+      prices = info.prices,
     )
   }
 }
+
+/** تاریخِ کادر (خورشیدی یا میلادی، رقمِ فارسی هم) ⇒ `yyyy-MM-dd` — همان قاعدهٔ `DateField` */
+private fun dayOf(text: String): String? = ir.vil3ntec.tohid.Jalali.parseTyped(ir.vil3ntec.tohid.latinDigits(text.trim()))
 
 /** «راهرو ۳ · قفسه B» — فقط بخش‌های پُر، با زبانِ صفحه */
 fun shelfLabel(loc: ShelfLocation): String = loc.parts().joinToString(" · ") { (part, v) ->
@@ -215,7 +231,55 @@ fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onCha
       singleLine = false,
       modifier = Modifier.fillMaxWidth(),
     )
+    KitAndPriceFields(form, d, selfId, onChange)
   }
+}
+
+/** PRD-10 و PRD-13 — اجزای کیت و قیمتِ زمان‌بندی‌شده، با ایرادِ هر خط همان‌جا */
+@Composable
+private fun KitAndPriceFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
+  val c = Shop.colors
+  val byId = d.products.associateBy { it.id }
+  val kitText = form.kitText ?: ProductKit.format(form.kitParts, { byId[it]?.name ?: it }, { ir.vil3ntec.tohid.qty(it / 1000.0) })
+  val kitParsed = form.kitText?.let { t ->
+    ProductKit.parse(t, selfId, ProductKit.resolver(ProductInfoMap.refs(d))) { id -> ir.vil3ntec.tohid.data.ProductPlansMap.isKit(byId[id]) }
+  }
+  val kitBad = kitParsed?.problems.orEmpty()
+  val parts = kitParsed?.parts ?: form.kitParts
+  val kits = if (parts.isEmpty()) null else ProductKit.available(parts) { Math.round(ir.vil3ntec.tohid.data.ShopStore.stock(d, it) * 1000.0) }
+  OutlinedTextField(
+    value = kitText,
+    onValueChange = { onChange(form.copy(kitText = it.take(KIT_INPUT))) },
+    label = { Text(StrProduct.kit) },
+    supportingText = {
+      when {
+        kitBad.isNotEmpty() -> Text(StrProduct.kitBad(kitBad.first().first), color = c.danger)
+        kits != null -> Text(StrProduct.kitStock(ir.vil3ntec.tohid.qty(kits.toDouble())), color = c.primary)
+        else -> Text(StrProduct.kitHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  val pricesText = form.pricesText ?: PriceSchedule.format(form.prices, { ir.vil3ntec.tohid.formatDate(it) }, { ir.vil3ntec.tohid.qty(it / 100.0) })
+  val parsed = form.pricesText?.let { PriceSchedule.parse(it, ::dayOf) }
+  val windows = parsed?.windows ?: form.prices
+  val today = PriceSchedule.active(windows, ir.vil3ntec.tohid.todayIso())
+  OutlinedTextField(
+    value = pricesText,
+    onValueChange = { onChange(form.copy(pricesText = it.take(PRICES_INPUT))) },
+    label = { Text(StrProduct.prices) },
+    supportingText = {
+      val bad = parsed?.problems.orEmpty()
+      when {
+        bad.isNotEmpty() -> Text(StrProduct.pricesBad(bad.first().first), color = c.danger)
+        today != null -> Text(StrProduct.priceToday(ir.vil3ntec.tohid.money(today.priceMinor / 100.0)), color = c.primary)
+        else -> Text(StrProduct.pricesHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
 }
 
 /** PRD-26 — محلِ قفسهٔ کالای یک قلمِ سفارش، زیرِ نامش؛ تنظیمِ خاموش، قلمِ بی کالا یا کالای بی محل ⇒ هیچ */
@@ -247,6 +311,10 @@ fun ProductInfoSettings(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** سقفِ نویسهٔ کادرِ فهرست — ۲۰ واژه × ۶۰ نویسه با جداکننده جا می‌شود */
 private const val LIST_INPUT = ProductTerms.MAX_TERMS * (ProductTerms.MAX_TERM + 2)
+
+/** سقفِ نویسهٔ کادرِ کیت و قیمت‌های زمان‌بندی‌شده */
+private const val KIT_INPUT = ProductKit.MAX_PARTS * 100
+private const val PRICES_INPUT = PriceSchedule.MAX * 60
 
 /** سقفِ نویسهٔ کادرِ فیلدهای سفارشی — ۲۰ خطِ «نام: مقدار» */
 private const val CUSTOM_INPUT = CustomFields.MAX_FIELDS * (CustomFields.MAX_KEY + CustomFields.MAX_VALUE + 3)

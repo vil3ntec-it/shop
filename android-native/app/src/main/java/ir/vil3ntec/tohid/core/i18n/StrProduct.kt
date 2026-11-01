@@ -59,4 +59,24 @@ object StrProduct {
     "پرته له موجودۍ پلورل کېږي او د کمښت حد نه لري، لکه ګنډل یا چارج",
   )
   val serviceTag: String get() = t("خدماتی", "Service", "خدماتي")
+
+  // کیت (PRD-10) و قیمتِ زمان‌بندی‌شده (PRD-13)
+  val kit: String get() = t("اجزای کیت (نام یا بارکد × مقدار)", "Kit parts (name or barcode × amount)", "د کټ برخې (نوم یا بارکوډ × اندازه)")
+  val kitHint: String get() = t(
+    "هر خط یک جزء، مثلاً «روغن ۵ لیتری × 2». فروشِ کیت موجودیِ اجزا را کم می‌کند",
+    "One part per line, e.g. \"Oil 5 L × 2\". Selling the kit takes stock from its parts",
+    "هره کرښه یوه برخه، لکه «غوړي ۵ لیتره × 2». د کټ پلور د برخو موجودي کموي",
+  )
+  fun kitBad(a: Any): String = t("این خط درست نیست یا کالایش پیدا نشد: $a", "This line is wrong or its item was not found: $a", "دا کرښه سمه نه ده یا یې توکی ونه موندل شو: $a")
+  val kitPartGone: String get() = t("یکی از اجزای کیت دیگر در دکان نیست", "A kit part is no longer in the shop", "د کټ یوه برخه نور په دوکان کې نشته")
+  fun kitNested(a: Any): String = t("کیتِ تو در تو نمی‌شود: «$a»", "Kits cannot be nested: \"$a\"", "کټ په کټ کې نه کېږي: «$a»")
+  fun kitStock(a: Any): String = t("$a کیتِ کامل از اجزای موجود", "$a complete kits from parts in stock", "له موجودو برخو $a بشپړ کټونه")
+  val prices: String get() = t("قیمتِ زمان‌بندی‌شده", "Scheduled prices", "مهالویش شوې بیې")
+  val pricesHint: String get() = t(
+    "هر خط «از تا تا = قیمت»، مثلاً «۱۴۰۵/۱۲/۱۰ تا ۱۴۰۵/۱۲/۲۰ = 450»؛ هر دو روز شامل‌اند",
+    "One \"from to to = price\" per line, e.g. \"1405/12/10 to 1405/12/20 = 450\"; both days included",
+    "هره کرښه «له تر = بیه»، لکه «۱۴۰۵/۱۲/۱۰ تا ۱۴۰۵/۱۲/۲۰ = 450»؛ دواړه ورځې شاملې دي",
+  )
+  fun pricesBad(a: Any): String = t("این خط درست نیست یا با بازهٔ دیگر هم‌پوشان است: $a", "This line is wrong or overlaps another range: $a", "دا کرښه سمه نه ده یا له بلې مودې سره ګډه ده: $a")
+  fun priceToday(a: Any): String = t("قیمتِ امروز: $a", "Today's price: $a", "د نن بیه: $a")
 }

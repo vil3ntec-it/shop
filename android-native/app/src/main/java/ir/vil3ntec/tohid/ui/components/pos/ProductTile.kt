@@ -189,7 +189,7 @@ fun ProductCard(
 ) {
   val c = Shop.colors
   val label = buildString {
-    append(product.name); append(Str.listSep + " "); append(money(product.salePrice)); append(" " + Str.afghani)
+    append(product.name); append(Str.listSep + " "); append(money(ir.vil3ntec.tohid.data.ProductPlansMap.price(product))); append(" " + Str.afghani)
     if (inCart > 0) { append(Str.listSep + " " + StrPos.inCartColon + " "); append(qty(inCart)) }
   }
   Column(
@@ -224,7 +224,7 @@ fun ProductCard(
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Text(
-        "${money(product.salePrice)} ؋",
+        "${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(product))} ؋",
         Modifier.weight(1f),
         style = MaterialTheme.typography.titleMedium.tabular(), fontWeight = FontWeight.Bold, color = c.text, maxLines = 1,
       )
@@ -330,7 +330,7 @@ fun ProductTable(
             if (p.category.isNotBlank()) Text(p.category, style = MaterialTheme.typography.labelSmall, color = c.muted, maxLines = 1)
           }
           Text(p.barcodes.firstOrNull().orEmpty(), Modifier.width(112.dp), style = MaterialTheme.typography.bodySmall.tabular(), color = c.muted, maxLines = 1)
-          Text("${money(p.salePrice)} ؋", Modifier.width(110.dp), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.End, maxLines = 1)
+          Text("${money(ir.vil3ntec.tohid.data.ProductPlansMap.price(p))} ؋", Modifier.width(110.dp), style = MaterialTheme.typography.bodyMedium.tabular(), fontWeight = FontWeight.SemiBold, color = c.text, textAlign = TextAlign.End, maxLines = 1)
           Spacer(Modifier.width(16.dp))
           StockLine(cb.stockOf(p.id), p.minStock, p.unit, Modifier.width(130.dp), stockless = p.stockless == true)
           Box(Modifier.width(64.dp), contentAlignment = Alignment.Center) {

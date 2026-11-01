@@ -156,6 +156,10 @@ object OwnerExport {
     //  PRD-03/PRD-09
     "sku" to "کد کالا (SKU)",
     "stockless" to "خدماتی یا بی موجودی",
+    //  PRD-10/PRD-13
+    "kit" to "اجزای کیت",
+    "priceWindows" to "قیمت‌های زمان‌بندی‌شده",
+    "parts" to "اجزای کیت هنگام فروش",
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",

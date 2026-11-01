@@ -70,7 +70,7 @@ object SalesEngine {
   fun linePrice(d: ShopData, line: CartLine): Double {
     line.unitPrice?.let { return it }
     if (line.free) return 0.0
-    return d.products.find { it.id == line.productId }?.salePrice ?: 0.0
+    return d.products.find { it.id == line.productId }?.let(ProductPlansMap::price) ?: 0.0 // PRD-13: قیمتِ زمان‌بندی‌شده
   }
 
   enum class DiscountType { AMOUNT, PERCENT }
@@ -277,7 +277,7 @@ object SalesEngine {
       if (line.free) lineTotal(line.unitPrice ?: 0.0, line.quantity)
       else {
         val p = d.products.find { it.id == line.productId }
-        if (p == null) 0.0 else lineTotal(line.unitPrice ?: p.salePrice, line.quantity)
+        if (p == null) 0.0 else lineTotal(line.unitPrice ?: ProductPlansMap.price(p), line.quantity)
       }
     }
 
@@ -342,6 +342,7 @@ object SalesEngine {
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
+      ProductPlansMap.kitShortage(d, cart, p)?.let { return Result.Failed(it) } // PRD-10: نیازِ همهٔ سبد به اجزای کیت
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
       var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
@@ -499,8 +500,7 @@ object SalesEngine {
       }
 
       val p = d.products.find { it.id == line.productId } ?: return@forEachIndexed
-      //  قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا
-      val unit = line.unitPrice ?: p.salePrice
+      val unit = linePrice(d, line) // قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا (PRD-13: با بازهٔ فعال)
       //  موتورِ تازه: بهای موقت = میانگینِ موزون؛ نامعلوم (کالای بی ورود) ⇒ همان قیمتِ خریدِ امروز
       val planned = stockPlan?.get(lineIndex)?.takeIf { it.ok && !it.unknownCost }
       items += SaleItem(
@@ -509,17 +509,17 @@ object SalesEngine {
         productId = p.id,
         quantity = line.quantity,
         unitPrice = unit,
-        purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: p.purchasePrice,
+        purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: ProductPlansMap.cost(d, p),
         totalPrice = lineTotal(unit, line.quantity),
-        returnedQty = 0.0,
+        returnedQty = 0.0, parts = ProductPlansMap.parts(p),
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
       )
-      movements += StockMovement(
+      for ((pid, q) in ProductPlansMap.moves(p, line.quantity)) movements += StockMovement( // PRD-10: کیت ⇒ هر جزء
         id = newId(),
-        productId = p.id,
+        productId = pid,
         type = "sale",
-        qty = -line.quantity,
+        qty = -q,
         date = today,
         notes = "فاکتور #${sale.invoiceLabel()}",
         refId = saleId,

@@ -117,10 +117,14 @@ data class ProductInfo(
   val sku: String = "",
   /** PRD-09 — کالای خدماتی یا بی موجودی: فروش موجودی نمی‌خواهد و حدِ موجودی ندارد */
   val stockless: Boolean = false,
+  /** PRD-10 — اجزای کیت (`ProductKit`)؛ تهی ⇒ کالای عادی */
+  val kit: List<ProductKit.Part> = emptyList(),
+  /** PRD-13 — بازه‌های قیمتِ زمان‌بندی‌شده (`PriceSchedule`)، به ترتیبِ آغاز و بی هم‌پوشانی */
+  val prices: List<PriceSchedule.Window> = emptyList(),
 ) {
   val isEmpty: Boolean
     get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty &&
-      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless
+      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless && kit.isEmpty() && prices.isEmpty()
 
   /** نام‌های دیگرِ کالا (پشتو، انگلیسی، مترادف‌ها) — در جست‌وجو هم‌پایهٔ نام */
   val aliases: List<String> get() = listOfNotNull(namePs.ifEmpty { null }, nameEn.ifEmpty { null }) + synonyms
