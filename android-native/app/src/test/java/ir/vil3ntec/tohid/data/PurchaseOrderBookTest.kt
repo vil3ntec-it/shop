@@ -201,7 +201,10 @@ class PurchaseOrderBookTest {
         SaleItem(id = "i3", saleId = "s-x", productId = "pA", quantity = 99.0),
         SaleItem(id = "i4", saleId = "s-old", productId = "pA", quantity = 99.0),
       ),
+      //  موجودی = ورودی − همهٔ فروش‌های لغونشده (۲۰ + ۳۵ + ۹۹ = ۱۵۴)، نه فقط پنجره؛ ورودیِ آغازِ ۱۵۴ ⇒ موجودی همان ۲
+      warehouseEntries = d.warehouseEntries + WarehouseEntry(id = "w-open", productId = "pA", units = 154.0),
     )
+    assertEquals(2.0, ShopStore.stock(d, "pA"), 1e-9)
     assertEquals(mapOf("pA" to 55_000L), PurchaseOrderBook.soldMilli(d, "2026-11-01"))
 
     val sentA = po.copy(id = "o1", supplierId = "s1", status = "partial", sentAt = 1_000L, firstReceiptAt = 1_000L + 3 * 86_400_000L,
