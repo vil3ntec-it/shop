@@ -1,0 +1,80 @@
+name: CodeQL (گزارش)
+
+#  §۱۴ برنامهٔ امنیت — SASTِ رایگانِ GitHub برای مخزنِ عمومی. شرح و طرح: docs/security/supply-fa.md
+#  • javascript-typescript: سرور، پنل‌ها، وبِ دکان (index.html، sw.js) و هسته‌های license — بی ساخت
+#  • actions: خودِ ورک‌فلوها (تزریق، مجوز، checkoutِ ناامن)
+#  ⚠️ فعلاً فقط گزارش (هشدارها در Security ⇒ Code scanning و حاشیهٔ PR)؛ گامِ «analyze» حتی اگر
+#  بارگذاری رد شود PR را قرمز نمی‌کند. سد شدن فقط با تصمیمِ صاحب محصول (قاعدهٔ شاخه: «Code scanning
+#  results»). ⛔ همزمان «Default setup» ِ CodeQL را در تنظیمات روشن نکنید: GitHub بارگذاریِ این ورک‌فلو
+#  را رد می‌کند. یکی از دو: همین فایل (پیشنهاد) یا Default setup + برداشتنِ این فایل.
+#  Kotlin (java-kotlin) ساخت می‌خواهد و هنوز این‌جا نیست — طرحش در همان سند.
+
+on:
+  pull_request:
+    paths:
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/public/**'
+      - 'license/**'
+      - 'index.html'
+      - 'sw.js'
+      - '.github/workflows/**'
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/**'
+      - 'server/scripts/**'
+      - 'server/public/**'
+      - 'license/**'
+      - 'index.html'
+      - 'sw.js'
+      - '.github/workflows/**'
+  schedule:
+    - cron: '23 4 * * 3'
+  workflow_dispatch:
+
+concurrency:
+  group: codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: CodeQL — ${{ matrix.language }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      #  فقط بارگذاریِ نتیجه (SARIF) در Code scanning
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        continue-on-error: true
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - '**/node_modules/**'
+              - 'server/test/**'
+              - 'license/vendor/**'
+              - 'license/test-vectors/**'
+              - 'bench/**'
+              - 'docs/**'
+
+      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
+        #  گزارش، نه سد (طرحِ سد شدن در docs/security/supply-fa.md)
+        continue-on-error: true
+        with:
+          category: /language:${{ matrix.language }}

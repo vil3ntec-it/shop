@@ -128,20 +128,21 @@ async function flagOf(shopId) {
 // ════════════════════════════════════════════════════════════════════
 
 /**
- * زمانِ رویداد، اکیداً صعودی در این فرایند. تاریخچه با `created_at, id` خوانده می‌شود و شناسه تصادفی است؛
- * دو رویدادِ یک تراکنش (تصمیم و جریمه، رأیِ اعتراض و برداشتنِ جریمه) در یک میلی‌ثانیه جابه‌جا دیده می‌شدند.
+ * تاریخچه به ترتیبِ نوشتن: `eventsOf` با `created_at, id` مرتب می‌کند و `id` تصادفی است (`newId`)، پس دو
+ * رویدادِ هم‌میلی‌ثانیه (مثلاً «تصمیم» و «جریمه» در یک تراکنش) گاهی جابه‌جا می‌آمدند. زمانِ هر رویداد
+ * دست‌کم یک میلی‌ثانیه پس از آخرین رویدادِ همان پرونده است ⇒ ترتیب همیشه همان ترتیبِ نوشتن. نویسنده‌ها
+ * ردیفِ پرونده را `FOR UPDATE` گرفته‌اند (جز `liftSanction` که فقط جریمه را قفل می‌کند)، و هر دستور
+ * در READ COMMITTED رویدادهای ثبت‌شدهٔ پیشین را می‌بیند. بی مهاجرت؛ از نمایهٔ `(case_id, created_at, id)`.
  */
-let lastEventAt = 0;
-function eventAt() {
-  lastEventAt = Math.max(now(), lastEventAt + 1);
-  return lastEventAt;
-}
-
 async function addEvent(c, row, actor, actorId, type, body = '', data = {}) {
+  const last = (await c.query(
+    'SELECT created_at FROM trust_case_events WHERE case_id=$1 ORDER BY created_at DESC LIMIT 1', [row.id]
+  )).rows[0];
+  const at = Math.max(now(), last ? Number(last.created_at) + 1 : 0);
   await c.query(
     `INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, body, data, created_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), eventAt()]
+    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), at]
   );
 }
 
