@@ -75,6 +75,8 @@ const TABLES = Object.freeze({
 
   priceHistory: { policy: 'log', money: ['oldPrice', 'newPrice'] },
   auditLog: { policy: 'log', money: ['amount'] },
+  //  گاوصندوق (PAY-18): فقط‌افزودنی؛ مبلغ از اول `amountMinor`ِ صحیح است
+  safeEntries: { policy: 'log' },
 
   stockMovements: { policy: 'moves', qty: ['qty'] },
   //  تازهٔ v3 — در v1 نیست
@@ -115,14 +117,20 @@ for (const [name, t] of Object.entries(TABLES)) {
 }
 
 /** @returns {object|null} */
-function specOf(table) {
-  return typeof table === 'string' ? SPECS.get(table) || null : null;
+/**
+ * با `ctx` (درِ دستگاه، `sync-v3.validate`): جدولِ پشتِ پرچمِ خاموش (گاوصندوق، `safe-flag.js`) همان
+ * ناشناختهٔ main است. بی `ctx` (تبدیل، پل به v1، رسید) همهٔ جدول‌ها، مثلِ پیش.
+ */
+function specOf(table, ctx) {
+  const spec = typeof table === 'string' ? SPECS.get(table) || null : null;
+  return spec && ctx !== undefined && !require('./safe-flag').allowed(spec.name, ctx) ? null : spec;
 }
 
-/** شکلِ عمومی برای `/hello` — برنامه از همین می‌خواند. */
-function describe() {
+/** شکلِ عمومی برای `/hello` — برنامه از همین می‌خواند. با `ctx` (حتی null) بی جدولِ پشتِ پرچمِ خاموش. */
+function describe(ctx) {
   const out = {};
   for (const s of SPECS.values()) {
+    if (ctx !== undefined && !require('./safe-flag').allowed(s.name, ctx)) continue;
     out[s.name] = {
       policy: s.policy, kinds: s.kinds,
       money: s.money.map(minorOf), qty: s.qty.map(milliOf),

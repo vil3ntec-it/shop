@@ -36,6 +36,10 @@ const router = express.Router();
 //  اول به‌ازای آی‌پی (برای درخواستِ بی توکن)، بعد به‌ازای **حساب**.
 router.use(rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' }));
 router.use(requireSyncAccount);
+//  گاوصندوق (PAY-18): بقیهٔ درخواستِ دکان زیرِ `ctx` ِ خودش، تا پلهٔ schema ِ پشتِ پرچمِ `sync.safe_entries`
+//  بی رساندنِ `ctx` از `lib/sync-v1.js` خوانده شود — آن پرونده مشترک با پمپ است و دست نمی‌خورد (‎lib/safe-flag.js‎)
+const safeFlag = require('../lib/safe-flag');
+router.use(safeFlag.within);
 router.use(rateLimit({
   max: config.rateLimit.syncMax,
   keyPrefix: 'sync',
@@ -89,10 +93,16 @@ const ownNewer = require('../lib/sync-v1-own-newer');
  *  ‎lib/sync-v1-ack.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد؛ پمپ همان مسیرِ پیشین را می‌رود.
  */
 const ack = require('../lib/sync-v1-ack');
+/*
+ *  دکان: گاوصندوق (PAY-18) — opِ `safeEntries` فقط درج، با شکلِ درست و `safe.move`
+ *  (جز «از دخل») — ‎lib/safe-ledger.js‎. پمپ و بقیهٔ جدول‌ها بی هیچ کاری از آن رد می‌شوند.
+ *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
+ */
+const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
-//  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, async (req, res, next) => {
+//  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
@@ -172,7 +182,9 @@ router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
 router.get('/status', async (req, res, next) => {
   try {
     const deviceId = String(req.query?.device_id || req.query?.deviceId || '').slice(0, 64);
-    res.json({ ok: true, ...(await sync.status(req.sync, deviceId)) });
+    const out = await sync.status(req.sync, deviceId);
+    //  جدولِ پشتِ پرچمِ خاموش (گاوصندوق) در فهرستِ دکان نه — همین‌جا، نه در `lib/sync-v1.js` ِ مشترک با پمپ
+    res.json({ ok: true, ...out, tables: safeFlag.tablesFor(req.sync, out.tables) });
   } catch (err) { next(err); }
 });
 

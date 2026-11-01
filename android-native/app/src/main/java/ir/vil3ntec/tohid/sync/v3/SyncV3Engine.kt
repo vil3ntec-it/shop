@@ -437,7 +437,8 @@ internal class SyncV3Engine(
       if (meta.lastError.isNotEmpty()) put("last_error", JsonPrimitive(meta.lastError))
       if (b.fmt == V3Entry.V2) {
         put("format", JsonPrimitive("v2"))
-        put("schema_version", JsonPrimitive(LedgerDiff.SCHEMA_VERSION))
+        //  قالبِ v2 پلهٔ پایه را می‌فرستد (همان `LEGACY_SCHEMA` ِ وب): پلهٔ ۴ ِ سرور پشتِ پرچم است
+        put("schema_version", JsonPrimitive(LedgerDiff.BASE_SCHEMA))
       }
     }
     val r = tryCall("POST", "/push", body) ?: return fail(0, null)

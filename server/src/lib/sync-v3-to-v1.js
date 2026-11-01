@@ -148,7 +148,7 @@ function aboveFloor(stamp, floor, node) {
  * @returns {Promise<number|null>} server_seq، یا null اگر op_id گرفته بود
  */
 async function writeV1(c, ctx, op, { deviceId, t }) {
-  const current = v1migrations.currentVersion(ctx.app);
+  const current = v1migrations.currentVersion(ctx.app, ctx);
   const ins = await c.query(
     `INSERT INTO oplog (id, app, account_kind, account_id, device_id, op_id, client_ts, table_name, row_id,
                         op_type, fields, hash, schema_version, received_at)

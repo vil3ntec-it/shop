@@ -261,9 +261,14 @@ class SyncV1Engine private constructor(context: Context) {
       val legacy = state.legacyOpsUpTo
       if (legacy.isNotEmpty() && queue.all().none { LedgerDiff.isLegacyOp(it.opId, legacy) }) state.legacyOpsUpTo = ""
       val out = try {
-        client.push(device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo))
+        client.push(
+          device, batch, queue.size(), caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo),
+          schema = LedgerDiff.wireSchema(state.serverSchema),
+        )
       } catch (upgrade: SyncV1Client.UpgradeRequired) {
-        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود. پلهٔ بالاتر از پایه را دیگر نمی‌شناسد (پرچمِ
+        //  گاوصندوقِ دکان خاموش شد)؟ بارِ بعد با پایه — `LedgerDiff.wireSchema`
+        if (LedgerDiff.wireSchema(state.serverSchema) > LedgerDiff.BASE_SCHEMA) state.serverSchema = 0
         state.holding = true
         state.lastError = upgrade.reason
         publish()

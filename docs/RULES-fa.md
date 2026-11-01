@@ -566,6 +566,7 @@
 | `shop.promo_tier_price` | دکان / `all` | خاموش | پلهٔ «قیمتِ ثابتِ هر واحد» در قاعدهٔ پله‌ای (`tiers[].unitMinor`، POS-19): خاموش ⇒ `PUT /api/shop/promos/rules/:id` ِ چنین قاعده‌ای ۴۰۳ `tier_price_disabled`؛ `tierPrice` در `GET /api/shop/promos` گزینهٔ فرمِ برنامه را نشان می‌دهد. برنامهٔ پیشین چنین قاعده‌ای را نامعتبر می‌بیند و نادیده می‌گیرد ⇒ پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند | `claude/part-pos-3` | باز |
 | `shop.customer_notify` | دکان / `all` | خاموش | پیامِ وضعیتِ سفارشِ **ویترین** به خودِ مشتری (NTF-01/03/04، مهاجرتِ ۱۴۳): صفِ `customer_notify_outbox` در همان تراکنشِ ثبت/گذار، زنجیرهٔ کانال‌های مجازِ هر رویداد و `GET /api/shop/orders/:id/notices` (فقط خواندن). امروز هیچ سرویس‌دهنده‌ای وصل نیست (D-09) ⇒ `no_channel`؛ هیچ پیامِ واقعی نمی‌رود. لینکِ پیگیری فقط با `STORE_PUBLIC_URL` (https) | `claude/spec-ntf-1` | باز |
 | `shop.stock_v2` | دکان / `all` | خاموش | موتورِ تازهٔ موجودی و بهای برنامه (میانگینِ موزون، سری/FEFO، دفترِ حرکت، شمارش، انتقال)؛ برنامه از `GET /api/shop/stock-ledger/config` می‌خواند (`StockFlag`، هر ۱۰ دقیقه با سوکت)؛ روشن شدن هم پرچم و هم تنظیمِ دکانِ `stock_mode=on` را می‌خواهد (`StockLedger.isOn`)؛ خاموش ⇒ کارتِ «موجودی و بها» پنهان و همان موتورِ امروز | #315 (و #323 رویش) | باز |
+| `sync.safe_entries` | دکان / `all` | خاموش | گاوصندوق (PAY-18): پلهٔ ۴ ِ schema ِ دکان و جدولِ `safeEntries` در Sync v1/v3 با نگهبانِ `safe-ledger.js`؛ خاموش ⇒ همان main (پلهٔ ۳، `unknown_table`، راهِ قدیم بی‌صدا، `/status` و `/hello` بی این جدول)؛ برنامه‌ها پلهٔ همان سرور را می‌فرستند (`wireSchema`) | #364 | باز |
 | `shop.order_risk` | دکان / `all` | خاموش | قاعده‌های ریسکِ ثبتِ **ویترین** (`lib/order-risk.js`): سفارشِ تکراری ⇒ ۴۰۹ `duplicate_order` (RSK-05) و سقفِ مبلغ و سفارشِ بازِ مشتریِ تازه ⇒ ۴۰۹ `new_customer_limit` (RSK-02)، و `GET /api/shop/orders/:id/risk` ِ سابقه و نشانه‌ها (RSK-03؛ خاموش ⇒ `{enabled:false}`). فروشِ حضوری و سفارشِ کارمند هرگز | `claude/spec-rsk-2` | باز |
 | `shop.storefront.notify_area` | دکان / `all` | خاموش | «خبرم کن» ِ بیرونِ محدوده (CHK-10)، فقط روی `shop.storefront.zones`: `POST`/`DELETE /api/store/:slug/area-request` (خاموش ⇒ همان پاسخِ درِ ناشناخته)، `GET /api/shop/storefront/area-requests` و `POST …/:id/notified` (خاموش ⇒ ۴۰۳ `notify_area_disabled`)، و `notifyArea` در «کجا؟» | `claude/part-chk-2` | باز |
 | `shop.storefront.cart` | دکان / `all` | خاموش | سبدِ سروریِ حسابِ مشتری: `GET`/`PUT /api/store/:slug/account/cart` و `POST …/cart/merge` (CHK-03)؛ خاموش یا ویترینِ بسته ⇒ همان پاسخِ درِ ناشناخته (۴۰۱ `unauthorized`)، پیش از هر سقف و نشست | `claude/part-chk-1` | باز |
@@ -1747,6 +1748,10 @@ ADMIN_BOOTSTRAP_USER / ADMIN_BOOTSTRAP_PASSWORD
 
 شرحِ کامل: `docs/LOGIN-fa.md` و `docs/SYNC-v1-fa.md`.
 
+- ⛔ **`server/src/lib/sync-v1.js`، `PUMP_TABLES` و `/api/pump/*` در کارِ دکان دست نمی‌خورند** (۱۴۰۵/۰۸/۱۰، #364): راهِ همگام‌سازیِ
+  برنامهٔ پمپِ نصب‌شده همین‌جاست و هر خطِ تازه، حتی بی تغییرِ رفتارِ پمپ، پمپ را با هر PR ِ دکان در خطر می‌گذارد. رفتارِ تازهٔ دکان
+  (پرچم، پلهٔ schema، فهرستِ جدول‌ها) بیرون می‌نشیند: میان‌افزارِ فقط‌دکانِ `routes/sync-v1.js` و `ctx` ِ درخواست با `safe-flag.within`
+  (`AsyncLocalStorage`) برای `sync-v1-migrations`. سنجه: `safe-flag.test.js`.
 - ⛔ **هر جدولِ همگام‌شوندهٔ برنامهٔ پمپ در `PUMP_TABLES` است** (۱۴۰۵/۰۷/۲۸، 2.14.4):
   `HawalaQuota`، `FuelTank`، `TankFill`، `PumpCalibration` و `FuelConversion` نبودند و هر
   opشان «جدولِ ناشناس» می‌گرفت — کامپیوترِ دوم هیچ‌وقت حواله و مخزن‌ها را نمی‌دید. جدولِ
