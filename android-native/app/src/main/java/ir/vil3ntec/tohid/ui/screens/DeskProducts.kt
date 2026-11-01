@@ -34,8 +34,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.core.stock.StockLevelRules
@@ -96,6 +102,8 @@ fun DeskProductsScreen(
   var openId by remember { mutableStateOf<String?>(null) }
   var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
   var confirm by remember { mutableStateOf<BulkKind?>(null) }
+  var priceOpen by remember { mutableStateOf(false) }
+  val productTools = remember { ShopPolicy.productTools(context) }
   var results by remember { mutableStateOf<Pair<String, List<BulkRowResult>>?>(null) }
   //  INV-12: ویرایشِ گروهیِ حدها — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
   val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
@@ -131,8 +139,10 @@ fun DeskProductsScreen(
   val kpis = remember(d) { ProductListModel.kpis(d.products, stockOf, System.currentTimeMillis()) }
   val counts = remember(d) { ProductListModel.counts(d.products, stockOf) }
   val categories = remember(d.products) { ProductListModel.categories(d.products) }
-  val rows = remember(d.products, index, search, tab, category, sortBy, asc) {
-    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc)
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نام‌های دیگر و واژه‌های جست‌وجو هم
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val rows = remember(d.products, index, search, tab, category, sortBy, asc, infoSearch) {
+    ProductListModel.rows(d.products, stockOf, search, tab, category, sortBy, asc, infoSearch)
   }
   //  کالایی که رفته (حذف یا همگام‌سازی) از انتخاب بیرون می‌رود
   LaunchedEffect(d.products) { selected = Selection.prune(selected, d.products.mapTo(HashSet()) { it.id }) }
@@ -284,6 +294,8 @@ fun DeskProductsScreen(
                   ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))
                     ?.let { toast("${plain(part.products.size)} کالا ذخیره شد: $it") }
                 })
+                //  PRD-21 (پیش‌فرض خاموش): قیمتِ گروهی با پیش‌نمایش، هشدار، تأیید و دلیل
+                if (productTools) add(BulkAction("قیمت", Icons.Filled.Sell) { priceOpen = true })
                 add(BulkAction("فعال", Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
                 add(BulkAction("غیرفعال", Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
                 if (levelsOn) add(BulkAction("حدِ موجودی", Icons.Filled.Tune) { levelsInput = true })
@@ -317,6 +329,18 @@ fun DeskProductsScreen(
   }
 
   /* ─────────── پیش‌نمایش و نتیجهٔ کارِ گروهی ─────────── */
+  if (priceOpen) {
+    BulkPriceDialog(d, selected, onDismiss = { priceOpen = false }) { r ->
+      when (r) {
+        is WarehouseEngine.Result.Failed -> toast(r.message)
+        is WarehouseEngine.Result.Ok -> {
+          scope.launch { store.save(r.data) }
+          toast("قیمتِ ${plain(selected.size)} کالا عوض شد")
+          selected = emptySet(); priceOpen = false
+        }
+      }
+    }
+  }
   confirm?.let { kind ->
     val hidden = Selection.hiddenCount(selected, rows.map { it.id })
     val warnings = if (hidden > 0) listOf("${plain(hidden)} مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند ولی در این کار هستند.") else emptyList()
@@ -722,12 +746,24 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
   LaunchedEffect(incoming.value) {
     incoming.value?.let { barcode = it; incoming.value = null; runCatching { nameFocus.requestFocus() } }
   }
+  //  PRD-19 (پیش‌فرض خاموش): نامِ مشابه ⇒ هشدار و Enterِ دوم برای ثبت؛ نامِ یکسان را موتور رد می‌کند
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  var warnedFor by remember { mutableStateOf("") }
 
   fun save() {
+    val similar = similarIndex?.find(name).orEmpty()
+    if (similar.isNotEmpty() && warnedFor != name.trim()) {
+      warnedFor = name.trim()
+      toast("نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" } + " — اگر کالای دیگری است، دوباره Enter بزنید")
+      return
+    }
     val draft = WarehouseEngine.ProductDraft(
       name = name, category = category.trim(), unit = unit.trim(),
       purchasePrice = buy.toDoubleOrNull() ?: 0.0, salePrice = sell.toDoubleOrNull() ?: 0.0,
-      barcode = barcode.trim(),
+      barcode = if (tools) "" else barcode.trim(),
+      barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
     )
     when (val r = WarehouseEngine.addProduct(d, draft, System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -760,7 +796,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
       QuickField(name, { name = it }, "کالای تازه", Modifier.weight(1f).focusRequester(nameFocus), ::save)
       Spacer(Modifier.width(6.dp))
-      QuickField(barcode, { barcode = it }, "بارکد", Modifier.width(150.dp), ::save)
+      QuickField(barcode, { barcode = it }, if (tools) "بارکدها (،)" else "بارکد", Modifier.width(150.dp), ::save)
       Spacer(Modifier.width(6.dp))
       QuickField(category, { category = it }, "دسته", Modifier.width(120.dp), ::save)
       Spacer(Modifier.width(6.dp))
@@ -790,14 +826,30 @@ private fun EditPanel(
 ) {
   val scope = rememberCoroutineScope()
   val focus = LocalFocusManager.current
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
   var name by remember { mutableStateOf(p.name) }
-  var barcode by remember { mutableStateOf(p.barcodes.firstOrNull().orEmpty()) }
+  var barcode by remember { mutableStateOf(if (tools) p.barcodes.joinToString("، ") else p.barcodes.firstOrNull().orEmpty()) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(name, similarIndex) { similarIndex?.find(name, except = d.products.indexOfFirst { it.id == p.id }).orEmpty() }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember { mutableStateOf("") }
+  //  PRD-06 (همان پرچم): برند و برچسب‌ها
+  var brand by remember { mutableStateOf(p.brand.orEmpty()) }
+  var tags by remember { mutableStateOf(p.tags.orEmpty().joinToString("، ")) }
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
   var sell by remember { mutableStateOf(qty(p.salePrice)) }
   var min by remember { mutableStateOf(qty(p.minStock)) }
   var active by remember { mutableStateOf(p.active) }
+  //  PRD-02/PRD-26: خاموش ⇒ همان پنلِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  var info by remember {
+    mutableStateOf(ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)))
+  }
   //  INV-12 — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
   val context = LocalContext.current
   val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
@@ -808,7 +860,13 @@ private fun EditPanel(
     val draft = WarehouseEngine.ProductDraft(
       name = name, category = category.trim(), unit = unit.trim(),
       purchasePrice = buy.toDoubleOrNull() ?: 0.0, salePrice = sell.toDoubleOrNull() ?: 0.0,
-      minStock = min.toDoubleOrNull() ?: 0.0, barcode = barcode.trim(), active = active,
+      minStock = min.toDoubleOrNull() ?: 0.0, barcode = if (tools) "" else barcode.trim(), active = active,
+      barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
+      changedBy = if (tools) me else null,
+      reason = if (tools) priceReason else null,
+      info = if (infoOn) info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), p.id) else null,
+      brand = if (tools) brand else null,
+      tags = if (tools) ProductLabels.tags(tags) else null,
       editLevels = levelsOn,
       reorderPoint = if (levelsOn) levelNumber(reorder) else null,
       maxStock = if (levelsOn) levelNumber(maxStock) else null,
@@ -851,13 +909,27 @@ private fun EditPanel(
         Spacer(Modifier.height(6.dp))
       }
       F(name, { name = it }, "نام")
-      F(barcode, { barcode = it }, "بارکد")
+      if (similar.isNotEmpty()) {
+        Text(
+          "نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" },
+          style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning,
+        )
+        Spacer(Modifier.height(6.dp))
+      }
+      F(barcode, { barcode = it }, if (tools) "بارکدها (با «،» جدا)" else "بارکد")
       F(category, { category = it }, "دسته")
+      if (tools) {
+        F(brand, { brand = it }, "برند")
+        F(tags, { tags = it }, "برچسب‌ها (با «،» جدا)")
+      }
       F(unit, { unit = it }, "واحد")
       Row {
         Box(Modifier.weight(1f)) { F(buy, { buy = it }, "قیمتِ خرید", true) }
         Spacer(Modifier.width(6.dp))
         Box(Modifier.weight(1f)) { F(sell, { sell = it }, "قیمتِ فروش", true) }
+      }
+      if (tools && (buy != qty(p.purchasePrice) || sell != qty(p.salePrice))) {
+        F(priceReason, { priceReason = it }, "دلیلِ تغییرِ قیمت (با نامِ شما در سابقه)")
       }
       F(min, { min = it }, "حدِ هشدارِ موجودی", true)
       if (levelsOn) {
@@ -870,6 +942,10 @@ private fun EditPanel(
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = active, onCheckedChange = { active = it })
         Text("فعال (در فروش دیده می‌شود)", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+      }
+      if (infoOn) {
+        Spacer(Modifier.height(8.dp))
+        ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info, d, p.id) { info = it }
       }
       Spacer(Modifier.height(10.dp))
       Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text("ذخیره  (Enter / Ctrl+S)") }

@@ -9,6 +9,8 @@
 
    دوقلوی `core/report/ReportBoard.kt`؛ هر دو `core/test-vectors/report-board-v1.json`
    را عیناً می‌گذرانند. رفتارِ یکی را بی دیگری و بی فایلِ مرجع عوض نکنید.
+   `cashierAlerts` (RSK-10) دوقلوی `core/risk/CashierAlerts.kt` (commonMain) است و هر دو
+   `core/test-vectors/cashier-alerts-v1.json` را می‌گذرانند.
    ========================================================== */
 (function (factory) {
   'use strict';
@@ -115,7 +117,58 @@
     pills.push(events > 0
       ? pill('fraud', events + ' رویداد حساس امروز', 'warning', preset('fraud', 'today', ''))
       : pill('fraud', 'رویداد حساسی امروز نیست', 'success', preset('fraud', 'today', '')));
+    //  RSK-10: هشدار برای صاحب و مدیر است (همان که زبانهٔ ضدتقلب را می‌بیند)، نه شاگرد
+    var alerts = money === false ? [] : alertsOf(fraud);
+    if (alerts.length) pills.push(pill('cashier', alerts.length + ' هشدارِ رفتارِ غیرعادیِ صندوقدار امروز', 'danger', preset('fraud', 'today', '')));
     return { date: t.date, kpis: kpis, pills: pills };
+  }
+
+  /* ---------------- RSK-10: هشدارِ رفتارِ غیرعادیِ صندوقدار ---------------- */
+
+  var ALERT_KINDS = ['void', 'discount', 'no_sale'];
+  var MAX_EVENTS = 100000, MAX_INVOICES = 10000000;
+  function clampInt(n, lo, hi) { n = Math.floor(Number(n) || 0); return n < lo ? lo : (n > hi ? hi : n); }
+  function countOf(r, k) { return k === 'void' ? r.voids : (k === 'discount' ? r.discounts : r.noSales); }
+
+  /**
+   * «معمول» = نرخِ بقیهٔ کاربرانِ همین بازه (رویداد به‌ازای فاکتور). هشدار: دستِ کم `minCount` بار و نرخِ کاربر
+   * دستِ کم `factorPct` درصدِ نرخِ بقیه (شمارِ بقیه کمِ کم ۱؛ کاربرِ بی فاکتور مخرجِ ۱). بی فاکتورِ همکار هشداری نیست؛
+   * کلیدِ خالی در «بقیه» هست ولی هشدار نمی‌گیرد. فقط عددِ صحیحِ زیرِ ۲^۵۳ — همان حسابِ CashierAlerts.kt.
+   * `rows`: [{key, invoices, voids, discounts, noSales}]؛ `policy`: {minCount = 3, factorPct = 200}.
+   */
+  function cashierAlerts(rows, policy) {
+    policy = policy || {};
+    var min = clampInt(policy.minCount === undefined ? 3 : policy.minCount, 1, MAX_EVENTS);
+    var factor = clampInt(policy.factorPct === undefined ? 200 : policy.factorPct, 100, 1000);
+    var out = [];
+    ALERT_KINDS.forEach(function (k, ki) {
+      rows.forEach(function (u, i) {
+        var c = clampInt(countOf(u, k), 0, MAX_EVENTS);
+        if (!u.key || c < min) return;
+        var peerCount = 0, peerInvoices = 0;
+        rows.forEach(function (p, j) {
+          if (j === i) return;
+          peerCount = clampInt(peerCount + clampInt(countOf(p, k), 0, MAX_EVENTS), 0, MAX_EVENTS);
+          peerInvoices = clampInt(peerInvoices + clampInt(p.invoices, 0, MAX_INVOICES), 0, MAX_INVOICES);
+        });
+        if (peerInvoices === 0) return;
+        var mine = clampInt(u.invoices, 0, MAX_INVOICES), den = Math.max(1, mine), base = Math.max(1, peerCount);
+        if (c * peerInvoices * 100 < factor * base * den) return;
+        out.push({ key: String(u.key), kind: k, count: c, invoices: mine, peerCount: peerCount, peerInvoices: peerInvoices,
+          ratioPct: Math.floor((c * peerInvoices * 100) / (den * base)), k: ki });
+      });
+    });
+    out.sort(function (a, b) {
+      return a.k - b.k || b.ratioPct - a.ratioPct || b.count - a.count || (a.key < b.key ? -1 : (a.key > b.key ? 1 : 0));
+    });
+    return out.map(function (a) { delete a.k; return a; });
+  }
+
+  /** هشدارهای یک گزارشِ ضدتقلبِ هسته (`core.fraud`) */
+  function alertsOf(fraud, policy) {
+    return cashierAlerts((fraud && fraud.rows || []).map(function (r) {
+      return { key: r.key, invoices: r.invoices, voids: r.voidCount, discounts: r.discountCount, noSales: r.noSaleCount };
+    }), policy);
   }
 
   /**
@@ -164,5 +217,7 @@
     home: home,
     build: build,
     sortRows: sortRows,
+    cashierAlerts: cashierAlerts,
+    alertsOf: alertsOf,
   };
 });

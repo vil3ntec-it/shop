@@ -263,6 +263,17 @@ object ReportEngine {
     val byDebtor = d.transactions.groupBy { it.debtorId }
     return d.debtors.map { debtor ->
       val mine = byDebtor[debtor.id].orEmpty()
+      //  `shop.debt_minor` (`DebtMinorFlag`): به پول، مثلِ `DebtBook` — «داده»، «گرفته» و «مانده» هم‌خوان و
+      //  ماندهٔ حسابِ تسویه‌شده صفرِ دقیق (نه −9.09e-13 که «۰ ؋ موجودی» می‌شد)
+      if (DebtMinorFlag.on) {
+        val lb = ir.vil3ntec.tohid.core.money.LedgerBalance
+        return@map DebtorStat(
+          debtor = debtor,
+          given = lb.sum(mine.filter { it.type == "give" }, plus = { true }, amount = { it.amount }),
+          received = lb.sum(mine.filter { it.type != "give" }, plus = { true }, amount = { it.amount }),
+          remaining = lb.sum(mine, plus = { it.type == "give" }, amount = { it.amount }),
+        )
+      }
       var given = 0.0
       var received = 0.0
       mine.forEach { if (it.type == "give") given += it.amount else received += it.amount }
