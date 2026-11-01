@@ -624,3 +624,20 @@ test('دکانِ دیگر برگه را نمی‌بیند و دست نمی‌ز�
   const read = await h.get(`/api/shop/orders/${order.id}/pick`, { token: a.token });
   assert.equal(read.status, 200);
 });
+
+test('PCK-13/14: «شاخص‌ها» و «پیدا نشد» در /orders/config همان اجازهٔ درهایشان‌اند — دکمه بی اجازه دیده نمی‌شود', async () => {
+  const o = await shopOwner('اجازه‌های میز');
+  await setFlag(o.shopId, 'shop.orders', true);
+  await setFlag(o.shopId, 'shop.orders.picking', true);
+  const { can } = require('../src/lib/permissions');
+  for (const role of ['owner', 'manager', 'staff', 'picker']) {
+    const u = role === 'owner' ? o : await member(o.shopId, role, `عضوِ ${role}`);
+    const p = (await h.get('/api/shop/orders/config', { token: u.token })).body.permissions;
+    assert.equal(p.pickMetrics, can(role, 'reports.view'), `${role}: pickMetrics`);
+    assert.equal(p.pickIssues, can(role, 'stock.adjust'), `${role}: pickIssues`);
+    //  همان پاسخِ درها: اجازه ⇒ ۲۰۰، بی اجازه ⇒ ۴۰۳
+    assert.equal((await h.get('/api/shop/orders/pick/metrics', { token: u.token })).status, p.pickMetrics ? 200 : 403, `${role}: metrics`);
+    const resolve = await h.post('/api/shop/orders/pick/issues/01ARZ3NDEKTSV4RRFFQ69G5FAV/resolve', { action: 'resolved', note: 'x' }, { token: u.token });
+    assert.equal(resolve.status, p.pickIssues ? 404 : 403, `${role}: resolve ⇒ ${JSON.stringify(resolve.body)}`);
+  }
+});

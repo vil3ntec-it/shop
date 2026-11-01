@@ -102,6 +102,42 @@ data class PickShelfItemDto(
 @Serializable
 data class PickShelfDto(val shelf: List<PickShelfItemDto> = emptyList())
 
+/** PCK-13 — `GET /shop/orders/pick/metrics` (۷ روزِ گذشته؛ زمان میلی‌ثانیه، نرخ یک‌دهمِ درصد) */
+@Serializable
+data class PickMetricsDto(
+  val from: Long = 0,
+  val to: Long = 0,
+  val orders: Int = 0,
+  val lines: Int = 0,
+  val found: Int = 0,
+  val notFound: Int = 0,
+  val short: Int = 0,
+  val substituted: Int = 0,
+  val avgPickMs: Long? = null,
+  val medianPickMs: Long? = null,
+  val foundRateBp: Long? = null,
+  val substitutionRateBp: Long? = null,
+  val wrongScans: Int = 0,
+)
+
+/** PCK-14 — یک وظیفهٔ «پیدا نشد» (`GET /shop/orders/pick/issues`)؛ `detail.name` نامِ کالا در همان سفارش */
+@Serializable
+data class PickIssueDetailDto(val name: String = "", val orderedMilli: Long = 0, val pickedMilli: Long = 0)
+
+@Serializable
+data class PickIssueDto(
+  val id: String = "",
+  val productId: String = "",
+  val status: String = "",
+  val hits: Int = 0,
+  val detail: PickIssueDetailDto = PickIssueDetailDto(),
+  val createdAt: Long = 0,
+  val note: String = "",
+)
+
+@Serializable
+data class PickIssuesDto(val issues: List<PickIssueDto> = emptyList())
+
 /** نتیجهٔ اسکنِ یک کیسه روی قفسه */
 @Serializable
 data class PickShelfScanDto(

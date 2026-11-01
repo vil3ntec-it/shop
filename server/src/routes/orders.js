@@ -84,6 +84,8 @@ router.get('/config', async (req, res) => {
     handoverSince,
     permissions: {
       ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
+      //  PCK-13/14: «شاخص‌ها» و «پیدا نشد» در میزِ جمع‌آوری — همان اجازهٔ درهای خودشان (فقط برای نمایش)
+      pickMetrics: can(req.role, 'reports.view'), pickIssues: can(req.role, 'stock.adjust'),
       //  اجازهٔ کلیِ نقش و اشتراک (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
       ...(await ledger.capsFor(req.shopId, req.role)),
     },

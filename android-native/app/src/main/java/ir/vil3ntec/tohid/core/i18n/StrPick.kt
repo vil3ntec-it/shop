@@ -53,4 +53,28 @@ object StrPick {
     "د هر فرمایش تلل او بسته‌بندي د همغه فرمایش په پاڼه کې دي.",
   )
   val retry: String get() = t("دوباره بزنید؛ همان کار یک بار حساب می‌شود", "Try again; it is counted once", "بیا یې وکړئ؛ یو ځل حسابېږي")
+
+  // شاخص‌ها (PCK-13)
+  val tabMetrics: String get() = t("شاخص‌ها", "Metrics", "شاخصونه")
+  val metricsHint: String get() = t("۷ روزِ گذشته؛ همهٔ عددها از سرور.", "Last 7 days; all figures come from the server.", "تېرې ۷ ورځې؛ ټولې شمېرې له سرور څخه دي.")
+  fun mOrders(n: Int): String = t("سفارشِ بسته‌شده: $n", "Packed orders: $n", "بسته شوي فرمایشونه: $n")
+  fun mAvg(min: String): String = t("میانگینِ زمانِ جمع‌آوری: $min دقیقه", "Average picking time: $min min", "د راټولولو منځنی وخت: $min دقیقې")
+  fun mMedian(min: String): String = t("میانهٔ زمان: $min دقیقه", "Median time: $min min", "منځنی وخت: $min دقیقې")
+  fun mLines(found: Int, lines: Int): String = t("قلمِ پیداشده: $found از $lines", "Items found: $found of $lines", "موندل شوي توکي: $found له $lines څخه")
+  fun mFound(pct: String): String = t("درصدِ پیدا شدن: $pct٪", "Found rate: $pct%", "د موندلو کچه: $pct٪")
+  fun mSubst(pct: String): String = t("نرخِ جایگزینی: $pct٪", "Substitution rate: $pct%", "د بدیل کچه: $pct٪")
+  fun mWrong(n: Int): String = t("اسکنِ اشتباه: $n", "Wrong scans: $n", "ناسم سکنونه: $n")
+
+  // رسیدگی به «پیدا نکردم» (PCK-14)
+  val tabIssues: String get() = t("پیدا نشده‌ها", "Not-found items", "نه موندل شوي توکي")
+  val issuesHint: String get() = t(
+    "کالایی که «پیدا نکردم» خورد تا رسیدگی در ویترین «تمام شده» است.",
+    "Items marked not found stay sold out in the storefront until reviewed.",
+    "هغه توکي چې «ونه موندل شو» شوي، تر کتنې پورې په پلورنځي کې پای ته رسېدلي ښودل کېږي.",
+  )
+  val issuesEmpty: String get() = t("وظیفهٔ بازی نیست", "No open tasks", "پرانیستې دنده نشته")
+  fun issueRow(name: String, hits: Int): String = t("$name · $hits بار", "$name · $hits times", "$name · $hits ځله")
+  val issueNote: String get() = t("توضیحِ رسیدگی (لازم)", "Review note (required)", "د کتنې یادښت (اړین)")
+  val resolve: String get() = t("رسیدگی شد", "Resolved", "وکتل شو")
+  val dismiss: String get() = t("کنار گذاشته شد", "Dismiss", "یو طرف شو")
 }

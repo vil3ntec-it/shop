@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
+import ir.vil3ntec.tohid.core.model.PickIssuesDto
+import ir.vil3ntec.tohid.core.model.PickMetricsDto
 import ir.vil3ntec.tohid.core.model.PickShelfDto
 import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
@@ -109,5 +111,23 @@ class PickingWireTest {
     assertEquals("1", b.lines[0].location.aisle)
     val body = PickingRepository.batchJson(listOf("a", "b"))
     assertEquals(listOf("a", "b"), (body["orderIds"] as kotlinx.serialization.json.JsonArray).map { it.jsonPrimitive.content })
+  }
+
+  @Test fun `PCK-13 و PCK-14 — شاخص‌ها و وظیفه‌های «پیدا نشد» همان پاسخِ سرورند؛ نرخِ تهی null می‌ماند`() {
+    val m = ApiJson.decode<PickMetricsDto>(obj("""{"from":1,"to":2,"orders":3,"lines":10,"found":9,"notFound":1,"short":0,
+      "substituted":1,"avgPickMs":150000,"medianPickMs":120000,"foundRateBp":9000,"substitutionRateBp":1000,"wrongScans":2}"""))
+    assertEquals(3, m.orders)
+    assertEquals(150_000L, m.avgPickMs)
+    assertEquals(9_000L, m.foundRateBp)
+    assertEquals(2, m.wrongScans)
+    val empty = ApiJson.decode<PickMetricsDto>(obj("""{"orders":0,"lines":0,"avgPickMs":null,"foundRateBp":null}"""))
+    assertNull(empty.avgPickMs)
+    assertNull(empty.foundRateBp)
+    val i = ApiJson.decode<PickIssuesDto>(obj("""{"issues":[{"id":"01JX0000000000000000000001","kind":"not_found","productId":"rice",
+      "status":"open","hits":3,"detail":{"name":"برنج","orderedMilli":1000,"pickedMilli":0,"by":"u1"},"createdAt":5,"note":"",
+      "resolvedAt":null}]}"""))
+    assertEquals("برنج", i.issues.single().detail.name)
+    assertEquals(3, i.issues.single().hits)
+    assertTrue(ApiJson.decode<PickIssuesDto>(obj("""{"issues":[]}""")).issues.isEmpty())
   }
 }
