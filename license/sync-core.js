@@ -876,6 +876,15 @@
     return Math.round(ms * (0.75 + j * 0.5));
   }
 
+  /* ۱۱) `since` ِ push (#481): یادداشت = cursor ِ لحظه‌ای که صفِ خالی نخستین op را گرفت، تا خالی شدنِ صف فقط پایین؛ push
+     کم‌ترینِ آن و cursor. قرینهٔ core/…/core/sync/PushSince.kt (core/test-vectors/push-since-v1.json)؛ نادرست = -1 ⇒ cursor. */
+  function sinceNumber(v) {
+    var n = typeof v === 'number' ? v : (typeof v === 'string' && /^\d{1,16}$/.test(v) ? Number(v) : NaN);
+    return Number.isSafeInteger(n) && n >= 0 ? n : -1;
+  }
+  function pushSinceNote(previous, empty, cursor) { var c = Math.max(0, sinceNumber(cursor)), p = sinceNumber(previous); return empty || p < 0 ? c : Math.min(p, c); }
+  function pushSince(noted, cursor) { var c = Math.max(0, sinceNumber(cursor)), n = sinceNumber(noted); return n < 0 ? c : Math.min(n, c); }
+
   return {
     SCHEMA_VERSION: SCHEMA_VERSION,
     COLLECTIONS: COLLECTIONS,
@@ -890,6 +899,8 @@
     canonical: canonical,
     sha256Hex: sha256Hex,
     hashOf: hashOf,
+    pushSinceNote: pushSinceNote,
+    pushSince: pushSince,
     diff: diff,
     applyRemote: applyRemote,
     fromSnapshot: fromSnapshot,

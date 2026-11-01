@@ -696,6 +696,10 @@ internal class SyncV3Engine(
         if (!init.ok) return init
       }
       recordNow()
+      //  A16: Pushِ ۴۰۳ (نقش یا اشتراک) Pull را نمی‌خواباند — دادهٔ دکان همچنان
+      //  می‌رسد و opهای همین دستگاه در صف می‌مانند؛ خطا پس از Pull سرِ جایش می‌ماند (`pushAll`).
+      refused = null
+      refusedError = ""
       pushAll()?.let { return it }
       //  §۹.۵: سرور برگشته بود (پیش از این دور) و صف خالی شد ⇒ دفتر از Snapshot از نو
       restoreStep()?.let { return it }
@@ -709,6 +713,10 @@ internal class SyncV3Engine(
       if (meta.conflictsDirty || now() - conflictsAt > 5 * 60 * 1000L) {
         conflictsAt = now()
         fetchConflicts()
+      }
+      refused?.let { r ->
+        withLock { save(meta.copy(lastError = refusedError, lastErrorAt = now())) }
+        return r
       }
       return V3Step(ok = true)
     } finally {
@@ -724,11 +732,20 @@ internal class SyncV3Engine(
     return pushAll()
   }
 
-  /** Push تا خالی شدنِ صف؛ شکست ⇒ همان قدم، وگرنه null */
+  /** A16: نخستین Pushِ ۴۰۳ ِ همین دور و خطایش — `sync` پس از Pull برمی‌گرداندش */
+  private var refused: V3Step? = null
+  private var refusedError = ""
+
+  /**
+   *  Push تا خالی شدنِ صف؛ شکست ⇒ همان قدم، وگرنه null. ۴۰۳ (نقش یا اشتراک) شکستِ دور نیست:
+   *  همان‌جا می‌ایستد، در `refused` می‌ماند و در همین دور دیگر Push نمی‌شود (A16).
+   */
   private suspend fun pushAll(): V3Step? {
+    if (refused != null) return null
     for (i in 0 until ROUNDS) {
       if (queue.outbox.isEmpty()) break
       val p = pushOnce()
+      if (!p.ok && p.status == 403) { refused = p; refusedError = meta.lastError; return null }
       if (!p.ok) return p
       if (p.done == 0 && p.rejected == 0) break
     }

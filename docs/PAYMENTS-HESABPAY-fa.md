@@ -88,7 +88,7 @@
 ### وضعیت‌ها
 ```
 created → pending → paid | failed | expired | cancelled
-paid → refunded            (فقط مدیر؛ درِ پنل در PR ِ بعد)
+paid → refunded            (فقط مدیرِ ارشد — بخشِ ۳)
 expired | cancelled | failed → paid   فقط وقتی خودِ حساب‌پی پرداخت را تأیید کند (S35) ⇒ needsReview + هشدار
 ```
 پایانی‌ها برنمی‌گردند؛ `paid` هرگز با رویدادِ بعدی پایین نمی‌آید.
@@ -117,14 +117,48 @@ expired | cancelled | failed → paid   فقط وقتی خودِ حساب‌پی
 - مبلغ **و** ارز باید با قصد یکی باشند؛ نه ⇒ «paid» نمی‌شود، `needsReview` و سابقهٔ `payment.review`.
 - «paid» فقط پس از **تأییدِ دوم** از خودِ حساب‌پی (`fetchStatus`)؛ خاموش کردنش: `PAYMENTS_CONFIRM_WEBHOOK=0`
   (پیشنهاد نمی‌شود). پرداختِ دیر (پس از انقضا/لغو) همیشه تأییدِ دوم می‌خواهد.
-- تأییدِ دوم نرسید (شبکه) ⇒ ۵۰۳ `retry_later` تا حساب‌پی دوباره بفرستد؛ همان رویداد آن بار اعمال می‌شود.
+- تأییدِ دوم نرسید (شبکه) **یا درِ وضعیت هنوز `pending`/`unknown` می‌گوید** (هم‌گامیِ دیرِ حساب‌پی) ⇒ ۵۰۳ `retry_later`
+  تا حساب‌پی دوباره بفرستد؛ رویداد `deferred` می‌ماند و همان رویداد آن بار اعمال می‌شود. فقط «نه» ِ قطعی
+  (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ و `unconfirmed` ِ نهایی، با `needsReview` و هشدار (امضا می‌گوید paid، درِ وضعیت نه).
+- «paid» ِ `deferred` روی قصدی که بسته یا منقضی شد (یا از پیش بسته بود) ⇒ `needsReview` و سابقهٔ `payment.review`
+  (`paid_unconfirmed`)؛ هرگز خودکار «پرداخت‌شده» نمی‌شود — تأییدِ بعدیِ حساب‌پی همان مسیرِ پرداختِ دیر است.
+- همان رویداد هنوز در پردازش ⇒ ۵۰۳ (نه «تکراری»)؛ پردازشی که ۲ دقیقه بی پایان ماند (فرآیندِ مرده) دوباره گرفته می‌شود.
 - برگشتِ مرورگر از صفحهٔ حساب‌پی هرگز پرداخت را «موفق» نمی‌کند.
 
 ## ۳) تطبیق (PAY-21)
 
 `payment-intents.reconcile({ sinceMs })` قصدهای `created`/`pending`/`expired` ِ ۴۸ ساعتِ اخیر را از حساب‌پی می‌پرسد:
-پرداختِ تأییدشده ⇒ `paid` (دیر ⇒ هشدار)، ناموفق ⇒ بستن، اختلاف ⇒ `needsReview` + سابقه. زمان‌بندِ شبانه و فهرستِ
-پنلِ مدیر در PR ِ بعدی (ویترین + تطبیق + پنل) است.
+پرداختِ تأییدشده ⇒ `paid` (دیر ⇒ هشدار)، ناموفق ⇒ بستن، اختلاف ⇒ `needsReview` + سابقه. زنده پیش از منقضی و تازه
+پیش از کهنه.
+
+زمان‌بند (`startReconciler`، از `index.js`): هر ۵ دقیقه قصدهای ۲ ساعتِ اخیر (زنده و تازه‌منقضی؛ مهلتِ قصد ۱۵ دقیقه)،
+و هر ۱۲ نوبت (≈ ساعتی) همان ۴۸ ساعت؛ هر نوبت حداکثر ۴ دقیقه و بقیه به نوبتِ بعد. فقط وقتی ارائه‌دهندهٔ فعال پیکربندی
+شده (بی کلید هیچ پرسشی نمی‌رود). دو نمونهٔ سرور هم‌زمان اجرا نمی‌کنند: اجارهٔ `lease:payments.reconcile` در `app_config`
+(نمونه‌ای که وسطِ کار بمیرد، پس از ۱۰ دقیقه آزاد می‌شود).
+
+- **خودکار:** زمان‌بندِ بالا؛ کارِ دوره‌ایِ سرور (`housekeeping` در `app.js`) هم هر ۶ ساعت یک نوبتِ ۴۸ ساعته از همان درِ `reconcileTick` (با همان اجاره) می‌زند. بی کلید هیچ کاری نمی‌کند.
+- **دستی و پنل** (زبانهٔ «عملیات» ⇐ «پرداخت‌های حساب‌پی»):
+  - `GET /api/admin/payments/intents?status=&review=1&shopId=&limit=&before=` — هر مدیر؛ تازه‌ترین بالا؛ `next` برای صفحهٔ بعد؛
+    `counts` (هر وضعیت و `review`)؛ بی نشانیِ پرداخت.
+  - `POST /api/admin/payments/reconcile` — فقط مدیرِ ارشد ⇒ `{checked, paid, closed, mismatched, errors}` و سابقه.
+  - `POST /api/admin/payments/intents/:id/refund` `{note}` — فقط مدیرِ ارشد و فقط از `paid`، **پس از** برگرداندنِ پول در خودِ
+    حساب‌پی؛ پرداختِ سفارشِ آنلاین هم «بازپرداخت» می‌شود و سابقهٔ `payment.refunded` می‌ماند.
+- «سرویس‌های بیرونی» ِ همان زبانه حالِ واقعی را می‌گوید: بی کلید «ندارد»، یک کلید «ناقص»، هر دو «زنده»، ساختگی «آزمایشی».
+
+## ۳-ب) ویترین (سفارشِ آنلاین)
+
+- `GET /api/store/:slug` ⇒ `store.payment` = `{methods:['cod','hesabpay'], online:{available:true, provider:'hesabpay'}}` فقط با کلید
+  + پرچمِ `pay.hesabpay` + اشتراکِ فعال؛ وگرنه همان `{methods:['cod'], online:{available:false, decision:'D-08'}}`.
+- `GET /api/store/:slug/orders/:token` ⇒ `order.onlinePay.available` (همین حالا پرداختنی؟) کنارِ `paymentStatus`.
+- `POST /api/store/:slug/orders/:token/pay` (سرآیندِ `Idempotency-Key` لازم) ⇒ `201 {payment:{status, checkoutUrl, expiresAt, amountMinor, currency}}`؛
+  توکنِ پیگیری همان اجازه است (دست‌کاری/ویترینِ دیگر ⇒ ۴۰۴)؛ مبلغ = جمعِ سفارش در سرور؛ نشانیِ بازگشت را سرور می‌سازد
+  (`SERVER_URL/store/<slug>#/o/<token>` یا `https://<slug>.<STOREFRONT_DOMAIN>/#/o/<token>`) — بی redirect ِ باز.
+  ⚠️ توکنِ پیگیری در نشانیِ بازگشت به حساب‌پی می‌رسد (فقط نمای محدودِ سفارش، بی شماره و نشانی).
+- صفحه: دکمهٔ «پرداخت با حساب‌پی» در پیگیریِ سفارش (پرداخت‌نشده/ناموفق/در انتظار — همان کلید همان جلسه را باز می‌کند)؛
+  قصدِ گذشته از زمان با همان خواندنِ پیگیری «ناموفق» می‌شود؛ پس از برگشت، «در انتظارِ تأیید» و خواندن هر ۵ ثانیه تا
+  سرور «پرداخت‌شده» یا «ناموفق» بگوید. برگشتِ مرورگر به‌تنهایی هیچ چیز را «پرداخت‌شده» نمی‌کند. نقد هنگامِ تحویل همان می‌ماند.
+- ⚠️ سفارشِ پرداخت‌شده‌ای که دکان بعداً رد یا لغو کند خودکار بازپرداخت نمی‌شود: صاحب/مدیر پول را در حساب‌پی برمی‌گرداند و
+  مدیرِ سامانه «بازپرداخت» را ثبت می‌کند (دفترِ بازپرداختِ سفارش تا D-08 فقط نقد است).
 
 ## ۴) محیطِ سرور
 
@@ -132,21 +166,23 @@ expired | cancelled | failed → paid   فقط وقتی خودِ حساب‌پی
 |---|---|---|---|
 | `HESABPAY_API_KEY` | ✔ | — | کلیدِ API ِ پذیرنده |
 | `HESABPAY_WEBHOOK_SECRET` | ✔ | — | رازِ امضای وب‌هوک |
-| `HESABPAY_BASE_URL` | | `https://api.hesab.com/api/v1` | نشانیِ API (sandbox اگر حساب‌پی داد) |
+| `HESABPAY_BASE_URL` | | `https://api.hesab.com/api/v1` | نشانیِ API (sandbox اگر حساب‌پی داد)؛ فقط `https` — http ⇒ «پیکربندی نشده» |
 | `HESABPAY_MERCHANT_ID` | | — | اگر حساب‌پی در بدنه خواست |
 | `HESABPAY_CALLBACK_URL` | | `SERVER_URL` + مسیرِ وب‌هوک | نشانیِ وب‌هوک در درخواستِ جلسه |
 | `HESABPAY_TIMEOUT_MS` | | ۱۰۰۰۰ | مهلتِ هر درخواست به حساب‌پی |
 | `PAYMENTS_CONFIRM_WEBHOOK` | | `1` | تأییدِ دوم پیش از «paid» |
-| `PAYMENTS_PROVIDER` | | — | `fake` فقط برای آزمون/توسعه؛ در `NODE_ENV=production` نادیده |
+| `PAYMENTS_PROVIDER` | | — | `fake` فقط با `NODE_ENV` ِ صریحِ `test`/`development`؛ هر محیطِ دیگر ⇒ نادیده |
+| `PAYMENTS_FAKE_SECRET` | | — | رازِ امضای ساختگی (فقط توسعه/آزمون)؛ نبود ⇒ ساختگی خاموش |
 | `RATE_PAY_CREATE_MAX` / `RATE_PAY_POLL_MAX` | | ۳۰ / ۲۴۰ در دقیقه | سقف‌ها |
 
 نبودِ کلید ⇒ «پیکربندی نشده»: `/config` همیشه `enabled: false` و ساختن ۴۰۳ `hesabpay_disabled`.
 پرچم: `pay.hesabpay` در «تنظیماتِ زنده» (`PUT /api/admin/pump/live-config`، scope = شناسهٔ دکان یا `all`)، پیش‌فرض خاموش.
 پرداختِ سفارشِ آنلاین افزون بر این **اشتراکِ فعال** می‌خواهد (دورهٔ آزمایشی نه).
 
-**توسعه با ارائه‌دهندهٔ ساختگی:** سرور را با `PAYMENTS_PROVIDER=fake` بالا بیاورید؛ `checkoutUrl` ساختگی است
-(`https://pay.invalid/fake/…`). پرداخت را با
-`node server/scripts/fake-pay.js --url http://127.0.0.1:3000 --intent pi_… --amount 145000` بزنید (`--status failed` هم).
+**توسعه با ارائه‌دهندهٔ ساختگی:** سرور را با `NODE_ENV=development`، `PAYMENTS_PROVIDER=fake` و یک
+`PAYMENTS_FAKE_SECRET` ِ دلخواه بالا بیاورید؛ `checkoutUrl` ساختگی است (`https://pay.invalid/fake/…`). پرداخت را با
+`PAYMENTS_FAKE_SECRET=<همان> node server/scripts/fake-pay.js --url http://127.0.0.1:3000 --intent pi_… --amount 145000`
+بزنید (`--status failed` هم).
 
 ## ۵) آن‌چه صاحب محصول باید بدهد
 

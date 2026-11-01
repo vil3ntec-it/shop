@@ -10,12 +10,7 @@
  *   • باگِ واقعی فقط با PR ِ اصلاحِ باز (شماره در `ref`) یا blocker ِ صریح (مثلاً پروندهٔ
  *     ممنوعِ مشترک با پمپ) این‌جا می‌آید؛ پس از مرجِ اصلاح «xpass» می‌شود و ردیف پاک.
  */
-export const KNOWN_GAPS = [
-  {
-    scenario: 'return', step: 'S13.waste', match: /مقصدِ «ضایعات»/,
-    ref: 'RET-07 (STATUS: ناقص) — SalesEngine.recordReturn مقصدِ برگشت (موجودی/ضایعات) ندارد؛ کالای «خراب» به موجودیِ فروختنی برمی‌گردد',
-  },
-];
+export const KNOWN_GAPS = [];
 
 /**
  * @returns {{status:'pass'|'fail'|'known-gap'|'xpass', ref?:string}}

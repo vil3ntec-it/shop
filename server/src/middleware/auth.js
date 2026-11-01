@@ -155,9 +155,16 @@ async function requireAnyUser(req, res, next) {
  * فقط عضویتِ فعال در همان، وگرنه همان قاعدهٔ همیشگی. دکانی که دیگر عضوش
  * نیست ⇒ خطای روشن، **نه** افتادنِ بی‌صدا به دکانِ دیگر (بندِ ۲۹.۲ قاعدهٔ ۱).
  */
-async function shopOfSession(req) {
+async function shopOfSession(req, { explain = false } = {}) {
   const bound = sessionShopOf(req.tokenRow);
   const member = await membershipOf(req.user.id, { shopId: bound });
+  //  فاز ۳: دکانی که مدیر بسته (تعلیق، بایگانی، درخواستِ حذف) خطای روشنِ خودش را دارد، نه «دکانی نیست»
+  //  — فقط در راهِ شکست یک پرسش (`lib/shop-holds.blockFor`).
+  if (!member && explain) {
+    const holds = require('../lib/shop-holds');
+    const block = await holds.blockFor(req.user.id, bound);
+    if (block) throw holds.blockError(block);
+  }
   if (!member && bound) {
     throw forbidden('دکانی که برای این نشست برگزیده شده دیگر در دسترسِ شما نیست؛ دکان را دوباره انتخاب کنید', 'active_shop_unavailable');
   }
@@ -168,7 +175,7 @@ async function shopOfSession(req) {
 async function requireShop(req, res, next) {
   try {
     if (!req.user) return next(unauthorized());
-    const member = await shopOfSession(req);
+    const member = await shopOfSession(req, { explain: true });
     if (!member) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
     //  نقشِ پیک — حتی با توکنی که پیش از پیک شدن گرفته شده
     if (member.role === 'courier' && req.courierScope !== true) return courierScopeDenied(req, next);
@@ -351,11 +358,19 @@ function requireFeature(featureKey) {
   };
 }
 
-/** مدیر سامانه — کاملاً جدا از کاربران عادی. */
+/**
+ * مدیر سامانه — کاملاً جدا از کاربران عادی.
+ *
+ * فاز ۳ ِ پنلِ مرکزی: (۱) نقش‌های باریک (`finance`، `viewer`) مرزِ خودشان را **همین‌جا** در سرور دارند
+ * (`lib/admin-roles.check`)؛ (۲) پلِ پنل به‌جای رمزِ ارشدِ مشترک می‌تواند با **کلیدِ سرویس** بیاید
+ * (`Bearer vsk_…` + «انجام‌دهنده» در سرآیند، `lib/admin-service.js`). راهِ پیشین دست نخورده است.
+ */
 async function requireAdmin(req, res, next) {
   try {
     const token = bearer(req);
     if (!token) return next(unauthorized());
+    const svc = require('../lib/admin-service');
+    if (svc.isServiceKey(token)) return await serviceAdmin(req, res, next, token);
     const row = await tokens.verify(token, 'admin');
     if (!row) return next(unauthorized('نشست مدیر منقضی شده است', 'invalid_token'));
     const admin = await one('SELECT * FROM admins WHERE id=$1', [row.subject_id]);
@@ -364,8 +379,30 @@ async function requireAdmin(req, res, next) {
     }
     req.admin = admin;
     req.tokenRow = row;
+    const denied = require('../lib/admin-roles').check(req);
+    if (denied) return next(denied);
     next();
   } catch (err) { next(err); }
+}
+
+/** درخواستِ پلِ پنل با کلیدِ سرویس: نقشِ مؤثر = کم‌رتبه‌ترِ انجام‌دهنده و سقفِ کلید. */
+async function serviceAdmin(req, res, next, token) {
+  const svc = require('../lib/admin-service');
+  const roles = require('../lib/admin-roles');
+  const key = await svc.verify(token);
+  if (!key) return next(unauthorized('کلیدِ سرویس معتبر نیست یا باطل شده است', 'invalid_service_key'));
+  const actor = svc.actorOf(req);
+  const role = roles.lower(actor.role, key.role_cap);
+  req.admin = {
+    id: key.id, username: `svc:${key.name}`, name: actor.name || actor.id, role,
+    status: 'active', is_owner: false, totp_enabled_at: null, service: true,
+  };
+  req.service = { keyId: key.id, keyName: key.name, roleCap: key.role_cap };
+  req.actor = { kind: 'panel', id: actor.id, name: actor.name, role: actor.role, effectiveRole: role, via: key.id };
+  req.tokenRow = null;
+  const denied = roles.check(req);
+  if (denied) return next(denied);
+  return svc.run(req.actor, () => next());
 }
 
 function requireSuperAdmin(req, res, next) {
