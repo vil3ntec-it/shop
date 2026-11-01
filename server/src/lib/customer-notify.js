@@ -22,6 +22,9 @@
  *     (`<ردیف>:<کانال>`) بعداً دوباره، حداکثر `MAX_ATTEMPTS` بار. رویدادِ تازه‌ترِ همان سفارش
  *     ردیف‌های هنوز‌نرفته را `superseded` می‌کند: پیامِ کهنه نمی‌رود.
  *   • سقفِ هر مشتری روی همهٔ دکان‌ها (`PER_HOUR`، `PER_DAY` پیامِ رفته) ⇒ `rate_limited`.
+ *   • NTF-02: سقفِ روزانهٔ هزینهٔ هر دکان و هر کانال (`notify-cost`، پیامک بخش‌به‌بخش): کانالِ پولی که پیام از سقفش
+ *     می‌گذرد صدا زده نمی‌شود (`cost_cap` در `tried`) و زنجیره کانالِ بعدی را می‌آزماید؛ هزینهٔ هر پیامِ پذیرفته
+ *     (`costMicros`) روی همان `tried` می‌ماند.
  *     شمارش با `phone_key` (HMAC ِ شماره)، نه خودِ شماره.
  *   • بی دادهٔ حساس (§۳۰.۱ بندِ ۴): متن فقط نامِ ویترین، شمارهٔ سفارش و وضعیت — نه نام، شماره،
  *     نشانی، اقلام یا مبلغ. لینکِ پیگیری (همان توکنِ HMAC ِ صفحهٔ «سفارشِ من») فقط اگر
@@ -34,6 +37,7 @@ const crypto = require('crypto');
 const { query, one, many, now } = require('../db');
 const { ulid } = require('./ulid');
 const { serverSecret } = require('./server-secret');
+const cost = require('./notify-cost');
 
 const FLAG_KEY = 'shop.customer_notify';
 
@@ -307,6 +311,15 @@ async function sentSince(phoneKeyValue, since) {
   return r.n;
 }
 
+/** NTF-02: هزینهٔ پیام‌های پذیرفتهٔ همین دکان و همین کانال در ۲۴ ساعتِ گذشته (میکرودلار) */
+async function spentToday(shopId, channel, at) {
+  const rows = await many(
+    `SELECT tried FROM customer_notify_outbox WHERE shop_id=$1 AND channel=$2 AND status='sent' AND sent_at > $3`,
+    [shopId, channel, at - cost.DAY_MS]
+  );
+  return cost.spentOf(rows.map((r) => asJson(r.tried)), channel);
+}
+
 async function overCap(row, at) {
   if (await sentSince(row.phone_key, at - 60 * 60_000) >= PER_HOUR) return true;
   return await sentSince(row.phone_key, at - 24 * 60 * 60_000) >= PER_DAY;
@@ -366,9 +379,16 @@ async function processRow(row, at) {
   for (const channel of MATRIX[row.event] || []) {
     const p = providers[channel];
     if (!p) { tried.push({ channel, result: 'not_configured' }); continue; }
+    //  NTF-02: پیامک با لینک (اگر هست) شمرده می‌شود — بخشِ بیشتر، نه کمتر
+    const sized = msg.link ? `${msg.text} ${msg.link}` : msg.text;
+    const price = cost.costMicros(channel, sized);
+    if (price > 0 && !cost.allows(channel, sized, await spentToday(row.shop_id, channel, at)).ok) {
+      tried.push({ channel, result: 'cost_cap' });
+      continue;
+    }
     const out = await callProvider(p, { ...msg, channel, key: `${row.id}:${channel}` });
     if (out.status === 'accepted') {
-      tried.push({ channel, result: 'accepted' });
+      tried.push({ channel, result: 'accepted', costMicros: price });
       return settle(row, lock, {
         status: 'sent', channel, sent_at: at, provider_ref: out.ref, tried, last_error: '', updated_at: at,
       });
