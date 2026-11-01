@@ -14,7 +14,13 @@ class ShiftReportPermTest {
   @Test
   fun defaultIsTodayForEveryRole() {
     assertTrue(key in PermCore.keys())
-    for (role in PermCore.ROLES) assertEquals("allow", PermCore.defaultMode(role, key), role)
+    //  سه نقشِ قدیم همان امروز؛ نقش‌های تازه (STF-01): صندوق‌دار و حسابدار می‌بینند، انباردار و جمع‌آور نه
+    val want = mapOf(
+      "owner" to "allow", "manager" to "allow", "staff" to "allow",
+      "cashier" to "allow", "storekeeper" to "deny", "picker" to "deny", "accountant" to "allow",
+    )
+    assertEquals(want.keys, PermCore.ROLES.toSet())
+    for (role in PermCore.ROLES) assertEquals(want[role], PermCore.defaultMode(role, key), role)
     assertEquals("allow", PermCore.evaluate("staff", emptyList(), key).decision)
   }
 

@@ -17,6 +17,8 @@
 const { one, many, tx, newId, now } = require('../db');
 const { badRequest, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
+const permCore = require('./perm-core');
+const roleRows = require('./role-rows');
 
 /** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
 const TABLES = {
@@ -83,6 +85,16 @@ async function pushChanges(ctx, changes) {
     return { applied: 0, skipped: 0, conflicts: [], rev: await currentRev(shopId) };
   }
   if (!can(role, 'data.write')) throw forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied');
+  //  A16: جدولی که این نقش نمی‌نویسد ⇒ کلِ دسته رد (همه یا هیچ؛ `/api/data/sales/full`
+  //  هم همین‌جا می‌رسد). سه نقشِ قدیم «*»اند و این‌جا هرگز گیر نمی‌کنند.
+  const offTable = changes.find((ch) => {
+    const col = String(ch?.collection || '');
+    return Object.prototype.hasOwnProperty.call(TABLES, col) && !permCore.canWrite(role, col);
+  });
+  if (offTable) {
+    throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(offTable.collection)})`, 'table_not_allowed');
+  }
+  const ruled = changes.some((ch) => permCore.rowRule(role, String(ch?.collection || '')));
 
   //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
   const guard = ctx.finalized
@@ -91,6 +103,25 @@ async function pushChanges(ctx, changes) {
   //  رویداد پس از تراکنش — در `enforce` همان ردی که تراکنش را برگرداند هم ثبت می‌شود
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);
+    //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت؛ `role-rows.js`).
+    //  راهِ قدیم «ویرایش» و «درج» را از هم جدا نمی‌کند: ردیفِ موجود (حتی حذف‌شده) ویرایش است.
+    //  دسته همه یا هیچ است، پس برگشتی که این‌جا «تازه» است با همین دسته می‌نشیند — مگر کنار
+    //  گذاشته شود (شناسهٔ نادرست یا ردیفِ بزرگ)، که همان‌ها تازه شمرده نمی‌شوند.
+    //  ⛔ درونِ همین تراکنش و پس از `reserveRevs` (قفلِ ردیفِ `shop_rev` ⇐ Pushهای این دکان پشتِ هم):
+    //  وگرنه دو Pushِ هم‌زمان هر دو «جا» می‌دیدند و سهمِ هر قلم دو بار خرج می‌شد (بازبینیِ دومِ #336، د).
+    if (ruled) {
+      const items = changes.map((ch) => {
+        const id = String(ch?.id || '');
+        const data = ch?.data && typeof ch.data === 'object' && !Array.isArray(ch.data) ? ch.data : null;
+        const insert = ch?.deleted !== true && !!data;
+        const fits = insert && id.length <= 80 && Buffer.byteLength(JSON.stringify(data), 'utf8') <= MAX_RECORD_BYTES;
+        return { ch, table: String(ch?.collection || ''), rowId: id, insert, fresh: fits, live: fits, fields: data, unit: 0 };
+      });
+      const rows = async (sql, params) => (await c.query(sql, params)).rows;
+      const res = await roleRows.judge(role, items, roleRows.legacyDb(rows, shopId, userId, TABLES));
+      const bad = items.find((it) => res.has(it) && !res.get(it).ok);
+      if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${bad.table})`, 'table_not_allowed');
+    }
     let applied = 0, skipped = 0;
     const conflicts = [];
     const t = now();

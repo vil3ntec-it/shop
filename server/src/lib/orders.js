@@ -52,12 +52,19 @@ function decode(text) {
 /**
  * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است.
  * `key` نیامده ⇒ `shop.orders`؛ ویترین (`shop.storefront`) و تحویل و پیک (`shop.delivery`) همین قاعده را می‌خوانند.
+ *
+ * ⛔ فاز ۳ ِ پنلِ مرکزی: «غیرفعال کردنِ سرویس» (`lib/shop-holds.js`، حالتِ `service_disabled` با
+ * `service` = همین کلید) هر مقداری را می‌بُرد — در همین یک پرسش، بی رفت‌وبرگشتِ دوم.
  */
 async function flagOf(shopId, key = FLAG_KEY) {
   const rows = await many(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
+    `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
+     UNION ALL
+     SELECT '#hold', 'false' FROM shop_holds
+      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`,
     [key, 'all', String(shopId)]
   );
+  if (rows.some((r) => r.scope === '#hold')) return false;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
@@ -245,7 +252,8 @@ function card(row, viewer, at) {
     orderNo: Number(row.order_no),
     status: row.status,
     tab: S.tabOf(row, at),
-    next: S.nextFor(row, { type: 'user', role: viewer.role }),
+    //  دکمهٔ گذار فقط برای کسی که `orders.manage` دارد (حسابدار فقط می‌بیند — A16)
+    next: can(viewer.role, 'orders.manage') ? S.nextFor(row, { type: 'user', role: viewer.role }) : [],
     source: row.source,
     isTest: row.is_test === true,
     fulfillment: row.fulfillment,

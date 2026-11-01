@@ -649,6 +649,8 @@ router.get('/accounts/:app/:tenantId/backups', async (req, res, next) => {
  */
 router.get('/accounts/:app/:tenantId/backups/:id', requireSuperAdmin, async (req, res, next) => {
   try {
+    //  SEC-AUTH-13: خروجیِ دادهٔ خصوصی هم «کارِ حساس» است، با آن‌که GET است (پرچمِ خاموشِ ADMIN_REAUTH)
+    await require('../lib/admin-guard').assertFresh(req);
     const store = backupStore(req);
     const tenantId = v.text(req.params.tenantId, { max: 64, required: true, field: 'شناسهٔ حساب' });
     const reason = requireReason(req);
