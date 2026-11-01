@@ -1,0 +1,352 @@
+{
+  "version": 1,
+  "about": "DLV-07 (اسکنِ کیسه‌ها هنگامِ گرفتن) و DLV-17 («تحویل شد» فقط نزدیکِ پین). خوانندگان: server/test/courier-checks.test.js (lib/courier-checks) و CourierChecksVectorsTest (core/courier/CourierChecks.kt). هر تغییر در هر دو.",
+  "bags": [
+    {
+      "name": "همهٔ کیسه‌ها",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [
+        "VLNB-12-1-2",
+        "VLNB-12-2-2"
+      ],
+      "want": {
+        "ok": true,
+        "scanned": 2
+      }
+    },
+    {
+      "name": "رقمِ فارسی، فاصله و تکرار بی‌اثر",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [
+        " vlnb-۱۲-۲-۲ ",
+        "VLNB-12-1-2",
+        "VLNB-12-1-2"
+      ],
+      "want": {
+        "ok": true,
+        "scanned": 2
+      }
+    },
+    {
+      "name": "یک کیسه جاماند",
+      "orderNo": 12,
+      "bags": 3,
+      "labels": [
+        "VLNB-12-3-3",
+        "VLNB-12-1-3"
+      ],
+      "want": {
+        "ok": false,
+        "code": "bags_incomplete",
+        "missing": [
+          2
+        ]
+      }
+    },
+    {
+      "name": "هیچ اسکنی",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [],
+      "want": {
+        "ok": false,
+        "code": "bags_required",
+        "missing": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "کیسهٔ سفارشِ دیگر",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [
+        "VLNB-12-1-2",
+        "VLNB-13-2-2"
+      ],
+      "want": {
+        "ok": false,
+        "code": "bag_wrong_order"
+      }
+    },
+    {
+      "name": "برچسبِ کهنه با تعدادِ دیگر",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [
+        "VLNB-12-1-3"
+      ],
+      "want": {
+        "ok": false,
+        "code": "label_mismatch"
+      }
+    },
+    {
+      "name": "کدِ تحویل جای برچسب",
+      "orderNo": 12,
+      "bags": 1,
+      "labels": [
+        "VLNH-12-123456"
+      ],
+      "want": {
+        "ok": false,
+        "code": "bad_label"
+      }
+    },
+    {
+      "name": "نخستین خطا برنده",
+      "orderNo": 12,
+      "bags": 2,
+      "labels": [
+        "hello",
+        "VLNB-13-1-2"
+      ],
+      "want": {
+        "ok": false,
+        "code": "bad_label"
+      }
+    },
+    {
+      "name": "یک کیسه",
+      "orderNo": 7,
+      "bags": 1,
+      "labels": [
+        "VLNB-7-1-1"
+      ],
+      "want": {
+        "ok": true,
+        "scanned": 1
+      }
+    }
+  ],
+  "distance": [
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.523456,
+        69.181234
+      ],
+      "m": 0
+    },
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.524356,
+        69.181234
+      ],
+      "m": 100
+    },
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.523456,
+        69.182334
+      ],
+      "m": 101
+    },
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.532456,
+        69.181234
+      ],
+      "m": 1001
+    },
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.513456,
+        69.171234
+      ],
+      "m": 1441
+    },
+    {
+      "a": [
+        34.523456,
+        69.181234
+      ],
+      "b": [
+        34.5233,
+        69.1811
+      ],
+      "m": 21
+    },
+    {
+      "a": [
+        0,
+        179.9999
+      ],
+      "b": [
+        0,
+        -179.9999
+      ],
+      "m": 22
+    },
+    {
+      "a": [
+        51.5074,
+        -0.1278
+      ],
+      "b": [
+        48.8566,
+        2.3522
+      ],
+      "m": 343557
+    }
+  ],
+  "nearPin": [
+    {
+      "name": "بی پین سنجیده نمی‌شود",
+      "pin": null,
+      "position": null,
+      "maxM": 300,
+      "want": {
+        "ok": true,
+        "checked": false
+      }
+    },
+    {
+      "name": "بی موقعیت",
+      "pin": [
+        34.523456,
+        69.181234
+      ],
+      "position": null,
+      "maxM": 300,
+      "want": {
+        "ok": false,
+        "code": "position_required"
+      }
+    },
+    {
+      "name": "نزدیک",
+      "pin": [
+        34.523456,
+        69.181234
+      ],
+      "position": [
+        34.524356,
+        69.181234
+      ],
+      "maxM": 300,
+      "want": {
+        "ok": true,
+        "checked": true,
+        "distanceM": 100
+      }
+    },
+    {
+      "name": "درست روی مرز",
+      "pin": [
+        34.523456,
+        69.181234
+      ],
+      "position": [
+        34.524356,
+        69.181234
+      ],
+      "maxM": 100,
+      "want": {
+        "ok": true,
+        "checked": true,
+        "distanceM": 100
+      }
+    },
+    {
+      "name": "یک متر بیرون از مرز",
+      "pin": [
+        34.523456,
+        69.181234
+      ],
+      "position": [
+        34.523456,
+        69.182334
+      ],
+      "maxM": 100,
+      "want": {
+        "ok": false,
+        "code": "too_far_from_pin",
+        "distanceM": 101,
+        "maxM": 100
+      }
+    },
+    {
+      "name": "یک کیلومتر دور",
+      "pin": [
+        34.523456,
+        69.181234
+      ],
+      "position": [
+        34.532456,
+        69.181234
+      ],
+      "maxM": 300,
+      "want": {
+        "ok": false,
+        "code": "too_far_from_pin",
+        "distanceM": 1001,
+        "maxM": 300
+      }
+    }
+  ],
+  "maxM": [
+    {
+      "raw": null,
+      "want": 300
+    },
+    {
+      "raw": 20,
+      "want": 20
+    },
+    {
+      "raw": 5000,
+      "want": 5000
+    },
+    {
+      "raw": 150,
+      "want": 150
+    },
+    {
+      "raw": 19,
+      "want": 300
+    },
+    {
+      "raw": 5001,
+      "want": 300
+    },
+    {
+      "raw": "150",
+      "want": 300
+    },
+    {
+      "raw": 150.5,
+      "want": 300
+    },
+    {
+      "raw": true,
+      "want": 300
+    },
+    {
+      "raw": -100,
+      "want": 300
+    }
+  ]
+}
