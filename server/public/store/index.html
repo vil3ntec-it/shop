@@ -132,6 +132,14 @@
                     <button id="pin-btn" class="btn btn-soft btn-sm" type="button" data-t="pin.btn">پین با موقعیتِ فعلیِ من</button>
                     <span id="pin-text" class="muted small" data-t="pin.hint">پین اختیاری است؛ فقط برای پیدا کردنِ دقیق‌ترِ در.</span>
                   </div>
+                  <div id="zone-box" class="stack" hidden>
+                    <label class="field"><span data-t="zone.l">ناحیهٔ ارسال</span><select id="zone-pick"><option value="" data-t="zone.pick">ناحیه را برگزینید</option></select></label>
+                    <div id="zone-msg" class="note" role="status" hidden></div>
+                    <div id="zone-acts" class="pin-row" hidden>
+                      <button id="zone-pickup" class="btn btn-soft btn-sm" type="button" data-t="pickup">دریافت از دکان</button>
+                      <button id="zone-notify" class="btn btn-soft btn-sm" type="button" data-t="zone.notify">وقتی ارسال به این‌جا رسید خبرم کن</button>
+                    </div>
+                  </div>
                   <label class="check"><input id="d-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
                   <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="d-leave" type="text" maxlength="80" data-tp="ck.leave.ph" placeholder="مثلاً «دربان» یا «برادرم»"></label>
                 </div>

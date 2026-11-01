@@ -323,5 +323,22 @@
   "err.query_too_short": "Type at least two letters.",
   "err.bad_location": "That location isn't valid.",
   "err.storefront_unavailable": "Shops aren't ready on this server yet.",
-  "err.idempotency_key_reused": "This order was already sent with different contents — please refresh the page."
+  "err.idempotency_key_reused": "This order was already sent with different contents — please refresh the page.",
+  "ship.from": "Delivery from {fee}",
+  "zone.after": "Delivery fee after you pin or choose your area",
+  "zone.small": "Below the {m} minimum: small-basket fee {fee}",
+  "zone.free.left": "{left} more for free delivery",
+  "zone.free.progress": "Progress to free delivery",
+  "zone.l": "Delivery area",
+  "zone.pick": "Choose your area",
+  "zone.opt": "{name} — delivery {fee}",
+  "zone.out": "This address is outside the shop's delivery area.",
+  "zone.in": "Your address is in the “{name}” area.",
+  "zone.need": "To deliver, add a pin or choose your area.",
+  "zone.notify": "Tell me when delivery reaches here",
+  "zone.notified": "Saved; you will get a message when delivery reaches here.",
+  "err.out_of_zone": "This address is outside the shop's delivery area; choose pickup.",
+  "err.zone_required": "To deliver, add a pin or choose your area.",
+  "err.bad_zone": "This area is no longer in the delivery list; choose again.",
+  "err.in_zone": "This address is inside the delivery area; order now."
 }
