@@ -20,7 +20,7 @@ const { requireRecentAuth, assertFresh } = require('../lib/reauth');
 const INVITE_WITHOUT_REAUTH = new Set(['staff', 'courier']);
 const subsLib = require('../lib/subscriptions');
 const { entitlementOf } = require('../lib/entitlement');
-const { permissionsOf } = require('../lib/permissions');
+const { permissionsOf, STAFF_ROLES, legacyRole } = require('../lib/permissions');
 const { requireUser, requireShop, optionalShop, requirePermission, requireFeature } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound } = require('../middleware/errors');
@@ -37,7 +37,9 @@ function shopPayload(shop, member, extra = {}) {
       ownerUserId: shop.owner_user_id, createdAt: Number(shop.created_at),
       maxMembers: shop.max_members,
     },
-    role: member.role,
+    //  A16: نسخهٔ قدیم فقط `role` را می‌خواند ⇐ نقشِ تازه آن‌جا «staff»؛ نقشِ واقعی در `actualRole`
+    role: legacyRole(member.role),
+    actualRole: member.role,
     isOwner: member.role === 'owner',
     permissions: permissionsOf(member.role),
     ...extra,
@@ -140,16 +142,20 @@ router.get('/members', requireShop, requirePermission('members.view'), async (re
 });
 
 //  ⛔ نقشِ کارمند = مجوزهایش ⇒ فقط از نشستِ تازه احراز‌شده (بندِ ۲۱.۱، `lib/reauth`)
-router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, async (req, res) => {
+async function updateMemberRoute(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
   const patch = {
-    role: req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff'], { field: 'نقش' }) : undefined,
+    role: req.body?.role ? v.oneOf(req.body.role, STAFF_ROLES, { field: 'نقش' }) : undefined,
     status: req.body?.status ? v.oneOf(req.body.status, ['active', 'suspended'], { field: 'وضعیت' }) : undefined,
   };
   const row = await shops.updateMember(req.shopId, id, patch);
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.updated', targetType: 'member', targetId: id, detail: patch });
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
-});
+}
+router.patch('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
+//  برنامهٔ نصبی (HttpURLConnection) PATCH ندارد — «تغییرِ نقش» (A16) همین در را با PUT می‌زند،
+//  با همان تأییدِ دوبارهٔ هویت
+router.put('/members/:id', requireShop, requirePermission('members.role'), requireRecentAuth, updateMemberRoute);
 
 /**
  * برداشتنِ یک عضو.
@@ -222,11 +228,13 @@ router.post('/staff-code/rotate', requireShop, requirePermission('staffcode.crea
 // «چند کاربر روی یک دکان» قابلیت اشتراکی است؛ بررسی‌اش اینجا سمت سرور
 // انجام می‌شود، نه با پنهان کردن دکمه در گوشی.
 router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcode.create'), requireFeature('multi_device'), async (req, res, next) => {
-  const role = req.body?.role ? v.oneOf(req.body.role, ['manager', 'staff', 'courier'], { field: 'نقش' }) : 'staff';
+  const role = req.body?.role ? v.oneOf(req.body.role, [...STAFF_ROLES, 'courier'], { field: 'نقش' }) : 'staff';
   //  ⛔ کدِ دعوتِ نقشِ **بالاتر از شاگرد** یک درِ پشتیِ ماندگار است: نشستِ کهنهٔ
   //  صاحب دکان (گوشیِ باز، توکنِ دزدیده) با آن مدیرِ تازه می‌ساخت که پس از
   //  بیرون کردنِ نشست هم می‌ماند. پس همان تأییدِ دوبارهٔ «عوض کردنِ نقش»
   //  (`PATCH /members/:id`) را می‌خواهد. شاگرد و پیک مثلِ پیش (یافتهٔ ۳).
+  //  A16: نقش‌های تازه هم تأیید می‌خواهند — انباردار اصلاحِ موجودی و حسابدار
+  //  سابقه و عددِ مالی دارد که شاگرد ندارد؛ یک قاعده برای همه، نه فهرستِ استثنا.
   if (!INVITE_WITHOUT_REAUTH.has(role)) await assertFresh(req);
   //  دعوتِ پیک (DLV-01) — پشتِ پرچمِ `shop.delivery`، پیش‌فرض خاموش؛ همان
   //  سنجش‌های `routes/delivery.js` (بی پرچم ۴۰۴، بی اشتراکِ تحویل ۴۰۳)
