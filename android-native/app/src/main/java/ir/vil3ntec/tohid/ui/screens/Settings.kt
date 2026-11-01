@@ -613,19 +613,18 @@ fun SettingsScreen(
       }
     }
 
-    /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
-    //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
-    //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item {
+    /* ================= گزارش‌های مشتری (CRM-02/04/06/10/11/14) ================= */
+    //  کامپیوتر: زبانه‌های «گزارش‌ها» و پروندهٔ مشتری؛ گوشی: شمارهٔ دوم، برچسب و ادغام در «قرض‌داران». پیش‌فرض خاموش.
+    item {
       var crmReports by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context)) }
       SettingsSection(
         icon = Icons.Filled.TableChart,
         title = StrShell.crmReports,
-        subtitle = if (crmReports) StrShell.crmShownInReports else StrSettings.off,
+        subtitle = if (!crmReports) StrSettings.off else if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrShell.crmShownInReports else StrShell.switchOn,
         tint = if (crmReports) Shop.colors.success else Shop.colors.muted,
       ) {
         Text(
-          StrShell.crmNote,
+          if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrShell.crmNote else StrShell.crmNotePhone,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -638,8 +637,8 @@ fun SettingsScreen(
             ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
           },
         )
-        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود
-        if (crmReports) {
+        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود (فقط کامپیوتر؛ گوشی آن زبانه را ندارد)
+        if (crmReports && ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
           var reminderText by remember { mutableStateOf(ir.vil3ntec.tohid.data.DebtReminderPref.template(context)) }
           Spacer(Modifier.height(12.dp))
           DebtReminderTemplateEditor(
