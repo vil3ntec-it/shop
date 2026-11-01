@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import ir.vil3ntec.tohid.core.i18n.StrCount
 import ir.vil3ntec.tohid.core.stock.CountBlind
+import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.CountMerge
 import ir.vil3ntec.tohid.core.stock.CountScan
 import ir.vil3ntec.tohid.data.CountSheetModel
@@ -47,8 +48,10 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *
  *  // i18n: سه‌زبانه — نوشته‌ها در `StrCount` (LOC-06)؛ نام و واحدِ کالا داده‌اند و همان می‌مانند.
  *
- *  حساب در `core/stock/CountTools` و `CountSheetModel` است؛ ثبت همان `WarehouseEngine.stockCount` ِ امروز
+ *  حساب در `core/stock/CountTools` و `CountSheetModel` است؛ ثبت همان `WarehouseEngine.stockCount`
  *  (`onSave`)، پس شمرده‌نشده دست نمی‌خورد و هر اختلاف «اصلاحِ موجودی» با دلیلِ «انبارگردانی» می‌شود.
+ *  فروش‌های حینِ شمارش (INV-10): لحظهٔ شمردنِ هر کالا همراهِ شمرده‌ها می‌رود (`core/stock/CountDuringSales`)؛
+ *  پیش‌نویسِ بازگردانده‌شده لحظه ندارد و همان مقایسهٔ امروز را دارد.
  *  فایل و دوربین در مرزِ پلتفرم (`StockCountToolsWired`). پیش‌فرض خاموش (`CountToolsPref`).
  */
 @Composable
@@ -63,7 +66,10 @@ fun StockCountToolsSheet(
   onShare: (Map<String, Long>) -> Unit,
   onImport: () -> Unit,
   onRemoveSheet: (String) -> Unit,
-  onSave: (Map<String, Double>, String) -> Unit,
+  /** شمرده‌ها، لحظهٔ شمردنِ هر کالا (INV-10) و یادداشت */
+  onSave: (Map<String, Double>, Map<String, Long>, String) -> Unit,
+  /** ساعتِ سکو (مرزِ `StockCountToolsWired`) */
+  now: () -> Long,
 ) {
   var texts by remember { mutableStateOf(mapOf<String, String>()) }
   var search by remember { mutableStateOf("") }
@@ -72,13 +78,18 @@ fun StockCountToolsSheet(
   var message by remember { mutableStateOf<String?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
   var camera by remember { mutableStateOf(false) }
+  //  INV-10: آخرین تغییرِ عددِ هر کالا در همین برگه؛ برگهٔ دستگاهِ دیگر با لحظهٔ خودش
+  var at by remember { mutableStateOf(mapOf<String, Long>()) }
 
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val names = remember(d) { d.products.associate { it.id to it.name } }
   val (own, bad) = remember(texts) { CountSheetModel.own(texts) }
   val merged = remember(own, imported, ownSheetId) { CountSheetModel.total(own, ownSheetId, imported) }
   val counted = remember(merged) { CountSheetModel.asDouble(merged.counts) }
-  val lines = remember(d, counted, blind) { if (blind) emptyList() else WarehouseEngine.countLines(d, counted) }
+  val countedAt = remember(at, imported, ownSheetId) {
+    CountDuringSales.latest(imported.filter { it.sheetId != ownSheetId }.map { it.at to it.counts.keys } + at.map { (id, t) -> t to setOf(id) })
+  }
+  val lines = remember(d, counted, blind, countedAt) { if (blind) emptyList() else WarehouseEngine.countLines(d, counted, countedAt) }
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val others = remember(imported, ownSheetId) { CountMerge.merge(imported.filter { it.sheetId != ownSheetId }).counts }
   val term = search.trim()
@@ -92,6 +103,7 @@ fun StockCountToolsSheet(
     if (code.isBlank()) return
     val (next, r) = CountSheetModel.scan(texts, code, d, index)
     texts = next
+    if (r is CountScan.Result.Counted) at = at + (r.productId to now())
     message = when (r) {
       is CountScan.Result.Counted -> StrCount.scanned(names[r.productId].orEmpty(), CountSheetModel.text(r.countedMilli))
       is CountScan.Result.Unknown -> StrCount.unknown(r.code)
@@ -225,7 +237,7 @@ fun StockCountToolsSheet(
                 }
                 OutlinedTextField(
                   value = texts[p.id].orEmpty(),
-                  onValueChange = { v -> texts = texts + (p.id to v) },
+                  onValueChange = { v -> texts = texts + (p.id to v); at = at + (p.id to now()) },
                   placeholder = { Text(StrCount.counted) },
                   singleLine = true,
                   isError = cell == CountSheetModel.Cell.Bad,
@@ -264,7 +276,7 @@ fun StockCountToolsSheet(
                   error = StrCount.badNumber(names[bad].orEmpty())
                 } else {
                   error = null
-                  onSave(counted, note)
+                  onSave(counted, countedAt, note)
                 }
               },
             )

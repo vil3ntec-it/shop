@@ -29,7 +29,7 @@ fun StockCountToolsWired(
   d: ShopData,
   onDismiss: () -> Unit,
   onExport: (ReportCsv.Sheet) -> Unit,
-  onSave: (Map<String, Double>, String) -> Unit,
+  onSave: (Map<String, Double>, Map<String, Long>, String) -> Unit,
 ) {
   val scope = rememberCoroutineScope()
   val blind = remember { CountToolsPref.blind(context) }
@@ -99,6 +99,7 @@ fun StockCountToolsWired(
     onImport = { openText.launch("*/*") },
     onRemoveSheet = { id -> imported = imported.filter { it.sheetId != id } },
     onSave = onSave,
+    now = { System.currentTimeMillis() },
   )
 }
 
