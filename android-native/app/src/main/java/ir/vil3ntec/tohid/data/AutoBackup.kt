@@ -198,6 +198,7 @@ object AutoBackup {
   /** نسخهٔ محلیِ نیم‌ساعته — بی ابر، بی پوشهٔ قرینه؛ اگر دفتر عوض نشده، هیچ */
   class LocalWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+      ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(applicationContext)
       runCatching { take(applicationContext, ir.vil3ntec.tohid.todayIso()) }
       return Result.success()
     }
@@ -205,6 +206,8 @@ object AutoBackup {
 
   class Worker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
+      //  درِ ورودِ فرآیند: «سرورِ بعدی» پیش از پشتیبان و فرستادنش (`ServerSwitchAndroid`)
+      ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(applicationContext)
       runCatching { take(applicationContext, ir.vil3ntec.tohid.todayIso()) }
       //  نسخهٔ کامل (با عکس‌ها) در پوشه‌ای که صاحبِ دکان می‌بیند
       if (BackupMirror.enabled(applicationContext)) runCatching { BackupMirror.write(applicationContext) }

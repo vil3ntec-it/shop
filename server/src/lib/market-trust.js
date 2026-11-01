@@ -127,11 +127,27 @@ async function flagOf(shopId) {
 //  تاریخچه و نماها
 // ════════════════════════════════════════════════════════════════════
 
+/**
+ * تاریخچه به ترتیبِ نوشتن: `eventsOf` با `created_at, id` مرتب می‌کند و `id` تصادفی است (`newId`)، پس دو
+ * رویدادِ هم‌میلی‌ثانیه (مثلاً «تصمیم» و «جریمه» در یک تراکنش) گاهی جابه‌جا می‌آمدند. زمانِ هر رویداد
+ * دست‌کم یک میلی‌ثانیه پس از آخرین رویدادِ همان پرونده است ⇒ ترتیب همیشه همان ترتیبِ نوشتن. نویسنده‌ها
+ * ردیفِ پرونده را `FOR UPDATE` گرفته‌اند (جز `liftSanction` که فقط جریمه را قفل می‌کند)، و هر دستور
+ * در READ COMMITTED رویدادهای ثبت‌شدهٔ پیشین را می‌بیند. بی مهاجرت؛ از نمایهٔ `(case_id, created_at, id)`.
+ */
+/**
+ *  ترتیبِ تاریخچه `created_at, id` است و `id` تصادفی. دو رویدادِ یک تراکنش (تصمیم و جریمه، ثبت و برچسب)
+ *  در یک میلی‌ثانیه ⇒ ترتیبِ تصادفی (جریمه پیش از تصمیم). پس زمانِ هر رویداد دست‌کم یکی بیش از
+ *  آخرین رویدادِ همان پرونده است: تاریخچه همیشه به ترتیبِ ثبت، با همان نمایه (case_id, created_at, id).
+ */
 async function addEvent(c, row, actor, actorId, type, body = '', data = {}) {
+  const last = (await c.query(
+    'SELECT created_at FROM trust_case_events WHERE case_id=$1 ORDER BY created_at DESC LIMIT 1', [row.id]
+  )).rows[0];
+  const at = Math.max(now(), last ? Number(last.created_at) + 1 : 0);
   await c.query(
     `INSERT INTO trust_case_events (id, case_id, shop_id, actor, actor_id, type, body, data, created_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), now()]
+    [newId('tce'), row.id, row.shop_id, actor, actorId || '', type, body || '', JSON.stringify(data || {}), at]
   );
 }
 
@@ -689,6 +705,11 @@ async function decide(adminId, id, body, reason) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [sanction.id, row.shop_id, row.id, sanction.kind, sanction.productId, reason, adminId, at]
       );
+      //  S6: جریانِ تغییرِ بازار (پرچمِ `market.changes`) — «پنهان کردن» و «تعلیق» همان دم در کشِ بازار
+      await require('./market-changes').record(c, row.shop_id, {
+        entity: 'sanction', entityId: sanction.id, kind: 'impose', at,
+        state: { kind: sanction.kind, productId: sanction.productId, lifted: false },
+      });
       await addEvent(c, row, 'admin', adminId, 'sanction_applied', reason,
         { sanctionId: sanction.id, kind: sanction.kind, ...(sanction.productId ? { productId: sanction.productId } : {}) });
     }
@@ -702,6 +723,10 @@ async function liftIn(c, row, s, adminId, reason, at) {
     'UPDATE trust_sanctions SET lifted_at=$2, lifted_by=$3, lift_reason=$4 WHERE id=$1 AND lifted_at IS NULL',
     [s.id, at, adminId, reason]
   );
+  await require('./market-changes').record(c, s.shop_id, {
+    entity: 'sanction', entityId: s.id, kind: 'lift', at,
+    state: { kind: s.kind, productId: s.product_id || '', lifted: true },
+  });
   await addEvent(c, row, 'admin', adminId, 'sanction_lifted', reason,
     { sanctionId: s.id, kind: s.kind, ...(s.product_id ? { productId: s.product_id } : {}) });
 }

@@ -90,6 +90,23 @@ object StrHome {
   val quickSale: String get() = t("فروش سریع", "Quick sale", "چټک پلور")
   val stockIn: String get() = t("ورود کالا", "Stock in", "د توکو داخلول")
 
+  // گزارش‌های کامپیوتر ← کلیدهای دوره و مقایسه (RPT-13)
+  val reportKeys: String get() = t("کلیدهای دوره در گزارش‌ها", "Period keys in reports", "په راپورونو کې د دورې کیلي")
+  val reportKeysOn: String get() = t("− دورهٔ قبل · + دورهٔ بعد · Ctrl+Shift+C مقایسه", "− previous period · + next period · Ctrl+Shift+C compare", "− مخکینۍ دوره · + راتلونکې دوره · Ctrl+Shift+C پرتله")
+  val reportKeysNote: String get() = t(
+    "روشن: در «گزارش‌ها»ی کامپیوتر، کلیدِ − همان بازه را یک دوره عقب می‌برد (روز، ۷ روز، ماهِ میلادی یا خورشیدی، سال) و + یک دوره جلو، تا دورهٔ جاری؛ Ctrl+Shift+C زیرِ کارت‌ها تغییرِ هر عدد را نسبت به دورهٔ قبل نشان می‌دهد. در «از … تا …» فقط مقایسه کار می‌کند تا نوشتنِ تاریخ به هم نخورد. فقط خواندنی است و فقط روی همین دستگاه.",
+    "On: in the computer's “Reports”, the − key moves the same range back one period (day, 7 days, calendar or solar month, year) and + moves it forward, up to the current period; Ctrl+Shift+C shows under the cards how each figure changed from the previous period. With “From … to …” only the comparison works, so typing dates is not disturbed. It is read-only and only on this device.",
+    "روښانه: د کمپیوټر په «راپورونه» کې، − کیلي هماغه موده یوه دوره شاته وړي (ورځ، ۷ ورځې، میلادي یا لمریزه میاشت، کال) او + یوه دوره مخکې، تر اوسنۍ دورې پورې؛ Ctrl+Shift+C د کارتونو لاندې د هرې شمېرې بدلون له مخکینۍ دورې سره ښيي. په «له … تر …» کې یوازې پرتله کار کوي چې د نېټې لیکل ګډوډ نه شي. یوازې د لوستلو دی او یوازې په همدې وسیله.",
+  )
+  fun compareWith(from: String, to: String): String = t("نسبت به $from تا $to:", "Compared with $from to $to:", "له $from تر $to سره پرتله:")
+  val compareNone: String get() = t("دورهٔ قبلی برای مقایسه نیست.", "There is no previous period to compare with.", "د پرتلې لپاره مخکینۍ دوره نشته.")
+  val compareNet: String get() = t("فروشِ خالص", "Net sales", "خالص پلور")
+  val compareInvoices: String get() = t("فاکتورها", "Invoices", "بلونه")
+  val compareGross: String get() = t("سودِ ناخالص", "Gross profit", "ناخالصه ګټه")
+  val comparePurchases: String get() = t("جمعِ خرید", "Total purchases", "د پېرود ټولګه")
+  val compareExpenses: String get() = t("جمعِ مصارف", "Total expenses", "د لګښتونو ټولګه")
+  val compareNoBase: String get() = t("بی پایه", "no base", "بې بنسټه")
+
   // داشبوردِ کامپیوتر
   fun hello(name: Any): String = t("سلام، $name", "Hello, $name", "سلام، $name")
   val hi: String get() = t("سلام", "Hello", "سلام")

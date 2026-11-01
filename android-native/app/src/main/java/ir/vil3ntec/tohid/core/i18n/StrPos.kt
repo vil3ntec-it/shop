@@ -10,6 +10,19 @@ package ir.vil3ntec.tohid.core.i18n
 object StrPos {
 
   // صندوقِ کامپیوتر
+  val smartSearch: String get() = t("جست‌وجوی مقاومِ صندوق", "Forgiving till search", "د صندوق بښونکې لټون")
+  val smartSearchNote: String get() = t(
+    "روشن: «ي/ی» و «ك/ک»، نیم‌فاصله، رقمِ فارسی، کلمه‌ها به هر ترتیب و یک غلطِ تایپی هم پیدا می‌شوند؛ بارکدِ کامل اول، بعد نامی که با نوشته آغاز می‌شود. فقط روی همین دستگاه.",
+    "On: Arabic/Persian letter variants, half-spaces, Persian digits, words in any order and a typo are found too; a full barcode comes first, then names starting with the text. This device only.",
+    "روښانه: د «ي/ی» او «ك/ک» بڼې، نیمه تشه، فارسي عددونه، کلمې په هر ترتیب او یوه ټایپي تېروتنه هم موندل کېږي؛ بشپړ بارکوډ لومړی، بیا هغه نومونه چې په لیکنه پیلېږي. یوازې همدا وسیله.",
+  )
+  //  POS-41 — کلیدهای بیشترِ صندوق
+  val moreKeys: String get() = t("کلیدهای بیشترِ صندوق", "More till keys", "د صندوق نورې کیلي")
+  val moreKeysNote: String get() = t(
+    "روشن: Shift+F5 به کادرِ تخفیفِ کلِ فاکتور می‌برد، Esc در کادرِ اسکنِ خالی خالی کردنِ فاکتور را می‌پرسد (هرگز بی پرسش)، و برچسبِ کلید روی ردیفِ انتخاب‌شده (F3، +/−، Delete)، دکمهٔ «خالی» ِ سبد و کادرِ تخفیف دیده می‌شود. فقط روی همین دستگاه.",
+    "On: Shift+F5 moves to the invoice discount box, Esc in an empty scan box asks before emptying the invoice (never without asking), and key labels show on the selected row (F3, +/−, Delete), the cart's \"Clear\" button and the discount box. This device only.",
+    "روښانه: Shift+F5 د ټول بل د تخفیف بکس ته ځي، په تش سکن بکس کې Esc د بل د تشولو پوښتنه کوي (هېڅکله پرته له پوښتنې)، او د کیلي نښې په ټاکل شوې کرښه (F3، +/−، Delete)، د سبد «تش یې کړئ» تڼۍ او د تخفیف بکس ښکاري. یوازې همدا وسیله.",
+  )
   val discountForbidden: String get() = t("این تخفیف برای شما ممنوع است", "You're not allowed to give this discount", "تاسو ته د دې تخفیف اجازه نشته")
   val cartChangedRetry: String get() = t("سبد همین حالا عوض شد — دوباره بزنید", "The cart just changed — press again", "ټوکرۍ همدا اوس بدله شوه — بیا یې ووهئ")
   fun saleRecorded(a: Any): String = t("فروش $a ؋ ثبت شد", "Sale of $a ؋ recorded", "د $a ؋ پلور ثبت شو")
@@ -61,6 +74,8 @@ object StrPos {
   // تخفیف
   val autoDiscount: String get() = t("تخفیفِ خودکار", "Automatic discount", "اتومات تخفیف")
   fun promoA11y(n: Any, a: Any): String = t("تخفیفِ $n: $a افغانی", "Discount $n: $a AFN", "تخفیف $n: $a افغانۍ")
+  //  PRM-02: کدِ سقف‌دار بی پاسخِ سرور پذیرفته نمی‌شود
+  fun couponNeedsOnline(c: Any): String = t("کدِ $c سقفِ مصرف دارد و فقط با اینترنت پذیرفته می‌شود — وصل شوید یا کد را بردارید", "Code $c has a usage limit and is accepted only online — connect or remove the code", "کوډ $c د کارونې حد لري او یوازې له انټرنېټ سره منل کېږي — وصل شئ یا کوډ لرې کړئ")
   val discountCode: String get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
   val apply: String get() = t("اعمال", "Apply", "پلي کړئ")
   fun removeCode(c: Any): String = t("برداشتنِ کدِ $c", "Remove code $c", "$c کوډ لرې کړئ")
@@ -127,6 +142,15 @@ object StrPos {
   val no: String get() = t("نه", "No", "نه")
   val clearStaleQ: String get() = t("پاک کردنِ فاکتورهای کهنه؟", "Clear stale invoices?", "زاړه بلونه پاک شي؟")
   fun clearStaleWarn(h: Any): String = t("فاکتورهای نگه‌داشتهٔ کهنه‌تر از $h ساعت دور انداخته می‌شوند. این کار برنمی‌گردد.", "Held invoices older than $h hours will be discarded. This can't be undone.", "له $h ساعتونو زاړه ساتل شوي بلونه لرې کېږي. دا کار بېرته نه راګرځي.")
+  //  POS-12 — پاک‌سازیِ خودکارِ کهنه‌ها
+  fun heldAutoClean(h: Any): String = t("پاک‌سازیِ خودکارِ فاکتورهای کهنه‌تر از $h ساعت", "Clear held invoices older than $h hours automatically", "له $h ساعتونو زاړه ساتل شوي بلونه پخپله پاک کړئ")
+  val heldAutoCleanNote: String get() = t(
+    "روشن: تا صندوق باز است، فاکتورِ نگه‌داشته‌ای که کهنه شد بی پرسش دور انداخته می‌شود و برنمی‌گردد. فاکتورِ جاریِ صندوق پاک نمی‌شود. فقط روی همین دستگاه.",
+    "On: while the till is open, a held invoice that gets stale is discarded without asking and can't be brought back. The invoice on the till is never cleared. This device only.",
+    "روښانه: تر هغه چې صندوق خلاص وي، هغه ساتل شوی بل چې زوړ شي پرته له پوښتنې لرې کېږي او نه راګرځي. د صندوق اوسنی بل نه پاکېږي. یوازې همدا وسیله.",
+  )
+  val heldAutoCleanLocked: String get() = t("فقط کسی که اجازهٔ لغوِ فاکتور دارد این را عوض می‌کند", "Only someone allowed to cancel invoices can change this", "یوازې هغه څوک چې د بل د لغوه کولو اجازه لري دا بدلولی شي")
+  fun heldAutoCleared(n: Any, h: Any): String = t("$n فاکتورِ نگه‌داشتهٔ کهنه‌تر از $h ساعت خودکار پاک شد", "$n held invoices older than $h hours were cleared automatically", "$n ساتل شوي بلونه له $h ساعتونو زاړه پخپله پاک شول")
   val clearIt: String get() = t("پاک کن", "Clear", "پاک یې کړئ")
   fun heldNote(max: Any): String = t("مشتری‌ای منتظر است و دیگری پول می‌دهد: فاکتورِ اولی با نام یا شماره نگه داشته می‌شود و صندوق خالی. تا $max فاکتورِ باز با هم، هر کدام با سبد، مشتری، تخفیف و یادداشتِ خودش. فقط روی همین دستگاه می‌ماند و با بسته شدنِ برنامه یا قطعِ برق از دست نمی‌رود.", "One customer waits while another pays: the first invoice is held under a name or number and the register clears. Up to $max open invoices at once, each with its own cart, customer, discount and note. Kept only on this device, and not lost if the app closes or the power goes out.", "یو پیرودونکی په تمه دی او بل پیسې ورکوي: لومړی بل په نوم یا شمېره ساتل کېږي او صندوق تشېږي. تر $max پورې خلاص بلونه په یو وخت، هر یو له خپلې ټوکرۍ، پیرودونکي، تخفیف او یادښت سره. یوازې په همدې وسیله پاتې کېږي او د اپ په بندېدو یا برېښنا په تلو نه ورکېږي.")
 }

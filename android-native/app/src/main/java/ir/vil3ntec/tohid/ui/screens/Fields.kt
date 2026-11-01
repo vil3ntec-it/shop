@@ -12,6 +12,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import ir.vil3ntec.tohid.scan.scanChar
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -54,8 +58,40 @@ fun NumberField(
     label = { Text(label) },
     singleLine = true,
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-    modifier = modifier,
+    modifier = modifier.scanGuard(value, onValueChange),
   )
+}
+
+/**
+ *  HW-05 «اسکن هرگز در فیلد قیمت یا تعداد نمی‌نشیند» — فقط با «ابزارهای تازهٔ دستگاه» (`HwTools`) روشن.
+ *
+ *  بارکدخوان مثلِ صفحه‌کلید تایپ می‌کند، پس نخستین نویسه‌ها پیش از آن‌که بدانیم اسکن است به کادر
+ *  می‌رسند. `FieldScanGuard` مقدارِ کادر را پیش از هر هجوم نگه می‌دارد؛ اگر هجوم اسکن از آب درآمد
+ *  (تند + Enter، یا پیشوند/پسوندِ تنظیم‌شده) همان مقدار برمی‌گردد و بارکد به صفحهٔ باز می‌رود
+ *  (`ScanRouter`). تایپِ آدم دست نمی‌خورد. منطق و آزمونش در `core/hw/KeyScan` (`KeyScanTest`).
+ */
+@Composable
+private fun Modifier.scanGuard(value: String, onValueChange: (String) -> Unit): Modifier {
+  if (!ir.vil3ntec.tohid.print.HwTools.on.value) return this
+  val guard = remember { ir.vil3ntec.tohid.core.hw.FieldScanGuard(ir.vil3ntec.tohid.scan.ScanPrefs.current()) }
+  val current by rememberUpdatedState(value)
+  val restore by rememberUpdatedState(onValueChange)
+  fun hit(h: ir.vil3ntec.tohid.core.hw.FieldScanGuard.Hit): Boolean {
+    restore(h.restore)
+    ir.vil3ntec.tohid.scan.ScanRouter.dispatch(h.code) { ir.vil3ntec.tohid.ui.AppNav.go("sale") }
+    return true
+  }
+  return this.onPreviewKeyEvent { e ->
+    if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onPreviewKeyEvent false
+    val now = System.currentTimeMillis()
+    if (e.key == androidx.compose.ui.input.key.Key.Enter || e.key == androidx.compose.ui.input.key.Key.NumPadEnter) {
+      guard.enter(now)?.let(::hit) ?: false
+    } else {
+      val ch = e.scanChar() ?: return@onPreviewKeyEvent false
+      //  نویسه به کادر هم می‌رسد (`false`) — تا اسکن بودنش معلوم نشده، تایپ است
+      guard.key(ch, now, current)?.let(::hit) ?: false
+    }
+  }
 }
 
 /** مثل بالا، با نمایشِ مبلغ به شکلِ خوانا زیرِ کادر */
@@ -115,8 +151,10 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
 
   val parsed = remember(text) { Jalali.parseTyped(text) }
   val broken = text.isNotBlank() && parsed == null
-  //  نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد)
+  //  نسخهٔ ۳: نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد).
+  //  رابطِ امروز (پرچمِ `UiV3` خاموش) همان نمونهٔ ثابتِ main را می‌بیند.
   val sample = remember { formatDate(todayIso()) }
+  val v3 = ir.vil3ntec.tohid.ui.UiV3.on
 
   Text(StrFields.date, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
@@ -127,7 +165,7 @@ fun DateField(value: String, onValueChange: (String) -> Unit) {
         text = latinDigits(raw).filter { c -> c.isDigit() || c == '/' || c == '-' }
         Jalali.parseTyped(text)?.let(onValueChange)
       },
-      placeholder = { Text(sample) },
+      placeholder = { Text(if (v3) sample else "۱۴۰۵/۰۶/۰۶") },
       singleLine = true,
       isError = broken,
       keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),

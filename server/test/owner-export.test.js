@@ -45,6 +45,7 @@ function ledger() {
     stockMovements: [{ id: 'm1', productId: 'p1', type: 'purchase_in', qty: 100, date: '2026-08-02', refId: 'w1', createdAt: 1700000000000 }],
     priceHistory: [],
     auditLog: [{ id: 'a1', type: 'shift_open', date: '2026-08-28', refId: null, notes: 'صندوق', createdAt: 1700000000000, amount: 1000 }],
+    safeEntries: [{ id: 'sf1', kind: 'to_bank', amountMinor: 250000, createdAt: 1700000000000, bagNo: 'K-17' }],
     settings: { storeName: 'دکان آزمون', theme: 'dark', motion: 'full' },
   };
 }
