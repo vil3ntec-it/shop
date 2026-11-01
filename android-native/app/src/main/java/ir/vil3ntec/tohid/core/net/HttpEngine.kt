@@ -225,7 +225,18 @@ class HttpEngine(
         connection.setRequestProperty("Content-Type", raw.contentType)
         raw.headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
         connection.setFixedLengthStreamingMode(raw.bytes.size)
-        connection.outputStream.use { it.write(raw.bytes) }
+        val report = raw.onProgress
+        if (report == null) connection.outputStream.use { it.write(raw.bytes) }
+        else connection.outputStream.use { out ->
+          //  CHAT-05: تکه‌تکه، تا صدا زننده بداند چند بایت به سوکت رسید (بی گزارش ⇒ همان یک write)
+          var off = 0
+          while (off < raw.bytes.size) {
+            val n = minOf(RawBody.CHUNK, raw.bytes.size - off)
+            out.write(raw.bytes, off, n)
+            off += n
+            runCatching { report(off.toLong()) }
+          }
+        }
       } else if (body != null) {
         connection.doOutput = true
         connection.setRequestProperty("Content-Type", "application/json; charset=utf-8")
@@ -321,7 +332,14 @@ data class RawBody(
   val bytes: ByteArray,
   val contentType: String = "application/octet-stream",
   val headers: Map<String, String> = emptyMap(),
+  /** بایت‌های نوشته‌شده تا این‌جا (CHAT-05)؛ null ⇒ بدنه یک‌جا نوشته می‌شود، مثلِ پیش */
+  val onProgress: ((Long) -> Unit)? = null,
 ) {
+  companion object {
+    /** اندازهٔ هر تکه وقتی پیشرفت خواسته شده */
+    const val CHUNK = 16 * 1024
+  }
+
   //  ⚠️ `ByteArray` در `data class` برابریِ ارجاعی دارد؛ کاتلین برای
   //  همین هشدار می‌دهد. این دو تا فقط آن هشدار را می‌بندند — هیچ‌جا
   //  دو `RawBody` مقایسه نمی‌شود.

@@ -16,8 +16,9 @@
  *       status ∈ 'paid' | 'failed' | 'pending' | 'expired' | 'cancelled'
  *   fetchStatus(sessionId)  ⇒ { status, amountMinor, currency, providerRef } (اختیاری؛ نبود ⇒ تأییدِ دوم ممکن نیست)
  *
- * ⛔ ساختگی (`fake`) فقط بیرون از تولید و فقط با `PAYMENTS_PROVIDER=fake`؛ در تولید
- *    (`NODE_ENV=production`) هرگز — حتی اگر متغیر داده شده باشد (`activeName`).
+ * ⛔ ساختگی (`fake`) فقط با `NODE_ENV` ِ صریحِ `test` یا `development`، `PAYMENTS_PROVIDER=fake` و
+ *    `PAYMENTS_FAKE_SECRET` ِ داده‌شده (رازِ پیش‌فرض در کد نیست)؛ تولید، NODE_ENV ِ خالی یا هر محیطِ
+ *    دیگر (staging…) ⇒ هرگز، حتی اگر متغیر داده شده باشد (`activeName`) — و `/webhook/fake` ۴۰۱.
  * ⛔ هیچ کلیدی در کد نیست؛ همه از محیط و **هر بار** خوانده می‌شوند (تنظیمِ تازه بی ری‌استارتِ کد).
  */
 const crypto = require('crypto');
@@ -70,17 +71,23 @@ const hmacHex = (secret, raw) => crypto.createHmac('sha256', String(secret)).upd
  *  ⛔ فقط برای آزمون و سرورِ توسعه. نشانیِ پرداخت ساختگی است و هیچ پولی جابه‌جا
  *  نمی‌شود. رویدادِ «پرداخت شد» را آزمون (یا `scripts/fake-pay.js`) با امضای
  *  `PAYMENTS_FAKE_SECRET` به `/api/v1/payments/webhook/fake` می‌فرستد و وضعیتِ
- *  تأییدِ دوم را با `fake.settle` می‌گذارد.
+ *  تأییدِ دوم را با `fake.settle` می‌گذارد. بی آن راز ساختگی «پیکربندی نشده» است.
  */
 const FAKE_SIG_HEADER = 'x-fake-signature';
 const fakeState = new Map();
 
-function fakeSecret() { return process.env.PAYMENTS_FAKE_SECRET || 'fake-webhook-secret-dev-only'; }
+/** رازِ امضای ساختگی فقط از محیط؛ نبود ⇒ ساختگی خاموش (هرگز پیش‌فرضی که هر کسی بداند). */
+function fakeSecret() { return String(process.env.PAYMENTS_FAKE_SECRET || '').trim(); }
+function fakeSecretOrThrow() {
+  const s = fakeSecret();
+  if (!s) throw new Error('fake: PAYMENTS_FAKE_SECRET داده نشده');
+  return s;
+}
 
 const fake = Object.freeze({
   name: 'fake',
   SIG_HEADER: FAKE_SIG_HEADER,
-  configured: () => true,
+  configured: () => fakeSecret() !== '',
   /** شناسهٔ جلسهٔ ساختگی از خودِ شناسهٔ قصد — قطعی، تا اسکریپتِ توسعه بی دیتابیس بسازدش. */
   sessionOf: (intentId) => `fake_${crypto.createHash('sha256').update(String(intentId)).digest('hex').slice(0, 24)}`,
   async createSession({ intentId, amountMinor, currency }) {
@@ -91,10 +98,12 @@ const fake = Object.freeze({
     return { providerSessionId: sid, checkoutUrl: `https://pay.invalid/fake/${sid}`, expiresAt: Date.now() + ttl };
   },
   /** امضا: HMAC-SHA256 ِ بدنهٔ خام، hex، در `x-fake-signature`. */
-  sign: (raw) => hmacHex(fakeSecret(), raw),
+  sign: (raw) => hmacHex(fakeSecretOrThrow(), raw),
   async verifyWebhook(raw, headers) {
+    const secret = fakeSecret();
+    if (!secret) return { ok: false, reason: 'not_configured' };
     if (!Buffer.isBuffer(raw) || !raw.length) return { ok: false, reason: 'empty_body' };
-    if (!safeEqual(headers[FAKE_SIG_HEADER], hmacHex(fakeSecret(), raw))) return { ok: false, reason: 'bad_signature' };
+    if (!safeEqual(headers[FAKE_SIG_HEADER], hmacHex(secret, raw))) return { ok: false, reason: 'bad_signature' };
     let b;
     try { b = JSON.parse(raw.toString('utf8')); } catch { return { ok: false, reason: 'bad_json' }; }
     if (!b || typeof b !== 'object') return { ok: false, reason: 'bad_json' };
@@ -135,23 +144,27 @@ function adapter(name) {
 }
 
 const isProduction = () => (process.env.NODE_ENV || '') === 'production';
+/** محیطی که ساختگی و سرورِ ساختگیِ loopback را می‌پذیرد — فقط با NODE_ENV ِ صریح؛ خالی یا هر نامِ دیگر نه. */
+const FAKE_ENVS = Object.freeze(['test', 'development']);
+const isTestOrDev = () => FAKE_ENVS.includes(String(process.env.NODE_ENV || '').trim());
 
-/** ساختگی مجاز است؟ فقط بیرون از تولید و با درخواستِ صریح. */
+/** ساختگی مجاز است؟ فقط با NODE_ENV ِ صریحِ test/development، درخواستِ صریح و رازِ داده‌شده. */
 function fakeAllowed() {
-  return !isProduction() && (process.env.PAYMENTS_PROVIDER || '').trim() === 'fake';
+  return isTestOrDev() && (process.env.PAYMENTS_PROVIDER || '').trim() === 'fake' && fake.configured();
 }
 
-let warnedFakeInProd = false;
+let warnedFakeIgnored = false;
 /**
  * ارائه‌دهندهٔ «حساب‌پی» ِ این سرور: در توسعه/آزمون با `PAYMENTS_PROVIDER=fake` همان ساختگی،
- * وگرنه آداپتورِ واقعی. تولید + fake ⇒ نادیده و یک هشدار در لاگ.
+ * وگرنه آداپتورِ واقعی. fake ِ نامجاز (تولید، NODE_ENV ِ دیگر، بی راز) ⇒ نادیده و یک هشدار در لاگ.
  */
 function activeName() {
-  if ((process.env.PAYMENTS_PROVIDER || '').trim() === 'fake' && isProduction() && !warnedFakeInProd) {
-    warnedFakeInProd = true;
-    console.error('[payments] PAYMENTS_PROVIDER=fake در تولید نادیده گرفته شد — ارائه‌دهندهٔ ساختگی فقط برای آزمون است');
+  if (fakeAllowed()) return 'fake';
+  if ((process.env.PAYMENTS_PROVIDER || '').trim() === 'fake' && !warnedFakeIgnored) {
+    warnedFakeIgnored = true;
+    console.error('[payments] PAYMENTS_PROVIDER=fake نادیده گرفته شد — ساختگی فقط با NODE_ENV=test|development و PAYMENTS_FAKE_SECRET');
   }
-  return fakeAllowed() ? 'fake' : 'hesabpay';
+  return 'hesabpay';
 }
 
 /** وب‌هوک از کدام آداپتور پذیرفته می‌شود — ساختگی فقط وقتی مجاز است. */
@@ -160,7 +173,23 @@ function webhookAdapter(name) {
   return adapter(name);
 }
 
+/**
+ * حالِ «پرداختِ آنلاین» برای پنلِ مدیر (`system-health.providers`) — بی هیچ راز:
+ *   ساختگی ⇒ mock؛ هر دو کلیدِ حساب‌پی ⇒ live؛ یکی ⇒ incomplete؛ هیچ ⇒ همان نقدِ هنگامِ تحویل (none، D-08).
+ */
+function providerState() {
+  if (fakeAllowed()) return { mode: 'fake', state: 'mock', missing: [] };
+  const key = Boolean(String(process.env.HESABPAY_API_KEY || '').trim());
+  const secret = Boolean(String(process.env.HESABPAY_WEBHOOK_SECRET || '').trim());
+  if (key && secret) return { mode: 'hesabpay', state: 'live', missing: [], flag: 'pay.hesabpay' };
+  if (key || secret) {
+    return { mode: 'hesabpay', state: 'incomplete', missing: [key ? '' : 'HESABPAY_API_KEY', secret ? '' : 'HESABPAY_WEBHOOK_SECRET'].filter(Boolean) };
+  }
+  return { mode: 'cod', state: 'none', missing: [], decision: 'D-08' };
+}
+
 module.exports = {
+  providerState,
   minorToDecimal, decimalToMinor, safeEqual, hmacHex,
-  adapter, activeName, webhookAdapter, fakeAllowed, isProduction, fake,
+  adapter, activeName, webhookAdapter, fakeAllowed, isProduction, isTestOrDev, fake,
 };
