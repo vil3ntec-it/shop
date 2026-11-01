@@ -321,7 +321,7 @@ object WarehouseEngine {
 
     return Result.Ok(
       d.copy(
-        products = d.products + product,
+        products = ProductVariantsMap.withChildren(d.products + product, product, newId, now), // PRD-11: تنوع‌های تازه
         productCategories = withCategory(d.productCategories, draft.category),
         productUnits = withUnit(d.productUnits, draft.unit),
       ),
@@ -444,7 +444,7 @@ object WarehouseEngine {
 
     return Result.Ok(
       d.copy(
-        products = d.products.map { if (it.id == id) updated else it },
+        products = ProductVariantsMap.withChildren(d.products.map { if (it.id == id) updated else it }, updated, newId, now),
         productCategories = withCategory(d.productCategories, draft.category),
         productUnits = withUnit(d.productUnits, draft.unit),
         priceHistory = history,

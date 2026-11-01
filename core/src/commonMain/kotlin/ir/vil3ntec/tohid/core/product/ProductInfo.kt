@@ -121,10 +121,12 @@ data class ProductInfo(
   val kit: List<ProductKit.Part> = emptyList(),
   /** PRD-13 — بازه‌های قیمتِ زمان‌بندی‌شده (`PriceSchedule`)، به ترتیبِ آغاز و بی هم‌پوشانی */
   val prices: List<PriceSchedule.Window> = emptyList(),
+  /** PRD-11 — ویژگی‌های مدل (`ProductVariants`)؛ تهی ⇒ مدل نیست */
+  val axes: List<ProductVariants.Axis> = emptyList(),
 ) {
   val isEmpty: Boolean
     get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty &&
-      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless && kit.isEmpty() && prices.isEmpty()
+      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless && kit.isEmpty() && prices.isEmpty() && axes.isEmpty()
 
   /** نام‌های دیگرِ کالا (پشتو، انگلیسی، مترادف‌ها) — در جست‌وجو هم‌پایهٔ نام */
   val aliases: List<String> get() = listOfNotNull(namePs.ifEmpty { null }, nameEn.ifEmpty { null }) + synonyms

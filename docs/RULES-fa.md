@@ -640,6 +640,9 @@
 `ProductPlansMap`؛ موجودیِ کیت ساختگی در `ShopStore.StockIndex` (ورود/اصلاحِ کیت به اجزا پخش، فروش از `SaleItem.parts` ِ رونوشت‌شده)، ثبتِ فروش نیازِ
 همهٔ سبد به اجزا را می‌سنجد و با `StockLedger` ِ روشن کیت را رد می‌کند؛ قیمتِ فهرست همه‌جا `ProductPlansMap.price` (linePrice، جمعِ سبد، ثبت،
 PromoEngine، DiscountGate، PriceWhyLine، CustomerCrm، کاشیِ صندوق) — کالای بی `kit`/`priceWindows` دقیقاً همان؛ ویترینِ سرور قیمتِ زمان‌بندی‌شده را نمی‌شناسد؛
+همان `tohid-ui:product_info` تنوع با ماتریس را هم دارد (PRD-11، `claude/prd-variants`): هر ترکیب کالای جداست (`variantOf` + `variant`؛ بارکد، قیمت و
+موجودیِ خودش)، مدل فقط `variantAxes` دارد؛ منطق فقط `core/product/ProductVariants` (حداکثر ۳ ویژگی و ۱۰۰ ترکیب، ترکیب با کلیدِ مقایسه) و ساختن فقط
+`ProductVariantsMap.withChildren` در ثبت/ویرایشِ کالا: ترکیبِ موجود دوباره ساخته نمی‌شود، مقدارِ برداشته تنوع را پاک نمی‌کند، نامِ ساخته‌شدهٔ گرفته‌شده ساخته نمی‌شود؛
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_reasons` = فهرستِ
 `tohid-policy`: `returns_v2` = برگشت و تعویضِ تازه، `return_limit` = سقفِ بی تأیید (`ReturnSettings`، #318، main)، `return_window_days` و `return_blocked` = سیاستِ برگشت (`ReturnPolicyPrefs`، RET-09، `claude/new-ret-1`)، `return_reasons` = فهرستِ
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).

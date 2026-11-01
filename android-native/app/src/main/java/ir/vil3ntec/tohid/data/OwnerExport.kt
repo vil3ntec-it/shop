@@ -160,6 +160,10 @@ object OwnerExport {
     "kit" to "اجزای کیت",
     "priceWindows" to "قیمت‌های زمان‌بندی‌شده",
     "parts" to "اجزای کیت هنگام فروش",
+    //  PRD-11
+    "variantAxes" to "ویژگی‌های تنوع",
+    "variantOf" to "شناسهٔ کالای مدل",
+    "variant" to "ترکیبِ تنوع",
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",

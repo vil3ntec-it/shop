@@ -21,7 +21,7 @@ object ProductInfoMap {
     p.namePs.isNullOrEmpty() && p.nameEn.isNullOrEmpty() && p.synonyms.isNullOrEmpty() &&
       p.keywords.isNullOrEmpty() && p.aisle.isNullOrEmpty() && p.shelf.isNullOrEmpty() && p.shelfLevel.isNullOrEmpty() &&
       p.alternatives.isNullOrEmpty() && p.customFields.isNullOrEmpty() && p.sku.isNullOrEmpty() && p.stockless != true &&
-      p.kit.isNullOrEmpty() && p.priceWindows.isNullOrEmpty()
+      p.kit.isNullOrEmpty() && p.priceWindows.isNullOrEmpty() && p.variantAxes.isNullOrEmpty()
 
   fun of(p: Product): ProductInfo = ProductInfo(
     namePs = p.namePs.orEmpty(),
@@ -35,6 +35,7 @@ object ProductInfoMap {
     stockless = p.stockless == true,
     kit = ProductPlansMap.kitOf(p),
     prices = ProductPlansMap.windowsOf(p),
+    axes = ProductVariantsMap.axesOf(p),
   )
 
   fun shelf(p: Product): ShelfLocation = ShelfLocation.of(p.aisle, p.shelf, p.shelfLevel)
@@ -55,6 +56,7 @@ object ProductInfoMap {
     stockless = if (info.stockless) true else null,
     kit = ProductPlansMap.kitModel(info.kit),
     priceWindows = ProductPlansMap.windowsModel(info.prices),
+    variantAxes = ProductVariantsMap.axesModel(info.axes),
   ).let { u ->
     //  PRD-09: خدماتی حدِ موجودی ندارد ⇒ هشدارِ کم‌موجودی و پیشنهادِ سفارش هرگز
     if (info.stockless) u.copy(minStock = 0.0, reorderPoint = null, maxStock = null) else u
@@ -78,6 +80,7 @@ object ProductInfoMap {
     if (a.sku.orEmpty() != b.sku.orEmpty()) add("کدِ کالا «${a.sku.orEmpty()}» ⇐ «${b.sku.orEmpty()}»")
     if ((a.stockless == true) != (b.stockless == true)) add(if (b.stockless == true) "خدماتی (بی موجودی) شد" else "دیگر خدماتی نیست")
     addAll(ProductPlansMap.changes(a, b))
+    if (a.variantAxes.orEmpty() != b.variantAxes.orEmpty()) add("ویژگی‌های تنوع عوض شد")
   }
 
   /**

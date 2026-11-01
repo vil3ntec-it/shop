@@ -79,4 +79,15 @@ object StrProduct {
   )
   fun pricesBad(a: Any): String = t("این خط درست نیست یا با بازهٔ دیگر هم‌پوشان است: $a", "This line is wrong or overlaps another range: $a", "دا کرښه سمه نه ده یا له بلې مودې سره ګډه ده: $a")
   fun priceToday(a: Any): String = t("قیمتِ امروز: $a", "Today's price: $a", "د نن بیه: $a")
+
+  // تنوع (PRD-11)
+  val variants: String get() = t("تنوع‌ها (ویژگی: مقدار، مقدار)", "Variants (attribute: value, value)", "ډولونه (ځانګړنه: ارزښت، ارزښت)")
+  val variantsHint: String get() = t(
+    "هر خط یک ویژگی، مثلاً «رنگ: قرمز، آبی» و «اندازه: S، M». با ذخیره هر ترکیب کالای جدا با بارکد، قیمت و موجودیِ خودش می‌شود",
+    "One attribute per line, e.g. \"Colour: red, blue\" and \"Size: S, M\". On save each combination becomes its own item with its own barcode, price and stock",
+    "هره کرښه یوه ځانګړنه، لکه «رنګ: سور، شین» او «اندازه: S، M». په ثبت سره هره ترکیب جلا توکی کېږي له خپل بارکوډ، بیې او موجودۍ سره",
+  )
+  fun variantsBad(a: Any): String = t("این خط درست نیست یا ترکیب‌ها بیش از ۱۰۰ است: $a", "This line is wrong or there are over 100 combinations: $a", "دا کرښه سمه نه ده یا ترکیبونه له ۱۰۰ ډېر دي: $a")
+  fun variantsNew(a: Any): String = t("با ذخیره $a تنوعِ تازه ساخته می‌شود", "Saving creates $a new variants", "په ثبت سره $a نوي ډولونه جوړېږي")
+  val variantsMatrix: String get() = t("تنوع‌ها: قیمت · موجودی", "Variants: price · stock", "ډولونه: بیه · موجودي")
 }

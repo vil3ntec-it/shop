@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.core.product.ProductAlternatives
 import ir.vil3ntec.tohid.core.product.PriceSchedule
 import ir.vil3ntec.tohid.core.product.ProductInfo
 import ir.vil3ntec.tohid.core.product.ProductKit
+import ir.vil3ntec.tohid.core.product.ProductVariants
 import ir.vil3ntec.tohid.core.product.ProductSku
 import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
@@ -64,6 +65,8 @@ data class ProductInfoForm(
   /** PRD-13 — بازه‌های قیمت؛ [pricesText] `null` ⇒ ویرایش نشده */
   val prices: List<PriceSchedule.Window> = emptyList(),
   val pricesText: String? = null,
+  /** PRD-11 — ویژگی‌های مدل، هر خط «ویژگی: مقدار، مقدار» */
+  val axes: String = "",
 ) {
   /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
   fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
@@ -75,6 +78,7 @@ data class ProductInfoForm(
   ).copy(
     kit = kitText?.let { ProductKit.parse(it, selfId, ProductKit.resolver(catalog)) { false }.parts } ?: kitParts,
     prices = pricesText?.let { PriceSchedule.parse(it, ::dayOf).windows } ?: prices,
+    axes = ProductVariants.parse(axes).axes,
   )
 
   companion object {
@@ -92,6 +96,7 @@ data class ProductInfoForm(
       stockless = info.stockless,
       kitParts = info.kit,
       prices = info.prices,
+      axes = ProductVariants.format(info.axes),
     )
   }
 }
@@ -232,6 +237,7 @@ fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onCha
       modifier = Modifier.fillMaxWidth(),
     )
     KitAndPriceFields(form, d, selfId, onChange)
+    VariantFields(form, d, selfId, onChange)
   }
 }
 
@@ -311,6 +317,45 @@ fun ProductInfoSettings(on: Boolean, onChange: (Boolean) -> Unit) {
 
 /** سقفِ نویسهٔ کادرِ فهرست — ۲۰ واژه × ۶۰ نویسه با جداکننده جا می‌شود */
 private const val LIST_INPUT = ProductTerms.MAX_TERMS * (ProductTerms.MAX_TERM + 2)
+
+/** PRD-11 — ویژگی‌های مدل و ماتریسِ تنوع‌های موجود (قیمت · موجودی)؛ ترکیبِ تازه با ذخیرهٔ فرم ساخته می‌شود */
+@Composable
+private fun VariantFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
+  val c = Shop.colors
+  val parsed = ProductVariants.parse(form.axes)
+  val existing = selfId?.let { id -> ir.vil3ntec.tohid.data.ProductVariantsMap.children(d.products, id) }.orEmpty()
+  val fresh = ProductVariants.missing(parsed.axes, existing.map(ir.vil3ntec.tohid.data.ProductVariantsMap::comboOf)).size
+  OutlinedTextField(
+    value = form.axes,
+    onValueChange = { onChange(form.copy(axes = it.take(AXES_INPUT))) },
+    label = { Text(StrProduct.variants) },
+    supportingText = {
+      when {
+        parsed.problems.isNotEmpty() -> Text(StrProduct.variantsBad(parsed.problems.first().first), color = c.danger)
+        fresh > 0 -> Text(StrProduct.variantsNew(ir.vil3ntec.tohid.plain(fresh)), color = c.primary)
+        else -> Text(StrProduct.variantsHint)
+      }
+    },
+    singleLine = false,
+    modifier = Modifier.fillMaxWidth(),
+  )
+  if (selfId == null || existing.isEmpty() || parsed.axes.isEmpty()) return
+  val (m, byId) = ir.vil3ntec.tohid.data.ProductVariantsMap.matrix(d.products, parsed.axes, selfId)
+  Text(StrProduct.variantsMatrix, style = MaterialTheme.typography.labelMedium, color = c.muted)
+  Row { Text("", Modifier.weight(1f)); m.cols.forEach { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = c.muted) } }
+  m.rows.forEachIndexed { i, r ->
+    Row {
+      Text(r, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = c.text)
+      m.cols.indices.forEach { j ->
+        val p = m.cells[i to j]?.let { byId[it] }
+        val cell = if (p == null) "—" else "${ir.vil3ntec.tohid.money(p.salePrice)} · ${ir.vil3ntec.tohid.qty(ir.vil3ntec.tohid.data.ShopStore.stock(d, p.id))}"
+        Text(cell, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = if (p == null) c.muted else c.text)
+      }
+    }
+  }
+}
+
+private const val AXES_INPUT = ProductVariants.MAX_AXES * 1300
 
 /** سقفِ نویسهٔ کادرِ کیت و قیمت‌های زمان‌بندی‌شده */
 private const val KIT_INPUT = ProductKit.MAX_PARTS * 100
