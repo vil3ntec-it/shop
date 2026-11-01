@@ -504,7 +504,7 @@ fun SaleScreen(
       }
 
       /* ---------------------------- سبد ---------------------------- */
-      item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }
+      item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) } // پیش‌فاکتور (POS-25)، پشتِ `QuotePref`
       item { TillReceivePhone(d, store, cartDebtorId, ::toast) } // POS-39، پشتِ `TillReceivePref` (پیش‌فرض خاموش)
       item { ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } }
       item {

@@ -780,7 +780,7 @@ fun DeskSaleScreen(
       }
       .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
   ) {
-    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp))
+    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) // پیش‌فاکتور (POS-25)، پشتِ `QuotePref`
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
       /*
        *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).
