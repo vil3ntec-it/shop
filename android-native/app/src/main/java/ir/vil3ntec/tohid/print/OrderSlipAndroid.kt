@@ -94,8 +94,9 @@ object OrderSlipPrint {
 
   /** دستهٔ چاپِ همین دستگاه برای صفحهٔ بی Context ِ کارِ گروهی (`ui/screens/OrderBulkUi.kt`) */
   class Bulk(private val context: Context) {
-    suspend fun print(orders: List<OrderDto>): String = printAll(context, orders)
-    suspend fun accepted(from: String, ids: List<String>, fetch: suspend (String) -> OrderDto?): String? = afterBulk(context, from, ids, fetch)
+    suspend fun print(orders: List<OrderDto>): String = OrderSlipPrint.printAll(context, orders)
+    suspend fun accepted(from: String, ids: List<String>, fetch: suspend (String) -> OrderDto?): String? =
+      OrderSlipPrint.afterBulk(context, from, ids, fetch)
   }
 
   /** «قبولِ گروهی» (ORD-19) ⇒ همان «یک قبول، یک برگه» ِ ORD-10 برای هر سفارشِ پذیرفته‌شده؛ تنظیمِ خاموش ⇒ هیچ پرسشی */
