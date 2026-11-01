@@ -74,6 +74,11 @@ const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
  *  می‌رود (A00) — ‎lib/newer-fields.js‎. پمپ از آن هم بی هیچ کاری رد می‌شود.
  */
 const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
+/*
+ *  دکان: فاکتورِ ثبت‌شده سرِ جا ویرایش/حذف نمی‌شود (S89، SEC-03؛ پرچمِ `shop.doc_chain`) — ‎lib/finalized-sales.js‎.
+ *  داخلِ تراکنشِ push و زیرِ قفلِ ردیف سنجیده می‌شود، نه در میان‌افزار: درجِ همان دسته را هم می‌بیند.
+ */
+const finalized = require('../lib/finalized-sales');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
@@ -85,6 +90,9 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : [];
     const schemaVersion = Number(req.body?.schema_version || req.body?.schemaVersion || 0);
 
+    //  S89: فقط دکان، فقط با پرچمِ `shop.doc_chain` و دسته‌ای که فاکتور یا قلم دارد؛ وگرنه null و هیچ پرسشی
+    const guard = await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) });
+
     let out;
     try {
       out = await sync.push(req.sync, {
@@ -93,6 +101,7 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
         ops,
         appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
         queued: Number.isFinite(Number(req.body?.queued)) ? Number(req.body.queued) : null,
+        guard,
       });
     } catch (err) {
       //  نسخهٔ برنامه از سرور جلوتر است: هیچ چیزی اعمال نشد و برنامه باید

@@ -37,7 +37,7 @@
 | AI | ۱۲ | ۰ | ۱ | ۱۱ | ۰ | ۰ | ۰ |
 | LOC | ۱۰ | ۳ | ۵ | ۰ | ۰ | ۲ | ۰ |
 | OPS | ۱۴ | ۴ | ۷ | ۳ | ۰ | ۰ | ۰ |
-| S | ۱۴۶ | ۳۲ | ۲۴ | ۳۴ | ۰ | ۵۶ | ۰ |
+| S | ۱۴۶ | ۳۲ | ۲۵ | ۳۴ | ۰ | ۵۵ | ۰ |
 | E2E-MKT | ۲ | ۲ | ۰ | ۰ | ۰ | ۰ | ۰ |
 | E2E-ORD | ۲ | ۲ | ۰ | ۰ | ۰ | ۰ | ۰ |
 | E2E-STK | ۱ | ۱ | ۰ | ۰ | ۰ | ۰ | ۰ |
@@ -68,7 +68,7 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۲۴۵ | ۲۹۰ | ۱۴۸ | ۰ | ۵۹ | ۲۲ |
+| **همه** | ۷۶۴ | ۲۴۵ | ۲۹۱ | ۱۴۸ | ۰ | ۵۸ | ۲۲ |
 
 ## خلاصه به تفکیکِ فاز
 
@@ -81,7 +81,7 @@
 | ۴ | ۱۴۱ | ۲۹ | ۸۱ | ۲۳ | ۰ | ۲ | ۶ |
 | ۵ | ۸۲ | ۹ | ۲۲ | ۴۸ | ۰ | ۰ | ۳ |
 | ۶ | ۶ | ۰ | ۱ | ۵ | ۰ | ۰ | ۰ |
-| بی‌فاز در سند | ۲۷۳ | ۱۱۸ | ۶۵ | ۲۳ | ۰ | ۵۴ | ۱۳ |
+| بی‌فاز در سند | ۲۷۳ | ۱۱۸ | ۶۶ | ۲۳ | ۰ | ۵۳ | ۱۳ |
 
 ## F0
 
@@ -430,8 +430,8 @@
 | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
 |---|---|---|---|---|---|---|---|---|---|
 | SEC-01 | رمزگذاری داده محلی (SQLCipher، DPAPI یا Keystore). | §۶.۱۳ | ۱ | P1 | MISSING | دفترِ محلی رمز نمی‌شود (فقط توکن‌ها، مثلاً SecretBox در کامپیوتر) | — | — | — |
-| SEC-02 | زنجیره هش اسناد مالی و ابزار بررسی آن. | §۶.۱۳ | ۱ | P1 | PARTIAL | سرور: قالب، جدولِ فقط‌افزودنی، سنجش، CLI و پنل (hash-chain.test.js ۷/۷، hash-chain-vectors.test.js ۱۲/۱۲، admin-ops-chain). دستگاه پشتِ پرچمِ خاموشِ `shop.doc_chain`: زنجیرهٔ فاکتورهای هر سری در core ِ خالص (Sha256 با NIST، HashChain، DocChain، DocChainCycle: `gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.audit.*'` ⇐ Sha256Test ۵/۵، Sha256ParityTest ۳/۳، HashChainVectorsTest ۷/۷، DocChainTest ۱۲/۱۲، DocChainCycleTest ۷/۷، DocChainVectorsTest ۱/۱)؛ سر و حلقه‌ها در هر دورِ همگام‌سازی به `POST /api/sync/v1/chain`، سنجش و لنگر در `hash_chain` و رویدادِ امنیتی بی بستنِ فروش (`TEST_DATABASE_URL=pglite:memory node --test test/doc-chain.test.js` ⇐ ۶/۶؛ SUB-10 ۶/۶)؛ مهاجرتِ ۱۵۱. مانده: سندِ معکوس/برگشت/قرض/خرید در زنجیره، وب، دستگاهِ Sync v3، صفحهٔ بررسی روی دستگاه، اجرای اندروید/کامپیوتر فقط در CI | — | — | claude/spec-sec2-1 |
-| SEC-03 | سند ثبت‌شده ویرایش نمی‌شود. اصلاح فقط با سند معکوس. | §۶.۱۳ | ۱ | P0 | PARTIAL | جدولِ سرور فقط‌افزودنی؛ نگهبان و سندِ معکوس (PostedDocument) خالص با آزمون، به صفحه وصل نیست؛ برنامه فاکتور را لغو می‌کند نه ویرایش (SalesReturnTest) | — | — | #242 |
+| SEC-02 | زنجیره هش اسناد مالی و ابزار بررسی آن. | §۶.۱۳ | ۱ | P1 | PARTIAL | سرور: قالب، جدولِ فقط‌افزودنی، سنجش، CLI و پنل (hash-chain.test.js ۷/۷، hash-chain-vectors.test.js ۱۲/۱۲، admin-ops-chain). دستگاه پشتِ پرچمِ خاموشِ `shop.doc_chain`: زنجیرهٔ فاکتورهای هر سری در core ِ خالص (Sha256 با NIST، HashChain، DocChain، DocChainCycle: `gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.audit.*'` ⇐ Sha256Test ۵/۵، Sha256ParityTest ۳/۳، HashChainVectorsTest ۷/۷، DocChainTest ۱۲/۱۲، DocChainCycleTest ۷/۷، DocChainVectorsTest ۱/۱)؛ سر و حلقه‌ها در هر دورِ همگام‌سازی به `POST /api/sync/v1/chain`، سنجش و لنگر در `hash_chain` و رویدادِ امنیتی بی بستنِ فروش (`TEST_DATABASE_URL=pglite:memory node --test test/doc-chain.test.js` ⇐ ۷/۷؛ SUB-10 ۶/۶)؛ مهاجرتِ ۱۵۱. مانده: سندِ برگشت/قرض/خرید در زنجیره (معکوسِ لغو و اصلاح: SEC-03)، وب، دستگاهِ Sync v3، صفحهٔ بررسی روی دستگاه، اجرای اندروید/کامپیوتر فقط در CI | — | — | claude/spec-sec2-1 |
+| SEC-03 | سند ثبت‌شده ویرایش نمی‌شود. اصلاح فقط با سند معکوس. | §۶.۱۳ | ۱ | P0 | PARTIAL | جدولِ سرور فقط‌افزودنی؛ PostedDocument خالص در core (بردارهای مشترک با JS: HashChainVectorsTest ۷/۷). کنترلِ یگانهٔ لغو و «اصلاح» در core (`InvoiceVoid.check`: فاکتور هست، لغوشده و اینترنتی نیست، اجازه، دلیلِ ۱ تا ۱۲۰ نویسه) و سندِ معکوس (قرینهٔ مقدار و مبلغ، `reverses`/`reason`/`by`/زمان) پس از نشستنِ لغو در زنجیرهٔ اسنادِ دستگاه (SEC-02، پرچمِ خاموشِ `shop.doc_chain`)؛ به تاریخچهٔ فروشِ امروز وصل: `gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.audit.*'` ⇐ InvoiceVoidTest ۶/۶؛ سرور حلقهٔ معکوس را می‌پذیرد و حلقهٔ ثبت دست نمی‌خورد (doc-chain.test.js ۷/۷). سرور (S89، همان پرچم): ویرایش/حذفِ سرِ جای فاکتور و قلمِ ثبت‌شده برای دستگاهِ زنجیره‌دار و API ِ مستقیم رد، فقط سندِ معکوس (لغو، برگشت) آزاد (finalized-sales.test.js ۷/۷). مانده: برنامهٔ بی زنجیره فقط رویداد، سیم‌کشیِ `CancelSheet` ِ نسخهٔ ۳ (#391) و وب | — | — | claude/spec-s89-finalized |
 | SEC-04 | تأیید دومرحله‌ای (TOTP) برای مدیران سرور (F0-15). | §۶.۱۳ | ۰ | P0 | IMPLEMENTED-VERIFIED | همان F0-15 (#205) | — | — | #205 |
 | SEC-05 | بلیت کوتاه‌مدت برای WebSocket (F0-11). | §۶.۱۳ | ۰ | P0 | IMPLEMENTED-VERIFIED | همان F0-11: #202 (مرج)؛ sync-live-ticket ۹/۹ | — | — | #202 |
 | SEC-06 | محافظت از کد ورود و پیامک در برابر سوءاستفاده: سقف تعداد، سقف هزینه و جلوگیری از SMS pump… | §۶.۱۳ | ۴ | P0 | IMPLEMENTED-VERIFIED | سقفِ تلاش، فاصلهٔ ارسالِ دوباره، سقفِ هر نشانی: verify-limit ۳/۳، login-hardening ۳۶/۳۶، otp-desk ۱۵/۱۵؛ ضدِ pumping (IP، بلوکِ هزارتایی، خارجی) و سقفِ شمارِ روزانه از `sms_usage`: otp-cost ۷/۷ (#387)؛ سقفِ **هزینهٔ** روزانهٔ کلِ سرور و هر دکان برای هر کانال (`OTP_SMS_*_COST_MAX_MINOR`، ۰ = خاموش): otp-cost-cap ۲/۷ قرمز ⇒ ۷/۷، جهش ۴/۴ گرفته شد؛ پس‌رفتِ ۱۰ پرونده ۱۱۰/۱۱۰ (PGlite). بها و سقف را صاحب محصول می‌گذارد | — | — | پیش از v3؛ #204، #387، #453 |
@@ -765,7 +765,7 @@
 | S86 | بازسازی projection | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
 | S87 | outbox crash | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
 | S88 | محدودیت API | §۱۹.۱۲ | — | — | IMPLEMENTED-VERIFIED | سرتاسری `access.e2e.mjs` «S88»: بدنهٔ ۳ مگابایتی ۴۱۳ و JSON ِ خراب ۴۰۰ با کدِ خطا؛ برگهٔ نامعتبر، نشانگرِ صفحهٔ ساختگی و scope ِ ناشناخته ۴۰۰؛ limit=1000000 به سقف بریده و limit منفی و پارامترِ ناشناخته (sort با SQL) بی اثر؛ عکسِ ۷۰۰ کیلوبایتی TOO_LARGE؛ سقفِ درخواستِ کدِ ویترین ۴۲۹ با زمانِ تلاشِ دوباره؛ در هیچ پاسخی stack، مسیرِ کد یا SQL نیست (`cd server && node test/e2e/run.mjs access` ۹/۹ گام سبز روی 98f9ef8)؛ API هیچ پارامترِ sort ندارد (ترتیب ثابت است) | — | — | شاخهٔ claude/spec-s-wave2-3 (98f9ef8) |
-| S89 | دفتر مالی append-only | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
+| S89 | دفتر مالی append-only | §۱۹.۱۲ | — | — | PARTIAL | سرور پشتِ پرچمِ خاموشِ `shop.doc_chain` (`lib/finalized-sales.js`): ویرایشِ مبلغ/قلم/مقدار/قیمت/پرداخت/تاریخ/شماره/مشتریِ نسیه، حذفِ فاکتور یا قلم، قلمِ تازه از ثبتِ دیگر و برگشت از لغو برای دستگاهِ زنجیره‌دار `rejected` (`sale_finalized_edit_forbidden`) و در API ِ مستقیم (`/api/sales`، `/api/sale-items`) ۴۰۹ بی هیچ نوشتن؛ لغو و برگشت (سندِ معکوس) آزاد؛ درجِ دوبارهٔ همان سند (بازپخش پس از بازیابی) پذیرفته و بی بازنویسی؛ هر تلاش یک رویدادِ `security.doc_chain` (`finalized_edit`) در سابقه: `TEST_DATABASE_URL=pglite:memory node --test test/finalized-sales.test.js` ⇐ ۷/۷ (روی PostgreSQL ۱۶ هم ۷/۷؛ پیش از پیاده‌سازی ۶ قرمز؛ ۶ جهش همه گرفته شد). مانده: برنامهٔ بی زنجیره و راهِ قدیمِ `/api/sync` فقط رویداد می‌سازند (سازگاری، F0-02)؛ سندهای برگشت/قرض/خرید؛ نمایشِ رویداد در پنل | — | — | claude/spec-s89-finalized |
 | S90 | پنل نقش‌ها | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
 | S91 | تجربهٔ خرید کاربر جدید | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
 | S92 | گوشی ضعیف/اینترنت ضعیف | §۱۹.۱۲ | — | — | NOT-VERIFIED | — | — | — | — |
