@@ -1,0 +1,186 @@
+package ir.vil3ntec.tohid.data
+
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
+
+/**
+ *  دفترِ حافظهٔ یک نمونهٔ `ShopStore` در برابرِ دیسک و همتاها — ذخیرهٔ کهنه.
+ *
+ *  ⛔ صفحه (`MainActivity`، `desktop/Main.kt`) و کارگرِ همگام‌سازی (`SyncV1Worker`، هر بار نمونهٔ
+ *  تازه) هر کدام `ShopStore` ِ خودشان را دارند. پیش‌تر دفترِ صفحه پس از Pull ِ کارگر تازه نمی‌شد و
+ *  ذخیرهٔ بعدیِ صفحه دفترِ کهنه را کامل می‌نوشت: `record` برای هر ردیفی که کارگر آورده بود DELETE و
+ *  برای هر ویرایشِ دستگاهِ دیگر برگرداندن به سرور می‌فرستاد. و برعکس: Pull ِ کارگر روی دفترِ کهنهٔ
+ *  خودش فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد.
+ *
+ *  این‌جا: (۱) هر نوشتن به همتاها می‌رسد ([published] ⇐ `LedgerPeers`) و همان دفتر را می‌گیرند؛
+ *  (۲) پیش از هر نوشتن، زیرِ قفلِ نوشتن، نسخه و مُهرِ دیسک سنجیده می‌شود و فقط اگر دیسک جلوتر است
+ *  دفتر از نو خوانده می‌شود ([freshLocked])؛ (۳) دفترهایی که پیش از جایگزینی از بیرون روی صفحه بودند
+ *  پایهٔ ادغامِ سه‌طرفهٔ `ShopStore.save` می‌مانند ([baseOf] ⇐ `LedgerMerge`).
+ *
+ *  ⛔ [enabled] پرچمِ `shop.ledger_merge` است (`LedgerMergeFlag`، پیش‌فرض خاموش). خاموش ⇒ همان رفتارِ `main`:
+ *  نوشتنِ همتا گرفته نمی‌شود، دیسک پیش از نوشتن سنجیده نمی‌شود ([freshLocked] همان دفترِ حافظه است)، دفترِ
+ *  پیشینی نگه داشته نمی‌شود و [sameAccount] همیشه آری است. فقط نسخه و مُهر نگه داشته می‌شوند تا روشن شدنِ
+ *  پرچم از همان لحظه درست کار کند (دیسکِ جلوتر از نو خوانده شود).
+ *
+ *  بی `Context` تا آزمون‌پذیر باشد. «Locked» یعنی فراخوان قفلِ نوشتنِ دفتر (`SyncV1Engine`) را دارد.
+ */
+internal class LedgerFollow(
+  private val file: File,
+  private val data: MutableStateFlow<ShopData>,
+  /** دفترِ رمزدارِ خوانده‌نشده (SEC-01): نه همتا می‌گیرد، نه از نو خوانده می‌شود — راهش بازسازی است */
+  private val unreadable: () -> Boolean,
+  /** دفترِ دیسک؛ `null` اگر خوانده نشد (رمز، دیسک، JSON) */
+  private val readDisk: () -> ShopData?,
+  /** پرچمِ `shop.ledger_merge` — شرح بالا */
+  private val enabled: () -> Boolean,
+) {
+  /** پرچمِ همین لحظه */
+  val on: Boolean get() = enabled()
+
+  private val peers = LedgerPeers.of(file)
+
+  /** نسخه، مُهر و دورهٔ دیسک که دفترِ حافظه با آن خوانده یا نوشته شد */
+  @Volatile private var seenGen = -1L
+  @Volatile private var seenStamp = LedgerPeers.Stamp.MISSING
+  @Volatile private var seenEpoch = -1L
+
+  /** تا `load` تمام نشده نوشتنِ همتا گرفته نمی‌شود — خودِ `load` تازه‌ترین را می‌خواند */
+  @Volatile private var following = false
+
+  /** حداکثر [EARLIER] دفترِ پیش از جایگزینی از بیرون (همتا، دیسک، دفترِ ادغام‌شده، بازیابی) */
+  private val earlier = ArrayDeque<ShopData>()
+
+  /** دست‌کم یک دفترِ پیشین از [earlier] بیرون رفت — پایهٔ صفحه‌ای کهنه‌تر دیگر پیدا نمی‌شود ([baseOf]) */
+  private var evicted = false
+
+  private val member = LedgerPeers.Member { next, gen, stamp -> adopt(next, gen, stamp) }
+
+  init {
+    peers.join(member)
+  }
+
+  /** نشانِ دیسک **پیش از** خواندنِ `load` — نوشتنی که میانِ خواندن برسد در [loadedLocked] دیده می‌شود */
+  class Mark internal constructor(internal val gen: Long, internal val epoch: Long, internal val stamp: LedgerPeers.Stamp)
+
+  fun mark(): Mark = Mark(peers.gen, peers.epoch, LedgerPeers.Stamp.of(file))
+
+  /** پایانِ `load`: از این‌جا همتاها دنبال می‌شوند؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو */
+  fun loadedLocked(m: Mark) {
+    seenEpoch = m.epoch
+    if (enabled() && !unreadable() && peers.gen != m.gen && peers.epoch == m.epoch) {
+      reloadLocked()
+    } else {
+      seenGen = m.gen
+      seenStamp = m.stamp
+    }
+    following = true
+  }
+
+  /** دفترِ حافظه از بیرون عوض شد؛ دفترِ پیشین پایهٔ ممکنِ صفحه می‌ماند */
+  fun replace(next: ShopData) {
+    remember(data.value)
+    data.value = next
+  }
+
+  fun remember(d: ShopData) {
+    if (!enabled()) return
+    synchronized(earlier) {
+      if (earlier.lastOrNull() === d) return
+      earlier.removeAll { it === d }           //  همان شیء، نه برابری (مقایسهٔ کلِ دفتر)
+      earlier.addLast(d)
+      while (earlier.size > EARLIER) { earlier.removeFirst(); evicted = true }
+    }
+  }
+
+  /** دفترِ حسابِ دیگر، یا خالی: هیچ پایهٔ کهنه‌ای نمی‌ماند */
+  fun reset(d: ShopData) {
+    synchronized(earlier) { earlier.clear(); evicted = false }
+    data.value = d
+  }
+
+  /**
+   *  دفتری که صفحه [next] را با آن ساخت (شرح سرِ `LedgerMerge.baseOf`).
+   *
+   *  @return `null` ⇒ پایه دیگر نگه داشته نشده: [next] با هیچ دفترِ مانده شیئی ندارد و دست‌کم یک دفترِ
+   *  پیشین بیرون رفته. ⛔ ادغام با دفترِ همین حالا به‌جای پایه همان باگِ ذخیرهٔ کهنه است (ردیف‌های تازه
+   *  DELETE)، پس فراخوان نمی‌نویسد و پیام می‌دهد.
+   */
+  fun baseOf(next: ShopData): ShopData? {
+    val (list, lost) = synchronized(earlier) { earlier.toList() to evicted }
+    return LedgerMerge.retainedBaseOf(next, data.value, list, lost)
+  }
+
+  /** همتا همین حالا نوشت — زیرِ قفلِ نوشتنِ همان همتا */
+  private fun adopt(next: ShopData, gen: Long, stamp: LedgerPeers.Stamp) {
+    if (!enabled() || !following || unreadable() || seenEpoch != peers.epoch) return
+    replace(next)
+    seenGen = gen
+    seenStamp = stamp
+  }
+
+  /** همین نمونه [next] را روی دیسک نشاند: همتاها همان را می‌گیرند */
+  fun publishedLocked(next: ShopData) {
+    val stamp = LedgerPeers.Stamp.of(file)
+    seenGen = peers.wrote(member, next, stamp)
+    seenStamp = stamp
+  }
+
+  /** دفترِ حافظه همان دیسکِ همین لحظه است (خوانده شد بی آن‌که همتاها خبر شوند) */
+  fun syncedLocked() {
+    seenGen = peers.gen
+    seenStamp = LedgerPeers.Stamp.of(file)
+  }
+
+  /** دفترِ حسابِ دیگری جای این فایل ننشسته (پرچمِ خاموش ⇒ همیشه آری، همان `main`) */
+  fun sameAccount(): Boolean = !enabled() || seenEpoch == peers.epoch
+
+  /**
+   *  دفترِ همین لحظهٔ دیسک. فقط وقتی دیسک جلوتر است (نسخهٔ این فرایند یا مُهرِ فایل عوض شده) از نو
+   *  خوانده می‌شود.
+   *
+   *  @return `null` ⇒ نباید نوشت: دیسک جلوتر است و خوانده نشد، یا دفترِ حسابِ دیگری جای این نشسته
+   */
+  fun freshLocked(): ShopData? {
+    //  پرچمِ خاموش ⇒ همان دفترِ حافظه، بی سنجشِ دیسک (همان `main`)
+    if (!enabled()) return data.value
+    //  دفترِ خوانده‌نشده هیچ نوشتنی نمی‌گیرد؛ پیامش را `ShopStore.writeToDisk` می‌دهد
+    if (unreadable()) return data.value
+    if (!sameAccount()) return null
+    if (seenGen == peers.gen && LedgerPeers.Stamp.of(file) == seenStamp) return data.value
+    return reloadLocked()
+  }
+
+  private fun reloadLocked(): ShopData? {
+    val gen = peers.gen
+    val stamp = LedgerPeers.Stamp.of(file)
+    //  فایل نیست: چیزی جلوتر از دفترِ حافظه نیست (همان رفتارِ همیشه)
+    if (stamp == LedgerPeers.Stamp.MISSING) {
+      seenGen = gen
+      seenStamp = stamp
+      return data.value
+    }
+    val next = readDisk() ?: return null
+    replace(next)
+    seenGen = gen
+    seenStamp = stamp
+    return next
+  }
+
+  /**
+   *  دفتر به حسابِ دیگری رفت یا از آن آمد (`stashTo`، `openFrom`): همتاهای پیشین — کارگرِ نیمه‌راه —
+   *  دیگر روی این فایل نمی‌نویسند. [stop] ⇒ تا `load` ِ بعدی همتا گرفته نمی‌شود.
+   */
+  fun movedLocked(stop: Boolean, next: ShopData) {
+    val (gen, epoch) = peers.moved()
+    seenGen = gen
+    seenEpoch = epoch
+    seenStamp = LedgerPeers.Stamp.of(file)
+    if (stop) following = false
+    reset(next)
+  }
+
+  private companion object {
+    /** چند دفترِ پیشین پایهٔ ممکنِ صفحه می‌مانند — هر کدام شاید یک دفترِ کامل در حافظه */
+    const val EARLIER = 2
+  }
+}

@@ -26,6 +26,8 @@ object LocaleChoice {
   private const val SYMBOL = "symbol"
   private const val LANG = "lang"
   private const val CALENDAR = "calendar"
+  private const val LUNAR = "lunar"
+  private const val LUNAR_ADJUST = "lunar_adjust"
 
   /**
    *  زبانِ صفحه: فارسی (پیش‌فرض)، انگلیسی یا پشتو — نمایشی و فقط روی همین
@@ -60,6 +62,17 @@ object LocaleChoice {
   var symbol by mutableStateOf(LocaleFormat.SYMBOL_WORD)
     private set
 
+  /** LOC-01: تاریخِ قمری روی فاکتور و رسیدِ برگشت — **پیش‌فرض خاموش** (رفتارِ امروز) */
+  var lunar by mutableStateOf(false)
+    private set
+
+  /** جابه‌جاییِ قمری به روز (−۲ تا +۲) برای همخوانی با دیدنِ هلال */
+  var lunarAdjust by mutableStateOf(0)
+    private set
+
+  /** متنِ قمریِ یک تاریخ برای سند، یا null وقتی خاموش است یا تاریخ نادرست */
+  fun lunarOn(iso: String): String? = if (lunar) LocaleText.lunar(iso, digits, lunarAdjust) else null
+
   private fun prefs(context: Context) =
     context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -70,6 +83,18 @@ object LocaleChoice {
     symbol = LocaleText.symbolOf(p.getString(SYMBOL, null))
     lang = Lang.of(p.getString(LANG, null))
     calendar = I18n.calendarOf(p.getString(CALENDAR, null))
+    lunar = p.getBoolean(LUNAR, false)
+    lunarAdjust = LocaleText.lunarAdjustOf(p.getInt(LUNAR_ADJUST, 0))
+  }
+
+  fun setLunar(context: Context, value: Boolean) {
+    lunar = value
+    prefs(context).edit().putBoolean(LUNAR, value).apply()
+  }
+
+  fun setLunarAdjust(context: Context, value: Int) {
+    lunarAdjust = LocaleText.lunarAdjustOf(value)
+    prefs(context).edit().putInt(LUNAR_ADJUST, lunarAdjust).apply()
   }
 
   fun setLang(context: Context, value: Lang) {
