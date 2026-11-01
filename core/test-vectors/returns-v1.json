@@ -188,7 +188,7 @@
         "total": 300, "split": { "account": 0, "credit": 0, "cash": 300 }, "audit": "return_no_receipt", "approvedBy": "مدیر",
         "rows": [{ "saleItemId": "", "productId": "pA", "quantity": 2, "amount": 300, "disposition": "restock", "toAccount": 0, "toCredit": 0 }],
         "movements": [{ "productId": "pA", "type": "customer_return", "qty": 2 }],
-        "entries": [{ "productId": "pA", "units": 2, "refId": "d5" }], "transactions": [], "returnedQty": {}, "debtSettled": 0,
+        "entries": [{ "productId": "pA", "units": 2, "adjKind": "customer_return", "refId": "d5" }], "transactions": [], "returnedQty": {}, "debtSettled": 0,
         "stock": { "pA": 101 }
       } },
     { "id": "nr-damaged-sc", "name": "بی رسید، ضایعات، اعتبار به مشتری", "req": { "docId": "d6", "free": [{ "productId": "pR", "qty": 1.5, "unitPrice": 300, "disposition": "damaged" }], "reason": "خراب یا معیوب", "mode": "store_credit", "customerId": "c2", "role": "owner" },

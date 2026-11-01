@@ -119,6 +119,8 @@
         lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }),
         note: $('c-note').value.trim(),
         expectedTotalMinor: subtotal() + feeFor(f),
+        //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
+        lang: K.lang,
       };
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };

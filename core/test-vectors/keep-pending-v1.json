@@ -1,0 +1,22 @@
+{
+  "about": "KeepPending (core/…/core/sync/KeepPending.kt) و keepPendingVerdicts (license/sync-core.js) — یک رفتار. op: «<جدول> <ردیف> <i|u|d> [فیلد:= | فیلد:+<دلتا>]…»؛ حکم: keep | drop | trim -<فیلدِ برداشته>… +<فیلد>=<دلتا>…",
+  "cases": [
+    {"name": "صفِ خالی ⇒ همه همان", "pending": [], "incoming": ["products p1 u price:=", "products p2 d"], "want": ["keep", "keep"]},
+    {"name": "یک فیلد در صف و همان فیلد رسید ⇒ برداشته", "pending": ["products p1 u price:="], "incoming": ["products p1 u price:="], "want": ["trim -price"]},
+    {"name": "فیلدِ دیگرِ همان ردیف ⇒ همان", "pending": ["products p1 u price:="], "incoming": ["products p1 u name:="], "want": ["keep"]},
+    {"name": "چندفیلدی ⇒ فقط فیلدِ صف برداشته", "pending": ["products p1 u price:="], "incoming": ["products p1 u name:= price:= unit:="], "want": ["trim -price"]},
+    {"name": "ردیف یا جدولِ دیگر ⇒ همان", "pending": ["products p1 u price:="], "incoming": ["products p2 u price:=", "sales p1 u price:="], "want": ["keep", "keep"]},
+    {"name": "$inc ِ رسیده روی $inc ِ صف ⇒ همان", "pending": ["sales s1 u paidAmount:+50"], "incoming": ["sales s1 u paidAmount:+30"], "want": ["keep"]},
+    {"name": "مقدارِ سادهٔ رسیده روی $inc ِ صف ⇒ مقدار + دلتا", "pending": ["sales s1 u paidAmount:+50"], "incoming": ["sales s1 u paidAmount:="], "want": ["trim +paidAmount=50"]},
+    {"name": "چند $inc ِ صف جمع می‌شوند، با اعشار و منفی", "pending": ["sales s1 u paidAmount:+2.5", "sales s1 u paidAmount:+-1"], "incoming": ["sales s1 u paidAmount:= note:="], "want": ["trim +paidAmount=1.5"]},
+    {"name": "مقدارِ سادهٔ صف و پس از آن $inc ⇒ رسیده (ساده یا $inc) برداشته", "pending": ["sales s1 u paidAmount:=", "sales s1 u paidAmount:+20"], "incoming": ["sales s1 u paidAmount:+30", "sales s1 u paidAmount:="], "want": ["trim -paidAmount", "trim -paidAmount"]},
+    {"name": "$inc ِ صف و پس از آن مقدارِ ساده ⇒ برداشته، بی دلتا", "pending": ["sales s1 u paidAmount:+20", "sales s1 u paidAmount:="], "incoming": ["sales s1 u paidAmount:="], "want": ["trim -paidAmount"]},
+    {"name": "حذفِ در صف ⇒ ویرایش و درجِ رسیده نشانده نمی‌شود؛ حذفِ رسیده همان", "pending": ["products p1 d"], "incoming": ["products p1 u price:=", "products p1 i name:= price:=", "products p1 d"], "want": ["drop", "drop", "keep"]},
+    {"name": "ویرایشِ در صف ⇒ حذفِ رسیده نشانده نمی‌شود", "pending": ["products p1 u price:="], "incoming": ["products p1 d"], "want": ["drop"]},
+    {"name": "حذف و درجِ دوبارهٔ در صف ⇒ ردیف زنده: حذفِ رسیده نه، فیلدِ درج برداشته", "pending": ["products p1 u stock:=", "products p1 d", "products p1 i name:= price:="], "incoming": ["products p1 u price:= stock:=", "products p1 d"], "want": ["trim -price", "drop"]},
+    {"name": "ویرایش و سپس حذفِ در صف ⇒ ویرایشِ رسیده نه", "pending": ["products p1 u price:=", "products p1 d"], "incoming": ["products p1 u name:="], "want": ["drop"]},
+    {"name": "$inc ِ پیش از حذفِ صف حساب نمی‌شود", "pending": ["sales s1 u paidAmount:+50", "sales s1 d", "sales s1 i total:="], "incoming": ["sales s1 u paidAmount:="], "want": ["keep"]},
+    {"name": "فهرستِ تنظیماتی: درجِ در صف ⇒ درجِ همان نام برداشته؛ حذفِ رسیده نه", "pending": ["productCategories h1 i name:="], "incoming": ["productCategories h1 i name:=", "productCategories h1 d"], "want": ["trim -name", "drop"]},
+    {"name": "یک صفحهٔ قاطی به همان ترتیب", "pending": ["products p1 u price:=", "products p2 d"], "incoming": ["products p1 u price:= name:=", "products p2 u name:=", "products p3 u name:=", "products p1 d"], "want": ["trim -price", "drop", "keep", "drop"]}
+  ]
+}

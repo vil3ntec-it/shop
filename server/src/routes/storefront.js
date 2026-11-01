@@ -138,6 +138,7 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
+      contactPhone: req.store.contact_phone,
     });
   //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
   if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {

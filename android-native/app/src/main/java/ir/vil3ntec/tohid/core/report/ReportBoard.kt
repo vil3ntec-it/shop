@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.report
 
 import ir.vil3ntec.tohid.core.risk.CashierAlerts
+import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
@@ -22,8 +23,11 @@ object ReportBoard {
   const val VERSION = 1
 
   /** بازه‌های صفحهٔ گزارشِ تازه — همان معنای `ReportEngine.rangeOf` */
-  val SPANS = listOf("today", "week", "month", "all")
-  val SPAN_LABELS = mapOf("today" to "امروز", "week" to "۷ روز", "month" to "این ماه", "all" to "همه")
+  val SPANS = listOf("today", "week", "month", "quarter", "lastQuarter", "all")
+  val SPAN_LABELS = mapOf(
+    "today" to "امروز", "week" to "۷ روز", "month" to "این ماه",
+    "quarter" to "این سه‌ماهه", "lastQuarter" to "سه‌ماههٔ پیش", "all" to "همه",
+  )
 
   data class TabDef(val id: String, val label: String, val ranged: Boolean)
 
@@ -67,6 +71,13 @@ object ReportBoard {
     "all" -> Range("0000-01-01", "9999-12-31")
     "week" -> Range(ReportDates.addDays(today, -6).ifEmpty { today }, today)
     "month" -> Range(today.take(7) + "-01", today)
+    //  LOC-02: سه‌ماههٔ مالی (حمل–جوزا … جدی–حوت) — «این» تا امروز، «پیش» کامل
+    "quarter" -> SolarHijri.fiscalQuarterOf(today)
+      ?.let { (y, q) -> SolarHijri.fiscalQuarterRange(y, q) }
+      ?.let { Range(it.first, today) } ?: Range(today, today)
+    "lastQuarter" -> SolarHijri.fiscalQuarterOf(today)
+      ?.let { (y, q) -> if (q == 1) SolarHijri.fiscalQuarterRange(y - 1, 4) else SolarHijri.fiscalQuarterRange(y, q - 1) }
+      ?.let { Range(it.first, it.second) } ?: Range(today, today)
     else -> Range(today, today)
   }
 

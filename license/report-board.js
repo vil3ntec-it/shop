@@ -28,6 +28,8 @@
 
   var VERSION = 1;
   /** بازه‌های صفحهٔ گزارشِ تازه — همان معنای `ReportEngine.rangeOf` */
+  //  ⛔ وبِ مدیریت منجمد است (۱۴۰۵/۰۷/۲۷): «quarter»/«lastQuarter» این‌جا نیستند و دکمه نمی‌گیرند؛ فقط `range`
+  //  آن‌ها را برای بردارِ مشترکِ report-board-v1.json (همتای ReportBoard.kt) می‌شناسد
   var SPANS = ['today', 'week', 'month', 'all'];
   var SPAN_LABELS = { today: 'امروز', week: '۷ روز', month: 'این ماه', all: 'همه' };
   /** زبانه‌ها؛ `ranged` یعنی بازه دارد */
@@ -49,6 +51,20 @@
     if (span === 'all') return { from: '0000-01-01', to: '9999-12-31' };
     if (span === 'week') return { from: cal.addDays(today, -6) || today, to: today };
     if (span === 'month') return { from: String(today).slice(0, 7) + '-01', to: today };
+    //  LOC-02: سه‌ماههٔ مالی (حمل–جوزا … جدی–حوت) — «این» تا امروز، «پیش» کامل. تابعِ خالص، فقط برای بردارِ مشترک؛ به صفحه وصل نیست
+    if (span === 'quarter' || span === 'lastQuarter') {
+      //  کشِ کهنهٔ calendar-core.js (سرویس‌ورکر یک بار دیرتر تازه می‌کند) ⇒ همان «امروز»، نه خطا
+      var at = typeof cal.fiscalQuarterOf === 'function' ? cal.fiscalQuarterOf(today) : null;
+      if (at) {
+        if (span === 'quarter') {
+          var cur = cal.fiscalQuarterRange(at.y, at.q);
+          if (cur) return { from: cur.from, to: today };
+        } else {
+          var prev = at.q === 1 ? cal.fiscalQuarterRange(at.y - 1, 4) : cal.fiscalQuarterRange(at.y, at.q - 1);
+          if (prev) return prev;
+        }
+      }
+    }
     return { from: today, to: today };
   }
 

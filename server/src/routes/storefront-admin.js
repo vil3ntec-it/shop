@@ -20,10 +20,11 @@ const config = require('../config');
 const areas = require('../lib/storefront-area-requests');
 const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
+const idempotency = require('../lib/idempotency');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { ApiError, forbidden, notFound } = require('../middleware/errors');
+const { ApiError, forbidden, notFound, badRequest } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -51,6 +52,8 @@ router.get('/config', async (req, res) => {
     permissions: { manage: can(req.role, 'settings.write') },
     //  برگهٔ «ارسال و زمان» فقط با پرچمِ جدای `shop.storefront.zones`
     zones: st.flag ? await sfd.flagOn(req.shopId) : false,
+    //  انتشارِ گروهی در یک درخواست (M2) فقط با پرچمِ جدای `shop.storefront.bulk`
+    bulk: st.flag ? await sf.bulkFlagOn(req.shopId) : false,
     //  M3: لوگو و تصویرِ سر فقط با پرچمِ جدای `shop.storefront.media`
     media: st.flag ? await sfm.flagOn(req.shopId) : false,
   });
@@ -180,7 +183,30 @@ router.post('/area-requests/:id/notified', requirePermission('settings.write'), 
 });
 
 router.get('/products', requirePermission('data.read'), needFlag, async (req, res) => {
-  res.json(await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit }));
+  const page = await sf.staffProducts(req.shopId, { cursor: req.query.cursor, limit: req.query.limit });
+  //  M2: دلیلِ «در بازار نمی‌آید» فقط با پرچمِ گروهی؛ بی آن پاسخ همان قبلی است
+  res.json(await sf.bulkFlagOn(req.shopId) ? await sf.withReasons(req.shopId, page) : page);
+});
+
+//  ── انتشارِ گروهی (M2): تا ۵۰۰ کالا در یک درخواست، کلیدِ یکتایی اجباری ──
+const needBulk = async (req, res, next) => {
+  if (!(await sf.bulkFlagOn(req.shopId))) return next(forbidden('انتشارِ گروهی برای این دکان روشن نیست', 'bulk_disabled'));
+  next();
+};
+
+router.put('/products', requirePermission('settings.write'), needFlag, needBulk, needWrite, async (req, res) => {
+  const idem = idempotency.fromRequest(req, `storefront-bulk:${req.shopId}`);
+  if (!idem) throw badRequest('کلیدِ یکتایی (Idempotency-Key) لازم است', 'idempotency_key_required');
+  const out = await sf.setProducts(req.shopId, req.body, req.user.id, idem);
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'storefront.products_bulk',
+      targetType: 'storefront', targetId: req.shopId,
+      detail: { applied: out.applied, notFound: out.notFound, published: out.published }, ip: clientIp(req),
+    });
+  }
+  res.json(out);
 });
 
 router.put('/products/:productId', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
