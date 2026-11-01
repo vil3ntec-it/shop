@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.HandoverPageDto
+import ir.vil3ntec.tohid.core.model.OrderBulkOutDto
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderNoticeDto
+import ir.vil3ntec.tohid.core.model.OrderNoticesDto
 import ir.vil3ntec.tohid.core.model.OrderPageDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.OrdersSummaryDto
@@ -10,6 +13,7 @@ import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderDraft
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -97,6 +101,51 @@ class OrdersRepository(private val api: ApiClient) {
       if (readyInMinutes != null) put("readyInMinutes", readyInMinutes)
     }
     order(api.post("$ROOT/${enc(id)}/transition", body))
+  }
+
+  /**
+   *  ORD-07 «عقب انداختن» (`POST /:id/delay`، پرچمِ `shop.orders.delay`): [key] یک بار برای هر پنجره ⇒
+   *  «تأیید» ِ دوباره پس از قطعِ نت دو بار عقب نمی‌برد. [expectedReadyAt] همان زمانی است که کاربر دید
+   *  (`null` = «بی زمان»)؛ کسِ دیگری زودتر عوضش کرده ⇒ ۴۰۹ `ready_changed` و هیچ تغییری.
+   */
+  suspend fun delay(id: String, key: String, minutes: Int, reason: String, note: String, expectedReadyAt: Long?): ApiResult<OrderDto> = result {
+    val body = buildJsonObject {
+      put("clientKey", key)
+      put("minutes", minutes)
+      put("expectedReadyAt", expectedReadyAt?.let { JsonPrimitive(it) } ?: JsonNull)
+      if (reason.isNotEmpty()) put("reason", reason)
+      if (note.isNotBlank()) put("note", note.trim().take(300))
+    }
+    order(api.post("$ROOT/${enc(id)}/delay", body))
+  }
+
+  /**
+   *  ORD-19 گذارِ گروهی (`POST /shop/orders/bulk/transition`، پرچمِ `shop.orders.bulk`): یک `from` برای همه؛ سرور
+   *  هر سفارش را جدا از همان درِ گذارِ تکی می‌گذراند و نتیجهٔ هر کدام جداست. تکرار ⇒ `unchanged`.
+   */
+  suspend fun bulkTransition(ids: List<String>, to: String, from: String, reason: String = "", note: String = "", readyInMinutes: Int? = null): ApiResult<OrderBulkOutDto> = result {
+    val body = buildJsonObject {
+      put("ids", buildJsonArray { ids.forEach { add(JsonPrimitive(it)) } })
+      put("to", to)
+      put("from", from)
+      if (reason.isNotEmpty()) put("reason", reason)
+      if (note.isNotBlank()) put("note", note.trim())
+      if (readyInMinutes != null) put("readyInMinutes", readyInMinutes)
+    }
+    ApiJson.decode<OrderBulkOutDto>(api.post("$ROOT/bulk/transition", body))
+  }
+
+  /** ORD-16 پیام‌های وضعیت به مشتریِ همین سفارش (`GET /:id/notices`) */
+  suspend fun notices(id: String): ApiResult<OrderNoticesDto> =
+    result { ApiJson.decode<OrderNoticesDto>(api.get("$ROOT/${enc(id)}/notices")) }
+
+  /**
+   *  ORD-16 «فرستادنِ دوباره» (`POST /:id/notices/:noticeId/resend`، پرچمِ `shop.orders.notice_resend`): همان ردیف
+   *  دوباره در صف؛ [key] یک بار برای هر دکمه ⇒ دو کلیک یا قطعِ نت پس از ثبت دو بار نمی‌فرستد.
+   */
+  suspend fun resendNotice(id: String, noticeId: String, key: String): ApiResult<OrderNoticeDto> = result {
+    val out = api.post("$ROOT/${enc(id)}/notices/${enc(noticeId)}/resend", buildJsonObject { put("clientKey", key) })
+    ApiJson.decodeAt<OrderNoticeDto>(out, "notice") ?: throw ApiFailure.InvalidResponse()
   }
 
   private fun order(body: JsonObject): OrderDto =

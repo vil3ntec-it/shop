@@ -199,6 +199,10 @@ FLAGS.push('shop.orders.picking');
 FLAGS.push('shop.storefront.media');
 //  MKT-10/11: پیوندِ کمپین و QR ِ دکان
 FLAGS.push('shop.storefront.campaigns');
+//  ORD-16: «فرستادنِ دوبارهٔ» پیامِ مشتری
+FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
+//  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
+FLAGS.push('shop.orders.amend_paid');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -353,6 +357,12 @@ async function seedShop(a) {
     const t = await h.post(`/api/shop/orders/${ids.order}/transition`, { to }, { token: a.accessToken });
     assert.equal(t.status, 200, `${to}: ${JSON.stringify(t.body)}`);
   }
+  //  ORD-16: پیامِ نرفتهٔ مشتریِ همین سفارش (صندوقِ `customer_notify_outbox`) برای «فرستادنِ دوباره»
+  ids.notice = (await one(
+    `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status, next_attempt_at, created_at, updated_at)
+     VALUES ($1,$2,$3,'order_accepted','fa','inventory','no_channel',$4,$4,$4) RETURNING id`,
+    [require('../src/lib/ulid').ulid(now()), a.shopId, ids.order, now()]
+  )).id;
   //  جمع‌آوری (PCK): سفارشِ دیگرِ «الف» ⇒ برگه ⇒ «پیدا نکردم» ⇒ وظیفهٔ بررسی
   const po = await h.post('/api/shop/orders', {
     source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'رحیم' },
@@ -510,6 +520,7 @@ function concreteFor(ids) {
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
     [/(\/amendments\/):amendId/, ids.amend],
+    [/(\/notices\/):noticeId/, ids.notice],
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
@@ -568,6 +579,7 @@ function bodyFor(r, ids) {
     //  عکسِ مدرکِ بسته (PCK-08)
     'POST /shop/orders/:id/pick/photos': { eventId: fresh('pphoto'), parcelOnly: true, imageBase64: F.jpeg(200, 150, { seed: 6 }).toString('base64') },
     'POST /shop/orders/:id/amendments': { changes: [{ lineNo: 1, qtyMilli: 500 }], consent: { via: 'phone' } },
+    'POST /shop/orders/:id/amendments/:amendId/settlement': { method: 'cash' },
     'PATCH /shop/delivery/couriers/:id': { active: false },
     'POST /shop/delivery/orders/:orderId/assign': { mode: 'shop_courier', courierId: ids.courier, overrideCashCap: true },
     'POST /shop/delivery/assignments/:id/status': { to: 'returned', note: 'آزمون' },

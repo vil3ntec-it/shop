@@ -68,6 +68,12 @@ test('پرچم خاموش ⇒ ۴۰۳ order_bulk_disabled و هیچ تغییر', 
   assert.equal(r.status, 403, JSON.stringify(r.body));
   assert.equal(r.body.error.code, 'order_bulk_disabled');
   assert.equal((await statusOf(id)).status, 'new');
+  //  `/config` بی کلیدِ `bulk` (همان پاسخِ پیشین) ⇒ برنامه انتخابِ چندتایی نمی‌سازد؛ روشن ⇒ `bulk: true`
+  const cOff = await h.get('/api/shop/orders/config', { token: s.token });
+  assert.equal(cOff.status, 200);
+  assert.ok(!('bulk' in cOff.body), JSON.stringify(Object.keys(cOff.body)));
+  await setFlag(s.shopId, 'shop.orders.bulk', true);
+  assert.equal((await h.get('/api/shop/orders/config', { token: s.token })).body.bulk, true);
 });
 
 test('قبولِ گروهی: هر سفارش جدا، به همان ترتیب؛ نامجاز بقیه را نگه نمی‌دارد؛ تکرار بی اثرِ دوم', async () => {

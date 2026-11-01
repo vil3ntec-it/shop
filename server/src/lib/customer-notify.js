@@ -470,5 +470,5 @@ async function forOrder(shopId, orderId) {
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
   flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
-  tick, start, stop, forOrder, shape,
+  tick, start, stop, soon, forOrder, shape,
 };
