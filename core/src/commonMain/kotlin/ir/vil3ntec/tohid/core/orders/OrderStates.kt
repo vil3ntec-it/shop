@@ -225,6 +225,8 @@ object OrderDraft {
     val note: String = "",
     val test: Boolean = false,
     val lines: List<LineInput> = listOf(LineInput(qty = "1")),
+    /** ترجیحِ کلیِ جایگزینی (CHK-15) — فقط وقتی `/config` ِ سرور `substitution` دارد نشان داده می‌شود */
+    val substitution: String = "",
   )
   /**
    *  [productId]/[unit] (POS-38، `core/pos/DeliverLater`): قلمِ سبدِ صندوق با شناسهٔ کالا و واحد، تا فروشِ
@@ -244,6 +246,8 @@ object OrderDraft {
     val lines: List<Line>,
     val note: String,
     val test: Boolean,
+    /** '' ⇒ کلید فرستاده نمی‌شود (سرورِ کهنه و پرچمِ خاموش همان بدنهٔ پیشین را می‌بینند) */
+    val substitution: String = "",
   )
 
   sealed class Result {
@@ -322,6 +326,7 @@ object OrderDraft {
         lines = lines,
         note = form.note.trim(),
         test = form.test,
+        substitution = OrderSubstitution.orderCodeOrEmpty(form.substitution),
       ),
     )
   }

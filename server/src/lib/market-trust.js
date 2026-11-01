@@ -134,6 +134,11 @@ async function flagOf(shopId) {
  * ردیفِ پرونده را `FOR UPDATE` گرفته‌اند (جز `liftSanction` که فقط جریمه را قفل می‌کند)، و هر دستور
  * در READ COMMITTED رویدادهای ثبت‌شدهٔ پیشین را می‌بیند. بی مهاجرت؛ از نمایهٔ `(case_id, created_at, id)`.
  */
+/**
+ *  ترتیبِ تاریخچه `created_at, id` است و `id` تصادفی. دو رویدادِ یک تراکنش (تصمیم و جریمه، ثبت و برچسب)
+ *  در یک میلی‌ثانیه ⇒ ترتیبِ تصادفی (جریمه پیش از تصمیم). پس زمانِ هر رویداد دست‌کم یکی بیش از
+ *  آخرین رویدادِ همان پرونده است: تاریخچه همیشه به ترتیبِ ثبت، با همان نمایه (case_id, created_at, id).
+ */
 async function addEvent(c, row, actor, actorId, type, body = '', data = {}) {
   const last = (await c.query(
     'SELECT created_at FROM trust_case_events WHERE case_id=$1 ORDER BY created_at DESC LIMIT 1', [row.id]

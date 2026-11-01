@@ -237,6 +237,18 @@ object StrSettings {
   fun monthsToday(d: Any): String = t("نامِ ماه‌های خورشیدی: امروز $d", "Solar month names: today is $d", "د لمریزو میاشتو نومونه: نن $d دی")
   val monthsDari: String get() = t("دری (حمل، ثور…)", "Dari (Hamal, Sawr…)", "دري (حمل، ثور…)")
   val monthsPashto: String get() = t("پشتو (وری، غویی…)", "Pashto (Wray, Ghwayay…)", "پښتو (وری، غویی…)")
+  //  LOC-01: تاریخِ قمریِ اختیاری روی فاکتور
+  val lunarNote: String get() = t(
+    "تاریخِ قمری روی فاکتور، اختیاری. ماهِ واقعی با دیدنِ هلال است؛ اگر یک روز جلو یا عقب بود، این‌جا درستش کنید.",
+    "Hijri (lunar) date on receipts, optional. The real month follows the moon sighting; shift it here if it is a day off.",
+    "په بل کې قمري نېټه، اختیاري. ریښتینې میاشت د سپوږمۍ په لیدو ده؛ که یوه ورځ مخکې یا وروسته وه، دلته یې سمه کړئ.",
+  )
+  val lunarOff: String get() = t("بی تاریخِ قمری", "No Hijri date", "بې قمري نېټې")
+  val lunarOn: String get() = t("با تاریخِ قمری", "With Hijri date", "له قمري نېټې سره")
+  val lunarEarlier: String get() = t("یک روز عقب", "A day earlier", "یوه ورځ مخکې")
+  val lunarAsIs: String get() = t("همان حساب", "As calculated", "لکه حساب")
+  val lunarLater: String get() = t("یک روز جلو", "A day later", "یوه ورځ وروسته")
+  fun lunarToday(d: Any): String = t("امروز: $d", "Today: $d", "نن: $d")
   val symbolNote: String get() = t("نمادِ پول در فاکتور. مبلغ همیشه بی اعشار است.", "Currency sign on receipts. Amounts never have decimals.", "په بل کې د پیسو نښه. مبلغ تل بې اعشاریې وي.")
   val calendar: String get() = t("تقویم", "Calendar", "جنتري")
   val calAuto: String get() = t("خودکار", "Automatic", "اتومات")

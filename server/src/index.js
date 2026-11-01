@@ -72,6 +72,9 @@ async function main() {
   require('./lib/order-desk').start();
   //  ORD-18: هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (فقط دکانِ با پرچمِ `shop.orders.start_alert`)
   require('./lib/order-start-alert').start();
+  //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
+  const payments = require('./lib/payment-intents');
+  payments.startReconciler();
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
@@ -101,6 +104,7 @@ async function main() {
     outbox.stop();
     orderNotify.stop();
     require('./lib/customer-notify').stop();
+    payments.stopReconciler();
     notices.stopRunner();
     telegram.stop();
     server.close(async () => {

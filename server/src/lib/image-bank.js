@@ -972,7 +972,7 @@ async function batchFile(id, name, buf) {
        ON CONFLICT (batch_id, name) DO UPDATE SET blob_hash=EXCLUDED.blob_hash, status=EXCLUDED.status,
           error=EXCLUDED.error, warnings=EXCLUDED.warnings, orientation=EXCLUDED.orientation`,
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
-    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags };
+    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf) };
   }
 }
 
@@ -1203,7 +1203,7 @@ async function reportsList({ status = 'open', limit = 50 } = {}) {
 
 module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
-  shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
+  flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
   productInput, insertProduct, updateProduct, productOut,
   search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
