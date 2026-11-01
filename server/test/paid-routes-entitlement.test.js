@@ -78,6 +78,8 @@ FLAGS.push('shop.orders.picking');
 FLAGS.push('shop.storefront.bulk');
 //  M3: لوگو و تصویرِ سرِ ویترین (`/shop/storefront/media/*`) با پرچمِ خودش
 FLAGS.push('shop.storefront.media');
+//  MKT-10/11: پیوندِ کمپین و QR (`/shop/storefront/campaigns`) با پرچمِ خودش
+FLAGS.push('shop.storefront.campaigns');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
