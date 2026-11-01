@@ -366,6 +366,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/promos', require('./routes/shop-promos'));
     //  STF-07/STF-08: ورود و خروجِ کارمند و نرخ‌های پورسانت — پشتِ `shop.staff_time`، پیش‌فرض خاموش
     api.use('/shop/staff-time', require('./routes/staff-time'));
+    //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
+    api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
     //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
     api.use('/shop/payments', require('./routes/shop-payments'));
@@ -565,8 +567,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
     //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
-    require('./lib/payment-intents').reconcile()
-      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();

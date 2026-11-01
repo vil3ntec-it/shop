@@ -407,4 +407,88 @@ class WarehouseEngineTest {
     assertEquals("کالا پیدا نشد", failed(WarehouseEngine.deleteProduct(base, "نیست", "2026-08-28", 0, ::newId)))
     assertNull(base.products.find { it.id == "نیست" })
   }
+
+  /* ------------- حدهای موجودی: نقطهٔ سفارش و بیشینه (INV-12) ------------- */
+
+  private fun draftOf(p: Product, reorder: Double?, max: Double?, min: Double = p.minStock) = WarehouseEngine.ProductDraft(
+    name = p.name, unit = p.unit, purchasePrice = p.purchasePrice, salePrice = p.salePrice, minStock = min,
+    barcode = p.barcodes.firstOrNull().orEmpty(), editLevels = true, reorderPoint = reorder, maxStock = max,
+  )
+
+  @Test
+  fun `نقطه سفارش و بیشینه با فرم ثبت و در سابقه دیده می شود`() {
+    val p1 = base.products.single()
+    val r = ok(WarehouseEngine.editProduct(base, "p1", draftOf(p1, 12.0, 40.0), "2026-08-28", 7, ::newId))
+    val p = r.data.products.single()
+    assertEquals(12.0, p.reorderPoint!!, 0.0)
+    assertEquals(40.0, p.maxStock!!, 0.0)
+    val note = r.data.auditLog.single { it.type == "product_edit" }.notes
+    assertTrue(note, note.contains("نقطهٔ سفارش — ⇐ 12") && note.contains("حداکثر موجودی — ⇐ 40"))
+  }
+
+  @Test
+  fun `ترتیب حدها سنجیده می شود و فرم بی حدها آن ها را دست نمی زند`() {
+    val p1 = base.products.single()
+    //  کمینه ۵ و نقطهٔ سفارش ۳ ⇒ رد
+    assertEquals("نقطهٔ سفارش کمتر از حدِ کم بودن است", failed(WarehouseEngine.editProduct(base, "p1", draftOf(p1, 3.0, null), "2026-08-28", 7, ::newId)))
+    assertEquals("بیشینه باید بیشتر از نقطهٔ سفارش باشد", failed(WarehouseEngine.editProduct(base, "p1", draftOf(p1, 10.0, 10.0), "2026-08-28", 7, ::newId)))
+    assertEquals("عددِ حدِ موجودی درست نیست", failed(WarehouseEngine.editProduct(base, "p1", draftOf(p1, Double.NaN, null), "2026-08-28", 7, ::newId)))
+    val withLevels = ok(WarehouseEngine.editProduct(base, "p1", draftOf(p1, 12.0, 40.0), "2026-08-28", 7, ::newId)).data
+    //  فرمِ امروز (تنظیم خاموش) فقط نام را عوض می‌کند ⇒ نقطهٔ سفارش و بیشینه می‌مانند
+    val plain = WarehouseEngine.ProductDraft(name = "برنج اعلا", unit = "کیلو", purchasePrice = 200.0, salePrice = 300.0, minStock = 5.0, barcode = "111")
+    val after = ok(WarehouseEngine.editProduct(withLevels, "p1", plain, "2026-08-29", 8, ::newId)).data.products.single()
+    assertEquals(12.0, after.reorderPoint!!, 0.0)
+    assertEquals(40.0, after.maxStock!!, 0.0)
+    //  کالای بی حدِ تازه: همان رفتارِ امروز، فیلدها null و در JSON نوشته نمی‌شوند
+    val json = kotlinx.serialization.json.Json { encodeDefaults = true }.encodeToString(Product.serializer(), p1)
+    assertTrue(json, !json.contains("reorderPoint") && !json.contains("maxStock"))
+  }
+
+  @Test
+  fun `ویرایش گروهی حدها ردیف ناجور را عوض نمی کند و بقیه را می کند`() {
+    val d = base.copy(
+      products = base.products + Product(id = "p2", name = "روغن", unit = "عدد", minStock = 30.0) +
+        Product(id = "p3", name = "قند", unit = "کیلو"),
+    )
+    val patch = ir.vil3ntec.tohid.core.stock.StockLevelRules.Patch(
+      reorder = ir.vil3ntec.tohid.core.stock.StockLevelRules.Edit.To(10_000),
+      max = ir.vil3ntec.tohid.core.stock.StockLevelRules.Edit.To(50_000),
+    )
+    val plan = WarehouseEngine.previewLevels(d, setOf("p1", "p2", "p3"), patch)
+    assertEquals(listOf("p2", "p1", "p3"), plan.map { it.id })   // روغن (کمینه ۳۰ > ۱۰) ناموفق و اول
+    val r = ok(WarehouseEngine.bulkLevels(d, setOf("p1", "p2", "p3"), patch, "2026-08-28", 9, ::newId)).data
+    val by = r.products.associateBy { it.id }
+    assertEquals(10.0, by.getValue("p1").reorderPoint!!, 0.0)
+    assertEquals(5.0, by.getValue("p1").minStock, 0.0)            // کمینه دست نخورد
+    assertNull(by.getValue("p2").reorderPoint)
+    assertEquals(50.0, by.getValue("p3").maxStock!!, 0.0)
+    assertEquals(2, r.auditLog.count { it.type == "product_edit" })
+  }
+
+  @Test
+  fun `فهرست نیاز به سفارش با پیشنهاد تا بیشینه`() {
+    val d = ShopData(
+      products = listOf(
+        Product(id = "a", name = "الف", unit = "عدد", minStock = 2.0, reorderPoint = 10.0, maxStock = 40.0),  // موجودی ۸ ⇒ وقتِ سفارش
+        Product(id = "b", name = "ب", unit = "عدد", minStock = 5.0),                                       // موجودی ۳ ⇒ زیرِ کمینه، بی بیشینه
+        Product(id = "c", name = "پ", unit = "عدد", reorderPoint = 5.0, maxStock = 20.0),                   // موجودی ۱۵ ⇒ کافی
+        Product(id = "x", name = "ت", unit = "عدد"),                                                       // بی حد ⇒ نمی‌آید
+        Product(id = "z", name = "ث", unit = "عدد", reorderPoint = 5.0, active = false),                    // غیرفعال ⇒ نمی‌آید
+      ),
+      warehouseEntries = listOf(
+        WarehouseEntry(id = "e1", productId = "a", units = 8.0),
+        WarehouseEntry(id = "e2", productId = "b", units = 3.0),
+        WarehouseEntry(id = "e3", productId = "c", units = 15.0),
+      ),
+    )
+    val due = WarehouseEngine.reorderList(d)
+    assertEquals(listOf("b", "a"), due.map { it.product.id })     // زیرِ کمینه پیش از وقتِ سفارش
+    assertNull(due[0].suggest)
+    assertEquals(32.0, due[1].suggest!!, 0.0)
+    assertEquals(ir.vil3ntec.tohid.core.stock.StockLevelRules.State.REORDER, due[1].state)
+    //  همان فهرست در برگهٔ اکسلِ کامپیوتر
+    val sheet = ReportCsv.of("reorder", d, "", "", "2026-08-28")
+    assertEquals(listOf("ب", "بیشینه تعریف نشده"), sheet.rows[1].let { listOf(it[0], it[8]) })
+    assertEquals(listOf("الف", "وقتِ سفارش", "32"), sheet.rows[2].let { listOf(it[0], it[7], it[8]) })
+  }
 }

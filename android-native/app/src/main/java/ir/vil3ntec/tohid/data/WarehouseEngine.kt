@@ -1,10 +1,12 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.product.BulkPrice
+import ir.vil3ntec.tohid.core.money.Qty
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.core.product.ProductLabels
-import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.stock.StockLevelRules
+import ir.vil3ntec.tohid.core.stock.StockLevels
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -62,6 +64,14 @@ object WarehouseEngine {
     /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
     val brand: String? = null,
     val tags: List<String>? = null,
+    /**
+     *  INV-12: `true` ⇒ نقطهٔ سفارش و بیشینه دقیقاً همین دو مقدار می‌شوند (`null` = پاک)، با سنجشِ
+     *  ترتیبِ «کمینه ≤ نقطهٔ سفارش < بیشینه» در `core`. `false` (پیش‌فرض؛ فرم‌هایی که این دو را
+     *  ندارند یا تنظیمِ «نقطهٔ سفارش و بیشینه» خاموش است) ⇒ همان مقدارِ پیشین دست نمی‌خورد.
+     */
+    val editLevels: Boolean = false,
+    val reorderPoint: Double? = null,
+    val maxStock: Double? = null,
   )
 
   data class EntryDraft(
@@ -78,7 +88,21 @@ object WarehouseEngine {
     val batch: String = "",
     /** خالی = ثبت نشده؛ وگرنه `yyyy-MM-dd` و نه بعد از انقضا */
     val productionDate: String = "",
+    /*
+     *  موتورِ تازهٔ موجودی (`StockLedger`) — `null` یعنی فرم این‌ها را ندارد (خاموش)
+     *  و ردیف دقیقاً مثلِ امروز ساخته/ویرایش می‌شود.
+     */
+    /** هزینهٔ جانبیِ کلِ همین ردیف (کرایه، گمرک) به افغانی؛ ۰ = ندارد — PUR-06 */
+    val landedCost: Double? = null,
+    /** محلِ نگه‌داری؛ "" = محلِ اصلیِ دکان — INV-20 */
+    val locationId: String? = null,
+    /** کاربرِ ثبت‌کننده (INV-02) — فقط در ردیفِ تازه */
+    val userId: String? = null,
   )
+
+  /** هزینهٔ جانبیِ نادرست — `null` یعنی درست یا نیامده */
+  private fun landedProblem(draft: EntryDraft): String? =
+    draft.landedCost?.takeIf { it.isNaN() || it < 0 }?.let { "هزینهٔ جانبی درست نیست" }
 
   /** تاریخِ تولید درست است و از انقضا جلوتر نیست — `null` یعنی درست */
   private fun datesProblem(draft: EntryDraft): String? {
@@ -180,6 +204,8 @@ object WarehouseEngine {
     if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")
     if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")
     if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
+    if (a.reorderPoint != b.reorderPoint) add("نقطهٔ سفارش ${levelText(a.reorderPoint)} ⇐ ${levelText(b.reorderPoint)}")
+    if (a.maxStock != b.maxStock) add("حداکثر موجودی ${levelText(a.maxStock)} ⇐ ${levelText(b.maxStock)}")
     if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
     if (a.barcodes != b.barcodes) add("بارکد عوض شد")
     //  PRD-02/PRD-26 — فقط وقتی فرمِ همین بخش چیزی را عوض کرد (خاموش ⇒ هرگز)
@@ -237,6 +263,8 @@ object WarehouseEngine {
     unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
+    if (draft.editLevels) levelsProblem(minStock, draft.reorderPoint, draft.maxStock)?.let { return Result.Failed(it) }
 
     val barcode = draft.barcode.trim()
     val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
@@ -266,6 +294,8 @@ object WarehouseEngine {
       active = draft.active ?: true,
       saleUnit = draft.saleUnit?.trim().orEmpty(),
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
+      reorderPoint = if (draft.editLevels) draft.reorderPoint else null,
+      maxStock = if (draft.editLevels) draft.maxStock else null,
       brand = brandOf(draft.brand, null),
       tags = tagsOf(draft.tags, null),
     ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
@@ -296,6 +326,13 @@ object WarehouseEngine {
       ?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    //  حدِ کم بودن همیشه از فرم می‌آید؛ نقطهٔ سفارش و بیشینه فقط وقتی فرم آن‌ها را دارد — ترتیبِ هر سه با هم سنجیده می‌شود
+    val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
+    val reorderPoint = if (draft.editLevels) draft.reorderPoint else existing.reorderPoint
+    val maxStock = if (draft.editLevels) draft.maxStock else existing.maxStock
+    if (draft.editLevels || existing.reorderPoint != null || existing.maxStock != null) {
+      levelsProblem(minStock, reorderPoint, maxStock)?.let { return Result.Failed(it) }
+    }
 
     val barcode = draft.barcode.trim()
     //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
@@ -326,6 +363,8 @@ object WarehouseEngine {
         (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
         else -> draft.unitFactor ?: existing.unitFactor
       },
+      reorderPoint = reorderPoint,
+      maxStock = maxStock,
       brand = brandOf(draft.brand, existing.brand),
       tags = tagsOf(draft.tags, existing.tags),
     ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
@@ -512,6 +551,95 @@ object WarehouseEngine {
     )
   }
 
+  /* ------------- حدهای موجودی: کمینه، نقطهٔ سفارش، بیشینه (INV-12) ------------- */
+
+  /** «۱۲» یا «—» برای ردِ تغییر در سابقه */
+  private fun levelText(v: Double?): String = v?.let { ir.vil3ntec.tohid.qty(it) } ?: "—"
+
+  /** مقدار ⇒ هزارم با همان `Qty.fromLegacy`؛ بیرون از بازهٔ دقیق ⇒ سقفِ Long تا سنجش «بیش از اندازه» بگوید */
+  private fun milliOrNull(v: Double?): Long? =
+    v?.takeIf { it.isFinite() }?.let { runCatching { Qty.fromLegacy(it).milli }.getOrDefault(if (it < 0) Long.MIN_VALUE else Long.MAX_VALUE) }
+
+  /**
+   *  حدهای کالا به زبانِ `core`. `minStock = 0` همان «بی هشدار» ِ امروز است ⇒ `null`.
+   *  عددِ نامعتبر (NaN) ⇒ `null`؛ سنجش در `levelsProblem` جلویش را می‌گیرد.
+   */
+  fun levelsOf(p: Product): StockLevels = StockLevels(
+    minMilli = p.minStock.takeIf { it != 0.0 }?.let { milliOrNull(it) },
+    reorderMilli = milliOrNull(p.reorderPoint),
+    maxMilli = milliOrNull(p.maxStock),
+  )
+
+  /**
+   *  کالا با حدهای تازه؛ کمینهٔ تعریف‌نشده ⇒ `minStock = 0` (همان قالبِ امروز). حدی که عوض نشده
+   *  همان عددِ پیشینِ کالا می‌ماند (گردِ هزارم آن را دست نمی‌زند و ردِ بی‌جا در سابقه نمی‌سازد).
+   */
+  fun withLevels(p: Product, l: StockLevels): Product {
+    val before = levelsOf(p)
+    return p.copy(
+      minStock = if (l.minMilli == before.minMilli) p.minStock else (l.minMilli ?: 0L) / 1000.0,
+      reorderPoint = if (l.reorderMilli == before.reorderMilli) p.reorderPoint else l.reorderMilli?.let { it / 1000.0 },
+      maxStock = if (l.maxMilli == before.maxMilli) p.maxStock else l.maxMilli?.let { it / 1000.0 },
+    )
+  }
+
+  /** پیامِ نخستین ایرادِ حدها (فارسی) یا `null` */
+  fun levelsProblem(minStock: Double, reorderPoint: Double?, maxStock: Double?): String? {
+    if (listOfNotNull(minStock, reorderPoint, maxStock).any { !it.isFinite() }) return "عددِ حدِ موجودی درست نیست"
+    val l = StockLevels(
+      minMilli = minStock.takeIf { it != 0.0 }?.let { milliOrNull(it) },
+      reorderMilli = milliOrNull(reorderPoint),
+      maxMilli = milliOrNull(maxStock),
+    )
+    return StockLevelRules.problems(l).firstOrNull()?.fa
+  }
+
+  /** پیش‌نمایشِ ویرایشِ گروهیِ حدها برای کالاهای انتخاب‌شده — ناموفق‌ها اول (`StockLevelRules.plan`) */
+  fun previewLevels(d: ShopData, ids: Set<String>, patch: StockLevelRules.Patch): List<StockLevelRules.Planned> =
+    StockLevelRules.plan(d.products.filter { it.id in ids }.map { it.id to levelsOf(it) }, patch)
+
+  /**
+   *  ویرایشِ گروهیِ حدها: فقط ردیف‌هایی که پس از تغییر ترتیبشان درست است عوض می‌شوند (بقیه دست
+   *  نمی‌خورند و در پیش‌نمایش/نتیجه با دلیل می‌آیند). هر کالای عوض‌شده یک ردِ `product_edit` دارد.
+   *  هیچ ردیفی عوض نشود ⇒ `Failed`.
+   */
+  fun bulkLevels(
+    d: ShopData,
+    ids: Set<String>,
+    patch: StockLevelRules.Patch,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    val apply = previewLevels(d, ids, patch).filter { it.changes }.associate { it.id to it.after }
+    if (apply.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    return bulkUpdate(d, apply.keys, today, now, newId) { p -> apply[p.id]?.let { withLevels(p, it) } ?: p }
+  }
+
+  /** یک ردیفِ «نیاز به سفارش»: وضعیت نسبت به حدها و پیشنهادِ مقدار تا بیشینه (`null` ⇒ بیشینه تعریف نشده) */
+  data class ReorderRow(val product: Product, val onHand: Double, val state: StockLevelRules.State, val suggest: Double?)
+
+  /**
+   *  کالاهای فعالی که حدی دارند و به نقطهٔ سفارش، کمینه یا صفر رسیده‌اند (INV-12)، با پیشنهادِ «تا
+   *  بیشینه». ترتیب: تمام‌شده، زیرِ کمینه، وقتِ سفارش؛ سپس نام. فقط خواندن — سفارشی ثبت نمی‌شود.
+   */
+  fun reorderList(d: ShopData): List<ReorderRow> {
+    val stock = ShopStore.index(d)
+    return d.products.asSequence()
+      .filter { it.active }
+      .mapNotNull { p ->
+        val l = levelsOf(p)
+        if (l.minMilli == null && l.reorderMilli == null && l.maxMilli == null) return@mapNotNull null
+        val onHand = stock.stock(p.id)
+        val have = milliOrNull(onHand) ?: 0L
+        val st = StockLevelRules.state(have, l)
+        if (st !in StockLevelRules.NEEDS_ORDER) return@mapNotNull null
+        ReorderRow(p, onHand, st, StockLevelRules.suggestOrderMilli(have, l)?.let { it / 1000.0 })
+      }
+      .sortedWith(compareBy<ReorderRow> { it.state.ordinal }.thenBy { it.product.name })
+      .toList()
+  }
+
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
   fun bulkDelete(d: ShopData, ids: Set<String>, today: String, now: Long, newId: () -> String): Result {
     if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
@@ -542,6 +670,7 @@ object WarehouseEngine {
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
     datesProblem(draft)?.let { return Result.Failed(it) }
+    landedProblem(draft)?.let { return Result.Failed(it) }
 
     val id = newId()
     val date = draft.date.ifBlank { today }
@@ -561,6 +690,10 @@ object WarehouseEngine {
           expiryDate = draft.expiryDate.trim(),
           batch = draft.batch.trim(),
           productionDate = draft.productionDate.trim(),
+          landedCost = draft.landedCost?.takeIf { it > 0 },
+          landedCostMinor = draft.landedCost?.takeIf { it > 0 }?.let(StockLedger::minor),
+          locationId = draft.locationId?.trim()?.ifEmpty { null },
+          userId = draft.userId?.trim()?.ifEmpty { null },
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -587,6 +720,7 @@ object WarehouseEngine {
     if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
     if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
     datesProblem(draft)?.let { return Result.Failed(it) }
+    landedProblem(draft)?.let { return Result.Failed(it) }
     //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
     //  همان نگهبانِ `deleteEntry`
     val left = ShopStore.stock(d, existing.productId) - existing.units +
@@ -607,6 +741,10 @@ object WarehouseEngine {
       expiryDate = draft.expiryDate.trim(),
       batch = draft.batch.trim(),
       productionDate = draft.productionDate.trim(),
+      //  فرمی که این دو را ندارد (خاموش) ⇒ همان مقدارِ قبلی
+      landedCost = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 } else existing.landedCost,
+      landedCostMinor = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 }?.let(StockLedger::minor) else existing.landedCostMinor,
+      locationId = if (draft.locationId != null) draft.locationId.trim().ifEmpty { null } else existing.locationId,
     )
     return Result.Ok(
       d.copy(
@@ -685,6 +823,12 @@ object WarehouseEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /**
+     *  موتورِ تازهٔ موجودی (INV-04): count · damage · expired · lost · other؛ برگشت به
+     *  تأمین‌کننده خودش `supplier_return` می‌شود. `null` (خاموش) ⇒ ردیف مثلِ امروز.
+     */
+    adjKind: String? = null,
+    userId: String? = null,
   ): Result {
     val product = d.products.find { it.id == productId } ?: return Result.Failed("ابتدا یک محصول اضافه کنید")
     if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
@@ -701,6 +845,15 @@ object WarehouseEngine {
     val id = newId()
     val date = today
     val label = if (kind == AdjustKind.SUPPLIER_RETURN) "برگشت به تأمین‌کننده" else "اصلاح موجودی"
+    val stockKind: String? = when {
+      adjKind == null -> null
+      kind == AdjustKind.SUPPLIER_RETURN -> "supplier_return"
+      //  خراب/گم‌شده/منقضی فقط کاهش است؛ افزایش ⇒ اصلاحِ شمارش
+      increase && adjKind in setOf("damage", "lost", "expired") -> "count"
+      adjKind in StockLedger.ADJ_KINDS -> adjKind
+      else -> "other"
+    }
+    val user = userId?.trim()?.ifEmpty { null }.takeIf { stockKind != null }
 
     return Result.Ok(
       d.copy(
@@ -716,6 +869,8 @@ object WarehouseEngine {
           notes = why,
           isAdjustment = true,
           createdAt = now,
+          adjKind = stockKind,
+          userId = user,
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
@@ -726,6 +881,8 @@ object WarehouseEngine {
           notes = why,
           refId = id,
           createdAt = now,
+          userId = user,
+          reason = if (stockKind != null) why else null,
         ),
         auditLog = d.auditLog + AuditEntry(
           id = newId(),
