@@ -128,6 +128,10 @@ fun StorefrontScreen(snackbar: SnackbarHostState) {
         if (!c.entitled) {
           Text("اشتراکِ این دکان ویترین را در بر ندارد؛ تغییرها ذخیره نمی‌شوند.", color = Shop.colors.warning, style = MaterialTheme.typography.bodySmall)
         }
+        //  سرور می‌گوید سفارشِ آنلاینِ تازه فقط با اشتراکِ فعال است و این دکان ندارد؛ مشتری «نمی‌پذیرد» می‌بیند
+        if (c.subscribersOnly && !c.subscribed) {
+          Text("برای دریافتِ سفارشِ آنلاین، اشتراک لازم است", color = Shop.colors.warning, style = MaterialTheme.typography.bodySmall)
+        }
         TohidFilterRow(
           //  «ارسال و زمان» فقط وقتی سرور پرچمِ جدای `shop.storefront.zones` را روشن گفته
           options = listOf("status" to "وضعیت", "settings" to "تنظیمات", "products" to "کالاها", "market" to "بازارچه", "campaigns" to "پیوند و QR") +

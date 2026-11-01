@@ -34,7 +34,9 @@ const PRESENCE = ['badge', 'mode', 'declaredUntil', 'connection', 'lastConfirmed
 const FIELDS = Object.freeze({
   //  §۱.۱ — `GET /api/store/:slug` ⇒ store
   shop: ['slug', 'title', 'tagline', 'contactPhone', 'accent', 'status', 'fulfillment', 'deliveryFeeMinor',
-    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?', 'media?'],
+    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?', 'media?', 'ordering?'],
+  //  «سفارش می‌پذیرد؟» (#467، پرچمِ `shop.orders.subscribers_only`؛ خاموش ⇒ کلید نیست)
+  ordering: ['accepting', 'code?', 'message?'],
   //  لوگو و تصویرِ سرِ ویترین (M3 #428): main همیشه می‌فرستد؛ پرچمِ خاموش ⇒ هر دو null. افزوده به v1.
   shopMedia: ['logo', 'header'],
   mediaFile: ['version', 'width', 'height', 'mime', 'url'],
@@ -79,7 +81,7 @@ const FIELDS = Object.freeze({
 });
 
 const NESTED = Object.freeze({
-  shop: { status: 'presence', media: 'shopMedia' },
+  shop: { status: 'presence', media: 'shopMedia', ordering: 'ordering' },
   shopMedia: { logo: 'mediaFile', header: 'mediaFile' },
   shopCard: { status: 'cardPresence' },
   product: { stock: 'stock' },

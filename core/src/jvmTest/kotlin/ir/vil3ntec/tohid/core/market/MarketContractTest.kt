@@ -40,6 +40,7 @@ class MarketContractTest {
     val models: Map<String, Pair<KSerializer<*>, Set<String>>> = mapOf(
       "shop" to (PublicShop.serializer() to setOf("delivery")),
       "shopMedia" to (ShopMedia.serializer() to emptySet()),
+      "ordering" to (StoreOrdering.serializer() to emptySet()),
       "mediaFile" to (MediaFile.serializer() to emptySet()),
       "presence" to (PublicPresence.serializer() to emptySet()),
       "cardPresence" to (PublicPresence.serializer() to emptySet()),
