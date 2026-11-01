@@ -79,6 +79,11 @@ const { v1Guard: shopStaffGuard } = require('../lib/staff-approval');
  */
 const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
 /*
+ *  دکان: فاکتورِ ثبت‌شده سرِ جا ویرایش/حذف نمی‌شود (S89، SEC-03؛ پرچمِ `shop.doc_chain`) — ‎lib/finalized-sales.js‎.
+ *  داخلِ تراکنشِ push و زیرِ قفلِ ردیف سنجیده می‌شود، نه در میان‌افزار: درجِ همان دسته را هم می‌بیند.
+ */
+const finalized = require('../lib/finalized-sales');
+/*
  *  دکان: گاوصندوق (PAY-18) — opِ `safeEntries` فقط درج، با شکلِ درست و `safe.move`
  *  (جز «از دخل») — ‎lib/safe-ledger.js‎. پمپ و بقیهٔ جدول‌ها بی هیچ کاری از آن رد می‌شوند.
  *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
@@ -95,6 +100,9 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : [];
     const schemaVersion = Number(req.body?.schema_version || req.body?.schemaVersion || 0);
 
+    //  S89: فقط دکان، فقط با پرچمِ `shop.doc_chain` و دسته‌ای که فاکتور یا قلم دارد؛ وگرنه null و هیچ پرسشی
+    const guard = await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) });
+
     let out;
     try {
       out = await sync.push(req.sync, {
@@ -103,6 +111,7 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
         ops,
         appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
         queued: Number.isFinite(Number(req.body?.queued)) ? Number(req.body.queued) : null,
+        guard,
       });
     } catch (err) {
       //  نسخهٔ برنامه از سرور جلوتر است: هیچ چیزی اعمال نشد و برنامه باید
@@ -257,6 +266,36 @@ router.get('/photo-inbox/:id', async (req, res, next) => {
 
 router.delete('/photo-inbox/:id', requireSyncWrite, async (req, res, next) => {
   try { res.json({ ok: true, removed: await photos.inboxDelete(req.sync, req.params.id) }); } catch (err) { next(err); }
+});
+
+/* ------------------------------------------- زنجیرهٔ اسناد (SEC-02) */
+/*
+ *  «سر» ِ زنجیرهٔ اسنادِ مالیِ هر سریِ دستگاه، در هر دورِ همگام‌سازی پس از push/pull (بخشِ ۱۰.۳).
+ *  ⛔ عمداً جدا از push: هیچ op ای را رد نمی‌کند، شکستش همگام‌سازی و فروش را نمی‌خواباند و بدنهٔ
+ *  push دست نمی‌خورد. فقط دکان (پمپ ۴۰۴). پرچمِ خاموشِ `shop.doc_chain` ⇒ `{enabled:false}` و
+ *  هیچ نوشتنی. شرح و قاعده‌ها: `lib/doc-chain.js`. نوشتن همان قاعدهٔ push (`requireSyncWrite`، SUB-10).
+ */
+function shopChainOnly(req, res, next) {
+  if (!req.sync || req.sync.accountKind !== require('../lib/tenancy').SHOP.app) {
+    return res.status(404).json({ ok: false, error: 'NOT_FOUND', message: 'زنجیرهٔ اسناد فقط برای دکان است' });
+  }
+  next();
+}
+
+router.get('/chain', shopChainOnly, async (req, res, next) => {
+  try {
+    const deviceId = v.id(req.query?.device_id, { field: 'شناسه دستگاه', required: true, max: 64 });
+    res.set('Cache-Control', 'no-store');
+    res.json({ ok: true, ...(await require('../lib/doc-chain').status(req.sync, deviceId)) });
+  } catch (err) { next(err); }
+});
+
+router.post('/chain', shopChainOnly, requireSyncWrite, async (req, res, next) => {
+  try {
+    const deviceId = v.id(req.body?.device_id, { field: 'شناسه دستگاه', required: true, max: 64 });
+    const ip = require('../middleware/ratelimit').clientIp(req);
+    res.json({ ok: true, ...(await require('../lib/doc-chain').report(req.sync, deviceId, req.body, { ip })) });
+  } catch (err) { next(err); }
 });
 
 module.exports = router;

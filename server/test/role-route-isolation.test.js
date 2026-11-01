@@ -14,6 +14,8 @@
  *      بی‌نشست، با توکنِ دکان/پیک/مدیر ⇒ ۴۰۱؛
  *      مشتریِ دیگر (و مشتریِ ویترینِ دیگر) با شناسه‌های واقعیِ مشتریِ اول هیچ دادهٔ او را نمی‌گیرد؛
  *      توکنِ پیگیریِ دست‌کاری‌شده یا روی ویترینِ دیگر ⇒ ۴۰۴.
+ *   کارمندانِ دکان (شاگرد و چهار نقشِ تازهٔ A16: صندوق‌دار، انباردار، جمع‌آور، حسابدار) در هر سه
+ *   ماتریس همان انتظارِ صاحبِ دکان را دارند: هیچ‌کدام بازتر از شاگرد نیست (STF-01).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -87,7 +89,7 @@ const flag = (scope, key) => h.put('/api/admin/pump/live-config', { scope, key, 
 async function liveShop(label) {
   const u = await h.newUser(`صاحب-${label}`);
   const shopId = (await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken })).body.shop.id;
-  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat']) await flag(shopId, k);
+  for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.chat', 'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.storefront.cart']) await flag(shopId, k);
   const slug = `iso-${uniq()}`;
   const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: u.accessToken });
   assert.equal(put.status, 200, JSON.stringify(put.body));
@@ -116,6 +118,28 @@ async function customer(slug, phone) {
   return { session: a.body.session, ticket: c.body.ticket, phone };
 }
 const as = (k) => ({ headers: { 'X-Store-Session': k.session } });
+
+/** شاگرد و چهار نقشِ تازهٔ A16 — هر کدام با نقشِ واقعی‌اش وارد شده (`actualRole`) */
+const STAFF = [['staff', 'شاگرد'], ['cashier', 'صندوق‌دار'], ['storekeeper', 'انباردار'], ['picker', 'جمع‌آور'], ['accountant', 'حسابدار']];
+async function members(owner) {
+  const fresh = await h.signIn(owner, 'shop');          //  دعوتِ نقش‌های تازه هویتِ تازه می‌خواهد
+  const out = [];
+  for (const [role, name] of STAFF) {
+    resetAll();
+    const inv = await h.post('/api/shop/invite', { role }, { token: fresh.accessToken });
+    assert.equal(inv.status, 201, `${role}: ${JSON.stringify(inv.body)}`);
+    const u = await h.newUser(`${name}-${uniq()}`, 'shop');
+    const j = await h.post('/api/shop/join', { code: inv.body.code }, { token: u.accessToken });
+    assert.ok([200, 201].includes(j.status), `${role}: ${JSON.stringify(j.body)}`);
+    const s = await h.signIn(u, 'shop');
+    assert.equal(s.shop.actualRole, role, `${role}: نقشِ واقعی`);
+    //  توکنِ زنده — آزمون بی‌اثر نیست
+    assert.equal((await h.get('/api/me', { token: s.accessToken })).status, 200, `${role}: /api/me`);
+    out.push([name, { token: s.accessToken }]);
+  }
+  resetAll();
+  return out;
+}
 /** درِ مشتری با نشستِ حساب (session_required) یا با برگهٔ تأییدِ شماره (verification_required، چت و شکایت). */
 const AUTH = { session_required: (k) => ({ 'X-Store-Session': k.session }), verification_required: (k) => ({ 'X-Store-Ticket': k.ticket }) };
 
@@ -124,6 +148,7 @@ test('E2E-SEC-13 (مدیر): توکنِ دکان، پمپ، پیک و نشستِ
   const pump = await h.signIn(a, 'pump');
   const c = await courier(a, 'پیکِ مدیر');
   const k = await customer(a.slug, '0791230001');
+  const staff = await members(a);
   const made = await h.post('/api/admin/admins', { username: 'clerk', password: 'Clerk!12345', role: 'admin' }, { token: admin });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const clerk = (await h.post('/api/admin/login', { username: 'clerk', password: 'Clerk!12345' })).body.token;
@@ -139,7 +164,7 @@ test('E2E-SEC-13 (مدیر): توکنِ دکان، پمپ، پیک و نشستِ
     if (PUBLIC.has(r.key)) continue;
     const body = noBody(r.method) ? null : {};
     for (const [who, opts] of [['بی‌توکن', {}], ['دکان', { token: a.token }], ['پمپ', { token: pump.accessToken }],
-      ['پیک', { token: c.token }], ['مشتری', as(k)]]) {
+      ['پیک', { token: c.token }], ['مشتری', as(k)], ...staff]) {
       const res = await call(r.method, fill(r.path), { body, ...opts });
       if (res.status !== 401) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
     }
@@ -173,12 +198,13 @@ test('E2E-SEC-13 (پیک): نقش‌های دیگر به درِ پیک نمی‌
   const routes = live().filter((r) => r.path.startsWith('/api/courier/'));
   assert.ok(routes.length >= 4, `درهای پیک: ${routes.length}`);
   const k = await customer(a.slug, '0791230003');
+  const staff = await members(a);
   const secrets = [asgId, order.body.order.id, 'رازِ-پیک', '791230002'];
   const bad = [];
   for (const r of routes) {
     const url = fill(r.path, { id: asgId });
     const body = noBody(r.method) ? null : { deviceId: 'x', events: [{ eventId: `e-${uniq()}`, assignmentId: asgId, type: 'accept', deviceTime: Date.now(), deviceSeq: 1 }] };
-    for (const [who, opts] of [['بی‌توکن', {}], ['صاحبِ دکان', { token: a.token }], ['مدیر', { token: admin }], ['مشتری', as(k)]]) {
+    for (const [who, opts] of [['بی‌توکن', {}], ['صاحبِ دکان', { token: a.token }], ['مدیر', { token: admin }], ['مشتری', as(k)], ...staff]) {
       const res = await call(r.method, url, { body, ...opts });
       if (res.status < 400 || res.status >= 500) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
       if (leaks(res, secrets).length) bad.push(`${r.key} با ${who} دادهٔ مأموریت را داد`);
@@ -202,8 +228,12 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   const ka = await customer(a.slug, '0791230004');
   const kb = await customer(a.slug, '0791230005');
   const kc = await customer(b.slug, '0791230006');
+  const staff = await members(a);
   const addr = await h.post(`/api/store/${a.slug}/account/addresses`, { label: 'خانه', text: 'کوچهٔ رازِ-مشتری' }, as(ka));
   assert.equal(addr.status, 201, JSON.stringify(addr.body));
+  //  CHK-03: سبدِ سروریِ الف با یادداشتِ راز — درِ سبد هم در همین ماتریس است
+  const cart = await h.put(`/api/store/${a.slug}/account/cart`, { version: 0, items: [{ productId: 'oil', qtyMilli: 1000, note: 'رازِ-سبدِ-مشتری' }] }, as(ka));
+  assert.equal(cart.status, 200, JSON.stringify(cart.body));
   const ck = await h.post(`/api/store/${a.slug}/checkout`, {
     fulfillment: 'pickup', customer: { name: 'مشتریِ الف', phone: ka.phone }, lines: [{ productId: 'rice', qtyMilli: 1000 }],
   }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Session': ka.session } });
@@ -215,7 +245,7 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   const msg = await h.post(`/api/store/${a.slug}/chat/conversations/${conv.body.conversation.id}/messages`, { body: 'رازِ-چتِ-مشتری', clientId: `m-${uniq()}` }, { headers: AUTH.verification_required(ka) });
   assert.ok(msg.status < 300, JSON.stringify(msg.body));
   const idsOf = (p) => ({ slug: a.slug, id: p.includes('/chat/') ? conv.body.conversation.id : addr.body.address.id, token });
-  const secrets = [addr.body.address.id, 'رازِ-مشتری', 'رازِ-چتِ-مشتری', '791230004', token, ck.body.order?.id, conv.body.conversation.id];
+  const secrets = [addr.body.address.id, 'رازِ-مشتری', 'رازِ-چتِ-مشتری', 'رازِ-سبدِ-مشتری', '791230004', token, ck.body.order?.id, conv.body.conversation.id];
 
   const routes = live().filter((r) => r.path.startsWith('/api/store/'));
   const gated = [];
@@ -230,7 +260,7 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
     if (/logout|DELETE \/api\/store\/:slug\/account$/.test(r.key)) continue;   // نشستِ فرستنده را می‌بندند
     const url = fill(r.path, idsOf(r.path));
     const body = noBody(r.method) ? null : { label: 'دزدی', text: 'x' };
-    for (const [who, opts] of [['صاحبِ دکان', { token: a.token }], ['پیک', { token: c.token }], ['مدیر', { token: admin }]]) {
+    for (const [who, opts] of [['صاحبِ دکان', { token: a.token }], ['پیک', { token: c.token }], ['مدیر', { token: admin }], ...staff]) {
       const res = await call(r.method, url, { body, ...opts });
       if (res.status !== 401) bad.push(`${r.key} با ${who} ⇒ ${res.status}`);
     }
@@ -243,6 +273,10 @@ test('E2E-SEC-13 (مشتری): درهای نشست‌دار فقط با نشست
   assert.deepEqual(bad, [], bad.join('\n'));
   //  شناسهٔ واقعیِ الف در دستِ ب: نه می‌بیند، نه عوض می‌کند
   assert.deepEqual((await h.get(`/api/store/${a.slug}/account/addresses`, as(ka))).body.addresses.map((x) => x.text), ['کوچهٔ رازِ-مشتری']);
+  //  CHK-10: «خبرم کن» با برگهٔ شماره در همین ماتریس است
+  assert.ok(gated.some((r) => r.key === 'POST /api/store/:slug/area-request'), 'درِ «خبرم کن» در ماتریس است');
+  assert.ok(gated.some((r) => r.key === 'PUT /api/store/:slug/account/cart'), 'درِ سبد در ماتریس است');
+  assert.deepEqual((await h.get(`/api/store/${a.slug}/account/cart`, as(ka))).body.cart.lines.map((l) => l.note), ['رازِ-سبدِ-مشتری']);
   //  توکنِ پیگیری: دست‌کاری‌شده یا روی ویترینِ دیگر ⇒ ۴۰۴؛ خودش ⇒ ۲۰۰
   assert.equal((await h.get(`/api/store/${a.slug}/orders/${token}`)).status, 200);
   const flip = token.slice(0, -1) + (token.endsWith('A') ? 'B' : 'A');

@@ -11,7 +11,9 @@ import ir.vil3ntec.tohid.core.orders.OrderText
  *  • «نزدیک‌ترین پیک» هنوز داده ندارد (موقعیتِ پیک، DLV-16، ساخته نشده)؛ پس
  *    کم‌کارترین پیک انتخاب می‌شود: کمترین مأموریتِ زنده، بعد کمترین نقدِ
  *    درگیر، بعد نام — تا کار پخش شود و نتیجه همیشه یکی باشد.
- *  • سقفِ کارِ هم‌زمان (`maxLive`) اختیاری است؛ تهی یعنی بی‌سقف.
+ *  • سقفِ کارِ هم‌زمان: کمترینِ سقفِ همین نوبت (`maxLive`) و سقفِ خودِ پیک
+ *    (`CourierRow.maxLive`، DLV-03 — سرور همان را با ۴۰۹ `courier_busy` می‌سنجد)؛
+ *    هر دو تهی یعنی بی‌سقف.
  *  • قدیمی‌ترین سفارش اول.
  *
  *  نقشه فقط پیشنهاد است؛ هر سپردن را سرور با قفلِ ردیفِ پیک دوباره
@@ -41,6 +43,11 @@ object AutoAssign {
   fun expectedOf(paymentMethod: String, paymentStatus: String, totalMinor: Long): Long =
     if (paymentMethod == "cod" && paymentStatus != "paid") totalMinor else 0L
 
+  /** سقفِ کارِ هم‌زمانِ مؤثر برای این پیک در این نوبت؛ null = بی‌سقف */
+  fun liveCapOf(c: CourierRow, maxLive: Int?): Int? = listOfNotNull(maxLive, c.maxLive).minOrNull()
+
+  private fun hasRoom(c: CourierRow, maxLive: Int?): Boolean = liveCapOf(c, maxLive)?.let { c.liveCount < it } ?: true
+
   fun plan(orders: List<Candidate>, couriers: List<CourierRow>, maxLive: Int? = null): Plan {
     val loads = couriers.filter { it.active }.associateBy { it.id }.toMutableMap()
     val picks = ArrayList<Pick>()
@@ -49,7 +56,7 @@ object AutoAssign {
 
     for (o in queue) {
       val best = loads.values
-        .filter { CourierCash.fits(it, o.expectedCollectMinor) && (maxLive == null || it.liveCount < maxLive) }
+        .filter { CourierCash.fits(it, o.expectedCollectMinor) && hasRoom(it, maxLive) }
         .minWithOrNull(compareBy<CourierRow>({ it.liveCount }, { CourierCash.committed(it) }, { it.name }, { it.id }))
       if (best == null) {
         unplaced += Unplaced(o.orderId, o.orderNo, whyNot(o, loads.values, maxLive))
@@ -64,8 +71,9 @@ object AutoAssign {
 
     val blocked = couriers.mapNotNull { c ->
       val now = loads[c.id] ?: c
+      val cap = liveCapOf(now, maxLive)
       val why = CourierCash.autoBlockReason(now)
-        ?: if (maxLive != null && now.liveCount >= maxLive) "$maxLive مأموریتِ هم‌زمان دارد (سقفِ کارِ هم‌زمان)" else null
+        ?: if (cap != null && now.liveCount >= cap) "${now.liveCount} مأموریتِ هم‌زمان دارد (سقفِ کارِ هم‌زمان: $cap)" else null
       why?.let { Blocked(c.id, c.name, it) }
     }
     return Plan(picks, unplaced, blocked)
@@ -73,8 +81,11 @@ object AutoAssign {
 
   private fun whyNot(o: Candidate, loads: Collection<CourierRow>, maxLive: Int?): String {
     if (loads.isEmpty()) return "هیچ پیکِ فعالی نیست"
-    val free = loads.filter { maxLive == null || it.liveCount < maxLive }
-    if (free.isEmpty()) return "همهٔ پیک‌ها به سقفِ کارِ هم‌زمان ($maxLive) رسیده‌اند"
+    val free = loads.filter { hasRoom(it, maxLive) }
+    if (free.isEmpty()) {
+      return if (maxLive != null && loads.all { liveCapOf(it, maxLive) == maxLive }) "همهٔ پیک‌ها به سقفِ کارِ هم‌زمان ($maxLive) رسیده‌اند"
+      else "همهٔ پیک‌ها به سقفِ کارِ هم‌زمانِ خودشان رسیده‌اند"
+    }
     val most = free.maxOf { CourierCash.headroom(it) }
     return "نقدِ این سفارش (${OrderText.money(o.expectedCollectMinor)} افغانی) در جای خالیِ نقدِ هیچ پیکی جا نمی‌شود " +
       "(بیشترین جای خالی: ${OrderText.money(most)}) — پیک‌ها را تسویه کنید"

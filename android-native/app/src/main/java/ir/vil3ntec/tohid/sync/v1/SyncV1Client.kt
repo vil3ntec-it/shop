@@ -15,7 +15,11 @@ import kotlinx.serialization.json.buildJsonObject
  *  برمی‌دارد (`requireSyncAccount`)؛ فرستادنش یعنی ساختنِ راهی که
  *  می‌شد با آن در دفترِ دکانِ دیگری نوشت.
  */
-class SyncV1Client(private val api: ApiClient) {
+class SyncV1Client(
+  private val api: ApiClient,
+  /** `since` ِ push (#481، پرچمِ دکانِ `sync.cursor_from_since`)؛ null ⇒ نمی‌رود */
+  private val since: () -> Long? = { null },
+) {
 
   data class PushResult(
     val results: List<OpResult>,
@@ -46,6 +50,8 @@ class SyncV1Client(private val api: ApiClient) {
       //  A00: دستهٔ دارای op ِ ساختِ پیش از A00 بی نشان (`LedgerDiff.capsFor`)
       if (caps) put("caps", LedgerDiff.capsJson())
       put("ops", JsonArray(ops.map { it.toJson() }))
+      //  #481: «تا این‌جا را دیده بودم» — سرور فقط با پرچمِ دکان می‌خواندش
+      since()?.let { put("since", JsonPrimitive(it)) }
     }
     val res = try {
       api.post(ApiEndpoints.SyncV1.PUSH, body)

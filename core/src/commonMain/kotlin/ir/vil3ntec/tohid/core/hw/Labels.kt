@@ -48,14 +48,30 @@ object Labels {
      *  همین تصویر به اندازهٔ کاملِ A4 چاپ می‌شود؛ پس هر نقطه ۰٫۱۲۵ میلی‌متر است.
      */
     fun sheet(label: MonoImage, copies: Int): MonoImage {
-      val page = MonoImage(PAGE_W * DOTS_PER_MM / 10, PAGE_H * DOTS_PER_MM / 10)
+      val page = blank()
+      for (i in 0 until copies.coerceIn(0, COLS * ROWS)) place(page, label, i)
+      return page
+    }
+
+    /**
+     *  برچسب‌های گوناگون (PRD-23، چند کالا با هم): هر ۲۴ برچسب یک برگه، به همان ترتیب و همان خانه‌بندیِ
+     *  `sheet`. تکرارِ هر کالا را صدازننده پیش‌تر در فهرست گذاشته است (`LabelPlan`). فهرستِ خالی ⇒ هیچ برگه.
+     */
+    fun sheets(labels: List<MonoImage>): List<MonoImage> =
+      labels.chunked(COLS * ROWS).map { chunk ->
+        val page = blank()
+        chunk.forEachIndexed { i, label -> place(page, label, i) }
+        page
+      }
+
+    private fun blank(): MonoImage = MonoImage(PAGE_W * DOTS_PER_MM / 10, PAGE_H * DOTS_PER_MM / 10)
+
+    /** برچسب وسطِ خانهٔ `index` */
+    private fun place(page: MonoImage, label: MonoImage, index: Int) {
       val cw = CELL_W * DOTS_PER_MM / 10
       val ch = CELL_H * DOTS_PER_MM / 10
-      for (i in 0 until copies.coerceIn(0, COLS * ROWS)) {
-        val (x, y) = cell(i)
-        page.blit(label, x * DOTS_PER_MM / 10 + (cw - label.width) / 2, y * DOTS_PER_MM / 10 + (ch - label.height) / 2)
-      }
-      return page
+      val (x, y) = cell(index)
+      page.blit(label, x * DOTS_PER_MM / 10 + (cw - label.width) / 2, y * DOTS_PER_MM / 10 + (ch - label.height) / 2)
     }
   }
 

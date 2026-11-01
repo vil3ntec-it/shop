@@ -207,6 +207,38 @@ export const KOTLIN = {
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
   diffInModelTerms: /modelView\(/.test(bodyOf('diff')),
   capsA00: /put\("caps"/.test(bodyOf('push', SYNC_V1_CLIENT_KT)),
+  //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
+  restoreNoOps: restoreWiredNoOps(bodyOf('restoreBackup', fs.readFileSync(
+    path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
+};
+
+/**
+ * `ShopStore.restoreBackup` واقعاً بی op است؟ تنها «decide هست» کافی نبود: `writeInternal` در شاخهٔ
+ * FROM_SERVER سبز می‌ماند (بازبینیِ #485). حالا: بدنه هیچ `writeInternal(`/`save(`/`record(` ندارد،
+ * LOCAL حتماً `engine.resetTo(` و FROM_SERVER حتماً `engine.rebuildFromServer(` است؛ وگرنه هارنس همان
+ * [NativeDevice.save] (تفاضل با سایه) را بازی می‌کند و S143 سرخ می‌شود.
+ */
+export function restoreWiredNoOps(body) {
+  if (!/RestoreRoute\.decide\(/.test(body)) return false;
+  if (/\b(writeInternal|save|record)\(/.test(body)) return false;
+  const branch = (name) => {
+    const at = body.indexOf(`RestoreRoute.Route.${name} ->`);
+    if (at < 0) return '';
+    const next = body.slice(at + 1).search(/RestoreRoute\.Route\.[A-Z_]+ ->/);
+    return body.slice(at, next < 0 ? undefined : at + 1 + next);
+  };
+  return /^RestoreRoute\.Route\.LOCAL -> runCatching \{ engine\.resetTo\(next, staging\) \}/.test(branch('LOCAL'))
+    && /^RestoreRoute\.Route\.FROM_SERVER -> try \{\s*when \(val out = engine\.rebuildFromServer\(next, pushedStaging\)\)/.test(branch('FROM_SERVER'));
+}
+
+/*
+ * برگشتِ تازه (`ReturnFlow.kt`، RET-07): شاخهٔ «ضایعات» از خودِ کدِ کاتلین خوانده می‌شود — ردیفِ اصلاحیِ
+ * انبار با `adjKind = "damage"` و حرکتِ `damage`. اگر کاتلین این شاخه را از دست بدهد، شبیه‌سازی هم
+ * کالای «خراب» را به موجودی برمی‌گرداند و `S13.waste` قرمز می‌شود.
+ */
+const RETURN_FLOW_KT = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ReturnFlow.kt'), 'utf8');
+export const KOTLIN_RETURNS = {
+  waste: /adjKind = "damage"/.test(RETURN_FLOW_KT) && /type = "damage"/.test(RETURN_FLOW_KT),
 };
 
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
@@ -466,6 +498,63 @@ export class NativeDevice {
     const r = await this.sync();
     if (!r.ok || this.queue.length) throw new Error(`${this.label}: همگام نشد (${this.queue.length} در صف؛ ${this.lastError || JSON.stringify(r)})`);
     return r;
+  }
+
+  /**
+   * «بازیابیِ پشتیبان» = `ShopStore.restoreBackup` (S143، #455) — راه از `RestoreRoute.decide` ِ core
+   * (`core/.../backup/RestoreRoute.kt`؛ یکی را عوض کنی، هر دو را). بازیابی **هرگز op نمی‌سازد**:
+   *   • هرگز هم‌تراز نشده و (بی ورود یا Snapshot ِ خالی) ⇒ `SyncV1Engine.resetTo`: پشتیبان جای دفتر و خودش سایه، cursor صفر؛
+   *   • هرگز هم‌تراز نشده، واردشده و Snapshot ردیف دارد ⇒ همان راهِ همگام (پایین)؛ Snapshot نیامد ⇒ `sync_first`، هیچ؛
+   *   • همگام، بی ورود یا بی شبکه ⇒ هیچ چیزی عوض نمی‌شود؛
+   *   • همگام ⇒ `SyncRebuild.run`: صف تا ته (این‌جا همان دورِ همیشه)، بعد Snapshot — ردیف‌ها فقط از سرور،
+   *     از پشتیبان فقط آنچه همگام نمی‌شود (`fromServer`)، کفِ فاکتور (`withInvoiceCursor`)؛ سایه و
+   *     cursor با همان Snapshot.
+   * ساختی که بازیابی را هنوز «ذخیره» می‌کند (`KOTLIN.restoreNoOps` خاموش) ⇒ همان [save] (تفاضل با سایه).
+   * @returns {Promise<{ok:boolean, route:string, rows?:number, notOnServer?:number}>}
+   */
+  async restore(backup) {
+    if (!this.kotlin.restoreNoOps) { this.save(backup); return { ok: true, route: 'save' }; }
+    const shaped = (t) => (this.kotlin.snapshotShaped ? projectLedger(t, this.keepOf) : t);
+    const synced = this.cursor > 0 || this.snapshotAt > 0;
+    const signedIn = !!this.token;
+    //  #485: واردشده ولی هرگز همگام‌نشده ⇒ `SyncV1Engine.serverRows` (Snapshot.rows؛ نیامد ⇒ null)
+    let serverRows = null;
+    if (!synced && signedIn && !this.offline) {
+      const s = await this.api('GET', '/sync/v1/snapshot');
+      const n = s.status === 200 ? Number(s.body?.rows) : NaN;
+      serverRows = Number.isInteger(n) && n >= 0 ? n : null;
+    }
+    //  `RestoreRoute.decide` (v1؛ v3 این‌جا نیست)
+    if (!synced && (!signedIn || serverRows === 0)) {
+      this.ledger = this.raw ? backup : projectLedger(backup, this.keepOf);
+      this.shadow = core.shadowOf(shaped(backup));
+      this.cursor = 0;
+      return { ok: true, route: 'local' };
+    }
+    if (!synced && (serverRows === null || this.offline)) return { ok: false, route: 'sync_first' };
+    if (!signedIn) return { ok: false, route: 'need_sign_in' };
+    if (this.offline) return { ok: false, route: 'need_net' };
+    const pushed = await this.sync();
+    if (!pushed.ok) return { ok: false, route: 'from_server', error: this.lastError };
+    if (this.queue.length) return { ok: false, route: 'queue_left' };
+    const r = await this.api('GET', '/sync/v1/snapshot');
+    if (r.status !== 200) return { ok: false, route: 'from_server', status: r.status };
+    const syncedKeys = new Set([...core.COLLECTIONS, ...core.LIST_COLLECTIONS]);
+    const base = emptyLedger();
+    for (const [k, v] of Object.entries(backup)) if (!syncedKeys.has(k)) base[k] = v;
+    const next = core.fromSnapshot(r.body, base);
+    const highest = Math.max(0, ...(next.sales || []).map((s) => Number(s.invoiceNumber) || 0));
+    next.nextInvoiceNo = Math.max(Number(next.nextInvoiceNo) || 1, highest + 1);
+    this.ledger = this.raw ? next : projectLedger(next, this.keepOf);
+    this.shadow = core.shadowOf(shaped(next));
+    this.cursor = Number(r.body.cursor || 0);
+    this.snapshotAt = Date.now();
+    //  `RestoreRoute.notOnServer`: ردیف‌های پشتیبان که دفترِ تازه ندارد — افزوده نمی‌شوند، فقط شمرده
+    const notOnServer = core.COLLECTIONS.reduce((n, t) => {
+      const have = new Set((this.ledger[t] || []).map((x) => String(x.id)));
+      return n + new Set((backup[t] || []).map((x) => String(x.id)).filter((id) => !have.has(id))).size;
+    }, 0);
+    return { ok: true, route: 'from_server', rows: Number(r.body.rows || 0), notOnServer };
   }
 
   /* ---------------- کارهای دکان (سطر به سطرِ موتورهای کاتلین) ---------------- */
@@ -816,6 +905,105 @@ export class NativeDevice {
     }));
     this.save(d);
     return { ok: true, totals: t, diff };
+  }
+
+  /**
+   * `ReturnFlow.post` (برگشتِ تازه، `ReturnSettings.enabled`) — با رسید، مقصدِ هر قلم «به موجودی» یا
+   * «ضایعات»، سطر به سطر از `ReturnFlow.quote/post`: مبلغ با سهمِ تخفیف و گردِ هر قلم، سقفِ مبلغِ
+   * نهاییِ فاکتور، بیش از «قابلِ برگشت» رد (نه بریده)، `docId` یکتا (تکرار رد)، ردیف‌های `SaleReturn`
+   * با `docId`/`disposition`/`refund`، حرکتِ `customer_return`، و برای ضایعات ردیفِ اصلاحیِ انبار
+   * (`adjKind = damage`) و حرکتِ `damage`.
+   *
+   * ⛔ زیرمجموعه: فقط صاحبِ دکان (دروازهٔ نقش `allow`)، فاکتورِ بی `payments` (#286)، و بازپرداختِ
+   * `original`/`cash` با همان ترتیبِ `Pay.refund`: اول بدهیِ بازِ همین فاکتور (رسیدِ `customer_return`)،
+   * بقیه نقد. اعتبارِ فروشگاه، بی رسید و تعویض این‌جا نیستند (آزمونِ `ReturnFlowTest`).
+   * picks: {saleItemId: {qty, disposition: 'restock' | 'damaged'}}
+   * @returns {{ok:true, docId:string, amount:number, cash:number, account:number} | {ok:false, code:string}}
+   */
+  returnFlow(saleId, picks, { reason = '', mode = 'original', docId = null, by = '' } = {}) {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const today = todayOf(now);
+    const doc = docId || core.ulid(now);
+    if (d.returns.some((r) => r.docId === doc)) return { ok: false, code: 'ALREADY_POSTED' };
+    const why = reason.trim();
+    if (!why) return { ok: false, code: 'REASON_REQUIRED' };
+    const sale = d.sales.find((s) => s.id === saleId);
+    if (!sale) return { ok: false, code: 'SALE_NOT_FOUND' };
+    if (sale.status === 'cancelled') return { ok: false, code: 'SALE_CANCELLED' };
+    if (mode !== 'original' && mode !== 'cash') throw new Error(`returnFlow: روشِ «${mode}» در این شبیه‌سازی نیست`);
+    if ((sale.payments || []).length) throw new Error('returnFlow: پرداختِ ترکیبی (#286) در این شبیه‌سازی نیست');
+    //  `quote`
+    const ratio = sale.total > 0 && sale.discount > 0 ? Math.min(1, Math.max(0, (sale.total - sale.discount) / sale.total)) : 1;
+    const lines = [];
+    for (const item of d.saleItems) {
+      if (item.saleId !== saleId) continue;
+      const p = picks[item.id];
+      if (!p) continue;
+      const q = Number(p.qty);
+      if (!Number.isFinite(q) || q < 0) return { ok: false, code: 'BAD_QTY' };
+      if (q === 0) continue;
+      const disposition = p.disposition || 'restock';
+      if (disposition !== 'restock' && disposition !== 'damaged') return { ok: false, code: 'BAD_DISPOSITION' };
+      if (q > item.quantity - item.returnedQty + 1e-9) return { ok: false, code: 'QTY_EXCEEDS' };
+      const amount = item.quantity > 0 ? roundHalfUp(item.totalPrice / item.quantity * q * ratio) : 0;
+      lines.push({ item, q, amount, disposition });
+    }
+    if (!lines.length) return { ok: false, code: 'NOTHING_TO_RETURN' };
+    const cap = Math.max(0, sale.finalTotal - d.returns.filter((r) => r.saleId === saleId).reduce((s, r) => s + r.amount, 0));
+    let total = lines.reduce((s, l) => s + l.amount, 0);
+    if (total > cap) {
+      let extra = total - cap;
+      for (let i = lines.length - 1; i >= 0 && extra > 0; i--) { const cut = Math.min(extra, lines[i].amount); lines[i].amount -= cut; extra -= cut; }
+      total = lines.reduce((s, l) => s + l.amount, 0);
+    }
+    //  `split` (`Pay.refund`): اول بدهیِ بازِ همین فاکتور، بقیه نقد — به پول (یک‌صدم) و بی ممیزِ شناور
+    const minor = (afn) => Math.round(afn * 100);
+    let leftAccount = Math.min(minor(total), Math.max(0, minor(sale.debtGiven - sale.debtSettled)));
+    const account = leftAccount / 100;
+    const tag = `R-${doc.slice(-6).toUpperCase()}`;
+    const invoice = `فاکتور #${sale.series ? `${sale.series}-` : ''}${sale.invoiceNumber}`;
+    for (const l of lines) {
+      const rowId = core.ulid(now);
+      const accM = Math.min(leftAccount, minor(l.amount));
+      leftAccount -= accM;
+      d.returns.push(row('SaleReturn', {
+        id: rowId, saleId, saleItemId: l.item.id, productId: l.item.productId, quantity: l.q, amount: l.amount, reason: why,
+        date: today, createdAt: now, docId: doc, disposition: l.disposition, refund: mode,
+        toAccount: accM > 0 ? accM / 100 : null, by: by.trim() || null,
+      }));
+      l.item.returnedQty += l.q;
+      if (!l.item.productId) continue;
+      const product = d.products.find((x) => x.id === l.item.productId);
+      d.stockMovements.push(row('StockMovement', {
+        id: core.ulid(now), productId: l.item.productId, type: 'customer_return', qty: l.q, date: today,
+        notes: `برگشت ${tag} — ${invoice} — ${why}`, refId: rowId, createdAt: now,
+      }));
+      if (l.disposition === 'damaged' && KOTLIN_RETURNS.waste) {
+        d.warehouseEntries.push(row('WarehouseEntry', {
+          id: core.ulid(now), productId: l.item.productId, units: -l.q, unit: product ? product.unit : '', date: today,
+          notes: `ضایعاتِ برگشتی ${tag} — ${why}`, isAdjustment: true, createdAt: now, adjKind: 'damage', refId: doc,
+        }));
+        d.stockMovements.push(row('StockMovement', {
+          id: core.ulid(now), productId: l.item.productId, type: 'damage', qty: -l.q, date: today,
+          notes: `ضایعاتِ برگشتی ${tag} — ${why}`, refId: rowId, createdAt: now,
+        }));
+      }
+    }
+    if (account > 0 && sale.debtorId) {
+      d.transactions.push(row('DebtTransaction', {
+        id: core.ulid(now), debtorId: sale.debtorId, type: 'receive', amount: account, date: today,
+        notes: `برگشت ${tag} — ${invoice}`, createdAt: now, refId: doc, kind: 'customer_return',
+      }));
+      sale.debtSettled += account;
+    }
+    d.auditLog.push(row('AuditEntry', {
+      id: core.ulid(now), type: 'return', date: today, refId: saleId, createdAt: now, amount: total,
+      notes: `برگشت ${tag} به مبلغ ${money(total)} افغانی — ${invoice} — دلیل: ${why}`
+        + (lines.some((l) => l.disposition === 'damaged') ? ' — ضایعات' : ''),
+    }));
+    this.save(d);
+    return { ok: true, docId: doc, amount: total, account, cash: Math.round((total - account) * 100) / 100 };
   }
 
   /** `SalesEngine.recordReturn` — quantities: {saleItemId: qty} */

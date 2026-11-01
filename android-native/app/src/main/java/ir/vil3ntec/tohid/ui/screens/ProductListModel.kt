@@ -49,14 +49,18 @@ object ProductListModel {
     Tab.INACTIVE -> !p.active
   }
 
-  /** جست‌وجو در نام، دسته، زیردسته و بارکد — ارقامِ فارسی/عربی هم */
-  fun matches(p: Product, query: String): Boolean {
+  /**
+   *  جست‌وجو در نام، دسته، زیردسته و بارکد — ارقامِ فارسی/عربی هم. `extra` (PRD-02، پشتِ
+   *  `ProductInfoPrefs`، پیش‌فرض خاموش): نامِ پشتو/انگلیسی، مترادف و واژهٔ جست‌وجو هم.
+   */
+  fun matches(p: Product, query: String, extra: Boolean = false): Boolean {
     val q = ir.vil3ntec.tohid.normalizeDigits(query.trim())
     if (q.isEmpty()) return true
     return p.name.contains(q, ignoreCase = true) ||
       p.category.contains(q, ignoreCase = true) ||
       p.subcategory.contains(q, ignoreCase = true) ||
-      p.barcodes.any { it.contains(q) }
+      p.barcodes.any { it.contains(q) } ||
+      (extra && ir.vil3ntec.tohid.data.ProductInfoMap.matches(p, q))
   }
 
   /**
@@ -111,9 +115,10 @@ object ProductListModel {
     category: String?,
     sort: Sort,
     asc: Boolean,
+    extra: Boolean = false,
   ): List<Product> {
     val list = products.filter { p ->
-      inTab(p, stockOf(p.id), tab) && (category == null || p.category == category) && matches(p, query)
+      inTab(p, stockOf(p.id), tab) && (category == null || p.category == category) && matches(p, query, extra)
     }
     val sorted = when (sort) {
       Sort.NAME -> list.sortedBy { it.name }

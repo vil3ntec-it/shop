@@ -100,4 +100,24 @@ class DebtReminderTest {
     assertEquals("سررسیدگذشته", s.rows[1][0])
     assertEquals("2026-10-15", s.rows[1][4])
   }
+
+  /** CRM-06 — خطای نوع‌دار برای فرمِ سه‌زبانه؛ `validate` همان متن‌های پیشین را از همین می‌سازد */
+  @Test fun `سنجشِ نوع‌دارِ قالب`() {
+    assertNull(DebtReminder.check(DebtReminder.DEFAULT_TEMPLATE))
+    assertEquals(DebtReminder.Problem.Empty, DebtReminder.check(" \n "))
+    assertEquals(DebtReminder.Problem.TooLong, DebtReminder.check("ا".repeat(DebtReminder.MAX_TEMPLATE_LENGTH + 1)))
+    assertNull(DebtReminder.check("ا".repeat(DebtReminder.MAX_TEMPLATE_LENGTH)))
+    assertEquals(DebtReminder.Problem.Unknown(listOf("ناشناس", "x")), DebtReminder.check("{نام} {ناشناس} {x} {ناشناس}"))
+    assertEquals("جای‌نگهدارِ ناشناخته: {ناشناس}، {x}", DebtReminder.validate("{نام} {ناشناس} {x} {ناشناس}"))
+  }
+
+  /** CRM-06 — برگهٔ «یادآوریِ امروز» (چاپ و اکسلِ کامپیوتر) با متنِ همین دستگاه؛ بی متن همان جملهٔ امروز */
+  @Test fun `برگهٔ یادآوری با متنِ دکان`() {
+    val tpl = "{نام} جان، {مبلغ} افغانی، سررسید {سررسید}"
+    val custom = ReportCsv.of("reminders", d0, "", "", today, tpl)
+    val late = custom.rows.single { it[0] == "سررسیدگذشته" }
+    assertEquals("سررسیدگذشته جان، ${money(300.0)} افغانی، سررسید ${formatDate("2026-10-15")}", late[6])
+    val plain = ReportCsv.of("reminders", d0, "", "", today)
+    assertEquals(DebtReminder.message(DebtReminder.Vars("سررسیدگذشته", 300.0)), plain.rows.single { it[0] == "سررسیدگذشته" }[6])
+  }
 }

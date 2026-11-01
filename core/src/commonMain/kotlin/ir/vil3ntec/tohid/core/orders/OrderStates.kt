@@ -220,11 +220,19 @@ object OrderDraft {
     val addressText: String = "",
     val landmark: String = "",
     val deliveryFee: String = "",
+    /** «مشتری با چه مبلغی می‌پردازد؟» (CHK-14) — افغانیِ کامل؛ خالی ⇒ نگفته */
+    val cashTender: String = "",
     val note: String = "",
     val test: Boolean = false,
     val lines: List<LineInput> = listOf(LineInput(qty = "1")),
+    /** ترجیحِ کلیِ جایگزینی (CHK-15) — فقط وقتی `/config` ِ سرور `substitution` دارد نشان داده می‌شود */
+    val substitution: String = "",
   )
-  data class Line(val name: String, val qtyMilli: Long, val unitPriceMinor: Long)
+  /**
+   *  [productId]/[unit] (POS-38، `core/pos/DeliverLater`): قلمِ سبدِ صندوق با شناسهٔ کالا و واحد، تا فروشِ
+   *  تحویل همان کالا را کم کند. تهی (پیش‌فرض، فرمِ سفارشِ دستی) ⇒ فرستاده نمی‌شوند و بدنه همان پیشین است.
+   */
+  data class Line(val name: String, val qtyMilli: Long, val unitPriceMinor: Long, val productId: String = "", val unit: String = "")
   data class Body(
     val source: String,
     val fulfillment: String,
@@ -233,9 +241,13 @@ object OrderDraft {
     val addressText: String,
     val landmark: String,
     val deliveryFeeMinor: Long,
+    /** CHK-14 — null ⇒ کلید فرستاده نمی‌شود */
+    val cashTenderMinor: Long? = null,
     val lines: List<Line>,
     val note: String,
     val test: Boolean,
+    /** '' ⇒ کلید فرستاده نمی‌شود (سرورِ کهنه و پرچمِ خاموش همان بدنهٔ پیشین را می‌بینند) */
+    val substitution: String = "",
   )
 
   sealed class Result {
@@ -295,6 +307,12 @@ object OrderDraft {
     if (delivery && form.deliveryFee.isNotBlank()) {
       fee = scaled(form.deliveryFee, 2) ?: return err("هزینهٔ ارسال درست نیست")
     }
+    //  CHK-14: قالب این‌جا؛ «نه کمتر از جمع، پول خرد کمتر از یک اسکناسِ ۱۰۰۰» را سرور با جمعِ خودش می‌سنجد
+    val tender = when (val t = if (delivery) DeliveryPrefs.parseTender(form.cashTender) else DeliveryPrefs.Tender.None) {
+      is DeliveryPrefs.Tender.Error -> return err(t.message)
+      is DeliveryPrefs.Tender.Ok -> t.minor
+      DeliveryPrefs.Tender.None -> null
+    }
     return Result.Ok(
       Body(
         source = form.source.ifBlank { "manual" },
@@ -304,9 +322,11 @@ object OrderDraft {
         addressText = if (delivery) addressText else "",
         landmark = if (delivery) landmark else "",
         deliveryFeeMinor = if (delivery) fee else 0L,
+        cashTenderMinor = tender,
         lines = lines,
         note = form.note.trim(),
         test = form.test,
+        substitution = OrderSubstitution.orderCodeOrEmpty(form.substitution),
       ),
     )
   }

@@ -23,7 +23,7 @@ const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
 const { reasonOf } = require('../lib/admin-access');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
+const { badRequest, unauthorized, notFound, tooMany } = require('../middleware/errors');
 
 const router = express.Router();
 const adminLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'admin-auth' });
@@ -627,16 +627,23 @@ router.get('/purchase-requests', async (req, res) => {
   res.json({ requests: rows });
 });
 
+/*
+ *  ⛔ SUB-06: گرفتنِ درخواست (`pending ⇒ approved`) و اعطا یک تراکنش‌اند (`subs.grantClaimed`).
+ *  تا ۲.۱۴.۴ این‌جا اول `pending` خوانده، بعد اعطا و بعد بی شرط `approved` نوشته می‌شد؛ دو کلیک یا تکرار
+ *  پس از قطعِ شبکه در فاصلهٔ خبرِ «تمدید شد» (SMTP) هر دو `pending` می‌دیدند و یک پرداخت دو دوره می‌نشاند.
+ *  تکرار همان ۴۰۴ ِ پیشین را می‌گیرد؛ شکستِ اعطا درخواست را `pending` نگه می‌دارد.
+ */
 router.post('/purchase-requests/:id/approve', async (req, res, next) => {
   const id = v.id(req.params.id);
   const reqRow = await one(`SELECT * FROM purchase_requests WHERE id=$1 AND status='pending'`, [id]);
   if (!reqRow) return next(notFound('درخواست پیدا نشد'));
   const days = req.body?.days ? v.integer(req.body.days, { min: 1, max: 3650 }) : null;
-  const sub = await subs.grant(reqRow.shop_id, {
+  const { row: sub, claimed } = await subs.grantClaimed(reqRow.shop_id, {
     plan: reqRow.plan_code, days, createdBy: req.admin.id, note: reqRow.note, allowUnsuspend: true,
-  });
-  await query(`UPDATE purchase_requests SET status='approved', handled_at=$2, handled_by=$3 WHERE id=$1`,
-    [id, now(), req.admin.id]);
+  }, async (c) => (await c.query(
+    `UPDATE purchase_requests SET status='approved', handled_at=$2, handled_by=$3
+      WHERE id=$1 AND status='pending' RETURNING id`, [id, now(), req.admin.id])).rows.length > 0);
+  if (!claimed) return next(notFound('درخواست پیدا نشد'));
   const reason = reasonOf(req);   // اختیاری — فقط در سابقه (ADMIN-CONTROL-PLANE.md G2)
   await audit.log({ shopId: reqRow.shop_id, actorType: 'admin', userId: req.admin.id, action: 'admin.request_approved', targetId: id, detail: reason ? { reason } : {} });
   res.json({ subscription: sub, state: subs.stateOf(sub) });
@@ -718,9 +725,14 @@ router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
   //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
   const configured = !!config.backup.passphrase;
+  //  SEC-07: `required` = پرچمِ `security / backup.require_encryption` (بی رمز ⇒ پشتیبان نمی‌سازد)
+  const required = await backup.encryptionRequired();
   res.json({
     backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
-    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+    encryption: {
+      configured, required,
+      warning: configured ? '' : (required ? backup.REFUSED_WARNING : backup.UNENCRYPTED_WARNING),
+    },
   });
 });
 
