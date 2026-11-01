@@ -2,7 +2,7 @@
 
 > **ردیف:** SUB-01 (§۲۹.۸): اشتراکِ فعال، منقضی، لغوشده، پرداخت‌درانتظار و grace هر کدام رفتارِ جدا و مستند دارند.
 > **منبعِ حقیقت:** سرور. وضعیت از `stateOf()` در `server/src/lib/subscriptions.js` می‌آید و دسترسی از `entitlementOf()` در `server/src/lib/entitlement.js`. ساعتِ دستگاه هیچ اثری ندارد (SUB-03).
-> **آزمون:** `server/test/subscription-states.test.js`. هر ردیفِ جدولِ زیر یک آزمونِ هم‌نام دارد.
+> **آزمون:** `server/test/subscription-states.test.js`. هر ردیفِ جدولِ زیر یک آزمونِ هم‌نام دارد؛ آزمونِ «SUB-01: /api/me/subscription و /api/me/heartbeat…» همان مرحله را روی API می‌سنجد.
 
 ## واژه‌ها
 
@@ -43,4 +43,4 @@
    - خودِ لحظهٔ `ends_at` هنوز **فعال** است و یک میلی‌ثانیه بعد **مهلت**.
    - خودِ لحظهٔ `graceEndsAt` هنوز **مهلت** است و یک میلی‌ثانیه بعد **منقضی**.
 3. **یک منطق برای دو بخش:** دکان و پمپ هر دو همین `stateOf` را به کار می‌برند. پمپ فقط قاعدهٔ «خدماتِ سرور تا `servicesUntil`» را روی دسترسی اضافه می‌کند.
-4. **سازگاری:** `phase` فیلدی **فقط افزوده** است. هر جا `stateOf` یا `ent.subscription` کامل برگردانده می‌شود، `phase` هم بیرون می‌رود: پاسخ‌های `/api/me` که `subscription: ent.subscription` دارند، `routes/pump-device.js`، و پنلِ مدیر. برنامه‌هایی که فقط `status` و `active` را می‌خوانند همان رفتارِ پیشین را می‌بینند. `GET /api/me/subscription` فیلدها را یکی‌یکی می‌چیند و هنوز `phase` ندارد.
+4. **سازگاری:** `phase` فیلدی **فقط افزوده** است. هر جا `stateOf` یا `ent.subscription` کامل برگردانده می‌شود، `phase` هم بیرون می‌رود: پاسخ‌های `/api/me` که `subscription: ent.subscription` دارند، `routes/pump-device.js`، و پنلِ مدیر. `GET /api/me/subscription` (`phase`، `graceEndsAt`) و نمای `subscriptionView` در `routes/portal.js` **فقط برای دکان** (تپشِ `/api/me/heartbeat`، تپشِ پورتال در بخشِ دکان و عضویتِ دکان در `/api/portal/me` و `/api/portal/subscriptions`: `phase`، `graceEndsAt`) هم آن را دارند (۲.۱۴.۴). ⛔ پاسخِ `/api/pump/heartbeat` و نمای عضویتِ پمپ بیت‌به‌بیت همان پیشین است (کدِ مشترکِ پمپ؛ آزمونِ «پاسخِ تپشِ پمپ همان شکلِ main است»). برنامه‌هایی که فقط `status` و `active` را می‌خوانند همان رفتارِ پیشین را می‌بینند؛ متنِ `label` ِ تپش هنوز در مهلت «n روز مانده» است و نشان دادنِ «مهلت» کارِ رابطِ هر برنامه است.

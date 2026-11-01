@@ -49,6 +49,31 @@ class TokenStore(context: Context) : TokenStorage {
     prefs.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRES).apply()
   }
 
+  /**
+   *  همان `stashTo`/`openFrom` ِ اندروید (پرچمِ `app.multi_server`؛ صدا از `ServerSwitchAndroid`): نشستِ هر
+   *  سرور زیرِ نامِ دامنه‌اش بایگانی می‌شود. مقدارها همان رشتهٔ رمزشدهٔ `SecretBox` جابه‌جا می‌شوند و هرگز باز
+   *  نمی‌شوند؛ توکنِ یک سرور هرگز به سرورِ دیگر فرستاده نمی‌شود.
+   */
+  fun stashTo(scope: String) {
+    val tag = "@srv:" + scope.ifEmpty { "default" }
+    val e = prefs.edit()
+    for (k in listOf(ACCESS, REFRESH)) {
+      val v = prefs.getString(k, null)
+      if (v != null) e.putString(k + tag, v) else e.remove(k + tag)
+    }
+    if (prefs.contains(EXPIRES)) e.putLong(EXPIRES + tag, prefs.getLong(EXPIRES, 0)) else e.remove(EXPIRES + tag)
+    e.remove(ACCESS).remove(REFRESH).remove(EXPIRES).commit()
+  }
+
+  /** نشستِ بایگانی‌شدهٔ یک سرور — نبود ⇒ بی نشست (ورودِ تازه) */
+  fun openFrom(scope: String) {
+    val tag = "@srv:" + scope.ifEmpty { "default" }
+    val e = prefs.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRES)
+    for (k in listOf(ACCESS, REFRESH)) prefs.getString(k + tag, null)?.let { e.putString(k, it) }
+    if (prefs.contains(EXPIRES + tag)) e.putLong(EXPIRES, prefs.getLong(EXPIRES + tag, 0))
+    e.remove(ACCESS + tag).remove(REFRESH + tag).remove(EXPIRES + tag).commit()
+  }
+
   private companion object {
     const val ACCESS = "access_token"
     const val REFRESH = "refresh_token"

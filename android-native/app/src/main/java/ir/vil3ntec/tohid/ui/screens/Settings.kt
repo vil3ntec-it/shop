@@ -132,6 +132,8 @@ fun SettingsScreen(
    *
    *  نشانی فقط در زمانِ **ساخت** داخلِ برنامه می‌نشیند
    *  (`tohid.apiBase` در `gradle.properties`) و از آن به بعد قفل است.
+   *  ⚠️ تنها استثنا بخشِ «سرورها» (`ServersSettings`) پشتِ پرچمِ خاموشِ `app.multi_server` است — فقط صاحبِ دکان،
+   *  با سنجاقِ هویت و دادهٔ جدا برای هر سرور (`docs/SERVERS-fa.md`).
    */
   val serverReady = AppConfig.isConfigured(context)
   var busy by remember { mutableStateOf(false) }
@@ -1105,19 +1107,15 @@ fun SettingsScreen(
             //  می‌کند برنامه خراب است
             val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
             val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ
-            //  پایانِ اشتراک نباید گروگانش بگیرد.
-            if (!store.applyRestore(fixed)) {
-              //  به دیسک نرسید (F0-01): دفترِ قبلی دست‌نخورده سرِ جایش است
-              toast(StrSettings.restoreDiskFail)
-              return@launch
-            }
+            //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد.
+            //  S143: هرگز op نمی‌سازد؛ دستگاهِ همگام ⇒ اطلاعات از سرور. نشد (دیسک F0-01، شبکه، صف) ⇒
+            //  دفترِ قبلی دست‌نخورده و دلیلش
+            val r = store.restoreBackup(fixed)
+            if (!r.ok) { toast(r.message); return@launch }
             canUndo = true
             restorePhotos = 0
-            toast(
-              if (moved > 0) StrSettings.restoredWithPhotos(plain(moved))
-              else StrSettings.restored
-            )
+            val done = if (moved > 0) StrSettings.restoredWithPhotos(plain(moved)) else StrSettings.restored
+            toast(if (r.message.isEmpty()) done else "$done\n${r.message}")
           }
         }) { Text(StrSettings.restore, color = Shop.colors.danger) }
       },
@@ -1195,27 +1193,19 @@ fun SettingsScreen(
   }
 
   if (confirmClear) {
-    AlertDialog(
-      onDismissRequest = { confirmClear = false },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text(StrSettings.wipeQ, color = Shop.colors.text) },
-      text = {
-        Text(
-          StrSettings.wipeWarn,
-          style = MaterialTheme.typography.bodySmall,
-          color = Shop.colors.muted,
-        )
+    WipeAllDialog(
+      shopName = storeName,
+      onDismiss = { confirmClear = false },
+      onConfirm = {
+        confirmClear = false
+        //  نقش در این فاصله عوض شد؟ دوباره سنجیده می‌شود
+        if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.OWNER) toast(StrSettings.wipeOwnerOnly)
+        else scope.launch {
+          //  «پاک کردنِ همه» جایگزینیِ کامل است، نه ویرایشی روی پایه (`ShopStore.save`، پرچمِ `shop.ledger_merge`).
+          //  نوشته نشد (قفلِ نرم، خطای دیسک) ⇒ پیامش را `AppRoot` می‌دهد؛ «پاک شد» دروغ نگوید
+          if (store.save(ShopData(), replace = true)) toast(StrSettings.wiped)
+        }
       },
-      confirmButton = {
-        TextButton(onClick = {
-          confirmClear = false
-          scope.launch {
-            store.save(ShopData())
-            toast(StrSettings.wiped)
-          }
-        }) { Text(StrSettings.wipe, color = Shop.colors.danger) }
-      },
-      dismissButton = { TextButton(onClick = { confirmClear = false }) { Text(Str.cancel) } },
     )
   }
 

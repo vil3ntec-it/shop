@@ -65,6 +65,7 @@ object CourierCodec {
     .put("lat", c.lat ?: JSONObject.NULL).put("lng", c.lng ?: JSONObject.NULL)
     .put("customerName", c.customerName).put("phoneMasked", c.phoneMasked)
     .put("callBeforeArrival", c.callBeforeArrival).put("leaveWith", c.leaveWith)
+    .put("cashTenderMinor", c.cashTenderMinor ?: JSONObject.NULL)
     .put("itemsCount", c.itemsCount).put("paymentMethod", c.paymentMethod)
     .put("expectedCollectMinor", c.expectedCollectMinor)
     .put("cashCollectedMinor", c.cashCollectedMinor ?: JSONObject.NULL)
@@ -75,6 +76,8 @@ object CourierCodec {
         a.put(JSONObject().put("kind", t.kind).put("to", t.to).put("at", t.at).put("reason", t.reason).put("by", t.by))
       }
     })
+    .put("area", c.area).put("gateColor", c.gateColor)
+    .put("addressCorrectedAt", c.addressCorrectedAt ?: JSONObject.NULL)
 
   fun card(o: JSONObject): MissionCard = MissionCard(
     id = o.optString("id"),
@@ -88,6 +91,7 @@ object CourierCodec {
     phoneMasked = o.optString("phoneMasked"),
     callBeforeArrival = o.optBoolean("callBeforeArrival"),
     leaveWith = o.optString("leaveWith"),
+    cashTenderMinor = if (o.isNull("cashTenderMinor")) null else o.optLong("cashTenderMinor"),
     itemsCount = o.optInt("itemsCount"),
     paymentMethod = o.optString("paymentMethod"),
     expectedCollectMinor = o.optLong("expectedCollectMinor"),
@@ -104,6 +108,10 @@ object CourierCodec {
         }
       }
     }.orEmpty(),
+    area = o.optString("area"),
+    gateColor = o.optString("gateColor"),
+    //  کارتِ کهنه‌تر این کلید را ندارد ⇒ null (isNull برای کلیدِ نبوده هم true است)
+    addressCorrectedAt = if (o.isNull("addressCorrectedAt")) null else o.optLong("addressCorrectedAt"),
   )
 
   /** «نقدِ من» و آمار، برای دیدن بی اینترنت (آخرین پاسخِ سرور) */

@@ -107,6 +107,8 @@ fun AppRoot(
   //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
   if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
+  //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()

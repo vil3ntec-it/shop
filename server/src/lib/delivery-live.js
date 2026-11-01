@@ -145,5 +145,5 @@ async function putEta(shopId, assignmentId, body, actor) {
 }
 
 module.exports = {
-  VIEW_FLAG, LOCATION_FLAG, ON_THE_WAY, LOCATION_TTL_MS, customerView, putLocation, putEta, purgeLocations,
+  VIEW_FLAG, LOCATION_FLAG, ON_THE_WAY, LOCATION_TTL_MS, LOCATION_MIN_INTERVAL_MS, customerView, putLocation, putEta, purgeLocations,
 };

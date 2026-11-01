@@ -45,6 +45,11 @@ class CourierStore(context: Context) {
   fun summary(): CourierSummary? = CourierCodec.summary(prefs.getString(K_SUMMARY, null))
   fun saveSummary(x: CourierSummary) { prefs.edit().putString(K_SUMMARY, CourierCodec.summaryJson(x)).apply() }
 
+  /** دکان «تماس با مشتری» را روشن کرده؟ (از `/courier/me`؛ آفلاین همان آخرین پاسخ) */
+  var callEnabled: Boolean
+    get() = prefs.getBoolean(K_CALL, false)
+    set(v) { prefs.edit().putBoolean(K_CALL, v).apply() }
+
   /** آخرین بار که سرور جواب داد (ساعتِ گوشی؛ فقط برای نمایش) */
   var lastSyncAt: Long
     get() = prefs.getString(K_LAST, "0")?.toLongOrNull() ?: 0L
@@ -95,6 +100,7 @@ class CourierStore(context: Context) {
     private const val K_ACTIVE = "cards_active"
     private const val K_DONE = "cards_done"
     private const val K_NAME = "name"
+    private const val K_CALL = "call_enabled"
     private const val K_LAST = "last_sync"
     private const val K_PHOTOS = "photos"
     private const val K_SUMMARY = "summary"
@@ -166,7 +172,7 @@ object CourierSync {
 
     //  ۳) کارت‌ها
     if (failure == null) {
-      repo.me().onSuccess { store.courierName = it.name }
+      repo.me().onSuccess { store.courierName = it.name; store.callEnabled = it.callEnabled }
       val a = repo.missions("active")
       val cards = a.valueOrNull()
       if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)

@@ -43,6 +43,8 @@ on:
       #  بردارهای آزمون (Kotlin و JS) را نسخهٔ وب بار نمی‌کند — سایت از آن‌ها عوض نمی‌شود
       - '!license/test-vectors/**'
       - 'sounds/**'
+      #  دروازهٔ محتوای سایت (SEC-ART-03/04) — تغییرِ آن روی همین سایت سنجیده شود
+      - 'tools/security/**'
       - '.github/workflows/web-pages.yml'
   workflow_dispatch:
     inputs:
@@ -73,7 +75,7 @@ jobs:
       deploy: ${{ steps.plan.outputs.deploy }}
       tag_to: ${{ steps.plan.outputs.tag_to }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: کدام نسخه کجا
         id: plan
@@ -125,10 +127,17 @@ jobs:
           set -euo pipefail
           rm -rf _site && mkdir -p _site/beta
           git cat-file -e "$STABLE^{commit}" 2>/dev/null || git fetch --no-tags --depth=1 origin "$STABLE"
-          git archive "$STABLE" | tar -x -C _site
-          git archive HEAD | tar -x -C _site/beta
-          rm -rf _site/.github _site/.gitattributes _site/.gitignore \
-                 _site/beta/.github _site/beta/.gitattributes _site/beta/.gitignore
+          #  ⛔ SEC-ART-03/04: فقط فهرستِ سفیدِ پوستهٔ وب — نه کلِ مخزن. `git archive` بی فهرست سورسِ سرور،
+          #  مهاجرت‌ها، سندهای درونی، آزمون‌ها و کلیدِ امضای APK را روی سایتِ عمومی می‌گذاشت. فایلِ تازه‌ای
+          #  که سایت لازم دارد همین‌جا (و در paths ِ بالا) اضافه شود؛ دروازهٔ پایین هر چیزِ بیرون از آن را سد می‌کند.
+          WEB_PATHS="index.html sw.js manifest.webmanifest download.html privacy.html install.ps1 fonts icons license sounds"
+          pick() {
+            # shellcheck disable=SC2086
+            git archive "$1" -- $(git ls-tree --name-only "$1" -- $WEB_PATHS) | tar -x -C "$2"
+            rm -rf "$2/license/test-vectors"
+          }
+          pick "$STABLE" _site
+          pick HEAD _site/beta
           #  PWAِ آزمایشی جدا از پایدار نصب می‌شود: شناسه و نامِ خودش
           jq '.id = "/tohid-shop/beta/" | .name += " (آزمایشی)" | .short_name += " (آزمایشی)"' \
             _site/beta/manifest.webmanifest > "$RUNNER_TEMP/manifest.json"
@@ -142,8 +151,15 @@ jobs:
             grep -q 'BETA_PATH' "$f" || { echo "::error::$f کانالِ آزمایشی را نمی‌شناسد؛ یک بار Run workflow ⇒ channel = stable"; exit 1; }
           done
           du -sh _site _site/beta
+      #  SEC-ART-03/04: خودِ محتوای سایت — بی .git، سورسِ بک‌اند، .env، کلید، پشتیبان، source map، آزمون
+      #  و سندِ درونی (tools/security/artifact-gate.mjs). در PR هم می‌دود، پس سایتِ آلوده هرگز مرج نمی‌شود.
+      #  آزمونِ خودِ دروازه (با fixtureهای ساختگی) پیش از آن، تا دروازهٔ خراب «پاک» نگوید.
+      - name: دروازهٔ محتوای سایت
+        run: |
+          node --test tools/security/artifact-gate.test.mjs
+          node tools/security/artifact-gate.mjs --profile web _site
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@56afc609e74202658d3ffba0e8f6dda462b719fa # v3.0.1
         if: ${{ steps.plan.outputs.deploy == 'true' }}
         with:
           path: _site
@@ -177,4 +193,4 @@ jobs:
           echo "tohid-web ⇐ $SHA"
 
       - id: pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4.0.5

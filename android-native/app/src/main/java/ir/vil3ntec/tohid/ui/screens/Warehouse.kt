@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -57,7 +58,10 @@ fun WarehouseScreen(
   openProductId: String? = null,
   newBarcode: String? = null,
   onConsumed: () -> Unit = {},
+  /** «دفترِ موجودی» — فقط وقتی موتورِ تازهٔ موجودی و بها روشن است */
+  onStockBook: () -> Unit = {},
 ) {
+  val stockOn = remember(d.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(d) }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -73,14 +77,22 @@ fun WarehouseScreen(
   var confirmDelete by remember { mutableStateOf<Product?>(null) }
   var movementsFor by remember { mutableStateOf<Product?>(null) }
   var stockCount by remember { mutableStateOf(false) }
+  //  چاپِ برچسب و بارکدِ داخلی (PRD-23، PRD-05) — پشتِ `LabelToolsPref`، پیش‌فرض خاموش
+  var labels by remember { mutableStateOf(false) }
   //  ورودِ گروهیِ عکس (v3 ۳۶.۸) — کارِ صاحب/مدیر
   var imageBulk by remember { mutableStateOf(false) }
   //  ورودِ گروهی از CSV — پیش‌نمایش پیش از ثبت
   var importPlan by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Plan?>(null) }
+  //  PRD-20 (پشتِ `ShopPolicy.productTools`): xlsx یا CSV، پیش‌نمایشِ کامل، فایلِ ردیف‌های رد و سابقه
+  var importFile by remember { mutableStateOf<ir.vil3ntec.tohid.data.ProductImport.Picked?>(null) }
+  var importHistory by remember { mutableStateOf(false) }
   //  فیلترِ انقضا: null همه، "expired" منقضی، "near" نزدیک به انقضا
   var expiryFilter by rememberSaveable { mutableStateOf<String?>(null) }
 
   val context = androidx.compose.ui.platform.LocalContext.current
+  val labelTools = remember { ir.vil3ntec.tohid.data.LabelToolsPref.on(context) }
+  //  انبارگردانیِ تازه با اسکن، چند دستگاه و شمارشِ کور (INV-06/07/08) — پشتِ `CountToolsPref`، پیش‌فرض خاموش
+  val countTools = remember { ir.vil3ntec.tohid.data.CountToolsPref.on(context) }
   var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
   val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")
@@ -101,6 +113,26 @@ fun WarehouseScreen(
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
+  }
+
+  val productTools = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
+  var pendingReport by remember { mutableStateOf<ByteArray?>(null) }
+  val saveReport = androidx.activity.compose.rememberLauncherForActivityResult(
+    androidx.activity.result.contract.ActivityResultContracts.CreateDocument(
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+  ) { uri ->
+    val bytes = pendingReport
+    pendingReport = null
+    if (uri == null || bytes == null) return@rememberLauncherForActivityResult
+    scope.launch {
+      val ok = runCatching {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+          context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: error("فایل ساخته نشد")
+        }
+      }.isSuccess
+      toast(if (ok) "فایلِ ردیف‌های رد ذخیره شد — درستش کنید و دوباره وارد کنید" else "فایل ذخیره نشد")
+    }
   }
 
   /** یک نتیجه را می‌نویسد یا دلیلِ ردش را می‌گوید */
@@ -135,6 +167,35 @@ fun WarehouseScreen(
     androidx.activity.result.contract.ActivityResultContracts.GetContent()
   ) { uri ->
     if (uri == null) return@rememberLauncherForActivityResult
+    if (productTools) {
+      scope.launch {
+        //  بیش از سقف خوانده نمی‌شود — فایلِ بزرگ پیش از رسیدن به حافظه رد می‌شود
+        val read = runCatching {
+          kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val bytes = context.contentResolver.openInputStream(uri)?.use { input ->
+              val out = java.io.ByteArrayOutputStream()
+              val buf = ByteArray(64 * 1024)
+              var total = 0
+              while (total <= ir.vil3ntec.tohid.core.product.ImportTable.MAX_FILE_BYTES) {
+                val n = input.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                total += n
+              }
+              out.toByteArray()
+            } ?: error("فایل خوانده نشد")
+            ir.vil3ntec.tohid.data.FileName.of(context, uri) to ir.vil3ntec.tohid.data.ProductImport.read(bytes)
+          }
+        }.getOrNull()
+        if (read == null) { toast("فایل خوانده نشد"); return@launch }
+        when (val r = read.second) {
+          is ir.vil3ntec.tohid.core.product.ImportTable.Read.Failed -> toast(r.reason)
+          is ir.vil3ntec.tohid.core.product.ImportTable.Read.Table ->
+            importFile = ir.vil3ntec.tohid.data.ProductImport.Picked(read.first.ifBlank { "فایل" }, r.rows)
+        }
+      }
+      return@rememberLauncherForActivityResult
+    }
     scope.launch {
       val text = runCatching {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -183,10 +244,32 @@ fun WarehouseScreen(
           Text("ورود کالا به انبار")
         }
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = { stockCount = true }, modifier = Modifier.fillMaxWidth()) {
+        //  موتورِ تازه روشن ⇒ شمارش با بازبینی در «دفترِ موجودی» (INV-09/10)؛ خاموش ⇒ همان برگهٔ امروز
+        OutlinedButton(
+          onClick = { if (stockOn) { StockBookNav.tab.value = "count"; onStockBook() } else stockCount = true },
+          modifier = Modifier.fillMaxWidth(),
+        ) {
           Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
+        }
+        if (labelTools) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = { labels = true }, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text(ir.vil3ntec.tohid.core.i18n.StrLabel.openButton)
+          }
+        }
+        if (stockOn) {
+          Spacer(Modifier.height(8.dp))
+          OutlinedButton(onClick = onStockBook, modifier = Modifier.fillMaxWidth()) {
+            Icon(Icons.Filled.Inventory2, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("دفترِ موجودی — بها، سری، محل و دفترِ حرکت")
+          }
+          Spacer(Modifier.height(8.dp))
+          StockStrip(d, onStockBook)
         }
         Spacer(Modifier.height(8.dp))
         OutlinedButton(
@@ -195,7 +278,13 @@ fun WarehouseScreen(
         ) {
           Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
           Spacer(Modifier.width(6.dp))
-          Text("ورود کالا از فایل اکسل (CSV)")
+          Text(if (productTools) "ورود کالا از فایل اکسل (xlsx یا CSV)" else "ورود کالا از فایل اکسل (CSV)")
+        }
+        val imported = remember(d.auditLog) { d.auditLog.any { it.type == ir.vil3ntec.tohid.data.ProductImport.AUDIT_TYPE } }
+        if (productTools && imported) {
+          TextButton(onClick = { importHistory = true }, modifier = Modifier.fillMaxWidth()) {
+            Text("سابقهٔ ورود از فایل")
+          }
         }
         if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.STAFF) {
           Spacer(Modifier.height(8.dp))
@@ -356,7 +445,24 @@ fun WarehouseScreen(
 
   if (imageBulk) ImageBulkImportSheet(store, d) { imageBulk = false }
 
+  importFile?.let { file ->
+    ProductImportDialog(
+      d = d,
+      file = file,
+      onDismiss = { importFile = null },
+      onErrorReport = { bytes, name -> pendingReport = bytes; saveReport.launch(name) },
+      onDone = { result ->
+        importFile = null
+        apply(result, "ورود از فایل ثبت شد")
+      },
+    )
+  }
+  if (importHistory) {
+    ProductImportHistoryDialog(ir.vil3ntec.tohid.data.ProductImport.history(d)) { importHistory = false }
+  }
+
   importPlan?.let { plan ->
+    val similarWarn = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
     AlertDialog(
       onDismissRequest = { importPlan = null },
       containerColor = Shop.colors.surfaceSolid,
@@ -379,6 +485,21 @@ fun WarehouseScreen(
           if (plan.skipped.size > 50) {
             Text("و ${plain(plan.skipped.size - 50)} ردیفِ دیگر", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           }
+          //  PRD-19 (پیش‌فرض خاموش): ثبت می‌شوند، ولی شاید همان کالای دیگرند
+          if (similarWarn && plan.similar.isNotEmpty()) {
+            Text(
+              "${plain(plan.similar.size)} ردیف ثبت می‌شود ولی نامش مشابه است — اگر همان کالاست، از فایل بردارید:",
+              style = MaterialTheme.typography.bodySmall,
+              color = Shop.colors.warning,
+            )
+            plan.similar.take(50).forEach { sm ->
+              Text(
+                "ردیف ${plain(sm.row)} «${sm.name}» ≈ «${sm.other}»${if (sm.inFile) " (در همین فایل)" else ""}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Shop.colors.warning,
+              )
+            }
+          }
         }
       },
       confirmButton = {
@@ -394,19 +515,19 @@ fun WarehouseScreen(
   }
 
   if (stockCount) {
-    StockCountSheet(
-      d = d,
-      onDismiss = { stockCount = false },
-      onExport = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") },
-      onSave = { counted, note ->
-        val n = WarehouseEngine.countLines(d, counted).size
-        apply(
-          WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
-          "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
-        ) { stockCount = false }
-      },
-    )
+    val onCountSave: (Map<String, Double>, String) -> Unit = { counted, note ->
+      val n = WarehouseEngine.countLines(d, counted).size
+      apply(
+        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId),
+        "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
+      ) { stockCount = false }
+    }
+    val onCountExport: (ir.vil3ntec.tohid.data.ReportCsv.Sheet) -> Unit = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
+    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
   }
+
+  if (labels) LabelSheetWired(context, d, onDismiss = { labels = false }) { r, done -> apply(r, done) }
 
   if (bulkEntry) {
     BulkEntrySheet(
@@ -460,11 +581,13 @@ fun WarehouseScreen(
       d = d,
       productId = productId,
       onDismiss = { adjustFor = null },
-      onSave = { quantity, increase, reason, kind ->
+      onSave = { quantity, increase, reason, kind, adjKind ->
         apply(
           WarehouseEngine.adjustStock(
             d, productId, quantity, increase, reason, kind,
             todayIso(), System.currentTimeMillis(), ::newId,
+            adjKind = adjKind,
+            userId = if (adjKind != null) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null,
           ),
           "با موفقیت ثبت شد",
         ) { adjustFor = null }
@@ -722,5 +845,9 @@ private fun movementLabel(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }

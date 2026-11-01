@@ -193,6 +193,21 @@ object HwPages {
     return EscPos.document(testImage(context, s), s.profile())
   }
 
+  /**
+   *  HW-01 — برگهٔ دوروشی: نمونهٔ «۱» با `ESC *` (ستونی) و نمونهٔ «۲» با `GS v 0` (رستری).
+   *  کاربر می‌گوید کدام درست درآمد و روش در پروفایلِ همین چاپگر ذخیره می‌شود (`ModeProbe.choose`).
+   *  ترتیب و بایت‌ها در `core/hw/ModeProbe` (آزمون: `PrinterDrawerTest`)؛ روی چاپگرِ واقعی آزموده نشده.
+   */
+  fun modeTestBytes(context: Context, s: PrinterRegistry.Saved): ByteArray {
+    val p = s.profile()
+    val w = p.paperDots
+    fun sample(no: String, how: String): MonoImage = stack(w, listOf(
+      text(context, w, listOf(Line("نمونهٔ $no", Style.TITLE), Line("$how — دری و پښتو: ښه راغلاست ۱۲۳", Style.BODY))),
+      ruler(w),
+    ), gap = 6)
+    return ir.vil3ntec.tohid.core.hw.ModeProbe.page(sample("۱", "ستونی ESC *"), sample("۲", "رستری GS v 0"), p)
+  }
+
   /* ============================ برچسبِ کالا ============================ */
 
   data class LabelResult(val image: MonoImage?, val error: String? = null)

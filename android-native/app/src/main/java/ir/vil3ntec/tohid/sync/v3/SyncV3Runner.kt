@@ -4,7 +4,9 @@ import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.data.DiskWrite
+import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -68,6 +70,8 @@ internal class FileV3Store(private val dir: File) : V3Store {
   private val metaFile = File(dir, "state.json")
   private val queueFile = File(dir, "queue.json")
   override val journal = SyncCommit.Journal(File(dir, "journal.json"))
+  /** §۹.۵: پس از بازیابیِ سرور — `replay-sent.jsonl` و `replay-seen.jsonl` در همین پوشه */
+  override val replay = FileReplayStore.inDir(dir, "replay")
 
   override fun loadMeta(): V3Meta? = read(metaFile) { json.decodeFromString(V3Meta.serializer(), it) }
   override fun saveMeta(meta: V3Meta) = write(metaFile, json.encodeToString(V3Meta.serializer(), meta))
@@ -135,7 +139,8 @@ class SyncV3Runner private constructor(context: Context) {
     key = k
     val dir = File(app.filesDir, "sync-v3-${OpQueue.fileKey(k)}")
     val ledger = object : V3Ledger {
-      override fun read(): ShopData = shop?.data?.value ?: ShopData()
+      //  دفترِ همین لحظهٔ دیسک (`ShopStore.ledgerNow`) — شرح سرِ همان
+      override fun read(): ShopData = shop?.ledgerNow() ?: ShopData()
       override fun write(next: ShopData) {
         val s = shop ?: throw java.io.IOException("دفتر باز نیست")
         s.applyFromServerNow(next)
@@ -147,6 +152,7 @@ class SyncV3Runner private constructor(context: Context) {
       deviceId = SyncStore(app).deviceUid,
       ledger = ledger,
       withLock = { block -> synchronized(lock()) { block() } },
+      archived = { LedgerArchive.archivedIds(LedgerArchive.readArchive(app)) },
     ).load().also { engine = it }
   }
 
@@ -172,7 +178,8 @@ class SyncV3Runner private constructor(context: Context) {
       dropped = s.rejected,
       cursor = e.meta.cursor,
       lastOkAt = s.lastOkAt,
-      lastError = s.lastError,
+      //  §۹.۵: هشدارِ پوششِ دفترچه — نوشته، ولی چراغ را قرمز نمی‌کند
+      lastError = s.lastError.ifBlank { s.notice },
       holding = s.upgradeRequired,
       upgradeAvailable = false,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
@@ -188,6 +195,9 @@ class SyncV3Runner private constructor(context: Context) {
   fun recordOps(ops: List<ir.vil3ntec.tohid.sync.v1.SyncOp>): Int =
     runCatching { engine().recordOps(ops) }.getOrDefault(0).also { publish() }
 
+  /** v3 روی این حساب راه افتاده (از این به بعد ذخیره op می‌سازد) — `ShopStore.restoreBackup`؛ نخوانده ⇒ `true` (امن) */
+  fun initialized(): Boolean = runCatching { engine().meta.initialized }.getOrDefault(true)
+
   fun recover(onDisk: ShopData) {
     runCatching { engine().recover(onDisk) }
     publish()
@@ -199,12 +209,19 @@ class SyncV3Runner private constructor(context: Context) {
   suspend fun work(store: ShopStore): Boolean {
     shop = store
     val e = engine()
-    synchronized(lock()) { e.recover(store.data.value) }
-    //  دستگاهی که هرگز با v1 همگام نشده، دفترش را یک بار «درج» می‌فرستد (نخستین بارگذاری)
-    val firstUpload = SyncV1Engine.of(app).snapshotStatus().lastOkAt == 0L
-    val r = e.sync(keepLocalOnly = firstUpload) { synchronized(lock()) { e.record(store.data.value) } }
-    publish()
-    return r.ok || r.stopped
+    //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`، فقط با پرچمِ `shop.ledger_merge`) ⇒ هیچ چیزی نشانده
+    //  نمی‌شود؛ دورِ بعد دوباره. هر خطای دیگر همان رفتارِ `main` (بالا می‌رود، بی `publish`).
+    try {
+      synchronized(lock()) { e.recover(store.ledgerNow()) }
+      //  دستگاهی که هرگز با v1 همگام نشده، دفترش را یک بار «درج» می‌فرستد (نخستین بارگذاری)
+      val firstUpload = SyncV1Engine.of(app).snapshotStatus().lastOkAt == 0L
+      val r = e.sync(keepLocalOnly = firstUpload) { synchronized(lock()) { e.record(store.ledgerNow()) } }
+      publish()
+      return r.ok || r.stopped
+    } catch (stale: ShopStore.StaleLedger) {
+      publish()
+      return false
+    }
   }
 
   fun queueSize(): Int = runCatching { engine().queued() }.getOrDefault(0)

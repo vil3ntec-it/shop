@@ -145,6 +145,15 @@ object Receipts {
   fun pdf(context: Context, d: ShopData, sale: Sale, legacyQr: String? = null): ByteArray =
     ReceiptPdf.single(mono(context, d, sale, SHARE_DOTS, legacyQr = legacyQr))
 
+  /**
+   *  POS-34 — رسیدِ هدیهٔ بی قیمت با چیدمانِ هسته (`GiftReceiptLayout`): همان ورودیِ فاکتور، ولی هیچ
+   *  مبلغ، پرداخت، قرض‌دار یا QR به کاغذ نمی‌رسد. فقط از دکمهٔ «رسیدِ هدیه» (`GiftReceiptPrefs`، خاموش).
+   */
+  fun giftBitmap(context: Context, d: ShopData, sale: Sale, widthDots: Int, fallbackName: String = localName(context)): Bitmap {
+    val doc = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.build(input(context, d, sale, widthDots, fallbackName = fallbackName), widthDots, format())
+    return ThermalPrinter.toBitmap(ReceiptRaster.compose(doc, ReceiptPainter(context)))
+  }
+
   /* ---------------------------- رسیدِ برگشت (RET-12) ---------------------------- */
 
   /** برچسب‌های رسیدِ برگشت به زبانِ برنامه — همان نوشته‌های رسیدِ پیشین (`StrPos`) */
@@ -228,6 +237,8 @@ object Receipts {
   fun format(exactUnit: Boolean = false): ReceiptFormat {
     val digits = LocaleChoice.digits
     val symbol = LocaleChoice.symbol
+    val lunar = LocaleChoice.lunar
+    val lunarAdjust = LocaleChoice.lunarAdjust
     return object : ReceiptFormat {
       override fun money(afn: Double) = LocaleText.afghani(afn, digits, symbol)
       //  قیمتِ واحدِ اعشاری (قلمِ تخفیفِ خودکار) با دو رقم؛ عددِ کامل همان `LocaleText.amount`
@@ -237,6 +248,8 @@ object Receipts {
       //  شماره جدا و چپ‌به‌راست (LRE…PDF) تا در سطرِ راست‌به‌چپ رقم‌ها جابه‌جا نشوند
       override fun phone(text: String) = "\u202A" + LocaleText.digitsIn(text, digits) + "\u202C"
       override fun date(iso: String) = LocaleText.date(iso, digits)
+      //  LOC-01: فقط با تنظیمِ «تاریخِ قمری» (پیش‌فرض خاموش)
+      override fun lunarDate(iso: String) = if (lunar) LocaleText.lunar(iso, digits, lunarAdjust) else null
     }
   }
 }

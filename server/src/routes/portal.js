@@ -63,8 +63,12 @@ async function cloudSyncOf(app, tenantId) {
   return !!(r && r.cloud_sync);
 }
 
-/** نمای اشتراک برای «اشتراکِ من»: روزِ مانده، رنگ، دائمی. */
-function subscriptionView(ent, at = now()) {
+/**
+ * نمای اشتراک برای «اشتراکِ من»: روزِ مانده، رنگ، دائمی.
+ * SUB-01 (docs/SUB-STATES-fa.md): `phase` و `graceEndsAt` فقط برای دکان (`app = 'shop'`)؛ برای پمپ
+ * (و هر صدازنندهٔ بی `app`) نما بیت‌به‌بیت همان پیشین است — کدِ مشترکِ پمپ (`/api/pump/heartbeat`) دست نمی‌خورد.
+ */
+function subscriptionView(ent, at = now(), app = '') {
   const s = ent.subscription || {};
   const permanent = !!s.endsAt && (s.plan === 'perm' || s.endsAt - at > 10 * 365 * DAY);
   const days = s.endsAt ? Math.max(0, Math.ceil(((s.graceEndsAt || s.endsAt) - at) / DAY)) : 0;
@@ -76,6 +80,8 @@ function subscriptionView(ent, at = now()) {
   else if (ent.source === 'trial') color = 'yellow';
   return {
     source: ent.source, status: s.status || 'none', active: !!s.active, plan: s.plan || '',
+    //  SUB-01: مرحلهٔ رفتاری، «مهلت» جدا از «فعال» — فقط افزوده و فقط دکان؛ متنِ `label` همان
+    ...(app === tenancy.SHOP.app ? { phase: s.phase || 'none', graceEndsAt: s.graceEndsAt || 0 } : {}),
     startsAt: s.startsAt || 0, endsAt: s.endsAt || 0, daysLeft: permanent ? null : days,
     totalDays: total, progress: permanent ? 100 : (total ? Math.max(0, Math.min(100, Math.round(days / total * 100))) : 0),
     permanent, color,
@@ -224,7 +230,7 @@ async function heartbeatHandler(app, req, res, next) {
       await query('UPDATE tokens SET app_version=$2 WHERE token_hash=$1', [req.tokenRow.token_hash, String(req.query.version).slice(0, 32)]).catch(() => {});
     }
     res.json({
-      app, tenantId, subscription: ent ? subscriptionView(ent) : null,
+      app, tenantId, subscription: ent ? subscriptionView(ent, undefined, app) : null,
       entitlement: ent ? { source: ent.source, features: ent.features } : null,
       unreadNotices: inbox.unread, latest: dl.downloads[0] || null, serverTime: now(),
     });
@@ -250,7 +256,7 @@ router.get('/me', async (req, res, next) => {
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId, at);
       memberships.push({
         ...m,
-        subscription: subscriptionView(ent, at),
+        subscription: subscriptionView(ent, at, app),
         cloudSync: await cloudSyncOf(app, m.tenantId),
         addons: await discounts.listAddons({ app, tenantId: m.tenantId }),
         history: (await subs.forApp(app).changeLog(m.tenantId, 20)).map(r => ({
@@ -276,7 +282,7 @@ router.get('/subscriptions', async (req, res, next) => {
       const m = await membership(app, req.user.id, req.tokenRow);
       if (!m) continue;
       const ent = await entitlement.forApp(app).entitlementOf(m.tenantId);
-      out.push({ ...m, subscription: subscriptionView(ent) });
+      out.push({ ...m, subscription: subscriptionView(ent, undefined, app) });
     }
     res.json({ subscriptions: out, serverTime: now() });
   } catch (err) { next(err); }
@@ -328,6 +334,8 @@ router.delete('/devices/:id', async (req, res, next) => {
     if (r.rowCount) {
       await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
         [now(), id, req.user.id]);
+      //  ⛔ S78: سوکتِ زندهٔ همان دستگاه هم در همین درخواست
+      await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
     }
     res.json({ ok: true });
   } catch (err) { next(err); }

@@ -62,6 +62,7 @@ import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -122,6 +123,10 @@ fun DebtorsScreen(
   var receiptFor by remember { mutableStateOf<String?>(null) }
   var dueFor by remember { mutableStateOf<String?>(null) }
   var overLimit by remember { mutableStateOf<PendingTx?>(null) }
+  //  پروندهٔ CRM (CRM-02/10/11) — فقط با «گزارش‌های مشتری» روشن (`ShopPolicy.crmReports`، پیش‌فرض خاموش)
+  val crm = ShopPolicy.crmReports(LocalContext.current)
+  var tagFilter by rememberSaveable { mutableStateOf<String?>(null) }
+  var mergeOpen by remember { mutableStateOf(false) }
 
   fun toast(text: String) {
     scope.launch { snackbar.showSnackbar(text) }
@@ -350,9 +355,13 @@ fun DebtorsScreen(
   form?.let { state ->
     DebtorFormSheet(
       state = state,
+      crm = crm,
       onDismiss = { form = null },
-      onSave = { draft ->
-        val result = if (state.editingId == null) {
+      onSave = { draft, phone2, tags ->
+        val result = if (crm) {
+          //  CRM روشن: قرض‌دار، شمارهٔ دوم و برچسب‌ها با هم — همه یا هیچ
+          CustomerProfileForm.save(d, state.editingId, draft, phone2, tags, System.currentTimeMillis(), ::newId)
+        } else if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)
         } else {
           DebtorEngine.editWithLimit(d, state.editingId, draft)
@@ -362,6 +371,10 @@ fun DebtorsScreen(
         }
       },
     )
+  }
+
+  if (mergeOpen && crm) {
+    CustomerMergeDialog(d, store, onDismiss = { mergeOpen = false }, toast = ::toast)
   }
 
   txFor?.let { (debtorId, kind) ->
@@ -509,9 +522,13 @@ data class DebtorFormState(
   val notes: String = "",
   /** سقفِ اعتبار (CRM-03) — خالی یعنی بی سقف */
   val creditLimit: String = "",
+  /** شمارهٔ دوم (CRM-02) — فقط با CRM روشن دیده و ذخیره می‌شود */
+  val phone2: String = "",
+  /** برچسب‌ها با «،» (CRM-11) — فقط با CRM روشن */
+  val tags: String = "",
 ) {
   companion object {
-    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit))
+    fun of(d: Debtor) = DebtorFormState(d.id, d.name, d.phone, d.notes, limitText(d.creditLimit), d.phone2.orEmpty(), CustomerProfileForm.tagsText(d))
   }
 }
 
