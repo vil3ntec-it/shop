@@ -369,7 +369,7 @@ for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'C
 
 //  ⛔ واژه‌نامه نیامد (شبکه یا ۵۰۰): ویترینِ زنده هرگز کلیدِ خام («od.history»، «ship.free») نشان نمی‌دهد —
 //  HTML ِ فارسی می‌ماند و متنِ ساختهٔ JS از واژه‌های پایهٔ کیت؛ و یک بار دوباره خواسته می‌شود
-const KEYS = Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8')));
+const KEYS = ['fa.json', 'order.fa.json'].flatMap((f) => Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', f), 'utf8'))));
 const rawKeys = (pg) => pg.evaluate((keys) => {
   const set = new Set(keys);
   const out = [];

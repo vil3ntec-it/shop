@@ -405,9 +405,10 @@
   // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var orderView = null;
   function loadOrderView() {
-    orderView = orderView || new Promise(function (ok, no) {
+    //  واژه‌نامهٔ همین صفحه (`kit/i18n/order.<زبان>.json`) هم‌زمان با اسکریپت؛ نیامد ⇒ متنِ فارسیِ HTML، بی کلیدِ خام
+    orderView = orderView || Promise.all([new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
-    }).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
+    }), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
