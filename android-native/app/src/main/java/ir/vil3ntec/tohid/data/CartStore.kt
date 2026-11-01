@@ -56,6 +56,10 @@ class CartStore(context: Context) : HeldCart {
   private val _coupons = MutableStateFlow(initial?.takeIf { it.lines.isNotEmpty() }?.coupons.orEmpty())
   val coupons: StateFlow<List<String>> = _coupons.asStateFlow()
 
+  /** POS-11 — یادداشتِ فاکتورِ همین سبد؛ مثلِ کدها با پیش‌نویس و فاکتورِ نگه‌داشته می‌رود و برمی‌گردد */
+  private val _note = MutableStateFlow(initial?.takeIf { it.lines.isNotEmpty() }?.note)
+  val note: StateFlow<String?> = _note.asStateFlow()
+
   /**
    *  پیش‌نویسی که از بارِ پیش مانده و هنوز از کاربر پرسیده نشده
    *  (`DraftRecoveryPrompt`). تا پاسخ، همان ردیف‌ها در سبد هستند — مثلِ پیش.
@@ -75,7 +79,7 @@ class CartStore(context: Context) : HeldCart {
   }
 
   private fun persist() {
-    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value)
+    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value)
     write(file, draft) {
       //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
       if (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY)) {
@@ -112,7 +116,7 @@ class CartStore(context: Context) : HeldCart {
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
-    if (lines.isEmpty()) _coupons.value = emptyList()
+    if (lines.isEmpty()) { _coupons.value = emptyList(); _note.value = null }
     persist()
     if (byUser) removed(before, lines, draftKey)
     return true
@@ -130,6 +134,18 @@ class CartStore(context: Context) : HeldCart {
     if (frozen) return false
     if (codes != _coupons.value) {
       _coupons.value = codes
+      persist()
+    }
+    return true
+  }
+
+  /** POS-11 — `false` ⇒ وسطِ جابه‌جاییِ فاکتور بود؛ متن از پیش `SaleNotes.clean` شده است */
+  fun setNote(text: String?): Boolean {
+    if (frozen) return false
+    //  یادداشتِ فاکتور بی سبد معنا ندارد (مثلِ کدها)
+    val next = if (_lines.value.isEmpty()) null else text
+    if (next != _note.value) {
+      _note.value = next
       persist()
     }
     return true
@@ -156,6 +172,7 @@ class CartStore(context: Context) : HeldCart {
     _lines.value = emptyList()
     _debtorId.value = null
     _coupons.value = emptyList()
+    _note.value = null
     persist()
   }
 
@@ -193,6 +210,7 @@ class CartStore(context: Context) : HeldCart {
     _lines.value = keep.cart()
     _debtorId.value = keep.debtorId
     _coupons.value = keep.coupons
+    _note.value = keep.note
     persist()
   }
 
@@ -205,7 +223,7 @@ class CartStore(context: Context) : HeldCart {
   override val recovering: Boolean get() = _recovered.value != null
 
   override fun snapshot(): SaleDraft =
-    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value)
+    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value)
 
   /**
    *  سبد را با فاکتورِ دیگری عوض می‌کند (`null` = سبدِ خالی) و تا رسیدنش به
@@ -219,11 +237,12 @@ class CartStore(context: Context) : HeldCart {
     _debtorId.value = draft?.debtorId
     //  N3: کدهای تخفیف مالِ همان فاکتورند — با آن می‌روند و برمی‌گردند، به فاکتورِ دیگر نمی‌رسند
     _coupons.value = if (lines.isEmpty()) emptyList() else draft?.coupons.orEmpty()
+    _note.value = if (lines.isEmpty()) null else draft?.note
     //  همان نویسندهٔ تک‌رشته‌ای: نوشتن‌های پیشین پیش از این می‌روند و این یکی آخرین حالت را می‌نویسد
     return withContext(Dispatchers.IO) {
       runCatching {
         writer.submit(Callable {
-          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value))) }.isSuccess
+          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value))) }.isSuccess
         }).get()
       }.getOrDefault(false)
     }

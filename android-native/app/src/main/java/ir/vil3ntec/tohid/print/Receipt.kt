@@ -182,6 +182,8 @@ object Receipt {
         { LocaleText.unitAmount(it, digits) }, { LocaleText.digitsIn(ir.vil3ntec.tohid.qty(it), digits) })
       row(detail, num(item.totalPrice), small)
       if (item.returnedQty > 0) line(StrSale.returned(num(item.returnedQty)), small)
+      //  POS-11: یادداشتِ ردیف؛ بی یادداشت ⇒ همان چیدمانِ پیشین
+      item.note?.takeIf { it.isNotBlank() }?.let { line(it, small) }
       gap(0.25f)
     }
 
@@ -200,6 +202,7 @@ object Receipt {
     //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
     ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> row(label, afn(amount), body) }
     if (debtor != null) row(Str.debtor, debtor.name, body)
+    sale.note?.takeIf { it.isNotBlank() }?.let { line("${StrSale.invoiceNote}: $it", small) }
 
     rule(thick = true)
     if (qr != null) {

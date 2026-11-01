@@ -926,8 +926,11 @@ fun CartLineDialog(
   linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
   /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
   why: List<ir.vil3ntec.tohid.core.pos.PriceWhy.Row>? = null,
+  /** POS-11 — یادداشتِ ردیف (`posLineNote`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
+  note: ir.vil3ntec.tohid.ui.components.pos.PosLineNote? = null,
 ) {
   val policy = linePolicy
+  var noteText by remember { mutableStateOf(note?.value.orEmpty()) }
   var qtyText by remember { mutableStateOf(qty(quantity)) }
   var priceText by remember { mutableStateOf(qty(unitPrice)) }
   var manual by remember { mutableStateOf(custom) }
@@ -1038,6 +1041,7 @@ fun CartLineDialog(
           color = Shop.colors.text,
         )
         edit.net?.let { Text(ir.vil3ntec.tohid.core.i18n.StrLine.afterDiscount(money(it)), style = MaterialTheme.typography.titleSmall, color = Shop.colors.success) }
+        if (note != null) ir.vil3ntec.tohid.ui.components.pos.PosNoteField(noteText, { noteText = it }, "یادداشتِ ردیف")
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
@@ -1045,7 +1049,7 @@ fun CartLineDialog(
           Button(
             enabled = ok,
             //  تخفیفِ ردیف ⇒ قیمتِ واحدِ پس از تخفیف؛ وگرنه همان قیمتِ دستیِ پیشین
-            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else null) },
+            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else null); note?.save?.invoke(noteText) },
           ) { Text("ثبت") }
         }
       }
