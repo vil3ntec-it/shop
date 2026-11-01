@@ -73,6 +73,7 @@ const PREFIX = [
 /** بی دکان: عمومی یا هویتِ خودِ آدم — هر کدام با دلیل. */
 const NO_TENANT = {
   'GET /api/health': 'سلامت', 'GET /api/ready': 'آمادگی', 'GET /api/config': 'پیکربندیِ عمومی',
+  'GET /api/config/server': 'هویت و توانِ همین سرور (`lib/server-identity.js`) — بی دادهٔ هیچ حسابی',
   'GET /api/plans': 'پلن‌های عمومی', 'GET /api/terms': 'شرایط', 'GET /api/downloads': 'فهرستِ دانلود',
   'GET /api/license/public-key': 'کلیدِ عمومی', 'POST /api/visit': 'شمارشِ بازدید', 'POST /api/errors': 'گزارشِ خطا، فقط نوشتن',
   'POST /api/location': 'لوکیشنِ دستگاه، فقط نوشتن (claimDevice فقط ردیف‌های بی‌صاحب — TEN-L3)',
