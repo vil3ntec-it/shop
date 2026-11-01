@@ -202,14 +202,14 @@ async function run({ kind = 'manual', dir = null } = {}) {
   //  ⚠️ پیش از spawn (قاعدهٔ «هیچ await میانِ spawn و وصل شدن به stdout» در `runPg`)
   const snap = await openSnapshot();
   try {
-    return await runPg({ kind, encrypted, base, target, tmp, snap });
+    return await runPg({ kind, encrypted, base, target, tmp, snap, strict });
   } finally {
     if (snap) await snap.close();
   }
 }
 
 /** pg_dump ⇒ gzip ⇒ (رمز) ⇒ فایل؛ با `snap` همان snapshot ِ manifest را می‌خواند */
-async function runPg({ kind, encrypted, base, target, tmp, snap }) {
+async function runPg({ kind, encrypted, base, target, tmp, snap, strict = false }) {
   const dump = spawn(config.backup.pgDump, [
     config.db.url,
     '--no-owner', '--no-privileges', '--format=plain', '--encoding=UTF8',

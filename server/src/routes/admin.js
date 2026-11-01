@@ -23,7 +23,7 @@ const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
 const { reasonOf } = require('../lib/admin-access');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, unauthorized, notFound, forbidden, tooMany } = require('../middleware/errors');
+const { badRequest, unauthorized, notFound, tooMany } = require('../middleware/errors');
 
 const router = express.Router();
 const adminLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'admin-auth' });
