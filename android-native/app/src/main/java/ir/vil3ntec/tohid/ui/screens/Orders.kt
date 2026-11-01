@@ -78,6 +78,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   val repo = remember(context) { OrdersLive.repository(context) }
   val colors = Shop.colors
   val view = rememberViewMode("orders", ScreenKind.MANAGEMENT)
+  val ledgerNow by store.data.collectAsState()
 
   var tab by rememberSaveable { mutableStateOf("new") }
   var items by remember { mutableStateOf<List<OrderDto>>(emptyList()) }
@@ -85,7 +86,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var loading by remember { mutableStateOf(true) }
   var error by remember { mutableStateOf<String?>(null) }
   var openId by remember { mutableStateOf<String?>(null) }
-  var creating by remember { mutableStateOf(false) }
+  var creating by remember { mutableStateOf(false) }; var pickFor by remember { mutableStateOf<OrderDto?>(null) }   // + برگهٔ جمع‌آوری (PCK)
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   val rev = OrdersLive.rev.value
@@ -116,7 +117,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         Text("سفارش‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.text)
         Text("ویترین، تلفن، تلگرام و واتس‌اپ — در یک صف", style = MaterialTheme.typography.bodySmall, color = colors.muted)
       }
-      ViewModeToggle(view)
+      ViewModeToggle(view); PickDeskEntry(cfg, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }) { reload++ }   // قفسه و دسته (PCK-10/12)
       if (cfg.permissions.create) {
         Spacer(Modifier.width(8.dp))
         TohidButton("+ سفارشِ دستی", onClick = { creating = true })
@@ -144,6 +145,8 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         onAction = { openId = review.first().orderId },
       )
     }
+    //  بازپرداخت‌هایی که «کالا به انبار برگشت؟» نگرفته‌اند، و آن‌ها که در دفتر ننشستند
+    RefundListNotices(ledgerNow, cfg, onOpen = { openId = it }, onRetry = { scope.launch { OrdersLive.reconcile(context, store, force = true) } })
     //  تحویل‌هایی که فروششان ثبت نشد (قفل، دیسک…) — موجودی تا ثبتِ فروش کم نشده است
     val unposted = OrdersLive.unposted.value
     if (unposted.isNotEmpty()) {
@@ -223,11 +226,11 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       }
     }
   }
-
+  pickFor?.let { o -> OrderPickHost(o, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }, onClose = { pickFor = null; openId = o.id }) { reload++; scope.launch { OrdersLive.pollSummary(context) } } }
   openId?.let { id ->
     OrderDetailSheet(
       id = id, repo = repo, cfg = cfg, store = store, snackbar = snackbar,
-      onClose = { openId = null },
+      onClose = { openId = null }, onPick = { o -> openId = null; pickFor = o },
       onChanged = { reload++; scope.launch { OrdersLive.pollSummary(context) } },
     )
   }
@@ -366,7 +369,7 @@ private fun OrderDetailSheet(
   store: ShopStore,
   snackbar: SnackbarHostState,
   onClose: () -> Unit,
-  onChanged: () -> Unit,
+  onChanged: () -> Unit, onPick: (OrderDto) -> Unit = {},
 ) {
   val c = Shop.colors
   val context = LocalContext.current
@@ -378,6 +381,8 @@ private fun OrderDetailSheet(
   var error by remember(id) { mutableStateOf<String?>(null) }
   var act by remember(id) { mutableStateOf<String?>(null) }
   var busy by remember(id) { mutableStateOf(false) }
+  //  «کالا به انبار برگشت؟» — همان دمِ بازپرداخت، یا برای بازپرداختی که بی پرسش نشست (سرور، دستگاهِ دیگر)
+  var restocking by remember(id) { mutableStateOf(false) }
   var actError by remember(id) { mutableStateOf<String?>(null) }
   val rev = OrdersLive.rev.value
 
@@ -405,7 +410,6 @@ private fun OrderDetailSheet(
       is OrdersLive.Posted.Review -> snackbar.showSnackbar(r.message)
     }
   }
-
   /** «بررسی شد» ِ صاحب برای ردیفِ بررسیِ همین سفارش — برای همهٔ دستگاه‌ها */
   suspend fun ackReview(o: OrderDto) {
     val err = OrdersLive.ackReview(context, o.id)
@@ -436,8 +440,14 @@ private fun OrderDetailSheet(
           order = it
           act = null
           onChanged()
+          scope.launch { ir.vil3ntec.tohid.print.OrderSlipPrint.afterTransition(context, o.status, it)?.let { m -> snackbar.showSnackbar(m) } } // ORD-10
           scope.launch { snackbar.showSnackbar("سفارش #${it.orderNo}: ${OrderText.status(it.status)}") }
           if (it.status in OrderFulfillment.HANDED_OVER || it.status in OrderFulfillment.BACK_IN_SHOP) postSale(it)
+          //  بازپرداخت ⇒ سندِ برگشتِ همان فروش در همین دفتر، و همان دم «کالا به انبار برگشت؟» (پیش‌فرض نه)
+          if (to in OrderStates.MONEY_TARGETS && OrderFulfillment.saleOf(ledger, it.id) != null) {
+            postRefundNotice(snackbar, it) { OrdersLive.postById(context, store, it.id) }
+            if (OrderFulfillment.restockPending(store.data.value, it.id).isNotEmpty()) restocking = true
+          }
         }
         .onFailure { f ->
           if (f.code == "status_changed") {
@@ -527,11 +537,17 @@ private fun OrderDetailSheet(
         )
       }
 
-      val actions = OrderStates.actions(o.status, o.fulfillment, cfg.permissions.manage, cfg.permissions.refund)
-      if (actions.isNotEmpty()) {
+      RefundDetailNotices(
+        ledger, cfg, o,
+        onRestock = { restocking = true },
+        onRetry = { if (!busy) scope.launch { busy = true; postRefundNotice(snackbar, o) { OrdersLive.postById(context, store, o.id) }; busy = false } },
+      )
+
+      val (actions, pickable) = orderPickActions(o, cfg)   // جمع‌آوری (PCK): «جمع‌آوری» و «بسته‌بندی» فقط از برگه
+      if (actions.isNotEmpty() || pickable) {
         Spacer(Modifier.height(12.dp))
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          actions.forEach { to ->
+          if (pickable) OrderPickButton(o, busy) { onPick(o) }; actions.forEach { to ->
             val needsDialog = OrderStates.needsReason(to) || to == "accepted" || to in OrderStates.MONEY_TARGETS
             val click = { if (needsDialog) { actError = null; act = to } else send(to) }
             if (to in OrderText.DANGER) TohidDangerButton(OrderText.action(to), onClick = click, enabled = !busy)
@@ -561,12 +577,8 @@ private fun OrderDetailSheet(
       }
       if (o.fulfillment == "delivery") {
         Section("نشانی")
-        val bits = listOfNotNull(
-          o.address.text.takeIf { it.isNotEmpty() },
-          o.address.landmark.takeIf { it.isNotEmpty() }?.let { "نشانه: $it" },
-          if (o.address.lat != null && o.address.lng != null) "پین: ${o.address.lat}, ${o.address.lng}" else null,
-        )
-        Text(bits.joinToString(" · ").ifEmpty { "—" }, color = c.text)
+        //  نشانی، و دستورِ تحویل با ویرایشش تا پیش از ارسال (CHK-14، CHK-24) — `OrderDeliveryPrefsUi.kt`
+        OrderDeliveryPrefsSection(o, cfg, repo, onUpdated = { order = it; onChanged() })
       }
       if (o.note.isNotEmpty()) { Section("یادداشت"); Text(o.note, color = c.text) }
       Section("اقلام"); OrderSubstitutionNote(o.substitution)   // CHK-15: ترجیحِ کلی
@@ -575,6 +587,9 @@ private fun OrderDetailSheet(
           Column(Modifier.weight(1f)) {
             Text(l.name, color = c.text)
             OrderLineExtras(l)   // یادداشتِ قلم و ترجیحِ جایگزینیِ آن (CHK-16، CHK-15)
+            if (l.note.isNotEmpty()) Text(l.note, style = MaterialTheme.typography.labelSmall, color = c.muted)
+            //  PRD-26 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): محلِ قفسه برای جمع‌آوری
+            ir.vil3ntec.tohid.ui.components.product.OrderLineShelf(ledger, l.productId)
           }
           Text("${OrderText.qty(l.qtyMilli)}${if (l.unit.isNotEmpty()) " ${l.unit}" else ""} × ${OrderText.money(l.unitPriceMinor)}", color = c.muted, style = MaterialTheme.typography.bodySmall)
           Spacer(Modifier.width(10.dp))
@@ -626,11 +641,16 @@ private fun OrderDetailSheet(
       onConfirm = { reason, note, ready -> send(to, reason, note, ready) },
     )
   }
+  if (o != null && restocking) {
+    RestockDialog(o, OrderFulfillment.restockChoices(ledger, o.id), busy, onDismiss = { restocking = false }) { chosen ->
+      if (!busy) scope.launch { busy = true; restockNotice(snackbar, chosen) { OrdersLive.restock(context, store, o.id, o.orderNo, chosen) }; busy = false; restocking = false }
+    }
+  }
 }
 
 /** هشدارِ «تحویل بی فروش» — رنگِ هشدار + متن، با کارِ بعدی (VISUAL-DIRECTION: هرگز رنگِ تنها) */
 @Composable
-private fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
+internal fun FulfillNotice(title: String, body: String, action: String?, onAction: () -> Unit) {
   val c = Shop.colors
   Column(
     Modifier.fillMaxWidth().clip(RoundedCornerShape(Radius.md)).background(c.warningTint).padding(12.dp),
@@ -794,6 +814,7 @@ private fun NewOrderSheet(
         TohidTextField(form.addressText, { form = form.copy(addressText = it.take(300)) }, label = "نشانی")
         TohidTextField(form.landmark, { form = form.copy(landmark = it.take(200)) }, label = "نشانه")
         TohidTextField(form.deliveryFee, { form = form.copy(deliveryFee = it.take(14)) }, label = "هزینهٔ ارسال (افغانی)", keyboardOptions = decimal)
+        CashTenderField(cfg.deliveryPrefs, form.cashTender) { form = form.copy(cashTender = it) }   // CHK-14
       }
       Spacer(Modifier.height(10.dp))
       Text("اقلام (مقدار و فی به افغانی)", style = MaterialTheme.typography.labelLarge, color = c.muted)

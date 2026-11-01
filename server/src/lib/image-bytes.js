@@ -12,7 +12,10 @@
  *    تشخیصِ تاری) روی سرور نیست — هیچ وابستگیِ نصب‌شده‌ای این کار را نمی‌کند
  *    و افزودنِ کتابخانهٔ بومیِ سنگین ممنوع است. نسخه‌های کوچک را برنامه
  *    می‌سازد (مثلِ امروزِ عکسِ ۸۰۰ پیکسلی) و این‌جا فقط سنجیده می‌شوند.
- * ⛔ بمبِ فشرده: بیش از ۱۰٬۰۰۰ پیکسل در یک بُعد یا ۴۰ مگاپیکسل رد می‌شود.
+ * ⛔ بمبِ فشرده: بیش از ۱۰٬۰۰۰ پیکسل در یک بُعد یا ۴۰ مگاپیکسل رد می‌شود —
+ *    فقط از سرآیند، بی بازکردنِ zlib/VP8 (IMG-PRO-09). سرآیندِ دوم که ابعادِ
+ *    دیگری بگوید (JPEG با دو SOF، WebP با جریانِ بزرگ‌تر از بومِ VP8X) «خراب» است:
+ *    رمزگشا ممکن است همان دیگری را بخواند و سقفِ این‌جا دور زده شود.
  */
 const { sniff } = require('./product-photos');
 const { badRequest } = require('../middleware/errors');
@@ -63,10 +66,11 @@ function jpegOrientation(buf, seg) {
 
 function inspectJpeg(buf) {
   const segs = jpegSegments(buf);
-  let width = 0, height = 0, orientation = 0;
+  let width = 0, height = 0, orientation = 0, sof = 0;
   for (const s of segs) {
     const m = s.marker;
     if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+      if (++sof > 1) throw corrupt('jpeg-multi-sof');
       if (s.end - s.start < 9) throw corrupt('jpeg-sof');
       height = buf.readUInt16BE(s.start + 5);
       width = buf.readUInt16BE(s.start + 7);
@@ -129,7 +133,7 @@ const PNG_DROP = new Set(['tEXt', 'zTXt', 'iTXt', 'eXIf', 'tIME']);
 
 function inspectPng(buf) {
   const chunks = pngChunks(buf);
-  if (!chunks.length || chunks[0].type !== 'IHDR') throw corrupt('png-ihdr');
+  if (!chunks.length || chunks[0].type !== 'IHDR' || chunks[0].end - chunks[0].start !== 12 + 13) throw corrupt('png-ihdr');
   return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20), orientation: 0, warnings: [] };
 }
 
@@ -158,22 +162,42 @@ function webpChunks(buf) {
   return out;
 }
 
+/** ابعادِ خودِ جریانِ تصویر ('VP8 ' یا 'VP8L')؛ چیزِ دیگر ⇒ null. */
+function webpBitstream(buf, c) {
+  if (c.type === 'VP8 ') {
+    if (c.len < 10) throw corrupt('webp-vp8');
+    if (buf[c.data + 3] !== 0x9d || buf[c.data + 4] !== 0x01 || buf[c.data + 5] !== 0x2a) throw corrupt('webp-vp8-start');
+    return { width: buf.readUInt16LE(c.data + 6) & 0x3fff, height: buf.readUInt16LE(c.data + 8) & 0x3fff };
+  }
+  if (c.type === 'VP8L') {
+    if (c.len < 5 || buf[c.data] !== 0x2f) throw corrupt('webp-vp8l');
+    const b = buf.readUInt32LE(c.data + 1);
+    return { width: (b & 0x3fff) + 1, height: ((b >>> 14) & 0x3fff) + 1 };
+  }
+  return null;
+}
+
 function inspectWebp(buf) {
   const chunks = webpChunks(buf);
   const c = chunks[0];
-  let width = 0, height = 0;
-  if (c.type === 'VP8 ' && c.len >= 10) {
-    width = buf.readUInt16LE(c.data + 6) & 0x3fff;
-    height = buf.readUInt16LE(c.data + 8) & 0x3fff;
-  } else if (c.type === 'VP8L' && c.len >= 5 && buf[c.data] === 0x2f) {
-    const b = buf.readUInt32LE(c.data + 1);
-    width = (b & 0x3fff) + 1;
-    height = ((b >>> 14) & 0x3fff) + 1;
-  } else if (c.type === 'VP8X' && c.len >= 10) {
-    width = buf.readUIntLE(c.data + 4, 3) + 1;
-    height = buf.readUIntLE(c.data + 7, 3) + 1;
-  } else {
-    throw corrupt('webp-header');
+  if (c.type !== 'VP8X') {
+    const dims = webpBitstream(buf, c);
+    if (!dims) throw corrupt('webp-header');
+    return { ...dims, orientation: 0, warnings: [] };
+  }
+  if (c.len < 10) throw corrupt('webp-header');
+  const width = buf.readUIntLE(c.data + 4, 3) + 1;
+  const height = buf.readUIntLE(c.data + 7, 3) + 1;
+  //  جریانِ تصویرِ ثابت (و فریم‌های ANMF) باید درونِ بوم بنشیند — وگرنه سقف دور زده می‌شود
+  for (const k of chunks.slice(1)) {
+    const dims = webpBitstream(buf, k);
+    if (dims && (dims.width > width || dims.height > height)) throw corrupt('webp-canvas');
+    if (k.type === 'ANMF') {
+      if (k.len < 16) throw corrupt('webp-anmf');
+      const x = buf.readUIntLE(k.data, 3) * 2, y = buf.readUIntLE(k.data + 3, 3) * 2;
+      const fw = buf.readUIntLE(k.data + 6, 3) + 1, fh = buf.readUIntLE(k.data + 9, 3) + 1;
+      if (x + fw > width || y + fh > height) throw corrupt('webp-canvas');
+    }
   }
   return { width, height, orientation: 0, warnings: [] };
 }

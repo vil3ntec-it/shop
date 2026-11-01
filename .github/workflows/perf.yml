@@ -89,6 +89,92 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+  #  IMG-BANK-18 و IMG-BANK-14 (§۳۷.۱۰): جست‌وجوی بانکِ تصاویر زیرِ بارِ هم‌زمان — ۱۰٬۰۰۰ کالا، ۳۰۰ عکسِ
+  #  تأییدشده، ۸ کاربر؛ p50/p95/p99 سرد و گرم، خطا، منابع، دقت. فقط گزارش؛ `--assert` فقط خطا و دقت را سخت می‌گیرد.
+  image-bank:
+    name: بانکِ تصاویر — ${{ matrix.db }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        db: [postgres, pglite]
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_bench
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: نصبِ وابستگی‌ها
+        working-directory: server
+        run: npm ci || npm install
+      - name: سنجش
+        env:
+          SCALE: ${{ inputs.scale || '1' }}
+        run: |
+          if [ "${{ matrix.db }}" = postgres ]; then DB=postgres://shop:shoppass@127.0.0.1:5432/shop_bench; else DB="pglite:$RUNNER_TEMP/pglite-imgbank"; fi
+          node --max-old-space-size=4096 bench/image-bank.mjs --db "$DB" --scale "$SCALE" --assert \
+            --json "perf-image-bank-${{ matrix.db }}.json" | tee perf-image-bank.log
+          {
+            echo "### بانکِ تصاویر — ${{ matrix.db }} (مقیاس $SCALE)"
+            echo '```'
+            cat perf-image-bank.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: perf-image-bank-${{ matrix.db }}
+          path: perf-image-bank-${{ matrix.db }}.json
+          if-no-files-found: ignore
+
+  #  PERF-06: دو نتیجه کنارِ هم و هر کدام جدا (`bench/db-compare.mjs`)؛ پروندهٔ جابه‌جا یا مقیاسِ
+  #  ناهمسان ⇒ کدِ ۲ و قرمز. یکی از دو کار نتیجه نداد ⇒ فقط notice، چون همان کار خودش قرمز است.
+  compare:
+    name: PostgreSQL و PGlite، کنارِ هم
+    needs: server
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: perf-server-*
+          merge-multiple: true
+      - name: جدولِ کنارِ هم
+        run: |
+          if [ ! -f perf-server-postgres.json ] || [ ! -f perf-server-pglite.json ]; then
+            echo "::notice::یکی از دو نتیجهٔ سرور نیست؛ جدولِ کنارِ هم ساخته نشد"
+            exit 0
+          fi
+          node bench/db-compare.mjs --pg perf-server-postgres.json --pglite perf-server-pglite.json \
+            --md perf-server-compare.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: perf-server-compare
+          path: |
+            perf-server-compare.md
+            perf-server-postgres.json
+            perf-server-pglite.json
+          if-no-files-found: ignore
+
   engines:
     name: موتورهای Kotlin (JVM)
     runs-on: ubuntu-latest
