@@ -47,6 +47,14 @@ object PromoEngine {
      *  بایت‌به‌بایت همان پیشین.
      */
     val stamp: Boolean = false,
+    /** POS-19 — پرچمِ `shop.promo_tier_price` ِ سرور: فرمِ قاعده گزینهٔ «پلهٔ قیمتِ ثابت» را نشان می‌دهد */
+    val tierPrice: Boolean = false,
+    /**
+     *  PRM-02 — پرچمِ `shop.promo_uses` ِ سرور (`redeem` در پاسخ، پیش‌فرض خاموش): کدِ سقف‌دار پیش از ثبتِ
+     *  فاکتور از سرور گرفته می‌شود (`PromoLive.redeemGate`) و ویرایشگر «سقفِ مصرف» را نشان می‌دهد.
+     *  خاموش ⇒ همان رفتارِ پیشین.
+     */
+    val redeem: Boolean = false,
   ) {
     val active: Boolean get() = enabled && rules.any { it.active }
     val hasCodes: Boolean get() = rules.any { it.active && it.code.isNotBlank() }

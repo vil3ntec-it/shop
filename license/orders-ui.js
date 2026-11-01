@@ -214,6 +214,20 @@
   })();
   const when = (ms) => (DATE_FMT ? DATE_FMT.format(new Date(Number(ms))) : new Date(Number(ms)).toLocaleString());
 
+  /** افزونهٔ پشتِ پرچم (`license/orders-desk.js`: ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») — فقط با `presence`/`delay` ِ `/config` */
+  const extApi = { call, toast, esc, when, $, closeModal, get cfg() { return st.cfg; }, get open() { return st.open; },
+    showOrder(o) { st.open = o; st.detailSeq++; paintDetail(); }, reopen(id) { openDetail(id, true); },
+    refresh() { pollSummary(); if (isActive()) loadList(true); } };
+  const ext = (name, ...a) => { const x = root.TohidOrdersDesk; return x && typeof x[name] === 'function' ? x[name](extApi, ...a) : undefined; };
+  function loadExt() {
+    if (!st.cfg || !(st.cfg.delay || st.cfg.presence) || root.TohidOrdersDesk || st.extLoading) return;
+    const el = Object.assign(document.createElement('script'), { src: 'license/orders-desk.js?v=1' });
+    st.extLoading = true;
+    el.onload = () => { st.extLoading = false; ext('mount'); if (st.open) paintDetail(); };
+    el.onerror = () => { st.extLoading = false; };
+    document.head.appendChild(el);
+  }
+
   const ICON = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';
 
   // ── پرچم ─────────────────────────────────────────────────────────
@@ -243,12 +257,14 @@
     st.enabled = on;
     if (on) {
       mount();
+      loadExt(); ext('mount');
       paintTabs();
       if (!was) { st.rev = null; pollSummary(); }
       //  نشانیِ #orders پیش از روشن شدن باز شده بود ⇒ حالا خودِ صفحه
       if (location.hash === '#orders' && !isActive() && typeof root.goTo === 'function') root.goTo('orders');
       else if (isActive()) show();
     } else {
+      ext('unmount');
       unmount();
       st.items = []; st.counts = {}; st.rev = null; st.open = null;
       if (location.hash === '#orders') leave();
@@ -280,12 +296,14 @@
       st.rev = s.rev;
       paintTabs();
       paintBadges();
+      ext('summary', s);
       if (changed && isActive()) {
         loadList(true);
         if (st.open) openDetail(st.open.id, true);
       }
     } catch (e) {
-      if (e && e.code === 'orders_disabled') { st.cfgAt = 0; refreshConfig(); }
+      if (e && e.code === 'orders_disabled') { st.cfgAt = 0; refreshConfig(); return; }
+      ext('summaryFailed', e);
     }
   }
 
@@ -634,6 +652,7 @@
         <td dir="ltr">${money(l.unitPriceMinor)}</td>
         <td dir="ltr">${money(l.lineTotalMinor)}</td></tr>`).join('');
     const events = (o.events || []).map((e) => {
+      const own = ext('eventLine', e); if (own) return own;
       const what = e.kind === 'created' ? 'ثبت شد'
         : e.kind === 'cod' ? `نقد: ${esc(COD_LABELS[e.toStatus] || e.toStatus)}`
           : `${esc(STATUS_LABELS[e.fromStatus] || e.fromStatus)} ← ${esc(STATUS_LABELS[e.toStatus] || e.toStatus)}`;
@@ -643,7 +662,8 @@
         ${e.note ? `<span class="ord-note">${esc(e.note)}</span>` : ''}</li>`;
     }).join('');
     const perms = (st.cfg && st.cfg.permissions) || {};
-    const acts = actionsFor(o, perms).map((to) => `<button type="button" class="btn ${DANGER.includes(to) ? 'btn-danger' : 'btn-primary'} btn-sm" data-act="${esc(to)}">${esc(ACTION_LABELS[to] || to)}</button>`).join('');
+    const acts = actionsFor(o, perms).map((to) => `<button type="button" class="btn ${DANGER.includes(to) ? 'btn-danger' : 'btn-primary'} btn-sm" data-act="${esc(to)}">${esc(ACTION_LABELS[to] || to)}</button>`).join('')
+      + (ext('detailButtons', o) || '');
     body.innerHTML = `
       <p class="ord-status-line">${pill(o.status)}
         ${o.statusReason ? `<span class="ord-hint">دلیل: ${esc(REASON_LABELS[o.statusReason] || o.statusReason)}</span>` : ''}
@@ -665,7 +685,7 @@
       <h4 class="ord-h">خطِ زمانی</h4>
       <ol class="ord-timeline">${events}</ol>`;
     const box = $('ord-actions');
-    if (box) box.addEventListener('click', (e) => { const b = e.target.closest('[data-act]'); if (b) startAct(b.dataset.act); });
+    if (box) box.addEventListener('click', (e) => { if (ext('detailClick', e)) return; const b = e.target.closest('[data-act]'); if (b) startAct(b.dataset.act); });
   }
 
   // ── گذار: دلیل، زمانِ آماده، تأیید ─────────────────────────────────

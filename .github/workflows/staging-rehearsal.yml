@@ -1,0 +1,89 @@
+name: تمرینِ ارتقا (staging)
+
+# OPS-03@29 (§۲۹.۸، §۲۹.۹): «release و migration در staging آزمایش شود».
+# آزمون‌های سرور مهاجرت‌ها را روی پایگاهِ **خالی** می‌دوانند؛ این‌جا نسخهٔ پیش (پایهٔ PR یا ورودیِ دستی) روی
+# PostgreSQL 16 بالا می‌آید، فقط از راهِ HTTP دادهٔ واقعی‌نما می‌گیرد (ثبت‌نام، دکان، کالا، فروش، `$inc`،
+# قرض‌دار، ویرایش و حذف)، خاموش می‌شود، مهاجرت‌های نسخهٔ تازه روی **همان داده** اجرا می‌شوند (با زمان)،
+# و سپس: اثرِ انگشتِ پیش و پس، `verify-data` ِ نسخهٔ تازه، و دودآزمایی روی سرورِ تازه (ورود و دریافتِ
+# همهٔ opها). جدول/ستونِ برداشته، ردیفِ گم‌شده یا دست بردن در دفتر ⇒ قرمز. شرح: server/scripts/upgrade-rehearsal.js.
+# ⛔ هیچ دادهٔ واقعی؛ هیچ استقرار. این «staging ِ یک‌بارمصرف» است، نه سرورِ staging ِ ماندگار.
+
+on:
+  pull_request:
+    paths:
+      - 'server/migrations/**'
+      - 'server/src/migrate.js'
+      - 'server/src/db.js'
+      - 'server/scripts/upgrade-rehearsal.*'
+      - '.github/workflows/staging-rehearsal.yml'
+  workflow_dispatch:
+    inputs:
+      base:
+        description: 'نسخهٔ پیش (شاخه، برچسب یا کامیت) — همان چیزی که الان روی سرور است'
+        default: 'main'
+      sales:
+        description: 'شمارِ فروشِ هر دکان در seed'
+        default: '300'
+
+concurrency:
+  group: staging-rehearsal-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  rehearsal:
+    name: نسخهٔ پیش ⇐ نسخهٔ تازه روی دادهٔ واقعی‌نما
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: shop
+          POSTGRES_PASSWORD: shoppass
+          POSTGRES_DB: shop_staging
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://shop:shoppass@127.0.0.1:5432/shop_staging
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: head
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          path: base
+          ref: ${{ github.event.pull_request.base.sha || inputs.base || 'main' }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - name: نصبِ وابستگی‌ها (هر دو نسخه)
+        run: |
+          (cd base/server && npm ci)
+          (cd head/server && npm ci)
+      - name: تمرین
+        env:
+          SALES: ${{ inputs.sales || '300' }}
+        run: bash head/server/scripts/upgrade-rehearsal.sh base head rehearsal-out
+      - name: خلاصه
+        if: always()
+        run: |
+          {
+            echo "### تمرینِ ارتقا: \`$(git -C base rev-parse --short HEAD)\` ⇐ \`$(git -C head rev-parse --short HEAD)\`"
+            [ -f rehearsal-out/migrate-ms.txt ] && echo "- زمانِ مهاجرت روی دادهٔ seed: $(cat rehearsal-out/migrate-ms.txt)ms"
+            echo '```'
+            cat rehearsal-out/migrate.log rehearsal-out/check.log 2>/dev/null || echo 'تمرین پیش از مقایسه ایستاد — لاگِ گام را ببینید'
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: staging-rehearsal
+          path: rehearsal-out/
+          if-no-files-found: ignore

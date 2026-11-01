@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -117,6 +118,8 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     }
   }
 
+  val txKey = remember(txFor) { newId() }  // ⛔ ثبت روی دفترِ همین لحظهٔ دیسک (`DebtEntry`)، نه `d` ِ صفحه؛ کلید = شناسهٔ ردیف، یکی برای هر پنجره ⇒ دو ضربه یک ردیف
+  fun record(p: PendingTx, over: Boolean) { scope.launch { DebtEntry.record(store, txKey, p.entry(over), todayIso(), System.currentTimeMillis()).show(::toast, "با موفقیت ثبت شد") { if (txFor?.first == p.debtorId) txFor = null } } }
   // قرض‌داری که حذف شده نباید صفحه‌اش باز بماند
   LaunchedEffect(d.debtors.size) {
     if (openId != null && d.debtors.none { it.id == openId }) openId = null
@@ -136,6 +139,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       onDeleteTx = { confirmTx = it },
       onOpenTx = { receiptFor = it },
       onMessage = ::toast,
+      store = store,
     )
   } else {
     /*
@@ -311,7 +315,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
           DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount))
         } else null
         if (credit != null && credit.over) overLimit = pending
-        else apply(pending.submit(d, overLimit = false), "با موفقیت ثبت شد") { txFor = null }
+        else record(pending, over = false)
       },
     )
   }
@@ -325,7 +329,7 @@ fun DebtorsScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
       OverLimitDialog(
         credit = credit,
         onConfirm = {
-          apply(pending.submit(d, overLimit = true), "با موفقیت ثبت شد") { txFor = null }
+          record(pending, over = true)
           overLimit = null
         },
         onDismiss = { overLimit = null },
@@ -710,6 +714,8 @@ private fun AccountView(
   onDeleteTx: (String) -> Unit,
   onOpenTx: (String) -> Unit,
   onMessage: (String) -> Unit = {},
+  /** CRM-08/12: دکمهٔ «گروه، لیستِ قیمت و رضایت» (`CrmPricingButton`)؛ null ⇒ نیست */
+  store: ShopStore? = null,
 ) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
@@ -815,10 +821,11 @@ private fun AccountView(
           "کل رسید", money(account.received), "؋",
           Shop.colors.success, Shop.colors.successTint, Modifier.weight(1f),
         )
+        val settled = ir.vil3ntec.tohid.data.DebtMinorFlag.settled(account.balance)
         AccountTile(
           "الباقی",
-          if (account.balance == 0.0) "تسویه" else money(kotlin.math.abs(account.balance)),
-          if (account.balance == 0.0) "حساب صاف" else DebtorEngine.stateText(account.balance),
+          if (settled) "تسویه" else money(kotlin.math.abs(account.balance)),
+          if (settled) "حساب صاف" else DebtorEngine.stateText(account.balance),
           when {
             account.balance > 0 -> Shop.colors.warning
             account.balance < 0 -> Shop.colors.success
@@ -859,6 +866,7 @@ private fun AccountView(
         }
         StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
+      if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {
@@ -1051,10 +1059,7 @@ private data class PendingTx(
   val notes: String,
   val due: String?,
 ) {
-  fun submit(d: ShopData, overLimit: Boolean) = DebtorEngine.addTransaction(
-    d, debtorId, kind, amount, date, notes, todayIso(), System.currentTimeMillis(), ::newId,
-    dueDate = due, overLimit = overLimit,
-  )
+  fun entry(overLimit: Boolean) = DebtEntry.Entry(debtorId, kind, amount, date, notes, dueDate = due, overLimit = overLimit)
 }
 
 @Composable
