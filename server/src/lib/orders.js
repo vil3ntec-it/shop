@@ -173,6 +173,29 @@ function parseCreate(body, at) {
 }
 
 /**
+ * نشانیِ تحویل — مشترکِ سفارشِ کارمند، ویترین و «اصلاحِ نشانی» پس از ناموفق
+ * (DLV-09، `delivery.fixAddress`). کارتِ پیک «اول نشانه» است (DLV-02): نشانه،
+ * ناحیه و رنگِ دروازه. ناحیه و رنگِ دروازه کمک‌اند، نه جای نشانی: بی پین،
+ * نشانه یا نشانیِ متنی هنوز ۴۰۰ است. هر کلیدِ دیگرِ ورودی دور ریخته می‌شود.
+ */
+function parseAddress(raw) {
+  const a = raw && typeof raw === 'object' ? raw : {};
+  const lat = coord(a.lat, -90, 90);
+  const lng = coord(a.lng, -180, 180);
+  if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
+  const landmark = text(a.landmark, 200);
+  const addrText = text(a.text, 300);
+  const area = text(a.area, 80);
+  const gateColor = text(a.gateColor, 40);
+  //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
+  if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
+  return {
+    ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
+    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}),
+  };
+}
+
+/**
  * مشتری، نشانی و دستورِ تحویل — مشترکِ سفارشِ دستیِ کارمند و ویترین.
  * `phoneRequired` نیامده ⇒ فقط برای ارسال لازم است (رفتارِ سفارشِ دستی).
  */
@@ -184,18 +207,7 @@ function parseContact(body, fulfillment, { phoneRequired } = {}) {
   const v = require('./validate');
   const customerPhone = v.phone(c.phone, { required: phoneRequired ?? fulfillment === 'delivery' }) || '';
 
-  let address = {};
-  if (fulfillment === 'delivery') {
-    const a = b.address && typeof b.address === 'object' ? b.address : {};
-    const lat = coord(a.lat, -90, 90);
-    const lng = coord(a.lng, -180, 180);
-    if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
-    const landmark = text(a.landmark, 200);
-    const addrText = text(a.text, 300);
-    //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
-    if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
-    address = { ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}) };
-  }
+  const address = fulfillment === 'delivery' ? parseAddress(b.address) : {};
 
   const d = b.delivery && typeof b.delivery === 'object' ? b.delivery : {};
   const delivery = {};
@@ -307,6 +319,7 @@ async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
   let input = price ? null : parseCreate(body, at);
   const hash = hashOf(body);
+  const prefsOn = await require('./delivery-prefs').flagOn(shopId);   // CHK-14 (پیش‌فرض خاموش)
   //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
   //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
   if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
@@ -326,6 +339,8 @@ async function create(shopId, { key, body, actor, price, notify }) {
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
     if (price) input = await price(run, at);
+    //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در برابرِ جمعِ همین لحظه؛ خاموش ⇒ کلید دور ریخته می‌شود
+    input = require('./delivery-prefs').applyOnCreate(input, body, prefsOn);
     //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
     //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
     await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
@@ -595,6 +610,6 @@ async function summary(shopId) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, maskPhone,
+  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary,
 };

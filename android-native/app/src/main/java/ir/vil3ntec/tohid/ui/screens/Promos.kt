@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -407,12 +408,19 @@ private fun PromoEditor(
               FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text("مبلغ") })
             }
           }
+          //  POS-19: پلهٔ «قیمتِ ثابتِ هر واحد» فقط با پرچمِ `shop.promo_tier_price` (یا قاعده‌ای که از پیش چنین است)
+          if (f.kind == "tiers" && (PromoLive.snap.value.tierPrice || f.tierAmount)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+              FilterChip(selected = !f.tierAmount, onClick = { f = f.copy(tierAmount = false) }, label = { Text(StrLine.percent) })
+              FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text(StrLine.tierFixedPrice) })
+            }
+          }
           f.tiers.forEachIndexed { i, (a, b) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
               NumField(if (f.kind == "threshold") "از مبلغِ (؋)" else "از تعدادِ", a, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) v to t.second else t })
               }
-              NumField(if (f.kind == "threshold" && f.tierAmount) "تخفیف (؋)" else "تخفیف (٪)", b, Modifier.weight(1f)) { v ->
+              NumField(if (f.kind == "threshold" && f.tierAmount) "تخفیف (؋)" else if (f.tierAmount) StrLine.tierUnitPrice else "تخفیف (٪)", b, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) t.first to v else t })
               }
               if (f.tiers.size > 1) TextButton(onClick = { f = f.copy(tiers = f.tiers.filterIndexed { j, _ -> j != i }) }) { Text("✕") }

@@ -36,6 +36,9 @@ async function createApp({ runMigrations = true } = {}) {
   app.use(['/api/pump/device/state', '/api/v1/pump/device/state'], express.json({ limit: '4mb' }));
   //  عکس/PDFِ برنامه برای بات (‎/report/:id‎): تا ۴ فایلِ ۶ مگابایتی به base64
   app.use(/^\/api(?:\/v1)?\/pump\/device\/report\//, express.json({ limit: '34mb' }));
+  //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
+  //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
+  app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
   app.use(express.json({ limit: '2mb' }));
 
   /*
@@ -126,6 +129,23 @@ async function createApp({ runMigrations = true } = {}) {
         console.log(`${req.method} ${redactPath(req.originalUrl)} ${res.statusCode} ${ms}ms`);
       }
     });
+    next();
+  });
+
+  /*
+   *  ⛔ TEN-02 (cache) — پاسخِ درخواستِ دارای اعتبارنامه هرگز در کشِ مشترک (CDN، پراکسیِ
+   *  کش‌دار، قاعدهٔ «همه را کش کن») نمی‌نشیند: پیش‌فرضِ `private, no-cache` و `Vary`
+   *  روی همان سرآیندها. مسیری که خودش Cache-Control می‌گذارد (‎no-store‎، ‎private,
+   *  max-age‎، ETag ِ فاکتور…) پس از این می‌نویسد و همان می‌ماند. `tenant-surfaces.test.js`.
+   */
+  const CREDENTIALS = ['authorization', 'x-store-session', 'x-store-ticket'];
+  app.use('/api', (req, res, next) => {
+    if (CREDENTIALS.some((k) => req.headers[k])) {
+      res.set('Cache-Control', 'private, no-cache');
+      res.vary('Authorization');
+      res.vary('X-Store-Session');
+      res.vary('X-Store-Ticket');
+    }
     next();
   });
 
@@ -309,14 +329,23 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/trust', require('./routes/admin-trust'));
     //  کاتالوگ و موجودیِ سرور (v3 §۳۲) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.catalog`
     api.use('/shop/catalog', require('./routes/catalog'));
+    //  سفارشِ خرید از تأمین‌کننده (PUR-02/04) — پیش از `/shop`، پشتِ پرچمِ خاموشِ `shop.purchase_orders`
+    api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
+    //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
+    api.use('/shop/orders/desk', require('./routes/order-desk'));
+    //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
+    api.use('/shop/orders/bulk', require('./routes/order-bulk'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/storefront', require('./routes/storefront-admin'));
+    //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
+    api.use('/store', require('./routes/pick-substitutes-store'));
+    api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
@@ -333,6 +362,13 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/courier', require('./routes/courier'));
     //  تخفیف‌ها و قاعده‌های قیمت (PRM) — کلیدِ دکان، پیش‌فرض خاموش
     api.use('/shop/promos', require('./routes/shop-promos'));
+    //  STF-07/STF-08: ورود و خروجِ کارمند و نرخ‌های پورسانت — پشتِ `shop.staff_time`، پیش‌فرض خاموش
+    api.use('/shop/staff-time', require('./routes/staff-time'));
+    //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
+    //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
+    api.use('/shop/payments', require('./routes/shop-payments'));
+    api.use('/payments', require('./routes/payments-webhook'));
+    api.use('/admin/payments', require('./routes/admin-payments'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
@@ -389,6 +425,9 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin', require('./routes/admin-sales'));
     //  بانکِ مرکزیِ تصاویر (v3 ۳۷.۳) — پشتِ پرچمِ `image_bank.central`، پیش‌فرض خاموش
     api.use('/admin/image-bank', require('./routes/admin-image-bank'));
+    //  LOC-04: جدولِ تعطیلاتِ رسمی — خواندنِ همگانی، نوشتنِ مدیرِ ارشد
+    api.use('/calendar', require('./routes/calendar'));
+    api.use('/admin/calendar', require('./routes/admin-calendar'));
     api.use('/portal', require('./routes/portal'));
     api.use('/rep', require('./routes/rep'));       // شورا چ۳: نمایندهٔ فروش — فقط فروش‌های خودش
     api.get('/downloads', require('./routes/portal').downloadsHandler);
@@ -505,6 +544,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));
     //  چتِ دکان: رسانهٔ بارگذاری‌شدهٔ بی‌پیام پس از یک ساعت (و نگهداری، اگر روشن شد)
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
+    //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
+    require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
@@ -521,6 +562,10 @@ async function createApp({ runMigrations = true } = {}) {
     //  گوشیِ مدیر که ممکن است پشت فیلتر باشد
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
+    //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
+    require('./lib/payment-intents').reconcile()
+      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+      .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
   //  ⚠️ سرِ بالا آمدن هم — شش ساعت صبر برای پمپی که همین حالا بی‌مُهر است زیاد است

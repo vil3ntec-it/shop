@@ -2,7 +2,8 @@ name: توحید بومی
 
 on:
   push:
-    branches: ['claude/**', main]
+    #  شاخه‌های claude/** فقط از راهِ PR سنجیده می‌شوند (اجرای دوتایی صفِ Actions را چند ساعت عقب انداخت)
+    branches: [main]
     paths:
       - 'android-native/**'
       - 'core/**'
@@ -35,38 +36,48 @@ concurrency:
   group: tohid-native-${{ github.event.pull_request.number || github.ref }}-${{ inputs.channel || 'push' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+#  ⛔ §۱۴ (docs/security/supply-fa.md): کارِ ساخت (کدِ PR، Gradle و همهٔ وابستگی‌هایش) فقط توکنِ
+#  خواندنی دارد؛ برچسب و انتشار در کارِ جدای «انتشار» با `contents: write` و بی اجرای کدِ ساخت.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     name: ساخت نسخهٔ بومی
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      publish: ${{ steps.meta.outputs.publish }}
+      channel: ${{ steps.meta.outputs.channel }}
+      tag: ${{ steps.meta.outputs.tag }}
+      apk_name: ${{ steps.meta.outputs.apk_name }}
+      apk_mb: ${{ steps.meta.outputs.apk_mb }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       #  کدام برچسب؟ فقط main منتشر می‌کند؛ پایدار فقط با workflow_dispatch.
       #  نصبیِ آزمایشی به `.apk` ختم نمی‌شود (`….apk.beta`): برنامه‌های نصب‌شده
       #  وقتی سرور در دسترس نیست از api.github.com فهرستِ انتشارها را می‌خوانند و
       #  اولین `.apk`ی را که ببینند برمی‌دارند — نسخهٔ آزمایشی نباید به آن‌ها برسد.
       - name: کانال
+        env:
+          INPUT_CHANNEL: ${{ inputs.channel }}
         run: |
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "PUBLISH=false" >> "$GITHUB_ENV"
-          elif [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.channel }}" = "stable" ]; then
+          elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_CHANNEL" = "stable" ]; then
             printf 'PUBLISH=true\nCHANNEL=stable\nTAG=tohid-native\n' >> "$GITHUB_ENV"
           else
             printf 'PUBLISH=true\nCHANNEL=beta\nTAG=tohid-native-beta\n' >> "$GITHUB_ENV"
           fi
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: 17
 
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
 
       # کلیدِ امضا از secret می‌آید، نه از داخلِ مخزن.
       #
@@ -85,9 +96,19 @@ jobs:
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — فعلاً کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
 
+      #  `:core:jvmTest` = همهٔ آزمون‌های core (`core/src/commonTest` و `core/src/jvmTest`: «تسویهٔ کامل»
+      #  بی گردِ افغانی، کشو، وضعیتِ چاپگر، برگهٔ دوروشی، هم‌خوانیِ CoreVectorsCommonTest با JSON…)؛
+      #  همان کارِ دستورِ محلیِ `gradle -p core jvmTest`. testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)،
+      #  پس فقط همین‌جا و فقط یک بار اجرا می‌شوند؛ گامِ جدا برایشان نگذار (همین‌ها را دوباره می‌دواند).
       - name: سنجشِ حساب‌ها
         working-directory: android-native
-        run: gradle --no-daemon testReleaseUnitTest
+        run: gradle --no-daemon testReleaseUnitTest :core:jvmTest
+
+      #  آزمون‌های commonTest ِ core (منطقِ خالص و بی اندروید: کشو، وضعیتِ چاپگر، برگهٔ دوروشی…)
+      #  همان دستورِ محلیِ `gradle -p core jvmTest`؛ testReleaseUnitTest آن‌ها را نمی‌بیند (includeBuild)
+      - name: آزمون‌های core
+        working-directory: core
+        run: gradle --no-daemon jvmTest
 
       - name: ساخت APK
         working-directory: android-native
@@ -123,10 +144,12 @@ jobs:
           bash tools/apk-gates.sh app/build/outputs/apk/release/app-release.apk
           $((100 + ${{ github.run_number }})) app/build/test-results/testReleaseUnitTest
 
+      #  ⛔ §۱۴: امضای فهرست (`SHA256SUMS.txt.sig`) دیگر این‌جا نیست، در کارِ «انتشار» است — کلیدِ
+      #  خصوصیِ به‌روزرسانی به کارِ ساخت (و هر PR) نمی‌رسد. این‌جا فقط بودنش سنجیده می‌شود.
       - name: نام‌گذاری و جمع کنترلی
         working-directory: android-native
         env:
-          UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
+          HAS_UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY != '' }}
           TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
         run: |
           mkdir -p out
@@ -155,15 +178,10 @@ jobs:
           echo "APK_NAME=Tohid-Native-$version.apk" >> "$GITHUB_ENV"
           fi
           cd out
-          #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`.
+          #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt` (امضا در کارِ «انتشار»).
           #  کلیدِ عمومی که در برنامه سنجاق شود ولی امضایش نیاید، یعنی
           #  هیچ گوشی‌ای به‌روز نمی‌شود؛ پس این حالت ساخت را می‌شکند.
-          if [ -n "$UPDATE_SIGNING_KEY" ]; then
-            printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
-            openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
-            rm -f "$RUNNER_TEMP/update.pem"
-            echo "فهرست امضا شد"
-          elif [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
+          if [ "$HAS_UPDATE_SIGNING_KEY" != true ] && [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
             echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
             exit 1
           fi
@@ -193,12 +211,63 @@ jobs:
             fi
           fi
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Tohid-Native
           path: android-native/out/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: خروجی‌ها برای کارِ انتشار
+        id: meta
+        run: |
+          {
+            echo "publish=${PUBLISH:-false}"
+            echo "channel=${CHANNEL:-}"
+            echo "tag=${TAG:-}"
+            echo "apk_name=${APK_NAME:-}"
+            echo "apk_mb=${APK_MB:-}"
+          } >> "$GITHUB_OUTPUT"
+
+  #  ⛔ §۱۴: فقط این کار توکنِ نوشتنی و کلیدِ امضای فهرست را دارد و هیچ کدِ ساختی (Gradle، کدِ PR)
+  #  در آن اجرا نمی‌شود؛ فقط همان فایل‌های artifactِ کارِ «ساخت» را می‌فرستد.
+  publish:
+    name: انتشار
+    needs: build
+    if: ${{ needs.build.outputs.publish == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      PUBLISH: 'true'
+      CHANNEL: ${{ needs.build.outputs.channel }}
+      TAG: ${{ needs.build.outputs.tag }}
+      APK_NAME: ${{ needs.build.outputs.apk_name }}
+      APK_MB: ${{ needs.build.outputs.apk_mb }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: Tohid-Native
+          path: android-native/out
+
+      #  امضای جدای فهرست — شرح سرِ `update/ReleaseSignature.kt`. همان فهرستی که کارِ ساخت ساخت.
+      - name: امضای فهرست
+        working-directory: android-native/out
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.TOHID_UPDATE_SIGNING_KEY }}
+          TOHID_UPDATE_PUBLIC_KEY: ${{ vars.TOHID_UPDATE_PUBLIC_KEY }}
+        run: |
+          test -s SHA256SUMS.txt && test -s "$APK_NAME" && test -s version.txt
+          if [ -n "$UPDATE_SIGNING_KEY" ]; then
+            printf '%s\n' "$UPDATE_SIGNING_KEY" > "$RUNNER_TEMP/update.pem"
+            openssl dgst -sha256 -sign "$RUNNER_TEMP/update.pem" SHA256SUMS.txt | base64 -w0 > SHA256SUMS.txt.sig
+            rm -f "$RUNNER_TEMP/update.pem"
+            echo "فهرست امضا شد"
+          elif [ -n "$TOHID_UPDATE_PUBLIC_KEY" ]; then
+            echo "::error::کلیدِ عمومیِ به‌روزرسانی سنجاق شده ولی secretِ TOHID_UPDATE_SIGNING_KEY نیست"
+            exit 1
+          fi
 
       # ⛔ فقط از main به گوشی‌ها می‌رسد. پیش‌تر هر push روی شاخه‌ی
       # `claude/**` برچسب را جابه‌جا و APK را جایگزین می‌کرد؛ یعنی کارِ
@@ -228,7 +297,7 @@ jobs:
       # فایلش هنوز نیامده. هر فایل تا سه بار تلاش می‌شود.
       - name: انتشار
         if: ${{ env.PUBLISH == 'true' && env.CHANNEL == 'stable' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-native
           name: توحید — نسخهٔ بومی اندروید
@@ -251,7 +320,7 @@ jobs:
 
       - name: انتشارِ آزمایشی
         if: ${{ env.PUBLISH == 'true' && env.CHANNEL == 'beta' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: tohid-native-beta
           name: توحید — نسخهٔ آزمایشی اندروید (beta)
