@@ -195,6 +195,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat
   'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
+//  M3: لوگو و تصویرِ سرِ ویترین
+FLAGS.push('shop.storefront.media');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -207,6 +209,8 @@ FLAGS.push('shop.orders.picking');
 const PER_SHOP_KEYS = new Set([
   'PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId',
   'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+  //  M3: `:kind` (logo/header) نامِ جایگاه در فضای خودِ هر دکان است — «ب» فقط لوگوی خودش را می‌نویسد
+  'PUT /shop/storefront/media/:kind', 'DELETE /shop/storefront/media/:kind',
 ]);
 /** شناسهٔ کالا و قاعدهٔ تخفیف کلیدِ فضای دکان‌اند، نه راز — برای «ب» بازتابِ همان نشانی‌اند */
 const NOT_SECRET = new Set(['product', 'promoRule']);
@@ -296,6 +300,10 @@ async function seedShop(a) {
      VALUES ($1,$2,'+93791234568',34.62,69.31,$3,$3)`,
     [ids.areaRequest, a.shopId, now()]
   );
+
+  //  M3: لوگوی ویترین (نسخهٔ ۱)
+  const logo = await h.raw('PUT', '/api/shop/storefront/media/logo', F.jpeg(256, 256, { seed: 733 }), { token: a.accessToken });
+  assert.equal(logo.status, 200, JSON.stringify(logo.body));
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -483,6 +491,7 @@ function concreteFor(ids) {
   const rules = [
     [/^(\/shop\/chat\/conversations\/):id/, ids.conv],
     [/(\/messages\/):mid/, ids.message],
+    [/(\/pins\/):mid/, ids.message],
     [/(\/media\/):mediaId/, ids.media],
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
@@ -497,6 +506,7 @@ function concreteFor(ids) {
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
+    [/^(\/shop\/storefront\/media\/):kind/, 'logo'],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
@@ -588,6 +598,7 @@ const RAW = new Set([
   'POST /shop/chat/conversations/:id/media',
   'POST /shop/images/:id/versions',
   'PUT /shop/images/:id/v/:version/:size',
+  'PUT /shop/storefront/media/:kind',
 ]);
 
 function call(r, url, body, token, extraHeaders = {}) {

@@ -37,6 +37,9 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgres://${POSTGRES_USER:-shop}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-shop}
+      # یک کانتینرِ سرور ⇒ قفلِ گاوصندوق فقط در همین فرآیند، بی اتصالِ اضافه (همان پیش‌فرض؛ چند نمونه: db)
+      SAFE_LOCK_SCOPE: ${SAFE_LOCK_SCOPE:-local}
+      SAFE_LOCK_POOL_MAX: ${SAFE_LOCK_POOL_MAX:-10}
       SERVER_URL: ${SERVER_URL:-}
       SERVER_NAME: ${SERVER_NAME:-}
       API_SECRET: ${API_SECRET:?API_SECRET را در .env بگذارید}

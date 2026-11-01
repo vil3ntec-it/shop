@@ -68,7 +68,7 @@ router.post('/errors', (req, res, next) => portal.reportErrorHandler('shop', req
 async function subscriptionHandler(req, res) {
   if (!req.shopId) {
     return res.json({
-      status: 'none', active: false, source: 'none',
+      status: 'none', phase: 'none', active: false, source: 'none',
       features: [], serverTime: now(), shop: null,
     });
   }
@@ -77,11 +77,14 @@ async function subscriptionHandler(req, res) {
   res.json({
     shop: { id: req.shopId, name: req.member.shop_name || '' },
     status: ent.subscription.status,
+    //  SUB-01 (docs/SUB-STATES-fa.md): مرحلهٔ رفتاری — «مهلت» (grace) از «فعال» جدا؛ فقط افزوده
+    phase: ent.subscription.phase,
     active: ent.subscription.active,
     source: ent.source,
     plan: ent.subscription.plan || '',
     startsAt: ent.subscription.startsAt,
     endsAt: ent.subscription.endsAt,
+    graceEndsAt: ent.subscription.graceEndsAt ?? 0,
     daysLeft: ent.subscription.daysLeft,
     trial: ent.trial,
     features: ent.features,

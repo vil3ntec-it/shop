@@ -113,11 +113,11 @@ test('هر نقشِ تازه با کدِ دعوت می‌پیوندد؛ فیلد
     'delivery.handover', 'chat.view', 'chat.reply']);
   assert.deepEqual(permissionsOf('manager'), ['shop.view', 'members.view', 'staffcode.view', 'subscription.view',
     'subscription.request', 'data.read', 'data.write', 'data.delete.any', 'data.delete.own', 'sales.discount', 'sales.cancel',
-    'settings.write', 'stock.view', 'stock.move', 'stock.adjust', 'reports.view', 'audit.view', 'orders.view', 'orders.create',
+    'settings.write', 'stock.view', 'stock.move', 'stock.adjust', 'reports.view', 'audit.view', 'safe.move', 'orders.view', 'orders.create',
     'orders.manage', 'orders.contact', 'orders.refund', 'delivery.view', 'delivery.assign', 'delivery.handover',
     'delivery.couriers', 'delivery.settle', 'delivery.photo', 'chat.view', 'chat.reply', 'chat.moderate',
     'trust.view', 'trust.respond']);
-  assert.equal(permissionsOf('owner').length, 40);
+  assert.equal(permissionsOf('owner').length, 41);   // +۱: `safe.move` (گاوصندوق، PAY-18)
   //  پرونده‌های اعتماد و شکایتِ بازارچه (main، §۳۸.۶) فقط صاحب و مدیر — هیچ نقشِ تازه
   for (const role of NEW_ROLES) {
     assert.ok(!permissionsOf(role).some((k) => k.startsWith('trust.')), role);
