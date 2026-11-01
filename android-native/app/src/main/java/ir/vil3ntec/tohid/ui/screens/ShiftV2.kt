@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.hw.EscPos
+import ir.vil3ntec.tohid.core.i18n.StrShiftReview
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
@@ -69,7 +70,8 @@ import ir.vil3ntec.tohid.core.i18n.StrShift
  *  در X ِ میانِ شیفت، در Z و در سابقهٔ هر بستن (کور یا مدیر، `PayFlow.closeNote`) هم (`ShiftSlip.forViewer`، PAY-13): در نمای او فروش، رسید،
  *  مرجوعی و ورود/خروجِ نقد فقط با شمار می‌آیند، و بستنِ کور هرگز به‌خاطرِ اختلاف رد نمی‌شود (بی پیشگو).
  *  PAY-16: در بستن، هر روشِ غیرنقدی که در شیفت گردش داشت کادرِ شمارشِ خودش را دارد (`ShiftSlip.countable`).
- *  PAY-15: X و Z از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
+ *  PAY-14: بستنِ «نیازمند بررسی» را صاحب/مدیر با یادداشت «بررسی شد» می‌زند (`ShiftReviewV2`، `core/pay/ShiftReview`).
+ *  PAY-15: X و Z فقط با مجوزِ `shift.report` (پیش‌فرض همه؛ `ShopRole.allows`)، و از یک فهرستِ ردیف (`ShiftSlip.rows`) هم روی صفحه می‌آیند هم روی چاپگرِ فاکتور.
  *  خاموش ⇒ این‌جا صدا زده نمی‌شود و همان کارتِ `CashShift`ِ امروز در `SalesHistory` است.
  *  // i18n: سه‌زبانه — نوشته‌ها در `StrShift` (LOC-06)؛ یادداشتِ سابقه و «تأیید» ِ ذخیره‌شده داده‌اند و فارسی می‌مانند.
  */
@@ -95,6 +97,9 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val staff = remember { ir.vil3ntec.tohid.data.ShopRole.isStaff(context) }
+  //  PAY-15: مجوزِ جدای X/Z (`shift.report`ِ هسته، پیش‌فرض همه؛ فقط نمایش)؛ بسته ⇒ نه دکمهٔ X، نه Z پس از بستن،
+  //  نه «گزارش Z» در سابقه — خودِ بستنِ صندوق بسته نمی‌شود
+  val canReport = remember { ir.vil3ntec.tohid.data.ShopRole.allows(context, "shift.report") }
   val shift = remember(d) { CashShift.current(d) }
   val now = System.currentTimeMillis()
   val x = remember(d, shift) { shift?.let { PayFlow.report(d, it.open, null, now) } }
@@ -104,6 +109,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   var closeDialog by remember { mutableStateOf(false) }
   var history by remember { mutableStateOf(false) }
   var showReport by remember { mutableStateOf<ShiftReport?>(null) }
+  var reviewing by remember { mutableStateOf<AuditEntry?>(null) }
 
   fun save(row: AuditEntry, done: String) {
     scope.launch { if (store.save(d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
@@ -155,7 +161,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       if (shift != null) {
         OutlinedButton(onClick = { moveMode = "cash_out" }) { Text(StrShift.cashInOut) }
         OutlinedButton(onClick = { moveMode = "no_sale" }) { Text(StrShift.noSale) }
-        OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast(StrShift.reportFailed) }) { Text(StrShift.xReport) }
+        if (canReport) OutlinedButton(onClick = { x?.valueOrNull()?.let { showReport = it.report } ?: toast(StrShift.reportFailed) }) { Text(StrShift.xReport) }
         Button(onClick = { closeDialog = true }) { Text(StrShift.closeRegister) }
       } else {
         Button(onClick = { openDialog = true }) { Text(StrShift.openRegister) }
@@ -360,7 +366,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
                 (if (extra.isNotEmpty()) " — $extra" else "")
               save(r.value.row.copy(date = ir.vil3ntec.tohid.todayIso(), notes = notes), StrShift.registerClosedNow)
               closeDialog = false
-              showReport = z
+              if (canReport) showReport = z
             }
           }
         }) { Text(StrShift.closeIt) }
@@ -383,6 +389,14 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
     )
   }
 
+  /* ── PAY-14: ثبتِ بررسیِ بستنِ «نیازمند بررسی» (صاحب/مدیر) ── */
+  reviewing?.let { c ->
+    ShiftReviewDialog(
+      d, c, ir.vil3ntec.tohid.data.ShopRole.current(context), me, now,
+      save = { row -> save(row, StrShiftReview.done); reviewing = null }, dismiss = { reviewing = null },
+    )
+  }
+
   /* ── سابقه، با Zِ ذخیره‌شده ── */
   if (history) {
     val shifts = remember(d) { CashShift.list(d).take(60) }
@@ -400,10 +414,12 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
               sh.close?.let { formatMillis(it.createdAt) + " — " + PayFlow.closeNote(it, seesExpected = !staff) } ?: StrShift.stillOpen,
               style = MaterialTheme.typography.labelSmall, color = if (sh.close == null) Shop.colors.warning else Shop.colors.muted,
             )
-            sh.close?.z?.let { PayFlow.reportOf(it) }?.let { z ->
-              //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد
-              if (!staff && z.needsReview == true) StatusPill(StrShift.needsReview, PillTone.WARNING)
-              TextButton(onClick = { history = false; showReport = z }) { Text(StrShift.zReport) }
+            sh.close?.let { c ->
+              c.z?.let { PayFlow.reportOf(it) }?.let { z ->
+                //  PAY-14: اختلاف خودکار اصلاح نمی‌شود؛ مدیر از همین فهرست می‌بیند کدام بستن بررسی می‌خواهد و بررسی را ثبت می‌کند
+                if (!staff) ShiftReviewBadge(d, c) { history = false; reviewing = c }
+                if (canReport) TextButton(onClick = { history = false; showReport = z }) { Text(StrShift.zReport) }
+              }
             }
             HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           }
