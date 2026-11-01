@@ -191,8 +191,6 @@ object OrderFulfillment {
     return if (unit.isNotBlank() && unit == p.saleUnit && unit != p.unit) SalesEngine.toStockQty(p, q) else q
   }
 
-  private fun digits(s: String?): String = s.orEmpty().filter { it.isDigit() }.takeLast(9)
-
   private fun round2(x: Double): Double = Math.round(x * 100.0) / 100.0
 
   /**
@@ -256,8 +254,9 @@ object OrderFulfillment {
     val fee = o.deliveryFeeMinor
     val feeLine = if (fee > 0) SalesEngine.CartLine(feeItemIdOf(o.id), 1.0, fee / 100.0, FEE_LABEL) else null
     val cart = plan.map { it.cart } + listOfNotNull(feeLine)
-    val phone = digits(o.customer.phone)
-    val debtorId = if (phone.length >= 7) d.debtors.firstOrNull { digits(it.phone) == phone }?.id else null
+    //  CRM-07: سفارشِ اینترنتی در تاریخچهٔ همان مشتری — هر دو شماره (CRM-02، ‎+93/07… یکی)، فقط مشتریِ فعال
+    //  (ادغام‌شده نه، CRM-10) و فقط وقتی یکی است؛ دو مشتریِ فعال با یک شماره ⇒ بی نام، نه حدس
+    val debtorId = CustomerCrm.findByPhone(d, o.customer.phone.orEmpty()).singleOrNull()?.id
 
     var n = 0
     val recorded = SalesEngine.record(

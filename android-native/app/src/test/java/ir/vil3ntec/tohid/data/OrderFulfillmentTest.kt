@@ -438,4 +438,27 @@ class OrderFulfillmentTest {
     val fixed = r.data.copy(warehouseEntries = r.data.warehouseEntries + WarehouseEntry(id = "we9", productId = "p1", units = 5.0))
     assertFalse(OrderFulfillment.stillShort(fixed, r.shortIds))
   }
+
+  /* ───────────── CRM-07: سفارشِ اینترنتی در تاریخچهٔ مشتری ───────────── */
+
+  private fun linked(debtors: List<Debtor>, phone: String = "+93791234567"): String? =
+    ok(OrderFulfillment.fulfill(ledger().copy(debtors = debtors), order(phone = phone), "2026-10-19", 1L)).data.sales.single().debtorId
+
+  @Test
+  fun secondPhoneLinksTheCustomer() {
+    assertEquals("c1", linked(listOf(Debtor(id = "c1", name = "احمد", phone = "0700 000 000", phone2 = "۰۷۹۱۲۳۴۵۶۷"))))
+  }
+
+  @Test
+  fun mergedCustomerGoesToTheSurvivor() {
+    val gone = Debtor(id = "old", name = "احمد", phone = "0791 234 567", mergedInto = "c2")
+    val keep = Debtor(id = "c2", name = "احمد", phone = "0700 000 000", phone2 = "0791 234 567")
+    assertEquals("c2", linked(listOf(gone, keep)))
+  }
+
+  @Test
+  fun twoActiveCustomersWithOnePhoneLinkNobody() {
+    assertNull(linked(listOf(Debtor(id = "a", name = "یک", phone = "0791234567"), Debtor(id = "b", name = "دو", phone = "+93 791 234 567"))))
+    assertNull(linked(listOf(Debtor(id = "c1", name = "احمد", phone = "0791 234 567")), phone = "12"))
+  }
 }
