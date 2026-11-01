@@ -173,11 +173,11 @@ router.get('/:id', needFlag, async (req, res) => {
  * NTF-01/04: پیام‌های وضعیت به مشتریِ همین سفارش — کدام رویداد، از کدام کانال، چه شد — و حالِ
  * کانال‌ها. فقط خواندن؛ بی شماره، متن یا لینک. سفارشِ دکانِ دیگر ⇒ ۴۰۴.
  */
-router.get('/:id/notices', needFlag, wrap(async (req, res) => {
+router.get('/:id/notices', needFlag, async (req, res) => {
   const out = await require('../lib/customer-notify').forOrder(req.shopId, req.params.id);
   if (!out) throw notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
-}));
+});
 
 /**
  * سفارشِ دستیِ کارمند — تلفنی، تلگرام، واتس‌اپ یا دستی (ORD-21)؛ با
