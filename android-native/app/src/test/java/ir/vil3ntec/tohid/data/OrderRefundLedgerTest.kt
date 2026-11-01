@@ -207,7 +207,7 @@ class OrderRefundLedgerTest {
   fun `بازپرداختِ درگاه و گذارِ کامل یک کلیدند و مرجوعیِ دستیِ پیشین کم می‌شود`() {
     val o = order(events = listOf(full(source = "gateway")))
     var seq = 0
-    val manual = (SalesEngine.recordReturn(sold(o), "o-01ORDER", mapOf("o-01ORDER-1" to 0.5), "خراب", saleDay, 6_000L) { "m${seq++}" }
+    val manual = (SalesEngine.recordReturn(sold(o), "o-01ORDER", mapOf("o-01ORDER-1" to 0.5), "خراب", saleDay, 6_000L, newId = { "m${seq++}" })
       as SalesEngine.Result.Ok).data
     val manualAmount = ReturnFlow.returnedAmount(manual, "o-01ORDER")
     assertTrue(manualAmount > 0)
