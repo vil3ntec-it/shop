@@ -152,7 +152,7 @@ async function updateMember(shopId, memberId, patch) {
   memberId = m.id;
   if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
 
-  const role = patch.role && ['manager', 'staff'].includes(patch.role) ? patch.role : m.role;
+  const role = patch.role && require('./permissions').STAFF_ROLES.includes(patch.role) ? patch.role : m.role;
   const status = patch.status && ['active', 'suspended', 'removed'].includes(patch.status)
     ? patch.status : m.status;
 
@@ -165,6 +165,9 @@ async function updateMember(shopId, memberId, patch) {
     await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
       [now(), m.user_id]);
   }
+  //  ⛔ S78: سوکتِ زندهٔ او هم در همین درخواست — برداشتن/تعلیق (نشست رفت) و
+  //  تغییرِ نقش (دسترسی عوض شد) هر دو؛ دکان‌های دیگرش با همان نقش دست نمی‌خورند
+  await require('./sync-v1-live').accessChanged({ userId: m.user_id });
   return row;
 }
 
