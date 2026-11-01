@@ -1,6 +1,12 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.product.BulkPrice
+import ir.vil3ntec.tohid.core.money.Qty
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.stock.StockLevelRules
+import ir.vil3ntec.tohid.core.stock.StockLevels
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -28,6 +34,44 @@ object WarehouseEngine {
     val active: Boolean? = null,
     val saleUnit: String? = null,
     val unitFactor: Double? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
+    /**
+     *  PRD-02/PRD-26 — نام‌های دیگر، واژه‌ها و محلِ قفسه. `null` ⇒ دست نمی‌خورد (فرمی که این بخش را
+     *  نشان نمی‌دهد، یعنی تنظیمِ خاموش، ورود از فایل و ثبتِ گروهی)؛ وگرنه همه از همین.
+     */
+    val info: ir.vil3ntec.tohid.core.product.ProductInfo? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
+    /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
+    val brand: String? = null,
+    val tags: List<String>? = null,
+    /**
+     *  INV-12: `true` ⇒ نقطهٔ سفارش و بیشینه دقیقاً همین دو مقدار می‌شوند (`null` = پاک)، با سنجشِ
+     *  ترتیبِ «کمینه ≤ نقطهٔ سفارش < بیشینه» در `core`. `false` (پیش‌فرض؛ فرم‌هایی که این دو را
+     *  ندارند یا تنظیمِ «نقطهٔ سفارش و بیشینه» خاموش است) ⇒ همان مقدارِ پیشین دست نمی‌خورد.
+     */
+    val editLevels: Boolean = false,
+    val reorderPoint: Double? = null,
+    val maxStock: Double? = null,
   )
 
   data class EntryDraft(
@@ -136,9 +180,8 @@ object WarehouseEngine {
 
   /* ---------------------------- ثبتِ کالا ---------------------------- */
 
-  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود */
-  private fun nameKey(name: String): String =
-    name.trim().replace(Regex("\\s+"), " ").replace('ي', 'ی').replace('ك', 'ک').lowercase()
+  /** نامِ کالا برای سنجشِ تکرار: فاصله‌های اضافه و بزرگی/کوچکیِ حروف حساب نمی‌شود (همان کلیدِ core) */
+  private fun nameKey(name: String): String = SimilarNames.exactKey(name)
 
   /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
   internal fun productChanges(a: Product, b: Product): List<String> = buildList {
@@ -147,14 +190,40 @@ object WarehouseEngine {
     if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")
     if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")
     if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
+    if (a.reorderPoint != b.reorderPoint) add("نقطهٔ سفارش ${levelText(a.reorderPoint)} ⇐ ${levelText(b.reorderPoint)}")
+    if (a.maxStock != b.maxStock) add("حداکثر موجودی ${levelText(a.maxStock)} ⇐ ${levelText(b.maxStock)}")
     if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
     if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+    //  PRD-02/PRD-26 — فقط وقتی فرمِ همین بخش چیزی را عوض کرد (خاموش ⇒ هرگز)
+    if (a.namePs != b.namePs || a.nameEn != b.nameEn || a.synonyms != b.synonyms || a.keywords != b.keywords) {
+      add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
+    }
+    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
+    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
+    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
+    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
+    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
   }
+
+  /** برند/برچسبِ فرم ⇒ مقدارِ ذخیره؛ خالی ⇒ null تا JSON ِ کالای بی برند همان پیشین بماند */
+  private fun brandOf(raw: String?, keep: String?): String? = if (raw == null) keep else ProductLabels.brand(raw).ifEmpty { null }
+  private fun tagsOf(raw: List<String>?, keep: List<String>?): List<String>? =
+    if (raw == null) keep else ProductLabels.tags(raw).ifEmpty { null }
 
   /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */
   fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
     d.auditLog.filter { it.refId == productId && (it.type == "product_edit" || it.type == "price_change") }
       .sortedByDescending { it.createdAt }
+
+  /**
+   *  PRD-19: کالاهایی با نامِ **مشابه** (نه یکسان) — هشدار، نه رد: فاصله/نیم‌فاصله/اعراب، ترتیبِ
+   *  کلمه‌ها یا غلطِ تایپیِ کوچک؛ رقمِ متفاوت هرگز (`SimilarNames` ِ core). `exceptId` خودِ کالا.
+   */
+  fun similarNames(d: ShopData, name: String, exceptId: String? = null, limit: Int = 3): List<Product> {
+    if (name.isBlank()) return emptyList()
+    val except = if (exceptId == null) -1 else d.products.indexOfFirst { it.id == exceptId }
+    return SimilarNames.Index(d.products.map { it.name }).find(name, except, limit).map { d.products[it.index] }
+  }
 
   /** کالای دیگری با همین نام هست؟ (`exceptId` خودِ کالای در حالِ ویرایش) */
   fun duplicateName(d: ShopData, name: String, exceptId: String? = null): Product? {
@@ -180,11 +249,17 @@ object WarehouseEngine {
     unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
+    if (draft.editLevels) levelsProblem(minStock, draft.reorderPoint, draft.maxStock)?.let { return Result.Failed(it) }
 
     val barcode = draft.barcode.trim()
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: (if (barcode.isEmpty()) emptyList() else listOf(barcode))
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
     // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد
-    if (barcode.isNotEmpty() && ShopStore.barcodeIndex(d).containsKey(barcode)) {
-      return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    val index = ShopStore.barcodeIndex(d)
+    ProductBarcodes.conflict(codes, null) { index[it] }?.let {
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val id = newId()
@@ -198,14 +273,18 @@ object WarehouseEngine {
       wholesalePrice = 0.0,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       notes = "",
-      barcodes = if (barcode.isEmpty()) emptyList() else listOf(barcode),
+      barcodes = codes,
       createdAt = now,
       subcategory = draft.subcategory?.trim().orEmpty(),
       supplierId = draft.supplierId.orEmpty(),
       active = draft.active ?: true,
       saleUnit = draft.saleUnit?.trim().orEmpty(),
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
-    )
+      reorderPoint = if (draft.editLevels) draft.reorderPoint else null,
+      maxStock = if (draft.editLevels) draft.maxStock else null,
+      brand = brandOf(draft.brand, null),
+      tags = tagsOf(draft.tags, null),
+    ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
 
     return Result.Ok(
       d.copy(
@@ -233,16 +312,25 @@ object WarehouseEngine {
       ?.let { return Result.Failed(it) }
     if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
     if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    //  حدِ کم بودن همیشه از فرم می‌آید؛ نقطهٔ سفارش و بیشینه فقط وقتی فرم آن‌ها را دارد — ترتیبِ هر سه با هم سنجیده می‌شود
+    val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
+    val reorderPoint = if (draft.editLevels) draft.reorderPoint else existing.reorderPoint
+    val maxStock = if (draft.editLevels) draft.maxStock else existing.maxStock
+    if (draft.editLevels || existing.reorderPoint != null || existing.maxStock != null) {
+      levelsProblem(minStock, reorderPoint, maxStock)?.let { return Result.Failed(it) }
+    }
 
     val barcode = draft.barcode.trim()
-    //  ⛔ از دست رفتنِ داده (رفع): فرم فقط بارکدِ نخست را نشان می‌دهد؛ ویرایش فقط همان را عوض می‌کند و
-    //  بارکدهای دوم به بعدِ کالا (از وب، ورود یا همگام‌سازی) نمی‌افتند. پیش از این همه به یکی کم می‌شد.
-    val codes = ProductBarcodes.mergePrimary(barcode, existing.barcodes)
+    //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
+    val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
+      ?: ProductBarcodes.mergePrimary(barcode, existing.barcodes)
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
     // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
-    // بارکدی که همین حالا روی همین کالاست (حتی با تعارضِ آفلاینِ قدیمی، §۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
+    // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
     val index = ShopStore.barcodeIndex(d)
-    if (ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] } != null) {
-      return Result.Failed("این بارکد قبلاً برای کالای دیگری ثبت شده")
+    //  فرمِ تک‌بارکدی (`barcodes == null`) همان پیامِ همیشگی را می‌گیرد، هر چند بارکدِ دیگر هم کالا داشته باشد (#476)
+    ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
 
     val updated = existing.copy(
@@ -261,11 +349,18 @@ object WarehouseEngine {
         (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
         else -> draft.unitFactor ?: existing.unitFactor
       },
-    )
+      reorderPoint = reorderPoint,
+      maxStock = maxStock,
+      brand = brandOf(draft.brand, existing.brand),
+      tags = tagsOf(draft.tags, existing.tags),
+    ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
     var history = d.priceHistory
     var audit = d.auditLog
+    val by = draft.changedBy?.trim()?.ifEmpty { null }
+    val why = draft.reason?.trim()?.ifEmpty { null }
+    val whySuffix = why?.let { " — دلیل: $it" }.orEmpty()
     if (existing.purchasePrice != draft.purchasePrice) {
       history = history + PriceChange(
         id = newId(),
@@ -274,14 +369,17 @@ object WarehouseEngine {
         newPrice = draft.purchasePrice,
         date = today,
         createdAt = now,
+        by = by,
+        reason = why,
       )
       audit = audit + AuditEntry(
         id = newId(),
         type = "price_change",
         date = today,
         refId = id,
-        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی$whySuffix",
         createdAt = now,
+        by = by,
       )
     }
     //  بقیهٔ تغییرهای کالا هم ردپا دارند — «چه کسی نام یا قیمتِ فروش را عوض کرد؟»
@@ -292,8 +390,9 @@ object WarehouseEngine {
         type = "product_edit",
         date = today,
         refId = id,
-        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}",
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice) whySuffix else "",
         createdAt = now,
+        by = by,
       )
     }
 
@@ -382,6 +481,149 @@ object WarehouseEngine {
     if (audit.isEmpty()) return Result.Failed("چیزی عوض نشد")
     val categories = products.filter { it.id in ids }.map { it.category }.fold(d.productCategories) { acc, c -> withCategory(acc, c) }
     return Result.Ok(d.copy(products = products, productCategories = categories, auditLog = d.auditLog + audit), id = ids.first())
+  }
+
+  /** کالاهای انتخاب‌شده به زبانِ `BulkPrice` ِ core (پول به یک‌صدمِ افغانی) */
+  private fun minorOf(x: Double): Long = Math.round(x * 100)
+
+  /**
+   *  PRD-21: پیش‌نمایشِ قیمتِ گروهی — همان که رابط رنگی نشان می‌دهد و همان که `bulkPrice` اعمال می‌کند.
+   */
+  fun bulkPricePreview(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long = 100,
+  ): BulkPrice.Preview = BulkPrice.preview(
+    d.products.filter { it.id in ids }.map { BulkPrice.Item(it.id, it.name, minorOf(it.salePrice), minorOf(it.purchasePrice)) },
+    field, op, roundToMinor,
+  )
+
+  /**
+   *  PRD-21 و PRD-14: قیمتِ گروهی. فقط ردیف‌های `applies` ِ پیش‌نمایش؛ ردیفِ «رد» (منفی) دست نمی‌خورد.
+   *  ⛔ پیش‌نمایشِ هشدارداده (زیرِ بها، صفر، تغییرِ ۵۰٪) بی `confirmed` اعمال نمی‌شود؛ دلیل اجباری است.
+   *  هر کالا ردیفِ سابقه با کاربر و دلیل دارد؛ تغییرِ قیمتِ خرید در `priceHistory` هم می‌نشیند.
+   */
+  fun bulkPrice(
+    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long,
+    confirmed: Boolean, by: String, reason: String, today: String, now: Long, newId: () -> String,
+  ): Result {
+    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    if (!BulkPrice.valid(op)) return Result.Failed("مقدار درست نیست")
+    val why = reason.trim()
+    if (why.isEmpty()) return Result.Failed("دلیلِ تغییرِ قیمت را بنویسید")
+    val preview = bulkPricePreview(d, ids, field, op, roundToMinor)
+    if (preview.changed == 0) return Result.Failed("چیزی عوض نشد")
+    if (preview.needsConfirm && !confirmed) return Result.Failed("هشدارهای پیش‌نمایش را ببینید و تأیید کنید")
+    val who = by.trim().ifEmpty { null }
+    val rows = preview.rows.filter { it.applies }.associateBy { it.id }
+    val audit = ArrayList<AuditEntry>()
+    val history = ArrayList<PriceChange>()
+    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"
+    val products = d.products.map { p ->
+      val r = rows[p.id] ?: return@map p
+      val value = r.newMinor / 100.0
+      val old = r.oldMinor / 100.0
+      if (field == BulkPrice.Field.PURCHASE) {
+        history += PriceChange(id = newId(), productId = p.id, oldPrice = p.purchasePrice, newPrice = value,
+          date = today, createdAt = now, by = who, reason = why)
+      }
+      audit += AuditEntry(
+        id = newId(), type = if (field == BulkPrice.Field.PURCHASE) "price_change" else "product_edit", date = today, refId = p.id,
+        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,
+      )
+      if (field == BulkPrice.Field.SALE) p.copy(salePrice = value) else p.copy(purchasePrice = value)
+    }
+    return Result.Ok(
+      d.copy(products = products, priceHistory = d.priceHistory + history, auditLog = d.auditLog + audit),
+      id = rows.keys.first(),
+    )
+  }
+
+  /* ------------- حدهای موجودی: کمینه، نقطهٔ سفارش، بیشینه (INV-12) ------------- */
+
+  /** «۱۲» یا «—» برای ردِ تغییر در سابقه */
+  private fun levelText(v: Double?): String = v?.let { ir.vil3ntec.tohid.qty(it) } ?: "—"
+
+  /** مقدار ⇒ هزارم با همان `Qty.fromLegacy`؛ بیرون از بازهٔ دقیق ⇒ سقفِ Long تا سنجش «بیش از اندازه» بگوید */
+  private fun milliOrNull(v: Double?): Long? =
+    v?.takeIf { it.isFinite() }?.let { runCatching { Qty.fromLegacy(it).milli }.getOrDefault(if (it < 0) Long.MIN_VALUE else Long.MAX_VALUE) }
+
+  /**
+   *  حدهای کالا به زبانِ `core`. `minStock = 0` همان «بی هشدار» ِ امروز است ⇒ `null`.
+   *  عددِ نامعتبر (NaN) ⇒ `null`؛ سنجش در `levelsProblem` جلویش را می‌گیرد.
+   */
+  fun levelsOf(p: Product): StockLevels = StockLevels(
+    minMilli = p.minStock.takeIf { it != 0.0 }?.let { milliOrNull(it) },
+    reorderMilli = milliOrNull(p.reorderPoint),
+    maxMilli = milliOrNull(p.maxStock),
+  )
+
+  /**
+   *  کالا با حدهای تازه؛ کمینهٔ تعریف‌نشده ⇒ `minStock = 0` (همان قالبِ امروز). حدی که عوض نشده
+   *  همان عددِ پیشینِ کالا می‌ماند (گردِ هزارم آن را دست نمی‌زند و ردِ بی‌جا در سابقه نمی‌سازد).
+   */
+  fun withLevels(p: Product, l: StockLevels): Product {
+    val before = levelsOf(p)
+    return p.copy(
+      minStock = if (l.minMilli == before.minMilli) p.minStock else (l.minMilli ?: 0L) / 1000.0,
+      reorderPoint = if (l.reorderMilli == before.reorderMilli) p.reorderPoint else l.reorderMilli?.let { it / 1000.0 },
+      maxStock = if (l.maxMilli == before.maxMilli) p.maxStock else l.maxMilli?.let { it / 1000.0 },
+    )
+  }
+
+  /** پیامِ نخستین ایرادِ حدها (فارسی) یا `null` */
+  fun levelsProblem(minStock: Double, reorderPoint: Double?, maxStock: Double?): String? {
+    if (listOfNotNull(minStock, reorderPoint, maxStock).any { !it.isFinite() }) return "عددِ حدِ موجودی درست نیست"
+    val l = StockLevels(
+      minMilli = minStock.takeIf { it != 0.0 }?.let { milliOrNull(it) },
+      reorderMilli = milliOrNull(reorderPoint),
+      maxMilli = milliOrNull(maxStock),
+    )
+    return StockLevelRules.problems(l).firstOrNull()?.fa
+  }
+
+  /** پیش‌نمایشِ ویرایشِ گروهیِ حدها برای کالاهای انتخاب‌شده — ناموفق‌ها اول (`StockLevelRules.plan`) */
+  fun previewLevels(d: ShopData, ids: Set<String>, patch: StockLevelRules.Patch): List<StockLevelRules.Planned> =
+    StockLevelRules.plan(d.products.filter { it.id in ids }.map { it.id to levelsOf(it) }, patch)
+
+  /**
+   *  ویرایشِ گروهیِ حدها: فقط ردیف‌هایی که پس از تغییر ترتیبشان درست است عوض می‌شوند (بقیه دست
+   *  نمی‌خورند و در پیش‌نمایش/نتیجه با دلیل می‌آیند). هر کالای عوض‌شده یک ردِ `product_edit` دارد.
+   *  هیچ ردیفی عوض نشود ⇒ `Failed`.
+   */
+  fun bulkLevels(
+    d: ShopData,
+    ids: Set<String>,
+    patch: StockLevelRules.Patch,
+    today: String,
+    now: Long,
+    newId: () -> String,
+  ): Result {
+    val apply = previewLevels(d, ids, patch).filter { it.changes }.associate { it.id to it.after }
+    if (apply.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    return bulkUpdate(d, apply.keys, today, now, newId) { p -> apply[p.id]?.let { withLevels(p, it) } ?: p }
+  }
+
+  /** یک ردیفِ «نیاز به سفارش»: وضعیت نسبت به حدها و پیشنهادِ مقدار تا بیشینه (`null` ⇒ بیشینه تعریف نشده) */
+  data class ReorderRow(val product: Product, val onHand: Double, val state: StockLevelRules.State, val suggest: Double?)
+
+  /**
+   *  کالاهای فعالی که حدی دارند و به نقطهٔ سفارش، کمینه یا صفر رسیده‌اند (INV-12)، با پیشنهادِ «تا
+   *  بیشینه». ترتیب: تمام‌شده، زیرِ کمینه، وقتِ سفارش؛ سپس نام. فقط خواندن — سفارشی ثبت نمی‌شود.
+   */
+  fun reorderList(d: ShopData): List<ReorderRow> {
+    val stock = ShopStore.index(d)
+    return d.products.asSequence()
+      .filter { it.active }
+      .mapNotNull { p ->
+        val l = levelsOf(p)
+        if (l.minMilli == null && l.reorderMilli == null && l.maxMilli == null) return@mapNotNull null
+        val onHand = stock.stock(p.id)
+        val have = milliOrNull(onHand) ?: 0L
+        val st = StockLevelRules.state(have, l)
+        if (st !in StockLevelRules.NEEDS_ORDER) return@mapNotNull null
+        ReorderRow(p, onHand, st, StockLevelRules.suggestOrderMilli(have, l)?.let { it / 1000.0 })
+      }
+      .sortedWith(compareBy<ReorderRow> { it.state.ordinal }.thenBy { it.product.name })
+      .toList()
   }
 
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */

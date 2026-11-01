@@ -139,7 +139,8 @@
     arr(raw.returns).forEach(function (r) {
       L.returns.push({
         id: str(r.id), saleId: str(r.saleId), saleItemId: str(r.saleItemId), productId: str(r.productId),
-        qty: milli(r.quantity), amount: money(r.amount), user: str(r.user).trim(), approvedBy: str(r.approvedBy).trim(),
+        //  `by` همان فیلدِ `SaleReturn` ِ برنامه (جریانِ تازهٔ برگشت و «سابقهٔ ضدتقلب»)؛ `user` شکلِ دفترِ وب
+        qty: milli(r.quantity), amount: money(r.amount), user: (str(r.by) || str(r.user)).trim(), approvedBy: str(r.approvedBy).trim(),
         date: str(r.date), createdAt: ms(r.createdAt),
       });
     });
@@ -506,7 +507,7 @@
   /**
    * RPT-09 — به تفکیکِ کاربر: تخفیف (فروشنده)، برگشتی، لغو، حذفِ ردیف و باز کردنِ
    * کشو بی فروش (`no_sale`، همان نامِ pay-core). کاربرِ هر رویداد فقط از فیلدِ صریحش
-   * می‌آید (`seller`، `returns[].user`، `cancelledBy`، `auditLog[].by|user`)؛ نبودش یعنی ""
+   * می‌آید (`seller`، `returns[].by|user`، `cancelledBy`، `auditLog[].by|user`)؛ نبودش یعنی ""
    * (نامعلوم) — به گردنِ فروشندهٔ فاکتور انداخته نمی‌شود.
    * v3 S08: هر رویدادی که `approvedBy` دارد، برای کننده `overrideCount` و برای
    * تأییدکننده `approvalCount` می‌شمارد.
