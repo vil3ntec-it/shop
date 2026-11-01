@@ -156,6 +156,8 @@ object OwnerExport {
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",
+    "brand" to "برند",
+    "packs" to "بسته‌ها",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",

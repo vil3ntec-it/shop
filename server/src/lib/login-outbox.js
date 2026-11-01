@@ -347,7 +347,8 @@ async function tick() {
 function start() {
   if (started) return;
   started = true;
-  timer = setInterval(() => tick().catch(err => console.error('[login-mail]', err.message)), TICK_MS);
+  const run = require('./job-beat').wrap('login-outbox', TICK_MS, tick);   //  پنلِ مرکزی ۴.۹
+  timer = setInterval(() => run().catch(err => console.error('[login-mail]', err.message)), TICK_MS);
   if (timer.unref) timer.unref();
 }
 function stop() {

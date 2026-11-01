@@ -33,7 +33,8 @@ function bearer(req) {
  * یک چیز با دو در.
  */
 function requireUserOf(app) {
-  return async function (req, res, next) {
+  //  نام‌دار، تا فهرستِ زندهٔ درها (`test/route-inventory.js` ⇐ `route-authz-inventory`) احراز را ببیند
+  return async function requireAppUser(req, res, next) {
     try {
       const token = bearer(req);
       if (!token) return next(unauthorized());
@@ -377,6 +378,9 @@ async function requireAdmin(req, res, next) {
     if (!admin || admin.status !== 'active') {
       return next(forbidden('حساب مدیر غیرفعال است', 'admin_disabled'));
     }
+    //  SEC-AUTH-12: تأییدِ دومرحله‌ایِ اجباری (پرچمِ خاموشِ `ADMIN_2FA_REQUIRED`) — از ردیفِ زنده، هر درخواست
+    const blocked = require('../lib/admin-guard').enrollmentBlock(req, admin);
+    if (blocked) return next(blocked);
     req.admin = admin;
     req.tokenRow = row;
     const denied = require('../lib/admin-roles').check(req);
@@ -405,10 +409,15 @@ async function serviceAdmin(req, res, next, token) {
   return svc.run(req.actor, () => next());
 }
 
+/**
+ *  فقط مدیرِ ارشد. SEC-AUTH-13: با پرچمِ خاموشِ `ADMIN_REAUTH`، **نوشتنِ** ارشد فقط از نشستی که
+ *  همین چند دقیقه رمز را زده (`lib/admin-guard.assertFresh`). خواندن مثلِ پیش.
+ */
 function requireSuperAdmin(req, res, next) {
   if (!req.admin) return next(unauthorized());
   if (req.admin.role !== 'superadmin') return next(forbidden('فقط مدیر ارشد'));
-  next();
+  if (req.method === 'GET' || req.method === 'HEAD') return next();
+  require('../lib/admin-guard').assertFresh(req).then(() => next(), next);
 }
 
 module.exports = {

@@ -446,6 +446,27 @@ const config = {
   //  پلهٔ اولِ ثبت‌نام برمی‌گرداند (رفتارِ پیش از 2.14.2). پیش‌فرض خاموش.
   signupLegacyConflict: bool(process.env.SIGNUP_LEGACY_CONFLICT, false),
   trustProxy:        bool(process.env.TRUST_PROXY, false),
+  /*
+   *  دو قفلِ نشستِ مدیر — هر دو پیش‌فرض خاموش؛ روشن کردن فقط با صاحبِ سامانه (F0-15، `lib/admin-guard.js`).
+   *  `ADMIN_2FA_REQUIRED=1`: مدیرِ بی TOTP فقط به درهای روشن کردنِ همان می‌رسد (SEC-AUTH-12).
+   *  `ADMIN_REAUTH=1`: نوشتنِ مدیرِ ارشد فقط چند دقیقه پس از ورود یا `/api/admin/reauth` (SEC-AUTH-13).
+   */
+  admin: {
+    twoFactorRequired: bool(process.env.ADMIN_2FA_REQUIRED, false),
+    reauthRequired:    bool(process.env.ADMIN_REAUTH, false),
+  },
+  /*
+   *  SEC-AUTH-05: `X-Forwarded-For` فقط وقتی خوانده می‌شود که **همسایهٔ مستقیمِ** سوکت
+   *  پروکسیِ مطمئن باشد. خالی ⇒ loopback و نشانی‌های خصوصی (پنلِ خانگی روی 127.0.0.1،
+   *  Caddy در شبکهٔ docker). فهرست ⇒ فقط همان‌ها (IP یا CIDRِ IPv4، با ویرگول).
+   */
+  trustProxyFrom:    list(process.env.TRUST_PROXY_FROM),
+  /*
+   *  SEC-AUTH-06: کدِ یک‌بارمصرف در **پاسخ** (`devCode`) و در لاگ فقط وقتی `NODE_ENV`
+   *  صریحاً `development` یا `test` است. تا ۲.۱۴.۴ «هر چه production نیست» بود، پس سروری
+   *  که بی `NODE_ENV` بالا می‌آمد کدِ ورودِ هر شماره را به هر درخواست‌کننده‌ای پس می‌داد.
+   */
+  devCodes:          ['development', 'test'].includes(String(process.env.NODE_ENV || '').trim()),
   defaults: {
     timezone:  process.env.DEFAULT_TIMEZONE || 'Asia/Kabul',
     //  ⛔ F0-13: `TRIAL_DAYS` برداشته شد — هیچ جا خوانده نمی‌شد و فقط عددِ دومی
