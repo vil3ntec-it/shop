@@ -140,6 +140,41 @@ jobs:
           path: perf-image-bank-${{ matrix.db }}.json
           if-no-files-found: ignore
 
+  #  PERF-06: دو نتیجه کنارِ هم و هر کدام جدا (`bench/db-compare.mjs`)؛ پروندهٔ جابه‌جا یا مقیاسِ
+  #  ناهمسان ⇒ کدِ ۲ و قرمز. یکی از دو کار نتیجه نداد ⇒ فقط notice، چون همان کار خودش قرمز است.
+  compare:
+    name: PostgreSQL و PGlite، کنارِ هم
+    needs: server
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: perf-server-*
+          merge-multiple: true
+      - name: جدولِ کنارِ هم
+        run: |
+          if [ ! -f perf-server-postgres.json ] || [ ! -f perf-server-pglite.json ]; then
+            echo "::notice::یکی از دو نتیجهٔ سرور نیست؛ جدولِ کنارِ هم ساخته نشد"
+            exit 0
+          fi
+          node bench/db-compare.mjs --pg perf-server-postgres.json --pglite perf-server-pglite.json \
+            --md perf-server-compare.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: perf-server-compare
+          path: |
+            perf-server-compare.md
+            perf-server-postgres.json
+            perf-server-pglite.json
+          if-no-files-found: ignore
+
   engines:
     name: موتورهای Kotlin (JVM)
     runs-on: ubuntu-latest
