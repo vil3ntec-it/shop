@@ -41,7 +41,10 @@ class PayFixWiringTest {
     assertTrue(s.contains("need = ApprovalSlip.Need(PayFix.PERM, \"auditLog/\$key\", null, r.amountMinor)"))
   }
 
-  @Test fun `تنظیم در Settings`() {
-    assertEquals(1, Regex(Regex.escape("PayFixSettingsWired(context)")).findAll(src("ir/vil3ntec/tohid/ui/screens/Settings.kt")).count())
+  @Test fun `تنظیم در هر دو رابط`() {
+    fun count(rel: String, what: String) = Regex(Regex.escape(what)).findAll(src(rel)).count()
+    //  رابطِ امروز (`SettingsLegacy`) و نسخهٔ ۳ (`settings/sales/payment-fix`) — همان `PayFixPref`
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SettingsLegacy.kt", "PayFixSettingsWired(context)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/PosToggleScreensAndroid.kt", "PayFixPref.set(context, it)"))
   }
 }

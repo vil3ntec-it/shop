@@ -43,8 +43,8 @@ class SettingsPortTest {
   /** «قفلِ خودکار پس از بی‌کاری» (STF-05): ویژگیِ `LockStore`، نه تابع */
   private val idle = Regex("""\b[a-z][A-Za-z0-9]*\.idleMinutes\s*=[^=]""")
 
-  /** جزءِ صدازدهٔ صفحه که خودش تنظیم می‌نویسد */
-  private val part = Regex("""\b([A-Z][A-Za-z0-9]*(?:Section|Settings|Choice))\(""")
+  /** جزءِ صدازدهٔ صفحه که خودش تنظیم می‌نویسد — `…SettingsWired(` (یک خطِ تنظیمِ رابطِ امروز) هم */
+  private val part = Regex("""\b([A-Z][A-Za-z0-9]*(?:Section|Settings|SettingsWired|Choice))\(""")
 
   /** `set…` هایی که تنظیم نیستند */
   private val notSettings = setOf("SalesEngine", "Modifier")
@@ -107,6 +107,7 @@ class SettingsPortTest {
     val ported = listOf(
       SettingsLayout.ENCRYPTION, SettingsLayout.CHECKOUT_RULES, SettingsLayout.HELD, SettingsLayout.RETURNS,
       SettingsLayout.PAY, SettingsLayout.CREDIT_GATE, SettingsLayout.CRM_REPORTS,
+      SettingsLayout.PAY_FIX, SettingsLayout.PRICE_LIST, SettingsLayout.QUOTE,
     )
     ported.forEach { key ->
       assertTrue("$key در هیچ گروهی نیست", SettingsLayout.groupOf(key) != null)
@@ -121,6 +122,17 @@ class SettingsPortTest {
     assertTrue(SettingsLayout.CRM_REPORTS in SettingsLayout.deskSections)
     //  کلیدِ برگشت همان عنوانِ رابطِ امروز است
     assertEquals(ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE, SettingsLayout.RETURNS)
+    assertEquals(ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE, SettingsLayout.PRICE_LIST)
+  }
+
+  @Test
+  fun `پیش‌فاکتور، لیستِ قیمت و اصلاحِ پرداخت همان کلیدِ رابطِ امروز را می‌نویسند`() {
+    val v3 = writers(v3Files)
+    listOf("QuotePref.set", "PriceListPrefs.set", "PayFixPref.set").forEach { assertTrue("$it در نسخهٔ ۳ نیست", it in v3) }
+    assertEquals(
+      listOf("settings/sales/payment-fix", "settings/sales/price-lists", "settings/sales/quotes"),
+      listOf(SettingsLayout.PAY_FIX, SettingsLayout.PRICE_LIST, SettingsLayout.QUOTE).map(SettingsPaths::section),
+    )
   }
 
   @Test
@@ -137,7 +149,34 @@ class SettingsPortTest {
   }
 
   companion object {
-    /** نوشتنِ تنظیمی که عمداً در نسخهٔ ۳ نیست ⇐ دلیل. امروز خالی: همه آمده‌اند. */
-    val EXCEPTIONS: Map<String, String> = emptyMap()
+    private const val PENDING = "هنوز فقط در رابطِ امروز (`…SettingsWired` ِ `SettingsLegacy`)؛ صفحهٔ نسخهٔ ۳ ندارد"
+
+    /**
+     *  نوشتنِ تنظیمی که در نسخهٔ ۳ نیست ⇐ دلیل. فهرستِ باز: این‌ها هنوز صفحهٔ نسخهٔ ۳ ندارند و هر کدام که آمد
+     *  از این‌جا برداشته شود («استثنای کهنه» قرمز است). بخشِ تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود.
+     */
+    val EXCEPTIONS: Map<String, String> = mapOf(
+      "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
+      "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
+      "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
+      "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
+      "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
+      "LabelToolsPref.set" to "$PENDING — برچسب و بارکدِ داخلی، PRD-23/PRD-05",
+      "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
+      "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
+      "LinePolicyPrefs.setOn" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
+      "PosMoreKeysPrefs.set" to "$PENDING — کلیدهای بیشترِ صندوق، فقط کامپیوتر",
+      "PosNotesPrefs.set" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
+      "PosNotesPrefs.setTemplates" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
+      "PosPriceCheckPrefs.set" to "$PENDING — بررسیِ قیمت در صندوق، فقط کامپیوتر",
+      "PosSearchPrefs.set" to "$PENDING — جست‌وجوی مقاوم، POS-04، فقط کامپیوتر",
+      "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
+      "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
+      "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
+      "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
+      "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
+      "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
+      "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
+    )
   }
 }
