@@ -21,6 +21,8 @@
     var hasBad = c.hasBad; var short = c.short; var hasShort = c.hasShort; var shortText = c.shortText;
     var thumb = c.thumb; var setQty = c.setQty; var saveCart = c.saveCart;
     var verifyAvailable = c.verifyAvailable;
+    //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
+    var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
 
     function fulfillment() {
@@ -55,7 +57,7 @@
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');
-      btn.disabled = !ids().length || !f || below || hasBad() || hasShort() || !ok;
+      btn.disabled = closed() || !ids().length || !f || below || hasBad() || hasShort() || !ok;
       btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
     }
 
@@ -185,6 +187,10 @@
           d.unavailable.forEach(function (id) { if (c.cart[id]) c.cart[id].unavailable = true; });
           saveCart();
           K.note(msg, 'err', e.message);
+        } else if (e.code === 'store_not_accepting_orders') {
+          c.store.ordering = { accepting: false };
+          if (c.renderHead) c.renderHead();
+          K.note(msg, 'warn', e.message);
         } else if (e.code === 'qty_over_limit') {
           K.note(msg, 'err', e.message + ' (' + t('maxq', { q: K.qty(d.maxQtyMilli) }) + ')');
         } else if (e.code === 'below_min_order') {

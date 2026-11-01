@@ -102,6 +102,8 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     store: views.pub('shop', {
       ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery, media,
       ...(pid ? { publicId: req.store.public_id } : {}),
+      //  shop.orders.subscribers_only روشن ⇒ `ordering` («سفارش می‌پذیرد؟»)؛ ثبت را `orders.create` می‌بندد. خاموش ⇒ کلید نیست (پاسخِ main)
+      ...require('../lib/storefront-intake').orderingOf(req.store),
     }),
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)

@@ -4,6 +4,8 @@
  *
  *   پرچم ── `shop.orders` در «تنظیماتِ زنده» (scope = شناسهٔ دکان، یا `all`)
  *           + کلیدِ اشتراکِ `online_orders` (بخشِ ۳.۱۷). ⛔ پیش‌فرض خاموش.
+ *           `shop.orders.subscribers_only` روشن ⇒ سفارشِ تازهٔ مشتری فقط با اشتراکِ فعال
+ *           (`intakeOf`)؛ ردِ آن ۴۰۳ `store_not_accepting_orders`.
  *   ساخت ── با کلیدِ یکتایی (CHK-19)، زیرِ قفلِ دکان، در یک تراکنش:
  *           سفارش + ردیف‌ها + رویدادِ «ثبت». مبلغ را سرور می‌سازد.
  *   گذار ── فقط آن‌چه `order-states` اجازه می‌دهد؛ ردیفِ سفارش قفل می‌شود،
@@ -27,10 +29,13 @@ const S = require('./order-states');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
-const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
+const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders';
 const FEATURE_KEY = 'online_orders';
+const SUBSCRIBERS_FLAG = 'shop.orders.subscribers_only';
+const NOT_ACCEPTING = 'store_not_accepting_orders';
+const NOT_ACCEPTING_MESSAGE = 'این فروشگاه فعلاً سفارشِ آنلاین نمی‌پذیرد';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
 
 const MAX_LINES = 200;
@@ -77,10 +82,41 @@ async function entitledOf(shopId) {
   return { entitled: ent.features.includes(FEATURE_KEY), ent };
 }
 
+/**
+ * ⛔ تصمیمِ صاحب محصول (۱۴۰۵/۰۸/۰۸): سفارشِ آنلاینِ **تازهٔ مشتری** فقط برای دکانِ با
+ * **اشتراکِ فعال** — پشتِ پرچمِ `shop.orders.subscribers_only` (پیش‌فرض خاموش؛ همان قاعدهٔ
+ * `flagOf`). «فعال» را فقط سرور می‌گوید: `entitlementOf` با ساعتِ سرور ⇒ `source = 'subscription'`
+ * (مهلتِ `grace_days` هم فعال است) و پلن کلیدِ `online_orders` را دارد. دورهٔ آزمایشی، منقضی،
+ * معلق، لغوشده و «هرگز اشتراک نداشته» ⇒ نه. `keys`: کلیدهای پولیِ دیگرِ همان راه (ویترین: `storefront`).
+ * ⛔ SUB-10 (#621) جلوتر است: ویترینِ بی کلیدِ اشتراک (منقضی، معلق، لغوشده) پیش از این‌جا ۴۰۴ می‌گیرد؛
+ * این دروازه عملاً دکانِ بازِ بی اشتراکِ پولی (دورهٔ آزمایشی) را فقط‌خواندنی می‌کند (`lib/storefront-intake.js`).
+ * سفارشی که پیش‌تر ثبت شده لغو نمی‌شود و جلو می‌رود (گذار، بازپرداخت، پیگیری) — این دروازه
+ * فقط **ساختِ** سفارشِ مشتری را می‌بندد (`create`)، نه چیزِ دیگری.
+ * @returns {Promise<{gated:boolean, subscribed:boolean, accepting:boolean}>}
+ *   `accepting` فقط حرفِ همین قاعده است؛ پرچم‌ها و کلیدهای دیگر جدا سنجیده می‌شوند.
+ */
+async function intakeOf(shopId, ent = null, keys = []) {
+  const gated = await flagOf(shopId, SUBSCRIBERS_FLAG);
+  const e = ent || (await entitledOf(shopId)).ent;
+  const subscribed = e.source === 'subscription' && [FEATURE_KEY, ...keys].every((k) => e.features.includes(k));
+  return { gated, subscribed, accepting: !gated || subscribed };
+}
+
+/** همان جوابِ عمومی — بی هیچ حرفی از اشتراک یا پولِ دکان. */
+const notAccepting = () => forbidden(NOT_ACCEPTING_MESSAGE, NOT_ACCEPTING);
+
+/**
+ * `enabled` ِ بخشِ «سفارش‌ها» برای برنامهٔ کارمند — همان main (SUB-10 دست نمی‌خورد: بی کلیدِ اشتراک
+ * بخش پنهان و نوشتن ۴۰۳). `subscribersOnly`/`subscribed`/`accepting` فقط حرفِ `intakeOf` است.
+ */
 async function stateOf(shopId) {
   const flag = await flagOf(shopId);
-  const { entitled } = await entitledOf(shopId);
-  return { flag, entitled, enabled: flag && entitled };
+  const { entitled, ent } = await entitledOf(shopId);
+  const intake = await intakeOf(shopId, ent);
+  return {
+    flag, entitled, enabled: flag && entitled,
+    subscribersOnly: intake.gated, subscribed: intake.subscribed, accepting: flag && entitled && intake.accepting,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -328,9 +364,10 @@ async function get(shopId, id, viewer) {
  * درونِ همین تراکنش و **پس از** بررسیِ کلیدِ یکتایی صدا زده می‌شود، تا
  * قیمت را سرور از دفتر بخواند و تکرارِ همان درخواست همان سفارشِ قبلی را
  * برگرداند حتی اگر قیمت از آن پس عوض شده باشد. نیامدنش ⇒ رفتارِ پیشین.
+ * `intakeKeys`: کلیدهای پولیِ دیگری که دروازهٔ اشتراکِ سفارشِ مشتری (`intakeOf`) می‌خواهد.
  * @returns {{order:object, replayed:boolean}}
  */
-async function create(shopId, { key, body, actor, price, notify }) {
+async function create(shopId, { key, body, actor, price, notify, intakeKeys = [] }) {
   const at = now();
   let input = price ? null
     : parseCreate(body, at, { substitution: await require('./order-substitution').flagOn(shopId) });
@@ -339,6 +376,9 @@ async function create(shopId, { key, body, actor, price, notify }) {
   //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
   //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
   if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
+  //  دروازهٔ اشتراکِ سفارشِ مشتری (`intakeOf`) هم پیش از تراکنش خوانده می‌شود — مثلِ پرچمِ ناحیهٔ
+  //  ویترین: درونِ قفلِ سفارش فقط اتصالِ همان تراکنش (استخرِ PostgreSQL خالی نماند)
+  const intake = actor && actor.type === 'customer' ? await intakeOf(shopId, null, intakeKeys) : null;
 
   return tx(async (c) => {
     const run = (t, p) => c.query(t, p);
@@ -354,6 +394,9 @@ async function create(shopId, { key, body, actor, price, notify }) {
       }
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
+    //  ⛔ سفارشِ مشتری فقط با اشتراکِ فعال — **پس از** تکرارِ کلید: سفارشی که پیش از پایانِ
+    //  اشتراک ثبت شده، با تکرارِ همان درخواست همان می‌ماند.
+    if (intake && !intake.accepting) throw notAccepting();
     if (price) input = await price(run, at);
     //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در برابرِ جمعِ همین لحظه؛ خاموش ⇒ کلید دور ریخته می‌شود
     input = require('./delivery-prefs').applyOnCreate(input, body, prefsOn);
@@ -632,7 +675,7 @@ async function summary(shopId) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
+  FLAG_KEY, FEATURE_KEY, SUBSCRIBERS_FLAG, NOT_ACCEPTING, NOT_ACCEPTING_MESSAGE, KEY_RE, MAX_LINES, STAFF_SOURCES,
+  flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary,
 };
