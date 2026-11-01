@@ -197,6 +197,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat
 FLAGS.push('shop.orders.picking');
 //  M3: لوگو و تصویرِ سرِ ویترین
 FLAGS.push('shop.storefront.media');
+//  MKT-10/11: پیوندِ کمپین و QR ِ دکان
+FLAGS.push('shop.storefront.campaigns');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -304,6 +306,11 @@ async function seedShop(a) {
   //  M3: لوگوی ویترین (نسخهٔ ۱)
   const logo = await h.raw('PUT', '/api/shop/storefront/media/logo', F.jpeg(256, 256, { seed: 733 }), { token: a.accessToken });
   assert.equal(logo.status, 200, JSON.stringify(logo.body));
+
+  //  پیوندِ کمپین (MKT-11)
+  const camp = await h.post('/api/shop/storefront/campaigns', { clientId: fresh('camp'), name: 'QR ِ الف', source: 'qr_wall' }, { token: a.accessToken });
+  assert.equal(camp.status, 201, JSON.stringify(camp.body));
+  ids.campaign = camp.body.campaign.id;
 
   //  عکسِ اختصاصیِ دکان
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
@@ -507,6 +514,7 @@ function concreteFor(ids) {
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/media\/):kind/, 'logo'],
+    [/^(\/shop\/storefront\/campaigns\/):id/, ids.campaign],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
     [/^(\/shop\/images\/file\/):id/, ids.image],
@@ -577,6 +585,7 @@ function bodyFor(r, ids) {
     'POST /shop/catalog/transfers/:id/reject': { reason: 'آزمون' },
     'POST /shop/order-notify/:id/ack': { kind: 'opened' },
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
+    'PUT /shop/storefront/campaigns/:id': { name: 'پیوندِ ب', archived: true },
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },
     'POST /shop/images/:id/process': { step: 'strip_metadata' },
     'POST /shop/images/:id/propose': { consent: true },

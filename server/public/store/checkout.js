@@ -122,6 +122,7 @@
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
         lang: K.lang,
       };
+      if (c.campaign) body.campaign = c.campaign;   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
