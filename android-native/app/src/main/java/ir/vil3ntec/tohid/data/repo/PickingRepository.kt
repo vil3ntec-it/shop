@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
+import ir.vil3ntec.tohid.core.model.PickIssuesDto
+import ir.vil3ntec.tohid.core.model.PickMetricsDto
 import ir.vil3ntec.tohid.core.model.PickShelfDto
 import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
@@ -46,6 +48,22 @@ class PickingRepository(private val api: ApiClient) {
       put("aisle", aisle.trim())
       put("shelf", shelf.trim())
       put("level", level.trim())
+    })
+    Unit
+  }
+
+  // ── شاخص‌ها (PCK-13) و «پیدا نشد» (PCK-14) ─────────────────────────────
+
+  /** ۷ روزِ گذشته (پیش‌فرضِ سرور)؛ فقط با `reports.view` */
+  suspend fun metrics(): ApiResult<PickMetricsDto> = result { ApiJson.decode<PickMetricsDto>(api.get("$ROOT/pick/metrics")) }
+
+  suspend fun issues(): ApiResult<PickIssuesDto> = result { ApiJson.decode<PickIssuesDto>(api.get("$ROOT/pick/issues?status=open")) }
+
+  /** «رسیدگی شد» (کالا دوباره در ویترین) یا «کنار گذاشته شد» — توضیح لازم؛ فقط با `stock.adjust` */
+  suspend fun resolveIssue(issueId: String, action: String, note: String): ApiResult<Unit> = result {
+    api.post("$ROOT/pick/issues/${enc(issueId)}/resolve", buildJsonObject {
+      put("action", action)
+      put("note", note.trim())
     })
     Unit
   }

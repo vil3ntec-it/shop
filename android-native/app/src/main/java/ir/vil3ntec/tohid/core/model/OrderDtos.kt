@@ -21,6 +21,10 @@ data class OrderPermsDto(
   val recordSale: Boolean = false,
   val saleDiscount: Boolean = false,
   val saleCancel: Boolean = false,
+  /** PCK-13: «شاخص‌های جمع‌آوری» (`reports.view`) */
+  val pickMetrics: Boolean = false,
+  /** PCK-14: رسیدگی به «پیدا نشد» (`stock.adjust`) */
+  val pickIssues: Boolean = false,
 )
 
 /** `GET /shop/orders/config` — بخش فقط وقتی `enabled` است دیده می‌شود */
