@@ -22,11 +22,20 @@
   var pollTimer = 0; var searchTimer = 0;
   var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
   var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
+  //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
+  var campaign = campaignOfPage();
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
     if (parts[0] === 'store' && parts[1]) return parts[1].toLowerCase();
     return location.hostname.split('.')[0].toLowerCase();
+  }
+  function campaignOfPage() {
+    var key = 'store-campaign:' + slug;
+    var m = /[?&]c=([0-9A-Za-z]{10})(?:&|#|$)/.exec(location.search);
+    if (m) { K.saveS(key, m[1].toUpperCase()); return m[1].toUpperCase(); }
+    var v = K.loadS(key);
+    return typeof v === 'string' ? v : '';
   }
   function sanitize(c) {
     var out = {};
@@ -376,6 +385,7 @@
         short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
         empty: function () { cart = {}; cap = {}; saveCart(); },
+        campaign: campaign,
       });
       return checkout;
     }).catch(function () { checkoutP = null; throw new Error(t('err.network')); });

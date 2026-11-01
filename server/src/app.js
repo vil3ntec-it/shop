@@ -2,7 +2,7 @@
 const path = require('path');
 const express = require('express');
 const config = require('./config');
-const { healthy, pruneExpired, now, driverName } = require('./db');
+const { healthy, pruneExpired, now } = require('./db');
 const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
@@ -361,6 +361,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
+    //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
+    api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));
@@ -533,6 +535,32 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/store', (req, res, next) => (typeof req.query.id !== 'string' ? next()
     : storefront.byPublicId(req.query.id).then((hit) => (hit
       ? res.set('Cache-Control', 'no-store').redirect(302, `/store/${hit.slug}`) : next())).catch(next)));
+  //  پیوندِ کمپین و QR ِ دکان (MKT-10/11، `lib/campaigns.js`): `/store/go/<کد>` ⇒ ویترینِ
+  //  همان دکان با `?c=<کد>`. «go» هرگز slug نیست (کمینه ۳ نویسه) و زیرِ همان پیشوندِ
+  //  `/store` است ⇒ ACCOUNT_PREFIXES ِ پنلِ خانگی چیزِ تازه‌ای نمی‌خواهد. پرچمِ خاموش،
+  //  کدِ ناشناخته و ویترینِ بسته همان پوستهٔ ۴۰۴ ِ ویترین‌اند. برنامه با
+  //  `Accept: application/json` همان را JSON می‌گیرد. HEAD بازدید نمی‌شمارد.
+  const campaigns = require('./lib/campaigns');
+  const { clientIp } = require('./middleware/ratelimit');
+  const goLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-go' });
+  app.get('/store/go/:code', storeHeaders, goLimit, (req, res, next) => {
+    const wantsJson = req.accepts(['html', 'json']) === 'json';
+    res.set('Cache-Control', 'no-store');
+    campaigns.resolve(req.params.code).then(async ({ campaign, store }) => {
+      const live = campaign.archived !== true;
+      if (req.method === 'GET') {
+        await campaigns.recordVisit(campaign, store, { ip: clientIp(req), ua: req.get('user-agent') || '' })
+          .catch((err) => console.error('[campaigns] visit', err.message));
+      }
+      const target = `/store/${store.slug}`;
+      if (wantsJson) return res.json({ store: { slug: store.slug, path: target }, campaign: live ? campaign.code : null });
+      res.redirect(302, live ? `${target}?c=${campaign.code}` : target);
+    }).catch((err) => {
+      if (err.status !== 404) return next(err);
+      if (wantsJson) return res.status(404).json({ error: { code: 'store_not_found', message: 'این ویترین پیدا نشد' } });
+      res.status(404).sendFile('index.html', { root: storeDir });
+    });
+  });
   //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
   //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
   const seoOnly = (slugOf, fn) => (req, res, next) => {

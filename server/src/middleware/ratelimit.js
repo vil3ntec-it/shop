@@ -74,8 +74,9 @@ function trustedPeer(addr) {
 /**
  * @param {object} opts
  * @param {function} [opts.key] کلید دلخواه (مثلاً شماره‌ی موبایل) به‌جای IP
+ * @param {boolean} [opts.refundable] سهمِ این درخواست با `refund(req, keyPrefix)` پس‌دادنی است
  */
-function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', key: keyFn = null }) {
+function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', key: keyFn = null, refundable = false }) {
   return function (req, res, next) {
     const key = `${keyPrefix}:${keyFn ? (keyFn(req) || clientIp(req)) : clientIp(req)}`;
     const t = Date.now();
@@ -89,8 +90,29 @@ function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', 
       return next(tooMany());
     }
     hits.push(t);
+    if (refundable) {
+      if (!req.rateLimitTaken) req.rateLimitTaken = new Map();
+      req.rateLimitTaken.set(keyPrefix, () => {
+        const i = hits.lastIndexOf(t);
+        if (i >= 0) hits.splice(i, 1);
+      });
+    }
     next();
   };
+}
+
+/**
+ * پس دادنِ سهمی که همین درخواست از سطلِ `keyPrefix` برداشت (فقط سطلِ
+ * `refundable`، فقط یک بار). برای تکرارِ بی‌اثر: همان پیام با همان شناسه یا
+ * همان بایتِ بارگذاری‌شده — تلاشِ دوبارهٔ دستگاه نباید سهمیه بخورد (CHAT-11).
+ * درخواستِ ردشده (۴۰۰، ۴۰۹…) پس داده نمی‌شود؛ سقفِ کلیِ IP هم دست نمی‌خورد.
+ */
+function refund(req, keyPrefix) {
+  const undo = req && req.rateLimitTaken && req.rateLimitTaken.get(keyPrefix);
+  if (!undo) return false;
+  req.rateLimitTaken.delete(keyPrefix);
+  undo();
+  return true;
 }
 
 /**
@@ -110,4 +132,4 @@ if (sweeper.unref) sweeper.unref();
 
 function resetAll() { buckets.clear(); windows.clear(); }
 
-module.exports = { rateLimit, clientIp, trustedPeer, resetAll, sweep };
+module.exports = { rateLimit, refund, clientIp, trustedPeer, resetAll, sweep };
