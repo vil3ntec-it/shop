@@ -86,6 +86,23 @@
             <ul id="fresh-list" class="rail products"></ul>
           </section>
 
+          <div id="saved">
+            <section id="favs" class="section" hidden aria-labelledby="favs-title">
+              <div class="section-head"><h2 id="favs-title" data-t="fav.title">دلخواه‌ها</h2></div>
+              <ul id="favs-list" class="rail products"></ul>
+            </section>
+            <section id="list" class="section" hidden aria-labelledby="list-title">
+              <div class="section-head"><h2 id="list-title" data-t="list.title">فهرستِ خرید</h2><p id="list-n"></p></div>
+              <p class="small muted" data-t="list.hint">آن‌چه هر بار می‌خرید؛ قیمت و موجودی هر بار همانِ امروز است و فهرست فقط روی همین دستگاه می‌ماند.</p>
+              <ul id="list-lines" class="list-lines"></ul>
+              <div class="row wrap-row">
+                <button id="list-add" class="btn btn-primary" type="button" data-t="list.add" hidden>همه به سبد</button>
+                <button id="list-save" class="btn btn-ghost" type="button" data-t="list.save">نگه‌داشتنِ سبد در فهرست</button>
+                <button id="list-clear" class="btn btn-ghost" type="button" data-t="list.clear" hidden>پاک کردنِ فهرست</button>
+              </div>
+            </section>
+          </div>
+
           <section id="recent" class="section" hidden aria-labelledby="recent-title">
             <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
             <ul id="recent-list" class="rail products"></ul>

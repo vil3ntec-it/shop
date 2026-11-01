@@ -29,6 +29,8 @@ const main = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/$
 const PARTS = {
   order: { js: 'store/order.js', from: 'id="view-order"', to: 'id="view-orders"' },
   checkout: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"' },
+  //  دلخواه‌ها و فهرستِ خرید (WEB-11، catalog.js ِ دیربار): فقط بخشِ `#saved` ترجمه می‌شود، نه کلِ کاتالوگ (نشانه‌های data-i)
+  catalog: { js: 'store/catalog.js', from: 'id="saved"', to: 'id="recent"', root: 'saved' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
@@ -160,5 +162,5 @@ for (const [name, P] of Object.entries(PARTS)) test(`واژه‌نامهٔ ${nam
     assert.ok(n <= 4 * 1024, `${name}.${l}.json: ${n} بایت`);
   }
   //  صفحه همان واژه‌نامه را با بارِ خودش می‌گیرد
-  assert.ok(read('store/store.js').includes(`K.part('${name}', $('view-${name}'))`));
+  assert.ok((read('store/store.js') + read(P.js)).includes(`K.part('${name}', $('${P.root || `view-${name}`}'))`));
 });

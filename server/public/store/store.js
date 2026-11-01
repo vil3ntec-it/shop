@@ -115,10 +115,12 @@
   }
 
   function card(p) {
-    return K.productCard(p, {
+    var li = K.productCard(p, {
       photo: photoUrl(p.id), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
       onOpen: function () { location.hash = '#/p/' + encodeURIComponent(p.id); },
     });
+    if (more) more.card(li, p);
+    return li;
   }
 
   function refreshCard(id) {
@@ -136,13 +138,16 @@
     $(id).hidden = !list.length;
   }
 
-  // ── پیشنهادها (WEB-02) و دیده‌شده‌های اخیر (WEB-13): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  // ── پیشنهادها (WEB-02)، دیده‌شده‌های اخیر (WEB-13) و دلخواه‌ها/فهرستِ خرید (WEB-11): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var more = null;
   function loadMore(r) {
     return new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
     }).then(function () {
-      more = window.StoreCatalog({ api: api, slug: slug, get store() { return store; }, rail: rail, card: card, items: catalog.items, recent: Boolean(r.recent) });
+      more = window.StoreCatalog({
+        api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, rail: rail, card: card, items: catalog.items, ids: ids, reorder: reorder,
+        recent: Boolean(r.recent), favorites: Boolean(r.features && r.features.favorites),
+      });
       return more.picks();
     }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
   }
@@ -232,6 +237,7 @@
     renderBar();
     if (K.cartIsOpen()) renderSheet();
     if (checkout && !$('view-checkout').hidden) checkout.render();
+    if (more) more.cart();
   }
   function addOne(p) {
     var cur = cart[p.id] ? cart[p.id].qtyMilli : 0;
@@ -479,8 +485,8 @@
     load();
   }
 
-  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. */
-  function reorder(o) {
+  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. «فهرستِ خرید» (WEB-11) هم با `fail` ِ خودش. */
+  function reorder(o, fail) {
     var want = {}; o.lines.forEach(function (l) { want[l.productId] = l.qtyMilli; });
     api('/products?ids=' + Object.keys(want).map(encodeURIComponent).join(',')).then(function (r) {
       var added = 0;
@@ -494,7 +500,7 @@
       var missing = Object.keys(want).length - added;
       location.hash = '#/cart';
       K.toast(missing ? t('re.some', { a: K.fa(added, 0), m: K.fa(missing, 0) }) : t('re.all'));
-    }).catch(function (e) { K.note($('o-msg'), 'err', e.message); });
+    }).catch(fail || function (e) { K.note($('o-msg'), 'err', e.message); });
   }
 
   // ── سفارش‌های من در همین دکان ──

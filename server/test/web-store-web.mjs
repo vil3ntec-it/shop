@@ -6,6 +6,7 @@
  *   • WEB-14: بی اینترنت ⇒ نوارِ «اینترنت وصل نیست…»؛ سبد روی همین دستگاه می‌ماند و برگشتِ شبکه نوار را برمی‌دارد؛
  *   • WEB-13: «دیده‌شده‌های اخیر» (پرچمِ `shop.storefront.recent`) پس از دیدنِ کالا و بارِ دوباره، فقط روی همین دستگاه؛
  *   • WEB-20: دکمهٔ «فرستادنِ نشانیِ کالا» (پرچمِ `shop.storefront.seo`) نشانیِ `/p/…` را کپی می‌کند؛
+ *   • WEB-11: ♥ روی کارت و برگهٔ کالا، «دلخواه‌ها» و «فهرستِ خرید» (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ)؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -116,11 +117,47 @@ ok(true, 'WEB-13: «دیده‌شده‌های اخیر» پس از بارِ د�
 const keys = await page.evaluate(() => Object.keys(localStorage));
 ok(keys.some((k) => /recent/i.test(k)), 'فهرستِ اخیر فقط روی همین دستگاه (localStorage)', keys.join(','));
 
+//  WEB-11: پرچمِ خاموش ⇒ بی ♥ و بی فهرست؛ روشن ⇒ ♥ روی کارت و برگه، «دلخواه‌ها» و «فهرستِ خرید» (catalog.js، فقط روی همین دستگاه)
+ok(await page.locator('.fav').count() === 0 && await page.isHidden('#favs') && await page.isHidden('#list'), 'WEB-11 خاموش: بی ♥ و بی فهرستِ خرید');
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.favorites', value: true }, A);
+await open();
+const heart = page.locator('#products li[data-id="rice"] .fav');
+await heart.waitFor({ timeout: 10000 });
+ok(await heart.getAttribute('aria-pressed') === 'false' && /برنج/.test(await heart.getAttribute('aria-label')), 'WEB-11: ♥ روی کارت با نامِ کالا');
+await heart.click();
+await page.waitForSelector('#favs:not([hidden]) #favs-list li[data-id="rice"]', { timeout: 5000 });
+ok(await heart.getAttribute('aria-pressed') === 'true' && await page.locator('#favs-list li[data-id="rice"] .fav[aria-pressed="true"]').count() === 1,
+  '♥ ⇒ «دلخواه‌ها» برنج را دارد و ♥ ِ هر دو کارت روشن است');
+await open();
+await page.waitForSelector('#favs:not([hidden]) #favs-list li[data-id="rice"]', { timeout: 10000 });
+ok(true, 'دلخواه‌ها پس از بارِ دوباره همان‌اند');
+await page.locator('#products li[data-id="oil"] .p-open').first().click();
+await page.waitForSelector('#ps-fav:not([hidden])', { timeout: 10000 });
+await page.click('#ps-fav');
+await page.waitForSelector('#favs-list li[data-id="oil"]', { state: 'attached', timeout: 5000 });
+ok(await page.getAttribute('#ps-fav', 'aria-pressed') === 'true' && await page.locator('#products li[data-id="oil"] .fav[aria-pressed="true"]').count() === 1,
+  'برگهٔ کالا: ♥ همان فهرست و همان کارت');
+await page.click('#ps-close');
+await page.waitForSelector('#list:not([hidden])', { timeout: 5000 });
+ok(await page.isHidden('#list-add') && !(await page.isDisabled('#list-save')), 'فهرستِ خالی با سبدِ پر: فقط «نگه‌داشتنِ سبد»');
+await page.click('#list-save');
+await page.waitForSelector('#list-lines li', { timeout: 5000 });
+ok((await page.textContent('#list-lines')).includes('روغن') && await page.isVisible('#list-add'), '«فهرستِ خرید» = اقلامِ سبد');
+await page.evaluate((k) => localStorage.removeItem(k), `store-cart:${slug}`);
+await open();
+await page.waitForSelector('#list:not([hidden]) #list-lines li', { timeout: 10000 });
+ok((await page.textContent('#list-lines')).includes('روغن'), 'فهرست با سبدِ خالی و پس از بارِ دوباره می‌ماند');
+const listed = await page.evaluate((k) => localStorage.getItem(k) || '', `store-list:${slug}`);
+ok(!/price|name/i.test(listed), 'فهرست فقط شناسه و مقدار را نگه می‌دارد، نه قیمت', listed);
+await page.click('#list-add');
+await page.waitForFunction(() => location.hash === '#/cart', null, { timeout: 5000 });
+ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store-cart:${slug}`)), '«همه به سبد» ⇒ همان اقلام با قیمتِ امروز در سبد');
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 await ctx.close();
 await browser.close();
 server.close();
 await closeDb();
-console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر و فرستادنِ نشانی');
+console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر، فرستادنِ نشانی، دلخواه‌ها و فهرستِ خرید');
 process.exit(bad ? 1 : 0);

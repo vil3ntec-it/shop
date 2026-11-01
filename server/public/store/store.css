@@ -83,3 +83,8 @@
 .dlv-code { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); padding: var(--s3) var(--s4); border: 1px dashed var(--line); border-radius: var(--surface-radius); }
 .dlv-code b { font-size: 28px; letter-spacing: .2em; }
 .promo-auto { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s1); font-size: 14px; }
+/* WEB-11: ♥ ِ کارت (catalog.js) و فهرستِ خرید */
+.p-card > .fav { position: absolute; top: var(--s3); inset-inline-end: var(--s3); margin: 0; background: var(--surface); box-shadow: var(--shadow-1); }
+.list-lines { list-style: none; margin: 0 0 var(--s3); padding: 0; }
+.list-lines li { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
+.list-lines .grow { flex: 1; min-width: 0; }
