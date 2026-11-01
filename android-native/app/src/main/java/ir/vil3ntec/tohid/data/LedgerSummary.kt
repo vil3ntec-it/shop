@@ -82,10 +82,8 @@ data class LedgerSummary(
           )
         },
         debts = d.debtors.map { debtor ->
-          var amount = 0.0
-          byDebtor[debtor.id]?.forEach {
-            amount += if (it.type == "give") it.amount else -it.amount
-          }
+          //  همان جمعِ `ShopStore.debt` (`DebtMinorFlag`: با `shop.debt_minor` حسابِ تسویه‌شده در `owing` نمی‌ماند)
+          val amount = DebtMinorFlag.balance(byDebtor[debtor.id].orEmpty())
           DebtLine(id = debtor.id, name = debtor.name, amount = amount)
         },
       )

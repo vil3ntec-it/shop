@@ -30,6 +30,10 @@ test('هر ردیفِ شکافِ شناخته به گامِ موجودی می‌
 
 test('فقط همان خطای ثبت‌شده شکاف است؛ خطای دیگر قرمز؛ سبز شدن xpass', async () => {
   const { KNOWN_GAPS, classify } = await import(path.join(DIR, 'lib', 'known-gaps.mjs'));
+  assert.equal(classify('sync', 'گامِ-بی‌ردیف', new Error('x')).status, 'fail');
+  assert.equal(classify('sync', 'گامِ-بی‌ردیف', null).status, 'pass');
+  //  فهرستِ خالی (همهٔ شکاف‌ها بسته شدند، مثلاً S13.waste با RET-07 و OPS-14 با #335) هم درست است
+  if (!KNOWN_GAPS.length) return;
   const g = KNOWN_GAPS[0];
   const sample = g.match.source.replace(/\\/g, '');
   assert.equal(classify(g.scenario, g.step, new Error(`... ${sample} ...`)).status, 'known-gap');
