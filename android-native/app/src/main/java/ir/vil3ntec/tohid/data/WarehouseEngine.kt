@@ -52,17 +52,6 @@ object WarehouseEngine {
      *  نشان نمی‌دهد، یعنی تنظیمِ خاموش، ورود از فایل و ثبتِ گروهی)؛ وگرنه همه از همین.
      */
     val info: ir.vil3ntec.tohid.core.product.ProductInfo? = null,
-    /**
-     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
-     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
-     */
-    val barcodes: List<String>? = null,
-    /**
-     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
-     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
-     */
-    val changedBy: String? = null,
-    val reason: String? = null,
     /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
     val brand: String? = null,
     val tags: List<String>? = null,
@@ -74,20 +63,6 @@ object WarehouseEngine {
     val editLevels: Boolean = false,
     val reorderPoint: Double? = null,
     val maxStock: Double? = null,
-    /**
-     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
-     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
-     */
-    val barcodes: List<String>? = null,
-    /**
-     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
-     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
-     */
-    val changedBy: String? = null,
-    val reason: String? = null,
-    /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
-    val brand: String? = null,
-    val tags: List<String>? = null,
     /**
      *  PRD-04 (همان پرچم): بسته‌ها با بارکدِ خودشان (کارتنِ ۲۴ دانه‌ای)، به شکلِ فرم؛ موتور می‌سنجد
      *  (`PackBarcodes.check`). null ⇒ در ویرایش دست نمی‌خورد؛ فهرستِ خالی ⇒ همه برداشته.
@@ -696,60 +671,6 @@ object WarehouseEngine {
       }
       .sortedWith(compareBy<ReorderRow> { it.state.ordinal }.thenBy { it.product.name })
       .toList()
-  }
-
-  /** کالاهای انتخاب‌شده به زبانِ `BulkPrice` ِ core (پول به یک‌صدمِ افغانی) */
-  private fun minorOf(x: Double): Long = Math.round(x * 100)
-
-  /**
-   *  PRD-21: پیش‌نمایشِ قیمتِ گروهی — همان که رابط رنگی نشان می‌دهد و همان که `bulkPrice` اعمال می‌کند.
-   */
-  fun bulkPricePreview(
-    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long = 100,
-  ): BulkPrice.Preview = BulkPrice.preview(
-    d.products.filter { it.id in ids }.map { BulkPrice.Item(it.id, it.name, minorOf(it.salePrice), minorOf(it.purchasePrice)) },
-    field, op, roundToMinor,
-  )
-
-  /**
-   *  PRD-21 و PRD-14: قیمتِ گروهی. فقط ردیف‌های `applies` ِ پیش‌نمایش؛ ردیفِ «رد» (منفی) دست نمی‌خورد.
-   *  ⛔ پیش‌نمایشِ هشدارداده (زیرِ بها، صفر، تغییرِ ۵۰٪) بی `confirmed` اعمال نمی‌شود؛ دلیل اجباری است.
-   *  هر کالا ردیفِ سابقه با کاربر و دلیل دارد؛ تغییرِ قیمتِ خرید در `priceHistory` هم می‌نشیند.
-   */
-  fun bulkPrice(
-    d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long,
-    confirmed: Boolean, by: String, reason: String, today: String, now: Long, newId: () -> String,
-  ): Result {
-    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
-    if (!BulkPrice.valid(op)) return Result.Failed("مقدار درست نیست")
-    val why = reason.trim()
-    if (why.isEmpty()) return Result.Failed("دلیلِ تغییرِ قیمت را بنویسید")
-    val preview = bulkPricePreview(d, ids, field, op, roundToMinor)
-    if (preview.changed == 0) return Result.Failed("چیزی عوض نشد")
-    if (preview.needsConfirm && !confirmed) return Result.Failed("هشدارهای پیش‌نمایش را ببینید و تأیید کنید")
-    val who = by.trim().ifEmpty { null }
-    val rows = preview.rows.filter { it.applies }.associateBy { it.id }
-    val audit = ArrayList<AuditEntry>()
-    val history = ArrayList<PriceChange>()
-    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"
-    val products = d.products.map { p ->
-      val r = rows[p.id] ?: return@map p
-      val value = r.newMinor / 100.0
-      val old = r.oldMinor / 100.0
-      if (field == BulkPrice.Field.PURCHASE) {
-        history += PriceChange(id = newId(), productId = p.id, oldPrice = p.purchasePrice, newPrice = value,
-          date = today, createdAt = now, by = who, reason = why)
-      }
-      audit += AuditEntry(
-        id = newId(), type = if (field == BulkPrice.Field.PURCHASE) "price_change" else "product_edit", date = today, refId = p.id,
-        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,
-      )
-      if (field == BulkPrice.Field.SALE) p.copy(salePrice = value) else p.copy(purchasePrice = value)
-    }
-    return Result.Ok(
-      d.copy(products = products, priceHistory = d.priceHistory + history, auditLog = d.auditLog + audit),
-      id = rows.keys.first(),
-    )
   }
 
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */

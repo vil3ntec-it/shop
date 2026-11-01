@@ -853,7 +853,6 @@ private fun EditPanel(
     mutableStateOf(ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)))
   }
   //  INV-12 — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
-  val context = LocalContext.current
   val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
   var reorder by remember { mutableStateOf(p.reorderPoint?.let { qty(it) }.orEmpty()) }
   var maxStock by remember { mutableStateOf(p.maxStock?.let { qty(it) }.orEmpty()) }
