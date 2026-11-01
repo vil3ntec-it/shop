@@ -151,7 +151,7 @@ const asJson = (x, def) => {
 };
 
 //  ساعتِ کار و وضعیت (`localParts`، `scheduleOf`، `presenceOf`): `lib/storefront-hours.js`
-const { localParts, scheduleOf, presenceOf } = require('./storefront-hours');
+const { localParts, presenceOf } = require('./storefront-hours');
 
 /** آخرین تماسِ واقعیِ دستگاه‌های دکان با سرور (همگام‌سازی) — یا ۰. */
 async function lastSeenOf(shopId) {
@@ -1147,5 +1147,5 @@ module.exports = {
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
-  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView, PRODUCT_ID_RE,
+  PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,
 };

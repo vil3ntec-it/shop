@@ -27,7 +27,7 @@ const S = require('./order-states');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
-const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
+const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders';
 const FEATURE_KEY = 'online_orders';
