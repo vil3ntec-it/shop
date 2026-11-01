@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
+import ir.vil3ntec.tohid.core.pos.ScaleSale
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -18,7 +19,9 @@ import org.json.JSONObject
  *  کدِ ترازو (PLU) یکی از بارکدهای کالاست: یا خودِ کد (`00150`) یا
  *  پیشوند و کد (`2100150`). وزن به واحدِ کالا برمی‌گردد (کیلو ⇐ همان،
  *  گرم ⇐ ×۱۰۰۰)؛ کالای غیرِ وزنی رد می‌شود. مبلغ را همان `SalesEngine`
- *  و قاعدهٔ گردکردنِ همیشگی حساب می‌کند.
+ *  و قاعدهٔ گردکردنِ همیشگی حساب می‌کند. برچسبِ قیمتی (قاعده با `kind = price`)
+ *  مقدار را از مبلغ ÷ قیمتِ کالا می‌گیرد و فقط وقتی پذیرفته است که مبلغِ ردیف همان
+ *  مبلغِ برچسب شود (هستهٔ `ScaleSale`).
  *  ──────────────────────────────────────────────────────────────────
  */
 object ScaleLabels {
@@ -53,33 +56,32 @@ object ScaleLabels {
     context.getSharedPreferences("tohid", Context.MODE_PRIVATE).edit().putString(KEY, arr.toString()).apply()
   }
 
-  /** `null` ⇒ برچسبِ ترازو نیست؛ راهِ معمولیِ بارکد */
+  /**
+   *  `null` ⇒ برچسبِ ترازو نیست؛ راهِ معمولیِ بارکد. حساب فقط در هستهٔ `ScaleSale.label`
+   *  (برچسبِ وزنی و قیمتی، `ScaleSaleTest`)؛ این‌جا فقط کالا و متن.
+   */
   fun match(rules: List<WeightBarcode.Rule>, code: String, index: Map<String, String>, products: List<Product>): Match? {
-    if (rules.isEmpty()) return null
     val clean = ir.vil3ntec.tohid.normalizeDigits(code.trim())
-    //  کدی که خودش بارکدِ کالایی است برچسبِ ترازو نیست — کالای ثبت‌شده جلوتر است
-    if (index.containsKey(clean)) return null
-    return when (val r = WeightBarcode.parse(clean, rules)) {
-      WeightBarcode.Result.NotScale -> null
-      is WeightBarcode.Result.BadCheck -> Match.Rejected("برچسبِ ترازو رد شد — رقمِ کنترلِ «$clean» درست نیست")
-      is WeightBarcode.Result.Hit -> {
-        val id = index[r.itemCode] ?: index[r.rule.prefix + r.itemCode]
-          ?: return Match.Rejected("کالای ترازو با کدِ «${r.itemCode}» ثبت نشده — این کد را به بارکدهای کالا بیفزایید")
-        val p = products.firstOrNull { it.id == id } ?: return Match.Rejected("کالای «${r.itemCode}» پیدا نشد")
-        if (!p.active) return Match.Rejected("«${p.name}» غیرفعال است")
-        if (r.rule.kind == WeightBarcode.Kind.PRICE) {
-          return Match.Rejected("برچسبِ قیمتیِ ترازو هنوز پشتیبانی نمی‌شود — ترازو را روی «وزن» بگذارید")
-        }
-        val kg = r.value
-        if (kg <= 0.0) return Match.Rejected("وزنِ برچسب صفر است")
-        val qty = when (p.unit) {
-          "کیلو", "کیلوگرم" -> kg
-          //  از عددِ خامِ برچسب، تا ۲۵ گرم ۲۵ بماند نه ۲۵٫۰۰۰۰۰۰۰۰۰۰۰۰۰۴
-          "گرم" -> r.raw * 1000.0 / Math.pow(10.0, r.rule.decimals.toDouble())
-          else -> return Match.Rejected("«${p.name}» کالای وزنی نیست (واحد: ${p.unit.ifBlank { "—" }})")
-        }
-        Match.Weighed(p, qty, kg)
-      }
+    val byId = products.associateBy { it.id }
+    val m = ScaleSale.label(rules, clean, index::get) { id ->
+      byId[id]?.let { ScaleSale.Item(it.id, it.name, it.unit, it.active, Math.round(it.salePrice * 100)) }
+    } ?: return null
+    return when (m) {
+      is ScaleSale.Label.Weighed -> byId[m.item.id]?.let { Match.Weighed(it, m.quantity, m.kg) } ?: Match.Rejected(notFound(m.item.id))
+      is ScaleSale.Label.Rejected -> Match.Rejected(message(m))
     }
+  }
+
+  private fun notFound(code: String) = "کالای «$code» پیدا نشد"
+
+  private fun message(m: ScaleSale.Label.Rejected): String = when (m.why) {
+    ScaleSale.Why.BAD_CHECK -> "برچسبِ ترازو رد شد — رقمِ کنترلِ «${m.arg}» درست نیست"
+    ScaleSale.Why.UNKNOWN_CODE -> "کالای ترازو با کدِ «${m.arg}» ثبت نشده — این کد را به بارکدهای کالا بیفزایید"
+    ScaleSale.Why.NOT_FOUND -> notFound(m.arg)
+    ScaleSale.Why.INACTIVE -> "«${m.arg}» غیرفعال است"
+    ScaleSale.Why.ZERO -> "وزن یا مبلغِ برچسب صفر است"
+    ScaleSale.Why.NOT_WEIGHED -> "«${m.arg}» کالای وزنی نیست (واحد: ${m.item?.unit.orEmpty().ifBlank { "—" }})"
+    ScaleSale.Why.NO_PRICE -> "«${m.arg}» قیمتِ فروش ندارد — برچسبِ قیمتی بی قیمتِ کالا خوانده نمی‌شود"
+    ScaleSale.Why.PRICE_MISMATCH -> "برچسبِ قیمتیِ «${m.arg}» با قیمتِ کالا به همان مبلغ نمی‌رسد — کالا را دوباره روی ترازو بگذارید"
   }
 }

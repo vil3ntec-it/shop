@@ -983,6 +983,7 @@ fun CartLineDialog(
           label = (if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) "تعداد ($u)" else "تعداد" },
           modifier = Modifier.fillMaxWidth(),
         )
+        ir.vil3ntec.tohid.ui.components.pos.ScaleWeighButton(unit) { qtyText = qty(it); inSaleUnit = false }
         if (inSaleUnit && parsedQty != null) {
           Spacer(Modifier.height(4.dp))
           Text(
