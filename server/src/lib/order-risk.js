@@ -21,6 +21,8 @@
  *   • سیاست (`POLICY_KEY`، شیءِ JSON در «تنظیماتِ زنده»، دکان بر `all` جلو می‌افتد): هر عددِ نامعتبر
  *     همان پیش‌فرض است؛ ۰ = آن قاعده خاموش.
  *   • نمای سابقه فقط همین دکان را می‌شمارد (نه دکان‌های دیگر — حریمِ مشتری) و شماره را برنمی‌گرداند.
+ *   • RSK-04 (`lib/risk-lists`): شماره یا پینِ فهرستِ بسته ⇒ ۴۰۳ `order_blocked` با پیامِ خنثی، پیش از هر
+ *     قاعدهٔ دیگر؛ شمارهٔ فهرستِ مطمئن از سقفِ مشتریِ تازه رد نمی‌شود (قاعدهٔ تکرار همچنان هست).
  */
 const { query, one } = require('../db');
 const { ApiError } = require('../middleware/errors');
@@ -157,6 +159,14 @@ function refuse(status, code, message, data) {
  */
 async function checkIn(run, shopId, phone, input, { at = Date.now() } = {}) {
   if (!phone || !input || !(await flagIn(run, shopId))) return;
+  //  RSK-04: فهرستِ بسته ⇒ ردِ خنثی (نه دلیل، نه این‌که شماره بود یا جا)؛ فهرستِ مطمئن ⇒ بی سقفِ مشتریِ تازه
+  const listed = await require('./risk-lists').matchIn(run, shopId, {
+    phone, address: input.fulfillment === 'delivery' ? input.address : null, at,
+  });
+  if (listed.block) {
+    throw refuse(403, 'order_blocked',
+      'این دکان فعلاً سفارشِ اینترنتی از این شماره یا این نشانی نمی‌پذیرد؛ برای سفارش با خودِ دکان تماس بگیرید', {});
+  }
   const policy = await policyIn(run, shopId);
   const forms = require('./order-rate').formsOf(require('./order-rate').canon(phone));
 
@@ -177,6 +187,7 @@ async function checkIn(run, shopId, phone, input, { at = Date.now() } = {}) {
   const capOpen = policy.newCustomerMaxOpen;
   const capTotal = policy.newCustomerMaxTotalMinor;
   if (!capOpen && !capTotal) return;
+  if (listed.allow) return;   // مشتریِ مطمئنِ همین دکان (RSK-04) — تکرار همچنان سنجیده شد
   if (await countOf(run, shopId, forms, COMPLETED) > 0) return;   // مشتریِ آشنای همین دکان
   if (capTotal && Number(input.totalMinor) > capTotal) {
     throw refuse(409, 'new_customer_limit',
@@ -244,6 +255,12 @@ async function riskOf(shopId, orderId, { at = Date.now() } = {}) {
   };
 
   const flags = [];
+  //  RSK-04: در فهرستِ بسته/مطمئن؟ (بی دلیل — دلیل در خودِ فهرست برای صاحب و مدیر است)
+  const listed = await require('./risk-lists').matchIn(viaDb, shopId, {
+    phone: order.customer_phone, address: order.fulfillment === 'delivery' ? asJson(order.address) : null, at,
+  });
+  if (listed.block) flags.push({ code: 'blocklisted', severity: 'warn', count: 1, until: Number(listed.block.expires_at) });
+  if (listed.allow) flags.push({ code: 'allowlisted', severity: 'info', count: 1, until: Number(listed.allow.expires_at) });
   if (history.completed === 0) flags.push({ code: 'new_customer', severity: 'info', count: 0 });
   if (history.deliveryFailed > 0) flags.push({ code: 'delivery_failed_before', severity: 'warn', count: history.deliveryFailed });
   if (history.noShow > 0) flags.push({ code: 'no_show_before', severity: 'warn', count: history.noShow });

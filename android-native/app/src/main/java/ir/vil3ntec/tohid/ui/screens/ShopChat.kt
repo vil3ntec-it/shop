@@ -38,6 +38,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -76,6 +77,7 @@ import ir.vil3ntec.tohid.core.chat.ChatMeta
 import ir.vil3ntec.tohid.core.chat.ChatQueue
 import ir.vil3ntec.tohid.core.chat.ChatThread
 import ir.vil3ntec.tohid.core.chat.OutboxItem
+import ir.vil3ntec.tohid.core.i18n.StrChat
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ChatMedia
 import ir.vil3ntec.tohid.data.ShopChatSync
@@ -401,8 +403,7 @@ private fun ChatThreadPane(
       prepared.onSuccess { p ->
         val q = queue ?: return@onSuccess
         val id = ir.vil3ntec.tohid.core.chat.ChatIds.next(System.currentTimeMillis())
-        ShopChatSync.putBlob(context, "$id-main", p.main)
-        ShopChatSync.putBlob(context, "$id-thumb", p.thumb)
+        ShopChatSync.putBlobs(context, "$id-main" to p.main, "$id-thumb" to p.thumb)?.let { banner = it to true; return@onSuccess }
         q.add(convId, kind = "image", body = draft.trim(), meta = ChatMeta(width = p.width, height = p.height),
           blobKey = "$id-main", thumbKey = "$id-thumb", size = p.main.size.toLong(), clientId = id)
         draft = ""
@@ -496,6 +497,7 @@ private fun ChatThreadPane(
         LocalBubble(
           x = x,
           image = k?.let { media["local-$it"] },
+          progress = ShopChatSync.progress[x.clientId],
           onRetry = { queue?.retry(x.clientId); ShopChatSync.flush(context, convId) },
           onCancel = { queue?.cancel(x.clientId)?.forEach { ShopChatSync.delBlob(context, it) } },
         )
@@ -514,7 +516,7 @@ private fun ChatThreadPane(
     VoiceBar(enabled = canWrite, limits = cfg.limits.audioMax, onBanner = { banner = it }) { bytes, ms ->
       val q = queue ?: return@VoiceBar
       val id = ir.vil3ntec.tohid.core.chat.ChatIds.next(System.currentTimeMillis())
-      ShopChatSync.putBlob(context, "$id-main", bytes)
+      ShopChatSync.putBlobs(context, "$id-main" to bytes)?.let { banner = it to true; return@VoiceBar }
       q.add(convId, kind = "audio", meta = ChatMeta(durationMs = maxOf(1L, ms)), blobKey = "$id-main", size = bytes.size.toLong(), clientId = id)
       ShopChatSync.flush(context, convId)
     }
@@ -556,7 +558,7 @@ private var player: ChatMedia.Player? = null
 private fun playOrSave(context: android.content.Context, id: String, bytes: ByteArray): String? {
   if (ChatMedia.voiceSupported) {
     val p = player ?: ChatMedia.Player(context.applicationContext).also { player = it }
-    return runCatching { p.play(id, bytes) {} }.exceptionOrNull()?.let { "این پیامِ صوتی روی این گوشی پخش نشد" }
+    return runCatching { p.play(id, bytes) {} }.exceptionOrNull()?.let { e -> if (e is ChatMedia.LowStorage) e.message else "این پیامِ صوتی روی این گوشی پخش نشد" }
   } else {
     val ext = when {
       bytes.size > 4 && String(bytes, 0, 4, Charsets.ISO_8859_1) == "OggS" -> "ogg"
@@ -612,7 +614,7 @@ private fun ServerBubble(
 
 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
-private fun LocalBubble(x: OutboxItem, image: ImageBitmap?, onRetry: () -> Unit, onCancel: () -> Unit) {
+private fun LocalBubble(x: OutboxItem, image: ImageBitmap?, progress: Int?, onRetry: () -> Unit, onCancel: () -> Unit) {
   val colors = Shop.colors
   Bubble(mine = true) {
     when (x.kind) {
@@ -622,9 +624,13 @@ private fun LocalBubble(x: OutboxItem, image: ImageBitmap?, onRetry: () -> Unit,
       "audio" -> Text("پیامِ صوتی" + (x.meta.durationMs?.let { " · " + mmss(it) }.orEmpty()), color = colors.text)
     }
     if (x.body.isNotBlank()) Text(x.body, style = MaterialTheme.typography.bodyMedium, color = colors.text)
+    //  CHAT-05: درصدِ رفته فقط با `ShopPolicy.chatMediaGuard` (خاموش ⇒ `progress` همیشه null)
+    val pct = progress?.takeIf { x.state == ChatQueue.SENDING }
+    if (pct != null) LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.width(200.dp).padding(top = 2.dp))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       Text(formatMillis(x.createdAt), style = MaterialTheme.typography.labelSmall, color = colors.muted2)
-      val label = ChatThread.LABEL[x.state].orEmpty() + if (x.state == ChatQueue.FAILED && x.error.isNotBlank()) " — ${x.error}" else ""
+      val label = if (pct != null) StrChat.sending(pct)
+        else ChatThread.LABEL[x.state].orEmpty() + if (x.state == ChatQueue.FAILED && x.error.isNotBlank()) " — ${x.error}" else ""
       Text(label, style = MaterialTheme.typography.labelSmall,
         color = when (x.state) { ChatQueue.FAILED, ChatQueue.AUTH -> colors.danger; ChatQueue.SENDING -> colors.muted2; else -> colors.warning })
       if (x.state != ChatQueue.SENDING) {

@@ -20,8 +20,13 @@ const sf = require('../lib/storefront');
 const sfd = require('../lib/storefront-delivery');
 const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
+const extras = require('../lib/storefront-extras');
+const cart = require('../lib/store-cart');
 const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
+const areas = require('../lib/storefront-area-requests');
+const onlineReport = require('../lib/order-online-report');
+const orderDesk = require('../lib/order-desk');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -29,6 +34,9 @@ const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
+const RECENT_FLAG = 'shop.storefront.recent';
+/** E2E-MKT-02: ۴۰۹ ِ `out_of_stock` در ویترین با فهرستِ همهٔ قلم‌های کم و «کم کن به …» (پیش‌فرض خاموش) */
+const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -61,7 +69,8 @@ const customer = async (req, res, next) => {
 
 router.get('/:slug', readLimit, store, async (req, res) => {
   const [cats, status, delivery, media] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store), sfm.publicView(req.store),
+    sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
+    sfm.publicView(req.store),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
@@ -69,6 +78,10 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },
+    //  WEB-13: «دیده‌شده‌های اخیر» (`recent.js`، فقط روی دستگاه) با پرچمِ `shop.storefront.recent`؛ خاموش ⇒ این کلید نیست
+    ...((await orders.flagOf(req.store.shop_id, RECENT_FLAG)) ? { recent: true } : {}),
+    //  فقط با پرچمِ روشن (E2E-MKT-02)؛ خاموش ⇒ همان پاسخِ پیشین، بی این کلید
+    ...(await orders.flagOf(req.store.shop_id, STOCK_LIST_FLAG) ? { features: { stockList: true } } : {}),
   });
 });
 
@@ -87,12 +100,46 @@ router.get('/:slug/slots', readLimit, store, async (req, res) => {
   res.json(await sfd.publicSlots(req.store, String(req.query.fulfillment || '')));
 });
 
+//  ── CHK-10/S34: «وقتی به محلِ شما رسیدیم خبرم کن» ─────────────────────
+//  ⛔ پرچمِ خاموشِ `shop.storefront.notify_area` (یا ناحیهٔ خاموش، یا ویترینِ بسته) ⇒
+//  `next('route')` پیش از هر سقف و شماره: همان پاسخِ مسیرِ ناشناختهٔ main، بیت‌به‌بیت.
+const areaStore = async (req, res, next) => {
+  //  ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین (SUB-10)،
+  //  پیش از سنجشِ شماره؛ پرچمِ خاموش ⇒ این در نیست.
+  const s = await sf.open(req.params.slug);
+  if (!(await areas.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+//  شمارهٔ تأییدشده: بلیتِ همین چند روز یا نشستِ حساب — همان که دکان با آن خبر می‌دهد
+const verified = async (req, res, next) => {
+  const phone = await sf.verifiedPhone(ticketOf(req), sessionOf(req));
+  if (!phone) throw new ApiError(401, 'verification_required', 'برای «خبرم کن»، شمارهٔ خود را با کد تأیید کنید');
+  req.verifiedPhone = phone;
+  next();
+};
+
+router.post('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  const out = await areas.request(req.store, req.verifiedPhone, req.body);
+  res.status(out.created ? 201 : 200).json({ request: out.request });
+});
+
+//  پس گرفتنِ رضایت — تکرارش همان پاسخ
+router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (req, res) => {
+  res.json(await areas.withdraw(req.store, req.verifiedPhone));
+});
+
 router.get('/:slug/products', readLimit, store, async (req, res) => {
   const out = req.query.ids !== undefined
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
     });
+  //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
+  if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {
+    await onlineReport.noteMiss(req.store.shop_id, req.query.q);
+  }
   //  ۳۲.۳: با پرچمِ `shop.catalog` وضعیتِ موجودی از دفترِ سرور (#263)؛ خاموش ⇒ null
   //  و همان «در حال بررسی». موجودیِ نامعلوم/کهنه هرگز «موجود» نیست (`badgeOf`).
   const stock = out.items.length
@@ -145,6 +192,8 @@ router.post('/:slug/verify/check', codeLimit, store, async (req, res) => {
 //  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
 router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   const key = orders.clientKeyOf(req);
+  //  ORD-08/09: توقفِ موقتِ سفارش‌گیری ⇒ ۴۰۹ `store_paused` (تکرارِ سفارشِ پیشین آزاد)
+  await orderDesk.guardCheckout(req.store.shop_id, key);
   let out;
   try {
     out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
@@ -161,6 +210,8 @@ router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
   await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
     .catch((err) => console.error('[order-timeout] arm', err.message));
+  //  ORD-04 قبولِ خودکار و ORD-09 سنجشِ توقف (پرچمِ `shop.orders.desk`)؛ شکست سفارش را پس نمی‌گیرد
+  await orderDesk.afterOrder(req.store, out.orderId).catch((err) => console.error('[order-desk] after', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,
@@ -180,6 +231,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   await pay.refreshOrder(req.store.shop_id, orderId);
   const order = await sf.track(req.store, req.params.token);
   order.onlinePay = { available: await pay.orderPayable(req.store.shop_id, orderId) };
+  //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
+  const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
+  if (refund !== undefined) order.refund = refund;
   res.json({ order });
 });
 
@@ -285,8 +339,62 @@ router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, as
   res.json(await customers.removeAddress(req.customer, req.params.id));
 });
 
+//  ── WEB-11: علاقه‌مندی‌های حسابِ مشتری (پرچمِ خاموشِ `shop.storefront.favorites` ⇒ ۴۰۴) ──
+const favoritesOn = async (req, res, next) => {
+  if (!(await extras.favoritesOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'favorites_disabled');
+  next();
+};
+
+router.get('/:slug/account/favorites', readLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.favorites(req.store.shop_id, req.customer));
+});
+
+router.put('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.addFavorite(req.store.shop_id, req.customer, req.params.productId));
+});
+
+router.delete('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json(await extras.removeFavorite(req.store.shop_id, req.customer, req.params.productId));
+});
+
+//  ── WEB-24: بنرهای همین لحظه برای ناحیهٔ مشتری (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۴) ──
+router.get('/:slug/banners', readLimit, store, async (req, res) => {
+  if (!(await extras.bannersOn(req.store.shop_id))) throw notFound('این بخش در این ویترین نیست', 'banners_disabled');
+  res.json({ banners: await extras.activeBanners(req.store.shop_id, { zone: req.query.zone }) });
+});
+
+//  ── CHK-03: سبدِ ماندگارِ حساب روی سرور (S140) ─────────────────────
+//  ⛔ ویترینِ نبوده یا بسته (اشتراکِ منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ درهای دیگرِ ویترین
+//  (SUB-10، مثلِ #684)، پیش از نشست؛ پرچمِ خاموشِ `shop.storefront.cart` ⇒ `next('route')`: این در نیست.
+const cartStore = async (req, res, next) => {
+  const s = await sf.open(req.params.slug);
+  if (!(await cart.flagOn(s.shop_id))) return next('route');
+  req.store = s;
+  res.set('Cache-Control', 'no-store');
+  next();
+};
+
+router.get('/:slug/account/cart', cartStore, readLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.get(req.store, req.customer) });
+});
+
+//  جایگزینیِ کامل با نسخهٔ دیده‌شده؛ فهرستِ خالی = خالی کردن (پس از ثبتِ سفارش هم)
+router.put('/:slug/account/cart', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.replace(req.store, req.customer, req.body) });
+});
+
+//  سبدِ مهمانِ همین مرورگر پس از ورود — تکرارش اثرِ دوم ندارد
+router.post('/:slug/account/cart/merge', cartStore, checkoutLimit, customer, async (req, res) => {
+  res.json({ cart: await cart.merge(req.store, req.customer, req.body) });
+});
+
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {
   res.json(await sf.cancel(req.store, req.params.token));
+});
+
+//  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
+router.post('/:slug/orders/:token/delivery', checkoutLimit, store, async (req, res) => {
+  res.json(await require('../lib/delivery-prefs').editByToken(req.store, req.params.token, req.body));
 });
 
 /** خطایی که دادهٔ همراه دارد (برگهٔ قیمتِ تازه، کالای ناموجود، …) — همه‌اش برود. */

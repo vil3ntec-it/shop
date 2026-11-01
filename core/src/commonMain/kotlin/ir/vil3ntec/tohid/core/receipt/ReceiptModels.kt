@@ -86,6 +86,11 @@ interface ReceiptFormat {
   fun phone(text: String): String
   /** تاریخِ خورشیدیِ عددی از `YYYY-MM-DD` */
   fun date(iso: String): String
+  /**
+   *  تاریخِ قمریِ اختیاری (LOC-01، بخشِ ۳.۱۴) — null یعنی ردیفش چاپ نشود. پیش‌فرض null است،
+   *  پس هر `ReceiptFormat` ِ پیشین همان فاکتورِ امروز را می‌دهد؛ برنامه فقط با تنظیمِ دکان پرش می‌کند.
+   */
+  fun lunarDate(iso: String): String? = null
 }
 
 /** برچسب‌های فاکتور — پیش‌فرضِ دری؛ سازوکارِ سه‌زبانه (#348) همین را جایگزین می‌کند */
@@ -93,6 +98,7 @@ data class ReceiptLabels(
   val fallbackShop: String = "فروشگاه",
   val invoiceNo: String = "شمارهٔ فاکتور",
   val date: String = "تاریخ",
+  val lunarDate: String = "تاریخِ قمری",
   val cashier: String = "فروشنده",
   val kind: String = "نوع",
   val cancelled: String = "لغو شد",

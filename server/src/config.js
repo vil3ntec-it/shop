@@ -112,6 +112,9 @@ const config = {
       knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
       dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
       knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+      //  SEC-06، سقفِ **هزینه** (واحدِ خُردِ sms_usage.cost_minor) در ۲۴ ساعت برای هر کانال؛ ۰ = خاموش
+      dailyCostMax:     num(process.env.OTP_SMS_DAILY_COST_MAX_MINOR, 0),      // کلِ سرور
+      shopDailyCostMax: num(process.env.OTP_SMS_SHOP_DAILY_COST_MAX_MINOR, 0), // هر دکان (ویترین)
     },
   },
 
@@ -200,6 +203,12 @@ const config = {
     dir:     process.env.RELEASE_CACHE_PATH || path.join(ROOT, 'data', 'releases'),
     ttlMs:   num(process.env.RELEASE_CACHE_MINUTES, 10) * 60 * 1000,
     apiBase: process.env.RELEASE_API_BASE || 'https://api.github.com',
+  },
+
+  //  DLV-05 (§۳.۱۱، §۳.۲): نقشهٔ آفلاینِ شهر برای پیک — فایل‌های `*.pmtiles` (عصارهٔ OSM) که
+  //  گردانندهٔ سرور در این پوشه می‌گذارد؛ سرور فقط همین‌ها را به پیکِ دکانِ پرچم‌دار می‌دهد.
+  courierMap: {
+    dir: process.env.COURIER_MAP_DIR || path.join(ROOT, 'data', 'maps'),
   },
 
   backup: {
@@ -357,6 +366,8 @@ const config = {
     accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
     //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
+    //  TEN-03 — لینکِ پیگیریِ سفارش (پرچمِ `shop.storefront.link_expiry`) چند روز پس از صدور کار می‌کند
+    trackLinkTtlMs: num(process.env.STORE_TRACK_LINK_DAYS, 30) * 24 * 60 * 60 * 1000,
   },
 
   /**

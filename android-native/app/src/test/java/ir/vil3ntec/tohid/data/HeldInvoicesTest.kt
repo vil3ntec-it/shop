@@ -286,6 +286,51 @@ class HeldInvoicesTest {
     refused(s.dropStale())
   }
 
+  /**
+   *  POS-12 — پاک‌سازیِ خودکار: خاموش هیچ (حتی خواندنِ فایل)، روشن فقط کهنه‌ها و همان دم روی دیسک؛
+   *  نوشتنِ ناموفق ⇒ ۰ و دفتر همان؛ فاکتورِ جاریِ صندوق هرگز پاک نمی‌شود.
+   */
+  @Test
+  fun `پاک‌سازیِ خودکارِ کهنه‌ها فقط با تنظیم و فقط کهنه‌ها`() = runBlocking<Unit> {
+    val hour = 3_600_000L
+    val old = HeldInvoiceCodec.encode(HeldBook(items = listOf(
+      HeldInvoice(id = "A", number = 1, lines = listOf(SaleDraft.Line("p1", 1.0)), heldAt = now - HeldRules.STALE_HOURS * hour),
+      HeldInvoice(id = "B", number = 2, lines = listOf(SaleDraft.Line("p2", 1.0)), heldAt = now - (HeldRules.STALE_HOURS - 1) * hour),
+    )))
+    var reads = 0
+    var writes = 0
+    val disk = object : HeldDisk {
+      var text: String? = old
+      var fail = false
+      override fun read(): String? { reads++; return text }
+      override fun write(text: String) { writes++; if (fail) throw IOException("دیسک پر است"); this.text = text }
+    }
+    val s = store(disk)
+    assertEquals(0, s.autoDropStale(false))
+    assertEquals("خاموش ⇒ فایل خوانده نمی‌شود", 0, reads)
+    //  «A» درست ۲۴ ساعت دارد ⇒ کهنه؛ «B» نه
+    assertEquals(1, s.autoDropStale(true))
+    assertEquals(listOf("B"), s.book.value.items.map { it.id })
+    assertEquals(listOf("B"), HeldInvoiceCodec.decode(disk.text)!!.items.map { it.id })
+    //  کهنه‌ای نمانده ⇒ هر ساعت نوشتنِ بیهوده نه
+    val wrote = writes
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals(wrote, writes)
+    //  نوشتن نشد ⇒ هیچ چیز گم نمی‌شود
+    now += 2 * hour
+    disk.fail = true
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals(listOf("B"), s.book.value.items.map { it.id })
+    disk.fail = false
+    //  «B» به صندوق برگشت ⇒ فاکتورِ جاری است، نه نگه‌داشته؛ کهنه شدنِ زمان پاکش نمی‌کند
+    val cart = MemCart()
+    done(s.resume(cart, "B", HeldExtras()))
+    now += HeldRules.STALE_HOURS * hour
+    assertEquals(0, s.autoDropStale(true))
+    assertEquals("B", keyOf(cart))
+    assertEquals(listOf("p2"), cart.snapshot().lines.map { it.productId })
+  }
+
   @Test
   fun `کالای غیرفعال هنگامِ بازگرداندن می‌افتد، قلمِ آزاد می‌ماند`() = runBlocking<Unit> {
     val cart = MemCart(); val s = store(MemDisk())
@@ -389,6 +434,35 @@ class HeldInvoicesTest {
     //  نگه‌داشتهٔ نسخهٔ پیش (بی روشِ پرداخت) ⇒ `null`: صفحه از مشتری می‌سازد
     val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}],"debtorId":"d1"}]}""")!!
     assertNull(HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A").let { (it as HeldRules.Result.Ok).extras.payment })
+  }
+
+  /**
+   *  POS-20 — تخفیفِ کلِ فاکتور به مبلغ با فاکتور می‌رود و برمی‌گردد. بی آن «۵۰۰» ِ مبلغ پس از
+   *  جابه‌جایی درصد خوانده و ۱۰۰٪ می‌شد. درصدی (و نگه‌داشتهٔ نسخهٔ پیش) بایت‌به‌بایت همان امروز.
+   */
+  @Test
+  fun `تخفیفِ مبلغیِ فاکتور با فاکتور می‌رود و برمی‌گردد و درصدی همان شکلِ امروز است`() = runBlocking<Unit> {
+    val disk = MemDisk(); val cart = MemCart(); val s = store(disk)
+    cart.put("A", "p1" to 2.0)
+    done(s.hold(cart, HeldExtras(" 500 ", discountAmount = true)))
+    assertTrue(disk.text!!.contains("\"discountAmount\":true"))
+    cart.put("B", "p2" to 1.0)
+    done(s.hold(cart, HeldExtras("10")))
+    //  درصدی: کلیدِ تازه اصلاً نوشته نمی‌شود — فقط همان یکِ «A»
+    assertEquals(1, Regex("discountAmount").findAll(disk.text!!).count())
+    assertEquals(HeldInvoiceCodec.encode(HeldBook(items = listOf(HeldInvoice(id = "X", number = 1, discount = "10")))),
+      """{"v":1,"items":[{"id":"X","number":1,"label":"","lines":[],"debtorId":null,"discount":"10","note":"","heldAt":0,"device":"","payment":"","paid":"","coupons":[]}],"current":null}""")
+    assertEquals(HeldExtras("500", discountAmount = true), done(s.resume(cart, "A", HeldExtras())).extras)
+    assertEquals(HeldExtras("10"), done(s.resume(cart, "B", HeldExtras("700", discountAmount = true))).extras)
+    //  همان که با «B» کنار رفت: «A» با مبلغش نگه داشته شد
+    assertTrue(HeldInvoiceCodec.decode(disk.text)!!.items.single { it.id == "A" }.let { it.discount == "700" && it.discountAmount })
+    //  کادرِ خالی واحد ندارد
+    cart.put("C", "p1" to 1.0)
+    done(s.hold(cart, HeldExtras("  ", discountAmount = true)))
+    assertFalse(HeldInvoiceCodec.decode(disk.text)!!.items.single { it.id == "C" }.discountAmount)
+    //  نگه‌داشتهٔ نسخهٔ پیش ⇒ درصد
+    val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}],"discount":"5"}]}""")!!
+    assertEquals(HeldExtras("5"), (HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A") as HeldRules.Result.Ok).extras)
   }
 
   /** نسیهٔ بی‌مشتری نسیه می‌ماند (ثبت خودش مشتری می‌خواهد)؛ نبودِ روش ⇒ مشتری دارد ⇒ نسیه */

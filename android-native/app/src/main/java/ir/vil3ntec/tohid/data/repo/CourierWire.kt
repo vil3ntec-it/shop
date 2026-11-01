@@ -54,6 +54,7 @@ object CourierWire {
       phoneMasked = cust?.let { str(it, "phoneMasked") }.orEmpty(),
       callBeforeArrival = pref?.let { bool(it, "callBeforeArrival") } == true,
       leaveWith = pref?.let { str(it, "leaveWith") }.orEmpty(),
+      cashTenderMinor = pref?.let { long(it, "cashTenderMinor") },
       itemsCount = (long(o, "itemsCount") ?: 0L).toInt(),
       paymentMethod = str(o, "paymentMethod"),
       expectedCollectMinor = long(o, "expectedCollectMinor") ?: 0L,
@@ -63,6 +64,9 @@ object CourierWire {
       photoAllowed = bool(o, "photoAllowed"),
       recallRequested = o["recall"].let { it != null && it !is JsonNull },
       updatedAt = long(o, "updatedAt") ?: 0L,
+      area = addr?.let { str(it, "area") }.orEmpty(),
+      gateColor = addr?.let { str(it, "gateColor") }.orEmpty(),
+      addressCorrectedAt = addr?.let { long(it, "correctedAt") },
     )
   }
 
