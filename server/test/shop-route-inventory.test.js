@@ -18,6 +18,7 @@
  */
 //  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
 process.env.PAYMENTS_PROVIDER = 'fake';
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-route-inventory';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -191,7 +192,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 
@@ -279,6 +280,11 @@ async function seedShop(a) {
   const tasks = (await h.get('/api/shop/catalog/tasks?status=open', { token: a.accessToken })).body.tasks;
   ids.task = tasks.find((t) => t.kind === 'low_stock' && t.productId === ids.product)?.id;
   assert.ok(ids.task, 'وظیفهٔ «موجودیِ کم»ِ الف');
+  //  انتقالِ «در مسیر» ِ الف (INV-11)
+  const xf = await h.post('/api/shop/catalog/transfers', { from: 'shop_floor', to: 'warehouse', lines: [{ productId: ids.product, qtyMilli: 1000 }] },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('xfer') } });
+  assert.equal(xf.status, 201, JSON.stringify(xf.body));
+  ids.transfer = xf.body.transfer.id;
 
   //  ویترین
   const sf = await h.put(`/api/shop/storefront/products/${ids.product}`, { published: true, onlinePriceMinor: 6000 }, { token: a.accessToken });
@@ -435,6 +441,17 @@ async function seedShop(a) {
     { rule: { name: 'تخفیفِ الف', kind: 'percent', bp: 1000 } }, { token: a.accessToken });
   assert.equal(promo.status, 200, JSON.stringify(promo.body));
 
+  //  سفارشِ خرید (PUR-02/04): فرستاده و با یک رسید — شناسه را سرور می‌سازد
+  const pur = await h.post('/api/shop/purchase-orders',
+    { supplierId: 'sup-a', supplierName: 'تأمین‌کنندهٔ الف', lines: [{ productId: 'p-a', name: 'کالای الف', qtyMilli: 5000, priceMinor: 1000 }] },
+    { token: a.accessToken, headers: { 'Idempotency-Key': fresh('po-a') } });
+  assert.equal(pur.status, 201, JSON.stringify(pur.body));
+  ids.purchaseOrder = pur.body.order.id;
+  assert.equal((await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/send`, {}, { token: a.accessToken })).status, 200);
+  const rc = await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/receipts`,
+    { id: 'inv-receipt-a1', lines: [{ lineId: 'l1', receivedMilli: 1000 }] }, { token: a.accessToken });
+  assert.equal(rc.status, 201, JSON.stringify(rc.body));
+
   //  شکایتِ بازارچه از «الف» + پاسخِ دکان — از لایهٔ اعتماد، همان راهِ مشتریِ ویترین
   const filed = await trust.file({ shop_id: a.shopId }, { phone: '+93791112244', ip: '' },
     { subject: 'shop', category: 'rude', body: 'فروشنده بد برخورد کرد' }, 'complaint');
@@ -452,6 +469,12 @@ async function seedShop(a) {
   assert.equal(pi.status, 201, JSON.stringify(pi.body));
   ids.paymentIntent = pi.body.id;
 
+  //  فهرستِ سیاهِ ویترینِ «الف» (RSK-04؛ پرچمِ `shop.order_risk` در FLAGS)
+  const listed = await h.post('/api/shop/orders/risk/lists',
+    { list: 'block', kind: 'phone', phone: '0791112255', reason: 'آزمونِ جداسازی', expiresInDays: 30 }, { token: a.accessToken });
+  assert.equal(listed.status, 201, JSON.stringify(listed.body));
+  ids.riskEntry = listed.body.entry.id;
+
   return { ids, staff, courier };
 }
 
@@ -463,6 +486,7 @@ function concreteFor(ids) {
     [/(\/media\/):mediaId/, ids.media],
     [/^(\/shop\/catalog\/products\/):id/, ids.product],
     [/^(\/shop\/catalog\/tasks\/):id/, ids.task],
+    [/^(\/shop\/catalog\/transfers\/):id/, ids.transfer],
     [/^(\/shop\/order-notify\/):id/, ids.notify],
     [/(\/pick\/issues\/):issueId/, ids.pickIssue],
     [/(\/pick\/locations\/):productId/, ids.product],
@@ -470,6 +494,7 @@ function concreteFor(ids) {
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
     [/(\/amendments\/):amendId/, ids.amend],
+    [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
@@ -490,6 +515,7 @@ function concreteFor(ids) {
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
+    [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
   const QUERY = {
@@ -537,6 +563,8 @@ function bodyFor(r, ids) {
     'POST /shop/chat/conversations/:id/reports': { reason: 'spam', note: 'آزمون' },
     'PUT /shop/catalog/products/:id/low': { location: 'shop_floor', lowMilli: 5000 },
     'POST /shop/catalog/tasks/:id/resolve': { action: 'resolved', note: 'آزمون' },
+    'POST /shop/catalog/transfers/:id/receive': { lines: [{ productId: ids.product, receivedMilli: 1000 }] },
+    'POST /shop/catalog/transfers/:id/reject': { reason: 'آزمون' },
     'POST /shop/order-notify/:id/ack': { kind: 'opened' },
     'PUT /shop/storefront/products/:productId': { published: false, onlinePriceMinor: 1 },
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },
@@ -548,6 +576,9 @@ function bodyFor(r, ids) {
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
     'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },
     'POST /shop/trust/cases/:id/appeal': { body: 'اعتراضِ «ب» به این تصمیم' },
+    'PUT /shop/purchase-orders/:id': { version: 1, supplierId: 'sup-b', lines: [{ productId: 'p-b', qtyMilli: 1000, priceMinor: 1 }] },
+    'POST /shop/purchase-orders/:id/cancel': { reason: 'آزمون' },
+    'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});
 }
@@ -597,6 +628,35 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
   }
   assert.deepEqual(own, [], own.join('\n'));
 
+  //  AUTH-09، کاربرِ چنددکانی (دکانِ فعالِ نشست، مهاجرتِ ۰۹۷): «م» صاحبِ دکانِ خودش و شاگردِ «الف» است،
+  //  با دو نشست — یکی صریحاً بسته به دکانِ خودش، یکی به «الف». پیش از ردپا، چون نشستِ بسته به «الف»
+  //  ردیفی با shop_id ِ «الف» در `tokens` دارد
+  const m = await owner('میمِ چنددکانی');
+  await query(
+    `INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at)
+     VALUES ($1,$2,$3,'staff','active',$4,$4)`,
+    [newId('mem'), a.shopId, m.user.id, now()]
+  );
+  //  هر نشست دستگاهِ خودش: انتخابِ دکان نشست‌های زندهٔ **همان دستگاه** را هم می‌بندد
+  const bindTo = async (shopId, role) => {
+    const s = await h.post('/api/auth/login', {
+      identifier: m.email, password: m.password,
+      device: { deviceId: fresh('dev-mim'), name: 'تست', platform: 'test' },
+    });
+    assert.equal(s.status, 200, JSON.stringify(s.body));
+    const r = await h.post('/api/shop/active', { shopId }, { token: s.body.accessToken });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.shop.role, role, JSON.stringify(r.body));
+    return s.body.accessToken;
+  };
+  const mOwn = await bindTo(m.shopId, 'owner');
+  const mInA = await bindTo(a.shopId, 'staff');
+  for (const [t, shopId] of [[mOwn, m.shopId], [mInA, a.shopId]]) {
+    const ms = await h.get('/api/shop/memberships', { token: t });
+    assert.equal(ms.body.activeShopId, shopId, JSON.stringify(ms.body));
+    assert.equal(ms.body.explicit, true);
+  }
+
   const before = await footprint(a.shopId);
   const promoOfA = () => one('SELECT * FROM shop_promotions WHERE shop_id=$1 AND id=$2', [a.shopId, ids.promoRule]);
   const promoBefore = await promoOfA();
@@ -628,6 +688,36 @@ test('هر مسیرِ شناسه‌دارِ /api/shop با ردیفِ واقعی
     }
   }
   assert.deepEqual(failures, [], failures.join('\n'));
+
+  //  و) AUTH-09، «م»ِ چنددکانی با شناسه‌های واقعیِ «الف»:
+  //   - نشستِ بسته به دکانِ خودش (نقشِ صاحب) درست مثلِ «ب» است، حتی با سرآیندِ دکانِ «الف»: عضویتِ
+  //     شاگردیِ «الف» هیچ درِ «الف» را با نقشِ صاحبِ دکانِ دیگر باز نمی‌کند
+  //   - نشستِ بسته به «الف» فقط نقشِ شاگرد دارد: نقشِ صاحب از دکانِ خودش به «الف» نشت نمی‌کند
+  const multi = [];
+  let lacking = 0;
+  for (const r of withIds) {
+    const key = `${r.method} ${r.path}`;
+    const url = `/api${concrete(r)}`;
+    const body = bodyFor(r, ids);
+
+    const cross = await call(r, url, body, mOwn, { 'X-Shop-Id': a.shopId });
+    const ok = PER_SHOP_KEYS.has(key) ? cross.status < 500 : [403, 404].includes(cross.status);
+    if (!ok) multi.push(`${key} «م» بسته به دکانِ خودش ⇒ ${cross.status} ${JSON.stringify(cross.body).slice(0, 160)}`);
+    const text = JSON.stringify(cross.body ?? '');
+    for (const s of secrets) if (text.includes(s)) multi.push(`${key} «م» بسته به دکانِ خودش شناسهٔ «الف» را برگرداند (${s.slice(0, 10)}…)`);
+
+    const lacks = r.perms.filter((p) => !can('staff', p));
+    if (lacks.length) {
+      lacking++;
+      const res = await call(r, url, body, mInA, { 'X-Shop-Id': m.shopId });
+      if (res.status !== 403) multi.push(`${key} «م» بسته به «الف» (شاگرد، بی ${lacks.join('،')}) ⇒ ${res.status} ${JSON.stringify(res.body).slice(0, 120)}`);
+    }
+  }
+  assert.deepEqual(multi, [], multi.join('\n'));
+  assert.ok(lacking >= 10, `فقط ${lacking} مسیرِ شناسه‌دارِ بسته به اجازه برای شاگردِ چنددکانی سنجیده شد`);
+  //  نشستِ «الف» ِ «م» واقعاً به «الف» بسته است: همان GET ِ بی‌اجازه‌ای که شاگرد دارد ۲۰۰ می‌گیرد
+  const mInAOrder = await h.get(`/api/shop/orders/${ids.order}`, { token: mInA });
+  assert.equal(mInAOrder.status, 200, `«م» بسته به «الف» سفارشِ «الف» را نمی‌بیند: ${JSON.stringify(mInAOrder.body).slice(0, 160)}`);
 
   //  قاعدهٔ تخفیف، صریح: PUT/DELETEِ «ب» با شناسهٔ «الف» فقط فضای خودِ «ب» است —
   //  ردیفِ «الف» پس از هر کدام بایت‌به‌بایت همان می‌ماند

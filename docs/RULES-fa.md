@@ -136,6 +136,10 @@
 - ⛔ پرچمِ `pay.hesabpay` (دکان/`all`، پیش‌فرض خاموش)؛ پرداختِ سفارشِ آنلاین افزون بر آن اشتراکِ فعال (`source = subscription`، نه آزمایشی).
 - ⛔ مبلغ عددِ صحیح به پول؛ برای سفارش همان `total_minor` ِ سرور (ناهمخوان ⇒ ۴۰۹ `amount_mismatch`)؛ ارز فقط AFN؛ تبدیل به دهدهیِ ارائه‌دهنده دقیق و بی گرد (`minorToDecimal`/`decimalToMinor`).
 - ⛔ «paid» فقط از وب‌هوکِ امضاشده (HMAC، زمان‌ثابت) + مبلغ و ارزِ برابر + تأییدِ دومِ ارائه‌دهنده (`PAYMENTS_CONFIRM_WEBHOOK`، پیش‌فرض روشن)؛ هرگز از برگشتِ مرورگر یا گفتهٔ برنامه.
+- ⛔ تأییدِ دومِ دست‌نیافتنی **یا هنوز نامعلوم** (`pending`/`unknown`) ⇒ ۵۰۳ و رویدادِ `deferred` (همان رویداد دوباره‌پذیر است)؛ فقط «نه» ِ قطعی (`failed`/`expired`/`cancelled`) ⇒ ۲۰۰ `unconfirmed` ِ نهایی، با `needs_review` و هشدار (تناقض).
+- ⛔ «paid» ِ امضاشده هرگز بی‌صدا نمی‌ماند: رویدادِ `deferred` روی قصدی که بسته/منقضی/لغو شد (`close`، وب‌هوکِ دیر، تورِ تطبیق) ⇒ `needs_review` و `payment.review` با `paid_unconfirmed`؛ هرگز خودکار پرداخت‌شده نمی‌شود. هشدار فقط با نشانِ تازه (بی طوفان).
+- رویدادِ در حالِ پردازش `outcome = processing:<پایانِ اجاره>` (۲ دقیقه)؛ ارسالِ دوباره‌اش ۵۰۳، نه ۲۰۰ ِ «تکراری»؛ اجارهٔ گذشته (فرآیندِ مرده) با compare-and-set دوباره گرفته می‌شود.
+- ⛔ تطبیقِ زمان‌بندی‌شده (`startReconciler` در `index.js`): هر ۵ دقیقه قصدهای ۲ ساعتِ اخیر، ساعتی همان ۴۸ ساعت؛ فقط با ارائه‌دهندهٔ پیکربندی‌شده؛ دو نمونهٔ سرور هم‌زمان نه (اجارهٔ `lease:payments.reconcile` در `app_config`).
 - وضعیت فقط `created → pending → paid|failed|expired|cancelled` و `paid → refunded` با compare-and-set روی status؛ پایانی برنمی‌گردد. تنها استثنا S35: `expired|cancelled|failed → paid` فقط با تأییدِ ارائه‌دهنده، همراهِ `needs_review` و سابقهٔ `payment.review`.
 - درستی هرگز به ترتیبِ `created_at` تکیه ندارد (رویدادِ هم‌میلی‌ثانیه)؛ تکرار با `payment_events.provider_event_id` یکتا؛ قصدِ ناشناخته ۲۰۰ و لاگ.
 - هر فروش/سفارش حداکثر یک قصدِ زنده (`ux_payment_intents_live_ref`)؛ `ref_id` عوض نمی‌شود؛ فروشِ پرداخت‌شده قصدِ تازه نمی‌گیرد (`already_paid`).
@@ -143,6 +147,8 @@
 - ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط بیرون از `NODE_ENV=production`؛ در تولید نادیده و `/webhook/fake` ۴۰۱.
 - ویترین: `POST /api/store/:slug/orders/:token/pay` (توکنِ پیگیری = اجازه، کلیدِ یکتایی در فضای `sf:`، مبلغ از سفارش، نشانیِ بازگشت را سرور می‌سازد ⇒ بی redirect ِ باز)؛ صفحه «پرداخت‌شده» را فقط از `paymentStatus` ِ پیگیری می‌خواند.
 - تطبیق: `housekeeping` ِ `app.js` هر ۶ ساعت (۴۸ ساعتِ اخیر) و `POST /api/admin/payments/reconcile` (مدیرِ ارشد)؛ فهرست `GET /api/admin/payments/intents` (زبانهٔ «عملیات»)؛ `paid → refunded` فقط `POST /api/admin/payments/intents/:id/refund` (مدیرِ ارشد، پس از برگرداندنِ پول در خودِ حساب‌پی).
+- ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط با `NODE_ENV` ِ صریحِ `test`/`development` و `PAYMENTS_FAKE_SECRET` (رازِ پیش‌فرض در کد نیست)؛ هر محیطِ دیگر یا بی راز ⇒ نادیده و `/webhook/fake` ۴۰۱.
+- ⛔ `HESABPAY_BASE_URL` فقط `https` (کلید در سرآیند می‌رود)؛ تنها استثنا http ِ loopback برای سرورِ ساختگیِ آزمون، فقط در `test`/`development`.
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
 
 ### v3 · موجودی و کاتالوگ
@@ -284,6 +290,9 @@
 - دستورِ تحویل (`lib/delivery-prefs.js`، CHK-14/24): مبلغِ اسکناسِ مشتری `delivery.cashTenderMinor` فقط ارسال + نقد، نه کمتر از جمع، پول خرد کمتر از یک اسکناسِ ۱۰۰۰؛ هیچ اثری بر جمع، COD یا تسویه ندارد و پیک پول خرد را از `expectedCollectMinor` ِ مأموریتِ خودش می‌بیند. ویرایش (`POST /shop/orders/:id/delivery`، مشتری `POST /store/:slug/orders/:token/delivery`) فقط در `new`…`packed`، با `expectedVersion`، زیرِ قفلِ ردیف و با رویدادِ `delivery_edit`؛ POST و نه PATCH چون `HttpURLConnection` ِ کامپیوتر PATCH ندارد (#545).
 
 - ⛔ ویرایشِ سفارش پس از ثبت (ORD-14) فقط با `lib/order-amend.js`: فقط «تازه»/«قبول‌شده» و پرداخت‌نشده؛ قیمتِ واحد هرگز از کلاینت؛ سفارشِ ویترین فقط با پذیرشِ خودِ مشتری (توکنِ پیگیری، مهلتِ ۳۰ دقیقه، اثرِ انگشتِ قلم‌ها)، سفارشِ کارمند فقط با رضایتِ ثبت‌شده؛ سابقه رویدادِ `note` با `detail.type = amend_*`.
+- ⛔ کارمزدِ سامانه و کمیسیونِ بازار (`platform_fee_minor`، `commission_minor`، مهاجرتِ ۱۳۰) فقط با `lib/market-fees.js` و فقط یک بار در تراکنشِ `orders.create` نوشته می‌شوند؛ تغییرِ تنظیمات هرگز سفارشِ ثبت‌شده را بازنویسی نمی‌کند و کلاینت هیچ‌کدام را نمی‌گذارد. نرخ‌ها در live_config: `market.platform_fee_bps`، `market.commission_bps` (صدمِ درصد، ۰ تا ۱۰٬۰۰۰) و `market.platform_fee_fixed_minor`، `market.commission_fixed_minor`؛ همه پیش‌فرض ۰ (تصمیمِ صاحب محصول ۱۴۰۵/۰۸/۰۸: فعلاً هیچ کارمزدی گرفته نمی‌شود)؛ scope ِ دکان بر `all` جلو می‌افتد؛ مقدارِ نامعتبر ⇒ ۰. پایه = `subtotal − discount` (بی هزینهٔ رساندن، کفِ ۰)؛ سهمِ نرخ = `floor((پایه × bps + 5000) / 10000)` (نیم به بالا، BigInt) + مبلغِ ثابت؛ کارمزد ≤ کل و کمیسیون ≤ کل − کارمزد. فقط سفارشِ مشتری (`channel` ناتهی) و نه آزمایشی؛ سفارشِ کارمند ۰. هیچ گزارش، جمع یا پاسخی این ستون‌ها را نمی‌خواند (S10، #432).
+- ترجیحِ جایگزینی (CHK-15، `lib/order-substitution.js`): یکی کلی (`online_orders.substitution`، بی `specific`) و یکی برای هر قلم؛ قلمِ بی ترجیح ترجیحِ کلی را **در ثبت** می‌گیرد و هر خواننده فقط قلم را می‌خواند. «کالای مشخص» جایگزینِ نام‌دار می‌خواهد: ویترین شناسهٔ کالای زندهٔ همان ویترین و نام از سرور (نبودش ⇒ ۴۰۹ `substitute_unavailable`)، کارمند نامِ آزاد. پرچمِ خاموش ⇒ هیچ کلیدِ تازه‌ای خوانده نمی‌شود (#525).
+- ⛔ فهرستِ سیاه و سفید (RSK-04، `lib/risk-lists.js`): هر ردیف دلیل (۳ تا ۲۰۰) و انقضا (۱ تا ۳۶۵ روز، ساعتِ سرور) دارد؛ پین فقط «بسته» با شعاعِ ۱۰ تا ۲۰۰۰ متر؛ یک شمارهٔ فعال فقط در یک فهرست؛ برداشتن نرم. ردِ ویترین خنثی است (`order_blocked`، بی دلیل و بی «شماره یا جا»). «مطمئن» فقط سقفِ مشتریِ تازه را برمی‌دارد، نه قاعدهٔ تکرار. فقط `orders.contact` (صاحب و مدیر)؛ سابقهٔ عملیات بی شماره و دلیل. «دستگاه» تا شناسهٔ دستگاهِ مشتری (برنامهٔ خریدِ جدا) نیست.
 
 ### v3 · ویترین
 
@@ -298,8 +307,11 @@
 - بخشِ پیکِ صفحهٔ پیگیری (`#o-dlv`، DLV-06) فقط از `delivery` ِ سرور ساخته می‌شود (پرچمِ `shop.delivery_customer_view`): نامِ کوچک، «رسیده است»، ساعتِ تقریبی و کدِ تحویل؛ بی کلید، پس از تحویل یا پس از خطای پیگیری پنهان. صفحه چیزی را حدس یا نگه نمی‌دارد.
 - صفحهٔ `server/public/store/` با CSPِ سخت (`script-src 'self'`، بی `unsafe-inline`) (SEC-09، #244).
 - پیشوندِ `/store` ⇒ `ACCOUNT_PREFIXES`ِ پنلِ خانگی (#244).
+- «پیشنهادهای واقعی» ِ صفحهٔ ویترین (`highlights.deals`، WEB-02) همان «ارزان‌تر از قیمتِ دکان» ِ بازارچه است: قیمتِ آنلاین کمتر از قیمتِ فروشِ دفتر و فقط با `market_listings.show_deals` ِ صاحبِ دکان؛ پیش‌فرض خاموش ⇒ قیمتِ دفتر (`regularPriceMinor`) هیچ‌جای پاسخ نیست (`storefront-deals.test.js`، `claude/part-WEB-1`). برگهٔ کالا توضیح، مشخصات، مشابه و مکمل را از `/products/:id` می‌خواند و پاسخِ دیررس برگهٔ بسته را باز نمی‌کند (WEB-08).
 - بیرون از محدوده (CHK-10، S34): «کجا؟» برای پینِ بیرون `pickup` و با پرچم `notifyArea` می‌گوید؛ «خبرم کن» (`lib/storefront-area-requests.js`) فقط با شمارهٔ تأییدشده و ⛔ فقط مرکزِ خانهٔ ۳۰۰ متریِ شبکه را نگه می‌دارد، هرگز پینِ خام. دکان شماره را فقط برای خانه‌ای می‌بیند که ناحیهٔ فعالِ امروز پوشانده؛ «خبر دادم» و «پس گرفتن» ردیف را پاک می‌کنند و سابقه شماره ندارد. سرور پیامی نمی‌فرستد (D-09) (`claude/part-chk-2`).
 - سبدِ سروریِ حساب (CHK-03، `lib/store-cart.js`): فقط شناسهٔ کالا، مقدار و یادداشت؛ ⛔ قیمت هرگز ذخیره نمی‌شود و هر خواندن از کالای ویترین می‌خواند. نوشتن فقط با نسخهٔ دیده‌شده (کهنه ⇒ ۴۰۹ `cart_changed`)؛ خالی کردن ردیف را نگه می‌دارد. ادغامِ سبدِ مهمان بیشینهٔ مقدار است نه جمع، تا تکرارش اثرِ دوم نداشته باشد (S140). ثبتِ سفارش سبد را خودبه‌خود عوض نمی‌کند (`claude/part-chk-1`).
+- صفحهٔ کالا و سئو (WEB-17/20، `shop.storefront.seo`): نشانیِ مطلق فقط از `config.storefront.domain` (هرگز از `Host`)؛ هر متنِ دکان با `esc` و JSON-LD بی `<`/`>`/`&`؛ جای‌گذاری در پوسته با تابع، نه رشته (`$&`)؛ موجودیِ «در حال بررسی» در JSON-LD ادعای `InStock` نمی‌شود؛ خاموش ⇒ پاسخِ بایت‌به‌بایتِ امروز. دکمهٔ «فرستادن» در `store/share.js` ِ دیربار است؛ در بارِ نخست فقط `fromProductPath` (`claude/new-web-1`).
+- هر ذخیرهٔ صفحهٔ «ویترین و بازار» (تنظیمات، ارسال و زمان، بازار، حضور) از صفِ `StorefrontOutbox` ِ core می‌گذرد: «ثبت شد» فقط با ۲xx، ردیف بسته به دکان، و تغییرِ دستگاهِ دیگر بی‌پرسش رونویسی نمی‌شود (M1، #427).
 
 ### v3 · پیک و تحویل
 
@@ -349,8 +361,12 @@
 - عکسِ مرکزی به نسخهٔ مشخص سنجاق می‌شود و نسخهٔ تازه فقط `update_available` است؛ هیچ عکسِ مرکزی خودکار جای عکسِ دکان نمی‌نشیند (#262).
 - پیشنهاد به بانک فقط صاحبِ دکان و فقط با `consent: true`؛ اصل خصوصی می‌ماند (IMG-BANK-08، #262).
 - تأیید، رد، بایگانی و روشن کردن در جست‌وجو فقط مدیرِ ارشد با دلیل و سابقه؛ شرطِ تأیید مجوزِ `licensed`ِ تجاری و تطبیقِ قطعی (§۳۷.۳، #262). ردِ نسخه فقط برای نسخهٔ منتظرِ بررسی است: نسخهٔ ۱، نسخهٔ جاری و هر نسخهٔ تأییدشده (سنجاقِ ممکنِ دکان) رد نمی‌شود (۴۰۹ `version_approved`)؛ کنار گذاشتنِ عکسِ منتشرشده یعنی بایگانی (IMG-13).
+- `X-Content-SHA256` (اختیاری) روی هر درِ خامِ بانک (دکان و مدیر): ناجور ⇒ ۴۲۲ `checksum_mismatch` پیش از هر نوشتن، بدشکل ⇒ ۴۰۰ `bad_checksum`؛ ادامهٔ بارگذاری فقط با «همان نام + همان sha256 ِ موفق»، هرگز فقط نام (IMG-14، #474).
+- تأیید، رد، بایگانی و روشن کردن در جست‌وجو فقط مدیرِ ارشد با دلیل و سابقه؛ شرطِ تأیید مجوزِ `licensed`ِ تجاری و تطبیقِ قطعی (§۳۷.۳، #262).
 - مرحله‌های بیرونی (بهبود، حذفِ پس‌زمینه، بزرگ‌نمایی، ترمیم) ۵۰۳ `step_unavailable` بی هیچ ارسال، ردیف یا هزینه (#262).
 - قیمت، موجودی، قفسه و SKUِ دکان به بانک نمی‌روند (#262).
+- سقفِ ابعاد (۱۰٬۰۰۰ پیکسل در هر ضلع، ۴۰ مگاپیکسل) فقط از سرآیند و بی بازکردنِ zlib/VP8؛ سرآیندِ دوم با ابعادِ دیگر «خراب» است: JPEG با بیش از یک SOF، WebP با جریانِ VP8/VP8L یا فریمِ ANMF بیرون از بومِ VP8X، IHDRِ PNG جز ۱۳ بایت (IMG-PRO-09).
+- `BitmapFactory`ِ کامپیوتر (`desktop/src/shim`) همان قراردادِ اندروید: `inJustDecodeBounds` فقط سرآیند، `inSampleSize` نمونه‌گیری هنگامِ خواندن بالای ۲۴ مگاپیکسل، رمزگشاییِ بی نمونه بیش از ۶۴ مگاپیکسل ⇒ null. عکسِ کاربر هرگز بی سنجشِ سرآیند و `inSampleSize` تمام‌اندازه خوانده نمی‌شود (IMG-PRO-09).
 
 ### v3 · شکایت و تخلف
 
@@ -380,6 +396,7 @@
 - نصاب و `install.ps1` با curl.exe و `--continue-at -`، هر تلاش یک curlِ تازه؛ `--retry` همراهِ `-C -` به کار نرود (#264).
 - نصابِ آنلاین برچسب را از `/DReleaseTag` می‌گیرد (push ⇒ `tohid-desktop-beta`، Run workflow + stable ⇒ `tohid-desktop`) (#264).
 - دروازه‌های سختِ CI: `applicationId` یکسان، `versionCode` نه کمتر، اثرِ انگشتِ امضا یکسان، حجمِ APK در ±۵٪ برای PRِ فایلِ ساخت؛ کامپیوتر: `upgradeUuid`، `AppId` و `bundleID` بی‌تغییر (#220، #223).
+- سرور: هر فایلِ مهاجرت و ردیفِ `schema_migrations` ِ آن یک تراکنش‌اند؛ مهاجرتِ خطادار یا فرایندِ کشته‌شده وسطِ آن هیچ اثری نمی‌گذارد و سرور بالا نمی‌آید (کدِ ۱). طرحِ برگشت = نسخهٔ پیش روی همان پایگاه. مهاجرتی که هیچ‌جا اعمال نشده با همان نام اصلاح می‌شود؛ اعمال‌شده فقط با فایلِ تازه. سنجه: `recovery.e2e.mjs` (REL-01).
 - ⛔ SEC-CLI (۱۴۰۵/۰۸/۰۹): ابزارِ عکس/اسکریپتِ کامپیوتر (`DevShot`، با `typecmd` = فرمانِ پوسته) فقط در ساختِ `-Pdev=true`؛ در انتشار هیچ `-Dtohid.shot…`ی روشنش نمی‌کند (`DevShotReleaseGateTest`). مبهم‌سازیِ R8ِ کدِ خودِ برنامهٔ اندروید فقط با `-Ptohid.obfuscate=true` (پیش‌فرض خاموش ⇒ `proguard-keep-app.pro`، خروجیِ بی‌تغییر)؛ روشن کردنش برای کاربران فقط پس از سنجش‌های سرِ `proguard-obfuscate.pro` و نگه داشتنِ `mapping.txt`. شرح: `docs/security/client-fa.md`.
 
 ### v3 · پشتیبان و خروجی
@@ -390,6 +407,8 @@
 - خروجیِ کاملِ مالک (JSONِ نسخه‌دار + اکسلِ یک‌برگه‌برای‌هرمجموعه) فقط مالک و مدیر؛ عکس‌ها نه؛ زمان‌ها UTC (OPS-08، #247).
 - ⛔ **بازیابیِ پشتیبان هرگز دادهٔ تازه‌ترِ سرور را پاک یا برنمی‌گرداند و هرگز op نمی‌سازد** (S143، #455). سرور منبعِ حقیقتِ دکانِ همگام است: `ShopStore.restoreBackup` راه را از `core/.../backup/RestoreRoute.decide` می‌گیرد — دستگاهِ همگام (`everSynced`) ⇒ صف اول تا ته، بعد ردیف‌ها **فقط** از Snapshot ِ سرور و از پشتیبان فقط تنظیمات (`SyncRebuild` با `pushedStaging`؛ وسطِ آن هیچ نوشتنی، `engine.rebuilding`)؛ بی شبکه/ورود یا v3 ِ راه‌افتاده ⇒ هیچ چیزی عوض نمی‌شود، با پیام؛ هرگز همگام‌نشده ولی **وارد شده** ⇒ اگر Snapshot ِ سرور ردیف دارد همان راهِ «از سرور»، اگر Snapshot نیامد (بی شبکه) «اول همگام کنید» (`SYNC_FIRST`، هیچ تغییری)، v3 ⇒ `NOT_ON_V3`؛ `resetTo` (پشتیبان خودش سایه) **فقط** وقتی که وارد نشده یا حسابِ سرور خالی است (`rows = 0`) — وگرنه پشتیبانِ کهنه با ردیف‌های سرور می‌آمیخت: فاکتورِ ۲۰۰ با برگشت‌های ۱۰۰ + ۲۰۰ = ۳۰۰ و `returnedQty` ۳ از ۲ (#485). ردیفِ پشتیبان که سرور ندارد افزوده نمی‌شود (ردیفِ حذف‌شده را زنده می‌کرد)، فقط در پیام شمرده می‌شود. بازیابی را هرگز به `save`/`writeInternal` (تفاضل با سایه) برنگردانید: هارنس (`restoreWiredNoOps` در `server/test/e2e/lib/native.mjs`) بدنهٔ `restoreBackup` را می‌سنجد — بی `writeInternal(`/`save(`/`record(`، LOCAL حتماً `engine.resetTo(` و FROM_SERVER حتماً `engine.rebuildFromServer(` — وگرنه S143 سرخ است. سنجه: `server/test/e2e/restore.e2e.mjs` (S143، S143.offline، S143.gone، S143.fresh، S143.fresh.offline) و `RestoreRouteTest` (`core/src/commonTest`).
 - ⛔ پشتیبانِ سرور `manifest` (شمار و جمعِ پول/مقدار، بی دادهٔ شخصی) را در **همان** snapshot ِ pg_dump در `meta.json` می‌گذارد؛ پشتیبان «سالم» یعنی `npm run restore-drill` آن را در دیتابیسِ **جدا** برگرداند و برابر بیابد (خالی یا بی manifest هرگز «سالم» نیست). تمرین هرگز روی دیتابیسِ زنده نمی‌نویسد. شکستِ پشتیبانِ خودکار ⇒ سابقهٔ `backup.failed` و «سلامت» قرمز تا موفقِ بعدی (SEC-DATA-04/05، `docs/security/data-fa.md`).
+- تمرینِ بازیابیِ پشتیبانِ سرور با «شمارش و جمعِ کنترل» (`server/test/e2e/lib/control-sums.mjs`): هر جدول (شمار، هشِ محتوا، جمعِ `*_minor`) و هر مجموعهٔ دفترِ دکان (شمار، جمعِ هر فیلدِ عددی) باید با مبدأ یکی باشد؛ جدولِ تازه خودکار شمرده می‌شود (REC-01).
+- پشتیبانِ سرور با پرچمِ `security / backup.require_encryption`: بی رمز هیچ فایلی (نه متنِ ساده، نه `.part`) و هیچ هرسی؛ «موفق» فقط پس از رمزگشایی + gzip ِ همان فایل با شمارِ بایتِ برابرِ dump؛ پرچمِ ناخوانا = خاموش = رفتارِ F0-08 (SEC-07).
 - چت جدا هم پشتیبان می‌گیرد (`node scripts/chat-backup.js`): پیام و رسانه دو فایلِ جدا، رمز با همان `BACKUP_PASSPHRASE`؛ بازگردانی فقط افزودنی (`ON CONFLICT DO NOTHING`) و به ترتیبِ «پشتیبانِ اصلی ⇐ پیام ⇐ رسانه ⇐ verify»؛ رسانه‌ای که sha256 ِ بایتش نخواند نوشته نمی‌شود (CHAT-12).
 - **عبارتِ بازیابیِ فروشگاه** (OPS-02، §۱۰.۳؛ فقط منطق و رمز، هنوز بی صفحه): پشتیبانِ دستگاه با کلیدِ ساخته از عبارت رمز می‌شود، **هرگز** با کلیدِ دستگاه. عبارت = ۲۵ نویسهٔ Crockford (۱۲۰ بیتِ تصادفی + وارسی، `core/backup/RecoveryPhrase`)؛ کلید = PBKDF2-HMAC-SHA256 با ۶۰۰٬۰۰۰ تکرار؛ فایل = همان پاکتِ `AtRestEnvelope` با KID ِ `rp1.<تکرار>.<نمک>` (`core/atrest/platform/PhraseBackup`). تکرارِ بیرون از ۱۰۰٬۰۰۰..۵٬۰۰۰٬۰۰۰ در فایل ⇒ باز نمی‌شود (فایلِ دست‌کاری‌شده برنامه را قفل نکند). قالب را بی بردارِ تازه در `PhraseBackupTest` و `RecoveryPhraseTest` (ساختهٔ Python) عوض نکن — پشتیبانِ قدیمی دیگر باز نمی‌شود.
 
@@ -403,6 +422,7 @@
 - رقمِ صفحه از فونت (`ss01`) می‌آید، نه از عوض کردنِ متن؛ داده و کادرها ASCII می‌مانند (#241).
 - تلفنِ تازه یا ویرایش‌شده `+93` و ۹ رقمِ ملی؛ پیش‌شماره به اپراتور نگاشت نمی‌شود؛ دادهٔ قدیم دست نمی‌خورد (LOC-09، #224، #241).
 - نمادِ پول («؋» یا «افغانی») فقط در فاکتور قابلِ تنظیم است (LOC-07، #241).
+- تاریخِ قمری روی فاکتور و رسیدِ برگشت فقط با تنظیمِ همین دستگاه (`tohid-locale`: `lunar`، پیش‌فرض خاموش؛ `lunar_adjust` −۲..+۲ برای دیدنِ هلال)؛ `ReceiptFormat.lunarDate` پیش‌فرض null است، پس فاکتورِ پیشین بی‌تغییر؛ تاریخِ نادرست چیزی چاپ نمی‌کند (LOC-01).
 
 ### v3 · هسته‌های مشترک و میان‌برها
 
@@ -443,6 +463,8 @@
 - پیش از تغییرِ رفتار آزمونِ مرجع روی رفتارِ امروز؛ مقدارِ موردِ انتظار فقط با دلیل عوض شود و assertion ضعیف نشود (#231، #236، #241).
 - CIِ کامپیوتر عکسِ صفحه می‌گیرد (`desktop-screenshots`)؛ کارِ ظاهری با همان سنجیده شود (#257، #268).
 - شواهدِ هر آزمونِ سرور (GATE-NEW-05): `TEST_EVIDENCE_FILE` ⇒ `scripts/test-evidence.js` برای هر آزمون یک خطِ JSON (شناسهٔ `<فایل>#<نام>`، commit، Node، سیستم‌عامل، پایگاه بی رمز، نتیجه، زمان، دستورِ بازتولید، خطا)؛ CI آن را artifact ِ `test-evidence-postgres`/`test-evidence-pglite` می‌کند. راز در آن ننویسید؛ `npm test` دو اجرا را به یک پرونده می‌افزاید (`claude/spec-auth-6`).
+- مهاجرتِ تازه (`server/migrations/**`) ⇒ ورک‌فلوی «تمرینِ ارتقا (staging)» باید سبز باشد: نسخهٔ پایهٔ PR با دادهٔ seed ِ HTTP، سپس مهاجرت‌های تازه روی همان داده،
+  اثرِ انگشتِ پیش/پس (ردیفِ گم‌شده، جدول/ستونِ برداشته، دست بردن در دفتر ⇒ قرمز)، `verify-data` و دودآزمایی. محلی: `bash server/scripts/upgrade-rehearsal.sh <base> <head>` (OPS-03@29).
 - ⛔ زنجیرهٔ تأمین (§۱۴، `docs/security/supply-fa.md`، سدِ `security.yml`): هر `uses:` با SHAِ کامل و `# vX.Y.Z`؛ `permissions:` ِ بالای فایل فقط خواندنی و `write` فقط در کارِ انتشاری که کدِ ساخت اجرا نمی‌کند (`WRITE_JOBS` در `tools/security/workflow-guard.mjs`)؛ ورودی (`inputs`، نامِ شاخه، عنوانِ PR) در `run:` فقط از `env:`؛ بی `pull_request_target`. کلیدِ امضای فهرستِ به‌روزرسانی فقط در کارِ انتشار.
 - ⛔ `npm ci` بی `|| npm install`؛ وابستگیِ تازهٔ سرور ⇒ `package-lock.json` در همان PR. critical در `npm audit --omit=dev` سد است (high از ۱۴۰۵/۱۰/۰۱)؛ استثنا فقط با GHSA، دلیل و تاریخ در `tools/security/audit-allow.json`.
 - ⛔ secret و فایلِ کلید هرگز در مخزن؛ اسکنِ هر PR سد است و مقدار را چاپ نمی‌کند. استثنا فقط در `tools/security/secret-scan-allow.json` (دلیل، بی مقدار)؛ رازِ لورفته را چرخاندن لازم است، نه فقط برداشتن.
@@ -465,7 +487,9 @@
 | `shop.storefront.stock_list` | دکان / `all` | خاموش | E2E-MKT-02: `GET /api/store/:slug` کلیدِ `features.stockList` (خاموش ⇒ بی کلید)؛ ویترین در ۴۰۹ ِ `out_of_stock` همهٔ قلم‌های کم را با مقدارِ موجود و «کم کن به …» نشان می‌دهد و «ثبت» تا کم کردن بسته است؛ خاموش ⇒ همان پیامِ سرور | `claude/part-E2E-1` | باز |
 | `shop.storefront.search_core` | دکان / `all` | خاموش | SRCH-01: جست‌وجوی `GET /api/store/:slug/products?q=` با قاعده‌های `text-core.js` (همان صندوق): رقمِ فارسی/عربی = لاتین، نامرئی و فاصله حذف، کلمه‌ها به هر ترتیب؛ خاموش ⇒ همان `normalize`/`SQL_NAME` ِ پیشین. بازارچه (`market.js`) عوض نشده | `claude/part-SRCH-1` | باز |
 | `shop.orders.online_report` | دکان / `all` | خاموش | `GET /api/shop/orders/online-report` (خاموش ⇒ ۴۰۳ `online_report_disabled`) و نوشتنِ جست‌وجوی بی‌نتیجهٔ ویترین در `storefront_search_misses` (خاموش ⇒ هیچ نوشتنی) (RPT-14، `lib/order-online-report.js`)؛ با `shop.orders` | `claude/new-rpt-2` | باز |
+| `shop.storefront.seo` | دکان / `all` | خاموش | صفحهٔ کالا `/p/<id>` و `/store/<slug>/p/<id>` با Open Graph و JSON-LD، `sitemap.xml` و `robots.txt` ِ میزبانِ دکان، برچسب‌های `/store/<slug>` و `seo.productBase` در `GET /api/store/:slug` (WEB-17، WEB-20؛ `lib/store-seo.js`)؛ با ویترینِ روشن؛ خاموش ⇒ همان index.html ِ ایستا و همان ۴۰۴، بی شمردنِ سقف | `claude/new-web-1` | باز |
 | `shop.orders.desk` | دکان / `all` | خاموش | میزِ سفارش (ORD-04/08/09): `/api/shop/orders/desk/*` (`GET` خاموش ⇒ `{enabled:false}`؛ نوشتن ⇒ ۴۰۳ `order_desk_disabled`)، توقفِ ویترین (۴۰۹ `store_paused`)، `busy`/`pause` در وضعیتِ عمومیِ ویترین، قبولِ خودکار و کارگرِ توقفِ خودکار؛ مهاجرتِ ۱۵۷ | `claude/spec-ord-3` | باز |
+| `shop.storefront.link_expiry` | دکان / `all` | خاموش | لینکِ پیگیریِ سفارشِ ویترین زمان‌دار (`STORE_TRACK_LINK_DAYS`، پیش‌فرض ۳۰ روز از صدور؛ v1 ِ پیشین = صدور هنگامِ ساختِ سفارش) و باطل‌شدنی (`POST /api/shop/orders/:id/track-link/revoke`، صاحب و مدیر) ⇒ ۴۱۰ `link_expired`/`link_revoked`؛ «سفارش‌های من» لینکِ تازه می‌دهد (TEN-03، مهاجرتِ ۱۴۰) | `claude/spec-auth-4` | باز |
 | `shop.delivery` | دکان / `all` | خاموش | `/api/shop/delivery/*` و `/api/courier/*`؛ با `shop.orders` و کلیدِ اشتراکِ `delivery`؛ تا تصویبِ قرارداد روشن نشود | #249 | main |
 | `shop.delivery_map` | دکان / `all` | خاموش | DLV-05: `navigation` در کارتِ `/api/courier/missions` و `GET /api/courier/map`، `GET /api/courier/map/:id` (خاموش ⇒ ۴۰۴ `delivery_map_disabled`)؛ با `shop.delivery` | `claude/new-dlv-1` | باز |
 | `shop.delivery_courier_call` | دکان / `all` | خاموش | «تماس با مشتری» روی کارتِ پیک (`POST /api/courier/missions/:id/call`، شمارهٔ کامل فقط برای همان تماس)؛ خاموش ⇒ ۴۰۴ `courier_call_disabled` و دکمه پنهان؛ با `shop.delivery` | DLV-02 | باز |
@@ -481,6 +505,7 @@
 | `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11)؛ `/shop/orders/pick/…` و `/shop/orders/:id/pick…` (خاموش ⇒ ۴۰۳ `picking_disabled`)، کسرِ خودکار در بسته‌بندی، «تمام شده» ِ کالای پیدانشده در ویترین؛ قفسهٔ انتظار و دسته (PCK-10/12): `/shop/orders/pick/shelf…` و `/shop/orders/pick/batches…` | `claude/spec-pck-1`، `claude/spec-pck-2`، `claude/new-pck-2` | باز |
 | `shop.orders.picking` | دکان / `all` | خاموش | جمع‌آوری و بسته‌بندی (PCK)؛ `picking` در `/shop/orders/config` و `/shop/delivery/config`؛ QRِ کدِ تحویل و پذیرشِ اسکنش در برنامهٔ مدیریت (PCK-11)؛ `/shop/orders/pick/…` و `/shop/orders/:id/pick…` (خاموش ⇒ ۴۰۳ `picking_disabled`)، کسرِ خودکار در بسته‌بندی، «تمام شده» ِ کالای پیدانشده در ویترین؛ عکسِ مدرکِ بسته (PCK-08): `/shop/orders/:id/pick/photos…` | `claude/spec-pck-1`، `claude/spec-pck-2`، `claude/new-pck-3` | باز |
 | `shop.orders.delivery_prefs` | دکان / `all` | خاموش | «مشتری با … می‌پردازد» (`delivery.cashTenderMinor`) و ویرایشِ دستورِ تحویل تا پیش از ارسال (کارمند و مشتری)؛ خاموش ⇒ کلید دور ریخته و ویرایش ۴۰۳ `delivery_prefs_disabled`؛ `deliveryPrefs` ِ `/config` کادرهای برنامه را نشان می‌دهد (CHK-14، CHK-24) | #545 | باز |
+| `shop.orders.substitution` | دکان / `all` | خاموش | ترجیحِ کلیِ جایگزینی و نامِ «کالای مشخص» در سفارشِ کارمند و ویترین؛ `substitution` ِ `/config` کادرِ فرمِ دستیِ برنامه را نشان می‌دهد (CHK-15) | #525 | باز |
 | `shop.chat` | دکان / `all` | خاموش | `/api/shop/chat/*` (۴۰۴ `chat_disabled`؛ `/config` فقط `enabled` می‌گوید) و چتِ مشتری روی ویترینِ روشن | #259 | main |
 | `shop.orders.start_alert` | دکان / `all` | خاموش | ORD-18: کارگرِ هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (رویدادِ `note` ِ `start_alert`، سابقه، پوش با `shop.order_notify`) | `claude/spec-ord-4` | باز |
 | `shop.orders.bulk` | دکان / `all` | خاموش | ORD-19: `POST /api/shop/orders/bulk/transition` (خاموش ⇒ ۴۰۳ `order_bulk_disabled`) | `claude/spec-ord-4` | باز |
@@ -488,8 +513,11 @@
 | `image_bank.central` | فقط `all` | خاموش | پنلِ بانکِ مدیر `/api/admin/image-bank/*`؛ جدا تا مدیر پیش از دکان‌ها بانک را پر کند | #262 | main |
 | `shop.delivery_code_rule` | دکان / `all` | خاموش | کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل است (DLV-08)؛ خاموش ⇒ کد فقط با `requireCode`، بیت‌به‌بیت همان پیشین | `claude/part-dlv-1` | باز |
 | `shop.delivery_code_rule.min_total_minor` | دکان / `all` | نبود (= خاموش) | آستانهٔ «گران‌قیمت» به واحدِ خرد برای همان قاعده؛ فقط با پرچمِ بالا؛ ۰ یا نامعتبر ⇒ خاموش (آستانهٔ پیش‌فرض با صاحب‌کار) | `claude/part-dlv-1` | باز |
+| `image_bank.resume` | فقط `all` | خاموش | در پنلِ بانک: پرسیدنِ فایل‌های رسیده (`GET …/batches/:id/files`)، نفرستادنِ دوبارهٔ «همان نام + همان sha256»، `X-Content-SHA256` و تلاشِ دوباره؛ سنجشِ سرآیند روی سرور به پرچم بسته نیست | #474 | باز |
 | `hashchain.audit` | `security` | خاموش | زنجیرهٔ هشِ سابقه در `hash_chain`؛ روشن با `true` (و `1`، `"true"`، `"on"`) | #242 | main |
 | `shop.doc_chain` | دکان / `all` | خاموش | زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه (SEC-02): `GET`/`POST /api/sync/v1/chain`، جدولِ `device_chain_heads` و حلقه‌ها در `hash_chain`؛ خاموش ⇒ `{enabled:false}`، هیچ نوشتنی و برنامه هیچ حلقه‌ای نمی‌سازد (فقط پرسشِ پرچم، حداکثر روزی یک بار؛ بی‌پاسخ یا ۴۰۴ هم یک روز صبر) | SEC-02 | باز |
+| `ops.sync_lag` | `ops` | خاموش | بخشِ `lag` ِ «همگام‌سازی» در `GET /api/admin/system/health` و خطِ همان کارت در پنل: دستگاهِ عقب از سرِ دفتر، صفِ دستگاه‌ها، بی‌همگام‌سازیِ ۲۴ساعته، «گیرکرده» (آنلاین ولی بی pull ⇒ کارت warn)؛ فقط عدد؛ فقط `true` روشن است | #460 | باز |
+| `backup.require_encryption` | `security` | خاموش | SEC-07: بی `BACKUP_PASSPHRASE` پشتیبانِ سرور ساخته نمی‌شود (۴۰۹ `backup_passphrase_required`، خبرِ `backup.refused_unencrypted`)؛ موفقیت فقط پس از بازگشاییِ همان فایل (`verified`)؛ شکست ⇒ بی هرس | SEC-07 | باز |
 | `auth.phone_add_code` | `security` | خاموش | افزودنِ شماره (راهِ ورود) به حسابِ بی‌شماره فقط با کدِ همان شماره و همان حساب: `POST /api/me/phone/code` و `phoneCode` در `PUT /api/me` (خاموش ⇒ درِ کد ۴۰۴ و رفتارِ امروز)؛ پیش از روشن کردن، برنامه‌ها `phoneCode` بفرستند (AUTH-08) | `claude/spec-auth-3` | باز |
 | `shop.doc_chain` | دکان / `all` | خاموش | زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه (SEC-02): `GET`/`POST /api/sync/v1/chain`، جدولِ `device_chain_heads` و حلقه‌ها در `hash_chain`؛ خاموش ⇒ `{enabled:false}`، هیچ نوشتنی و برنامه هیچ حلقه‌ای نمی‌سازد (فقط پرسشِ پرچم، هر ده دقیقه). روشن ⇒ ردِ ویرایش/حذفِ سرِ جای فاکتورِ ثبت‌شده هم (S89: دستگاهِ زنجیره‌دار و API ِ مستقیم؛ بقیه فقط رویداد) | SEC-02، S89 | باز |
 ||||||| eb152359
@@ -504,23 +532,30 @@
 | `shop.orders.ledger` | دکان / `all` | خاموش | ⛔ بازنشسته: سرور دیگر فاکتورِ W یا سندِ برگشت نمی‌نویسد؛ فقط کفِ راه‌اندازیِ «فروشِ تحویل» (`order-ledger.LEGACY_FLAGS`) آن را می‌خواند. زنده‌اش نکنید؛ بازپرداخت = سندِ برگشتِ برنامه (بخشِ «سفارش») | #275 | بازنشسته |
 | `shop.sync_v3_to_v1` | دکان / `all` | خاموش | پلِ v3 ⇒ v1 برای دکانِ دستگاه‌های قاطی | #287 | باز |
 | `market.trust` | دکان / `all` | خاموش | شکایت و تخلفِ بازارچه (درِ مدیر به پرچم بسته نیست) | #270 | باز |
+| `shop.ledger_merge` | دکان / `all` | خاموش | ذخیرهٔ کهنه در برنامه: همتاها (`LedgerPeers`)، سنجشِ دیسک پیش از نوشتن و ادغامِ سه‌طرفهٔ `ShopStore.save` (`LedgerMerge`)؛ برنامه از `GET /api/shop/ledger-merge/config` می‌خواند (`LedgerMergeFlag`)؛ خاموش ⇒ همان رفتارِ پیشین | #407 | باز |
 | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
 | `shop.debt_minor` | دکان / `all` | خاموش | ماندهٔ حساب در برنامه به پول، دقیقاً مثلِ `DebtBook` (`core/money/LedgerBalance` از راهِ `DebtMinorFlag`): `ShopStore.debt`، «حساب صاف/بدهکار/موجودی»، داشبورد، `LedgerSummary` و گزارشِ قرض‌داران؛ خاموش ⇒ همان جمعِ Double، بیت‌به‌بیت. سرور چیزی حساب نمی‌کند؛ برنامه از `debtMinor` ِ `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #610 | باز |
 | `shop.promo_stamp` | دکان / `all` | خاموش | نشانِ تخفیفِ خودکار روی فاکتور (`listPriceMinor`، `promo`، `promoDiscountMinor`، `coupons`) و ردیف‌های تازهٔ فاکتورِ صفحه، چاپ و QR؛ برنامه از `stamp` ِ `GET /api/shop/promos` می‌خواند | #375 | باز |
 | `shop.promo_tier_price` | دکان / `all` | خاموش | پلهٔ «قیمتِ ثابتِ هر واحد» در قاعدهٔ پله‌ای (`tiers[].unitMinor`، POS-19): خاموش ⇒ `PUT /api/shop/promos/rules/:id` ِ چنین قاعده‌ای ۴۰۳ `tier_price_disabled`؛ `tierPrice` در `GET /api/shop/promos` گزینهٔ فرمِ برنامه را نشان می‌دهد. برنامهٔ پیشین چنین قاعده‌ای را نامعتبر می‌بیند و نادیده می‌گیرد ⇒ پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند | `claude/part-pos-3` | باز |
+| `shop.stock_v2` | دکان / `all` | خاموش | موتورِ تازهٔ موجودی و بهای برنامه (میانگینِ موزون، سری/FEFO، دفترِ حرکت، شمارش، انتقال)؛ برنامه از `GET /api/shop/stock-ledger/config` می‌خواند (`StockFlag`، هر ۱۰ دقیقه با سوکت)؛ روشن شدن هم پرچم و هم تنظیمِ دکانِ `stock_mode=on` را می‌خواهد (`StockLedger.isOn`)؛ خاموش ⇒ کارتِ «موجودی و بها» پنهان و همان موتورِ امروز | #315 (و #323 رویش) | باز |
 | `shop.order_risk` | دکان / `all` | خاموش | قاعده‌های ریسکِ ثبتِ **ویترین** (`lib/order-risk.js`): سفارشِ تکراری ⇒ ۴۰۹ `duplicate_order` (RSK-05) و سقفِ مبلغ و سفارشِ بازِ مشتریِ تازه ⇒ ۴۰۹ `new_customer_limit` (RSK-02)، و `GET /api/shop/orders/:id/risk` ِ سابقه و نشانه‌ها (RSK-03؛ خاموش ⇒ `{enabled:false}`). فروشِ حضوری و سفارشِ کارمند هرگز | `claude/spec-rsk-2` | باز |
 | `shop.storefront.notify_area` | دکان / `all` | خاموش | «خبرم کن» ِ بیرونِ محدوده (CHK-10)، فقط روی `shop.storefront.zones`: `POST`/`DELETE /api/store/:slug/area-request` (خاموش ⇒ همان پاسخِ درِ ناشناخته)، `GET /api/shop/storefront/area-requests` و `POST …/:id/notified` (خاموش ⇒ ۴۰۳ `notify_area_disabled`)، و `notifyArea` در «کجا؟» | `claude/part-chk-2` | باز |
 | `shop.storefront.cart` | دکان / `all` | خاموش | سبدِ سروریِ حسابِ مشتری: `GET`/`PUT /api/store/:slug/account/cart` و `POST …/cart/merge` (CHK-03)؛ خاموش یا ویترینِ بسته ⇒ همان پاسخِ درِ ناشناخته (۴۰۱ `unauthorized`)، پیش از هر سقف و نشست | `claude/part-chk-1` | باز |
+| `shop.order_risk` | دکان / `all` | خاموش | قاعده‌های ریسکِ ثبتِ **ویترین** (`lib/order-risk.js`): سفارشِ تکراری ⇒ ۴۰۹ `duplicate_order` (RSK-05) و سقفِ مبلغ و سفارشِ بازِ مشتریِ تازه ⇒ ۴۰۹ `new_customer_limit` (RSK-02)، و `GET /api/shop/orders/:id/risk` ِ سابقه و نشانه‌ها (RSK-03؛ خاموش ⇒ `{enabled:false}`)؛ فهرستِ سیاه و سفید (RSK-04، مهاجرتِ ۱۶۶): `GET/POST /api/shop/orders/risk/lists`، `DELETE …/:entryId` (خاموش ⇒ ۴۰۳ `order_risk_disabled`) و ردِ خنثیِ ۴۰۳ `order_blocked`. فروشِ حضوری و سفارشِ کارمند هرگز | `claude/spec-rsk-2`، `claude/spec-rsk-3` | باز |
 | `shop.order_risk.policy` | دکان / `all` | `{newCustomerMaxTotalMinor: 1000000, newCustomerMaxOpen: 2, duplicateWindowMin: 10}` | شیءِ سیاستِ همان قاعده‌ها؛ هر کلید جدا، دکان بر `all`؛ عددِ نامعتبر ⇒ پیش‌فرض؛ ۰ = آن قاعده خاموش | `claude/spec-rsk-2` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 | `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
+| `shop.purchase_orders` | دکان / `all` | خاموش | `/api/shop/purchase-orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `purchase_orders_disabled`)؛ سفارشِ خرید، فرستادن، لغو و رسیدِ دریافت (PUR-02/04)؛ کلیدِ اشتراکِ `purchasing` رایگان است | #471 | باز |
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
 | `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
+| `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند (`PromoLive.redeemGate`)؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | #450 (سرور)، برنامه در PRِ پشتِ آن | باز |
+
+تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 در هستهٔ پرداخت (#237، main)؛ `view_mode:<کاربر>:<صفحه>` نمای کارتی/جدولی (#257، #261، main)؛ `SyncChoice` / `tohid-sync-engine`
 = `v1` (#250، باز)؛ `ShopPolicy.payV2` / `tohid-pay-v2` (#286، باز)؛ `report_fresh` / `tohid-report-fresh` (#279، باز)؛
 `tohid-policy` ⇒ `checkout_customer_from_minor` (نبودن = خاموش) و `checkout_block_zero_total = false` قاعده‌های پایانِ فاکتور (POS-24، `claude/spec-pos-b-3`).
@@ -552,6 +587,11 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `count_tools` و `count_blind` = انبارگردانیِ تازه با اسکن و برگهٔ چند دستگاه، و شمارشِ کور (`CountToolsPref`، INV-06/07/08، `claude/new-inv-2`).
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `fraud_trail` = سابقهٔ ضدتقلب: کاربر روی لغو/مرجوعی و ردیفِ `line_delete` (`FraudTrailPref`، RPT-09، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 `tohid-policy` ⇒ `till_receive = false` دریافت از مشتری در صندوق با F7 (POS-39، `claude/spec-pos-b-4`).
+`ShopPolicy.productTools` (`tohid-policy` ⇐ `product_tools`، پیش‌فرض خاموش؛ «تنظیمات ⇐ ابزارهای تازهٔ کالا»): هشدارِ «نامِ مشابه» در فرم
+و ورود از فایل و کادرِ «بارکدها» (PRD-19، PRD-04؛ #459، باز)، نام و دلیلِ تغییرِ قیمت و «قیمتِ گروهی» با پیش‌نمایش و تأیید (PRD-14،
+PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ رفعِ «ویرایش بارکدهای دیگر را پاک می‌کرد» (#476) پشتِ هیچ پرچمی نیست.
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛
+`ShopPolicy.stockInsight` / `tohid-policy:stock_insight` «تحلیلِ موجودی» در گزارشِ کالاها: ارزش، سودِ بالقوه و ABC، فقط خواندنی (INV-15/16، #438، باز)؛ `ShopPolicy.stockLevels` / `tohid-policy:stock_levels` «نقطهٔ سفارش و بیشینه»: دو کادرِ فرمِ کالا، ویرایشِ گروهیِ حدها و «نیاز به سفارش»؛ فیلدهای افزودنیِ `Product.reorderPoint`/`maxStock` (`NEVER`) فقط با روشن بودن نوشته می‌شوند (INV-12، #438، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
@@ -646,6 +686,15 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
   (نامِ محلی یک بار درج می‌رود، هرگز حذف). سرور پیش از برنامه‌ها مستقر می‌شود؛ برنامهٔ پلهٔ ۳ روی سرورِ پلهٔ ۲ ۴۲۶
   می‌گیرد و opهایش را نگه می‌دارد. هر مجموعهٔ تازه = یک پلهٔ تازه. سنجه: `server/test/sync-setting-lists.test.js`
   و `SettingListsSyncTest.kt`.
+- ⛔ **ذخیرهٔ کهنه (از ۱۴۰۵/۰۸/۰۳؛ پشتِ پرچمِ خاموشِ `shop.ledger_merge`، #407):** صفحه و کارگرِ همگام‌سازی هر کدام `ShopStore` ِ خودشان را دارند. هر نوشتن به
+  همتاها می‌رسد (`LedgerPeers`)؛ پیش از هر نوشتن زیرِ قفلِ موتور نسخه و مُهرِ دیسک سنجیده و اگر جلوتر است دفتر از نو
+  خوانده می‌شود؛ `save` ِ صفحه با ادغامِ سه‌طرفه (`LedgerMerge`: پایه = دفتری که صفحه با آن ساخت، دیسک = مالِ آن‌ها)
+  فقط تغییرِ خودش را می‌نشاند. `read` ِ موتورها فقط `ShopStore.ledgerNow()`، هرگز `store.data.value`. حذف می‌برد،
+  شمارنده‌ها (`INC_FIELDS`) جمع می‌شوند — دلتای برابرِ دو طرف هم (دو پرداختِ ۱۰۰ ⇒ ۲۰۰)، فیلدِ یکسانِ دیگر مالِ کاربر.
+  دیسکِ جلوتری که خوانده نشد ⇒ هیچ نوشتنی. پایه‌ای که دیگر نگه داشته نشده (`LedgerFollow.EARLIER` = ۲) ⇒ ذخیره رد و
+  پیامِ `ShopStore.STALE_BASE`؛ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست ⇒ پیامِ `ShopStore.editsDropped`
+  (`ShopStore.notice`). پرچمِ خاموش ⇒ همهٔ این‌ها کنار و همان رفتارِ پیشین. سنجه: `StaleSaveTest` (کامپیوتر)،
+  `LedgerFollowTest`، `LedgerMergeTest` و `server/test/shop-ledger-merge.test.js`.
 
 ### سرور: اشتراک و سوکتِ زنده
 - ⛔ **F0-14 (#201):** «ثبت اشتراک»ِ پنلِ مدیر (دکان و پمپ) سرآیندِ `Idempotency-Key` می‌فرستد و تا بدنه همان است و
@@ -684,6 +733,12 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
   افتِ بیش از ۱۰٪ رد است. عددِ ماشینِ ایجنت با بودجهٔ بخشِ ۹.۲ مقایسه نمی‌شود؛ عددِ مرجع فقط از سخت‌افزارِ مرجع
   (`bench/desktop-cold-start.ps1`، `bench/android-cold-start.sh`، `bench/web.mjs --channel msedge`).
   ⛔ دادهٔ سنجش فقط از `bench/datagen.mjs` (seed ثابت)؛ دادهٔ واقعیِ دکان در ریپو نمی‌آید.
+- **S26 (SYN-01، SYN-04):** `server/test/sync-s26-offline-2g.test.js` — موتورِ واقعیِ وب در `vm`، سه دستگاه ۳۰ روز آفلاین، پراکسیِ TCP ِ
+  هر دستگاه (شمارشِ بایتِ سیم، بُریدنِ بدنه/پاسخ، و 2G ِ واقعی در آزمونِ ۲). هر تغییرِ push/pull، دسته‌بندیِ صف یا شکلِ op باید سبزش
+  نگه دارد؛ `S26_OPS` اندازه را عوض می‌کند (CI ۴۵۰۰). عددِ 2G «برون‌یابیِ خطی» است، نه اجرای ۱۰۰٬۰۰۰تایی.
+- **PERF-06:** عددِ PostgreSQL و PGlite همیشه جدا ثبت می‌شود و یکی به دیگری تعمیم داده نمی‌شود (§۲۹.۶ بند ۸). کارِ
+  «PostgreSQL و PGlite، کنارِ هم» ِ `perf.yml` جدول را با `bench/db-compare.mjs` می‌سازد (درایورِ جابه‌جا یا مقیاسِ ناهمسان ⇒ کدِ ۲)؛
+  ثبتِ ماندگار در `docs/spec/bench/perf-<تاریخ>.md` با شمارهٔ اجرای CI.
 
 ### کلیدها (فقط دستورالعمل؛ اجرا با صاحب محصول)
 - ⛔ کلیدِ خصوصیِ مجوز فقط با **همان** کلیدِ فعلی به `LICENSE_PRIVATE_KEY` منتقل می‌شود؛
@@ -1312,6 +1367,15 @@ ESC/POS.
   مبلغ از برنامه به برنامهٔ پرداختِ کارت‌خوان فقط با سندِ یکپارچه‌سازیِ همان کارت‌خوان/بانک یا حساب‌پی ساخته می‌شود؛ تا آن
   روز هیچ intent یا پروتکلِ حدسی نیست. **از صاحب محصول لازم است:** نام و مدلِ کارت‌خوان و نسخهٔ اندرویدش، بانکِ پذیرنده
   (یا حساب‌پی)، سندِ یکپارچه‌سازی (intent/AIDL/SDK و نمونهٔ پاسخ)، شناسهٔ پذیرنده/پایانه و دستگاهِ آزمایشی یا sandbox.
+  رابط: `core/terminal/CardTerminal.kt` (`requestPayment` ⇐ Approved/Declined/Cancelled/Unavailable). امروز فقط
+  `ManualCardTerminal`: صندوقدار مبلغ را دستی روی کارت‌خوان می‌زند و شمارهٔ تأیید/مرجع (و اختیاری چهار رقمِ آخر) را
+  می‌نویسد ⇐ **همان ردیفِ ثبتِ دستیِ PAY-06** در پنلِ ترکیبی (`afpay_card`، `pending`، `verification: manual`) و ثبت با
+  همان «ثبتِ فروش» ِ پنل؛ ⛔ هرگز «تأییدِ دستگاه». دکمه فقط با پنلِ ترکیبی (`payV2`) و همان پرچمِ درگاه.
+  `VendorAppTerminal` جای خالیِ آگاهانه است و همیشه Unavailable.
+- **نمایشگرِ رو به مشتری** (HW-10): تا برگهٔ حساب‌پی باز است مبلغ، QR و وضعیت (`pay/CustomerPay.kt`،
+  `CustomerPayScreen`) — اندروید روی صفحهٔ دوم (`Presentation` روی `DISPLAY_CATEGORY_PRESENTATION`، کارت‌خوان/صندوقِ
+  دوصفحه‌ای؛ بی اجازهٔ تازه)، کامپیوتر در همان پنجرهٔ دومِ «نمایشگرِ مشتری». بی صفحهٔ دوم هیچ‌چیز. جمعِ سبد در حینِ فروش
+  روی صفحهٔ دومِ اندروید هنوز نیست (فقط پنجرهٔ دومِ کامپیوتر، `CustomerFacing`).
 - QR تا ۳۳۱ بایت (نسخهٔ ۱۳)؛ فاکتور همان سقفِ ۱۰۶ بایت. هر دو با zxing ِ مستقل: `core/test-vectors/qr-large-v1.json`
   و `server/test/qr-large.test.js` (و `QrLargeVectorsTest`). کارمزدِ حساب‌پی قیمتِ عمومی ندارد؛ صاحب محصول بپرسد.
 

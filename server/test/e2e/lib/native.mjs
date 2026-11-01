@@ -231,6 +231,16 @@ export function restoreWiredNoOps(body) {
     && /^RestoreRoute\.Route\.FROM_SERVER -> try \{\s*when \(val out = engine\.rebuildFromServer\(next, pushedStaging\)\)/.test(branch('FROM_SERVER'));
 }
 
+/*
+ * برگشتِ تازه (`ReturnFlow.kt`، RET-07): شاخهٔ «ضایعات» از خودِ کدِ کاتلین خوانده می‌شود — ردیفِ اصلاحیِ
+ * انبار با `adjKind = "damage"` و حرکتِ `damage`. اگر کاتلین این شاخه را از دست بدهد، شبیه‌سازی هم
+ * کالای «خراب» را به موجودی برمی‌گرداند و `S13.waste` قرمز می‌شود.
+ */
+const RETURN_FLOW_KT = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ReturnFlow.kt'), 'utf8');
+export const KOTLIN_RETURNS = {
+  waste: /adjKind = "damage"/.test(RETURN_FLOW_KT) && /type = "damage"/.test(RETURN_FLOW_KT),
+};
+
 /** ساختِ نصب‌شدهٔ پیش از A00: همان `applyRemote` ِ از درِ مدل، بی قاعده‌های تازه */
 export const PRE_A00 = Object.freeze({ applyRemoteShaped: true, snapshotShaped: false, keepsUnknownFields: false, diffInModelTerms: false, capsA00: false, frozenModel: true });
 /** وب: دفترِ خام، هیچ مدلی در کار نیست */
@@ -884,6 +894,105 @@ export class NativeDevice {
     }));
     this.save(d);
     return { ok: true, totals: t, diff };
+  }
+
+  /**
+   * `ReturnFlow.post` (برگشتِ تازه، `ReturnSettings.enabled`) — با رسید، مقصدِ هر قلم «به موجودی» یا
+   * «ضایعات»، سطر به سطر از `ReturnFlow.quote/post`: مبلغ با سهمِ تخفیف و گردِ هر قلم، سقفِ مبلغِ
+   * نهاییِ فاکتور، بیش از «قابلِ برگشت» رد (نه بریده)، `docId` یکتا (تکرار رد)، ردیف‌های `SaleReturn`
+   * با `docId`/`disposition`/`refund`، حرکتِ `customer_return`، و برای ضایعات ردیفِ اصلاحیِ انبار
+   * (`adjKind = damage`) و حرکتِ `damage`.
+   *
+   * ⛔ زیرمجموعه: فقط صاحبِ دکان (دروازهٔ نقش `allow`)، فاکتورِ بی `payments` (#286)، و بازپرداختِ
+   * `original`/`cash` با همان ترتیبِ `Pay.refund`: اول بدهیِ بازِ همین فاکتور (رسیدِ `customer_return`)،
+   * بقیه نقد. اعتبارِ فروشگاه، بی رسید و تعویض این‌جا نیستند (آزمونِ `ReturnFlowTest`).
+   * picks: {saleItemId: {qty, disposition: 'restock' | 'damaged'}}
+   * @returns {{ok:true, docId:string, amount:number, cash:number, account:number} | {ok:false, code:string}}
+   */
+  returnFlow(saleId, picks, { reason = '', mode = 'original', docId = null, by = '' } = {}) {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const today = todayOf(now);
+    const doc = docId || core.ulid(now);
+    if (d.returns.some((r) => r.docId === doc)) return { ok: false, code: 'ALREADY_POSTED' };
+    const why = reason.trim();
+    if (!why) return { ok: false, code: 'REASON_REQUIRED' };
+    const sale = d.sales.find((s) => s.id === saleId);
+    if (!sale) return { ok: false, code: 'SALE_NOT_FOUND' };
+    if (sale.status === 'cancelled') return { ok: false, code: 'SALE_CANCELLED' };
+    if (mode !== 'original' && mode !== 'cash') throw new Error(`returnFlow: روشِ «${mode}» در این شبیه‌سازی نیست`);
+    if ((sale.payments || []).length) throw new Error('returnFlow: پرداختِ ترکیبی (#286) در این شبیه‌سازی نیست');
+    //  `quote`
+    const ratio = sale.total > 0 && sale.discount > 0 ? Math.min(1, Math.max(0, (sale.total - sale.discount) / sale.total)) : 1;
+    const lines = [];
+    for (const item of d.saleItems) {
+      if (item.saleId !== saleId) continue;
+      const p = picks[item.id];
+      if (!p) continue;
+      const q = Number(p.qty);
+      if (!Number.isFinite(q) || q < 0) return { ok: false, code: 'BAD_QTY' };
+      if (q === 0) continue;
+      const disposition = p.disposition || 'restock';
+      if (disposition !== 'restock' && disposition !== 'damaged') return { ok: false, code: 'BAD_DISPOSITION' };
+      if (q > item.quantity - item.returnedQty + 1e-9) return { ok: false, code: 'QTY_EXCEEDS' };
+      const amount = item.quantity > 0 ? roundHalfUp(item.totalPrice / item.quantity * q * ratio) : 0;
+      lines.push({ item, q, amount, disposition });
+    }
+    if (!lines.length) return { ok: false, code: 'NOTHING_TO_RETURN' };
+    const cap = Math.max(0, sale.finalTotal - d.returns.filter((r) => r.saleId === saleId).reduce((s, r) => s + r.amount, 0));
+    let total = lines.reduce((s, l) => s + l.amount, 0);
+    if (total > cap) {
+      let extra = total - cap;
+      for (let i = lines.length - 1; i >= 0 && extra > 0; i--) { const cut = Math.min(extra, lines[i].amount); lines[i].amount -= cut; extra -= cut; }
+      total = lines.reduce((s, l) => s + l.amount, 0);
+    }
+    //  `split` (`Pay.refund`): اول بدهیِ بازِ همین فاکتور، بقیه نقد — به پول (یک‌صدم) و بی ممیزِ شناور
+    const minor = (afn) => Math.round(afn * 100);
+    let leftAccount = Math.min(minor(total), Math.max(0, minor(sale.debtGiven - sale.debtSettled)));
+    const account = leftAccount / 100;
+    const tag = `R-${doc.slice(-6).toUpperCase()}`;
+    const invoice = `فاکتور #${sale.series ? `${sale.series}-` : ''}${sale.invoiceNumber}`;
+    for (const l of lines) {
+      const rowId = core.ulid(now);
+      const accM = Math.min(leftAccount, minor(l.amount));
+      leftAccount -= accM;
+      d.returns.push(row('SaleReturn', {
+        id: rowId, saleId, saleItemId: l.item.id, productId: l.item.productId, quantity: l.q, amount: l.amount, reason: why,
+        date: today, createdAt: now, docId: doc, disposition: l.disposition, refund: mode,
+        toAccount: accM > 0 ? accM / 100 : null, by: by.trim() || null,
+      }));
+      l.item.returnedQty += l.q;
+      if (!l.item.productId) continue;
+      const product = d.products.find((x) => x.id === l.item.productId);
+      d.stockMovements.push(row('StockMovement', {
+        id: core.ulid(now), productId: l.item.productId, type: 'customer_return', qty: l.q, date: today,
+        notes: `برگشت ${tag} — ${invoice} — ${why}`, refId: rowId, createdAt: now,
+      }));
+      if (l.disposition === 'damaged' && KOTLIN_RETURNS.waste) {
+        d.warehouseEntries.push(row('WarehouseEntry', {
+          id: core.ulid(now), productId: l.item.productId, units: -l.q, unit: product ? product.unit : '', date: today,
+          notes: `ضایعاتِ برگشتی ${tag} — ${why}`, isAdjustment: true, createdAt: now, adjKind: 'damage', refId: doc,
+        }));
+        d.stockMovements.push(row('StockMovement', {
+          id: core.ulid(now), productId: l.item.productId, type: 'damage', qty: -l.q, date: today,
+          notes: `ضایعاتِ برگشتی ${tag} — ${why}`, refId: rowId, createdAt: now,
+        }));
+      }
+    }
+    if (account > 0 && sale.debtorId) {
+      d.transactions.push(row('DebtTransaction', {
+        id: core.ulid(now), debtorId: sale.debtorId, type: 'receive', amount: account, date: today,
+        notes: `برگشت ${tag} — ${invoice}`, createdAt: now, refId: doc, kind: 'customer_return',
+      }));
+      sale.debtSettled += account;
+    }
+    d.auditLog.push(row('AuditEntry', {
+      id: core.ulid(now), type: 'return', date: today, refId: saleId, createdAt: now, amount: total,
+      notes: `برگشت ${tag} به مبلغ ${money(total)} افغانی — ${invoice} — دلیل: ${why}`
+        + (lines.some((l) => l.disposition === 'damaged') ? ' — ضایعات' : ''),
+    }));
+    this.save(d);
+    return { ok: true, docId: doc, amount: total, account, cash: Math.round((total - account) * 100) / 100 };
   }
 
   /** `SalesEngine.recordReturn` — quantities: {saleItemId: qty} */

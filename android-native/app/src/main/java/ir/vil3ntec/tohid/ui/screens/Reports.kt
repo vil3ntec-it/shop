@@ -326,11 +326,18 @@ private fun productsSection(
       StatTile("موجودی کم", plain(r.low.size), Shop.colors.warning, modifier = Modifier.weight(1f))
     }
     Spacer(Modifier.height(8.dp))
-    StatTile(
-      "ارزش موجودی (به بهای خرید)",
-      "${money(r.inventoryValue)} ؋",
-      modifier = Modifier.fillMaxWidth(),
-    )
+    //  «تحلیلِ موجودی» (تنظیمات، پیش‌فرض خاموش) ⇒ ارزش، سودِ بالقوه و ABC از core؛ خاموش ⇒ همان کاشیِ امروز
+    val context = LocalContext.current
+    val insightOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockInsight(context) }
+    if (insightOn) {
+      StockInsightPanel(d)
+    } else {
+      StatTile(
+        "ارزش موجودی (به بهای خرید)",
+        "${money(r.inventoryValue)} ؋",
+        modifier = Modifier.fillMaxWidth(),
+      )
+    }
     Spacer(Modifier.height(16.dp))
 
     RankPanel("پرفروش‌ترین", r.topSelling) { "${qty(it.quantity)} فروخته‌شده" }
@@ -346,7 +353,30 @@ private fun productsSection(
       }
       Spacer(Modifier.height(16.dp))
     }
+
+    //  INV-12: «نیاز به سفارش» با پیشنهادِ «تا بیشینه» — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+    val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
+    if (levelsOn) {
+      val due = remember(d) { ir.vil3ntec.tohid.data.WarehouseEngine.reorderList(d) }
+      SectionTitle("نیاز به سفارش")
+      Panel {
+        if (due.isEmpty()) EmptyNote("کالایی به نقطهٔ سفارش نرسیده")
+        due.forEach { row -> IssueRow(row.product.name, reorderLabel(row), reorderTint(row)) }
+      }
+      Spacer(Modifier.height(16.dp))
+    }
   }
+}
+
+/** «۳ موجود · سفارش ۲۷» یا «… · بیشینه تعریف نشده» */
+internal fun reorderLabel(row: ir.vil3ntec.tohid.data.WarehouseEngine.ReorderRow): String =
+  "${qty(row.onHand)} موجود · " + (row.suggest?.let { "سفارش ${qty(it)}" } ?: "بیشینه تعریف نشده")
+
+@Composable
+internal fun reorderTint(row: ir.vil3ntec.tohid.data.WarehouseEngine.ReorderRow): Color = when (row.state) {
+  ir.vil3ntec.tohid.core.stock.StockLevelRules.State.OUT -> Shop.colors.danger
+  ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN -> Shop.colors.warning
+  else -> Shop.colors.primary
 }
 
 @Composable
@@ -380,6 +410,102 @@ private fun IssueRow(name: String, label: String, tint: Color) {
   ) {
     Text(name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
     Text(label, style = MaterialTheme.typography.labelSmall, color = tint)
+  }
+}
+
+/* ------------------ تحلیلِ موجودی (INV-15، INV-16) — پیش‌فرض خاموش ------------------ */
+
+/** بیسیس‌پوینت ⇒ «۲۶.۸٪» (یک رقمِ اعشار، رقمِ لاتین مثلِ بقیهٔ عددها) */
+internal fun bpText(bp: Long): String {
+  val a = kotlin.math.abs(bp)
+  return "${if (bp < 0) "-" else ""}${a / 100}.${(a % 100) / 10}٪"
+}
+
+/** واحدِ کوچک ⇒ افغانی برای `money` */
+private fun minorAfn(minor: Long): Double = minor / 100.0
+
+/**
+ *  ارزشِ موجودی به قیمتِ خرید و فروش و سودِ بالقوه (INV-16)، و ABC ِ فروشِ ۱۲ ماهِ اخیر (INV-15).
+ *  حساب در `ReportEngine.stockInsight` ⇐ `core` (`StockAnalysis`)؛ این‌جا فقط نمایش.
+ *  کم‌بودها (بی قیمتِ خرید، موجودیِ منفی، زیرِ قیمتِ خرید) پنهان نمی‌شوند: عدد «تقریبی» است و دلیلش پیداست.
+ */
+@Composable
+private fun StockInsightPanel(d: ShopData) {
+  val today = todayIso()
+  val from = remember(today) { ir.vil3ntec.tohid.core.calendar.CivilDays.addDays(today, -364) ?: today }
+  val s = remember(d, from, today) { ReportEngine.stockInsight(d, from, today) }
+  val v = s.valuation
+
+  Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    StatTile("ارزش به قیمتِ خرید", "${money(minorAfn(v.costMinor))} ؋", modifier = Modifier.weight(1f))
+    StatTile("ارزش به قیمتِ فروش", "${money(minorAfn(v.retailMinor))} ؋", modifier = Modifier.weight(1f))
+  }
+  Spacer(Modifier.height(8.dp))
+  StatTile(
+    "سودِ بالقوهٔ موجودی (تقریبی)",
+    "${money(minorAfn(v.potentialProfitMinor))} ؋",
+    if (v.potentialProfitMinor >= 0) Shop.colors.success else Shop.colors.danger,
+    hint = v.marginBp?.let { "حاشیه ${bpText(it)} · بها = قیمتِ خریدِ ثبت‌شده" },
+    modifier = Modifier.fillMaxWidth(),
+  )
+  val notes = buildList {
+    if (v.missingCost.isNotEmpty()) add("${v.missingCost.size} کالای موجود بی قیمتِ خرید — در سود نیامد" to Shop.colors.warning)
+    if (v.missingPrice.isNotEmpty()) add("${v.missingPrice.size} کالای موجود بی قیمتِ فروش" to Shop.colors.warning)
+    if (v.belowCost.isNotEmpty()) add("${v.belowCost.size} کالا ارزان‌تر از قیمتِ خرید قیمت خورده" to Shop.colors.danger)
+    if (v.negative.isNotEmpty()) add("${v.negative.size} کالا موجودیِ منفی دارد — در جمع نیامد" to Shop.colors.danger)
+    if (v.outOfRange.isNotEmpty()) add("${v.outOfRange.size} کالا عددِ نامعقول دارد — حساب نشد" to Shop.colors.danger)
+  }
+  if (notes.isNotEmpty()) {
+    Spacer(Modifier.height(8.dp))
+    Panel { notes.forEach { (text, tint) -> Text(text, style = MaterialTheme.typography.labelSmall, color = tint) } }
+  }
+
+  Spacer(Modifier.height(16.dp))
+  SectionTitle("تحلیلِ ABC — فروشِ ۱۲ ماهِ اخیر")
+  Panel {
+    if (s.abc.totalMinor <= 0) {
+      EmptyNote("در ۱۲ ماهِ اخیر فروشی ثبت نشده")
+    } else {
+      ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.entries.forEach { c ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+          Text("$c · ${plain(s.abc.count[c] ?: 0)} کالا", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          Text("${bpText(s.abc.shareBp[c] ?: 0)} فروش", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        }
+      }
+      Text(
+        "A: کالاهایی که ۸۰٪ فروش از آن‌هاست — نباید تمام شوند. C: کم‌فروش‌ها و بی‌فروش‌ها.",
+        style = MaterialTheme.typography.labelSmall,
+        color = Shop.colors.muted2,
+      )
+    }
+  }
+  val top = s.rows.filter { it.abc == ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.A }.take(10)
+  if (top.isNotEmpty()) {
+    Spacer(Modifier.height(12.dp))
+    SectionTitle("ردهٔ A")
+    Panel {
+      top.forEach { row ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+          Text(row.product.name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          Text(bpText(row.shareBp), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        }
+      }
+    }
+  }
+  //  کم‌فروشِ موجود: ردهٔ C که موجودی دارد — پول در قفسه خوابیده
+  val idle = s.rows.filter { it.abc == ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.C && it.onHand > 0 }
+    .sortedByDescending { it.onHand * it.product.purchasePrice }.take(10)
+  if (idle.isNotEmpty()) {
+    Spacer(Modifier.height(12.dp))
+    SectionTitle("کم‌فروشِ موجود (ردهٔ C)")
+    Panel {
+      idle.forEach { row ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+          Text(row.product.name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          Text("${qty(row.onHand)} موجود · ${if (row.sales > 0) "${money(row.sales)} ؋ فروش" else "بی‌فروش"}", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        }
+      }
+    }
   }
 }
 
@@ -627,5 +753,9 @@ fun movementLabelOf(type: String): String = when (type) {
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
   "damage" -> "ضایعات"
+  //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
+  "transfer_out" -> "انتقالِ خروجی"
+  "transfer_in" -> "انتقالِ ورودی"
+  "transfer" -> "انتقال"
   else -> type
 }
