@@ -77,6 +77,8 @@ private sealed interface PoMode {
   /** `base == null` ⇒ سفارشِ تازه */
   data class Edit(val base: PurchaseOrderDto?) : PoMode
   data class Receive(val order: PurchaseOrderDto) : PoMode
+  /** پیشنهادِ سفارش (INV-13/14، `PurchaseSuggestView.kt`) */
+  data object Suggest : PoMode
 }
 
 @Composable
@@ -106,7 +108,8 @@ private fun PurchaseOrdersDialog(
           }
           Spacer(Modifier.height(8.dp))
           when (val m = mode) {
-            PoMode.Index -> PoList(repo, perms, onOpen = { mode = PoMode.Detail(it) }, onNew = { mode = PoMode.Edit(null) })
+            PoMode.Index -> PoList(repo, perms, onOpen = { mode = PoMode.Detail(it) }, onNew = { mode = PoMode.Edit(null) }, onSuggest = { mode = PoMode.Suggest })
+            PoMode.Suggest -> PoSuggest(d, repo, perms, toast, onCreated = { mode = PoMode.Detail(it.id) })
             is PoMode.Detail -> PoDetail(store, d, host, perms, m.id, toast,
               onEdit = { mode = PoMode.Edit(it) }, onReceive = { mode = PoMode.Receive(it) })
             is PoMode.Edit -> PoEditor(d, repo, m.base, toast, onSaved = { mode = PoMode.Detail(it.id) })
@@ -121,7 +124,7 @@ private fun PurchaseOrdersDialog(
 /* ══════════════════════════ فهرست ══════════════════════════ */
 
 @Composable
-private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (String) -> Unit, onNew: () -> Unit) {
+private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (String) -> Unit, onNew: () -> Unit, onSuggest: () -> Unit) {
   val c = Shop.colors
   var state by remember { mutableStateOf<String?>(null) }
   var orders by remember { mutableStateOf<List<PurchaseOrderDto>?>(null) }
@@ -138,6 +141,7 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
     }
     Spacer(Modifier.width(12.dp))
     if (perms.manage) Button(onClick = onNew) { Text("+ سفارشِ خریدِ تازه") }
+    OutlinedButton(onClick = onSuggest) { Text("پیشنهادِ سفارش") }
   }
   Spacer(Modifier.height(10.dp))
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
