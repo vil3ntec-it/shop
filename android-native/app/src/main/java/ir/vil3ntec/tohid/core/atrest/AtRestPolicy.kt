@@ -9,6 +9,8 @@ package ir.vil3ntec.tohid.core.atrest
  *   • صفِ opها (`oplog-*.json`) و ژورنال‌های همگام‌سازی (`sync-journal-*`، `sync-v3-*`):
  *     باید **بی کلید** خوانده شوند تا وقتی دفترِ رمزدار باز نمی‌شود (گوشیِ تازه،
  *     Keystore ازدست‌رفته) تغییرهای نرفته هنوز به سرور برسند.
+ *   • دفترچهٔ §۹.۵ (`sync-replay-*-sent.jsonl`، `ReplayBook`): همان opها پس از پذیرش — برای
+ *     دوباره فرستادن اگر سرور از پشتیبان برگشت؛ «بازسازی از سرور» هم پیش از Snapshot آن را می‌خواند.
  *   • سایه و cursorِ Sync v1 (`shared_prefs/tohid-sync-v1.xml`).
  *   • `ledger-summary.json` (چند عدد برای نگهبانِ پس‌زمینه) و `sale-draft.json` (سبدِ نیمه‌کاره).
  */
@@ -30,7 +32,7 @@ object AtRestScope {
 
   /** حالِ همگام‌سازی که روی دیسک ساده می‌ماند و به سایه/cursor/دفتر بسته است */
   fun syncState(rel: String): Boolean =
-    rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-")
+    rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-") || rel.startsWith("sync-replay-")
 
   /** فایلی که کنار گذاشته شد و دیگر بکار نمی‌رود — برای فهرستِ صفحهٔ امنیت */
   fun leftover(rel: String): Boolean =

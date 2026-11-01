@@ -62,7 +62,7 @@ router.get('/status', async (req, res) => {
   res.json({
     shopId: req.shopId,
     rev: await sync.currentRev(req.shopId),
-    collections: sync.COLLECTIONS,
+    collections: sync.LEGACY_COLLECTIONS,
     role: require('../lib/permissions').legacyRole(req.role),
     actualRole: req.role,
     subscription: ent.subscription,

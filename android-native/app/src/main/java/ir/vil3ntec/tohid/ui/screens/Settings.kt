@@ -613,19 +613,18 @@ fun SettingsScreen(
       }
     }
 
-    /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
-    //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
-    //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item {
+    /* ================= گزارش‌های مشتری (CRM-02/04/06/10/11/14) ================= */
+    //  کامپیوتر: زبانه‌های «گزارش‌ها» و پروندهٔ مشتری؛ گوشی: شمارهٔ دوم، برچسب و ادغام در «قرض‌داران». پیش‌فرض خاموش.
+    item {
       var crmReports by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context)) }
       SettingsSection(
         icon = Icons.Filled.TableChart,
         title = StrShell.crmReports,
-        subtitle = if (crmReports) StrShell.crmShownInReports else StrSettings.off,
+        subtitle = if (!crmReports) StrSettings.off else if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrShell.crmShownInReports else StrShell.switchOn,
         tint = if (crmReports) Shop.colors.success else Shop.colors.muted,
       ) {
         Text(
-          StrShell.crmNote,
+          if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrShell.crmNote else StrShell.crmNotePhone,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
         )
@@ -638,8 +637,8 @@ fun SettingsScreen(
             ir.vil3ntec.tohid.data.ShopPolicy.setCrmReports(context, crmReports)
           },
         )
-        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود
-        if (crmReports) {
+        //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود (فقط کامپیوتر؛ گوشی آن زبانه را ندارد)
+        if (crmReports && ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
           var reminderText by remember { mutableStateOf(ir.vil3ntec.tohid.data.DebtReminderPref.template(context)) }
           Spacer(Modifier.height(12.dp))
           DebtReminderTemplateEditor(
@@ -759,6 +758,36 @@ fun SettingsScreen(
           onSelect = {
             stockLevels = it == "on"
             ir.vil3ntec.tohid.data.ShopPolicy.setStockLevels(context, stockLevels)
+          },
+        )
+      }
+    }
+
+    /* ======== ابزارهای تازهٔ کالا: نامِ مشابه و چند بارکد (PRD-19، PRD-04) — پیش‌فرض خاموش ======== */
+    item {
+      var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Description,
+        title = "ابزارهای تازهٔ کالا",
+        subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
+        tint = if (productTools) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد، برند و برچسب (با «،» جدا) و بسته‌ها با بارکدِ هر واحد (کارتنِ ۲۴ دانه‌ای) می‌گیرد، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. ورود از فایل xlsx هم می‌خواند، پیش از ثبت تازه/بی تغییر/رد را نشان می‌دهد، " +
+            "کالای موجود را فقط با انتخابِ خودتان و بی پاک کردن به‌روز می‌کند، فایلِ ردیف‌های رد برای اصلاح می‌دهد و سابقه دارد. " +
+            "فقط روی همین دستگاه.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (productTools) "on" else "off",
+          onSelect = {
+            productTools = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setProductTools(context, productTools)
           },
         )
       }

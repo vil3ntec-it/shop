@@ -320,7 +320,11 @@ class CoreVectorsCommonParityTest {
           "solar", "invalidIso", "fromSolarInvalid", "lunar", "formatLunarLong", "formatSolarLong",
           "weekday", "addDays", "weekStart", "businessDate", "businessDateAt",
         ),
-        setOf("fromSolarExtra", "leapYears1395to1415", "monthLength", "monthNames", "formatSolarNumeric", "fiscalYear", "dayKind"),
+        setOf(
+          "fromSolarExtra", "leapYears1395to1415", "monthLength", "monthNames", "formatSolarNumeric", "fiscalYear", "dayKind",
+          //  LOC-02: مثلِ fiscalYear فقط روی JVM (android-native CoreVectorsTest) و JS (locale-vectors.test.js)
+          "fiscalQuarter", "fiscalQuarterOf",
+        ),
       ),
       "core/test-vectors/locale-format.json" to Pair(
         setOf("asciiDigits", "formatAfghani", "normalizePhone", "formatPhone"),

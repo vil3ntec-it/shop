@@ -95,6 +95,15 @@ router.delete('/conversations/:id/messages/:mid', on, async (req, res) => {
   res.json(await chat.remove(viewerOf(req), req.params.id, req.params.mid, req.query.for));
 });
 
+//  سنجاقِ طرفِ دکان (CHAT-14) — همهٔ کارمندانِ همین دکان می‌بینند، مشتری نه
+router.put('/conversations/:id/pins/:mid', on, reply, async (req, res) => {
+  res.json({ conversation: await chat.pin(viewerOf(req), req.params.id, req.params.mid, true) });
+});
+
+router.delete('/conversations/:id/pins/:mid', on, reply, async (req, res) => {
+  res.json({ conversation: await chat.pin(viewerOf(req), req.params.id, req.params.mid, false) });
+});
+
 router.post('/conversations/:id/receipts', on, async (req, res) => {
   res.json(await chat.receipts(viewerOf(req), req.params.id, req.body));
 });
