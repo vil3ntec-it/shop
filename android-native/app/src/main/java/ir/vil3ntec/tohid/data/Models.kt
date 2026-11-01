@@ -764,6 +764,30 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fromMethod: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toMethod: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payRef: String? = null,
+  /** POS-26 — فقط `special_order` (سند) و `special_order_status` (وضعیتِ تازه)؛ `SpecialOrders`. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
+)
+
+/**
+ *  POS-26 — سفارشِ ویژه روی ردیفِ سابقه (`SpecialOrders`): سند روی `special_order` (مشتری، کالا یا شرح، مقدار، جمع،
+ *  پیش‌پرداخت، روزِ تحویل) و وضعیتِ تازه روی `special_order_status` (`to`، و فاکتورِ تحویل در `saleId`). پول به پول
+ *  (یک‌صدمِ افغانی). هر فیلدِ خالی نوشته نمی‌شود — ردیفِ وضعیت فقط `to` (و `saleId`) دارد.
+ */
+@Serializable
+@OptIn(ExperimentalSerializationApi::class)
+data class SpecialOrderDoc(
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val debtorId: String? = null,
+  /** کالای فهرست؛ `null` ⇒ شرحِ دلخواه (قلمِ آزادِ فاکتورِ تحویل) */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val productId: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val item: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val qtyMilli: Long? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val totalMinor: Long? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val depositMinor: Long? = null,
+  /** روزِ تحویل (`yyyy-MM-dd`) */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val due: String? = null,
+  /** وضعیتِ تازه (`SpecialOrder.Status.code`) — فقط ردیفِ `special_order_status` */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val to: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val saleId: String? = null,
 )
 
 /**

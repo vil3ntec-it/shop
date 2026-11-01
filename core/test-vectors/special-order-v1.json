@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "about": "POS-26 — SpecialOrder: سفارشِ ویژه با پیش‌پرداخت. پول یک‌صدمِ افغانی، مقدار هزارم. هر ردیف یک خط. today = 2026-11-01. qty/total/deposit منفیِ یک = خالی یا نادرست (null).",
+  "draft": [
+    { "name": "ok", "customer": true, "item": "یخچالِ ۱۲ فوت", "qty": 1000, "total": 2500000, "deposit": 500000, "due": "2026-11-10", "want": "" },
+    { "name": "ok-no-deposit", "customer": true, "item": "رنگِ سفارشی", "qty": 2500, "total": 120000, "deposit": 0, "due": "2026-11-01", "want": "" },
+    { "name": "ok-full-deposit", "customer": true, "item": "x", "qty": 1, "total": 100, "deposit": 100, "due": "2026-11-02", "want": "" },
+    { "name": "no-customer", "customer": false, "item": "x", "qty": 1000, "total": 10000, "deposit": 0, "due": "2026-11-10", "want": "NO_CUSTOMER" },
+    { "name": "blank-item", "customer": true, "item": "   ", "qty": 1000, "total": 10000, "deposit": 0, "due": "2026-11-10", "want": "NO_ITEM" },
+    { "name": "zero-qty", "customer": true, "item": "x", "qty": 0, "total": 10000, "deposit": 0, "due": "2026-11-10", "want": "BAD_QTY" },
+    { "name": "missing-qty", "customer": true, "item": "x", "qty": -1, "total": 10000, "deposit": 0, "due": "2026-11-10", "want": "BAD_QTY" },
+    { "name": "qty-over-cap", "customer": true, "item": "x", "qty": 1000000001, "total": 10000, "deposit": 0, "due": "2026-11-10", "want": "BAD_QTY" },
+    { "name": "zero-total", "customer": true, "item": "x", "qty": 1000, "total": 0, "deposit": 0, "due": "2026-11-10", "want": "BAD_TOTAL" },
+    { "name": "missing-total", "customer": true, "item": "x", "qty": 1000, "total": -1, "deposit": 0, "due": "2026-11-10", "want": "BAD_TOTAL" },
+    { "name": "total-over-cap", "customer": true, "item": "x", "qty": 1000, "total": 10000000100, "deposit": 0, "due": "2026-11-10", "want": "BAD_TOTAL" },
+    { "name": "total-at-cap", "customer": true, "item": "x", "qty": 1000, "total": 10000000000, "deposit": 10000000000, "due": "2026-11-10", "want": "" },
+    { "name": "missing-deposit", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": -1, "due": "2026-11-10", "want": "BAD_DEPOSIT" },
+    { "name": "total-not-whole", "customer": true, "item": "x", "qty": 1000, "total": 10050, "deposit": 0, "due": "2026-11-10", "want": "NOT_WHOLE" },
+    { "name": "deposit-not-whole", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": 2525, "due": "2026-11-10", "want": "NOT_WHOLE" },
+    { "name": "deposit-over-total", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": 10100, "due": "2026-11-10", "want": "DEPOSIT_OVER_TOTAL" },
+    { "name": "bad-due", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": 0, "due": "2026-02-30", "want": "BAD_DUE" },
+    { "name": "blank-due", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": 0, "due": "", "want": "BAD_DUE" },
+    { "name": "due-yesterday", "customer": true, "item": "x", "qty": 1000, "total": 10000, "deposit": 0, "due": "2026-10-31", "want": "DUE_PAST" }
+  ],
+  "move": [
+    { "name": "open-ready", "from": "open", "to": "ready", "reason": "", "want": "" },
+    { "name": "open-delivered", "from": "open", "to": "delivered", "reason": "", "want": "" },
+    { "name": "ready-delivered", "from": "ready", "to": "delivered", "reason": "", "want": "" },
+    { "name": "open-cancel", "from": "open", "to": "cancelled", "reason": "مشتری منصرف شد", "want": "" },
+    { "name": "ready-cancel", "from": "ready", "to": "cancelled", "reason": "abc", "want": "" },
+    { "name": "cancel-no-reason", "from": "open", "to": "cancelled", "reason": "  ", "want": "BAD_REASON" },
+    { "name": "cancel-short-reason", "from": "ready", "to": "cancelled", "reason": " ab ", "want": "BAD_REASON" },
+    { "name": "cancel-reason-121", "from": "open", "to": "cancelled", "reason": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "want": "BAD_REASON" },
+    { "name": "ready-ready", "from": "ready", "to": "ready", "reason": "", "want": "NOT_ALLOWED" },
+    { "name": "ready-open", "from": "ready", "to": "open", "reason": "", "want": "NOT_ALLOWED" },
+    { "name": "delivered-cancel", "from": "delivered", "to": "cancelled", "reason": "دیر شد", "want": "NOT_ALLOWED" },
+    { "name": "cancelled-delivered", "from": "cancelled", "to": "delivered", "reason": "", "want": "NOT_ALLOWED" },
+    { "name": "cancelled-ready", "from": "cancelled", "to": "ready", "reason": "", "want": "NOT_ALLOWED" }
+  ],
+  "fold": [
+    { "name": "no-events", "ids": [], "at": [], "to": [], "void": [], "status": "open", "applied": [], "review": false },
+    { "name": "ready-then-delivered", "ids": ["e1", "e2"], "at": [10, 20], "to": ["ready", "delivered"], "void": [false, false], "status": "delivered", "applied": ["e1", "e2"], "review": false },
+    { "name": "time-order-not-list-order", "ids": ["e2", "e1"], "at": [20, 10], "to": ["delivered", "ready"], "void": [false, false], "status": "delivered", "applied": ["e1", "e2"], "review": false },
+    { "name": "same-time-id-order", "ids": ["b", "a"], "at": [10, 10], "to": ["cancelled", "delivered"], "void": [false, false], "status": "delivered", "applied": ["a"], "review": true },
+    { "name": "deliver-after-cancel-other-device", "ids": ["c", "d"], "at": [10, 11], "to": ["cancelled", "delivered"], "void": [false, false], "status": "cancelled", "applied": ["c"], "review": true },
+    { "name": "double-ready-no-review", "ids": ["r1", "r2"], "at": [10, 11], "to": ["ready", "ready"], "void": [false, false], "status": "ready", "applied": ["r1"], "review": false },
+    { "name": "voided-delivery-reopens", "ids": ["r", "d"], "at": [10, 20], "to": ["ready", "delivered"], "void": [false, true], "status": "ready", "applied": ["r"], "review": false },
+    { "name": "voided-then-cancel", "ids": ["d", "c"], "at": [10, 20], "to": ["delivered", "cancelled"], "void": [true, false], "status": "cancelled", "applied": ["c"], "review": false },
+    { "name": "unknown-status", "ids": ["u"], "at": [10], "to": ["lost"], "void": [false], "status": "open", "applied": [], "review": true },
+    { "name": "back-to-open-ignored", "ids": ["r", "o"], "at": [10, 20], "to": ["ready", "open"], "void": [false, false], "status": "ready", "applied": ["r"], "review": false }
+  ],
+  "settle": [
+    { "name": "deposit-under-total", "total": 2500000, "held": 500000, "apply": 500000, "pay": 2000000, "left": 0 },
+    { "name": "no-deposit", "total": 120000, "held": 0, "apply": 0, "pay": 120000, "left": 0 },
+    { "name": "full-deposit", "total": 100000, "held": 100000, "apply": 100000, "pay": 0, "left": 0 },
+    { "name": "deposit-over-sale", "total": 80000, "held": 100000, "apply": 80000, "pay": 0, "left": 20000 },
+    { "name": "negative-held-is-zero", "total": 5000, "held": -300, "apply": 0, "pay": 5000, "left": 0 },
+    { "name": "zero-sale", "total": 0, "held": 700, "apply": 0, "pay": 0, "left": 700 }
+  ],
+  "money": [
+    { "name": "open-with-deposit", "status": "open", "foldReview": false, "deposits": 500000, "refunds": 0, "held": 500000, "review": false },
+    { "name": "cancelled-refunded", "status": "cancelled", "foldReview": false, "deposits": 500000, "refunds": 500000, "held": 0, "review": false },
+    { "name": "cancelled-not-refunded", "status": "cancelled", "foldReview": false, "deposits": 500000, "refunds": 0, "held": 500000, "review": true },
+    { "name": "delivered-and-refunded", "status": "delivered", "foldReview": false, "deposits": 500000, "refunds": 500000, "held": 0, "review": true },
+    { "name": "delivered-clean", "status": "delivered", "foldReview": false, "deposits": 500000, "refunds": 0, "held": 500000, "review": false },
+    { "name": "over-refund-held-zero", "status": "cancelled", "foldReview": false, "deposits": 500000, "refunds": 600000, "held": 0, "review": false },
+    { "name": "fold-review-wins", "status": "open", "foldReview": true, "deposits": 0, "refunds": 0, "held": 0, "review": true }
+  ],
+  "overdue": [
+    { "name": "open-past", "status": "open", "due": "2026-10-31", "today": "2026-11-01", "want": true },
+    { "name": "ready-past", "status": "ready", "due": "2026-10-01", "today": "2026-11-01", "want": true },
+    { "name": "due-today", "status": "open", "due": "2026-11-01", "today": "2026-11-01", "want": false },
+    { "name": "future", "status": "ready", "due": "2026-11-05", "today": "2026-11-01", "want": false },
+    { "name": "delivered-past", "status": "delivered", "due": "2026-10-01", "today": "2026-11-01", "want": false },
+    { "name": "cancelled-past", "status": "cancelled", "due": "2026-10-01", "today": "2026-11-01", "want": false },
+    { "name": "bad-date", "status": "open", "due": "soon", "today": "2026-11-01", "want": false }
+  ]
+}
