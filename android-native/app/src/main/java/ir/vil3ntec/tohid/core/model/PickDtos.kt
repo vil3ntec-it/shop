@@ -64,6 +64,63 @@ data class PickSheetDto(
   val progress: PickProgressDto = PickProgressDto(),
   val totals: PickTotalsDto = PickTotalsDto(),
   val labels: List<PickLabelDto> = emptyList(),
+  /** PCK-05: پیشنهادهای جایگزینِ این برگه (`forSheet` ِ سرور) */
+  val substitutions: List<PickSubstitutionDto> = emptyList(),
+)
+
+/** PCK-05 — یک پیشنهادِ جایگزین (`subView` ِ سرور)؛ مبلغ را فقط سرور می‌سازد */
+@Serializable
+data class PickSubstitutionDto(
+  val id: String = "",
+  val lineNo: Int = 0,
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val qtyMilli: Long = 0,
+  val shelfUnitPriceMinor: Long = 0,
+  val chargedUnitPriceMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val preference: String = "",
+  /** `pending` · `accepted` · `rejected` · `withdrawn` */
+  val status: String = "",
+  val deadlineAt: Long = 0,
+  val expired: Boolean = false,
+  val willApply: String? = null,
+)
+
+/** PCK-05/06 — دو جایگزینِ امنِ پیشنهادیِ سرور برای یک قلم (`GET …/pick/substitutes?lineNo=`) */
+@Serializable
+data class PickSuggestionDto(
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val brand: String = "",
+  val halal: String = "",
+  val shelfUnitPriceMinor: Long = 0,
+  val chargedUnitPriceMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val qtyMilli: Long = 0,
+  val needsScan: Boolean = false,
+)
+
+@Serializable
+data class PickSuggestionsDto(
+  val lineNo: Int = 0,
+  val preference: String = "",
+  val proposable: Boolean = true,
+  /** `category_unknown` ⇒ دستهٔ کالای اصل معلوم نیست و جایگزینِ امن ساخته نمی‌شود */
+  val reason: String = "",
+  val suggestions: List<PickSuggestionDto> = emptyList(),
+)
+
+@Serializable
+data class PickCustomerLinkDto(val link: String = "", val whatsappUrl: String = "")
+
+@Serializable
+data class PickProposedDto(
+  val substitution: PickSubstitutionDto = PickSubstitutionDto(),
+  val replayed: Boolean = false,
+  val customer: PickCustomerLinkDto = PickCustomerLinkDto(),
 )
 
 /** نتیجهٔ یک رویدادِ جمع‌آور */

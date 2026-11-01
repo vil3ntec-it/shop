@@ -91,4 +91,18 @@ object PickSubstitute {
 
   /** پس از مهلت: فقط «بهترین مشابه» ⇒ `accept`؛ بقیه ⇒ `reject` */
   fun timeoutDecision(preference: String): String = if (preference == "best_match") "accept" else "reject"
+
+  /**
+   *  آن‌چه برگهٔ جمع‌آور برای یک پیشنهاد نشان می‌دهد (`subView` ِ سرور): «در انتظار»، «پذیرفت»، «رد کرد»،
+   *  «پس گرفته شد»، و پس از مهلت آن‌چه اعمال **خواهد** شد (`will_accept`/`will_reject`). دکمهٔ «مشتری گفت …» فقط
+   *  برای `pending` است (همان `decide` ِ سرور که پس از مهلت `substitution_expired` می‌دهد).
+   */
+  fun shownState(status: String, expired: Boolean, willApply: String?): String = when {
+    status == "pending" && expired -> if (willApply == "accept") "will_accept" else "will_reject"
+    status in setOf("pending", "accepted", "rejected", "withdrawn") -> status
+    else -> "pending"
+  }
+
+  /** حلالِ کالا برای کادرِ انبارداری (`PUT /pick/products/:id`): «حلال»، «غیرحلال» یا «نامعلوم» (خالی) */
+  val HALAL_CHOICES: List<String> = listOf("halal", "non_halal", "")
 }
