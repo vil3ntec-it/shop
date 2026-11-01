@@ -17,6 +17,9 @@
  *                ۴۰۳ `subscription_*`.
  *   MARKET     — بازارچه (`market.js`): دکانِ بی اشتراک در فهرست و جست‌وجو نیست و ویترینش از
  *                بازارچه هم باز نمی‌شود.
+ *   STORE_LOOKUP — درِ بی `:slug` ِ ویترین (S3: `GET /api/store?id=<شناسهٔ عمومی>`، پرچمِ `market.public_id`):
+ *                با اشتراکِ فعال نشانیِ امروز را می‌دهد؛ پس از پایانِ اشتراک دقیقاً همان پاسخِ شناسهٔ
+ *                ناموجود (هیچ نشتی از بودنِ دکان یا وضعیتِ اشتراک)، هرگز ۲۰۰.
  * `/api/receipt` (فاکتورِ صندوقِ پایه) و `/api/visit` (تپشِ بازدید) کلیدِ پولی ندارند و این‌جا نیستند.
  */
 process.env.SYNC_V3_ENABLED = '1';
@@ -39,14 +42,20 @@ const CATEGORY = {
   'order-amend-store.js': 'STORE_PAID',        //  ORD-14: رضایتِ مشتری به ویرایشِ سفارش — همان ویترینِ پولی
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
-const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust'];
+/** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */
+const ROUTE_CATEGORY = { 'GET /store': 'STORE_LOOKUP' };
+const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust', 'market.public_id'];
 
 /** `${base}` ِ روترهای چت و شکایت همان ثابتِ `const base = '…'` ِ پرونده است. */
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';
 const publicRoutes = () => ['/store', '/courier', '/market'].flatMap((p) => inv.routes(p))
   .map((r) => (r.path.includes('${base}') ? { ...r, path: r.path.replace('${base}', baseOf(r.file)) } : r))
-  .map((r) => ({ ...r, key: `${r.method} ${r.path}`, cat: CATEGORY[r.file] }));
+  .map((r) => ({ ...r, key: `${r.method} ${r.path}` }))
+  .map((r) => ({ ...r, cat: ROUTE_CATEGORY[r.key] || CATEGORY[r.file] }));
 const code = (r) => r.body?.error?.code || '';
+/** STORE_LOOKUP با شناسهٔ عمومیِ همین دکان (یا شناسهٔ ناموجودِ هم‌شکل). */
+const lookup = (r, id) => { resetAll(); return h.api(r.method, `/api${r.path}?id=${id}`); };
+const UNKNOWN_PUBLIC_ID = '01ZZZZZZZZZZZZZZZZZZZZZZZZ';
 const urlOf = (r, slug) => `/api${r.path.replace(':slug', slug).replace(/:[A-Za-z_]+/g, 'x1')}`;
 const call = (r, slug) => { resetAll(); return h.api(r.method, urlOf(r, slug), { body: r.method === 'GET' ? null : {}, headers: { 'Idempotency-Key': `k-${newId('k')}` } }); };
 
@@ -133,7 +142,8 @@ async function paidStore(label) {
   const first = await assign(await order());
   assert.equal(first.status, 201, JSON.stringify(first.body));
   const spareOrder = await order();
-  return { token, shopId, subId: g.body.subscription.id, slug, word, courier, assignmentId: first.body.assignment.id, spareOrder, assign };
+  const publicId = (await query('SELECT public_id FROM storefronts WHERE shop_id = $1', [shopId])).rows[0].public_id;
+  return { token, shopId, subId: g.body.subscription.id, slug, publicId, word, courier, assignmentId: first.body.assignment.id, spareOrder, assign };
 }
 
 const setStatus = (s, status) => h.post(`/api/admin/subscriptions/${s.subId}/status`, { status }, { token: admin })
@@ -174,6 +184,10 @@ test('SUB-10: با اشتراکِ فعال ویترین، چت، شکایت، پ
     const res = await call(r, s.slug);
     if (code(res) === 'store_not_found' || /^subscription_/.test(code(res)) || res.status >= 500) bad.push(`${r.key} ⇒ ${res.status} ${code(res)}`);
   }
+  for (const r of publicRoutes().filter((x) => x.cat === 'STORE_LOOKUP')) {
+    const res = await lookup(r, s.publicId);
+    if (res.status !== 200 || res.body.slug !== s.slug) bad.push(`STORE_LOOKUP ${r.key} ⇒ ${res.status} ${code(res)}`);
+  }
   assert.deepEqual(bad, [], bad.join('\n'));
   assert.equal((await h.get(`/api/store/${s.slug}`)).status, 200);
   assert.deepEqual(await inMarket(s), { listed: true, found: true });
@@ -191,6 +205,13 @@ for (const [name, apply] of Object.entries(STATES)) {
     for (const r of publicRoutes().filter((x) => x.cat === 'STORE_PAID')) {
       const res = await call(r, s.slug);
       if (res.status !== 404 || code(res) !== 'store_not_found') bad.push(`STORE_PAID ${r.key} ⇒ ${res.status} ${code(res)}`);
+    }
+    //  ۱ب) STORE_LOOKUP: شناسهٔ عمومیِ دکانِ بسته همان پاسخِ شناسهٔ ناموجود
+    for (const r of publicRoutes().filter((x) => x.cat === 'STORE_LOOKUP')) {
+      const [res, none] = [await lookup(r, s.publicId), await lookup(r, UNKNOWN_PUBLIC_ID)];
+      if (res.status === 200 || res.status !== none.status || code(res) !== code(none)) {
+        bad.push(`STORE_LOOKUP ${r.key} ⇒ ${res.status} ${code(res)} (ناموجود: ${none.status} ${code(none)})`);
+      }
     }
     //  ۲) STORE_FREE: شکایت از دکانِ بی اشتراک هم ممکن است (§۳۸.۶)
     for (const r of publicRoutes().filter((x) => x.cat === 'STORE_FREE')) {

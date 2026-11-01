@@ -49,9 +49,21 @@ const locateLimit = rateLimit({
   key: (req) => `${clientIp(req)}|${String(req.params.slug || '').toLowerCase()}`,
 });
 
-/** ویترینِ روشن — یا ۴۰۴. پاسخ‌ها کش نمی‌شوند (قیمت و وضعیت زنده‌اند). */
+/**
+ * ویترینِ روشن — یا ۴۰۴. پاسخ‌ها کش نمی‌شوند (قیمت و وضعیت زنده‌اند).
+ * S3 (پرچمِ `market.public_id`): نشانیِ پیشینِ دکانی که نشانی‌اش را عوض کرده ⇒
+ * ۳۰۸ به همان مسیر با نشانیِ تازه (روش و بدنه می‌مانند). پرچمِ خاموش ⇒ همان ۴۰۴.
+ */
 const store = async (req, res, next) => {
-  req.store = await sf.open(req.params.slug);
+  try {
+    req.store = await sf.open(req.params.slug);
+  } catch (err) {
+    const moved = err && err.status === 404 ? await sf.movedTo(req.params.slug) : null;
+    if (!moved) throw err;
+    const location = `${req.baseUrl}${req.url.replace(/^\/[^/?]*/, `/${moved}`)}`;
+    res.set('Cache-Control', 'no-store').location(location);
+    return res.status(308).json({ error: { code: 'store_moved', message: 'نشانیِ این ویترین عوض شده است', slug: moved } });
+  }
   res.set('Cache-Control', 'no-store');
   next();
 };
@@ -68,14 +80,25 @@ const customer = async (req, res, next) => {
   next();
 };
 
+//  ── S3: ویترین با شناسهٔ عمومیِ پایدار — `/api/store?id=<ULID>` ⇒ نشانیِ امروز ──
+//  (پرچمِ خاموش، ویترینِ بسته یا شناسهٔ ناموجود ⇒ همان ۴۰۴ ِ امروزِ این نشانی)
+router.get('/', (req, res, next) => next(typeof req.query.id === 'string' ? undefined : 'route'), readLimit, async (req, res, next) => {
+  const hit = await sf.byPublicId(req.query.id);
+  if (!hit) return next();
+  res.set('Cache-Control', 'no-store').json(hit);
+});
+
 router.get('/:slug', readLimit, store, async (req, res) => {
-  const [cats, status, delivery, seo, media] = await Promise.all([
+  const [cats, status, delivery, seo, media, pid] = await Promise.all([
     sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
-    storeSeo.publicInfo(req.store), sfm.publicView(req.store),
+    storeSeo.publicInfo(req.store), sfm.publicView(req.store), sf.publicIdOn(req.store.shop_id),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
-    store: { ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery, media },
+    store: {
+      ...sf.profile(req.store, cats, status), payment: await pay.storefrontPayment(req.store.shop_id), delivery, media,
+      ...(pid ? { publicId: req.store.public_id } : {}),
+    },
     verification: { available: await sf.verificationAvailable() },
     //  پیوندِ «بازارچه» فقط وقتی بازارچه باز است (پرچمِ `market.directory`)
     market: { available: await require('../lib/market').directoryOn() },

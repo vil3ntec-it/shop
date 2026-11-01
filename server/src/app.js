@@ -510,14 +510,24 @@ async function createApp({ runMigrations = true } = {}) {
   //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
   const storeSeo = require('./lib/store-seo');
   const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
-  const storePage = async (slug, res, lang) => {
+  const storePage = async (slug, res, lang, onHost = false) => {
     let status = 200;
     let sf = null;
     try { sf = await storefront.open(slug); } catch (err) { if (err.status === 404) status = 404; else throw err; }
+    //  S3 (پرچمِ `market.public_id`): نشانیِ پیشین ⇒ نشانیِ تازهٔ همان دکان؛ خاموش ⇒ همان ۴۰۴
+    const moved = status === 404 ? await storefront.movedTo(slug) : null;
+    if (moved) {
+      return res.set('Cache-Control', 'no-store')
+        .redirect(301, onHost ? `//${moved}.${config.storefront.domain}/` : `/store/${moved}`);
+    }
     const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
     if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
     res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
   };
+  //  S3: پیوندِ پایدار (تبلیغ، API) — `/store?id=<ULID>` ⇒ نشانیِ امروز؛ نبود ⇒ همان راهِ امروز (پیش از static، که `/store` را به `/store/` می‌برد)
+  app.get('/store', (req, res, next) => (typeof req.query.id !== 'string' ? next()
+    : storefront.byPublicId(req.query.id).then((hit) => (hit
+      ? res.set('Cache-Control', 'no-store').redirect(302, `/store/${hit.slug}`) : next())).catch(next)));
   //  ویترینِ روشن با پرچمِ سئو ⇒ سقفِ درخواست و `fn(sf)`؛ وگرنه `next()` — همان ۴۰۴ ِ امروزِ
   //  نشانیِ ناشناخته (سقف هم فقط وقتی روشن است شمرده می‌شود، تا خاموش هیچ فرقی نکند)
   const seoOnly = (slugOf, fn) => (req, res, next) => {
@@ -560,7 +570,7 @@ async function createApp({ runMigrations = true } = {}) {
   app.get('/', (req, res, next) => {
     const slug = storefront.slugFromHost(req.hostname);
     if (!slug) return next();
-    storeHeaders(req, res, () => storePage(slug, res, req.query.lang).catch(next));
+    storeHeaders(req, res, () => storePage(slug, res, req.query.lang, true).catch(next));
   });
   // ---- بازارچه (WEB، §۲۳؛ پرچمِ `market.directory`) و کیتِ مشترکِ وبِ خریدار ----
   //  همان سرآیندهای سختِ ویترین (CSP بی unsafe-inline). بازارچهٔ خاموش ⇒ همان پوسته

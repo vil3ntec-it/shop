@@ -653,6 +653,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 
 - ۱۳۳ (`storefront_media`، بازار M3: لوگو و تصویرِ سرِ ویترین، شاخهٔ `claude/market-m3-media`).
+- ۱۳۱ (S3 ِ قراردادِ بازار، به جای ۱۲۲ که سهمِ شاخهٔ `claude/market-m4-m6` است: `storefronts.public_id` و `storefront_slug_redirects`؛ rollback در `server/migrations/rollback/`؛ شاخهٔ `claude/market-s3-public-id`).
 - ۱۸۰ (`store_customer_favorites` و `storefront_banners`، WEB-11 و WEB-24، `claude/new-web-3`؛ ۱۴۰۵/۰۸/۱۰ پس از سنجشِ main و همهٔ شاخه‌ها).
 - ۱۷۵ (`storefront_search_misses`، RPT-14، `claude/new-rpt-2`؛ ۱۴۰۵/۰۸/۱۰ پس از سنجشِ main و همهٔ شاخه‌های باز: ۱۷۴ از آنِ `claude/part-chk-1` است).
 - روی main (`server/migrations`، ۱۴۰۵/۰۷/۲۷): ۰۰۱–۰۵۰، ۰۵۵، ۰۶۰، ۰۶۵–۰۶۷، ۰۷۰، ۰۷۲–۰۷۳، ۰۷۷–۰۷۹، ۰۸۵–۰۹۰. در PRهای باز: ۰۸۰–۰۸۱ (#258)، ۰۸۲–۰۸۴ (#263)، ۰۹۳ (#287)، ۰۹۵ (#275)، ۰۹۷ (#273)، ۰۹۸ (#283؛ #284 همان فایل)، ۱۰۰–۱۰۱ (#270)، ۱۰۲ (#282؛ #273 همان فایل)، ۱۱۷ (#345)، ۱۱۹ (فاکتورِ نسخهٔ ۲، #369)، ۱۲۰ (دفترِ پیامک `sms_usage`، WP-2: OPS-09 و SEC-06)، ۱۲۱ (ORD-05). شکاف‌ها رزروِ کارهای دیگرند؛ شمارهٔ تازه فقط از سهمِ هماهنگ‌کننده.

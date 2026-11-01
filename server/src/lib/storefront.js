@@ -99,6 +99,7 @@ function normalize(s) {
 const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
 
 const { SEARCH_FLAG, SEARCH_KEY, searchWhere, plan: searchPlan, finish: searchFinish } = require('./storefront-search');   //  SRCH-01 و WEB-05/06 (شرح همان‌جا)
+const spid = require('./storefront-public-id')({ open, str, SLUG_RE });   //  S3: شناسهٔ عمومی و نشانیِ پیشین (شرح همان‌جا)
 function slugOf(v) {
   const s = str(v).toLowerCase();
   if (!SLUG_RE.test(s) || s.includes('--')) {
@@ -963,10 +964,9 @@ async function saveSettings(shopId, body, userId) {
     if (!v.accept_delivery && !v.accept_pickup) throw badRequest('دست‌کم یکی از ارسال یا دریافت از دکان', 'bad_fulfillment');
     if (v.enabled && !v.title) throw badRequest('برای روشن کردن، نامِ ویترین لازم است', 'title_required');
 
-    const taken = (await c.query('SELECT 1 FROM storefronts WHERE slug = $1 AND shop_id <> $2', [v.slug, shopId])).rows[0];
-    if (taken) throw conflict('این نشانی را دکانِ دیگری گرفته است', 'slug_taken');
-
     const at = now();
+    await spid.claimSlug(c, shopId, cur && cur.slug, v.slug, at);   //  slug_taken؛ S3: نشانیِ پیشین
+
     await c.query(
       `INSERT INTO storefronts (shop_id, slug, enabled, title, tagline, contact_phone, accent, notice, timezone,
          weekly_hours, closed_dates, accept_delivery, accept_pickup, delivery_fee_minor, min_order_minor,
@@ -1131,7 +1131,7 @@ function slugFromHost(host) {
 }
 
 module.exports = {
-  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI,
+  FLAG_KEY, FEATURE_KEY, SLUG_RE, RESERVED, SEARCH_FLAG, SEARCH_KEY, PRODUCT_ID_RE, MAX_CHECKOUT_LINES, MAX_QTY_MILLI, ...spid,
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
