@@ -103,6 +103,8 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("تأمین‌کنندگان") })
       }
       Spacer(Modifier.width(12.dp))
+      //  PUR-02/04: فقط با پرچمِ سرورِ `shop.purchase_orders` دیده می‌شود
+      PurchaseOrdersEntry(store, d, ::toast, Modifier.padding(end = 8.dp))
       Button(onClick = { editing = true }) { Text("+ فاکتورِ خریدِ تازه  Ctrl+N") }
     }
     Spacer(Modifier.height(12.dp))

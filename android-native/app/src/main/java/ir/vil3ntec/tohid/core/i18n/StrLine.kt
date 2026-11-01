@@ -1,7 +1,8 @@
 package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  قیمتِ ردیف در صندوق — تخفیفِ ردیف، «قاعدهٔ جهت» و سقفِ قلمِ آزاد (POS-08، POS-10، POS-20، POS-21).
+ *  قیمتِ ردیف در صندوق — تخفیفِ ردیف، «قاعدهٔ جهت» و سقفِ قلمِ آزاد (POS-08، POS-10، POS-20، POS-21)؛
+ *  با همین تنظیم تخفیفِ کلِ فاکتورِ کامپیوتر به مبلغ هم (POS-20).
  *  قاعده‌ها سرِ `I18n.kt`؛ ترجمه‌های نامطمئن در `docs/i18n-glossary.md`.
  */
 @Suppress("unused")
@@ -11,9 +12,9 @@ object StrLine {
   val section: String get() = t("قیمت و تخفیفِ ردیف", "Line prices and discounts", "د کرښې بیه او تخفیف")
   val sectionOn: String get() = t("با سقفِ تخفیف سنجیده می‌شود", "Checked against the discount limit", "د تخفیف له حد سره سنجول کېږي")
   val note: String get() = t(
-    "روشن: قیمتِ دستیِ پایین‌تر از قیمتِ کالا و تخفیفِ ردیف هم تخفیف‌اند و با همان سقفِ تخفیفِ هر نقش و «درخواستِ تأیید» سنجیده می‌شوند. «تغییرِ قیمت» و «سقفِ قلمِ آزاد» برای همه جز صاحبِ دکان است. فقط روی همین دستگاه.",
-    "On: a manual price below the item's price and a line discount are discounts too, checked against each role's discount limit and \"request approval\". \"Price change\" and \"custom item limit\" apply to everyone except the shop owner. This device only.",
-    "روښانه: د توکي له بیې ټیټه لاسي بیه او د کرښې تخفیف هم تخفیف دی او د هر رول د تخفیف له حد او «د تایید غوښتنې» سره سنجول کېږي. «د بیې بدلون» او «د آزاد توکي حد» پرته د دوکان له خاوند څخه په ټولو پلي کېږي. یوازې همدا وسیله.",
+    "روشن: قیمتِ دستیِ پایین‌تر از قیمتِ کالا و تخفیفِ ردیف هم تخفیف‌اند و با همان سقفِ تخفیفِ هر نقش و «درخواستِ تأیید» سنجیده می‌شوند. «تغییرِ قیمت» و «سقفِ قلمِ آزاد» برای همه جز صاحبِ دکان است. صندوقِ کامپیوتر تخفیفِ کلِ فاکتور را به مبلغ هم می‌گیرد. فقط روی همین دستگاه.",
+    "On: a manual price below the item's price and a line discount are discounts too, checked against each role's discount limit and \"request approval\". \"Price change\" and \"custom item limit\" apply to everyone except the shop owner. The computer till also takes an invoice discount as an amount. This device only.",
+    "روښانه: د توکي له بیې ټیټه لاسي بیه او د کرښې تخفیف هم تخفیف دی او د هر رول د تخفیف له حد او «د تایید غوښتنې» سره سنجول کېږي. «د بیې بدلون» او «د آزاد توکي حد» پرته د دوکان له خاوند څخه په ټولو پلي کېږي. د کمپیوټر صندوق د ټول بل تخفیف په اندازه هم اخلي. یوازې همدا وسیله.",
   )
   val direction: String get() = t("تغییرِ قیمتِ ردیف", "Changing a line price", "د کرښې د بیې بدلون")
   val dirBoth: String get() = t("هر دو", "Both ways", "دواړه")
@@ -32,6 +33,10 @@ object StrLine {
     "The discount becomes this line's unit price and is checked against your discount limit.",
     "تخفیف د همدې کرښې د هر واحد په بیه اوړي او ستاسو د تخفیف له حد سره سنجول کېږي.",
   )
+  // POS-19 — پلهٔ قیمتِ ثابت در فرمِ تخفیف
+  val tierFixedPrice: String get() = t("قیمتِ ثابت", "Fixed price", "ثابته بیه")
+  val tierUnitPrice: String get() = t("قیمتِ هر واحد (؋)", "Price per unit (؋)", "د هر واحد بیه (؋)")
+  fun tierUnitText(a: Any): String = t("$a ؋ هر واحد", "$a ؋ per unit", "$a ؋ د هر واحد")
   fun afterDiscount(a: Any): String = t("پس از تخفیف: $a ؋", "After discount: $a ؋", "له تخفیف وروسته: $a ؋")
 
   // رد

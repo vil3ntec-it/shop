@@ -16,7 +16,7 @@ import kotlin.math.floor
  *
  *  ورودی `JsonObject` است، نه `ShopData`: هسته به لایهٔ `data` وابسته
  *  نیست و فیلدهای تازه‌ای را هم می‌خواند که هنوز در مدل نیستند
- *  (`returns[].user`، `auditLog[].user`، `sales[].cancelledBy`، `channel`).
+ *  (`returns[].by|user`، `auditLog[].by|user`، `sales[].cancelledBy`، `channel`).
  *  برنامه: `ReportLedger.parse(json.encodeToJsonElement(ShopData.serializer(), d).jsonObject)`.
  */
 class ReportLedger private constructor() {
@@ -87,7 +87,8 @@ class ReportLedger private constructor() {
       raw.list("returns").forEach { r ->
         l.returns += Return(
           id = r.s("id"), saleId = r.s("saleId"), saleItemId = r.s("saleItemId"), productId = r.s("productId"),
-          qty = milli(r, "quantity"), amount = money(r, "amount"), user = r.s("user").trim(), approvedBy = r.s("approvedBy").trim(),
+          //  `by` همان فیلدِ `SaleReturn` ِ برنامه (جریانِ تازهٔ برگشت و «سابقهٔ ضدتقلب»)؛ `user` شکلِ دفترِ وب
+          qty = milli(r, "quantity"), amount = money(r, "amount"), user = r.s("by").ifEmpty { r.s("user") }.trim(), approvedBy = r.s("approvedBy").trim(),
           date = r.s("date"), createdAt = ms(r, "createdAt"),
         )
       }

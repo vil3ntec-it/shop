@@ -25,19 +25,23 @@ import java.io.FileOutputStream
  */
 object LabelSheetPrint {
 
-  fun print(context: Context, sheet: MonoImage, title: String) {
+  fun print(context: Context, sheet: MonoImage, title: String) = print(context, listOf(sheet), title)
+
+  /** چند برگه در یک کارِ چاپ (PRD-23: برچسبِ چند کالا، هر ۲۴ تا یک برگه) */
+  fun print(context: Context, sheets: List<MonoImage>, title: String) {
+    if (sheets.isEmpty()) return
     val manager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager ?: return
     val attrs = PrintAttributes.Builder()
       .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
       .setColorMode(PrintAttributes.COLOR_MODE_MONOCHROME)
       .setMinMargins(PrintAttributes.Margins.NO_MARGINS)
       .build()
-    manager.print(title, SheetAdapter(context.applicationContext, sheet, title), attrs)
+    manager.print(title, SheetAdapter(context.applicationContext, sheets, title), attrs)
   }
 
   private class SheetAdapter(
     private val context: Context,
-    private val sheet: MonoImage,
+    private val sheets: List<MonoImage>,
     private val title: String,
   ) : PrintDocumentAdapter() {
 
@@ -54,7 +58,7 @@ object LabelSheetPrint {
       attrs = newAttributes
       val info = PrintDocumentInfo.Builder("$title.pdf")
         .setContentType(PrintDocumentInfo.CONTENT_TYPE_PHOTO)
-        .setPageCount(1)
+        .setPageCount(sheets.size)
         .build()
       callback.onLayoutFinished(info, oldAttributes != newAttributes)
     }
@@ -67,21 +71,26 @@ object LabelSheetPrint {
     ) {
       val a = attrs ?: run { callback.onWriteFailed("اندازهٔ کاغذ معلوم نیست"); return }
       val pdf = PrintedPdfDocument(context, a)
-      val bitmap = ThermalPrinter.toBitmap(sheet)
       try {
-        val page = pdf.startPage(0)
-        val info = page.info
-        //  تمامِ صفحه — نه «جا شدن» در ناحیهٔ چاپی، تا اندازهٔ برچسب درست بماند
-        page.canvas.drawBitmap(bitmap, null, RectF(0f, 0f, info.pageWidth.toFloat(), info.pageHeight.toFloat()), null)
-        pdf.finishPage(page)
-        if (cancellationSignal?.isCanceled == true) { callback.onWriteCancelled(); return }
+        for ((index, sheet) in sheets.withIndex()) {
+          val bitmap = ThermalPrinter.toBitmap(sheet)
+          try {
+            val page = pdf.startPage(index)
+            val info = page.info
+            //  تمامِ صفحه — نه «جا شدن» در ناحیهٔ چاپی، تا اندازهٔ برچسب درست بماند
+            page.canvas.drawBitmap(bitmap, null, RectF(0f, 0f, info.pageWidth.toFloat(), info.pageHeight.toFloat()), null)
+            pdf.finishPage(page)
+          } finally {
+            bitmap.recycle()
+          }
+          if (cancellationSignal?.isCanceled == true) { callback.onWriteCancelled(); return }
+        }
         FileOutputStream(destination.fileDescriptor).use { pdf.writeTo(it) }
         callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
       } catch (e: Exception) {
         callback.onWriteFailed(e.message)
       } finally {
         pdf.close()
-        bitmap.recycle()
       }
     }
   }
