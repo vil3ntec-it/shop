@@ -61,3 +61,7 @@ p .rf-pill,.rf-note .rf-pill{cursor:default;}
   .rf-seg button{min-height:44px;}
   .rf-kpi .v,.rf-stat .v{font-size:17px;}
 }
+/* RSK-10: کادرِ هشدارِ صندوقدار در زبانهٔ ضدتقلب */
+.rf-alerts{border:1px solid var(--danger); border-radius:10px; padding:8px 12px; margin:0 0 12px;}
+.rf-alerts-title{font-weight:600; color:var(--danger); margin:0 0 4px;}
+.rf-alerts ul{margin:0 0 6px; padding-inline-start:18px;}
