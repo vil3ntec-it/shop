@@ -245,6 +245,62 @@ class ReportEngineTest {
     assertEquals(900 * 200.0 + 1000 * 400.0, ReportEngine.products(d).inventoryValue, 0.0)
   }
 
+  /* --------------------- تحلیلِ موجودی (INV-15، INV-16) --------------------- */
+
+  @Test
+  fun `تحلیل موجودی ارزش به بها و به فروش و سود بالقوه را از core می گیرد`() {
+    val d = sell(ledger(), "p1", 100.0, "2026-08-10").data
+    val s = ReportEngine.stockInsight(d, "2026-08-01", "2026-08-31")
+    //  ۹۰۰ برنج و ۱۰۰۰ روغن، به پولِ خرد (صدمِ افغانی)
+    assertEquals((900 * 200 + 1000 * 400) * 100L, s.valuation.costMinor)
+    assertEquals((900 * 300 + 1000 * 500) * 100L, s.valuation.retailMinor)
+    assertEquals((900 * 100 + 1000 * 100) * 100L, s.valuation.potentialProfitMinor)
+    assertTrue(s.valuation.complete)
+    //  جدولِ کامپیوتر/اکسل همان عددها را ردیف به ردیف دارد
+    val sheet = ReportCsv.of("insight", d, "2026-08-01", "2026-08-31", "2026-08-31")
+    assertEquals("ردهٔ ABC", sheet.rows[0][3])
+    assertEquals(listOf("برنج", "A", "30000", "100.0٪", "180000", "270000"), sheet.rows[1].let { listOf(it[1], it[3], it[4], it[5], it[8], it[9]) })
+    assertEquals(listOf("روغن", "C", "0", "400000", "500000"), sheet.rows[2].let { listOf(it[1], it[3], it[4], it[8], it[9]) })
+  }
+
+  @Test
+  fun `تحلیل ABC فقط فروش خالص همان بازه را می شمارد و لغوشده را نه`() {
+    var d = sell(ledger(), "p1", 10.0, "2026-08-10").data            // ۳۰۰۰ برنج در بازه
+    d = sell(d, "p2", 1.0, "2026-08-11").data                       // ۵۰۰ روغن در بازه
+    d = sell(d, "p2", 100.0, "2026-07-01").data                     // بیرون از بازه
+    val cancelled = sell(d, "p2", 50.0, "2026-08-12")
+    d = cancelled.data.copy(sales = cancelled.data.sales.map { if (it.id == cancelled.saleId) it.copy(status = "cancelled") else it })
+    val s = ReportEngine.stockInsight(d, "2026-08-01", "2026-08-31")
+    assertEquals(listOf("p1", "p2"), s.rows.map { it.product.id })
+    assertEquals(3000.0, s.rows[0].sales, 0.0)
+    assertEquals(500.0, s.rows[1].sales, 0.0)
+    assertEquals(ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.A, s.rows[0].abc)  // ۸۶٪ ⇒ A
+    assertEquals(ir.vil3ntec.tohid.core.stock.StockAnalysis.Abc.B, s.rows[1].abc)  // پیش از آن ۸۶٪ (زیرِ ۹۵٪) ⇒ B
+    assertEquals(3_500L * 100, s.abc.totalMinor)
+  }
+
+  @Test
+  fun `تحلیل موجودی موجودی منفی و کالای بی قیمت خرید را جدا نشان می دهد`() {
+    val noCost = Product(id = "p3", name = "صابون", unit = "عدد", purchasePrice = 0.0, salePrice = 50.0)
+    //  روغن: ۱۰۰۰ ورود، همه فروخته، سپس اصلاحِ «−۱» ⇒ موجودیِ منفی (مثلِ فروشِ آفلاینِ بیش از موجودی)
+    val d1 = ledger().let {
+      it.copy(
+        products = it.products + noCost,
+        warehouseEntries = it.warehouseEntries + WarehouseEntry(id = "w3", productId = "p3", units = 10.0),
+      )
+    }
+    val sold = sell(d1, "p2", 1000.0, "2026-08-10").data
+    val d = sold.copy(warehouseEntries = sold.warehouseEntries + WarehouseEntry(id = "w4", productId = "p2", units = -1.0, isAdjustment = true))
+    val s = ReportEngine.stockInsight(d, "2026-08-01", "2026-08-31")
+    assertEquals(listOf("p2"), s.valuation.negative)
+    assertEquals(listOf("p3"), s.valuation.missingCost)
+    assertEquals(listOf("صابون"), s.names(s.valuation.missingCost))
+    //  روغنِ منفی در هیچ جمعی نیست؛ صابونِ بی بها فقط در ارزشِ فروش
+    assertEquals(1000 * 200 * 100L, s.valuation.costMinor)
+    assertEquals((1000 * 300 + 10 * 50) * 100L, s.valuation.retailMinor)
+    assertEquals(1000 * 100 * 100L, s.valuation.potentialProfitMinor)
+  }
+
   /* --------------------------- قرض‌داران --------------------------- */
 
   @Test

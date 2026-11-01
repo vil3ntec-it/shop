@@ -15,6 +15,7 @@ import ir.vil3ntec.tohid.core.pay.ShiftCore
 import ir.vil3ntec.tohid.core.pay.ShiftEventInput
 import ir.vil3ntec.tohid.core.pay.ShiftReport
 import ir.vil3ntec.tohid.core.pay.ShiftRow
+import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.Tender
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -522,6 +523,22 @@ object PayFlow {
       r.needsReview?.let { put("needsReview", it) }
       r.blind?.let { put("blind", it) }
     }
+  }
+
+  /**
+   *  ⛔ PAY-13 — متنِ خطِ سابقهٔ یک بستن برای همین بیننده. شاگرد (بی حقِ دیدنِ «مورد انتظار») هرگز `notes` را
+   *  نمی‌بیند: متنِ بستنِ مدیر و بستن‌های پیش از نسخهٔ ۳ «مورد انتظار» و «اختلاف» را دارند، و دلیلِ اختلاف هم
+   *  یعنی «شمارش نخواند». برای او فقط شمرده‌ها از Zِ ذخیره‌شده از راهِ `ShiftSlip.forViewer` (بی Z همان `amount` ِ
+   *  ردیف = نقدِ شمرده)، کور بودن و نامِ بندنده. صاحب و مدیر همان `notes`.
+   */
+  fun closeNote(row: AuditEntry, seesExpected: Boolean): String {
+    if (seesExpected) return row.notes
+    val z = row.z?.let(::reportOf)?.let { ShiftSlip.forViewer(it, seesExpected = false) }
+    val counted = z?.counted?.takeIf { it.isNotEmpty() }?.entries
+      ?.joinToString("، ") { (id, v) -> "${methodName(id)} ${ir.vil3ntec.tohid.money(major(v))}" }
+      ?: "${methodName(CASH)} ${ir.vil3ntec.tohid.money(row.amount)}"
+    val who = row.by?.trim()?.takeIf { it.isNotEmpty() }?.let { " — $it" }.orEmpty()
+    return "بستنِ صندوق" + (if (z?.blind == true) " (شمارشِ کور)" else "") + " — شمرده: " + counted + who
   }
 
   /** Zِ ذخیره‌شده (از هر دستگاه) ⇒ گزارش؛ `null` اگر خوانا نیست */

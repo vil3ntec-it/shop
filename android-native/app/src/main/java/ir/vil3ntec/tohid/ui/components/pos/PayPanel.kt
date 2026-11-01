@@ -308,6 +308,8 @@ fun PayPanelDialog(
   target: Dp,
   onDismiss: () -> Unit,
   onConfirm: (Settlement) -> Unit,
+  /** PAY-21: درگاه‌ها (حساب‌پی) برای باقی‌ماندهٔ همین پنل — فقط با پرچمِ سرور و نت دیده می‌شوند */
+  gateways: GatewayHook? = null,
 ) {
   val state = remember { PayPanelState() }
   val cashFocus = remember { FocusRequester() }
@@ -334,6 +336,10 @@ fun PayPanelDialog(
         )
         Spacer(Modifier.height(10.dp))
         PaySplitSection(state, total, customerId, customerName, target, cashFocus, ::submit)
+        if (gateways != null) CheckoutGateways(
+          hook = gateways, total = total, panel = state, customerId = customerId, enabled = true, busy = busy,
+          onPaid = onConfirm, modifier = Modifier.padding(top = 8.dp),
+        )
         error?.let {
           Spacer(Modifier.height(4.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)

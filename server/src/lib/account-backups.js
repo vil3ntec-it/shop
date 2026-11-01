@@ -224,7 +224,10 @@ function build(T) {
     //  (۲.۱۱.۲۲). کامپیوترِ تازه یا نصبِ دوباره دفترِ خالی یا نیمه‌اش را هر شش
     //  ساعت می‌فرستاد؛ «تازه‌ترین N» همه همان نسخه‌های کوچک می‌شدند و پشتیبانی
     //  که دادهٔ واقعی را داشت از ته پاک می‌شد. حجمِ فایلِ SQLite با داده بالا
-    //  می‌رود، پس بزرگ‌ترین همان پُرترین است. فقط تا جایی که در سهم جا شود.
+    //  می‌رود، پس بزرگ‌ترین همان پُرترین است.
+    //  ⛔ حتی اگر در سهم جا نشود (SEC-DATA-06): پشتیبانِ پُرِ دورهٔ اشتراک از سهمِ
+    //  رایگان بزرگ‌تر است و با نخستین نسخهٔ کوچکِ پس از پایانِ اشتراک پاک می‌شد —
+    //  پاک شدنِ خودکارِ دادهٔ کاربر با پایانِ اشتراک. سهم حداکثر یک فایل (≤ maxBytes) جلو می‌افتد.
     let largest = null;
     for (const r of rows) if (!largest || Number(r.bytes) > Number(largest.bytes)) largest = r;
     for (let i = 0; i < rows.length; i++) {
@@ -233,8 +236,7 @@ function build(T) {
           && (i >= tier.keep || used + Number(row.bytes) > tier.quotaBytes)) {
         cutting = true;
       }
-      if (cutting && largest && row.id === largest.id
-          && used + Number(row.bytes) <= tier.quotaBytes) {
+      if (cutting && largest && row.id === largest.id) {
         used += Number(row.bytes);
         continue;
       }

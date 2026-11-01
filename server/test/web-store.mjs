@@ -41,7 +41,7 @@ process.env.OTP_RESEND_SECONDS = '0';
 process.env.OTP_UNIFORM_MS = '0';
 
 const { createApp } = require('../src/app');
-const { query, one, newId, now, closeDb } = require('../src/db');
+const { query, one, many, newId, now, closeDb } = require('../src/db');
 const migrate = require('../src/migrate');
 const pw = require('../src/lib/password');
 
@@ -89,6 +89,10 @@ const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner',
 ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
 ok(pushed.status === 200, 'کالاها از راهِ همگام‌سازیِ واقعی رسیدند');
 for (const id of ['rice', 'oil']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
+//  WEB-16: عکسِ همگام‌شدهٔ برنج — کارت و سبد نسخهٔ کوچک (`/thumb`)، برگهٔ کالا اندازهٔ نمایش (`/photo`)
+const ricePhoto = await call('PUT', '/api/sync/v1/photos/rice', { data: require('./image-fixtures').jpeg(320, 320, { seed: 9 }).toString('base64') },
+  T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+ok(ricePhoto.status === 200, 'عکسِ برنج همگام شد', JSON.stringify(ricePhoto.body).slice(0, 80));
 
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome' }).catch(() => chromium.launch());
 const errors = [];
@@ -115,6 +119,19 @@ ok((await page.locator('#products li[data-id]').count()) === 2, 'فقط دو ک�
 //  ۳۲.۳: موجودیِ نامعلوم هرگز «موجود» نیست؛ «در حال بررسی» یک بار بالای کاتالوگ، نه روی هر کارت
 ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')).includes('موجودی در حال بررسی است')
   && !/(^|[\s،.])موجود([\s،.]|$)/.test(await page.textContent('#products')), 'موجودیِ نامعلوم «موجود» گفته نمی‌شود (۳۲.۳)');
+
+{
+  const sel = '#products li[data-id="rice"] img';
+  await page.waitForFunction((q) => { const i = document.querySelector(q); return Boolean(i && i.complete && i.naturalWidth > 0); }, sel, { timeout: 5000 }).catch(() => {});
+  const img = await page.$eval(sel, (i) => ({ src: i.getAttribute('src'), lazy: i.getAttribute('loading'), w: i.naturalWidth }));
+  ok(/\/products\/rice\/thumb$/.test(img.src) && img.lazy === 'lazy' && img.w > 0, 'کارت: نسخهٔ کوچک (thumb) با بارگذاریِ تنبل (WEB-16)', JSON.stringify(img));
+  await page.evaluate(() => { location.hash = '#/p/rice'; });
+  await page.waitForSelector('#ps-img img', { timeout: 5000 });
+  const big = await page.getAttribute('#ps-img img', 'src');
+  ok(/\/products\/rice\/photo$/.test(big), 'برگهٔ کالا: اندازهٔ نمایش (photo) (WEB-16)', big);
+  await page.evaluate(() => { location.hash = '#/'; });
+  await page.waitForFunction(() => !document.querySelector('#product-sheet.open, #product-sheet[open]'), null, { timeout: 5000 }).catch(() => {});
+}
 
 for (const w of [320, 360, 768, 1280]) {
   await page.setViewportSize({ width: w, height: 760 });
@@ -307,6 +324,150 @@ for (const lang of ['fa', 'en']) {
   await rp.waitForSelector('#products li[data-id]', { timeout: 15000 });
   ok(n === 2 && (await rp.textContent('#stock-note')).includes('Stock is being checked'), 'واژه‌نامه پس از یک شکست، با بارِ دوم آمد', `${n} درخواست`);
   await rc.close();
+}
+
+//  ── E2E-MKT-02: موجودیِ کم هنگامِ ثبت (۴۰۹ ِ out_of_stock) — دکانِ دوم با موجودیِ دفتر ──
+//  پرچمِ shop.storefront.stock_list خاموش ⇒ همان پیامِ پیشینِ سرور؛ روشن ⇒ همهٔ قلم‌های کم، هر کدام با مقدارِ
+//  موجود و «کم کن به …»؛ تا مشتری کم نکند «ثبت» بسته است و هیچ سفارشی بی‌صدا با مقدارِ دیگر ثبت نمی‌شود.
+{
+  const em2 = 'stock@store.local';
+  const r1 = await call('POST', '/api/auth/register/start', { name: 'صاحبِ دوم', email: em2, password });
+  const r2 = await call('POST', '/api/auth/register/verify', { email: em2, code: r1.body.devCode });
+  const T = (await call('POST', '/api/auth/register/complete', { ticket: r2.body.ticket, name: 'صاحبِ دوم', password,
+    device: { deviceId: 'dev-owner-2', name: 'تست', platform: 'test' }, app: 'shop', terms: { accepted: true } })).body.accessToken;
+  const sid = (await call('POST', '/api/shop', { name: 'دکانِ موجودی' }, T)).body.shop.id;
+  const flag = (key, value) => call('PUT', '/api/admin/pump/live-config', { scope: sid, key, value }, A);
+  for (const key of ['shop.orders', 'shop.storefront', 'shop.catalog']) await flag(key, true);
+  const sslug = 'stock-store';
+  await call('PUT', '/api/shop/storefront', { slug: sslug, enabled: true, title: 'ویترینِ موجودی', contactPhone: '0700000002', minOrderMinor: 0 }, T);
+  const sop = (table, row, fields) => ({ op_id: `op-${row}-${Date.now()}`, ts: Date.now(), table, row_id: row, type: 'insert', fields });
+  const pr = (row, name) => sop('products', row, { name, unit: 'دانه', salePrice: 50, purchasePrice: 40, active: true, barcodes: [], createdAt: Date.now() });
+  const en = (row, pid, units) => sop('warehouseEntries', row, { productId: pid, units, cartons: 0, perCarton: 0, unit: 'دانه', price: 40, createdAt: Date.now() });
+  const sp = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner-2', schema_version: 2, ops: [
+    pr('tea', 'چای'), pr('salt', 'نمک'), en('tea-e', 'tea', 2), en('salt-e', 'salt', 1),
+  ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner-2' });
+  ok(sp.status === 200, 'دکانِ موجودی: کالا و ورودِ انبار رسید', JSON.stringify(sp.body).slice(0, 160));
+  for (const id of ['tea', 'salt']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true }, T);
+
+  const sc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const sg = await sc.newPage();
+  sg.on('pageerror', (e) => errors.push(String(e)));
+  sg.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  const toCheckout = async () => {
+    await sg.goto(`${base}/store/${sslug}#/checkout`);
+    await sg.reload();   //  همان نشانی با # بار نمی‌شود؛ پرچمِ تازه فقط با بارِ دوباره
+    await sg.waitForSelector('#view-checkout:not([hidden])', { timeout: 15000 });
+    await sg.check('input[name="fulfillment"][value="pickup"]');
+    await sg.fill('#c-name', 'مشتریِ موجودی');
+  };
+  await sg.goto(`${base}/store/${sslug}`);
+  await sg.waitForSelector('#products li[data-id="tea"]', { timeout: 15000 });
+  for (const [id, n] of [['tea', 3], ['salt', 2]]) {
+    for (let i = 0; i < n; i++) await sg.locator(`#products li[data-id="${id}"] .p-add`).click();
+  }
+  await toCheckout();
+  await sg.fill('#c-phone', '0791112244');
+  await sg.click('#verify-send');
+  await sg.waitForSelector('#verify-code-row:not([hidden])', { timeout: 10000 });
+  await sg.fill('#v-code', ((await sg.textContent('#verify-msg')).match(/(\d{4,8})/) || [])[1] || '');
+  await sg.click('#verify-check');
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+
+  //  خاموش: همان پیامِ یک‌قلمیِ سرور، بی «کم کن»
+  await sg.click('#submit-order');
+  await sg.waitForFunction(() => /موجود/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });
+  const offMsg = await sg.textContent('#checkout-msg');
+  ok(!(offMsg.includes('چای') && offMsg.includes('نمک')) && (await sg.locator('#cart-lines .fit').count()) === 0,
+    'E2E-MKT-02 خاموش: همان پیامِ پیشینِ سرور', offMsg);
+
+  //  روشن: فهرستِ هر دو قلم با مقدارِ موجود؛ «ثبت» تا کم کردن بسته
+  ok(!('features' in (await call('GET', `/api/store/${sslug}`)).body), 'E2E-MKT-02 خاموش: پاسخِ ویترین همان پیشین، بی کلیدِ features');
+  await flag('shop.storefront.stock_list', true);
+  ok((await call('GET', `/api/store/${sslug}`)).body.features?.stockList === true, 'E2E-MKT-02 روشن: features.stockList');
+  await toCheckout();
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+  await sg.click('#submit-order');
+  await sg.waitForFunction(() => document.querySelectorAll('#cart-lines .fit').length === 2, null, { timeout: 10000 });
+  const onMsg = await sg.textContent('#checkout-msg');
+  ok(onMsg.includes('چای') && onMsg.includes('نمک') && onMsg.includes('فقط ۲') && onMsg.includes('فقط ۱'),
+    'E2E-MKT-02 روشن: همهٔ قلم‌های کم با مقدارِ موجود', onMsg);
+  ok(await sg.isDisabled('#submit-order'), 'E2E-MKT-02: تا مشتری مقدار را کم نکند «ثبت» بسته است');
+  ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [sid])).n === 0, 'E2E-MKT-02: هیچ سفارشی بی‌صدا ثبت نشد');
+  await sg.locator('#cart-lines .fit').first().click();
+  ok(await sg.isDisabled('#submit-order') && (await sg.locator('#cart-lines .fit').count()) === 1, 'E2E-MKT-02: یک قلم ماند، «ثبت» هنوز بسته');
+  await sg.locator('#cart-lines .fit').first().click();
+  await sg.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 5000 });
+  await sg.click('#submit-order');
+  await sg.waitForSelector('#view-order:not([hidden])', { timeout: 10000 });
+  const placed = await many(`SELECT l.product_id, l.qty_milli FROM online_order_lines l JOIN online_orders o ON o.id = l.order_id
+    WHERE o.shop_id=$1 ORDER BY l.product_id`, [sid]);
+  ok(JSON.stringify(placed.map((r) => [r.product_id, Number(r.qty_milli)])) === JSON.stringify([['salt', 1000], ['tea', 2000]]),
+    'E2E-MKT-02: سفارش با همان مقدارِ پذیرفته‌شدهٔ مشتری ثبت شد', JSON.stringify(placed));
+  await sc.close();
+}
+
+//  ── WEB-18: عدد و تم ── رقمِ فارسی در قیمت‌ها؛ کلیدِ تم تیره/روشن را عوض می‌کند و پس از
+//  بارِ دوباره می‌ماند؛ بی انتخاب، تمِ سیستم (prefers-color-scheme) پیروی می‌شود
+{
+  const luminance = (pg) => pg.evaluate(() => {
+    const m = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g).map(Number);
+    const lin = (c) => { const s = c / 255; return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+    return 0.2126 * lin(m[0]) + 0.7152 * lin(m[1]) + 0.0722 * lin(m[2]);
+  });
+  const theme = (pg) => pg.evaluate(() => document.documentElement.getAttribute('data-theme'));
+  const tc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: 'light' });
+  const tp = await tc.newPage();
+  tp.on('pageerror', (e) => errors.push(String(e)));
+  await tp.goto(`${base}/store/${slug}`);
+  await tp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  const prices = await tp.$$eval('#products li[data-id] .p-price', (xs) => xs.map((x) => x.textContent).join(' '));
+  ok(/[۰-۹]/.test(prices) && !/[0-9]/.test(prices), 'رقمِ قیمت‌ها فارسی (fa-AF)، بی رقمِ لاتین (WEB-18)', prices.slice(0, 60));
+  const light = await luminance(tp);
+  ok((await theme(tp)) === 'light' && light > 0.6, 'تمِ روشنِ سیستم ⇒ زمینهٔ روشن (WEB-18)', `L=${light.toFixed(2)}`);
+  await tp.click('[data-act="theme"]');
+  const darkL = await luminance(tp);
+  ok((await theme(tp)) === 'dark' && darkL < 0.1, 'کلیدِ تم ⇒ تیره (WEB-18)', `L=${darkL.toFixed(2)}`);
+  await tp.reload();
+  await tp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await theme(tp)) === 'dark' && (await luminance(tp)) < 0.1, 'تمِ برگزیده پس از بارِ دوباره می‌ماند (WEB-18)');
+  await tp.click('[data-act="theme"]');
+  ok((await theme(tp)) === 'light', 'کلیدِ تم ⇒ دوباره روشن (WEB-18)');
+  await tc.close();
+  const dc = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'fa-AF', colorScheme: 'dark' });
+  const dp = await dc.newPage();
+  dp.on('pageerror', (e) => errors.push(String(e)));
+  await dp.goto(`${base}/store/${slug}`);
+  await dp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok((await theme(dp)) === 'dark' && (await luminance(dp)) < 0.1, 'تمِ تیرهٔ سیستم ⇒ ویترینِ تیره (WEB-18)');
+  await dc.close();
+}
+
+//  ── WEB-15 (۳.۱۰): کلِ بارِ اول ≤ ۵۰۰KB و CLS ≤ ۰٫۱ — قطعی و بی وابستگی به سرعتِ ماشینِ CI.
+//  (LCP/INP و امتیازِ Lighthouse این‌جا سنجیده نمی‌شوند: روی ماشینِ مشترکِ CI ناپایدارند.)
+{
+  const wc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const wp = await wc.newPage();
+  wp.on('pageerror', (e) => errors.push(String(e)));
+  await wp.addInitScript(() => {
+    window.__cls = 0;
+    try {
+      new PerformanceObserver((l) => { for (const e of l.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; })
+        .observe({ type: 'layout-shift', buffered: true });
+    } catch { /* مرورگرِ بی layout-shift */ }
+  });
+  const bytes = new Map();
+  wp.on('response', async (r) => {
+    try { bytes.set(r.url(), (await r.body()).length); } catch { /* بدنه نداشت (۳۰۴/ریدایرکت) */ }
+  });
+  await wp.goto(`${base}/store/${slug}`, { waitUntil: 'networkidle' });
+  await wp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await wp.evaluate(() => document.fonts.ready);
+  await wp.waitForTimeout(300);
+  const total = [...bytes.values()].reduce((s, n) => s + n, 0);
+  ok(total > 0 && total <= 500 * 1024, 'کلِ بارِ اولِ ویترین ≤ ۵۰۰KB (۳.۱۰، WEB-15)', `${total} بایت در ${bytes.size} پاسخ`);
+  const cls = await wp.evaluate(() => window.__cls);
+  ok(cls <= 0.1, 'جابه‌جاییِ چیدمان (CLS) ≤ ۰٫۱ (۳.۱۰، WEB-15)', cls.toFixed(3));
+  await wc.close();
 }
 
 await page.goto(`${base}/store/no-such-store`);
