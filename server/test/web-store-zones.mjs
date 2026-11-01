@@ -74,9 +74,11 @@ ok(put.status === 200, 'ویترین ساخته و روشن شد', JSON.stringif
 const pushed = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
   { op_id: `op-rice-${Date.now()}`, ts: Date.now(), table: 'products', row_id: 'rice', type: 'insert',
     fields: { name: 'برنج', unit: 'دانه', salePrice: 300, category: 'خوراکی', active: true } },
+  { op_id: `op-oil-${Date.now()}`, ts: Date.now(), table: 'products', row_id: 'oil', type: 'insert',
+    fields: { name: 'روغن', unit: 'دانه', salePrice: 300, category: 'خوراکی', active: true } },
 ] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
 ok(pushed.status === 200, 'کالا از راهِ همگام‌سازیِ واقعی رسید');
-await call('PUT', '/api/shop/storefront/products/rice', { published: true, onlinePriceMinor: null, maxQtyMilli: null }, T);
+for (const id of ['rice', 'oil']) await call('PUT', `/api/shop/storefront/products/${id}`, { published: true, onlinePriceMinor: null, maxQtyMilli: null }, T);
 
 const INSIDE = { latitude: 34.53, longitude: 69.17 };
 const OUTSIDE = { latitude: 35.2, longitude: 70.4 };
@@ -179,6 +181,51 @@ const addr = typeof row.address === 'string' ? JSON.parse(row.address) : row.add
 ok(Number(row.delivery_fee_minor) === 3000 && Number(row.total_minor) === 93000, 'ثبت ⇒ همان هزینهٔ ناحیهٔ سرور (۳۰) و جمعِ ۹۳۰',
   `${row.delivery_fee_minor} / ${row.total_minor}`);
 ok(addr && addr.zone && addr.zone.name === 'کارته‌سه' && addr.zone.source === 'customer', 'ناحیهٔ برگزیده ⇒ `source: customer`', JSON.stringify(addr && addr.zone));
+
+//  CHK-24: صفحهٔ پیگیری ⇐ «دستورِ تحویل» تا پیش از ارسال (پرچمِ `shop.orders.delivery_prefs`)؛ پس از حرکت بسته
+await flag('shop.orders.delivery_prefs', true);
+const first = await one('SELECT id FROM online_orders WHERE shop_id = $1 ORDER BY created_at LIMIT 1', [shopId]);
+const firstToken = require('../src/lib/storefront').tokenOf(shopId, first.id);
+//  همان نشانیِ صفحهٔ کنونی است (پس از ثبت) ⇒ بارِ دوباره تا پرچمِ تازه دیده شود
+await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(firstToken)}`);
+await page.reload();
+await page.waitForSelector('#o-prefs:not([hidden])', { timeout: 15000 });
+ok(!(await page.isChecked('#op-call')) && await page.isEnabled('#op-save'), 'CHK-24: دستورِ تحویل پیش از ارسال ویرایش‌پذیر است');
+await page.check('#op-call');
+await page.fill('#op-leave', 'دربان');
+await page.click('#op-save');
+await page.waitForFunction(() => /ثبت شد/.test(document.getElementById('op-msg').textContent), null, { timeout: 10000 });
+const dl = await one('SELECT delivery FROM online_orders WHERE id = $1', [first.id]);
+const dj = typeof dl.delivery === 'string' ? JSON.parse(dl.delivery) : dl.delivery;
+ok(dj.callBeforeArrival === true && dj.leaveWith === 'دربان', 'دستورِ تازه همان سفارشِ سرور است', JSON.stringify(dj));
+for (const to of ['accepted', 'picking', 'packed', 'out_for_delivery']) {
+  const tr = await call('POST', `/api/shop/orders/${first.id}/transition`, { to }, T);
+  if (tr.status !== 200) ok(false, `گذارِ ${to}`, JSON.stringify(tr.body));
+}
+await page.reload();
+await page.waitForSelector('#o-prefs:not([hidden])', { timeout: 15000 });
+await page.waitForFunction(() => /بیرون رفته/.test(document.getElementById('op-msg').textContent), null, { timeout: 10000 });
+ok(await page.isDisabled('#op-save') && await page.isChecked('#op-call'), 'پس از حرکت: همان دستور دیده می‌شود ولی بسته است');
+
+//  CHK-17/S32: فیِ دو قلم عوض شد ولی جمع همان ماند (۳۰۰ + ۳۰۰ ⇐ ۳۵۰ + ۲۵۰) ⇒ پیش از ثبت گفته می‌شود
+await open();
+for (const id of ['rice', 'oil']) await page.locator(`#products li[data-id="${id}"] .p-add`).first().click();
+await toCheckout();
+await page.check('input[name="fulfillment"][value="pickup"]');
+ok((await text('#t-total')).includes('۶۰۰'), 'سبدِ تازه ۶۰۰', await text('#t-total'));
+const re = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
+  { op_id: `op-rice-up-${Date.now()}`, ts: Date.now(), table: 'products', row_id: 'rice', type: 'update', fields: { salePrice: 350 } },
+  { op_id: `op-oil-dn-${Date.now()}`, ts: Date.now(), table: 'products', row_id: 'oil', type: 'update', fields: { salePrice: 250 } },
+] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+ok(re.status === 200, 'قیمتِ دو کالا در دفترِ دکان عوض شد (جمع همان)');
+const before = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n;
+await page.click('#submit-order');
+await page.waitForFunction(() => /برنج/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });
+ok((await text('#checkout-msg')).includes('۳۵۰') && (await text('#checkout-msg')).includes('۲۵۰'), 'CHK-17: تغییرِ فیِ هر دو قلم پیش از ثبت دیده شد', await text('#checkout-msg'));
+ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === before, 'بی پذیرش هیچ سفارشی ثبت نشد');
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === before + 1, 'پس از پذیرشِ برگهٔ تازه، ثبت شد');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));

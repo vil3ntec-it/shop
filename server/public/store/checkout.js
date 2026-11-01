@@ -158,7 +158,8 @@
       var body = {
         fulfillment: f, paymentMethod: 'cod',
         customer: { name: $('c-name').value.trim(), phone: $('c-phone').value.trim() },
-        lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }),
+        //  CHK-17/S32: فیِ هر قلم که مشتری دید — ناهمخوان ⇒ ۴۰۹ `price_changed` حتی اگر جمع از قضا برابر بماند
+        lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor }; }),
         note: $('c-note').value.trim(),
         expectedTotalMinor: subtotal() + feeFor(f),
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان

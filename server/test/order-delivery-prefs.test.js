@@ -278,9 +278,20 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   const staffView = async () => (await h.get(`/api/shop/orders/${id}`, { token: s.token })).body.order;
   assert.equal((await staffView()).delivery.cashTenderMinor, 50_000, 'ویترین هم همان قاعده');
 
+  //  صفحهٔ پیگیری: «دستورِ تحویل» با نسخه و «ویرایش‌پذیر؟»؛ ⛔ بی نشانی و نشانه
+  const track = async () => (await h.get(`/api/store/${slug}/orders/${token}`)).body.order;
+  const p0 = (await track()).deliveryPrefs;
+  assert.deepEqual(Object.keys(p0).sort(), ['callBeforeArrival', 'editable', 'leaveWith', 'version']);
+  assert.deepEqual([p0.editable, p0.callBeforeArrival, p0.leaveWith], [true, false, '']);
+  assert.ok(!JSON.stringify(await track()).includes('پشتِ مسجد'), 'نمای مشتری نشانه ندارد');
   const url = (t) => `/api/store/${slug}/orders/${t}/delivery`;
-  const r = await h.api('POST', url(token), { body: { delivery: { callBeforeArrival: true, leaveWith: 'دربان' } } });
+  const r = await h.api('POST', url(token), { body: { delivery: { callBeforeArrival: true, leaveWith: 'دربان' }, expectedVersion: p0.version } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual([r.body.order.deliveryPrefs.callBeforeArrival, r.body.order.deliveryPrefs.leaveWith], [true, 'دربان']);
+  assert.ok(r.body.order.deliveryPrefs.version > p0.version, 'نسخه بالا رفت');
+  //  نسخهٔ کهنه ⇒ ۴۰۹ (دو صفحهٔ باز هم‌دیگر را بی‌صدا رونویسی نمی‌کنند)
+  const stale = await h.api('POST', url(token), { body: { delivery: { leaveWith: 'همسایه' }, expectedVersion: p0.version } });
+  assert.equal(stale.status, 409, JSON.stringify(stale.body));
   assert.equal(r.body.order.token, token);
   assert.ok(!JSON.stringify(r.body).includes('0791112233'), 'نمای مشتری همان پیگیری است');
   const after = await staffView();
@@ -293,8 +304,13 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   const staffToken = require('../src/lib/storefront').tokenOf(s.shopId, staffOrder.id);
   assert.equal((await h.api('POST', url(staffToken), { body: { delivery: { leaveWith: 'x' } } })).status, 404);
 
+  //  پس از حرکت: هنوز دیده می‌شود ولی ویرایش‌پذیر نیست
+  await moveOrder(s, id, 'accepted', 'picking', 'packed', 'out_for_delivery');
+  assert.equal((await track()).deliveryPrefs.editable, false);
+
   await setFlag(s.shopId, 'shop.orders.delivery_prefs', false);
   const off = await h.api('POST', url(token), { body: { delivery: { leaveWith: 'همسایه' } } });
   assert.equal(off.status, 403, JSON.stringify(off.body));
   assert.equal(off.body.error.code, 'delivery_prefs_disabled');
+  assert.ok(!('deliveryPrefs' in (await track())), 'پرچمِ خاموش ⇒ کلید نیست');
 });

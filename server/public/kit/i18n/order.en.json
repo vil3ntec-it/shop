@@ -28,5 +28,12 @@
   "od.courier.at": "{name}, your courier, has arrived",
   "od.eta": "Estimated arrival: {t}",
   "od.code": "Delivery code",
-  "od.code.hint": "Share this code only when you receive your order."
+  "od.code.hint": "Share this code only when you receive your order.",
+  "od.prefs": "Delivery instructions",
+  "od.prefs.lm": "New landmark (optional)",
+  "od.prefs.save": "Save instructions",
+  "od.prefs.saved": "Saved; the courier sees these instructions.",
+  "od.prefs.locked": "The order has left the shop; contact the courier to change this.",
+  "err.delivery_locked": "The order has left the shop; contact the courier to change this.",
+  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again."
 }

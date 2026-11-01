@@ -227,6 +227,14 @@
                 <a class="btn btn-ghost btn-block" href="#/" data-t="a.back">بازگشت به کالاها</a>
                 <p class="muted small" data-t="od.keep">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
               </div>
+              <form id="o-prefs" class="card card-lg stack" hidden novalidate>
+                <h2 class="label-lg" data-t="od.prefs">دستورِ تحویل</h2>
+                <label class="check"><input id="op-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
+                <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="op-leave" type="text" maxlength="80"></label>
+                <label class="field"><span data-t="od.prefs.lm">نشانهٔ تازه (اختیاری)</span><input id="op-lm" type="text" maxlength="200"></label>
+                <div id="op-msg" class="note" hidden role="status"></div>
+                <button id="op-save" class="btn btn-block" type="submit" data-t="od.prefs.save">ثبتِ دستورِ تحویل</button>
+              </form>
             </aside>
           </div>
         </div>
