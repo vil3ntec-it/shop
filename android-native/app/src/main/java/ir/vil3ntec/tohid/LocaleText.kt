@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid
 
+import ir.vil3ntec.tohid.core.calendar.LunarHijri
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 
@@ -67,6 +68,21 @@ object LocaleText {
 
   /** تاریخِ خورشیدیِ عددی: `1405/07/22` یا `۱۴۰۵/۰۷/۲۲` */
   fun date(iso: String, digits: String): String = LocaleFormat.displayDigits(formatDate(iso), digits)
+
+  /** جابه‌جاییِ تقویمِ قمری به روز (دیدنِ هلال): فقط −۲ تا +۲؛ هر چیزِ دیگر ۰ */
+  const val LUNAR_ADJUST_MAX = 2
+
+  fun lunarAdjustOf(value: Int?): Int = if (value != null && value in -LUNAR_ADJUST_MAX..LUNAR_ADJUST_MAX) value else 0
+
+  /**
+   *  تاریخِ قمری برای سند (LOC-01): `2 جمادی‌الاول 1448` یا `۲ جمادی‌الاول ۱۴۴۸`، با
+   *  جابه‌جاییِ دکان؛ تاریخِ نادرست ⇒ null (چیزی چاپ نمی‌شود، نه خودِ رشتهٔ میلادی).
+   */
+  fun lunar(iso: String, digits: String, adjust: Int = 0): String? {
+    val a = lunarAdjustOf(adjust)
+    if (LunarHijri.toLunar(iso, a) == null) return null
+    return LunarHijri.formatLong(iso, digitsOf(digits), a)
+  }
 
   /* --------------------------------- تلفن --------------------------------- */
 
