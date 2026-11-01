@@ -567,6 +567,9 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛ `count_tools` و `count_blind` = انبارگردانیِ تازه با اسکن و برگهٔ چند دستگاه، و شمارشِ کور (`CountToolsPref`، INV-06/07/08، `claude/new-inv-2`).
 دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `fraud_trail` = سابقهٔ ضدتقلب: کاربر روی لغو/مرجوعی و ردیفِ `line_delete` (`FraudTrailPref`، RPT-09، باز)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز).
 `tohid-policy` ⇒ `till_receive = false` دریافت از مشتری در صندوق با F7 (POS-39، `claude/spec-pos-b-4`).
+`ShopPolicy.productTools` (`tohid-policy` ⇐ `product_tools`، پیش‌فرض خاموش؛ «تنظیمات ⇐ ابزارهای تازهٔ کالا»): هشدارِ «نامِ مشابه» در فرم
+و ورود از فایل و کادرِ «بارکدها» (PRD-19، PRD-04؛ #459، باز)، نام و دلیلِ تغییرِ قیمت و «قیمتِ گروهی» با پیش‌نمایش و تأیید (PRD-14،
+PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ رفعِ «ویرایش بارکدهای دیگر را پاک می‌کرد» (#476) پشتِ هیچ پرچمی نیست.
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

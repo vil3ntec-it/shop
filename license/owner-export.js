@@ -110,6 +110,7 @@
     shelfLevel: 'طبقهٔ قفسه',
     alternatives: 'کالاهای جایگزین',
     customFields: 'فیلدهای سفارشی',
+    brand: 'برند',
     cartons: 'تعداد کارتن',
     perCarton: 'تعداد در هر کارتن',
     units: 'تعداد واحد',

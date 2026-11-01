@@ -3,6 +3,8 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import kotlin.math.max
@@ -46,6 +48,20 @@ object WarehouseEngine {
      *  نشان نمی‌دهد، یعنی تنظیمِ خاموش، ورود از فایل و ثبتِ گروهی)؛ وگرنه همه از همین.
      */
     val info: ir.vil3ntec.tohid.core.product.ProductInfo? = null,
+    /**
+     *  PRD-04: همهٔ بارکدهای کالا (کادرِ «بارکدها» پشتِ `ShopPolicy.productTools`). null ⇒ فرمِ
+     *  تک‌بارکدی: `barcode` فقط بارکدِ نخست است و بقیهٔ بارکدهای کالای ویرایشی سرِ جایشان می‌مانند.
+     */
+    val barcodes: List<String>? = null,
+    /**
+     *  PRD-14 (پشتِ `ShopPolicy.productTools`): کاربر و دلیلِ تغییرِ قیمت در سابقه و `priceHistory`.
+     *  null ⇒ همان ردیف‌های پیشین، بی این دو فیلد.
+     */
+    val changedBy: String? = null,
+    val reason: String? = null,
+    /** PRD-06 (پشتِ `ShopPolicy.productTools`): برند و برچسب‌ها؛ null ⇒ در ویرایش دست نمی‌خورد، خالی ⇒ پاک */
+    val brand: String? = null,
+    val tags: List<String>? = null,
   )
 
   data class EntryDraft(
@@ -173,7 +189,14 @@ object WarehouseEngine {
     if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
     if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
     if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
+    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
+    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
   }
+
+  /** برند/برچسبِ فرم ⇒ مقدارِ ذخیره؛ خالی ⇒ null تا JSON ِ کالای بی برند همان پیشین بماند */
+  private fun brandOf(raw: String?, keep: String?): String? = if (raw == null) keep else ProductLabels.brand(raw).ifEmpty { null }
+  private fun tagsOf(raw: List<String>?, keep: List<String>?): List<String>? =
+    if (raw == null) keep else ProductLabels.tags(raw).ifEmpty { null }
 
   /** تاریخچهٔ یک کالا: ویرایش‌ها و تغییرِ قیمتِ خرید، تازه‌ترین اول */
   fun productHistory(d: ShopData, productId: String): List<AuditEntry> =
@@ -243,6 +266,8 @@ object WarehouseEngine {
       active = draft.active ?: true,
       saleUnit = draft.saleUnit?.trim().orEmpty(),
       unitFactor = if (draft.saleUnit.isNullOrBlank()) 1.0 else draft.unitFactor ?: 1.0,
+      brand = brandOf(draft.brand, null),
+      tags = tagsOf(draft.tags, null),
     ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
 
     return Result.Ok(
@@ -301,6 +326,8 @@ object WarehouseEngine {
         (draft.saleUnit ?: existing.saleUnit).isBlank() -> 1.0
         else -> draft.unitFactor ?: existing.unitFactor
       },
+      brand = brandOf(draft.brand, existing.brand),
+      tags = tagsOf(draft.tags, existing.tags),
     ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود

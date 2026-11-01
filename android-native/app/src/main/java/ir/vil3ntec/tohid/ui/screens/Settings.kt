@@ -679,6 +679,34 @@ fun SettingsScreen(
 
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
 
+    /* ======== ابزارهای تازهٔ کالا: نامِ مشابه و چند بارکد (PRD-19، PRD-04) — پیش‌فرض خاموش ======== */
+    item {
+      var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Description,
+        title = "ابزارهای تازهٔ کالا",
+        subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
+        tint = if (productTools) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد، برند و برچسب می‌گیرد (با «،» جدا)، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. فقط روی همین دستگاه.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (productTools) "on" else "off",
+          onSelect = {
+            productTools = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setProductTools(context, productTools)
+          },
+        )
+      }
+    }
+
     /* ============================== دوربین ============================== */
     item {
       SettingsSection(

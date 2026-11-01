@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -57,6 +60,11 @@ data class ProductFormState(
   val barcodes: String = barcode,
   /** PRD-02/PRD-26 — فقط با `productInfoOn()` دیده و ذخیره می‌شود */
   val info: ir.vil3ntec.tohid.ui.components.product.ProductInfoForm = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm(),
+  /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
+  val barcodes: String = barcode,
+  /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
+  val brand: String = "",
+  val tags: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -75,6 +83,9 @@ data class ProductFormState(
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
       barcodes = p.barcodes.joinToString("، "),
       info = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)),
+      barcodes = p.barcodes.joinToString("، "),
+      brand = p.brand.orEmpty(),
+      tags = p.tags.orEmpty().joinToString("، "),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -104,6 +115,17 @@ fun ProductDialog(
   val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
   //  PRD-02/PRD-26: خاموش ⇒ همان فرمِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
   val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(form.name, similarIndex) {
+    similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
+  }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember(state.editingId) { mutableStateOf("") }
+  val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -213,6 +235,25 @@ fun ProductDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        if (tools) {
+          Spacer(Modifier.height(10.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+              value = form.brand,
+              onValueChange = { form = form.copy(brand = it) },
+              label = { Text("برند (اختیاری)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+              value = form.tags,
+              onValueChange = { form = form.copy(tags = it) },
+              label = { Text("برچسب‌ها (با «،» جدا)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
 
         //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
         Spacer(Modifier.height(10.dp))
@@ -286,6 +327,11 @@ fun ProductDialog(
                   changedBy = if (tools) me else null,
                   reason = if (tools) priceReason else null,
                   info = if (infoOn) form.info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), form.editingId) else null,
+                  barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
+                  changedBy = if (tools) me else null,
+                  reason = if (tools) priceReason else null,
+                  brand = if (tools) form.brand else null,
+                  tags = if (tools) ProductLabels.tags(form.tags) else null,
                 )
               )
             },
