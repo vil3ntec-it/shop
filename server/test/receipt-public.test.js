@@ -146,6 +146,25 @@ test('تخفیفِ خودکار (پرچمِ shop.promo_stamp): ستون و «ج�
   assert.ok(!JSON.stringify(on).includes('EID5'), 'کدِ تخفیف روی صفحهٔ عمومی نمی‌آید');
 });
 
+test('یادداشتِ ردیف و فاکتور (POS-11) روی صفحهٔ عمومی: یک خط و تمیز؛ بی یادداشت کلیدی نیست', async () => {
+  const a = await shop('یادداشت');
+  const token = newToken();
+  await sell(a, 'sale-n1', token, { note: '  تحویل\n  ساعت ۵ ' });
+  await push(a, [op('update', 'saleItems', 'sale-n1-i1', { note: 'بدون\tشکر\u0007' })]);
+  const r = await read(a.tag, token);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const x = r.body.receipt;
+  assert.equal(x.note, 'تحویل ساعت ۵');
+  assert.equal(x.items[0].note, 'بدون شکر');
+  assert.ok(!('note' in x.items[1]));
+  //  فروشِ بی یادداشت (یا با یادداشتِ تهی) همان پاسخِ پیشین است
+  const plain = newToken();
+  await sell(a, 'sale-n2', plain, { note: '   ' });
+  const y = (await read(a.tag, plain)).body.receipt;
+  assert.ok(!('note' in y));
+  assert.ok(y.items.every((it) => !('note' in it)));
+});
+
 test('ناشناخته، همگام‌نشده، نشانِ دکانِ دیگر و شکلِ بد: یک ۴۰۴ ِ یکسان', async () => {
   const a = await shop('ب');
   const b = await shop('پ');

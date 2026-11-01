@@ -331,6 +331,7 @@ fun QuickSaleScreen(
               }
               //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش
               promo?.let { ir.vil3ntec.tohid.ui.components.pos.PromoLines(it.applied) }
+              ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } // POS-11
             }
           }
         }
@@ -436,7 +437,7 @@ fun QuickSaleScreen(
   fun postSale(options: SalesEngine.Checkout) {
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
-      d, priced, options,
+      d, priced, options.copy(note = cartStore.note.value),
       today = todayIso(),
       now = System.currentTimeMillis(),
       newId = ::newId,

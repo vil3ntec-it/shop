@@ -36,5 +36,6 @@
 .slip-item-line { display: flex; justify-content: space-between; gap: var(--s3); color: var(--muted); font-feature-settings: 'tnum'; }
 .slip-item-total { color: var(--text); }
 .slip-item-returned { color: var(--warning); font-size: 13px; }
+.slip-item-note, .slip-note { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
 
 .slip-footer { border-top: 1px dashed var(--field-line); padding-top: var(--s4); text-align: center; overflow-wrap: anywhere; }
