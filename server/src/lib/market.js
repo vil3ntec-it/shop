@@ -170,7 +170,7 @@ async function reindex(sigs, ids, from) {
   }
 }
 
-const counters = { builds: 0, shelves: 0, popular: 0, deals: 0 };
+const counters = { builds: 0, shelves: 0, popular: 0, deals: 0, changes: 0 };
 
 /** برای پایش و آزمون: چند بار برش از نو ساخته شد. */
 function stats() { return { ...counters }; }
@@ -238,7 +238,7 @@ function invalidate() { snapGen++; snap = null; }
  * `listed` با یک پرسشِ باریک در همین درخواست (بیرون رفتن همان دم است).
  */
 async function eligible(at = now()) {
-  const data = await snapshot();
+  const data = await require('./market-changes').sync({ all: clearCache, forget: [gates, shelves, stocks], reset: () => { deals = null; invalidate(); } }, counters).then(snapshot);   //  S6: دکانِ تغییرکرده (seq) پیش از برش از حافظه بیرون
   if (!data.size) return [];
   const live = new Set((await many(
     `SELECT sf.shop_id FROM ${LISTED_FROM} WHERE sf.shop_id = ANY($1::text[]) AND ${LISTED_WHERE}`,
@@ -781,7 +781,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
       v.lat = g.lat; v.lng = g.lng;
     }
   }
-  const row = await one(
+  const row = await require('./market-changes').within(shopId, { entity: 'listing', kind: 'update', state: v }, async (c) => (await c.query(   //  S6: همان تراکنش
     `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
@@ -789,7 +789,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
        show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
      RETURNING *`,
     [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
-  );
+  )).rows[0]);
   if (catMap) row.category_map = await m4.saveMap(shopId, catMap);
   gates.delete(shopId);
   deals = null;   // خاموش کردنِ «ارزان‌تر» همان دم

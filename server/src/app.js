@@ -640,6 +640,8 @@ async function createApp({ runMigrations = true } = {}) {
   const housekeeping = setInterval(() => {
     beat.ran('housekeeping', HOUSEKEEPING_MS);
     pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
+    //  S6: جریانِ تغییرِ بازار فقط MARKET_CHANGES_KEEP_DAYS روز می‌ماند (`lib/market-changes.js`)
+    require('./lib/market-changes').prune().catch(err => console.error('[market-changes]', err.message));
     //  پیام‌ها و رسانه‌های چت فقط CHAT_RELAY_DAYS روز روی سرور می‌مانند؛
     //  برنامهٔ پمپ رونوشتِ خودش را دارد
     require('./lib/chat-relay').sweep().catch(err => console.error('[chat-relay]', err.message));

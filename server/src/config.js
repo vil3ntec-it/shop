@@ -382,6 +382,10 @@ const config = {
     eligibleCacheMs: num(process.env.MARKET_ELIGIBLE_CACHE_MS, 30 * 1000),
     //  خانهٔ بازارچه: «قفسهٔ» کالاهای هر دکان و «پرفروش/ارزان‌تر» ِ سراسری
     feedCacheMs: num(process.env.MARKET_FEED_CACHE_MS, 60 * 1000),
+    //  S6: جریانِ تغییر (`market_changes`، پرچمِ `market.changes`) — هر چند وقت یک بار `seq` ِ تازه
+    //  خوانده شود (۰ ⇒ هر درخواست) و ردیف‌ها چند روز بمانند
+    changesPollMs: num(process.env.MARKET_CHANGES_POLL_MS, 2 * 1000),
+    changesKeepMs: num(process.env.MARKET_CHANGES_KEEP_DAYS, 14) * 24 * 60 * 60 * 1000,
   },
 
   // CORS_ORIGIN چند دامنه را با کاما می‌پذیرد. برنامه‌ی اندروید به CORS

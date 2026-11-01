@@ -981,7 +981,7 @@ async function saveSettings(shopId, body, userId) {
       [shopId, v.slug, v.enabled, v.title, v.tagline, v.contact_phone, v.accent, v.notice, v.timezone,
         JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
         v.delivery_fee_minor, v.min_order_minor, userId || '', at]
-    );
+    ).then(() => require('./market-changes').record(c, shopId, { entity: 'shop', kind: cur ? 'update' : 'create', state: v, at }));   //  S6: همان تراکنش
     //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
     if (has('timezone') || has('weeklyHours') || has('closedDates')) {
       await recordEvent(c, shopId, {
@@ -1031,7 +1031,7 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
       await c.query(
         'UPDATE storefronts SET presence_mode = $2, declared_until = $3, updated_by = $4, updated_at = $5 WHERE shop_id = $1',
         [shopId, mode, declaredUntil, userId || '', at]
-      );
+      ).then(() => require('./market-changes').record(c, shopId, { entity: 'presence', kind: 'update', state: { mode, declaredUntil }, at }));   //  S6
     }
     const sfNow = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1', [shopId])).rows[0];
     return { sf: sfNow, replayed: !inserted, applied: inserted ? applied : null };
@@ -1099,7 +1099,7 @@ async function setProduct(shopId, productId, body, userId) {
   const exists = await one(`SELECT 1 FROM ${src.from} WHERE ${src.where} AND r.row_id = $2`, [shopId, id]);
   if (!exists) throw notFound('این کالا در دفترِ دکان نیست', 'product_not_found');
   const at = now();
-  const row = await one(
+  const row = await require('./market-changes').productTx(shopId, id, at, async (c) => (await c.query(   //  S6: همان تراکنش
     `INSERT INTO storefront_products (shop_id, product_id, published, online_price_minor, max_qty_milli, updated_by, updated_at,
        description, specs, published_at)
      VALUES ($1,$2,$3,$4,$5,$6,$7,COALESCE($8,''),COALESCE($9::jsonb,'[]'::jsonb),CASE WHEN $3 THEN $7::bigint END)
@@ -1112,7 +1112,7 @@ async function setProduct(shopId, productId, body, userId) {
      RETURNING product_id, description, specs`,
     [shopId, id, published, onlinePriceMinor, maxQtyMilli, userId || '', at, description,
       specs === null ? null : JSON.stringify(specs)]
-  );
+  )).rows[0], (r) => ({ published, onlinePriceMinor, maxQtyMilli, description: r.description, specs: specsOf(r.specs) }));
   return {
     productId: id, published, onlinePriceMinor, maxQtyMilli,
     description: text(row.description, 2000), specs: specsOf(row.specs),
