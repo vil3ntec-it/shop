@@ -1,7 +1,5 @@
 package ir.vil3ntec.tohid.ui.courier
 
-import android.content.Context
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -41,8 +39,9 @@ import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Payments
-import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.TableRows
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -66,6 +65,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierFlow
 import ir.vil3ntec.tohid.core.courier.CourierInputError
 import ir.vil3ntec.tohid.core.courier.CourierQueue
@@ -73,9 +73,9 @@ import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
 import ir.vil3ntec.tohid.core.courier.QueueState
+import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.data.CourierStore
 import ir.vil3ntec.tohid.data.CourierSync
-import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.money
@@ -84,7 +84,6 @@ import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.PhotoSourceSheet
 import ir.vil3ntec.tohid.ui.components.common.openOnMap
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -94,7 +93,6 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
-import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3IconButton
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -104,14 +102,10 @@ import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
 import ir.vil3ntec.tohid.ui.v3.V3StaggerState
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
-import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Stagger
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 
 /*
  *  حالتِ پیک — DLV-01/02/08/09/10/11/12، v3 §۳.۱۱.
@@ -230,6 +224,9 @@ internal data class CourierAction(
   val cash: Long? = null,
   val cashReason: String = "",
   val code: String = "",
+  /** DLV-07: برچسبِ همهٔ کیسه‌ها با «بسته را گرفتم»؛ DLV-17: موقعیتِ همین لحظه با «تحویل شد» */
+  val bags: List<String> = emptyList(),
+  val position: CourierChecks.Point? = null,
 )
 
 @Composable
@@ -251,11 +248,12 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var syncing by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
   var summaryError by remember { mutableStateOf<String?>(null) }
+  var extras by remember { mutableStateOf(CourierExtras.of(store)) }   //  پرچم‌های مسیر و امتیاز (DLV-04/18)
 
   fun reloadLocal() {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
     name = store.courierName; photosWaiting = store.photos().size
-    summary = store.summary(); lastSyncAt = store.lastSyncAt
+    summary = store.summary(); lastSyncAt = store.lastSyncAt; extras = CourierExtras.of(store)
   }
 
   suspend fun sync() {
@@ -270,13 +268,13 @@ fun CourierHome(onSignedOut: () -> Unit) {
   }
 
   /** هر کار: اول صفِ گوشی، بعد اگر شد سرور */
-  fun record(card: MissionCard, type: String, reason: String = "", note: String = "", cash: Long? = null, cashReason: String = "", code: String = "") {
+  fun record(a: CourierAction) {
     try {
       val (next, _) = CourierQueue.enqueue(
-        store.queue(), "cev-" + ir.vil3ntec.tohid.sync.v1.Ulid.next(), card.id, type, System.currentTimeMillis(),
+        store.queue(), "cev-" + ir.vil3ntec.tohid.sync.v1.Ulid.next(), a.card.id, a.type, System.currentTimeMillis(),
         //  CAS (§۲۸.۵): همان وضعیتی که پیک روی کارت دید (سرور + صف)
-        from = card.status, reason = reason, note = note,
-        cashCollectedMinor = cash, cashReason = cashReason, code = code,
+        from = a.card.status, reason = a.reason, note = a.note,
+        cashCollectedMinor = a.cash, cashReason = a.cashReason, code = a.code, bags = a.bags, position = a.position,
       )
       store.saveQueue(next)
       queue = next
@@ -306,12 +304,16 @@ fun CourierHome(onSignedOut: () -> Unit) {
     summary = summary,
     lastSyncAt = lastSyncAt,
     summaryError = summaryError,
+    extras = extras,
     onRefresh = { scope.launch { sync() } },
     onDismissRejected = { eventId ->
       val next = CourierQueue.dismissRejected(store.queue(), eventId)
       store.saveQueue(next); queue = next
     },
-    onRecord = { a -> record(a.card, a.type, reason = a.reason, note = a.note, cash = a.cash, cashReason = a.cashReason, code = a.code) },
+    onRecord = ::record,
+    onRate = { card, stars, tags ->
+      scope.launch { val text = rateMission(Backend.courier(context), store, card, stars, tags); extras = CourierExtras.of(store); snackbar.showSnackbar(text) }
+    },
     onPhoto = { card, bytes ->
       val eventId = "cph-" + ir.vil3ntec.tohid.sync.v1.Ulid.next()
       store.addPhoto(CourierStore.PendingPhoto(eventId, card.id, System.currentTimeMillis()), bytes)
@@ -370,6 +372,8 @@ internal fun CourierBoard(
   initialDetailTab: String = "track",
   initialDeliver: Boolean = false,
   summaryError: String? = null,
+  extras: CourierExtras = CourierExtras(),
+  onRate: (MissionCard, Int, List<String>) -> Unit = { _, _, _ -> },
 ) {
   val p = PhoneV3.colors
   var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -380,6 +384,7 @@ internal fun CourierBoard(
   var statsWeek by rememberSaveable { mutableStateOf(false) }
   var query by rememberSaveable { mutableStateOf("") }
   var ask by remember { mutableStateOf<Ask?>(null) }
+  var check by remember { mutableStateOf<CheckAsk?>(null) }   //  DLV-04/07/17/18 (`CourierChecksV3.kt`)
   var askSignOut by remember { mutableStateOf(false) }
   var bellOpen by remember { mutableStateOf(false) }
   val view = rememberViewMode("courier.jobs", ScreenKind.SALE)
@@ -395,11 +400,15 @@ internal fun CourierBoard(
   val shopPhone = summary?.shopPhone.orEmpty()
   val staleError = summaryError ?: lastError   //  نقد و آمار کهنه‌اند اگر «نقدِ من» یا کلِ همگام‌سازی نشد
 
+  //  کارِ آماده: پیش‌شرط دارد (کیسه، موقعیت) ⇒ اول برگه‌اش، وگرنه همان دم به صف
+  fun submit(a: CourierAction) { check = checkFor(a); if (check == null) onRecord(a) }
+  val rateFor: (MissionCard) -> (() -> Unit)? = { c -> if (extras.canRate(c)) ({ check = CheckAsk.Rate(c) }) else null }
+
   fun act(c: MissionCard, to: String) {
     when (to) {
       "rejected", "failed" -> ask = Ask.Reason(c, to)
       "delivered" -> ask = Ask.Deliver(c)
-      else -> onRecord(CourierAction(c, to))
+      else -> submit(CourierAction(c, to))
     }
   }
 
@@ -470,6 +479,7 @@ internal fun CourierBoard(
                   onPhoto = { ask = Ask.Photo(c) },
                   onNavigate = { onNavigate(c) },
                   seen = seen,
+                  onRate = rateFor(c),
                 )
               }
             }
@@ -490,6 +500,7 @@ internal fun CourierBoard(
               },
               seen = seen, onRefresh = onRefresh, onDismissRejected = onDismissRejected,
               onOpen = { open(it) }, onAction = { c, to -> act(c, to) },
+              onRoutePlan = if (extras.routeEnabled) ({ check = CheckAsk.Route }) else null, rateFor = rateFor,
             )
             key == "t:stats" -> CourierStatsTab(
               summary = summary, week = statsWeek, onWeek = { statsWeek = it }, staleError = staleError,
@@ -538,7 +549,7 @@ internal fun CourierBoard(
         ask = null; onRecord(CourierAction(a.card, a.type, reason = reason, note = note))
       }
       is Ask.Deliver -> DeliverSheet(a.card, onDismiss = { ask = null }) { code, cash, cashReason, note ->
-        ask = null; onRecord(CourierAction(a.card, "delivered", code = code, cash = cash, cashReason = cashReason, note = note))
+        ask = null; submit(CourierAction(a.card, "delivered", code = code, cash = cash, cashReason = cashReason, note = note))
       }
       is Ask.Photo -> PhotoFlow(a.card, onDismiss = { ask = null }) { bytes ->
         ask = null
@@ -546,6 +557,7 @@ internal fun CourierBoard(
       }
       null -> {}
     }
+    CourierCheckSheets(check, live, onDismiss = { check = null }, onRecord = onRecord, onRate = onRate)
 
     if (askSignOut) {
       SignOutSheet(waitingTotal, onDismiss = { askSignOut = false }) {
@@ -578,6 +590,8 @@ private fun RouteTab(
   onDismissRejected: (String) -> Unit,
   onOpen: (MissionCard) -> Unit,
   onAction: (MissionCard, String) -> Unit,
+  onRoutePlan: (() -> Unit)?,
+  rateFor: (MissionCard) -> (() -> Unit)?,
 ) {
   val p = PhoneV3.colors
   val list = if (routeTab == "active") live else finished
@@ -590,6 +604,8 @@ private fun RouteTab(
       Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Text("مسیر", style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
         wideToggle()
+        //  DLV-04: «مسیرِ پیشنهادی» فقط با پرچمِ دکان (`/courier/me`)
+        onRoutePlan?.let { Spacer(Modifier.width(8.dp)); V3IconButton(Icons.Outlined.Place, StrCourier.routeTitle, onClick = it) }
         Spacer(Modifier.width(8.dp))
         RefreshButton(syncing, onRefresh)
       }
@@ -627,7 +643,7 @@ private fun RouteTab(
         val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
         val itemMod = Modifier.animateItem().v3Stagger(seen, c.id, index)
         if (view == ViewMode.CARD) {
-          MissionCardView(c, waiting, itemMod, onOpen = { onOpen(c) }, onAction = { to -> onAction(c, to) })
+          MissionCardView(c, waiting, itemMod, onOpen = { onOpen(c) }, onAction = { to -> onAction(c, to) }, onRate = rateFor(c))
         } else {
           MissionRow(c, waiting, itemMod, onOpen = { onOpen(c) })
         }
@@ -745,6 +761,7 @@ private fun MissionCardView(
   modifier: Modifier,
   onOpen: () -> Unit,
   onAction: (String) -> Unit,
+  onRate: (() -> Unit)? = null,
 ) {
   val p = PhoneV3.colors
   val live = CourierFlow.isLive(c.status)
@@ -802,6 +819,11 @@ private fun MissionCardView(
         //  یک دکمهٔ بزرگ برای پلهٔ بعد؛ «ناموفق» و بقیه در صفحهٔ جزئیات
         StepButton(actionLabel(c.status, primary), { onAction(primary) }, Modifier.fillMaxWidth())
       }
+    }
+    //  DLV-18: امتیازِ پیک به تحویلِ انجام‌شده — فقط با پرچمِ دکان و یک بار
+    if (onRate != null) {
+      Spacer(Modifier.height(14.dp))
+      CourierSecondary(StrCourier.rate, onRate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Star)
     }
   }
 }
@@ -940,71 +962,4 @@ private fun SignOutSheet(waiting: Int, onDismiss: () -> Unit, onConfirm: () -> U
     icon = Icons.AutoMirrored.Outlined.Logout,
     danger = waiting > 0,
   )
-}
-
-/**
- *  عکسِ بسته (DLV-08): فقط با رضایتِ مشتری (`photoAllowed` از سرور) و فقط از
- *  بسته، نه از شخص — پیک پیش از دوربین تأیید می‌کند.
- */
-@Composable
-private fun PhotoFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (ByteArray) -> Unit) {
-  val context = LocalContext.current
-  val scope = rememberCoroutineScope()
-  val p = PhoneV3.colors
-  var parcelOnly by remember { mutableStateOf(false) }
-  var pick by remember { mutableStateOf(false) }
-  var busy by remember { mutableStateOf(false) }
-  var error by remember { mutableStateOf<String?>(null) }
-
-  if (!pick) {
-    V3Sheet(onDismiss = onDismiss, title = "عکسِ بسته") { _ ->
-      Text(
-        "مشتریِ سفارشِ #${c.orderNo.fa()} به عکسِ تحویل رضایت داده است. عکس فقط از بسته گرفته شود؛ چهرهٔ کسی در عکس نباشد.",
-        style = courierText(15.sp), color = p.inkMuted,
-      )
-      Spacer(Modifier.height(12.dp))
-      V3Card(padding = PaddingValues(0.dp)) {
-        V3ToggleRow("عکس فقط از بسته است", parcelOnly, { parcelOnly = it }, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.SKY)
-      }
-      error?.let {
-        Spacer(Modifier.height(8.dp))
-        V3Message(V3Tone.ERROR, it)
-      }
-      Spacer(Modifier.height(18.dp))
-      StepButton(
-        "گرفتنِ عکس", { pick = true }, Modifier.fillMaxWidth(),
-        enabled = parcelOnly && !busy, loading = busy, icon = Icons.Outlined.PhotoCamera,
-      )
-      Spacer(Modifier.height(8.dp))
-      CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
-    }
-  }
-  PhotoSourceSheet(
-    open = pick,
-    onDismiss = { pick = false },
-    note = "فقط بسته؛ عکس پس از رسیدن به دکان از این گوشی پاک می‌شود",
-  ) { uri ->
-    busy = true
-    scope.launch {
-      val bytes = withContext(Dispatchers.IO) { runCatching { parcelJpeg(context, uri) }.getOrNull() }
-      busy = false
-      if (bytes == null) error = "عکس خوانده نشد؛ دوباره بگیرید" else onReady(bytes)
-    }
-  }
-}
-
-/** کوچک و فشرده — زیرِ سقفِ ۶۰۰ کیلوبایتِ سرور */
-private fun parcelJpeg(context: Context, uri: Uri): ByteArray? {
-  val bmp = PhotoStore.decode(context, uri) ?: return null
-  val edge = maxOf(bmp.width, bmp.height)
-  val scaled = if (edge > 1280) Bitmap.createScaledBitmap(bmp, bmp.width * 1280 / edge, bmp.height * 1280 / edge, true) else bmp
-  var quality = 80
-  var out: ByteArray
-  do {
-    out = ByteArrayOutputStream().use { s -> scaled.compress(Bitmap.CompressFormat.JPEG, quality, s); s.toByteArray() }
-    quality -= 15
-  } while (out.size > 550 * 1024 && quality >= 35)
-  if (scaled !== bmp) scaled.recycle()
-  bmp.recycle()
-  return out.takeIf { it.size in 100..(600 * 1024) }
 }
