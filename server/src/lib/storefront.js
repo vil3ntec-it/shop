@@ -98,7 +98,7 @@ function normalize(s) {
 /** همان نرمال‌سازی، در SQL، روی نامِ کالا. */
 const SQL_NAME = "translate(lower(r.data->>'name'), 'يىكۀةأإآ' || chr(1600) || chr(8204), 'ییکههااا  ')";
 
-const { SEARCH_FLAG, SEARCH_KEY, searchWhere } = require('./storefront-search');   //  SRCH-01 (شرح همان‌جا)
+const { SEARCH_FLAG, SEARCH_KEY, searchWhere, plan: searchPlan, finish: searchFinish } = require('./storefront-search');   //  SRCH-01 و WEB-05/06 (شرح همان‌جا)
 function slugOf(v) {
   const s = str(v).toLowerCase();
   if (!SLUG_RE.test(s) || s.includes('--')) {
@@ -243,19 +243,19 @@ function decodeCursor(raw) {
   }
 }
 
-/** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی. */
-async function catalog(shopId, { q, category, cursor, limit } = {}) {
+/** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی؛ با `shop.storefront.search` (WEB-05/06) پرش به دسته، غلطِ تایپی و «پیدا نشد» ِ مفید. */
+async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
   const raw = text(q, 60);
-  const needle = normalize(raw);
-  if (raw && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
-  else if (needle) {
-    params.push(`%${needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
-    where += ` AND ${SQL_NAME} LIKE $${params.length}`;
+  const p = await searchPlan(shopId, raw, text(category, 80), { categories, normalize, SQL_NAME });   //  خاموش ⇒ همان قبلی
+  if (raw && !p.jump && await orders.flagOf(shopId, SEARCH_FLAG)) where += searchWhere(raw, params);
+  else if (p.needle) {
+    params.push(`%${p.needle.replace(/[\\%_]/g, (c) => `\\${c}`)}%`);
+    where += ` AND ${p.name} LIKE $${params.length}`;
   }
-  const cat = text(category, 80);
+  const cat = p.jump || text(category, 80);
   if (cat) {
     params.push(cat);
     where += ` AND r.data->>'category' = $${params.length}`;
@@ -274,11 +274,11 @@ async function catalog(shopId, { q, category, cursor, limit } = {}) {
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
   const last = page[page.length - 1];
-  return {
+  return searchFinish({
     //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
-    items: await decorate(shopId, page.map(productView).filter((p) => p.priceMinor !== null && p.name)),
+    items: await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name)),
     nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
-  };
+  }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
 
 /** عکسِ بانک (اگر هست)، جزئیاتِ M4 (برند، بارکد، واحد، variant، `bankProductId`؛ فقط با `market.product_details`) و موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
