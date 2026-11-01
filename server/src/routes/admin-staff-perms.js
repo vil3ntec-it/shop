@@ -27,6 +27,11 @@ async function shopOf(req) {
 
 router.get('/', async (req, res) => {
   const shop = await shopOf(req);
+  //  TEN-04: اجازه‌های اعضا و دستگاه‌هایشان مالِ یک دکان است ⇒ دیدنش سابقه دارد، مثلِ پروندهٔ دکان
+  await audit.log({
+    shopId: shop.id, actorType: 'admin', userId: req.admin.id, action: 'admin.shop_staff_perms_viewed',
+    targetType: 'shop', targetId: shop.id, ip: clientIp(req),
+  });
   res.json({
     shop: { id: shop.id, name: shop.name },
     perms: await perms.overview(shop.id),
