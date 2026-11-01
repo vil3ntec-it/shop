@@ -50,7 +50,7 @@ class CourierCodecTest {
     assertTrue(CourierCodec.cards("[[[").isEmpty())
   }
 
-  @Test fun `DLV-07 و DLV-17: برچسب‌ها و موقعیت در صفِ آفلاین می‌مانند، و کارت شمارِ کیسه و فاصله را نگه می‌دارد`() {
+  @Test fun `DLV-07 و DLV-17 — برچسب‌ها و موقعیت در صفِ آفلاین می‌مانند، و کارت شمارِ کیسه و فاصله را نگه می‌دارد`() {
     var q = QueueState()
     q = CourierQueue.enqueue(q, "cev-bbbbbbbb-1", "A", "picked_up", 1_000, bags = listOf("VLNB-12-1-2", "VLNB-12-2-2")).first
     q = CourierQueue.enqueue(q, "cev-bbbbbbbb-2", "A", "delivered", 2_000, cashCollectedMinor = 0, position = CourierChecks.Point(34.524356, 69.181234)).first
