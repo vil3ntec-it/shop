@@ -4,6 +4,7 @@
  *
  *   sniff(buf)               ⇒ { kind, mime } یا null — فقط از روی بایت‌های آغاز
  *   stripImageMetadata(buf)  ⇒ همان عکس بی EXIF ِ مکان/XMP/IPTC/توضیح؛ جهت می‌ماند
+ *   send(res, m)             ⇒ بایت‌ها به بیننده با سرآیندهای امن (`chat.sendMedia`)
  *
  * ⛔ سرآیندِ `Content-Type` و پسوندِ کلاینت هیچ‌وقت ملاک نیست: فایلِ اجرایی
  * یا HTML ای که خودش را «image/jpeg» می‌نامد همین‌جا null می‌گیرد (CHAT-10).
@@ -170,4 +171,19 @@ function stripImageMetadata(buf, mime) {
   return buf;
 }
 
-module.exports = { sniff, stripImageMetadata, orientationOf };
+/**
+ * بایت‌ها به بیننده — هرگز صفحه نمی‌شود، کش نمی‌شود؛ PDF فقط دانلود. از `lib/shop-chat.js` (همان
+ * `chat.sendMedia`) به این‌جا آمد تا آن زیرِ سقفِ اندازه بماند؛ رفتار همان.
+ */
+function send(res, m) {
+  res.set('Content-Type', m.mime);
+  res.set('Content-Length', String(m.data.length));
+  res.set('Cache-Control', 'private, no-store');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('Content-Security-Policy', "default-src 'none'; sandbox");
+  res.set('Cross-Origin-Resource-Policy', 'same-origin');
+  res.set('Content-Disposition', m.kind === 'file' ? `attachment; filename="chat-${m.id}.pdf"` : 'inline');
+  res.end(m.data);
+}
+
+module.exports = { sniff, stripImageMetadata, orientationOf, send };

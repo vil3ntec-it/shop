@@ -24,7 +24,7 @@ import java.io.File
  *  ⚠️ نوشتن اتمی است (فایلِ کناری، بعد جابه‌جایی): اگر وسطِ نوشتن باتری
  *  تمام شود، صف نصفه نمی‌ماند.
  */
-class OpQueue(context: Context, accountKey: String) {
+class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
   private val json = Json { ignoreUnknownKeys = true; isLenient = true }
   private val dir = context.applicationContext.filesDir
@@ -45,7 +45,7 @@ class OpQueue(context: Context, accountKey: String) {
   @Volatile private var cachedDropped: Int = -1
 
   @Synchronized
-  fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
+  override fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
 
   @Synchronized
   fun size(): Int {
@@ -59,19 +59,44 @@ class OpQueue(context: Context, accountKey: String) {
     return cachedDropped
   }
 
-  @Synchronized
+  /**
+   *  ⛔ **هیچ سقفی که کهنه‌ترین‌ها را دور بریزد نیست** (`core/…/core/sync/OpBacklog.kt`): پیش‌تر بالای
+   *  ۵۰٬۰۰۰ op کهنه‌ترین‌ها `queue_overflow` می‌شدند و هرگز به سرور نمی‌رسیدند. صفِ بزرگ با پیامِ
+   *  `OpBacklog.warning` دیده می‌شود؛ حافظهٔ پر ⇒ نوشتن پرتاب می‌کند (`update`) و تغییر روی دفتر می‌ماند
+   *  تا ثبتِ بعدی، با پیامِ «حافظه پر است» (`SyncV1Engine.record`).
+   */
   fun push(ops: List<SyncOp>) {
     if (ops.isEmpty()) return
-    val list = read(file).toMutableList()
-    list += ops.map { it.toJson() }
-    if (list.size > MAX) {
-      //  سقفِ ایمنی. کهنه‌ترین می‌رود **و ثبت می‌شود**، نه بی‌صدا.
-      val cut = list.subList(0, list.size - MAX).toList()
-      repeat(cut.size) { list.removeAt(0) }
-      dropRaw(cut, "queue_overflow")
+    update { current -> current + ops.map { it.toJson() } }
+  }
+
+  /**
+   *  opهایی که پس از بازیابیِ سرور دوباره باید بروند — **جلوی** صف (پیش از تغییرهای
+   *  تازه‌تر، به همان ترتیبِ نخستین فرستادن) و با **همان op_id** (F0-05). opی که همین
+   *  حالا در صف هست دوباره نمی‌آید. §۹.۵، `core/sync/RestoreReplay.kt`.
+   *
+   *  @return چند op به صف آمد
+   */
+  override fun pushFront(ops: List<SyncOp>): Int {
+    if (ops.isEmpty()) return 0
+    var added = 0
+    update { list ->
+      val have = list.mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }
+      val add = ops.filter { it.opId.isNotEmpty() && have.add(it.opId) }.map { it.toJson() }
+      added = add.size
+      if (add.isEmpty()) null else add + list
     }
-    //  اگر نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود
-    if (!write(file, list)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+    return added
+  }
+
+  /**
+   *  خواندن، تغییر و نوشتنِ صف زیرِ یک قفل (`push`، `pushFront`)؛ null ⇒ بی نوشتن.
+   *  اگر نوشتن نگرفت، `record()` سایه را جلو نمی‌برد و تغییر دفعهٔ بعد دوباره op می‌شود.
+   */
+  @Synchronized
+  private fun update(edit: (List<JsonObject>) -> List<JsonObject>?) {
+    val next = edit(read(file)) ?: return
+    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
   }
 
   /**
@@ -166,7 +191,6 @@ class OpQueue(context: Context, accountKey: String) {
       accountKey.map { if (it.isLetterOrDigit()) it else '_' }
         .joinToString("").take(48).ifBlank { "anon" }
 
-    const val MAX = 50_000
     const val MAX_OPS = 200
     const val MAX_BYTES = 256 * 1024
 

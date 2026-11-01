@@ -152,6 +152,35 @@ test('پشتیبانِ خالی، پشتیبان حساب نمی‌شود', asyn
   assert.deepEqual(left, [], 'فایل نیمه‌کاره نباید بماند');
 });
 
+test('pg_dump/psql ِ ناموجود ⇒ خطای روشن، نه unhandledRejection یا رویدادِ «error» ِ بی‌شنونده که سرور را می‌خواباند', {
+  //  روی PGlite پشتیبان از `runPglite` است و pg_dump صدا زده نمی‌شود؛ این در فقط روی PostgreSQL معنا دارد
+  skip: require('../src/db').isPglite() && 'PGlite: پشتیبان بی pg_dump/psql',
+}, async () => {
+  //  پیش‌تر `closed` پیش از `await` رد می‌شد ⇒ unhandledRejection (همان سرخیِ sync-epoch روی PostgreSQL)
+  const original = config.backup.pgDump;
+  config.backup.pgDump = '/nonexistent/pg_dump-for-test';
+  try {
+    await assert.rejects(() => backup.run({ kind: 'manual' }), /pg_dump اجرا نشد: .*ENOENT/);
+  } finally {
+    config.backup.pgDump = original;
+  }
+  const left = (await fs.readdir(backup.dirFor('manual')).catch(() => []))
+    .filter(f => f.endsWith('.part'));
+  assert.deepEqual(left, [], 'فایل نیمه‌کاره نباید بماند');
+
+  //  بازیابی: psql نیست ⇒ همان شکستِ بازیابی، بی رویدادِ «error» ِ بی‌شنونده
+  const file = path.join(BACKUP_DIR, 'no-psql.sql.gz');
+  await fs.mkdir(BACKUP_DIR, { recursive: true });
+  await fs.writeFile(file, require('zlib').gzipSync('SELECT 1;\n'));
+  const savedRestore = config.backup.pgRestore;
+  config.backup.pgRestore = '/nonexistent/psql-for-test';
+  try {
+    await assert.rejects(() => backup.restore(file, { databaseUrl: restoreUrl }), /psql اجرا نشد: .*ENOENT/);
+  } finally {
+    config.backup.pgRestore = savedRestore;
+  }
+});
+
 /**
  * SEC-07 — پرچمِ `security / backup.require_encryption` روی مسیرِ واقعیِ pg_dump:
  * بی رمز هیچ فایلی نمی‌سازد؛ با رمز، فایلِ جریانیِ رمزشده پیش از «موفق» باز و شمرده

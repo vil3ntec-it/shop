@@ -24,15 +24,19 @@ async function main() {
 
   const role = roleArg === 'superadmin' ? 'superadmin' : 'admin';
   const uname = String(username).toLowerCase();
-  const exists = await one('SELECT id FROM admins WHERE username=$1', [uname]);
+  const exists = await one('SELECT id, is_owner FROM admins WHERE username=$1', [uname]);
   if (exists) {
     //  F0-15: راهِ نجات از ترمینال ⇒ تأییدِ دومرحله‌ای هم خاموش (گوشی گم شده)
+    //  ⛔ فاز ۳: این راهِ بازیابیِ **مالکِ اصلی** هم هست — مالک همیشه ارشد و فعال می‌ماند (بی آرگومانِ
+    //  نقش هم تنزل نمی‌خورد) و نشست‌های پیشینش بسته می‌شوند.
+    const keep = exists.is_owner === true ? 'superadmin' : role;
     await one(
-      `UPDATE admins SET password_hash=$2, role=$3,
+      `UPDATE admins SET password_hash=$2, role=$3, status = CASE WHEN $4 THEN 'active' ELSE status END,
          totp_secret='', totp_pending='', totp_enabled_at=NULL, totp_last_step=0, totp_recovery='[]'
        WHERE id=$1 RETURNING id`,
-      [exists.id, await pw.hashPassword(password), role]);
-    console.log(`رمز مدیر «${uname}» عوض شد (تأییدِ دومرحله‌ای‌اش، اگر روشن بود، خاموش شد).`);
+      [exists.id, await pw.hashPassword(password), keep, exists.is_owner === true]);
+    await require('../src/lib/tokens').revokeAllForSubject(exists.id);
+    console.log(`رمز مدیر «${uname}» عوض شد (تأییدِ دومرحله‌ای‌اش، اگر روشن بود، خاموش شد؛ نقش: ${keep}).`);
   } else {
     await one(
       `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
@@ -41,6 +45,7 @@ async function main() {
     );
     console.log(`مدیر «${uname}» ساخته شد (${role}).`);
   }
+  await require('../src/lib/admin-owner').ownerId();
   if (!passwordArg) console.log(`رمز: ${password}`);
   await closeDb();
 }

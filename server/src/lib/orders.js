@@ -52,12 +52,19 @@ function decode(text) {
 /**
  * پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است.
  * `key` نیامده ⇒ `shop.orders`؛ ویترین (`shop.storefront`) و تحویل و پیک (`shop.delivery`) همین قاعده را می‌خوانند.
+ *
+ * ⛔ فاز ۳ ِ پنلِ مرکزی: «غیرفعال کردنِ سرویس» (`lib/shop-holds.js`، حالتِ `service_disabled` با
+ * `service` = همین کلید) هر مقداری را می‌بُرد — در همین یک پرسش، بی رفت‌وبرگشتِ دوم.
  */
 async function flagOf(shopId, key = FLAG_KEY) {
   const rows = await many(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
+    `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
+     UNION ALL
+     SELECT '#hold', 'false' FROM shop_holds
+      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`,
     [key, 'all', String(shopId)]
   );
+  if (rows.some((r) => r.scope === '#hold')) return false;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
@@ -245,7 +252,8 @@ function card(row, viewer, at) {
     orderNo: Number(row.order_no),
     status: row.status,
     tab: S.tabOf(row, at),
-    next: S.nextFor(row, { type: 'user', role: viewer.role }),
+    //  دکمهٔ گذار فقط برای کسی که `orders.manage` دارد (حسابدار فقط می‌بیند — A16)
+    next: can(viewer.role, 'orders.manage') ? S.nextFor(row, { type: 'user', role: viewer.role }) : [],
     source: row.source,
     isTest: row.is_test === true,
     fulfillment: row.fulfillment,
@@ -403,6 +411,11 @@ async function create(shopId, { key, body, actor, price, notify }) {
     const hook = notify !== undefined ? notify
       : (actor.type === 'customer' ? require('./order-notify').enqueueIn : null);
     if (hook) await hook(run, { shopId, orderId: id, orderNo: no, at });
+    //  NTF-01/03: زبانِ مشتری روی سفارش و رویدادِ «ثبت شد» برای خودِ او (پرچمِ `shop.customer_notify`؛
+    //  فقط ویترین) — همین تراکنش؛ خطایش کلِ سفارش را برمی‌گرداند، مثلِ صفِ اعلانِ دکان
+    if (actor.type === 'customer') {
+      await require('./customer-notify').onCreatedIn(run, { shopId, orderId: id, lang: body && body.lang, at });
+    }
     return { order: await loadDetail(run, shopId, id, actor), replayed: false };
   });
 }
@@ -504,6 +517,8 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
       [ulid(at), row.id, shopId, seq, row.status, to, actor.type, actor.id || '', reason, note,
         JSON.stringify(readyAt ? { readyAt } : {}), at]
     );
+    //  NTF-01: پیامِ وضعیت به مشتری (پرچمِ `shop.customer_notify`؛ فقط سفارشِ ویترین) — همین تراکنش
+    await require('./customer-notify').onStatusIn(run, { shopId, order: row, to, at });
     return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
   }
 }

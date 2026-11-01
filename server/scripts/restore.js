@@ -6,19 +6,33 @@
  *
  * دیتابیس مقصد باید خالی باشد (یا جدول‌های هم‌نام نداشته باشد).
  * برای انتقال سرور: روی سرور تازه یک دیتابیس خالی بسازید و همین را بزنید.
+ *
+ * §۹.۵: پس از بازگرداندن، دورانِ بازیابیِ همگام‌سازی در **همان** دیتابیس تازه می‌شود
+ * (`lib/sync-epoch.js`) تا برنامه‌ها opهای پس از پشتیبان را دوباره بفرستند — پس نشانیِ مقصد
+ * پیش از بارِ پیکربندی و دیتابیس در DATABASE_URL می‌نشیند.
  */
-const backup = require('../src/lib/backup');
-const { closeDb } = require('../src/db');
-
 const [file, target] = process.argv.slice(2);
 if (!file) {
   console.error('کاربرد: node scripts/restore.js <فایل پشتیبان> [DATABASE_URL مقصد]');
   process.exit(1);
 }
+if (target) process.env.DATABASE_URL = target;
 
-backup.restore(file, target ? { databaseUrl: target } : {})
+const backup = require('../src/lib/backup');
+const { closeDb } = require('../src/db');
+
+backup.restore(file)
   .then(async (out) => {
     console.log(`بازیابی انجام شد (${Math.round(out.bytes / 1024)} کیلوبایت SQL).`);
+    if (out.epochError) {
+      //  دادهٔ پشتیبان نشسته است؛ فقط «دورانِ بازیابی» تازه نشد — جدا و روشن، با کدِ خروجِ جدا
+      console.error(`⚠️ داده برگشت ولی دورانِ بازیابیِ همگام‌سازی تازه نشد: ${out.epochError}\n`
+        + '   سرور را یک بار دوباره بالا بیاورید (نشانِ پشتیبان در دیتابیس هست)، یا با همین DATABASE_URL:\n'
+        + '   node -e "require(\'./src/lib/sync-epoch\').rotate(\'restore\').then(() => process.exit(0))"\n'
+        + '   تا آن وقت فروش‌های پس از پشتیبان روی برنامه‌ها می‌مانند و دوباره فرستاده نمی‌شوند.');
+      await closeDb();
+      process.exit(2);
+    }
     await closeDb();
   })
   .catch(async (e) => { console.error('✖', e.message); await closeDb(); process.exit(1); });

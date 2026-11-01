@@ -17,6 +17,8 @@
 const { one, many, tx, newId, now } = require('../db');
 const { badRequest, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
+const permCore = require('./perm-core');
+const roleRows = require('./role-rows');
 
 /** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
 const TABLES = {
@@ -40,8 +42,20 @@ const TABLES = {
   productCategories: 'product_categories',
   productUnits:      'product_units',
   expenseCategories: 'expense_categories',
+  //  PAY-18 (پلهٔ ۴): گاوصندوق — فقط در Sync v1/v3 (`sync_rows`)، جدولِ راهِ قدیم ندارد (`V1_ONLY`)؛
+  //  شکل و مجوز در `safe-ledger.js`
+  safeEntries:       null,
 };
 const COLLECTIONS = Object.keys(TABLES);
+/**
+ * مجموعه‌هایی که فقط Sync v1/v3 دارد، با سنجشِ شکل و مجوزِ خودشان (`safe-ledger.js`). کلیدشان
+ * در `TABLES` است چون همین کلیدها فهرستِ سفیدِ v1 ِ دکان‌اند، ولی جدولِ راهِ قدیم ندارند (`null`).
+ * راهِ قدیم آن‌ها را نه می‌نویسد (هر تغییرش با کدِ `sync_v1_only` برمی‌گردد) نه می‌خواند و نه در
+ * فهرستِ مجموعه‌هایش نشان می‌دهد — درِ بی‌سنجش نمی‌ماند.
+ */
+const V1_ONLY = new Set(['safeEntries']);
+/** آنچه راهِ قدیم (`/api/sync`، پنلِ مدیر) می‌بیند */
+const LEGACY_COLLECTIONS = COLLECTIONS.filter((c) => !V1_ONLY.has(c));
 
 const MAX_BATCH = 2000;
 const MAX_RECORD_BYTES = 64 * 1024;
@@ -83,6 +97,19 @@ async function pushChanges(ctx, changes) {
     return { applied: 0, skipped: 0, conflicts: [], rev: await currentRev(shopId) };
   }
   if (!can(role, 'data.write')) throw forbidden('اجازه‌ی ثبت اطلاعات ندارید', 'permission_denied');
+  //  A16: جدولی که این نقش نمی‌نویسد ⇒ کلِ دسته رد (همه یا هیچ؛ `/api/data/sales/full`
+  //  هم همین‌جا می‌رسد). سه نقشِ قدیم «*»اند و این‌جا هرگز گیر نمی‌کنند.
+  const offTable = changes.find((ch) => {
+    const col = String(ch?.collection || '');
+    return Object.prototype.hasOwnProperty.call(TABLES, col) && !permCore.canWrite(role, col);
+  });
+  if (offTable) {
+    throw forbidden(`این کار در حدِ نقشِ شما نیست (${String(offTable.collection)})`, 'table_not_allowed');
+  }
+  const ruled = changes.some((ch) => permCore.rowRule(role, String(ch?.collection || '')));
+  //  پرچمِ گاوصندوق بیرون از تراکنش و فقط اگر لازم شد (‎lib/safe-flag.js‎)
+  const safeOn = changes.some((r) => V1_ONLY.has(String(r?.collection || '')))
+    && await require('./safe-flag').enabledFor(shopId);
 
   //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
   const guard = ctx.finalized
@@ -91,6 +118,25 @@ async function pushChanges(ctx, changes) {
   //  رویداد پس از تراکنش — در `enforce` همان ردی که تراکنش را برگرداند هم ثبت می‌شود
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);
+    //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت؛ `role-rows.js`).
+    //  راهِ قدیم «ویرایش» و «درج» را از هم جدا نمی‌کند: ردیفِ موجود (حتی حذف‌شده) ویرایش است.
+    //  دسته همه یا هیچ است، پس برگشتی که این‌جا «تازه» است با همین دسته می‌نشیند — مگر کنار
+    //  گذاشته شود (شناسهٔ نادرست یا ردیفِ بزرگ)، که همان‌ها تازه شمرده نمی‌شوند.
+    //  ⛔ درونِ همین تراکنش و پس از `reserveRevs` (قفلِ ردیفِ `shop_rev` ⇐ Pushهای این دکان پشتِ هم):
+    //  وگرنه دو Pushِ هم‌زمان هر دو «جا» می‌دیدند و سهمِ هر قلم دو بار خرج می‌شد (بازبینیِ دومِ #336، د).
+    if (ruled) {
+      const items = changes.map((ch) => {
+        const id = String(ch?.id || '');
+        const data = ch?.data && typeof ch.data === 'object' && !Array.isArray(ch.data) ? ch.data : null;
+        const insert = ch?.deleted !== true && !!data;
+        const fits = insert && id.length <= 80 && Buffer.byteLength(JSON.stringify(data), 'utf8') <= MAX_RECORD_BYTES;
+        return { ch, table: String(ch?.collection || ''), rowId: id, insert, fresh: fits, live: fits, fields: data, unit: 0 };
+      });
+      const rows = async (sql, params) => (await c.query(sql, params)).rows;
+      const res = await roleRows.judge(role, items, roleRows.legacyDb(rows, shopId, userId, TABLES));
+      const bad = items.find((it) => res.has(it) && !res.get(it).ok);
+      if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${bad.table})`, 'table_not_allowed');
+    }
     let applied = 0, skipped = 0;
     const conflicts = [];
     const t = now();
@@ -99,6 +145,12 @@ async function pushChanges(ctx, changes) {
       const collection = String(raw?.collection || '');
       const table = TABLES[collection];
       const recordId = String(raw?.id || '');
+      if (V1_ONLY.has(collection)) {
+        //  پرچمِ خاموش ⇒ همان main: مجموعهٔ ناشناخته، بی‌صدا کنار می‌رود (‎lib/safe-flag.js‎)
+        if (safeOn) conflicts.push({ collection, id: recordId, reason: 'sync_v1_only' });
+        skipped++;
+        continue;
+      }
       if (!table || !recordId || recordId.length > 80) { skipped++; continue; }
 
       const updatedAt = Number(raw.updatedAt) || t;
@@ -179,7 +231,7 @@ async function pushChanges(ctx, changes) {
 
 /** ساخت پرس‌وجوی خواندن تفاضلی روی همه‌ی مجموعه‌ها. */
 const PULL_SQL = (() => {
-  const parts = COLLECTIONS.map(col => `
+  const parts = LEGACY_COLLECTIONS.map(col => `
     SELECT '${col}'::text AS collection, id, rev, updated_at, deleted, user_id, device_id, data
       FROM ${TABLES[col]} WHERE shop_id = $1 AND rev > $2`);
   return `${parts.join(' UNION ALL ')} ORDER BY rev ASC LIMIT $3`;
@@ -246,6 +298,6 @@ async function runIdempotent({ shopId, userId, deviceId, operationId }, fn) {
 }
 
 module.exports = {
-  TABLES, COLLECTIONS, MAX_BATCH, MAX_LIMIT,
+  TABLES, COLLECTIONS, V1_ONLY, LEGACY_COLLECTIONS, MAX_BATCH, MAX_LIMIT,
   pushChanges, pullChanges, currentRev, runIdempotent,
 };
