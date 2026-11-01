@@ -67,8 +67,12 @@ async function verifyIdToken(idToken) {
 
   const nowSec = Math.floor(Date.now() / 1000);
   if (!ISSUERS.includes(payload.iss)) throw forbidden('صادرکننده‌ی توکن گوگل نیست', 'bad_google_token');
-  if (Number(payload.exp) < nowSec - 60) throw forbidden('توکن گوگل منقضی شده است', 'google_token_expired');
-  if (Number(payload.iat) > nowSec + 300) throw forbidden('زمان توکن گوگل درست نیست', 'bad_google_token');
+  //  SEC-AUTH-07: `exp`/`iat`ِ نبوده یا نادرست (NaN) از هر مقایسه‌ای رد می‌شد ⇒ توکنِ بی‌پایان
+  const exp = Number(payload.exp);
+  const iat = Number(payload.iat);
+  if (!Number.isFinite(exp) || !Number.isFinite(iat)) throw forbidden('زمان توکن گوگل درست نیست', 'bad_google_token');
+  if (exp < nowSec - 60) throw forbidden('توکن گوگل منقضی شده است', 'google_token_expired');
+  if (iat > nowSec + 300) throw forbidden('زمان توکن گوگل درست نیست', 'bad_google_token');
 
   const audOk = config.google.clientIds.some(id => {
     const a = Buffer.from(String(payload.aud || ''));

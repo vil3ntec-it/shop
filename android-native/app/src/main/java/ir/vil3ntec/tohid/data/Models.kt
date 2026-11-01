@@ -796,6 +796,8 @@ data class ShopData(
   val stockMovements: List<StockMovement> = emptyList(),
   val priceHistory: List<PriceChange> = emptyList(),
   val auditLog: List<AuditEntry> = emptyList(),
+  /** گاوصندوق (PAY-18) — مجموعهٔ پلهٔ ۴ِ Sync v1 */
+  val safeEntries: List<SafeEntry> = emptyList(),
 )
 
 val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")

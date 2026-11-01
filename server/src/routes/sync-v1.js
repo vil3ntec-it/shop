@@ -39,6 +39,10 @@ const router = express.Router();
 //  اول به‌ازای آی‌پی (برای درخواستِ بی توکن)، بعد به‌ازای **حساب**.
 router.use(rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' }));
 router.use(requireSyncAccount);
+//  گاوصندوق (PAY-18): بقیهٔ درخواستِ دکان زیرِ `ctx` ِ خودش، تا پلهٔ schema ِ پشتِ پرچمِ `sync.safe_entries`
+//  بی رساندنِ `ctx` از `lib/sync-v1.js` خوانده شود — آن پرونده مشترک با پمپ است و دست نمی‌خورد (‎lib/safe-flag.js‎)
+const safeFlag = require('../lib/safe-flag');
+router.use(safeFlag.within);
 router.use(rateLimit({
   max: config.rateLimit.syncMax,
   keyPrefix: 'sync',
@@ -98,10 +102,26 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
  *  داخلِ تراکنشِ push و زیرِ قفلِ ردیف سنجیده می‌شود، نه در میان‌افزار: درجِ همان دسته را هم می‌بیند.
  */
 const finalized = require('../lib/finalized-sales');
+/*
+ *  دکان: pull بی opِ کهنه‌ترِ دیگران روی نوشتهٔ تازه‌ترِ همین دستگاه، پشتِ پرچمِ خاموشِ
+ *  `sync.pull_own_newer` (#501) — ‎lib/sync-v1-own-newer.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد.
+ */
+const ownNewer = require('../lib/sync-v1-own-newer');
+/*
+ *  دکان: cursor ِ دستگاه از تأییدِ خودِ دستگاه، پشتِ پرچمِ خاموشِ `sync.cursor_from_since` (#481) —
+ *  ‎lib/sync-v1-ack.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد؛ پمپ همان مسیرِ پیشین را می‌رود.
+ */
+const ack = require('../lib/sync-v1-ack');
+/*
+ *  دکان: گاوصندوق (PAY-18) — opِ `safeEntries` فقط درج، با شکلِ درست و `safe.move`
+ *  (جز «از دخل») — ‎lib/safe-ledger.js‎. پمپ و بقیهٔ جدول‌ها بی هیچ کاری از آن رد می‌شوند.
+ *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
+ */
+const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
-//  پس نگهبان باید همان دسته‌ای را ببیند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, async (req, res, next) => {
+//  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
@@ -114,14 +134,15 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
 
     let out;
     try {
-      out = await sync.push(req.sync, {
+      //  `since` ِ اختیاریِ بدنه = cursor ِ خودِ دستگاه؛ فقط دکان و فقط با پرچم خوانده می‌شود
+      out = await ack.aroundPush(req.sync, deviceId, req.body?.since, () => sync.push(req.sync, {
         deviceId,
         schemaVersion,
         ops,
         appVersion: String(req.headers['x-app-version'] || '').slice(0, 32),
         queued: Number.isFinite(Number(req.body?.queued)) ? Number(req.body.queued) : null,
         guard,
-      });
+      }));
     } catch (err) {
       //  نسخهٔ برنامه از سرور جلوتر است: هیچ چیزی اعمال نشد و برنامه باید
       //  opها را نگه دارد. شکلِ پاسخ همان بندِ ۲ پرامپت است، نه شکلِ عمومیِ خطا.
@@ -149,7 +170,10 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     });
     const since = Number(req.query?.since || 0);
     const limit = Number(req.query?.limit || 0) || undefined;
-    const out = await sync.pull(req.sync, { since, deviceId, limit });
+    //  دکان با پرچم: cursor ِ ذخیره = `since` ِ همین درخواست، نه آنچه همین پاسخ می‌برد (شاید نرسد)
+    const out = await ack.aroundPull(req.sync, deviceId, since, (from) => sync.pull(req.sync, { since: from, deviceId, limit }));
+    //  فقط دکان با پرچم: فیلد یا opی کم می‌شود؛ cursor، has_more و head همان
+    out.ops = await ownNewer.view(req.sync, deviceId, since, out.ops);
     //  دکان، پرچم‌های `sync.keep_pending` / `sync.revive_full_row` / `sync.gzip_pull` (`lib/sync-v1-keep.js`)
     const keep = await syncKeep.pullExtras(req.sync, out.ops);
     const epoch = await epochFor(req.sync);
@@ -192,7 +216,9 @@ router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
 router.get('/status', async (req, res, next) => {
   try {
     const deviceId = String(req.query?.device_id || req.query?.deviceId || '').slice(0, 64);
-    res.json({ ok: true, ...(await sync.status(req.sync, deviceId)) });
+    const out = await sync.status(req.sync, deviceId);
+    //  جدولِ پشتِ پرچمِ خاموش (گاوصندوق) در فهرستِ دکان نه — همین‌جا، نه در `lib/sync-v1.js` ِ مشترک با پمپ
+    res.json({ ok: true, ...out, tables: safeFlag.tablesFor(req.sync, out.tables) });
   } catch (err) { next(err); }
 });
 

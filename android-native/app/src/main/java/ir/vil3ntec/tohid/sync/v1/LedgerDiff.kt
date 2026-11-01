@@ -41,14 +41,26 @@ object LedgerDiff {
   /**
    *  نسخهٔ Schema — همان عددی که سرور برای `shop` می‌شناسد.
    *  پلهٔ ۳ (F0-04): سه فهرستِ تنظیماتی (`LIST_COLLECTIONS`) هم می‌روند.
+   *  پلهٔ ۴ (PAY-18): گاوصندوق (`safeEntries`)، روی سرور پشتِ پرچمِ `sync.safe_entries`
+   *  ِ هر دکان — پس روی سیم همان [wireSchema] می‌رود، نه این عدد.
    */
-  const val SCHEMA_VERSION = 3
+  const val SCHEMA_VERSION = 4
+
+  /** پله‌ای که هر سرور می‌شناسد (main، پرچمِ گاوصندوق خاموش). */
+  const val BASE_SCHEMA = 3
+
+  /**
+   *  پله‌ای که روی سیم می‌رود: همان که سرور گفته، نه بیشتر — تا روی دکانِ پرچم‌خاموش
+   *  ۴۲۶ نگیرد و صف نایستد. سرورِ ناشناخته (۰) ⇒ [BASE_SCHEMA]. همان `wireSchema` ِ وب.
+   */
+  fun wireSchema(serverSchema: Int): Int = serverSchema.coerceIn(BASE_SCHEMA, SCHEMA_VERSION)
 
   val COLLECTIONS = listOf(
     "products", "warehouseEntries", "sales", "saleItems", "returns",
     "debtors", "transactions", "expenses",
     "suppliers", "purchases", "supplierPayments",
     "stockMovements", "priceHistory", "auditLog",
+    "safeEntries",
   )
 
   /**

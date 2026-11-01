@@ -14,7 +14,8 @@ const { redactPath } = require('./lib/log-redact');
 async function createApp({ runMigrations = true } = {}) {
   const app = express();
   app.disable('x-powered-by');
-  if (config.trustProxy) app.set('trust proxy', true);
+  //  SEC-AUTH-05: فقط پروکسیِ مطمئن (همان قاعدهٔ `clientIp`)، نه هر همسایه‌ای
+  if (config.trustProxy) app.set('trust proxy', (addr) => require('./middleware/ratelimit').trustedPeer(addr));
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
   await plans.seedDefaults();

@@ -325,9 +325,14 @@ class SyncV1Engine private constructor(context: Context) {
       //  §۹.۵: opِ دوباره‌فرستاده (شاید از ساختِ دیگری و پیش از A00) هم بی `caps` — بدترین اثرِ تور «کهنه ماندن» است
       val caps = LedgerDiff.capsFor(batch.map { it.opId }, state.legacyOpsUpTo) && batch.none { restore.isReplay(it.opId) }
       val out = try {
-        client.push(device, batch, queue.size(), caps = caps)
+        client.push(
+          device, batch, queue.size(), caps = caps,
+          schema = LedgerDiff.wireSchema(state.serverSchema),
+        )
       } catch (upgrade: SyncV1Client.UpgradeRequired) {
-        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود
+        //  سرور عقب‌تر است: هیچ opی پاک نمی‌شود. پلهٔ بالاتر از پایه را دیگر نمی‌شناسد (پرچمِ
+        //  گاوصندوقِ دکان خاموش شد)؟ بارِ بعد با پایه — `LedgerDiff.wireSchema`
+        if (LedgerDiff.wireSchema(state.serverSchema) > LedgerDiff.BASE_SCHEMA) state.serverSchema = 0
         state.holding = true
         state.lastError = upgrade.reason
         publish()

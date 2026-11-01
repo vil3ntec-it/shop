@@ -152,7 +152,10 @@ test('پشتیبانِ خالی، پشتیبان حساب نمی‌شود', asyn
   assert.deepEqual(left, [], 'فایل نیمه‌کاره نباید بماند');
 });
 
-test('pg_dump/psql ِ ناموجود ⇒ خطای روشن، نه unhandledRejection یا رویدادِ «error» ِ بی‌شنونده که سرور را می‌خواباند', async () => {
+test('pg_dump/psql ِ ناموجود ⇒ خطای روشن، نه unhandledRejection یا رویدادِ «error» ِ بی‌شنونده که سرور را می‌خواباند', {
+  //  روی PGlite پشتیبان از `runPglite` است و pg_dump صدا زده نمی‌شود؛ این در فقط روی PostgreSQL معنا دارد
+  skip: require('../src/db').isPglite() && 'PGlite: پشتیبان بی pg_dump/psql',
+}, async () => {
   //  پیش‌تر `closed` پیش از `await` رد می‌شد ⇒ unhandledRejection (همان سرخیِ sync-epoch روی PostgreSQL)
   const original = config.backup.pgDump;
   config.backup.pgDump = '/nonexistent/pg_dump-for-test';

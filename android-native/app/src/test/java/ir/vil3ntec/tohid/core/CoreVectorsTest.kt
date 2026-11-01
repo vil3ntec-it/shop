@@ -140,6 +140,30 @@ class CoreVectorsTest {
   }
 
   @Test
+  fun `LOC-02 سه‌ماههٔ مالی و سه‌ماههٔ یک روز`() {
+    for (v in cal.list("fiscalQuarter")) {
+      val want = v.strOrNull("from")?.let { it to v.str("to") }
+      assertEquals("$v", want, SolarHijri.fiscalQuarterRange(v.num("y"), v.num("q")))
+    }
+    for (v in cal.list("fiscalQuarterOf")) {
+      val y = v.getValue("y").let { if (it is JsonNull) null else it.jsonPrimitive.int }
+      assertEquals("$v", y?.let { it to v.num("q") }, SolarHijri.fiscalQuarterOf(v.str("iso")))
+    }
+    //  چهار سه‌ماهه بی شکاف و بی هم‌پوشانی همان سالِ مالی‌اند (۱۳۰۰ تا ۱۵۰۰) — همان سنجشِ JS
+    for (y in 1300..1500) {
+      val year = SolarHijri.fiscalYearRange(y)!!
+      val qs = (1..4).map { SolarHijri.fiscalQuarterRange(y, it)!! }
+      assertEquals("$y", year.first, qs[0].first)
+      assertEquals("$y", year.second, qs[3].second)
+      for (q in 1..3) assertEquals("$y/$q", qs[q].first, CivilDays.addDays(qs[q - 1].second, 1))
+      for (q in 1..4) {
+        assertEquals(y to q, SolarHijri.fiscalQuarterOf(qs[q - 1].first))
+        assertEquals(y to q, SolarHijri.fiscalQuarterOf(qs[q - 1].second))
+      }
+    }
+  }
+
+  @Test
   fun `قمری روز هفته و روز کاری`() {
     for (v in cal.list("lunar")) {
       assertEquals("$v", v.getValue("lunar").ints(), LunarHijri.toLunar(v.str("iso"), v.num("adjust")).ints())

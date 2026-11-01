@@ -119,7 +119,7 @@ async function shop(label) {
 async function phone(acc, ops, device = 'phone') {
   const r = await h.api('POST', '/api/sync/v1/push', {
     token: acc.token, headers: { 'X-App': 'shop', 'X-Device': device },
-    body: { device_id: device, schema_version: core.SCHEMA_VERSION, ops },
+    body: { device_id: device, schema_version: core.BASE_SCHEMA, ops },
   });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.ok(r.body.results.every((x) => x.status === 'applied'), JSON.stringify(r.body.results));

@@ -65,6 +65,9 @@ await E.step('E2E-SYNC.shapes', 'شکلِ ردیف‌های دستگاهِ آز�
   assert.ok(empty.productUnits.length > 0, 'واحدهای پیش‌فرضِ ShopData');
   const kt = fs.readFileSync(path.join(import.meta.dirname, '..', '..', '..', 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'sync', 'v1', 'LedgerDiff.kt'), 'utf8');
   assert.equal(core.SCHEMA_VERSION, Number(/SCHEMA_VERSION = (\d+)/.exec(kt)[1]), 'همان LedgerDiff.SCHEMA_VERSION ِ برنامه');
+  //  دستگاهِ آزمون پلهٔ روی سیم را مثلِ برنامه می‌سازد (`LedgerDiff.wireSchema`، پرچمِ گاوصندوق)
+  assert.equal(core.BASE_SCHEMA, Number(/BASE_SCHEMA = (\d+)/.exec(kt)[1]), 'همان LedgerDiff.BASE_SCHEMA ِ برنامه');
+  assert.deepEqual([0, 2, 3, 4, 9].map(core.wireSchema), [3, 3, 3, 4, 4], 'همان جدولِ SettingListsSyncTest');
   assert.deepEqual([...core.COLLECTIONS].sort(), [...kt.match(/val COLLECTIONS = listOf\(([\s\S]*?)\)/)[1].matchAll(/"(\w+)"/g)].map((m) => m[1]).sort(), 'همان LedgerDiff.COLLECTIONS');
 });
 
@@ -136,11 +139,11 @@ await E.step('E2E-SYNC-12.6', 'جوابِ push گم می‌شود (سرور گر
   const r = A.sell({ lines: [{ id: chai, qty: 1 }] });
   const sent = A.queue.slice();
   //  همان بدنهٔ `SyncV1Client.push` به سرور می‌رسد، ولی پاسخش به دستگاه نمی‌رسد ⇒ صف دست‌نخورده
-  const lost = await A.api('POST', '/sync/v1/push', { device_id: A.deviceId, schema_version: core.SCHEMA_VERSION, queued: sent.length, ops: sent });
+  const lost = await A.api('POST', '/sync/v1/push', { device_id: A.deviceId, schema_version: A.wireSchema(), queued: sent.length, ops: sent });
   assert.equal(lost.status, 200);
   assert.ok(lost.body.results.every((x) => x.status === 'applied'), JSON.stringify(lost.body.results));
   assert.equal(A.queue.length, sent.length, 'صف نباید پاک شده باشد');
-  const again = await A.api('POST', '/sync/v1/push', { device_id: A.deviceId, schema_version: core.SCHEMA_VERSION, queued: sent.length, ops: sent });
+  const again = await A.api('POST', '/sync/v1/push', { device_id: A.deviceId, schema_version: A.wireSchema(), queued: sent.length, ops: sent });
   assert.ok(again.body.results.every((x) => x.status === 'duplicate'), JSON.stringify(again.body.results));
   await A.drain();
   const ops = await db.many(`SELECT COUNT(*)::int AS n FROM oplog WHERE account_id=$1 AND table_name='sales' AND row_id=$2`, [owner.shopId, r.saleId]);

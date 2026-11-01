@@ -40,6 +40,7 @@ const FREE = [
     'PATCH /shop/chat/conversations/:id/messages/:mid', 'DELETE /shop/chat/conversations/:id/messages/:mid',
     'POST /shop/chat/conversations/:id/receipts', 'POST /shop/chat/conversations/:id/media',
     'PUT /shop/chat/conversations/:id/block', 'DELETE /shop/chat/conversations/:id/block', 'POST /shop/chat/conversations/:id/reports',
+    'PUT /shop/chat/conversations/:id/pins/:mid', 'DELETE /shop/chat/conversations/:id/pins/:mid',
     'POST /shop/trust/cases/:id/responses', 'POST /shop/trust/cases/:id/appeal']],
   ['موجودیِ سرور، بانکِ عکس، قاعده و مصرفِ کدِ تخفیف (بخشی از صندوقِ پایه، PRM-02) و رسیدِ اعلان کلیدِ کاتالوگ ندارند', [
     'PUT /shop/catalog/settings', 'POST /shop/catalog/refresh', 'PUT /shop/catalog/products/:id/low',
