@@ -16,7 +16,9 @@
     { "id": "purchase", "kind": "screen", "title": "خرید" },
     { "id": "orders", "kind": "screen", "title": "سفارش‌های اینترنتی" },
     { "id": "stocktake", "kind": "screen", "title": "انبارگردانی" },
-    { "id": "reports", "kind": "screen", "title": "گزارش‌ها" }
+    { "id": "reports", "kind": "screen", "title": "گزارش‌ها" },
+    { "id": "products", "kind": "screen", "title": "محصولات" },
+    { "id": "productGrid", "kind": "window", "parent": "products", "title": "جدولِ ویرایشِ کالا" }
   ],
   "actions": [
     { "id": "global.help", "scope": "global", "title": "راهنمای کلیدهای همین صفحه", "status": "live", "keys": ["F1"], "web": ["Alt+Slash"] },
@@ -107,6 +109,16 @@
 
     { "id": "stocktake.confirm", "scope": "stocktake", "title": "تأیید", "status": "planned", "keys": ["Enter"] },
     { "id": "stocktake.finish", "scope": "stocktake", "title": "بازبینی و پایان", "status": "planned", "keys": ["F9"] },
+
+    { "id": "productGrid.edit", "scope": "productGrid", "title": "ویرایشِ خانه", "status": "live", "keys": ["F2"] },
+    { "id": "productGrid.down", "scope": "productGrid", "title": "ثبتِ خانه و رفتن به پایین", "status": "live", "keys": ["Enter"] },
+    { "id": "productGrid.nextCell", "scope": "productGrid", "title": "خانهٔ بعدی", "status": "live", "keys": ["Tab"] },
+    { "id": "productGrid.prevCell", "scope": "productGrid", "title": "خانهٔ قبلی", "status": "live", "keys": ["Shift+Tab"] },
+    { "id": "productGrid.paste", "scope": "productGrid", "title": "چسباندن از Excel", "status": "live", "keys": ["Mod+V"] },
+    { "id": "productGrid.duplicateRow", "scope": "productGrid", "title": "تکرارِ ردیفِ بالا (جز نام و بارکد)", "status": "live", "keys": ["Mod+D"] },
+    { "id": "productGrid.undo", "scope": "productGrid", "title": "برگرداندن", "status": "live", "keys": ["Mod+Z"] },
+    { "id": "productGrid.save", "scope": "productGrid", "title": "ثبتِ همهٔ تغییرها", "status": "live", "keys": ["Mod+S"] },
+    { "id": "productGrid.cancel", "scope": "productGrid", "title": "لغوِ ویرایشِ خانه؛ بستنِ جدول", "status": "live", "keys": ["Escape"] },
 
     { "id": "reports.drill", "scope": "reports", "title": "ریز شدن در ردیف", "status": "planned", "keys": ["Enter"] },
     { "id": "reports.nextPeriod", "scope": "reports", "title": "دورهٔ بعد", "status": "planned", "keys": ["Plus", "Shift+Equals"] },

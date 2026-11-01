@@ -35,14 +35,15 @@ object ImportTable {
   /**
    *  CSVِ استاندارد: گیومه، گیومهٔ دوتایی، خطِ تازه درونِ گیومه، BOM؛ جداکنندهٔ «;» اگر سرستون بیشتر
    *  «;» دارد تا «,». `tabs` (فقط مسیرِ تازه): «ذخیره به متنِ یونیکد»ِ اکسل تب‌دار است.
-   *  ردیفِ خالی نگه داشته می‌شود تا شمارهٔ ردیف با اکسل یکی بماند.
+   *  ردیفِ خالی نگه داشته می‌شود تا شمارهٔ ردیف با اکسل یکی بماند. `forceSep` (چسباندن از اکسل در
+   *  `DeskGrid`: همیشه تب) حدس را کنار می‌گذارد — «۱,۲۵۰» ِ تک‌خانه دو خانه نشود.
    */
-  fun csv(text: String, tabs: Boolean = false): List<List<String>> {
+  fun csv(text: String, tabs: Boolean = false, forceSep: Char? = null): List<List<String>> {
     val src = text.removePrefix("\uFEFF")
     val firstLine = src.lineSequence().firstOrNull().orEmpty()
     val semi = firstLine.count { it == ';' }
     val comma = firstLine.count { it == ',' }
-    val sep = when {
+    val sep = forceSep ?: when {
       tabs && firstLine.count { it == '\t' } > maxOf(semi, comma) -> '\t'
       semi > comma -> ';'
       else -> ','

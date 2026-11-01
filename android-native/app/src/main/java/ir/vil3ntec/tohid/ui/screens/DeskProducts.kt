@@ -101,6 +101,7 @@ fun DeskProductsScreen(
   var selected by remember { mutableStateOf<Set<String>>(emptySet()) }
   var confirm by remember { mutableStateOf<BulkKind?>(null) }
   var priceOpen by remember { mutableStateOf(false) }
+  var gridIds by remember { mutableStateOf<List<String>?>(null) } // PRD-22: جدولِ ویرایش، همان پرچمِ productTools
   val productTools = remember { ShopPolicy.productTools(context) }
   var results by remember { mutableStateOf<Pair<String, List<BulkRowResult>>?>(null) }
   //  INV-12: ویرایشِ گروهیِ حدها — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
@@ -294,6 +295,7 @@ fun DeskProductsScreen(
                 })
                 //  PRD-21 (پیش‌فرض خاموش): قیمتِ گروهی با پیش‌نمایش، هشدار، تأیید و دلیل
                 if (productTools) add(BulkAction("قیمت", Icons.Filled.Sell) { priceOpen = true })
+                if (productTools) add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrGrid.open, Icons.Filled.TableChart) { gridIds = rows.map { it.id }.filter { it in selected } })
                 add(BulkAction("فعال", Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
                 add(BulkAction("غیرفعال", Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
                 if (levelsOn) add(BulkAction("حدِ موجودی", Icons.Filled.Tune) { levelsInput = true })
@@ -327,6 +329,7 @@ fun DeskProductsScreen(
   }
 
   /* ─────────── پیش‌نمایش و نتیجهٔ کارِ گروهی ─────────── */
+  gridIds?.let { ids -> ProductGridSheet(store, d, ids, remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }, ::toast) { gridIds = null; selected = emptySet() } }
   if (priceOpen) {
     BulkPriceDialog(d, selected, onDismiss = { priceOpen = false }) { r ->
       when (r) {

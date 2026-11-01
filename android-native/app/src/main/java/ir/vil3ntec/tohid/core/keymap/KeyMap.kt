@@ -82,6 +82,8 @@ object KeyMap {
     KeyScope("orders", KeyScope.Kind.SCREEN, "سفارش‌های اینترنتی"),
     KeyScope("stocktake", KeyScope.Kind.SCREEN, "انبارگردانی"),
     KeyScope("reports", KeyScope.Kind.SCREEN, "گزارش‌ها"),
+    KeyScope("products", KeyScope.Kind.SCREEN, "محصولات"),
+    KeyScope("productGrid", KeyScope.Kind.WINDOW, "جدولِ ویرایشِ کالا", parent = "products"),
   )
 
   val GLOBAL_HELP = KeyAction(
@@ -500,6 +502,51 @@ object KeyMap {
     keys = listOf(Chord(KeyName.F9)),
     web = emptyList(),
   )
+  val PRODUCT_GRID_EDIT = KeyAction(
+    "productGrid.edit", "productGrid", "ویرایشِ خانه", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.F2)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_DOWN = KeyAction(
+    "productGrid.down", "productGrid", "ثبتِ خانه و رفتن به پایین", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.Enter)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_NEXT_CELL = KeyAction(
+    "productGrid.nextCell", "productGrid", "خانهٔ بعدی", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.Tab)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_PREV_CELL = KeyAction(
+    "productGrid.prevCell", "productGrid", "خانهٔ قبلی", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.Tab, shift = true)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_PASTE = KeyAction(
+    "productGrid.paste", "productGrid", "چسباندن از Excel", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.V, mod = true)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_DUPLICATE_ROW = KeyAction(
+    "productGrid.duplicateRow", "productGrid", "تکرارِ ردیفِ بالا (جز نام و بارکد)", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.D, mod = true)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_UNDO = KeyAction(
+    "productGrid.undo", "productGrid", "برگرداندن", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.Z, mod = true)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_SAVE = KeyAction(
+    "productGrid.save", "productGrid", "ثبتِ همهٔ تغییرها", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.S, mod = true)),
+    web = emptyList(),
+  )
+  val PRODUCT_GRID_CANCEL = KeyAction(
+    "productGrid.cancel", "productGrid", "لغوِ ویرایشِ خانه؛ بستنِ جدول", KeyStatus.LIVE,
+    keys = listOf(Chord(KeyName.Escape)),
+    web = emptyList(),
+  )
   val REPORTS_DRILL = KeyAction(
     "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.PLANNED,
     keys = listOf(Chord(KeyName.Enter)),
@@ -603,6 +650,15 @@ object KeyMap {
     ORDERS_PAUSE,
     STOCKTAKE_CONFIRM,
     STOCKTAKE_FINISH,
+    PRODUCT_GRID_EDIT,
+    PRODUCT_GRID_DOWN,
+    PRODUCT_GRID_NEXT_CELL,
+    PRODUCT_GRID_PREV_CELL,
+    PRODUCT_GRID_PASTE,
+    PRODUCT_GRID_DUPLICATE_ROW,
+    PRODUCT_GRID_UNDO,
+    PRODUCT_GRID_SAVE,
+    PRODUCT_GRID_CANCEL,
     REPORTS_DRILL,
     REPORTS_NEXT_PERIOD,
     REPORTS_PREV_PERIOD,
