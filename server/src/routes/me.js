@@ -32,7 +32,9 @@ router.get('/', async (req, res) => {
     shop: req.member ? {
       id: req.member.shop_id,
       name: req.member.shop_name || '',
-      role: req.member.role,
+      //  A16: نقشِ تازه در فیلدِ قدیم «staff» (نسخهٔ قدیم)، نقشِ واقعی در `actualRole`
+      role: require('../lib/permissions').legacyRole(req.member.role),
+      actualRole: req.member.role,
       isOwner: req.member.role === 'owner',
     } : null,
     permissions: pol.permissions,
@@ -368,6 +370,8 @@ router.use('/backups', require('./account-backups').makeRouter(
   {
     actor: (req) => ({ userId: req.user ? req.user.id : '', deviceId: req.device ? req.device.id : '' }),
     canDelete: (req) => req.role === 'owner' || req.role === 'manager',
+    //  A16: پشتیبانِ کاملِ دفتر را فقط نقشی می‌فرستد که همهٔ دفتر را می‌نویسد (صاحب، مدیر، شاگرد)
+    canUpload: (req) => require('../lib/perm-core').writable(req.role) === '*',
   }
 ));
 

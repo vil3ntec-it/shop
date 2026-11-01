@@ -332,10 +332,15 @@ test('IMG-11 / IMG-12: نسخهٔ کوچک سنجیده، بی EXIF، یک‌ب�
 test('IMG-BANK-15: بایگانی ⇒ انتخابِ تازه نه، از جست‌وجو بیرون؛ سنجاقِ قبلی سالم', async () => {
   const c = await centralImage({ name: 'پنیر', brand: 'کابل', gtin: F.ean13('400000000001') });
   await S('POST', '/select', A, { product_id: 'cheese-1', source: 'central', image_id: c.imageId, expect: { barcode: F.ean13('400000000001') } });
+  const before = await S('GET', '/search?q=پنیر', B);
+  assert.equal(before.body.items[0].images.length, 1);
   const arch = await AD('POST', `/images/${c.imageId}/archive`, root, { reason: 'بستهٔ قدیمی' });
   assert.equal(arch.status, 200, JSON.stringify(arch.body));
   const s = await S('GET', '/search?q=پنیر', B);
   assert.equal(s.body.items[0].images.length, 0);
+  //  «cache باطل»: نسخهٔ بانک عوض می‌شود ⇒ کشِ بی‌اینترنتیِ برنامه (`BankSearchCache.observe`) صفحه‌های قبلی را دور می‌ریزد
+  assert.ok(Number(s.body.bank_rev) > Number(before.body.bank_rev), `${before.body.bank_rev} → ${s.body.bank_rev}`);
+  assert.equal(s.body.live, true);
   const sel = await S('POST', '/select', B, { product_id: 'c', source: 'central', image_id: c.imageId, confirm: true });
   assert.equal(sel.body.error.code, 'image_not_selectable');
   const a = await S('GET', '/products/cheese-1', A);
@@ -411,6 +416,51 @@ test('IMG-04 (بخشِ بی AI) / IMG-08: اصل محفوظ؛ پردازشِ ب�
   assert.ok(orig.buffer.indexOf(Buffer.from('Exif')) > 0);                    // اصل دست‌نخورده
   const cfg = await S('GET', '/config', A);
   assert.equal(cfg.body.pipeline.find((s) => s.id === 'enhance').status, 'blocked_external');
+});
+
+test('IMG-PRO-09: ابعادِ بسیار بزرگ و سرآیندِ دوگانه از هر درِ بارگذاری امن رد می‌شوند؛ بی ردیف، بی بلاب، سرویس سرپا', async () => {
+  const c = await centralImage({ name: 'کالای آزمونِ بمب', brand: 'آزمون' }, { thumb: false });
+  const bomb = F.pngBomb(16000, 16000);                                      // بمبِ واقعی: ۳۱KB ⇒ ۲۵۶ مگاپیکسل
+  const bad = [
+    ['bomb.png', bomb, 'image_too_large_dimensions'],
+    ['two-sof.jpg', F.jpeg(100, 100, { sof: [40000, 40000], seed: ++seed }), 'image_corrupt'],
+    ['canvas.webp', F.webp(100, 100, { bits: [16000, 16000] }), 'image_corrupt'],
+    ['huge.webp', F.webpLossy(16000, 16000), 'image_too_large_dimensions'],
+  ];
+  const before = { images: await count('images'), versions: await count('image_versions'), blobs: await count('image_blobs'),
+    derivs: await count('image_derivatives') };
+  const timed = async (label, fn) => {
+    const t = Date.now();
+    const r = await fn();
+    assert.ok(Date.now() - t < 2000, `${label}: ${Date.now() - t}ms`);   // سنجشِ سرآیند، نه رمزگشایی
+    return r;
+  };
+  for (const [name, buf, code] of bad) {
+    const shop = await timed(`shop ${name}`, () => SR('POST', '/?product_id=bomb-1', A, buf));
+    assert.deepEqual([shop.status, shop.body.error?.code], [400, code], `دکان، ${name}`);
+    const admin = await timed(`admin ${name}`, () => ADR('POST', '/images', clerk, buf));
+    assert.deepEqual([admin.status, admin.body.error?.code], [400, code], `مدیر، ${name}`);
+    const ver = await timed(`version ${name}`, () => ADR('POST', `/images/${c.imageId}/versions`, clerk, buf));
+    assert.deepEqual([ver.status, ver.body.error?.code], [400, code], `نسخه، ${name}`);
+    const der = await timed(`thumb ${name}`, () => ADR('PUT', `/images/${c.imageId}/v/1/thumb`, clerk, buf));
+    assert.deepEqual([der.status, der.body.error?.code], [400, code], `نسخهٔ کوچک، ${name}`);
+  }
+  assert.deepEqual({ images: await count('images'), versions: await count('image_versions'), blobs: await count('image_blobs'),
+    derivs: await count('image_derivatives') }, before);
+
+  //  ورودِ گروهی: فقط همان فایل «ناموفق»، بی بلاب؛ دسته باز می‌ماند و فایلِ بعدی می‌نشیند
+  const batch = await AD('POST', '/batches', clerk, { license_source: 'آزمونِ بمب', license_status: 'unknown' });
+  for (const [name, buf, code] of bad) {
+    const r = await timed(`batch ${name}`, () => ADR('PUT', `/batches/${batch.body.id}/files/${name}`, clerk, buf));
+    assert.deepEqual([r.status, r.body.status, r.body.error], [200, 'failed', code], name);
+  }
+  assert.equal(await count('image_blobs'), before.blobs);
+  const ok = await ADR('PUT', `/batches/${batch.body.id}/files/ok.jpg`, clerk, img());
+  assert.deepEqual([ok.status, ok.body.status], [200, 'ok']);
+  const rep = await AD('GET', `/batches/${batch.body.id}/report`, clerk);
+  assert.equal(rep.status, 200);
+  assert.equal(rep.body.status, 'open');
+  assert.equal((await h.get('/health')).status, 200);
 });
 
 test('IMG-BANK-01 / IMG-01 / IMG-02 / IMG-03 / IMG-09: ۱۰۰۰ ردیفِ CSV با فایل‌ها؛ گزارشِ جدا، بی توقفِ دسته، retryِ بی‌تکرار', async () => {

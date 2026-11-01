@@ -20,4 +20,9 @@ object PayDevice {
   @Suppress("UNUSED_PARAMETER")
   @Composable
   fun HceForeground(active: Boolean) = Unit
+
+  /** کامپیوتر پنجرهٔ دومِ خودش را دارد (`CustomerDisplayScreen`، HW-10) که همان `CustomerPay` را می‌خواند */
+  @Suppress("UNUSED_PARAMETER")
+  @Composable
+  fun CustomerScreen(active: Boolean, content: @Composable () -> Unit) = Unit
 }

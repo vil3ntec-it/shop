@@ -152,11 +152,17 @@ data class PromoForm(
   val code: String = "",
   val active: Boolean = true,
   val allowBelowCost: Boolean = false,
+  /**
+   *  PRM-02 — «سقفِ مصرفِ کد»؛ `null` = فرم نشانش نمی‌دهد (پرچمِ `redeem` ِ سرور خاموش) و سقفِ قاعدهٔ پایه
+   *  دست نمی‌خورد (همان رفتارِ پیشین)؛ خالی = بی سقف.
+   */
+  val maxUses: String? = null,
 ) {
   companion object {
     private fun num(d: Double): String = if (d == Math.floor(d)) d.roundToLong().toString() else d.toString()
 
-    fun of(r: PromoCore.Rule): PromoForm = PromoForm(
+    /** @param uses پرچمِ `redeem` ِ سرور روشن است ⇒ فرم «سقفِ مصرف» را نشان می‌دهد */
+    fun of(r: PromoCore.Rule, uses: Boolean = false): PromoForm = PromoForm(
       name = r.name,
       kind = r.kind.ifEmpty { "percent" },
       pct = if (r.kind == "bxgy" || r.kind == "percent") num(r.bp / 100.0) else "10",
@@ -186,6 +192,7 @@ data class PromoForm(
       code = r.code,
       active = r.active,
       allowBelowCost = r.allowBelowCost,
+      maxUses = if (!uses) null else if (r.maxUses > 0) r.maxUses.toString() else "",
     )
 
     /** «۱۴:۳۰» ⇒ دقیقه؛ خالی ⇒ -1؛ نادرست ⇒ -2 (که `validate` رد می‌کند) */
@@ -254,6 +261,12 @@ data class PromoForm(
           if (tierAmount) PromoCore.Tier(min = minor(a), amountMinor = minor(b)) else PromoCore.Tier(min = minor(a), bp = bp(b))
         }
         else -> emptyList()
+      },
+      //  سقف فقط برای کد شمرده می‌شود (دفترِ مصرفِ سرور)؛ نادرست ⇒ -1 تا `validate` بگیرد («uses»)
+      maxUses = when {
+        maxUses == null -> base.maxUses
+        code.isBlank() || maxUses.isBlank() -> 0L
+        else -> int(maxUses, -1L)
       },
       buy = if (kind == "bxgy") int(buy, 0) else 0,
       get = if (kind == "bxgy") int(get, 0) else 0,

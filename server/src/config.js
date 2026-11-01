@@ -364,6 +364,8 @@ const config = {
     accountTicketMaxMs: num(process.env.STORE_ACCOUNT_TICKET_MAX_MIN, 10) * 60 * 1000,
     //  CHK-02 — نشستِ حسابِ مشتری (لغوشدنی) چند روز می‌ماند
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
+    //  TEN-03 — لینکِ پیگیریِ سفارش (پرچمِ `shop.storefront.link_expiry`) چند روز پس از صدور کار می‌کند
+    trackLinkTtlMs: num(process.env.STORE_TRACK_LINK_DAYS, 30) * 24 * 60 * 60 * 1000,
   },
 
   /**

@@ -63,4 +63,29 @@ object StrPay {
   )
   val nothingDue: String get() = t("چیزی برای پرداخت نمانده", "Nothing is left to pay", "د ورکړې لپاره څه نه دي پاتې")
   val needsReview: String get() = t("این پرداخت دیر رسید و مدیر باید بررسی‌اش کند", "This payment arrived late and needs a manager's review", "دا ورکړه ناوخته ورسېده او مدیر یې باید وګوري")
+
+  // نمایشگرِ رو به مشتری
+  val customerAmount: String get() = t("مبلغِ قابلِ پرداخت", "Amount to pay", "د ورکړې مبلغ")
+  val customerScan: String get() = t("این کد را با برنامهٔ حساب‌پی اسکن کنید", "Scan this code with the HesabPay app", "دا کوډ د حساب‌پې په اپ سکن کړئ")
+  val customerPaid: String get() = t("پرداخت شد — سپاس از خرید شما", "Paid — thank you for your purchase", "ورکړه وشوه — له پېرود مو مننه")
+
+  // کارت‌خوان (آداپتورِ دستی)
+  val cardTerminal: String get() = t("کارت‌خوان", "Card terminal", "د کارت ماشین")
+  val terminalCharge: String get() = t(
+    "این مبلغ را روی کارت‌خوان بزنید؛ پس از تأییدِ کارت‌خوان، شمارهٔ تأیید یا مرجعِ رسیدش را بنویسید",
+    "Enter this amount on the card terminal; once it approves, type the approval or reference number from its receipt",
+    "دا مبلغ د کارت په ماشین کې ولیکئ؛ له تایید وروسته د هغې د رسید د تایید یا مرجع شمېره ولیکئ",
+  )
+  val terminalRef: String get() = t("شمارهٔ تأیید یا مرجع", "Approval or reference number", "د تایید یا مرجع شمېره")
+  val terminalLast4: String get() = t("چهار رقمِ آخرِ کارت (اختیاری)", "Last four digits of the card (optional)", "د کارت وروستۍ څلور شمېرې (اختیاري)")
+  val terminalBadRef: String get() = t("۴ تا ۳۲ حرف یا رقمِ لاتین", "4 to 32 Latin letters or digits", "له ۴ تر ۳۲ لاتیني توري یا شمېرې")
+  val terminalBadCard: String get() = t("فقط چهار رقم", "Exactly four digits", "یوازې څلور شمېرې")
+  val terminalApprove: String get() = t("تأیید شد", "Approved", "تایید شو")
+  val terminalDeclined: String get() = t("رد شد", "Declined", "رد شو")
+  val terminalAdded: String get() = t(
+    "ردیفِ کارت افزوده شد (ثبتِ دستی، در انتظارِ تأیید) — حالا فروش را ثبت کنید",
+    "Card row added (manual entry, pending confirmation) — now record the sale",
+    "د کارت کرښه زیاته شوه (لاسي ثبت، د تایید په تمه) — اوس پلور ثبت کړئ",
+  )
+  val terminalDeclinedNote: String get() = t("کارت رد شد — روشِ دیگری انتخاب کنید", "The card was declined — choose another method", "کارت رد شو — بله لاره وټاکئ")
 }

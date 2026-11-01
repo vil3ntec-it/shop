@@ -619,7 +619,10 @@ object ReturnFlow {
           entries += WarehouseEntry(
             id = newId(), productId = line.productId, units = line.qty, unit = product?.unit.orEmpty(),
             date = today, notes = "برگشتِ بی رسید $tag — $reason", isAdjustment = true, createdAt = now,
-            refId = req.docId,
+            //  نوعِ اصلاح «برگشتِ مشتری»: نگهبانِ نقش (A16، `PermCore.checkRows`) اصلاحِ موجودیِ
+            //  قلمِ برگشت را از رسیدِ انبارِ دستی همین‌طور جدا می‌کند (isAdjustment، بی قیمت، همان
+            //  کالا و نه بیش از مقدارِ قلم، یک اصلاح برای هر قلم) — صندوق‌دار فقط این را می‌نویسد
+            adjKind = "customer_return", refId = req.docId,
           )
         }
       }

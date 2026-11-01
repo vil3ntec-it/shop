@@ -122,4 +122,29 @@ class ProductToolsTest {
     assertEquals(listOf("p2", "احمد", "فاکتورِ تازه"), listOf(ch.productId, ch.by, ch.reason))
     assertEquals(250.0, ch.newPrice, 0.0)
   }
+
+  @Test fun `PRD-06 برند و برچسب ثبت و ویرایش می‌شوند؛ null یعنی دست نخورد و کالای بی برند همان JSON`() {
+    val added = ok(WarehouseEngine.addProduct(base,
+      WarehouseEngine.ProductDraft(name = "قند", unit = "عدد", salePrice = 50.0, brand = "  کابل   فود ", tags = listOf("تخفیفی", " ارگانیک ", "تخفيفي")),
+      0, ::newId))
+    val p = added.data.products.first { it.id == added.id }
+    assertEquals("کابل فود", p.brand)
+    assertEquals(listOf("تخفیفی", "ارگانیک"), p.tags)
+    //  ویرایش بی این دو (پرچمِ خاموش) ⇒ همان
+    val kept = ok(WarehouseEngine.editProduct(added.data, added.id,
+      WarehouseEngine.ProductDraft(name = "قند", unit = "عدد", salePrice = 55.0), "2026-10-30", 0, ::newId))
+      .data.products.first { it.id == added.id }
+    assertEquals("کابل فود", kept.brand)
+    assertEquals(listOf("تخفیفی", "ارگانیک"), kept.tags)
+    //  خالی ⇒ پاک، و سابقه می‌گوید
+    val cleared = ok(WarehouseEngine.editProduct(added.data, added.id,
+      WarehouseEngine.ProductDraft(name = "قند", unit = "عدد", salePrice = 50.0, brand = " ", tags = emptyList()), "2026-10-30", 0, ::newId))
+    val c = cleared.data.products.first { it.id == added.id }
+    assertNull(c.brand)
+    assertNull(c.tags)
+    assertTrue(cleared.data.auditLog.any { it.type == "product_edit" && "برند" in it.notes })
+    //  کالای بی برند و برچسب: هیچ کلیدِ تازه‌ای در JSON (همان تنظیمِ دفتر)
+    val json = Json { encodeDefaults = true }.encodeToString(Product.serializer(), base.products.first())
+    assertFalse(json, "\"brand\"" in json || "\"tags\"" in json)
+  }
 }
