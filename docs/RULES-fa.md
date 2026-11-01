@@ -570,6 +570,8 @@ PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ 
 `ShopPolicy.productTools` (`tohid-policy` ⇐ `product_tools`، پیش‌فرض خاموش؛ «تنظیمات ⇐ ابزارهای تازهٔ کالا»): هشدارِ «نامِ مشابه» در فرم
 و ورود از فایل و کادرِ «بارکدها» (PRD-19، PRD-04؛ #459، باز)، نام و دلیلِ تغییرِ قیمت و «قیمتِ گروهی» با پیش‌نمایش و تأیید (PRD-14،
 PRD-21؛ #466، باز) و برند و برچسب (PRD-06؛ #473، باز). ⛔ رفعِ «ویرایش بارکدهای دیگر را پاک می‌کرد» (#476) پشتِ هیچ پرچمی نیست.
+دلیل‌های برگشتِ دکان، خالی ⇒ پیش‌فرضِ `core/returns/ReturnReasons` (RET-08، باز)، `crm_reports` = گزارش‌های مشتری (`ShopPolicy`، #330، main)؛ `line_pricing`، `line_price_direction`، `free_line_cap_minor` = قیمت و تخفیفِ ردیف (`LinePolicyPrefs`، POS-08/10/20/21، باز)؛
+`ShopPolicy.stockInsight` / `tohid-policy:stock_insight` «تحلیلِ موجودی» در گزارشِ کالاها: ارزش، سودِ بالقوه و ABC، فقط خواندنی (INV-15/16، #438، باز)؛ `ShopPolicy.stockLevels` / `tohid-policy:stock_levels` «نقطهٔ سفارش و بیشینه»: دو کادرِ فرمِ کالا، ویرایشِ گروهیِ حدها و «نیاز به سفارش»؛ فیلدهای افزودنیِ `Product.reorderPoint`/`maxStock` (`NEVER`) فقط با روشن بودن نوشته می‌شوند (INV-12، #438، باز).
 
 ### v3 · سهم‌بندیِ شماره‌های مهاجرت
 

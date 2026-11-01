@@ -63,6 +63,33 @@ object ShopPolicy {
   }
 
   /**
+   *  «تحلیلِ موجودی» در گزارشِ کالاها: ارزش به بها و به قیمتِ فروش، سودِ بالقوه (INV-16) و تحلیلِ
+   *  ABC (INV-15) — `ReportEngine.stockInsight` روی `core` (`StockAnalysis`). پیش‌فرض **خاموش**: تا
+   *  دکان‌دار خودش روشن نکند، گزارش‌ها همان است که بود. فقط خواندنی؛ هیچ داده‌ای نمی‌نویسد. فقط همین دستگاه.
+   */
+  private const val STOCK_INSIGHT = "stock_insight"
+
+  fun stockInsight(context: Context): Boolean = prefs(context).getBoolean(STOCK_INSIGHT, false)
+
+  fun setStockInsight(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(STOCK_INSIGHT, on).apply()
+  }
+
+  /**
+   *  «نقطهٔ سفارش و بیشینه» (INV-12): دو کادرِ تازه در فرمِ کالا، ویرایشِ گروهیِ «حدِ موجودی» در فهرستِ
+   *  کالاهای کامپیوتر و فهرستِ «نیاز به سفارش» با پیشنهادِ «تا بیشینه» در گزارش‌ها. پیش‌فرض **خاموش**:
+   *  فرم و فهرست همان امروزند. روشن ⇒ فقط دو فیلدِ افزودنیِ کالا (`reorderPoint`، `maxStock`) نوشته
+   *  می‌شوند و همگام می‌شوند؛ دستگاهی که خاموش است آن‌ها را نمی‌بیند ولی پاکشان هم نمی‌کند. فقط همین دستگاه.
+   */
+  private const val STOCK_LEVELS = "stock_levels"
+
+  fun stockLevels(context: Context): Boolean = prefs(context).getBoolean(STOCK_LEVELS, false)
+
+  fun setStockLevels(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(STOCK_LEVELS, on).apply()
+  }
+
+  /**
    *  CRM-03 / S07 — سقفِ اعتبار در صندوق: فروشِ نسیه‌ای که ماندهٔ مشتری را از سقفش می‌گذراند بی تأییدِ
    *  مدیر/صاحب ثبت نمی‌شود (`SalesEngine.Checkout.creditGate`، `CreditGate`). پیش‌فرض **خاموش**: صندوق
    *  همان است که بود؛ سقف فقط در دفترِ قرض سنجیده می‌شود. فقط روی همین دستگاه.

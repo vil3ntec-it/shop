@@ -153,6 +153,8 @@ object OwnerExport {
     "alternatives" to "کالاهای جایگزین",
     "customFields" to "فیلدهای سفارشی",
     "brand" to "برند",
+    "reorderPoint" to "نقطهٔ سفارش",
+    "maxStock" to "حداکثر موجودی",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",
