@@ -120,7 +120,7 @@ async function stateOf(shopId) {
   ]);
   const flag = ordersFlag && storefrontFlag;
   const entitled = ent.features.includes(FEATURE_KEY) && ent.features.includes(orders.FEATURE_KEY);
-  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ent };
+  return { flag, ordersFlag, storefrontFlag, entitled, enabled: flag && entitled, ...(await require('./storefront-intake').stateOf(shopId, ent, flag && entitled, FEATURE_KEY)), ent };   //  SUB-10 همین `enabled`؛ #467: accepting و…
 }
 
 /** ویترینِ عمومی — یا ۴۰۴؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب‌اند. */
@@ -137,7 +137,7 @@ async function open(slug) {
     [s]
   );
   if (!row || row.enabled !== true || row.shop_status !== 'active' || row.trust_suspended === true) throw gone();
-  if (!(await stateOf(row.shop_id)).enabled) throw gone();
+  if (!require('./storefront-intake').onRow(row, await stateOf(row.shop_id)).enabled) throw gone();   //  SUB-10: بسته ⇒ ۴۰۴؛ #467: accepting روی ردیف
   return row;
 }
 
@@ -622,7 +622,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
   const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn, from }), { shopId: sf.shop_id, phone: verified });
-  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
+  const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
   return {

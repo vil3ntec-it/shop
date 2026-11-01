@@ -66,6 +66,10 @@ data class MediaFile(val version: Long, val width: Int = 0, val height: Int = 0,
 @Serializable
 data class ShopMedia(val logo: MediaFile? = null, val header: MediaFile? = null)
 
+/** «سفارش می‌پذیرد؟» ِ ویترین (#467): `accepting=false` ⇒ ثبتِ سفارش بسته، با کد و پیامِ سرور */
+@Serializable
+data class StoreOrdering(val accepting: Boolean = true, val code: String? = null, val message: String? = null)
+
 /**
  * §۱.۱ — پروفایلِ عمومیِ دکان (`GET /api/store/:slug` ⇒ `store`).
  * `delivery` (ناحیه و زمان‌بندی، §۱.۵) بیرون از این نسخهٔ مدل است و نادیده گرفته می‌شود.
@@ -85,6 +89,8 @@ data class PublicShop(
   val payment: Payment = Payment(),
   val categories: List<String> = emptyList(),
   val media: ShopMedia = ShopMedia(),
+  /** «سفارش می‌پذیرد؟» (#467) — فقط با پرچمِ `shop.orders.subscribers_only`؛ نبودن = همان رفتارِ پیشین */
+  val ordering: StoreOrdering? = null,
 )
 
 /** §۱.۴ — نشانِ موجودی. عددها فقط وقتی دکان «دقیق» را خواسته. */
