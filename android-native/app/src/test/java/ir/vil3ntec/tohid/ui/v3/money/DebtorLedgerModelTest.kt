@@ -64,6 +64,20 @@ class DebtorLedgerModelTest {
   }
 
   @Test
+  fun statementImageOnlyWithCrmSwitchAndTransactions() {
+    //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن و فقط وقتی تراکنشی هست
+    assertEquals(
+      listOf(Action.EDIT, Action.STATEMENT_CSV, Action.PRINT, Action.STATEMENT_IMAGE, Action.DELETE),
+      DebtorLedgerModel.actions("", hasTransactions = true, image = true),
+    )
+    assertEquals(listOf(Action.EDIT, Action.DELETE), DebtorLedgerModel.actions("", hasTransactions = false, image = true))
+    assertEquals(
+      listOf(Action.EDIT, Action.STATEMENT_CSV, Action.PRINT, Action.DELETE),
+      DebtorLedgerModel.actions("", hasTransactions = true, image = false),
+    )
+  }
+
+  @Test
   fun `شماره — رقمِ فارسی لاتین، فاصله‌ها حذف، واتساپ بی «+»`() {
     assertEquals("0792236008", DebtorLedgerModel.dialable("۰۷۹ ۲۲۳ ۶۰۰۸"))
     assertEquals("+93792236008", DebtorLedgerModel.dialable("+93 79 223 6008"))

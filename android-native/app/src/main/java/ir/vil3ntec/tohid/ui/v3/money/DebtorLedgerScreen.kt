@@ -104,7 +104,11 @@ internal fun DebtorLedgerScreen(
   val stagger = rememberV3Stagger(id)
   var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
   val tasks = rememberDebtorTasks(d, account, actions)
-  val available = DebtorLedgerModel.actions(account.debtor.phone, account.transactions.isNotEmpty())
+  val available = DebtorLedgerModel.actions(
+    account.debtor.phone, account.transactions.isNotEmpty(),
+    //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
+    image = ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context),
+  )
   val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
   //  دو ستون فقط وقتی جا هست (کامپیوتر، تبلت) — پنجرهٔ باریک همان چیدمانِ گوشی
