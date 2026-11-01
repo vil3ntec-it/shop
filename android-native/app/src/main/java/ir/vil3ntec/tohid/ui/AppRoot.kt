@@ -94,6 +94,7 @@ private val PAGE_TITLES: Map<String, String> get() = mapOf(
   "team" to Str.staff,
   "orders" to Str.orders,
   "storefront" to Str.storefront,
+  "stockbook" to "دفترِ موجودی",
   "promos" to StrShell.promos,
   //  میزِ تحویل (C01) — فقط وقتی سرور پرچمِ `shop.delivery` را روشن گفته
   "delivery" to StrNav.deliveryDesk,
@@ -125,6 +126,8 @@ fun AppRoot(
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
   val context = LocalContext.current
+  //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
@@ -167,7 +170,7 @@ fun AppRoot(
       .onSuccess { state ->
         needsShop = !state.hasShop
         //  نقش از همین‌جا می‌آید؛ درخواستِ جدا لازم نیست
-        state.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
+        state.effectiveRole?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
         //  لایه‌های مجوزِ دکان (STF-01..03) — نبودنش یعنی همان رفتارِ امروزِ نقش
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberPolicy(context, state.policy?.toString())
         if (state.hasShop) ir.vil3ntec.tohid.data.ShopRole.rememberShopId(context, state.shop?.id)
@@ -217,6 +220,16 @@ fun AppRoot(
    */
   val lockStore = remember { ir.vil3ntec.tohid.data.LockStore(context) }
   var unlocked by rememberSaveable { mutableStateOf(false) }
+  //  Ctrl+L (STF-04): قفلِ صندوق همین حالا. بی رمزِ برنامه قفلی نیست که بیفتد —
+  //  پس فقط راهش گفته می‌شود (پیام پایین‌تر، کنارِ بقیهٔ پیام‌ها).
+  val lockAsk by AppNav.lockNow
+  var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }
+  var lockHint by remember { mutableStateOf(0) }
+  LaunchedEffect(lockAsk) {
+    if (lockAsk == lockSeen) return@LaunchedEffect
+    lockSeen = lockAsk
+    if (lockStore.enabled) unlocked = false else lockHint++
+  }
 
   /*
    *  قفلِ خودکار پس از بی‌کاری — STF-05. آخرین لمس/کلید روی ساعتِ یکنوا؛
@@ -375,6 +388,21 @@ fun AppRoot(
         actionLabel = Str.renew, duration = SnackbarDuration.Long,
       )
       if (r == SnackbarResult.ActionPerformed) AppNav.go("vip")
+    }
+  }
+  LaunchedEffect(lockHint) {
+    if (lockHint == 0) return@LaunchedEffect
+    snackbar.currentSnackbarData?.dismiss()
+    snackbar.showSnackbar("برای قفلِ صندوق با Ctrl+L، اول در «تنظیمات» رمزِ برنامه را بگذارید.")
+  }
+  //  سدِ نقش (A16): کاری بیرون از حدِ نقشِ این کارمند ⇐ ثبت نشد، و راستش گفته می‌شود
+  LaunchedEffect(store) {
+    store.roleBlocked.collect { (part, role) ->
+      snackbar.currentSnackbarData?.dismiss()
+      snackbar.showSnackbar(
+        "ثبت نشد — «$part» در حدِ نقشِ شما ($role) نیست. اگر لازم است، صاحب دکان نقشتان را در «کارمندان» عوض کند.",
+        duration = SnackbarDuration.Long,
+      )
     }
   }
   //  دفتر روی دیسک ننشست (F0-01) ⇐ پیامِ «ثبت شد»ِ صفحه برداشته و راستش
@@ -786,7 +814,7 @@ fun AppRoot(
         "settings" ->
           if (ir.vil3ntec.tohid.data.ShopRole.canOpenSettings(context)) {
             if (Platform.DESKTOP) DeskSettings(
-              listOf(
+              listOfNotNull(
                 StrSettings.language to androidx.compose.material.icons.Icons.Filled.Language,
                 Str.alerts to androidx.compose.material.icons.Icons.Filled.NotificationsActive,
                 Str.appearance to androidx.compose.material.icons.Icons.Filled.Palette,
@@ -798,6 +826,8 @@ fun AppRoot(
                 ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
                 ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
                 ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
+                //  پرچمِ `shop.stock_v2` خاموش ⇒ بی ستونِ «موجودی و بها» (کارتش هم پنهان است)
+                if (ir.vil3ntec.tohid.data.StockLedger.serverFlag) ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz else null,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale,
@@ -886,7 +916,10 @@ fun AppRoot(
           openProductId = pendingProduct,
           newBarcode = pendingBarcode,
           onConsumed = { pendingBarcode = null; pendingProduct = null },
+          onStockBook = { open("stockbook") },
         )
+        //  «دفترِ موجودی» — موتورِ تازهٔ موجودی و بها (پیش‌فرض خاموش؛ خاموش ⇒ فقط راهِ تنظیمات)
+        "stockbook" -> ir.vil3ntec.tohid.ui.screens.StockBookScreen(store, data, snackbar) { open("settings") }
         "vip" -> VipScreen { sub = null }
         "myplan" -> MySubscriptionScreen()
         "support" -> SupportScreen { sub = null }

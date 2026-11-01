@@ -18,6 +18,7 @@
  */
 //  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
 process.env.PAYMENTS_PROVIDER = 'fake';
+process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-route-inventory';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -191,7 +192,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend', 'shop.purchase_orders'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 
@@ -468,6 +469,12 @@ async function seedShop(a) {
   assert.equal(pi.status, 201, JSON.stringify(pi.body));
   ids.paymentIntent = pi.body.id;
 
+  //  فهرستِ سیاهِ ویترینِ «الف» (RSK-04؛ پرچمِ `shop.order_risk` در FLAGS)
+  const listed = await h.post('/api/shop/orders/risk/lists',
+    { list: 'block', kind: 'phone', phone: '0791112255', reason: 'آزمونِ جداسازی', expiresInDays: 30 }, { token: a.accessToken });
+  assert.equal(listed.status, 201, JSON.stringify(listed.body));
+  ids.riskEntry = listed.body.entry.id;
+
   return { ids, staff, courier };
 }
 
@@ -487,6 +494,7 @@ function concreteFor(ids) {
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
     [/(\/amendments\/):amendId/, ids.amend],
+    [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],

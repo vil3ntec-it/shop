@@ -44,6 +44,8 @@ data class OrdersConfigDto(
   val handoverSince: Long? = null,
   /** پرچمِ خاموشِ `shop.orders.picking` (PCK): برگهٔ جمع‌آوری به‌جای گذارهای سادهٔ «جمع‌آوری/بسته‌بندی» */
   val picking: Boolean = false,
+  /** ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی (CHK-15، پرچمِ `shop.orders.substitution`) */
+  val substitution: Boolean = false,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -92,6 +94,8 @@ data class OrderLineDto(
   val lineTotalMinor: Long = 0,
   val note: String = "",
   val substitution: String = "",
+  /** «کالای مشخص»: نامِ جایگزین (CHK-15) */
+  val substituteName: String = "",
 )
 
 @Serializable
@@ -138,6 +142,8 @@ data class OrderDto(
   val canContact: Boolean = false,
   val address: OrderAddressDto = OrderAddressDto(),
   val note: String = "",
+  /** ترجیحِ کلیِ جایگزینی (CHK-15)؛ هر قلم ترجیحِ مؤثرِ خودش را دارد */
+  val substitution: String = "",
   val subtotalMinor: Long = 0,
   val discountMinor: Long = 0,
   val deliveryFeeMinor: Long = 0,

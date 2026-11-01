@@ -240,9 +240,10 @@ fun DeskSaleScreen(
     if (term.isNotEmpty()) matches else PosCatalog.byCategory(d.products, category)
   }
 
-  fun applyAdded(product: Product, added: SalesEngine.Added) {
+  /** `false` ⇒ سبد قفل بود و چیزی اضافه نشد (پیامِ «اضافه شد» نباید بیاید) */
+  fun applyAdded(product: Product, added: SalesEngine.Added): Boolean {
     //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد؛ بوقِ خطا تا دوباره اسکن شود
-    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
+    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return false }
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -250,9 +251,22 @@ fun DeskSaleScreen(
         //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
         ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoSearch))
     } else ScanFeedback.ok(context)
+    return true
   }
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
+
+  /**
+   *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
+   *  سری برداشته می‌شود (`StockActions.lotForCode`). خاموش یا ناشناس ⇒ false (رفتارِ امروز).
+   */
+  fun addLot(code: String, dd: ShopData = d): Boolean {
+    val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
+    val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
+    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ShopStore.stock(dd, pid))
+    if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast("${product.name} — سری $lot به سبد اضافه شد")
+    return true
+  }
 
   /**
    *  POS-29: برچسبِ ترازو (فقط اگر دکان قاعده‌اش را روشن کرده باشد) — وزن
@@ -274,7 +288,7 @@ fun DeskSaleScreen(
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
       is PosHit.Add -> { add(hit.product, hit.count); query = "" }
-      is PosHit.Unknown -> {
+      is PosHit.Unknown -> if (addLot(hit.code)) query = "" else {
         ScanFeedback.unknown(context)
         scope.launch {
           val r = snackbar.showSnackbar(StrSale.notFound(hit.code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
@@ -297,7 +311,7 @@ fun DeskSaleScreen(
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
-      else -> scope.launch {
+      else -> if (!addLot(code, dd)) scope.launch {
         ScanFeedback.unknown(context)
         val r = snackbar.showSnackbar(StrSale.barcodeUnregistered(code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
@@ -393,7 +407,7 @@ fun DeskSaleScreen(
     }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
-    scope.launch { when (val posted = cartStore.post(store) { key ->
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
       ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo) }) {
