@@ -1,0 +1,170 @@
+{
+  "format": "tohid-hashchain-v1",
+  "version": 1,
+  "about": "بردارِ مرجعِ زنجیرهٔ اسنادِ دستگاه (SEC-02، بخشِ ۱۰.۳). ساخته‌شده با server/scripts/doc-chain-vectors.js — دستی ویرایش نشود. Kotlin (core/audit/DocChain، DocChainVectorsTest) همین خط‌ها را می‌سازد و سرور (lib/doc-chain.js، doc-chain.test.js) همین حلقه‌ها را می‌پذیرد. مبلغ به پول (کوچک‌ترین واحد)، مقدار به هزارم؛ سند بی دادهٔ شخصی.",
+  "rules": {
+    "chain": "doc/<shopId>/<series>/<epoch>",
+    "doc": "canonicalJson of { chain, seq, kind:\"doc\", type:\"sale\", v:1, id, series, no, status:\"posted\", postedAt, by? (when non-empty), customerId? (when non-empty), currency, qtyScale:1000, lines:[{productId, qty, unitPrice, amount}], subtotal, discount, total, paid, method }",
+    "pick": "sales of this series with no >= startNo and no > last chained no, ascending by no, one per no",
+    "line": "L1 TAB seq TAB prevHash TAB hash TAB type TAB ref TAB no TAB body (one line per link, LF-terminated)"
+  },
+  "shopId": "shp_vec01",
+  "series": "B1",
+  "epoch": 1,
+  "chain": "doc/shp_vec01/B1/1",
+  "by": "usr_vec01",
+  "startNo": 7,
+  "sales": [
+    {
+      "id": "sal_old",
+      "series": "B1",
+      "no": 6,
+      "postedAt": 1761800000000,
+      "customerId": null,
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_rice",
+          "qty": 1000,
+          "unitPrice": 5000,
+          "amount": 5000
+        }
+      ],
+      "subtotal": 5000,
+      "discount": 0,
+      "total": 5000,
+      "paid": 5000,
+      "method": "cash"
+    },
+    {
+      "id": "sal_01",
+      "series": "B1",
+      "no": 7,
+      "postedAt": 1761800100000,
+      "customerId": null,
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_rice",
+          "qty": 1500,
+          "unitPrice": 5000,
+          "amount": 7500
+        },
+        {
+          "productId": "p_oil",
+          "qty": 2000,
+          "unitPrice": 12550,
+          "amount": 25100
+        }
+      ],
+      "subtotal": 32600,
+      "discount": 600,
+      "total": 32000,
+      "paid": 32000,
+      "method": "cash"
+    },
+    {
+      "id": "sal_a1",
+      "series": "A1",
+      "no": 8,
+      "postedAt": 1761800150000,
+      "customerId": null,
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_tea",
+          "qty": 1000,
+          "unitPrice": 9000,
+          "amount": 9000
+        }
+      ],
+      "subtotal": 9000,
+      "discount": 0,
+      "total": 9000,
+      "paid": 9000,
+      "method": "cash"
+    },
+    {
+      "id": "sal_02",
+      "series": "B1",
+      "no": 8,
+      "postedAt": 1761800200000,
+      "customerId": "deb_07",
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_tea",
+          "qty": 3000,
+          "unitPrice": 9000,
+          "amount": 27000
+        },
+        {
+          "productId": "",
+          "qty": 1000,
+          "unitPrice": 2500,
+          "amount": 2500
+        }
+      ],
+      "subtotal": 29500,
+      "discount": 0,
+      "total": 29500,
+      "paid": 10000,
+      "method": "credit"
+    },
+    {
+      "id": "sal_03",
+      "series": "B1",
+      "no": 9,
+      "postedAt": 1761800300000,
+      "customerId": null,
+      "currency": "AFN",
+      "lines": [
+        {
+          "productId": "p_gold",
+          "qty": 1000,
+          "unitPrice": 987654321012,
+          "amount": 987654321012
+        }
+      ],
+      "subtotal": 987654321012,
+      "discount": 12,
+      "total": 987654321000,
+      "paid": 987654321000,
+      "method": "mixed"
+    }
+  ],
+  "links": [
+    {
+      "seq": 1,
+      "prevHash": "0000000000000000000000000000000000000000000000000000000000000000",
+      "hash": "3cf48ac917ea09ddd3cbd830083d1d71a455c046924e20f68b6bd79fb8e9a120",
+      "type": "sale",
+      "ref": "sal_01",
+      "no": 7,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"discount\":600,\"id\":\"sal_01\",\"kind\":\"doc\",\"lines\":[{\"amount\":7500,\"productId\":\"p_rice\",\"qty\":1500,\"unitPrice\":5000},{\"amount\":25100,\"productId\":\"p_oil\",\"qty\":2000,\"unitPrice\":12550}],\"method\":\"cash\",\"no\":7,\"paid\":32000,\"postedAt\":1761800100000,\"qtyScale\":1000,\"seq\":1,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":32600,\"total\":32000,\"type\":\"sale\",\"v\":1}",
+      "line": "L1\t1\t0000000000000000000000000000000000000000000000000000000000000000\t3cf48ac917ea09ddd3cbd830083d1d71a455c046924e20f68b6bd79fb8e9a120\tsale\tsal_01\t7\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"discount\":600,\"id\":\"sal_01\",\"kind\":\"doc\",\"lines\":[{\"amount\":7500,\"productId\":\"p_rice\",\"qty\":1500,\"unitPrice\":5000},{\"amount\":25100,\"productId\":\"p_oil\",\"qty\":2000,\"unitPrice\":12550}],\"method\":\"cash\",\"no\":7,\"paid\":32000,\"postedAt\":1761800100000,\"qtyScale\":1000,\"seq\":1,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":32600,\"total\":32000,\"type\":\"sale\",\"v\":1}"
+    },
+    {
+      "seq": 2,
+      "prevHash": "3cf48ac917ea09ddd3cbd830083d1d71a455c046924e20f68b6bd79fb8e9a120",
+      "hash": "a16ff40384ad4a2792b6e09541842e895113bf92f4eabc7c59bbfded5f88c77e",
+      "type": "sale",
+      "ref": "sal_02",
+      "no": 8,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"discount\":0,\"id\":\"sal_02\",\"kind\":\"doc\",\"lines\":[{\"amount\":27000,\"productId\":\"p_tea\",\"qty\":3000,\"unitPrice\":9000},{\"amount\":2500,\"productId\":\"\",\"qty\":1000,\"unitPrice\":2500}],\"method\":\"credit\",\"no\":8,\"paid\":10000,\"postedAt\":1761800200000,\"qtyScale\":1000,\"seq\":2,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":29500,\"total\":29500,\"type\":\"sale\",\"v\":1}",
+      "line": "L1\t2\t3cf48ac917ea09ddd3cbd830083d1d71a455c046924e20f68b6bd79fb8e9a120\ta16ff40384ad4a2792b6e09541842e895113bf92f4eabc7c59bbfded5f88c77e\tsale\tsal_02\t8\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"customerId\":\"deb_07\",\"discount\":0,\"id\":\"sal_02\",\"kind\":\"doc\",\"lines\":[{\"amount\":27000,\"productId\":\"p_tea\",\"qty\":3000,\"unitPrice\":9000},{\"amount\":2500,\"productId\":\"\",\"qty\":1000,\"unitPrice\":2500}],\"method\":\"credit\",\"no\":8,\"paid\":10000,\"postedAt\":1761800200000,\"qtyScale\":1000,\"seq\":2,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":29500,\"total\":29500,\"type\":\"sale\",\"v\":1}"
+    },
+    {
+      "seq": 3,
+      "prevHash": "a16ff40384ad4a2792b6e09541842e895113bf92f4eabc7c59bbfded5f88c77e",
+      "hash": "44c468d1947938bfe34ef00cdb1467dc2d29abb0f5f9c91e201eef5dcf9dd73f",
+      "type": "sale",
+      "ref": "sal_03",
+      "no": 9,
+      "body": "{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"discount\":12,\"id\":\"sal_03\",\"kind\":\"doc\",\"lines\":[{\"amount\":987654321012,\"productId\":\"p_gold\",\"qty\":1000,\"unitPrice\":987654321012}],\"method\":\"mixed\",\"no\":9,\"paid\":987654321000,\"postedAt\":1761800300000,\"qtyScale\":1000,\"seq\":3,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":987654321012,\"total\":987654321000,\"type\":\"sale\",\"v\":1}",
+      "line": "L1\t3\ta16ff40384ad4a2792b6e09541842e895113bf92f4eabc7c59bbfded5f88c77e\t44c468d1947938bfe34ef00cdb1467dc2d29abb0f5f9c91e201eef5dcf9dd73f\tsale\tsal_03\t9\t{\"by\":\"usr_vec01\",\"chain\":\"doc/shp_vec01/B1/1\",\"currency\":\"AFN\",\"discount\":12,\"id\":\"sal_03\",\"kind\":\"doc\",\"lines\":[{\"amount\":987654321012,\"productId\":\"p_gold\",\"qty\":1000,\"unitPrice\":987654321012}],\"method\":\"mixed\",\"no\":9,\"paid\":987654321000,\"postedAt\":1761800300000,\"qtyScale\":1000,\"seq\":3,\"series\":\"B1\",\"status\":\"posted\",\"subtotal\":987654321012,\"total\":987654321000,\"type\":\"sale\",\"v\":1}"
+    }
+  ],
+  "head": "44c468d1947938bfe34ef00cdb1467dc2d29abb0f5f9c91e201eef5dcf9dd73f",
+  "bytes": 1681
+}

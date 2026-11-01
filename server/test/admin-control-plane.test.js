@@ -227,6 +227,7 @@ const MOUNTS = {
   'admin-release.js': '/admin/release',
   'admin-trust.js': '/admin/trust',
   'admin-payments.js': '/admin/payments',
+  'admin-calendar.js': '/admin/calendar',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
