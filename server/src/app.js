@@ -29,6 +29,8 @@ async function createApp({ runMigrations = true } = {}) {
     password: process.env.ADMIN_BOOTSTRAP_PASSWORD,
     log: (m) => console.log(`[admin] ${m}`),
   });
+  //  فاز ۳: «مالکِ اصلی» (پیشین‌ترین ارشد) نشان بخورد — مدیرِ دیگری غیرفعال یا تنزلش نمی‌دهد
+  await require('./lib/admin-owner').ownerId();
 
   //  ⚠️ حالِ زندهٔ پمپ فهرستِ **همهٔ** قرض‌داران را هم دارد (جست‌وجوی بات، بی
   //  هیچ سقفی بر شمارِ حساب‌ها) — پس سقفِ خودش را می‌گیرد، پیش از پارسرِ همگانی

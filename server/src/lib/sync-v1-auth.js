@@ -58,7 +58,14 @@ async function contextOfRow(row) {
   if (row.scope) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'courier_scope' };
   //  دکانِ برگزیدهٔ همین نشست، اگر برگزیده (مهاجرتِ ۰۹۷)
   const m = await require('./shops').membershipOf(user.id, { shopId: row.shop_id || null });
-  if (!m) return { app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user', missing: 'no_shop' };
+  if (!m) {
+    //  فاز ۳: دکانِ بسته‌شده به دستِ مدیر خطای روشنِ خودش را دارد (فقط در راهِ شکست)
+    const block = await require('./shop-holds').blockFor(user.id, row.shop_id || null);
+    return {
+      app, accountKind: 'shop', accountId: '', userId: user.id, role: '', via: 'user',
+      missing: block ? block.code : 'no_shop', ...(block ? { blockMessage: block.message } : {}),
+    };
+  }
   if (m.role === 'courier') return { app, accountKind: 'shop', accountId: '', userId: user.id, role: m.role, via: 'user', missing: 'courier_scope' };
   return {
     app, accountKind: 'shop', accountId: m.shop_id, accountName: m.shop_name || '',
@@ -126,7 +133,8 @@ async function requireSyncAccount(req, res, next) {
         return next(forbidden(require('../middleware/auth').COURIER_SCOPE_MESSAGE, 'courier_scope'));
       }
       return next(forbidden(
-        ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است',
+        ctx.blockMessage
+          || (ctx.missing === 'no_station' ? 'برای این حساب پمپی ثبت نشده است' : 'برای این حساب دکانی ثبت نشده است'),
         ctx.missing || 'no_account'
       ));
     }

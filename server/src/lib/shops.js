@@ -66,6 +66,11 @@ function assertCan(member, permission) {
 async function createShop(userId, name) {
   const existing = await membershipOf(userId);
   if (existing) throw conflict('این حساب از قبل عضو یک دکان است', 'already_member');
+  //  فاز ۳: عضوِ دکانی که مدیر بسته (تعلیق، بایگانی، درخواستِ حذف) با ساختنِ دکانِ تازه دورش نمی‌زند
+  //  (دورهٔ آزمایشیِ تازه). همان قاعدهٔ «هر کاربر یک دکان».
+  const holds = require('./shop-holds');
+  const block = await holds.blockFor(userId);
+  if (block) throw holds.blockError(block);
 
   return tx(async (c) => {
     const t = now();
