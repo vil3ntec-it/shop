@@ -109,6 +109,8 @@ object StrShell {
   fun reminderTooLong(max: Int): String = t("متنِ یادآوری حداکثر $max حرف", "The reminder text can have at most $max characters", "د یادونې متن تر $max تورو پورې")
   fun reminderUnknown(slots: String): String = t("جای‌نگهدارِ ناشناخته: $slots", "Unknown placeholder: $slots", "ناپېژندل شوی ځای نیونکی: $slots")
   // «تحلیلِ موجودی» (INV-15، INV-16) — گزارشِ کالاها، پیش‌فرض خاموش
+  /** عنوانِ بخشِ «ابزارهای تازهٔ کالا» (PRD-19، PRD-04) — ثابت، تا فهرستِ تنظیماتِ کامپیوتر نامش را بداند */
+  val productTools: String get() = t("ابزارهای تازهٔ کالا", "New product tools", "د توکو نوې وسیلې")
   val stockInsight: String get() = t("تحلیلِ موجودی", "Stock analysis", "د زېرمې شننه")
   val stockInsightShown: String get() = t("در گزارشِ کالاها دیده می‌شود", "Shown in the products report", "د توکو په راپور کې ښکاري")
   val stockInsightNote: String get() = t("در گزارشِ کالاها: ارزشِ موجودی به قیمتِ خرید و به قیمتِ فروش، سودِ بالقوه، و تحلیلِ ABC (کدام کالاها بیشترِ فروش را می‌سازند). فقط خواندنی است و چیزی نمی‌نویسد. سود تقریبی است، چون از قیمتِ خریدِ ثبت‌شدهٔ هر کالا حساب می‌شود. پس از تغییر، «گزارش‌ها» را دوباره باز کنید.", "In the products report: stock value at purchase price and at sale price, potential profit, and ABC analysis (which products make most of your sales). It is read-only and writes nothing. The profit is approximate, because it uses each product's recorded purchase price. After changing this, reopen “Reports”.", "د توکو په راپور کې: د زېرمې ارزښت د پېر په بیه او د پلور په بیه، شونې ګټه، او د ABC شننه (کوم توکي د پلور ډېره برخه جوړوي). یوازې د لوستلو لپاره دی او هېڅ نه لیکي. ګټه اټکلي ده، ځکه چې د هر توکي له ثبت شوې پېر بیې حسابېږي. له بدلون وروسته «راپورونه» بیا پرانیزئ.")
