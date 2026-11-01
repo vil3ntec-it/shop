@@ -159,6 +159,8 @@
   "ps.addbtn": "افزودن به سبد",
   "recent.title": "دیده‌شده‌های اخیر",
   "recent.clear": "پاک کردن",
+  "ps.share": "فرستادنِ نشانیِ کالا",
+  "ps.copied": "نشانی کپی شد.",
   "bar.label": "، {n} قلم، جمع {sum} — باز کردنِ سبد",
   "qty.less": "یکی کمتر {name}",
   "qty.more": "یکی بیشتر {name}",
