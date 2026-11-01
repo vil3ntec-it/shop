@@ -472,4 +472,27 @@ object StrSettings {
   /** پرچمِ `UiV3`: کلیدِ برگشت به رابطِ امروز (فقط همین دستگاه) */
   val uiV3: String get() = t("رابطِ تازه (نسخهٔ ۳)", "New interface (version 3)", "نوې ښودنه (۳ نسخه)")
   val uiV3Note: String get() = t("آزمایشی و فقط روی همین دستگاه. خاموش ⇐ رابطِ امروز؛ داده و همگام‌سازی دست نمی‌خورند.", "Experimental, this device only. Off ⇒ the current interface; data and sync are untouched.", "ازمایښتي او یوازې په همدې وسیله. بند ⇐ اوسنۍ ښودنه؛ معلومات او همغږي نه بدلېږي.")
+
+  // بخش‌های آمده از رابطِ امروز به نسخهٔ ۳ (SettingsLayout.ENCRYPTION، RETURNS)
+  val encryptionRow: String get() = t("رمزگذاریِ دفتر", "Ledger encryption", "د دفتر رمزي کول")
+  val returnsRow: String get() = t("برگشت و تعویض", "Returns & exchanges", "بېرته ورکړه او بدلون")
+  val returnsOn: String get() = t("جریانِ تازه روشن است", "New returns flow is on", "د بېرته ورکړې نوې لړۍ روښانه ده")
+  val returnsOff: String get() = t("همان مرجوعیِ ساده", "Simple returns (current)", "ساده بېرته ورکړه (اوسنۍ)")
+  val returnsNote: String get() = t(
+    "روشن: برگشت با اسکنِ QRِ رسید یا جست‌وجو، دلیلِ اجباری، «به موجودی» یا «ضایعات»، بازپرداخت به روشِ اصلی، نقد یا اعتبارِ فروشگاه، تعویض در یک سند، برگشتِ بی رسید با تأیید، و رسیدِ چاپیِ برگشت. رسیدِ فروش هم QR می‌گیرد. خاموش: همان پنجرهٔ مرجوعیِ امروز.",
+    "On: returns by scanning the receipt QR or by search, a required reason, “back to stock” or “waste”, refund to the original method, cash or store credit, exchanges in one document, returns without a receipt with approval, and a printed return receipt. Sale receipts get a QR too. Off: the current return window.",
+    "روښانه: بېرته ورکړه د رسید QR په سکن یا لټون، اړین دلیل، «زېرمې ته» یا «ضایع»، پیسې بېرته د اصلي لارې، نغدو یا د دوکان اعتبار ته، په یوه سند کې بدلون، بې رسیده بېرته ورکړه له تایید سره، او د بېرته ورکړې چاپي رسید. د پلور رسید هم QR اخلي. بند: د بېرته ورکړې اوسنۍ کړکۍ.",
+  )
+  val returnLimitNote: String get() = t(
+    "سقفِ برگشت بی تأییدِ صاحبِ دکان (برای مدیر و شاگرد)؛ خالی = بی سقف. شاگرد برای برگشتِ بی رسید و ضایعات همیشه تأییدِ مدیر می‌خواهد.",
+    "Largest return without the owner's approval (for managers and staff); empty = no limit. Staff always need a manager for returns without a receipt and for waste.",
+    "تر کومې اندازې بېرته ورکړه د دوکاندار له تایید پرته (د مدیر او شاګرد لپاره)؛ تش = بې سقفه. شاګرد د بې رسیده بېرته ورکړې او ضایع لپاره تل د مدیر تایید غواړي.",
+  )
+  val returnLimitLabel: String get() = t("سقفِ برگشت بی تأیید", "Limit without approval", "له تایید پرته سقف")
+  fun returnReasonsNote(max: Any, length: Any): String = t(
+    "دلیل‌های برگشت — هر خط یک دلیل (حداکثر $max، هر کدام تا $length نویسه). صندوق فقط از همین فهرست دلیل می‌پذیرد؛ خالی = فهرستِ پیش‌فرض.",
+    "Return reasons — one per line (up to $max, each up to $length characters). The register only accepts reasons from this list; empty = the default list.",
+    "د بېرته ورکړې دلیلونه — هره کرښه یو دلیل (تر $max پورې، هر یو تر $length توري). صندوق یوازې له همدې لړلیک دلیل مني؛ تش = اصلي لړلیک.",
+  )
+  val returnReasonsLabel: String get() = t("دلیل‌ها", "Reasons", "دلیلونه")
 }

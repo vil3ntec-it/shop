@@ -51,6 +51,15 @@ object SettingsShots : GroupShots {
     Shot("sessions", route = "settings/security/sessions"),
     Shot("password", route = "settings/security/password"),
     Shot("expiry", route = "settings/sales/expiry"),
+    //  بخش‌های آمده از تنظیماتِ رابطِ امروز (SettingsPortTest)
+    Shot("sales", route = "settings/sales"),
+    Shot("checkout-rules", route = "settings/sales/checkout-rules"),
+    Shot("held-invoices", route = "settings/sales/held-invoices"),
+    Shot("returns", route = "settings/sales/returns"),
+    Shot("payments", route = "settings/sales/payments"),
+    Shot("credit-limit", route = "settings/sales/credit-limit"),
+    Shot("customer-reports", route = "settings/sales/customer-reports"),
+    Shot("encryption", route = "settings/security/encryption"),
     Shot("camera", route = "settings/devices/camera"),
     Shot(
       "sync-error", route = "settings/data/sync",

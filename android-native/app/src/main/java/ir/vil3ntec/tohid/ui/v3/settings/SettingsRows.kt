@@ -112,7 +112,9 @@ internal fun SettingsGroupCard(
   showTitle: Boolean = true,
   footer: String? = null,
 ) {
-  val sections = SettingsLayout.GROUPS.firstOrNull { it.title == group }?.sections.orEmpty()
+  //  بخشِ فقط‌کامپیوتر (`PHONE_HIDDEN`) روی گوشی ردیف ندارد، مثلِ رابطِ امروز
+  val all = SettingsLayout.GROUPS.firstOrNull { it.title == group }?.sections.orEmpty()
+  val sections = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) all else all.filterNot { it in SettingsLayout.PHONE_HIDDEN }
   V3Section(if (showTitle) SettingsLayout.groupLabel(group) else null, modifier, footer = footer) {
     sections.forEachIndexed { i, key ->
       if (i > 0) V3Divider(start = ROW_DIVIDER_START)

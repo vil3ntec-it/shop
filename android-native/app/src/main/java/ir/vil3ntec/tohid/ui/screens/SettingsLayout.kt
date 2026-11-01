@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  فهرستِ بخش‌های تنظیمات (VILL3N، G9) — خالص، بی Compose.
@@ -40,6 +43,25 @@ object SettingsLayout {
   const val PERIPHERALS = "دستگاه‌های جانبی"
   const val ABOUT_APP = "درباره برنامه"
 
+  /*
+   *  بخش‌هایی که از تنظیماتِ رابطِ امروز (`ui/legacy/SettingsLegacy.kt`) به نسخهٔ ۳ آمدند — همان کلیدها و
+   *  همان ذخیره (`SettingsPortTest` می‌سنجد هیچ تنظیمِ رابطِ امروز در نسخهٔ ۳ بی‌جا نمانده است).
+   */
+  /** رمزگذاریِ دفتر روی همین دستگاه (SEC-01، `AtRest`) */
+  const val ENCRYPTION = "رمزگذاری دفتر"
+  /** قاعده‌های پیش از پایانِ فاکتور (POS-24، `CheckoutRulesPref`) */
+  const val CHECKOUT_RULES = "قاعده‌های فاکتور"
+  /** چند فاکتورِ هم‌زمان (POS-12، `HeldInvoicePrefs`) */
+  const val HELD = "فاکتورهای هم‌زمان"
+  /** برگشت و تعویض (RET، `ReturnSettings`) — همان `RETURN_SETTINGS_TITLE` */
+  const val RETURNS = "برگشت و تعویض"
+  /** پرداخت و صندوق (PAY، `ShopPolicy.payV2`) */
+  const val PAY = "پرداخت و صندوق"
+  /** سقفِ اعتبار در صندوق (CRM-03، `ShopPolicy.creditGate`) */
+  const val CREDIT_GATE = "سقف اعتبار"
+  /** گزارش‌های مشتری (CRM-04/06/10/14، `ShopPolicy.crmReports`) — فقط کامپیوتر */
+  const val CRM_REPORTS = "گزارش‌های مشتری"
+
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
     PRINTER to "devices?tab=printers",
@@ -48,8 +70,8 @@ object SettingsLayout {
 
   val GROUPS: List<Group> = listOf(
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
-    Group(SECURITY, listOf("قفل برنامه", "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
-    Group(SALES, listOf("کالای منقضی", PRINTER)),
+    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
+    Group(SALES, listOf("کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, CREDIT_GATE, CRM_REPORTS, PRINTER)),
     Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها")),
     Group(ABOUT, listOf(ABOUT_APP)),
@@ -73,10 +95,17 @@ object SettingsLayout {
     "زبان" to "language",
     "تاریخ و رقم" to "digits",
     "قفل برنامه" to "app-lock",
+    ENCRYPTION to "encryption",
     "کد شاگرد" to "staff-code",
     "دستگاه‌های وارد شده" to "sessions",
     "تغییر رمز حساب" to "password",
     "کالای منقضی" to "expiry",
+    CHECKOUT_RULES to "checkout-rules",
+    HELD to "held-invoices",
+    RETURNS to "returns",
+    PAY to "payments",
+    CREDIT_GATE to "credit-limit",
+    CRM_REPORTS to "customer-reports",
     CAMERA to "camera",
     "همگام‌سازی" to "sync",
     "داده‌ها" to "backup",
@@ -100,10 +129,17 @@ object SettingsLayout {
     "زبان" -> StrSettings.language
     "تاریخ و رقم" -> Str.dateAndDigits
     "قفل برنامه" -> StrSettings.appLockRow
+    ENCRYPTION -> StrSettings.encryptionRow
     "کد شاگرد" -> StrSettings.staffCodeRow
     "دستگاه‌های وارد شده" -> StrSettings.sessionsRow
     "تغییر رمز حساب" -> StrSettings.passwordRow
     "کالای منقضی" -> Str.expiredGoods
+    CHECKOUT_RULES -> StrSale.checkoutRulesTitle
+    HELD -> StrPos.heldSection
+    RETURNS -> StrSettings.returnsRow
+    PAY -> StrShell.payAndRegister
+    CREDIT_GATE -> StrShell.creditGate
+    CRM_REPORTS -> StrShell.crmReports
     PRINTER -> StrSettings.printerRow
     CAMERA -> StrSettings.scannerRow
     PERIPHERALS -> StrSettings.peripheralsRow
@@ -137,6 +173,12 @@ object SettingsLayout {
 
   /** بخش‌هایی که کامپیوتر عمداً ندارد: دوربینِ گوشی و نوارِ پایینِ گوشی */
   val DESK_HIDDEN: Set<String> = setOf(CAMERA, NAV_BAR)
+
+  /**
+   *  بخش‌هایی که فقط کامپیوتر دارد — مثلِ رابطِ امروز: «گزارش‌های مشتری» فقط زبانه‌های «گزارش‌ها»ی
+   *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد.
+   */
+  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS)
 
   /**
    *  فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر: ترتیبِ دادهٔ `given` می‌ماند و هر بخشی
