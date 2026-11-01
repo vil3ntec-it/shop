@@ -2,7 +2,7 @@
 const path = require('path');
 const express = require('express');
 const config = require('./config');
-const { healthy, pruneExpired, now, driverName } = require('./db');
+const { healthy, pruneExpired, now } = require('./db');
 const migrate = require('./migrate');
 const plans = require('./lib/plans');
 const subs = require('./lib/subscriptions');
