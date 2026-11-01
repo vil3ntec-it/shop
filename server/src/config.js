@@ -491,6 +491,18 @@ const config = {
     scope: String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase() === 'db' ? 'db' : 'local',
     poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
   },
+  /*
+   *  «دورانِ» همگام‌سازی پس از بازیابی (§۹.۵، `lib/sync-epoch.js`) — فقط دکان.
+   *  پیش‌فرض خاموش (قاعدهٔ همگام‌سازی: رفتارِ تازه فقط پشتِ پرچمِ خاموش). خاموش ⇒ نه دوران
+   *  در بالا آمدن و بازیابی، نه نشانِ پشتیبان، `/api/shop/sync-epoch*` و `/api/sync/v3/deleted`
+   *  ۴۰۴ و pull ِ v3 و pull/Snapshot ِ v1 بی دوران ⇒ برنامه دفترچه نمی‌نویسد، درِ دوران را هم نمی‌زند
+   *  (فقط پس از pull ِ دوران‌دار می‌پرسد) و همان رفتارِ پیشین را دارد.
+   *  ⚠️ پشتیبانی که با پرچمِ خاموش گرفته شده نشان ندارد؛ بازیابی از آن را فقط
+   *  `scripts/restore.js` (با پرچمِ روشن) یا «cursor جلوتر از سرِ دفترِ سرور» می‌شناسد.
+   */
+  syncEpoch: {
+    enabled: bool(process.env.SYNC_EPOCH_ENABLED, false),
+  },
 };
 
 /** بررسی پیکربندی هنگام راه‌اندازی — بهتر است سرور بالا نیاید تا ناامن کار کند. */

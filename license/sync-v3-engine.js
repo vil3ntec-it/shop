@@ -876,6 +876,8 @@
   /** یک صفحه Pull؛ ژورنال ⇐ دفتر ⇐ سایه + cursor */
   Engine.prototype.pullOnce = async function () {
     if (this.meta.upgrade) return { ok: false, stopped: true, upgrade: true, applied: 0 };
+    //  §۹.۵: سرور برگشته و دفتر هنوز از نو ساخته نشده ⇒ Pull نه (`rebuild`)
+    if (this.meta.restorePending) return { ok: true, applied: 0, hasMore: false };
     var since = Number(this.meta.cursor || 0);
     var budget = Math.min(MAX_BYTES, Math.max(MIN_BYTES, this.meta.pullBytes || MIN_BYTES));
     var r;
@@ -893,6 +895,20 @@
     var now = this.now();
     var patch = { cursor: cursor, lastPullAt: now, lastOkAt: now, attempt: 0, lastError: '', lastErrorAt: 0,
       pullBytes: Math.min(MAX_BYTES, budget * 2) };
+    //  §۹.۵: دورانِ سرور (`lib/sync-epoch.js`) عوض شده و این دستگاه پس از پایه چیزی دیده ⇒ «در انتظار»؛
+    //  این صفحه (از cursor ِ کهنه) نشانده نمی‌شود — `rebuild` («نگه‌دارِ محلی»؛ وب دفترچهٔ op ندارد)
+    var ep = r.body.epoch;
+    if (ep && typeof ep.id === 'string' && ep.id && Number.isFinite(Number(ep.base)) && Number.isFinite(Number(ep.head))) {
+      var known = this.meta.epoch || '';
+      var base = Math.min(Number(ep.base), Number(ep.head));
+      var restored = (known !== '' && known !== ep.id) || since > Number(ep.head);
+      if (restored && since > base) {
+        await this.persist({ epoch: ep.id, restorePending: true });
+        this.emit();
+        return { ok: true, applied: 0, hasMore: false, restore: true };
+      }
+      if (known !== ep.id) patch.epoch = ep.id;
+    }
     if (legacy.length) {
       var data = this.ledger.read();
       //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود
@@ -966,15 +982,15 @@
         if (!init.ok) return init;
       }
       await this.record();
-      for (var i = 0; i < 50 && this.outbox.length; i++) {
-        var p = await this.pushOnce();
-        if (!p.ok) return p;
-        if (!p.done && !p.rejected) break;
-      }
-      for (var j = 0; j < 50; j++) {
-        var q = await this.pullOnce();
-        if (!q.ok) return q;
-        if (!q.hasMore) break;
+      var step = await this.pushAll();
+      if (step) return step;
+      //  §۹.۵: سرور برگشته بود و صف خالی شد ⇒ دفتر از نو (نگه‌دارِ محلی)، تنهاها می‌روند، بعد Pull
+      if ((step = await this.restoreStep())) return step;
+      if ((step = await this.pullAll())) return step;
+      if (this.meta.restorePending) {
+        if ((step = await this.pushAll())) return step;
+        if ((step = await this.restoreStep())) return step;
+        if ((step = await this.pullAll())) return step;
       }
       if (this.meta.conflictsDirty || !this.conflictsFetchedAt || this.now() - this.conflictsFetchedAt > 5 * 60 * 1000) {
         this.conflictsFetchedAt = this.now();
@@ -985,6 +1001,81 @@
       this.busy = false;
       this.emit();
     }
+  };
+
+  /** Push تا خالی شدنِ صف؛ شکست ⇒ همان قدم، وگرنه null */
+  Engine.prototype.pushAll = async function () {
+    for (var i = 0; i < 50 && this.outbox.length; i++) {
+      var p = await this.pushOnce();
+      if (!p.ok) return p;
+      if (!p.done && !p.rejected) break;
+    }
+    return null;
+  };
+
+  /** Pull تا آخر؛ شکست ⇒ همان قدم، وگرنه null */
+  Engine.prototype.pullAll = async function () {
+    for (var j = 0; j < 50; j++) {
+      var q = await this.pullOnce();
+      if (!q.ok) return q;
+      if (!q.hasMore) break;
+    }
+    return null;
+  };
+
+  /** §۹.۵: «در انتظار» و صفِ خالی ⇒ ساختنِ دوباره و فرستادنِ ردیف‌های تنها؛ شکست ⇒ همان قدم */
+  Engine.prototype.restoreStep = async function () {
+    if (!this.meta.restorePending || this.outbox.length) return null;
+    var step = await this.rebuild();
+    if (step) return step;
+    return this.pushAll();
+  };
+
+  var INCOMPLETE = 'سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند.';
+
+  /**
+   *  §۹.۵ «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): Snapshot + تنهاهای این‌جا (جز حذف‌شده‌های
+   *  سرور، `POST /deleted`)؛ سایه = Snapshot ⇒ تنهاها «درج». فقط با صفِ خالی و تفاضلِ هیچ؛ اول سایه و cursor،
+   *  بعد دفتر (شکست ⇒ پیشین برمی‌گردد)؛ Snapshot ِ ناقص ⇒ دورِ بعد با خطای دیدنی. @returns null یا قدمِ شکست
+   */
+  Engine.prototype.rebuild = async function () {
+    var r = await this.call('GET', '/snapshot');
+    if (r.status !== 200 || !r.body) return this.fail(r.status, r.body);
+    if (r.body.complete === false) {
+      await this.locked(function () { return this.persist({ lastError: INCOMPLETE, lastErrorAt: this.now() }); });
+      this.emit();
+      return { ok: false, reason: 'incomplete' };
+    }
+    var C = Core();
+    var legacy = snapshotToLegacy(r.body);
+    var ask = C.restoreLocalOnly(legacy, this.ledger.read() || {});
+    var gone = [];
+    for (var i = 0; i < ask.length; i += 500) {
+      var d = await this.call('POST', '/deleted', { rows: ask.slice(i, i + 500) });
+      if (d.status === 404) break;
+      if (d.status !== 200 || !d.body) return this.fail(d.status, d.body);
+      gone = gone.concat(Array.isArray(d.body.deleted) ? d.body.deleted : []);
+    }
+    await this.locked(async function () {
+      if (!this.meta.restorePending || this.outbox.length) return;
+      await this.recordNow();
+      var data = this.ledger.read();
+      if (this.outbox.length || !data || C.diff(this.meta.shadow || {}, data).ops.length) return;
+      var merged = C.restoreMerge(legacy, data, gone);
+      var before = { shadow: this.meta.shadow, cursor: this.meta.cursor };
+      await this.persist({ shadow: C.shadowOf(merged.shadow), cursor: legacy.cursor });
+      try {
+        this.ledger.write(merged.ledger);
+      } catch (e) {
+        await this.persist(before);
+        throw e;
+      }
+      await this.persist({ restorePending: false, lastOkAt: this.now() });
+      //  ردیف‌های تنهای این دستگاه ⇒ «درج»
+      await this.recordNow();
+    });
+    this.emit();
+    return null;
   };
 
   /** SYN-08 و بخشِ ۲۹.۵ بندِ ۸: «روی دستگاه ثبت شد» جدا از «سرور تأیید کرد» */

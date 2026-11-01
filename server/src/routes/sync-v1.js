@@ -28,6 +28,9 @@ const config = require('../config');
 const { requireSyncAccount, requireSyncWrite, tokenOf } = require('../lib/sync-v1-auth');
 const live = require('../lib/sync-v1-live');
 const v = require('../lib/validate');
+const syncEpoch = require('../lib/sync-epoch');
+const syncKeep = require('../lib/sync-v1-keep');
+const { SHOP } = require('../lib/tenancy');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -54,6 +57,22 @@ const pumpOnline = require('../middleware/pump-services').requirePumpServices();
 function pumpServicesOnly(req, res, next) {
   if (req.sync && req.sync.accountKind === 'station') return pumpOnline(req, res, next);
   next();
+}
+
+/*
+ *  §۹.۵: «دورانِ بازیابی» کنارِ pull و Snapshot ِ دکان — فقط با پرچمِ روشنِ `SYNC_EPOCH_ENABLED`.
+ *  برنامه (`V1Restore.pulled`، وب `epochLive`) درِ جدای `GET /api/shop/sync-epoch` را **فقط** وقتی
+ *  می‌زند که pull ِ پیشین دوران آورده باشد؛ خاموش ⇒ این کلید نیست ⇒ هیچ درخواستی که ۴۰۴ بگیرد.
+ *  پمپ و پرچمِ خاموش ⇒ همان پاسخِ پیشین. شکستِ خواندنِ دوران pull را نمی‌خواباند (فقط کلید نیست).
+ */
+async function epochFor(ctx) {
+  if (!config.syncEpoch.enabled || !ctx || ctx.app !== SHOP.app || ctx.accountKind !== SHOP.app) return undefined;
+  try {
+    return await syncEpoch.forAccount(ctx, 'v1');
+  } catch (err) {
+    console.error('[sync-epoch] دوران کنارِ pull خوانده نشد:', err.message);
+    return undefined;
+  }
 }
 
 /* ------------------------------------------------------- بلیتِ سوکت (F0-11) */
@@ -155,7 +174,20 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     const out = await ack.aroundPull(req.sync, deviceId, since, (from) => sync.pull(req.sync, { since: from, deviceId, limit }));
     //  فقط دکان با پرچم: فیلد یا opی کم می‌شود؛ cursor، has_more و head همان
     out.ops = await ownNewer.view(req.sync, deviceId, since, out.ops);
-    res.json({ ok: true, ...out });
+    //  دکان، پرچم‌های `sync.keep_pending` / `sync.revive_full_row` / `sync.gzip_pull` (`lib/sync-v1-keep.js`)
+    const keep = await syncKeep.pullExtras(req.sync, out.ops);
+    const epoch = await epochFor(req.sync);
+    const reply = { ok: true, ...out, ...(keep ? keep.body : {}), ...(epoch ? { epoch } : {}) };
+    if (keep && keep.gzip && String(req.headers['accept-encoding'] || '').includes('gzip')) {
+      const text = JSON.stringify(reply);
+      if (Buffer.byteLength(text, 'utf8') > syncKeep.GZIP_MIN_BYTES) {
+        res.set('Content-Encoding', 'gzip');
+        res.set('Content-Type', 'application/json; charset=utf-8');
+        res.set('Vary', 'Accept-Encoding');
+        return res.send(await gzip(Buffer.from(text, 'utf8')));
+      }
+    }
+    res.json(reply);
   } catch (err) { next(err); }
 });
 
@@ -163,8 +195,10 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
 
 router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
   try {
+    //  دورانِ پیش از Snapshot: دفترِ ساخته‌شده از آن دست‌کم همین دوران را دارد
+    const epoch = await epochFor(req.sync);
     const snap = await sync.snapshot(req.sync);
-    const body = JSON.stringify({ ok: true, ...snap });
+    const body = JSON.stringify({ ok: true, ...snap, ...(epoch ? { epoch } : {}) });
     //  عکسِ کاملِ یک دفتر چند مگابایت می‌شود؛ روی اینترنتِ موبایل فشرده می‌رود
     if (String(req.headers['accept-encoding'] || '').includes('gzip')) {
       const packed = await gzip(Buffer.from(body, 'utf8'));

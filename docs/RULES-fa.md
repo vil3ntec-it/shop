@@ -222,6 +222,18 @@
   `lib/sync-v1-ack.js` و `routes/sync-v1.js`؛ ⛔ `lib/sync-v1.js` ِ مشترک با پمپ دست نمی‌خورد. سنجه: `server/test/sync-v1-ack-cursor.test.js` (#481).
 - v3 ⇒ v1 خودکار نیست: v3 را برای دکانی بزن که همهٔ دستگاه‌هایش v3اند (#233؛ پلِ v3 ⇒ v1 در #287، باز).
 - `broadcast`ِ v1 را از v3 صدا نزن تا cursorِ v1 قاطی نشود (#233).
+- ⛔ صفِ op ِ v1 (اندروید/کامپیوتر `OpQueue`، وب `OpQueue` ِ `sync-core.js`) **هیچ opی را دور نمی‌ریزد** — سقفِ ۵۰٬۰۰۰ که کهنه‌ترین‌ها را
+  `queue_overflow` می‌کرد برداشته شد. از ۱۰٬۰۰۰ پیامِ «X تغییر هنوز به سرور نرسیده» در همان جای پیامِ نوار (چراغ قرمز نمی‌شود)؛ حافظهٔ
+  پر ⇒ ثبت با پیامِ روشن رد می‌شود و تغییر روی دفتر می‌ماند. منطق: `core/…/core/sync/OpBacklog.kt` و `QUEUE_WARN`/`backlogWarning`
+  با `core/test-vectors/op-backlog-v1.json`. سنجه: `OpQueueBacklogDesktopTest` (۶۰٬۰۰۰ op)، `sync-keep-local.test.js`.
+- pull ِ v1 با پرچمِ `sync.keep_pending` (پیش‌فرض خاموش، فقط دکان؛ `keep_pending` در پاسخ) تغییرِ محلیِ **در صف** را بازنویسی نمی‌کند:
+  opِ رسیده پیش از نشاندن از `KeepPending` (`core/…/core/sync/KeepPending.kt`؛ اندروید `LedgerDiff.keepPending` زیرِ قفلِ موتور، وب
+  `core.keepPending`؛ بردار `keep-pending-v1.json`) می‌گذرد و همان op روی دفتر، سایه و ژورنال می‌نشیند. فیلدِ سادهٔ صف می‌ماند،
+  `$inc` جمع می‌شود، مقدارِ ساده روی `$inc` ِ صف + دلتا؛ حذفِ در صف ⇒ ویرایشِ رسیده نه، ویرایشِ در صف ⇒ حذفِ رسیده نه.
+- pull ِ v1 با پرچمِ `sync.revive_full_row` (پیش‌فرض خاموش، فقط دکان) روی op ِ زنده‌کنندهٔ ردیفِ حذف‌شده `row` = دادهٔ کاملِ ردیف
+  **درست پس از همان op** (بازپخشِ `applyOp`، `server/src/lib/sync-v1-keep.js`) می‌گذارد؛ دستگاهی که ردیف را ندارد آن را کامل می‌سازد
+  و فیلدهای op (و `$inc`) را دوباره نمی‌نشاند. `row` فقط در ژورنال (`SyncOp.toJournalJson`)، هرگز در push/صف/دفترچه. پمپ پرچم را
+  نمی‌خواند؛ `lib/sync-v1.js` دست نخورد (افزوده در `routes/sync-v1.js`). سنجه: `sync-keep-local.test.js`، `KeepLocalTest`.
 - قطع و بازگشت (PERF-05): `server/test/outage-recovery.test.js` با پراکسیِ TCPِ واقعی بدنه یا پاسخِ push/pull را می‌بُرد، سرور را خاموش/روشن
   می‌کند و روی PostgreSQL اتصال‌ها را می‌کشد/می‌بندد؛ هر تغییرِ push/pull، استخرِ `db.js` یا `errorHandler` باید آن را سبز نگه دارد.
   ⚠️ یافتهٔ باز (آزمونِ todo ِ «۳-ب»): cursor ِ سرور هنگامِ pull جلو می‌رود حتی اگر پاسخ نرسد؛ اصلاحش تغییرِ معنای همگام‌سازی است ⇒ پرچم و تصمیمِ صاحب محصول.
@@ -551,6 +563,10 @@
 | `stage.tohid-native`، `stage.tohid-desktop` | `release` | نیست | انتشارِ مرحله‌ای: `{version, percent}`؛ دستگاهِ درونِ درصد با `staged=1` از برچسبِ `<برچسب>-v<نسخه>`؛ ناجور ⇒ نیست؛ پنل: `/api/admin/release/stage` | OPS-01 | باز |
 | `SYNC_V3_ENABLED` (محیط، نه `live_config`) | کلِ سرور | خاموش | `/api/sync/v3/*` (خاموش ⇒ ۴۰۴) | #233 | main |
 | `OTP_SMS_DAILY_COST_MAX_MINOR`، `OTP_SMS_SHOP_DAILY_COST_MAX_MINOR` (محیط) | کلِ سرور / هر دکان، هر کانال | ۰ = خاموش | SEC-06: جمعِ `cost_minor` ِ ۲۴ ساعتِ همان کانال در `sms_usage` ⇒ ۴۲۹ `sms_cost_ceiling` / `sms_shop_cost_ceiling` برای همهٔ شماره‌ها؛ سابقهٔ `sms.cost_ceiling` روزی یک بار هر سهم؛ خطای خواندن ⇒ باز | SEC-06 | باز |
+| `SYNC_EPOCH_ENABLED` (محیط، نه `live_config`) | کلِ سرور، فقط دکان | خاموش | §۹.۵: دورانِ بازیابی در بالا آمدن و `backup.restore`، نشانِ پشتیبان، `/api/shop/sync-epoch*`، `/api/sync/v3/deleted`، `epoch` در pull ِ v3 و در pull/Snapshot ِ v1 ِ دکان (خاموش ⇒ ۴۰۴ و هیچ نوشتنی؛ برنامه دفترچهٔ دوباره‌فرستادن نمی‌نویسد و درِ دوران را **فقط** وقتی می‌زند که pull ِ پیشین دوران آورد — خاموش ⇒ هیچ درخواستِ ۴۰۴ِ تکراری). پشتیبانِ گرفته‌شده با پرچمِ خاموش نشان ندارد | #335 | باز |
+| `sync.keep_pending` | دکان / `all` | خاموش | pull ِ Sync v1 کلیدِ `keep_pending` می‌گیرد و برنامه (اندروید/کامپیوتر/وب) تغییرِ محلیِ در صف را با opِ رسیده بازنویسی نمی‌کند (`KeepPending`)؛ پمپ نه | SYN-06 | باز |
+| `sync.revive_full_row` | دکان / `all` | خاموش | op ِ زنده‌کنندهٔ ردیفِ حذف‌شده در pull ِ Sync v1 `row` ِ کامل (پس از همان op) دارد؛ برنامهٔ کهنه نادیده می‌گیرد؛ پمپ نه | SYN-06 | باز |
+| `sync.gzip_pull` | دکان / `all` | خاموش | pull ِ Sync v1 ِ بزرگ‌تر از ۱KB با `Accept-Encoding: gzip` فشرده (همان سازوکارِ Snapshot)؛ push نه؛ پمپ نه | SYN-04 | باز |
 | `min_app_version_<app>` (پیکربندیِ پلن‌ها) | هر برنامه | خالی | پیامِ قرمزِ «پشتیبانی نمی‌شود»، بی قفل | #260 | main |
 | `shop.order_notify` | دکان / `all` | خاموش | صفِ پایدارِ اعلانِ سفارش، `/pending` و `/ack` | #258 | باز |
 | `shop.catalog` | دکان / `all` | خاموش | کاتالوگِ سرور و رزروِ اتمیِ موجودی با سفارش | #263 | باز |

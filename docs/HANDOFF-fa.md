@@ -678,6 +678,24 @@ PRها سرخ می‌ماند. ترتیبِ پیشنهادیِ مرج: #416 ⇐ 
   fields/sync) پلهٔ ۴ِ ثابت می‌فرستاد، نه `wireSchema` ِ برنامه ⇒ ۴۲۶ روی دکانِ پرچم‌خاموش و همهٔ سناریوها از گامِ صفر سرخ. حالا مثلِ
   برنامه؛ E2E ِ محلی ۷۶ سبز. کارِ Electron ِ CI پس از `account-backup` ۴۵ دقیقه ایستاد و لغو شد؛ کلِ سرور زیرِ Electron 38 (PGlite) و روی PostgreSQL ِ محلی سبز (گاه‌به‌گاه؟).
 - قدمِ بعدی: CI؛ اگر Electron باز ایستاد، فایلِ پس از `account-backup` را بکاو.
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/sync-no-data-loss` (روی #335؛ سه یافتهٔ داده‌ازدست‌دادنِ ممیزیِ SYN + gzip ِ pull)
+- انجام شد: (۱) صفِ v1 (اندروید/کامپیوتر و وب) دیگر بالای ۵۰٬۰۰۰ op کهنه‌ترین‌ها را دور نمی‌ریزد؛ از ۱۰٬۰۰۰ پیامِ «X تغییر هنوز به
+  سرور نرسیده» (`core/…/sync/OpBacklog.kt`)؛ صفِ ننشسته در اندروید پیامِ روشن می‌دهد — بی پرچم (تصمیمِ سرپرست). (۲) تغییرِ در صف
+  (ثبتِ وسطِ pull) با op ِ رسیده بازنویسی نمی‌شود — پرچمِ خاموشِ `sync.keep_pending` (`core/…/sync/KeepPending.kt`). (۳) ردیفی که
+  دستگاهِ دیگر پس از حذف زنده کرد کامل می‌رسد — پرچمِ خاموشِ `sync.revive_full_row` (`server/src/lib/sync-v1-keep.js`). (۴) pull ِ بزرگ
+  فشرده پشتِ `sync.gzip_pull`؛ push نه.
+- آزمون: `sync-keep-local.test.js` ۱۳/۱۳ (پیش از درمان ۱۰ سرخ)، `:core:jvmTest` (KeepPending/OpBacklog + بردارها)، KeepLocalTest ۸/۸ و
+  OpQueueBacklogDesktopTest (۶۰٬۰۰۰ op) در پروژهٔ JVM ِ جدا؛ ۱۰ جهش سرخ. Gradle ِ اندروید/کامپیوتر فقط CI.
+- نیمه‌کاره: push ِ فشرده (برنامه باید بدنه را فشرده کند و از سرور بداند)؛ صفِ خیلی بزرگ کند است (هر batch/ack کلِ پرونده را
+  می‌خواند)؛ v3 دست نخورد. قدمِ بعدی: پس از مرجِ #335 همین PR به main؛ روشن کردنِ سه پرچم دکان‌به‌دکان با صاحب محصول؛ با #501/#506/#553
+  فقط ردیف‌های STATUS/RULES/HANDOFF برخورد دارند.
+
+### ۱۴۰۵/۰۸/۰۸ — PR #335 (دورِ CI)، شاخهٔ `ccr-3a0d593c-ac0jpj-restore-repush`
+- انجام شد: ادغامِ main (تعارضِ FREE ِ `paid-routes-entitlement`: هر دو ردیف). ریشهٔ سرخیِ PostgreSQL (`sync-epoch.test:182`):
+  با pg_dump ِ ناموجود Promise ِ `closed` در `lib/backup.js` پیش از `await` بی‌شنونده رد می‌شد ⇒ unhandledRejection (در تولید یعنی
+  خوابیدنِ سرور هنگامِ پشتیبانِ زمان‌بندی‌شده). درست شد؛ psql ِ بازیابی هم شنوندهٔ error گرفت؛ آزمونِ برگشت در `backup.test` (فقط PostgreSQL).
+- قدمِ بعدی: CI را ببین.
+
 
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/ios-step0-guard` (گامِ ۰ِ آیفون)
 - انجام شد: قاعدهٔ کدِ تازه برای آیفون در `RULES-fa.md` (بخشِ «v3 · هسته‌های مشترک»)؛ سنجهٔ `tools/quality/checks/platform-deps.mjs`

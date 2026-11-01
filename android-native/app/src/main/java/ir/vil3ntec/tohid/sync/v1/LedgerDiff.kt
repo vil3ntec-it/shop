@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync.v1
 
+import ir.vil3ntec.tohid.core.sync.KeepPending
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.encoding.CompositeDecoder
@@ -88,7 +89,7 @@ object LedgerDiff {
   }
 
   /** فهرستِ نام ⇒ نام‌های بی خالی و بی تکرار؛ `null` یعنی کلید اصلاً نیست. */
-  private fun listNames(tree: JsonObject?, key: String): List<String>? {
+  internal fun listNames(tree: JsonObject?, key: String): List<String>? {
     val arr = tree?.get(key) as? JsonArray ?: return null
     val out = ArrayList<String>(arr.size)
     for (e in arr) {
@@ -508,8 +509,12 @@ object LedgerDiff {
         if (at >= 0) list.removeAt(at)
         continue
       }
-      val current = if (at >= 0) LinkedHashMap(list[at]) else linkedMapOf<String, JsonElement>()
-      for ((f, v) in (op.fields ?: JsonObject(emptyMap()))) {
+      //  ردیفِ نبوده که این op زنده‌اش کرد (پرچمِ سرورِ `sync.revive_full_row`): ردیفِ کاملِ سرور پس از
+      //  همین op، نه نیمه‌ای فقط با فیلدهای همین op — شرح سرِ `SyncOp.row`. فیلدهای op در آن هست
+      //  (`$inc` هم)، پس دوباره نشانده نمی‌شوند.
+      val revived = if (at < 0) op.row else null
+      val current = if (at >= 0) LinkedHashMap(list[at]) else LinkedHashMap<String, JsonElement>(revived ?: emptyMap())
+      for ((f, v) in (if (revived != null) emptyMap() else op.fields ?: JsonObject(emptyMap()))) {
         val inc = (v as? JsonObject)?.get("\$inc")
         val incNum = numberOf(inc)
         if (inc != null && incNum != null) {
@@ -549,6 +554,54 @@ object LedgerDiff {
      */
     //  ⚠️ پیش‌فرضِ مدل جای فهرستی که در درخت نبود نمی‌نشیند (شرح بالای `LIST_COLLECTIONS`)
     return modelTree(raw)
+  }
+
+  /**
+   *  opهای رسیده، پیش از نشاندن، بی بازنویسیِ تغییرِ محلی‌ای که هنوز در صف است — پرچمِ دکانِ
+   *  `sync.keep_pending` (`keep_pending` در پاسخِ pull). قاعده و شرح: `core/…/core/sync/KeepPending.kt`
+   *  (قرینهٔ `keepPending` ِ `license/sync-core.js`). خروجی همان opها به همان ترتیب است، جز آنچه نباید
+   *  بنشیند؛ op ِ بریده همان `op_id` را دارد (فقط روی همین دستگاه نشانده می‌شود، به سرور نمی‌رود).
+   *
+   *  @param pending opهای صف (`OpQueue.all`) — زیرِ همان قفلی که دفتر خوانده می‌شود
+   */
+  fun keepPending(ops: List<SyncOp>, pending: List<SyncOp>): List<SyncOp> {
+    if (ops.isEmpty() || pending.isEmpty()) return ops
+    val rows = HashSet<String>()
+    for (o in ops) rows += "${o.table} ${o.rowId}"
+    //  فقط opهای صف روی همین ردیف‌ها (صفِ بزرگ را تا ته تبدیل نمی‌کنیم)
+    val mine = pending.filter { "${it.table} ${it.rowId}" in rows }
+    if (mine.isEmpty()) return ops
+    val verdicts = KeepPending.verdicts(ops.map(::policyOp), mine.map(::policyOp))
+    val out = ArrayList<SyncOp>(ops.size)
+    for ((i, op) in ops.withIndex()) {
+      when (val v = verdicts[i]) {
+        KeepPending.Keep -> out += op
+        KeepPending.Drop -> Unit
+        is KeepPending.Trim -> {
+          val kept = LinkedHashMap<String, JsonElement>()
+          for ((f, value) in op.fields ?: JsonObject(emptyMap())) {
+            if (f in v.drop) continue
+            val delta = v.rebase[f]
+            kept[f] = if (delta == null) value else JsonPrimitive(trim((numberOf(value) ?: 0.0) + delta))
+          }
+          out += op.copy(fields = JsonObject(kept))
+        }
+      }
+    }
+    return out
+  }
+
+  /** op ⇐ شکلِ بی JSON ِ `KeepPending`: `{"$inc": عدد}` دلتا، هر چیزِ دیگر مقدارِ ساده (همان قاعدهٔ [applyRemote]) */
+  private fun policyOp(op: SyncOp): KeepPending.Op {
+    val set = LinkedHashSet<String>()
+    val inc = LinkedHashMap<String, Double>()
+    if (op.type != SyncOp.DELETE) {
+      for ((f, v) in op.fields ?: JsonObject(emptyMap())) {
+        val d = numberOf((v as? JsonObject)?.get("\$inc"))
+        if (d != null) inc[f] = (inc[f] ?: 0.0) + d else set += f
+      }
+    }
+    return KeepPending.Op(op.table, op.rowId, op.type == SyncOp.DELETE, set, inc)
   }
 
   private fun keepListsOf(src: JsonObject, dst: JsonObject): JsonObject {
