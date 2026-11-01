@@ -8,6 +8,7 @@ import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -52,6 +53,18 @@ class PermCoreTest {
     }
   }
 
+  /** یافتهٔ ۴: هر کلید برای هر هفت نقش پیش‌فرضِ صریح دارد و بردارها همه را می‌پوشانند (همان آزمونِ JS) */
+  @Test fun everyKeyCoversEveryRole() {
+    val covered = list("defaults").mapTo(HashSet()) { "${it.s("role")}/${it.s("key")}" }
+    for (key in PermCore.keys()) for (role in PermCore.ROLES) {
+      assertTrue("$role / $key", PermCore.defaultMode(role, key) in PermCore.MODES)
+      assertTrue("بردارِ پیش‌فرض نیست: $role / $key", "$role/$key" in covered)
+    }
+    for (role in listOf("cashier", "storekeeper", "picker", "accountant")) {
+      assertEquals(role, false, PermCore.canWrite(role, "safeEntries"))
+    }
+  }
+
   @Test fun resolve() {
     for (c in list("resolve")) {
       assertEquals(c.toString(), resolvedOf(PermPolicy.tree(c.getValue("out"))), PermCore.resolve(c.s("role"), c.layers(), c.s("key")))
@@ -93,6 +106,78 @@ class PermCoreTest {
       val t = c.getValue("total").jsonPrimitive.content.toLong()
       assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toLong(), PermCore.discountBp(d, t))
     }
+  }
+
+  /** جدول‌های نوشتنیِ هر نقش (A16) — همان `canWrite`/`writable`ِ JS */
+  @Test fun writes() {
+    for (c in list("writes")) {
+      assertEquals(c.toString(), c.getValue("out").jsonPrimitive.content.toBoolean(), PermCore.canWrite(c.s("role"), c.s("table")))
+    }
+    for (c in list("writable")) {
+      val want: Any? = when (val o = c.getValue("out")) {
+        is JsonNull -> null
+        is kotlinx.serialization.json.JsonArray -> o.map { it.jsonPrimitive.content }
+        else -> o.jsonPrimitive.content
+      }
+      assertEquals(c.toString(), want, PermCore.writable(c.s("role")))
+    }
+  }
+
+  @Suppress("UNCHECKED_CAST")
+  private fun refsOf(o: Any?): PermCore.RowRefs {
+    val m = (o as? Map<String, Any?>).orEmpty()
+    fun maps(k: String) = (m[k] as? List<*>).orEmpty().map { it as Map<String, Any?> }
+    return PermCore.RowRefs(
+      returns = maps("returns").map {
+        PermCore.ReturnLine(
+          id = it["id"] as String, docId = it["docId"] as String?, productId = it["productId"] as String,
+          qty = (it["qty"] as Number).toDouble(), own = it["own"] == true,
+        )
+      },
+      sales = (m["sales"] as? List<*>).orEmpty().map { it as String },
+      taken = maps("taken").map {
+        PermCore.Taken(it["refId"] as String, it["productId"] as String, (it["units"] as Number?)?.toDouble())
+      },
+      saleItems = maps("saleItems").map {
+        PermCore.SaleLine(it["id"] as String, it["saleId"] as String, it["productId"] as String, (it["qty"] as Number?)?.toDouble())
+      },
+      cancelled = (m["cancelled"] as? List<*>).orEmpty().map { it as String },
+      moved = maps("moved").map {
+        PermCore.Moved(it["refId"] as String, it["productId"] as String, it["type"] as String, (it["qty"] as Number?)?.toDouble())
+      },
+    )
+  }
+
+  /** قاعدهٔ ردیف (A16): صندوق‌دار اصلاحِ موجودیِ قلمِ برگشتِ خودش و حرکتِ انبارِ سند — همان JS */
+  @Test fun rowRules() {
+    assertEquals(v.getValue("return_adj_kinds").jsonArray.map { it.jsonPrimitive.content }, PermCore.RETURN_ADJ_KINDS)
+    assertEquals(PermPolicy.tree(v.getValue("doc_move_types")), PermCore.DOC_MOVE_TYPES)
+    for (c in list("row_rules")) {
+      val out = c.getValue("out").let { if (it is JsonNull) null else it.jsonPrimitive.content }
+      assertEquals(c.toString(), out, PermCore.rowRule(c.s("role"), c.s("table")))
+    }
+    for (c in list("rows")) {
+      @Suppress("UNCHECKED_CAST")
+      val rows = (PermPolicy.tree(c.getValue("rows")) as List<Map<String, Any?>>)
+        .map { PermCore.RowIn(it["table"] as String, it["row"] as Map<String, Any?>?) }
+      val refs = refsOf(PermPolicy.tree(c.getValue("refs")))
+      val want = c.getValue("out").jsonArray.map { it.jsonPrimitive.content }
+      val got = PermCore.checkRows(c.s("role"), rows, refs)
+      assertEquals(c.s("_"), want, got.map { it.reason })
+      assertEquals(c.s("_"), want.map { it.isEmpty() }, got.map { it.ok })
+      if (rows.size == 1) assertEquals(c.s("_"), want[0].isEmpty(), PermCore.canWriteRow(c.s("role"), rows[0].table, rows[0].row, refs))
+    }
+  }
+
+  /** نقش‌های تازه هیچ‌کدام از سه نقشِ قدیم را عوض نکرده‌اند (آزمونِ مرجع) */
+  @Test fun legacyRolesUnchanged() {
+    assertEquals(listOf("owner", "manager", "staff"), PermCore.ROLES.take(3))
+    for (role in listOf("owner", "manager", "staff")) {
+      assertEquals(role, PermCore.ALL_TABLES, PermCore.writable(role))
+      assertEquals(role, true, PermCore.canWrite(role, "anything"))
+    }
+    assertEquals(false, PermCore.canWrite("courier", "sales"))
+    assertEquals(emptyList<String>(), PermCore.writable("accountant"))
   }
 
   /** «نیازمند تأیید» برای شاگرد پذیرفته است ولی «مجاز» نه (بخشِ ۱۰.۱) */

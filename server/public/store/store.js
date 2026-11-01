@@ -21,6 +21,7 @@
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
   var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
+  var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
 
   function slugOfPage() {
     var parts = location.pathname.split('/').filter(Boolean);
@@ -118,18 +119,24 @@
     });
   }
 
-  /** «پیشنهادِ همین دکان»: فقط پرفروش/تازهٔ واقعیِ سرور (#301)؛ نبودِ داده ⇒ هیچ. */
+  /** ردیفِ کارت (`<id>-list`)؛ خالی ⇒ پنهان */
+  function rail(id, list) {
+    var ul = K.clear($(id + '-list'));
+    list.forEach(function (p) { catalog.items[p.id] = catalog.items[p.id] || p; ul.appendChild(card(p)); });
+    $(id).hidden = !list.length;
+  }
+
+  /** WEB-02: پرفروش (یا تازه)، «ارزان‌تر» و تازه‌ها — فقط دادهٔ واقعیِ سرور (#301)؛ نبود ⇒ هیچ */
   function loadPicks() {
     //  سرورِ بی #301 این مسیر را ندارد؛ #301 همراهِ `store.delivery` می‌آید
     if (!store.delivery) return Promise.resolve();
     return api('/highlights').then(function (r) {
-      var best = (r.bestsellers || []).length > 0;
-      var list = best ? r.bestsellers : (r.newArrivals || []);
-      var ul = K.clear($('picks-list'));
-      list.forEach(function (p) { catalog.items[p.id] = catalog.items[p.id] || p; ul.appendChild(card(p)); });
-      $('picks-why').textContent = best ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
-      $('picks').hidden = list.length === 0;
-    }).catch(function () { $('picks').hidden = true; });
+      var best = r.bestsellers || []; var fresh = r.newArrivals || [];
+      rail('picks', best.length ? best : fresh);
+      $('picks-why').textContent = best.length ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
+      rail('deals', r.deals || []);
+      rail('fresh', best.length ? fresh.filter(function (p) { return !best.some(function (b) { return b.id === p.id; }); }) : []);
+    }).catch(function () { $('picks').hidden = true; $('deals').hidden = true; $('fresh').hidden = true; });
   }
 
   function loadProducts(more) {
@@ -159,9 +166,18 @@
     }).then(function () { ul.setAttribute('aria-busy', 'false'); });
   }
 
-  // ── برگهٔ کالا ──
+  // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل در store/product.js، با نخستین بازشدن (WEB-08، WEB-15) ──
+  var detail = null; var detailP = null;
+  function loadProductView() {
+    detailP = detailP || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/product.js' }, on: { load: ok, error: no } }));
+    }).then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
+    return detailP;
+  }
   function openProduct(id) {
     var p = catalog.items[id];
+    //  پاسخِ دیررس (کالای دیگر یا پس از بستن) برگه را باز نمی‌کند
+    var here = function () { return location.hash === '#/p/' + encodeURIComponent(id); };
     var fill = function (x) {
       catalog.items[x.id] = x;
       var st = K.stockOf(x);
@@ -175,15 +191,24 @@
       K.clear($('ps-price')).append(K.money(x.priceMinor), x.unit ? el('small', { text: ' / ' + x.unit }) : '');
       K.clear($('ps-stock')).appendChild(el('span', { class: 'pill ' + st.kind, text: st.text }));
       $('ps-note').textContent = x.maxQtyMilli ? t('maxq', { q: K.qty(x.maxQtyMilli) + (x.unit ? ' ' + x.unit : '') }) : '';
+      $('ps-share').hidden = !share;
+      $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
       if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
-    if (p) return fill(p);
-    api('/products?ids=' + encodeURIComponent(id)).then(function (r) {
-      if (r.items[0]) fill(r.items[0]);
-      else { K.toast(t('p.gone')); closeToCatalog(); }
-    }).catch(function (e) { K.toast(e.message); });
+    if (detail) detail(null);
+    if (p) fill(p);
+    //  بی product.js (شبکه) برگه همان باز می‌شود، فقط بی جزئیات
+    Promise.all([api('/products/' + encodeURIComponent(id)), loadProductView().catch(function () { return null; })]).then(function (r) {
+      if (!here()) return;
+      fill(r[0].product);
+      if (r[1]) r[1](r[0]);
+    }).catch(function (e) {
+      if (!here()) return;
+      if (e.status === 404) { K.toast(t('p.gone')); closeToCatalog(); }
+      else if (!p) K.toast(e.message);
+    });
   }
   function renderAddSheet(p) {
     var b = $('ps-add'); var st = K.stockOf(p); var line = cart[p.id];
@@ -462,7 +487,15 @@
     renderBar();
   }
 
+  /** صفحهٔ کالا (`/p/<id>` یا `/store/<slug>/p/<id>`، WEB-20) ⇒ همان مسیرِ `#/p/<id>` ِ همین پوسته. */
+  function fromProductPath() {
+    var m = /^(.*?)\/p\/([^/]+)\/?$/.exec(location.pathname);
+    if (!m || (location.hash && location.hash !== '#/')) return;
+    history.replaceState(null, '', (m[1] || '/') + location.search + '#/p/' + m[2]);
+  }
+
   function boot() {
+    fromProductPath();
     K.offline();
     $('to-market').appendChild(K.icon('back'));
     $('to-catalog').appendChild(K.icon('back'));
@@ -483,6 +516,12 @@
         var rs = el('script', { attrs: { src: '/store/recent.js' } });
         rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
         document.head.appendChild(rs);
+      }
+      if (r.seo && typeof r.seo.productBase === 'string') {
+        var ss = el('script', { attrs: { src: '/store/share.js' } });
+        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
+        ss.onload = function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; };
+        document.head.appendChild(ss);
       }
       renderHead();
       renderCats();

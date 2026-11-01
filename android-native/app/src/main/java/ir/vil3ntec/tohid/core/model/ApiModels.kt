@@ -36,7 +36,15 @@ data class ShopRefDto(
   val id: String = "",
   val name: String = "",
   val role: String = "staff",
-)
+  /**
+   *  نقشِ واقعی (A16). سرور در `role` برای چهار نقشِ تازه «staff» می‌فرستد تا
+   *  نسخهٔ قدیمِ برنامه دست‌کم مثلِ شاگرد ببندد؛ این نسخه نقشِ واقعی را از این‌جا می‌خواند.
+   */
+  val actualRole: String = "",
+) {
+  /** نقشی که برنامه به‌کار می‌برد — سرورِ قدیم `actualRole` ندارد */
+  val effectiveRole: String get() = actualRole.ifBlank { role }
+}
 
 /**
  *  پاسخِ همهٔ راه‌های ورود — رمز، کد یک‌بارمصرف، گوگل، و رمزِ تازه.
@@ -165,8 +173,13 @@ data class ShopStateDto(
   val policy: kotlinx.serialization.json.JsonObject? = null,
   val memberCount: Int = 0,
   val serverTime: Long = 0,
+  /** نقشِ واقعی (A16) — `role` برای نقش‌های تازه «staff» است تا نسخهٔ قدیم ببندد */
+  val actualRole: String? = null,
 ) {
   val hasShop: Boolean get() = shop != null && shop.id.isNotBlank()
+
+  /** نقشی که برنامه به‌کار می‌برد — سرورِ قدیم `actualRole` ندارد */
+  val effectiveRole: String? get() = actualRole?.takeIf { it.isNotBlank() } ?: role
 }
 
 @Serializable

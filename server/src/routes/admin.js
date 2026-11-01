@@ -6,7 +6,7 @@
  * حتی با توکن معتبر خودش — نمی‌تواند به این مسیرها برسد.
  */
 const express = require('express');
-const { query, one, many, newId, now } = require('../db');
+const { query, one, many, now } = require('../db');
 const config = require('../config');
 const v = require('../lib/validate');
 const pw = require('../lib/password');
@@ -102,7 +102,10 @@ router.post('/logout', async (req, res) => {
 
 router.get('/me', (req, res) => {
   res.json({
-    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role },
+    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role, isOwner: req.admin.is_owner === true },
+    //  فاز ۳: درخواستِ پلِ پنل با کلیدِ سرویس ⇒ «انجام‌دهنده» و نقشِ مؤثرش (نه خودِ کلید)
+    ...(req.actor ? { actor: req.actor, service: { keyId: req.service.keyId, name: req.service.keyName, roleCap: req.service.roleCap } } : {}),
+    capabilities: require('../lib/admin-capabilities').CAPABILITIES,
     serverTime: now(),
   });
 });
@@ -240,26 +243,27 @@ router.get('/shops', async (req, res) => {
   const offset = v.integer(req.query?.offset, { min: 0, max: 1e6, def: 0 });
   const q = v.text(req.query?.q, { max: 60 });
   const like = `%${q.toLowerCase()}%`;
+  //  فاز ۳: حالت‌های مدیریتیِ باز (`lib/shop-holds.js`) کنارِ هر دکان، و پالایشِ سمتِ سرور با `?hold=`
+  const hold = req.query?.hold ? v.oneOf(req.query.hold, [...require('../lib/shop-holds').KINDS, 'none'], { field: 'حالت' }) : '';
+  const where = require('../lib/admin-capabilities').SHOP_WHERE;   //  یک WHERE برای ردیف‌ها و `total` (بندِ ۱۲.۶)
   const rows = await many(
     `SELECT s.id, s.name, s.status, s.created_at, s.owner_user_id,
             u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email,
             (SELECT COUNT(*)::int FROM shop_members m WHERE m.shop_id=s.id AND m.status='active') AS members,
-            sub.id AS subscription_id, sub.plan, sub.status AS sub_status, sub.starts_at, sub.ends_at
+            sub.id AS subscription_id, sub.plan, sub.status AS sub_status, sub.starts_at, sub.ends_at,
+            COALESCE((SELECT array_agg(DISTINCT h.kind) FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL),
+                     ARRAY[]::text[]) AS holds
        FROM shops s
        JOIN users u ON u.id = s.owner_user_id
        LEFT JOIN LATERAL (
          SELECT * FROM subscriptions x WHERE x.shop_id = s.id
           ORDER BY (x.status IN ('active','suspended','pending')) DESC, x.created_at DESC LIMIT 1
        ) sub ON true
-      --  ⛔ ایمیل هم گشته می‌شود — همان قاعدهٔ admin-pump.js: صاحبِ
-      --  سامانه معمولاً فقط ایمیلِ طرف را دارد، نه نامِ دکانش.
-      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2
-             OR lower(coalesce(u.email,'')) LIKE $2
-             OR coalesce(u.phone,'') LIKE $2)
-      ORDER BY s.created_at DESC LIMIT $3 OFFSET $4`,
-    [q, like, limit, offset]
+      ${where}
+      ORDER BY s.created_at DESC LIMIT $4 OFFSET $5`,
+    [q, like, hold, limit, offset]
   );
-  const total = await one('SELECT COUNT(*)::int n FROM shops');
+  const total = await one(`SELECT COUNT(*)::int n FROM shops s JOIN users u ON u.id = s.owner_user_id ${where}`, [q, like, hold]);
   // دکانی که هنوز اشتراک نخریده ولی در دوره‌ی آزمایشی است، «آزمایشی» نشان داده شود
   const trialDays = await plans.trialDaysOf('shop');
   const t = now();
@@ -620,10 +624,20 @@ router.patch('/config', requireSuperAdmin, async (req, res) => {
     'trial_days', 'whatsapp_number', 'whatsapp_message', 'currency',
     'pump_trial_days', 'pump_currency',
   ];
+  //  پوستهٔ کنسول (۴.۱۲): سابقه «پیشین ⇒ تازه» و دلیل را هم دارد — بی آن «تاریخچهٔ تنظیمات» فقط می‌گفت «چیزی عوض شد»
+  const before = await plans.allConfig();
+  const changes = {};
   for (const key of allowed) {
-    if (req.body?.[key] !== undefined) await plans.setConfig(key, v.text(req.body[key], { max: 300 }));
+    if (req.body?.[key] === undefined) continue;
+    const next = v.text(req.body[key], { max: 300 });
+    await plans.setConfig(key, next);
+    if (String(before?.[key] ?? '') !== next) changes[key] = { from: before?.[key] ?? null, to: next };
   }
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.config_updated' });
+  const reason = reasonOf(req);
+  await audit.log({
+    actorType: 'admin', userId: req.admin.id, action: 'admin.config_updated',
+    detail: { changes, ...(reason ? { reason } : {}) },
+  });
   res.json({ config: await plans.publicConfig() });
 });
 
@@ -689,50 +703,8 @@ router.get('/audit', async (req, res) => {
   res.json({ entries: rows });
 });
 
-// ---------- مدیران ----------
-router.post('/admins', requireSuperAdmin, async (req, res, next) => {
-  const username = v.text(req.body?.username, { max: 40, required: true, field: 'نام کاربری' }).toLowerCase();
-  const password = typeof req.body?.password === 'string' ? req.body.password : '';
-  const weak = pw.checkStrength(password);
-  if (weak) return next(badRequest(weak, 'weak_password'));
-  const exists = await one('SELECT 1 FROM admins WHERE username=$1', [username]);
-  if (exists) return next(badRequest('این نام کاربری گرفته شده است'));
-  const row = await one(
-    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
-     VALUES ($1,$2,$3,$4,$5,'active',$6) RETURNING id, username, name, role`,
-    [newId('adm'), username, v.text(req.body?.name, { max: 60 }), await pw.hashPassword(password),
-      v.oneOf(req.body?.role, ['admin', 'superadmin'], { field: 'نقش', def: 'admin' }), now()]
-  );
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_created', targetType: 'admin', targetId: row.id, detail: { username, role: row.role } });
-  res.status(201).json({ admin: row });
-});
-
-router.get('/admins', requireSuperAdmin, async (req, res) => {
-  res.json({ admins: await many('SELECT id, username, name, role, status, created_at FROM admins ORDER BY created_at') });
-});
-
-/**
- *  غیرفعال کردن یا عوض کردنِ نقشِ یک مدیر — فقط مدیرِ ارشد.
- *  ⚠️ نه خودش (قفل شدنِ ناخواسته) و نه آخرین مدیرِ ارشدِ فعال (پنلِ بی‌صاحب).
- *  غیرفعال ⇒ همهٔ نشست‌هایش همان دم بسته می‌شود.
- */
-router.patch('/admins/:id', requireSuperAdmin, async (req, res, next) => {
-  const id = String(req.params.id);
-  if (id === req.admin.id) return next(badRequest('نقش یا وضعیتِ خودتان را نمی‌توانید عوض کنید', 'admin_self'));
-  const target = await one('SELECT id, role, status FROM admins WHERE id=$1', [id]);
-  if (!target) return next(notFound('مدیر پیدا نشد'));
-  const status = req.body?.status === undefined ? target.status : v.oneOf(req.body.status, ['active', 'disabled'], { field: 'وضعیت' });
-  const role = req.body?.role === undefined ? target.role : v.oneOf(req.body.role, ['admin', 'superadmin'], { field: 'نقش' });
-  const losesSuper = target.role === 'superadmin' && target.status === 'active' && (role !== 'superadmin' || status !== 'active');
-  if (losesSuper) {
-    const left = await one(`SELECT COUNT(*)::int AS n FROM admins WHERE role='superadmin' AND status='active' AND id<>$1`, [id]);
-    if (!left || left.n < 1) return next(badRequest('آخرین مدیرِ ارشدِ فعال نمی‌تواند کنار برود', 'last_superadmin'));
-  }
-  const row = await one('UPDATE admins SET status=$2, role=$3 WHERE id=$1 RETURNING id, username, name, role, status', [id, status, role]);
-  if (status === 'disabled') await tokens.revokeAllForSubject(id);
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.admin_updated', targetType: 'admin', targetId: id, detail: { status, role } });
-  res.json({ admin: row });
-});
+// ---------- مدیران (ساختن، نقش/وضعیت، نشست‌ها) — `routes/admin-admins.js` ----------
+router.use('/admins', require('./admin-admins'));
 
 // ---------- پشتیبان‌گیری ----------
 router.get('/backups', async (req, res) => {
@@ -785,8 +757,18 @@ router.use('/shops/:id/staff-perms', require('./admin-staff-perms'));
  */
 router.use('/otp', require('./admin-otp'));
 router.use('/sync', require('./admin-sync'));
+//  پنلِ مرکزی، فاز ۳: سلامت و حالت‌های مدیریتیِ دکان، پرچم‌ها با تاریخچه، کلیدِ سرویسِ پلِ پنل
+router.use('/shops/:id', require('./admin-shop-state'));
+router.use('/flags', require('./admin-flags'));
+//  پوستهٔ کنسول — جست‌وجوی سراسریِ بخشِ «فروشگاه» ِ پنل (توانایی `search.v1`)
+router.use('/search', require('./admin-search'));
+router.use('/service-keys', require('./admin-service-keys'));
 //  سلامتِ سرور (§۳۸.۸، OPS-01@38) — فقط عدد و وضعیت، بی هیچ راز
 router.use('/system', require('./admin-system'));
+//  پنلِ مرکزی ۴.۶ و ۴.۷: مدیریتِ بازار و نظارت بر پیک — فقط خواندن (+ آستانه‌های «گیر کرده»، فقط ارشد)
+router.use('/market', require('./admin-market'));
+router.use('/delivery', require('./admin-delivery'));
+router.use('/ops', require('./admin-ops'));         //  پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳: نسخه، سلامت، رخداد، هشدار، یکپارچه‌سازی
 //  F0-27: کانالِ آزمایشیِ نسخه‌ها (فقط مدیرِ ارشد) — درِ خودش، نه `/pump/live-config`
 router.use('/release', require('./admin-release'));
 router.use('/', require('./admin-platform'));
