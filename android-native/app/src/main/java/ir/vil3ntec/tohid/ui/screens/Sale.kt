@@ -505,6 +505,7 @@ fun SaleScreen(
 
       /* ---------------------------- سبد ---------------------------- */
       item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }
+      item { TillReceivePhone(d, store, cartDebtorId, ::toast) } // POS-39، پشتِ `TillReceivePref` (پیش‌فرض خاموش)
       item { ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } }
       item {
         Row(
