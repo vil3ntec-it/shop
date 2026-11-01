@@ -175,7 +175,7 @@ class DeliveryWireTest {
     assertEquals(day.second, week.second)
   }
 
-  @Test fun `DLV-18: امتیازِ تحویل‌ها — جمعِ هر پیک، تازه‌ها و پرچمِ دکمه؛ کلیدِ ناجور ⇒ خالی، نه کرش`() {
+  @Test fun `DLV-18 — امتیازِ تحویل‌ها — جمعِ هر پیک، تازه‌ها و پرچمِ دکمه؛ کلیدِ ناجور ⇒ خالی، نه کرش`() {
     val b = DeliveryWire.ratings(obj("""{"couriers":[{"courierId":"c1","name":"احمد",
       "fromCustomers":{"count":2,"avgTenths":45,"tags":{"on_time":2,"polite":1}},
       "byCourier":{"count":1,"avgTenths":20,"tags":{"not_ready":1}}}],
