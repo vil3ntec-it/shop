@@ -338,6 +338,35 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
   ok(dj && dj.slot && dj.slot.startsAt === Number(slotVal) && dj.slot.feeMinor === 2000 && Number(o.delivery_fee_minor) >= 2000,
     'CHK-07: همان بازه و هزینهٔ ۲۰ ِ آن در سفارش، با جمعی که وب نشان داد', JSON.stringify(dj && dj.slot) + ' / ' + o.delivery_fee_minor);
 }
+
+//  CHK-14: «با کدام اسکناس…» — پرچمِ خاموش ⇒ نیست؛ روشن ⇒ فقط اسکناس‌هایی که سرور می‌پذیرد، و همان در سفارش
+await flag('shop.orders.delivery_prefs', false);   //  CHK-24 ِ بالا روشنش کرده بود
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+ok(await page.isHidden('#tender-row'), 'CHK-14 خاموش: بی «با کدام اسکناس»');
+await flag('shop.orders.delivery_prefs', true);
+await open();
+await toCheckout();
+await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
+await page.fill('#c-name', 'مشتریِ آزمایشی');
+await page.fill('#a-text', 'کارته‌سه، کوچهٔ پنجم');
+await page.waitForSelector('#slot-pick option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+await page.selectOption('#slot-pick', await page.locator('#slot-pick option:not([disabled])').nth(1).getAttribute('value'));
+await page.waitForSelector('#tender-row:not([hidden]) #d-tender option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+const tv = await page.locator('#d-tender option').nth(1).getAttribute('value');
+ok((await page.locator('#d-tender option').nth(1).textContent()).includes('پول خرد'), 'گزینهٔ اسکناس پول خرد را می‌گوید', await page.locator('#d-tender option').nth(1).textContent());
+await page.selectOption('#d-tender', tv);
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+{
+  const o = await one('SELECT delivery, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const dj = typeof o.delivery === 'string' ? JSON.parse(o.delivery) : o.delivery;
+  const total = Number(o.total_minor);
+  ok(dj.cashTenderMinor === Number(tv) && dj.cashTenderMinor > total && dj.cashTenderMinor - total < 100000,
+    'CHK-14: همان اسکناس در سفارش؛ بیش از جمع و پول خرد کمتر از یک اسکناسِ ۱۰۰۰', `${dj.cashTenderMinor} / ${total}`);
+}
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

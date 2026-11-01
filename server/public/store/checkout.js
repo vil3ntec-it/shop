@@ -42,6 +42,31 @@
     var slots = {};             // روش ⇒ undefined = نخواسته، null = در راه، false = نیامد، وگرنه پاسخِ GET /slots
     var slotAt = 0;             // `startsAt` ِ برگزیده؛ ۰ = هرچه زودتر / هیچ
     var drawn = null;
+
+    // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
+    //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
+    //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
+    var NOTE_MINOR = 100000; var tender = 0;
+    function tenders(total) {
+      var out = [];
+      [10000, 50000, 100000].forEach(function (u) {
+        var x = Math.ceil(total / u) * u;
+        if (x === total) x += u;
+        if (x - total < NOTE_MINOR && out.indexOf(x) < 0) out.push(x);
+      });
+      return out.sort(function (a, b) { return a - b; });
+    }
+    function renderTender(f, total) {
+      var on = Boolean(c.store.features && c.store.features.deliveryPrefs) && f === 'delivery';
+      $('tender-row').hidden = !on;
+      if (!on) { tender = 0; return; }
+      var list = total > 0 ? tenders(total) : [];
+      if (list.indexOf(tender) < 0) tender = 0;
+      var sel = K.clear($('d-tender'));
+      sel.appendChild(el('option', { attrs: { value: '' }, text: t('ck.tender.none') }));
+      list.forEach(function (x) { sel.appendChild(el('option', { attrs: { value: String(x) }, text: t('ck.tender.opt', { m: K.money(x), c: K.money(x - total) }) })); });
+      sel.value = tender ? String(tender) : '';
+    }
     function scheduled(f) { var d = c.store.delivery; return Boolean(f && d && d.scheduling && d.scheduling[f]); }
     function slotOf(f) {
       var r = slots[f];
@@ -160,6 +185,7 @@
       $('t-disc-label').hidden = $('t-disc').hidden = !(disc > 0);
       $('t-disc').textContent = '−' + K.money(disc);
       $('t-total').textContent = K.money(sub - disc + fee);
+      if (!(f === 'delivery' && c.zones() && !c.zone)) renderTender(f, sub - disc + fee); else renderTender('', 0);
       $('address-box').hidden = f !== 'delivery';
       $('addr-extra').hidden = !c.store.addressExtra;
       var min = c.minFor(f);
@@ -285,6 +311,7 @@
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
+        if (tender && !$('tender-row').hidden) body.delivery.cashTenderMinor = tender;
       }
       return body;
     }
@@ -407,6 +434,7 @@
       if (r) { r.checked = true; renderCheckout(); }
     });
     $('zone-notify').addEventListener('click', notifyMe);
+    $('d-tender').addEventListener('change', function () { tender = Number($('d-tender').value) || 0; });
     $('slot-pick').addEventListener('change', function () { slotAt = Number($('slot-pick').value) || 0; renderCheckout(); });
     var applyCode = function () {
       var v = $('promo-code').value.trim();

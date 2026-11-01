@@ -262,6 +262,8 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   });
   assert.equal(pushed.status, 200, JSON.stringify(pushed.body));
   assert.equal((await h.put('/api/shop/storefront/products/rice', { published: true }, { token: s.token })).status, 200);
+  //  وب (checkout.js): «با اسکناسِ …» فقط با `features.deliveryPrefs` ِ همان پرچم
+  assert.equal((await h.get(`/api/store/${slug}`)).body.features.deliveryPrefs, true);
   const phone = '0791112233';
   const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
   const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
@@ -313,4 +315,5 @@ test('CHK-24 مشتری: ویرایشِ سفارشِ ویترینِ خودش ب�
   assert.equal(off.status, 403, JSON.stringify(off.body));
   assert.equal(off.body.error.code, 'delivery_prefs_disabled');
   assert.ok(!('deliveryPrefs' in (await track())), 'پرچمِ خاموش ⇒ کلید نیست');
+  assert.equal('features' in (await h.get(`/api/store/${slug}`)).body, false, 'پرچمِ خاموش ⇒ پاسخِ ویترین همان پیشین');
 });

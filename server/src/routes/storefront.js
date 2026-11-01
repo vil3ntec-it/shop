@@ -126,6 +126,8 @@ async function featuresOf(shopId) {
     ...((await orders.flagOf(shopId, ADDRESS_EXTRA_FLAG)) ? { addressExtra: true } : {}),
     //  WEB-11: ♥ و «فهرستِ خرید» ِ وب (`store/catalog.js`، روی همین دستگاه) با پرچمِ `shop.storefront.favorites`
     ...((await extras.favoritesOn(shopId)) ? { favorites: true } : {}),
+    //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در فرمِ ثبتِ وب با پرچمِ `shop.orders.delivery_prefs` (همان درِ `delivery.cashTenderMinor`)
+    ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
   };

@@ -572,6 +572,7 @@
       marketOn = Boolean(r.market && r.market.available);
       stockList = Boolean(r.features && r.features.stockList);
       store.addressExtra = Boolean(r.features && r.features.addressExtra);
+      store.features = r.features || {};
       verifyAvailable = !r.verification || r.verification.available !== false;
       if (r.seo && typeof r.seo.productBase === 'string') {
         var ss = el('script', { attrs: { src: '/store/share.js' } });
