@@ -128,7 +128,12 @@ data class PhoneCatalogItem(
   val inCart: Double,
   /** کالای وزنی/پیمانه‌ای (کیلو، لیتر، …): زدن ⇐ صفحه‌کلید، نه +۱ */
   val weighed: Boolean,
-)
+  /** PRD-09 کالای خدماتی/بی موجودی (`Product.stockless`): هرگز «تمام شد» نیست و «خدماتی» می‌گوید */
+  val stockless: Boolean = false,
+) {
+  /** کاشیِ کم‌رنگ و «تمام شد» — کالای خدماتی هرگز */
+  val soldOut: Boolean get() = stock <= 0 && !stockless
+}
 
 @Composable
 fun PhoneCatalog(
@@ -385,12 +390,12 @@ private fun BestsellerRow(items: List<PhoneCatalogItem>, onTap: (PhoneCatalogIte
         Modifier
           .height(32.dp)
           .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
-          .alpha(if (b.stock <= 0) SOLD_OUT_ALPHA else 1f)
+          .alpha(if (b.soldOut) SOLD_OUT_ALPHA else 1f)
           .clip(RoundedCornerShape(percent = 50))
           .background(if (b.inCart > 0) v.cart else v.card)
           .border(1.dp, if (b.inCart > 0) v.cart else v.hairline, RoundedCornerShape(percent = 50))
           .clickable(role = Role.Button, onClickLabel = if (b.weighed) StrSale.weigh else StrSale.addOne) {
-            if (b.stock > 0) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            if (!b.soldOut) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
             onTap(b)
           }
           .padding(horizontal = 12.dp),
@@ -489,8 +494,8 @@ fun PhoneTile(
   )
   val pop = rememberAddPop(item.inCart)
   val priceText = PhoneSaleText.amount(item.price)
-  val stockText = PhoneSaleText.stock(item.stock, item.unit)
-  val out = item.stock <= 0
+  val stockText = PhoneSaleText.stock(item)
+  val out = item.soldOut
   Column(
     Modifier
       .fillMaxWidth()
@@ -582,9 +587,9 @@ fun PhoneListRow(
     bottomStart = if (last) r else 0.dp, bottomEnd = if (last) r else 0.dp,
   )
   val priceText = PhoneSaleText.amount(item.price)
-  val stockText = PhoneSaleText.stock(item.stock, item.unit)
+  val stockText = PhoneSaleText.stock(item)
   val hairline = v.hairline
-  val out = item.stock <= 0
+  val out = item.soldOut
   val dim = if (out) SOLD_OUT_ALPHA else 1f
   Row(
     Modifier
@@ -632,7 +637,7 @@ fun PhoneListRow(
         Text(priceText, color = v.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, maxLines = 1)
         Text(
           "  ·  $stockText",
-          color = if (item.stock <= 0) v.negative else v.inkMuted,
+          color = if (item.soldOut) v.negative else v.inkMuted,
           fontSize = 12.sp,
           maxLines = 1,
           overflow = TextOverflow.Ellipsis,
