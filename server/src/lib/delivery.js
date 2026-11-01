@@ -26,6 +26,7 @@ const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 const liveCap = require('./delivery-live-cap');   //  DLV-03: سقفِ کارِ هم‌زمانِ هر پیک (مهاجرتِ ۱۴۸)
+const courierChecks = require('./courier-checks');   //  DLV-07/17: کیسه‌ها هنگامِ گرفتن و «تحویل شد» نزدیکِ پین
 
 const FLAG_KEY = 'shop.delivery';
 const FEATURE_KEY = 'delivery';
@@ -38,9 +39,7 @@ const DEFAULT_CASH_CAP_MINOR = 1_000_000;  // D-18 (پیش‌نهاد): ۱۰٬۰
 
 const { VIEW_FLAG, LOCATION_FLAG, ON_THE_WAY, LOCATION_TTL_MS, LOCATION_MIN_INTERVAL_MS } = require('./delivery-live');
 
-// ════════════════════════════════════════════════════════════════════
-//  پرچم و اشتراک
-// ════════════════════════════════════════════════════════════════════
+// ══════════════════════ پرچم و اشتراک ══════════════════════
 
 async function stateOf(shopId) {
   const ordersFlag = await orders.flagOf(shopId);
@@ -55,9 +54,7 @@ async function stateOf(shopId) {
 const { KEY_RE, ID_RE, MAX_MONEY_MINOR, str, text, int, optInt, eventKey, idOf, n, asJson, hashOf } = require('./delivery-input');
 const { CODE_MAX_ATTEMPTS, codeHash, codeFor, codeMatches } = require('./delivery-codes');
 
-// ════════════════════════════════════════════════════════════════════
-//  مدلِ خواندنی
-// ════════════════════════════════════════════════════════════════════
+// ══════════════════════ مدلِ خواندنی ══════════════════════
 
 function staffView(a) {
   return {
@@ -455,6 +452,7 @@ function parseEvent(raw, { requireKey = true } = {}) {
     code: e.code === undefined || e.code === null ? '' : String(e.code).slice(0, 12),
     deviceTime: optInt(e.deviceTime, 'زمانِ دستگاه', { min: 0, max: 4102444800000 }),
     deviceSeq: optInt(e.deviceSeq, 'ترتیبِ دستگاه', { min: 0, max: Number.MAX_SAFE_INTEGER }),
+    ...courierChecks.parseInput(e),
   };
 }
 
@@ -492,8 +490,10 @@ async function applyEvent(c, shopId, ev, actor) {
 
   const verdict = D.check(a, ev.to, { actor, reason: ev.reason, note: ev.note });
   if (!verdict.ok) return rejection(verdict.code, { current: a.status });
+  const pre = await courierChecks.verify(c, shopId, a, ev, actor);   //  پشتِ پرچم‌های خاموش؛ پیش از کدِ تحویل
+  if (pre.code) return rejection(pre.code, { current: a.status, ...pre.extra });
 
-  const detail = {};
+  const detail = { ...pre.detail };
   let collected = null;
   let cashReview = a.cash_review === true;
   let codeUsed = false;
@@ -619,7 +619,7 @@ async function courierEvents(shopId, body, actor) {
     }
     results[p.i] = out.ok
       ? { eventId, status: out.status, assignment: { id: out.assignment.id, status: out.assignment.status, version: Number(out.assignment.version) } }
-      : { eventId, status: 'rejected', code: out.code, message: out.message, ...(out.current ? { current: out.current } : {}) };
+      : { eventId, status: 'rejected', code: out.code, message: out.message, ...(out.current ? { current: out.current } : {}), ...(out.data ? { data: out.data } : {}) };
   }
   return { results, serverTime: now() };
 }
