@@ -230,7 +230,9 @@ fun SaleScreen(
       toast(StrSale.partialBarcode(hit.count))
       return
     }
-    val productId = (hit as? BarcodeMatch.Hit.Product)?.id
+    //  موتورِ تازهٔ موجودی (روشن): بارکدِ ناشناس که «سری»ِ یک کالاست ⇒ همان کالا، و فروش اول از همین سری
+    val lotHit = if (hit is BarcodeMatch.Hit.Product) null else ir.vil3ntec.tohid.data.StockActions.lotForCode(d, code)
+    val productId = (hit as? BarcodeMatch.Hit.Product)?.id ?: lotHit?.first
     if (productId == null) {
       ScanFeedback.unknown(context)
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
@@ -259,7 +261,8 @@ fun SaleScreen(
       cartStore.lines.value, productId, multiplier.toDouble(), ShopStore.stock(d, productId),
     )
     //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد
-    if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
+    val next = if (lotHit != null) SalesEngine.setLineLot(added.cart, productId, lotHit.second) else added.cart
+    if (!cartStore.set(next)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return }
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
@@ -271,7 +274,13 @@ fun SaleScreen(
       //  اگر از نیمهٔ بارکد شناخته شد، همان را بگو — فروشنده باید بداند
       //  که کدِ کامل خوانده نشده، تا اگر کالا آن نبود بفهمد
       val whole = (hit as? BarcodeMatch.Hit.Product)?.exact ?: true
-      toast(if (whole) StrSale.addedToCart(product.name) else StrSale.halfBarcode(product.name))
+      toast(
+        when {
+          lotHit != null -> "${product.name} — سری ${lotHit.second} به سبد اضافه شد"
+          whole -> StrSale.addedToCart(product.name)
+          else -> StrSale.halfBarcode(product.name)
+        }
+      )
     }
   }
 
@@ -676,7 +685,7 @@ fun SaleScreen(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
       d, priced, options,
       today = ir.vil3ntec.tohid.todayIso(),

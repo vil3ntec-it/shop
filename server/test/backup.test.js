@@ -151,3 +151,38 @@ test('پشتیبانِ خالی، پشتیبان حساب نمی‌شود', asyn
     .filter(f => f.endsWith('.part'));
   assert.deepEqual(left, [], 'فایل نیمه‌کاره نباید بماند');
 });
+
+/**
+ * SEC-07 — پرچمِ `security / backup.require_encryption` روی مسیرِ واقعیِ pg_dump:
+ * بی رمز هیچ فایلی نمی‌سازد؛ با رمز، فایلِ جریانیِ رمزشده پیش از «موفق» باز و شمرده
+ * می‌شود و همان فایل روی سرورِ تازه برمی‌گردد. (PGlite را backup-strict.test.js می‌سنجد.)
+ */
+test('SEC-07: پرچمِ رمزِ اجباری روی pg_dump — رد بی رمز، سنجش و بازیابی با رمز', async () => {
+  const set = (v) => sql(process.env.DATABASE_URL,
+    `INSERT INTO live_config (scope, key, value, updated_at) VALUES ('security','backup.require_encryption','${v}',0)
+     ON CONFLICT (scope, key) DO UPDATE SET value = EXCLUDED.value`);
+  await set('true');
+  try {
+    config.backup.passphrase = '';
+    const before = await fs.readdir(backup.dirFor('manual'));
+    await assert.rejects(() => backup.run({ kind: 'manual' }), (e) => e.code === 'backup_passphrase_required');
+    assert.deepEqual(await fs.readdir(backup.dirFor('manual')), before, 'هیچ فایلِ متنِ ساده یا .part');
+
+    config.backup.passphrase = 'sec07-test-passphrase-long';
+    const out = await backup.run({ kind: 'manual' });
+    assert.equal(out.encrypted, true);
+    assert.equal(out.verified, true);
+    const meta = JSON.parse(await fs.readFile(`${out.file}.meta.json`, 'utf8'));
+    assert.equal(meta.verified, true);
+    assert.equal((await backup.decode(out.file)).length, meta.rawBytes, 'شمارِ بایتِ سنجیده = خروجیِ واقعیِ dump');
+
+    await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`);
+    await sql(adminUrl, `CREATE DATABASE ${RESTORE_DB}`);
+    await backup.restore(out.file, { databaseUrl: restoreUrl });
+    const migrations = await sql(restoreUrl, 'SELECT version FROM schema_migrations');
+    assert.ok(migrations.rows.length >= 2);
+  } finally {
+    config.backup.passphrase = '';
+    await sql(process.env.DATABASE_URL, `DELETE FROM live_config WHERE scope='security' AND key='backup.require_encryption'`);
+  }
+});

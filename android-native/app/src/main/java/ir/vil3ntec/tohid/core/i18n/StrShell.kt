@@ -9,6 +9,11 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrShell {
 
+  // OPS-03: برنامه دفعهٔ پیش ناگهان بسته شد (MainActivity)
+  val crashTitle: String get() = t("برنامه ناگهان بسته شد", "The app closed unexpectedly", "پروګرام ناڅاپه بند شو")
+  val crashBody: String get() = t("گزارشِ خطا بی هیچ دادهٔ شخصی برای پشتیبانی فرستاده می‌شود. اگر با پشتیبانی تماس گرفتید، این کد را بگویید:", "An error report with no personal data is being sent to support. If you contact support, give them this code:", "د تېروتنې راپور پرته له شخصي معلوماتو ملاتړ ته لېږل کېږي. که له ملاتړ سره اړیکه نیسئ، دا کوډ ورته ووایاست:")
+  val crashOk: String get() = t("باشه", "OK", "سمه ده")
+
   // منو و سربرگ
   val promos: String get() = t("تخفیف‌ها", "Discounts", "تخفیفونه")
   val promosSub: String get() = t("تخفیفِ خودکار، بخر X بگیر Y، بسته، ساعتِ خوش و کدِ تخفیف", "Automatic discounts, buy X get Y, bundles, happy hours and discount codes", "اتومات تخفیف، X واخلئ Y ترلاسه کړئ، بنډل، د خوښۍ ساعتونه او د تخفیف کوډ")
@@ -103,6 +108,14 @@ object StrShell {
   val reminderEmpty: String get() = t("متنِ یادآوری خالی است", "The reminder text is empty", "د یادونې متن خالي دی")
   fun reminderTooLong(max: Int): String = t("متنِ یادآوری حداکثر $max حرف", "The reminder text can have at most $max characters", "د یادونې متن تر $max تورو پورې")
   fun reminderUnknown(slots: String): String = t("جای‌نگهدارِ ناشناخته: $slots", "Unknown placeholder: $slots", "ناپېژندل شوی ځای نیونکی: $slots")
+  // «تحلیلِ موجودی» (INV-15، INV-16) — گزارشِ کالاها، پیش‌فرض خاموش
+  val stockInsight: String get() = t("تحلیلِ موجودی", "Stock analysis", "د زېرمې شننه")
+  val stockInsightShown: String get() = t("در گزارشِ کالاها دیده می‌شود", "Shown in the products report", "د توکو په راپور کې ښکاري")
+  val stockInsightNote: String get() = t("در گزارشِ کالاها: ارزشِ موجودی به قیمتِ خرید و به قیمتِ فروش، سودِ بالقوه، و تحلیلِ ABC (کدام کالاها بیشترِ فروش را می‌سازند). فقط خواندنی است و چیزی نمی‌نویسد. سود تقریبی است، چون از قیمتِ خریدِ ثبت‌شدهٔ هر کالا حساب می‌شود. پس از تغییر، «گزارش‌ها» را دوباره باز کنید.", "In the products report: stock value at purchase price and at sale price, potential profit, and ABC analysis (which products make most of your sales). It is read-only and writes nothing. The profit is approximate, because it uses each product's recorded purchase price. After changing this, reopen “Reports”.", "د توکو په راپور کې: د زېرمې ارزښت د پېر په بیه او د پلور په بیه، شونې ګټه، او د ABC شننه (کوم توکي د پلور ډېره برخه جوړوي). یوازې د لوستلو لپاره دی او هېڅ نه لیکي. ګټه اټکلي ده، ځکه چې د هر توکي له ثبت شوې پېر بیې حسابېږي. له بدلون وروسته «راپورونه» بیا پرانیزئ.")
+  // «نقطهٔ سفارش و بیشینه» (INV-12) — پیش‌فرض خاموش
+  val stockLevels: String get() = t("نقطهٔ سفارش و بیشینه", "Reorder point and maximum", "د امر ټکی او اعظمي کچه")
+  val stockLevelsShown: String get() = t("در فرمِ کالا و گزارش‌ها", "In the product form and reports", "د توکي په فورمه او راپورونو کې")
+  val stockLevelsNote: String get() = t("برای هر کالا، کنارِ «حد کم بودن»، «نقطهٔ سفارش» (وقتی موجودی به آن رسید، وقتِ سفارش است) و «بیشینه» (سفارش تا همین‌جا پر می‌کند) را بنویسید؛ در کامپیوتر برای چند کالا با هم هم می‌شود. گزارش‌ها فهرستِ «نیاز به سفارش» را با مقدارِ پیشنهادی نشان می‌دهند. سفارشی خودکار ثبت نمی‌شود. پس از تغییر، صفحه را دوباره باز کنید.", "For each product, next to “Low stock level”, set a “Reorder point” (when stock reaches it, it is time to order) and a “Maximum” (an order fills up to it); on the computer you can set them for many products at once. Reports show a “Needs ordering” list with a suggested quantity. No order is placed automatically. After changing this, reopen the page.", "د هر توکي لپاره، د «لږې زېرمې کچه» تر څنګ، «د امر ټکی» (کله چې زېرمه ورته ورسېږي، د امر وخت دی) او «اعظمي کچه» (امر تر همدې ځایه ډکوي) ولیکئ؛ په کمپیوټر کې د څو توکو لپاره یوځای هم کېږي. راپورونه د «امر ته اړتیا» لړ له وړاندیز شوي مقدار سره ښيي. هېڅ امر په خپله نه ثبتېږي. له بدلون وروسته، پاڼه بیا پرانیزئ.")
   // مشتری ← ادغامِ تکراری‌ها (CRM-10)
   val mergeNotOnV3: String get() = t("روی همگام‌سازیِ تازه هنوز نیست", "Not available on the new sync yet", "په نوې همغږۍ کې لا نشته")
   val mergeNotSaved: String get() = t("ادغام ثبت نشد", "The merge wasn't saved", "یوځای کول ثبت نه شو")

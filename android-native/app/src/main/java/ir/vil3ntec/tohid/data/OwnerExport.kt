@@ -152,6 +152,9 @@ object OwnerExport {
     //  PRD-24/PRD-25
     "alternatives" to "کالاهای جایگزین",
     "customFields" to "فیلدهای سفارشی",
+    "brand" to "برند",
+    "reorderPoint" to "نقطهٔ سفارش",
+    "maxStock" to "حداکثر موجودی",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",
@@ -216,6 +219,14 @@ object OwnerExport {
     "oldPrice" to "قیمت قبلی",
     "newPrice" to "قیمت تازه",
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    //  موتورِ تازهٔ موجودی و بها (افزودنی، فقط وقتی تنظیمِ دکان روشن است)
+    "landedCost" to "هزینهٔ جانبی",
+    "landedCostMinor" to "هزینهٔ جانبی (صدم افغانی)",
+    "locationId" to "محل",
+    "toLocationId" to "محلِ مقصد",
+    "userId" to "کاربر",
+    "lotId" to "سری",
+    //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */
