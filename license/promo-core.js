@@ -1,5 +1,5 @@
 /* ==========================================================
-   فروشگاه من | هستهٔ تخفیف و قاعده‌های قیمت — PRM-01..09، 11، 12، 17
+   فروشگاه من | هستهٔ تخفیف و قاعده‌های قیمت — PRM-01..12، 17
    ----------------------------------------------------------
    هم‌زادِ `core/src/commonMain/.../core/promo/PromoCore.kt`. هر دو با یک
    فایلِ بردارِ مرجع (`core/test-vectors/promo-v1.json`) سنجیده می‌شوند؛
@@ -17,6 +17,10 @@
    bxgy       بخر X بگیر Y؛ ارزان‌ترین واحدهای دامنه (buy، get، bp)
    bundle     بسته: هر qty واحد از دامنه به priceMinor
    threshold  آستانهٔ مبلغِ خرید (tiers: {min=مبلغ, bp | amountMinor})
+   expiry     PRM-10: درصد (bp) فقط روی واحدهای محموله‌های تا nearDays (۱ تا ۳۶۵) روز مانده به
+              انقضا (۰ ≤ daysLeft ≤ nearDays؛ منقضی نه). ردیف `lots: [{daysLeft, qtyMilli}]` می‌آورد؛
+              FEFO: کمینهٔ مقدارِ ردیف و ماندهٔ نزدیکِ همان کالا، ردیف‌های یک کالا به ترتیبِ سبد.
+              بی `lots` (وب، فروشگاهِ اینترنتی) ⇒ هیچ.
 
    ── ترکیب و اولویت (PRM-12) ──────────────────────────────────
    ۱. قاعدهٔ واجدِ شرط: فعال، معتبر، در بازهٔ زمانی، گروه/کانالِ درست، کدِ
@@ -46,10 +50,11 @@
   'use strict';
 
   var VERSION = 1;
-  var KINDS = ['percent', 'amount', 'price', 'tiers', 'bxgy', 'bundle', 'threshold'];
+  var KINDS = ['percent', 'amount', 'price', 'tiers', 'bxgy', 'bundle', 'threshold', 'expiry'];
   var STACKS = ['exclusive', 'best', 'combine'];
   var CHANNELS = ['pos', 'online'];
   var FULL_BP = 10000;
+  var MAX_NEAR_DAYS = 365;             // PRM-10 — بیشترین «روز پیش از انقضا»
   var MAX = 9007199254740991;          // ۲^۵۳−۱ — کاتلین هم همین سقف را می‌سنجد
 
   // ── حسابِ صحیحِ امن ────────────────────────────────────
@@ -144,7 +149,7 @@
     var i, tiers = [], prices = [], to = objs(o.tiers), po = objs(o.prices);
     for (i = 0; i < to.length; i++) tiers.push(tierOf(to[i]));
     for (i = 0; i < po.length; i++) prices.push(priceOf(po[i]));
-    return {
+    var r = {
       id: str(o.id), name: str(o.name), kind: str(o.kind),
       active: bool(o.active, true), stack: typeof o.stack === 'string' ? o.stack : 'best', priority: int(o.priority, 0),
       code: str(o.code), maxUses: int(o.maxUses, 0), uses: int(o.uses, 0), allowBelowCost: bool(o.allowBelowCost, false),
@@ -152,7 +157,12 @@
       bp: int(o.bp, 0), amountMinor: int(o.amountMinor, 0), prices: prices, tiers: tiers,
       buy: int(o.buy, 0), get: int(o.get, 0), qty: int(o.qty, 0), priceMinor: int(o.priceMinor, 0),
     };
+    //  PRM-10: `nearDays` فقط وقتی آمده نوشته می‌شود — قاعدهٔ ذخیره‌شدهٔ دیگر بایت‌به‌بایت همان
+    if (o.nearDays !== undefined && o.nearDays !== null) r.nearDays = int(o.nearDays, 0);
+    return r;
   }
+  /** PRM-10 — روزِ پیش از انقضا؛ نبودن = ۰ (کاتلین: پیش‌فرضِ `Rule.nearDays`) */
+  function nearDaysOf(r) { return typeof r.nearDays === 'number' ? r.nearDays : 0; }
 
   // ── تاریخ ──────────────────────────────────────────────
   /** "YYYY-MM-DD" ⇒ شمارهٔ روز از ۱۹۷۰-۰۱-۰۱؛ نادرست ⇒ null */
@@ -265,6 +275,10 @@
     }
     if (k === 'bxgy' && (r.buy < 1 || r.get < 1 || r.buy > 1000 || r.get > 1000 || !validBp(r.bp))) e.push('bxgy');
     if (k === 'bundle' && (r.qty < 2 || r.qty > 1000 || r.priceMinor <= 0 || r.priceMinor % step !== 0)) e.push('bundle');
+    if (k === 'expiry') {
+      if (!validBp(r.bp)) e.push('bp');
+      if (nearDaysOf(r) < 1 || nearDaysOf(r) > MAX_NEAR_DAYS) e.push('expiry');
+    }
     return e;
   }
 
@@ -281,7 +295,8 @@
       var qty = int(l.qtyMilli, 0), unit = int(l.unitMinor, 0);
       var amount = int(l.amountMinor, null);
       if (amount === null) amount = (qty > 0 && unit > 0) ? lineTotalMinor(qty, unit, step) : 0;
-      var cost = int(l.costMinor, 0);
+      var cost = int(l.costMinor, 0), lots = [], lo = objs(l.lots);
+      for (var q = 0; q < lo.length; q++) lots.push({ daysLeft: int(lo[q].daysLeft, -1), qtyMilli: int(lo[q].qtyMilli, 0) });
       lines.push({
         key: str(l.key), productId: str(l.productId), qtyMilli: qty, unitMinor: unit, amountMinor: amount,
         costMinor: cost, category: str(l.category), supplierId: str(l.supplierId), brand: str(l.brand),
@@ -289,6 +304,7 @@
         units: qty > 0 ? div(qty, 1000) : 0,
         costFloor: (cost > 0 && qty > 0) ? ceilStep(mul(qty, cost), 1000, step) : 0,
         open: str(l.productId) !== '' && !bool(l.noPromo, false) && qty > 0 && amount > 0,
+        lots: lots,
       });
     }
     var codes = [], seen = {}, cc = strs(cart.coupons);
@@ -450,6 +466,26 @@
       if (!tier) return out;
       var amt = tier.amountMinor > 0 ? Math.min(tier.amountMinor, floorStep(base, step)) : roundStep(mul(base, tier.bp), FULL_BP, step);
       return allocate(amt, w, cp, step);
+    }
+    if (k === 'expiry') {
+      //  PRM-10 — FEFO: ردیف‌های یک کالا به ترتیبِ سبد از همان ماندهٔ نزدیکِ انقضا برمی‌دارند
+      var used = {}, nd = nearDaysOf(r);
+      for (j = 0; j < idx.length; j++) {
+        i = idx[j]; l = lines[i];
+        var near = 0;
+        for (var z = 0; z < l.lots.length; z++) {
+          var lot = l.lots[z];
+          if (lot.daysLeft >= 0 && lot.daysLeft <= nd && lot.qtyMilli > 0) near = add(near, lot.qtyMilli);
+        }
+        var prior = used['#' + l.productId] || 0;
+        var nq = Math.min(l.qtyMilli, Math.max(0, near - prior));
+        used['#' + l.productId] = prior + nq;
+        if (nq <= 0) continue;
+        //  همهٔ ردیف ⇒ همان «percent»؛ بخشی ⇒ مبلغِ همان واحدها، نه بیش از مبلغِ ردیف
+        var eb = nq >= l.qtyMilli ? l.amountMinor : Math.min(l.amountMinor, lineTotalMinor(nq, l.unitMinor, step));
+        out[i] = Math.min(roundStep(mul(eb, r.bp), FULL_BP, step), roomOf(r, l, rem[i], step));
+      }
+      return out;
     }
     return out;
   }
