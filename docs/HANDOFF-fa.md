@@ -775,6 +775,26 @@ PRها سرخ می‌ماند. ترتیبِ پیشنهادیِ مرج: #416 ⇐ 
 - قدمِ بعدی: بازبینی و مرجِ PR #422 به دستِ سرپرست؛ تصمیمِ صاحب محصول دربارهٔ نگه‌داشتنِ نشانیِ رهاشده برای همان دکان (امروز نشانیِ زنده مقدم است).
 
 
+### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/market-s2-public-views` (S2 و S4 ِ قراردادِ بازار)
+- انجام شد: `server/src/lib/public-views.js` (فهرستِ سفیدِ همهٔ شکل‌های عمومی + `SCHEMA_VERSION = 1`)؛ سازنده‌های امروزِ
+  `/store` و `/market` (`profile`، `productView`، `publicOrder`، `cardOf`، `feedItem`، جست‌وجو، «سفارش‌های من»، خریدِ دوباره)
+  از آن می‌گذرند، با ترتیبِ کلیدِ همان ورودی ⇒ پاسخ بی تغییر. نمونهٔ مشترک `core/test-vectors/market-public-v1.json`؛
+  آزمون‌ها `server/test/public-views.test.js` و `core/src/jvmTest/.../market/MarketContractTest.kt`؛ مدل‌ها در
+  `core/src/commonMain/.../market/MarketContract.kt` (kotlinx.serialization 1.7.3، همان نسخهٔ اندروید). کارِ `test` در core
+  = `jvmTest`، و گامِ «آزمونِ core» در `tohid-desktop.yml`.
+- دنباله (همان روز): بُرشِ پاسخِ زنده پشتِ پرچمِ `market.public_views` (scope `all`، **پیش‌فرض خاموش**) رفت تا فیلدِ تازهٔ
+  M4/S3/S5/S7 پیش از رسیدن به فهرست بی‌صدا بریده نشود: سازنده‌ها `pub`/`pubList` را صدا می‌زنند (خاموش ⇒ همان شیء، پاسخِ main)،
+  `view`/`list` همیشه می‌بُرند، و `router.use(views.gate)` در `/store` و `/market` پرچم را می‌خواند. روشن کردنِ پرچم
+  فقط پس از هم‌گام شدنِ فهرست با فیلدهای شاخه‌های بالا (نسخهٔ ۲).
+- نیمه‌کاره/بیرون از کار: `store.delivery` (ناحیه‌ها، §۱.۵) و پاسخ‌های بازه/ناحیه/گفت‌وگو/حساب هنوز از ماژول نمی‌گذرند؛
+  `delivery` (پیک) شکلش ثابت شده ولی در هیچ پاسخی نیست (S5)؛ `schemaVersion` فقط در کد و پرونده است، نه در پاسخ.
+- قدمِ بعدی: S1 (خواندن از کاتالوگِ واحد) یا S5 (پیک برای مشتری) — هر فیلدِ تازه ⇒ نسخهٔ ۲ و پروندهٔ `market-public-v2.json`.
+- ادغامِ main (۱۴۰۵/۰۸/۱۰، تصمیمِ صاحب محصول): فیلدهایی که main همین حالا عمومی می‌فرستد، **بی v2** و با همان شکلِ main
+  به v1 افزوده شد (فهرستِ سفید، `market-public-v1.json` ← `_v1Additions`، `MarketContract.kt`، §۳ ِ `MARKETPLACE-CONTRACT-fa.md`):
+  `substitution`/`substituteName` (#525)، `smallBasketFeeMinor`/`slotFeeMinor` (#494)، `onlinePay` ِ پیگیری (#529)،
+  `highlights.deals` با `regularPriceMinor` (#626)، `store.media` (#428). آزمون حالا همهٔ نشانی‌ها را با پرچمِ خاموش/روشن به شکل
+  می‌سنجد. هنوز بیرون (پشتِ پرچم‌های خاموشِ دیگر): `order.delivery` (S5)، `order.refund` (NTF-08)، `store.publicId` (S3)، جزئیاتِ M4.
+
 ### ۱۴۰۵/۰۸/۰۸ — شاخهٔ `claude/great-ptolemy-ptt10v`
 - انجام شد: بندِ ۴ِ `CLAUDE.md` (هر سه اسکیل در هر سیزن) و بندِ ۷ (چتِ معمولی بی دست‌زدن به پروژه) و هوکِ
   `SessionStart` (PR #413)؛ ممیزیِ وضعیتِ پروژه در برابرِ سندِ v32 (همین فایل).
