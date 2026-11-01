@@ -213,6 +213,8 @@ object OwnerExport {
     "fromMethod" to "روش پیشین",
     "toMethod" to "روش تازه",
     "payRef" to "مرجع روش تازه",
+    //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
+    "specialOrder" to "سفارش ویژه",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",

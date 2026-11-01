@@ -756,13 +756,13 @@ data class AuditEntry(
   val z: kotlinx.serialization.json.JsonObject? = null,
   /** ردیف‌هایی که این رد جابه‌جا کرده، هر کدام `جدول/شناسه` (مثلاً `transactions/t1`، `sales/s7`) — فعلاً فقط `customer_merge`
    *  (CRM-10)، تا ادغام برگشت‌پذیر و دنبال‌کردنی بماند. حداکثر `CustomerMerge.REF_CHUNK` در هر رد (سقفِ ۶۴KB ِ هر op). `null` نوشته نمی‌شود. */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val refIds: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val refIds: List<String>? = null,
   /** POS-40 — فقط `pay_fix` (`PayFixFlow`؛ `refId` = فاکتور، `amount` = مبلغ): روشِ پیشین، روشِ تازه و مرجعِ روشِ تازه */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fromMethod: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toMethod: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payRef: String? = null,
+  /** POS-26 — فقط `special_order` (سند) و `special_order_status` (وضعیتِ تازه)؛ `SpecialOrders`. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
 )
 
 /**
