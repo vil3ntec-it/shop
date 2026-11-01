@@ -186,9 +186,25 @@
     if (v.fraud) {
       var f = v.fraud.totals, w = periodOf(v.fraud.from, v.fraud.to, E);
       return '<div class="rf-stats">' + stat('لغوِ فاکتور', String(f.voidCount), w) + stat('برگشتی', String(f.returnCount), w) +
-        stat('حذفِ ردیف', String(f.lineDeleteCount), w) + stat('کشو بی فروش', String(f.noSaleCount), w) + stat('نیازمندِ تأیید', String(f.overrideCount), w) + '</div>';
+        stat('حذفِ ردیف', String(f.lineDeleteCount), w) + stat('کشو بی فروش', String(f.noSaleCount), w) + stat('نیازمندِ تأیید', String(f.overrideCount), w) + '</div>' +
+        alertsHtml(v.fraud, E);
     }
     return '';
+  }
+
+  /**
+   *  RSK-10: هشدارِ رفتارِ غیرعادیِ صندوقدار در زبانهٔ ضدتقلب — همان `alertsOf` ِ تابلو که نشانِ خانه را می‌سازد
+   *  (دوقلوی `CashierAlertBox` ِ برنامه، `StrRisk`). بی هشدار ⇒ هیچ کادری؛ بی اجازهٔ دیدنِ پول ⇒ هیچ (همان نشانِ خانه).
+   */
+  var ALERT_LABELS = { void: 'لغوِ فاکتور', discount: 'تخفیف', no_sale: 'کشو بی فروش' };
+  function alertsHtml(fraud, E) {
+    if (E.money === false) return '';
+    var a = board().alertsOf(fraud);
+    if (!a.length) return '';
+    return '<div class="rf-alerts" role="status"><p class="rf-alerts-title">' + esc(a.length + ' هشدارِ رفتارِ غیرعادیِ صندوقدار') + '</p><ul>' +
+      a.map(function (x) {
+        return '<li>' + esc(x.key + ': ' + x.count + ' ' + (ALERT_LABELS[x.kind] || x.kind) + ' در ' + x.invoices + ' فاکتور — بقیه ' + x.peerCount + ' در ' + x.peerInvoices) + '</li>';
+      }).join('') + '</ul><p class="rf-note">سنجش با بقیهٔ کاربرانِ همین بازه: دستِ کم ۳ بار و دو برابرِ نرخِ آن‌ها</p></div>';
   }
 
   function tableHtml(t, E) {
