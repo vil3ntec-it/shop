@@ -423,7 +423,7 @@ fun DeskSaleScreen(
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
-      ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale.copy(note = cartStore.note.value), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo) }) {
       SalePost.Outcome.Busy -> Unit
@@ -630,6 +630,7 @@ fun DeskSaleScreen(
           onPick = { pickDebtor = true },
           onRemove = { cartStore.setDebtor(null); payment = SalesEngine.Payment.CASH; refocus() },
         )
+        ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it).also { refocus() } }
       },
       items = {
         OrderLines(
@@ -893,6 +894,7 @@ fun DeskSaleScreen(
         unitFactor = p?.unitFactor ?: 1.0,
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
+        note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) },
         onDismiss = { editLine = null; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)
