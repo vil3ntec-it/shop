@@ -312,7 +312,9 @@ async function tick(at = now()) {
 let timer = null;
 function start() {
   if (timer) return;
-  timer = setInterval(() => tick().catch((err) => console.error('[order-notify]', err.message)), TICK_MS);
+  //  پنلِ مرکزی ۴.۹: هر دور ثبت می‌شود (`lib/job-beat.js`) — «اجرا شد یا نه» از حدس نیست
+  const run = require('./job-beat').wrap('order-notify', TICK_MS, tick);
+  timer = setInterval(() => run().catch((err) => console.error('[order-notify]', err.message)), TICK_MS);
   if (timer.unref) timer.unref();
 }
 function stop() {

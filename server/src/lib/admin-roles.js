@@ -44,7 +44,12 @@ const FINANCE = [
   ['GET', /^\/admin\/plans\/[^/]+\/price-history$/],
   ['GET', /^\/admin\/campaigns\/[^/]+\/stats$/],
   ['GET', /^\/admin\/flags(\/history)?$/],
+  //  جست‌وجوی سراسری — خودِ در برای مالی فقط دکان و پرداخت را می‌گردد (`routes/admin-search.js`)
+  ['GET', /^\/admin\/search$/],
   ['GET', /^\/admin\/shop-desk\/groups$/],
+  //  ۴.۶ و ۴.۷: فقط درهای پولیِ بازار و پیک (سفارش، کمیسیون، نقد و تسویهٔ پیک) — نه پرونده و نه آستانه
+  ['GET', /^\/admin\/market\/(overview|orders|commission)$/],
+  ['GET', /^\/admin\/delivery\/(overview|report)$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)$/],
   ['PUT', /^\/admin\/subscriptions\/[^/]+$/],
   ['POST', /^\/admin\/(subscriptions|pump\/subscriptions)\/[^/]+\/status$/],
@@ -54,6 +59,10 @@ const FINANCE = [
   ['POST', /^\/admin\/discount-codes\/quote$/],
   //  درِ حالت‌های دکان خودش نوع را می‌سنجد: مالی فقط «پایانِ اشتراک» (`lib/shop-holds.js`)
   ['POST', /^\/admin\/shops\/[^/]+\/holds(\/[^/]+\/lift)?$/],
+  //  ماژولِ ۴.۵ (مالیِ مرکزی) — نوشتن فقط سندِ اصلاحی؛ خودِ در مالی/ارشد را می‌سنجد (`lib/central-finance.js`)
+  ['GET', /^\/admin\/finance\/(summary|breakdown|payments|adjustments|receivables|pending|gateway|discrepancies|history|export)$/],
+  ['GET', /^\/admin\/finance\/payments\/[^/]+$/],
+  ['POST', /^\/admin\/finance\/adjustments$/],
 ];
 
 /** درهایی که کلیدِ سرویس هرگز به آن‌ها نمی‌رسد — هویتِ ماشین مدیر نمی‌سازد و کلید نمی‌چرخاند. */
