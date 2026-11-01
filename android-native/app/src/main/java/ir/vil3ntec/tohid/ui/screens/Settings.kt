@@ -1224,8 +1224,9 @@ fun SettingsScreen(
         //  نقش در این فاصله عوض شد؟ دوباره سنجیده می‌شود
         if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.OWNER) toast(StrSettings.wipeOwnerOnly)
         else scope.launch {
-          store.save(ShopData())
-          toast(StrSettings.wiped)
+          //  «پاک کردنِ همه» جایگزینیِ کامل است، نه ویرایشی روی پایه (`ShopStore.save`، پرچمِ `shop.ledger_merge`).
+          //  نوشته نشد (قفلِ نرم، خطای دیسک) ⇒ پیامش را `AppRoot` می‌دهد؛ «پاک شد» دروغ نگوید
+          if (store.save(ShopData(), replace = true)) toast(StrSettings.wiped)
         }
       },
     )

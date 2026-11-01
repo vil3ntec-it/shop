@@ -160,7 +160,8 @@ jobs:
         working-directory: desktop
         shell: bash
         #  SEC-01: کوچِ رمزِ دفتر (جایگزینیِ اتمی، کنار گذاشتنِ دفترِ خوانده‌نشده) روی ویندوزِ واقعی
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest'
+        #  ذخیرهٔ کهنه: مُهرِ فایل (زمان و اندازه) و ادغامِ سه‌طرفه روی NTFS ِ واقعی (`StaleSaveTest`)
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest' --tests 'ir.vil3ntec.tohid.desktop.StaleSaveTest'
 
   #  ⛔ ۱۴۰۵/۰۷/۲۷: پنج نصاب (دو ویندوز، دو مک، لینوکس؛ هر کدام تا ۴۰ دقیقه با نصبِ واقعی) روی
   #  **هر** pushِ هر PRِ برنامه گلوگاهِ صفِ Actions بودند. حالا در PR فقط وقتی ساخته می‌شوند که

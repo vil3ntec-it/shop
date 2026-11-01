@@ -350,6 +350,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/receipt-profile', require('./routes/shop-receipt'));
+    //  ذخیرهٔ کهنه (#407): فقط پرچمِ `shop.ledger_merge` (پیش‌فرض خاموش) برای برنامه — پیش از `/shop`
+    api.use('/shop/ledger-merge', require('./routes/shop-ledger-merge'));
     api.use('/receipt', require('./routes/receipt-public'));
     //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
     //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
