@@ -58,6 +58,32 @@ object DocChainCycle {
     }
   }
 
+  /**
+   *  SEC-03: لغو یا «اصلاح» ِ [original] که همین حالا در دفتر نشست ⇐ سندِ معکوس در زنجیرهٔ همین
+   *  دستگاه (هر سری‌ای که فاکتورِ اصلی داشته باشد؛ مرجع شناسهٔ اوست). [ownSales] فاکتورهای همین
+   *  سری از دفترِ **پیش از لغو**: اگر خودِ فاکتور هنوز حلقه نشده، اول حلقهٔ «ثبت» و بعد «معکوس».
+   *  پرچمِ خاموش، زنجیرهٔ نساخته یا ایستاده ⇐ هیچ (null). بی شبکه — سرور در دورِ بعد می‌گیرد.
+   */
+  fun recordVoid(
+    gate: Gate,
+    book: DocChainBook,
+    shopId: String,
+    series: String,
+    by: String,
+    ownSales: List<SaleFacts>,
+    original: SaleFacts,
+    at: Long,
+    kind: InvoiceVoid.Kind,
+    reason: String,
+  ): DocChainState? {
+    if (!gate.enabled) return null
+    val st = book.state()?.takeIf {
+      it.series == series && DocChain.chainId(it.chain)?.first == shopId && it.halted.isEmpty()
+    } ?: return null
+    val caught = book.catchUp(st, by, ownSales)
+    return book.appendVoid(caught, by, original, at, kind, reason)
+  }
+
   private suspend fun run(
     book: DocChainBook,
     server: DocChainServer,
