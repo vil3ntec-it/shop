@@ -987,7 +987,7 @@ class ShopStore(private val context: Context) {
       fun cartons(productId: String): Double = cartonsIn[productId] ?: 0.0
 
       fun status(product: Product): String {
-        val s = stock(product.id)
+        val s = if (product.stockless == true) Double.MAX_VALUE else stock(product.id) // PRD-09: خدماتی همیشه «کافی»
         return when {
           s <= 0 -> "out"
           s <= product.minStock -> "low"

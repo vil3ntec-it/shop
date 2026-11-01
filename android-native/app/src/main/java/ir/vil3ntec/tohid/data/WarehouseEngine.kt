@@ -208,9 +208,7 @@ object WarehouseEngine {
     if (a.namePs != b.namePs || a.nameEn != b.nameEn || a.synonyms != b.synonyms || a.keywords != b.keywords) {
       add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
     }
-    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
-    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
-    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
+    addAll(ProductInfoMap.changes(a, b)) // محلِ قفسه، جایگزین، فیلدِ سفارشی؛ PRD-03/09: کد و خدماتی
     if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
     if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
     if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
@@ -294,7 +292,7 @@ object WarehouseEngine {
       return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
     }
     val (packs, packProblem) = packsOf(draft.packs, null, draft.unit, draft.saleUnit.orEmpty(), codes, null, index)
-    packProblem?.let { return Result.Failed(it) }
+    (packProblem ?: draft.info?.let { ProductInfoMap.skuProblem(d, it, null, null) })?.let { return Result.Failed(it) } // PRD-03: کد یکتا
 
     val id = newId()
     val product = Product(
@@ -369,7 +367,8 @@ object WarehouseEngine {
     }
     val unitNow = draft.unit
     val (packs, packProblem) = packsOf(draft.packs, existing.packs, unitNow, draft.saleUnit ?: existing.saleUnit, codes, id, index)
-    packProblem?.let { return Result.Failed(it) }
+    //  PRD-03: فقط کدِ تازه سنجیده می‌شود — تعارضِ آفلاینِ قدیمی ویرایشِ نام یا قیمت را قفل نمی‌کند
+    (packProblem ?: draft.info?.let { ProductInfoMap.skuProblem(d, it, id, existing.sku) })?.let { return Result.Failed(it) }
     //  PRD-04: بارکدِ تازهٔ کالا بارکدِ بستهٔ خودش نباشد — وگرنه یک اسکن هم «۱» بود هم «۲۴»
     packs.orEmpty().firstNotNullOfOrNull { pk -> codes.firstOrNull { it in pk.barcodes && it !in existing.barcodes }?.let { it to pk } }?.let { (code, pk) ->
       return Result.Failed("بارکدِ $code بارکدِ بستهٔ «${pk.name}» همین کالاست")

@@ -10,10 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProduct
@@ -21,6 +24,7 @@ import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.product.CustomFields
 import ir.vil3ntec.tohid.core.product.ProductAlternatives
 import ir.vil3ntec.tohid.core.product.ProductInfo
+import ir.vil3ntec.tohid.core.product.ProductSku
 import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
 import ir.vil3ntec.tohid.data.ProductInfoMap
@@ -30,7 +34,8 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  کادرهای فرمِ کالا برای PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو)، PRD-26 (محلِ قفسه)،
+ *  کادرهای فرمِ کالا برای PRD-03 (کدِ کالا با ساختِ خودکار)، PRD-09 (خدماتی یا بی موجودی)،
+ *  PRD-02 (نامِ پشتو و انگلیسی، مترادف، واژهٔ جست‌وجو)، PRD-26 (محلِ قفسه)،
  *  PRD-24 (کالاهای جایگزین: نام یا بارکد، با «،») و PRD-25 (فیلدهای سفارشی: هر خط «نام: مقدار»).
  *  جایگزین‌ها در دفتر شناسه‌اند؛ تا کاربر کادر را عوض نکرده ([alternativesText] تهی) همان شناسه‌ها
  *  دست‌نخورده می‌مانند، پس ساختنِ فرم نامِ کالاها را لازم ندارد.
@@ -49,12 +54,16 @@ data class ProductInfoForm(
   /** متنِ کادرِ جایگزین‌ها پس از ویرایش؛ `null` ⇒ ویرایش نشده و [alternativeIds] همان است */
   val alternativesText: String? = null,
   val custom: String = "",
+  val sku: String = "",
+  val stockless: Boolean = false,
 ) {
   /** [catalog]/[selfId] فقط برای کادرِ ویرایش‌شدهٔ جایگزین‌ها: نام یا بارکد ⇐ شناسه (ناشناخته کنار) */
   fun toInfo(catalog: List<ProductAlternatives.Ref>, selfId: String?): ProductInfo = ProductInfo.of(
     namePs, nameEn, synonyms, keywords, aisle, shelf, level,
     alternatives = alternativesText?.let { ProductAlternatives.resolve(it, selfId, catalog).ids } ?: alternativeIds,
     custom = custom,
+    sku = sku,
+    stockless = stockless,
   )
 
   companion object {
@@ -68,6 +77,8 @@ data class ProductInfoForm(
       level = info.location.level,
       alternativeIds = info.alternatives,
       custom = CustomFields.format(info.custom),
+      sku = info.sku,
+      stockless = info.stockless,
     )
   }
 }
@@ -85,6 +96,37 @@ fun shelfLabel(loc: ShelfLocation): String = loc.parts().joinToString(" · ") { 
 fun ProductInfoFields(form: ProductInfoForm, d: ShopData, selfId: String?, onChange: (ProductInfoForm) -> Unit) {
   val c = Shop.colors
   Column(Modifier.fillMaxWidth()) {
+    //  PRD-03: کدِ کالا — ایرادِ شکل یا کدِ کالای دیگر همان‌جا (ذخیره هم همین را رد می‌کند)
+    val skuProblem = ProductSku.problem(form.sku)
+    val skuOwner = ProductSku.owner(form.sku, selfId, ProductInfoMap.skus(d))
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedTextField(
+        value = form.sku,
+        onValueChange = { onChange(form.copy(sku = it.take(ProductSku.MAX + 8))) },
+        label = { Text(StrProduct.sku) },
+        singleLine = true,
+        isError = skuProblem != null || skuOwner != null,
+        supportingText = {
+          when {
+            skuProblem == ProductSku.Problem.BAD_CHAR -> Text(StrProduct.skuBadChar, color = c.danger)
+            skuProblem == ProductSku.Problem.TOO_LONG -> Text(StrProduct.skuTooLong(ProductSku.MAX), color = c.danger)
+            skuOwner != null -> Text(StrProduct.skuTaken(ProductSku.clean(form.sku), d.products.firstOrNull { it.id == skuOwner }?.name.orEmpty()), color = c.danger)
+            else -> Text(StrProduct.skuHint)
+          }
+        },
+        modifier = Modifier.weight(1f),
+      )
+      TextButton(onClick = { onChange(form.copy(sku = ProductSku.next(ProductInfoMap.skus(d).values))) }) { Text(StrProduct.skuAuto) }
+    }
+    //  PRD-09: خدماتی یا بی موجودی
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Checkbox(checked = form.stockless, onCheckedChange = { onChange(form.copy(stockless = it)) })
+      Column(Modifier.weight(1f)) {
+        Text(StrProduct.stockless, style = MaterialTheme.typography.bodyMedium)
+        Text(StrProduct.stocklessHint, style = MaterialTheme.typography.labelSmall, color = c.muted)
+      }
+    }
+    Spacer(Modifier.height(6.dp))
     Text(StrProduct.names, style = MaterialTheme.typography.labelMedium, color = c.muted)
     Spacer(Modifier.height(6.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

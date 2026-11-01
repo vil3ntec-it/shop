@@ -343,7 +343,7 @@ object SalesEngine {
       val p = d.products.find { it.id == line.productId } ?: continue
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
-      var available = ShopStore.stock(d, p.id)
+      var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
       //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
       if (checkout.blockExpired) {
@@ -364,7 +364,7 @@ object SalesEngine {
      *  (INV-19، بخشِ ۳.۶)؛ بهای موقتِ هر قلم به میانگینِ موزون؛ سریِ اسکن‌شده اول.
      */
     val stockPlan: Map<Int, StockLedger.Check>? = if (!StockLedger.isOn(d)) null else {
-      val idx = cart.indices.filter { i -> !cart[i].free && d.products.any { it.id == cart[i].productId } }
+      val idx = cart.indices.filter { i -> !cart[i].free && d.products.any { it.id == cart[i].productId && it.stockless != true } }
       val view = StockLedger.replay(d, idx.map { cart[it].productId }.distinct())
       val checks = StockLedger.checkCart(
         view, idx.map { i -> StockLedger.Line(cart[i].productId, StockLedger.milli(cart[i].quantity), cart[i].lotId) }, today,

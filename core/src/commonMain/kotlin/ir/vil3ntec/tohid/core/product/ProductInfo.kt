@@ -113,10 +113,14 @@ data class ProductInfo(
   val alternatives: List<String> = emptyList(),
   /** PRD-25 — فیلدهای سفارشی «نام: مقدار» به ترتیبِ ورود (`CustomFields`) */
   val custom: List<Pair<String, String>> = emptyList(),
+  /** PRD-03 — کدِ کالا (`ProductSku.clean`)؛ تهی ⇒ ندارد */
+  val sku: String = "",
+  /** PRD-09 — کالای خدماتی یا بی موجودی: فروش موجودی نمی‌خواهد و حدِ موجودی ندارد */
+  val stockless: Boolean = false,
 ) {
   val isEmpty: Boolean
     get() = namePs.isEmpty() && nameEn.isEmpty() && synonyms.isEmpty() && keywords.isEmpty() && location.isEmpty &&
-      alternatives.isEmpty() && custom.isEmpty()
+      alternatives.isEmpty() && custom.isEmpty() && sku.isEmpty() && !stockless
 
   /** نام‌های دیگرِ کالا (پشتو، انگلیسی، مترادف‌ها) — در جست‌وجو هم‌پایهٔ نام */
   val aliases: List<String> get() = listOfNotNull(namePs.ifEmpty { null }, nameEn.ifEmpty { null }) + synonyms
@@ -124,8 +128,9 @@ data class ProductInfo(
   /** واژه‌های جست‌وجو و مقدارِ فیلدهای سفارشی — در جست‌وجو «همهٔ کلمه‌ها» */
   val searchWords: List<String> get() = keywords + custom.map { it.second }
 
-  /** پرس‌وجو در یکی از نام‌های دیگر، واژه‌ها یا مقدارِ فیلدِ سفارشی هست؟ (نامِ دری کارِ همان جست‌وجوی پیشین است) */
-  fun matches(query: String): Boolean = ProductTerms.matchesAny(aliases + searchWords, query)
+  /** پرس‌وجو در یکی از نام‌های دیگر، واژه‌ها، مقدارِ فیلدِ سفارشی یا آغازِ کدِ کالا هست؟ (نامِ دری کارِ همان جست‌وجوی پیشین است) */
+  fun matches(query: String): Boolean =
+    ProductTerms.matchesAny(aliases + searchWords, query) || (sku.isNotEmpty() && ProductSku.startsWith(sku, query))
 
   companion object {
     fun of(
@@ -138,6 +143,8 @@ data class ProductInfo(
       level: String?,
       alternatives: List<String> = emptyList(),
       custom: String? = null,
+      sku: String? = null,
+      stockless: Boolean = false,
     ): ProductInfo = ProductInfo(
       namePs = ProductTerms.cleanName(namePs.orEmpty()),
       nameEn = ProductTerms.cleanName(nameEn.orEmpty()),
@@ -146,6 +153,8 @@ data class ProductInfo(
       location = ShelfLocation.of(aisle, shelf, level),
       alternatives = alternatives.distinct().take(ProductAlternatives.MAX),
       custom = CustomFields.parse(custom.orEmpty()).fields,
+      sku = ProductSku.clean(sku.orEmpty()),
+      stockless = stockless,
     )
   }
 }

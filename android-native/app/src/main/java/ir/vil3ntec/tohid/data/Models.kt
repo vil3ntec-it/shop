@@ -84,12 +84,11 @@ data class Product(
    *  فیلدهای سفارشیِ «نام: مقدار» به ترتیبِ ورود (`core/product/ProductExtras`). همان قاعدهٔ بالا: خالی ⇒
    *  `null` و نوشته نمی‌شود؛ فرم و پیشنهاد فقط با `ProductInfoPrefs`.
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val alternatives: List<String>? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val customFields: Map<String, String>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val alternatives: List<String>? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val customFields: Map<String, String>? = null,
+  /** PRD-03 کدِ کالا (`ProductSku`)؛ PRD-09 `true` = خدماتی/بی موجودی (`ProductInfoMap.sellable`) — همان قاعده و همان تنظیم */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val sku: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val stockless: Boolean? = null,
   /*
    *  PRD-06 — برند و برچسب‌ها (فقط با `ShopPolicy.productTools` نوشته می‌شوند). همان کلیدِ `brand` که
    *  کاتالوگِ سرور (`lib/catalog.js`) و نمای عمومیِ بازار می‌خوانند. `null` نوشته نمی‌شود ⇒ کالای

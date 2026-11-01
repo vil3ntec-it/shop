@@ -153,6 +153,9 @@ object OwnerExport {
     //  PRD-24/PRD-25
     "alternatives" to "کالاهای جایگزین",
     "customFields" to "فیلدهای سفارشی",
+    //  PRD-03/PRD-09
+    "sku" to "کد کالا (SKU)",
+    "stockless" to "خدماتی یا بی موجودی",
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",

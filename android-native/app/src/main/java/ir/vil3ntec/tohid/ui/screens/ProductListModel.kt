@@ -36,6 +36,8 @@ object ProductListModel {
 
   fun status(p: Product, stock: Double): Status = when {
     !p.active -> Status.INACTIVE
+    //  PRD-09: خدماتی نه تمام می‌شود نه کم
+    p.stockless == true -> Status.ACTIVE
     stock <= 0.0 -> Status.OUT
     p.minStock > 0.0 && stock <= p.minStock -> Status.LOW
     else -> Status.ACTIVE

@@ -256,7 +256,7 @@ fun DeskSaleScreen(
     return true
   }
   fun add(product: Product, count: Double) =
-    applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ShopStore.stock(d, product.id)))
+    applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, product.id)))
 
   /**
    *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
@@ -265,7 +265,7 @@ fun DeskSaleScreen(
   fun addLot(code: String, dd: ShopData = d): Boolean {
     val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
     val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
-    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ShopStore.stock(dd, pid))
+    val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(dd, pid))
     if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast("${product.name} — سری $lot به سبد اضافه شد")
     return true
   }

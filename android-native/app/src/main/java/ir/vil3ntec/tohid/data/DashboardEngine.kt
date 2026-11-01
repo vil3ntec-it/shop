@@ -95,7 +95,8 @@ object DashboardEngine {
     val index = ShopStore.index(d)
     val stockOf = d.products.associate { it.id to index.stock(it.id) }
     val active = d.products.filter { it.active }
-    val out = active.filter { (stockOf[it.id] ?: 0.0) <= 0.0 }.map { StockAlert(it, stockOf[it.id] ?: 0.0) }
+    //  PRD-09: کالای خدماتی هرگز «ناموجود» نیست
+    val out = active.filter { it.stockless != true && (stockOf[it.id] ?: 0.0) <= 0.0 }.map { StockAlert(it, stockOf[it.id] ?: 0.0) }
     val low = active.filter { val s = stockOf[it.id] ?: 0.0; s > 0.0 && it.minStock > 0 && s <= it.minStock }
       .map { StockAlert(it, stockOf[it.id] ?: 0.0) }.sortedBy { it.stock / max(1.0, it.product.minStock) }
     val unsold = active.filter { (stockOf[it.id] ?: 0.0) > 0.0 && it.id !in sold.keys }
