@@ -420,7 +420,7 @@
   function loadCheckout() {
     checkoutP = checkoutP || new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/checkout.js' }, on: { load: ok, error: no } }));
-    }).then(function () {
+    }).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
         ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; },

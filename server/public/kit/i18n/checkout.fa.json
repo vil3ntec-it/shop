@@ -1,0 +1,15 @@
+{
+  "promo.disc": "تخفیف",
+  "promo.code.l": "کدِ تخفیف",
+  "promo.apply": "اعمال",
+  "promo.clear": "برداشتنِ کد",
+  "promo.ok": "کدِ «{code}» اعمال شد: {d} تخفیف",
+  "promo.days": "{n} روز تا پایان",
+  "promo.hours": "{n} ساعت تا پایان",
+  "promo.mins": "{n} دقیقه تا پایان",
+  "promo.st.unknown": "این کدِ تخفیف در این ویترین نیست.",
+  "promo.st.inactive": "این کدِ تخفیف الان فعال نیست.",
+  "promo.st.used_up": "ظرفیتِ این کدِ تخفیف پر شده است.",
+  "promo.st.no_effect": "این کدِ تخفیف روی این سبد اثری ندارد.",
+  "err.promo_code_rejected": "کدِ تخفیف پذیرفته نشد؛ سبد بی آن دوباره حساب شد."
+}

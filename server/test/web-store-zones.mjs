@@ -227,6 +227,47 @@ await page.click('#submit-order');
 await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === before + 1, 'پس از پذیرشِ برگهٔ تازه، ثبت شد');
 
+//  MKT-01/09، CHK-04: تخفیفِ خودکارِ زمان‌دار با شمارشِ معکوس، کدِ تخفیف، و `promo_code_rejected` (پرچمِ `shop.storefront.promos`)
+const rule = (id, data) => call('PUT', `/api/shop/promos/rules/${id}`, { rule: { name: id, stack: 'best', active: true, ...data } }, T);
+const kabulDate = (ms) => new Date(ms + 4.5 * 3600e3).toISOString().slice(0, 10);
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+await page.check('input[name="fulfillment"][value="pickup"]');
+ok(await page.isHidden('#promo-box') && await page.isHidden('#t-disc'), 'پرچمِ تخفیف خاموش ⇒ همان برگهٔ امروز');
+for (const k of ['shop.promo_uses', 'shop.storefront.promos']) await flag(k, true);
+const r1 = await rule('online10', { kind: 'percent', bp: 1000, channels: ['online'], window: { to: kabulDate(Date.now() + 2 * 864e5) } });
+const r2 = await rule('vip5', { kind: 'percent', bp: 500, channels: ['online'], code: 'VIP5', stack: 'combine' });
+ok(r1.status === 200 && r2.status === 200, 'دو قاعدهٔ اینترنتی (خودکارِ ۱۰٪ تا دو روزِ دیگر و کدِ VIP5)', JSON.stringify(r1.body).slice(0, 120));
+await open();
+await toCheckout();
+await page.check('input[name="fulfillment"][value="pickup"]');
+await page.waitForSelector('#promo-box:not([hidden]) #promo-auto li', { timeout: 10000 });
+ok(/online10 — ۲ روز تا پایان/.test(await text('#promo-auto')), 'MKT-09: تخفیفِ زمان‌دار با «۲ روز تا پایان»', await text('#promo-auto'));
+await page.waitForSelector('#t-disc:not([hidden])', { timeout: 10000 });
+ok((await text('#t-disc')).includes('۳۵') && (await text('#t-total')).includes('۳۱۵'), 'CHK-04: تخفیفِ ۳۵ در جمع و مبلغِ نهایی ۳۱۵', `${await text('#t-disc')} / ${await text('#t-total')}`);
+await page.fill('#promo-code', 'NOPE99');
+await page.click('#promo-apply');
+await page.waitForFunction(() => /در این ویترین نیست/.test(document.getElementById('promo-msg').textContent), null, { timeout: 10000 });
+ok(true, 'کدِ ناشناخته ⇒ «در این ویترین نیست»، سبد بی کد');
+await page.fill('#promo-code', 'vip5');
+await page.click('#promo-apply');
+await page.waitForFunction(() => /VIP5|vip5/.test(document.getElementById('promo-msg').textContent), null, { timeout: 10000 });
+const withCode = await text('#t-disc');
+ok(withCode !== '−۳۵ افغانی' && await page.isVisible('#promo-clear'), 'MKT-01: کد اعمال شد و تخفیف بیشتر شد', withCode);
+//  کد پس از نمایش از کار افتاد ⇒ ثبت ۴۰۹ `promo_code_rejected` و پیامِ روشن، نه سفارشِ بی‌صدا
+await rule('vip5', { kind: 'percent', bp: 500, channels: ['online'], code: 'VIP5', stack: 'combine', active: false });
+const n0 = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n;
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForFunction(() => /کدِ تخفیف/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });
+ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === n0, '`promo_code_rejected` ⇒ پیام و بی سفارش', await text('#checkout-msg'));
+await page.waitForFunction(() => document.getElementById('t-disc').textContent.includes('۳۵') && !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+const po = await one('SELECT subtotal_minor, discount_minor, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+ok(Number(po.discount_minor) === 3500 && Number(po.total_minor) === 31500, 'ثبت ⇒ همان تخفیفِ دیده‌شده (۳۵) و جمعِ ۳۱۵ در سرور', JSON.stringify(po));
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 
@@ -234,5 +275,5 @@ await ctx.close();
 await browser.close();
 server.close();
 await closeDb();
-console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: ناحیه‌های ارسال در فرمِ سفارش');
+console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: فرمِ سفارش — ناحیه، فیِ قلم، دستورِ تحویل و تخفیف');
 process.exit(bad ? 1 : 0);

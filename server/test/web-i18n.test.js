@@ -25,8 +25,13 @@ const read = (f) => fs.readFileSync(path.join(pub, f), 'utf8');
 const LANGS = ['fa', 'en', 'ps'];
 const main = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
 //  صفحهٔ پیگیریِ سفارش واژه‌نامهٔ خودش را با `K.part('order')` می‌گیرد؛ کلیدها روی هم همان یک واژه‌نامه‌اند
-const part = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/order.${l}.json`))]));
-const dict = Object.fromEntries(LANGS.map((l) => [l, { ...main[l], ...part[l] }]));
+//  فرمِ ثبت هم (`K.part('checkout')`، با checkout.js ِ دیربار): هر بخش فقط کلیدهای صفحهٔ خودش
+const PARTS = {
+  order: { js: 'store/order.js', from: 'id="view-order"', to: 'id="view-orders"' },
+  checkout: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"' },
+};
+const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
+const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
 const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'market/index.html', 'store/index.html'];
 const ARABIC = /[\u0600-\u06FF]/;
 
@@ -129,29 +134,31 @@ test('هر واژه‌نامه زیرِ ۲۱KB است', () => {
   }
 });
 
-test('واژه‌نامهٔ صفحهٔ پیگیری فقط کلیدهای همان صفحه را دارد و کوچک است', () => {
+for (const [name, P] of Object.entries(PARTS)) test(`واژه‌نامهٔ ${name} فقط کلیدهای همان صفحه را دارد و کوچک است`, () => {
+  const part = parts[name];
   const html = read('store/index.html');
-  const from = html.indexOf('id="view-order"');
-  const to = html.indexOf('id="view-orders"');
-  assert.ok(from > 0 && to > from, 'بخشِ view-order پیدا شد');
+  const from = html.indexOf(P.from);
+  const to = html.indexOf(P.to);
+  assert.ok(from > 0 && to > from, `بخشِ ${P.from} پیدا شد`);
   //  هر جای دیگرِ کیت، بازارچه و ویترین (جز order.js و همان بخش) که کلیدی از این واژه‌نامه را بخواهد بی آن می‌ماند
-  const elsewhere = SOURCES.filter((f) => f !== 'store/order.js' && f !== 'store/index.html').map(read).join('\n') +
+  const elsewhere = SOURCES.filter((f) => f !== P.js && f !== 'store/index.html').map(read).join('\n') +
     html.slice(0, from) + html.slice(to);
   const base = (d) => Object.keys(d).filter((k) => !k.endsWith('.1')).sort();
-  assert.ok(base(part.fa).length >= 25, `${base(part.fa).length} کلید`);
+  assert.ok(base(part.fa).length >= 10, `${base(part.fa).length} کلید`);
   assert.deepEqual(base(part.en), base(part.fa), 'en = fa');
   assert.deepEqual(base(part.ps), base(part.fa), 'ps = fa');
   const fbLine = read('kit/kit.js').split('\n').find((l) => /^\s*K\.FB = \{/.test(l));
   for (const l of LANGS) {
     for (const k of Object.keys(part[l])) {
       assert.ok(!(k in main[l]), `${l}: ${k} در هر دو واژه‌نامه`);
+      for (const other of Object.keys(PARTS).filter((x) => x !== name)) assert.ok(!(k in parts[other][l]), `${l}: ${k} در ${name} و ${other}`);
       assert.ok(!fbLine.includes(`'${k}'`), `${k} واژهٔ پایهٔ K.FB است و باید در واژه‌نامهٔ اصلی بماند`);
       const b = k.replace(/\.1$/, '');
       assert.ok(!elsewhere.includes(`'${b}'`) && !elsewhere.includes(`"${b}"`), `${b} بیرون از صفحهٔ پیگیری هم به کار رفته`);
     }
-    const n = fs.statSync(path.join(pub, 'kit', 'i18n', `order.${l}.json`)).size;
-    assert.ok(n <= 4 * 1024, `order.${l}.json: ${n} بایت`);
+    const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${name}.${l}.json`)).size;
+    assert.ok(n <= 4 * 1024, `${name}.${l}.json: ${n} بایت`);
   }
   //  صفحه همان واژه‌نامه را با بارِ خودش می‌گیرد
-  assert.ok(read('store/store.js').includes("K.part('order', $('view-order'))"));
+  assert.ok(read('store/store.js').includes(`K.part('${name}', $('view-${name}'))`));
 });

@@ -1,0 +1,15 @@
+{
+  "promo.disc": "تخفیف",
+  "promo.code.l": "د تخفیف کوډ",
+  "promo.apply": "پلي کړئ",
+  "promo.clear": "کوډ لرې کړئ",
+  "promo.ok": "«{code}» کوډ پلي شو: {d} تخفیف",
+  "promo.days": "{n} ورځې پاتې",
+  "promo.hours": "{n} ساعته پاتې",
+  "promo.mins": "{n} دقیقې پاتې",
+  "promo.st.unknown": "دا د تخفیف کوډ په دې پلورنځي کې نشته.",
+  "promo.st.inactive": "دا د تخفیف کوډ اوس فعال نه دی.",
+  "promo.st.used_up": "د دې تخفیف کوډ ظرفیت ډک شوی دی.",
+  "promo.st.no_effect": "دا د تخفیف کوډ په دې ټوکرۍ اغېز نه لري.",
+  "err.promo_code_rejected": "د تخفیف کوډ ونه منل شو؛ ټوکرۍ بې له هغه بیا حساب شوه."
+}
