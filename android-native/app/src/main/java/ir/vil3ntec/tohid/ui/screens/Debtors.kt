@@ -61,6 +61,7 @@ import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
+import ir.vil3ntec.tohid.data.CustomerProfileForm
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
@@ -355,13 +356,10 @@ fun DebtorsScreen(
   form?.let { state ->
     DebtorFormSheet(
       state = state,
-      crm = crm,
       onDismiss = { form = null },
-      onSave = { draft, phone2, tags ->
-        val result = if (crm) {
-          //  CRM روشن: قرض‌دار، شمارهٔ دوم و برچسب‌ها با هم — همه یا هیچ
-          CustomerProfileForm.save(d, state.editingId, draft, phone2, tags, System.currentTimeMillis(), ::newId)
-        } else if (state.editingId == null) {
+      //  پنجرهٔ نسخهٔ ۳ کادرِ شمارهٔ دوم و برچسب ندارد (پروندهٔ CRM ِ CRM-02/10/11 در رابطِ امروز است، `ui/legacy`)
+      onSave = { draft ->
+        val result = if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)
         } else {
           DebtorEngine.editWithLimit(d, state.editingId, draft)
