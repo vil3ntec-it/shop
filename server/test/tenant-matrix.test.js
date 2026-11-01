@@ -90,6 +90,7 @@ const NO_TENANT = {
   'GET /api/auth/:app/request-status': 'ورودِ برنامه با کد', 'POST /api/auth/:app/verify': 'ورودِ برنامه با کد',
   'POST /api/payments/webhook/hesabpay': 'وب‌هوکِ ارائه‌دهندهٔ پرداخت — بی توکنِ کاربر؛ اعتبار فقط امضای بدنهٔ خام (بد ⇒ ۴۰۱) و دکان از ردیفِ قصدِ پرداخت، نه از درخواست (payment-intents.test.js)',
   'POST /api/payments/webhook/fake': 'ارائه‌دهندهٔ ساختگی، فقط بیرون از تولید؛ همان قاعدهٔ وب‌هوک (payment-intents.test.js)',
+  'GET /api/calendar/holidays': 'تعطیلاتِ رسمی، دادهٔ همگانی بی توکن و فقط خواندن؛ نوشتن فقط مدیرِ ارشد زیرِ /api/admin (LOC-04)',
 };
 
 /* ── دادهٔ واقعیِ دکان‌ها ─────────────────────────────────────────────── */
@@ -251,6 +252,10 @@ function casesFor(I) {
   add('GET /api/sync/v1/photo-inbox', { url: `/api/sync/v1/photo-inbox?pair=${PAIR}`, own: ['inboxId'] });
   add('GET /api/sync/v1/photo-inbox/:id', { url: `/api/sync/v1/photo-inbox/${I.inbox}`, ownStatus: 200 });
   add('DELETE /api/sync/v1/photo-inbox/:id', { url: `/api/sync/v1/photo-inbox/${I.inbox}` });
+  //  زنجیرهٔ اسناد (SEC-02/03): دکان از نشست (`req.sync.accountId`)، نه از device_id ِ «الف»؛ پرچمِ خاموشِ
+  //  `shop.doc_chain` ⇒ `{enabled:false}` و هیچ نوشتنی. سریِ دستگاهِ دیگر با پرچمِ روشن: doc-chain.test.js (series_owner)
+  add('GET /api/sync/v1/chain', { url: `/api/sync/v1/chain?device_id=${I.device}` });
+  add('POST /api/sync/v1/chain', { url: '/api/sync/v1/chain', body: { device_id: I.device, heads: [], links: [] } });
 
   //  Sync v3
   const v3ops = () => ({ device_id: 'v3-other', protocol: 3, ops: [
@@ -569,6 +574,7 @@ const ADMIN_SUBJECT = {
   'GET /api/admin/image-bank/images/:id': { exempt: 'بانکِ مشترکِ تصویر — فقط عکسِ پیشنهادشده با رضایتِ دکان' },
   'GET /api/admin/image-bank/file/:id/:version/:size': { exempt: 'بانکِ مشترکِ تصویر' },
   'GET /api/admin/image-bank/batches/:id/report': { exempt: 'بانکِ مشترکِ تصویر' },
+  'GET /api/admin/image-bank/batches/:id/files': { exempt: 'بانکِ مشترکِ تصویر — فایل‌های رسیدهٔ دستهٔ مدیر برای ادامهٔ بارگذاری (IMG-14)، فقط‌خواندنی' },
 };
 /** درهای GETی که محتوای خصوصیِ یک دکان را **می‌توانند** بدهند، بی سابقه، با دلیل. */
 const CONTENT_LIST_OK = {
