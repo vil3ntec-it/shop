@@ -2,8 +2,6 @@ package ir.vil3ntec.tohid.ui.courier
 
 // i18n: سه‌زبانه
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -27,11 +25,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -42,13 +38,11 @@ import ir.vil3ntec.tohid.core.delivery.DeliveryRating
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.core.i18n.StrPick
-import ir.vil3ntec.tohid.data.DeviceLocation
 import ir.vil3ntec.tohid.ui.screens.SheetBody
 import ir.vil3ntec.tohid.ui.screens.TohidBottomSheet
 import ir.vil3ntec.tohid.ui.screens.TohidCard
 import ir.vil3ntec.tohid.ui.screens.TohidFilterChip
 import ir.vil3ntec.tohid.ui.theme.Shop
-import kotlinx.coroutines.launch
 
 /*
  *  صفحه‌های پیش‌شرط و کمکیِ پیک — همه فقط وقتی دیده می‌شوند که پرچمِ خاموشِ دکان روشن باشد (کارت یا `/courier/me`):
@@ -152,15 +146,17 @@ internal fun BagScanDialog(c: MissionCard, onDismiss: () -> Unit, onDone: (List<
 /** موقعیتِ «همین لحظه»: نقطهٔ کهنه‌تر از یک دقیقه (مثلاً هنوز از دکان) پذیرفته نیست */
 private const val FIX_MAX_AGE_MS = 60_000L
 
+/** مسیر فقط پیشنهاد است: نقطهٔ تا پنج دقیقه کهنه بس است */
+private const val ROUTE_MAX_AGE_MS = 5 * 60_000L
+
 /**
  *  DLV-17: پیش از «تحویل شد» موقعیتِ همین لحظه گرفته و با پینِ کارت سنجیده می‌شود. نزدیک ⇒ همان دم `onReady`؛
  *  دور ⇒ فاصله و «دوباره بسنج». بی اجازه یا بی مکان‌یاب ⇒ پیامِ روشن (سرور هم بی موقعیت رد می‌کرد).
+ *  اجازه و خودِ مکان‌یاب پشتِ مرزِ پلتفرم‌اند (`rememberCourierFix`).
  *  ⛔ موقعیت فقط به همین رویداد می‌رود؛ سرور فقط فاصلهٔ گرد را نگه می‌دارد.
  */
 @Composable
 internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (CourierChecks.Point) -> Unit) {
-  val context = LocalContext.current
-  val scope = rememberCoroutineScope()
   val colors = Shop.colors
   val maxM = c.nearPinMaxM ?: CourierChecks.DEFAULT_MAX_M
   val la = c.lat
@@ -169,26 +165,21 @@ internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (Courie
   var busy by remember { mutableStateOf(true) }
   var message by remember { mutableStateOf("") }
 
-  fun look() {
-    busy = true
-    message = ""
-    scope.launch {
-      val fix = DeviceLocation.current(context, force = true, maxAgeMs = FIX_MAX_AGE_MS)
-      busy = false
-      if (fix == null) {
-        message = StrCourier.noLocation
-        return@launch
-      }
-      val here = CourierChecks.Point(fix.lat, fix.lng)
+  //  مرزِ پلتفرم: `CourierLocationAndroid.kt` (اجازه و `DeviceLocation`)
+  val locate = rememberCourierFix(FIX_MAX_AGE_MS, ask = true) { here ->
+    busy = false
+    if (here == null) {
+      message = StrCourier.noLocation
+    } else {
       val v = CourierChecks.nearPin(here, pin, maxM)
       if (v.ok) onReady(here) else message = StrCourier.tooFar(v.distanceM ?: 0L, maxM)
     }
   }
-
-  val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-    if (granted.values.any { it }) look() else { busy = false; message = StrCourier.noLocation }
+  fun start() {
+    busy = true
+    message = ""
+    locate()
   }
-  fun start() = if (DeviceLocation.granted(context)) look() else ask.launch(DeviceLocation.PERMISSIONS)
   LaunchedEffect(Unit) { start() }
 
   AlertDialog(
@@ -214,15 +205,12 @@ internal fun NearPinFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (Courie
  */
 @Composable
 internal fun RouteSheet(cards: List<MissionCard>, onDismiss: () -> Unit) {
-  val context = LocalContext.current
   val colors = Shop.colors
   var start by remember { mutableStateOf<CourierChecks.Point?>(null) }
   var looked by remember { mutableStateOf(false) }
-  LaunchedEffect(Unit) {
-    val fix = if (DeviceLocation.granted(context)) DeviceLocation.current(context) else null
-    start = fix?.let { CourierChecks.Point(it.lat, it.lng) }
-    looked = true
-  }
+  //  بی اجازه نمی‌پرسد: مسیر بی موقعیت هم ساخته می‌شود (از یکی از ایستگاه‌ها)
+  val locate = rememberCourierFix(ROUTE_MAX_AGE_MS, ask = false) { here -> start = here; looked = true }
+  LaunchedEffect(Unit) { locate() }
   val route = RoutePlan.forCards(start, cards)
   TohidBottomSheet(title = StrCourier.routeTitle, onDismiss = onDismiss) {
     SheetBody {
