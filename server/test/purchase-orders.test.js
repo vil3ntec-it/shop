@@ -312,6 +312,10 @@ test('فهرست: تازه‌ترین بالا، پالایشِ وضعیت و ت
   assert.equal(all.body.orders[0].id, ids[0], 'رسید زمانِ تغییر را بالا می‌برد');
   assert.equal(all.body.orders[0].status, 'partial');
   assert.equal(all.body.orders[0].receipts, undefined, 'فهرست رسیدها را نمی‌فرستد');
+  //  PUR-10: فرستادن و نخستین رسید برای سنجشِ زمانِ تأمین
+  assert.ok(Number.isSafeInteger(all.body.orders[0].sentAt));
+  assert.ok(all.body.orders[0].firstReceiptAt >= all.body.orders[0].sentAt);
+  assert.ok(all.body.orders.slice(1).every((o) => o.firstReceiptAt === null && o.sentAt === null));
   assert.equal((await h.get(`${BASE}?state=sent`, { token: t.staff })).body.orders.length, 1);
   assert.equal((await h.get(`${BASE}?supplierId=sup-odd`, { token: t.staff })).body.orders.length, 2);
   assert.equal((await h.get(`${BASE}?state=partial`, { token: t.staff })).status, 400, 'پالایش فقط روی وضعیتِ ذخیره‌شده');

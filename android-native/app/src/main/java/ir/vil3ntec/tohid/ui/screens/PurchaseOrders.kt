@@ -10,12 +10,19 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
+import ir.vil3ntec.tohid.core.purchase.ReorderCore
+import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.PoConfigDto
 import ir.vil3ntec.tohid.data.PoLineDto
@@ -210,6 +217,26 @@ private fun PoDetail(
     }
   }
 
+  /**
+   *  PUR-13: برچسبِ اقلامِ پذیرفتهٔ یک رسید (S19: همان برچسب روی برگهٔ A4 ِ ۳×۸ هم). هر واحدِ شمارشی یک
+   *  برچسب (تا ۹۹؛ برگهٔ A4 تا ۲۴)، کالای وزنی یکی. چاپ از مرزِ سکو (`PurchaseOrderHost.printLabel`).
+   */
+  fun printLabels(r: PoReceiptDto, a4: Boolean) {
+    scope.launch {
+      if (!a4 && !host.hasLabelPrinter()) { toast("هنوز چاپگری «برچسبِ کالا» تعریف نشده — «A4» یا «دستگاه‌ها»"); return@launch }
+      var done = 0
+      for (p in r.posted.filter { it.acceptedMilli > 0 }) {
+        val line = o.lines.find { it.id == p.lineId } ?: continue
+        val product = d.products.find { it.id == line.productId } ?: continue
+        val units = ((p.acceptedMilli + 999) / 1000).toInt()
+        val copies = if (line.unit in PurchaseOrderBook.WEIGHED_UNITS) 1 else units.coerceIn(1, if (a4) 24 else 99)
+        host.printLabel(product, copies, a4)?.let(toast)
+        done++
+      }
+      if (done == 0) toast("کالای پذیرفته‌ای برای برچسب نیست")
+    }
+  }
+
   fun postReceipt(r: PoReceiptDto) {
     scope.launch {
       var msg = "ثبت نشد"
@@ -300,6 +327,10 @@ private fun PoDetail(
               style = MaterialTheme.typography.labelSmall, color = c.danger,
             )
           }
+          if (r.posted.any { it.acceptedMilli > 0 }) {
+            TextButton(onClick = { printLabels(r, a4 = false) }) { Text("برچسب") }
+            TextButton(onClick = { printLabels(r, a4 = true) }) { Text("A4") }
+          }
           if (posted) Text("در دفتر", style = MaterialTheme.typography.labelSmall, color = c.success)
           else TextButton(onClick = { postReceipt(r) }) { Text("ثبت در دفتر") }
         }
@@ -380,6 +411,13 @@ private fun PoEditor(
   var note by remember { mutableStateOf(base?.note.orEmpty()) }
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
+  //  PUR-09: تاریخچهٔ قیمت از دفتر؛ PUR-10: سفارش‌های فرستاده برای زمانِ تأمین و «در راه»
+  val buys = remember(d) { PurchaseOrderBook.buys(d) }
+  var sentOrders by remember { mutableStateOf<List<PurchaseOrderDto>>(emptyList()) }
+  LaunchedEffect(Unit) { sentOrders = repo.list("sent").valueOrNull()?.orders.orEmpty() }
+  val lead = remember(sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId) }
+  var historyFor by remember { mutableStateOf<String?>(null) }
+  var lastKey by remember { mutableStateOf<Int?>(null) }
 
   fun addProduct(p: Product, qtyMilli: Long? = null, priceMinor: Long? = null) {
     if (rows.any { it.productId == p.id }) { error = "«${p.name}» پیش‌تر در سفارش هست"; return }
@@ -393,6 +431,14 @@ private fun PoEditor(
     val picks = PurchaseOrderBook.supplierPicks(d, supplierId, onlyLow).filter { pk -> rows.none { it.productId == pk.productId } }
     if (picks.isEmpty()) { toast(if (onlyLow) "کالای کم‌موجودی از این تأمین‌کننده نیست" else "کالای تازه‌ای از این تأمین‌کننده نیست"); return }
     rows = rows + picks.map { pk -> EditRow(seq++, pk.productId, pk.name, pk.unit, poNum(PurchaseOrderBook.units(pk.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pk.priceMinor))) }
+  }
+
+  fun addPlanned() {
+    val plan = PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).filter { pl -> rows.none { it.productId == pl.pick.productId } }
+    if (plan.isEmpty()) { toast("با فروشِ ۳۰ روز و زمانِ تأمین، کالایی از این تأمین‌کننده سفارش نمی‌خواهد"); return }
+    rows = rows + plan.map { pl ->
+      EditRow(seq++, pl.pick.productId, pl.pick.name, pl.pick.unit, poNum(PurchaseOrderBook.units(pl.pick.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pl.pick.priceMinor)))
+    }
   }
 
   fun save() {
@@ -420,7 +466,18 @@ private fun PoEditor(
     }
   }
 
-  Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
+  Column(
+    Modifier
+      .fillMaxWidth()
+      //  Ctrl+I: تاریخچهٔ قیمتِ کالای همین ردیف (آخرین ردیفی که دست خورد، وگرنه آخرین ردیف) — PUR-09
+      .onPreviewKeyEvent { e ->
+        if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.I) {
+          historyFor = (rows.find { it.key == lastKey } ?: rows.lastOrNull())?.productId
+          historyFor != null
+        } else false
+      }
+      .verticalScroll(rememberScrollState()),
+  ) {
     Text(if (base == null) "سفارشِ خریدِ تازه" else "ویرایشِ سفارشِ #${base.no}", style = MaterialTheme.typography.titleSmall, color = c.text)
     Spacer(Modifier.height(8.dp))
     if (d.suppliers.isEmpty()) EmptyNote("اول یک تأمین‌کننده بسازید.")
@@ -430,18 +487,33 @@ private fun PoEditor(
       }
     }
     Spacer(Modifier.height(8.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(
+      lead.days?.let { "زمانِ تأمینِ این تأمین‌کننده: $it روز (میانهٔ ${lead.samples} سفارشِ رسیده)" }
+        ?: "زمانِ تأمینِ این تأمین‌کننده هنوز سنجیده نشده — ${ReorderCore.DEFAULT_LEAD_DAYS} روز فرض می‌شود",
+      style = MaterialTheme.typography.labelSmall, color = c.muted,
+    )
+    Spacer(Modifier.height(6.dp))
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedButton(onClick = { addPlanned() }, enabled = supplierId.isNotBlank()) { Text("پیشنهاد با فروش و زمانِ تأمین") }
       OutlinedButton(onClick = { addPicks(onlyLow = true) }, enabled = supplierId.isNotBlank()) { Text("کم‌موجودهای این تأمین‌کننده") }
       OutlinedButton(onClick = { addPicks(onlyLow = false) }, enabled = supplierId.isNotBlank()) { Text("همهٔ کالاهای این تأمین‌کننده") }
     }
     Spacer(Modifier.height(8.dp))
     rows.forEachIndexed { i, r ->
-      Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${i + 1}. ${r.name}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        NumberField(r.qty, { v -> rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, "مقدار ${r.unit}", Modifier.width(120.dp))
-        NumberField(r.price, { v -> rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, "فی (؋)", Modifier.width(120.dp))
+        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, "مقدار ${r.unit}", Modifier.width(120.dp))
+        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, "فی (؋)", Modifier.width(120.dp))
+        TextButton(onClick = { historyFor = r.productId }) { Text("تاریخچه") }
         TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text("حذف") }
       }
+      //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود
+      val last = remember(buys, r.productId, supplierId) { SupplierPricing.last(buys, r.productId, supplierId) }
+      Text(
+        last?.let { "آخرین فیِ این تأمین‌کننده: ${money(PurchaseOrderBook.asAfn(it.priceMinor))} ؋ (${ir.vil3ntec.tohid.formatDate(it.date)})" + changeText(it) }
+          ?: "از این تأمین‌کننده هنوز خریده نشده",
+        style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(bottom = 4.dp),
+      )
     }
     PoProductPicker(d, "افزودنِ کالا — نام یا بارکد") { addProduct(it) }
     Spacer(Modifier.height(8.dp))
@@ -458,6 +530,48 @@ private fun PoEditor(
       Text(if (base == null) "ذخیرهٔ پیش‌نویس" else "ذخیره")
     }
   }
+
+  historyFor?.let { pid -> PriceHistoryDialog(d, buys, pid, supplierId) { historyFor = null } }
+}
+
+private fun changeText(p: SupplierPricing.Point): String {
+  val bp = p.changeBp ?: return ""
+  if (bp == 0L) return " · بی تغییر"
+  val pct = kotlin.math.abs(bp) / 100.0
+  return (if (bp > 0) " · ▲ " else " · ▼ ") + qty(pct) + "٪"
+}
+
+/** تاریخچهٔ قیمتِ خریدِ یک کالا از همهٔ تأمین‌کنندگان، تازه‌ترین بالا (PUR-09) */
+@Composable
+private fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, productId: String, supplierId: String, onDismiss: () -> Unit) {
+  val c = Shop.colors
+  val names = remember(d) { d.suppliers.associate { it.id to it.name } }
+  val rows = remember(buys, productId) { SupplierPricing.history(buys, productId).take(30) }
+  val cheapest = remember(buys, productId) { SupplierPricing.bySupplier(buys, productId).firstOrNull() }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = c.surfaceSolid,
+    title = { Text("تاریخچهٔ قیمتِ «${d.products.find { it.id == productId }?.name.orEmpty()}»", color = c.text) },
+    text = {
+      Column(Modifier.verticalScroll(rememberScrollState())) {
+        if (rows.isEmpty()) EmptyNote("هنوز خریدی ثبت نشده است.")
+        cheapest?.let {
+          Text("ارزان‌ترین آخرین فی: ${names[it.supplierId].orEmpty()} ${money(PurchaseOrderBook.asAfn(it.priceMinor))} ؋",
+            style = MaterialTheme.typography.labelSmall, color = c.success)
+        }
+        rows.forEach { p ->
+          Text(
+            "${ir.vil3ntec.tohid.formatDate(p.date)} · ${names[p.supplierId] ?: "—"} · ${qty(PurchaseOrderBook.units(p.qtyMilli))} × ${money(PurchaseOrderBook.asAfn(p.priceMinor))} ؋" + changeText(p),
+            style = MaterialTheme.typography.bodySmall,
+            color = if (p.supplierId == supplierId) c.text else c.muted,
+            fontWeight = if (p.supplierId == supplierId) FontWeight.SemiBold else FontWeight.Normal,
+            modifier = Modifier.padding(vertical = 3.dp),
+          )
+        }
+      }
+    },
+    confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+  )
 }
 
 @Composable

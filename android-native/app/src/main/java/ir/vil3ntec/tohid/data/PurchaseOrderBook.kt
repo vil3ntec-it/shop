@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
+import ir.vil3ntec.tohid.core.purchase.ReorderCore
+import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.sync.v1.OpHash
 import kotlinx.serialization.Serializable
 import kotlin.math.ceil
@@ -98,6 +101,8 @@ data class PurchaseOrderDto(
   val cancelledAt: Long? = null,
   val cancelReason: String? = null,
   val receiptCount: Int = 0,
+  /** نخستین رسید (زمانِ تأمین، PUR-10)؛ سرورِ پیش از آن ⇒ `null` */
+  val firstReceiptAt: Long? = null,
   /** فقط در `GET /:id` و پاسخِ کارها */
   val receipts: List<PoReceiptDto> = emptyList(),
 )
@@ -233,10 +238,9 @@ object PurchaseOrderBook {
 
   data class Pick(val productId: String, val name: String, val unit: String, val qtyMilli: Long, val priceMinor: Long, val low: Boolean)
 
-  /** آخرین فیِ خریدِ یک کالا از همین تأمین‌کننده؛ نبود ⇒ فیِ خریدِ کالا */
-  fun lastPriceMinor(d: ShopData, supplierId: String, product: Product): Long =
-    minor(d.purchases.filter { it.supplierId == supplierId && it.productId == product.id && it.quantity > 0 }
-      .maxByOrNull { it.createdAt }?.purchasePrice ?: product.purchasePrice)
+  /** آخرین فیِ خریدِ یک کالا از همین تأمین‌کننده (`SupplierPricing.last`، PUR-09)؛ نبود ⇒ فیِ خریدِ کالا */
+  fun lastPriceMinor(d: ShopData, supplierId: String, product: Product, history: List<SupplierPricing.Buy> = buys(d)): Long =
+    SupplierPricing.last(history, product.id, supplierId)?.priceMinor ?: minor(product.purchasePrice)
 
   /** مقدارِ پیشنهادی: تا «حدِ کم» و دست‌کم یک واحد (عددِ کامل) */
   fun suggestedQtyMilli(d: ShopData, product: Product): Long {
@@ -250,9 +254,73 @@ object PurchaseOrderBook {
    */
   fun supplierPicks(d: ShopData, supplierId: String, onlyLow: Boolean = false): List<Pick> {
     val bought = d.purchases.filter { it.supplierId == supplierId && it.quantity > 0 }.mapTo(HashSet()) { it.productId }
+    val all = buys(d)
     return d.products.filter { it.active && it.id in bought }.map { p ->
       val low = p.minStock > 0 && ShopStore.stock(d, p.id) <= p.minStock
-      Pick(p.id, p.name, p.unit, suggestedQtyMilli(d, p), lastPriceMinor(d, supplierId, p), low)
+      Pick(p.id, p.name, p.unit, suggestedQtyMilli(d, p), lastPriceMinor(d, supplierId, p, all), low)
     }.filter { !onlyLow || it.low }.sortedWith(compareByDescending<Pick> { it.low }.thenBy { it.name })
   }
+
+  /* ── تاریخچهٔ قیمت (PUR-09) و پیشنهاد با فروش و زمانِ تأمین (PUR-10، PUR-03) ── */
+
+  /** ردیف‌های خریدِ دفتر برای هستهٔ قیمت (سندِ کسرِ منفی را خودِ هسته کنار می‌گذارد) */
+  fun buys(d: ShopData): List<SupplierPricing.Buy> = d.purchases.map {
+    SupplierPricing.Buy(it.supplierId, it.productId, it.date, it.createdAt, milli(it.quantity), minor(it.purchasePrice))
+  }
+
+  /** فروشِ خالصِ (فروش − برگشتِ همان قلم) [windowDays] روزِ آخر تا امروز، بی فاکتورِ لغوشده */
+  fun soldMilli(d: ShopData, today: String, windowDays: Int = ReorderCore.DEFAULT_WINDOW_DAYS): Map<String, Long> {
+    val from = CivilDays.addDays(today, -(windowDays - 1)) ?: return emptyMap()
+    val live = d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= today }.mapTo(HashSet()) { it.id }
+    val out = HashMap<String, Long>()
+    for (i in d.saleItems) {
+      if (i.productId.isBlank() || i.saleId !in live) continue
+      out[i.productId] = (out[i.productId] ?: 0L) + milli(i.quantity - i.returnedQty)
+    }
+    return out
+  }
+
+  /** «در راه»: باقی‌ماندهٔ سفارش‌های فرستاده/بخشی برای هر کالا */
+  fun onOrderMilli(orders: List<PurchaseOrderDto>): Map<String, Long> {
+    val out = HashMap<String, Long>()
+    for (o in orders) {
+      val st = status(o)
+      if (st != PurchaseOrderCore.Status.SENT && st != PurchaseOrderCore.Status.PARTIAL) continue
+      for (p in o.progress) out[p.productId] = (out[p.productId] ?: 0L) + p.remainingMilli
+    }
+    return out
+  }
+
+  /** زمانِ تأمینِ یک تأمین‌کننده از سفارش‌های فرستاده‌ای که رسید گرفته‌اند */
+  fun leadTime(orders: List<PurchaseOrderDto>, supplierId: String): ReorderCore.Lead =
+    ReorderCore.leadTime(orders.filter { it.supplierId == supplierId }.mapNotNull { o ->
+      val sent = o.sentAt ?: return@mapNotNull null
+      val first = o.firstReceiptAt ?: return@mapNotNull null
+      ReorderCore.Delivery(sent, first)
+    })
+
+  data class Planned(val pick: Pick, val suggestion: ReorderCore.Suggestion)
+
+  /**
+   *  پیشنهادِ ردیف با فروشِ واقعی و زمانِ تأمینِ همین تأمین‌کننده (و «در راه»)؛ فقط مقدارِ بیش از صفر.
+   *  کالای وزنی (کیلو، لیتر…) هزارم، بقیه عددِ کامل. سفارش خودکار ثبت نمی‌شود — فقط ردیفِ فرم.
+   */
+  fun planned(d: ShopData, supplierId: String, orders: List<PurchaseOrderDto>, today: String): List<Planned> {
+    val lead = leadTime(orders, supplierId)
+    val sold = soldMilli(d, today)
+    val onOrder = onOrderMilli(orders)
+    return supplierPicks(d, supplierId).mapNotNull { pk ->
+      val p = d.products.find { it.id == pk.productId } ?: return@mapNotNull null
+      val s = ReorderCore.suggest(
+        ReorderCore.Input(
+          onHandMilli = milli(ShopStore.stock(d, p.id)), onOrderMilli = onOrder[p.id] ?: 0L, minStockMilli = milli(p.minStock),
+          soldMilli = sold[p.id] ?: 0L, leadDays = lead.days, wholeUnits = p.unit !in WEIGHED_UNITS,
+        ),
+      )
+      if (s.qtyMilli > 0) Planned(pk.copy(qtyMilli = s.qtyMilli), s) else null
+    }
+  }
+
+  /** واحدهایی که مقدارشان کسری است */
+  val WEIGHED_UNITS = setOf("کیلوگرم", "کیلو", "گرم", "لیتر", "متر")
 }

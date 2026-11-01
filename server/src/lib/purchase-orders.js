@@ -187,6 +187,8 @@ function view(order, receipts, { withReceipts = true } = {}) {
     progress: core.progress(order, receipts),
     totals: core.totals(order, receipts),
     receiptCount: receipts.length,
+    //  زمانِ تأمین (PUR-10): «فرستادن ⇐ نخستین رسید» را برنامه از همین دو زمان می‌سنجد (ReorderCore)
+    firstReceiptAt: receipts.length ? Math.min(...receipts.map((r) => r.createdAt)) : null,
   };
   if (withReceipts) out.receipts = receipts;
   return out;
