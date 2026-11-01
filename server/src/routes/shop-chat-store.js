@@ -21,12 +21,14 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
+const { goneSignal } = require('../lib/chat-wait');
 const { rateLimit, refund } = require('../middleware/ratelimit');
 const { ApiError, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
-const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${req.chatViewer.phone}` : '');
+//  شماره با کلیدِ یکتا (RSK-07): شکلِ دیگرِ همان گوشی سطلِ تازه نمی‌گیرد
+const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${require('../lib/validate').phoneKey(req.chatViewer.phone)}` : '');
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-chat-read' });
 //  تکرارِ همان پیام/همان بایت سهمیه را پس می‌دهد (CHAT-11) ⇒ `refundable`
 const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey, refundable: true });
@@ -77,9 +79,10 @@ router.get(`${base}/conversations/:id`, readLimit, customer, async (req, res) =>
 });
 
 router.get(`${base}/conversations/:id/messages`, readLimit, customer, async (req, res) => {
-  res.json(await chat.changes(v(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait,
-  }));
+  const out = await chat.changes(v(req), req.params.id, {
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+  });
+  if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
 });
 
 router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, async (req, res) => {

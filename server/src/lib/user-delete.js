@@ -174,6 +174,8 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
     await q('backups', 'DELETE FROM account_backups WHERE user_id=$1 OR tenant_id = ANY($2::text[])', [userId, tenants]);
     await q('sync', 'DELETE FROM sync_rows WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM oplog WHERE account_id = ANY($1::text[])', [accounts]);
+    //  A16: نویسندهٔ درجِ برگشت (مهاجرتِ ۱۲۳) — دفترِ حساب‌های خودش، و نامِ خودش در دکانِ دیگران
+    await q('sync', 'DELETE FROM sync_op_authors WHERE account_id = ANY($1::text[]) OR user_id = $2', [accounts, userId]);
     await q('sync', 'DELETE FROM sync_devices WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_conflicts WHERE account_id = ANY($1::text[])', [accounts]);
     await q('sync', 'DELETE FROM sync_operations WHERE user_id=$1 OR shop_id = ANY($2::text[])', [userId, shopIds]);
@@ -221,6 +223,12 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
     //  ۳) خودِ حساب — دستگاه، عضویت، راهِ ورود، تلگرام… با CASCADE
     await q('users', 'DELETE FROM users WHERE id=$1', [userId]);
   });
+
+  //  ⛔ S78: پس از تراکنش — سوکت‌های زندهٔ خودش و همهٔ دستگاه‌های دکان‌ها/پمپ‌های رفته همان لحظه بسته
+  const live = require('./sync-v1-live');
+  await live.accessChanged({ userId });
+  for (const id of shopIds) await live.accessChanged({ accountKind: 'shop', accountId: id });
+  for (const id of stationIds) await live.accessChanged({ accountKind: 'station', accountId: id });
 
   //  ۴) پوشهٔ پشتیبان‌های ابری روی دیسک — پس از تراکنش، و نرفتنش حذف را برنمی‌گرداند
   let files = 0;

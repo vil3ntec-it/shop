@@ -407,6 +407,128 @@ await step('صفِ زنده فقط وقتی برگه پیداست: پنهان �
   assert.ok(seen.filter((s) => s.includes('/summary')).length > before, 'برگشت به جلو ⇒ شمارش دوباره');
 });
 
+/* ══════════════════════ ۲-ب) افزونهٔ پشتِ پرچم: ORD-03 و ORD-07 ══════════════════════ */
+const deskLoaded = () => page.evaluate(() => performance.getEntriesByType('resource').some((e) => /orders-desk\.js/.test(e.name)));
+await step('بی پرچم‌های presence/delay: افزونه (orders-desk.js) بار نمی‌شود، نه نشانگر، نه «عقب انداختن»', async () => {
+  assert.equal(await deskLoaded(), false);
+  assert.equal(await page.evaluate(() => !!window.TohidOrdersDesk), false);
+  assert.equal(await page.locator('#ord-presence, #ord-net').count(), 0);
+  const made = (await apiOrder()).body.order;
+  assert.equal((await post(`/api/v1/shop/orders/${made.id}/transition`, { to: 'accepted', readyInMinutes: 15 }, owner.accessToken)).status, 200);
+  await page.click('#ord-tabs [data-tab="preparing"]');
+  await page.locator(`.ord-card[data-id="${made.id}"]`).click();
+  await page.waitForSelector('#ord-actions [data-act="picking"]');
+  assert.equal(await page.locator('[data-delay]').count(), 0);
+  await page.keyboard.press('Escape');
+});
+
+/** پرچمِ تازه ⇒ برنامه config را دوباره می‌پرسد (همان کاری که هر ۱۰ دقیقه می‌کند) */
+const reconfig = async () => {
+  await page.evaluate(() => window.TohidOrders.refreshConfig());
+  await page.waitForFunction(() => !!window.TohidOrdersDesk, null, { timeout: 10000 });
+};
+
+await step('ORD-03: نشانگرِ بزرگِ «باز / بسته» همان وضعیتِ ویترین — باز، اعلامِ «بسته» ⇒ بسته', async () => {
+  await liveConfig.set(String(shopOn), 'shop.storefront', true);
+  await liveConfig.set(String(shopOn), 'shop.orders.presence', true);
+  const sfPut = await call('PUT', '/api/v1/shop/storefront', { slug: `web-ord-${Date.now().toString(36)}`, enabled: true, title: 'ویترینِ آزمون', contactPhone: '0700000001' }, owner.accessToken);
+  assert.equal(sfPut.status, 200, JSON.stringify(sfPut.body));
+  //  یک دستگاهِ دکان همین حالا همگام شد ⇒ «اتصالِ تأییدشده» (همان سنجهٔ ویترین، D-18)
+  await query(`INSERT INTO sync_devices (app, account_kind, account_id, device_id, last_seen_at)
+    VALUES ('shop','shop',$1,'web-orders-dev',$2)
+    ON CONFLICT (app, account_kind, account_id, device_id) DO UPDATE SET last_seen_at = EXCLUDED.last_seen_at`, [shopOn, Date.now()]);
+  await reconfig();
+  await page.waitForSelector('#ord-presence:not([hidden])', { timeout: 10000 });
+  const box = page.locator('#ord-presence');
+  const pub = (await call('GET', '/api/v1/shop/orders/summary', undefined, owner.accessToken)).body.presence;
+  assert.deepEqual([pub.badge, pub.connection, pub.published], ['open_online', 'confirmed', true], JSON.stringify(pub));
+  await page.waitForFunction(() => document.querySelector('#ord-presence b')?.textContent.trim() === 'باز', null, { timeout: 10000 });
+  assert.match(await box.innerText(), /سفارش می‌گیرد/);
+  assert.match(await box.getAttribute('class'), /p-open/);
+  //  اعلامِ «بسته» از دستگاهِ دیگر ⇒ پرسشِ بعدی همین‌جا «بسته» (همان چیزی که مشتری می‌بیند)
+  const d = await post('/api/v1/shop/storefront/presence', { eventId: `ev-web-${Date.now()}`, mode: 'closed' }, owner.accessToken);
+  assert.equal(d.status, 200, JSON.stringify(d.body));
+  await page.waitForFunction(() => document.querySelector('#ord-presence b')?.textContent.trim() === 'بسته', null, { timeout: 10000 });
+  assert.match(await box.innerText(), /اعلامِ «بسته»/);
+  assert.match(await box.getAttribute('class'), /p-closed/);
+  assert.equal(await box.getAttribute('role'), 'status');
+});
+
+await step('ORD-03: سرور نرسید (۵۰۳ یا قطعِ اینترنت) ⇒ هشدارِ «اتصال قطع است»؛ برگشت ⇒ می‌رود', async () => {
+  const warn = page.locator('#ord-net');
+  assert.equal(await warn.isHidden(), true);
+  await page.route('**/api/v1/shop/orders/summary', (route) => route.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"unavailable","message":"x"}}' }));
+  await page.waitForSelector('#ord-net:not([hidden])', { timeout: 10000 });
+  assert.match(await warn.innerText(), /اتصال قطع است/);
+  assert.match(await warn.innerText(), /آخرین به‌روزرسانی/);
+  assert.equal(await warn.getAttribute('role'), 'alert');
+  assert.equal(await page.locator('#ord-presence').isHidden(), false, '«باز / بسته» ِ پیشین سرِ جایش');
+  await page.unroute('**/api/v1/shop/orders/summary');
+  await page.waitForSelector('#ord-net[hidden]', { state: 'attached', timeout: 10000 });
+  //  قطعِ اینترنتِ خودِ دستگاه ⇒ همان لحظه
+  await page.context().setOffline(true);
+  await page.waitForSelector('#ord-net:not([hidden])', { timeout: 5000 });
+  await page.context().setOffline(false);
+  await page.waitForSelector('#ord-net[hidden]', { state: 'attached', timeout: 10000 });
+});
+
+await step('ORD-07: «عقب انداختن» — قطعِ نت وسطِ ثبت ⇒ «تأیید» دوباره، و فقط یک بار عقب؛ خطِ زمانی', async () => {
+  await liveConfig.set(String(shopOn), 'shop.orders.delay', true);
+  await reconfig();
+  await page.waitForFunction(() => !!(window.TohidOrders && document.getElementById('page-orders')));
+  const made = (await apiOrder()).body.order;
+  const acc = await post(`/api/v1/shop/orders/${made.id}/transition`, { to: 'accepted', readyInMinutes: 15 }, owner.accessToken);
+  const before = Number(acc.body.order.readyAt);
+  //  پنجره‌ای که پیش از روشن شدن باز بود ⇒ دوباره
+  await page.click('#ord-tabs [data-tab="preparing"]');
+  await page.locator(`.ord-card[data-id="${made.id}"]`).click();
+  await page.waitForSelector('#ord-actions [data-delay]', { timeout: 10000 });
+  await page.click('#ord-actions [data-delay]');
+  await page.waitForSelector('#ord-delay-modal.open #ord-delay-min');
+  assert.equal(await page.inputValue('#ord-delay-min'), '15');
+  await page.selectOption('#ord-delay-min', '20');
+  await page.check('#ord-delay-body input[value="other"]');
+  assert.equal(await page.locator('#ord-delay-ok').isDisabled(), true, '«دیگر» بی توضیح نمی‌رود');
+  await page.fill('#ord-delay-note', 'منتظرِ نان');
+  assert.equal(await page.locator('#ord-delay-ok').isDisabled(), false);
+  let dropped = 0;
+  const delayPath = `**/api/v1/shop/orders/${made.id}/delay`;
+  await page.route(delayPath, closeSafeRoute(async (route) => {
+    if (!dropped) { dropped++; await route.fetch(); return route.abort('failed'); }
+    return route.fallback();
+  }));
+  await page.click('#ord-delay-ok');
+  await page.waitForFunction(() => /اتصال قطع شد/.test(document.getElementById('ord-delay-err').textContent));
+  await page.click('#ord-delay-ok');
+  await page.waitForFunction(() => !document.querySelector('#ord-delay-modal.open'));
+  await page.unroute(delayPath);
+  await page.waitForFunction(() => /عقب افتاد/.test(document.querySelector('.ord-timeline')?.innerText || ''));
+  const row = await one('SELECT ready_at, status FROM online_orders WHERE id=$1', [made.id]);
+  assert.equal(Number(row.ready_at), before + 20 * 60_000, 'روی زمانِ سرور، یک بار');
+  assert.equal(row.status, 'accepted');
+  const ev = await many(`SELECT reason, note, actor_id FROM online_order_events WHERE order_id=$1 AND kind='note'`, [made.id]);
+  assert.deepEqual(ev.map((e) => [e.reason, e.note, e.actor_id]), [['other', 'منتظرِ نان', owner.user.id]]);
+  const line = await page.locator('.ord-timeline li.ord-ev-delay').innerText();
+  assert.match(line, /دلیلِ دیگر/);
+  assert.match(line, /منتظرِ نان/);
+  assert.match(line, /پیش‌تر/);
+});
+
+await step('ORD-07: کسِ دیگری زودتر عقب انداخت ⇒ پیام و زمانِ تازه، بی جمعِ ناخواسته', async () => {
+  assert.equal(await page.locator('#ord-detail-modal.open').count(), 1, 'جزئیاتِ همان سفارش باز است');
+  await page.click('#ord-actions [data-delay]');
+  await page.waitForSelector('#ord-delay-modal.open');
+  const orderId = (await one(`SELECT order_id FROM online_order_events WHERE shop_id=$1 AND kind='note' ORDER BY created_at DESC LIMIT 1`, [shopOn])).order_id;
+  const other = await post(`/api/v1/shop/orders/${orderId}/delay`, { minutes: 5 }, owner.accessToken, { 'Idempotency-Key': `other-device-${Date.now()}` });
+  assert.equal(other.status, 200, JSON.stringify(other.body));
+  await page.click('#ord-delay-ok');
+  await page.waitForFunction(() => !document.querySelector('#ord-delay-modal.open'));
+  await page.waitForFunction(() => document.querySelectorAll('.ord-timeline li.ord-ev-delay').length === 2, null, { timeout: 10000 });
+  assert.equal((await one(`SELECT COUNT(*)::int n FROM online_order_events WHERE order_id=$1 AND kind='note'`, [orderId])).n, 2,
+    'زمانِ کهنهٔ پنجره روی زمانِ تازه جمع نشد');
+  await page.keyboard.press('Escape');
+});
+
 if (axeSrc) {
   await step('دسترس‌پذیری: نامِ دکمه، برچسبِ فیلد، کنتراست — صفحه و فرمِ سفارشِ دستی', async () => {
     await page.addScriptTag({ content: axeSrc });

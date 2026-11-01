@@ -168,6 +168,14 @@ object PrinterRegistry {
     ThermalPrinter.send(context, link, bytes)
   }
 
+  /** HW-01: برگهٔ دوروشی (`HwPages.modeTestBytes`) — بی صف، همان لحظه */
+  suspend fun modeTestPrint(context: Context, s: Saved): String? = withContext(Dispatchers.IO) {
+    val bytes = runCatching { HwPages.modeTestBytes(context, s) }
+      .getOrElse { return@withContext "برگهٔ دوروشی کشیده نشد: ${it.message}" }
+    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext "نشانیِ چاپگر خوانده نشد"
+    ThermalPrinter.send(context, link, bytes)
+  }
+
   private fun write(context: Context, all: List<Saved>) {
     val arr = JSONArray()
     all.forEach {

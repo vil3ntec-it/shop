@@ -66,6 +66,13 @@ class OrdersRepository(private val api: ApiClient) {
     result { order(api.post(ROOT, createJson(clientKey, body))) }
 
   /**
+   *  ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-24) — فقط کلیدهای آمده؛ `expectedVersion` ِ کهنه ⇒
+   *  ۴۰۹ و هیچ تغییری (ویرایشِ هم‌زمانِ دو دستگاه بی‌صدا رونویسی نمی‌شود).
+   */
+  suspend fun editDelivery(id: String, expectedVersion: Long, body: JsonObject): ApiResult<OrderDto> =
+    result { order(api.post("$ROOT/${enc(id)}/delivery", JsonObject(body + ("expectedVersion" to JsonPrimitive(expectedVersion))))) }
+
+  /**
    *  «بررسی شد» ِ صاحب یا مدیر برای ردیفِ بررسیِ فروشِ تحویل (`before_floor`، `reverse_blocked`) —
    *  ردیف برای همهٔ دستگاه‌ها می‌رود؛ تکرار بی‌اثر.
    */
@@ -117,16 +124,23 @@ class OrdersRepository(private val api: ApiClient) {
           if (b.landmark.isNotEmpty()) put("landmark", b.landmark)
         })
         if (b.deliveryFeeMinor > 0) put("deliveryFeeMinor", b.deliveryFeeMinor)
+        //  CHK-14: فقط وقتی نوشته شده (سرورِ کهنه/پرچمِ خاموش همان بدنهٔ پیشین را می‌بیند)
+        b.cashTenderMinor?.let { t -> put("delivery", buildJsonObject { put("cashTenderMinor", t) }) }
       }
       put("lines", buildJsonArray {
         for (l in b.lines) add(buildJsonObject {
+          //  POS-38: قلمِ صندوق شناسهٔ کالا و واحد دارد؛ تهی ⇒ نوشته نمی‌شود (بدنهٔ سفارشِ دستی همان پیشین)
+          if (l.productId.isNotEmpty()) put("productId", l.productId)
           put("name", l.name)
+          if (l.unit.isNotEmpty()) put("unit", l.unit)
           put("qtyMilli", l.qtyMilli)
           put("unitPriceMinor", l.unitPriceMinor)
         })
       })
       if (b.note.isNotEmpty()) put("note", b.note)
       if (b.test) put("test", JsonPrimitive(true))
+      //  CHK-15: فقط وقتی برگزیده شده (سرورِ کهنه/پرچمِ خاموش همان بدنهٔ پیشین را می‌بیند)
+      if (b.substitution.isNotEmpty()) put("substitution", b.substitution)
     }
 
     /** کلیدِ یکتایی — یک بار برای هر فرم */
