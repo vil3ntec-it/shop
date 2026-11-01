@@ -7,6 +7,7 @@
 const { many } = require('../db');
 const sf = require('./storefront');
 const { ApiError } = require('../middleware/errors');
+const views = require('./public-views');   //  S2: فهرستِ سفیدِ `orderSummary` (پشتِ `market.public_views`)
 
 module.exports = ({ storeOpen, filterAsync }) => {
   async function myOrders(ticket) {
@@ -28,7 +29,7 @@ module.exports = ({ storeOpen, filterAsync }) => {
     );
     const slugs = [...new Set(rows.map((r) => r.slug))];
     const [open, linked] = (await Promise.all([filterAsync(slugs, storeOpen), filterAsync([...new Set(rows.map((r) => r.shop_id))], sf.linkPolicyOn)])).map((x) => new Set(x));   //  linked: TEN-03، به‌ازای پرچمِ هر دکان
-    return rows.filter((r) => open.has(r.slug)).map((r) => ({
+    return rows.filter((r) => open.has(r.slug)).map((r) => views.pub('orderSummary', {
       orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), fulfillment: r.fulfillment, createdAt: Number(r.created_at),
       token: sf.listTokenOf(r.shop_id, r, linked.has(r.shop_id)),
