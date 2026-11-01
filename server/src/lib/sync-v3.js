@@ -34,8 +34,6 @@ const schema = require('./sync-v3-schema');
 const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
-const safeLedger = require('./safe-ledger');
-const safeFlag = require('./safe-flag');
 const permCore = require('./perm-core');
 
 const PROTOCOL = 3;
@@ -103,9 +101,8 @@ function validate(raw, origin = 'v3', ctx = undefined) {
   const relaxed = origin !== 'v3';
 
   if (!OP_ID_RE.test(opId)) return bad('bad_op_id');
-  const spec = schema.specOf(r.table);
-  //  جدولِ پشتِ پرچمِ خاموش (گاوصندوق، `safe-flag.js`) همان ناشناختهٔ main است — فقط درِ دستگاه (ctx دارد)
-  if (!spec || (ctx !== undefined && !safeFlag.allowed(spec.name, ctx))) return bad('unknown_table');
+  const spec = schema.specOf(r.table, ctx);   // درِ دستگاه (ctx): جدولِ پشتِ پرچمِ خاموش (گاوصندوق) همان ناشناختهٔ main
+  if (!spec) return bad('unknown_table');
   if (typeof r.row_id !== 'string' || !r.row_id || r.row_id.length > 80) return bad('bad_row_id');
   //  `srv.` مالِ opها و ردیف‌های خودِ سرور است (تعدیلِ شمارش، برگرداندن): دستگاهی
   //  که پیش‌دستی کند می‌توانست تعدیل را «تکراری» کند و بی‌صدا از کار بیندازد
@@ -176,12 +173,6 @@ function emptyRow() {
     data: {}, field_hlc: {}, field_src: {}, row_hlc: '', inserted: false, created_by: '',
     deleted_hlc: null, deleted_at: null,
   };
-}
-
-function maxHlc(map) {
-  let best = '';
-  for (const h of Object.values(map || {})) if (h && (!best || cmp(h, best) > 0)) best = h;
-  return best;
 }
 
 /**
@@ -272,7 +263,7 @@ function merge(row, op, { seq, deviceId, cursor = 0, t, skewed = false }) {
   const wasAlive = !!row && !cur.deleted_at;
 
   if (op.kind === 'delete') {
-    const newest = maxHlc(cur.field_hlc);
+    const newest = hlc.newestOf(cur.field_hlc);
     const deletedHlc = !cur.deleted_hlc || cmp(op.hlc, cur.deleted_hlc) > 0 ? op.hlc : cur.deleted_hlc;
     if (newest && cmp(newest, deletedHlc) > 0) {
       //  ویرایشی تازه‌تر از این حذف هست ⇒ ردیف می‌ماند
@@ -437,8 +428,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
-  //  گاوصندوق (PAY-18): فقط درج، شکلِ درست و `safe.move` (جز «از دخل») — `safe-ledger.js`
-  if (op.table === safeLedger.TABLE) return safeLedger.judgeV3(ctx, op, row);
+  if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row);   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {
@@ -1182,8 +1172,6 @@ async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
 
 /** آنچه برنامه برای راه افتادن لازم دارد — `/hello` (جدولِ پشتِ پرچمِ خاموش نه، `safe-flag.js`). */
 function describe(ctx = null) {
-  const tables = schema.describe();
-  for (const t of safeFlag.GATED) if (!safeFlag.allowed(t, ctx)) delete tables[t];
   return {
     protocol: PROTOCOL,
     accepts: { v3: true, v2_schema_max: v1migrations.currentVersion('shop', ctx) },
@@ -1191,7 +1179,7 @@ function describe(ctx = null) {
     max_ops: MAX_OPS, max_batch_bytes: MAX_BATCH_BYTES,
     pull_bytes: { min: PULL_MIN_BYTES, max: PULL_MAX_BYTES },
     units: { money: 'Minor (1/100 AFN, integer)', qty: 'Milli (1/1000, integer)' },
-    tables,
+    tables: schema.describe(ctx),
     server_time: now(), hlc: clock.peek(),
   };
 }

@@ -15,7 +15,7 @@
  */
 const tokens = require('./tokens');
 const { one, many, now } = require('../db');
-const { sectionOf } = require('./tenancy');
+const { sectionOf, SHOP } = require('./tenancy');
 const { can } = require('./permissions');
 const { unauthorized, forbidden } = require('../middleware/errors');
 
@@ -137,7 +137,7 @@ async function requireSyncAccount(req, res, next) {
     const wrongDevice = await checkDevice(req, ctx);
     if (wrongDevice) return next(wrongDevice);
     //  گاوصندوق (PAY-18): پرچمِ `sync.safe_entries` یک بار برای همین درخواست (‎lib/safe-flag.js‎)
-    if (ctx.app === 'shop' && ctx.accountKind === 'shop') ctx.safeEntries = await require('./safe-flag').enabledFor(ctx.accountId);
+    if (ctx.app === SHOP.app && ctx.accountKind === SHOP.app) ctx.safeEntries = await require('./safe-flag').enabledFor(ctx.accountId);
     req.sync = ctx;
     req.appSection = ctx.app;
     if (ctx.accountKind === 'shop') { req.shopId = ctx.accountId; req.role = ctx.role; }
