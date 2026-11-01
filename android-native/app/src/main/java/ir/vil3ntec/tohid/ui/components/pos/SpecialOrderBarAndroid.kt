@@ -100,7 +100,7 @@ private fun SpecialOrderPref.Saved.show(toast: (String) -> Unit, onOk: (SpecialO
   }
 }
 
-private fun afn(text: String): Long? = text.toLongOrNull()?.takeIf { it <= SpecialOrder.MAX_MINOR / SpecialOrder.WHOLE }?.let { it * SpecialOrder.WHOLE }
+private fun wholeAfghani(text: String): Long? = text.toLongOrNull()?.takeIf { it <= SpecialOrder.MAX_MINOR / SpecialOrder.WHOLE }?.let { it * SpecialOrder.WHOLE }
 
 private fun digits(raw: String, max: Int = 11): String = ir.vil3ntec.tohid.numericInput(raw).filter(Char::isDigit).take(max)
 
@@ -177,7 +177,7 @@ private fun SpecialOrderNewDialog(d: ShopData, store: ShopStore, debtorId: Strin
         val order = SpecialOrders.NewOrder(
           debtorId = debtorId, productId = productId, item = linked?.name ?: item,
           qtyMilli = ir.vil3ntec.tohid.numericInput(qty).toDoubleOrNull()?.takeIf { it > 0 && it < 1e7 }?.let { Math.round(it * 1000) },
-          totalMinor = afn(total), depositMinor = if (deposit.isEmpty()) 0L else afn(deposit), due = due,
+          totalMinor = wholeAfghani(total), depositMinor = if (deposit.isEmpty()) 0L else wholeAfghani(deposit), due = due,
         )
         busy = true
         scope.launch {
