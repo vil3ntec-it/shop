@@ -33,6 +33,8 @@ data class OrdersConfigDto(
   val reasons: Map<String, List<String>> = emptyMap(),
   val sources: List<String> = emptyList(),
   val permissions: OrderPermsDto = OrderPermsDto(),
+  /** «با اسکناسِ …» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24؛ پرچمِ `shop.orders.delivery_prefs`) */
+  val deliveryPrefs: Boolean = false,
   /** سرور «فروشِ تحویل در برنامه» را دارد — بی این (سرورِ کهنه) برنامه هیچ فروشی نمی‌سازد */
   val saleOnHandover: Boolean = false,
   /**
@@ -40,6 +42,10 @@ data class OrdersConfigDto(
    *  نخستین `config?caps=saleOnHandover` می‌گذارد؛ null ⇒ هنوز نه ⇒ هیچ فروشی.
    */
   val handoverSince: Long? = null,
+  /** پرچمِ خاموشِ `shop.orders.picking` (PCK): برگهٔ جمع‌آوری به‌جای گذارهای سادهٔ «جمع‌آوری/بسته‌بندی» */
+  val picking: Boolean = false,
+  /** ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی (CHK-15، پرچمِ `shop.orders.substitution`) */
+  val substitution: Boolean = false,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -67,6 +73,16 @@ data class OrderAddressDto(
   val text: String = "",
 )
 
+/** دستورِ تحویلِ سفارش — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، اسکناسِ مشتری (CHK-14/23/24) */
+@Serializable
+data class OrderDeliveryDto(
+  val callBeforeArrival: Boolean = false,
+  val leaveWith: String = "",
+  val photoConsent: Boolean = false,
+  /** مبلغی که مشتری هنگامِ تحویل می‌دهد (یک‌صدم)؛ null ⇒ نگفته */
+  val cashTenderMinor: Long? = null,
+)
+
 @Serializable
 data class OrderLineDto(
   val lineNo: Int = 0,
@@ -78,6 +94,8 @@ data class OrderLineDto(
   val lineTotalMinor: Long = 0,
   val note: String = "",
   val substitution: String = "",
+  /** «کالای مشخص»: نامِ جایگزین (CHK-15) */
+  val substituteName: String = "",
 )
 
 @Serializable
@@ -124,9 +142,13 @@ data class OrderDto(
   val canContact: Boolean = false,
   val address: OrderAddressDto = OrderAddressDto(),
   val note: String = "",
+  /** ترجیحِ کلیِ جایگزینی (CHK-15)؛ هر قلم ترجیحِ مؤثرِ خودش را دارد */
+  val substitution: String = "",
   val subtotalMinor: Long = 0,
   val discountMinor: Long = 0,
   val deliveryFeeMinor: Long = 0,
+  /** دستورِ تحویل (`online_orders.delivery`) — فقط در جزئیات */
+  val delivery: OrderDeliveryDto = OrderDeliveryDto(),
   val lines: List<OrderLineDto> = emptyList(),
   val events: List<OrderEventDto> = emptyList(),
   /** فقط در `GET /shop/orders/handover`: لحظهٔ نخستین تحویل (زمانِ سرور) */
@@ -135,6 +157,13 @@ data class OrderDto(
   val action: String = "",
   /** فقط در `handover` برای `reverse`: لحظهٔ برگشت به دکان */
   val returnedAt: Long? = null,
+  /**
+   *  فقط در `handover` برای `refund`: همهٔ رویدادهای بازپرداختِ همین سفارش با مبلغِ سقف‌دارِ سرور
+   *  (`order-ledger.refundEventsOf`) — برنامه نشسته‌ها را خودش رد می‌کند (`core/orders/OrderRefunds`)
+   */
+  val refundEvents: List<RefundEventDto> = emptyList(),
+  /** فقط در `handover` برای `refund`: همین کاربر سندِ برگشت را می‌تواند بنویسد (`returns.create`) */
+  val refundable: Boolean? = null,
   /**
    *  فقط در `handover` برای `sale`: همین کاربر (اجازهٔ مؤثرش، با سقفِ درصد/مبلغِ تخفیفِ **همین**
    *  سفارش) فروش را می‌تواند بنویسد. null (سرورِ کهنه) ⇒ اجازهٔ کلیِ نقش.
@@ -146,6 +175,16 @@ data class OrderDto(
   val reviewCode: String? = null,
 )
 
+/** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */
+@Serializable
+data class RefundEventDto(
+  val key: String = "",
+  val amountMinor: Long = 0,
+  val at: Long = 0,
+  /** `ledger` | `status` | `gateway` */
+  val source: String = "",
+)
+
 /** `GET /shop/orders/handover` — سفارش‌های تحویل‌شده‌ای که فروششان هنوز در دفترِ دکان نیست */
 @Serializable
 data class HandoverPageDto(
@@ -154,6 +193,8 @@ data class HandoverPageDto(
   val reversals: List<OrderDto> = emptyList(),
   /** بررسیِ صاحب: پیش از کف بیرون رفت و پس از آن تحویل شد — هرگز خودکار */
   val review: List<OrderDto> = emptyList(),
+  /** بازپرداختِ سفارشِ دارای فروش که سندِ برگشتش هنوز در دفترِ دکان ننشسته (`action = refund`) */
+  val refunds: List<OrderDto> = emptyList(),
   /** صفحهٔ بعد (`after`) — سفارشِ گیرکرده جلوی بقیه را نمی‌گیرد */
   val nextAfter: String? = null,
   val since: Long = 0,

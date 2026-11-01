@@ -23,19 +23,18 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 async function stateOf(shopId) {
   const [st, flag] = await Promise.all([sf.stateOf(shopId), campaigns.flagOn(shopId)]);
   return { st, flag: st.flag && flag };
 }
 
-const needFlag = wrap(async (req, res, next) => {
+const needFlag = async (req, res, next) => {
   const { st, flag } = await stateOf(req.shopId);
   if (!flag) return next(forbidden('پیوندِ کمپین برای این دکان روشن نیست', 'campaigns_disabled'));
   req.storeState = st;
   next();
-});
+};
 
 const needWrite = (req, res, next) => {
   const { entitled, ent } = req.storeState;
@@ -45,7 +44,7 @@ const needWrite = (req, res, next) => {
     : forbidden('این قابلیت نیازمندِ اشتراک است', 'subscription_required'));
 };
 
-router.get('/config', wrap(async (req, res) => {
+router.get('/config', async (req, res) => {
   const { st, flag } = await stateOf(req.shopId);
   res.json({
     flag,
@@ -53,13 +52,13 @@ router.get('/config', wrap(async (req, res) => {
     sources: campaigns.SOURCES,
     permissions: { manage: can(req.role, 'settings.write') },
   });
-}));
+});
 
-router.get('/', requirePermission('data.read'), needFlag, wrap(async (req, res) => {
+router.get('/', requirePermission('data.read'), needFlag, async (req, res) => {
   res.json(await campaigns.list(req.shopId, { days: req.query.days }));
-}));
+});
 
-router.post('/', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.post('/', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await campaigns.create(req.shopId, req.body, req.user.id);
   if (!out.replayed) {
     await audit.log({
@@ -69,9 +68,9 @@ router.post('/', requirePermission('settings.write'), needFlag, needWrite, wrap(
     });
   }
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
-router.put('/:id', requirePermission('settings.write'), needFlag, needWrite, wrap(async (req, res) => {
+router.put('/:id', requirePermission('settings.write'), needFlag, needWrite, async (req, res) => {
   const out = await campaigns.update(req.shopId, req.params.id, req.body);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'storefront.campaign.update',
@@ -79,6 +78,6 @@ router.put('/:id', requirePermission('settings.write'), needFlag, needWrite, wra
     detail: { name: out.campaign.name, archived: out.campaign.archived }, ip: clientIp(req),
   });
   res.json(out);
-}));
+});
 
 module.exports = router;

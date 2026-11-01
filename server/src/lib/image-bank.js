@@ -840,8 +840,8 @@ async function reject(adminId, id, { reason, version }) {
     if (version != null) {
       const ver = intIn(version, 2, 100000, 0);
       if (!ver || ver === Number(img.current_version)) throw conflict('نسخهٔ جاری رد نمی‌شود — بایگانی کنید', 'version_current');
-      const r = await q1(c, `UPDATE image_versions SET review='rejected' WHERE image_id=$1 AND version=$2 RETURNING version`, [id, ver]);
-      if (!r) throw notFound('این نسخه نیست');
+      const r = await q1(c, `UPDATE image_versions SET review='rejected' WHERE image_id=$1 AND version=$2 AND review <> 'approved' RETURNING version`, [id, ver]);
+      if (!r) throw (await q1(c, 'SELECT 1 FROM image_versions WHERE image_id=$1 AND version=$2', [id, ver])) ? conflict('نسخهٔ تأییدشده رد نمی‌شود — شاید دکانی روی آن باشد؛ برای کنار گذاشتن، عکس را بایگانی کنید', 'version_approved') : notFound('این نسخه نیست');   //  ⛔ IMG-13: تأییدشده شاید سنجاقِ دکانی است؛ کنار گذاشتن = بایگانی
       await c.query(`UPDATE images SET rev=nextval('image_bank_rev'), updated_at=$2 WHERE id=$1`, [id, t]);
       return { id, version: ver, review: 'rejected' };
     }
@@ -972,7 +972,7 @@ async function batchFile(id, name, buf) {
        ON CONFLICT (batch_id, name) DO UPDATE SET blob_hash=EXCLUDED.blob_hash, status=EXCLUDED.status,
           error=EXCLUDED.error, warnings=EXCLUDED.warnings, orientation=EXCLUDED.orientation`,
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
-    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags };
+    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf) };
   }
 }
 
@@ -1203,7 +1203,7 @@ async function reportsList({ status = 'open', limit = 50 } = {}) {
 
 module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
-  shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
+  flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
   productInput, insertProduct, updateProduct, productOut,
   search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
