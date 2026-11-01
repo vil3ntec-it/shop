@@ -304,6 +304,40 @@ const ax = await one('SELECT address FROM online_orders WHERE shop_id = $1 ORDER
 const aj = typeof ax.address === 'string' ? JSON.parse(ax.address) : ax.address;
 ok(aj.phone2 === '+93799888777' && aj.plusCode === '9G8F+6W کابل', 'CHK-08: شمارهٔ دوم و Plus Code در نشانیِ سفارش', JSON.stringify(aj));
 
+
+//  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه
+//  برگزیده نشده «ثبت» بسته، هزینه روی هزینهٔ ناحیه، و همان بازه و هزینه در سفارشِ سرور (جمعِ دیده‌شده = جمعِ سرور)
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+ok(await page.isHidden('#slot-box'), 'بی بازهٔ زمانی ⇒ همان فرم، بی «زمانِ تحویل»');
+const sr = await call('PUT', '/api/shop/storefront/delivery', { allowAsap: false, slotRules: [
+  { fulfillment: 'delivery', weekdays: [0, 1, 2, 3, 4, 5, 6], startMin: 1380, endMin: 1439, capacity: 5, cutoffMin: 0, feeMinor: 2000 },
+] }, T);
+ok(sr.status === 200, 'بازهٔ ارسال با هزینهٔ ۲۰ ذخیره شد', JSON.stringify(sr.body).slice(0, 120));
+await open();
+await toCheckout();
+await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
+await page.fill('#c-name', 'مشتریِ آزمایشی');
+await page.fill('#a-text', 'کارته‌سه، کوچهٔ چهارم');
+await page.waitForSelector('#slot-box:not([hidden]) #slot-pick option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+const fee0 = await text('#t-fee');
+ok(await page.isDisabled('#submit-order') && (await text('#slot-pick option:first-child')).includes('برگزینید'),
+  'بی «هرچه زودتر» و بی بازه ⇒ «ثبت» بسته', await text('#slot-pick option:first-child'));
+const slotVal = await page.locator('#slot-pick option:not([disabled])').nth(1).getAttribute('value');
+ok((await page.locator(`#slot-pick option[value="${slotVal}"]`).textContent()).includes('+۲۰'), 'گزینهٔ بازه هزینهٔ اضافه را می‌گوید');
+await page.selectOption('#slot-pick', slotVal);
+await page.waitForFunction((f) => document.getElementById('t-fee').textContent.trim() !== f, fee0, { timeout: 5000 });
+ok(true, 'هزینهٔ ارسال با بازه عوض شد', `${fee0} ⇐ ${await text('#t-fee')}`);
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+{
+  const o = await one('SELECT delivery, delivery_fee_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const dj = typeof o.delivery === 'string' ? JSON.parse(o.delivery) : o.delivery;
+  ok(dj && dj.slot && dj.slot.startsAt === Number(slotVal) && dj.slot.feeMinor === 2000 && Number(o.delivery_fee_minor) >= 2000,
+    'CHK-07: همان بازه و هزینهٔ ۲۰ ِ آن در سفارش، با جمعی که وب نشان داد', JSON.stringify(dj && dj.slot) + ' / ' + o.delivery_fee_minor);
+}
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 
