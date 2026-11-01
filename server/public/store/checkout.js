@@ -24,6 +24,8 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    //  CHK-07/10 (فقط با `store.delivery.zoned`): پینِ بیرون از محدوده ⇒ «دریافت از دکان» یا «خبرم کن»
+    var area = null;
 
     function fulfillment() {
       var r = document.querySelector('input[name="fulfillment"]:checked');
@@ -48,16 +50,19 @@
       var f = fulfillment();
       var sub = subtotal(); var fee = feeFor(f);
       $('t-subtotal').textContent = K.money(sub);
-      $('t-fee').textContent = f === 'delivery' ? (fee > 0 ? K.money(fee) : t('free')) : '—';
+      var unknown = f === 'delivery' && c.zones() && !c.zone;
+      $('t-fee').textContent = f === 'delivery' && !unknown ? (fee > 0 ? K.money(fee) : t('free')) : '—';
       $('t-fee-label').textContent = f === 'pickup' ? t('pickup') : t('ck.fee');
       $('t-total').textContent = K.money(sub + fee);
       $('address-box').hidden = f !== 'delivery';
-      var below = c.store.minOrderMinor > sub;
-      if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(c.store.minOrderMinor) })); else $('min-order').hidden = true;
+      var min = c.minFor(f);
+      var below = min > sub;
+      if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(min) })); else $('min-order').hidden = true;
+      renderZone(f);
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');
-      btn.disabled = closed() || !ids().length || !f || below || hasBad() || hasShort() || !ok;
+      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok;
       btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
     }
 
@@ -100,6 +105,40 @@
       }).then(function () { b.disabled = false; });
     }
 
+    function renderZone(f) {
+      var zs = c.zones(); var box = $('zone-box');
+      box.hidden = !(zs && f === 'delivery');
+      if (box.hidden) return;
+      var sel = $('zone-pick');
+      if (sel.options.length !== zs.length + 1) {
+        while (sel.options.length > 1) sel.remove(1);
+        zs.forEach(function (z) {
+          sel.appendChild(el('option', { attrs: { value: z.id }, text: t('zone.opt', { name: z.name, fee: z.feeMinor > 0 ? K.money(z.feeMinor) : t('free') }) }));
+        });
+      }
+      sel.value = c.zone ? c.zone.id : '';
+      $('zone-acts').hidden = !area;
+      $('zone-pickup').hidden = !(area && c.store.fulfillment.pickup);
+      $('zone-notify').hidden = !(area && area.notify && !area.done);
+      if (area) K.note($('zone-msg'), area.done ? 'ok' : 'warn', area.done ? t('zone.notified') : t('zone.out'));
+      else if (c.zone) K.note($('zone-msg'), 'ok', t('zone.in', { name: c.zone.name }));
+      else K.note($('zone-msg'), 'info', t('zone.need'));
+    }
+    //  «کدام ناحیه؟» از سرور، بی ذخیره؛ ناحیهٔ پین جای گزینشِ دستی را می‌گیرد
+    function locate() {
+      if (!pin || !c.zones()) return;
+      api('/delivery?lat=' + pin.lat + '&lng=' + pin.lng).then(function (r) {
+        area = r.zoned && !r.inZone ? { lat: pin.lat, lng: pin.lng, notify: Boolean(r.notifyArea) } : null;
+        c.setZone(r.zone || null);
+      }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); }).then(renderCheckout);
+    }
+    function notifyMe() {
+      if (!area) return;
+      if (!verifiedFor($('c-phone').value)) { K.note($('zone-msg'), 'warn', t('err.verification_required')); $('c-phone').focus(); return; }
+      api('/area-request', { method: 'POST', body: { lat: area.lat, lng: area.lng } }).then(function () {
+        area.done = true; renderCheckout();
+      }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); });
+    }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
       $('pin-text').textContent = t('pin.wait');
@@ -107,6 +146,7 @@
         pin = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
         $('pin-text').textContent = t('pin.ok', { m: K.fa(Math.round(pos.coords.accuracy || 0), 0) });
         $('pin-btn').textContent = t('pin.again');
+        locate();
       }, function () {
         pin = null;
         $('pin-text').textContent = t('pin.fail');
@@ -128,6 +168,8 @@
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
+        //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
+        else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
       }
       return body;
@@ -231,6 +273,17 @@
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
     $('pin-btn').addEventListener('click', takePin);
     $('checkout-form').addEventListener('submit', submitOrder);
+    $('zone-pick').addEventListener('change', function () {
+      var id = $('zone-pick').value;
+      //  گزینشِ دستی جای پین را می‌گیرد: سرور با پین ناحیه را از پین می‌گوید و پینِ ناجور سفارش را رد می‌کرد
+      pin = null; $('pin-text').textContent = t('pin.hint'); $('pin-btn').textContent = t('pin.btn');
+      c.setZone(id ? { id: id } : null); area = null; renderCheckout();
+    });
+    $('zone-pickup').addEventListener('click', function () {
+      var r = document.querySelector('input[name="fulfillment"][value="pickup"]');
+      if (r) { r.checked = true; renderCheckout(); }
+    });
+    $('zone-notify').addEventListener('click', notifyMe);
 
     return { open: openCheckout, render: renderCheckout };
   };

@@ -93,7 +93,7 @@
       if (s.notice) box.appendChild(el('span', { class: 'notice', text: s.notice }));
     }
     var meta = K.clear($('store-meta'));
-    if (store.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), store.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(store.deliveryFeeMinor) }) : t('ship.free')));
+    if (store.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), shipText()));
     if (store.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (store.minOrderMinor > 0) meta.appendChild(el('span', { text: t('min.order', { m: K.money(store.minOrderMinor) }) }));
     meta.appendChild(el('span', {}, K.icon('cash'), t('cod')));
@@ -263,7 +263,34 @@
   function ids() { return Object.keys(cart); }
   function subtotal() { return ids().reduce(function (s, id) { return s + K.lineTotal(cart[id].qtyMilli, cart[id].priceMinor); }, 0); }
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
-  function feeFor(f) { return f === 'delivery' && store ? store.deliveryFeeMinor : 0; }
+  // ── CHK-05/06/07/10 ناحیهٔ ارسال (`store.delivery.zoned`، پرچمِ `shop.storefront.zones`؛ خاموش ⇒ هزینه و حداقلِ ثابت).
+  //  ناحیه از پین (`/delivery`) یا گزینش؛ ندانسته ⇒ هزینه «پس از ناحیه» و سبد بسته نمی‌شود. حساب همان `forCheckout` ِ سرور.
+  var zone = null;
+  function zones() { return store && store.delivery && store.delivery.zoned ? store.delivery.zones : null; }
+  function setZone(z) {
+    var all = zones() || [];
+    zone = z && all.filter(function (x) { return x.id === z.id; })[0] || null;
+    K.saveS('zone:' + slug, zone && zone.id);
+  }
+  function zoneFee(z, sub) {
+    return (z.freeOverMinor !== null && sub >= z.freeOverMinor ? 0 : z.feeMinor) + (z.smallBasketFeeMinor && sub < z.minOrderMinor ? z.smallBasketFeeMinor : 0);
+  }
+  function feeFor(f) {
+    if (f !== 'delivery' || !store) return 0;
+    return zones() ? (zone ? zoneFee(zone, subtotal()) : 0) : store.deliveryFeeMinor;
+  }
+  /** حداقلی که سبد را می‌بندد؛ ناحیهٔ «هزینهٔ سبدِ کوچک» زیرِ حداقل را با هزینه می‌پذیرد (CHK-06) */
+  function minFor(f) {
+    if (!store) return 0;
+    if (f !== 'delivery' || !zones()) return store.minOrderMinor;
+    return zone && !zone.smallBasketFeeMinor ? zone.minOrderMinor : 0;
+  }
+  function shipText() {
+    var zs = zones();
+    if (!zs) return store.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(store.deliveryFeeMinor) }) : t('ship.free');
+    var low = Math.min.apply(null, zs.map(function (z) { return z.feeMinor; }));
+    return low > 0 ? t('ship.from', { fee: K.money(low) }) : t('ship.free');
+  }
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
   function short(id) { return cap[id] > 0 && cart[id].qtyMilli > cap[id]; }
   function hasShort() { return ids().some(short); }
@@ -327,14 +354,26 @@
     var sub = subtotal();
     var f = defaultFulfillment();
     var fee = feeFor(f);
+    var min = minFor(f);
+    var unknown = f === 'delivery' && zones() && !zone;
     var d = K.clear($('sheet-deliv'));
     var txt = el('div', { class: 'txt' },
-      el('b', {}, f === 'delivery' ? t('ship') : t('pickup'), el('span', { text: fee > 0 ? K.money(fee) : t('free') })));
-    if (store && store.minOrderMinor > sub) {
-      var pct = Math.min(100, Math.round(sub * 100 / store.minOrderMinor));
-      txt.appendChild(el('p', { text: t('min.left', { left: K.money(store.minOrderMinor - sub), m: K.money(store.minOrderMinor) }) }));
+      el('b', {}, f === 'delivery' ? t('ship') : t('pickup'), el('span', { text: unknown ? '—' : fee > 0 ? K.money(fee) : t('free') })));
+    var progress = function (to, label) {
+      var pct = Math.min(100, Math.round(sub * 100 / to));
       var bar = el('i'); bar.style.setProperty('width', pct + '%');
-      txt.appendChild(el('div', { class: 'progress', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': t('min.progress') } }, bar));
+      txt.appendChild(el('div', { class: 'progress', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': label } }, bar));
+    };
+    if (unknown) {
+      txt.appendChild(el('p', { text: t('zone.after') }));
+    } else if (min > sub) {
+      txt.appendChild(el('p', { text: t('min.left', { left: K.money(min - sub), m: K.money(min) }) }));
+      progress(min, t('min.progress'));
+    } else if (f === 'delivery' && zone && zone.smallBasketFeeMinor && sub < zone.minOrderMinor) {
+      txt.appendChild(el('p', { text: t('zone.small', { fee: K.money(zone.smallBasketFeeMinor), m: K.money(zone.minOrderMinor) }) }));
+    } else if (f === 'delivery' && zone && zone.freeOverMinor !== null && sub < zone.freeOverMinor && fee > 0) {
+      txt.appendChild(el('p', { text: t('zone.free.left', { left: K.money(zone.freeOverMinor - sub) }) }));
+      progress(zone.freeOverMinor, t('zone.free.progress'));
     } else if (f === 'delivery' && store.fulfillment.pickup) {
       txt.appendChild(el('p', { text: t('pickup.hint') }));
     }
@@ -344,7 +383,7 @@
     if (closed()) block = accept();
     else if (hasBad()) block = t('cart.bad');
     else if (hasShort()) block = t('cart.short');
-    else if (store && store.minOrderMinor > sub) block = t('cart.min');
+    else if (minFor(f) > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
     $('cart-next').disabled = Boolean(block) || ids().length === 0;
@@ -384,7 +423,8 @@
     }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
-        ids: ids, subtotal: subtotal, feeFor: feeFor, defaultFulfillment: defaultFulfillment, hasBad: hasBad,
+        ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; },
+        defaultFulfillment: defaultFulfillment, hasBad: hasBad,
         short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
         empty: function () { cart = {}; cap = {}; saveCart(); },
@@ -543,7 +583,8 @@
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;
       $('opt-pickup').hidden = !store.fulfillment.pickup;
-      $('opt-delivery-fee').textContent = store.deliveryFeeMinor > 0 ? K.money(store.deliveryFeeMinor) : t('free');
+      $('opt-delivery-fee').textContent = zones() ? shipText() : store.deliveryFeeMinor > 0 ? K.money(store.deliveryFeeMinor) : t('free');
+      setZone({ id: K.loadS('zone:' + slug) });
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
