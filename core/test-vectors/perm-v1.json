@@ -1,7 +1,7 @@
 {
   "_doc": "STF-01..03 — هستهٔ سنجشِ مجوز. همین فایل را license/perm-core.js (و نسخهٔ سرور) و PermCore.kt می‌دوانند. defaults = رفتارِ امروز (MATRIX سرور + ShopRole برنامه). returns.create و «نیازمند تأیید» برای شاگرد و discount_bp: برگهٔ امضاشده (بخشِ ۱۰.۱).",
   "version": 1,
-  "keys": ["audit.view", "drawer.open", "reports.money", "returns.create", "sales.cancel", "sales.discount", "settings.write"],
+  "keys": ["audit.view", "drawer.open", "reports.money", "returns.create", "sales.cancel", "sales.discount", "settings.write", "shift.report"],
   "defaults": [
     { "role": "owner", "key": "sales.discount", "out": "allow" },
     { "role": "manager", "key": "sales.discount", "out": "allow" },
@@ -26,7 +26,10 @@
     { "role": "staff", "key": "returns.create", "out": "allow" },
     { "role": "owner", "key": "drawer.open", "out": "allow" },
     { "role": "manager", "key": "drawer.open", "out": "allow" },
-    { "role": "staff", "key": "drawer.open", "out": "deny" }
+    { "role": "staff", "key": "drawer.open", "out": "deny" },
+    { "role": "owner", "key": "shift.report", "out": "allow" },
+    { "role": "manager", "key": "shift.report", "out": "allow" },
+    { "role": "staff", "key": "shift.report", "out": "allow" }
   ],
   "resolve": [
     { "role": "staff", "layers": [], "key": "sales.discount", "out": { "mode": "deny", "caps": {} } },
@@ -54,7 +57,10 @@
     { "role": "staff", "layers": [{ "sales.discount": { "mode": "allow", "caps": { "maxPct": 5 } } }], "key": "sales.discount", "out": { "mode": "deny", "caps": { "maxPct": 5 } } },
     { "role": "staff", "layers": [{ "settings.write": { "mode": "approve" } }], "key": "settings.write", "out": { "mode": "deny", "caps": {} } },
     { "role": "staff", "layers": [{ "returns.create": { "caps": { "maxAmount": 50000 } } }], "key": "returns.create", "out": { "mode": "allow", "caps": { "maxAmount": 50000 } } },
-    { "role": "manager", "layers": [{ "returns.create": { "mode": "approve" } }], "key": "returns.create", "out": { "mode": "approve", "caps": {} } }
+    { "role": "manager", "layers": [{ "returns.create": { "mode": "approve" } }], "key": "returns.create", "out": { "mode": "approve", "caps": {} } },
+    { "role": "staff", "layers": [{ "shift.report": { "mode": "deny" } }], "key": "shift.report", "out": { "mode": "deny", "caps": {} } },
+    { "role": "staff", "layers": [{ "shift.report": { "mode": "approve" } }], "key": "shift.report", "out": { "mode": "deny", "caps": {} } },
+    { "role": "manager", "layers": [], "key": "shift.report", "out": { "mode": "allow", "caps": {} } }
   ],
   "evaluate": [
     { "role": "manager", "layers": [{ "sales.discount": { "caps": { "maxPct": 5 } } }], "key": "sales.discount", "req": { "pct": 5 }, "out": { "decision": "allow", "reason": "ok" } },
@@ -76,7 +82,9 @@
     { "role": "staff", "layers": [{ "returns.create": { "caps": { "maxAmount": 50000 } } }], "key": "returns.create", "req": { "amount": 50001 }, "out": { "decision": "approve", "reason": "over_cap", "cap": "maxAmount", "limit": 50000 } },
     { "role": "owner", "layers": [{ "returns.create": { "mode": "deny" } }], "key": "returns.create", "req": { "amount": 99999999 }, "out": { "decision": "allow", "reason": "ok" } },
     { "role": "staff", "layers": [], "key": "drawer.open", "req": null, "out": { "decision": "deny", "reason": "denied" } },
-    { "role": "staff", "layers": [{ "drawer.open": { "mode": "approve" } }], "key": "drawer.open", "req": null, "out": { "decision": "approve", "reason": "needs_approval" } }
+    { "role": "staff", "layers": [{ "drawer.open": { "mode": "approve" } }], "key": "drawer.open", "req": null, "out": { "decision": "approve", "reason": "needs_approval" } },
+    { "role": "staff", "layers": [], "key": "shift.report", "req": null, "out": { "decision": "allow", "reason": "ok" } },
+    { "role": "staff", "layers": [{ "shift.report": { "mode": "deny" } }], "key": "shift.report", "req": null, "out": { "decision": "deny", "reason": "denied" } }
   ],
   "effective": [
     {
@@ -89,7 +97,8 @@
         "returns.create": { "mode": "allow", "caps": {} },
         "sales.cancel": { "mode": "allow", "caps": {} },
         "sales.discount": { "mode": "allow", "caps": { "maxPct": 7 } },
-        "settings.write": { "mode": "deny", "caps": {} }
+        "settings.write": { "mode": "deny", "caps": {} },
+        "shift.report": { "mode": "allow", "caps": {} }
       }
     }
   ],
@@ -120,7 +129,9 @@
     { "role": "staff", "key": "sales.cancel", "override": { "mode": "approve" }, "out": null },
     { "role": "staff", "key": "sales.discount", "override": { "mode": "allow" }, "out": "exceeds_role" },
     { "role": "staff", "key": "returns.create", "override": { "mode": "approve", "caps": { "maxAmount": 1000 } }, "out": null },
-    { "role": "staff", "key": "returns.create", "override": { "caps": { "maxPct": 5 } }, "out": "unknown_cap" }
+    { "role": "staff", "key": "returns.create", "override": { "caps": { "maxPct": 5 } }, "out": "unknown_cap" },
+    { "role": "staff", "key": "shift.report", "override": { "mode": "deny" }, "out": null },
+    { "role": "staff", "key": "shift.report", "override": { "mode": "approve" }, "out": "not_approvable" }
   ],
   "discount_bp": [
     { "discount": 0, "total": 10000, "out": 0 },
