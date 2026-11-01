@@ -603,7 +603,7 @@ private fun OrderDetailSheet(
       SumRow("جمعِ کل", "${OrderText.money(o.totalMinor)} افغانی", bold = true)
 
       //  خطِ زمانی (ORD-16): هر تغییر با زمان، کننده و دلیل
-      Section("خطِ زمانی")
+      OrderNoticesSection(o, cfg, repo, ::orderStamp) { m -> scope.launch { snackbar.showSnackbar(m) } }; Section("خطِ زمانی")   // + پیام‌ها و «فرستادنِ دوباره» (ORD-16)
       o.events.forEach { e ->
         Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
           Box(Modifier.padding(top = 6.dp).size(8.dp).clip(CircleShape).background(c.primary))
@@ -614,7 +614,7 @@ private fun OrderDetailSheet(
               when (e.kind) {
                 "created" -> "ثبت شد"
                 "cod" -> "نقد: ${OrderText.COD[e.toStatus] ?: e.toStatus}"
-                else -> orderDelayEventTitle(e, cfg.delay != null, ::orderStamp) ?: "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
+                else -> orderDelayEventTitle(e, cfg.delay != null, ::orderStamp) ?: orderNoticeEventTitle(e, cfg.noticeResend != null) ?: "${OrderText.status(e.fromStatus)} ← ${OrderText.status(e.toStatus)}"
               },
               color = c.text, fontWeight = FontWeight.SemiBold,
             )

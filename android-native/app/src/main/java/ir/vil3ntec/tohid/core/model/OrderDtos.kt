@@ -52,6 +52,38 @@ data class OrdersConfigDto(
   val presence: Boolean = false,
   /** ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (پرچمِ `shop.orders.bulk`؛ خاموش ⇒ کلید نیست) */
   val bulk: Boolean = false,
+  /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
+  val noticeResend: OrderNoticeResendCfgDto? = null,
+)
+
+/** `noticeResend` ِ `/config` (`notice-resend.configOf`) */
+@Serializable
+data class OrderNoticeResendCfgDto(
+  val statuses: List<String> = emptyList(),
+  val maxResends: Int = 0,
+)
+
+/** `GET /shop/orders/:id/notices` — پیام‌های وضعیت به مشتری (NTF-01/04)، بی شماره، متن یا لینک */
+@Serializable
+data class OrderNoticesDto(
+  val enabled: Boolean = false,
+  val eligible: Boolean = false,
+  val channels: Map<String, String> = emptyMap(),
+  val items: List<OrderNoticeDto> = emptyList(),
+)
+
+@Serializable
+data class OrderNoticeDto(
+  val id: String = "",
+  val event: String = "",
+  val lang: String = "",
+  val status: String = "",
+  val channel: String = "",
+  val attempts: Int = 0,
+  val nextAttemptAt: Long? = null,
+  val sentAt: Long? = null,
+  val createdAt: Long = 0,
+  val updatedAt: Long = 0,
 )
 
 /** `POST /shop/orders/bulk/transition` — نتیجهٔ هر سفارش جدا و به همان ترتیب (`order-bulk.transition`) */
@@ -151,6 +183,8 @@ data class OrderEventDetailDto(
   val type: String = "",
   val prevReadyAt: Long? = null,
   val scheduledFor: Long? = null,
+  /** `notice_resend` (ORD-16): رویدادِ پیامی که دوباره فرستاده شد */
+  val event: String = "",
 )
 
 @Serializable

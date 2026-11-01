@@ -3,6 +3,8 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.model.HandoverPageDto
 import ir.vil3ntec.tohid.core.model.OrderBulkOutDto
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderNoticeDto
+import ir.vil3ntec.tohid.core.model.OrderNoticesDto
 import ir.vil3ntec.tohid.core.model.OrderPageDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.OrdersSummaryDto
@@ -131,6 +133,19 @@ class OrdersRepository(private val api: ApiClient) {
       if (readyInMinutes != null) put("readyInMinutes", readyInMinutes)
     }
     ApiJson.decode<OrderBulkOutDto>(api.post("$ROOT/bulk/transition", body))
+  }
+
+  /** ORD-16 پیام‌های وضعیت به مشتریِ همین سفارش (`GET /:id/notices`) */
+  suspend fun notices(id: String): ApiResult<OrderNoticesDto> =
+    result { ApiJson.decode<OrderNoticesDto>(api.get("$ROOT/${enc(id)}/notices")) }
+
+  /**
+   *  ORD-16 «فرستادنِ دوباره» (`POST /:id/notices/:noticeId/resend`، پرچمِ `shop.orders.notice_resend`): همان ردیف
+   *  دوباره در صف؛ [key] یک بار برای هر دکمه ⇒ دو کلیک یا قطعِ نت پس از ثبت دو بار نمی‌فرستد.
+   */
+  suspend fun resendNotice(id: String, noticeId: String, key: String): ApiResult<OrderNoticeDto> = result {
+    val out = api.post("$ROOT/${enc(id)}/notices/${enc(noticeId)}/resend", buildJsonObject { put("clientKey", key) })
+    ApiJson.decodeAt<OrderNoticeDto>(out, "notice") ?: throw ApiFailure.InvalidResponse()
   }
 
   private fun order(body: JsonObject): OrderDto =

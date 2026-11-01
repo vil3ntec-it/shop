@@ -80,6 +80,8 @@ router.get('/config', async (req, res) => {
     ...((await amend.flagOf(req.shopId)) ? { amend: amend.configOf() } : {}),
     //  ORD-19 کارِ گروهی (پرچمِ `shop.orders.bulk`) — خاموش ⇒ کلید نیست و برنامه انتخابِ چندتایی نمی‌سازد
     ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
+    //  ORD-16 «فرستادنِ دوبارهٔ» پیامِ نرفته (پرچمِ `shop.orders.notice_resend`) — خاموش ⇒ کلید نیست
+    ...((await require('../lib/notice-resend').flagOf(req.shopId)) ? { noticeResend: require('../lib/notice-resend').configOf() } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,
@@ -182,6 +184,34 @@ router.get('/:id/notices', needFlag, async (req, res) => {
   const out = await require('../lib/customer-notify').forOrder(req.shopId, req.params.id);
   if (!out) throw notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
+});
+
+/**
+ * ORD-16 — «فرستادنِ دوبارهٔ» پیامِ نرفتهٔ همین سفارش (`lib/notice-resend.js`)، پشتِ پرچمِ خاموشِ
+ * `shop.orders.notice_resend`، با `orders.manage` و اشتراک (SUB-10). کلیدِ یکتایی لازم است (تکرار ⇒ همان پاسخ).
+ */
+router.post('/:id/notices/:noticeId/resend', needFlag, requirePermission('orders.manage'), needWrite, async (req, res) => {
+  const nr = require('../lib/notice-resend');
+  if (!(await nr.flagOf(req.shopId))) throw forbidden('فرستادنِ دوبارهٔ پیام برای این دکان روشن نیست', 'notice_resend_disabled');
+  const key = orders.clientKeyOf(req);
+  let out;
+  try {
+    out = await nr.resend(req.shopId, req.params.id, req.params.noticeId, { key, actor: actorOf(req) });
+  } catch (err) {
+    if (err.status === 409 && err.code !== 'idempotency_key_reused') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, current: err.current, max: err.max } });
+    }
+    throw err;
+  }
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.notice_resend', targetType: 'online_order', targetId: String(req.params.id),
+      detail: { orderNo: out.orderNo, noticeId: out.notice.id, event: out.notice.event, prevStatus: out.prevStatus },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ notice: out.notice, replayed: out.replayed });
 });
 
 /**
