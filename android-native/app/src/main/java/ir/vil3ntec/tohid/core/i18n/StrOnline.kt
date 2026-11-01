@@ -826,11 +826,11 @@ object StrOnline {
   private val DESK_EN = mapOf(
     DeskActions.Act.PICKUP_HANDOVER to "Hand over with code", DeskActions.Act.NEW_CODE to "New code", DeskActions.Act.WITHDRAW to "Withdraw",
     DeskActions.Act.HAND_TO_COMPANY to "Handed to company", DeskActions.Act.DELIVER to "Delivered", DeskActions.Act.FAIL to "Failed",
-    DeskActions.Act.RETRY to "Retry", DeskActions.Act.RETURN to "Parcel returned", DeskActions.Act.RECALL to "Recall",
+    DeskActions.Act.RETRY to "Retry", DeskActions.Act.RETURN to "Parcel returned", DeskActions.Act.RECALL to "Recall", DeskActions.Act.FIX_ADDRESS to "Fix address",
   )
   private val DESK_PS = mapOf(
     DeskActions.Act.PICKUP_HANDOVER to "په کوډ سپارل", DeskActions.Act.NEW_CODE to "نوی کوډ", DeskActions.Act.WITHDRAW to "بېرته اخیستل",
     DeskActions.Act.HAND_TO_COMPANY to "شرکت ته ورکړل شو", DeskActions.Act.DELIVER to "وسپارل شو", DeskActions.Act.FAIL to "ناکام",
-    DeskActions.Act.RETRY to "بیا هڅه", DeskActions.Act.RETURN to "بسته راستنه شوه", DeskActions.Act.RECALL to "بېرته غوښتل",
+    DeskActions.Act.RETRY to "بیا هڅه", DeskActions.Act.RETURN to "بسته راستنه شوه", DeskActions.Act.RECALL to "بېرته غوښتل", DeskActions.Act.FIX_ADDRESS to "پته سمول",
   )
 }

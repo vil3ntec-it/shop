@@ -1006,12 +1006,15 @@ fun SettingsScreen(
             Spacer(Modifier.height(8.dp))
             Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
           }
-          Spacer(Modifier.height(12.dp))
-          TohidDangerButton(
-            text = StrSettings.wipeAll,
-            onClick = { confirmClear = true },
-            modifier = Modifier.fillMaxWidth(),
-          )
+          //  پاک‌سازیِ کامل دفترِ دکان را روی همهٔ دستگاه‌ها و سرور خالی می‌کند ⇒ فقط صاحبِ دکان (نه مدیر)، دو مرحله (`WipeAllDialog`)
+          if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER) {
+            Spacer(Modifier.height(12.dp))
+            TohidDangerButton(
+              text = StrSettings.wipeAll,
+              onClick = { confirmClear = true },
+              modifier = Modifier.fillMaxWidth(),
+            )
+          }
         }
       }
     }

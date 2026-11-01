@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.DeliveryWire
 import ir.vil3ntec.tohid.ui.OrdersLive
+import ir.vil3ntec.tohid.ui.screens.AddressFixDialog
 import ir.vil3ntec.tohid.ui.screens.DeliveryGate
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
@@ -152,6 +153,11 @@ internal fun RouteScope.MissionActionRoute() {
   val act = DeskActions.Act.entries.firstOrNull { it.name == args.query("act") }
   LaunchedEffect(m, act) { if (m == null || act == null) back() }
   if (m == null || act == null) return
+  //  DLV-09: «اصلاحِ نشانی» فرمِ خودش را دارد (نه گذارِ وضعیت) — همان فرمِ میزِ امروز
+  if (act == DeskActions.Act.FIX_ADDRESS) {
+    AddressFixDialog(m, DeliveryGate.repository(context), onDismiss = { back() }, onDone = { msg -> Haptics.success(context); finished(msg) })
+    return
+  }
   MissionActionSheet(
     m, act, cfg, DeliveryGate.repository(context),
     onDismiss = { back() },
