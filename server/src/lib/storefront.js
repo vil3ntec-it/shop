@@ -556,18 +556,8 @@ function macOf(shopId, orderId) {
   return crypto.createHmac('sha256', tokenKey()).update(`${shopId}\n${orderId}`).digest('base64url').slice(0, 32);
 }
 
-function tokenOf(shopId, orderId) {
-  return `${orderId}.${macOf(shopId, orderId)}`;
-}
-
-/** شناسهٔ سفارش از توکن — یا null (زمان‌ثابت). */
-function orderIdOf(shopId, token) {
-  const m = /^([0-9A-Z]{26})\.([A-Za-z0-9_-]{32})$/.exec(String(token || ''));
-  if (!m) return null;
-  const a = Buffer.from(m[2]);
-  const b = Buffer.from(macOf(shopId, m[1]));
-  return a.length === b.length && crypto.timingSafeEqual(a, b) ? m[1] : null;
-}
+//  TEN-03: لینکِ پیگیریِ زمان‌دار و باطل‌شدنی — `lib/storefront-links.js` (شرح همان‌جا)
+const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
 
 /**
  * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
@@ -630,23 +620,23 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
   const price = require('./order-rate').guard(pricer(sf.shop_id, sf, input, { zonesOn }), { shopId: sf.shop_id, phone: verified });
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price });
+  //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
+  const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
   return {
-    order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id)), replayed: out.replayed,
+    order: publicOrder(out.order, tokenOf(sf.shop_id, out.order.id, link)), replayed: out.replayed,
     orderId: out.order.id,
   };
 }
 
 async function track(sf, token) {
-  const id = orderIdOf(sf.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
   return require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)));
 }
 
 async function cancel(sf, token) {
-  const id = orderIdOf(sf.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
   try {
@@ -770,14 +760,15 @@ async function myOrders(sf, ticket, session = '') {
   const phone = await verifiedPhone(ticket, session);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای دیدنِ سفارش‌ها، شمارهٔ خود را تأیید کنید');
   const rows = await many(
-    `SELECT id, order_no, status, total_minor, items_count, created_at FROM online_orders
+    `SELECT id, order_no, status, total_minor, items_count, created_at, track_gen FROM online_orders
       WHERE shop_id = $1 AND source = 'storefront' AND customer_phone = $2
       ORDER BY created_at DESC, id DESC LIMIT 20`,
     [sf.shop_id, phone]
   );
+  const on = await linkPolicyOn(sf.shop_id);
   return rows.map((r) => ({
     orderNo: Number(r.order_no), status: r.status, totalMinor: Number(r.total_minor),
-    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: tokenOf(sf.shop_id, r.id),
+    itemsCount: Number(r.items_count), createdAt: Number(r.created_at), token: listTokenOf(sf.shop_id, r, on),
   }));
 }
 
@@ -797,7 +788,7 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
   }
   params.push(lim + 1);
   const rows = await many(
-    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at FROM online_orders
+    `SELECT id, order_no, status, fulfillment, total_minor, items_count, scheduled_for, created_at, track_gen FROM online_orders
       WHERE ${where} ORDER BY created_at DESC, id DESC LIMIT $${params.length}`,
     params
   );
@@ -809,13 +800,14 @@ async function ordersOfPhone(sf, phone, { cursor, limit } = {}) {
     [sf.shop_id, page.map((r) => r.id)]
   ) : [];
   const last = page[page.length - 1];
+  const on = await linkPolicyOn(sf.shop_id);
   return {
     orders: page.map((r) => ({
       orderNo: Number(r.order_no), status: r.status, fulfillment: r.fulfillment, totalMinor: Number(r.total_minor),
       itemsCount: Number(r.items_count), createdAt: Number(r.created_at),
       scheduledFor: r.scheduled_for === null ? null : Number(r.scheduled_for),
       preview: names.filter((n) => n.order_id === r.id).map((n) => n.name),
-      token: tokenOf(sf.shop_id, r.id),
+      token: listTokenOf(sf.shop_id, r, on),
     })),
     nextCursor: more ? `${Number(last.created_at)}.${last.id}` : null,
   };
@@ -1143,7 +1135,7 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct,
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
