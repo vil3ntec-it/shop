@@ -123,6 +123,8 @@ object StrSale {
   // فاکتورِ چاپی
   val storeFallback: String get() = t("فروشگاه", "Shop", "دوکان")
   fun saleInvoiceNo(n: Any): String = t("فاکتور فروش #$n", "Sales invoice #$n", "د پلور بل #$n")
+  /** LOC-01: ردیفِ تاریخِ قمری زیرِ تاریخِ فاکتور (فقط با تنظیمِ دکان) */
+  fun hijriDate(d: Any): String = t("قمری: $d", "Hijri: $d", "قمري: $d")
   val cancelled: String get() = t("لغوشده", "Cancelled", "لغوه شوی")
   fun returned(q: Any): String = t("مرجوعی: $q", "Returned: $q", "بېرته راګرځېدلي: $q")
   val itemsTotal: String get() = t("جمع اقلام", "Items total", "د توکو ټول")

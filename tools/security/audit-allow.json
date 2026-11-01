@@ -1,0 +1,4 @@
+{
+  "_doc": "استثناهای npm audit — docs/security/supply-fa.md. هر سطر: id (GHSA-…)، reason، until (YYYY-MM-DD، اجباری؛ پس از آن دوباره سد). فقط وقتی اصلاحی نیست و خطر سنجیده شده.",
+  "allow": []
+}

@@ -476,7 +476,7 @@
     b.addEventListener('click', function (e) { e.stopPropagation(); onAdd(p); });
     return b;
   };
-  K.photo = function (slug, id) { return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/photo'; };
+  K.photo = function (slug, id) { return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/thumb'; };
   /** o = { href | onOpen, photo (نشانی), qty, onAdd, shop: نامِ دکان روی کارت } */
   K.productCard = function (p, o) {
     var el = K.el;
