@@ -441,11 +441,11 @@ async function seedShop(a) {
   assert.equal(promo.status, 200, JSON.stringify(promo.body));
 
   //  سفارشِ خرید (PUR-02/04): فرستاده و با یک رسید — شناسه را سرور می‌سازد
-  const po = await h.post('/api/shop/purchase-orders',
+  const pur = await h.post('/api/shop/purchase-orders',
     { supplierId: 'sup-a', supplierName: 'تأمین‌کنندهٔ الف', lines: [{ productId: 'p-a', name: 'کالای الف', qtyMilli: 5000, priceMinor: 1000 }] },
     { token: a.accessToken, headers: { 'Idempotency-Key': fresh('po-a') } });
-  assert.equal(po.status, 201, JSON.stringify(po.body));
-  ids.purchaseOrder = po.body.order.id;
+  assert.equal(pur.status, 201, JSON.stringify(pur.body));
+  ids.purchaseOrder = pur.body.order.id;
   assert.equal((await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/send`, {}, { token: a.accessToken })).status, 200);
   const rc = await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/receipts`,
     { id: 'inv-receipt-a1', lines: [{ lineId: 'l1', receivedMilli: 1000 }] }, { token: a.accessToken });
