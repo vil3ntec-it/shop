@@ -1,0 +1,16 @@
+{
+  "fav.title": "Favourites",
+  "fav.sheet": "Add to favourites",
+  "fav.sheet.on": "In favourites — remove",
+  "list.title": "Shopping list",
+  "list.hint": "What you buy every time; price and stock are always today's, and the list stays on this device only.",
+  "list.save": "Save cart as the list",
+  "list.add": "Add all to cart",
+  "list.clear": "Clear the list",
+  "list.saved": "Cart saved as your shopping list.",
+  "list.cleared": "Shopping list cleared.",
+  "list.remove": "Remove {name} from the shopping list",
+  "bn.title": "Shop announcements",
+  "bn.product": "View product",
+  "bn.category": "View category"
+}

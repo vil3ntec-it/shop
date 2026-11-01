@@ -19,5 +19,22 @@
   "ck.plus.l": "Plus Code (optional)",
   "ck.plus.ph": "e.g. 9G8F+6W Kabul",
   "err.bad_plus_code": "The Plus Code is not valid, e.g. 9G8F+6W Kabul.",
-  "err.bad_phone2": "The second phone number is not valid."
+  "err.bad_phone2": "The second phone number is not valid.",
+  "slot.l": "Delivery time",
+  "slot.asap": "As soon as possible",
+  "slot.pick": "Choose a time slot",
+  "slot.opt": "{d}, {h}",
+  "slot.fee": "(+{m})",
+  "slot.full": "full",
+  "slot.few": "few left",
+  "slot.none": "No free slot in the coming days; check back later or choose the other option.",
+  "err.slot_required": "Please choose a time slot.",
+  "err.slot_unavailable": "This slot is no longer available; please choose another.",
+  "err.slot_full": "This slot just filled up; please choose another.",
+  "ck.tender.l": "Which banknote will you pay with? (optional, so the courier brings change)",
+  "ck.tender.none": "No change needed",
+  "ck.tender.opt": "{m} — change: {c}",
+  "err.cash_tender_short": "The banknote is less than the order total; please choose again.",
+  "err.cash_tender_excess": "The change would be more than one 1000 note; choose a smaller banknote.",
+  "err.bad_cash_tender": "The banknote amount is not valid; please choose again."
 }

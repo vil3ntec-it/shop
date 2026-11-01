@@ -548,9 +548,49 @@ if (axeSrc) {
 }
 
 /* ══════════════════════ ۳) کارمند — ORD-17 ══════════════════════ */
+/* ══════════════════════ ۲-پ) CHK-10: فهرستِ «خبرم کن» ِ ویترین (license/area-requests.js) ══════════════════════ */
+const areaLoaded = () => page.evaluate(() => performance.getEntriesByType('resource').some((e) => /area-requests\.js/.test(e.name)));
+await step('CHK-10 بی پرچمِ notify_area: area-requests.js بار نمی‌شود و دکمهٔ «خبرم کن» نیست', async () => {
+  for (let i = 0; i < 2; i++) await page.keyboard.press('Escape');
+  assert.equal(await areaLoaded(), false);
+  assert.equal(await page.locator('#ord-area-btn').count(), 0);
+});
+
+await step('CHK-10: «خبرم کن» — شماره فقط برای محلِ پوشیده، تقاضای بیرون بی شماره، «خبر دادم» ردیف را پاک می‌کند', async () => {
+  await liveConfig.set(String(shopOn), 'shop.storefront.zones', true);
+  await liveConfig.set(String(shopOn), 'shop.storefront.notify_area', true);
+  const z = await call('PUT', '/api/v1/shop/storefront/delivery', { zones: [{ name: 'کارته‌سه', kind: 'polygon',
+    polygon: [[34.50, 69.12], [34.50, 69.22], [34.56, 69.22], [34.56, 69.12]], feeMinor: 3000, minOrderMinor: 0 }] }, owner.accessToken);
+  assert.equal(z.status, 200, JSON.stringify(z.body));
+  const t0 = Date.now();
+  for (const [id, phone, lat, lng] of [['01HAREAWEB0000000000000001', '+93791200077', 34.53, 69.17], ['01HAREAWEB0000000000000002', '+93791200078', 34.70, 69.40]]) {
+    await query(`INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at)
+      VALUES ($1,$2,$3,$4,$5,$6,$6)`, [id, String(shopOn), phone, lat, lng, t0]);
+  }
+  await page.evaluate(() => window.TohidOrders.refreshConfig());
+  await page.waitForSelector('#ord-area-btn', { timeout: 10000 });
+  await page.waitForFunction(() => document.getElementById('ord-area-n')?.textContent.trim() === '۱', null, { timeout: 10000 });
+  await page.click('#ord-area-btn');
+  await page.waitForSelector('#ord-area-modal.open .ord-area-row');
+  const body = await page.locator('#ord-area-body').innerText();
+  assert.ok(body.includes('+93791200077') && !body.includes('+93791200078'), `شمارهٔ بیرون نباید برسد: ${body}`);
+  assert.match(body, /هنوز بیرون از ناحیه‌ها/);
+  assert.match(body, /سرور چیزی نمی‌فرستد/);
+  assert.equal(await page.locator('#ord-area-body a[href="tel:+93791200077"]').count(), 1);
+  await page.click('[data-area-done="01HAREAWEB0000000000000001"]');
+  await page.waitForFunction(() => !document.querySelector('#ord-area-body .ord-area-row'), null, { timeout: 10000 });
+  assert.match(await page.locator('#ord-area-body').innerText(), /کسی برای خبر دادن نیست/);
+  assert.deepEqual((await many('SELECT id FROM storefront_area_requests WHERE shop_id = $1', [String(shopOn)])).map((r) => r.id), ['01HAREAWEB0000000000000002']);
+  assert.equal(await page.locator('#ord-area-n').isHidden(), true, 'نشانِ شمار پس از خبر دادن می‌رود');
+  await page.click('#ord-area-modal [data-area-close]');
+  await page.waitForFunction(() => !document.querySelector('#ord-area-modal.open'));
+});
+
 await step('کارمند (۳۹۰ پیکسل): شمارهٔ نقاب‌دار، بی دکمهٔ تماس؛ دکمه‌های گذار هست؛ بی بیرون‌زدگی', async () => {
   const s = await openAs(staff, { width: 390, hash: '#orders' });
   await s.page.waitForSelector('#page-orders.active', { timeout: 10000 });
+  //  CHK-10: فهرستِ «خبرم کن» (شمارهٔ مشتری) فقط صاحب و مدیر — پرچم روشن است ولی کارمند نه دکمه دارد نه افزونه
+  assert.equal(await s.page.locator('#ord-area-btn').count(), 0, 'کارمند ⇒ بی «خبرم کن»');
   await s.page.click('#ord-tabs [data-tab="new"]');
   await s.page.locator('.ord-card').first().waitFor();
   assert.equal(await s.page.locator('#ord-view').isVisible(), false, 'گوشی همیشه کارتی است، بی کلیدِ نما');

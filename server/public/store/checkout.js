@@ -33,6 +33,79 @@
     var promos;                 // undefined = در راه، false = خاموش، وگرنه پاسخِ GET /promos
     var code = '';              // کدی که مشتری زد
     var quoted = null; var qKey = ''; var qTimer = null; var skew = 0;
+
+    // ── CHK-07/12: زمانِ تحویل (فقط با `store.delivery.scheduling[روش]`، پرچمِ `shop.storefront.zones`) ──
+    //  بازه‌ها، ظرفیت و هزینهٔ بازه فقط از `GET /slots`؛ هزینهٔ بازهٔ «ارسال» روی هزینهٔ ناحیه می‌آید («رایگان از…» آن را
+    //  برنمی‌دارد) و در `expectedTotalMinor` می‌رود. «هرچه زودتر» فقط با `allowAsap`؛ نبود ⇒ تا بازه برگزیده نشده «ثبت» بسته.
+    //  پاسخِ `slot_*` ِ سرور ⇒ بازه‌های تازهٔ همان پاسخ. خاموش ⇒ همان فرمِ امروز، بی `slotStartsAt`.
+    var LOC = K.lang === 'en' ? 'en-GB' : 'fa-AF';
+    var slots = {};             // روش ⇒ undefined = نخواسته، null = در راه، false = نیامد، وگرنه پاسخِ GET /slots
+    var slotAt = 0;             // `startsAt` ِ برگزیده؛ ۰ = هرچه زودتر / هیچ
+    var drawn = null;
+
+    // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
+    //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
+    //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
+    var NOTE_MINOR = 100000; var tender = 0;
+    function tenders(total) {
+      var out = [];
+      [10000, 50000, 100000].forEach(function (u) {
+        var x = Math.ceil(total / u) * u;
+        if (x === total) x += u;
+        if (x - total < NOTE_MINOR && out.indexOf(x) < 0) out.push(x);
+      });
+      return out.sort(function (a, b) { return a - b; });
+    }
+    function renderTender(f, total) {
+      var on = Boolean(c.store.features && c.store.features.deliveryPrefs) && f === 'delivery';
+      $('tender-row').hidden = !on;
+      if (!on) { tender = 0; return; }
+      var list = total > 0 ? tenders(total) : [];
+      if (list.indexOf(tender) < 0) tender = 0;
+      var sel = K.clear($('d-tender'));
+      sel.appendChild(el('option', { attrs: { value: '' }, text: t('ck.tender.none') }));
+      list.forEach(function (x) { sel.appendChild(el('option', { attrs: { value: String(x) }, text: t('ck.tender.opt', { m: K.money(x), c: K.money(x - total) }) })); });
+      sel.value = tender ? String(tender) : '';
+    }
+    function scheduled(f) { var d = c.store.delivery; return Boolean(f && d && d.scheduling && d.scheduling[f]); }
+    function slotOf(f) {
+      var r = slots[f];
+      return r && slotAt ? r.slots.filter(function (s) { return s.startsAt === slotAt && s.available; })[0] || null : null;
+    }
+    function slotFee(f) { var s = f === 'delivery' && slotOf(f); return s ? s.feeMinor : 0; }
+    function needSlot(f) { var r = slots[f]; return scheduled(f) && r !== false && (!r || (!r.allowAsap && !slotOf(f))); }
+    function loadSlots(f) {
+      if (slots[f] !== undefined) return;
+      slots[f] = null;
+      api('/slots?fulfillment=' + f).then(function (r) { slots[f] = r; }, function () { slots[f] = false; }).then(renderCheckout);
+    }
+    function slotLabel(s, r, f) {
+      var d = '';
+      try { d = new Date(s.startsAt).toLocaleDateString(LOC, { timeZone: r.timezone, weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { d = s.date; }
+      var x = t('slot.opt', { d: d, h: K.hm(s.startMin) + '–' + K.hm(s.endMin) });
+      if (f === 'delivery' && s.feeMinor) x += ' ' + t('slot.fee', { m: K.money(s.feeMinor) });
+      return !s.available ? x + ' — ' + t('slot.full') : s.few ? x + ' — ' + t('slot.few') : x;
+    }
+    function renderSlots(f) {
+      var on = scheduled(f);
+      $('slot-box').hidden = !on;
+      if (!on) return;
+      loadSlots(f);
+      var r = slots[f]; var sel = $('slot-pick');
+      if (!slotOf(f)) slotAt = 0;
+      if (drawn !== r || sel.getAttribute('data-f') !== f) {
+        drawn = r;
+        sel.setAttribute('data-f', f);
+        K.clear(sel).appendChild(el('option', { attrs: { value: '' }, text: t(r && r.allowAsap ? 'slot.asap' : 'slot.pick') }));
+        (r ? r.slots : []).forEach(function (s) {
+          sel.appendChild(el('option', { attrs: { value: String(s.startsAt), disabled: s.available ? null : '' }, text: slotLabel(s, r, f) }));
+        });
+      }
+      sel.disabled = !r;
+      sel.value = slotAt ? String(slotAt) : '';
+      if (r && !r.allowAsap && !r.slots.some(function (s) { return s.available; })) K.note($('slot-msg'), 'warn', t('slot.none'));
+      else $('slot-msg').hidden = true;
+    }
     function promoKey() { return JSON.stringify([ids().map(function (id) { return [id, c.cart[id].qtyMilli, c.cart[id].priceMinor]; }), code]); }
     function discount() { return promos && quoted && quoted.key === promoKey() ? quoted.discountMinor : 0; }
     function pending() { return promos === undefined || Boolean(promos && ids().length && !(quoted && quoted.key === promoKey())); }
@@ -103,7 +176,7 @@
       });
       $('cart-empty').hidden = ids().length > 0;
       var f = fulfillment();
-      var sub = subtotal(); var fee = feeFor(f);
+      var sub = subtotal(); var fee = feeFor(f) + slotFee(f);
       $('t-subtotal').textContent = K.money(sub);
       var unknown = f === 'delivery' && c.zones() && !c.zone;
       $('t-fee').textContent = f === 'delivery' && !unknown ? (fee > 0 ? K.money(fee) : t('free')) : '—';
@@ -112,16 +185,18 @@
       $('t-disc-label').hidden = $('t-disc').hidden = !(disc > 0);
       $('t-disc').textContent = '−' + K.money(disc);
       $('t-total').textContent = K.money(sub - disc + fee);
+      if (!(f === 'delivery' && c.zones() && !c.zone)) renderTender(f, sub - disc + fee); else renderTender('', 0);
       $('address-box').hidden = f !== 'delivery';
       $('addr-extra').hidden = !c.store.addressExtra;
       var min = c.minFor(f);
       var below = min > sub;
       if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(min) })); else $('min-order').hidden = true;
       renderZone(f);
+      renderSlots(f);
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');
-      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok || pending();
+      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok || pending() || needSlot(f);
       btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub - disc + fee) });
       renderPromos();
     }
@@ -221,11 +296,12 @@
         //  CHK-17/S32: فیِ هر قلم که مشتری دید — ناهمخوان ⇒ ۴۰۹ `price_changed` حتی اگر جمع از قضا برابر بماند
         lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor }; }),
         note: $('c-note').value.trim(),
-        expectedTotalMinor: subtotal() - discount() + feeFor(f),
+        expectedTotalMinor: subtotal() - discount() + feeFor(f) + slotFee(f),
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
         lang: K.lang,
       };
       if (c.campaign) body.campaign = c.campaign;
+      if (slotOf(f)) body.slotStartsAt = slotAt;
       if (code) body.promoCode = code;   //  MKT-01: سرور در همان تراکنش می‌سنجد؛ اعمال نشد ⇒ ۴۰۹ `promo_code_rejected`   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
@@ -235,6 +311,7 @@
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
+        if (tender && !$('tender-row').hidden) body.delivery.cashTenderMinor = tender;
       }
       return body;
     }
@@ -296,6 +373,9 @@
           d.unavailable.forEach(function (id) { if (c.cart[id]) c.cart[id].unavailable = true; });
           saveCart();
           K.note(msg, 'err', e.message);
+        } else if (/^slot_/.test(e.code) && Array.isArray(d.slots) && slots[body.fulfillment]) {
+          slots[body.fulfillment].slots = d.slots; slotAt = 0; drawn = null;
+          K.note(msg, 'err', e.message);
         } else if (e.code === 'store_not_accepting_orders') {
           c.store.ordering = { accepting: false };
           if (c.renderHead) c.renderHead();
@@ -331,6 +411,8 @@
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }
       loadPromos();
+      //  ظرفیتِ بازه‌ها هر بار تازه
+      slots = {}; drawn = null;
       renderCheckout();
     }
 
@@ -352,6 +434,8 @@
       if (r) { r.checked = true; renderCheckout(); }
     });
     $('zone-notify').addEventListener('click', notifyMe);
+    $('d-tender').addEventListener('change', function () { tender = Number($('d-tender').value) || 0; });
+    $('slot-pick').addEventListener('change', function () { slotAt = Number($('slot-pick').value) || 0; renderCheckout(); });
     var applyCode = function () {
       var v = $('promo-code').value.trim();
       if (!v) return;

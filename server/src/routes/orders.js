@@ -85,6 +85,9 @@ router.get('/config', async (req, res) => {
     ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
     //  ORD-16 «فرستادنِ دوبارهٔ» پیامِ نرفته (پرچمِ `shop.orders.notice_resend`) — خاموش ⇒ کلید نیست
     ...((await require('../lib/notice-resend').flagOf(req.shopId)) ? { noticeResend: require('../lib/notice-resend').configOf() } : {}),
+    //  CHK-10/S34: فهرستِ «خبرم کن» ِ ویترین (پرچمِ `shop.storefront.notify_area` روی ناحیه‌ها) فقط برای صاحب و مدیر
+    //  (`settings.write`، همان درِ `GET /storefront/area-requests`) — خاموش یا نقشِ دیگر ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...(can(req.role, 'settings.write') && (await require('../lib/storefront-area-requests').flagOn(req.shopId)) ? { notifyArea: true } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,

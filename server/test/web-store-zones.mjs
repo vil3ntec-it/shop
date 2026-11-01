@@ -117,7 +117,16 @@ const set = await call('PUT', '/api/shop/storefront/delivery', { zones: [{
   feeMinor: 3000, minOrderMinor: 60000, freeOverMinor: 100000, smallBasketFeeMinor: 1500,
 }] }, T);
 ok(set.status === 200, 'ناحیه ذخیره شد', JSON.stringify(set.body).slice(0, 160));
+//  WEB-24: بنری که فقط برای همین ناحیه است، تا ناحیه دانسته نیست دیده نمی‌شود
+await flag('shop.storefront.banners', true);
+{
+  const zid = (set.body.zones || (set.body.delivery || {}).zones || [])[0].id;
+  const H = 3600 * 1000;
+  const bn = await call('PUT', '/api/shop/storefront/banners', { banners: [{ title: 'ویژهٔ کارته‌سه', startAt: Date.now() - H, endAt: Date.now() + H, zoneIds: [zid] }] }, T);
+  ok(bn.status === 200, 'بنرِ ناحیه نوشته شد', JSON.stringify(bn.body).slice(0, 120));
+}
 await open();
+ok(await page.isHidden('#banners'), 'WEB-24: ناحیهٔ ندانسته ⇒ بنرِ ناحیه نیست');
 ok((await text('#store-meta')).includes('ارسال از ۳۰ افغانی'), 'روشن ⇒ «ارسال از ۳۰»', await text('#store-meta'));
 await page.evaluate(() => { location.hash = '#/cart'; });
 await page.waitForSelector('#sheet-deliv .txt', { timeout: 10000 });
@@ -164,6 +173,8 @@ await page.check('input[name="fulfillment"][value="delivery"]');
 await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
 ok((await text('#zone-msg')).includes('کارته‌سه'), 'ناحیهٔ برگزیده', await text('#zone-msg'));
 await page.evaluate(() => { location.hash = '#/'; });
+await page.waitForSelector('#banners:not([hidden]) .banner', { timeout: 10000 });
+ok((await text('#banners-list')).includes('ویژهٔ کارته‌سه'), 'WEB-24: با برگشت به کاتالوگ پس از گزینشِ ناحیه ⇒ بنرِ همان ناحیه');
 for (let i = 0; i < 2; i++) await page.locator('#products li[data-id="rice"] .p-add').first().click();
 await page.evaluate(() => { location.hash = '#/cart'; });
 await page.waitForFunction(() => /تا ارسالِ رایگان/.test(document.getElementById('sheet-deliv').textContent), null, { timeout: 10000 });
@@ -293,6 +304,69 @@ const ax = await one('SELECT address FROM online_orders WHERE shop_id = $1 ORDER
 const aj = typeof ax.address === 'string' ? JSON.parse(ax.address) : ax.address;
 ok(aj.phone2 === '+93799888777' && aj.plusCode === '9G8F+6W کابل', 'CHK-08: شمارهٔ دوم و Plus Code در نشانیِ سفارش', JSON.stringify(aj));
 
+
+//  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه
+//  برگزیده نشده «ثبت» بسته، هزینه روی هزینهٔ ناحیه، و همان بازه و هزینه در سفارشِ سرور (جمعِ دیده‌شده = جمعِ سرور)
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+ok(await page.isHidden('#slot-box'), 'بی بازهٔ زمانی ⇒ همان فرم، بی «زمانِ تحویل»');
+const sr = await call('PUT', '/api/shop/storefront/delivery', { allowAsap: false, slotRules: [
+  { fulfillment: 'delivery', weekdays: [0, 1, 2, 3, 4, 5, 6], startMin: 1380, endMin: 1439, capacity: 5, cutoffMin: 0, feeMinor: 2000 },
+] }, T);
+ok(sr.status === 200, 'بازهٔ ارسال با هزینهٔ ۲۰ ذخیره شد', JSON.stringify(sr.body).slice(0, 120));
+await open();
+await toCheckout();
+await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
+await page.fill('#c-name', 'مشتریِ آزمایشی');
+await page.fill('#a-text', 'کارته‌سه، کوچهٔ چهارم');
+await page.waitForSelector('#slot-box:not([hidden]) #slot-pick option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+const fee0 = await text('#t-fee');
+ok(await page.isDisabled('#submit-order') && (await text('#slot-pick option:first-child')).includes('برگزینید'),
+  'بی «هرچه زودتر» و بی بازه ⇒ «ثبت» بسته', await text('#slot-pick option:first-child'));
+const slotVal = await page.locator('#slot-pick option:not([disabled])').nth(1).getAttribute('value');
+ok((await page.locator(`#slot-pick option[value="${slotVal}"]`).textContent()).includes('+۲۰'), 'گزینهٔ بازه هزینهٔ اضافه را می‌گوید');
+await page.selectOption('#slot-pick', slotVal);
+await page.waitForFunction((f) => document.getElementById('t-fee').textContent.trim() !== f, fee0, { timeout: 5000 });
+ok(true, 'هزینهٔ ارسال با بازه عوض شد', `${fee0} ⇐ ${await text('#t-fee')}`);
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+{
+  const o = await one('SELECT delivery, delivery_fee_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const dj = typeof o.delivery === 'string' ? JSON.parse(o.delivery) : o.delivery;
+  ok(dj && dj.slot && dj.slot.startsAt === Number(slotVal) && dj.slot.feeMinor === 2000 && Number(o.delivery_fee_minor) >= 2000,
+    'CHK-07: همان بازه و هزینهٔ ۲۰ ِ آن در سفارش، با جمعی که وب نشان داد', JSON.stringify(dj && dj.slot) + ' / ' + o.delivery_fee_minor);
+}
+
+//  CHK-14: «با کدام اسکناس…» — پرچمِ خاموش ⇒ نیست؛ روشن ⇒ فقط اسکناس‌هایی که سرور می‌پذیرد، و همان در سفارش
+await flag('shop.orders.delivery_prefs', false);   //  CHK-24 ِ بالا روشنش کرده بود
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+ok(await page.isHidden('#tender-row'), 'CHK-14 خاموش: بی «با کدام اسکناس»');
+await flag('shop.orders.delivery_prefs', true);
+await open();
+await toCheckout();
+await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
+await page.fill('#c-name', 'مشتریِ آزمایشی');
+await page.fill('#a-text', 'کارته‌سه، کوچهٔ پنجم');
+await page.waitForSelector('#slot-pick option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+await page.selectOption('#slot-pick', await page.locator('#slot-pick option:not([disabled])').nth(1).getAttribute('value'));
+await page.waitForSelector('#tender-row:not([hidden]) #d-tender option[value]:not([value=""])', { state: 'attached', timeout: 10000 });
+const tv = await page.locator('#d-tender option').nth(1).getAttribute('value');
+ok((await page.locator('#d-tender option').nth(1).textContent()).includes('پول خرد'), 'گزینهٔ اسکناس پول خرد را می‌گوید', await page.locator('#d-tender option').nth(1).textContent());
+await page.selectOption('#d-tender', tv);
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+{
+  const o = await one('SELECT delivery, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const dj = typeof o.delivery === 'string' ? JSON.parse(o.delivery) : o.delivery;
+  const total = Number(o.total_minor);
+  ok(dj.cashTenderMinor === Number(tv) && dj.cashTenderMinor > total && dj.cashTenderMinor - total < 100000,
+    'CHK-14: همان اسکناس در سفارش؛ بیش از جمع و پول خرد کمتر از یک اسکناسِ ۱۰۰۰', `${dj.cashTenderMinor} / ${total}`);
+}
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 

@@ -20,7 +20,6 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
-  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
   var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
   //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
   var campaign = campaignOfPage();
@@ -116,10 +115,12 @@
   }
 
   function card(p) {
-    return K.productCard(p, {
+    var li = K.productCard(p, {
       photo: photoUrl(p.id), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
       onOpen: function () { location.hash = '#/p/' + encodeURIComponent(p.id); },
     });
+    if (more) more.card(li, p);
+    return li;
   }
 
   function refreshCard(id) {
@@ -137,17 +138,19 @@
     $(id).hidden = !list.length;
   }
 
-  /** WEB-02: پرفروش (یا تازه)، «ارزان‌تر» و تازه‌ها — فقط دادهٔ واقعیِ سرور (#301)؛ نبود ⇒ هیچ */
-  function loadPicks() {
-    //  سرورِ بی #301 این مسیر را ندارد؛ #301 همراهِ `store.delivery` می‌آید
-    if (!store.delivery) return Promise.resolve();
-    return api('/highlights').then(function (r) {
-      var best = r.bestsellers || []; var fresh = r.newArrivals || [];
-      rail('picks', best.length ? best : fresh);
-      $('picks-why').textContent = best.length ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
-      rail('deals', r.deals || []);
-      rail('fresh', best.length ? fresh.filter(function (p) { return !best.some(function (b) { return b.id === p.id; }); }) : []);
-    }).catch(function () { $('picks').hidden = true; $('deals').hidden = true; $('fresh').hidden = true; });
+  // ── پیشنهادها (WEB-02)، اخیر (WEB-13)، دلخواه‌ها/فهرستِ خرید (WEB-11) و بنرها (WEB-24): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var more = null;
+  function loadMore(r) {
+    return new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
+    }).then(function () {
+      more = window.StoreCatalog({
+        api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, get zone() { return zone; }, rail: rail, card: card, items: catalog.items,
+        ids: ids, reorder: reorder, recent: Boolean(r.recent), features: r.features || {},
+        category: function (c) { catalog.category = c; renderCats(); loadProducts(false); },
+      });
+      return more.picks();
+    }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
   }
 
   function loadProducts(more) {
@@ -205,7 +208,7 @@
       $('ps-share').hidden = !share;
       $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
-      if (recent) recent.seen(x);
+      if (more) more.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
     if (detail) detail(null);
@@ -235,6 +238,7 @@
     renderBar();
     if (K.cartIsOpen()) renderSheet();
     if (checkout && !$('view-checkout').hidden) checkout.render();
+    if (more) more.cart();
   }
   function addOne(p) {
     var cur = cart[p.id] ? cart[p.id].qtyMilli : 0;
@@ -482,8 +486,8 @@
     load();
   }
 
-  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. */
-  function reorder(o) {
+  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. «فهرستِ خرید» (WEB-11) هم با `fail` ِ خودش. */
+  function reorder(o, fail) {
     var want = {}; o.lines.forEach(function (l) { want[l.productId] = l.qtyMilli; });
     api('/products?ids=' + Object.keys(want).map(encodeURIComponent).join(',')).then(function (r) {
       var added = 0;
@@ -497,7 +501,7 @@
       var missing = Object.keys(want).length - added;
       location.hash = '#/cart';
       K.toast(missing ? t('re.some', { a: K.fa(added, 0), m: K.fa(missing, 0) }) : t('re.all'));
-    }).catch(function (e) { K.note($('o-msg'), 'err', e.message); });
+    }).catch(fail || function (e) { K.note($('o-msg'), 'err', e.message); });
   }
 
   // ── سفارش‌های من در همین دکان ──
@@ -568,12 +572,8 @@
       marketOn = Boolean(r.market && r.market.available);
       stockList = Boolean(r.features && r.features.stockList);
       store.addressExtra = Boolean(r.features && r.features.addressExtra);
+      store.features = r.features || {};
       verifyAvailable = !r.verification || r.verification.available !== false;
-      if (r.recent) {
-        var rs = el('script', { attrs: { src: '/store/recent.js' } });
-        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
-        document.head.appendChild(rs);
-      }
       if (r.seo && typeof r.seo.productBase === 'string') {
         var ss = el('script', { attrs: { src: '/store/share.js' } });
         //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
@@ -589,7 +589,7 @@
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
-      return Promise.all([loadProducts(false), refreshCart(), loadPicks()]);
+      return Promise.all([loadProducts(false), refreshCart(), loadMore(r)]);
     }).then(route).catch(function (e) {
       if (e.status === 404) {
         show('view-missing');
