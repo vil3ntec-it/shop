@@ -6,7 +6,7 @@ import ir.vil3ntec.tohid.core.qr.QrCode
  *  چیدمانِ فاکتورِ نسخهٔ ۲ (RECEIPT-V2 §۱.۳) — از بالا به پایین:
  *  لوگو · نامِ دکان · نشانی و تلفن · ‒ · «لغو شد» · شماره، تاریخ، فروشنده، نوع · ‒ ·
  *  قلم‌ها · ‒ · تعداد · جمع، تخفیف‌ها، مبلغِ نهایی · پرداخت‌ها، دریافتی، پولِ پس، نسیه ·
- *  ‒ · QR · متنِ پایین.
+ *  ‒ · یادداشتِ فاکتور (POS-11) · QR · متنِ پایین. یادداشتِ هر ردیف زیرِ همان ردیف.
  *
  *  فقط چیدمان است: نه مبلغی حساب می‌شود (همه از [ReceiptInput])، نه قلم و نه سکو.
  */
@@ -50,6 +50,7 @@ object ReceiptLayout {
       val notes = buildList {
         if (list != null && list > line.unitPrice) add("${labels.listPrice}: ${fmt.amount(list)}")
         if (line.returnedQty > 0) add("${labels.returned}: ${fmt.qty(line.returnedQty)}")
+        line.note?.trim()?.takeIf { it.isNotEmpty() }?.let { add(it) }
       }
       b += ReceiptBlock.Item(line.name, "${fmt.qty(line.qty)}$unit × ${fmt.amount(line.unitPrice)}", fmt.amount(line.total), notes)
     }
@@ -78,6 +79,8 @@ object ReceiptLayout {
 
     /* ------------------------------ QR و پایان ------------------------------ */
     b += ReceiptBlock.Rule()
+    //  POS-11: یادداشتِ فاکتور زیرِ جمع‌ها؛ بی یادداشت ⇒ همان بلوک‌های پیشین
+    input.note?.trim()?.takeIf { it.isNotEmpty() }?.let { text("${labels.note}: $it", TextStyle.SMALL, center = false) }
     //  QR ِ نشدنی (نشانیِ بلندتر از نسخهٔ ۶) ⇒ فاکتور بی QR چاپ می‌شود، چاپ نمی‌شکند
     val qr = input.qrUrl?.let { url -> runCatching { url to QrCode.encode(url) }.getOrNull() }
     qr?.let { (url, modules) ->

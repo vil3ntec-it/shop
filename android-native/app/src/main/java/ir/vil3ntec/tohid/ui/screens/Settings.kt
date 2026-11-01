@@ -505,6 +505,7 @@ fun SettingsScreen(
     item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }
+    item { ir.vil3ntec.tohid.ui.components.pos.PosNotesSettingsWired(context) } // یادداشتِ ردیف و فاکتور (POS-11)، پیش‌فرض خاموش
     /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
     item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */

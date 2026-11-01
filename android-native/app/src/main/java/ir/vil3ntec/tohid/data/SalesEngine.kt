@@ -48,6 +48,8 @@ object SalesEngine {
     val label: String = "",
     /** سریِ اسکن‌شده (موتورِ تازهٔ موجودی، `StockLedger`) — فروش اول از همین برداشته می‌شود */
     val lotId: String? = null,
+    /** یادداشتِ ردیف (POS-11، `CartNotes`) — به `SaleItem.note` می‌رود */
+    val note: String? = null,
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -117,6 +119,8 @@ object SalesEngine {
      *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) و تعویض (`ReturnFlow`) همیشه خاموش می‌فرستند.
      */
     val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
+    /** POS-11 — یادداشتِ فاکتور (`CartStore.note`)؛ `null` ⇒ فاکتورِ بی یادداشت، همان امروز */
+    val note: String? = null,
   )
 
   data class Totals(
@@ -466,6 +470,7 @@ object SalesEngine {
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
       receiptToken = receiptToken,
+      note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(checkout.note),
     )
 
     val items = mutableListOf<SaleItem>()
@@ -488,6 +493,7 @@ object SalesEngine {
           purchasePrice = 0.0,
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
+          note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
         )
         return@forEachIndexed
       }
@@ -507,6 +513,7 @@ object SalesEngine {
         totalPrice = lineTotal(unit, line.quantity),
         returnedQty = 0.0,
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
+        note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
       )
       movements += StockMovement(
         id = newId(),
