@@ -61,14 +61,15 @@ function decode(text) {
  * ⛔ فاز ۳ ِ پنلِ مرکزی: «غیرفعال کردنِ سرویس» (`lib/shop-holds.js`، حالتِ `service_disabled` با
  * `service` = همین کلید) هر مقداری را می‌بُرد — در همین یک پرسش، بی رفت‌وبرگشتِ دوم.
  */
-async function flagOf(shopId, key = FLAG_KEY) {
-  const rows = await many(
-    `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
+async function flagOf(shopId, key = FLAG_KEY, run = null) {
+  //  `run` = اتصالِ تراکنشِ جاری (`(sql, params) ⇒ {rows}`): درونِ تراکنش از همان اتصال، نه استخر — وگرنه
+  //  ثبت‌های هم‌زمانِ پشتِ یک قفل همهٔ اتصال‌ها را نگه می‌دارند و این پرسش اتصال نمی‌گیرد (RSK-07 روی PostgreSQL)
+  const sql = `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
      UNION ALL
      SELECT '#hold', 'false' FROM shop_holds
-      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`,
-    [key, 'all', String(shopId)]
-  );
+      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`;
+  const params = [key, 'all', String(shopId)];
+  const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   if (rows.some((r) => r.scope === '#hold')) return false;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);

@@ -28,6 +28,8 @@ class PurchaseSuggestTest {
     sales = sales,
     saleItems = items,
     purchases = listOf(Purchase(id = "u1", productId = "pB", supplierId = "s2", quantity = 1.0, purchasePrice = 50.0, date = "2026-01-01")),
+    //  موجودی = ورودی − همهٔ فروش‌های لغونشده (۳۰ × ۲ = ۶۰)؛ ورودیِ آغازِ ۶۰ ⇒ موجودیِ pA صفر، همان فرضِ عددهای زیر
+    warehouseEntries = listOf(WarehouseEntry(id = "w-open", productId = "pA", units = 60.0)),
   )
 
   @Test fun `فروش و تأمین‌کننده و ترتیب`() {

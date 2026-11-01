@@ -195,7 +195,7 @@ object OwnerExport {
     "approvedBy" to "تأییدکننده",
     "note" to "توضیح",
     "z" to "گزارش Z",
-    //  اصلاحِ روشِ پرداخت (POS-40، ردیفِ `pay_fix`)
+    //  POS-40 اصلاحِ روشِ پرداخت (`pay_fix`)
     "fromMethod" to "روش پیشین",
     "toMethod" to "روش تازه",
     "payRef" to "مرجع روش تازه",
