@@ -328,6 +328,7 @@
 
 ### v3 · ویترین
 
+- تخفیفِ ویترین (MKT-01/09، پشتِ پرچمِ خاموشِ `shop.storefront.promos`، `lib/storefront-promos.js`): همان قاعده‌های `shop_promotions` با کانالِ «اینترنتی» و فقط `promo-core.evaluate` (همان صندوق)، ساعتِ محلیِ دکان؛ پیچیده دورِ `pricer` در همان تراکنش؛ کدِ اعمال‌نشده ⇒ ۴۰۹ `promo_code_rejected` (`promo.status`)، هرگز سفارشِ بی‌صدا با قیمتِ دیگر؛ کدِ سقف‌دار زیرِ قفلِ ردیفِ قاعده و در دفترِ مصرف با `sale_id = sf:<کلیدِ یکتایی>`؛ «جمعِ دیده‌شده» پس از تخفیف؛ ⛔ `GET /promos` هیچ کدی فهرست نمی‌کند و پیش‌نمایش چیزی نمی‌نویسد (`claude/mkt-01-store-promo`).
 - ویترین فقط با `shop.orders` + `shop.storefront` + کلیدِ اشتراکِ `storefront`؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب دارند (۴۰۴) (#244).
 - قیمت، نام و واحد را سرور در همان تراکنش از دفتر می‌خواند؛ `unitPriceMinor`، `discountMinor`، `deliveryFeeMinor`، `source` و `test`ِ مشتری خوانده نمی‌شوند (#244).
 - «همان که مشتری دید» (`lib/storefront-seen.js`، CHK-17/S32): `expectedTotalMinor` و فیِ هر قلم `expectedUnitPriceMinor` فقط برای «تغییر کرده؟» است؛ هر کدام ناهمخوان ⇒ ۴۰۹ `price_changed` با برگهٔ تازه و `changes` (`productId`، `name`، `fromMinor`، `toMinor`)، حتی اگر جمع از قضا برابر مانده باشد (#543).
@@ -536,6 +537,7 @@
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.storefront.recent` | دکان / `all` | خاموش | کلیدِ `recent: true` در `GET /api/store/:slug` ⇒ ویترین `store/recent.js` را دیر بار می‌کند و «دیده‌شده‌های اخیر» را فقط روی دستگاه نگه می‌دارد (WEB-13، همزادِ `core/product/RecentlyViewed`)؛ خاموش ⇒ کلید نیست و recent.js بار نمی‌شود | `claude/new-web-2` | باز |
 | `shop.storefront.favorites` | دکان / `all` | خاموش | `/api/store/:slug/account/favorites*` (خاموش ⇒ ۴۰۴ `favorites_disabled`، بی نوشتن) — WEB-11، `lib/storefront-extras.js` | `claude/new-web-3` | باز |
+| `shop.storefront.promos` | دکان / `all` | خاموش | MKT-01/09: تخفیفِ ویترین در `POST /api/store/:slug/checkout` (`promoCode` و خودکار)، `GET /api/store/:slug/promos` و `POST …/promos/quote` (خاموش ⇒ ۴۰۴ `promos_disabled` و ثبت همان پیشین) | `claude/mkt-01-store-promo` | باز |
 | `shop.storefront.banners` | دکان / `all` | خاموش | `/api/shop/storefront/banners` (خاموش ⇒ ۴۰۳ `banners_disabled`) و `/api/store/:slug/banners` (۴۰۴) — WEB-24 | `claude/new-web-3` | باز |
 | `shop.storefront.stock_list` | دکان / `all` | خاموش | E2E-MKT-02: `GET /api/store/:slug` کلیدِ `features.stockList` (خاموش ⇒ بی کلید)؛ ویترین در ۴۰۹ ِ `out_of_stock` همهٔ قلم‌های کم را با مقدارِ موجود و «کم کن به …» نشان می‌دهد و «ثبت» تا کم کردن بسته است؛ خاموش ⇒ همان پیامِ سرور | `claude/part-E2E-1` | باز |
 | `shop.storefront.search_core` | دکان / `all` | خاموش | SRCH-01: جست‌وجوی `GET /api/store/:slug/products?q=` با قاعده‌های `text-core.js` (همان صندوق): رقمِ فارسی/عربی = لاتین، نامرئی و فاصله حذف، کلمه‌ها به هر ترتیب؛ خاموش ⇒ همان `normalize`/`SQL_NAME` ِ پیشین. بازارچه (`market.js`) عوض نشده | `claude/part-SRCH-1` | باز |
