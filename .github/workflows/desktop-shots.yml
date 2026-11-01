@@ -29,12 +29,56 @@ concurrency:
 #  دارد؛ pushِ شاخهٔ عکس‌ها در کارِ جدای «انتشار» که فقط artifactِ عکس‌ها را می‌گیرد.
 permissions:
   contents: read
+  #  فهرستِ فایل‌های PR برای گزینشِ گروه‌های نسخهٔ ۳ (`plan`)
+  pull-requests: read
 
 jobs:
+  #  کدام گروه‌های نسخهٔ ۳ عکس بگیرند و در چند تکهٔ موازی:
+  #   • شاخهٔ یک گروه (`…-v3-<گروه>`) ⇐ foundation + همان گروه + هر گروهِ دیگری که در `ui/v3/<گروه>/` یا
+  #     `shots/<Group>Shots.kt` ِ همان درخواست تغییر کرده؛
+  #   • پایه (v3-foundation)، phone-v3، هر شاخهٔ دیگر و اجرای دستی ⇐ همهٔ گروه‌ها، سه‌تا‌سه‌تا در تکه‌های موازی.
+  #  فهرستِ گروه‌ها از خودِ `*Shots.kt` خوانده می‌شود (`override val group`)؛ گروهِ تازه خودش می‌آید.
+  plan:
+    name: گزینشِ گروه‌های نسخهٔ ۳
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          BR="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          ALL=$(grep -ho 'override val group = "[a-z0-9-]*"' desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/*Shots.kt | sed 's/.*"\(.*\)"/\1/' | sort -u)
+          test -n "$ALL"
+          #  گروهِ شاخه از نامش (`…-v3-<گروه>`) و فقط اگر چنین گروهی در `*Shots.kt` هست
+          G="${BR##*-v3-}"
+          FULL=1
+          if [ "$EVENT" = pull_request ] && [ "$G" != "$BR" ] && [ "$G" != foundation ] && grep -Fxq "$G" <<<"$ALL"; then FULL=0; fi
+          if [ "$FULL" = 1 ]; then
+            PICK="$ALL"
+          else
+            FILES=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename')
+            PICK=$( { echo foundation; echo "$G"
+              sed -nE 's#^android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/([a-z0-9-]+)/.*#\1#p' <<<"$FILES"
+              for f in $(sed -nE 's#^desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/([A-Za-z]+Shots)\.kt$#\1#p' <<<"$FILES"); do
+                grep -ho 'override val group = "[a-z0-9-]*"' "desktop/src/main/kotlin/ir/vil3ntec/tohid/desktop/shots/$f.kt" 2>/dev/null | sed 's/.*"\(.*\)"/\1/' || true
+              done; } | sort -u | grep -Fxf <(echo "$ALL") )
+          fi
+          #  تکه‌ها: هر تکه تا سه گروه (`groupshots:a,b,c`)
+          SHARDS=$(printf '%s\n' $PICK | paste -sd' ' | python3 -c 'import json,sys; g=sys.stdin.read().split(); print(json.dumps([",".join(g[i:i+3]) for i in range(0, len(g), 3)]))')
+          echo "گروه‌ها ($([ "$FULL" = 1 ] && echo همه || echo "گروهِ $G و تغییرکرده‌ها")): $SHARDS"
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+
   shots:
     name: عکس از همهٔ بخش‌ها
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     env:
       LC_ALL: C.UTF-8
       LANG: C.UTF-8
@@ -110,6 +154,37 @@ jobs:
           S="$S;help:on;wait:1500;shot:17-shortcuts-F1;help:off"
           #  F0-18: پنجرهٔ میان‌برها (F1) و قرض‌داران (DeskCustomers) در شب هم — رنگ‌ها از تم، نه ثابت
           S="$S;key:F11;wait:1500;theme:DARK;go:products;wait:1500;shot:18-products-dark;prodsel:2;wait:800;shot:18b-products-dark-bulk;prodsel:0;go:dashboard;wait:1500;shot:19-dashboard-dark;help:on;wait:1500;shot:19b-shortcuts-F1-dark;help:off;go:debtors;wait:1500;shot:19c-debtors-dark;theme:LIGHT"
+          #  گوشی (phone-ui): پنجرهٔ ۳۹۰×۸۴۴ِ `PhonePreview` — عکس فقط از همان پنجره
+          S="$S;phone:nav;wait:1500;pshot:20-phone-nav;phone:nav-dark;wait:1500;pshot:20b-phone-nav-dark;phone:settings;wait:1500;pshot:21-phone-settings;phone:settings-dark;wait:1500;pshot:21b-phone-settings-dark;phone:profile;wait:1500;pshot:22-phone-profile;phone:profile-dark;wait:1500;pshot:22b-phone-profile-dark;phone:cart;wait:2000;pshot:23-phone-cart-bar;phone:cart-open;wait:2000;pshot:23b-phone-cart-sheet;phone:cart-open-dark;wait:2000;pshot:23c-phone-cart-sheet-dark;phone:off"
+          #  گوشی نسخهٔ ۳: «حساب من» (r4، واردشده و مهمان)، «تنظیمات» (r5: بالا، پایین، صفحهٔ یک بخش) و «بیشتر» (بالا و تهِ «تنظیمات») — روشن و تیره
+          S="$S;phone:v3-profile;wait:1800;pshot:phone-v3-profile-in;phone:v3-profile-dark;wait:1500;pshot:phone-v3-profile-in-dark;phone:v3-profile-out;wait:1800;pshot:phone-v3-profile-out;phone:v3-profile-out-dark;wait:1500;pshot:phone-v3-profile-out-dark"
+          S="$S;phone:v3-settings;wait:1800;pshot:phone-v3-settings-top;phone:v3-settings-dark;wait:1500;pshot:phone-v3-settings-top-dark;phone:v3-settings-scrolled;wait:1800;pshot:phone-v3-settings-scrolled;phone:v3-settings-scrolled-dark;wait:1500;pshot:phone-v3-settings-scrolled-dark;phone:v3-settings-detail;wait:1800;pshot:phone-v3-settings-detail;phone:v3-settings-detail-dark;wait:1500;pshot:phone-v3-settings-detail-dark"
+          S="$S;phone:v3-more;wait:1800;pshot:phone-v3-more-top;phone:v3-more-dark;wait:1500;pshot:phone-v3-more-top-dark;phone:v3-more-bottom;wait:2000;pshot:phone-v3-more-bottom;phone:v3-more-bottom-dark;wait:1500;pshot:phone-v3-more-bottom-dark;phone:off"
+          #  phone-v3-home: خانهٔ r7، کارتِ کششیِ r6، آمارِ r8، نوارِ r10 (هر موردِ فعال + تمدید)، ویرایشگرِ نوار، نوارِ سفارشی، جست‌وجو
+          H="phone:v3home;wait:1500;pshot:phone-v3-home-01-home;phone:v3home-dark;wait:1500;pshot:phone-v3-home-01b-home-dark"
+          H="$H;phone:v3home-pull;wait:1800;pshot:phone-v3-home-02-pull;phone:v3home-pull-dark;wait:1800;pshot:phone-v3-home-02b-pull-dark"
+          H="$H;phone:v3home-stats;wait:1800;pshot:phone-v3-home-03-stats;phone:v3home-stats-dark;wait:1800;pshot:phone-v3-home-03b-stats-dark"
+          H="$H;phone:v3home-navs;wait:1500;pshot:phone-v3-home-04-nav-states;phone:v3home-navs-dark;wait:1500;pshot:phone-v3-home-04b-nav-states-dark"
+          H="$H;phone:v3home-renew;wait:1500;pshot:phone-v3-home-05-renew-pill"
+          H="$H;phone:v3home-big;wait:1500;pshot:phone-v3-home-06-big-long-name;phone:v3home-big-pull;wait:1800;pshot:phone-v3-home-06b-big-pull;phone:v3home-big-stats;wait:1800;pshot:phone-v3-home-06c-big-stats"
+          H="$H;phone:v3home-editor;wait:1500;pshot:phone-v3-home-07-nav-editor;phone:v3home-editor-dark;wait:1500;pshot:phone-v3-home-07b-nav-editor-dark"
+          H="$H;phone:v3home-custom;wait:1500;pshot:phone-v3-home-08-custom-nav;phone:v3home-search;wait:1500;pshot:phone-v3-home-09-search;phone:off"
+          S="$S;$H"
+          #  گوشی نسخهٔ ۳، صندوق (r3 بسته / r2 باز) — `PhoneV3CartPreview`
+          S="$S;phone:v3cart-grid;wait:2500;pshot:phone-v3-cart-grid;phone:v3cart-grid-dark;wait:2500;pshot:phone-v3-cart-grid-dark"
+          S="$S;phone:v3cart-list;wait:2500;pshot:phone-v3-cart-list;phone:v3cart-list-dark;wait:2500;pshot:phone-v3-cart-list-dark"
+          S="$S;phone:v3cart-search;wait:2800;pshot:phone-v3-cart-search;phone:v3cart-search-dark;wait:2500;pshot:phone-v3-cart-search-dark"
+          S="$S;phone:v3cart-keypad;wait:3000;pshot:phone-v3-cart-keypad;phone:v3cart-keypad-dark;wait:2500;pshot:phone-v3-cart-keypad-dark"
+          S="$S;phone:v3cart-open;wait:3000;pshot:phone-v3-cart-open;phone:v3cart-open-dark;wait:2500;pshot:phone-v3-cart-open-dark"
+          S="$S;phone:v3cart-long;wait:2500;pshot:phone-v3-cart-long;phone:v3cart-long-open;wait:3000;pshot:phone-v3-cart-long-open;phone:v3cart-long-open-dark;wait:2500;pshot:phone-v3-cart-long-open-dark"
+          S="$S;phone:v3cart-empty;wait:2200;pshot:phone-v3-cart-empty;phone:v3cart-scan;wait:2500;pshot:phone-v3-cart-scan;phone:v3cart-scan-dark;wait:2200;pshot:phone-v3-cart-scan-dark;phone:off"
+          #  قرض‌دارانِ گوشی (phone v3، r9): سه نفرِ r9، هشت نفرِ بلند، خالی — روز و شب
+          #  «many-end»: همان فهرست تا ته پایین‌کشیده — آخرین ردیف از زیرِ دکمهٔ «+» بیرون است
+          S="$S;phone:debtors-r9;wait:2500;pshot:phone-v3-debtors-r9;phone:debtors-r9-dark;wait:2500;pshot:phone-v3-debtors-r9-dark;phone:debtors-many-dark;wait:2500;pshot:phone-v3-debtors-many-dark;phone:debtors-many;wait:2500;pshot:phone-v3-debtors-many;move:200,600;scroll:15;wait:1200;pshot:phone-v3-debtors-many-end;phone:debtors-empty;wait:2000;pshot:phone-v3-debtors-empty;phone:debtors-empty-dark;wait:2000;pshot:phone-v3-debtors-empty-dark;phone:off"
+          #  حالتِ پیک (phone-v3-courier-*): خانه، مسیر، پیگیری، ارسال، نقدِ من، آمار — روشن و تیره؛ حساب، ورود، تأییدِ نقد — روشن؛ دادهٔ نمایشی
+          S="$S;phone:courier-home;wait:1200;pshot:phone-v3-courier-home;phone:courier-home-dark;wait:1200;pshot:phone-v3-courier-home-dark;phone:courier-route;wait:1200;pshot:phone-v3-courier-route;phone:courier-route-dark;wait:1200;pshot:phone-v3-courier-route-dark;phone:courier-track;wait:1200;pshot:phone-v3-courier-track;phone:courier-track-dark;wait:1200;pshot:phone-v3-courier-track-dark;phone:courier-ship;wait:1200;pshot:phone-v3-courier-ship;phone:courier-ship-dark;wait:1200;pshot:phone-v3-courier-ship-dark;phone:courier-cash;wait:1200;pshot:phone-v3-courier-cash;phone:courier-cash-dark;wait:1200;pshot:phone-v3-courier-cash-dark;phone:courier-stats;wait:1200;pshot:phone-v3-courier-stats;phone:courier-stats-dark;wait:1200;pshot:phone-v3-courier-stats-dark;phone:courier-cash0;wait:1200;pshot:phone-v3-courier-cash-nocash-stale;phone:courier-account;wait:1200;pshot:phone-v3-courier-account;phone:courier-join;wait:1200;pshot:phone-v3-courier-join;phone:courier-cod;wait:1200;pshot:phone-v3-courier-cod;phone:off"
+          #  حسابِ یک قرض‌دار (owner-feedback-2): کشوی بسته/باز، فهرستِ بلند، برگهٔ جزئیاتِ ردیف (روز و شب)، بی تراکنش، و برگهٔ «ثبتِ تراکنش» (آخر، چون برگه باز می‌ماند)
+          S="$S;phone:debtor-detail;wait:3000;pshot:phone-v3-debtor-detail;phone:debtor-detail-dark;wait:2500;pshot:phone-v3-debtor-detail-dark;phone:debtor-detail-drawer;wait:3000;pshot:phone-v3-debtor-detail-drawer;phone:debtor-detail-drawer-dark;wait:2500;pshot:phone-v3-debtor-detail-drawer-dark;phone:debtor-detail-long;wait:3000;pshot:phone-v3-debtor-detail-long;phone:debtor-detail-long-dark;wait:2500;pshot:phone-v3-debtor-detail-long-dark;phone:debtor-detail-tx;wait:3500;pshot:phone-v3-debtor-detail-tx;phone:debtor-detail-tx-dark;wait:2500;pshot:phone-v3-debtor-detail-tx-dark;phone:debtor-detail-empty;wait:3000;pshot:phone-v3-debtor-detail-empty;phone:debtor-detail-composer;wait:3500;pshot:phone-v3-debtor-detail-composer;phone:debtor-detail-composer-dark;wait:2500;pshot:phone-v3-debtor-detail-composer-dark;phone:off"
           #  مجموعهٔ ثابتِ ظاهر (نسخهٔ ۲): صندوق روز و شب، کالاها، داشبورد و قرض‌داران در دو اندازهٔ واقعی
           for WH in 1280,800 1920,1080; do
             N="v2-${WH/,/x}"
@@ -124,9 +199,99 @@ jobs:
           S="$S;size:1280,800;move:1160,30;theme:DARK;wait:1500;go:debtors;wait:1800;shot:vill3n-debtors-dark;go:settings;wait:1800;shot:vill3n-settings-dark"
           S="$S;go:orders;wait:1800;shot:vill3n-orders-dark;theme:LIGHT;wait:1500;go:orders;wait:1800;shot:vill3n-orders-light"
           export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
-          timeout 780 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
+          #  هر دو مجموعه (گوشی و نسخهٔ ۲/VILL3N): نمایشگرِ ۱۹۲۰×۱۰۸۰ برای پنجرهٔ بزرگ و مهلتِ بیشتر برای عکس‌های گوشی
+          timeout 1080 xvfb-run -s "-screen 0 1920x1080x24" ./gradlew --no-daemon -q -Pdev=true run || true
           ls -la "$RUNNER_TEMP/shots"
           test -n "$(ls "$RUNNER_TEMP/shots")"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: shots-legacy
+          path: ${{ runner.temp }}/shots
+          retention-days: 3
+
+  #  بازسازیِ VILL3N: کیت و هر گروه (`desktop/.../shots/<Group>Shots.kt`) — هر حالت روشن/تیره ×
+  #  فارسی/انگلیسی در shots/v3/<گروه>/<حالت>-<تم>-<زبان>.png. هر تکه برنامهٔ خودش را باز می‌کند؛ پایانِ
+  #  هر گروه نشانِ `.done` دارد (`DevShot`). مهلت تمام شد یا گروهی نیمه ماند ⇐ کار قرمز، نه عکسِ کم و بی‌صدا.
+  v3:
+    name: نسخهٔ ۳ — ${{ matrix.groups }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        groups: ${{ fromJson(needs.plan.outputs.shards) }}
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: قلم و نمایشگرِ مجازی
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb fonts-noto-core >/dev/null
+
+      - name: کامپایل
+        working-directory: desktop
+        run: ./gradlew --no-daemon -q -Pdev=true compileKotlin
+
+      - name: دفترِ نمایشی
+        run: node desktop/tools/demo-ledger.mjs "$RUNNER_TEMP/tohid-data"
+
+      - name: عکس‌های گروه‌ها
+        working-directory: desktop
+        env:
+          TOHID_DATA_DIR: ${{ runner.temp }}/tohid-data
+          SHOT_GROUPS: ${{ matrix.groups }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/shots/v3"
+          S="wait:6000;key:ESCAPE;wait:1500;groupshots:$SHOT_GROUPS"
+          export JAVA_TOOL_OPTIONS="-Dtohid.shot=$RUNNER_TEMP/shots/v3 -Dtohid.shot.every=9000 -Dtohid.shot.exit=true -Dtohid.shot.script=$S -Dsun.jnu.encoding=UTF-8 -Dfile.encoding=UTF-8"
+          set +e
+          timeout 1800 xvfb-run -s "-screen 0 1440x900x24" ./gradlew --no-daemon -q -Pdev=true run
+          rc=$?
+          set -e
+          [ "$rc" -eq 124 ] && echo "::error::مهلتِ ۳۰ دقیقهٔ عکس‌های «$SHOT_GROUPS» تمام شد"
+          bad=""
+          for g in ${SHOT_GROUPS//,/ }; do
+            n=$(find "$RUNNER_TEMP/shots/v3/$g" -name '*.png' 2>/dev/null | wc -l)
+            if [ -f "$RUNNER_TEMP/shots/v3/$g/.done" ]; then echo "$g: $n عکس، کامل"
+            else bad="$bad $g($n$(cat "$RUNNER_TEMP/shots/v3/$g/.partial" 2>/dev/null | sed 's/^/ از /'))"; fi
+          done
+          if [ -n "$bad" ]; then echo "::error::عکسِ این گروه‌ها کامل نشد:$bad (کدِ خروج $rc)"; exit 1; fi
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: shots-v3-${{ strategy.job-index }}
+          path: ${{ runner.temp }}/shots
+          retention-days: 3
+          if-no-files-found: ignore
+
+  #  همهٔ عکس‌ها یک‌جا ⇐ شاخهٔ desktop-screenshots. اگر تکه‌ای قرمز شد، باز هم هرچه هست منتشر می‌شود
+  #  (و کارِ همان تکه قرمز می‌ماند)، تا عکس‌های گروه‌های سالم از دست نروند.
+  collect:
+    name: گردآوریِ عکس‌ها
+    needs: [shots, v3]
+    if: ${{ always() && needs.shots.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: shots-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/shots
+
+      - name: نشان‌های پایانِ گروه بیرون
+        run: find "$RUNNER_TEMP/shots" \( -name .done -o -name .partial \) -delete
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -138,7 +303,7 @@ jobs:
   #  فقط این کار توکنِ نوشتنی دارد؛ هیچ کدِ مخزن یا ساختی اجرا نمی‌کند — فقط PNGهای artifact را می‌فرستد.
   publish:
     name: انتشار در شاخهٔ desktop-screenshots
-    needs: shots
+    needs: collect
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -198,6 +363,15 @@ jobs:
             rm -rf "pr/$SAFE" && mkdir -p "pr/$SAFE" && cp "$SHOTS"/*.png "pr/$SAFE/"
             date +%s > "pr/$SAFE/.stamp"
             readme "pr/$SAFE" "عکس‌های شاخهٔ $BR"
+            #  کیت و گروه‌های نسخهٔ ۳ (`groupshots`): pr/<شاخه>/v3/<گروه>/<حالت>-<تم>-<زبان>.png
+            if [ -d "$SHOTS/v3" ]; then
+              cp -r "$SHOTS/v3" "pr/$SAFE/" 2>/dev/null || true
+              for g in "pr/$SAFE"/v3/*/; do
+                if ls "$g"*.png >/dev/null 2>&1; then readme "${g%/}" "نسخهٔ ۳ — $(basename "$g")"; fi
+              done
+              { echo "---"; echo; echo "## نسخهٔ ۳ (هر گروه)"; echo
+                for g in "pr/$SAFE"/v3/*/; do n=$(basename "$g"); echo "- [$n](v3/$n/README.md)"; done; } >> "pr/$SAFE/README.md"
+            fi
             NOW=$(date +%s)
             for d in pr/*/; do
               s=$(cat "$d.stamp" 2>/dev/null || true); [[ "$s" =~ ^[0-9]+$ ]] || s=0

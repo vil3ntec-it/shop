@@ -46,6 +46,8 @@ class I18nCoverageTest {
     when (type) {
       Int::class.javaPrimitiveType, Int::class.javaObjectType -> 7301 + i
       Long::class.javaPrimitiveType, Long::class.javaObjectType -> 7301L + i
+      //  جدول‌های نسخهٔ ۳ گاهی پرچم می‌گیرند (`StrAccount.pendingBody(…, online)`)
+      Boolean::class.javaPrimitiveType, Boolean::class.javaObjectType -> true
       else -> (7301 + i).toString()
     }
   }
@@ -62,7 +64,8 @@ class I18nCoverageTest {
       }
       I18n.audit = null
       assertTrue("${keyOf(table, m)} از t/td نمی‌خواند", entry != null)
-      out += Row(keyOf(table, m), entry!!, outputs, args.map { it.toString() })
+      //  پرچم (Boolean) جای خالی نیست؛ فقط عدد و متن باید در هر زبان دیده شوند
+      out += Row(keyOf(table, m), entry!!, outputs, args.filter { it !is Boolean }.map { it.toString() })
     }
     return out
   }

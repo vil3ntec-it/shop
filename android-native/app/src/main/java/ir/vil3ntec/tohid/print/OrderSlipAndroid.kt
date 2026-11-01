@@ -7,6 +7,7 @@ import android.text.Layout
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.PrintQueue
+import ir.vil3ntec.tohid.core.i18n.StrOrderOps
 import ir.vil3ntec.tohid.core.i18n.StrOrderSlip
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.orders.OrderAutoPrint
@@ -63,6 +64,49 @@ object OrderSlipPrint {
     if (r.center) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL,
   )
 
+  /** بایت‌های برگهٔ یک سفارش برای همان چاپگر (قلمِ برنامه، اندازهٔ کاغذِ چاپگر) */
+  private suspend fun bytesOf(context: Context, printer: PrinterRegistry.Saved, o: OrderDto): Result<ByteArray> =
+    withContext(Dispatchers.IO) {
+      runCatching {
+        val p = printer.profile()
+        val rows = OrderSlip.rows(slipOf(o), StrOrderSlip, System.currentTimeMillis(), ::stamp)
+        EscPos.document(HwPages.text(context, p.paperDots, rows.map(::lineOf)), p)
+      }
+    }
+
+  /**
+   *  ORD-19 «چاپِ برگه‌ها» برای سفارش‌های انتخاب‌شده: یک کار در صفِ چاپ برای هر سفارش، به همان ترتیب؛ دستی است،
+   *  پس حافظهٔ «چاپِ خودکار» دست نمی‌خورد. خروجی: پیامِ صفحه (همه چاپ شد، یا چند تا و چرا نه).
+   */
+  suspend fun printAll(context: Context, orders: List<OrderDto>): String {
+    val printer = PrinterRegistry.defaultSaved(context) ?: return StrOrderSlip.noPrinter
+    var ok = 0
+    var why: String? = null
+    for (o in orders) {
+      val bytes = bytesOf(context, printer, o).getOrElse { why = StrOrderSlip.failed(it.message ?: StrOrderSlip.unknown); null } ?: continue
+      val msg = PrintSpooler.submitAndWait(
+        context, PrintQueue.Kind.REPORT, printer.link, StrOrderSlip.jobTitle(o.orderNo.toString()), bytes, done = StrOrderSlip.printed,
+      )
+      if (msg == StrOrderSlip.printed) ok++ else why = msg
+    }
+    return why?.let { StrOrderOps.bulkPrintedSome(ok, orders.size, it) } ?: StrOrderOps.bulkPrinted(ok)
+  }
+
+  /** دستهٔ چاپِ همین دستگاه برای صفحهٔ بی Context ِ کارِ گروهی (`ui/screens/OrderBulkUi.kt`) */
+  class Bulk(private val context: Context) {
+    suspend fun print(orders: List<OrderDto>): String = OrderSlipPrint.printAll(context, orders)
+    suspend fun accepted(from: String, ids: List<String>, fetch: suspend (String) -> OrderDto?): String? =
+      OrderSlipPrint.afterBulk(context, from, ids, fetch)
+  }
+
+  /** «قبولِ گروهی» (ORD-19) ⇒ همان «یک قبول، یک برگه» ِ ORD-10 برای هر سفارشِ پذیرفته‌شده؛ تنظیمِ خاموش ⇒ هیچ پرسشی */
+  suspend fun afterBulk(context: Context, from: String, ids: List<String>, fetch: suspend (String) -> OrderDto?): String? {
+    if (!auto(context)) return null
+    var last: String? = null
+    for (id in ids) fetch(id)?.let { o -> afterTransition(context, from, o)?.let { last = it } }
+    return last
+  }
+
   /**
    *  پس از پاسخِ **موفقِ** گذار روی همین دستگاه (`from` = وضعیتِ پیش از فرستادن). کاری نبود ⇒ `null`؛
    *  وگرنه پیامی برای صفحه («چاپ شد» یا چرا نشد). هر سفارش یک بار روی هر دستگاه.
@@ -72,13 +116,7 @@ object OrderSlipPrint {
     val printed = synchronized(this) { OrderAutoPrint.parse(prefs(context).getString(KEY_PRINTED, null)) }
     if (!OrderAutoPrint.shouldPrint(true, from, after.status, after.id, printed)) return null
     val printer = PrinterRegistry.defaultSaved(context) ?: return StrOrderSlip.noPrinter
-    val bytes = withContext(Dispatchers.IO) {
-      runCatching {
-        val p = printer.profile()
-        val rows = OrderSlip.rows(slipOf(after), StrOrderSlip, System.currentTimeMillis(), ::stamp)
-        EscPos.document(HwPages.text(context, p.paperDots, rows.map(::lineOf)), p)
-      }
-    }.getOrElse { return StrOrderSlip.failed(it.message ?: StrOrderSlip.unknown) }
+    val bytes = bytesOf(context, printer, after).getOrElse { return StrOrderSlip.failed(it.message ?: StrOrderSlip.unknown) }
     //  پیش از صف به حافظه می‌رود: پاسخِ دوباره یا ضربهٔ دوم برگهٔ دوم نمی‌سازد؛ کارِ صف خودش دوباره تلاش می‌شود
     synchronized(this) {
       val now = OrderAutoPrint.parse(prefs(context).getString(KEY_PRINTED, null))

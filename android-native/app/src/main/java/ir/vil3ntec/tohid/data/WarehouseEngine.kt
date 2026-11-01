@@ -125,10 +125,10 @@ object WarehouseEngine {
    *  فقط کالاهایی که شمرده شده‌اند و با موجودیِ برنامه فرق دارند.
    *  فرقِ کمتر از یک‌هزارم (گرد شدنِ اعشار) اختلاف نیست.
    */
-  fun countLines(d: ShopData, counted: Map<String, Double>): List<CountLine> =
+  fun countLines(d: ShopData, counted: Map<String, Double>, shift: Map<String, Double> = emptyMap()): List<CountLine> =
     d.products.mapNotNull { p ->
       val c = counted[p.id] ?: return@mapNotNull null
-      val sys = ShopStore.stock(d, p.id)
+      val sys = ShopStore.stock(d, p.id) - (shift[p.id] ?: 0.0) // INV-10: `CountShift` ⇒ مورد انتظار هنگامِ شمارش
       if (kotlin.math.abs(c - sys) < 0.0005) null else CountLine(p, sys, c)
     }
 
@@ -144,9 +144,10 @@ object WarehouseEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    shift: Map<String, Double> = emptyMap(),
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
-    val lines = countLines(d, counted)
+    val lines = countLines(d, counted, shift)
     if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
     val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
     var data = d

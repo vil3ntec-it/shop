@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.ui.v3.online.delivery.DeskData
+import ir.vil3ntec.tohid.ui.v3.online.delivery.jalaliMonth
+import ir.vil3ntec.tohid.ui.v3.online.delivery.fieldOf
+import ir.vil3ntec.tohid.ui.v3.online.delivery.minorOf
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -62,6 +66,7 @@ internal fun ColumnScope.CouriersTab(
   var ledgerFor by remember { mutableStateOf<CourierRow?>(null) }
   var capFor by remember { mutableStateOf<CourierRow?>(null) }
   var reportOpen by remember { mutableStateOf(false) }
+  var ratingsOpen by remember { mutableStateOf(false) }
 
   if (d.couriers.isEmpty()) {
     TohidEmptyState(
@@ -77,6 +82,11 @@ internal fun ColumnScope.CouriersTab(
   } else {
     //  RPT-15: گزارشِ نقدِ همهٔ پیک‌ها در یک بازه
     TohidSecondaryButton("گزارشِ نقدِ پیک‌ها", onClick = { reportOpen = true })
+    Spacer(Modifier.height(6.dp))
+  }
+  //  DLV-18: امتیازِ تحویل‌ها — صاحب و مدیر، فقط با پرچمِ دکان
+  if (cfg.ratings && cfg.perms.couriers) {
+    TohidSecondaryButton(ir.vil3ntec.tohid.core.i18n.StrCourier.ratingsButton, onClick = { ratingsOpen = true })
     Spacer(Modifier.height(6.dp))
   }
   LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,6 +135,7 @@ internal fun ColumnScope.CouriersTab(
   }
   ledgerFor?.let { cr -> LedgerSheet(cr, repo) { ledgerFor = null } }
   if (reportOpen) CashReportSheet(repo) { reportOpen = false }
+  if (ratingsOpen) RatingsSheet(repo) { ratingsOpen = false }
   capFor?.let { cr ->
     CourierCapDialog(cr, repo, onDismiss = { capFor = null }, onDone = {
       capFor = null
@@ -259,8 +270,16 @@ private fun SettlementSheet(cr: CourierRow, repo: DeliveryRepository, onDismiss:
         }
       }
       val needReason = receivedMinor != null && t.reasonRequired
-      TohidTextField(reason, { reason = it.take(200) }, label = if (needReason) "دلیلِ اختلاف (لازم)" else "دلیل (اختیاری)")
-      TohidTextField(note, { note = it.take(300) }, label = "یادداشت (اختیاری)", singleLine = false)
+      //  دلیل در «نقدِ من» ِ برنامهٔ پیک دیده می‌شود (`/api/courier/summary`)؛ یادداشت نه
+      TohidTextField(
+        reason, { reason = it.take(200) },
+        label = if (needReason) "دلیلِ اختلاف (لازم)" else "دلیل (اختیاری)",
+        supporting = "پیک این دلیل را در «نقدِ من» می‌بیند.",
+      )
+      TohidTextField(
+        note, { note = it.take(300) }, label = "یادداشت (اختیاری)", singleLine = false,
+        supporting = "فقط دکان می‌بیند.",
+      )
       ErrorLine(err)
       val valid = receivedMinor != null && (handed.isBlank() || handedMinor != null) && (!needReason || reason.isNotBlank())
       TohidButton(
@@ -430,23 +449,6 @@ internal fun ColumnScope.CompaniesTab(d: DeskData, cfg: DeskConfig, repo: Delive
     }
   }
   checkFor?.let { co -> InvoiceSheet(co, repo) { checkFor = null } }
-}
-
-/** آغاز و پایانِ یک ماهِ خورشیدی به ساعتِ محلی؛ `offset` = ۰ این ماه، −۱ ماهِ پیش */
-private fun jalaliMonth(offset: Int): Pair<Long, Long> {
-  val cal = java.util.Calendar.getInstance()
-  val j = Jalali.of(cal.get(java.util.Calendar.YEAR), cal.get(java.util.Calendar.MONTH) + 1, cal.get(java.util.Calendar.DAY_OF_MONTH))
-  var y = j.year
-  var m = j.month + offset
-  while (m < 1) { m += 12; y -= 1 }
-  while (m > 12) { m -= 12; y += 1 }
-  val ny = if (m == 12) y + 1 else y
-  val nm = if (m == 12) 1 else m + 1
-  //  isoMillis ظهرِ همان روز است؛ نیم‌روز عقب ⇒ نیمه‌شب
-  val half = 12 * 3_600_000L
-  val from = isoMillis(Jalali.toIso(y, m, 1).orEmpty()) - half
-  val to = isoMillis(Jalali.toIso(ny, nm, 1).orEmpty()) - half
-  return from to to
 }
 
 private val KIND_LABEL = mapOf(

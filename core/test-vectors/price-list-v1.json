@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "about": "POS-18 — PriceList: فیِ هر لیست و تغییرِ لیستِ فاکتور. پول یک‌صدمِ افغانی. هر ردیف یک خط.",
+  "unit": [
+    { "name": "retail", "retail": 10000, "wholesale": 9000, "list": "retail", "want": 10000 },
+    { "name": "wholesale", "retail": 10000, "wholesale": 9000, "list": "wholesale", "want": 9000 },
+    { "name": "no-wholesale-falls-back", "retail": 10000, "wholesale": 0, "list": "wholesale", "want": 10000 },
+    { "name": "negative-wholesale-falls-back", "retail": 10000, "wholesale": -5, "list": "wholesale", "want": 10000 },
+    { "name": "unknown-list-is-retail", "retail": 10000, "wholesale": 9000, "list": "vip", "want": 10000 },
+    { "name": "blank-list-is-retail", "retail": 2550, "wholesale": 2400, "list": "", "want": 2550 },
+    { "name": "padded-name", "retail": 2550, "wholesale": 2400, "list": " wholesale ", "want": 2400 }
+  ],
+  "reprice": [
+    { "name": "to-wholesale-keeps-manual", "list": "wholesale", "units": [10000, 5000, 7777, 3000], "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "manual": [false, false, true, false], "want": [9000, 5000, 7777, 2800], "changed": 2, "kept": 1 },
+    { "name": "back-to-retail", "list": "retail", "units": [9000, 5000, 7777, 2800], "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "manual": [false, false, true, false], "want": [10000, 5000, 7777, 3000], "changed": 2, "kept": 1 },
+    { "name": "manual-equal-to-target-not-counted", "list": "wholesale", "units": [9000], "retail": [10000], "wholesale": [9000], "manual": [true], "want": [9000], "changed": 0, "kept": 0 },
+    { "name": "empty-invoice", "list": "wholesale", "units": [], "retail": [], "wholesale": [], "manual": [], "want": [], "changed": 0, "kept": 0 }
+  ]
+}

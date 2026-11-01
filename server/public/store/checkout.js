@@ -24,6 +24,136 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    //  CHK-07/10 (فقط با `store.delivery.zoned`): پینِ بیرون از محدوده ⇒ «دریافت از دکان» یا «خبرم کن»
+    var area = null;
+
+    // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
+    //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
+    //  تا پیش‌نمایشِ همین سبد نرسیده «ثبت» بسته است. کدی که اعمال نشود ⇒ پیامِ روشن، نه سفارشِ بی‌صدا.
+    var promos;                 // undefined = در راه، false = خاموش، وگرنه پاسخِ GET /promos
+    var code = '';              // کدی که مشتری زد
+    var quoted = null; var qKey = ''; var qTimer = null; var skew = 0;
+
+    // ── CHK-07/12: زمانِ تحویل (فقط با `store.delivery.scheduling[روش]`، پرچمِ `shop.storefront.zones`) ──
+    //  بازه‌ها، ظرفیت و هزینهٔ بازه فقط از `GET /slots`؛ هزینهٔ بازهٔ «ارسال» روی هزینهٔ ناحیه می‌آید («رایگان از…» آن را
+    //  برنمی‌دارد) و در `expectedTotalMinor` می‌رود. «هرچه زودتر» فقط با `allowAsap`؛ نبود ⇒ تا بازه برگزیده نشده «ثبت» بسته.
+    //  پاسخِ `slot_*` ِ سرور ⇒ بازه‌های تازهٔ همان پاسخ. خاموش ⇒ همان فرمِ امروز، بی `slotStartsAt`.
+    var LOC = K.lang === 'en' ? 'en-GB' : 'fa-AF';
+    var slots = {};             // روش ⇒ undefined = نخواسته، null = در راه، false = نیامد، وگرنه پاسخِ GET /slots
+    var slotAt = 0;             // `startsAt` ِ برگزیده؛ ۰ = هرچه زودتر / هیچ
+    var drawn = null;
+
+    // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
+    //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
+    //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
+    var NOTE_MINOR = 100000; var tender = 0;
+    function tenders(total) {
+      var out = [];
+      [10000, 50000, 100000].forEach(function (u) {
+        var x = Math.ceil(total / u) * u;
+        if (x === total) x += u;
+        if (x - total < NOTE_MINOR && out.indexOf(x) < 0) out.push(x);
+      });
+      return out.sort(function (a, b) { return a - b; });
+    }
+    function renderTender(f, total) {
+      var on = Boolean(c.store.features && c.store.features.deliveryPrefs) && f === 'delivery';
+      $('tender-row').hidden = !on;
+      if (!on) { tender = 0; return; }
+      var list = total > 0 ? tenders(total) : [];
+      if (list.indexOf(tender) < 0) tender = 0;
+      var sel = K.clear($('d-tender'));
+      sel.appendChild(el('option', { attrs: { value: '' }, text: t('ck.tender.none') }));
+      list.forEach(function (x) { sel.appendChild(el('option', { attrs: { value: String(x) }, text: t('ck.tender.opt', { m: K.money(x), c: K.money(x - total) }) })); });
+      sel.value = tender ? String(tender) : '';
+    }
+    function scheduled(f) { var d = c.store.delivery; return Boolean(f && d && d.scheduling && d.scheduling[f]); }
+    function slotOf(f) {
+      var r = slots[f];
+      return r && slotAt ? r.slots.filter(function (s) { return s.startsAt === slotAt && s.available; })[0] || null : null;
+    }
+    function slotFee(f) { var s = f === 'delivery' && slotOf(f); return s ? s.feeMinor : 0; }
+    function needSlot(f) { var r = slots[f]; return scheduled(f) && r !== false && (!r || (!r.allowAsap && !slotOf(f))); }
+    function loadSlots(f) {
+      if (slots[f] !== undefined) return;
+      slots[f] = null;
+      api('/slots?fulfillment=' + f).then(function (r) { slots[f] = r; }, function () { slots[f] = false; }).then(renderCheckout);
+    }
+    function slotLabel(s, r, f) {
+      var d = '';
+      try { d = new Date(s.startsAt).toLocaleDateString(LOC, { timeZone: r.timezone, weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) { d = s.date; }
+      var x = t('slot.opt', { d: d, h: K.hm(s.startMin) + '–' + K.hm(s.endMin) });
+      if (f === 'delivery' && s.feeMinor) x += ' ' + t('slot.fee', { m: K.money(s.feeMinor) });
+      return !s.available ? x + ' — ' + t('slot.full') : s.few ? x + ' — ' + t('slot.few') : x;
+    }
+    function renderSlots(f) {
+      var on = scheduled(f);
+      $('slot-box').hidden = !on;
+      if (!on) return;
+      loadSlots(f);
+      var r = slots[f]; var sel = $('slot-pick');
+      if (!slotOf(f)) slotAt = 0;
+      if (drawn !== r || sel.getAttribute('data-f') !== f) {
+        drawn = r;
+        sel.setAttribute('data-f', f);
+        K.clear(sel).appendChild(el('option', { attrs: { value: '' }, text: t(r && r.allowAsap ? 'slot.asap' : 'slot.pick') }));
+        (r ? r.slots : []).forEach(function (s) {
+          sel.appendChild(el('option', { attrs: { value: String(s.startsAt), disabled: s.available ? null : '' }, text: slotLabel(s, r, f) }));
+        });
+      }
+      sel.disabled = !r;
+      sel.value = slotAt ? String(slotAt) : '';
+      if (r && !r.allowAsap && !r.slots.some(function (s) { return s.available; })) K.note($('slot-msg'), 'warn', t('slot.none'));
+      else $('slot-msg').hidden = true;
+    }
+    function promoKey() { return JSON.stringify([ids().map(function (id) { return [id, c.cart[id].qtyMilli, c.cart[id].priceMinor]; }), code]); }
+    function discount() { return promos && quoted && quoted.key === promoKey() ? quoted.discountMinor : 0; }
+    function pending() { return promos === undefined || Boolean(promos && ids().length && !(quoted && quoted.key === promoKey())); }
+    function promoNote(kind, text) { K.note($('promo-msg'), kind, text); }
+    function reason(st) { var s = st && st.status; return K.has('promo.st.' + s) ? t('promo.st.' + s) : t('promo.st.unknown'); }
+    function loadPromos() {
+      if (promos !== undefined) return;
+      api('/promos').then(function (r) { promos = r; skew = (r.serverTime || Date.now()) - Date.now(); })
+        .catch(function () { promos = false; }).then(renderCheckout);
+    }
+    function requote() {
+      if (!promos || !ids().length) return;
+      var key = promoKey();
+      if (key === qKey) return;
+      qKey = key;
+      clearTimeout(qTimer);
+      qTimer = setTimeout(function () {
+        var body = { lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }) };
+        if (code) body.promoCode = code;
+        api('/promos/quote', { method: 'POST', body: body }).then(function (r) {
+          if (key !== promoKey()) return;
+          if (code && !(r.code && r.code.status === 'applied')) { var why = reason(r.code); code = ''; qKey = ''; renderCheckout(); promoNote('warn', why); return; }
+          quoted = { key: key, discountMinor: r.discountMinor || 0, applied: r.applied || [] };
+          renderCheckout();
+        }).catch(function (e) { qKey = ''; promoNote('err', e.message); });
+      }, 250);
+    }
+    //  MKT-09: «تا پایان …» — پایانِ همان روزِ `endsOn` به وقتِ کابل، با ساعتِ سرور
+    function leftText(endsOn) {
+      var ms = Date.parse(endsOn + 'T23:59:59+04:30') - (Date.now() + skew);
+      var d = Math.floor(ms / 864e5); var h = Math.floor(ms / 36e5);
+      if (d >= 1) return t('promo.days', { n: K.fa(d, 0) });
+      if (h >= 1) return t('promo.hours', { n: K.fa(h, 0) });
+      return t('promo.mins', { n: K.fa(Math.max(1, Math.ceil(ms / 6e4)), 0) });
+    }
+    function renderPromos() {
+      $('promo-box').hidden = !promos;
+      if (!promos) return;
+      var ul = K.clear($('promo-auto'));
+      promos.promos.forEach(function (p) {
+        ul.appendChild(el('li', { text: p.endsOn ? p.name + ' — ' + leftText(p.endsOn) : p.name }));
+      });
+      $('promo-row').hidden = !promos.codes || Boolean(code);
+      $('promo-clear').hidden = !code;
+      if (code && quoted && quoted.key === promoKey()) promoNote('ok', t('promo.ok', { code: code, d: K.money(quoted.discountMinor) }));
+      else if (!code && $('promo-msg').className.indexOf('ok') >= 0) $('promo-msg').hidden = true;
+      requote();
+    }
 
     function fulfillment() {
       var r = document.querySelector('input[name="fulfillment"]:checked');
@@ -46,19 +176,29 @@
       });
       $('cart-empty').hidden = ids().length > 0;
       var f = fulfillment();
-      var sub = subtotal(); var fee = feeFor(f);
+      var sub = subtotal(); var fee = feeFor(f) + slotFee(f);
       $('t-subtotal').textContent = K.money(sub);
-      $('t-fee').textContent = f === 'delivery' ? (fee > 0 ? K.money(fee) : t('free')) : '—';
+      var unknown = f === 'delivery' && c.zones() && !c.zone;
+      $('t-fee').textContent = f === 'delivery' && !unknown ? (fee > 0 ? K.money(fee) : t('free')) : '—';
       $('t-fee-label').textContent = f === 'pickup' ? t('pickup') : t('ck.fee');
-      $('t-total').textContent = K.money(sub + fee);
+      var disc = discount();
+      $('t-disc-label').hidden = $('t-disc').hidden = !(disc > 0);
+      $('t-disc').textContent = '−' + K.money(disc);
+      $('t-total').textContent = K.money(sub - disc + fee);
+      if (!(f === 'delivery' && c.zones() && !c.zone)) renderTender(f, sub - disc + fee); else renderTender('', 0);
       $('address-box').hidden = f !== 'delivery';
-      var below = c.store.minOrderMinor > sub;
-      if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(c.store.minOrderMinor) })); else $('min-order').hidden = true;
+      $('addr-extra').hidden = !c.store.addressExtra;
+      var min = c.minFor(f);
+      var below = min > sub;
+      if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(min) })); else $('min-order').hidden = true;
+      renderZone(f);
+      renderSlots(f);
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');
-      btn.disabled = closed() || !ids().length || !f || below || hasBad() || hasShort() || !ok;
-      btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub + fee) });
+      btn.disabled = closed() || !ids().length || !f || below || unknown || hasBad() || hasShort() || !ok || pending() || needSlot(f);
+      btn.textContent = t(quoteNote ? 'ck.accept' : 'ck.submit', { sum: K.money(sub - disc + fee) });
+      renderPromos();
     }
 
     function renderVerify() {
@@ -100,6 +240,40 @@
       }).then(function () { b.disabled = false; });
     }
 
+    function renderZone(f) {
+      var zs = c.zones(); var box = $('zone-box');
+      box.hidden = !(zs && f === 'delivery');
+      if (box.hidden) return;
+      var sel = $('zone-pick');
+      if (sel.options.length !== zs.length + 1) {
+        while (sel.options.length > 1) sel.remove(1);
+        zs.forEach(function (z) {
+          sel.appendChild(el('option', { attrs: { value: z.id }, text: t('zone.opt', { name: z.name, fee: z.feeMinor > 0 ? K.money(z.feeMinor) : t('free') }) }));
+        });
+      }
+      sel.value = c.zone ? c.zone.id : '';
+      $('zone-acts').hidden = !area;
+      $('zone-pickup').hidden = !(area && c.store.fulfillment.pickup);
+      $('zone-notify').hidden = !(area && area.notify && !area.done);
+      if (area) K.note($('zone-msg'), area.done ? 'ok' : 'warn', area.done ? t('zone.notified') : t('zone.out'));
+      else if (c.zone) K.note($('zone-msg'), 'ok', t('zone.in', { name: c.zone.name }));
+      else K.note($('zone-msg'), 'info', t('zone.need'));
+    }
+    //  «کدام ناحیه؟» از سرور، بی ذخیره؛ ناحیهٔ پین جای گزینشِ دستی را می‌گیرد
+    function locate() {
+      if (!pin || !c.zones()) return;
+      api('/delivery?lat=' + pin.lat + '&lng=' + pin.lng).then(function (r) {
+        area = r.zoned && !r.inZone ? { lat: pin.lat, lng: pin.lng, notify: Boolean(r.notifyArea) } : null;
+        c.setZone(r.zone || null);
+      }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); }).then(renderCheckout);
+    }
+    function notifyMe() {
+      if (!area) return;
+      if (!verifiedFor($('c-phone').value)) { K.note($('zone-msg'), 'warn', t('err.verification_required')); $('c-phone').focus(); return; }
+      api('/area-request', { method: 'POST', body: { lat: area.lat, lng: area.lng } }).then(function () {
+        area.done = true; renderCheckout();
+      }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); });
+    }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
       $('pin-text').textContent = t('pin.wait');
@@ -107,6 +281,7 @@
         pin = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
         $('pin-text').textContent = t('pin.ok', { m: K.fa(Math.round(pos.coords.accuracy || 0), 0) });
         $('pin-btn').textContent = t('pin.again');
+        locate();
       }, function () {
         pin = null;
         $('pin-text').textContent = t('pin.fail');
@@ -118,17 +293,25 @@
       var body = {
         fulfillment: f, paymentMethod: 'cod',
         customer: { name: $('c-name').value.trim(), phone: $('c-phone').value.trim() },
-        lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli }; }),
+        //  CHK-17/S32: فیِ هر قلم که مشتری دید — ناهمخوان ⇒ ۴۰۹ `price_changed` حتی اگر جمع از قضا برابر بماند
+        lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor }; }),
         note: $('c-note').value.trim(),
-        expectedTotalMinor: subtotal() + feeFor(f),
+        expectedTotalMinor: subtotal() - discount() + feeFor(f) + slotFee(f),
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
         lang: K.lang,
       };
-      if (c.campaign) body.campaign = c.campaign;   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
+      if (c.campaign) body.campaign = c.campaign;
+      if (slotOf(f)) body.slotStartsAt = slotAt;
+      if (code) body.promoCode = code;   //  MKT-01: سرور در همان تراکنش می‌سنجد؛ اعمال نشد ⇒ ۴۰۹ `promo_code_rejected`   //  MKT-11: پیوندِ کمپین/QR ِ همین نشست
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
+        //  CHK-08 (پرچمِ `shop.storefront.address_extra`): شمارهٔ دوم و Plus Code — نادرست ⇒ ۴۰۰ ِ سرور با پیامِ روشن
+        if (c.store.addressExtra) { body.address.phone2 = $('a-phone2').value.trim(); body.address.plusCode = $('a-plus').value.trim(); }
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
+        //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
+        else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;
         body.delivery = { callBeforeArrival: $('d-call').checked, leaveWith: $('d-leave').value.trim() };
+        if (tender && !$('tender-row').hidden) body.delivery.cashTenderMinor = tender;
       }
       return body;
     }
@@ -159,7 +342,10 @@
         location.hash = '#/o/' + encodeURIComponent(r.order.token);
       }).catch(function (e) {
         var d = e.data || {};
-        if (e.code === 'price_changed' && d.quote) {
+        if (e.code === 'promo_code_rejected') {
+          code = ''; quoted = null; qKey = '';
+          K.note(msg, 'err', reason(d.promo));
+        } else if (e.code === 'price_changed' && d.quote) {
           //  S135: تغییر روشن نشان داده می‌شود؛ بی پذیرشِ دوباره ثبت نمی‌شود
           var changed = [];
           d.quote.lines.forEach(function (l) {
@@ -186,6 +372,9 @@
         } else if (e.code === 'product_unavailable' && d.unavailable) {
           d.unavailable.forEach(function (id) { if (c.cart[id]) c.cart[id].unavailable = true; });
           saveCart();
+          K.note(msg, 'err', e.message);
+        } else if (/^slot_/.test(e.code) && Array.isArray(d.slots) && slots[body.fulfillment]) {
+          slots[body.fulfillment].slots = d.slots; slotAt = 0; drawn = null;
           K.note(msg, 'err', e.message);
         } else if (e.code === 'store_not_accepting_orders') {
           c.store.ordering = { accepting: false };
@@ -221,6 +410,9 @@
         if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }
+      loadPromos();
+      //  ظرفیتِ بازه‌ها هر بار تازه
+      slots = {}; drawn = null;
       renderCheckout();
     }
 
@@ -231,6 +423,29 @@
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
     $('pin-btn').addEventListener('click', takePin);
     $('checkout-form').addEventListener('submit', submitOrder);
+    $('zone-pick').addEventListener('change', function () {
+      var id = $('zone-pick').value;
+      //  گزینشِ دستی جای پین را می‌گیرد: سرور با پین ناحیه را از پین می‌گوید و پینِ ناجور سفارش را رد می‌کرد
+      pin = null; $('pin-text').textContent = t('pin.hint'); $('pin-btn').textContent = t('pin.btn');
+      c.setZone(id ? { id: id } : null); area = null; renderCheckout();
+    });
+    $('zone-pickup').addEventListener('click', function () {
+      var r = document.querySelector('input[name="fulfillment"][value="pickup"]');
+      if (r) { r.checked = true; renderCheckout(); }
+    });
+    $('zone-notify').addEventListener('click', notifyMe);
+    $('d-tender').addEventListener('change', function () { tender = Number($('d-tender').value) || 0; });
+    $('slot-pick').addEventListener('change', function () { slotAt = Number($('slot-pick').value) || 0; renderCheckout(); });
+    var applyCode = function () {
+      var v = $('promo-code').value.trim();
+      if (!v) return;
+      code = v.slice(0, 32); quoted = null; $('promo-code').value = ''; renderCheckout();
+    };
+    $('promo-apply').addEventListener('click', applyCode);
+    $('promo-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } });
+    $('promo-clear').addEventListener('click', function () { code = ''; quoted = null; $('promo-msg').hidden = true; renderCheckout(); });
+    //  شمارشِ معکوس فقط وقتی برگهٔ ثبت جلوی چشم است
+    setInterval(function () { if (promos && !$('view-checkout').hidden) renderPromos(); }, 30000);
 
     return { open: openCheckout, render: renderCheckout };
   };

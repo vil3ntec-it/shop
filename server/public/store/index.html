@@ -73,6 +73,9 @@
             <div id="store-meta" class="meta"></div>
           </div>
 
+          <section id="banners" class="section" hidden>
+            <ul id="banners-list" class="banners"></ul>
+          </section>
           <section id="picks" class="section" hidden aria-labelledby="picks-title">
             <div class="section-head"><h2 id="picks-title" data-i="flame" data-t="picks.title">پیشنهادِ همین دکان</h2><p id="picks-why"></p></div>
             <ul id="picks-list" class="rail products"></ul>
@@ -85,6 +88,23 @@
             <div class="section-head"><h2 id="fresh-title" data-t="picks.new">تازه در ویترین</h2></div>
             <ul id="fresh-list" class="rail products"></ul>
           </section>
+
+          <div id="saved">
+            <section id="favs" class="section" hidden aria-labelledby="favs-title">
+              <div class="section-head"><h2 id="favs-title" data-t="fav.title">دلخواه‌ها</h2></div>
+              <ul id="favs-list" class="rail products"></ul>
+            </section>
+            <section id="list" class="section" hidden aria-labelledby="list-title">
+              <div class="section-head"><h2 id="list-title" data-t="list.title">فهرستِ خرید</h2><p id="list-n"></p></div>
+              <p class="small muted" data-t="list.hint">آن‌چه هر بار می‌خرید؛ قیمت و موجودی هر بار همانِ امروز است و فهرست فقط روی همین دستگاه می‌ماند.</p>
+              <ul id="list-lines" class="list-lines"></ul>
+              <div class="row wrap-row">
+                <button id="list-add" class="btn btn-primary" type="button" data-t="list.add" hidden>همه به سبد</button>
+                <button id="list-save" class="btn btn-ghost" type="button" data-t="list.save">نگه‌داشتنِ سبد در فهرست</button>
+                <button id="list-clear" class="btn btn-ghost" type="button" data-t="list.clear" hidden>پاک کردنِ فهرست</button>
+              </div>
+            </section>
+          </div>
 
           <section id="recent" class="section" hidden aria-labelledby="recent-title">
             <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
@@ -128,12 +148,29 @@
                   <label class="field"><span data-t="ck.lm.l">نشانهٔ نزدیک</span><input id="a-landmark" type="text" maxlength="200" data-tp="ck.lm.ph" placeholder="مثلاً «پشتِ مسجد»"></label>
                   <label class="field"><span data-t="ck.area.l">ناحیه (اختیاری)</span><input id="a-area" type="text" maxlength="80" data-tp="ck.area.ph" placeholder="مثلاً «کارتهٔ چهار»"></label>
                   <label class="field"><span data-t="ck.gate.l">رنگِ دروازه (اختیاری)</span><input id="a-gate" type="text" maxlength="40" data-tp="ck.gate.ph" placeholder="مثلاً «سبز»"></label>
+                  <div id="addr-extra" class="stack" hidden>
+                    <label class="field"><span data-t="ck.phone2.l">شمارهٔ دوم (اختیاری)</span><input id="a-phone2" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" class="ltr"></label>
+                    <label class="field"><span data-t="ck.plus.l">Plus Code (اختیاری)</span><input id="a-plus" type="text" maxlength="60" autocomplete="off" class="ltr" data-tp="ck.plus.ph" placeholder="مثلاً 9G8F+6W کابل"></label>
+                  </div>
                   <div class="pin-row">
                     <button id="pin-btn" class="btn btn-soft btn-sm" type="button" data-t="pin.btn">پین با موقعیتِ فعلیِ من</button>
                     <span id="pin-text" class="muted small" data-t="pin.hint">پین اختیاری است؛ فقط برای پیدا کردنِ دقیق‌ترِ در.</span>
                   </div>
+                  <div id="zone-box" class="stack" hidden>
+                    <label class="field"><span data-t="zone.l">ناحیهٔ ارسال</span><select id="zone-pick"><option value="" data-t="zone.pick">ناحیه را برگزینید</option></select></label>
+                    <div id="zone-msg" class="note" role="status" hidden></div>
+                    <div id="zone-acts" class="pin-row" hidden>
+                      <button id="zone-pickup" class="btn btn-soft btn-sm" type="button" data-t="pickup">دریافت از دکان</button>
+                      <button id="zone-notify" class="btn btn-soft btn-sm" type="button" data-t="zone.notify">وقتی ارسال به این‌جا رسید خبرم کن</button>
+                    </div>
+                  </div>
                   <label class="check"><input id="d-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
                   <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="d-leave" type="text" maxlength="80" data-tp="ck.leave.ph" placeholder="مثلاً «دربان» یا «برادرم»"></label>
+                  <label class="field" id="tender-row" hidden><span data-t="ck.tender.l">با کدام اسکناس پرداخت می‌کنید؟ (اختیاری، تا پیک پول خرد بیاورد)</span><select id="d-tender"></select></label>
+                </div>
+                <div id="slot-box" class="stack" hidden>
+                  <label class="field"><span data-t="slot.l">زمانِ تحویل</span><select id="slot-pick"></select></label>
+                  <div id="slot-msg" class="note" role="status" hidden></div>
                 </div>
               </fieldset>
 
@@ -164,10 +201,20 @@
                 <div class="spread"><h2 data-t="ck.cart">سبدِ شما</h2><a href="#/cart" id="edit-cart" class="small" data-t="ck.edit">ویرایش</a></div>
                 <ul id="cart-lines" class="sum-lines"></ul>
                 <p id="cart-empty" class="muted" hidden data-t="ck.empty">سبد خالی است.</p>
+                <div id="promo-box" class="stack section" hidden>
+                  <ul id="promo-auto" class="promo-auto"></ul>
+                  <div id="promo-row" class="pin-row" hidden>
+                    <input id="promo-code" type="text" maxlength="32" autocomplete="off" aria-label="کدِ تخفیف" data-ta="promo.code.l" data-tp="promo.code.l" placeholder="کدِ تخفیف">
+                    <button id="promo-apply" class="btn btn-soft btn-sm" type="button" data-t="promo.apply">اعمال</button>
+                  </div>
+                  <div id="promo-msg" class="note" hidden role="status"></div>
+                  <button id="promo-clear" class="btn btn-ghost btn-sm" type="button" hidden data-t="promo.clear">برداشتنِ کد</button>
+                </div>
                 <hr class="divider">
                 <div class="sums">
                   <span data-t="od.sub">جمعِ کالاها</span><span id="t-subtotal" class="num"></span>
                   <span id="t-fee-label" data-t="ck.fee">هزینهٔ ارسال</span><span id="t-fee" class="num"></span>
+                  <span id="t-disc-label" hidden data-t="promo.disc">تخفیف</span><span id="t-disc" class="num" hidden></span>
                   <span class="grand" data-t="od.total">مبلغِ نهایی</span><span id="t-total" class="grand num"></span>
                 </div>
                 <div id="min-order" class="note warn section" hidden></div>
@@ -197,6 +244,15 @@
                 <ol id="o-steps" class="steps section" data-ta="a.steps" aria-label="مراحلِ سفارش"></ol>
                 <details class="history section"><summary data-t="od.history">تاریخچهٔ کامل</summary><ol id="o-timeline" class="timeline"></ol></details>
               </div>
+              <div id="o-rate" class="card card-lg" hidden>
+                <h2 data-t="od.rt.title">به پیک امتیاز دهید</h2>
+                <div id="o-rate-form" class="stack">
+                  <div id="o-rate-stars" class="chips" role="group" data-ta="od.rt.title" aria-label="به پیک امتیاز دهید"></div>
+                  <div id="o-rate-tags" class="chips" role="group"></div>
+                  <button id="o-rate-send" class="btn btn-accent" type="button" data-t="od.rt.send" disabled>ثبتِ امتیاز</button>
+                </div>
+                <div id="o-rate-msg" class="note" hidden role="status"></div>
+              </div>
               <div id="o-subs" class="card card-lg" hidden>
                 <h2 data-t="od.sub.title">کالای جایگزین</h2>
                 <ul id="o-sub-list" class="sum-lines"></ul>
@@ -219,6 +275,14 @@
                 <a class="btn btn-ghost btn-block" href="#/" data-t="a.back">بازگشت به کالاها</a>
                 <p class="muted small" data-t="od.keep">این صفحه با همین نشانی دوباره باز می‌شود؛ نشانی را نگه دارید.</p>
               </div>
+              <form id="o-prefs" class="card card-lg stack" hidden novalidate>
+                <h2 class="label-lg" data-t="od.prefs">دستورِ تحویل</h2>
+                <label class="check"><input id="op-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
+                <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="op-leave" type="text" maxlength="80"></label>
+                <label class="field"><span data-t="od.prefs.lm">نشانهٔ تازه (اختیاری)</span><input id="op-lm" type="text" maxlength="200"></label>
+                <div id="op-msg" class="note" hidden role="status"></div>
+                <button id="op-save" class="btn btn-block" type="submit" data-t="od.prefs.save">ثبتِ دستورِ تحویل</button>
+              </form>
             </aside>
           </div>
         </div>

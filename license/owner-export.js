@@ -154,6 +154,10 @@
     approvedBy: 'تأییدکننده',
     note: 'توضیح',
     z: 'گزارش Z',
+    //  POS-40 اصلاحِ روشِ پرداخت (`pay_fix`) — همان `OwnerExport.kt`
+    fromMethod: 'روش پیشین',
+    toMethod: 'روش تازه',
+    payRef: 'مرجع روش تازه',
     promoDiscountMinor: 'تخفیف خودکار (یک‌صدم افغانی)',
     coupons: 'کدهای تخفیف',
     quantity: 'تعداد',

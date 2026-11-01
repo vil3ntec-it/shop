@@ -21,6 +21,10 @@ data class OrderPermsDto(
   val recordSale: Boolean = false,
   val saleDiscount: Boolean = false,
   val saleCancel: Boolean = false,
+  /** PCK-13: «شاخص‌های جمع‌آوری» (`reports.view`) */
+  val pickMetrics: Boolean = false,
+  /** PCK-14: رسیدگی به «پیدا نشد» (`stock.adjust`) */
+  val pickIssues: Boolean = false,
 )
 
 /** `GET /shop/orders/config` — بخش فقط وقتی `enabled` است دیده می‌شود */
@@ -46,6 +50,123 @@ data class OrdersConfigDto(
   val picking: Boolean = false,
   /** ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی (CHK-15، پرچمِ `shop.orders.substitution`) */
   val substitution: Boolean = false,
+  /** ORD-07 «عقب انداختن» (پرچمِ `shop.orders.delay`) — خاموش ⇒ null و هیچ دکمه‌ای */
+  val delay: OrderDelayCfgDto? = null,
+  /** ORD-03 «باز / بسته» و هشدارِ قطعِ اتصال (پرچمِ `shop.orders.presence`) */
+  val presence: Boolean = false,
+  /** ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (پرچمِ `shop.orders.bulk`؛ خاموش ⇒ کلید نیست) */
+  val bulk: Boolean = false,
+  /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
+  val noticeResend: OrderNoticeResendCfgDto? = null,
+  /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
+  val amend: OrderAmendCfgDto? = null,
+)
+
+/** `amend` ِ `/config` (`order-amend.configOf` + `paid`/`settleMethods`) */
+@Serializable
+data class OrderAmendCfgDto(
+  val statuses: List<String> = emptyList(),
+  val reasons: List<String> = emptyList(),
+  val consentVia: List<String> = emptyList(),
+  val ttlMinutes: Int = 0,
+  val paid: Boolean = false,
+  val settleMethods: List<String> = emptyList(),
+)
+
+/** آخرین پیشنهاد/ویرایشِ سفارش (`amendment` ِ `GET /:id`، `order-amend.staffView`) */
+@Serializable
+data class OrderAmendmentDto(
+  val id: String = "",
+  val status: String = "",
+  val reason: String = "",
+  val changes: List<OrderAmendChangeDto> = emptyList(),
+  val prevTotalMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val differenceMinor: Long = 0,
+  val expiresAt: Long? = null,
+  val createdAt: Long = 0,
+  val closedAt: Long? = null,
+  /** فقط سفارشِ پرداخت‌شده (پرچمِ `shop.orders.amend_paid`) */
+  val settlement: OrderAmendSettlementDto? = null,
+)
+
+@Serializable
+data class OrderAmendChangeDto(
+  val lineNo: Int = 0,
+  val name: String = "",
+  val unit: String = "",
+  val fromQtyMilli: Long = 0,
+  val toQtyMilli: Long = 0,
+  val fromLineTotalMinor: Long = 0,
+  val toLineTotalMinor: Long = 0,
+)
+
+/** `refund` = دکان بدهکار، `charge` = مشتری بدهکار؛ `settledAt` ⇒ تسویه ثبت شد */
+@Serializable
+data class OrderAmendSettlementDto(
+  val kind: String = "",
+  val amountMinor: Long = 0,
+  val paidTotalMinor: Long = 0,
+  val settledAt: Long? = null,
+  val method: String? = null,
+)
+
+/** `noticeResend` ِ `/config` (`notice-resend.configOf`) */
+@Serializable
+data class OrderNoticeResendCfgDto(
+  val statuses: List<String> = emptyList(),
+  val maxResends: Int = 0,
+)
+
+/** `GET /shop/orders/:id/notices` — پیام‌های وضعیت به مشتری (NTF-01/04)، بی شماره، متن یا لینک */
+@Serializable
+data class OrderNoticesDto(
+  val enabled: Boolean = false,
+  val eligible: Boolean = false,
+  val channels: Map<String, String> = emptyMap(),
+  val items: List<OrderNoticeDto> = emptyList(),
+)
+
+@Serializable
+data class OrderNoticeDto(
+  val id: String = "",
+  val event: String = "",
+  val lang: String = "",
+  val status: String = "",
+  val channel: String = "",
+  val attempts: Int = 0,
+  val nextAttemptAt: Long? = null,
+  val sentAt: Long? = null,
+  val createdAt: Long = 0,
+  val updatedAt: Long = 0,
+)
+
+/** `POST /shop/orders/bulk/transition` — نتیجهٔ هر سفارش جدا و به همان ترتیب (`order-bulk.transition`) */
+@Serializable
+data class OrderBulkOutDto(
+  val results: List<OrderBulkResultDto> = emptyList(),
+  val okCount: Int = 0,
+  val failedCount: Int = 0,
+)
+
+@Serializable
+data class OrderBulkResultDto(
+  val id: String = "",
+  val ok: Boolean = false,
+  val status: String = "",
+  val unchanged: Boolean = false,
+  val orderNo: Long = 0,
+  val code: String = "",
+  val message: String = "",
+  val current: String = "",
+)
+
+/** `delay` ِ `/config` (`order-delay.configOf`): وضعیت‌های مجاز، دلیل‌ها و سقفِ دقیقه */
+@Serializable
+data class OrderDelayCfgDto(
+  val statuses: List<String> = emptyList(),
+  val reasons: List<String> = emptyList(),
+  val maxMinutes: Int = 0,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -55,6 +176,18 @@ data class OrdersSummaryDto(
   val oldestNewAt: Long? = null,
   val rev: Long = 0,
   val serverTime: Long = 0,
+  /** ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ تهی) */
+  val startAlerts: List<OrderStartAlertDto> = emptyList(),
+)
+
+/** یک هشدارِ ORD-18 — بی نام، شماره یا نشانی (`order-start-alert.pendingOf`) */
+@Serializable
+data class OrderStartAlertDto(
+  val id: String = "",
+  val orderNo: Long = 0,
+  val status: String = "",
+  val scheduledFor: Long = 0,
+  val alertAt: Long = 0,
 )
 
 @Serializable
@@ -98,8 +231,16 @@ data class OrderLineDto(
   val substituteName: String = "",
 )
 
+/** `detail` ِ رویداد — `type` فقط برای رویدادِ `note` (`ready_delay` ِ ORD-07، `start_alert` ِ ORD-18، …) */
 @Serializable
-data class OrderEventDetailDto(val readyAt: Long? = null)
+data class OrderEventDetailDto(
+  val readyAt: Long? = null,
+  val type: String = "",
+  val prevReadyAt: Long? = null,
+  val scheduledFor: Long? = null,
+  /** `notice_resend` (ORD-16): رویدادِ پیامی که دوباره فرستاده شد */
+  val event: String = "",
+)
 
 @Serializable
 data class OrderEventDto(
@@ -173,6 +314,8 @@ data class OrderDto(
   val reversible: Boolean? = null,
   /** فقط در `handover` برای `review`: چرا خودکار نه (`before_floor`: نخستین تحویل پیش از کفِ دکان) */
   val reviewCode: String? = null,
+  /** ORD-14: آخرین پیشنهاد/ویرایش — فقط در جزئیات و فقط با پرچمِ `shop.orders.amend` */
+  val amendment: OrderAmendmentDto? = null,
 )
 
 /** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */

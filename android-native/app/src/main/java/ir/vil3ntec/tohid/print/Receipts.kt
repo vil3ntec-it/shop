@@ -123,6 +123,8 @@ object Receipts {
       //  فروشِ نسخهٔ ۲: نشانیِ عمومی؛ فروشِ کهنه با «برگشتِ تازه»: کدِ `TR1:` ِ اسکنرِ برگشت (بی متنِ «اسکن کنید»)
       qrUrl = publicUrl ?: legacyQr,
       qrCaption = publicUrl != null,
+      //  MKT-10: QR ِ ویترین زیرِ فاکتور — تنظیمِ همین دستگاه، پیش‌فرض خاموش
+      storeQrUrl = ReceiptStoreQr.url(context),
       logo = ReceiptProfileStore.logoMono(context, widthDots),
       copyMark = copyMark,
       note = sale.note,

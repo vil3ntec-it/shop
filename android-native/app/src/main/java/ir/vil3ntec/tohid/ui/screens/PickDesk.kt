@@ -28,8 +28,11 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPick
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.PickBatchDto
+import ir.vil3ntec.tohid.core.model.PickIssueDto
+import ir.vil3ntec.tohid.core.model.PickMetricsDto
 import ir.vil3ntec.tohid.core.model.PickShelfItemDto
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.pick.PickDesk
@@ -61,11 +64,11 @@ internal fun PickDeskEntry(cfg: OrdersConfigDto, api: ApiClient, buzz: (Boolean)
   var open by remember { mutableStateOf(false) }
   Spacer(Modifier.width(8.dp))
   TohidSecondaryButton(StrPick.desk, onClick = { open = true })
-  if (open) PickDeskSheet(api, buzz, onClose = { open = false }, onChanged = onChanged)
+  if (open) PickDeskSheet(api, cfg.permissions, buzz, onClose = { open = false }, onChanged = onChanged)
 }
 
 @Composable
-private fun PickDeskSheet(api: ApiClient, buzz: (Boolean) -> Unit, onClose: () -> Unit, onChanged: () -> Unit) {
+private fun PickDeskSheet(api: ApiClient, perms: OrderPermsDto, buzz: (Boolean) -> Unit, onClose: () -> Unit, onChanged: () -> Unit) {
   val repo = remember(api) { PickingRepository(api) }
   val orders = remember(api) { OrdersRepository(api) }
   var tab by remember { mutableStateOf("shelf") }
@@ -76,13 +79,100 @@ private fun PickDeskSheet(api: ApiClient, buzz: (Boolean) -> Unit, onClose: () -
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         TohidFilterChip(label = StrPick.tabShelf, selected = tab == "shelf", onClick = { tab = "shelf" })
         TohidFilterChip(label = StrPick.tabBatch, selected = tab == "batch", onClick = { tab = "batch" })
+        //  PCK-13/14: فقط با اجازهٔ همان درها (`/orders/config`)
+        if (perms.pickMetrics) TohidFilterChip(label = StrPick.tabMetrics, selected = tab == "metrics", onClick = { tab = "metrics" })
+        if (perms.pickIssues) TohidFilterChip(label = StrPick.tabIssues, selected = tab == "issues", onClick = { tab = "issues" })
       }
-      if (tab == "shelf") ShelfPane(repo, buzz, onChanged)
-      else BatchPane(repo, orders, buzz, onChanged, onOpenSheet = { id, no -> sheetFor = id to no })
+      when (tab) {
+        "shelf" -> ShelfPane(repo, buzz, onChanged)
+        "metrics" -> MetricsPane(repo)
+        "issues" -> IssuesPane(repo, onChanged)
+        else -> BatchPane(repo, orders, buzz, onChanged, onOpenSheet = { id, no -> sheetFor = id to no })
+      }
     }
   }
   sheetFor?.let { (id, no) ->
     PickSheet(orderId = id, orderNo = no, repo = repo, buzz = buzz, onClose = { sheetFor = null }, onChanged = onChanged)
+  }
+}
+
+// ── شاخص‌ها (PCK-13) ─────────────────────────────────────────────────
+
+/** زمانِ جمع‌آوری، درصدِ پیدا شدن و نرخِ جایگزینی — همه از سرور (`GET /pick/metrics`، ۷ روزِ گذشته) */
+@Composable
+private fun MetricsPane(repo: PickingRepository) {
+  val c = Shop.colors
+  var m by remember { mutableStateOf<PickMetricsDto?>(null) }
+  var error by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(Unit) { repo.metrics().onSuccess { m = it }.onFailure { error = it.userMessage } }
+  Text(StrPick.metricsHint, style = MaterialTheme.typography.bodySmall, color = c.muted)
+  val x = m
+  if (x == null) {
+    if (error != null) ErrorLine(error) else TohidLoadingState(rows = 3)
+    return
+  }
+  TohidCard {
+    Text(StrPick.mOrders(x.orders), fontWeight = FontWeight.SemiBold, color = c.text)
+    Text(StrPick.mAvg(PickDesk.minutes(x.avgPickMs)), style = MaterialTheme.typography.bodyMedium, color = c.text)
+    Text(StrPick.mMedian(PickDesk.minutes(x.medianPickMs)), style = MaterialTheme.typography.bodySmall, color = c.muted)
+    Text(StrPick.mLines(x.found, x.lines), style = MaterialTheme.typography.bodyMedium, color = c.text)
+    Text(StrPick.mFound(PickDesk.percent(x.foundRateBp)), style = MaterialTheme.typography.bodyMedium, color = c.text)
+    Text(StrPick.mSubst(PickDesk.percent(x.substitutionRateBp)), style = MaterialTheme.typography.bodyMedium, color = c.text)
+    Text(StrPick.mWrong(x.wrongScans), style = MaterialTheme.typography.bodySmall, color = c.muted)
+  }
+}
+
+// ── رسیدگی به «پیدا نکردم» (PCK-14) ─────────────────────────────────────
+
+/** وظیفه‌های باز؛ «رسیدگی شد» کالا را به ویترین برمی‌گرداند، «کنار گذاشته شد» نه — هر دو با توضیح (سرور) */
+@Composable
+private fun IssuesPane(repo: PickingRepository, onChanged: () -> Unit) {
+  val c = Shop.colors
+  val scope = rememberCoroutineScope()
+  var list by remember { mutableStateOf<List<PickIssueDto>?>(null) }
+  var error by remember { mutableStateOf<String?>(null) }
+  var open by remember { mutableStateOf<String?>(null) }
+  var note by remember { mutableStateOf("") }
+  var busy by remember { mutableStateOf(false) }
+
+  fun load() {
+    scope.launch { repo.issues().onSuccess { list = it.issues; error = null }.onFailure { error = it.userMessage } }
+  }
+  LaunchedEffect(Unit) { load() }
+
+  fun act(id: String, action: String) {
+    if (busy || !PickDesk.canResolve(action, note)) return
+    busy = true
+    scope.launch {
+      repo.resolveIssue(id, action, note)
+        .onSuccess { open = null; note = ""; onChanged(); load() }
+        .onFailure { error = it.userMessage }
+      busy = false
+    }
+  }
+
+  Text(StrPick.issuesHint, style = MaterialTheme.typography.bodySmall, color = c.muted)
+  ErrorLine(error)
+  val l = list
+  if (l == null) {
+    if (error == null) TohidLoadingState(rows = 3)
+    return
+  }
+  if (l.isEmpty()) {
+    Text(StrPick.issuesEmpty, style = MaterialTheme.typography.bodyMedium, color = c.muted)
+    return
+  }
+  for (i in l) {
+    TohidCard(onClick = { open = if (open == i.id) null else i.id; note = "" }) {
+      Text(StrPick.issueRow(i.detail.name.ifBlank { i.productId }, i.hits), fontWeight = FontWeight.SemiBold, color = c.text)
+      if (open == i.id) {
+        TohidTextField(note, { note = it.take(300) }, label = StrPick.issueNote, singleLine = false)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+          TohidButton(StrPick.resolve, onClick = { act(i.id, "resolved") }, enabled = !busy && note.isNotBlank())
+          TohidSecondaryButton(StrPick.dismiss, onClick = { act(i.id, "dismissed") }, enabled = !busy && note.isNotBlank())
+        }
+      }
+    }
   }
 }
 

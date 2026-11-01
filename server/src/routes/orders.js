@@ -77,13 +77,25 @@ router.get('/config', async (req, res) => {
     delay: (await delay.flagOf(req.shopId)) ? delay.configOf() : null,
     presence: await presence.flagOf(req.shopId),
     //  ORD-14 ویرایشِ سفارش (پرچمِ `shop.orders.amend`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
-    ...((await amend.flagOf(req.shopId)) ? { amend: amend.configOf() } : {}),
+    //  + سفارشِ پرداخت‌شده (پرچمِ جدای `shop.orders.amend_paid`): `paid` و روشِ تسویه؛ خاموش ⇒ همان شیءِ پیشین
+    ...((await amend.flagOf(req.shopId))
+      ? { amend: { ...amend.configOf(), ...((await amend.paidFlagOf(req.shopId)) ? { paid: true, settleMethods: [...amend.SETTLE_METHODS] } : {}) } }
+      : {}),
+    //  ORD-19 کارِ گروهی (پرچمِ `shop.orders.bulk`) — خاموش ⇒ کلید نیست و برنامه انتخابِ چندتایی نمی‌سازد
+    ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
+    //  ORD-16 «فرستادنِ دوبارهٔ» پیامِ نرفته (پرچمِ `shop.orders.notice_resend`) — خاموش ⇒ کلید نیست
+    ...((await require('../lib/notice-resend').flagOf(req.shopId)) ? { noticeResend: require('../lib/notice-resend').configOf() } : {}),
+    //  CHK-10/S34: فهرستِ «خبرم کن» ِ ویترین (پرچمِ `shop.storefront.notify_area` روی ناحیه‌ها) فقط برای صاحب و مدیر
+    //  (`settings.write`، همان درِ `GET /storefront/area-requests`) — خاموش یا نقشِ دیگر ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...(can(req.role, 'settings.write') && (await require('../lib/storefront-area-requests').flagOn(req.shopId)) ? { notifyArea: true } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,
     handoverSince,
     permissions: {
       ...Object.fromEntries(['create', 'manage', 'contact', 'refund'].map((k) => [k, can(req.role, `orders.${k}`)])),
+      //  PCK-13/14: «شاخص‌ها» و «پیدا نشد» در میزِ جمع‌آوری — همان اجازهٔ درهای خودشان (فقط برای نمایش)
+      pickMetrics: can(req.role, 'reports.view'), pickIssues: can(req.role, 'stock.adjust'),
       //  اجازهٔ کلیِ نقش و اشتراک (برای نمایش)؛ تصمیمِ هر سفارش `recordable`/`reversible` ِ `GET /handover` است
       ...(await ledger.capsFor(req.shopId, req.role)),
     },
@@ -94,6 +106,9 @@ router.get('/summary', needFlag, async (req, res) => {
   const out = await orders.summary(req.shopId);
   //  ORD-03: همان «باز / بسته» که مشتری در ویترین می‌بیند، در همان پرسشِ ۲۰ثانیه‌ای
   if (await presence.flagOf(req.shopId)) out.presence = await presence.presenceOf(req.shopId, out.serverTime);
+  //  ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ بی کلید)
+  const sa = require('../lib/order-start-alert');
+  if (await sa.flagOf(req.shopId)) out.startAlerts = await sa.pendingOf(req.shopId, out.serverTime);
   res.json(out);
 });
 
@@ -109,7 +124,10 @@ router.get('/', needFlag, async (req, res) => {
  * پیش از `/:id` تا با شناسهٔ سفارش اشتباه نشود.
  */
 router.get('/reconciliation', needFlag, requirePermission('orders.refund'), async (req, res) => {
-  res.json(await refunds.report(req.shopId, { from: req.query.from, to: req.query.to }));
+  const out = await refunds.report(req.shopId, { from: req.query.from, to: req.query.to });
+  //  ORD-14: تسویهٔ ویرایشِ سفارشِ پرداخت‌شده — بدهیِ باز و تسویهٔ بازه (پرچمِ `shop.orders.amend_paid`؛ خاموش ⇒ بی کلید)
+  if (await amend.paidFlagOf(req.shopId)) out.amendSettlements = await amend.settlementsOf(req.shopId, out.window);
+  res.json(out);
 });
 
 /**
@@ -177,6 +195,34 @@ router.get('/:id/notices', needFlag, async (req, res) => {
   const out = await require('../lib/customer-notify').forOrder(req.shopId, req.params.id);
   if (!out) throw notFound('سفارش پیدا نشد', 'order_not_found');
   res.json(out);
+});
+
+/**
+ * ORD-16 — «فرستادنِ دوبارهٔ» پیامِ نرفتهٔ همین سفارش (`lib/notice-resend.js`)، پشتِ پرچمِ خاموشِ
+ * `shop.orders.notice_resend`، با `orders.manage` و اشتراک (SUB-10). کلیدِ یکتایی لازم است (تکرار ⇒ همان پاسخ).
+ */
+router.post('/:id/notices/:noticeId/resend', needFlag, requirePermission('orders.manage'), needWrite, async (req, res) => {
+  const nr = require('../lib/notice-resend');
+  if (!(await nr.flagOf(req.shopId))) throw forbidden('فرستادنِ دوبارهٔ پیام برای این دکان روشن نیست', 'notice_resend_disabled');
+  const key = orders.clientKeyOf(req);
+  let out;
+  try {
+    out = await nr.resend(req.shopId, req.params.id, req.params.noticeId, { key, actor: actorOf(req) });
+  } catch (err) {
+    if (err.status === 409 && err.code !== 'idempotency_key_reused') {
+      return res.status(409).json({ error: { code: err.code, message: err.message, current: err.current, max: err.max } });
+    }
+    throw err;
+  }
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.notice_resend', targetType: 'online_order', targetId: String(req.params.id),
+      detail: { orderNo: out.orderNo, noticeId: out.notice.id, event: out.notice.event, prevStatus: out.prevStatus },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ notice: out.notice, replayed: out.replayed });
 });
 
 /**
@@ -367,6 +413,24 @@ router.post('/:id/amendments/:amendId/withdraw', needFlag, requirePermission('or
     return res.status(409).json({ error: { code: out.code, message: 'این پیشنهاد دیگر باز نیست', status: out.status } });
   }
   res.json({ status: out.status, unchanged: out.unchanged, order: await orders.get(req.shopId, req.params.id, actorOf(req)) });
+});
+
+/**
+ * ORD-14 — تسویهٔ تفاوتِ ویرایشِ سفارشِ **پرداخت‌شده** (`amend.settle`؛ پرچمِ خاموشِ `shop.orders.amend_paid`،
+ * ۴۰۳ در خودِ lib): فقط ثبت، نقد، بی درگاه؛ پول جابه‌جا می‌شود ⇒ `orders.refund` (صاحب و مدیر) و اشتراک.
+ */
+router.post('/:id/amendments/:amendId/settlement', needFlag, requirePermission('orders.refund'), needWrite, needAmend, async (req, res) => {
+  const key = orders.clientKeyOf(req);
+  const out = await amend.settle(req.shopId, req.params.id, req.params.amendId, { key, body: req.body, actor: actorOf(req) });
+  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  else {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.amend_settle', targetType: 'online_order', targetId: out.order.id,
+      detail: { orderNo: out.orderNo, amendId: req.params.amendId, kind: out.kind, amountMinor: out.amountMinor, method: req.body.method },
+      ip: clientIp(req),
+    });
+  }
+  res.json({ amendment: out.amendment, order: out.order, replayed: out.replayed });
 });
 
 /**

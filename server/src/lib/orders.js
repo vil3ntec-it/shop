@@ -61,14 +61,15 @@ function decode(text) {
  * ⛔ فاز ۳ ِ پنلِ مرکزی: «غیرفعال کردنِ سرویس» (`lib/shop-holds.js`، حالتِ `service_disabled` با
  * `service` = همین کلید) هر مقداری را می‌بُرد — در همین یک پرسش، بی رفت‌وبرگشتِ دوم.
  */
-async function flagOf(shopId, key = FLAG_KEY) {
-  const rows = await many(
-    `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
+async function flagOf(shopId, key = FLAG_KEY, run = null) {
+  //  `run` = اتصالِ تراکنشِ جاری (`(sql, params) ⇒ {rows}`): درونِ تراکنش از همان اتصال، نه استخر — وگرنه
+  //  ثبت‌های هم‌زمانِ پشتِ یک قفل همهٔ اتصال‌ها را نگه می‌دارند و این پرسش اتصال نمی‌گیرد (RSK-07 روی PostgreSQL)
+  const sql = `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
      UNION ALL
      SELECT '#hold', 'false' FROM shop_holds
-      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`,
-    [key, 'all', String(shopId)]
-  );
+      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`;
+  const params = [key, 'all', String(shopId)];
+  const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   if (rows.some((r) => r.scope === '#hold')) return false;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
@@ -234,12 +235,29 @@ function parseAddress(raw) {
   const addrText = text(a.text, 300);
   const area = text(a.area, 80);
   const gateColor = text(a.gateColor, 40);
+  //  CHK-08: شمارهٔ دوم (کارتِ پیک فقط کلیدهای خودش را برمی‌دارد، پس پوشیده می‌ماند) و Plus Code (فقط متن، بی ژئوکدر)
+  let phone2 = null;
+  if (text(a.phone2, 40)) {
+    try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
+  }
+  const plusCode = plusCodeOf(a.plusCode);
   //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
   if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
   return {
     ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
-    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}),
+    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}), ...(phone2 ? { phone2 } : {}), ...(plusCode ? { plusCode } : {}),
   };
+}
+
+/** Plus Code (Open Location Code): کامل (۸+۲/۳) یا کوتاه (۴/۶+۲/۳) با نامِ شهرِ اختیاری؛ نادرست ⇒ ۴۰۰ `bad_plus_code` */
+const OLC = /^(?:[23456789CFGHJMPQRVWX]{8}|[23456789CFGHJMPQRVWX]{6}|[23456789CFGHJMPQRVWX]{4})\+[23456789CFGHJMPQRVWX]{2,3}$/;
+function plusCodeOf(raw) {
+  const s = text(raw, 60).replace(/\s+/g, ' ');
+  if (!s) return '';
+  const [head, ...rest] = s.split(' ');
+  const code = head.toUpperCase();
+  if (!OLC.test(code)) throw badRequest('Plus Code معتبر نیست (مثلاً 8FVC9G8F+6W یا 9G8F+6W کابل)', 'bad_plus_code');
+  return [code, ...rest].join(' ').slice(0, 60);
 }
 
 /**

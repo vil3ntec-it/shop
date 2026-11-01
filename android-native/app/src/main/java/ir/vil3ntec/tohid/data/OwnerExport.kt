@@ -195,6 +195,10 @@ object OwnerExport {
     "approvedBy" to "تأییدکننده",
     "note" to "توضیح",
     "z" to "گزارش Z",
+    //  POS-40 اصلاحِ روشِ پرداخت (`pay_fix`)
+    "fromMethod" to "روش پیشین",
+    "toMethod" to "روش تازه",
+    "payRef" to "مرجع روش تازه",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",

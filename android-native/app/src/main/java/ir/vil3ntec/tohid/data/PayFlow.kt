@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.pay.MethodTotals
 import ir.vil3ntec.tohid.core.pay.Moves
 import ir.vil3ntec.tohid.core.pay.OpenShiftInput
 import ir.vil3ntec.tohid.core.pay.Pay
+import ir.vil3ntec.tohid.core.pay.PayFix
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.SettleInput
@@ -316,8 +317,18 @@ object PayFlow {
   // ── صندوق (PAY-11..15، 19) ───────────────────────────────
   private val AUDIT_TYPES = setOf("cash_in", "cash_out", "no_sale")
 
-  /** ردیف‌های فروشِ یک فاکتور: `payments` اگر هست، وگرنه همان حسابِ امروز */
-  fun saleRows(s: Sale): List<ShiftRow> {
+  /**
+   *  ردیف‌های فروشِ یک فاکتور: `payments` اگر هست، وگرنه همان حسابِ امروز. با [fixes] (POS-40، `PayFixFlow.bySale`)
+   *  اصلاح‌های روشِ پرداختِ تا [until] روی همان ردیف‌ها می‌نشینند (`PayFix.apply`)؛ بی اصلاح همان ردیف‌های امروز.
+   */
+  fun saleRows(s: Sale, fixes: List<PayFix.Fix> = emptyList(), until: Long = Long.MAX_VALUE): List<ShiftRow> {
+    val base = saleRowsAsPosted(s)
+    if (fixes.isEmpty()) return base
+    return PayFix.apply(s.id, base.map { PayFix.Row(it.method, it.amount) }, fixes, until)
+      .rows.map { ShiftRow(it.method, it.amount) }
+  }
+
+  private fun saleRowsAsPosted(s: Sale): List<ShiftRow> {
     s.payments?.takeIf { it.isNotEmpty() }?.let { list ->
       //  ردیفی که امانتِ کسِ دیگری است (`custody`، مثلاً پیک) پولِ این صندوق نیست
       return list.filter { it.amountMinor > 0 && it.custody == null }.map { ShiftRow(it.method, it.amountMinor) }
@@ -344,9 +355,10 @@ object PayFlow {
     val ev = ArrayList<Pair<Int, ShiftEventInput>>()
     //  فاکتورِ اینترنتیِ سرور (W، #321) و مرجوعیِ سرورِ آن پولِ دخل نیستند — همان قاعدهٔ `CashShift`
     val online = d.sales.filter(CashShift::isOnline).mapTo(HashSet()) { it.id }
+    val fixes = PayFixFlow.bySale(d)
     d.sales.forEach { s ->
       if (s.status == "cancelled" || s.id in online || !inWindow(s.createdAt)) return@forEach
-      val rows = saleRows(s)
+      val rows = saleRows(s, fixes[s.id].orEmpty(), to)
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
     }
     d.transactions.forEach { t ->

@@ -197,7 +197,7 @@
   const st = {
     known: false, enabled: false, cfg: null, cfgAt: 0, cfgBusy: null,
     counts: {}, rev: null, tab: 'new', items: [], cursor: null, loading: false, err: '', listSeq: 0,
-    open: null, act: null, formKey: '', timer: null, busy: false, detailSeq: 0,
+    open: null, act: null, formKey: '', timer: null, busy: false, detailSeq: 0, extLoading: {},
   };
 
   const $ = (id) => document.getElementById(id);
@@ -214,18 +214,18 @@
   })();
   const when = (ms) => (DATE_FMT ? DATE_FMT.format(new Date(Number(ms))) : new Date(Number(ms)).toLocaleString());
 
-  /** افزونهٔ پشتِ پرچم (`license/orders-desk.js`: ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») — فقط با `presence`/`delay` ِ `/config` */
+  /** افزونه‌های پشتِ پرچم: `orders-desk.js` (ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») با `presence`/`delay` و `area-requests.js` (CHK-10 «خبرم کن») با `notifyArea` ِ `/config` */
   const extApi = { call, toast, esc, when, $, closeModal, get cfg() { return st.cfg; }, get open() { return st.open; },
     showOrder(o) { st.open = o; st.detailSeq++; paintDetail(); }, reopen(id) { openDetail(id, true); },
     refresh() { pollSummary(); if (isActive()) loadList(true); } };
-  const ext = (name, ...a) => { const x = root.TohidOrdersDesk; return x && typeof x[name] === 'function' ? x[name](extApi, ...a) : undefined; };
+  const ext = (name, ...a) => [root.TohidOrdersDesk, root.TohidAreaRequests].reduce((r, x) => (x && typeof x[name] === 'function' ? x[name](extApi, ...a) ?? r : r), undefined);
   function loadExt() {
-    if (!st.cfg || !(st.cfg.delay || st.cfg.presence) || root.TohidOrdersDesk || st.extLoading) return;
-    const el = Object.assign(document.createElement('script'), { src: 'license/orders-desk.js?v=1' });
-    st.extLoading = true;
-    el.onload = () => { st.extLoading = false; ext('mount'); if (st.open) paintDetail(); };
-    el.onerror = () => { st.extLoading = false; };
-    document.head.appendChild(el);
+    [['TohidOrdersDesk', 'orders-desk', st.cfg && (st.cfg.delay || st.cfg.presence)], ['TohidAreaRequests', 'area-requests', st.cfg && st.cfg.notifyArea]].forEach(([g, f, on]) => {
+      if (!on || root[g] || st.extLoading[f]) return;
+      const el = Object.assign(document.createElement('script'), { src: `license/${f}.js?v=1` }); st.extLoading[f] = true;
+      el.onload = () => { st.extLoading[f] = false; ext('mount'); if (st.open) paintDetail(); };
+      el.onerror = () => { st.extLoading[f] = false; }; document.head.appendChild(el);
+    });
   }
 
   const ICON = '<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';

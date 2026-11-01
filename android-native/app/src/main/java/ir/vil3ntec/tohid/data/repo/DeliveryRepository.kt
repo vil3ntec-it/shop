@@ -94,6 +94,10 @@ class DeliveryRepository(private val api: ApiClient) {
   suspend fun cashReport(from: Long, to: Long): ApiResult<CashReport> =
     result { DeliveryWire.cashReport(api.get(Delivery.cashReport(from, to))) }
 
+  /** DLV-18 — امتیازِ تحویل‌ها (۹۰ روزِ گذشته)؛ فقط صاحب و مدیر، پشتِ پرچمِ خاموش */
+  suspend fun ratings(): ApiResult<ir.vil3ntec.tohid.core.delivery.DeliveryRating.Board> =
+    result { DeliveryWire.ratings(api.get(Delivery.RATINGS)) }
+
   suspend fun companies(): ApiResult<List<ExternalCompany>> =
     result { DeliveryWire.rows(api.get(Delivery.EXTERNAL), "items", DeliveryWire::company) }
 

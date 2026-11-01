@@ -153,6 +153,12 @@ test('DLV-18 خاموش: پیک ۴۰۴، مشتری «سفارش پیدا نشد
   assert.equal(r.status, 403, JSON.stringify(r.body));
   assert.equal(code(r), 'ratings_disabled');
   assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM delivery_ratings WHERE shop_id=$1', [s.shopId])).n), 0);
+  //  دکمه‌های برنامه: پیک (`/courier/me`) و دکان (`/shop/delivery/config`) پرچم را می‌دانند
+  assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.ratingsEnabled, false);
+  assert.equal((await h.get('/api/shop/delivery/config', { token: s.token })).body.ratings, false);
+  await setFlag(s.shopId, R.FLAG, true);
+  assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.ratingsEnabled, true);
+  assert.equal((await h.get('/api/shop/delivery/config', { token: s.token })).body.ratings, true);
 });
 
 test('DLV-18: فقط پس از «تحویل شد»، یک بار از هر سو؛ برچسبِ سوی دیگر و پیکِ دیگر رد؛ پس از ۷ روز بسته', async () => {
@@ -232,4 +238,17 @@ test('DLV-18: جمعِ هر پیک فقط برای صاحب و مدیر؛ بی �
   assert.equal(other.status, 200);
   assert.deepEqual([other.body.couriers, other.body.recent], [[], []]);
   assert.equal((await rateCourier(t.courier, a.assignmentId, { stars: 5 })).status, 404, 'پیکِ دکانِ دیگر');
+});
+
+test('DLV-18 ویترین: صفحهٔ پیگیری فرمِ امتیاز را فقط پس از «تحویل شد» و با درِ همین پرونده دارد', () => {
+  const pub = path.join(__dirname, '..', 'public');
+  const html = fs.readFileSync(path.join(pub, 'store', 'index.html'), 'utf8');
+  const js = fs.readFileSync(path.join(pub, 'store', 'order.js'), 'utf8');
+  for (const id of ['o-rate', 'o-rate-form', 'o-rate-stars', 'o-rate-tags', 'o-rate-send', 'o-rate-msg']) assert.match(html, new RegExp(`id="${id}"`), id);
+  assert.match(html, /id="o-rate"[^>]*hidden/, 'پیش‌فرض پنهان');
+  assert.match(js, /o\.status !== 'delivered'/, 'فقط پس از «تحویل شد»');
+  assert.match(js, /'\/orders\/' \+ encodeURIComponent\(token\) \+ '\/rating'/, 'همان درِ `/api/store/:slug/orders/:token/rating`');
+  //  برچسب‌های صفحه همان فهرستِ ثابتِ سرور برای مشتری‌اند — نه بیشتر، نه کمتر
+  const tags = [...js.matchAll(/\{ tag: '([a-z_]+)', label: 'od\.rt\.\1' \}/g)].map((m) => m[1]);
+  assert.deepEqual(tags, R.TAGS.customer);
 });

@@ -20,6 +20,7 @@
     pieces: 'عدد',
     returned: 'مرجوعی',
     autoDiscount: 'تخفیفِ خودکار',
+    note: 'یادداشت',
   };
 
   var $ = function (id) { return document.getElementById(id); };
@@ -76,6 +77,13 @@
       ret.textContent = MSG.returned + ': ' + it.returned;
       li.appendChild(ret);
     }
+    //  POS-11: یادداشتِ ردیف — فقط textContent
+    if (it.note) {
+      var note = document.createElement('div');
+      note.className = 'slip-item-note';
+      note.textContent = it.note;
+      li.appendChild(note);
+    }
     list.appendChild(li);
   }
 
@@ -120,6 +128,7 @@
     r.payments.forEach(function (p) { row(pays, p.label, p.amount); });
     if (r.remaining) row(pays, r.remaining.label, r.remaining.amount);
 
+    text('note', r.note ? MSG.note + ': ' + r.note : '');
     text('footer', r.shop.footer);
     document.title = r.shop.name ? 'فاکتور — ' + r.shop.name : 'فاکتور';
     show('receipt');

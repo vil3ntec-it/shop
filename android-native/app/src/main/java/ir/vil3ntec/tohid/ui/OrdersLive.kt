@@ -449,6 +449,7 @@ object OrdersLive {
       counts.value = emptyMap(); rev.value = 0
       unposted.value = emptyList(); shortfalls.value = emptyList(); waiting.value = emptyList(); review.value = emptyList()
       refundIssues.value = emptyList()
+      OrderAlertsLive.reset()
     }
   }
 
@@ -458,8 +459,9 @@ object OrdersLive {
       .onSuccess {
         counts.value = it.counts
         rev.value = it.rev
+        OrderAlertsLive.onSummary(context, it)   // ORD-18 هشدارِ زمان‌بندی‌شده، ORD-03 «وصل است»
       }
-      .onFailure { if (it.code == "orders_disabled") refreshConfig(context) }
+      .onFailure { OrderAlertsLive.onFailure(it); if (it.code == "orders_disabled") refreshConfig(context) }
   }
 
   /** باز کردنِ یک سفارش با شناسه (برای اعلان)؛ اگر بخش خاموش است، هیچ */

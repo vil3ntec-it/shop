@@ -253,7 +253,7 @@ fun PaySplitSection(
     )
     if (s != null && s.payments.any { it.status == "pending" }) {
       Spacer(Modifier.height(4.dp))
-      StatusPill(StrPos.nonCashPending, PillTone.WARNING)
+      StatusPill(StrPos.nonCashPending, PillTone.AWAITING)
     }
   }
   val error = when {

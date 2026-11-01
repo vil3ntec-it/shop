@@ -111,6 +111,7 @@ test('CHK-10 ⛔: پرچمِ خاموش ⇒ درِ مشتری همان پاسخ�
   const own = await h.get('/api/shop/storefront/area-requests', { token: s.token });
   assert.equal(own.status, 403);
   assert.equal(own.body.error.code, 'notify_area_disabled');
+  assert.equal('notifyArea' in (await h.get('/api/shop/orders/config', { token: s.token })).body, false, 'خاموش ⇒ پاسخِ پیشینِ `/orders/config`');
   const where = await h.get(`/api/store/${s.slug}/delivery?lat=${OUTSIDE.lat}&lng=${OUTSIDE.lng}`);
   assert.deepEqual(Object.keys(where.body).sort(), ['inZone', 'pickup', 'zone', 'zoned']);
   assert.equal((await rowsOf(s.shopId)).length, 0);
@@ -181,6 +182,20 @@ test('CHK-10: دکان تقاضا را بی شماره می‌بیند؛ شما�
   }
   assert.equal((await ask(s.slug, { lat: 34.70, lng: 69.40 }, T(await ticketFor(s.slug, '0791200005')))).status, 201);
 
+  //  وب (license/area-requests.js): فهرست فقط برای صاحب و مدیر (`settings.write`) — صندوق‌دار نه کلید دارد نه فهرست
+  assert.equal((await h.get('/api/shop/orders/config', { token: s.token })).body.notifyArea, true);
+  {
+    resetAll();
+    const fresh = await h.signIn(s, 'shop');
+    const inv = await h.post('/api/shop/invite', { role: 'cashier' }, { token: fresh.accessToken });
+    assert.equal(inv.status, 201, JSON.stringify(inv.body));
+    const u = await h.newUser(`صندوق-${uniq()}`, 'shop');
+    assert.ok([200, 201].includes((await h.post('/api/shop/join', { code: inv.body.code }, { token: u.accessToken })).status));
+    const c = await h.signIn(u, 'shop');
+    assert.equal('notifyArea' in (await h.get('/api/shop/orders/config', { token: c.accessToken })).body, false, 'صندوق‌دار ⇒ بی کلید');
+    assert.equal((await h.get('/api/shop/storefront/area-requests', { token: c.accessToken })).status, 403);
+    resetAll();
+  }
   const before = await h.get('/api/shop/storefront/area-requests', { token: s.token });
   assert.equal(before.status, 200, JSON.stringify(before.body));
   assert.equal(before.headers.get('cache-control'), 'no-store');

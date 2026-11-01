@@ -79,6 +79,12 @@
     کلیددان و حالِ همگام‌سازی با هم بیرون)؛ خاموش ⇒ همان دو فایلِ قاعده (`TohidBackupAgent`).
     `fullBackupOnly` یعنی همان پشتیبانِ خودکارِ کامل، نه کلید/مقدارِ قدیمی.
   -->
+  <!--
+    برگشتِ پیش‌نما (`android:enableOnBackInvokedCallback`) فقط در نسخهٔ پیش‌نمایش روشن است
+    (`src/preview/AndroidManifest.xml`، رابطِ نسخهٔ ۳ آن‌جا پیش‌فرض روشن است). بستهٔ اصلی مثلِ main
+    بی آن می‌ماند تا روشن شدنِ `UiV3` برای همه؛ نسخهٔ ۳ در بستهٔ اصلی هم برمی‌گردد، فقط
+    بی جابه‌جاییِ پا‌به‌پای انگشت (`PredictiveBackHandler` در `V3RouteHost`).
+  -->
   <application
       android:allowBackup="true"
       android:backupAgent=".data.TohidBackupAgent"
@@ -102,7 +108,28 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+      <!-- پیوندِ ویترین و QRِ دکان (https://<slug>.vill3n.top/، …/store/<slug>) این‌جا نیست: خریدِ مشتری
+           برنامهٔ جدای خودش را دارد (تصمیمِ ۱۴۰۵/۰۸/۰۸) و برنامهٔ مدیریت آن‌ها را به مرورگر می‌سپارد -->
     </activity>
+
+    <!--
+      پیوندِ درونیِ برنامه: vill3n://app/<مسیر> (`DeepLinks`) — فقط با رابطِ نسخهٔ ۳. پیش‌فرض خاموش
+      (`enabled="false"`)؛ `MainActivity.syncLinkAlias` با پرچمِ `UiV3` روشن/خاموشش می‌کند. پس با پرچمِ
+      خاموش، مثلِ main، هیچ پیوندِ بیرونی برنامه را باز نمی‌کند. اعلان‌های خودِ برنامه صریح به
+      `MainActivity` می‌روند (`getLaunchIntentForPackage`) و به این بند بسته نیستند.
+    -->
+    <activity-alias
+        android:name=".AppLinkAlias"
+        android:targetActivity=".MainActivity"
+        android:enabled="false"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="vill3n" android:host="app" />
+      </intent-filter>
+    </activity-alias>
 
     <!--
       برچسبِ NFC ِ پرداختِ حساب‌پی. `exported=true` لازمِ خودِ اندروید است؛ فقط سرویسِ NFC ِ سیستم

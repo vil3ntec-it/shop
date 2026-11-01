@@ -64,6 +64,63 @@ data class PickSheetDto(
   val progress: PickProgressDto = PickProgressDto(),
   val totals: PickTotalsDto = PickTotalsDto(),
   val labels: List<PickLabelDto> = emptyList(),
+  /** PCK-05: پیشنهادهای جایگزینِ این برگه (`forSheet` ِ سرور) */
+  val substitutions: List<PickSubstitutionDto> = emptyList(),
+)
+
+/** PCK-05 — یک پیشنهادِ جایگزین (`subView` ِ سرور)؛ مبلغ را فقط سرور می‌سازد */
+@Serializable
+data class PickSubstitutionDto(
+  val id: String = "",
+  val lineNo: Int = 0,
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val qtyMilli: Long = 0,
+  val shelfUnitPriceMinor: Long = 0,
+  val chargedUnitPriceMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val preference: String = "",
+  /** `pending` · `accepted` · `rejected` · `withdrawn` */
+  val status: String = "",
+  val deadlineAt: Long = 0,
+  val expired: Boolean = false,
+  val willApply: String? = null,
+)
+
+/** PCK-05/06 — دو جایگزینِ امنِ پیشنهادیِ سرور برای یک قلم (`GET …/pick/substitutes?lineNo=`) */
+@Serializable
+data class PickSuggestionDto(
+  val productId: String = "",
+  val name: String = "",
+  val unit: String = "",
+  val brand: String = "",
+  val halal: String = "",
+  val shelfUnitPriceMinor: Long = 0,
+  val chargedUnitPriceMinor: Long = 0,
+  val totalMinor: Long = 0,
+  val qtyMilli: Long = 0,
+  val needsScan: Boolean = false,
+)
+
+@Serializable
+data class PickSuggestionsDto(
+  val lineNo: Int = 0,
+  val preference: String = "",
+  val proposable: Boolean = true,
+  /** `category_unknown` ⇒ دستهٔ کالای اصل معلوم نیست و جایگزینِ امن ساخته نمی‌شود */
+  val reason: String = "",
+  val suggestions: List<PickSuggestionDto> = emptyList(),
+)
+
+@Serializable
+data class PickCustomerLinkDto(val link: String = "", val whatsappUrl: String = "")
+
+@Serializable
+data class PickProposedDto(
+  val substitution: PickSubstitutionDto = PickSubstitutionDto(),
+  val replayed: Boolean = false,
+  val customer: PickCustomerLinkDto = PickCustomerLinkDto(),
 )
 
 /** نتیجهٔ یک رویدادِ جمع‌آور */
@@ -101,6 +158,49 @@ data class PickShelfItemDto(
 
 @Serializable
 data class PickShelfDto(val shelf: List<PickShelfItemDto> = emptyList())
+
+/** PCK-13 — `GET /shop/orders/pick/metrics` (۷ روزِ گذشته؛ زمان میلی‌ثانیه، نرخ یک‌دهمِ درصد) */
+@Serializable
+data class PickMetricsDto(
+  val from: Long = 0,
+  val to: Long = 0,
+  val orders: Int = 0,
+  val lines: Int = 0,
+  val found: Int = 0,
+  val notFound: Int = 0,
+  val short: Int = 0,
+  val substituted: Int = 0,
+  val avgPickMs: Long? = null,
+  val medianPickMs: Long? = null,
+  val foundRateBp: Long? = null,
+  val substitutionRateBp: Long? = null,
+  val wrongScans: Int = 0,
+)
+
+/** PCK-14 — یک وظیفهٔ «پیدا نشد» (`GET /shop/orders/pick/issues`)؛ `detail.name` نامِ کالا در همان سفارش */
+@Serializable
+data class PickIssueDetailDto(val name: String = "", val orderedMilli: Long = 0, val pickedMilli: Long = 0)
+
+@Serializable
+data class PickIssueDto(
+  val id: String = "",
+  val productId: String = "",
+  val status: String = "",
+  val hits: Int = 0,
+  val detail: PickIssueDetailDto = PickIssueDetailDto(),
+  val createdAt: Long = 0,
+  val note: String = "",
+)
+
+@Serializable
+data class PickIssuesDto(val issues: List<PickIssueDto> = emptyList())
+
+/** PCK-08 — عکسِ بسته (بی بایت؛ `GET/POST /shop/orders/:id/pick/photos`) */
+@Serializable
+data class PickPhotoDto(val id: String = "", val size: Int = 0, val bags: Int = 0, val createdAt: Long = 0)
+
+@Serializable
+data class PickPhotosDto(val photos: List<PickPhotoDto> = emptyList())
 
 /** نتیجهٔ اسکنِ یک کیسه روی قفسه */
 @Serializable

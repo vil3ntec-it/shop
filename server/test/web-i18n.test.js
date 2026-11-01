@@ -11,7 +11,9 @@
  *   ۴) در JS ِ صفحه‌ها هیچ متنِ فارسیِ ثابت نمانده (همه از واژه‌نامه)، جز واژه‌های پایهٔ
  *      `K.FB` (وقتی واژه‌نامه نیامد) که باید بی‌کم‌وکاست همان fa.json باشند.
  *   ۵) هر کدِ خطای سرور که صفحه نشان می‌دهد ترجمهٔ خودش را دارد.
- *   ۶) هر واژه‌نامه زیرِ ۲۲KB (بارِ نخستِ صفحه = JS + واژه‌نامه؛ شرح سرِ همان آزمون).
+ *   ۶) هر واژه‌نامه زیرِ ۲۱KB (بارِ نخستِ صفحه = JS + واژه‌نامه؛ شرح سرِ همان آزمون).
+ *   ۷) واژه‌نامهٔ جدای صفحهٔ پیگیریِ سفارش (`kit/i18n/order.<زبان>.json`، `K.part('order')`) فقط کلیدهای
+ *      همان صفحه را دارد، هیچ کلیدِ واژه‌نامهٔ اصلی یا `K.FB` را نه، و زیرِ ۴KB است.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -21,8 +23,18 @@ const path = require('node:path');
 const pub = path.join(__dirname, '..', 'public');
 const read = (f) => fs.readFileSync(path.join(pub, f), 'utf8');
 const LANGS = ['fa', 'en', 'ps'];
-const dict = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'market/index.html', 'store/index.html'];
+const main = Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${l}.json`))]));
+//  صفحهٔ پیگیریِ سفارش واژه‌نامهٔ خودش را با `K.part('order')` می‌گیرد؛ کلیدها روی هم همان یک واژه‌نامه‌اند
+//  فرمِ ثبت هم (`K.part('checkout')`، با checkout.js ِ دیربار): هر بخش فقط کلیدهای صفحهٔ خودش
+const PARTS = {
+  order: { js: 'store/order.js', from: 'id="view-order"', to: 'id="view-orders"' },
+  checkout: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"' },
+  //  دلخواه‌ها و فهرستِ خرید (WEB-11، catalog.js ِ دیربار): فقط بخشِ `#saved` ترجمه می‌شود، نه کلِ کاتالوگ (نشانه‌های data-i)
+  catalog: { js: 'store/catalog.js', from: 'id="saved"', to: 'id="recent"', root: 'saved' },
+};
+const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
+const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'market/index.html', 'store/index.html'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
@@ -90,7 +102,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js']) {
+  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
@@ -112,15 +124,43 @@ test('واژه‌های پایهٔ K.FB (واژه‌نامه نیامد) هما�
   const fb = Function(`'use strict'; return (${lines[0].replace(/^\s*K\.FB = /, '').replace(/;\s*$/, '')});`)();
   assert.ok(Object.keys(fb).length >= 30, 'سبد، ثبت و وضعیتِ سفارش را می‌پوشاند');
   for (const k of ['money', 'ps.add', 'ck.title', 'ck.sending', 'bar.label', 'od.placed', 'order.new', 'err.generic']) assert.ok(fb[k], k);
-  for (const [k, v] of Object.entries(fb)) assert.equal(v, dict.fa[k], `K.FB['${k}'] = fa.json`);
+  for (const [k, v] of Object.entries(fb)) assert.equal(v, main.fa[k], `K.FB['${k}'] = fa.json`);
 });
 
-//  ۲۲KB از ۱ نوامبر ۲۰۲۶ (پیش‌تر ۲۰KB): پیگیریِ سفارش (جایگزین، پیک، کدِ تحویل، بازپرداخت) و سبد/علاقه‌مندی
-//  کلیدهای تازه آوردند و fa.json به ۲۰٬۶۱۲ بایت رسید. همهٔ کلیدها زنده‌اند (بسیاری پویا: `cat.`/`order.`/`reason.`/`err.`).
-//  بدهی: واژه‌نامهٔ جدای صفحهٔ پیگیریِ سفارش که فقط همان‌جا بار شود، سپس سقف دوباره ۲۰KB.
-test('هر واژه‌نامه زیرِ ۲۲KB است', () => {
+//  ۲۲KB از ۱ نوامبر ۲۰۲۶ (پیش‌تر ۲۰KB)؛ سپس صفحهٔ پیگیریِ سفارش واژه‌نامهٔ جدای خودش را گرفت (fa.json ۲۱٬۲۸۶ ⇐
+//  ۱۹٬۴۷۹ بایت) و سقف ۲۱KB شد — جا برای کلیدهای فرمِ ثبت (CHK) تا آن هم مثلِ پیگیری جدا شود، سپس ۲۰KB.
+test('هر واژه‌نامه زیرِ ۲۱KB است', () => {
   for (const l of LANGS) {
     const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${l}.json`)).size;
-    assert.ok(n <= 22 * 1024, `${l}.json: ${n} بایت`);
+    assert.ok(n <= 21 * 1024, `${l}.json: ${n} بایت`);
   }
+});
+
+for (const [name, P] of Object.entries(PARTS)) test(`واژه‌نامهٔ ${name} فقط کلیدهای همان صفحه را دارد و کوچک است`, () => {
+  const part = parts[name];
+  const html = read('store/index.html');
+  const from = html.indexOf(P.from);
+  const to = html.indexOf(P.to);
+  assert.ok(from > 0 && to > from, `بخشِ ${P.from} پیدا شد`);
+  //  هر جای دیگرِ کیت، بازارچه و ویترین (جز order.js و همان بخش) که کلیدی از این واژه‌نامه را بخواهد بی آن می‌ماند
+  const elsewhere = SOURCES.filter((f) => f !== P.js && f !== 'store/index.html').map(read).join('\n') +
+    html.slice(0, from) + html.slice(to);
+  const base = (d) => Object.keys(d).filter((k) => !k.endsWith('.1')).sort();
+  assert.ok(base(part.fa).length >= 10, `${base(part.fa).length} کلید`);
+  assert.deepEqual(base(part.en), base(part.fa), 'en = fa');
+  assert.deepEqual(base(part.ps), base(part.fa), 'ps = fa');
+  const fbLine = read('kit/kit.js').split('\n').find((l) => /^\s*K\.FB = \{/.test(l));
+  for (const l of LANGS) {
+    for (const k of Object.keys(part[l])) {
+      assert.ok(!(k in main[l]), `${l}: ${k} در هر دو واژه‌نامه`);
+      for (const other of Object.keys(PARTS).filter((x) => x !== name)) assert.ok(!(k in parts[other][l]), `${l}: ${k} در ${name} و ${other}`);
+      assert.ok(!fbLine.includes(`'${k}'`), `${k} واژهٔ پایهٔ K.FB است و باید در واژه‌نامهٔ اصلی بماند`);
+      const b = k.replace(/\.1$/, '');
+      assert.ok(!elsewhere.includes(`'${b}'`) && !elsewhere.includes(`"${b}"`), `${b} بیرون از صفحهٔ پیگیری هم به کار رفته`);
+    }
+    const n = fs.statSync(path.join(pub, 'kit', 'i18n', `${name}.${l}.json`)).size;
+    assert.ok(n <= 4 * 1024, `${name}.${l}.json: ${n} بایت`);
+  }
+  //  صفحه همان واژه‌نامه را با بارِ خودش می‌گیرد
+  assert.ok((read('store/store.js') + read(P.js)).includes(`K.part('${name}', $('${P.root || `view-${name}`}'))`));
 });

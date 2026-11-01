@@ -20,7 +20,6 @@
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var pollTimer = 0; var searchTimer = 0;
-  var recent = null; // WEB-13: recent.js، فقط با کلیدِ `recent` ِ سرور
   var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
   //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
   var campaign = campaignOfPage();
@@ -93,7 +92,7 @@
       if (s.notice) box.appendChild(el('span', { class: 'notice', text: s.notice }));
     }
     var meta = K.clear($('store-meta'));
-    if (store.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), store.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(store.deliveryFeeMinor) }) : t('ship.free')));
+    if (store.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), shipText()));
     if (store.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (store.minOrderMinor > 0) meta.appendChild(el('span', { text: t('min.order', { m: K.money(store.minOrderMinor) }) }));
     meta.appendChild(el('span', {}, K.icon('cash'), t('cod')));
@@ -116,10 +115,12 @@
   }
 
   function card(p) {
-    return K.productCard(p, {
+    var li = K.productCard(p, {
       photo: photoUrl(p.id), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
       onOpen: function () { location.hash = '#/p/' + encodeURIComponent(p.id); },
     });
+    if (more) more.card(li, p);
+    return li;
   }
 
   function refreshCard(id) {
@@ -137,17 +138,19 @@
     $(id).hidden = !list.length;
   }
 
-  /** WEB-02: پرفروش (یا تازه)، «ارزان‌تر» و تازه‌ها — فقط دادهٔ واقعیِ سرور (#301)؛ نبود ⇒ هیچ */
-  function loadPicks() {
-    //  سرورِ بی #301 این مسیر را ندارد؛ #301 همراهِ `store.delivery` می‌آید
-    if (!store.delivery) return Promise.resolve();
-    return api('/highlights').then(function (r) {
-      var best = r.bestsellers || []; var fresh = r.newArrivals || [];
-      rail('picks', best.length ? best : fresh);
-      $('picks-why').textContent = best.length ? t('picks.best', { d: K.fa(r.windowDays || 30, 0) }) : t('picks.new');
-      rail('deals', r.deals || []);
-      rail('fresh', best.length ? fresh.filter(function (p) { return !best.some(function (b) { return b.id === p.id; }); }) : []);
-    }).catch(function () { $('picks').hidden = true; $('deals').hidden = true; $('fresh').hidden = true; });
+  // ── پیشنهادها (WEB-02)، اخیر (WEB-13)، دلخواه‌ها/فهرستِ خرید (WEB-11) و بنرها (WEB-24): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  var more = null;
+  function loadMore(r) {
+    return new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
+    }).then(function () {
+      more = window.StoreCatalog({
+        api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, get zone() { return zone; }, rail: rail, card: card, items: catalog.items,
+        ids: ids, reorder: reorder, recent: Boolean(r.recent), features: r.features || {},
+        category: function (c) { catalog.category = c; renderCats(); loadProducts(false); },
+      });
+      return more.picks();
+    }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
   }
 
   function loadProducts(more) {
@@ -205,7 +208,7 @@
       $('ps-share').hidden = !share;
       $('ps-share').onclick = function () { share(x); };
       renderAddSheet(x);
-      if (recent) recent.seen(x);
+      if (more) more.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
     if (detail) detail(null);
@@ -235,6 +238,7 @@
     renderBar();
     if (K.cartIsOpen()) renderSheet();
     if (checkout && !$('view-checkout').hidden) checkout.render();
+    if (more) more.cart();
   }
   function addOne(p) {
     var cur = cart[p.id] ? cart[p.id].qtyMilli : 0;
@@ -263,7 +267,34 @@
   function ids() { return Object.keys(cart); }
   function subtotal() { return ids().reduce(function (s, id) { return s + K.lineTotal(cart[id].qtyMilli, cart[id].priceMinor); }, 0); }
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
-  function feeFor(f) { return f === 'delivery' && store ? store.deliveryFeeMinor : 0; }
+  // ── CHK-05/06/07/10 ناحیهٔ ارسال (`store.delivery.zoned`، پرچمِ `shop.storefront.zones`؛ خاموش ⇒ هزینه و حداقلِ ثابت).
+  //  ناحیه از پین (`/delivery`) یا گزینش؛ ندانسته ⇒ هزینه «پس از ناحیه» و سبد بسته نمی‌شود. حساب همان `forCheckout` ِ سرور.
+  var zone = null;
+  function zones() { return store && store.delivery && store.delivery.zoned ? store.delivery.zones : null; }
+  function setZone(z) {
+    var all = zones() || [];
+    zone = z && all.filter(function (x) { return x.id === z.id; })[0] || null;
+    K.saveS('zone:' + slug, zone && zone.id);
+  }
+  function zoneFee(z, sub) {
+    return (z.freeOverMinor !== null && sub >= z.freeOverMinor ? 0 : z.feeMinor) + (z.smallBasketFeeMinor && sub < z.minOrderMinor ? z.smallBasketFeeMinor : 0);
+  }
+  function feeFor(f) {
+    if (f !== 'delivery' || !store) return 0;
+    return zones() ? (zone ? zoneFee(zone, subtotal()) : 0) : store.deliveryFeeMinor;
+  }
+  /** حداقلی که سبد را می‌بندد؛ ناحیهٔ «هزینهٔ سبدِ کوچک» زیرِ حداقل را با هزینه می‌پذیرد (CHK-06) */
+  function minFor(f) {
+    if (!store) return 0;
+    if (f !== 'delivery' || !zones()) return store.minOrderMinor;
+    return zone && !zone.smallBasketFeeMinor ? zone.minOrderMinor : 0;
+  }
+  function shipText() {
+    var zs = zones();
+    if (!zs) return store.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(store.deliveryFeeMinor) }) : t('ship.free');
+    var low = Math.min.apply(null, zs.map(function (z) { return z.feeMinor; }));
+    return low > 0 ? t('ship.from', { fee: K.money(low) }) : t('ship.free');
+  }
   function hasBad() { return ids().some(function (id) { return cart[id].unavailable; }); }
   function short(id) { return cap[id] > 0 && cart[id].qtyMilli > cap[id]; }
   function hasShort() { return ids().some(short); }
@@ -327,14 +358,26 @@
     var sub = subtotal();
     var f = defaultFulfillment();
     var fee = feeFor(f);
+    var min = minFor(f);
+    var unknown = f === 'delivery' && zones() && !zone;
     var d = K.clear($('sheet-deliv'));
     var txt = el('div', { class: 'txt' },
-      el('b', {}, f === 'delivery' ? t('ship') : t('pickup'), el('span', { text: fee > 0 ? K.money(fee) : t('free') })));
-    if (store && store.minOrderMinor > sub) {
-      var pct = Math.min(100, Math.round(sub * 100 / store.minOrderMinor));
-      txt.appendChild(el('p', { text: t('min.left', { left: K.money(store.minOrderMinor - sub), m: K.money(store.minOrderMinor) }) }));
+      el('b', {}, f === 'delivery' ? t('ship') : t('pickup'), el('span', { text: unknown ? '—' : fee > 0 ? K.money(fee) : t('free') })));
+    var progress = function (to, label) {
+      var pct = Math.min(100, Math.round(sub * 100 / to));
       var bar = el('i'); bar.style.setProperty('width', pct + '%');
-      txt.appendChild(el('div', { class: 'progress', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': t('min.progress') } }, bar));
+      txt.appendChild(el('div', { class: 'progress', attrs: { role: 'progressbar', 'aria-valuemin': '0', 'aria-valuemax': '100', 'aria-valuenow': String(pct), 'aria-label': label } }, bar));
+    };
+    if (unknown) {
+      txt.appendChild(el('p', { text: t('zone.after') }));
+    } else if (min > sub) {
+      txt.appendChild(el('p', { text: t('min.left', { left: K.money(min - sub), m: K.money(min) }) }));
+      progress(min, t('min.progress'));
+    } else if (f === 'delivery' && zone && zone.smallBasketFeeMinor && sub < zone.minOrderMinor) {
+      txt.appendChild(el('p', { text: t('zone.small', { fee: K.money(zone.smallBasketFeeMinor), m: K.money(zone.minOrderMinor) }) }));
+    } else if (f === 'delivery' && zone && zone.freeOverMinor !== null && sub < zone.freeOverMinor && fee > 0) {
+      txt.appendChild(el('p', { text: t('zone.free.left', { left: K.money(zone.freeOverMinor - sub) }) }));
+      progress(zone.freeOverMinor, t('zone.free.progress'));
     } else if (f === 'delivery' && store.fulfillment.pickup) {
       txt.appendChild(el('p', { text: t('pickup.hint') }));
     }
@@ -344,7 +387,7 @@
     if (closed()) block = accept();
     else if (hasBad()) block = t('cart.bad');
     else if (hasShort()) block = t('cart.short');
-    else if (store && store.minOrderMinor > sub) block = t('cart.min');
+    else if (minFor(f) > sub) block = t('cart.min');
     var m = $('sheet-msg');
     if (block) K.note(m, 'warn', block); else m.hidden = true;
     $('cart-next').disabled = Boolean(block) || ids().length === 0;
@@ -381,10 +424,11 @@
   function loadCheckout() {
     checkoutP = checkoutP || new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/checkout.js' }, on: { load: ok, error: no } }));
-    }).then(function () {
+    }).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
-        ids: ids, subtotal: subtotal, feeFor: feeFor, defaultFulfillment: defaultFulfillment, hasBad: hasBad,
+        ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; },
+        defaultFulfillment: defaultFulfillment, hasBad: hasBad,
         short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
         empty: function () { cart = {}; cap = {}; saveCart(); },
@@ -405,9 +449,10 @@
   // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var orderView = null;
   function loadOrderView() {
-    orderView = orderView || new Promise(function (ok, no) {
+    //  واژه‌نامهٔ همین صفحه (`kit/i18n/order.<زبان>.json`) هم‌زمان با اسکریپت؛ نیامد ⇒ متنِ فارسیِ HTML، بی کلیدِ خام
+    orderView = orderView || Promise.all([new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
-    }).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
+    }), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
@@ -441,8 +486,8 @@
     load();
   }
 
-  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. */
-  function reorder(o) {
+  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. «فهرستِ خرید» (WEB-11) هم با `fail` ِ خودش. */
+  function reorder(o, fail) {
     var want = {}; o.lines.forEach(function (l) { want[l.productId] = l.qtyMilli; });
     api('/products?ids=' + Object.keys(want).map(encodeURIComponent).join(',')).then(function (r) {
       var added = 0;
@@ -456,7 +501,7 @@
       var missing = Object.keys(want).length - added;
       location.hash = '#/cart';
       K.toast(missing ? t('re.some', { a: K.fa(added, 0), m: K.fa(missing, 0) }) : t('re.all'));
-    }).catch(function (e) { K.note($('o-msg'), 'err', e.message); });
+    }).catch(fail || function (e) { K.note($('o-msg'), 'err', e.message); });
   }
 
   // ── سفارش‌های من در همین دکان ──
@@ -526,12 +571,9 @@
       store = r.store;
       marketOn = Boolean(r.market && r.market.available);
       stockList = Boolean(r.features && r.features.stockList);
+      store.addressExtra = Boolean(r.features && r.features.addressExtra);
+      store.features = r.features || {};
       verifyAvailable = !r.verification || r.verification.available !== false;
-      if (r.recent) {
-        var rs = el('script', { attrs: { src: '/store/recent.js' } });
-        rs.onload = function () { recent = window.StoreRecent.start({ slug: slug, api: api, card: card, items: catalog.items }); };
-        document.head.appendChild(rs);
-      }
       if (r.seo && typeof r.seo.productBase === 'string') {
         var ss = el('script', { attrs: { src: '/store/share.js' } });
         //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
@@ -542,11 +584,12 @@
       renderCats();
       $('opt-delivery').hidden = !store.fulfillment.delivery;
       $('opt-pickup').hidden = !store.fulfillment.pickup;
-      $('opt-delivery-fee').textContent = store.deliveryFeeMinor > 0 ? K.money(store.deliveryFeeMinor) : t('free');
+      $('opt-delivery-fee').textContent = zones() ? shipText() : store.deliveryFeeMinor > 0 ? K.money(store.deliveryFeeMinor) : t('free');
+      setZone({ id: K.loadS('zone:' + slug) });
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
-      return Promise.all([loadProducts(false), refreshCart(), loadPicks()]);
+      return Promise.all([loadProducts(false), refreshCart(), loadMore(r)]);
     }).then(route).catch(function (e) {
       if (e.status === 404) {
         show('view-missing');

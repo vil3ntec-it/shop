@@ -105,6 +105,37 @@ object ScaleSale {
     return Label.Weighed(p, quantity, kg, labelMinor)
   }
 
+  /* ── قاعده‌های «دستگاه‌ها ⇐ ترازو»: طولِ کد و مقدار و رقمِ اعشار ── */
+
+  /** رقم‌های کدِ کالا (PLU) روی برچسب؛ مقدار بقیهٔ ده رقمِ پس از پیشوندِ دورقمی است */
+  val ITEM_DIGITS: List<Int> = listOf(4, 5, 6)
+
+  /** رقمِ اعشارِ مقدار: وزن ⇐ گرم (۳) یا ده‌گرم (۲)؛ قیمت ⇐ افغانی (۰) یا با دو رقمِ پول (۲). نخستین پیش‌فرض است */
+  fun decimalsFor(kind: WeightBarcode.Kind): List<Int> = if (kind == WeightBarcode.Kind.PRICE) listOf(0, 2) else listOf(3, 2)
+
+  /**
+   *  قاعده‌های ۲۰ تا ۲۹ با همین طول‌ها — همیشه EAN-13 ِ درست (۲ + کد + مقدار + رقمِ کنترل). طول یا اعشارِ
+   *  بیرون از فهرست ⇒ پیش‌فرض (کدِ ۵ رقمی، نخستین اعشار)، نه قاعدهٔ نادرست.
+   */
+  fun rules(kind: WeightBarcode.Kind, itemDigits: Int, decimals: Int): List<WeightBarcode.Rule> {
+    val item = itemDigits.takeIf { it in ITEM_DIGITS } ?: 5
+    val dec = decimals.takeIf { it in decimalsFor(kind) } ?: decimalsFor(kind).first()
+    return (20..29).map { WeightBarcode.Rule(prefix = it.toString(), itemDigits = item, valueDigits = 10 - item, kind = kind, decimals = dec) }
+  }
+
+  /**
+   *  برچسبِ نمونه برای صفحه: کدِ ۱۵۰ با ۱٫۲۵ کیلو یا ۱۵۰ افغانی (اگر در رقم‌های مقدار نگنجد ۱۵ افغانی)، به
+   *  شکلِ همین قاعده‌ها (پیشوندِ ۲۱). نگنجد ⇒ `null`.
+   */
+  fun sample(rules: List<WeightBarcode.Rule>): String? {
+    val r = rules.firstOrNull { it.prefix == "21" && it.valid } ?: return null
+    var scale = 1L
+    repeat(r.decimals) { scale *= 10 }
+    val tries = if (r.kind == WeightBarcode.Kind.PRICE) listOf(150L * scale, 15L * scale) else listOf(125L * scale / 100)
+    val raw = tries.firstOrNull { it.toString().length <= r.valueDigits } ?: return null
+    return WeightBarcode.build(r, "150", raw)
+  }
+
   enum class ReadWhy { NOT_WEIGHED, ERROR, OVER, UNDER, MOTION, NO_WEIGHT }
 
   sealed interface Weigh {

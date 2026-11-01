@@ -369,7 +369,7 @@ for (const [lang, dir, stock, ck] of [['en', 'ltr', 'Stock is being checked', 'C
 
 //  ⛔ واژه‌نامه نیامد (شبکه یا ۵۰۰): ویترینِ زنده هرگز کلیدِ خام («od.history»، «ship.free») نشان نمی‌دهد —
 //  HTML ِ فارسی می‌ماند و متنِ ساختهٔ JS از واژه‌های پایهٔ کیت؛ و یک بار دوباره خواسته می‌شود
-const KEYS = Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8')));
+const KEYS = ['fa.json', 'order.fa.json', 'checkout.fa.json'].flatMap((f) => Object.keys(JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'i18n', f), 'utf8'))));
 const rawKeys = (pg) => pg.evaluate((keys) => {
   const set = new Set(keys);
   const out = [];
@@ -587,6 +587,22 @@ await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.ord
   await gc.close();
 }
 await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.subscribers_only', value: null }, A);
+
+//  پیشنهادها و «اخیر» در store/catalog.js ِ دیربار: نیامد (شبکه) ⇒ همان کاتالوگ و سبد، بی ردیف‌ها و بی خطا
+{
+  const lc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  await lc.route('**/store/catalog.js', (r) => r.abort());
+  const lp = await lc.newPage();
+  const le = [];
+  lp.on('pageerror', (e) => le.push(String(e)));
+  await lp.goto(`${base}/store/${slug}`);
+  await lp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await lp.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
+  await lp.waitForSelector('#cart-bar:not([hidden])', { timeout: 5000 });
+  ok(await lp.isHidden('#picks') && await lp.isHidden('#fresh') && le.length === 0, 'بی catalog.js: کالاها و سبد هست، ردیف‌های پیشنهاد نه، بی خطا', le.join(' | '));
+  await lc.close();
+}
+ok(!fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'store', 'index.html'), 'utf8').includes('catalog.js'), 'catalog.js در بارِ نخست نیست');
 
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });

@@ -2,9 +2,14 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierQueue
+import ir.vil3ntec.tohid.core.courier.CourierSettlement
+import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.MissionStep
+import ir.vil3ntec.tohid.core.courier.PeriodStats
 import ir.vil3ntec.tohid.core.courier.QueueState
+import ir.vil3ntec.tohid.core.courier.UnsettledDelivery
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -48,6 +53,25 @@ class CourierCodecTest {
     assertNull(back[1].lat)
     assertEquals(7L, back[1].cashCollectedMinor)
     assertTrue(CourierCodec.cards("[[[").isEmpty())
+  }
+
+  @Test fun `خطِ زمانی و «نقدِ من» بی اینترنت هم همان می‌مانند`() {
+    val c = MissionCard(
+      id = "A", orderNo = 12, status = "delivered",
+      timeline = listOf(MissionStep("created", "requested", 1, "", "shop"), MissionStep("status", "delivered", 9, "", "courier")),
+    )
+    assertEquals(c, CourierCodec.cards(CourierCodec.cardsJson(listOf(c))).single())
+    val s = CourierSummary(
+      shopName = "دکان", shopPhone = "0700000000", cashInHandMinor = 98_000, liveExpectedMinor = 552_000,
+      cashCapMinor = 1_000_000, headroomMinor = 350_000,
+      unsettled = listOf(UnsettledDelivery(1038, 5, 98_000, 98_000, 5_000)), unsettledCount = 57,
+      settlements = listOf(CourierSettlement(11, 7, "confirmed", 4, 920_000, 28_000, 920_000, 900_000, 20_000, 0, "کسری")),
+      today = PeriodStats(1, 2, 1, 98_000, 11_000), week = PeriodStats(0, 14, 2, 3_120_000, 76_000), serverTime = 9,
+    )
+    assertEquals(s, CourierCodec.summary(CourierCodec.summaryJson(s)))
+    //  هنوز نیامده یا خراب ⇒ null، نه صفرِ ساختگی
+    assertNull(CourierCodec.summary(null))
+    assertNull(CourierCodec.summary("{{"))
   }
 
   @Test fun `DLV-07 و DLV-17 — برچسب‌ها و موقعیت در صفِ آفلاین می‌مانند، و کارت شمارِ کیسه و فاصله را نگه می‌دارد`() {

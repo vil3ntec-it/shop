@@ -40,4 +40,21 @@ object PickDesk {
 
   /** پیشرفتِ قفسهٔ یک سفارش: همهٔ کیسه‌ها ⇒ آماده */
   fun ready(scanned: Int, bags: Int): Boolean = bags > 0 && scanned >= bags
+
+  /** شاخص‌های PCK-13 برای صفحه — میلی‌ثانیه ⇒ دقیقه با یک رقمِ اعشار (گرد)؛ null ⇒ «—» (رقمِ لاتین، رقمِ صفحه از فونت) */
+  fun minutes(ms: Long?): String {
+    if (ms == null || ms < 0) return "—"
+    val tenths = (ms + 3_000) / 6_000
+    return "${tenths / 10}.${tenths % 10}"
+  }
+
+  /** نرخ به یک‌دهمِ درصد (۱۰۰۰۰ = ۱۰۰٪) ⇒ «97.5»؛ null ⇒ «—» */
+  fun percent(bp: Long?): String {
+    if (bp == null || bp < 0) return "—"
+    val tenths = (bp + 5) / 10
+    return "${tenths / 10}.${tenths % 10}"
+  }
+
+  /** «پیدا نشد» ِ صفِ مدیر (PCK-14): کار فقط «رسیدگی شد» یا «کنار گذاشته شد»، و توضیح لازم (همان سرور) */
+  fun canResolve(action: String, note: String): Boolean = action in setOf("resolved", "dismissed") && note.isNotBlank()
 }

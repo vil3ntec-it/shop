@@ -68,4 +68,11 @@ object SupplierPricing {
   fun bySupplier(buys: List<Buy>, productId: String): List<Point> =
     history(buys, productId).groupBy { it.supplierId }.values.map { it.first() }
       .sortedWith(compareBy<Point> { it.priceMinor }.thenByDescending { it.date }.thenByDescending { it.at })
+
+  /**
+   *  تأمین‌کنندهٔ تازه‌ترین خریدِ واقعیِ این کالا (سندِ کسر نه) — سفارشِ «با یک کلید» ِ INV-14 به او می‌رود؛
+   *  هرگز نخریده ⇒ `null`.
+   */
+  fun latestSupplier(buys: List<Buy>, productId: String): String? =
+    buys.filter { it.productId == productId && real(it) }.maxWithOrNull(oldestFirst)?.supplierId
 }

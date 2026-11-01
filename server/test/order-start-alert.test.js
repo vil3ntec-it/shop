@@ -161,3 +161,44 @@ test('چهار جاروبِ هم‌زمان روی سفارشِ تازه‌رس�
   assert.deepEqual(got.map((e) => e.order_id).sort(), [...ids].sort());
   assert.equal((await one(`SELECT COUNT(*)::int n FROM audit_logs WHERE shop_id=$1 AND action='order.start_alert'`, [s.shopId])).n, 2);
 });
+
+test('summary: هشدارِ هنوز شروع‌نشده برای برنامهٔ مدیریت (`startAlerts`) فقط با پرچم، فقط همین دکان؛ شروع ⇒ بیرون', async () => {
+  const off = await shop('بی‌کلید', { on: false });
+  const offId = await scheduled(off, Date.now() + 10 * MIN, { to: ['accepted'] });
+  const sOff = await h.get('/api/shop/orders/summary', { token: off.token });
+  assert.equal(sOff.status, 200);
+  assert.ok(!('startAlerts' in sOff.body), 'پرچمِ خاموش ⇒ همان پاسخِ پیشین، بی کلید');
+
+  const s = await shop('نشان');
+  const other = await shop('همسایه');
+  const t = Date.now();
+  const a = await scheduled(s, t + 10 * MIN, { to: ['accepted'] });
+  const b = await scheduled(s, t + 25 * MIN);
+  const noAlertYet = await scheduled(s, t + 50 * MIN, { to: ['accepted'] });
+  const theirs = await scheduled(other, t + 10 * MIN, { to: ['accepted'] });
+  const before = (await h.get('/api/shop/orders/summary', { token: s.token })).body;
+  assert.deepEqual(before.startAlerts, [], 'پیش از جاروب هیچ');
+
+  await alert.sweep(t);
+  const sum = (await h.get('/api/shop/orders/summary', { token: s.token })).body;
+  assert.deepEqual(sum.startAlerts.map((x) => x.id), [a, b], 'به ترتیبِ زمان');
+  const first = sum.startAlerts[0];
+  assert.equal(first.status, 'accepted');
+  assert.equal(first.scheduledFor, t + 10 * MIN);
+  assert.ok(first.alertAt > 0 && Number.isSafeInteger(first.orderNo));
+  assert.deepEqual(Object.keys(first).sort(), ['alertAt', 'id', 'orderNo', 'scheduledFor', 'status'], 'بی نام، شماره یا نشانی');
+  for (const id of [noAlertYet, theirs, offId]) assert.ok(!sum.startAlerts.some((x) => x.id === id), id);
+
+  //  شروعِ آماده‌سازی ⇒ از فهرست می‌رود (رویداد در خطِ زمانی می‌ماند)
+  const m = await h.post(`/api/shop/orders/${a}/transition`, { to: 'picking' }, { token: s.token });
+  assert.equal(m.status, 200, JSON.stringify(m.body));
+  const after = (await h.get('/api/shop/orders/summary', { token: s.token })).body;
+  assert.deepEqual(after.startAlerts.map((x) => x.id), [b]);
+  assert.ok((await alerts(s.shopId)).some((e) => e.order_id === a));
+  //  همسایه هشدارِ خودش را می‌بیند، نه این دکان را
+  await alert.sweep(t);
+  assert.deepEqual((await h.get('/api/shop/orders/summary', { token: other.token })).body.startAlerts.map((x) => x.id), [theirs]);
+  //  خیلی دیر (بیش از ۱۵ دقیقه پس از زمان) ⇒ بیرون
+  await query('UPDATE online_orders SET scheduled_for=$2 WHERE id=$1', [b, t - 16 * MIN]);
+  assert.deepEqual((await h.get('/api/shop/orders/summary', { token: s.token })).body.startAlerts, []);
+});

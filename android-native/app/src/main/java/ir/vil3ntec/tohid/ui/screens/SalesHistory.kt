@@ -79,9 +79,12 @@ fun SalesHistoryScreen(
   var invoiceFor by remember { mutableStateOf<Sale?>(null) }
   var returnFor by remember { mutableStateOf<Sale?>(null) }
   var cancelFor by remember { mutableStateOf<Sale?>(null) }
+  var payFixFor by remember { mutableStateOf<Sale?>(null) }
 
   val roleContext = androidx.compose.ui.platform.LocalContext.current
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
+  //  POS-40 — «اصلاحِ روشِ پرداخت» فقط با تنظیمِ روشنِ همین دستگاه (`PayFixPref`) و مجوزِ `sales.pay_fix` جز «ممنوع»
+  val payFix = remember { ir.vil3ntec.tohid.data.PayFixPref.on(roleContext) && ir.vil3ntec.tohid.data.PayFixPref.decision(roleContext) != "deny" }
   //  RPT-09 — «سابقهٔ ضدتقلب» (`FraudTrailPref`، پیش‌فرض خاموش): نامِ همین کاربر روی لغو و مرجوعی؛ خاموش ⇒ null
   val trailBy = remember { ir.vil3ntec.tohid.data.FraudTrailPref.by(roleContext) }
   //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
@@ -320,6 +323,7 @@ fun SalesHistoryScreen(
           //  سرور هم opِ لغوِ شاگرد را رد می‌کند (`sales.cancel`)
           onCancel = { if (canCancel) cancelFor = sale else toast(StrInvoices.cancelDenied) },
           onReopen = { if (canCancel) reopenFor = sale else toast(StrInvoices.cancelDenied) },
+          onPayFix = if (payFix) ({ payFixFor = sale }) else null,
         )
       }
     }
@@ -542,6 +546,7 @@ fun SalesHistoryScreen(
     }
   }
 
+  payFixFor?.let { sale -> PayFixHost(d, store, sale, me, ::toast) { payFixFor = null } }
   cancelFor?.let { sale ->
     CancelInvoiceDialog(sale, onDismiss = { cancelFor = null }) { reason ->
       voidSale(sale, InvoiceVoid.Kind.VOID, reason, StrInvoices.saleCancelled) { cancelFor = null }
@@ -570,6 +575,7 @@ private fun SaleRow(
   onReopen: () -> Unit,
   returnsV2: Boolean = false,
   onReturnReceipt: (String) -> Unit = {},
+  onPayFix: (() -> Unit)? = null,
 ) {
   val cancelled = sale.status == "cancelled"
   //  RET-12 — سندهای برگشتِ تازهٔ همین فاکتور، برای چاپِ دوبارهٔ رسید
@@ -642,6 +648,7 @@ private fun SaleRow(
             )
           }
           if (!cancelled && !online) {
+            onPayFix?.let { f -> DropdownMenuItem(text = { Text(ir.vil3ntec.tohid.core.i18n.StrPayFix.menu) }, onClick = { menu = false; f() }) }
             DropdownMenuItem(text = { Text(StrInvoices.correctInvoice) }, onClick = { menu = false; onReopen() })
             DropdownMenuItem(
               text = { Text(StrInvoices.cancelSale, color = Shop.colors.danger) },

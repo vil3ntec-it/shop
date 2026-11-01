@@ -192,6 +192,23 @@ async function editByToken(sf, token, body) {
   return { order: await store.track(sf, token), unchanged: out.unchanged };
 }
 
+/**
+ * CHK-24، نمای مشتری (صفحهٔ پیگیری با توکن): آن‌چه «ویرایشِ دستورِ تحویل» لازم دارد — فقط با پرچم، فقط سفارشِ
+ * «ارسال» ِ ویترین؛ وگرنه `undefined` (کلید نیست). ⛔ نشانی و نشانه نه (نمای مشتری نشانی ندارد): فقط «زنگ بزنید»،
+ * «تحویل به…»، نسخه و «هنوز ویرایش‌پذیر؟».
+ */
+async function customerPrefs(shopId, orderId) {
+  if (!orderId || !(await flagOn(shopId))) return undefined;
+  const row = await db.one('SELECT status, fulfillment, source, version, delivery FROM online_orders WHERE shop_id=$1 AND id=$2',
+    [shopId, String(orderId)]);
+  if (!row || row.fulfillment !== 'delivery' || row.source !== 'storefront') return undefined;
+  const d = asJson(row.delivery);
+  return {
+    editable: EDITABLE.includes(row.status), version: Number(row.version),
+    callBeforeArrival: d.callBeforeArrival === true, leaveWith: d.leaveWith || '',
+  };
+}
+
 /** کارتِ پیک: مبلغِ اسکناس و پول خردِ همین مأموریت (از مبلغِ مورد انتظارِ خودش). */
 function courierCash(delivery, expectedCollectMinor) {
   const tender = Number.isSafeInteger(delivery.cashTenderMinor) ? delivery.cashTenderMinor : null;
@@ -201,5 +218,5 @@ function courierCash(delivery, expectedCollectMinor) {
 
 module.exports = {
   FLAG_KEY, LARGEST_NOTE_MINOR, EDITABLE, flagOn, parseTender, changeOf, checkTender, applyOnCreate, parseEdit,
-  edit, editByToken, courierCash,
+  edit, editByToken, courierCash, customerPrefs,
 };

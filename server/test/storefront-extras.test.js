@@ -79,8 +79,10 @@ test('WEB-11 علاقه‌مندی: خاموش ۴۰۴، روشن فقط فروخ
   assert.equal(off.body.error.code, 'favorites_disabled');
   assert.equal((await h.get(base, k)).status, 404);
   assert.equal(await favCount(s.shopId), 0, 'خاموش ⇒ هیچ نوشتنی');
+  assert.equal('features' in (await h.get(`/api/store/${s.slug}`)).body, false, 'خاموش ⇒ پاسخِ ویترین همان پیشین');
 
   await flag(s.shopId, 'shop.storefront.favorites', true);
+  assert.deepEqual((await h.get(`/api/store/${s.slug}`)).body.features, { favorites: true }, 'روشن ⇒ ♥ ِ وب (`features.favorites`)');
   assert.deepEqual((await h.put(`${base}/rice`, {}, k)).body, { productId: 'rice', added: true });
   assert.deepEqual((await h.put(`${base}/rice`, {}, k)).body, { productId: 'rice', added: false }, 'تکرار بی‌اثر');
   await query("UPDATE store_customer_favorites SET created_at = created_at - 1000 WHERE product_id = 'rice'");
@@ -140,8 +142,10 @@ test('WEB-24 بنر: خاموش ۴۰۳/۴۰۴، بازهٔ اکنون، ناحی
   assert.equal(off.body.error.code, 'banners_disabled');
   assert.equal((await h.put(adminUrl, { banners: [] }, { token: s.token })).status, 403);
   assert.equal((await pub()).status, 404);
+  assert.equal('features' in (await h.get(`/api/store/${s.slug}`)).body, false, 'خاموش ⇒ پاسخِ ویترین همان پیشین');
 
   await flag(s.shopId, 'shop.storefront.banners', true);
+  assert.deepEqual((await h.get(`/api/store/${s.slug}`)).body.features, { banners: true }, 'روشن ⇒ بنرِ وب (`features.banners`)');
   const t = now();
   const H = 3600 * 1000;
   const put = await h.put(adminUrl, {

@@ -184,7 +184,7 @@ fun CheckoutDialog(
           DiscountGate.State.NEEDS_APPROVAL -> {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              StatusPill("نیازمند تأیید", PillTone.WARNING)
+              StatusPill("نیازمند تأیید", PillTone.AWAITING)
               Text(
                 if (decision.cap == "maxPct") "بیش از سقفِ ${qty(decision.limit ?: 0.0)}٪ِ شما"
                 else "بیش از اختیارِ شما",
@@ -445,6 +445,7 @@ fun InvoiceDialog(
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted,
               )
+              item.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) } // POS-11
             }
             Text(money(item.totalPrice), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
@@ -469,6 +470,7 @@ fun InvoiceDialog(
             Text(debtor.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
         }
+        sale.note?.takeIf { it.isNotBlank() }?.let { Text("${ir.vil3ntec.tohid.core.i18n.StrSale.invoiceNote}: $it", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text, modifier = Modifier.padding(vertical = 3.dp)) } // POS-11
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -88,4 +88,14 @@ object StrLabel {
   )
   val off: String get() = t("خاموش", "Off", "بند")
   val on: String get() = t("روشن", "On", "روښانه")
+
+  // QR ِ ویترین زیرِ هر رسیدِ فروش (MKT-10، «پیوند و QR» ِ ویترین)
+  val storeQrOn: String get() = t("زیرِ هر رسید چاپ شود", "Print under every receipt", "د هر رسید لاندې چاپ شي")
+  val storeQrOff: String get() = t("دیگر زیرِ رسید نه", "Stop printing under receipts", "نور د رسید لاندې نه")
+  val storeQrSet: String get() = t(
+    "این QR از این پس زیرِ هر رسیدِ فروشِ همین دستگاه چاپ می‌شود",
+    "This QR will now print under every sales receipt from this device",
+    "دا QR له اوس وروسته د دې وسیلې د هر پلور رسید لاندې چاپېږي",
+  )
+  val storeQrCleared: String get() = t("QR ِ ویترین دیگر زیرِ رسید چاپ نمی‌شود", "The store QR no longer prints under receipts", "د پلورنځي QR نور د رسید لاندې نه چاپېږي")
 }

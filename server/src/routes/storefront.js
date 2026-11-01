@@ -42,6 +42,8 @@ router.use(views.gate);
 const RECENT_FLAG = 'shop.storefront.recent';
 /** E2E-MKT-02: ۴۰۹ ِ `out_of_stock` در ویترین با فهرستِ همهٔ قلم‌های کم و «کم کن به …» (پیش‌فرض خاموش) */
 const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
+//  CHK-08: شمارهٔ دوم و Plus Code در فرمِ نشانیِ وب (پیش‌فرض خاموش ⇒ همان فرم)
+const ADDRESS_EXTRA_FLAG = 'shop.storefront.address_extra';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -111,11 +113,26 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     //  WEB-13: «دیده‌شده‌های اخیر» (`recent.js`، فقط روی دستگاه) با پرچمِ `shop.storefront.recent`؛ خاموش ⇒ این کلید نیست
     ...((await orders.flagOf(req.store.shop_id, RECENT_FLAG)) ? { recent: true } : {}),
     //  فقط با پرچمِ روشن (E2E-MKT-02)؛ خاموش ⇒ همان پاسخِ پیشین، بی این کلید
-    ...(await orders.flagOf(req.store.shop_id, STOCK_LIST_FLAG) ? { features: { stockList: true } } : {}),
+    ...await featuresOf(req.store.shop_id),
     //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
     ...(seo ? { seo } : {}),
   });
 });
+
+/** `features` فقط با پرچم‌های روشن؛ هیچ‌کدام ⇒ کلید نیست (پاسخِ پیشین) */
+async function featuresOf(shopId) {
+  const f = {
+    ...((await orders.flagOf(shopId, STOCK_LIST_FLAG)) ? { stockList: true } : {}),
+    ...((await orders.flagOf(shopId, ADDRESS_EXTRA_FLAG)) ? { addressExtra: true } : {}),
+    //  WEB-11: ♥ و «فهرستِ خرید» ِ وب (`store/catalog.js`، روی همین دستگاه) با پرچمِ `shop.storefront.favorites`
+    ...((await extras.favoritesOn(shopId)) ? { favorites: true } : {}),
+    //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در فرمِ ثبتِ وب با پرچمِ `shop.orders.delivery_prefs` (همان درِ `delivery.cashTenderMinor`)
+    ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
+    //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
+    ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+  };
+  return Object.keys(f).length ? { features: f } : {};
+}
 
 //  ── WEB-02: پرفروش‌ها و تازه‌ها (دادهٔ واقعی؛ نبود ⇒ خالی) ───────────
 router.get('/:slug/highlights', readLimit, store, async (req, res) => {
@@ -271,6 +288,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
   const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
   if (refund !== undefined) order.refund = refund;
+  //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
+  const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
+  if (prefs !== undefined) order.deliveryPrefs = prefs;
   res.json({ order });
 });
 
@@ -431,7 +451,11 @@ router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res
 
 //  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
 router.post('/:slug/orders/:token/delivery', checkoutLimit, store, async (req, res) => {
-  res.json(await require('../lib/delivery-prefs').editByToken(req.store, req.params.token, req.body));
+  const P = require('../lib/delivery-prefs');
+  const out = await P.editByToken(req.store, req.params.token, req.body);
+  const prefs = await P.customerPrefs(req.store.shop_id, sf.orderIdOf(req.store.shop_id, req.params.token));
+  if (prefs !== undefined) out.order.deliveryPrefs = prefs;
+  res.json(out);
 });
 
 /** خطایی که دادهٔ همراه دارد (برگهٔ قیمتِ تازه، کالای ناموجود، …) — همه‌اش برود. */

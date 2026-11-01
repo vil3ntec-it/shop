@@ -52,8 +52,8 @@ const PAID = ['paid', 'partially_refunded'];
 // ════════════════════════════════════════════════════════════════════
 
 /** پرچمِ جمع‌آوری برای این دکان (بی `shop.orders` هم خوانده می‌شود؛ درها جدا می‌سنجند). */
-async function flagOf(shopId) {
-  return orders.flagOf(shopId, FLAG_KEY);
+async function flagOf(shopId, run = null) {
+  return orders.flagOf(shopId, FLAG_KEY, run);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -715,7 +715,7 @@ async function resolveIssue(shopId, issueId, body, userId) {
 /** کالاهایی که «پیدا نشد» ِ بازشان هنوز رسیدگی نشده — پرچم خاموش ⇒ هیچ (رفتارِ پیشین). */
 async function heldIn(run, shopId, productIds) {
   const ids = [...new Set((productIds || []).map(String).filter(Boolean))];
-  if (!ids.length || !(await flagOf(shopId))) return new Set();
+  if (!ids.length || !(await flagOf(shopId, run))) return new Set();
   const rows = (await run(
     `SELECT product_id FROM pick_issues WHERE shop_id=$1 AND status='open' AND product_id = ANY($2::text[])`,
     [shopId, ids]

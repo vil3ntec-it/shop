@@ -2,6 +2,12 @@ package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.PickBatchDto
 import ir.vil3ntec.tohid.core.model.PickEventsDto
+import ir.vil3ntec.tohid.core.model.PickIssuesDto
+import ir.vil3ntec.tohid.core.model.PickMetricsDto
+import ir.vil3ntec.tohid.core.model.PickPhotoDto
+import ir.vil3ntec.tohid.core.model.PickPhotosDto
+import ir.vil3ntec.tohid.core.model.PickProposedDto
+import ir.vil3ntec.tohid.core.model.PickSuggestionsDto
 import ir.vil3ntec.tohid.core.model.PickShelfDto
 import ir.vil3ntec.tohid.core.model.PickShelfScanDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
@@ -48,6 +54,70 @@ class PickingRepository(private val api: ApiClient) {
       put("level", level.trim())
     })
     Unit
+  }
+
+  // ── شاخص‌ها (PCK-13) و «پیدا نشد» (PCK-14) ─────────────────────────────
+
+  /** ۷ روزِ گذشته (پیش‌فرضِ سرور)؛ فقط با `reports.view` */
+  suspend fun metrics(): ApiResult<PickMetricsDto> = result { ApiJson.decode<PickMetricsDto>(api.get("$ROOT/pick/metrics")) }
+
+  suspend fun issues(): ApiResult<PickIssuesDto> = result { ApiJson.decode<PickIssuesDto>(api.get("$ROOT/pick/issues?status=open")) }
+
+  /** «رسیدگی شد» (کالا دوباره در ویترین) یا «کنار گذاشته شد» — توضیح لازم؛ فقط با `stock.adjust` */
+  suspend fun resolveIssue(issueId: String, action: String, note: String): ApiResult<Unit> = result {
+    api.post("$ROOT/pick/issues/${enc(issueId)}/resolve", buildJsonObject {
+      put("action", action)
+      put("note", note.trim())
+    })
+    Unit
+  }
+
+  // ── جایگزین (PCK-05) و حلال (PCK-06) ─────────────────────────────────
+
+  suspend fun suggestions(orderId: String, lineNo: Int): ApiResult<PickSuggestionsDto> =
+    result { ApiJson.decode<PickSuggestionsDto>(api.get("$ROOT/${enc(orderId)}/pick/substitutes?lineNo=$lineNo")) }
+
+  /** پیشنهاد برای قلمِ «پیدا نشد»؛ کالای بارکددار با بارکدِ خودش. همان `eventId` ⇒ همان پیشنهاد */
+  suspend fun propose(orderId: String, eventId: String, lineNo: Int, productId: String, barcode: String): ApiResult<PickProposedDto> = result {
+    ApiJson.decode<PickProposedDto>(api.post("$ROOT/${enc(orderId)}/pick/substitutions", buildJsonObject {
+      put("eventId", eventId)
+      put("lineNo", lineNo)
+      put("productId", productId)
+      if (barcode.isNotBlank()) put("barcode", barcode.trim())
+    }))
+  }
+
+  /** تصمیمِ کارمند پس از تماس/واتس‌اپ: `accept` یا `reject` */
+  suspend fun decide(orderId: String, substitutionId: String, decision: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(orderId)}/pick/substitutions/decide", buildJsonObject {
+      put("substitutionId", substitutionId)
+      put("decision", decision)
+    })
+    Unit
+  }
+
+  /** حلالِ کالا (PCK-06): `halal`، `non_halal` یا خالی (نامعلوم) — فقط `stock.adjust` */
+  suspend fun setHalal(productId: String, halal: String): ApiResult<Unit> = result {
+    api.put("$ROOT/pick/products/${enc(productId)}", buildJsonObject { put("halal", halal) })
+    Unit
+  }
+
+  // ── عکسِ بسته (PCK-08) ───────────────────────────────────────────────
+
+  suspend fun photos(orderId: String): ApiResult<PickPhotosDto> =
+    result { ApiJson.decode<PickPhotosDto>(api.get("$ROOT/${enc(orderId)}/pick/photos")) }
+
+  /** فقط از بسته (`parcelOnly` همیشه true، کاربر پیش از دوربین تأیید کرده)؛ همان `eventId` ⇒ همان عکس */
+  suspend fun addPhoto(orderId: String, eventId: String, imageBase64: String, deviceTime: Long): ApiResult<PickPhotoDto> = result {
+    ApiJson.decodeAt<PickPhotoDto>(
+      api.post("$ROOT/${enc(orderId)}/pick/photos", buildJsonObject {
+        put("eventId", eventId)
+        put("imageBase64", imageBase64)
+        put("parcelOnly", true)
+        put("deviceTime", deviceTime)
+      }),
+      "photo",
+    ) ?: throw ApiFailure.InvalidResponse()
   }
 
   // ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) ─────────────────

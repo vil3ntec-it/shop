@@ -122,6 +122,9 @@ test('DLV-04 خاموش: ۴۰۴ delivery_route_disabled؛ فهرستِ مأمو�
   assert.equal(r.status, 404, JSON.stringify(r.body));
   assert.equal(r.body.error.code, 'delivery_route_disabled');
   assert.equal((await h.get('/api/courier/missions', { token: s.courier.token })).body.items.length, 1);
+  assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.routeEnabled, false, 'دکمهٔ مسیر پنهان');
+  await setFlag(s.shopId, R.FLAG, true);
+  assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.routeEnabled, true, 'دکمهٔ مسیر دیده می‌شود');
 });
 
 test('DLV-04: ترتیبِ پیشنهادی فقط برای مأموریتِ پذیرفتهٔ همین پیک؛ بی پین ته؛ موقعیت نیمه یا نامعتبر ۴۰۰؛ no-store', async () => {

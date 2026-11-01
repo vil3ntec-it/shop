@@ -174,6 +174,17 @@ function paymentRows(sale, money) {
   return [{ label: LABELS.paid, amount: money(sale.paidAmount) }];
 }
 
+/**
+ * یادداشتِ ردیف یا فاکتور (POS-11) — هم‌زادِ `SaleNotes.clean` ِ core: یک خط، بی نویسهٔ کنترلی، حداکثر ۱۲۰
+ * نویسه؛ نبود یا خالی ⇒ null (و کلیدش در خروجی نمی‌آید، تا فاکتورِ بی یادداشت همان پاسخِ پیشین باشد).
+ */
+function noteOf(x) {
+  if (typeof x !== 'string') return null;
+  const one = x.replace(/[\s\u0000-\u001f\u007f-\u009f]+/g, ' ').trim();
+  if (!one) return null;
+  return one.length <= 120 ? one : one.slice(0, 120).trimEnd();
+}
+
 /** سهم‌های تخفیفِ خودکارِ یک قلم (`SaleItem.promo`)؛ فقط عددِ صحیحِ مثبت */
 function promoParts(it) {
   return (Array.isArray(it.promo) ? it.promo : []).map(asObject)
@@ -220,6 +231,8 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
       line.unitPrice = plain(it.listPriceMinor / 100);
       line.autoDiscount = plain(promo / 100);
     }
+    const note = noteOf(it.note);
+    if (note) line.note = note;
     return line;
   });
   const allWhole = items.every((it) => Number.isInteger(num(it.quantity)));
@@ -244,6 +257,8 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
     remaining: num(sale.remaining) > 0 ? { label: LABELS.remaining, amount: money(sale.remaining) } : null,
   };
   if (included) view.included = [included];
+  const note = noteOf(sale.note);
+  if (note) view.note = note;
   return view;
 }
 
@@ -265,4 +280,4 @@ async function receiptOf(tag, tok) {
   return view;
 }
 
-module.exports = { NOT_YET, PROMO_FLAG, receiptOf, render, formatQty };
+module.exports = { NOT_YET, PROMO_FLAG, receiptOf, render, formatQty, noteOf };

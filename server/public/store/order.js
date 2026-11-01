@@ -65,7 +65,52 @@
       renderDelivery(o.delivery);
       renderPay(o, token);
       renderSubs(o, token);
+      renderRate(o, token);
+      renderPrefs(o, token);
       return o;
+    }
+
+    //  DLV-18: پس از «تحویل شد» و تا ۷ روز، یک بار — مشتری به پیک ستاره و برچسب می‌دهد (بی متنِ آزاد).
+    //  پرچمِ خاموش ⇒ ۴۰۴ ⇒ پنهان؛ سرور تصمیمِ آخر را می‌گیرد. فرمِ ساخته‌شده با تازه‌شدنِ صفحه پاک نمی‌شود.
+    var RT = [{ tag: 'on_time', label: 'od.rt.on_time' }, { tag: 'polite', label: 'od.rt.polite' }, { tag: 'careful', label: 'od.rt.careful' },
+      { tag: 'late', label: 'od.rt.late' }, { tag: 'rude', label: 'od.rt.rude' }, { tag: 'damaged', label: 'od.rt.damaged' }];
+    function chip(text, aria, click) {
+      return el('button', { class: 'chip plain', attrs: { type: 'button', 'aria-pressed': 'false', 'aria-label': aria }, text: text, on: { click: click } });
+    }
+    function renderRate(o, token) {
+      var box = $('o-rate');
+      if (o.status !== 'delivered' || o.fulfillment !== 'delivery') { box.hidden = true; return; }
+      if (box.getAttribute('data-for') === token) return;
+      box.setAttribute('data-for', token);
+      var path = '/orders/' + encodeURIComponent(token) + '/rating';
+      api(path).then(function (r) {
+        var form = $('o-rate-form'); var msg = $('o-rate-msg'); var send = $('o-rate-send');
+        box.hidden = !(r.canRate || r.rating);
+        form.hidden = !r.canRate;
+        if (!r.canRate) { if (r.rating) K.note(msg, 'ok', t('od.rt.done')); return; }
+        var pick = { stars: 0, tags: [] };
+        var sRow = K.clear($('o-rate-stars')); var tRow = K.clear($('o-rate-tags'));
+        [1, 2, 3, 4, 5].forEach(function (n) {
+          sRow.appendChild(chip(K.fa(n, 0) + ' ★', t('od.rt.stars', { n: K.fa(n, 0) }), function () {
+            pick.stars = n; send.disabled = false;
+            Array.prototype.forEach.call(sRow.children, function (c, i) { c.setAttribute('aria-pressed', String(i === n - 1)); });
+          }));
+        });
+        RT.forEach(function (x) {
+          var b = chip(t(x.label), t(x.label), function () {
+            var i = pick.tags.indexOf(x.tag);
+            if (i >= 0) pick.tags.splice(i, 1); else if (pick.tags.length < 4) pick.tags.push(x.tag); else return;
+            b.setAttribute('aria-pressed', String(i < 0));
+          });
+          tRow.appendChild(b);
+        });
+        send.onclick = function () {
+          send.disabled = true;
+          api(path, { method: 'POST', body: { stars: pick.stars, tags: pick.tags } }).then(function () {
+            form.hidden = true; K.note(msg, 'ok', t('od.rt.done'));
+          }).catch(function (e) { send.disabled = false; K.note(msg, 'err', e.message); });
+        };
+      }).catch(function () { box.hidden = true; box.removeAttribute('data-for'); });
     }
 
     //  PCK-05: کالایی که پیدا نشد و دکان جایگزینِ هم‌دسته‌اش را پیشنهاد داده — مشتری همین‌جا می‌پذیرد یا رد
@@ -102,6 +147,33 @@
 
     //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):
     //  نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل — نه شماره، نه شناسه. بی کلید یا چیزی برای گفتن ⇒ پنهان.
+    // ── CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال — فقط با `o.deliveryPrefs` (پرچمِ `shop.orders.delivery_prefs`) ──
+    //  پیگیری هر ۲۰ ثانیه دوباره می‌کشد: کادرها فقط با نسخهٔ تازه از سرور پر می‌شوند تا نوشتهٔ مشتری پاک نشود
+    function renderPrefs(o, token) {
+      var p = o.deliveryPrefs; var f = $('o-prefs'); var msg = $('op-msg');
+      f.hidden = !p;
+      if (!p) return;
+      if (f.getAttribute('data-v') !== String(p.version)) {
+        $('op-call').checked = p.callBeforeArrival; $('op-leave').value = p.leaveWith; $('op-lm').value = '';
+        f.setAttribute('data-v', String(p.version));
+      }
+      ['op-call', 'op-leave', 'op-lm', 'op-save'].forEach(function (id) { $(id).disabled = !p.editable; });
+      if (!p.editable) K.note(msg, 'info', t('od.prefs.locked'));
+      else if (msg.getAttribute('data-ok') !== String(p.version)) msg.hidden = true;
+      f.onsubmit = function (ev) {
+        ev.preventDefault();
+        var body = { delivery: { callBeforeArrival: $('op-call').checked, leaveWith: $('op-leave').value.trim() }, expectedVersion: p.version };
+        var lm = $('op-lm').value.trim();
+        if (lm) body.address = { landmark: lm };
+        $('op-save').disabled = true;
+        api('/orders/' + encodeURIComponent(token) + '/delivery', { method: 'POST', body: body }).then(function (r) {
+          var np = r.order && r.order.deliveryPrefs;
+          if (np) { msg.setAttribute('data-ok', String(np.version)); f.setAttribute('data-v', ''); o.deliveryPrefs = np; renderPrefs(o, token); }
+          K.note(msg, 'ok', t('od.prefs.saved'));
+        }).catch(function (e) { K.note(msg, 'err', e.message); $('op-save').disabled = false; });
+      };
+    }
+
     function renderDelivery(d) {
       var name = d && d.courierName ? String(d.courierName) : '';
       var eta = d && d.etaAt ? K.clock(d.etaAt) : '';

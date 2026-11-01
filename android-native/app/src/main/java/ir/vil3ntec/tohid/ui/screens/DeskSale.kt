@@ -684,7 +684,7 @@ fun DeskSaleScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
               ) {
                 ir.vil3ntec.tohid.ui.components.common.StatusPill(
-                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.WARNING,
+                  StrPos.needsApproval, ir.vil3ntec.tohid.ui.components.common.PillTone.AWAITING,
                 )
                 Spacer(Modifier.weight(1f))
                 OutlinedButton(onClick = { askApproval = true }, enabled = !posting) { Text(StrPos.requestApprovalF9) }
@@ -780,7 +780,8 @@ fun DeskSaleScreen(
       }
       .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
   ) {
-    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp))
+    ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) // پیش‌فاکتور (POS-25)، پشتِ `QuotePref`
+    ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) // POS-18
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
       /*
        *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).

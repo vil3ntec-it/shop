@@ -579,3 +579,155 @@ test('مسیرِ پیک: ردِ کار با دلیل؛ ناموفق ← تلاش
   assert.equal(fin.address, null, 'نشانی پس از پایانِ مأموریت پنهان');
   assert.equal(fin.cashCollectedMinor, null, 'نقدِ گرفته‌نشده در دفترِ پیک نمی‌نشیند');
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   ۷) «نقدِ من» و آمارِ پیک — فقط خواندن، فقط دادهٔ خودش
+   ══════════════════════════════════════════════════════════════════ */
+
+test('«نقدِ من»: نقدِ در دست، سقف، تسویه‌ها و آمار فقط برای خودِ پیک؛ پیکِ دیگر و دکانِ دیگر هیچ‌چیز نمی‌بینند', async () => {
+  const delivery = require('../src/lib/delivery');
+  const a = await shopOwner('نقدِ پیک');
+  await enable(a.shopId);
+  const c1 = await courierJoin(a, 'پیکِ یکم');
+  const c2 = await courierJoin(a, 'پیکِ دوم');
+  const b = await shopOwner('دیگرِ نقد');
+  await enable(b.shopId);
+  const c3 = await courierJoin(b, 'پیکِ دکانِ دیگر');
+  const id1 = (await h.get('/api/courier/me', { token: c1.token })).body.courier.id;
+  const testStart = Date.now();
+
+  //  دو تحویل با نقد؛ یکی تسویه می‌شود (با کسری و یادداشتِ مدیر)
+  const deliver = async () => {
+    const o = await packedOrder(a);
+    const asg = await assignTo(a, id1, o.id, { fareMinor: 5_000 });
+    const id = asg.assignment.id;
+    await sendOk(c1, [ev(id, 'assigned'), ev(id, 'picked_up'), ev(id, 'moving'), ev(id, 'arrived'),
+      ev(id, 'delivered', { cashCollectedMinor: TOTAL })]);
+    return { id, order: o };
+  };
+  const first = await deliver();
+  const second = await deliver();
+  const st = await h.post(`/api/shop/delivery/couriers/${id1}/settlements`,
+    { assignmentIds: [first.id], handedOverMinor: TOTAL, receivedMinor: TOTAL - 10_000, reason: 'کسریِ شمارش', note: 'یادداشتِ مدیر' },
+    { token: a.token, headers: { 'Idempotency-Key': freshKey('settle') } });
+  assert.equal(st.status, 201, JSON.stringify(st.body));
+  //  یک کارِ زنده که نقدش هنوز گرفته نشده
+  const o3 = await packedOrder(a);
+  await assignTo(a, id1, o3.id);
+  //  یک «تحویل نشد» از خودِ پیک و «برگشت»ِ دکان: فقط یک ناموفقِ پیک
+  const o4 = await packedOrder(a);
+  const f4 = (await assignTo(a, id1, o4.id)).assignment.id;
+  await sendOk(c1, [ev(f4, 'assigned'), ev(f4, 'picked_up'), ev(f4, 'moving'), ev(f4, 'arrived'),
+    ev(f4, 'failed', { reason: 'no_answer' })]);
+  const back = await h.post(`/api/shop/delivery/assignments/${f4}/status`, { to: 'returned', note: 'برگشت' },
+    { token: a.token, headers: { 'Idempotency-Key': freshKey('ret') } });
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+
+  //  ساعتِ گوشی مرجع نیست: «امروزِ آینده»ِ برنامهٔ کهنه نادیده گرفته می‌شود، نه ۴۰۰
+  const ahead = Date.now() + 4.5 * 3_600_000;
+  const s1 = await h.get(`/api/courier/summary?today=${ahead}&week=${ahead}`, { token: c1.token });
+  assert.equal(s1.status, 200, JSON.stringify(s1.body));
+  //  مرزِ روز و هفته را سرور به وقتِ دکان (پیش‌فرض کابل) و آغازِ هفتهٔ دکان می‌سازد
+  const bounds = delivery.periodStarts(s1.body.serverTime, 'Asia/Kabul');
+  assert.equal(s1.body.shop.timezone, 'Asia/Kabul');
+  assert.equal(s1.body.stats.today.from, bounds.today);
+  assert.equal(s1.body.stats.week.from, bounds.week);
+  const inToday = testStart >= bounds.today;
+  assert.equal(s1.headers.get('cache-control'), 'no-store');
+  assert.equal(s1.body.courier.name, 'پیکِ یکم');
+  assert.equal(s1.body.shop.name, 'دکانِ نقدِ پیک');
+  assert.equal(s1.body.cash.inHandMinor, TOTAL, 'فقط تحویلِ تسویه‌نشده در دست است');
+  assert.equal(s1.body.cash.liveExpectedMinor, TOTAL);
+  assert.equal(s1.body.cash.capMinor, 1_000_000);
+  assert.equal(s1.body.cash.headroomMinor, 0, 'از سقف گذشته ⇒ جای خالی صفر، نه منفی');
+  assert.equal(s1.body.unsettled.length, 1);
+  assert.equal(s1.body.unsettledCount, 1);
+  assert.equal(s1.body.unsettled[0].orderNo, Number(second.order.orderNo));
+  assert.equal(s1.body.settlements.length, 1);
+  assert.equal(s1.body.settlements[0].receivedMinor, TOTAL - 10_000);
+  assert.ok(s1.body.settlements[0].shortageMinor > 0);
+  //  (اگر آزمون درست سرِ نیمه‌شبِ کابل بدود، «امروز» تازه آغاز شده و صفر است)
+  if (inToday) {
+    assert.equal(s1.body.stats.today.delivered, 2);
+    assert.equal(s1.body.stats.today.collectedCashMinor, 2 * TOTAL);
+    assert.equal(s1.body.stats.today.fareMinor, 10_000);
+    assert.equal(s1.body.stats.today.failed, 1, 'برگشتِ دکان ناموفقِ پیک نیست');
+  }
+  if (testStart >= bounds.week) {
+    assert.equal(s1.body.stats.week.delivered, 2);
+    assert.equal(s1.body.stats.week.failed, 1);
+  }
+  const raw = JSON.stringify(s1.body);
+  assert.equal(raw.includes('یادداشتِ مدیر'), false, 'یادداشتِ مدیر به پیک نمی‌رسد');
+  assert.equal(raw.includes(a.user.id), false, 'شناسهٔ تأییدکننده به پیک نمی‌رسد');
+  assert.equal(raw.includes('791234567'), false, 'شمارهٔ مشتری در «نقدِ من» نیست');
+
+  //  پیکِ دیگرِ همین دکان: هیچ‌چیزِ پیکِ یکم
+  const s2 = await h.get('/api/courier/summary', { token: c2.token });
+  assert.equal(s2.status, 200, JSON.stringify(s2.body));
+  assert.equal(s2.body.cash.inHandMinor, 0);
+  assert.equal(s2.body.cash.liveExpectedMinor, 0);
+  assert.deepEqual(s2.body.unsettled, []);
+  assert.deepEqual(s2.body.settlements, []);
+  assert.equal(s2.body.stats.week.delivered, 0);
+  //  پیکِ دکانِ دیگر: دکانِ خودش، نه این
+  const s3 = await h.get('/api/courier/summary', { token: c3.token });
+  assert.equal(s3.status, 200, JSON.stringify(s3.body));
+  assert.equal(s3.body.shop.name, 'دکانِ دیگرِ نقد');
+  assert.equal(s3.body.cash.inHandMinor, 0);
+  assert.deepEqual(s3.body.settlements, []);
+  assert.equal(JSON.stringify(s3.body).includes('نقدِ پیک'), false);
+
+  //  صاحبِ دکان پیک نیست؛ بی توکن هم نه؛ بازهٔ بد ⇒ ۴۰۰
+  const owner = await h.get('/api/courier/summary', { token: a.token });
+  assert.equal(owner.status, 403, JSON.stringify(owner.body));
+  assert.equal(owner.body.error.code, 'not_a_courier');
+  assert.equal((await h.get('/api/courier/summary')).status, 401);
+  const junk = await h.get('/api/courier/summary?today=abc', { token: c1.token });
+  assert.equal(junk.status, 200, 'پارامترِ برنامهٔ کهنه نادیده گرفته می‌شود');
+
+  //  خطِ زمانیِ مأموریت: زمانِ سرور و این‌که کار از پیک بود یا دکان — بی شناسهٔ کاربر
+  const done = await h.get('/api/courier/missions?scope=done', { token: c1.token });
+  const tl = done.body.items.find((x) => x.id === second.id).timeline;
+  assert.deepEqual(tl.map((x) => x.to), ['requested', 'assigned', 'picked_up', 'moving', 'arrived', 'delivered']);
+  assert.equal(tl[0].by, 'shop');
+  assert.equal(tl[5].by, 'courier');
+  assert.ok(tl.every((x) => Number.isSafeInteger(x.at) && x.at > 0));
+  assert.equal(JSON.stringify(tl).includes(c1.userId), false);
+  //  پیکِ دوم مأموریت‌های پیکِ یکم را نمی‌بیند
+  const other = await h.get('/api/courier/missions?scope=done', { token: c2.token });
+  assert.deepEqual(other.body.items, []);
+});
+
+test('مرزِ «امروز» و «این هفته» به وقتِ دکان و آغازِ هفتهٔ دکان — نه ساعتِ گوشی', () => {
+  const delivery = require('../src/lib/delivery');
+  const H = 3_600_000;
+  const D = 24 * H;
+  //  ۲۰۲۶-۱۰-۲۰ ۰۲:۰۰Z = سه‌شنبه ۰۶:۳۰ کابل ⇒ امروز از ۱۹:۳۰Z ِ دیروز، هفته از شنبه
+  const tue = Date.UTC(2026, 9, 20, 2, 0, 17, 250);
+  const k = delivery.periodStarts(tue, 'Asia/Kabul');
+  assert.equal(k.date, '2026-10-20');
+  assert.equal(k.today, Date.UTC(2026, 9, 19, 19, 30));
+  assert.equal(k.weekDate, '2026-10-17');
+  assert.equal(k.week, k.today - 3 * D);
+  //  ۲۱:۰۰Z ِ شنبه = یکشنبه ۰۱:۳۰ کابل: گوشیِ UTC هنوز «شنبه» می‌گوید، دکان یکشنبه
+  const sunKabul = delivery.periodStarts(Date.UTC(2026, 9, 17, 21, 0), 'Asia/Kabul');
+  assert.equal(sunKabul.date, '2026-10-18');
+  assert.equal(sunKabul.today, Date.UTC(2026, 9, 17, 19, 30));
+  assert.equal(sunKabul.week, sunKabul.today - D);
+  //  خودِ شنبه آغازِ هفته است
+  const sat = delivery.periodStarts(Date.UTC(2026, 9, 17, 6, 0), 'Asia/Kabul');
+  assert.equal(sat.week, sat.today);
+  //  منطقهٔ دیگرِ ویترین و منطقهٔ نامعتبر (⇒ کابل)
+  const utc = delivery.periodStarts(Date.UTC(2026, 9, 20, 23, 59), 'UTC');
+  assert.equal(utc.today, Date.UTC(2026, 9, 20));
+  assert.equal(delivery.periodStarts(tue, 'Not/AZone').timezone, 'Asia/Kabul');
+});
+
+test('server/src/lib/calendar-core.js کپیِ دقیقِ license/calendar-core.js است', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const a = fs.readFileSync(path.join(__dirname, '..', '..', 'license', 'calendar-core.js'));
+  const b = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'calendar-core.js'));
+  assert.ok(a.equals(b), 'server/src/lib/calendar-core.js باید کپیِ دقیقِ license/calendar-core.js باشد');
+});

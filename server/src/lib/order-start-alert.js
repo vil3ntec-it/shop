@@ -114,6 +114,32 @@ async function sweep(at = now()) {
   return n;
 }
 
+/** سقفِ فهرستِ `startAlerts` در `GET /orders/summary` (پرسشِ ۲۰ثانیه‌ای کوچک می‌ماند) */
+const PENDING_MAX = 20;
+
+/**
+ * هشدارهای ثبت‌شده‌ای که هنوز کار دارند — برای نشانِ درون‌برنامه‌ایِ برنامهٔ مدیریت (`GET /orders/summary`،
+ * فقط با همین پرچم). همان سفارش‌هایی که جاروب هشدار داده و هنوز «تازه» یا «قبول‌شده»اند، تا [LATE_MS] پس از
+ * زمانشان؛ شروع ⇒ بیرون. فقط همین دکان، بی نام و شماره و نشانی.
+ */
+async function pendingOf(shopId, at = now()) {
+  const rows = await many(
+    `SELECT o.id, o.order_no, o.status, o.scheduled_for, MIN(e.created_at) AS alert_at
+       FROM online_orders o
+       JOIN online_order_events e ON e.order_id = o.id AND e.shop_id = o.shop_id AND e.kind = 'note' AND e.detail->>'type' = $3
+      WHERE o.shop_id = $1 AND o.status = ANY($2::text[]) AND o.is_test = false
+        AND o.scheduled_for IS NOT NULL AND o.scheduled_for > $4
+      GROUP BY o.id, o.order_no, o.status, o.scheduled_for
+      ORDER BY o.scheduled_for, o.id
+      LIMIT $5`,
+    [String(shopId), WAITING, EVENT_TYPE, at - LATE_MS, PENDING_MAX]
+  );
+  return rows.map((r) => ({
+    id: r.id, orderNo: Number(r.order_no), status: r.status,
+    scheduledFor: Number(r.scheduled_for), alertAt: Number(r.alert_at),
+  }));
+}
+
 let timer = null;
 let sweeping = false;
 async function tick() {
@@ -131,4 +157,4 @@ function stop() {
   timer = null;
 }
 
-module.exports = { FLAG_KEY, LEAD_MS, LATE_MS, EVENT_TYPE, flagOf, sweep, start, stop };
+module.exports = { FLAG_KEY, LEAD_MS, LATE_MS, EVENT_TYPE, PENDING_MAX, flagOf, sweep, pendingOf, start, stop };

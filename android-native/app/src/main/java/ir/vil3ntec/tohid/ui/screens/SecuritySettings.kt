@@ -233,7 +233,8 @@ val REBUILD: String get() = StrSecurity.rebuild
 /** چه چیزی در فاز ۱ ساده می‌ماند — بی تعارف (بازبینیِ #331؛ شرح سرِ `AtRestScope`) */
 val PLAIN_IN_PHASE_1: String get() = StrSecurity.plainInPhase1
 
-private fun unreadableText(kind: AtRestException.Kind?): String = when (kind) {
+/** همان متن در صفحهٔ «رمزگذاری دفتر»ِ نسخهٔ ۳ (`EncryptionScreen`) */
+internal fun unreadableText(kind: AtRestException.Kind?): String = when (kind) {
   AtRestException.Kind.KEY_UNAVAILABLE -> StrSecurity.unreadableKeyUnavailable(REBUILD)
   AtRestException.Kind.KEY_MISSING ->
     StrSecurity.unreadableKeyMissing(if (Platform.DESKTOP) StrSecurity.newComputerOf else StrSecurity.newPhoneOf, REBUILD)
@@ -241,7 +242,8 @@ private fun unreadableText(kind: AtRestException.Kind?): String = when (kind) {
   else -> StrSecurity.unreadableDamaged(REBUILD)
 }
 
-private fun enableWarning(): String = buildString {
+/** همان هشدار در صفحهٔ «رمزگذاری دفتر»ِ نسخهٔ ۳ (`EncryptionScreen`) */
+internal fun enableWarning(): String = buildString {
   append(StrSecurity.keyOnlyHere(if (Platform.DESKTOP) StrSecurity.thisComputer else StrSecurity.thisPhone))
   append(AtRestKeys.note())
   append(StrSecurity.keyLostComesBack(REBUILD))
