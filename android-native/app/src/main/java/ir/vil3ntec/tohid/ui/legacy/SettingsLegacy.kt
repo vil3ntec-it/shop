@@ -570,7 +570,7 @@ fun SettingsScreenLegacy(
     item {
       SettingsSectionLegacy(
         icon = Icons.Filled.Palette,
-        title = "رابطِ تازه (نسخهٔ ۳)",
+        title = ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE,
         subtitle = "خاموش — همین رابطِ امروز",
         tint = Shop.colors.muted,
       ) {

@@ -9,10 +9,12 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrShell
+import ir.vil3ntec.tohid.data.DebtReminderPref
 import ir.vil3ntec.tohid.data.HeldRules
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs
+import ir.vil3ntec.tohid.ui.screens.DebtReminderTemplateEditor
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -102,6 +104,18 @@ internal fun RouteScope.CrmReportsScreen(onBack: (() -> Unit)?) {
       }
       SettingsNote(StrShell.crmNote)
     }
+    //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود (فقط کامپیوتر، مثلِ رابطِ امروز)
+    if (on && ir.vil3ntec.tohid.ui.Platform.DESKTOP) item(key = "reminder") {
+      var reminderText by remember { mutableStateOf(DebtReminderPref.template(context)) }
+      SettingsBlock {
+        DebtReminderTemplateEditor(
+          saved = reminderText,
+          onSave = { t -> DebtReminderPref.set(context, t).also { if (it == null) reminderText = DebtReminderPref.template(context) } },
+          onReset = { DebtReminderPref.reset(context); reminderText = DebtReminderPref.template(context) },
+          onMessage = { toasts.show(it) },
+        )
+      }
+    }
   }
 }
 
@@ -125,6 +139,18 @@ internal fun RouteScope.HeldInvoicesScreen(onBack: (() -> Unit)?) {
         )
       }
       SettingsNote(StrPos.heldNote(plain(HeldRules.MAX_OPEN)))
+    }
+    //  POS-12 «پاک‌سازیِ خودکارِ کهنه‌ها»: عوض کردنش همان مجوزِ لغوِ فاکتور (همان `HeldInvoiceSettings` ِ رابطِ امروز)
+    if (on) item(key = "autoClean") {
+      val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(context) }
+      val auto = HeldInvoicePrefs.autoClean.value
+      SettingsNote(StrPos.heldAutoClean(plain(HeldRules.STALE_HOURS)))
+      if (canCancel) {
+        SettingsBlock { V3Segmented(OFF_ON, if (auto) 1 else 0, { HeldInvoicePrefs.setAutoClean(context, it == 1) }) }
+      } else {
+        SettingsNote((if (auto) StrShell.switchOn else StrShell.switchOff) + " — " + StrPos.heldAutoCleanLocked)
+      }
+      SettingsNote(StrPos.heldAutoCleanNote)
     }
   }
 }

@@ -59,6 +59,10 @@ object SettingsShots : GroupShots {
     Shot("payments", route = "settings/sales/payments"),
     Shot("credit-limit", route = "settings/sales/credit-limit"),
     Shot("customer-reports", route = "settings/sales/customer-reports"),
+    Shot("till-receive", route = "settings/sales/till-receive"),
+    Shot("stock-insight", route = "settings/sales/stock-insight"),
+    Shot("product-tools", route = "settings/sales/product-tools"),
+    Shot("fraud-trail", route = "settings/security/fraud-trail"),
     Shot("encryption", route = "settings/security/encryption"),
     Shot("camera", route = "settings/devices/camera"),
     Shot(

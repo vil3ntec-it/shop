@@ -61,6 +61,20 @@ object SettingsLayout {
   const val CREDIT_GATE = "سقف اعتبار"
   /** گزارش‌های مشتری (CRM-04/06/10/14، `ShopPolicy.crmReports`) — فقط کامپیوتر */
   const val CRM_REPORTS = "گزارش‌های مشتری"
+  /** دریافتِ وجه یا قسط از مشتری در صندوق (POS-39، `TillReceivePref`) */
+  const val TILL_RECEIVE = "دریافت از مشتری"
+  /** موجودی و بها (`StockActions.setMode`، پشتِ پرچمِ سرورِ `shop.stock_v2`) — همان `STOCK_SETTINGS_TITLE` */
+  const val STOCK_MODE = "موجودی و بها"
+  /** تحلیلِ موجودی (INV-15/16، `ShopPolicy.stockInsight`) */
+  const val STOCK_INSIGHT = "تحلیل موجودی"
+  /** نقطهٔ سفارش و بیشینه (INV-12، `ShopPolicy.stockLevels`) */
+  const val STOCK_LEVELS = "نقطه سفارش"
+  /** ابزارهای تازهٔ کالا (PRD-19/04، `ShopPolicy.productTools`) */
+  const val PRODUCT_TOOLS = "ابزارهای کالا"
+  /** ردِ حذف از فاکتور (RPT-09، `FraudTrailPref`) — فقط همین دستگاه */
+  const val FRAUD_TRAIL = "سابقه ضدتقلب"
+  /** پیشرفت و جای دستگاه در گفت‌وگو (`ShopPolicy.chatMediaGuard`) */
+  const val CHAT_GUARD = "جای گفت‌وگو"
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
@@ -70,10 +84,16 @@ object SettingsLayout {
 
   val GROUPS: List<Group> = listOf(
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
-    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب")),
-    Group(SALES, listOf("کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, CREDIT_GATE, CRM_REPORTS, PRINTER)),
+    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب", FRAUD_TRAIL)),
+    Group(
+      SALES,
+      listOf(
+        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, TILL_RECEIVE, CREDIT_GATE, CRM_REPORTS,
+        STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, PRODUCT_TOOLS, PRINTER,
+      ),
+    ),
     Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
-    Group(DATA, listOf("همگام‌سازی", "داده‌ها")),
+    Group(DATA, listOf("همگام‌سازی", "داده‌ها", CHAT_GUARD)),
     Group(ABOUT, listOf(ABOUT_APP)),
   )
 
@@ -106,6 +126,13 @@ object SettingsLayout {
     PAY to "payments",
     CREDIT_GATE to "credit-limit",
     CRM_REPORTS to "customer-reports",
+    TILL_RECEIVE to "till-receive",
+    STOCK_MODE to "stock-mode",
+    STOCK_INSIGHT to "stock-insight",
+    STOCK_LEVELS to "stock-levels",
+    PRODUCT_TOOLS to "product-tools",
+    FRAUD_TRAIL to "fraud-trail",
+    CHAT_GUARD to "chat-storage",
     CAMERA to "camera",
     "همگام‌سازی" to "sync",
     "داده‌ها" to "backup",
@@ -140,6 +167,13 @@ object SettingsLayout {
     PAY -> StrShell.payAndRegister
     CREDIT_GATE -> StrShell.creditGate
     CRM_REPORTS -> StrShell.crmReports
+    TILL_RECEIVE -> StrSettings.tillReceiveTitle
+    STOCK_MODE -> STOCK_SETTINGS_TITLE
+    STOCK_INSIGHT -> StrShell.stockInsight
+    STOCK_LEVELS -> StrShell.stockLevels
+    PRODUCT_TOOLS -> StrShell.productTools
+    FRAUD_TRAIL -> StrShell.fraudTrail
+    CHAT_GUARD -> ir.vil3ntec.tohid.core.i18n.StrChat.guard
     PRINTER -> StrSettings.printerRow
     CAMERA -> StrSettings.scannerRow
     PERIPHERALS -> StrSettings.peripheralsRow

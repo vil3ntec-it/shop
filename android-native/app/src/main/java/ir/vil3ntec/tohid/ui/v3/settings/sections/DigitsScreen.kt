@@ -93,6 +93,23 @@ internal fun RouteScope.DigitsScreen(onBack: (() -> Unit)?) {
         V3Segmented(SYMBOLS.map(SettingsIndexModel::symbolLabel), SYMBOLS.indexOf(symbol).coerceAtLeast(0), { LocaleChoice.setSymbol(context, SYMBOLS[it]) })
       }
       SettingsNote(StrSettings.symbolNote)
+    }
+    //  LOC-01: تاریخِ قمریِ اختیاری روی فاکتور و رسیدِ برگشت — همان `LocaleChoice.setLunar` ِ رابطِ امروز، پیش‌فرض خاموش
+    item(key = "lunar") {
+      SettingsBlock {
+        V3Segmented(listOf(StrSettings.lunarOff, StrSettings.lunarOn), if (LocaleChoice.lunar) 1 else 0, { LocaleChoice.setLunar(context, it == 1) })
+      }
+      SettingsNote(StrSettings.lunarNote)
+      if (LocaleChoice.lunar) {
+        SettingsBlock {
+          V3Segmented(
+            listOf(StrSettings.lunarEarlier, StrSettings.lunarAsIs, StrSettings.lunarLater),
+            (LocaleChoice.lunarAdjust + 1).coerceIn(0, 2),
+            { LocaleChoice.setLunarAdjust(context, it - 1) },
+          )
+        }
+        LocaleChoice.lunarOn(todayIso())?.let { SettingsNote(StrSettings.lunarToday(it)) }
+      }
       Spacer(Modifier.height(8.dp))
     }
   }

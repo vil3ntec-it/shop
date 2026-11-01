@@ -51,6 +51,19 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.ReturnsSettingsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SessionsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StaffCodeScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SyncScreen
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Inventory
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Storage
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TillReceiveScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.StockModeScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.StockInsightScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.StockLevelsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductToolsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.FraudTrailScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ChatGuardScreen
 
 /** صفحهٔ یک بخش: کلیدش (`SettingsLayout`)، آیکنِ خطیِ ردیفش و خودِ صفحه */
 internal class SettingsPage(
@@ -86,6 +99,13 @@ internal object SettingsPages {
     Page(SettingsLayout.PAY, Icons.Outlined.Payments) { PaySettingsScreen(it) },
     Page(SettingsLayout.CREDIT_GATE, Icons.Outlined.CreditCardOff) { CreditGateScreen(it) },
     Page(SettingsLayout.CRM_REPORTS, Icons.Outlined.TableChart) { CrmReportsScreen(it) },
+    Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
+    Page(SettingsLayout.STOCK_MODE, Icons.Outlined.SwapHoriz) { StockModeScreen(it) },
+    Page(SettingsLayout.STOCK_INSIGHT, Icons.Outlined.Inventory2) { StockInsightScreen(it) },
+    Page(SettingsLayout.STOCK_LEVELS, Icons.Outlined.Inventory) { StockLevelsScreen(it) },
+    Page(SettingsLayout.PRODUCT_TOOLS, Icons.Outlined.Description) { ProductToolsScreen(it) },
+    Page(SettingsLayout.FRAUD_TRAIL, Icons.Outlined.History) { FraudTrailScreen(it) },
+    Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },

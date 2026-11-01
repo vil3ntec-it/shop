@@ -20,6 +20,9 @@ object UiV3 {
   private const val PREFS = "tohid-ui"
   private const val KEY = "ui_v3"
 
+  /** عنوانِ بخشِ روشن‌کردنِ همین پرچم در تنظیماتِ رابطِ امروز (گوشی و ستونِ کامپیوتر) */
+  const val TOGGLE_TITLE = "رابطِ تازه (نسخهٔ ۳)"
+
   /** روشن؟ — `mutableStateOf`: با `set` کلِ برنامه بی راه‌اندازیِ دوباره عوض می‌شود */
   var on by mutableStateOf(resolve(stored = null, preview = isPreview()))
     private set
