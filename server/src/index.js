@@ -66,6 +66,10 @@ async function main() {
   orderNotify.start();
   //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
   require('./lib/order-timeout').start();
+  //  ORD-09: توقفِ خودکارِ سفارش‌گیری (فقط دکانِ با پرچمِ `shop.orders.desk` و توقفِ خودکارِ روشن)
+  require('./lib/order-desk').start();
+  //  ORD-18: هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (فقط دکانِ با پرچمِ `shop.orders.start_alert`)
+  require('./lib/order-start-alert').start();
   //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
   const payments = require('./lib/payment-intents');
   payments.startReconciler();

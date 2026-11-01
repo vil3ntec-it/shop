@@ -31,6 +31,7 @@ const { one, many, query, newId, now, tx } = require('../db');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const chatMedia = require('./chat-media');
+const { notify, listen, waiting } = require('./chat-wait');
 const { ApiError, badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.chat';
@@ -120,9 +121,11 @@ async function rowOf(viewer, id, { c = null, lock = false } = {}) {
   return row;
 }
 
+/** بلاک‌های (دکان، شماره) — روی هر شکلِ همان شماره (RSK-07): شکلِ دیگرِ همان گوشی بلاکِ دکان را دور نمی‌زند. */
 async function blocksOf(shopId, phone, c = null) {
-  const sql = 'SELECT blocker FROM shop_chat_blocks WHERE shop_id=$1 AND customer_phone=$2';
-  const rows = c ? (await c.query(sql, [shopId, phone])).rows : await many(sql, [shopId, phone]);
+  const sql = 'SELECT blocker FROM shop_chat_blocks WHERE shop_id=$1 AND customer_phone = ANY($2::text[])';
+  const args = [shopId, require('./validate').phoneForms(phone)];
+  const rows = c ? (await c.query(sql, args)).rows : await many(sql, args);
   return { shop: rows.some((r) => r.blocker === 'shop'), customer: rows.some((r) => r.blocker === 'customer') };
 }
 
@@ -490,9 +493,10 @@ async function messageRow(messageId, viewer) {
 /**
  * تغییرها پس از `after` (rev) — همان راهِ بازیابی پس از بسته شدنِ برنامه، قطعِ
  * اینترنت یا افتادنِ سوکت. `wait` (میلی‌ثانیه، حداکثر ۲۵ ثانیه): اگر چیزی تازه
- * نبود، تا رسیدنِ پیام/رسید یا پایانِ مهلت صبر کن.
+ * نبود، تا رسیدنِ پیام/رسید یا پایانِ مهلت صبر کن. `signal` (قطعِ اتصال) ⇒ صبر
+ * همان دم آزاد و پاسخ `null` (کسی برای شنیدن نیست).
  */
-async function changes(viewer, id, { after, limit, wait } = {}) {
+async function changes(viewer, id, { after, limit, wait, signal = null } = {}) {
   const a = intIn(after, { min: 0, def: 0 });
   const lim = intIn(limit, { min: 1, max: MAX_PAGE, def: 100 });
   const w = Math.min(MAX_WAIT_MS, intIn(wait, { min: 0, max: 60_000, def: 0 }));
@@ -503,10 +507,18 @@ async function changes(viewer, id, { after, limit, wait } = {}) {
       WHERE m.conversation_id = $1 AND m.rev > $2 ORDER BY m.rev ASC LIMIT $4`,
     [conv.id, a, viewerKey(viewer), lim + 1]
   );
-  let rows = await fetch();
-  if (!rows.length && w > 0) {
-    await waitFor(conv.id, w);
+  //  ⛔ گوش دادن پیش از خواندن (`chat-wait.js`): پیامِ میانِ خواندن و صبر گم نمی‌شود (CHAT-15)
+  const ear = w > 0 ? listen(conv.id, w, signal) : null;
+  let rows;
+  try {
     rows = await fetch();
+    if (ear && !rows.length) {
+      await ear.promise;
+      if (signal && signal.aborted) return null;
+      rows = await fetch();
+    }
+  } finally {
+    if (ear) ear.cancel();
   }
   const page = rows.slice(0, lim);
   const fresh = await viewRow(viewer, conv.id);
@@ -836,36 +848,6 @@ async function reviewReport(id) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  long-poll — فقط شتاب؛ هر پاسخ دوباره از دیتابیس خوانده می‌شود
-// ════════════════════════════════════════════════════════════════════
-
-const waiters = new Map();
-
-function notify(convId) {
-  const set = waiters.get(convId);
-  if (!set) return;
-  waiters.delete(convId);
-  for (const done of set) done();
-}
-
-function waitFor(convId, ms) {
-  return new Promise((resolve) => {
-    let set = waiters.get(convId);
-    if (!set) { set = new Set(); waiters.set(convId, set); }
-    const s = set;
-    const done = () => {
-      clearTimeout(timer);
-      s.delete(done);
-      if (!s.size && waiters.get(convId) === s) waiters.delete(convId);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    if (timer.unref) timer.unref();
-    s.add(done);
-  });
-}
-
-// ════════════════════════════════════════════════════════════════════
 //  پاک‌سازی
 // ════════════════════════════════════════════════════════════════════
 
@@ -896,5 +878,5 @@ module.exports = {
   putMedia, getMedia, sendMedia, rawMedia,
   setBlock, report, search,
   reportsForAdmin, reviewReport,
-  sweep, maskPhone,
+  sweep, maskPhone, waiting,
 };

@@ -173,7 +173,23 @@ function webhookAdapter(name) {
   return adapter(name);
 }
 
+/**
+ * حالِ «پرداختِ آنلاین» برای پنلِ مدیر (`system-health.providers`) — بی هیچ راز:
+ *   ساختگی ⇒ mock؛ هر دو کلیدِ حساب‌پی ⇒ live؛ یکی ⇒ incomplete؛ هیچ ⇒ همان نقدِ هنگامِ تحویل (none، D-08).
+ */
+function providerState() {
+  if (fakeAllowed()) return { mode: 'fake', state: 'mock', missing: [] };
+  const key = Boolean(String(process.env.HESABPAY_API_KEY || '').trim());
+  const secret = Boolean(String(process.env.HESABPAY_WEBHOOK_SECRET || '').trim());
+  if (key && secret) return { mode: 'hesabpay', state: 'live', missing: [], flag: 'pay.hesabpay' };
+  if (key || secret) {
+    return { mode: 'hesabpay', state: 'incomplete', missing: [key ? '' : 'HESABPAY_API_KEY', secret ? '' : 'HESABPAY_WEBHOOK_SECRET'].filter(Boolean) };
+  }
+  return { mode: 'cod', state: 'none', missing: [], decision: 'D-08' };
+}
+
 module.exports = {
+  providerState,
   minorToDecimal, decimalToMinor, safeEqual, hmacHex,
   adapter, activeName, webhookAdapter, fakeAllowed, isProduction, isTestOrDev, fake,
 };

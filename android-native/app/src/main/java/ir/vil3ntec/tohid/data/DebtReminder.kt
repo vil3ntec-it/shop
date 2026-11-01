@@ -58,14 +58,30 @@ object DebtReminder {
   fun message(v: Vars, template: String = DEFAULT_TEMPLATE): String =
     render(if (v.balance > 0) template.ifBlank { DEFAULT_TEMPLATE } else NO_BALANCE_TEMPLATE, v)
 
-  /** خطای قالب برای فرم — `null` یعنی درست */
-  fun validate(template: String): String? {
+  /** خطای قالب، نوع‌دار — برای فرمِ سه‌زبانهٔ «متنِ یادآوری» (`DebtReminderTemplateEditor`) */
+  sealed class Problem {
+    object Empty : Problem()
+    object TooLong : Problem()
+    /** جای‌نگهدارهای ناشناخته، بی تکرار و به ترتیبِ متن */
+    data class Unknown(val slots: List<String>) : Problem()
+  }
+
+  /** همان سنجشِ [validate]؛ `null` یعنی درست */
+  fun check(template: String): Problem? {
     val t = template.trim()
-    if (t.isEmpty()) return "متنِ یادآوری خالی است"
-    if (t.length > MAX_TEMPLATE_LENGTH) return "متنِ یادآوری حداکثر $MAX_TEMPLATE_LENGTH حرف"
+    if (t.isEmpty()) return Problem.Empty
+    if (t.length > MAX_TEMPLATE_LENGTH) return Problem.TooLong
     val unknown = SLOT.findAll(t).map { it.groupValues[1] }.filter { it !in PLACEHOLDERS }.distinct().toList()
-    if (unknown.isNotEmpty()) return "جای‌نگهدارِ ناشناخته: " + unknown.joinToString("، ") { "{$it}" }
+    if (unknown.isNotEmpty()) return Problem.Unknown(unknown)
     return null
+  }
+
+  /** خطای قالب برای فرم — `null` یعنی درست */
+  fun validate(template: String): String? = when (val p = check(template)) {
+    null -> null
+    Problem.Empty -> "متنِ یادآوری خالی است"
+    Problem.TooLong -> "متنِ یادآوری حداکثر $MAX_TEMPLATE_LENGTH حرف"
+    is Problem.Unknown -> "جای‌نگهدارِ ناشناخته: " + p.slots.joinToString("، ") { "{$it}" }
   }
 
   /* ------------------------------ زمان‌بندی ------------------------------ */
