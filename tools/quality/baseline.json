@@ -34,6 +34,7 @@
     "server/src/lib/market.js": 828,
     "server/src/lib/notices.js": 825,
     "server/src/lib/otp.js": 877,
+    "server/src/lib/payment-intents.js": 868,
     "server/src/lib/shop-chat.js": 882,
     "server/src/lib/staff-approval.js": 1081,
     "server/src/lib/storefront.js": 1143,

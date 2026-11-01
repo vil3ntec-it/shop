@@ -567,8 +567,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/managed-apps').checkHealth()
       .catch(err => console.error('[app-health]', err.message));
     //  PAY-21: تطبیقِ قصدهای حساب‌پیِ ۴۸ ساعتِ اخیر با خودِ ارائه‌دهنده (بی کلید ⇒ هیچ کاری)
-    require('./lib/payment-intents').reconcile()
-      .then((r) => { if (r.paid || r.closed || r.mismatched || r.errors) console.log('[payments] تطبیق', JSON.stringify(r)); })
+    //  از همان درِ زمان‌بندِ ۵ دقیقه‌ای (`reconcileTick`) با قفلِ اجاره، تا با آن یا نمونهٔ دیگرِ سرور هم‌زمان اجرا نشود
+    require('./lib/payment-intents').reconcileTick({ wide: true })
       .catch(err => console.error('[payments] تطبیق', err.message));
   }, 6 * 60 * 60 * 1000);
   if (housekeeping.unref) housekeeping.unref();
