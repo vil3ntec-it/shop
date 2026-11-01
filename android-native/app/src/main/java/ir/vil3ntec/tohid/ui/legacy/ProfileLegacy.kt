@@ -38,7 +38,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -54,6 +53,7 @@ import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.core.sync.LogoutGuard
+import ir.vil3ntec.tohid.core.account.PhoneClaim
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -106,6 +106,8 @@ fun ProfileScreenLegacy(
   var phone by remember { mutableStateOf(state.accountPhone) }
   var createdAt by remember { mutableStateOf(state.accountCreatedAt) }
   var newPhone by remember { mutableStateOf("") }
+  var codeShown by remember { mutableStateOf(false) }   //  AUTH-08 (`PhoneClaimStep.kt`)
+  var phoneCode by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
   var syncing by remember { mutableStateOf(false) }
   var lastSyncAt by remember { mutableStateOf(state.lastSyncAt) }
@@ -299,26 +301,14 @@ fun ProfileScreenLegacy(
     Spacer(Modifier.height(10.dp))
 
     if (phone.isBlank()) {
-      /*
-       *  شماره ندارد — یک بار می‌شود ثبتش کرد.
-       *
-       *  چرا مهم است: بازیابیِ رمز و خبرهای دکان از راهِ شماره می‌روند،
-       *  و کسی که با ایمیل آمده هیچ‌کدام را ندارد.
-       */
-      OutlinedTextField(
-        value = newPhone,
-        onValueChange = { newPhone = it },
-        label = { Text("شماره موبایل — یک بار ثبت می‌شود") },
-        placeholder = { Text("07XXXXXXXX") },
-        singleLine = true,
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Phone),
-        modifier = Modifier.fillMaxWidth(),
-      )
-      Spacer(Modifier.height(4.dp))
-      Text(
-        "شماره پس از ثبت قفل می‌شود و از برنامه عوض نمی‌شود.",
-        style = MaterialTheme.typography.labelSmall,
-        color = colors.warning,
+      //  شماره ندارد — یک بار؛ با پرچمِ سروریِ AUTH-08 فقط با کدِ همان شماره (`PhoneClaimStep.kt`)
+      NewPhoneField(
+        phone = newPhone, onPhone = { newPhone = it; codeShown = false; phoneCode = "" },
+        codeShown = codeShown, code = phoneCode, onCode = { phoneCode = it }, busy = busy,
+        onResend = {
+          busy = true
+          scope.launch { sendPhoneCode(Backend.account(context), newPhone.trim()) { toast(it) }?.let { codeShown = it }; busy = false }
+        },
       )
     } else {
       LockedRowLegacy(
@@ -343,6 +333,8 @@ fun ProfileScreenLegacy(
         //  اینترنت نمی‌خواهد
         prefs.edit().putString("store_name", shopName.trim()).apply()
         val claim = newPhone.trim()
+        val code = if (codeShown && claim.isNotBlank()) PhoneClaim.normalizeCode(phoneCode) else null
+        if (codeShown && claim.isNotBlank() && code == null) { toast("کدِ پیامک را درست بنویسید"); return@Button }
         busy = true
         scope.launch {
           //  نام روی گوشی همان لحظه می‌نشیند: برنامه آفلاین هم کار
@@ -359,7 +351,8 @@ fun ProfileScreenLegacy(
             return@launch
           }
 
-          Backend.account(context).updateProfile(cleanName, claim)
+          val account = Backend.account(context)
+          account.updateProfile(cleanName, claim, code.orEmpty())
             .onSuccess { done ->
               state.accountName = done.user.name
               state.accountEmail = done.user.email.orEmpty()
@@ -368,9 +361,11 @@ fun ProfileScreenLegacy(
               email = done.user.email.orEmpty()
               phone = done.user.phone.orEmpty()
               newPhone = ""
+              codeShown = false; phoneCode = ""
               toast(if (claim.isNotBlank()) "شماره ثبت شد و قفل شد" else "ذخیره شد")
             }
-            .onFailure { toast(it.userMessage) }
+            //  پرچمِ خاموش ⇒ همان پیامِ سرور و بس؛ روشن و «کد لازم است» ⇒ کد به همان شماره و کادرِ کد
+            .onFailure { f -> afterProfileFailure(account, claim, f) { toast(it) }?.let { codeShown = it; phoneCode = "" } }
           busy = false
         }
       },

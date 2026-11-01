@@ -8,11 +8,38 @@
  *   owner    صاحب دکان — همه‌کاره
  *   manager  مدیر — کارهای روزمره و مدیریتی، بجز مالکیت و اشتراک
  *   staff    شاگرد — فروش و ثبت روزمره؛ حذف فقط روی رکورد خودش
+ *
+ * چهار نقشِ تازه (STF-01، A16) — فقط وقتی صاحب دکان خودش بدهد؛ سه نقشِ بالا
+ * دست نخورده‌اند. جدول‌های همگام‌سازی که هر نقش می‌نویسد در هستهٔ مشترک است
+ * (`perm-core.js` ⇐ `canWrite`) و هر سه راهِ همگام‌سازی همان را اجرا می‌کنند.
+ *   cashier      صندوق‌دار — فروش، قرض، برگشت و سفارش؛ نه انبار، نه خرید
+ *   storekeeper  انباردار — کالا، رسیدِ انبار، خرید، شمارش و اصلاحِ موجودی
+ *   picker       جمع‌آور — دیدن و آماده کردنِ سفارش و سپردن به پیک
+ *   accountant   حسابدار — فقط‌خواندنی: همه را می‌بیند، هیچ نمی‌نویسد
  */
-const ROLES = ['owner', 'manager', 'staff'];
+const ROLES = ['owner', 'manager', 'staff', 'cashier', 'storekeeper', 'picker', 'accountant'];
+/** نقش‌هایی که صاحب دکان به کارمند می‌دهد (کد، تغییرِ نقش، لایهٔ نقش) — پیک جداست */
+const STAFF_ROLES = Object.freeze(ROLES.filter((r) => r !== 'owner'));
+
+/**
+ * نقش در فیلدِ قدیمِ `role`ِ پاسخ‌ها (`/api/shop`، `/api/me`، ورود، پیوستن).
+ * نسخه‌های پیش از A16 نقشِ ناشناخته را «مدیر» می‌پنداشتند (`isStaff` = «== staff»)؛
+ * پس چهار نقشِ تازه آن‌جا «staff» می‌روند تا برنامهٔ قدیم دست‌کم مثلِ شاگرد ببندد.
+ * نقشِ واقعی در فیلدِ تازهٔ `actualRole` است. سدِ واقعی همیشه همین سرور است.
+ */
+const LEGACY_AS_STAFF = Object.freeze(['cashier', 'storekeeper', 'picker', 'accountant']);
+function legacyRole(role) {
+  return LEGACY_AS_STAFF.includes(role) ? 'staff' : role;
+}
+
+/** کوتاه‌نویسیِ نقش‌های تازه در سطرهای جدول */
+const CSH = 'cashier';
+const STK = 'storekeeper';
+const PCK = 'picker';
+const ACC = 'accountant';
 
 const MATRIX = {
-  'shop.view':            ['owner', 'manager', 'staff'],
+  'shop.view':            ['owner', 'manager', 'staff', CSH, STK, PCK, ACC],
   'shop.update':          ['owner'],
   'shop.delete':          ['owner'],
 
@@ -24,13 +51,13 @@ const MATRIX = {
   'staffcode.create':     ['owner'],
   'staffcode.revoke':     ['owner'],
 
-  'subscription.view':    ['owner', 'manager', 'staff'],
+  'subscription.view':    ['owner', 'manager', 'staff', CSH, STK, PCK, ACC],
   'subscription.request': ['owner', 'manager'],
 
-  'data.read':            ['owner', 'manager', 'staff'],
-  'data.write':           ['owner', 'manager', 'staff'],
+  'data.read':            ['owner', 'manager', 'staff', CSH, STK, PCK, ACC],
+  'data.write':           ['owner', 'manager', 'staff', CSH, STK, PCK],
   'data.delete.any':      ['owner', 'manager'],
-  'data.delete.own':      ['owner', 'manager', 'staff'],
+  'data.delete.own':      ['owner', 'manager', 'staff', CSH, STK],
 
   //  کارهای پولیِ حساس — شاگرد نه. سرور در Sync v1 همین را می‌سنجد
   //  (`authorizeOp`)، نه فقط پنهان‌شدنِ دکمه در برنامه.
@@ -41,18 +68,18 @@ const MATRIX = {
 
   //  موجودیِ سرور (v3 §۳۲، INV-08/INV-12) — پشتِ پرچمِ `shop.catalog`. جابه‌جاییِ
   //  قفسه/انبار کارِ روزمره است؛ خراب، مرجوعی، اصلاح و شمارش دلیل و مدیر می‌خواهد.
-  'stock.view':           ['owner', 'manager', 'staff'],
-  'stock.move':           ['owner', 'manager', 'staff'],
-  'stock.adjust':         ['owner', 'manager'],
-  'reports.view':         ['owner', 'manager', 'staff'],
-  'audit.view':           ['owner', 'manager'],
+  'stock.view':           ['owner', 'manager', 'staff', CSH, STK, PCK, ACC],
+  'stock.move':           ['owner', 'manager', 'staff', STK],
+  'stock.adjust':         ['owner', 'manager', STK],
+  'reports.view':         ['owner', 'manager', 'staff', CSH, STK, ACC],
+  'audit.view':           ['owner', 'manager', ACC],
   'backup.run':           ['owner'],
 
   //  سفارشِ آنلاین (فاز ۴) — پشتِ پرچمِ `shop.orders`، پیش‌فرض خاموش.
   //  شمارهٔ کاملِ مشتری فقط برای «کاربرِ مجاز» (ORD-17)؛ بازپرداخت پولی است.
-  'orders.view':          ['owner', 'manager', 'staff'],
-  'orders.create':        ['owner', 'manager', 'staff'],
-  'orders.manage':        ['owner', 'manager', 'staff'],
+  'orders.view':          ['owner', 'manager', 'staff', CSH, PCK, ACC],
+  'orders.create':        ['owner', 'manager', 'staff', CSH],
+  'orders.manage':        ['owner', 'manager', 'staff', CSH, PCK],
   'orders.contact':       ['owner', 'manager'],
   'orders.refund':        ['owner', 'manager'],
 
@@ -61,17 +88,17 @@ const MATRIX = {
   //  را از `/api/courier` می‌بیند. نقشِ عضویتِ `courier` (DLV-01، مهاجرتِ ۱۰۲)
   //  عمداً در هیچ سطرِ این جدول نیست: توکنش دامنهٔ `courier` دارد و جز درِ
   //  پیک همه‌جا `403 courier_scope` می‌گیرد (`middleware/auth.js`).
-  'delivery.view':        ['owner', 'manager', 'staff'],
+  'delivery.view':        ['owner', 'manager', 'staff', CSH, PCK, ACC],
   'delivery.assign':      ['owner', 'manager'],
-  'delivery.handover':    ['owner', 'manager', 'staff'],
+  'delivery.handover':    ['owner', 'manager', 'staff', CSH, PCK],
   'delivery.couriers':    ['owner', 'manager'],
   'delivery.settle':      ['owner', 'manager'],
   'delivery.photo':       ['owner', 'manager'],
 
   //  چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
   //  شمارهٔ کاملِ مشتری در چت هم همان `orders.contact` را می‌خواهد.
-  'chat.view':            ['owner', 'manager', 'staff'],
-  'chat.reply':           ['owner', 'manager', 'staff'],
+  'chat.view':            ['owner', 'manager', 'staff', CSH, PCK],
+  'chat.reply':           ['owner', 'manager', 'staff', CSH, PCK],
   'chat.moderate':        ['owner', 'manager'],
 
   //  شکایت و تخلفِ بازارچه (v3 §۳۸.۶) — پشتِ پرچمِ `market.trust`، پیش‌فرض خاموش.
@@ -91,4 +118,4 @@ function permissionsOf(role) {
   return Object.keys(MATRIX).filter(k => can(role, k));
 }
 
-module.exports = { ROLES, MATRIX, can, permissionsOf };
+module.exports = { ROLES, STAFF_ROLES, MATRIX, can, permissionsOf, legacyRole };

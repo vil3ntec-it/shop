@@ -23,7 +23,8 @@ test('۱) بردار با order-states.js امروز یکی است', () => {
   assert.equal(fs.readFileSync(gen.FIXTURE, 'utf8'), gen.expected(),
     'بردارها کهنه‌اند: cd server && node scripts/order-vectors.js --write');
   //  خودِ سنجه خالی نیست
-  assert.ok(vec.check.length > 500 && vec.nextFor.length === S.ORDER_STATUSES.length * 2 * 3);
+  //  هر وضعیت × دو نوعِ تحویل × هر نقشِ کارمند (با چهار نقشِ تازهٔ A16)
+  assert.ok(vec.check.length > 500 && vec.nextFor.length === S.ORDER_STATUSES.length * 2 * require('../src/lib/permissions').ROLES.length);
 });
 
 test('۲) وب: دلیل‌های پنجره همان بردار است (آماده ⇐ لغو فقط «نیامد»)', () => {

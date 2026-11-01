@@ -1,0 +1,70 @@
+{
+  "_": "فهرستِ مجازِ اسکنِ راز (history-scan.mjs). هر ردیف دلیل دارد؛ قاعده‌های «قوی» (کلیدِ PEM، توکن‌های شناخته) برای پوشه‌های آزمون هم مجاز نیستند. ردیفِ رخداد (incident) پس از چرخشِ کلید و برداشتنِ فایل پاک شود — docs/security/artifacts-fa.md.",
+  "allow": [
+    {
+      "rule": "keystore",
+      "path": "android-native/app/tohid-release.jks",
+      "reason": "رخدادِ SEC-ART-05a: کلیدِ امضای APK در مخزنِ عمومی؛ چرخش و برداشتن کارِ صاحب محصول است (docs/security/artifacts-fa.md). این ردیف فقط تا آن روز."
+    },
+    {
+      "rule": "signing-password-literal",
+      "path": "android-native/app/build.gradle.kts",
+      "reason": "رخدادِ SEC-ART-05a: رمزِ پیش‌فرضِ همان کلیدِ بالا؛ با برداشتنِ کلید از مخزن این fallback هم برداشته می‌شود."
+    },
+    {
+      "rule": "signing-password-literal",
+      "path": "admin-android/app/build.gradle.kts",
+      "reason": "رخدادِ SEC-ART-05a: برنامهٔ مدیر همان کلید و همان رمزِ پیش‌فرض را می‌خواند."
+    },
+    {
+      "rule": "signing-password-literal",
+      "path": "docs/spec/OWNER-ACTIONS-fa.md",
+      "reason": "رخدادِ SEC-ART-05a: همان رمزِ پیش‌فرض در فرمانِ نمونهٔ بخشِ ۲؛ PRِ claude/sec-artifacts-signing برش می‌دارد."
+    },
+    {
+      "rule": "url-credentials",
+      "path": ".github/workflows/server.yml",
+      "reason": "PostgreSQLِ سرویسِ همان اجرای CI روی 127.0.0.1 با دادهٔ ساختگی؛ پس از کار نابود می‌شود."
+    },
+    {
+      "rule": "url-credentials",
+      "path": ".github/workflows/perf.yml",
+      "reason": "PostgreSQLِ سرویسِ همان اجرای CI (سنجشِ کارایی) روی 127.0.0.1 با دادهٔ ساختگی."
+    },
+    {
+      "rule": "url-credentials",
+      "path": "bench/*.mjs",
+      "reason": "نمونهٔ فرمان در توضیحِ ابزارِ سنجش — همان پایگاهِ محلیِ CI."
+    },
+    {
+      "rule": "url-credentials",
+      "path": "server/test/**",
+      "reason": "پیش‌فرضِ TEST_DATABASE_URL ِ آزمون‌ها: پایگاهِ محلیِ آزمون، دادهٔ ساختگی."
+    },
+    {
+      "rule": "secret-assignment",
+      "path": "server/test/**",
+      "reason": "رمز و توکنِ ساختگیِ آزمون‌ها (دکانِ A و B)."
+    },
+    {
+      "rule": "jwt",
+      "path": "server/test/**",
+      "reason": "توکنِ ساختگی برای آزمونِ پاک شدنِ راز از لاگ."
+    },
+    {
+      "rule": "secret-assignment",
+      "path": "core/test-vectors/**",
+      "reason": "بردارهای مرجعِ مشترک (توکنِ رسید و بازار) — ساختگی و قطعی."
+    },
+    {
+      "rule": "secret-assignment",
+      "path": "license/test-vectors/**",
+      "reason": "بردارهای مرجعِ مشترکِ JS — ساختگی و قطعی."
+    },
+    {
+      "rule": "secret-assignment",
+      "path": "**/src/test/**",
+      "reason": "آزمون‌های Kotlin با همان بردارهای ساختگیِ core/test-vectors."
+    }
+  ]
+}

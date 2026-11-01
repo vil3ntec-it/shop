@@ -1,0 +1,182 @@
+{
+  "format": "stock-ledger-v1",
+  "about": "Golden vectors for the ledger -> stock-core bridge of the native apps (data/StockLedger.kt, run by StockLedgerVectorsTest on Android and desktop CI). The ledger uses the shape every app version already writes (web localStorage 'tohid-shop-data-v1' = Kotlin ShopData) plus the optional additive fields listed in the bridge header. Expected numbers were worked out by hand from the rules below and from stock-v1.json, not copied from either engine.",
+  "rules": [
+    "Events: warehouseEntries (receipt when !isAdjustment && units > 0, else an adjustment typed by adjKind / the supplier_return stock movement with the same refId / notes starting with 'انبارگردانی' = count), stockMovements of type 'transfer' (zero-sum, needs toLocationId), saleItems of sales that are not cancelled (orphan items count), returns capped by saleItem.returnedQty with the remainder at the sale time.",
+    "Order: at (createdAt, else UTC midnight of date, else 1), then entry < transfer < sale < return, then id (UTF-16 order).",
+    "Receipt cost = round(units * price * 100) minor + round(landedCost * 100) landed. Lot = batch, else 'w:'+entryId when it has a date, else none.",
+    "History is replayed in recorded mode with today = the event's own day; a sale is split over locations: the scanned lot's location, the sale's location, then others by name; healthy stock first, then expired, then the shortage on the sale's location.",
+    "On-hand per product (sum of locations) equals today's engine: sum(units) - sum(quantity - returnedQty) of non-cancelled sales.",
+    "New work is checked in local mode: more than the healthy stock of the whole shop is refused (expired_stock when only expired units are missing).",
+    "Setting: the latest auditLog row of type stock_mode (createdAt, then id) decides; refId 'on' = on; no row = off."
+  ],
+  "ledger": {
+    "products": [
+      {"id": "p1", "name": "روغن"}, {"id": "p2", "name": "شیر"}, {"id": "p3", "name": "برنج"},
+      {"id": "p4", "name": "چای"}, {"id": "p5", "name": "صابون"}, {"id": "p6", "name": "نمک"}
+    ],
+    "warehouseEntries": [
+      {"id": "w1", "productId": "p1", "units": 10, "price": 100, "date": "2026-10-01", "createdAt": 1000},
+      {"id": "w2", "productId": "p1", "units": 5, "price": 130, "landedCost": 50, "date": "2026-10-01", "createdAt": 2000},
+      {"id": "w3", "productId": "p1", "units": -2, "price": 0, "isAdjustment": true, "adjKind": "damage", "notes": "خراب شد", "date": "2026-10-01", "createdAt": 5000},
+      {"id": "w4", "productId": "p1", "units": 1, "price": 0, "isAdjustment": true, "notes": "انبارگردانی — قفسهٔ ۲", "date": "2026-10-01", "createdAt": 6000},
+      {"id": "w5", "productId": "p1", "units": -2, "price": 0, "isAdjustment": true, "notes": "پس دادیم", "date": "2026-10-01", "createdAt": 7000},
+      {"id": "wA", "productId": "p2", "units": 5, "price": 10, "batch": "A", "expiryDate": "2026-12-01", "date": "2026-09-01", "createdAt": 1000},
+      {"id": "wB", "productId": "p2", "units": 5, "price": 10, "batch": "B", "expiryDate": "2026-11-01", "date": "2026-09-01", "createdAt": 2000},
+      {"id": "wC", "productId": "p2", "units": 3, "price": 10, "date": "2026-09-01", "createdAt": 3000},
+      {"id": "w31", "productId": "p3", "units": 10, "price": 20, "batch": "L1", "expiryDate": "2027-01-01", "date": "2026-09-01", "createdAt": 1000},
+      {"id": "w41", "productId": "p4", "units": 2, "price": 50, "date": "2026-09-01", "createdAt": 1000},
+      {"id": "w42", "productId": "p4", "units": 5, "price": 60, "date": "2026-09-01", "createdAt": 3000},
+      {"id": "w61", "productId": "p6", "units": 1, "price": 10, "date": "2026-01-02"}
+    ],
+    "stockMovements": [
+      {"id": "mw5", "productId": "p1", "type": "supplier_return", "qty": -2, "refId": "w5", "date": "2026-10-01", "createdAt": 7000},
+      {"id": "m1", "productId": "p3", "type": "transfer", "qty": 4, "locationId": "", "toLocationId": "انبار", "userId": "احمد", "reason": "پشتِ دکان", "date": "2026-09-01", "createdAt": 2000},
+      {"id": "mx", "productId": "p3", "type": "transfer", "qty": 1, "locationId": "", "date": "2026-09-01", "createdAt": 2500},
+      {"id": "my", "productId": "p1", "type": "sale", "qty": -3, "refId": "s1", "date": "2026-10-01", "createdAt": 3000}
+    ],
+    "sales": [
+      {"id": "s1", "status": "completed", "date": "2026-10-01", "createdAt": 3000, "seller": "کریم"},
+      {"id": "s2", "status": "cancelled", "date": "2026-10-01", "createdAt": 3500},
+      {"id": "s3", "status": "completed", "date": "2026-10-01", "createdAt": 4000},
+      {"id": "s4", "status": "completed", "date": "2026-10-01", "createdAt": 5000},
+      {"id": "s5", "status": "completed", "date": "2026-09-01", "createdAt": 3000},
+      {"id": "s6", "status": "completed", "date": "2026-09-01", "createdAt": 2000},
+      {"id": "s7", "status": "completed", "date": "2026-09-01", "createdAt": 2000},
+      {"id": "s8", "status": "completed", "createdAt": 1}
+    ],
+    "saleItems": [
+      {"id": "i1", "saleId": "s1", "productId": "p1", "quantity": 3, "unitPrice": 200, "purchasePrice": 130, "returnedQty": 1},
+      {"id": "i2", "saleId": "s2", "productId": "p1", "quantity": 4, "unitPrice": 200, "purchasePrice": 130, "returnedQty": 0},
+      {"id": "j1", "saleId": "s3", "productId": "p2", "quantity": 4, "unitPrice": 15, "returnedQty": 0},
+      {"id": "j2", "saleId": "s4", "productId": "p2", "quantity": 2, "unitPrice": 15, "returnedQty": 0, "lotId": "A"},
+      {"id": "k1", "saleId": "s5", "productId": "p3", "quantity": 7, "unitPrice": 30, "returnedQty": 0},
+      {"id": "n1", "saleId": "s6", "productId": "p4", "quantity": 3, "unitPrice": 80, "returnedQty": 0},
+      {"id": "q1", "saleId": "s7", "productId": "p5", "quantity": 1, "unitPrice": 40, "returnedQty": 0},
+      {"id": "f1", "saleId": "s8", "productId": "p6", "quantity": 1, "unitPrice": 15, "returnedQty": 0},
+      {"id": "free", "saleId": "s1", "productId": "", "name": "قلمِ آزاد", "quantity": 1, "unitPrice": 5, "returnedQty": 0}
+    ],
+    "returns": [
+      {"id": "r1", "saleId": "s1", "saleItemId": "i1", "productId": "p1", "quantity": 1, "amount": 200, "reason": "خراب بود", "date": "2026-10-01", "createdAt": 4000}
+    ],
+    "auditLog": [
+      {"id": "a1", "type": "stock_mode", "refId": "on", "createdAt": 10},
+      {"id": "a2", "type": "stock_review_ack", "refId": "q1", "createdAt": 20}
+    ]
+  },
+  "expect": {
+    "on": true,
+    "errors": 0,
+    "reconciles": true,
+    "locations": ["", "انبار"],
+    "products": {
+      "p1": {"qtyMilli": 10000, "valueMinor": 113332, "unitCostMinor": 11333,
+        "locations": [{"location": "", "qtyMilli": 10000, "valueMinor": 113332}], "lots": [{"lotId": "", "location": "", "qtyMilli": 10000}]},
+      "p2": {"qtyMilli": 7000, "valueMinor": 7000, "unitCostMinor": 1000,
+        "locations": [{"location": "", "qtyMilli": 7000, "valueMinor": 7000}],
+        "lots": [{"lotId": "B", "location": "", "qtyMilli": 1000}, {"lotId": "A", "location": "", "qtyMilli": 3000}, {"lotId": "", "location": "", "qtyMilli": 3000}]},
+      "p3": {"qtyMilli": 3000, "valueMinor": 6000, "unitCostMinor": 2000,
+        "locations": [{"location": "", "qtyMilli": 0, "valueMinor": 0}, {"location": "انبار", "qtyMilli": 3000, "valueMinor": 6000}],
+        "lots": [{"lotId": "L1", "location": "انبار", "qtyMilli": 3000}]},
+      "p4": {"qtyMilli": 4000, "valueMinor": 24000, "unitCostMinor": 6000,
+        "locations": [{"location": "", "qtyMilli": 4000, "valueMinor": 24000}], "lots": [{"lotId": "", "location": "", "qtyMilli": 4000}]},
+      "p5": {"qtyMilli": -1000, "valueMinor": 0, "unitCostMinor": null,
+        "locations": [{"location": "", "qtyMilli": -1000, "valueMinor": 0}], "lots": [{"lotId": "", "location": "", "qtyMilli": -1000}]},
+      "p6": {"qtyMilli": 0, "valueMinor": 0, "unitCostMinor": 1000,
+        "locations": [{"location": "", "qtyMilli": 0, "valueMinor": 0}], "lots": []}
+    },
+    "rows": [
+      {"id": "f1", "type": "sale", "productId": "p6", "location": "", "qtyMilli": -1000, "costMinor": 0, "userId": "legacy"},
+      {"id": "w1", "type": "purchase_receipt", "productId": "p1", "location": "", "qtyMilli": 10000, "costMinor": 100000, "userId": "legacy"},
+      {"id": "w31", "type": "purchase_receipt", "productId": "p3", "location": "", "qtyMilli": 10000, "costMinor": 20000, "lotId": "L1"},
+      {"id": "w41", "type": "purchase_receipt", "productId": "p4", "location": "", "qtyMilli": 2000, "costMinor": 10000},
+      {"id": "wA", "type": "purchase_receipt", "productId": "p2", "location": "", "qtyMilli": 5000, "costMinor": 5000, "lotId": "A"},
+      {"id": "w2", "type": "purchase_receipt", "productId": "p1", "location": "", "qtyMilli": 5000, "costMinor": 70000},
+      {"id": "wB", "type": "purchase_receipt", "productId": "p2", "location": "", "qtyMilli": 5000, "costMinor": 5000, "lotId": "B"},
+      {"id": "m1:out", "type": "transfer_out", "productId": "p3", "location": "", "qtyMilli": -4000, "costMinor": 8000, "userId": "احمد", "reason": "پشتِ دکان"},
+      {"id": "m1:in", "type": "transfer_in", "productId": "p3", "location": "انبار", "qtyMilli": 4000, "costMinor": 8000, "lotId": "L1"},
+      {"id": "n1", "type": "sale", "productId": "p4", "location": "", "qtyMilli": -3000, "costMinor": 15000},
+      {"id": "q1", "type": "sale", "productId": "p5", "location": "", "qtyMilli": -1000, "costMinor": 0},
+      {"id": "w42", "type": "purchase_receipt", "productId": "p4", "location": "", "qtyMilli": 5000, "costMinor": 30000, "costAdjustMinor": 1000},
+      {"id": "wC", "type": "purchase_receipt", "productId": "p2", "location": "", "qtyMilli": 3000, "costMinor": 3000, "lotId": ""},
+      {"id": "i1", "type": "sale", "productId": "p1", "location": "", "qtyMilli": -3000, "costMinor": 34000, "userId": "کریم", "refId": "s1"},
+      {"id": "k1:0", "type": "sale", "productId": "p3", "location": "", "qtyMilli": -6000, "costMinor": 12000},
+      {"id": "k1:1", "type": "sale", "productId": "p3", "location": "انبار", "qtyMilli": -1000, "costMinor": 2000},
+      {"id": "j1", "type": "sale", "productId": "p2", "location": "", "qtyMilli": -4000, "costMinor": 4000},
+      {"id": "r1", "type": "customer_return", "productId": "p1", "location": "", "qtyMilli": 1000, "costMinor": 11333, "reason": "خراب بود"},
+      {"id": "w3", "type": "damage", "productId": "p1", "location": "", "qtyMilli": -2000, "costMinor": 22667, "reason": "خراب شد"},
+      {"id": "j2", "type": "sale", "productId": "p2", "location": "", "qtyMilli": -2000, "costMinor": 2000, "lotId": "A"},
+      {"id": "w4", "type": "count_adjust", "productId": "p1", "location": "", "qtyMilli": 1000, "costMinor": 11333, "reason": "انبارگردانی — قفسهٔ ۲"},
+      {"id": "w5", "type": "supplier_return", "productId": "p1", "location": "", "qtyMilli": -2000, "costMinor": 22667, "reason": "پس دادیم"},
+      {"id": "w61", "type": "purchase_receipt", "productId": "p6", "location": "", "qtyMilli": 1000, "costMinor": 1000, "costAdjustMinor": 1000}
+    ],
+    "picks": {
+      "j1": [{"lotId": "B", "qtyMilli": 4000}],
+      "j2": [{"lotId": "A", "qtyMilli": 2000}],
+      "k1:1": [{"lotId": "L1", "qtyMilli": 1000}]
+    },
+    "tasks": [
+      {"id": "f1", "productId": "p6", "location": "", "reasons": ["negative_stock", "unknown_cost"], "shortMilli": 1000, "qtyAfterMilli": -1000, "acked": false},
+      {"id": "n1", "productId": "p4", "location": "", "reasons": ["negative_stock"], "shortMilli": 1000, "qtyAfterMilli": -1000, "acked": false},
+      {"id": "q1", "productId": "p5", "location": "", "reasons": ["negative_stock", "unknown_cost"], "shortMilli": 1000, "qtyAfterMilli": -1000, "acked": true}
+    ]
+  },
+  "modes": [
+    {"name": "no row = off", "auditLog": [], "on": false},
+    {"name": "latest wins", "auditLog": [{"id": "a", "type": "stock_mode", "refId": "on", "createdAt": 5}, {"id": "b", "type": "stock_mode", "refId": "off", "createdAt": 9}], "on": false},
+    {"name": "tie on createdAt -> larger id", "auditLog": [{"id": "b", "type": "stock_mode", "refId": "on", "createdAt": 9}, {"id": "a", "type": "stock_mode", "refId": "off", "createdAt": 9}], "on": true},
+    {"name": "other audit rows are ignored", "auditLog": [{"id": "z", "type": "price_change", "refId": "on", "createdAt": 99}], "on": false}
+  ],
+  "cart": [
+    {"name": "FEFO skips the lot that expired before today; no-lot stock comes after dated lots", "today": "2026-11-15",
+      "lines": [{"productId": "p2", "qtyMilli": 6000}],
+      "expect": [{"ok": true, "costMinor": 6000, "unitCostMinor": 1000, "picks": [{"location": "", "lotId": "A", "qtyMilli": 3000}, {"location": "", "lotId": "", "qtyMilli": 3000}]}]},
+    {"name": "only expired units are missing -> expired_stock", "today": "2026-11-15",
+      "lines": [{"productId": "p2", "qtyMilli": 7000}],
+      "expect": [{"ok": false, "error": "expired_stock", "availableMilli": 6000, "expiredMilli": 1000}]},
+    {"name": "more than on hand -> insufficient_stock", "today": "2026-11-15",
+      "lines": [{"productId": "p2", "qtyMilli": 8000}],
+      "expect": [{"ok": false, "error": "insufficient_stock", "availableMilli": 6000}]},
+    {"name": "a scanned lot is picked first", "today": "2026-10-15",
+      "lines": [{"productId": "p2", "qtyMilli": 1000, "lotId": "A"}],
+      "expect": [{"ok": true, "costMinor": 1000, "picks": [{"location": "", "lotId": "A", "qtyMilli": 1000}]}]},
+    {"name": "lines of one product are checked one after another", "today": "2026-10-15",
+      "lines": [{"productId": "p1", "qtyMilli": 6000}, {"productId": "p1", "qtyMilli": 5000}],
+      "expect": [{"ok": true, "costMinor": 67999}, {"ok": false, "error": "insufficient_stock", "availableMilli": 4000}]},
+    {"name": "stock in another location still sells (shelf first, then the store room)", "today": "2026-10-15",
+      "lines": [{"productId": "p3", "qtyMilli": 2000}],
+      "expect": [{"ok": true, "costMinor": 4000, "picks": [{"location": "انبار", "lotId": "L1", "qtyMilli": 2000}]}]},
+    {"name": "never stocked -> insufficient_stock with nothing available", "today": "2026-10-15",
+      "lines": [{"productId": "nope", "qtyMilli": 1000}],
+      "expect": [{"ok": false, "error": "insufficient_stock", "availableMilli": 0}]}
+  ],
+  "transfers": [
+    {"name": "more than the source holds is refused", "today": "2026-10-15", "productId": "p3", "from": "انبار", "to": "", "qtyMilli": 5000,
+      "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 3000}},
+    {"name": "same location is refused", "today": "2026-10-15", "productId": "p3", "from": "", "to": "", "qtyMilli": 1000,
+      "expect": {"ok": false, "error": "same_location"}},
+    {"name": "moves at average cost, lot kept", "today": "2026-10-15", "productId": "p3", "from": "انبار", "to": "", "qtyMilli": 1000,
+      "expect": {"ok": true, "costMinor": 2000, "picks": [{"lotId": "L1", "qtyMilli": 1000}]}}
+  ],
+  "count": {
+    "productIds": ["p1", "p2", "p3"],
+    "counts": {"p1": 9000, "p2": 7000},
+    "snapshot": {"p1": 10000},
+    "expect": {"matched": 1, "variance": 1, "uncounted": 1, "valueMinor": -11333, "gainMinor": 0, "lossMinor": 11333,
+      "lines": [{"productId": "p1", "systemMilli": 10000, "countedMilli": 9000, "diffMilli": -1000, "valueMinor": -11333},
+        {"productId": "p2", "systemMilli": 7000, "countedMilli": 7000, "diffMilli": 0, "valueMinor": 0}]}
+  },
+  "spreadLanded": [
+    [1000, [3000, 7000, 0], [300, 700, 0]],
+    [100, [1, 1, 1], [33, 34, 33]],
+    [100, [0, 0], [50, 50]],
+    [0, [5], [0]],
+    [7, [], []]
+  ],
+  "unitCost": [
+    [34000, 3000, 11333],
+    [6000, 6000, 1000],
+    [1, 3000, 0],
+    [0, 0, 0]
+  ]
+}

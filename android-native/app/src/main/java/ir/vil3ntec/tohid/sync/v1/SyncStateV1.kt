@@ -74,6 +74,16 @@ class SyncStateV1(context: Context, private val accountKey: String) {
     get() = prefs.getLong(k("lastPullAt"), 0)
     set(v) = prefs.edit().putLong(k("lastPullAt"), v).apply()
 
+  /**
+   *  «یادداشتِ» `since` ِ push (#481): cursor ِ لحظه‌ای که صفِ خالی نخستین op را گرفت، و تا خالی شدنِ
+   *  صف فقط پایین می‌آید — شرح سرِ `core/…/core/sync/PushSince.kt`. `-1` یعنی هیچ (⇒ همان cursor).
+   *  گم شدنِ این نوشتن (بسته شدن پیش از `apply`) فقط محتاط‌ترش می‌کند یا cursor را می‌فرستد؛ پس از
+   *  باز شدن هم push پیش از pull است، پس cursor همان لحظهٔ ثبت است.
+   */
+  var pushSince: Long
+    get() = prefs.getLong(k("pushSince"), -1L)
+    set(v) = prefs.edit().putLong(k("pushSince"), v).apply()
+
   var lastError: String
     get() = prefs.getString(k("lastError"), "").orEmpty()
     set(v) = prefs.edit().putString(k("lastError"), v).apply()

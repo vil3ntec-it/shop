@@ -65,6 +65,16 @@
   <uses-feature android:name="android.hardware.usb.host" android:required="false" />
 
   <!--
+    حساب‌پی در صندوق (PAY-21): دستگاهِ دکان تا برگهٔ QR باز است خودش را برچسبِ NFC ِ نوعِ ۴ نشان
+    می‌دهد و گوشیِ مشتری با لمس همان صفحهٔ پرداخت را باز می‌کند (HCE، `HesabPayHceService`).
+    هیچ کارتِ بانکی خوانده نمی‌شود. `NFC` اجازهٔ عادی است (بی پرسش) و فقط برای «سرویسِ پیش‌رو»
+    است؛ `required=false` چون دستگاهِ بی NFC (و کارت‌خوانِ بی Play) هم باید نصب و فروش کند.
+  -->
+  <uses-permission android:name="android.permission.NFC" />
+  <uses-feature android:name="android.hardware.nfc" android:required="false" />
+  <uses-feature android:name="android.hardware.nfc.hce" android:required="false" />
+
+  <!--
     SEC-01: عاملِ پشتیبان فقط وقتی رمزِ دفتر در کار است چیزی کم می‌کند (دفترِ رمزدار،
     کلیددان و حالِ همگام‌سازی با هم بیرون)؛ خاموش ⇒ همان دو فایلِ قاعده (`TohidBackupAgent`).
     `fullBackupOnly` یعنی همان پشتیبانِ خودکارِ کامل، نه کلید/مقدارِ قدیمی.
@@ -120,6 +130,22 @@
         <data android:scheme="vill3n" android:host="app" />
       </intent-filter>
     </activity-alias>
+
+    <!--
+      برچسبِ NFC ِ پرداختِ حساب‌پی. `exported=true` لازمِ خودِ اندروید است؛ فقط سرویسِ NFC ِ سیستم
+      (`BIND_NFC_SERVICE`) می‌تواند به آن وصل شود. بی پرداختِ باز به هر دستوری «پرونده نیست» می‌گوید.
+    -->
+    <service
+        android:name=".pay.platform.HesabPayHceService"
+        android:exported="true"
+        android:permission="android.permission.BIND_NFC_SERVICE">
+      <intent-filter>
+        <action android:name="android.nfc.cardemulation.action.HOST_APDU_SERVICE" />
+      </intent-filter>
+      <meta-data
+          android:name="android.nfc.cardemulation.host_apdu_service"
+          android:resource="@xml/apduservice" />
+    </service>
 
     <provider
         android:name="androidx.core.content.FileProvider"

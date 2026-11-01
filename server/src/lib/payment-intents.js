@@ -179,6 +179,9 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
   } else if (to === 'pending') {
     if (!S.canPayment(o.payment_status, 'pending')) return '';
     steps = ['pending'];
+  } else if (to === 'refunded') {
+    if (!S.canPayment(o.payment_status, 'refunded')) return 'order_not_paid';
+    steps = ['refunded'];
   } else {
     if (o.payment_status !== 'pending') return '';
     //  قصدِ زندهٔ دیگری برای همین سفارش؟ ⇒ همچنان «در انتظار»
@@ -214,6 +217,7 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {
+    //  pending | failed | refunded — روش و نقد همان می‌ماند
     await c.query('UPDATE online_orders SET payment_status=$3, version=version+1, updated_at=$4 WHERE shop_id=$1 AND id=$2',
       [intent.shop_id, o.id, steps[steps.length - 1], at]);
   }
@@ -230,6 +234,36 @@ function alert(intent, reason, detail = {}) {
   });
 }
 
+/**
+ * needs_review و هشدار. هشدار فقط وقتی نشان تازه خورد: تکرارِ همان رویداد طوفانِ هشدار نمی‌سازد و
+ * قصدی که از پیش زیرِ بررسی است همان یک ردیفِ سابقه را دارد. @returns {Promise<boolean>} نشانِ تازه خورد؟
+ */
+async function flagReview(intent, reason, detail = {}) {
+  const r = await one(
+    'UPDATE payment_intents SET needs_review=true, updated_at=$2 WHERE id=$1 AND needs_review=false RETURNING *',
+    [intent.id, now()]
+  );
+  if (r) await alert(r, reason, detail);
+  return Boolean(r);
+}
+
+/**
+ * «paid» ِ امضاشده‌ای که هرگز تأیید نشد (رویدادِ `deferred`) روی قصدی که دیگر زنده نیست: پول شاید نزدِ
+ * ارائه‌دهنده است و دکان باید ببیند ⇒ needs_review و هشدارِ `paid_unconfirmed`. ⛔ هرگز خودکار پرداخت‌شده
+ * نمی‌شود؛ تأییدِ بعدیِ ارائه‌دهنده (ارسالِ دوباره یا تطبیق) همان مسیرِ S35 است.
+ */
+async function flagDeferredPaid(intent, source) {
+  if (!intent || intent.needs_review === true || ['paid', 'refunded'].includes(intent.status)) return false;
+  const ev = await one(
+    `SELECT provider_event_id, received_at FROM payment_events
+      WHERE intent_id=$1 AND type='paid' AND outcome='deferred' ORDER BY received_at LIMIT 1`, [intent.id]
+  );
+  if (!ev) return false;
+  return flagReview(intent, 'paid_unconfirmed', {
+    cause: 'never_confirmed', source, from: intent.status, eventId: ev.provider_event_id, receivedAt: Number(ev.received_at),
+  });
+}
+
 /** گذار به یکی از وضعیت‌های بسته‌ی بی‌پول (failed/expired/cancelled) با اثرش روی سفارش. */
 async function close(row, to, reason) {
   const out = await tx(async (c) => {
@@ -237,7 +271,11 @@ async function close(row, to, reason) {
     if (next) await orderPaymentIn(c, next, 'failed', { reason });
     return next;
   });
-  if (out) nudge(out.id);
+  if (out) {
+    nudge(out.id);
+    //  بسته شد در حالی که «paid» ِ امضاشده‌اش هنوز «بعداً» است ⇒ بی‌صدا منقضی نشود
+    await flagDeferredPaid(out, reason).catch((err) => console.error('[payments] نشانِ بررسی', out.id, err.message));
+  }
   return out;
 }
 
@@ -279,7 +317,7 @@ async function markPaid(id, { providerRef = '', confirmed = false, source = 'web
       nudge(id);
       if (res.late || res.problem) await alert(res.row, res.late ? 'late_payment' : res.problem, { from: res.from, source, problem: res.problem || '' });
     }
-    if (res.outcome === 'unconfirmed' && res.row) await alert(res.row, 'late_payment_unconfirmed', { from: res.row.status, source });
+    if (res.outcome === 'unconfirmed' && res.row) await flagReview(res.row, 'late_payment_unconfirmed', { from: res.row.status, source });
     return res.outcome;
   }
   return 'duplicate_state';
@@ -493,6 +531,9 @@ async function cancel(shopId, id, actor = {}) {
 //  وب‌هوک
 // ════════════════════════════════════════════════════════════════════
 
+/** پاسخِ قطعیِ «پرداخت نشد» ِ ارائه‌دهنده در تأییدِ دوم/تطبیق. */
+const PROVIDER_NO = Object.freeze(['failed', 'expired', 'cancelled']);
+
 /** تأییدِ دومِ «paid» از خودِ ارائه‌دهنده. */
 async function confirmWith(ad, intent) {
   if (typeof ad.fetchStatus !== 'function') return { ok: false, reason: 'no_status_api' };
@@ -501,7 +542,9 @@ async function confirmWith(ad, intent) {
     console.warn(`[payments] تأییدِ دوم از ${ad.name} نشد (${intent.id}): ${err.message}`);
     return { ok: false, reason: 'status_unreachable', retry: true };
   }
-  if (st.status !== 'paid') return { ok: false, reason: `provider_says_${st.status}` };
+  //  فقط «نه» ِ قطعی پایانی است. pending/unknown/… یعنی درِ وضعیت هنوز هم‌گام نشده (پول شاید رفته)
+  //  ⇒ «بعداً» (۵۰۳) تا ارائه‌دهنده همان رویداد را دوباره بفرستد؛ رویداد نهایی نمی‌شود.
+  if (st.status !== 'paid') return { ok: false, reason: `provider_says_${st.status}`, retry: !PROVIDER_NO.includes(st.status) };
   if (st.amountMinor !== Number(intent.amount_minor) || st.currency !== intent.currency) {
     return { ok: false, reason: 'amount_mismatch', mismatch: true, got: { amountMinor: st.amountMinor, currency: st.currency } };
   }
@@ -524,15 +567,20 @@ async function applyEvent(ad, found, ev) {
     let confirmed = false;
     if (confirmEnabled() || late) {
       const c = await confirmWith(ad, intent);
-      if (c.retry) return 'deferred';
+      if (c.retry) {
+        if (c.reason !== 'status_unreachable') console.warn(`[payments] «paid» ِ ${intent.id} هنوز تأیید نشد (${c.reason}) ⇒ بعداً`);
+        return 'deferred';
+      }
       if (c.mismatch) {
         await query('UPDATE payment_intents SET needs_review=true, updated_at=$2 WHERE id=$1', [intent.id, now()]);
         await alert(intent, 'amount_mismatch', { got: c.got, source: 'status' });
         return 'mismatch';
       }
       if (!c.ok) {
+        //  امضاشده می‌گوید «paid» و درِ وضعیت قطعاً «نه» (یا درِ وضعیت نیست): تناقض ⇒ بررسیِ دستی، هرگز پرداخت‌شده نه
         console.warn(`[payments] «paid» ِ ${intent.id} تأیید نشد: ${c.reason}`);
-        if (late) await alert(intent, 'late_payment_unconfirmed', { reason: c.reason });
+        await flagReview(intent, late ? 'late_payment_unconfirmed' : 'paid_unconfirmed',
+          { cause: c.reason, eventId: ev.eventId || '' });
         return 'unconfirmed';
       }
       confirmed = true;
@@ -547,10 +595,29 @@ async function applyEvent(ad, found, ev) {
   return 'ignored';
 }
 
+/*
+ *  رویدادِ در حالِ پردازش: `outcome = 'processing:<پایانِ اجاره>'` (ردیفِ پیش از این نسخه: '' با
+ *  `received_at`). ارسالِ دوبارهٔ رویدادی که هنوز در کار است ⇒ ۵۰۳ (نه ۲۰۰ ِ «تکراری» که ارائه‌دهنده را از
+ *  ارسالِ دوباره بازمی‌داشت)؛ اجارهٔ گذشته (فرآیندی که وسطِ کار مُرد) ⇒ همین بار دوباره. گرفتنِ ردیف
+ *  compare-and-set روی همان مقدار است، پس دو پردازشِ هم‌زمانِ یک رویداد پدید نمی‌آید (و markPaid/close هم CAS‌اند).
+ */
+const EVENT_LEASE_MS = 2 * 60 * 1000;   // یک پردازش (تأییدِ دوم با مهلتِ ۱۰ ثانیه) هرگز این‌قدر نمی‌کشد
+const leaseOf = (at) => `processing:${at + EVENT_LEASE_MS}`;
+function processingState(prev, at) {
+  if (prev.outcome === '') return Number(prev.received_at) + EVENT_LEASE_MS <= at ? 'stale' : 'busy';
+  const m = /^processing:(\d+)$/.exec(String(prev.outcome || ''));
+  if (!m) return '';
+  return Number(m[1]) <= at ? 'stale' : 'busy';
+}
+const retryLater = (message = 'تأییدِ پرداخت هنوز ممکن نشد؛ دوباره بفرستید') =>
+  ({ status: 503, body: { error: { code: 'retry_later', message } } });
+
 /**
  * وب‌هوکِ ارائه‌دهنده — همیشه سریع و یک‌باره. @returns {{status:number, body:object}}
  *   امضای بد ⇒ ۴۰۱؛ رویدادِ تکراری ⇒ ۲۰۰؛ قصدِ ناشناخته ⇒ ۲۰۰ و لاگ (بی طوفانِ تکرار)؛
- *   اختلافِ مبلغ/ارز ⇒ ۲۰۰ و هشدار، بی «paid»؛ تأییدِ دومِ دست‌نیافتنی ⇒ ۵۰۳ تا ارائه‌دهنده دوباره بفرستد.
+ *   اختلافِ مبلغ/ارز ⇒ ۲۰۰ و هشدار، بی «paid»؛ تأییدِ دومِ دست‌نیافتنی یا هنوز نامعلوم (pending/unknown)
+ *   ⇒ ۵۰۳ و رویدادِ «deferred» تا ارائه‌دهنده دوباره بفرستد؛ فقط «نه» ِ قطعی ⇒ ۲۰۰ `unconfirmed` و بررسی.
+ *   همان رویداد هنوز در کار ⇒ ۵۰۳؛ «paid» ِ deferred روی قصدی که دیگر زنده نیست ⇒ needs_review و هشدار.
  */
 async function handleWebhook(name, raw, headers) {
   const ad = P.webhookAdapter(name);
@@ -565,16 +632,20 @@ async function handleWebhook(name, raw, headers) {
   const at = now();
   const ins = await one(
     `INSERT INTO payment_events (id, provider, provider_event_id, type, outcome, raw, received_at)
-     VALUES ($1,$2,$3,$4,'',$5::jsonb,$6) ON CONFLICT (provider_event_id) DO NOTHING RETURNING id`,
-    [newId('pe'), name, eventKey, String(ev.status || '').slice(0, 40), JSON.stringify(ev.raw || {}), at]
+     VALUES ($1,$2,$3,$4,$7,$5::jsonb,$6) ON CONFLICT (provider_event_id) DO NOTHING RETURNING id`,
+    [newId('pe'), name, eventKey, String(ev.status || '').slice(0, 40), JSON.stringify(ev.raw || {}), at, leaseOf(at)]
   );
   let eventRowId = ins && ins.id;
   if (!eventRowId) {
-    const prev = await one('SELECT id, outcome FROM payment_events WHERE provider_event_id=$1', [eventKey]);
-    if (!prev || prev.outcome !== 'deferred') return { status: 200, body: { ok: true, duplicate: true } };
-    //  پیش‌تر «بعداً» شد (تأییدِ دوم نرسید) ⇒ همین بار دوباره
-    const claimed = await one(`UPDATE payment_events SET outcome='' WHERE id=$1 AND outcome='deferred' RETURNING id`, [prev.id]);
-    if (!claimed) return { status: 200, body: { ok: true, duplicate: true } };
+    const prev = await one('SELECT id, outcome, received_at FROM payment_events WHERE provider_event_id=$1', [eventKey]);
+    if (!prev) return { status: 200, body: { ok: true, duplicate: true } };
+    const busy = processingState(prev, at);
+    if (prev.outcome !== 'deferred' && !busy) return { status: 200, body: { ok: true, duplicate: true } };
+    if (busy === 'busy') return retryLater('همین رویداد در حالِ پردازش است؛ کمی بعد دوباره بفرستید');
+    //  پیش‌تر «بعداً» شد (تأییدِ دوم نرسید) یا پردازشش وسطِ کار ماند ⇒ همین بار دوباره؛ فقط یکی برنده
+    const claimed = await one('UPDATE payment_events SET outcome=$3 WHERE id=$1 AND outcome=$2 RETURNING id',
+      [prev.id, prev.outcome, leaseOf(at)]);
+    if (!claimed) return retryLater('همین رویداد در حالِ پردازش است؛ کمی بعد دوباره بفرستید');
     eventRowId = prev.id;
   }
   const setOutcome = (outcome, intentId = null) => query(
@@ -598,7 +669,14 @@ async function handleWebhook(name, raw, headers) {
   }
   await setOutcome(outcome, intent.id);
   if (outcome === 'deferred') {
-    return { status: 503, body: { error: { code: 'retry_later', message: 'تأییدِ پرداخت هنوز ممکن نشد؛ دوباره بفرستید' } } };
+    //  «paid» ِ تأییدنشده روی قصدی که دیگر زنده نیست (دیر رسید، یا در همین پردازش منقضی شد) ⇒ دکان ببیند
+    if (ev.status === 'paid') {
+      const cur = await one('SELECT * FROM payment_intents WHERE id=$1', [intent.id]);
+      if (cur && (!LIVE.includes(cur.status) || Number(cur.expires_at) <= now())) {
+        await flagDeferredPaid(cur, 'webhook').catch((err) => console.error('[payments] نشانِ بررسی', cur.id, err.message));
+      }
+    }
+    return retryLater();
   }
   return { status: 200, body: { ok: true, outcome } };
 }
@@ -610,16 +688,21 @@ async function handleWebhook(name, raw, headers) {
 /**
  * برای هر قصدِ created/pending/expired ِ بازهٔ `sinceMs` (پیش‌فرض ۴۸ ساعت) وضعیت را از ارائه‌دهنده
  * می‌پرسد: «paid» ِ تأییدشده ⇒ markPaid (دیر ⇒ هشدار)؛ «failed/expired/cancelled» ⇒ بستنِ زنده؛
- * اختلاف ⇒ هشدار. @returns {{checked, paid, closed, mismatched, errors}}
+ * اختلاف ⇒ هشدار. زنده پیش از منقضی و تازه پیش از کهنه؛ `budgetMs` ⇒ پس از آن زمان بقیه به نوبتِ بعد
+ * (`truncated`). قصدِ بسته با «paid» ِ deferred ⇒ needs_review و هشدار (`flagged`).
+ * @returns {{checked, paid, closed, mismatched, errors, truncated, flagged}}
  */
-async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500 } = {}) {
-  const out = { checked: 0, paid: 0, closed: 0, mismatched: 0, errors: 0 };
+async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500, budgetMs = 0 } = {}) {
+  const out = { checked: 0, paid: 0, closed: 0, mismatched: 0, errors: 0, truncated: false, flagged: 0 };
+  const t0 = Date.now();
   const rows = (await query(
     `SELECT * FROM payment_intents WHERE status IN ('created','pending','expired') AND created_at >= $1
-        AND provider_session_id IS NOT NULL ORDER BY created_at, id LIMIT $2`,
+        AND provider_session_id IS NOT NULL
+      ORDER BY CASE WHEN status = 'expired' THEN 1 ELSE 0 END, created_at DESC, id LIMIT $2`,
     [now() - sinceMs, Math.min(5000, Math.max(1, limit))]
   )).rows;
   for (const r of rows) {
+    if (budgetMs > 0 && Date.now() - t0 >= budgetMs) { out.truncated = true; break; }
     //  ساختگی فقط بیرون از تولید (`webhookAdapter`)؛ بی کلید ⇒ رد
     const ad = P.webhookAdapter(r.provider);
     if (!ad || !ad.configured() || typeof ad.fetchStatus !== 'function') continue;
@@ -640,11 +723,146 @@ async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500 } = {}) {
       if (await expireIfDue(r).then((x) => x && x.status === 'expired')) out.closed++;
     }
   }
+  //  تورِ ایمنی: قصدِ بسته‌ای که «paid» ِ deferred دارد و هنوز نشانِ بررسی ندارد (مثلاً فرآیند میانِ بستن و
+  //  نشان مُرد) ⇒ needs_review و هشدار. قصدِ زنده‌ای که زمانش گذشته در حلقهٔ بالا بسته و همان‌جا نشان می‌خورد.
+  const stuck = (await query(
+    `SELECT i.* FROM payment_intents i
+      WHERE i.status IN ('expired','failed','cancelled') AND i.needs_review = false AND i.created_at >= $1
+        AND EXISTS (SELECT 1 FROM payment_events e WHERE e.intent_id = i.id AND e.type = 'paid' AND e.outcome = 'deferred')
+      ORDER BY i.created_at DESC LIMIT $2`,
+    [now() - sinceMs, Math.min(5000, Math.max(1, limit))]
+  )).rows;
+  for (const r of stuck) {
+    if (await flagDeferredPaid(r, 'reconcile')) out.flagged++;
+  }
   return out;
 }
+
+// ════════════════════════════════════════════════════════════════════
+//  ویترین (سفارشِ آنلاینِ مشتری)
+// ════════════════════════════════════════════════════════════════════
+
+const OFF = Object.freeze({ methods: ['cod'], online: { available: false, decision: 'D-08' } });
+
+/** `store.payment` ِ ویترین: «حساب‌پی» فقط با کلید + پرچم + اشتراکِ فعال؛ وگرنه همان نقدِ هنگامِ تحویل. */
+async function storefrontPayment(shopId) {
+  if (!(await enabledFor(shopId)) || !(await subscribedFor(shopId))) return OFF;
+  return { methods: ['cod', METHOD_ID], online: { available: true, provider: METHOD_ID } };
+}
+
+/**
+ * قصدهای زندهٔ این سفارش که زمانشان گذشته ⇒ «expired» (و پرداختِ سفارش «ناموفق») — پیش از خواندنِ پیگیری،
+ * تا مشتریِ برگشته از حساب‌پی تا تطبیقِ بعدی «در انتظار» نماند.
+ */
+async function refreshOrder(shopId, orderId) {
+  if (!orderId) return;
+  const rows = (await query(
+    `SELECT * FROM payment_intents WHERE shop_id=$1 AND kind='online_order' AND ref_id=$2
+        AND status IN ('created','pending') AND expires_at <= $3`, [shopId, String(orderId), now()]
+  )).rows;
+  for (const r of rows) await expireIfDue(r);
+}
+
+/** این سفارش همین حالا با حساب‌پی پرداختنی است؟ (برای دکمهٔ ویترین؛ تصمیمِ نهایی همان `create`) */
+async function orderPayable(shopId, orderId) {
+  if (!orderId || !(await storefrontPayment(shopId)).online.available) return false;
+  const o = await one(
+    'SELECT status, is_test, payment_status, cod_status FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, String(orderId)]
+  );
+  return Boolean(o) && !o.is_test && !S.isTerminal(o.status) && ['', 'to_collect'].includes(o.cod_status)
+    && ['unpaid', 'pending', 'failed'].includes(o.payment_status);
+}
+
+/**
+ * پرداختِ سفارشِ ویترین — مبلغ و ارز از خودِ سفارش (سرور)، کلید در فضای جدای `sf:`؛
+ * `returnUrl` را مسیرِ سرور می‌سازد، هرگز مشتری (بی redirect ِ باز).
+ */
+async function createForStorefront(shopId, orderId, { key, returnUrl, description = '' }) {
+  if (!(await enabledFor(shopId))) throw forbidden('پرداختِ آنلاین برای این فروشگاه روشن نیست', 'online_payment_unavailable');
+  const k = String(key || '').trim();
+  if (!k) throw badRequest('کلیدِ یکتایی (Idempotency-Key) لازم است', 'idempotency_key_required');
+  if (!/^[A-Za-z0-9_.:-]{8,120}$/.test(k)) throw badRequest('کلیدِ یکتایی نامعتبر است', 'bad_idempotency_key');
+  const o = await one('SELECT total_minor, currency FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, String(orderId || '')]);
+  if (!o) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  return create(shopId, {
+    body: { kind: 'online_order', refId: String(orderId), amount: Number(o.total_minor), currency: o.currency, idempotencyKey: `sf:${k}`, description },
+    actor: { id: 'customer' }, returnUrl,
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════
+//  مدیرِ سامانه: فهرست، «بازپرداخت شد»
+// ════════════════════════════════════════════════════════════════════
+
+/** فهرستِ قصدها برای پنل — تازه‌ترین بالا، صفحه‌بندی با (created_at، id)؛ بی نشانیِ پرداخت. */
+async function list({ status = '', review = false, shopId = '', limit = 50, before = '' } = {}) {
+  const where = [];
+  const params = [];
+  if (status) {
+    if (!Object.prototype.hasOwnProperty.call(TRANSITIONS, status)) throw badRequest('وضعیت نامعتبر است', 'bad_status');
+    params.push(status);
+    where.push(`pi.status = $${params.length}`);
+  }
+  if (review) where.push('pi.needs_review = true');
+  if (shopId) { params.push(String(shopId)); where.push(`pi.shop_id = $${params.length}`); }
+  const m = /^(\d{1,16})~([A-Za-z0-9_]{1,64})$/.exec(String(before || ''));
+  if (m) { params.push(Number(m[1]), m[2]); where.push(`(pi.created_at, pi.id) < ($${params.length - 1}::bigint, $${params.length}::text)`); }
+  const n = Math.min(200, Math.max(1, Math.floor(Number(limit)) || 50));
+  params.push(n + 1);
+  const rows = (await query(
+    `SELECT pi.*, s.name AS shop_name FROM payment_intents pi JOIN shops s ON s.id = pi.shop_id
+      ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY pi.created_at DESC, pi.id DESC LIMIT $${params.length}`,
+    params
+  )).rows;
+  const page = rows.slice(0, n);
+  const last = page[page.length - 1];
+  const counts = Object.fromEntries((await query(
+    'SELECT status, COUNT(*)::int AS n FROM payment_intents GROUP BY status'
+  )).rows.map((r) => [r.status, Number(r.n)]));
+  counts.review = Number((await one('SELECT COUNT(*)::int AS n FROM payment_intents WHERE needs_review = true')).n);
+  return {
+    items: page.map((r) => {
+      const { checkoutUrl: _c, qrPayload: _q, payment: _p, ...v } = view(r);
+      return { ...v, shopId: r.shop_id, shopName: r.shop_name, provider: r.provider, statusReason: r.status_reason, updatedAt: num(r.updated_at) };
+    }),
+    next: rows.length > n && last ? `${last.created_at}~${last.id}` : null,
+    counts,
+  };
+}
+
+/** paid → refunded — فقط مدیر، پس از بازگرداندنِ پول در خودِ حساب‌پی؛ پرداختِ سفارشِ آنلاین هم «بازپرداخت». */
+async function markRefunded(id, { adminId = '', note = '' } = {}) {
+  const out = await tx(async (c) => {
+    const row = (await c.query('SELECT * FROM payment_intents WHERE id=$1 FOR UPDATE', [String(id || '')])).rows[0];
+    if (!row) throw notFound('پرداخت پیدا نشد', 'payment_not_found');
+    if (row.status === 'refunded') return { row, unchanged: true };
+    if (row.status !== 'paid') {
+      const err = conflict('فقط پرداختِ «پرداخت‌شده» بازپرداختنی است', 'not_refundable');
+      err.data = { status: row.status };
+      throw err;
+    }
+    const next = await casIn(c, row, 'refunded', { status_reason: 'refunded_by_admin' });
+    if (!next) throw conflict('وضعیت همین حالا عوض شد؛ دوباره بخوانید', 'status_changed');
+    await orderPaymentIn(c, next, 'refunded', { reason: 'refunded_by_admin' });
+    return { row: next, unchanged: false };
+  });
+  if (!out.unchanged) {
+    nudge(out.row.id);
+    await audit.log({ shopId: out.row.shop_id, actorType: 'admin', userId: adminId, action: 'payment.refunded',
+      targetType: 'payment_intent', targetId: out.row.id,
+      detail: { kind: out.row.kind, refId: out.row.ref_id, amountMinor: Number(out.row.amount_minor), note: String(note || '').slice(0, 300) } });
+  }
+  return { ...view(out.row), unchanged: out.unchanged };
+}
+
+//  زمان‌بندِ تطبیق (هر ۵ دقیقه، با اجارهٔ میانِ نمونه‌ها): `lib/payment-reconciler.js`
 
 module.exports = {
   FLAG_KEY, METHOD_ID, TRANSITIONS, LATE_PAID_FROM, MAX_WAIT_S,
   canTransition, enabledFor, subscribedFor, configOf, create, get, cancel, handleWebhook, reconcile, markPaid,
+  storefrontPayment, refreshOrder, orderPayable, createForStorefront, list, markRefunded,
+  EVENT_LEASE_MS, provider,
+  ...require('./payment-reconciler'),
   view, paymentRow, _bus: bus,
 };
+
