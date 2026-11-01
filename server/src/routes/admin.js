@@ -83,37 +83,12 @@ router.post('/logout', async (req, res) => {
   res.json({ ok: true });
 });
 
-/*
- *  «توانایی»های این سرور برای پلِ پنلِ خانگی (ریپوی server، `account-admin.js`) — بندِ ۱۲.۶ ِ
- *  ADMIN-CONTROL-PLANE. پل پیش از صدا زدنِ هر درِ تازه همین را می‌خواند؛ سرورِ کهنه‌تر این فیلد را
- *  ندارد ⇒ پل «داده در دسترس نیست» نشان می‌دهد، نه عددِ ساختگی. ⛔ نام‌ها قرارداد‌ند و همان‌اند که پل
- *  می‌شناسد؛ هر چه این‌جا گفته شود درش واقعاً هست (`admin-control-plane.test.js` ⇒ CAPABILITY_PROBES).
- *  فهرست به نقش بسته نیست: مرزِ نقش را خودِ هر در می‌سنجد (`lib/admin-roles.js`).
- */
-const CAPABILITIES = Object.freeze([
-  'shop-health.v1',   //  GET /admin/shops/:id/health
-  'shop-holds.v1',    //  GET|POST /admin/shops/:id/holds · POST …/holds/:holdId/lift (چهار حالت + بایگانی)
-  'flags.v1',         //  GET /admin/flags · GET /admin/flags/history (نوشتن: ارشد + دلیل)
-  'actor.v1',         //  سرآیندهای X-Actor-Id/Role/Name با کلیدِ سرویس ⇒ «انجام‌دهنده» در سابقه
-  'service-key.v1',   //  Bearer vsk_… · GET|POST /admin/service-keys · POST …/:keyId/revoke
-  //  پوستهٔ کنسول (ریپوی server، ماژولِ ۴.۳ و جست‌وجوی سراسری):
-  'admin-sessions.v1', //  GET /admin/admins/:id/sessions · POST …/sessions/revoke (+ دلیل و «پیشین ⇒ تازه» در سابقهٔ نقش)
-  'search.v1',        //  GET /admin/search?q= — دکان، کاربر، پرداخت، سفارش، خطا (و مدیر فقط برای ارشدِ انسانی)، به نقش
-  'market-admin.v1',  //  GET /admin/market/overview|sellers|orders|commission|history (۴.۶، فقط خواندن)
-  'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
-  ...require('../lib/ops-overview').CAPABILITIES,   //  ops.v1 (+release-stage.v1 با OPS-01) — پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳
-  'finance.v1',       //  ماژولِ ۴.۵: GET /admin/finance/(summary…export) · POST …/adjustments (app.js ⇒ routes/admin-finance.js)
-]);
-
 router.get('/me', (req, res) => {
   res.json({
-    admin: {
-      id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role,
-      isOwner: req.admin.is_owner === true,
-    },
+    admin: { id: req.admin.id, username: req.admin.username, name: req.admin.name, role: req.admin.role, isOwner: req.admin.is_owner === true },
     //  فاز ۳: درخواستِ پلِ پنل با کلیدِ سرویس ⇒ «انجام‌دهنده» و نقشِ مؤثرش (نه خودِ کلید)
     ...(req.actor ? { actor: req.actor, service: { keyId: req.service.keyId, name: req.service.keyName, roleCap: req.service.roleCap } } : {}),
-    capabilities: CAPABILITIES,
+    capabilities: require('../lib/admin-capabilities').CAPABILITIES,
     serverTime: now(),
   });
 });
@@ -253,16 +228,7 @@ router.get('/shops', async (req, res) => {
   const like = `%${q.toLowerCase()}%`;
   //  فاز ۳: حالت‌های مدیریتیِ باز (`lib/shop-holds.js`) کنارِ هر دکان، و پالایشِ سمتِ سرور با `?hold=`
   const hold = req.query?.hold ? v.oneOf(req.query.hold, [...require('../lib/shop-holds').KINDS, 'none'], { field: 'حالت' }) : '';
-  //  ⛔ یک WHERE برای ردیف‌ها و `total` — پیش‌تر `total` همهٔ دکان‌ها را می‌شمرد و صفحه‌بندیِ پنل با
-  //  جست‌وجو «۴ از ۲» نشان می‌داد (چسبِ پنلِ مرکزی، بندِ ۱۲.۶).
-  const where = `
-      --  ⛔ ایمیل هم گشته می‌شود — همان قاعدهٔ admin-pump.js: صاحبِ
-      --  سامانه معمولاً فقط ایمیلِ طرف را دارد، نه نامِ دکانش.
-      WHERE ($1 = '' OR lower(s.name) LIKE $2 OR lower(u.name) LIKE $2
-             OR lower(coalesce(u.email,'')) LIKE $2
-             OR coalesce(u.phone,'') LIKE $2)
-        AND ($3 = '' OR ($3 = 'none' AND NOT EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL))
-             OR EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL AND h.kind=$3))`;
+  const where = require('../lib/admin-capabilities').SHOP_WHERE;   //  یک WHERE برای ردیف‌ها و `total` (بندِ ۱۲.۶)
   const rows = await many(
     `SELECT s.id, s.name, s.status, s.created_at, s.owner_user_id,
             u.name AS owner_name, u.phone AS owner_phone, u.email AS owner_email,
@@ -280,10 +246,7 @@ router.get('/shops', async (req, res) => {
       ORDER BY s.created_at DESC LIMIT $4 OFFSET $5`,
     [q, like, hold, limit, offset]
   );
-  const total = await one(
-    `SELECT COUNT(*)::int n FROM shops s JOIN users u ON u.id = s.owner_user_id ${where}`,
-    [q, like, hold]
-  );
+  const total = await one(`SELECT COUNT(*)::int n FROM shops s JOIN users u ON u.id = s.owner_user_id ${where}`, [q, like, hold]);
   // دکانی که هنوز اشتراک نخریده ولی در دوره‌ی آزمایشی است، «آزمایشی» نشان داده شود
   const trialDays = await plans.trialDaysOf('shop');
   const t = now();
@@ -731,9 +694,14 @@ router.get('/backups', async (req, res) => {
   const backup = require('../lib/backup');
   //  F0-08: بی رمز ⇒ پنل هشدارِ قرمز می‌دهد (خودِ رمز هرگز این‌جا نمی‌آید)
   const configured = !!config.backup.passphrase;
+  //  SEC-07: `required` = پرچمِ `security / backup.require_encryption` (بی رمز ⇒ پشتیبان نمی‌سازد)
+  const required = await backup.encryptionRequired();
   res.json({
     backups: await backup.list(), dir: config.backup.dir, enabled: config.backup.enabled,
-    encryption: { configured, warning: configured ? '' : backup.UNENCRYPTED_WARNING },
+    encryption: {
+      configured, required,
+      warning: configured ? '' : (required ? backup.REFUSED_WARNING : backup.UNENCRYPTED_WARNING),
+    },
   });
 });
 

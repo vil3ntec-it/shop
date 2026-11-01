@@ -27,7 +27,7 @@ const S = require('./order-states');
 const { ulid } = require('./ulid');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
-const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
+const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders';
 const FEATURE_KEY = 'online_orders';
@@ -127,8 +127,10 @@ function hashOf(body) {
  * بدنهٔ «سفارشِ دستیِ کارمند» (تلفنی/تلگرام/واتس‌اپ/دستی، ORD-21) — بررسی
  * و ساختِ مبلغ. هر عدد صحیح است: `qtyMilli` (هزارم) و `*Minor` (یک‌صدم).
  */
-function parseCreate(body, at) {
+function parseCreate(body, at, { substitution: subOn = false } = {}) {
   const b = body && typeof body === 'object' ? body : {};
+  //  CHK-15: ترجیحِ کلیِ جایگزینی (پرچمِ `shop.orders.substitution`؛ خاموش ⇒ '')
+  const orderSub = require('./order-substitution').orderOf(b, subOn);
   const source = str(b.source) || 'manual';
   if (!STAFF_SOURCES.includes(source)) throw badRequest('منبعِ سفارش معتبر نیست', 'bad_source');
   const fulfillment = str(b.fulfillment);
@@ -153,7 +155,9 @@ function parseCreate(body, at) {
     if (productId && !/^[A-Za-z0-9_.:-]{1,80}$/.test(productId)) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_lines');
     return {
       lineNo: i + 1, productId, name, unit: text(x.unit, 30), qtyMilli, unitPriceMinor,
-      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: text(x.note, 200), substitution,
+      lineTotalMinor: S.lineTotalMinor(qtyMilli, unitPriceMinor), note: text(x.note, 200),
+      //  CHK-15: قلمِ بی ترجیح ترجیحِ کلی را می‌گیرد؛ «کالای مشخص» نامِ جایگزین می‌خواهد
+      ...require('./order-substitution').staffLine(x, substitution, orderSub, subOn, i),
     };
   });
 
@@ -175,7 +179,30 @@ function parseCreate(body, at) {
     source, fulfillment, paymentMethod, customerName, customerPhone, address, delivery,
     note: text(b.note, 500), isTest: b.test === true, lines, subtotalMinor, discountMinor,
     deliveryFeeMinor, totalMinor, scheduledFor,
-    itemsCount: lines.length,
+    itemsCount: lines.length, substitution: orderSub,
+  };
+}
+
+/**
+ * نشانیِ تحویل — مشترکِ سفارشِ کارمند، ویترین و «اصلاحِ نشانی» پس از ناموفق
+ * (DLV-09، `delivery.fixAddress`). کارتِ پیک «اول نشانه» است (DLV-02): نشانه،
+ * ناحیه و رنگِ دروازه. ناحیه و رنگِ دروازه کمک‌اند، نه جای نشانی: بی پین،
+ * نشانه یا نشانیِ متنی هنوز ۴۰۰ است. هر کلیدِ دیگرِ ورودی دور ریخته می‌شود.
+ */
+function parseAddress(raw) {
+  const a = raw && typeof raw === 'object' ? raw : {};
+  const lat = coord(a.lat, -90, 90);
+  const lng = coord(a.lng, -180, 180);
+  if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
+  const landmark = text(a.landmark, 200);
+  const addrText = text(a.text, 300);
+  const area = text(a.area, 80);
+  const gateColor = text(a.gateColor, 40);
+  //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
+  if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
+  return {
+    ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
+    ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}),
   };
 }
 
@@ -191,18 +218,7 @@ function parseContact(body, fulfillment, { phoneRequired } = {}) {
   const v = require('./validate');
   const customerPhone = v.phone(c.phone, { required: phoneRequired ?? fulfillment === 'delivery' }) || '';
 
-  let address = {};
-  if (fulfillment === 'delivery') {
-    const a = b.address && typeof b.address === 'object' ? b.address : {};
-    const lat = coord(a.lat, -90, 90);
-    const lng = coord(a.lng, -180, 180);
-    if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
-    const landmark = text(a.landmark, 200);
-    const addrText = text(a.text, 300);
-    //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
-    if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
-    address = { ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}) };
-  }
+  const address = fulfillment === 'delivery' ? parseAddress(b.address) : {};
 
   const d = b.delivery && typeof b.delivery === 'object' ? b.delivery : {};
   const delivery = {};
@@ -236,7 +252,8 @@ function card(row, viewer, at) {
     orderNo: Number(row.order_no),
     status: row.status,
     tab: S.tabOf(row, at),
-    next: S.nextFor(row, { type: 'user', role: viewer.role }),
+    //  دکمهٔ گذار فقط برای کسی که `orders.manage` دارد (حسابدار فقط می‌بیند — A16)
+    next: can(viewer.role, 'orders.manage') ? S.nextFor(row, { type: 'user', role: viewer.role }) : [],
     source: row.source,
     isTest: row.is_test === true,
     fulfillment: row.fulfillment,
@@ -266,6 +283,8 @@ function detail(row, lines, events, viewer, at) {
     address: asJson(row.address),
     delivery: asJson(row.delivery),
     note: row.note,
+    //  CHK-15: ترجیحِ کلی (هر قلم ترجیحِ مؤثرِ خودش را دارد)
+    substitution: row.substitution || '',
     subtotalMinor: Number(row.subtotal_minor),
     discountMinor: Number(row.discount_minor),
     deliveryFeeMinor: Number(row.delivery_fee_minor),
@@ -274,6 +293,7 @@ function detail(row, lines, events, viewer, at) {
       lineNo: Number(l.line_no), productId: l.product_id, name: l.name, unit: l.unit,
       qtyMilli: Number(l.qty_milli), unitPriceMinor: Number(l.unit_price_minor),
       lineTotalMinor: Number(l.line_total_minor), note: l.note, substitution: l.substitution,
+      substituteProductId: l.substitute_product_id || '', substituteName: l.substitute_name || '',
     })),
     events: events.map((e) => ({
       seq: Number(e.seq), kind: e.kind, fromStatus: e.from_status, toStatus: e.to_status,
@@ -312,8 +332,10 @@ async function get(shopId, id, viewer) {
  */
 async function create(shopId, { key, body, actor, price, notify }) {
   const at = now();
-  let input = price ? null : parseCreate(body, at);
+  let input = price ? null
+    : parseCreate(body, at, { substitution: await require('./order-substitution').flagOn(shopId) });
   const hash = hashOf(body);
+  const prefsOn = await require('./delivery-prefs').flagOn(shopId);   // CHK-14 (پیش‌فرض خاموش)
   //  QA #263: خواندنِ دفترِ دستگاه (پرچمِ `shop.catalog`) در تراکنشِ خودش و **پیش از**
   //  تراکنش و قفلِ سفارش؛ سفارشِ آزمایشی موجودی را نمی‌سنجد.
   if (!(input && input.isTest)) await require('./catalog').prepare(shopId, { at });
@@ -333,6 +355,8 @@ async function create(shopId, { key, body, actor, price, notify }) {
       return { order: await loadDetail(run, shopId, prev.id, actor), replayed: true };
     }
     if (price) input = await price(run, at);
+    //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در برابرِ جمعِ همین لحظه؛ خاموش ⇒ کلید دور ریخته می‌شود
+    input = require('./delivery-prefs').applyOnCreate(input, body, prefsOn);
     //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
     //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
     await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
@@ -341,27 +365,33 @@ async function create(shopId, { key, body, actor, price, notify }) {
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
     )).rows[0].n);
     const id = ulid(at);
+    //  S10 (مهاجرتِ ۱۳۰): درِ ورودِ مشتری را سرور می‌گذارد، نه بدنه؛ امروز فقط ویترین.
+    //  سفارشِ کارمند ⇒ '' (منبعش `source` است). کارمزد و کمیسیون همین‌جا یک بار از سیاستِ
+    //  `market-fees` (live_config، پیش‌فرض ۰) حساب می‌شوند و دیگر هرگز بازنویسی نمی‌شوند.
+    const channel = input.source === 'storefront' ? 'storefront' : '';
+    const fees = await require('./market-fees').forNewOrder(run, shopId, { ...input, channel });
     await c.query(
       `INSERT INTO online_orders (
          id, shop_id, order_no, client_key, request_hash, source, is_test, status, fulfillment,
          payment_method, payment_status, cod_status, customer_name, customer_phone, address, delivery,
          note, items_count, subtotal_minor, discount_minor, delivery_fee_minor, total_minor,
-         scheduled_for, created_by, created_at, updated_at)
+         scheduled_for, created_by, created_at, updated_at, channel, platform_fee_minor, commission_minor, substitution)
        VALUES ($1,$2,$3,$4,$5,$6,$7,'new',$8,$9,'unpaid',$10,$11,$12,$13::jsonb,$14::jsonb,
-               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23)`,
+               $15,$16,$17,$18,$19,$20,$21,$22,$23,$23,$24,$25,$26,$27)`,
       [id, shopId, no, key, hash, input.source, input.isTest, input.fulfillment,
         input.paymentMethod, input.paymentMethod === 'cod' ? 'to_collect' : '',
         input.customerName, input.customerPhone, JSON.stringify(input.address), JSON.stringify(input.delivery),
         input.note, input.itemsCount, input.subtotalMinor, input.discountMinor, input.deliveryFeeMinor,
-        input.totalMinor, input.scheduledFor, actor.id || '', at]
+        input.totalMinor, input.scheduledFor, actor.id || '', at,
+        channel, fees.platformFeeMinor, fees.commissionMinor, input.substitution || '']
     );
     for (const l of input.lines) {
       await c.query(
         `INSERT INTO online_order_lines (id, order_id, shop_id, line_no, product_id, name, unit, qty_milli,
-           unit_price_minor, line_total_minor, note, substitution)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+           unit_price_minor, line_total_minor, note, substitution, substitute_product_id, substitute_name)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
         [ulid(at), id, shopId, l.lineNo, l.productId, l.name, l.unit, l.qtyMilli, l.unitPriceMinor,
-          l.lineTotalMinor, l.note, l.substitution]
+          l.lineTotalMinor, l.note, l.substitution, l.substituteProductId || '', l.substituteName || '']
       );
     }
     await c.query(
@@ -596,6 +626,6 @@ async function summary(shopId) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, maskPhone,
+  flagOf, entitledOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary,
 };

@@ -56,7 +56,7 @@ function build(T) {
    *  آزمایشیِ مصرف‌شده، **بی** دست زدن به ردیفِ اشتراک یا پول؛ برداشتنش همه‌چیز را به حسابِ ساعتِ سرور
    *  برمی‌گرداند (روزی اضافه نمی‌شود). پمپ این حالت را ندارد.
    */
-  const TENANT_SQL = T.app === 'shop'
+  const TENANT_SQL = T.tenantTable === 'shops'
     ? `SELECT t.*, (SELECT h.placed_at FROM shop_holds h
                      WHERE h.shop_id = t.id AND h.kind = 'subscription_ended' AND h.lifted_at IS NULL
                      LIMIT 1) AS hold_sub_ended_at

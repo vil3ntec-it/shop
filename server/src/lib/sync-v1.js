@@ -293,7 +293,7 @@ async function touchDevice(q, ctx, deviceId, patch) {
  * @returns {{results:Array, head:number, applied:number, schema_version:number, upgrade_available:boolean}}
  * @throws 426 اگر برنامه از سرور جدیدتر باشد — و هیچ چیزی اعمال نمی‌شود
  */
-async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued = null }) {
+async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued = null, guard = null }) {
   if (!Array.isArray(ops)) throw badRequest('فهرستِ opها درست نیست', 'bad_ops');
   if (ops.length > MAX_OPS) throw badRequest(`حداکثر ${MAX_OPS} op در هر دسته`, 'batch_too_large');
 
@@ -310,7 +310,7 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
   const upgradeAvailable = clientSchema < current;
   const t = now();
 
-  return tx(async (c) => {
+  const out = await tx(async (c) => {
     /*
      *  پوش‌های یک حساب پشتِ سرِ هم، نه هم‌زمان.
      *
@@ -355,6 +355,18 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
         [...accArgs(ctx), op.table, op.row_id]
       )).rows[0] || null;
 
+      //  S89: فاکتورِ ثبت‌شده سرِ جا عوض نمی‌شود — نگهبانِ فقط‌دکانِ `lib/finalized-sales.js` (پرچمِ `shop.doc_chain`)
+      if (guard) {
+        const g = await guard.check(c, { table: op.table, rowId: op.row_id, type: op.type, fields: op.fields || {}, ts: op.ts },
+          row && !row.deleted_at ? row.data : null);
+        if (g && g.reject) { results.push({ op_id: op.op_id, status: 'rejected', reason: g.reject }); continue; }
+        if (g && g.replay) {
+          //  درجِ دوبارهٔ همان سند: پذیرفته، بی بازنویسی (همان «فقط‌افزودنی» ِ v3)
+          results.push({ op_id: op.op_id, status: 'duplicate', server_seq: Number(row.updated_seq), replay: true });
+          continue;
+        }
+      }
+
       const ins = await c.query(
         `INSERT INTO oplog (id, app, account_kind, account_id, device_id, op_id, client_ts, table_name, row_id,
                             op_type, fields, hash, schema_version, received_at)
@@ -397,6 +409,8 @@ async function push(ctx, { deviceId, schemaVersion, ops, appVersion = '', queued
       schema_version: current, upgrade_available: upgradeAvailable,
     };
   });
+  if (guard) await guard.finish();
+  return out;
 }
 
 // ---------- دسترسیِ هر op ----------

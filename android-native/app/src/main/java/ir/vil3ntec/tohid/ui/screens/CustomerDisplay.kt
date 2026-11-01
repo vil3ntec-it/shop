@@ -37,6 +37,9 @@ import ir.vil3ntec.tohid.ui.theme.Space
  */
 @Composable
 fun CustomerDisplayScreen(storeName: String) {
+  //  PAY-21: در پرداختِ حساب‌پی همان مبلغ، QR و وضعیتِ برگهٔ صندوقدار
+  val pay = ir.vil3ntec.tohid.pay.CustomerPay.view.value
+  if (pay != null) { ir.vil3ntec.tohid.ui.components.pos.CustomerPayScreen(storeName, pay); return }
   val v by CustomerFacing.view
   val c = Shop.colors
   Column(Modifier.fillMaxSize().background(c.bg).padding(Space.xl)) {

@@ -96,4 +96,40 @@ async function log(entry, { client = null } = {}) {
   return id;
 }
 
-module.exports = { log, scrub };
+/**
+ * سابقه **درونِ تراکنشِ خودِ کار** (`db.tx`): ردیف با همان client نوشته می‌شود و شکستش
+ * پرتاب می‌شود ⇒ کارِ اصلی هم برمی‌گردد. کارِ حساس (پول) بی سابقه نمی‌ماند، و هر که
+ * نتیجهٔ کار را ببیند سابقه‌اش را هم می‌بیند (هر دو با یک COMMIT).
+ * زنجیرهٔ STF-09 فقط پس از COMMIT: `afterCommit()` را بیرون از `tx` صدا بزنید.
+ * `once` این‌جا نیست (همان `log`).
+ */
+async function logIn(c, entry) {
+  const {
+    shopId = '', actorType = 'user', userId = '', action,
+    targetType = '', targetId = '', detail = {}, ip = '',
+  } = entry || {};
+  if (!action) throw new Error('audit.logIn: action لازم است');
+  const id = newId('aud');
+  const clean = scrub(detail);
+  const at = now();
+  const r = await c.query(
+    `INSERT INTO audit_logs (id, shop_id, actor_type, user_id, action, target_type, target_id, detail, ip, created_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     RETURNING ${chain.FLAG_SQL} AS hashchain`,
+    [id, shopId, actorType, userId, action, targetType, targetId, JSON.stringify(clean), ip, at]
+  );
+  const flag = r.rows[0] && r.rows[0].hashchain;
+  return {
+    id,
+    async afterCommit() {
+      if (!chain.flagOn(flag)) return;
+      try {
+        await chain.appendAudit({ id, shopId, actorType, userId, action, targetType, targetId, detail: clean, at });
+      } catch (err) {
+        console.error('[audit] زنجیره نوشته نشد:', err.message);
+      }
+    },
+  };
+}
+
+module.exports = { log, logIn, scrub };

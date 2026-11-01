@@ -179,7 +179,7 @@ fun ShopSetupScreen(store: ShopStore, onDone: () -> Unit) {
           //  می‌آید)، پس همان حساب به دکان می‌پیوندد
           shops.join(entered)
             .onSuccess {
-              it.role?.let { role -> ir.vil3ntec.tohid.data.ShopRole.remember(context, role) }
+              it.effectiveRole?.let { role -> ir.vil3ntec.tohid.data.ShopRole.remember(context, role) }
               settle(it.shop?.id.orEmpty())
             }
             .onFailure { error = it.userText(StrAuth.joinFailed) }

@@ -23,6 +23,13 @@
  *   ⛔ شناسه‌ها راز نیستند و نباید باشند: بدترین حالتِ جعل، گرفتنِ یک نسخهٔ
  *      آزمایشیِ امضاشده است که روی GitHub هم عمومی است.
  *
+ * ── انتشارِ مرحله‌ای (OPS-01، پشتِ پیکربندی؛ `lib/release-stage.js`) ───────────
+ * با کلیدِ `stage.<برچسب>` در همان scope `release` (مثلاً `{version:"2.14.5",percent:10}`)
+ * دستگاهی که در سطلِ آن درصد است و `staged=1` می‌فرستد (برنامه‌ای که برچسبِ نسخه‌دار را
+ * می‌شناسد) نسخه را از برچسبِ نسخه‌دارِ ثابت `<برچسب>-v<نسخه>` می‌گیرد، اگر از برچسبِ
+ * روان بالاتر باشد؛ بقیه و برنامهٔ قدیمی همان برچسبِ روان. کلید نیست یا ناجور است ⇒
+ * رفتارِ پیشین. برچسبِ نسخه‌دار فقط همانی است که مرحلهٔ جاری می‌گوید.
+ *
  * ⛔ فقط برچسب‌ها و فایل‌هایی که در انتشار هست؛ نامِ فایل هرگز مسیر نمی‌شود.
  * ⛔ اصالت را سرور تضمین نمی‌کند — برنامه `SHA256SUMS.txt` و امضای ECDSAِ آن را
  *    با کلیدِ سنجاق‌شدهٔ خودش می‌سنجد؛ سرورِ دست‌کاری‌شده هم نمی‌تواند نصبیِ جعلی بدهد.
@@ -33,6 +40,7 @@ const path = require('path');
 const { pipeline } = require('stream/promises');
 const { Readable } = require('stream');
 const config = require('../config');
+const stage = require('../lib/release-stage');
 const { notFound } = require('../middleware/errors');
 
 const router = express.Router();
@@ -130,8 +138,9 @@ function newer(a, b) {
   return false;
 }
 
-/** فهرستِ آزمایشی‌ها از live_config (scope `release`)، تا ۶۰ ثانیه در حافظه */
-let betaCache = { at: 0, shops: new Set(), devices: new Set() };
+/** پیکربندیِ انتشار از live_config (scope `release`): آزمایشی‌ها و مرحله‌ها، تا ۶۰ ثانیه در حافظه */
+const EMPTY = () => ({ at: 0, shops: new Set(), devices: new Set(), stages: new Map() });
+let betaCache = EMPTY();
 async function betaMembers() {
   if (Date.now() - betaCache.at < 60 * 1000) return betaCache;
   const ids = (v) => new Set((Array.isArray(v) ? v : String(v ?? '').split(','))
@@ -139,12 +148,29 @@ async function betaMembers() {
   try {
     const { items } = await require('../lib/live-config').list('release');
     const val = (k) => items.find((i) => i.key === k)?.value;
-    betaCache = { at: Date.now(), shops: ids(val('beta.shops')), devices: ids(val('beta.devices')) };
+    betaCache = {
+      at: Date.now(), shops: ids(val('beta.shops')), devices: ids(val('beta.devices')),
+      stages: stage.stagesOf(items, STABLE),
+    };
   } catch (err) {
     //  دیتابیس در دسترس نیست ⇒ همان فهرستِ قبلی؛ هرگز خطا به‌خاطرِ کانال
     console.warn(`[releases] beta list: ${err.message}`);
   }
   return betaCache;
+}
+
+/** مرحلهٔ جاریِ یک برچسبِ پایدار؛ نبود ⇒ null */
+async function stageOf(base) {
+  return (await betaMembers()).stages.get(base) || null;
+}
+
+/** برچسبِ خواسته‌شده سرو می‌شود؟ ثابت‌ها همیشه؛ نسخه‌دار فقط اگر همان نسخهٔ مرحلهٔ جاری باشد */
+async function servable(tag) {
+  if (TAGS.has(tag)) return true;
+  const v = stage.parseVersionedTag(tag, STABLE);
+  if (!v) return false;
+  const s = await stageOf(v.base);
+  return !!s && s.version === v.version;
 }
 
 async function isBeta(q) {
@@ -172,6 +198,22 @@ router.get('/:tag/latest', async (req, res, next) => {
     let data = await release(tag);
     let version = await versionOf(data);
     let channel = tag.endsWith('-beta') ? 'beta' : 'stable';
+    //  OPS-01: دستگاهِ درونِ مرحله (و برنامه‌ای که برچسبِ نسخه‌دار را می‌شناسد) نسخهٔ مرحله
+    //  را از برچسبِ ثابتش می‌گیرد، اگر از برچسبِ روان بالاتر است. انتشارِ نسخه‌دار نبود یا
+    //  خراب بود ⇒ همان برچسبِ روان، بی خطا.
+    if (STABLE.includes(tag) && req.query.staged === '1') {
+      const s = await stageOf(tag);
+      if (s && stage.inStage(s, tag, req.query.device)) {
+        try {
+          const vt = stage.versionedTag(tag, s.version);
+          const d = await release(vt);
+          const dv = await versionOf(d);
+          if (dv === s.version && newer(dv, version)) { use = vt; data = d; version = dv; channel = 'staged'; }
+        } catch (err) {
+          console.warn(`[releases] stage ${tag}: ${err.message}`);
+        }
+      }
+    }
     //  عضوِ آزمایشی: از پایدار و آزمایشی، هر کدام بالاتر. انتشارِ آزمایشی
     //  نبود یا خراب بود ⇒ همان پایدار، بی خطا.
     if (STABLE.includes(tag) && await isBeta(req.query)) {
@@ -206,7 +248,7 @@ router.get('/:tag/file/:name', async (req, res, next) => {
   try {
     const tag = String(req.params.tag);
     const name = String(req.params.name);
-    if (!TAGS.has(tag) || !NAME.test(name)) return next(notFound('فایلی با این نام نیست', 'release_file_not_found'));
+    if (!NAME.test(name) || !(await servable(tag))) return next(notFound('فایلی با این نام نیست', 'release_file_not_found'));
     const data = await release(tag);
     const asset = data.assets.find(a => a.name === name);
     if (!asset) return next(notFound('فایلی با این نام نیست', 'release_file_not_found'));
@@ -221,4 +263,5 @@ router.get('/:tag/file/:name', async (req, res, next) => {
 
 module.exports = router;
 module.exports._cache = cache;
-module.exports._forgetBeta = () => { betaCache = { at: 0, shops: new Set(), devices: new Set() }; };
+module.exports.STABLE = STABLE;
+module.exports._forgetBeta = () => { betaCache = EMPTY(); };

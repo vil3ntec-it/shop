@@ -286,7 +286,7 @@ async function loginPayload(user, session) {
   return {
     user: publicUser(user),
     shop: member ? {
-      id: member.shop_id, name: member.shop_name || '', role: member.role,
+      id: member.shop_id, name: member.shop_name || '', role: require('../lib/permissions').legacyRole(member.role), actualRole: member.role, // A16
     } : null,
     shops: all.map((m) => ({ id: m.shop_id, name: m.shop_name || '', role: m.role })),
     ...session,

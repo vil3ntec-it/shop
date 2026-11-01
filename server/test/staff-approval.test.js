@@ -406,10 +406,11 @@ test('Sync v1: بیش از سقف بی برگه در جای خودش «rejected�
 
 /* ------------------------------- v1: تکرارِ opِ ثبت‌شده و «کلِ سند» */
 
-//  `ts` = مهرِ «ثبت» ِ برنامه: همهٔ opهای یک ثبت یک مهر دارند (`sameSave` ِ نگهبان همین را می‌سنجد)
+//  برنامهٔ v1 همهٔ opهای یک «ثبت» را با یک ts می‌فرستد و نگهبان «همان ثبت» را با ts ِ برابر می‌شناسد؛
+//  پس opهای یک دسته ts ِ مشترک (`t`…) می‌گیرند — Date.now() ِ جدا برای هر op آزمون را به گذرِ یک ms وابسته می‌کرد
 const v1op = (table, rowId, type, fields, ts = Date.now()) => ({ op_id: oid(), table, row_id: rowId, type, ts, fields });
-const v1sale = (id, total, discount) => v1op('sales', id, 'insert',
-  { total, discount, finalTotal: total - discount, status: 'completed' });
+const v1sale = (id, total, discount, ts) => v1op('sales', id, 'insert',
+  { total, discount, finalTotal: total - discount, status: 'completed' }, ts);
 const inOplog = async (opId) => !!(await one('SELECT 1 FROM oplog WHERE op_id=$1', [opId]));
 const v1row = (table, id) => one(
   `SELECT * FROM sync_rows WHERE app='shop' AND account_id=$1 AND table_name=$2 AND row_id=$3`, [shopId, table, id]
@@ -419,9 +420,10 @@ const anyBox = (opId) => many('SELECT kind FROM sync_v3_conflicts WHERE account_
 test('Sync v1: تکرارِ opِ ثبت‌شده پس از پایین آمدنِ سقف ⇒ «تکراری»ِ خودِ v1، نه رد و نه صندوق (مثلِ v3)', async () => {
   //  تخفیفِ ۸٪ِ مدیر بی سقف می‌نشیند؛ پاسخ گم می‌شود؛ صاحب سقفِ ۵٪ می‌گذارد؛ دستگاه همان op_idها را دوباره می‌فرستد
   assert.equal((await setRole('manager', {})).status, 200);
-  const s = v1sale('s-v1-dup', 100, 8);
-  const item = v1op('saleItems', 'si-v1-dup', 'insert', { saleId: 's-v1-dup', productId: 'p-dup', quantity: 1, unitPrice: 100 });
-  const move = v1op('stockMovements', 'm-v1-dup', 'insert', { productId: 'p-dup', type: 'sale', qty: -1, refId: 's-v1-dup' });
+  const t = Date.now();
+  const s = v1sale('s-v1-dup', 100, 8, t);
+  const item = v1op('saleItems', 'si-v1-dup', 'insert', { saleId: 's-v1-dup', productId: 'p-dup', quantity: 1, unitPrice: 100 }, t);
+  const move = v1op('stockMovements', 'm-v1-dup', 'insert', { productId: 'p-dup', type: 'sale', qty: -1, refId: 's-v1-dup' }, t);
   const first = await push1(manager, 'm-dup', [item, move, s]);
   assert.deepEqual(first.body.results.map((x) => x.status), ['applied', 'applied', 'applied'], JSON.stringify(first.body));
   assert.equal((await setRole('manager', { 'sales.discount': { caps: { maxPct: 5 } } })).status, 200);
@@ -445,12 +447,13 @@ test('Sync v1: تکرارِ opِ ثبت‌شده پس از پایین آمدنِ
 test('Sync v1: فروشِ ردشده قلم‌ها، حرکتِ انبار و سطرِ دفترِ کارش را هم با خود برمی‌گرداند؛ بقیهٔ دسته می‌نشیند', async () => {
   assert.equal((await setRole('manager', { 'sales.discount': { caps: { maxPct: 10 } } })).status, 200);
   const S = 's-v1-whole';
-  const prod = v1op('products', 'p-v1-whole', 'insert', { name: 'برنج' });
-  const item = v1op('saleItems', 'si-v1-whole', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 2, unitPrice: 50 });
-  const move = v1op('stockMovements', 'm-v1-whole', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -2, refId: S });
-  const s = v1sale(S, 100, 30);
-  const audit = v1op('auditLog', 'a-v1-whole', 'insert', { type: 'sale', refId: S, notes: 'ثبت فروش' });
-  const other = v1op('stockMovements', 'm-v1-other', 'insert', { productId: 'p-v1-whole', type: 'adjustment', qty: 5, refId: '' });
+  const t = Date.now();
+  const prod = v1op('products', 'p-v1-whole', 'insert', { name: 'برنج' }, t);
+  const item = v1op('saleItems', 'si-v1-whole', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 2, unitPrice: 50 }, t);
+  const move = v1op('stockMovements', 'm-v1-whole', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -2, refId: S }, t);
+  const s = v1sale(S, 100, 30, t);
+  const audit = v1op('auditLog', 'a-v1-whole', 'insert', { type: 'sale', refId: S, notes: 'ثبت فروش' }, t);
+  const other = v1op('stockMovements', 'm-v1-other', 'insert', { productId: 'p-v1-whole', type: 'adjustment', qty: 5, refId: '' }, t);
   const ops = [prod, item, move, s, audit, other];
   const r = await push1(manager, 'm-whole', ops);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -469,40 +472,40 @@ test('Sync v1: فروشِ ردشده قلم‌ها، حرکتِ انبار و س
 
 test('Sync v1: فروشِ تخفیف‌دارِ شاگرد (ردِ نقشِ خودِ v1) هم قلم‌های یتیم نمی‌گذارد؛ فروشِ بی تخفیفش کامل می‌نشیند', async () => {
   const S = 's-v1-st-whole';
-  const item = v1op('saleItems', 'si-v1-st', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 1, unitPrice: 100 });
-  const move = v1op('stockMovements', 'm-v1-st', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -1, refId: S });
-  const s = v1sale(S, 100, 5);
+  const t = Date.now();
+  const item = v1op('saleItems', 'si-v1-st', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 1, unitPrice: 100 }, t);
+  const move = v1op('stockMovements', 'm-v1-st', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -1, refId: S }, t);
+  const s = v1sale(S, 100, 5, t);
   const r = await push1(staff, 's-whole', [item, move, s]);
   assert.deepEqual(r.body.results.map((x) => x.reason || x.status), ['tx_rejected', 'tx_rejected', 'discount_not_allowed']);
   assert.equal(await v1row('saleItems', 'si-v1-st'), null);
   assert.equal(await v1row('stockMovements', 'm-v1-st'), null);
   //  بی تخفیف: همان امروز
   const S2 = 's-v1-st-plain';
+  const t2 = Date.now();
   const ok = await push1(staff, 's-whole', [
-    v1op('saleItems', 'si-v1-st2', 'insert', { saleId: S2, productId: 'p-v1-whole', quantity: 1, unitPrice: 100 }),
-    v1op('stockMovements', 'm-v1-st2', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -1, refId: S2 }),
-    v1sale(S2, 100, 0),
+    v1op('saleItems', 'si-v1-st2', 'insert', { saleId: S2, productId: 'p-v1-whole', quantity: 1, unitPrice: 100 }, t2),
+    v1op('stockMovements', 'm-v1-st2', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -1, refId: S2 }, t2),
+    v1sale(S2, 100, 0, t2),
   ]);
   assert.deepEqual(ok.body.results.map((x) => x.status), ['applied', 'applied', 'applied'], JSON.stringify(ok.body));
 });
 
 test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خودشان را هم برمی‌گردانند، نه حرکتِ خودِ فروش را', async () => {
   const S = 's-v1-cx';
+  const t0 = Date.now();
   const base = await push1(owner, 'o-cx', [
-    v1op('saleItems', 'si-v1-cx', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 3, unitPrice: 100, returnedQty: 0 }),
-    v1sale(S, 300, 0),
+    v1op('saleItems', 'si-v1-cx', 'insert', { saleId: S, productId: 'p-v1-whole', quantity: 3, unitPrice: 100, returnedQty: 0 }, t0),
+    v1sale(S, 300, 0, t0),
   ]);
   assert.ok(base.body.results.every((x) => x.status === 'applied'), JSON.stringify(base.body));
 
   assert.equal((await setRole('manager', { 'sales.cancel': { mode: 'approve' } })).status, 200);
-  //  یک ثبت ⇒ یک مهر. با Date.now() ِ جدا برای هر op، روی دستگاهِ کند (CI زیرِ Electron) میانِ دو op یک
-  //  میلی‌ثانیه می‌گذشت و حرکتِ sale_cancel «ثبتِ دیگر» می‌شد و می‌نشست. حرکتِ خودِ فروش هم‌مهر است تا
-  //  روشن باشد که به نوع کنار می‌ماند، نه به مهر.
-  const T1 = Date.now();
-  const cancel = v1op('sales', S, 'update', { status: 'cancelled', finalTotal: 300 }, T1);
-  const back = v1op('stockMovements', 'm-v1-cx-back', 'insert', { productId: 'p-v1-whole', type: 'sale_cancel', qty: 3, refId: S }, T1);
-  const audit = v1op('auditLog', 'a-v1-cx', 'insert', { type: 'cancel_sale', refId: S }, T1);
-  const saleMove = v1op('stockMovements', 'm-v1-cx-sale', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -3, refId: S }, T1);
+  const t = Date.now();
+  const cancel = v1op('sales', S, 'update', { status: 'cancelled', finalTotal: 300 }, t);
+  const back = v1op('stockMovements', 'm-v1-cx-back', 'insert', { productId: 'p-v1-whole', type: 'sale_cancel', qty: 3, refId: S }, t);
+  const audit = v1op('auditLog', 'a-v1-cx', 'insert', { type: 'cancel_sale', refId: S }, t);
+  const saleMove = v1op('stockMovements', 'm-v1-cx-sale', 'insert', { productId: 'p-v1-whole', type: 'sale', qty: -3, refId: S }, t);
   const rc = await push1(manager, 'm-cx', [back, cancel, audit, saleMove]);
   assert.deepEqual(rc.body.results.map((x) => x.reason || x.status), ['tx_rejected', 'approval_required', 'tx_rejected', 'applied']);
   assert.equal(await v1row('stockMovements', 'm-v1-cx-back'), null);
@@ -510,20 +513,21 @@ test('Sync v1: لغو و برگشتِ ردشده حرکتِ انبارِ خود�
 
   assert.equal((await setRole('staff', { 'returns.create': { caps: { maxAmount: 50000 } } })).status, 200);
   const R = 'r-v1-over';
-  const T2 = Date.now();                                   //  همان ثبت: returnedQty ِ قلم فقط با مهرِ برابر همراه است
-  const ret = v1op('returns', R, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 2, amount: 600 }, T2);
-  const retMove = v1op('stockMovements', 'm-v1-r', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 2, refId: R }, T2);
-  const itemUpd = v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 2 }, T2);
+  const t2 = Date.now();
+  const ret = v1op('returns', R, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 2, amount: 600 }, t2);
+  const retMove = v1op('stockMovements', 'm-v1-r', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 2, refId: R }, t2);
+  const itemUpd = v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 2 }, t2);
   const rr = await push1(staff, 's-r1', [ret, retMove, itemUpd]);
   assert.deepEqual(rr.body.results.map((x) => x.reason || x.status), ['approval_required', 'tx_rejected', 'tx_rejected']);
   assert.equal(await v1row('stockMovements', 'm-v1-r'), null);
   assert.equal(Number((await v1row('saleItems', 'si-v1-cx')).data.returnedQty), 0);
   //  زیرِ سقف ⇒ هر سه می‌نشینند
   const R2 = 'r-v1-ok';
+  const t3 = Date.now();
   const ok = await push1(staff, 's-r1', [
-    v1op('returns', R2, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 1, amount: 100 }),
-    v1op('stockMovements', 'm-v1-r2', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 1, refId: R2 }),
-    v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 1 }),
+    v1op('returns', R2, 'insert', { saleId: S, saleItemId: 'si-v1-cx', quantity: 1, amount: 100 }, t3),
+    v1op('stockMovements', 'm-v1-r2', 'insert', { productId: 'p-v1-whole', type: 'customer_return', qty: 1, refId: R2 }, t3),
+    v1op('saleItems', 'si-v1-cx', 'update', { returnedQty: 1 }, t3),
   ]);
   assert.deepEqual(ok.body.results.map((x) => x.status), ['applied', 'applied', 'applied'], JSON.stringify(ok.body));
 });
