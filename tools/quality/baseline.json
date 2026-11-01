@@ -6,7 +6,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1160,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/WarehouseEngine.kt": 1121,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1261,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1202,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1215,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 804,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Dashboard.kt": 1147,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Debtors.kt": 1405,
@@ -94,7 +94,7 @@
     "StatusPill": 2,
     "html-escape": 13,
     "secret-derivation": 6,
-    "express-wrap": 1
+    "express-wrap": 0
   },
   "platformDeps": {
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/atrest/AtRestEnvelope.kt": 10,

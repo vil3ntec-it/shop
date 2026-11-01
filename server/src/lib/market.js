@@ -101,21 +101,21 @@ const gates = new Map();
 
 async function storeOpen(slug) {
   try {
-    await sf.open(slug);
-    return true;
+    return await sf.open(slug);   //  ردیفِ باز (راست): «سفارش‌های من» فقط راستی‌اش را می‌خواهد، حتی اگر سفارش نگیرد
   } catch (err) {
     if (err && err.status === 404) return false;
     throw err;
   }
 }
 
-/** ویترینِ باز + پرچمِ بازارچهٔ همین دکان. */
+/** ویترینِ باز **که سفارش می‌گیرد** (#467: `accepting` ِ `shop.orders.subscribers_only`؛ نمی‌پذیرد ⇒ مثلِ دروازهٔ بسته دیده نمی‌شود) + پرچمِ بازارچهٔ همین دکان. */
 async function gateOf(row) {
   const ttl = config.market.gateCacheMs;
   const t = Date.now();
   const hit = gates.get(row.shop_id);
   if (ttl > 0 && hit && hit.slug === row.slug && t - hit.at < ttl) return hit.ok;
-  const ok = (await storeOpen(row.slug)) && (await orders.flagOf(row.shop_id, FLAG_KEY));
+  const open = await storeOpen(row.slug);
+  const ok = Boolean(open && open.accepting !== false) && (await orders.flagOf(row.shop_id, FLAG_KEY));
   if (gates.size > 10_000) gates.clear();
   gates.set(row.shop_id, { ok, at: t, slug: row.slug });
   return ok;
