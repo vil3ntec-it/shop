@@ -62,6 +62,7 @@ internal fun ColumnScope.CouriersTab(
   var ledgerFor by remember { mutableStateOf<CourierRow?>(null) }
   var capFor by remember { mutableStateOf<CourierRow?>(null) }
   var reportOpen by remember { mutableStateOf(false) }
+  var ratingsOpen by remember { mutableStateOf(false) }
 
   if (d.couriers.isEmpty()) {
     TohidEmptyState(
@@ -77,6 +78,11 @@ internal fun ColumnScope.CouriersTab(
   } else {
     //  RPT-15: گزارشِ نقدِ همهٔ پیک‌ها در یک بازه
     TohidSecondaryButton("گزارشِ نقدِ پیک‌ها", onClick = { reportOpen = true })
+    Spacer(Modifier.height(6.dp))
+  }
+  //  DLV-18: امتیازِ تحویل‌ها — صاحب و مدیر، فقط با پرچمِ دکان
+  if (cfg.ratings && cfg.perms.couriers) {
+    TohidSecondaryButton(ir.vil3ntec.tohid.core.i18n.StrCourier.ratingsButton, onClick = { ratingsOpen = true })
     Spacer(Modifier.height(6.dp))
   }
   LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,6 +131,7 @@ internal fun ColumnScope.CouriersTab(
   }
   ledgerFor?.let { cr -> LedgerSheet(cr, repo) { ledgerFor = null } }
   if (reportOpen) CashReportSheet(repo) { reportOpen = false }
+  if (ratingsOpen) RatingsSheet(repo) { ratingsOpen = false }
   capFor?.let { cr ->
     CourierCapDialog(cr, repo, onDismiss = { capFor = null }, onDone = {
       capFor = null

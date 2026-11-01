@@ -45,6 +45,20 @@ class CourierStore(context: Context) {
     get() = prefs.getBoolean(K_CALL, false)
     set(v) { prefs.edit().putBoolean(K_CALL, v).apply() }
 
+  /** «مسیرِ پیشنهادی» (DLV-04) و «امتیاز» (DLV-18) روشن‌اند؟ (از `/courier/me`؛ آفلاین همان آخرین پاسخ) */
+  var routeEnabled: Boolean
+    get() = prefs.getBoolean(K_ROUTE, false)
+    set(v) { prefs.edit().putBoolean(K_ROUTE, v).apply() }
+  var ratingsEnabled: Boolean
+    get() = prefs.getBoolean(K_RATINGS, false)
+    set(v) { prefs.edit().putBoolean(K_RATINGS, v).apply() }
+
+  /** مأموریت‌هایی که پیک امتیازشان را داده (دکمه دوباره دیده نشود؛ سرور هم دومی را نمی‌پذیرد) */
+  fun rated(): Set<String> = prefs.getStringSet(K_RATED, emptySet()).orEmpty().toSet()
+  fun markRated(assignmentId: String) {
+    prefs.edit().putStringSet(K_RATED, (rated() + assignmentId).toSet()).apply()
+  }
+
   /** آخرین بار که سرور جواب داد (ساعتِ گوشی؛ فقط برای نمایش) */
   var lastSyncAt: Long
     get() = prefs.getString(K_LAST, "0")?.toLongOrNull() ?: 0L
@@ -96,6 +110,9 @@ class CourierStore(context: Context) {
     private const val K_DONE = "cards_done"
     private const val K_NAME = "name"
     private const val K_CALL = "call_enabled"
+    private const val K_ROUTE = "route_enabled"
+    private const val K_RATINGS = "ratings_enabled"
+    private const val K_RATED = "rated"
     private const val K_LAST = "last_sync"
     private const val K_PHOTOS = "photos"
   }
@@ -163,7 +180,10 @@ object CourierSync {
 
     //  ۳) کارت‌ها
     if (failure == null) {
-      repo.me().onSuccess { store.courierName = it.name; store.callEnabled = it.callEnabled }
+      repo.me().onSuccess {
+        store.courierName = it.name; store.callEnabled = it.callEnabled
+        store.routeEnabled = it.routeEnabled; store.ratingsEnabled = it.ratingsEnabled
+      }
       val a = repo.missions("active")
       val cards = a.valueOrNull()
       if (cards != null) store.saveCards("active", cards) else failure = errorOf(a)

@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -55,11 +56,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierFlow
 import ir.vil3ntec.tohid.core.courier.CourierInputError
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
+import ir.vil3ntec.tohid.core.delivery.DeliveryRating
+import ir.vil3ntec.tohid.core.i18n.StrCourier
 import ir.vil3ntec.tohid.core.orders.DeliveryPrefs
 import ir.vil3ntec.tohid.data.CourierStore
 import ir.vil3ntec.tohid.data.CourierSync
@@ -142,6 +146,12 @@ private sealed interface Ask {
   data class Reason(val card: MissionCard, val type: String) : Ask
   data class Deliver(val card: MissionCard) : Ask
   data class Photo(val card: MissionCard) : Ask
+  /** DLV-07: اسکنِ همهٔ کیسه‌ها پیش از «بسته را گرفتم» */
+  data class Bags(val card: MissionCard) : Ask
+  /** DLV-17: موقعیتِ همین لحظه پس از کادرِ تحویل و پیش از ثبت */
+  data class Locate(val card: MissionCard, val code: String, val cash: Long?, val cashReason: String, val note: String) : Ask
+  /** DLV-18: امتیازِ پیک به تحویل */
+  data class Rate(val card: MissionCard) : Ask
 }
 
 @Composable
@@ -157,6 +167,10 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var done by remember { mutableStateOf(store.cards("done")) }
   var name by remember { mutableStateOf(store.courierName) }
   var callEnabled by remember { mutableStateOf(store.callEnabled) }
+  var routeEnabled by remember { mutableStateOf(store.routeEnabled) }
+  var ratingsEnabled by remember { mutableStateOf(store.ratingsEnabled) }
+  var rated by remember { mutableStateOf(store.rated()) }
+  var routeOpen by remember { mutableStateOf(false) }
   var photosWaiting by remember { mutableStateOf(store.photos().size) }
   var syncing by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
@@ -169,6 +183,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
     name = store.courierName; photosWaiting = store.photos().size
     callEnabled = store.callEnabled
+    routeEnabled = store.routeEnabled; ratingsEnabled = store.ratingsEnabled; rated = store.rated()
   }
 
   /**
@@ -211,19 +226,41 @@ fun CourierHome(onSignedOut: () -> Unit) {
   }
 
   /** هر کار: اول صفِ گوشی، بعد اگر شد سرور */
-  fun record(card: MissionCard, type: String, reason: String = "", note: String = "", cash: Long? = null, cashReason: String = "", code: String = "") {
+  fun record(
+    card: MissionCard, type: String, reason: String = "", note: String = "", cash: Long? = null, cashReason: String = "", code: String = "",
+    bags: List<String> = emptyList(), position: CourierChecks.Point? = null,
+  ) {
     try {
       val (next, _) = CourierQueue.enqueue(
         store.queue(), "cev-" + ir.vil3ntec.tohid.sync.v1.Ulid.next(), card.id, type, System.currentTimeMillis(),
         //  CAS (§۲۸.۵): همان وضعیتی که پیک روی کارت دید (سرور + صف)
         from = card.status, reason = reason, note = note,
-        cashCollectedMinor = cash, cashReason = cashReason, code = code,
+        cashCollectedMinor = cash, cashReason = cashReason, code = code, bags = bags, position = position,
       )
       store.saveQueue(next)
       queue = next
       scope.launch { sync() }
     } catch (e: CourierInputError) {
       scope.launch { snackbar.showSnackbar(e.message ?: "ثبت نشد") }
+    }
+  }
+
+  /** DLV-18: امتیاز فقط آنلاین؛ ثبت‌شده یا مهلت‌گذشته ⇒ دکمه دیگر دیده نمی‌شود */
+  fun rate(card: MissionCard, stars: Int, tags: List<String>) {
+    scope.launch {
+      Backend.courier(context).rate(card.id, stars, tags)
+        .onSuccess { store.markRated(card.id); rated = store.rated(); snackbar.showSnackbar(StrCourier.rated) }
+        .onFailure { f ->
+          if (f.code == "already_rated" || f.code == "rating_closed") { store.markRated(card.id); rated = store.rated() }
+          snackbar.showSnackbar(
+            when (f.code) {
+              "already_rated" -> StrCourier.rated
+              "rating_closed" -> StrCourier.rateClosed
+              "offline", "unreachable", "timeout" -> StrCourier.rateOnline
+              else -> f.userMessage
+            },
+          )
+        }
     }
   }
 
@@ -250,6 +287,12 @@ fun CourierHome(onSignedOut: () -> Unit) {
         Column(Modifier.weight(1f)) {
           Text("مأموریت‌های من", style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
           if (name.isNotBlank()) Text(name, style = MaterialTheme.typography.labelSmall, color = colors.muted)
+        }
+        //  DLV-04: «مسیرِ پیشنهادی» فقط با پرچمِ دکان (`/courier/me`)
+        if (routeEnabled) {
+          IconButton(onClick = { routeOpen = true }) {
+            Icon(Icons.Filled.Place, contentDescription = StrCourier.routeTitle, tint = colors.primary)
+          }
         }
         IconButton(onClick = { scope.launch { sync() } }, enabled = !syncing) {
           Icon(Icons.Filled.Refresh, contentDescription = "به‌روز کردن", tint = colors.muted)
@@ -323,10 +366,13 @@ fun CourierHome(onSignedOut: () -> Unit) {
                 when (to) {
                   "rejected", "failed" -> ask = Ask.Reason(c, to)
                   "delivered" -> ask = Ask.Deliver(c)
+                  //  DLV-07: کارت شمارِ کیسه دارد ⇒ اول اسکنِ همه
+                  "picked_up" -> if (c.bagScanBags != null) ask = Ask.Bags(c) else record(c, to)
                   else -> record(c, to)
                 }
               }, onPhoto = { ask = Ask.Photo(c) },
-                onCall = if (callEnabled && CourierFlow.canCall(c.status)) ({ callCustomer(c) }) else null)
+                onCall = if (callEnabled && CourierFlow.canCall(c.status)) ({ callCustomer(c) }) else null,
+                onRate = if (ratingsEnabled && DeliveryRating.courierCanRate(c.status, c.id, rated)) ({ ask = Ask.Rate(c) }) else null)
             } else {
               MissionRow(c, waiting)
             }
@@ -342,7 +388,19 @@ fun CourierHome(onSignedOut: () -> Unit) {
       ask = null; record(a.card, a.type, reason = reason, note = note)
     }
     is Ask.Deliver -> DeliverDialog(a.card, onDismiss = { ask = null }) { code, cash, cashReason, note ->
-      ask = null; record(a.card, "delivered", code = code, cash = cash, cashReason = cashReason, note = note)
+      //  DLV-17: کارت فاصلهٔ مجاز دارد ⇒ اول موقعیتِ همین لحظه
+      ask = if (a.card.nearPinMaxM != null) Ask.Locate(a.card, code, cash, cashReason, note) else null
+      if (ask == null) record(a.card, "delivered", code = code, cash = cash, cashReason = cashReason, note = note)
+    }
+    is Ask.Locate -> NearPinFlow(a.card, onDismiss = { ask = null }) { here ->
+      ask = null
+      record(a.card, "delivered", code = a.code, cash = a.cash, cashReason = a.cashReason, note = a.note, position = here)
+    }
+    is Ask.Bags -> BagScanDialog(a.card, onDismiss = { ask = null }) { labels ->
+      ask = null; record(a.card, "picked_up", bags = labels)
+    }
+    is Ask.Rate -> RateDialog(onDismiss = { ask = null }) { stars, tags ->
+      ask = null; rate(a.card, stars, tags)
     }
     is Ask.Photo -> PhotoFlow(a.card, onDismiss = { ask = null }) { bytes ->
       ask = null
@@ -352,6 +410,10 @@ fun CourierHome(onSignedOut: () -> Unit) {
       scope.launch { snackbar.showSnackbar("عکسِ بسته در صف است"); sync() }
     }
     null -> {}
+  }
+
+  if (routeOpen) {
+    RouteSheet(active.map { MissionView.forDisplay(it, queue) }.filter { CourierFlow.isLive(it.status) }) { routeOpen = false }
   }
 
   if (askSignOut) {
@@ -387,6 +449,7 @@ private fun MissionCardView(
   onAction: (String) -> Unit,
   onPhoto: () -> Unit,
   onCall: (() -> Unit)? = null,
+  onRate: (() -> Unit)? = null,
 ) {
   val colors = Shop.colors
   Column(
@@ -445,7 +508,7 @@ private fun MissionCardView(
       )
     }
     val actions = CourierFlow.actions(c.status)
-    if (actions.isNotEmpty() || (c.photoAllowed && c.status == "arrived") || onCall != null) {
+    if (actions.isNotEmpty() || (c.photoAllowed && c.status == "arrived") || onCall != null || onRate != null) {
       Spacer(Modifier.height(10.dp))
       FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         actions.forEach { to ->
@@ -463,6 +526,8 @@ private fun MissionCardView(
             Text("تماس با مشتری", color = colors.primary)
           }
         }
+        //  DLV-18: امتیازِ پیک به تحویلِ انجام‌شده — فقط با پرچمِ دکان و یک بار
+        if (onRate != null) TextButton(onClick = onRate) { Text(StrCourier.rate, color = colors.primary) }
         if (c.photoAllowed && c.status == "arrived") {
           TextButton(onClick = onPhoto) {
             Icon(Icons.Filled.CameraAlt, contentDescription = null, tint = colors.primary)

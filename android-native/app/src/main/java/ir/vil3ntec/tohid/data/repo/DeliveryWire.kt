@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.delivery.CashReport
 import ir.vil3ntec.tohid.core.delivery.CashReportRow
 import ir.vil3ntec.tohid.core.delivery.CourierRow
+import ir.vil3ntec.tohid.core.delivery.DeliveryRating
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.DeskPerms
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
@@ -23,6 +24,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.longOrNull
 
 /**
  *  شکلِ سیمِ میزِ تحویلِ دکان — `/api/shop/delivery/…`
@@ -58,7 +60,29 @@ object DeliveryWire {
         photo = bool(perms, "photo"),
       ),
       picking = bool(o, "picking"),
+      ratings = bool(o, "ratings"),
     )
+  }
+
+  /** `GET /shop/delivery/ratings` (DLV-18) ⇒ جمعِ هر پیک و تازه‌ها؛ کلیدِ نادرست ⇒ رد نه، خالی */
+  fun ratings(o: JsonObject): DeliveryRating.Board {
+    fun summary(x: JsonObject?): DeliveryRating.Summary {
+      val tags = (x?.get("tags") as? JsonObject)?.mapNotNull { (k, v) -> (v as? JsonPrimitive)?.longOrNull?.let { k to it.toInt() } }?.toMap().orEmpty()
+      return DeliveryRating.Summary(
+        count = (x?.let { long(it, "count") } ?: 0L).toInt(), avgTenths = x?.let { long(it, "avgTenths") }?.toInt(), tags = tags,
+      )
+    }
+    val couriers = (o["couriers"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map { c ->
+      DeliveryRating.CourierRatings(str(c, "courierId"), str(c, "name"), summary(c["fromCustomers"] as? JsonObject), summary(c["byCourier"] as? JsonObject))
+    }
+    val recent = (o["recent"] as? JsonArray).orEmpty().mapNotNull { it as? JsonObject }.map { r ->
+      DeliveryRating.Recent(
+        orderNo = long(r, "orderNo") ?: 0L, rater = str(r, "rater"), stars = (long(r, "stars") ?: 0L).toInt(),
+        tags = (r["tags"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content },
+        courierId = str(r, "courierId"),
+      )
+    }
+    return DeliveryRating.Board(couriers, recent)
   }
 
   fun courier(o: JsonObject): CourierRow? {

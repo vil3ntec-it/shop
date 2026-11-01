@@ -61,6 +61,12 @@ object CourierChecks {
     return (scanned + l.bag) to ""
   }
 
+  /** برچسبِ کیسه به همان شکلِ سرور — صف همین را می‌فرستد، نه نوشتهٔ خامِ بارکدخوان */
+  fun labelOf(orderNo: Long, bag: Int, of: Int): String = "VLNB-$orderNo-$bag-$of"
+
+  /** کیسه‌هایی که هنوز اسکن نشده‌اند */
+  fun missing(scanned: Set<Int>, bags: Int): List<Int> = (1..bags).filter { it !in scanned }
+
   /** فاصلهٔ دو نقطه روی کره (هاورساین)، متر، گرد به عددِ صحیح — همان `distanceM` ِ سرور. */
   fun distanceM(a: Point, b: Point): Long {
     fun rad(x: Double) = x * PI / 180

@@ -103,10 +103,12 @@ object DeviceLocation {
    *  گرفتنِ لوکیشن.
    *
    *  @param force نقطهٔ ذخیره‌شده نادیده گرفته شود و از دستگاه پرسیده شود
+   *  @param maxAgeMs آخرین نقطهٔ دستگاه از این کهنه‌تر نباشد (پیش‌فرض همان ۱۰ دقیقه؛ «تحویل شد» ِ پیک
+   *    نزدیکِ پین ــ DLV-17 ــ نقطهٔ همین لحظه را می‌خواهد، نه نقطهٔ دکان)
    *  @return `null` یعنی اجازه نبود، لوکیشن خاموش بود یا در مهلت جواب نداد
    *    — هیچ‌کدام خطا نیست و هیچ‌کدام نباید جلوی کارِ کاربر را بگیرد.
    */
-  suspend fun current(context: Context, force: Boolean = false): LocationFix? {
+  suspend fun current(context: Context, force: Boolean = false, maxAgeMs: Long = FRESH_MS): LocationFix? {
     if (!granted(context)) return null
     if (!force) {
       remembered(context)?.let { if (System.currentTimeMillis() - it.at < FRESH_MS) return it }
@@ -116,7 +118,7 @@ object DeviceLocation {
       context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     }.getOrNull() ?: return null
 
-    lastKnown(manager)?.let { fix -> remember(context, fix); return fix }
+    lastKnown(manager, maxAgeMs)?.let { fix -> remember(context, fix); return fix }
 
     //  چیزی در دست نیست: یک نقطهٔ تازه می‌خواهیم، ولی نه بیشتر از ۱۲ ثانیه
     val fresh = withTimeoutOrNull(12_000) { requestOnce(context, manager) }
@@ -125,11 +127,11 @@ object DeviceLocation {
   }
 
   /** آخرین نقطهٔ هر فراهم‌کننده — دقیق‌ترینِ تازه‌ها */
-  private fun lastKnown(manager: LocationManager): LocationFix? = runCatching {
+  private fun lastKnown(manager: LocationManager, maxAgeMs: Long = FRESH_MS): LocationFix? = runCatching {
     val now = System.currentTimeMillis()
     manager.getProviders(true)
       .mapNotNull { p -> @Suppress("MissingPermission") manager.getLastKnownLocation(p) }
-      .filter { now - it.time < FRESH_MS }
+      .filter { now - it.time < maxAgeMs }
       .minByOrNull { it.accuracy.takeIf { a -> a > 0 } ?: Float.MAX_VALUE }
       ?.let { it.toFix() }
   }.getOrNull()

@@ -72,4 +72,25 @@ object RoutePlan {
     val legs = order.mapIndexed { k, s -> if (k == 0) fromStart(s) else d(order[k - 1], s) }
     return Plan(order.toList(), legs, legs.sum(), unpinned)
   }
+
+  /** همان `STOP_STATUSES` ِ `courier-route.js`: پس از «قبول» و پیش از پایان */
+  val STOP_STATUSES: Set<String> = setOf("assigned", "picked_up", "moving", "arrived")
+
+  data class CardStop(val card: MissionCard, val seq: Int, val legM: Long)
+  data class CardRoute(val stops: List<CardStop>, val unpinned: List<MissionCard>, val totalM: Long)
+
+  /** کارت‌های پیک ⇒ همان ترتیبِ `routeOf` ِ سرور، روی خودِ گوشی و بی اینترنت (DLV-04، DLV-10) */
+  fun forCards(start: Point?, cards: List<MissionCard>): CardRoute {
+    val stops = cards.filter { it.status in STOP_STATUSES }
+    val pins = stops.map { c ->
+      val la = c.lat
+      val ln = c.lng
+      if (la != null && ln != null) Point(la, ln) else null
+    }
+    val p = plan(start, pins)
+    return CardRoute(p.order.mapIndexed { k, i -> CardStop(stops[i], k + 1, p.legsM[k]) }, p.unpinned.map { stops[it] }, p.totalM)
+  }
+
+  /** فاصله برای صفحه: زیرِ هزار متر «متر»، وگرنه کیلومتر با یک رقمِ اعشار (رقمِ لاتین؛ رقمِ صفحه از فونت) */
+  fun km(m: Long): String = "${m / 1000}.${(m % 1000) / 100}"
 }
