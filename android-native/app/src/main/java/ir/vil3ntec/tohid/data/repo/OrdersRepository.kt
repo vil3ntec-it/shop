@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.HandoverPageDto
+import ir.vil3ntec.tohid.core.model.OrderBulkOutDto
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPageDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
@@ -114,6 +115,22 @@ class OrdersRepository(private val api: ApiClient) {
       if (note.isNotBlank()) put("note", note.trim().take(300))
     }
     order(api.post("$ROOT/${enc(id)}/delay", body))
+  }
+
+  /**
+   *  ORD-19 گذارِ گروهی (`POST /shop/orders/bulk/transition`، پرچمِ `shop.orders.bulk`): یک `from` برای همه؛ سرور
+   *  هر سفارش را جدا از همان درِ گذارِ تکی می‌گذراند و نتیجهٔ هر کدام جداست. تکرار ⇒ `unchanged`.
+   */
+  suspend fun bulkTransition(ids: List<String>, to: String, from: String, reason: String = "", note: String = "", readyInMinutes: Int? = null): ApiResult<OrderBulkOutDto> = result {
+    val body = buildJsonObject {
+      put("ids", buildJsonArray { ids.forEach { add(JsonPrimitive(it)) } })
+      put("to", to)
+      put("from", from)
+      if (reason.isNotEmpty()) put("reason", reason)
+      if (note.isNotBlank()) put("note", note.trim())
+      if (readyInMinutes != null) put("readyInMinutes", readyInMinutes)
+    }
+    ApiJson.decode<OrderBulkOutDto>(api.post("$ROOT/bulk/transition", body))
   }
 
   private fun order(body: JsonObject): OrderDto =

@@ -78,6 +78,8 @@ router.get('/config', async (req, res) => {
     presence: await presence.flagOf(req.shopId),
     //  ORD-14 ویرایشِ سفارش (پرچمِ `shop.orders.amend`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
     ...((await amend.flagOf(req.shopId)) ? { amend: amend.configOf() } : {}),
+    //  ORD-19 کارِ گروهی (پرچمِ `shop.orders.bulk`) — خاموش ⇒ کلید نیست و برنامه انتخابِ چندتایی نمی‌سازد
+    ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,

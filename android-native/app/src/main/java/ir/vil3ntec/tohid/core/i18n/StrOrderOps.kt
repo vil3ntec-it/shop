@@ -39,4 +39,34 @@ object StrOrderOps {
   val startDue: String get() = t("وقتش رسیده و هنوز شروع نشده است.", "It is due and has not started yet.", "وخت یې رسېدلی او لا نه دی پیل شوی.")
   val startOpen: String get() = t("باز کن", "Open", "پرانیزه")
   val startSeen: String get() = t("دیدم", "Got it", "ومې لید")
+
+  // ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (`ui/screens/OrderBulkUi.kt`)
+  val bulkSelect: String get() = t("انتخاب", "Select", "ټاکل")
+  val bulkDone: String get() = t("پایانِ انتخاب", "Done selecting", "د ټاکلو پای")
+  fun bulkCount(n: Int): String = t("$n انتخاب‌شده", "$n selected", "$n ټاکل شوي")
+  val bulkAll: String get() = t("همه", "All", "ټول")
+  val bulkNone: String get() = t("هیچ", "None", "هېڅ")
+  fun bulkPrint(n: Int): String = t("چاپِ برگه‌ها ($n)", "Print slips ($n)", "پاڼې چاپول ($n)")
+  fun bulkMove(action: String, n: Int): String = t("$action ($n)", "$action ($n)", "$action ($n)")
+  val bulkMixed: String get() = t("برای تغییرِ گروهی، سفارش‌های یک وضعیت را انتخاب کنید", "To change in bulk, select orders with the same status", "د ډله‌ییز بدلون لپاره، د یو حالت فرمایشونه وټاکئ")
+  fun bulkPick(n: Int): String = t("تا $n سفارش انتخاب کنید", "Select up to $n orders", "تر $n پورې فرمایشونه وټاکئ")
+  fun bulkPrinted(n: Int): String = t("$n برگه چاپ شد", "$n slips printed", "$n پاڼې چاپ شوې")
+  fun bulkPrintedSome(ok: Int, total: Int, why: String): String = t("$ok از $total برگه چاپ شد — $why", "$ok of $total slips printed — $why", "له $total څخه $ok پاڼې چاپ شوې — $why")
+  fun bulkConfirmTitle(action: String, n: Int): String = t("$action — $n سفارش", "$action — $n orders", "$action — $n فرمایشونه")
+  val bulkReason: String get() = t("دلیل", "Reason", "لامل")
+  val bulkNote: String get() = t("توضیح", "Note", "یادښت")
+  val bulkReady: String get() = t("زمانِ آماده شدن", "Ready time", "د چمتو کېدو وخت")
+  val bulkNoTime: String get() = t("بی زمان", "No time", "بې وخته")
+  fun bulkMinutes(min: Int): String = t("$min دقیقه", "$min min", "$min دقیقې")
+  val bulkConfirm: String get() = t("تأیید", "Confirm", "تایید")
+  val bulkCancel: String get() = t("انصراف", "Cancel", "لغوه")
+  fun bulkResult(changed: Int, unchanged: Int, failed: Int): String = t(
+    "$changed سفارش عوض شد، $unchanged از پیش همان بود، $failed نشد",
+    "$changed changed, $unchanged already done, $failed failed",
+    "$changed فرمایشونه بدل شول، $unchanged له مخکې همداسې وو، $failed ونه شول",
+  )
+  fun bulkFailed(orderNo: String, why: String): String = t("#$orderNo: $why", "#$orderNo: $why", "#$orderNo: $why")
+  val bulkWhyChanged: String get() = t("وضعیتش همین حالا جای دیگری عوض شده بود", "its status had just changed elsewhere", "حالت یې همدا اوس بل ځای بدل شوی و")
+  val bulkWhyMissing: String get() = t("پیدا نشد", "not found", "ونه موندل شو")
+  fun bulkFetchFailed(n: Int): String = t("$n سفارش از سرور نیامد و چاپ نشد", "$n orders did not load and were not printed", "$n فرمایشونه له سرور رانغلل او چاپ نه شول")
 }

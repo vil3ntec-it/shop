@@ -50,6 +50,28 @@ data class OrdersConfigDto(
   val delay: OrderDelayCfgDto? = null,
   /** ORD-03 «باز / بسته» و هشدارِ قطعِ اتصال (پرچمِ `shop.orders.presence`) */
   val presence: Boolean = false,
+  /** ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (پرچمِ `shop.orders.bulk`؛ خاموش ⇒ کلید نیست) */
+  val bulk: Boolean = false,
+)
+
+/** `POST /shop/orders/bulk/transition` — نتیجهٔ هر سفارش جدا و به همان ترتیب (`order-bulk.transition`) */
+@Serializable
+data class OrderBulkOutDto(
+  val results: List<OrderBulkResultDto> = emptyList(),
+  val okCount: Int = 0,
+  val failedCount: Int = 0,
+)
+
+@Serializable
+data class OrderBulkResultDto(
+  val id: String = "",
+  val ok: Boolean = false,
+  val status: String = "",
+  val unchanged: Boolean = false,
+  val orderNo: Long = 0,
+  val code: String = "",
+  val message: String = "",
+  val current: String = "",
 )
 
 /** `delay` ِ `/config` (`order-delay.configOf`): وضعیت‌های مجاز، دلیل‌ها و سقفِ دقیقه */

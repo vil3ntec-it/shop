@@ -89,7 +89,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
   var creating by remember { mutableStateOf(false) }; var pickFor by remember { mutableStateOf<OrderDto?>(null) }   // + برگهٔ جمع‌آوری (PCK)
   var reload by remember { mutableStateOf(0) }
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
-  val rev = OrdersLive.rev.value
+  val rev = OrdersLive.rev.value; val bulk = rememberOrderBulk(cfg, tab)   // انتخابِ چندتایی (ORD-19)
 
   suspend fun load(reset: Boolean) {
     loading = true
@@ -117,7 +117,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         Text("سفارش‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = colors.text)
         Text("ویترین، تلفن، تلگرام و واتس‌اپ — در یک صف", style = MaterialTheme.typography.bodySmall, color = colors.muted)
       }
-      ViewModeToggle(view); PickDeskEntry(cfg, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }) { reload++ }   // قفسه و دسته (PCK-10/12)
+      ViewModeToggle(view); OrderBulkToggle(bulk, cfg); PickDeskEntry(cfg, ir.vil3ntec.tohid.data.repo.Backend.api(context), { ok -> if (ok) Haptics.success(context) else Haptics.confirm(context) }) { reload++ }   // قفسه و دسته (PCK-10/12)
       if (cfg.permissions.create) {
         Spacer(Modifier.width(8.dp))
         TohidButton("+ سفارشِ دستی", onClick = { creating = true })
@@ -195,7 +195,7 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
         )
       }
     }
-    Spacer(Modifier.height(10.dp))
+    Spacer(Modifier.height(10.dp)); OrderBulkBar(bulk, cfg, items, repo, remember(context) { ir.vil3ntec.tohid.print.OrderSlipPrint.Bulk(context) }, { m -> scope.launch { snackbar.showSnackbar(m) } }) { reload++; scope.launch { OrdersLive.pollSummary(context) } }
 
     when {
       loading && items.isEmpty() -> TohidLoadingState(rows = 4)
@@ -211,9 +211,9 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
       else -> LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (view.mode == ViewMode.TABLE) {
           item(key = "head") { OrderTableHeader() }
-          items(items, key = { it.id }) { o -> OrderTableRow(o, now) { openId = o.id } }
+          items(items, key = { it.id }) { o -> OrderBulkRow(bulk, o.id) { OrderTableRow(o, now) { if (!bulk.tap(o.id)) openId = o.id } } }
         } else {
-          items(items, key = { it.id }) { o -> OrderCard(o, now) { openId = o.id } }
+          items(items, key = { it.id }) { o -> OrderBulkRow(bulk, o.id) { OrderCard(o, now) { if (!bulk.tap(o.id)) openId = o.id } } }
         }
         if (cursor != null) item(key = "more") {
           TohidSecondaryButton(
