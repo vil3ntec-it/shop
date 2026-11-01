@@ -6,6 +6,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/WarehouseEngine.kt": 824,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1261,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt": 1164,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HesabPaySheet.kt": 1064,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 804,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Dashboard.kt": 1147,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Debtors.kt": 1380,
@@ -36,7 +37,7 @@
     "server/src/lib/otp.js": 877,
     "server/src/lib/shop-chat.js": 882,
     "server/src/lib/staff-approval.js": 1081,
-    "server/src/lib/storefront.js": 1151,
+    "server/src/lib/storefront.js": 1143,
     "server/src/lib/sync-v3.js": 1198,
     "server/src/routes/auth.js": 1181,
     "server/src/routes/pump-device.js": 917

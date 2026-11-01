@@ -641,3 +641,28 @@ test('تاریخچه به ترتیبِ رخداد است — «تصمیم» پی
     assert.deepEqual((await trust.adminView(id)).history.map((e) => e.type), ['decided', 'sanction_applied'], id);
   }
 });
+
+test('تاریخچه به ترتیبِ رخداد است — «تصمیم» پیش از «جریمه»، حتی هر دو در یک میلی‌ثانیه', async (t) => {
+  //  دو رویدادِ یک تراکنش با همان `now()` و شناسهٔ تصادفی پیش‌تر به ترتیبِ شناسه خوانده می‌شدند
+  //  (ABUSE-01 در CI ِ تند گاهی «جریمه» را پیش از «تصمیم» دید)
+  const trust = require('../src/lib/market-trust');
+  const o = await shopOwner('ترتیبِ رویداد');
+  const at = now();
+  const ids = [];
+  for (let i = 0; i < 16; i++) {
+    const id = newId('tc');
+    await query(
+      `INSERT INTO trust_cases (id, shop_id, kind, subject, category, severity, reporter_key, created_at, updated_at)
+       VALUES ($1,$2,'complaint','shop','fraud','medium',$3,$4,$4)`,
+      [id, o.shopId, `order-${i}`, at]
+    );
+    ids.push(id);
+  }
+  t.mock.method(Date, 'now', () => at);
+  try {
+    for (const id of ids) await trust.decide('adm_order', id, { outcome: 'upheld', sanction: { kind: 'warning' } }, 'آزمونِ ترتیب');
+  } finally { t.mock.restoreAll(); }
+  for (const id of ids) {
+    assert.deepEqual((await trust.adminView(id)).history.map((e) => e.type), ['decided', 'sanction_applied'], id);
+  }
+});
