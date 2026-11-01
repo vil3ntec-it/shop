@@ -16,9 +16,9 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
   || COALESCE(cp.barcodes::text, r.data->>'barcodes', r.data->>'barcode', '') || chr(31) || COALESCE(spi.bank_product_id, '')`;
 
   /** ردیف‌های `market_search` ِ یک دکان، درونِ تراکنشِ `reindex`: برند، بارکد و `bank_product_id` کنارِ نام (همیشه پر؛ خواندنش پشتِ پرچم). */
-  async function indexShop(c, shopId) {
+  async function indexShop(c, shopId, from = sf.PRODUCT_FROM) {
     const rows = (await c.query(
-      `SELECT sp.product_id, ${sf.SQL_NAME} AS name_norm, r.data, ${details.COLS} FROM ${sf.PRODUCT_FROM} ${details.JOINS}
+      `SELECT sp.product_id, ${sf.SQL_NAME} AS name_norm, r.data, ${details.COLS} FROM ${from} ${details.JOINS}
         WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
       [shopId]
     )).rows;
@@ -86,7 +86,7 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
     const bySlug = new Map(list.map((e) => [e.row.shop_id, cardOf(e, near, at)]));
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
-         FROM market_search ms JOIN (${sf.PRODUCT_FROM}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
+         FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
         WHERE ms.bank_product_id = $1 AND ms.shop_id = ANY($2::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
         ORDER BY sp.shop_id, r.row_id LIMIT $3`,
       [bank, [...bySlug.keys()], MAX_CANDIDATES]

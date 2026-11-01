@@ -94,7 +94,7 @@ async function upsertProduct(c, shopId, row, fmt, at) {
       JSON.stringify(barcodesOf(d)), text(d.unit, 30), text(d.saleUnit, 30),
       Number.isSafeInteger(factor) && factor > 0 ? factor : 1000,
       price !== null && price > 0 ? price : null, Math.max(0, rd.qty(d, 'minStock')),
-      d.active !== false, row.deleted_at !== null && row.deleted_at !== undefined,
+      d.active !== false && d.active !== 'false', row.deleted_at !== null && row.deleted_at !== undefined,
       fmt, num(row.updated_seq), at]
   );
 }
@@ -910,7 +910,7 @@ async function requireEnabled(shopId) {
 }
 
 module.exports = {
-  MANUAL, TRANSFER_LOCS,
+  MANUAL, TRANSFER_LOCS, TABLES, PAGE, upsertProduct,   //  آخری‌ها برای catalog-products.js (S1)
   barcodesOf, ingestTx, refresh, hasNewer, retireOrderStock, afterIngest, REFRESH_THROTTLE_MS, prepare, freshness, badgeOf, publicStock,
   list, detail, moves, tasks, resolveTask,
   parseManual, manualMove, setLow,

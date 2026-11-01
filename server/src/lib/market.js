@@ -24,7 +24,7 @@
  *           برای دکانی که امضای کالاهایش عوض شده، تازه می‌کند؛ با `pg_trgm` نمایهٔ
  *           GIN دارد، بی آن (PGlite) پیمایشِ همان جدولِ باریک. هر نتیجه دوباره
  *           با دادهٔ زنده (منتشرشده، فعال، همان نام) سنجیده می‌شود.
- *   کالا ── فقط از راهِ `PRODUCT_FROM` و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
+ *   کالا ── فقط از راهِ `productFrom()` (`PRODUCT_FROM`، یا با پرچمِ S1 کاتالوگ) و `LIVE_PRODUCT` ِ خودِ ویترین (منتشرشده،
  *           حذف‌نشده، فعال، قیمت‌دار) — همان چیزی که ثبتِ سفارش می‌پذیرد.
  *   حریم ── هیچ شناسهٔ داخلی، شماره، ایمیل، نامِ صاحب یا مختصات در پاسخ نیست؛
  *           «نزدیکِ من» فقط فاصلهٔ گردشده می‌دهد و مکانِ مشتری ذخیره یا لاگ نمی‌شود
@@ -146,7 +146,7 @@ const LISTED_WHERE = "sf.enabled AND s.status = 'active' AND COALESCE(ml.listed,
  * `market_search` ِ دکان‌هایی که امضای کالاهایشان عوض شده، از نو؛ ردیفِ دکانِ
  * بیرون‌رفته پاک. هر دکان در تراکنشِ خودش.
  */
-async function reindex(sigs, ids) {
+async function reindex(sigs, ids, from) {
   const known = new Map((await many('SELECT shop_id, sig FROM market_search_shops')).map((r) => [r.shop_id, r.sig]));
   const keep = new Set(ids);
   const gone = [...known.keys()].filter((id) => !keep.has(id));
@@ -160,7 +160,7 @@ async function reindex(sigs, ids) {
   for (const [id, sig] of stale) {
     await tx(async (c) => {
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
-      await m4.indexShop(c, id);   // M4: برند، بارکد و `bank_product_id` کنارِ نام
+      await m4.indexShop(c, id, from);   // M4: برند، بارکد و `bank_product_id` کنارِ نام؛ S1: از همان منبعِ کالا
       await c.query(
         `INSERT INTO market_search_shops (shop_id, sig, indexed_at) VALUES ($1,$2,$3)
          ON CONFLICT (shop_id) DO UPDATE SET sig = EXCLUDED.sig, indexed_at = EXCLUDED.indexed_at`,
@@ -186,12 +186,12 @@ async function buildSnapshot() {
       ORDER BY sf.slug LIMIT ${MAX_CANDIDATES}`
   );
   const open = await filterAsync(rows, gateOf);
-  const ids = open.map((r) => r.shop_id);
+  const ids = open.map((r) => r.shop_id);   //  S1: کاتالوگ منبع ⇒ `productFrom(ids)` کاتالوگِ هر دکانِ باز را پیش از شمردن تازه می‌کند
   const [counts, seen] = ids.length ? await Promise.all([
     many(
       `SELECT sp.shop_id, COUNT(*)::int AS n,
               md5(string_agg(sp.product_id || chr(31) || ${sf.SQL_NAME} || chr(31) || ${m4.DETAIL_SIG}, chr(30) ORDER BY sp.product_id)) AS sig
-         FROM ${sf.PRODUCT_FROM} ${m4.JOINS}
+         FROM ${await sf.productFrom(ids)} ${m4.JOINS}
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> ''
         GROUP BY sp.shop_id`,
@@ -204,7 +204,7 @@ async function buildSnapshot() {
       [ids]
     ),
   ]) : [[], []];
-  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id));
+  await reindex(new Map(counts.map((r) => [r.shop_id, r.sig])), counts.map((r) => r.shop_id), await sf.productFrom());
   const n = new Map(counts.map((r) => [r.shop_id, Number(r.n)]));
   const last = new Map(seen.map((r) => [r.account_id, r.t === null || r.t === undefined ? 0 : Number(r.t)]));
   const out = new Map();
@@ -394,7 +394,7 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
-         FROM market_search ms JOIN (${sf.PRODUCT_FROM}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
+         FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
         WHERE ms.shop_id = ANY($1::text[])
           AND (ms.name_norm LIKE $2 OR ($4::boolean AND (ms.brand_norm LIKE $2 OR ms.barcodes @> ARRAY[$5::text])))
           AND sp.published AND ${sf.LIVE_PRODUCT} AND ($4::boolean OR ${sf.SQL_NAME} LIKE $2)
@@ -492,7 +492,7 @@ function shelfOf(shopId) {
 async function loadShelf(shopId) {
   counters.shelves++;
   const rows = await many(
-    `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT ${sf.PRODUCT_COLS} FROM ${await sf.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
     [shopId, SHELF * 2]
@@ -510,7 +510,7 @@ async function liveViews(pairs) {
   const uniq = [...new Map(pairs.map((x) => [pairKey(x.shopId, x.id), x])).values()];
   if (!uniq.length) return out;
   const rows = await many(
-    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM}
+    `SELECT sp.shop_id, ${sf.PRODUCT_COLS} FROM ${await sf.productFrom()}
       WHERE (sp.shop_id, sp.product_id) IN (SELECT * FROM unnest($1::text[], $2::text[]))
         AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''`,
     [uniq.map((x) => x.shopId), uniq.map((x) => x.id)]
@@ -598,7 +598,7 @@ async function loadDeals(ids) {
        SELECT sp.shop_id, r.row_id AS id,
               ROW_NUMBER() OVER (PARTITION BY sp.shop_id
                 ORDER BY sp.online_price_minor::numeric / ROUND((r.data->>'salePrice')::numeric * 100), r.row_id) AS n
-         FROM ${sf.PRODUCT_FROM}
+         FROM ${await sf.productFrom()}
          JOIN market_listings ml ON ml.shop_id = sp.shop_id AND ml.show_deals
         WHERE sp.shop_id = ANY($1::text[]) AND sp.published AND ${sf.LIVE_PRODUCT}
           AND COALESCE(r.data->>'name', '') <> '' AND sp.online_price_minor IS NOT NULL
