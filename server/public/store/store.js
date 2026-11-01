@@ -165,16 +165,13 @@
     }).then(function () { ul.setAttribute('aria-busy', 'false'); });
   }
 
-  // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل (WEB-08) ──
-  function detail(r) {
-    var x = r ? r.product : {};
-    $('ps-desc').textContent = x.description || '';
-    $('ps-desc').hidden = !x.description;
-    var dl = K.clear($('ps-specs'));
-    (x.specs || []).forEach(function (s) { dl.append(el('dt', { text: s.name }), el('dd', { text: s.value })); });
-    dl.hidden = !dl.children.length;
-    rail('ps-sim', r ? r.similar : []);
-    rail('ps-comp', r ? r.complementary : []);
+  // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل در store/product.js، با نخستین بازشدن (WEB-08، WEB-15) ──
+  var detail = null; var detailP = null;
+  function loadProductView() {
+    detailP = detailP || new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/product.js' }, on: { load: ok, error: no } }));
+    }).then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
+    return detailP;
   }
   function openProduct(id) {
     var p = catalog.items[id];
@@ -197,12 +194,13 @@
       if (recent) recent.seen(x);
       if (K.sheetOpen() !== $('product-sheet')) K.openSheet($('product-sheet'), closeToCatalog);
     };
-    detail(null);
+    if (detail) detail(null);
     if (p) fill(p);
-    api('/products/' + encodeURIComponent(id)).then(function (r) {
+    //  بی product.js (شبکه) برگه همان باز می‌شود، فقط بی جزئیات
+    Promise.all([api('/products/' + encodeURIComponent(id)), loadProductView().catch(function () { return null; })]).then(function (r) {
       if (!here()) return;
-      fill(r.product);
-      detail(r);
+      fill(r[0].product);
+      if (r[1]) r[1](r[0]);
     }).catch(function (e) {
       if (!here()) return;
       if (e.status === 404) { K.toast(t('p.gone')); closeToCatalog(); }
