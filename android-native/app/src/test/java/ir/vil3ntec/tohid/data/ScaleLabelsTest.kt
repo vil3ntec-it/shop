@@ -52,4 +52,14 @@ class ScaleLabelsTest {
     //  بارکدِ معمولی
     assertNull(ScaleLabels.match(rules, "6260100120014", index, all))
   }
+
+  @Test fun `برچسبِ قیمتی — ۱۵۰ افغانی برنجِ کیلویی ۱۲۰ یعنی ۱٫۲۵ کیلو؛ مبلغِ ناجور رد`() {
+    val price = WeightBarcode.Rule(prefix = "22", kind = WeightBarcode.Kind.PRICE, decimals = 0)
+    val m = ScaleLabels.match(listOf(price), WeightBarcode.build(price, "00150", 150), index, all) as ScaleLabels.Match.Weighed
+    assertEquals("rice", m.product.id)
+    assertEquals(1.25, m.quantity, 0.0)
+    assertEquals(150.0, SalesEngine.lineTotal(rice.salePrice, m.quantity), 0.0)
+    //  کالای دانه‌ای با برچسبِ قیمتی رد
+    assertTrue(ScaleLabels.match(listOf(price), WeightBarcode.build(price, "00999", 50), index, all) is ScaleLabels.Match.Rejected)
+  }
 }
