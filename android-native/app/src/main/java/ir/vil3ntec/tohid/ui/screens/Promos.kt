@@ -52,6 +52,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -356,7 +357,9 @@ private fun PromoEditor(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val c = Shop.colors
-  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule).let { if (isNew) it.copy(name = "") else it }) }
+  //  PRM-02: «سقفِ مصرف» فقط وقتی سرور مصرف را می‌شمارد (پرچمِ `redeem`)
+  val counted = PromoLive.snap.value.redeem
+  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule, uses = counted).let { if (isNew) it.copy(name = "") else it }) }
   var error by remember { mutableStateOf("") }
   var saving by remember { mutableStateOf(false) }
   val categories = remember(d.products) { d.products.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
@@ -407,12 +410,19 @@ private fun PromoEditor(
               FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text("مبلغ") })
             }
           }
+          //  POS-19: پلهٔ «قیمتِ ثابتِ هر واحد» فقط با پرچمِ `shop.promo_tier_price` (یا قاعده‌ای که از پیش چنین است)
+          if (f.kind == "tiers" && (PromoLive.snap.value.tierPrice || f.tierAmount)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+              FilterChip(selected = !f.tierAmount, onClick = { f = f.copy(tierAmount = false) }, label = { Text(StrLine.percent) })
+              FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text(StrLine.tierFixedPrice) })
+            }
+          }
           f.tiers.forEachIndexed { i, (a, b) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
               NumField(if (f.kind == "threshold") "از مبلغِ (؋)" else "از تعدادِ", a, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) v to t.second else t })
               }
-              NumField(if (f.kind == "threshold" && f.tierAmount) "تخفیف (؋)" else "تخفیف (٪)", b, Modifier.weight(1f)) { v ->
+              NumField(if (f.kind == "threshold" && f.tierAmount) "تخفیف (؋)" else if (f.tierAmount) StrLine.tierUnitPrice else "تخفیف (٪)", b, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) t.first to v else t })
               }
               if (f.tiers.size > 1) TextButton(onClick = { f = f.copy(tiers = f.tiers.filterIndexed { j, _ -> j != i }) }) { Text("✕") }
@@ -478,6 +488,14 @@ private fun PromoEditor(
         TextIn("کدِ تخفیف (اختیاری)", f.code, Modifier.weight(2f)) { f = f.copy(code = it) }
       }
       Hint("بی کد ⇐ خودکار. کد را صندوقدار در سبد می‌زند؛ کدِ هر قاعده در این دکان یکتاست.")
+      val cap = f.maxUses
+      if (cap != null && f.code.isNotBlank()) {
+        NumField("سقفِ مصرفِ کد (خالی = بی سقف)", cap) { f = f.copy(maxUses = it) }
+        Hint(
+          "سرور هر مصرف را می‌شمارد؛ کدِ سقف‌دار فقط با اینترنت در صندوق پذیرفته می‌شود." +
+            if (rule.uses > 0) " تا امروز ${rule.uses} بار مصرف شده." else "",
+        )
+      }
 
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = f.active, onCheckedChange = { f = f.copy(active = it) })

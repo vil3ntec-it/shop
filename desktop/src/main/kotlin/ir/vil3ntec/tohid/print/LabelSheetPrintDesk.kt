@@ -21,12 +21,19 @@ import java.awt.print.PrinterJob
  */
 object LabelSheetPrint {
 
-  fun print(@Suppress("UNUSED_PARAMETER") context: Context, sheet: MonoImage, title: String) {
+  fun print(context: Context, sheet: MonoImage, title: String) = print(context, listOf(sheet), title)
+
+  /** چند برگه در یک کارِ چاپ (PRD-23: برچسبِ چند کالا، هر ۲۴ تا یک برگه) — همان API ِ اندروید */
+  fun print(@Suppress("UNUSED_PARAMETER") context: Context, sheets: List<MonoImage>, title: String) {
+    if (sheets.isEmpty()) return
     //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد
     Thread({
       runCatching {
-        val image = BufferedImage(sheet.width, sheet.height, BufferedImage.TYPE_BYTE_BINARY)
-        for (y in 0 until sheet.height) for (x in 0 until sheet.width) image.setRGB(x, y, if (sheet[x, y]) 0x000000 else 0xFFFFFF)
+        val images = sheets.map { sheet ->
+          BufferedImage(sheet.width, sheet.height, BufferedImage.TYPE_BYTE_BINARY).also { image ->
+            for (y in 0 until sheet.height) for (x in 0 until sheet.width) image.setRGB(x, y, if (sheet[x, y]) 0x000000 else 0xFFFFFF)
+          }
+        }
         val job = PrinterJob.getPrinterJob()
         job.jobName = title
         val format = job.defaultPage().apply {
@@ -37,15 +44,15 @@ object LabelSheetPrint {
           }
           orientation = PageFormat.PORTRAIT
         }
-        job.setPrintable(SheetPrintable(image), format)
+        job.setPrintable(SheetPrintable(images), format)
         if (job.printDialog()) job.print()
       }.onFailure { DesktopNotify.show("چاپِ برچسب", "چاپ انجام نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
     }, "tohid-label-print").apply { isDaemon = true }.start()
   }
 
-  private class SheetPrintable(private val image: BufferedImage) : Printable {
+  private class SheetPrintable(private val images: List<BufferedImage>) : Printable {
     override fun print(g: Graphics, pf: PageFormat, page: Int): Int {
-      if (page > 0) return Printable.NO_SUCH_PAGE
+      val image = images.getOrNull(page) ?: return Printable.NO_SUCH_PAGE
       val g2 = g as Graphics2D
       g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR)
       g2.drawImage(image, 0, 0, pf.width.toInt(), pf.height.toInt(), null)

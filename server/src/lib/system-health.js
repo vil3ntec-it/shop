@@ -89,11 +89,93 @@ async function telegramOutbox(t) {
   };
 }
 
+/*
+ *  ── تأخیرِ همگام‌سازی — OPS-04 (§۶.۲۴)، پشتِ پرچمِ `ops.sync_lag` ─────────
+ *  live_config، scope ‏`ops`، پیش‌فرض خاموش؛ فقط `true` روشن است. خاموش ⇒ بخشِ «همگام‌سازی»
+ *  دقیقاً همان پیشین (بی `lag`).
+ *
+ *  فقط از `sync_devices` (یک ردیف برای هر دستگاهِ Sync v1) و سرِ دفترِ هر حساب (`MAX(server_seq)`
+ *  روی `idx_oplog_account_seq`، یک جست‌وجوی نمایه برای هر حساب) — هیچ پیمایشِ oplog نیست.
+ *    devices         دستگاه‌های دیده‌شده در `windowDays` روزِ اخیر (حداکثر `maxDevices` تازه‌ترین)
+ *    behindDevices   cursor ِ دستگاه پایین‌تر از سرِ دفترِ حسابش؛ maxBehindOps بیشینهٔ فاصله
+ *    queuedDevices   صفِ گزارش‌شدهٔ خودِ دستگاه در آخرین push (`queued_count`) > ۰؛ queuedOps جمعش
+ *    stale24h        آخرین push/pull ِ موفق بیش از ۲۴ ساعت پیش
+ *    stuck           در `stuckMs` ِ اخیر دیده شده (push یا pull کرده)، عقب است و `stuckMs` است pull نکرده
+ *    lastSyncAge*    سنِ آخرین push/pull (میانه و p95)
+ *  ⚠️ کارِ آفلاین سقفِ زمانی ندارد (D-05) ⇒ عقب‌ماندگی و کهنگی فقط شمرده می‌شوند؛ تنها `stuck`
+ *     (آنلاین ولی بی pull) کارت را `warn` می‌کند.
+ *  ⛔ فقط عدد؛ هیچ شناسهٔ دستگاه، حساب یا دکان.
+ */
+const SYNC_LAG_FLAG = Object.freeze({ scope: 'ops', key: 'ops.sync_lag' });
+const SYNC_LAG_LIMITS = Object.freeze({ windowDays: 30, maxDevices: 5000, stuckMs: HOUR });
+
+async function syncLagEnabled() {
+  const r = await one('SELECT value FROM live_config WHERE scope = $1 AND key = $2', [SYNC_LAG_FLAG.scope, SYNC_LAG_FLAG.key]);
+  if (!r) return false;
+  try { return JSON.parse(r.value) === true; } catch { return false; }
+}
+
+async function syncLag(t) {
+  const L = SYNC_LAG_LIMITS;
+  const r = await one(
+    `WITH d AS (
+       SELECT app, account_kind, account_id, cursor, queued_count, last_pull_at, last_seen_at,
+              GREATEST(COALESCE(last_push_at, 0), COALESCE(last_pull_at, 0)) AS synced_at
+         FROM sync_devices
+        WHERE last_seen_at > $1
+        ORDER BY last_seen_at DESC
+        LIMIT $2
+     ), heads AS MATERIALIZED (
+       --  یک بار برای هر حساب؛ بی MATERIALIZED برنامه‌ریز زیرپرس‌وجو را برای هر دستگاه و هر بار
+       --  که «behind» خوانده می‌شود دوباره می‌زد (۶k دستگاه، ۱k حساب: ۲۷۵ms ⇐ اندازه‌گیری در PR)
+       SELECT a.app, a.account_kind, a.account_id,
+              (SELECT COALESCE(MAX(o.server_seq), 0) FROM oplog o
+                WHERE o.app = a.app AND o.account_kind = a.account_kind AND o.account_id = a.account_id) AS head
+         FROM (SELECT DISTINCT app, account_kind, account_id FROM d) a
+     ), j AS (
+       SELECT d.*, GREATEST(heads.head - d.cursor, 0) AS behind
+         FROM d JOIN heads USING (app, account_kind, account_id)
+     )
+     SELECT COUNT(*)::int AS devices,
+            COUNT(*) FILTER (WHERE behind > 0)::int AS behind_devices,
+            COALESCE(MAX(behind), 0)::bigint AS max_behind,
+            COUNT(*) FILTER (WHERE queued_count > 0)::int AS queued_devices,
+            COALESCE(SUM(queued_count), 0)::bigint AS queued_ops,
+            COUNT(*) FILTER (WHERE synced_at < $3)::int AS stale,
+            COUNT(*) FILTER (WHERE behind > 0 AND last_seen_at > $4 AND COALESCE(last_pull_at, 0) < $4)::int AS stuck,
+            percentile_disc(0.5) WITHIN GROUP (ORDER BY $5::bigint - synced_at) AS p50,
+            percentile_disc(0.95) WITHIN GROUP (ORDER BY $5::bigint - synced_at) AS p95
+       FROM j`,
+    [t - L.windowDays * DAY, L.maxDevices, t - DAY, t - L.stuckMs, t]
+  );
+  const age = (v) => (v == null ? null : Math.max(0, Number(v)));
+  const stuck = Number(r.stuck);
+  return {
+    status: stuck > 0 ? 'warn' : 'ok',
+    windowDays: L.windowDays,
+    devices: Number(r.devices),
+    behindDevices: Number(r.behind_devices),
+    maxBehindOps: Number(r.max_behind),
+    queuedDevices: Number(r.queued_devices),
+    queuedOps: Number(r.queued_ops),
+    stale24h: Number(r.stale),
+    stuck,
+    lastSyncAgeP50Ms: age(r.p50),
+    lastSyncAgeP95Ms: age(r.p95),
+  };
+}
+
 /** خطاهای گزارش‌شدهٔ برنامه‌ها و تعارض‌های همگام‌سازی در ۲۴ ساعت — شمرده، نه فهرست. */
 async function sync(t) {
   const e = await one('SELECT COUNT(*)::int AS n FROM client_errors WHERE at > $1', [t - DAY]);
   const c = await one('SELECT COUNT(*)::int AS n FROM sync_conflicts WHERE at > $1', [t - DAY]);
-  return { status: 'ok', clientErrors24h: e.n, conflicts24h: c.n };
+  const out = { status: 'ok', clientErrors24h: e.n, conflicts24h: c.n };
+  //  پرچم یا پرس‌وجوی تأخیر شکست بخورد ⇒ فقط `lag` نامعلوم، نه شمارش‌های بالا
+  let on = false;
+  try { on = await syncLagEnabled(); } catch { return { ...out, lag: { status: 'unknown' } }; }
+  if (!on) return out;
+  const lag = await safe(() => syncLag(t));
+  return { ...out, status: worst([out.status, lag.status]), lag };
 }
 
 async function storage() {
@@ -109,13 +191,18 @@ async function storage() {
 }
 
 async function backups(t) {
-  const list = await require('./backup').list();
+  const backup = require('./backup');
+  const list = await backup.list();
   const last = list[0] || null;
   const ageMs = last ? ageOf(last.createdAt, t) : null;
   const enabled = config.backup.enabled === true;
   const late = ageMs == null || ageMs > config.backup.intervalMs * LIMITS.backupLateFactor;
+  //  SEC-DATA-05: شکستِ آخر پس از آخرین پشتیبانِ موفق ⇒ قرمز، نه فقط «دیر شده»
+  const failure = backup.status().lastFailure;
+  const failing = !!failure && (!last || Number(failure.at) > Number(last.createdAt));
   return {
-    status: !enabled ? 'warn' : late ? 'warn' : 'ok',
+    status: failing ? 'down' : !enabled ? 'warn' : late ? 'warn' : 'ok',
+    lastFailure: failing ? { at: failure.at, kind: failure.kind, message: failure.message } : null,
     enabled,
     //  فقط «رمز دارد یا نه» — خودِ عبارتِ عبور هرگز
     encryption: Boolean(config.backup.passphrase),

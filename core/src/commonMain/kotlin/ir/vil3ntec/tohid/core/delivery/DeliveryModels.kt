@@ -31,6 +31,8 @@ data class DeskConfig(
   val reasons: Map<String, List<String>> = emptyMap(),
   val defaultCashCapMinor: Long = 0,
   val perms: DeskPerms = DeskPerms(),
+  /** پرچمِ خاموشِ `shop.orders.picking` (PCK): QRِ کدِ تحویل و پذیرشِ اسکنِ آن (PCK-11) */
+  val picking: Boolean = false,
 )
 
 /** پیکِ دکان با نقدِ در دستش (DLV-11) */
@@ -48,6 +50,8 @@ data class CourierRow(
   val liveCount: Int = 0,
   /** نقدی که از مأموریت‌های زنده باید بگیرد */
   val liveExpectedMinor: Long = 0,
+  /** سقفِ کارِ هم‌زمانِ همین پیک (DLV-03، سرور: `max_live`)؛ null = بی‌سقف */
+  val maxLive: Int? = null,
 )
 
 /** یک مأموریتِ تحویل از دیدِ دکان (`staffView` + نامِ مشتری و وضعیتِ سفارش) */
