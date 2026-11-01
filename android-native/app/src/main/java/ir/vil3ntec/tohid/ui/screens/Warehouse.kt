@@ -523,7 +523,15 @@ fun WarehouseScreen(
       ) { stockCount = false }
     }
     val onCountExport: (ir.vil3ntec.tohid.data.ReportCsv.Sheet) -> Unit = { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
-    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
+    //  INV-10: برگهٔ تازه لحظهٔ شمردنِ هر کالا را هم می‌دهد تا فروش‌های حینِ شمارش اختلاف نسازند
+    val onToolsSave: (Map<String, Double>, Map<String, Long>, String) -> Unit = { counted, at, note ->
+      val n = WarehouseEngine.countLines(d, counted, at).size
+      apply(
+        WarehouseEngine.stockCountAt(d, counted, at, note, todayIso(), System.currentTimeMillis(), ::newId),
+        "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
+      ) { stockCount = false }
+    }
+    if (countTools) StockCountToolsWired(context, d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onToolsSave)
     else StockCountSheet(d = d, onDismiss = { stockCount = false }, onExport = onCountExport, onSave = onCountSave)
   }
 

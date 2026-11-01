@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.ProductImportPlan
 import ir.vil3ntec.tohid.core.product.ProductLabels
 import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.StockLevelRules
 import ir.vil3ntec.tohid.core.stock.StockLevels
 import ir.vil3ntec.tohid.money
@@ -124,13 +125,26 @@ object WarehouseEngine {
   /**
    *  فقط کالاهایی که شمرده شده‌اند و با موجودیِ برنامه فرق دارند.
    *  فرقِ کمتر از یک‌هزارم (گرد شدنِ اعشار) اختلاف نیست.
+   *
+   *  INV-10: با [countedAt] (لحظهٔ شمردنِ هر کالا) «موجودیِ برنامه» ِ ردیف همان مورد انتظار هنگامِ شمارش
+   *  است — موجودیِ امروز منهای گردشِ کالا پس از آن لحظه (`core/stock/CountDuringSales`؛ انتقالِ میانِ
+   *  مکان‌ها جمع را عوض نمی‌کند و بیرون است). خالی ⇒ بیت‌به‌بیت همان رفتارِ امروز.
    */
-  fun countLines(d: ShopData, counted: Map<String, Double>): List<CountLine> =
-    d.products.mapNotNull { p ->
+  fun countLines(d: ShopData, counted: Map<String, Double>, countedAt: Map<String, Long> = emptyMap()): List<CountLine> {
+    val after = if (countedAt.isEmpty()) emptyMap() else CountDuringSales.movedAfter(
+      countedAt,
+      d.stockMovements.filter { it.productId in countedAt && it.type !in TRANSFER_TYPES }
+        .map { CountDuringSales.Move(it.productId, it.createdAt, Math.round(it.qty * 1000.0)) },
+    )
+    return d.products.mapNotNull { p ->
       val c = counted[p.id] ?: return@mapNotNull null
-      val sys = ShopStore.stock(d, p.id)
+      val sys = ShopStore.stock(d, p.id) - (after[p.id] ?: 0L) / 1000.0
       if (kotlin.math.abs(c - sys) < 0.0005) null else CountLine(p, sys, c)
     }
+  }
+
+  /** حرکت‌هایی که فقط مکان را عوض می‌کنند، نه جمعِ موجودی را */
+  private val TRANSFER_TYPES = setOf(StockLedger.TRANSFER_OUT, StockLedger.TRANSFER_IN, StockLedger.TRANSFER_LEGACY)
 
   /**
    *  ثبتِ انبارگردانی: هر اختلاف یک «اصلاحِ موجودی» با دلیلِ «انبارگردانی»
@@ -144,9 +158,20 @@ object WarehouseEngine {
     today: String,
     now: Long,
     newId: () -> String,
+  ): Result = stockCountAt(d, counted, emptyMap(), note, today, now, newId)
+
+  /** همان ثبت، با لحظهٔ شمردنِ هر کالا تا فروش‌های حینِ شمارش لحاظ شوند (INV-10، [countLines]) */
+  fun stockCountAt(
+    d: ShopData,
+    counted: Map<String, Double>,
+    countedAt: Map<String, Long>,
+    note: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
-    val lines = countLines(d, counted)
+    val lines = countLines(d, counted, countedAt)
     if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
     val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
     var data = d
