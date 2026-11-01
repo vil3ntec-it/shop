@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import ir.vil3ntec.tohid.core.image.ImagePrep
 import java.io.File
 
 /**
@@ -27,6 +28,8 @@ object PhotoStore {
    */
   private const val MAX_EDGE = 800
   private const val QUALITY = 80
+  /** خواندنِ فایلِ خودِ دستگاه: عکسِ ۸۰۰ پیکسلی همان‌طور (s=1)؛ فایلِ ناجورِ رسیده از سرور نمونه‌گیری می‌شود */
+  private const val LOAD_SIDE = 1600
 
   private fun dir(context: Context): File =
     File(context.filesDir, "product-photos").apply { if (!exists()) mkdirs() }
@@ -43,9 +46,7 @@ object PhotoStore {
 
   /** عکسِ انتخاب‌شده را کوچک و فشرده می‌کند و کنار شناسهٔ محصول می‌گذارد */
   fun save(context: Context, productId: String, source: Uri): Result<Unit> = runCatching {
-    val bitmap = context.contentResolver.openInputStream(source).use { stream ->
-      requireNotNull(BitmapFactory.decodeStream(stream)) { "عکس خوانده نشد" }
-    }
+    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { "عکس خوانده نشد" }
     val scaled = shrink(bitmap)
     file(context, productId).outputStream().use { out ->
       scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
@@ -77,17 +78,26 @@ object PhotoStore {
   }
 
   /**
-   *  خواندنِ عکسِ انتخاب‌شده برای استودیو — عکسِ ۱۲ مگاپیکسلیِ دوربین
-   *  اول با `inSampleSize` تا حدودِ ۲۴۰۰ پیکسل کوچک خوانده می‌شود، وگرنه
-   *  ۴۸ مگابایت حافظه می‌گرفت.
+   *  خواندنِ عکسِ انتخاب‌شده — اول فقط ابعاد، بعد با `inSampleSize` تا حدودِ `side`
+   *  (استودیو ۲۴۰۰، عکسِ کالا و نشانِ حساب ۸۰۰). عکسِ ۱۲ مگاپیکسلیِ دوربین ۴۸ مگابایت
+   *  حافظه نمی‌گیرد و «بمبِ فشرده» (فایلِ کوچک با ابعادِ ده‌ها هزار پیکسلی) هرگز تمام‌اندازه
+   *  رمزگشایی نمی‌شود (IMG-PRO-09). فایلِ بی ابعاد ⇒ null.
    */
-  fun decode(context: Context, source: Uri): Bitmap? = runCatching {
+  fun decode(context: Context, source: Uri, side: Int = 2400): Bitmap? = runCatching {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(source).use { BitmapFactory.decodeStream(it, null, bounds) }
-    var sample = 1
-    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= 2400) sample *= 2
-    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    val opts = BitmapFactory.Options().apply { inSampleSize = ImagePrep.sampleSize(bounds.outWidth, bounds.outHeight, side) }
     context.contentResolver.openInputStream(source).use { BitmapFactory.decodeStream(it, null, opts) }
+  }.getOrNull()
+
+  /** همان، برای فایلِ روی دستگاه (عکسی که از سرور رسیده هم از این‌جا می‌گذرد) */
+  private fun decodeFile(f: File, side: Int): Bitmap? = runCatching {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(f.absolutePath, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return@runCatching null
+    val opts = BitmapFactory.Options().apply { inSampleSize = ImagePrep.sampleSize(bounds.outWidth, bounds.outHeight, side) }
+    BitmapFactory.decodeFile(f.absolutePath, opts)
   }.getOrNull()
 
   fun toStudio(bitmap: Bitmap): PhotoStudio.Image {
@@ -103,7 +113,7 @@ object PhotoStore {
   fun load(context: Context, productId: String): Bitmap? {
     val f = file(context, productId)
     if (!f.exists()) return null
-    return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
+    return decodeFile(f, LOAD_SIDE)
   }
 
   fun delete(context: Context, productId: String) {
@@ -164,9 +174,7 @@ object PhotoStore {
     File(context.filesDir, "account-avatar-${safeKey(accountId)}.jpg")
 
   fun saveAvatar(context: Context, accountId: String, source: Uri): Result<Unit> = runCatching {
-    val bitmap = context.contentResolver.openInputStream(source).use { stream ->
-      requireNotNull(BitmapFactory.decodeStream(stream)) { "عکس خوانده نشد" }
-    }
+    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { "عکس خوانده نشد" }
     val scaled = shrink(bitmap)
     avatar(context, accountId).outputStream().use { out ->
       scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
@@ -178,7 +186,7 @@ object PhotoStore {
   fun loadAvatar(context: Context, accountId: String): Bitmap? {
     val f = avatar(context, accountId)
     if (!f.exists()) return null
-    return runCatching { BitmapFactory.decodeFile(f.absolutePath) }.getOrNull()
+    return decodeFile(f, LOAD_SIDE)
   }
 
   fun deleteAvatar(context: Context, accountId: String) {

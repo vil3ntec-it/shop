@@ -10,6 +10,9 @@ package ir.vil3ntec.tohid.core.storefront
  *           به کیلومتر، ۰٫۰۵ تا ۵۰)، با هزینه، حداقل و «رایگان از…» ِ اختیاری.
  *  بازه ─── روش، روزها، «10:00-12:00»، ظرفیت (۱ تا ۱۰۰۰) و مهلت (دقیقه)؛ دو
  *           بازهٔ فعالِ یک روش در یک روز روی هم نمی‌افتند.
+ *  هزینه ── (مهاجرتِ ۱۳۸) «هزینهٔ سبدِ کوچک» ِ ناحیه (CHK-06): سبدِ زیرِ حداقل به‌جای
+ *           رد با این مبلغ پذیرفته می‌شود — بی حداقل معنا ندارد. «هزینهٔ بازه» (CHK-07،
+ *           زمانِ تحویل): فقط برای «ارسال»؛ «دریافت از دکان» همیشه صفر می‌فرستد.
  */
 object StorefrontDelivery {
 
@@ -22,6 +25,8 @@ object StorefrontDelivery {
     val fee: String = "0",
     val min: String = "0",
     val free: String = "",
+    /** هزینهٔ سبدِ کوچک (اختیاری؛ خالی ⇒ زیرِ حداقل رد) */
+    val small: String = "",
     val center: String = "",
     val radiusKm: String = "2",
     val polygon: String = "",
@@ -35,17 +40,20 @@ object StorefrontDelivery {
     val range: String = "10:00-12:00",
     val capacity: String = "5",
     val cutoff: String = "60",
+    /** هزینهٔ اضافهٔ این بازه (فقط ارسال) */
+    val fee: String = "0",
     val active: Boolean = true,
   )
 
   data class ZoneOut(
     val name: String, val kind: String, val feeMinor: Long, val minOrderMinor: Long, val freeOverMinor: Long?,
     val center: LatLng?, val radiusM: Int?, val polygon: List<LatLng>, val active: Boolean,
+    val smallBasketFeeMinor: Long? = null,
   )
 
   data class RuleOut(
     val fulfillment: String, val weekdays: List<Int>, val startMin: Int, val endMin: Int,
-    val capacity: Int, val cutoffMin: Int, val active: Boolean,
+    val capacity: Int, val cutoffMin: Int, val active: Boolean, val feeMinor: Long = 0,
   )
 
   /** خطاها به کلیدِ کادر: «z0.name»، «r1.range»، «slotDays» … */
@@ -119,6 +127,9 @@ object StorefrontDelivery {
       val fee = money("$k.fee", z.fee, StorefrontOwner.MAX_FEE_MINOR) ?: 0L
       val min = money("$k.min", z.min) ?: 0L
       val free = money("$k.free", z.free)
+      //  CHK-06: خالی ⇒ null (زیرِ حداقل رد)؛ صفر هم یعنی «نه» تا سرور صفر را رد نکند
+      val small = money("$k.small", z.small, StorefrontOwner.MAX_FEE_MINOR)?.takeIf { it > 0 }
+      if (small != null && min == 0L) e["$k.small"] = "اول حداقلِ سفارش را بنویسید؛ این هزینه به‌جای ردِ زیرِ آن است"
       var center: LatLng? = null
       var radius: Int? = null
       var poly: List<LatLng> = emptyList()
@@ -131,7 +142,7 @@ object StorefrontDelivery {
         val (pts, err) = parsePolygon(z.polygon)
         if (err != null) e["$k.polygon"] = err else poly = pts!!
       }
-      ZoneOut(z.name.trim().take(60), if (z.kind == "radius") "radius" else "polygon", fee, min, free, center, radius, poly, z.active)
+      ZoneOut(z.name.trim().take(60), if (z.kind == "radius") "radius" else "polygon", fee, min, free, center, radius, poly, z.active, small)
     }
 
     val rs = rules.mapIndexed { i, r ->
@@ -143,8 +154,11 @@ object StorefrontDelivery {
       if (cap == null || cap < 1 || cap > 1000) e["$k.capacity"] = "۱ تا ۱۰۰۰"
       val cut = StorefrontOwner.asciiDigits(r.cutoff.ifBlank { "0" }).toIntOrNull()
       if (cut == null || cut < 0 || cut > 10080) e["$k.cutoff"] = "۰ تا ۱۰۰۸۰ دقیقه"
-      RuleOut(if (r.fulfillment == "pickup") "pickup" else "delivery", r.weekdays.sorted(),
-        range?.first ?: 0, range?.second ?: 0, cap ?: 0, cut ?: 0, r.active)
+      val pickup = r.fulfillment == "pickup"
+      //  CHK-07: «دریافت از دکان» هزینهٔ بازه ندارد ⇒ همیشه صفر، کادرش هم دیده نمی‌شود
+      val fee = if (pickup) 0L else money("$k.fee", r.fee.ifBlank { "0" }, StorefrontOwner.MAX_FEE_MINOR) ?: 0L
+      RuleOut(if (pickup) "pickup" else "delivery", r.weekdays.sorted(),
+        range?.first ?: 0, range?.second ?: 0, cap ?: 0, cut ?: 0, r.active, fee)
     }
 
     val days = StorefrontOwner.asciiDigits(slotDays).toIntOrNull()
@@ -162,5 +176,6 @@ object StorefrontDelivery {
     append(" · ارسال ").append(StorefrontOwner.toFa(StorefrontOwner.formatMinor(z.feeMinor))).append(" افغانی")
     if (z.minOrderMinor > 0) append(" · حداقل ").append(StorefrontOwner.toFa(StorefrontOwner.formatMinor(z.minOrderMinor)))
     z.freeOverMinor?.let { append(" · رایگان از ").append(StorefrontOwner.toFa(StorefrontOwner.formatMinor(it))) }
+    z.smallBasketFeeMinor?.let { append(" · سبدِ کوچک ").append(StorefrontOwner.toFa(StorefrontOwner.formatMinor(it))) }
   }
 }

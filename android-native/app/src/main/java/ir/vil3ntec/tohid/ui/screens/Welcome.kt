@@ -414,7 +414,7 @@ fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
     SavedLogins.remember(context, identifier, display)
     //  نقش را همین‌جا می‌دانیم؛ صبر کردن تا اولین پرسشِ سرور یعنی
     //  شاگرد یک لحظه تنظیمات را باز می‌بیند
-    session.shop?.role?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
+    session.shop?.effectiveRole?.let { ir.vil3ntec.tohid.data.ShopRole.remember(context, it) }
     /*
      *  پیش از هر چیز، دفترِ روی گوشی باید مالِ همین حساب باشد.
      *

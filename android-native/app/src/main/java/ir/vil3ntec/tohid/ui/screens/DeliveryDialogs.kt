@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.core.delivery.Mission
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderDraft
+import ir.vil3ntec.tohid.core.pick.HandoverCode
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.DeliveryWire
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
@@ -250,7 +251,8 @@ internal fun AutoAssignDialog(
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
           is ApiResult.Failure -> {
-            if (r.error.code == "cash_cap_exceeded") { replan = true; break@picks }
+            //  دستگاهِ دیگری زودتر سپرد: سقفِ نقد یا سقفِ کارِ هم‌زمان (DLV-03) پر شد ⇒ تازه و دوباره
+            if (r.error.code == "cash_cap_exceeded" || r.error.code == "courier_busy") { replan = true; break@picks }
             bad += "#${pick.orderNo}: ${r.error.userMessage}"
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
@@ -427,7 +429,7 @@ internal fun MissionActionDialog(
         }
         if (needCode) {
           TohidTextField(
-            code, { code = it.filter { ch -> ch.isDigit() }.take(6) }, label = "کدِ تحویلِ مشتری",
+            code, { raw -> code = scannedCode(raw, m.orderNo, cfg.picking) { err = it } }, label = "کدِ تحویلِ مشتری",
             supporting = if (cfg.perms.assign) "مشتری کد ندارد؟ خالی بگذارید و توضیح بنویسید (تأییدِ دستیِ مدیر)" else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
           )
@@ -449,9 +451,12 @@ internal fun MissionActionDialog(
   }
 }
 
-/** کدِ دریافت/تحویل فقط همین یک بار دیده می‌شود (سرور فقط HMACش را دارد) */
+/**
+ *  کدِ دریافت/تحویل فقط همین یک بار دیده می‌شود (سرور فقط HMACش را دارد). با پرچمِ جمع‌آوری
+ *  (`qr`، PCK-11) QRِ همان کد هم هست تا مشتری عکسش را بگیرد و دکان با اسکن سفارش را پیدا کند.
+ */
 @Composable
-internal fun CodeOnceDialog(orderNo: Long, code: String, onDismiss: () -> Unit) {
+internal fun CodeOnceDialog(orderNo: Long, code: String, qr: Boolean = false, onDismiss: () -> Unit) {
   val c = Shop.colors
   val clipboard = LocalClipboardManager.current
   AlertDialog(
@@ -461,9 +466,14 @@ internal fun CodeOnceDialog(orderNo: Long, code: String, onDismiss: () -> Unit) 
     text = {
       Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Text(code, fontSize = 34.sp, fontWeight = FontWeight.Bold, color = c.text, letterSpacing = 6.sp)
+        if (qr) {
+          Spacer(Modifier.height(8.dp))
+          HandoverQr(orderNo, code)
+        }
         Spacer(Modifier.height(8.dp))
         Text(
-          "این کد را به مشتری بدهید (پیامک یا تلفن). دوباره نشان داده نمی‌شود؛ اگر گم شد «کدِ تازه» بزنید.",
+          if (qr) "کد یا QR را به مشتری بدهید (عکس، پیامک یا تلفن). در دکان QR را اسکن کنید. دوباره نشان داده نمی‌شود؛ اگر گم شد «کدِ تازه» بزنید."
+          else "این کد را به مشتری بدهید (پیامک یا تلفن). دوباره نشان داده نمی‌شود؛ اگر گم شد «کدِ تازه» بزنید.",
           style = MaterialTheme.typography.bodySmall, color = c.muted,
         )
       }
@@ -495,17 +505,36 @@ internal fun ColumnScope.PickupTab(
   val scope = rememberCoroutineScope()
   var query by remember { mutableStateOf("") }
   var handover by remember { mutableStateOf<Pair<OrderDto, Mission>?>(null) }
+  var scanHit by remember { mutableStateOf("") }
   var shownCode by remember { mutableStateOf<Pair<Long, String>?>(null) }
   var newCodeFor by remember { mutableStateOf<Mission?>(null) }
   var busyId by remember { mutableStateOf<String?>(null) }
   val pickupKeys = remember { HashMap<String, DeliveryRepository.OnceKey>() }
+
+  /**
+   *  PCK-11، S43: QRِ مشتری در جست‌وجو اسکن شد ⇐ همان سفارش، و اگر آمادهٔ دریافت است و کدش باز،
+   *  برگهٔ تحویل با کدِ همان اسکن باز می‌شود؛ وگرنه فقط فهرست به همان سفارش می‌رسد.
+   */
+  fun onSearch(raw: String) {
+    val scan = if (cfg.picking) HandoverCode.parse(raw) else null
+    val no = scan?.orderNo
+    val code = scan?.code
+    if (no == null || code == null) { query = raw; return }
+    query = no.toString()
+    val o = d.pickups.firstOrNull { it.orderNo == no } ?: return
+    val m = d.missionOf(o.id)?.takeIf { it.mode == "pickup" } ?: return
+    if (writable && DeskActions.Act.PICKUP_HANDOVER in DeskActions.of(m.copy(orderStatus = o.status), cfg.perms)) {
+      scanHit = code
+      handover = o to m
+    }
+  }
 
   val q = OrderDraft.latin(query).removePrefix("#").trim()
   val list = d.pickups.filter { o ->
     q.isEmpty() || o.orderNo.toString().contains(q) || o.customer.name.contains(query.trim(), ignoreCase = true)
   }
 
-  SearchBox(query, { query = it }, "شمارهٔ سفارش یا نامِ مشتری", Modifier.fillMaxWidth())
+  SearchBox(query, { onSearch(it) }, if (cfg.picking) "شمارهٔ سفارش، نامِ مشتری یا اسکنِ QR" else "شمارهٔ سفارش یا نامِ مشتری", Modifier.fillMaxWidth())
   Spacer(Modifier.height(8.dp))
   if (list.isEmpty()) {
     TohidEmptyState(
@@ -563,7 +592,7 @@ internal fun ColumnScope.PickupTab(
             if (m != null) {
               DeskActions.of(m.copy(orderStatus = o.status), cfg.perms).forEach { a ->
                 when (a) {
-                  DeskActions.Act.PICKUP_HANDOVER -> TohidButton(DeskActions.label(a), onClick = { handover = o to m })
+                  DeskActions.Act.PICKUP_HANDOVER -> TohidButton(DeskActions.label(a), onClick = { scanHit = ""; handover = o to m })
                   DeskActions.Act.NEW_CODE -> TohidSecondaryButton(DeskActions.label(a), onClick = { newCodeFor = m })
                   else -> {}
                 }
@@ -584,6 +613,7 @@ internal fun ColumnScope.PickupTab(
         onChanged()
         scope.launch { snackbar.showSnackbar(msg) }
       },
+      scanned = scanHit,
     )
   }
   newCodeFor?.let { m ->
@@ -602,7 +632,21 @@ internal fun ColumnScope.PickupTab(
       onDismiss = { newCodeFor = null },
     )
   }
-  shownCode?.let { (no, code) -> CodeOnceDialog(no, code) { shownCode = null } }
+  shownCode?.let { (no, code) -> CodeOnceDialog(no, code, qr = cfg.picking) { shownCode = null } }
+}
+
+/**
+ *  پالایهٔ کادرِ کدِ تحویل. پرچمِ جمع‌آوری خاموش ⇒ همان رفتارِ پیشین (فقط رقم، تا شش‌تا).
+ *  روشن (PCK-11) ⇒ QRِ اسکن‌شده و رقمِ فارسی هم؛ QRِ سفارشِ دیگر کادر را خالی می‌کند و خطا می‌گوید.
+ */
+internal fun scannedCode(raw: String, orderNo: Long, picking: Boolean, onError: (String) -> Unit): String {
+  if (!picking) return raw.filter { ch -> ch.isDigit() }.take(6)
+  val other = HandoverCode.otherOrder(raw, orderNo)
+  if (other != null) {
+    onError("این QR مالِ سفارش #$other است، نه #$orderNo")
+    return ""
+  }
+  return HandoverCode.typed(raw)
 }
 
 @Composable
@@ -614,10 +658,12 @@ private fun PickupHandoverDialog(
   ordersRepo: OrdersRepository,
   onDismiss: () -> Unit,
   onDone: (String) -> Unit,
+  scanned: String = "",
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
-  var code by remember { mutableStateOf("") }
+  //  PCK-11: با اسکنِ QR در جست‌وجو، کد از همان اسکن می‌آید (کارمند فقط نام را تطبیق می‌دهد)
+  var code by remember { mutableStateOf(scanned) }
   var manual by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf("") }
   var cash by remember { mutableStateOf(if (m.expectedCollectMinor > 0) fieldOf(m.expectedCollectMinor) else "0") }
@@ -637,7 +683,8 @@ private fun PickupHandoverDialog(
       Text(order.customer.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = c.text)
       if (!manual) {
         TohidTextField(
-          code, { code = it.filter { ch -> ch.isDigit() }.take(6) }, label = "کدی که مشتری نشان می‌دهد (۶ رقم)",
+          code, { raw -> code = scannedCode(raw, order.orderNo, cfg.picking) { err = it } },
+          label = if (cfg.picking) "کد یا QRی که مشتری نشان می‌دهد (۶ رقم)" else "کدی که مشتری نشان می‌دهد (۶ رقم)",
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
       }

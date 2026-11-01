@@ -58,7 +58,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    *  نتیجهٔ بازیابی. `STALE` یعنی ژورنالی که دیگر به سایهٔ امروز نمی‌خورد
    *  (پاک نشده بود): کنار می‌رود و به هیچ چیزی دست نمی‌زند.
    */
-  enum class Outcome { NONE, ALREADY, FORWARD, BACK, STALE, MISMATCH }
+  enum class Outcome { NONE, ALREADY, FORWARD, BACK, STALE, MISMATCH, PENDING }
 
   /**
    *  ثبتِ محلی: تفاضلِ دفترِ تازه با سایه ⇐ opها در صف و سایهٔ تازه، با هم.
@@ -68,8 +68,8 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    */
   fun record(data: ShopData): Int {
     //  ژورنالی که هنگامِ شروع بازیابی نشد (نباید پیش بیاید) — دفترِ آن لحظه
-    //  دیگر روی دیسک نیست؛ `recover` بی دفتر هم تصمیمِ امن می‌گیرد
-    if (journal.exists()) recover(null)
+    //  دیگر روی دیسک نیست؛ `recover` بی دفتر هم تصمیمِ امن می‌گیرد (ساختنِ دوباره: با همین دفتر)
+    settle(data)
     val before = parts.shadow()
     val tree = LedgerDiff.toJson(data)
     val shadow = parse(before)
@@ -97,7 +97,8 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    */
   fun recordOps(ops: List<SyncOp>): Int {
     if (ops.isEmpty()) return 0
-    if (journal.exists()) recover(null)
+    //  §۹.۵: ژورنالِ «ساختنِ دوباره» بی دفتر تصمیم‌پذیر نیست ⇒ پرتاب، نه رونویسیِ آن (`settle`)
+    settle(null)
     val before = parts.shadow()
     val shadow = parse(before) ?: return 0
     commitOps(ops, before, LedgerDiff.shadowOf(LedgerDiff.applyRemote(shadow, ops)).toString())
@@ -106,7 +107,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
 
   /** کلِ دفتر یک‌جا — فقط دستگاهِ نخست (`SyncV1Engine.baseline`). */
   fun baseline(data: ShopData): Int {
-    if (journal.exists()) recover(null)
+    settle(data)
     val before = parts.shadow()
     val tree = LedgerDiff.toJson(data)
     val ops = LedgerDiff.diff(null, tree)
@@ -130,7 +131,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    *  @return چند ردیف از سایه بیرون آمد؛ `0` اگر هنوز سایه‌ای نیست
    */
   fun forget(gone: Map<String, Collection<String>>): Int {
-    if (journal.exists()) recover(null)
+    settle(null)
     val shadow = parse(parts.shadow()) ?: return 0
     var removed = 0
     val next = JsonObject(
@@ -145,6 +146,17 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     if (removed == 0) return 0
     parts.commit(next.toString(), null)
     return removed
+  }
+
+  /**
+   *  ژورنالِ مانده پیش از ثبت/بایگانی. ژورنالِ «ساختنِ دوباره» بی دفتر تصمیم‌پذیر نیست
+   *  (`recover(null)` ⇒ `PENDING`، پاک نمی‌شود): با دفترِ همین حالا، وگرنه پرتاب — سایهٔ کهنه
+   *  کنارِ دفترِ تازه یعنی DELETE و `$inc`ِ ساختگی برای همه.
+   */
+  private fun settle(data: ShopData?) {
+    if (!journal.exists()) return
+    if (recover(null) != Outcome.PENDING) return
+    if (data == null || recover(data) == Outcome.PENDING) throw IOException("ساختنِ دوبارهٔ دفتر نیمه‌کاره مانده است")
   }
 
   /** ژورنال ⇐ صف ⇐ سایه (همزمان) ⇐ پاک کردنِ ژورنال */
@@ -178,6 +190,45 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     writeLedger(ledger)
     parts.commit(shadow, cursor)
     journal.clear()
+  }
+
+  /**
+   *  §۹.۵ — ساختنِ دوبارهٔ دفتر پس از بازیابیِ سرور (`V1Restore.rebuild`، `SyncV3Engine.rebuild`):
+   *  دفتر و سایه از `RestoreMerge.merge` (Snapshot + ردیف‌های تنهای این دستگاه؛ سایه بی آن‌ها)،
+   *  cursor = سرِ Snapshot. ژورنال ⇐ دفتر ⇐ سایه + cursor ⇐ پاک کردنِ ژورنال.
+   *
+   *  ژورنال **خودِ سایهٔ تازه** را هم دارد (یک بار در هر بازیابی، نه هر ثبت) و اثرِ انگشتِ دفترِ
+   *  پیش از کار: بسته شدن یا شکست در میانه ⇒ `recover` با دفترِ روی دیسک — همان دفترِ پیشین ⇒
+   *  هیچ چیزی عوض نشده (دورِ بعد دوباره)؛ دفترِ تازه (حتی با ویرایشی پس از آن) ⇒ سایهٔ تازه.
+   *
+   *  @param ledgerTree دفترِ تازه (از درِ مدل)
+   *  @param shadowTree سایهٔ تازه (همان دفتر بی ردیف‌های تنها)
+   *  @param cursor سرِ همان Snapshot
+   *  @return دفتری که نوشته شد
+   */
+  fun rebuild(
+    ledgerTree: JsonObject,
+    shadowTree: JsonObject,
+    current: ShopData,
+    cursor: Long,
+    writeLedger: (ShopData) -> Unit,
+  ): ShopData {
+    if (journal.exists()) recover(current)
+    val ledger = LedgerDiff.fromJson(ledgerTree)
+    val tree = LedgerDiff.toJson(ledger)
+    val before = parts.shadow()
+    val shadow = LedgerDiff.shadowOf(shadowTree).toString()
+    journal.write(
+      Journal.Entry(
+        Journal.REBUILD, before = sha(before), shadow = sha(shadow),
+        ledger = sha(tree.toString()), cursor = cursor,
+        from = sha(LedgerDiff.toJson(current).toString()), next = shadow,
+      ),
+    )
+    writeLedger(ledger)
+    parts.commit(shadow, cursor)
+    journal.clear()
+    return ledger
   }
 
   fun pending(): Boolean = journal.exists()
@@ -258,6 +309,8 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    */
   fun recover(ledger: ShopData?): Outcome {
     val j = journal.read()
+    //  ساختنِ دوباره بی دفترِ همین حالا تصمیم‌پذیر نیست: ژورنال می‌ماند (`settle`)
+    if (j != null && j.stage == Journal.REBUILD && ledger == null && sha(parts.shadow()) == j.before) return Outcome.PENDING
     if (j == null) {
       if (!journal.exists()) return Outcome.NONE
       //  ژورنالِ نصفه: پیش از نقطهٔ commit بسته شده؛ چیزی عوض نشده بود
@@ -305,10 +358,37 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         }
       }
 
+      j.stage == Journal.REBUILD -> {
+        val onDisk = LedgerDiff.toJson(ledger!!).toString().let(::sha)
+        when {
+          //  دفترِ پیشین سرِ جایش است ⇒ هیچ چیزی عوض نشده؛ «در انتظارِ ساختنِ دوباره» می‌ماند
+          onDisk == j.from && onDisk != j.ledger -> Outcome.BACK
+          sha(j.next) != j.shadow -> Outcome.MISMATCH
+          //  دفترِ تازه نشسته (یا همان به‌اضافهٔ ویرایشی پس از آن) ⇒ سایهٔ تازه
+          onDisk == j.ledger || closer(ledger, j.next, current) -> {
+            parts.commit(j.next, j.cursor)
+            Outcome.FORWARD
+          }
+          else -> Outcome.BACK
+        }
+      }
+
       else -> Outcome.BACK
     }
     journal.clear()
     return outcome
+  }
+
+  /**
+   *  ژورنالِ «ساختنِ دوباره» و دفتری که نه پیشین است نه تازه (ویرایشی پس از شکست): به کدام
+   *  سایه نزدیک‌تر است؟ ویرایشِ کاربر چند op است؛ فاصلهٔ دفترِ پیش از بازیابی تا Snapshot همهٔ
+   *  پنجرهٔ برگشته. سایهٔ اشتباه یعنی همان پنجره به‌شکلِ DELETE و `$inc` ِ ساختگی.
+   */
+  private fun closer(ledger: ShopData, next: String, before: String): Boolean {
+    val tree = LedgerDiff.toJson(ledger)
+    val toNext = parse(next)?.let { LedgerDiff.diff(it, tree, 0).size } ?: return false
+    val toBefore = parse(before)?.let { LedgerDiff.diff(it, tree, 0).size } ?: return true
+    return toNext <= toBefore
   }
 
   /** سایه پس از opهای رسیده — همان قاعدهٔ `absorbRemote` */
@@ -340,6 +420,9 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
       val ledger: String = "",
       val cursor: Long? = null,
       val ops: List<SyncOp> = emptyList(),
+      /** فقط ساختنِ دوباره: اثرِ انگشتِ دفترِ پیش از کار و خودِ سایهٔ تازه */
+      val from: String = "",
+      val next: String = "",
     )
 
     fun exists(): Boolean = file.exists()
@@ -352,7 +435,9 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         put("shadow", JsonPrimitive(e.shadow))
         put("ledger", JsonPrimitive(e.ledger))
         e.cursor?.let { put("cursor", JsonPrimitive(it)) }
-        put("ops", JsonArray(e.ops.map { it.toJson() }))
+        put("ops", JsonArray(e.ops.map { it.toJournalJson() }))
+        if (e.from.isNotEmpty()) put("from", JsonPrimitive(e.from))
+        if (e.next.isNotEmpty()) put("next", JsonPrimitive(e.next))
       }.toString().toByteArray(Charsets.UTF_8)
       file.parentFile?.mkdirs()
       if (file.exists() && !file.delete()) throw IOException("ژورنالِ کهنه پاک نشد")
@@ -374,6 +459,8 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
           ledger = (o["ledger"] as? JsonPrimitive)?.content.orEmpty(),
           cursor = (o["cursor"] as? JsonPrimitive)?.content?.toLongOrNull(),
           ops = (o["ops"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(SyncOp::fromJson) },
+          from = (o["from"] as? JsonPrimitive)?.content.orEmpty(),
+          next = (o["next"] as? JsonPrimitive)?.content.orEmpty(),
         )
       }.getOrNull()
     }
@@ -387,6 +474,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     companion object {
       const val RECORD = "record"
       const val ABSORB = "absorb"
+      const val REBUILD = "rebuild"
     }
   }
 

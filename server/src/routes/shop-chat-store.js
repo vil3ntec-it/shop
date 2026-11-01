@@ -4,6 +4,8 @@
  *
  * هویتِ مشتری = شمارهٔ تأییدشده با بلیتِ ویترین (سرآیندِ `X-Store-Ticket`)،
  * همان که ویترین (PR #244، `lib/storefront.js`) پس از کدِ یک‌بارمصرف می‌دهد.
+ * با پرچمِ سراسریِ `market.account` (پیش‌فرض خاموش) نشستِ حساب (`X-Store-Session`)
+ * هم پذیرفته است و گفت‌وگو به شناسهٔ حساب گره می‌خورد (S9).
  * قراردادی که این‌جا از ویترین لازم است، فقط دو تابع:
  *
  *   open(slug)            ⇒ ردیفِ ویترینِ روشن با `shop_id` — یا خطای ۴۰۴
@@ -21,15 +23,18 @@
 const express = require('express');
 const config = require('../config');
 const chat = require('../lib/shop-chat');
-const { rateLimit } = require('../middleware/ratelimit');
+const { goneSignal } = require('../lib/chat-wait');
+const { rateLimit, refund } = require('../middleware/ratelimit');
 const { ApiError, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 
-const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${req.chatViewer.phone}` : '');
+//  شماره با کلیدِ یکتا (RSK-07): شکلِ دیگرِ همان گوشی سطلِ تازه نمی‌گیرد
+const viewerKey = (req) => (req.chatViewer ? `${req.chatViewer.shopId}:${require('../lib/validate').phoneKey(req.chatViewer.phone)}` : '');
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-chat-read' });
-const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey });
-const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'store-chat-upload', key: viewerKey });
+//  تکرارِ همان پیام/همان بایت سهمیه را پس می‌دهد (CHAT-11) ⇒ `refundable`
+const sendLimit = rateLimit({ max: config.shopChat.sendMax, keyPrefix: 'store-chat-send', key: viewerKey, refundable: true });
+const uploadLimit = rateLimit({ max: config.shopChat.uploadMax, keyPrefix: 'store-chat-upload', key: viewerKey, refundable: true });
 
 /** ماژولِ ویترین — اگر هنوز روی این سرور نیست، null (نه خطای ۵۰۰). */
 function storefront() {
@@ -49,6 +54,14 @@ const customer = async (req, res, next) => {
   }
   const store = await sf.open(req.params.slug);
   if (!(await chat.flagOf(store.shop_id))) throw notFound('چت برای این دکان روشن نیست', 'chat_disabled');
+  //  S9: با پرچمِ `market.account` نشستِ حساب هم ⇒ گفت‌وگو به `customer_id` گره می‌خورد
+  const session = req.get('x-store-session') || '';
+  if (session && (await require('../lib/market').accountOn())) {
+    const a = await require('../lib/store-customers').auth(session);
+    if (!a) throw new ApiError(401, 'session_required', 'برای این کار وارد حسابِ خود شوید');
+    req.chatViewer = { side: 'customer', shopId: store.shop_id, phone: a.customer.phone, customerId: a.customer.id };
+    return next();
+  }
   const phone = await sf.verifiedPhoneOfTicket(req.get('x-store-ticket') || '');
   if (!phone) throw new ApiError(401, 'verification_required', 'برای چت با دکان، شمارهٔ خود را تأیید کنید');
   req.chatViewer = { side: 'customer', shopId: store.shop_id, phone };
@@ -76,14 +89,15 @@ router.get(`${base}/conversations/:id`, readLimit, customer, async (req, res) =>
 });
 
 router.get(`${base}/conversations/:id/messages`, readLimit, customer, async (req, res) => {
-  res.json(await chat.changes(v(req), req.params.id, {
-    after: req.query.after, limit: req.query.limit, wait: req.query.wait,
-  }));
+  const out = await chat.changes(v(req), req.params.id, {
+    after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),
+  });
+  if (out) res.json(out); //  null ⇒ کلاینت وسطِ long-poll رفت
 });
 
 router.post(`${base}/conversations/:id/messages`, readLimit, customer, sendLimit, async (req, res) => {
   const out = await chat.send(v(req), req.params.id, req.body);
-  if (out.replayed) res.set('Idempotent-Replayed', 'true');
+  if (out.replayed) { res.set('Idempotent-Replayed', 'true'); refund(req, 'store-chat-send'); }
   res.status(out.replayed ? 200 : 201).json(out);
 });
 
@@ -95,12 +109,23 @@ router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, as
   res.json(await chat.remove(v(req), req.params.id, req.params.mid, req.query.for));
 });
 
+//  سنجاقِ مشتری (CHAT-14) — فقط برای خودش؛ دکان نمی‌بیند
+router.put(`${base}/conversations/:id/pins/:mid`, readLimit, customer, sendLimit, async (req, res) => {
+  res.json({ conversation: await chat.pin(v(req), req.params.id, req.params.mid, true) });
+});
+
+router.delete(`${base}/conversations/:id/pins/:mid`, readLimit, customer, sendLimit, async (req, res) => {
+  res.json({ conversation: await chat.pin(v(req), req.params.id, req.params.mid, false) });
+});
+
 router.post(`${base}/conversations/:id/receipts`, readLimit, customer, async (req, res) => {
   res.json(await chat.receipts(v(req), req.params.id, req.body));
 });
 
 router.post(`${base}/conversations/:id/media`, readLimit, customer, uploadLimit, chat.rawMedia, async (req, res) => {
-  res.status(201).json(await chat.putMedia(v(req), req.params.id, req.body, { role: req.query.role }));
+  const out = await chat.putMedia(v(req), req.params.id, req.body, { role: req.query.role });
+  if (out.reused) refund(req, 'store-chat-upload');
+  res.status(201).json(out);
 });
 
 router.get(`${base}/conversations/:id/media/:mediaId`, readLimit, customer, async (req, res) => {

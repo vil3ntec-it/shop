@@ -4,9 +4,10 @@
  *   فاکتورِ سه‌قلمی: الف ۱ × ۱۵۰، ب ۲ × ۲۵۰، ج ۱ × ۳۵۰ = ۱٬۰۰۰، تخفیفِ ۱۰٪ ⇐ ۹۰۰.
  *   برگشتِ ۱ از ۲ واحدِ «ب» ⇐ ۲۵۰ − ۲۵ = ۲۲۵؛ نقدِ موردِ انتظارِ صندوق ۲۲۵ کم می‌شود؛ برگشتِ
  *   دوباره بیش از فروخته‌شده ممکن نیست؛ برگشت روی فاکتورِ نسیه از قرض کم می‌کند نه از دخل؛
- *   دستگاهِ دوم و سرور همان را می‌بینند (returnedQty با `$inc`، نه «آخرین نوشتن»).
+ *   دستگاهِ دوم و سرور همان را می‌بینند (returnedQty با `$inc`، نه «آخرین نوشتن»). S13.waste همان
+ *   برگشت با جریانِ تازه (`ReturnFlow.post`، RET-07): مقصدِ «ضایعات» موجودی را بالا نمی‌برد.
  *
- * کارها همان `SalesEngine.record/recordReturn` و `CashShift.kt`اند (lib/native.mjs).
+ * کارها همان `SalesEngine.record/recordReturn`، `ReturnFlow.post` و `CashShift.kt`اند (lib/native.mjs).
  * اجرا:  node test/e2e/return.e2e.mjs
  */
 import { boot, assert } from './lib/harness.mjs';
@@ -100,9 +101,60 @@ await E.step('S13.credit', 'برگشت روی فاکتورِ نسیه از قر�
   assert.equal(B.debt(debtor), 350);
 }, { needs: ['S13.0'] });
 
-await E.step('S13.waste', 'S13/RET-07: کالای «خراب» به موجودیِ قابلِ فروش برنمی‌گردد (مقصدِ ضایعات)', async () => {
-  //  ۱۰ − ۲ فروش + ۲ برگشتِ «خراب» ⇒ سند: موجودیِ قابلِ فروش زیاد نمی‌شود ⇐ ۸
-  assert.equal(A.stock(P.b), 8, `برگشتِ «خراب» موجودیِ قابلِ فروش را ${A.stock(P.b)} کرد (مقصدِ «ضایعات» در SalesEngine.recordReturn نیست)`);
-}, { needs: ['S13.3'] });
+await E.step('S13.waste', 'S13/RET-07: برگشتِ تازه با مقصدِ «ضایعات» ⇐ ۲۲۵ نقد؛ موجودیِ قابلِ فروش زیاد نمی‌شود و حرکتِ «ضایعات» ثبت می‌شود', async () => {
+  //  همان فاکتورِ S13.1 (۱٬۰۰۰ با ۱۰٪ ⇐ ۹۰۰)، این بار با جریانِ تازه (`ReturnFlow.post`)
+  const s = A.sell({ lines: [{ id: P.a, qty: 1 }, { id: P.b, qty: 2 }, { id: P.c, qty: 1 }], discountType: 'percent', discountValue: 10 });
+  assert.equal(s.ok, true, s.message);
+  const it = A.ledger.saleItems.find((x) => x.saleId === s.saleId && x.productId === P.b).id;
+  const stock = A.stock(P.b);
+  const cash = A.shiftTotals(A.currentShift()).expected;
+  const r = A.returnFlow(s.saleId, { [it]: { qty: 1, disposition: 'damaged' } }, { reason: 'خراب یا معیوب', mode: 'cash' });
+  assert.equal(r.ok, true, r.code);
+  assert.deepEqual([r.amount, r.cash, r.account], [225, 225, 0]);
+  assert.equal(A.stock(P.b), stock, `برگشتِ «خراب» موجودیِ قابلِ فروش را از ${stock} به ${A.stock(P.b)} برد (مقصدِ «ضایعات»)`);
+  assert.equal(A.shiftTotals(A.currentShift()).expected, cash - 225, 'نقدِ موردِ انتظارِ صندوق ۲۲۵ کم نشد');
+  const entry = A.ledger.warehouseEntries.find((e) => e.refId === r.docId);
+  assert.ok(entry, 'ردیفِ اصلاحیِ «ضایعات» در انبار نیست');
+  assert.deepEqual([entry.productId, entry.units, entry.adjKind, entry.isAdjustment], [P.b, -1, 'damage', true]);
+  const row = A.ledger.returns.find((x) => x.docId === r.docId);
+  assert.deepEqual([row.disposition, row.refund, row.amount, row.reason], ['damaged', 'cash', 225, 'خراب یا معیوب']);
+  assert.ok(A.ledger.stockMovements.some((m) => m.type === 'damage' && m.refId === row.id && m.qty === -1), 'حرکتِ «ضایعات» ثبت نشد');
+  //  همان سند دوباره ثبت نمی‌شود؛ بیش از «قابلِ برگشت» رد می‌شود (بریده نمی‌شود)
+  assert.equal(A.returnFlow(s.saleId, { [it]: { qty: 1, disposition: 'damaged' } }, { reason: 'خراب یا معیوب', docId: r.docId }).code, 'ALREADY_POSTED');
+  assert.equal(A.returnFlow(s.saleId, { [it]: { qty: 2, disposition: 'damaged' } }, { reason: 'خراب یا معیوب' }).code, 'QTY_EXCEEDS');
+  //  واحدِ دوم «به موجودی» ⇐ موجودی یکی بالا می‌رود (فرقِ دو مقصد)
+  const back = A.returnFlow(s.saleId, { [it]: { qty: 1, disposition: 'restock' } }, { reason: 'پشیمانیِ مشتری' });
+  assert.equal(back.ok, true, back.code);
+  assert.equal(A.stock(P.b), stock + 1);
+  //  دستگاهِ دوم و سرور همان سند، همان ضایعات و همان موجودی
+  await A.drain();
+  await B.drain();
+  assert.equal(B.stock(P.b), A.stock(P.b), 'موجودیِ «ب» روی دستگاهِ دوم');
+  assert.equal(B.ledger.warehouseEntries.find((e) => e.refId === r.docId)?.adjKind, 'damage');
+  assert.equal(B.ledger.saleItems.find((x) => x.id === it).returnedQty, 2);
+  const srvReturn = (await rows('returns')).find((x) => x.data.docId === r.docId);
+  assert.deepEqual([srvReturn?.data.disposition, srvReturn?.data.amount], ['damaged', 225]);
+  const srvEntry = (await rows('warehouseEntries')).find((x) => x.data.refId === r.docId);
+  assert.deepEqual([srvEntry?.data.adjKind, srvEntry?.data.units], ['damage', -1]);
+}, { needs: ['S13.0'] });
+
+await E.step('S13.credit.v2', 'RET-06: برگشتِ تازه روی فاکتورِ نسیه ⇐ اول از بدهیِ همان فاکتور (رسیدِ customer_return)، دخل دست نمی‌خورد', async () => {
+  const debtor = A.addDebtor('نادر');
+  const s = A.sell({ lines: [{ id: P.c, qty: 2 }], payment: 'credit', debtorId: debtor, paid: 0 });
+  assert.equal(s.ok, true, s.message);
+  const it = A.ledger.saleItems.find((x) => x.saleId === s.saleId).id;
+  const cash = A.shiftTotals(A.currentShift()).expected;
+  const r = A.returnFlow(s.saleId, { [it]: { qty: 1, disposition: 'restock' } }, { reason: 'اشتباه در فروش' });
+  assert.equal(r.ok, true, r.code);
+  assert.deepEqual([r.amount, r.account, r.cash], [350, 350, 0]);
+  assert.equal(A.debt(debtor), 350);
+  assert.equal(A.shiftTotals(A.currentShift()).expected, cash, 'برگشتِ نسیه نباید از دخل کم کند');
+  const receipt = A.ledger.transactions.find((t) => t.refId === r.docId);
+  assert.deepEqual([receipt?.type, receipt?.kind, receipt?.amount], ['receive', 'customer_return', 350]);
+  await A.drain();
+  await B.drain();
+  assert.equal(B.debt(debtor), 350);
+  assert.equal(B.ledger.sales.find((x) => x.id === s.saleId).debtSettled, 350);
+}, { needs: ['S13.0'] });
 
 await E.finish();

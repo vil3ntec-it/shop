@@ -74,8 +74,9 @@ fun CheckoutDialog(
   promo: ir.vil3ntec.tohid.data.PromoEngine.Outcome? = null,
   /** POS-14 — ثبت در جریان است ⇒ دکمه تا پایانش قفل */
   busy: Boolean = false,
-  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
+  /** POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر؛ [presetAmount] ⇒ مبلغ به افغانی، POS-20) */
   presetDiscount: String = "",
+  presetAmount: Boolean = false,
   /** شناسهٔ فاکتورِ همین سبد (`CartStore.saleKey`) — برگهٔ تأیید به آن بسته است */
   saleKey: String? = null,
 ) {
@@ -86,7 +87,7 @@ fun CheckoutDialog(
   // باز می‌شود؛ وگرنه «نقدی». تخفیف هم پیش‌فرض درصدی است.
   val preset = presetDebtorId?.takeIf { id -> d.debtors.any { it.id == id } }
 
-  var discountType by remember { mutableStateOf(SalesEngine.DiscountType.PERCENT) }
+  var discountType by remember { mutableStateOf(if (presetAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT) }
   var payment by remember { mutableStateOf(if (preset != null) SalesEngine.Payment.CREDIT else SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf(presetDiscount.ifBlank { "0" }) }
   var debtorId by remember { mutableStateOf(preset) }
@@ -110,10 +111,13 @@ fun CheckoutDialog(
   //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
   var approval by remember { mutableStateOf<ApprovalSlip.Slip?>(null) }
   var askApproval by remember { mutableStateOf(false) }
+  //  POS-21 (پشتِ `LinePolicy.on`، پیش‌فرض خاموش): قیمتِ دستیِ زیرِ فهرست و تخفیفِ ردیف هم تخفیف‌اند
+  val lineGate = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
+  val basis = DiscountGate.basis(lineGate, d, cart, promo, totals)
   val decision = ir.vil3ntec.tohid.data.ShopRole.decide(
-    context, "sales.discount", DiscountGate.req(totals.discount, totals.subtotal),
+    context, "sales.discount", DiscountGate.req(basis.discount, basis.subtotal),
   )
-  val gate = DiscountGate.state(decision.decision, saleKey, totals.discount, totals.subtotal, approval)
+  val gate = DiscountGate.state(decision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
   // در فروشِ نقدی مبلغِ پرداختی همیشه کلِ مبلغِ نهایی است
   val paid = if (payment == SalesEngine.Payment.CASH) totals.finalTotal
@@ -148,6 +152,11 @@ fun CheckoutDialog(
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text("تسویه فروش", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))
+        //  POS-21: کادرِ تخفیف پنهان است ولی قیمتِ ردیفی زیرِ فهرست مانده ⇒ چرا «ثبت» خاموش است
+        if (!canDiscount && gate == DiscountGate.State.DENIED) {
+          StatusPill(ir.vil3ntec.tohid.core.i18n.StrLine.reductionDenied, PillTone.DANGER)
+          Spacer(Modifier.height(14.dp))
+        }
 
         //  تخفیف فقط با صاحب و مدیر — `ShopRole.canDiscount`
         if (canDiscount) {
@@ -242,7 +251,8 @@ fun CheckoutDialog(
         if (debtorMenu) {
           SearchablePicker(
             title = if (payment == SalesEngine.Payment.CREDIT) "انتخاب قرض‌دار" else "انتخاب مشتری",
-            options = d.debtors,
+            //  ادغام‌شده دوباره انتخاب نمی‌شود (CRM-10)؛ بی ادغام همان فهرستِ امروز
+            options = ir.vil3ntec.tohid.data.CustomerCrm.active(d),
             idOf = { it.id },
             nameOf = { it.name },
             onClose = { debtorMenu = false },
@@ -278,6 +288,14 @@ fun CheckoutDialog(
           )
         }
 
+        //  PAY-21: حساب‌پی — فقط با پرچمِ سرور (`pay.hesabpay`) و نت؛ پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
+        ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
+          hook = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) { (SalesEngine.record(d, cart, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message },
+          total = totals.finalTotal, panel = if (payV2) payState else null, customerId = debtorId, busy = busy, modifier = Modifier.padding(top = 12.dp),
+          enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
+          onPaid = { st -> onConfirm(checkout.copy(settlement = st, debtorId = debtorId, approval = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null)) },
+        )
+
         Spacer(Modifier.height(16.dp))
         Panel {
           //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
@@ -312,10 +330,10 @@ fun CheckoutDialog(
   if (askApproval && saleKey != null) {
     ApprovalDialog(
       title = "تأییدِ تخفیف",
-      summary = "تخفیفِ ${money(totals.discount)} ؋ روی فاکتورِ ${money(totals.subtotal)} ؋",
+      summary = "تخفیفِ ${money(basis.discount)} ؋ روی فاکتورِ ${money(basis.subtotal)} ؋",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
-      need = DiscountGate.need(saleKey, totals.discount, totals.subtotal),
+      need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false },
       onDismiss = { askApproval = false },
     )
@@ -477,6 +495,8 @@ fun InvoiceDialog(
           }
           Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
         }
+        //  POS-34 (پشتِ `GiftReceiptPrefs`، پیش‌فرض خاموش): رسیدِ هدیهٔ بی قیمت
+        ir.vil3ntec.tohid.ui.components.pos.GiftReceiptButton(d, sale, onMessage)
       }
     }
     }
@@ -711,7 +731,7 @@ internal fun PrinterDialog(
               style = MaterialTheme.typography.bodySmall,
               color = Shop.colors.muted,
             )
-            Spacer(Modifier.height(8.dp))
+            LocalNetworkNotice(context)  // HW-13: اندروید ۱۷ و هدفِ ۳۷ ⇒ «اجازه دادن»؛ وگرنه همان فاصلهٔ ۸
             OutlinedTextField(
               value = host,
               onValueChange = { host = it },
@@ -822,7 +842,7 @@ fun DebtorPicker(
   onPick: (String?) -> Unit,
 ) {
   var search by remember { mutableStateOf("") }
-  val shown = d.debtors.filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
+  val shown = ir.vil3ntec.tohid.data.CustomerCrm.active(d).filter { search.isBlank() || it.name.contains(search.trim(), ignoreCase = true) }
 
   Dialog(onDismissRequest = onClose) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
@@ -897,10 +917,22 @@ fun CartLineDialog(
   /** واحدِ فروشِ دومِ کالا و ضریبش — شرح سرِ `Product.saleUnit` */
   saleUnit: String = "",
   unitFactor: Double = 1.0,
+  /** قلمِ آزاد — سقفِ قیمتش (POS-10) به‌جای «قاعدهٔ جهت» */
+  free: Boolean = false,
+  /**
+   *  POS-08/10/20 — سیاستِ قیمتِ ردیف (`LinePolicyPrefs.of`)؛ پیش‌فرض خاموش ⇒ همان کادرِ پیشین،
+   *  بی تخفیفِ ردیف و بی سنجش
+   */
+  linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
+  /** POS-22 — گام‌های «چرا این قیمت؟» (`PriceWhyLine`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
+  why: List<ir.vil3ntec.tohid.core.pos.PriceWhy.Row>? = null,
 ) {
+  val policy = linePolicy
   var qtyText by remember { mutableStateOf(qty(quantity)) }
   var priceText by remember { mutableStateOf(qty(unitPrice)) }
   var manual by remember { mutableStateOf(custom) }
+  var discountText by remember { mutableStateOf("") }
+  var discountPercent by remember { mutableStateOf(true) }
   //  مقدار به کدام واحد تایپ می‌شود؛ موجودی و قیمت همیشه به `unit` می‌مانند
   var inSaleUnit by remember { mutableStateOf(false) }
   val hasSaleUnit = saleUnit.isNotBlank() && unitFactor > 0
@@ -908,7 +940,11 @@ fun CartLineDialog(
   val typedQty = qtyText.toDoubleOrNull()
   val parsedQty = typedQty?.let { if (inSaleUnit) Math.round(it * unitFactor * 1000.0) / 1000.0 else it }
   val parsedPrice = priceText.toDoubleOrNull()
-  val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0))
+  //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف (`LinePolicy.edit`)؛ خاموش ⇒ بی رد و بی تخفیف
+  val edit = ir.vil3ntec.tohid.data.LinePolicy.edit(
+    policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText,
+  )
+  val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0)) && edit.ok
 
   Dialog(onDismissRequest = onDismiss) {
     Surface(
@@ -919,6 +955,10 @@ fun CartLineDialog(
       Column(Modifier.padding(18.dp)) {
         Text(name, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
+        if (why != null) {
+          ir.vil3ntec.tohid.ui.components.pos.PriceWhyPanel(why) { money(it) }
+          Spacer(Modifier.height(12.dp))
+        }
 
         if (hasSaleUnit) {
           SegmentedChoice(
@@ -984,6 +1024,11 @@ fun CartLineDialog(
           )
         }
 
+        ir.vil3ntec.tohid.ui.components.pos.LineDiscountPanel(
+          show = edit.canDiscount, percent = discountPercent, text = discountText, problem = edit.problem,
+          onPercent = { discountPercent = it }, onText = { discountText = it },
+        )
+
         Spacer(Modifier.height(14.dp))
         val shownPrice = if (manual) (parsedPrice ?: 0.0) else basePrice
         Text(
@@ -991,13 +1036,15 @@ fun CartLineDialog(
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )
+        edit.net?.let { Text(ir.vil3ntec.tohid.core.i18n.StrLine.afterDiscount(money(it)), style = MaterialTheme.typography.titleSmall, color = Shop.colors.success) }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
           TextButton(onClick = onDismiss) { Text("انصراف") }
           Button(
             enabled = ok,
-            onClick = { onConfirm(parsedQty ?: 0.0, if (manual) parsedPrice else null) },
+            //  تخفیفِ ردیف ⇒ قیمتِ واحدِ پس از تخفیف؛ وگرنه همان قیمتِ دستیِ پیشین
+            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else null) },
           ) { Text("ثبت") }
         }
       }
@@ -1016,6 +1063,8 @@ fun CartLineDialog(
 fun FreeLineDialog(
   onDismiss: () -> Unit,
   onConfirm: (label: String, price: Double, quantity: Double) -> Unit,
+  /** POS-10 — سیاستِ قیمتِ ردیف (`LinePolicyPrefs.of`)؛ پیش‌فرض خاموش ⇒ بی سقف */
+  linePolicy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy = ir.vil3ntec.tohid.core.pos.LinePricing.Policy(),
 ) {
   var label by remember { mutableStateOf("") }
   var priceText by remember { mutableStateOf("") }
@@ -1023,8 +1072,13 @@ fun FreeLineDialog(
 
   val parsedPrice = priceText.toDoubleOrNull()
   val parsedQty = qtyText.toDoubleOrNull()
+  //  POS-10 — سقفِ قیمتِ قلمِ آزاد برای همه جز صاحبِ دکان (خاموش ⇒ بی سقف)
+  val policy = linePolicy
+  val problem = ir.vil3ntec.tohid.data.LinePolicy.message(
+    parsedPrice?.let { ir.vil3ntec.tohid.core.pos.LinePricing.checkFreeLine(policy, DiscountGate.minor(it)) }, policy,
+  )
   val ok = label.isNotBlank() && parsedPrice != null && parsedPrice > 0 &&
-    parsedQty != null && parsedQty > 0
+    parsedQty != null && parsedQty > 0 && problem == null
 
   Dialog(onDismissRequest = onDismiss) {
     Surface(
@@ -1060,6 +1114,10 @@ fun FreeLineDialog(
           modifier = Modifier.fillMaxWidth(),
         )
 
+        problem?.let {
+          Spacer(Modifier.height(8.dp))
+          Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
+        }
         Spacer(Modifier.height(14.dp))
         Text(
           "جمع: ${money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))} ؋",

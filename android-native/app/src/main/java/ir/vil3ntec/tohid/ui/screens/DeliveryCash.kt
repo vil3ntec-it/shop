@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeliveryDining
 import androidx.compose.material.icons.filled.LocalShipping
@@ -20,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.delivery.CourierCash
@@ -63,6 +65,7 @@ internal fun ColumnScope.CouriersTab(
   var settleFor by remember { mutableStateOf<CourierRow?>(null) }
   var ledgerFor by remember { mutableStateOf<CourierRow?>(null) }
   var capFor by remember { mutableStateOf<CourierRow?>(null) }
+  var reportOpen by remember { mutableStateOf(false) }
 
   if (d.couriers.isEmpty()) {
     TohidEmptyState(
@@ -74,6 +77,10 @@ internal fun ColumnScope.CouriersTab(
   }
   if (!cfg.perms.settle) {
     Text("تسویه و دفترِ تسویه‌ها فقط با صاحب یا مدیرِ دکان است.", style = MaterialTheme.typography.bodySmall, color = c.muted)
+    Spacer(Modifier.height(6.dp))
+  } else {
+    //  RPT-15: گزارشِ نقدِ همهٔ پیک‌ها در یک بازه
+    TohidSecondaryButton("گزارشِ نقدِ پیک‌ها", onClick = { reportOpen = true })
     Spacer(Modifier.height(6.dp))
   }
   LazyColumn(Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -121,6 +128,7 @@ internal fun ColumnScope.CouriersTab(
     })
   }
   ledgerFor?.let { cr -> LedgerSheet(cr, repo) { ledgerFor = null } }
+  if (reportOpen) CashReportSheet(repo) { reportOpen = false }
   capFor?.let { cr ->
     CourierCapDialog(cr, repo, onDismiss = { capFor = null }, onDone = {
       capFor = null
@@ -343,9 +351,13 @@ private fun CourierCapDialog(cr: CourierRow, repo: DeliveryRepository, onDismiss
   val scope = rememberCoroutineScope()
   var cap by remember { mutableStateOf(fieldOf(cr.cashCapMinor)) }
   var active by remember { mutableStateOf(cr.active) }
+  var maxLive by remember { mutableStateOf(cr.maxLive?.toString().orEmpty()) }
   var busy by remember { mutableStateOf(false) }
   var err by remember { mutableStateOf<String?>(null) }
   val capMinor = if (cap.isBlank()) null else minorOf(cap)
+  //  DLV-03: خالی = بی‌سقف؛ وگرنه ۱ تا ۵۰ (همان CHECKِ سرور)
+  val liveCap = maxLive.trim().toIntOrNull()?.takeIf { it in 1..50 }
+  val liveCapOk = maxLive.isBlank() || liveCap != null
   TohidBottomSheet(title = "سقف و وضعیتِ ${cr.name}", onDismiss = onDismiss) {
     SheetBody {
       TohidTextField(
@@ -354,17 +366,26 @@ private fun CourierCapDialog(cr: CourierRow, repo: DeliveryRepository, onDismiss
         error = if (capMinor == null) "عدد لازم است" else null,
         keyboardOptions = MONEY_KEYS,
       )
+      TohidTextField(
+        maxLive, { maxLive = it.filter { ch -> ch.isDigit() }.take(2) }, label = "سقفِ کارِ هم‌زمان (اختیاری)",
+        supporting = "این‌قدر مأموریتِ زنده داشته باشد، کارِ تازه به او سپرده نمی‌شود؛ خالی = بی‌سقف",
+        error = if (!liveCapOk) "عددِ ۱ تا ۵۰" else null,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+      )
       Row(verticalAlignment = Alignment.CenterVertically) {
         Switch(checked = active, onCheckedChange = { active = it })
         Spacer(Modifier.width(8.dp))
         Text(if (active) "فعال — کارِ تازه می‌گیرد" else "غیرفعال — کارِ تازه نمی‌گیرد", color = c.text)
       }
       ErrorLine(err)
-      TohidButton("ذخیره", busy = busy, enabled = capMinor != null && !busy, modifier = Modifier.fillMaxWidth(), onClick = {
+      TohidButton("ذخیره", busy = busy, enabled = capMinor != null && liveCapOk && !busy, modifier = Modifier.fillMaxWidth(), onClick = {
         busy = true
         err = null
         scope.launch {
-          repo.updateCourier(cr.id, DeliveryWire.courierUpdateJson(cashCapMinor = capMinor, active = active))
+          val body = DeliveryWire.courierUpdateJson(
+            cashCapMinor = capMinor, active = active, maxLive = liveCap, clearMaxLive = liveCap == null && cr.maxLive != null,
+          )
+          repo.updateCourier(cr.id, body)
             .onSuccess { onDone() }
             .onFailure { err = it.userMessage }
           busy = false

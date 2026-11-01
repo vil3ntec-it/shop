@@ -20,8 +20,8 @@
  *     در PGlite همه‌چیز یک اتصال است و خودبه‌خود پشتِ هم.
  * ⛔ تکرارِ همان کلیدِ یکتایی (CHK-19) پیش از `price` پاسخ داده می‌شود و هرگز ۴۲۹
  * نمی‌گیرد.
- * کلیدِ سقف صفرِ پس از ‎+93‎ را برمی‌دارد (‎+930700…‎ همان ‎+93700…‎ است) —
- * فقط برای شمردن؛ دادهٔ ذخیره‌شده دست نمی‌خورد.
+ * کلیدِ سقف همهٔ صفرهای پس از ‎+93‎ را برمی‌دارد (‎+930700…‎ و ‎+9300700…‎ همان ‎+93700…‎اند؛
+ * `phoneKey`/`phoneForms` ِ validate) — فقط برای شمردن؛ دادهٔ ذخیره‌شده دست نمی‌خورد.
  */
 const { now } = require('../db');
 const { ApiError } = require('../middleware/errors');
@@ -31,9 +31,8 @@ const PER_SHOP = Object.freeze({ scope: 'shop', windowMs: HOUR_MS, max: 10 });
 const ALL_SHOPS = Object.freeze({ scope: 'all', windowMs: 24 * HOUR_MS, max: 40 });
 const RULES = Object.freeze([PER_SHOP, ALL_SHOPS]);
 
-/** کلیدِ سقف و هر دو شکلِ ذخیره‌شده‌اش. */
-const canon = (phone) => String(phone || '').replace(/^\+930/, '+93');
-const formsOf = (key) => (key.startsWith('+93') ? [key, `+930${key.slice(3)}`] : [key]);
+/** کلیدِ سقف و همهٔ شکل‌های ذخیره‌شدنی‌اش (RSK-07). */
+const { phoneKey: canon, phoneForms: formsOf } = require('./validate');
 
 /**
  * زمانِ ساختِ max-امین سفارشِ تازه در پنجره — یا null اگر هنوز زیرِ سقف است.

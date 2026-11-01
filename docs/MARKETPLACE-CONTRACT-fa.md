@@ -40,7 +40,7 @@
 | `fulfillment` (ارسال/تحویل در دکان)، `deliveryFeeMinor`، `minOrderMinor`، `currency` | `storefronts` | ✅ (ارز ثابتِ `AFN`) |
 | `payment.methods` | ثابت `['cod']` در `profile()` ِ `lib/storefront.js` | 🟡 پرداختِ آنلاین منتظرِ D-08 |
 | **لوگو و تصویرِ سرِ صفحه** | — | ❌ هیچ ستونی نیست |
-| **شناسهٔ عمومیِ پایدارِ دکان** (جدا از `slug`) | — | ❌ `slug` قابلِ تغییر است؛ لینکِ کهنه، تبلیغ و API باید به شناسهٔ ثابت تکیه کنند |
+| **شناسهٔ عمومیِ پایدارِ دکان** (جدا از `slug`) | `storefronts.public_id` (ULID، تغییرناپذیر) و `storefront_slug_redirects` (مهاجرت ۱۳۱)؛ `GET /api/store?id=` و ۳۰۸/۳۰۱ از نشانیِ کهنه | 🟡 پشتِ پرچمِ خاموشِ `market.public_id` (S3) |
 | **امتیاز/نظرِ مشتری** | — | ❌ (فقط شکایت/گزارش در `trust_cases`) |
 | **وضعیتِ اعتماد** (جریمهٔ فعال) | `trust_sanctions` (۱۰۱) با `suspend_storefront` | ✅ اثر می‌گذارد، ولی در نمای عمومی فیلدِ صریح ندارد |
 
