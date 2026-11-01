@@ -495,6 +495,7 @@ fun SettingsScreen(
     }
     /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
+    item { ir.vil3ntec.tohid.ui.components.pos.PriceListSettingsWired(context) } // POS-18، پیش‌فرض خاموش
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */

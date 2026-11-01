@@ -69,4 +69,30 @@ object PriceList {
     chosenByHand || customerList == null -> of(current)
     else -> of(customerList)
   }
+
+  /**
+   *  ردیفِ سبدِ صندوق: `unitMinor = null` یعنی همان قیمتِ کالا (خرده). فیِ برابر با خرده یا عمدهٔ کالا
+   *  «از لیست» است و با لیست عوض می‌شود؛ هر فیِ دیگری دستی است و دست نمی‌خورد.
+   */
+  fun isManual(p: Prices, unitMinor: Long?): Boolean =
+    unitMinor != null && unitMinor != p.retailMinor && !(p.wholesaleMinor > 0 && unitMinor == p.wholesaleMinor)
+
+  /** فیِ تازهٔ ردیفِ سبد در این لیست؛ خرده ⇒ `null` (همان قیمتِ کالا)، دستی ⇒ همان */
+  fun cartUnit(p: Prices, unitMinor: Long?, list: String): Long? {
+    if (isManual(p, unitMinor)) return unitMinor
+    val target = unitMinor(p, list)
+    return if (target == p.retailMinor) null else target
+  }
+
+  /** لیستِ همین فاکتور و این‌که صندوق‌دار خودش انتخابش کرده */
+  data class State(val list: String = RETAIL, val byHand: Boolean = false)
+
+  /** Ctrl+R یا دکمهٔ لیست */
+  fun toggle(s: State): State = State(next(s.list), byHand = true)
+
+  /** مشتری عوض شد ([customerList] = `null` ⇒ برداشته شد) */
+  fun onCustomer(s: State, customerList: String?): State = s.copy(list = afterCustomer(s.list, s.byHand, customerList))
+
+  /** سبد خالی شد یا فاکتور ثبت شد ⇒ فاکتورِ بعدی از خرده و بی انتخابِ دستی */
+  val FRESH = State()
 }

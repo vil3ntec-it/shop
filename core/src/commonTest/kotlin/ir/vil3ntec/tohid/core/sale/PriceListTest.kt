@@ -24,4 +24,27 @@ class PriceListTest {
   @Test fun repriceReturnsNormalisedList() {
     assertEquals(PriceList.RETAIL, PriceList.reprice(emptyList(), "vip").list)
   }
+
+  private val p = PriceList.Prices(10_000, 9_000)
+
+  @Test fun cartLineFollowsListUnlessManual() {
+    assertEquals(9_000L, PriceList.cartUnit(p, null, PriceList.WHOLESALE))
+    assertEquals(null, PriceList.cartUnit(p, 9_000, PriceList.RETAIL))
+    assertEquals(null, PriceList.cartUnit(p, 10_000, PriceList.RETAIL))
+    //  فیِ دستی (نه خرده، نه عمده) در هر دو لیست همان
+    assertEquals(8_500L, PriceList.cartUnit(p, 8_500, PriceList.WHOLESALE))
+    assertEquals(8_500L, PriceList.cartUnit(p, 8_500, PriceList.RETAIL))
+    //  کالای بی عمده: عمده همان خرده ⇒ null
+    assertEquals(null, PriceList.cartUnit(PriceList.Prices(5_000, 0), null, PriceList.WHOLESALE))
+    assertEquals(true, PriceList.isManual(PriceList.Prices(5_000, 0), 0))
+  }
+
+  @Test fun stateMachine() {
+    val s1 = PriceList.onCustomer(PriceList.FRESH, "wholesale")
+    assertEquals(PriceList.State(PriceList.WHOLESALE, false), s1)
+    val s2 = PriceList.toggle(s1)
+    assertEquals(PriceList.State(PriceList.RETAIL, true), s2)
+    //  پس از انتخابِ دستی، مشتریِ عمدهٔ دیگر لیست را عوض نمی‌کند
+    assertEquals(s2, PriceList.onCustomer(s2, "wholesale"))
+  }
 }
