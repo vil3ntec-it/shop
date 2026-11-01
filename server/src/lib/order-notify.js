@@ -163,10 +163,12 @@ function messageFor(row, reminder) {
   };
 }
 
-const RECIPIENT_PERMISSION = 'orders.view';
+//  A16: `orders.manage` نه `orders.view` — حسابدار سفارش را می‌بیند ولی رسیدگی نمی‌کند،
+//  پس اعلانِ «سفارشِ تازه» و یادآوری‌اش برای او نیست. صاحب، مدیر و شاگرد هر دو را دارند.
+const RECIPIENT_PERMISSION = 'orders.manage';
 
 /**
- * کاربرانی که اعلانِ سفارش می‌گیرند: عضوِ فعالِ دکان که `orders.view` دارد
+ * کاربرانی که اعلانِ سفارش می‌گیرند: عضوِ فعالِ دکان که `orders.manage` دارد
  * (همان سنجشِ `requirePermission`: سقفِ نقش، سپس لایه‌ها اگر کلید لایه‌پذیر
  * باشد) + صاحبِ دکان همیشه. پیک (`courier`) و عضوِ بسته‌شده بیرون‌اند.
  */
@@ -310,7 +312,9 @@ async function tick(at = now()) {
 let timer = null;
 function start() {
   if (timer) return;
-  timer = setInterval(() => tick().catch((err) => console.error('[order-notify]', err.message)), TICK_MS);
+  //  پنلِ مرکزی ۴.۹: هر دور ثبت می‌شود (`lib/job-beat.js`) — «اجرا شد یا نه» از حدس نیست
+  const run = require('./job-beat').wrap('order-notify', TICK_MS, tick);
+  timer = setInterval(() => run().catch((err) => console.error('[order-notify]', err.message)), TICK_MS);
   if (timer.unref) timer.unref();
 }
 function stop() {

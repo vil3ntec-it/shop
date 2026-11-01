@@ -919,6 +919,196 @@
    "out": [
     "kind"
    ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 9000
+     },
+     {
+      "min": 6000,
+      "unitMinor": 8000
+     }
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 9000
+     },
+     {
+      "min": 6000,
+      "unitMinor": 9000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 9000
+     },
+     {
+      "min": 6000,
+      "bp": 1000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "bp": 500
+     },
+     {
+      "min": 6000,
+      "unitMinor": 8000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 9000,
+      "bp": 500
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 9000,
+      "amountMinor": 100
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 0,
+      "unitMinor": 9000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "unitMinor": 0
+     }
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "tiers",
+    "tiers": [
+     {
+      "min": 3000,
+      "bp": 500,
+      "unitMinor": -1
+     }
+    ]
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "threshold",
+    "tiers": [
+     {
+      "min": 100000,
+      "bp": 500,
+      "unitMinor": 0
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "t",
+    "name": "n",
+    "kind": "threshold",
+    "tiers": [
+     {
+      "min": 100000,
+      "unitMinor": 5000
+     }
+    ]
+   },
+   "out": [
+    "tiers"
+   ]
   }
  ],
  "evaluate": [
@@ -4046,6 +4236,303 @@
       "id": "p10",
       "name": "ده درصد",
       "discountMinor": 4500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "POS-19 پله‌ای با قیمتِ ثابتِ هر واحد (کفِ بهای خرید)",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 6000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "tp",
+     "name": "پلهٔ قیمت",
+     "kind": "tiers",
+     "tiers": [
+      {
+       "min": 3000,
+       "unitMinor": 9000
+      },
+      {
+       "min": 6000,
+       "unitMinor": 8000
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 270000,
+    "discountMinor": 35000,
+    "totalMinor": 235000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 5000,
+      "netMinor": 45000
+     },
+     {
+      "key": "b",
+      "amountMinor": 150000,
+      "discountMinor": 30000,
+      "netMinor": 120000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 0,
+      "netMinor": 70000
+     }
+    ],
+    "applied": [
+     {
+      "id": "tp",
+      "name": "پلهٔ قیمت",
+      "discountMinor": 35000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "POS-19 پلهٔ قیمت با مقدارِ کسری و گردکردنِ نیمه رو به بالا",
+   "cart": {
+    "lines": [
+     {
+      "key": "k",
+      "productId": "K",
+      "qtyMilli": 2500,
+      "unitMinor": 1234,
+      "costMinor": 0
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "tk",
+     "name": "برنجِ فله",
+     "kind": "tiers",
+     "tiers": [
+      {
+       "min": 1000,
+       "unitMinor": 1200
+      },
+      {
+       "min": 2000,
+       "unitMinor": 1111
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 3100,
+    "discountMinor": 300,
+    "totalMinor": 2800,
+    "lines": [
+     {
+      "key": "k",
+      "amountMinor": 3100,
+      "discountMinor": 300,
+      "netMinor": 2800
+     }
+    ],
+    "applied": [
+     {
+      "id": "tk",
+      "name": "برنجِ فله",
+      "discountMinor": 300
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "POS-19 پلهٔ گران‌تر از قیمتِ ردیف تخفیفِ منفی نمی‌دهد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 3000,
+      "unitMinor": 5000,
+      "costMinor": 0
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 5000,
+      "unitMinor": 5000,
+      "costMinor": 0
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "tx",
+     "name": "پله",
+     "kind": "tiers",
+     "tiers": [
+      {
+       "min": 2000,
+       "unitMinor": 6000
+      },
+      {
+       "min": 5000,
+       "unitMinor": 4500
+      }
+     ]
+    }
+   ],
+   "out": {
+    "subtotalMinor": 40000,
+    "discountMinor": 2500,
+    "totalMinor": 37500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 15000,
+      "discountMinor": 0,
+      "netMinor": 15000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 2500,
+      "netMinor": 22500
+     }
+    ],
+    "applied": [
+     {
+      "id": "tx",
+      "name": "پله",
+      "discountMinor": 2500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "POS-19 پلهٔ قیمت در کنارِ «بهترین»ِ درصدی: بیشترین تخفیف می‌ماند",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 6000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "costMinor": 0,
+      "category": "drinks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "tp",
+     "name": "پلهٔ قیمت",
+     "kind": "tiers",
+     "tiers": [
+      {
+       "min": 3000,
+       "unitMinor": 9000
+      }
+     ],
+     "scope": {
+      "products": [
+       "A"
+      ]
+     }
+    },
+    {
+     "id": "p5",
+     "name": "۵٪",
+     "kind": "percent",
+     "bp": 500,
+     "scope": {
+      "products": [
+       "A"
+      ]
+     }
+    }
+   ],
+   "out": {
+    "subtotalMinor": 270000,
+    "discountMinor": 5000,
+    "totalMinor": 265000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 5000,
+      "netMinor": 45000
+     },
+     {
+      "key": "b",
+      "amountMinor": 150000,
+      "discountMinor": 0,
+      "netMinor": 150000
+     },
+     {
+      "key": "c",
+      "amountMinor": 70000,
+      "discountMinor": 0,
+      "netMinor": 70000
+     }
+    ],
+    "applied": [
+     {
+      "id": "tp",
+      "name": "پلهٔ قیمت",
+      "discountMinor": 5000
      }
     ],
     "codes": []

@@ -83,7 +83,9 @@ object AppConfig {
    */
   fun baseUrl(context: Context): String {
     forgetStoredBase(context)
-    return buildTimeBaseUrl
+    //  ⚠️ تنها استثنا: پرچمِ خاموشِ `app.multi_server` و سرورِ دیگری که صاحبِ دکان در «سرورها» برگزیده
+    //  (`docs/SERVERS-fa.md`). پرچمِ خاموش ⇒ همیشه `null` ⇒ همان نشانیِ زمانِ ساخت.
+    return ir.vil3ntec.tohid.platform.ServerSwitchAndroid.activeUrl(context) ?: buildTimeBaseUrl
   }
 
   /**
@@ -105,7 +107,7 @@ object AppConfig {
 
   /** آیا برنامه می‌داند به کجا وصل شود */
   fun isConfigured(context: Context): Boolean =
-    ApiConfig.isValid(baseUrl(context), allowInsecure)
+    ir.vil3ntec.tohid.platform.ServerSwitchAndroid.reject(baseUrl(context), allowInsecure) == null
 
   /**
    *  پیکربندی جداست از داده‌های کار، پس پروندهٔ خودش را دارد.

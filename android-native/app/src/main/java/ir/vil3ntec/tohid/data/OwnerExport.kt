@@ -98,6 +98,7 @@ object OwnerExport {
     "stockMovements" to "حرکات انبار",
     "priceHistory" to "سابقهٔ قیمت‌ها",
     "auditLog" to "سابقهٔ عملیات",
+    "safeEntries" to "گاوصندوق",
   )
 
   /** فیلد ⇐ سرستونِ فارسی */
@@ -141,6 +142,22 @@ object OwnerExport {
     "active" to "فعال",
     "saleUnit" to "واحد فروش",
     "unitFactor" to "ضریب واحد",
+    //  PRD-02/PRD-26
+    "namePs" to "نام پشتو",
+    "nameEn" to "نام انگلیسی",
+    "synonyms" to "مترادف‌ها",
+    "keywords" to "واژه‌های جست‌وجو",
+    "aisle" to "راهرو",
+    "shelf" to "قفسه",
+    "shelfLevel" to "طبقهٔ قفسه",
+    //  PRD-24/PRD-25
+    "alternatives" to "کالاهای جایگزین",
+    "customFields" to "فیلدهای سفارشی",
+    "brand" to "برند",
+    "reorderPoint" to "نقطهٔ سفارش",
+    "maxStock" to "حداکثر موجودی",
+    "brand" to "برند",
+    "packs" to "بسته‌ها",
     "cartons" to "تعداد کارتن",
     "perCarton" to "تعداد در هر کارتن",
     "units" to "تعداد واحد",
@@ -205,6 +222,20 @@ object OwnerExport {
     "oldPrice" to "قیمت قبلی",
     "newPrice" to "قیمت تازه",
     "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    //  موتورِ تازهٔ موجودی و بها (افزودنی، فقط وقتی تنظیمِ دکان روشن است)
+    "landedCost" to "هزینهٔ جانبی",
+    "landedCostMinor" to "هزینهٔ جانبی (صدم افغانی)",
+    "locationId" to "محل",
+    "toLocationId" to "محلِ مقصد",
+    "userId" to "کاربر",
+    "lotId" to "سری",
+    //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
+    //  گاوصندوق (PAY-18)
+    "amountMinor" to "مبلغ (پول)",
+    "bagNo" to "شمارهٔ کیسه",
+    "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",
+    "shiftId" to "شناسهٔ صندوق",
+    "auditId" to "شناسهٔ ردیفِ صندوق",
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

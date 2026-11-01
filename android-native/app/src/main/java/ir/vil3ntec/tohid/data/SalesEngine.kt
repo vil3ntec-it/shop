@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.money.Money
+import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
@@ -45,6 +46,8 @@ object SalesEngine {
     val quantity: Double,
     val unitPrice: Double? = null,
     val label: String = "",
+    /** سریِ اسکن‌شده (موتورِ تازهٔ موجودی، `StockLedger`) — فروش اول از همین برداشته می‌شود */
+    val lotId: String? = null,
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -232,6 +235,10 @@ object SalesEngine {
     return cart.map { if (it.productId == productId) it.copy(unitPrice = clean) else it }
   }
 
+  /** سریِ ترجیحیِ یک ردیف (اسکنِ سری)؛ `null` یعنی همان FEFO */
+  fun setLineLot(cart: List<CartLine>, productId: String, lotId: String?): List<CartLine> =
+    cart.map { if (it.productId == productId) it.copy(lotId = lotId?.takeIf { l -> l.isNotEmpty() }) else it }
+
   /** تعیینِ تعداد. صفر یا کمتر یعنی حذفِ ردیف. */
   fun setCartQty(cart: List<CartLine>, productId: String, quantity: Double): List<CartLine> {
     if (quantity <= 0) return cart.filter { it.productId != productId }
@@ -347,6 +354,31 @@ object SalesEngine {
       if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
     }
 
+    /*
+     *  موتورِ تازهٔ موجودی و بها (`StockLedger`، تنظیمِ دکان؛ پیش‌فرض خاموش ⇒ `null`):
+     *  سنجشِ هسته در حالتِ local — بیش از موجودیِ **سالم** و سریِ منقضی بسته است
+     *  (INV-19، بخشِ ۳.۶)؛ بهای موقتِ هر قلم به میانگینِ موزون؛ سریِ اسکن‌شده اول.
+     */
+    val stockPlan: Map<Int, StockLedger.Check>? = if (!StockLedger.isOn(d)) null else {
+      val idx = cart.indices.filter { i -> !cart[i].free && d.products.any { it.id == cart[i].productId } }
+      val view = StockLedger.replay(d, idx.map { cart[it].productId }.distinct())
+      val checks = StockLedger.checkCart(
+        view, idx.map { i -> StockLedger.Line(cart[i].productId, StockLedger.milli(cart[i].quantity), cart[i].lotId) }, today,
+      )
+      idx.zip(checks).toMap()
+    }
+    stockPlan?.forEach { (i, c) ->
+      if (c.ok) return@forEach
+      val p = d.products.first { it.id == cart[i].productId }
+      val avail = (c.availableMilli ?: 0L) / 1000.0
+      return Result.Failed(
+        if (c.error == "expired_stock") {
+          "از «${p.name}» ${ir.vil3ntec.tohid.qty((c.expiredMilli ?: 0L) / 1000.0)} واحد منقضی است؛ " +
+            "فقط ${ir.vil3ntec.tohid.qty(avail)} واحدِ سالم مانده"
+        } else shortageMessage(p, cart[i].quantity, avail)
+      )
+    }
+
     val t = totals(d, cart, checkout)
 
     //  PAY (v3 A4): با پرچم، پرداخت از تسویهٔ هسته می‌آید — همان مبلغِ همین فاکتور، بی ناتمام
@@ -438,7 +470,7 @@ object SalesEngine {
 
     val items = mutableListOf<SaleItem>()
     val movements = mutableListOf<StockMovement>()
-    cart.forEach { line ->
+    cart.forEachIndexed { lineIndex, line ->
       /*
        *  قلمِ آزاد: نه کالایی دارد، نه حرکتِ انبار می‌سازد، نه بهای
        *  تمام‌شده. سودش برابرِ کلِ مبلغش حساب می‌شود، چون خریدش جای دیگری
@@ -457,21 +489,24 @@ object SalesEngine {
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
         )
-        return@forEach
+        return@forEachIndexed
       }
 
-      val p = d.products.find { it.id == line.productId } ?: return@forEach
+      val p = d.products.find { it.id == line.productId } ?: return@forEachIndexed
       //  قیمتِ دستیِ همین ردیف، وگرنه قیمتِ خودِ کالا
       val unit = line.unitPrice ?: p.salePrice
+      //  موتورِ تازه: بهای موقت = میانگینِ موزون؛ نامعلوم (کالای بی ورود) ⇒ همان قیمتِ خریدِ امروز
+      val planned = stockPlan?.get(lineIndex)?.takeIf { it.ok && !it.unknownCost }
       items += SaleItem(
         id = newId(),
         saleId = saleId,
         productId = p.id,
         quantity = line.quantity,
         unitPrice = unit,
-        purchasePrice = p.purchasePrice,
+        purchasePrice = planned?.let { it.unitCostMinor / 100.0 } ?: p.purchasePrice,
         totalPrice = lineTotal(unit, line.quantity),
         returnedQty = 0.0,
+        lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
       )
       movements += StockMovement(
         id = newId(),
@@ -601,6 +636,8 @@ object SalesEngine {
     newId: () -> String,
     /** رابط بی دلیل اجازه نمی‌دهد؛ این‌جا پیش‌فرضِ خالی فقط برای صدازننده‌های قدیمی است */
     reason: String = "",
+    /** RPT-09: لغوکننده روی ردیفِ `cancel_sale` (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
@@ -654,6 +691,7 @@ object SalesEngine {
           refId = saleId,
           notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
+          by = by,
         ),
       ),
       invoiceNumber = sale.invoiceNumber ?: 0,
@@ -697,6 +735,21 @@ object SalesEngine {
     if (item.quantity > 0) (item.totalPrice / item.quantity * quantity * paidRatio(sale)).roundToLong().toDouble() else 0.0
 
   /**
+   *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) × سهمِ پرداخت‌شده
+   *  پس از تخفیفِ فاکتور، با گردِ تجمعی (SEC-DATA-01): برگشتِ تکه‌تکه بیش از برگشتِ یک‌جای همان مقدار پس
+   *  نمی‌دهد (پیش‌تر دو عدد به ۲٫۵ ⇒ ۳ + ۳ = ۶). پیش‌نمایشِ پنجرهٔ مرجوعی هم همین را نشان می‌دهد.
+   *  مبنا پولِ واقعاً پس‌دادهٔ همین قلم است، چون برگشت‌های کهنه جداجدا گرد شده‌اند (#586).
+   */
+  fun returnAmount(d: ShopData, sale: Sale, item: SaleItem, quantity: Double): Double {
+    //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
+    val paidRatio =
+      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+    val prior = d.saleReturns.filter { it.saleItemId == item.id }
+    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio,
+      refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity })
+  }
+
+  /**
    * مرجوعیِ جزئی — چند قلم از یک فاکتور، هرکدام به هر مقدار.
    *
    * مبلغِ هر قلم از قیمتِ واقعیِ همان قلم در همان فاکتور حساب می‌شود، نه
@@ -711,10 +764,13 @@ object SalesEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
+    by: String? = null,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
     if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
+
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
     val movements = d.stockMovements.toMutableList()
@@ -726,12 +782,13 @@ object SalesEngine {
       var quantity = quantities[item.id] ?: return@forEachIndexed
       if (quantity.isNaN() || quantity <= 0) return@forEachIndexed
 
-      val allowed = returnable(item)
+      //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
+      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 
-      // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز
-      val amount = returnAmount(sale, item, quantity)
+      // قیمتِ همان قلم در همان فاکتور، نه قیمتِ امروز — با گردِ تجمعیِ SEC-DATA-01
+      val amount = returnAmount(d, sale, item, quantity)
 
       items[index] = item.copy(returnedQty = item.returnedQty + quantity)
 
@@ -746,6 +803,7 @@ object SalesEngine {
         reason = reason,
         date = today,
         createdAt = now,
+        by = by,
       )
       //  قلمِ آزاد کالایی ندارد، پس حرکتِ انبار هم نمی‌سازد — وگرنه ردیفی
       //  با شناسهٔ کالای خالی در گردشِ موجودی می‌نشست

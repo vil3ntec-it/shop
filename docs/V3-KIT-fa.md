@@ -80,7 +80,7 @@
 | خطا | `Modifier.v3Shake(trigger)` (سه رفت‌وبرگشتِ ۸dp + `Haptics.error`) — `trigger` شمارنده یا پیامِ خطا |
 | آمدن/رفتن/جابه‌جاییِ ردیف | Lazy: `Modifier.v3AnimateItem(this)` (کلید لازم)؛ غیرِ Lazy و «کشیدن برای حذف»: `V3Collapse(visible) { … }` + `LocalV3Toasts.current?.undo(...)` |
 | لرزش | فقط از کیت: `haptic = true`، `Haptics.success/confirm/error`؛ هرگز روی پیمایش |
-| برگشتِ پیش‌نما (اندروید ۱۴+) | خودِ پوسته (`PredictiveBackHandler` در `V3RouteHost`): صفحه با انگشت کنار و کوچک می‌شود؛ قدیم/کامپیوتر برگشتِ ساده |
+| برگشتِ پیش‌نما (اندروید ۱۴+) | خودِ پوسته (`PredictiveBackHandler` در `V3RouteHost`): صفحه با انگشت کنار و کوچک می‌شود؛ قدیم/کامپیوتر برگشتِ ساده. تا روشن شدنِ `UiV3` برای همه، `enableOnBackInvokedCallback` فقط در بستهٔ پیش‌نمایش است (بستهٔ اصلی: برگشتِ ساده) |
 | ایستگاهِ نیمه/کاملِ برگه | `V3Sheet(detents = true)` (پیش‌فرض)؛ تأیید و منو `false` |
 | جابه‌جاییِ تب | پوسته: shared-axis X (۱۰٪ + محو) به ترتیبِ نوار (`V3Nav.tabOrder`)، آینه در RTL |
 | «شیشه»ی نوار | `v3GlassColor(solid)` فقط روی نوارها؛ گوشیِ ضعیف/کاهشِ حرکت ⇒ پُر؛ بی blur |
