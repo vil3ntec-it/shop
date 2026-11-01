@@ -148,6 +148,37 @@ class OrdersRepository(private val api: ApiClient) {
     ApiJson.decodeAt<OrderNoticeDto>(out, "notice") ?: throw ApiFailure.InvalidResponse()
   }
 
+  /**
+   *  ORD-14 «ویرایشِ سفارش» (`POST /:id/amendments`): فقط مقدارِ تازهٔ قلم‌ها (۰ = برداشتن)؛ قیمت را سرور می‌گذارد.
+   *  سفارشِ کارمند با رضایتِ ثبت‌شده همان دم اعمال می‌شود؛ سفارشِ ویترین پیشنهادی است که خودِ مشتری می‌پذیرد.
+   *  [key] یک بار برای هر پنجره ⇒ «ثبت» ِ دوباره پس از قطعِ نت دو بار ویرایش نمی‌کند.
+   */
+  suspend fun amend(id: String, key: String, changes: List<Pair<Int, Long>>, reason: String, note: String, consentVia: String, consentNote: String): ApiResult<Unit> = result {
+    val body = buildJsonObject {
+      put("clientKey", key)
+      put("changes", buildJsonArray { changes.forEach { (no, q) -> add(buildJsonObject { put("lineNo", no); put("qtyMilli", q) }) } })
+      if (reason.isNotEmpty()) put("reason", reason)
+      if (note.isNotBlank()) put("note", note.trim())
+      if (consentVia.isNotEmpty()) put("consent", buildJsonObject { put("via", consentVia); if (consentNote.isNotBlank()) put("note", consentNote.trim()) })
+    }
+    api.post("$ROOT/${enc(id)}/amendments", body)
+    Unit
+  }
+
+  /** پس گرفتنِ پیشنهادِ بازِ ویترین (`POST /:id/amendments/:amendId/withdraw`) */
+  suspend fun withdrawAmend(id: String, amendId: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(id)}/amendments/${enc(amendId)}/withdraw", JsonObject(emptyMap()))
+    Unit
+  }
+
+  /** ثبتِ تسویهٔ نقدیِ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده (`POST /:id/amendments/:amendId/settlement`؛ فقط نقد، بی درگاه) */
+  suspend fun settleAmend(id: String, amendId: String, key: String, note: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(id)}/amendments/${enc(amendId)}/settlement", buildJsonObject {
+      put("clientKey", key); put("method", "cash"); if (note.isNotBlank()) put("note", note.trim())
+    })
+    Unit
+  }
+
   private fun order(body: JsonObject): OrderDto =
     ApiJson.decodeAt<OrderDto>(body, "order") ?: throw ApiFailure.InvalidResponse()
 
