@@ -5,7 +5,9 @@ import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.PermPolicy
 import ir.vil3ntec.tohid.data.PromoJson
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.net.URLEncoder
@@ -31,6 +33,18 @@ class PromoRepository(private val api: ApiClient) {
   }
 
   suspend fun delete(id: String): ApiResult<Unit> = result { api.delete("$ROOT/rules/${enc(id)}"); Unit }
+
+  /**
+   *  PRM-02 — کدهای سقف‌دارِ همین فاکتور پیش از ثبت (`POST /redeem`). همان `saleId` دوباره
+   *  مصرفِ دوم نمی‌سازد؛ همه یا هیچ. خطا ⇒ `ApiFailure` با `status` و `code` ِ سرور (`PromoRedeem.decide`).
+   */
+  suspend fun redeem(saleId: String, codes: List<String>): ApiResult<Unit> = result {
+    api.post("$ROOT/redeem", buildJsonObject {
+      put("saleId", saleId)
+      put("codes", JsonArray(codes.map { JsonPrimitive(it) }))
+    })
+    Unit
+  }
 
   private companion object {
     const val ROOT = "/shop/promos"

@@ -14,6 +14,11 @@
  *  ⛔ **توکن اجباری نیست.** برنامه‌ای که هنگامِ ورود می‌شکند هنوز نشستی
  *     ندارد — و همان خطا دقیقاً همانی است که باید دیده شود.
  *  ⚠️ سقفِ نرخ دارد، وگرنه یک حلقهٔ خطا در یک برنامه دفتر را پر می‌کند.
+ *
+ * ── شناسهٔ گزارش (OPS-03) ───────────────────────────────────────────────
+ * برنامهٔ نصبی کدِ `cer_<ULID>` را خودش می‌سازد و به کاربر نشان می‌دهد («به پشتیبانی بگویید»)؛
+ * همان `report_id` شناسهٔ ردیف می‌شود و فرستادنِ دوباره (پاسخ گم شد) ردیفِ دوم نمی‌سازد و
+ * ردیفِ اول را هم عوض نمی‌کند. شناسهٔ ناجور ⇒ شناسهٔ سرور، مثلِ پیش. پاسخ: `{ ok, id }`.
  */
 const express = require('express');
 const { query, now, newId } = require('../db');
@@ -26,6 +31,7 @@ const router = express.Router();
 const MAX_MESSAGE = 500;
 const MAX_STACK = 4000;
 const MAX_LOG = 4000;
+const REPORT_ID = /^cer_[0-9A-HJKMNP-TV-Z]{26}$/;
 
 /** هر چیزی که به کسی برگردد — ایمیل، شماره، توکنِ بلند — پوشانده می‌شود. */
 function scrub(text, limit) {
@@ -52,12 +58,15 @@ router.post(
         || sectionOf(req.body?.app || req.headers['x-app'] || req.headers['x-app-id'])
         || 'shop';
 
+      const given = typeof req.body?.report_id === 'string' && REPORT_ID.test(req.body.report_id) ? req.body.report_id : '';
+      const id = given || newId('cer');
       await query(
         `INSERT INTO client_errors (id, app, account_kind, account_id, device_id, app_version, schema_version,
                                     message, stack, log_tail, at, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)`,
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11)
+         ON CONFLICT (id) DO NOTHING`,
         [
-          newId('cer'),
+          id,
           app,
           ctx?.accountKind || '',
           ctx?.accountId || '',
@@ -72,7 +81,7 @@ router.post(
       );
       //  پاسخ کوتاه است و هیچ‌وقت خطا نمی‌دهد: برنامه‌ای که دارد می‌شکند
       //  نباید به‌خاطرِ گزارشِ خطا دوباره بشکند.
-      res.status(202).json({ ok: true });
+      res.status(202).json({ ok: true, id });
     } catch (err) {
       //  حتی خرابیِ خودِ ثبت هم به برنامه برنمی‌گردد
       if (String(err?.code || '').startsWith('42')) return res.status(202).json({ ok: true });

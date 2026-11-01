@@ -334,6 +334,8 @@ router.delete('/devices/:id', async (req, res, next) => {
     if (r.rowCount) {
       await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
         [now(), id, req.user.id]);
+      //  ⛔ S78: سوکتِ زندهٔ همان دستگاه هم در همین درخواست
+      await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
     }
     res.json({ ok: true });
   } catch (err) { next(err); }
