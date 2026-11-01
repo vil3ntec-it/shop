@@ -26,14 +26,13 @@ const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
 
 const router = express.Router();
-const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 /*
  *  DLV-01 (§۳.۱۱): **تنها** دری که توکنِ دامنه‌دارِ پیک را می‌پذیرد. پرچمِ
  *  `req.courierScope` فقط همین‌جا روشن می‌شود و تهِ همین روتر هر نشانیِ
  *  ناشناخته ۴۰۴ است، تا درخواست با پرچمِ روشن به روترِ دیگری سُر نخورد.
  */
-router.use(allowCourierScope, requireUser, requireShop, wrap(async (req, res, next) => {
+router.use(allowCourierScope, requireUser, requireShop, async (req, res, next) => {
   const st = await delivery.stateOf(req.shopId);
   if (!st.readable) return next(notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled'));
   const courier = await delivery.courierOfUser(req.shopId, req.user.id);
@@ -44,9 +43,9 @@ router.use(allowCourierScope, requireUser, requireShop, wrap(async (req, res, ne
     deviceId: req.device?.id || '',
   };
   next();
-}));
+});
 
-router.get('/me', wrap(async (req, res) => {
+router.get('/me', async (req, res) => {
   const c = req.courier;
   res.json({
     courier: { id: c.id, name: c.name, active: c.active === true, cashCapMinor: Number(c.cash_cap_minor) },
@@ -54,29 +53,29 @@ router.get('/me', wrap(async (req, res) => {
     callEnabled: await delivery.callFlagOf(req.shopId),
     serverTime: Date.now(),
   });
-}));
+});
 
-router.get('/missions', wrap(async (req, res) => {
+router.get('/missions', async (req, res) => {
   //  DLV-05/DLV-16: پیوندهای مسیریاب و «موقعیت فقط در راه» فقط با پرچم (`courierMap.decorate`)؛
   //  DLV-07/DLV-17: شمارِ کیسه‌های اسکنی و فاصلهٔ مجاز از پین، هم فقط با پرچم (`courierChecks.decorate`)
   res.json(await courierChecks.decorate(req.shopId, await courierMap.decorate(req.shopId, await delivery.missions(req.shopId, req.courier.id, {
     scope: String(req.query.scope || 'active'), limit: req.query.limit,
   }))));
-}));
+});
 
 /**
  * صفِ رویدادها (DLV-10): `{deviceId?, events:[{eventId, assignmentId, type,
  * deviceTime, deviceSeq, reason?, note?, cashCollectedMinor?, cashReason?, code?, bags? (DLV-07), position? (DLV-17)}]}`.
  * پاسخ برای هر رویداد: applied | duplicate | unchanged | rejected(code).
  */
-router.post('/events', wrap(async (req, res) => {
+router.post('/events', async (req, res) => {
   res.json(await delivery.courierEvents(req.shopId, req.body, req.courierActor));
-}));
+});
 
-router.post('/missions/:id/photos', wrap(async (req, res) => {
+router.post('/missions/:id/photos', async (req, res) => {
   const out = await delivery.putPhoto(req.shopId, req.params.id, req.body, req.courierActor);
   res.status(out.replayed ? 200 : 201).json(out);
-}));
+});
 
 /**
  * «تماس با مشتری» (DLV-02، §۳۸): شمارهٔ کامل فقط همین لحظه و فقط برای مأموریتِ پذیرفته و
@@ -100,13 +99,13 @@ router.post('/missions/:id/call', async (req, res) => {
  *  `shop.delivery_live_location`): «تقریباً کی می‌رسم» و آخرین نقطه — فقط
  *  مأموریتِ خودِ پیک و فقط «در راه». مشتری فقط از سرور می‌خواند.
  */
-router.post('/missions/:id/eta', wrap(async (req, res) => {
+router.post('/missions/:id/eta', async (req, res) => {
   res.json(await delivery.putEta(req.shopId, req.params.id, req.body, req.courierActor));
-}));
+});
 
-router.post('/missions/:id/location', wrap(async (req, res) => {
+router.post('/missions/:id/location', async (req, res) => {
   res.json(await delivery.putLocation(req.shopId, req.params.id, req.body, req.courierActor));
-}));
+});
 
 /*
  *  DLV-05 (پشتِ پرچمِ خاموشِ `shop.delivery_map`): نقشهٔ آفلاینِ شهر. فهرست با
