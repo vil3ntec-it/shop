@@ -25,7 +25,6 @@
  * • `client_id` کلیدِ یکتاییِ برنامه است: دوبار زدن (یا صفِ آفلاین) ⇒ همان پیوند.
  */
 const crypto = require('crypto');
-const config = require('../config');
 const { query, one, many, tx, now } = require('../db');
 const { ulid, ALPHABET } = require('./ulid');
 const { badRequest, conflict, notFound } = require('../middleware/errors');
@@ -229,7 +228,7 @@ async function resolve(raw) {
 
 let lastSweep = 0;
 function visitorKey() {
-  const secret = config.secrets.api || config.secrets.jwt || '';
+  const secret = require('./server-secret').serverSecret(['api', 'jwt'], '');   //  همان زنجیرهٔ یگانهٔ راز
   return crypto.createHash('sha256').update(`store-campaign-visitor\n${secret}`).digest();
 }
 
