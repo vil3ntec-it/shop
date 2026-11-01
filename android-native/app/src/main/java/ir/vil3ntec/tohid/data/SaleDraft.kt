@@ -135,10 +135,15 @@ class SalePost {
     data class Done(val ok: SalesEngine.Result.Ok) : Outcome
   }
 
+  /**
+   *  @param before کارِ پیش از ساختنِ فاکتور، زیرِ همان قفل (PRM-02: گرفتنِ کدِ سقف‌دار از سرور).
+   *    پیام ⇒ `Refused` و هیچ ثبتی؛ `null` ⇒ ادامه. نبودنش ⇒ همان رفتارِ پیشین.
+   */
   suspend fun run(
     key: String,
     record: (key: String) -> SalesEngine.Result,
     save: suspend (ShopData) -> Boolean,
+    before: (suspend (key: String) -> String?)? = null,
     /** فقط موتورِ تازهٔ موجودی (`StockLedger.isOn`) بیرون از رشتهٔ صفحه؛ خاموش ⇒ همان مسیرِ امروز */
     offMain: Boolean = false,
     done: (key: String) -> Unit,
@@ -146,6 +151,7 @@ class SalePost {
     if (!gate.compareAndSet(false, true)) return Outcome.Busy
     _busy.value = true
     try {
+      before?.invoke(key)?.let { return Outcome.Refused(it) }
       //  موتورِ تازه روشن ⇒ سنجشِ دفترِ موجودی بیرون از رشتهٔ صفحه تا دفترِ بزرگ صندوق را قفل
       //  نکند (`record` تابعِ خالص است، `SalesEngine.record`). خاموش ⇒ همان فراخوانیِ مستقیمِ امروز.
       val r = if (offMain) withContext(Dispatchers.Default) { record(key) } else record(key)

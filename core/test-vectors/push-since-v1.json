@@ -1,0 +1,22 @@
+{
+  "about": "PushSince (core/…/core/sync/PushSince.kt) و pushSinceNote/pushSince (license/sync-core.js) — یک رفتار. یادداشتِ نبوده = -1",
+  "note": [
+    { "previous": -1, "empty": true, "cursor": 10, "want": 10 },
+    { "previous": -1, "empty": false, "cursor": 10, "want": 10 },
+    { "previous": 4, "empty": true, "cursor": 10, "want": 10 },
+    { "previous": 4, "empty": false, "cursor": 10, "want": 4 },
+    { "previous": 12, "empty": false, "cursor": 10, "want": 10 },
+    { "previous": 0, "empty": false, "cursor": 10, "want": 0 },
+    { "previous": 7, "empty": false, "cursor": 7, "want": 7 },
+    { "previous": 7, "empty": true, "cursor": 0, "want": 0 },
+    { "previous": 7, "empty": false, "cursor": -3, "want": 0 }
+  ],
+  "since": [
+    { "noted": -1, "cursor": 10, "want": 10 },
+    { "noted": 4, "cursor": 10, "want": 4 },
+    { "noted": 12, "cursor": 10, "want": 10 },
+    { "noted": 0, "cursor": 10, "want": 0 },
+    { "noted": 10, "cursor": 10, "want": 10 },
+    { "noted": 5, "cursor": -1, "want": 0 }
+  ]
+}

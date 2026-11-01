@@ -88,6 +88,11 @@ fun SaleScreen(
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
   val pricedFrom = cart
+  //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
+  val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
+  var deliverOpen by remember { mutableStateOf(false) }
+  //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): پیشنهادِ جایگزینِ موجود هنگامِ کمبود
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
 
   // کالای حذف‌شده نباید در سبد بماند
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
@@ -261,7 +266,9 @@ fun SaleScreen(
     selectedId = productId
     if (added.capped) {
       ScanFeedback.unknown(context)
-      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")))
+      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")) +
+        //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
+        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoOn))
     } else {
       ScanFeedback.ok(context)
       //  اگر از نیمهٔ بارکد شناخته شد، همان را بگو — فروشنده باید بداند
@@ -280,6 +287,19 @@ fun SaleScreen(
   //  بارکدی که گوشیِ جفت‌شده خواند، همین‌جا به سبد می‌رود
   LaunchedEffect(Unit) {
     for (code in ir.vil3ntec.tohid.sync.PhoneScanner.inbox) onBarcode(code, skipDedup = true, fromPhone = true)
+  }
+
+  //  HW-05 (فقط با «ابزارهای تازهٔ دستگاه»): اسکنی که در کادرِ قیمت/تعداد افتاد و نگهبانِ `NumberField`
+  //  برش گرداند (`ScanRouter.dispatch`) به همین سبد می‌رسد — همان کارِ `DeskSale` در کامپیوتر
+  val scanOwner = remember { Any() }
+  val hwTools = ir.vil3ntec.tohid.print.HwTools.on.value
+  DisposableEffect(hwTools) {
+    if (hwTools) ir.vil3ntec.tohid.scan.ScanRouter.register(scanOwner) { onBarcode(it, skipDedup = true); true }
+    onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(scanOwner) }
+  }
+  //  …و اسکنی که بیرون از صندوق از کادرِ عدد برگشت و صندوق را باز کرد (`ScanRouter.toSale`)
+  LaunchedEffect(hwTools) {
+    if (hwTools) for (code in ir.vil3ntec.tohid.scan.ScanRouter.toSale) onBarcode(code, skipDedup = true)
   }
 
   /*
@@ -333,7 +353,8 @@ fun SaleScreen(
         //  F0-06: با کلیدِ فیزیکی — چیدمانِ فارسی/پشتو «۶» و «ش» می‌سازد
         val ch = event.scanChar(allowSpace = true)
         if (ch != null) {
-          hid.feed(ch, now)
+          //  HW-05: بارکدخوانی که به‌جای Enter پسوندِ تنظیم‌شده می‌زند همین‌جا تمام می‌شود
+          hid.feed(ch, now)?.let { onBarcode(it, skipDedup = true) }
           return@onKeyEvent true
         }
         false
@@ -539,6 +560,17 @@ fun SaleScreen(
             Spacer(Modifier.height(8.dp))
           }
         }
+        //  POS-38 (پشتِ `DeliverLaterPrefs`، پیش‌فرض خاموش): سبد ⇐ سفارشِ ارسال، بی فروش
+        if (deliverLater) {
+          item(key = "deliver-later") {
+            TohidSecondaryButton(
+              ir.vil3ntec.tohid.core.i18n.StrDeliver.button,
+              onClick = { deliverOpen = true },
+              modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+              icon = Icons.Filled.LocalShipping,
+            )
+          }
+        }
         //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش، و کادرِ کد اگر قاعدهٔ کددار هست
         if (promo != null && promo.applied.isNotEmpty()) {
           item(key = "promo-lines") { ir.vil3ntec.tohid.ui.components.pos.PromoLines(promo.applied) }
@@ -577,6 +609,15 @@ fun SaleScreen(
   }
 
   /* --------------------------- پنجره‌ها --------------------------- */
+  //  POS-38: سفارشِ ارسال از همین سبد (با تخفیفِ خودکار، `priced`)؛ پس از ثبت سبد خالی — هیچ فروشی این‌جا نیست
+  if (deliverOpen) {
+    ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSheetWired(d, priced, onClose = { deliverOpen = false }) { o ->
+      deliverOpen = false
+      cartStore.clear()
+      selectedId = null
+      toast(ir.vil3ntec.tohid.core.i18n.StrDeliver.created(o.orderNo))
+    }
+  }
 
   if (pickDebtor) {
     DebtorPicker(
@@ -602,8 +643,12 @@ fun SaleScreen(
         basePrice = base,
         //  ردیفِ آزاد همیشه قیمتِ خودش را دارد و برگشتی به «قیمتِ کالا» ندارد
         custom = line.free || line.unitPrice != null,
+        free = line.free,
+        linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
         saleUnit = product?.saleUnit.orEmpty(),
         unitFactor = product?.unitFactor ?: 1.0,
+        //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
+        why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         onDismiss = { editLine = null },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)
@@ -619,6 +664,7 @@ fun SaleScreen(
 
   if (freeLine) {
     FreeLineDialog(
+      linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
       onDismiss = { freeLine = false },
       onConfirm = { label, price, quantity ->
         cartStore.set(SalesEngine.addFreeLine(cart, label, price, quantity, ::newId))
@@ -639,7 +685,7 @@ fun SaleScreen(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
       d, priced, options,
       today = ir.vil3ntec.tohid.todayIso(),
@@ -672,7 +718,7 @@ fun SaleScreen(
       cart = priced,
       promo = promo,
       presetDebtorId = cartDebtorId,
-      presetDiscount = extrasNow().discount,
+      presetDiscount = extrasNow().discount, presetAmount = extrasNow().discountAmount,
       onDismiss = { checkout = false },
       busy = cartStore.posting.collectAsState().value,
       //  برگهٔ تأییدِ تخفیف (S08) به شناسهٔ همین فاکتور بسته است

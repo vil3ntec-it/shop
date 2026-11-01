@@ -84,6 +84,8 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
           color = Shop.colors.muted,
         )
         Spacer(Modifier.height(14.dp))
+        //  PUR-02/04: فقط با پرچمِ سرورِ `shop.purchase_orders` دیده می‌شود (خاموش ⇒ هیچ)
+        PurchaseOrdersEntry(store, d, ::toast, Modifier.fillMaxWidth().padding(bottom = 12.dp))
       }
 
       item {
