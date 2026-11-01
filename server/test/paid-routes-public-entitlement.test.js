@@ -40,6 +40,7 @@ const CATEGORY = {
   'storefront.js': 'STORE_PAID', 'shop-chat-store.js': 'STORE_PAID', 'trust-store.js': 'STORE_FREE',
   'pick-substitutes-store.js': 'STORE_PAID',   //  PCK-05: پاسخِ مشتری به جایگزین — همان ویترینِ پولی (sf.open)
   'order-amend-store.js': 'STORE_PAID',        //  ORD-14: رضایتِ مشتری به ویرایشِ سفارش — همان ویترینِ پولی
+  'delivery-rating-store.js': 'STORE_PAID',    //  DLV-18: امتیازِ مشتری به پیک — همان ویترینِ پولی (sf.open)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */

@@ -22,6 +22,7 @@ const orders = require('../lib/orders');
 const courierMap = require('../lib/courier-map');
 const courierChecks = require('../lib/courier-checks');
 const courierRoute = require('../lib/courier-route');
+const ratings = require('../lib/delivery-ratings');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -107,6 +108,15 @@ router.post('/missions/:id/call', async (req, res) => {
   });
   res.set('Cache-Control', 'no-store');
   res.json({ phone: out.phone, status: out.status });
+});
+
+/*
+ *  DLV-18 (پشتِ پرچمِ خاموشِ `shop.delivery_ratings`): پیک پس از «تحویل شد» به همان تحویل امتیاز می‌دهد
+ *  (`{stars, tags}`، فقط برچسبِ فهرستِ ثابت). یک بار؛ همان امتیاز دوباره ⇒ همان پاسخ.
+ */
+router.post('/missions/:id/rating', async (req, res) => {
+  const out = await ratings.rateByCourier(req.shopId, req.params.id, req.body, req.courierActor);
+  res.status(out.replayed ? 200 : 201).json(out);
 });
 
 /*
