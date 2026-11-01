@@ -139,6 +139,13 @@ fun DeskSaleScreen(
   var hint by remember { mutableStateOf(0) }
   var selected by remember { mutableStateOf<String?>(null) }
   var pickDebtor by remember { mutableStateOf(false) }
+  //  POS-39: دریافت از مشتری (F7) — فقط با کلیدِ همین دستگاه (پیش‌فرض خاموش)
+  val tillReceive = remember { ir.vil3ntec.tohid.data.TillReceivePref.on(context) }
+  var receivePick by remember { mutableStateOf(false) }
+  var receiveFor by remember { mutableStateOf<String?>(null) }
+  var receiveKey by remember { mutableStateOf("") }
+  var receiveBusy by remember { mutableStateOf(false) }
+  var receiptOf by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
   var freeLine by remember { mutableStateOf(false) }
   var editLine by remember { mutableStateOf<String?>(null) }
   var lastInvoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
@@ -195,6 +202,7 @@ fun DeskSaleScreen(
   var returnMode by remember { mutableStateOf(false) }
 
   val searchFocus = remember { FocusRequester() }
+  val moreKeys = ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.isOn(context); val discountFocus = remember { FocusRequester() } // POS-41، خاموش ⇒ همان
   LaunchedEffect(Unit) { runCatching { searchFocus.requestFocus() } }
   fun refocus() { runCatching { searchFocus.requestFocus() } }
 
@@ -218,10 +226,12 @@ fun DeskSaleScreen(
   //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`
   ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.load(context)
   val smartSearch = ir.vil3ntec.tohid.ui.components.pos.PosSearchPrefs.on.value
-  val searchIndex = remember(d.products, smartSearch) { if (smartSearch) PosCatalog.searchIndex(d.products) else null }
+  //  PRD-02 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): نام‌های دیگر و واژه‌های جست‌وجو هم؛ خاموش ⇒ همان دو راهِ پیشین
+  val infoSearch = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  val searchIndex = remember(d.products, smartSearch, infoSearch) { if (smartSearch) PosCatalog.searchIndex(d.products, infoSearch) else null }
   val byId = remember(d.products) { d.products.associateBy { it.id } }
-  val matches: List<Product> = remember(term, d.products, searchIndex) {
-    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term)
+  val matches: List<Product> = remember(term, d.products, searchIndex, infoSearch) {
+    searchIndex?.let { PosCatalog.smartMatches(it, byId, term) } ?: PosCatalog.matches(d.products, term, infoSearch)
   }
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
@@ -236,7 +246,9 @@ fun DeskSaleScreen(
     selected = product.id
     if (added.capped) {
       ScanFeedback.unknown(context)
-      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")))
+      toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")) +
+        //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): جایگزینِ موجود
+        ir.vil3ntec.tohid.data.ProductInfoMap.insteadSuffix(d, product, infoSearch))
     } else ScanFeedback.ok(context)
   }
   fun add(product: Product, count: Double) =
@@ -331,6 +343,10 @@ fun DeskSaleScreen(
   )
   val gate = DiscountGate.state(discountDecision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
+  //  PAY-21: درگاه‌های تسویه (حساب‌پی) — پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
+  val gateways = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) {
+    (SalesEngine.record(d, priced, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message
+  }
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
   //  تأییدِ بیش از سقف در حالت نگه داشته نمی‌شود — مثلِ گوشی (`QuickSale`، `Sale`) فقط به همان یک تلاشِ
@@ -351,12 +367,13 @@ fun DeskSaleScreen(
     ) {
       toast(StrPos.cartChangedRetry); return
     }
-    if (discountBad || (!payV2 && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
-    if (!payV2 && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (discountBad || (!payV2 && settled == null && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
+    if (!payV2 && settled == null && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
     if (gate == DiscountGate.State.DENIED) { toast(StrPos.discountForbidden); return }
     if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
     val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
-    val st = if (!payV2) null else settled ?: when (
+    //  PAY-21: تسویهٔ آمادهٔ حساب‌پی با پرچم و بی آن پذیرفته است
+    val st = settled ?: if (!payV2) null else when (
       val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
         ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
       )
@@ -376,7 +393,7 @@ fun DeskSaleScreen(
     }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
-    scope.launch { when (val posted = cartStore.post(store) { key ->
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
       ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo) }) {
@@ -484,6 +501,7 @@ fun DeskSaleScreen(
             .focusRequester(searchFocus)
             .onPreviewKeyEvent { e ->
               if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+              if (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.field(moreKeys, e, query.isEmpty(), cart.isEmpty()) != null) { confirmClear = true; return@onPreviewKeyEvent true }
               when (PosKeys.field(keyName(e.key), e.isPrimaryModifier, query.isEmpty(), matches.isNotEmpty(), selected != null)) {
                 PosAction.SUBMIT -> { submit(); true }
                 PosAction.HINT_DOWN -> { hint = (hint + 1).coerceAtMost(matches.size - 1); true }
@@ -566,7 +584,7 @@ fun DeskSaleScreen(
       headerActions = {
         CartHeaderAction(StrSale.freeItemAlt, Icons.Filled.AddBox, KeyMap.SALE_FREE_ITEM.hint) { freeLine = true }
         if (returnsV2) CartHeaderAction(StrInvoices.returnItems, Icons.Filled.SwapHoriz, KeyMap.SALE_RETURN_MODE.hint) { returnMode = true }
-        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
+        CartHeaderAction(StrPos.emptyCart, Icons.Filled.DeleteOutline, if (moreKeys) KeyMap.SALE_CLEAR.hint else null, enabled = cart.isNotEmpty(), danger = true) { confirmClear = true }
         //  POS-38 (پشتِ `DeliverLaterPrefs`، پیش‌فرض خاموش): سبد ⇐ سفارشِ ارسال، بی فروش
         if (deliverLater) {
           CartHeaderAction(ir.vil3ntec.tohid.core.i18n.StrDeliver.button, Icons.Filled.LocalShipping, null, enabled = cart.isNotEmpty() && !posting) {
@@ -595,6 +613,7 @@ fun DeskSaleScreen(
           onEdit = { editLine = it },
           onMinus = { step(it, -1); refocus() },
           onPlus = { step(it, 1); refocus() },
+          rowHints = if (moreKeys) listOf(KeyMap.SALE_EDIT_ROW.hint, "${KeyMap.SALE_QTY_UP.hint} ${KeyMap.SALE_QTY_DOWN.hint}", KeyMap.SALE_DELETE_ROW.hint) else emptyList(),
           //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
           //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
           footer = if (promoSnap.active) {
@@ -626,7 +645,7 @@ fun DeskSaleScreen(
                 onSelect = { discountAmount = it == "amount"; refocus() },
               )
             }
-            MiniNumberField(Str.discount, discountText, { discountText = numericInput(it) }, discountBad, if (discountAmount) "؋" else "٪")
+            MiniNumberField(if (moreKeys) Str.discount + " · " + KeyMap.SALE_DISCOUNT_INVOICE.hint else Str.discount, discountText, { discountText = numericInput(it) }, discountBad, if (discountAmount) "؋" else "٪", discountFocus)
             //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
             when (gate) {
               DiscountGate.State.NEEDS_APPROVAL -> Row(
@@ -669,6 +688,12 @@ fun DeskSaleScreen(
           if (payment == SalesEngine.Payment.CREDIT) {
             MiniNumberField(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
           }
+          //  PAY-21: حساب‌پی (کلِ فاکتور؛ با پنلِ ترکیبی در همان پنل و برای باقی‌مانده)
+          ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
+            hook = gateways, total = totals.finalTotal,
+            panel = null, customerId = cartDebtorId, busy = posting, modifier = Modifier.padding(top = 8.dp), onPaid = { st -> finish(st) },
+            enabled = !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
+          )
         }
       },
       actions = {
@@ -708,6 +733,7 @@ fun DeskSaleScreen(
           returnMode = true
           return@onPreviewKeyEvent true
         }
+        if (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e) != null) { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
@@ -715,6 +741,10 @@ fun DeskSaleScreen(
           PosAction.FREE_ITEM -> { freeLine = true; true }
           PosAction.REPRINT -> { if (lastInvoice != null) showInvoice = true; true }
           PosAction.PRICE_CHECK -> if (ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.on.value) { priceCheck = true; true } else false
+          //  مشتریِ همین فاکتور ⇒ مستقیم؛ وگرنه اول انتخابِ مشتری. خاموش ⇒ کلید مالِ صندوق نیست
+          PosAction.RECEIVE -> if (!tillReceive) false else {
+            receiveKey = newId(); if (cartDebtorId != null) receiveFor = cartDebtorId else receivePick = true; true
+          }
           else -> false
         }
       }
@@ -774,6 +804,38 @@ fun DeskSaleScreen(
     }
   }
 
+  if (receivePick) {
+    DebtorPicker(d = d, selected = null, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
+  }
+  receiveFor?.let { id ->
+    val name = d.debtors.find { it.id == id }?.name
+    if (name != null) {
+      TillReceiveDialog(
+        name = name,
+        balanceMinor = ir.vil3ntec.tohid.data.TillReceiveFlow.balanceMinor(d, id),
+        busy = receiveBusy,
+        gate = { content -> VipGate(Str.debtors) { content() } },
+        onDismiss = { receiveFor = null; refocus() },
+        onSubmit = { amount, notes, prepay ->
+          receiveBusy = true
+          val key = receiveKey
+          scope.launch {
+            //  ⛔ روی دفترِ همین لحظهٔ دیسک (`DebtEntry.record`)، نه `d` ِ صفحه؛ همان کلید ⇒ یک ردیف، حتی با دو ضربه
+            val r = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, key, prepay)
+            receiveBusy = false
+            //  ضربهٔ دوم (`again`) پیامِ دوم نمی‌گیرد؛ «ثبت نشد» ِ قفل/دیسک از `AppRoot`
+            r.show(::toast, "دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L))} ؋ از «$name» ثبت شد") {
+              receiveFor = null; receiptOf = Triple(store.data.value, id, key)
+            }
+          }
+        },
+      )
+    }
+  }
+  //  رسیدِ همان دریافت — همان رسیدِ دفترِ قرض (چاپ/کپی)، روی دفترِ پس از ثبت
+  receiptOf?.let { (data, debtorId, txId) ->
+    DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
+  }
   if (pickDebtor) {
     DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus() }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus()
@@ -846,6 +908,8 @@ fun DeskSaleScreen(
       target = target,
       onDismiss = { payOpen = false; refocus() },
       onConfirm = { st -> finish(st) },
+      //  PAY-21: حساب‌پی برای باقی‌ماندهٔ پنل — نه با تخفیفِ تأییدنشده (پول گرفته و فروش رد نشود)
+      gateways = gateways.takeIf { !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED },
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(

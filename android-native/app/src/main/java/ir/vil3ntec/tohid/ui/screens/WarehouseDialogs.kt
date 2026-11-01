@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.product.ProductBarcodes
 import ir.vil3ntec.tohid.core.product.SimilarNames
+import ir.vil3ntec.tohid.core.product.ProductBarcodes
+import ir.vil3ntec.tohid.core.product.ProductLabels
+import ir.vil3ntec.tohid.core.product.SimilarNames
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -55,6 +58,16 @@ data class ProductFormState(
   val unitFactor: String = "",
   /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
   val barcodes: String = barcode,
+  /** PRD-02/PRD-26 — فقط با `productInfoOn()` دیده و ذخیره می‌شود */
+  val info: ir.vil3ntec.tohid.ui.components.product.ProductInfoForm = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm(),
+  /** PRD-04 (پشتِ `ShopPolicy.productTools`): همهٔ بارکدها با «،» — کالای تازه با بارکدِ اسکن‌شده همان را دارد */
+  val barcodes: String = barcode,
+  /** PRD-06 (همان پرچم): برند و برچسب‌ها با «،» */
+  val brand: String = "",
+  val tags: String = "",
+  /** INV-12 — فقط وقتی «نقطهٔ سفارش و بیشینه» روشن است دیده و فرستاده می‌شوند؛ خالی = تعریف نشده */
+  val reorder: String = "",
+  val max: String = "",
 ) {
   companion object {
     fun of(p: Product) = ProductFormState(
@@ -72,6 +85,12 @@ data class ProductFormState(
       saleUnit = p.saleUnit,
       unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
       barcodes = p.barcodes.joinToString("، "),
+      info = ir.vil3ntec.tohid.ui.components.product.ProductInfoForm.of(ir.vil3ntec.tohid.data.ProductInfoMap.of(p)),
+      barcodes = p.barcodes.joinToString("، "),
+      brand = p.brand.orEmpty(),
+      tags = p.tags.orEmpty().joinToString("، "),
+      reorder = p.reorderPoint?.let { numberText(it) }.orEmpty(),
+      max = p.maxStock?.let { numberText(it) }.orEmpty(),
     )
 
     /** عدد را برای کادرِ ورودی می‌نویسد: بدونِ اعشارِ بی‌مورد و با رقمِ لاتین */
@@ -99,6 +118,21 @@ fun ProductDialog(
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
   var priceReason by remember(state.editingId) { mutableStateOf("") }
   val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
+  //  PRD-02/PRD-26: خاموش ⇒ همان فرمِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
+  val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
+  //  PRD-19 و PRD-04 — پیش‌فرض خاموش (تنظیمِ همین دستگاه)
+  val context = LocalContext.current
+  val tools = remember { ShopPolicy.productTools(context) }
+  val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
+  val similar = remember(form.name, similarIndex) {
+    similarIndex?.find(form.name, except = d.products.indexOfFirst { it.id == form.editingId }).orEmpty()
+  }
+  //  PRD-14: تغییرِ قیمت با نامِ کاربر و دلیل در سابقه (همان پرچم)
+  val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim() }
+  var priceReason by remember(state.editingId) { mutableStateOf("") }
+  val priceChanged = form.editingId != null && (form.purchase != state.purchase || form.sale != state.sale)
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val levelsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context) }
 
   Dialog(onDismissRequest = onDismiss) {
     DialogEntry {
@@ -181,6 +215,24 @@ fun ProductDialog(
             modifier = Modifier.fillMaxWidth(),
           )
         }
+        //  INV-12: نقطهٔ سفارش و بیشینه — فقط با تنظیمِ «نقطهٔ سفارش و بیشینه» (پیش‌فرض خاموش)
+        if (levelsOn) {
+          Spacer(Modifier.height(10.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            NumberField(
+              value = form.reorder,
+              onValueChange = { form = form.copy(reorder = it) },
+              label = "نقطهٔ سفارش",
+              modifier = Modifier.weight(1f),
+            )
+            NumberField(
+              value = form.max,
+              onValueChange = { form = form.copy(max = it) },
+              label = "بیشینهٔ موجودی",
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
 
         Spacer(Modifier.height(14.dp))
         ChipPicker(
@@ -208,6 +260,25 @@ fun ProductDialog(
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
+        if (tools) {
+          Spacer(Modifier.height(10.dp))
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedTextField(
+              value = form.brand,
+              onValueChange = { form = form.copy(brand = it) },
+              label = { Text("برند (اختیاری)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+              value = form.tags,
+              onValueChange = { form = form.copy(tags = it) },
+              label = { Text("برچسب‌ها (با «،» جدا)") },
+              singleLine = true,
+              modifier = Modifier.weight(1f),
+            )
+          }
+        }
 
         //  واحدِ فروشِ دوم — مثلاً موجودی «کیلوگرم»، فروش «گرم» با ضریبِ ۰٫۰۰۱
         Spacer(Modifier.height(10.dp))
@@ -226,6 +297,11 @@ fun ProductDialog(
             label = if (form.unit.isBlank()) "ضریب" else "هر واحد = چند ${form.unit}",
             modifier = Modifier.weight(1f),
           )
+        }
+
+        if (infoOn) {
+          Spacer(Modifier.height(14.dp))
+          ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(form.info, d, form.editingId) { form = form.copy(info = it) }
         }
 
         if (d.suppliers.isNotEmpty()) {
@@ -275,6 +351,16 @@ fun ProductDialog(
                   barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
                   changedBy = if (tools) me else null,
                   reason = if (tools) priceReason else null,
+                  info = if (infoOn) form.info.toInfo(ir.vil3ntec.tohid.data.ProductInfoMap.refs(d), form.editingId) else null,
+                  barcodes = if (tools) ProductBarcodes.parse(form.barcodes) else null,
+                  changedBy = if (tools) me else null,
+                  reason = if (tools) priceReason else null,
+                  brand = if (tools) form.brand else null,
+                  tags = if (tools) ProductLabels.tags(form.tags) else null,
+                  //  خالی ⇒ پاک؛ نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
+                  editLevels = levelsOn,
+                  reorderPoint = if (levelsOn) levelNumber(form.reorder) else null,
+                  maxStock = if (levelsOn) levelNumber(form.max) else null,
                 )
               )
             },
@@ -286,6 +372,9 @@ fun ProductDialog(
     }
   }
 }
+
+/** کادرِ حد: خالی ⇒ `null` (تعریف نشده)، عددِ نادرست ⇒ NaN (موتور پیامِ روشن می‌دهد) */
+internal fun levelNumber(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.let { it.toDoubleOrNull() ?: Double.NaN }
 
 /* ========================= فرمِ ورودِ کالا ========================= */
 

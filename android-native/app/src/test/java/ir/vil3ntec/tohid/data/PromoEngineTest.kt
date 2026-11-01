@@ -148,6 +148,10 @@ class PromoEngineTest {
     val flagged = snap.copy(tierPrice = true)
     assertEquals(flagged, PromoJson.snapshotOf(PromoJson.toJson(flagged), 42))
     assertFalse(PromoJson.toJson(snap).toString().contains("tierPrice"))
+    //  PRM-02: پرچمِ `redeem` ِ سرور هم رفت‌وبرگشت دارد؛ پاسخِ سرورِ قدیم (بی کلید) ⇒ خاموش
+    val counted = snap.copy(redeem = true)
+    assertEquals(counted, PromoJson.snapshotOf(PromoJson.toJson(counted), 42))
+    assertEquals(false, PromoJson.snapshotOf(PromoJson.toJson(snap), 42).redeem)
   }
 
   /* ---------------- S2: فیلدهای تازهٔ فاکتور ---------------- */

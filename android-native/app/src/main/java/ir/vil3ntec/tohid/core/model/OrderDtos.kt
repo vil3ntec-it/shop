@@ -33,6 +33,8 @@ data class OrdersConfigDto(
   val reasons: Map<String, List<String>> = emptyMap(),
   val sources: List<String> = emptyList(),
   val permissions: OrderPermsDto = OrderPermsDto(),
+  /** «با اسکناسِ …» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24؛ پرچمِ `shop.orders.delivery_prefs`) */
+  val deliveryPrefs: Boolean = false,
   /** سرور «فروشِ تحویل در برنامه» را دارد — بی این (سرورِ کهنه) برنامه هیچ فروشی نمی‌سازد */
   val saleOnHandover: Boolean = false,
   /**
@@ -42,6 +44,8 @@ data class OrdersConfigDto(
   val handoverSince: Long? = null,
   /** پرچمِ خاموشِ `shop.orders.picking` (PCK): برگهٔ جمع‌آوری به‌جای گذارهای سادهٔ «جمع‌آوری/بسته‌بندی» */
   val picking: Boolean = false,
+  /** ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی (CHK-15، پرچمِ `shop.orders.substitution`) */
+  val substitution: Boolean = false,
 )
 
 /** `GET /shop/orders/summary` — شمارشِ برگه‌های باز و نشانگرِ تغییر */
@@ -69,6 +73,16 @@ data class OrderAddressDto(
   val text: String = "",
 )
 
+/** دستورِ تحویلِ سفارش — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، اسکناسِ مشتری (CHK-14/23/24) */
+@Serializable
+data class OrderDeliveryDto(
+  val callBeforeArrival: Boolean = false,
+  val leaveWith: String = "",
+  val photoConsent: Boolean = false,
+  /** مبلغی که مشتری هنگامِ تحویل می‌دهد (یک‌صدم)؛ null ⇒ نگفته */
+  val cashTenderMinor: Long? = null,
+)
+
 @Serializable
 data class OrderLineDto(
   val lineNo: Int = 0,
@@ -80,6 +94,8 @@ data class OrderLineDto(
   val lineTotalMinor: Long = 0,
   val note: String = "",
   val substitution: String = "",
+  /** «کالای مشخص»: نامِ جایگزین (CHK-15) */
+  val substituteName: String = "",
 )
 
 @Serializable
@@ -126,9 +142,13 @@ data class OrderDto(
   val canContact: Boolean = false,
   val address: OrderAddressDto = OrderAddressDto(),
   val note: String = "",
+  /** ترجیحِ کلیِ جایگزینی (CHK-15)؛ هر قلم ترجیحِ مؤثرِ خودش را دارد */
+  val substitution: String = "",
   val subtotalMinor: Long = 0,
   val discountMinor: Long = 0,
   val deliveryFeeMinor: Long = 0,
+  /** دستورِ تحویل (`online_orders.delivery`) — فقط در جزئیات */
+  val delivery: OrderDeliveryDto = OrderDeliveryDto(),
   val lines: List<OrderLineDto> = emptyList(),
   val events: List<OrderEventDto> = emptyList(),
   /** فقط در `GET /shop/orders/handover`: لحظهٔ نخستین تحویل (زمانِ سرور) */

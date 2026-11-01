@@ -26,6 +26,7 @@ const orders = require('../lib/orders');
 const orderTimeout = require('../lib/order-timeout');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
+const orderDesk = require('../lib/order-desk');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -68,7 +69,8 @@ const customer = async (req, res, next) => {
 
 router.get('/:slug', readLimit, store, async (req, res) => {
   const [cats, status, delivery, seo] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store), sfd.publicInfo(req.store), storeSeo.publicInfo(req.store),
+    sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
+    storeSeo.publicInfo(req.store),
   ]);
   res.json({
     //  `payment`: «حساب‌پی» فقط با کلید + پرچمِ `pay.hesabpay` + اشتراکِ فعال (PAY-21)؛ وگرنه نقدِ هنگامِ تحویل
@@ -179,6 +181,8 @@ router.post('/:slug/verify/check', codeLimit, store, async (req, res) => {
 //  ── ثبت: فقط از راهِ `orders.create` با کلیدِ یکتایی (CHK-19) ───────
 router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   const key = orders.clientKeyOf(req);
+  //  ORD-08/09: توقفِ موقتِ سفارش‌گیری ⇒ ۴۰۹ `store_paused` (تکرارِ سفارشِ پیشین آزاد)
+  await orderDesk.guardCheckout(req.store.shop_id, key);
   let out;
   try {
     out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
@@ -195,6 +199,8 @@ router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   //  شکستش سفارش را پس نمی‌گیرد؛ فقط این سفارش بی زمان‌سنج می‌ماند.
   await orderTimeout.arm(req.store, out.orderId, { at: out.order.createdAt })
     .catch((err) => console.error('[order-timeout] arm', err.message));
+  //  ORD-04 قبولِ خودکار و ORD-09 سنجشِ توقف (پرچمِ `shop.orders.desk`)؛ شکست سفارش را پس نمی‌گیرد
+  await orderDesk.afterOrder(req.store, out.orderId).catch((err) => console.error('[order-desk] after', err.message));
   await audit.log({
     shopId: req.store.shop_id, actorType: 'customer', action: 'order.create',
     targetType: 'online_order', targetId: out.orderId,
@@ -373,6 +379,11 @@ router.post('/:slug/account/cart/merge', cartStore, checkoutLimit, customer, asy
 
 router.post('/:slug/orders/:token/cancel', checkoutLimit, store, async (req, res) => {
   res.json(await sf.cancel(req.store, req.params.token));
+});
+
+//  CHK-24: ویرایشِ دستورِ تحویل تا پیش از ارسال (پرچمِ خاموشِ `shop.orders.delivery_prefs`)
+router.post('/:slug/orders/:token/delivery', checkoutLimit, store, async (req, res) => {
+  res.json(await require('../lib/delivery-prefs').editByToken(req.store, req.params.token, req.body));
 });
 
 /** خطایی که دادهٔ همراه دارد (برگهٔ قیمتِ تازه، کالای ناموجود، …) — همه‌اش برود. */

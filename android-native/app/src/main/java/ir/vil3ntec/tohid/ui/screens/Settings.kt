@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Storefront
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.TableChart
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -483,18 +484,25 @@ fun SettingsScreen(
 
     /* ===================== چند فاکتورِ هم‌زمان (POS-12) ===================== */
     item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceSettings() }
+    /* ============== دریافت از مشتری در صندوق (POS-39، پیش‌فرض خاموش) ============== */
+    item {
+      var on by remember { mutableStateOf(ir.vil3ntec.tohid.data.TillReceivePref.on(context)) }
+      TillReceiveSettings(on) { on = it; ir.vil3ntec.tohid.data.TillReceivePref.set(context, it) }
+    }
     /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) } }
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysSettingsWired(context) } }
     /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
     item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* ======================== رسیدِ هدیهٔ بی قیمت (POS-34، پیش‌فرض خاموش) ======================== */
     item { ir.vil3ntec.tohid.ui.components.pos.GiftReceiptSettingsWired(context) }
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }
+    /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
+    item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
     item {
       var payV2 by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.payV2(context)) }
@@ -577,6 +585,32 @@ fun SettingsScreen(
       }
     }
 
+    /* ============== سابقهٔ ضدتقلب (RPT-09، پیش‌فرض خاموش، فقط همین دستگاه) ============== */
+    item {
+      var fraudTrail by remember { mutableStateOf(ir.vil3ntec.tohid.data.FraudTrailPref.enabled(context)) }
+      SettingsSection(
+        icon = Icons.Filled.History,
+        title = StrShell.fraudTrail,
+        subtitle = if (fraudTrail) StrShell.fraudTrailOn else StrSettings.off,
+        tint = if (fraudTrail) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.fraudTrailNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (fraudTrail) "on" else "off",
+          onSelect = {
+            fraudTrail = it == "on"
+            ir.vil3ntec.tohid.data.FraudTrailPref.setEnabled(context, fraudTrail)
+          },
+        )
+      }
+    }
+
     /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */
     //  فقط زبانه‌های «گزارش‌ها»ی کامپیوتر را نشان/پنهان می‌کند؛ گوشی هنوز این زبانه‌ها را ندارد،
     //  پس این‌جا دکمهٔ بی‌اثر نمی‌گذاریم. پیش‌فرض خاموش.
@@ -645,6 +679,88 @@ fun SettingsScreen(
     }
 
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+
+    /* ======== ابزارهای تازهٔ کالا: نامِ مشابه و چند بارکد (PRD-19، PRD-04) — پیش‌فرض خاموش ======== */
+    item {
+      var productTools by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.productTools(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Description,
+        title = "ابزارهای تازهٔ کالا",
+        subtitle = if (productTools) StrShell.switchOn else StrSettings.off,
+        tint = if (productTools) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          "روشن ⇒ هنگامِ ثبتِ کالا و ورود از فایل، نامِ مشابهِ کالاهای دکان هشدار داده می‌شود (ثبت را نمی‌بندد)، " +
+            "فرمِ کالا چند بارکد، برند و برچسب می‌گیرد (با «،» جدا)، تغییرِ قیمت نام و دلیل در سابقه دارد و «قیمتِ گروهی» با پیش‌نمایش " +
+            "و تأیید در نوارِ انتخاب می‌آید. فقط روی همین دستگاه.",
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (productTools) "on" else "off",
+          onSelect = {
+            productTools = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setProductTools(context, productTools)
+          },
+        )
+      }
+    }
+
+    /* ============ تحلیلِ موجودی (INV-15، INV-16) — گزارشِ کالاها در گوشی و کامپیوتر ============ */
+    //  پیش‌فرض خاموش؛ فقط خواندنی و فقط همین دستگاه (`ShopPolicy.stockInsight`).
+    item {
+      var stockInsight by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.stockInsight(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Inventory2,
+        title = StrShell.stockInsight,
+        subtitle = if (stockInsight) StrShell.stockInsightShown else StrSettings.off,
+        tint = if (stockInsight) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.stockInsightNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (stockInsight) "on" else "off",
+          onSelect = {
+            stockInsight = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setStockInsight(context, stockInsight)
+          },
+        )
+      }
+    }
+
+    /* ============ نقطهٔ سفارش و بیشینه (INV-12) — فرمِ کالا، ویرایشِ گروهی و «نیاز به سفارش» ============ */
+    //  پیش‌فرض خاموش؛ فقط همین دستگاه (`ShopPolicy.stockLevels`).
+    item {
+      var stockLevels by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.stockLevels(context)) }
+      SettingsSection(
+        icon = Icons.Filled.Inventory2,
+        title = StrShell.stockLevels,
+        subtitle = if (stockLevels) StrShell.stockLevelsShown else StrSettings.off,
+        tint = if (stockLevels) Shop.colors.success else Shop.colors.muted,
+      ) {
+        Text(
+          StrShell.stockLevelsNote,
+          style = MaterialTheme.typography.labelSmall,
+          color = Shop.colors.muted2,
+        )
+        Spacer(Modifier.height(8.dp))
+        SegmentedChoice(
+          options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
+          selected = if (stockLevels) "on" else "off",
+          onSelect = {
+            stockLevels = it == "on"
+            ir.vil3ntec.tohid.data.ShopPolicy.setStockLevels(context, stockLevels)
+          },
+        )
+      }
+    }
 
     /* ============================== دوربین ============================== */
     item {
@@ -1191,8 +1307,9 @@ fun SettingsScreen(
         //  نقش در این فاصله عوض شد؟ دوباره سنجیده می‌شود
         if (ir.vil3ntec.tohid.data.ShopRole.current(context) != ir.vil3ntec.tohid.data.ShopRole.OWNER) toast(StrSettings.wipeOwnerOnly)
         else scope.launch {
-          store.save(ShopData())
-          toast(StrSettings.wiped)
+          //  «پاک کردنِ همه» جایگزینیِ کامل است، نه ویرایشی روی پایه (`ShopStore.save`، پرچمِ `shop.ledger_merge`).
+          //  نوشته نشد (قفلِ نرم، خطای دیسک) ⇒ پیامش را `AppRoot` می‌دهد؛ «پاک شد» دروغ نگوید
+          if (store.save(ShopData(), replace = true)) toast(StrSettings.wiped)
         }
       },
     )

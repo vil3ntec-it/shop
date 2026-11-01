@@ -98,6 +98,14 @@ val replaced = listOf(
   "data/FileName.kt",
   //  HW-13: اجازهٔ «شبکهٔ محلی» ِ اندروید ۱۷ — کامپیوتر ندارد (‎hw/LocalNetworkDesk.kt‎)
   "hw/LocalNetworkAndroid.kt",
+  //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
+  //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
+  "pay/platform/PayDevice.kt",
+  "pay/platform/HesabPayHceService.kt",
+  //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
+  //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
+  "pay/platform/PayDevice.kt",
+  "pay/platform/HesabPayHceService.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

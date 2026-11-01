@@ -278,6 +278,8 @@ data class MissionCard(
   val phoneMasked: String = "",
   val callBeforeArrival: Boolean = false,
   val leaveWith: String = "",
+  /** CHK-14: مشتری با این مبلغ می‌پردازد (یک‌صدم) — پول خرد از `expectedCollectMinor`؛ null ⇒ نگفته */
+  val cashTenderMinor: Long? = null,
   val itemsCount: Int = 0,
   val paymentMethod: String = "",
   val expectedCollectMinor: Long = 0,
@@ -311,7 +313,7 @@ object MissionView {
   /** نشانی و مشتری بیرون — برای نمایش و برای آن‌چه روی گوشی نگه داشته می‌شود */
   fun redact(card: MissionCard): MissionCard = card.copy(
     landmark = "", addressText = "", lat = null, lng = null,
-    customerName = "", phoneMasked = "", leaveWith = "", callBeforeArrival = false,
+    customerName = "", phoneMasked = "", leaveWith = "", callBeforeArrival = false, cashTenderMinor = null,
     area = "", gateColor = "", addressCorrectedAt = null,
   )
 

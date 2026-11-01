@@ -190,6 +190,8 @@ object ApiEndpoints {
     fun settlementPreview(courierId: String) = "$COURIERS/${enc(courierId)}/settlement-preview"
     fun settle(courierId: String) = "$COURIERS/${enc(courierId)}/settlements"
     fun settlements(courierId: String, limit: Int) = "$SETTLEMENTS?courierId=${enc(courierId)}&limit=$limit"
+    /** RPT-15 — گزارشِ نقدِ پیک‌ها در [from، to) */
+    fun cashReport(from: Long, to: Long) = "$ROOT/cash-report?from=$from&to=$to"
     fun statement(name: String, from: Long?, to: Long?) = buildString {
       append("$EXTERNAL/statement?name=").append(enc(name))
       if (from != null) append("&from=").append(from)

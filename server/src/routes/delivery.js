@@ -14,6 +14,7 @@
 const express = require('express');
 const delivery = require('../lib/delivery');
 const D = require('../lib/delivery-states');
+const { cashReport } = require('../lib/delivery-cash-report');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -73,13 +74,17 @@ router.get('/couriers', async (req, res) => {
 
 router.post('/couriers', requirePermission('delivery.couriers'), needWrite, async (req, res) => {
   const courier = await delivery.createCourier(req.shopId, req.body, delivery.staffActor(req));
-  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, { userId: courier.userId, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.create', 'shop_courier', courier.id, {
+    userId: courier.userId, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.status(201).json({ courier });
 });
 
 const updateCourier = async (req, res) => {
   const courier = await delivery.updateCourier(req.shopId, req.params.id, req.body);
-  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, { active: courier.active, cashCapMinor: courier.cashCapMinor });
+  await log(req, 'delivery.courier.update', 'shop_courier', courier.id, {
+    active: courier.active, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+  });
   res.json({ courier });
 };
 router.patch('/couriers/:id', requirePermission('delivery.couriers'), needWrite, updateCourier);
@@ -228,6 +233,11 @@ router.get('/settlements', requirePermission('delivery.settle'), async (req, res
   res.json(await delivery.listSettlements(req.shopId, {
     courierId: req.query.courierId, from: req.query.from, to: req.query.to, limit: req.query.limit,
   }));
+});
+
+//  RPT-15: نقدِ پیک‌ها و تسویه در یک بازه — فقط خواندن، همان اجازهٔ دفترِ تسویه
+router.get('/cash-report', requirePermission('delivery.settle'), async (req, res) => {
+  res.json(await cashReport(req.shopId, { from: req.query.from, to: req.query.to }));
 });
 
 router.get('/settlements/:id', requirePermission('delivery.settle'), async (req, res) => {

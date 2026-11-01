@@ -16,6 +16,13 @@ object StrPos {
     "On: Arabic/Persian letter variants, half-spaces, Persian digits, words in any order and a typo are found too; a full barcode comes first, then names starting with the text. This device only.",
     "روښانه: د «ي/ی» او «ك/ک» بڼې، نیمه تشه، فارسي عددونه، کلمې په هر ترتیب او یوه ټایپي تېروتنه هم موندل کېږي؛ بشپړ بارکوډ لومړی، بیا هغه نومونه چې په لیکنه پیلېږي. یوازې همدا وسیله.",
   )
+  //  POS-41 — کلیدهای بیشترِ صندوق
+  val moreKeys: String get() = t("کلیدهای بیشترِ صندوق", "More till keys", "د صندوق نورې کیلي")
+  val moreKeysNote: String get() = t(
+    "روشن: Shift+F5 به کادرِ تخفیفِ کلِ فاکتور می‌برد، Esc در کادرِ اسکنِ خالی خالی کردنِ فاکتور را می‌پرسد (هرگز بی پرسش)، و برچسبِ کلید روی ردیفِ انتخاب‌شده (F3، +/−، Delete)، دکمهٔ «خالی» ِ سبد و کادرِ تخفیف دیده می‌شود. فقط روی همین دستگاه.",
+    "On: Shift+F5 moves to the invoice discount box, Esc in an empty scan box asks before emptying the invoice (never without asking), and key labels show on the selected row (F3, +/−, Delete), the cart's \"Clear\" button and the discount box. This device only.",
+    "روښانه: Shift+F5 د ټول بل د تخفیف بکس ته ځي، په تش سکن بکس کې Esc د بل د تشولو پوښتنه کوي (هېڅکله پرته له پوښتنې)، او د کیلي نښې په ټاکل شوې کرښه (F3، +/−، Delete)، د سبد «تش یې کړئ» تڼۍ او د تخفیف بکس ښکاري. یوازې همدا وسیله.",
+  )
   val discountForbidden: String get() = t("این تخفیف برای شما ممنوع است", "You're not allowed to give this discount", "تاسو ته د دې تخفیف اجازه نشته")
   val cartChangedRetry: String get() = t("سبد همین حالا عوض شد — دوباره بزنید", "The cart just changed — press again", "ټوکرۍ همدا اوس بدله شوه — بیا یې ووهئ")
   fun saleRecorded(a: Any): String = t("فروش $a ؋ ثبت شد", "Sale of $a ؋ recorded", "د $a ؋ پلور ثبت شو")
@@ -67,6 +74,8 @@ object StrPos {
   // تخفیف
   val autoDiscount: String get() = t("تخفیفِ خودکار", "Automatic discount", "اتومات تخفیف")
   fun promoA11y(n: Any, a: Any): String = t("تخفیفِ $n: $a افغانی", "Discount $n: $a AFN", "تخفیف $n: $a افغانۍ")
+  //  PRM-02: کدِ سقف‌دار بی پاسخِ سرور پذیرفته نمی‌شود
+  fun couponNeedsOnline(c: Any): String = t("کدِ $c سقفِ مصرف دارد و فقط با اینترنت پذیرفته می‌شود — وصل شوید یا کد را بردارید", "Code $c has a usage limit and is accepted only online — connect or remove the code", "کوډ $c د کارونې حد لري او یوازې له انټرنېټ سره منل کېږي — وصل شئ یا کوډ لرې کړئ")
   val discountCode: String get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
   val apply: String get() = t("اعمال", "Apply", "پلي کړئ")
   fun removeCode(c: Any): String = t("برداشتنِ کدِ $c", "Remove code $c", "$c کوډ لرې کړئ")

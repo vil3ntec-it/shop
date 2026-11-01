@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
-import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
+import ir.vil3ntec.tohid.core.storefront.PresenceDeclaration
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -31,7 +31,7 @@ class StorefrontRepository(private val api: ApiClient) {
   }
 
   /** اعلامِ مالک — همان `eventId` در تکرار ⇒ سرور بی‌اثرش می‌کند (PRES-08/09) */
-  suspend fun declare(p: StorefrontOwner.PendingPresence, deviceId: String): ApiResult<PresenceResultDto> = result {
+  suspend fun declare(p: PresenceDeclaration, deviceId: String): ApiResult<PresenceResultDto> = result {
     val body = buildJsonObject {
       put("eventId", p.eventId)
       put("mode", p.mode)
