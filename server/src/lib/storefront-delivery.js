@@ -16,6 +16,12 @@
  *            شمرده می‌شود، پس دو سفارشِ هم‌زمان از ظرفیت بیرون نمی‌زنند.
  *            به مشتری فقط «هست/پر است/کم مانده» گفته می‌شود، نه عددِ سفارش‌ها.
  *
+ *   هزینه ── (مهاجرتِ ۱۳۸) هزینهٔ ارسال = هزینهٔ ناحیه (رایگان از «رایگان از…»)
+ *            + هزینهٔ سبدِ کوچک (CHK-06: ناحیه‌ای که آن را دارد سبدِ زیرِ حداقل را
+ *            به‌جای رد با همین مبلغ می‌پذیرد) + هزینهٔ بازهٔ برگزیده (CHK-07: «زمانِ
+ *            تحویل»؛ فقط «ارسال»). ریزِ هر سه کنارِ همان ناحیه/بازه در JSON ِ سفارش
+ *            می‌ماند تا هر سه از همان سبد دیده شوند (CHK-04).
+ *
  * ⛔ قیمت و هزینه را سرور می‌گوید؛ عددِ مشتری فقط برای «تغییر کرده؟» است.
  * ⛔ پرچمِ جدا و پیش‌فرض خاموشِ `shop.storefront.zones` (live_config، دکان یا all):
  *    صفحهٔ امروزِ ویترین (server/public/store) ناحیه و بازه را نمی‌شناسد؛ تا
@@ -140,13 +146,18 @@ function zoneView(r) {
     polygon: r.kind === 'polygon' ? asJson(r.polygon, []) : [],
     centerLat: nOrNull(r.center_lat), centerLng: nOrNull(r.center_lng), radiusM: nOrNull(r.radius_m),
     feeMinor: Number(r.fee_minor), minOrderMinor: Number(r.min_order_minor), freeOverMinor: nOrNull(r.free_over_minor),
+    smallBasketFeeMinor: nOrNull(r.small_basket_fee_minor),
     active: r.active === true, sort: Number(r.sort),
   };
 }
 
 /** آن‌چه مشتری از ناحیه می‌بیند — بی مختصات. */
 function publicZone(z) {
-  return { id: z.id, name: z.name, feeMinor: z.feeMinor, minOrderMinor: z.minOrderMinor, freeOverMinor: z.freeOverMinor };
+  return {
+    id: z.id, name: z.name, feeMinor: z.feeMinor, minOrderMinor: z.minOrderMinor, freeOverMinor: z.freeOverMinor,
+    //  CHK-06: null ⇒ زیرِ حداقل پذیرفته نیست؛ عدد ⇒ با همین هزینه پذیرفته است
+    smallBasketFeeMinor: z.smallBasketFeeMinor ?? null,
+  };
 }
 
 const bitsToDays = (b) => [0, 1, 2, 3, 4, 5, 6].filter((d) => (b >> d) & 1);
@@ -155,7 +166,7 @@ function ruleView(r) {
   return {
     id: r.id, fulfillment: r.fulfillment, weekdays: bitsToDays(Number(r.weekdays)),
     startMin: Number(r.start_min), endMin: Number(r.end_min), capacity: Number(r.capacity),
-    cutoffMin: Number(r.cutoff_min), active: r.active === true, sort: Number(r.sort),
+    cutoffMin: Number(r.cutoff_min), feeMinor: Number(r.fee_minor || 0), active: r.active === true, sort: Number(r.sort),
   };
 }
 
@@ -183,8 +194,16 @@ function parseZone(raw, i) {
     minOrderMinor: int(z.minOrderMinor ?? 0, `${at}: حداقلِ سفارش`, { max: MAX_PRICE_MINOR }),
     freeOverMinor: z.freeOverMinor === null || z.freeOverMinor === undefined || z.freeOverMinor === ''
       ? null : int(z.freeOverMinor, `${at}: ارسالِ رایگان از`, { min: 1, max: MAX_PRICE_MINOR }),
+    //  CHK-06 — نیامدنِ کلید (برنامهٔ پیش از ۱۳۸) ⇒ undefined: مقدارِ پیشینِ همین ناحیه می‌ماند (saveSettings)؛
+    //  null یا '' ⇒ پاک (زیرِ حداقل رد)
+    smallBasketFeeMinor: !Object.prototype.hasOwnProperty.call(z, 'smallBasketFeeMinor') ? undefined
+      : z.smallBasketFeeMinor === null || z.smallBasketFeeMinor === ''
+        ? null : int(z.smallBasketFeeMinor, `${at}: هزینهٔ سبدِ کوچک`, { min: 1, max: MAX_FEE_MINOR }),
     active: z.active === undefined ? true : z.active === true,
   };
+  if (out.smallBasketFeeMinor && out.minOrderMinor === 0) {
+    throw badRequest(`${at}: هزینهٔ سبدِ کوچک بی حداقلِ سفارش معنا ندارد`, 'bad_zone');
+  }
   if (kind === 'radius') {
     out.centerLat = num(z.centerLat, `${at}: عرضِ مرکز`, -90, 90);
     out.centerLng = num(z.centerLng, `${at}: طولِ مرکز`, -180, 180);
@@ -220,12 +239,38 @@ function parseRule(raw, i) {
   const startMin = int(r.startMin, `${at}: آغاز`, { min: 0, max: 1439 });
   const endMin = int(r.endMin, `${at}: پایان`, { min: 1, max: 1440 });
   if (endMin <= startMin) throw badRequest(`${at}: پایان باید پس از آغاز باشد`, 'bad_slot_rule');
+  //  CHK-07 — نیامدنِ کلید (برنامهٔ پیش از ۱۳۸) ⇒ undefined: هزینهٔ پیشینِ همین بازه می‌ماند (saveSettings)
+  const feeMinor = !Object.prototype.hasOwnProperty.call(r, 'feeMinor') ? undefined
+    : int(r.feeMinor ?? 0, `${at}: هزینهٔ بازه`, { max: MAX_FEE_MINOR });
+  if (feeMinor && fulfillment !== 'delivery') throw badRequest(`${at}: «دریافت از دکان» هزینهٔ بازه ندارد`, 'bad_slot_rule');
   return {
     fulfillment, weekdays, startMin, endMin,
     capacity: int(r.capacity, `${at}: ظرفیت`, { min: 1, max: 1000 }),
     cutoffMin: int(r.cutoffMin ?? 60, `${at}: مهلتِ سفارش`, { min: 0, max: 10080 }),
+    feeMinor,
     active: r.active === undefined ? true : r.active === true,
   };
+}
+
+/*
+ *  ⛔ برنامهٔ پیش از مهاجرتِ ۱۳۸ کلیدِ هزینهٔ سبدِ کوچک/بازه را نمی‌شناسد و با هر
+ *  «ذخیره» فهرستِ کامل را بی آن می‌فرستد؛ پاک شدنِ بی‌صدای تنظیمِ صاحب دکان از
+ *  دستگاهِ دیگر بدترین خطاست (همان قاعدهٔ newer-fields: «مقدارِ کهنه می‌ماند»).
+ *  پس کلیدِ نیامده مقدارِ پیشینِ همان ناحیه (هم‌نام) یا همان بازه (همان روش، روزها و
+ *  ساعت) را نگه می‌دارد؛ نبودِ همتا ⇒ بی هزینه. فقط null/۰ ِ صریح پاک می‌کند.
+ */
+function keepZoneFee(z, prev) {
+  if (z.smallBasketFeeMinor !== undefined) return z.smallBasketFeeMinor;
+  const p = prev.find((x) => x.name === z.name);
+  return p && p.smallBasketFeeMinor && z.minOrderMinor > 0 ? p.smallBasketFeeMinor : null;
+}
+
+function keepRuleFee(r, prev) {
+  if (r.feeMinor !== undefined) return r.feeMinor;
+  if (r.fulfillment !== 'delivery') return 0;
+  const p = prev.find((x) => x.fulfillment === r.fulfillment && x.weekdays === r.weekdays
+    && x.startMin === r.startMin && x.endMin === r.endMin);
+  return p ? p.feeMinor : 0;
 }
 
 /** دو بازهٔ فعالِ یک روش در یک روز روی هم نیفتند — وگرنه «ظرفیت» دو معنا دارد. */
@@ -279,27 +324,33 @@ async function saveSettings(shopId, body, userId) {
     const sf = (await c.query('SELECT shop_id FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
     if (!sf) throw notFound('اول ویترین را بسازید', 'storefront_missing');
     const at = db.now();
+    const run = (t, p) => c.query(t, p);
     if (zones) {
+      const prev = await zonesOf(shopId, run);
       await c.query('DELETE FROM storefront_zones WHERE shop_id = $1', [shopId]);
       for (const [i, z] of zones.entries()) {
         await c.query(
           `INSERT INTO storefront_zones (id, shop_id, name, kind, polygon, center_lat, center_lng, radius_m,
-             fee_minor, min_order_minor, free_over_minor, active, sort, updated_by, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15)`,
+             fee_minor, min_order_minor, free_over_minor, small_basket_fee_minor, active, sort, updated_by,
+             created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$16)`,
           [ulid(at), shopId, z.name, z.kind, JSON.stringify(z.polygon), z.centerLat, z.centerLng, z.radiusM,
-            z.feeMinor, z.minOrderMinor, z.freeOverMinor, z.active, i, userId || '', at]
+            z.feeMinor, z.minOrderMinor, z.freeOverMinor, keepZoneFee(z, prev), z.active, i, userId || '', at]
         );
       }
     }
     if (rules) {
+      const prev = (await rowsOf(run, 'SELECT * FROM storefront_slot_rules WHERE shop_id = $1', [shopId]))
+        .map((r) => ({ fulfillment: r.fulfillment, weekdays: Number(r.weekdays), startMin: Number(r.start_min),
+          endMin: Number(r.end_min), feeMinor: Number(r.fee_minor || 0) }));
       await c.query('DELETE FROM storefront_slot_rules WHERE shop_id = $1', [shopId]);
       for (const [i, r] of rules.entries()) {
         await c.query(
           `INSERT INTO storefront_slot_rules (id, shop_id, fulfillment, weekdays, start_min, end_min, capacity,
-             cutoff_min, active, sort, updated_by, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)`,
-          [ulid(at), shopId, r.fulfillment, r.weekdays, r.startMin, r.endMin, r.capacity, r.cutoffMin, r.active, i,
-            userId || '', at]
+             cutoff_min, fee_minor, active, sort, updated_by, created_at, updated_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$13)`,
+          [ulid(at), shopId, r.fulfillment, r.weekdays, r.startMin, r.endMin, r.capacity, r.cutoffMin,
+            keepRuleFee(r, prev), r.active, i, userId || '', at]
         );
       }
     }
@@ -373,7 +424,10 @@ function slotsOf(sf, rules, fulfillment, at) {
       const startsAt = epochOf(date, r.startMin, tz);
       const endsAt = epochOf(date, r.endMin, tz);
       if (at >= startsAt - r.cutoffMin * 60000) continue;
-      out.push({ ruleId: r.id, date, startMin: r.startMin, endMin: r.endMin, startsAt, endsAt, capacity: r.capacity });
+      out.push({
+        ruleId: r.id, date, startMin: r.startMin, endMin: r.endMin, startsAt, endsAt, capacity: r.capacity,
+        feeMinor: r.feeMinor || 0,
+      });
     }
   }
   return out.sort((a, b) => a.startsAt - b.startsAt);
@@ -402,6 +456,8 @@ function publicSlot(s) {
   return {
     startsAt: s.startsAt, endsAt: s.endsAt, date: s.date, startMin: s.startMin, endMin: s.endMin,
     available: s.remaining > 0, few: s.remaining > 0 && s.remaining <= 2,
+    //  CHK-07: هزینهٔ اضافهٔ همین بازه (۰ = بی هزینهٔ اضافه)
+    feeMinor: s.feeMinor || 0,
   };
 }
 
@@ -477,6 +533,8 @@ function withData(err, data) {
 async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false } = {}) {
   let deliveryFeeMinor = 0;
   let minOrderMinor = Number(sf.min_order_minor);
+  let smallBasketFeeMinor = 0;
+  let slotFeeMinor = 0;
   let address = input.address;
   let delivery = input.delivery;
 
@@ -503,7 +561,12 @@ async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false 
       }
       minOrderMinor = zone.minOrderMinor;
       deliveryFeeMinor = zone.freeOverMinor !== null && subtotalMinor >= zone.freeOverMinor ? 0 : zone.feeMinor;
-      address = { ...address, zone: { id: zone.id, name: zone.name, source } };
+      //  CHK-06: زیرِ حداقل و ناحیه هزینهٔ سبدِ کوچک دارد ⇒ پذیرفته با همین هزینه (نه رد)
+      if (zone.smallBasketFeeMinor && subtotalMinor < zone.minOrderMinor) smallBasketFeeMinor = zone.smallBasketFeeMinor;
+      address = {
+        ...address,
+        zone: { id: zone.id, name: zone.name, source, ...(smallBasketFeeMinor ? { smallBasketFeeMinor } : {}) },
+      };
     }
   }
 
@@ -526,14 +589,36 @@ async function forCheckout(run, sf, input, subtotalMinor, at, { zonesOn = false 
       throw withData(conflict('این بازه پر شد؛ بازهٔ دیگری برگزینید', 'slot_full'), { slots: slots.map(publicSlot) });
     }
     scheduledFor = s.startsAt;
-    delivery = { ...delivery, slot: { startsAt: s.startsAt, endsAt: s.endsAt } };
+    //  CHK-07: هزینهٔ زمانِ تحویل — فقط ارسال (CHECK ِ ۱۳۸ برای «دریافت» صفر نگهش می‌دارد)
+    if (input.fulfillment === 'delivery') slotFeeMinor = s.feeMinor || 0;
+    delivery = { ...delivery, slot: { startsAt: s.startsAt, endsAt: s.endsAt, ...(slotFeeMinor ? { feeMinor: slotFeeMinor } : {}) } };
   }
-  return { deliveryFeeMinor, minOrderMinor, address, delivery, scheduledFor };
+  deliveryFeeMinor += smallBasketFeeMinor + slotFeeMinor;
+  return { deliveryFeeMinor, minOrderMinor, smallBasketFeeMinor, slotFeeMinor, address, delivery, scheduledFor };
+}
+
+/** ریزِ هزینهٔ ارسال برای برگهٔ قیمت (CHK-04/06/07) — فقط بخشِ ناصفر؛ هر دو درونِ `deliveryFeeMinor` اند. */
+function feeParts(d) {
+  return {
+    ...(d.smallBasketFeeMinor ? { smallBasketFeeMinor: d.smallBasketFeeMinor } : {}),
+    ...(d.slotFeeMinor ? { slotFeeMinor: d.slotFeeMinor } : {}),
+  };
+}
+
+/** CHK-06: زیرِ حداقل رد می‌شود مگر ناحیه «هزینهٔ سبدِ کوچک» داشته و همان اعمال شده باشد. */
+const belowMin = (subtotalMinor, d) => subtotalMinor < d.minOrderMinor && !d.smallBasketFeeMinor;
+
+/** همان ریز از روی سفارشِ ثبت‌شده (کنارِ `address.zone` و `delivery.slot`) — برای نمای مشتری. */
+function orderFeeParts(o) {
+  return {
+    smallBasketFeeMinor: o.address && o.address.zone ? Number(o.address.zone.smallBasketFeeMinor || 0) : 0,
+    slotFeeMinor: o.delivery && o.delivery.slot ? Number(o.delivery.slot.feeMinor || 0) : 0,
+  };
 }
 
 module.exports = {
   MAX_ZONES, MAX_RULES, RELEASED, ID_RE, DAY_MS, FLAG_KEY, flagOn,
   GRID_M, M_PER_DEG_LAT, inPolygon, distanceM, contains, zoneAt, snapPin, zoneForPin, publicZone, epochOf, localDate, addDays,
   zonesOf, rulesOf, settingsOf, saveSettings, slotsOf, slotsWithLoad, publicSlot,
-  publicInfo, locate, publicSlots, forCheckout,
+  publicInfo, locate, publicSlots, forCheckout, feeParts, belowMin, orderFeeParts,
 };

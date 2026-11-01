@@ -483,7 +483,7 @@ function quoteOf(lines, fees) {
       unitPriceMinor: l.unitPriceMinor, lineTotalMinor: l.lineTotalMinor,
     })),
     subtotalMinor: fees.subtotalMinor,
-    deliveryFeeMinor: fees.deliveryFeeMinor,
+    deliveryFeeMinor: fees.deliveryFeeMinor, ...sfd.feeParts(fees),
     totalMinor: fees.totalMinor,
     ...(fees.minOrderMinor !== undefined ? { minOrderMinor: fees.minOrderMinor } : {}),
   };
@@ -529,8 +529,8 @@ function pricer(shopId, sf, input, { zonesOn = false, from = PRODUCT_FROM } = {}
     const { deliveryFeeMinor } = d;
     const totalMinor = subtotalMinor + deliveryFeeMinor;
     if (!Number.isSafeInteger(totalMinor)) throw badRequest('جمعِ سفارش بیش از حد بزرگ است', 'bad_lines');
-    const fees = { subtotalMinor, deliveryFeeMinor, totalMinor, minOrderMinor: d.minOrderMinor };
-    if (subtotalMinor < d.minOrderMinor) {
+    const fees = { subtotalMinor, deliveryFeeMinor, totalMinor, minOrderMinor: d.minOrderMinor, ...sfd.feeParts(d) };
+    if (sfd.belowMin(subtotalMinor, d)) {
       throw withData(badRequest('سبد از حداقلِ سفارش کمتر است', 'below_min_order'),
         { minOrderMinor: d.minOrderMinor, quote: quoteOf(lines, fees) });
     }
@@ -583,10 +583,10 @@ function publicOrder(o, token, delivery) {
     deliveryFeeMinor: o.deliveryFeeMinor,
     totalMinor: o.totalMinor,
     readyAt: o.readyAt,
-    //  CHK-12: بازهٔ برگزیده (null = هرچه زودتر) · CHK-07: ناحیهٔ ارسال
+    //  CHK-12: بازهٔ برگزیده (null = هرچه زودتر) · CHK-07: ناحیهٔ ارسال · CHK-06/07: ریزِ هزینهٔ ارسال
     scheduledFor: o.scheduledFor,
     slotEndsAt: o.delivery && o.delivery.slot ? Number(o.delivery.slot.endsAt) : null,
-    zoneName: o.address && o.address.zone ? o.address.zone.name : '',
+    zoneName: o.address && o.address.zone ? o.address.zone.name : '', ...sfd.orderFeeParts(o),
     createdAt: o.createdAt,
     updatedAt: o.updatedAt,
     //  CHK-22: لغوِ رایگان تا پیش از قبول
