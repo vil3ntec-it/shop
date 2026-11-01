@@ -29,6 +29,31 @@
   };
   K.has = function (key) { return own(DICT, key); };
 
+  /**
+   * واژه‌نامهٔ جدای یک صفحه (`/kit/i18n/<name>.<زبان>.json`)، فقط وقتی همان صفحه باز می‌شود — تا بارِ نخستِ
+   * ویترین کوچک بماند (web-i18n). مثلِ واژه‌نامهٔ اصلی یک بار دوباره؛ باز نیامد ⇒ همان متنِ فارسیِ HTML و
+   * واژه‌های پایه (کلیدِ خام هرگز) و بارِ بعد دوباره خواسته می‌شود. کلیدِ واژه‌نامهٔ اصلی جایش را نمی‌دهد.
+   * [root] (اختیاری) پس از رسیدن ترجمه می‌شود. هرگز رد نمی‌شود: `true` = رسید.
+   */
+  var parts = {};
+  K.part = function (name, root) {
+    return ready.then(function () {
+      if (!parts[name]) {
+        var url = '/kit/i18n/' + name + '.' + LANG + '.json';
+        var get = function () {
+          return fetch(url, { credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
+        };
+        parts[name] = get().catch(function () { return new Promise(function (r) { setTimeout(r, 500); }).then(get); })
+          .then(function (d) {
+            Object.keys(d || {}).forEach(function (k) { if (!own(DICT, k) && typeof d[k] === 'string') DICT[k] = d[k]; });
+            return true;
+          })
+          .catch(function () { parts[name] = null; return false; });
+      }
+      return parts[name];
+    }).then(function (ok) { if (ok && root) translate(root); return ok; });
+  };
+
   /** el('div', { class, text, attrs, on, hidden }, ...children) */
   K.el = function (tag, p) {
     var e = document.createElement(tag);
