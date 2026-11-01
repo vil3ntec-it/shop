@@ -666,3 +666,37 @@ test('تاریخچه به ترتیبِ رخداد است — «تصمیم» پی
     assert.deepEqual((await trust.adminView(id)).history.map((e) => e.type), ['decided', 'sanction_applied'], id);
   }
 });
+
+test('تاریخچهٔ پرونده به ترتیبِ ثبت است حتی در یک میلی‌ثانیه: پاسخ‌ها به همان ترتیب، «تصمیم» پیش از «جریمه»', async () => {
+  //  پیش‌تر ترتیب `created_at, id` بود و id تصادفی ⇒ رویدادهای یک میلی‌ثانیه جابه‌جا (سرخیِ گاه‌به‌گاهِ ABUSE-01)
+  const s = await liveStore('ترتیبِ رویداد');
+  const PHONE = '0790000401';
+  const order = await placeOrder(s, PHONE);
+  const t = await ticketFor(s.slug, PHONE);
+  const made = await pub(s.slug, 'POST', '/complaints', { subject: 'order', orderNo: order.orderNo, category: 'damaged', body: 'ترتیبِ رویدادها باید بماند' }, t);
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const caseId = (await shopApi(s.token, 'GET', '/cases')).body.cases[0].id;
+  const bodies = Array.from({ length: 8 }, (_, i) => `پاسخِ شمارهٔ ${i + 1} برای سنجشِ ترتیب`);
+  const realNow = Date.now;
+  const frozen = realNow();
+  Date.now = () => frozen;
+  try {
+    for (const body of bodies) {
+      const r = await shopApi(s.token, 'POST', `/cases/${caseId}/responses`, { body });
+      assert.equal(r.status, 201, JSON.stringify(r.body));
+    }
+    const dec = await adm('POST', `/cases/${caseId}/decide`, { outcome: 'upheld', reason: 'ترتیب سنجیده شد', sanction: { kind: 'warning' } });
+    assert.equal(dec.status, 200, JSON.stringify(dec.body));
+  } finally {
+    Date.now = realNow;
+  }
+  const hist = (await adm('GET', `/cases/${caseId}`)).body.case.history;
+  assert.deepEqual(hist.filter((e) => e.type === 'shop_response').map((e) => e.body), bodies);
+  assert.deepEqual(hist.map((e) => e.type).filter((x) => x !== 'evidence_added'),
+    ['filed', ...bodies.map(() => 'shop_response'), 'assigned', 'decided', 'sanction_applied'].filter((x) => hist.some((e) => e.type === x)));
+  const at = hist.map((e) => e.at);
+  assert.ok(at.every((x, i) => i === 0 || x > at[i - 1]), `زمان‌ها اکیداً صعودی: ${at}`);
+  //  نمای شاکی هم همان ترتیب
+  const seen = (await pub(s.slug, 'GET', `/cases/${made.body.case.token}`)).body.case;
+  assert.deepEqual(seen.history.filter((e) => e.type === 'shop_response').map((e) => e.body), bodies);
+});
