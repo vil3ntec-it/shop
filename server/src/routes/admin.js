@@ -21,9 +21,12 @@ const { entitlementOf } = require('../lib/entitlement');
 const { FEATURES, sanitizeFeatures } = require('../lib/features');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { checkSecondFactor } = require('../lib/admin-2fa');
+const guard = require('../lib/admin-guard');
+const reauth = require('../lib/reauth');
+const hardening = require('../lib/auth-session-hardening');
 const { reasonOf } = require('../lib/admin-access');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { badRequest, unauthorized, notFound, tooMany } = require('../middleware/errors');
+const { badRequest, unauthorized, notFound } = require('../middleware/errors');
 
 const router = express.Router();
 const adminLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'admin-auth' });
@@ -33,17 +36,22 @@ router.post('/login', adminLimit, async (req, res, next) => {
   const username = v.text(req.body?.username, { max: 60, required: true, field: 'نام کاربری' }).toLowerCase();
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
 
-  const since = now() - config.rateLimit.lockoutMs;
-  const fails = await one(
-    `SELECT COUNT(*)::int AS n FROM login_attempts WHERE scope='admin' AND identifier=$1 AND ok=false AND created_at>$2`,
-    [username, since]
-  );
-  if (fails.n >= config.rateLimit.lockoutTries) {
-    return next(tooMany('تلاش ناموفق زیاد بود، بعداً امتحان کنید', 'locked_out'));
-  }
+  /*
+   *  SEC-AUTH-03 (S17ِ ممیزی، نیمهٔ «قفلِ سراسری»): تا ۲.۱۴.۴ هر هشت رمزِ غلط برای
+   *  یک نامِ کاربری، **از هر جا**، همان مدیر را یک ربع می‌بست — هر کسی که نامِ
+   *  مدیرِ ارشد را می‌دانست، صاحبِ سامانه را از پنل بیرون نگه می‌داشت. حالا همان
+   *  دو شمارندهٔ ورودِ کاربران: «نام + IP» (هشت) فقط حدس‌زننده را می‌بندد و
+   *  «نام، از همه‌جا» (`lockoutGlobalTries`، چهل) فقط حملهٔ پخش‌شده را.
+   */
+  const ip = clientIp(req);
+  await require('./auth').assertNotLocked('admin', username, ip);
 
   const admin = await one('SELECT * FROM admins WHERE username=$1', [username]);
-  const passOk = admin && admin.status === 'active' && await pw.verifyPassword(password, admin.password_hash);
+  //  SEC-AUTH-04: نامِ ناموجود یا مدیرِ غیرفعال همان‌قدر وقت بگیرد (شمارش‌پذیریِ نامِ مدیر)
+  const usable = !!(admin && admin.status === 'active');
+  const passOk = usable && await pw.verifyPassword(password, admin.password_hash);
+  if (!usable) await pw.burnTime(password);
+  else if (!passOk && pw.needsRehash(admin.password_hash)) await pw.burnTime(password);
 
   //  F0-15: مرحلهٔ دوم فقط برای مدیری که خودش روشنش کرده (اجباری نیست).
   //  رمزِ درست بی کد = گامِ اولِ ورود، نه شکست؛ کدِ نادرست = شکست (در قفل
@@ -58,13 +66,17 @@ router.post('/login', adminLimit, async (req, res, next) => {
   const ok = passOk && (!twoStep || !!second);
   await query(
     `INSERT INTO login_attempts (scope, identifier, ip, ok, created_at) VALUES ('admin',$1,$2,$3,$4)`,
-    [username, clientIp(req), !!ok, now()]
+    [username, ip, !!ok, now()]
   );
   if (!passOk) return next(unauthorized('نام کاربری یا رمز درست نیست', 'bad_credentials'));
   if (!ok) return next(unauthorized('کدِ تأیید درست نیست', 'totp_invalid'));
+  //  SEC-AUTH-01: هشِ کهنهٔ مدیر هم پس از ورودِ درست به هزینهٔ امروز می‌رسد
+  await hardening.upgradeHash('admins', admin, password);
 
   const t = await tokens.issue({ kind: 'admin', subjectId: admin.id, ttlMs: config.tokens.adminTtlMs });
   await query('UPDATE admins SET last_login_at=$2 WHERE id=$1', [admin.id, now()]);
+  //  SEC-AUTH-13: ورود خودش احراز است — تا چند دقیقه کارِ حساسِ ارشد بی پرسشِ دوباره
+  await reauth.markFresh({ accessToken: t.token, ip });
   await audit.log({
     actorType: 'admin', userId: admin.id, action: 'admin.login', ip: clientIp(req),
     ...(second ? { detail: { second_factor: second } } : {}),
@@ -72,10 +84,15 @@ router.post('/login', adminLimit, async (req, res, next) => {
   res.json({
     token: t.token, expiresAt: t.expiresAt,
     admin: { id: admin.id, username: admin.username, name: admin.name, role: admin.role },
+    //  SEC-AUTH-12: پنل از روی این، مدیرِ بی TOTP را (وقتی اجباری است) یک‌راست به «روشن کردن» می‌برد
+    twoFactor: { enabled: !!admin.totp_enabled_at, required: guard.twoFactorRequired() },
   });
 });
 
 router.use(requireAdmin);
+
+//  SEC-AUTH-13: تأییدِ دوبارهٔ نشستِ مدیر — بدنه در `lib/auth-session-hardening.js`
+router.post('/reauth', adminLimit, hardening.adminReauth);
 
 router.post('/logout', async (req, res) => {
   const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
