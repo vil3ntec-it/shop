@@ -222,6 +222,12 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
     await q('users', 'DELETE FROM users WHERE id=$1', [userId]);
   });
 
+  //  ⛔ S78: پس از تراکنش — سوکت‌های زندهٔ خودش و همهٔ دستگاه‌های دکان‌ها/پمپ‌های رفته همان لحظه بسته
+  const live = require('./sync-v1-live');
+  await live.accessChanged({ userId });
+  for (const id of shopIds) await live.accessChanged({ accountKind: 'shop', accountId: id });
+  for (const id of stationIds) await live.accessChanged({ accountKind: 'station', accountId: id });
+
   //  ۴) پوشهٔ پشتیبان‌های ابری روی دیسک — پس از تراکنش، و نرفتنش حذف را برنمی‌گرداند
   let files = 0;
   for (const [app, ids] of [['pump', stationIds], ['shop', shopIds]]) {
