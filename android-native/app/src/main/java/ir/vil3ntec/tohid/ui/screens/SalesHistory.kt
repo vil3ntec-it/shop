@@ -173,6 +173,7 @@ fun SalesHistoryScreen(
   val shift = remember(d) { ir.vil3ntec.tohid.data.CashShift.current(d) }
   //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم (`ShiftPanelV2`)؛ خاموش ⇒ کارتِ امروز
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(roleContext) }
+  val safeBook = remember { ir.vil3ntec.tohid.data.SafeBookPref.on(roleContext) } // PAY-18: گاوصندوق، پیش‌فرض خاموش ⇒ همان صفحهٔ امروز
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp)) {
     item {
@@ -221,6 +222,7 @@ fun SalesHistoryScreen(
       }
       Spacer(Modifier.height(12.dp))
     }
+    if (safeBook) item { SafePanel(d = d, store = store, me = me, toast = ::toast) }
 
     item {
       OutlinedTextField(
