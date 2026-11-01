@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.courier.CourierChecks
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
@@ -47,5 +48,17 @@ class CourierCodecTest {
     assertNull(back[1].lat)
     assertEquals(7L, back[1].cashCollectedMinor)
     assertTrue(CourierCodec.cards("[[[").isEmpty())
+  }
+
+  @Test fun `DLV-07 و DLV-17: برچسب‌ها و موقعیت در صفِ آفلاین می‌مانند، و کارت شمارِ کیسه و فاصله را نگه می‌دارد`() {
+    var q = QueueState()
+    q = CourierQueue.enqueue(q, "cev-bbbbbbbb-1", "A", "picked_up", 1_000, bags = listOf("VLNB-12-1-2", "VLNB-12-2-2")).first
+    q = CourierQueue.enqueue(q, "cev-bbbbbbbb-2", "A", "delivered", 2_000, cashCollectedMinor = 0, position = CourierChecks.Point(34.524356, 69.181234)).first
+    val back = CourierCodec.queue(CourierCodec.queueJson(q))
+    assertEquals(q, back)
+    assertEquals(listOf("VLNB-12-1-2", "VLNB-12-2-2"), back.pending[0].bags)
+    assertEquals(CourierChecks.Point(34.524356, 69.181234), back.pending[1].position)
+    val card = MissionCard(id = "A", orderNo = 1, status = "assigned", bagScanBags = 3, nearPinMaxM = 300)
+    assertEquals(card, CourierCodec.cards(CourierCodec.cardsJson(listOf(card))).single())
   }
 }
