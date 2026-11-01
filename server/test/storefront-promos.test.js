@@ -134,6 +134,20 @@ test('MKT-01: خودکارِ اینترنتی روی دستهٔ خوراکی —
   assert.equal(r.body.order.discountMinor, 2400);
 });
 
+test('PRM-10: «نزدیکِ انقضا» در ویترین نه فهرست می‌شود نه اعمال — حتی با lots ِ ساختگیِ مشتری', async () => {
+  const s = await liveShop('انقضا');
+  await setFlag(s.shopId, 'shop.promo_expiry', true);
+  await rule(s, 'near', { kind: 'expiry', bp: 5000, nearDays: 30, channels: ['online'] });
+  const list = await h.get(`/api/store/${s.slug}/promos`);
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.deepEqual(list.body.promos, []);
+  const lots = [{ daysLeft: 1, qtyMilli: 9000 }];
+  const q = await h.post(`/api/store/${s.slug}/promos/quote`, { lines: LINES.map((l) => ({ ...l, lots })) });
+  assert.equal(q.status, 200, JSON.stringify(q.body));
+  assert.deepEqual([q.body.subtotalMinor, q.body.discountMinor], [28000, 0]);
+  assert.deepEqual(q.body.applied, []);
+});
+
 test('MKT-01: کد — اعمال، ناشناخته (ثبت ۴۰۹، پیش‌نمایش فقط وضعیت)، و «جمعِ دیده‌شده» پس از تخفیف', async () => {
   const s = await liveShop('تخفیف-کد');
   await rule(s, 'vip', { kind: 'percent', bp: 1000, channels: ['online'], code: 'VIP10' });

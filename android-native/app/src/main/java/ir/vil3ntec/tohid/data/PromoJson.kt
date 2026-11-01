@@ -33,6 +33,7 @@ object PromoJson {
       stamp = bool(o["stamp"]),
       tierPrice = bool(o["tierPrice"]),
       redeem = bool(o["redeem"]),
+      expiry = bool(o["expiry"]),
       revs = rules.zip(raw).mapNotNull { (r, e) -> (e as? JsonObject)?.let { rev(it) }?.takeIf { it > 0 }?.let { r.id to it } }.toMap(),
     )
   }
@@ -46,6 +47,8 @@ object PromoJson {
     //  POS-19: فقط روشن نوشته می‌شود — نسخهٔ ذخیره‌شدهٔ دستگاه با پرچمِ خاموش همان پیشین
     if (s.tierPrice) put("tierPrice", true)
     put("redeem", s.redeem)
+    //  PRM-10: فقط روشن — همان پاسخِ سرور
+    if (s.expiry) put("expiry", true)
     //  `rev` فقط برای همین نسخهٔ دستگاه — `PUT` ِ قاعده آن را نمی‌فرستد
     put("rules", JsonArray(s.rules.map { r -> s.revs[r.id]?.let { JsonObject(toJson(r) + ("rev" to JsonPrimitive(it))) } ?: toJson(r) }))
     put("permissions", buildJsonObject { put("manage", s.manage); put("belowCost", s.belowCost) })
@@ -88,6 +91,8 @@ object PromoJson {
     put("get", r.get)
     put("qty", r.qty)
     put("priceMinor", r.priceMinor)
+    //  PRM-10: فقط برای «نزدیکِ انقضا» — قاعدهٔ دیگر همان شکلِ پیشین
+    if (r.nearDays != 0L) put("nearDays", r.nearDays)
   }
 
   /** شمارهٔ نسخهٔ قاعده که سرور برمی‌گرداند (`rev`) — نمایش، و `SalePromo.rev` روی قلمِ فاکتور */
