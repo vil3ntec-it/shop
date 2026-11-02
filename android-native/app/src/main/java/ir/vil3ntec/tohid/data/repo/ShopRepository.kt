@@ -9,10 +9,13 @@ import ir.vil3ntec.tohid.core.model.ShopDevicesDto
 import ir.vil3ntec.tohid.core.model.ShopStateDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
 import ir.vil3ntec.tohid.core.model.StaffCodesDto
+import ir.vil3ntec.tohid.core.model.StaffScopeConfigDto
+import ir.vil3ntec.tohid.core.model.StaffScopeMembersDto
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -115,6 +118,18 @@ class ShopRepository(
   /** لایهٔ یک کارمند — `perms` همان قالبِ `PermCore` ({کلید: {mode}}) */
   suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
     result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
+
+  /** STF-06: سرورِ قدیمی یا پرچمِ خاموش ⇒ `enabled = false` و هیچ چیزِ تازه‌ای دیده نمی‌شود */
+  suspend fun staffScopeConfig(): StaffScopeConfigDto =
+    result { ApiJson.decode<StaffScopeConfigDto>(api.get(ApiEndpoints.Shop.STAFF_SCOPE_CONFIG)) }.valueOrNull() ?: StaffScopeConfigDto()
+
+  /** محدودهٔ هر عضو (صاحب و مدیر)؛ پرچمِ خاموش ⇒ `null` */
+  suspend fun staffScopeMembers(): StaffScopeMembersDto? =
+    result { ApiJson.decode<StaffScopeMembersDto>(api.get(ApiEndpoints.Shop.STAFF_SCOPE_MEMBERS)) }.valueOrNull()
+
+  /** فقط صاحب؛ `places` ِ خالی = همهٔ مکان‌ها. سرور مرجع است (`location_out_of_scope`) */
+  suspend fun setStaffScope(memberId: String, places: List<String>): ApiResult<Unit> =
+    result { api.put(ApiEndpoints.Shop.staffScope(memberId), buildJsonObject { put("places", JsonArray(places.map(::JsonPrimitive))) }); Unit }
 
   /**
    *  ثبتِ کلیدِ عمومیِ تأییدِ همین دستگاه (STF-02). کلیدِ خصوصی و PIN هرگز

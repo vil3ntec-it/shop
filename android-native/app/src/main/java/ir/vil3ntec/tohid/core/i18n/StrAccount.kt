@@ -172,6 +172,11 @@ object StrAccount {
   val permsTitle: String get() = t("مجوزِ کارمندان", "Staff permissions", "د کارکوونکو اجازې")
   val permsHelper: String get() = t("هر کلید فقط می‌تواند کمتر از نقش بدهد؛ «عددهای مالی» فقط نمایش است و داده روی دستگاه هست.", "Each switch can only give less than the role; “money figures” only hides the view — the data is still on the device.", "هره کیلي یوازې له رول کمه ورکولای شي؛ «مالي شمېرې» یوازې ښودنه ده او معلومات په وسیله کې شته.")
   val permsOwnerOnly: String get() = t("فقط صاحب دکان این کلیدها را عوض می‌کند.", "Only the shop owner can change these switches.", "یوازې د دوکان خاوند دا کیلي بدلولای شي.")
+  //  STF-06: محدودهٔ مکانِ کارمند
+  val scopeTitle: String get() = t("مکان‌های مجاز", "Allowed locations", "اجازه لرونکي ځایونه")
+  val scopeHelper: String get() = t("کارمند فقط موجودیِ مکان‌های روشن را می‌بیند و جابه‌جا می‌کند؛ همه روشن یعنی همه. سرور همین را اجرا می‌کند.", "The staff member only sees and moves stock in the switched-on locations; all on means all. The server enforces it.", "کارکوونکی یوازې د روښانه ځایونو زېرمه ویني او لېږدوي؛ ټول روښانه یعنې ټول. سرور همدا پلي کوي.")
+  val placeShopFloor: String get() = t("قفسهٔ فروشگاه", "Shop floor", "د دوکان المارۍ")
+  val placeWarehouse: String get() = t("انبار", "Warehouse", "ګودام")
   val permSettings: String get() = t("تنظیماتِ دکان", "Shop settings", "د دوکان امستنې")
   val permAudit: String get() = t("سابقهٔ عملیات", "Activity log", "د کړنو تاریخچه")
   val permMoney: String get() = t("دیدنِ عددهای مالی (درآمد، سود)", "See money figures (income, profit)", "مالي شمېرې لیدل (عاید، ګټه)")

@@ -13,6 +13,7 @@ object I18nTables {
     StrInvoices, StrSecurity, StrLine, StrKit, StrProducts, StrStock, StrMoney, StrReports, StrAccount,
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
-    StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe,
+    StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
+    StrTaxQuarter, StrCustomerCard,
   )
 }

@@ -76,3 +76,33 @@ data class ShopDeviceDto(
 
 @Serializable
 data class ShopDevicesDto(val devices: List<ShopDeviceDto> = emptyList())
+
+/*
+ *  STF-06 — محدودهٔ مکانِ کارمندان (`/api/shop/staff-scope`، `core/staff/StaffScope`).
+ *  `places`/`mine` ِ خالی یعنی «همهٔ مکان‌ها» (همان رفتارِ پیشین).
+ */
+@Serializable
+data class StaffScopeConfigDto(
+  val enabled: Boolean = false,
+  val places: List<String> = emptyList(),
+  /** محدودهٔ خودم */
+  val mine: List<String> = emptyList(),
+)
+
+@Serializable
+data class StaffScopeMemberDto(
+  val id: String = "",
+  val userId: String = "",
+  val name: String = "",
+  val role: String = "",
+  val places: List<String> = emptyList(),
+)
+
+@Serializable
+data class StaffScopeMembersDto(
+  val places: List<String> = emptyList(),
+  val members: List<StaffScopeMemberDto> = emptyList(),
+) {
+  fun of(id: String, userId: String): StaffScopeMemberDto? =
+    members.firstOrNull { it.id == id } ?: members.firstOrNull { userId.isNotBlank() && it.userId == userId }
+}

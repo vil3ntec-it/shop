@@ -887,6 +887,8 @@ private fun AccountViewLegacy(
         StatementImageButton(d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       }
       if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
+      //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش ⇒ هیچ)
+      if (store != null) ir.vil3ntec.tohid.ui.screens.CustomerCardButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {

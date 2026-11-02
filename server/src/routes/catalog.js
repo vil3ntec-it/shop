@@ -8,6 +8,9 @@
  * ⛔ خواندن همیشه باز است (داده گروگان نیست)؛ هر نوشتن اجازهٔ خودش را دارد
  * و حرکتِ دستی کلیدِ یکتایی و (جز انتقال) دلیل می‌خواهد (INV-12، INV-15).
  *
+ * ⛔ STF-06 (`lib/staff-scope.js`، پرچمِ خاموشِ `shop.staff_scope`): عضوِ محدود فقط مکان‌های محدوده‌اش را
+ * می‌بیند و می‌نویسد (۴۰۳ `location_out_of_scope`)؛ پرچم خاموش، مالک یا محدودهٔ خالی ⇒ همان امروز.
+ *
  * زیرِ پیشوندِ موجودِ `/shop` است، پس `ACCOUNT_PREFIXES`ِ پنلِ خانگی
  * چیزِ تازه‌ای نمی‌خواهد.
  */
@@ -15,6 +18,7 @@ const express = require('express');
 const catalog = require('../lib/catalog');
 const stock = require('../lib/stock');
 const transfers = require('../lib/stock-transfers');
+const scope = require('../lib/staff-scope');
 const audit = require('../lib/audit');
 const { now } = require('../db');
 const { can } = require('../lib/permissions');
@@ -28,10 +32,11 @@ router.use(requireUser, requireShop, requirePermission('stock.view'));
 const needFlag = async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); };
 
 router.get('/config', async (req, res) => {
+  const sc = await scope.scopeOfReq(req);
   res.json({
     enabled: await stock.flagOf(req.shopId),
     settings: await stock.settingsOf(req.shopId),
-    locations: stock.LOCATIONS,
+    locations: sc ? sc.slice() : stock.LOCATIONS,
     sellableChoices: stock.SELLABLE_CHOICES,
     kinds: Object.keys(catalog.MANUAL),
     permissions: {
@@ -39,10 +44,12 @@ router.get('/config', async (req, res) => {
       adjust: can(req.role, 'stock.adjust'),
       settings: can(req.role, 'settings.write'),
     },
+    ...(sc ? { scope: sc } : {}),
   });
 });
 
 router.put('/settings', needFlag, requirePermission('settings.write'), async (req, res) => {
+  scope.requireAll(await scope.scopeOfReq(req));
   const settings = await stock.saveSettings(req.shopId, req.body, req.user.id, now());
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'stock.settings', targetType: 'catalog_settings',
@@ -66,32 +73,42 @@ router.post('/refresh', needFlag, requirePermission('stock.move'), async (req, r
 });
 
 router.get('/products', needFlag, async (req, res) => {
-  res.json(await catalog.list(req.shopId, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit }));
+  const sc = await scope.scopeOfReq(req);
+  const out = await catalog.list(req.shopId, { q: req.query.q, cursor: req.query.cursor, limit: req.query.limit });
+  res.json(sc ? { ...out, items: out.items.map((p) => scope.trimProduct(p, sc)) } : out);
 });
 
 router.get('/products/:id', needFlag, async (req, res) => {
-  res.json(await catalog.detail(req.shopId, req.params.id));
+  const sc = await scope.scopeOfReq(req);
+  const out = await catalog.detail(req.shopId, req.params.id);
+  res.json(sc ? { ...out, product: scope.trimProduct(out.product, sc), lowByLocation: scope.trimLows(out.lowByLocation, sc) } : out);
 });
 
 router.put('/products/:id/low', needFlag, requirePermission('settings.write'), async (req, res) => {
+  scope.checkLocation(await scope.scopeOfReq(req), req.body?.location);
   res.json(await catalog.setLow(req.shopId, req.params.id, req.body));
 });
 
 router.get('/moves', needFlag, async (req, res) => {
   res.json(await catalog.moves(req.shopId, {
-    productId: req.query.productId, cursor: req.query.cursor, limit: req.query.limit,
+    productId: req.query.productId, cursor: req.query.cursor, limit: req.query.limit, places: await scope.scopeOfReq(req),
   }));
 });
 
 router.get('/report', needFlag, requirePermission('reports.view'), async (req, res) => {
+  scope.requireAll(await scope.scopeOfReq(req));
   res.json(await stock.reconcile(req.shopId, { productId: String(req.query.productId || '') }));
 });
 
 router.get('/tasks', needFlag, async (req, res) => {
-  res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit }) });
+  const places = await scope.scopeOfReq(req);
+  res.json({ tasks: await catalog.tasks(req.shopId, { status: String(req.query.status || 'open'), limit: req.query.limit, places }) });
 });
 
 router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), async (req, res) => {
+  const sc = await scope.scopeOfReq(req);
+  const task = sc ? await scope.taskOf(req.shopId, req.params.id) : null;
+  if (task) scope.check(sc, scope.taskPlaces(task));
   const out = await catalog.resolveTask(req.shopId, req.params.id, req.body, req.user.id);
   await audit.log({
     shopId: req.shopId, userId: req.user.id, action: 'stock.task', targetType: 'stock_task',
@@ -108,6 +125,8 @@ router.post('/moves', needFlag, async (req, res) => {
   const spec = catalog.MANUAL[String(req.body?.kind || '')];
   if (!spec) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
   if (!can(req.role, spec.permission)) throw forbidden('این کار در حد دسترسی شما نیست', 'permission_denied');
+  const sc = await scope.scopeOfReq(req);
+  if (sc) scope.check(sc, scope.manualPlaces(catalog.parseManual(req.body)));
   const out = await catalog.manualMove(req.shopId, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body,
     actor: { type: 'user', id: req.user.id, role: req.role },
@@ -132,7 +151,8 @@ router.post('/moves', needFlag, async (req, res) => {
  * هر سه نوشتن اجازهٔ `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ کسری و رد دلیل.
  */
 router.get('/transfers', needFlag, async (req, res) => {
-  res.json({ transfers: await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit }) });
+  const places = await scope.scopeOfReq(req);
+  res.json({ transfers: await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit, places }) });
 });
 
 async function transferDone(req, res, action, out) {
@@ -149,7 +169,16 @@ async function transferDone(req, res, action, out) {
   return res.status(action === 'stock.transfer_send' ? 201 : 200).json(out);
 }
 
+/** عضوِ محدود: ارسال از مبدأِ محدوده؛ دریافت و رد در مقصدِ محدوده (همان «قبول یا رد در مقصد») */
+async function checkClose(req) {
+  const sc = await scope.scopeOfReq(req);
+  const to = sc ? await scope.transferTo(req.shopId, req.params.id) : null;
+  if (to) scope.check(sc, [to]);
+}
+
 router.post('/transfers', needFlag, requirePermission('stock.move'), async (req, res) => {
+  const sc = await scope.scopeOfReq(req);
+  if (sc) scope.check(sc, [transfers.parseSend(req.body).from]);
   const out = await transfers.send(req.shopId, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
   });
@@ -157,6 +186,7 @@ router.post('/transfers', needFlag, requirePermission('stock.move'), async (req,
 });
 
 router.post('/transfers/:id/receive', needFlag, requirePermission('stock.move'), async (req, res) => {
+  await checkClose(req);
   const out = await transfers.receive(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
   });
@@ -164,6 +194,7 @@ router.post('/transfers/:id/receive', needFlag, requirePermission('stock.move'),
 });
 
 router.post('/transfers/:id/reject', needFlag, requirePermission('stock.move'), async (req, res) => {
+  await checkClose(req);
   const out = await transfers.reject(req.shopId, req.params.id, {
     key: req.get('idempotency-key') || req.body?.clientKey, body: req.body, actor: { id: req.user.id, role: req.role },
   });

@@ -246,7 +246,7 @@ function decodeCursor(raw) {
 }
 
 /** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی؛ با `shop.storefront.search` (WEB-05/06) پرش به دسته، غلطِ تایپی و «پیدا نشد» ِ مفید. */
-async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' } = {}) {
+async function catalog(shopId, { q, category, cursor, limit, contactPhone = '', filters = null } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
@@ -258,10 +258,9 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
     where += ` AND ${p.name} LIKE $${params.length}`;
   }
   const cat = p.jump || text(category, 80);
-  if (cat) {
-    params.push(cat);
-    where += ` AND r.data->>'category' = $${params.length}`;
-  }
+  if (cat) where += ` AND r.data->>'category' = $${params.push(cat)}`;
+  //  WEB-07 (`storefront-filters.js`، پرچمِ `shop.storefront.filters`): خاموش ⇒ `filters` تهی و همان پرس‌وجو
+  if (filters) where += await filters.where(shopId, params);
   if (cursor) {
     const c = decodeCursor(cursor);
     params.push(c.name, c.id);
@@ -278,7 +277,7 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '' }
   const last = page[page.length - 1];
   return searchFinish({
     //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
-    items: await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name)),
+    items: (filters ? filters.keep : (x) => x)(await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name))),
     nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
   }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
@@ -609,7 +608,7 @@ async function verifiedPhone(ticket, session) {
   return a ? a.customer.phone : null;
 }
 
-async function checkout(sf, { key, body, ticket, session }) {
+async function checkout(sf, { key, body, ticket, session, ip = '' }) {
   //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
   const verified = await verifiedPhone(ticket, session);
   if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
@@ -621,7 +620,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  پرچمِ ناحیه/بازه و کاتالوگِ S1 (اگر منبع است: بی مهلت تازه؛ قیمت درونِ تراکنش از همان جدول) پیش از تراکنش (قفلِ سفارش کوتاه بماند)
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
-  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input }), { shopId: sf.shop_id, phone: verified });   //  MKT-01: تخفیفِ ویترین پشتِ پرچمِ خاموش
+  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input, phone: verified, ip }), { shopId: sf.shop_id, phone: verified });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;

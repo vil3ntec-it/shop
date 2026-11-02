@@ -837,6 +837,9 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale, ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle to androidx.compose.material.icons.Icons.Filled.AccountBalance, // PAY-18
                 StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                //  پیش‌بینیِ تقاضا (AI-07) و تشخیصِ ناهنجاری (AI-08) — هر دو پیش‌فرض خاموش
+                ir.vil3ntec.tohid.ui.screens.SMART_FORECAST_TITLE to androidx.compose.material.icons.Icons.Filled.TrendingUp,
+                ir.vil3ntec.tohid.ui.screens.ANOMALY_TITLE to androidx.compose.material.icons.Icons.Filled.Warning,
                 StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
                 //  صندوق: قیمت و تخفیفِ ردیف، جست‌وجوی مقاوم، قیمت‌پرسی، حالتِ لمسی، کلیدهای بیشتر، دریافت از مشتری (POS-04/08/15/31/39/41)
                 ir.vil3ntec.tohid.core.i18n.StrLine.section to androidx.compose.material.icons.Icons.Filled.LocalOffer,
@@ -861,6 +864,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrPos.quoteSettingsTitle to androidx.compose.material.icons.Icons.Filled.Description, ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2, // POS-26
                 ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.LocalOffer,
                 ir.vil3ntec.tohid.core.i18n.StrPayFix.settingsTitle to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CardGiftcard, // PAY-24
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,
@@ -868,6 +872,10 @@ fun AppRootLegacy(
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
                 ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
+                //  PAY-20/RPT-12: فقط صاحبِ واردشده و پرچمِ سروریِ `shop.owner_report` (خاموش ⇒ بی ردیف)
+                if (ir.vil3ntec.tohid.ui.screens.ownerReportRow(if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE to androidx.compose.material.icons.Icons.Filled.TableChart else null,
+                ir.vil3ntec.tohid.core.i18n.StrTaxQuarter.settingsTitle to androidx.compose.material.icons.Icons.Filled.Receipt, // RPT-10، پیش‌فرض خاموش
+                ir.vil3ntec.tohid.core.i18n.StrCustomerCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CreditCard, // CRM-16، پیش‌فرض خاموش
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ) + (
                 //  «سرورها» (پرچمِ `app.multi_server`) فقط برای صاحبِ دکان

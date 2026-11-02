@@ -253,14 +253,17 @@ function reject(shopId, id, { key, body, actor }) {
 }
 
 /** فهرست: تازه‌ترین اول؛ `status` اختیاری (`in_transit` ⇒ «در مسیر»). */
-async function list(shopId, { status, limit } = {}) {
+async function list(shopId, { status, limit, places = null } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
   const st = str(status);
   if (st && !STATUSES.includes(st)) throw badRequest('وضعیتِ انتقال معتبر نیست', 'bad_status');
   const { query } = require('../db');
+  const params = st ? [shopId, lim, st] : [shopId, lim];
+  //  STF-06 (`staff-scope.js`): عضوِ محدود فقط انتقالی را می‌بیند که یک سرش در محدودهٔ اوست
+  const mine = places ? ` AND (from_location = ANY($${params.push(places)}::text[]) OR to_location = ANY($${params.length}::text[]))` : '';
   const rows = (await query(
-    `SELECT * FROM stock_transfers WHERE shop_id=$1 ${st ? 'AND status=$3' : ''} ORDER BY created_at DESC, id DESC LIMIT $2`,
-    st ? [shopId, lim, st] : [shopId, lim]
+    `SELECT * FROM stock_transfers WHERE shop_id=$1 ${st ? 'AND status=$3' : ''}${mine} ORDER BY created_at DESC, id DESC LIMIT $2`,
+    params
   )).rows;
   return rows.map(view);
 }

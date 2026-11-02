@@ -73,6 +73,8 @@
     priceList: 'لیست قیمت',
     marketingConsent: 'رضایت پیام تبلیغاتی',
     mergedInto: 'ادغام‌شده در',
+    //  کارتِ مشتری (CRM-16) — همان `OwnerExport.kt`
+    cardCode: 'کارت مشتری',
     notes: 'یادداشت',
     createdAt: 'زمان ثبت (UTC)',
     date: 'تاریخ',

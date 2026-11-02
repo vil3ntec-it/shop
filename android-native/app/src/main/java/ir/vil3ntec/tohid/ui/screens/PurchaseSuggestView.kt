@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.purchase.DemandForecast
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
+import ir.vil3ntec.tohid.core.purchase.SmartDemand
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
@@ -35,6 +36,8 @@ import kotlinx.coroutines.launch
  *  حساب در `core/purchase/DemandForecast` و ورودی‌اش در `data/PurchaseSuggest`. «ساختِ پیش‌نویس» برای هر
  *  تأمین‌کننده یک کلید است و فقط پیش‌نویس می‌سازد؛ کلیدِ یکتای هر تأمین‌کننده تا بسته شدنِ همین
  *  صفحه ثابت است، پس دو بار زدن یا قطعِ نت دو سفارش نمی‌سازد. همان پرچمِ `shop.purchase_orders`.
+ *  AI-07: با تنظیمِ خاموشِ «پیش‌بینیِ تقاضا» (`SmartForecastPref`) روش، پیش‌بینیِ هفت روزِ آینده و نوسان هم دیده می‌شود؛
+ *  خاموش ⇒ همان صفحهٔ پیشین.
  */
 @Composable
 internal fun PoSuggest(
@@ -52,7 +55,8 @@ internal fun PoSuggest(
   var busy by remember { mutableStateOf<String?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
   val keys = remember { HashMap<String, String>() }
-  val rows = remember(d, orders) { orders?.let { PurchaseSuggest.rows(d, it, todayIso()) } }
+  val smart = rememberSmartForecastOn()
+  val rows = remember(d, orders, smart) { orders?.let { PurchaseSuggest.rows(d, it, todayIso(), smart) } }
 
   fun oneKey(supplierId: String) {
     val supplier = d.suppliers.find { it.id == supplierId } ?: return
@@ -75,7 +79,8 @@ internal fun PoSuggest(
   }
   Text(
     "از فروشِ ۹۰ روزِ اخیر (روزِ هفته و همین روزهای پارسال)، زمانِ تأمینِ هر تأمین‌کننده و «در راه». " +
-      "«ساختِ پیش‌نویس» فقط پیش‌نویس می‌سازد؛ فرستادن با خودتان است.",
+      "«ساختِ پیش‌نویس» فقط پیش‌نویس می‌سازد؛ فرستادن با خودتان است." +
+      (if (smart) " پیش‌بینیِ تقاضا روشن است: پرفروش با میانگینِ متحرکِ ۲۸ روز، کم‌فروش با Croston؛ اطمینان از درازای داده و نوسان." else ""),
     style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(vertical = 6.dp),
   )
   error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
@@ -117,6 +122,13 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       style = MaterialTheme.typography.bodySmall, color = if (r.due) c.text else c.muted,
     )
     Text(DemandForecast.why(f, LocaleFormat.DIGITS_LATN), style = MaterialTheme.typography.labelSmall, color = c.muted)
+    f.smart?.let { s ->
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        StatusPill(SmartDemand.methodText(s.method), PillTone.INFO)
+        Spacer(Modifier.width(6.dp))
+        Text("۷ روزِ آینده: ${SmartDemand.nextDaysText(s, 7, LocaleFormat.DIGITS_LATN)}", style = MaterialTheme.typography.labelSmall, color = c.muted)
+      }
+    }
   }
 }
 

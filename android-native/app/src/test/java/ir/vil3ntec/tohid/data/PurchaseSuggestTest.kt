@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
+import ir.vil3ntec.tohid.core.purchase.SmartDemand
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -69,5 +70,20 @@ class PurchaseSuggestTest {
     assertEquals(10_000L, a.forecast.onOrderMilli)
     //  نقطهٔ سفارش ۱۴ (۷ روز × ۲)؛ جایگاه ۱۰ ⇒ ۴۲ − ۱۰ در راه
     assertEquals(32_000L, a.forecast.qtyMilli)
+  }
+
+  @Test fun `پیش‌بینیِ تقاضای خاموش همان پیشنهاد است و روشن روش و پیش‌بینیِ هر روز دارد`() {
+    //  AI-07: تنظیمِ خاموش ⇒ ردیف به ردیف همان، بی `smart`
+    val off = PurchaseSuggest.rows(d, emptyList(), today)
+    assertEquals(off, PurchaseSuggest.rows(d, emptyList(), today, smart = false))
+    assertTrue(off.all { it.forecast.smart == null })
+    val a = PurchaseSuggest.rows(d, emptyList(), today, smart = true).first { it.product.id == "pA" }
+    val s = a.forecast.smart!!
+    //  ۳۰ روز هر روز ۲ ⇒ میانگینِ متحرکِ ۲۸ روز همان ۲، هر روزِ آینده ۲ و همان مقدارِ ۴۲
+    assertEquals(SmartDemand.Method.MOVING_AVERAGE, s.method)
+    assertEquals(2_000L, a.forecast.dailyMilli)
+    assertEquals(List(SmartDemand.FORECAST_DAYS) { 2_000L }, s.perDayMilli)
+    assertEquals(42_000L, a.forecast.qtyMilli)
+    assertEquals(0, s.cvPermille)
   }
 }

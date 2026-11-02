@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
+import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.returns.ReturnPolicy
 import ir.vil3ntec.tohid.core.returns.ReturnReasons
 import ir.vil3ntec.tohid.core.text.LocaleFormat
@@ -451,7 +452,11 @@ object ReturnFlow {
       is PayResult.Ok -> {
         var account = 0L; var credit = 0L; var cash = 0L
         val other = LinkedHashMap<String, Long>()
-        r.value.payouts.forEach {
+        //  PAY-24: سهمِ ردیف‌های کارتِ هدیه و اعتبارِ فروشگاه همیشه به همان روش (هر روش تا آنچه گرفت)؛ بی آن‌ها همان `payouts`
+        val routed = StoredPay.route(r.value, rows, m, (Pay.table(methods) as PayResult.Ok).value)
+        if (routed.giftMinor > 0) other[StoredPay.GIFT] = routed.giftMinor
+        if (routed.creditMinor > 0) other[StoredPay.CREDIT] = routed.creditMinor
+        routed.payouts.forEach {
           when (it.kind) {
             Pay.ACCOUNT -> account += it.amount
             Pay.STORE_CREDIT -> credit += it.amount
@@ -647,6 +652,17 @@ object ReturnFlow {
         notes = "اعتبارِ فروشگاه — برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,
       )
     }
+    //  PAY-24: سهمِ کارت به همان کارت‌ها و سهمِ اعتبار به اعتبارِ مشتریِ فاکتور (رسیدِ غیرنقد)؛ فاکتورِ بی آن‌ها ⇒ هیچ
+    val stored = if (sale == null) GiftCards.Rows() else when (
+      val g = GiftCards.forReturn(
+        d, sale, req.docId, minor(s.methods[StoredPay.GIFT] ?: 0.0), minor(s.methods[StoredPay.CREDIT] ?: 0.0),
+        "برگشت $tag — $invoice", today, now, req.by.trim().ifEmpty { null },
+      )
+    ) {
+      is GiftCards.Out.Bad -> return Outcome.Bad(Code.REFUND_FAILED, g.message)
+      is GiftCards.Out.Ok -> g.rows
+    }
+    transactions += stored.transactions
 
     val refundText = buildList {
       if (s.cash > 0) add("نقد ${money(s.cash)}")
@@ -682,7 +698,7 @@ object ReturnFlow {
         notes = notes,
         createdAt = now,
         amount = quote.total,
-      ),
+      ) + stored.audit,
     )
     return Outcome.Ok(Posted(out, req.docId, quote.total, s, g))
   }

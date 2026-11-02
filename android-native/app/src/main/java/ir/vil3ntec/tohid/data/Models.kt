@@ -565,6 +565,13 @@ data class Debtor(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val mergedInto: String? = null,
+  /**
+   *  کد/بارکدِ کارتِ مشتری (CRM-16) — فقط رقم، یکتا در دکان؛ نوشتن فقط از `CustomerCards`.
+   *  `null` = بی کارت، همان رفتارِ همیشه، و ⛔ نوشته نمی‌شود (`EncodeDefault.NEVER`).
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val cardCode: String? = null,
 )
 
 @Serializable

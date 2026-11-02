@@ -512,6 +512,7 @@ fun SettingsScreenLegacy(
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.SpecialOrderSettingsWired(context) } // پیش‌فاکتور (POS-25) و سفارشِ ویژه (POS-26)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.components.pos.PosNotesSettingsWired(context) } // یادداشتِ ردیف و فاکتور (POS-11)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) } // کارتِ هدیه و اعتبارِ فروشگاه (PAY-24)، پیش‌فرض خاموش
     /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
     item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
@@ -540,6 +541,8 @@ fun SettingsScreenLegacy(
       }
     }
     item { ir.vil3ntec.tohid.ui.screens.SafeBookSettingsWired(context) } // گاوصندوق (PAY-18)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.SmartForecastSettingsWired(context) } // پیش‌بینیِ تقاضا (AI-07)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.AnomalySettingsWired(context) } // تشخیصِ ناهنجاری (AI-08)، پیش‌فرض خاموش
     /* ============== سقفِ اعتبار در صندوق (CRM-03، S07، پیش‌فرض خاموش) ============== */
     item {
       var creditGate by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context)) }
@@ -682,6 +685,8 @@ fun SettingsScreenLegacy(
     }
 
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.TaxQuarterSettingsWired(context, d, snackbar) } //  مالیاتِ سه‌ماهه و یادآورِ سررسید (RPT-10)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.CustomerCardSettingsWired(context) } //  کارت یا بارکدِ مشتری (CRM-16)، پیش‌فرض خاموش
 
     /* ============ تحلیلِ موجودی (INV-15، INV-16) — گزارشِ کالاها در گوشی و کامپیوتر ============ */
     //  پیش‌فرض خاموش؛ فقط خواندنی و فقط همین دستگاه (`ShopPolicy.stockInsight`).
@@ -912,6 +917,8 @@ fun SettingsScreenLegacy(
       val servers = remember { ir.vil3ntec.tohid.platform.ServersController(context) }
       ServersSettings(servers) { toast(it) }
     }
+    //  PAY-20/RPT-12: گزارشِ خودکار برای صاحب (پرچمِ سروریِ `shop.owner_report`؛ خاموش یا غیرِ صاحب ⇒ هیچ)
+    item { OwnerReportSettings(if (signedIn && ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
 
     /* ============================== داده‌ها ============================== */
     item {

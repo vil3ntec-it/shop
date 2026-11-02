@@ -82,6 +82,12 @@ class CartFeedback(
         CartNote(StrSale.inactiveActivate(s.product.name), V3Tone.WARNING)
       }
       is CartModel.Scan.Unknown -> {
+        //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
+        ir.vil3ntec.tohid.data.CustomerCards.atTill(ir.vil3ntec.tohid.data.CustomerCardPref.on(context), d, code, index)?.let { c ->
+          if (!cart.setDebtor(c.id)) { ScanFeedback.unknown(context); return CartNote(CartStore.NOT_ADDED, V3Tone.WARNING) }
+          ScanFeedback.ok(context)
+          return CartNote(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.picked(c.name), V3Tone.SUCCESS)
+        }
         ScanFeedback.unknown(context)
         CartNote(StrSale.unknownBarcode, V3Tone.WARNING, register = s.code)
       }

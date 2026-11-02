@@ -821,5 +821,5 @@ module.exports = {
   TEMPLATES, CHANNELS, APP_LABEL, seedTemplates, templateFor, listTemplates, saveTemplate,
   render, variablesFor, emailHtml, resolveAudience, ownersOf,
   create, get, update, remove, list, shapeNotice, preview, send, sendTest, report, shapeDelivery,
-  inboxFor, markRead, systemNotice, onSubscription, checkSystem, tick, startRunner, stopRunner,
+  inboxFor, markRead, systemNotice, onSubscription, checkSystem, tick, startRunner, stopRunner, deliverOne, brand,
 };

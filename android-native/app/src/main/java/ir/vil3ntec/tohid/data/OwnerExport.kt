@@ -114,6 +114,8 @@ object OwnerExport {
     "priceList" to "لیست قیمت",
     "marketingConsent" to "رضایت پیام تبلیغاتی",
     "mergedInto" to "ادغام‌شده در",
+    //  کارتِ مشتری (CRM-16) — همان `license/owner-export.js`
+    "cardCode" to "کارت مشتری",
     "notes" to "یادداشت",
     "createdAt" to "زمان ثبت (UTC)",
     "date" to "تاریخ",

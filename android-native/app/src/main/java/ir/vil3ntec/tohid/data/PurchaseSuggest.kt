@@ -32,8 +32,11 @@ object PurchaseSuggest {
     val due: Boolean get() = forecast.qtyMilli > 0
   }
 
-  /** پیشنهادِ هر کالای فعال؛ نیازمندِ سفارش بالا، بعد کم‌روزتر */
-  fun rows(d: ShopData, orders: List<PurchaseOrderDto>, today: String): List<Row> {
+  /**
+   *  پیشنهادِ هر کالای فعال؛ نیازمندِ سفارش بالا، بعد کم‌روزتر. [smart] (AI-07، تنظیمِ خاموشِ `SmartForecastPref`) ⇒
+   *  میانگینِ متحرک یا Croston با نوسان و پیش‌بینیِ هر روز (`SmartDemand`)؛ خاموش ⇒ همان حسابِ پیشین.
+   */
+  fun rows(d: ShopData, orders: List<PurchaseOrderDto>, today: String, smart: Boolean = false): List<Row> {
     val t = CivilDays.jdnOfIso(today) ?: return emptyList()
     val from = t - HISTORY_DAYS + 1
     val live = HashMap<String, Int>()
@@ -73,6 +76,7 @@ object PurchaseSuggest {
             leadDays = lead?.days,
             firstJdn = first[p.id],
             wholeUnits = p.unit !in PurchaseOrderBook.WEIGHED_UNITS,
+            smart = smart,
           ),
         )
       } catch (e: ArithmeticException) {
