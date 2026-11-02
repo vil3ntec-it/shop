@@ -192,7 +192,7 @@ test('هر مسیرِ خصوصیِ /api/shop: بی توکن و با توکنِ �
 
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.delivery', 'shop.chat', 'shop.catalog',
   'shop.storefront', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'pay.hesabpay',
-  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
+  'shop.storefront.zones', 'shop.storefront.notify_area', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.amend', 'shop.purchase_orders', 'shop.order_risk'];
 //  جمع‌آوری و بسته‌بندی (PCK) — درهای `/shop/orders/pick/…` و `/shop/orders/:id/pick…`
 FLAGS.push('shop.orders.picking');
 //  M3: لوگو و تصویرِ سرِ ویترین
@@ -540,6 +540,7 @@ function concreteFor(ids) {
     [/^(\/shop\/staff-codes\/):id/, ids.code],
     [/^(\/shop\/permissions\/roles\/):role/, 'staff'],
     [/^(\/shop\/permissions\/members\/):id/, ids.member],
+    [/^(\/shop\/staff-scope\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
@@ -603,6 +604,7 @@ function bodyFor(r, ids) {
     'POST /shop/images/:id/propose': { consent: true },
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
+    'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
     'PUT /shop/permissions/roles/:role': { perms: {} },
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
     'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },

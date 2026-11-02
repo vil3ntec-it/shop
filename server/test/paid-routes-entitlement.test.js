@@ -66,11 +66,14 @@ const FREE = [
   ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
     + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
+  ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
+    + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
+    'PUT /shop/staff-scope/members/:id']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
   'shop.storefront.notify_area', 'shop.storefront.banners',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');
