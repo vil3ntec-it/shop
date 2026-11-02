@@ -378,6 +378,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/pick-substitutes-store'));
     api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/order-add-store'));   // CHK-21: افزودنِ قلم پیش از جمع‌آوری، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-method-store'));   // S72: تغییرِ روشِ تحویل پیش از جمع‌آوری، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش

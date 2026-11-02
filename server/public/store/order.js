@@ -65,6 +65,7 @@
       $('o-reorder').onclick = function () { ctx.reorder(o); };
       renderDelivery(o.delivery);
       renderEta(o);
+      renderMethod(o, token);
       renderPay(o, token);
       renderSubs(o, token);
       renderRate(o, token);
@@ -144,6 +145,17 @@
         document.head.appendChild(el('script', { attrs: { src: '/store/order-changes.js' }, on: { load: ok, error: no } }));
       }).then(function () { return window.StoreChanges({ api: api, show: renderOrder }); }).catch(function () { changes = null; return null; });
       changes.then(function (f) { if (f) f.render(o, token); });
+    }
+    //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — store/delivery-method.js فقط وقتی سرور `deliveryMethod` را داد
+    var method = null;
+    function renderMethod(o, token) {
+      if (!o.deliveryMethod) { if ($('o-dm')) $('o-dm').hidden = true; return; }
+      method = method || (window.StoreMethod ? Promise.resolve() : new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/delivery-method.js' }, on: { load: ok, error: no } }));
+      })).then(function () { return window.StoreMethod({ api: api, slug: ctx.slug }); }).catch(function () { method = null; return null; });
+      method.then(function (m) {
+        if (m) m.order(o, token, function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { renderOrder(r.order, token); }); });
+      });
     }
 
     //  DLV-18: پس از «تحویل شد» و تا ۷ روز، یک بار — مشتری به پیک ستاره و برچسب می‌دهد (بی متنِ آزاد).
