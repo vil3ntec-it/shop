@@ -13,12 +13,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.pay.Settlement
+import ir.vil3ntec.tohid.data.GiftCards
 import ir.vil3ntec.tohid.data.PayFlow
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.components.pos.PayPanelState
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
@@ -44,6 +47,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  نقدِ دریافتی با «نقدِ دقیق»، ردیف‌های کیف پول/کارت/حواله (روش با تراشه، شمارهٔ مرجع، مبلغ)،
  *  «+ روشِ دیگر»، و خلاصهٔ هسته (قابلِ پرداخت، دریافتی، پولِ پس، باقی‌مانده یا «به حسابِ …»).
  *  همهٔ حساب `PayFlow` است؛ متن‌ها در `PayPanelState` (`CheckoutSession.pay`) می‌مانند.
+ *  PAY-24: با `state.stored` (`GiftCardPref`) «کارت هدیه» و «اعتبار فروشگاه» هم در تراشه‌هایند، با راهنمای مانده زیرِ
+ *  ردیف و پیامِ خرجِ بیش از مانده (`CheckoutStoredPay`، همان صندوقِ قدیم)؛ خاموش ⇒ همان روش‌های امروز.
  */
 @Composable
 fun CheckoutPaySplit(
@@ -53,9 +58,13 @@ fun CheckoutPaySplit(
   customerName: String?,
   onSubmit: () -> Unit,
   error: String?,
+  /** PAY-24 — دفترِ صفحه برای ماندهٔ کارت و اعتبار (فقط با `state.stored`)؛ `null` ⇒ بی راهنما */
+  ledger: ShopData? = null,
 ) {
   val c = PhoneV3.colors
   val preview = PayFlow.preview(state.draft(total, customerId))
+  val book = ledger?.takeIf { state.stored }
+  val giftView = remember(book) { book?.let(GiftCards::view) }
   Column(Modifier.fillMaxWidth().animateContentSize(MotionSpec.tweenOf(MotionTokens.MEDIUM))) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       V3TextField(
@@ -76,7 +85,7 @@ fun CheckoutPaySplit(
       V3Card(radius = 16.dp, padding = PaddingValues(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           V3ChipRow(Modifier.weight(1f), contentPadding = PaddingValues(horizontal = 12.dp)) {
-            PayFlow.panelMethods().forEach { m ->
+            state.methods().forEach { m ->
               V3Chip(m.name, row.method == m.id, { state.rows[i] = row.copy(method = m.id) })
             }
           }
@@ -102,6 +111,9 @@ fun CheckoutPaySplit(
             modifier = Modifier.weight(1f),
           )
         }
+        CheckoutStoredPay.hint(book, giftView, row, customerId)?.let {
+          Text(it, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(horizontal = 12.dp).padding(top = 4.dp))
+        }
       }
     }
     Spacer(Modifier.height(10.dp))
@@ -125,8 +137,10 @@ fun CheckoutPaySplit(
         Spacer(Modifier.height(4.dp))
       }
     }
+    val stored = CheckoutStoredPay.problem(book, s, customerId)
     val shown = error ?: when {
       preview is PayFlow.Outcome.Bad -> PayFlow.message(preview.problem)
+      stored != null -> stored
       s != null && s.status == "short" && (s.tendered > 0 || state.rows.isNotEmpty()) -> PayFlow.message(PayFlow.Problem("SHORT", remaining = s.remaining))
       else -> null
     }

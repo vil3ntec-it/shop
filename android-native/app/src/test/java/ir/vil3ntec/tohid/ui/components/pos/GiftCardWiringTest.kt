@@ -44,6 +44,27 @@ class GiftCardWiringTest {
     assertTrue(src("ir/vil3ntec/tohid/ui/components/pos/PayPanel.kt").contains("GiftCards.problem(ledger, r.value, customerId)"))
   }
 
+  @Test fun `شارژ و باطل و چاپ و بدهی در همان نوار و کارت و اعتبار در صندوقِ v3 با همان تنظیم`() {
+    val s = src(bar)
+    assertEquals(1, count(bar, "GiftCardPref.recharge(store, key,"))
+    assertEquals(1, count(bar, "GiftCardPref.void(store, key,"))
+    //  باطل همان اجازهٔ لغوِ فاکتور؛ بدهی فقط برای نقشی که عددِ مالی می‌بیند؛ چاپ فقط از برگهٔ کارت
+    assertTrue(s.contains("ShopRole.canCancelSale(context)"))
+    assertTrue(s.contains("if (canMoney) TextButton(onClick = { owed = true })"))
+    assertTrue(s.contains("GiftCardPrint.print(context, sheet)"))
+    val v3 = "ir/vil3ntec/tohid/ui/v3/sales/checkout/"
+    assertEquals(1, count(v3 + "CheckoutRoute.kt", "GiftCardPref.on(context)"))
+    assertEquals(1, count(v3 + "CheckoutRoute.kt", "CheckoutStoredPay.settle(data, CheckoutSession.pay.draft("))
+    assertEquals(1, count(v3 + "CheckoutRoute.kt", "giftLedger = data.takeIf { giftOn }"))
+    val split = src(v3 + "CheckoutPaySplit.kt")
+    assertTrue(split.contains("state.methods().forEach"))
+    assertFalse(split.contains("PayFlow.panelMethods()"))
+    for (rel in listOf("CheckoutPaySplit.kt", "CheckoutRoute.kt", "CheckoutSheet.kt")) {
+      val t = src(v3 + rel)
+      for (x in listOf("GiftCards.forSale", "GiftCards.issue(", "gift_card_redeem", "store.update")) assertFalse("$rel ⇐ $x", t.contains(x))
+    }
+  }
+
   @Test fun `خرج و برگشتِ کارت فقط در دفتر — هیچ صفحه‌ای ردیفِ کارت نمی‌سازد`() {
     val data = "ir/vil3ntec/tohid/data/"
     assertEquals(1, count(data + "SalesEngine.kt", "GiftCards.forSale("))

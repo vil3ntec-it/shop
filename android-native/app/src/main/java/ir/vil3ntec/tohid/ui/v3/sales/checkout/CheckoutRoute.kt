@@ -13,9 +13,9 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.data.DiscountGate
+import ir.vil3ntec.tohid.data.GiftCardPref
 import ir.vil3ntec.tohid.data.HeldRules
 import ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession
-import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -82,6 +82,9 @@ fun RouteScope.CheckoutRoute() {
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
     val seller = remember { runCatching { SyncStore(context).accountName }.getOrDefault("") }
     val payV2 = remember { ShopPolicy.payV2(context) }
+    //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
+    val giftOn = remember { GiftCardPref.on(context) }
+    if (CheckoutSession.pay.stored != giftOn) CheckoutSession.pay.stored = giftOn
     //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
     val saleKey = remember(lines) { cart.saleKey() }
@@ -100,9 +103,9 @@ fun RouteScope.CheckoutRoute() {
       //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد
       val signed = if (gate == DiscountGate.State.APPROVED) CheckoutSession.approval?.let(DiscountGate::json) else null
       val options = if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
-      else when (val r = PayFlow.checkout(CheckoutSession.pay.draft(n.finalTotal, form.debtorId))) {
-        is PayFlow.Outcome.Ok -> checkout.copy(settlement = r.value, debtorId = form.debtorId, approval = signed)
-        is PayFlow.Outcome.Bad -> { payError = PayFlow.message(r.problem); return }
+      else when (val r = CheckoutStoredPay.settle(data, CheckoutSession.pay.draft(n.finalTotal, form.debtorId))) {
+        is CheckoutStoredPay.Out.Ok -> checkout.copy(settlement = r.settlement, debtorId = form.debtorId, approval = signed)
+        is CheckoutStoredPay.Out.Bad -> { payError = r.message; return }
       }
       payError = null
       error = null
@@ -203,6 +206,7 @@ fun RouteScope.CheckoutRoute() {
       payError = payError,
       canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate),
       canAskApproval = !busy,
+      giftLedger = data.takeIf { giftOn },
     ).also { last[0] = it }
   }
 
