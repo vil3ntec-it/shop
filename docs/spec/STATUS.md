@@ -1406,6 +1406,23 @@
   (`WhatsNewOnUpdate`/`WhatsNewSettingsRows`) و Ctrl+L ِ بی PIN ِ صندوق (S46، رمزِ برنامه) فقط در رابطِ قدیم بودند. صفحه‌های
   قدیمیِ بی‌مرجعِ `ui/screens` (`ProductsScreen`، `WarehouseScreen`، `PurchasingScreen`، `TeamScreen`، `ManagementScreen`،
   `DeskDashboardScreen`، `DeskReportsScreen`، `TohidTopBar`…) و `…SettingsWired`های بی‌مرجع گامِ بعدِ پاک‌سازی‌اند.
+- ۱۴۰۵/۰۸/۱۱ — «پاک‌سازی، گامِ ۳» (`claude/cleanup-3`): صفحه‌های بی‌مرجعِ `ui/screens` پاک شدند — `ProductsScreen`،
+  `WarehouseScreen`، `TeamScreen`، `ManagementScreen`، `DeskDashboardScreen`، `DeskReportsScreen` و سربرگِ آبیِ `TohidTopBar`
+  (هشدارهای زنگ `rememberAlerts`/`Alert`/`SUBSCRIPTION_WARN_DAYS` را نسخهٔ ۳ می‌خواند ⇒ به `BellAlertsAndroid.kt` رفتند)؛ ۲۶ `…SettingsWired`
+  ِ بی‌صدازننده و ۱۲ نیمهٔ «بخشِ تنظیمات» ِ بی‌مرجعشان (`KeyHelpSettings`، `TillSwitchSettings`، `AutoFeesSettings`… ؛ هر نوشتنشان
+  صفحهٔ `ui/v3/settings` دارد، `SettingsPortTest`). نگهبان: `NoLegacyUiTest` (پرونده و تعریفِ صفحه‌ها برنمی‌گردد؛ `…SettingsWired`
+  ِ تازه ساخته نمی‌شود و ۱۲ ِ مانده فقط کم می‌شود). سنجش‌های متنیِ آن صفحه‌ها: `KeyMapTest` ⇐ `ReportsDesk` ِ نسخهٔ ۳،
+  `StockPlacesOffTest` ⇐ «هیچ صفحه‌ای جز درگاهِ محل‌ها به `StockPlaces`/`Repack` دست نمی‌زند»، `SimpleAskEngineTest` ⇐ «هر
+  صدازنندهٔ `DeskSimpleAsk` کلید را می‌خواند»؛ سطرِ `Products.kt` ِ `VisualSearchTest` و سقفِ `TopBar.kt` ِ `HardcodedColorsTest`
+  با پرونده رفتند. **کمبودهای آشکارشده** (از #848/#851 بی‌راه؛ کدشان ماند تا جای نسخهٔ ۳ بگیرند): درگاهِ محل‌ها و بسته‌بندی
+  (`StockPlacesEntry`، INV-20/21)، `StockCountToolsWired`، برگهٔ برچسب (`LabelSheetWired`)، ورودِ گروهیِ کالا/عکس و پیشینه‌اش
+  (`BulkProductSheet`، `BulkEntrySheet`، `StockCountSheet`، `ImageBulkImportSheet`، `ProductImportDialog`، `ProductImportHistoryDialog`)،
+  پنجره‌های انبار (`ProductDialog`، `EntryDialog`، `AdjustDialog`)، `CategoryFilter`، `StockStrip`، بخش‌های تیم (`MemberPermsSection`،
+  `ApproverSetupSection`، `DevicesSection`، `StaffScopeSection`، `StaffTimeHub`)، «پرسشِ ساده» ِ کامپیوتر (`DeskSimpleAsk`) و
+  `ReportCompareLine`. **هنوز بی‌مرجع** (گامِ بعد): `Purchasing.kt` (چاپِ «سندِ کسر» ِ گوشی، شاهدِ S25)، `AuditLog`، `Dashboard`،
+  `MySubscription`، `PhoneClaimStep`، `Rings`، `Servers`، `ShopChat`، `Support`، `TillReceiveSettings`، `Toast`، `WelcomeDecor`،
+  `BrandLogo`، `TaxDueBanner`، `TillUserChip`؛ تنظیماتِ رابطِ امروز (`ui/screens/Settings.kt`) فقط از پیش‌نمایشِ گوشیِ `DevShot`
+  صدا زده می‌شود و ۱۱ `…SettingsWired` ِ مانده را نگه می‌دارد.
 - ۱۴۰۵/۰۸/۱۲ — **ممیزیِ شاهدِ CI، دورِ هفتم** (ردیف‌های PARTIAL ِ دستهٔ ۱۳، #855، و دستهٔ ۱۴، #859 — #852، #853، #854، #857 — که بازمانده‌شان فقط شاهدِ CI
   بود: «فقط شاهدِ CI مانده» ِ #846 یا «پیشنهادِ وضعیت پس از مرج و CIِ سبز: IMPLEMENTED-VERIFIED» ِ #857؛ #856 و #858 هیچ ردیفی را دست نزدند): #855 (0a68b851) —
   «توحید بومی» 41521490357، «فروشگاه من — کامپیوتر» 41521490247 (هر ۸ کار) و «سرور» 41521490213 سبز: PostgreSQL (۲۸۰۸: ۲۷۹۵ سبز، ۰ شکست، ۰ لغو، ۱۱ skip،

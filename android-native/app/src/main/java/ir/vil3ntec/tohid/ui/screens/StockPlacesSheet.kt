@@ -4,8 +4,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -41,28 +39,6 @@ private fun milliText(milli: Long): String = (if (milli < 0) "−" else "") + qt
 
 /** عددِ تایپ‌شده ⇐ هزارم؛ خالی یا نادرست ⇒ ۰ */
 private fun milliOf(raw: String): Long = raw.toDoubleOrNull()?.takeIf { it.isFinite() && it > 0 }?.let(StockLedger::milli) ?: 0L
-
-@Composable
-fun StockPlacesSettings(places: Boolean, repack: Boolean, onPlaces: (Boolean) -> Unit, onRepack: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Inventory2,
-    title = STOCK_PLACES_TITLE,
-    subtitle = if (places || repack) StrPlaces.settingsOn else StrPlaces.off,
-    tint = if (places || repack) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrPlaces.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(12.dp))
-    Text(StrPlaces.placesSection, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
-    Text(StrPlaces.placesSectionNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(6.dp))
-    SegmentedChoice(listOf("off" to StrPlaces.off, "on" to StrPlaces.on), if (places) "on" else "off", { onPlaces(it == "on") })
-    Spacer(Modifier.height(12.dp))
-    Text(StrPlaces.repackSection, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
-    Text(StrPlaces.repackSectionNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(6.dp))
-    SegmentedChoice(listOf("off" to StrPlaces.off, "on" to StrPlaces.on), if (repack) "on" else "off", { onRepack(it == "on") })
-  }
-}
 
 /** انتخابِ کالایی که موجودیِ خودش را دارد (نه کیت، نه خدماتی) */
 @Composable

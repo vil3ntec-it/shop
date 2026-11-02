@@ -215,11 +215,13 @@ class SimpleAskEngineTest {
     assertTrue(Regex("""listOfNotNull\([\s\S]{0,300}?\("ask" to ir\.vil3ntec\.tohid\.core\.i18n\.StrSimpleAsk\.tab\)\.takeIf \{ askOn \}""").containsMatchIn(phone))
     assertTrue(phone.contains("\"ask\" -> if (askOn) simpleAskSection(this, d, canSeeMoney)"))
     assertEquals(1, Regex("simpleAskSection\\(").findAll(phone).count())
-    //  کامپیوتر: زبانهٔ `ASK` فقط با همان کلید از فهرست می‌گذرد
-    val desk = src("ui/screens/DeskReports.kt")
-    assertTrue(desk.contains("val ask = remember { SimpleAskPref.on(context) }"))
-    assertTrue(desk.contains("&& (ask || !it.ask) }"))
-    assertTrue(desk.contains("ASK(\"ask\", \"\", false, ask = true,"))
+    //  کامپیوتر: گزارش‌های رابطِ امروز (`DeskReports.kt`، زبانهٔ `ASK`) بی‌مرجع از نسخهٔ ۳ بود و در «پاک‌سازی، گامِ ۳»
+    //  پاک شد؛ `DeskSimpleAsk` تا جای کامپیوتریِ نسخهٔ ۳ می‌ماند (STATUS، یادداشت‌ها) و هیچ صفحه‌ای آن را بی کلید نمی‌کشد
+    val ui = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/ui") }.first { it.isDirectory }
+    ui.walkTopDown().filter { it.isFile && it.extension == "kt" }.map { it.name to it.readText() }
+      .filter { (_, s) -> Regex("""(?<!fun )\bDeskSimpleAsk\(""").containsMatchIn(s) }
+      .forEach { (name, s) -> assertTrue("$name زبانهٔ پرسش را بی کلید می‌کشد", s.contains("SimpleAskPref.on(context)")) }
     //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
     assertEquals(1, Regex(Regex.escape("SimpleAskPref.set(context, it)")).findAll(src("ui/v3/settings/sections/OpsToggleScreensAndroid.kt")).count())
     assertTrue(src("ui/screens/SettingsLayout.kt").contains("SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle"))

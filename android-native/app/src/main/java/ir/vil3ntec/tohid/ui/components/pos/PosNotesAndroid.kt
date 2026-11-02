@@ -4,15 +4,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -21,17 +18,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.pos.SaleNotes
-import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shape
-import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
  *  POS-11 — یادداشتِ ردیف و یادداشتِ فاکتور در صندوق، با قالب‌های تکراری؛ فایلِ مرزیِ پلتفرم.
@@ -128,52 +120,4 @@ fun InvoiceNoteButton(note: String?, show: Boolean, onNote: (String?) -> Boolean
     confirmButton = { TextButton(onClick = { if (onNote(SaleNotes.clean(text))) open = false }) { Text("ثبت") } },
     dismissButton = { TextButton(onClick = { open = false }) { Text("انصراف") } },
   )
-}
-
-/** بخشِ تنظیمات: روشن/خاموش و قالب‌ها — همان جای تنظیم‌های صندوق، یک خط در آن‌جا */
-@Composable
-fun PosNotesSettingsWired(context: android.content.Context) {
-  PosNotesPrefs.load(context)
-  val on = PosNotesPrefs.on.value
-  SettingsSection(
-    icon = Icons.Filled.Edit,
-    title = ir.vil3ntec.tohid.core.i18n.StrPos.notesSection,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(
-      "یادداشتِ هر ردیف (در کادرِ ویرایشِ ردیف) و یادداشتِ کلِ فاکتور، روی رسید چاپ می‌شوند. قالب‌ها با یک لمس افزوده می‌شوند. انتخابِ همین دستگاه است.",
-      style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
-    )
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { PosNotesPrefs.set(context, it == "on") },
-    )
-    if (!on) return@SettingsSection
-    Spacer(Modifier.height(8.dp))
-    val list = PosNotesPrefs.templates.value
-    list.forEach { t ->
-      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(t, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
-        TextButton(onClick = { PosNotesPrefs.setTemplates(context, SaleNotes.removeTemplate(list, t)) }) { Text("حذف") }
-      }
-    }
-    if (list.size < SaleNotes.MAX_TEMPLATES) {
-      var draft by remember { mutableStateOf("") }
-      Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-          value = draft,
-          onValueChange = { draft = it.take(SaleNotes.MAX) },
-          singleLine = true,
-          label = { Text("قالبِ تازه") },
-          modifier = Modifier.weight(1f),
-        )
-        TextButton(enabled = SaleNotes.clean(draft) != null, onClick = {
-          PosNotesPrefs.setTemplates(context, SaleNotes.addTemplate(list, draft)); draft = ""
-        }) { Text("افزودن") }
-      }
-    }
-  }
 }

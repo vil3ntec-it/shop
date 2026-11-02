@@ -8,7 +8,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.data.InternalBarcodes
-import ir.vil3ntec.tohid.data.LabelToolsPref
 import ir.vil3ntec.tohid.data.ScaleLabels
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -57,11 +56,4 @@ fun LabelSheetWired(
       }
     },
   )
-}
-
-/** بخشِ «برچسب و بارکدِ داخلی» با خواندن و نوشتنِ `LabelToolsPref` — تا `Settings` یک خط بخواهد */
-@Composable
-fun LabelToolsSettingsWired(context: android.content.Context) {
-  var on by remember { mutableStateOf(LabelToolsPref.on(context)) }
-  LabelToolsSettings(on) { on = it; LabelToolsPref.set(context, it) }
 }

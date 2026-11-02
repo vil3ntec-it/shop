@@ -14,8 +14,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -34,7 +32,6 @@ import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrPos
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.model.MemberDto
 import ir.vil3ntec.tohid.core.perm.ApproverVault
@@ -47,7 +44,6 @@ import ir.vil3ntec.tohid.data.TillUser
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.screens.AppLockScreen
 import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.Dispatchers
@@ -144,35 +140,6 @@ fun TillUserChip() {
     style = MaterialTheme.typography.labelMedium, color = Shop.colors.text,
     modifier = Modifier.background(Shop.colors.primaryTint, RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
   )
-}
-
-/** بخشِ تنظیمِ رابطِ امروز — روشن/خاموش و کاربرانِ PIN‌دارِ همین دستگاه */
-@Composable
-fun TillSwitchSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Lock,
-    title = StrTill.switchTitle,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrTill.switchNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
-    if (on) {
-      Spacer(Modifier.height(10.dp))
-      TillUsersBlock()
-    }
-  }
-}
-
-@Composable
-fun TillSwitchSettingsWired(context: android.content.Context) {
-  TillUser.load(context)
-  TillSwitchSettings(TillUser.on.value) { TillUser.set(context, it) }
 }
 
 /**

@@ -3,12 +3,9 @@ package ir.vil3ntec.tohid.ui.components.pos
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Loyalty
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
@@ -30,7 +27,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrLoyalty
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.promo.Loyalty
 import ir.vil3ntec.tohid.data.LoyaltyPoints
 import ir.vil3ntec.tohid.data.LoyaltyPref
@@ -46,7 +42,6 @@ import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.normalizeDigits
 import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -270,59 +265,3 @@ private fun LoyaltyAdjustDialog(store: ShopStore, debtorId: String, rule: Loyalt
 }
 
 private const val HISTORY_SHOWN = 30
-
-/** تنظیمات: روشن/خاموش (همین دستگاه) و قاعده (فقط صاحب یا مدیر) */
-@Composable
-fun LoyaltySettingsWired(context: android.content.Context) {
-  var on by remember { mutableStateOf(LoyaltyPref.on(context)) }
-  val may = remember { !ShopRole.isStaff(context) }
-  val rule0 = remember { LoyaltyPref.rule(context) }
-  var every by remember { mutableStateOf(rule0.everyAfn.toString()) }
-  var point by remember { mutableStateOf(rule0.pointAfn.toString()) }
-  var share by remember { mutableStateOf(rule0.maxSharePct.toString()) }
-  var silver by remember { mutableStateOf(rule0.silverAfn.toString()) }
-  var gold by remember { mutableStateOf(rule0.goldAfn.toString()) }
-  var note by remember { mutableStateOf<String?>(null) }
-  SettingsSection(
-    icon = Icons.Filled.Loyalty,
-    title = StrLoyalty.settingsTitle,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.primary else Shop.colors.muted,
-  ) {
-    Text(StrLoyalty.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { on = it == "on"; LoyaltyPref.set(context, on) },
-    )
-    Spacer(Modifier.height(8.dp))
-    Text(StrLoyalty.tiersNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    if (!may) Text(StrLoyalty.ownerOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    LoyaltyField(StrLoyalty.everyAfn, every, may) { every = it }
-    LoyaltyField(StrLoyalty.pointAfn, point, may) { point = it }
-    LoyaltyField(StrLoyalty.maxShare, share, may) { share = it }
-    LoyaltyField(StrLoyalty.silverAfn, silver, may) { silver = it }
-    LoyaltyField(StrLoyalty.goldAfn, gold, may) { gold = it }
-    if (may) OutlinedButton(onClick = {
-      val r = Loyalty.Rule(
-        everyAfn = normalizeDigits(every).toLongOrNull() ?: 0, pointAfn = normalizeDigits(point).toLongOrNull() ?: 0,
-        maxSharePct = normalizeDigits(share).toIntOrNull() ?: 0, silverAfn = normalizeDigits(silver).toLongOrNull() ?: 0,
-        goldAfn = normalizeDigits(gold).toLongOrNull() ?: 0,
-      )
-      note = if (LoyaltyPref.setRule(context, r)) StrLoyalty.saved else StrLoyalty.badRule
-    }, modifier = Modifier.padding(top = 8.dp)) { Text(StrLoyalty.save) }
-    note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
-    LoyaltyShopSettings(context) // انقضا و قاعدهٔ یکسانِ دکان (پرچمِ خاموشِ `shop.loyalty_rule` ⇒ فقط انقضای همین دستگاه)
-  }
-}
-
-@Composable
-private fun LoyaltyField(label: String, value: String, enabled: Boolean, onChange: (String) -> Unit) {
-  OutlinedTextField(
-    value = value, onValueChange = { onChange(it.filter { c -> c.isDigit() }.take(13)) }, label = { Text(label) },
-    singleLine = true, enabled = enabled, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-  )
-}
