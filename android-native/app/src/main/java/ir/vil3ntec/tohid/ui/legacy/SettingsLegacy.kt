@@ -483,6 +483,7 @@ fun SettingsScreenLegacy(
     item { LabelToolsSettingsWired(context) } // برچسب و بارکدِ داخلی (PRD-23، PRD-05)، پیش‌فرض خاموش
     item { EasySetupSettingsWired(context) } // راه‌اندازیِ آسانِ چاپگر و بارکدخوان (HW-12)، پیش‌فرض خاموش
     item { CountToolsSettingsWired(context) } // انبارگردانیِ تازه: اسکن، چند دستگاه، کور (INV-06/07/08)، پیش‌فرض خاموش
+    item { StockPlacesSettingsWired(context) } // محل‌ها و انتقال، بسته‌بندیِ دوباره (INV-20/21)، پیش‌فرض خاموش
 
     /* ============== موجودی و بهای تمام‌شده — تنظیمِ دکان، پیش‌فرض خاموش (`StockBook.kt`) ============== */
     item { StockModeSection(store, d) }
@@ -502,6 +503,7 @@ fun SettingsScreenLegacy(
     /* ============ قیمت و تخفیفِ ردیف (POS-08/10/20/21، پیش‌فرض خاموش) ============ */
     item { ir.vil3ntec.tohid.ui.components.pos.LinePricingSettingsWired(context) }
     item { ir.vil3ntec.tohid.ui.components.pos.PriceListSettingsWired(context) } // POS-18، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.components.pos.LoyaltySettingsWired(context) } // امتیازِ وفاداری و سطحِ مشتری (PRM-13)، پیش‌فرض خاموش
     /* ======================== برگشت و تعویض (RET، پیش‌فرض خاموش) ======================== */
     item { ReturnSettingsSection() }
     /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
@@ -513,7 +515,7 @@ fun SettingsScreenLegacy(
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.SpecialOrderSettingsWired(context) } // پیش‌فاکتور (POS-25) و سفارشِ ویژه (POS-26)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.components.pos.PosNotesSettingsWired(context) } // یادداشتِ ردیف و فاکتور (POS-11)، پیش‌فرض خاموش
-    item { ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) } // کارتِ هدیه و اعتبارِ فروشگاه (PAY-24)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.LayawaySettingsWired(context) } // کارتِ هدیه (PAY-24) و فروشِ امانی (POS-27)، پیش‌فرض خاموش
     /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
     item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
@@ -912,6 +914,11 @@ fun SettingsScreenLegacy(
         }
       }
     }
+
+    /* ===== ویترین: زمانِ تقریبیِ تحویل (WEB-04) و اولین خرید و سدِ تخفیف (MKT-02، RSK-09) ===== */
+    //  پرچم‌های سروریِ `shop.storefront.eta` و `shop.storefront.promo_guard`؛ خاموش یا نقشِ بی `settings.write` ⇒ هیچ
+    item { StorefrontEtaSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
+    item { PromoGuardSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
 
     /* ============== سرورها (پرچمِ `app.multi_server`، فقط صاحبِ دکان) ============== */
     item {

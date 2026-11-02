@@ -44,11 +44,15 @@ const CATEGORY = {
   'delivery-rating-store.js': 'STORE_PAID',    //  DLV-18: امتیازِ مشتری به پیک — همان ویترینِ پولی (sf.open)
   'storefront-finder-store.js': 'STORE_PAID',  //  WEB-07/10: فیلتر و «خبرم کن» — همان ویترینِ پولی (sf.open)
   'order-feedback-store.js': 'STORE_PAID',     //  NTF-07/09: گزارشِ مشکل و نظرِ سفارش — همان ویترینِ پولی (sf.open)
+  'storefront-eta-store.js': 'STORE_PAID',    //  WEB-04: زمانِ تقریبیِ تحویل — همان ویترینِ پولی (sf.open)
+  'store-account-history.js': 'STORE_PAID',    //  CRM-13: «حسابِ من» — همان ویترینِ پولی (sf.open پیش از پرچم)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */
 const ROUTE_CATEGORY = { 'GET /store': 'STORE_LOOKUP' };
-const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust', 'market.public_id'];
+const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust', 'market.public_id',
+  //  SEC-10: `POST /store/:slug/account/erase` پشتِ پرچمِ خودش (خاموش ⇒ همان درِ ناشناخته)
+  'shop.customer_erasure'];
 
 /** `${base}` ِ روترهای چت و شکایت همان ثابتِ `const base = '…'` ِ پرونده است. */
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';

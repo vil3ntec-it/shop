@@ -505,11 +505,23 @@
     }).catch(fail || function (e) { K.note($('o-msg'), 'err', e.message); });
   }
 
+  // CRM-13 (account.js)
+  var accountView = null;
+  function loadAccount() {
+    accountView = accountView || Promise.all([new Promise(function (ok, no) {
+      document.head.appendChild(el('script', { attrs: { src: '/store/account.js' }, on: { load: ok, error: no } }));
+    }), K.part('account', $('view-orders'))]).then(function () { return window.StoreAccount({ api: api, root: $('view-orders').firstElementChild }); })
+      .catch(function () { accountView = null; throw new Error(t('err.network')); });
+    return accountView;
+  }
+
   // ── سفارش‌های من در همین دکان ──
   function openOrders() {
     show('view-orders');
     document.title = t('my.orders') + ' — ' + store.title;
+    var mine = false;
     var draw = function (list) {
+      if (mine) return;
       var ul = K.clear($('my-orders'));
       list.forEach(function (o) {
         var end = el('span', { class: 'end' });
@@ -525,6 +537,15 @@
     draw(K.load(KEY_ORDERS, []) || []);
     //  S138: با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاه
     if (K.ticket()) api('/orders').then(function (r) { if (r.orders.length) draw(r.orders); }).catch(function () { /* همان محلی */ });
+    // CRM-13
+    var acc = Boolean(store.features.accountHistory && K.ticket());
+    if ($('my-account')) $('my-account').hidden = !acc;
+    if (!acc) return;
+    $('my-orders').hidden = false;
+    loadAccount().then(function (a) { return a.open(); }).then(function (ok) {
+      mine = ok;
+      if (ok) { $('my-orders').hidden = true; $('my-orders-empty').hidden = true; }
+    }).catch(function () { /* همان فهرستِ امروز */ });
   }
 
   // ── مسیر ──
