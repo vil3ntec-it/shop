@@ -62,7 +62,7 @@ internal sealed interface CheckAsk {
   data object Route : CheckAsk
 }
 
-/** کارِ پیک پیش‌شرط دارد؟ ⇒ برگه‌اش؛ null ⇒ همان دم به صف (همان شاخه‌های `CourierHomeLegacy`) */
+/** کارِ پیک پیش‌شرط دارد؟ ⇒ برگه‌اش؛ null ⇒ همان دم به صف */
 internal fun checkFor(a: CourierAction): CheckAsk? = when {
   a.type == "picked_up" && a.card.bagScanBags != null && a.bags.isEmpty() -> CheckAsk.Bags(a.card)
   a.type == "delivered" && a.card.nearPinMaxM != null && a.position == null -> CheckAsk.Locate(a)

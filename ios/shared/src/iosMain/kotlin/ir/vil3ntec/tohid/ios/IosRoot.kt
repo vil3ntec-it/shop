@@ -32,7 +32,6 @@ import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.AppRoot
 import ir.vil3ntec.tohid.ui.ProvideLang
-import ir.vil3ntec.tohid.ui.UiV3
 import ir.vil3ntec.tohid.ui.courier.CourierHome
 import ir.vil3ntec.tohid.ui.directionOf
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -82,7 +81,6 @@ internal object IosBoot {
     ir.vil3ntec.tohid.data.ExpiryPref.load(IosContext)
     ThemeStore.load(IosContext)
     ModeState.load(IosContext)
-    UiV3.load(IosContext)
     ShopRole.courierMode.value = ShopRole.isCourier(IosContext)
     IosWork.install()
     IosSync.start()
@@ -137,19 +135,6 @@ private fun IosApp(store: ShopStore) {
   val signOut: () -> Unit = {
     prefs.edit().putBoolean("welcomed", false).apply()
     welcomed = false
-  }
-
-  if (!UiV3.on) {
-    TohidTheme(theme) {
-      ProvideLang {
-        when {
-          !welcomed -> WelcomeScreen(store, welcome)
-          courier -> CourierHome(onSignedOut = signOut)
-          else -> AppRoot(store = store, theme = theme, onTheme = onTheme)
-        }
-      }
-    }
-    return
   }
 
   val chosen = ModeState.chosen.value

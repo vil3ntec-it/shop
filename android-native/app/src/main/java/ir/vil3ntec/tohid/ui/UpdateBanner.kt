@@ -27,8 +27,6 @@ import ir.vil3ntec.tohid.update.UpdateManager
  */
 @Composable
 fun UpdateBanner() {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on) { UpdateBannerLegacy(); return }
   ir.vil3ntec.tohid.ui.v3.shell.UpdateNotice()
 }
 
@@ -60,8 +58,6 @@ private fun updateMessage(version: String, required: Boolean, progress: Int, rea
  */
 @Composable
 fun UpdateChip() {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on) { UpdateChipLegacy(); return }
   if (BuildConfig.STORE == "bazaar") return
   val context = LocalContext.current
   AutoCheck()

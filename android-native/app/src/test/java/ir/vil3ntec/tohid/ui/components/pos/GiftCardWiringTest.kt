@@ -31,12 +31,13 @@ class GiftCardWiringTest {
     assertTrue(s.contains("ShopRole.canWrite(context, \"sales\")"))
   }
 
-  @Test fun `هر سه صندوق و تنظیمات و پنلِ پرداخت`() {
+  @Test fun `صندوقِ گوشی و کامپیوتر و تنظیمات و پنلِ پرداخت`() {
     val call = "GiftCardBar(d, store, ::toast"
-    for (rel in listOf("ui/screens/Sale.kt", "ui/legacy/SaleLegacy.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count("ir/vil3ntec/tohid/$rel", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SettingsLegacy.kt", "GiftCardSettingsWired(context)"))
+    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count("ir/vil3ntec/tohid/$rel", call))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Settings.kt", "GiftCardSettingsWired(context)"))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt", "StrGiftCard.settingsTitle to"))
+    //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/TillMoneyScreensAndroid.kt", "GiftCardPref.set(context, it)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/SettingsLayout.kt", "GIFT_CARD -> ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle"))
     //  روش‌های پنل فقط با همان تنظیم؛ پیش‌سنجشِ مانده پیش از ثبت
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt", "it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context)"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", "stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) }"))
@@ -70,7 +71,7 @@ class GiftCardWiringTest {
     assertEquals(1, count(data + "SalesEngine.kt", "GiftCards.forSale("))
     assertEquals(1, count(data + "SalesEngine.kt", "GiftCards.forCancel("))
     assertEquals(1, count(data + "ReturnFlow.kt", "GiftCards.forReturn("))
-    for (rel in listOf("ui/screens/Sale.kt", "ui/legacy/SaleLegacy.kt", "ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/components/pos/PayPanel.kt")) {
+    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt", "ui/screens/SaleDialogs.kt", "ui/components/pos/PayPanel.kt")) {
       val s = src("ir/vil3ntec/tohid/$rel")
       for (x in listOf("GiftCards.forSale", "GiftCards.forReturn", "GiftCards.forCancel", "GiftCards.issue(", "gift_card_redeem")) assertFalse("$rel ⇐ $x", s.contains(x))
     }

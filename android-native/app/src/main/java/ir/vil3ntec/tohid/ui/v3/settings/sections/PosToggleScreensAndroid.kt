@@ -15,7 +15,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 
 /*
  *  سه کلیدِ صندوق که فقط در تنظیماتِ رابطِ امروز بودند (`PayFixSettingsWired`، `PriceListSettingsWired`،
- *  `QuoteSettingsWired` در `ui/legacy/SettingsLegacy.kt`) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن
+ *  `QuoteSettingsWired` در رابطِ قدیمِ پاک‌شده) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن
  *  (`SettingsPortTest`)، فقط رویِ کیت (`ToggleScreen` ِ `MoreToggleScreensAndroid.kt`). هر سه فقط همین دستگاه.
  */
 

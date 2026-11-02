@@ -25,7 +25,7 @@ import ir.vil3ntec.tohid.data.repo.CustomerErasureRepository
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /*
- *  SEC-10 — «حذفِ دادهٔ این مشتری» در پروندهٔ مشتری (رابطِ امروز: `DebtorsLegacy` گوشی و `DeskCustomers` کامپیوتر).
+ *  SEC-10 — «حذفِ دادهٔ این مشتری» در پروندهٔ مشتری (`DeskCustomers` کامپیوتر).
  *  فقط صاحبِ واردشده، شمارهٔ قابلِ حذف و پاسخِ روشنِ سرور. حالت فقط در `CustomerErasureController`.
  */
 

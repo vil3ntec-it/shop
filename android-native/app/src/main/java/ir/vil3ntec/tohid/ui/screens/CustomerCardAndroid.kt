@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
 
 /**
  *  CRM-16 — بخشِ «کارت یا بارکدِ مشتری» در تنظیماتِ گوشی و کامپیوتر (`CustomerCardPref`، پیش‌فرض خاموش).
- *  عنوانش در فهرستِ `DeskSettingsLegacy` ِ `AppRootLegacy` هم هست.
  */
 @Composable
 fun CustomerCardSettingsWired(context: android.content.Context) {

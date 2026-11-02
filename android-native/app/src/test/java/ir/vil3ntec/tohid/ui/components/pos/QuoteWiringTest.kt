@@ -37,8 +37,7 @@ class QuoteWiringTest {
     fun count(rel: String, what: String) = Regex(Regex.escape(what)).findAll(src(rel)).count()
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Sale.kt", "QuoteBar(d, cartStore, ::toast"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", "QuoteBar(d, cartStore, ::toast"))
-    //  تنظیم: رابطِ امروز (`SettingsLegacy`) و نسخهٔ ۳ (`settings/sales/quotes`) — همان `QuotePref`
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SettingsLegacy.kt", "QuoteSettingsWired(context)"))
+    //  تنظیم: نسخهٔ ۳ (`settings/sales/quotes`) — همان `QuotePref` (رابطِ قدیم ۱۴۰۵/۰۸/۱۱ پاک شد)
     assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/PosToggleScreensAndroid.kt", "QuotePref.set(context, it)"))
   }
 }

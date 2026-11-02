@@ -26,7 +26,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 
 /*
- *  کلیدهای ساده‌ی «فروش و پرداخت» که از تنظیماتِ رابطِ امروز (`ui/legacy/SettingsLegacy.kt`) به نسخهٔ ۳
+ *  کلیدهای ساده‌ی «فروش و پرداخت» که از تنظیماتِ رابطِ امروز (رابطِ قدیمِ پاک‌شده) به نسخهٔ ۳
  *  آمدند — همان کلید، همان پیش‌فرض و همان نوشتن؛ فقط رویِ کیت (`V3Segmented` + توضیح، مثلِ «کالای منقضی»).
  */
 

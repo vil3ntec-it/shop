@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 
 /*
  *  سه تنظیمِ تازهٔ رابطِ امروز (`SimpleAskSettingsWired`، `EasySetupSettingsWired`، `TrainingSettingsWired` در
- *  `ui/legacy/SettingsLegacy.kt`) — همان کلید، همان پیش‌فرضِ خاموش، همان نوشتن و همان مجوز (`SettingsPortTest`)؛
+ *  رابطِ قدیمِ پاک‌شده) — همان کلید، همان پیش‌فرضِ خاموش، همان نوشتن و همان مجوز (`SettingsPortTest`)؛
  *  فقط رویِ کیت. هر سه فقط همین دستگاه.
  */
 

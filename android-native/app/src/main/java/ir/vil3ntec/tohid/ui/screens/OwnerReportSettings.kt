@@ -29,7 +29,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
-/** عنوانِ بخش — همان کلیدِ فهرستِ تنظیماتِ کامپیوتر (`AppRootLegacy`) */
+/** عنوانِ بخش — همان کلیدِ `SettingsLayout` */
 const val OWNER_REPORT_TITLE: String = "گزارشِ خودکار برای صاحب"
 
 /**

@@ -378,7 +378,7 @@ class ServerFeatureScreensTest {
       .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
 
   @Test
-  fun `هر سه صفحه در هر دو رابط وصل اند و پشت پرچم سرورند`() {
+  fun `هر سه صفحه وصل اند و پشت پرچم سرورند`() {
     //  پروندهٔ مدرک: فقط با `orders.manage` و پس از پاسخِ روشن
     assertTrue(src("ui/screens/Orders.kt").contains("OrderEvidenceEntry(o.id, cfg.permissions.manage,"))
     assertTrue(src("ui/v3/online/orders/OrdersRouteContent.kt").contains("OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true,"))
@@ -387,13 +387,10 @@ class ServerFeatureScreensTest {
       assertTrue(f, t.indexOf("if (!OrderEvidenceLive.gate.visible) return") in 0 until t.indexOf("open = true"))
       assertTrue(f, t.contains("if (!canManage"))
     }
-    //  پوزش: بخشِ رابطِ امروز، ردیفِ کامپیوتر و صفحهٔ نسخهٔ ۳ با همان نوشتن
-    assertTrue(src("ui/legacy/SettingsLegacy.kt").contains("LateApologySettings("))
-    assertTrue(src("ui/legacy/AppRootLegacy.kt").contains("lateApologyRow("))
+    //  پوزش: صفحهٔ نسخهٔ ۳ (گوشی و کامپیوتر) با همان نوشتن، ردیف فقط با پاسخِ روشنِ سرور
     assertTrue(src("ui/v3/settings/sections/LateApologyScreen.kt").contains("LateApologyLive.set("))
     assertTrue(src("ui/v3/settings/SettingsRoutes.kt").contains("shown = { lateApologyRow(lateApologyApi()) }"))
-    //  حذف: پروندهٔ مشتریِ گوشی، کامپیوتر و نسخهٔ ۳
-    assertTrue(src("ui/legacy/DebtorsLegacy.kt").contains("CustomerErasureButton(account.debtor.phone"))
+    //  حذف: پروندهٔ مشتریِ کامپیوتر و نسخهٔ ۳ (گوشی)
     assertTrue(src("ui/screens/DeskCustomers.kt").contains("CustomerErasureButton("))
     assertTrue(src("ui/v3/money/DebtorLedgerScreen.kt").contains("CustomerErasureV3(account.debtor.phone)"))
     //  وابستگیِ پلتفرم فقط در `*Android.kt`

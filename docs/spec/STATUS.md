@@ -1373,3 +1373,15 @@
   را با دروازه‌های `ScanSaleRule.why` از `data/ScanCashSale.kt` (همان `SalesEngine.record`، فقط نقد) ثبت می‌کند، وگرنه
   فاکتورِ نگه‌داشته؛ یادداشتِ «ثبت از اسکنر» در صندوق و X/Z. قاعده: `docs/RULES-fa.md` (چاپگر و بارکدخوان). مانده: آزمونِ
   دستگاهِ واقعی، کارتِ مشترکِ همهٔ دستگاه‌های دکان، کارت با برنامهٔ باز.
+- ۱۴۰۵/۰۸/۱۱ — رابطِ قدیم پاک شد (گامِ ۲ ِ «شکلِ قدیم هرگز»، `claude/remove-legacy-ui`؛ گامِ ۱: دستهٔ ۱۲ ‏#845). پوشهٔ
+  `ui/legacy` (۲۱ پرونده، ۱۵٬۳۴۶ خط)، `ui/UiV3.kt`، پالتِ سبزآبیِ `ui/theme/LegacyPalette.kt`، ۲۷ شاخهٔ `if (!UiV3.on) { …Legacy(…) }`،
+  شاخهٔ رابطِ قدیم در `MainActivity` و `IosRoot`، `HesabPayLegacySection`، `deskLegacyTier`/`SettingsTiers.hiddenTitle` و دو متنِ کلیدِ
+  `StrSettings.uiV3*` برداشته شدند؛ هیچ صفحهٔ نسخهٔ ۳ به `ui/legacy` تکیه نداشت (جز همان بخشِ حساب‌پیِ رابطِ قدیم). آزمون‌ها:
+  `UiV3Test` ⇐ `NoLegacyUiTest` (نه پوشه، نه رونوشت، نه پرچم برنمی‌گردد)؛ `SettingsPortTest` با فهرستِ ثابتِ ۸۹ نوشتنِ رابطِ قدیم +
+  قاعدهٔ تازهٔ «هر جزءِ تنظیمِ بیرون از `ui/v3`»؛ `DeskSettingsCoverageTest` روی `SettingsLayout.deskSections`؛ سنجش‌های متنیِ
+  `…Legacy.kt` در آزمون‌های سیم‌کشی به صفحه و ردیفِ نسخهٔ ۳ رفتند. **کمبودهای پیش‌تر هم بی‌راه (از گامِ ۱)، حالا بی‌مرجع:**
+  پنجرهٔ «ثبتِ سریع» (POS-17/S03) فقط در صندوقِ کامپیوتر است (گوشیِ نسخهٔ ۳ «ثبتِ کالا» با همان بارکد را دارد)؛ امانی‌های مشتری
+  (`LayawayCustomerPanel`) و کادرِ شمارهٔ دوم/برچسبِ پروندهٔ مشتری (CRM-02/10/11) در پروندهٔ مشتریِ نسخهٔ ۳ نیستند؛ «تازه‌ها»
+  (`WhatsNewOnUpdate`/`WhatsNewSettingsRows`) و Ctrl+L ِ بی PIN ِ صندوق (S46، رمزِ برنامه) فقط در رابطِ قدیم بودند. صفحه‌های
+  قدیمیِ بی‌مرجعِ `ui/screens` (`ProductsScreen`، `WarehouseScreen`، `PurchasingScreen`، `TeamScreen`، `ManagementScreen`،
+  `DeskDashboardScreen`، `DeskReportsScreen`، `TohidTopBar`…) و `…SettingsWired`های بی‌مرجع گامِ بعدِ پاک‌سازی‌اند.

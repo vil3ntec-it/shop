@@ -24,8 +24,8 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  S03 ⌨ — بارکدِ ناشناخته (POS-17)، روی صندوقِ گوشی (`CartModel.scan`، `SaleScreenLegacy`) و کامپیوتر (`PosSearch.resolve`،
- *  `DeskSaleScreen`). «ثبتِ سریع» پشتِ `TillGoodsPref.quickRegister` (پیش‌فرض خاموش): مجوز همان `canWrite(role, "products")` ِ
+ *  S03 ⌨ — بارکدِ ناشناخته (POS-17)، روی صندوقِ کامپیوتر (`PosSearch.resolve`، `DeskSaleScreen`؛ صندوقِ گوشیِ رابطِ قدیم
+ *  ۱۴۰۵/۰۸/۱۱ پاک شد). «ثبتِ سریع» پشتِ `TillGoodsPref.quickRegister` (پیش‌فرض خاموش): مجوز همان `canWrite(role, "products")` ِ
  *  سرور (`QuickRegister.allowed`)، پنجره در خودِ صندوق (Enter پس از بارکدِ ناشناس، Ctrl+S ثبت) و کالا با موجودیِ در دست
  *  همان‌جا به فاکتور. بخشِ Compose با آزمونِ JVM ساخته نمی‌شود، پس سیم‌کشی‌اش با متنِ همان پرونده‌ها سنجیده می‌شود.
  */
@@ -117,7 +117,7 @@ class ScenarioS03Test {
   }
 
   @Test
-  fun `S03 — سیم‌کشیِ صندوقِ گوشی و کامپیوتر — پنجره در صندوق، Enter و Ctrl+S`() {
+  fun `S03 — سیم‌کشیِ صندوقِ کامپیوتر — پنجره در صندوق، Enter و Ctrl+S`() {
     val dialog = src("ir/vil3ntec/tohid/ui/components/pos/QuickRegisterDialog.kt")
     assertTrue(dialog.contains("e.isPrimaryModifier && e.key == Key.S"))
     val desk = src("ir/vil3ntec/tohid/ui/screens/DeskSale.kt")
@@ -125,10 +125,7 @@ class ScenarioS03Test {
     assertTrue(desk.contains("if (quick?.enter(query) == true)"))
     assertEquals(2, Regex(Regex.escape("quick.unknown(")).findAll(desk).count())
     assertTrue(desk.contains("QuickTillDialog(quick, store, cartStore)"))
-    val phone = src("ir/vil3ntec/tohid/ui/legacy/SaleLegacy.kt")
-    assertTrue(phone.contains("if (quick != null) quick.unknown(code, scope, snackbar) { freeLine = true }"))
-    assertTrue(phone.contains("QuickTillDialog(quick, store, cartStore)"))
     //  خاموش ⇒ همان راهِ پیشین (`onRegisterBarcode`) دست‌نخورده
-    assertTrue(desk.contains("onRegisterBarcode(hit.code)") && phone.contains("onRegisterBarcode(code)"))
+    assertTrue(desk.contains("onRegisterBarcode(hit.code)"))
   }
 }

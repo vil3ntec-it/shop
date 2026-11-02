@@ -17,7 +17,7 @@ import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.ui.theme.Shop
 
-/** عنوانِ بخش — همان ردیفِ فهرستِ `DeskSettingsLegacy` و صفحهٔ نسخهٔ ۳ (`SettingsLayout.TILL_GOODS`) */
+/** عنوانِ بخش — صفحهٔ نسخهٔ ۳ (`SettingsLayout.TILL_GOODS`) */
 const val TILL_GOODS_TITLE = "ثبتِ سریع و واحدِ بزرگ در صندوق"
 const val TILL_GOODS_NOTE =
   "ثبتِ سریع (S03): بارکدِ ناشناس در صندوق ⇒ «ثبتِ سریعِ کالا» با همان بارکد، و کالا همان‌جا به فاکتور می‌رود؛ فقط برای نقشی که کالا " +

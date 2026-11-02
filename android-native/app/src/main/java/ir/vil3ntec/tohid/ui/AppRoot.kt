@@ -121,8 +121,6 @@ private fun AppRootActive(
   theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
   //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
   remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }; remember(context) { ir.vil3ntec.tohid.data.LayawayPref.load(context) } // POS-27: کنار گذاشتنِ کالای امانی فقط با تنظیمِ همین دستگاه
