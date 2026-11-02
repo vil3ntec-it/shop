@@ -650,6 +650,13 @@ data class Supplier(
   val address: String = "",
   val notes: String = "",
   val createdAt: Long = 0,
+  /**
+   *  PUR-10 — زمانِ تأمینِ دستی (روز، ۱ تا ۳۶۵) از فرمِ تأمین‌کننده؛ بر زمانِ سنجیده از سفارش‌ها
+   *  می‌چربد (`ReorderCore.leadTime`). افزودنی: `null` نوشته نمی‌شود و دفترِ قدیم همان است.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val leadDays: Int? = null,
 )
 
 @Serializable

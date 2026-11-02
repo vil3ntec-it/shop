@@ -49,7 +49,7 @@ import kotlinx.coroutines.launch
 /**
  *  RPT-10 — بخشِ «گزارشِ مالیاتِ سه‌ماهه» در تنظیماتِ گوشی و کامپیوتر (همان الگوی RPT-17 ِ «شماره‌های
  *  جاافتاده») و کارتِ یادآورِ سررسید روی خانه. مرزِ پلتفرم: خواندن/نوشتنِ `TaxQuarterPref`، ذخیرهٔ فایل
- *  و چاپ؛ حساب‌ها همه در `TaxQuarter` / `core/report/QuarterTax`. عنوانش در فهرستِ `DeskSettingsLegacy` هم هست.
+ *  و چاپ؛ حساب‌ها همه در `TaxQuarter` / `core/report/QuarterTax`.
  *  خاموش (پیش‌فرض) ⇒ فقط کلیدِ روشن‌کردن؛ کارتِ خانه کشیده نمی‌شود.
  */
 @Composable

@@ -37,7 +37,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   /** سوکتِ «چیزی عوض شد» — با بسته شدنِ صفحه بسته می‌شود */
   private var live: ir.vil3ntec.tohid.sync.v1.LiveSocket? = null
 
-  /** برنامهٔ باز (singleTask) با لمسِ اعلانِ سفارش، یا پیوندِ `vill3n://app/…` (فقط با پرچمِ `UiV3`) */
+  /** برنامهٔ باز (singleTask) با لمسِ اعلانِ سفارش، یا پیوندِ `vill3n://app/…` */
   override fun onNewIntent(intent: android.content.Intent) {
     super.onNewIntent(intent)
     setIntent(intent)
@@ -91,11 +91,10 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ir.vil3ntec.tohid.data.ExpiryPref.load(applicationContext) // S22: روزِ هشدارِ انقضا
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
-    ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
     //  «دستگاه‌ها»: بارکدخوانِ ثبت‌شده ⇒ سرویسِ اسکن در پس‌زمینه (بی بارکدخوان هیچ)
     runCatching { ir.vil3ntec.tohid.scan.ScanBackground.sync(applicationContext) }
-    //  پیوندِ vill3n://app فقط با پرچمِ روشن؛ با هر بار عوض شدنِ پرچم (تنظیمات) همان دم
-    lifecycleScope.launch { snapshotFlow { ir.vil3ntec.tohid.ui.UiV3.on }.collect { syncLinkAlias(it) } }
+    //  پیوندِ vill3n://app (رابطِ نسخهٔ ۳ تنها رابط است)
+    syncLinkAlias()
 
     /*
      *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
@@ -138,36 +137,6 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
           if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext)
           else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)   // KEEP: بی اثرِ دوم
         }
-      }
-
-      //  پرچمِ رابطِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز، بی انتخابگرِ حالت (`UiV3`)
-      if (!ir.vil3ntec.tohid.ui.UiV3.on) {
-        TohidTheme(theme) {
-          ir.vil3ntec.tohid.ui.ProvideLang {
-            if (!welcomed) {
-              WelcomeScreen(store) {
-                prefs.edit().putBoolean("welcomed", true).apply()
-                welcomed = true
-              }
-            } else if (courier) {
-              ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = {
-                //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
-                prefs.edit().putBoolean("welcomed", false).apply()
-                welcomed = false
-              })
-            } else {
-              AppRoot(
-                store = store,
-                theme = theme,
-                onTheme = {
-                  theme = it
-                  prefs.edit().putString("theme", it.name).apply()
-                },
-              )
-            }
-          }
-        }
-        return@setContent
       }
 
       //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
@@ -222,14 +191,13 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   }
 
   /**
-   *  `AppLinkAlias` ِ مانیفست (intent-filter ِ `vill3n://app`) فقط وقتی روشن است که رابطِ نسخهٔ ۳ روشن
-   *  است. خاموش ⇒ همان حالتِ مانیفست (`enabled="false"`)، یعنی مثلِ main هیچ پیوندِ بیرونی برنامه را
-   *  باز نمی‌کند. فقط وقتی حالت فرق دارد چیزی نوشته می‌شود؛ خطا (مثلاً سیاستِ دستگاه) بی‌صدا.
+   *  `AppLinkAlias` ِ مانیفست (intent-filter ِ `vill3n://app`، پیش‌فرض `enabled="false"`) در هر اجرا روشن
+   *  می‌شود. فقط وقتی حالت فرق دارد چیزی نوشته می‌شود؛ خطا (مثلاً سیاستِ دستگاه) بی‌صدا.
    */
-  private fun syncLinkAlias(on: Boolean) {
+  private fun syncLinkAlias() {
     runCatching {
       val alias = android.content.ComponentName(this, "ir.vil3ntec.tohid.AppLinkAlias")
-      val want = if (on) android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED else android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+      val want = android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED
       if (packageManager.getComponentEnabledSetting(alias) != want) {
         packageManager.setComponentEnabledSetting(alias, want, android.content.pm.PackageManager.DONT_KILL_APP)
       }
@@ -242,8 +210,6 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
    *  می‌کند. پیوندِ ویترین و QRِ دکان مالِ برنامهٔ خرید است و در مرورگر می‌ماند.
    */
   private fun handleLink(intent: android.content.Intent?) {
-    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) پیوندِ درونی نداشت — همان رفتار
-    if (!ir.vil3ntec.tohid.ui.UiV3.on) return
     val link = DeepLinks.parse(intent?.dataString) ?: return
     ModeState.pendingLink.value = link
     if (link.mode in ModeState.available(applicationContext) && ModeState.chosen.value != link.mode) {

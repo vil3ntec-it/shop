@@ -29,7 +29,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 
 /*
  *  تنظیم‌های انبار و گزارش که فقط در رابطِ امروز بودند (`StockPlacesSettingsWired`، `SmartForecastSettingsWired`،
- *  `AnomalySettingsWired` در `ui/legacy/SettingsLegacy.kt`) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن
+ *  `AnomalySettingsWired` در رابطِ قدیمِ پاک‌شده) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن
  *  (`SettingsPortTest`)؛ فقط رویِ کیت. هر سه کلیدِ همین دستگاه‌اند.
  */
 

@@ -1,96 +1,62 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
 /**
- *  تنظیماتِ کامپیوتر (`DeskSettings`) همان `SettingsScreen` ِ گوشی را می‌کشد، ولی `SettingsSection`
- *  فقط بخشی را رسم می‌کند که عنوانش در فهرستِ `AppRoot` است (`if (pick != title) return`). بخشِ
- *  جاافتاده روی کامپیوتر هرگز روشن‌شدنی نیست — همان که سقفِ اعتبار (#451) و قاعده‌های پایانِ فاکتور
- *  (#503) را روی صندوقِ کامپیوتر کدِ مرده کرده بود.
+ *  هر بخشِ تنظیمات روی کامپیوتر هم جایی دارد. بخشِ جاافتاده روی کامپیوتر هرگز روشن‌شدنی نیست — همان که سقفِ
+ *  اعتبار (#451) و قاعده‌های پایانِ فاکتور (#503) را روی صندوقِ کامپیوتر کدِ مرده کرده بود.
  *
- *  هر `SettingsSection(…)` ِ برنامه (هر پرونده) با آن فهرست سنجیده می‌شود: یا در فهرست است یا در
- *  [notOnDesktop] با دلیل؛ و هر ردیفِ فهرست بخشی واقعی است (ردیفِ بی بخش صفحهٔ خالی می‌دهد).
- *  آزمونِ متنی است چون `pick` در ترکیب سنجیده می‌شود و آزمونِ JVM آن را نمی‌سازد.
+ *  رابطِ قدیم (`AppRootLegacy` ⇐ `DeskSettingsLegacy`، فهرستِ دستی) ۱۴۰۵/۰۸/۱۱ پاک شد؛ تنظیماتِ کامپیوتر حالا
+ *  همان نسخهٔ ۳ است: ستونِ کناریِ `DeskSettingsScreen` از `SettingsLayout.deskSections` و صفحهٔ هر بخش از
+ *  `SettingsPages` (هر بخش دقیقاً یک صفحه: `SettingsLayoutTest`). پس این‌جا همان قاعده سنجیده می‌شود: هر بخش یا در
+ *  ستونِ کامپیوتر است یا در [notOnDesktop] با دلیل، و هیچ ردیفِ کامپیوتر بخشِ ساختگی نیست.
  */
 class DeskSettingsCoverageTest {
 
-  private val root: File =
-    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
-      .map(::File).firstOrNull { File(it, "ir/vil3ntec/tohid/ui/AppRoot.kt").isFile }
-      ?: error("ریشهٔ کد پیدا نشد (cwd=${File(".").absoluteFile})")
-
   /** بخش‌هایی که عمداً روی کامپیوتر نیستند — هر کدام با دلیل */
   private val notOnDesktop = mapOf(
-    "StrSettings.cameraScanner" to "کامپیوتر دوربین ندارد: بارکدخوانِ USB/بلوتوث یا گوشیِ جفت‌شده (DeskSaleScreen)",
+    SettingsLayout.CAMERA to "کامپیوتر دوربین ندارد: بارکدخوانِ USB/بلوتوث یا گوشیِ جفت‌شده (DeskSaleScreen)",
+    SettingsLayout.NAV_BAR to "نوارِ پایینِ گوشی؛ کامپیوتر ستونِ کناری دارد",
   )
 
-  /** `ir.vil3ntec.tohid.ui.screens.X` و `X` یکی‌اند: پیشوندِ بسته (بخش‌های کوچک‌حرف) کنار می‌رود */
-  private fun norm(expr: String): String = expr.trim().replace(Regex("""^(?:[a-z][a-z0-9_]*\.)+"""), "")
+  private fun src(rel: String): String =
+    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText()
+      ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
 
-  /**
-   *  نسخهٔ ۳ (`ui/v3`) تنظیماتِ کامپیوترِ خودش را دارد (`SettingsLayout`، `SettingsPortTest`)؛ با پرچمِ خاموش
-   *  رابطِ امروز از `ui/legacy` کشیده می‌شود: `AppRootLegacy` ⇐ `DeskSettingsLegacy(…)` و `SettingsScreenLegacy`.
-   *  پس این‌جا همان رابطِ امروز سنجیده می‌شود: بی `ui/v3` و بی بدنهٔ نسخهٔ ۳ (`ui/screens/Settings.kt`).
-   */
-  private val legacy: Boolean get() = File(root, "ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt").isFile
-
-  private fun counted(f: File): Boolean {
-    if (!legacy) return true
-    val rel = f.relativeTo(File(root, "ir/vil3ntec/tohid")).invariantSeparatorsPath
-    return !rel.startsWith("ui/v3/") && rel != "ui/screens/Settings.kt"
+  @Test fun `هر بخشِ تنظیمات روی کامپیوتر هم جایی دارد — یا استثنای با دلیل`() {
+    val all = SettingsLayout.sections
+    assertTrue("بخش‌های تنظیمات پیدا نشدند", all.size >= 15)
+    val desk = SettingsLayout.deskSections.toSet()
+    val missing = all.filter { it !in desk && it !in notOnDesktop }
+    assertTrue("روی کامپیوتر روشن‌شدنی نیستند (به ستونِ کامپیوتر بیاورید یا با دلیل استثنا کنید): $missing", missing.isEmpty())
+    //  ترتیبِ ستون همان ترتیبِ گروه‌هاست و بخشِ تازه بی‌راه نمی‌ماند
+    assertEquals(SettingsLayout.deskSections, SettingsLayout.deskOrder(SettingsLayout.deskSections))
   }
 
-  /** عنوانِ هر بخشِ تنظیمات ⇒ پرونده‌اش */
-  private fun sections(): Map<String, String> {
-    val out = LinkedHashMap<String, String>()
-    val call = Regex("""(?<![\w])SettingsSection(?:Legacy)?\(""")
-    val title = Regex("""\btitle\s*=\s*([^,\n]+),""")
-    //  فرستادنِ بی‌نام (`SettingsSectionLegacy(icon, title, …)` درونِ خودِ `SettingsSection`) بخشِ تازه‌ای نیست
-    val named = Regex("""^\s*\w+\s*=""")
-    root.walkTopDown().filter { it.isFile && it.extension == "kt" && counted(it) }.forEach { f ->
-      val text = f.readText()
-      for (m in call.findAll(text)) {
-        if (text.substring(maxOf(0, m.range.first - 4), m.range.first) == "fun ") continue
-        val window = text.substring(m.range.last + 1, minOf(text.length, m.range.last + 600))
-        if (!named.containsMatchIn(window)) continue
-        val t = title.find(window) ?: error("${f.name}: SettingsSection بی `title =`")
-        out[norm(t.groupValues[1])] = f.name
-      }
-    }
-    return out
-  }
-
-  private fun deskList(): List<String> {
-    val app = File(root, if (legacy) "ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt" else "ir/vil3ntec/tohid/ui/AppRoot.kt").readText()
-    val from = app.indexOf(if (legacy) "DeskSettingsLegacy(" else "DeskSettings(")
-    val to = app.indexOf(if (legacy) "{ SettingsScreenLegacy(" else "{ SettingsScreen(", from)
-    assertTrue("فهرستِ DeskSettings در AppRoot پیدا نشد", from >= 0 && to > from)
-    return Regex("""([\w.]+)\s+to\s+[\w.]*Icons\.Filled\.\w+""").findAll(app.substring(from, to)).map { norm(it.groupValues[1]) }.toList()
-  }
-
-  @Test fun `هر بخشِ تنظیماتِ گوشی روی کامپیوتر هم جایی دارد — یا استثنای با دلیل`() {
-    val phone = sections()
-    assertTrue("بخش‌های تنظیمات پیدا نشدند", phone.size >= 15)
-    val desk = deskList().toSet()
-    val missing = phone.filterKeys { it !in desk && it !in notOnDesktop }
-    assertTrue("روی کامپیوتر روشن‌شدنی نیستند (به فهرستِ DeskSettings ِ AppRoot بیفزایید یا با دلیل استثنا کنید): $missing", missing.isEmpty())
-  }
-
-  @Test fun `هر ردیفِ فهرستِ کامپیوتر بخشی واقعی است و استثناها کهنه نیستند`() {
-    val phone = sections().keys
-    val desk = deskList()
+  @Test fun `هر ردیفِ ستونِ کامپیوتر بخشی واقعی است و استثناها کهنه نیستند`() {
+    val all = SettingsLayout.sections.toSet()
+    val desk = SettingsLayout.deskSections
     assertTrue("ردیفِ تکراری: $desk", desk.size == desk.toSet().size)
-    val dead = desk.filter { it !in phone }
+    val dead = desk.filter { it !in all }
     assertTrue("ردیفِ بی بخش (صفحهٔ خالی): $dead", dead.isEmpty())
-    val stale = notOnDesktop.keys.filter { it !in phone || it in desk }
+    assertEquals("استثناها همان بخش‌های فقط‌گوشی‌اند", SettingsLayout.DESK_HIDDEN, notOnDesktop.keys)
+    val stale = notOnDesktop.keys.filter { it !in all || it in desk }
     assertTrue("استثنای کهنه: $stale", stale.isEmpty())
     assertTrue(notOnDesktop.values.all { it.isNotBlank() })
+    //  ستونِ کامپیوتر همان فهرستِ `SettingsLayout` را می‌کشد، نه فهرستِ دستی
+    val screen = src("ui/v3/settings/DeskSettingsScreen.kt")
+    assertTrue(screen.contains("SettingsLayout."))
+    assertTrue("فهرستِ دستیِ رابطِ قدیم برگشته است", !src("ui/AppRoot.kt").contains("DeskSettings("))
   }
 
   @Test fun `سقفِ اعتبار و قاعده‌های پایانِ فاکتور روی کامپیوتر روشن‌شدنی‌اند`() {
-    val desk = deskList()
-    for (x in listOf("StrShell.creditGate", "StrSale.checkoutRulesTitle")) assertTrue("$x در فهرستِ کامپیوتر نیست", x in desk)
+    for (x in listOf(SettingsLayout.CREDIT_GATE, SettingsLayout.CHECKOUT_RULES)) {
+      assertTrue("$x در ستونِ کامپیوتر نیست", x in SettingsLayout.deskSections)
+      assertTrue("$x روی کامپیوتر پنهان است", SettingsLayout.visible(x, desktop = true, serverOn = emptySet(), featuresOn = emptySet()))
+    }
   }
 }

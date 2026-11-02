@@ -27,6 +27,29 @@ object QuickRegister {
   fun freeLineOpen(policy: ir.vil3ntec.tohid.core.pos.LinePricing.Policy): Boolean =
     ir.vil3ntec.tohid.core.pos.LinePricing.checkFreeLine(policy, 0) == null
 
+  /** بارکدِ ناشناس در صندوق: راهِ بعدی */
+  enum class Next {
+    /** «ثبتِ سریع» خاموش ⇒ همان «ثبتِ کالا» ⇐ فرمِ کالا */
+    PRODUCT_FORM,
+    /** پنجره/برگهٔ «ثبتِ سریع» در خودِ صندوق */
+    QUICK,
+    /** صندوق‌دارِ بی‌مجوز: فقط «قلمِ آزاد» */
+    FREE_LINE,
+    /** بی‌مجوز و سقفِ قلمِ آزاد بسته: فقط پیام */
+    NONE,
+  }
+
+  /**
+   *  راهِ بارکدِ ناشناس — یک قاعده برای صندوقِ کامپیوتر (`QuickTill`) و گوشیِ نسخهٔ ۳ (`QuickTillModel`).
+   *  @param on `TillGoodsPref.quickRegister`؛ @param may [allowed]؛ @param freeLineOpen [freeLineOpen]
+   */
+  fun next(on: Boolean, may: Boolean, freeLineOpen: Boolean): Next = when {
+    !on -> Next.PRODUCT_FORM
+    may -> Next.QUICK
+    freeLineOpen -> Next.FREE_LINE
+    else -> Next.NONE
+  }
+
   data class Draft(val name: String = "", val salePrice: String = "", val unit: String = "عدد", val stock: String = "1")
 
   sealed interface Result {

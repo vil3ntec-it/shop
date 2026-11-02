@@ -129,10 +129,14 @@ internal fun DraftToneChip(tone: V3Tone, icon: ImageVector, label: String, onCli
   }
 }
 
-/** زیرعنوانِ ردیف: کارتن‌ها، قیمتِ فروش و روزهای مانده تا انقضا */
+/** زیرعنوانِ ردیف: کارتن‌ها، قیمتِ فروش، «چند روز کافی است» (INV-14) و روزهای مانده تا انقضا */
 internal fun stockRowSubtitle(row: StockRowUi): String = listOfNotNull(
   row.cartons.takeIf { it > 0 }?.let { StrStock.cartons(qty(it)) },
   StrStock.salePrice(money(row.product.salePrice)),
+  StockListModel.coverShown(row)?.let { days ->
+    if (row.coverBeyond) StrStock.coverBeyond(money(ir.vil3ntec.tohid.core.purchase.DemandForecast.MAX_COVER_DAYS.toDouble()))
+    else StrStock.coverDays(money(days.toDouble()))
+  },
   row.expiresInDays?.let { if (it <= 0) StrStock.expiresToday else StrStock.expiresIn(money(it.toDouble())) },
 ).joinToString(" · ")
 

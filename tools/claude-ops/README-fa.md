@@ -58,7 +58,7 @@
 
 - **SUB-10:** هر مسیرِ تازه در هر دو `paid-routes*.test.js` دسته می‌خواهد (STORE_PAID ⇒ ۴۰۴ `store_not_found` با `sf.open`).
 - `shop-route-inventory` برای مسیرهای `:id` ردیفِ واقعیِ کاشته‌شده؛ `route-authz-inventory`.
-- **CodeQL `js/missing-rate-limiting`:** سقفِ IP پیش از احراز، و احراز + سقفِ هر کاربر در **یک** `router.use(requireUser, requireShop, limit)` (الگوی `order-evidence.js`).
+- **CodeQL `js/missing-rate-limiting`:** از `(2.14.5)` model pack ِ `.github/codeql/extensions/shop-javascript` `rateLimit` ِ مخزن را می‌شناساند؛ سقفِ IP با `rateLimit` **پیش از** احراز (`router.use(rateLimit(…))`) کافی است. هشدارِ تازه یعنی مسیرِ واقعاً بی سقف (یا model کهنه: `node --test tools/security/codeql-models.test.mjs`). ساکت کردن ممنوع.
 - **Kotlin:** نامِ آزمونِ backtick بی `: . ; [ ] / < > \` (`python3 $OPS/kt-names.py <wt>`)؛ وابستگیِ پلتفرم فقط در `*Android.kt`؛ هر `Str*` تازه در `core/i18n/I18nTables.kt`؛ هر نویسندهٔ تنظیم صفحهٔ v3 می‌خواهد (`SettingsPortTest.EXCEPTIONS` خالی است).
 - **حافظه:** کامپایلِ Kotlin با `-Pkotlin.compiler.execution.strategy=in-process` و `--no-daemon` (desk-check همین را دارد).
 - **رفع‌شده‌ها (دوباره نیاورید):** `tenant-matrix` (ردپای «الف» پس از آرام شدنِ نوشتن‌های بی‌await)، `web-store-zones.mjs` (`addRice` با کلیکِ DOM).

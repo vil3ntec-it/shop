@@ -11,13 +11,15 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  پیش از روشن شدنِ `UiV3` برای همه هیچ تنظیمی نباید از دست برود.
+ *  هیچ تنظیمی از دست نمی‌رود — رابطِ قدیم (`ui/legacy`) ۱۴۰۵/۰۸/۱۱ پاک شد و نسخهٔ ۳ تنها رابط است.
  *
  *  «تنظیم» این‌جا یعنی **نوشتنِ** یک مقدارِ ماندگار: `Owner.set…(` روی شیءِ نام‌دار (`ShopPolicy.setPayV2`،
- *  `ReturnSettings.setLimit`، `LocaleChoice.setDigits`…) یا `….idleMinutes = …` ِ قفل. هر چنین نوشتنی در صفحهٔ
- *  تنظیماتِ رابطِ امروز (`ui/legacy/SettingsLegacy.kt` و هر `…Section(` / `…Settings(` / `…Choice(` ای که
- *  صدا می‌زند، بیرون از `ui/v3`) باید در تنظیماتِ نسخهٔ ۳ (همهٔ پرونده‌های زیرِ `ui/v3/settings` و همان جزءهای صدازده) هم باشد،
- *  یا در [EXCEPTIONS] با دلیل. بخشِ تازه‌ای که به رابطِ امروز اضافه شود و به نسخهٔ ۳ نیاید همین‌جا قرمز می‌شود.
+ *  `ReturnSettings.setLimit`، `LocaleChoice.setDigits`…) یا `….idleMinutes = …` ِ قفل. دو سنجش:
+ *   • هر نوشتنی که تنظیماتِ رابطِ قدیم داشت ([LEGACY_WRITERS]، فهرستِ ثابتِ همان روزِ پاک شدن) در تنظیماتِ نسخهٔ ۳
+ *     (همهٔ پرونده‌های زیرِ `ui/v3/settings` و هر `…Section(` / `…Settings(` / `…SettingsWired(` / `…Choice(` ای که
+ *     صدا می‌زنند) هم هست؛
+ *   • هر جزءِ تنظیمِ بیرون از `ui/v3` (هر پرونده‌ای که چنین تابعی تعریف می‌کند و جزءهای صدازده‌اش) نوشتنش را در
+ *     نسخهٔ ۳ هم دارد، یا در [OUTSIDE_SETTINGS]/[EXCEPTIONS] با دلیل — بخشِ تازه‌ای که صفحهٔ نسخهٔ ۳ نگیرد همین‌جا قرمز است.
  *
  *  ⚠️ متن با متن، مثلِ `SettingsLayoutTest`: کامپیوتر پیش از کامپایل چند عبارت را در کدِ اندروید عوض
  *  می‌کند؛ این آزمون همان پرونده‌های خامِ `android-native` را می‌خواند.
@@ -76,10 +78,10 @@ class SettingsPortTest {
       .toList() + (if (idle.containsMatchIn(text)) listOf("LockStore.idleMinutes") else emptyList())
   }.toSet()
 
-  private val legacyFiles: Set<File> by lazy {
-    val start = root.resolve("ui/legacy/SettingsLegacy.kt")
-    assertTrue("$start پیدا نشد", start.isFile)
-    closure(listOf(start)) { !rel(it).startsWith("ui/v3/") }
+  /** جزءهای تنظیمِ بیرون از نسخهٔ ۳: هر پرونده‌ای که `fun …Section(` / `…Settings(` / `…SettingsWired(` / `…Choice(` دارد */
+  private val outsideFiles: Set<File> by lazy {
+    val def = Regex("""fun (?:[A-Za-z0-9_.]+\.)?[A-Z][A-Za-z0-9]*(?:Section|Settings|SettingsWired|Choice)\(""")
+    closure(sources.filter { (f, text) -> !rel(f).startsWith("ui/v3/") && def.containsMatchIn(text) }.keys.toList()) { !rel(it).startsWith("ui/v3/") }
   }
 
   private val v3Files: Set<File> by lazy {
@@ -87,20 +89,34 @@ class SettingsPortTest {
   }
 
   @Test
-  fun `هر تنظیمِ رابطِ امروز در نسخهٔ ۳ جایی دارد یا با دلیل استثناست`() {
-    val legacy = writers(legacyFiles)
+  fun `هر تنظیمِ رابطِ قدیمِ پاک‌شده در نسخهٔ ۳ صفحه دارد`() {
     val v3 = writers(v3Files)
-    println("settings port: legacy ${legacy.size} — ${legacy.sorted()}")
-    assertTrue("نوشتنِ تنظیمی در رابطِ امروز پیدا نشد — الگوی متن عوض شده؟", legacy.size >= 20)
-    val missing = legacy - v3 - EXCEPTIONS.keys
+    assertEquals("فهرستِ ثابتِ رابطِ قدیم تکراری دارد", LEGACY_WRITERS.size, LEGACY_WRITERS.toSet().size)
+    assertTrue("نوشتنِ تنظیمی در نسخهٔ ۳ پیدا نشد — الگوی متن عوض شده؟", v3.size >= LEGACY_WRITERS.size)
+    val missing = LEGACY_WRITERS.toSet() - v3
+    assertTrue("این تنظیم‌های رابطِ قدیم در نسخهٔ ۳ صفحه ندارند:\n" + missing.sorted().joinToString("\n"), missing.isEmpty())
+    assertFalse("رابطِ قدیم برگشته است", root.resolve("ui/legacy").exists())
+  }
+
+  @Test
+  fun `هر جزءِ تنظیمِ بیرون از نسخهٔ ۳ در نسخهٔ ۳ جایی دارد یا با دلیل استثناست`() {
+    val outside = writers(outsideFiles)
+    val v3 = writers(v3Files)
+    println("settings port: outside ${outside.size} — ${outside.sorted()}")
+    assertTrue("نوشتنِ تنظیمی بیرون از نسخهٔ ۳ پیدا نشد — الگوی متن عوض شده؟", outside.size >= 20)
+    val missing = outside - v3 - EXCEPTIONS.keys - OUTSIDE_SETTINGS.keys
     assertTrue(
       "این تنظیم‌ها در نسخهٔ ۳ صفحه ندارند — به `ui/v3/settings` ببرید، یا با دلیل در EXCEPTIONS بگذارید:\n" +
         missing.sorted().joinToString("\n"),
       missing.isEmpty(),
     )
-    //  استثنای کهنه نمی‌ماند: یا هنوز در رابطِ امروز هست و در نسخهٔ ۳ نیست، یا برداشته شود
-    val stale = EXCEPTIONS.keys.filter { it !in legacy || it in v3 }
+    //  استثنای کهنه نمی‌ماند: یا هنوز بیرون هست و در نسخهٔ ۳ نیست، یا برداشته شود
+    val stale = (EXCEPTIONS.keys + OUTSIDE_SETTINGS.keys).filter { it !in outside || it in v3 }
     assertTrue("استثنای کهنه: $stale", stale.isEmpty())
+    assertTrue(OUTSIDE_SETTINGS.values.all { it.isNotBlank() })
+    //  ترازو: همان کلید از صفحهٔ «دستگاه‌ها»ی نسخهٔ ۳
+    assertTrue(sources.entries.first { rel(it.key) == "ui/screens/DevicesHw.kt" }.value.contains("ScaleAtPosSettings(rules)"))
+    assertTrue(sources.entries.first { rel(it.key) == "ui/v3/settings/SettingsRoutes.kt" }.value.contains("DevicesScreen(data"))
   }
 
   @Test
@@ -302,7 +318,7 @@ class SettingsPortTest {
       "settings/general/appearance" to "ظاهر",
     )
 
-    /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */
+    /** کلیدهایی که رابطِ قدیم فقط پشتِ `Platform.DESKTOP` داشت */
     private val DESK_ONLY: Set<String> = setOf(
       SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
       SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS,
@@ -310,13 +326,44 @@ class SettingsPortTest {
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */
     @Suppress("unused")
-    private const val PENDING = "هنوز فقط در رابطِ امروز (`…SettingsWired` ِ `SettingsLegacy`)؛ صفحهٔ نسخهٔ ۳ ندارد"
+    private const val PENDING = "هنوز فقط در جزءِ بیرون از `ui/v3` (`…SettingsWired`)؛ صفحهٔ نسخهٔ ۳ ندارد"
 
     /**
-     *  نوشتنِ تنظیمی که در نسخهٔ ۳ نیست ⇐ دلیل. اکنون خالی: همهٔ تنظیم‌های رابطِ امروز صفحهٔ نسخهٔ ۳ دارند. بخشِ
-     *  تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود — یا صفحه‌اش را بسازید، یا با `PENDING` و دلیل این‌جا
-     *  بگذارید (و هر کدام که آمد برداشته شود: «استثنای کهنه» قرمز است).
+     *  نوشتنِ تنظیمی که در نسخهٔ ۳ نیست ⇐ دلیل. اکنون خالی: همهٔ تنظیم‌ها صفحهٔ نسخهٔ ۳ دارند. بخشِ تازه‌ای که
+     *  صفحهٔ نسخهٔ ۳ نگیرد همین‌جا قرمز می‌شود — یا صفحه‌اش را بسازید، یا با `PENDING` و دلیل این‌جا بگذارید
+     *  (و هر کدام که آمد برداشته شود: «استثنای کهنه» قرمز است).
      */
     val EXCEPTIONS: Map<String, String> = emptyMap()
+
+    /** نوشتنی که جای نسخهٔ ۳ ِ آن صفحه‌ای غیر از تنظیمات است ⇐ همان صفحه */
+    val OUTSIDE_SETTINGS: Map<String, String> = mapOf(
+      "ScaleAtPos.set" to "«دستگاه‌ها ⇐ ترازو» (`DevicesScreen` ⇐ `ScalePanel` ⇐ `ScaleAtPosSettings`)",
+    )
+
+    /** همهٔ نوشتن‌های تنظیماتِ رابطِ قدیم (`SettingsLegacy` و جزءهایش) در روزِ پاک شدن — ۱۴۰۵/۰۸/۱۱ */
+    val LEGACY_WRITERS: List<String> = listOf(
+      "AnomalyPref.set", "AtRest.setWanted", "AutoFeesPref.set", "BackupMirror.setEnabled", "BackupMirror.setFolder",
+      "CashRoundPref.set", "CheckoutRulesPref.set", "CountToolsPref.setBlind", "CountToolsPref.setOn",
+      "CustomerCardPref.setOn", "DebtReminderPref.set", "DeliverLaterPrefs.set", "DocGapsPref.setOn",
+      "EasySetupPref.set", "ExpiryPref.setApproval", "ExpiryPref.setNearDays", "FraudTrailPref.setEnabled",
+      "GiftCardPref.set", "GiftReceiptPrefs.set", "HeldInvoicePrefs.set", "HeldInvoicePrefs.setAutoClean",
+      "KeyHelpPref.set", "LabelToolsPref.set", "LateApologyLive.set", "LayawayPref.set",
+      "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor", "LinePolicyPrefs.setOn",
+      "LocaleChoice.setCalendar", "LocaleChoice.setDigits", "LocaleChoice.setLang", "LocaleChoice.setLunar",
+      "LocaleChoice.setLunarAdjust", "LocaleChoice.setMonths", "LocaleChoice.setSymbol", "LockStore.idleMinutes",
+      "LoyaltyPref.set", "LoyaltyPref.setExpiry", "LoyaltyPref.setRule", "LoyaltyShop.setRule", "Motion.set",
+      "OwnerReportLive.set", "PayFixPref.set", "PosMoreKeysPrefs.set", "PosNotesPrefs.set",
+      "PosNotesPrefs.setTemplates", "PosPriceCheckPrefs.set", "PosSearchPrefs.set", "PosTouchPrefs.setOn",
+      "PriceListPrefs.set", "PriceWhyPrefs.set", "ProductInfoPrefs.set", "PromoGuardLive.set", "QuotePref.set",
+      "ReportKeysPref.setOn", "ReturnPolicyPrefs.setBlocked", "ReturnPolicyPrefs.setDays",
+      "ReturnSettings.setEnabled", "ReturnSettings.setLimit", "ReturnSettings.setReasons", "SafeBookPref.set",
+      "ScanCashPref.set", "ShopDayChoice.set", "ShopPolicy.setBlockExpired", "ShopPolicy.setChatMediaGuard",
+      "ShopPolicy.setCreditGate", "ShopPolicy.setCrmReports", "ShopPolicy.setPayV2", "ShopPolicy.setProductTools",
+      "ShopPolicy.setStockInsight", "ShopPolicy.setStockLevels", "ShrinkReportPref.set", "SimpleAskPref.set",
+      "SmartForecastPref.set", "SpecialOrderPref.set", "StockActions.setMode", "StockPlacesPref.setPlaces",
+      "StockPlacesPref.setRepack", "StorefrontEtaLive.set", "TaxQuarterPref.setConfig", "TaxQuarterPref.setOn",
+      "TillGoodsPref.setQuickRegister", "TillGoodsPref.setUnits", "TillGoodsPref.setWholePacks",
+      "TillReceivePref.set", "TillUser.set", "TrainingPref.setOn", "TrainingPref.setStaff", "Watchman.setDebtLimit",
+    )
   }
 }

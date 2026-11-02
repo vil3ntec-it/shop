@@ -5,6 +5,8 @@ package ir.vil3ntec.tohid.core.pos
  *  **خاموشِ** «کلیدهای بیشترِ صندوق». خاموش ⇒ هر تابع `null`/`false` و صندوق بیت‌به‌بیت همان.
  *
  *   • Shift+F5 ⇒ کادرِ «تخفیفِ کلِ فاکتور» (`sale.discountInvoice`).
+ *   • F5 ِ تنها ⇒ «تخفیفِ ردیف» (`sale.discountRow`): برگهٔ ردیفِ انتخاب‌شده با فوکوس روی کادرِ تخفیفِ
+ *     ردیف (همان برگهٔ F3 و همان سیاستِ `LinePolicy`)؛ بی ردیفِ انتخاب‌شده کاری نمی‌کند.
  *   • Esc در کادرِ اسکنِ **خالی** با سبدِ ناخالی ⇒ پرسشِ «خالی کردنِ فاکتور» با فوکوس روی «انصراف»
  *     (`sale.clear`: «پاک کردنِ کادر؛ خالی کردنِ فاکتور فقط با تأیید»). کادرِ نوشته‌دار همان «پاک
  *     کردنِ کادر» ِ امروز است؛ Esc هرگز بی پرسش چیزی پاک نمی‌کند.
@@ -18,14 +20,17 @@ object PosMoreKeys {
 
   enum class Key { F5, ESCAPE, OTHER }
 
-  enum class Act { DISCOUNT_INVOICE, CLEAR_CART }
+  enum class Act { DISCOUNT_INVOICE, DISCOUNT_ROW, CLEAR_CART }
 
   /** پیرایه‌های فشرده‌شده؛ `primary` = Ctrl یا Cmd */
   data class Mods(val shift: Boolean = false, val primary: Boolean = false, val alt: Boolean = false)
 
   /** پیش‌نمایشِ کلید روی کلِ صفحه */
-  fun screen(on: Boolean, key: Key, mods: Mods): Act? =
-    if (on && key == Key.F5 && mods.shift && !mods.primary && !mods.alt) Act.DISCOUNT_INVOICE else null
+  fun screen(on: Boolean, key: Key, mods: Mods): Act? = when {
+    !on || key != Key.F5 || mods.primary || mods.alt -> null
+    mods.shift -> Act.DISCOUNT_INVOICE
+    else -> Act.DISCOUNT_ROW
+  }
 
   /** کادرِ اسکن: Esc ِ خالی ⇒ پرسشِ خالی کردن — فقط با سبدِ ناخالی و بی پیرایه */
   fun field(on: Boolean, key: Key, mods: Mods, queryEmpty: Boolean, cartEmpty: Boolean): Act? =

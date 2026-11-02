@@ -419,7 +419,7 @@ private fun PoEditor(
   val buys = remember(d) { PurchaseOrderBook.buys(d) }
   var sentOrders by remember { mutableStateOf<List<PurchaseOrderDto>>(emptyList()) }
   LaunchedEffect(Unit) { sentOrders = repo.list("sent").valueOrNull()?.orders.orEmpty() }
-  val lead = remember(sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId) }
+  val lead = remember(d, sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId, PurchaseOrderBook.manualLead(d, supplierId)) }
   var historyFor by remember { mutableStateOf<String?>(null) }
   var lastKey by remember { mutableStateOf<Int?>(null) }
 
@@ -492,7 +492,7 @@ private fun PoEditor(
     }
     Spacer(Modifier.height(8.dp))
     Text(
-      lead.days?.let { "زمانِ تأمینِ این تأمین‌کننده: $it روز (میانهٔ ${lead.samples} سفارشِ رسیده)" }
+      lead.days?.let { if (lead.manual) "زمانِ تأمینِ این تأمین‌کننده: $it روز (دستی)" else "زمانِ تأمینِ این تأمین‌کننده: $it روز (میانهٔ ${lead.samples} سفارشِ رسیده)" }
         ?: "زمانِ تأمینِ این تأمین‌کننده هنوز سنجیده نشده — ${ReorderCore.DEFAULT_LEAD_DAYS} روز فرض می‌شود",
       style = MaterialTheme.typography.labelSmall, color = c.muted,
     )

@@ -351,13 +351,19 @@ object PurchaseOrderBook {
     return out
   }
 
-  /** زمانِ تأمینِ یک تأمین‌کننده از سفارش‌های فرستاده‌ای که رسید گرفته‌اند */
-  fun leadTime(orders: List<PurchaseOrderDto>, supplierId: String): ReorderCore.Lead =
+  /**
+   *  زمانِ تأمینِ یک تأمین‌کننده از سفارش‌های فرستاده‌ای که رسید گرفته‌اند؛ [manualDays] (PUR-10،
+   *  `Supplier.leadDays`) اگر نوشته شده بر آن می‌چربد.
+   */
+  fun leadTime(orders: List<PurchaseOrderDto>, supplierId: String, manualDays: Int? = null): ReorderCore.Lead =
     ReorderCore.leadTime(orders.filter { it.supplierId == supplierId }.mapNotNull { o ->
       val sent = o.sentAt ?: return@mapNotNull null
       val first = o.firstReceiptAt ?: return@mapNotNull null
       ReorderCore.Delivery(sent, first)
-    })
+    }, manualDays)
+
+  /** PUR-10 — زمانِ دستیِ تأمین‌کننده از دفتر */
+  fun manualLead(d: ShopData, supplierId: String): Int? = d.suppliers.firstOrNull { it.id == supplierId }?.leadDays
 
   data class Planned(val pick: Pick, val suggestion: ReorderCore.Suggestion)
 
@@ -366,7 +372,7 @@ object PurchaseOrderBook {
    *  کالای وزنی (کیلو، لیتر…) هزارم، بقیه عددِ کامل. سفارش خودکار ثبت نمی‌شود — فقط ردیفِ فرم.
    */
   fun planned(d: ShopData, supplierId: String, orders: List<PurchaseOrderDto>, today: String): List<Planned> {
-    val lead = leadTime(orders, supplierId)
+    val lead = leadTime(orders, supplierId, manualLead(d, supplierId))
     val sold = soldMilli(d, today)
     val onOrder = onOrderMilli(orders)
     return supplierPicks(d, supplierId).mapNotNull { pk ->

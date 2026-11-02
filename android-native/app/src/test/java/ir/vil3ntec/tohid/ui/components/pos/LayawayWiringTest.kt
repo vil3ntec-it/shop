@@ -38,13 +38,13 @@ class LayawayWiringTest {
     assertTrue(s.contains("PrintSpooler.submitAndWait(context, PrintQueue.Kind.REPORT"))
   }
 
-  @Test fun `هر سه صندوق و پروندهٔ مشتری و تنظیمات`() {
+  @Test fun `صندوقِ گوشی و کامپیوتر و تنظیمات`() {
     val call = "LayawayBar(d, store, cartStore, ::toast"
-    for (rel in listOf("ui/screens/Sale.kt", "ui/legacy/SaleLegacy.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count(rel, call))
-    assertEquals(1, count("ui/legacy/DebtorsLegacy.kt", "LayawayCustomerPanel(d, store, account.debtor.id"))
-    assertEquals(1, count("ui/legacy/SettingsLegacy.kt", "LayawaySettingsWired(context)"))
+    for (rel in listOf("ui/screens/Sale.kt", "ui/screens/DeskSale.kt")) assertEquals(rel, 1, count(rel, call))
     assertEquals(1, count("ui/screens/Settings.kt", "LayawaySettingsWired(context)"))
-    assertEquals(1, count("ui/legacy/AppRootLegacy.kt", "StrLayaway.settingsTitle to"))
+    //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر)
+    assertEquals(1, count("ui/v3/settings/sections/TillMoneyScreensAndroid.kt", "LayawayPref.set(context, it)"))
+    assertEquals(1, count("ui/screens/SettingsLayout.kt", "LAYAWAY -> ir.vil3ntec.tohid.core.i18n.StrLayaway.settingsTitle"))
   }
 
   @Test fun `بازپرداختِ امانی در دخل و رویدادهای صندوق`() {
@@ -58,6 +58,6 @@ class LayawayWiringTest {
     assertEquals(1, count("data/SalesEngine.kt", "ProductInfoMap.sellable(d, p.id, ownReservation)"))
     assertEquals(0, count("data/ShopStore.kt", "Layaways."))
     assertEquals(1, count("data/Layaways.kt", "ownReservation = v.id"))
-    for (rel in listOf("ui/AppRoot.kt", "ui/legacy/AppRootLegacy.kt")) assertEquals(rel, 1, count(rel, "LayawayPref.load(context)"))
+    assertEquals(1, count("ui/AppRoot.kt", "LayawayPref.load(context)"))
   }
 }

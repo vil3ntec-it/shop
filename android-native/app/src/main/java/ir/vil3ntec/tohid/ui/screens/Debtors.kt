@@ -102,8 +102,6 @@ fun DebtorsScreen(
   /** باز شده از «بیشتر» ⇒ دکمهٔ برگشتِ سربرگ؛ `null` ⇒ بی دکمه */
   onBack: (() -> Unit)? = null,
 ) {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on && !showHeader && onBack == null) { DebtorsScreenLegacy(store, d, snackbar); return }
   val scope = rememberCoroutineScope()
 
   var search by rememberSaveable { mutableStateOf("") }
@@ -357,7 +355,7 @@ fun DebtorsScreen(
     DebtorFormSheet(
       state = state,
       onDismiss = { form = null },
-      //  پنجرهٔ نسخهٔ ۳ کادرِ شمارهٔ دوم و برچسب ندارد (پروندهٔ CRM ِ CRM-02/10/11 در رابطِ امروز است، `ui/legacy`)
+      //  پنجرهٔ نسخهٔ ۳ کادرِ شمارهٔ دوم و برچسب ندارد (پروندهٔ CRM ِ CRM-02/10/11 فقط در رابطِ قدیمِ پاک‌شده بود)
       onSave = { draft ->
         val result = if (state.editingId == null) {
           DebtorEngine.add(d, draft, System.currentTimeMillis(), ::newId)

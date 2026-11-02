@@ -6,7 +6,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrLine
 import ir.vil3ntec.tohid.ui.screens.NumberField
@@ -25,8 +28,11 @@ fun LineDiscountPanel(
   problem: String?,
   onPercent: (Boolean) -> Unit,
   onText: (String) -> Unit,
+  /** POS-41 — F5 ِ صندوقِ کامپیوتر: برگه با فوکوس روی همین کادر باز می‌شود؛ `null` ⇒ مثلِ پیش */
+  focus: FocusRequester? = null,
 ) {
   if (show) {
+    if (focus != null) LaunchedEffect(focus) { runCatching { focus.requestFocus() } }
     Spacer(Modifier.height(12.dp))
     SegmentedChoice(
       options = listOf("pct" to StrLine.percent, "amt" to StrLine.amount),
@@ -38,7 +44,7 @@ fun LineDiscountPanel(
       value = text,
       onValueChange = onText,
       label = StrLine.lineDiscount + if (percent) " (٪)" else " (؋)",
-      modifier = Modifier.fillMaxWidth(),
+      modifier = if (focus != null) Modifier.fillMaxWidth().focusRequester(focus) else Modifier.fillMaxWidth(),
     )
     Spacer(Modifier.height(4.dp))
     Text(StrLine.lineDiscountNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)

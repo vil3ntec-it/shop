@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrPayStatus
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrQuickRegister
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
@@ -26,6 +27,7 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.cart.FreeLineRoute
+import ir.vil3ntec.tohid.ui.v3.sales.cart.QuickRegisterRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.KeypadRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.LineRoute
 import ir.vil3ntec.tohid.ui.v3.sales.cart.SaleRoute
@@ -72,6 +74,9 @@ object SalesPaths {
   /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
   fun line(i: Int) = "sale/line/$i"
   const val FREE_LINE = "sale/free-line"
+  /** S03 (POS-17): «ثبتِ سریعِ کالا» با همین بارکدِ ناشناس، در خودِ صندوق */
+  const val QUICK_REGISTER = "sale/quick-register"
+  fun quickRegister(code: String) = RoutePaths.withQuery(QUICK_REGISTER, "code" to code)
   fun keypad(productId: String) = "sale/keypad/" + RoutePaths.encode(productId)
   /** اسکن برای نتیجه: `nav.openForResult(SalesPaths.scan("stock")) { code -> … }` */
   fun scan(forWhat: String) = RoutePaths.withQuery("scan", "for" to forWhat)
@@ -136,6 +141,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.CREDIT, RouteKind.SHEET, { StrPos.creditOverTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CreditApprovalRoute() },
     V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
     V3Route(SalesPaths.FREE_LINE, RouteKind.SHEET, { StrSale.freeItem }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { FreeLineRoute() },
+    V3Route(SalesPaths.QUICK_REGISTER, RouteKind.SHEET, { StrQuickRegister.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { QuickRegisterRoute() },
     V3Route("sale/keypad/{productId}", RouteKind.SHEET, { StrSale.typeQty }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { KeypadRoute() },
     //  اسکن: صندوق ⇒ پیوسته زیرِ همان برگه (`SaleScan`)؛ رسید ⇒ QR هم؛ بقیه کد را با `finish`
     //  به صدازننده برمی‌گردانند (بستن ⇒ null). کامپیوتر بی کادرِ دوربین.

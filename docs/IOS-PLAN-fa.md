@@ -185,7 +185,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 
 **صفحه‌های ریشه:** همان انتخابِ حالت (`ModeChooser`)، ورود و خوش‌آمد (`WelcomeScreen` ⇐ `AuthGate` یا `WelcomeScreenLegacy`، درخواست‌ها
 روی NSURLSession)، و `AppRoot` با صندوق و فروش (`v3/sales/cart/SaleScreen`، `QuickSaleScreen`، `DeskSaleScreen`؛ رابطِ قدیم `Sale.kt`)،
-فهرستِ کالا (`v3/products/ProductsListScreen`) و بقیهٔ مسیرهای اندروید؛ حالتِ پیک (`CourierHome`) هم. هر دو رابط (پرچمِ `UiV3`) همان‌اند. ترتیبِ بارگذاری همان `onCreate` است (گزارشِ خطا، «سرورِ بعدی»، دفتر، شستنِ توکن‌های کهنه، تنظیم‌ها، نقشِ پیک).
+فهرستِ کالا (`v3/products/ProductsListScreen`) و بقیهٔ مسیرهای اندروید؛ حالتِ پیک (`CourierHome`) هم. رابط فقط نسخهٔ ۳ است (رابطِ قدیم و پرچمِ `UiV3` ۱۴۰۵/۰۸/۱۱ پاک شدند). ترتیبِ بارگذاری همان `onCreate` است (گزارشِ خطا، «سرورِ بعدی»، دفتر، شستنِ توکن‌های کهنه، تنظیم‌ها، نقشِ پیک).
 
 **دستهٔ نهم (#826):** ۲۷ فایلِ تازهٔ main (`TillUserAndroid`، `QuickRegister`، `LateApologyScreen`، `CustomerErasurePanel`، `OrderEvidencePanel`،
 `VisualSearchUi`، `LoyaltyShopAndroid`، `ExpiryPrefAndroid`، `CountReview`…) که دو کارِ آیفونِ #826 را سرخ کرده بودند، حالا بی هیچ سطرِ تازه
@@ -221,7 +221,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 | Face ID / Touch ID | `Fingerprint` روی LocalAuthentication (فقط زیست‌سنجی؛ لغو و «با رمز وارد می‌شوم» ⇐ `onFail(null)`). `LocalContext` ِ ریشه حالا `IosActivity` (یک `FragmentActivity`) است، مثلِ اندروید ⇐ `LockGate` و `AppLockLegacy` ِ مشترک خودشان می‌پرسند | `data/FingerprintIos.kt`، `ios/IosApp.kt`، `androidx/fragment/app/FragmentActivity.kt` |
 | اعلانِ محلی | `NotificationManagerCompat`/`NotificationManager` ⇐ UNUserNotificationCenter (شناسهٔ `tohid-<id>`، جایگزینی و `cancel`)؛ `Intent` ِ `setContentIntent` در userInfo ⇐ لمسِ اعلان همان `openNotice` ِ `MainActivity` (سفارشِ تازه). اجازه هنگامِ نخستین نمایشِ دکان (همان لحظهٔ اندرویدِ ۱۳+) | `android/app/Notification.kt`، `PendingIntent.kt`، `androidx/core/app/Notifications.kt`، `ios/IosNotifications.kt` |
 | اجازه‌ها و موقعیت | `checkSelfPermission` و `RequestPermission`/`RequestMultiplePermissions` ⇐ اجازهٔ واقعیِ iOS (دوربین، موقعیت، اعلان؛ گالری همیشه بله؛ بقیه نه). `DeviceLocation` روی CoreLocation («هنگامِ استفاده»، یک‌باره، مهلتِ ۱۲ ثانیه، همان پروندهٔ `tohid-location`) — فقط جایی که کدِ مشترک از پیش می‌خواهد (F0-07، پیک، ویترین) | `ios/IosPermissions.kt`، `ios/IosLocation.kt`، `data/DeviceLocationIos.kt` |
-| پیوند و «برنامه بسته شد» | `vill3n://app/…` (`CFBundleURLTypes` + `.onOpenURL`) ⇐ همان `handleLink` (`DeepLinks.parse`، فقط با `UiV3`)؛ `CrashNotice` همان پنجرهٔ `MainActivity` با `StrShell` و `CrashReporter` | `ios/IosApp.kt`، `ios/IosRoot.kt`، `ios/iosApp/iosApp/iOSApp.swift` |
+| پیوند و «برنامه بسته شد» | `vill3n://app/…` (`CFBundleURLTypes` + `.onOpenURL`) ⇐ همان `handleLink` (`DeepLinks.parse`)؛ `CrashNotice` همان پنجرهٔ `MainActivity` با `StrShell` و `CrashReporter` | `ios/IosApp.kt`، `ios/IosRoot.kt`، `ios/iosApp/iosApp/iOSApp.swift` |
 
 **پوستهٔ Xcode:** `Info.plist` — `CFBundleURLTypes` (vill3n)، `BGTaskSchedulerPermittedIdentifiers` (`ir.vil3ntec.tohid.refresh`) و
 `UIBackgroundModes=fetch`، و متنِ اجازه‌ها (`NSCameraUsageDescription`، `NSFaceIDUsageDescription`، `NSLocationWhenInUseUsageDescription`،

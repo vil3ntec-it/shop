@@ -27,7 +27,7 @@ import ir.vil3ntec.tohid.todayIso
 import kotlinx.coroutines.launch
 
 /*
- *  کلیدهای روشن/خاموشِ دیگرِ رابطِ امروز (`ui/legacy/SettingsLegacy.kt`) در نسخهٔ ۳ — همان کلید، همان
+ *  کلیدهای روشن/خاموشِ دیگرِ رابطِ امروز (رابطِ قدیمِ پاک‌شده) در نسخهٔ ۳ — همان کلید، همان
  *  پیش‌فرضِ خاموش و همان نوشتن (`SettingsPortTest`)؛ فقط رویِ کیت (`V3Segmented` + توضیح).
  */
 

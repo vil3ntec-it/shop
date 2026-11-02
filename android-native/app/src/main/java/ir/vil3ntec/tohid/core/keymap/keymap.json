@@ -56,7 +56,7 @@
     { "id": "sale.customer", "scope": "sale", "title": "انتخاب یا ساختِ مشتری", "status": "live", "keys": ["F2"], "web": ["Alt+C"] },
     { "id": "sale.editRow", "scope": "sale", "title": "ویرایشِ ردیف", "status": "live", "keys": ["F3"], "web": ["Alt+J"] },
     { "id": "sale.freeItem", "scope": "sale", "title": "قلمِ آزاد", "status": "live", "keys": ["F4"], "web": ["Alt+Q"] },
-    { "id": "sale.discountRow", "scope": "sale", "title": "تخفیفِ ردیف", "status": "planned", "keys": ["F5"], "web": ["Alt+X"] },
+    { "id": "sale.discountRow", "scope": "sale", "title": "تخفیفِ ردیف", "status": "partial", "keys": ["F5"], "web": ["Alt+X"] },
     { "id": "sale.discountInvoice", "scope": "sale", "title": "تخفیفِ کلِ فاکتور", "status": "partial", "keys": ["Shift+F5"], "web": ["Alt+Shift+X"] },
     { "id": "sale.hold", "scope": "sale", "title": "نگه‌داشتنِ سبد", "status": "partial", "keys": ["F6"], "web": ["Alt+G"] },
     { "id": "sale.heldList", "scope": "sale", "title": "فهرستِ سبدهای نگه‌داشته", "status": "partial", "keys": ["Shift+F6"], "web": ["Alt+Shift+G"] },

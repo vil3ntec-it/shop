@@ -123,6 +123,7 @@ val MoneyModule = AppModule(
             onOpenSale = { nav.open(SalesPaths.invoice(it)) },
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
           ),
+          extras = { DebtorFileExtras(data, store, id) { toasts.show(it) } },
         )
       }
     },

@@ -1,0 +1,16 @@
+#  ⛔ js/missing-rate-limiting فقط میان‌افزارِ کتابخانه‌های شناخته‌شده (express-rate-limit، express-brute،
+#  rate-limiter-flexible …) را «سقفِ نرخ» می‌داند، نه `rateLimit` ِ خودِ مخزن؛ پس هر مسیرِ تازه هشدارِ کاذب می‌گرفت.
+#
+#  این سطر (typeModel، CodeQL ِ javascript-all ≥ 2.9.0) می‌گوید: آنچه `rateLimit({…})` ِ
+#  `server/src/middleware/ratelimit.js` برمی‌گرداند هم‌ارزِ خروجیِ `rateLimit()` ِ `express-rate-limit` است —
+#  همان چیزی که پرسش «میان‌افزارِ سقفِ نرخ» (`RateLimitingMiddleware`) می‌شناسد. `file:` از ریشهٔ مخزن است و
+#  هر `require('…/middleware/ratelimit')` را، با هر مسیرِ نسبی، می‌گیرد.
+#
+#  ساکت کردن نیست: مسیری که میان‌افزارِ `rateLimit` پیش از خودش ندارد (همان `use`/مسیر یا پیش از آن) همچنان
+#  هشدار می‌گیرد. جابه‌جایی یا تغییرِ نامِ فایل یا export ⇒ همین سطر هم؛ `tools/security/codeql-models.test.mjs` سد است.
+extensions:
+  - addsTo:
+      pack: codeql/javascript-all
+      extensible: typeModel
+    data:
+      - ["express-rate-limit", "file:server/src/middleware/ratelimit.js", "Member[rateLimit]"]

@@ -37,13 +37,13 @@ class ScenarioS45PriceTest {
   }
 
   @Test
-  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد و هر سه صندوق وصل‌اند`() {
+  fun `S45 کادرِ ردیف به‌جای پیامِ رد درخواستِ تأیید دارد و هر دو صندوق وصل‌اند`() {
     val dialogs = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt")
     assertTrue(dialogs.contains("PriceApproval.askable(policy, it)"))
     assertTrue(dialogs.contains("StrTill.askApproval"))
     assertTrue(dialogs.contains("ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog("))
     assertTrue(dialogs.contains("PriceApproval.lifted(policy, granted.code)"))
-    for (rel in listOf("ui/screens/DeskSale.kt", "ui/screens/Sale.kt", "ui/legacy/SaleLegacy.kt")) {
+    for (rel in listOf("ui/screens/DeskSale.kt", "ui/screens/Sale.kt")) {
       assertTrue(rel, source("android-native/app/src/main/java/ir/vil3ntec/tohid/$rel").contains("priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask("))
     }
   }

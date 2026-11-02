@@ -121,8 +121,6 @@ private fun AppRootActive(
   theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
   //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
   remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }; remember(context) { ir.vil3ntec.tohid.data.LayawayPref.load(context) } // POS-27: کنار گذاشتنِ کالای امانی فقط با تنظیمِ همین دستگاه
@@ -313,10 +311,19 @@ private fun AppRootActive(
   val hasAccount = !syncState.accessToken.isNullOrBlank()
   val locked = lockStore.enabled && !unlocked
   val askLock = hasAccount && !lockStore.enabled && !lockAsked && !syncState.lockDeclined
-  //  S46: Ctrl+L ⇒ قفلِ «هر کس با PIN ِ خودش» (`TillUser`)؛ تنظیمِ خاموش ⇒ هیچ (مثلِ امروزِ نسخهٔ ۳)
+  //  S46/STF-04: Ctrl+L ⇒ نخست قفلِ «هر کس با PIN ِ خودش» (`TillUser`)؛ آن خاموش یا بی راهِ برگشت ⇒ قفلِ برنامه
+  //  همان دم، و بی رمزِ برنامه فقط راهش گفته می‌شود (`AppLockKey`)
   val lockAsk by AppNav.lockNow
   var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }
-  LaunchedEffect(lockAsk) { if (lockAsk != lockSeen) { lockSeen = lockAsk; ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled) } }
+  LaunchedEffect(lockAsk) {
+    if (lockAsk == lockSeen) return@LaunchedEffect
+    lockSeen = lockAsk
+    when (AppLockKey.after(ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled), lockStore.enabled)) {
+      AppLockKey.Then.TILL -> Unit
+      AppLockKey.Then.APP -> unlocked = false
+      AppLockKey.Then.HINT -> toasts.show(ir.vil3ntec.tohid.core.i18n.StrTill.lockNeedsPassword, ir.vil3ntec.tohid.ui.theme.V3Tone.WARNING)
+    }
+  }
   val tillLocked = ir.vil3ntec.tohid.data.TillUser.locked.value
   val held = !loaded || locked || needsShop || askLock || tillLocked
   SideEffect { nav.held = held }
@@ -559,6 +566,8 @@ private fun AppRootActive(
       }
       //  دوربینِ گوشی برای کامپیوتر — درخواست، فرستادن و استودیو
       PhoneLinkHost(store, data, snackbar)
+      //  OPS-05: «چه چیزی تازه است» یک بار پس از به‌روزرسانی (نخستین اجرا هیچ) — پشتِ قفل‌ها و دروازه‌ها نه
+      ir.vil3ntec.tohid.ui.screens.WhatsNewOnUpdate()
       //  جست‌وجوی سریع (Ctrl+K)
       if (AppNav.palette.value) {
         CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->

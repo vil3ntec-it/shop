@@ -6,7 +6,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  PRM-13 — صندوقِ `Sale.kt` (گوشیِ نسخهٔ ۳ و تبلت) و `QuickSale` همان راهِ صندوقِ `SaleLegacy`/`DeskSale` را دارند
+ *  PRM-13 — صندوقِ `Sale.kt` (گوشیِ نسخهٔ ۳ و تبلت) و `QuickSale` همان راهِ صندوقِ `DeskSale` را دارند
  *  (Compose، پس آزمونِ JVM آن را نمی‌سازد؛ منطقِ خالص در `LoyaltyPointsTest` و `LoyaltyCompleteTest`): همان
  *  `rememberLoyaltyTill` ⇐ سبدِ `loyal` در جمع، اعتبار، پنجرهٔ پرداخت و ثبت ⇐ `LoyaltyAtTill.post` روی نتیجهٔ ثبت.
  *  خاموش ⇒ `rememberLoyaltyTill` `null` است و `loyal` همان `priced` (همان سبد و همان ثبت).
@@ -20,7 +20,6 @@ class LoyaltyTillWiringTest {
   private val tills = mapOf(
     "Sale" to src("ir/vil3ntec/tohid/ui/screens/Sale.kt"),
     "QuickSale" to src("ir/vil3ntec/tohid/ui/screens/QuickSale.kt"),
-    "SaleLegacy" to src("ir/vil3ntec/tohid/ui/legacy/SaleLegacy.kt"),
   )
 
   @Test fun `هر صندوق امتیاز را از همان راهِ صندوقِ پیشین می‌گیرد`() {

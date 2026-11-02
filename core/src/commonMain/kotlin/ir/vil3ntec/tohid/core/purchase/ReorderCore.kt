@@ -31,7 +31,21 @@ object ReorderCore {
     /** میانهٔ روزها؛ `null` = هنوز سفارشِ رسیده‌ای نیست */
     val days: Int?,
     val samples: Int,
+    /** PUR-10 — `days` همان زمانِ دستیِ فرمِ تأمین‌کننده است، نه میانهٔ سفارش‌ها */
+    val manual: Boolean = false,
   )
+
+  /** سقفِ زمانِ دستی (روز) — همان سقفِ «چند روز کافی است» */
+  const val MAX_MANUAL_LEAD_DAYS = 365
+
+  /**
+   *  PUR-10 — زمانِ تأمینِ یک تأمین‌کننده: زمانِ دستیِ دفتر (۱ تا [MAX_MANUAL_LEAD_DAYS]) اگر نوشته شده،
+   *  چون صاحبِ دکان تأخیرِ تازه (راهِ بسته، فصل) را زودتر از سفارش‌ها می‌داند؛ وگرنه میانهٔ سنجیده.
+   *  عددِ بیرونِ بازه نادیده است (همان سنجیده).
+   */
+  fun leadTime(deliveries: List<Delivery>, manualDays: Int?): Lead =
+    if (manualDays != null && manualDays in 1..MAX_MANUAL_LEAD_DAYS) Lead(manualDays, 0, manual = true)
+    else leadTime(deliveries)
 
   fun leadTime(deliveries: List<Delivery>): Lead {
     val days = deliveries.filter { it.sentAt > 0 && it.firstReceiptAt >= it.sentAt }

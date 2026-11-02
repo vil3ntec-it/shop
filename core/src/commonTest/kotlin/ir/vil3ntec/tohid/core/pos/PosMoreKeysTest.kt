@@ -26,7 +26,9 @@ class PosMoreKeysTest {
   @Test
   fun shiftF5OpensInvoiceDiscountOnlyWithShiftAlone() {
     assertEquals(Act.DISCOUNT_INVOICE, PosMoreKeys.screen(true, Key.F5, shift))
-    assertNull(PosMoreKeys.screen(true, Key.F5, Mods()), "F5 تنها مالِ «تخفیفِ ردیف» است (هنوز برنامه‌ریزی‌شده)")
+    assertEquals(Act.DISCOUNT_ROW, PosMoreKeys.screen(true, Key.F5, Mods()), "F5 تنها ⇒ «تخفیفِ ردیف»")
+    assertNull(PosMoreKeys.screen(true, Key.F5, Mods(primary = true)))
+    assertNull(PosMoreKeys.screen(true, Key.F5, Mods(alt = true)))
     assertNull(PosMoreKeys.screen(true, Key.F5, Mods(shift = true, primary = true)))
     assertNull(PosMoreKeys.screen(true, Key.F5, Mods(shift = true, alt = true)))
     assertNull(PosMoreKeys.screen(true, Key.ESCAPE, shift))

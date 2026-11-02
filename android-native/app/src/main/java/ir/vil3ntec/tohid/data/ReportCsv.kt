@@ -251,18 +251,27 @@ object ReportCsv {
     return Sheet("گزارش-قرض‌داران-$today", rows)
   }
 
-  private fun stock(d: ShopData, today: String): Sheet {
-    val rows = mutableListOf(listOf("تاریخ", "محصول", "نوع حرکت", "تعداد", "توضیحات"))
-    d.stockMovements.sortedBy { it.createdAt }.forEach { m ->
+  private fun stock(d: ShopData, today: String): Sheet = moves(d, d.stockMovements, "گردش-موجودی-$today")
+
+  /**
+   *  INV-02 — گردشِ موجودی با کاربر و دلیلِ هر حرکت (`StockMovement.userId/reason`؛ نداشته ⇒ خالی).
+   *  صفحهٔ «حرکاتِ انبار» ِ یک کالا همین را با حرکت‌های صافی‌شدهٔ همان صفحه می‌سازد.
+   */
+  fun moves(d: ShopData, moves: List<StockMovement>, name: String): Sheet {
+    val rows = mutableListOf(listOf("تاریخ", "محصول", "نوع حرکت", "تعداد", "توضیحات", "کاربر", "دلیل"))
+    val names = d.products.associate { it.id to it.name }
+    moves.sortedBy { it.createdAt }.forEach { m ->
       rows += listOf(
         m.date,
-        d.products.find { it.id == m.productId }?.name ?: "(حذف‌شده)",
+        names[m.productId] ?: "(حذف‌شده)",
         movementLabel(m.type),
         trim(m.qty),
         m.notes,
+        m.userId?.trim().orEmpty(),
+        m.reason?.trim().orEmpty(),
       )
     }
-    return Sheet("گردش-موجودی-$today", rows)
+    return Sheet(name, rows)
   }
 
   /** متنِ نهایی فایل، آمادهٔ نوشتن */

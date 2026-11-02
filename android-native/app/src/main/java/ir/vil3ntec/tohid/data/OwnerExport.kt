@@ -262,6 +262,8 @@ object OwnerExport {
     "toLocationId" to "محلِ مقصد",
     "userId" to "کاربر",
     "lotId" to "سری",
+    //  PUR-10 — زمانِ تأمینِ دستیِ تأمین‌کننده (افزودنی)
+    "leadDays" to "زمان تأمین (روز)",
     //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
     //  گاوصندوق (PAY-18)
     "amountMinor" to "مبلغ (پول)",

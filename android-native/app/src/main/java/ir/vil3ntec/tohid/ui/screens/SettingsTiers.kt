@@ -3,8 +3,8 @@ package ir.vil3ntec.tohid.ui.screens
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp as H
 
 /**
- *  تنظیماتِ کم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱) — خالص، بی Compose؛ تنظیماتِ نسخهٔ ۳ (گوشی و صفحهٔ پهن) و
- *  تنظیماتِ رابطِ امروز (`SettingsSectionLegacy`، `DeskSettingsLegacy`) همین را می‌خوانند.
+ *  تنظیماتِ کم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱) — خالص، بی Compose؛ تنظیماتِ نسخهٔ ۳ (گوشی و صفحهٔ پهن)
+ *  همین را می‌خواند.
  *
  *  هر بخشِ `SettingsLayout.GROUPS` دقیقاً در یکی از سه دسته است:
  *  - **A — [ALWAYS_ON]:** فقط نمایش یا یک کارِ اختیاریِ بیشتر؛ هیچ مبلغ، قیمت، مالیات، قرض، شمارِ موجودی یا
@@ -15,7 +15,8 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp as H
  *  - **B — بقیه ([Tier.ADVANCED]):** تصمیمِ پولی، سیاستی، دسترسی، آزمایشی یا وابسته به دستگاه؛ پیش‌فرض دست
  *    نمی‌خورد (خاموش).
  *  تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): نسخهٔ ۳ دیگر C و B را جدا نمی‌کشد — هر ردیفِ دیدنی در بخشِ کوتاهِ دستهٔ خودش
- *  است (`SettingsLayout.visible`) و «پیشرفته» نیست؛ A همچنان هیچ ردیفی ندارد. C/B فقط برای رابطِ قدیمی مانده است.
+ *  است (`SettingsLayout.visible`) و «پیشرفته» نیست؛ A همچنان هیچ ردیفی ندارد. C/B فقط ردهٔ پیش‌فرض‌هاست (رابطِ قدیم
+ *  که آن‌ها را جدا می‌کشید ۱۴۰۵/۰۸/۱۱ پاک شد).
  *  بخشِ پشتِ پرچمِ سرور (`SettingsLayout.SERVER_GATED`) هنوز تابعِ همان پرچم است.
  *  آزمون: `SettingsTiersTest`.
  */
@@ -54,9 +55,6 @@ object SettingsTiers {
 
   /** بخش‌های یک گروه در همین دسته، به ترتیبِ `SettingsLayout` */
   fun rows(group: SettingsLayout.Group, tier: Tier): List<String> = group.sections.filter { tier(it) == tier }
-
-  /** رابطِ امروز: بخشی با این عنوان (به زبانِ صفحه) روشن و پنهان است؟ — عنوانِ ناشناس هرگز پنهان نمی‌شود */
-  fun hiddenTitle(title: String): Boolean = SettingsLayout.keyOf(title, fallback = "") in ALWAYS_ON
 }
 
 /**
