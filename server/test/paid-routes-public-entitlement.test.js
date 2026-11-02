@@ -44,6 +44,7 @@ const CATEGORY = {
   'delivery-rating-store.js': 'STORE_PAID',    //  DLV-18: امتیازِ مشتری به پیک — همان ویترینِ پولی (sf.open)
   'storefront-finder-store.js': 'STORE_PAID',  //  WEB-07/10: فیلتر و «خبرم کن» — همان ویترینِ پولی (sf.open)
   'order-feedback-store.js': 'STORE_PAID',     //  NTF-07/09: گزارشِ مشکل و نظرِ سفارش — همان ویترینِ پولی (sf.open)
+  'storefront-eta-store.js': 'STORE_PAID',    //  WEB-04: زمانِ تقریبیِ تحویل — همان ویترینِ پولی (sf.open)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */

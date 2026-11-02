@@ -368,6 +368,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
     //  تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ پیش‌فرض خاموش
     api.use('/shop/storefront/promo-guard', require('./routes/storefront-promo-guard'));
+    api.use('/shop/storefront/eta', require('./routes/storefront-eta'));   // WEB-04: تنظیمِ زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));
@@ -376,6 +377,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)

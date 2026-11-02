@@ -31,6 +31,7 @@ const campaigns = require('../lib/campaigns');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
+const eta = require('../lib/storefront-eta');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -134,6 +135,8 @@ async function featuresOf(shopId) {
     //  WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» ِ وب (`store/filters.js` ِ دیربار) با `shop.storefront.filters`/`.alerts`
     ...((await finder.flagOn(shopId)) ? { filters: true } : {}),
     ...((await require('../lib/storefront-alerts').flagOn(shopId)) ? { alerts: true } : {}),
+    //  WEB-04: «تحویلِ تقریبی» در سبد و ثبت (`GET /:slug/eta`، `storefront-eta-store.js`) با پرچمِ `shop.storefront.eta`
+    ...((await eta.flagOn(shopId)) ? { eta: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -302,6 +305,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   if (issueReports !== undefined) order.issueReports = issueReports;
   const review = await require('../lib/order-reviews').customerView(req.store.shop_id, orderId, order.status);
   if (review !== undefined) order.review = review;
+  //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
+  const live = await eta.orderEta(req.store, orderId);
+  if (live !== undefined) order.eta = live;
   res.json({ order });
 });
 
