@@ -104,7 +104,17 @@ async function toCheckout() {
 //  ── پرچم خاموش: همان امروز ──
 await open();
 ok((await text('#store-meta')).includes('ارسال ۵۰ افغانی'), 'خاموش ⇒ همان هزینهٔ ثابتِ ۵۰', await text('#store-meta'));
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+/**
+ *  «افزودن» ِ برنج در کاتالوگ: نوارِ ثابتِ پایین (`nav.bnav`) دکمهٔ لبهٔ پایین را می‌پوشاند و scrollIntoView ِ
+ *  Playwright فقط تا لبه می‌آورد؛ وقتی بنرها دیر بار شوند جای کاشی جابه‌جا می‌شود ⇒ گاه «intercepts pointer events»
+ *  (CI ِ #831). پس اول وسطِ صفحه، بعد زدن.
+ */
+async function addRice() {
+  const b = page.locator('#products li[data-id="rice"] .p-add').first();
+  await b.evaluate((el) => el.scrollIntoView({ block: 'center' }));
+  await b.click();
+}
+await addRice();
 await toCheckout();
 ok(await page.isHidden('#zone-box'), 'خاموش ⇒ کادرِ ناحیه نیست');
 ok((await text('#t-fee')).includes('۵۰'), 'خاموش ⇒ هزینهٔ ارسالِ ثابت در برگه', await text('#t-fee'));
@@ -175,7 +185,7 @@ ok((await text('#zone-msg')).includes('کارته‌سه'), 'ناحیهٔ برگ
 await page.evaluate(() => { location.hash = '#/'; });
 await page.waitForSelector('#banners:not([hidden]) .banner', { timeout: 10000 });
 ok((await text('#banners-list')).includes('ویژهٔ کارته‌سه'), 'WEB-24: با برگشت به کاتالوگ پس از گزینشِ ناحیه ⇒ بنرِ همان ناحیه');
-for (let i = 0; i < 2; i++) await page.locator('#products li[data-id="rice"] .p-add').first().click();
+for (let i = 0; i < 2; i++) await addRice();
 await page.evaluate(() => { location.hash = '#/cart'; });
 await page.waitForFunction(() => /تا ارسالِ رایگان/.test(document.getElementById('sheet-deliv').textContent), null, { timeout: 10000 });
 ok((await text('#sheet-deliv')).includes('۱۰۰ افغانی تا ارسالِ رایگان'), 'CHK-05: «۱۰۰ افغانی تا ارسالِ رایگان»', await text('#sheet-deliv'));
@@ -242,7 +252,7 @@ ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1',
 const rule = (id, data) => call('PUT', `/api/shop/promos/rules/${id}`, { rule: { name: id, stack: 'best', active: true, ...data } }, T);
 const kabulDate = (ms) => new Date(ms + 4.5 * 3600e3).toISOString().slice(0, 10);
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 await page.check('input[name="fulfillment"][value="pickup"]');
 ok(await page.isHidden('#promo-box') && await page.isHidden('#t-disc'), 'پرچمِ تخفیف خاموش ⇒ همان برگهٔ امروز');
@@ -287,7 +297,7 @@ ok(pg.status === 200, 'تنظیمِ اولین خرید (۲۰٪)', JSON.stringif
 //  «مشتریِ تازه» با همان شمارهٔ تأییدشده: سفارش‌های پیشینِ این آزمون به شمارهٔ دیگری
 await query("UPDATE online_orders SET customer_phone = '+93700000099' WHERE shop_id = $1", [shopId]);
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 await page.check('input[name="fulfillment"][value="pickup"]');
 await page.waitForFunction(() => /اولین خرید/.test(document.getElementById('t-disc-label').textContent) && !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
@@ -302,7 +312,7 @@ ok(Number(fo.discount_minor) === 9800 && Number(fo.total_minor) === 25200 && /^[
   && claim && Number(claim.discount_minor) === 6300 && /^[0-9a-f]{32}$/.test(claim.device_key) && claim.device_key !== dev,
 'ثبت ⇒ همان ۹۸ و ۲۵۲ در سرور؛ اولین خرید با چکیدهٔ دستگاه، نه خودِ شناسه', JSON.stringify({ fo, claim }));
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 await page.check('input[name="fulfillment"][value="pickup"]');
 await page.waitForFunction(() => document.getElementById('t-disc').textContent.includes('۳۵') && !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
@@ -310,7 +320,7 @@ ok(!(await text('#t-disc-label')).includes('اولین'), 'خریدِ دومِ �
 
 //  CHK-08: شمارهٔ دوم و Plus Code (پرچمِ `shop.storefront.address_extra`)؛ نادرست ⇒ پیامِ سرور و بی سفارش
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 ok(await page.isHidden('#addr-extra'), 'پرچمِ نشانیِ بیشتر خاموش ⇒ همان فرم');
 await flag('shop.storefront.address_extra', true);
@@ -344,7 +354,7 @@ ok(aj.province === 'کابل' && aj.street === 'گذرِ سوم' && aj.house ===
 //  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه
 //  برگزیده نشده «ثبت» بسته، هزینه روی هزینهٔ ناحیه، و همان بازه و هزینه در سفارشِ سرور (جمعِ دیده‌شده = جمعِ سرور)
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 ok(await page.isHidden('#slot-box'), 'بی بازهٔ زمانی ⇒ همان فرم، بی «زمانِ تحویل»');
 const sr = await call('PUT', '/api/shop/storefront/delivery', { allowAsap: false, slotRules: [
@@ -378,7 +388,7 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 //  CHK-14: «با کدام اسکناس…» — پرچمِ خاموش ⇒ نیست؛ روشن ⇒ فقط اسکناس‌هایی که سرور می‌پذیرد، و همان در سفارش
 await flag('shop.orders.delivery_prefs', false);   //  CHK-24 ِ بالا روشنش کرده بود
 await open();
-await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await addRice();
 await toCheckout();
 ok(await page.isHidden('#tender-row'), 'CHK-14 خاموش: بی «با کدام اسکناس»');
 await flag('shop.orders.delivery_prefs', true);
