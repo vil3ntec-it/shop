@@ -262,4 +262,4 @@ function available(app) {
   return raw(app) !== null && rawEmail(app) !== null;
 }
 
-module.exports = { codeHtml, messageHtml, inlineParts, available, EMAIL_FILES, appOf, titleOf, brandOf, preheader, PREVIEW, SAMPLE, FILES, DIR };
+module.exports = { codeHtml, messageHtml, escapeHtml, inlineParts, available, EMAIL_FILES, appOf, titleOf, brandOf, preheader, PREVIEW, SAMPLE, FILES, DIR };

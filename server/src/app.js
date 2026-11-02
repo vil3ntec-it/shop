@@ -360,6 +360,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders/desk', require('./routes/order-desk'));
     //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     api.use('/shop/orders/bulk', require('./routes/order-bulk'));
+    //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
+    api.use('/shop/orders/evidence', require('./routes/order-evidence'));
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
