@@ -11,9 +11,11 @@ import platform.CoreFoundation.CFArrayGetValueAtIndex
 import platform.CoreFoundation.CFDataGetBytePtr
 import platform.CoreFoundation.CFDataGetLength
 import platform.CoreFoundation.CFRelease
+import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSURLAuthenticationChallenge
 import platform.Foundation.NSURLAuthenticationMethodServerTrust
 import platform.Foundation.NSURLCredential
+import platform.Foundation.NSURLRequest
 import platform.Foundation.NSURLRequestReloadIgnoringLocalCacheData
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionAuthChallengeCancelAuthenticationChallenge
@@ -117,46 +119,71 @@ internal object IosTls {
 }
 
 /**
- *  نشستِ NSURLSession ِ درخواست‌های سنجاق‌دار (`HttpsURLConnection` با `sslSocketFactory`، ‎java/net/Http.kt‎) —
- *  یکی برای همه؛ کارخانه و verifier ِ هر درخواست با شناسهٔ کارش نگه داشته می‌شود تا پایانِ همان درخواست.
+ *  نشست‌های NSURLSession ِ `HttpURLConnection` ِ shim (‎java/net/Http.kt‎): [پراکسیِ سیستم | بی پراکسی (`Proxy.NO_PROXY`)]
+ *  × [اعتمادِ پیش‌فرضِ iOS | سنجاقِ گواهی]؛ هر چهار تنبل و یکی برای همه. هر نشست نمایندهٔ خودش و دفترِ کارهای خودش را
+ *  دارد (شناسهٔ کار فقط درونِ یک نشست یکتاست) و برای هر درخواست تا پایانش نگه می‌دارد:
+ *    - کارخانه و verifier ِ سنجاق (فقط نشستِ سنجاق‌دار؛ کارِ ناشناس در آن ⇐ رد، نه اعتمادِ پیش‌فرض)؛
+ *    - `instanceFollowRedirects = false` ⇐ ریدایرکت دنبال نمی‌شود و پاسخِ ۳xx همان‌جا برمی‌گردد (مثلِ JDK؛
+ *      `ServerSwitchAndroid.probe` و `HubRelayAndroid` ِ کدِ مشترک همین را می‌خواهند).
  */
-internal object PinnedHttp {
-  private class Entry(val trust: List<TrustManager>, val verifier: HostnameVerifier?) {
+internal class ShimHttp private constructor(private val pinned: Boolean, direct: Boolean) {
+  private class Entry(val trust: List<TrustManager>?, val verifier: HostnameVerifier?, val follow: Boolean) {
     var rejected = false
   }
 
   private val lock = Any()
   private val tasks = HashMap<ULong, Entry>()
 
-  private class Delegate : NSObject(), NSURLSessionTaskDelegateProtocol {
+  private class Delegate(private val owner: ShimHttp) : NSObject(), NSURLSessionTaskDelegateProtocol {
     override fun URLSession(
       session: NSURLSession,
       task: NSURLSessionTask,
       didReceiveChallenge: NSURLAuthenticationChallenge,
       completionHandler: (NSURLSessionAuthChallengeDisposition, NSURLCredential?) -> Unit,
     ) {
-      val entry = synchronized(lock) { tasks[task.taskIdentifier] }
-      //  کارِ ناشناس در نشستِ سنجاق‌دار ⇐ رد (نه اعتمادِ پیش‌فرض)
-      val ok = IosTls.answer(didReceiveChallenge, entry?.trust ?: emptyList(), entry?.verifier, completionHandler)
-      if (ok == false) synchronized(lock) { entry?.rejected = true }
+      val entry = owner.entry(task)
+      //  سنجاق‌دار: کارِ ناشناس ⇐ فهرستِ خالی ⇐ رد؛ بی سنجاق ⇐ `null` ⇐ رسیدگیِ پیش‌فرضِ iOS
+      val trust = if (owner.pinned) entry?.trust ?: emptyList() else null
+      val ok = IosTls.answer(didReceiveChallenge, trust, entry?.verifier, completionHandler)
+      if (ok == false) synchronized(owner.lock) { entry?.rejected = true }
+    }
+
+    override fun URLSession(
+      session: NSURLSession,
+      task: NSURLSessionTask,
+      willPerformHTTPRedirection: NSHTTPURLResponse,
+      newRequest: NSURLRequest,
+      completionHandler: (NSURLRequest?) -> Unit,
+    ) {
+      completionHandler(if (owner.entry(task)?.follow == false) null else newRequest)
     }
   }
 
-  private val delegate = Delegate()
+  private val delegate = Delegate(this)
 
   val session: NSURLSession by lazy {
     val config = NSURLSessionConfiguration.ephemeralSessionConfiguration
     config.HTTPCookieStorage = null
     config.URLCache = null
     config.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData
+    //  دیکشنریِ خالی = «بی پراکسی» (null یعنی تنظیمِ سیستم)
+    if (direct) config.connectionProxyDictionary = emptyMap<Any?, Any?>()
     NSURLSession.sessionWithConfiguration(config, delegate = delegate, delegateQueue = null)
   }
 
-  /** پیش از `resume` */
-  fun register(task: NSURLSessionTask, factory: SSLSocketFactory, verifier: HostnameVerifier?) {
-    synchronized(lock) { tasks[task.taskIdentifier] = Entry(factory.trustManagers, verifier) }
+  private fun entry(task: NSURLSessionTask): Entry? = synchronized(lock) { tasks[task.taskIdentifier] }
+
+  /** پیش از `resume`؛ [factory] فقط در نشستِ سنجاق‌دار */
+  fun register(task: NSURLSessionTask, factory: SSLSocketFactory?, verifier: HostnameVerifier?, follow: Boolean) {
+    synchronized(lock) { tasks[task.taskIdentifier] = Entry(factory?.trustManagers, verifier, follow) }
   }
 
   /** پایانِ درخواست؛ true یعنی سنجاق دست‌دادن را رد کرد */
   fun finish(task: NSURLSessionTask): Boolean = synchronized(lock) { tasks.remove(task.taskIdentifier)?.rejected == true }
+
+  companion object {
+    private val all = Array(4) { i -> lazy { ShimHttp(pinned = i and 1 == 1, direct = i and 2 == 2) } }
+
+    fun of(pinned: Boolean, direct: Boolean): ShimHttp = all[(if (pinned) 1 else 0) + (if (direct) 2 else 0)].value
+  }
 }

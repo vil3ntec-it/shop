@@ -148,9 +148,11 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 2. **Team ID** ⇐ `TEAM_ID` در `ios/iosApp/Configuration/Config.xcconfig` (اکنون خالی).
 3. **شناسهٔ برنامه (bundle id)**: پیشنهادِ `ir.vil3ntec.tohid` (همان `APPLICATION_ID` ِ اندروید) — باید در حسابِ اپل ثبت شود.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
-5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل بماند — Sign in with Apple (قاعدهٔ ۴.۸).
-6. اعلانِ سرور (APNs): کلیدِ p8 ِ APNs با Key ID و Team ID (برای فرستنده‌ای که هنوز در سرور نیست)، و قابلیتِ
-   «Push Notifications» (`aps-environment`) در شناسه و profile ِ برنامه — بی آن iOS توکن نمی‌دهد (⇐ ۰.۹؛ سمتِ برنامه آماده است).
+5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل روشن شود — Sign in with Apple (قاعدهٔ ۴.۸؛
+   امروز `GOOGLE_LOGIN = false` است و ورود فقط ایمیل/رمز/کدِ خودِ برنامه ⇐ ۴.۸ هنوز پیش نمی‌آید، ⇐ ۰.۱۰).
+6. اعلانِ سرور (APNs): کلیدِ p8 ِ APNs با Key ID و Team ID ⇐ پنج متغیرِ محیطِ سرور (`APNS_KEY_ID`، `APNS_TEAM_ID`، `APNS_KEY_P8`،
+   `APNS_BUNDLE_ID`، `APNS_ENV`؛ فرستنده از گامِ ۵ در سرور هست ⇐ ۰.۱۰)، و قابلیتِ «Push Notifications» (`aps-environment`) در شناسه و
+   profile ِ برنامه — بی آن iOS توکن نمی‌دهد (سمتِ برنامه از گامِ ۴ آماده است).
 7. از گامِ ۳: متنِ اجازه‌های `ios/iosApp/iosApp/Info.plist` (دوربین، Face ID، موقعیت، ذخیرهٔ تصویر؛ از گامِ ۴ «شبکهٔ محلی») و «Background App Refresh» باید با
    برچسب‌های حریمِ خصوصیِ App Store Connect (بندِ ۵) یکی باشند — پرکردنِ آن فرم‌ها فقط با حسابِ صاحب‌کار.
 
@@ -305,6 +307,36 @@ ambiguous» و `ComposeView` بی `Context`. حالا `ContentView.swift` و `iO
 **بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`) با
 Compose 1.7.3 (‎۰.۷‎)؛ `jvmTest` ِ `ios/shared` ۱۸/۱۸ (Gcm ۴، RasterPdf ۶، WorkTiming ۸)؛ سرور `push-delivery` ۲۲/۲۲ روی PGlite. فقط
 CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` (۹ + ۵).
+
+### ۰.۱۰ گامِ ۵ — فرستندهٔ APNs در سرور، هابِ محلی، لمسِ اعلانِ سرور، CI ِ آیفون (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase5`)
+
+> روی دستهٔ دوازدهم (#845، با گامِ ۴ = #841). اندروید، کامپیوتر و `core` دست نخوردند؛ سرور یک فرستندهٔ تازه دارد (بی مسیرِ تازه).
+> باز هم **همان فایل‌های اندروید** روی آیفون‌اند؛ یک جایگزینِ دیگر حذف شد.
+
+**نتیجه:** ۱۱۵۱ از ۱۱۷۰ فایلِ `android-native/app/src/main/java` برای iOS کامپایل می‌شوند (گامِ ۴: ۱۱۳۷ از ۱۱۵۷؛ `ios-exclude.txt`: ۱۶
+جایگزین + همان سه فایلِ مستقیم). `platform/HubRelayIos.kt` حذف شد و خودِ `platform/HubRelayAndroid.kt` جایش است.
+
+| برش | چه شد | فایل‌ها |
+|---|---|---|
+| CI ِ آیفون سرخ بود | دستهٔ دوازدهم (#845) و هر PR ِ پس از آن در `ios-ui-klib` و `ios-app` با «Redeclaration» افتاده بودند: ادغامِ main سه جایگزینی را که گامِ ۴ حذف کرده بود برگردانده بود (`ServerSwitchIos.kt`، `ReportPrintIos.kt`، `LabelSheetPrintIos.kt`) و خودِ فایلِ اندروید هم کامپایل می‌شد. حذف شدند. کارِ `ios-app` ِ گامِ ۴ هر چهار مرحله را سبز گذراند (پیوند، xcodebuild، اجرا روی شبیه‌ساز، `iosSimulatorArm64Test`) ولی در ذخیرهٔ کشِ پایانی به سقفِ ۷۵ دقیقه خورد و «لغو» شد ⇐ سقف ۱۰۰ دقیقه (همان کار، بی سرخِ دروغ). هر دو کار هنوز «گزارش» و `continue-on-error`اند | `ios/shared/src/iosMain/…`، `.github/workflows/ios-spike.yml` |
+| فرستندهٔ APNs (سرور) | `lib/apns.js` کنارِ FCM ِ `push.js`: HTTP/2 ِ `node:http2` به `api.push.apple.com` (یا sandbox) با یک نشستِ ماندگار؛ JWT ِ ES256 با `node:crypto` (امضای خامِ r‖s، `kid` = Key ID، `iss` = Team ID)، تازه هر ۴۰ دقیقه (اپل: نه زیرِ ۲۰، نه بالای ۶۰)؛ سرآیندهای `apns-topic`/`apns-push-type: alert`/`apns-priority: 10`/`apns-expiration` (۲۴ ساعت)/`apns-collapse-id` (= notifId)؛ بدنه `aps` + دادهٔ پیام در سطحِ بالا، بیش از ۴KB ⇐ متن کوتاه می‌شود. ۴۲۹/۵xx/قطعِ اتصال ⇐ دوباره با عقب‌نشینیِ نمایی (۳ بار، `retry-after` ِ اپل)؛ `ExpiredProviderToken` ⇐ یک بار JWT ِ تازه (فقط اگر ≥ ۲۰ دقیقه)؛ ۴۰۳ ِ دیگر ⇐ بقیهٔ دسته فرستاده نمی‌شود؛ فقط ۴۱۰ و `BadDeviceToken` ⇐ ردیف «کهنه» (برنامه روزی یک بار دوباره ثبت می‌کند و زنده می‌شود؛ `DeviceTokenNotForTopic` نه — شناسهٔ نادرستِ سرور همهٔ توکن‌ها را نکشد). توکنِ غیرهگز بی درخواست کنار می‌رود. تنظیم فقط از محیط (⇐ ۰.۶ بندِ ۶)؛ هیچ ⇐ خاموشِ بی‌صدا و همان رفتارِ گامِ ۴؛ ناقص/خراب ⇐ خاموش با هشدارِ «نامِ متغیر/دلیل». کلیدِ «پوش روشن» ِ پنل کلیدِ اصلیِ هر دو است؛ `push.masked()` فقط `apns: {configured, env, reason}`. توکن، کلید و JWT هرگز در لاگ، `last_error` («apns ۴۱۰ Unregistered») یا پاسخ نیستند | `server/src/lib/apns.js`، `server/src/lib/push.js`، `server/src/routes/me.js` (فقط توضیح) |
+| لمسِ اعلانِ سرور | userInfo ِ اعلانِ APNs (`aps` + `type`/`notifId`/`orderId`) ⇐ `IosPush.remoteIntent` ⇐ همان دو extra ِ `OrderNotify` ⇐ همان `openNotice` (سفارش باز می‌شود، رسیدِ «دیده شد» همان راه). اعلانِ محلیِ دیدبان برای همان notifId اعلانِ APNs ِ رسیده را برمی‌دارد (شناسهٔ آن = `apns-collapse-id`) تا یک خبر دو بار دیده نشود؛ روی گوشیِ واقعی هنوز آزموده نشده | `ios/IosPush.kt`، `ios/IosNotifications.kt` |
+| هابِ محلی (SYN-09) | خودِ `HubRelayAndroid` ِ اندروید: `URL.openConnection(Proxy.NO_PROXY)` ⇐ نشستِ NSURLSession ِ **بی پراکسی** (`connectionProxyDictionary` خالی؛ پراکسیِ Wi-Fi ِ iOS نشانیِ محلی را هم می‌گیرد) و `instanceFollowRedirects = false` ⇐ نمایندهٔ نشست ریدایرکت را دنبال نمی‌کند و ۳xx همان‌جا برمی‌گردد (مثلِ JDK) — این دومی «سنجشِ سرور» ِ `ServerSwitchAndroid` را هم درست کرد که از گامِ ۴ ریدایرکت را بی‌صدا دنبال می‌کرد. نشست‌های shim حالا چهارتا‌اند ([پراکسیِ سیستم/بی پراکسی] × [اعتمادِ iOS/سنجاق])، هر کدام با نمایندهٔ خودش (`ShimHttp` به‌جای `PinnedHttp`). پراکسیِ دستیِ HTTP/SOCKS ⇐ `UnsupportedOperationException` (کدِ مشترک نمی‌خواهد) | `java/net/Net.kt` (`Proxy`)، `java/net/Http.kt`، `javax/net/ssl/IosTls.kt` |
+
+**آزمونِ تازه:**
+- سرور: `test/apns.test.js` ۱۱/۱۱ — سرورِ HTTP/2 ِ ساختگی روی 127.0.0.1 (بی TLS، بی شبکه) و کلیدِ P-256 ِ همین‌جا ساخته: تنظیمِ ناقص/خراب (فقط نامِ متغیر)، سه شکلِ کلید در `.env`، JWT (امضا با کلیدِ عمومی، ۴۰ دقیقه)، مسیر/سرآیند/بدنه، ۴۱۰/BadDeviceToken/DeviceTokenNotForTopic، عقب‌نشینی و `retry-after` و سقف، قطعِ اتصال ⇐ نشستِ تازه، `ExpiredProviderToken`، `InvalidProviderToken`، توکنِ غیرهگز، بدنهٔ بلند، و «هیچ توکن/کلید/JWT در لاگ و نتیجه». `test/push-delivery.test.js` ۲۳/۲۳ روی PGlite (آزمونِ تازه: رسیده ⇐ `last_ok_at`، ۴۱۰ ⇐ کهنه با `last_error` ِ بی توکن، ردیفِ FCM دست‌نخورده، ۴۰۳ ِ کلید ⇐ ایست، کلیدِ اصلیِ پنل خاموش ⇐ APNs هم خاموش). جهش‌ها: برداشتنِ BadDeviceToken، «کهنه»، امضای DER، کلیدِ اصلی، ایستِ ۴۰۳ و سنجشِ توکن ⇐ هر کدام دست‌کم ۱ سرخ.
+- `src/iosTest/…/ios/Phase5IosTest` (۳) — نگاشتِ userInfo ِ APNs به `Intent` ِ سفارش، `Proxy.NO_PROXY` ⇐ `HttpsURLConnection` و ردِ پراکسیِ دیگر، چهار نشستِ جدا، `HubRelayAndroid.of` روی آیفون (پرچم خاموش ⇐ null). فقط روی شبیه‌ساز (کارِ `ios-app`).
+
+**هنوز نه (و چرا):**
+- **ورود با اپل / انتزاعِ «فراهم‌کننده»:** ساخته نشد. ورود با گوگل در کدِ مشترک **خاموش** است (`GOOGLE_LOGIN = false` در `ui/v3/onboarding/GoogleLinkSheet.kt`؛ دکمه هیچ‌جا دیده نمی‌شود) ⇒ امروز ورودِ شخصِ ثالثی نیست که انتزاع بخواهد، و قاعدهٔ ۴.۸ ِ اپل (Sign in with Apple فقط وقتی ورودِ شخصِ ثالث هست) پیش نمی‌آید. انتزاعِ امروز کدِ مرده در سه سکو (اندروید، کامپیوتر، آیفون) بود. طرحِ آماده برای روزی که گوگل روشن شود: (۱) سرور `POST /auth/apple` کنارِ `/auth/google` با `lib/apple.js` ِ هم‌شکلِ `lib/google.js` (JWKS ِ `https://appleid.apple.com/auth/keys` با کش، RS256، `iss = https://appleid.apple.com`، `aud` ∈ `APPLE_CLIENT_IDS` = bundle id، `exp`/`iat`، و `nonce` = SHA-256 ِ nonce ِ خامی که سرور یک‌بار‌مصرف و ۱۰ دقیقه‌ای داده)، پیوند با `user_identities` (`provider = 'apple'`، بی مهاجرت) و همان قاعدهٔ «ایمیلِ دارای حساب ⇐ اثباتِ روشِ قبلی» (۴۰۹ `apple_link_required` + `/auth/apple/link-code`؛ هرگز پیوندِ خودکار با ایمیل، رلهٔ خصوصیِ اپل حسابِ تازه)؛ (۲) کدِ مشترک: `ExternalSignIn` (نام، مسیرِ سرور، کدِ ۴۰۹) به‌جای `GoogleSignIn`/`GoogleLinkAsk` ِ تک‌منظوره، و `AppleSignIn` فقط در shim ِ iOS (`ASAuthorizationAppleIDProvider`). پیش‌نیاز: قابلیتِ «Sign in with Apple» در حسابِ اپل (۰.۶).
+- **تشخیصِ گفتار:** کدِ مشترک `StartActivityForResult(ACTION_RECOGNIZE_SPEECH)` را به برنامهٔ دیگرِ اندروید می‌سپارد؛ shim ِ کوچک نیست — SFSpeechRecognizer صفحهٔ شنیدنِ خودش (AVAudioEngine)، دو اجازهٔ تازه (میکروفون، گفتار) و برچسبِ حریمِ خصوصی می‌خواهد، و پشتیبانیِ زبانِ فارسی روی دستگاه باید اول روی گوشیِ واقعی دیده شود. تا آن روز دکمهٔ میکروفون پنهان است (همان «برنامه‌ای نیست» ِ اندروید).
+- **App Attest (`Integrity`):** shim ِ کوچک نیست — کلید در Secure Enclave، گواهیِ اپل و وارسیِ CBOR/زنجیرهٔ گواهی در سرور، و قابلیتِ App Attest در حسابِ اپل. `IntegrityIos.isGenuine` همان «درست» ِ گامِ ۲ است (امضای برنامه را خودِ iOS وارسی می‌کند).
+- هابِ محلی: صفحه، mDNS و جفت‌سازی همان «مانده» ِ SYN-09 برای همهٔ سکوهاست؛ روی آیفونِ واقعی با هابِ کامپیوتر آزموده نشده.
+- آزمونِ دستی روی گوشیِ واقعی: APNs (کلید + قابلیتِ Push)، AirPrint، سرورِ دکان و هاب در شبکهٔ دکان، بوق و صفحه‌ها.
+
+**بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`) با
+Compose 1.7.3 (‎۰.۷‎) بی خطا و بی هشدار در فایل‌های این گام، و `jvmTest` ِ `ios/shared` ۱۸/۱۸؛ سرور `apns` ۱۱/۱۱ و `push-delivery` ۲۳/۲۳ روی PGlite. فقط CI ِ macOS: پیوندِ چارچوب،
+xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` (۹ + ۵ + ۳).
 
 ## ۱. خلاصه در پنج خط
 
