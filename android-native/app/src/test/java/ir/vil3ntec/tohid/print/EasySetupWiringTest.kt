@@ -57,9 +57,17 @@ class EasySetupWiringTest {
     fun sigs(s: String) = api.findAll(s).map { it.groupValues[1].trim() }.toSet()
     assertTrue(sigs(android).size >= 7)
     assertEquals(sigs(android), sigs(desk))
-    //  روی کامپیوتر جست‌وجوی بلوتوث نیست و اجازه‌ای خواسته نمی‌شود
-    assertFalse(ir.vil3ntec.tohid.hw.PrinterFinderPlatform.bluetoothScan())
-    assertEquals(emptyList<String>(), ir.vil3ntec.tohid.hw.PrinterFinderPlatform.bluetoothPermissions())
+    //  روی کامپیوتر جست‌وجوی بلوتوث نیست و اجازه‌ای خواسته نمی‌شود — از متنِ پروندهٔ کامپیوتر، در هر دو ماژول
+    assertTrue(desk.contains("fun bluetoothScan(): Boolean = false"))
+    assertTrue(desk.contains("fun bluetoothPermissions(): List<String> = emptyList()"))
+    assertTrue(android.contains("fun bluetoothScan(): Boolean = true"))
+    //  و همان پیاده‌سازی‌ای که این ماژول کامپایل کرده (آزمون هم با `:app` ِ اندروید و هم با کامپیوتر اجرا می‌شود)
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
+      assertFalse(ir.vil3ntec.tohid.hw.PrinterFinderPlatform.bluetoothScan())
+      assertEquals(emptyList<String>(), ir.vil3ntec.tohid.hw.PrinterFinderPlatform.bluetoothPermissions())
+    } else {
+      assertTrue(ir.vil3ntec.tohid.hw.PrinterFinderPlatform.bluetoothScan())
+    }
   }
 
   @Test fun `اجازهٔ جست‌وجوی بلوتوث در مانیفست با neverForLocation است و فقط هنگامِ زدنِ دکمه خواسته می‌شود`() {
