@@ -174,14 +174,14 @@ class SettingsPortTest {
       "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
       "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
       "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
+      "StockPlacesPref.setPlaces" to "$PENDING — محل‌ها و انتقال، INV-20",
+      "StockPlacesPref.setRepack" to "$PENDING — بسته‌بندیِ دوباره و ساختِ بسته، INV-21",
       "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
       "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
-      "StockPlacesPref.setPlaces" to "$PENDING — محل‌ها و انتقال، INV-20",
-      "StockPlacesPref.setRepack" to "$PENDING — بسته‌بندیِ دوباره و ساختِ بسته، INV-21",
     )
   }
 }
