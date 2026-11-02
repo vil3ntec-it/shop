@@ -163,6 +163,7 @@ class SettingsPortTest {
       "CustomerCardPref.setOn" to "$PENDING — کارت یا بارکدِ مشتری، CRM-16",
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
       "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
+      "EasySetupPref.set" to "$PENDING — راه‌اندازیِ آسانِ چاپگر و بارکدخوان، HW-12 (کارش در «دستگاه‌ها» ِ رابطِ امروز)",
       "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
       "LabelToolsPref.set" to "$PENDING — برچسب و بارکدِ داخلی، PRD-23/PRD-05",
       "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
