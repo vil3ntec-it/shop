@@ -44,6 +44,22 @@ class PromoTextTest {
     assertEquals(listOf("tiers"), PromoCore.validate(PromoForm(name = "n", kind = "tiers", tierAmount = true, tiers = listOf("3" to "")).toRule(base)))
   }
 
+  /** PRM-10 — «نزدیکِ انقضا»: فقط با پرچم در فرم؛ رفت‌وبرگشت، متن و داوری */
+  @Test fun `PRM-10 — نزدیکِ انقضا فقط با پرچم در فرم، رفت‌وبرگشت، متن و داوری`() {
+    assertEquals(listOf("percent", "amount", "price", "tiers", "bxgy", "bundle", "threshold"), PromoText.kinds(false).map { it.first })
+    assertEquals(PromoCore.KINDS, PromoText.kinds(true).map { it.first })
+    val r = base.copy(name = "شیرِ نزدیک", kind = "expiry", bp = 3000, nearDays = 7, scope = PromoCore.Scope(categories = listOf("لبنیات")))
+    roundTrip(r)
+    assertEquals("30٪ تا 7 روز پیش از انقضا", PromoText.valueText(r))
+    assertEquals("تخفیفِ نزدیکِ انقضا", PromoText.kindLabel("expiry"))
+    assertEquals(listOf("expiry"), PromoCore.validate(PromoForm(name = "n", kind = "expiry", nearDays = "0").toRule(base)))
+    assertEquals(listOf("expiry"), PromoCore.validate(PromoForm(name = "n", kind = "expiry", nearDays = "400").toRule(base)))
+    assertEquals(listOf("expiry"), PromoCore.validate(PromoForm(name = "n", kind = "expiry", nearDays = "2.5").toRule(base)))
+    assertEquals("روزِ پیش از انقضا باید ۱ تا ۳۶۵ باشد", PromoText.errors(listOf("expiry")))
+    //  نوعِ دیگر `nearDays` نمی‌گیرد ⇒ JSONِ قاعده همان شکلِ پیشین
+    assertEquals(0L, PromoForm.of(r).copy(kind = "percent").toRule(base).nearDays)
+  }
+
   @Test fun `فرمِ نادرست را validate می‌گیرد`() {
     val f = PromoForm(name = "زیاد", kind = "percent", pct = "150")
     assertEquals(listOf("bp"), PromoCore.validate(f.toRule(base)))
