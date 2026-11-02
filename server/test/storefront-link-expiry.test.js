@@ -204,3 +204,80 @@ test('پرچمِ روشن: شاگرد (بی orders.contact) لینک را باط
   const nope = await revoke(s, phone.body.order.id);
   assert.equal(nope.status, 404, JSON.stringify(nope.body));
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   مسیرهای تازه‌ترِ «توکنِ پیگیری» (پس از #507): جایگزین‌ها (PRD/CHK) و دستورِ تحویل (CHK-24)
+   همان سنجشِ `orderIdOfLink` — لینکِ منقضی یا باطل نه خوانده می‌شود، نه می‌نویسد.
+   ══════════════════════════════════════════════════════════════════ */
+
+/** سفارشِ «ارسال» ِ ویترین با پرچم‌های جمع‌آوری و دستورِ تحویل */
+async function deliveryOrder(s) {
+  await setFlag(s.shopId, 'shop.orders.picking', true);
+  await setFlag(s.shopId, 'shop.orders.delivery_prefs', true);
+  const put = await h.put('/api/shop/storefront', { slug: s.slug, enabled: true, title: 'ویترین', contactPhone: '0700000001',
+    deliveryFeeMinor: 5000, minOrderMinor: 0 }, { token: s.token });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const phone = `07966${String(10000 + (++phoneN)).slice(-5)}`;
+  const ticket = await ticketFor(s.slug, phone);
+  const r = await h.post(`/api/store/${s.slug}/checkout`, {
+    fulfillment: 'delivery', customer: { name: 'مشتری', phone },
+    address: { text: 'کارته‌سه', landmark: 'پشتِ مسجد', lat: 34.53, lng: 69.17 },
+    lines: [{ productId: 'rice', qtyMilli: 1000 }],
+  }, { headers: { 'Idempotency-Key': `ck-${uniq()}-key`, 'X-Store-Ticket': ticket } });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  return { token: r.body.order.token, id: r.body.order.token.split('.')[0], ticket };
+}
+const subsOf = (s, token) => h.get(`/api/store/${s.slug}/orders/${encodeURIComponent(token)}/substitutions`);
+const decideSub = (s, token) => h.post(`/api/store/${s.slug}/orders/${encodeURIComponent(token)}/substitutions/${'0'.repeat(26)}`, { decision: 'accept' });
+const editPrefs = (s, token, leaveWith) => h.post(`/api/store/${s.slug}/orders/${encodeURIComponent(token)}/delivery`, { delivery: { leaveWith } });
+const leaveWithOf = async (s, id) => (await h.get(`/api/shop/orders/${id}`, { token: s.token })).body.order.delivery.leaveWith || '';
+
+test('پرچمِ خاموش: جایگزین‌ها و دستورِ تحویل با v1 ِ سفارشِ یک‌ساله مثلِ امروز کار می‌کنند؛ لینکِ صادرشده v1 است', async () => {
+  const s = await liveStore('بی‌پرچمِ مسیرهای تازه');
+  const o = await deliveryOrder(s);
+  assert.ok(isV1(o.token), o.token);
+  await query('UPDATE online_orders SET created_at=$2 WHERE id=$1', [o.id, now() - 400 * 24 * 3600 * 1000]);
+  const subs = await subsOf(s, o.token);
+  assert.equal(subs.status, 200, JSON.stringify(subs.body));
+  assert.deepEqual(subs.body.substitutions, []);
+  const d = await decideSub(s, o.token);
+  assert.equal(d.status, 404, JSON.stringify(d.body));
+  assert.ok(!/^link_/.test(d.body.error.code), `گذشت از درِ لینک: ${d.body.error.code}`);
+  const ed = await editPrefs(s, o.token, 'دربان');
+  assert.equal(ed.status, 200, JSON.stringify(ed.body));
+  assert.equal(await leaveWithOf(s, o.id), 'دربان');
+  assert.equal((await track(s, o.token)).status, 200);
+  assert.equal(await sf.currentTokenOf(s.shopId, o.id), sf.tokenOf(s.shopId, o.id), 'پیام و لینکِ جایگزین: همان v1');
+});
+
+test('پرچمِ روشن: جایگزین‌ها و دستورِ تحویل لینکِ باطل یا منقضی را نمی‌پذیرند (۴۱۰، بی نوشتن)؛ لینکِ نسلِ جاری کار می‌کند', async () => {
+  const s = await liveStore('مسیرهای تازه');
+  await setFlag(s.shopId, 'shop.storefront.link_expiry', true);
+  const o = await deliveryOrder(s);
+  assert.ok(isV2(o.token), o.token);
+  assert.equal((await subsOf(s, o.token)).status, 200, 'پیش از باطل شدن');
+
+  const r = await revoke(s, o.id);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const v1 = sf.tokenOf(s.shopId, o.id);
+  const expired = sf.tokenOf(s.shopId, o.id, { gen: 1, at: now() - TTL() - 60_000 });
+  for (const [old, code] of [[o.token, 'link_revoked'], [v1, 'link_revoked'], [expired, 'link_expired']]) {
+    for (const [name, call] of [['substitutions', () => subsOf(s, old)], ['decide', () => decideSub(s, old)],
+      ['delivery', () => editPrefs(s, old, 'همسایه')]]) {
+      const res = await call();
+      assert.equal(res.status, 410, `${name} ⇒ ${res.status} ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.error.code, code, name);
+      assert.ok(!JSON.stringify(res.body).includes('برنج'), `${name}: هیچ دادهٔ سفارشی برنگشت`);
+    }
+  }
+  assert.equal(await leaveWithOf(s, o.id), '', 'لینکِ ناروا دستورِ تحویل را ننوشت');
+
+  //  لینکی که سرور خودش می‌فرستد (پیامِ وضعیت، لینکِ جایگزین، ۴۰۹ ِ تکراری) = نسلِ جاری
+  const cur = await sf.currentTokenOf(s.shopId, o.id);
+  assert.ok(isV2(cur), cur);
+  assert.equal((await subsOf(s, cur)).status, 200);
+  const ok = await editPrefs(s, r.body.token, 'دربان');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(await leaveWithOf(s, o.id), 'دربان');
+  assert.equal((await track(s, cur)).status, 200);
+});

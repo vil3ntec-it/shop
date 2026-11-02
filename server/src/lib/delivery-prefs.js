@@ -186,8 +186,8 @@ const pick = (o, keys) => Object.fromEntries(keys.map((k) => [k, o[k]]));
  */
 async function editByToken(sf, token, body) {
   const store = require('./storefront');
-  const id = store.orderIdOf(sf.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  //  TEN-03: پیش از هر نوشتن — لینکِ منقضی یا باطل (پرچمِ `shop.storefront.link_expiry`) ۴۱۰، نادرست ۴۰۴
+  const id = await store.orderIdOfLink(sf, token);
   const out = await edit(sf.shop_id, id, body, { type: 'customer', id: '' }, { source: 'storefront' });
   return { order: await store.track(sf, token), unchanged: out.unchanged };
 }
