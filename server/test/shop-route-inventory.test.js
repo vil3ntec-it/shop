@@ -203,6 +203,8 @@ FLAGS.push('shop.storefront.campaigns');
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
 //  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
 FLAGS.push('shop.orders.amend_paid');
+//  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان
+FLAGS.push('shop.customer_erasure');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

@@ -31,6 +31,8 @@ const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
 const audit = require('../lib/audit');
+const erasure = require('../lib/customer-erasure');
+const { phoneKey } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -360,6 +362,25 @@ router.delete('/:slug/account', checkoutLimit, store, customer, async (req, res)
     targetType: 'store_customer', targetId: req.customer.id, detail: {}, ip: clientIp(req),
   });
   res.json(out);
+});
+
+//  SEC-10: حذفِ دادهٔ شخصیِ خودِ مشتری در **همین** دکان (`lib/customer-erasure.js`)؛ حساب می‌ماند
+//  (پاک کردنش همان `DELETE /:slug/account`). پرچمِ `shop.customer_erasure` خاموش یا نشانیِ ناشناس ⇒
+//  `next('route')`، همان پاسخِ امروز. اجرای واقعی بلیتِ تازهٔ «شماره تأیید شد» ِ **همان** شمارهٔ حساب
+//  می‌خواهد؛ `dryRun: true` فقط شمارش‌ها (بی نوشتن).
+const erasureOn = async (req, res, next) => {
+  next((await erasure.flagOnSlug(req.params.slug)) ? undefined : 'route');
+};
+router.post('/:slug/account/erase', checkoutLimit, erasureOn, store, customer, async (req, res) => {
+  const dryRun = req.body && req.body.dryRun === true;
+  if (!dryRun) {
+    const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+    if (!phone) throw new ApiError(401, 'verification_required', 'برای حذفِ داده‌ها، همین حالا شمارهٔ خود را با کد تأیید کنید');
+    if (phoneKey(phone) !== phoneKey(req.customer.phone)) {
+      throw new ApiError(403, 'phone_mismatch', 'کدِ تأیید باید برای همان شمارهٔ این حساب باشد');
+    }
+  }
+  res.json(await erasure.erase(req.store.shop_id, { phone: req.customer.phone, customerId: req.customer.id }, { dryRun, by: 'customer' }));
 });
 
 router.post('/:slug/account/logout', checkoutLimit, store, async (req, res) => {

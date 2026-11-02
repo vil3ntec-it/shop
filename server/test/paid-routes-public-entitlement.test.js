@@ -46,7 +46,9 @@ const CATEGORY = {
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */
 const ROUTE_CATEGORY = { 'GET /store': 'STORE_LOOKUP' };
-const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust', 'market.public_id'];
+const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', 'market.trust', 'market.public_id',
+  //  SEC-10: `POST /store/:slug/account/erase` پشتِ پرچمِ خودش (خاموش ⇒ همان درِ ناشناخته)
+  'shop.customer_erasure'];
 
 /** `${base}` ِ روترهای چت و شکایت همان ثابتِ `const base = '…'` ِ پرونده است. */
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';
