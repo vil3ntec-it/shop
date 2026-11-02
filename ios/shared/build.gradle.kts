@@ -255,6 +255,30 @@ val generateConfig by tasks.registering {
 }
 
 /*
+ *  سرآیندِ ObjC ِ چارچوب (`TohidShared.h`) همهٔ API ِ عمومیِ کدِ مشترک را با همان نام‌ها دارد؛ چند ثابتِ Kotlin
+ *  هم‌نامِ ماکروهای C‌اند و Clang ِ Xcode پیش از خواندنِ اعلان جایشان را عوض می‌کند (‎`DEBUG`‎ ِ پیکربندیِ Debug،
+ *  ‎`NAME_MAX`‎ ِ <limits.h>، ‎`NULL`‎) ⇐ «expected member name» و شکستِ xcodebuild (CI ِ گامِ ۲). نام‌ها عوض نمی‌شوند
+ *  (کدِ اندروید دست نمی‌خورد)؛ فقط درونِ همین سرآیند آن ماکروها کنار می‌روند و پس از آن برمی‌گردند
+ *  (`#pragma push_macro`/`pop_macro`). فقط ماکروهایی که واقعاً نامِ اعلانی در سرآیندند.
+ */
+val headerMacros = listOf("DEBUG", "NULL", "NAME_MAX", "PATH_MAX", "MAX_INPUT", "MAX_CANON", "LINE_MAX", "RELEASE", "YES", "NO", "TRUE", "FALSE", "EOF")
+
+fun guardHeaderMacros(framework: File) {
+  val header = framework.resolve("Headers/TohidShared.h")
+  if (!header.isFile) return
+  val text = header.readText(Charsets.UTF_8)
+  if ("tohid: macro guard" in text) return
+  val hit = headerMacros.filter { Regex("\\b$it\\s+__attribute__\\(\\(swift_name\\(").containsMatchIn(text) }
+  if (hit.isEmpty()) return
+  val lines = text.lines().toMutableList()
+  val at = lines.indexOfLast { it.startsWith("#import ") } + 1
+  lines.addAll(at, listOf("", "// tohid: macro guard — ${hit.joinToString()}") + hit.flatMap { listOf("#pragma push_macro(\"$it\")", "#undef $it") })
+  lines.addAll(hit.reversed().map { "#pragma pop_macro(\"$it\")" })
+  header.writeText(lines.joinToString("\n") + "\n", Charsets.UTF_8)
+  logger.lifecycle("iOS: سرآیندِ TohidShared.h — ماکروهای کنارگذاشته: ${hit.joinToString()}")
+}
+
+/*
  *  هدفِ jvm فقط برای آزمونِ منطقِ خالصِ `src/commonMain` (حالتِ GCM ِ دفترِ رمزدار) در برابرِ خودِ JDK —
  *  همان بایت‌ها، روی لینوکس، بی Xcode (`jvmTest`). نه برنامه‌ای می‌سازد، نه Compose دارد.
  */
@@ -269,6 +293,9 @@ kotlin {
       it.binaries.framework {
         baseName = "TohidShared"
         isStatic = true
+        binaryOption("bundleId", "ir.vil3ntec.tohid.TohidShared")
+        //  سرآیندِ ObjC بی برخورد با ماکروهای C (پایینِ همین فایل، `guardHeaderMacros`)
+        linkTaskProvider.configure { doLast { guardHeaderMacros(outputFile.get()) } }
       }
     }
   }
