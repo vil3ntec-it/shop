@@ -151,15 +151,16 @@ private fun TaxQuarterReportBody(d: ShopData, cfg: QuarterTax.Config, onMessage:
     )
     TextButton(onClick = { quarter = QuarterTax.next(x) }) { Text(StrTaxQuarter.next) }
   }
-  fun afn(minor: Long) = "${ir.vil3ntec.tohid.money(minor / 100.0)} ؋"
-  TaxLine(StrTaxQuarter.sales, StrTaxQuarter.count(s.salesCount), afn(s.salesMinor))
-  TaxLine(StrTaxQuarter.returns, StrTaxQuarter.count(s.returnsCount), afn(s.returnsMinor))
-  TaxLine(StrTaxQuarter.net, "", afn(s.netMinor), bold = true)
+  //  متنِ پول همان `LocaleText.afghani` ِ برچسب و فاکتور (رقم و نمادِ همین دستگاه)
+  val money = { minor: Long -> ir.vil3ntec.tohid.LocaleText.afghani(minor / 100.0, ir.vil3ntec.tohid.LocaleChoice.digits, ir.vil3ntec.tohid.LocaleChoice.symbol) }
+  TaxLine(StrTaxQuarter.sales, StrTaxQuarter.count(s.salesCount), money(s.salesMinor))
+  TaxLine(StrTaxQuarter.returns, StrTaxQuarter.count(s.returnsCount), money(s.returnsMinor))
+  TaxLine(StrTaxQuarter.net, "", money(s.netMinor), bold = true)
   TaxLine(StrTaxQuarter.rate, "", QuarterTax.rateText(s.rateBp))
-  TaxLine(StrTaxQuarter.salesTax, "", afn(s.salesTaxMinor))
-  TaxLine(StrTaxQuarter.returnsTax, "", afn(s.returnsTaxMinor))
-  TaxLine(StrTaxQuarter.netTax, "", afn(s.netTaxMinor), bold = true)
-  TaxLine(StrTaxQuarter.purchases, StrTaxQuarter.count(s.purchasesCount), afn(s.purchasesMinor))
+  TaxLine(StrTaxQuarter.salesTax, "", money(s.salesTaxMinor))
+  TaxLine(StrTaxQuarter.returnsTax, "", money(s.returnsTaxMinor))
+  TaxLine(StrTaxQuarter.netTax, "", money(s.netTaxMinor), bold = true)
+  TaxLine(StrTaxQuarter.purchases, StrTaxQuarter.count(s.purchasesCount), money(s.purchasesMinor))
   report.dueIso?.let { Text(StrTaxQuarter.due(ir.vil3ntec.tohid.formatDate(it)), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 6.dp)) {
     OutlinedButton(onClick = {
