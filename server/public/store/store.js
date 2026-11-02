@@ -505,7 +505,7 @@
     }).catch(fail || function (e) { K.note($('o-msg'), 'err', e.message); });
   }
 
-  // ── CRM-13: «حسابِ من» (store/account.js ِ دیربار، با واژه‌نامهٔ `kit/i18n/account.<زبان>.json`) ──
+  // CRM-13 (account.js)
   var accountView = null;
   function loadAccount() {
     accountView = accountView || Promise.all([new Promise(function (ok, no) {
@@ -537,7 +537,7 @@
     draw(K.load(KEY_ORDERS, []) || []);
     //  S138: با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاه
     if (K.ticket()) api('/orders').then(function (r) { if (r.orders.length) draw(r.orders); }).catch(function () { /* همان محلی */ });
-    //  CRM-13: پرچمِ روشن و شمارهٔ تأییدشده ⇒ «حسابِ من» (آنلاین، حضوری، مانده) جای همین فهرست؛ نشد ⇒ همان فهرست
+    // CRM-13
     var acc = Boolean(store.features.accountHistory && K.ticket());
     if ($('my-account')) $('my-account').hidden = !acc;
     if (!acc) return;
