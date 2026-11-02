@@ -192,8 +192,7 @@ test('پشتیبانِ بی manifest «برابر» نیست', async () => {
 });
 
 test('پشتیبانِ خالی (بی هیچ جدول) هرگز «سالم» نیست، حتی برابر با manifest ِ خودش', async () => {
-  const { PGlite } = require('@electric-sql/pglite');
-  const empty = await PGlite.create({ dataDir: 'memory://' });
+  const empty = await require('../src/lib/pglite-create').createPglite({ dataDir: 'memory://' });
   const tar = Buffer.from(await (await empty.dumpDataDir('gzip')).arrayBuffer());
   const manifest = await drill.fingerprint((t, p) => (p && p.length ? empty.query(t, p) : empty.exec(t).then((r) => r[r.length - 1])));
   await empty.close();
