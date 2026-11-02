@@ -27,6 +27,9 @@
  * سقفِ ۴۵ دقیقهٔ کار (۳۵ دقیقه) جا می‌شود. `TEST_WATCHDOG_SECONDS=0` نگهبان را برمی‌دارد (مثلاً برای
  * `--inspect-brk`).
  *
+ * با `--test-force-exit` (test-pglite.js) stdout ِ فرآیندِ هر پرونده هم‌زمان می‌شود (`test-stdout-sync.js`)،
+ * وگرنه گزارشِ آزمون‌های پایانیِ پرونده با process.exit گم می‌شد.
+ *
  * ⛔ هیچ آزمونی رد، تکرار یا خاموش نمی‌شود. اجرای بی‌گیر همان خروجی و همان کدِ خروج را دارد،
  * به‌اضافهٔ یک خطِ «نگهبان: …» (طولانی‌ترین سکوت و کندترین پرونده) پیش از خلاصهٔ شکست‌ها.
  */
@@ -230,6 +233,8 @@ async function run(args, { env = process.env, seconds = readSeconds(), out = pro
     //  به فرآیندِ هر پرونده هم می‌رسد (`node --test` پرچم‌های خودش را به فرزندان می‌دهد) و تا SIGUSR2
     //  نیاید کاری نمی‌کند؛ دستگیرهٔ سیگنالش unref است و فرآیند را نگه نمی‌دارد
     ...(posix ? ['--report-on-signal', `--report-directory=${dir}`] : []),
+    //  با --test-force-exit گزارشِ آزمون‌های پایانیِ هر پرونده گم می‌شد (`test-stdout-sync.js`)
+    ...(args.includes('--test-force-exit') ? [`--require=${path.join(__dirname, 'test-stdout-sync.js')}`] : []),
     `--test-reporter=${__filename}`, `--test-reporter-destination=${stateFile}`,
     ...args,
   ], { stdio: 'inherit', env });
