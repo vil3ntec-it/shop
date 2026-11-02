@@ -1,16 +1,9 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -31,23 +24,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
-import androidx.core.content.ContextCompat
 import ir.vil3ntec.tohid.core.gateway.AccountCall
 import ir.vil3ntec.tohid.core.gateway.HesabAccountView
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
-import ir.vil3ntec.tohid.data.ShopRole
-import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.pay.HesabPayHints
-import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
-import ir.vil3ntec.tohid.pay.platform.HesabPayNotice
-import ir.vil3ntec.tohid.scan.CameraScanner
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -88,7 +72,7 @@ private const val HP_OFFLINE = "سرور در دسترس نیست؛ اینترن
 /** رابطِ امروز (`SettingsLegacy`): همان صفحه در بخشِ تاشو؛ زیرنویس «وصل است / وصل نیست» */
 @Composable
 fun HesabPayLegacySection(signedIn: Boolean, toast: (String) -> Unit) {
-  val context = LocalContext.current
+  val deps = rememberHesabPayDeps()
   var hp by remember { mutableStateOf<HesabAccountView?>(null) }
   SettingsSectionLegacy(
     icon = Icons.Filled.AccountBalanceWallet,
@@ -97,7 +81,7 @@ fun HesabPayLegacySection(signedIn: Boolean, toast: (String) -> Unit) {
     stateKey = SettingsLayout.HESAB_SHOP,
   ) {
     HesabPayAccountSettings(
-      ready = signedIn && ShopRole.current(context) == ShopRole.OWNER && Backend.isReady(context),
+      ready = deps.ownerReady(signedIn),
       toast = toast,
       onView = { hp = it },
     )
@@ -107,8 +91,8 @@ fun HesabPayLegacySection(signedIn: Boolean, toast: (String) -> Unit) {
 /** `ready` = واردشده، سرورِ آماده و نقشِ همین دستگاه صاحبِ دکان */
 @Composable
 fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (HesabAccountView?) -> Unit = {}) {
-  val context = LocalContext.current
-  val env = remember { HesabPayEnv.of(context) }
+  val deps = rememberHesabPayDeps()
+  val env = deps.env
   val scope = rememberCoroutineScope()
   val c = Shop.colors
   var view by remember { mutableStateOf<HesabAccountView?>(null) }
@@ -127,7 +111,7 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   var askReset by remember { mutableStateOf(false) }
   var askRemove by remember { mutableStateOf(false) }
   var scanning by remember { mutableStateOf(false) }
-  var hintOn by remember { mutableStateOf(HesabPayHints.enabled(context)) }
+  var hintOn by remember { mutableStateOf(deps.hintOn()) }
 
   fun show(v: HesabAccountView?) {
     view = v
@@ -250,11 +234,11 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
             TextButton(onClick = { changingPin = true }, enabled = !busy) { Text("عوض کردنِ رمزِ حساب‌پی") }
           }
         }
-        if (HesabPayNotice.SUPPORTED && v.opened && v.mode == HesabPayShop.SIMPLE) {
-          HpHintRow(hintOn, granted = HesabPayNotice.granted(context), onToggle = {
+        if (deps.noticeSupported && v.opened && v.mode == HesabPayShop.SIMPLE) {
+          HpHintRow(hintOn, granted = deps.noticeGranted(), onToggle = {
             hintOn = it
-            HesabPayHints.setEnabled(context, it)
-            if (it && !HesabPayNotice.granted(context)) HesabPayNotice.openAccess(context)
+            deps.setHintOn(it)
+            if (it && !deps.noticeGranted()) deps.openNoticeAccess()
           })
         }
       }
@@ -403,32 +387,3 @@ private fun HpNote(text: String) {
 }
 
 private fun hpMinutesLeft(until: Long, now: Long): Long = maxOf(1L, (until - now + 59_999L) / 60_000L)
-
-/** دوربین فقط برای QR ِ خودِ دکان (اندروید)؛ خوانشِ اول پذیرفته می‌شود */
-@Composable
-private fun HpQrScanDialog(onDismiss: () -> Unit, onText: (String) -> Unit) {
-  val context = LocalContext.current
-  var granted by remember {
-    mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
-  }
-  var taken by remember { mutableStateOf(false) }
-  val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { ok -> granted = ok }
-  LaunchedEffect(Unit) { if (!granted) ask.launch(Manifest.permission.CAMERA) }
-  Dialog(onDismissRequest = onDismiss) {
-    Column(Modifier.fillMaxWidth().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-      Box(Modifier.fillMaxWidth().height(320.dp), contentAlignment = Alignment.Center) {
-        if (granted) {
-          CameraScanner(
-            onCode = { text -> if (!taken) { taken = true; onText(text) } },
-            onStatus = { _, _ -> },
-            modifier = Modifier.fillMaxWidth().height(320.dp),
-            qrOnly = true,
-          )
-        } else {
-          Text("برای اسکن، اجازهٔ دوربین لازم است.", color = Shop.colors.muted)
-        }
-      }
-      OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("بستن") }
-    }
-  }
-}

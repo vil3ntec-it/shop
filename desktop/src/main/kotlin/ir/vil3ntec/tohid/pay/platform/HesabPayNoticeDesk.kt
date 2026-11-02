@@ -12,6 +12,12 @@ object HesabPayNotice {
   val PACKAGES: Set<String> = emptySet()
 
   @Suppress("UNUSED_PARAMETER")
+  fun hintOn(context: Context): Boolean = false
+
+  @Suppress("UNUSED_PARAMETER")
+  fun setHintOn(context: Context, on: Boolean) = Unit
+
+  @Suppress("UNUSED_PARAMETER")
   fun granted(context: Context): Boolean = false
 
   @Suppress("UNUSED_PARAMETER")
