@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.checkout
 
+import ir.vil3ntec.tohid.core.i18n.StrLoyalty
 import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
@@ -108,11 +109,13 @@ object CheckoutModel {
    *  منفیِ «تخفیفِ خودکار»، بعد تخفیفِ دستی؛ «مبلغ نهایی» پررنگ. پرداختِ ساده ⇒ «مبلغ پرداختی»
    *  و «باقی‌مانده» هم (ترکیبی خلاصهٔ خودش را دارد).
    */
-  fun rows(n: CheckoutNumbers, promo: PromoEngine.Outcome?, payV2: Boolean): List<TotalRow> = buildList {
+  fun rows(n: CheckoutNumbers, promo: PromoEngine.Outcome?, payV2: Boolean, points: Long = 0, pointsOff: Double = 0.0): List<TotalRow> = buildList {
     if (promo != null && promo.discount > 0) {
       add(TotalRow(StrSale.totalLabel, promo.gross))
       add(TotalRow(StrSale.autoDiscount, -promo.discount))
-    } else add(TotalRow(StrSale.itemsTotal, n.subtotal))
+    } else add(TotalRow(StrSale.itemsTotal, n.subtotal + pointsOff))
+    //  PRM-13: همان ردیفِ «مصرفِ امتیاز» ِ صندوقِ کامپیوتر (`LoyaltyAtTill.rows`) — «جمع» پیش از امتیاز
+    if (pointsOff > 0) add(TotalRow(StrLoyalty.receiptUsed(points), -pointsOff))
     if (n.discount > 0) add(TotalRow(StrSale.discountWord, -n.discount))
     if (n.rounding != 0.0) add(TotalRow(StrRounding.line, n.rounding)) // PAY-09
     add(TotalRow(StrSale.finalAmount, n.payable, strong = true))
@@ -123,10 +126,10 @@ object CheckoutModel {
   }
 
   /** زیرِ مبلغِ درشت: «جمع اقلام ۱٬۲۰۰ · تخفیف −۱۰۰» (تخفیفِ خودکار و دستی با هم) */
-  fun heroLine(n: CheckoutNumbers, promo: PromoEngine.Outcome?, amount: (Double) -> String): String {
+  fun heroLine(n: CheckoutNumbers, promo: PromoEngine.Outcome?, amount: (Double) -> String, pointsOff: Double = 0.0): String {
     val auto = promo?.discount?.takeIf { it > 0 } ?: 0.0
-    val gross = if (auto > 0) promo!!.gross else n.subtotal
-    val off = auto + n.discount
+    val gross = if (auto > 0) promo!!.gross else n.subtotal + pointsOff
+    val off = auto + n.discount + pointsOff
     return if (off <= 0) "${StrSale.itemsTotal} ${amount(gross)}"
     else "${StrSale.itemsTotal} ${amount(gross)} · ${StrSale.discountWord} ${amount(-off)}"
   }

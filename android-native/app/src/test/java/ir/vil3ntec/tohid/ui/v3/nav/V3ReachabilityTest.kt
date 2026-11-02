@@ -73,6 +73,11 @@ class V3ReachabilityTest {
       pos("QuoteBar"), pos("SpecialOrderBar"), pos("GiftCardBar"), pos("LayawayBar"), pos("PriceListAtPos"), pos("DeliverLaterSheetWired"),
       root = PHONE_SALE,
     ),
+    Feature(
+      "PRM-13 مصرف و کسبِ امتیاز سرِ صندوقِ گوشی (ثبت با `TillSale`)", "sale/checkout",
+      pos("rememberLoyaltyTill"), pos("LoyaltyBar"), "ir.vil3ntec.tohid.data.TillSale", root = PHONE_CHECKOUT,
+    ),
+    Feature("POS-11 یادداشتِ فاکتورِ صندوقِ گوشی", "sale", pos("InvoiceNoteButton"), root = PHONE_SALE),
     //  ── سفارش و تحویل ──
     Feature("PCK جمع‌آوری و بسته‌بندیِ سفارش", "orders/{id}/pick", s("OrderPickHost"), s("OrderPickButton")),
     Feature("PCK-10/12 قفسه و دستهٔ جمع‌آوری", "orders", s("PickDeskEntry")),
@@ -179,6 +184,7 @@ class V3ReachabilityTest {
   private companion object {
     const val APP_ROOT = "ir.vil3ntec.tohid.ui.AppRoot"
     const val PHONE_SALE = "ir.vil3ntec.tohid.ui.v3.sales.cart.SaleRoute"
+    const val PHONE_CHECKOUT = "ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute"
     const val PHONE_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsScreen"
     const val DESK_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsDesk"
     val repo: File = generateSequence(File("").absoluteFile) { it.parentFile }.first { File(it, "android-native").isDirectory }

@@ -94,8 +94,13 @@ object LoyaltyAtTill {
   /** ثبتِ صندوق: مصرف و کسبِ همین فاکتور در همان دفتر (`LoyaltyPoints.post`)؛ خاموش ⇒ همان نتیجه */
   fun post(context: android.content.Context, r: SalesEngine.Result, till: LoyaltyTill?, by: String?): SalesEngine.Result {
     if (r !is SalesEngine.Result.Ok) return r
+    return points(context, till).post(r, by)
+  }
+
+  /** امتیازِ همین فاکتور برای ثبت (`TillSale`): قاعدهٔ در کار (`LoyaltyPref.effective`) و برنامهٔ مصرفِ [till] */
+  fun points(context: android.content.Context, till: LoyaltyTill?): ir.vil3ntec.tohid.data.TillSale.Points {
     val cfg = LoyaltyPref.effective(context)
-    return LoyaltyPoints.post(r, cfg.on, till?.rule ?: cfg.rule, till?.plan, by)
+    return ir.vil3ntec.tohid.data.TillSale.Points(cfg.on, till?.rule ?: cfg.rule, till?.plan, till?.cart)
   }
 
   /**
