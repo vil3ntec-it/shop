@@ -329,3 +329,38 @@ test('فهرست: تازه‌ترین بالا، پالایشِ وضعیت و ت
   assert.deepEqual([...seen].sort(), [...ids].sort());
   assert.equal((await h.get(`${BASE}?cursor=x`, { token: t.staff })).body.error.code, 'bad_cursor');
 });
+
+test('PUR-06 کرایهٔ رسید (S19: ۲۸۰ به حمل‌کننده): مدیر می‌نویسد و در رسید، تکرار و جزئیات می‌ماند؛ شاگرد ۴۰۳، نادرست ۴۰۰ و بی ردیف', async () => {
+  const t = await shopWithTeam('کرایه');
+  const o = (await create(t.manager)).body.order;
+  assert.equal((await h.post(`${BASE}/${o.id}/send`, {}, { token: t.manager })).status, 200);
+  const lines = [{ lineId: 'l1', receivedMilli: 10000 }, { lineId: 'l2', receivedMilli: 7000 }, { lineId: 'l3', receivedMilli: 10000, damagedMilli: 2000 }];
+
+  //  شاگرد رسید می‌گیرد ولی کرایه نمی‌نویسد (بهای کالا را بالا می‌برد)؛ نادرست ⇒ ۴۰۰ و هیچ رسیدی
+  const staff = await h.post(`${BASE}/${o.id}/receipts`, { id: 'r-fr-staff', lines, freightMinor: 28000 }, { token: t.staff });
+  assert.equal(staff.status, 403, JSON.stringify(staff.body));
+  assert.equal(staff.body.error.code, 'freight_not_allowed');
+  for (const bad of [-1, 1.5, '28000', 100000000001]) {
+    const r = await h.post(`${BASE}/${o.id}/receipts`, { id: 'r-fr-bad', lines, freightMinor: bad }, { token: t.manager });
+    assert.equal(r.status, 400, `کرایهٔ ${JSON.stringify(bad)}`);
+    assert.equal(r.body.error.code, 'bad_freight');
+  }
+  assert.equal((await many('SELECT id FROM purchase_receipts WHERE shop_id=$1', [t.shopId])).length, 0, 'ردِ کرایه هیچ رسیدی نساخت');
+
+  const ok = await h.post(`${BASE}/${o.id}/receipts`, { id: 'r-fr-1', lines, freightMinor: 28000 }, { token: t.manager });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.equal(ok.body.receipt.freightMinor, 28000);
+  assert.equal(ok.body.receipt.totalMinor, 280000, 'بدهیِ تأمین‌کننده همان ۲٬۸۰۰ — کرایه جزوِ جمعِ رسید نیست');
+  //  تکرارِ همان کلید ⇒ همان رسید با همان کرایه
+  const again = await h.post(`${BASE}/${o.id}/receipts`, { id: 'r-fr-1', lines, freightMinor: 28000 }, { token: t.manager });
+  assert.equal(again.body.replayed, true);
+  assert.equal(again.body.receipt.freightMinor, 28000);
+  const detail = await h.get(`${BASE}/${o.id}`, { token: t.staff });
+  assert.equal(detail.status, 200, JSON.stringify(detail.body));
+  assert.deepEqual(detail.body.order.receipts.map((r) => r.freightMinor), [28000]);
+
+  //  بی کرایه (برنامهٔ پیشین) ⇒ ۰؛ شاگرد با کرایهٔ ۰ آزاد است
+  const plain = await h.post(`${BASE}/${o.id}/receipts`, { id: 'r-fr-2', lines: [{ lineId: 'l2', receivedMilli: 1000 }], freightMinor: 0 }, { token: t.staff });
+  assert.equal(plain.status, 201, JSON.stringify(plain.body));
+  assert.equal(plain.body.receipt.freightMinor, 0);
+});

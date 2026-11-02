@@ -35,6 +35,8 @@ const PARTS = {
   filters: { js: 'store/filters.js', from: 'id="filters"', to: 'id="stock-note"', root: 'filters' },
   //  گزارشِ مشکل و نظرِ سفارش (NTF-07/09، order-feedback.js ِ دیربار): گره‌ها را خودِ اسکریپت می‌سازد، پس بخشی در index.html ندارد
   feedback: { js: 'store/order-feedback.js', root: 'o-fb' },
+  //  پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14/NTF-08، order-changes.js ِ دیربار): گره‌ها را خودِ اسکریپت می‌سازد
+  changes: { js: 'store/order-changes.js', root: 'o-ch' },
   //  نظرهای تأییدشده روی صفحهٔ دکان (NTF-09، reviews.js ِ دیربار، فقط با `features.reviews`): بخشش را هم خودِ اسکریپت می‌سازد
   reviews: { js: 'store/reviews.js', root: 'rv' },
   //  «حسابِ من» (CRM-13، account.js ِ دیربار): بخش را خودِ account.js می‌سازد ⇒ پوستهٔ HTML بی هیچ کلیدِ آن
@@ -42,7 +44,7 @@ const PARTS = {
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js'];
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
