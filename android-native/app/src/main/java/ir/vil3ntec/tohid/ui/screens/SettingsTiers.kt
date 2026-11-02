@@ -118,6 +118,7 @@ object SettingsHelp {
     SettingsLayout.STOREFRONT_ETA -> H.etaLine
     SettingsLayout.PROMO_GUARD -> H.promoLine
     SettingsLayout.EASY_SETUP -> H.easySetupLine
+    SettingsLayout.SCAN_CASH -> H.scanCashLine
     SettingsLayout.PERIPHERALS -> H.peripheralsLine
     LATE_APOLOGY -> H.lateApologyLine
     else -> null
@@ -175,6 +176,7 @@ object SettingsHelp {
     SettingsLayout.STOREFRONT_ETA -> H.etaExample
     SettingsLayout.PROMO_GUARD -> H.promoExample
     SettingsLayout.EASY_SETUP -> H.easySetupExample
+    SettingsLayout.SCAN_CASH -> H.scanCashExample
     //  پیوند است ولی صفحهٔ «دستگاه‌ها» کارتِ «این چه می‌کند؟» دارد (`DevicesScreen`)
     SettingsLayout.PERIPHERALS -> H.peripheralsExample
     LATE_APOLOGY -> H.lateApologyExample

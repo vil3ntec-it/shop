@@ -62,6 +62,7 @@ class SettingsTiersTest {
       SettingsLayout.LAYAWAY, SettingsLayout.SAFE_BOOK, SettingsLayout.LOYALTY, SettingsLayout.SPECIAL_ORDER, SettingsLayout.AUTO_FEES,
       SettingsLayout.PRICE_LIST, SettingsLayout.LINE_PRICING, SettingsLayout.SMART_FORECAST, SettingsLayout.ANOMALY, SettingsLayout.EASY_SETUP,
       SettingsLayout.TILL_RECEIVE, SettingsLayout.TAX_QUARTER, SettingsLayout.STOCK_MODE, SettingsLayout.STOCK_PLACES,
+      SettingsLayout.SCAN_CASH,
     ).forEach { assertEquals(it, Tier.ADVANCED, SettingsTiers.tier(it)) }
     all.filter { "(آزمایشی)" in it }.forEach { assertEquals(it, Tier.ADVANCED, SettingsTiers.tier(it)) }
   }
@@ -228,6 +229,7 @@ class SettingsTiersTest {
       SettingsLayout.PRODUCT_INFO to listOf("ui/components/product/ProductInfoAndroid.kt" to "KEY"),
       SettingsLayout.LABEL_TOOLS to listOf("data/LabelToolsAndroid.kt" to "KEY"),
       SettingsLayout.EASY_SETUP to listOf("print/EasySetupAndroid.kt" to "KEY"),
+      SettingsLayout.SCAN_CASH to listOf("scan/ScanCashAndroid.kt" to "KEY"),
     )
   }
 }

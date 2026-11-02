@@ -72,6 +72,8 @@ data class DrawerView(
   val reportError: String?,
   val skipped: Int,
   val history: List<CashShift.Shift>,
+  /** «ثبت از اسکنر» در همین صندوق (`DrawerModel.scannerLine`) */
+  val scanner: String? = null,
 )
 
 /**
@@ -116,6 +118,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         Spacer(Modifier.height(12.dp))
         SaleTotals(DrawerModel.breakdown(it))
       }
+      v.scanner?.takeIf { open }?.let { Spacer(Modifier.height(8.dp)); Text(it, style = V3Type.footnote, color = c.inkMuted) }
       Spacer(Modifier.height(14.dp))
       V3Button(if (open) StrSale.closeDrawer else StrSale.openDrawer, if (open) actions.close else actions.open, Modifier.fillMaxWidth(), haptic = true)
       if (open && v.payV2) {

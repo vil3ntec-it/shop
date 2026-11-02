@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.scan
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.hw.CommandCard
 import ir.vil3ntec.tohid.core.hw.MemoryImport
 import ir.vil3ntec.tohid.core.hw.MemoryLine
 import ir.vil3ntec.tohid.core.hw.QueuedScan
@@ -90,7 +91,8 @@ object ScanInbox {
   @Synchronized fun arrive(device: String, raw: String, now: Long = System.currentTimeMillis()): Boolean {
     val code = ScanJournal.clean(raw)
     if (code.isEmpty()) return false
-    if (foreground && collecting && live.trySend(code).isSuccess) return false
+    //  کدِ «کارتِ فرمان» هرگز به صندوق یا صفحهٔ کالا نمی‌رود (کالای تازه با این بارکد ساخته نشود) — همیشه صف
+    if (foreground && collecting && !CommandCard.isCommandLike(code) && live.trySend(code).isSuccess) return false
     return queue(listOf(QueuedScan(newId(), device, now, code)))
   }
 

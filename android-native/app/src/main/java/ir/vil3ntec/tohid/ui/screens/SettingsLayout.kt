@@ -152,6 +152,8 @@ object SettingsLayout {
   const val SIMPLE_ASK = "پرسشِ ساده از گزارش‌ها"
   /** راه‌اندازیِ آسانِ دستگاه‌ها (HW-12، `EasySetupPref`) — همان `EASY_SETUP_TITLE` */
   const val EASY_SETUP = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"
+  /** فروشِ نقدی با «کارتِ فرمان» از بارکدخوانِ پس‌زمینه (`ScanCashPref`، پولی ⇒ B) — همان `SCAN_CASH_TITLE` */
+  const val SCAN_CASH = "فروشِ نقدی با کارتِ فرمان"
   /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
   const val TRAINING = "حالتِ آموزشی"
 
@@ -175,7 +177,7 @@ object SettingsLayout {
         STOREFRONT_ETA, PROMO_GUARD, PRINTER,
       ),
     ),
-    Group(DEVICES, listOf(CAMERA, EASY_SETUP, PERIPHERALS)),
+    Group(DEVICES, listOf(CAMERA, EASY_SETUP, SCAN_CASH, PERIPHERALS)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها", CHAT_GUARD)),
     Group(ABOUT, listOf(ABOUT_APP)),
   )
@@ -247,6 +249,7 @@ object SettingsLayout {
     AUTO_FEES to "auto-fees",
     SIMPLE_ASK to "simple-ask",
     EASY_SETUP to "easy-setup",
+    SCAN_CASH to "scan-cash",
     TRAINING to "training",
     TILL_RECEIVE to "till-receive",
     STOCK_MODE to "stock-mode",
@@ -327,6 +330,7 @@ object SettingsLayout {
     AUTO_FEES -> StrSale.feesTitle
     SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle
     EASY_SETUP -> EASY_SETUP_TITLE
+    SCAN_CASH -> ir.vil3ntec.tohid.core.i18n.StrDevices.cashCardTitle
     TRAINING -> TRAINING_SETTINGS_TITLE
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE

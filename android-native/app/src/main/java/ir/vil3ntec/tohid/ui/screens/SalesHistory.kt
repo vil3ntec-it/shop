@@ -361,6 +361,9 @@ fun SalesHistoryScreen(
               Text(StrInvoices.expected, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
               Text("${money(t.expected)} ؋", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
             }
+            //  «ثبت از اسکنر» (کارتِ فرمان) در همین صندوق
+            shift?.let { ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.scannerLine(d, it.open.createdAt, Long.MAX_VALUE, seesMoney = true) }
+              ?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted) }
           }
           OutlinedTextField(
             value = amount,
