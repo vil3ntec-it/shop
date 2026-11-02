@@ -42,6 +42,7 @@ const CATEGORY = {
   'order-amend-store.js': 'STORE_PAID',        //  ORD-14: رضایتِ مشتری به ویرایشِ سفارش — همان ویترینِ پولی
   'storefront-promos-store.js': 'STORE_PAID',  //  MKT-01/09: تخفیفِ ویترین — همان ویترینِ پولی (sf.open)
   'delivery-rating-store.js': 'STORE_PAID',    //  DLV-18: امتیازِ مشتری به پیک — همان ویترینِ پولی (sf.open)
+  'store-account-history.js': 'STORE_PAID',    //  CRM-13: «حسابِ من» — همان ویترینِ پولی (sf.open پیش از پرچم)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */

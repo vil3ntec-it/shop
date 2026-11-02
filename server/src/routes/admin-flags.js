@@ -41,6 +41,7 @@ const KNOWN = Object.freeze([
   { key: 'beta.devices', scope: 'release', default: [], what: 'دستگاه‌های کانالِ آزمایشی' },
   { key: 'shop.receipt_v2', scope: 'shop', default: false, what: 'فاکتورِ نسخهٔ ۲' },
   { key: 'shop.promo_stamp', scope: 'shop', default: false, what: 'نشانِ تخفیفِ خودکار روی فاکتور' },
+  { key: 'shop.storefront.account_history', scope: 'shop', default: false, what: '«حسابِ من» ِ ویترین: خریدِ حضوری و مانده' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
 ]);
 
