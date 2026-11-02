@@ -142,7 +142,7 @@ fun main(args: Array<String>) {
   val chain = ArrayList<ChainEntry>()
   rows += bench("HashChain.append ×۱۰k", runs = 3) {
     chain.clear()
-    for (i in 0 until 10_000) chain += HashChain.append(chain, buildJsonObject { put("i", i); put("t", "sale"); put("amount", i * 100L) })
+    for (i in 0 until 10_000) chain += HashChain.append(chain, mapOf("i" to i, "t" to "sale", "amount" to i * 100L)) // سند همان Map/List/عدد ِ canonicalJson (#541)، نه JsonObject
     chain.size
   }
   rows += bench("HashChain.verify ×۱۰k", runs = 3) { HashChain.verify(chain).ok }

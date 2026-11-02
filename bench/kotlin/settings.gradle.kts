@@ -18,3 +18,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "engine-bench"
+
+//  core ِ KMP مثلِ کامپیوتر و اندروید (`ir.vil3ntec.tohid:core`)، نه کپیِ پوشه‌به‌پوشه — موتورها هر روز به پوشهٔ
+//  تازه‌ای از core تکیه می‌کنند (risk، orders، credit، …) و فهرستِ دستی بنچ را می‌شکست
+includeBuild("../../core")
