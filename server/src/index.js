@@ -115,6 +115,9 @@ async function main() {
   //  هشدارهای مرکزیِ پنلِ مالک (۴.۱۱): هر ۵ دقیقه، با یکی کردنِ تکرار و سقفِ سیل (`lib/ops-alerts.js`)
   const opsAlerts = require('./lib/ops-alerts');
   opsAlerts.start();
+  //  OPS-01@29: خبرِ بحرانی به مسئول + پیگیری (هر دقیقه؛ پرچمِ خاموشِ `ops.critical_alerts` ⇒ فقط پرسشِ پرچم)
+  const opsPaging = require('./lib/ops-paging');
+  opsPaging.start();
   //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
   //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
   //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
@@ -136,6 +139,7 @@ async function main() {
     payments.stopReconciler();
     notices.stopRunner();
     opsAlerts.stop();
+    opsPaging.stop();
     telegram.stop();
     server.close(async () => {
       await closeDb();
