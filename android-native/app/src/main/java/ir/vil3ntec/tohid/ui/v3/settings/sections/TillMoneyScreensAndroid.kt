@@ -155,6 +155,8 @@ internal fun RouteScope.LoyaltyScreen(onBack: (() -> Unit)?) {
       }
       note?.let { SettingsNote(it) }
     }
+    //  PRM-13: قاعدهٔ یکسانِ دکان (`LoyaltyShop`) و انقضای امتیاز — همان جزءِ رابطِ امروز، همان نوشتن‌ها
+    item(key = "shop") { ir.vil3ntec.tohid.ui.components.pos.LoyaltyShopSettings(context) }
   }
 }
 
