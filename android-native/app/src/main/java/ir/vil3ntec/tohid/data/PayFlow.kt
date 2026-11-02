@@ -411,8 +411,9 @@ object PayFlow {
     }
     //  POS-26: بازپرداختِ نقدِ پیش‌پرداختِ سفارشِ ویژهٔ لغوشده — همان «پولِ پس» ِ `CashShift.totals`
     d.transactions.forEach { t ->
-      if (!SpecialOrders.isRefund(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
-      ev += 2 to ShiftEventInput(id = "sor:${t.id}", type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
+      if (!(SpecialOrders.isRefund(t) || Layaways.isRefund(t)) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
+      //  POS-27: بازپرداختِ نقدِ امانیِ لغوشده هم همین «پولِ پس» است (`Layaways.REFUND`)
+      ev += 2 to ShiftEventInput(id = (if (Layaways.isRefund(t)) "lyr:" else "sor:") + t.id, type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
     }
     fun out(id: String, at: Long, amount: Double, reason: String, note: String?) {
       if (!inWindow(at) || minor(amount) <= 0) return

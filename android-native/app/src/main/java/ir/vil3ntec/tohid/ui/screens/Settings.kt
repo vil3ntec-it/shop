@@ -676,7 +676,7 @@ fun SettingsScreen(
         //  پیش‌فاکتور (POS-25)، اصلاحِ روشِ پرداخت (POS-40) و لیستِ قیمت (POS-18) — هر سه پیش‌فرض خاموش؛ همان رابطِ امروز
         ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context); ir.vil3ntec.tohid.ui.components.pos.SpecialOrderSettingsWired(context) // و سفارشِ ویژه (POS-26)
         PayFixSettingsWired(context)
-        ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) // کارتِ هدیه و اعتبارِ فروشگاه (PAY-24)
+        ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context); ir.vil3ntec.tohid.ui.components.pos.LayawaySettingsWired(context) // کارتِ هدیه (PAY-24) و فروشِ امانی (POS-27)
         ir.vil3ntec.tohid.ui.components.pos.PriceListSettingsWired(context)
 
         /* ================= گزارش‌های مشتری (CRM-04/06/10/14) — فقط کامپیوتر ================= */

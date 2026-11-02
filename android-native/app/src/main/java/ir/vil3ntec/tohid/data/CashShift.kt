@@ -21,7 +21,8 @@ import ir.vil3ntec.tohid.money
  *   + ورودِ نقد − خروجِ نقد (`cash_in`/`cash_out`ِ همین صندوق، `refId` = بازکردن) — داده‌اند،
  *     پس با پرچمِ pay v2 یا بی آن همیشه شمرده می‌شوند
  *   − مرجوعی‌ها (کلِ مبلغ؛ بخشی که از بدهی کم شد خودش یک `receive` است، پس خالص درست است) و بازپرداختِ
- *     پیش‌پرداختِ سفارشِ ویژهٔ لغوشده (POS-26، `SpecialOrders.REFUND`؛ پیش‌پرداخت خودش رسید است)
+ *     پیش‌پرداختِ سفارشِ ویژهٔ لغوشده (POS-26، `SpecialOrders.REFUND`؛ پیش‌پرداخت خودش رسید است) و همهٔ پرداختیِ
+ *     فروشِ امانیِ لغوشده (POS-27، `Layaways.REFUND`؛ پیش‌پرداخت و هر قسط خودشان رسیدند)
  *   − مصارف − پرداخت به تأمین‌کننده − پیش‌پرداختِ خریدها
  *  هر کدام اگر `createdAt`ش میانِ باز و بسته شدن باشد. «برد»ِ دستی حساب
  *  نمی‌شود چون معلوم نیست پول بوده یا جنس.
@@ -164,8 +165,9 @@ object CashShift {
       //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛
       //  ردیفِ قدیمی آن را ندارد ⇒ همان `amount`ِ امروز
       returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { ReturnFlow.drawerAmount(it) } +
-        //  POS-26: پیش‌پرداختِ سفارشِ ویژه که هنگامِ لغو نقد به مشتری پس رفت (`SpecialOrders.REFUND`)
-        d.transactions.filter { SpecialOrders.isRefund(it) && inWindow(it.createdAt) }.sumOf { it.amount },
+        //  POS-26: پیش‌پرداختِ سفارشِ ویژه که هنگامِ لغو نقد به مشتری پس رفت (`SpecialOrders.REFUND`)؛ POS-27: همهٔ
+        //  پرداختیِ امانیِ لغوشده (`Layaways.REFUND`؛ پیش‌پرداخت و قسط‌ها خودشان رسیدند). بی امانی ⇒ همان جمع
+        d.transactions.filter { (SpecialOrders.isRefund(it) || Layaways.isRefund(it)) && inWindow(it.createdAt) }.sumOf { it.amount },
       expenses = d.expenses.filter { inWindow(it.createdAt) }.sumOf { it.amount },
       suppliers = d.supplierPayments.filter { inWindow(it.createdAt) }.sumOf { it.amount } +
         d.purchases.filter { inWindow(it.createdAt) }.sumOf { it.paidAmount },

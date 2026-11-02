@@ -921,6 +921,7 @@ private fun AccountViewLegacy(
         }
       }
 
+      ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, account.debtor.id, onMessage) // فروشِ امانیِ همین مشتری (POS-27، `LayawayPref`)
       Spacer(Modifier.height(18.dp))
       SectionTitle("تاریخچهٔ تراکنش‌ها")
     }

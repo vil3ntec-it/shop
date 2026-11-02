@@ -215,6 +215,8 @@ object OwnerExport {
     "payRef" to "مرجع روش تازه",
     //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
     "specialOrder" to "سفارش ویژه",
+    //  فروشِ امانی (POS-27): سند و وضعیتِ تازه روی ردیفِ سابقه
+    "layaway" to "فروش امانی",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",

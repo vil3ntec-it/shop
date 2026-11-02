@@ -512,7 +512,7 @@ fun SettingsScreenLegacy(
     /* ================ فروش با تحویلِ بعدی (POS-38، پیش‌فرض خاموش) ================ */
     item { ir.vil3ntec.tohid.ui.components.pos.DeliverLaterSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.SpecialOrderSettingsWired(context) } // پیش‌فاکتور (POS-25) و سفارشِ ویژه (POS-26)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.components.pos.PosNotesSettingsWired(context) } // یادداشتِ ردیف و فاکتور (POS-11)، پیش‌فرض خاموش
-    item { ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) } // کارتِ هدیه و اعتبارِ فروشگاه (PAY-24)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.components.pos.GiftCardSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.LayawaySettingsWired(context) } // کارتِ هدیه (PAY-24) و فروشِ امانی (POS-27)، پیش‌فرض خاموش
     /* ========= نام‌های دیگر و محلِ قفسهٔ کالا (PRD-02، PRD-26، پیش‌فرض خاموش) ========= */
     item { ir.vil3ntec.tohid.ui.components.product.ProductInfoSettingsWired(context) }
     /* =================== پرداخت و صندوق (PAY، v3 A4) =================== */
