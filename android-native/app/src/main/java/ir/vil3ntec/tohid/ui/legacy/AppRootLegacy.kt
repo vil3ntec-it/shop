@@ -850,6 +850,7 @@ fun AppRootLegacy(
                 StrShell.fraudTrail to androidx.compose.material.icons.Icons.Filled.History,
                 StrShell.productTools to androidx.compose.material.icons.Icons.Filled.Description,
                 StrShell.stockInsight to androidx.compose.material.icons.Icons.Filled.Inventory,
+                ir.vil3ntec.tohid.core.i18n.StrLoyalty.settingsTitle to androidx.compose.material.icons.Icons.Filled.Loyalty, // PRM-13، پیش‌فرض خاموش
                 StrShell.stockLevels to androidx.compose.material.icons.Icons.Filled.Inventory,
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrSale.feesTitle to androidx.compose.material.icons.Icons.Filled.ShoppingBag, // POS-36

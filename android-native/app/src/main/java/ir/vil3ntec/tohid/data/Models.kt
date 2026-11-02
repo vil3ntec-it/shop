@@ -763,6 +763,8 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payRef: String? = null,
   /** POS-26 — فقط `special_order` (سند) و `special_order_status` (وضعیتِ تازه)؛ `SpecialOrders`. `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
+  /** PRM-13 — فقط ردیف‌های `loyalty_*` (`LoyaltyPoints`): شمارِ امتیاز (همیشه مثبت؛ نوع علامت را می‌گوید). `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val points: Long? = null,
 )
 
 /**

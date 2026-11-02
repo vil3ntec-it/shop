@@ -162,6 +162,8 @@ class SettingsPortTest {
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
       "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
       "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
+      "LoyaltyPref.set" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
+      "LoyaltyPref.setRule" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
       "LabelToolsPref.set" to "$PENDING — برچسب و بارکدِ داخلی، PRD-23/PRD-05",
       "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",

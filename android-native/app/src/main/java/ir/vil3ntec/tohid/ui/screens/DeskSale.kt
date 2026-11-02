@@ -134,6 +134,9 @@ fun DeskSaleScreen(
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — `finish` با سبدِ عوض‌شده ثبت نمی‌کند
   val pricedFrom = cart
   val promoSnap = ir.vil3ntec.tohid.ui.PromoLive.snap.value
+  //  PRM-13: امتیازِ وفاداری (`LoyaltyPref`، پیش‌فرض خاموش ⇒ null و `loyal` همان `priced`)؛ سنجشِ تخفیفِ ردیف، سفارشِ ارسال و «چرا این قیمت؟» همان `priced`
+  val loyalty = ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill(d, priced, cartDebtorId)
+  val loyal = loyalty?.cart ?: priced
 
   var query by remember { mutableStateOf("") }
   var hint by remember { mutableStateOf(0) }
@@ -354,7 +357,7 @@ fun DeskSaleScreen(
     blockExpired = blockExpired,
     rules = checkoutRules,
   )
-  val totals = SalesEngine.totals(d, priced, checkout)
+  val totals = SalesEngine.totals(d, loyal, checkout)
   //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
   val inputsFrom = listOf<Any?>(discountText, discountAmount, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
@@ -374,7 +377,7 @@ fun DeskSaleScreen(
 
   //  PAY-21: درگاه‌های تسویه (حساب‌پی) — پیش از گرفتنِ پول، ثبت‌شدنیِ همین فاکتور سنجیده می‌شود
   val gateways = ir.vil3ntec.tohid.ui.components.pos.GatewayHook(remember { ir.vil3ntec.tohid.pay.platform.HesabPayEnv.of(context) }, saleKey) {
-    (SalesEngine.record(d, priced, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message
+    (SalesEngine.record(d, loyal, checkout.copy(payment = SalesEngine.Payment.CASH), ir.vil3ntec.tohid.todayIso(), 0L, ::newId, saleId = saleKey) as? SalesEngine.Result.Failed)?.message
   }
   //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`، پیش‌فرض خاموش): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
@@ -412,7 +415,7 @@ fun DeskSaleScreen(
     }
     val sale = checkout.copy(settlement = st, approval = signed, creditGate = creditGateOn, creditApproval = creditApproval)
     //  CRM-03 / S07: بی تأییدِ مدیر هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
-    val over = SalesEngine.creditOver(d, priced, sale)
+    val over = SalesEngine.creditOver(d, loyal, sale)
     if (over != null && ir.vil3ntec.tohid.core.credit.CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval) ==
       ir.vil3ntec.tohid.core.credit.CreditGate.State.NEEDS_APPROVAL
     ) {
@@ -423,9 +426,9 @@ fun DeskSaleScreen(
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
-      ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, priced, sale.copy(note = cartStore.note.value), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, loyal, sale.copy(note = cartStore.note.value), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
-      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo) }) {
+      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo), loyalty, sale.seller) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
@@ -631,6 +634,7 @@ fun DeskSaleScreen(
           onRemove = { cartStore.setDebtor(null); payment = SalesEngine.Payment.CASH; refocus() },
         )
         ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it).also { refocus() } }
+        ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(top = 6.dp)) // PRM-13
       },
       items = {
         OrderLines(
@@ -663,7 +667,7 @@ fun DeskSaleScreen(
         )
       },
       summary = {
-        PaymentSummary(PromoSummary.rows(totals, promo), totals.finalTotal) {
+        PaymentSummary(ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.rows(PromoSummary.rows(totals, promo), promo, loyalty), totals.finalTotal) {
           if (canDiscount) {
             //  POS-20: درصد یا مبلغ — عددِ نوشته‌شده می‌ماند و فقط واحدش عوض می‌شود (همان پنجرهٔ تسویهٔ گوشی)؛
             //  ردیفِ «تخفیف» ِ بالای کادر همان دم مبلغِ کم‌شده را نشان می‌دهد

@@ -645,7 +645,9 @@ object SalesEngine {
     reason: String = "",
     /** RPT-09: لغوکننده روی ردیفِ `cancel_sale` (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
     by: String? = null,
-  ): Result {
+  ): Result = LoyaltyPoints.afterCancel(cancelPlain(d, saleId, today, now, newId, reason, by), today, now, by) // PRM-13: فاکتورِ بی امتیاز ⇒ همان شیء
+
+  private fun cancelPlain(d: ShopData, saleId: String, today: String, now: Long, newId: () -> String, reason: String, by: String?): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
     //  ORD-20: فاکتورِ سفارشِ اینترنتی را سرور ساخته؛ لغو/«اصلاح در سبد» یعنی دوباره زدن
@@ -773,6 +775,10 @@ object SalesEngine {
     newId: () -> String,
     /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
     by: String? = null,
+  ): Result = LoyaltyPoints.afterReturn(d, recordReturnPlain(d, saleId, quantities, reason, today, now, newId, by), saleId, today, now, by) // PRM-13
+
+  private fun recordReturnPlain(
+    d: ShopData, saleId: String, quantities: Map<String, Double>, reason: String, today: String, now: Long, newId: () -> String, by: String?,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند

@@ -79,6 +79,10 @@ fun CheckoutDialog(
   presetAmount: Boolean = false,
   /** شناسهٔ فاکتورِ همین سبد (`CartStore.saleKey`) — برگهٔ تأیید به آن بسته است */
   saleKey: String? = null,
+  /** PRM-13 — سبدِ پیش از امتیاز برای سنجشِ تخفیفِ ردیف (امتیاز تخفیفِ کارمند نیست)؛ `null` ⇒ همان [cart] */
+  gateCart: List<SalesEngine.CartLine>? = null,
+  /** PRM-13 — مبلغی که امتیاز از [cart] کم کرد (افغانی)؛ ۰ ⇒ همان ردیف‌های امروز */
+  pointsOff: Double = 0.0,
 ) {
   val context = LocalContext.current
   //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
@@ -113,7 +117,7 @@ fun CheckoutDialog(
   var askApproval by remember { mutableStateOf(false) }
   //  POS-21 (پشتِ `LinePolicy.on`، پیش‌فرض خاموش): قیمتِ دستیِ زیرِ فهرست و تخفیفِ ردیف هم تخفیف‌اند
   val lineGate = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
-  val basis = DiscountGate.basis(lineGate, d, cart, promo, totals)
+  val basis = DiscountGate.basis(lineGate, d, gateCart ?: cart, promo, totals)
   val decision = ir.vil3ntec.tohid.data.ShopRole.decide(
     context, "sales.discount", DiscountGate.req(basis.discount, basis.subtotal),
   )
@@ -302,7 +306,8 @@ fun CheckoutDialog(
           if (promo != null && promo.stamp && promo.discount > 0) {
             MoneyRow("جمع اقلام", promo.gross)
             MoneyRow(SaleReceipt.promoLabel(promo.applied.map { it.name }), promo.discount, negative = true)
-          } else MoneyRow("جمع اقلام", totals.subtotal)
+          } else MoneyRow("جمع اقلام", totals.subtotal + pointsOff)
+          if (pointsOff > 0) MoneyRow(ir.vil3ntec.tohid.core.i18n.StrLoyalty.use, pointsOff, negative = true) // PRM-13
           MoneyRow("تخفیف", totals.discount)
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
           MoneyRow("مبلغ نهایی", totals.finalTotal, strong = true)
@@ -464,6 +469,10 @@ fun InvoiceDialog(
         MoneyRow("باقی‌مانده", sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)
         //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
         ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> MoneyRow(label, amount) }
+        //  PRM-13: امتیازِ مصرف‌شده و کسب‌شدهٔ همین فاکتور — بی امتیاز ⇒ هیچ
+        ir.vil3ntec.tohid.data.LoyaltyPoints.receiptLines(d, sale.id).forEach { (label, amount) ->
+          if (amount != null) MoneyRow(label, amount) else Text(label, style = MaterialTheme.typography.bodySmall, color = Shop.colors.success)
+        }
         if (debtor != null) {
           Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text("قرض‌دار", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)

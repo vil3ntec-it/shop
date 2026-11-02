@@ -921,6 +921,9 @@ private fun AccountViewLegacy(
         }
       }
 
+      //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, account.debtor.id, Modifier.padding(top = 18.dp))
+
       Spacer(Modifier.height(18.dp))
       SectionTitle("تاریخچهٔ تراکنش‌ها")
     }

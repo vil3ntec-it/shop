@@ -503,7 +503,15 @@ object ReturnFlow {
   /**
    *  ثبتِ یک سندِ برگشت. اگر چیزی درست نباشد دفتر دست‌نخورده می‌ماند (همه یا هیچ).
    */
-  fun post(d: ShopData, req: Request, today: String, now: Long, newId: () -> String): Outcome<Posted> {
+  fun post(d: ShopData, req: Request, today: String, now: Long, newId: () -> String): Outcome<Posted> =
+    when (val o = postPlain(d, req, today, now, newId)) {
+      //  PRM-13: سهمِ امتیازِ همین برگشت؛ فاکتورِ بی امتیاز ⇒ همان شیء
+      is Outcome.Ok -> LoyaltyPoints.afterReturn(d, o.value.data, req.saleId, req.docId, today, now, req.by.trim().ifEmpty { null })
+        .let { if (it === o.value.data) o else Outcome.Ok(o.value.copy(data = it)) }
+      else -> o
+    }
+
+  private fun postPlain(d: ShopData, req: Request, today: String, now: Long, newId: () -> String): Outcome<Posted> {
     if (req.docId.isBlank()) return Outcome.Bad(Code.BAD_REQUEST)
     if (d.saleReturns.any { it.docId == req.docId }) return Outcome.Bad(Code.ALREADY_POSTED)
     val typed = req.reason.trim()

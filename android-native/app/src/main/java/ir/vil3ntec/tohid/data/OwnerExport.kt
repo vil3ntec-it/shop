@@ -215,6 +215,8 @@ object OwnerExport {
     "payRef" to "مرجع روش تازه",
     //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
     "specialOrder" to "سفارش ویژه",
+    //  امتیازِ وفاداری (PRM-13): شمارِ امتیازِ ردیفِ سابقه
+    "points" to "امتیاز",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",
