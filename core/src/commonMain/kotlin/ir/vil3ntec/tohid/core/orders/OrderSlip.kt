@@ -123,6 +123,21 @@ object OrderAutoPrint {
   fun shouldPrint(enabled: Boolean, fromStatus: String, toStatus: String, orderId: String, printed: List<String>): Boolean =
     enabled && toStatus == "accepted" && fromStatus != "accepted" && ID.matches(orderId) && orderId !in printed
 
+  /** بیشینهٔ برگه‌های «قبولِ خودکار» در هر پرسشِ ۲۰ثانیه‌ای؛ بقیه پرسشِ بعد */
+  const val SERVER_BATCH = 5
+
+  /**
+   *  «قبولِ خودکار» ِ سرور (ORD-04) را هیچ دستگاهی نزده، پس [shouldPrint] آن را نمی‌بیند. فهرستِ `autoAccepted` ِ
+   *  `GET /orders/summary` ⇐ شناسه‌هایی که این دستگاه هنوز برگه‌شان را نزده — فقط با تنظیمِ جدای همین دستگاه
+   *  (پیش‌فرض خاموش؛ روی یک دستگاه روشن شود تا برگه دوتا نشود)، به ترتیبِ سرور، بی تکرار، حداکثر [SERVER_BATCH].
+   */
+  fun serverAccepted(enabled: Boolean, ids: List<String>, printed: List<String>): List<String> =
+    if (!enabled) emptyList() else ids.filter { ID.matches(it) && it !in printed }.distinct().take(SERVER_BATCH)
+
+  /** پیش از چاپ دوباره سنجیده می‌شود: سفارشِ خوانده‌شده هنوز «قبول‌شده» و همان شناسه است و برگه نگرفته */
+  fun serverStillDue(orderId: String, status: String, printed: List<String>): Boolean =
+    status == "accepted" && ID.matches(orderId) && orderId !in printed
+
   /** شناسه‌های چاپ‌شدهٔ ذخیره‌شده ⇐ فهرست؛ نبوده یا خراب ⇒ خالی (شناسهٔ ناجور دور ریخته می‌شود) */
   fun parse(raw: String?): List<String> =
     raw.orEmpty().split(',').map { it.trim() }.filter { ID.matches(it) }.distinct().takeLast(MEMORY)

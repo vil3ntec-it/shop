@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
 import ir.vil3ntec.tohid.core.pay.RefundInput
+import ir.vil3ntec.tohid.core.pay.TillRounding
 import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.returns.ReturnPolicy
 import ir.vil3ntec.tohid.core.returns.ReturnReasons
@@ -236,6 +237,13 @@ object ReturnFlow {
       lines += Line(item.id, item.productId, name, q, unit, amount, pick.disposition)
     }
     if (lines.isEmpty()) return Outcome.Bad(Code.NOTHING_TO_RETURN)
+    //  PAY-09: فاکتورِ گردشده — جمعِ برگشت‌ها هرگز بیش از پرداختی، برگشتِ کامل دقیقاً ماندهٔ آن (`TillRounding.refund`)
+    if ((sale.roundingMinor ?: 0L) != 0L) {
+      val completes = d.saleItems.filter { it.saleId == saleId }.all { it.returnedQty + (picks[it.id]?.qty ?: 0.0) >= it.quantity - 1e-9 }
+      val fixed = TillRounding.refund(lines.map { PayFlow.minor(it.amount) }, PayFlow.minor(sale.finalTotal), PayFlow.minor(returnedAmount(d, saleId)), completes)
+      lines.indices.forEach { i -> lines[i] = lines[i].copy(amount = PayFlow.major(fixed[i])) }
+      return Outcome.Ok(Quote(lines, lines.sumOf { it.amount }))
+    }
     //  گردکردنِ هر قلم نباید جمعِ برگشت‌ها را از مبلغِ نهاییِ فاکتور بیشتر کند
     val cap = max(0.0, sale.finalTotal - returnedAmount(d, saleId))
     var total = lines.sumOf { it.amount }

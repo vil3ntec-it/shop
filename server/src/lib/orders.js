@@ -241,11 +241,16 @@ function parseAddress(raw) {
     try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
   }
   const plusCode = plusCodeOf(a.plusCode);
+  //  CHK-08 (§۴.۴): ولایت، گذر یا کوچه، منزل و طبقه — فقط متنِ کمکی، جای نشانه/پین را نمی‌گیرند (کلیدِ دیگر دور، LOC-10)
+  const province = text(a.province, 60);
+  const street = text(a.street, 120);
+  const house = text(a.house, 60);
   //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
   if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
   return {
     ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
     ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}), ...(phone2 ? { phone2 } : {}), ...(plusCode ? { plusCode } : {}),
+    ...(province ? { province } : {}), ...(street ? { street } : {}), ...(house ? { house } : {}),
   };
 }
 

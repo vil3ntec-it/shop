@@ -61,6 +61,7 @@ import ir.vil3ntec.tohid.core.pay.GiftCard
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.i18n.StrGiftCard
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.data.GiftCards
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.PayFlow
@@ -101,10 +102,12 @@ class PayPanelState {
   val rows = mutableStateListOf<PayFlow.DraftRow>()
   /** PAY-24 — کارتِ هدیه و اعتبارِ فروشگاه در فهرستِ روش‌ها (`GiftCardPref`)؛ پیش‌فرض خاموش ⇒ همان فهرستِ امروز */
   var stored by mutableStateOf(false)
+  /** PAY-09 — پلهٔ گردکردنِ نقدی به پول (`CashRoundPref`)؛ ۰ (پیش‌فرض) ⇒ همان پنلِ امروز */
+  var cashRounding by mutableStateOf(0L)
 
   fun methods(): List<PayMethod> = PayFlow.panelMethods(stored)
 
-  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId, stored)
+  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId, stored, cashRounding)
 
   fun addRow(): Int {
     rows += PayFlow.DraftRow(methods().firstOrNull()?.id.orEmpty())
@@ -263,7 +266,10 @@ fun PaySplitSection(
   Column(
     Modifier.fillMaxWidth().background(Shop.colors.surface2, RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 8.dp),
   ) {
-    SumRow(StrSale.payable, money(total), strong = true)
+    //  PAY-09: ردیفِ جدای گرد (فقط سهمِ نقدی که فاکتور را می‌بندد) و «قابلِ پرداخت» با آن
+    val rounding = s?.rounding ?: 0L
+    if (rounding != 0L) SumRow(StrRounding.line, (if (rounding < 0) "−" else "+") + money(PayFlow.major(kotlin.math.abs(rounding))))
+    SumRow(StrSale.payable, money(if (rounding != 0L) PayFlow.major(s!!.due) else total), strong = true)
     SumRow(StrSale.received, s?.let { money(PayFlow.major(it.tendered)) } ?: "—")
     SumRow(StrPos.changeCashOnly, s?.let { money(PayFlow.major(it.change)) } ?: "—")
     SumRow(
@@ -336,8 +342,10 @@ fun PayPanelDialog(
   /** PAY-24 — دفترِ صفحه و تنظیمِ `GiftCardPref` (کارتِ هدیه و اعتبار در روش‌ها)؛ پیش‌فرض خاموش ⇒ همان پنلِ امروز */
   ledger: ShopData? = null,
   stored: Boolean = false,
+  /** PAY-09 — پلهٔ گردکردنِ نقدی (`CashRoundPref`)؛ ۰ ⇒ همان پنلِ امروز */
+  cashRounding: Long = 0L,
 ) {
-  val state = remember { PayPanelState().also { it.stored = stored } }
+  val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
   var error by remember { mutableStateOf<String?>(null) }

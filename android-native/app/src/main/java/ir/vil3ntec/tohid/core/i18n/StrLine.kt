@@ -36,8 +36,8 @@ object StrLine {
   // POS-19 — پلهٔ قیمتِ ثابت در فرمِ تخفیف
   val tierFixedPrice: String get() = t("قیمتِ ثابت", "Fixed price", "ثابته بیه")
   val tierUnitPrice: String get() = t("قیمتِ هر واحد (؋)", "Price per unit (؋)", "د هر واحد بیه (؋)")
-  fun tierUnitText(a: Any): String = t("$a ؋ هر واحد", "$a ؋ per unit", "$a ؋ د هر واحد")
-  fun afterDiscount(a: Any): String = t("پس از تخفیف: $a ؋", "After discount: $a ؋", "له تخفیف وروسته: $a ؋")
+  fun tierUnitText(a: Any): String = t("${asIs(a)} ؋ هر واحد", "$a ؋ per unit", "$a ؋ د هر واحد")
+  fun afterDiscount(a: Any): String = t("پس از تخفیف: ${asIs(a)} ؋", "After discount: $a ؋", "له تخفیف وروسته: $a ؋")
 
   // رد
   val priceUpBlocked: String get() = t("بالا بردنِ قیمتِ ردیف در این دکان بسته است", "Raising a line price is not allowed in this shop", "په دې دوکان کې د کرښې بیه لوړول بند دي")
@@ -45,5 +45,5 @@ object StrLine {
   val reductionDenied: String get() = t("کاهشِ قیمت یا تخفیفِ ردیف برای شما ممنوع است", "You're not allowed to lower a price or give a line discount", "تاسو ته د بیې ټیټولو یا د کرښې تخفیف اجازه نشته")
   val freeLineClosed: String get() = t("قلمِ آزاد برای شما بسته است", "Custom items are closed for you", "آزاد توکی ستاسو لپاره بند دی")
   val tooLarge: String get() = t("عدد بیش از اندازه است", "The number is too large", "شمېره له حده ډېره لویه ده")
-  fun freeLineOverCap(a: Any): String = t("قیمتِ قلمِ آزاد حداکثر $a ؋", "A custom item can cost at most $a ؋", "د آزاد توکي بیه تر $a ؋ پورې")
+  fun freeLineOverCap(a: Any): String = t("قیمتِ قلمِ آزاد حداکثر ${asIs(a)} ؋", "A custom item can cost at most $a ؋", "د آزاد توکي بیه تر $a ؋ پورې")
 }

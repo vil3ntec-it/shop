@@ -19,6 +19,7 @@ import ir.vil3ntec.tohid.core.pay.ShiftRow
 import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.pay.Tender
+import ir.vil3ntec.tohid.core.pay.TillRounding
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -129,6 +130,8 @@ object PayFlow {
     val customerId: String? = null,
     /** PAY-24 — کارتِ هدیه و اعتبارِ فروشگاه روشن (`GiftCardPref`)؛ `false` ⇒ همان جدولِ امروز (هر دو خاموش) */
     val stored: Boolean = false,
+    /** PAY-09 — پلهٔ گردکردنِ نقدی به پول (`CashRoundPref`)؛ ۰ ⇒ همان امروز. هسته فقط سهمِ نقد را گرد می‌کند */
+    val cashRounding: Long = 0,
   )
 
   sealed interface Outcome<out T> {
@@ -166,7 +169,8 @@ object PayFlow {
       at += i
     }
     val methods = if (d.stored) StoredPay.methods(true) else null
-    return Outcome.Ok(Built(SettleInput(total = minor(d.total), tenders = tenders, customerId = d.customerId?.trim()?.ifEmpty { null }, methods = methods), at))
+    val total = minor(d.total)
+    return Outcome.Ok(Built(SettleInput(total = total, tenders = tenders, cashRounding = TillRounding.stepFor(total, d.cashRounding), customerId = d.customerId?.trim()?.ifEmpty { null }, methods = methods), at))
   }
 
   /** پیش‌نمایشِ زنده: همان `settle`ِ هسته؛ خطا با شمارهٔ ردیف و روش */
@@ -227,7 +231,7 @@ object PayFlow {
 
   fun saleFields(s: Settlement): SaleFields = SaleFields(
     paymentMethod = legacyMethod(s),
-    paidAmount = major(s.total - s.toAccount),
+    paidAmount = major(s.due - s.toAccount), // PAY-09: `due` = جمع + ردیفِ گرد؛ بی گرد همان `total`
     remaining = major(s.toAccount),
     debtGiven = major(s.toAccount),
     payments = s.payments.map { SalePayment(it.method, it.kind, it.amount, it.status, it.ref, it.verification) },
@@ -312,6 +316,15 @@ object PayFlow {
     p.verification == "manual" -> " (ثبتِ دستی)"
     else -> " (در انتظار)"
   }
+
+  /**
+   *  PAY-09 — ردیفِ جدای «گردکردنِ نقدی» ِ فاکتور (افغانیِ علامت‌دار) برای فاکتور، رسید و گزارش؛ بی گرد ⇒ null.
+   *  مبلغِ نهایی همین حالا آن را دارد (`Sale.roundingMinor`)؛ این ردیف فقط می‌گوید از کجا آمد.
+   */
+  fun rounding(s: Sale): Double? = s.roundingMinor?.takeIf { it != 0L }?.let(::major)
+
+  /** PAY-09 — ردیفِ گردِ نقدِ کاملِ صندوقِ ساده (افغانی)، پیش از ثبت: همان حسابِ `SalesEngine.record` */
+  fun cashRounding(finalTotal: Double, step: Long): Double = major(TillRounding.cash(minor(finalTotal), step))
 
   /**
    *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — جمعشان همان مبلغِ فاکتور.

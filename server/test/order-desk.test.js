@@ -286,6 +286,43 @@ test('قبولِ خودکار (ORD-04): با سقفِ صف، زمانِ آماد
   assert.equal((await rowOfKey(s, e.key)).status, 'new');
 });
 
+test('ORD-10: «قبولِ خودکار» در `GET /orders/summary` برای برگه — فقط سیستم، فقط «قبول‌شده»، فقط تازه؛ پرچمِ خاموش ⇒ بی کلید', async () => {
+  const sum = async (s) => {
+    const r = await h.get('/api/shop/orders/summary', { token: s.token });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return r.body;
+  };
+  const off = await liveStore('برگه‌خاموش', { deskOn: false });
+  assert.equal('autoAccepted' in (await sum(off)), false, 'پرچمِ میز خاموش ⇒ همان پاسخِ پیشین');
+
+  const s = await liveStore('برگه');
+  assert.deepEqual((await sum(s)).autoAccepted, [], 'روشن، هنوز هیچ');
+  //  قبولِ کارمند: هیچ (برگه‌اش را همان دستگاهِ «قبول» زد)
+  const manual = await staffOrder(s);
+  assert.equal(manual.status, 201, JSON.stringify(manual.body));
+  assert.equal((await h.post(`/api/shop/orders/${manual.body.order.id}/transition`, { to: 'accepted' }, { token: s.token })).status, 200);
+  assert.deepEqual((await sum(s)).autoAccepted, []);
+
+  assert.equal((await put(s, { eventId: ev(), autoAccept: { enabled: true, maxOpen: 3, readyMinutes: 10 } })).status, 200);
+  const a = await checkout(s, { phone: '0791113301' });
+  const b = await checkout(s, { phone: '0791113302' });
+  const [ra, rb] = [await rowOfKey(s, a.key), await rowOfKey(s, b.key)];
+  assert.deepEqual([ra.status, rb.status], ['accepted', 'accepted']);
+  const list = (await sum(s)).autoAccepted;
+  assert.deepEqual(list.map((x) => x.id), [ra.id, rb.id], 'به ترتیبِ قبول');
+  const no = await one('SELECT order_no FROM online_orders WHERE id=$1', [ra.id]);
+  assert.equal(list[0].orderNo, Number(no.order_no));
+  assert.ok(list[0].acceptedAt > 0);
+  assert.deepEqual(Object.keys(list[0]).sort(), ['acceptedAt', 'id', 'orderNo'], 'بی نام، شماره و نشانی');
+
+  //  شروعِ جمع‌آوری ⇒ بیرون؛ کهنه‌تر از پنجره ⇒ بیرون؛ دکانِ دیگر هیچ
+  assert.equal((await h.post(`/api/shop/orders/${ra.id}/transition`, { to: 'picking' }, { token: s.token })).status, 200);
+  assert.deepEqual((await sum(s)).autoAccepted.map((x) => x.id), [rb.id]);
+  await query(`UPDATE online_order_events SET created_at = created_at - $2 WHERE order_id=$1 AND kind='status'`, [rb.id, desk.AUTO_PRINT_MS + MIN]);
+  assert.deepEqual((await sum(s)).autoAccepted, []);
+  assert.deepEqual(await desk.autoAcceptedOf(off.shopId), []);
+});
+
 test('قبولِ خودکار: سفارش‌های هم‌زمان از سقف نمی‌گذرند؛ سفارشی که کارمند زودتر جواب داد دست نمی‌خورد', async () => {
   const s = await liveStore('هم‌زمان');
   assert.equal((await put(s, { eventId: ev(), autoAccept: { enabled: true, maxOpen: 2, readyMinutes: 10 } })).status, 200);

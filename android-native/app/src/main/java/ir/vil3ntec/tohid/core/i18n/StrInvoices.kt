@@ -13,7 +13,7 @@ object StrInvoices {
   // تاریخچهٔ فروش
   val salesTotal: String get() = t("جمع فروش", "Total sales", "ټول پلور")
   fun invoicesHint(n: Any, cancelled: Any): String = t(
-    "$n فاکتور — $cancelled لغوشده",
+    "${asIs(n)} فاکتور — ${asIs(cancelled)} لغوشده",
     "$n ${pl(n, "invoice", "invoices")} — $cancelled cancelled",
     "$n ${pl(n, "بل", "بلونه")} — $cancelled لغوه شوي",
   )
@@ -33,7 +33,7 @@ object StrInvoices {
   val viewInvoice: String get() = t("دیدن فاکتور", "View invoice", "بل وګورئ")
   val returnOrExchange: String get() = t("برگشت یا تعویض", "Return or exchange", "بېرته ورکړه یا بدلول")
   val returnItems: String get() = t("مرجوعی", "Return", "بېرته ورکړه")
-  fun returnReceiptOf(l: Any): String = t("رسیدِ برگشت $l", "Return receipt $l", "د بېرته ورکړې رسید $l")
+  fun returnReceiptOf(l: Any): String = t("رسیدِ برگشت ${asIs(l)}", "Return receipt $l", "د بېرته ورکړې رسید $l")
   val correctInvoice: String get() = t("اصلاح فاکتور", "Correct invoice", "بل سمول")
   val cancelSale: String get() = t("لغو فروش", "Cancel sale", "پلور لغوه کول")
   val cancelDenied: String get() = t("لغوِ فاکتور با صاحب یا مدیرِ دکان است", "Only the shop owner or a manager can cancel an invoice", "بل یوازې د دوکان مالک یا مدیر لغوه کولی شي")
@@ -53,8 +53,8 @@ object StrInvoices {
 
   // صندوقِ ساده (پرچمِ pay v2 خاموش)
   val registerClosed: String get() = t("صندوق بسته است", "The register is closed", "صندوق بند دی")
-  fun registerOpenSince(at: Any): String = t("صندوق باز — از $at", "Register open — since $at", "صندوق خلاص — له $at راهیسې")
-  fun expectedInDrawer(a: Any): String = t("نقدِ مورد انتظار در دخل: $a ؋", "Expected cash in the drawer: $a ؋", "په دراز کې د تمې وړ نغدې: $a ؋")
+  fun registerOpenSince(at: Any): String = t("صندوق باز — از ${asIs(at)}", "Register open — since $at", "صندوق خلاص — له $at راهیسې")
+  fun expectedInDrawer(a: Any): String = t("نقدِ مورد انتظار در دخل: ${asIs(a)} ؋", "Expected cash in the drawer: $a ؋", "په دراز کې د تمې وړ نغدې: $a ؋")
   val history: String get() = t("سابقه", "History", "تاریخچه")
   val closeRegister: String get() = t("بستن صندوق", "Close register", "صندوق بندول")
   val openRegisterTitle: String get() = t("باز کردنِ صندوق", "Open the register", "د صندوق پرانیستل")
@@ -70,8 +70,8 @@ object StrInvoices {
   val openingCash: String get() = t("پولِ اولِ صندوق", "Opening cash", "د صندوق لومړنۍ پیسې")
   val countedCash: String get() = t("پولِ شمرده‌شده در دخل", "Cash counted in the drawer", "په دراز کې شمېرل شوې پیسې")
   val noDifference: String get() = t("بی اختلاف", "No difference", "بې توپیره")
-  fun overBy(a: Any): String = t("اضافه: $a ؋", "Over: $a ؋", "زیات: $a ؋")
-  fun shortBy(a: Any): String = t("کسری: $a ؋", "Short: $a ؋", "کم: $a ؋")
+  fun overBy(a: Any): String = t("اضافه: ${asIs(a)} ؋", "Over: $a ؋", "زیات: $a ؋")
+  fun shortBy(a: Any): String = t("کسری: ${asIs(a)} ؋", "Short: $a ؋", "کم: $a ؋")
   val noteOptional: String get() = t("یادداشت (اختیاری)", "Note (optional)", "یادښت (اختیاري)")
   val registerOpened: String get() = t("صندوق باز شد", "Register opened", "صندوق پرانیستل شو")
   val registerClosedNow: String get() = t("صندوق بسته شد", "Register closed", "صندوق بند شو")
@@ -82,9 +82,9 @@ object StrInvoices {
   val stillOpen: String get() = t("هنوز باز است", "Still open", "لا خلاص دی")
 
   // مرجوعی (پرچمِ برگشتِ تازه خاموش)
-  fun returnTitle(n: Any): String = t("مرجوعی — فاکتور #$n", "Return — invoice #$n", "بېرته ورکړه — #$n بل")
+  fun returnTitle(n: Any): String = t("مرجوعی — فاکتور #${asIs(n)}", "Return — invoice #$n", "بېرته ورکړه — #$n بل")
   val nothingToReturn: String get() = t("موردی برای مرجوعی وجود ندارد.", "Nothing left to return.", "د بېرته ورکولو لپاره هېڅ نه دي پاتې.")
-  fun returnable(name: Any, q: Any): String = t("$name — قابل مرجوعی: $q", "$name — returnable: $q", "$name — بېرته ورکېدونکی: $q")
+  fun returnable(name: Any, q: Any): String = t("${asIs(name)} — قابل مرجوعی: ${asIs(q)}", "$name — returnable: $q", "$name — بېرته ورکېدونکی: $q")
   val returnQty: String get() = t("مقدار مرجوعی", "Quantity to return", "د بېرته ورکولو مقدار")
   val returnAmount: String get() = t("مبلغ مرجوعی", "Return amount", "د بېرته ورکړې مبلغ")
   val reasonOptional: String get() = t("دلیل (اختیاری)", "Reason (optional)", "لامل (اختیاري)")
@@ -94,7 +94,7 @@ object StrInvoices {
   // اصلاح و لغو
   val reopenTitle: String get() = t("اصلاح فاکتور؟", "Correct this invoice?", "دا بل سم کړئ؟")
   fun reopenBody(n: Any): String = t(
-    "فاکتور #$n لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
+    "فاکتور #${asIs(n)} لغو می‌شود و اقلامش با همان قیمت به سبد خرید برمی‌گردند. بعد از اصلاح، فروش را دوباره ثبت کنید — شمارهٔ فاکتور تازه‌ای می‌گیرد.",
     "Invoice #$n will be cancelled and its items go back to the cart at the same prices. After correcting, record the sale again — it gets a new invoice number.",
     "#$n بل لغوه کېږي او توکي یې په هماغه بیه ټوکرۍ ته ورګرځي. له سمون وروسته پلور بیا ثبت کړئ — د بل نوې شمېره اخلي.",
   )
@@ -105,12 +105,12 @@ object StrInvoices {
   val saleCancelled: String get() = t("فروش لغو شد", "Sale cancelled", "پلور لغوه شو")
   val alreadyCancelled: String get() = t("این فاکتور قبلاً لغو شده است", "This invoice is already cancelled", "دا بل مخکې لغوه شوی دی")
   val reasonRequired: String get() = t("دلیلِ لغو لازم است", "A reason for cancelling is required", "د لغوه کولو لامل اړین دی")
-  fun reasonTooLong(max: Any): String = t("دلیلِ لغو حداکثر $max نویسه است", "The reason can be at most $max characters", "لامل تر $max تورو زیات نه شي کېدای")
+  fun reasonTooLong(max: Any): String = t("دلیلِ لغو حداکثر ${asIs(max)} نویسه است", "The reason can be at most $max characters", "لامل تر $max تورو زیات نه شي کېدای")
   val invoiceNotFound: String get() = t("فاکتور پیدا نشد", "Invoice not found", "بل ونه موندل شو")
 
   // جدولِ فاکتورهای کامپیوتر
   val backToTable: String get() = t("← برگشت به جدولِ فاکتورها", "← Back to the invoice table", "← د بلونو جدول ته شاته")
-  fun savedTo(p: Any): String = t("ذخیره شد: $p", "Saved: $p", "خوندي شو: $p")
+  fun savedTo(p: Any): String = t("ذخیره شد: ${asIs(p)}", "Saved: $p", "خوندي شو: $p")
   val netSales: String get() = t("فروشِ خالص", "Net sales", "خالص پلور")
   val creditUnpaid: String get() = t("نسیه (باقی)", "Credit (unpaid)", "پور (پاتې)")
   val deskSearchHint: String get() = t("شمارهٔ فاکتور، مشتری یا فروشنده — Ctrl+F", "Invoice number, customer or seller — Ctrl+F", "د بل شمېره، پیرودونکی یا پلورونکی — Ctrl+F")

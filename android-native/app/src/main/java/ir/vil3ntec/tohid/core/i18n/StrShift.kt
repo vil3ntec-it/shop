@@ -13,15 +13,15 @@ object StrShift {
 
   // کارتِ صندوق
   val registerClosed: String get() = t("صندوق بسته است", "The register is closed", "صندوق بند دی")
-  fun registerOpenSince(at: Any): String = t("صندوق باز — از $at", "Register open — since $at", "صندوق خلاص — له $at راهیسې")
-  fun expectedInDrawer(a: Any): String = t("نقدِ مورد انتظار در دخل: $a", "Expected cash in the drawer: $a", "په دراز کې د تمې وړ نغدې: $a")
+  fun registerOpenSince(at: Any): String = t("صندوق باز — از ${asIs(at)}", "Register open — since $at", "صندوق خلاص — له $at راهیسې")
+  fun expectedInDrawer(a: Any): String = t("نقدِ مورد انتظار در دخل: ${asIs(a)}", "Expected cash in the drawer: $a", "په دراز کې د تمې وړ نغدې: $a")
   val blindNote: String get() = t(
     "شمارشِ کور: مبلغِ مورد انتظار پس از بستن به مدیر نشان داده می‌شود",
     "Blind count: the expected amount is shown to a manager after closing",
     "پټ شمېرل: د تمې وړ مبلغ له بندولو وروسته مدیر ته ښودل کېږي",
   )
   fun skippedOuts(n: Any): String = t(
-    "$n خروجِ دفتر بیش از نقدِ دخل — بررسیِ مدیر",
+    "${asIs(n)} خروجِ دفتر بیش از نقدِ دخل — بررسیِ مدیر",
     "$n ledger ${pl(n, "withdrawal exceeds", "withdrawals exceed")} the cash in the drawer — manager review",
     "$n د دفتر ${pl(n, "ایستنه", "ایستنې")} د دراز له نغدو زیاتې — د مدیر کتنه",
   )
@@ -41,7 +41,7 @@ object StrShift {
     "No receipt printer is set up — Settings › Devices",
     "د بل پرنټر نه دی ټاکل شوی — امستنې › وسایل",
   )
-  fun reportNotPrinted(why: Any): String = t("گزارش کشیده نشد: $why", "The report couldn't be laid out: $why", "راپور جوړ نه شو: $why")
+  fun reportNotPrinted(why: Any): String = t("گزارش کشیده نشد: ${asIs(why)}", "The report couldn't be laid out: $why", "راپور جوړ نه شو: $why")
   val reportPrinted: String get() = t("گزارش چاپ شد", "Report printed", "راپور چاپ شو")
   val print: String get() = t("چاپ", "Print", "چاپ")
 
@@ -69,12 +69,12 @@ object StrShift {
     "بې پلوره د دراز پرانیستل د مالک یا مدیر تایید غواړي؛ د مالک یا مدیر په حساب ننوځئ.",
   )
   fun noSaleApprover(name: Any): String = t(
-    "تأییدکننده: $name — کشوِ برقی به چاپگرِ پیش‌فرض وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.",
+    "تأییدکننده: ${asIs(name)} — کشوِ برقی به چاپگرِ پیش‌فرض وصل نیست؛ این‌جا فقط با دلیل و تأیید ثبت می‌شود.",
     "Approver: $name — no electric drawer is connected to the default printer; this only records it with a reason and approval.",
     "تاییدوونکی: $name — برېښنايي دراز له اصلي پرنټر سره نه دی نښلول شوی؛ دلته یوازې له لامل او تایید سره ثبتېږي.",
   )
   fun noSaleApproverDrawer(name: Any, printer: Any): String = t(
-    "تأییدکننده: $name — کشوی چاپگرِ «$printer» باز می‌شود و با دلیل در سابقهٔ همین صندوق می‌ماند.",
+    "تأییدکننده: ${asIs(name)} — کشوی چاپگرِ «${asIs(printer)}» باز می‌شود و با دلیل در سابقهٔ همین صندوق می‌ماند.",
     "Approver: $name — the drawer of printer “$printer” opens and is kept with the reason in this register's history.",
     "تاییدوونکی: $name — د «$printer» پرنټر دراز پرانیستل کېږي او له لامل سره د همدې صندوق په تاریخچه کې پاتې کېږي.",
   )
@@ -90,16 +90,16 @@ object StrShift {
     "Blind count: count the banknotes; the expected amount is shown to a manager after closing.",
     "پټ شمېرل: نوټونه وشمېرئ؛ د تمې وړ مبلغ له بندولو وروسته مدیر ته ښودل کېږي.",
   )
-  fun expectedCash(a: Any): String = t("نقدِ مورد انتظار: $a", "Expected cash: $a", "د تمې وړ نغدې: $a")
+  fun expectedCash(a: Any): String = t("نقدِ مورد انتظار: ${asIs(a)}", "Expected cash: $a", "د تمې وړ نغدې: $a")
   val countedCash: String get() = t("نقدِ شمرده", "Cash counted", "شمېرل شوې نغدې")
   val methodCountsNote: String get() = t(
     "شمارشِ هر روش — جمعِ رسیدهای دستگاهِ کارت یا کیف پول؛ خالی یعنی «شمرده نشد»",
     "Count per method — the total of the card terminal or wallet receipts; empty means “not counted”",
     "د هرې لارې شمېرل — د کارت ماشین یا بټوې د رسیدونو ټولګه؛ خالي یعنې «ونه شمېرل شو»",
   )
-  fun expectedSuffix(a: Any): String = t(" — مورد انتظار $a", " — expected $a", " — د تمې وړ $a")
+  fun expectedSuffix(a: Any): String = t(" — مورد انتظار ${asIs(a)}", " — expected $a", " — د تمې وړ $a")
   val noteForManager: String get() = t("یادداشت برای مدیر (اختیاری)", "Note for the manager (optional)", "مدیر ته یادښت (اختیاري)")
-  fun badMethodCount(m: Any): String = t("شمرده‌شدهٔ «$m» درست نیست", "The count for “$m” isn't valid", "د «$m» شمېرل سم نه دي")
+  fun badMethodCount(m: Any): String = t("شمرده‌شدهٔ «${asIs(m)}» درست نیست", "The count for “$m” isn't valid", "د «$m» شمېرل سم نه دي")
   val varianceReasonLabel: String get() = t("دلیلِ اختلاف (بالای ۵۰ افغانی لازم است)", "Reason for the difference (required above 50 AFN)", "د توپیر لامل (له 50 افغانیو پورته اړین دی)")
   val varianceReasonRequired: String get() = t("اختلافِ شمارش از آستانهٔ ۵۰ افغانی بیشتر است؛ دلیل بنویسید", "The count is off by more than 50 AFN; write a reason", "د شمېرلو توپیر له 50 افغانیو زیات دی؛ لامل ولیکئ")
   val registerClosedNow: String get() = t("صندوق بسته شد", "Register closed", "صندوق بند شو")
@@ -117,21 +117,21 @@ object StrShift {
   val reportTime: String get() = t("زمانِ گزارش", "Report time", "د راپور وخت")
   val user: String get() = t("کاربر", "User", "کارن")
   val openingFloat: String get() = t("اولِ صندوق", "Opening float", "د صندوق پیل")
-  fun methodSales(m: Any): String = t("$m — فروش", "$m — sales", "$m — پلور")
-  fun methodReceipts(m: Any): String = t("$m — رسیدِ قرض‌داران", "$m — debtor payments", "$m — د پوروړو ورکړې")
-  fun methodRefunds(m: Any): String = t("$m — مرجوعی", "$m — returns", "$m — بېرته ورکړې")
-  fun times(n: Any): String = t("$n بار", "$n ${pl(n, "time", "times")}", "$n ځله")
-  fun countedOf(m: Any): String = t("شمرده — $m", "Counted — $m", "شمېرل شوي — $m")
+  fun methodSales(m: Any): String = t("${asIs(m)} — فروش", "$m — sales", "$m — پلور")
+  fun methodReceipts(m: Any): String = t("${asIs(m)} — رسیدِ قرض‌داران", "$m — debtor payments", "$m — د پوروړو ورکړې")
+  fun methodRefunds(m: Any): String = t("${asIs(m)} — مرجوعی", "$m — returns", "$m — بېرته ورکړې")
+  fun times(n: Any): String = t("${asIs(n)} بار", "$n ${pl(n, "time", "times")}", "$n ځله")
+  fun countedOf(m: Any): String = t("شمرده — ${asIs(m)}", "Counted — $m", "شمېرل شوي — $m")
   //  نمای کور (`ShiftSlip.forViewer`): فقط شمار، بی روش
   val sales: String get() = t("فروش", "Sales", "پلور")
   val receipts: String get() = t("رسیدِ قرض‌داران", "Debtor payments", "د پوروړو ورکړې")
   val refunds: String get() = t("مرجوعی", "Returns", "بېرته ورکړې")
-  fun expectedOf(m: Any): String = t("مورد انتظار — $m", "Expected — $m", "د تمې وړ — $m")
-  fun varianceOf(m: Any): String = t("اختلاف — $m", "Difference — $m", "توپیر — $m")
+  fun expectedOf(m: Any): String = t("مورد انتظار — ${asIs(m)}", "Expected — $m", "د تمې وړ — $m")
+  fun varianceOf(m: Any): String = t("اختلاف — ${asIs(m)}", "Difference — $m", "توپیر — $m")
   val notCounted: String get() = t("شمرده نشد", "Not counted", "ونه شمېرل شو")
   val noDifference: String get() = t("بی اختلاف", "No difference", "بې توپیره")
-  fun over(a: Any): String = t("اضافه $a", "Over $a", "زیات $a")
-  fun shortBy(a: Any): String = t("کسری $a", "Short $a", "کم $a")
+  fun over(a: Any): String = t("اضافه ${asIs(a)}", "Over $a", "زیات $a")
+  fun shortBy(a: Any): String = t("کسری ${asIs(a)}", "Short $a", "کم $a")
   val varianceReason: String get() = t("دلیلِ اختلاف", "Reason for the difference", "د توپیر لامل")
   val notAutoFixed: String get() = t(
     "اختلاف خودکار اصلاح نمی‌شود — برای بررسیِ مدیر ثبت شد",

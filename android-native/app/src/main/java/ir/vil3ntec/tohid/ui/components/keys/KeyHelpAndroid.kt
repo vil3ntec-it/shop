@@ -51,7 +51,7 @@ import kotlinx.coroutines.delay
 /**
  *  S50 (POS-41، بخشِ ۳.۱۶) — راهنمای کلیدِ هر صفحه از `keymap.json` و برچسب‌های «نگه‌داشتنِ Ctrl»، فقط کامپیوتر.
  *
- *  ⛔ پشتِ تنظیمِ همین دستگاه (`tohid-ui:key_help`)، پیش‌فرض **خاموش**: پنجرهٔ F1 همان فهرستِ دست‌نوشتهٔ
+ *  ⛔ پشتِ تنظیمِ همین دستگاه (`tohid-ui:key_help`)، پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: پنجرهٔ F1 همان فهرستِ دست‌نوشتهٔ
  *  پیشین (`ShortcutsHelp` ِ `desktop/Main.kt`) و هیچ برچسبی با Ctrl. منطق در `core/keys/KeyHelp`؛ این‌جا فقط
  *  مرزِ پلتفرم (`SharedPreferences`، ساعت، کلیدِ Compose) و نمایش.
  */
@@ -63,7 +63,7 @@ object KeyHelpPref {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, true)
   }
 
   fun set(context: android.content.Context, value: Boolean) {

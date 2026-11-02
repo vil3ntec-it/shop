@@ -18,7 +18,7 @@ object StrChat {
   )
 
   // صفحهٔ گفت‌وگو
-  fun sending(pct: Any): String = t("در حالِ فرستادن — $pct٪", "Sending — $pct%", "لېږل کېږي — $pct٪")
+  fun sending(pct: Any): String = t("در حالِ فرستادن — ${asIs(pct)}٪", "Sending — $pct%", "لېږل کېږي — $pct٪")
   val storageLow: String get() = t(
     "جای این دستگاه کم است؛ برای ضبط، پخش یا فرستادنِ رسانه کمی جا باز کنید.",
     "This device is low on storage; free up some space to record, play or send media.",

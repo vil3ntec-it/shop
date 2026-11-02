@@ -321,6 +321,19 @@ test('sum.sale_final: پرداخت + مانده ≠ نهایی', async () => {
   await expectOnly(o.shopId, 'sum.sale_final');
 });
 
+test('sum.sale_final: ردیفِ جدای گردکردنِ نقدی (PAY-09، `roundingMinor`) جزوِ نهایی است، نه تخلف', async () => {
+  const o = await cleanShop('گرد');
+  //  ۳۶۱ − ۱۱ + ۲ = ۳۵۲؛ پرداخت + مانده = ۲۰۲ + ۱۵۰
+  await setField(o.shopId, 'sales', 's1', '{roundingMinor}', '200');
+  await setField(o.shopId, 'sales', 's1', '{finalTotal}', '352');
+  await setField(o.shopId, 'sales', 's1', '{paidAmount}', '202');
+  const rep = await vd.verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((c) => c.count > 0), [], JSON.stringify(rep.checks.filter((c) => c.count > 0)));
+  //  گردی که با نهایی نمی‌خواند همان خطاست
+  await setField(o.shopId, 'sales', 's1', '{roundingMinor}', '-300');
+  await expectOnly(o.shopId, 'sum.sale_final');
+});
+
 test('sum.sale_final: تسویه بیشتر از نسیه', async () => {
   const o = await cleanShop('تسویه');
   await setField(o.shopId, 'sales', 's1', '{debtSettled}', '151');

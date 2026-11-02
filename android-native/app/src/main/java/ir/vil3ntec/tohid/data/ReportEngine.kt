@@ -29,6 +29,8 @@ object ReportEngine {
     val netProfit: Double,
     /** مبلغِ مرجوعیِ مؤثر در این بازه — فقط برای نمایش */
     val returnAmount: Double,
+    /** PAY-09 — جمعِ ردیف‌های «گردکردنِ نقدی» (علامت‌دار)؛ `net` = `gross − discount` + همین */
+    val rounding: Double = 0.0,
   )
 
   /**
@@ -84,6 +86,7 @@ object ReportEngine {
       expenses = expenses,
       netProfit = grossProfit - expenses,
       returnAmount = returnAmount,
+      rounding = active.sumOf { it.roundingMinor ?: 0L } / 100.0,
     )
   }
 

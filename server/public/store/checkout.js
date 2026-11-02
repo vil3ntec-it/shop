@@ -26,6 +26,15 @@
     var pin = null; var quoteNote = '';
     //  CHK-07/10 (فقط با `store.delivery.zoned`): پینِ بیرون از محدوده ⇒ «دریافت از دکان» یا «خبرم کن»
     var area = null;
+    //  CHK-08 (§۴.۴، همان پرچمِ `shop.storefront.address_extra`): ولایت، گذر یا کوچه، منزل و طبقه — همه اختیاری؛ کدِ پستی
+    //  نه (LOC-10). این‌جا ساخته می‌شوند، نه در صفحهٔ بارِ نخست، تا بارِ نخستِ ویترین زیرِ سقف بماند؛ واژه‌نامهٔ checkout
+    //  نیامد ⇒ این سه کادرِ اختیاری ساخته نمی‌شوند (برچسبِ خالی نه)
+    [['a-prov', 'ck.prov.l', 60], ['a-street', 'ck.street.l', 120], ['a-house', 'ck.house.l', 60]].forEach(function (f) {
+      if (!$('addr-extra') || $(f[0]) || !K.has(f[1])) return;
+      $('addr-extra').appendChild(el('label', { class: 'field' }, el('span', { text: t(f[1]), attrs: { 'data-t': f[1] } }),
+        el('input', { attrs: { id: f[0], type: 'text', maxlength: String(f[2]) } })));
+    });
+    function extra(id) { return $(id) ? $(id).value.trim() : ''; }
 
     // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
     //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
@@ -357,7 +366,10 @@
       if (f === 'delivery') {
         body.address = { text: $('a-text').value.trim(), landmark: $('a-landmark').value.trim(), area: $('a-area').value.trim(), gateColor: $('a-gate').value.trim() };
         //  CHK-08 (پرچمِ `shop.storefront.address_extra`): شمارهٔ دوم و Plus Code — نادرست ⇒ ۴۰۰ ِ سرور با پیامِ روشن
-        if (c.store.addressExtra) { body.address.phone2 = $('a-phone2').value.trim(); body.address.plusCode = $('a-plus').value.trim(); }
+        if (c.store.addressExtra) {
+          body.address.phone2 = $('a-phone2').value.trim(); body.address.plusCode = $('a-plus').value.trim();
+          body.address.province = extra('a-prov'); body.address.street = extra('a-street'); body.address.house = extra('a-house');
+        }
         if (pin) { body.address.lat = pin.lat; body.address.lng = pin.lng; }
         //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید
         else if (c.zones() && c.zone) body.address.zoneId = c.zone.id;

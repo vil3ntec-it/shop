@@ -80,4 +80,27 @@ class CommissionTest {
     assertEquals("0.05", Commission.percentOf(5))
     for (bp in listOf(0, 1, 99, 250, 333, 10_000)) assertEquals(bp, Commission.bpOfPercent(Commission.percentOf(bp)))
   }
+  @Test
+  fun returnLinesGoToTheOriginalSellerAndSkipCancelledSales() {
+    val origins = mapOf(
+      "f1" to Commission.Origin("s1"),
+      "f2" to Commission.Origin(" s2 "),
+      "f3" to Commission.Origin("s1", cancelled = true),
+      "f4" to Commission.Origin(""),
+    )
+    val back = Commission.returnLines(
+      listOf(
+        Commission.Returned("f1", af(300)),   // فروشِ ماهِ پیش، برگشتِ این ماه ⇒ از s1 کم
+        Commission.Returned("f2", af(200)),
+        Commission.Returned("f3", af(900)),   // اصلِ لغوشده ⇒ بیرون
+        Commission.Returned("f4", af(50)),    // اصلِ بی فروشنده ⇒ بی فروشنده
+        Commission.Returned("gone", af(70)),  // اصلِ ناپیدا ⇒ بی فروشنده، نه پنهان
+      ),
+      origins,
+    )
+    assertEquals(listOf(Line("s1", null, af(-300)), Line("s2", null, af(-200)), Line("", null, af(-50)), Line("", null, af(-70))), back)
+    val r = Commission.compute(listOf(Line("s1", null, af(1_000)), Line("s2", null, af(1_000))) + back, Plan(1_000), afn)
+    assertEquals(listOf(af(70), af(80)), r.sellers.map { it.commission })
+    assertEquals(af(-120), r.unassignedBase)
+  }
 }

@@ -109,6 +109,9 @@ router.get('/summary', needFlag, async (req, res) => {
   //  ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ بی کلید)
   const sa = require('../lib/order-start-alert');
   if (await sa.flagOf(req.shopId)) out.startAlerts = await sa.pendingOf(req.shopId, out.serverTime);
+  //  ORD-10: سفارش‌هایی که «قبولِ خودکار» ِ سرور پذیرفت (پرچمِ `shop.orders.desk`؛ خاموش ⇒ بی کلید) — برگه روی دستگاهِ برگزیده
+  const desk = require('../lib/order-desk');
+  if (await desk.flagOf(req.shopId)) out.autoAccepted = await desk.autoAcceptedOf(req.shopId, out.serverTime);
   res.json(out);
 });
 

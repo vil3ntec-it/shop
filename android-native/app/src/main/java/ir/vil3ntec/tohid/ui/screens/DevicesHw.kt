@@ -123,6 +123,7 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
   var deferred by remember { mutableStateOf(PrintSpooler.deferred(context)) }
   var copies by remember { mutableIntStateOf(ReceiptCopiesPref.get(context)) }
   var slipAuto by remember { mutableStateOf(OrderSlipPrint.auto(context)) }
+  var slipServer by remember { mutableStateOf(OrderSlipPrint.autoServer(context)) }
   var tick by remember { mutableIntStateOf(0) }
   val reprints = remember(tick, jobs.size) { PrintLog.reprints(context, 5) }
   var dry by remember { mutableStateOf<Pair<String, HwPages.Preview>?>(null) }
@@ -185,6 +186,8 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
       }
       //  ORD-10: برگهٔ سفارش پس از قبول روی همین دستگاه — تنظیمِ همین دستگاه، پیش‌فرض خاموش
       HwSwitchRow(StrOrderSlip.setting, StrOrderSlip.settingNote, slipAuto) { slipAuto = it; OrderSlipPrint.setAuto(context, it) }
+      //  ORD-10: برگهٔ سفارشی که «قبولِ خودکار» ِ سرور پذیرفت — روی یک دستگاه، پیش‌فرض خاموش
+      HwSwitchRow(StrOrderSlip.serverSetting, StrOrderSlip.serverSettingNote, slipServer) { slipServer = it; OrderSlipPrint.setAutoServer(context, it) }
       HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
         deferred = it; PrintSpooler.setDeferred(context, it)
       }

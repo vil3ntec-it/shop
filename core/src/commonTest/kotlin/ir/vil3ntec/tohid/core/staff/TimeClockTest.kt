@@ -88,4 +88,24 @@ class TimeClockTest {
     assertEquals(TimeClock.spans(a, at(20), kabul), TimeClock.spans(a.reversed(), at(20), kabul))
     assertEquals(listOf("a", "b"), TimeClock.spans(a, at(20), kabul).map { it.staffId })
   }
+  @Test
+  fun periodTotalsSumHealthyMinutesWorkedDaysAndIssuesInsideTheRange() {
+    fun d(n: Int, h: Int, m: Int = 0) = at(h, m) + n * 86_400_000L
+    val punches = listOf(
+      p("1", "a", Kind.IN, d(-1, 9)), p("2", "a", Kind.OUT, d(-1, 17)),          // بیرون از بازه
+      p("3", "a", Kind.IN, d(0, 8)), p("4", "a", Kind.OUT, d(0, 12)),
+      p("5", "a", Kind.IN, d(0, 13)), p("6", "a", Kind.OUT, d(0, 15)),
+      p("7", "a", Kind.IN, d(2, 22)), p("8", "a", Kind.OUT, d(3, 1)),            // شبِ آخر ⇒ مالِ روزِ ورود
+      p("9", "b", Kind.IN, d(1, 8)), p("10", "b", Kind.IN, d(1, 9)), p("11", "b", Kind.OUT, d(1, 10)),
+      p("12", "b", Kind.IN, d(2, 18)),                                            // هنوز باز
+    )
+    val spans = TimeClock.spans(punches, d(2, 20), kabul)
+    val r = TimeClock.periodTotals(spans, "2026-11-01", "2026-11-03")
+    assertEquals(listOf("a", "b"), r.map { it.staffId })
+    assertEquals(TimeClock.PeriodTotal("a", 4 * 60 + 2 * 60 + 3 * 60, 2, 0), r[0])
+    //  ورودِ دوباره بی خروج ⇒ یک ناجور؛ نوبتِ باز ناجور نیست و دقیقه هم ندارد
+    assertEquals(TimeClock.PeriodTotal("b", 60, 1, 1), r[1])
+    assertEquals(emptyList(), TimeClock.periodTotals(spans, "2026-11-05", "2026-11-30"))
+    assertEquals(listOf(TimeClock.PeriodTotal("a", 8 * 60, 1, 0)), TimeClock.periodTotals(spans, "2026-10-31", "2026-10-31"))
+  }
 }

@@ -46,7 +46,7 @@ fun LocaleSection() {
       if (lang == Lang.EN) null else if (digits == LocaleFormat.DIGITS_FA) StrSettings.persianDigits else StrSettings.latinDigits,
       when {
         gregorian -> StrSettings.calGregorian
-        lang == Lang.FA -> if (months == LocaleText.MONTHS_PASHTO) StrSettings.pashtoMonths else StrSettings.dariMonths
+        lang.persian -> if (months == LocaleText.MONTHS_PASHTO) StrSettings.pashtoMonths else StrSettings.dariMonths
         else -> StrSettings.calSolar
       },
     ).joinToString(" · "),
@@ -96,7 +96,7 @@ fun LocaleSection() {
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
-    if (lang == Lang.FA) {
+    if (lang.persian) {
       Spacer(Modifier.height(8.dp))
       SegmentedChoice(
         options = listOf(LocaleText.MONTHS_DARI to StrSettings.monthsDari, LocaleText.MONTHS_PASHTO to StrSettings.monthsPashto),

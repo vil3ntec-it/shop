@@ -33,6 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsWhatCard
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.launch
 
@@ -84,6 +85,8 @@ internal fun RouteScope.PasswordScreen(onBack: (() -> Unit)?) {
     loading = busy,
     dirty = current.isNotEmpty() || fresh.isNotEmpty() || repeat.isNotEmpty(),
   ) {
+    //  «این چه می‌کند؟» (تنظیماتِ کم) — فرم قابِ خودش را دارد، پس کارت دستی
+    SettingsWhatCard("تغییر رمز حساب")
     SettingsNote(StrSettings.serverPassword)
     //  رمزِ نادرست: لرزشِ کوتاهِ فرم (MOTION-APPLE) کنارِ پیام
     V3Section(null, Modifier.v3Shake(failed.takeIf { it > 0 }), padding = androidx.compose.foundation.layout.PaddingValues(16.dp)) {

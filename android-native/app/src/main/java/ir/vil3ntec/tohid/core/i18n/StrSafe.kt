@@ -15,12 +15,12 @@ object StrSafe {
     "د پلور په تاریخچه کې د «تجوري» کارت: شمېرنه، له دلیل سره راتګ او وتنه، بانک ته سپارل د کڅوړې له شمېرې سره، او د دخل او تجوري ترمنځ لېږد. هر کرښه یوازې زیاتېږي او د شمېرنې توپیر هېڅکله پخپله نه برابرېږي.",
   )
   val title: String get() = t("گاوصندوق", "Safe", "تجوري")
-  fun balance(amount: Any): String = t("مانده: $amount", "Balance: $amount", "پاتې: $amount")
+  fun balance(amount: Any): String = t("مانده: ${asIs(amount)}", "Balance: $amount", "پاتې: $amount")
   val notCounted: String get() = t("هنوز شمرده نشده", "Not counted yet", "لا نه دی شمېرل شوی")
-  fun lastCount(time: Any): String = t("آخرین شمارش: $time", "Last count: $time", "وروستۍ شمېرنه: $time")
+  fun lastCount(time: Any): String = t("آخرین شمارش: ${asIs(time)}", "Last count: $time", "وروستۍ شمېرنه: $time")
   val negative: String get() = t("مانده زیرِ صفر — نیازمندِ شمارش", "Balance below zero — needs a count", "پاتې له صفر لاندې — شمېرنې ته اړتیا")
-  fun needsReview(n: Any): String = t("$n شمارش نیازمندِ بررسی", "$n count(s) need review", "$n شمېرنې کتنې ته اړتیا لري")
-  fun invalid(n: Any): String = t("$n ردیفِ نادرست کنار رفت", "$n invalid row(s) set aside", "$n ناسمې کرښې یوې خوا شوې")
+  fun needsReview(n: Any): String = t("${asIs(n)} شمارش نیازمندِ بررسی", "$n count(s) need review", "$n شمېرنې کتنې ته اړتیا لري")
+  fun invalid(n: Any): String = t("${asIs(n)} ردیفِ نادرست کنار رفت", "$n invalid row(s) set aside", "$n ناسمې کرښې یوې خوا شوې")
   val transferNeedsShift: String get() = t("انتقال با دخل فقط وقتی صندوق باز است", "Drawer transfers need an open register", "له دخل سره لېږد یوازې کله چې صندوق پرانیستی وي")
   val staffNote: String get() = t("شما فقط از دخل به گاوصندوق می‌گذارید", "You can only move cash from the drawer into the safe", "تاسو یوازې له دخل څخه تجوري ته اچولی شئ")
 
@@ -49,9 +49,9 @@ object StrSafe {
   val countTitle: String get() = t("شمارشِ گاوصندوق", "Count the safe", "د تجوري شمېرنه")
   val amount: String get() = t("مبلغ (افغانی)", "Amount (AFN)", "اندازه (افغانۍ)")
   val counted: String get() = t("مبلغِ شمرده (افغانی)", "Counted amount (AFN)", "شمېرل شوې اندازه (افغانۍ)")
-  fun bookBalance(amount: Any): String = t("ماندهٔ دفتر: $amount", "Book balance: $amount", "د دفتر پاتې: $amount")
-  fun over(amount: Any): String = t("اضافه: $amount", "Over: $amount", "زیات: $amount")
-  fun short(amount: Any): String = t("کسری: $amount", "Short: $amount", "کمښت: $amount")
+  fun bookBalance(amount: Any): String = t("ماندهٔ دفتر: ${asIs(amount)}", "Book balance: $amount", "د دفتر پاتې: $amount")
+  fun over(amount: Any): String = t("اضافه: ${asIs(amount)}", "Over: $amount", "زیات: $amount")
+  fun short(amount: Any): String = t("کسری: ${asIs(amount)}", "Short: $amount", "کمښت: $amount")
   val reason: String get() = t("دلیل", "Reason", "دلیل")
   val varianceReason: String get() = t("دلیلِ اختلاف (بیش از ۵۰ افغانی لازم)", "Reason for the difference (needed above 50 AFN)", "د توپیر دلیل (له ۵۰ افغانیو پورته اړین)")
   val noteForOther: String get() = t("یادداشت (برای «دیگر» لازم)", "Note (needed for \"Other\")", "یادښت (د «نور» لپاره اړین)")
@@ -65,11 +65,11 @@ object StrSafe {
   // تاریخچه
   val historyTitle: String get() = t("تاریخچهٔ گاوصندوق", "Safe history", "د تجوري تاریخچه")
   val empty: String get() = t("هنوز ردیفی نیست", "No entries yet", "لا کومه کرښه نشته")
-  fun after(amount: Any): String = t("مانده پس از آن: $amount", "Balance after: $amount", "وروسته پاتې: $amount")
-  fun bag(no: Any): String = t("کیسه: $no", "Bag: $no", "کڅوړه: $no")
+  fun after(amount: Any): String = t("مانده پس از آن: ${asIs(amount)}", "Balance after: $amount", "وروسته پاتې: $amount")
+  fun bag(no: Any): String = t("کیسه: ${asIs(no)}", "Bag: $no", "کڅوړه: $no")
   val startCount: String get() = t("شمارشِ آغاز", "Opening count", "پیلنۍ شمېرنه")
   val late: String get() = t("ردیفی دیر رسید — نیازمندِ بررسی", "A row arrived late — needs review", "یوه کرښه ناوخته راغله — کتنې ته اړتیا")
-  fun more(n: Any): String = t("و $n ردیفِ کهنه‌تر", "and $n older row(s)", "او $n زړې کرښې")
+  fun more(n: Any): String = t("و ${asIs(n)} ردیفِ کهنه‌تر", "and $n older row(s)", "او $n زړې کرښې")
 
   // نتیجه
   val saved: String get() = t("ثبت شد", "Recorded", "ثبت شو")
@@ -79,11 +79,11 @@ object StrSafe {
 
   // خطاها (کدهای `SafeCore.Code` و صندوق)
   fun varianceNeedsReason(over: Boolean, amount: Any, threshold: Any): String = if (over) t(
-    "اختلافِ شمارش اضافه $amount است — بیش از $threshold دلیل می‌خواهد",
+    "اختلافِ شمارش اضافه ${asIs(amount)} است — بیش از ${asIs(threshold)} دلیل می‌خواهد",
     "The count is over by $amount — more than $threshold needs a reason",
     "شمېرنه $amount زیاته ده — له $threshold زیات دلیل غواړي",
   ) else t(
-    "اختلافِ شمارش کسری $amount است — بیش از $threshold دلیل می‌خواهد",
+    "اختلافِ شمارش کسری ${asIs(amount)} است — بیش از ${asIs(threshold)} دلیل می‌خواهد",
     "The count is short by $amount — more than $threshold needs a reason",
     "شمېرنه $amount کمه ده — له $threshold زیات دلیل غواړي",
   )

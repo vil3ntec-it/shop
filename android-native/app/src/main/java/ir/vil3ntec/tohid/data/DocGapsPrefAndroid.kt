@@ -3,8 +3,8 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 
 /**
- *  RPT-17 — زبانهٔ «شماره‌های جاافتاده» در «گزارش‌ها»ی کامپیوتر، روی **همین دستگاه**، کنارِ
- *  سیاست‌های دیگرِ دکان (`ShopPolicy`، پروندهٔ `tohid-policy`، کلیدِ `doc_gaps`). پیش‌فرض **خاموش**:
+ *  RPT-17 — زبانهٔ «شماره‌های جاافتاده» در «گزارش‌ها»ی کامپیوتر و گوشی، روی **همین دستگاه**، کنارِ
+ *  سیاست‌های دیگرِ دکان (`ShopPolicy`، پروندهٔ `tohid-policy`، کلیدِ `doc_gaps`). پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**:
  *  تا دکان‌دار روشن نکند، صفحهٔ گزارش‌ها همان است که بود. خودِ گزارش فقط خواندنی است.
  */
 object DocGapsPref {
@@ -14,7 +14,7 @@ object DocGapsPref {
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-  fun on(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, false) }.getOrDefault(false)
+  fun on(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, true) }.getOrDefault(false)
 
   fun setOn(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(KEY, on).apply()

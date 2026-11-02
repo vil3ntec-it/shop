@@ -24,6 +24,7 @@ import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
+import ir.vil3ntec.tohid.print.OrderSlipPrint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.sync.Mutex
@@ -453,6 +454,9 @@ object OrdersLive {
     }
   }
 
+  /** ORD-10: آخرین پیامِ برگهٔ «قبولِ خودکار» (چاپ شد / چرا نه) برای صفحهٔ سفارش‌ها؛ null = هیچ */
+  val slipMessage = mutableStateOf<String?>(null)
+
   suspend fun pollSummary(context: Context) {
     if (!enabled) return
     repository(context).summary()
@@ -460,6 +464,12 @@ object OrdersLive {
         counts.value = it.counts
         rev.value = it.rev
         OrderAlertsLive.onSummary(context, it)   // ORD-18 هشدارِ زمان‌بندی‌شده، ORD-03 «وصل است»
+        //  ORD-10: برگهٔ «قبولِ خودکار» ِ سرور — فقط با تنظیمِ همین دستگاه (`OrderSlipPrint.autoServer`)
+        val auto = it.autoAccepted.map { a -> a.id }
+        if (auto.isNotEmpty()) {
+          OrderSlipPrint.afterServerAccept(context, auto) { id -> (repository(context).get(id) as? ApiResult.Success)?.value }
+            ?.let { m -> slipMessage.value = m }
+        }
       }
       .onFailure { OrderAlertsLive.onFailure(it); if (it.code == "orders_disabled") refreshConfig(context) }
   }

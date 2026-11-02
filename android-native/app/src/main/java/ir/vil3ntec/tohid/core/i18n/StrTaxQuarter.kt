@@ -26,7 +26,7 @@ object StrTaxQuarter {
   val prev: String get() = t("سه‌ماههٔ پیش", "Previous quarter", "مخکېنۍ درېمیاشتنۍ")
   val next: String get() = t("سه‌ماههٔ بعد", "Next quarter", "راتلونکې درېمیاشتنۍ")
   fun quarter(q: Any, year: Any, months: Any): String =
-    t("سه‌ماههٔ $q ِ سالِ مالیِ $year ($months)", "Quarter $q of fiscal year $year ($months)", "د $year مالي کال $q درېمیاشتنۍ ($months)")
+    t("سه‌ماههٔ ${asIs(q)} ِ سالِ مالیِ ${asIs(year)} (${asIs(months)})", "Quarter $q of fiscal year $year ($months)", "د $year مالي کال $q درېمیاشتنۍ ($months)")
   val sales: String get() = t("فروشِ مشمول", "Taxable sales", "د مالیې وړ پلور")
   val returns: String get() = t("برگشتِ فروش", "Sales returns", "د پلور بېرته راګرځېدنه")
   val net: String get() = t("درآمدِ ناخالصِ خالص", "Net gross receipts", "خالص ناخالص عاید")
@@ -34,15 +34,15 @@ object StrTaxQuarter {
   val returnsTax: String get() = t("مالیاتِ برگشت", "Tax on returns", "د بېرته راګرځېدنې مالیه")
   val netTax: String get() = t("مالیاتِ خالصِ دوره", "Net tax for the period", "د دورې خالصه مالیه")
   val purchases: String get() = t("خرید (فقط برای دیدن؛ مالیاتِ خرید ثبت نمی‌شود)", "Purchases (for reference; purchase tax is not recorded)", "پېر (یوازې د لیدو لپاره؛ د پېر مالیه نه ثبتېږي)")
-  fun count(n: Any): String = t("$n سند", "$n documents", "$n سندونه")
-  fun due(date: Any): String = t("سررسید: $date", "Due: $date", "موعد: $date")
+  fun count(n: Any): String = t("${asIs(n)} سند", "$n documents", "$n سندونه")
+  fun due(date: Any): String = t("سررسید: ${asIs(date)}", "Due: $date", "موعد: $date")
   val export: String get() = t("خروجیِ CSV", "Export CSV", "CSV صادرول")
   val print: String get() = t("چاپ", "Print", "چاپ")
   val exported: String get() = t("فایل ذخیره شد", "File saved", "فایل خوندي شو")
   val exportFailed: String get() = t("فایل ذخیره نشد", "File not saved", "فایل خوندي نه شو")
 
   // یادآورِ خانه
-  fun reminderTitle(days: Any): String = t("سررسیدِ مالیاتِ سه‌ماهه: $days روز مانده", "Quarterly tax due in $days days", "د درېمیاشتنۍ مالیې موعد: $days ورځې پاتې")
+  fun reminderTitle(days: Any): String = t("سررسیدِ مالیاتِ سه‌ماهه: ${asIs(days)} روز مانده", "Quarterly tax due in $days days", "د درېمیاشتنۍ مالیې موعد: $days ورځې پاتې")
   val reminderToday: String get() = t("سررسیدِ مالیاتِ سه‌ماهه امروز است", "Quarterly tax is due today", "د درېمیاشتنۍ مالیې موعد نن دی")
   val open: String get() = t("دیدنِ گزارش", "Open report", "راپور وګورئ")
 }

@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.data.GiftCards
@@ -123,7 +124,10 @@ fun CheckoutPaySplit(
     val s: Settlement? = preview.valueOrNull()
     Spacer(Modifier.height(12.dp))
     V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
-      SplitRow(StrSale.payable, PhoneSaleText.amount(total), strong = true)
+      //  PAY-09: ردیفِ جدای گرد (فقط سهمِ نقدی که فاکتور را می‌بندد) و «قابلِ پرداخت» با آن
+      val rounding = s?.rounding ?: 0L
+      if (rounding != 0L) SplitRow(StrRounding.line, PhoneSaleText.amount(PayFlow.major(rounding)))
+      SplitRow(StrSale.payable, PhoneSaleText.amount(if (rounding != 0L) PayFlow.major(s!!.due) else total), strong = true)
       SplitRow(StrSale.tendered, s?.let { PhoneSaleText.amount(PayFlow.major(it.tendered)) } ?: "—")
       SplitRow(StrSale.changeCashOnly, s?.let { PhoneSaleText.amount(PayFlow.major(it.change)) } ?: "—")
       SplitRow(

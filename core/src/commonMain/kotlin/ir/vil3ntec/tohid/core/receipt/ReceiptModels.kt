@@ -52,6 +52,8 @@ data class ReceiptInput(
   val included: List<DiscountLine> = emptyList(),
   /** یادداشتِ فاکتور (POS-11، `SaleNotes.clean`)؛ null یا خالی ⇒ چاپ نمی‌شود */
   val note: String? = null,
+  /** PAY-09: ردیفِ جدای گردکردنِ نقدی (علامت‌دار، پس از تخفیف‌ها)؛ ۰ ⇒ چاپ نمی‌شود. [total] همین حالا آن را دارد */
+  val rounding: Double = 0.0,
 )
 
 data class ShopHeader(
@@ -133,6 +135,8 @@ data class ReceiptLabels(
   val credit: String = "نسیه",
   val online: String = "آنلاین",
   val note: String = "یادداشت",
+  /** PAY-09: ردیفِ جدای گردکردنِ نقدی */
+  val rounding: String = "گردکردنِ نقدی",
 ) {
   companion object {
     val FA = ReceiptLabels()

@@ -10,12 +10,12 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrStaffTime {
   val title: String get() = t("ورود و خروج", "Clock in and out", "ننوتل او وتل")
-  fun inSince(time: String): String = t("سرِ کار هستید از $time", "On duty since $time", "له $time راهیسې په دنده یاست")
+  fun inSince(time: String): String = t("سرِ کار هستید از ${asIs(time)}", "On duty since $time", "له $time راهیسې په دنده یاست")
   val out: String get() = t("بیرون هستید.", "You are off duty.", "تاسو له دندې بهر یاست.")
   val clockIn: String get() = t("ثبتِ ورود", "Clock in", "ننوتل ثبت کړئ")
   val clockOut: String get() = t("ثبتِ خروج", "Clock out", "وتل ثبت کړئ")
   fun queued(n: Any): String = t(
-    "$n زدن در صف است و با وصل شدنِ اینترنت فرستاده می‌شود.",
+    "${asIs(n)} زدن در صف است و با وصل شدنِ اینترنت فرستاده می‌شود.",
     "$n ${pl(n, "punch is", "punches are")} queued and will be sent once the internet is connected.",
     "$n ثبت په لیکه کې دي او د انټرنېټ په وصلېدو لېږل کېږي.",
   )
@@ -27,20 +27,27 @@ object StrStaffTime {
   )
   val team: String get() = t("امروزِ کارمندان", "Staff today", "د کارکوونکو نن ورځ")
   val noPunches: String get() = t("امروز کسی نزده است.", "Nobody has clocked in today.", "نن هېچا ثبت نه دی کړی.")
-  fun hoursMinutes(h: Any, m: Any): String = t("$h ساعت و $m دقیقه", "${h}h ${m}m", "$h ساعته او $m دقیقې")
+  fun hoursMinutes(h: Any, m: Any): String = t("${asIs(h)} ساعت و ${asIs(m)} دقیقه", "${h}h ${m}m", "$h ساعته او $m دقیقې")
   val stillIn: String get() = t("هنوز سرِ کار", "still on duty", "لا هم په دنده")
   fun issues(n: Any): String = t(
-    "$n نوبتِ ناجور (بی خروج، بی ورود یا بیش از سقف) شمرده نشد؛ مدیر با زدنِ تازه درستش کند.",
+    "${asIs(n)} نوبتِ ناجور (بی خروج، بی ورود یا بیش از سقف) شمرده نشد؛ مدیر با زدنِ تازه درستش کند.",
     "$n ${pl(n, "irregular shift was", "irregular shifts were")} not counted (no clock-out, no clock-in, or over the cap); a manager should fix it with a new punch.",
     "$n ناسم ${pl(n, "نوبت", "نوبتونه")} (بې وتلو، بې ننوتلو یا له حد څخه زیات) ونه شمېرل شول؛ مدیر دې په نوي ثبت سره سم کړي.",
   )
-  fun clockOutFor(name: String): String = t("ثبتِ خروجِ $name", "Clock out $name", "د $name وتل ثبت کړئ")
+  val periods: String get() = t("۷ روز و این ماه", "Last 7 days and this month", "تېرې ۷ ورځې او دا میاشت")
+  fun weekWorked(time: String): String = t("۷ روزِ گذشته: ${asIs(time)}", "Last 7 days: $time", "تېرې ۷ ورځې: $time")
+  fun monthWorked(time: String, days: Any): String = t(
+    "این ماه: ${asIs(time)} در ${asIs(days)} روز",
+    "This month: $time over $days ${pl(days, "day", "days")}",
+    "دا میاشت: $time په $days ${pl(days, "ورځ", "ورځو")} کې",
+  )
+  fun clockOutFor(name: String): String = t("ثبتِ خروجِ ${asIs(name)}", "Clock out $name", "د $name وتل ثبت کړئ")
   val commission: String get() = t("پورسانتِ این ماه", "Commission this month", "د دې میاشتې کمېشن")
   val noSales: String get() = t("فروشی ثبت نشده.", "No sales recorded.", "هېڅ پلور نه دی ثبت شوی.")
-  fun unassigned(amount: String): String = t("بی فروشنده: $amount", "No seller: $amount", "بې پلورونکي: $amount")
+  fun unassigned(amount: String): String = t("بی فروشنده: ${asIs(amount)}", "No seller: $amount", "بې پلورونکي: $amount")
   val rates: String get() = t("نرخ‌های پورسانت", "Commission rates", "د کمېشن نرخونه")
   val defaultRate: String get() = t("نرخِ همه (٪)", "Rate for everyone (%)", "د ټولو نرخ (٪)")
-  fun sellerRate(name: String): String = t("نرخِ $name (٪)", "Rate for $name (%)", "د $name نرخ (٪)")
+  fun sellerRate(name: String): String = t("نرخِ ${asIs(name)} (٪)", "Rate for $name (%)", "د $name نرخ (٪)")
   val save: String get() = t("ذخیرهٔ نرخ‌ها", "Save rates", "نرخونه خوندي کړئ")
   val saved: String get() = t("نرخ‌ها ذخیره شد.", "Rates saved.", "نرخونه خوندي شول.")
   val rateInvalid: String get() = t(

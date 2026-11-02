@@ -178,6 +178,16 @@ data class OrdersSummaryDto(
   val serverTime: Long = 0,
   /** ORD-18: هشدارهای «شروعِ سفارشِ زمان‌بندی‌شده» که هنوز شروع نشده‌اند (پرچمِ `shop.orders.start_alert`؛ خاموش ⇒ تهی) */
   val startAlerts: List<OrderStartAlertDto> = emptyList(),
+  /** ORD-10: سفارش‌هایی که «قبولِ خودکار» ِ سرور تازه پذیرفت (پرچمِ `shop.orders.desk`؛ خاموش ⇒ تهی) — برای برگه */
+  val autoAccepted: List<OrderAutoAcceptedDto> = emptyList(),
+)
+
+/** یک «قبولِ خودکار» ِ ORD-04 برای برگهٔ ORD-10 — بی نام، شماره یا نشانی (`order-desk.autoAcceptedOf`) */
+@Serializable
+data class OrderAutoAcceptedDto(
+  val id: String = "",
+  val orderNo: Long = 0,
+  val acceptedAt: Long = 0,
 )
 
 /** یک هشدارِ ORD-18 — بی نام، شماره یا نشانی (`order-start-alert.pendingOf`) */

@@ -12,7 +12,7 @@ object StrPay {
   // دکمه و برگهٔ حساب‌پی
   val payWithHesab: String get() = t("پرداخت با حساب‌پی", "Pay with HesabPay", "د حساب‌پې له لارې ورکړه")
   val resumeHesab: String get() = t("ادامهٔ پرداختِ حساب‌پی", "Continue the HesabPay payment", "د حساب‌پې ورکړه پسې ونیسئ")
-  fun coversRest(a: Any): String = t("حساب‌پی باقی‌مانده را می‌پردازد: $a ؋", "HesabPay pays the rest: $a ؋", "حساب‌پې پاتې برخه ورکوي: $a ؋")
+  fun coversRest(a: Any): String = t("حساب‌پی باقی‌مانده را می‌پردازد: ${asIs(a)} ؋", "HesabPay pays the rest: $a ؋", "حساب‌پې پاتې برخه ورکوي: $a ؋")
   val hesabTitle: String get() = t("حساب‌پی", "HesabPay", "حساب‌پې")
   val scanHint: String get() = t(
     "مشتری این کد را با برنامهٔ حساب‌پی اسکن کند — با کیف پولِ حساب‌پی یا کارتِ بانکیِ AfPay",
@@ -22,7 +22,7 @@ object StrPay {
   val tapHint: String get() = t("یا گوشیِ مشتری را به این دستگاه نزدیک کنید", "Or hold the customer's phone near this device", "یا د پیرودونکي موبایل دې وسیلې ته نږدې کړئ")
   val nfcOff: String get() = t("NFC خاموش است — برای لمسِ گوشیِ مشتری روشنش کنید", "NFC is off — turn it on so the customer can tap", "NFC بند دی — چالان یې کړئ چې پیرودونکی خپل موبایل ولګوي")
   val nfcSettings: String get() = t("تنظیماتِ NFC", "NFC settings", "د NFC امستنې")
-  fun expiresIn(left: Any): String = t("مهلت: $left", "Expires in $left", "پای ته وخت: $left")
+  fun expiresIn(left: Any): String = t("مهلت: ${asIs(left)}", "Expires in $left", "پای ته وخت: $left")
 
   // وضعیت
   val creating: String get() = t("در حالِ ساختنِ پرداخت…", "Creating the payment…", "ورکړه جوړېږي…")

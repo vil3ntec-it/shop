@@ -34,7 +34,7 @@ object StrSimpleAsk {
     "دا پوښتنه مې ونه پوهېده. یوه چمتو پوښتنه وټاکئ.",
   )
   fun unknownWords(words: Any): String = t(
-    "این واژه‌ها در این پرسش شناخته نشد: $words — یکی از پرسش‌های آماده را بزنید یا نام را از فهرست برگزینید.",
+    "این واژه‌ها در این پرسش شناخته نشد: ${asIs(words)} — یکی از پرسش‌های آماده را بزنید یا نام را از فهرست برگزینید.",
     "These words were not recognised in this question: $words — tap a ready question or pick the name from the list.",
     "دا کلمې پدې پوښتنه کې ونه پېژندل شوې: $words — یوه چمتو پوښتنه وټاکئ یا نوم له لېست وټاکئ.",
   )
@@ -48,9 +48,9 @@ object StrSimpleAsk {
     "Your role cannot see money figures; this question is closed to you.",
     "ستاسې رول مالي عددونه نه ویني؛ دا پوښتنه درته تړلې ده.",
   )
-  fun missing(what: Any): String = t("$what را برگزینید.", "Choose the $what.", "$what وټاکئ.")
+  fun missing(what: Any): String = t("${asIs(what)} را برگزینید.", "Choose the $what.", "$what وټاکئ.")
   fun unknown(what: Any): String = t(
-    "این $what در دفتر نیست؛ از فهرست برگزینید.",
+    "این ${asIs(what)} در دفتر نیست؛ از فهرست برگزینید.",
     "This $what is not in the books; pick one from the list.",
     "دا $what په دفتر کې نشته؛ له لېست یو وټاکئ.",
   )
@@ -71,8 +71,8 @@ object StrSimpleAsk {
   val all: String get() = t("از آغاز", "All time", "له پیله")
   val prev: String get() = t("قبلی", "Previous", "مخکېنی")
   val next: String get() = t("بعدی", "Next", "راتلونکی")
-  fun year(n: Any): String = t("سالِ $n", "Year $n", "$n کال")
-  fun range(from: Any, to: Any): String = t("$from تا $to", "$from to $to", "له $from تر $to")
+  fun year(n: Any): String = t("سالِ ${asIs(n)}", "Year $n", "$n کال")
+  fun range(from: Any, to: Any): String = t("${asIs(from)} تا ${asIs(to)}", "$from to $to", "له $from تر $to")
   val allDates: String get() = t("همهٔ تاریخ‌ها", "All dates", "ټولې نېټې")
   val now: String get() = t("وضعیتِ همین حالا", "As of now", "همدا اوس")
 
@@ -120,9 +120,9 @@ object StrSimpleAsk {
   val stLow: String get() = t("موجودی کم", "Low stock", "لږه موجودي")
   val stOk: String get() = t("موجود", "In stock", "شته")
   val settled: String get() = t("تسویه شده", "Settled", "تصفیه شوی")
-  fun credit(amount: Any): String = t("$amount پیش‌پرداخت", "$amount in credit", "$amount مخکې ورکړل شوي")
+  fun credit(amount: Any): String = t("${asIs(amount)} پیش‌پرداخت", "$amount in credit", "$amount مخکې ورکړل شوي")
   val none: String get() = t("چیزی نیست", "Nothing here", "هېڅ نشته")
-  fun more(n: Any): String = t("و $n تای دیگر", "and $n more", "او $n نور")
+  fun more(n: Any): String = t("و ${asIs(n)} تای دیگر", "and $n more", "او $n نور")
 
   // فرمول و منبع
   val formula: String get() = t("فرمول و منبع", "Formula and source", "فورمول او سرچینه")

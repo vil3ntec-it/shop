@@ -84,7 +84,6 @@ import ir.vil3ntec.tohid.ui.components.common.ViewMode
 import ir.vil3ntec.tohid.ui.components.common.ViewModePref
 import ir.vil3ntec.tohid.ui.components.common.rememberViewMode
 import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.components.common.openOnMap
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
@@ -327,10 +326,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
       }.isSuccess
       if (!opened) scope.launch { snackbar.showSnackbar("شماره‌گیرِ گوشی باز نشد") }
     },
-    onNavigate = { c ->
-      val lat = c.lat; val lng = c.lng
-      if (lat != null && lng != null) openOnMap(context, lat, lng, c.landmark.ifBlank { "مقصد" })
-    },
+    onNavigate = { c -> openMissionRoute(context, c) },   // DLV-05: پیوندهای سرور، وگرنه همان پیشین
     onSignOut = {
       scope.launch {
         runCatching { Backend.auth(context).signOut() }

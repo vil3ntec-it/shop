@@ -165,6 +165,21 @@ test('یادداشتِ ردیف و فاکتور (POS-11) روی صفحهٔ عم�
   assert.ok(y.items.every((it) => !('note' in it)));
 });
 
+test('گردکردنِ نقدی (PAY-09، `roundingMinor`): ردیفِ جدا با علامت؛ بی گرد کلیدی نیست', async () => {
+  const a = await shop('گرد');
+  const up = newToken();
+  const down = newToken();
+  const plain = newToken();
+  await sell(a, 'sale-r1', up, { finalTotal: 402, paidAmount: 402, roundingMinor: 200 });
+  await sell(a, 'sale-r2', down, { finalTotal: 397, paidAmount: 397, roundingMinor: -300 });
+  await sell(a, 'sale-r3', plain, { roundingMinor: 0 });
+  const x = (await read(a.tag, up)).body.receipt;
+  assert.equal(x.rounding.label, 'گردکردنِ نقدی');
+  assert.match(x.rounding.amount, /^\+/);
+  assert.match((await read(a.tag, down)).body.receipt.rounding.amount, /^−/);
+  assert.ok(!('rounding' in (await read(a.tag, plain)).body.receipt));
+});
+
 test('ناشناخته، همگام‌نشده، نشانِ دکانِ دیگر و شکلِ بد: یک ۴۰۴ ِ یکسان', async () => {
   const a = await shop('ب');
   const b = await shop('پ');
