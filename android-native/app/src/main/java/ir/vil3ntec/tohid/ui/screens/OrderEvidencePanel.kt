@@ -157,7 +157,7 @@ private fun DraftForm(c: OrderEvidenceController, d: OrderEvidence.Draft, curren
       Text(StrEvidence.dueLabel, style = MaterialTheme.typography.labelLarge, color = colors.muted)
       Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         for (h in OrderEvidence.DUE_HOURS) TohidFilterChip(label = StrEvidence.dueIn(h), selected = d.dueHours == h,
-          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueAt(System.currentTimeMillis(), h), dueHours = h)) })
+          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueIn(h), dueHours = h)) })
       }
     }
     OrderEvidence.Act.NOTE -> Unit

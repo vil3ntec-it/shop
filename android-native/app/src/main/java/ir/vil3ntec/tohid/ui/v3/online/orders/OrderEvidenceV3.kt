@@ -165,7 +165,7 @@ private fun DraftV3(c: OrderEvidenceController, d: OrderEvidence.Draft, current:
       Text(StrEvidence.dueLabel, style = V3Type.subhead, color = muted, modifier = pad)
       FlowRow(pad, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         for (h in OrderEvidence.DUE_HOURS) V3Chip(StrEvidence.dueIn(h), selected = d.dueHours == h,
-          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueAt(System.currentTimeMillis(), h), dueHours = h)) })
+          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueIn(h), dueHours = h)) })
       }
     }
     OrderEvidence.Act.NOTE -> Unit

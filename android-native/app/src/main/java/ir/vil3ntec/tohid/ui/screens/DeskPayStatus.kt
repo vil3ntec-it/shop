@@ -21,7 +21,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPayStatus
@@ -29,9 +28,7 @@ import ir.vil3ntec.tohid.core.pay.PayStatus
 import ir.vil3ntec.tohid.data.PayStatusFlow
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -63,15 +60,17 @@ internal object DeskPayCell {
   }
 }
 
+/** کاربرِ همین صفحه: [sell] = نقش فروش می‌نویسد، [manage] = صاحب یا مدیر، [me] = نامِ ثبت‌کننده (از `DeskInvoices`) */
+internal data class DeskPayUser(val sell: Boolean, val manage: Boolean, val me: String)
+
 @Composable
-internal fun DeskPayStatus(store: ShopStore, d: ShopData, sale: Sale, onMessage: (String) -> Unit) {
-  val context = LocalContext.current
+internal fun DeskPayStatus(store: ShopStore, d: ShopData, sale: Sale, user: DeskPayUser, onMessage: (String) -> Unit) {
   val scope = rememberCoroutineScope()
-  val sell = remember { ShopRole.canWrite(context, "sales") }
-  val manage = remember { !ShopRole.isStaff(context) }
+  val sell = user.sell
+  val manage = user.manage
+  val me = user.me
   val rows = remember(d, sale.id, sell, manage) { PayStatusFlow.desk(d, sale, sell, manage) }
   if (rows.isEmpty()) return
-  val me = remember { runCatching { SyncStore(context).accountName }.getOrDefault("").trim().ifEmpty { ShopRole.current(context) } }
   //  یک ثبت در هر زمان: ضربهٔ دوم ردیفِ دوم نمی‌سازد (کلید پیش از ثبت ساخته می‌شود)
   var busy by remember(sale.id) { mutableStateOf(false) }
   Column(Modifier.fillMaxWidth().padding(top = 8.dp)) {
@@ -92,7 +91,7 @@ internal fun DeskPayStatus(store: ShopStore, d: ShopData, sale: Sale, onMessage:
               val key = Ulid.next()
               val req = PayStatusFlow.Request(sale.id, r.view.index, to, me, sell, manage)
               scope.launch {
-                val out = PayStatusFlow.record(store, key, req, todayIso(), System.currentTimeMillis())
+                val out = PayStatusFlow.record(store, key, req, todayIso(), ir.vil3ntec.tohid.data.ReportBridge.nowMs())
                 onMessage(
                   when (out) {
                     is PayStatusFlow.Saved.Ok -> StrPayStatus.done

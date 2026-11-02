@@ -71,6 +71,13 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
   val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
   //  PAY-07: سندهای `pay_status` ِ هر فاکتور (دفترِ بی سند ⇒ نقشهٔ خالی، همان ستونِ امروز)
   val payChanges = remember(d) { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d) }
+  val payUser = remember {
+    val role = ir.vil3ntec.tohid.data.ShopRole
+    DeskPayUser(
+      sell = role.canWrite(context, "sales"), manage = !role.isStaff(context),
+      me = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim().ifEmpty { role.current(context) },
+    )
+  }
   val list = remember(d, search, from, to, pay, state) {
     val q = search.trim()
     d.sales
@@ -173,7 +180,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
         Spacer(Modifier.width(12.dp))
         Column(Modifier.width(380.dp).fillMaxHeight()) {
           InvoicePeek(d, sale, Modifier.weight(1f).fillMaxWidth()) { show = sale }
-          DeskPayStatus(store, d, sale, ::toast)   // PAY-07: فاکتورِ بی ردیفِ غیرنقد ⇒ هیچ
+          DeskPayStatus(store, d, sale, payUser, ::toast)   // PAY-07: فاکتورِ بی ردیفِ غیرنقد ⇒ هیچ
           Spacer(Modifier.height(6.dp))
           OutlinedButton(onClick = { saleSheet(d, sale).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, modifier = Modifier.fillMaxWidth()) {
             Text(StrInvoices.printA4)

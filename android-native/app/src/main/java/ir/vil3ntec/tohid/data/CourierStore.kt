@@ -35,7 +35,7 @@ class CourierStore(context: Context) {
 
   /** DLV-10: کارت‌ها با رمزِ دفترِ دستگاه اگر «رمزگذاریِ داده» روشن است (`CourierSeal`)؛ خاموش ⇒ همان JSON ِ امروز */
   fun cards(scope: String): List<MissionCard> =
-    CourierCodec.cards(CourierSeal.unwrap(prefs.getString(cardsKey(scope), null)) { AtRest.open(app, it) })
+    CourierCodec.cards(CourierSeal.unwrap(prefs.getString(cardsKey(scope), null)) { AtRest.codec(app).open(it) })
   fun saveCards(scope: String, cards: List<MissionCard>) {
     val json = CourierCodec.cardsJson(MissionView.forStorage(cards))
     prefs.edit().putString(cardsKey(scope), CourierSeal.wrap(json) { AtRest.encode(app, it) }).apply()

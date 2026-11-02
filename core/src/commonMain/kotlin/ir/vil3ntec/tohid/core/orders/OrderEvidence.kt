@@ -58,6 +58,8 @@ object OrderEvidence {
   /** مهلت‌های آمادهٔ «سپردن» (ساعت از اکنون) — سرور تا ۹۰ روز می‌پذیرد */
   val DUE_HOURS: List<Int> = listOf(2, 24, 72)
   fun dueAt(now: Long, hours: Int): Long = now + hours * 3_600_000L
+  /** همان [dueAt] از ساعتِ همین دستگاه (هسته، بی وابستگیِ پلتفرمی در صفحه) */
+  fun dueIn(hours: Int): Long = dueAt(ir.vil3ntec.tohid.core.platform.currentTimeMillis(), hours)
   private val USER = Regex("^[A-Za-z0-9_-]{1,80}$")
   fun validUserId(id: String): Boolean = USER.matches(id)
   val probePath: String get() = "$ROOT/$PROBE_ID"
