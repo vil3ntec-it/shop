@@ -18,7 +18,10 @@
  * • مانده = Σ «give» − Σ بقیه به واحدِ کوچک (همان `DebtBook.creditCheck`): مثبت = مشتری بدهکار، منفی = طلبکار.
  * • صفحه‌بندی: نشانگر = شمارِ ردیف‌های دیده‌شده (هیچ شناسه‌ای بیرون نمی‌رود). سقفِ هر خواندن MAX_ROWS ردیف
  *   از هر دفتر؛ بیش از آن ⇒ مانده `null`.
- * • امتیازِ وفاداری (PRM-13) هنوز نیست ⇒ هیچ کلیدِ امتیازی در پاسخ نیست.
+ * • امتیازِ وفاداری (PRM-13): کلیدِ `loyalty` (`{points, tier, soon, soonAt}`) **فقط** وقتی قاعدهٔ یکسانِ دکان روشن است
+ *   (`shop.loyalty_rule` + قاعدهٔ ذخیره‌شده با `on`، `lib/loyalty-rule.js`) — قاعدهٔ فقط‌دستگاهی سطح و انقضا را به سرور
+ *   نمی‌دهد. مانده از ردیف‌های همگام‌شدهٔ `loyalty_*` ِ همین قرض‌دارها (و قرض‌دارهای ادغام‌شده در آن‌ها، CRM-10) با همان
+ *   انقضای FIFO ِ برنامه (`lib/loyalty-balance.js`)؛ سطح از خریدِ ۱۲ ماهه منهای برگشت. دفترِ بریده (بیش از سقف) ⇒ بی کلید.
  */
 const config = require('../config');
 const { many } = require('../db');
@@ -30,12 +33,16 @@ const validate = require('./validate');
 const receipts = require('./receipt-token');
 const profiles = require('./receipt-profile');
 const { badRequest } = require('../middleware/errors');
+const loyaltyRule = require('./loyalty-rule');
+const loyaltyBalance = require('./loyalty-balance');
 
 const FLAG = 'shop.storefront.account_history';
 const PAGE = 10;
 const MAX_PAGE = 50;
 const MAX_DEBTORS = 10;
 const MAX_ROWS = 20000;
+const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+const LOYALTY_TYPES = Object.keys(loyaltyBalance.TYPES);
 const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
 const STORES = Object.freeze([{ fmt: 'v1', table: 'sync_rows' }, { fmt: 'v3', table: 'sync_v3_rows' }]);
 const ONLINE_SERIES = new Set(['O', 'W']);
@@ -201,15 +208,61 @@ function onlinePage(sf, phone, opts) {
     .then((r) => ({ items: r.orders, nextCursor: r.nextCursor }));
 }
 
+/** همین قرض‌دارها و هر قرض‌دارِ ادغام‌شده در آن‌ها (CRM-10؛ ردیفِ امتیاز شناسهٔ پیش از ادغام را دارد)، تا سه لایه */
+async function familyOf(shopId, ids) {
+  const all = [...ids];
+  let frontier = ids;
+  for (let i = 0; i < 3 && frontier.length && all.length < MAX_DEBTORS * 4; i++) {
+    const rows = await liveRows(shopId, 'debtors', `data->>'mergedInto' = ANY($2::text[])`, [frontier]);
+    frontier = rows.map((r) => r.id).filter((id) => !all.includes(id)).sort();
+    all.push(...frontier);
+  }
+  return all.slice(0, MAX_DEBTORS * 4);
+}
+
+/**
+ * امتیاز و سطحِ همین مشتری (PRM-13) — فقط با قاعدهٔ روشنِ دکان؛ بی پیوند، بی قاعده یا دفترِ بریده ⇒ `null` (بی کلید).
+ * [at] = لحظهٔ سنجش (انقضا و پنجرهٔ ۱۲ ماههٔ سطح).
+ */
+async function loyaltyOf(shopId, ids, at = Date.now()) {
+  if (!ids.length) return null;
+  const rule = await loyaltyRule.activeRule(shopId);
+  if (!rule) return null;
+  const fam = await familyOf(shopId, ids);
+  const rows = await liveRows(shopId, 'auditLog', `data->>'payRef' = ANY($2::text[]) AND data->>'type' = ANY($3::text[])`, [fam, LOYALTY_TYPES]);
+  if (rows.truncated) return null;
+  const events = rows.map((r) => {
+    const p = Number(r.d.points);
+    return { id: r.id, kind: loyaltyBalance.TYPES[r.d.type], points: Number.isSafeInteger(p) ? p : 0, saleId: str(r.d.refId), at: num(r.d.createdAt) };
+  }).filter((e) => e.kind);
+  const st = loyaltyBalance.state(events, rule, at);
+  //  سطح: خریدِ لغونشدهٔ ۱۲ ماهِ پیش منهای برگشت‌هایشان (همان `LoyaltyPoints.spendAfn`)
+  const sales = await liveRows(shopId, 'sales', `data->>'debtorId' = ANY($2::text[])`, [fam]);
+  if (sales.truncated) return null;
+  const inWindow = sales.filter((s) => s.d.status !== 'cancelled' && num(s.d.createdAt) >= at - YEAR_MS && num(s.d.createdAt) < at);
+  let minor = inWindow.reduce((a, s) => a + s.minor('finalTotal'), 0);
+  if (inWindow.length) {
+    const back = await liveRows(shopId, 'returns', `data->>'saleId' = ANY($2::text[])`, [inWindow.map((s) => s.id)]);
+    if (back.truncated) return null;
+    minor -= back.reduce((a, r) => a + r.minor('amount'), 0);
+  }
+  return {
+    points: st.balance, tier: loyaltyBalance.tier(rule, Math.floor(Math.max(0, minor) / 100)),
+    soon: st.soon, soonAt: st.soonAt,
+  };
+}
+
 /** نخستین صفحهٔ هر سه بخش و مانده */
 async function summary(sf, phone) {
   const ids = await debtorsOf(sf.shop_id, phone);
-  const [online, purchases, ledger] = await Promise.all([
-    onlinePage(sf, phone, {}), purchasesPage(sf.shop_id, ids, {}), ledgerOf(sf.shop_id, ids),
+  const [online, purchases, ledger, loyalty] = await Promise.all([
+    onlinePage(sf, phone, {}), purchasesPage(sf.shop_id, ids, {}), ledgerOf(sf.shop_id, ids), loyaltyOf(sf.shop_id, ids),
   ]);
   return {
     linked: ids.length > 0,
     balanceMinor: ledger.balanceMinor,
+    //  PRM-13: فقط با قاعدهٔ روشنِ دکان — خاموش ⇒ پاسخ بایت‌به‌بایت همان پیشین
+    ...(loyalty ? { loyalty } : {}),
     online, purchases,
     ledger: pageOf(ledger.entries, {}),
   };
@@ -226,4 +279,4 @@ async function part(sf, phone, name, opts) {
   return { balanceMinor: ledger.balanceMinor, ...pageOf(ledger.entries, opts) };
 }
 
-module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, phoneKeyOf };
+module.exports = { FLAG, PARTS, flagOn, summary, part, debtorsOf, phoneKeyOf, loyaltyOf };
