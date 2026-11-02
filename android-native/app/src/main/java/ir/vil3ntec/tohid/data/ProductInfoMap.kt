@@ -67,9 +67,14 @@ object ProductInfoMap {
   /**
    *  PRD-09 — موجودیِ فروختنی برای سقفِ سبد و ثبتِ فروش: همان `ShopStore.stock`، جز کالای خدماتی یا بی
    *  موجودی که سقف ندارد. کالای بی این پرچم (همهٔ دفترهای پیشین) ⇒ دقیقاً همان `ShopStore.stock`.
+   *  POS-27: منهای کالای کنارگذاشتهٔ امانی‌های باز جز سندِ [except] (`Layaways.reserved`؛ تنظیمِ خاموش ⇒ ۰ و همان عدد).
    */
-  fun sellable(d: ShopData, productId: String): Double =
-    if (d.products.any { it.id == productId && it.stockless == true }) STOCKLESS else ShopStore.stock(d, productId)
+  fun sellable(d: ShopData, productId: String, except: String? = null): Double {
+    if (d.products.any { it.id == productId && it.stockless == true }) return STOCKLESS
+    val stock = ShopStore.stock(d, productId)
+    val held = Layaways.reserved(d, productId, except)
+    return if (held == 0.0) stock else stock - held
+  }
 
   /** «بی‌سقف» ِ کالای خدماتی — بزرگ ولی متناهی تا جمع و تفریقِ سبد سالم بماند */
   const val STOCKLESS: Double = 1e12

@@ -51,4 +51,13 @@ class LayawayWiringTest {
     assertEquals(1, count("data/CashShift.kt", "Layaways.isRefund(it)"))
     assertEquals(2, count("data/PayFlow.kt", "Layaways.isRefund(t)"))
   }
+
+  @Test fun `کنار گذاشتنِ کالا فقط از یک گلوگاه و با تنظیمِ همین دستگاه`() {
+    //  سقفِ سبد و ثبتِ فروش هر دو از `ProductInfoMap.sellable`؛ موجودیِ انبار (`ShopStore.stock`) دست نمی‌خورد
+    assertEquals(1, count("data/ProductInfoMap.kt", "Layaways.reserved(d, productId, except)"))
+    assertEquals(1, count("data/SalesEngine.kt", "ProductInfoMap.sellable(d, p.id, ownReservation)"))
+    assertEquals(0, count("data/ShopStore.kt", "Layaways."))
+    assertEquals(1, count("data/Layaways.kt", "ownReservation = v.id"))
+    for (rel in listOf("ui/AppRoot.kt", "ui/legacy/AppRootLegacy.kt")) assertEquals(rel, 1, count(rel, "LayawayPref.load(context)"))
+  }
 }

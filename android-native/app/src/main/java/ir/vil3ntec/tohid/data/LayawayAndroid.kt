@@ -17,8 +17,12 @@ object LayawayPref {
 
   fun on(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, false) }.getOrDefault(false)
 
+  /** سرِ برنامه (`AppRoot`، کنارِ `StockFlag.load`): کنار گذاشتنِ کالای امانی‌های باز فقط با همین تنظیم (`Layaways.reserving`) */
+  fun load(context: Context): Boolean = on(context).also { Layaways.reserving = it }
+
   fun set(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(KEY, on).apply()
+    Layaways.reserving = on
   }
 
   sealed interface Saved {

@@ -132,7 +132,7 @@ fun AppRootLegacy(
 ) {
   val context = LocalContext.current
   //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
-  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }; remember(context) { ir.vil3ntec.tohid.data.LayawayPref.load(context) } // POS-27: کنار گذاشتنِ کالای امانی فقط با تنظیمِ همین دستگاه
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()

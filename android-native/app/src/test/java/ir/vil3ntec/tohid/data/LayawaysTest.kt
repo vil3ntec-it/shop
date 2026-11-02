@@ -7,6 +7,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 
 /**
@@ -30,6 +32,10 @@ class LayawaysTest {
   private val cart = listOf(SalesEngine.CartLine("p1", 1.0), SalesEngine.CartLine("p2", 2.0))
   private var seq = 0
   private fun newId() = "n${seq++}"
+
+  //  کنار گذاشتنِ کالا همان تنظیمِ روشن است (`LayawayPref.load`)؛ پس از هر آزمون خاموش، تا آزمونِ دیگری اثر نگیرد
+  @Before fun on() { Layaways.reserving = true }
+  @After fun off() { Layaways.reserving = false }
 
   private class Disk(var ledger: ShopData) {
     var writes = 0
@@ -306,5 +312,72 @@ class LayawaysTest {
     assertEquals("REVIEW", code(pay(disk, 100_000)))
     assertNull(Layaways.find(disk.ledger, "nope", today))
     assertNotNull(Layaways.find(disk.ledger, "L1", today))
+  }
+
+  /* ───────────────────────────── کنار گذاشتنِ کالا ───────────────────────────── */
+
+  /** فقط یک یخچال در انبار */
+  private val last = base.copy(warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1", units = 1.0)))
+  private val fridge = listOf(SalesEngine.CartLine("p1", 1.0))
+
+  private fun tillSale(d: ShopData, id: String) =
+    SalesEngine.record(d, fridge, SalesEngine.Checkout(seller = "رضا"), today, t0 + 9000, ::newId, saleId = id)
+
+  @Test fun `امانیِ دوم روی همان واحدِ آخر رد می‌شود`() {
+    val disk = Disk(last)
+    assertTrue(create(disk, draft(c = fridge, deposit = 500_000)) is AppendOnce.Outcome.Wrote<*>)
+    //  موجودیِ انبار همان یک است؛ فروختنی صفر
+    assertEquals(1.0, ShopStore.stock(disk.ledger, "p1"), 0.0)
+    assertEquals(0.0, ProductInfoMap.sellable(disk.ledger, "p1"), 0.0)
+    assertEquals(1.0, Layaways.reserved(disk.ledger, "p1"), 0.0)
+    val second = create(disk, draft(c = fridge, deposit = 500_000), key = "L2", at = t0 + 10) as Layaways.Built.Bad
+    assertEquals("SALE", second.code)
+    assertTrue(second.detail!!, second.detail.contains("فروشِ امانی کنار گذاشته شده"))
+    assertEquals(1, disk.ledger.auditLog.count { Layaways.isDoc(it) })
+  }
+
+  @Test fun `فروشِ صندوق از واحدِ کنارگذاشته با پیامِ روشن رد می‌شود و سقفِ سبد همان‌جا می‌ایستد`() {
+    val disk = Disk(last)
+    create(disk, draft(c = fridge, deposit = 500_000))
+    val r = tillSale(disk.ledger, "sX") as SalesEngine.Result.Failed
+    assertEquals("«یخچال»: 1 عدد برای فروشِ امانی کنار گذاشته شده و فروخته نمی‌شود؛ فقط 0 عدد آزاد است، شما 1 عدد خواستید.", r.message.replace(Regex("[۰-۹]")) { (it.value[0] - '۰').toString() })
+    val added = SalesEngine.addToCartCapped(emptyList(), "p1", 1.0, ProductInfoMap.sellable(disk.ledger, "p1"))
+    assertTrue(added.capped)
+    assertTrue(added.cart.isEmpty())
+    //  کالای خدماتی (PRD-09) و قلمِ آزاد کنار گذاشته نمی‌شوند
+    val service = disk.ledger.copy(products = disk.ledger.products.map { if (it.id == "p1") it.copy(stockless = true) else it })
+    assertEquals(ProductInfoMap.STOCKLESS, ProductInfoMap.sellable(service, "p1"), 0.0)
+  }
+
+  @Test fun `تحویلِ همان سند سهمِ خودش را مصرف می‌کند و مانعش نیست`() {
+    val disk = Disk(last)
+    create(disk, draft(c = fridge, deposit = 500_000, count = 1))
+    pay(disk, 2_000_000)
+    assertTrue(deliver(disk) is AppendOnce.Outcome.Wrote<*>)
+    val d = disk.ledger
+    assertEquals(1, d.sales.size)
+    assertEquals(0.0, ShopStore.stock(d, "p1"), 0.0)
+    //  بی شمارِ دوباره: سندِ تحویل‌شده دیگر چیزی کنار نمی‌گذارد
+    assertEquals(0.0, Layaways.reserved(d, "p1"), 0.0)
+    assertEquals(0.0, ProductInfoMap.sellable(d, "p1"), 0.0)
+  }
+
+  @Test fun `لغو واحد را آزاد می‌کند و صندوق دوباره می‌فروشد`() {
+    val disk = Disk(last)
+    create(disk, draft(c = fridge, deposit = 500_000))
+    assertTrue(tillSale(disk.ledger, "sY") is SalesEngine.Result.Failed)
+    cancel(disk)
+    assertEquals(0.0, Layaways.reserved(disk.ledger, "p1"), 0.0)
+    assertEquals(1.0, ProductInfoMap.sellable(disk.ledger, "p1"), 0.0)
+    assertTrue(tillSale(disk.ledger, "sY") is SalesEngine.Result.Ok)
+  }
+
+  @Test fun `تنظیمِ خاموش هیچ کالایی کنار نمی‌گذارد`() {
+    val disk = Disk(last)
+    create(disk, draft(c = fridge, deposit = 500_000))
+    Layaways.reserving = false
+    assertEquals(0.0, Layaways.reserved(disk.ledger, "p1"), 0.0)
+    assertEquals(1.0, ProductInfoMap.sellable(disk.ledger, "p1"), 0.0)
+    assertTrue(tillSale(disk.ledger, "sZ") is SalesEngine.Result.Ok)
   }
 }
