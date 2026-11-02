@@ -377,6 +377,32 @@ async function notifyManagers(shopId, { open, oldestMinutes }) {
 }
 
 /** کارگرِ هر دقیقه: دکان‌هایی که توقفِ خودکار روشن دارند و الان متوقف نیستند. خروجی: شمارِ متوقف‌شده‌ها. */
+// ── ORD-10: برگهٔ سفارشی که «قبولِ خودکار» پذیرفت ───────────────────────
+/** پنجرهٔ «تازه» برای برگه: پس از این، سفارشِ خودکارپذیرفته دیگر در فهرست نیست (چاپِ دیرهنگام نه) */
+const AUTO_PRINT_MS = 30 * MIN;
+const AUTO_PRINT_MAX = 20;
+
+/**
+ * سفارش‌هایی که «قبولِ خودکار» (بازیگرِ سیستم) در [AUTO_PRINT_MS] ِ اخیر پذیرفت و هنوز «قبول‌شده»اند — برای
+ * برگهٔ سفارش روی دستگاهی که «برگهٔ قبولِ خودکار» را روشن کرده (`GET /orders/summary`، فقط با همین پرچم).
+ * هیچ دستگاهی «قبول» را نزده، پس «یک قبول، یک برگه» ِ دستگاه این‌ها را نمی‌بیند. بی نام، شماره و نشانی؛
+ * سفارشِ آزمایشی و قبولِ کارمند نه.
+ */
+async function autoAcceptedOf(shopId, at = now()) {
+  const rows = await many(
+    `SELECT o.id, o.order_no, MAX(e.created_at) AS accepted_at
+       FROM online_orders o
+       JOIN online_order_events e ON e.order_id = o.id AND e.shop_id = o.shop_id
+        AND e.kind = 'status' AND e.to_status = 'accepted' AND e.actor_type = 'system'
+      WHERE o.shop_id = $1 AND o.status = 'accepted' AND o.is_test = false AND e.created_at > $2
+      GROUP BY o.id, o.order_no
+      ORDER BY accepted_at, o.id
+      LIMIT $3`,
+    [String(shopId), at - AUTO_PRINT_MS, AUTO_PRINT_MAX]
+  );
+  return rows.map((r) => ({ id: r.id, orderNo: Number(r.order_no), acceptedAt: Number(r.accepted_at) }));
+}
+
 async function sweep(at = now()) {
   const rows = await many(
     `SELECT shop_id FROM order_desk WHERE auto_pause AND (paused_until IS NULL OR paused_until <= $1)
@@ -416,4 +442,5 @@ module.exports = {
   FLAG_KEY, PAUSE_REASONS, AUTO_REASON, OPEN_STATUSES, PREP_STATUSES, QUEUE_SQL,
   flagOf, view, stateOf, busy, pause, resume, saveSettings,
   guardCheckout, overlay, afterOrder, evaluateAutoPause, sweep, start, stop,
+  AUTO_PRINT_MS, autoAcceptedOf,
 };

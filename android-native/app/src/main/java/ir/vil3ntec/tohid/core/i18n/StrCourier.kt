@@ -11,14 +11,14 @@ object StrCourier {
   // اسکنِ کیسه‌ها (DLV-07)
   val bagsTitle: String get() = t("اسکنِ کیسه‌ها", "Scan the bags", "د کڅوړو سکن")
   fun bagsHint(bags: Int): String = t(
-    "برچسبِ هر $bags کیسه را اسکن کنید؛ بعد «بسته را گرفتم».",
+    "برچسبِ هر ${asIs(bags)} کیسه را اسکن کنید؛ بعد «بسته را گرفتم».",
     "Scan the label of all $bags bags, then confirm the pickup.",
     "د ټولو $bags کڅوړو لیبل سکن کړئ؛ بیا «بسته مې واخیسته».",
   )
   val scanBag: String get() = t("اسکنِ برچسبِ کیسه", "Scan bag label", "د کڅوړې لیبل سکن کړئ")
   val add: String get() = t("افزودن", "Add", "زیاتول")
-  fun bagOk(bag: Int, of: Int): String = t("کیسهٔ $bag از $of", "Bag $bag of $of", "کڅوړه $bag له $of څخه")
-  fun missing(list: String): String = t("مانده: $list", "Missing: $list", "پاتې: $list")
+  fun bagOk(bag: Int, of: Int): String = t("کیسهٔ ${asIs(bag)} از ${asIs(of)}", "Bag $bag of $of", "کڅوړه $bag له $of څخه")
+  fun missing(list: String): String = t("مانده: ${asIs(list)}", "Missing: $list", "پاتې: $list")
   val wrongOrder: String get() = t("این کیسه مالِ سفارشِ دیگری است", "This bag belongs to another order", "دا کڅوړه د بل فرمایش ده")
   val mismatch: String get() = t(
     "برچسب با تعدادِ کیسه‌های بسته نمی‌خواند؛ از دکان برچسبِ تازه بخواهید",
@@ -36,7 +36,7 @@ object StrCourier {
     "موقعیت ونه موندل شو؛ موقعیت‌یاب روښانه کړئ او بیا هڅه وکړئ",
   )
   fun tooFar(distanceM: Long, maxM: Int): String = t(
-    "$distanceM متر از پینِ مشتری دورید؛ «تحویل شد» تا $maxM متر ثبت می‌شود. نزدیک‌تر بروید یا به دکان زنگ بزنید.",
+    "${asIs(distanceM)} متر از پینِ مشتری دورید؛ «تحویل شد» تا ${asIs(maxM)} متر ثبت می‌شود. نزدیک‌تر بروید یا به دکان زنگ بزنید.",
     "You are $distanceM m from the customer's pin; delivery is recorded within $maxM m. Move closer or call the shop.",
     "تاسو د پېرودونکي له پن څخه $distanceM متره لرې یاست؛ «وسپارل شو» تر $maxM مترو پورې ثبتېږي. نږدې ورشئ یا دوکان ته زنګ ووهئ.",
   )
@@ -54,10 +54,10 @@ object StrCourier {
     "Your location is unavailable; the order starts from one of the stops.",
     "ستاسو موقعیت ونه رسېد؛ ترتیب له یوې پتې پیلېږي.",
   )
-  fun stop(seq: Int, landmark: String): String = t("ایستگاهِ $seq: $landmark", "Stop $seq: $landmark", "تمځای $seq: $landmark")
-  fun meters(m: Long): String = t("$m متر", "$m m", "$m متره")
-  fun km(km: String): String = t("$km کیلومتر", "$km km", "$km کیلومتره")
-  fun total(km: String): String = t("همهٔ راه: $km کیلومتر", "Whole route: $km km", "ټوله لار: $km کیلومتره")
+  fun stop(seq: Int, landmark: String): String = t("ایستگاهِ ${asIs(seq)}: ${asIs(landmark)}", "Stop $seq: $landmark", "تمځای $seq: $landmark")
+  fun meters(m: Long): String = t("${asIs(m)} متر", "$m m", "$m متره")
+  fun km(km: String): String = t("${asIs(km)} کیلومتر", "$km km", "$km کیلومتره")
+  fun total(km: String): String = t("همهٔ راه: ${asIs(km)} کیلومتر", "Whole route: $km km", "ټوله لار: $km کیلومتره")
   val noPin: String get() = t("بی پین — آخرِ راه", "No pin — last", "بې پن — د لارې په پای کې")
   val noLandmark: String get() = t("بی نشانه", "No landmark", "بې نښه")
   val routeEmpty: String get() = t("مأموریتِ پذیرفته‌ای برای مسیر نیست", "No accepted missions for a route", "د لارې لپاره منل شوې دنده نشته")
@@ -65,7 +65,7 @@ object StrCourier {
   // امتیاز (DLV-18)
   val rate: String get() = t("امتیاز به این تحویل", "Rate this delivery", "دې سپارنې ته نمره ورکړئ")
   val rateTitle: String get() = t("تحویل چطور بود؟", "How was the delivery?", "سپارنه څنګه وه؟")
-  fun stars(n: Int): String = t("$n ستاره", "$n stars", "$n ستوري")
+  fun stars(n: Int): String = t("${asIs(n)} ستاره", "$n stars", "$n ستوري")
   val send: String get() = t("ثبت", "Save", "ثبتول")
   val rated: String get() = t("امتیاز ثبت شد؛ سپاس", "Rating saved; thank you", "نمره ثبت شوه؛ مننه")
   val rateOnline: String get() = t("امتیاز فقط با اینترنت فرستاده می‌شود", "Ratings need the internet", "نمره یوازې له انټرنټ سره لېږل کېږي")
@@ -94,15 +94,15 @@ object StrCourier {
     "تېرې ۹۰ ورځې. یوازې خاوند او مدیر یې ویني؛ سپارونکي او پېرودونکي د یو بل نمرې نه ویني.",
   )
   fun fromCustomers(avg: String, n: Int): String = t(
-    "مشتری‌ها به پیک: $avg از 5 ($n امتیاز)", "Customers to courier: $avg of 5 ($n ratings)", "پېرودونکي سپارونکي ته: $avg له 5 ($n نمرې)",
+    "مشتری‌ها به پیک: ${asIs(avg)} از 5 (${asIs(n)} امتیاز)", "Customers to courier: $avg of 5 ($n ratings)", "پېرودونکي سپارونکي ته: $avg له 5 ($n نمرې)",
   )
   fun byCourier(avg: String, n: Int): String = t(
-    "پیک به تحویل‌ها: $avg از 5 ($n امتیاز)", "Courier on deliveries: $avg of 5 ($n ratings)", "سپارونکی سپارنو ته: $avg له 5 ($n نمرې)",
+    "پیک به تحویل‌ها: ${asIs(avg)} از 5 (${asIs(n)} امتیاز)", "Courier on deliveries: $avg of 5 ($n ratings)", "سپارونکی سپارنو ته: $avg له 5 ($n نمرې)",
   )
-  fun tagCount(tag: String, n: Int): String = t("$tag: $n", "$tag: $n", "$tag: $n")
+  fun tagCount(tag: String, n: Int): String = t("${asIs(tag)}: ${asIs(n)}", "$tag: $n", "$tag: $n")
   val ratingsEmpty: String get() = t("در ۹۰ روزِ گذشته امتیازی نیست", "No ratings in the last 90 days", "په تېرو ۹۰ ورځو کې نمره نشته")
   val ratingsFailed: String get() = t("امتیازها نیامد", "Ratings did not load", "نمرې رانغلې")
-  fun recent(orderNo: Long, stars: Int): String = t("سفارش #$orderNo · $stars ستاره", "Order #$orderNo · $stars stars", "فرمایش #$orderNo · $stars ستوري")
+  fun recent(orderNo: Long, stars: Int): String = t("سفارش #${asIs(orderNo)} · ${asIs(stars)} ستاره", "Order #$orderNo · $stars stars", "فرمایش #$orderNo · $stars ستوري")
   val raterCustomer: String get() = t("مشتری", "Customer", "پېرودونکی")
   val raterCourier: String get() = t("پیک", "Courier", "سپارونکی")
 }

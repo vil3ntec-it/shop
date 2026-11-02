@@ -44,9 +44,9 @@ object StrFields {
   )
   val crmConsentSource: String get() = t("منبعِ رضایت (مثلاً حضوری یا تلفنی)", "Source of consent (for example in person or by phone)", "د رضایت سرچینه (د بېلګې په توګه حضوري یا تلیفوني)")
   val crmConsentSourceNeeded: String get() = t("برای «بله» منبعِ رضایت را بنویسید", "Write where the “yes” came from", "د «هو» سرچینه ولیکئ")
-  fun crmLastConsent(date: String): String = t("آخرین سندِ رضایت: $date", "Last consent record: $date", "د رضایت وروستی سند: $date")
+  fun crmLastConsent(date: String): String = t("آخرین سندِ رضایت: ${asIs(date)}", "Last consent record: $date", "د رضایت وروستی سند: $date")
   fun crmSummary(group: String, list: String, consent: String): String =
-    t("گروه: $group · قیمت: $list · تبلیغ: $consent", "Group: $group · Price: $list · Marketing: $consent", "ډله: $group · بیه: $list · اعلان: $consent")
+    t("گروه: ${asIs(group)} · قیمت: ${asIs(list)} · تبلیغ: ${asIs(consent)}", "Group: $group · Price: $list · Marketing: $consent", "ډله: $group · بیه: $list · اعلان: $consent")
   val crmSaved: String get() = t("پروندهٔ مشتری ذخیره شد", "Customer file saved", "د پیرودونکي دوسیه خوندي شوه")
   val crmSave: String get() = t("ذخیره", "Save", "خوندي کول")
   val crmNotSaved: String get() = t("ذخیره نشد — دوباره امتحان کنید", "Not saved — try again", "خوندي نه شو — بیا هڅه وکړئ")

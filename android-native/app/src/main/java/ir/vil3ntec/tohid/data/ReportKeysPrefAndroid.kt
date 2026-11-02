@@ -4,7 +4,7 @@ import android.content.Context
 
 /**
  *  RPT-13 — کلیدهای دوره و مقایسه در «گزارش‌ها»ی کامپیوتر، روی **همین دستگاه** (`tohid-policy:report_keys`،
- *  **پیش‌فرض خاموش**): خاموش ⇒ −، + و Ctrl+Shift+C در گزارش‌ها هیچ نمی‌کنند و صفحه همان است که بود.
+ *  **پیش‌فرض روشن** از ۱۴۰۵/۰۸/۱۱، تنظیماتِ کم): خاموش ⇒ −، + و Ctrl+Shift+C در گزارش‌ها هیچ نمی‌کنند و صفحه همان است که بود.
  */
 object ReportKeysPref {
 
@@ -13,7 +13,7 @@ object ReportKeysPref {
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-  fun on(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, false) }.getOrDefault(false)
+  fun on(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, true) }.getOrDefault(false)
 
   fun setOn(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(KEY, on).apply()

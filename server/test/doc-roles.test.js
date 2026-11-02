@@ -290,6 +290,19 @@ test('روشن: درجِ دوبارهٔ ردیفی که پیش‌تر نشسته
   assert.deepEqual(results(r), ['applied'], JSON.stringify(r.body));
 });
 
+test('روشن: فاکتورِ نقدی با ردیفِ جدای گردکردنِ نقدی (PAY-09، `roundingMinor`) داوری نمی‌شود و برای صندوق‌دار می‌نشیند', async () => {
+  //  گرد فیلدِ خودِ فاکتور است (`Sale.roundingMinor`)، نه ردیفِ سابقه یا رسید ⇒ هیچ خانواده‌ای از این داوری نیست
+  const sale = { invoiceNumber: 7001, totalMinor: 12_300, finalTotalMinor: 12_500, roundingMinor: 200, paymentMethod: 'cash', status: 'completed', date: '2026-11-02' };
+  for (const roundingMinor of [200, -300, 500]) assert.equal(docRoles.needOf('sales', { ...sale, roundingMinor }), null);
+  assert.equal(docRoles.needOf('auditLog', { type: 'sale', refId: 'rounded-sale', notes: 'ثبت فروش', amount: 125 }), null);
+  const r = await push3('cashier', [
+    v3op('sales', 'rounded-sale', sale, 'tx.rounded'),
+    v3op('auditLog', 'rounded-sale-a', { type: 'sale', refId: 'rounded-sale', notes: 'ثبت فروش' }, 'tx.rounded'),
+  ]);
+  assert.deepEqual(results(r), ['applied', 'applied'], JSON.stringify(r.body));
+  assert.equal((await inV3('sales', 'rounded-sale')).roundingMinor, 200);
+});
+
 test('v1 (بی تغییر، `sync-v1.js` مشترک با پمپ): پرچمِ روشن هم این ردیف‌ها را فقط با `canWrite` ِ جدول می‌نشاند', async () => {
   const v1 = (rowId, fields) => ({ op_id: oid(), table: 'auditLog', row_id: rowId, type: 'insert', ts: Date.now(), fields });
   const r = await push1('cashier', [v1('v1-void', { type: 'gift_card_void', payRef: CODE, amount: 0, reason: 'کارتِ گم‌شده' })]);

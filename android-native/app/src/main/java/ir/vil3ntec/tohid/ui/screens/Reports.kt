@@ -104,8 +104,13 @@ fun ReportsScreen(d: ShopData) {
   val crmOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context) }
   //  RPT-16 — «پرسشِ ساده» (پیش‌فرض خاموش ⇒ همان زبانه‌های امروز)؛ پرسشِ پولی را خودِ `SimpleAsk` با `canSeeMoney` می‌بندد
   val askOn = remember { ir.vil3ntec.tohid.data.SimpleAskPref.on(context) }
+  //  RPT-17 — «شماره‌های جاافتاده» (`DocGapsPhone.kt`)، همان تنظیمِ خاموشِ کامپیوتر (`DocGapsPref`)
+  val gapsOn = remember { ir.vil3ntec.tohid.data.DocGapsPref.on(context) }
   val shown = (if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections) + crmTabs(crmOn, canSeeMoney) +
-    listOfNotNull(("ask" to ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.tab).takeIf { askOn })
+    listOfNotNull(
+      ("gaps" to ir.vil3ntec.tohid.core.i18n.StrReports.gapsTab).takeIf { gapsOn },
+      ("ask" to ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.tab).takeIf { askOn },
+    )
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
@@ -182,6 +187,7 @@ fun ReportsScreen(d: ShopData) {
       "aging" -> if (crmOn) agingSection(this, d, todayIso())
       "rfm" -> if (crmOn && canSeeMoney) rfmSection(this, d, todayIso())
       "ask" -> if (askOn) simpleAskSection(this, d, canSeeMoney)
+      "gaps" -> if (gapsOn) gapsSection(this, d, todayIso())
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }
@@ -265,6 +271,7 @@ private fun salesSection(
     Panel {
       ReportRow("جمع اقلام", r.gross)
       ReportRow("تخفیف", r.discount, negative = true)
+      if (r.rounding != 0.0) ReportRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(r.rounding), negative = r.rounding < 0) // PAY-09
       ReportRow("فروش خالص", r.net, strong = true)
       HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.border)
       ReportRow("بهای تمام‌شدهٔ کالا", r.cogs, negative = true)

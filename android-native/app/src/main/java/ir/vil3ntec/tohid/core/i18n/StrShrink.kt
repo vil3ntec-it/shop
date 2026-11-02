@@ -19,22 +19,22 @@ object StrShrink {
   val wasteTotal: String get() = t("ضایعات و منقضی", "Waste and expired", "ضایعات او تېر شوي")
   val shrinkTotal: String get() = t("کسریِ خالص", "Net shrinkage", "خالص کمښت")
   val netLoss: String get() = t("زیانِ کل", "Total loss", "ټول زیان")
-  fun ofSales(pct: Any): String = t("$pct٪ فروش", "$pct% of sales", "د پلور $pct٪")
+  fun ofSales(pct: Any): String = t("${asIs(pct)}٪ فروش", "$pct% of sales", "د پلور $pct٪")
   val noSales: String get() = t("بی فروش در بازه", "No sales in this period", "په دې موده کې پلور نشته")
 
   val byKind: String get() = t("به تفکیکِ نوع", "By type", "د ډول له مخې")
   val byProduct: String get() = t("بیشترین زیان", "Largest losses", "تر ټولو لوی زیانونه")
   val topReasons: String get() = t("دلیل‌های پرتکرار", "Common reasons", "ډېر تکرار شوي دلیلونه")
   val noReason: String get() = t("بی دلیل", "No reason given", "بې دلیله")
-  fun rows(n: Any): String = t("$n ردیف", "$n ${pl(n, "row", "rows")}", "$n ${pl(n, "کرښه", "کرښې")}")
+  fun rows(n: Any): String = t("${asIs(n)} ردیف", "$n ${pl(n, "row", "rows")}", "$n ${pl(n, "کرښه", "کرښې")}")
   fun outIn(out: Any, inQty: Any, unit: Any): String = t(
-    "بیرون $out، آمده $inQty $unit",
+    "بیرون ${asIs(out)}، آمده ${asIs(inQty)} ${asIs(unit)}",
     "out $out, in $inQty $unit",
     "وتلي $out، راغلي $inQty $unit",
   )
   val deletedProduct: String get() = t("کالای حذف‌شده", "Deleted product", "ړنګ شوی توکی")
   fun unpriced(n: Any): String = t(
-    "ارزشِ $n ردیف معلوم نیست، چون قیمتِ خریدِ کالا ثبت نشده — در جمع صفر حساب شده است.",
+    "ارزشِ ${asIs(n)} ردیف معلوم نیست، چون قیمتِ خریدِ کالا ثبت نشده — در جمع صفر حساب شده است.",
     "The value of $n ${pl(n, "row", "rows")} is unknown because the product has no purchase price — counted as zero.",
     "د $n ${pl(n, "کرښې", "کرښو")} ارزښت نه دی معلوم، ځکه چې د توکي د پېر بیه نه ده ثبت شوې — په ټولګه کې صفر حساب شوی.",
   )
@@ -54,7 +54,7 @@ object StrShrink {
   val week: String get() = t("۷ روز", "7 days", "۷ ورځې")
   val month: String get() = t("این ماه", "This month", "دا میاشت")
   val all: String get() = t("از آغاز", "All time", "له پیله")
-  fun span(from: Any, to: Any): String = t("$from تا $to", "$from to $to", "له $from تر $to")
+  fun span(from: Any, to: Any): String = t("${asIs(from)} تا ${asIs(to)}", "$from to $to", "له $from تر $to")
 
   // تنظیمات
   val settingsTitle: String get() = t("گزارشِ ضایعات و کسری", "Waste and shrinkage report", "د ضایعاتو او کمښت راپور")

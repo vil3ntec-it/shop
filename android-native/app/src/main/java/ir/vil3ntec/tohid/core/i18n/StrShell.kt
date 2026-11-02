@@ -43,7 +43,7 @@ object StrShell {
 
   // تأییدِ دوبارهٔ هویت (ReauthHost)
   val codeSentShort: String get() = t("کد فرستاده شد.", "Code sent.", "کوډ ولېږل شو.")
-  fun codeSentTo(d: Any): String = t("کد به $d فرستاده شد.", "Code sent to $d.", "$d ته کوډ ولېږل شو.")
+  fun codeSentTo(d: Any): String = t("کد به ${asIs(d)} فرستاده شد.", "Code sent to $d.", "$d ته کوډ ولېږل شو.")
   val reauthTitle: String get() = t("تأییدِ دوبارهٔ هویت", "Confirm it's you", "د هویت بیا تایید")
   val reauthNote: String get() = t("برای امنیتِ حساب، این کار فقط چند دقیقه پس از ورود ممکن است.", "For account security, this can only be done within a few minutes of signing in.", "د حساب د خوندیتوب لپاره، دا کار یوازې له ننوتلو څو دقیقې وروسته کېدای شي.")
   val enterSentCode: String get() = t("کدی را که برایتان فرستاده شد بزنید.", "Enter the code we sent you.", "هغه کوډ ولیکئ چې درته ولېږل شو.")
@@ -79,7 +79,7 @@ object StrShell {
   )
   //  گزارش ← PDF ِ کامپیوتر (RPT-11): بیش از سقفِ صفحه ⇒ PDF ِ ناقص ساخته نمی‌شود
   fun pdfTooManyPages(max: Any): String = t(
-    "PDF ساخته نشد: گزارش بیش از $max صفحه است. بازهٔ کوتاه‌تری بگیرید یا خروجیِ Excel بگیرید.",
+    "PDF ساخته نشد: گزارش بیش از ${asIs(max)} صفحه است. بازهٔ کوتاه‌تری بگیرید یا خروجیِ Excel بگیرید.",
     "PDF not created: the report is longer than $max pages. Choose a shorter period or export to Excel.",
     "PDF جوړ نه شو: راپور له $max پاڼو اوږد دی. لنډه موده وټاکئ یا Excel ته یې وباسئ.",
   )
@@ -96,18 +96,18 @@ object StrShell {
   // مشتری ← متنِ یادآوریِ بدهی (CRM-06) — جای‌نگهدارها ({نام}…) خودِ قالب‌اند و ترجمه نمی‌شوند
   val reminderTemplate: String get() = t("متنِ یادآوریِ بدهی", "Debt reminder text", "د پور د یادونې متن")
   fun reminderTemplateNote(slots: String): String = t(
-    "همین متن در زبانهٔ «یادآوریِ امروز» ِ «گزارش‌ها» و برگهٔ چاپ و اکسلِ آن می‌آید. جای‌نگهدارها: $slots — هر کدام با مقدارِ همان مشتری پر می‌شود.",
+    "همین متن در زبانهٔ «یادآوریِ امروز» ِ «گزارش‌ها» و برگهٔ چاپ و اکسلِ آن می‌آید. جای‌نگهدارها: ${asIs(slots)} — هر کدام با مقدارِ همان مشتری پر می‌شود.",
     "This text is used in the “Today's reminders” tab under “Reports” and its print and Excel sheet. Placeholders: $slots — each is filled with that customer's value.",
     "همدا متن د «راپورونه» د «د نن یادونې» په پاڼه او د هغې د چاپ او اکسل په پاڼه کې راځي. ځای نیونکي: $slots — هر یو د هماغه پیرودونکي په ارزښت ډکېږي.",
   )
-  fun reminderPreview(text: String): String = t("نمونه: $text", "Preview: $text", "بېلګه: $text")
+  fun reminderPreview(text: String): String = t("نمونه: ${asIs(text)}", "Preview: $text", "بېلګه: $text")
   val reminderSampleName: String get() = t("احمد", "Ahmad", "احمد")
   val reminderSampleStore: String get() = t("دکانِ شما", "Your shop", "ستاسو دوکان")
   val reminderDefault: String get() = t("همان متنِ پیش‌فرض", "Use the default text", "اصلي متن")
   val reminderSaved: String get() = t("متنِ یادآوری ذخیره شد", "Reminder text saved", "د یادونې متن خوندي شو")
   val reminderEmpty: String get() = t("متنِ یادآوری خالی است", "The reminder text is empty", "د یادونې متن خالي دی")
-  fun reminderTooLong(max: Int): String = t("متنِ یادآوری حداکثر $max حرف", "The reminder text can have at most $max characters", "د یادونې متن تر $max تورو پورې")
-  fun reminderUnknown(slots: String): String = t("جای‌نگهدارِ ناشناخته: $slots", "Unknown placeholder: $slots", "ناپېژندل شوی ځای نیونکی: $slots")
+  fun reminderTooLong(max: Int): String = t("متنِ یادآوری حداکثر ${asIs(max)} حرف", "The reminder text can have at most $max characters", "د یادونې متن تر $max تورو پورې")
+  fun reminderUnknown(slots: String): String = t("جای‌نگهدارِ ناشناخته: ${asIs(slots)}", "Unknown placeholder: $slots", "ناپېژندل شوی ځای نیونکی: $slots")
   // «تحلیلِ موجودی» (INV-15، INV-16) — گزارشِ کالاها، پیش‌فرض خاموش
   /** عنوانِ بخشِ «ابزارهای تازهٔ کالا» (PRD-19، PRD-04) — ثابت، تا فهرستِ تنظیماتِ کامپیوتر نامش را بداند */
   val productTools: String get() = t("ابزارهای تازهٔ کالا", "New product tools", "د توکو نوې وسیلې")

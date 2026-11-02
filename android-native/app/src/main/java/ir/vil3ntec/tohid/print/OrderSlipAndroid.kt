@@ -27,12 +27,18 @@ object OrderSlipPrint {
 
   private const val KEY_AUTO = "order_slip_auto"
   private const val KEY_PRINTED = "order_slip_printed"
+  /** ORD-10: برگهٔ سفارشی که «قبولِ خودکار» ِ سرور پذیرفت — تنظیمِ جدای همین دستگاه، پیش‌فرض خاموش */
+  private const val KEY_AUTO_SERVER = "order_slip_auto_server"
 
   private fun prefs(context: Context) = context.getSharedPreferences("tohid", Context.MODE_PRIVATE)
 
   fun auto(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY_AUTO, false) }.getOrDefault(false)
 
   fun setAuto(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_AUTO, on).apply()
+
+  fun autoServer(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY_AUTO_SERVER, false) }.getOrDefault(false)
+
+  fun setAutoServer(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_AUTO_SERVER, on).apply()
 
   /** سفارشِ سرور ⇐ مدلِ خالصِ برگه (بی شماره و بی نشانیِ کامل) */
   fun slipOf(o: OrderDto): OrderSlip.Order = OrderSlip.Order(
@@ -115,6 +121,31 @@ object OrderSlipPrint {
     if (!auto(context)) return null
     val printed = synchronized(this) { OrderAutoPrint.parse(prefs(context).getString(KEY_PRINTED, null)) }
     if (!OrderAutoPrint.shouldPrint(true, from, after.status, after.id, printed)) return null
+    return printOnce(context, after)
+  }
+
+  /**
+   *  ORD-10: سفارش‌هایی که «قبولِ خودکار» ِ سرور پذیرفت (`autoAccepted` ِ پرسشِ ۲۰ثانیه‌ای) — هیچ دستگاهی «قبول» را
+   *  نزده، پس فقط دستگاهی که «برگهٔ قبولِ خودکار» را روشن کرده برگه می‌زند؛ همان حافظهٔ «یک سفارش، یک برگه».
+   *  خاموش یا بی کار ⇒ `null` بی هیچ پرسشی؛ بی چاپگر ⇒ پیام بی خواندنِ سفارش.
+   */
+  suspend fun afterServerAccept(context: Context, ids: List<String>, fetch: suspend (String) -> OrderDto?): String? {
+    if (ids.isEmpty() || !autoServer(context)) return null
+    val printed = synchronized(this) { OrderAutoPrint.parse(prefs(context).getString(KEY_PRINTED, null)) }
+    val due = OrderAutoPrint.serverAccepted(true, ids, printed)
+    if (due.isEmpty()) return null
+    if (PrinterRegistry.defaultSaved(context) == null) return StrOrderSlip.noPrinter
+    var last: String? = null
+    for (id in due) {
+      val o = fetch(id) ?: continue
+      val now = synchronized(this) { OrderAutoPrint.parse(prefs(context).getString(KEY_PRINTED, null)) }
+      if (o.id != id || !OrderAutoPrint.serverStillDue(o.id, o.status, now)) continue
+      printOnce(context, o)?.let { last = it }
+    }
+    return last
+  }
+
+  private suspend fun printOnce(context: Context, after: OrderDto): String? {
     val printer = PrinterRegistry.defaultSaved(context) ?: return StrOrderSlip.noPrinter
     val bytes = bytesOf(context, printer, after).getOrElse { return StrOrderSlip.failed(it.message ?: StrOrderSlip.unknown) }
     //  پیش از صف به حافظه می‌رود: پاسخِ دوباره یا ضربهٔ دوم برگهٔ دوم نمی‌سازد؛ کارِ صف خودش دوباره تلاش می‌شود

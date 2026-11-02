@@ -37,11 +37,11 @@ object StrLabel {
 
   // بارکدِ داخلی
   fun makeCodes(n: Any): String = t(
-    "ساختِ بارکدِ داخلی برای $n کالای بی‌بارکد",
+    "ساختِ بارکدِ داخلی برای ${asIs(n)} کالای بی‌بارکد",
     "Create in-store barcodes for $n ${pl(n, "product", "products")} without one",
     "د $n بې بارکوډه ${pl(n, "توکي", "توکو")} لپاره دننني بارکوډ جوړول",
   )
-  fun codesMade(n: Any): String = t("$n بارکدِ داخلی ساخته شد", "$n in-store ${pl(n, "barcode", "barcodes")} created", "$n دننني ${pl(n, "بارکوډ", "بارکوډونه")} جوړ شول")
+  fun codesMade(n: Any): String = t("${asIs(n)} بارکدِ داخلی ساخته شد", "$n in-store ${pl(n, "barcode", "barcodes")} created", "$n دننني ${pl(n, "بارکوډ", "بارکوډونه")} جوړ شول")
   val codesNote: String get() = t(
     "بارکدِ داخلی EAN-13 با پیشوندِ ۲۰ یا ۲۹ است و رقمِ کنترل دارد؛ هرگز با قاعده‌های ترازو یکی نمی‌شود. هر کالا روی هر دستگاه همان کد را می‌گیرد.",
     "In-store barcodes are EAN-13 starting with 20 or 29, with a check digit; they never overlap the scale rules. A product gets the same code on every device.",
@@ -56,27 +56,27 @@ object StrLabel {
   val allHaveCodes: String get() = t("همهٔ کالاهای انتخاب‌شده بارکد دارند", "All the selected products already have a barcode", "ټول ټاکل شوي توکي بارکوډ لري")
 
   // چاپ
-  fun printN(n: Any): String = t("چاپِ $n برچسب", "Print $n ${pl(n, "label", "labels")}", "د $n ${pl(n, "لیبل", "لیبلونو")} چاپول")
+  fun printN(n: Any): String = t("چاپِ ${asIs(n)} برچسب", "Print $n ${pl(n, "label", "labels")}", "د $n ${pl(n, "لیبل", "لیبلونو")} چاپول")
   fun missingCodes(n: Any): String = t(
-    "$n کالا بارکد ندارد و برچسبِ بارکد نمی‌گیرد — اول بارکدِ داخلی بسازید یا «برچسبِ قفسه» را بزنید.",
+    "${asIs(n)} کالا بارکد ندارد و برچسبِ بارکد نمی‌گیرد — اول بارکدِ داخلی بسازید یا «برچسبِ قفسه» را بزنید.",
     "$n ${pl(n, "product has", "products have")} no barcode and won't get a barcode label — create in-store barcodes first or choose “Shelf label”.",
     "$n ${pl(n, "توکی", "توکي")} بارکوډ نه لري او د بارکوډ لیبل نه اخلي — لومړی دننني بارکوډ جوړ کړئ یا «د المارۍ لیبل» وټاکئ.",
   )
   fun dropped(n: Any, max: Any): String = t(
-    "$n برچسب از سقفِ $max برچسب در هر بار بیشتر است و چاپ نمی‌شود.",
+    "${asIs(n)} برچسب از سقفِ ${asIs(max)} برچسب در هر بار بیشتر است و چاپ نمی‌شود.",
     "$n ${pl(n, "label is", "labels are")} over the limit of $max per job and won't be printed.",
     "$n ${pl(n, "لیبل", "لیبلونه")} په هر ځل کې له $max حد څخه زیات دي او نه چاپېږي.",
   )
   val nothingToPrint: String get() = t("برچسبی برای چاپ نیست", "There are no labels to print", "د چاپ لپاره لیبل نشته")
   val printTitle: String get() = t("برچسبِ کالا", "Product labels", "د توکو لیبلونه")
-  fun printed(n: Any): String = t("$n برچسب چاپ شد", "$n ${pl(n, "label", "labels")} printed", "$n ${pl(n, "لیبل", "لیبلونه")} چاپ شول")
+  fun printed(n: Any): String = t("${asIs(n)} برچسب چاپ شد", "$n ${pl(n, "label", "labels")} printed", "$n ${pl(n, "لیبل", "لیبلونه")} چاپ شول")
   fun a4Opened(pages: Any): String = t(
-    "پنجرهٔ چاپ باز شد — $pages برگه؛ «اندازهٔ واقعی / بی حاشیه» را بزنید.",
+    "پنجرهٔ چاپ باز شد — ${asIs(pages)} برگه؛ «اندازهٔ واقعی / بی حاشیه» را بزنید.",
     "The print dialog is open — $pages ${pl(pages, "sheet", "sheets")}; choose “Actual size / no margins”.",
     "د چاپ کړکۍ پرانیستل شوه — $pages ${pl(pages, "پاڼه", "پاڼې")}؛ «اصلي اندازه / بې څنډې» وټاکئ.",
   )
-  fun labelFailed(name: Any, why: Any): String = t("برچسبِ «$name» ساخته نشد: $why", "The label for “$name” couldn't be made: $why", "د «$name» لیبل جوړ نه شو: $why")
-  fun perUnit(unit: Any): String = t("هر $unit", "per $unit", "هر $unit")
+  fun labelFailed(name: Any, why: Any): String = t("برچسبِ «${asIs(name)}» ساخته نشد: ${asIs(why)}", "The label for “$name” couldn't be made: $why", "د «$name» لیبل جوړ نه شو: $why")
+  fun perUnit(unit: Any): String = t("هر ${asIs(unit)}", "per $unit", "هر $unit")
 
   // تنظیمات
   val settingsTitle: String get() = t("برچسب و بارکدِ داخلی", "Labels and in-store barcodes", "لیبلونه او دننني بارکوډونه")

@@ -545,6 +545,17 @@ fun SettingsScreenLegacy(
             ir.vil3ntec.tohid.data.ShopPolicy.setPayV2(context, payV2)
           },
         )
+        //  PAY-09: گردکردنِ نقدی (۵/۱۰ افغانی، ردیفِ جدا) — پیش‌فرض خاموش، فقط همین دستگاه
+        var cashStep by remember { mutableStateOf(ir.vil3ntec.tohid.data.CashRoundPref.step(context)) }
+        Spacer(Modifier.height(12.dp))
+        Text(ir.vil3ntec.tohid.core.i18n.StrRounding.line, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Spacer(Modifier.height(6.dp))
+        SegmentedChoiceLegacy(
+          options = listOf("0" to ir.vil3ntec.tohid.core.i18n.StrRounding.off, "500" to ir.vil3ntec.tohid.core.i18n.StrRounding.five, "1000" to ir.vil3ntec.tohid.core.i18n.StrRounding.ten),
+          selected = cashStep.toString(),
+          onSelect = { cashStep = it.toLong(); ir.vil3ntec.tohid.data.CashRoundPref.set(context, cashStep) },
+        )
+        Text(ir.vil3ntec.tohid.core.i18n.StrRounding.note, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
       }
     }
     item { ir.vil3ntec.tohid.ui.screens.SafeBookSettingsWired(context) } // گاوصندوق (PAY-18)، پیش‌فرض خاموش
@@ -691,7 +702,7 @@ fun SettingsScreenLegacy(
       }
     }
 
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+    item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، گوشی و کامپیوتر، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.TaxQuarterSettingsWired(context, d, snackbar) } //  مالیاتِ سه‌ماهه و یادآورِ سررسید (RPT-10)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.CustomerCardSettingsWired(context) } //  کارت یا بارکدِ مشتری (CRM-16)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.TillGoodsSettingsWired(context) } //  ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05)، پیش‌فرض خاموش

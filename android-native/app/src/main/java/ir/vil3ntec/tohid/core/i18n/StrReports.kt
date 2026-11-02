@@ -26,7 +26,7 @@ object StrReports {
   val rangePickMonth: String get() = t("ماه…", "Month…", "میاشت…")
   val rangePickYear: String get() = t("سال…", "Year…", "کال…")
   val rangeAll: String get() = t("از آغاز", "All time", "له پیله")
-  fun rangeSpan(from: Any, to: Any): String = t("$from تا $to", "$from – $to", "له $from تر $to")
+  fun rangeSpan(from: Any, to: Any): String = t("${asIs(from)} تا ${asIs(to)}", "$from – $to", "له $from تر $to")
   val allDates: String get() = t("همهٔ تاریخ‌ها", "All dates", "ټولې نېټې")
   val rightNow: String get() = t("وضعیتِ همین حالا", "As of right now", "همدا اوس حالت")
   val allMovements: String get() = t("همهٔ حرکت‌ها از آغاز", "Every movement since the start", "له پیله ټول خوځښتونه")
@@ -35,7 +35,7 @@ object StrReports {
   val previous: String get() = t("قبلی", "Previous", "مخکینی")
   val next: String get() = t("بعدی", "Next", "راتلونکی")
   val show: String get() = t("نمایش", "Show", "ښودل")
-  fun yearLabel(y: Any): String = t("سال $y", "Year $y", "کال $y")
+  fun yearLabel(y: Any): String = t("سال ${asIs(y)}", "Year $y", "کال $y")
   val moneyLocked: String get() = t("عددهای مالی برای شما بسته است", "Money figures are closed to you", "مالي شمېرې تاسو ته تړلې دي")
   val moneyLockedBody: String get() = t("صاحبِ دکان می‌تواند این دسترسی را بدهد.", "The shop owner can grant this access.", "د دوکان خاوند کولای شي دا لاسرسی درکړي.")
 
@@ -68,19 +68,19 @@ object StrReports {
   val slowest: String get() = t("کم‌فروش‌ترین", "Slowest sellers", "تر ټولو لږ پلورل شوي")
   val mostProfitable: String get() = t("پرسودترین", "Most profitable", "تر ټولو ګټور")
   val leastProfitable: String get() = t("کم‌سودترین", "Least profitable", "تر ټولو لږ ګټور")
-  fun sold(q: Any): String = t("$q فروخته‌شده", "$q sold", "$q پلورل شوي")
+  fun sold(q: Any): String = t("${asIs(q)} فروخته‌شده", "$q sold", "$q پلورل شوي")
   val needsAttention: String get() = t("نیاز به توجه", "Needs attention", "پاملرنې ته اړتیا")
   val noData: String get() = t("داده‌ای موجود نیست", "No data yet", "معلومات نشته")
   val noProducts: String get() = t("هنوز کالایی ثبت نشده", "No items yet", "لا هېڅ توکی نه دی ثبت شوی")
   val addProduct: String get() = t("افزودنِ کالا", "Add an item", "توکی زیات کړئ")
-  fun rank(n: Any): String = t("رتبهٔ $n", "Rank $n", "$n درجه")
+  fun rank(n: Any): String = t("رتبهٔ ${asIs(n)}", "Rank $n", "$n درجه")
 
   // قرض‌داران
   val receivable: String get() = t("جمع طلب از مشتریان", "Owed by customers", "له پېرودونکو ټول طلب")
   fun creditVsPaid(given: Any, paid: Any): String =
-    t("فروش نسیه $given — پرداخت‌شده $paid", "On credit $given — paid $paid", "پور پلور $given — ورکړل شوي $paid")
+    t("فروش نسیه ${asIs(given)} — پرداخت‌شده ${asIs(paid)}", "On credit $given — paid $paid", "پور پلور $given — ورکړل شوي $paid")
   val settled: String get() = t("تسویه شده", "Settled", "تصفیه شوی")
-  fun prepaid(a: Any): String = t("$a ؋ پیش‌پرداخت", "$a ؋ in credit", "$a ؋ مخکې ورکړل شوي")
+  fun prepaid(a: Any): String = t("${asIs(a)} ؋ پیش‌پرداخت", "$a ؋ in credit", "$a ؋ مخکې ورکړل شوي")
   val noDebtors: String get() = t("قرض‌داری ثبت نشده", "No debtors yet", "لا هېڅ پوروړی نه دی ثبت شوی")
   val addDebtor: String get() = t("ثبتِ قرض‌دار", "Add a debtor", "پوروړی ثبت کړئ")
 
@@ -96,16 +96,16 @@ object StrReports {
 
   // انقضا
   val expired: String get() = t("منقضی", "Expired", "نېټه تېره")
-  fun withinDays(n: Any): String = t("تا $n روز", "Within $n ${pl(n, "day", "days")}", "تر $n ورځو")
-  fun laterThan(n: Any): String = t("بیش از $n روز", "More than $n ${pl(n, "day", "days")}", "له $n ورځو زیات")
-  fun batch(b: Any): String = t("سری $b", "Batch $b", "لړۍ $b")
-  fun daysLeft(n: Any): String = t("$n روز", "$n ${pl(n, "day", "days")}", "$n ${pl(n, "ورځ", "ورځې")}")
+  fun withinDays(n: Any): String = t("تا ${asIs(n)} روز", "Within $n ${pl(n, "day", "days")}", "تر $n ورځو")
+  fun laterThan(n: Any): String = t("بیش از ${asIs(n)} روز", "More than $n ${pl(n, "day", "days")}", "له $n ورځو زیات")
+  fun batch(b: Any): String = t("سری ${asIs(b)}", "Batch $b", "لړۍ $b")
+  fun daysLeft(n: Any): String = t("${asIs(n)} روز", "$n ${pl(n, "day", "days")}", "$n ${pl(n, "ورځ", "ورځې")}")
   val noLots: String get() = t("محموله‌ای با تاریخِ انقضا در انبار نمانده", "No batches with an expiry date in stock", "په ګدام کې د ختمېدو نېټې لرونکې کڅوړه نشته")
   val stockEntry: String get() = t("ورودِ کالا", "Receive stock", "توکي راوړل")
 
   // گردش موجودی
-  fun flowLine(inQty: Any, outQty: Any): String = t("ورود $inQty · خروج $outQty", "In $inQty · out $outQty", "راغلي $inQty · وتلي $outQty")
-  fun moves(n: Any): String = t("$n حرکت", "$n ${pl(n, "movement", "movements")}", "$n خوځښتونه")
+  fun flowLine(inQty: Any, outQty: Any): String = t("ورود ${asIs(inQty)} · خروج ${asIs(outQty)}", "In $inQty · out $outQty", "راغلي $inQty · وتلي $outQty")
+  fun moves(n: Any): String = t("${asIs(n)} حرکت", "$n ${pl(n, "movement", "movements")}", "$n خوځښتونه")
   val noMovements: String get() = t("هنوز حرکتی ثبت نشده", "No stock movement yet", "لا هېڅ خوځښت نه دی ثبت شوی")
 
   // آمار (صفحهٔ دومِ خانه)
@@ -122,13 +122,13 @@ object StrReports {
   val statsEmpty: String get() = t("در این بازه فروشی ثبت نشده", "No sales in these periods", "په دې مودو کې پلور نه دی ثبت شوی")
   val streakTitle: String get() = t("روزهای فروشِ این هفته", "Days with sales this week", "د دې اونۍ د پلور ورځې")
   fun streakCaption(sold: Any, past: Any): String =
-    t("$sold روز از $past روزِ گذشتهٔ این هفته فروش داشتید", "Sales on $sold of the $past days so far this week", "د دې اونۍ له $past تېرو ورځو $sold ورځې پلور درلود")
+    t("${asIs(sold)} روز از ${asIs(past)} روزِ گذشتهٔ این هفته فروش داشتید", "Sales on $sold of the $past days so far this week", "د دې اونۍ له $past تېرو ورځو $sold ورځې پلور درلود")
   val streakNone: String get() = t("این هفته هنوز فروشی ثبت نشده", "No sales recorded this week yet", "پدې اونۍ کې لا پلور نه دی ثبت شوی")
   val soldThatDay: String get() = t("فروش داشت", "Had sales", "پلور یې درلود")
   val hoursTitle: String get() = t("ساعت‌های فروش", "Sales by hour", "د پلور ساعتونه")
   val peakHour: String get() = t("پُرفروش‌ترین ساعت", "Busiest hour", "تر ټولو ګڼ ساعت")
   fun peakLine(span: Any, count: Any, amount: Any): String =
-    t("پُرفروش‌ترین: $span — $count · $amount", "Busiest: $span — $count · $amount", "تر ټولو ګڼ: $span — $count · $amount")
+    t("پُرفروش‌ترین: ${asIs(span)} — ${asIs(count)} · ${asIs(amount)}", "Busiest: $span — $count · $amount", "تر ټولو ګڼ: $span — $count · $amount")
   /** روزهای هفته به شمارِ ISO (۱ دوشنبه … ۷ یکشنبه) — برچسبِ کوتاهِ نمودار */
   val weekdaysShort: List<String> get() = listOf(
     t("دوشنبه", "Mon", "دوشنبه"), t("سه‌شنبه", "Tue", "سه‌شنبه"), t("چهارشنبه", "Wed", "چهارشنبه"),
@@ -141,7 +141,7 @@ object StrReports {
 
   // سابقهٔ عملیات
   val auditTitle: String get() = t("سابقهٔ عملیات", "Activity log", "د کړنو تاریخچه")
-  fun auditCount(n: Any): String = t("$n رویداد ثبت‌شده", "$n ${pl(n, "event", "events")} recorded", "$n پېښې ثبت شوې")
+  fun auditCount(n: Any): String = t("${asIs(n)} رویداد ثبت‌شده", "$n ${pl(n, "event", "events")} recorded", "$n پېښې ثبت شوې")
   val eventKind: String get() = t("نوعِ رویداد", "Event type", "د پېښې ډول")
   val deletion: String get() = t("حذف", "Deleted", "ړنګ شوی")
   val auditEmpty: String get() = t("هنوز رویدادی ثبت نشده است.", "Nothing has been recorded yet.", "لا هېڅ پېښه نه ده ثبت شوې.")
@@ -180,7 +180,7 @@ object StrReports {
     "credit_over_limit" -> t("برد بیش از سقفِ اعتبار", "Over the credit limit", "له پور حد څخه زیات")
     "credit_limit_set" -> t("سقفِ اعتبار", "Credit limit", "د پور حد")
     //  نوعِ ناشناخته: همان کدِ رویداد، در هر سه زبان (و از t، تا آزمونِ پوشش آن را بشمارد)
-    else -> t(type, type, type)
+    else -> t(asIs(type), type, type)
   }
 
   // مرکزِ مدیریت
@@ -191,17 +191,17 @@ object StrReports {
   val monthLoss: String get() = t("ضررِ خالصِ ماه", "Month's net loss", "د میاشتې خالص تاوان")
   val afterExpenses: String get() = t("پس از مصارف", "After expenses", "له لګښتونو وروسته")
   val stockValue: String get() = t("ارزشِ انبار", "Stock value", "د ګدام ارزښت")
-  fun itemCount(n: Any): String = t("$n قلم کالا", "$n ${pl(n, "item", "items")}", "$n ${pl(n, "توکی", "توکي")}")
+  fun itemCount(n: Any): String = t("${asIs(n)} قلم کالا", "$n ${pl(n, "item", "items")}", "$n ${pl(n, "توکی", "توکي")}")
   val owedByDebtors: String get() = t("طلب از قرض‌داران", "Owed by debtors", "له پوروړو طلب")
-  fun people(n: Any): String = t("$n نفر", "$n ${pl(n, "person", "people")}", "$n تنه")
+  fun people(n: Any): String = t("${asIs(n)} نفر", "$n ${pl(n, "person", "people")}", "$n تنه")
   val owedToSuppliers: String get() = t("بدهی به تأمین‌کننده", "Owed to suppliers", "عرضه‌کوونکو ته پور")
-  fun suppliers(n: Any): String = t("$n تأمین‌کننده", "$n ${pl(n, "supplier", "suppliers")}", "$n عرضه‌کوونکي")
+  fun suppliers(n: Any): String = t("${asIs(n)} تأمین‌کننده", "$n ${pl(n, "supplier", "suppliers")}", "$n عرضه‌کوونکي")
   val expectedCash: String get() = t("نقدِ مورد انتظار در دخل", "Expected cash in drawer", "په صندوق کې تمه شوې نغدې")
   val drawerClosed: String get() = t("صندوق بسته", "Drawer closed", "صندوق تړلی")
-  fun openSince(at: Any): String = t("باز از $at", "Open since $at", "له $at راهیسې پرانیستی")
+  fun openSince(at: Any): String = t("باز از ${asIs(at)}", "Open since $at", "له $at راهیسې پرانیستی")
   val openFromHistory: String get() = t("از «تاریخچهٔ فروش» باز کنید", "Open it from Sales history", "له «د پلور تاریخچه» یې پرانیزئ")
   val stockAlert: String get() = t("هشدارِ انبار", "Stock alerts", "د ګدام خبرتیاوې")
-  fun outAndLow(out: Any, low: Any): String = t("$out تمام‌شده · $low کم", "$out sold out · $low low", "$out خلاص · $low لږ")
+  fun outAndLow(out: Any, low: Any): String = t("${asIs(out)} تمام‌شده · ${asIs(low)} کم", "$out sold out · $low low", "$out خلاص · $low لږ")
   val staff: String get() = t("کارمندان", "Staff", "کارکوونکي")
   val subscription: String get() = t("اشتراکِ من", "My subscription", "زما ګډون")
   val noConnection: String get() = t("اتصال نیست", "No connection", "اړیکه نشته")
@@ -222,7 +222,7 @@ object StrReports {
   val to: String get() = t("تا", "To", "تر")
   val printShort: String get() = t("چاپ", "Print", "چاپ")
   val excel: String get() = t("اکسل", "Excel", "اکسل")
-  fun savedTo(path: Any): String = t("ذخیره شد: $path", "Saved: $path", "خوندي شو: $path")
+  fun savedTo(path: Any): String = t("ذخیره شد: ${asIs(path)}", "Saved: $path", "خوندي شو: $path")
   val invoices: String get() = t("فاکتورها", "Invoices", "بلونه")
   val paid: String get() = t("پرداخت‌شده", "Paid", "ورکړل شوي")
   val onSupplierAccount: String get() = t("به حسابِ تأمین‌کننده", "On supplier account", "د عرضه‌کوونکي په حساب")
@@ -252,6 +252,11 @@ object StrReports {
   // زبانه و کارت‌ها
   val gapsTab: String get() = t("شماره‌های جاافتاده", "Missing numbers", "ورکې شمېرې")
   val gapsNow: String get() = t("همهٔ اسنادِ شماره‌دارِ دفتر — بی بازهٔ تاریخ", "All numbered documents in the ledger — no date range", "د دفتر ټول شمېره‌لرونکي سندونه — بې نېټې")
+  val gapsNone: String get() = t(
+    "هیچ شمارهٔ جاافتاده، پرش یا تکراری‌ای نیست.",
+    "No missing, jumped or duplicate numbers.",
+    "هېڅ ورکه، ټوپ شوې یا تکراري شمېره نشته.",
+  )
   val kpiMissing: String get() = t("شمارهٔ جاافتاده", "Missing numbers", "ورکې شمېرې")
   val kpiJumped: String get() = t("پرشِ شمارنده", "Counter jumps", "د شمېرونکي ټوپونه")
   val kpiDuplicates: String get() = t("شمارهٔ تکراری", "Duplicate numbers", "تکراري شمېرې")
@@ -270,8 +275,8 @@ object StrReports {
   val kindPurchase: String get() = t("فاکتورِ خرید", "Purchase invoice", "د پېرود بل")
   val noSeries: String get() = t("بی سری", "No series", "بې لړۍ")
   val statusMissing: String get() = t("جاافتاده", "Missing", "ورکه")
-  fun statusJump(series: String): String = t("پرشِ شمارنده (سریِ $series)", "Counter jump (series $series)", "د شمېرونکي ټوپ (لړۍ $series)")
-  fun statusDuplicate(n: Int): String = t("تکراری: $n سند با یک شماره", "Duplicate: $n documents with one number", "تکراري: $n سندونه په یوه شمېره")
-  fun moreGaps(n: Int): String = t("… و $n جای خالیِ دیگر (شمارها بالا کامل‌اند)", "… and $n more gaps (the totals above are complete)", "… او $n نورې تشې (پورته شمېرې بشپړې دي)")
+  fun statusJump(series: String): String = t("پرشِ شمارنده (سریِ ${asIs(series)})", "Counter jump (series $series)", "د شمېرونکي ټوپ (لړۍ $series)")
+  fun statusDuplicate(n: Int): String = t("تکراری: ${asIs(n)} سند با یک شماره", "Duplicate: $n documents with one number", "تکراري: $n سندونه په یوه شمېره")
+  fun moreGaps(n: Int): String = t("… و ${asIs(n)} جای خالیِ دیگر (شمارها بالا کامل‌اند)", "… and $n more gaps (the totals above are complete)", "… او $n نورې تشې (پورته شمېرې بشپړې دي)")
   val sheetName: String get() = t("شماره‌های-جاافتاده", "missing-numbers", "ورکې-شمېرې")
 }

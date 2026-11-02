@@ -136,7 +136,8 @@ class PayFlowTest {
       val f = PayFlow.saleFields(s)
       assertEquals(name, s.due, f.payments.sumOf { it.amountMinor })
       assertEquals(name, s.toAccount, Math.round(f.debtGiven * 100))
-      assertEquals(name, s.total, Math.round(f.paidAmount * 100) + Math.round(f.debtGiven * 100))
+      //  PAY-09: پرداختی + نسیه = مبلغِ نهاییِ فاکتور با ردیفِ گرد (`due`)؛ بی گرد همان `total`
+      assertEquals(name, s.due, Math.round(f.paidAmount * 100) + Math.round(f.debtGiven * 100))
       //  `paymentMethod`ِ قدیمی: به حساب ⇒ credit؛ بی غیرنقد ⇒ cash؛ وگرنه هرگز cash نیست
       val nonCash = s.payments.filter { it.kind != "cash" && it.kind != "account" }.map { it.kind }.toSet()
       val hasCash = s.payments.any { it.kind == "cash" }

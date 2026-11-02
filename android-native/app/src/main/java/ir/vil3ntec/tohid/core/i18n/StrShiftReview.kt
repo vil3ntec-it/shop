@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrShiftReview {
   val pending: String get() = t("اختلاف — نیازمند بررسیِ مدیر", "Difference — needs manager review", "توپیر — د مدیر کتنې ته اړتیا لري")
-  fun reviewed(by: Any, at: Any): String = t("بررسی شد — $by، $at", "Reviewed — $by, $at", "وکتل شو — $by، $at")
+  fun reviewed(by: Any, at: Any): String = t("بررسی شد — ${asIs(by)}، ${asIs(at)}", "Reviewed — $by, $at", "وکتل شو — $by، $at")
   val action: String get() = t("ثبتِ بررسی", "Record review", "کتنه ثبت کړئ")
   val title: String get() = t("بررسیِ اختلافِ صندوق", "Review register difference", "د صندوق د توپیر کتنه")
   val body: String get() = t(

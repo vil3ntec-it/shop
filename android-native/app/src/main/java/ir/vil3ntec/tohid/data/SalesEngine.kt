@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.core.credit.CreditGate
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.money.ReturnShare
+import ir.vil3ntec.tohid.core.pay.TillRounding
 import ir.vil3ntec.tohid.money
 import kotlin.math.max
 import kotlin.math.min
@@ -125,6 +126,11 @@ object SalesEngine {
     val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
     /** POS-11 — یادداشتِ فاکتور (`CartStore.note`)؛ `null` ⇒ فاکتورِ بی یادداشت، همان امروز */
     val note: String? = null,
+    /**
+     *  PAY-09 — پلهٔ گردکردنِ نقدیِ صندوق به پول (`CashRoundPref`، فقط ۰/۵۰۰/۱۰۰۰). فقط نقدِ کامل (`payment = CASH`)
+     *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق) ⇒ همان امروز.
+     */
+    val cashRounding: Long = 0,
   )
 
   data class Totals(
@@ -413,12 +419,16 @@ object SalesEngine {
       PayFlow.saleFields(st)
     }
 
+    //  PAY-09: ردیفِ جدای گردکردنِ نقدی — از تسویه، یا نقدِ کامل با پلهٔ صندوق؛ پله‌ی خاموش ⇒ ۰ و همان امروز
+    val roundingMinor = stl?.rounding ?: if (checkout.payment == Payment.CASH) TillRounding.cash(PayFlow.minor(t.finalTotal), checkout.cashRounding) else 0L
+    val finalTotal = t.finalTotal + PayFlow.major(roundingMinor)
+
     // فروشِ نقدی همیشه کامل تسویه می‌شود
     var paid = if (settled != null) settled.paidAmount
-    else if (checkout.payment == Payment.CASH) t.finalTotal else checkout.paidAmount
+    else if (checkout.payment == Payment.CASH) finalTotal else checkout.paidAmount
     if (paid.isNaN() || paid < 0) return Result.Failed("مبلغ پرداختی درست نیست")
-    paid = min(paid, t.finalTotal)
-    val remaining = max(0.0, t.finalTotal - paid)
+    paid = min(paid, finalTotal)
+    val remaining = max(0.0, finalTotal - paid)
 
     /*
      *  مشتری. در نسیه اجباری است و بدهی می‌سازد؛ در نقدی اختیاری است و
@@ -473,7 +483,7 @@ object SalesEngine {
       discountType = if (checkout.discountType == DiscountType.PERCENT) "percent" else "amount",
       discountValue = t.discountValue,
       discount = t.discount,
-      finalTotal = t.finalTotal,
+      finalTotal = finalTotal,
       paymentMethod = settled?.paymentMethod ?: if (checkout.payment == Payment.CASH) "cash" else "credit",
       debtorId = debtorId,
       paidAmount = paid,
@@ -490,6 +500,7 @@ object SalesEngine {
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
+      roundingMinor = roundingMinor.takeIf { it != 0L },
       receiptToken = receiptToken,
       note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(checkout.note),
     )
@@ -581,7 +592,7 @@ object SalesEngine {
       type = "sale",
       date = today,
       refId = saleId,
-      notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(t.finalTotal)} افغانی",
+      notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(finalTotal)} افغانی",
       createdAt = now,
     ) + listOfNotNull(
       creditOk?.let { (over, ok) ->
@@ -886,6 +897,15 @@ object SalesEngine {
     }
 
     if (!any) return Result.Failed("مقدار معتبری برای مرجوعی وارد نشده")
+    //  PAY-09: فاکتورِ گردشده — همان `TillRounding.refund` ِ `ReturnFlow.quote`: هرگز بیش از پرداختی، کامل ⇒ دقیقاً ماندهٔ آن
+    if ((sale.roundingMinor ?: 0L) != 0L) {
+      val added = returns.subList(d.saleReturns.size, returns.size)
+      val completes = items.filter { it.saleId == saleId }.all { it.returnedQty >= it.quantity - 1e-9 }
+      val before = d.saleReturns.filter { it.saleId == saleId }.sumOf { it.amount }
+      val fixed = TillRounding.refund(added.map { PayFlow.minor(it.amount) }, PayFlow.minor(sale.finalTotal), PayFlow.minor(before), completes)
+      for (k in added.indices) added[k] = added[k].copy(amount = PayFlow.major(fixed[k]))
+      totalAmount = fixed.sum() / 100.0
+    }
 
     var updatedSale = sale
     val transactions = d.transactions.toMutableList()

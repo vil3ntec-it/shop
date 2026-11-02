@@ -20,11 +20,11 @@ object StrSecurity {
   )
   val plan: String get() = t("پلن", "Plan", "پلان")
   val permanent: String get() = t("دائمی ✓", "Permanent ✓", "تلپاتې ✓")
-  fun daysLeft(n: Any): String = t("$n روز مانده", "$n ${pl(n, "day", "days")} left", "$n ${pl(n, "ورځ", "ورځې")} پاتې")
+  fun daysLeft(n: Any): String = t("${asIs(n)} روز مانده", "$n ${pl(n, "day", "days")} left", "$n ${pl(n, "ورځ", "ورځې")} پاتې")
   val starts: String get() = t("آغاز", "Start", "پیل")
   val ends: String get() = t("پایان", "End", "پای")
   fun endsSoon(n: Any): String = t(
-    "$n روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود — هیچ داده‌ای پاک نمی‌شود و خروجی و چاپ هم کار می‌کند.",
+    "${asIs(n)} روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود — هیچ داده‌ای پاک نمی‌شود و خروجی و چاپ هم کار می‌کند.",
     "$n ${pl(n, "day", "days")} until the subscription ends. After that the app becomes read-only — no data is deleted, and export and printing still work.",
     "د ګډون تر پای $n ${pl(n, "ورځ", "ورځې")}. له هغې وروسته اپ یوازې د لوستلو کېږي — هېڅ معلومات نه ړنګېږي او ایستل او چاپ هم کار کوي.",
   )
@@ -48,7 +48,7 @@ object StrSecurity {
     "ګډون پای ته رسېدلی — اپ یوازې د لوستلو دی. ستاسو دفتر روغ پر خپل ځای دی او ایستل او چاپ کار کوي.",
   )
   fun bannerSoon(n: Any): String = t(
-    "$n روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود؛ هیچ داده‌ای پاک نمی‌شود.",
+    "${asIs(n)} روز تا پایانِ اشتراک. پس از آن برنامه فقط‌خواندنی می‌شود؛ هیچ داده‌ای پاک نمی‌شود.",
     "$n ${pl(n, "day", "days")} until the subscription ends. After that the app becomes read-only; no data is deleted.",
     "د ګډون تر پای $n ${pl(n, "ورځ", "ورځې")}. له هغې وروسته اپ یوازې د لوستلو کېږي؛ هېڅ معلومات نه ړنګېږي.",
   )
@@ -59,12 +59,12 @@ object StrSecurity {
   val encSubtitleOff: String get() = t("رمزگذاریِ دفتر: خاموش", "Ledger encryption: off", "د دفتر رمزي کول: بند")
   val settingNotSaved: String get() = t("تنظیم ذخیره نشد", "The setting wasn't saved", "امستنه خوندي نه شوه")
   fun filesNotConverted(n: Any): String = t(
-    "$n فایل کوچ نشد و دست‌نخورده ماند؛ دوباره امتحان کنید",
+    "${asIs(n)} فایل کوچ نشد و دست‌نخورده ماند؛ دوباره امتحان کنید",
     "$n ${pl(n, "file wasn't", "files weren't")} converted and stayed untouched; try again",
     "$n ${pl(n, "فایل", "فایلونه")} ونه لېږدول شول او روغ پاتې شول؛ بیا هڅه وکړئ",
   )
-  fun encTurnedOn(n: Any): String = t("رمزگذاری روشن شد ($n فایل رمز شد)", "Encryption turned on ($n ${pl(n, "file", "files")} encrypted)", "رمزي کول روښانه شو ($n ${pl(n, "فایل", "فایلونه")} رمزي شول)")
-  fun encTurnedOff(n: Any): String = t("رمزگذاری خاموش شد ($n فایل ساده شد)", "Encryption turned off ($n ${pl(n, "file", "files")} decrypted)", "رمزي کول بند شو ($n ${pl(n, "فایل", "فایلونه")} ساده شول)")
+  fun encTurnedOn(n: Any): String = t("رمزگذاری روشن شد (${asIs(n)} فایل رمز شد)", "Encryption turned on ($n ${pl(n, "file", "files")} encrypted)", "رمزي کول روښانه شو ($n ${pl(n, "فایل", "فایلونه")} رمزي شول)")
+  fun encTurnedOff(n: Any): String = t("رمزگذاری خاموش شد (${asIs(n)} فایل ساده شد)", "Encryption turned off ($n ${pl(n, "file", "files")} decrypted)", "رمزي کول بند شو ($n ${pl(n, "فایل", "فایلونه")} ساده شول)")
   val whatIsEncrypted: String get() = t(
     "دفترِ دکان، دفترِ حساب‌های دیگرِ همین دستگاه، بایگانی، نسخهٔ ایمنیِ پیش از بازیابی و نسخه‌های خودکار روی همین دستگاه رمز می‌شوند؛ کسی که فقط این فایل‌ها را بردارد، بی کلیدِ همین دستگاه چیزی نمی‌خواند.",
     "The shop ledger, the ledgers of other accounts on this device, the archive, the safety copy made before a restore and the automatic copies are encrypted on this device; anyone who takes only these files can't read anything without this device's key.",
@@ -78,29 +78,29 @@ object StrSecurity {
   val encOnThisDevice: String get() = t("رمزگذاریِ دفتر روی این دستگاه", "Encrypt the ledger on this device", "په دې وسیله کې د دفتر رمزي کول")
   val converting: String get() = t("در حالِ کوچِ فایل‌ها…", "Converting files…", "فایلونه لېږدول کېږي…")
   fun filesState(sealed: Any, plain: Any): String = t(
-    "$sealed فایلِ رمزدار، $plain فایلِ ساده",
+    "${asIs(sealed)} فایلِ رمزدار، ${asIs(plain)} فایلِ ساده",
     "$sealed encrypted ${pl(sealed, "file", "files")}, $plain plain ${pl(plain, "file", "files")}",
     "$sealed رمزي ${pl(sealed, "فایل", "فایلونه")}، $plain ساده ${pl(plain, "فایل", "فایلونه")}",
   )
   fun keyUnavailable(r: Any): String = t(
-    "کلیدِ رمز همین حالا در دسترس نیست ($r) — دفتر فعلاً ساده نوشته می‌شود.",
+    "کلیدِ رمز همین حالا در دسترس نیست (${asIs(r)}) — دفتر فعلاً ساده نوشته می‌شود.",
     "The encryption key isn't available right now ($r) — the ledger is written unencrypted for now.",
     "د رمز کیلي همدا اوس نشته ($r) — دفتر اوس مهال ساده لیکل کېږي.",
   )
-  fun keyLost(r: Any): String = t("کلیدِ رمزِ قبلی روی این دستگاه نیست ($r).", "The previous encryption key isn't on this device ($r).", "پخوانۍ د رمز کیلي په دې وسیله کې نشته ($r).")
+  fun keyLost(r: Any): String = t("کلیدِ رمزِ قبلی روی این دستگاه نیست (${asIs(r)}).", "The previous encryption key isn't on this device ($r).", "پخوانۍ د رمز کیلي په دې وسیله کې نشته ($r).")
   val keyNone: String get() = t(
     "کلیدِ رمز هنوز ساخته نشده — دفتر فعلاً ساده نوشته می‌شود.",
     "No encryption key has been created yet — the ledger is written unencrypted for now.",
     "د رمز کیلي لا نه ده جوړه شوې — دفتر اوس مهال ساده لیکل کېږي.",
   )
-  fun lastSaveNotSealed(e: Any): String = t("آخرین ذخیره رمز نشد: $e", "The last save wasn't encrypted: $e", "وروستی خوندي کول رمزي نه شول: $e")
+  fun lastSaveNotSealed(e: Any): String = t("آخرین ذخیره رمز نشد: ${asIs(e)}", "The last save wasn't encrypted: $e", "وروستی خوندي کول رمزي نه شول: $e")
   val backupsNotSealed: String get() = t(
     "فایل‌های پشتیبانی که بیرون می‌روند (فایل، پوشه، ابر) رمزِ این دستگاه را ندارند.",
     "Backup files that leave the device (file, folder, cloud) don't carry this device's encryption.",
     "هغه بیک‌اپ فایلونه چې بهر ځي (فایل، فولډر، ورېځ) د دې وسیلې رمز نه لري.",
   )
   fun leftovers(n: Any, files: Any): String = t(
-    "$n فایلِ کنارگذاشته روی دستگاه مانده (پاک نشده‌اند): $files",
+    "${asIs(n)} فایلِ کنارگذاشته روی دستگاه مانده (پاک نشده‌اند): ${asIs(files)}",
     "$n set-aside ${pl(n, "file remains", "files remain")} on the device (not deleted): $files",
     "$n یوې خوا ته شوي ${pl(n, "فایل", "فایلونه")} په وسیله کې پاتې دي (نه دي ړنګ شوي): $files",
   )
@@ -112,7 +112,7 @@ object StrSecurity {
 
   // بازسازی از سرور و «دفترِ رمزدار باز نشد»
   val rebuild: String get() = t("بازسازی از سرور", "Rebuild from server", "له سرور څخه بیا جوړول")
-  fun rebuildAsk(r: Any): String = t("$r؟", "$r?", "$r؟")
+  fun rebuildAsk(r: Any): String = t("${asIs(r)}؟", "$r?", "$r؟")
   val rebuildBody: String get() = t(
     "اول تغییرهایی که هنوز از این دستگاه نرفته‌اند فرستاده می‌شوند؛ اگر نرسیدند، هیچ چیزی عوض نمی‌شود. بعد دفتر از روی سرور ساخته می‌شود. دفترِ رمزدارِ فعلی پاک نمی‌شود، کنار می‌رود. اینترنت لازم است.",
     "First, changes not yet sent from this device are sent; if they don't arrive, nothing changes. Then the ledger is built from the server. The current encrypted ledger isn't deleted; it's set aside. Internet is required.",
@@ -127,22 +127,22 @@ object StrSecurity {
   val rebuilding: String get() = t("در حالِ بازسازی…", "Rebuilding…", "بیا جوړېږي…")
   val later: String get() = t("بعداً", "Later", "وروسته")
   fun unreadableKeyUnavailable(r: Any): String = t(
-    "دفترِ رمزدار همین حالا باز نشد (کلید در دسترس نبود). دوباره امتحان کنید؛ اگر نشد، «$r» دفتر را از سرور می‌گیرد.",
+    "دفترِ رمزدار همین حالا باز نشد (کلید در دسترس نبود). دوباره امتحان کنید؛ اگر نشد، «${asIs(r)}» دفتر را از سرور می‌گیرد.",
     "The encrypted ledger didn't open just now (the key wasn't available). Try again; if it still fails, “$r” gets the ledger from the server.",
     "رمزي دفتر همدا اوس پرانیستل نه شو (کیلي نه وه). بیا هڅه وکړئ؛ که نه شو، «$r» دفتر له سرور څخه راوړي.",
   )
   fun unreadableKeyMissing(device: Any, r: Any): String = t(
-    "دفترِ این دستگاه رمزدار است ولی کلیدش روی این دستگاه نیست (نصبِ دوباره، انتقال به $device تازه یا از کار افتادنِ کلید). هیچ چیزی پاک نشده. «$r» اول تغییرهای نرفتهٔ این دستگاه را می‌فرستد و بعد دفتر را از سرور می‌سازد؛ بازیابیِ پشتیبان هم از همین راه است و فقط ردیف‌هایی را می‌افزاید که هرگز به سرور نرفته بودند؛ ردیفِ حذف‌شده زنده نمی‌شود.",
+    "دفترِ این دستگاه رمزدار است ولی کلیدش روی این دستگاه نیست (نصبِ دوباره، انتقال به ${asIs(device)} تازه یا از کار افتادنِ کلید). هیچ چیزی پاک نشده. «${asIs(r)}» اول تغییرهای نرفتهٔ این دستگاه را می‌فرستد و بعد دفتر را از سرور می‌سازد؛ بازیابیِ پشتیبان هم از همین راه است و فقط ردیف‌هایی را می‌افزاید که هرگز به سرور نرفته بودند؛ ردیفِ حذف‌شده زنده نمی‌شود.",
     "This device's ledger is encrypted but its key isn't on this device (a reinstall, a move to a new $device, or a broken key). Nothing has been deleted. “$r” first sends this device's unsent changes and then rebuilds the ledger from the server; restoring a backup works the same way and only adds rows that never reached the server; a deleted row doesn't come back.",
     "د دې وسیلې دفتر رمزي دی خو کیلي یې په دې وسیله کې نشته (بیا نصبول، نوي $device ته لېږد یا د کیلي خرابېدل). هېڅ شی نه دی ړنګ شوی. «$r» لومړی د دې وسیلې نه تللي بدلونونه لېږي او بیا دفتر له سرور څخه جوړوي؛ د بیک‌اپ بېرته راګرځول هم همداسې دي او یوازې هغه کرښې زیاتوي چې هېڅکله سرور ته نه وې تللې؛ ړنګه شوې کرښه بېرته نه راژوندۍ کېږي.",
   )
   fun unreadableIo(r: Any): String = t(
-    "بازسازیِ قبلی نیمه‌کاره ماند و دفترِ تازه جا نیفتاد؛ برای اینکه دفترِ قدیم کنارِ همگام‌سازیِ تازه ذخیره نشود، ثبت بسته است. «دوباره امتحان» همان جابه‌جایی را تمام می‌کند؛ اگر نشد، «$r» را دوباره بزنید. هیچ چیزی پاک نشده.",
+    "بازسازیِ قبلی نیمه‌کاره ماند و دفترِ تازه جا نیفتاد؛ برای اینکه دفترِ قدیم کنارِ همگام‌سازیِ تازه ذخیره نشود، ثبت بسته است. «دوباره امتحان» همان جابه‌جایی را تمام می‌کند؛ اگر نشد، «${asIs(r)}» را دوباره بزنید. هیچ چیزی پاک نشده.",
     "The previous rebuild didn't finish and the new ledger wasn't put in place; recording is blocked so the old ledger isn't saved next to the new sync. “Try again” finishes the swap; if it doesn't, press “$r” again. Nothing has been deleted.",
     "پخوانی بیا جوړول نیمګړی پاتې شو او نوی دفتر ځای پر ځای نه شو؛ د دې لپاره چې زوړ دفتر د نوې همغږۍ تر څنګ خوندي نه شي، ثبت بند دی. «بیا هڅه» هماغه بدلون بشپړوي؛ که نه شو، «$r» بیا ووهئ. هېڅ شی نه دی ړنګ شوی.",
   )
   fun unreadableDamaged(r: Any): String = t(
-    "فایلِ دفترِ رمزدار خراب است و باز نشد. هیچ چیزی پاک نشده؛ «$r» دفتر را از سرور می‌سازد.",
+    "فایلِ دفترِ رمزدار خراب است و باز نشد. هیچ چیزی پاک نشده؛ «${asIs(r)}» دفتر را از سرور می‌سازد.",
     "The encrypted ledger file is damaged and didn't open. Nothing has been deleted; “$r” rebuilds the ledger from the server.",
     "د رمزي دفتر فایل خراب دی او پرانیستل نه شو. هېڅ شی نه دی ړنګ شوی؛ «$r» دفتر له سرور څخه جوړوي.",
   )
@@ -152,9 +152,9 @@ object StrSecurity {
   /** نامِ دستگاه در «کلید فقط روی همین …» */
   val thisComputer: String get() = t("کامپیوتر", "computer", "کمپیوټر")
   val thisPhone: String get() = t("گوشی", "phone", "موبایل")
-  fun keyOnlyHere(device: Any): String = t("کلید فقط روی همین $device است. ", "The key is only on this $device. ", "کیلي یوازې په همدې $device کې ده. ")
+  fun keyOnlyHere(device: Any): String = t("کلید فقط روی همین ${asIs(device)} است. ", "The key is only on this $device. ", "کیلي یوازې په همدې $device کې ده. ")
   fun keyLostComesBack(r: Any): String = t(
-    " اگر کلید از دست برود، دفتر با «$r» برمی‌گردد — پس پیش از روشن کردن مطمئن شوید همگام‌سازی کار می‌کند.",
+    " اگر کلید از دست برود، دفتر با «${asIs(r)}» برمی‌گردد — پس پیش از روشن کردن مطمئن شوید همگام‌سازی کار می‌کند.",
     " If the key is lost, the ledger comes back with “$r” — so make sure sync works before turning this on.",
     " که کیلي ورکه شي، دفتر په «$r» بېرته راځي — نو له روښانه کولو مخکې ډاډه شئ چې همغږي کار کوي.",
   )

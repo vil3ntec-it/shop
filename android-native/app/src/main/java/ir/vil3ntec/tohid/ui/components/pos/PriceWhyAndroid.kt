@@ -19,7 +19,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
  *  POS-22 — روشن/خاموشِ «چرا این قیمت؟» روی همین دستگاه (`tohid-ui:price_why`)؛ فایلِ مرزیِ پلتفرم
- *  (`SharedPreferences`). پیش‌فرض **خاموش**: کادرِ ویرایشِ ردیف همان پیشین است.
+ *  (`SharedPreferences`). پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: کادرِ ویرایشِ ردیف همان پیشین است.
  */
 object PriceWhyPrefs {
   val on = mutableStateOf(false)
@@ -29,7 +29,7 @@ object PriceWhyPrefs {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, true)
   }
 
   fun set(context: android.content.Context, value: Boolean) {

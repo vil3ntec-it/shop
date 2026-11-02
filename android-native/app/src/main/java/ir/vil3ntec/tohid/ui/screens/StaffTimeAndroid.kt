@@ -15,12 +15,12 @@ import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.core.i18n.StrStaffTime
 import ir.vil3ntec.tohid.core.money.Currency
-import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.staff.Commission
 import ir.vil3ntec.tohid.core.staff.TimeClock
 import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.StaffReport
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.StaffTimeRepository
 import ir.vil3ntec.tohid.formatMillis
@@ -46,7 +46,8 @@ import kotlinx.serialization.json.put
  *     فرستاده می‌شود؛ سرور تکرار را یک بار می‌شمارد. ردِ قطعیِ سرور (۴۰۹) صف را پاک می‌کند و پیامش دیده می‌شود.
  *  ⛔ پورسانت از فاکتورهای لغونشدهٔ این ماهِ همین دفتر (فروشندهٔ فاکتور، POS-23) با نرخِ فروشنده یا نرخِ همه
  *     حساب می‌شود؛ نرخِ دسته در سرور نگه داشته می‌شود ولی تا فروشنده و دسته برای هر ردیف نیامده، این‌جا به کار
- *     نمی‌رود. برگشت هنوز کم نمی‌شود (همان کارتِ «فروشنده‌ها»)؛ `Commission` آماده‌اش است.
+ *     نمی‌رود. برگشتِ این ماه از پایهٔ فروشندهٔ فاکتورِ اصل کم می‌شود (`StaffReport.commissionLines`).
+ *  ⛔ «۷ روز و این ماه» (STF-07): جمعِ نوبت‌های سالم و روزهای کارکردهٔ هر کارمند، فقط برای صاحب و مدیر.
  */
 /**
  *  پرچمِ `shop.staff_time` ِ همین دکان از `/config`؛ تا جواب نیامده، بی حساب یا بی اینترنت ⇒ `null`.
@@ -99,12 +100,12 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
   val mine = spans.lastOrNull { it.staffId == c.memberId }
   val myOpen = mine?.takeIf { it.issue == TimeClock.Issue.OPEN }?.startMs
 
-  //  همان فاکتورهای «فروشنده‌ها»ی این ماه (`ReportEngine.bySeller`)، ولی فاکتورِ بی فروشنده جدا می‌ماند
+  //  همان فاکتورهای «فروشنده‌ها»ی این ماه (`ReportEngine.bySeller`)، ولی فاکتورِ بی فروشنده جدا می‌ماند و
+  //  برگشتِ این ماه از فروشندهٔ فاکتورِ اصل کم می‌شود (STF-08)
   val result = if (!manager) null else plan?.let { p ->
-    val lines = d.sales.filter { it.status != "cancelled" && it.date >= monthFrom && it.date <= today }
-      .map { Commission.Line(it.seller.trim(), null, Money.fromLegacy(it.finalTotal, Currency.AFN)) }
-    Commission.compute(lines, p.plan, Currency.AFN)
+    Commission.compute(StaffReport.commissionLines(d, monthFrom, today), p.plan, Currency.AFN)
   }
+  val periods = if (!manager) emptyList() else StaffReport.periods(spans, today, monthFrom)
 
   fun punch(forMember: String?, kind: TimeClock.Kind) {
     busy = true
@@ -141,6 +142,15 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
         TeamRow(id, names[id].orEmpty().ifBlank { id }, StrStaffTime.hoursMinutes(mins / 60, mins % 60), list.any { it.issue == TimeClock.Issue.OPEN })
       },
       issues = if (manager) todays.count { it.issue != null && it.issue != TimeClock.Issue.OPEN } else 0,
+      periods = periods.map { r ->
+        fun hm(t: TimeClock.PeriodTotal?) = (t?.minutes ?: 0L).let { StrStaffTime.hoursMinutes(it / 60, it % 60) }
+        PeriodRow(
+          name = names[r.staffId].orEmpty().ifBlank { r.staffId },
+          week = hm(r.week),
+          month = StrStaffTime.monthWorked(hm(r.month), r.month?.days ?: 0),
+          issues = r.month?.issues ?: 0,
+        )
+      },
       commission = result?.sellers?.sortedByDescending { it.commission.minor }?.map { SellerRow(it.sellerId, money(it.base.minor / 100.0), "${money(it.commission.minor / 100.0)} ؋") },
       unassigned = result?.unassignedBase?.takeIf { it.minor != 0L }?.let { "${money(it.minor / 100.0)} ؋" },
       plan = if (manager) plan?.plan else null,
@@ -161,8 +171,11 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
   )
 }
 
-/** نوبت‌های ۳۶ ساعتِ گذشته — نوبتِ شبانه‌ای که دیروز شروع شده هم دیده می‌شود */
-private const val STAFF_WINDOW_MS = 36L * 60 * 60 * 1000
+/**
+ *  نوبت‌های ۳۳ روزِ گذشته — آغازِ ماهِ جاری (حداکثر ۳۱ روز) و «۷ روزِ گذشته» (STF-07) هر دو در آن‌اند، و نوبتِ
+ *  شبانه‌ای که دیروز شروع شده هم دیده می‌شود. سرور بازهٔ تا ۶۲ روز را می‌دهد.
+ */
+private const val STAFF_WINDOW_MS = 33L * 24 * 60 * 60 * 1000
 
 private fun staffRejection(code: String): String? = when (code) {
   "punch_same_kind" -> StrStaffTime.sameKind

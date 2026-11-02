@@ -386,6 +386,22 @@ async function footprint(shopId, userId) {
   return out;
 }
 const diff = (a, b) => Object.keys({ ...a, ...b }).filter((k) => a[k] !== b[k]);
+/**
+ *  ردپا پس از آرام شدن: `auth` زمانِ دیده‌شدنِ دستگاه را بی await می‌نویسد
+ *  (`UPDATE devices SET last_seen_at …` در middleware/auth.js)، پس واپسین درخواست‌های خودِ «الف»
+ *  گاه پس از عکسِ «پیش» می‌نشست و ردیفِ دستگاهِ خودِ «الف» «عوض‌شده» دیده می‌شد. صبر تا دو عکسِ پیاپی
+ *  یکی شوند؛ هیچ ستونی کنار نمی‌رود، پس نوشتنِ واقعیِ «ب» همچنان دیده می‌شود.
+ */
+async function settledFootprint(shopId, userId) {
+  let prev = await footprint(shopId, userId);
+  for (let i = 0; i < 40; i++) {
+    await new Promise((r) => setTimeout(r, 50));
+    const cur = await footprint(shopId, userId);
+    if (diff(prev, cur).length === 0) return cur;
+    prev = cur;
+  }
+  return prev;
+}
 
 let world = null;
 /** دو دکان، و صاحبِ «ب» که شاگردِ «الف» هم هست (عضویتِ دوم، مثلِ active-shop.test.js). */
@@ -452,7 +468,7 @@ test('TEN-01/02: هر درِ نشست‌دارِ بیرون از /api/shop — �
   assert.deepEqual(unread, [], `این نشانه‌ها را هیچ درِ GET نمی‌سنجد: ${unread.join('، ')}`);
 
   //  ب) صاحبِ «ب» — هر بردارِ جعل؛ ردپای «الف» پیش و پس
-  const before = await footprint(a.shopId, a.userId);
+  const before = await settledFootprint(a.shopId, a.userId);
   const bad = [];
   for (const s of specs) {
     for (const spoof of ['', a.shopId]) {
@@ -465,7 +481,7 @@ test('TEN-01/02: هر درِ نشست‌دارِ بیرون از /api/shop — �
     }
   }
   assert.deepEqual(bad, [], bad.join('\n'));
-  const after = await footprint(a.shopId, a.userId);
+  const after = await settledFootprint(a.shopId, a.userId);
   assert.deepEqual(diff(before, after), [], 'هیچ ردیفی از «الف» یا صاحبش عوض نشد');
 
   //  ج) نوشته‌های «ب» با شناسه‌های «الف» در فضای خودِ «ب» نشستند، نه در «الف»

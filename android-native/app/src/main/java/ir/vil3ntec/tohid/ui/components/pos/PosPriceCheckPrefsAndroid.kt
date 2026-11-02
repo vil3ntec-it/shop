@@ -4,7 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 
 /**
  *  POS-15 — قیمت‌پرسی با Ctrl+I در صندوقِ کامپیوتر، روی همین دستگاه (`tohid-ui:pos_price_check`)؛ فایلِ
- *  مرزیِ پلتفرم. پیش‌فرض **خاموش**: Ctrl+I همان امروز هیچ کاری نمی‌کند.
+ *  مرزیِ پلتفرم. پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: Ctrl+I همان امروز هیچ کاری نمی‌کند.
  */
 object PosPriceCheckPrefs {
   val on = mutableStateOf(false)
@@ -14,7 +14,7 @@ object PosPriceCheckPrefs {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, true)
   }
 
   fun set(context: android.content.Context, value: Boolean) {

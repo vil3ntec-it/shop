@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.courier.CourierEvent
 import ir.vil3ntec.tohid.core.courier.CourierSettlement
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.MissionNav
 import ir.vil3ntec.tohid.core.courier.MissionStep
 import ir.vil3ntec.tohid.core.courier.PeriodStats
 import ir.vil3ntec.tohid.core.courier.QueueState
@@ -86,6 +87,8 @@ object CourierCodec {
     .put("addressCorrectedAt", c.addressCorrectedAt ?: JSONObject.NULL)
     .put("bagScanBags", c.bagScanBags ?: JSONObject.NULL)
     .put("nearPinMaxM", c.nearPinMaxM ?: JSONObject.NULL)
+    //  DLV-05: فقط پیوندهای مختصات؛ کارتِ پایان‌یافته پیش از ذخیره بی آن است (`MissionView.forStorage`)
+    .put("navigation", c.navigation?.let { JSONObject().put("geo", it.geo).put("google", it.google).put("osmand", it.osmand) } ?: JSONObject.NULL)
 
   fun card(o: JSONObject): MissionCard = MissionCard(
     id = o.optString("id"),
@@ -122,6 +125,8 @@ object CourierCodec {
     addressCorrectedAt = if (o.isNull("addressCorrectedAt")) null else o.optLong("addressCorrectedAt"),
     bagScanBags = if (o.isNull("bagScanBags")) null else o.optInt("bagScanBags"),
     nearPinMaxM = if (o.isNull("nearPinMaxM")) null else o.optInt("nearPinMaxM"),
+    //  دوباره از همان سنجه می‌گذرد: پروندهٔ دست‌کاری‌شدهٔ گوشی هم برنامهٔ دیگری باز نمی‌کند
+    navigation = o.optJSONObject("navigation")?.let { MissionNav.of(it.optString("geo"), it.optString("google"), it.optString("osmand")) },
   )
 
   /** «نقدِ من» و آمار، برای دیدن بی اینترنت (آخرین پاسخِ سرور) */

@@ -31,7 +31,7 @@ import ir.vil3ntec.tohid.core.staff.Commission
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» (STF-07، STF-08). فقط نمایش است:
+ *  کارتِ «ورود و خروج»، «۷ روز و این ماه» و «پورسانتِ این ماه» در «مدیریت» (STF-07، STF-08). فقط نمایش است:
  *  داده و کارها از `StaffTimeAndroid.kt` می‌آیند و این‌جا هیچ تنظیم یا شبکه‌ای خوانده نمی‌شود.
  *  فقط وقتی پرچمِ `shop.staff_time` ِ دکان روشن است کشیده می‌شود.
  */
@@ -43,12 +43,16 @@ data class StaffTimeUi(
   val manager: Boolean,
   val team: List<TeamRow>,
   val issues: Int,
+  /** «۷ روز و این ماه» ِ هر کارمند (STF-07)؛ فقط برای صاحب و مدیر */
+  val periods: List<PeriodRow>,
   val commission: List<SellerRow>?,
   val unassigned: String?,
   val plan: Commission.Plan?,
 )
 
 data class TeamRow(val memberId: String, val name: String, val worked: String, val open: Boolean)
+
+data class PeriodRow(val name: String, val week: String, val month: String, val issues: Int)
 
 data class SellerRow(val seller: String, val base: String, val commission: String)
 
@@ -82,6 +86,19 @@ fun StaffTimeCard(
         if (r.open) TextButton(onClick = { onClockOutFor(r) }, enabled = !ui.busy) { Text(StrStaffTime.clockOutFor(r.name)) }
       }
       if (ui.issues > 0) StaffNote(StrStaffTime.issues(ui.issues), warning = true)
+
+      if (ui.periods.isNotEmpty()) {
+        Spacer(Modifier.height(10.dp))
+        Text(StrStaffTime.periods, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+        ui.periods.forEach { r ->
+          Column(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
+            Text(r.name, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(StrStaffTime.weekWorked(r.week), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+            Text(r.month, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+            if (r.issues > 0) StaffNote(StrStaffTime.issues(r.issues), warning = true)
+          }
+        }
+      }
     }
 
     ui.commission?.let { rows ->

@@ -23,7 +23,7 @@ object StrMoney {
   val date: String get() = t("تاریخ", "Date", "نېټه")
   val settleAll: String get() = t("تسویهٔ کامل", "Settle in full", "بشپړ تصفیه")
   val showAll: String get() = t("نمایشِ همه", "Show all", "ټول ښکاره کړئ")
-  fun rows(n: Any): String = t("$n ردیف", "$n ${pl(n, "row", "rows")}", "$n ${pl(n, "کرښه", "کرښې")}")
+  fun rows(n: Any): String = t("${asIs(n)} ردیف", "$n ${pl(n, "row", "rows")}", "$n ${pl(n, "کرښه", "کرښې")}")
   val deletedDebtor: String get() = t("قرض‌دار حذف‌شده", "Deleted debtor", "ړنګ شوی پوروړی")
   val saved: String get() = t("با موفقیت ثبت شد", "Saved", "په بریالیتوب ثبت شو")
   val edited: String get() = t("با موفقیت ویرایش شد", "Changes saved", "په بریالیتوب سم شو")
@@ -48,7 +48,7 @@ object StrMoney {
   val statPeople: String get() = t("تعداد قرض‌داران", "Debtors", "د پوروړو شمېر")
   val statOwed: String get() = t("جمع تمام قرض‌ها", "Total owed", "ټول پورونه")
   val statReceived: String get() = t("رسیدهای همه", "All received", "ټول ترلاسه شوي")
-  fun itemsCount(n: Any): String = t("$n مورد", "$n ${pl(n, "person", "people")}", "$n کسان")
+  fun itemsCount(n: Any): String = t("${asIs(n)} مورد", "$n ${pl(n, "person", "people")}", "$n کسان")
   val openAccount: String get() = t("باز کردنِ حساب", "Open account", "حساب پرانیستل")
   val noName: String get() = t("بی‌نام", "No name", "بې نومه")
   val sortMost: String get() = t("بیشترین قرض", "Most owed", "تر ټولو ډېر پور")
@@ -61,41 +61,41 @@ object StrMoney {
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
   /** CRM-05 — صورت‌حساب به PNG (گوشی: فرستادن) */
   val statementImage: String get() = t("تصویرِ صورت‌حساب", "Statement image", "د صورتحساب انځور")
-  fun printTitle(name: Any): String = t("صورت‌حسابِ $name", "Statement — $name", "صورتحساب — $name")
+  fun printTitle(name: Any): String = t("صورت‌حسابِ ${asIs(name)}", "Statement — $name", "صورتحساب — $name")
   fun daysInDebt(span: Any, since: Any): String =
-    t("$span است که بدهکار است — از $since", "In debt for $span — since $since", "$span راهیسې پوروړی دی — له $since")
-  fun inDebtShort(span: Any): String = t("$span بدهکار", "$span in debt", "$span پوروړی")
+    t("${asIs(span)} است که بدهکار است — از ${asIs(since)}", "In debt for $span — since $since", "$span راهیسې پوروړی دی — له $since")
+  fun inDebtShort(span: Any): String = t("${asIs(span)} بدهکار", "$span in debt", "$span پوروړی")
   val noDebt: String get() = t("بدهی ندارد", "No debt", "پور نه لري")
   fun overdue(n: Any, amount: Any): String =
-    t("$n برد از سررسید گذشته — $amount افغانی", "$n overdue ${pl(n, "give", "gives")} — $amount AFN", "$n ورکړې له نېټې تېرې — $amount افغانۍ")
+    t("${asIs(n)} برد از سررسید گذشته — ${asIs(amount)} افغانی", "$n overdue ${pl(n, "give", "gives")} — $amount AFN", "$n ورکړې له نېټې تېرې — $amount افغانۍ")
   fun nextDue(date: Any, amount: Any): String =
-    t("سررسیدِ بعدی $date — $amount افغانی", "Next due $date — $amount AFN", "راتلونکې نېټه $date — $amount افغانۍ")
+    t("سررسیدِ بعدی ${asIs(date)} — ${asIs(amount)} افغانی", "Next due $date — $amount AFN", "راتلونکې نېټه $date — $amount افغانۍ")
   fun overLimitBy(excess: Any, limit: Any): String =
-    t("$excess افغانی بیش از سقفِ اعتبار ($limit)", "$excess AFN over the credit limit ($limit)", "$excess افغانۍ د پور له حد ($limit) زیات")
-  fun currentBalance(amount: Any): String = t("ماندهٔ فعلی $amount", "current balance $amount", "اوسنی پاتې $amount")
+    t("${asIs(excess)} افغانی بیش از سقفِ اعتبار (${asIs(limit)})", "$excess AFN over the credit limit ($limit)", "$excess افغانۍ د پور له حد ($limit) زیات")
+  fun currentBalance(amount: Any): String = t("ماندهٔ فعلی ${asIs(amount)}", "current balance $amount", "اوسنی پاتې $amount")
   fun limitHeadroom(limit: Any, headroom: Any): String =
-    t("سقفِ اعتبار $limit — تا سقف $headroom افغانی", "Credit limit $limit — $headroom AFN left", "د پور حد $limit — $headroom افغانۍ پاتې")
+    t("سقفِ اعتبار ${asIs(limit)} — تا سقف ${asIs(headroom)} افغانی", "Credit limit $limit — $headroom AFN left", "د پور حد $limit — $headroom افغانۍ پاتې")
   val given: String get() = t("کل برد", "Total given", "ټول ورکړل شوي")
   val received: String get() = t("کل رسید", "Total received", "ټول ترلاسه شوي")
   val balance: String get() = t("الباقی", "Balance", "پاتې")
   val settled: String get() = t("تسویه", "Settled", "تصفیه")
   val transactions: String get() = t("تراکنش‌ها", "Transactions", "راکړې ورکړې")
   val details: String get() = t("جزئیات", "Details", "جزئیات")
-  fun balanceAfterShort(amount: Any): String = t("مانده $amount", "Bal. $amount", "پاتې $amount")
+  fun balanceAfterShort(amount: Any): String = t("مانده ${asIs(amount)}", "Bal. $amount", "پاتې $amount")
   val giveTag: String get() = t("برد", "Given", "ورکړه")
   val receiveTag: String get() = t("رسید", "Received", "رسید")
   val noTx: String get() = t("هنوز تراکنشی برای این حساب ثبت نشده.", "No transactions on this account yet.", "تر اوسه پر دې حساب راکړه ورکړه نشته.")
   val noTxHint: String get() = t("نخستین برد یا رسیدِ این حساب را ثبت کنید.", "Record this account's first give or payment.", "د دې حساب لومړۍ ورکړه یا رسید ثبت کړئ.")
   val firstTx: String get() = t("ثبتِ نخستین تراکنش", "Add first transaction", "لومړۍ راکړه ورکړه ثبت کړئ")
-  fun invoices(n: Any): String = t("فاکتورهای این مشتری ($n)", "This customer's invoices ($n)", "د دې پیرودونکي بلونه ($n)")
-  fun olderInvoices(n: Any): String = t("$n فاکتورِ قدیمی‌تر در «فروش‌ها»", "$n older ${pl(n, "invoice", "invoices")} in Sales", "$n زاړه بلونه په «پلور» کې")
-  fun invoiceNo(label: Any): String = t("فاکتور #$label", "Invoice #$label", "بل #$label")
+  fun invoices(n: Any): String = t("فاکتورهای این مشتری (${asIs(n)})", "This customer's invoices ($n)", "د دې پیرودونکي بلونه ($n)")
+  fun olderInvoices(n: Any): String = t("${asIs(n)} فاکتورِ قدیمی‌تر در «فروش‌ها»", "$n older ${pl(n, "invoice", "invoices")} in Sales", "$n زاړه بلونه په «پلور» کې")
+  fun invoiceNo(label: Any): String = t("فاکتور #${asIs(label)}", "Invoice #$label", "بل #$label")
   val cancelled: String get() = t("لغوشده", "Cancelled", "لغوه شوی")
-  fun remaining(amount: Any): String = t("مانده $amount", "$amount due", "پاتې $amount")
+  fun remaining(amount: Any): String = t("مانده ${asIs(amount)}", "$amount due", "پاتې $amount")
   val newTx: String get() = t("ثبتِ تراکنش", "New transaction", "نوې راکړه ورکړه")
   val newTxHint: String get() = t("مبلغ را بنویسید و برد یا رسید را انتخاب کنید", "Enter an amount, then pick give or receive", "مبلغ ولیکئ او ورکړه یا رسید وټاکئ")
   val txDeleted: String get() = t("تراکنش حذف شد", "Transaction deleted", "راکړه ورکړه ړنګه شوه")
-  fun debtorDeleted(name: Any): String = t("«$name» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
+  fun debtorDeleted(name: Any): String = t("«${asIs(name)}» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
   val deleteDebtorTitle: String get() = t("حذفِ قرض‌دار؟", "Delete this debtor?", "پوروړی ړنګ شي؟")
   val deleteTxTitle: String get() = t("حذفِ تراکنش؟", "Delete this transaction?", "راکړه ورکړه ړنګه شي؟")
   val deleteTxBody: String get() = t(
@@ -110,16 +110,16 @@ object StrMoney {
   val status: String get() = t("وضعیت", "Status", "حالت")
   val due: String get() = t("سررسید", "Due date", "د ورکړې نېټه")
   val noDue: String get() = t("سررسید ندارد", "No due date", "د ورکړې نېټه نه لري")
-  fun openAmount(amount: Any): String = t("باز $amount", "$amount open", "$amount پاتې")
+  fun openAmount(amount: Any): String = t("باز ${asIs(amount)}", "$amount open", "$amount پاتې")
   val paidOff: String get() = t("تسویه شد", "Paid off", "تصفیه شو")
   val pastDue: String get() = t("گذشته", "overdue", "تېره")
   val forWhat: String get() = t("بابتِ", "Applied to", "د")
   val prepaid: String get() = t("پیش‌پرداخت", "Prepaid", "مخکې ورکړه")
   val balanceAfter: String get() = t("مانده پس از این ردیف", "Balance after this entry", "له دې وروسته پاتې")
   val items: String get() = t("اقلام", "Items", "توکي")
-  fun returned(q: Any): String = t("مرجوعی $q", "returned $q", "بېرته $q")
-  fun discount(amount: Any): String = t("تخفیف $amount", "Discount $amount", "تخفیف $amount")
-  fun paidAtOnce(amount: Any): String = t("پرداختِ همان لحظه $amount", "Paid at sale $amount", "سمدستي ورکړه $amount")
+  fun returned(q: Any): String = t("مرجوعی ${asIs(q)}", "returned $q", "بېرته $q")
+  fun discount(amount: Any): String = t("تخفیف ${asIs(amount)}", "Discount $amount", "تخفیف $amount")
+  fun paidAtOnce(amount: Any): String = t("پرداختِ همان لحظه ${asIs(amount)}", "Paid at sale $amount", "سمدستي ورکړه $amount")
   val showInvoice: String get() = t("نمایشِ فاکتور", "Show invoice", "بل ښکاره کړئ")
   val printPdf: String get() = t("چاپ / PDF", "Print / PDF", "چاپ / PDF")
   val sendReceipt: String get() = t("فرستادن", "Send", "لېږل")
@@ -134,7 +134,7 @@ object StrMoney {
   val dueTwoWeeks: String get() = t("دو هفته", "2 weeks", "دوه اوونۍ")
   val dueMonth: String get() = t("یک ماه", "1 month", "یوه میاشت")
   val dueNone: String get() = t("بی سررسید", "No due date", "بې نېټې")
-  fun dueUnreadable(sample: Any): String = t("تاریخ خوانده نشد — مثل $sample بنویسید", "Couldn't read the date — write it like $sample", "نېټه ونه لوستل شوه — داسې یې ولیکئ: $sample")
+  fun dueUnreadable(sample: Any): String = t("تاریخ خوانده نشد — مثل ${asIs(sample)} بنویسید", "Couldn't read the date — write it like $sample", "نېټه ونه لوستل شوه — داسې یې ولیکئ: $sample")
   val dueSaved: String get() = t("سررسید ثبت شد", "Due date saved", "نېټه ثبت شوه")
 
   //  برگهٔ قرض‌دار و برگهٔ تراکنش
@@ -160,7 +160,7 @@ object StrMoney {
   val receiveKind: String get() = t("رسید — پول رساند", "Receive — paid back", "رسید — پیسې یې راکړې")
   val recordGive: String get() = t("ثبت برد", "Record give", "ورکړه ثبت کړئ")
   val recordReceive: String get() = t("ثبت رسید", "Record receipt", "رسید ثبت کړئ")
-  fun balanceAfterSave(state: Any): String = t("مانده پس از ثبت: $state", "Balance after saving: $state", "له ثبت وروسته پاتې: $state")
+  fun balanceAfterSave(state: Any): String = t("مانده پس از ثبت: ${asIs(state)}", "Balance after saving: $state", "له ثبت وروسته پاتې: $state")
   val overLimitTitle: String get() = t("بیش از سقفِ اعتبار", "Over the credit limit", "له پور حد زیات")
   val overLimitNote: String get() = t(
     "اگر ثبت شود، در «دفترچهٔ ثبت» با همین مبلغ می‌ماند.",
@@ -178,20 +178,20 @@ object StrMoney {
   /* ------------------------------ ادغامِ تکراری‌ها (CRM-10) ------------------------------ */
 
   val mergeTitle: String get() = t("ادغامِ تکراری‌ها", "Merge duplicates", "تکراري یوځای کول")
-  fun mergeEntry(n: Any): String = t("$n گروه مشتریِ تکراری", "$n duplicate ${pl(n, "group", "groups")}", "$n تکراري ${pl(n, "ډله", "ډلې")}")
+  fun mergeEntry(n: Any): String = t("${asIs(n)} گروه مشتریِ تکراری", "$n duplicate ${pl(n, "group", "groups")}", "$n تکراري ${pl(n, "ډله", "ډلې")}")
   val mergeEntrySub: String get() = t("ادغام با حفظِ همهٔ سوابق", "Merge and keep every record", "یوځای کول، ټول سوابق پاتې کېږي")
   val mergeSamePhone: String get() = t("شمارهٔ یکسان", "Same number", "یوه شمېره")
   val mergeSameName: String get() = t("نامِ یکسان — شاید دو نفرِ جدا", "Same name — may be two people", "یو نوم — کېدای شي دوه کسان وي")
   val mergeKeep: String get() = t("ماندگار", "Kept", "پاتې کېږي")
   val mergeAction: String get() = t("ادغام", "Merge", "یوځای کول")
   val noDuplicates: String get() = t("مشتریِ تکراری‌ای نمانده", "No duplicates left", "هېڅ تکراري نه دی پاتې")
-  fun mergeConfirmTitle(drop: Any, keep: Any): String = t("ادغامِ «$drop» در «$keep»؟", "Merge “$drop” into “$keep”?", "«$drop» په «$keep» کې یوځای شي؟")
+  fun mergeConfirmTitle(drop: Any, keep: Any): String = t("ادغامِ «${asIs(drop)}» در «${asIs(keep)}»؟", "Merge “$drop” into “$keep”?", "«$drop» په «$keep» کې یوځای شي؟")
   fun mergeConfirmBody(tx: Any, sales: Any, drop: Any, keep: Any, after: Any): String = t(
-    "$tx تراکنش و $sales فاکتورِ «$drop» به «$keep» می‌رود؛ ماندهٔ «$keep» پس از ادغام: $after. «$drop» پاک نمی‌شود و پیوندهای کهنه‌اش «$keep» را باز می‌کنند. این کار برگشت ندارد.",
+    "${asIs(tx)} تراکنش و ${asIs(sales)} فاکتورِ «${asIs(drop)}» به «${asIs(keep)}» می‌رود؛ ماندهٔ «${asIs(keep)}» پس از ادغام: ${asIs(after)}. «${asIs(drop)}» پاک نمی‌شود و پیوندهای کهنه‌اش «${asIs(keep)}» را باز می‌کنند. این کار برگشت ندارد.",
     "$tx ${pl(tx, "transaction", "transactions")} and $sales ${pl(sales, "invoice", "invoices")} of “$drop” move to “$keep”; balance of “$keep” after the merge: $after. “$drop” isn't deleted and old links open “$keep”. This can't be undone.",
     "د «$drop» $tx راکړې ورکړې او $sales بلونه «$keep» ته ځي؛ له یوځای کېدو وروسته د «$keep» پاتې: $after. «$drop» نه ړنګېږي او زاړه لینکونه «$keep» پرانیزي. دا کار بېرته نه راګرځي.",
   )
-  fun merged(drop: Any, keep: Any): String = t("«$drop» در «$keep» ادغام شد", "“$drop” merged into “$keep”", "«$drop» په «$keep» کې یوځای شو")
+  fun merged(drop: Any, keep: Any): String = t("«${asIs(drop)}» در «${asIs(keep)}» ادغام شد", "“$drop” merged into “$keep”", "«$drop» په «$keep» کې یوځای شو")
 
   /* ------------------------------ رسیدها ------------------------------ */
 
@@ -212,7 +212,7 @@ object StrMoney {
 
   val supplierDebtTotal: String get() = t("بدهیِ ما به تأمین‌کننده‌ها", "We owe suppliers", "موږ عرضه‌کوونکو ته پوروړي یو")
   fun suppliersCaption(suppliers: Any, purchases: Any): String =
-    t("$suppliers تأمین‌کننده — $purchases خرید", "$suppliers ${pl(suppliers, "supplier", "suppliers")} — $purchases ${pl(purchases, "purchase", "purchases")}", "$suppliers عرضه‌کوونکي — $purchases پېرودونه")
+    t("${asIs(suppliers)} تأمین‌کننده — ${asIs(purchases)} خرید", "$suppliers ${pl(suppliers, "supplier", "suppliers")} — $purchases ${pl(purchases, "purchase", "purchases")}", "$suppliers عرضه‌کوونکي — $purchases پېرودونه")
   val newSupplier: String get() = t("تأمین‌کنندهٔ تازه", "New supplier", "نوی عرضه‌کوونکی")
   val editSupplier: String get() = t("ویرایش تأمین‌کننده", "Edit supplier", "عرضه‌کوونکی سمول")
   val newPurchase: String get() = t("ثبت خرید", "Record purchase", "پېرود ثبت کړئ")
@@ -220,8 +220,8 @@ object StrMoney {
   val weOwe: String get() = t("بدهکاریم", "We owe", "پوروړي یو")
   val prepaidToSupplier: String get() = t("پیش‌پرداخت داریم", "Prepaid", "مخکې مو ورکړي")
   val accountSettled: String get() = t("حساب صاف است", "Settled", "حساب صاف دی")
-  fun owesAfn(amount: Any): String = t("$amount افغانی بدهکار", "Owes $amount AFN", "$amount افغانۍ پوروړی")
-  fun creditAfn(amount: Any): String = t("$amount افغانی موجودی دارد", "$amount AFN in credit", "$amount افغانۍ زېرمه لري")
+  fun owesAfn(amount: Any): String = t("${asIs(amount)} افغانی بدهکار", "Owes $amount AFN", "$amount افغانۍ پوروړی")
+  fun creditAfn(amount: Any): String = t("${asIs(amount)} افغانی موجودی دارد", "$amount AFN in credit", "$amount افغانۍ زېرمه لري")
   val emptySuppliers: String get() = t("هنوز تأمین‌کننده‌ای ثبت نشده است.", "No suppliers yet.", "تر اوسه عرضه‌کوونکی نشته.")
   val emptySuppliersBody: String get() = t(
     "کسانی که از آن‌ها جنس می‌خرید را ثبت کنید تا خرید و بدهی به هرکدام جدا بماند.",
@@ -230,7 +230,7 @@ object StrMoney {
   )
   val deleteSupplierTitle: String get() = t("حذف تأمین‌کننده؟", "Delete this supplier?", "عرضه‌کوونکی ړنګ شي؟")
   fun deleteSupplierBody(name: Any): String = t(
-    "«$name» حذف می‌شود. اگر خرید یا پرداختی به نامش ثبت شده باشد، حذف نمی‌شود.",
+    "«${asIs(name)}» حذف می‌شود. اگر خرید یا پرداختی به نامش ثبت شده باشد، حذف نمی‌شود.",
     "“$name” will be deleted. A supplier with recorded purchases or payments is kept.",
     "«$name» ړنګېږي. که پېرود یا ورکړه یې ثبت وي، نه ړنګېږي.",
   )
@@ -243,10 +243,10 @@ object StrMoney {
   val noHistory: String get() = t("هنوز خرید یا پرداختی ثبت نشده.", "No purchases or payments yet.", "تر اوسه پېرود یا ورکړه نشته.")
   val payment: String get() = t("پرداخت", "Payment", "ورکړه")
   val deletedProduct: String get() = t("(محصول حذف‌شده)", "(deleted item)", "(ړنګ شوی توکی)")
-  fun leftToPay(amount: Any): String = t("$amount ؋ باقی", "$amount ؋ left", "$amount ؋ پاتې")
+  fun leftToPay(amount: Any): String = t("${asIs(amount)} ؋ باقی", "$amount ؋ left", "$amount ؋ پاتې")
   val purchaseSettled: String get() = t("تسویه", "Paid", "تصفیه")
   val supplierPayHint: String get() = t("پرداخت", "Pay", "ورکړه")
-  fun owedLine(name: Any, amount: Any): String = t("$name — $amount ؋ بدهکاریم", "$name — we owe $amount ؋", "$name — $amount ؋ پوروړي یو")
+  fun owedLine(name: Any, amount: Any): String = t("${asIs(name)} — ${asIs(amount)} ؋ بدهکاریم", "$name — we owe $amount ؋", "$name — $amount ؋ پوروړي یو")
   val payAmount: String get() = t("مبلغ پرداختی", "Amount paid", "ورکړل شوې پیسې")
   val recordPayment: String get() = t("ثبت پرداخت", "Record payment", "ورکړه ثبت کړئ")
 
@@ -266,7 +266,7 @@ object StrMoney {
   val paidHelper: String get() = t("خالی یعنی نسیه", "Empty means on credit", "تش یعنې پور")
   /** PUR-09: زیرِ «قیمت هر واحد» — آخرین فیِ همین تأمین‌کننده برای همین کالا */
   fun lastSupplierPrice(price: Any, date: Any): String =
-    t("آخرین فیِ این تأمین‌کننده: $price ($date)", "Last price from this supplier: $price ($date)", "د دې عرضه کوونکي وروستۍ بیه: $price ($date)")
+    t("آخرین فیِ این تأمین‌کننده: ${asIs(price)} (${asIs(date)})", "Last price from this supplier: $price ($date)", "د دې عرضه کوونکي وروستۍ بیه: $price ($date)")
   val noSupplierBuyYet: String get() = t("از این تأمین‌کننده هنوز خریده نشده", "Not bought from this supplier yet", "له دې عرضه کوونکي لا نه دي اخیستل شوي")
   val remainingLabel: String get() = t("باقی‌مانده", "Remaining", "پاتې")
   val notesSection: String get() = t("توضیحات", "Notes", "یادښتونه")
@@ -276,24 +276,24 @@ object StrMoney {
 
   /* ------------------------------ مصارف ------------------------------ */
 
-  fun monthTotal(month: Any): String = t("جمع مصارف $month", "Expenses in $month", "د $month لګښتونه")
+  fun monthTotal(month: Any): String = t("جمع مصارف ${asIs(month)}", "Expenses in $month", "د $month لګښتونه")
   val newExpense: String get() = t("مصرف تازه", "New expense", "نوی لګښت")
   val editExpense: String get() = t("ویرایش مصرف", "Edit expense", "لګښت سمول")
   val byCategory: String get() = t("به تفکیک دسته", "By category", "د ډلې له مخې")
   val allCategories: String get() = t("نمایشِ همهٔ دسته‌ها", "Show all categories", "ټولې ډلې ښکاره کړئ")
-  fun categoriesIn(n: Any, month: Any): String = t("$n دسته در $month", "$n ${pl(n, "category", "categories")} in $month", "$n ډلې په $month کې")
+  fun categoriesIn(n: Any, month: Any): String = t("${asIs(n)} دسته در ${asIs(month)}", "$n ${pl(n, "category", "categories")} in $month", "$n ډلې په $month کې")
   val allExpenses: String get() = t("همهٔ مصارف", "All expenses", "ټول لګښتونه")
-  fun categoryExpenses(name: Any): String = t("مصارف «$name»", "“$name” expenses", "د «$name» لګښتونه")
+  fun categoryExpenses(name: Any): String = t("مصارف «${asIs(name)}»", "“$name” expenses", "د «$name» لګښتونه")
   val noExpensesMonth: String get() = t("در این ماه مصرفی ثبت نشده است.", "No expenses this month.", "په دې میاشت کې لګښت نشته.")
   val noExpensesBody: String get() = t("کرایه، برق، معاش و هر خرجِ دیگرِ دکان را این‌جا ثبت کنید.", "Record rent, power, wages and other shop costs here.", "کرایه، برېښنا، معاش او نور لګښتونه دلته ثبت کړئ.")
   val pickMonth: String get() = t("انتخابِ ماه", "Choose month", "میاشت وټاکئ")
   val prevMonth: String get() = t("ماهِ پیش", "Previous month", "تېره میاشت")
   val nextMonth: String get() = t("ماهِ بعد", "Next month", "راتلونکې میاشت")
-  fun breakdownTitle(month: Any): String = t("مصارف $month به تفکیک دسته", "$month expenses by category", "د $month لګښتونه د ډلې له مخې")
+  fun breakdownTitle(month: Any): String = t("مصارف ${asIs(month)} به تفکیک دسته", "$month expenses by category", "د $month لګښتونه د ډلې له مخې")
   val breakdownHint: String get() = t("روی هر دسته بزنید تا فقط مصارفِ همان دیده شود", "Tap a category to see only its expenses", "پر یوې ډلې ووهئ چې یوازې هغه لګښتونه وګورئ")
   val deleteExpenseTitle: String get() = t("حذف مصرف؟", "Delete this expense?", "لګښت ړنګ شي؟")
   fun deleteExpenseBody(title: Any, amount: Any): String =
-    t("«$title» به مبلغ $amount ؋ حذف می‌شود.", "“$title” ($amount ؋) will be deleted.", "«$title» په $amount ؋ ړنګېږي.")
+    t("«${asIs(title)}» به مبلغ ${asIs(amount)} ؋ حذف می‌شود.", "“$title” ($amount ؋) will be deleted.", "«$title» په $amount ؋ ړنګېږي.")
   val category: String get() = t("دسته", "Category", "ډله")
   val forWhatOptional: String get() = t("بابت چی؟ (اختیاری)", "What for? (optional)", "د څه لپاره؟ (اختیاري)")
   val expenseAmount: String get() = t("مبلغ (افغانی)", "Amount (AFN)", "مبلغ (افغانۍ)")

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -25,6 +26,7 @@ import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.SettingsTiers
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -39,6 +41,9 @@ import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
  *  `SettingsLayout.deskSections`) و صفحهٔ همان بخش در ستونِ پایان — **همان** صفحه‌های
  *  گوشی (`SettingsPages`)، بی دکمهٔ برگشت. پیوندِ هر بخش (`settings/security/app-lock`)
  *  همان بخش را باز انتخاب می‌کند.
+ *
+ *  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱، `SettingsTiers`): ستون فقط بخش‌های اصلی را دارد و زیرش ردیفِ بستهٔ «پیشرفته»؛
+ *  بخشِ روشن و پنهان (A) ردیف ندارد ولی نشانیِ مستقیمش (`selected`) همان صفحه را باز می‌کند.
  */
 @Composable
 internal fun RouteScope.DeskSettingsScreen(selected: String?) {
@@ -47,40 +52,47 @@ internal fun RouteScope.DeskSettingsScreen(selected: String?) {
   val all = if (Platform.DESKTOP) SettingsLayout.deskSections else SettingsLayout.sections.filterNot { it in SettingsLayout.PHONE_HIDDEN }
   //  بخشِ پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارد؛ نشانیِ مستقیمش همان صفحه را باز می‌کند (صفحه خودش «خاموش» می‌گوید)
   val desk = all.filter { SettingsLayout.shown(it, facts.serverOn) }
-  var pick by rememberSaveable(selected) { mutableStateOf(selected?.takeIf { it in all } ?: desk.first()) }
+  val main = desk.filter { SettingsTiers.tier(it) == SettingsTiers.Tier.MAIN }
+  var pick by rememberSaveable(selected) { mutableStateOf(selected?.takeIf { it in all } ?: main.firstOrNull() ?: desk.first()) }
   val extra = remember(access) { V3Modules.settingsEntries(access) }
   val lockToggle = rememberLockToggle()
+  //  «پیشرفته» باز است اگر بخشِ انتخاب‌شده خودش پیشرفته باشد
+  var advanced by rememberSaveable(selected) { mutableStateOf(SettingsTiers.tier(pick) == SettingsTiers.Tier.ADVANCED) }
+  @Composable
+  fun Group(g: SettingsLayout.Group, tier: SettingsTiers.Tier) {
+    val rows = g.sections.filter { (it in desk || SettingsLayout.isLink(it)) && SettingsTiers.tier(it) == tier }
+    val more = if (tier == SettingsTiers.Tier.ADVANCED) extra.filter { it.group == g.title }.filter { it.shown() } else emptyList()
+    if (rows.isEmpty() && more.isEmpty()) return
+    V3Section(SettingsLayout.groupLabel(g.title)) {
+      rows.forEachIndexed { i, key ->
+        if (i > 0) V3Divider(start = ROW_DIVIDER_START)
+        Box {
+          SettingsRow(key, facts, onClick = {
+            val link = SettingsLayout.LINKS[key]
+            if (link != null) nav.open(link) else pick = key
+          }, onLockToggle = lockToggle)
+          if (key == pick) SelectedMark(Modifier.align(Alignment.CenterStart))
+        }
+      }
+      more.forEachIndexed { i, e ->
+        if (rows.isNotEmpty() || i > 0) V3Divider(start = ROW_DIVIDER_START)
+        V3ListRow(e.label(), subtitle = e.subtitle(), icon = e.icon, tile = false, onClick = { nav.open(e.route) })
+      }
+    }
+  }
   V3TwoPane(
     listWidth = 320.dp,
     list = {
       SettingsPageFrame(title = Str.settings, onBack = null, largeTitle = false) {
-        items(SettingsLayout.GROUPS, key = { it.title }) { g ->
-          val rows = g.sections.filter { it in desk || SettingsLayout.isLink(it) }
-          val more = extra.filter { it.group == g.title }.filter { it.shown() }
-          if (rows.isNotEmpty() || more.isNotEmpty()) {
-            V3Section(SettingsLayout.groupLabel(g.title)) {
-              rows.forEachIndexed { i, key ->
-                if (i > 0) V3Divider(start = ROW_DIVIDER_START)
-                Box {
-                  SettingsRow(key, facts, onClick = {
-                    val link = SettingsLayout.LINKS[key]
-                    if (link != null) nav.open(link) else pick = key
-                  }, onLockToggle = lockToggle)
-                  if (key == pick) SelectedMark(Modifier.align(Alignment.CenterStart))
-                }
-              }
-              more.forEach { e ->
-                V3Divider(start = ROW_DIVIDER_START)
-                V3ListRow(e.label(), icon = e.icon, tile = false, onClick = { nav.open(e.route) })
-              }
-            }
-          }
-        }
+        items(SettingsLayout.GROUPS, key = { it.title }) { g -> Group(g, SettingsTiers.Tier.MAIN) }
+        item(key = "advanced") { AdvancedRow(advanced) { advanced = !advanced } }
+        if (advanced) items(SettingsLayout.GROUPS, key = { "advanced/" + it.title }) { g -> Group(g, SettingsTiers.Tier.ADVANCED) }
       }
     },
     detail = {
       AnimatedContent(pick, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) }, label = "deskSettings") { key ->
-        SettingsPages.of(key)?.content?.invoke(this@DeskSettingsScreen, null)
+        //  «این چه می‌کند؟» بالای صفحهٔ همان بخش (`SettingsPageFrame`)
+        CompositionLocalProvider(LocalSettingsKey provides key) { SettingsPages.of(key)?.content?.invoke(this@DeskSettingsScreen, null) }
       }
     },
   )

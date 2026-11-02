@@ -94,6 +94,19 @@ class ReceiptLayoutTest {
       texts(ReceiptLayout.build(base.copy(included = listOf(DiscountLine("x", 0.0))), PrinterProfile.WIDTH_58MM, fmt)))
   }
 
+  @Test fun `ردیفِ جدای گردکردنِ نقدی پس از تخفیف‌ها و با علامت؛ صفر نمی‌آید (PAY-09)`() {
+    val base = input()
+    val up = texts(ReceiptLayout.build(base.copy(total = 575.0, rounding = 5.0), PrinterProfile.WIDTH_58MM, fmt))
+    val i = up.indexOf("R:تخفیفِ ویژه=−30 افغانی")
+    assertEquals("R:گردکردنِ نقدی=+5 افغانی", up[i + 1])
+    assertEquals("R:مبلغ نهایی=575 افغانی", up[i + 3])
+    val down = texts(ReceiptLayout.build(base.copy(total = 565.0, rounding = -5.0), PrinterProfile.WIDTH_58MM, fmt))
+    assertTrue(down.contains("R:گردکردنِ نقدی=−5 افغانی"))
+    //  بی گرد ⇒ همان فاکتورِ پیشین
+    assertEquals(texts(ReceiptLayout.build(base, PrinterProfile.WIDTH_58MM, fmt)),
+      texts(ReceiptLayout.build(base.copy(rounding = 0.0), PrinterProfile.WIDTH_58MM, fmt)))
+  }
+
   @Test fun `شمارِ عدد فقط وقتی همه دانه‌ای‌اند؛ نسیه با نامِ قرض‌دار؛ بی QR؛ لغو و لوگو`() {
     val whole = listOf(LineView("الف", 2.0, "", 10.0, 20.0), LineView("ب", 3.0, "", 10.0, 30.0))
     val logo = MonoImage(40, 20)

@@ -15,14 +15,14 @@ object StrErasure {
   )
   val previewing: String get() = t("در حالِ شمردن…", "Counting…", "د شمېرلو په حال کې…")
   val previewTitle: String get() = t("پیش‌نمایش — هنوز چیزی پاک نشده", "Preview — nothing erased yet", "مخکتنه — تر اوسه هېڅ نه دي پاک شوي")
-  fun total(n: String): String = t("روی هم $n ردیف", "$n rows in total", "ټول $n کرښې")
+  fun total(n: String): String = t("روی هم ${asIs(n)} ردیف", "$n rows in total", "ټول $n کرښې")
   val nothing: String get() = t(
     "از این مشتری در سرورِ این دکان چیزی برای پاک کردن نیست.",
     "There is nothing to erase for this customer on this shop's server.",
     "د دې پېرودونکي لپاره د دې دوکان په سرور کې د پاکولو لپاره څه نشته.",
   )
   fun openOrders(n: String): String = t(
-    "$n سفارشِ بازِ این مشتری هنوز تمام نشده؛ پس از پایانشان دوباره بخواهید.",
+    "${asIs(n)} سفارشِ بازِ این مشتری هنوز تمام نشده؛ پس از پایانشان دوباره بخواهید.",
     "$n open orders of this customer are not finished yet; ask again after they end.",
     "د دې پېرودونکي $n پرانیستي فرمایشونه لا نه دي بشپړ شوي؛ له پای وروسته بیا وغواړئ.",
   )
@@ -59,10 +59,10 @@ object StrErasure {
   val reauthCancelled: String get() = t("تأییدِ هویت انجام نشد؛ چیزی پاک نشد.", "Identity was not confirmed; nothing was erased.", "هویت تایید نه شو؛ هېڅ پاک نه شول.")
   val erasing: String get() = t("در حالِ حذف…", "Erasing…", "د پاکولو په حال کې…")
   val doneTitle: String get() = t("حذف شد", "Erased", "پاک شول")
-  fun done(n: String): String = t("$n ردیف پاک یا ناشناس شد.", "$n rows were erased or anonymised.", "$n کرښې پاکې یا بې نومه شوې.")
+  fun done(n: String): String = t("${asIs(n)} ردیف پاک یا ناشناس شد.", "$n rows were erased or anonymised.", "$n کرښې پاکې یا بې نومه شوې.")
   val close: String get() = t("بستن", "Close", "بندول")
   val cancel: String get() = t("انصراف", "Cancel", "لغوه")
-  fun count(label: String, n: String): String = t("$label: $n", "$label: $n", "$label: $n")
+  fun count(label: String, n: String): String = t("${asIs(label)}: ${asIs(n)}", "$label: $n", "$label: $n")
 
   // شمارش‌ها — همان `COUNT_KEYS` ِ سرور
   fun label(key: String): String = when (key) {
@@ -86,6 +86,6 @@ object StrErasure {
     "issues" -> t("گزارشِ مشکل", "Problem reports", "د ستونزې راپورونه")
     "issuePhotos" -> t("عکسِ گزارش", "Report photos", "د راپور انځورونه")
     "reviews" -> t("نظر", "Reviews", "نظرونه")
-    else -> t(key, key, key)
+    else -> t(asIs(key), key, key)
   }
 }
