@@ -219,6 +219,8 @@ object OwnerExport {
     "specialOrder" to "سفارش ویژه",
     //  فروشِ امانی (POS-27): سند و وضعیتِ تازه روی ردیفِ سابقه
     "layaway" to "فروش امانی",
+    //  امتیازِ وفاداری (PRM-13): شمارِ امتیازِ ردیفِ سابقه
+    "points" to "امتیاز",
     "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
     "coupons" to "کدهای تخفیف",
     "quantity" to "تعداد",
