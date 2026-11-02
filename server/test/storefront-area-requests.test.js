@@ -14,6 +14,8 @@
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '1000';
 const test = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, many, newId, now } = require('../src/db');
@@ -138,7 +140,13 @@ test('S34: پینِ بیرون ⇒ ارسال ثبت نمی‌شود، «دری�
   const far = await checkout(s.slug, order('delivery', phone, { text: 'بیرون', ...OUTSIDE }), t);
   assert.equal(far.status, 400, JSON.stringify(far.body));
   assert.deepEqual([far.body.error.code, far.body.error.pickup], ['out_of_zone', true]);
+  assert.match(far.body.error.message, /بیرون از محدودهٔ ارسال/, 'پیامِ روشن، نه خطای مبهم');
   assert.equal(await orders(s.shopId), n0, 'سفارشِ ارسالی ثبت نشد');
+  //  صفحهٔ ویترین پیش از پرداخت: همان پیام کنارِ دو گزینهٔ «دریافت از دکان» و «خبرم کن» (`store/checkout.js` با پاسخِ «کجا؟»)
+  const fa = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'public', 'kit', 'i18n', 'fa.json'), 'utf8'));
+  assert.match(fa['zone.out'], /این نشانی بیرون از محدودهٔ ارسال/);
+  const page = fs.readFileSync(path.join(__dirname, '..', 'public', 'store', 'index.html'), 'utf8');
+  for (const id of ['zone-msg', 'zone-pickup', 'zone-notify']) assert.ok(page.includes(`id="${id}"`), `#${id} در فرمِ ثبت نیست`);
   //  راهِ اول: همان سبد، «دریافت از دکان»
   const pick = await checkout(s.slug, order('pickup', phone), t);
   assert.equal(pick.status, 201, JSON.stringify(pick.body));

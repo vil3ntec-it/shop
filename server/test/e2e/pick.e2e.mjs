@@ -1,5 +1,5 @@
 /**
- * سناریوی سرتاسریِ ناموجودی هنگامِ جمع‌آوری — E2E-PCK-06 (S37؛ PCK-03، PCK-05، PCK-06، PCK-07).
+ * سناریوی سرتاسریِ ناموجودی هنگامِ جمع‌آوری — E2E-PCK-06 و گامِ S37 (PCK-03، PCK-05 تا PCK-07، ORD-13).
  *
  * «کالای ناموجود هنگامِ جمع‌آوری طبقِ سیاستِ جایگزینی/حذف و با مبلغِ نهاییِ درست مدیریت می‌شود.»
  *
@@ -155,10 +155,49 @@ await E.step('E2E-PCK-06.4', 'مشتری تا پایانِ مهلت جواب ن�
   assert.deepEqual((await lines(second.id)).map((l) => l.product_id), [P.soap]);
 }, { needs: ['E2E-PCK-06.0'] });
 
+await E.step('S37', 'S37: «پیدا نکردم» برای B ⇒ دو جایگزینِ امن؛ جمع‌آور یکی را اسکن و پیشنهاد می‌کند؛ مشتری با لینک رد می‌کند ⇒ کسرِ خودکار؛ B از ویترین بیرون و وظیفهٔ بررسی', async () => {
+  //  (سطرِ «اگر ظرفِ N دقیقه جواب نداد، ترجیحِ ذخیره‌شده» همان E2E-PCK-06.4 است؛ «پذیرفتن با لینک» همان E2E-PCK-06.2)
+  const B_OIL3 = '6260000000048';
+  P.oil3 = A.stockIn({ name: 'روغنِ سوم', price: 280, cost: 220, units: 10, unit: 'بوتل', category: 'خوراکی', barcode: B_OIL3 });
+  await A.drain();
+  E.ok(await A.api('PUT', `/shop/storefront/products/${P.oil3}`, { published: true }), 'انتشارِ روغنِ سوم');
+  for (const i of E.ok(await A.api('GET', '/shop/orders/pick/issues'), 'وظیفه‌ها').issues) {
+    E.ok(await A.api('POST', `/shop/orders/pick/issues/${i.id}/resolve`, { action: 'resolved', note: 'شمرده شد' }), 'رسیدگی');
+  }
+  const o = await placeAndStart([{ productId: P.oil2, qtyMilli: 1000 }, { productId: P.soap, qtyMilli: 1000 }]);
+  const bLine = lineOf(o.sheet, P.oil2).lineNo;
+  await events(o.id, [{ lineNo: bLine, type: 'not_found' }, { lineNo: lineOf(o.sheet, P.soap).lineNo, type: 'pick', qtyMilli: 1000 }]);
+  const sg = E.ok(await A.api('GET', `/shop/orders/${o.id}/pick/substitutes?lineNo=${bLine}`), 'پیشنهادها');
+  assert.deepEqual(sg.suggestions.map((x) => x.productId).sort(), [P.oil, P.oil3].sort(), 'دو جایگزینِ امن (هم‌دسته)');
+  //  قاعدهٔ قیمتِ شفاف: مشتری قیمتِ واحدِ کمتر را می‌پردازد (B = ۳۲۰)
+  const charged = Object.fromEntries(sg.suggestions.map((x) => [x.productId, x.chargedUnitPriceMinor]));
+  assert.deepEqual([charged[P.oil], charged[P.oil3]], [30000, 28000]);
+  const p = E.ok(await A.api('POST', `/shop/orders/${o.id}/pick/substitutions`, { eventId: E.key('sub'), lineNo: bLine, productId: P.oil3, barcode: B_OIL3 }), 'پیشنهاد با اسکن');
+  //  مشتری از همان لینکِ پیگیری می‌بیند و رد می‌کند
+  const tok = encodeURIComponent(o.token);
+  const seen = E.ok(await E.get(`/api/store/${SLUG}/orders/${tok}/substitutions`, '', { 'X-Store-Ticket': ticket }), 'پیشنهادهای مشتری');
+  assert.ok(JSON.stringify(seen).includes('روغنِ سوم'), JSON.stringify(seen).slice(0, 300));
+  E.ok(await E.post(`/api/store/${SLUG}/orders/${tok}/substitutions/${encodeURIComponent(p.substitution.id)}`, { decision: 'reject' }, '', { 'X-Store-Ticket': ticket }), 'ردِ مشتری');
+  const row = await db.one('SELECT status, decided_by FROM order_pick_substitutions WHERE id=$1', [p.substitution.id]);
+  assert.deepEqual([row.status, row.decided_by], ['rejected', 'customer']);
+  //  رد ⇒ کسرِ خودکار (نقدِ هنگامِ تحویل: چیزی برای بازپرداخت نیست)
+  const pk = E.ok(await A.api('POST', `/shop/orders/${o.id}/pick/pack`, { bags: 1 }, { headers: { 'Idempotency-Key': E.key('pack') } }), 'بسته');
+  assert.equal(pk.pick.totals.deductedMinor, 32000);
+  assert.equal(pk.pick.totals.totalMinor, 4000);
+  assert.deepEqual((await lines(o.id)).map((l) => l.product_id), [P.soap]);
+  //  B از ویترین بیرون (موجودیِ ویترین صفر) و وظیفهٔ بررسی ساخته شد
+  const issues = E.ok(await A.api('GET', '/shop/orders/pick/issues'), 'وظیفه‌های بررسی').issues;
+  assert.ok(issues.some((i) => i.productId === P.oil2), JSON.stringify(issues));
+  const held = await E.post(`/api/store/${SLUG}/checkout`, {
+    fulfillment: 'pickup', customer: { name: 'مشتریِ جمع‌آوری', phone: PHONE }, lines: [{ productId: P.oil2, qtyMilli: 1000 }],
+  }, '', { 'Idempotency-Key': E.key('ck'), 'X-Store-Ticket': ticket });
+  assert.equal(held.body?.error?.code, 'product_unavailable');
+}, { needs: ['E2E-PCK-06.0'] });
+
 await E.step('E2E-PCK-06.5', 'دفترِ سفارش‌ها پس از جایگزین و حذف سالم است (verify-data)', async () => {
   const rep = await verifyData.verify({ shopId: owner.shopId });
   assert.deepEqual(rep.checks.filter((c) => c.count > 0).map((c) => c.id), []);
   assert.deepEqual(E.pageErrors, [], 'خطای JS در صفحهٔ مشتری');
-}, { needs: ['E2E-PCK-06.3', 'E2E-PCK-06.4'] });
+}, { needs: ['E2E-PCK-06.3', 'E2E-PCK-06.4', 'S37'] });
 
 await E.finish();
