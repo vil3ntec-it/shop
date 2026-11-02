@@ -50,6 +50,7 @@ const h = require(path.join(SERVER, 'test', 'helpers.js'));
 const db = require(path.join(SERVER, 'src', 'db.js'));
 const migrations = require(path.join(SERVER, 'src', 'lib', 'sync-v1-migrations.js'));
 const pw = require(path.join(SERVER, 'src', 'lib', 'password.js'));
+const gate = require(path.join(SERVER, 'src', 'lib', 'sync-v3-gate.js'));
 
 const loop = monitorEventLoopDelay({ resolution: 10 });
 loop.enable();
@@ -84,6 +85,8 @@ async function stats({ gc = false } = {}) {
     loopP99Ms: +(loop.percentile(99) / 1e6).toFixed(1), loopMaxMs: +(loop.max / 1e6).toFixed(1),
     pool: pool ? { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount } : null,
     pg: await pgActivity(),
+    //  دروازهٔ push ِ v3: منتظر (صفِ دکان + سقفِ push، بی اتصال) و push ِ دارای جا
+    gate: (({ on, waiting, inflight }) => ({ on, waiting, inflight }))(gate.stats()),
     slowLines,
   };
   loop.reset();

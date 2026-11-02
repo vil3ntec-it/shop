@@ -70,6 +70,8 @@ const config = {
     poolMax:          num(process.env.PG_POOL_MAX, 10),
     idleTimeoutMs:    num(process.env.PG_IDLE_TIMEOUT_MS, 30000),
     connectTimeoutMs: num(process.env.PG_CONNECT_TIMEOUT_MS, 10000),
+    //  سقفِ صفِ انتظارِ استخر (`db.js`، PERF-04)؛ ۰ = بی سقف
+    maxWaiting:       Math.max(0, Math.floor(num(process.env.PG_POOL_MAX_WAITING, 0))),
     ssl:              bool(process.env.PGSSL, false),
   },
 
@@ -505,6 +507,21 @@ const config = {
    */
   syncV3: {
     enabled: bool(process.env.SYNC_V3_ENABLED, false),
+    /**
+     * دروازهٔ تراکنش‌های قفل‌دار (`lib/sync-v3-gate.js`، PERF-02/04): صفِ هر دکان و سقفِ push ِ
+     * هم‌زمان **پیش از** گرفتنِ اتصالِ استخر. فقط PostgreSQL. `slots` پیش‌فرض نیمِ `PG_POOL_MAX`
+     * (دست‌کم ۱؛ ۰ = بی سقف)، تا نیمِ دیگرِ استخر همیشه برای ویترین و میز بماند. بیرون از سقفِ
+     * انتظار (`waitMs`) یا شمارِ منتظرها (`queueMax`، ۰ = بی سقف) ⇒ ۵۰۳ ِ `db_busy` با `Retry-After`.
+     * `waitMs` کمتر از مهلتِ معمولِ کلاینت (۱۰ ثانیه) است: سرور پیش از رفتنِ کلاینت پس می‌زند، نه
+     * پس از آن (burst ِ `docs/PERF-LOAD-fa.md`: با ۱۵ ثانیه، ۵۰۳ ها پس از مهلتِ کلاینت می‌رسید).
+     */
+    gate: {
+      enabled: bool(process.env.SYNC_V3_GATE, true),
+      slots: Math.max(0, Math.floor(num(process.env.SYNC_V3_PUSH_SLOTS,
+        Math.max(1, Math.floor(num(process.env.PG_POOL_MAX, 10) / 2))))),
+      waitMs: Math.max(0, num(process.env.SYNC_V3_GATE_WAIT_MS, 8000)),
+      queueMax: Math.max(0, Math.floor(num(process.env.SYNC_V3_GATE_QUEUE_MAX, 200))),
+    },
   },
 
   /**

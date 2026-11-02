@@ -77,9 +77,12 @@ function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array
 function deepEqual(a, b) { return canonical(a === undefined ? null : a) === canonical(b === undefined ? null : b); }
 const cmp = hlc.compare;
 
+const lockKey = (ctx) => `sync-v3:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`;
 function lock(c, ctx) {
-  return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sync-v3:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`]);
+  return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey(ctx)]);
 }
+//  تراکنش زیرِ قفلِ حساب: اول نوبت در صفِ فرآیند، بی اتصال ([heavy]: جای push هم؛ `sync-v3-gate.js`)، بعد همان قفلِ advisory
+const lockedTx = (ctx, fn, heavy = false) => require('./sync-v3-gate').run(lockKey(ctx), heavy, () => tx((c) => lock(c, ctx).then(() => fn(c))));
 
 function requireShop(ctx) {
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') {
@@ -761,8 +764,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   await ready();
   const t = now();
 
-  const out = await tx(async (c) => {
-    await lock(c, ctx);
+  const out = await lockedTx(ctx, async (c) => {
     //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن در همین تراکنش (با پایانش آزاد)
     if (groups) await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [approvals.returnsLockKey(ctx.accountId)]);
     //  روشن: قفلِ v1 هم، و v1 ⇒ v3 کامل پیش از اعمال ⇒ داوریِ این opها همهٔ v1 را دیده است
@@ -853,7 +855,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       lastError: errorText(lastError), clockOffsetMs: intOrNull(clockOffsetMs, -1e12, 1e12),
     });
     return { results, applied, head: await headSeq(c, ctx) };
-  });
+  }, true);
   return { ...out, protocol: PROTOCOL, server_time: now(), hlc: clock.peek() };
 }
 
@@ -960,8 +962,7 @@ async function bridge(ctx, { max = BRIDGE_BATCH, toV1On } = {}) {
   if (!fresh && !(out && await toV1.pending(dbq, ctx))) return { imported: 0, behind: false };
   await ready();
   const t = now();
-  return tx(async (c) => {
-    await lock(c, ctx);
+  return lockedTx(ctx, async (c) => {
     if (!out) return importV1(c, ctx, { max, t });
     const o = await openToV1(c, ctx, t, { rounds: 1, max });
     if (!o.ready) return { imported: o.imported, behind: true };
@@ -1144,8 +1145,7 @@ async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
   await ready();
   const t = now();
   const toV1On = await toV1.enabled(ctx);
-  return tx(async (c) => {
-    await lock(c, ctx);
+  return lockedTx(ctx, async (c) => {
     const v1 = toV1On ? await openToV1(c, ctx, t) : null;
     const cf = (await c.query(
       `SELECT * FROM sync_v3_conflicts WHERE ${ACC} AND id=$4 FOR UPDATE`, [...acc(ctx), String(id || '')]
