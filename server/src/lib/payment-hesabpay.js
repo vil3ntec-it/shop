@@ -43,6 +43,10 @@ const STATUS_MAP = {
   cancelled: 'cancelled', canceled: 'cancelled',
 };
 
+//  TODO(hesabpay-sandbox): نامِ فیلدِ شناسهٔ پذیرنده در وب‌هوک و درِ وضعیت
+const MERCHANT_FIELDS = ['merchant_id', 'merchantId', 'merchant', 'merchant_code'];
+const REF_FIELDS = ['reference', 'order_id', 'merchant_reference'];
+
 /*
  *  سقفِ مهلتِ هر درخواست. باید خیلی کمتر از اجارهٔ پردازشِ رویداد (`EVENT_LEASE_MS` = ۲ دقیقه در
  *  `payment-intents.js`) بماند؛ وگرنه پردازشِ دوم ِ همان رویداد پیش از پایانِ اولی شروع می‌شود (پول امن
@@ -134,14 +138,18 @@ function peekRefs(raw) {
 }
 
 /**
- * آداپتورِ حساب‌پی با کلیدهای **یک** دکان (همان قراردادِ `payment-providers`). کلید و راز فقط در بستار می‌مانند —
- * نه روی شیء (هیچ `JSON.stringify` / لاگی آن‌ها را نمی‌بیند).
- * @param {{apiKey:string, secret:string, merchantId?:string, webhookToken?:string}} creds
+ * آداپتورِ حساب‌پی با کلیدهای **یک** دکان (همان قراردادِ `payment-providers`). کلید، راز و شناسهٔ پذیرنده فقط در
+ * بستار می‌مانند — نه روی شیء (هیچ `JSON.stringify` / لاگی آن‌ها را نمی‌بیند).
+ *   payeeFp          اثرِ انگشتِ حسابِ **فعالِ** دکان (`hesabpay-guard`) ⇒ روی هر قصد؛ «پرداخت شد» فقط اگر همان بماند
+ *   merchantMatches  پذیرنده‌ای که وب‌هوک/درِ وضعیت گفت همان پذیرندهٔ **همین** دکان است؟ (مقایسهٔ زمان‌ثابت)
+ * @param {{apiKey:string, secret:string, merchantId?:string, webhookToken?:string, payeeFp?:string}} creds
  */
-function forShop({ apiKey, secret, merchantId = '', webhookToken = '' } = {}) {
+function forShop({ apiKey, secret, merchantId = '', webhookToken = '', payeeFp = '' } = {}) {
   const key = String(apiKey || '').trim();
   const sec = String(secret || '').trim();
   const merchant = String(merchantId || '').trim();
+  const merchantMatches = (v) => Boolean(merchant) && (typeof v === 'string' || typeof v === 'number')
+    && P.safeEqual(String(v).trim(), merchant);
 
   async function createSession({ intentId, amountMinor, currency, description, returnUrl, callbackUrl }) {
     //  TODO(hesabpay-sandbox): شکلِ بدنه — فهرستِ اقلام (نام، تعداد، قیمت) مثلِ افزونهٔ WooCommerce، به‌علاوهٔ مرجعِ ما
@@ -183,7 +191,9 @@ function forShop({ apiKey, secret, merchantId = '', webhookToken = '' } = {}) {
     if (!b || typeof b !== 'object') return { ok: false, reason: 'bad_json' };
     //  TODO(hesabpay-sandbox): نامِ فیلدهای وب‌هوک
     const sessionId = String(pick(b, ['session_id', 'sessionId', 'payment_session_id']) || '');
-    const reference = String(pick(b, ['reference', 'order_id', 'merchant_reference']) || '');
+    const reference = String(pick(b, REF_FIELDS) || '');
+    //  در رویداد (حافظه) برای سنجشِ پذیرنده؛ هرگز در `raw` ِ ثبت‌شده
+    const merchantId = String(pick(b, MERCHANT_FIELDS) ?? '').slice(0, 200);
     const providerRef = String(pick(b, ['transaction_id', 'transactionId', 'reference_number', 'txn_id']) || '');
     const status = statusOf(pick(b, ['status', 'payment_status', 'state', 'event']));
     //  شناسهٔ رویداد؛ نبود ⇒ اثرِ انگشتِ بدنه (همان بدنهٔ تکراری همان رویداد است)
@@ -192,7 +202,7 @@ function forShop({ apiKey, secret, merchantId = '', webhookToken = '' } = {}) {
     return {
       ok: true,
       event: {
-        eventId, sessionId, reference, status, amountMinor: amountOf(b), currency: currencyOf(b), providerRef,
+        eventId, sessionId, reference, status, amountMinor: amountOf(b), currency: currencyOf(b), providerRef, merchantId,
         //  فقط فیلدهای لازم برای تطبیق — بی سرآیند و امضا
         raw: { sessionId, reference, status: pick(b, ['status', 'payment_status', 'state', 'event']) ?? null,
           amount: pick(b, ['amount', 'total', 'total_amount', 'price']) ?? null, currency: pick(b, ['currency', 'currency_code']) ?? null,
@@ -208,6 +218,8 @@ function forShop({ apiKey, secret, merchantId = '', webhookToken = '' } = {}) {
       amountMinor: amountOf(r),
       currency: currencyOf(r),
       providerRef: String(pick(r, ['transaction_id', 'transactionId', 'reference_number', 'txn_id']) || ''),
+      merchantId: String(pick(r, MERCHANT_FIELDS) ?? '').slice(0, 200),
+      reference: String(pick(r, REF_FIELDS) || '').slice(0, 200),
     };
   }
 
@@ -215,6 +227,8 @@ function forShop({ apiKey, secret, merchantId = '', webhookToken = '' } = {}) {
     name: 'hesabpay',
     perShop: true,
     webhookToken: String(webhookToken || ''),
+    payeeFp: String(payeeFp || ''),
+    merchantMatches,
     configured: () => Boolean(key && sec && baseAllowed(env().base)),
     createSession, verifyWebhook, fetchStatus,
   });

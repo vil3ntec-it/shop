@@ -42,6 +42,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import ir.vil3ntec.tohid.core.gateway.HesabPayHint
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
+import ir.vil3ntec.tohid.core.gateway.Payee
 import ir.vil3ntec.tohid.core.gateway.SimpleAccount
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.pay.Settlement
@@ -66,13 +67,26 @@ import kotlinx.coroutines.delay
  *    پرداخت‌کننده. TODO(hesabpay-sandbox): اگر QR ِ حساب‌پی مبلغ/یادداشت بپذیرد، `HesabPayShop.qrWithAmount`.
  *  - ⛔ تأیید فقط با «پول رسید» ِ صندوقدار ⇐ `HesabPaySettle.settleSimple` (`verification = cashier`). اعلانِ برنامهٔ
  *    حساب‌پی (اختیاری، اندروید) فقط **پیشنهاد** نشان می‌دهد ([HesabPayHint.suggest]) و هرگز خودش نمی‌بندد.
+ *  - ⛔ QR فقط از حسابِ ذخیره‌شده در سرور (`/shop/payments/config`)، هرگز عکس یا متنِ واردشده در صندوق؛ کنارش
+ *    «پول به حسابِ <نام> — <۴ رقم>» ([PayeeLine]) و اثرِ انگشتِ همان حساب روی ردیفِ پرداخت (`payee`).
  */
+
+/** «پول به حسابِ <نام> — <۴ رقم>» کنارِ QR ِ صندوق (حسابِ فعالِ سرور) — صندوقدار و مشتری گیرنده را می‌بینند */
+@Composable
+internal fun PayeeLine(p: Payee, modifier: Modifier = Modifier) {
+  Text(
+    StrPay.payeeLine(p.name.ifBlank { "—" }, p.last4),
+    modifier = modifier.padding(top = 8.dp), color = Shop.colors.text, fontWeight = FontWeight.SemiBold,
+    textAlign = TextAlign.Center, style = MaterialTheme.typography.titleMedium,
+  )
+}
 
 /** دکمهٔ «حساب‌پی (حسابِ دکان)» و برگه‌اش. `draft` = پنلِ ترکیبی (باقی را می‌پردازد)، `null` = کلِ فاکتور */
 @Composable
 internal fun HesabPaySimpleEntry(
   hook: GatewayHook,
   simple: SimpleAccount,
+  payee: Payee?,
   total: Double,
   draft: PayFlow.Draft?,
   enabled: Boolean,
@@ -96,7 +110,7 @@ internal fun HesabPaySimpleEntry(
   }
   if (open) {
     HesabPaySimpleSheet(
-      saleKey = saleKey, simple = simple, amountMinor = due.minor, total = total, draft = draft, busy = busy,
+      saleKey = saleKey, simple = simple, payee = payee, amountMinor = due.minor, total = total, draft = draft, busy = busy,
       precheck = hook.precheck, now = hook.env::now, storeName = hook.env::storeName, onPaid = onPaid, onClose = { open = false },
     )
   }
@@ -106,6 +120,7 @@ internal fun HesabPaySimpleEntry(
 private fun HesabPaySimpleSheet(
   saleKey: String,
   simple: SimpleAccount,
+  payee: Payee?,
   amountMinor: Long,
   total: Double,
   draft: PayFlow.Draft?,
@@ -133,7 +148,7 @@ private fun HesabPaySimpleSheet(
 
   fun confirm() {
     check()?.let { error = it; return }
-    when (val s = HesabPaySettle.settleSimple(total, draft, ref)) {
+    when (val s = HesabPaySettle.settleSimple(total, draft, ref, payee?.fp)) {
       is PayFlow.Outcome.Ok -> { HesabPayHints.consume(); onPaid(s.value) }
       is PayFlow.Outcome.Bad -> error = StrPay.amountMismatch
     }
@@ -166,6 +181,7 @@ private fun HesabPaySimpleSheet(
             if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp))
             else Text(simple.account, fontSize = 28.sp, color = LightColors.textPrimary)
           }
+          payee?.let { PayeeLine(it) }
           Spacer(Modifier.height(12.dp))
           Text("${StrPay.invoiceCode}: $ref", style = MaterialTheme.typography.titleMedium, color = c.text, fontWeight = FontWeight.Bold)
           Spacer(Modifier.height(8.dp))

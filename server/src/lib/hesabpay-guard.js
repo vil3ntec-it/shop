@@ -148,15 +148,15 @@ function untrusted(trustedAfter) {
 }
 
 /**
- * درِ پیش از رمز برای هر تغییر: بخشِ بسته ⇒ ۴۲۳؛ دستگاهِ نامطمئن ⇒ ۴۰۳. `refusal` را `withPin` سابقه می‌کند.
- * @returns {Promise<ApiError|null>}
+ * درِ پیش از رمز برای هر تغییر (همگام، درونِ قفلِ ردیف): بخشِ بسته ⇒ ۴۲۳؛ دستگاهِ نامطمئن ⇒ ۴۰۳. `tr` همان
+ * `trustOf(actor)` است که فراخواننده پیش از تراکنش گرفته؛ نبودش (یا هر چیزِ جز `trusted: true`) ⇒ نامطمئن.
+ * `refusal` را `withPin` سابقه می‌کند. @returns {ApiError|null}
  */
-async function gate(row, actor, t, { trust = true } = {}) {
+function gate(row, tr, t, { trust = true } = {}) {
   const locked = Number(row.section_locked_until || 0);
   if (locked > t) return Object.assign(sectionLocked(locked, t), { refusal: 'section_locked' });
-  if (!trust) return null;
-  const tr = await trustOf(actor, t);
-  return tr.trusted ? null : Object.assign(untrusted(tr.trustedAfter), { refusal: tr.reason });
+  if (!trust || (tr && tr.trusted === true)) return null;
+  return Object.assign(untrusted(tr ? tr.trustedAfter : null), { refusal: (tr && tr.reason) || 'no_device' });
 }
 
 const lastRefusalPush = new Map();
@@ -267,7 +267,8 @@ async function holdForReview(intent, missing, source) {
   );
   if (r) {
     console.warn(`[payments] رسیدنِ پول به حسابِ دکان ثابت نشد: ${intent.id} (${intent.shop_id}) — ${missing.join(',')}`);
-    const detail = { reason: 'payee_unproven', missing, source, kind: r.kind, refId: r.ref_id, amountMinor: Number(r.amount_minor),
+    //  `missing` متن (نه آرایه): `audit.scrub` آرایه را به شیء می‌کند
+    const detail = { reason: 'payee_unproven', missing: missing.join(','), source, kind: r.kind, refId: r.ref_id, amountMinor: Number(r.amount_minor),
       payeeFp: String(r.payee_fp || '').slice(0, 12) };
     await audit.log({ shopId: r.shop_id, actorType: 'system', action: 'payment.review', targetType: 'payment_intent', targetId: r.id, detail });
     await audit.log({ shopId: r.shop_id, actorType: 'system', action: 'hesabpay.payee_alert', targetType: 'payment_intent', targetId: r.id, detail });
@@ -313,7 +314,7 @@ async function report(shopId, { days = 30 } = {}) {
     days: d, active, pending: pendingOf(row), accounts, unknown,
     alerts: alerts.rows.map((a) => ({
       intentId: a.target_id, at: Number(a.created_at), amountMinor: Number(a.detail?.amountMinor) || 0,
-      missing: Array.isArray(a.detail?.missing) ? a.detail.missing : [],
+      missing: String(a.detail?.missing || '').split(',').filter(Boolean),
     })),
   };
 }
@@ -337,7 +338,7 @@ async function receivedBy(shopId, w, sales = []) {
   };
   const intents = await query(
     `SELECT payee_fp, amount_minor FROM payment_intents WHERE shop_id=$1 AND provider='hesabpay' AND status IN ('paid','refunded')
-        AND paid_at >= $2 AND paid_at < $3`, [shopId, w.from, w.to]
+        AND paid_at >= $2 AND paid_at < $3`, [shopId, w.fromAt, w.until]
   );
   for (const r of intents.rows) add(r.payee_fp, Number(r.amount_minor));
   for (const s of sales) {
@@ -352,7 +353,7 @@ async function receivedBy(shopId, w, sales = []) {
   });
   const alerts = Number((await one(
     `SELECT COUNT(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action='hesabpay.payee_alert' AND created_at >= $2 AND created_at < $3`,
-    [shopId, w.from, w.to]
+    [shopId, w.fromAt, w.until]
   )).n);
   return { accounts, alerts };
 }

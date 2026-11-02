@@ -76,7 +76,7 @@ function provider() { return P.adapter(P.activeName()); }
 
 const flagOf = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
 const accounts = () => require('./hesabpay-account');
-const { gatewayFor, callbackUrl, webhookTarget, intentAdapters } = require('./payment-gateway');
+const { gatewayFor, callbackUrl, webhookTarget, intentAdapters, confirmWith, payeeHeld } = require('./payment-gateway');
 
 /** «حساب‌پیِ خودکار» برای این دکان روشن است؟ = پرچمِ دکان + کلیدهای خودِ دکان. */
 async function enabledFor(shopId) {
@@ -90,10 +90,12 @@ async function subscribedFor(shopId) {
   return ent.source === 'subscription' && ent.features.includes('online_orders');
 }
 
-/** صندوق: `enabled` = درگاهِ خودکار؛ `mode` و فقط در «ساده» شماره/QR ِ خودِ دکان (تأیید فقط «پول رسید» ِ صندوقدار). */
+/** صندوق: `enabled` = درگاهِ خودکار؛ `mode`، فقط در «ساده» شماره/QR ِ خودِ دکان (تأیید فقط «پول رسید» ِ صندوقدار). */
 async function configOf(shopId) {
   const till = await accounts().tillView(shopId);
-  return { hesabpay: { enabled: await enabledFor(shopId), mode: till.mode, ...(till.simple ? { simple: till.simple } : {}) } };
+  //  `payee` = گیرندهٔ فعال («پول به حسابِ <نام> — <۴ رقم>» کنارِ QR، و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد)
+  const extra = { ...(till.simple ? { simple: till.simple } : {}), ...(till.payee ? { payee: till.payee } : {}) };
+  return { hesabpay: { enabled: await enabledFor(shopId), mode: till.mode, ...extra } };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -417,10 +419,10 @@ async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = ''
     const id = newId('pi');
     const r = await c.query(
       `INSERT INTO payment_intents (id, shop_id, kind, ref_id, amount_minor, currency, status, provider,
-         idempotency_key, request_hash, expires_at, created_by, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,'created',$7,$8,$9,$10,$11,$12,$12) RETURNING *`,
+         idempotency_key, request_hash, expires_at, created_by, created_at, updated_at, payee_fp)
+       VALUES ($1,$2,$3,$4,$5,$6,'created',$7,$8,$9,$10,$11,$12,$12,$13) RETURNING *`,
       [id, shopId, input.kind, input.refId, input.amount, input.currency, name, input.key, hash,
-        at + 15 * 60 * 1000, String(actor.id || ''), at]
+        at + 15 * 60 * 1000, String(actor.id || ''), at, String(ad.payeeFp || '')]
     );
     return { row: r.rows[0], replayed: false };
   });
@@ -527,26 +529,6 @@ async function cancel(shopId, id, actor = {}) {
 //  وب‌هوک
 // ════════════════════════════════════════════════════════════════════
 
-/** پاسخِ قطعیِ «پرداخت نشد» ِ ارائه‌دهنده در تأییدِ دوم/تطبیق. */
-const PROVIDER_NO = Object.freeze(['failed', 'expired', 'cancelled']);
-
-/** تأییدِ دومِ «paid» از خودِ ارائه‌دهنده. */
-async function confirmWith(ad, intent) {
-  if (typeof ad.fetchStatus !== 'function') return { ok: false, reason: 'no_status_api' };
-  let st;
-  try { st = await ad.fetchStatus(intent.provider_session_id); } catch (err) {
-    console.warn(`[payments] تأییدِ دوم از ${ad.name} نشد (${intent.id}): ${err.message}`);
-    return { ok: false, reason: 'status_unreachable', retry: true };
-  }
-  //  فقط «نه» ِ قطعی پایانی است. pending/unknown/… یعنی درِ وضعیت هنوز هم‌گام نشده (پول شاید رفته)
-  //  ⇒ «بعداً» (۵۰۳) تا ارائه‌دهنده همان رویداد را دوباره بفرستد؛ رویداد نهایی نمی‌شود.
-  if (st.status !== 'paid') return { ok: false, reason: `provider_says_${st.status}`, retry: !PROVIDER_NO.includes(st.status) };
-  if (st.amountMinor !== Number(intent.amount_minor) || st.currency !== intent.currency) {
-    return { ok: false, reason: 'amount_mismatch', mismatch: true, got: { amountMinor: st.amountMinor, currency: st.currency } };
-  }
-  return { ok: true, providerRef: st.providerRef };
-}
-
 async function applyEvent(ad, found, ev) {
   const intent = await expireIfDue(found);
   if (ev.status === 'paid') {
@@ -561,6 +543,7 @@ async function applyEvent(ad, found, ev) {
     const late = !LIVE.includes(intent.status) || Number(intent.expires_at) <= now();
     let providerRef = ev.providerRef;
     let confirmed = false;
+    let st = null;
     if (confirmEnabled() || late) {
       const c = await confirmWith(ad, intent);
       if (c.retry) {
@@ -581,8 +564,10 @@ async function applyEvent(ad, found, ev) {
       }
       confirmed = true;
       providerRef = c.providerRef || providerRef;
+      st = c.st;
     }
-    return markPaid(intent.id, { providerRef, confirmed, source: 'webhook' });
+    //  حساب‌پیِ هر دکان: پول به پذیرندهٔ **همین** دکان رسید (پذیرنده + مرجع + اثرِ انگشت)؟ نه ⇒ «نیازمندِ بررسی»
+    return (await payeeHeld(ad, intent, ev, st, 'webhook')) || markPaid(intent.id, { providerRef, confirmed, source: 'webhook' });
   }
   if (['failed', 'expired', 'cancelled'].includes(ev.status)) {
     if (!LIVE.includes(intent.status)) return 'duplicate_state';
@@ -716,6 +701,7 @@ async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500, budgetMs 
         await alert(r, 'amount_mismatch', { got: { amountMinor: st.amountMinor, currency: st.currency }, source: 'reconcile' });
         continue;
       }
+      if (await payeeHeld(ad, r, { sessionId: r.provider_session_id }, st, 'reconcile')) { out.mismatched++; continue; }
       if ((await markPaid(r.id, { providerRef: st.providerRef, confirmed: true, source: 'reconcile' })) === 'applied') out.paid++;
     } else if (['failed', 'expired', 'cancelled'].includes(st.status) && LIVE.includes(r.status)) {
       if (await close(r, st.status, `provider_${st.status}`)) out.closed++;

@@ -4,6 +4,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
@@ -12,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -31,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.gateway.AccountCall
 import ir.vil3ntec.tohid.core.gateway.HesabAccountView
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
+import ir.vil3ntec.tohid.core.gateway.PendingPayee
+import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -46,6 +51,9 @@ import kotlinx.coroutines.launch
  *  - «ساده»: شمارهٔ حساب‌پیِ دکان یا QR ِ خودش (اسکن) ⇐ صندوق همان را با مبلغ و کدِ فاکتور نشان می‌دهد؛ تأیید
  *    فقط با «پول رسید» ِ صندوقدار. اعلانِ برنامهٔ حساب‌پی (اختیاری، اندروید) فقط پیشنهاد می‌دهد.
  *  - «خودکار»: کلید و رازِ پذیرندهٔ خودِ دکان — فقط نوشتنی؛ پس از ذخیره فقط چهار نویسهٔ آخر دیده می‌شود.
+ *  - نگهبانِ حسابِ گیرنده (سرور: `lib/hesabpay-guard.js`): نامِ صاحبِ حساب اجباری؛ نخستین حساب فوری، هر حسابِ بعدی
+ *    ۲۴ ساعت «در انتظار» با کارتِ «این من نبودم — لغو کن» ([HpPendingCard]، همان نوارِ پوسته `HesabPayChangeNotice`)؛
+ *    تغییر فقط از دستگاهِ مطمئن + رمزِ حساب‌پی + تأییدِ دوبارهٔ ورود (پنجرهٔ `ReauthHost` خودش باز می‌شود).
  *  منطق و درها: `core/gateway/HesabPayShop.kt`؛ سرور: `server/src/lib/hesabpay-account.js`.
  */
 
@@ -108,6 +116,7 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   var apiKey by remember { mutableStateOf("") }
   var secret by remember { mutableStateOf("") }
   var merchant by remember { mutableStateOf("") }
+  var holder by remember { mutableStateOf("") }
   var askReset by remember { mutableStateOf(false) }
   var askRemove by remember { mutableStateOf(false) }
   var scanning by remember { mutableStateOf(false) }
@@ -120,6 +129,7 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
       mode = if (v.mode == HesabPayShop.AUTO) HesabPayShop.AUTO else HesabPayShop.SIMPLE
       account = v.account
       qr = v.qrPayload
+      if (holder.isBlank()) holder = v.payee?.name.orEmpty()
     }
   }
 
@@ -159,7 +169,19 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
       v == null -> HpNote("در حالِ خواندن…")
       else -> {
         Text(hesabPayStatusLine(v), fontWeight = FontWeight.SemiBold, color = if (v.connected) c.success else c.muted)
+        v.payee?.let { Text(StrPay.payeeLine(it.name.ifBlank { "—" }, it.last4), color = c.text) }
         HpNote("پولِ حساب‌پی مستقیم به حسابِ خودِ همین دکان می‌رود؛ هیچ حسابِ دیگری جایش نمی‌نشیند.")
+        v.pending?.let { p ->
+          HpPendingCard(p, env.now(), busy) {
+            act({ env.account.cancelPending() }) { show(it); env.forget(); toast(StrPay.changeCancelled) }
+          }
+        }
+        v.sectionLockedUntil?.let {
+          HpNote("پس از «این من نبودم»، بخشِ حساب‌پی تا ${hpMinutesLeft(it, env.now())} دقیقهٔ دیگر بسته است؛ پول به همان حسابِ قبلیِ دکان می‌رود. پس از آن رمزِ حساب‌پی و رمزِ برنامه را عوض کنید.")
+        }
+        if (v.deviceTrusted == false) {
+          HpNote("این دستگاه هنوز برای عوض کردنِ حساب‌پی مطمئن نیست (دست‌کم ${v.trustDays} روز پس از نخستین ورود). دیدن شدنی است؛ برای تغییر از گوشی یا کمپیوترِ همیشگیِ خودتان بکوشید.")
+        }
         when {
           !v.pinSet -> {
             HpNote("برای این بخش یک رمزِ ۶ رقمیِ جدا بگذارید (غیر از رمزِ برنامه). بی این رمز هیچ‌کس حسابِ دکان را نمی‌بیند یا عوض نمی‌کند.")
@@ -193,21 +215,28 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
             account = account, onAccount = { account = it }, qr = qr, onQr = { qr = it },
             apiKey = apiKey, onApiKey = { apiKey = it }, secret = secret, onSecret = { secret = it },
             merchant = merchant, onMerchant = { merchant = it },
+            holder = holder, onHolder = { holder = it },
             onScan = { scanning = true },
             onSave = {
-              if (mode == HesabPayShop.SIMPLE) {
+              val saved: (HesabAccountView) -> Unit = {
+                show(it); env.forget(); apiKey = ""; secret = ""
+                toast(if (it.pending != null) "حسابِ تازه ۲۴ ساعتِ دیگر فعال می‌شود؛ تا آن دم پول به همان حسابِ قبلی می‌رود." else "حساب‌پیِ دکان ذخیره شد.")
+              }
+              if (holder.isBlank()) {
+                toast("نامِ صاحبِ حساب را بنویسید (همان که در صندوق کنارِ QR دیده می‌شود).")
+              } else if (mode == HesabPayShop.SIMPLE) {
                 val num = account.trim()
                 if (num.isNotEmpty() && HesabPayShop.normalizeAccount(num) == null) {
                   toast("شمارهٔ حساب‌پی درست نیست (مثلِ 0799123456).")
                 } else if (num.isEmpty() && qr.isBlank()) {
                   toast("شمارهٔ حساب‌پیِ دکان یا QR ِ آن را بدهید.")
                 } else {
-                  act({ env.account.saveSimple(pin, num, qr) }) { show(it); env.forget(); toast("حساب‌پیِ دکان ذخیره شد.") }
+                  act({ env.account.saveSimple(pin, holder, num, qr) }, saved)
                 }
+              } else if (merchant.isBlank()) {
+                toast("شناسهٔ پذیرندهٔ حساب‌پیِ دکان را بنویسید.")
               } else {
-                act({ env.account.saveAuto(pin, apiKey, secret, merchant) }) {
-                  show(it); env.forget(); apiKey = ""; secret = ""; merchant = ""; toast("کلیدهای حساب‌پیِ دکان ذخیره شد.")
-                }
+                act({ env.account.saveAuto(pin, holder, apiKey, secret, merchant) }) { saved(it); merchant = "" }
               }
             },
             onRemove = { askRemove = true },
@@ -277,9 +306,11 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
     scanning = false
     val parsed = HesabPayShop.parseQr(text)
     if (parsed == null) toast("این QR خوانده نشد یا بلند است.")
+    else if (parsed.account.isEmpty()) toast("در این QR شمارهٔ حساب‌پی نیست؛ شمارهٔ حساب را بنویسید.")
+    else if (account.isNotBlank() && HesabPayShop.normalizeAccount(account) != parsed.account) toast("شمارهٔ درونِ این QR با شمارهٔ حساب یکی نیست.")
     else {
       qr = parsed.payload
-      if (account.isBlank() && parsed.account.isNotEmpty()) account = parsed.account
+      account = parsed.account
     }
   }
 }
@@ -300,6 +331,8 @@ private fun HpOpened(
   onSecret: (String) -> Unit,
   merchant: String,
   onMerchant: (String) -> Unit,
+  holder: String,
+  onHolder: (String) -> Unit,
   onScan: () -> Unit,
   onSave: () -> Unit,
   onRemove: () -> Unit,
@@ -310,6 +343,11 @@ private fun HpOpened(
       else OutlinedButton(onClick = { onMode(m) }, modifier = Modifier.weight(1f)) { Text(label) }
     }
   }
+  OutlinedTextField(
+    value = holder, onValueChange = { onHolder(it.take(60)) }, label = { Text("نامِ صاحبِ حساب (در صندوق کنارِ QR دیده می‌شود)") },
+    singleLine = true, modifier = Modifier.fillMaxWidth(),
+  )
+  if (v.connected) HpNote("حسابِ تازه ۲۴ ساعت پس از ذخیره فعال می‌شود و تا آن دم پول به همین حسابِ امروز می‌رود؛ به همهٔ دستگاه‌های صاحب خبر می‌رود.")
   if (mode == HesabPayShop.SIMPLE) {
     HpNote("شماره یا QR ِ حساب‌پیِ خودِ دکان. در صندوق همین QR با مبلغ و کدِ فاکتور نشان داده می‌شود و پول مستقیم به همین حساب می‌رود. صندوقدار فقط وقتی پول را در حساب دید «پول رسید» را می‌زند.")
     OutlinedTextField(
@@ -336,12 +374,25 @@ private fun HpOpened(
     HpSecretField(apiKey, onApiKey, "کلیدِ API")
     HpSecretField(secret, onSecret, "رازِ وب‌هوک")
     OutlinedTextField(
-      value = merchant, onValueChange = onMerchant, label = { Text("شناسهٔ پذیرنده (اگر حساب‌پی داده)") },
+      value = merchant, onValueChange = onMerchant, label = { Text("شناسهٔ پذیرنده (لازم؛ از داشبوردِ حساب‌پی)") },
       singleLine = true, modifier = Modifier.fillMaxWidth(),
     )
   }
   Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("ذخیره") }
   if (v.connected) OutlinedButton(onClick = onRemove, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("برداشتنِ حساب‌پیِ دکان") }
+}
+
+/** «حسابِ گیرنده در حالِ عوض شدن است» + «این من نبودم — لغو کن» (یک لمس؛ سرور تأییدِ دوبارهٔ ورود می‌خواهد) */
+@Composable
+internal fun HpPendingCard(p: PendingPayee, now: Long, busy: Boolean, onCancel: () -> Unit) {
+  val c = Shop.colors
+  Surface(color = c.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text(StrPay.changeNotice(p.name.ifBlank { "—" }, p.last4), color = c.warning, fontWeight = FontWeight.Bold)
+      HpNote("حدودِ ${maxOf(1L, hpMinutesLeft(p.until, now) / 60)} ساعتِ دیگر فعال می‌شود. ${StrPay.changeNoticeDetail}")
+      Button(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(StrPay.notMe) }
+    }
+  }
 }
 
 @Composable

@@ -446,96 +446,145 @@ async function open(shopId, body, actor) {
   return fullOf(shopId, out.row, actor);
 }
 
-/** گذاشتنِ نخستین رمز (بی رمزِ قبلی) یا عوض کردنش (با رمزِ فعلی) */
+/** ستون‌های حسابِ فعال در یک `UPDATE` (فوری یا فعال شدنِ حسابِ در انتظار) */
+const ACTIVE_COLS = Object.freeze(['mode', 'account', 'qr_payload', 'api_key_enc', 'secret_enc', 'merchant_enc', 'key_last4',
+  'merchant_last4', 'account_name', 'payee_fp']);
+/** حسابِ پاک (برداشتن، بازنشانی) */
+const CLEARED = Object.freeze({ mode: 'off', account: '', qr_payload: '', api_key_enc: '', secret_enc: '', merchant_enc: '',
+  key_last4: '', merchant_last4: '', account_name: '', payee_fp: '' });
+const payeeOfCols = (cols) => ({ mode: cols.mode, name: cols.account_name, last4: guard.last4Of(cols), fp: cols.payee_fp });
+
+/** `UPDATE` ِ ستون‌های حسابِ فعال + `extra` (ستون ⇒ مقدار) ⇒ ردیفِ تازه */
+async function writeActive(c, shopId, cols, extra) {
+  const all = { ...Object.fromEntries(ACTIVE_COLS.map((k) => [k, cols[k] ?? ''])), ...extra };
+  const keys = Object.keys(all);
+  return (await c.query(
+    `UPDATE shop_hesabpay SET ${keys.map((k, i) => `${k}=$${i + 2}`).join(', ')}, version=version+1 WHERE shop_id=$1 RETURNING *`,
+    [shopId, ...keys.map((k) => all[k])]
+  )).rows[0];
+}
+
+/**
+ * بیرون از `withPin` (نخستین رمز، بازنشانی): همان درِ نگهبان زیرِ قفلِ ردیف. ⇒ `{error, refused}` یا نتیجهٔ `work`؛
+ * ردشده ⇒ سابقه در همان تراکنش، خبر پس از commit، سپس پرتاب.
+ */
+async function guarded(shopId, actor, op, work) {
+  const tr = await guard.trustOf(actor);
+  const out = await tx(async (c) => {
+    const row = await lockRow(c, shopId);
+    const t = now();
+    return (await refuseIn(c, shopId, actor, row, t, tr, { trust: true, op })) || work(c, row, t);
+  });
+  if (out.refused) await guard.refusalNotice(shopId, out.refused);
+  if (out.notify) await notifyOwners(shopId, out.notify);
+  if (out.error) throw out.error;
+  return out;
+}
+
+/**
+ * گذاشتنِ نخستین رمز (بی رمزِ قبلی) یا عوض کردنش (با رمزِ فعلی) — هر دو فقط از دستگاهِ مطمئن و با تأییدِ دوبارهٔ ورود
+ * (مسیر): دزدِ گوشی یا کسی که فقط رمزِ ورود را دارد نه رمزِ نخست را می‌گذارد، نه عوضش می‌کند.
+ */
 async function setPin(shopId, body, actor) {
   const b = body && typeof body === 'object' ? body : {};
   const problem = pinProblem(b.newPin);
   if (problem === 'length') throw badRequest('رمزِ حساب‌پی باید ۶ رقم باشد.', 'hesabpay_pin_format');
   if (problem === 'weak') throw badRequest('این رمز ساده است (همه یکسان یا پشتِ سرِ هم)؛ رمزِ دیگری بگذارید.', 'hesabpay_pin_weak');
   const hash = await hashPin(b.newPin);
-  const first = await tx(async (c) => {
-    const row = await lockRow(c, shopId);
-    if (row.pin_hash) return false;
-    const t = now();
-    await c.query(
-      `UPDATE shop_hesabpay SET pin_hash=$2, pin_failures=0, pin_locked_until=0, pin_changed_at=$3,
-              version=version+1, updated_by=$4, updated_at=$3 WHERE shop_id=$1`, [shopId, hash, t, String(actor.id || '')]
-    );
+  const write = async (c, t) => c.query(
+    `UPDATE shop_hesabpay SET pin_hash=$2, pin_failures=0, pin_locked_until=0, pin_changed_at=$3,
+            version=version+1, updated_by=$4, updated_at=$3 WHERE shop_id=$1`, [shopId, hash, t, String(actor.id || '')]
+  );
+  const first = await guarded(shopId, actor, 'pin_set', async (c, row, t) => {
+    if (row.pin_hash) return { first: false };
+    await write(c, t);
     await logIn(c, shopId, actor, 'hesabpay.pin_set', {});
-    return true;
+    return { first: true, notify: 'pin_set' };
   });
-  if (first) {
-    await notifyOwners(shopId, 'pin_set');
-    return statusOf(shopId);
-  }
+  if (first.first) return statusOf(shopId, undefined, actor);
   const pin = pinGiven(b);
   await withPin(shopId, pin, actor, async (c, row, t) => {
-    await c.query(
-      `UPDATE shop_hesabpay SET pin_hash=$2, pin_failures=0, pin_locked_until=0, pin_changed_at=$3,
-              version=version+1, updated_by=$4, updated_at=$3 WHERE shop_id=$1`, [shopId, hash, t, String(actor.id || '')]
-    );
+    await write(c, t);
     await logIn(c, shopId, actor, 'hesabpay.pin_changed', {});
-    return { row };
-  });
-  await notifyOwners(shopId, 'pin_changed');
-  return statusOf(shopId);
+    return { row, notify: 'pin_changed' };
+  }, { trust: true, op: 'pin_change' });
+  return statusOf(shopId, undefined, actor);
 }
 
-/** رمز فراموش شد: رمز و حساب پاک، ۲۴ ساعت بی حسابِ تازه، خبر به صاحب. */
+/**
+ * رمز فراموش شد: رمز، حسابِ فعال و حسابِ در انتظار پاک؛ ۲۴ ساعت بی حسابِ تازه؛ خبر به صاحب. فقط از دستگاهِ مطمئن
+ * و با تأییدِ دوبارهٔ ورود (مسیر) — وگرنه دزدِ گوشی با «فراموش کردم» رمز را دور می‌زد.
+ */
 async function resetPin(shopId, actor) {
-  const out = await tx(async (c) => {
-    const row = await lockRow(c, shopId);
-    if (!row.pin_hash && row.mode === 'off') return { changed: false };
-    const t = now();
-    await c.query(
-      `UPDATE shop_hesabpay SET pin_hash='', pin_failures=0, pin_locked_until=0, pin_changed_at=$2,
-              mode='off', account='', qr_payload='', api_key_enc='', secret_enc='', merchant_enc='', key_last4='',
-              hold_until=$3, version=version+1, updated_by=$4, updated_at=$2 WHERE shop_id=$1`,
-      [shopId, t, t + RESET_HOLD_MS, String(actor.id || '')]
-    );
-    await logIn(c, shopId, actor, 'hesabpay.pin_reset', { previousMode: row.mode, holdHours: RESET_HOLD_MS / 3_600_000 });
-    return { changed: true };
+  await guarded(shopId, actor, 'pin_reset', async (c, row, t) => {
+    if (!row.pin_hash && row.mode === 'off' && !row.pending) return { changed: false };
+    await writeActive(c, shopId, CLEARED, {
+      pin_hash: '', pin_failures: 0, pin_locked_until: 0, pin_changed_at: t, hold_until: t + RESET_HOLD_MS,
+      active_since: null, pending: null, pending_until: 0, updated_by: String(actor.id || ''), updated_at: t,
+    });
+    await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), null, t);
+    await logIn(c, shopId, actor, 'hesabpay.pin_reset', {
+      previousMode: row.mode, pendingDropped: Boolean(row.pending), holdHours: RESET_HOLD_MS / 3_600_000,
+    });
+    return { changed: true, notify: 'pin_reset' };
   });
-  if (out.changed) await notifyOwners(shopId, 'pin_reset');
-  return statusOf(shopId);
+  return statusOf(shopId, undefined, actor);
 }
 
-/** ورودیِ حساب ⇒ ستون‌های تازه (پیش از رمز سنجیده می‌شود تا خطای فرم تلاشِ رمز را نسوزاند) */
+/**
+ * ورودیِ حساب ⇒ ستون‌های تازه، نام و اثرِ انگشت (پیش از رمز سنجیده می‌شود تا خطای فرم تلاشِ رمز را نسوزاند).
+ * ⛔ QR فقط متن و فقط وقتی شمارهٔ درونش همان شمارهٔ حساب است — QR ِ کسِ دیگر کنارِ شمارهٔ دکان پذیرفته نمی‌شود؛
+ * عکس هرگز. «خودکار» بی شناسهٔ پذیرنده نه (وب‌هوک باید بگوید پول به پذیرندهٔ **همین** دکان رسید).
+ */
 function parseAccount(shopId, body) {
   const b = body && typeof body === 'object' ? body : {};
   const mode = String(b.mode || '');
+  if (!['simple', 'auto'].includes(mode)) throw badRequest('حالت باید «ساده» (simple) یا «خودکار» (auto) باشد.', 'hesabpay_bad_mode');
+  const name = guard.cleanName(b.name);
+  if (name === null) throw badRequest(`نامِ صاحبِ حساب باید متنِ کوتاه (تا ${guard.NAME_MAX} نویسه) باشد.`, 'hesabpay_bad_name');
+  if (!name) throw badRequest('نامِ صاحبِ حسابِ حساب‌پی را بنویسید (همان که در صندوق کنارِ QR دیده می‌شود).', 'hesabpay_name_required');
   if (mode === 'simple') {
+    if (isQrImage(b)) throw badRequest('عکسِ QR پذیرفته نمی‌شود؛ QR ِ دکان را با دوربینِ برنامه اسکن کنید.', 'hesabpay_qr_image');
     const qr = normQr(b.qr);
     if (qr === null) throw badRequest('متنِ QR نامعتبر یا بلند است.', 'hesabpay_bad_qr');
     const given = b.account === undefined || b.account === null || b.account === '' ? '' : normAccount(b.account);
     if (given === null) throw badRequest('شمارهٔ حساب‌پی درست نیست (مثلِ 0799123456).', 'hesabpay_bad_account');
-    const account = given || (qr ? accountInQr(qr) : '');
-    if (!account && !qr) throw badRequest('شمارهٔ حساب‌پیِ دکان یا QR ِ آن را بدهید.', 'hesabpay_account_required');
-    return { mode, account, qr_payload: qr, api_key_enc: '', secret_enc: '', merchant_enc: '', key_last4: '' };
-  }
-  if (mode === 'auto') {
-    if (!credKeyReady()) throw credKeyError();
-    const apiKey = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
-    const secret = typeof b.webhookSecret === 'string' ? b.webhookSecret.trim() : '';
-    const merchant = typeof b.merchantId === 'string' ? b.merchantId.trim() : '';
-    if (!CRED_RE.test(apiKey)) throw badRequest('کلیدِ API ِ حساب‌پی نامعتبر است.', 'hesabpay_bad_api_key');
-    if (!CRED_RE.test(secret)) throw badRequest('رازِ وب‌هوکِ حساب‌پی نامعتبر است.', 'hesabpay_bad_secret');
-    if (merchant && !MERCHANT_RE.test(merchant)) throw badRequest('شناسهٔ پذیرنده نامعتبر است.', 'hesabpay_bad_merchant');
+    const inQr = qr ? accountInQr(qr) : '';
+    if (qr && !inQr) throw badRequest('در این QR شمارهٔ حساب‌پی نیست؛ شمارهٔ حساب را بنویسید و QR را خالی بگذارید.', 'hesabpay_qr_no_account');
+    if (qr && given && inQr !== given) throw badRequest('شمارهٔ درونِ QR با شمارهٔ حساب یکی نیست.', 'hesabpay_qr_mismatch');
+    const account = given || inQr;
+    if (!account) throw badRequest('شمارهٔ حساب‌پیِ دکان یا QR ِ آن را بدهید.', 'hesabpay_account_required');
     return {
-      mode, account: '', qr_payload: '',
-      api_key_enc: seal(shopId, 'api_key', apiKey),
-      secret_enc: seal(shopId, 'secret', secret),
-      merchant_enc: merchant ? seal(shopId, 'merchant', merchant) : '',
-      key_last4: apiKey.slice(-4),
+      mode, account, qr_payload: qr, api_key_enc: '', secret_enc: '', merchant_enc: '', key_last4: '', merchant_last4: '',
+      account_name: name, payee_fp: guard.fpOf(shopId, 'simple', account),
     };
   }
-  throw badRequest('حالت باید «ساده» (simple) یا «خودکار» (auto) باشد.', 'hesabpay_bad_mode');
+  if (!credKeyReady()) throw credKeyError();
+  const apiKey = typeof b.apiKey === 'string' ? b.apiKey.trim() : '';
+  const secret = typeof b.webhookSecret === 'string' ? b.webhookSecret.trim() : '';
+  const merchant = typeof b.merchantId === 'string' ? b.merchantId.trim() : '';
+  if (!CRED_RE.test(apiKey)) throw badRequest('کلیدِ API ِ حساب‌پی نامعتبر است.', 'hesabpay_bad_api_key');
+  if (!CRED_RE.test(secret)) throw badRequest('رازِ وب‌هوکِ حساب‌پی نامعتبر است.', 'hesabpay_bad_secret');
+  if (!merchant) throw badRequest('شناسهٔ پذیرندهٔ حساب‌پیِ دکان را بدهید.', 'hesabpay_merchant_required');
+  if (!MERCHANT_RE.test(merchant)) throw badRequest('شناسهٔ پذیرنده نامعتبر است.', 'hesabpay_bad_merchant');
+  return {
+    mode, account: '', qr_payload: '',
+    api_key_enc: seal(shopId, 'api_key', apiKey),
+    secret_enc: seal(shopId, 'secret', secret),
+    merchant_enc: seal(shopId, 'merchant', merchant),
+    key_last4: apiKey.slice(-4), merchant_last4: merchant.slice(-4),
+    account_name: name, payee_fp: guard.fpOf(shopId, 'auto', merchant),
+  };
 }
 
-/** گذاشتن یا عوض کردنِ حسابِ دکان (با رمز) */
+/**
+ * گذاشتن یا عوض کردنِ حسابِ دکان — دستگاهِ مطمئن + تأییدِ دوبارهٔ ورود (مسیر) + رمزِ حساب‌پی.
+ * نخستین حسابِ دکان فوری فعال؛ هر حسابِ بعدی ۲۴ ساعت «در انتظار» (حسابِ کهنه فعال می‌ماند) با پوش و «این من نبودم».
+ */
 async function saveAccount(shopId, body, actor) {
   const cols = parseAccount(shopId, body);
   const pin = pinGiven(body);
+  await guard.activateDue(shopId);
   const out = await withPin(shopId, pin, actor, async (c, row, t) => {
     if (Number(row.hold_until) > t) {
       const e = new ApiError(423, 'hesabpay_on_hold', 'پس از بازنشانیِ رمز، تا ۲۴ ساعت حسابِ تازه پذیرفته نمی‌شود.');
@@ -543,48 +592,60 @@ async function saveAccount(shopId, body, actor) {
       return { error: e };
     }
     if (row.mode === 'auto' && await openGatewayPayment(c, shopId, t)) return { error: openPaymentError() };
+    const by = String(actor.id || '');
+    //  نشانیِ وب‌هوک از همین حالا (صاحب پیش از فعال شدن در داشبوردِ حساب‌پی ثبتش می‌کند)؛ اعتبار فقط امضای رازِ دکان
     const token = cols.mode === 'auto' ? (row.webhook_token || crypto.randomBytes(24).toString('base64url')) : row.webhook_token;
+    const next = payeeOfCols(cols);
+    const brief = { mode: cols.mode, previousMode: row.mode, last4: next.last4, qr: Boolean(cols.qr_payload) };
+    if (row.first_set_at === null || row.first_set_at === undefined) {
+      const r = await writeActive(c, shopId, cols, {
+        webhook_token: token, active_since: t, first_set_at: t, pending: null, pending_until: 0, updated_by: by, updated_at: t,
+      });
+      await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), next, t);
+      await logIn(c, shopId, actor, 'hesabpay.account_set', { ...brief, immediate: true });
+      return { row: r, notify: 'account_changed' };
+    }
+    const until = guard.activateAt(row, t);
     const r = (await c.query(
-      `UPDATE shop_hesabpay SET mode=$2, account=$3, qr_payload=$4, api_key_enc=$5, secret_enc=$6, merchant_enc=$7,
-              key_last4=$8, webhook_token=$9, version=version+1, updated_by=$10, updated_at=$11
-        WHERE shop_id=$1 RETURNING *`,
-      [shopId, cols.mode, cols.account, cols.qr_payload, cols.api_key_enc, cols.secret_enc, cols.merchant_enc,
-        cols.key_last4, token, String(actor.id || ''), t]
+      `UPDATE shop_hesabpay SET pending=$2::jsonb, pending_until=$3, webhook_token=$4, version=version+1, updated_by=$5,
+              updated_at=$6 WHERE shop_id=$1 RETURNING *`,
+      [shopId, JSON.stringify({ ...cols, at: t, by }), until, token, by, t]
     )).rows[0];
-    await logIn(c, shopId, actor, 'hesabpay.account_set', {
-      mode: cols.mode, previousMode: row.mode,
-      ...(cols.mode === 'simple' ? { accountLast4: cols.account.slice(-4), qr: Boolean(cols.qr_payload) } : { keyLast4: cols.key_last4, merchant: Boolean(cols.merchant_enc) }),
-    });
-    return { row: r };
-  });
-  if (out.error) throw out.error;
-  await notifyOwners(shopId, 'account_changed');
-  return fullOf(shopId, out.row);
+    await logIn(c, shopId, actor, 'hesabpay.change_pending', { ...brief, replaced: Boolean(row.pending), activatesAt: until });
+    return { row: r, notify: 'change_pending', notifyData: { until } };
+  }, { trust: true, op: 'save' });
+  return fullOf(shopId, out.row, actor);
 }
 
-/** برداشتنِ حساب (با رمز) — رمز می‌ماند */
+/** برداشتنِ حساب (با رمز؛ همان درِ دستگاهِ مطمئن) — رمز می‌ماند؛ حسابِ در انتظار هم پاک. پول به هیچ حسابی نمی‌رود. */
 async function removeAccount(shopId, body, actor) {
   const pin = pinGiven(body);
+  await guard.activateDue(shopId);
   const out = await withPin(shopId, pin, actor, async (c, row, t) => {
-    if (row.mode === 'off') return { row, unchanged: true };
+    if (row.mode === 'off' && !row.pending) return { row, unchanged: true };
     if (row.mode === 'auto' && await openGatewayPayment(c, shopId, t)) return { error: openPaymentError() };
-    const r = (await c.query(
-      `UPDATE shop_hesabpay SET mode='off', account='', qr_payload='', api_key_enc='', secret_enc='', merchant_enc='',
-              key_last4='', version=version+1, updated_by=$2, updated_at=$3 WHERE shop_id=$1 RETURNING *`,
-      [shopId, String(actor.id || ''), t]
-    )).rows[0];
-    await logIn(c, shopId, actor, 'hesabpay.account_removed', { previousMode: row.mode });
-    return { row: r };
-  });
-  if (out.error) throw out.error;
-  if (!out.unchanged) await notifyOwners(shopId, 'account_removed');
-  return fullOf(shopId, out.row);
+    const r = await writeActive(c, shopId, CLEARED, {
+      active_since: null, pending: null, pending_until: 0, updated_by: String(actor.id || ''), updated_at: t,
+    });
+    await guard.payeeSwitch(c, shopId, guard.fpOfRow(row), null, t);
+    await logIn(c, shopId, actor, 'hesabpay.account_removed', { previousMode: row.mode, pendingDropped: Boolean(row.pending) });
+    return { row: r, notify: 'account_removed' };
+  }, { trust: true, op: 'remove' });
+  return fullOf(shopId, out.row, actor);
 }
+
+/** «این من نبودم — لغو کن» (تأییدِ دوبارهٔ ورود در مسیر؛ بی رمزِ حساب‌پی): `lib/hesabpay-guard.js` */
+const cancelPending = (shopId, actor) => guard.cancelPending(shopId, actor);
+
+/** گزارشِ «پول به کدام حساب رفت» برای صاحب (بی شماره و کلید) */
+const payees = (shopId, q = {}) => guard.report(shopId, { days: q.days });
 
 module.exports = {
   MODES, PIN_MAX_FAILURES, RESET_HOLD_MS,
   credKeyState, credKeyReady, pinProblem, normAccount, normQr, accountInQr, webhookUrlOf,
-  status, open, setPin, resetPin, saveAccount, removeAccount, tillView, gatewayOf, byWebhookToken,
+  status, open, setPin, resetPin, saveAccount, removeAccount, cancelPending, payees, tillView, gatewayOf, byWebhookToken,
+  //  برای `lib/hesabpay-guard.js`
+  openGatewayPayment, notifyOwners, logIn,
   //  فقط آزمون: رمزگذاری با AAD ِ دکان
   _seal: seal, _unseal: unseal,
 };

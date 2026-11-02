@@ -84,12 +84,15 @@ class HesabPayShopTest {
     val t = FakeTransport(ok(status), ok(status), GatewayReply(403, code = "hesabpay_pin_wrong", message = "رمز درست نیست"),
       GatewayReply(423, code = "hesabpay_pin_locked", message = "بسته است"), GatewayReply(0), GatewayReply(503, code = "hesabpay_cred_key_missing", message = "کلید"))
     val c = HesabPayAccountClient(t)
-    val saved = runSync { c.saveAuto("258014", " KEY-1111 ", "whsec-abc ", "") }
+    val saved = runSync { c.saveAuto("258014", " دکانِ احمد ", " KEY-1111 ", "whsec-abc ", " M-1 ") }
     assertIs<AccountCall.Ok>(saved)
     assertEquals("1111", saved.view.keyLast4)
     assertTrue(saved.view.opened)
     assertEquals("PUT /shop/hesabpay/account", t.calls[0])
-    assertEquals(mapOf("pin" to "258014", "mode" to "auto", "apiKey" to "KEY-1111", "webhookSecret" to "whsec-abc"), t.bodies[0])
+    assertEquals(
+      mapOf("pin" to "258014", "name" to "دکانِ احمد", "mode" to "auto", "apiKey" to "KEY-1111", "webhookSecret" to "whsec-abc", "merchantId" to "M-1"),
+      t.bodies[0],
+    )
     //  نما هیچ کلید یا رازی ندارد — فقط چهار نویسهٔ آخر
     assertFalse(saved.view.toString().contains("KEY-1111") || saved.view.toString().contains("whsec"))
     assertIs<AccountCall.Ok>(runSync { c.open("258014") })
@@ -97,7 +100,56 @@ class HesabPayShopTest {
     assertEquals(AccountCall.Refused(423, "hesabpay_pin_locked", "بسته است"), runSync { c.open("258014") })
     assertIs<AccountCall.Offline>(runSync { c.status() })
     //  کلیدِ رمزگذاریِ سرور نیست ⇒ پیامِ روشنِ سرور، نه «نرسید»
-    assertEquals("hesabpay_cred_key_missing", (runSync { c.saveAuto("258014", "k".repeat(8), "s".repeat(8), "") } as AccountCall.Refused).code)
+    assertEquals("hesabpay_cred_key_missing", (runSync { c.saveAuto("258014", "الف", "k".repeat(8), "s".repeat(8), "M") } as AccountCall.Refused).code)
+  }
+
+  @Test
+  fun tillShowsActivePayeeBesideQrOnlyFromServer() {
+    val till = TillHesab.fromMap(mapOf("hesabpay" to mapOf("enabled" to false, "mode" to "simple",
+      "simple" to mapOf("account" to "0799123456", "qrPayload" to ""),
+      "payee" to mapOf("name" to "دکانِ احمد", "last4" to "3456", "fp" to "hp1_abc"))))
+    assertEquals(Payee("دکانِ احمد", "3456", "hp1_abc"), till.payee)
+    //  سرورِ کهنه بی `payee`، یا حالتِ خاموش ⇐ هیچ (هرگز گیرنده‌ای از جای دیگر)
+    assertNull(TillHesab.fromMap(mapOf("hesabpay" to mapOf("mode" to "simple", "simple" to mapOf("account" to "0799123456")))).payee)
+    assertNull(TillHesab.fromMap(mapOf("hesabpay" to mapOf("mode" to "off", "payee" to mapOf("name" to "x", "last4" to "1234")))).payee)
+    assertNull(Payee.fromMap(mapOf("name" to "x", "last4" to "")))
+  }
+
+  @Test
+  fun pendingChangeAndNotMeCancelGoToServer() {
+    val pending = status + mapOf(
+      "payee" to mapOf("name" to "دکانِ احمد", "last4" to "1111"),
+      "pending" to mapOf("name" to "حسابِ تازه", "last4" to "9888", "until" to 1_800_000_000_000L),
+      "sectionLockedUntil" to null,
+      "device" to mapOf("trusted" to false, "trustedAfter" to 1_700_000_000_000L),
+      "trustDays" to 7,
+    )
+    val v = HesabAccountView.fromMap(pending, opened = false)!!
+    assertEquals(PendingPayee("حسابِ تازه", "9888", 1_800_000_000_000L), v.pending)
+    assertEquals("1111", v.payee!!.last4)
+    assertEquals(false, v.deviceTrusted)
+    assertEquals(1_700_000_000_000L, v.trustedAfter)
+    //  سرورِ کهنه بی این فیلدها ⇐ بی کارت و بی هشدار
+    val old = HesabAccountView.fromMap(status, opened = false)!!
+    assertNull(old.pending)
+    assertNull(old.deviceTrusted)
+    val after = status + mapOf("pending" to null, "sectionLockedUntil" to 1_800_000_000_000L)
+    val t = FakeTransport(ok(after), GatewayReply(403, code = "reauth_required", message = "رمز را دوباره بزنید"))
+    val c = HesabPayAccountClient(t)
+    val r = runSync { c.cancelPending() }
+    assertIs<AccountCall.Ok>(r)
+    assertNull(r.view.pending)
+    assertEquals(1_800_000_000_000L, r.view.sectionLockedUntil)
+    assertEquals("POST /shop/hesabpay/pending/cancel", t.calls[0])
+    assertEquals(emptyMap<String, Any?>(), t.bodies[0])
+    assertEquals(AccountCall.Refused(403, "reauth_required", "رمز را دوباره بزنید"), runSync { c.cancelPending() })
+  }
+
+  @Test
+  fun simpleSaveSendsHolderName() {
+    val t = FakeTransport(ok(status))
+    runSync { HesabPayAccountClient(t).saveSimple("258014", " دکانِ احمد ", " 0799123456 ", "") }
+    assertEquals(mapOf("pin" to "258014", "name" to "دکانِ احمد", "mode" to "simple", "account" to "0799123456"), t.bodies[0])
   }
 
   @Test
