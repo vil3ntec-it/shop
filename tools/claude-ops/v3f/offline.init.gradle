@@ -1,0 +1,21 @@
+def C = '/root/.gradle/caches/modules-2/files-2.1/org.jetbrains.compose.runtime'
+allprojects {
+  configurations.all {
+    exclude group: 'androidx.lifecycle'
+    exclude group: 'androidx.arch.core'
+    exclude group: 'androidx.savedstate'
+    exclude group: 'androidx.compose.runtime'
+    exclude group: 'androidx.collection'
+    exclude group: 'androidx.annotation'
+    exclude group: 'org.jetbrains.compose.collection-internal'
+    exclude group: 'org.jetbrains.compose.annotation-internal'
+  }
+  afterEvaluate { p ->
+    if (p.name == 'TohidDesktop') {
+      p.dependencies.add('implementation', p.files(
+        "$C/runtime-desktop/1.7.3/c7ec36fb96961f1cd208a4e0daab62eebb1e3728/runtime-desktop-1.7.3.jar",
+        "$C/runtime-saveable-desktop/1.7.3/16cec893bca783af229978ba2091f58eea6906c1/runtime-saveable-desktop-1.7.3.jar"))
+      p.kotlin.sourceSets.main.kotlin.srcDir(new File(buildscript.sourceFile.parentFile, 'stubs'))
+    }
+  }
+}
