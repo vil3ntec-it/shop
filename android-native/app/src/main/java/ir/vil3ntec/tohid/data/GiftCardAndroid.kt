@@ -33,14 +33,27 @@ object GiftCardPref {
    *  `SpecialOrderPref.record`)، تا کدی که دستگاهِ دیگر همین حالا فروخت دوباره ثبت نشود. [key] شناسهٔ رویداد است که
    *  پنجره هنگامِ باز شدن می‌سازد ⇒ دو ضربه یک ثبت.
    */
-  suspend fun issue(store: ShopStore, key: String, code: String, amountMinor: Long, today: String, now: Long, by: String?): Saved {
+  suspend fun issue(store: ShopStore, key: String, code: String, amountMinor: Long, today: String, now: Long, by: String?): Saved =
+    append(store, key) { cur, k -> GiftCards.issue(cur, k, code, amountMinor, today, now, by) }
+
+  /** PRM-14 — شارژِ دوباره، همان راهِ [issue] (دفترِ همین لحظهٔ دیسک، کلیدِ پنجره ⇒ دو ضربه یک شارژ) */
+  suspend fun recharge(store: ShopStore, key: String, code: String, amountMinor: Long, today: String, now: Long, by: String?): Saved =
+    append(store, key) { cur, k -> GiftCards.recharge(cur, k, code, amountMinor, today, now, by) }
+
+  /** باطل کردن با دلیل؛ [allowed] از `ShopRole.canCancelSale` (همان `sales.cancel`) — بی اجازه هیچ چیز نوشته نمی‌شود */
+  suspend fun void(store: ShopStore, key: String, code: String, reason: String, allowed: Boolean, today: String, now: Long, by: String?): Saved {
+    if (!allowed) return Saved.Bad(GiftCards.NOT_ALLOWED)
+    return append(store, key) { cur, k -> GiftCards.void(cur, k, code, reason, allowed, today, now, by) }
+  }
+
+  private suspend fun append(store: ShopStore, key: String, op: (ShopData, String) -> GiftCards.Issued): Saved {
     var bad: String? = null
     var made: String? = null
     val out = AppendOnce.append<ShopData>(
       key, GiftCards::hasRow,
       { cur, k ->
-        when (val b = GiftCards.issue(cur, k, code, amountMinor, today, now, by)) {
-          is GiftCards.Issued.Ok -> { made = b.event.code; b.data }
+        when (val b = op(cur, k)) {
+          is GiftCards.Issued.Ok -> { made = b.event.code; b.data.takeUnless { b.again } }
           is GiftCards.Issued.Bad -> { bad = b.code; null }
         }
       },
@@ -48,7 +61,7 @@ object GiftCardPref {
     return when (out) {
       is AppendOnce.Outcome.Wrote -> Saved.Ok(again = false, code = made)
       AppendOnce.Outcome.Already -> Saved.Ok(again = true, code = null)
-      AppendOnce.Outcome.Skipped -> bad?.let { Saved.Bad(it) } ?: Saved.NotSaved
+      AppendOnce.Outcome.Skipped -> bad?.let { Saved.Bad(it) } ?: if (made != null) Saved.Ok(again = true, code = null) else Saved.NotSaved
       AppendOnce.Outcome.Unread -> Saved.Bad("UNREAD")
       AppendOnce.Outcome.Unsaved -> Saved.NotSaved
     }

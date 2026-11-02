@@ -66,8 +66,8 @@ fun AutoFeesSettings(rules: List<AutoFees.Rule>, d: ShopData, onSave: (List<Auto
   }
 }
 
-/** نام یا بارکد ⇒ شناسه: بارکدِ کامل، سپس نامِ دقیق با کلیدِ مقایسه */
-private fun resolver(refs: List<ProductAlternatives.Ref>): (String) -> String? {
+/** نام یا بارکد ⇒ شناسه: بارکدِ کامل، سپس نامِ دقیق با کلیدِ مقایسه — همان برای صفحهٔ نسخهٔ ۳ (`AutoFeesScreen`) */
+internal fun resolver(refs: List<ProductAlternatives.Ref>): (String) -> String? {
   val byCode = HashMap<String, String>()
   val byName = HashMap<String, String>()
   refs.forEach { r -> r.barcodes.forEach { byCode.putIfAbsent(it.trim(), r.id) }; byName.putIfAbsent(TextNormalizer.compareKey(r.name), r.id) }

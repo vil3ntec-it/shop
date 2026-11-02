@@ -381,8 +381,8 @@ object PayFlow {
       if (t.type != "receive" || !CashShift.isCashReceipt(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
     }
-    //  PAY-24: فروشِ کارتِ هدیه نقد به دخل می‌آورد — همان `CashShift.totals`
-    GiftCards.issueRows(d, from, to).forEach { a ->
+    //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه نقد به دخل می‌آورند — همان `CashShift.totals`
+    GiftCards.cashRows(d, from, to).forEach { a ->
       ev += 0 to ShiftEventInput(id = "gci:${a.id}", type = "receipt", at = a.createdAt, method = CASH, amount = minor(a.amount))
     }
     d.auditLog.forEach { a ->

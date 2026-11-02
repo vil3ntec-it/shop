@@ -36,6 +36,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.components.pos.PayPanelState
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
@@ -84,6 +85,8 @@ data class CheckoutView(
   val payError: String?,
   val canSubmit: Boolean,
   val canAskApproval: Boolean,
+  /** PAY-24 — دفترِ صفحه برای کارت و اعتبار در پنلِ ترکیبی، فقط با `GiftCardPref`؛ `null` ⇒ همان پنلِ امروز */
+  val giftLedger: ShopData? = null,
 )
 
 /** کارهای برگه — هر کدام یک تغییرِ فرم یا یک مسیر */
@@ -167,7 +170,7 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
 
       Spacer(Modifier.height(12.dp))
       if (v.payV2) {
-        CheckoutPaySplit(pay, v.numbers.finalTotal, f.debtorId, v.customerName, onSubmit = a.submit, error = v.payError)
+        CheckoutPaySplit(pay, v.numbers.finalTotal, f.debtorId, v.customerName, onSubmit = a.submit, error = v.payError, ledger = v.giftLedger)
         Spacer(Modifier.height(12.dp))
       } else if (f.payment == SalesEngine.Payment.CREDIT) {
         V3TextField(
