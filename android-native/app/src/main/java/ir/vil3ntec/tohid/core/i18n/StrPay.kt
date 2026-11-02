@@ -19,7 +19,7 @@ object StrPay {
   val payToShop: String get() = t("حساب‌پی (حسابِ دکان)", "HesabPay (shop account)", "حساب‌پې (د دوکان حساب)")
   val shopHesabTitle: String get() = t("پرداخت به حساب‌پیِ دکان", "Pay to the shop's HesabPay", "د دوکان حساب‌پې ته ورکړه")
   fun simpleSteps(account: Any, ref: Any): String = t(
-    "مشتری با برنامهٔ حساب‌پی همین QR را اسکن کند یا به شمارهٔ $account بفرستد، همین مبلغ را بزند و کدِ $ref را در یادداشت بنویسد.",
+    "مشتری با برنامهٔ حساب‌پی همین QR را اسکن کند یا به شمارهٔ ${asIs(account)} بفرستد، همین مبلغ را بزند و کدِ ${asIs(ref)} را در یادداشت بنویسد.",
     "The customer scans this QR with the HesabPay app or sends to $account, enters this exact amount and writes $ref in the note.",
     "پیرودونکی دا QR د حساب‌پې په اپ سکن کړي یا $account ته ولېږي، همدا مبلغ ولیکي او $ref په یادښت کې ولیکي.",
   )
@@ -30,7 +30,7 @@ object StrPay {
     "Tap «Money received» only after you see the money in the shop's HesabPay account; the app never confirms on its own.",
     "یوازې هغه وخت «پیسې ورسېدې» ووهئ چې پیسې د دوکان د حساب‌پې په حساب کې ووینئ؛ اپ پخپله تایید نه کوي.",
   )
-  fun hintSuggest(amount: Any, ref: Any): String = t("$amount ؋ رسید — فاکتورِ $ref؟", "$amount ؋ arrived — invoice $ref?", "$amount ؋ ورسېدې — فاکتور $ref؟")
+  fun hintSuggest(amount: Any, ref: Any): String = t("${asIs(amount)} ؋ رسید — فاکتورِ ${asIs(ref)}؟", "$amount ؋ arrived — invoice $ref?", "$amount ؋ ورسېدې — فاکتور $ref؟")
   val hintNoRef: String get() = t("کدِ فاکتور در اعلان نبود؛ مطمئن شوید همین مشتری است.", "The invoice code wasn't in the notification; make sure it's this customer.", "د فاکتور کوډ په خبرتیا کې نه و؛ ډاډ ترلاسه کړئ چې همدا پیرودونکی دی.")
   val scanHint: String get() = t(
     "مشتری این کد را با برنامهٔ حساب‌پی اسکن کند — با کیف پولِ حساب‌پی یا کارتِ بانکیِ AfPay",

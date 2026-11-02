@@ -73,7 +73,7 @@ object StrDevices {
     "It turns on by itself once a scanner is added; there is no separate switch. Scans are kept and the app asks where they go when it opens.",
     "د یو بارکوډ لوستونکي په ثبت سره پخپله روښانه کېږي او جلا تڼۍ نه لري. سکنونه ساتل کېږي او د اپ په پرانیستو پوښتل کېږي چې چېرته لاړ شي.",
   )
-  fun backgroundOn(n: Any): String = t("$n بارکدخوان وصل است", "$n ${pl(n, "scanner", "scanners")} connected", "$n بارکوډ لوستونکي وصل دي")
+  fun backgroundOn(n: Any): String = t("${asIs(n)} بارکدخوان وصل است", "$n ${pl(n, "scanner", "scanners")} connected", "$n بارکوډ لوستونکي وصل دي")
   val backgroundNone: String get() = t(
     "هنوز بارکدخوانی ثبت نشده؛ از «همهٔ دستگاه‌ها» یکی را بیفزایید.",
     "No scanner added yet; add one from \"All devices\".",
@@ -94,9 +94,9 @@ object StrDevices {
   val noteChannel: String get() = t("اسکن در پس‌زمینه", "Background scanning", "په شالید کې سکن")
 
   //  ── «N اسکن در انتظار» ───────────────────────────────────────────
-  fun pendingTitle(n: Any): String = t("$n اسکن در انتظار", "$n ${pl(n, "scan", "scans")} waiting", "$n سکنونه په تمه")
-  fun pendingLine(codes: Any, units: Any): String = t("$codes کالا، روی‌هم $units عدد", "$codes ${pl(codes, "item", "items")}, $units in total", "$codes توکي، ټول $units")
-  fun fromMemory(n: Any): String = t("$n اسکن از حافظهٔ بارکدخوان", "$n from the scanner's memory", "$n د بارکوډ لوستونکي له حافظې")
+  fun pendingTitle(n: Any): String = t("${asIs(n)} اسکن در انتظار", "$n ${pl(n, "scan", "scans")} waiting", "$n سکنونه په تمه")
+  fun pendingLine(codes: Any, units: Any): String = t("${asIs(codes)} کالا، روی‌هم ${asIs(units)} عدد", "$codes ${pl(codes, "item", "items")}, $units in total", "$codes توکي، ټول $units")
+  fun fromMemory(n: Any): String = t("${asIs(n)} اسکن از حافظهٔ بارکدخوان", "$n from the scanner's memory", "$n د بارکوډ لوستونکي له حافظې")
   val pendingAsk: String get() = t("این اسکن‌ها کجا بروند؟", "Where should these scans go?", "دا سکنونه چېرته لاړ شي؟")
   val toCount: String get() = t("انبارگردانی", "Stock count", "د ګودام شمېرنه")
   val toCountLine: String get() = t("شمارِ هر کالا به برگهٔ انبارگردانی افزوده می‌شود", "Each item's count is added to the stock count", "د هر توکي شمېر د ګودام شمېرنې ته ورزیاتېږي")
@@ -111,21 +111,21 @@ object StrDevices {
   val later: String get() = t("بعداً", "Later", "وروسته")
   val discard: String get() = t("کنار گذاشتن", "Set aside", "یو طرف ته کول")
   fun discardAsk(n: Any): String = t(
-    "همهٔ $n اسکن کنار گذاشته شود؟ این کار برگشت ندارد.",
+    "همهٔ ${asIs(n)} اسکن کنار گذاشته شود؟ این کار برگشت ندارد.",
     "Set aside all $n ${pl(n, "scan", "scans")}? This cannot be undone.",
     "ټول $n سکنونه یو طرف ته شي؟ دا کار بېرته نه راګرځي.",
   )
   fun heldReady(n: Any, total: String): String = t(
-    "$n فاکتورِ نگه‌داشته آماده است — جمع: $total",
+    "${asIs(n)} فاکتورِ نگه‌داشته آماده است — جمع: ${asIs(total)}",
     "$n held ${pl(n, "invoice", "invoices")} ready — total: $total",
     "$n ساتل شوي بلونه چمتو دي — ټول: $total",
   )
   val pay: String get() = t("پرداخت", "Pay", "تادیه")
   fun unknownCodes(n: Any): String = t(
-    "$n بارکد کالا ندارد — با «ثبتِ کالا» ثبتش کنید",
+    "${asIs(n)} بارکد کالا ندارد — با «ثبتِ کالا» ثبتش کنید",
     "$n ${pl(n, "barcode has", "barcodes have")} no item — add with \"New item\"",
     "$n بارکوډونه توکی نه لري — د «نوی توکی» په مرسته یې ثبت کړئ",
   )
   val newItem: String get() = t("ثبتِ کالا", "New item", "نوی توکی")
-  fun countAdded(n: Any): String = t("شمارِ $n کالا از بارکدخوان افزوده شد", "Counts for $n ${pl(n, "item", "items")} added from the scanner", "د $n توکو شمېر له بارکوډ لوستونکي ورزیات شو")
+  fun countAdded(n: Any): String = t("شمارِ ${asIs(n)} کالا از بارکدخوان افزوده شد", "Counts for $n ${pl(n, "item", "items")} added from the scanner", "د $n توکو شمېر له بارکوډ لوستونکي ورزیات شو")
 }
