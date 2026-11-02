@@ -22,11 +22,12 @@ const { forbidden } = require('../middleware/errors');
 const router = express.Router();
 //  سقفِ نرخ پیش از احراز (هر IP) و پس از آن برای هر صاحب؛ قفلِ رمز جدا در خودِ سرور است
 router.use(rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' }));
-router.use(requireUser, requireShop);
-router.use(rateLimit({
+//  همان الگوی `order-evidence.js`: احراز و سقفِ هر صاحب در یک `use` (CodeQL ِ js/missing-rate-limiting)
+const limit = rateLimit({
   max: Number(process.env.RATE_HESABPAY_ACCOUNT_MAX) || 30, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay',
   key: (req) => `${req.shopId}:${req.user.id}`,
-}));
+});
+router.use(requireUser, requireShop, limit);
 router.use((req, res, next) => (req.role === 'owner' ? next()
   : next(forbidden('حساب‌پیِ دکان را فقط صاحبِ دکان می‌بیند و تنظیم می‌کند', 'owner_only'))));
 
