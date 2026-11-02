@@ -217,6 +217,11 @@ object OwnerExport {
     "fromMethod" to "روش پیشین",
     "toMethod" to "روش تازه",
     "payRef" to "مرجع روش تازه",
+    //  PAY-07 وضعیتِ پرداخت (`pay_status`)
+    "payRow" to "ردیف پرداخت",
+    "payMethod" to "روش ردیف",
+    "fromStatus" to "وضعیت پیشین",
+    "toStatus" to "وضعیت تازه",
     //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
     "specialOrder" to "سفارش ویژه",
     //  فروشِ امانی (POS-27): سند و وضعیتِ تازه روی ردیفِ سابقه

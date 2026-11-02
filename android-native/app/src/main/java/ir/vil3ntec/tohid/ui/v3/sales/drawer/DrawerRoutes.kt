@@ -209,7 +209,10 @@ fun RouteScope.DrawerXRoute() {
   val rep = if (args.query("kind") == "z") DrawerSession.z
   else remember(data, shift) { shift?.let { PayFlow.report(data, it.open, null, System.currentTimeMillis()).valueOrNull()?.report } }
   if (rep == null) { LaunchedEffect(Unit) { back() }; return }
-  ShiftReportSheet(rep, staff, title = null, notes = emptyList(), onClose = { back() })
+  //  PAY-07: غیرنقدِ «در انتظار»/«نیازمند بررسی» ِ همین صندوق در جمع نیست — فقط یادداشت، تا صندوقدار بداند چرا
+  val waiting = if (args.query("kind") == "z" || shift == null) 0L
+  else remember(data, shift) { DrawerNotes.unreceived(data, shift.open.createdAt, System.currentTimeMillis()) }
+  ShiftReportSheet(rep, staff, title = null, notes = DrawerNotes.unreceivedNotes(waiting), onClose = { back() })
 }
 
 /** `sales/drawer/shift/{id}` — ریزِ یک صندوق: گزارشِ Z اگر ذخیره شده، وگرنه یادداشت‌ها */

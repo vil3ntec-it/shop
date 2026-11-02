@@ -1,6 +1,6 @@
 'use strict';
 /**
- * ── داوریِ نقشِ سندهای «سابقه‌سوار» در Sync v3 (PAY-24، PRM-13، POS-26/27، INV-20/21) ─────────────
+ * ── داوریِ نقشِ سندهای «سابقه‌سوار» در Sync v3 (PAY-24، PRM-13، POS-26/27، INV-20/21، PAY-07) ─────────────
  * کارتِ هدیه، امتیازِ وفاداری، فروشِ امانی، سفارشِ ویژه، محلِ انبار و بسته‌بندی جدولِ تازه ندارند: سندشان ردیفِ
  * `auditLog` (با `type`) و پولشان رسید/بردِ `transactions` (با `kind`) است. هر دو جدول برای هر نقشِ نویسنده باز است
  * (`perm-core.WRITES`) و قاعدهٔ ردیف ندارند، پس اجازه‌ای که برنامه پیش از ساختنِ ردیف می‌سنجد فقط روی دستگاه بود:
@@ -29,6 +29,8 @@
  *           برگشتِ امتیاز `LoyaltyPoints.afterReturn/afterCancel`): برگشت ⇐ `returns` نوشتنی و `returns.create`
  *           نه «ممنوع» (`ReturnFlow.permDecision`: allow، یا approve با PIN)، یا لغو ⇐ CANCEL
  *   PLACES  `StockPlacesEntry`: هر نقش جز `staff` (شاگرد) — محل‌ها و بسته‌بندیِ دوباره
+ *   MANAGE  فقط صاحب و مدیر: اصلاحِ دستیِ امتیاز (PRM-13)؛ و PAY-07 `pay_status` جز «در انتظار ⇐ تأییدشده/نیازمند بررسی»
+ *           که SELL است (`PayStatus.need` ِ هسته، صفحهٔ وضعیتِ پرداختِ فاکتور: `PayStatusRoute`)
  *   ''      بی سنجشِ نقش در برنامه (ساختِ امانی و سفارش، «آماده»، پیش‌پرداخت و قسط): فقط شکل
  *
  * ⛔ Sync v1 (`sync-v1.js` ِ مشترک با پمپ) دست نمی‌خورد: v1 این ردیف‌ها را فقط با `canWrite` ِ جدول می‌نشاند و
@@ -77,6 +79,25 @@ const moved = (key, to) => (f) => (text(f.refId) && zeroOk(f.amountMinor) && isO
 /** اصلاحِ دستیِ امتیاز (PRM-13): مشتری، امتیازِ علامت‌دارِ ناصفر، دلیلِ ناتهی — همان سنجشِ دستگاه */
 const adjusted = (f) => (text(f.payRef) && Number.isInteger(f.points) && f.points !== 0 && Math.abs(f.points) <= MAX_POINTS
   && typeof f.notes === 'string' && f.notes.trim().length > 0 && zeroOk(f.amountMinor) ? MANAGE : BAD);
+/**
+ * PAY-07 — تغییرِ وضعیتِ یک ردیفِ پرداختِ غیرنقدِ فاکتور (`PayStatusFlow.row`): فاکتور (`refId`)، جای ردیف (`payRow`)،
+ * روشش، و گذارِ (`fromStatus` ⇐ `toStatus`) که دستی گذاشتنی است. اجازه همان `PayStatus.need` ِ هسته. بازپرداخت از راهِ
+ * برگشت است و هرگز با این ردیف نیست. گذارِ کهنه (وضعیتِ ردیف دیگر `fromStatus` نیست) را خودِ برنامه هنگامِ خواندن کنار می‌گذارد.
+ */
+const PAY_MOVES = Object.freeze({
+  'pending>confirmed': SELL,
+  'pending>needs_review': SELL,
+  'pending>failed': MANAGE,
+  'pending>cancelled': MANAGE,
+  'needs_review>confirmed': MANAGE,
+  'needs_review>failed': MANAGE,
+  'needs_review>cancelled': MANAGE,
+});
+const payStatus = (f) => {
+  const move = `${f.fromStatus}>${f.toStatus}`;
+  return text(f.refId) && text(f.payMethod) && int(f.payRow, 0, 999) && typeof f.fromStatus === 'string'
+    && typeof f.toStatus === 'string' && own(PAY_MOVES, move) && zeroOk(f.amountMinor) ? PAY_MOVES[move] : BAD;
+};
 const placed = (f) => (text(f.refId) && (f.reason === 'add' || f.reason === 'archive') ? PLACES : BAD);
 const repacked = (f) => (text(f.refId) ? PLACES : BAD);
 
@@ -99,6 +120,7 @@ const AUDIT = Object.freeze({
   stock_place: placed,
   stock_repack: repacked,
   stock_assembly: repacked,
+  pay_status: payStatus,
 });
 
 /** `transactions.kind` ⇒ [type، اجازه] — مبلغِ مثبت و `refId` = سند */
@@ -111,7 +133,7 @@ const RECEIPT = Object.freeze({
 });
 
 /** خانواده‌هایی که نوعِ ناشناخته‌شان شکلِ نادرست است؛ نوع‌های دیگرِ سابقه (`sale`، `shift_open`، …) مالِ این‌جا نیستند */
-const AUDIT_FAMILY = /^(gift_card_|loyalty_|layaway(_|$)|special_order(_|$))/;
+const AUDIT_FAMILY = /^(gift_card_|loyalty_|layaway(_|$)|special_order(_|$)|pay_status(_|$))/;
 const RECEIPT_FAMILY = /^(layaway_|special_order_)/;
 
 /**

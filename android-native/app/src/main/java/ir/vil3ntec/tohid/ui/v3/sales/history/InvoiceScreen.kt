@@ -77,6 +77,9 @@ fun InvoiceScreen(
   actions: InvoiceActions,
   /** فاکتورِ نسخهٔ ۲: پیش‌نمایشِ همان کاغذِ چاپ (`Receipts.bitmap`)؛ `null` ⇒ رسیدِ کارتی */
   paper: ImageBitmap? = null,
+  /** PAY-07 — ردیف‌های غیرنقد با وضعیت (`PayStatusFlow.view`)؛ ضربه ⇐ برگهٔ وضعیتِ همان ردیف */
+  payRows: List<ir.vil3ntec.tohid.data.PayStatusFlow.RowView> = emptyList(),
+  onPayRow: ((Int) -> Unit)? = null,
 ) {
   val docs = if (returnsV2) HistoryModel.returnDocs(d, sale) else emptyList()
   V3Scaffold(
@@ -104,6 +107,7 @@ fun InvoiceScreen(
         .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding() + 16.dp),
     ) {
       if (paper != null) PaperPreview(paper, ReceiptModel.title(sale)) else ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
+      PayStatusSection(payRows, onPayRow)
       if (docs.isNotEmpty()) {
         V3Section(StrSale.returnReceipts) {
           docs.forEachIndexed { i, doc ->

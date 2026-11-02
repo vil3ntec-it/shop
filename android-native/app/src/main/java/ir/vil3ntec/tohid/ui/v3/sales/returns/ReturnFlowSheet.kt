@@ -117,7 +117,7 @@ fun ReturnFlowSheet(
   val gate = ReturnFlow.gate(role, perm, ReturnFlow.minor(total), sale == null, damaged, ReturnFlow.minor(limit))
   val creditTo = if (mode == ReturnFlow.STORE_CREDIT) customerId else null
   val prior = remember(d, sale) { sale?.let { s -> d.saleReturns.filter { it.saleId == s.id } }.orEmpty() }
-  val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior) as? ReturnFlow.Outcome.Ok)?.value
+  val split = (ReturnFlow.split(sale, total, mode, me, creditTo, prior, sale?.let { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d)[it.id] }.orEmpty()) as? ReturnFlow.Outcome.Ok)?.value
   val cartTotal = remember(d, cart) { SalesEngine.cartTotal(d, cart) }
   val approved = gate.decision == "allow" || (approval != null && ReturnFlow.canApprove(gate, approval!!.role))
   val requester = ReturnApproval.requester

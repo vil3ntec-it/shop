@@ -23,5 +23,6 @@ object I18nTables {
     StrRounding, // PAY-09: گردکردنِ نقدی
     StrSettingsHelp, // تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): خطِ ساده و «این چه می‌کند؟»
     StrDevices, // «دستگاه‌ها» و اسکن در پس‌زمینه (۱۴۰۵/۰۸/۱۱)
+    StrPayStatus, // PAY-07: وضعیتِ پرداخت
   )
 }

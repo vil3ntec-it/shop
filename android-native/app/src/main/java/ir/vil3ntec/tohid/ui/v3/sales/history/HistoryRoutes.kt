@@ -108,9 +108,11 @@ fun RouteScope.HistoryRoute() {
       }) else null,
       newSale = { nav.switchTab(SalesPaths.SALE) },
       back = backOrNull,
+      payReview = { nav.open(SalesPaths.PAY_REVIEW) },
     ),
     bottomReserve = bottomReserve,
     shopTag = shopTag,
+    reviews = reviewCount(data),
   )
 }
 
@@ -174,6 +176,8 @@ fun RouteScope.InvoiceRoute() {
       }) else null,
     ),
     paper = paper,
+    payRows = ir.vil3ntec.tohid.data.PayStatusFlow.view(data, sale),
+    onPayRow = { nav.open(SalesPaths.payStatus(sale.id, it)) },
   )
 }
 

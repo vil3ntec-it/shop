@@ -173,6 +173,11 @@
     fromMethod: 'روش پیشین',
     toMethod: 'روش تازه',
     payRef: 'مرجع روش تازه',
+    //  PAY-07 وضعیتِ پرداخت (`pay_status`) — همان `OwnerExport.kt`
+    payRow: 'ردیف پرداخت',
+    payMethod: 'روش ردیف',
+    fromStatus: 'وضعیت پیشین',
+    toStatus: 'وضعیت تازه',
     //  سفارشِ ویژه (POS-26) — همان `OwnerExport.kt`
     specialOrder: 'سفارش ویژه',
     //  فروشِ امانی (POS-27) — همان `OwnerExport.kt`
