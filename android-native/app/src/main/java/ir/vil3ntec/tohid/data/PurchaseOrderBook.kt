@@ -58,6 +58,8 @@ data class PoReceiptDto(
   val lines: List<PoReceiptLineDto> = emptyList(),
   val posted: List<PoPostedDto> = emptyList(),
   val totalMinor: Long = 0,
+  /** PUR-06: کرایهٔ همین رسید به حمل‌کننده (نه تأمین‌کننده)؛ رسیدِ پیشین ۰ */
+  val freightMinor: Long = 0,
   val note: String = "",
   val createdBy: String = "",
   val createdAt: Long = 0,
@@ -182,6 +184,10 @@ object PurchaseOrderBook {
    *  رسید ⇐ یک فاکتورِ خریدِ چندردیفه (همان `invoiceNo` ِ `PurchaseBook`)، بی پرداخت: بدهیِ تأمین‌کننده
    *  همان جمعِ پذیرفته به فیِ رسید است و پرداخت بعداً از راهِ امروز. ردیفِ پیش‌تر نشسته (همان دستگاه یا
    *  همگام‌سازی) دوباره ساخته نمی‌شود و شمارهٔ فاکتورش برای بقیه می‌ماند.
+   *
+   *  کرایهٔ رسید (PUR-06، `freightMinor`) به نسبتِ ارزشِ **همهٔ** ردیف‌های پذیرفته پخش می‌شود
+   *  (`StockLedger.spreadLanded`، جمع دقیقاً همان کرایه) و سهمِ هر ردیف روی بهای همان ردیف می‌نشیند — همان
+   *  `landedCost` ِ فاکتورِ خریدِ دستی؛ به بدهیِ تأمین‌کننده اضافه نمی‌شود. ثبتِ دوبارهٔ بخشی همان سهم‌ها را دارد.
    */
   fun post(d: ShopData, o: PurchaseOrderDto, r: PoReceiptDto, today: String, now: Long): Posting {
     val todo = toPost(r)
@@ -216,7 +222,41 @@ object PurchaseOrderBook {
     }
     val set = made.toSet()
     cur = cur.copy(purchases = cur.purchases.map { if (it.id in set) it.copy(invoiceNo = no) else it })
+    cur = withFreight(cur, r, todo, set)
     return Posting.Ok(cur, no, made.size)
+  }
+
+  /** سقفِ کرایه = سقفِ فیِ سرور (`MAX_PRICE_MINOR` ِ `purchase-orders.js`) */
+  const val MAX_FREIGHT_MINOR = 100_000_000_000L
+
+  /** متنِ کادرِ «کرایه» (رقمِ فارسی هم) ⇐ صدمِ افغانی؛ خالی ⇒ ۰؛ نادرست، منفی یا بیش از سقف ⇒ null */
+  fun freightMinorOf(raw: String): Long? {
+    val t = ir.vil3ntec.tohid.normalizeDigits(raw).trim()
+    if (t.isEmpty()) return 0L
+    val v = t.toDoubleOrNull() ?: return null
+    if (!v.isFinite() || v < 0) return null
+    val m = minor(v)
+    return if (m > MAX_FREIGHT_MINOR) null else m
+  }
+
+  /** سهمِ کرایهٔ هر ردیفِ پذیرفته (کلید: شناسهٔ ردیفِ خریدِ دفتر)؛ بی کرایه ⇒ تهی */
+  fun freightShares(r: PoReceiptDto): Map<String, Long> {
+    val todo = toPost(r)
+    if (r.freightMinor <= 0 || todo.isEmpty()) return emptyMap()
+    val shares = StockLedger.spreadLanded(r.freightMinor, todo.map { it.totalMinor })
+    return todo.zip(shares).associate { (p, share) -> purchaseIdOf(r.id, p.lineId) to share }
+  }
+
+  private fun withFreight(d: ShopData, r: PoReceiptDto, todo: List<PoPostedDto>, made: Set<String>): ShopData {
+    if (todo.isEmpty()) return d
+    val landed = freightShares(r).filter { (id, share) -> id in made && share > 0 }
+    if (landed.isEmpty()) return d
+    return d.copy(
+      purchases = d.purchases.map { p -> landed[p.id]?.let { p.copy(landedCost = asAfn(it), landedCostMinor = it) } ?: p },
+      warehouseEntries = d.warehouseEntries.map { w ->
+        w.purchaseId?.let { landed[it] }?.let { w.copy(landedCost = asAfn(it), landedCostMinor = it) } ?: w
+      },
+    )
   }
 
   /* ── تطبیقِ سه‌طرفه (PUR-14) ───────────────────────────────────────── */
@@ -267,6 +307,26 @@ object PurchaseOrderBook {
   fun buys(d: ShopData): List<SupplierPricing.Buy> = d.purchases.map {
     SupplierPricing.Buy(it.supplierId, it.productId, it.date, it.createdAt, milli(it.quantity), minor(it.purchasePrice))
   }
+
+  /** «▲ ۵٪» / «▼ ۲٫۵٪» / «بی تغییر» نسبت به خریدِ پیشینِ همان تأمین‌کننده (PUR-09)؛ بی پیشین ⇒ "" */
+  fun changeText(p: SupplierPricing.Point): String {
+    val bp = p.changeBp ?: return ""
+    if (bp == 0L) return " · بی تغییر"
+    val pct = kotlin.math.abs(bp) / 100.0
+    return (if (bp > 0) " · ▲ " else " · ▼ ") + ir.vil3ntec.tohid.qty(pct) + "٪"
+  }
+
+  /**
+   *  PUR-09: متنِ زیرِ ردیفِ فرمِ خرید (سفارشِ خرید و فاکتورِ خریدِ دستی) — آخرین فیِ **همین** تأمین‌کننده
+   *  برای همین کالا، با تاریخ و تغییر؛ کالا یا تأمین‌کننده انتخاب نشده ⇒ `null`.
+   */
+  fun lastPriceHint(buys: List<SupplierPricing.Buy>, productId: String?, supplierId: String?): String? {
+    if (productId.isNullOrBlank() || supplierId.isNullOrBlank()) return null
+    val last = SupplierPricing.last(buys, productId, supplierId) ?: return NO_BUY_YET
+    return "آخرین فیِ این تأمین‌کننده: ${ir.vil3ntec.tohid.money(asAfn(last.priceMinor))} ؋ (${ir.vil3ntec.tohid.formatDate(last.date)})" + changeText(last)
+  }
+
+  const val NO_BUY_YET = "از این تأمین‌کننده هنوز خریده نشده"
 
   /** فروشِ خالصِ (فروش − برگشتِ همان قلم) [windowDays] روزِ آخر تا امروز، بی فاکتورِ لغوشده */
   fun soldMilli(d: ShopData, today: String, windowDays: Int = ReorderCore.DEFAULT_WINDOW_DAYS): Map<String, Long> {

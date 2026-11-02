@@ -53,13 +53,22 @@ class PurchaseOrderRepository(private val api: ApiClient) {
     ApiJson.decode<PoOrderDto>(api.post("$ROOT/${enc(id)}/cancel", buildJsonObject { put("reason", reason) })).order
   }
 
-  /** رسیدِ دریافت؛ [receiptId] کلیدِ یکتای همین رسید است (صفحه یک بار می‌سازد) */
-  suspend fun receive(id: String, receiptId: String, lines: List<PoReceiptLineDto>, allowOver: Boolean, note: String): ApiResult<PoReceivedDto> =
+  /** رسیدِ دریافت؛ [receiptId] کلیدِ یکتای همین رسید است (صفحه یک بار می‌سازد)؛ [freightMinor] کرایهٔ رسید (PUR-06) */
+  suspend fun receive(
+    id: String,
+    receiptId: String,
+    lines: List<PoReceiptLineDto>,
+    allowOver: Boolean,
+    note: String,
+    freightMinor: Long = 0,
+  ): ApiResult<PoReceivedDto> =
     result {
       val body = buildJsonObject {
         put("id", receiptId)
         put("allowOver", allowOver)
         put("note", note)
+        //  کرایهٔ صفر فرستاده نمی‌شود ⇒ بدنهٔ رسیدِ بی کرایه همان پیشین
+        if (freightMinor > 0) put("freightMinor", freightMinor)
         put("lines", buildJsonArray {
           lines.forEach { l ->
             add(buildJsonObject {
