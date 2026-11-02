@@ -106,6 +106,9 @@ fun QuickSaleScreen(
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
   val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
+  //  PRM-13: امتیازِ وفاداری (قاعدهٔ در کار، پیش‌فرض خاموش ⇒ null و `loyal` همان `priced`)
+  val loyalty = ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill(d, priced, cartDebtorId)
+  val loyal = loyalty?.cart ?: priced
 
   var category by rememberSaveable { mutableStateOf<String?>(null) }
   var scanning by remember { mutableStateOf(false) }
@@ -353,13 +356,14 @@ fun QuickSaleScreen(
               //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش
               promo?.let { ir.vil3ntec.tohid.ui.components.pos.PromoLines(it.applied) }
               ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } // POS-11
+              ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(top = 6.dp)) // PRM-13
             }
           }
         }
 
         Box(Modifier.clickable { cartOpen = !cartOpen }) {
           CartBar(
-            total = SalesEngine.cartTotal(d, priced),
+            total = SalesEngine.cartTotal(d, loyal),
             debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
             debtorNote = cartDebtorId?.let { id -> debtStateText(d, id) },
             onPickDebtor = { pickDebtor = true },
@@ -457,9 +461,9 @@ fun QuickSaleScreen(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
-      d, priced, options.copy(note = cartStore.note.value),
+      d, loyal, options.copy(note = cartStore.note.value),
       today = todayIso(),
       now = System.currentTimeMillis(),
       newId = ::newId,
@@ -468,7 +472,7 @@ fun QuickSaleScreen(
       saleId = key,
       //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
-    ), promo) }) {
+    ), promo), loyalty, options.seller) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
@@ -493,8 +497,8 @@ fun QuickSaleScreen(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
-      cart = priced,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار و امتیاز (خاموش ⇒ همان سبد)؛ سنجشِ تخفیفِ ردیف بی امتیاز
+      cart = loyal, gateCart = priced, pointsOff = loyalty?.off ?: 0.0,
       promo = promo,
       presetDebtorId = cartDebtorId,
       onDismiss = { checkout = false },
@@ -506,7 +510,7 @@ fun QuickSaleScreen(
         //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید
         //  هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
         val sale = options.copy(creditGate = creditGateOn)
-        val over = SalesEngine.creditOver(d, priced, sale)
+        val over = SalesEngine.creditOver(d, loyal, sale)
         if (over != null) { creditAsk = sale to over; return@CheckoutDialog }
         postSale(sale)
       },

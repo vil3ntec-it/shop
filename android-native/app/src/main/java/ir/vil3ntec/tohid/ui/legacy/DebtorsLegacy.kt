@@ -925,7 +925,7 @@ private fun AccountViewLegacy(
 
       ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, account.debtor.id, onMessage) // فروشِ امانیِ همین مشتری (POS-27، `LayawayPref`)
       //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
-      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, account.debtor.id, Modifier.padding(top = 18.dp))
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, account.debtor.id, Modifier.padding(top = 18.dp), store, onMessage) // اصلاحِ دستی: صاحب/مدیر
 
       Spacer(Modifier.height(18.dp))
       SectionTitle("تاریخچهٔ تراکنش‌ها")

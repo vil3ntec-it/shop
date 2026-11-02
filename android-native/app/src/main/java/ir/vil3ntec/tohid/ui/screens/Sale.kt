@@ -130,6 +130,9 @@ fun SaleScreen(
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
   val pricedFrom = cart
+  //  PRM-13: امتیازِ وفاداری (قاعدهٔ در کار، پیش‌فرض خاموش ⇒ null و `loyal` همان `priced`)؛ سفارشِ ارسال و «چرا این قیمت؟» همان `priced`
+  val loyalty = ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill(d, priced, cartDebtorId)
+  val loyal = loyalty?.cart ?: priced
   //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
   val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
   var deliverOpen by remember { mutableStateOf(false) }
@@ -856,6 +859,7 @@ fun SaleScreen(
       item { ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) } // POS-18
       item { TillReceivePhone(d, store, cartDebtorId, ::toast) } // POS-39، پشتِ `TillReceivePref` (پیش‌فرض خاموش)
       item { ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } }
+      item { ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(bottom = 8.dp)) } // PRM-13
       item {
         Row(
           Modifier.fillMaxWidth(),
@@ -978,7 +982,7 @@ fun SaleScreen(
       modifier = Modifier.align(Alignment.BottomCenter),
     ) {
       CartBar(
-        total = SalesEngine.cartTotal(d, priced),
+        total = SalesEngine.cartTotal(d, loyal),
         debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
         debtorNote = cartDebtorId?.let { id -> debtStateText(d, id) },
         onPickDebtor = { pickDebtor = true },
@@ -992,7 +996,7 @@ fun SaleScreen(
       //  دکمهٔ برگشتِ گوشی: اول کادرِ اسکن، بعد خانه (سبدِ باز را خودِ قاب می‌بندد)
       BackHandler(onBack = { if (scanOpen) closeScanner() else goBack() })
       PhoneSaleFrame(
-        model = CartSummary.of(cart, d.products, SalesEngine.cartTotal(d, priced)),
+        model = CartSummary.of(cart, d.products, SalesEngine.cartTotal(d, loyal)),
         open = cartOpen,
         onOpen = { cartOpen = true },
         onClose = { cartOpen = false; expandedLine = null },
@@ -1080,7 +1084,8 @@ fun SaleScreen(
             }
           }
           Spacer(Modifier.height(16.dp))
-          PhoneCartTotal(SalesEngine.cartTotal(d, priced))
+          ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(top = 8.dp)) // PRM-13
+          PhoneCartTotal(SalesEngine.cartTotal(d, loyal))
           Spacer(Modifier.height(36.dp))
           PhoneCartPay("پرداخت", onClick = { checkout = true })
         },
@@ -1255,9 +1260,9 @@ fun SaleScreen(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
-      d, priced, options.copy(note = cartStore.note.value),
+      d, loyal, options.copy(note = cartStore.note.value),
       today = ir.vil3ntec.tohid.todayIso(),
       now = System.currentTimeMillis(),
       newId = ::newId,
@@ -1266,7 +1271,7 @@ fun SaleScreen(
       saleId = key,
       //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
-    ), promo) }) {
+    ), promo), loyalty, options.seller) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
@@ -1284,8 +1289,8 @@ fun SaleScreen(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
-      cart = priced,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار و امتیاز (خاموش ⇒ همان سبد)؛ سنجشِ تخفیفِ ردیف بی امتیاز
+      cart = loyal, gateCart = priced, pointsOff = loyalty?.off ?: 0.0,
       promo = promo,
       presetDebtorId = cartDebtorId,
       presetDiscount = extrasNow().discount, presetAmount = extrasNow().discountAmount,
@@ -1304,7 +1309,7 @@ fun SaleScreen(
         //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید
         //  هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
         val sale = options.copy(creditGate = creditGateOn)
-        val over = SalesEngine.creditOver(d, priced, sale)
+        val over = SalesEngine.creditOver(d, loyal, sale)
         if (over != null) { creditAsk = sale to over; return@CheckoutDialog }
         postSale(sale)
       },

@@ -198,6 +198,9 @@ class SettingsPortTest {
       "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",
       "LayawayPref.set" to "$PENDING — فروشِ امانی و قسطی، POS-27",
       "StorefrontEtaLive.set" to "$PENDING — زمانِ تقریبیِ تحویلِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.eta`)، WEB-04",
+      //  PRM-13 (تکمیل): انقضا و قاعدهٔ یکسانِ دکان در `LoyaltyShopSettings` ِ همان بخشِ امتیاز — صفحهٔ نسخهٔ ۳ ِ امتیاز با #797 می‌آید
+      "LoyaltyPref.setExpiry" to "$PENDING — انقضای امتیاز، PRM-13 (`LoyaltyShopSettings` در صفحهٔ امتیازِ نسخهٔ ۳ ِ #797 می‌نشیند)",
+      "LoyaltyShop.setRule" to "$PENDING — قاعدهٔ یکسانِ امتیازِ دکان (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.loyalty_rule`)، PRM-13",
     )
   }
 }

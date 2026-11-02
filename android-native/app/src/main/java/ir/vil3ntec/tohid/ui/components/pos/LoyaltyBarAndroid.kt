@@ -18,6 +18,8 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,11 +34,14 @@ import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.promo.Loyalty
 import ir.vil3ntec.tohid.data.LoyaltyPoints
 import ir.vil3ntec.tohid.data.LoyaltyPref
+import ir.vil3ntec.tohid.data.LoyaltyShop
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.ShopStore
+import kotlinx.coroutines.launch
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.normalizeDigits
@@ -45,9 +50,10 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  PRM-13 — امتیازِ وفاداری در صندوقِ گوشی و کامپیوتر (`SaleLegacy`، `DeskSale`)، پروندهٔ مشتری و تنظیمات. فقط با تنظیمِ
- *  همین دستگاه (`LoyaltyPref`، پیش‌فرض خاموش ⇒ [rememberLoyaltyTill] `null`، سبد و ثبت همان امروز). قاعده‌ها در هستهٔ
- *  `core/promo/Loyalty` و `data/LoyaltyPoints`؛ این‌جا فقط نمایش و انتخابِ «چند امتیاز».
+ *  PRM-13 — امتیازِ وفاداری در صندوقِ گوشی و کامپیوتر (`SaleLegacy`، `Sale`، `QuickSale`، `DeskSale`)، پروندهٔ مشتری
+ *  (با اصلاحِ دستیِ صاحب/مدیر) و تنظیمات. فقط با قاعدهٔ در کار (`LoyaltyPref.effective`: قاعدهٔ یکسانِ دکان یا همین
+ *  دستگاه؛ پیش‌فرض خاموش ⇒ [rememberLoyaltyTill] `null`، سبد و ثبت همان امروز). قاعده‌ها در هستهٔ `core/promo/Loyalty`
+ *  و `data/LoyaltyPoints`؛ این‌جا فقط نمایش و انتخابِ «چند امتیاز».
  */
 class LoyaltyTill(
   val view: LoyaltyPoints.View,
@@ -70,21 +76,27 @@ class LoyaltyTill(
 @Composable
 fun rememberLoyaltyTill(d: ShopData, priced: List<SalesEngine.CartLine>, debtorId: String?): LoyaltyTill? {
   val context = LocalContext.current
-  val on = remember { LoyaltyPref.on(context) }
-  if (!on || debtorId == null) return null
-  val rule = remember { LoyaltyPref.rule(context) }
+  //  قاعدهٔ یکسانِ دکان (پرچمِ خاموش ⇒ هیچ درخواستی جز همین پرسش، حداکثر هر ۱۰ دقیقه)
+  LaunchedEffect(Unit) { LoyaltyShop.kick(context) }
+  val cfg = remember(d) { LoyaltyPref.effective(context) }
+  if (!cfg.on || debtorId == null) return null
+  val rule = cfg.rule
   var points by remember(debtorId) { mutableStateOf(0L) }
-  val view = remember(d, debtorId) { LoyaltyPoints.view(d, rule, debtorId, System.currentTimeMillis()) }
-  val cap = remember(d, priced, debtorId) { LoyaltyPoints.capFor(d, priced, rule, debtorId) }
+  val now = remember(d, debtorId) { System.currentTimeMillis() }
+  val view = remember(d, debtorId, rule) { LoyaltyPoints.view(d, rule, debtorId, now) }
+  val cap = remember(d, priced, debtorId, rule) { LoyaltyPoints.capFor(d, priced, rule, debtorId, now) }
   val use = points.coerceIn(0, cap)
-  val applied = remember(d, priced, debtorId, use) { if (use > 0) LoyaltyPoints.apply(d, priced, rule, debtorId, use) else null }
+  val applied = remember(d, priced, debtorId, use, rule) { if (use > 0) LoyaltyPoints.apply(d, priced, rule, debtorId, use, now) else null }
   return LoyaltyTill(view, rule, cap, if (applied == null) 0 else use, applied) { points = it }
 }
 
 object LoyaltyAtTill {
   /** ثبتِ صندوق: مصرف و کسبِ همین فاکتور در همان دفتر (`LoyaltyPoints.post`)؛ خاموش ⇒ همان نتیجه */
-  fun post(context: android.content.Context, r: SalesEngine.Result, till: LoyaltyTill?, by: String?): SalesEngine.Result =
-    LoyaltyPoints.post(r, LoyaltyPref.on(context), till?.rule ?: LoyaltyPref.rule(context), till?.plan, by)
+  fun post(context: android.content.Context, r: SalesEngine.Result, till: LoyaltyTill?, by: String?): SalesEngine.Result {
+    if (r !is SalesEngine.Result.Ok) return r
+    val cfg = LoyaltyPref.effective(context)
+    return LoyaltyPoints.post(r, cfg.on, till?.rule ?: cfg.rule, till?.plan, by)
+  }
 
   /**
    *  ردیف‌های خلاصهٔ پرداخت با امتیاز: «جمع» پیش از امتیاز و یک ردیفِ منفیِ «مصرفِ امتیاز». بی مصرف ⇒ همان [rows].
@@ -112,6 +124,7 @@ fun LoyaltyBar(till: LoyaltyTill?, modifier: Modifier = Modifier) {
       style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted,
     )
     if (v.balance < 0) Text(StrLoyalty.negative, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
+    soonText(v.soon, v.soonAt)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning) }
     Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       if (till.points > 0) {
         Text(StrLoyalty.using(till.points, money(till.off)), style = MaterialTheme.typography.bodySmall, color = Shop.colors.success, modifier = Modifier.weight(1f))
@@ -142,22 +155,43 @@ fun LoyaltyBar(till: LoyaltyTill?, modifier: Modifier = Modifier) {
   }
 }
 
-/** پروندهٔ مشتری: مانده و سابقهٔ امتیاز. خاموش و بی ردیف ⇒ هیچ */
+/** «۱۲۰ امتیاز تا … می‌سوزد» — بی انقضا یا چیزی نزدیک ⇒ `null` */
+internal fun soonText(soon: Long, at: Long?): String? =
+  if (soon > 0 && at != null) StrLoyalty.soon(soon, formatDate(isoDay(at))) else null
+
+/** روزِ تقویمیِ دستگاه برای لحظهٔ [at] (`YYYY-MM-DD`) */
+private fun isoDay(at: Long): String {
+  val c = java.util.Calendar.getInstance().apply { timeInMillis = at }
+  return "${c.get(java.util.Calendar.YEAR)}-" + (c.get(java.util.Calendar.MONTH) + 1).toString().padStart(2, '0') + "-" +
+    c.get(java.util.Calendar.DAY_OF_MONTH).toString().padStart(2, '0')
+}
+
+/**
+ *  پروندهٔ مشتری: مانده (با انقضا)، سابقهٔ امتیاز و «اصلاحِ امتیاز» (فقط صاحب/مدیر، با [store]؛ دلیل لازم، فقط‌افزودنی،
+ *  هرگز زیرِ صفر — `LoyaltyPoints.adjust`). خاموش و بی ردیف ⇒ هیچ.
+ */
 @Composable
-fun LoyaltyHistory(d: ShopData, debtorId: String, modifier: Modifier = Modifier) {
+fun LoyaltyHistory(d: ShopData, debtorId: String, modifier: Modifier = Modifier, store: ShopStore? = null, toast: (String) -> Unit = {}) {
   val context = LocalContext.current
-  val on = remember { LoyaltyPref.on(context) }
+  val cfg = remember(d) { LoyaltyPref.effective(context) }
   val rows = remember(d, debtorId) { LoyaltyPoints.history(d, debtorId) }
-  if (!on && rows.isEmpty()) return
-  val balance = remember(d, debtorId) { LoyaltyPoints.balance(d, debtorId) }
+  if (!cfg.on && rows.isEmpty()) return
+  val now = remember(d, debtorId) { System.currentTimeMillis() }
+  val view = remember(d, debtorId, cfg) { LoyaltyPoints.view(d, cfg.rule, debtorId, now) }
+  val may = remember { !ShopRole.isStaff(context) }
+  var adjusting by remember(debtorId) { mutableStateOf(false) }
   Column(modifier.fillMaxWidth()) {
-    Text(StrLoyalty.historyTitle(balance), style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+      Text(StrLoyalty.historyTitle(view.balance), style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
+      if (store != null && may) TextButton(onClick = { adjusting = true }) { Text(StrLoyalty.adjust) }
+    }
+    soonText(view.soon, view.soonAt)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning) }
     if (rows.isEmpty()) Text(StrLoyalty.empty, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     rows.take(HISTORY_SHOWN).forEachIndexed { i, r ->
       if (i > 0) HorizontalDivider(color = Shop.colors.border)
       Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-          Text(LoyaltyPoints.kindText(r.kind) + " — " + StrLoyalty.invoice(r.invoice), style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          Text(LoyaltyPoints.rowText(r), style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
           Text(formatDate(r.date), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         }
         Text(
@@ -168,6 +202,66 @@ fun LoyaltyHistory(d: ShopData, debtorId: String, modifier: Modifier = Modifier)
       }
     }
   }
+  if (adjusting && store != null) LoyaltyAdjustDialog(store, debtorId, cfg.rule, may, toast) { adjusting = false }
+}
+
+/** «اصلاحِ امتیاز»: افزودن/کم‌کردن با دلیل؛ یک شناسهٔ کار برای هر بازشدن (دو ضربه ⇒ یک ردیف) */
+@Composable
+private fun LoyaltyAdjustDialog(store: ShopStore, debtorId: String, rule: Loyalty.Rule, may: Boolean, toast: (String) -> Unit, onClose: () -> Unit) {
+  val context = LocalContext.current
+  val scope = rememberCoroutineScope()
+  val opId = remember { ir.vil3ntec.tohid.sync.v1.Ulid.next() }
+  var add by remember { mutableStateOf(true) }
+  var text by remember { mutableStateOf("") }
+  var reason by remember { mutableStateOf("") }
+  var error by remember { mutableStateOf<String?>(null) }
+  var busy by remember { mutableStateOf(false) }
+  val n = normalizeDigits(text).trim().toLongOrNull()
+  val ok = n != null && n in 1..Loyalty.MAX_POINTS && reason.isNotBlank() && !busy
+  AlertDialog(
+    onDismissRequest = onClose,
+    title = { Text(StrLoyalty.adjust) },
+    text = {
+      Column {
+        SegmentedChoice(
+          options = listOf("add" to StrLoyalty.adjustAdd, "remove" to StrLoyalty.adjustRemove),
+          selected = if (add) "add" else "remove",
+          onSelect = { add = it == "add" },
+        )
+        OutlinedTextField(
+          value = text, onValueChange = { text = it.filter { c -> c.isDigit() }.take(10) },
+          label = { Text(StrLoyalty.adjustPoints) }, singleLine = true,
+          keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        )
+        OutlinedTextField(
+          value = reason, onValueChange = { reason = it.take(LoyaltyPoints.REASON_MAX) },
+          label = { Text(StrLoyalty.adjustReason) }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        )
+        error?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning) }
+      }
+    },
+    confirmButton = {
+      TextButton(enabled = ok, onClick = {
+        val delta = if (add) n!! else -n!!
+        busy = true
+        scope.launch {
+          var out: LoyaltyPoints.Adjusted? = null
+          val by = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
+          val wrote = store.update { cur ->
+            LoyaltyPoints.adjust(cur, debtorId, delta, reason, opId, rule, may, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), by)
+              .also { out = it }.let { a -> (a as? LoyaltyPoints.Adjusted.Ok)?.takeIf { !it.again }?.data }
+          }
+          busy = false
+          when (val a = out) {
+            is LoyaltyPoints.Adjusted.Bad -> error = a.message
+            is LoyaltyPoints.Adjusted.Ok -> if (wrote == false) error = StrLoyalty.errChanged else { toast(StrLoyalty.adjustDone); onClose() }
+            null -> error = StrLoyalty.errChanged
+          }
+        }
+      }) { Text(StrLoyalty.apply) }
+    },
+    dismissButton = { TextButton(onClick = onClose) { Text(StrLoyalty.cancel) } },
+  )
 }
 
 private const val HISTORY_SHOWN = 30
@@ -215,6 +309,7 @@ fun LoyaltySettingsWired(context: android.content.Context) {
       note = if (LoyaltyPref.setRule(context, r)) StrLoyalty.saved else StrLoyalty.badRule
     }, modifier = Modifier.padding(top = 8.dp)) { Text(StrLoyalty.save) }
     note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
+    LoyaltyShopSettings(context) // انقضا و قاعدهٔ یکسانِ دکان (پرچمِ خاموشِ `shop.loyalty_rule` ⇒ فقط انقضای همین دستگاه)
   }
 }
 
