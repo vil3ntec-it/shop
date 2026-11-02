@@ -26,6 +26,8 @@ import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.ShrinkLoss
 import ir.vil3ntec.tohid.data.ShrinkReportPref
+import ir.vil3ntec.tohid.data.SimpleAskPref
+import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
 import ir.vil3ntec.tohid.data.Xlsx
 import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.formatDate
@@ -56,6 +58,8 @@ private enum class Rep(
   val key: String, val label: String, val ranged: Boolean, val crm: Boolean = false,
   val gaps: Boolean = false, val shrink: Boolean = false, val insight: Boolean = false, val levels: Boolean = false,
   val text: (() -> String)? = null,
+  /** `ask`: «پرسشِ ساده» (RPT-16) — فقط وقتی `SimpleAskPref` روشن است (پیش‌فرض خاموش)؛ جای جدول پانلِ پرسش می‌نشیند */
+  val ask: Boolean = false,
 ) {
   SALES("sales", "فروش", true),
   PROFIT("profit", "سود و زیان", true),
@@ -69,6 +73,7 @@ private enum class Rep(
   //  بازه = دورهٔ فروشِ ABC؛ ارزش و سودِ بالقوه همیشه موجودیِ همین حالاست
   INSIGHT("insight", "تحلیلِ موجودی", true, insight = true),
   REORDER("reorder", "نیاز به سفارش", false, levels = true),
+  ASK("ask", "", false, ask = true, text = { StrSimpleAsk.tab }),
   AGING("aging", "سنِ بدهی", false, crm = true),
   RFM("rfm", "تحلیلِ خریدِ مشتریان", false, crm = true),
   DUPLICATES("duplicates", "مشتریانِ تکراری", false, crm = true),
@@ -99,8 +104,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val shrink = remember { ShrinkReportPref.on(context) && ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   val insight = remember { ShopPolicy.stockInsight(context) }
   val levels = remember { ShopPolicy.stockLevels(context) }
-  val reps = remember(crm, gaps, shrink, insight, levels) {
-    Rep.values().filter { (crm || !it.crm) && (gaps || !it.gaps) && (shrink || !it.shrink) && (insight || !it.insight) && (levels || !it.levels) }
+  val ask = remember { SimpleAskPref.on(context) }
+  val reps = remember(crm, gaps, shrink, insight, levels, ask) {
+    Rep.values().filter { (crm || !it.crm) && (gaps || !it.gaps) && (shrink || !it.shrink) && (insight || !it.insight) && (levels || !it.levels) && (ask || !it.ask) }
   }
   var rep by remember { mutableStateOf(Rep.SALES) }
   var span by remember { mutableStateOf(Span.MONTH) }
@@ -125,8 +131,9 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
   val reminderTemplate = remember { ir.vil3ntec.tohid.data.DebtReminderPref.template(context) }
   val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate) }
 
-  fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name)
-  fun excel() { Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { toast("ذخیره شد: $it") } }
+  //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند (نه برگهٔ «گردشِ موجودی» ِ کلیدِ ناشناخته)
+  fun print() { if (rep != Rep.ASK) ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name) }
+  fun excel() { if (rep == Rep.ASK) return; Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { toast("ذخیره شد: $it") } }
 
   Column(
     Modifier
@@ -156,6 +163,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
       reps.forEach { r -> Tab(selected = rep == r, onClick = { rep = r }, text = { Text(r.title) }) }
     }
     Spacer(Modifier.height(10.dp))
+    if (rep == Rep.ASK) { DeskSimpleAsk(d, ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context), Modifier.weight(1f)); return@Column }
 
     //  بازه
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -239,6 +247,7 @@ fun DeskReportsScreen(d: ShopData, snackbar: SnackbarHostState) {
           DeskKpi("زیرِ حد کم بودن", "${due.count { it.state == ir.vil3ntec.tohid.core.stock.StockLevelRules.State.BELOW_MIN }}", Shop.colors.warning, Modifier.weight(1f))
           DeskKpi("بی بیشینه (بی پیشنهاد)", "${due.count { it.suggest == null }}", Shop.colors.muted, Modifier.weight(1f))
         }
+        Rep.ASK -> Unit // بالا جای همهٔ این‌ها پانلِ پرسش نشسته است
         Rep.DEBTORS -> {
           val total = remember(d) { d.debtors.sumOf { ShopStore.debt(d, it.id).coerceAtLeast(0.0) } }
           DeskKpi("طلبِ کل", "${money(total)} ؋", Shop.colors.danger, Modifier.weight(1f))
