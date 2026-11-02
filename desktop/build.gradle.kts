@@ -98,6 +98,9 @@ val replaced = listOf(
   "data/FileName.kt",
   //  HW-13: اجازهٔ «شبکهٔ محلی» ِ اندروید ۱۷ — کامپیوتر ندارد (‎hw/LocalNetworkDesk.kt‎)
   "hw/LocalNetworkAndroid.kt",
+  //  HW-12: کارتِ شبکهٔ فعال و جست‌وجوی بلوتوثِ اندروید (ConnectivityManager، BroadcastReceiver) — کامپیوتر:
+  //  ‎hw/PrinterFinderDesktop.kt‎ (NetworkInterface، بی جست‌وجوی بلوتوث)
+  "hw/PrinterFinderAndroid.kt",
   //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
   //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
   "pay/platform/PayDevice.kt",
