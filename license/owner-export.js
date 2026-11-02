@@ -161,6 +161,7 @@
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',
     changeMinor: 'پول پس (پول)',
+    roundingMinor: 'گردکردن نقدی (پول)', // PAY-09 — همتای OwnerExport.kt
     //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (همتای OwnerExport.kt)
     receiptToken: 'توکنِ QRِ فاکتور',
     by: 'کاربر',

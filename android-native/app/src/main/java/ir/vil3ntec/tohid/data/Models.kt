@@ -273,6 +273,14 @@ data class Sale(
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val changeMinor: Long? = null,
   /**
+   *  PAY-09 — ردیفِ جدای «گردکردنِ نقدی» (نوعِ `rounding`، `core/pay/TillRounding`)، به پول و علامت‌دار؛ فقط فروشی
+   *  که نقد بستش و پلهٔ صندوق (`CashRoundPref`) روشن بود. `finalTotal` = `total − discount` + همین؛ پس پرداختی،
+   *  صندوق، گزارش و زنجیره همان مبلغِ گرفته‌شده را می‌بینند و قیمت/تخفیف دست نمی‌خورند. ⛔ `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val roundingMinor: Long? = null,
+  /**
    *  کانالِ فروش (ORD-20): `online` برای فاکتورِ سریِ `W` که سرور هنگامِ
    *  تحویلِ سفارشِ اینترنتی در دفترِ دکان می‌گذارد؛ فاکتورِ صندوق `null`
    *  است (گزارش آن را «حضوری» می‌خواند — `ReportLedger`). مثلِ `series`

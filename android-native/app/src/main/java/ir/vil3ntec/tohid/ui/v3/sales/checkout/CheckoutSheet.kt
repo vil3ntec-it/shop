@@ -201,7 +201,7 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
 @Composable
 private fun Hero(v: CheckoutView) {
   val c = PhoneV3.colors
-  val shown = rememberCountUp(v.numbers.finalTotal)
+  val shown = rememberCountUp(v.numbers.payable) // PAY-09: با ردیفِ گرد، همان مبلغِ ثبت
   Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
     Text(StrSale.finalAmount, style = V3Type.subhead, color = c.inkMuted)
     Text(

@@ -265,6 +265,7 @@ private fun salesSection(
     Panel {
       ReportRow("جمع اقلام", r.gross)
       ReportRow("تخفیف", r.discount, negative = true)
+      if (r.rounding != 0.0) ReportRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(r.rounding), negative = r.rounding < 0) // PAY-09
       ReportRow("فروش خالص", r.net, strong = true)
       HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.border)
       ReportRow("بهای تمام‌شدهٔ کالا", r.cogs, negative = true)

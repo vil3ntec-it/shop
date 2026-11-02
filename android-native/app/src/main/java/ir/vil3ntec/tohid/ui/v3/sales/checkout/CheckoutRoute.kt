@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.data.CashRoundPref
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.GiftCardPref
 import ir.vil3ntec.tohid.data.HeldRules
@@ -85,10 +86,13 @@ fun RouteScope.CheckoutRoute() {
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
     val giftOn = remember { GiftCardPref.on(context) }
     if (CheckoutSession.pay.stored != giftOn) CheckoutSession.pay.stored = giftOn
+    //  PAY-09: پلهٔ گردکردنِ نقدیِ همین دستگاه (`CashRoundPref`، پیش‌فرض خاموش) — پنلِ ترکیبی یا نقدِ کاملِ ساده
+    val cashStep = remember { CashRoundPref.step(context) }
+    if (CheckoutSession.pay.cashRounding != cashStep) CheckoutSession.pay.cashRounding = cashStep
     //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
     val saleKey = remember(lines) { cart.saleKey() }
-    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller)
+    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep)
     val n = CheckoutModel.numbers(data, priced, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)

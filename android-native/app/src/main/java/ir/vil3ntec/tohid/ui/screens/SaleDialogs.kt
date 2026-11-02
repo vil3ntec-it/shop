@@ -109,6 +109,7 @@ fun CheckoutDialog(
     rules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }, // POS-24، پیش‌فرض خاموش
     //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
     seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") },
+    cashRounding = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) }, // PAY-09، پیش‌فرض خاموش
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 
@@ -123,15 +124,18 @@ fun CheckoutDialog(
   )
   val gate = DiscountGate.state(decision.decision, saleKey, basis.discount, basis.subtotal, approval)
 
-  // در فروشِ نقدی مبلغِ پرداختی همیشه کلِ مبلغِ نهایی است
-  val paid = if (payment == SalesEngine.Payment.CASH) totals.finalTotal
-  else minOf(parseNumber(paidText)?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
-  val remaining = (totals.finalTotal - paid).coerceAtLeast(0.0)
-  val discountBad = canDiscount && numberInvalid(discountText)
-  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ خاموش ⇒ همان نقد/نسیهٔ امروز
+  //  PAY-09: نقدِ کاملِ پرداختِ ساده ⇒ ردیفِ گرد (همان حسابِ `SalesEngine.record`)؛ ترکیبی گردِ خودش را دارد
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
-  //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه در روش‌ها فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
-  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context) } }
+  val rounding = if (!payV2 && payment == SalesEngine.Payment.CASH) ir.vil3ntec.tohid.data.PayFlow.cashRounding(totals.finalTotal, checkout.cashRounding) else 0.0
+  val due = totals.finalTotal + rounding
+  // در فروشِ نقدی مبلغِ پرداختی همیشه کلِ مبلغِ نهایی است
+  val paid = if (payment == SalesEngine.Payment.CASH) due
+  else minOf(parseNumber(paidText)?.coerceAtLeast(0.0) ?: 0.0, totals.finalTotal)
+  val remaining = (due - paid).coerceAtLeast(0.0)
+  val discountBad = canDiscount && numberInvalid(discountText)
+  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم (`payV2` بالا)؛ خاموش ⇒ همان نقد/نسیهٔ امروز
+  //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه در روش‌ها فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)؛ PAY-09: پلهٔ گرد
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context); it.cashRounding = checkout.cashRounding } }
   val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
   var payError by remember { mutableStateOf<String?>(null) }
   val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
@@ -315,8 +319,9 @@ fun CheckoutDialog(
           } else MoneyRow("جمع اقلام", totals.subtotal + pointsOff)
           if (pointsOff > 0) MoneyRow(ir.vil3ntec.tohid.core.i18n.StrLoyalty.use, pointsOff, negative = true) // PRM-13
           MoneyRow("تخفیف", totals.discount)
+          if (rounding != 0.0) MoneyRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(rounding), negative = rounding < 0) // PAY-09
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
-          MoneyRow("مبلغ نهایی", totals.finalTotal, strong = true)
+          MoneyRow("مبلغ نهایی", due, strong = true)
           if (!payV2) {
           MoneyRow("مبلغ پرداختی", paid)
           MoneyRow("باقی‌مانده", remaining, tint = if (remaining > 0) Shop.colors.warning else null)
@@ -470,6 +475,7 @@ fun InvoiceDialog(
         MoneyRow("جمع اقلام", sale.total)
         SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { MoneyRow(it.label, it.amount) }
         MoneyRow("تخفیف", sale.discount)
+        ir.vil3ntec.tohid.data.PayFlow.rounding(sale)?.let { MoneyRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(it), negative = it < 0) } // PAY-09
         MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
         MoneyRow("پرداختی", sale.paidAmount)
         MoneyRow("باقی‌مانده", sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)

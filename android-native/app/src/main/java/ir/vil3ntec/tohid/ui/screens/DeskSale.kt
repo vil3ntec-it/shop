@@ -175,6 +175,7 @@ fun DeskSaleScreen(
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
   //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
   val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
+  val cashStep = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) } // PAY-09: گردکردنِ نقدی، پیش‌فرض خاموش
   //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض خاموش): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
   var priceCheck by remember { mutableStateOf(false) }
@@ -365,8 +366,11 @@ fun DeskSaleScreen(
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
     rules = checkoutRules,
+    cashRounding = cashStep,
   )
   val totals = SalesEngine.totals(d, loyal, checkout)
+  //  PAY-09: نقدِ کاملِ پرداختِ ساده ⇒ ردیفِ گرد و «قابلِ پرداخت» با آن (همان حسابِ `SalesEngine.record`)
+  val rounding = if (!payV2 && payment == SalesEngine.Payment.CASH) ir.vil3ntec.tohid.data.PayFlow.cashRounding(totals.finalTotal, cashStep) else 0.0
   //  POS-12: کادرهایی که `checkout` از آن‌ها ساخته شد (جابه‌جایی همین حالا عوضشان کرده باشد ⇒ ثبت نه)
   val inputsFrom = listOf<Any?>(discountText, discountAmount, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
@@ -416,7 +420,10 @@ fun DeskSaleScreen(
     //  PAY-21: تسویهٔ آمادهٔ حساب‌پی با پرچم و بی آن پذیرفته است
     val st = settled ?: if (!payV2) null else when (
       val r = ir.vil3ntec.tohid.data.PayFlow.checkout(
-        ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = totals.finalTotal.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId),
+        //  PAY-09: «نقدِ دقیق» با گرد — همان مبلغی که مشتری می‌دهد
+        (totals.finalTotal + ir.vil3ntec.tohid.data.PayFlow.cashRounding(totals.finalTotal, cashStep)).let { exact ->
+          ir.vil3ntec.tohid.data.PayFlow.Draft(totals.finalTotal, cash = exact.toBigDecimal().stripTrailingZeros().toPlainString(), customerId = cartDebtorId, cashRounding = cashStep)
+        },
       )
     ) {
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
@@ -676,7 +683,8 @@ fun DeskSaleScreen(
         )
       },
       summary = {
-        PaymentSummary(ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.rows(PromoSummary.rows(totals, promo), promo, loyalty), totals.finalTotal) {
+        PaymentSummary(ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.rows(PromoSummary.rows(totals, promo), promo, loyalty) +
+          listOfNotNull(rounding.takeIf { it != 0.0 }?.let { ir.vil3ntec.tohid.ui.components.pos.PosSummaryRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(it), negative = it < 0) }), totals.finalTotal + rounding) {
           if (canDiscount) {
             //  POS-20: درصد یا مبلغ — عددِ نوشته‌شده می‌ماند و فقط واحدش عوض می‌شود (همان پنجرهٔ تسویهٔ گوشی)؛
             //  ردیفِ «تخفیف» ِ بالای کادر همان دم مبلغِ کم‌شده را نشان می‌دهد
@@ -959,6 +967,7 @@ fun DeskSaleScreen(
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
+      cashRounding = cashStep, // PAY-09
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(
