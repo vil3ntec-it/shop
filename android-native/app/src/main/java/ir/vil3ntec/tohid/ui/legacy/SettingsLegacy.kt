@@ -540,6 +540,8 @@ fun SettingsScreenLegacy(
       }
     }
     item { ir.vil3ntec.tohid.ui.screens.SafeBookSettingsWired(context) } // گاوصندوق (PAY-18)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.SmartForecastSettingsWired(context) } // پیش‌بینیِ تقاضا (AI-07)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.AnomalySettingsWired(context) } // تشخیصِ ناهنجاری (AI-08)، پیش‌فرض خاموش
     /* ============== سقفِ اعتبار در صندوق (CRM-03، S07، پیش‌فرض خاموش) ============== */
     item {
       var creditGate by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context)) }

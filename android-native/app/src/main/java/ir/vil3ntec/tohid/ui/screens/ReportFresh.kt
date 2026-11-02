@@ -33,7 +33,10 @@ import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportTables
+import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.risk.Anomalies
 import ir.vil3ntec.tohid.core.risk.CashierAlerts
+import ir.vil3ntec.tohid.data.AnomalyBook
 import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
@@ -352,6 +355,11 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     "fraud" -> view.fraud?.let { f ->
       val p = if (f.from == f.to) formatDate(f.from) else if (f.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(f.from)} تا ${formatDate(f.to)}"
       val alerts = remember(f) { ReportBoard.alertsOf(f) }
+      //  AI-08: تنظیمِ خاموشِ «تشخیصِ ناهنجاری» (`AnomalyPref`) ⇒ `null` و همان کادرِ RSK-10
+      val anomalyOn = rememberAnomalyOn()
+      val findings = remember(d, f, alerts, anomalyOn) {
+        AnomalyBook.view(anomalyOn, d, f.from, f.to, alerts, ReportBridge.offsetMinutes(), ir.vil3ntec.tohid.todayIso())
+      }
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
@@ -360,7 +368,7 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
           card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
           card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
         }
-        if (alerts.isNotEmpty()) CashierAlertBox(alerts)
+        if (findings != null) AnomalyBox(findings) else if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
     }
   }
@@ -389,6 +397,41 @@ private fun CashierAlertBox(alerts: List<CashierAlerts.Alert>) {
         style = MaterialTheme.typography.bodyMedium,
       )
     }
+  }
+}
+
+/** AI-08 — یافته‌های تشخیصِ ناهنجاری (`core/risk/Anomalies`، هشدارهای RSK-10 هم در همین فهرست): فقط «نیازمندِ بررسی» */
+@Composable
+private fun AnomalyBox(findings: List<Anomalies.Finding>) {
+  val shown = 40
+  fun tone(s: Anomalies.Severity) = when (s) {
+    Anomalies.Severity.HIGH -> PillTone.DANGER
+    Anomalies.Severity.MEDIUM -> PillTone.WARNING
+    Anomalies.Severity.LOW -> PillTone.INFO
+  }
+  Column(
+    Modifier.fillMaxWidth().clip(Shape.card).border(1.dp, if (findings.isEmpty()) Shop.colors.border else Shop.colors.warning, Shape.card).padding(12.dp),
+    verticalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      StatusPill(if (findings.isEmpty()) "موردی نیازمندِ بررسی نیست" else "${findings.size} مورد نیازمندِ بررسی", if (findings.isEmpty()) PillTone.SUCCESS else PillTone.WARNING)
+      Spacer(Modifier.width(8.dp))
+      Text(
+        "تشخیصِ ناهنجاری (قاعده و آمار، روی دفترِ همین دستگاه): صندوقدار، اختلافِ صندوق، کمِ موجودی، زیرِ بها، ساعت و روزهای بیرون از معمول. فقط نشان می‌دهد.",
+        style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+      )
+    }
+    findings.take(shown).forEach { x ->
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        StatusPill(Anomalies.severityText(x.severity), tone(x.severity))
+        Spacer(Modifier.width(8.dp))
+        Text(
+          (x.dayJdn?.let { formatDate(CivilDays.isoOf(it)) + " · " } ?: "") + x.reason,
+          style = MaterialTheme.typography.bodyMedium,
+        )
+      }
+    }
+    if (findings.size > shown) Text("و ${findings.size - shown} موردِ دیگر", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
 

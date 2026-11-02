@@ -156,6 +156,7 @@ class SettingsPortTest {
      *  از این‌جا برداشته شود («استثنای کهنه» قرمز است). بخشِ تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود.
      */
     val EXCEPTIONS: Map<String, String> = mapOf(
+      "AnomalyPref.set" to "$PENDING — تشخیصِ ناهنجاری، AI-08 (کادرش در «ضدتقلب» ِ گزارشِ تازهٔ رابطِ امروز است)",
       "AutoFeesPref.set" to "$PENDING — هزینهٔ خودکارِ فاکتور، POS-36",
       "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
       "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
@@ -179,6 +180,7 @@ class SettingsPortTest {
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
+      "SmartForecastPref.set" to "$PENDING — پیش‌بینیِ تقاضای قابلِ توضیح، AI-07 (صفحه‌اش «پیشنهادِ سفارش» ِ رابطِ امروز است)",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
     )
   }

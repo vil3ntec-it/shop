@@ -837,6 +837,9 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale, ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle to androidx.compose.material.icons.Icons.Filled.AccountBalance, // PAY-18
                 StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                //  پیش‌بینیِ تقاضا (AI-07) و تشخیصِ ناهنجاری (AI-08) — هر دو پیش‌فرض خاموش
+                ir.vil3ntec.tohid.ui.screens.SMART_FORECAST_TITLE to androidx.compose.material.icons.Icons.Filled.TrendingUp,
+                ir.vil3ntec.tohid.ui.screens.ANOMALY_TITLE to androidx.compose.material.icons.Icons.Filled.Warning,
                 StrShell.crmReports to androidx.compose.material.icons.Icons.Filled.TableChart,
                 //  صندوق: قیمت و تخفیفِ ردیف، جست‌وجوی مقاوم، قیمت‌پرسی، حالتِ لمسی، کلیدهای بیشتر، دریافت از مشتری (POS-04/08/15/31/39/41)
                 ir.vil3ntec.tohid.core.i18n.StrLine.section to androidx.compose.material.icons.Icons.Filled.LocalOffer,
