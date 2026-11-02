@@ -169,7 +169,8 @@ object StrDevices {
     "Make a new card? Cards printed before will stop working.",
     "نوی کارت جوړ شي؟ پخواني چاپ شوي کارتونه نور کار نه کوي.",
   )
-  fun cardNumber(n: Any): String = t("کارتِ شمارهٔ ${asIs(n)}", "Card no. $n", "کارت شمېره $n")
+  //  نسخهٔ کارتِ فرمان، نه کارتِ بانکی (نگهبانِ S117 در card-data.test.js)
+  fun cardEdition(n: Any): String = t("کارتِ فرمان، نسخهٔ ${asIs(n)}", "Command card, edition $n", "د امر کارت، $n نسخه")
   val cardNoPrinter: String get() = t(
     "چاپگرِ رسید ثبت نشده — کارت را از روی صفحه اسکن کنید یا چاپگر بیفزایید",
     "No receipt printer is set — scan the card from the screen or add a printer",

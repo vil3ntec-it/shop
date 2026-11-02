@@ -61,7 +61,7 @@ fun CommandCardBody(colors: HubColors, toast: (String) -> Unit) {
     }
     key?.let { k ->
       Spacer(Modifier.height(6.dp))
-      Text(StrDevices.cardNumber(k.gen), color = colors.text, style = MaterialTheme.typography.labelMedium)
+      Text(StrDevices.cardEdition(k.gen), color = colors.text, style = MaterialTheme.typography.labelMedium)
       CommandCardPrint.ORDER.forEach { c ->
         val bitmap = remember(k, c) {
           runCatching { ThermalPrinter.toBitmap(ScannerSheetPrint.barcode(CommandCardPrint.modules(c, k), ThermalPrinter.WIDTH_58MM, 90)) }.getOrNull()

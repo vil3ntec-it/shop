@@ -31,7 +31,7 @@ object CommandCardPrint {
   fun image(context: Context, key: CommandCard.Key, paperDots: Int): MonoImage {
     val w = paperDots
     val parts = ArrayList<MonoImage>()
-    parts += HwPages.text(context, w, listOf(HwPages.Line(StrDevices.cardTitle, HwPages.Style.TITLE), HwPages.Line(StrDevices.cardNumber(key.gen), HwPages.Style.SMALL)))
+    parts += HwPages.text(context, w, listOf(HwPages.Line(StrDevices.cardTitle, HwPages.Style.TITLE), HwPages.Line(StrDevices.cardEdition(key.gen), HwPages.Style.SMALL)))
     ORDER.forEach { c ->
       parts += HwPages.text(context, w, listOf(HwPages.Line(label(c), HwPages.Style.HEAD)))
       parts += ScannerSheetPrint.barcode(modules(c, key), w, 100)
