@@ -173,6 +173,10 @@
     payRef: 'مرجع روش تازه',
     //  سفارشِ ویژه (POS-26) — همان `OwnerExport.kt`
     specialOrder: 'سفارش ویژه',
+    //  فروشِ امانی (POS-27) — همان `OwnerExport.kt`
+    layaway: 'فروش امانی',
+    //  امتیازِ وفاداری (PRM-13) — همان `OwnerExport.kt`
+    points: 'امتیاز',
     promoDiscountMinor: 'تخفیف خودکار (یک‌صدم افغانی)',
     coupons: 'کدهای تخفیف',
     quantity: 'تعداد',

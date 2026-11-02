@@ -201,6 +201,10 @@ object Receipt {
     row(StrSale.remaining, afn(sale.remaining), body)
     //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
     ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> row(label, afn(amount), body) }
+    //  PRM-13: امتیازِ مصرف‌شده و کسب‌شده — فاکتورِ بی امتیاز ⇒ همان چیدمان
+    ir.vil3ntec.tohid.data.LoyaltyPoints.receiptLines(d, sale.id).forEach { (label, amount) ->
+      if (amount != null) row(label, afn(amount), body) else line(LocaleText.digitsIn(label, digits), small)
+    }
     if (debtor != null) row(Str.debtor, debtor.name, body)
     sale.note?.takeIf { it.isNotBlank() }?.let { line("${StrSale.invoiceNote}: $it", small) }
 
