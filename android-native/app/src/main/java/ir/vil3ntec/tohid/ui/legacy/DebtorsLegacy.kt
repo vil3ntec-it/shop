@@ -889,6 +889,8 @@ private fun AccountViewLegacy(
       if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش ⇒ هیچ)
       if (store != null) ir.vil3ntec.tohid.ui.screens.CustomerCardButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
+      //  SEC-10: حذفِ دادهٔ این مشتری در سرور — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)
+      ir.vil3ntec.tohid.ui.screens.CustomerErasureButton(account.debtor.phone, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {

@@ -556,6 +556,7 @@ private fun OrderDetailSheet(
         }
       }
 
+      OrderEvidenceEntry(o.id, cfg.permissions.manage, ir.vil3ntec.tohid.data.repo.Backend.api(context), ::orderStamp)   // RSK-08: پروندهٔ مدرک (پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`)
       OrderAmendCard(o, cfg, repo, ::orderStamp) { m -> onChanged(); scope.launch { repo.get(o.id).onSuccess { order = it }; snackbar.showSnackbar(m) } }; Section("مشتری")   // + ویرایش و تسویهٔ تفاوت (ORD-14)
       Text(o.customer.name, color = c.text, fontWeight = FontWeight.SemiBold)
       val phone = o.customer.phone
