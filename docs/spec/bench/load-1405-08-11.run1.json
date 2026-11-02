@@ -1,0 +1,2264 @@
+{
+  "at": "2026-11-02T04:42:45.867Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v185",
+    "node": "v22.22.0",
+    "driver": "postgres",
+    "loadAvg": [
+      1.6,
+      4.3,
+      4.2
+    ]
+  },
+  "options": {
+    "rate": 40,
+    "shops": 20,
+    "devices": 3,
+    "scale": 0.05,
+    "smallScale": 0.003,
+    "history": 3000,
+    "timeoutMs": 10000,
+    "seed": 20261102,
+    "warmupSec": 5
+  },
+  "budget": {
+    "p95Ms": 300,
+    "errors": 0,
+    "soakDriftFactor": 1.5,
+    "soakDriftSlackMs": 20,
+    "heapGrowthMB": 32,
+    "heapGrowthPct": 25,
+    "recoverMs": 10000
+  },
+  "setups": [
+    {
+      "profiles": [
+        "load",
+        "peak",
+        "burst"
+      ],
+      "serverEnv": {},
+      "readyMs": 172250,
+      "dataset": {
+        "big": {
+          "products": 1000,
+          "sales": 10000,
+          "saleItems": 15000,
+          "customers": 250,
+          "activeDebtors": 100,
+          "suppliers": 25,
+          "expenses": 150,
+          "days": 365
+        },
+        "small": {
+          "products": 60,
+          "sales": 600,
+          "saleItems": 900,
+          "customers": 15,
+          "activeDebtors": 6,
+          "suppliers": 2,
+          "expenses": 9,
+          "days": 365
+        },
+        "rows": 63841,
+        "seedMs": 4065,
+        "bridge": {
+          "ops": 63841,
+          "ms": 153810,
+          "opsPerSec": 415
+        },
+        "setupMs": 170218,
+        "server": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "poolMax": 10,
+        "workers": [
+          "login-outbox",
+          "order-notify",
+          "customer-notify",
+          "order-timeout",
+          "order-desk",
+          "order-start-alert",
+          "owner-report",
+          "storefront-alerts",
+          "payment-intents",
+          "ops-alerts"
+        ],
+        "gc": true
+      },
+      "phonesPerShop": 16,
+      "warmupMs": 75923,
+      "v3HistoryOps": 10026
+    }
+  ],
+  "profiles": [
+    {
+      "profile": "load",
+      "durationSec": 60,
+      "scheduled": 2399,
+      "dropped": 0,
+      "generatorLagMaxMs": 200,
+      "total": {
+        "n": 2399,
+        "p50": 12.9,
+        "p95": 63.7,
+        "p99": 842.6,
+        "max": 1406.3,
+        "rps": 40,
+        "errors": 0
+      },
+      "endpoints": {
+        "auth.login": {
+          "n": 41,
+          "p50": 232,
+          "p95": 308.9,
+          "p99": 359.6,
+          "max": 359.6,
+          "rps": 0.7,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 41
+          },
+          "avgKB": 0.6
+        },
+        "auth.refresh": {
+          "n": 107,
+          "p50": 8.9,
+          "p95": 20.6,
+          "p99": 25.6,
+          "max": 387.1,
+          "rps": 1.8,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 107
+          },
+          "avgKB": 0.4
+        },
+        "desk.list": {
+          "n": 209,
+          "p50": 5.7,
+          "p95": 9.1,
+          "p99": 13.8,
+          "max": 187.6,
+          "rps": 3.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 209
+          },
+          "avgKB": 2
+        },
+        "desk.summary": {
+          "n": 71,
+          "p50": 6.8,
+          "p95": 12.6,
+          "p99": 15.7,
+          "max": 15.7,
+          "rps": 1.2,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 71
+          },
+          "avgKB": 0.1
+        },
+        "store.checkout": {
+          "n": 85,
+          "p50": 25.4,
+          "p95": 42.8,
+          "p99": 85.8,
+          "max": 85.8,
+          "rps": 1.4,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "201": 85
+          },
+          "avgKB": 1
+        },
+        "store.home": {
+          "n": 147,
+          "p50": 13.5,
+          "p95": 22.6,
+          "p99": 67.1,
+          "max": 101.7,
+          "rps": 2.4,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 147
+          },
+          "avgKB": 0.9
+        },
+        "store.product": {
+          "n": 332,
+          "p50": 14.8,
+          "p95": 25.6,
+          "p99": 95.8,
+          "max": 420.1,
+          "rps": 5.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 332
+          },
+          "avgKB": 1.8
+        },
+        "store.products": {
+          "n": 395,
+          "p50": 11.4,
+          "p95": 18.3,
+          "p99": 54,
+          "max": 227,
+          "rps": 6.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 395
+          },
+          "avgKB": 8.6
+        },
+        "store.search": {
+          "n": 273,
+          "p50": 12.4,
+          "p95": 21.7,
+          "p99": 26.9,
+          "max": 36.1,
+          "rps": 4.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 273
+          },
+          "avgKB": 4.9
+        },
+        "store.track": {
+          "n": 159,
+          "p50": 13,
+          "p95": 18.3,
+          "p99": 21.6,
+          "max": 25.5,
+          "rps": 2.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 159
+          },
+          "avgKB": 1
+        },
+        "sync3.pull": {
+          "n": 275,
+          "p50": 10.7,
+          "p95": 26,
+          "p99": 197.2,
+          "max": 247.4,
+          "rps": 4.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 275
+          },
+          "avgKB": 27
+        },
+        "sync3.push": {
+          "n": 271,
+          "p50": 32.1,
+          "p95": 90,
+          "p99": 302.4,
+          "max": 695.3,
+          "rps": 4.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 271
+          },
+          "avgKB": 1.2
+        },
+        "sync3.pushLarge": {
+          "n": 34,
+          "p50": 936.2,
+          "p95": 1264.5,
+          "p99": 1406.3,
+          "max": 1406.3,
+          "rps": 0.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 34
+          },
+          "avgKB": 38.9
+        }
+      },
+      "windowSec": 10,
+      "drift": [
+        {
+          "fromSec": 0,
+          "n": 398,
+          "p50": 14.3,
+          "p95": 216.3,
+          "p99": 936.2,
+          "max": 1406.3
+        },
+        {
+          "fromSec": 10,
+          "n": 399,
+          "p50": 12.8,
+          "p95": 55.6,
+          "p99": 841,
+          "max": 1160.8
+        },
+        {
+          "fromSec": 20,
+          "n": 401,
+          "p50": 13.2,
+          "p95": 51,
+          "p99": 787.5,
+          "max": 1060.4
+        },
+        {
+          "fromSec": 30,
+          "n": 399,
+          "p50": 12,
+          "p95": 47.2,
+          "p99": 232.4,
+          "max": 902.2
+        },
+        {
+          "fromSec": 40,
+          "n": 399,
+          "p50": 12.5,
+          "p95": 48.6,
+          "p99": 892.3,
+          "max": 1012.1
+        },
+        {
+          "fromSec": 50,
+          "n": 402,
+          "p50": 12.8,
+          "p95": 49.2,
+          "p99": 964.5,
+          "max": 1264.5
+        },
+        {
+          "fromSec": 60,
+          "n": 1,
+          "p50": 10.9,
+          "p95": 10.9,
+          "p99": 10.9,
+          "max": 10.9
+        }
+      ],
+      "server": {
+        "samples": [
+          {
+            "t": 0,
+            "at": 1793594815085,
+            "gc": true,
+            "rssMB": 244.3,
+            "heapMB": 26.6,
+            "externalMB": 3.6,
+            "cpuPct": 303,
+            "loopP99Ms": 0,
+            "loopMaxMs": 0,
+            "pool": {
+              "total": 8,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 5
+          },
+          {
+            "t": 2,
+            "at": 1793594817087,
+            "gc": false,
+            "rssMB": 245.9,
+            "heapMB": 29.9,
+            "externalMB": 3.6,
+            "cpuPct": 62,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 12.8,
+            "pool": {
+              "total": 8,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 5
+          },
+          {
+            "t": 4,
+            "at": 1793594819087,
+            "gc": false,
+            "rssMB": 245.9,
+            "heapMB": 41.3,
+            "externalMB": 5.7,
+            "cpuPct": 52,
+            "loopP99Ms": 15,
+            "loopMaxMs": 16.5,
+            "pool": {
+              "total": 8,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 6
+          },
+          {
+            "t": 6,
+            "at": 1793594821086,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 35.2,
+            "externalMB": 3.9,
+            "cpuPct": 32,
+            "loopP99Ms": 78.7,
+            "loopMaxMs": 108.7,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 6
+          },
+          {
+            "t": 8,
+            "at": 1793594823089,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 31.7,
+            "externalMB": 4.2,
+            "cpuPct": 75,
+            "loopP99Ms": 12.4,
+            "loopMaxMs": 19.1,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 6
+          },
+          {
+            "t": 10,
+            "at": 1793594825087,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 41.9,
+            "externalMB": 6.1,
+            "cpuPct": 46,
+            "loopP99Ms": 12,
+            "loopMaxMs": 12.9,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 8
+          },
+          {
+            "t": 12,
+            "at": 1793594827091,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 33.3,
+            "externalMB": 3.7,
+            "cpuPct": 47,
+            "loopP99Ms": 13.1,
+            "loopMaxMs": 15.9,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 8
+          },
+          {
+            "t": 14,
+            "at": 1793594829087,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 39.3,
+            "externalMB": 5.1,
+            "cpuPct": 42,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 15,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 9
+          },
+          {
+            "t": 16,
+            "at": 1793594831088,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 37.1,
+            "externalMB": 4.7,
+            "cpuPct": 41,
+            "loopP99Ms": 12.7,
+            "loopMaxMs": 13.5,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 9
+          },
+          {
+            "t": 18,
+            "at": 1793594833090,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 39.2,
+            "externalMB": 5.2,
+            "cpuPct": 44,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 13.2,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 9
+          },
+          {
+            "t": 20,
+            "at": 1793594835087,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 35.9,
+            "externalMB": 4.2,
+            "cpuPct": 41,
+            "loopP99Ms": 11.5,
+            "loopMaxMs": 12.1,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 10
+          },
+          {
+            "t": 22,
+            "at": 1793594837088,
+            "gc": false,
+            "rssMB": 246.1,
+            "heapMB": 30.1,
+            "externalMB": 4.1,
+            "cpuPct": 41,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 12.6,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 10
+          },
+          {
+            "t": 24,
+            "at": 1793594839089,
+            "gc": false,
+            "rssMB": 246.1,
+            "heapMB": 29.4,
+            "externalMB": 3.7,
+            "cpuPct": 39,
+            "loopP99Ms": 13,
+            "loopMaxMs": 14,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 10
+          },
+          {
+            "t": 26,
+            "at": 1793594841089,
+            "gc": false,
+            "rssMB": 246.1,
+            "heapMB": 42.9,
+            "externalMB": 5.4,
+            "cpuPct": 48,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11.1,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 10
+          },
+          {
+            "t": 28,
+            "at": 1793594843089,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 39.4,
+            "externalMB": 5.5,
+            "cpuPct": 41,
+            "loopP99Ms": 13.8,
+            "loopMaxMs": 18.2,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 10
+          },
+          {
+            "t": 30,
+            "at": 1793594845089,
+            "gc": false,
+            "rssMB": 245.9,
+            "heapMB": 41,
+            "externalMB": 5.4,
+            "cpuPct": 61,
+            "loopP99Ms": 11.4,
+            "loopMaxMs": 12.5,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 32,
+            "at": 1793594847089,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 35.5,
+            "externalMB": 4.1,
+            "cpuPct": 45,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11.6,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 34,
+            "at": 1793594849089,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 42.4,
+            "externalMB": 5.8,
+            "cpuPct": 31,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 14.6,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 36,
+            "at": 1793594851089,
+            "gc": false,
+            "rssMB": 246,
+            "heapMB": 41.6,
+            "externalMB": 4.4,
+            "cpuPct": 44,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 12.6,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 38,
+            "at": 1793594853090,
+            "gc": false,
+            "rssMB": 246.1,
+            "heapMB": 38.1,
+            "externalMB": 5.9,
+            "cpuPct": 40,
+            "loopP99Ms": 11.3,
+            "loopMaxMs": 12.4,
+            "pool": {
+              "total": 10,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 40,
+            "at": 1793594855089,
+            "gc": false,
+            "rssMB": 246.1,
+            "heapMB": 30.2,
+            "externalMB": 3.6,
+            "cpuPct": 65,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11,
+            "pool": {
+              "total": 9,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 42,
+            "at": 1793594857089,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 31.9,
+            "externalMB": 3.7,
+            "cpuPct": 56,
+            "loopP99Ms": 11.2,
+            "loopMaxMs": 18.5,
+            "pool": {
+              "total": 9,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 44,
+            "at": 1793594859089,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 36.3,
+            "externalMB": 4.9,
+            "cpuPct": 35,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 12.1,
+            "pool": {
+              "total": 9,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 46,
+            "at": 1793594861090,
+            "gc": false,
+            "rssMB": 246.2,
+            "heapMB": 38.8,
+            "externalMB": 4.9,
+            "cpuPct": 62,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11.6,
+            "pool": {
+              "total": 9,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 13
+          },
+          {
+            "t": 48,
+            "at": 1793594863090,
+            "gc": false,
+            "rssMB": 246.3,
+            "heapMB": 43.7,
+            "externalMB": 6.7,
+            "cpuPct": 47,
+            "loopP99Ms": 11.4,
+            "loopMaxMs": 13.3,
+            "pool": {
+              "total": 9,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 14
+          },
+          {
+            "t": 50,
+            "at": 1793594865089,
+            "gc": false,
+            "rssMB": 246.5,
+            "heapMB": 37.3,
+            "externalMB": 5.7,
+            "cpuPct": 62,
+            "loopP99Ms": 11.5,
+            "loopMaxMs": 12,
+            "pool": {
+              "total": 9,
+              "idle": 6,
+              "waiting": 0
+            },
+            "slowLines": 14
+          },
+          {
+            "t": 52,
+            "at": 1793594867089,
+            "gc": false,
+            "rssMB": 246.6,
+            "heapMB": 35.6,
+            "externalMB": 4.8,
+            "cpuPct": 45,
+            "loopP99Ms": 11.2,
+            "loopMaxMs": 14.5,
+            "pool": {
+              "total": 9,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 15
+          },
+          {
+            "t": 54,
+            "at": 1793594869091,
+            "gc": false,
+            "rssMB": 248.5,
+            "heapMB": 32.8,
+            "externalMB": 3.8,
+            "cpuPct": 69,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11.6,
+            "pool": {
+              "total": 9,
+              "idle": 5,
+              "waiting": 0
+            },
+            "slowLines": 15
+          },
+          {
+            "t": 56,
+            "at": 1793594871090,
+            "gc": false,
+            "rssMB": 248.5,
+            "heapMB": 36.5,
+            "externalMB": 4.2,
+            "cpuPct": 45,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 13.3,
+            "pool": {
+              "total": 9,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 15
+          },
+          {
+            "t": 58,
+            "at": 1793594873090,
+            "gc": false,
+            "rssMB": 248.5,
+            "heapMB": 39.9,
+            "externalMB": 6.2,
+            "cpuPct": 62,
+            "loopP99Ms": 12.9,
+            "loopMaxMs": 16.3,
+            "pool": {
+              "total": 9,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 15
+          },
+          {
+            "t": 60.1,
+            "at": 1793594875115,
+            "gc": true,
+            "rssMB": 248.6,
+            "heapMB": 27.5,
+            "externalMB": 3.6,
+            "cpuPct": 58,
+            "loopP99Ms": 11.8,
+            "loopMaxMs": 12.2,
+            "pool": {
+              "total": 9,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 17
+          }
+        ],
+        "rssMaxMB": 248.6,
+        "heapMaxMB": 43.7,
+        "heapAfterGcStartMB": 26.6,
+        "heapAfterGcEndMB": 27.5,
+        "poolWaitingMax": 0,
+        "poolTotalMax": 10,
+        "loopMaxMs": 108.7,
+        "cpuMaxPct": 303
+      },
+      "loadAvgStart": [
+        1.3,
+        2.7,
+        3.6
+      ],
+      "loadAvgEnd": [
+        1.9,
+        2.7,
+        3.5
+      ],
+      "generatorLoopMaxMs": 327.4,
+      "dbBytes": 418446359,
+      "budgetFails": [
+        "auth.login: p95 308.9ms > 300ms",
+        "sync3.pushLarge: p95 1264.5ms > 300ms"
+      ]
+    },
+    {
+      "profile": "peak",
+      "durationSec": 61.1,
+      "scheduled": 5999,
+      "dropped": 0,
+      "generatorLagMaxMs": 40,
+      "total": {
+        "n": 5999,
+        "p50": 18.6,
+        "p95": 1169.9,
+        "p99": 2080.8,
+        "max": 3160.7,
+        "rps": 98.2,
+        "errors": 0
+      },
+      "endpoints": {
+        "auth.login": {
+          "n": 116,
+          "p50": 275.1,
+          "p95": 631.5,
+          "p99": 1882.8,
+          "max": 1989.4,
+          "rps": 1.9,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 116
+          },
+          "avgKB": 0.6
+        },
+        "auth.refresh": {
+          "n": 236,
+          "p50": 11.5,
+          "p95": 801.1,
+          "p99": 1163.5,
+          "max": 1333.7,
+          "rps": 3.9,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 236
+          },
+          "avgKB": 0.4
+        },
+        "desk.list": {
+          "n": 528,
+          "p50": 7.1,
+          "p95": 573.7,
+          "p99": 902.6,
+          "max": 1023.4,
+          "rps": 8.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 528
+          },
+          "avgKB": 6.1
+        },
+        "desk.summary": {
+          "n": 156,
+          "p50": 7.6,
+          "p95": 37.4,
+          "p99": 1130.3,
+          "max": 1205.8,
+          "rps": 2.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 156
+          },
+          "avgKB": 0.1
+        },
+        "store.checkout": {
+          "n": 278,
+          "p50": 35.2,
+          "p95": 1186.6,
+          "p99": 2235,
+          "max": 2248.6,
+          "rps": 4.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "201": 278
+          },
+          "avgKB": 1
+        },
+        "store.home": {
+          "n": 352,
+          "p50": 18.9,
+          "p95": 1578.8,
+          "p99": 2068.2,
+          "max": 2080.8,
+          "rps": 5.8,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 352
+          },
+          "avgKB": 0.9
+        },
+        "store.product": {
+          "n": 826,
+          "p50": 19.6,
+          "p95": 407.4,
+          "p99": 1979.8,
+          "max": 2110.7,
+          "rps": 13.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 826
+          },
+          "avgKB": 1.8
+        },
+        "store.products": {
+          "n": 976,
+          "p50": 14.3,
+          "p95": 992.6,
+          "p99": 1588.5,
+          "max": 1667.7,
+          "rps": 16,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 976
+          },
+          "avgKB": 8.6
+        },
+        "store.search": {
+          "n": 709,
+          "p50": 16.4,
+          "p95": 1251.9,
+          "p99": 1685.5,
+          "max": 1823.1,
+          "rps": 11.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 709
+          },
+          "avgKB": 4.5
+        },
+        "store.track": {
+          "n": 396,
+          "p50": 17.5,
+          "p95": 1271.8,
+          "p99": 2180.3,
+          "max": 2227.6,
+          "rps": 6.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 396
+          },
+          "avgKB": 1
+        },
+        "sync3.pull": {
+          "n": 711,
+          "p50": 15.9,
+          "p95": 876.1,
+          "p99": 1404.6,
+          "max": 1466.5,
+          "rps": 11.6,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 711
+          },
+          "avgKB": 33.4
+        },
+        "sync3.push": {
+          "n": 637,
+          "p50": 66,
+          "p95": 1061.3,
+          "p99": 2029.3,
+          "max": 2501.2,
+          "rps": 10.4,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 637
+          },
+          "avgKB": 1.2
+        },
+        "sync3.pushLarge": {
+          "n": 78,
+          "p50": 1797.9,
+          "p95": 3045.2,
+          "p99": 3160.7,
+          "max": 3160.7,
+          "rps": 1.3,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 78
+          },
+          "avgKB": 39.3
+        }
+      },
+      "windowSec": 10,
+      "drift": [
+        {
+          "fromSec": 0,
+          "n": 988,
+          "p50": 20.1,
+          "p95": 142.8,
+          "p99": 1690.8,
+          "max": 2601.3
+        },
+        {
+          "fromSec": 10,
+          "n": 1008,
+          "p50": 19.3,
+          "p95": 179.3,
+          "p99": 1772.7,
+          "max": 3046
+        },
+        {
+          "fromSec": 20,
+          "n": 990,
+          "p50": 13.7,
+          "p95": 70.3,
+          "p99": 312.1,
+          "max": 1473.3
+        },
+        {
+          "fromSec": 30,
+          "n": 1004,
+          "p50": 16,
+          "p95": 90.1,
+          "p99": 1411.9,
+          "max": 2008.2
+        },
+        {
+          "fromSec": 40,
+          "n": 997,
+          "p50": 18.9,
+          "p95": 183.2,
+          "p99": 1540.6,
+          "max": 2382.6
+        },
+        {
+          "fromSec": 50,
+          "n": 856,
+          "p50": 35.5,
+          "p95": 2019.8,
+          "p99": 2340.1,
+          "max": 3116.8
+        },
+        {
+          "fromSec": 60,
+          "n": 156,
+          "p50": 1251.1,
+          "p95": 2194.9,
+          "p99": 2876.3,
+          "max": 3160.7
+        }
+      ],
+      "server": {
+        "samples": [
+          {
+            "t": 0,
+            "at": 1793594876158,
+            "gc": true,
+            "rssMB": 248.6,
+            "heapMB": 27.2,
+            "externalMB": 3.6,
+            "cpuPct": 307,
+            "loopP99Ms": 0,
+            "loopMaxMs": 0,
+            "pool": {
+              "total": 9,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 17
+          },
+          {
+            "t": 2,
+            "at": 1793594878160,
+            "gc": false,
+            "rssMB": 248.6,
+            "heapMB": 43.1,
+            "externalMB": 5,
+            "cpuPct": 90,
+            "loopP99Ms": 13.2,
+            "loopMaxMs": 13.9,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 18
+          },
+          {
+            "t": 4,
+            "at": 1793594880161,
+            "gc": false,
+            "rssMB": 248.6,
+            "heapMB": 41.5,
+            "externalMB": 5.4,
+            "cpuPct": 144,
+            "loopP99Ms": 12.5,
+            "loopMaxMs": 13.7,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 8
+            },
+            "slowLines": 18
+          },
+          {
+            "t": 6,
+            "at": 1793594882162,
+            "gc": false,
+            "rssMB": 248.7,
+            "heapMB": 39.8,
+            "externalMB": 5.5,
+            "cpuPct": 99,
+            "loopP99Ms": 13.7,
+            "loopMaxMs": 15.4,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 0
+            },
+            "slowLines": 23
+          },
+          {
+            "t": 8,
+            "at": 1793594884161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 32.5,
+            "externalMB": 4.4,
+            "cpuPct": 92,
+            "loopP99Ms": 12.9,
+            "loopMaxMs": 13.3,
+            "pool": {
+              "total": 10,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 29
+          },
+          {
+            "t": 10,
+            "at": 1793594886161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 37.4,
+            "externalMB": 4.4,
+            "cpuPct": 141,
+            "loopP99Ms": 13.8,
+            "loopMaxMs": 14.6,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 30
+          },
+          {
+            "t": 12,
+            "at": 1793594888161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 43.1,
+            "externalMB": 5.5,
+            "cpuPct": 117,
+            "loopP99Ms": 14,
+            "loopMaxMs": 18.5,
+            "pool": {
+              "total": 10,
+              "idle": 3,
+              "waiting": 0
+            },
+            "slowLines": 35
+          },
+          {
+            "t": 14,
+            "at": 1793594890161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 43.4,
+            "externalMB": 6,
+            "cpuPct": 147,
+            "loopP99Ms": 13.2,
+            "loopMaxMs": 13.5,
+            "pool": {
+              "total": 10,
+              "idle": 6,
+              "waiting": 0
+            },
+            "slowLines": 39
+          },
+          {
+            "t": 16,
+            "at": 1793594892160,
+            "gc": false,
+            "rssMB": 248.7,
+            "heapMB": 43.8,
+            "externalMB": 5.4,
+            "cpuPct": 97,
+            "loopP99Ms": 11.4,
+            "loopMaxMs": 12.5,
+            "pool": {
+              "total": 10,
+              "idle": 7,
+              "waiting": 0
+            },
+            "slowLines": 42
+          },
+          {
+            "t": 18,
+            "at": 1793594894161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 42.9,
+            "externalMB": 6.4,
+            "cpuPct": 100,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 14.3,
+            "pool": {
+              "total": 10,
+              "idle": 6,
+              "waiting": 0
+            },
+            "slowLines": 46
+          },
+          {
+            "t": 20,
+            "at": 1793594896161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 31,
+            "externalMB": 3.8,
+            "cpuPct": 116,
+            "loopP99Ms": 13.6,
+            "loopMaxMs": 15.3,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 48
+          },
+          {
+            "t": 22,
+            "at": 1793594898161,
+            "gc": false,
+            "rssMB": 248.7,
+            "heapMB": 35.3,
+            "externalMB": 3.9,
+            "cpuPct": 96,
+            "loopP99Ms": 12.2,
+            "loopMaxMs": 16,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 49
+          },
+          {
+            "t": 24,
+            "at": 1793594900162,
+            "gc": false,
+            "rssMB": 248.7,
+            "heapMB": 36.8,
+            "externalMB": 4.7,
+            "cpuPct": 79,
+            "loopP99Ms": 11,
+            "loopMaxMs": 11.3,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 50
+          },
+          {
+            "t": 26,
+            "at": 1793594902161,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 34.4,
+            "externalMB": 4.6,
+            "cpuPct": 98,
+            "loopP99Ms": 13.7,
+            "loopMaxMs": 15.6,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 52
+          },
+          {
+            "t": 28,
+            "at": 1793594904161,
+            "gc": false,
+            "rssMB": 248.9,
+            "heapMB": 43,
+            "externalMB": 5.5,
+            "cpuPct": 85,
+            "loopP99Ms": 11.6,
+            "loopMaxMs": 14.2,
+            "pool": {
+              "total": 10,
+              "idle": 5,
+              "waiting": 0
+            },
+            "slowLines": 53
+          },
+          {
+            "t": 30,
+            "at": 1793594906163,
+            "gc": false,
+            "rssMB": 248.9,
+            "heapMB": 35.9,
+            "externalMB": 4.3,
+            "cpuPct": 119,
+            "loopP99Ms": 12.2,
+            "loopMaxMs": 14.6,
+            "pool": {
+              "total": 10,
+              "idle": 3,
+              "waiting": 0
+            },
+            "slowLines": 56
+          },
+          {
+            "t": 32,
+            "at": 1793594908162,
+            "gc": false,
+            "rssMB": 249.3,
+            "heapMB": 39.9,
+            "externalMB": 4.9,
+            "cpuPct": 100,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 13.4,
+            "pool": {
+              "total": 10,
+              "idle": 6,
+              "waiting": 0
+            },
+            "slowLines": 60
+          },
+          {
+            "t": 34,
+            "at": 1793594910163,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 38.3,
+            "externalMB": 4.5,
+            "cpuPct": 91,
+            "loopP99Ms": 13.3,
+            "loopMaxMs": 14,
+            "pool": {
+              "total": 10,
+              "idle": 3,
+              "waiting": 0
+            },
+            "slowLines": 63
+          },
+          {
+            "t": 36,
+            "at": 1793594912170,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 38.4,
+            "externalMB": 4.5,
+            "cpuPct": 107,
+            "loopP99Ms": 11.1,
+            "loopMaxMs": 12,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 67
+          },
+          {
+            "t": 38,
+            "at": 1793594914169,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 38,
+            "externalMB": 5.1,
+            "cpuPct": 89,
+            "loopP99Ms": 13,
+            "loopMaxMs": 13.4,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 69
+          },
+          {
+            "t": 40,
+            "at": 1793594916170,
+            "gc": false,
+            "rssMB": 249,
+            "heapMB": 43.1,
+            "externalMB": 5.4,
+            "cpuPct": 87,
+            "loopP99Ms": 11.2,
+            "loopMaxMs": 11.6,
+            "pool": {
+              "total": 10,
+              "idle": 6,
+              "waiting": 0
+            },
+            "slowLines": 70
+          },
+          {
+            "t": 42,
+            "at": 1793594918169,
+            "gc": false,
+            "rssMB": 248.9,
+            "heapMB": 40.4,
+            "externalMB": 5.2,
+            "cpuPct": 137,
+            "loopP99Ms": 13.9,
+            "loopMaxMs": 16.1,
+            "pool": {
+              "total": 10,
+              "idle": 3,
+              "waiting": 0
+            },
+            "slowLines": 72
+          },
+          {
+            "t": 44,
+            "at": 1793594920172,
+            "gc": false,
+            "rssMB": 249,
+            "heapMB": 40,
+            "externalMB": 6,
+            "cpuPct": 115,
+            "loopP99Ms": 14.6,
+            "loopMaxMs": 18.8,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 1
+            },
+            "slowLines": 76
+          },
+          {
+            "t": 46,
+            "at": 1793594922172,
+            "gc": false,
+            "rssMB": 249,
+            "heapMB": 42.1,
+            "externalMB": 5.2,
+            "cpuPct": 90,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 13.7,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 79
+          },
+          {
+            "t": 48,
+            "at": 1793594924172,
+            "gc": false,
+            "rssMB": 248.9,
+            "heapMB": 36.5,
+            "externalMB": 4.6,
+            "cpuPct": 93,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 14.7,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 83
+          },
+          {
+            "t": 50,
+            "at": 1793594926172,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 48.3,
+            "externalMB": 6.4,
+            "cpuPct": 149,
+            "loopP99Ms": 15.6,
+            "loopMaxMs": 24.2,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 84
+          },
+          {
+            "t": 52,
+            "at": 1793594928171,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 42.2,
+            "externalMB": 5.4,
+            "cpuPct": 105,
+            "loopP99Ms": 12.1,
+            "loopMaxMs": 18.6,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 90
+          },
+          {
+            "t": 54.1,
+            "at": 1793594930171,
+            "gc": false,
+            "rssMB": 248.8,
+            "heapMB": 40,
+            "externalMB": 5.8,
+            "cpuPct": 95,
+            "loopP99Ms": 11.4,
+            "loopMaxMs": 11.8,
+            "pool": {
+              "total": 10,
+              "idle": 4,
+              "waiting": 0
+            },
+            "slowLines": 93
+          },
+          {
+            "t": 56,
+            "at": 1793594932175,
+            "gc": false,
+            "rssMB": 249.2,
+            "heapMB": 45.2,
+            "externalMB": 5.4,
+            "cpuPct": 124,
+            "loopP99Ms": 13.8,
+            "loopMaxMs": 19.2,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 22
+            },
+            "slowLines": 95
+          },
+          {
+            "t": 58,
+            "at": 1793594934172,
+            "gc": false,
+            "rssMB": 249.2,
+            "heapMB": 41.6,
+            "externalMB": 5.5,
+            "cpuPct": 93,
+            "loopP99Ms": 15.4,
+            "loopMaxMs": 19.9,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 175
+            },
+            "slowLines": 120
+          },
+          {
+            "t": 60,
+            "at": 1793594936177,
+            "gc": false,
+            "rssMB": 249.3,
+            "heapMB": 39.2,
+            "externalMB": 3.7,
+            "cpuPct": 94,
+            "loopP99Ms": 15.3,
+            "loopMaxMs": 16.2,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 150
+            },
+            "slowLines": 270
+          },
+          {
+            "t": 61.1,
+            "at": 1793594937242,
+            "gc": true,
+            "rssMB": 249.3,
+            "heapMB": 28.3,
+            "externalMB": 3.6,
+            "cpuPct": 103,
+            "loopP99Ms": 13.8,
+            "loopMaxMs": 18,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 375
+          }
+        ],
+        "rssMaxMB": 249.3,
+        "heapMaxMB": 48.3,
+        "heapAfterGcStartMB": 27.2,
+        "heapAfterGcEndMB": 28.3,
+        "poolWaitingMax": 175,
+        "poolTotalMax": 10,
+        "loopMaxMs": 24.2,
+        "cpuMaxPct": 307
+      },
+      "loadAvgStart": [
+        1.9,
+        2.7,
+        3.5
+      ],
+      "loadAvgEnd": [
+        3.2,
+        3,
+        3.5
+      ],
+      "generatorLoopMaxMs": 47.6,
+      "dbBytes": 489177615,
+      "budgetFails": [
+        "auth.login: p95 631.5ms > 300ms",
+        "auth.refresh: p95 801.1ms > 300ms",
+        "desk.list: p95 573.7ms > 300ms",
+        "store.checkout: p95 1186.6ms > 300ms",
+        "store.home: p95 1578.8ms > 300ms",
+        "store.product: p95 407.4ms > 300ms",
+        "store.products: p95 992.6ms > 300ms",
+        "store.search: p95 1251.9ms > 300ms",
+        "store.track: p95 1271.8ms > 300ms",
+        "sync3.pull: p95 876.1ms > 300ms",
+        "sync3.push: p95 1061.3ms > 300ms",
+        "sync3.pushLarge: p95 3045.2ms > 300ms"
+      ]
+    },
+    {
+      "profile": "burst",
+      "durationSec": 21.9,
+      "scheduled": 1597,
+      "dropped": 434,
+      "generatorLagMaxMs": 100,
+      "total": {
+        "n": 930,
+        "p50": 9999.9,
+        "p95": 10003.7,
+        "p99": 10016.8,
+        "max": 10059.3,
+        "rps": 42.4,
+        "errors": 497
+      },
+      "endpoints": {
+        "auth.login": {
+          "n": 24,
+          "p50": 10000.2,
+          "p95": 10001.8,
+          "p99": 10002.6,
+          "max": 10002.6,
+          "rps": 1.1,
+          "errors": 16,
+          "errorPct": 66.7,
+          "codes": {
+            "200": 8,
+            "timeout": 16
+          },
+          "avgKB": 0.2,
+          "firstError": "timeout"
+        },
+        "auth.refresh": {
+          "n": 39,
+          "p50": 10000.2,
+          "p95": 10003.8,
+          "p99": 10059.3,
+          "max": 10059.3,
+          "rps": 1.8,
+          "errors": 25,
+          "errorPct": 64.1,
+          "codes": {
+            "200": 14,
+            "timeout": 25
+          },
+          "avgKB": 0.1,
+          "firstError": "timeout"
+        },
+        "desk.list": {
+          "n": 90,
+          "p50": 10000.2,
+          "p95": 10003.2,
+          "p99": 10005.6,
+          "max": 10005.6,
+          "rps": 4.1,
+          "errors": 50,
+          "errorPct": 55.6,
+          "codes": {
+            "200": 40,
+            "503": 2,
+            "timeout": 48
+          },
+          "avgKB": 2.3,
+          "firstError": "timeout"
+        },
+        "desk.summary": {
+          "n": 39,
+          "p50": 10000,
+          "p95": 10003.1,
+          "p99": 10005.8,
+          "max": 10005.8,
+          "rps": 1.8,
+          "errors": 22,
+          "errorPct": 56.4,
+          "codes": {
+            "200": 17,
+            "timeout": 22
+          },
+          "avgKB": 0.1,
+          "firstError": "timeout"
+        },
+        "store.checkout": {
+          "n": 33,
+          "p50": 10000.5,
+          "p95": 10011.7,
+          "p99": 10055.1,
+          "max": 10055.1,
+          "rps": 1.5,
+          "errors": 22,
+          "errorPct": 66.7,
+          "codes": {
+            "201": 11,
+            "503": 1,
+            "timeout": 21
+          },
+          "avgKB": 0.3,
+          "firstError": "timeout"
+        },
+        "store.home": {
+          "n": 55,
+          "p50": 10000,
+          "p95": 10002.2,
+          "p99": 10010.1,
+          "max": 10010.1,
+          "rps": 2.5,
+          "errors": 32,
+          "errorPct": 58.2,
+          "codes": {
+            "200": 23,
+            "timeout": 32
+          },
+          "avgKB": 0.4,
+          "firstError": "timeout"
+        },
+        "store.product": {
+          "n": 156,
+          "p50": 10000.2,
+          "p95": 10004.5,
+          "p99": 10036.3,
+          "max": 10051.1,
+          "rps": 7.1,
+          "errors": 95,
+          "errorPct": 60.9,
+          "codes": {
+            "200": 61,
+            "503": 1,
+            "timeout": 94
+          },
+          "avgKB": 0.7,
+          "firstError": "timeout"
+        },
+        "store.products": {
+          "n": 147,
+          "p50": 10000.2,
+          "p95": 10003.6,
+          "p99": 10007.8,
+          "max": 10013,
+          "rps": 6.7,
+          "errors": 89,
+          "errorPct": 60.5,
+          "codes": {
+            "200": 58,
+            "503": 1,
+            "timeout": 88
+          },
+          "avgKB": 3.4,
+          "firstError": "timeout"
+        },
+        "store.search": {
+          "n": 120,
+          "p50": 10000.1,
+          "p95": 10005.1,
+          "p99": 10032.5,
+          "max": 10040,
+          "rps": 5.5,
+          "errors": 73,
+          "errorPct": 60.8,
+          "codes": {
+            "200": 47,
+            "503": 1,
+            "timeout": 72
+          },
+          "avgKB": 1.9,
+          "firstError": "timeout"
+        },
+        "store.track": {
+          "n": 57,
+          "p50": 6333.8,
+          "p95": 10001.8,
+          "p99": 10003.7,
+          "max": 10003.7,
+          "rps": 2.6,
+          "errors": 27,
+          "errorPct": 47.4,
+          "codes": {
+            "200": 30,
+            "timeout": 27
+          },
+          "avgKB": 0.5,
+          "firstError": "timeout"
+        },
+        "sync3.pull": {
+          "n": 90,
+          "p50": 5798.3,
+          "p95": 10000.9,
+          "p99": 10002.6,
+          "max": 10002.6,
+          "rps": 4.1,
+          "errors": 11,
+          "errorPct": 12.2,
+          "codes": {
+            "200": 79,
+            "timeout": 11
+          },
+          "avgKB": 41.5,
+          "firstError": "timeout"
+        },
+        "sync3.push": {
+          "n": 19,
+          "p50": 30.8,
+          "p95": 3330.1,
+          "p99": 3330.1,
+          "max": 3330.1,
+          "rps": 0.9,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 19
+          },
+          "avgKB": 1.2
+        },
+        "sync3.pushLarge": {
+          "n": 61,
+          "p50": 10000.7,
+          "p95": 10004,
+          "p99": 10006.7,
+          "max": 10006.7,
+          "rps": 2.8,
+          "errors": 35,
+          "errorPct": 57.4,
+          "codes": {
+            "200": 26,
+            "timeout": 35
+          },
+          "avgKB": 16.1,
+          "firstError": "timeout"
+        }
+      },
+      "windowSec": 10,
+      "drift": [
+        {
+          "fromSec": 0,
+          "n": 210,
+          "p50": 11.4,
+          "p95": 481.4,
+          "p99": 4456.2,
+          "max": 4748
+        },
+        {
+          "fromSec": 10,
+          "n": 519,
+          "p50": 10000.8,
+          "p95": 10005.8,
+          "p99": 10032.5,
+          "max": 10059.3
+        },
+        {
+          "fromSec": 20,
+          "n": 201,
+          "p50": 4515.1,
+          "p95": 7945.5,
+          "p99": 10000.4,
+          "max": 10002.6
+        }
+      ],
+      "server": {
+        "samples": [
+          {
+            "t": 0,
+            "at": 1793594938288,
+            "gc": true,
+            "rssMB": 249.3,
+            "heapMB": 28.1,
+            "externalMB": 3.6,
+            "cpuPct": 321,
+            "loopP99Ms": 0,
+            "loopMaxMs": 0,
+            "pool": {
+              "total": 10,
+              "idle": 10,
+              "waiting": 0
+            },
+            "slowLines": 375
+          },
+          {
+            "t": 2,
+            "at": 1793594940291,
+            "gc": false,
+            "rssMB": 249.3,
+            "heapMB": 34.4,
+            "externalMB": 4.7,
+            "cpuPct": 37,
+            "loopP99Ms": 11,
+            "loopMaxMs": 14.9,
+            "pool": {
+              "total": 10,
+              "idle": 9,
+              "waiting": 0
+            },
+            "slowLines": 375
+          },
+          {
+            "t": 4,
+            "at": 1793594942291,
+            "gc": false,
+            "rssMB": 249.4,
+            "heapMB": 32.7,
+            "externalMB": 3.8,
+            "cpuPct": 50,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 14.5,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 375
+          },
+          {
+            "t": 6,
+            "at": 1793594944292,
+            "gc": false,
+            "rssMB": 257.5,
+            "heapMB": 63.5,
+            "externalMB": 6.6,
+            "cpuPct": 96,
+            "loopP99Ms": 52,
+            "loopMaxMs": 61,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 225
+            },
+            "slowLines": 375
+          },
+          {
+            "t": 8,
+            "at": 1793594946295,
+            "gc": false,
+            "rssMB": 259.2,
+            "heapMB": 61.5,
+            "externalMB": 4.9,
+            "cpuPct": 58,
+            "loopP99Ms": 12,
+            "loopMaxMs": 19.3,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 457
+            },
+            "slowLines": 380
+          },
+          {
+            "t": 10,
+            "at": 1793594948296,
+            "gc": false,
+            "rssMB": 262.4,
+            "heapMB": 69.1,
+            "externalMB": 6.4,
+            "cpuPct": 56,
+            "loopP99Ms": 12.5,
+            "loopMaxMs": 12.8,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 552
+            },
+            "slowLines": 384
+          },
+          {
+            "t": 12,
+            "at": 1793594950295,
+            "gc": false,
+            "rssMB": 263,
+            "heapMB": 69,
+            "externalMB": 6.3,
+            "cpuPct": 53,
+            "loopP99Ms": 11.9,
+            "loopMaxMs": 13.2,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 550
+            },
+            "slowLines": 389
+          },
+          {
+            "t": 14,
+            "at": 1793594952296,
+            "gc": false,
+            "rssMB": 263.5,
+            "heapMB": 68.8,
+            "externalMB": 6.1,
+            "cpuPct": 51,
+            "loopP99Ms": 12.1,
+            "loopMaxMs": 12.6,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 544
+            },
+            "slowLines": 397
+          },
+          {
+            "t": 16.1,
+            "at": 1793594954308,
+            "gc": false,
+            "rssMB": 266.3,
+            "heapMB": 68.8,
+            "externalMB": 4.9,
+            "cpuPct": 58,
+            "loopP99Ms": 16.7,
+            "loopMaxMs": 20.9,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 564
+            },
+            "slowLines": 410
+          },
+          {
+            "t": 18.1,
+            "at": 1793594956356,
+            "gc": false,
+            "rssMB": 272.4,
+            "heapMB": 75.4,
+            "externalMB": 4.7,
+            "cpuPct": 56,
+            "loopP99Ms": 13.1,
+            "loopMaxMs": 17.2,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 513
+            },
+            "slowLines": 420
+          },
+          {
+            "t": 20.1,
+            "at": 1793594958356,
+            "gc": false,
+            "rssMB": 278.7,
+            "heapMB": 84.6,
+            "externalMB": 4.9,
+            "cpuPct": 137,
+            "loopP99Ms": 44.4,
+            "loopMaxMs": 105.6,
+            "pool": {
+              "total": 10,
+              "idle": 0,
+              "waiting": 449
+            },
+            "slowLines": 430
+          },
+          {
+            "t": 22,
+            "at": 1793594960253,
+            "gc": true,
+            "rssMB": 318.5,
+            "heapMB": 29.7,
+            "externalMB": 3.6,
+            "cpuPct": 79,
+            "loopP99Ms": 32.3,
+            "loopMaxMs": 39,
+            "pool": {
+              "total": 10,
+              "idle": 8,
+              "waiting": 0
+            },
+            "slowLines": 625
+          }
+        ],
+        "rssMaxMB": 318.5,
+        "heapMaxMB": 84.6,
+        "heapAfterGcStartMB": 28.1,
+        "heapAfterGcEndMB": 29.7,
+        "poolWaitingMax": 564,
+        "poolTotalMax": 10,
+        "loopMaxMs": 105.6,
+        "cpuMaxPct": 321
+      },
+      "loadAvgStart": [
+        3.2,
+        3,
+        3.5
+      ],
+      "loadAvgEnd": [
+        4.7,
+        3.3,
+        3.6
+      ],
+      "generatorLoopMaxMs": 108.6,
+      "dbBytes": 516243983,
+      "budgetFails": [
+        "auth.login: p95 10001.8ms > 300ms",
+        "auth.login: 16 خطا از 24 (timeout×16)",
+        "auth.refresh: p95 10003.8ms > 300ms",
+        "auth.refresh: 25 خطا از 39 (timeout×25)",
+        "desk.list: p95 10003.2ms > 300ms",
+        "desk.list: 50 خطا از 90 (503×2، timeout×48)",
+        "desk.summary: p95 10003.1ms > 300ms",
+        "desk.summary: 22 خطا از 39 (timeout×22)",
+        "store.checkout: p95 10011.7ms > 300ms",
+        "store.checkout: 22 خطا از 33 (503×1، timeout×21)",
+        "store.home: p95 10002.2ms > 300ms",
+        "store.home: 32 خطا از 55 (timeout×32)",
+        "store.product: p95 10004.5ms > 300ms",
+        "store.product: 95 خطا از 156 (503×1، timeout×94)",
+        "store.products: p95 10003.6ms > 300ms",
+        "store.products: 89 خطا از 147 (503×1، timeout×88)",
+        "store.search: p95 10005.1ms > 300ms",
+        "store.search: 73 خطا از 120 (503×1، timeout×72)",
+        "store.track: p95 10001.8ms > 300ms",
+        "store.track: 27 خطا از 57 (timeout×27)",
+        "sync3.pull: p95 10000.9ms > 300ms",
+        "sync3.pull: 11 خطا از 90 (timeout×11)",
+        "sync3.push: p95 3330.1ms > 300ms",
+        "sync3.pushLarge: p95 10004ms > 300ms",
+        "sync3.pushLarge: 35 خطا از 61 (timeout×35)",
+        "بارساز اشباع شد: 434 از 1597 درخواست جا افتاد (عدد معتبر نیست)"
+      ]
+    }
+  ]
+}
