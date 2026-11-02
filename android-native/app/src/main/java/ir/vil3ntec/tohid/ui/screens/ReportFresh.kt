@@ -27,6 +27,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.ShopDayChoice
+import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.core.cost.CostMethod
 import ir.vil3ntec.tohid.core.cost.CostPolicy
 import ir.vil3ntec.tohid.core.i18n.StrRisk
@@ -197,7 +199,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val money = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
-  val tabs = remember(money) { DayEndModel.tabs(ReportFreshModel.tabs(money), money) }
+  val tabs = remember(money) { HeatmapModel.tabs(DayEndModel.tabs(ReportFreshModel.tabs(money), money), money) }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
@@ -225,7 +227,13 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val dayEnd = remember(d, def.id, day) {
     if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
   }
-  val tables = dayEnd?.tables ?: view.tables
+  //  RPT-08: «ساعت و روز» از فروش‌ها و برگشت‌های دفتر در همان بازه
+  val heat = remember(d, def.id, span, today) {
+    if (def.id == HeatmapModel.TAB_ID) {
+      HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours))
+    } else null
+  }
+  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
   val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-')
 
@@ -289,7 +297,11 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
 
     /* ۳ ─ کارت‌های آماریِ همین زبانه */
-    if (dayEnd != null) DayEndSummary(dayEnd) else Summary(view, def.id, d, money)
+    when {
+      dayEnd != null -> DayEndSummary(dayEnd)
+      heat != null -> HeatmapSummary(heat)
+      else -> Summary(view, def.id, d, money)
+    }
 
     /* ۴ ─ جدول‌ها */
     if (tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)

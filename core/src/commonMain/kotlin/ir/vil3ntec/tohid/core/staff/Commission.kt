@@ -73,6 +73,24 @@ object Commission {
     return if (frac == 0) "$whole" else "$whole." + frac.toString().padStart(2, '0').trimEnd('0')
   }
 
+  /** فاکتورِ اصلِ یک برگشت: فروشنده‌اش و این‌که لغو شده یا نه */
+  data class Origin(val sellerId: String, val cancelled: Boolean = false)
+
+  /** یک ردیفِ برگشت: شناسهٔ فاکتورِ اصل و مبلغِ پس‌داده (مثبت) */
+  data class Returned(val saleId: String, val amount: Money)
+
+  /**
+   *  ردیف‌های **منفیِ** برگشت برای `compute`، به نامِ فروشندهٔ فاکتورِ اصل (نه کسی که برگشت را زد؛ POS-23)،
+   *  حتی اگر خودِ فروش در دورهٔ پیش بوده — پس پورسانتِ همان فروش پس گرفته می‌شود.
+   *  • فاکتورِ اصلِ لغوشده ⇒ بیرون: فروشش هم شمرده نشده بود (همان قاعدهٔ `ReportEngine.sales`).
+   *  • فاکتورِ اصلِ ناپیدا یا بی فروشنده ⇒ ردیفِ بی فروشنده (`unassignedBase`)، نه پنهان.
+   */
+  fun returnLines(returns: List<Returned>, origins: Map<String, Origin>): List<Line> =
+    returns.mapNotNull { r ->
+      val o = origins[r.saleId]
+      if (o?.cancelled == true) null else Line(o?.sellerId?.trim().orEmpty(), null, -r.amount)
+    }
+
   fun compute(lines: List<Line>, plan: Plan, currency: Currency): Result {
     val base = HashMap<String, Long>()
     val scaled = HashMap<String, Long>()          // مبلغ × پایه‌امتیاز، بی گرد کردن

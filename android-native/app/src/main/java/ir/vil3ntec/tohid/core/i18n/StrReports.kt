@@ -252,6 +252,11 @@ object StrReports {
   // زبانه و کارت‌ها
   val gapsTab: String get() = t("شماره‌های جاافتاده", "Missing numbers", "ورکې شمېرې")
   val gapsNow: String get() = t("همهٔ اسنادِ شماره‌دارِ دفتر — بی بازهٔ تاریخ", "All numbered documents in the ledger — no date range", "د دفتر ټول شمېره‌لرونکي سندونه — بې نېټې")
+  val gapsNone: String get() = t(
+    "هیچ شمارهٔ جاافتاده، پرش یا تکراری‌ای نیست.",
+    "No missing, jumped or duplicate numbers.",
+    "هېڅ ورکه، ټوپ شوې یا تکراري شمېره نشته.",
+  )
   val kpiMissing: String get() = t("شمارهٔ جاافتاده", "Missing numbers", "ورکې شمېرې")
   val kpiJumped: String get() = t("پرشِ شمارنده", "Counter jumps", "د شمېرونکي ټوپونه")
   val kpiDuplicates: String get() = t("شمارهٔ تکراری", "Duplicate numbers", "تکراري شمېرې")

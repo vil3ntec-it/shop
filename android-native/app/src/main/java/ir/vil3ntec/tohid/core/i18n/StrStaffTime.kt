@@ -34,6 +34,13 @@ object StrStaffTime {
     "$n ${pl(n, "irregular shift was", "irregular shifts were")} not counted (no clock-out, no clock-in, or over the cap); a manager should fix it with a new punch.",
     "$n ناسم ${pl(n, "نوبت", "نوبتونه")} (بې وتلو، بې ننوتلو یا له حد څخه زیات) ونه شمېرل شول؛ مدیر دې په نوي ثبت سره سم کړي.",
   )
+  val periods: String get() = t("۷ روز و این ماه", "Last 7 days and this month", "تېرې ۷ ورځې او دا میاشت")
+  fun weekWorked(time: String): String = t("۷ روزِ گذشته: $time", "Last 7 days: $time", "تېرې ۷ ورځې: $time")
+  fun monthWorked(time: String, days: Any): String = t(
+    "این ماه: $time در $days روز",
+    "This month: $time over $days ${pl(days, "day", "days")}",
+    "دا میاشت: $time په $days ${pl(days, "ورځ", "ورځو")} کې",
+  )
   fun clockOutFor(name: String): String = t("ثبتِ خروجِ $name", "Clock out $name", "د $name وتل ثبت کړئ")
   val commission: String get() = t("پورسانتِ این ماه", "Commission this month", "د دې میاشتې کمېشن")
   val noSales: String get() = t("فروشی ثبت نشده.", "No sales recorded.", "هېڅ پلور نه دی ثبت شوی.")

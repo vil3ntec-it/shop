@@ -22,9 +22,10 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 
 /*
  *  کلیدهای فقط‌کامپیوترِ رابطِ امروز (`PosSearchSettingsWired` با `PosPriceCheckSettingsWired`،
- *  `PosTouchSettingsWired`، `PosMoreKeysSettingsWired`، `ReportKeysSettingsWired`، `DocGapsSettingsWired` — در
- *  `SettingsLegacy` پشتِ `Platform.DESKTOP`) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن (`SettingsPortTest`).
- *  مثلِ رابطِ امروز گوشی ردیفشان را ندارد (`SettingsLayout.PHONE_HIDDEN`).
+ *  `PosTouchSettingsWired`، `PosMoreKeysSettingsWired`، `ReportKeysSettingsWired` — در `SettingsLegacy` پشتِ
+ *  `Platform.DESKTOP`) — همان کلید، همان پیش‌فرضِ خاموش و همان نوشتن (`SettingsPortTest`). مثلِ رابطِ امروز گوشی
+ *  ردیفشان را ندارد (`SettingsLayout.PHONE_HIDDEN`). «شماره‌های جاافتاده» (`DocGapsSettingsWired`) از RPT-17 زبانهٔ
+ *  گوشی هم دارد، پس در هر دو هست.
  */
 
 /** `settings/sales/smart-search`: جست‌وجوی مقاومِ صندوق (POS-04) */

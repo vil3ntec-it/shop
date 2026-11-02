@@ -111,6 +111,28 @@ object TimeClock {
     return out
   }
 
+  /** جمعِ یک بازه برای هر کارمند (گزارشِ هفته و ماه): دقیقه‌های سالم، روزهای کارکرده و نوبت‌های ناجور */
+  data class PeriodTotal(val staffId: String, val minutes: Long, val days: Int, val issues: Int)
+
+  /**
+   *  STF-07 — گزارشِ بازه‌ای. `fromDate`..`toDate` روزِ کاری به شکلِ `yyyy-MM-dd` (همان `Span.businessDate`)،
+   *  هر دو سر شامل؛ نوبت مالِ روزِ **ورودش** است، پس نوبتِ شبِ آخرِ بازه که پس از نیمه‌شب تمام شد هم داخل است.
+   *  «روز» فقط روزی است که دقیقهٔ سالم دارد؛ نوبتِ ناجور شمرده نمی‌شود و جدا (`issues`) می‌آید. نوبتِ هنوز باز
+   *  ناجور نیست (همان قاعدهٔ «امروزِ کارمندان»). کارمندی که در بازه نوبتی ندارد ردیف ندارد.
+   */
+  fun periodTotals(spans: List<Span>, fromDate: String, toDate: String): List<PeriodTotal> =
+    spans.filter { it.businessDate >= fromDate && it.businessDate <= toDate }
+      .groupBy { it.staffId }
+      .map { (id, v) ->
+        PeriodTotal(
+          staffId = id,
+          minutes = v.sumOf { it.minutes },
+          days = v.filter { it.minutes > 0 }.mapTo(HashSet()) { it.businessDate }.size,
+          issues = v.count { it.issue != null && it.issue != Issue.OPEN },
+        )
+      }
+      .sortedBy { it.staffId }
+
   /** جمعِ دقیقه‌های سالمِ هر کارمند در هر روزِ کاری، با شمارِ نوبت‌های ناجورِ همان روز. */
   fun totals(spans: List<Span>): List<DayTotal> =
     spans.groupBy { it.staffId to it.businessDate }
