@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrRisk {
   fun title(n: Any): String = t(
-    "$n هشدارِ رفتارِ غیرعادیِ صندوقدار",
+    "${asIs(n)} هشدارِ رفتارِ غیرعادیِ صندوقدار",
     "$n unusual cashier ${pl(n, "alert", "alerts")}",
     "د صندوقدار $n غیرعادي ${pl(n, "خبرتیا", "خبرتیاوې")}",
   )
@@ -21,7 +21,7 @@ object StrRisk {
   val discounts: String get() = t("تخفیف", "discounts", "تخفیفونه")
   val noSales: String get() = t("کشو بی فروش", "no-sale drawer opens", "بې پلور د دراز خلاصول")
   fun line(name: Any, kind: Any, count: Any, invoices: Any, peerCount: Any, peerInvoices: Any): String = t(
-    "$name: $count $kind در $invoices فاکتور — بقیه $peerCount در $peerInvoices",
+    "${asIs(name)}: ${asIs(count)} ${asIs(kind)} در ${asIs(invoices)} فاکتور — بقیه ${asIs(peerCount)} در ${asIs(peerInvoices)}",
     "$name: $count $kind in $invoices invoices — others $peerCount in $peerInvoices",
     "$name: $count $kind په $invoices بلونو کې — نور $peerCount په $peerInvoices کې",
   )

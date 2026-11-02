@@ -71,10 +71,10 @@ object I18n {
 
   /** نوشتهٔ یک زبان؛ جاافتاده ⇒ فارسی. دری ⇒ همان فارسی از لایهٔ واژه (`DariText`) */
   fun pick(lang: Lang, fa: String, en: String?, ps: String?): String = when (lang) {
-    Lang.FA -> fa
+    Lang.FA -> DariText.strip(fa)
     Lang.PRS -> DariText.of(fa)
-    Lang.EN -> en ?: fa
-    Lang.PS -> ps ?: fa
+    Lang.EN -> en ?: DariText.strip(fa)
+    Lang.PS -> ps ?: DariText.strip(fa)
   }
 
   /* ------------------------------ رنگِ پیام ------------------------------ */
@@ -245,6 +245,14 @@ fun t(fa: String, en: String? = null, ps: String? = null): String {
   I18n.audit?.invoke(I18n.Entry(fa, en, ps))
   return I18n.pick(I18n.lang, fa, en, ps)
 }
+
+/**
+ *  مقدارِ جای خالیِ متنِ فارسی: `t("کالای «${asIs(name)}» حذف شد", …)`. دادهٔ کاربر (نامِ کالا، مشتری،
+ *  دکان…) در دری هرگز از لایهٔ واژه نمی‌گذرد (`DariText.protect`). در فارسی، انگلیسی و پشتو همان
+ *  `toString()` ِ جای خالیِ عادیِ کاتلین است، پس خروجی بایت‌به‌بایت همان پیشین است.
+ *  ⚠️ هر جای خالیِ تازه در آرگومانِ فارسیِ `t`/`td` با همین (آزمون: `DariWordsTest`).
+ */
+fun asIs(value: Any?): String = if (I18n.lang == Lang.PRS) DariText.protect(value.toString()) else value.toString()
 
 /**
  *  مفرد یا جمع، برای جای عدد در نوشتهٔ انگلیسی و پشتو: `"$n ${pl(n, "item", "items")}"`.

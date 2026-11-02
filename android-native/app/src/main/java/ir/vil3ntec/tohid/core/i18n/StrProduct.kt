@@ -28,9 +28,9 @@ object StrProduct {
   val level: String get() = t("طبقه", "Level", "پوړ")
 
   // اقلامِ سفارش
-  fun aisleIs(a: Any): String = t("راهرو $a", "Aisle $a", "دهلیز $a")
-  fun shelfIs(a: Any): String = t("قفسه $a", "Shelf $a", "المارۍ $a")
-  fun levelIs(a: Any): String = t("طبقه $a", "Level $a", "پوړ $a")
+  fun aisleIs(a: Any): String = t("راهرو ${asIs(a)}", "Aisle $a", "دهلیز $a")
+  fun shelfIs(a: Any): String = t("قفسه ${asIs(a)}", "Shelf $a", "المارۍ $a")
+  fun levelIs(a: Any): String = t("طبقه ${asIs(a)}", "Level $a", "پوړ $a")
 
   // کالای جایگزین (PRD-24) و فیلدهای سفارشی (PRD-25)
   val alternatives: String get() = t("کالاهای جایگزین (نام یا بارکد)", "Substitute items (name or barcode)", "بدیل توکي (نوم یا بارکوډ)")
@@ -39,19 +39,19 @@ object StrProduct {
     "In order of preference, separated by commas. When this item runs out, the till suggests one in stock",
     "د غوره والي په ترتیب، په «،» سره جلا. کله چې دا توکی خلاص شي، صندوق موجود بدیل وړاندیز کوي",
   )
-  fun notFound(a: Any): String = t("پیدا نشد: $a", "Not found: $a", "ونه موندل شو: $a")
+  fun notFound(a: Any): String = t("پیدا نشد: ${asIs(a)}", "Not found: $a", "ونه موندل شو: $a")
   val customFields: String get() = t("فیلدهای سفارشی", "Custom fields", "دودیز ساحې")
   val customHint: String get() = t("هر خط «نام: مقدار»، مثلاً «گارانتی: ۱۲ ماه»", "One \"name: value\" per line, e.g. \"Warranty: 12 months\"", "هره کرښه «نوم: ارزښت»، لکه «تضمین: ۱۲ میاشتې»")
-  fun customBad(a: Any): String = t("این خط «نام: مقدار» نیست: $a", "This line is not \"name: value\": $a", "دا کرښه «نوم: ارزښت» نه ده: $a")
-  fun instead(a: Any): String = t("جایگزینِ موجود: $a", "In stock instead: $a", "موجود بدیل: $a")
+  fun customBad(a: Any): String = t("این خط «نام: مقدار» نیست: ${asIs(a)}", "This line is not \"name: value\": $a", "دا کرښه «نوم: ارزښت» نه ده: $a")
+  fun instead(a: Any): String = t("جایگزینِ موجود: ${asIs(a)}", "In stock instead: $a", "موجود بدیل: $a")
 
   // کدِ کالا (PRD-03) و کالای خدماتی (PRD-09)
   val sku: String get() = t("کدِ کالا (SKU)", "Item code (SKU)", "د توکي کوډ (SKU)")
   val skuAuto: String get() = t("ساختِ خودکار", "Generate", "په خپله جوړول")
   val skuHint: String get() = t("حرف، رقم و - _ . / — یکتا در دکان", "Letters, digits and - _ . / — unique in the shop", "توري، شمېرې او - _ . / — په دوکان کې یوازینی")
   val skuBadChar: String get() = t("فقط حرف، رقم و - _ . /", "Only letters, digits and - _ . /", "یوازې توري، شمېرې او - _ . /")
-  fun skuTooLong(a: Any): String = t("حداکثر $a نویسه", "At most $a characters", "تر $a تورو پورې")
-  fun skuTaken(a: Any, b: Any): String = t("کدِ «$a» برای «$b» ثبت شده", "Code \"$a\" already belongs to \"$b\"", "کوډ «$a» د «$b» لپاره ثبت دی")
+  fun skuTooLong(a: Any): String = t("حداکثر ${asIs(a)} نویسه", "At most $a characters", "تر $a تورو پورې")
+  fun skuTaken(a: Any, b: Any): String = t("کدِ «${asIs(a)}» برای «${asIs(b)}» ثبت شده", "Code \"$a\" already belongs to \"$b\"", "کوډ «$a» د «$b» لپاره ثبت دی")
   val stockless: String get() = t("کالای خدماتی یا بی موجودی", "Service or non-stock item", "خدماتي یا بې موجودۍ توکی")
   val stocklessHint: String get() = t(
     "فروش موجودی نمی‌خواهد و حدِ کم بودن ندارد، مثلِ دوخت یا شارژ",
@@ -67,18 +67,18 @@ object StrProduct {
     "One part per line, e.g. \"Oil 5 L × 2\". Selling the kit takes stock from its parts",
     "هره کرښه یوه برخه، لکه «غوړي ۵ لیتره × 2». د کټ پلور د برخو موجودي کموي",
   )
-  fun kitBad(a: Any): String = t("این خط درست نیست یا کالایش پیدا نشد: $a", "This line is wrong or its item was not found: $a", "دا کرښه سمه نه ده یا یې توکی ونه موندل شو: $a")
+  fun kitBad(a: Any): String = t("این خط درست نیست یا کالایش پیدا نشد: ${asIs(a)}", "This line is wrong or its item was not found: $a", "دا کرښه سمه نه ده یا یې توکی ونه موندل شو: $a")
   val kitPartGone: String get() = t("یکی از اجزای کیت دیگر در دکان نیست", "A kit part is no longer in the shop", "د کټ یوه برخه نور په دوکان کې نشته")
-  fun kitNested(a: Any): String = t("کیتِ تو در تو نمی‌شود: «$a»", "Kits cannot be nested: \"$a\"", "کټ په کټ کې نه کېږي: «$a»")
-  fun kitStock(a: Any): String = t("$a کیتِ کامل از اجزای موجود", "$a complete kits from parts in stock", "له موجودو برخو $a بشپړ کټونه")
+  fun kitNested(a: Any): String = t("کیتِ تو در تو نمی‌شود: «${asIs(a)}»", "Kits cannot be nested: \"$a\"", "کټ په کټ کې نه کېږي: «$a»")
+  fun kitStock(a: Any): String = t("${asIs(a)} کیتِ کامل از اجزای موجود", "$a complete kits from parts in stock", "له موجودو برخو $a بشپړ کټونه")
   val prices: String get() = t("قیمتِ زمان‌بندی‌شده", "Scheduled prices", "مهالویش شوې بیې")
   val pricesHint: String get() = t(
     "هر خط «از تا تا = قیمت»، مثلاً «۱۴۰۵/۱۲/۱۰ تا ۱۴۰۵/۱۲/۲۰ = 450»؛ هر دو روز شامل‌اند",
     "One \"from to to = price\" per line, e.g. \"1405/12/10 to 1405/12/20 = 450\"; both days included",
     "هره کرښه «له تر = بیه»، لکه «۱۴۰۵/۱۲/۱۰ تا ۱۴۰۵/۱۲/۲۰ = 450»؛ دواړه ورځې شاملې دي",
   )
-  fun pricesBad(a: Any): String = t("این خط درست نیست یا با بازهٔ دیگر هم‌پوشان است: $a", "This line is wrong or overlaps another range: $a", "دا کرښه سمه نه ده یا له بلې مودې سره ګډه ده: $a")
-  fun priceToday(a: Any): String = t("قیمتِ امروز: $a", "Today's price: $a", "د نن بیه: $a")
+  fun pricesBad(a: Any): String = t("این خط درست نیست یا با بازهٔ دیگر هم‌پوشان است: ${asIs(a)}", "This line is wrong or overlaps another range: $a", "دا کرښه سمه نه ده یا له بلې مودې سره ګډه ده: $a")
+  fun priceToday(a: Any): String = t("قیمتِ امروز: ${asIs(a)}", "Today's price: $a", "د نن بیه: $a")
 
   // تنوع (PRD-11)
   val variants: String get() = t("تنوع‌ها (ویژگی: مقدار، مقدار)", "Variants (attribute: value, value)", "ډولونه (ځانګړنه: ارزښت، ارزښت)")
@@ -87,18 +87,18 @@ object StrProduct {
     "One attribute per line, e.g. \"Colour: red, blue\" and \"Size: S, M\". On save each combination becomes its own item with its own barcode, price and stock",
     "هره کرښه یوه ځانګړنه، لکه «رنګ: سور، شین» او «اندازه: S، M». په ثبت سره هره ترکیب جلا توکی کېږي له خپل بارکوډ، بیې او موجودۍ سره",
   )
-  fun variantsBad(a: Any): String = t("این خط درست نیست یا ترکیب‌ها بیش از ۱۰۰ است: $a", "This line is wrong or there are over 100 combinations: $a", "دا کرښه سمه نه ده یا ترکیبونه له ۱۰۰ ډېر دي: $a")
-  fun variantsNew(a: Any): String = t("با ذخیره $a تنوعِ تازه ساخته می‌شود", "Saving creates $a new variants", "په ثبت سره $a نوي ډولونه جوړېږي")
+  fun variantsBad(a: Any): String = t("این خط درست نیست یا ترکیب‌ها بیش از ۱۰۰ است: ${asIs(a)}", "This line is wrong or there are over 100 combinations: $a", "دا کرښه سمه نه ده یا ترکیبونه له ۱۰۰ ډېر دي: $a")
+  fun variantsNew(a: Any): String = t("با ذخیره ${asIs(a)} تنوعِ تازه ساخته می‌شود", "Saving creates $a new variants", "په ثبت سره $a نوي ډولونه جوړېږي")
   val variantsMatrix: String get() = t("تنوع‌ها: قیمت · موجودی", "Variants: price · stock", "ډولونه: بیه · موجودي")
 
   // کالای سریال‌دار (POS-28)
   val serialTracked: String get() = t("کالای سریال‌دار", "Serial-numbered item", "سریال لرونکی توکی")
   val serialTrackedHint: String get() = t("هر دانه هنگامِ فروش سریال می‌خواهد؛ بی سریالِ کامل فاکتور بسته نمی‌شود", "Each unit needs a serial at sale; the invoice cannot finish without all serials", "هره دانه د پلور پر وخت سریال غواړي؛ له بشپړ سریال پرته بل نه بندېږي")
   val serials: String get() = t("سریال‌ها (هر کدام یک خط)", "Serial numbers (one per line)", "سریالونه (هر یو یوه کرښه)")
-  fun serialCount(have: Any, need: Any): String = t("$have از $need سریال", "$have of $need serials", "له $need څخه $have سریالونه")
-  fun serialMissing(name: Any, have: Any, need: Any): String = t("سریالِ «$name» کامل نیست: $have از $need — روی ردیف بزنید و سریال‌ها را بنویسید", "Serials for \"$name\" are incomplete: $have of $need — tap the line and enter them", "د «$name» سریالونه بشپړ نه دي: له $need څخه $have — پر کتار ووهئ او سریالونه ولیکئ")
-  fun serialTooMany(name: Any, have: Any, need: Any): String = t("«$name» $have سریال دارد ولی مقدار $need است", "\"$name\" has $have serials but the quantity is $need", "«$name» $have سریالونه لري خو اندازه $need ده")
-  fun serialDuplicate(a: Any): String = t("سریالِ «$a» دو بار آمده", "Serial \"$a\" appears twice", "سریال «$a» دوه ځله راغلی")
-  fun serialSold(a: Any): String = t("سریالِ «$a» پیش‌تر فروخته شده", "Serial \"$a\" was already sold", "سریال «$a» مخکې پلورل شوی")
-  fun serialWhole(a: Any): String = t("«$a» سریال‌دار است و فقط دانه‌ای فروخته می‌شود", "\"$a\" is serial-numbered and sells only in whole units", "«$a» سریال لري او یوازې په دانه پلورل کېږي")
+  fun serialCount(have: Any, need: Any): String = t("${asIs(have)} از ${asIs(need)} سریال", "$have of $need serials", "له $need څخه $have سریالونه")
+  fun serialMissing(name: Any, have: Any, need: Any): String = t("سریالِ «${asIs(name)}» کامل نیست: ${asIs(have)} از ${asIs(need)} — روی ردیف بزنید و سریال‌ها را بنویسید", "Serials for \"$name\" are incomplete: $have of $need — tap the line and enter them", "د «$name» سریالونه بشپړ نه دي: له $need څخه $have — پر کتار ووهئ او سریالونه ولیکئ")
+  fun serialTooMany(name: Any, have: Any, need: Any): String = t("«${asIs(name)}» ${asIs(have)} سریال دارد ولی مقدار ${asIs(need)} است", "\"$name\" has $have serials but the quantity is $need", "«$name» $have سریالونه لري خو اندازه $need ده")
+  fun serialDuplicate(a: Any): String = t("سریالِ «${asIs(a)}» دو بار آمده", "Serial \"$a\" appears twice", "سریال «$a» دوه ځله راغلی")
+  fun serialSold(a: Any): String = t("سریالِ «${asIs(a)}» پیش‌تر فروخته شده", "Serial \"$a\" was already sold", "سریال «$a» مخکې پلورل شوی")
+  fun serialWhole(a: Any): String = t("«${asIs(a)}» سریال‌دار است و فقط دانه‌ای فروخته می‌شود", "\"$a\" is serial-numbered and sells only in whole units", "«$a» سریال لري او یوازې په دانه پلورل کېږي")
 }

@@ -12,8 +12,9 @@ package ir.vil3ntec.tohid.core.text
  *
  *  خط، راست‌به‌چپ، رقم و قالبِ پول همان فارسی است. کدِ مشترک (commonMain) تا اندروید، کامپیوتر و آیفون
  *  یکی باشند. فهرست را صاحب‌کار واژه‌به‌واژه بازبینی می‌کند؛ واژهٔ تازه فقط با آزمون (`DariTextTest`).
- *  محدودیت: نامی که درونِ نوشته جاسازی شده (مثلاً نامِ کالا در پیام) هم از همین لایه می‌گذرد — فقط نمایش؛
- *  داده دست نمی‌خورد.
+ *  دادهٔ کاربر هرگز عوض نمی‌شود: هر جای خالیِ متنِ فارسیِ `Str*` با `asIs(…)` (`core/i18n/I18n.kt`) در
+ *  [protect] پیچیده می‌شود و [of] فقط متنِ خودِ برنامه را می‌گرداند — «گوشی سامسونگ» ِ نامِ کالا یا
+ *  «فروشگاه کریم» ِ نامِ مشتری در پیامِ دری همان‌طور که نوشته شده دیده می‌شود.
  */
 object DariText {
 
@@ -114,20 +115,68 @@ object DariText {
 
   private fun hasPersian(s: String): Boolean = s.any { it in '\u0600'..'\u06FF' }
 
-  /** نوشتهٔ فارسی ⇒ دری. نوشتهٔ بی واژهٔ فهرست، همان رشته (بی کپی) برمی‌گردد. */
+  /** آغاز و پایانِ مقدارِ جای خالی (نویسهٔ کاربردِ خصوصی؛ هرگز دیده نمی‌شود) */
+  const val OPEN: Char = '\uE000'
+  const val CLOSE: Char = '\uE001'
+
+  /** مقدارِ جای خالی (نامِ کالا، مشتری، دکان، عدد…) که [of] دست نمی‌زند */
+  fun protect(value: String): String = "$OPEN$value$CLOSE"
+
+  /** نشانه‌های [protect] را برمی‌دارد؛ بی نشانه ⇒ همان رشته */
+  fun strip(s: String): String =
+    if (s.indexOf(OPEN) < 0 && s.indexOf(CLOSE) < 0) s else s.filter { it != OPEN && it != CLOSE }
+
+  /**
+   *  نوشتهٔ فارسی ⇒ دری. بخشِ [protect]‌شده (دادهٔ کاربر) بایت‌به‌بایت همان می‌ماند و فقط متنِ
+   *  خودِ برنامه از فهرست می‌گذرد. نوشتهٔ بی واژهٔ فهرست و بی نشانه، همان رشته (بی کپی) برمی‌گردد.
+   */
   fun of(fa: String): String {
     PHRASES[fa]?.let { return it }
+    if (fa.indexOf(OPEN) < 0 && fa.indexOf(CLOSE) < 0) return if (hasPersian(fa)) words(fa, false, false) else fa
+    val sb = StringBuilder(fa.length)
+    var i = 0
+    var gluedLeft = false
+    while (i < fa.length) {
+      val open = fa.indexOf(OPEN, i).let { if (it < 0) fa.length else it }
+      var close = fa.length
+      if (open < fa.length) {
+        var depth = 0
+        var j = open
+        while (j < fa.length) {
+          if (fa[j] == OPEN) depth++ else if (fa[j] == CLOSE && --depth == 0) break
+          j++
+        }
+        close = j
+      }
+      val seg = strip(fa.substring(i, open))
+      val inside = if (open < fa.length) strip(fa.substring(open + 1, minOf(close, fa.length))) else ""
+      //  واژه‌ای که به دادهٔ کاربر چسبیده (بی فاصله) تکه‌ای از واژهٔ دیگر است ⇒ دست نمی‌خورد
+      val gluedRight = inside.isNotEmpty() && inWord(inside[0])
+      sb.append(words(seg, gluedLeft, gluedRight)).append(inside)
+      gluedLeft = when {
+        inside.isNotEmpty() -> inWord(inside[inside.length - 1])
+        seg.isNotEmpty() -> inWord(seg[seg.length - 1])
+        else -> gluedLeft
+      }
+      i = close + 1
+    }
+    return sb.toString()
+  }
+
+  /** واژه‌نامه روی یک تکه متنِ برنامه؛ [gluedLeft]/[gluedRight]: دادهٔ کاربر بی فاصله پیش/پس از آن */
+  private fun words(fa: String, gluedLeft: Boolean, gluedRight: Boolean): String {
     if (!hasPersian(fa)) return fa
     var out: StringBuilder? = null
     var i = 0
     var copied = 0
     scan@ while (i < fa.length) {
-      if (i == 0 || !inWord(fa[i - 1])) {
+      if (if (i == 0) !gluedLeft else !inWord(fa[i - 1])) {
         for (k in KEEP) if (fa.startsWith(k, i)) { i += k.length; continue@scan }
         for (w in WORDS) {
           if (!fa.startsWith(w.fa, i)) continue
           var j = i + w.fa.length
           while (j < fa.length && inWord(fa[j])) j++
+          if (j == fa.length && gluedRight) continue
           val dari = render(w, fa.substring(i + w.fa.length, j)) ?: continue
           val sb = out ?: StringBuilder(fa.length + 8).also { out = it }
           sb.appendRange(fa, copied, i).append(dari)

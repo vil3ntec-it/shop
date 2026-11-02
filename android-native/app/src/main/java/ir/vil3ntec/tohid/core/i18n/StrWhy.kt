@@ -15,10 +15,10 @@ object StrWhy {
   val title: String get() = t("چرا این قیمت؟", "Why this price?", "ولې دا بیه؟")
   val list: String get() = t("قیمتِ فهرستِ کالا (هر واحد)", "Item list price (each)", "د توکي د لړلیک بیه (هر واحد)")
   val manual: String get() = t("قیمتِ دستیِ همین ردیف (هر واحد)", "Manual price on this line (each)", "د همدې کرښې لاسي بیه (هر واحد)")
-  fun cheaper(a: Any): String = t("$a ؋ زیرِ فهرست", "$a ؋ below the list", "$a ؋ له لړلیک ټیټه")
-  fun dearer(a: Any): String = t("$a ؋ بالای فهرست", "$a ؋ above the list", "$a ؋ له لړلیک لوړه")
+  fun cheaper(a: Any): String = t("${asIs(a)} ؋ زیرِ فهرست", "$a ؋ below the list", "$a ؋ له لړلیک ټیټه")
+  fun dearer(a: Any): String = t("${asIs(a)} ؋ بالای فهرست", "$a ؋ above the list", "$a ؋ له لړلیک لوړه")
   val base: String get() = t("جمع پیش از تخفیفِ خودکار", "Before automatic discounts", "له خپلکاره تخفیف مخکې")
-  fun promo(a: Any): String = t("تخفیفِ خودکار: $a", "Automatic discount: $a", "خپلکاره تخفیف: $a")
+  fun promo(a: Any): String = t("تخفیفِ خودکار: ${asIs(a)}", "Automatic discount: $a", "خپلکاره تخفیف: $a")
   val rounding: String get() = t("گرد کردن", "Rounding", "ګردول")
   val total: String get() = t("جمعِ این ردیف", "Line total", "د دې کرښې ټولټال")
 }

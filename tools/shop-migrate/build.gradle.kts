@@ -42,6 +42,8 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
+  //  I18n.kt دری را از لایهٔ واژهٔ core می‌گیرد (`DariText`، کاتلینِ خالص)
+  "ir/vil3ntec/tohid/core/text/DariText.kt",
   //  LocaleFormat گرد کردن را از `mathRound` (برگردانِ دقیقِ Math.round، کاتلینِ خالص) می‌گیرد
   "ir/vil3ntec/tohid/core/money/MathRound.kt",
   //  Format.kt و Jalali.kt نوشته‌ها و تاریخِ نمایشی را از جدولِ سه‌زبانه می‌گیرند (کاتلینِ خالص)؛

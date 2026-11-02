@@ -13,16 +13,16 @@ object StrExpenses {
   // صفحهٔ مصارف
   val subtitle: String get() = t("هزینه‌های ثبت‌شده فروشگاه", "Recorded shop expenses", "د دوکان ثبت شوي لګښتونه")
   val month: String get() = t("ماه", "Month", "میاشت")
-  fun monthTotal(m: Any): String = t("جمع مصارف $m", "Total expenses for $m", "د $m ټول لګښتونه")
-  fun rows(n: Any): String = t("$n ردیف", "$n ${pl(n, "entry", "entries")}", "$n ${pl(n, "کرښه", "کرښې")}")
+  fun monthTotal(m: Any): String = t("جمع مصارف ${asIs(m)}", "Total expenses for $m", "د $m ټول لګښتونه")
+  fun rows(n: Any): String = t("${asIs(n)} ردیف", "$n ${pl(n, "entry", "entries")}", "$n ${pl(n, "کرښه", "کرښې")}")
   val byCategory: String get() = t("به تفکیک دسته‌بندی", "By category", "د ډلې له مخې")
-  fun categoriesIn(n: Any, m: Any): String = t("$n دسته در $m", "$n ${pl(n, "category", "categories")} in $m", "په $m کې $n ${pl(n, "ډله", "ډلې")}")
+  fun categoriesIn(n: Any, m: Any): String = t("${asIs(n)} دسته در ${asIs(m)}", "$n ${pl(n, "category", "categories")} in $m", "په $m کې $n ${pl(n, "ډله", "ډلې")}")
   val allExpenses: String get() = t("همهٔ مصارف", "All expenses", "ټول لګښتونه")
-  fun expensesOf(c: Any): String = t("مصارف «$c»", "“$c” expenses", "د «$c» لګښتونه")
+  fun expensesOf(c: Any): String = t("مصارف «${asIs(c)}»", "“$c” expenses", "د «$c» لګښتونه")
   val noneThisMonth: String get() = t("در این ماه مصرفی ثبت نشده است.", "No expenses recorded this month.", "په دې میاشت کې لګښت نه دی ثبت شوی.")
   val newExpense: String get() = t("مصرف تازه", "New expense", "نوی لګښت")
   val editExpense: String get() = t("ویرایش مصرف", "Edit expense", "لګښت سمول")
-  fun byCategoryTitle(m: Any): String = t("مصارف $m به تفکیک دسته", "Expenses for $m by category", "د $m لګښتونه د ډلې له مخې")
+  fun byCategoryTitle(m: Any): String = t("مصارف ${asIs(m)} به تفکیک دسته", "Expenses for $m by category", "د $m لګښتونه د ډلې له مخې")
   val tapCategory: String get() = t("روی هر دسته بزنید تا فقط مصارفِ همان دیده شود", "Tap a category to see only its expenses", "پر یوې ډلې ټک وکړئ چې یوازې د هماغې لګښتونه ښکاره شي")
   val showAllCategories: String get() = t("نمایش همهٔ دسته‌ها", "Show all categories", "ټولې ډلې وښایاست")
 
@@ -37,7 +37,7 @@ object StrExpenses {
   val deleted: String get() = t("با موفقیت حذف شد", "Expense removed", "لګښت لرې شو")
   val deleteTitle: String get() = t("حذف مصرف؟", "Delete this expense?", "دا لګښت لرې کړئ؟")
   fun deleteBody(title: Any, amount: Any): String = t(
-    "«$title» به مبلغ $amount ؋ حذف می‌شود.",
+    "«${asIs(title)}» به مبلغ ${asIs(amount)} ؋ حذف می‌شود.",
     "“$title” for $amount ؋ will be deleted.",
     "«$title» د $amount ؋ په مبلغ لرې کېږي.",
   )
@@ -46,7 +46,7 @@ object StrExpenses {
   val expenseNotFound: String get() = t("مصرف پیدا نشد", "Expense not found", "لګښت ونه موندل شو")
 
   // سابقهٔ عملیات
-  fun eventsCount(n: Any): String = t("$n رویداد ثبت‌شده", "$n recorded ${pl(n, "event", "events")}", "$n ثبت شوې ${pl(n, "پېښه", "پېښې")}")
+  fun eventsCount(n: Any): String = t("${asIs(n)} رویداد ثبت‌شده", "$n recorded ${pl(n, "event", "events")}", "$n ثبت شوې ${pl(n, "پېښه", "پېښې")}")
   val noEvents: String get() = t("هنوز رویدادی ثبت نشده است.", "No events recorded yet.", "لا تر اوسه هېڅ پېښه نه ده ثبت شوې.")
 
   // نوعِ رویداد (همان AUDIT_TYPE_LABELS ِ نسخهٔ وب)

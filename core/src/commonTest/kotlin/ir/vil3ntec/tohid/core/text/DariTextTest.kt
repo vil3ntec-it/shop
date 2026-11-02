@@ -90,4 +90,34 @@ class DariTextTest {
     //  فهرست کوتاه می‌ماند؛ هر واژهٔ تازه با بازبینیِ صاحب‌کار
     assertTrue(DariText.WORDS.size <= 24)
   }
+
+  private fun p(s: String) = DariText.protect(s)
+
+  @Test
+  fun userDataInsideAMessageIsNeverChanged() {
+    val product = "گوشی سامسونگ انبار"
+    assertEquals("مبایل «$product» به گدام رفت", DariText.of("گوشی «${p(product)}» به انبار رفت"))
+    val customer = "فروشگاه کریم"
+    assertEquals("$customer — 500 ؋ قرض‌داریم", DariText.of("${p(customer)} — ${p("500")} ؋ بدهکاریم"))
+    //  همان دادهٔ بی نشانه در متنِ برنامه دری می‌شد؛ نشانه است که نگهش می‌دارد
+    assertEquals("مبایل سامسونگ گدام", DariText.of(product))
+    //  هیچ نشانه‌ای در خروجی نمی‌ماند
+    val out = DariText.of("${p("گوشی")}${p("")} و ${p("انبار")}")
+    assertEquals("گوشی و انبار", out)
+    assertTrue(out.none { it == DariText.OPEN || it == DariText.CLOSE })
+  }
+
+  @Test
+  fun aWordGluedToUserDataIsNotTouched() {
+    //  «پیش‌» از داده + «انبار» ِ متن = یک واژه؛ «انبار» + «گردانی» ِ داده هم
+    assertEquals("پیش‌انبار", DariText.of("${p("پیش‌")}انبار"))
+    assertEquals("انبارگردانی", DariText.of("انبار${p("گردانی")}"))
+    assertEquals("12 گدام", DariText.of("${p("12")} انبار"))
+  }
+
+  @Test
+  fun stripRemovesOnlyTheMarkers() {
+    assertSame("گوشی", DariText.strip("گوشی"))
+    assertEquals("کالای گوشی", DariText.strip("کالای ${p("گوشی")}"))
+  }
 }

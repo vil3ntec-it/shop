@@ -29,9 +29,9 @@ object StrTill {
   val who: String get() = t("کی پشتِ صندوق است؟", "Who is at the till?", "څوک په صندوق کې دی؟")
   val deviceCode: String get() = t("با رمزِ دستگاه", "With the device code", "د وسیلې د رمز سره")
   val back: String get() = t("برگشت به فهرست", "Back to the list", "لړلیک ته بېرته")
-  fun atTill(name: String): String = t("پشتِ صندوق: $name", "At the till: $name", "په صندوق کې: $name")
+  fun atTill(name: String): String = t("پشتِ صندوق: ${asIs(name)}", "At the till: $name", "په صندوق کې: $name")
   fun lockedUser(name: String): String = t(
-    "PIN ِ «$name» پس از خطاهای پیاپی قفل است.",
+    "PIN ِ «${asIs(name)}» پس از خطاهای پیاپی قفل است.",
     "$name's PIN is locked after repeated mistakes.",
     "د «$name» PIN له پرله‌پسې تېروتنو وروسته قفل دی.",
   )
@@ -40,11 +40,11 @@ object StrTill {
   val askApproval: String get() = t("درخواستِ تأیید", "Ask for approval", "د تایید غوښتنه")
   val priceTitle: String get() = t("تغییرِ قیمت بیرون از قاعده", "Price change outside the rule", "له قاعدې بهر د بیې بدلون")
   fun priceSummary(product: String, from: String, to: String): String = t(
-    "«$product»: از $from به $to",
+    "«${asIs(product)}»: از ${asIs(from)} به ${asIs(to)}",
     "\"$product\": from $from to $to",
     "«$product»: له $from څخه $to ته",
   )
-  fun approvedBy(name: String): String = t("تأیید شد: $name", "Approved: $name", "تایید شو: $name")
+  fun approvedBy(name: String): String = t("تأیید شد: ${asIs(name)}", "Approved: $name", "تایید شو: $name")
 
   // ── S50 · راهنمای کلیدِ هر صفحه ──
   val keyHelpTitle: String get() = t("راهنمای کلیدِ هر صفحه (F1 و Ctrl)", "Per-screen key help (F1 and Ctrl)", "د هرې پاڼې د کیلي لارښود (F1 او Ctrl)")
@@ -57,17 +57,17 @@ object StrTill {
 
   // ── S28b · ساعتِ دستگاه ──
   fun clockBehind(gap: String): String = t(
-    "ساعتِ این دستگاه $gap عقب است — ساعت و تاریخ را درست کنید. فاکتور با ساعتِ دستگاه ثبت می‌شود و «تاریخِ تصحیح‌شده» را سرور کنارش می‌گذارد.",
+    "ساعتِ این دستگاه ${asIs(gap)} عقب است — ساعت و تاریخ را درست کنید. فاکتور با ساعتِ دستگاه ثبت می‌شود و «تاریخِ تصحیح‌شده» را سرور کنارش می‌گذارد.",
     "This device's clock is $gap behind — fix the time and date. Invoices keep the device time and the server adds the corrected date.",
     "د دې وسیلې ساعت $gap وروسته دی — ساعت او نېټه سمه کړئ. بل د وسیلې په ساعت ثبتېږي او سرور «سمه شوې نېټه» ورسره ږدي.",
   )
   fun clockAhead(gap: String): String = t(
-    "ساعتِ این دستگاه $gap جلو است — ساعت و تاریخ را درست کنید. فاکتور با ساعتِ دستگاه ثبت می‌شود و «تاریخِ تصحیح‌شده» را سرور کنارش می‌گذارد.",
+    "ساعتِ این دستگاه ${asIs(gap)} جلو است — ساعت و تاریخ را درست کنید. فاکتور با ساعتِ دستگاه ثبت می‌شود و «تاریخِ تصحیح‌شده» را سرور کنارش می‌گذارد.",
     "This device's clock is $gap ahead — fix the time and date. Invoices keep the device time and the server adds the corrected date.",
     "د دې وسیلې ساعت $gap مخکې دی — ساعت او نېټه سمه کړئ. بل د وسیلې په ساعت ثبتېږي او سرور «سمه شوې نېټه» ورسره ږدي.",
   )
-  fun gapDays(days: String): String = t("$days روز", "$days days", "$days ورځې")
-  fun gapHours(hours: String): String = t("$hours ساعت", "$hours hours", "$hours ساعته")
-  fun gapMinutes(minutes: String): String = t("$minutes دقیقه", "$minutes minutes", "$minutes دقیقې")
+  fun gapDays(days: String): String = t("${asIs(days)} روز", "$days days", "$days ورځې")
+  fun gapHours(hours: String): String = t("${asIs(hours)} ساعت", "$hours hours", "$hours ساعته")
+  fun gapMinutes(minutes: String): String = t("${asIs(minutes)} دقیقه", "$minutes minutes", "$minutes دقیقې")
   val correctedDate: String get() = t("تاریخِ تصحیح‌شده", "Corrected date", "سمه شوې نېټه")
 }

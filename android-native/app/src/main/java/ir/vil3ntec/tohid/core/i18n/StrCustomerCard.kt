@@ -15,7 +15,7 @@ object StrCustomerCard {
     "هر پېرودونکی یو بې‌ساری کوډ اخلي چې چاپېږي. په صندوق کې د همدې کوډ لوستل پېرودونکی ټاکي، نه توکی؛ هغه کوډ چې د توکي بارکوډ دی تل توکی پاتې کېږي.",
   )
   val title: String get() = t("کارتِ مشتری", "Customer card", "د پېرودونکي کارت")
-  fun current(code: Any): String = t("کارت: $code", "Card: $code", "کارت: $code")
+  fun current(code: Any): String = t("کارت: ${asIs(code)}", "Card: $code", "کارت: $code")
   val none: String get() = t("بی کارت", "No card", "کارت نشته")
   val generate: String get() = t("ساختنِ کدِ تازه", "Generate a new code", "نوی کوډ جوړ کړئ")
   val manual: String get() = t("کدِ کارتِ چاپ‌شده (۸ تا ۲۰ رقم)", "Printed card code (8 to 20 digits)", "د چاپ شوي کارت کوډ (۸ تر ۲۰ عددونه)")
@@ -26,8 +26,8 @@ object StrCustomerCard {
   val removed: String get() = t("کارت برداشته شد", "Card removed", "کارت لرې شو")
   val notSaved: String get() = t("ذخیره نشد — دوباره بزنید", "Not saved — try again", "خوندي نه شو — بیا هڅه وکړئ")
   val close: String get() = t("بستن", "Close", "بندول")
-  fun picked(name: Any): String = t("مشتری انتخاب شد: $name", "Customer selected: $name", "پېرودونکی وټاکل شو: $name")
-  fun printLabel(name: Any): String = t("کارتِ $name", "Card of $name", "د $name کارت")
+  fun picked(name: Any): String = t("مشتری انتخاب شد: ${asIs(name)}", "Customer selected: $name", "پېرودونکی وټاکل شو: $name")
+  fun printLabel(name: Any): String = t("کارتِ ${asIs(name)}", "Card of $name", "د $name کارت")
 
   val reasonEmpty: String get() = t("کد خالی است", "The code is empty", "کوډ تش دی")
   val reasonDigits: String get() = t("کد فقط رقم باشد", "Digits only", "کوډ دې یوازې عددونه وي")

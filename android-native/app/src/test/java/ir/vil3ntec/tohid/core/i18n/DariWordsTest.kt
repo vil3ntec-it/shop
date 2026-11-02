@@ -81,20 +81,26 @@ class DariWordsTest {
   /** یک نوشتهٔ جدول: متنِ فارسیِ ردیف و خروجیِ فارسی و دری */
   private class Row(val key: String, val fa: String, val outFa: String, val faOfDari: String, val outDari: String)
 
-  /** همهٔ ویژگی‌ها و تابع‌های `I18nTables` (همان روشِ `I18nCoverageTest`) */
+  private fun methods(table: Any) = table.javaClass.declaredMethods.filter {
+    Modifier.isPublic(it.modifiers) && !Modifier.isStatic(it.modifiers) && !it.isSynthetic && it.returnType == String::class.java
+  }
+
+  /** آرگومانِ نگهبان (همان روشِ `I18nCoverageTest`)؛ [text] برای جای خالیِ متنی */
+  private fun argsFor(m: java.lang.reflect.Method, text: (Int) -> String = { (7301 + it).toString() }): Array<Any> =
+    m.parameterTypes.mapIndexed { i, type ->
+      when (type) {
+        Int::class.javaPrimitiveType, Int::class.javaObjectType -> 7301 + i
+        Long::class.javaPrimitiveType, Long::class.javaObjectType -> 7301L + i
+        Boolean::class.javaPrimitiveType, Boolean::class.javaObjectType -> true
+        else -> text(i)
+      }
+    }.toTypedArray()
+
+  /** همهٔ ویژگی‌ها و تابع‌های `I18nTables` */
   private fun rows(): List<Row> {
     val out = ArrayList<Row>()
-    for (table in I18nTables.all) for (m in table.javaClass.declaredMethods) {
-      if (!Modifier.isPublic(m.modifiers) || Modifier.isStatic(m.modifiers) || m.isSynthetic) continue
-      if (m.returnType != String::class.java) continue
-      val args = m.parameterTypes.mapIndexed { i, type ->
-        when (type) {
-          Int::class.javaPrimitiveType, Int::class.javaObjectType -> 7301 + i
-          Long::class.javaPrimitiveType, Long::class.javaObjectType -> 7301L + i
-          Boolean::class.javaPrimitiveType, Boolean::class.javaObjectType -> true
-          else -> (7301 + i).toString()
-        }
-      }.toTypedArray()
+    for (table in I18nTables.all) for (m in methods(table)) {
+      val args = argsFor(m)
       var entry: I18n.Entry? = null
       I18n.audit = { entry = it }
       I18n.source = { Lang.FA }
@@ -177,5 +183,44 @@ class DariWordsTest {
     assertEquals(I18n.Tone.ERROR, I18n.toneOf("ذخیره نشد", Lang.PRS))
     assertEquals("مبایل را وصل کنید", GuideText("گوشی را وصل کنید").of("prs"))
     assertEquals("گوشی را وصل کنید", GuideText("گوشی را وصل کنید").of("fa"))
+  }
+
+  /* ------------------- دادهٔ کاربر در دری دست نمی‌خورد ------------------- */
+
+  @Test fun `نامِ کالا و مشتری درونِ پیامِ دری بایت‌به‌بایت همان است`() {
+    I18n.source = { Lang.PRS }
+    val product = "گوشی سامسونگ انبار"
+    assertEquals("حرکات گدام — $product", StrStock.movementsTitle(product))
+    val customer = "فروشگاه کریم"
+    assertEquals("$customer — 500 ؋ قرض‌داریم", StrMoney.owedLine(customer, "500"))
+    //  فارسی همان پیشین
+    I18n.source = { Lang.FA }
+    assertEquals("حرکات انبار — $product", StrStock.movementsTitle(product))
+    assertEquals("$customer — 500 ؋ بدهکاریم", StrMoney.owedLine(customer, "500"))
+  }
+
+  @Test fun `هر جای خالیِ متنی در همهٔ جدول‌ها در دری همان‌طور که داده شده دیده می‌شود`() {
+    //  داده‌ای پر از واژه‌های فهرست: اگر جای خالیِ تازه‌ای بی asIs بیاید، این‌جا «مبایل/گدام» می‌شود
+    val data = { i: Int -> "گوشی انبار فروشگاه کارمند ${7301 + i}" }
+    val bad = ArrayList<String>()
+    var seen = 0
+    for (table in I18nTables.all) for (m in methods(table)) {
+      if (m.parameterCount == 0) continue
+      val args = argsFor(m, data)
+      I18n.source = { Lang.FA }
+      //  تابعی که جای خالی‌اش را عدد می‌خواند (متنِ نگهبان را نمی‌پذیرد) این‌جا سنجیده نمی‌شود
+      val fa = try { m.invoke(table, *args) as String } catch (e: java.lang.reflect.InvocationTargetException) { continue }
+      I18n.source = { Lang.PRS }
+      val dari = m.invoke(table, *args) as String
+      for (a in args.filterIsInstance<String>()) {
+        if (!fa.contains(a)) continue
+        seen++
+        if (!dari.contains(a)) bad += "${table.javaClass.simpleName}.${m.name}: «$dari»"
+      }
+      assertFalse("${m.name}: نشانه در خروجی", dari.any { it == DariText.OPEN || it == DariText.CLOSE })
+    }
+    println("dari: $seen text placeholders checked")
+    assertTrue("جای خالیِ متنی پیدا نشد", seen > 300)
+    assertTrue("دادهٔ کاربر در دری عوض شد (asIs جا افتاده):\n" + bad.joinToString("\n"), bad.isEmpty())
   }
 }

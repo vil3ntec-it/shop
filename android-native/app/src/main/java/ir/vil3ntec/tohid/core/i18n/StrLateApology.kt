@@ -8,7 +8,7 @@ package ir.vil3ntec.tohid.core.i18n
 object StrLateApology {
 
   val title: String get() = t("پوزش و کوپنِ خودکارِ تأخیر", "Automatic apology and coupon for delays", "د ځنډ لپاره اتومات بښنه او کوپون")
-  fun on(minutes: String): String = t("روشن — پس از $minutes دقیقه تأخیر", "On — after $minutes minutes late", "فعال — له $minutes دقیقو ځنډ وروسته")
+  fun on(minutes: String): String = t("روشن — پس از ${asIs(minutes)} دقیقه تأخیر", "On — after $minutes minutes late", "فعال — له $minutes دقیقو ځنډ وروسته")
   val off: String get() = t("خاموش", "Off", "بند")
   val switchOn: String get() = t("روشن", "On", "فعال")
   val note: String get() = t(
@@ -38,9 +38,9 @@ object StrLateApology {
   val readOnly: String get() = t("فقط صاحب و مدیرِ دکان این تنظیم را عوض می‌کنند.", "Only the shop owner and managers can change this setting.", "یوازې د دوکان خاوند او مدیران دا تنظیم بدلولی شي.")
   val recent: String get() = t("پوزش‌های اخیر", "Recent apologies", "وروستۍ بښنې")
   fun recentLine(orderNo: String, minutes: String, at: String): String =
-    t("سفارش #$orderNo · $minutes دقیقه دیر · $at", "Order #$orderNo · $minutes min late · $at", "فرمایش #$orderNo · $minutes دقیقې ځنډ · $at")
+    t("سفارش #${asIs(orderNo)} · ${asIs(minutes)} دقیقه دیر · ${asIs(at)}", "Order #$orderNo · $minutes min late · $at", "فرمایش #$orderNo · $minutes دقیقې ځنډ · $at")
   val skipped: String get() = t("تأخیرِ کارِ مشتری — بی پیام", "Customer-caused delay — no message", "د پېرودونکي له امله ځنډ — بې پیغامه")
-  fun couponLast(last4: String): String = t("کوپنِ …$last4", "Coupon …$last4", "کوپون …$last4")
+  fun couponLast(last4: String): String = t("کوپنِ …${asIs(last4)}", "Coupon …$last4", "کوپون …$last4")
   val redeemed: String get() = t("به کار رفت", "used", "وکارول شو")
   val queued: String get() = t("در صفِ پیام", "queued", "په لیکه کې")
 }
