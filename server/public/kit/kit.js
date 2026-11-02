@@ -1,7 +1,7 @@
 /*
  * کیتِ مشترکِ وبِ خریدار (بازارچه + ویترین). بی وابستگی و بی innerHTML برای داده:
  * هر متنی که از سرور می‌آید با textContent می‌نشیند (XSS). CSP: فقط همین مبدأ.
- * سه زبان (fa پیش‌فرض، en، ps): هر متنِ صفحه از واژه‌نامهٔ /kit/i18n/<زبان>.json با
+ * چهار زبان (fa پیش‌فرض، prs، en، ps): هر متنِ صفحه از واژه‌نامهٔ /kit/i18n/<زبان>.json با
  * K.t(کلید)؛ HTML با data-t / data-ta (aria-label) / data-tp (placeholder).
  * حافظهٔ مرورگر ممکن است بسته باشد؛ صفحه بی آن هم کار می‌کند.
  */
@@ -24,7 +24,8 @@
   K.t = function (key, v) {
     //  مفرد (en/ps): «‎.1‎» وقتی شمار یک است
     if (v && (v.n === '1' || v.n === '۱') && own(DICT, key + '.1')) key += '.1';
-    var s = own(DICT, key) ? DICT[key] : own(K.FB, key) ? K.FB[key] : '';
+    //  prs: قالبِ fa از dari.js، پیش از v (داده هرگز)
+    var s = (V.tx || String)(own(DICT, key) ? DICT[key] : own(K.FB, key) ? K.FB[key] : '', key);
     return v ? s.replace(/\{(\w+)\}/g, function (m, k) { return v[k] === undefined ? m : v[k]; }) : s;
   };
   K.has = function (key) { return own(DICT, key); };
@@ -39,7 +40,7 @@
   K.part = function (name, root) {
     return ready.then(function () {
       if (!parts[name]) {
-        var url = '/kit/i18n/' + name + '.' + LANG + '.json';
+        var url = '/kit/i18n/' + name + '.' + (V.src || LANG) + '.json';
         var get = function () {
           return fetch(url, { credentials: 'omit' }).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); });
         };
@@ -70,6 +71,7 @@
     }
     return e;
   };
+  K.js = function (src) { return new Promise(function (ok, no) { document.head.appendChild(K.el('script', { attrs: { src: src }, on: { load: ok, error: no } })); }); };
   K.clear = function (e) { while (e.firstChild) e.removeChild(e.firstChild); return e; };
 
   // ── نشانه‌ها (خطی، ۲۴×۲۴)؛ نشانه‌های جهت‌دار در en آینه می‌شوند ──
@@ -378,9 +380,9 @@
   K.setLang = function (l) {
     if (V.setLang) V.setLang(l);
     var q = location.search.replace(/([?&])lang=[^&]*(&|$)/, '$1').replace(/[?&]$/, '');
-    location.replace(location.pathname + q + location.hash);
+    if (q == location.search) location.reload(); else location.replace(location.pathname + q + location.hash);
   };
-  var LANGS = [['fa', 'فارسی'], ['en', 'English'], ['ps', 'پښتو']];
+  var LANGS = [['fa', 'فارسی'], ['prs', 'دری'], ['en', 'English'], ['ps', 'پښتو']];
 
   // ── تنظیمات (پنجره): زبان، تم و شمارهٔ تأییدشدهٔ همین دستگاه ──
   function radios(name, list, cur, on, label) {
@@ -441,6 +443,8 @@
   }
   var ready = Promise.all([
     V.dict.then(function (d) { DICT = d || {}; }),
+    //  dari.js نیامد ⇒ فارسی با lang=fa
+    LANG == 'prs' && K.js('/kit/dari.js').catch(function () { document.documentElement.lang = 'fa'; }),
     //  کیت «defer» است: تا DOMContentLoaded صبر می‌کند تا اسکریپتِ صفحه هم اجرا شده باشد
     new Promise(function (r) { if (document.readyState === 'complete') r(); else document.addEventListener('DOMContentLoaded', r); }),
   ]).then(function () {

@@ -119,7 +119,7 @@ test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', (
   for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
-    const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
+    const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|دری|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
     assert.deepEqual(hits, [], `${f}: متنِ ثابت`);
   }
 });
