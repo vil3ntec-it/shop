@@ -161,6 +161,7 @@ object SettingsSearchIndex {
     L.PERIPHERALS to kw("دستگاه چاپگر ترازو نمایشگر", "devices printer scale display", "وسیلې"),
     L.CAMERA to kw("دوربین بارکد اسکن", "camera barcode scan", "کمره بارکوډ"),
     L.EASY_SETUP to kw("راه‌اندازی آسان", "easy setup", "اسانه چمتو کول"),
+    L.WEBCAM to kw("وب کم دوربین کامپیوتر لپ تاپ بارکدخوان اسکن", "webcam camera laptop barcode scanner scan", "ویب کم کمره کمپیوټر بارکوډ سکن"),
     L.SCAN_CASH to kw("کارت فرمان فروش نقدی اسکنر بارکدخوان بی برنامه", "command card cash sale scanner background", "د امر کارت نغده پلور سکنر"),
     //  داده و پشتیبان
     "همگام‌سازی" to kw("همگام‌سازی سینک سرور", "sync server", "همغږي"),

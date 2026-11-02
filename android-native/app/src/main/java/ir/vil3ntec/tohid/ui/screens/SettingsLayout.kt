@@ -177,6 +177,8 @@ object SettingsLayout {
   const val EASY_SETUP = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"
   /** فروشِ نقدی با «کارتِ فرمان» از بارکدخوانِ پس‌زمینه (`ScanCashPref`، پولی ⇒ B) — همان `SCAN_CASH_TITLE` */
   const val SCAN_CASH = "فروشِ نقدی با کارتِ فرمان"
+  /** HW-08: وب‌کمِ کامپیوتر به‌عنوانِ بارکدخوان (`WebcamPref`، وابسته به دستگاه ⇒ B، پیش‌فرض خاموش) — فقط کامپیوتر */
+  const val WEBCAM = "وب‌کم به‌عنوانِ بارکدخوان"
   /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
   const val TRAINING = "حالتِ آموزشی"
 
@@ -220,7 +222,7 @@ object SettingsLayout {
         Part("stock", listOf(STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, STOCK_LEVELS, STOCK_INSIGHT, STOCK_MODE, SMART_FORECAST)),
       ),
     ),
-    Group(DEVICES, listOf(Part("devices", listOf(PERIPHERALS, CAMERA, EASY_SETUP, SCAN_CASH)))),
+    Group(DEVICES, listOf(Part("devices", listOf(PERIPHERALS, CAMERA, WEBCAM, EASY_SETUP, SCAN_CASH)))),
     Group(
       DATA,
       listOf(
@@ -356,6 +358,7 @@ object SettingsLayout {
     SIMPLE_ASK to "simple-ask",
     EASY_SETUP to "easy-setup",
     SCAN_CASH to "scan-cash",
+    WEBCAM to "webcam",
     TRAINING to "training",
     TILL_RECEIVE to "till-receive",
     STOCK_MODE to "stock-mode",
@@ -437,6 +440,7 @@ object SettingsLayout {
     SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle
     EASY_SETUP -> EASY_SETUP_TITLE
     SCAN_CASH -> ir.vil3ntec.tohid.core.i18n.StrDevices.cashCardTitle
+    WEBCAM -> ir.vil3ntec.tohid.core.i18n.StrDevices.webcamTitle
     TRAINING -> TRAINING_SETTINGS_TITLE
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE
@@ -518,7 +522,7 @@ object SettingsLayout {
    *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد؛ کلیدهای صندوق و گزارشِ کامپیوتر هم (همان
    *  `Platform.DESKTOP` ِ رابطِ قدیمِ پاک‌شده). «شماره‌های جاافتاده» (RPT-17) زبانهٔ گوشی هم دارد و این‌جا نیست.
    */
-  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS)
+  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, WEBCAM)
 
   /**
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ

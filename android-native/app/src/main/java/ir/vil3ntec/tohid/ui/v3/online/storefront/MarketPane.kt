@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CloudOff
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Storefront
@@ -84,6 +85,8 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
   val f = ctl.form
   val cats = MarketListing.categoriesOf(ctl.listing)
   var picking by remember { mutableStateOf(false) }
+  var pickingProvince by remember { mutableStateOf(false) }
+  val provinces = MarketListing.provincesOf(ctl.listing)
   val settings = config.settings
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -101,6 +104,18 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
         f.area, { ctl.edit(f.copy(area = it)) }, StrOnline.mkArea, placeholder = StrOnline.mkAreaPlaceholder,
         helper = StrOnline.mkAreaHelper("${MarketListing.cleanArea(f.area).length}/${MarketListing.AREA_MAX}"),
         error = MarketListing.areaError(f.area), modifier = Modifier.fillMaxWidth().padding(12.dp),
+      )
+    }
+    //  S109: ولایت (برگهٔ انتخاب از فهرستِ سرور) و ولسوالی — سرورِ پیش از S109 فهرست نمی‌دهد ⇒ این بخش نیست
+    if (provinces.isNotEmpty()) V3Section(StrOnline.mkRegion, footer = StrOnline.mkRegionBody) {
+      V3PickerRow(
+        StrOnline.mkProvince, MarketListing.provinceLabel(f.province, provinces), { pickingProvince = true },
+        placeholder = StrOnline.mkPickProvince, icon = Icons.Outlined.Map,
+      )
+      V3Divider()
+      V3TextField(
+        f.district.orEmpty(), { ctl.edit(f.copy(district = it)) }, StrOnline.mkDistrict, placeholder = StrOnline.mkDistrictPlaceholder,
+        error = MarketListing.districtError(f.district.orEmpty()), modifier = Modifier.fillMaxWidth().padding(12.dp),
       )
     }
     if (f.listed && (settings == null || !settings.enabled)) {
@@ -142,6 +157,17 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
       allowNew = false,
     )
   }
+  if (pickingProvince) {
+    val none = StrOnline.mkNoProvince
+    V3PickerSheet(
+      title = StrOnline.mkProvince,
+      options = listOf(none) + provinces.map { it.name },
+      selected = MarketListing.provinceLabel(f.province, provinces).ifBlank { none },
+      onPick = { label -> ctl.edit(f.copy(province = provinces.firstOrNull { it.name == label }?.code ?: "")) },
+      onDismiss = { pickingProvince = false },
+      allowNew = false,
+    )
+  }
 }
 
 /** کاربرِ بی اجازهٔ تنظیم یا دکانِ بی اشتراکِ ویترین: فقط دیدن، بی کلید و دکمه */
@@ -156,6 +182,12 @@ private fun MarketReadOnly(ctl: MarketController, config: StorefrontConfigDto, p
       V3ListRow(StrOnline.mkCategoryLabel, value = MarketListing.labelOf(l.category, cats).ifBlank { "—" }, icon = Icons.Outlined.Category, hue = V3Hue.VIOLET, chevron = false)
       V3Divider(start = 64.dp)
       V3ListRow(StrOnline.mkAreaLabel, value = l.area.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.AMBER, chevron = false)
+      if (l.provinces.isNotEmpty()) {
+        V3Divider(start = 64.dp)
+        V3ListRow(StrOnline.mkProvince, value = l.provinceName.ifBlank { "—" }, icon = Icons.Outlined.Map, hue = V3Hue.MINT, chevron = false)
+        V3Divider(start = 64.dp)
+        V3ListRow(StrOnline.mkDistrictLabel, value = l.district.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
+      }
       V3Divider(start = 64.dp)
       V3ListRow(OnlineFmt.locationText(l.location?.lat, l.location?.lng), icon = Icons.Outlined.MyLocation, hue = V3Hue.MINT, chevron = false)
     }

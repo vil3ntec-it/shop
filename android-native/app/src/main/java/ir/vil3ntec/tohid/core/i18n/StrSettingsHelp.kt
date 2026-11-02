@@ -331,6 +331,12 @@ object StrSettingsHelp {
     "For example, the app finds the network printer itself and prints a test receipt.",
     "د بېلګې په توګه، اپ د شبکې چاپګر پخپله مومي او یو ازمایښتي رسید چاپوي.",
   )
+  val webcamLine: String get() = t("وب‌کمِ کامپیوتر بارکدِ کالا را می‌خواند", "The computer's webcam reads item barcodes", "د کمپیوټر ویب‌کم د توکو بارکوډ لولي")
+  val webcamExample: String get() = t(
+    "مثلاً دکانی که بارکدخوان ندارد وب‌کمِ لپ‌تاپ را روشن می‌کند و بستهٔ چای را جلوی آن می‌گیرد؛ بوق که زد، چای در سبد است.",
+    "For example, a shop without a scanner turns on the laptop webcam and holds a pack of tea in front of it; after the beep, the tea is in the cart.",
+    "د بېلګې په توګه، یو دوکان چې بارکوډ لوستونکی نه لري د لپ‌ټاپ ویب‌کم روښانه کوي او د چای بسته یې مخې ته نیسي؛ چې ټک یې وکړ، چای په ټوکرۍ کې دی.",
+  )
   val scanCashLine: String get() = t(
     "برنامهٔ بسته هم با کارتِ «نقد پرداخت شد» فروشِ نقدی ثبت کند",
     "Record cash sales from the scanner card even with the app closed",

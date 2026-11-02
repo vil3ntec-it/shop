@@ -20,6 +20,7 @@ const CAPABILITIES = Object.freeze([
   'admin-sessions.v1', //  GET /admin/admins/:id/sessions · POST …/sessions/revoke (+ دلیل و «پیشین ⇒ تازه» در سابقهٔ نقش)
   'search.v1',        //  GET /admin/search?q= — دکان، کاربر، پرداخت، سفارش، خطا (و مدیر فقط برای ارشدِ انسانی)، به نقش
   'market-admin.v1',  //  GET /admin/market/overview|sellers|orders|commission|history (۴.۶، فقط خواندن)
+  'market-regions.v1', //  S109: GET /admin/market/regions · GET|PUT /admin/shops/:id/census (نشانِ آزمایشی/تکراری + دلیل)
   'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
   ...require('./ops-overview').CAPABILITIES,   //  ops.v1 (+release-stage.v1 با OPS-01) — پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳
   'finance.v1',       //  ماژولِ ۴.۵: GET /admin/finance/(summary…export) · POST …/adjustments (app.js ⇒ routes/admin-finance.js)

@@ -36,7 +36,7 @@ const sf = require('./storefront');
 const orders = require('./orders');
 const views = require('./public-views');
 const { stripControl } = require('./validate');
-const { badRequest, notFound, forbidden } = require('../middleware/errors');
+const { badRequest, notFound, forbidden } = require('../middleware/errors'), region = require('./af-provinces');   //  S109
 
 const FLAG_KEY = 'market.directory';
 
@@ -727,7 +727,7 @@ function listingView(row, withMap = false) {
     ...m4.mapView(row, withMap),   // M4: نگاشتِ دسته — فقط با `market.product_details`
     listed: row ? row.listed === true : false,
     category: row ? row.category : '',
-    area: row ? row.area : '',
+    area: row ? row.area : '', ...region.viewOf(row),   //  S109: ولایت و ولسوالی (فقط شمارشِ منطقه‌ای)، با فهرستِ ولایت‌ها
     //  «ارزان‌تر از قیمتِ دکان»: قیمتِ فروشِ دفتر در بازارچه — پیش‌فرض خاموش، فقط صاحبِ دکان
     showDeals: row ? row.show_deals === true : false,
     //  به صاحبِ دکان خودش برمی‌گردد (درشت)، هرگز به مشتری
@@ -750,7 +750,7 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
   const v = {
     listed: cur ? cur.listed === true : false,
     category: cur ? cur.category : '',
-    area: cur ? cur.area : '',
+    area: cur ? cur.area : '', ...region.inputOf(b, has, cur),   //  S109: ولایت و ولسوالی (ولایتِ ناشناس ⇒ ۴۰۰ `bad_province`)
     lat: cur && cur.geo_lat !== null ? Number(cur.geo_lat) : null,
     lng: cur && cur.geo_lng !== null ? Number(cur.geo_lng) : null,
     showDeals: cur ? cur.show_deals === true : false,
@@ -781,13 +781,13 @@ async function saveListing(shopId, body, userId, { owner = false } = {}) {
     }
   }
   const row = await require('./market-changes').within(shopId, { entity: 'listing', kind: 'update', state: v }, async (c) => (await c.query(   //  S6: همان تراکنش
-    `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category,
-       area = EXCLUDED.area, geo_lat = EXCLUDED.geo_lat, geo_lng = EXCLUDED.geo_lng,
+    `INSERT INTO market_listings (shop_id, listed, category, area, geo_lat, geo_lng, show_deals, updated_by, updated_at, province, district)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     ON CONFLICT (shop_id) DO UPDATE SET listed = EXCLUDED.listed, category = EXCLUDED.category, province = EXCLUDED.province,
+       area = EXCLUDED.area, geo_lat = EXCLUDED.geo_lat, geo_lng = EXCLUDED.geo_lng, district = EXCLUDED.district,
        show_deals = EXCLUDED.show_deals, updated_by = EXCLUDED.updated_by, updated_at = EXCLUDED.updated_at
      RETURNING *`,
-    [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now()]
+    [shopId, v.listed, v.category, v.area, v.lat, v.lng, v.showDeals, userId || '', now(), v.province, v.district]
   )).rows[0]);
   if (catMap) row.category_map = await m4.saveMap(shopId, catMap);
   gates.delete(shopId);
