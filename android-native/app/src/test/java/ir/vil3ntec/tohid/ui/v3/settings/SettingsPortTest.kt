@@ -175,6 +175,7 @@ class SettingsPortTest {
       SettingsLayout.AUTO_FEES to "settings/sales/auto-fees",
       SettingsLayout.SIMPLE_ASK to "settings/sales/simple-ask",
       SettingsLayout.EASY_SETUP to "settings/devices/easy-setup",
+      SettingsLayout.SCAN_CASH to "settings/devices/scan-cash",
       SettingsLayout.TRAINING to "settings/general/training",
     )
     keys.forEach { (key, path) ->
@@ -192,6 +193,7 @@ class SettingsPortTest {
     assertEquals(ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE, SettingsLayout.STOREFRONT_ETA)
     assertEquals(ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE, SettingsLayout.PROMO_GUARD)
     assertEquals(ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE, SettingsLayout.EASY_SETUP)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.SCAN_CASH_TITLE, SettingsLayout.SCAN_CASH)
     assertEquals(ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE, SettingsLayout.TRAINING)
     assertEquals(ir.vil3ntec.tohid.ui.screens.TILL_GOODS_TITLE, SettingsLayout.TILL_GOODS)
     //  حالتِ آموزشی: ورود و پاک کردن همان `TrainingLedger` و همان سدِ نقشِ `TrainingSettingsWired`
@@ -249,7 +251,7 @@ class SettingsPortTest {
       "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "KeyHelpPref.set", "TillUser.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
       "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
       "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
-      "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
+      "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "ScanCashPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
       //  S03/S05/S22 — ثبتِ سریع، واحدِ بزرگ و «بستهٔ کامل»؛ «منقضی فقط با مجوز» و روزِ هشدار
       "TillGoodsPref.setQuickRegister", "TillGoodsPref.setUnits", "TillGoodsPref.setWholePacks", "ExpiryPref.setApproval", "ExpiryPref.setNearDays",
     )

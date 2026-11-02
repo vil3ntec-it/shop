@@ -249,9 +249,10 @@ object PrintSpooler {
    *    • «چاپِ خودکار» روشن ⇒ فاکتور (بی کشو) به صف — به شمارِ نسخهٔ همین دستگاه
    *      (POS-35)، هر نسخه کارِ جدا و به ترتیب؛ نتیجهٔ نخستین تلاشِ اصل گفته می‌شود
    *  هر چه نشد روی صفحهٔ فروش گفته می‌شود (`tillNotice`)، نه فقط در صفحهٔ دستگاه‌ها.
+   *  [receipt] ⇒ فاکتور بی‌توجه به «چاپِ خودکار» (ثبتِ «کارتِ فرمان»: صفحه‌ای نیست و رسید تنها نشانِ ثبت است).
    */
-  fun afterSale(context: Context, data: ShopData, saleId: String) {
-    val auto = autoPrint(context)
+  fun afterSale(context: Context, data: ShopData, saleId: String, receipt: Boolean = false) {
+    val auto = receipt || autoPrint(context)
     val printer = PrinterRegistry.defaultSaved(context) ?: return
     val sale = data.sales.firstOrNull { it.id == saleId } ?: return
     //  HW-03 (فقط با «ابزارهای تازهٔ دستگاه»): فقط وقتی نقد به دخل آمد — ردیفِ نقدِ بی‌امانت در تسویهٔ

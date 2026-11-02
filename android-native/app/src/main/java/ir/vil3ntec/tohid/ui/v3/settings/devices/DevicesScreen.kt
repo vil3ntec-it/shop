@@ -97,8 +97,13 @@ private fun HubCard(highlight: Boolean) {
 /** «اسکن وقتی برنامه بسته است» — کلید ندارد؛ با ثبتِ بارکدخوان خودش روشن است */
 @Composable
 private fun BackgroundCard(highlight: Boolean) {
+  val snackbar = ir.vil3ntec.tohid.ui.v3.LocalV3Toasts.current
   DeviceCard(ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundCaption, highlight, padding = PaddingValues(16.dp)) {
     ir.vil3ntec.tohid.ui.components.devices.BackgroundScanBody(hubColors())
+  }
+  //  «کارتِ فرمان» (فروشِ نقدی از بارکدخوان، پیش‌فرض خاموش)
+  DeviceCard(ir.vil3ntec.tohid.core.i18n.StrDevices.cardTitle, null, false, padding = PaddingValues(16.dp)) {
+    ir.vil3ntec.tohid.ui.components.devices.CommandCardBody(hubColors()) { snackbar?.show(it) }
   }
 }
 

@@ -59,7 +59,7 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
   val left: @Composable () -> Unit = {
     //  «دستگاه‌ها» (۱۴۰۵/۰۸/۱۱): همهٔ دستگاه‌ها با یک جست‌وجو، وضعیت و آزمایش؛ و اسکن وقتی برنامه بسته است
     if (canAdmin) { DeviceHubPanel(::toast); Spacer(Modifier.height(14.dp)) }
-    BackgroundScanPanel()
+    BackgroundScanPanel(::toast)
     Spacer(Modifier.height(14.dp))
     PrintersPanel(::toast, canAdmin, canDrawer)
     Spacer(Modifier.height(14.dp))
@@ -117,10 +117,14 @@ private fun DeviceHubPanel(toast: (String) -> Unit) {
 }
 
 @Composable
-private fun BackgroundScanPanel() {
+private fun BackgroundScanPanel(toast: (String) -> Unit) {
   Panel {
     Head(Icons.Filled.QrCodeScanner, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundCaption)
     ir.vil3ntec.tohid.ui.components.devices.BackgroundScanBody(legacyHubColors())
+    //  «کارتِ فرمان» (فروشِ نقدی از بارکدخوان، پیش‌فرض خاموش)
+    Spacer(Modifier.height(10.dp))
+    Text(ir.vil3ntec.tohid.core.i18n.StrDevices.cardTitle, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+    ir.vil3ntec.tohid.ui.components.devices.CommandCardBody(legacyHubColors(), toast)
   }
 }
 

@@ -383,7 +383,15 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
       onDismissRequest = { showReport = null },
       containerColor = Shop.colors.surfaceSolid,
       title = { Text(reportTitle(rep), color = Shop.colors.text) },
-      text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) { ShiftReportLines(seen) } },
+      text = {
+        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+          ShiftReportLines(seen)
+          //  «ثبت از اسکنر» (کارتِ فرمان) در همین بازه
+          ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.scannerLine(d, rep.openedAt, rep.at, seesMoney = !staff)?.let {
+            Spacer(Modifier.height(6.dp)); Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+          }
+        }
+      },
       confirmButton = { TextButton(onClick = { showReport = null }) { Text(Str.close) } },
       dismissButton = { TextButton(onClick = { printReport(seen) }) { Text(StrShift.print) } },
     )

@@ -15,6 +15,7 @@ import ir.vil3ntec.tohid.core.hw.Reconnect
 import ir.vil3ntec.tohid.core.hw.SavedDevice
 import ir.vil3ntec.tohid.core.hw.Scales
 import ir.vil3ntec.tohid.print.ThermalPrinter
+import ir.vil3ntec.tohid.scan.ScanCashRun
 import ir.vil3ntec.tohid.scan.ScanInbox
 import java.io.ByteArrayOutputStream
 import java.io.InterruptedIOException
@@ -106,6 +107,8 @@ object DeviceLinks {
     workers.keys.filter { !want.containsKey(it) }.forEach { k -> workers.remove(k)?.stop(); states.remove(k) }
     want.forEach { (k, d) -> if (!workers.containsKey(k)) workers[k] = Worker(app, d).also { it.start() } }
     if (workers.isNotEmpty() && ticker == null) startTicker()
+    //  صفی که پیش از بسته شدنِ برنامه «نقد» خورده بود
+    if (workers.isNotEmpty()) ScanCashRun.kick(app)
   }
 
   @Synchronized fun stopWorkers() {
@@ -281,10 +284,12 @@ object DeviceLinks {
     }
 
     private fun emit(out: List<BurstGate.Out>) = out.forEach { o ->
-      when (o) {
+      val queued = when (o) {
         is BurstGate.Out.Live -> ScanInbox.arrive(device.link, o.line, o.atMs)
-        is BurstGate.Out.Burst -> ScanInbox.importMemory(device.link, o.lines, o.atMs)
+        is BurstGate.Out.Burst -> ScanInbox.importMemory(device.link, o.lines, o.atMs) > 0
       }
+      //  «کارتِ فرمان» (پیش‌فرض خاموش ⇒ هیچ): فاکتورِ «نقد»‌خورده ثبت یا نگه‌داشته می‌شود (`ScanCashRun`)
+      if (queued) ScanCashRun.kick(app)
     }
   }
 }

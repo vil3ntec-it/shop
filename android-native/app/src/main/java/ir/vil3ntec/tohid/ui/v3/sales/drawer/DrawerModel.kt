@@ -51,6 +51,18 @@ object DrawerModel {
     add(TotalRow(StrSale.expectedWord, t.expected, strong = true))
   }
 
+  /**
+   *  «ثبت از اسکنر» (کارتِ فرمان، `ScanCashSale`) در بازهٔ صندوق — یک خط برای صفحهٔ صندوق و گزارشِ X/Z؛ هیچ ⇒ `null`.
+   *  شاگرد (شمارشِ کور) فقط شمار را می‌بیند، نه مبلغ.
+   */
+  fun scannerLine(d: ShopData, from: Long, to: Long, seesMoney: Boolean): String? {
+    val s = ir.vil3ntec.tohid.data.ScanCashSale.summary(d, from, to)
+    if (s.count == 0) return null
+    val head = if (seesMoney) ir.vil3ntec.tohid.core.i18n.StrDevices.scannerSales(s.count, PhoneSaleText.amount(PayFlow.major(s.totalMinor)))
+    else ir.vil3ntec.tohid.core.i18n.StrDevices.scannerSalesCount(s.count)
+    return if (s.fromMemory > 0) head + " · " + ir.vil3ntec.tohid.core.i18n.StrDevices.scannerFromMemory(s.fromMemory) else head
+  }
+
   fun diff(counted: Double?, expected: Double): DrawerDiff? {
     counted ?: return null
     val d = counted - expected

@@ -40,6 +40,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.AppLockScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AppearanceScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.BackupScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CameraScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ScanCashScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CheckoutRulesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CreditGateScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CrmReportsScreen
@@ -221,6 +222,7 @@ internal object SettingsPages {
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
     Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
+    Page(SettingsLayout.SCAN_CASH, Icons.Outlined.PointOfSale) { ScanCashScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },
