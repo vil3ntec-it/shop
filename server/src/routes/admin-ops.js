@@ -18,6 +18,8 @@
  *   POST /api/admin/ops/alerts/evaluate           «همین حالا بسنج» (حداکثر هر ۱۵ ثانیه)
  *   POST /api/admin/ops/alerts/:id/ack            {note?}
  *   POST /api/admin/ops/alerts/:id/resolve        {reason}
+ *   GET  /api/admin/ops/alerts/paging             OPS-01@29: پرچم، گیرنده‌ها (ایمیل پوشیده جز برای ارشد)، آخرین ارسال‌ها
+ *   PUT  /api/admin/ops/alerts/paging             {recipients:[{adminId, tier, email?}], escalateMin?, maxEscalations?} — فقط ارشد
  *
  * ⛔ مرزِ نقش همان `lib/admin-roles.js`: خواندن برای هر مدیر (viewer هم)؛ نوشتن برای admin/superadmin؛
  *    finance به این درها نمی‌رسد (پیش‌فرض‌بسته). هر نوشتن یک ردیفِ سابقه در همان تراکنش دارد.
@@ -28,6 +30,8 @@ const v = require('../lib/validate');
 const overview = require('../lib/ops-overview');
 const incidents = require('../lib/ops-errors');
 const alerts = require('../lib/ops-alerts');
+const paging = require('../lib/ops-paging');
+const { requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
@@ -112,6 +116,19 @@ router.get('/alerts', async (req, res) => {
 
 router.post('/alerts/evaluate', async (req, res) => {
   res.json(await alerts.evaluateNow());
+});
+
+/* ───── خبرِ بحرانی به مسئول — OPS-01@29 (`lib/ops-paging.js`) ───── */
+
+router.get('/alerts/paging', async (req, res) => {
+  noStore(res);
+  res.json(await paging.overview({ reveal: req.admin?.role === 'superadmin' }));
+});
+
+//  ⛔ گیرنده فقط مدیرِ فعالِ پلتفرم (سرور می‌سنجد)؛ نوشتنِ فهرست فقط مدیرِ ارشد
+router.put('/alerts/paging', requireSuperAdmin, async (req, res) => {
+  noStore(res);
+  res.json(await paging.configure(req, req.body || {}, { ip: clientIp(req) }));
 });
 
 router.post('/alerts/:id/ack', async (req, res) => {

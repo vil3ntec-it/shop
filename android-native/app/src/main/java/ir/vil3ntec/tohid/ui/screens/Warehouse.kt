@@ -520,7 +520,7 @@ fun WarehouseScreen(
       val shift = ir.vil3ntec.tohid.data.CountShift.of(d, at) // INV-10: پنجرهٔ قدیم بی لحظه ⇒ همان امروز
       val n = WarehouseEngine.countLines(d, counted, shift).size
       apply(
-        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId, shift),
+        WarehouseEngine.stockCount(d, counted, note, todayIso(), System.currentTimeMillis(), ::newId, shift, if (countTools) WarehouseEngine.AdjustKind.COUNT else WarehouseEngine.AdjustKind.ADJUSTMENT), // S20: «اصلاحِ شمارش»
         "انبارگردانی ثبت شد — ${plain(n)} اختلاف اصلاح شد",
       ) { stockCount = false }
     }
@@ -846,6 +846,7 @@ private fun movementLabel(type: String): String = when (type) {
   "sale_cancel" -> "لغو فروش"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
+  "count_adjust" -> "اصلاحِ شمارش"
   "damage" -> "ضایعات"
   //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
   "transfer_out" -> "انتقالِ خروجی"

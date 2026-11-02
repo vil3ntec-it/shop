@@ -150,6 +150,7 @@ fun AppRootLegacy(
   var pendingProduct by remember { mutableStateOf<String?>(null) }
   // صفحهٔ فرعیِ باز، اگر باز باشد
   var sub by rememberSaveable { mutableStateOf<String?>(null) }
+  LaunchedEffect(tab, sub) { AppNav.route.value = sub ?: tab } //  S50: کلیدهای همین صفحه، زیرصفحه هم (`KeyHelp.scopeOf`)
   // صفحهٔ ورود، وقتی از دکمهٔ حسابِ سربرگ باز شود
   var authOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -233,6 +234,8 @@ fun AppRootLegacy(
   LaunchedEffect(lockAsk) {
     if (lockAsk == lockSeen) return@LaunchedEffect
     lockSeen = lockAsk
+    //  S46: «هر کس با PIN ِ خودش» (`TillUser`، تنظیمِ خاموش یا بی راهِ برگشت ⇒ false ⇒ همان قفلِ امروز)
+    if (ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled)) return@LaunchedEffect
     if (lockStore.enabled) unlocked = false else lockHint++
   }
 
@@ -446,6 +449,11 @@ fun AppRootLegacy(
 
   if (lockStore.enabled && !unlocked) {
     AppLockScreen { unlocked = true }
+    return
+  }
+  //  S46: صندوقِ قفل با PIN ِ شخصی — سبدِ هر کاربر جدا (`TillUser.unlock`)
+  if (ir.vil3ntec.tohid.data.TillUser.locked.value) {
+    ir.vil3ntec.tohid.ui.components.staff.TillLockScreen(cartStore, store, lockStore.enabled)
     return
   }
 
@@ -668,6 +676,7 @@ fun AppRootLegacy(
       //  فقط نسخهٔ پیش‌نمایش (`BuildConfig.PREVIEW`)؛ در بقیه هیچ چیز نمی‌کشد
       PreviewBanner()
       SubscriptionBanner { sub = "myplan" }
+      ir.vil3ntec.tohid.ui.components.sync.ClockSkewBanner() //  S28b: فقط با Sync v3 ِ همین دستگاه و ساعتِ کج
       //  نسخهٔ تازه — بررسیِ خودکار و نصب با یک دکمه. کامپیوتر (نسخهٔ ۲): تراشهٔ
       //  کوچکِ سربرگ (`UpdateChipLegacy` در `DeskHeader`)، نه نوارِ تمام‌عرض
       if (!Platform.DESKTOP) UpdateBannerLegacy()
@@ -850,6 +859,8 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrPriceCheck.section to androidx.compose.material.icons.Icons.Filled.Search,
                 ir.vil3ntec.tohid.core.i18n.StrTouch.section to androidx.compose.material.icons.Icons.Filled.TouchApp,
                 ir.vil3ntec.tohid.core.i18n.StrPos.moreKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
+                ir.vil3ntec.tohid.core.i18n.StrTill.keyHelpTitle to androidx.compose.material.icons.Icons.Filled.Keyboard, // S50، پیش‌فرض خاموش
+                ir.vil3ntec.tohid.core.i18n.StrTill.switchTitle to androidx.compose.material.icons.Icons.Filled.Lock, // S46، پیش‌فرض خاموش
                 StrSettings.tillReceiveTitle to androidx.compose.material.icons.Icons.Filled.PointOfSale,
                 //  گفت‌وگو، ردِ حذف از فاکتور، ابزارهای کالا و موجودی — همان بخش‌های `SettingsScreenLegacy` ِ گوشی
                 ir.vil3ntec.tohid.core.i18n.StrChat.guard to androidx.compose.material.icons.Icons.Filled.Storage,
@@ -886,6 +897,7 @@ fun AppRootLegacy(
                 if (ir.vil3ntec.tohid.ui.screens.ownerReportRow(if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE to androidx.compose.material.icons.Icons.Filled.TableChart else null,
                 ir.vil3ntec.tohid.core.i18n.StrTaxQuarter.settingsTitle to androidx.compose.material.icons.Icons.Filled.Receipt, // RPT-10، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrCustomerCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CreditCard, // CRM-16، پیش‌فرض خاموش
+                ir.vil3ntec.tohid.ui.screens.TILL_GOODS_TITLE to androidx.compose.material.icons.Icons.Filled.QrCodeScanner, // S03/S05، پیش‌فرض خاموش
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ) + (
                 //  «سرورها» (پرچمِ `app.multi_server`) فقط برای صاحبِ دکان

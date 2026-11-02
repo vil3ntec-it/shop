@@ -114,6 +114,10 @@ object SalesEngine {
     val creditGate: Boolean = false,
     /** تأییدِ مدیر/صاحب برای بردِ بیش از سقف (`CreditGate.Approval`)؛ فقط همین مشتری و تا همین مبلغ */
     val creditApproval: CreditGate.Approval? = null,
+    /** S22 — «منقضی فقط با مجوز» (`ExpiryPref.approval`، خاموش ⇒ `false` و همان امروز)؛ با `blockExpired` بی اثر */
+    val expiryGate: Boolean = false,
+    /** تأییدِ مدیر/صاحب برای همان کالاهای منقضی و تا همان مقدار (`ExpiryGate.Approval`) */
+    val expiryApproval: ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval? = null,
     /**
      *  POS-24 — قاعده‌های پیش از پایانِ فاکتور (`CheckoutRulesPref`، فقط صندوق). پیش‌فرض خاموش ⇒
      *  همان امروز؛ تحویلِ سفارش (`OrderFulfillment`) و تعویض (`ReturnFlow`) همیشه خاموش می‌فرستند.
@@ -343,6 +347,12 @@ object SalesEngine {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
 
+    //  S22: منقضی بی تأییدِ همین کالاها ثبت نمی‌شود؛ با تأیید، سابقهٔ `expired_sale` با نام و دلیل کنارِ فروش
+    val expiredOk = if (!checkout.expiryGate || checkout.blockExpired) null
+      else expiredNeed(d, cart, today, ownReservation).takeIf { it.isNotEmpty() }?.let { need ->
+        if (!ir.vil3ntec.tohid.core.stock.ExpiryGate.covers(need, checkout.expiryApproval)) return Result.Failed(expiredNeedText(d, need) + " — " + CREDIT_NEEDS_APPROVAL)
+        need to checkout.expiryApproval!!
+      }
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
@@ -590,6 +600,13 @@ object SalesEngine {
           reason = ok.reason.trim(),
         )
       },
+      expiredOk?.let { (need, ok) ->
+        AuditEntry(
+          id = newId(), type = "expired_sale", date = today, refId = saleId, createdAt = now,
+          notes = "فروشِ کالای منقضی در فاکتور #${sale.invoiceLabel()} — ${expiredNeedText(d, need)} — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",
+          by = checkout.seller.trim().ifEmpty { null }, approvedBy = ok.by.trim(), reason = ok.reason.trim(),
+        )
+      },
     ) + stored.audit
 
     return Result.Ok(
@@ -613,6 +630,10 @@ object SalesEngine {
   /* ========================= سقفِ اعتبار در صندوق (CRM-03) ========================= */
 
   const val CREDIT_NEEDS_APPROVAL = "تأییدِ مدیر لازم است"
+
+  /** S22 — همان `ExpiryEngine.need` / `needText` (منقضی‌ای که سبد برمی‌دارد و تأیید می‌خواهد) */
+  fun expiredNeed(d: ShopData, cart: List<CartLine>, today: String, ownReservation: String? = null): Map<String, Long> = ExpiryEngine.need(d, cart, today, ownReservation)
+  fun expiredNeedText(d: ShopData, need: Map<String, Long>): String = ExpiryEngine.needText(d, need)
 
   /** بردِ [add] افغانی برای این مشتری از سقفش می‌گذرد؟ ماندهٔ دفتر همان `DebtBook` است؛ بی سقف ⇒ null */
   fun creditOverOf(d: ShopData, debtorId: String, add: Double): CreditGate.Over? {

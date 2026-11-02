@@ -41,6 +41,7 @@ object StrPos {
   //  CRM-03 / S07 — فروشِ نسیه بیش از سقفِ اعتبار
   val creditOverTitle: String get() = t("فروشِ نسیه بیش از سقف", "Credit sale over the limit", "له سقف پورته نسیه پلور")
   val creditApproveSelf: String get() = t("تأیید با این دلیل", "Approve with this reason", "په دې لامل تایید")
+  val expiredSaleTitle: String get() = t("فروشِ کالای منقضی", "Selling expired stock", "د تېرې نېټې توکو پلور")
   fun discountSummary(d: Any, s: Any): String = t("تخفیفِ $d ؋ روی فاکتورِ $s ؋", "Discount of $d ؋ on an invoice of $s ؋", "د $s ؋ بل باندې $d ؋ تخفیف")
   fun cashierCap(p: Any): String = t("سقفِ صندوقدار $p٪", "cashier limit $p%", "د صندوقدار حد $p٪")
   fun weighedAdded(n: Any, q: Any): String = t("$n — $q به سبد اضافه شد", "$n — $q added to the cart", "$n — $q ټوکرۍ ته اضافه شو")

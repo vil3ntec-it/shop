@@ -154,7 +154,7 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
 internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec) {
   val c = PhoneV3.colors
   val lots = remember(d, today) { ExpiryEngine.lots(d, today) }
-  val near = ExpiryEngine.NEAR_DAYS
+  val near = ExpiryEngine.nearDays
   val groups = listOf(
     StrReports.expired to lots.filter { it.expired },
     StrReports.withinDays(near) to lots.filter { !it.expired && it.daysLeft <= near },

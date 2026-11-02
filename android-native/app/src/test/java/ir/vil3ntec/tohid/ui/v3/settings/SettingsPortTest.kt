@@ -147,6 +147,7 @@ class SettingsPortTest {
       SettingsLayout.SAFE_BOOK to "settings/sales/safe",
       SettingsLayout.TAX_QUARTER to "settings/sales/tax-quarter",
       SettingsLayout.CUSTOMER_CARD to "settings/sales/customer-cards",
+      SettingsLayout.TILL_GOODS to "settings/sales/till-goods",
       SettingsLayout.STOCK_PLACES to "settings/sales/stock-places",
       SettingsLayout.SMART_FORECAST to "settings/sales/forecast",
       SettingsLayout.ANOMALY to "settings/security/anomalies",
@@ -165,6 +166,8 @@ class SettingsPortTest {
       SettingsLayout.POS_PRICE_CHECK to "settings/sales/price-check",
       SettingsLayout.POS_TOUCH to "settings/sales/touch-mode",
       SettingsLayout.POS_MORE_KEYS to "settings/sales/more-keys",
+      SettingsLayout.KEY_HELP to "settings/sales/key-help",
+      SettingsLayout.TILL_SWITCH to "settings/sales/till-switch",
       SettingsLayout.REPORT_KEYS to "settings/sales/report-keys",
       SettingsLayout.DOC_GAPS to "settings/sales/doc-gaps",
       SettingsLayout.LINE_PRICING to "settings/sales/line-pricing",
@@ -190,6 +193,7 @@ class SettingsPortTest {
     assertEquals(ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE, SettingsLayout.PROMO_GUARD)
     assertEquals(ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE, SettingsLayout.EASY_SETUP)
     assertEquals(ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE, SettingsLayout.TRAINING)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.TILL_GOODS_TITLE, SettingsLayout.TILL_GOODS)
     //  حالتِ آموزشی: ورود و پاک کردن همان `TrainingLedger` و همان سدِ نقشِ `TrainingSettingsWired`
     val ops = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/OpsToggleScreensAndroid.kt" }.value
     listOf("TrainingLedger.enter(", "TrainingLedger.wipe(", "TrainingMode.canEnter(role, staff)", "TrainingMode.canManage(role)", "if (!active)")
@@ -242,16 +246,18 @@ class SettingsPortTest {
       "StorefrontEtaLive.set", "PromoGuardLive.set",
       "GiftReceiptPrefs.set", "DeliverLaterPrefs.set", "SpecialOrderPref.set", "PriceWhyPrefs.set",
       "ShrinkReportPref.set", "CountToolsPref.setOn", "CountToolsPref.setBlind", "LabelToolsPref.set", "ProductInfoPrefs.set",
-      "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
+      "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "KeyHelpPref.set", "TillUser.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
       "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
       "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
       "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
+      //  S03/S05/S22 — ثبتِ سریع، واحدِ بزرگ و «بستهٔ کامل»؛ «منقضی فقط با مجوز» و روزِ هشدار
+      "TillGoodsPref.setQuickRegister", "TillGoodsPref.setUnits", "TillGoodsPref.setWholePacks", "ExpiryPref.setApproval", "ExpiryPref.setNearDays",
     )
 
     /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */
     private val DESK_ONLY: Set<String> = setOf(
       SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
-      SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
+      SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
     )
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */

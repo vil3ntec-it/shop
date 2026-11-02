@@ -20,6 +20,14 @@ object ExpiryEngine {
 
   /** پیش‌فرضِ «نزدیک به انقضا» — روز */
   const val NEAR_DAYS = 30
+  const val MAX_NEAR_DAYS = 365
+
+  /**
+   *  S22 — «نزدیک به انقضا» ِ همین دستگاه (`ExpiryPref`، «قابلِ تنظیم»): هشدار، انبار، داشبورد و گزارش همین را
+   *  می‌خوانند. تا تنظیم نشده [NEAR_DAYS] است ⇒ همان امروز.
+   */
+  var nearDays: Int = NEAR_DAYS
+    set(v) { field = if (v in 1..MAX_NEAR_DAYS) v else NEAR_DAYS }
 
   private val ISO = Regex("""^\d{4}-\d{2}-\d{2}$""")
 
@@ -95,6 +103,25 @@ object ExpiryEngine {
     lots(d, today).filter { it.product.id == productId && it.expired }.sumOf { it.remaining }
 
   /** منقضی‌شده یا تا `days` روزِ دیگر — همان چیزی که هشدار و گزارش نشان می‌دهند */
-  fun alerts(d: ShopData, today: String, days: Int = NEAR_DAYS): List<Lot> =
+  fun alerts(d: ShopData, today: String, days: Int = nearDays): List<Lot> =
     lots(d, today).filter { it.daysLeft <= days }
+
+  /**
+   *  S22 — مقدارِ منقضی‌ای که این سبد برمی‌دارد و تأیید می‌خواهد (کالا ⇐ هزارمِ واحد): همان سنجشِ `blockExpired`
+   *  (سالم = فروختنی منهای منقضی)؛ آنچه از سالم بیشتر است تا سقفِ ماندهٔ منقضی.
+   */
+  fun need(d: ShopData, cart: List<SalesEngine.CartLine>, today: String, ownReservation: String? = null): Map<String, Long> = buildMap {
+    cart.filter { !it.free }.groupBy { it.productId }.forEach { (id, lines) ->
+      val expired = expiredRemaining(d, id, today)
+      if (expired <= 0) return@forEach
+      val healthy = kotlin.math.max(0.0, ProductInfoMap.sellable(d, id, ownReservation) - expired)
+      val take = minOf(expired, lines.sumOf { it.quantity } - healthy)
+      if (take > 0.0005) put(id, Math.round(take * 1000))
+    }
+  }
+
+  /** «از «شیر» ۲ واحدِ منقضی» */
+  fun needText(d: ShopData, need: Map<String, Long>): String = need.entries.joinToString("، ") { (id, q) ->
+    "از «${d.products.find { it.id == id }?.name.orEmpty()}» ${ir.vil3ntec.tohid.qty(q / 1000.0)} واحدِ منقضی"
+  }
 }

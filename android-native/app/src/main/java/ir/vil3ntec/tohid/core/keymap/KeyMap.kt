@@ -483,7 +483,7 @@ object KeyMap {
     web = emptyList(),
   )
   val ORDERS_BUSY = KeyAction(
-    "orders.busy", "orders", "حالتِ «شلوغم» (با مدت)", KeyStatus.PLANNED,
+    "orders.busy", "orders", "حالتِ «شلوغم» (با مدت)", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.B, mod = true)),
     web = emptyList(),
   )

@@ -75,6 +75,13 @@ fun SubscriptionNotice() {
   )
 }
 
+/** S28b: ساعتِ کجِ دستگاه، قرمز (فقط با Sync v3 ِ همین دستگاه؛ `ClockSkewAndroid`) */
+@Composable
+fun ClockSkewNotice() {
+  val text = ir.vil3ntec.tohid.ui.components.sync.clockSkewText() ?: return
+  DraftNoticeBar(tone = V3Tone.ERROR, text = text, onClick = {})
+}
+
 /**
  *  «نسخهٔ تازه» (همان رفتارِ `UpdateBanner`): بررسیِ خودکار، نه در ساختِ بازار، گرفتن و
  *  نصب از همین دکمه، «بعداً» تا بازکردنِ بعدی — جز وقتی نسخه زیرِ حداقلِ پشتیبانی است.

@@ -359,6 +359,7 @@ async function integrations() {
  *  در همین نسخه هست — وگرنه پنل «پشتیبانی نمی‌شود» می‌گوید، نه دکمه‌ای که جایی نمی‌رود.
  */
 const HAS_RELEASE_STAGE = (() => { try { require.resolve('./release-stage'); return true; } catch { return false; } })();
-const CAPABILITIES = Object.freeze(['ops.v1', ...(HAS_RELEASE_STAGE ? ['release-stage.v1'] : [])]);
+//  ops-paging.v1: خبرِ بحرانی به مسئول (OPS-01@29) — `GET`/`PUT /api/admin/ops/alerts/paging`
+const CAPABILITIES = Object.freeze(['ops.v1', 'ops-paging.v1', ...(HAS_RELEASE_STAGE ? ['release-stage.v1'] : [])]);
 
 module.exports = { CAPABILITIES, PLATFORMS, DEFINITIONS, releases, health, integrations, stageInfo, credentials, policies, _withTimeout: withTimeout };
