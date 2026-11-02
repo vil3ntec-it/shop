@@ -253,8 +253,7 @@ fun WarehouseScreen(
           Spacer(Modifier.width(6.dp))
           Text("انبارگردانی")
         }
-        //  محل‌ها و انتقال (INV-20) و بسته‌بندیِ دوباره و ساختِ بسته (INV-21) — پشتِ `StockPlacesPref`، پیش‌فرض خاموش
-        StockPlacesEntry(context, store, d, stockOn, ::toast)
+        StockPlacesEntry(context, store, d, stockOn, ::toast) // محل‌ها و انتقال، بسته‌بندیِ دوباره (INV-20/21) — پشتِ `StockPlacesPref`، پیش‌فرض خاموش
         if (labelTools) {
           Spacer(Modifier.height(8.dp))
           OutlinedButton(onClick = { labels = true }, modifier = Modifier.fillMaxWidth()) {
@@ -852,7 +851,6 @@ private fun movementLabel(type: String): String = when (type) {
   "transfer_out" -> "انتقالِ خروجی"
   "transfer_in" -> "انتقالِ ورودی"
   "transfer" -> "انتقال"
-  //  بسته‌بندیِ دوباره و ساختِ بسته (INV-21): ورودی منفی، خروجی مثبت
-  "production" -> "بسته‌بندیِ دوباره و تولید"
+  "production" -> "بسته‌بندیِ دوباره و تولید" // INV-21: ورودی منفی، خروجی مثبت
   else -> type
 }
