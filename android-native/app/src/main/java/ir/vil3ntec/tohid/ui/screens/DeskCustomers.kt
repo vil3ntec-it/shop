@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -546,7 +547,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
                 5 -> TCell(money(v.paidAmount), Shop.colors.success)
                 6 -> TCell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
                 7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(v))
-                else -> TCell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
+                //  CRM-07: فاکتورِ سفارشِ اینترنتیِ تحویل‌شده نشانِ «اینترنتی» دارد
+                else -> TCell(
+                  when { off -> "لغوشده"; v.isOnlineOrder() -> StrDebtor.online; else -> "ثبت‌شده" },
+                  when { off -> Shop.colors.danger; v.isOnlineOrder() -> Shop.colors.primary; else -> Shop.colors.success },
+                )
               }
             },
             onClick = { i -> picked = invoices[i].id },

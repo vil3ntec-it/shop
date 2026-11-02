@@ -63,6 +63,12 @@ internal object StrDebtor {
   fun olderInvoices(n: Int): String = t("$n فاکتورِ قدیمی‌تر در «فروش‌ها»", "$n older invoices in Sales", "$n زاړه بلونه په «پلور» کې")
   val invoice: String get() = t("فاکتور", "Invoice", "بل")
   val cancelled: String get() = t("لغوشده", "cancelled", "لغوه شوی")
+  /** CRM-07: نشانِ فاکتورِ سفارشِ اینترنتی (`Sale.isOnlineOrder`) در پروندهٔ مشتری */
+  val online: String get() = t("اینترنتی", "online", "انلاین")
+  /** سطرِ فاکتور در «فاکتورهای این مشتری»: شماره، نشانِ «اینترنتی» و «لغوشده» */
+  fun invoiceTitle(label: String, online: Boolean, cancelled: Boolean): String =
+    invoice + " " + label +
+      (if (online) " · " + this.online else "") + (if (cancelled) " (" + this.cancelled + ")" else "")
   fun remaining(amount: String): String = t("مانده $amount", "$amount due", "پاتې $amount")
 
   val newTx: String get() = t("ثبتِ تراکنش", "New transaction", "نوې راکړه ورکړه")
