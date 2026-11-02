@@ -98,6 +98,7 @@ import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.isOnlineOrder
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.money
@@ -670,7 +671,7 @@ private fun InvoicesCard(account: DebtorEngine.Account) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
           Column(Modifier.weight(1f)) {
             Text(
-              "${StrDebtor.invoice} ${sale.invoiceLabel() ?: "—"}${if (cancelled) " (${StrDebtor.cancelled})" else ""}",
+              StrDebtor.invoiceTitle(sale.invoiceLabel() ?: "—", sale.isOnlineOrder(), cancelled),
               style = v3Text(14, FontWeight.Medium, 20),
               color = if (cancelled) c.inkMuted else c.ink,
             )
