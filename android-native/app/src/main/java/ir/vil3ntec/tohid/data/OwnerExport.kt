@@ -201,6 +201,7 @@ object OwnerExport {
     "syncStatus" to "وضعیت همگام‌سازی",
     "cancelReason" to "دلیل لغو",
     "seller" to "فروشنده",
+    "correctedAt" to "تاریخِ تصحیح‌شده (UTC)", //  S28b: از سرور، وقتی ساعتِ دستگاه کج بود
     "approval" to "تأییدِ مدیر",
     "payments" to "ردیف‌های پرداخت",
     "tenderedMinor" to "دریافتی (پول)",

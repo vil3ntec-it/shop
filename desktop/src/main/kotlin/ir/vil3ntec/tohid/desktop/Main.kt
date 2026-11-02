@@ -270,7 +270,8 @@ fun main() {
             runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
           }
           //  S50: با تنظیمِ «راهنمای کلیدِ هر صفحه» از keymap.json؛ خاموش ⇒ همان فهرستِ پیشین
-          TohidTheme(dialogTheme) { if (ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.on.value) ir.vil3ntec.tohid.ui.components.keys.KeyMapHelp() else ShortcutsHelp() }
+          if (ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.on.value) TohidTheme(dialogTheme) { ir.vil3ntec.tohid.ui.components.keys.KeyMapHelp() }
+          else TohidTheme(dialogTheme) { ShortcutsHelp() }
         }
       }
       //  پیش‌نمایشِ گوشی — فقط برای عکس‌های خودکار (`DevShot` ⇐ `phone:<صفحه>`)
