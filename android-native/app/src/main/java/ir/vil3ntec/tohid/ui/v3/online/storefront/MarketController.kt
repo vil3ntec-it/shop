@@ -15,7 +15,7 @@ import ir.vil3ntec.tohid.data.DeviceLocation
 
 /**
  *  «نمایش در بازارچه» (`GET/PUT /api/shop/market`) — همان کارِ `MarketPane` ِ پیشین بیرون از نمایش:
- *  دروازهٔ بار (`MarketListing.gateOf`)، فرم (کلید، دسته، ناحیه، موقعیتِ درشت)، یافتنِ موقعیت که همین‌جا
+ *  دروازهٔ بار (`MarketListing.gateOf`)، فرم (کلید، دسته، ناحیه، ولایت و ولسوالی ِ S109، موقعیتِ درشت)، یافتنِ موقعیت که همین‌جا
  *  گرد می‌شود (`coarseOf`)، و ذخیره که فرم را از پاسخِ سرور از نو پر می‌کند.
  */
 @Stable
@@ -63,7 +63,7 @@ internal class MarketController(private val repo: MarketListingRepository?) {
   /** حالتِ آماده (پس از بار یا برای پیش‌نمایش) */
   fun show(s: MarketStateDto) {
     state = s
-    form = MarketListing.Form(s.listing.listed, s.listing.category, s.listing.area)
+    form = MarketListing.formOf(s.listing)
     gate = MarketListing.Gate.READY
   }
 
@@ -103,7 +103,7 @@ internal class MarketController(private val repo: MarketListingRepository?) {
     r.save(form)
       .onSuccess { saved ->
         state = (state ?: MarketStateDto()).copy(listing = saved)
-        form = MarketListing.Form(saved.listed, saved.category, saved.area)
+        form = MarketListing.formOf(saved)
         save = Save.SAVED
         ok = true
       }

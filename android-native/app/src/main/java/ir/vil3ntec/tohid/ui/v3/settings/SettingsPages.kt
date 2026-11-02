@@ -30,6 +30,7 @@ import androidx.compose.material.icons.outlined.RequestQuote
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Videocam
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Tune
@@ -45,6 +46,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.AppearanceScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.BackupScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CameraScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ScanCashScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.WebcamScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CheckoutRulesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CreditGateScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CrmReportsScreen
@@ -227,6 +229,7 @@ internal object SettingsPages {
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
     Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
     Page(SettingsLayout.SCAN_CASH, Icons.Outlined.PointOfSale) { ScanCashScreen(it) },
+    Page(SettingsLayout.WEBCAM, Icons.Outlined.Videocam) { WebcamScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },

@@ -195,6 +195,7 @@ class SettingsPortTest {
       SettingsLayout.SIMPLE_ASK to "settings/data/simple-ask",
       SettingsLayout.EASY_SETUP to "settings/devices/easy-setup",
       SettingsLayout.SCAN_CASH to "settings/devices/scan-cash",
+      SettingsLayout.WEBCAM to "settings/devices/webcam",
       SettingsLayout.TRAINING to "settings/look/training",
     )
     val table = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.table
@@ -322,6 +323,8 @@ class SettingsPortTest {
     private val DESK_ONLY: Set<String> = setOf(
       SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
       SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS,
+      //  HW-08: وب‌کم به‌عنوانِ بارکدخوان — گوشی دوربینِ خودش را دارد
+      SettingsLayout.WEBCAM,
     )
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */

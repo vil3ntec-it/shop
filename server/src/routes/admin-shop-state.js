@@ -6,6 +6,8 @@
  *   GET  /api/admin/shops/:id/holds                   حالت‌های باز و تاریخچه
  *   POST /api/admin/shops/:id/holds                   {kind, service?, reason} — گذاشتن
  *   POST /api/admin/shops/:id/holds/:holdId/lift      {reason} — برداشتن
+ *   GET  /api/admin/shops/:id/census                  S109: نشانِ «آزمایشی/تکراری» ِ دکان در شمارشِ منطقه‌ای
+ *   PUT  /api/admin/shops/:id/census                  {kind: test|duplicate|none, duplicateOf?, reason} — با سابقه
  *
  * زیرِ `requireAdmin` ِ `routes/admin.js` (و مرزِ نقشِ `lib/admin-roles.js`). نقشِ هر حالت و قاعده‌ها:
  * `lib/shop-holds.js`. شناسهٔ دکان فقط از نشانی، و هر حالت فقط از **همان** دکان برداشته می‌شود.
@@ -15,7 +17,7 @@ const v = require('../lib/validate');
 const holds = require('../lib/shop-holds');
 const { one } = require('../db');
 const { notFound } = require('../middleware/errors');
-const { clientIp } = require('../middleware/ratelimit');
+const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { requireReason } = require('../lib/admin-access');
 
 const router = express.Router({ mergeParams: true });
@@ -62,6 +64,15 @@ router.post('/holds/:holdId/lift', async (req, res) => {
   const out = await holds.lift(id, holdId, req, { reason, ip: clientIp(req) });
   if (out.replayed) res.set('Idempotent-Replayed', 'true');
   res.json(out);
+});
+
+//  S109: نشانِ «آزمایشی/تکراری» — سقفِ IP ِ جدا (روی سقفِ عمومیِ پیش از احراز)
+const censusLimit = rateLimit({ max: 60, keyPrefix: 'admin-census' });
+router.get('/census', censusLimit, async (req, res) => res.json(await require('../lib/market-regions').markOf(shopIdOf(req))));
+
+router.put('/census', censusLimit, async (req, res) => {
+  const reason = requireReason(req);
+  res.json(await require('../lib/market-regions').setMark(shopIdOf(req), req.body, req, { reason, ip: clientIp(req) }));
 });
 
 module.exports = router;

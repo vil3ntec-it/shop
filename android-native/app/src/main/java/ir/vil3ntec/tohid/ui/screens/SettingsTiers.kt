@@ -120,6 +120,7 @@ object SettingsHelp {
     SettingsLayout.EASY_SETUP -> H.easySetupLine
     SettingsLayout.SCAN_CASH -> H.scanCashLine
     SettingsLayout.SERVERS -> ir.vil3ntec.tohid.core.i18n.StrReach.serversLine
+    SettingsLayout.WEBCAM -> H.webcamLine
     SettingsLayout.PERIPHERALS -> H.peripheralsLine
     SettingsLayout.PROFILE -> ir.vil3ntec.tohid.core.i18n.StrSettingsHome.profileLine
     LATE_APOLOGY -> H.lateApologyLine
@@ -180,6 +181,7 @@ object SettingsHelp {
     SettingsLayout.EASY_SETUP -> H.easySetupExample
     SettingsLayout.SCAN_CASH -> H.scanCashExample
     SettingsLayout.SERVERS -> ir.vil3ntec.tohid.core.i18n.StrReach.serversExample
+    SettingsLayout.WEBCAM -> H.webcamExample
     //  پیوند است ولی صفحهٔ «دستگاه‌ها» کارتِ «این چه می‌کند؟» دارد (`DevicesScreen`)
     SettingsLayout.PERIPHERALS -> H.peripheralsExample
     LATE_APOLOGY -> H.lateApologyExample

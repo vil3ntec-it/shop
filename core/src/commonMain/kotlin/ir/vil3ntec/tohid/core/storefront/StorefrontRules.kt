@@ -255,6 +255,26 @@ object StorefrontRules {
     return if (n > AREA_MAX) "ناحیه حداکثر ${toFa(AREA_MAX)} نویسه است (الان ${toFa(n)})" else null
   }
 
+  /** S109: نامِ ولسوالی — همان `cleanDistrict` ِ سرور (`lib/af-provinces.js`)، بی بریدن */
+  const val DISTRICT_MAX = 60
+
+  /** بی نویسهٔ کنترلی، «ي/ى/ك» ِ عربی ⇒ فارسی، نیم‌فاصله ⇒ فاصله، فاصله‌های پیاپی یکی (گروه‌بندیِ شمارشِ منطقه‌ای) */
+  fun cleanDistrict(s: String): String = buildString {
+    var space = false
+    for (c0 in s) {
+      val c = when (c0) { 'ي', 'ى' -> 'ی'; 'ك' -> 'ک'; '\u200c', '\u200d' -> ' '; else -> c0 }
+      if (c.code <= 31 || c.code == 127) continue
+      if (c.isWhitespace()) { space = isNotEmpty(); continue }
+      if (space) { append(' '); space = false }
+      append(c)
+    }
+  }
+
+  fun districtError(district: String): String? {
+    val n = cleanDistrict(district).length
+    return if (n > DISTRICT_MAX) "نامِ ولسوالی حداکثر ${toFa(DISTRICT_MAX)} نویسه است (الان ${toFa(n)})" else null
+  }
+
   /** `keys` = کلیدهای دسته که سرور می‌شناسد */
   fun categoryError(key: String, listed: Boolean, keys: Collection<String>): String? = when {
     key.isBlank() -> if (listed) "برای نمایش در بازارچه، دستهٔ دکان را انتخاب کنید" else null

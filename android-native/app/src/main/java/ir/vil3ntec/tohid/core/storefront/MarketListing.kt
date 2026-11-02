@@ -93,12 +93,30 @@ object MarketListing {
     val category: String,
     val area: String,
     val location: LocationEdit = LocationEdit.Keep,
+    /** S109: کدِ ولایت (ISO 3166-2:AF، از فهرستِ سرور) یا تهی؛ ولسوالی متن. null = «دست نزن» (کلید نمی‌رود) */
+    val province: String? = null,
+    val district: String? = null,
   )
+
+  /** فرمِ پرشده از پاسخِ سرور */
+  fun formOf(l: MarketListingDto): Form = Form(l.listed, l.category, l.area, province = l.province, district = l.district)
+
+  /** فهرستِ ولایت‌ها همانی است که سرور فرستاد؛ سرورِ پیش از S109 ⇒ تهی و بخشِ «ولایت» دیده نمی‌شود */
+  fun provincesOf(listing: MarketListingDto): List<MarketProvinceDto> =
+    listing.provinces.filter { it.code.isNotBlank() && it.name.isNotBlank() }
+
+  fun provinceLabel(code: String?, provinces: List<MarketProvinceDto>): String =
+    if (code.isNullOrBlank()) "" else provinces.firstOrNull { it.code == code }?.name ?: code
+
+  fun cleanDistrict(s: String): String = StorefrontRules.cleanDistrict(s)
+
+  fun districtError(d: String): String? = StorefrontRules.districtError(d)
 
   /** خطاها با کلیدِ همان کادر (`category`، `area`)؛ خالی یعنی فرستادنی است */
   fun errors(form: Form, categories: List<MarketCategoryDto>): Map<String, String> = buildMap {
     categoryError(form.category, form.listed, categories)?.let { put("category", it) }
     areaError(form.area)?.let { put("area", it) }
+    form.district?.let { d -> districtError(d)?.let { put("district", it) } }
   }
 
   /** بدنهٔ `PUT` — فقط کلیدهایی که سرور می‌شناسد؛ موقعیت همیشه درشت */
@@ -106,6 +124,8 @@ object MarketListing {
     put("listed", form.listed)
     put("category", form.category.trim())
     put("area", cleanArea(form.area))
+    form.province?.let { put("province", it.trim()) }
+    form.district?.let { put("district", cleanDistrict(it)) }
     when (val l = form.location) {
       LocationEdit.Keep -> Unit
       LocationEdit.Clear -> put("location", JsonNull)
@@ -175,7 +195,16 @@ data class MarketListingDto(
   val location: MarketLocationDto? = null,
   val updatedAt: Long? = null,
   val categories: List<MarketCategoryDto> = emptyList(),
+  /** S109: ولایت (کد) و نامش، ولسوالی، و فهرستِ ۳۴ ولایت برای انتخاب */
+  val province: String = "",
+  val provinceName: String = "",
+  val district: String = "",
+  val provinces: List<MarketProvinceDto> = emptyList(),
 )
+
+/** یک ولایت از فهرستِ مرجعِ سرور (`lib/af-provinces.js`) */
+@Serializable
+data class MarketProvinceDto(val code: String = "", val name: String = "")
 
 @Serializable
 data class MarketStateDto(
