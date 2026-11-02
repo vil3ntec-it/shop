@@ -24,11 +24,11 @@ object StrRetPolicy {
   // فرمِ برگشت
   val why: String get() = t("بیرون از سیاستِ برگشت", "Outside the return policy", "د بېرته ورکولو له تګلارې بهر")
   fun late(age: Int, days: Int): String = t(
-    "بیرون از مهلت: $age روز از فاکتور گذشته (مهلت $days روز)",
+    "بیرون از مهلت: ${asIs(age)} روز از فاکتور گذشته (مهلت ${asIs(days)} روز)",
     "Past the window: $age days since the invoice (window $days days)",
     "له مودې تېر: له بل څخه $age ورځې تېرې شوې (موده $days ورځې)",
   )
-  fun blockedItems(names: String): String = t("غیرقابلِ برگشت: $names", "Non-returnable: $names", "بېرته نه منل کېدونکي: $names")
+  fun blockedItems(names: String): String = t("غیرقابلِ برگشت: ${asIs(names)}", "Non-returnable: $names", "بېرته نه منل کېدونکي: $names")
   val exception: String get() = t(
     "استثنا — با نامِ شما در سابقهٔ سند می‌ماند",
     "Exception — recorded in the document's history under your name",

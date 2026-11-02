@@ -20,13 +20,13 @@ object StrPick {
   val slotFirst: String get() = t("اول جای قفسه را بنویسید", "Enter the shelf slot first", "لومړی د المارۍ ځای ولیکئ")
   val notLabel: String get() = t("این برچسبِ کیسه نیست (VLNB-…)", "This is not a bag label (VLNB-…)", "دا د کڅوړې لیبل نه دی (VLNB-…)")
   fun bagOn(orderNo: Long, bag: Int, of: Int, slot: String): String = t(
-    "سفارش #$orderNo: کیسهٔ $bag از $of روی $slot",
+    "سفارش #${asIs(orderNo)}: کیسهٔ ${asIs(bag)} از ${asIs(of)} روی ${asIs(slot)}",
     "Order #$orderNo: bag $bag of $of on $slot",
     "فرمایش #$orderNo: کڅوړه $bag له $of څخه په $slot کې",
   )
   val readyNow: String get() = t("همهٔ کیسه‌ها روی قفسه است؛ سفارش آماده شد", "All bags are on the shelf; the order is ready", "ټولې کڅوړې په المارۍ کې دي؛ فرمایش چمتو شو")
-  fun shelfRow(orderNo: Long, slot: String): String = t("#$orderNo · جای $slot", "#$orderNo · slot $slot", "#$orderNo · ځای $slot")
-  fun bags(scanned: Int, bags: Int): String = t("کیسه: $scanned از $bags", "Bags: $scanned of $bags", "کڅوړې: $scanned له $bags څخه")
+  fun shelfRow(orderNo: Long, slot: String): String = t("#${asIs(orderNo)} · جای ${asIs(slot)}", "#$orderNo · slot $slot", "#$orderNo · ځای $slot")
+  fun bags(scanned: Int, bags: Int): String = t("کیسه: ${asIs(scanned)} از ${asIs(bags)}", "Bags: $scanned of $bags", "کڅوړې: $scanned له $bags څخه")
   val ready: String get() = t("آماده", "Ready", "چمتو")
   val waitingBags: String get() = t("کیسه مانده", "Bags missing", "کڅوړې پاتې دي")
   val shelfEmpty: String get() = t("قفسهٔ انتظار خالی است", "The waiting shelf is empty", "د انتظار المارۍ تشه ده")
@@ -39,10 +39,10 @@ object StrPick {
   // جمع‌آوریِ گروهی
   val choose: String get() = t("۲ تا ۱۰ سفارشِ قبول‌شده را برگزینید", "Choose 2 to 10 accepted orders", "له ۲ تر ۱۰ منل شوي فرمایشونه وټاکئ")
   val noOrders: String get() = t("سفارشِ قبول‌شده‌ای برای جمع‌آوری نیست", "No accepted orders to pick", "د راټولولو لپاره منل شوی فرمایش نشته")
-  fun make(n: Int): String = t("ساختنِ دسته ($n سفارش)", "Create batch ($n orders)", "ډله جوړه کړئ ($n فرمایشونه)")
-  fun progress(done: Int, total: Int): String = t("$done از $total قلم", "$done of $total items", "$done له $total توکو څخه")
-  fun bin(bin: Int, orderNo: Long): String = t("سبدِ $bin · #$orderNo", "Bin $bin · #$orderNo", "ټوکرۍ $bin · #$orderNo")
-  fun orderSheet(orderNo: Long): String = t("برگهٔ #$orderNo", "Sheet #$orderNo", "پاڼه #$orderNo")
+  fun make(n: Int): String = t("ساختنِ دسته (${asIs(n)} سفارش)", "Create batch ($n orders)", "ډله جوړه کړئ ($n فرمایشونه)")
+  fun progress(done: Int, total: Int): String = t("${asIs(done)} از ${asIs(total)} قلم", "$done of $total items", "$done له $total توکو څخه")
+  fun bin(bin: Int, orderNo: Long): String = t("سبدِ ${asIs(bin)} · #${asIs(orderNo)}", "Bin $bin · #$orderNo", "ټوکرۍ $bin · #$orderNo")
+  fun orderSheet(orderNo: Long): String = t("برگهٔ #${asIs(orderNo)}", "Sheet #$orderNo", "پاڼه #$orderNo")
   val picked: String get() = t("برداشتم", "Picked", "ما واخیست")
   val notFound: String get() = t("پیدا نکردم", "Not found", "ونه موندل شو")
   val scanItem: String get() = t("اسکنِ کالای همین قلم", "Scan this item", "د همدې توکي سکن")
@@ -57,13 +57,13 @@ object StrPick {
   // شاخص‌ها (PCK-13)
   val tabMetrics: String get() = t("شاخص‌ها", "Metrics", "شاخصونه")
   val metricsHint: String get() = t("۷ روزِ گذشته؛ همهٔ عددها از سرور.", "Last 7 days; all figures come from the server.", "تېرې ۷ ورځې؛ ټولې شمېرې له سرور څخه دي.")
-  fun mOrders(n: Int): String = t("سفارشِ بسته‌شده: $n", "Packed orders: $n", "بسته شوي فرمایشونه: $n")
-  fun mAvg(min: String): String = t("میانگینِ زمانِ جمع‌آوری: $min دقیقه", "Average picking time: $min min", "د راټولولو منځنی وخت: $min دقیقې")
-  fun mMedian(min: String): String = t("میانهٔ زمان: $min دقیقه", "Median time: $min min", "منځنی وخت: $min دقیقې")
-  fun mLines(found: Int, lines: Int): String = t("قلمِ پیداشده: $found از $lines", "Items found: $found of $lines", "موندل شوي توکي: $found له $lines څخه")
-  fun mFound(pct: String): String = t("درصدِ پیدا شدن: $pct٪", "Found rate: $pct%", "د موندلو کچه: $pct٪")
-  fun mSubst(pct: String): String = t("نرخِ جایگزینی: $pct٪", "Substitution rate: $pct%", "د بدیل کچه: $pct٪")
-  fun mWrong(n: Int): String = t("اسکنِ اشتباه: $n", "Wrong scans: $n", "ناسم سکنونه: $n")
+  fun mOrders(n: Int): String = t("سفارشِ بسته‌شده: ${asIs(n)}", "Packed orders: $n", "بسته شوي فرمایشونه: $n")
+  fun mAvg(min: String): String = t("میانگینِ زمانِ جمع‌آوری: ${asIs(min)} دقیقه", "Average picking time: $min min", "د راټولولو منځنی وخت: $min دقیقې")
+  fun mMedian(min: String): String = t("میانهٔ زمان: ${asIs(min)} دقیقه", "Median time: $min min", "منځنی وخت: $min دقیقې")
+  fun mLines(found: Int, lines: Int): String = t("قلمِ پیداشده: ${asIs(found)} از ${asIs(lines)}", "Items found: $found of $lines", "موندل شوي توکي: $found له $lines څخه")
+  fun mFound(pct: String): String = t("درصدِ پیدا شدن: ${asIs(pct)}٪", "Found rate: $pct%", "د موندلو کچه: $pct٪")
+  fun mSubst(pct: String): String = t("نرخِ جایگزینی: ${asIs(pct)}٪", "Substitution rate: $pct%", "د بدیل کچه: $pct٪")
+  fun mWrong(n: Int): String = t("اسکنِ اشتباه: ${asIs(n)}", "Wrong scans: $n", "ناسم سکنونه: $n")
 
   // رسیدگی به «پیدا نکردم» (PCK-14)
   val tabIssues: String get() = t("پیدا نشده‌ها", "Not-found items", "نه موندل شوي توکي")
@@ -73,14 +73,14 @@ object StrPick {
     "هغه توکي چې «ونه موندل شو» شوي، تر کتنې پورې په پلورنځي کې پای ته رسېدلي ښودل کېږي.",
   )
   val issuesEmpty: String get() = t("وظیفهٔ بازی نیست", "No open tasks", "پرانیستې دنده نشته")
-  fun issueRow(name: String, hits: Int): String = t("$name · $hits بار", "$name · $hits times", "$name · $hits ځله")
+  fun issueRow(name: String, hits: Int): String = t("${asIs(name)} · ${asIs(hits)} بار", "$name · $hits times", "$name · $hits ځله")
   val issueNote: String get() = t("توضیحِ رسیدگی (لازم)", "Review note (required)", "د کتنې یادښت (اړین)")
   val resolve: String get() = t("رسیدگی شد", "Resolved", "وکتل شو")
   val dismiss: String get() = t("کنار گذاشته شد", "Dismiss", "یو طرف شو")
 
   // جایگزین (PCK-05) و حلال (PCK-06)
   val substitute: String get() = t("جایگزین", "Substitute", "بدیل")
-  fun subTitle(name: String): String = t("جایگزینِ «$name»", "Substitute for “$name”", "د «$name» بدیل")
+  fun subTitle(name: String): String = t("جایگزینِ «${asIs(name)}»", "Substitute for “$name”", "د «$name» بدیل")
   val subHint: String get() = t(
     "فقط هم‌دسته و هم‌حلال؛ مشتری قیمتِ کمتر را می‌پردازد و تأیید با خودِ اوست.",
     "Same category and halal status only; the customer pays the lower price and decides.",
@@ -89,7 +89,7 @@ object StrPick {
   val subNone: String get() = t("مشتری جایگزین نخواسته است", "The customer does not want substitutes", "پېرودونکي بدیل نه دی غوښتی")
   val subNoCategory: String get() = t("دستهٔ این کالا معلوم نیست؛ جایگزینِ امن ساخته نمی‌شود", "This item has no category; no safe substitute", "د دې توکي ډله نه ده معلومه؛ خوندي بدیل نه جوړېږي")
   val subEmpty: String get() = t("جایگزینِ امنی در دکان نیست", "No safe substitute in the shop", "په دوکان کې خوندي بدیل نشته")
-  fun subLine(name: String, price: String, total: String): String = t("$name · $price · جمع $total", "$name · $price · total $total", "$name · $price · ټول $total")
+  fun subLine(name: String, price: String, total: String): String = t("${asIs(name)} · ${asIs(price)} · جمع ${asIs(total)}", "$name · $price · total $total", "$name · $price · ټول $total")
   val subScan: String get() = t("اسکنِ بارکدِ جایگزین", "Scan the substitute's barcode", "د بدیل بارکوډ سکن کړئ")
   val subPropose: String get() = t("پیشنهاد به مشتری", "Offer to customer", "پېرودونکي ته وړاندیز")
   val subSent: String get() = t("پیشنهاد ثبت شد؛ پیوند را برای مشتری بفرستید", "Offer saved; send the link to the customer", "وړاندیز ثبت شو؛ پېرودونکي ته لینک ولېږئ")
@@ -117,7 +117,7 @@ object StrPick {
   )
   val photoTake: String get() = t("گرفتنِ عکس", "Take photo", "انځور اخیستل")
   val photoNote: String get() = t("فقط کیسه‌های بسته؛ حداکثر ۳ عکس", "Packed bags only; up to 3 photos", "یوازې بسته شوې کڅوړې؛ تر ۳ انځورونو پورې")
-  fun photos(n: Int, max: Int): String = t("عکسِ بسته: $n از $max", "Parcel photos: $n of $max", "د بستې انځورونه: $n له $max څخه")
+  fun photos(n: Int, max: Int): String = t("عکسِ بسته: ${asIs(n)} از ${asIs(max)}", "Parcel photos: $n of $max", "د بستې انځورونه: $n له $max څخه")
   val photoSaved: String get() = t("عکسِ بسته ثبت شد", "Parcel photo saved", "د بستې انځور ثبت شو")
   val photoBad: String get() = t("عکس خوانده نشد؛ دوباره بگیرید", "The photo could not be read; take it again", "انځور ونه لوستل شو؛ بیا یې واخلئ")
 
@@ -125,7 +125,7 @@ object StrPick {
   val printLabels: String get() = t("چاپِ برچسبِ کیسه‌ها", "Print bag labels", "د کڅوړو لیبلونه چاپ کړئ")
   val noPrinter: String get() = t("چاپگرِ رسید تنظیم نشده است", "No receipt printer is set up", "د رسید چاپګر نه دی ټاکل شوی")
   val printed: String get() = t("برچسب‌ها چاپ شد", "Labels printed", "لیبلونه چاپ شول")
-  fun printFailed(why: String): String = t("چاپ نشد: $why", "Not printed: $why", "چاپ نه شو: $why")
-  fun labelCaption(orderNo: Long, bag: Int, of: Int): String = t("#$orderNo · کیسهٔ $bag از $of", "#$orderNo · bag $bag of $of", "#$orderNo · کڅوړه $bag له $of څخه")
-  fun labelsJob(orderNo: Long): String = t("برچسبِ کیسه‌های #$orderNo", "Bag labels #$orderNo", "د #$orderNo کڅوړو لیبلونه")
+  fun printFailed(why: String): String = t("چاپ نشد: ${asIs(why)}", "Not printed: $why", "چاپ نه شو: $why")
+  fun labelCaption(orderNo: Long, bag: Int, of: Int): String = t("#${asIs(orderNo)} · کیسهٔ ${asIs(bag)} از ${asIs(of)}", "#$orderNo · bag $bag of $of", "#$orderNo · کڅوړه $bag له $of څخه")
+  fun labelsJob(orderNo: Long): String = t("برچسبِ کیسه‌های #${asIs(orderNo)}", "Bag labels #$orderNo", "د #$orderNo کڅوړو لیبلونه")
 }

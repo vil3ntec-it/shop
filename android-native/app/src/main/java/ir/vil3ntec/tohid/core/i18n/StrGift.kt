@@ -15,5 +15,5 @@ object StrGift {
   val button: String get() = t("رسیدِ هدیه", "Gift receipt", "د ډالۍ رسید")
   val sending: String get() = t("رسیدِ هدیه به چاپگر می‌رود…", "Sending the gift receipt to the printer…", "د ډالۍ رسید چاپګر ته ځي…")
   val printed: String get() = t("رسیدِ هدیه چاپ شد", "Gift receipt printed", "د ډالۍ رسید چاپ شو")
-  fun failed(a: Any): String = t("رسیدِ هدیه کشیده نشد: $a", "The gift receipt couldn't be drawn: $a", "د ډالۍ رسید جوړ نه شو: $a")
+  fun failed(a: Any): String = t("رسیدِ هدیه کشیده نشد: ${asIs(a)}", "The gift receipt couldn't be drawn: $a", "د ډالۍ رسید جوړ نه شو: $a")
 }

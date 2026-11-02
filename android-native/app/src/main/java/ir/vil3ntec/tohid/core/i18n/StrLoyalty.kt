@@ -28,19 +28,19 @@ object StrLoyalty {
   val tierBronze: String get() = t("برنزی", "Bronze", "برونزي")
 
   // صندوق
-  fun bar(points: Any, tier: Any, mult: Any): String = t("امتیاز: $points · سطحِ $tier (×$mult)", "Points: $points · $tier tier (×$mult)", "امتیاز: $points · $tier کچه (×$mult)")
+  fun bar(points: Any, tier: Any, mult: Any): String = t("امتیاز: ${asIs(points)} · سطحِ ${asIs(tier)} (×${asIs(mult)})", "Points: $points · $tier tier (×$mult)", "امتیاز: $points · $tier کچه (×$mult)")
   val use: String get() = t("مصرفِ امتیاز", "Use points", "د امتیاز مصرف")
-  fun using(points: Any, value: Any): String = t("مصرفِ $points امتیاز = $value ؋ کم شد", "Using $points points = $value ؋ off", "د $points امتیازونو مصرف = $value ؋ کم شول")
+  fun using(points: Any, value: Any): String = t("مصرفِ ${asIs(points)} امتیاز = ${asIs(value)} ؋ کم شد", "Using $points points = $value ؋ off", "د $points امتیازونو مصرف = $value ؋ کم شول")
   val stopUsing: String get() = t("برداشتن", "Remove", "لرې کول")
-  fun howMany(max: Any): String = t("چند امتیاز؟ (حداکثر $max)", "How many points? (max $max)", "څو امتیازه؟ (تر ټولو ډېر $max)")
+  fun howMany(max: Any): String = t("چند امتیاز؟ (حداکثر ${asIs(max)})", "How many points? (max $max)", "څو امتیازه؟ (تر ټولو ډېر $max)")
   val apply: String get() = t("اعمال", "Apply", "پلي کول")
   val cancel: String get() = t("انصراف", "Cancel", "لغوه")
   val nothingToUse: String get() = t("برای این فاکتور امتیازِ قابلِ مصرف نیست", "No points can be used on this invoice", "په دې بل کې د مصرف وړ امتیاز نشته")
   val negative: String get() = t("ماندهٔ امتیاز منفی است — نیازمندِ بررسی", "Points balance is negative — needs review", "د امتیاز پاتې منفي دی — کتنې ته اړتیا لري")
 
   // رسید
-  fun receiptUsed(points: Any): String = t("مصرفِ امتیاز ($points)", "Points used ($points)", "د امتیاز مصرف ($points)")
-  fun receiptEarned(points: Any): String = t("امتیازِ این خرید: +$points", "Points earned: +$points", "د دې پېرود امتیاز: +$points")
+  fun receiptUsed(points: Any): String = t("مصرفِ امتیاز (${asIs(points)})", "Points used ($points)", "د امتیاز مصرف ($points)")
+  fun receiptEarned(points: Any): String = t("امتیازِ این خرید: +${asIs(points)}", "Points earned: +$points", "د دې پېرود امتیاز: +$points")
 
   // خطا
   val errCustomer: String get() = t("امتیاز مالِ مشتریِ دیگری است؛ مشتریِ فاکتور را عوض نکنید یا امتیاز را بردارید", "The points belong to another customer; keep the invoice customer or remove the points", "امتیاز د بل پېرودونکي دی؛ د بل پېرودونکی مه بدلوئ یا امتیاز لرې کړئ")
@@ -50,12 +50,12 @@ object StrLoyalty {
   val errRule: String get() = t("قاعدهٔ امتیاز درست نیست؛ تنظیمات را ببینید", "The points rule is not valid; check settings", "د امتیاز قاعده سمه نه ده؛ تنظیمات وګورئ")
 
   // پروندهٔ مشتری
-  fun historyTitle(balance: Any): String = t("امتیازِ وفاداری (مانده: $balance)", "Loyalty points (balance: $balance)", "د وفادارۍ امتیاز (پاتې: $balance)")
+  fun historyTitle(balance: Any): String = t("امتیازِ وفاداری (مانده: ${asIs(balance)})", "Loyalty points (balance: $balance)", "د وفادارۍ امتیاز (پاتې: $balance)")
   val kindEarn: String get() = t("کسب", "Earned", "ګټل")
   val kindSpend: String get() = t("مصرف", "Used", "مصرف")
   val kindEarnBack: String get() = t("برگشتِ کسب", "Earn reversed", "د ګټلو بېرته اخیستل")
   val kindSpendBack: String get() = t("برگشتِ مصرف", "Use refunded", "د مصرف بېرته ورکول")
-  fun invoice(label: Any): String = t("فاکتور #$label", "Invoice #$label", "بل #$label")
+  fun invoice(label: Any): String = t("فاکتور #${asIs(label)}", "Invoice #$label", "بل #$label")
   val empty: String get() = t("هنوز امتیازی نیست", "No points yet", "لا امتیاز نشته")
 
   // انقضا
@@ -67,7 +67,7 @@ object StrLoyalty {
   )
   val expirySave: String get() = t("ذخیرهٔ انقضا", "Save expiry", "پای ته رسېدل خوندي کړئ")
   val badExpiry: String get() = t("ماه باید از ۰ تا ۱۲۰ باشد", "Months must be 0 to 120", "میاشتې باید له ۰ تر ۱۲۰ وي")
-  fun soon(points: Any, date: Any): String = t("$points امتیاز تا $date می‌سوزد", "$points points expire by $date", "$points امتیازونه تر $date پورې سوځي")
+  fun soon(points: Any, date: Any): String = t("${asIs(points)} امتیاز تا ${asIs(date)} می‌سوزد", "$points points expire by $date", "$points امتیازونه تر $date پورې سوځي")
 
   // قاعدهٔ یکسانِ دکان
   val shopTitle: String get() = t("قاعدهٔ یکسان برای همهٔ دستگاه‌های دکان", "One rule for all shop devices", "د هټۍ ټولو وسیلو لپاره یوه قاعده")
@@ -82,11 +82,11 @@ object StrLoyalty {
   val shopSaved: String get() = t("قاعدهٔ یکسانِ دکان ذخیره شد", "Shop-wide rule saved", "د هټۍ یوه قاعده خوندي شوه")
   val shopSaveFailed: String get() = t("قاعدهٔ دکان ذخیره نشد؛ اینترنت را ببینید و دوباره بزنید", "The shop rule was not saved; check the connection and try again", "د هټۍ قاعده خوندي نه شوه؛ انټرنېټ وګورئ او بیا هڅه وکړئ")
   fun ruleSummary(every: Any, point: Any, share: Any, months: Any): String = t(
-    "هر $every افغانی ۱ امتیاز · هر امتیاز $point افغانی · تا $share٪ فاکتور · انقضا $months ماه",
+    "هر ${asIs(every)} افغانی ۱ امتیاز · هر امتیاز ${asIs(point)} افغانی · تا ${asIs(share)}٪ فاکتور · انقضا ${asIs(months)} ماه",
     "1 point per $every AFN · 1 point = $point AFN · up to $share% of an invoice · expiry $months months",
     "هرو $every افغانیو ته ۱ امتیاز · هر امتیاز $point افغانۍ · د بل تر $share٪ پورې · پای ته رسېدل $months میاشتې",
   )
-  fun shopVersion(v: Any): String = t("نسخهٔ $v", "Version $v", "نسخه $v")
+  fun shopVersion(v: Any): String = t("نسخهٔ ${asIs(v)}", "Version $v", "نسخه $v")
 
   // اصلاحِ دستی
   val adjust: String get() = t("اصلاحِ امتیاز", "Adjust points", "د امتیاز سمون")
@@ -97,7 +97,7 @@ object StrLoyalty {
   val adjustDone: String get() = t("امتیاز اصلاح شد", "Points adjusted", "امتیاز سم شو")
   val adjustOwnerOnly: String get() = t("اصلاحِ امتیاز فقط با صاحب یا مدیر است", "Only the owner or a manager can adjust points", "امتیاز یوازې څښتن یا مدیر سمولای شي")
   val adjustNeedsReason: String get() = t("دلیلِ اصلاح را بنویسید", "Write a reason for the adjustment", "د سمون دلیل ولیکئ")
-  fun adjustReasonLong(max: Any): String = t("دلیل حداکثر $max حرف", "Reason is at most $max characters", "دلیل تر ټولو ډېر $max توري")
+  fun adjustReasonLong(max: Any): String = t("دلیل حداکثر ${asIs(max)} حرف", "Reason is at most $max characters", "دلیل تر ټولو ډېر $max توري")
   val adjustBadPoints: String get() = t("شمارِ امتیاز درست نیست", "The number of points is not valid", "د امتیاز شمېر سم نه دی")
   val kindAdjust: String get() = t("اصلاحِ دستی", "Manual adjustment", "لاسي سمون")
 }

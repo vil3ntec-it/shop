@@ -31,7 +31,7 @@ object StrTouch {
   val clear: String get() = t("پاک", "Clear", "پاکول")
   val back: String get() = t("پاک کردنِ رقمِ آخر", "Delete last digit", "وروستۍ شمېره پاکول")
   val pickLine: String get() = t("نخست ردیفی از سبد را انتخاب کنید", "Select a cart line first", "لومړی د ټوکرۍ یوه کرښه وټاکئ")
-  fun forLine(name: String): String = t("برای: $name", "For: $name", "لپاره: $name")
+  fun forLine(name: String): String = t("برای: ${asIs(name)}", "For: $name", "لپاره: $name")
   val discountOff: String get() = t(
     "تخفیفِ ردیف خاموش است یا برای شما مجاز نیست",
     "Line discounts are off or not allowed for you",

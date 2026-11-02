@@ -42,7 +42,7 @@ object StrPlaces {
   val newPlace: String get() = t("نامِ محلِ تازه، مثلاً انبارِ پشتی", "New place name, e.g. back store", "د نوي ځای نوم، لکه شاتنۍ زېرمه")
   val add: String get() = t("افزودن", "Add", "زیاتول")
   val archive: String get() = t("بایگانی", "Archive", "آرشیف")
-  fun items(n: Any): String = t("$n کالا", "$n items", "$n توکي")
+  fun items(n: Any): String = t("${asIs(n)} کالا", "$n items", "$n توکي")
   val transferTitle: String get() = t("انتقال بین محل‌ها", "Move between places", "د ځایونو ترمنځ لېږد")
   val search: String get() = t("نامِ کالا…", "Product name…", "د توکي نوم…")
   val otherProduct: String get() = t("کالای دیگر", "Other product", "بل توکی")
@@ -89,8 +89,8 @@ object StrPlaces {
   val note: String get() = t("یادداشت (اختیاری)", "Note (optional)", "یادښت (اختیاري)")
   val save: String get() = t("ثبت", "Save", "ثبت")
   fun result(q: Any, unit: Any, name: Any, cost: Any): String =
-    t("⇐ $q $unit «$name»، بهای هر واحد $cost ؋", "⇒ $q $unit “$name”, unit cost $cost ؋", "⇐ $q $unit «$name»، د هر واحد بیه $cost ؋")
+    t("⇐ ${asIs(q)} ${asIs(unit)} «${asIs(name)}»، بهای هر واحد ${asIs(cost)} ؋", "⇒ $q $unit “$name”, unit cost $cost ؋", "⇐ $q $unit «$name»، د هر واحد بیه $cost ؋")
   fun need(q: Any, unit: Any, name: Any, have: Any): String =
-    t("$q $unit «$name» (موجود: $have)", "$q $unit “$name” (in stock: $have)", "$q $unit «$name» (موجود: $have)")
+    t("${asIs(q)} ${asIs(unit)} «${asIs(name)}» (موجود: ${asIs(have)})", "$q $unit “$name” (in stock: $have)", "$q $unit «$name» (موجود: $have)")
   val savedRepack: String get() = t("ثبت شد", "Saved", "ثبت شو")
 }

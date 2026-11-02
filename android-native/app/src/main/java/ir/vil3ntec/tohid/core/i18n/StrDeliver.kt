@@ -29,10 +29,10 @@ object StrDeliver {
   val landmark: String get() = t("نشانه", "Landmark", "نښه")
   val fee: String get() = t("هزینهٔ ارسال (؋)", "Delivery fee (؋)", "د لېږد لګښت (؋)")
   val noteField: String get() = t("یادداشت", "Note", "یادښت")
-  fun items(a: Any): String = t("اقلام: $a", "Items: $a", "توکي: $a")
-  fun total(a: Any): String = t("جمع هنگامِ تحویل: $a ؋", "Due on delivery: $a ؋", "د سپارلو پر وخت ټولټال: $a ؋")
+  fun items(a: Any): String = t("اقلام: ${asIs(a)}", "Items: $a", "توکي: $a")
+  fun total(a: Any): String = t("جمع هنگامِ تحویل: ${asIs(a)} ؋", "Due on delivery: $a ؋", "د سپارلو پر وخت ټولټال: $a ؋")
   val submit: String get() = t("ثبتِ سفارشِ ارسال", "Create delivery order", "د لېږد فرمایش ثبت کړئ")
-  fun created(a: Any): String = t("سفارشِ #$a ثبت شد و به میزِ تحویل رفت", "Order #$a was created and sent to the delivery desk", "فرمایش #$a ثبت شو او د سپارلو مېز ته ولاړ")
+  fun created(a: Any): String = t("سفارشِ #${asIs(a)} ثبت شد و به میزِ تحویل رفت", "Order #$a was created and sent to the delivery desk", "فرمایش #$a ثبت شو او د سپارلو مېز ته ولاړ")
   val retry: String get() = t(
     "اتصال قطع شد. دوباره «ثبتِ سفارشِ ارسال» را بزنید — سفارش دو بار ثبت نمی‌شود.",
     "The connection dropped. Press \"Create delivery order\" again — the order won't be created twice.",
@@ -46,5 +46,5 @@ object StrDeliver {
   val needPhone: String get() = t("برای ارسال، شمارهٔ مشتری لازم است", "A phone number is required for delivery", "د لېږد لپاره د پیرودونکي شمېره اړینه ده")
   val needAddress: String get() = t("نشانی یا نشانهٔ تحویل لازم است", "An address or landmark is required", "پته یا د سپارلو نښه اړینه ده")
   val badFee: String get() = t("هزینهٔ ارسال درست نیست", "The delivery fee is not valid", "د لېږد لګښت سم نه دی")
-  fun badLine(a: Any): String = t("مقدار یا قیمتِ «$a» درست نیست", "The quantity or price of \"$a\" is not valid", "د «$a» اندازه یا بیه سمه نه ده")
+  fun badLine(a: Any): String = t("مقدار یا قیمتِ «${asIs(a)}» درست نیست", "The quantity or price of \"$a\" is not valid", "د «$a» اندازه یا بیه سمه نه ده")
 }

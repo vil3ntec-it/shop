@@ -30,7 +30,7 @@ object StrKit {
   val retry: String get() = t("دوباره", "Retry", "بیا هڅه")
   val required: String get() = t("لازم است", "Required", "اړین دی")
   val notANumber: String get() = t("عدد درست بنویسید", "Enter a valid number", "سم شمېر ولیکئ")
-  fun selectedCount(n: Any): String = t("$n انتخاب‌شده", "$n selected", "$n ټاکل شوي")
+  fun selectedCount(n: Any): String = t("${asIs(n)} انتخاب‌شده", "$n selected", "$n ټاکل شوي")
 
   // فرم: دور انداختنِ تغییرها
   val discardTitle: String get() = t("تغییرها دور ریخته شوند؟", "Discard changes?", "بدلونونه لرې شي؟")

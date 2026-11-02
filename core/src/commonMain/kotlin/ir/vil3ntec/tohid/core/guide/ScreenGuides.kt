@@ -20,11 +20,12 @@ package ir.vil3ntec.tohid.core.guide
 
 enum class GuideStatus { PLACEHOLDER, READY }
 
-/** یک نوشته در سه زبان؛ انگلیسی یا پشتوی خالی ⇒ همان فارسی (قاعدهٔ `I18n.kt`) */
+/** یک نوشته در سه زبان؛ انگلیسی یا پشتوی خالی ⇒ همان فارسی (قاعدهٔ `I18n.kt`)؛ دری (`prs`) ⇒ فارسی از `DariText` */
 data class GuideText(val fa: String, val en: String = "", val ps: String = "") {
   fun of(lang: String): String = when (lang) {
     "en" -> en.ifBlank { fa }
     "ps" -> ps.ifBlank { fa }
+    "prs" -> ir.vil3ntec.tohid.core.text.DariText.of(fa)
     else -> fa
   }
 }

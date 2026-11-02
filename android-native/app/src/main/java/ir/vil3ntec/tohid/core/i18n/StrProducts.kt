@@ -29,21 +29,21 @@ object StrProducts {
   val swipeEntry: String get() = t("ورود", "Stock in", "راوړل")
   val edit: String get() = t("ویرایش", "Edit", "سمول")
   val delete: String get() = t("حذف", "Delete", "ړنګول")
-  fun selectedTitle(n: Int): String = t("$n کالا انتخاب شد", "$n ${pl(n, "item", "items")} selected", "$n توکي وټاکل شول")
+  fun selectedTitle(n: Int): String = t("${asIs(n)} کالا انتخاب شد", "$n ${pl(n, "item", "items")} selected", "$n توکي وټاکل شول")
   val activate: String get() = t("فعال", "Activate", "فعال")
   val deactivate: String get() = t("غیرفعال", "Deactivate", "غیرفعال")
   val bulkCategory: String get() = t("دسته", "Category", "ډله")
   val cancelSelection: String get() = t("لغو", "Cancel", "لغوه")
-  fun bulkDeleteTitle(n: Int): String = t("حذفِ $n کالا؟", "Delete $n ${pl(n, "item", "items")}?", "$n توکي ړنګ شي؟")
+  fun bulkDeleteTitle(n: Int): String = t("حذفِ ${asIs(n)} کالا؟", "Delete $n ${pl(n, "item", "items")}?", "$n توکي ړنګ شي؟")
   val bulkDeleteBody: String get() = t(
     "کالاها و سوابقِ ورودشان از انبار حذف می‌شوند. فاکتورهای قبلی می‌مانند ولی نامِ کالا در آن‌ها «حذف‌شده» نشان داده می‌شود. برگشت ندارد.",
     "The items and their stock entries are removed. Past invoices stay, but show the item as “deleted”. This can't be undone.",
     "توکي او د ګدام ثبتونه یې ړنګېږي. پخواني بلونه پاتې کېږي خو د توکي نوم «ړنګ شوی» ښيي. بېرته نه راګرځي.",
   )
-  fun activated(n: Int): String = t("$n کالا فعال شد", "$n ${pl(n, "item", "items")} activated", "$n توکي فعال شول")
-  fun deactivated(n: Int): String = t("$n کالا غیرفعال شد", "$n ${pl(n, "item", "items")} deactivated", "$n توکي غیرفعال شول")
-  fun deleted(n: Int): String = t("$n کالا حذف شد", "$n ${pl(n, "item", "items")} deleted", "$n توکي ړنګ شول")
-  fun categoryChanged(n: Int): String = t("دستهٔ $n کالا عوض شد", "Category changed for $n ${pl(n, "item", "items")}", "د $n توکو ډله بدله شوه")
+  fun activated(n: Int): String = t("${asIs(n)} کالا فعال شد", "$n ${pl(n, "item", "items")} activated", "$n توکي فعال شول")
+  fun deactivated(n: Int): String = t("${asIs(n)} کالا غیرفعال شد", "$n ${pl(n, "item", "items")} deactivated", "$n توکي غیرفعال شول")
+  fun deleted(n: Int): String = t("${asIs(n)} کالا حذف شد", "$n ${pl(n, "item", "items")} deleted", "$n توکي ړنګ شول")
+  fun categoryChanged(n: Int): String = t("دستهٔ ${asIs(n)} کالا عوض شد", "Category changed for $n ${pl(n, "item", "items")}", "د $n توکو ډله بدله شوه")
   val emptyTitle: String get() = t("هنوز کالایی ثبت نشده", "No products yet", "تر اوسه هېڅ توکی نه دی ثبت شوی")
   val emptyBody: String get() = t(
     "کالاهای دکان را یک‌بار ثبت کنید تا در فروش، انبار و گزارش‌ها بیایند.",
@@ -52,7 +52,7 @@ object StrProducts {
   )
   val emptyAction: String get() = t("ثبت کالا", "Add products", "توکي ثبت کړئ")
   val clearFilters: String get() = t("پاک کردنِ فیلترها", "Clear filters", "فلټرونه پاک کړئ")
-  fun deleteTitle(name: String): String = t("حذف «$name»؟", "Delete “$name”?", "«$name» ړنګ شي؟")
+  fun deleteTitle(name: String): String = t("حذف «${asIs(name)}»؟", "Delete “$name”?", "«$name» ړنګ شي؟")
   val productDeleted: String get() = t("محصول حذف شد", "Product deleted", "توکی ړنګ شو")
 
   // جزئیات
@@ -64,7 +64,7 @@ object StrProducts {
   val stockNow: String get() = t("موجودی فعلی", "In stock", "اوسنۍ موجودي")
   val salePrice: String get() = t("قیمت فروش", "Sale price", "د پلور بیه")
   val purchasePrice: String get() = t("قیمت خرید", "Purchase price", "د پېرود بیه")
-  fun unitProfit(unit: String): String = t("سود هر $unit", "Profit per $unit", "د هر $unit ګټه")
+  fun unitProfit(unit: String): String = t("سود هر ${asIs(unit)}", "Profit per $unit", "د هر $unit ګټه")
   val unitWord: String get() = t("واحد", "unit", "واحد")
   val stockProfit: String get() = t("سود موجودی فعلی", "Profit on current stock", "د اوسنۍ موجودۍ ګټه")
   val minStock: String get() = t("حداقل موجودی", "Minimum stock", "لږترلږه موجودي")
@@ -92,7 +92,7 @@ object StrProducts {
   val history: String get() = t("تاریخچهٔ تغییرات", "Change history", "د بدلونونو تاریخچه")
   val entryCta: String get() = t("ورود کالا به انبار", "Add stock", "ګدام ته توکي راوړل")
   fun pairCode(code: String): String = t(
-    "کدِ جفت‌شدن: $code — در گوشی ⇐ دستگاه‌های جانبی همین را بزنید، بعد دوباره «عکس با دوربینِ گوشی»",
+    "کدِ جفت‌شدن: ${asIs(code)} — در گوشی ⇐ دستگاه‌های جانبی همین را بزنید، بعد دوباره «عکس با دوربینِ گوشی»",
     "Pairing code: $code — enter it on the phone under Devices, then tap “Photo with the phone camera” again",
     "د جوړې کوډ: $code — په ګرځنده کې یې د وسیلو برخه کې ولیکئ، بیا بیا «د ګرځنده کمرې انځور»",
   )
@@ -112,7 +112,7 @@ object StrProducts {
   val firstRowHint: String get() = t("چند کالا را با هم ثبت کنید — هر کارت یک کالا", "Add several products at once — one card per product", "څو توکي یوځای ثبت کړئ — هر کارت یو توکی")
   val category: String get() = t("دسته‌بندی", "Category", "ډله")
   val newCategory: String get() = t("دستهٔ تازه", "New category", "نوې ډله")
-  fun profitLine(unit: String, amount: String): String = t("سودِ هر $unit: $amount ؋", "Profit per $unit: $amount ؋", "د هر $unit ګټه: $amount ؋")
+  fun profitLine(unit: String, amount: String): String = t("سودِ هر ${asIs(unit)}: ${asIs(amount)} ؋", "Profit per $unit: $amount ؋", "د هر $unit ګټه: $amount ؋")
   val loss: String get() = t("زیان", "Loss", "تاوان")
   val unit: String get() = t("واحد", "Unit", "واحد")
   val newUnit: String get() = t("واحدِ تازه", "New unit", "نوی واحد")
@@ -122,7 +122,7 @@ object StrProducts {
   val saleUnit: String get() = t("واحدِ فروشِ دوم", "Second sale unit", "د پلور دویم واحد")
   val saleUnitPlaceholder: String get() = t("گرم", "gram", "ګرام")
   val factor: String get() = t("ضریب", "Factor", "ضریب")
-  fun factorHelper(unit: String): String = t("هر واحد = چند $unit", "One sale unit = how many $unit", "یو واحد = څو $unit")
+  fun factorHelper(unit: String): String = t("هر واحد = چند ${asIs(unit)}", "One sale unit = how many $unit", "یو واحد = څو $unit")
   val supplier: String get() = t("تأمین‌کننده", "Supplier", "عرضه کوونکی")
   val noSupplier: String get() = t("هیچ‌کدام", "None", "هېڅ")
   val activeInSale: String get() = t("فعال در فروش", "Active in sales", "په پلور کې فعال")
@@ -135,27 +135,27 @@ object StrProducts {
   val removeRow: String get() = t("حذف ردیف", "Remove row", "کتار لرې کول")
   val rowRemoved: String get() = t("ردیف حذف شد", "Row removed", "کتار لرې شو")
   val addRow: String get() = t("افزودن ردیف", "Add row", "کتار زیاتول")
-  fun readySummary(ready: Int, total: Int): String = t("کالای آماده: $ready از $total", "Ready: $ready of $total", "چمتو توکي: $ready له $total")
+  fun readySummary(ready: Int, total: Int): String = t("کالای آماده: ${asIs(ready)} از ${asIs(total)}", "Ready: $ready of $total", "چمتو توکي: $ready له $total")
   val saveAll: String get() = t("ذخیرهٔ همه", "Save all", "ټول خوندي کړئ")
   val saveChanges: String get() = t("ذخیرهٔ تغییرات", "Save changes", "بدلونونه خوندي کړئ")
   fun rowIncomplete(n: Int): String = t(
-    "ردیف $n کامل نیست — نام، دسته، واحد و هر دو قیمت لازم است",
+    "ردیف ${asIs(n)} کامل نیست — نام، دسته، واحد و هر دو قیمت لازم است",
     "Row $n is incomplete — name, category, unit and both prices are required",
     "$n کتار بشپړ نه دی — نوم، ډله، واحد او دواړه بیې اړینې دي",
   )
   val needOneRow: String get() = t("حداقل یک ردیف کامل لازم است", "At least one complete row is needed", "لږترلږه یو بشپړ کتار اړین دی")
   val saveFailed: String get() = t("ثبت نشد", "Not saved", "ثبت نه شو")
-  fun savedMany(n: Int): String = t("$n کالا ثبت شد", "$n ${pl(n, "product", "products")} saved", "$n توکي ثبت شول")
+  fun savedMany(n: Int): String = t("${asIs(n)} کالا ثبت شد", "$n ${pl(n, "product", "products")} saved", "$n توکي ثبت شول")
   val editSaved: String get() = t("با موفقیت ویرایش شد", "Changes saved", "بدلونونه خوندي شول")
 
   // دسته‌ها
   val categoriesTitle: String get() = t("دسته‌بندی‌ها", "Categories", "ډلې")
   val pickCategory: String get() = t("انتخاب دسته", "Choose category", "ډله وټاکئ")
-  fun bulkCategoryTitle(n: Int): String = t("دستهٔ $n کالا", "Category for $n ${pl(n, "item", "items")}", "د $n توکو ډله")
+  fun bulkCategoryTitle(n: Int): String = t("دستهٔ ${asIs(n)} کالا", "Category for $n ${pl(n, "item", "items")}", "د $n توکو ډله")
   val categoryAdded: String get() = t("دسته‌بندی اضافه شد", "Category added", "ډله زیاته شوه")
   val deleteCategoryTitle: String get() = t("حذف دسته‌بندی؟", "Delete category?", "ډله ړنګه شي؟")
   fun deleteCategoryBody(name: String): String = t(
-    "دسته‌بندی «$name» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
+    "دسته‌بندی «${asIs(name)}» حذف می‌شود. محصولات این دسته حذف نمی‌شوند، فقط دیگر در این دسته‌بندی فیلتر نمی‌شوند.",
     "The category “$name” is removed. Its products stay; they just no longer filter under it.",
     "د «$name» ډله ړنګېږي. د دې ډلې توکي نه ړنګېږي، یوازې نور پر دې ډله نه فلټر کېږي.",
   )

@@ -2,10 +2,14 @@ package ir.vil3ntec.tohid.core.i18n
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
+import ir.vil3ntec.tohid.core.text.DariText
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 
 /**
- *  زبانِ نوشته‌های برنامه — فارسی (پیش‌فرض)، انگلیسی و پشتو.
+ *  زبانِ نوشته‌های برنامه — فارسی (پیش‌فرض)، دری، انگلیسی و پشتو.
+ *
+ *  دری (`prs`، LOC-08) نسخهٔ جدایی از هر نوشته نیست: همان فارسی است که از لایهٔ واژهٔ
+ *  `DariText` (کدِ مشترکِ core) می‌گذرد. خط، جهت، رقم، تقویم و پول همان فارسی ([persian]).
  *
  *  این فقط زبانِ **صفحه** است: داده، کلیدهای همگام‌سازی، CSV و یادداشت‌های
  *  ذخیره‌شده هیچ‌وقت با آن عوض نمی‌شوند. انتخاب روی همین دستگاه می‌ماند
@@ -13,8 +17,12 @@ import ir.vil3ntec.tohid.core.text.LocaleFormat
  */
 enum class Lang(val code: String, val rtl: Boolean, /** نامِ زبان به خودِ آن زبان — برای انتخاب‌گر */ val native: String) {
   FA("fa", true, "فارسی"),
+  PRS("prs", true, "دری"),
   EN("en", false, "English"),
   PS("ps", true, "پښتو");
+
+  /** فارسی یا دری: همان خط، رقم، تقویم، نامِ ماه و قالبِ پول */
+  val persian: Boolean get() = this == FA || this == PRS
 
   companion object {
     /** هر مقدارِ ناشناخته یا خالی ⇒ فارسی، یعنی رفتارِ امروز */
@@ -61,11 +69,12 @@ object I18n {
   /** فقط آزمون: هر `t` و `td` که خوانده شود این‌جا هم گزارش می‌شود */
   @Volatile var audit: ((Entry) -> Unit)? = null
 
-  /** نوشتهٔ یک زبان؛ جاافتاده ⇒ فارسی */
+  /** نوشتهٔ یک زبان؛ جاافتاده ⇒ فارسی. دری ⇒ همان فارسی از لایهٔ واژه (`DariText`) */
   fun pick(lang: Lang, fa: String, en: String?, ps: String?): String = when (lang) {
-    Lang.FA -> fa
-    Lang.EN -> en ?: fa
-    Lang.PS -> ps ?: fa
+    Lang.FA -> DariText.strip(fa)
+    Lang.PRS -> DariText.of(fa)
+    Lang.EN -> en ?: DariText.strip(fa)
+    Lang.PS -> ps ?: DariText.strip(fa)
   }
 
   /* ------------------------------ رنگِ پیام ------------------------------ */
@@ -95,7 +104,7 @@ object I18n {
    *  اگر چیزی نیافتند همان قاعدهٔ فارسی (برای پیامی که هنوز ترجمه نشده).
    */
   fun toneOf(message: String, lang: Lang = this.lang): Tone = when (lang) {
-    Lang.FA -> toneFa(message)
+    Lang.FA, Lang.PRS -> toneFa(message)
     Lang.EN -> {
       val low = message.lowercase()
       when {
@@ -131,7 +140,7 @@ object I18n {
 
   /** واژهٔ پول: «افغانی» / «AFN» / «افغانۍ» */
   fun currencyWord(lang: Lang): String = when (lang) {
-    Lang.FA -> LocaleFormat.AFN_WORD
+    Lang.FA, Lang.PRS -> LocaleFormat.AFN_WORD
     Lang.EN -> "AFN"
     Lang.PS -> "افغانۍ"
   }
@@ -142,7 +151,7 @@ object I18n {
    */
   fun money(value: Double, lang: Lang, digits: String, symbol: String = LocaleFormat.SYMBOL_WORD): String {
     val d = screenDigits(lang, digits)
-    if (symbol != LocaleFormat.SYMBOL_WORD || lang == Lang.FA) return LocaleFormat.formatAfghani(value, symbol, d)
+    if (symbol != LocaleFormat.SYMBOL_WORD || lang.persian) return LocaleFormat.formatAfghani(value, symbol, d)
     return LocaleFormat.formatAfghani(value, LocaleFormat.SYMBOL_NONE, d) + " " + currencyWord(lang)
   }
 
@@ -191,11 +200,11 @@ object I18n {
   fun solarMonths(lang: Lang, monthsPref: String): List<String> = when (lang) {
     Lang.PS -> SolarHijri.MONTHS_PS
     Lang.EN -> SOLAR_MONTHS_EN
-    Lang.FA -> if (monthsPref == "ps") SolarHijri.MONTHS_PS else SolarHijri.MONTHS_FA
+    Lang.FA, Lang.PRS -> if (monthsPref == "ps") SolarHijri.MONTHS_PS else SolarHijri.MONTHS_FA
   }
 
   fun gregorianMonths(lang: Lang): List<String> = when (lang) {
-    Lang.FA -> GREGORIAN_MONTHS_FA
+    Lang.FA, Lang.PRS -> GREGORIAN_MONTHS_FA
     Lang.EN -> GREGORIAN_MONTHS_EN
     Lang.PS -> GREGORIAN_MONTHS_PS
   }
@@ -236,6 +245,14 @@ fun t(fa: String, en: String? = null, ps: String? = null): String {
   I18n.audit?.invoke(I18n.Entry(fa, en, ps))
   return I18n.pick(I18n.lang, fa, en, ps)
 }
+
+/**
+ *  مقدارِ جای خالیِ متنِ فارسی: `t("کالای «${asIs(name)}» حذف شد", …)`. دادهٔ کاربر (نامِ کالا، مشتری،
+ *  دکان…) در دری هرگز از لایهٔ واژه نمی‌گذرد (`DariText.protect`). در فارسی، انگلیسی و پشتو همان
+ *  `toString()` ِ جای خالیِ عادیِ کاتلین است، پس خروجی بایت‌به‌بایت همان پیشین است.
+ *  ⚠️ هر جای خالیِ تازه در آرگومانِ فارسیِ `t`/`td` با همین (آزمون: `DariWordsTest`).
+ */
+fun asIs(value: Any?): String = if (I18n.lang == Lang.PRS) DariText.protect(value.toString()) else value.toString()
 
 /**
  *  مفرد یا جمع، برای جای عدد در نوشتهٔ انگلیسی و پشتو: `"$n ${pl(n, "item", "items")}"`.

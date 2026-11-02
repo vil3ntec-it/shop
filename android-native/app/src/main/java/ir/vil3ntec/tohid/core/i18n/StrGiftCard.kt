@@ -37,11 +37,11 @@ object StrGiftCard {
     "اندازه نغده دخل ته راځي او تر لګښت پورې د کارت لرونکي ته د دوکان پور دی.",
   )
   val save: String get() = t("ثبتِ فروشِ کارت", "Save card sale", "د کارت پلور ثبت کړئ")
-  fun sold(code: Any, amount: Any): String = t("کارتِ $code با $amount افغانی فروخته شد", "Card $code sold with $amount AFN", "کارت $code په $amount افغانۍ وپلورل شو")
+  fun sold(code: Any, amount: Any): String = t("کارتِ ${asIs(code)} با ${asIs(amount)} افغانی فروخته شد", "Card $code sold with $amount AFN", "کارت $code په $amount افغانۍ وپلورل شو")
   val lookup: String get() = t("ببین", "Look up", "وګورئ")
-  fun balance(amount: Any): String = t("مانده: $amount افغانی", "Balance: $amount AFN", "پاتې: $amount افغانۍ")
-  fun issuedWith(amount: Any, date: Any): String = t("فروخته با $amount افغانی — $date", "Sold with $amount AFN — $date", "په $amount افغانۍ پلورل شوی — $date")
-  fun spentBack(spent: Any, back: Any): String = t("خرج: $spent — برگشت: $back", "Spent: $spent — Returned: $back", "لګښت: $spent — بېرته: $back")
+  fun balance(amount: Any): String = t("مانده: ${asIs(amount)} افغانی", "Balance: $amount AFN", "پاتې: $amount افغانۍ")
+  fun issuedWith(amount: Any, date: Any): String = t("فروخته با ${asIs(amount)} افغانی — ${asIs(date)}", "Sold with $amount AFN — $date", "په $amount افغانۍ پلورل شوی — $date")
+  fun spentBack(spent: Any, back: Any): String = t("خرج: ${asIs(spent)} — برگشت: ${asIs(back)}", "Spent: $spent — Returned: $back", "لګښت: $spent — بېرته: $back")
   val isVoid: String get() = t("این کارت باطل شده است", "This card has been voided", "دا کارت باطل شوی")
   val review: String get() = t(
     "نیازمندِ بررسی: از دو دستگاهِ بی‌اینترنت بیش از مانده خرج شده (ماندهٔ منفی).",
@@ -59,20 +59,20 @@ object StrGiftCard {
     "اندازه نغده دخل ته راځي او د همدې کارت پر پاتې ورزیاتېږي.",
   )
   val rechargeSave: String get() = t("ثبتِ شارژ", "Save recharge", "چارج ثبت کړئ")
-  fun recharged(code: Any, amount: Any): String = t("کارتِ $code با $amount افغانی شارژ شد", "Card $code recharged with $amount AFN", "کارت $code په $amount افغانۍ چارج شو")
-  fun rechargedTotal(amount: Any): String = t("شارژ: $amount", "Recharged: $amount", "چارج: $amount")
+  fun recharged(code: Any, amount: Any): String = t("کارتِ ${asIs(code)} با ${asIs(amount)} افغانی شارژ شد", "Card $code recharged with $amount AFN", "کارت $code په $amount افغانۍ چارج شو")
+  fun rechargedTotal(amount: Any): String = t("شارژ: ${asIs(amount)}", "Recharged: $amount", "چارج: $amount")
   val voidCard: String get() = t("باطل کردنِ کارت", "Void card", "کارت باطلول")
   val voidReason: String get() = t("دلیلِ باطل کردن", "Reason for voiding", "د باطلولو لامل")
   fun voidNote(amount: Any): String = t(
-    "ماندهٔ $amount افغانی از بدهیِ دکان کنار می‌رود و نقدی پس داده نمی‌شود. این کار برنمی‌گردد.",
+    "ماندهٔ ${asIs(amount)} افغانی از بدهیِ دکان کنار می‌رود و نقدی پس داده نمی‌شود. این کار برنمی‌گردد.",
     "The balance of $amount AFN leaves the shop's debt and no cash is paid back. This cannot be undone.",
     "د $amount افغانیو پاتې د دوکان له پور څخه وځي او نغدې بېرته نه ورکول کېږي. دا کار بېرته نه ګرځي.",
   )
   val voidSave: String get() = t("باطل شود", "Void it", "باطل یې کړئ")
-  fun voided(code: Any): String = t("کارتِ $code باطل شد", "Card $code voided", "کارت $code باطل شو")
+  fun voided(code: Any): String = t("کارتِ ${asIs(code)} باطل شد", "Card $code voided", "کارت $code باطل شو")
   val printCard: String get() = t("چاپِ کارت", "Print card", "کارت چاپ کړئ")
   val sheetTitle: String get() = t("کارتِ هدیه", "Gift card", "د ډالۍ کارت")
-  fun sheetAmount(amount: Any): String = t("مبلغ: $amount افغانی", "Amount: $amount AFN", "اندازه: $amount افغانۍ")
+  fun sheetAmount(amount: Any): String = t("مبلغ: ${asIs(amount)} افغانی", "Amount: $amount AFN", "اندازه: $amount افغانۍ")
   val sheetNote: String get() = t(
     "این کد مثلِ پول است؛ به کسی نشان ندهید. ماندهٔ کارت را از دکان بپرسید.",
     "This code is like cash; do not show it to anyone. Ask the shop for the card balance.",
@@ -80,7 +80,7 @@ object StrGiftCard {
   )
   val sheetOpened: String get() = t("برگهٔ چاپیِ کارت باز شد", "The card sheet is open for printing", "د کارت چاپي پاڼه پرانیستل شوه")
   val printed: String get() = t("کارت چاپ شد", "Card printed", "کارت چاپ شو")
-  fun printFailed(why: Any): String = t("کارت چاپ نشد: $why", "The card was not printed: $why", "کارت چاپ نشو: $why")
+  fun printFailed(why: Any): String = t("کارت چاپ نشد: ${asIs(why)}", "The card was not printed: $why", "کارت چاپ نشو: $why")
   val liability: String get() = t("بدهیِ کارت‌ها", "Gift card liability", "د کارتونو پور")
   val liabilityTotal: String get() = t("بدهیِ دکان به دارندگانِ کارت", "Shop's debt to card holders", "د کارت لرونکو ته د دوکان پور")
   val issuedWord: String get() = t("صدور", "Issued", "صادر شوي")
@@ -90,7 +90,7 @@ object StrGiftCard {
   val voidedWord: String get() = t("باطل (کنار رفته)", "Voided (removed)", "باطل شوي (لرې شوي)")
   val netWord: String get() = t("ماندهٔ کارت‌های فعال", "Balance of active cards", "د فعالو کارتونو پاتې")
   val overdrawnWord: String get() = t("ماندهٔ منفیِ نیازمندِ بررسی", "Negative balance needing review", "منفي پاتې چې کتنې ته اړتیا لري")
-  fun cardCounts(active: Any, void: Any): String = t("$active کارتِ فعال — $void باطل", "$active active cards — $void voided", "$active فعال کارتونه — $void باطل")
+  fun cardCounts(active: Any, void: Any): String = t("${asIs(active)} کارتِ فعال — ${asIs(void)} باطل", "$active active cards — $void voided", "$active فعال کارتونه — $void باطل")
   val reconciled: String get() = t(
     "صدور + شارژ − خرج + برگشت − باطل با ماندهٔ کارت‌ها می‌خواند.",
     "Issued + recharged − spent + returned − voided matches the card balances.",
@@ -99,8 +99,8 @@ object StrGiftCard {
   val notReconciled: String get() = t("جمعِ دفتر با مانده‌ها نمی‌خواند — بررسی کنید", "Ledger totals do not match the balances — check", "د دفتر ټولګه له پاتې سره سمون نه خوري — وګورئ")
   val noCards: String get() = t("هنوز کارتی فروخته نشده است", "No card has been sold yet", "تر اوسه کوم کارت نه دی پلورل شوی")
 
-  fun cardLeft(amount: Any): String = t("ماندهٔ کارت: $amount", "Card balance: $amount", "د کارت پاتې: $amount")
-  fun creditLeft(amount: Any): String = t("اعتبارِ مشتری: $amount", "Customer credit: $amount", "د پېرودونکي اعتبار: $amount")
+  fun cardLeft(amount: Any): String = t("ماندهٔ کارت: ${asIs(amount)}", "Card balance: $amount", "د کارت پاتې: $amount")
+  fun creditLeft(amount: Any): String = t("اعتبارِ مشتری: ${asIs(amount)}", "Customer credit: $amount", "د پېرودونکي اعتبار: $amount")
 
   val errCode: String get() = t("کدِ کارتِ هدیه درست نیست", "The gift card code is not valid", "د ډالۍ کارت کوډ سم نه دی")
   val errUnknown: String get() = t("این کارتِ هدیه پیدا نشد", "This gift card was not found", "دا د ډالۍ کارت ونه موندل شو")
