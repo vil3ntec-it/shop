@@ -428,7 +428,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     if (!can(role, 'data.delete.own')) return 'delete_not_allowed';
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
-  if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row);   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
+  if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row, (s, p) => c.query(s, p));   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {

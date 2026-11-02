@@ -27,8 +27,8 @@ function build(T) {
   //  ⛔ کلید و پیش‌فرض از `plans.trialConfig` می‌آیند، نه از این‌جا —
   //  شرحش آن‌جا. سه جا نوشته شدنشان یعنی فهرستِ مدیر و خودِ برنامه
   //  می‌توانستند دو حرفِ جدا بزنند.
-  async function trialState(tenant, at = now()) {
-    const days = await plans.trialDaysOf(T.app);
+  async function trialState(tenant, at = now(), run = null) {
+    const days = await plans.trialDaysOf(T.app, run);
     if (!days) return { enabled: false, active: false, used: true, endsAt: 0, daysLeft: 0 };
     //  ⛔ پمپ آغازِ دوره‌اش را در ستونِ خودش دارد (`trial_started_at`، مهاجرتِ
     //  ۰۳۲ — همهٔ حساب‌های پیشین یک بار بررسی شدند)؛ دکان همان `created_at`.
@@ -63,8 +63,14 @@ function build(T) {
          FROM shops t WHERE t.id=$1`
     : `SELECT * FROM ${T.tenantTable} WHERE id=$1`;
 
-  async function entitlementOf(tenantId, at = now()) {
-    const tenant = await one(TENANT_SQL, [tenantId]);
+  /*
+   *  `run` = اتصالِ تراکنشِ صدازننده (`(sql, params) ⇒ {rows}`، مثلِ `orders.flagOf`)؛ نیامده ⇒ استخر.
+   *  ⛔ درونِ تراکنش (`staffCodes.redeem`) همهٔ خواندن‌ها با همان اتصال: پیش‌تر از استخر بود و پیوستن‌های
+   *  هم‌زمانِ پشتِ قفلِ ردیفِ کد همهٔ اتصال‌ها را نگه می‌داشتند ⇒ `timeout exceeded when trying to connect`.
+   */
+  async function entitlementOf(tenantId, at = now(), run = null) {
+    const get = run ? async (text, params) => (await run(text, params)).rows[0] || null : one;
+    const tenant = await get(TENANT_SQL, [tenantId]);
     if (!tenant) {
       return {
         app: T.app,
@@ -75,9 +81,9 @@ function build(T) {
       };
     }
 
-    const sub = await ledger.latestOf(tenantId);
+    const sub = await ledger.latestOf(tenantId, get);
     const state = subs.stateOf(sub, at);
-    let trial = await trialState(tenant, at);
+    let trial = await trialState(tenant, at, run);
     /*
      *  ⛔ **دورهٔ آزمایشی مالِ حسابی است که هنوز هیچ اشتراکی نداشته.**
      *
@@ -117,7 +123,7 @@ function build(T) {
       //  ⛔ قاعدهٔ «فهرستِ خالی = پلنِ کامل» دست نمی‌خورد؛ افزونه فقط
       //  **به** فهرست اضافه می‌شود (Feature Flag روی همین اشتراک).
       let granted = state.features.length ? state.features : cat.PAID_KEYS;
-      const addons = await require('./discounts').addonKeysOf(T.app, sub.id);
+      const addons = await require('./discounts').addonKeysOf(T.app, sub.id, run);
       /*
        *  ⛔ دائمی: خدماتِ سرور فقط تا `servicesUntil` (سالِ اول رایگان، بعد
        *  تمدیدِ مدیر) — ‎lib/pump-services.js‎. بقیهٔ پلن بی محدودیت می‌ماند.
