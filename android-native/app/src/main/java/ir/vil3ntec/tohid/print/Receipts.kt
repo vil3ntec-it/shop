@@ -113,7 +113,7 @@ object Receipts {
       //  «جمع اقلام» = جمعِ ستونِ قلم‌ها؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
       included = listOfNotNull(
         SaleReceipt.included(sale, saleItems, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { DiscountLine(it.label, it.amount) },
-      ),
+      ) + ir.vil3ntec.tohid.data.LoyaltyPoints.receiptLines(d, sale.id).mapNotNull { (label, amount) -> amount?.let { DiscountLine(label, it) } }, // PRM-13
       total = sale.finalTotal,
       //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
       payments = PayFlow.receiptLines(sale).map { (label, amount) -> PaymentLine(label, amount) },

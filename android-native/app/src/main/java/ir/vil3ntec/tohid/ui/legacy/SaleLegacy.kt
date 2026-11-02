@@ -92,6 +92,9 @@ fun SaleScreenLegacy(
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
   val pricedFrom = cart
+  //  PRM-13: امتیازِ وفاداری (`LoyaltyPref`، پیش‌فرض خاموش ⇒ null و `loyal` همان `priced`)؛ سفارشِ ارسال و «چرا این قیمت؟» همان `priced`
+  val loyalty = ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill(d, priced, cartDebtorId)
+  val loyal = loyalty?.cart ?: priced
   //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
   val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
   var deliverOpen by remember { mutableStateOf(false) }
@@ -516,10 +519,11 @@ fun SaleScreenLegacy(
 
       /* ---------------------------- سبد ---------------------------- */
       item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.SpecialOrderBar(d, store, cartDebtorId, ::toast, Modifier.padding(bottom = 8.dp)) } // پیش‌فاکتور (POS-25، `QuotePref`) و سفارشِ ویژه (POS-26، `SpecialOrderPref`)
-      item { ir.vil3ntec.tohid.ui.components.pos.GiftCardBar(d, store, ::toast, Modifier.padding(bottom = 8.dp)) } // کارتِ هدیه (PAY-24، `GiftCardPref`)
+      item { ir.vil3ntec.tohid.ui.components.pos.GiftCardBar(d, store, ::toast, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.LayawayBar(d, store, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) } // کارتِ هدیه (PAY-24، `GiftCardPref`) و فروشِ امانی (POS-27، `LayawayPref`)
       item { ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) } // POS-18
       item { TillReceivePhone(d, store, cartDebtorId, ::toast) } // POS-39، پشتِ `TillReceivePref` (پیش‌فرض خاموش)
       item { ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } }
+      item { ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(bottom = 8.dp)) } // PRM-13
       item {
         Row(
           Modifier.fillMaxWidth(),
@@ -641,7 +645,7 @@ fun SaleScreenLegacy(
       modifier = Modifier.align(Alignment.BottomCenter),
     ) {
       CartBarLegacy(
-        total = SalesEngine.cartTotal(d, priced),
+        total = SalesEngine.cartTotal(d, loyal),
         debtorName = cartDebtorId?.let { id -> d.debtors.find { it.id == id }?.name },
         debtorNote = cartDebtorId?.let { id -> debtStateTextLegacy(d, id) },
         onPickDebtor = { pickDebtor = true },
@@ -729,9 +733,9 @@ fun SaleScreenLegacy(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
-      d, priced, options.copy(note = cartStore.note.value),
+      d, loyal, options.copy(note = cartStore.note.value),
       today = ir.vil3ntec.tohid.todayIso(),
       now = System.currentTimeMillis(),
       newId = ::newIdLegacy,
@@ -740,7 +744,7 @@ fun SaleScreenLegacy(
       saleId = key,
       //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context),
-    ), promo) }) {
+    ), promo), loyalty, options.seller) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
@@ -758,8 +762,8 @@ fun SaleScreenLegacy(
   if (checkout) {
     CheckoutDialog(
       d = d,
-      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار (خاموش ⇒ همان سبد)
-      cart = priced,
+      //  جمع و ثبت با قیمتِ پس از تخفیف‌های خودکار و امتیاز (خاموش ⇒ همان سبد)؛ سنجشِ تخفیفِ ردیف بی امتیاز
+      cart = loyal, gateCart = priced, pointsOff = loyalty?.off ?: 0.0,
       promo = promo,
       presetDebtorId = cartDebtorId,
       presetDiscount = extrasNow().discount, presetAmount = extrasNow().discountAmount,
@@ -778,7 +782,7 @@ fun SaleScreenLegacy(
         //  CRM-03 / S07 (پشتِ `ShopPolicy.creditGate`): نسیهٔ بیش از سقف ⇒ «درخواستِ تأیید»؛ بی تأیید
         //  هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
         val sale = options.copy(creditGate = creditGateOn)
-        val over = SalesEngine.creditOver(d, priced, sale)
+        val over = SalesEngine.creditOver(d, loyal, sale)
         if (over != null) { creditAsk = sale to over; return@CheckoutDialog }
         postSale(sale)
       },

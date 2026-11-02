@@ -164,6 +164,8 @@ class SettingsPortTest {
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
       "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
       "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
+      "LoyaltyPref.set" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
+      "LoyaltyPref.setRule" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
       "LabelToolsPref.set" to "$PENDING — برچسب و بارکدِ داخلی، PRD-23/PRD-05",
       "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
@@ -175,8 +177,11 @@ class SettingsPortTest {
       "PosPriceCheckPrefs.set" to "$PENDING — بررسیِ قیمت در صندوق، فقط کامپیوتر",
       "PosSearchPrefs.set" to "$PENDING — جست‌وجوی مقاوم، POS-04، فقط کامپیوتر",
       "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
+      "PromoGuardLive.set" to "$PENDING — تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیفِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.promo_guard`)، MKT-02/RSK-09",
       "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
       "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
+      "StockPlacesPref.setPlaces" to "$PENDING — محل‌ها و انتقال، INV-20",
+      "StockPlacesPref.setRepack" to "$PENDING — بسته‌بندیِ دوباره و ساختِ بسته، INV-21",
       "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
       "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
@@ -187,6 +192,8 @@ class SettingsPortTest {
       "TaxQuarterPref.setConfig" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
       "TaxQuarterPref.setOn" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
       "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",
+      "LayawayPref.set" to "$PENDING — فروشِ امانی و قسطی، POS-27",
+      "StorefrontEtaLive.set" to "$PENDING — زمانِ تقریبیِ تحویلِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.eta`)، WEB-04",
     )
   }
 }
