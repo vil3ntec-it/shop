@@ -23,11 +23,15 @@
  *     shop_chat_media، shop_chat_pins   پاک؛ shop_chat_reports: snapshot و یادداشت پاک.
  *   store_customer_carts، store_customer_favorites   سبد و ♥ ِ همین دکان پاک.
  *   storefront_area_requests   «خبرم کن» ِ همین شماره در همین دکان پاک.
+ *   (اگر جدولش هست — مهاجرت‌های ۱۸۸/۱۹۱)
+ *   storefront_alerts          «خبرم کن» ِ موجودی/قیمت پاک (شمارِ هزینهٔ پیامِ امروزِ دکان به‌اندازهٔ همین خبرها کم می‌شود).
+ *   order_issues               متنِ گزارشِ مشکل و پاسخِ دکان پاک؛ نوع و وضعیت می‌مانند. order_issue_photos پاک.
+ *   order_reviews              متنِ نظر پاک؛ ستاره و وضعیت (میانگینِ امتیاز) همان.
  *
  * عمداً **نمی‌ماند/نمی‌رود** (فهرستِ `KEPT`، در پاسخ هم):
  *   order_ledger_docs (زنجیرهٔ هش، فقط شناسه)، online_order_refunds، courier_settlements،
  *   delivery_assignments، delivery_ratings — سندِ مالی/تسویه، بی دادهٔ شخصیِ مشتری؛
- *   shop_risk_lists و shop_chat_blocks — بازدارندهٔ سوءاستفاده؛ trust_cases — پروندهٔ مدیرِ سامانه؛
+ *   shop_risk_lists، shop_chat_blocks و storefront_promo_claims (HMAC ِ شماره + مبلغِ تخفیف) — بازدارندهٔ سوءاستفاده؛ trust_cases — پروندهٔ مدیرِ سامانه؛
  *   store_customers/addresses/sessions — حسابِ سراسریِ مشتری، فقط با `DELETE /api/store/:slug/account`
  *   ِ خودش؛ دفترِ همگام‌سازیِ دستگاه (قرض‌داران و فروش‌ها) — دفترِ خودِ دستگاه است و سازوکارِ
  *   فرمانِ حذف به دستگاه نیست ⇒ تا دکان در برنامه پاکش نکند می‌ماند؛ audit_logs و پشتیبان‌ها.
@@ -48,11 +52,12 @@ const FLAG = 'shop.customer_erasure';
 const ERASED_PREFIX = 'erased:';
 const KEPT = Object.freeze([
   'order_ledger_docs', 'online_order_refunds', 'courier_settlements', 'delivery_assignments', 'delivery_ratings',
-  'shop_risk_lists', 'shop_chat_blocks', 'trust_cases', 'store_customers', 'device_sync_ledger', 'audit_logs', 'backups',
+  'shop_risk_lists', 'shop_chat_blocks', 'storefront_promo_claims', 'trust_cases', 'store_customers', 'device_sync_ledger', 'audit_logs', 'backups',
 ]);
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'areaRequests',
+  'alerts', 'issues', 'issuePhotos', 'reviews',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -90,6 +95,8 @@ const asObj = (x) => {
   try { const o = JSON.parse(String(x || '{}')); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
 };
 const ids = (rows, k = 'id') => rows.map((r) => r[k]);
+/** جدولِ قابلیتی که شاید هنوز ساخته نشده (مهاجرت‌های ۱۸۸/۱۹۱). نام فقط از همین پرونده می‌آید. */
+const has = async (c, table) => Boolean((await c.query('SELECT to_regclass($1) AS t', [table])).rows[0].t);
 
 /** یادداشت/دلیل/جزئیاتِ رویدادهای یک جدول؛ فقط ردیفی که واقعاً عوض می‌شود نوشته می‌شود. */
 async function scrubEvents(c, table, shopId, orderIds) {
@@ -204,6 +211,18 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
             WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND phone_key <> 'erased' RETURNING id`,
           [shopId, orderIds, at]
         );
+        if (await has(c, 'order_issues')) {
+          counts.issuePhotos = await q(
+            `DELETE FROM order_issue_photos WHERE shop_id=$1 AND issue_id IN (
+               SELECT id FROM order_issues WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING id`, [shopId, orderIds]);
+          counts.issues = await q(
+            `UPDATE order_issues SET body='', reply='' WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND (body <> '' OR reply <> '') RETURNING id`,
+            [shopId, orderIds]);
+        }
+        if (await has(c, 'order_reviews')) {
+          counts.reviews = await q(
+            `UPDATE order_reviews SET comment='' WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND comment <> '' RETURNING id`, [shopId, orderIds]);
+        }
       }
 
       //  گفت‌وگوها: همین شماره، همین حساب یا همین سفارش‌ها — فقط آن‌که هنوز چیزی برای پاک کردن دارد
@@ -251,6 +270,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       }
       if (t.forms.length) {
         counts.areaRequests = await q('DELETE FROM storefront_area_requests WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);
+        if (await has(c, 'storefront_alerts')) {
+          counts.alerts = await q('DELETE FROM storefront_alerts WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);
+        }
       }
 
       const total = COUNT_KEYS.reduce((s, k) => s + counts[k], 0);

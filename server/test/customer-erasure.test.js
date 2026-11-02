@@ -80,6 +80,8 @@ const T = { landmark: 'مسجدِ سبز', text: 'کوچهٔ هفتم', leave: '
   photo: 'عکسِ خانه', body: 'سلام دکان، نشانیِ من', lat: 34.5551, lng: 69.2075, plus: '8FVC9G8F+6W' };
 const T2 = { landmark: 'بازارِ کهنه', text: 'سرکِ دوم', leave: 'نگهبان', note: 'تند بیاورید', line: 'تازه',
   photo: 'عکسِ دیگر', body: 'پیامِ مشتریِ دیگر', lat: 31.1111, lng: 65.1111, plus: '7FG9V2XC+2Q' };
+/** جدول‌های مهاجرت‌های ۱۸۸/۱۹۱ (گزارشِ مشکل، نظر، «خبرم کن») — اگر ساخته شده‌اند همان‌ها هم کاشته و سنجیده می‌شوند. */
+const exists = async (t) => Boolean((await one('SELECT to_regclass($1) AS t', [t])).t);
 let orderNo = 0;
 async function order(shopId, phone, { status = 'delivered', name = NAME, totalMinor = 25000, t = T } = {}) {
   const id = newId('ord');
@@ -140,6 +142,20 @@ async function order(shopId, phone, { status = 'delivered', name = NAME, totalMi
      VALUES ($1,$2,$3,'order_completed','k-phone','pending',$4,$5,$5,$5)`,
     [newId('cno'), shopId, id, `sms to ${phone} failed`, at]
   );
+  if (await exists('order_issues')) {
+    const issue = newId('iss');
+    await query(
+      `INSERT INTO order_issues (id, shop_id, order_id, kind, body, reply, request_key, request_hash, created_at)
+       VALUES ($1,$2,$3,'damaged',$4,$5,$6,'h',$7)`, [issue, shopId, id, `${t.note} — شکسته`, `پاسخ به ${name}`, `rk-${id}`, at]);
+    await query(
+      `INSERT INTO order_issue_photos (id, shop_id, issue_id, mime, size, width, height, hash, data, created_at)
+       VALUES ($1,$2,$3,'image/jpeg',$4,1,1,'x',$5,$6)`, [newId('isp'), shopId, issue, jpeg.length, jpeg, at]);
+  }
+  if (await exists('order_reviews')) {
+    await query(
+      `INSERT INTO order_reviews (id, shop_id, order_id, stars, comment, status, request_hash, created_at)
+       VALUES ($1,$2,$3,4,$4,'approved','h',$5)`, [newId('rev'), shopId, id, `${t.body} — خوب بود`, at]);
+  }
   return id;
 }
 
@@ -189,6 +205,11 @@ async function extras(shopId, customerId, phone) {
     'INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at) VALUES ($1,$2,$3,34.55,69.2,$4,$4)',
     [newId('sar'), shopId, phone, at]
   );
+  if (await exists('storefront_alerts')) {
+    await query(
+      `INSERT INTO storefront_alerts (id, shop_id, phone, product_id, kind, checked_at, created_at, updated_at)
+       VALUES ($1,$2,$3,'rice','stock',$4,$4,$4)`, [newId('sal'), shopId, phone, at]);
+  }
 }
 
 /** ردیف‌های ناشناس‌نشدنیِ مالی و شمارش‌ها — باید بایت‌به‌بایت همان بمانند. */
@@ -207,18 +228,23 @@ async function money(shopId) {
     assignments: await many('SELECT * FROM delivery_assignments WHERE shop_id=$1 ORDER BY id', [shopId]),
     events: await one('SELECT COUNT(*)::int AS n FROM online_order_events WHERE shop_id=$1', [shopId]),
     messages: await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE shop_id=$1', [shopId]),
+    ...(await exists('order_reviews') ? { reviews: await many('SELECT id, order_id, stars, status FROM order_reviews WHERE shop_id=$1 ORDER BY id', [shopId]) } : {}),
+    ...(await exists('order_issues') ? { issues: await many('SELECT id, order_id, kind, status FROM order_issues WHERE shop_id=$1 ORDER BY id', [shopId]) } : {}),
   };
 }
 
 const PII_TABLES = ['online_orders', 'online_order_lines', 'online_order_events', 'delivery_events', 'delivery_photos',
   'order_pick_photos', 'delivery_locations', 'customer_notify_outbox', 'shop_chat_conversations', 'shop_chat_messages',
-  'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'storefront_area_requests'];
+  'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'storefront_area_requests',
+  'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews'];
+const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos']);
 
 /** متنِ کاملِ هر ردیفِ این دکان در جدول‌های فهرست (bytea به متن). */
 async function dump(shopId, where = '') {
   const out = {};
   for (const t of PII_TABLES) {
-    const rows = await many(`SELECT row_to_json(x)::text AS j, ${t === 'delivery_photos' || t === 'order_pick_photos' || t === 'shop_chat_media' ? "convert_from(data, 'UTF8')" : "''"} AS b
+    if (!(await exists(t))) continue;
+    const rows = await many(`SELECT row_to_json(x)::text AS j, ${BYTES.has(t) ? "convert_from(data, 'UTF8')" : "''"} AS b
                                FROM ${t} x WHERE shop_id=$1 ${where} ORDER BY 1`, [shopId]);
     out[t] = rows.map((r) => r.j + r.b);
   }
@@ -297,6 +323,9 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
   assert.deepEqual(done.body.counts, {
     orders: 2, orderLines: 2, orderEvents: 2, deliveryEvents: 2, deliveryPhotos: 2, pickPhotos: 2, deliveryLocations: 2,
     notifyOutbox: 2, conversations: 2, messages: 4, chatMedia: 2, chatPins: 2, chatReports: 2, carts: 1, favorites: 1, areaRequests: 1,
+    alerts: (await exists('storefront_alerts')) ? 1 : 0,
+    issues: (await exists('order_issues')) ? 2 : 0, issuePhotos: (await exists('order_issues')) ? 2 : 0,
+    reviews: (await exists('order_reviews')) ? 2 : 0,
   });
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 
