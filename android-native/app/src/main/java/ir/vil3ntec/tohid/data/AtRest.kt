@@ -79,6 +79,12 @@ object AtRest {
 
   fun readText(context: Context, f: File): String = String(readBytes(context, f), Charsets.UTF_8)
 
+  /**
+   *  بایت‌های باز از بایت‌های ذخیره‌شده (نه فایل) — رمزدار یا ساده؛ برای ترجیحاتِ رمزدارِ پیک (DLV-10، `CourierSeal`).
+   *  @throws AtRestException اگر رمزدار است و باز نشد
+   */
+  fun open(context: Context, stored: ByteArray): ByteArray = codec(context).open(stored)
+
   /** آخرین شکستِ رمز (روشن ولی ساده نوشته شد) — برای صفحهٔ امنیت */
   @Volatile var sealError: String? = null
     private set

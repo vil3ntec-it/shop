@@ -69,10 +69,15 @@ object OrderSlip {
     fun printedAt(at: String): String
   }
 
-  /** ردیف‌های برگه به ترتیبِ کاغذ. `time` زمانِ سرور (میلی‌ثانیه) را به نوشتهٔ صفحه می‌برد. */
-  fun rows(o: Order, tx: Texts, printedAt: Long, time: (Long) -> String): List<Row> {
+  /**
+   *  ردیف‌های برگه به ترتیبِ کاغذ. `time` زمانِ سرور (میلی‌ثانیه) را به نوشتهٔ صفحه می‌برد.
+   *  [mark] (OPS-07): مهرِ «آموزشی» ِ حالتِ آموزش (`TrainingMode.watermark(null)`) درست زیرِ سرِ برگه، تا برگهٔ
+   *  آموزشی از برگهٔ واقعی شناخته شود؛ null یا خالی ⇒ همان ردیف‌های امروز، بی کم و زیاد.
+   */
+  fun rows(o: Order, tx: Texts, printedAt: Long, time: (Long) -> String, mark: String? = null): List<Row> {
     val out = ArrayList<Row>()
     out += Row(tx.title(o.orderNo.toString()), Kind.TITLE, center = true)
+    mark?.trim()?.takeIf { it.isNotEmpty() }?.let { out += Row(it, Kind.HEAD, center = true) }
     if (o.isTest) out += Row(tx.test, Kind.HEAD, center = true)
     val delivery = o.fulfillment == "delivery"
     out += Row(if (delivery) tx.delivery else tx.pickup, Kind.HEAD, center = true)

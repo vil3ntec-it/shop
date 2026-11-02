@@ -9,6 +9,7 @@
  *   POST /:id/disputes           {kind, reason, requestKey}                  بازکردنِ اختلاف
  *   POST /:id/disputes/notes     {text, requestKey, disputeId?}              یادداشت
  *   POST /:id/disputes/resolve   {outcome, text, requestKey, disputeId?}     بستن با نتیجه
+ *   POST /:id/disputes/assign    {assigneeId, dueAt, text?, requestKey, disputeId?}  سپردن به مسئول با مهلت (§۱۹.۹ بندِ ۵)
  *
  * نوشتن کلیدِ اشتراکِ `online_orders` را هم می‌خواهد (همان `needWrite` ِ `order-feedback.js`). پیک (توکنِ دامنهٔ courier)
  * به این‌جا نمی‌رسد (`courier_scope`)؛ فقط مأموریتِ خودش را از `/api/courier` می‌بیند.
@@ -83,6 +84,11 @@ router.post('/:id/disputes/notes', needWrite, async (req, res) => {
 
 router.post('/:id/disputes/resolve', needWrite, async (req, res) => {
   const out = await evidence.resolve(req.shopId, req.params.id, req.body || {}, actor(req));
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.post('/:id/disputes/assign', needWrite, async (req, res) => {
+  const out = await evidence.assign(req.shopId, req.params.id, req.body || {}, actor(req));
   res.status(out.replayed ? 200 : 201).json(out);
 });
 

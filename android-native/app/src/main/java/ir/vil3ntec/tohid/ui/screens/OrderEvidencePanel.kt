@@ -105,11 +105,12 @@ private fun DisputeBlock(c: OrderEvidenceController, f: OrderEvidence.File, stam
       if (cur == null) TohidButton(StrEvidence.openDispute, onClick = { c.begin(OrderEvidence.Act.OPEN) }, enabled = !c.busy)
       else {
         TohidSecondaryButton(StrEvidence.addNote, onClick = { c.begin(OrderEvidence.Act.NOTE) }, enabled = !c.busy)
+        TohidSecondaryButton(StrEvidence.assign, onClick = { c.begin(OrderEvidence.Act.ASSIGN) }, enabled = !c.busy)
         TohidButton(StrEvidence.resolve, onClick = { c.begin(OrderEvidence.Act.RESOLVE) }, enabled = !c.busy)
       }
     }
   } else {
-    DraftForm(c, d, f.current)
+    DraftForm(c, d, f.current, f.assignees)
   }
   c.note?.let { (ok, msg) -> Text(msg, style = MaterialTheme.typography.bodySmall, color = if (ok) colors.success else colors.danger) }
   Text(StrEvidence.appendOnly, style = MaterialTheme.typography.labelSmall, color = colors.muted2)
@@ -131,7 +132,7 @@ private fun DisputeLines(f: OrderEvidence.File, d: OrderEvidence.Dispute, stamp:
 }
 
 @Composable
-private fun DraftForm(c: OrderEvidenceController, d: OrderEvidence.Draft, current: OrderEvidence.Dispute?) {
+private fun DraftForm(c: OrderEvidenceController, d: OrderEvidence.Draft, current: OrderEvidence.Dispute?, people: List<OrderEvidence.Assignee>) {
   val colors = Shop.colors
   when (d.act) {
     OrderEvidence.Act.OPEN -> {
@@ -146,12 +147,26 @@ private fun DraftForm(c: OrderEvidenceController, d: OrderEvidence.Draft, curren
         for (o in OrderEvidence.OUTCOMES) TohidFilterChip(label = evidenceOutcome(o), selected = d.choice == o, onClick = { c.edit(d.copy(choice = o)) })
       }
     }
+    OrderEvidence.Act.ASSIGN -> {
+      //  §۱۹.۹ بندِ ۵: مسئول از فهرستِ سرور و مهلتِ آماده (ساعت از همین لحظه)
+      Text(StrEvidence.assigneeLabel, style = MaterialTheme.typography.labelLarge, color = colors.muted)
+      if (people.isEmpty()) Text(StrEvidence.noAssignees, style = MaterialTheme.typography.bodySmall, color = colors.muted)
+      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (p in people) TohidFilterChip(label = p.name.ifBlank { p.userId.take(10) }, selected = d.choice == p.userId, onClick = { c.edit(d.copy(choice = p.userId)) })
+      }
+      Text(StrEvidence.dueLabel, style = MaterialTheme.typography.labelLarge, color = colors.muted)
+      Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        for (h in OrderEvidence.DUE_HOURS) TohidFilterChip(label = StrEvidence.dueIn(h), selected = d.dueHours == h,
+          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueAt(System.currentTimeMillis(), h), dueHours = h)) })
+      }
+    }
     OrderEvidence.Act.NOTE -> Unit
   }
   val label = when (d.act) {
     OrderEvidence.Act.OPEN -> StrEvidence.reasonLabel
     OrderEvidence.Act.NOTE -> StrEvidence.noteLabel
     OrderEvidence.Act.RESOLVE -> StrEvidence.resolveLabel
+    OrderEvidence.Act.ASSIGN -> StrEvidence.assignNoteLabel
   }
   TohidTextField(d.text, { c.edit(d.copy(text = it)) }, label = label, singleLine = false)
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
