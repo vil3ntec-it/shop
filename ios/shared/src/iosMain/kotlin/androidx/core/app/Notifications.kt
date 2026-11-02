@@ -18,6 +18,8 @@ class NotificationCompat {
     fun setPriority(p: Int) = this
     fun setCategory(c: String?) = this
     fun setOnlyAlertOnce(b: Boolean) = this
+    /** اعلانِ همیشگی (سرویسِ پیش‌رو) در iOS نیست */
+    fun setOngoing(b: Boolean) = this
     fun setContentIntent(p: PendingIntent?) = apply { intent = p?.intent }
     fun setColor(c: Int) = this
     fun setWhen(w: Long) = this
@@ -38,6 +40,7 @@ class NotificationCompat {
     const val PRIORITY_HIGH = 1
     const val PRIORITY_LOW = -1
     const val CATEGORY_REMINDER = "reminder"
+    const val CATEGORY_SERVICE = "service"
     const val CATEGORY_STATUS = "status"
     const val CATEGORY_MESSAGE = "msg"
   }

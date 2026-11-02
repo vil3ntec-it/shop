@@ -1,5 +1,5 @@
 #  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
-#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴ و ۰.۷).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۹).
 #  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
 #  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
 #  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
@@ -16,9 +16,6 @@ data/Migration.kt  # جایگزینِ iOS: data/MigrationIos.kt (دادهٔ وب
 hw/PrinterFinderAndroid.kt  # جایگزینِ iOS: hw/PrinterFinderIos.kt (کارتِ شبکه با getifaddrs؛ بی بلوتوث)
 pay/platform/PayDevice.kt  # جایگزینِ iOS: pay/platform/PayDeviceIos.kt (NFC ِ HCE و نمایشگرِ مشتری در iOS نیست)
 platform/HubRelayAndroid.kt  # جایگزینِ iOS: platform/HubRelayIos.kt (هابِ محلی خاموش، مثلِ پرچم‌خاموش)
-platform/ServerSwitchAndroid.kt  # جایگزینِ iOS: platform/ServerSwitchIos.kt (همان پرچم‌خاموش ِ اندروید)
-print/LabelSheetPrint.kt  # جایگزینِ iOS: print/LabelSheetPrintIos.kt (AirPrint گامِ ۳)
-print/ReportPrint.kt  # جایگزینِ iOS: print/ReportPrintIos.kt (PDF و AirPrint گامِ ۳)
 scan/BarcodeScanner.kt  # جایگزینِ iOS: scan/BarcodeScannerIos.kt (دوربین با AVCaptureMetadataOutput؛ CameraX و ML Kit در iOS نیستند)
 scan/GuidedCapture.kt  # جایگزینِ iOS: scan/GuidedCaptureIos.kt (CameraX؛ عکسِ کالا از راهِ TakePicture ِ iOS)
 sync/Integrity.kt  # جایگزینِ iOS: sync/IntegrityIos.kt (امضای برنامه را خودِ iOS وارسی می‌کند)

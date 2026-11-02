@@ -116,7 +116,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 | ۲-ج | بقیه | انتخابگرِ فایل/عکس (UIDocumentPicker/PHPicker پشتِ همان launcherها)، دوربین و بارکد (VisionKit)، اشتراک (UIActivityViewController)، اعلان، چاپ (شبکه/AirPrint؛ بلوتوثِ کلاسیک نه — بندِ ۵.۱) | — |
 
 **وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و بیشترِ ۲-ج در گامِ ۳ (⇐ ۰.۸؛
-بارکد با AVFoundation، نه VisionKit)؛ از ۲-ج چاپ (AirPrint/PDF) و تشخیصِ گفتار مانده‌اند.
+بارکد با AVFoundation، نه VisionKit)؛ چاپ (AirPrint/PDF) در گامِ ۴ (⇐ ۰.۹)؛ از ۲-ج فقط تشخیصِ گفتار مانده است.
 
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
@@ -149,8 +149,9 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 3. **شناسهٔ برنامه (bundle id)**: پیشنهادِ `ir.vil3ntec.tohid` (همان `APPLICATION_ID` ِ اندروید) — باید در حسابِ اپل ثبت شود.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
 5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل بماند — Sign in with Apple (قاعدهٔ ۴.۸).
-6. بعدتر: کلیدِ APNs برای اعلانِ سرور.
-7. از گامِ ۳: متنِ اجازه‌های `ios/iosApp/iosApp/Info.plist` (دوربین، Face ID، موقعیت، ذخیرهٔ تصویر) و «Background App Refresh» باید با
+6. اعلانِ سرور (APNs): کلیدِ p8 ِ APNs با Key ID و Team ID (برای فرستنده‌ای که هنوز در سرور نیست)، و قابلیتِ
+   «Push Notifications» (`aps-environment`) در شناسه و profile ِ برنامه — بی آن iOS توکن نمی‌دهد (⇐ ۰.۹؛ سمتِ برنامه آماده است).
+7. از گامِ ۳: متنِ اجازه‌های `ios/iosApp/iosApp/Info.plist` (دوربین، Face ID، موقعیت، ذخیرهٔ تصویر؛ از گامِ ۴ «شبکهٔ محلی») و «Background App Refresh» باید با
    برچسب‌های حریمِ خصوصیِ App Store Connect (بندِ ۵) یکی باشند — پرکردنِ آن فرم‌ها فقط با حسابِ صاحب‌کار.
 
 ### ۰.۷ گامِ ۲ — شبکه، دفترِ رمزدار، تصویر؛ ریشهٔ واقعیِ برنامه (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase2`)
@@ -242,13 +243,68 @@ UserNotifications). `iOSApp.init` ⇐ `appDidLaunch()` (پیش از پایانِ
 - اسکنِ دوربین: فوکوس/بزرگ‌نمایی/چراغِ خودکارِ اندروید (`FocusPilot`، `LightPilot`) نیست؛ فوکوسِ پیوستهٔ iOS. دوربینِ راهنمای عکسِ کالا (`GuidedCapture`) نیست؛ عکس با `TakePicture`.
 - شبیه‌ساز دوربین ندارد ⇐ مسیرهای دوربین فقط روی گوشیِ واقعی آزموده می‌شوند (هنوز نشده).
 
-**هنوز نه (گامِ ۴):** چاپ (PDF/AirPrint ِ گزارش و برگهٔ برچسب؛ چاپگرِ شبکه روی دستگاه آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست — §۵.۱)؛
+**هنوز نه (گامِ ۴؛ وضعِ امروز ⇐ ۰.۹):** چاپ (PDF/AirPrint ِ گزارش و برگهٔ برچسب؛ چاپگرِ شبکه روی دستگاه آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست — §۵.۱)؛
 تشخیصِ گفتار (Speech)؛ ورود با گوگل/اپل و گواهیِ «همین برنامه» (`Integrity`) — هر دو حسابِ اپل می‌خواهند (۰.۶)؛ «سرورِ خودِ دکان» با
 گواهیِ سنجاق‌شده (نمایندهٔ NSURLSession، برای HTTP و همین سوکت)؛ اعلانِ سرور (APNs، ۰.۶ بندِ ۶)؛ صدای اسکن (`MediaPlayer`)؛ آزمونِ دستیِ
 صفحه‌ها و دوربین روی گوشیِ واقعی.
 
 **بررسیِ محلی (لینوکس):** همان klib با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (‎۰.۷‎)، `jvmTest` ِ `ios/shared`،
 `core` ِ `jvmTest` و آزمونِ کامپیوتر. پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` فقط در CI ِ macOS.
+
+### ۰.۹ گامِ ۴ — چاپ و PDF، «سرورِ خودِ دکان» با گواهیِ سنجاق‌شده، APNs، بوقِ اسکن (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase4`)
+
+> روی دستهٔ یازدهم (#837 = گامِ ۲ و ۳ + `devices-hub` + `hesabpay-per-shop`). اندروید، کامپیوتر و `core` دست نخوردند؛ سرور یک
+> تغییرِ کوچک دارد (APNs، پایین). باز هم **همان فایل‌های اندروید** روی آیفون‌اند و هر چه تازه است shim ِ iOS است.
+
+**نتیجه:** ۱۱۳۷ از ۱۱۵۷ فایلِ `android-native/app/src/main/java` برای iOS کامپایل می‌شوند (گامِ ۳: ۱۱۱۱ از ۱۱۳۴؛ ۲۳ فایلِ تازهٔ
+دستهٔ یازدهم همه هستند). سه جایگزینِ دیگر **حذف شدند** و خودِ فایلِ اندروید جایشان است: `print/ReportPrint.kt`،
+`print/LabelSheetPrint.kt` و `platform/ServerSwitchAndroid.kt`. `ios-exclude.txt`: ۱۷ جایگزین + همان سه فایلِ مستقیم.
+
+| برش | چه شد | فایل‌ها (زیرِ `ios/shared/src`) |
+|---|---|---|
+| چاپ و PDF | `PrintManager.print` ⇐ همان `onLayout`/`onWrite` ِ سازگارکنندهٔ کدِ مشترک یک بار، PDF در `cache/print` ⇐ پنجرهٔ AirPrint (`UIPrintInteractionController`: چاپگر، شمار، صفحه‌ها؛ iPad با لنگر)؛ دستگاهِ بی چاپ ⇐ برگهٔ اشتراکِ همان PDF؛ خرابی ⇐ «چاپ نشد: …» (همان `StrPick.printFailed`). `PrintedPdfDocument`/`PdfDocument` روی همان `Canvas` ِ Skia با واحدِ پوینت (A4 = ۵۹۵ × ۸۴۱، همان حسابِ اندروید) و ۳۰۰ نقطه در اینچ؛ هر صفحه یک تصویرِ خاکستری (تک‌رنگ) یا RGB با zlib (FlateDecode). همهٔ «چاپ» ِ گزارش، صورت‌حساب، فاکتورِ خرید، برگهٔ برچسب و QR ِ کمپین؛ «ذخیرهٔ PDF» ِ گزارشِ تازه (`savePdf`) همان PDF را به برگهٔ اشتراک می‌دهد. رسیدِ فروش: «فرستادنِ PDF» (`PrintJob.sharePdf`، `ReceiptPdf` ِ core) برگهٔ اشتراک است و «چاپ» ِ همان برگه AirPrint است | `iosMain/…/android/print/*`، `android/graphics/pdf/PdfDocument.kt`، `android/os/PrintSupport.kt`، `ios/IosPrint.kt`، `commonMain/…/ios/print/RasterPdf.kt` |
+| «سرورِ خودِ دکان» | خودِ `ServerSwitchAndroid.kt` (پروفایل‌ها، «سرورِ بعدی» در شروعِ فرآیند، سنجشِ نشانی‌ها، `ServersController` ِ صفحهٔ «سرورها»). سنجاقِ گواهی **همان `PinnedTls` ِ اندروید** است روی shimِ `javax.net.ssl` (`SSLContext`، `X509TrustManager`، `HostnameVerifier`، `HttpsURLConnection`) و `java.security.cert`: پرسشِ اعتمادِ NSURLSession (`ServerTrust`) ⇐ زنجیرهٔ `SecTrust` (DER، برگ نخست) ⇐ `checkServerTrusted` ِ همان مدیرِ اعتماد ⇐ `verify` ِ همان verifier؛ هر دو ⇐ پذیرش، وگرنه دست‌دادن لغو و `SSLHandshakeException` (همان که `probe` می‌گیرد: «گواهیِ این سرور با گواهیِ سنجاق‌شده نمی‌خواند»). اعتمادِ پیش‌فرضِ iOS جایش را نمی‌گیرد (مثلِ JDK)؛ بی verifier ⇐ رد. «اعتماد در نخستین استفاده» (`PinnedTls.capture`) هم همان است. سوکتِ زنده با همان قاعده (`OkHttpClient.sslSocketFactory`/`hostnameVerifier`) | `iosMain/…/javax/net/ssl/Ssl.kt`، `javax/net/ssl/IosTls.kt`، `java/security/cert/Certificate.kt`، `java/net/Http.kt`، `okhttp3/WebSocket.kt` |
+| اعلانِ سرور (APNs) | سمتِ برنامه: `registerForRemoteNotifications` در `appDidLaunch`؛ `AppDelegate` ِ SwiftUI (`@UIApplicationDelegateAdaptor`) توکن را به `IosPush` می‌دهد ⇐ `POST /api/me/push` با `provider = apns`، `platform = ios`، پشتِ همان ورود (`Backend.api`)؛ پس از ورود، روزی یک بار برای هر «توکن + حساب». سرور: `apns` در فهرستِ سرویس‌های `/api/me/push`؛ فرستندهٔ FCM آن را نه می‌فرستد نه «کهنه» می‌کند (فقط apns ⇐ `apns_only`). فرستادن به APNs نیست (کلید و قابلیت ⇐ ۰.۶ بندِ ۶) | `iosMain/…/ios/IosPush.kt`، `ios/iosApp/iosApp/iOSApp.swift`، `server/src/routes/me.js`، `server/src/lib/push.js` |
+| بوقِ اسکن | `ScanFeedback.ok` ⇐ همان `res/raw/scan_beep.mp3` (در Resources ِ برنامه) با AVAudioPlayer ِ نگه‌داشته، از اول (نشستِ صدای Ambient: آهنگِ برنامهٔ دیگر قطع نمی‌شود و کلیدِ بی‌صدا رعایت می‌شود) + لرزشِ «درست»؛ «ناشناخته» ⇐ لرزشِ «هشدار» (بوقِ `ToneGenerator` در iOS نیست). لرزش‌های دیگر (`Haptics`) از گامِ ۲ بودند | `iosMain/…/scan/BarcodeScannerIos.kt`، `ir/vil3ntec/tohid/R.kt` |
+| دستهٔ یازدهم | چهار فایلِ تازه (`hw/DeviceLinks`، `hw/DeviceSignalsAndroid`، `scan/ScanServiceAndroid`، `pay/platform/HesabPayNoticeAndroid`) که `ios-ui-klib` ِ #837 را سرخ کرده بودند، بی سطرِ تازه در `ios-exclude.txt`: `Service`، `BroadcastReceiver`/`IntentFilter`، `NotificationListenerService`/`StatusBarNotification`، `ServiceCompat`، `Intent(Context, Class)`، `ComponentName.unflattenFromString`، `Thread.interrupt`/`InterruptedException`، `BluetoothDevice.type/uuids/bluetoothClass`. در iOS هیچ‌کدام اجرا نمی‌شوند: سرویسِ پیش‌رو، پخشِ سیستمی و خواندنِ اعلانِ برنامهٔ دیگر در iOS نیست و «بلوتوث نیست» ِ همیشگی است | `iosMain/…/android/app/Service.kt`، `android/content/BroadcastReceiver.kt`، `android/service/notification/*`، `androidx/core/app/ServiceCompat.kt` |
+
+**پوستهٔ Xcode:** `Info.plist` — `NSLocalNetworkUsageDescription` و `NSAppTransportSecurity`/`NSAllowsLocalNetworking` (سرورِ دکان و
+چاپگرِ شبکه در شبکهٔ محلی). `scan_beep.mp3` در Resources. `OTHER_LDFLAGS`: `AVFAudio` و `-lz` (zlib ِ PDF و xlsx؛ چارچوبِ ایستای
+Kotlin کتابخانه‌های سیستمی را خودش به برنامه نمی‌دهد). **رفعِ CI ِ `ios-app`:** xcodebuild ِ گامِ ۳ از سرآیندِ ObjC گذشت و در Swift
+افتاد: چارچوب رده‌های هم‌نامِ SwiftUI دارد (`View` ِ shimِ `android.view`، `Context` ِ shimِ `android.content`) ⇐ «'View' is
+ambiguous» و `ComposeView` بی `Context`. حالا `ContentView.swift` و `iOSApp.swift` نام‌های SwiftUI/UIKit/Foundation را با نامِ ماژول
+می‌نویسند (`SwiftUI.View`، `UIViewControllerRepresentableContext`، …).
+
+**آزمونِ تازه:**
+- `src/jvmTest/…/ios/print/RasterPdfJvmTest` (۶) — اندازهٔ A4 ِ اندروید (۵۹۵ × ۸۴۱)، جدولِ xref و `/Count`، بایت‌های تصویرِ فشرده
+  برابرِ پیکسل‌ها، RGB، PDF ِ بی صفحه ⇐ خطا؛ پروندهٔ نمونه با `pdfinfo` (۲ صفحه، A4، 1.4) و `pdftoppm` دستی هم باز شد. روی لینوکس.
+- `src/iosTest/…/ios/Phase4IosTest` (۵) — سنجاقِ گواهی با **همان** `PinnedTls` روی `SecTrust` ِ یک گواهیِ خودامضای P-256 (همان DER،
+  پذیرشِ سنجاقِ درست، ردِ سنجاقِ دیگر، ردِ بی verifier/بی مدیرِ اعتماد)، PDF ِ A4 ِ دوصفحه‌ای با zlib ِ iOS، `ComponentName`، هگزِ
+  توکنِ APNs. فقط روی شبیه‌ساز (کارِ `ios-app`).
+- سرور: `test/push-delivery.test.js` ۲۲/۲۲ روی PGlite (دو آزمونِ تازه: ثبتِ `apns` و ردِ سرویسِ ناشناخته؛ با FCM ِ ساختگی، توکنِ APNs
+  نه فرستاده می‌شود نه کهنه، و «فقط apns» گوگل را صدا نمی‌زند — همین آزمون بی تغییرِ `push.js` سرخ است).
+
+**تفاوت‌های دانسته (عمدی):**
+- PDF ِ آیفون تصویری است (۳۰۰ نقطه)، نه برداری مثلِ اندروید: برای چاپ و خواندن یکی است، ولی متنش جست‌وجوپذیر نیست و حجمش بیشتر است.
+- پنجرهٔ چاپ پس از ساختنِ PDF باز می‌شود؛ اندازهٔ کاغذ همان A4 ِ کدِ مشترک است و عوض کردنِ کاغذ در پنجرهٔ iOS صفحه را از نو نمی‌چیند.
+- «سرورِ بعدی» مثلِ اندروید برنامه را می‌بندد (`exitProcess`)؛ iOS خودش دوباره بازش نمی‌کند — کاربر باز می‌کند.
+- هابِ محلی (SYN-09) روی آیفون هنوز نه (`HubRelayIos` ⇐ null)؛ درخواست مستقیم به سرورِ فعال می‌رود.
+- ATS: نشانیِ IP و نامِ `.local` آزاد است؛ نامِ دامنهٔ عمومی با گواهیِ خودامضا را شاید ATS پیش از نماینده ببندد (آزموده نشده).
+- `Thread.interrupt` فقط نشان است (کارِ GCD بریدنی نیست)؛ کارگرهای بارکدخوانِ SPP در iOS هرگز بالا نمی‌آیند.
+
+**هنوز نه:**
+- **ورود با گوگل/اپل** — کدِ مشترک انتزاعِ «فراهم‌کننده» ندارد: فقط `data/GoogleSignIn` (Credential Manager) و سرور فقط `/auth/google`
+  (توکنِ ID ِ گوگل). ورود با گوگل در iOS شناسهٔ کلاینتِ iOS ِ گوگل (کنسولِ صاحب‌کار) و Sign in with Apple مسیرِ تازهٔ سرور + حسابِ اپل
+  (قاعدهٔ ۴.۸، ۰.۶) می‌خواهد؛ تا آن روز ایمیل و کد (همان پیامِ روشنِ `GoogleSignInIos`).
+- **تشخیصِ گفتار** — کدِ مشترک از برنامهٔ دیگرِ اندروید می‌پرسد (`RecognizerIntent`)؛ در iOS «برنامه‌ای نیست» ⇐ دکمهٔ میکروفون پنهان.
+  SFSpeechRecognizer صفحهٔ شنیدنِ خودش و دو اجازهٔ تازه (میکروفون، گفتار) می‌خواهد.
+- فرستندهٔ APNs در سرور (HTTP/2 + JWT ِ ES256 با کلیدِ p8؛ محیطِ sandbox/production) — بی کلیدِ صاحب‌کار ساختنی نیست.
+- `Integrity` (گواهیِ «همین برنامه»، App Attest) — حسابِ اپل.
+- آزمونِ دستی روی گوشیِ واقعی: AirPrint روی چاپگرِ واقعی، سرورِ دکان با گواهیِ خودامضا روی شبکهٔ دکان، بوق، APNs، و صفحه‌ها.
+
+**بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`) با
+Compose 1.7.3 (‎۰.۷‎)؛ `jvmTest` ِ `ios/shared` ۱۸/۱۸ (Gcm ۴، RasterPdf ۶، WorkTiming ۸)؛ سرور `push-delivery` ۲۲/۲۲ روی PGlite. فقط
+CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` (۹ + ۵).
 
 ## ۱. خلاصه در پنج خط
 

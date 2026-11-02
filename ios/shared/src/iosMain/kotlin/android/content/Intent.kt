@@ -1,6 +1,7 @@
 package android.content
 
 import android.net.Uri
+import ir.vil3ntec.tohid.ios.jvm.Class
 
 /*
  *  shimِ iOS ِ `android.content.Intent` (همان شکلِ کامپیوتر). `IosContext.startActivity`:
@@ -14,6 +15,13 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   val extras: MutableMap<String, Any?> = linkedMapOf()
 
   constructor(action: String?) : this(action, null)
+
+  /** «همین برنامه، این رده» (سرویس/گیرنده) — iOS هیچ‌کدام را اجرا نمی‌کند (‎Context.startService‎) */
+  constructor(packageContext: Context, cls: Class<*>) : this(null as String?) {
+    component = ComponentName(packageContext, cls)
+  }
+
+  var component: ComponentName? = null
 
   fun setPackage(name: String?): Intent = apply { `package` = name }
   fun addFlags(f: Int): Intent = apply { flags = flags or f }
@@ -31,6 +39,10 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   fun getIntExtra(key: String, def: Int): Int = extras[key] as? Int ?: def
   fun getBooleanExtra(key: String, def: Boolean): Boolean = extras[key] as? Boolean ?: def
   fun hasExtra(key: String): Boolean = extras.containsKey(key)
+  @Suppress("UNCHECKED_CAST")
+  fun <T : Any> getParcelableExtra(key: String, clazz: Class<T>): T? = extras[key] as? T
+  @Suppress("UNCHECKED_CAST")
+  fun <T> getParcelableExtra(key: String): T? = extras[key] as? T
 
   /** در iOS هیچ برنامه‌ای «قصد» ِ اندروید را نمی‌گیرد */
   fun resolveActivity(pm: android.content.pm.PackageManager): ComponentName? = null
@@ -41,6 +53,8 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
     const val ACTION_SEND = "android.intent.action.SEND"
     const val ACTION_SENDTO = "android.intent.action.SENDTO"
     const val ACTION_MAIN = "android.intent.action.MAIN"
+    const val ACTION_BOOT_COMPLETED = "android.intent.action.BOOT_COMPLETED"
+    const val ACTION_MY_PACKAGE_REPLACED = "android.intent.action.MY_PACKAGE_REPLACED"
     const val EXTRA_TEXT = "android.intent.extra.TEXT"
     const val EXTRA_SUBJECT = "android.intent.extra.SUBJECT"
     const val EXTRA_STREAM = "android.intent.extra.STREAM"
@@ -53,6 +67,20 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   }
 }
 
-class ComponentName(val packageName: String, val className: String)
+data class ComponentName(val packageName: String, val className: String) {
+  constructor(pkg: Context, cls: Class<*>) : this(pkg.packageName, cls.name)
+
+  fun flattenToString(): String = "$packageName/$className"
+
+  companion object {
+    fun unflattenFromString(str: String): ComponentName? {
+      val sep = str.indexOf('/')
+      if (sep < 0 || sep + 1 >= str.length) return null
+      val pkg = str.substring(0, sep)
+      val cls = str.substring(sep + 1).let { if (it.startsWith(".")) pkg + it else it }
+      return ComponentName(pkg, cls)
+    }
+  }
+}
 
 class ActivityNotFoundException(message: String? = null) : RuntimeException(message)

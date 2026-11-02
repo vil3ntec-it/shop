@@ -1,5 +1,6 @@
 package android.graphics
 
+import kotlin.math.roundToInt
 import org.jetbrains.skia.FilterMipmap
 import org.jetbrains.skia.FilterMode
 import org.jetbrains.skia.Image
@@ -128,11 +129,17 @@ class RectF(var left: Float = 0f, var top: Float = 0f, var right: Float = 0f, va
   internal fun sk(): SkRect = SkRect.makeLTRB(left, top, right, bottom)
 }
 
-class Canvas(private val target: Bitmap) {
-  private val c = SkCanvas(target.sk)
+/**
+ *  [unit] پیکسل در هر واحدِ رسم: ۱ برای بیت‌مپ؛ صفحهٔ PDF ِ چاپ (‎android/graphics/pdf‎) واحدش پوینت است و
+ *  روی بیت‌مپِ ۳۰۰ نقطه در اینچ کشیده می‌شود ⇐ `width`/`height` همان پوینت‌های اندروید (A4 = ۵۹۵ × ۸۴۱).
+ */
+class Canvas internal constructor(private val target: Bitmap, private val unit: Float) {
+  constructor(target: Bitmap) : this(target, 1f)
 
-  val width: Int get() = target.width
-  val height: Int get() = target.height
+  private val c = SkCanvas(target.sk).also { if (unit != 1f) it.scale(unit, unit) }
+
+  val width: Int get() = if (unit == 1f) target.width else (target.width / unit).roundToInt()
+  val height: Int get() = if (unit == 1f) target.height else (target.height / unit).roundToInt()
 
   fun drawColor(color: Int) { c.clear(color) }
 
