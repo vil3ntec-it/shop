@@ -30,6 +30,7 @@ const campaigns = require('../lib/campaigns');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
+const eta = require('../lib/storefront-eta');
 const audit = require('../lib/audit');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
@@ -130,6 +131,8 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  WEB-04: «تحویلِ تقریبی» در سبد و ثبت (`GET /:slug/eta`، `storefront-eta-store.js`) با پرچمِ `shop.storefront.eta`
+    ...((await eta.flagOn(shopId)) ? { eta: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -291,6 +294,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
   const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
   if (prefs !== undefined) order.deliveryPrefs = prefs;
+  //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
+  const live = await eta.orderEta(req.store, orderId);
+  if (live !== undefined) order.eta = live;
   res.json({ order });
 });
 

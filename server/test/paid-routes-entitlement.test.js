@@ -82,6 +82,8 @@ FLAGS.push('shop.storefront.media');
 FLAGS.push('shop.storefront.campaigns');
 //  MKT-02/RSK-09: اولین خرید و سدِ تخفیف (`/shop/storefront/promo-guard`) با پرچمِ خودش
 FLAGS.push('shop.storefront.promo_guard');
+//  WEB-04: تنظیمِ زمانِ تقریبیِ تحویل (`PUT /shop/storefront/eta`) با پرچمِ خودش
+FLAGS.push('shop.storefront.eta');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
