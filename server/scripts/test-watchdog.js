@@ -242,25 +242,32 @@ async function run(args, { env = process.env, seconds = readSeconds(), out = pro
   const s = tracker();
   const hangs = [];
   let offset = 0;
-  let partial = '';
   let lastProgress = Date.now();
   let busy = false;
   let exited = false;
 
+  //  خواندنِ افزوده‌های پروندهٔ وضعیت از همان fd ای که باز شده (نه stat و سپس open)؛ تکهٔ ناتمام به
+  //  شکلِ بایت می‌ماند تا نویسهٔ چندبایتی نشکند
+  let rest = Buffer.alloc(0);
   const poll = () => {
-    let size = 0;
-    try { size = fs.statSync(stateFile).size; } catch { return; }
-    if (size <= offset) return;
-    const fd = fs.openSync(stateFile, 'r');
+    let fd;
+    try { fd = fs.openSync(stateFile, 'r'); } catch { return; }
     try {
+      const size = fs.fstatSync(fd).size;
+      if (size <= offset) return;
       const buf = Buffer.alloc(size - offset);
-      fs.readSync(fd, buf, 0, buf.length, offset);
-      offset = size;
-      const lines = (partial + buf.toString('utf8')).split('\n');
-      partial = lines.pop();
-      for (const l of lines) { try { s.feed(JSON.parse(l)); } catch { /* خطِ ناقص */ } }
+      const n = fs.readSync(fd, buf, 0, buf.length, offset);
+      offset += n;
+      const all = Buffer.concat([rest, buf.subarray(0, n)]);
+      const end = all.lastIndexOf(0x0a);
+      rest = end < 0 ? all : all.subarray(end + 1);
+      if (end >= 0) {
+        for (const l of all.subarray(0, end).toString('utf8').split('\n')) {
+          try { s.feed(JSON.parse(l)); } catch { /* خطِ ناقص */ }
+        }
+      }
+      lastProgress = Date.now();
     } finally { fs.closeSync(fd); }
-    lastProgress = Date.now();
   };
 
   const say = (lines) => out.write(`\n${lines.join('\n')}\n`);
