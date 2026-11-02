@@ -50,12 +50,12 @@ object ShopPolicy {
 
   /**
    *  «تحلیلِ موجودی» در گزارشِ کالاها: ارزش به بها و به قیمتِ فروش، سودِ بالقوه (INV-16) و تحلیلِ
-   *  ABC (INV-15) — `ReportEngine.stockInsight` روی `core` (`StockAnalysis`). پیش‌فرض **خاموش**: تا
+   *  ABC (INV-15) — `ReportEngine.stockInsight` روی `core` (`StockAnalysis`). پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: تا
    *  دکان‌دار خودش روشن نکند، گزارش‌ها همان است که بود. فقط خواندنی؛ هیچ داده‌ای نمی‌نویسد. فقط همین دستگاه.
    */
   private const val STOCK_INSIGHT = "stock_insight"
 
-  fun stockInsight(context: Context): Boolean = prefs(context).getBoolean(STOCK_INSIGHT, false)
+  fun stockInsight(context: Context): Boolean = prefs(context).getBoolean(STOCK_INSIGHT, true)
 
   fun setStockInsight(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(STOCK_INSIGHT, on).apply()
@@ -63,13 +63,13 @@ object ShopPolicy {
 
   /**
    *  «نقطهٔ سفارش و بیشینه» (INV-12): دو کادرِ تازه در فرمِ کالا، ویرایشِ گروهیِ «حدِ موجودی» در فهرستِ
-   *  کالاهای کامپیوتر و فهرستِ «نیاز به سفارش» با پیشنهادِ «تا بیشینه» در گزارش‌ها. پیش‌فرض **خاموش**:
+   *  کالاهای کامپیوتر و فهرستِ «نیاز به سفارش» با پیشنهادِ «تا بیشینه» در گزارش‌ها. پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**:
    *  فرم و فهرست همان امروزند. روشن ⇒ فقط دو فیلدِ افزودنیِ کالا (`reorderPoint`، `maxStock`) نوشته
    *  می‌شوند و همگام می‌شوند؛ دستگاهی که خاموش است آن‌ها را نمی‌بیند ولی پاکشان هم نمی‌کند. فقط همین دستگاه.
    */
   private const val STOCK_LEVELS = "stock_levels"
 
-  fun stockLevels(context: Context): Boolean = prefs(context).getBoolean(STOCK_LEVELS, false)
+  fun stockLevels(context: Context): Boolean = prefs(context).getBoolean(STOCK_LEVELS, true)
 
   fun setStockLevels(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(STOCK_LEVELS, on).apply()
@@ -109,11 +109,11 @@ object ShopPolicy {
   /**
    *  CHAT-05 / CHAT-07 — چتِ دکان: نوارِ پیشرفتِ فرستادنِ عکس و صدا، و پیش از ضبط، پخش یا آماده
    *  کردنِ عکس سنجشِ جای دستگاه با پیامِ روشن (`ChatSpace`، `ChatProgress` در `core`). پیش‌فرض
-   *  **خاموش**: چت همان است که بود (بدنهٔ رسانه یک‌جا نوشته می‌شود، بی سنجشِ جا). فقط روی همین دستگاه.
+   *  **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: چت همان است که بود (بدنهٔ رسانه یک‌جا نوشته می‌شود، بی سنجشِ جا). فقط روی همین دستگاه.
    */
   private const val CHAT_MEDIA_GUARD = "chat_media_guard"
 
-  fun chatMediaGuard(context: Context): Boolean = prefs(context).getBoolean(CHAT_MEDIA_GUARD, false)
+  fun chatMediaGuard(context: Context): Boolean = prefs(context).getBoolean(CHAT_MEDIA_GUARD, true)
 
   fun setChatMediaGuard(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(CHAT_MEDIA_GUARD, on).apply()

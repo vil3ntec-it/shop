@@ -83,7 +83,7 @@ fun main() {
   //  SYN-09: هابِ محلی — پرچمِ بالا **و** تنظیمِ `hub.local` ِ همین دستگاه؛ هر کدام خاموش ⇒ هیچ (‎desktop/hub/HubBoot.kt‎)
   runCatching { ir.vil3ntec.tohid.desktop.hub.HubBoot.startIfEnabled(context) }
   val prefs = context.getSharedPreferences("tohid", 0)
-  ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.load(context) //  S50، پیش‌فرض خاموش
+  ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.load(context) //  S50، پیش‌فرض روشن (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }

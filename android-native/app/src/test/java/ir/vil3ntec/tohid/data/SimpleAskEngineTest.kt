@@ -202,9 +202,11 @@ class SimpleAskEngineTest {
     listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
 
-  @Test fun `کلید پیش‌فرض خاموش است و بی آن زبانهٔ پرسش ساخته نمی‌شود`() {
+  //  تنظیماتِ کم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱): «پرسشِ ساده» فقط خواندنی است و چیزی را عوض نمی‌کند ⇒ پیش‌فرض روشن
+  //  و بی ردیف در تنظیمات (`SettingsTiers.ALWAYS_ON`)؛ «خاموش» ِ دستیِ کاربر می‌ماند و بی آن هنوز زبانه‌ای نیست
+  @Test fun `کلید پیش‌فرض روشن است و بی آن زبانهٔ پرسش ساخته نمی‌شود`() {
     val pref = src("data/SimpleAskPrefAndroid.kt")
-    assertTrue(pref.contains("getBoolean(KEY, false) }.getOrDefault(false)"))
+    assertTrue(pref.contains("getBoolean(KEY, true) }.getOrDefault(false)"))
     assertFalse(pref.contains("putBoolean(KEY, true)"))
     //  گوشی: زبانه و بخش فقط با `askOn`
     val phone = src("ui/screens/Reports.kt")

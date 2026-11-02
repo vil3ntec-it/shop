@@ -37,6 +37,11 @@ import ir.vil3ntec.tohid.ui.theme.glassSurface
 import androidx.compose.runtime.saveable.rememberSaveable
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
+import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.SettingsTiers
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 
 /**
  *  اجزای صفحهٔ تنظیمات.
@@ -71,6 +76,8 @@ fun SettingsSectionLegacy(
     DeskSettingsSectionLegacy(icon, title, subtitle, tint, content)
     return
   }
+  //  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): بخشِ روشن و پنهان (A، `SettingsTiers`) کارت ندارد؛ کامپیوتر ستونش را ندارد (`deskLegacyTier`)
+  if (SettingsTiers.hiddenTitle(title)) return
   var open by rememberSaveable(stateKey) { mutableStateOf(initiallyOpen) }
   val colors = Shop.colors
   val turn by animateFloatAsState(
@@ -274,9 +281,32 @@ private fun DeskSettingsSectionLegacy(icon: ImageVector, title: String, subtitle
  */
 @Composable
 fun DeskSettingsLegacy(sections: List<Pair<String, ImageVector>>, content: @Composable () -> Unit) {
+  //  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱، `SettingsTiers`): بخشِ روشن و پنهان (A) ستون ندارد؛ تصمیم‌های پولی و گزینه‌های
+  //  کم‌کاربرد (B) زیرِ ردیفِ بستهٔ «پیشرفته» در تهِ ستون‌اند؛ عنوانِ ناشناس در فهرستِ اصلی می‌ماند
+  val main = sections.filter { deskLegacyTier(it.first) == SettingsTiers.Tier.MAIN }
+  val advanced = sections.filter { deskLegacyTier(it.first) == SettingsTiers.Tier.ADVANCED }
+  val listed = main + advanced
   //  جای بخش نگه داشته می‌شود، نه عنوانش: با عوض‌شدنِ زبان عنوان‌ها عوض می‌شوند و بخشِ باز نباید گم شود
   var pickAt by rememberSaveable { mutableStateOf(0) }
-  val pick = sections.getOrElse(pickAt) { sections.first() }.first
+  var advancedOpen by rememberSaveable { mutableStateOf(false) }
+  val pick = listed.getOrElse(pickAt) { listed.first() }.first
+  @Composable
+  fun Item(i: Int, title: String, icon: ImageVector) {
+    val on = i == pickAt
+    Row(
+      Modifier
+        .fillMaxWidth()
+        .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+        .background(if (on) Shop.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
+        .clickable { pickAt = i }
+        .padding(horizontal = 12.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically,
+    ) {
+      Icon(icon, null, tint = if (on) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
+      Spacer(Modifier.width(10.dp))
+      Text(title, style = MaterialTheme.typography.bodyMedium, color = if (on) Shop.colors.primary else Shop.colors.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+    }
+  }
   Row(Modifier.fillMaxSize().padding(16.dp)) {
     Column(
       Modifier
@@ -285,24 +315,34 @@ fun DeskSettingsLegacy(sections: List<Pair<String, ImageVector>>, content: @Comp
         .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
         .background(Shop.colors.surfaceSolid)
         .border(1.dp, Shop.colors.border, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+        .verticalScroll(rememberScrollState())
         .padding(10.dp),
     ) {
       Text(Str.settings, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text, modifier = Modifier.padding(10.dp))
-      sections.forEachIndexed { i, (title, icon) ->
-        val on = i == pickAt
+      main.forEachIndexed { i, (title, icon) -> Item(i, title, icon) }
+      if (advanced.isNotEmpty()) {
         Row(
           Modifier
             .fillMaxWidth()
+            .padding(top = 8.dp)
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .background(if (on) Shop.colors.primary.copy(alpha = 0.12f) else Color.Transparent)
-            .clickable { pickAt = i }
+            .clickable { advancedOpen = !advancedOpen }
             .padding(horizontal = 12.dp, vertical = 10.dp),
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Icon(icon, null, tint = if (on) Shop.colors.primary else Shop.colors.muted, modifier = Modifier.size(19.dp))
-          Spacer(Modifier.width(10.dp))
-          Text(title, style = MaterialTheme.typography.bodyMedium, color = if (on) Shop.colors.primary else Shop.colors.text, fontWeight = if (on) FontWeight.Bold else FontWeight.Normal)
+          Column(Modifier.weight(1f)) {
+            Text(StrSettingsHelp.advanced, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+            Text(StrSettingsHelp.advancedLine, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          }
+          Icon(
+            Icons.Filled.ExpandMore,
+            contentDescription = if (advancedOpen || pickAt >= main.size) Str.close else StrSettings.open,
+            tint = Shop.colors.muted,
+            modifier = Modifier.rotate(if (advancedOpen || pickAt >= main.size) 180f else 0f),
+          )
         }
+        //  بخشِ پیشرفتهٔ انتخاب‌شده ردیفش را نگه می‌دارد، حتی اگر گروه بسته شود
+        if (advancedOpen || pickAt >= main.size) advanced.forEachIndexed { j, (title, icon) -> Item(main.size + j, title, icon) }
       }
     }
     Spacer(Modifier.width(16.dp))
@@ -310,4 +350,22 @@ fun DeskSettingsLegacy(sections: List<Pair<String, ImageVector>>, content: @Comp
       CompositionLocalProvider(LocalSettingsPickLegacy provides pick) { content() }
     }
   }
+}
+
+/**
+ *  دستهٔ هر ردیفِ ستونِ تنظیماتِ کامپیوترِ رابطِ امروز (`DeskSettingsLegacy`) از عنوانش: کلیدِ `SettingsLayout`
+ *  (`keyOf`) و دستهٔ همان (`SettingsTiers`)؛ چند عنوانِ ویژهٔ رابطِ امروز این‌جا. عنوانِ ناشناس ⇒ فهرستِ اصلی.
+ */
+internal fun deskLegacyTier(title: String): SettingsTiers.Tier {
+  if (SettingsTiers.hiddenTitle(title)) return SettingsTiers.Tier.HIDDEN
+  val legacyAdvanced = setOf(
+    ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE,
+    ir.vil3ntec.tohid.ui.screens.SERVERS_SECTION_TITLE,
+    ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE,
+    Str.signedInDevices,
+    ir.vil3ntec.tohid.core.i18n.StrLateApology.title,
+  )
+  if (title in legacyAdvanced) return SettingsTiers.Tier.ADVANCED
+  val key = SettingsLayout.keyOf(title, fallback = "")
+  return if (key.isEmpty()) SettingsTiers.Tier.MAIN else SettingsTiers.tier(key)
 }

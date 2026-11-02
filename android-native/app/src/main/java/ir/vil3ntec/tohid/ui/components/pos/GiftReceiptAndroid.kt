@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
 
 /**
  *  POS-34 — روشن/خاموشِ «رسیدِ هدیه» روی همین دستگاه (`tohid-ui:gift_receipt`)؛ فایلِ مرزیِ پلتفرم
- *  (`SharedPreferences`). پیش‌فرض **خاموش**: فاکتور همان پیشین است و هیچ دکمه‌ای نمی‌آید.
+ *  (`SharedPreferences`). پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: فاکتور همان پیشین است و هیچ دکمه‌ای نمی‌آید.
  */
 object GiftReceiptPrefs {
   val on = mutableStateOf(false)
@@ -40,7 +40,7 @@ object GiftReceiptPrefs {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, true)
   }
 
   fun set(context: android.content.Context, value: Boolean) {

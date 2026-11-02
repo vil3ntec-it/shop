@@ -1,9 +1,13 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,11 +17,19 @@ import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
+import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Card
@@ -46,13 +58,48 @@ internal fun SettingsPageFrame(
   content: LazyListScope.() -> Unit,
 ) {
   val stagger = rememberV3Stagger(title)
-  V3Scaffold(title = title, subtitle = subtitle, onBack = onBack, actions = actions, largeTitle = largeTitle, bottomBar = bottomBar) { pad ->
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-      LazyColumn(
-        Modifier.widthIn(max = 720.dp).fillMaxSize(),
-        state = state,
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),
-      ) { StaggeredList(this, stagger).content() }
+  //  صفحهٔ یک بخش (`LocalSettingsKey`) ⇒ کارتِ «این چه می‌کند؟» با یک مثال بالای صفحه؛ قابِ تودرتو دوباره نمی‌کشد
+  val whatKey = LocalSettingsKey.current
+  CompositionLocalProvider(LocalSettingsKey provides null) {
+    V3Scaffold(title = title, subtitle = subtitle, onBack = onBack, actions = actions, largeTitle = largeTitle, bottomBar = bottomBar) { pad ->
+      Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(
+          Modifier.widthIn(max = 720.dp).fillMaxSize(),
+          state = state,
+          contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding()),
+        ) {
+          val list = StaggeredList(this, stagger)
+          if (whatKey != null && SettingsHelp.example(whatKey) != null) list.item(key = "settings-what") { SettingsWhatCard(whatKey) }
+          list.content()
+        }
+      }
+    }
+  }
+}
+
+/**
+ *  کلیدِ بخشی که صفحه‌اش همین حالا کشیده می‌شود (`SettingsLayout`، یا `SettingsHelp.LATE_APOLOGY`) — مسیرِ بخش
+ *  (`SettingsSection`) و ستونِ پایانِ کامپیوتر می‌دهند؛ `SettingsPageFrame` کارتِ «این چه می‌کند؟» را از آن می‌کشد.
+ */
+internal val LocalSettingsKey = compositionLocalOf<String?> { null }
+
+/**
+ *  «این چه می‌کند؟» (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱): آیکنِ همان ردیف و یک مثالِ ملموس به زبانِ دکان‌دار. بخشِ بی مثال ⇒ هیچ.
+ *  صفحه‌هایی که قابِ خودشان را دارند (نوارِ پایین، رمزِ حساب) همین را دستی بالای ستون می‌گذارند.
+ */
+@Composable
+internal fun SettingsWhatCard(key: String, modifier: Modifier = Modifier) {
+  val example = SettingsHelp.example(key) ?: return
+  val c = PhoneV3.colors
+  V3Card(modifier.padding(top = 8.dp), padding = PaddingValues(14.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+      Box(Modifier.size(36.dp).clip(CircleShape).background(c.tile), contentAlignment = Alignment.Center) {
+        Icon(SettingsPages.icon(key), contentDescription = null, tint = c.inkMuted, modifier = Modifier.size(20.dp))
+      }
+      Column(Modifier.weight(1f)) {
+        Text(StrSettingsHelp.whatTitle, style = V3Type.subhead, fontWeight = FontWeight.SemiBold, color = c.ink)
+        Text(example, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 2.dp))
+      }
     }
   }
 }

@@ -43,6 +43,7 @@ import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsWhatCard
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -83,6 +84,8 @@ internal fun NavBarScreen(allowed: Set<String>, onBack: (() -> Unit)?) {
         Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState())
           .padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
       ) {
+        //  «این چه می‌کند؟» (تنظیماتِ کم) — صفحه قابِ خودش را دارد، پس کارت دستی
+        SettingsWhatCard(SettingsLayout.NAV_BAR)
         //  پیش‌نمایشِ زنده (نوارِ واقعی، بی کار)
         Box(
           Modifier.padding(top = 8.dp).fillMaxWidth().height(116.dp)
