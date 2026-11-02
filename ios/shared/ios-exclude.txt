@@ -1,28 +1,22 @@
 #  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
-#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۹).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۱).
 #  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
 #  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
 #  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
 
 #  ── جایگزینِ iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop) ──
-core/net/TokenStore.kt  # جایگزینِ iOS: core/net/TokenStoreIos.kt (توکن در Keychain)
 data/AtRestKeys.kt  # جایگزینِ iOS: data/AtRestKeysIos.kt (KEK در Keychain)
 data/DeviceLocation.kt  # جایگزینِ iOS: data/DeviceLocationIos.kt (CoreLocation، «هنگامِ استفاده»، یک‌باره)
 data/DiskWrite.kt  # جایگزینِ iOS: data/DiskWriteIos.kt (fsync + rename ِ POSIX)
-data/FileName.kt  # جایگزینِ iOS: data/FileNameIos.kt (نامِ مسیرِ file://)
-data/Fingerprint.kt  # جایگزینِ iOS: data/FingerprintIos.kt (Face ID / Touch ID با LocalAuthentication)
-data/GoogleSignIn.kt  # جایگزینِ iOS: data/GoogleSignInIos.kt (ورود با گوگل/اپل گامِ ۳؛ ایمیل کار می‌کند)
+data/GoogleSignIn.kt  # جایگزینِ iOS: data/GoogleSignInIos.kt (Credential Manager ِ گوگل؛ اپل: ios/AppleSignInIos.kt پشتِ data/ExternalSignIn.kt)
 data/Migration.kt  # جایگزینِ iOS: data/MigrationIos.kt (دادهٔ وبیِ قدیمی در آیفون نیست)
 hw/PrinterFinderAndroid.kt  # جایگزینِ iOS: hw/PrinterFinderIos.kt (کارتِ شبکه با getifaddrs؛ بی بلوتوث)
 pay/platform/PayDevice.kt  # جایگزینِ iOS: pay/platform/PayDeviceIos.kt (NFC ِ HCE و نمایشگرِ مشتری در iOS نیست)
 scan/BarcodeScanner.kt  # جایگزینِ iOS: scan/BarcodeScannerIos.kt (دوربین با AVCaptureMetadataOutput؛ CameraX و ML Kit در iOS نیستند)
 scan/GuidedCapture.kt  # جایگزینِ iOS: scan/GuidedCaptureIos.kt (CameraX؛ عکسِ کالا از راهِ TakePicture ِ iOS)
-sync/Integrity.kt  # جایگزینِ iOS: sync/IntegrityIos.kt (امضای برنامه را خودِ iOS وارسی می‌کند)
 ui/Platform.kt  # جایگزینِ iOS: ui/PlatformIos.kt
 ui/screens/Haptics.kt  # جایگزینِ iOS: ui/screens/HapticsIos.kt
 update/Updater.kt  # جایگزینِ iOS: update/UpdaterIos.kt (به‌روزرسانی فقط از App Store؛ بی APK)
 
 #  ── مستقیم: API ِ JVM/اندروید در خودِ فایل ──
 MainActivity.kt  # androidx، android.os.Bundle
-data/TohidBackupAgent.kt  # android.app.backup، android.os.ParcelFileDescriptor
-pay/platform/HesabPayHceService.kt  # android.nfc.cardemulation، android.os.Bundle

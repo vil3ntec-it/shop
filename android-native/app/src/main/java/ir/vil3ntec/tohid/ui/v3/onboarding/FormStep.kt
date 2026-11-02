@@ -125,7 +125,7 @@ private fun ColumnScope.FormFields(ui: AuthUi, env: AuthEnv, act: AuthActions) {
     done = env.done,
     onClick = act::submitForm,
   )
-  if (!register && (env.otpReady || GOOGLE_LOGIN)) {
+  if (!register && (env.otpReady || GOOGLE_LOGIN || env.apple)) {
     OrDivider()
     if (env.otpReady) {
       V3Button(StrAuth.signInWithCode, act::requestOtp, Modifier.fillMaxWidth(), kind = V3ButtonKind.SECONDARY, enabled = env.ready && !ui.busy, height = GATE_BUTTON)
@@ -133,6 +133,11 @@ private fun ColumnScope.FormFields(ui: AuthUi, env: AuthEnv, act: AuthActions) {
     if (GOOGLE_LOGIN) {
       if (env.otpReady) Spacer(Modifier.height(10.dp))
       GoogleButton(enabled = env.ready && !ui.busy, onClick = act::google)
+    }
+    //  فقط آیفون (`AuthEnv.apple`)؛ اندروید و کامپیوتر هرگز
+    if (env.apple) {
+      if (env.otpReady || GOOGLE_LOGIN) Spacer(Modifier.height(10.dp))
+      AppleButton(enabled = env.ready && !ui.busy, onClick = act::apple)
     }
   }
   if (!env.ready) {

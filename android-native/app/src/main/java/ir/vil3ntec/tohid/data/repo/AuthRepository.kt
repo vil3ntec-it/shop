@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.AppleNonceDto
 import ir.vil3ntec.tohid.core.model.OtpChallengeDto
 import ir.vil3ntec.tohid.core.model.RegisterTicketDto
 import ir.vil3ntec.tohid.data.LocationFix
@@ -351,6 +352,51 @@ class AuthRepository(
     api.postPublic(
       ApiEndpoints.Auth.GOOGLE_LINK_CODE,
       buildJsonObject { put("idToken", JsonPrimitive(idToken)); putApp() },
+    )
+    Unit
+  }
+
+  /** ورود با اپل روی این سرور باز است؟ (`/config` ⇐ `appleLogin`؛ فقط آیفون می‌پرسد) */
+  suspend fun appleEnabled(): Boolean =
+    serverConfig().valueOrNull()?.appleLogin ?: false
+
+  /** nonce ِ یک‌بارمصرف و ده‌دقیقه‌ایِ سرور — پیش از هر پنجرهٔ اپل یکی تازه */
+  suspend fun appleNonce(): ApiResult<String> = result {
+    val body = api.postPublic(ApiEndpoints.Auth.APPLE_NONCE, buildJsonObject { putApp() })
+    ApiJson.decode<AppleNonceDto>(body).nonce
+  }
+
+  /**
+   *  ورود با اپل — همان قاعدهٔ `loginWithGoogle` (۴۰۹ `apple_link_required` ⇐ `password` یا `code`)،
+   *  به‌علاوهٔ `nonce` ِ خامِ سرور و `name` ِ بارِ نخست (اپل نام را در توکن نمی‌گذارد).
+   */
+  suspend fun loginWithApple(
+    idToken: String,
+    nonce: String,
+    name: String = "",
+    password: String? = null,
+    code: String? = null,
+  ): ApiResult<SessionDto> = result {
+    keep(
+      api.postPublic(
+        ApiEndpoints.Auth.APPLE,
+        buildJsonObject {
+          put("idToken", JsonPrimitive(idToken))
+          put("nonce", JsonPrimitive(nonce))
+          if (name.isNotBlank()) put("name", JsonPrimitive(name.trim()))
+          if (!password.isNullOrEmpty()) put("password", JsonPrimitive(password))
+          if (!code.isNullOrBlank()) put("code", JsonPrimitive(code.trim()))
+          putApp()
+        },
+      )
+    )
+  }
+
+  /** کدِ اثبات برای وصل کردنِ اپل — به ایمیلِ خودِ حساب می‌رود (nonce مصرف نمی‌شود). */
+  suspend fun requestAppleLinkCode(idToken: String, nonce: String): ApiResult<Unit> = result {
+    api.postPublic(
+      ApiEndpoints.Auth.APPLE_LINK_CODE,
+      buildJsonObject { put("idToken", JsonPrimitive(idToken)); put("nonce", JsonPrimitive(nonce)); putApp() },
     )
     Unit
   }

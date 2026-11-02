@@ -233,6 +233,8 @@ async function createApp({ runMigrations = true } = {}) {
           googleClientId: config.google.clientIds[0] || '',
           //  برنامه‌ی کامپیوتر شناسه‌ی خودش را برمی‌دارد، نه شناسه‌ی سایت.
           googleDesktopClientId: config.google.desktopClientId || '',
+          //  ورود با اپل (فقط برنامهٔ آیفون) — `APPLE_CLIENT_IDS`؛ شناسه به برنامه داده نمی‌شود
+          appleLogin: config.apple.clientIds.length > 0,
           otpEnabled: config.otp.provider !== 'off',
           //  F0-13: تنها خوانندهٔ مدتِ آزمایشی — همان عددِ `entitlement`
           trialDays: await plans.trialDaysOf('shop'),

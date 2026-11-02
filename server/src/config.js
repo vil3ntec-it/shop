@@ -209,6 +209,14 @@ const config = {
     legacyEmailLink: bool(process.env.GOOGLE_EMAIL_AUTOLINK, false),
   },
 
+  //  ورود با اپل (`lib/apple.js`) — شناسهٔ برنامهٔ آیفون (bundle id، مثلاً ir.vil3ntec.tohid) از
+  //  حسابِ اپلِ صاحب‌کار؛ خالی ⇒ خاموش (`/config` ⇐ appleLogin: false). هرگز وصلِ خودکار با ایمیل.
+  apple: {
+    clientIds: list(process.env.APPLE_CLIENT_IDS),
+    keysUrl: process.env.APPLE_KEYS_URL || 'https://appleid.apple.com/auth/keys',
+    nonceTtlMs: 10 * 60 * 1000,
+  },
+
   /*
    *  توزیعِ نسخه‌ها — برنامه‌ها نسخهٔ تازه را از **همین سرور** می‌گیرند، نه از
    *  GitHub. سرور از انتشارِ مخزن می‌خواند (با `GITHUB_TOKEN` اگر مخزن خصوصی

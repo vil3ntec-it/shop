@@ -126,6 +126,12 @@ object StrAuth {
   // وصل کردنِ گوگل
   val googleLinkTitle: String get() = t("وصل کردنِ گوگل به حسابِ موجود", "Link Google to your existing account", "ګوګل له موجود حساب سره ونښلوئ")
   val googleLinkBody: String get() = t("این ایمیل از قبل حساب دارد. برای وصل کردنِ گوگل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید.", "This email already has an account. To link Google, enter that account's password or the code we email you.", "دا ایمیل دمخه حساب لري. د ګوګل نښلولو لپاره د همغه حساب پټنوم یا هغه کوډ ولیکئ چې ایمیل ته یې لېږو.")
+  // ورود با اپل (فقط آیفون؛ همان قاعدهٔ گوگل)
+  val appleSignIn: String get() = t("ورود با اپل", "Sign in with Apple", "د اپل په حساب ننوځئ")
+  val appleFailed: String get() = t("ورود با اپل انجام نشد", "Sign in with Apple failed", "د اپل ننوتل ونه شو")
+  val appleNotEnabled: String get() = t("ورود با اپل روی این سرور باز نشده است", "Sign in with Apple isn't enabled on this server", "په دې سرور کې د اپل ننوتل فعال نه دي")
+  val appleLinkTitle: String get() = t("وصل کردنِ اپل به حسابِ موجود", "Link Apple to your existing account", "اپل له موجود حساب سره ونښلوئ")
+  val appleLinkBody: String get() = t("این ایمیل از قبل حساب دارد. برای وصل کردنِ اپل، رمزِ همان حساب یا کدی را که به ایمیل می‌فرستیم وارد کنید.", "This email already has an account. To link Apple, enter that account's password or the code we email you.", "دا ایمیل دمخه حساب لري. د اپل نښلولو لپاره د همغه حساب پټنوم یا هغه کوډ ولیکئ چې ایمیل ته یې لېږو.")
   val emailCode: String get() = t("کدِ ایمیل", "Email code", "د ایمیل کوډ")
   val thisAccountPassword: String get() = t("رمزِ همین حساب", "This account's password", "د همدې حساب پټنوم")
   val sendLinkCode: String get() = t("رمز را نمی‌دانم — کد به ایمیل بفرست", "I don't know the password — email me a code", "پټنوم نه پېژنم — ایمیل ته کوډ ولېږئ")
