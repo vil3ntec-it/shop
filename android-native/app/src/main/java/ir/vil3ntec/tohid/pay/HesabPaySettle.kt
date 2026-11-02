@@ -76,12 +76,13 @@ object HesabPaySettle {
    *  حالتِ ساده («حساب‌پیِ دکان» با شماره/QR ِ خودِ دکان): فقط وقتی صندوقدار «پول رسید» را زد. ردیف همان روشِ
    *  حساب‌پی است با کدِ فاکتور (`ref`)، `confirmed` و `verification = cashier` — تا گزارش «تأییدِ درگاه» را از
    *  «تأییدِ صندوقدار» جدا ببیند. ⛔ هیچ راهِ دیگری (اعلان، پیامک، مبلغِ برابر) به این‌جا نمی‌رسد.
+   *  `payee` = اثرِ انگشتِ حسابِ گیرندهٔ فعال که سرور به صندوق داد (`TillHesab.payee.fp`) ⇐ گزارشِ «پول به کدام حساب رفت».
    */
-  fun settleSimple(total: Double, draft: PayFlow.Draft?, ref: String): PayFlow.Outcome<Settlement> {
+  fun settleSimple(total: Double, draft: PayFlow.Draft?, ref: String, payee: String? = null): PayFlow.Outcome<Settlement> {
     val clean = ref.trim()
     if (clean.isEmpty()) return bad("REF_REQUIRED")
     val due = (due(total, draft) as? Due.Amount)?.minor ?: return bad("TOTAL_MISMATCH")
-    return withRow(total, draft, PaymentRow(METHOD, "wallet", due, clean, "confirmed", BY_CASHIER))
+    return withRow(total, draft, PaymentRow(METHOD, "wallet", due, clean, "confirmed", BY_CASHIER, payee?.trim()?.ifEmpty { null }))
   }
 
   /** تسویه با تکه‌های پنل + ردیفِ حساب‌پی؛ ردیفِ ثبتِ دستیِ همان تکه ⇐ `confirmed` (همان روش، مبلغ و مرجع) */

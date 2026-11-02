@@ -59,6 +59,18 @@ internal fun rememberHesabPayDeps(): HesabPayDeps {
   return remember { HesabPayDeps(HesabPayEnv.of(context), context.applicationContext ?: context) }
 }
 
+/**
+ *  تاریخچهٔ حساب‌های حساب‌پیِ دکان (نام، ۴ رقم، اثرِ انگشت) از پیکربندیِ صندوق ⇐ X/Z به تفکیکِ حساب (`DrawerModel.hesabPayLines`)؛
+ *  بی نت یا خطا ⇒ خالی (حسابِ بیگانه همچنان جدا و با نشان).
+ */
+@Composable
+internal fun rememberHesabPayees(): List<ir.vil3ntec.tohid.core.gateway.Payee> {
+  val context = LocalContext.current
+  return androidx.compose.runtime.produceState(emptyList<ir.vil3ntec.tohid.core.gateway.Payee>()) {
+    value = runCatching { HesabPayEnv.of(context).till().payees }.getOrDefault(emptyList())
+  }.value
+}
+
 /** دوربین فقط برای QR ِ خودِ دکان (اندروید)؛ خوانشِ اول پذیرفته می‌شود */
 @Composable
 internal fun HpQrScanDialog(onDismiss: () -> Unit, onText: (String) -> Unit) {
