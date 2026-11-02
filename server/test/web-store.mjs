@@ -247,6 +247,20 @@ ok(totals.includes('۵۴۱') && totals.includes('مانده'), 'رسید: مبل
 ok(await page.isVisible('#o-cancel'), 'لغوِ رایگان پیش از قبول (CHK-22) پیدا است');
 ok(/#\/o\/[0-9A-Z]{26}\.[A-Za-z0-9_-]{32}$/.test(page.url()), 'نشانیِ پیگیری توکنِ حدس‌نزدنی دارد (S137)');
 
+//  ── NTF-07/09: پرچم‌های خاموش ⇒ نه اسکریپت و نه گره؛ روشن ⇒ «گزارشِ مشکل» و متنِ مشتری فقط با textContent ──
+{
+  ok(!(await page.$('script[src="/store/order-feedback.js"]')) && !(await page.$('#o-fb')), 'NTF-07/09: پرچمِ خاموش ⇒ نه order-feedback.js، نه #o-fb');
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.issue_reports', value: true }, A);
+  await page.reload();
+  await page.waitForSelector('#fb-form:not([hidden])', { timeout: 10000 });
+  await page.fill('#fb-text', '<b>کیسه</b> پاره بود');
+  await page.click('#fb-send');
+  await page.waitForFunction(() => document.querySelectorAll('#fb-list li').length === 1, null, { timeout: 10000 });
+  const li = await page.$eval('#fb-list li', (x) => ({ text: x.textContent, b: x.querySelectorAll('b').length }));
+  ok(li.text.includes('<b>کیسه</b> پاره بود') && li.b === 1, 'NTF-07: گزارش از صفحهٔ پیگیری، متنِ خام بی HTML', JSON.stringify(li));
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.issue_reports', value: null }, A);
+}
+
 const man = await (await fetch(`${base}/store/${slug}/manifest.webmanifest`)).json();
 ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${slug}` && man.icons.length === 3, 'وب‌اپِ قابلِ نصبِ همین دکان (WEB-14)');
 ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');
