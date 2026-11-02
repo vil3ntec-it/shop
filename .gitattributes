@@ -8,3 +8,6 @@
 
 # ⛔ تکه‌های docs/spec بایت‌به‌بایت با MASTER-SPEC.md سنجیده می‌شوند (docs/spec/tools/spec.mjs)
 docs/spec/** text eol=lf
+
+# بایت‌های خامِ مرجعِ libjpeg برای آزمونِ رمزگشای JPEG (IMG-15) — هرگز تبدیلِ پایانِ خط
+server/test/fixtures/libjpeg/* binary
