@@ -248,7 +248,7 @@ fun DeskProductsScreen(
 
     Row(Modifier.weight(1f)) {
       Column(Modifier.weight(1f).fillMaxHeight()) {
-        QuickAddRow(store, d, ::toast, incoming, addFocus)
+        QuickAddRow(store, d, ::toast, incoming, addFocus); VisualSearchEntry(rememberVisualSearchApi(), d.products, ir.vil3ntec.tohid.core.product.VisualSearch.Place.LIST, Modifier.padding(top = 8.dp)) { t -> if (t is ir.vil3ntec.tohid.core.product.VisualSearch.Tap.Open) openId = t.productId } // AI-11: «مشابه» همان بازکردنِ کالا
         Spacer(Modifier.height(8.dp))
 
         /* ─────────── ۴. جدول یا کارت‌ها + نوارِ کارِ گروهی ─────────── */

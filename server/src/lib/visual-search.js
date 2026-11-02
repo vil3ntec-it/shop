@@ -3,6 +3,7 @@
  * جست‌وجوی تصویریِ کالا بر پایهٔ شباهت — AI-11 (§۶.۲۲). محلی و قطعی: بی سرویسِ بیرونی، بی کتابخانه (D-16).
  *
  *   search(shopId, buf, { limit, store })  ⇒ { label, notice, threshold, indexed, items[] }
+ *   indexedCount(shopId)                   ⇒ شمارِ کالاهای نمایه‌شده (درِ «روشن است؟» ِ برنامه)
  *   backfill(shopId, { limit })            ⇒ { hashed, removed, more, enabled } — نمایهٔ عکسِ کالاها، دسته‌ای و بی‌تکرار
  *   sweep({ budget })                      ⇒ کارِ دوره‌ای روی دکان‌های پرچم‌روشن (start/stop)
  *
@@ -77,6 +78,12 @@ function rank(q, rows) {
 const itemOf = (c, extra) => ({
   ...extra, product_id: c.product_id, distance: c.distance, similarity: Math.round(100 * (1 - c.distance / 64)), label: LABEL,
 });
+
+/** شمارِ کالاهای نمایه‌شدهٔ یک دکان — همان ردیف‌هایی که `search` می‌سنجد */
+async function indexedCount(shopId) {
+  const r = await one(`SELECT COUNT(*)::int AS n FROM product_visual_hashes WHERE shop_id=$1 AND dhash <> '-'`, [shopId]);
+  return Number(r ? r.n : 0);
+}
 
 /**
  * `store` = تابعِ ویترین (`ids ⇒ کالاهای منتشرشده`)؛ نبود ⇒ کارمندِ دکان (نامِ کالا از دفترِ همان دکان، حذف‌شده نه).
@@ -218,5 +225,5 @@ function stop() {
 }
 
 module.exports = {
-  FLAG, STORE_FLAG, LABEL, NOTICE, LIMITS, flagOn, storeFlagOn, histL1, probe, rank, search, backfill, sweep, tick, start, stop,
+  FLAG, STORE_FLAG, LABEL, NOTICE, LIMITS, flagOn, storeFlagOn, histL1, probe, rank, search, indexedCount, backfill, sweep, tick, start, stop,
 };

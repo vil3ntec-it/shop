@@ -202,6 +202,13 @@
       }).then(function () { return window.StoreReviews({ api: api, anchor: $('recent') }); })
         .catch(function () { /* بی reviews.js (شبکه) همان کاتالوگ، بی نظرها */ });
     }
+    //  AI-11: «جست‌وجو با عکس» — store/visual-search.js فقط با `features.visualSearch` (پرچمِ خاموش ⇒ نه اسکریپت، نه درخواست، نه دکمه)
+    if (f.visualSearch) {
+      new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/visual-search.js' }, on: { load: ok, error: no } }));
+      }).then(function () { return window.StoreVisual({ base: '/api/store/' + encodeURIComponent(ctx.slug), anchor: $('search-form') }); })
+        .catch(function () { /* بی visual-search.js (شبکه) همان جست‌وجوی متنی */ });
+    }
 
     return {
       picks: picks,

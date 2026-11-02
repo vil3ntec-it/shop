@@ -2,6 +2,7 @@
 /**
  * AI-11 — «جست‌وجو با عکس» برای کارمندِ دکان (`lib/visual-search.js`).
  *
+ *   GET  /api/shop/visual-search          ⇒ `{ enabled: true, label, notice, indexed }` — برنامه دکمه را فقط با همین نشان می‌دهد
  *   POST /api/shop/visual-search?limit=   بدنه: بایت‌های عکس (JPEG/PNG، همان سقفِ عکسِ کالا)
  *     ⇒ `{ label: 'مشابه', notice, threshold, indexed, items: [{ product_id, name, distance, similarity, label }] }`
  *
@@ -34,6 +35,11 @@ router.use(async (req, res, next) => {
 //  هر جست‌وجو یک رمزگشاییِ کامل است ⇒ سطلِ جدای دکان، کم‌تر از سقفِ عمومی
 const shopLimit = rateLimit({ max: 60, keyPrefix: 'visual-search', key: (req) => (req.shopId ? `shop:${req.shopId}` : '') });
 const body = express.raw({ type: () => true, limit: photos.MAX_BYTES + 1024 });
+
+//  برنامه (`core/product/VisualSearch`): دکمهٔ «جست‌وجو با عکس» فقط وقتی این پاسخ آمد؛ خاموش ⇒ بالاتر همان ۴۰۴
+router.get('/', requireShop, requirePermission('data.read'), async (req, res) => {
+  res.set('Cache-Control', 'no-store').json({ enabled: true, label: vs.LABEL, notice: vs.NOTICE, indexed: await vs.indexedCount(req.shopId) });
+});
 
 router.post('/', requireShop, requirePermission('data.read'), shopLimit, body, async (req, res) => {
   const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);

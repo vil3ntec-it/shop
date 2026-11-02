@@ -558,7 +558,7 @@ fun DeskSaleScreen(
             },
         )
         Spacer(Modifier.width(10.dp))
-        ViewModeToggle(view)
+        ViewModeToggle(view); VisualSearchEntry(rememberVisualSearchApi(), d.products, ir.vil3ntec.tohid.core.product.VisualSearch.Place.TILL, Modifier.padding(start = 10.dp)) { t -> if (t is ir.vil3ntec.tohid.core.product.VisualSearch.Tap.Search) { query = t.query; refocus() } } // AI-11: «مشابه» فقط در کادرِ جست‌وجو، نه در سبد
         //  POS-31: کلیدِ «حالتِ لمسی» فقط با تنظیمِ روشن (خاموش ⇒ همان نوارِ امروز)
         if (PosTouchPrefs.showToggle()) {
           Spacer(Modifier.width(10.dp))

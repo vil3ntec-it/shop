@@ -141,6 +141,8 @@ async function featuresOf(shopId) {
     ...((await eta.flagOn(shopId)) ? { eta: true } : {}),
     //  NTF-09: نظرهای تأییدشده در ویترین (`store/reviews.js` ِ دیربار، `GET /:slug/reviews`) با پرچمِ `shop.orders.reviews`
     ...((await orders.flagOf(shopId, require('../lib/order-reviews').FLAG)) ? { reviews: true } : {}),
+    //  AI-11: «جست‌وجو با عکس» ِ وب (`store/visual-search.js` ِ دیربار از catalog.js) با `shop.storefront.visual_search` و پرچمِ نمایه
+    ...((await require('../lib/visual-search').storeFlagOn(shopId)) ? { visualSearch: true } : {}),
     //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
   };
