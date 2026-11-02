@@ -347,7 +347,7 @@ private fun SpecialOrderCancelDialog(store: ShopStore, v: SpecialOrders.View, me
   )
 }
 
-/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در `SettingsLegacy` کنارِ تنظیم‌های صندوق */
+/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در تنظیماتِ نسخهٔ ۳ (`Settings.kt`) */
 @Composable
 fun SpecialOrderSettingsWired(context: android.content.Context) {
   var on by remember { mutableStateOf(SpecialOrderPref.on(context)) }

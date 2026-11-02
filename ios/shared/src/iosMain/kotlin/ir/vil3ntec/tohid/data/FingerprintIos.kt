@@ -18,7 +18,7 @@ import platform.darwin.dispatch_get_main_queue
  *  همان قراردادِ اندروید: فقط زیست‌سنجی (نه رمزِ گوشی — رمزِ برنامه همان صفحه‌کلیدِ قفل است)؛ لغو یا
  *  «با رمز وارد می‌شوم» ⇐ `onFail(null)`؛ نشدنِ دستگاه ⇐ `onFail(پیام)`؛ چهرهٔ نادرست را خودِ iOS دوباره می‌پرسد.
  *  `activity` همان `IosActivity` است (‎ios/IosActivity.kt‎) که `LocalContext` ِ ریشهٔ آیفون است، پس
- *  `LockGate` و `AppLockLegacy` ِ مشترک دست‌نخورده دکمه را نشان می‌دهند و خودشان یک بار می‌پرسند.
+ *  `LockGate` و `AppLock` ِ مشترک دست‌نخورده دکمه را نشان می‌دهند و خودشان یک بار می‌پرسند.
  *  کلیدِ `NSFaceIDUsageDescription` در ‎ios/iosApp/iosApp/Info.plist‎ است (بی آن iOS برنامه را می‌بندد).
  */
 object Fingerprint {

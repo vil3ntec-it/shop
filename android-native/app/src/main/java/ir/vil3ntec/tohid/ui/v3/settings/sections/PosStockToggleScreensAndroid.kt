@@ -35,7 +35,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 /*
  *  کلیدهای صندوق و کالا که فقط در رابطِ امروز بودند (`GiftReceiptSettingsWired`، `DeliverLaterSettingsWired`،
  *  `SpecialOrderSettingsWired`، `PriceWhySettingsWired`، `ShrinkReportSettingsWired`، `CountToolsSettingsWired`،
- *  `LabelToolsSettingsWired`، `ProductInfoSettingsWired` در `ui/legacy/SettingsLegacy.kt`) — همان کلید، همان پیش‌فرضِ
+ *  `LabelToolsSettingsWired`، `ProductInfoSettingsWired` در رابطِ قدیمِ پاک‌شده) — همان کلید، همان پیش‌فرضِ
  *  خاموش و همان نوشتن (`SettingsPortTest`)؛ فقط رویِ کیت (`ToggleScreen`). توضیح‌ها همان جدولِ سه‌زبانهٔ بخش‌ها.
  */
 

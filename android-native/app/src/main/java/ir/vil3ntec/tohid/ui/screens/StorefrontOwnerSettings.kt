@@ -33,7 +33,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
 
-/** عنوانِ بخش‌ها — همان کلیدِ فهرستِ تنظیماتِ کامپیوتر (`AppRootLegacy`، `DeskSettingsCoverageTest`) */
+/** عنوانِ بخش‌ها — همان کلیدِ `SettingsLayout` */
 const val STOREFRONT_ETA_TITLE: String = "زمانِ تقریبیِ تحویلِ ویترین"
 const val PROMO_GUARD_TITLE: String = "تخفیفِ اولین خرید و سدِ سوءاستفاده"
 

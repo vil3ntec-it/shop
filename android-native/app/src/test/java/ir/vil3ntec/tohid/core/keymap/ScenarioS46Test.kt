@@ -49,14 +49,11 @@ class ScenarioS46Test {
     val nav = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppNav.kt", "src/main/java/ir/vil3ntec/tohid/ui/AppNav.kt")
     assertNotNull(nav)
     assertTrue(nav!!.readText().contains("fun lock() { lockNow.intValue++ }"))
-    val root = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt", "src/main/java/ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt")
-    assertNotNull(root)
-    val text = root!!.readText()
-    //  هر بالا رفتنِ lockNow ⇒ نخست قفلِ PIN ِ شخصی (تنظیمِ روشن و راهِ برگشت)، وگرنه رمزِ برنامه همان دم
-    assertTrue(Regex("""LaunchedEffect\(lockAsk\)[\s\S]{0,400}TillUser\.lock\(context, lockStore\.enabled\)\) return@LaunchedEffect\s+if \(lockStore\.enabled\) unlocked = false""").containsMatchIn(text))
-    assertTrue(Regex("""if \(ir\.vil3ntec\.tohid\.data\.TillUser\.locked\.value\) \{\s+ir\.vil3ntec\.tohid\.ui\.components\.staff\.TillLockScreen\(cartStore, store, lockStore\.enabled\)""").containsMatchIn(text))
+    //  هر بالا رفتنِ lockNow ⇒ قفلِ PIN ِ شخصی (`TillUser`) و صفحهٔ قفلِ صندوق — رابطِ نسخهٔ ۳ (رابطِ قدیم، که با
+    //  تنظیمِ خاموش رمزِ برنامه را می‌خواست، ۱۴۰۵/۰۸/۱۱ پاک شد)
     val v3 = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt", "src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt")!!.readText()
-    assertTrue(v3.contains("TillUser.lock(context, lockStore.enabled)") && v3.contains("TillLockScreen(cartStore, store, lockStore.enabled)"))
+    assertTrue(Regex("""LaunchedEffect\(lockAsk\) \{ if \(lockAsk != lockSeen\) \{ lockSeen = lockAsk; ir\.vil3ntec\.tohid\.data\.TillUser\.lock\(context, lockStore\.enabled\) \} \}""").containsMatchIn(v3))
+    assertTrue(v3.contains("if (tillLocked) { ir.vil3ntec.tohid.ui.components.staff.TillLockScreen(cartStore, store, lockStore.enabled); return }"))
   }
 
   @Test

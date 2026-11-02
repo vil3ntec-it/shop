@@ -47,7 +47,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
 /**
- *  PAY-24 — کارتِ هدیه در صندوقِ گوشی و کامپیوتر (یک خط کنارِ `SpecialOrderBar` در `SaleLegacy`، `Sale` و `DeskSale`):
+ *  PAY-24 — کارتِ هدیه در صندوقِ گوشی و کامپیوتر (یک خط کنارِ `SpecialOrderBar` در `Sale` و `DeskSale`):
  *  «فروشِ کارتِ هدیه» و «ماندهٔ کارتِ هدیه». فقط با تنظیمِ همین دستگاه (`GiftCardPref`، پیش‌فرض خاموش ⇒ هیچ). پرداخت با
  *  کارت و اعتبار در پنلِ پرداختِ ترکیبی است (`PaySplitSection`)؛ این‌جا هیچ فاکتوری ثبت نمی‌شود. فروشِ کارت فقط با
  *  `GiftCardPref.issue` روی دفترِ همین لحظهٔ دیسک و کلیدی که پنجره هنگامِ باز شدن می‌سازد؛ فقط نقشی که فاکتور می‌نویسد.
@@ -345,7 +345,7 @@ private fun GiftCardLiabilityDialog(d: ShopData, onDismiss: () -> Unit) {
   )
 }
 
-/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در `SettingsLegacy` کنارِ تنظیم‌های صندوق */
+/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در تنظیماتِ نسخهٔ ۳ (`Settings.kt`) */
 @Composable
 fun GiftCardSettingsWired(context: android.content.Context) {
   var on by remember { mutableStateOf(GiftCardPref.on(context)) }

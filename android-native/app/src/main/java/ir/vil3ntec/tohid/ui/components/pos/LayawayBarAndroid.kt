@@ -62,7 +62,7 @@ import kotlinx.coroutines.withContext
 
 /**
  *  POS-27 — فروشِ امانی با پیش‌پرداخت و جدولِ قسط در صندوقِ گوشی و کامپیوتر (یک خط کنارِ `GiftCardBar` در `Sale`،
- *  `SaleLegacy` و `DeskSale`). فقط با تنظیمِ همین دستگاه (`LayawayPref`، پیش‌فرض خاموش ⇒ هیچ). سبد و مشتری همان سبد و
+ *  `Sale` و `DeskSale`). فقط با تنظیمِ همین دستگاه (`LayawayPref`، پیش‌فرض خاموش ⇒ هیچ). سبد و مشتری همان سبد و
  *  مشتریِ فاکتورِ صندوق ([cart]). هر ثبت فقط با `LayawayPref.record` روی دفترِ همین لحظهٔ دیسک و کلیدی که از شناسهٔ سند
  *  ساخته می‌شود (`Layaways.payKey`/`deliverKey`/`cancelKey`)؛ قاعده‌ها در `Layaways` و هستهٔ `Layaway`. تحویل فروشِ
  *  عادیِ صندوق است و چاپِ خودکارِ فاکتور همان راهِ صندوق؛ جدول روی چاپگرِ فاکتور از صفِ چاپ.
@@ -95,7 +95,7 @@ fun LayawayBar(d: ShopData, store: ShopStore, cart: CartStore, toast: (String) -
   if (listing) LayawayListDialog(store, views, toast) { listing = false }
 }
 
-/** پروندهٔ مشتری (`DebtorsLegacy`): امانی‌های همین مشتری با نشانِ «دیر» و همان کارها — فقط با همان تنظیم */
+/** پروندهٔ مشتری: امانی‌های همین مشتری با نشانِ «دیر» و همان کارها — فقط با همان تنظیم */
 @Composable
 fun LayawayCustomerPanel(d: ShopData, store: ShopStore?, debtorId: String, toast: (String) -> Unit) {
   val context = LocalContext.current
@@ -460,7 +460,7 @@ private suspend fun printLayaway(context: android.content.Context, v: Layaways.V
   return PrintSpooler.submitAndWait(context, PrintQueue.Kind.REPORT, printer.link, title, bytes, done = StrLayaway.printed)
 }
 
-/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در `SettingsLegacy` کنارِ تنظیم‌های صندوق */
+/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در تنظیماتِ نسخهٔ ۳ (`Settings.kt`) */
 @Composable
 fun LayawaySettingsWired(context: android.content.Context) {
   var on by remember { mutableStateOf(LayawayPref.on(context)) }

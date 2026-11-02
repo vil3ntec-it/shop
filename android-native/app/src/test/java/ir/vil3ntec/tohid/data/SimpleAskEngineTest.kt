@@ -220,9 +220,9 @@ class SimpleAskEngineTest {
     assertTrue(desk.contains("val ask = remember { SimpleAskPref.on(context) }"))
     assertTrue(desk.contains("&& (ask || !it.ask) }"))
     assertTrue(desk.contains("ASK(\"ask\", \"\", false, ask = true,"))
-    //  تنظیمات و فهرستِ کامپیوتر
-    assertEquals(1, Regex(Regex.escape("SimpleAskSettingsWired(context)")).findAll(src("ui/legacy/SettingsLegacy.kt")).count())
-    assertTrue(src("ui/legacy/AppRootLegacy.kt").contains("StrSimpleAsk.settingsTitle to"))
+    //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
+    assertEquals(1, Regex(Regex.escape("SimpleAskPref.set(context, it)")).findAll(src("ui/v3/settings/sections/OpsToggleScreensAndroid.kt")).count())
+    assertTrue(src("ui/screens/SettingsLayout.kt").contains("SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle"))
     //  پاسخ فقط خواندن است: نه دفتر می‌نویسد، نه به شبکه می‌رود
     for (rel in listOf("data/SimpleAskEngine.kt", "ui/screens/SimpleAsk.kt")) {
       val s = src(rel)

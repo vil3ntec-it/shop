@@ -48,14 +48,14 @@ import kotlinx.coroutines.launch
 
 /*
  *  سه تنظیمِ سروری که فقط در رابطِ امروز بودند (`OwnerReportSettings`، `StorefrontEtaSettings`، `PromoGuardSettings`
- *  در `ui/legacy/SettingsLegacy.kt`) — همان درِ سرور (`OwnerReportLive`، `StorefrontEtaLive`، `PromoGuardLive`)، همان
+ *  در رابطِ قدیمِ پاک‌شده) — همان درِ سرور (`OwnerReportLive`، `StorefrontEtaLive`، `PromoGuardLive`)، همان
  *  سنجشِ فرم (`StorefrontEtaApi.check`، `PromoGuardApi.check`) و همان پیام‌ها (متن‌ها هم همان، فارسی).
  *  پشتِ پرچمِ سرور: تا پاسخِ روشنِ سرور ردیفی نیست (`SettingsLayout.SERVER_GATED`، `rememberServerSections`) و
  *  صفحه هم جز «خاموش» چیزی نمی‌کشد — مثلِ رابطِ امروز که با پرچمِ خاموش یا نقشِ دیگر هیچ نمی‌کشد.
  */
 
 /**
- *  درِ سرور برای این صفحه‌ها — همان شرطِ `SettingsLegacy`: واردشده و سرورِ آماده؛ `ownerOnly` (گزارشِ صاحب) فقط
+ *  درِ سرور برای این صفحه‌ها — همان شرطِ رابطِ قدیم: واردشده و سرورِ آماده؛ `ownerOnly` (گزارشِ صاحب) فقط
  *  وقتی نقشِ همین دستگاه صاحبِ دکان است. وگرنه null ⇒ نه ردیفی، نه بخشی.
  */
 @Composable

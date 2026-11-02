@@ -13,7 +13,6 @@ import ir.vil3ntec.tohid.data.Watchman
 import ir.vil3ntec.tohid.sync.v1.LiveSocket
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.ui.OrdersLive
-import ir.vil3ntec.tohid.ui.UiV3
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -92,8 +91,6 @@ object IosLinks {
 
   fun open(url: String) {
     IosBoot.ready()
-    //  رابطِ امروز (پرچمِ نسخهٔ ۳ خاموش) پیوندِ درونی نداشت — همان رفتار
-    if (!UiV3.on) return
     val link = DeepLinks.parse(url) ?: return
     ModeState.pendingLink.value = link
     if (link.mode in ModeState.available(IosContext) && ModeState.chosen.value != link.mode) {
