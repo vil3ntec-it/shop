@@ -27,9 +27,9 @@ const limit = rateLimit({
   max: Number(process.env.RATE_HESABPAY_ACCOUNT_MAX) || 30, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay',
   key: (req) => `${req.shopId}:${req.user.id}`,
 });
-router.use(requireUser, requireShop, limit);
-router.use((req, res, next) => (req.role === 'owner' ? next()
-  : next(forbidden('حساب‌پیِ دکان را فقط صاحبِ دکان می‌بیند و تنظیم می‌کند', 'owner_only'))));
+const ownerOnly = (req, res, next) => (req.role === 'owner' ? next()
+  : next(forbidden('حساب‌پیِ دکان را فقط صاحبِ دکان می‌بیند و تنظیم می‌کند', 'owner_only')));
+router.use(requireUser, requireShop, limit, ownerOnly);
 
 const actor = (req) => ({ id: req.user.id, ip: clientIp(req) });
 
