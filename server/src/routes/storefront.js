@@ -130,6 +130,8 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  NTF-09: نظرهای تأییدشده در ویترین (`store/reviews.js` ِ دیربار، `GET /:slug/reviews`) با پرچمِ `shop.orders.reviews`
+    ...((await orders.flagOf(shopId, require('../lib/order-reviews').FLAG)) ? { reviews: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
