@@ -25,6 +25,15 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
   fun putExtra(key: String, value: Uri?): Intent = apply { extras[key] = value }
   fun getStringExtra(key: String): String? = extras[key] as? String
   fun removeExtra(key: String) { extras.remove(key) }
+  fun putStringArrayListExtra(key: String, value: ArrayList<String>?): Intent = apply { extras[key] = value }
+  @Suppress("UNCHECKED_CAST")
+  fun getStringArrayListExtra(key: String): ArrayList<String>? = extras[key] as? ArrayList<String>
+  fun getIntExtra(key: String, def: Int): Int = extras[key] as? Int ?: def
+  fun getBooleanExtra(key: String, def: Boolean): Boolean = extras[key] as? Boolean ?: def
+  fun hasExtra(key: String): Boolean = extras.containsKey(key)
+
+  /** در iOS هیچ برنامه‌ای «قصد» ِ اندروید را نمی‌گیرد */
+  fun resolveActivity(pm: android.content.pm.PackageManager): ComponentName? = null
 
   companion object {
     const val ACTION_VIEW = "android.intent.action.VIEW"
@@ -43,5 +52,7 @@ open class Intent(var action: String? = null, var data: Uri? = null) {
     fun createChooser(target: Intent, title: CharSequence?): Intent = target
   }
 }
+
+class ComponentName(val packageName: String, val className: String)
 
 class ActivityNotFoundException(message: String? = null) : RuntimeException(message)

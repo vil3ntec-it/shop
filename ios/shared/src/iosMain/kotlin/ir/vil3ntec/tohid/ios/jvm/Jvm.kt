@@ -131,24 +131,59 @@ object Character {
   fun isLowSurrogate(ch: Char): Boolean = ch.isLowSurrogate()
 }
 
-/** فقط UTF-8 — بقیهٔ نویسه‌نگاشت‌ها (ISO-8859-1، UTF-16) در iOS نیستند و فایل‌شان بیرون می‌ماند */
+/** UTF-8، US-ASCII و ISO-8859-1 (همان JDK: نویسهٔ بیرون از بازه ⇐ «?»)؛ UTF-16 در iOS نیست و فایلش بیرون می‌ماند */
 class Charset internal constructor(private val name: String) {
   fun name(): String = name
   override fun toString(): String = name
+  fun newDecoder(): java.nio.charset.CharsetDecoder = java.nio.charset.CharsetDecoder()
 }
 
 object Charsets {
   val UTF_8: Charset = Charset("UTF-8")
+  val US_ASCII: Charset = Charset("US-ASCII")
+  val ISO_8859_1: Charset = Charset("ISO-8859-1")
+  val UTF_16LE: Charset = Charset("UTF-16LE")
+  val UTF_16BE: Charset = Charset("UTF-16BE")
 }
 
-fun String.toByteArray(charset: Charset): ByteArray = encodeToByteArray()
+private fun utf16(b: ByteArray, off: Int, len: Int, little: Boolean): String = buildString(len / 2) {
+  var i = off
+  while (i + 1 < off + len) {
+    val lo = b[if (little) i else i + 1].toInt() and 0xFF
+    val hi = b[if (little) i + 1 else i].toInt() and 0xFF
+    append(((hi shl 8) or lo).toChar())
+    i += 2
+  }
+  if ((len and 1) == 1) append('\uFFFD')
+}
 
-fun ByteArray.toString(charset: Charset): String = decodeToString()
+fun charset(name: String): Charset = when (name.uppercase()) {
+  "UTF-8", "UTF8" -> Charsets.UTF_8
+  "US-ASCII", "ASCII" -> Charsets.US_ASCII
+  "ISO-8859-1", "LATIN1" -> Charsets.ISO_8859_1
+  else -> throw IllegalArgumentException("iOS: نویسه‌نگاشتِ $name")
+}
 
-fun String(bytes: ByteArray, charset: Charset): String = bytes.decodeToString()
+private fun narrow(s: String, max: Int): ByteArray = ByteArray(s.length) { i -> s[i].code.let { if (it <= max) it.toByte() else '?'.code.toByte() } }
 
-fun String(bytes: ByteArray, offset: Int, length: Int, charset: Charset): String =
-  bytes.decodeToString(offset, offset + length)
+private fun widen(b: ByteArray, off: Int, len: Int): String = buildString(len) { for (i in off until off + len) append((b[i].toInt() and 0xFF).toChar()) }
+
+fun String.toByteArray(charset: Charset): ByteArray = when (charset) {
+  Charsets.US_ASCII -> narrow(this, 0x7F)
+  Charsets.ISO_8859_1 -> narrow(this, 0xFF)
+  else -> encodeToByteArray()
+}
+
+fun ByteArray.toString(charset: Charset): String = String(this, 0, size, charset)
+
+fun String(bytes: ByteArray, charset: Charset): String = String(bytes, 0, bytes.size, charset)
+
+fun String(bytes: ByteArray, offset: Int, length: Int, charset: Charset): String = when (charset) {
+  Charsets.UTF_8 -> bytes.decodeToString(offset, offset + length)
+  Charsets.UTF_16LE -> utf16(bytes, offset, length, little = true)
+  Charsets.UTF_16BE -> utf16(bytes, offset, length, little = false)
+  else -> widen(bytes, offset, length).let { s -> if (charset == Charsets.US_ASCII) s.map { if (it.code < 0x80) it else '\uFFFD' }.joinToString("") else s }
+}
 
 /*
  *  `synchronized(lock) { … }` ِ JVM. iOS قفلِ روی هر شیء ندارد؛ یک قفلِ بازگشتیِ سراسری همان
@@ -203,4 +238,49 @@ fun interface Runnable {
 class Thread(private val target: Runnable? = null, val name: String = "") {
   var isDaemon: Boolean = false
   fun start(): Unit = throw UnsupportedOperationException("iOS: Thread ِ خام نیست؛ کوروتین یا Executors")
+
+  companion object {
+    /** همان `Thread.sleep` (مسدود؛ فقط درونِ `Dispatchers.IO`، مثلِ اندروید) */
+    fun sleep(millis: Long) {
+      if (millis > 0) platform.posix.usleep((millis * 1000).coerceAtMost(UInt.MAX_VALUE.toLong()).toUInt())
+    }
+  }
+}
+
+/** `java.lang.SecurityException` (در JVM خودکار import می‌شود) */
+open class SecurityException(message: String? = null, cause: Throwable? = null) : RuntimeException(message, cause)
+
+/** `toSortedSet()` ِ JVM (`java.util.TreeSet`) */
+fun <T : Comparable<T>> Iterable<T>.toSortedSet(): java.util.TreeSet<T> = java.util.TreeSet<T>().also { s -> forEach { s.add(it) } }
+
+fun <T> Iterable<T>.toSortedSet(comparator: Comparator<in T>): java.util.TreeSet<T> = java.util.TreeSet(comparator).also { s -> forEach { s.add(it) } }
+
+/** `sortedMapOf`/`toSortedMap` ِ JVM (`java.util.TreeMap`) */
+fun <K : Comparable<K>, V> sortedMapOf(vararg pairs: Pair<K, V>): java.util.TreeMap<K, V> = java.util.TreeMap<K, V>().also { m -> pairs.forEach { m[it.first] = it.second } }
+
+fun <K : Comparable<K>, V> Map<out K, V>.toSortedMap(): java.util.TreeMap<K, V> = java.util.TreeMap<K, V>().also { m -> forEach { (k, v) -> m[k] = v } }
+
+fun <K, V> Map<out K, V>.toSortedMap(comparator: Comparator<in K>): java.util.TreeMap<K, V> = java.util.TreeMap<K, V>(comparator).also { m -> forEach { (k, v) -> m[k] = v } }
+
+/** `kotlin.io.DEFAULT_BUFFER_SIZE` ِ JVM */
+const val DEFAULT_BUFFER_SIZE: Int = 8 * 1024
+
+/** `toBigDecimal()` ِ Kotlin/JVM — همان رقم‌های `toString()` (‎java/math/BigDecimal.kt‎) */
+fun Double.toBigDecimal(): java.math.BigDecimal = java.math.BigDecimal(this.toString())
+fun Float.toBigDecimal(): java.math.BigDecimal = java.math.BigDecimal(this.toString())
+fun Long.toBigDecimal(): java.math.BigDecimal = java.math.BigDecimal(this.toString())
+fun Int.toBigDecimal(): java.math.BigDecimal = java.math.BigDecimal(this.toString())
+fun String.toBigDecimal(): java.math.BigDecimal = java.math.BigDecimal(this)
+fun String.toBigDecimalOrNull(): java.math.BigDecimal? = runCatching { java.math.BigDecimal(this) }.getOrNull()
+
+/** `kotlin.concurrent.withLock` ِ JVM (ساختِ iOS import ِ آن را به این‌جا برمی‌گرداند؛ ‎build.gradle.kts‎) */
+@OptIn(ExperimentalContracts::class)
+inline fun <T> java.util.concurrent.locks.Lock.withLock(action: () -> T): T {
+  contract { callsInPlace(action, InvocationKind.EXACTLY_ONCE) }
+  lock()
+  try {
+    return action()
+  } finally {
+    unlock()
+  }
 }
