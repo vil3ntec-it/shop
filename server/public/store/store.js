@@ -141,9 +141,7 @@
   // ── پیشنهادها (WEB-02)، اخیر (WEB-13)، دلخواه‌ها/فهرستِ خرید (WEB-11) و بنرها (WEB-24): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var more = null;
   function loadMore(r) {
-    return new Promise(function (ok, no) {
-      document.head.appendChild(el('script', { attrs: { src: '/store/catalog.js' }, on: { load: ok, error: no } }));
-    }).then(function () {
+    return K.js('/store/catalog.js').then(function () {
       more = window.StoreCatalog({
         api: api, slug: slug, get store() { return store; }, get cart() { return cart; }, get zone() { return zone; }, rail: rail, card: card, items: catalog.items,
         ids: ids, reorder: reorder, recent: Boolean(r.recent), features: r.features || {},
@@ -184,9 +182,7 @@
   // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل در store/product.js، با نخستین بازشدن (WEB-08، WEB-15) ──
   var detail = null; var detailP = null;
   function loadProductView() {
-    detailP = detailP || new Promise(function (ok, no) {
-      document.head.appendChild(el('script', { attrs: { src: '/store/product.js' }, on: { load: ok, error: no } }));
-    }).then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
+    detailP = detailP || K.js('/store/product.js').then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
     return detailP;
   }
   function openProduct(id) {
@@ -423,9 +419,7 @@
   // ── ثبتِ سفارش: store/checkout.js، فقط با بازشدنِ سبد یا صفحهٔ ثبت (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var checkout = null; var checkoutP = null;
   function loadCheckout() {
-    checkoutP = checkoutP || new Promise(function (ok, no) {
-      document.head.appendChild(el('script', { attrs: { src: '/store/checkout.js' }, on: { load: ok, error: no } }));
-    }).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
+    checkoutP = checkoutP || K.js('/store/checkout.js').then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
         ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; },
@@ -451,9 +445,7 @@
   var orderView = null;
   function loadOrderView() {
     //  واژه‌نامهٔ order.<زبان>.json هم‌زمان؛ نیامد ⇒ متنِ HTML
-    orderView = orderView || Promise.all([new Promise(function (ok, no) {
-      document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
-    }), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); })
+    orderView = orderView || Promise.all([K.js('/store/order.js'), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
@@ -508,9 +500,7 @@
   // CRM-13 (account.js)
   var accountView = null;
   function loadAccount() {
-    accountView = accountView || Promise.all([new Promise(function (ok, no) {
-      document.head.appendChild(el('script', { attrs: { src: '/store/account.js' }, on: { load: ok, error: no } }));
-    }), K.part('account', $('view-orders'))]).then(function () { return window.StoreAccount({ api: api, root: $('view-orders').firstElementChild }); })
+    accountView = accountView || Promise.all([K.js('/store/account.js'), K.part('account', $('view-orders'))]).then(function () { return window.StoreAccount({ api: api, root: $('view-orders').firstElementChild }); })
       .catch(function () { accountView = null; throw new Error(t('err.network')); });
     return accountView;
   }
