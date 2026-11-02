@@ -23,7 +23,7 @@ const { query, newId, now } = require('../src/db');
 const { PAID_KEYS } = require('../src/lib/features');
 
 const DAY = 24 * 60 * 60 * 1000;
-const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
+const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
 const JOIN = ['POST /shop/staff/join', 'POST /shop/join'];
 const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
