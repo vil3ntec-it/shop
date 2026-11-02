@@ -5,6 +5,7 @@
  *   analyze(buf, info)   ⇒ { metrics, flags[], dhash }   (info = خروجیِ ‎image-bytes.inspect‎)
  *   flagsFrom(metrics)   ⇒ flags[]                       (خالص؛ آستانه‌ها در LIMITS)
  *   isNearDuplicate(a,b) ⇒ dHash ِ دو عکس حداکثر DUP_HAMMING_MAX بیت فرق دارد؟
+ *   fingerprint(buf,info)⇒ { dhash, hist } یا null — جست‌وجوی تصویری (AI-11)
  *
  * ⛔ فقط نشانِ پیشنهادی برای بازبینِ انسانی («نتایج پیشنهاد هستند»، §۳۴.۲)؛ هیچ بارگذاری
  *    با این‌ها رد نمی‌شود. پشتِ پرچمِ خاموشِ `image_bank.quality` در ‎lib/image-bank.js‎.
@@ -405,20 +406,39 @@ function analyze(buf, info) {
     jpeg_quality: info.mime === 'image/jpeg' ? jpegQuality(buf) : null,
     measured: false, reason: '',
   };
-  let px = null;
-  if (W * H > LIMITS.DECODE_MAX_PIXELS) m.reason = 'too_many_pixels';
-  else if (info.mime === 'image/webp') m.reason = 'format';
-  else {
-    try { px = info.mime === 'image/jpeg' ? jpegLuma(buf) : info.mime === 'image/png' ? pngLuma(buf) : null; } catch { px = null; }
-    if (px && (px.w !== W || px.h !== H)) px = null;
-    if (!px) m.reason = 'undecodable';
-  }
-  const gr = px && grid(px);
-  if (px && !gr) m.reason = 'too_thin';
-  if (gr) Object.assign(m, measure(gr), { measured: true });
+  const d = decode(buf, info);
+  if (d.gr) Object.assign(m, measure(d.gr), { measured: true });
+  else m.reason = d.reason;
   const dhash = m.dhash || '';
   delete m.dhash;
   return { metrics: m, flags: flagsFrom(m), dhash };
+}
+
+/** رمزگشایی تا شبکهٔ سنجش ⇒ { gr } یا { reason } (همان سقف‌ها و همان دلیل‌های `analyze`) */
+function decode(buf, info) {
+  const W = info.width, H = info.height;
+  if (W * H > LIMITS.DECODE_MAX_PIXELS) return { reason: 'too_many_pixels' };
+  if (info.mime === 'image/webp') return { reason: 'format' };
+  let px = null;
+  try { px = info.mime === 'image/jpeg' ? jpegLuma(buf) : info.mime === 'image/png' ? pngLuma(buf) : null; } catch { px = null; }
+  if (px && (px.w !== W || px.h !== H)) px = null;
+  if (!px) return { reason: 'undecodable' };
+  const gr = grid(px);
+  return gr ? { gr } : { reason: 'too_thin' };
+}
+
+/**
+ * AI-11 (‎lib/visual-search.js‎): همان رمزگشایی و همان dHash ِ `analyze`، و هیستوگرامِ ۸ خانه‌ایِ روشنایی
+ * روی همان شبکه (درصدِ گرد، ۱۶ رقمِ hex). رمزگشا فقط کانالِ Y دارد ⇒ رنگ نه. سنجیدنی نیست یا یک‌رنگ ⇒ null.
+ */
+function fingerprint(buf, info) {
+  const d = decode(buf, info);
+  if (!d.gr) return null;
+  const dhash = measure(d.gr).dhash;
+  if (!dhash) return null;
+  const g = d.gr.g, bins = new Array(8).fill(0);
+  for (let i = 0; i < g.length; i++) bins[Math.min(7, Math.floor(g[i] / 32))]++;
+  return { dhash, hist: bins.map((c) => Math.round((c * 100) / g.length).toString(16).padStart(2, '0')).join('') };
 }
 
 function hamming(a, b) {
@@ -432,4 +452,4 @@ function hamming(a, b) {
 const HEX16 = /^[0-9a-f]{16}$/;
 const isNearDuplicate = (a, b) => HEX16.test(a) && HEX16.test(b) && hamming(a, b) <= LIMITS.DUP_HAMMING_MAX;
 
-module.exports = { analyze, flagsFrom, hamming, isNearDuplicate, jpegQuality, pngLuma, jpegLuma, LIMITS };
+module.exports = { analyze, fingerprint, flagsFrom, hamming, isNearDuplicate, jpegQuality, pngLuma, jpegLuma, LIMITS };

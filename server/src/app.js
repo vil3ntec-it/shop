@@ -384,6 +384,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-visual-store'));   // AI-11: «جست‌وجو با عکس» ِ ویترین، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
@@ -415,6 +416,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/payments', require('./routes/admin-payments'));
     //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش
     api.use('/shop/customer-erasure', require('./routes/shop-customer-erasure'));
+    //  AI-11: «جست‌وجو با عکس» (کالاهای مشابهِ همان دکان) — پشتِ `shop.visual_search`، پیش‌فرض خاموش
+    api.use('/shop/visual-search', require('./routes/shop-visual-search'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.
