@@ -63,6 +63,7 @@
       };
       $('o-reorder').onclick = function () { ctx.reorder(o); };
       renderDelivery(o.delivery);
+      renderEta(o);
       renderPay(o, token);
       renderSubs(o, token);
       renderRate(o, token);
@@ -186,6 +187,14 @@
       $('o-code').hidden = !code;
       $('o-code-n').textContent = code.replace(/[0-9]/g, function (c) { return K.fa(Number(c), 0); });
       $('o-dlv').hidden = !(name || eta || code);
+    }
+
+    //  WEB-04: زمانِ تقریبیِ همین سفارش (`order.eta`، پرچمِ `shop.storefront.eta`؛ خاموش ⇒ کلید نیست ⇒ پنهان)؛ با هر بارِ
+    //  پیگیری از نو و به مرحله (سرور می‌سازد)؛ همیشه بازه و «تقریبی»، هرگز ساعتِ دقیق. `null` (پایان/زمان‌بندی) ⇒ پنهان.
+    function renderEta(o) {
+      var e = o.eta; var box = $('o-eta-live');
+      box.hidden = !e;
+      box.textContent = e ? t(o.fulfillment === 'pickup' ? 'od.eta.ready' : 'od.eta.live', { a: K.fa(e.minMinutes, 0), b: K.fa(e.maxMinutes, 0) }) : '';
     }
 
     //  PAY-21: «پرداخت با حساب‌پی» — نشانی و مبلغ را سرور می‌سازد؛ «پرداخت شد» فقط از وضعیتِ سرور

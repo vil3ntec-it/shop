@@ -36,5 +36,8 @@
   "ck.tender.opt": "{m} — change: {c}",
   "err.cash_tender_short": "The banknote is less than the order total; please choose again.",
   "err.cash_tender_excess": "The change would be more than one 1000 note; choose a smaller banknote.",
-  "err.bad_cash_tender": "The banknote amount is not valid; please choose again."
+  "err.bad_cash_tender": "The banknote amount is not valid; please choose again.",
+  "ck.eta": "Approximate delivery: {a} to {b} minutes",
+  "ck.eta.pickup": "Ready for pickup, approximately: {a} to {b} minutes",
+  "ck.eta.none": "Delivery time cannot be estimated right now"
 }
