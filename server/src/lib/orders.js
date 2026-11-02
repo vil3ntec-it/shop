@@ -241,12 +241,27 @@ function parseAddress(raw) {
     try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
   }
   const plusCode = plusCodeOf(a.plusCode);
+  //  CHK-08 (§۴.۴): ولایت، گذر یا کوچه، منزل و طبقه — فقط متنِ کمکی، جای نشانه/پین را نمی‌گیرند؛ کدِ پستیِ اختیاری
+  const province = text(a.province, 60);
+  const street = text(a.street, 120);
+  const house = text(a.house, 60);
+  const postalCode = postalCodeOf(a.postalCode);
   //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
   if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
   return {
     ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
     ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}), ...(phone2 ? { phone2 } : {}), ...(plusCode ? { plusCode } : {}),
+    ...(province ? { province } : {}), ...(street ? { street } : {}), ...(house ? { house } : {}), ...(postalCode ? { postalCode } : {}),
   };
+}
+
+/** کدِ پستیِ افغانستان: چهار رقم (رقمِ فارسی/عربی هم)؛ خالی ⇒ ''؛ نادرست ⇒ ۴۰۰ `bad_postal_code` */
+function postalCodeOf(raw) {
+  const s = text(raw, 20).replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\s+/g, '');
+  if (!s) return '';
+  if (!/^\d{4}$/.test(s)) throw badRequest('کدِ پستی چهار رقم است (مثلاً ۱۰۰۱)', 'bad_postal_code');
+  return s;
 }
 
 /** Plus Code (Open Location Code): کامل (۸+۲/۳) یا کوتاه (۴/۶+۲/۳) با نامِ شهرِ اختیاری؛ نادرست ⇒ ۴۰۰ `bad_plus_code` */

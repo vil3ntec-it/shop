@@ -31,6 +31,19 @@ test('Plus Code: کامل یا کوتاه با شهر؛ بزرگ‌حرف؛ نا
   }
 });
 
+test('ولایت، گذر یا کوچه، منزل و طبقه: متنِ کمکی؛ کدِ پستی چهار رقم؛ نادرست ⇒ ۴۰۰', () => {
+  const a = parseAddress({ landmark: 'x', province: ' کابل ', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم', postalCode: '۱۰۰۱' });
+  assert.deepEqual(a, { landmark: 'x', province: 'کابل', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم', postalCode: '1001' });
+  assert.equal(parseAddress({ landmark: 'x', postalCode: '١٠٠١' }).postalCode, '1001');
+  assert.deepEqual(parseAddress({ landmark: 'x', province: ' ', street: '', house: null, postalCode: '  ' }), { landmark: 'x' });
+  assert.equal(parseAddress({ landmark: 'x', province: 'ک'.repeat(90) }).province.length, 60);
+  for (const bad of ['100', '10011', 'AB12', '10-01']) {
+    assert.equal(code(() => parseAddress({ landmark: 'x', postalCode: bad })), 'bad_postal_code', bad);
+  }
+  //  کمک‌اند، نه جای نشانی: بی پین، نشانه و متن هنوز ۴۰۰
+  assert.equal(code(() => parseAddress({ province: 'کابل', street: 'گذرِ سوم', house: 'منزلِ ۱۲' })), 'bad_address');
+});
+
 test('کارتِ پیک شمارهٔ دوم را برنمی‌دارد', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'src', 'lib', 'delivery.js'), 'utf8');
   assert.ok(!/phone2/.test(src), 'delivery.js نباید phone2 را بخواند');
