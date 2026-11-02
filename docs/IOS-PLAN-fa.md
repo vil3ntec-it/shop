@@ -117,6 +117,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 
 **وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و بیشترِ ۲-ج در گامِ ۳ (⇐ ۰.۸؛
 بارکد با AVFoundation، نه VisionKit)؛ چاپ (AirPrint/PDF) در گامِ ۴ (⇐ ۰.۹)؛ از ۲-ج فقط تشخیصِ گفتار مانده است.
+گامِ ۶ (⇐ ۰.۱۱): ورود با اپل و قراردادِ مشترکِ «فراهم‌کننده»، و شش فایلِ دیگرِ اندروید خودشان روی آیفون (`ios-exclude.txt`: ۱۹ ⇐ ۱۳).
 
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
@@ -150,6 +151,9 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
 5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل روشن شود — Sign in with Apple (قاعدهٔ ۴.۸؛
    امروز `GOOGLE_LOGIN = false` است و ورود فقط ایمیل/رمز/کدِ خودِ برنامه ⇐ ۴.۸ هنوز پیش نمی‌آید، ⇐ ۰.۱۰).
+   **ورود با اپل از گامِ ۶ در کد هست (⇐ ۰.۱۱)** و فقط این‌ها را می‌خواهد: قابلیتِ «Sign in with Apple» در شناسهٔ برنامه و profile
+   (پروندهٔ entitlements با `com.apple.developer.applesignin` = `Default`، کنارِ `aps-environment` ِ بندِ ۶) و متغیرِ سرورِ
+   `APPLE_CLIENT_IDS` = همان bundle id. تا آن روز دکمه ساخته نمی‌شود.
 6. اعلانِ سرور (APNs): کلیدِ p8 ِ APNs با Key ID و Team ID ⇐ پنج متغیرِ محیطِ سرور (`APNS_KEY_ID`، `APNS_TEAM_ID`، `APNS_KEY_P8`،
    `APNS_BUNDLE_ID`، `APNS_ENV`؛ فرستنده از گامِ ۵ در سرور هست ⇐ ۰.۱۰)، و قابلیتِ «Push Notifications» (`aps-environment`) در شناسه و
    profile ِ برنامه — بی آن iOS توکن نمی‌دهد (سمتِ برنامه از گامِ ۴ آماده است).
@@ -337,6 +341,50 @@ CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه�
 **بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`) با
 Compose 1.7.3 (‎۰.۷‎) بی خطا و بی هشدار در فایل‌های این گام، و `jvmTest` ِ `ios/shared` ۱۸/۱۸؛ سرور `apns` ۱۱/۱۱ و `push-delivery` ۲۳/۲۳ روی PGlite. فقط CI ِ macOS: پیوندِ چارچوب،
 xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` (۹ + ۵ + ۳).
+
+### ۰.۱۱ گامِ ۶ — ورود با اپل و قراردادِ مشترکِ «فراهم‌کننده»، شش فایلِ دیگرِ اندروید خودشان روی آیفون (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase6`)
+
+> روی `claude/ios-app-phase5` (#852) و دستهٔ سیزدهم (#855: رابطِ قدیم و `UiV3` پاک شد). باز هم **همان فایل‌های اندروید**؛ هیچ صفحه‌ای
+> دوباره نوشته نشد. وابستگیِ سکو فقط در لایهٔ آیفون (`ios/shared/src/iosMain`)؛ رفتارِ اندروید و کامپیوتر همان است (دکمهٔ اپل آن‌جا
+> هرگز ساخته نمی‌شود و درخواستِ تازه‌ای هم نمی‌رود).
+
+**سنجش (فایل‌های `android-native/app/src/main/java` که برای iOS کامپایل می‌شوند):**
+
+| | کامپایل برای iOS | همه | `ios-exclude.txt` |
+|---|---:|---:|---|
+| گامِ ۴ (#841) | ۱۱۳۷ | ۱۱۵۷ | ۲۰ |
+| پیش از این گام: گامِ ۵ (`ac52c8ee`) | ۱۱۵۱ | ۱۱۷۰ | ۱۹ (۱۶ جایگزین + ۳ مستقیم) |
+| همان، پس از ادغامِ دستهٔ ۱۳ (‎−۱۷ فایلِ `ui/legacy` و `UiV3`) | ۱۱۳۴ | ۱۱۵۳ | ۱۹ |
+| **پس از این گام** | **۱۱۴۲** (۹۸٫۹٪) | ۱۱۵۵ (+۲ فایلِ مشترکِ تازه) | **۱۳** (۱۲ جایگزین + `MainActivity.kt`) |
+
+شش سطر از `ios-exclude.txt` رفت و خودِ فایلِ اندروید جایش است (چهار جایگزینِ iOS پاک شد):
+
+| فایلِ اندروید | چه شد (shim ِ iOS) |
+|---|---|
+| `core/net/TokenStore.kt` | `androidx.security.crypto.EncryptedSharedPreferences` روی کلیددان: یک پرونده = یک قلمِ Keychain (JSON)، «پس از نخستین بازگشایی، فقط همین دستگاه». حالا «سرورِ بعدی» (`stashTo`/`openFrom`) و انتقالِ پروندهٔ قدیمی همان کدِ اندروید است. `TokenStoreIos` پاک شد (برنامهٔ آیفون هنوز منتشر نشده، پس انتقالِ قلم‌های پیشین لازم نیست) |
+| `data/FileName.kt` | `ContentResolver.query` ِ نامِ پروندهٔ `file://` (`OpenableColumns.DISPLAY_NAME`، `Cursor` ِ یک‌ردیفه)؛ نشانیِ دیگر ⇐ null ⇐ همان «تکهٔ آخر» |
+| `data/Fingerprint.kt` | `androidx.biometric` روی LocalAuthentication: «دلیل» = `title` ِ اندروید، دکمهٔ دوم = `negativeButtonText`؛ لغو ⇐ بی پیام، «با رمز» ⇐ `ERROR_NEGATIVE_BUTTON` (رفتارِ همان `FingerprintIos` ِ پیشین) |
+| `sync/Integrity.kt` | `PackageManager.getPackageInfo` ⇐ بسته‌ای بی گواهیِ APK ⇐ اثرِ انگشت «» و `isGenuine` با `SIGNING_SHA256` ِ خالیِ آیفون «درست» (امضا را خودِ iOS وارسی می‌کند؛ App Attest هنوز نه) |
+| `data/TohidBackupAgent.kt`، `pay/platform/HesabPayHceService.kt` | `BackupAgent`/`HostApduService` ِ بی رفتار: در iOS هرگز ساخته نمی‌شوند (نه عاملِ پشتیبان، نه HCE)، ولی هر تغییرشان حالا روی آیفون هم وارسی می‌شود؛ `File.walkTopDown().onEnter` (همان `FileTreeWalk` ِ JVM) |
+
+**ورود با اپل** (مانده از گامِ ۵؛ طرح همان §۰.۱۰ «هنوز نه»):
+
+| لایه | چه شد | فایل |
+|---|---|---|
+| سرور | `lib/apple.js`: JWKS ِ اپل با کش (کلیدِ ناشناخته ⇐ یک بار تازه)، RS256، `iss`، `aud` ∈ `APPLE_CLIENT_IDS` (رشته، نه آرایه)، `exp`/`iat`، و **nonce ِ همین سرور**: `POST /api/auth/apple/nonce` بی نوشتن در پایگاه (`v1.<مهلت>.<تصادفی>.<HMAC>`، ده دقیقه)؛ ادعای `nonce` ِ توکن = SHA-256 ِ آن؛ **یک‌بار مصرف** با صدورِ نشست (`idempotency_keys`، بی مهاجرت) ⇐ همان توکن + nonce بارِ دوم ۴۰۱ `apple_nonce_used`. مسیرهای گوگل و اپل یک جدول‌اند (`PROVIDERS` در `routes/auth.js`): یافتن با شناسه، ساختن/وصل فقط با ایمیلِ تأییدشده، ایمیلِ دارای حساب ⇐ ۴۰۹ `apple_link_required` + `POST /api/auth/apple/link-code` (هرگز وصلِ خودکار؛ ۴۰۹ و کدِ وصل nonce را مصرف نمی‌کنند). نام از بدنه (اپل در توکن نمی‌دهد؛ بی نویسهٔ کنترلی، ۸۰ نویسه). بی `APPLE_CLIENT_IDS` همه ۴۰۳ `apple_not_configured` و `/config` ⇐ `appleLogin: false` | `server/src/lib/apple.js`، `routes/auth.js`، `config.js`، `app.js` |
+| کدِ مشترک | `data/ExternalSignIn.kt`: `SignInProvider` (کدِ ۴۰۹)، `ExternalLinkAsk` به‌جای `GoogleLinkAsk` ِ تک‌منظوره، `AppleSignInUi` و `ExternalSignIn.apple` (فقط لایهٔ آیفون می‌گذارد). `AuthController.apple`: nonce ِ تازه ⇐ پنجره ⇐ `/auth/apple`؛ ۴۰۹ ⇐ همان برگهٔ اثبات (`ExternalLinkSheet`، متنِ اپل). دکمهٔ «ورود با اپل» (`AppleButton`، رهنمودِ اپل: زمینهٔ `ink`، نوشته و نشانِ `bg`) فقط وقتی سکو پنجره دارد **و** سرور بازش کرده؛ اندروید و کامپیوتر نه پرسشِ `/config` ِ تازه‌ای دارند نه دکمه‌ای | `data/ExternalSignIn.kt`، `ui/v3/onboarding/*`، `data/repo/AuthRepository.kt` |
+| آیفون | `ios/AppleSignInIos.kt`: `ASAuthorizationAppleIDProvider` (نام + ایمیل)، SHA-256 ِ هگزِ nonce، ایمیل از خودِ توکن (اپل فقط بارِ نخست می‌دهد؛ فقط برای نمایش)، لغو ⇐ `null` (بی پیام)؛ در `appDidLaunch` گذاشته می‌شود. Xcode: `-framework AuthenticationServices` | `ios/shared/src/iosMain/…/ios/AppleSignInIos.kt`، `project.pbxproj` |
+
+**آزمونِ تازه:**
+- سرور: `test/apple-signin.test.js` ۶/۶ روی PGlite — JWKS ِ محلی و کلیدِ RSA ِ همین آزمون (بی شبکه): خاموشی بی `APPLE_CLIENT_IDS`؛ حسابِ تازه با رلهٔ خصوصی و نام؛ nonce ِ یک‌بارمصرف؛ AUTH-04 برای اپل (۴۰۹، رمزِ غلط، کدِ وصل، سابقهٔ `auth.identity_linked` با `provider: apple`)؛ ایمیلِ تأییدنشده؛ nonce ِ دیگر/ساختگی/کهنه/بی‌nonce، امضای بیگانه، aud/iss/alg، منقضی؛ چرخشِ کلید.
+- `src/iosTest/…/ios/Phase6IosTest` (۴) — SHA-256 ِ nonce هم‌شکلِ سرور و ایمیل از توکن، خودِ `FileName` و `Integrity` ِ اندروید روی shim، رمزگذارِ پروندهٔ کلیددان (همهٔ نوع‌ها). فقط روی شبیه‌ساز (کارِ `ios-app`).
+
+**هنوز نه (و چرا):**
+- ورود با اپل روی گوشیِ واقعی — قابلیتِ «Sign in with Apple» و `APPLE_CLIENT_IDS` (§۰.۶ بندِ ۵)؛ بی آن‌ها دکمه پنهان است. روی شبیه‌ساز هم بی امضا اپل خطای ۱۰۰۰ می‌دهد.
+- ۱۲ جایگزینِ مانده رفتارِ iOS ِ واقعی دارند (Keychain ِ کلیدِ دفتر، CoreLocation، fsync/rename ِ POSIX، دوربین، به‌روزرسانی از App Store، …) یا برای iOS معنا ندارند (`Migration` ِ WebView، `Platform`): پاک کردنشان رفتار را بدتر می‌کرد. `Haptics` (الگوی لرزشِ اندروید ⇐ بازخوردِ لمسیِ iOS) و `DiskWrite` (با `SDK_INT = 0` ِ shim شاخهٔ بی fsync ِ پوشه را می‌گرفت) عمداً ماندند.
+- تشخیصِ گفتار و App Attest — همان دلیلِ §۰.۱۰.
+
+**بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (‎۰.۷‎؛ مخزنِ گوگل بسته، Maven Central ِ مستقیم ۴۲۹ ⇐ آینهٔ GCS ِ آن؛ init-script در مخزن نیست؛ تنها دگرگونیِ محلیِ دیگر: `HapticFeedbackType.GestureThresholdActivate` ِ ۱.۸ در کپیِ ساخته‌شده ⇐ `LongPress`): هر دو klib سبز (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`؛ ۱۱۴۴ فایل = ۱۱۴۲ + دو فایلِ `core/src/jvmMain`)، `jvmTest` ِ `ios/shared` ۱۸/۱۸. سرور روی PGlite: `apple-signin` ۶/۶ و با `google-link`، `auth`، `sec-auth`، `log-secrets`، `route-authz-inventory`، `tenant-matrix`، `app-compat`، `platform`، `trial-single-source` روی‌هم ۸۶/۸۶؛ `codeql-models` ۴/۴. هسته `jvmTest` ۱۱۵۱/۱۱۵۱؛ کامپیوتر ۲۷۳۴/۲۷۴۷ (همان ۱۳ آزمونِ `ui.theme` که فقط محلی سرخ‌اند). فقط CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test`.
 
 ## ۱. خلاصه در پنج خط
 
