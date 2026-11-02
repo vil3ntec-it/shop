@@ -781,6 +781,7 @@ fun DeskSaleScreen(
       .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 12.dp),
   ) {
     ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.SpecialOrderBar(d, store, cartDebtorId, ::toast, Modifier.padding(bottom = 8.dp)) // پیش‌فاکتور (POS-25، `QuotePref`) و سفارشِ ویژه (POS-26، `SpecialOrderPref`)
+    ir.vil3ntec.tohid.ui.components.pos.GiftCardBar(d, store, ::toast, Modifier.padding(bottom = 8.dp)) // کارتِ هدیه (PAY-24، `GiftCardPref`)
     ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) // POS-18
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
       /*
@@ -942,6 +943,9 @@ fun DeskSaleScreen(
       onConfirm = { st -> finish(st) },
       //  PAY-21: حساب‌پی برای باقی‌ماندهٔ پنل — نه با تخفیفِ تأییدنشده (پول گرفته و فروش رد نشود)
       gateways = gateways.takeIf { !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED },
+      //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
+      ledger = d,
+      stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(

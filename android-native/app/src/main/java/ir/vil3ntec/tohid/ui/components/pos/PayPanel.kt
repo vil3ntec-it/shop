@@ -57,6 +57,12 @@ import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.core.pay.Settlement
+import ir.vil3ntec.tohid.core.pay.GiftCard
+import ir.vil3ntec.tohid.core.pay.PayMethod
+import ir.vil3ntec.tohid.core.pay.StoredPay
+import ir.vil3ntec.tohid.core.i18n.StrGiftCard
+import ir.vil3ntec.tohid.data.GiftCards
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.numericInput
@@ -93,16 +99,20 @@ private val NOTE_KEYS = listOf(
 class PayPanelState {
   var cash by mutableStateOf("")
   val rows = mutableStateListOf<PayFlow.DraftRow>()
+  /** PAY-24 — کارتِ هدیه و اعتبارِ فروشگاه در فهرستِ روش‌ها (`GiftCardPref`)؛ پیش‌فرض خاموش ⇒ همان فهرستِ امروز */
+  var stored by mutableStateOf(false)
 
-  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId)
+  fun methods(): List<PayMethod> = PayFlow.panelMethods(stored)
+
+  fun draft(total: Double, customerId: String?) = PayFlow.Draft(total, cash, rows.toList(), customerId, stored)
 
   fun addRow(): Int {
-    rows += PayFlow.DraftRow(PayFlow.panelMethods().firstOrNull()?.id.orEmpty())
+    rows += PayFlow.DraftRow(methods().firstOrNull()?.id.orEmpty())
     return rows.lastIndex
   }
 
   fun cycle(i: Int, step: Int) {
-    val ids = PayFlow.panelMethods().map { it.id }
+    val ids = methods().map { it.id }
     if (ids.isEmpty() || i !in rows.indices) return
     val at = ids.indexOf(rows[i].method)
     rows[i] = rows[i].copy(method = ids[(at + step + ids.size) % ids.size])
@@ -135,6 +145,8 @@ fun PaySplitSection(
   target: Dp,
   cashFocus: FocusRequester,
   onSubmit: () -> Unit,
+  /** PAY-24 — دفترِ صفحه برای ماندهٔ کارت و اعتبارِ مشتری (فقط با `state.stored`)؛ `null` ⇒ بی راهنما */
+  ledger: ShopData? = null,
 ) {
   //  فوکوسِ هر ردیف — فهرستِ ساده، نه state: فقط هم‌اندازهٔ ردیف‌ها می‌ماند
   val refFocus = remember { ArrayList<FocusRequester>() }
@@ -147,6 +159,7 @@ fun PaySplitSection(
   }
   fun addRow() { focusRef = state.addRow() }
   val preview = PayFlow.preview(state.draft(total, customerId))
+  val giftView = remember(ledger, state.stored) { if (state.stored) ledger?.let(GiftCards::view) else null }
   //  PAY-04: زمانِ باز شدنِ پنل (ساعتِ یکنواخت، نه ساعتِ دیواری)
   val opened = remember { TimeSource.Monotonic.markNow() }
   fun armed() = CashKeys.enterArmed(opened.elapsedNow().inWholeMilliseconds)
@@ -199,7 +212,7 @@ fun PaySplitSection(
     val bad = preview is PayFlow.Outcome.Bad && preview.problem.index == i
     Spacer(Modifier.height(6.dp))
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-      MethodPicker(row.method, target, Modifier.weight(1.2f)) { m -> state.rows[i] = row.copy(method = m) }
+      MethodPicker(row.method, state.methods(), target, Modifier.weight(1.2f)) { m -> state.rows[i] = row.copy(method = m) }
       val keys = noteKeys.onPreviewKeyEvent { e ->
         when {
           e.down(Key.PageDown) -> { state.cycle(i, 1); true }
@@ -235,6 +248,13 @@ fun PaySplitSection(
         Icon(Icons.Filled.Close, contentDescription = StrPos.removeMethod, tint = Shop.colors.muted)
       }
     }
+    //  PAY-24: ماندهٔ کارت (با کدِ درست) و اعتبارِ مشتریِ همین فاکتور
+    val hint = when (if (giftView != null) PayFlow.method(row.method)?.kind else null) {
+      StoredPay.GIFT -> giftView?.card(GiftCard.normalize(row.ref))?.let { StrGiftCard.cardLeft(money(PayFlow.major(it.spendableMinor))) }
+      StoredPay.CREDIT -> ledger?.let { StrGiftCard.creditLeft(money(PayFlow.major(GiftCards.creditOf(it, customerId)))) }
+      else -> null
+    }
+    if (hint != null) Text(hint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
   }
   TextButton(onClick = { addRow() }) { Text(StrPos.addMethod) }
 
@@ -256,8 +276,11 @@ fun PaySplitSection(
       StatusPill(StrPos.nonCashPending, PillTone.AWAITING)
     }
   }
+  //  PAY-24: خرج بیش از ماندهٔ کارت یا طلبِ مشتری همین‌جا دیده می‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
+  val storedError = if (s != null && giftView != null && ledger != null) GiftCards.problem(ledger, s, customerId)?.let(GiftCards::message) else null
   val error = when {
     preview is PayFlow.Outcome.Bad -> PayFlow.message(preview.problem)
+    storedError != null -> storedError
     s != null && s.status == "short" && (s.tendered > 0 || state.rows.isNotEmpty()) -> PayFlow.message(PayFlow.Problem("SHORT", remaining = s.remaining))
     else -> null
   }
@@ -281,14 +304,14 @@ private fun SumRow(label: String, value: String, strong: Boolean = false, warn: 
 }
 
 @Composable
-private fun MethodPicker(selected: String, target: Dp, modifier: Modifier, onPick: (String) -> Unit) {
+private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp, modifier: Modifier, onPick: (String) -> Unit) {
   var open by remember { mutableStateOf(false) }
   Box(modifier) {
     OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().heightIn(min = maxOf(target, 44.dp))) {
       Text(PayFlow.methodName(selected), maxLines = 1)
     }
     DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-      PayFlow.panelMethods().forEach { m ->
+      methods.forEach { m ->
         DropdownMenuItem(text = { Text(m.name) }, onClick = { onPick(m.id); open = false })
       }
     }
@@ -310,15 +333,21 @@ fun PayPanelDialog(
   onConfirm: (Settlement) -> Unit,
   /** PAY-21: درگاه‌ها (حساب‌پی) برای باقی‌ماندهٔ همین پنل — فقط با پرچمِ سرور و نت دیده می‌شوند */
   gateways: GatewayHook? = null,
+  /** PAY-24 — دفترِ صفحه و تنظیمِ `GiftCardPref` (کارتِ هدیه و اعتبار در روش‌ها)؛ پیش‌فرض خاموش ⇒ همان پنلِ امروز */
+  ledger: ShopData? = null,
+  stored: Boolean = false,
 ) {
-  val state = remember { PayPanelState() }
+  val state = remember { PayPanelState().also { it.stored = stored } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
   var error by remember { mutableStateOf<String?>(null) }
   fun submit() {
     if (busy) return
     when (val r = PayFlow.checkout(state.draft(total, customerId))) {
-      is PayFlow.Outcome.Ok -> onConfirm(r.value)
+      is PayFlow.Outcome.Ok -> {
+        val bad = if (stored && ledger != null) GiftCards.problem(ledger, r.value, customerId) else null
+        if (bad != null) error = GiftCards.message(bad) else onConfirm(r.value)
+      }
       is PayFlow.Outcome.Bad -> error = PayFlow.message(r.problem)
     }
   }
@@ -335,7 +364,7 @@ fun PayPanelDialog(
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
         )
         Spacer(Modifier.height(10.dp))
-        PaySplitSection(state, total, customerId, customerName, target, cashFocus, ::submit)
+        PaySplitSection(state, total, customerId, customerName, target, cashFocus, ::submit, ledger)
         if (gateways != null) CheckoutGateways(
           hook = gateways, total = total, panel = state, customerId = customerId, enabled = true, busy = busy,
           onPaid = onConfirm, modifier = Modifier.padding(top = 8.dp),
