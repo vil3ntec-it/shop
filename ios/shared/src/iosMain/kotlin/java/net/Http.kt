@@ -25,8 +25,6 @@ import platform.Foundation.NSURLErrorNotConnectedToInternet
 import platform.Foundation.NSURLErrorTimedOut
 import platform.Foundation.NSURLRequestReloadIgnoringLocalCacheData
 import platform.Foundation.NSURLResponse
-import platform.Foundation.NSURLSession
-import platform.Foundation.NSURLSessionConfiguration
 import platform.Foundation.create
 import platform.Foundation.dataTaskWithRequest
 import platform.Foundation.setHTTPBody
@@ -63,6 +61,15 @@ class URL(private val spec: String) {
   /** https ⇐ `HttpsURLConnection` (سنجاقِ گواهیِ «سرورِ خودِ دکان»، ‎javax/net/ssl‎)، مثلِ JDK */
   fun openConnection(): URLConnection =
     if (protocol.equals("https", ignoreCase = true)) javax.net.ssl.HttpsURLConnection(this) else HttpURLConnection(this)
+
+  /**
+   *  `Proxy.NO_PROXY` ⇐ نشستِ بی پراکسی (هابِ محلیِ SYN-09 در شبکهٔ دکان؛ پراکسیِ Wi-Fi ِ iOS نشانیِ محلی را هم
+   *  می‌گیرد). پراکسیِ دستیِ HTTP/SOCKS در iOS از راهِ NSURLSession داده نمی‌شود و کدِ مشترک هم نمی‌خواهد.
+   */
+  fun openConnection(proxy: Proxy): URLConnection {
+    if (proxy.type() != Proxy.Type.DIRECT) throw UnsupportedOperationException("proxy ${proxy.type()} is not supported on iOS")
+    return openConnection().also { it.direct = true }
+  }
   override fun toString(): String = spec
   override fun equals(other: Any?): Boolean = other is URL && other.spec == spec
   override fun hashCode(): Int = spec.hashCode()
@@ -75,6 +82,8 @@ abstract class URLConnection internal constructor(val url: URL) {
   var doInput: Boolean = true
   var useCaches: Boolean = false
   internal val headers = LinkedHashMap<String, String>()
+  /** `openConnection(Proxy.NO_PROXY)` */
+  internal var direct: Boolean = false
 
   fun setRequestProperty(key: String, value: String) { headers[key] = value }
   fun addRequestProperty(key: String, value: String) { headers[key] = headers[key]?.let { "$it, $value" } ?: value }
@@ -146,23 +155,25 @@ open class HttpURLConnection internal constructor(url: URL) : URLConnection(url)
     headers.forEach { (k, v) -> request.setValue(v, forHTTPHeaderField = k) }
     if (body.size() > 0) request.setHTTPBody(body.toByteArray().toNSData())
 
-    //  گواهیِ سنجاق‌شده (`PinnedTls.applyTo` ِ کدِ مشترک) ⇐ نشستِ سنجاق‌دار؛ وگرنه اعتمادِ پیش‌فرضِ iOS
+    //  گواهیِ سنجاق‌شده (`PinnedTls.applyTo` ِ کدِ مشترک) ⇐ نشستِ سنجاق‌دار؛ وگرنه اعتمادِ پیش‌فرضِ iOS.
+    //  `Proxy.NO_PROXY` ⇐ نشستِ بی پراکسی؛ `instanceFollowRedirects = false` ⇐ نمایندهٔ همان نشست ریدایرکت را نگه می‌دارد.
     val https = this as? javax.net.ssl.HttpsURLConnection
     val pinned = https?.sslSocketFactory
+    val shim = javax.net.ssl.ShimHttp.of(pinned = pinned != null, direct = direct)
     val signal = dispatch_semaphore_create(0)
     var data: NSData? = null
     var meta: NSURLResponse? = null
     var failure: NSError? = null
-    val task = (if (pinned != null) javax.net.ssl.PinnedHttp.session else session).dataTaskWithRequest(request) { d, r, e ->
+    val task = shim.session.dataTaskWithRequest(request) { d, r, e ->
       data = d; meta = r; failure = e
       dispatch_semaphore_signal(signal)
     }
-    if (pinned != null) javax.net.ssl.PinnedHttp.register(task, pinned, https.hostnameVerifier)
+    shim.register(task, pinned, https?.hostnameVerifier, follow = instanceFollowRedirects)
     task.resume()
     dispatch_semaphore_wait(signal, DISPATCH_TIME_FOREVER)
 
     //  دست‌دادنی که سنجاق رد کرد ⇐ همان ردهٔ JDK (`ServerSwitchAndroid.probe` همین را می‌گیرد)، نه «لغو شد»
-    if (pinned != null && javax.net.ssl.PinnedHttp.finish(task)) throw javax.net.ssl.SSLHandshakeException("certificate pin mismatch")
+    if (shim.finish(task)) throw javax.net.ssl.SSLHandshakeException("certificate pin mismatch")
     failure?.let { throw it.toIOException() }
     val http = meta as? NSHTTPURLResponse ?: throw IOException("پاسخِ HTTP نیست: $url")
     val headers = http.allHeaderFields.entries.associate { (k, v) -> k.toString() to v.toString() }
@@ -187,14 +198,6 @@ open class HttpURLConnection internal constructor(url: URL) : URLConnection(url)
     const val HTTP_CONFLICT = 409
     const val HTTP_INTERNAL_ERROR = 500
     const val HTTP_UNAVAILABLE = 503
-
-    /** بی کوکی و بی کش، مثلِ HttpURLConnection ِ بی CookieManager ِ اندروید */
-    private val session: NSURLSession by lazy {
-      val config = NSURLSessionConfiguration.ephemeralSessionConfiguration
-      config.HTTPCookieStorage = null
-      config.URLCache = null
-      NSURLSession.sessionWithConfiguration(config)
-    }
   }
 }
 

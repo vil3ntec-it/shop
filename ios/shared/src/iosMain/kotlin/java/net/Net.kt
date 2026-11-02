@@ -14,6 +14,18 @@ open class UnknownHostException(message: String? = null) : IOException(message)
 open class ConnectException(message: String? = null) : SocketException(message)
 open class NoRouteToHostException(message: String? = null) : SocketException(message)
 
+/** `java.net.Proxy` — فقط `NO_PROXY` (اتصالِ مستقیم) در iOS معنا دارد (`URL.openConnection(Proxy)` ِ ‎Http.kt‎) */
+class Proxy(private val kind: Type) {
+  enum class Type { DIRECT, HTTP, SOCKS }
+
+  fun type(): Type = kind
+  override fun toString(): String = if (kind == Type.DIRECT) "DIRECT" else kind.name
+
+  companion object {
+    val NO_PROXY = Proxy(Type.DIRECT)
+  }
+}
+
 object URLEncoder {
   private const val HEX = "0123456789ABCDEF"
 
