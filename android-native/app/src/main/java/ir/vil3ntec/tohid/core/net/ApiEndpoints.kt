@@ -158,6 +158,10 @@ object ApiEndpoints {
     const val APPROVER_KEYS = "/shop/approver-keys"
     const val DEVICES = "/shop/devices"
     fun memberPerms(id: String) = "$PERMISSIONS/members/${enc(id)}"
+    /** STF-06: محدودهٔ مکانِ کارمندان (پرچمِ خاموشِ `shop.staff_scope`) */
+    const val STAFF_SCOPE_CONFIG = "/shop/staff-scope/config"
+    const val STAFF_SCOPE_MEMBERS = "/shop/staff-scope/members"
+    fun staffScope(id: String) = "$STAFF_SCOPE_MEMBERS/${enc(id)}"
     fun approverKey(id: String) = "$APPROVER_KEYS/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"

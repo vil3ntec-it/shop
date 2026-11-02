@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
+const finder = require('../lib/storefront-filters');
 const cart = require('../lib/store-cart');
 const storeSeo = require('../lib/store-seo');
 const views = require('../lib/public-views');
@@ -132,6 +133,9 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» ِ وب (`store/filters.js` ِ دیربار) با `shop.storefront.filters`/`.alerts`
+    ...((await finder.flagOn(shopId)) ? { filters: true } : {}),
+    ...((await require('../lib/storefront-alerts').flagOn(shopId)) ? { alerts: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -187,6 +191,8 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
       contactPhone: req.store.contact_phone,
+      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)
+      filters: await finder.parse(req.store.shop_id, req.query),
     });
   //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
   if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {
@@ -248,7 +254,7 @@ router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   await orderDesk.guardCheckout(req.store.shop_id, key);
   let out;
   try {
-    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
+    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req), ip: clientIp(req) });
   } catch (err) {
     //  RSK-07: سقفِ شماره (lib/order-rate) — کِی دوباره
     if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));
@@ -293,6 +299,11 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
   const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
   if (prefs !== undefined) order.deliveryPrefs = prefs;
+  //  NTF-07/09: گزارشِ مشکل و نظر — فقط با پرچم‌های `shop.orders.issue_reports` / `shop.orders.reviews` (خاموش ⇒ کلید نیست)
+  const issueReports = await require('../lib/order-issues').customerView(req.store.shop_id, orderId);
+  if (issueReports !== undefined) order.issueReports = issueReports;
+  const review = await require('../lib/order-reviews').customerView(req.store.shop_id, orderId, order.status);
+  if (review !== undefined) order.review = review;
   res.json({ order });
 });
 

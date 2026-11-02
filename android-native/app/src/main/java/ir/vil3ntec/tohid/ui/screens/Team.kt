@@ -308,6 +308,7 @@ fun TeamScreen(snackbar: SnackbarHostState) {
     /* ---------------- مجوزِ کارمندان و دستگاه‌ها (STF) ---------------- */
     ApproverSetupSection(shops, snackbar = snackbar)
     MemberPermsSection(shops, canEdit = isOwner, snackbar = snackbar)
+    StaffScopeSection(shops, canEdit = isOwner, snackbar = snackbar)
     DevicesSection(shops, canEdit = isOwner, snackbar = snackbar)
 
     /* ------------------------ کدهای شاگرد ------------------------ */

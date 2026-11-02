@@ -135,6 +135,8 @@ fun DashboardScreenLegacy(d: ShopData, onOpen: (String) -> Unit = {}) {
       HomeKpis(d, onOpen, canSeeMoney, columns = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) 5 else 2)
       Spacer(Modifier.height(14.dp))
     }
+    /* RPT-10: یادآورِ سررسیدِ مالیاتِ سه‌ماهه — فقط با «گزارشِ مالیاتِ سه‌ماهه» روشن و درونِ پنجرهٔ یادآور */
+    if (canSeeMoney) ir.vil3ntec.tohid.ui.screens.TaxDueBanner(onOpen, Modifier.padding(bottom = 14.dp))
 
     /*
      *  کامپیوتر: کارتِ فروش و اقدام کنارِ وضعیتِ دکان، و معاملاتِ اخیر کنارِ

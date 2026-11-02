@@ -156,9 +156,11 @@ class SettingsPortTest {
      *  از این‌جا برداشته شود («استثنای کهنه» قرمز است). بخشِ تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود.
      */
     val EXCEPTIONS: Map<String, String> = mapOf(
+      "AnomalyPref.set" to "$PENDING — تشخیصِ ناهنجاری، AI-08 (کادرش در «ضدتقلب» ِ گزارشِ تازهٔ رابطِ امروز است)",
       "AutoFeesPref.set" to "$PENDING — هزینهٔ خودکارِ فاکتور، POS-36",
       "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
       "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
+      "CustomerCardPref.setOn" to "$PENDING — کارت یا بارکدِ مشتری، CRM-16",
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
       "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
       "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
@@ -166,6 +168,7 @@ class SettingsPortTest {
       "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
       "LinePolicyPrefs.setOn" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
+      "OwnerReportLive.set" to "$PENDING — گزارشِ خودکار برای صاحب (تنظیمِ سروریِ فقط صاحب)، PAY-20/RPT-12",
       "PosMoreKeysPrefs.set" to "$PENDING — کلیدهای بیشترِ صندوق، فقط کامپیوتر",
       "PosNotesPrefs.set" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
       "PosNotesPrefs.setTemplates" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
@@ -179,7 +182,11 @@ class SettingsPortTest {
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
+      "SmartForecastPref.set" to "$PENDING — پیش‌بینیِ تقاضای قابلِ توضیح، AI-07 (صفحه‌اش «پیشنهادِ سفارش» ِ رابطِ امروز است)",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
+      "TaxQuarterPref.setConfig" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
+      "TaxQuarterPref.setOn" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
+      "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",
     )
   }
 }

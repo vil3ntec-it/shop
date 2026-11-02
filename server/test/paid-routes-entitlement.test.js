@@ -23,7 +23,7 @@ const { query, newId, now } = require('../src/db');
 const { PAID_KEYS } = require('../src/lib/features');
 
 const DAY = 24 * 60 * 60 * 1000;
-const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
+const PAID = /^(POST|PUT|PATCH|DELETE) \/shop\/(orders|order-feedback|storefront|market|delivery)(\/|$)|^POST \/shop\/(staff-code|invite|staff-code\/rotate)$/;
 const JOIN = ['POST /shop/staff/join', 'POST /shop/join'];
 const STAFF = ['POST /shop/sync', 'POST /shop/sync/push'];
 /** نوشتنی‌های بی کلیدِ پولی — هر کدام با دلیل؛ فهرست باید با سورس یکی بماند. */
@@ -51,6 +51,8 @@ const FREE = [
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
     'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
+  ['گزارشِ خودکارِ صاحب (PAY-20/RPT-12) بخشی از مدیریتِ پایهٔ دکان است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.owner_report و فقط صاحب', [
+    'PUT /shop/owner-report']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
@@ -69,11 +71,14 @@ const FREE = [
   ['حذفِ دادهٔ شخصیِ مشتری (SEC-10) کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.customer_erasure: حقِ حذف به اشتراک بسته نیست '
     + 'و پس از پایانِ اشتراک هم باید شدنی بماند', [
     'POST /shop/customer-erasure']],
+  ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
+    + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
+    'PUT /shop/staff-scope/members/:id']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
   'shop.storefront.notify_area', 'shop.storefront.banners',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');
@@ -85,6 +90,8 @@ FLAGS.push('shop.storefront.media');
 FLAGS.push('shop.storefront.campaigns');
 //  SEC-10: حذفِ دادهٔ شخصیِ مشتری (`/shop/customer-erasure`) با پرچمِ خودش
 FLAGS.push('shop.customer_erasure');
+//  MKT-02/RSK-09: اولین خرید و سدِ تخفیف (`/shop/storefront/promo-guard`) با پرچمِ خودش
+FLAGS.push('shop.storefront.promo_guard');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

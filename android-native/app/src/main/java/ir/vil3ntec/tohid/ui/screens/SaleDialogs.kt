@@ -126,7 +126,8 @@ fun CheckoutDialog(
   val discountBad = canDiscount && numberInvalid(discountText)
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ خاموش ⇒ همان نقد/نسیهٔ امروز
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
-  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState() }
+  //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه در روش‌ها فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
+  val payState = remember { ir.vil3ntec.tohid.ui.components.pos.PayPanelState().also { it.stored = ir.vil3ntec.tohid.data.GiftCardPref.on(context) } }
   val cashFocus = remember { androidx.compose.ui.focus.FocusRequester() }
   var payError by remember { mutableStateOf<String?>(null) }
   val paidBad = !payV2 && payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
@@ -137,7 +138,11 @@ fun CheckoutDialog(
     val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
     if (!payV2) { onConfirm(checkout.copy(paidAmount = paid, debtorId = debtorId, approval = signed)); return }
     when (val r = ir.vil3ntec.tohid.data.PayFlow.checkout(payState.draft(totals.finalTotal, debtorId))) {
-      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> onConfirm(checkout.copy(settlement = r.value, debtorId = debtorId, approval = signed))
+      is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> {
+        val bad = if (payState.stored) ir.vil3ntec.tohid.data.GiftCards.problem(d, r.value, debtorId) else null
+        if (bad != null) payError = ir.vil3ntec.tohid.data.GiftCards.message(bad)
+        else onConfirm(checkout.copy(settlement = r.value, debtorId = debtorId, approval = signed))
+      }
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> payError = ir.vil3ntec.tohid.data.PayFlow.message(r.problem)
     }
   }
@@ -270,6 +275,7 @@ fun CheckoutDialog(
             target = 48.dp,
             cashFocus = cashFocus,
             onSubmit = { confirm() },
+            ledger = d,
           )
           payError?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
         }

@@ -279,6 +279,35 @@ await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 const po = await one('SELECT subtotal_minor, discount_minor, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
 ok(Number(po.discount_minor) === 3500 && Number(po.total_minor) === 31500, 'ثبت ⇒ همان تخفیفِ دیده‌شده (۳۵) و جمعِ ۳۱۵ در سرور', JSON.stringify(po));
 
+//  MKT-02 (پرچمِ `shop.storefront.promo_guard`): اولین خریدِ ۲۰٪ روی همان ۱۰٪ ِ خودکار — ردیفِ «تخفیف (اولین خرید: …)» در جمع،
+//  شناسهٔ تصادفیِ همین مرورگر در ثبت (در پایگاه فقط چکیده‌اش)، و خریدِ بعدیِ همان شماره بی آن
+await flag('shop.storefront.promo_guard', true);
+const pg = await call('PUT', '/api/shop/storefront/promo-guard', { firstOrder: { enabled: true, kind: 'percent', bp: 2000 } }, T);
+ok(pg.status === 200, 'تنظیمِ اولین خرید (۲۰٪)', JSON.stringify(pg.body).slice(0, 120));
+//  «مشتریِ تازه» با همان شمارهٔ تأییدشده: سفارش‌های پیشینِ این آزمون به شمارهٔ دیگری
+await query("UPDATE online_orders SET customer_phone = '+93700000099' WHERE shop_id = $1", [shopId]);
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+await page.check('input[name="fulfillment"][value="pickup"]');
+await page.waitForFunction(() => /اولین خرید/.test(document.getElementById('t-disc-label').textContent) && !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+ok((await text('#t-disc-label')).includes('۶۳') && (await text('#t-disc')).includes('۹۸') && (await text('#t-total')).includes('۲۵۲'),
+  'MKT-02: «تخفیف (اولین خرید: ۶۳)» و جمعِ تخفیف ۹۸ و مبلغِ ۲۵۲', `${await text('#t-disc-label')} / ${await text('#t-disc')} / ${await text('#t-total')}`);
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+const fo = await one('SELECT discount_minor, total_minor FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+const dev = await page.evaluate(() => JSON.parse(localStorage.getItem('store-device') || 'null'));
+const claim = await one("SELECT device_key, discount_minor FROM storefront_promo_claims WHERE shop_id = $1 AND kind = 'first_order'", [shopId]);
+ok(Number(fo.discount_minor) === 9800 && Number(fo.total_minor) === 25200 && /^[0-9a-f]{32}$/.test(dev || '')
+  && claim && Number(claim.discount_minor) === 6300 && /^[0-9a-f]{32}$/.test(claim.device_key) && claim.device_key !== dev,
+'ثبت ⇒ همان ۹۸ و ۲۵۲ در سرور؛ اولین خرید با چکیدهٔ دستگاه، نه خودِ شناسه', JSON.stringify({ fo, claim }));
+await open();
+await page.locator('#products li[data-id="rice"] .p-add').first().click();
+await toCheckout();
+await page.check('input[name="fulfillment"][value="pickup"]');
+await page.waitForFunction(() => document.getElementById('t-disc').textContent.includes('۳۵') && !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+ok(!(await text('#t-disc-label')).includes('اولین'), 'خریدِ دومِ همان شماره ⇒ فقط همان ۱۰٪ ِ خودکار', await text('#t-disc-label'));
+
 //  CHK-08: شمارهٔ دوم و Plus Code (پرچمِ `shop.storefront.address_extra`)؛ نادرست ⇒ پیامِ سرور و بی سفارش
 await open();
 await page.locator('#products li[data-id="rice"] .p-add').first().click();

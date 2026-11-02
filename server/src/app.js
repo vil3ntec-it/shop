@@ -352,23 +352,30 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
+    //  PAY-20/RPT-12: گزارشِ خودکار برای صاحبِ دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.owner_report`
+    api.use('/shop/owner-report', require('./routes/owner-report'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
     api.use('/shop/orders/desk', require('./routes/order-desk'));
     //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     api.use('/shop/orders/bulk', require('./routes/order-bulk'));
+    api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
     api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
+    //  تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ پیش‌فرض خاموش
+    api.use('/shop/storefront/promo-guard', require('./routes/storefront-promo-guard'));
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));
     api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
@@ -389,6 +396,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/promos', require('./routes/shop-promos'));
     //  STF-07/STF-08: ورود و خروجِ کارمند و نرخ‌های پورسانت — پشتِ `shop.staff_time`، پیش‌فرض خاموش
     api.use('/shop/staff-time', require('./routes/staff-time'));
+    //  STF-06: محدودهٔ مکانِ کارمندان (اجرا در `/shop/catalog`) — پشتِ `shop.staff_scope`، پیش‌فرض خاموش
+    api.use('/shop/staff-scope', require('./routes/staff-scope'));
     //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
     api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
