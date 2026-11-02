@@ -40,6 +40,8 @@ object DocSeries {
 
   /** سریِ حسابِ واردشده روی این دستگاه؛ خالی یعنی هنوز نرسیده. */
   fun current(context: Context): String {
+    //  OPS-07: فروشِ آموزشی سریِ سندِ واقعیِ دستگاه را نمی‌گیرد (شماره‌اش از دفترِ جدای آموزشی است)
+    if (ir.vil3ntec.tohid.data.TrainingMode.on) return ""
     val account = SyncStateV1.currentAccount(context)
     if (account.isBlank()) return ""
     return prefs(context).getString(account, "").orEmpty().takeIf { valid(it) }.orEmpty()
@@ -47,6 +49,7 @@ object DocSeries {
 
   /** اگر نیست، از سرور می‌گیرد (`POST /shop/series`). */
   suspend fun ensure(context: Context): String {
+    if (ir.vil3ntec.tohid.data.TrainingMode.on) return ""
     val have = current(context)
     if (have.isNotEmpty()) return have
     val account = SyncStateV1.currentAccount(context)

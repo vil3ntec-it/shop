@@ -207,6 +207,8 @@ class SyncV3Runner private constructor(context: Context) {
 
   /** @return آیا دورِ همگام‌سازی تمام شد (یا آگاهانه ایستاد) — `false` یعنی بعداً دوباره */
   suspend fun work(store: ShopStore): Boolean {
+    //  OPS-07: دفترِ آموزشی، یا هر دفتری در حالتِ آموزشی، هرگز به موتور نمی‌رسد
+    if (store.training || !ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return false
     shop = store
     val e = engine()
     //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`، فقط با پرچمِ `shop.ledger_merge`) ⇒ هیچ چیزی نشانده

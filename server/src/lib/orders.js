@@ -677,17 +677,23 @@ async function list(shopId, { tab = 'new', limit, cursor } = {}, viewer) {
   };
 }
 
+/**
+ * وضعیت‌های «باز»: هر برگه جز `done` فقط همین‌ها را دارد (`S.tabWhere`/`S.tabOf`؛ «done» = NOT IN همین فهرست).
+ * PERF-03 (`docs/PERF-QUERY-PLANS-fa.md`): خلاصه فقط سفارش‌های باز را می‌خواند (`ix_online_orders_shop_status`)،
+ * نه همهٔ سفارش‌های دکان (پیش‌تر Seq Scan: ۳۶ هزار سفارشِ دکان ⇒ ~۱۷–۲۷ms در هر پرسشِ ۲۰ثانیه‌ایِ میزِ سفارش)؛
+ * `rev` جدا با `ix_online_orders_shop_updated`. نتیجه همان پیشین است (`test/query-plans.test.js`).
+ */
+const OPEN_STATUSES = Object.freeze(['new', 'accepted', 'picking', 'packed', 'ready_for_pickup', 'out_for_delivery',
+  'delivery_failed', 'retry_scheduled']);
+const SUMMARY_SQL = `SELECT ${S.OPEN_TABS.map((tab) => `COUNT(*) FILTER (WHERE ${S.tabWhere(tab, '$2')})::int AS "${tab}"`).join(', ')},
+            MIN(created_at) FILTER (WHERE status = 'new') AS oldest,
+            (SELECT MAX(updated_at) FROM online_orders WHERE shop_id = $1) AS rev
+       FROM online_orders WHERE shop_id = $1 AND status = ANY($3::text[])`;
+
 /** شمارشِ برگه‌های باز + قدیمی‌ترین سفارشِ تازه (هشدارِ ORD-02) + نشانگرِ تغییر — یک پرس‌وجو. */
 async function summary(shopId) {
   const at = now();
-  const cols = S.OPEN_TABS.map((tab) => `COUNT(*) FILTER (WHERE ${S.tabWhere(tab, '$2')})::int AS "${tab}"`);
-  const r = await one(
-    `SELECT ${cols.join(', ')},
-            MIN(created_at) FILTER (WHERE status = 'new') AS oldest,
-            MAX(updated_at) AS rev
-       FROM online_orders WHERE shop_id = $1`,
-    [shopId, at]
-  );
+  const r = await one(SUMMARY_SQL, [shopId, at, OPEN_STATUSES]);
   const counts = Object.fromEntries(S.OPEN_TABS.map((tab) => [tab, Number(r?.[tab] || 0)]));
   return { counts, oldestNewAt: n(r?.oldest), rev: n(r?.rev) || 0, serverTime: at };
 }
@@ -695,5 +701,5 @@ async function summary(shopId) {
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SUBSCRIBERS_FLAG, NOT_ACCEPTING, NOT_ACCEPTING_MESSAGE, KEY_RE, MAX_LINES, STAFF_SOURCES,
   flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
-  create, transition, transitionIn, codIn, get, list, summary,
+  create, transition, transitionIn, codIn, get, list, summary, OPEN_STATUSES, SUMMARY_SQL,
 };

@@ -92,6 +92,8 @@ async function main() {
   require('./lib/owner-report').start();
   //  WEB-10: «خبرم کن وقتی موجود/ارزان شد» (بی پرچمِ `shop.storefront.alerts` ⇒ جدولِ خالی، یک پرسشِ کوچک)
   require('./lib/storefront-alerts').start();
+  //  NTF-10: پوزش و کوپنِ خودکارِ تأخیر (فقط دکانِ با پرچمِ `shop.orders.late_apology` و سیاستِ روشنِ صاحب)
+  require('./lib/order-late-apology').start();
   //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
   const payments = require('./lib/payment-intents');
   payments.startReconciler();
