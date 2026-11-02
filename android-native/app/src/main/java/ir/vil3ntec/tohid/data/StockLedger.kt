@@ -19,7 +19,7 @@ import kotlin.math.roundToLong
 /**
  *  پلِ دفترِ دکان ⇐ هستهٔ موجودی (`core/stock/StockCore`) — مشترکِ اندروید و کامپیوتر.
  *
- *  PRD-15 · PRD-16 · INV-02 · INV-04 · INV-09/10 · INV-19 · INV-20 · PUR-06
+ *  PRD-15 · PRD-16 · INV-02 · INV-04 · INV-09/10 · INV-19 · INV-20 · INV-21 · PUR-06
  *  (بخشِ ۳.۶ و ۱۵.۴). بردارهای مرجع: `license/test-vectors/stock-ledger-v1.json`
  *  (`StockLedgerVectorsTest`؛ عددها با دست حساب شده‌اند، نه از خروجیِ موتور).
  *  برنامهٔ وبِ دکان کنار گذاشته شده (دستورِ صاحب محصول ۱۴۰۵/۰۷/۲۷) و این پل را ندارد.
@@ -219,6 +219,14 @@ object StockLedger {
           costMinor = max(0L, roundOr0(w.units * w.price * 100.0)),
           landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
+        )
+      } else if (w.isAdjustment && w.adjKind == Repack.KIND) {
+        //  INV-21: بسته‌بندیِ دوباره/ساختِ بسته ⇒ سندِ `production` ِ هسته (علامت‌دار)؛ خروجی با بهای همان ردیف
+        //  (بهای کارتن ÷ دانه، جمعِ اجزا — `Repack`)، ورودی به میانگینِ همان محل. ردیفی که تا امروز بوده این نوع را ندارد.
+        out += Event(
+          id, "entry", Repack.MOVE, at, dayOf(w.date, at), w.productId, loc, q, user, ref,
+          reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },
+          costMinor = if (q > 0) max(0L, roundOr0(w.units * w.price * 100.0)) else null,
         )
       } else {
         val kind = if (w.isAdjustment) adjKindOf(w, moveTypeByRef, dmg != null) else "other"
@@ -436,7 +444,7 @@ object StockLedger {
         val d = if (ev.type == "purchase_receipt") {
           docOf(ev, ev.type, ev.location, ev.qtyMilli, lot = ev.lot, costMinor = ev.costMinor, landedMinor = ev.landedMinor.takeIf { it > 0 })
         } else {
-          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId)
+          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId, costMinor = ev.costMinor.takeIf { ev.type == Repack.MOVE })
         }
         val r = StockCore.apply(book, d, mode, today)
         if (!r.result.ok) return Step(book0, emptyList(), r.result)

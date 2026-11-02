@@ -38,6 +38,7 @@ object StockActions {
     "purchase_receipt" to "دریافتِ خرید", "sale" to "فروش", "customer_return" to "برگشت از مشتری",
     "supplier_return" to "برگشت به تأمین‌کننده", "adjustment" to "اصلاح", "count_adjust" to "تعدیلِ شمارش",
     "damage" to "خراب", "expired" to "منقضی", "transfer_out" to "انتقالِ خروجی", "transfer_in" to "انتقالِ ورودی",
+    "production" to "بسته‌بندیِ دوباره و تولید",
   )
 
   val REASON_LABEL = mapOf(
@@ -113,6 +114,28 @@ object StockActions {
       )
     }
     val id = newId()
+    return Result.Ok(transferRows(d, product, from, dest, q, lotId, reason, user, today, now, id, newId), id)
+  }
+
+  /**
+   *  دو ردیفِ جمعِ صفرِ یک انتقال + سابقه. [id] شناسهٔ ردیفِ خروجی و `refId` ِ هر دو ردیف است — همان کلیدِ یک‌بارهٔ
+   *  «محل‌ها و انتقال» ِ موتورِ امروز (`StockPlaces.transfer`، INV-20)؛ سنجشِ موجودی کارِ فراخوان است.
+   */
+  internal fun transferRows(
+    d: ShopData,
+    product: Product,
+    from: String,
+    dest: String,
+    q: Long,
+    lotId: String?,
+    reason: String,
+    user: String,
+    today: String,
+    now: Long,
+    id: String,
+    newId: () -> String,
+  ): ShopData {
+    val productId = product.id
     val why = reason.trim()
     val note = why.ifEmpty { "انتقال بین محل‌ها" }
     val who = user.trim().ifEmpty { null }
@@ -130,16 +153,13 @@ object StockActions {
       userId = who, reason = why.ifEmpty { null },
       locationId = dest, lotId = lot,
     )
-    return Result.Ok(
-      d.copy(
-        stockMovements = d.stockMovements + out + inn,
-        auditLog = d.auditLog + AuditEntry(
-          id = newId(), type = "stock_transfer", date = today, refId = id, createdAt = now,
-          notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${locationLabel(from)} به ${locationLabel(dest)}" +
-            (if (why.isNotEmpty()) " — $why" else ""),
-        ),
+    return d.copy(
+      stockMovements = d.stockMovements + out + inn,
+      auditLog = d.auditLog + AuditEntry(
+        id = newId(), type = "stock_transfer", date = today, refId = id, createdAt = now,
+        notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${locationLabel(from)} به ${locationLabel(dest)}" +
+          (if (why.isNotEmpty()) " — $why" else ""),
       ),
-      id,
     )
   }
 
