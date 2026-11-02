@@ -76,6 +76,9 @@ fun OrdersScreen(store: ShopStore, snackbar: SnackbarHostState, onLeave: () -> U
     return
   }
   val repo = remember(context) { OrdersLive.repository(context) }
+  //  ORD-10: پیامِ برگهٔ «قبولِ خودکار» ِ سرور (چاپ شد / بی چاپگر) — یک بار
+  val slipMsg = OrdersLive.slipMessage.value
+  LaunchedEffect(slipMsg) { slipMsg?.let { OrdersLive.slipMessage.value = null; snackbar.showSnackbar(it) } }
   val colors = Shop.colors
   val view = rememberViewMode("orders", ScreenKind.MANAGEMENT)
   val ledgerNow by store.data.collectAsState()

@@ -137,4 +137,18 @@ class OrderSlipTest {
     assertEquals(list.size, again.size)
     assertEquals(list.first(), again.last())
   }
+
+  @Test
+  fun serverAutoAcceptPrintsOnlyWithTheDeviceSettingOncePerOrderInServerOrder() {
+    val ids = listOf("01J0AAA", "01J0BBB", "01J0AAA", "bad id/", "01J0CCC")
+    assertEquals(emptyList(), OrderAutoPrint.serverAccepted(false, ids, emptyList()))
+    assertEquals(listOf("01J0AAA", "01J0BBB", "01J0CCC"), OrderAutoPrint.serverAccepted(true, ids, emptyList()))
+    assertEquals(listOf("01J0CCC"), OrderAutoPrint.serverAccepted(true, ids, listOf("01J0AAA", "01J0BBB")))
+    val many = (1..12).map { "o$it" }
+    assertEquals(many.take(OrderAutoPrint.SERVER_BATCH), OrderAutoPrint.serverAccepted(true, many, emptyList()))
+    assertTrue(OrderAutoPrint.serverStillDue("01J0AAA", "accepted", emptyList()))
+    for (st in listOf("new", "picking", "rejected", "cancelled")) assertFalse(OrderAutoPrint.serverStillDue("01J0AAA", st, emptyList()), st)
+    assertFalse(OrderAutoPrint.serverStillDue("01J0AAA", "accepted", listOf("01J0AAA")))
+    assertFalse(OrderAutoPrint.serverStillDue("", "accepted", emptyList()))
+  }
 }
