@@ -3,6 +3,13 @@ package ir.vil3ntec.tohid.ios
 import android.content.IosContext
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -16,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.nav.AppMode
@@ -50,11 +58,19 @@ import kotlinx.coroutines.withContext
  *
  *  ترتیبِ کارها همان `onCreate` است: گزارشِ خطا، «سرورِ بعدی»، دفتر، شستنِ توکن‌های کهنه، تنظیم‌ها، نقشِ پیک.
  *
- *  تفاوت با اندروید (docs/IOS-PLAN-fa.md بخشِ ۰.۷): همگام‌سازیِ دوره‌ای و سوکتِ زنده هنوز نیست (‎SyncV1WorkerIos‎،
- *  ‎LiveSocketIos‎)؛ دفتر محلی و رمزدار است (KEK در Keychain)؛ پیوندِ vill3n:// و لمسِ اعلان (`handleLink`،
- *  `openNotice`) و `CrashNotice` ِ خصوصیِ `MainActivity` گامِ ۳.
+ *  ترتیبِ همگام‌سازی، سوکتِ زنده، پیوندِ `vill3n://`، لمسِ اعلان و `CrashNotice` همان `MainActivity` است (‎IosApp.kt‎).
+ *  تفاوت با اندروید (docs/IOS-PLAN-fa.md بخشِ ۰.۸): همگام‌سازی داخلِ فرآیند و با `BGAppRefreshTask`، نه WorkManager ِ سیستم؛
+ *  اجازهٔ اعلان هنگامِ نخستین نمایشِ دکان (همان لحظهٔ اندرویدِ ۱۳+).
  */
-private object Boot {
+internal object IosBoot {
+  /** دفتر و تنظیم‌ها بار شده‌اند (پیوند یا لمسِ اعلان پیش از نخستین صفحه هم همین را می‌خواهد) */
+  var started = false
+    private set
+
+  fun ready() {
+    store
+  }
+
   val store: ShopStore by lazy {
     ir.vil3ntec.tohid.data.platform.CrashReporter.install(IosContext)
     ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(IosContext)
@@ -68,20 +84,23 @@ private object Boot {
     ModeState.load(IosContext)
     UiV3.load(IosContext)
     ShopRole.courierMode.value = ShopRole.isCourier(IosContext)
+    IosWork.install()
+    IosSync.start()
+    started = true
     s
   }
 }
 
 @Composable
 fun IosRoot() {
-  val store = remember { Boot.store }
+  val store = remember { IosBoot.store }
   LaunchedEffect(store) { store.loadAndSummarize() }
   LaunchedEffect(Unit) {
     withContext(Dispatchers.IO) { runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.flush(IosContext) } }
   }
   BoxWithConstraints(Modifier.fillMaxSize()) {
     CompositionLocalProvider(
-      LocalContext provides IosContext,
+      LocalContext provides IosActivity,
       LocalConfiguration provides Configuration(maxWidth.value.toInt(), maxHeight.value.toInt()),
     ) {
       IosApp(store)
@@ -102,6 +121,15 @@ private fun IosApp(store: ShopStore) {
   }
   var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
   val courier by ShopRole.courierMode.collectAsState()
+  //  نقشِ نشست عوض شد ⇐ کارِ دوره‌ای (همان `LaunchedEffect(courier)` ِ `MainActivity`؛ KEEP: بی اثرِ دوم)
+  LaunchedEffect(courier) {
+    runCatching {
+      if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(IosContext)
+      else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(IosContext)
+    }
+  }
+  //  اجازهٔ اعلان (سفارشِ تازه، دیدبان، یادآور) — اندرویدِ ۱۳+ همین را هنگامِ باز شدنِ دکان می‌پرسد
+  if (welcomed && !courier) LaunchedEffect(Unit) { IosNotifications.askOnce() }
   val welcome: () -> Unit = {
     prefs.edit().putBoolean("welcomed", true).apply()
     welcomed = true
@@ -135,6 +163,7 @@ private fun IosApp(store: ShopStore) {
   }
   TohidTheme(theme) {
     ProvideLang {
+      CrashNotice()
       AnimatedContent(
         targetState = screen,
         transitionSpec = { V3Transitions.page(Move.NONE, directionOf(LocaleChoice.lang)) },
@@ -149,4 +178,35 @@ private fun IosApp(store: ShopStore) {
       }
     }
   }
+}
+
+/**
+ *  OPS-03: برنامه دفعهٔ پیش ناگهان بسته شد ⇒ یک بار کدِ گزارش را بگو (برای تماس با پشتیبانی) — همان
+ *  `CrashNotice` ِ خصوصیِ `MainActivity`، با همان متن‌ها (`StrShell`) و همان `CrashReporter`. خطا ⇒ هیچ.
+ */
+@Composable
+private fun CrashNotice() {
+  var code by remember {
+    mutableStateOf(runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.notice(IosContext) }.getOrNull())
+  }
+  val shown = code ?: return
+  val done = {
+    runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.markShown(IosContext, shown) }
+    code = null
+  }
+  AlertDialog(
+    onDismissRequest = done,
+    title = { Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashTitle) },
+    text = {
+      Column {
+        Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashBody)
+        SelectionContainer {
+          Text(shown, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 8.dp))
+        }
+      }
+    },
+    confirmButton = {
+      TextButton(onClick = done) { Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashOk) }
+    },
+  )
 }

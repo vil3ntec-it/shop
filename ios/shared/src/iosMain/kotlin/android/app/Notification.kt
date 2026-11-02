@@ -1,11 +1,15 @@
 package android.app
 
+import android.content.Intent
+import ir.vil3ntec.tohid.ios.IosNotifications
+
 /*
- *  shimِ iOS ِ اعلانِ اندروید — همان نام‌های کامپیوتر. اعلانِ محلیِ iOS (UNUserNotificationCenter و پرسیدنِ
- *  اجازه) گامِ ۳ است؛ تا آن روز `areNotificationsEnabled` نه می‌گوید و `notify` هیچ نمی‌کند — کدِ مشترک
- *  همان مسیرِ «اعلان خاموش است» ِ اندروید را می‌رود و هشدارها در خودِ برنامه دیده می‌شوند.
+ *  shimِ iOS ِ اعلانِ اندروید — همان نام‌های کامپیوتر، روی اعلانِ محلیِ iOS (UNUserNotificationCenter،
+ *  ‎ir/…/ios/IosNotifications.kt‎). کانال در iOS نیست (فقط نامش نگه داشته می‌شود)؛ `notify` با همان شناسه
+ *  اعلانِ پیشین را جایگزین می‌کند (مثلِ اندروید) و لمسِ اعلان همان `Intent` ِ `setContentIntent` را به
+ *  ریشهٔ آیفون می‌دهد (`OrderNotify.fromIntent` ⇐ همان سفارش).
  */
-class Notification internal constructor(val title: String, val text: String)
+class Notification internal constructor(val title: String, val text: String, internal val intent: Intent? = null)
 
 class NotificationChannel(val id: String, val name: CharSequence, val importance: Int) {
   var description: String? = null
@@ -17,9 +21,9 @@ class NotificationManager internal constructor() {
   private val channels = linkedMapOf<String, NotificationChannel>()
   fun createNotificationChannel(channel: NotificationChannel) { channels[channel.id] = channel }
   fun getNotificationChannel(id: String): NotificationChannel? = channels[id]
-  fun areNotificationsEnabled(): Boolean = false
-  fun notify(id: Int, notification: Notification) {}
-  fun cancel(id: Int) {}
+  fun areNotificationsEnabled(): Boolean = IosNotifications.enabled
+  fun notify(id: Int, notification: Notification) = IosNotifications.post(id, notification.title, notification.text, notification.intent)
+  fun cancel(id: Int) = IosNotifications.cancel(id)
 
   companion object {
     const val IMPORTANCE_DEFAULT = 3
