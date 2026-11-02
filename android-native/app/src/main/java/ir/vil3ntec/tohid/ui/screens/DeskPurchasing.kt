@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.data.PurchaseFx
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -194,7 +195,7 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
             ) {
               Column(Modifier.weight(1f)) {
                 Text(d.products.find { it.id == p.productId }?.name ?: "(کالای حذف‌شده)", maxLines = 1, overflow = TextOverflow.Ellipsis, color = Shop.colors.text)
-                Text("فی ${money(p.purchasePrice)} · ${p.unit}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+                Text("فی ${money(p.purchasePrice)} · ${p.unit}" + fxLine(p), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
               }
               Text(qtyText(p.quantity), Modifier.width(60.dp), textAlign = TextAlign.End)
               Text(money(p.totalAmount), Modifier.width(100.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold)
@@ -205,6 +206,10 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
         Row { Text("جمع", Modifier.weight(1f), color = Shop.colors.muted); Text("${money(inv.total)} ؋", fontWeight = FontWeight.Bold) }
         Row { Text("پرداخت‌شده", Modifier.weight(1f), color = Shop.colors.muted); Text(money(inv.paid), color = Shop.colors.success) }
         Row { Text("مانده به حسابِ تأمین‌کننده", Modifier.weight(1f), color = Shop.colors.muted); Text(money(inv.debt), color = Shop.colors.danger, fontWeight = FontWeight.Bold) }
+        //  PUR-11 — اصلِ ارزیِ سند (داده است، به تنظیم بسته نیست)
+        inv.fx?.let { fx ->
+          Text("خرید به ${fx.currency}: ${PurchaseFx.minorText(fx.totalMinor)} · نرخِ ثبت‌شده ۱ ${fx.currency} = ${PurchaseFx.rateText(fx.rateMicros)} ؋", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        }
         Spacer(Modifier.height(10.dp))
         Row {
           Button(onClick = { PurchaseBook.invoiceSheet(d, inv).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, modifier = Modifier.weight(1f)) { Text("چاپ") }
@@ -220,6 +225,13 @@ private fun ColumnScope.PurchaseInvoices(d: ShopData, toast: (String) -> Unit) {
 }
 
 internal fun qtyText(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
+
+/** PUR-11 — فیِ اصلیِ ارزیِ ردیفِ خرید برای نمایش؛ ردیفِ افغانی ⇒ خالی */
+private fun fxLine(p: ir.vil3ntec.tohid.data.Purchase): String {
+  val c = p.fxCurrency ?: return ""
+  val m = p.fxPriceMinor ?: return ""
+  return " · ${PurchaseFx.minorText(m)} $c"
+}
 
 /* ══════════════════════════ فاکتورِ خریدِ تازه ══════════════════════════ */
 
@@ -257,6 +269,14 @@ private fun NewPurchaseInvoice(
   var landed by remember { mutableStateOf("") }
   var due by remember { mutableStateOf("") }
   val context = androidx.compose.ui.platform.LocalContext.current
+  //  PUR-11 — ارزِ فاکتور (تنظیمِ همین دستگاه، پیش‌فرض خاموش ⇒ همان فرمِ افغانیِ امروز). فی‌ها به همان ارز، پرداخت و
+  //  هزینهٔ جانبی افغانی؛ تبدیل و گردکردن فقط در `PurchaseFx`/`PurchaseBook.record`
+  val fxOn = remember { ir.vil3ntec.tohid.data.PurchaseFxPref.on(context) }
+  var fxCode by remember { mutableStateOf("") }
+  var fxRate by remember { mutableStateOf("") }
+  var fxMenu by remember { mutableStateOf(false) }
+  val foreign = fxOn && fxCode.isNotEmpty()
+  val rateMicros = if (foreign) PurchaseFx.parseRate(fxRate) else null
   val lines = remember { mutableStateListOf(Draft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
 
@@ -270,27 +290,39 @@ private fun NewPurchaseInvoice(
       else {
         val empty = lines.lastOrNull()?.takeIf { it.productId.isBlank() && it.query.isBlank() }
         if (empty != null) lines.remove(empty)
-        lines += Draft(p)
+        lines += Draft(p).also { if (foreign) it.price = "" }
         lines += Draft()
       }
     }
   }
 
-  val total = lines.sumOf { if (it.productId.isNotBlank()) it.total() else 0.0 }
+  /** جمعِ افغانیِ ردیف — همان `PurchaseBook.lineTotal` روی فیِ تبدیل‌شده */
+  fun afnTotal(l: Draft): Double {
+    if (!foreign) return l.total()
+    val afn = rateMicros?.let { r -> PurchaseFx.parseMinor(l.price)?.let { PurchaseFx.toAfnMinor(it, r) } } ?: return 0.0
+    return Math.round((l.qty.toDoubleOrNull() ?: 0.0) * (afn / 100.0)).toDouble()
+  }
+  val total = lines.sumOf { if (it.productId.isNotBlank()) afnTotal(it) else 0.0 }
+  val foreignMinor = if (!foreign) 0L else lines.sumOf { l ->
+    if (l.productId.isBlank()) 0L
+    else PurchaseFx.parseMinor(l.price)?.let { PurchaseFx.lineTotalMinor(l.qty.toDoubleOrNull() ?: 0.0, it) } ?: 0L
+  }
   val paidValue = paid.toDoubleOrNull() ?: 0.0
 
   fun save() {
     val sid = supplierId ?: return toast("تأمین‌کننده را انتخاب کنید")
-    val ls = lines.filter { it.productId.isNotBlank() }.map {
+    val fx = if (!foreign) null else PurchaseFx.Rate(fxCode, rateMicros ?: return toast(PurchaseFx.BAD_RATE))
+    val ls = lines.filter { it.productId.isNotBlank() }.mapIndexed { i, it ->
       val exp = it.expiry.trim()
-      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, it.price.toDoubleOrNull() ?: 0.0,
-        expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast("تاریخِ انقضای «$exp» درست نیست — مثلاً ۱۴۰۶/۰۳/۳۱"))
+      PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, if (fx != null) 0.0 else it.price.toDoubleOrNull() ?: 0.0,
+        expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast("تاریخِ انقضای «$exp» درست نیست — مثلاً ۱۴۰۶/۰۳/۳۱"),
+        fxPriceMinor = if (fx == null) null else PurchaseFx.parseMinor(it.price) ?: return toast("ردیفِ ${i + 1}: ${PurchaseFx.BAD_PRICE}"))
     }
     val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast("تاریخِ فاکتور درست نیست — مثلاً ${formatDate(today)}")
     val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast("هزینهٔ جانبی درست نیست")
     val user = if (stockOn) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null
     val dueIso = if (!stockOn || due.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(due) ?: return toast("سررسید درست نیست — مثلاً ${formatDate(today)}")
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso)) {
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso, fx = fx)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -344,6 +376,33 @@ private fun NewPurchaseInvoice(
       )
       Spacer(Modifier.width(8.dp))
       OutlinedTextField(date, { date = it }, singleLine = true, label = { Text("تاریخ (خورشیدی)") }, modifier = Modifier.width(200.dp))
+      if (fxOn) {
+        Spacer(Modifier.width(8.dp))
+        Box {
+          OutlinedButton(onClick = { fxMenu = true }, modifier = Modifier.width(160.dp)) { Text("ارز: " + fxCode.ifEmpty { "افغانی" }, maxLines = 1) }
+          DropdownMenu(expanded = fxMenu, onDismissRequest = { fxMenu = false }) {
+            (listOf("" to "افغانی (؋)") + PurchaseFx.SUGGESTED.map { (c, n) -> c to "$c — $n" }).forEach { (c, n) ->
+              DropdownMenuItem(text = { Text(n) }, onClick = {
+                fxMenu = false
+                if (c != fxCode) {
+                  //  فیِ نوشته‌شده به ارزِ پیشین بود — پاک می‌شود تا با ارزِ تازه اشتباه خوانده نشود
+                  if (lines.any { it.price.isNotBlank() }) { lines.forEach { it.price = "" }; toast("فی‌ها پاک شد — به ارزِ تازه بنویسید") }
+                  fxCode = c
+                }
+              })
+            }
+          }
+        }
+        if (foreign) {
+          Spacer(Modifier.width(8.dp))
+          OutlinedTextField(
+            fxRate, { fxRate = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
+            isError = fxRate.isNotBlank() && rateMicros == null,
+            label = { Text("نرخ: ۱ $fxCode = ؟ ؋") },
+            modifier = Modifier.width(170.dp),
+          )
+        }
+      }
     }
     Spacer(Modifier.height(10.dp))
 
@@ -351,13 +410,13 @@ private fun NewPurchaseInvoice(
     val line = Shop.colors.border
     Column(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(8.dp)).border(1.dp, line, RoundedCornerShape(8.dp))) {
       Row(Modifier.fillMaxWidth().background(Shop.colors.surface2).padding(horizontal = 8.dp, vertical = 8.dp)) {
-        listOf("#" to 36.dp, "کالا (نام یا بارکد)" to 0.dp, "مقدار" to 100.dp, "فی (؋)" to 130.dp, "انقضا (اختیاری)" to 150.dp, "جمع" to 130.dp, "" to 40.dp).forEach { (t, w) ->
+        listOf("#" to 36.dp, "کالا (نام یا بارکد)" to 0.dp, "مقدار" to 100.dp, (if (foreign) "فی ($fxCode)" else "فی (؋)") to 130.dp, "انقضا (اختیاری)" to 150.dp, "جمع" to 130.dp, "" to 40.dp).forEach { (t, w) ->
           Text(t, if (w == 0.dp) Modifier.weight(1f) else Modifier.width(w), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         }
       }
       LazyColumn(Modifier.weight(1f)) {
         itemsIndexed(lines, key = { _, l -> System.identityHashCode(l) }) { i, l ->
-          LineRow(i, l, d, onNext = {
+          LineRow(i, l, d, foreign, afnTotal(l), onNext = {
             if (i == lines.lastIndex) lines += Draft()
             scope.launch { kotlinx.coroutines.delay(60); runCatching { lines[i + 1].focus.requestFocus() } }
           }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = "" } })
@@ -389,6 +448,7 @@ private fun NewPurchaseInvoice(
       Spacer(Modifier.width(10.dp))
       Column(horizontalAlignment = Alignment.End, modifier = Modifier.width(220.dp)) {
         Text("جمعِ فاکتور: ${money(total)} ؋", fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        if (foreign) Text("به $fxCode: ${PurchaseFx.minorText(foreignMinor)}", color = Shop.colors.muted, style = MaterialTheme.typography.bodySmall)
         Text("به حسابِ تأمین‌کننده: ${money((total - paidValue).coerceAtLeast(0.0))} ؋", color = Shop.colors.danger, style = MaterialTheme.typography.bodySmall)
       }
       Spacer(Modifier.width(10.dp))
@@ -399,7 +459,7 @@ private fun NewPurchaseInvoice(
 }
 
 @Composable
-private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove: () -> Unit) {
+private fun LineRow(i: Int, l: Draft, d: ShopData, foreign: Boolean, lineTotal: Double, onNext: () -> Unit, onRemove: () -> Unit) {
   var menu by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val matches = remember(l.query, d) {
@@ -410,7 +470,8 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
   fun pick(p: Product) {
     l.productId = p.id; l.query = p.name; menu = false
     if (l.qty.isBlank()) l.qty = "1"
-    if (l.price.isBlank() && p.purchasePrice > 0) l.price = Math.round(p.purchasePrice).toString()
+    //  فاکتورِ ارزی (PUR-11): فیِ افغانیِ کالا در خانهٔ ارزی نمی‌نشیند
+    if (!foreign && l.price.isBlank() && p.purchasePrice > 0) l.price = Math.round(p.purchasePrice).toString()
     runCatching { l.qtyFocus.requestFocus() }
   }
   fun enterOn(next: () -> Unit) = Modifier.onPreviewKeyEvent { e ->
@@ -451,7 +512,7 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
     Spacer(Modifier.width(6.dp))
     OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
       modifier = Modifier.width(144.dp).then(enterOn(onNext)))
-    Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    Text(if (l.productId.isNotBlank()) money(lineTotal) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, "حذفِ ردیف", tint = Shop.colors.muted) }
   }
 }

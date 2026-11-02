@@ -660,6 +660,27 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /*
+   *  ── خرید به ارزِ دیگر (PUR-11، `PurchaseFx`، پشتِ تنظیمِ دستگاه) ──────
+   *  همه افزودنی؛ `null` = خریدِ افغانیِ امروز و نوشته نمی‌شود (`NEVER`). `purchasePrice`/`totalAmount` همیشه افغانی‌اند
+   *  (فیِ ارزی × همین نرخ، همان لحظهٔ ثبت)؛ این‌ها فقط اصلِ سند را نگه می‌دارند.
+   */
+  /** کدِ ارز (سه حرف، مثلاً USD) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val fxCurrency: String? = null,
+  /** نرخِ ثبت‌شده: افغانی برای یک واحدِ ارز × ۱۰^۶ (عددِ صحیح) */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val fxRateMicros: Long? = null,
+  /** فیِ اصلیِ ارزی، صدمِ واحدِ ارز */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val fxPriceMinor: Long? = null,
+  /** جمعِ اصلیِ ارزیِ ردیف (مقدار × فی)، صدمِ واحدِ ارز */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val fxTotalMinor: Long? = null,
 )
 
 @Serializable

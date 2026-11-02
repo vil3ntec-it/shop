@@ -505,6 +505,8 @@ fun SettingsScreenLegacy(
     item { ReturnSettingsSection() }
     /* ====== جست‌وجوی مقاوم (POS-04) و حالتِ لمسیِ صندوق (POS-31) — فقط کامپیوتر، پیش‌فرض خاموش ====== */
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { item { ir.vil3ntec.tohid.ui.components.pos.PosSearchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosTouchSettingsWired(context) }; item { ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysSettingsWired(context) } }
+    /* ====== خرید به ارزِ دیگر (PUR-11) — فقط فاکتورِ خریدِ کامپیوتر، پیش‌فرض خاموش ====== */
+    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ir.vil3ntec.tohid.ui.screens.PurchaseFxSettingsWired(context) }
     /* =================== «چرا این قیمت؟» در صندوق (POS-22، پیش‌فرض خاموش) =================== */
     item { ir.vil3ntec.tohid.ui.components.pos.PriceWhySettingsWired(context) }
     /* ======================== رسیدِ هدیهٔ بی قیمت (POS-34، پیش‌فرض خاموش) ======================== */
