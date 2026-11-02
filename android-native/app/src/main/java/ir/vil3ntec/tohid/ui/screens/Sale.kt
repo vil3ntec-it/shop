@@ -311,6 +311,12 @@ fun SaleScreen(
     val lotHit = if (hit is BarcodeMatch.Hit.Product) null else ir.vil3ntec.tohid.data.StockActions.lotForCode(d, code)
     val productId = (hit as? BarcodeMatch.Hit.Product)?.id ?: lotHit?.first
     if (productId == null) {
+      //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
+      ir.vil3ntec.tohid.data.CustomerCards.atTill(ir.vil3ntec.tohid.data.CustomerCardPref.on(context), d, code, index)?.let { c ->
+        if (cartStore.setDebtor(c.id)) { ScanFeedback.ok(context); toast(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.picked(c.name)) }
+        else { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED) }
+        return
+      }
       ScanFeedback.unknown(context)
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
       // کالای تازه‌اش را ثبت کرد و برگشت

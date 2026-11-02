@@ -159,6 +159,7 @@ class SettingsPortTest {
       "AutoFeesPref.set" to "$PENDING — هزینهٔ خودکارِ فاکتور، POS-36",
       "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
       "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
+      "CustomerCardPref.setOn" to "$PENDING — کارت یا بارکدِ مشتری، CRM-16",
       "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
       "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
       "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
@@ -181,6 +182,8 @@ class SettingsPortTest {
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
+      "TaxQuarterPref.setConfig" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
+      "TaxQuarterPref.setOn" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
     )
   }
 }

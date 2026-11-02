@@ -682,6 +682,8 @@ fun SettingsScreenLegacy(
     }
 
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.TaxQuarterSettingsWired(context, d, snackbar) } //  مالیاتِ سه‌ماهه و یادآورِ سررسید (RPT-10)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.CustomerCardSettingsWired(context) } //  کارت یا بارکدِ مشتری (CRM-16)، پیش‌فرض خاموش
 
     /* ============ تحلیلِ موجودی (INV-15، INV-16) — گزارشِ کالاها در گوشی و کامپیوتر ============ */
     //  پیش‌فرض خاموش؛ فقط خواندنی و فقط همین دستگاه (`ShopPolicy.stockInsight`).
