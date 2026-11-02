@@ -75,7 +75,8 @@ object OrderSlipPrint {
     withContext(Dispatchers.IO) {
       runCatching {
         val p = printer.profile()
-        val rows = OrderSlip.rows(slipOf(o), StrOrderSlip, System.currentTimeMillis(), ::stamp)
+        //  OPS-07: در حالتِ آموزش مهرِ «آموزشی» زیرِ سرِ برگه؛ بیرون از آن null ⇒ همان برگهٔ امروز
+        val rows = OrderSlip.rows(slipOf(o), StrOrderSlip, System.currentTimeMillis(), ::stamp, ir.vil3ntec.tohid.data.TrainingMode.watermark(null))
         EscPos.document(HwPages.text(context, p.paperDots, rows.map(::lineOf)), p)
       }
     }

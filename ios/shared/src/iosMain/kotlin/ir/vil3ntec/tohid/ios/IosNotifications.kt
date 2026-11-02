@@ -79,6 +79,9 @@ object IosNotifications {
     content.setSound(UNNotificationSound.defaultSound())
     if (intent != null) content.setUserInfo(userInfoOf(intent))
     val request = UNNotificationRequest.requestWithIdentifier(key(id), content, trigger = null)
+    //  همان سفارش از راهِ APNs هم رسیده؟ شناسهٔ آن اعلان `apns-collapse-id` = notifId است (`server/src/lib/apns.js`)
+    //  ⇐ برداشته می‌شود تا یک خبر دو بار دیده نشود؛ اعلانِ محلی با `Intent` ِ کامل جایش می‌نشیند.
+    intent?.getStringExtra(ir.vil3ntec.tohid.data.OrderNotify.EXTRA_NOTIF)?.let { center.removeDeliveredNotificationsWithIdentifiers(listOf(it)) }
     center.addNotificationRequest(request, withCompletionHandler = null)
   }
 
@@ -130,7 +133,8 @@ object IosNotifications {
       didReceiveNotificationResponse: UNNotificationResponse,
       withCompletionHandler: () -> Unit,
     ) {
-      val intent = intentOf(didReceiveNotificationResponse.notification.request.content.userInfo)
+      val info = didReceiveNotificationResponse.notification.request.content.userInfo
+      val intent = IosPush.remoteIntent(info) ?: intentOf(info)
       dispatch_async(dispatch_get_main_queue()) { IosLinks.openNotice(intent) }
       withCompletionHandler()
     }

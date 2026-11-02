@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.core.gateway.IntentPoller
 import ir.vil3ntec.tohid.core.gateway.IntentStatus
 import ir.vil3ntec.tohid.core.gateway.PaymentIntent
 import ir.vil3ntec.tohid.core.gateway.PendingPayment
+import ir.vil3ntec.tohid.core.gateway.Payee
 import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.pay.Settlement
@@ -113,9 +114,9 @@ fun CheckoutGateways(
   if (!till.any) return
   Column(modifier) {
     //  درگاهِ خودکار با کلیدِ خودِ دکان (قصدِ سرور + وب‌هوکِ امضاشده)
-    if (till.gateway) HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid)
-    //  حالتِ ساده: شماره/QR ِ خودِ دکان؛ تأیید فقط با «پول رسید» ِ صندوقدار
-    till.simple?.let { HesabPaySimpleEntry(hook, it, total, panel?.draft(total, customerId), enabled, busy, onPaid) }
+    if (till.gateway) HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid, payee = till.payee)
+    //  حالتِ ساده: شماره/QR ِ خودِ دکان (فقط از حسابِ ذخیره‌شده در سرور)؛ تأیید فقط با «پول رسید» ِ صندوقدار
+    till.simple?.let { HesabPaySimpleEntry(hook, it, till.payee, total, panel?.draft(total, customerId), enabled, busy, onPaid) }
     //  کارت‌خوان (آداپتورِ دستی) فقط جایی که ثبتِ دستیِ PAY-06 هست: پنلِ ترکیبی
     if (panel != null && till.gateway) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy)
   }
@@ -131,6 +132,7 @@ private fun HesabPayEntry(
   busy: Boolean,
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
+  payee: Payee? = null,
 ) {
   val env = hook.env
   val saleKey = hook.saleKey ?: return
@@ -158,7 +160,7 @@ private fun HesabPayEntry(
   if (open) {
     HesabPaySheet(
       env = env, saleKey = saleKey, amountMinor = due.minor, total = total, draft = draft, busy = busy,
-      precheck = hook.precheck, onPaid = onPaid, onClose = { open = false },
+      precheck = hook.precheck, onPaid = onPaid, onClose = { open = false }, payee = payee,
     )
   }
 }
@@ -190,6 +192,7 @@ private fun HesabPaySheet(
   precheck: () -> String?,
   onPaid: (Settlement) -> Unit,
   onClose: () -> Unit,
+  payee: Payee? = null,
 ) {
   val scope = rememberCoroutineScope()
   var phase by remember { mutableStateOf<Phase>(Phase.Starting) }
@@ -273,7 +276,13 @@ private fun HesabPaySheet(
       BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp)) {
         val wide = maxWidth > maxHeight && maxWidth > 560.dp
         val qrSide = (if (wide) minOf(maxHeight - 32.dp, maxWidth / 2) else minOf(maxWidth, maxHeight * 0.5f)).coerceAtMost(420.dp)
-        val qr: @Composable () -> Unit = { QrPanel(phase, qrSide) }
+        //  کنارِ QR: «پول به حسابِ <نام> — <۴ رقم>» از حسابِ فعالِ ذخیره‌شده در سرور
+        val qr: @Composable () -> Unit = {
+          Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            QrPanel(phase, qrSide)
+            payee?.let { PayeeLine(it) }
+          }
+        }
         val info: @Composable () -> Unit = {
           InfoPanel(
             env = env, phase = phase, amountMinor = amountMinor, skewMs = flow.skewMs, busy = busy,

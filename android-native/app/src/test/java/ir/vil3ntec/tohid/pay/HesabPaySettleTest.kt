@@ -89,4 +89,17 @@ class HesabPaySettleTest {
     assertEquals("REF_REQUIRED", (HesabPaySettle.settleSimple(1450.0, null, "  ") as PayFlow.Outcome.Bad).problem.code)
     assertTrue(HesabPaySettle.settleSimple(0.0, null, "HP-1") is PayFlow.Outcome.Bad)
   }
+  @Test fun `حالتِ ساده اثرِ انگشتِ حسابِ گیرندهٔ سرور را روی ردیفِ حساب‌پی و ردیفِ فروش می‌گذارد`() {
+    val s = (HesabPaySettle.settleSimple(1450.0, PayFlow.Draft(total = 1450.0, cash = "450"), "HP-1", " hp1_abc ") as PayFlow.Outcome.Ok).value
+    assertEquals(listOf(null, "hp1_abc"), s.payments.map { it.payee })
+    //  ردیفِ ذخیره‌شدهٔ فروش همان را دارد (گزارشِ «پول به کدام حساب رفت» در سرور)
+    val sale = ir.vil3ntec.tohid.data.SalePayment("hesabpay", "wallet", 100000L, "confirmed", "HP-1", "cashier", payee = "hp1_abc")
+    val json = kotlinx.serialization.json.Json.encodeToString(ir.vil3ntec.tohid.data.SalePayment.serializer(), sale)
+    assertTrue(json, json.contains("\"payee\":\"hp1_abc\""))
+    //  ردیفِ بی گیرنده (نقد) فیلد را اصلاً نمی‌فرستد
+    val cash = kotlinx.serialization.json.Json.encodeToString(ir.vil3ntec.tohid.data.SalePayment.serializer(),
+      ir.vil3ntec.tohid.data.SalePayment("cash", "cash", 100L, "confirmed"))
+    assertTrue(cash, !cash.contains("payee"))
+    assertEquals(null, (HesabPaySettle.settleSimple(1450.0, null, "HP-1", "  ") as PayFlow.Outcome.Ok).value.payments.single().payee)
+  }
 }

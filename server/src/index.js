@@ -90,6 +90,8 @@ async function main() {
   require('./lib/order-start-alert').start();
   //  PAY-20/RPT-12: گزارشِ خودکارِ صاحبِ دکان (فقط دکانِ با پرچمِ `shop.owner_report` و تنظیمِ روشنِ صاحب)
   require('./lib/owner-report').start();
+  //  حساب‌پیِ هر دکان: «پول رسید» ِ صندوق با گیرنده‌ای جز حسابِ دکان ⇒ هشدار و پوشِ فوری به صاحب (فقط دکانِ دارای حساب)
+  require('./lib/hesabpay-guard').start();
   //  WEB-10: «خبرم کن وقتی موجود/ارزان شد» (بی پرچمِ `shop.storefront.alerts` ⇒ جدولِ خالی، یک پرسشِ کوچک)
   require('./lib/storefront-alerts').start();
   //  NTF-10: پوزش و کوپنِ خودکارِ تأخیر (فقط دکانِ با پرچمِ `shop.orders.late_apology` و سیاستِ روشنِ صاحب)
@@ -136,6 +138,7 @@ async function main() {
     orderNotify.stop();
     require('./lib/customer-notify').stop();
     require('./lib/owner-report').stop();
+    require('./lib/hesabpay-guard').stop();
     payments.stopReconciler();
     notices.stopRunner();
     opsAlerts.stop();

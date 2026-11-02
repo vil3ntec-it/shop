@@ -525,8 +525,12 @@ async function seedShop(a) {
 
   //  «حساب‌پیِ دکان» ِ «الف» (رمزِ جدا + شمارهٔ حالتِ ساده) — توکنِ «ب» نه می‌بیند، نه عوض می‌کند
   assert.equal((await h.put('/api/shop/hesabpay/pin', { newPin: '258014' }, { token: a.accessToken })).status, 200);
-  const hp = await h.put('/api/shop/hesabpay/account', { pin: '258014', mode: 'simple', account: '0799123456' }, { token: a.accessToken });
+  const hp = await h.put('/api/shop/hesabpay/account', { pin: '258014', name: 'دکانِ الف', mode: 'simple', account: '0799123456' }, { token: a.accessToken });
   assert.equal(hp.status, 200, JSON.stringify(hp.body));
+  //  حسابِ دوم ⇒ «در انتظار» (نگهبانِ ۲۰۵) — توکنِ «ب» نه لغوش می‌کند، نه می‌بیندش
+  const hp2 = await h.put('/api/shop/hesabpay/account', { pin: '258014', name: 'دکانِ الف', mode: 'simple', account: '0788123456' }, { token: a.accessToken });
+  assert.equal(hp2.status, 200, JSON.stringify(hp2.body));
+  assert.equal(hp2.body.pending.last4, '3456');
 
   //  فهرستِ سیاهِ ویترینِ «الف» (RSK-04؛ پرچمِ `shop.order_risk` در FLAGS)
   const listed = await h.post('/api/shop/orders/risk/lists',
@@ -654,6 +658,7 @@ function bodyFor(r, ids) {
     'POST /shop/orders/evidence/:id/disputes': { kind: 'damaged', reason: 'آزمونِ اختلاف', requestKey: fresh('dispute-open') },
     'POST /shop/orders/evidence/:id/disputes/notes': { text: 'یادداشت', requestKey: fresh('dispute-note') },
     'POST /shop/orders/evidence/:id/disputes/resolve': { outcome: 'settled', text: 'بسته شد', requestKey: fresh('dispute-res') },
+    'POST /shop/orders/evidence/:id/disputes/assign': { assigneeId: 'u-x', dueAt: Date.now() + 3_600_000, requestKey: fresh('dispute-asg') },
     'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});

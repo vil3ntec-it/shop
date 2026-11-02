@@ -234,7 +234,7 @@ object PayFlow {
     paidAmount = major(s.due - s.toAccount), // PAY-09: `due` = جمع + ردیفِ گرد؛ بی گرد همان `total`
     remaining = major(s.toAccount),
     debtGiven = major(s.toAccount),
-    payments = s.payments.map { SalePayment(it.method, it.kind, it.amount, it.status, it.ref, it.verification) },
+    payments = s.payments.map { SalePayment(it.method, it.kind, it.amount, it.status, it.ref, it.verification, payee = it.payee) },
     tenderedMinor = s.tendered,
     changeMinor = s.change,
   )

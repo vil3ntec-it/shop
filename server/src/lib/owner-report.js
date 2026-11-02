@@ -266,7 +266,10 @@ function summarize(raw, w, zone, { partial = false, lowStock = null } = {}) {
 
 async function buildSummary(shopId, w, zone) {
   const L = await ledgerOf(shopId, w);
-  return summarize(L.raw, w, zone, { partial: L.partial, lowStock: await lowStockOf(shopId) });
+  const sum = summarize(L.raw, w, zone, { partial: L.partial, lowStock: await lowStockOf(shopId) });
+  //  حساب‌پی (PAY-21): پول به کدام حسابِ دکان رسید — فقط نام و ۴ رقم؛ حسابِ غیرِ فعال و هشدارِ «گیرنده ثابت نشد» جدا
+  const hp = await require('./hesabpay-guard').receivedBy(shopId, w, L.raw.sales);
+  return hp.accounts.length || hp.alerts ? { ...sum, hesabpay: hp } : sum;
 }
 
 // ── متن ──────────────────────────────────────────────────────────────
@@ -297,6 +300,13 @@ function render(sum, { shopName = '' } = {}) {
     }
   }
   if (sum.lowStock !== null && sum.lowStock !== undefined) lines.push(`کالای کم‌موجود: ${fa(sum.lowStock)}`);
+  const hp = sum.hesabpay;
+  if (hp && hp.accounts.length) {
+    const who = (a) => (a.active ? `${clean(a.name)} — ${fa(a.last4)}` : !a.fp ? 'بی نشانِ حساب'
+      : `⚠️ حسابِ دیگر${a.last4 ? ` (${clean(a.name)} — ${fa(a.last4)})` : ''}`);
+    lines.push(`حساب‌پی: ${hp.accounts.map((a) => `${who(a)} ${money(a.amountMinor)}`).join('، ')}`);
+  }
+  if (hp && hp.alerts) lines.push(`⚠️ ${fa(hp.alerts)} پرداختِ حساب‌پی به حسابِ دکان ثابت نشد و نیازمندِ بررسی است.`);
   if (sum.partial) lines.push('⚠️ ردیف‌ها از سقفِ یک گزارش بیشتر بود؛ این عددها ناقص‌اند.');
   lines.push('عددها از ردیف‌های همگام‌شده تا لحظهٔ ساختِ گزارش است؛ مبلغ‌ها به پولِ دکان.');
   return { title, body: lines.join('\n') };

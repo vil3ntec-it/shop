@@ -18,16 +18,22 @@ function hashToken(token) { return createHash('sha256').update(String(token)).di
  *  خالی یعنی «نگفت» — نسخه‌های امروزِ دستِ کاربر چیزی نمی‌فرستند و
  *  نباید هم از کار بیفتند. شرحش سرِ `migrations/015`.
  */
-async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '', shopId = null }) {
+/**
+ *  @param sessionAt زمانِ ورودی که این زنجیرهٔ نشست را ساخت — فقط تازه‌سازی (`/auth/refresh`) آن را از توکنِ پیشین
+ *         می‌آورد؛ هر ورودِ تازه (رمز، کد، گوگل، کدِ شاگرد…) زنجیرهٔ تازه است (= همین لحظه). «دستگاهِ مطمئن» ِ حساب‌پی
+ *         (`hesabpay-guard.trustOf`) سنِ همین را می‌سنجد، نه `device_uid` ِ برنامه (مهاجرتِ ۲۰۵).
+ */
+async function issue({ kind, subjectId, deviceId = null, ttlMs, app = 'shop', appVersion = '', shopId = null, sessionAt = null }) {
   const token = generateToken();
   const issuedAt = now();
   const expiresAt = issuedAt + ttlMs;
   const scope = (kind === 'access' || kind === 'refresh') ? await scopeFor(subjectId, app) : '';
   //  `shopId`: دکانِ برگزیدهٔ نشست (مهاجرتِ ۰۹۷) — تهی یعنی «همان قاعدهٔ همیشگی»
   await query(
-    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, scope, shop_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), scope, shopId || null]
+    `INSERT INTO tokens (token_hash, kind, subject_id, device_id, issued_at, expires_at, app, app_version, scope, shop_id, session_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    [hashToken(token), kind, subjectId, deviceId, issuedAt, expiresAt, app, String(appVersion || '').slice(0, 32), scope, shopId || null,
+      Number(sessionAt) > 0 ? Number(sessionAt) : issuedAt]
   );
   if (kind === 'access' || kind === 'refresh') await rememberApp(subjectId, app, issuedAt);
   return { token, expiresAt, app, scope };

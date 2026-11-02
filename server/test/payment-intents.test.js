@@ -713,7 +713,8 @@ test('آداپتورِ حساب‌پی روی سرورِ ساختگیِ حساب
         return res.end(JSON.stringify({ url: 'https://pay.hesab.example/s/abc', session_id: 'HS-1' }));
       }
       if (req.method === 'GET' && req.url === '/api/v1/payment/status/HS-1') {
-        return res.end(JSON.stringify({ data: { status: 'completed', amount: '1450.00', transaction_id: 'TX-9' } }));
+        //  پذیرندهٔ همین دکان — بی آن «پرداخت شد» نمی‌خورد (نگهبانِ ۲۰۵؛ `hesabpay-guard.test.js`)
+        return res.end(JSON.stringify({ data: { status: 'completed', amount: '1450.00', transaction_id: 'TX-9', merchant_id: 'MERCH-test-77' } }));
       }
       res.statusCode = 404;
       res.end('{}');
@@ -730,7 +731,7 @@ test('آداپتورِ حساب‌پی روی سرورِ ساختگیِ حساب
     const s = await shop('حساب‌پیِ واقعی');
     //  کلید و رازِ پذیرندهٔ **خودِ دکان** (رمزشده) — نه از محیط
     assert.equal((await h.put('/api/v1/shop/hesabpay/pin', { newPin: '258014' }, { token: s.t })).status, 200);
-    const acc = await h.put('/api/v1/shop/hesabpay/account', { pin: '258014', mode: 'auto', apiKey: 'test-key-123', webhookSecret: 'whsec-test' }, { token: s.t });
+    const acc = await h.put('/api/v1/shop/hesabpay/account', { pin: '258014', name: 'دکانِ آزمون', mode: 'auto', apiKey: 'test-key-123', webhookSecret: 'whsec-test', merchantId: 'MERCH-test-77' }, { token: s.t });
     assert.equal(acc.status, 200, JSON.stringify(acc.body));
     const hookUrl = `/api/v1/payments/webhook/hesabpay/${acc.body.auto.webhookUrl.split('/').pop()}`;
     assert.equal((await h.get('/api/shop/payments/config', { token: s.t })).body.hesabpay.enabled, true);
