@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.pos.LinePricing
+import kotlinx.coroutines.launch
 
 /**
  *  تنظیمِ «قیمت و تخفیفِ ردیف» روی همین دستگاه (POS-08، POS-10، POS-20، POS-21) — فایلِ مرزیِ
@@ -46,6 +47,17 @@ object LinePolicyPrefs {
   }
 
   /** سیاستِ کاربرِ همین لحظه برای صفحه‌های صندوق */
+  /** S45 — تأییدِ تغییرِ قیمت در سابقه، با درخواست‌کننده و تأییدکننده (`LinePolicy.approvalAudit`) */
+  suspend fun recordApproval(store: ShopStore, g: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant, product: String, refId: String?) {
+    store.update { d -> d.copy(auditLog = d.auditLog + LinePolicy.approvalAudit(g, product, refId, System.currentTimeMillis(), ir.vil3ntec.tohid.todayIso())) }
+  }
+
+  /** «درخواستِ تأیید» ِ کادرِ ردیف برای کاربرِ همین صندوق (`TillUser`) */
+  fun ask(context: Context, store: ShopStore, scope: kotlinx.coroutines.CoroutineScope, product: String, refId: String?): PriceAsk =
+    PriceAsk(
+      selfRole = ShopRole.current(context), selfName = TillUser.me(context), requesterUserId = TillUser.meId(context),
+    ) { g -> scope.launch { recordApproval(store, g, product, refId) } }
+
   fun of(context: Context): LinePricing.Policy = LinePolicy.policy(
     on = on(context),
     role = ShopRole.current(context),

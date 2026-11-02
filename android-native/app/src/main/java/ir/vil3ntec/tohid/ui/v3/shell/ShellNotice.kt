@@ -21,6 +21,7 @@ fun ShellNotice() {
   val desk = LocalDeskLayout.current
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
     if (desk || !home) SubscriptionNotice()
+    ClockSkewNotice()
     if (!desk) UpdateNotice()
   }
 }

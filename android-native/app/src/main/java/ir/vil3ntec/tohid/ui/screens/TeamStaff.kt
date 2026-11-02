@@ -368,7 +368,7 @@ fun ApproverSetupSection(shops: ShopRepository, snackbar: SnackbarHostState) {
 
 /** PINِ تازه: دو بار، شش رقم، نه ساده (۱۱۱۱۱۱ / ۱۲۳۴۵۶) */
 @Composable
-private fun PinSetupDialog(onDismiss: () -> Unit, onDone: (String) -> Unit) {
+internal fun PinSetupDialog(onDismiss: () -> Unit, onDone: (String) -> Unit) {
   var first by remember { mutableStateOf<String?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
   Dialog(onDismissRequest = onDismiss) {

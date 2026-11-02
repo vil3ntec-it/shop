@@ -18,5 +18,6 @@ object I18nTables {
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway,
+    StrTill, // S28b، S45، S46، S50
   )
 }

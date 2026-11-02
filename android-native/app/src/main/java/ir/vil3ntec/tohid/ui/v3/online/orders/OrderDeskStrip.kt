@@ -67,6 +67,11 @@ internal fun OrderDeskStrip(ctl: OrderDeskController) {
   val now = d.serverTime
   val repo = ctl.repo
   val status = OrderDesk.status(d.busyUntil, d.pausedUntil, now)
+  //  S42: Ctrl+B ⇒ «شلوغم» ۳۰ دقیقه، فقط همان‌جا که دکمه‌اش هست
+  val busyKey = OrderDesk.busyKey(d.canManage, status)
+  ir.vil3ntec.tohid.ui.screens.ScreenKey(ir.vil3ntec.tohid.core.keymap.KeyMap.ORDERS_BUSY, enabled = busyKey != null && !ctl.busy) {
+    if (busyKey != null) ctl.act { repo.busy(d, busyKey) }
+  }
   Column(Modifier.fillMaxWidth()) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       when (status) {

@@ -118,6 +118,8 @@ import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.KeyboardCommandKey
 import ir.vil3ntec.tohid.ui.v3.settings.sections.DocGapsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosMoreKeysScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.KeyHelpScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TillSwitchScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosPriceCheckScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosSearchScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosTouchScreen
@@ -185,6 +187,8 @@ internal object SettingsPages {
     Page(SettingsLayout.POS_PRICE_CHECK, Icons.Outlined.PriceCheck) { PosPriceCheckScreen(it) },
     Page(SettingsLayout.POS_TOUCH, Icons.Outlined.TouchApp) { PosTouchScreen(it) },
     Page(SettingsLayout.POS_MORE_KEYS, Icons.Outlined.KeyboardCommandKey) { PosMoreKeysScreen(it) },
+    Page(SettingsLayout.KEY_HELP, Icons.Outlined.KeyboardCommandKey) { KeyHelpScreen(it) },
+    Page(SettingsLayout.TILL_SWITCH, Icons.Outlined.Lock) { TillSwitchScreen(it) },
     Page(SettingsLayout.GIFT_CARD, Icons.Outlined.CardGiftcard) { GiftCardScreen(it) },
     Page(SettingsLayout.LAYAWAY, Icons.Outlined.Schedule) { LayawayScreen(it) },
     Page(SettingsLayout.SAFE_BOOK, Icons.Outlined.AccountBalance) { SafeBookScreen(it) },

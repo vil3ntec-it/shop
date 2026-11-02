@@ -26,7 +26,7 @@ push.setDeliver((row, message) => { pushes.push({ ...message, to: row.user_id })
 
 /** سطرهایی که امروز ساخته نشده‌اند — سند، نه assert */
 export const PENDING = [
-  'کلیدِ Ctrl+B ِ «شلوغم» در keymap.json «planned» است (orders.busy) — برنامه کلید ندارد؛ این‌جا همان درِ `POST /api/shop/orders/desk/busy` که دکمهٔ برنامه می‌زند',
+  'کلیدِ Ctrl+B ِ برنامه (`orders.busy`، زنده) همان `repo.busy(d, 30)` ِ دکمه را می‌زند — سنجه‌اش JVM است (ScenarioS42KeyTest، OrderDeskTest)؛ این‌جا همان درِ `POST /api/shop/orders/desk/busy` با ۳۰ دقیقه',
   'رسیدنِ پیامِ مدیر روی اندروید در پس‌زمینه FCM می‌خواهد (NTF-05 — BLOCKED-EXTERNAL)؛ این‌جا پوشِ سرور',
 ];
 

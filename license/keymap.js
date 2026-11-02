@@ -86,7 +86,7 @@
     "orders.advance": {"scope":"orders","title":"قبول یا مرحلهٔ بعد","status":"planned","page":null,"web":[],"overrides":[]},
     "orders.reject": {"scope":"orders","title":"رد با دلیل","status":"planned","page":null,"web":[],"overrides":[]},
     "orders.printSlip": {"scope":"orders","title":"چاپِ برگه","status":"planned","page":null,"web":[],"overrides":[]},
-    "orders.busy": {"scope":"orders","title":"حالتِ «شلوغم» (با مدت)","status":"planned","page":null,"web":[],"overrides":[]},
+    "orders.busy": {"scope":"orders","title":"حالتِ «شلوغم» (با مدت)","status":"live","page":null,"web":[],"overrides":[]},
     "orders.pause": {"scope":"orders","title":"توقفِ موقتِ سفارش‌گیری","status":"planned","page":null,"web":[],"overrides":[]},
     "stocktake.confirm": {"scope":"stocktake","title":"تأیید","status":"planned","page":null,"web":[],"overrides":[]},
     "stocktake.finish": {"scope":"stocktake","title":"بازبینی و پایان","status":"planned","page":null,"web":[],"overrides":[]},

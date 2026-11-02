@@ -17,9 +17,8 @@ const E = await boot({ name: 'scenario-s28b', env: { SYNC_V3_ENABLED: '1' } });
 
 /** سطرهایی که امروز ساخته نشده‌اند — سند، نه assert */
 export const PENDING = [
-  '«دستگاهِ ۲ هشدارِ قرمزِ ساعت نشان می‌دهد»: هیچ هشدارِ ساعتی در برنامه و وب نیست؛ موتور فقط `clockOffsetMs` را در وضعیت می‌دهد (این‌جا سنجیده شد)',
-  '«تاریخِ اسناد با زمانِ تصحیح‌شده»: فقط HLC ِ مؤثرِ op تصحیح می‌شود (ساعت‌کج ⇒ ساعتِ سرور)؛ `createdAt`/`date` ِ خودِ فاکتور همان ساعتِ غلطِ دستگاه می‌ماند',
-  'موتورِ v3 در برنامه پیش‌فرض خاموش است (SYN-05)',
+  'موتورِ v3 در برنامه پیش‌فرض خاموش است (SYN-05)؛ نوارِ قرمزِ ساعت فقط با v3 ِ همان دستگاه (قاعده‌اش `core/sync/ClockSkew`، ClockSkewTest)',
+  '«تاریخِ تصحیح‌شده» ِ سندِ خودِ دستگاه روی همان دستگاه نمی‌نشیند (Pull opِ خودِ دستگاه را برنمی‌گرداند)؛ روی سرور و دستگاه‌های دیگر هست',
 ];
 
 const owner = await E.owner('owner-s28b@e2e.local', 'صاحبِ S28b', 'دکانِ S28b');
@@ -91,8 +90,31 @@ await E.step('S28b', 'وصل شدن: تغییرِ D1 نمی‌برد و به ص�
     const wall = V3.hlc.parse(s.hlc).wall;
     assert.ok(wall >= T0 - 60_000 && wall <= Date.now() + 60_000, `HLC ِ مؤثرِ ${s.row_id} = ${new Date(wall).toISOString()}`);
   }
-  //  ۳ (بخشی) نشانهٔ هشدار در موتور هست: اختلافِ ساعتِ D2 با سرور
-  assert.ok(Math.abs(D2.engine.status().clockOffsetMs) > 20 * 365 * DAY, `clockOffsetMs = ${D2.engine.status().clockOffsetMs}`);
+  //  ۴) «تاریخِ تصحیح‌شده» ِ خودِ فاکتور: فیلدِ جدای `correctedAt` از سرور (زمانِ تصحیح‌شده)، `createdAt`/`date` همان ساعتِ دستگاه
+  const want = { 's28b-d1': (at) => at > Date.now() + DAY / 2, 's28b-d2': (at) => new Date(at).getUTCFullYear() === 2000 };
+  for (const [id, wrong] of Object.entries(want)) {
+    const data = (await rowOf(E, owner.shopId, 'sales', id)).data;
+    assert.ok(wrong(data.createdAt), `createdAt ِ ${id} بازنویسی شد: ${data.createdAt}`);
+    assert.ok(data.correctedAt >= T0 - 60_000 && data.correctedAt <= Date.now() + 60_000, `correctedAt ِ ${id} = ${data.correctedAt}`);
+    assert.equal('correctedAt' in (await rowOf(E, owner.shopId, 'saleItems', `${id}-1`)).data, false, 'قلمِ بی تاریخ فیلد نمی‌گیرد');
+  }
+  assert.equal(new Date(D1.find('sales', 's28b-d2').date).getUTCFullYear(), 2000, 'تاریخِ دستگاه دست نخورد');
+  assert.ok(Math.abs(D1.find('sales', 's28b-d2').correctedAt - Date.now()) < 60 * 60_000, 'D1 فاکتورِ D2 را با تاریخِ تصحیح‌شده دارد');
+  assert.ok(Math.abs(D2.find('sales', 's28b-d1').correctedAt - Date.now()) < 60 * 60_000, 'D2 فاکتورِ D1 را با تاریخِ تصحیح‌شده دارد');
+  //  ۳) هشدارِ قرمزِ ساعت روی D2: اختلافِ ساعت با سرور از مرزِ نگهبان (`SKEW_MS`، ۵ دقیقه، همان `skew_limit_ms` ِ سرور) گذشت —
+  //     همان قاعدهٔ `ClockSkew.level` ِ برنامه (core، ClockSkewTest «S28b»)؛ D1 هم جلوست و هشدار دارد
+  assert.ok(Math.abs(D2.engine.status().clockOffsetMs) > V3.hlc.SKEW_MS, `clockOffsetMs = ${D2.engine.status().clockOffsetMs}`);
+  assert.ok(D2.engine.status().clockOffsetMs > 20 * 365 * DAY, 'D2 عقب است');
+  assert.ok(D1.engine.status().clockOffsetMs < -V3.hlc.SKEW_MS, 'D1 جلوست');
 }, { needs: ['S28b.offline'] });
+
+await E.step('S28b.fresh', 'دستگاهِ با ساعتِ درست: سندش هیچ فیلدِ تازه‌ای نمی‌گیرد', async () => {
+  D1.shift = 0; D2.shift = 0;
+  D1.sell('s28b-ok', P.id, 1, 50);
+  assert.equal((await D1.engine.sync()).ok, true);
+  const data = (await rowOf(E, owner.shopId, 'sales', 's28b-ok')).data;
+  assert.equal('correctedAt' in data, false, JSON.stringify(Object.keys(data)));
+  assert.equal(Math.abs(D1.engine.status().clockOffsetMs) <= V3.hlc.SKEW_MS, true, 'بی هشدار');
+}, { needs: ['S28b'] });
 
 await E.finish();

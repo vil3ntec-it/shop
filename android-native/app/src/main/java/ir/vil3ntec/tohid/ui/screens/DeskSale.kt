@@ -181,7 +181,7 @@ fun DeskSaleScreen(
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
   var payOpen by remember { mutableStateOf(false) }
-  val seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
+  val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
   //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`،
@@ -905,6 +905,8 @@ fun DeskSaleScreen(
         custom = line.free || line.unitPrice != null,
         free = line.free,
         linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
+        //  S45: ردِ قاعدهٔ جهت/سقفِ قلمِ آزاد ⇒ «درخواستِ تأیید» (فقط با «قیمت و تخفیفِ ردیف» ِ روشن)
+        priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask(context, store, scope, if (line.free) line.label else p?.name.orEmpty(), if (line.free) null else id) },
         saleUnit = p?.saleUnit.orEmpty(),
         unitFactor = p?.unitFactor ?: 1.0,
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
@@ -925,7 +927,7 @@ fun DeskSaleScreen(
       summary = StrPos.discountSummary(money(basis.discount), money(basis.subtotal)) +
         if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
@@ -939,7 +941,7 @@ fun DeskSaleScreen(
       addMinor = over.addMinor,
       selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) },
       selfName = seller,
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       //  با تأیید همان فروش (با همان تسویه) ثبت می‌شود؛ انصراف ⇒ هیچ چیز
       onApproved = { ok -> creditAsk = null; finish(pending, ok) },
       onDismiss = { creditAsk = null; refocus() },
