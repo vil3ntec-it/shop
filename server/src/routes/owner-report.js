@@ -17,9 +17,10 @@ const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
-//  سقفِ نرخ برای هر کاربر — تنظیم کم عوض می‌شود؛ خواندن هم پایگاه را می‌زند
-const limit = rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) => req.user && req.user.id });
-router.use(requireUser, requireShop, limit);
+//  سقفِ نرخ پیش از احراز (برای هر IP) و پس از آن برای هر کاربر — تنظیم کم عوض می‌شود؛ خواندن هم پایگاه را می‌زند
+router.use(rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'owner-report-ip' }));
+router.use(requireUser, requireShop);
+router.use(rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) => req.user && req.user.id }));
 
 const isOwner = (req) => req.role === 'owner';
 
