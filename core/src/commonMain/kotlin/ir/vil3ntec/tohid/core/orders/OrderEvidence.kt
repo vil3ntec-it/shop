@@ -16,7 +16,9 @@ import kotlinx.serialization.json.put
  *  ⇒ هیچ‌چیز دیده نمی‌شود؛ فقط صاحب و `orders.manage` (سرور می‌سنجد).
  *  ⛔ هیچ‌چیز «روشن» فرض نمی‌شود: دکمه فقط وقتی پیداست که سرور به پرسشِ بی‌اثر ([PROBE_ID]) «این سفارش نیست» گفته باشد —
  *  یعنی در باز است و همین کاربر اجازه دارد؛ پرسش هیچ ردیفِ سابقه‌ای نمی‌نویسد (سرور دیدن را پس از یافتنِ سفارش ثبت می‌کند).
- *  ⛔ اختلاف فقط افزودنی است (باز کردن، یادداشت، بستن با نتیجه)؛ هر نوشتن کلیدِ یکتا دارد و ارسالِ دوباره همان کلید را می‌برد.
+ *  ⛔ اختلاف فقط افزودنی است (باز کردن، یادداشت، سپردن به مسئول با مهلت، بستن با نتیجه)؛ هر نوشتن کلیدِ یکتا دارد و ارسالِ
+ *  دوباره همان کلید را می‌برد. مسئول فقط از فهرستِ `assignees` ِ سرور (صاحب و کارمندانِ دارای `orders.manage`)؛ «مهلت گذشته»
+ *  همان `overdue` ِ سرور است (فقط نما، بی هیچ کارِ خودکار).
  */
 object OrderEvidence {
 
@@ -51,6 +53,15 @@ object OrderEvidence {
   fun openPath(orderId: String): String? = filePath(orderId)?.let { "$it/disputes" }
   fun notePath(orderId: String): String? = filePath(orderId)?.let { "$it/disputes/notes" }
   fun resolvePath(orderId: String): String? = filePath(orderId)?.let { "$it/disputes/resolve" }
+  fun assignPath(orderId: String): String? = filePath(orderId)?.let { "$it/disputes/assign" }
+
+  /** مهلت‌های آمادهٔ «سپردن» (ساعت از اکنون) — سرور تا ۹۰ روز می‌پذیرد */
+  val DUE_HOURS: List<Int> = listOf(2, 24, 72)
+  fun dueAt(now: Long, hours: Int): Long = now + hours * 3_600_000L
+  /** همان [dueAt] از ساعتِ همین دستگاه (هسته، بی وابستگیِ پلتفرمی در صفحه) */
+  fun dueIn(hours: Int): Long = dueAt(ir.vil3ntec.tohid.core.platform.currentTimeMillis(), hours)
+  private val USER = Regex("^[A-Za-z0-9_-]{1,80}$")
+  fun validUserId(id: String): Boolean = USER.matches(id)
   val probePath: String get() = "$ROOT/$PROBE_ID"
 
   /**
@@ -78,9 +89,17 @@ object OrderEvidence {
     val openedAt: Long,
     val notes: List<Note>,
     val resolution: Resolution?,
+    /** §۱۹.۹ بندِ ۵: مسئول و مهلتِ اختلاف (آخرین سپردن)؛ null = هنوز سپرده نشده */
+    val assigneeId: String? = null,
+    val dueAt: Long? = null,
+    /** اختلافِ باز و مهلتِ گذشته — همان `overdue` ِ سرور */
+    val overdue: Boolean = false,
   ) {
     val open: Boolean get() = status == "open"
   }
+
+  /** کسی که اختلاف را می‌شود به او سپرد (`assignees` ِ پرونده) */
+  data class Assignee(val userId: String, val name: String, val role: String)
 
   data class OrderInfo(
     val id: String,
@@ -158,6 +177,7 @@ object OrderEvidence {
     val users: Map<String, String>,
     val couriers: Map<String, String>,
     val truncated: List<String>,
+    val assignees: List<Assignee> = emptyList(),
   ) {
     val current: Dispute? get() = disputes.firstOrNull { it.open }
     val past: List<Dispute> get() = disputes.filterNot { it.open }
@@ -194,6 +214,8 @@ object OrderEvidence {
       openedBy = by(obj(o, "openedBy")), openedAt = long(o, "openedAt") ?: 0,
       notes = arr(o, "notes").map { n -> Note(str(n, "id").orEmpty(), str(n, "text").orEmpty(), by(obj(n, "by")), long(n, "at") ?: 0) },
       resolution = if (status == "resolved") res else null,
+      assigneeId = str(o, "assigneeId")?.takeIf(::validUserId), dueAt = long(o, "dueAt"),
+      overdue = status == "open" && bool(o, "overdue") == true,
     )
   }
 
@@ -274,6 +296,9 @@ object OrderEvidence {
       users = names(obj(people, "users")),
       couriers = names(obj(people, "couriers")),
       truncated = (o["truncated"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull },
+      assignees = arr(o, "assignees").mapNotNull { a ->
+        str(a, "userId")?.takeIf(::validUserId)?.let { Assignee(it, str(a, "name").orEmpty(), str(a, "role").orEmpty()) }
+      },
     )
   }
 
@@ -287,7 +312,7 @@ object OrderEvidence {
 
   // ── نوشتن ──
 
-  enum class Act { OPEN, NOTE, RESOLVE }
+  enum class Act { OPEN, NOTE, RESOLVE, ASSIGN }
 
   fun clean(raw: String): String = raw.trim()
 
@@ -295,14 +320,16 @@ object OrderEvidence {
   fun textOk(raw: String): Boolean = clean(raw).count { !it.isLowSurrogate() } in TEXT_MIN..TEXT_MAX
 
   /**
-   *  فرمِ یک نوشتن. [choice] نوعِ اختلاف (باز کردن) یا نتیجه (بستن)؛ یادداشت ندارد.
-   *  `ready` فقط با متنِ درست، انتخابِ معتبر و — برای یادداشت و بستن — اختلافِ باز.
+   *  فرمِ یک نوشتن. [choice] نوعِ اختلاف (باز کردن)، نتیجه (بستن) یا شناسهٔ مسئول (سپردن)؛ یادداشت ندارد.
+   *  `ready` فقط با متنِ درست، انتخابِ معتبر و — برای یادداشت، سپردن و بستن — اختلافِ باز. سپردن [dueAt] می‌خواهد و
+   *  متنش اختیاری است (خالی ⇒ بی یادداشت).
    */
-  data class Draft(val act: Act, val choice: String = "", val text: String = "") {
-    fun ready(current: Dispute?): Boolean = textOk(text) && when (act) {
-      Act.OPEN -> current == null && choice in KINDS
-      Act.NOTE -> current != null
-      Act.RESOLVE -> current != null && choice in OUTCOMES
+  data class Draft(val act: Act, val choice: String = "", val text: String = "", val dueAt: Long? = null, val dueHours: Int? = null) {
+    fun ready(current: Dispute?): Boolean = when (act) {
+      Act.OPEN -> textOk(text) && current == null && choice in KINDS
+      Act.NOTE -> textOk(text) && current != null
+      Act.RESOLVE -> textOk(text) && current != null && choice in OUTCOMES
+      Act.ASSIGN -> current != null && validUserId(choice) && dueAt != null && (clean(text).isEmpty() || textOk(text))
     }
   }
 
@@ -310,12 +337,19 @@ object OrderEvidence {
   fun body(d: Draft, key: String, disputeId: String?): JsonObject? {
     if (!validKey(key)) return null
     if (d.act != Act.OPEN && (disputeId == null || !validDisputeId(disputeId))) return null
+    val due = d.dueAt
+    if (d.act == Act.ASSIGN && (due == null || !validUserId(d.choice))) return null
     return buildJsonObject {
       put("requestKey", key)
       when (d.act) {
         Act.OPEN -> { put("kind", d.choice); put("reason", clean(d.text)) }
         Act.NOTE -> { put("text", clean(d.text)); put("disputeId", disputeId) }
         Act.RESOLVE -> { put("outcome", d.choice); put("text", clean(d.text)); put("disputeId", disputeId) }
+        Act.ASSIGN -> {
+          put("assigneeId", d.choice); put("dueAt", due)
+          clean(d.text).takeIf { it.isNotEmpty() }?.let { put("text", it) }
+          put("disputeId", disputeId)
+        }
       }
     }
   }

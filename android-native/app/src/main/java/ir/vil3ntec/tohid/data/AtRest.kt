@@ -67,7 +67,8 @@ object AtRest {
     ).also { ring = it }
   }
 
-  private fun codec(context: Context): AtRestCodec = codecOnce ?: synchronized(this) {
+  /** همان رمزگشای دفتر؛ `internal` برای ترجیحاتِ رمزدارِ پیک (DLV-10، `CourierStore` ⇐ `CourierSeal`) */
+  internal fun codec(context: Context): AtRestCodec = codecOnce ?: synchronized(this) {
     codecOnce ?: AtRestCodec(keyring(context)).also { codecOnce = it }
   }
 

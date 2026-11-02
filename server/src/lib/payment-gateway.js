@@ -67,4 +67,35 @@ function intentAdapters() {
   };
 }
 
-module.exports = { gatewayFor, callbackUrl, webhookTarget, intentAdapters };
+/** پاسخِ قطعیِ «پرداخت نشد» ِ ارائه‌دهنده در تأییدِ دوم/تطبیق. */
+const PROVIDER_NO = Object.freeze(['failed', 'expired', 'cancelled']);
+
+/** تأییدِ دومِ «paid» از خودِ ارائه‌دهنده (از `payment-intents.js` برای سقفِ اندازه). `st` ⇒ سنجشِ پذیرنده. */
+async function confirmWith(ad, intent) {
+  if (typeof ad.fetchStatus !== 'function') return { ok: false, reason: 'no_status_api' };
+  let st;
+  try { st = await ad.fetchStatus(intent.provider_session_id); } catch (err) {
+    console.warn(`[payments] تأییدِ دوم از ${ad.name} نشد (${intent.id}): ${err.message}`);
+    return { ok: false, reason: 'status_unreachable', retry: true };
+  }
+  //  فقط «نه» ِ قطعی پایانی است. pending/unknown/… یعنی درِ وضعیت هنوز هم‌گام نشده (پول شاید رفته)
+  //  ⇒ «بعداً» (۵۰۳) تا ارائه‌دهنده همان رویداد را دوباره بفرستد؛ رویداد نهایی نمی‌شود.
+  if (st.status !== 'paid') return { ok: false, reason: `provider_says_${st.status}`, retry: !PROVIDER_NO.includes(st.status) };
+  if (st.amountMinor !== Number(intent.amount_minor) || st.currency !== intent.currency) {
+    return { ok: false, reason: 'amount_mismatch', mismatch: true, got: { amountMinor: st.amountMinor, currency: st.currency } };
+  }
+  return { ok: true, providerRef: st.providerRef, st };
+}
+
+/**
+ * حساب‌پیِ هر دکان، پیش از «پرداخت شد» (مبلغ و ارز پیش‌تر سنجیده): پول به پذیرندهٔ **همین** دکان رسید؟ (پذیرنده در
+ * وب‌هوک یا درِ وضعیت + مرجعِ خودمان + اثرِ انگشتِ حسابِ فعال؛ `hesabpay-guard.payeeProof`). ثابت شد ⇒ null؛ نه ⇒
+ * «نیازمندِ بررسی» (قصد همان وضعیت می‌ماند، هرگز «پرداخت شد») با هشدار و خبرِ صاحب. ساختگیِ آزمون بیرون است.
+ */
+async function payeeHeld(ad, intent, ev, st, source) {
+  const g = require('./hesabpay-guard');
+  const p = g.payeeProof(ad, intent, ev || {}, st);
+  return p.ok ? null : g.holdForReview(intent, p.missing, source);
+}
+
+module.exports = { gatewayFor, callbackUrl, webhookTarget, intentAdapters, confirmWith, payeeHeld };

@@ -918,14 +918,14 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
     const user = await one('SELECT * FROM users WHERE id=$1', [row.subject_id]);
     if (!user || user.status !== 'active') return next(unauthorized('حساب در دسترس نیست', 'invalid_token'));
 
-    //  دکانِ برگزیدهٔ نشست با تازه‌سازی می‌ماند (مهاجرتِ ۰۹۷)
+    //  دکانِ برگزیدهٔ نشست و زمانِ ورودِ زنجیره (`session_at`، دستگاهِ مطمئنِ حساب‌پی) با تازه‌سازی می‌مانند
     const acc = await tokens.issue({
       kind: 'access', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
+      ttlMs: config.tokens.accessTtlMs, app: row.app || 'shop', shopId: row.shop_id || null, sessionAt: Number(row.session_at) || Number(row.issued_at),
     });
     const fresh = await tokens.issue({
       kind: 'refresh', subjectId: user.id, deviceId: row.device_id,
-      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop', shopId: row.shop_id || null,
+      ttlMs: config.tokens.refreshTtlMs, app: row.app || 'shop', shopId: row.shop_id || null, sessionAt: Number(row.session_at) || Number(row.issued_at),
     });
     if (await tokens.markRotated(found.hash, fresh.token)) {
       access = acc; refreshToken = fresh.token; refreshExpiresAt = fresh.expiresAt;

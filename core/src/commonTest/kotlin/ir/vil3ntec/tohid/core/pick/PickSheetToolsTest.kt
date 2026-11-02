@@ -23,6 +23,14 @@ class PickSheetToolsTest {
     for (q in listOf(1.25, 0.5, 3.333, 750.0)) assertEquals(kotlin.math.round(q * 1000).toLong(), PickText.weightMilli(PickText.scaleText(q)), "$q")
   }
 
+  /** OPS-07: برچسبِ کیسهٔ حالتِ آموزش «آموزشی · …»؛ بی مهر همان نوشتهٔ سرور */
+  @Test
+  fun trainingMarkPrefixesTheBagCaptionOnly() {
+    assertEquals("#42 · کیسهٔ ۱ از ۲", BagLabelPrint.caption("#42 · کیسهٔ ۱ از ۲", null))
+    assertEquals("#42 · کیسهٔ ۱ از ۲", BagLabelPrint.caption("#42 · کیسهٔ ۱ از ۲", " "))
+    assertEquals("آموزشی · #42 · کیسهٔ ۱ از ۲", BagLabelPrint.caption("#42 · کیسهٔ ۱ از ۲", "آموزشی"))
+  }
+
   @Test
   fun bagLabelsStackEveryQrWithItsCaption() {
     val bags = (1..3).map { BagLabelPrint.Bag("VLNB-12-$it-3", "#12 · $it/3") }

@@ -18,6 +18,47 @@ object StrPay {
   // «حساب‌پیِ دکان» — حالتِ ساده: شماره یا QR ِ خودِ دکان؛ تأیید فقط با «پول رسید» ِ صندوقدار
   val payToShop: String get() = t("حساب‌پی (حسابِ دکان)", "HesabPay (shop account)", "حساب‌پې (د دوکان حساب)")
   val shopHesabTitle: String get() = t("پرداخت به حساب‌پیِ دکان", "Pay to the shop's HesabPay", "د دوکان حساب‌پې ته ورکړه")
+  /** کنارِ QR ِ صندوق: گیرندهٔ فعالِ پول (از حسابِ ذخیره‌شده در سرور) */
+  fun payeeLine(name: Any, last4: Any): String = t(
+    "پول به حسابِ ${asIs(name)} — ${asIs(last4)}",
+    "Money goes to $name — $last4",
+    "پیسې د $name حساب ته — $last4",
+  )
+  /** نوارِ پوسته و کارتِ «حساب‌پیِ دکان» (فقط صاحب): حسابِ گیرنده در انتظارِ فعال شدن است */
+  fun changeNotice(name: Any, last4: Any): String = t(
+    "حسابِ گیرندهٔ پولِ حساب‌پی عوض می‌شود: ${asIs(name)} — ${asIs(last4)}",
+    "The HesabPay payout account is changing: $name — $last4",
+    "د حساب‌پې د پیسو اخیستونکی حساب بدلېږي: $name — $last4",
+  )
+  val changeNoticeDetail: String get() = t(
+    "اگر شما نبودید، همین حالا لغو کنید؛ تا ۲۴ ساعت پول به همان حسابِ قبلی می‌رود.",
+    "If it wasn't you, cancel now; for 24 hours money still goes to the old account.",
+    "که تاسو نه وئ، همدا اوس یې لغوه کړئ؛ تر ۲۴ ساعتونو پیسې زاړه حساب ته ځي.",
+  )
+  val notMe: String get() = t("این من نبودم — لغو کن", "This wasn't me — cancel", "دا زه نه وم — لغوه یې کړه")
+  /** X/Z: «پول رسید» ِ حساب‌پی به تفکیکِ حسابِ گیرنده (`DrawerModel.hesabPayLines`) */
+  fun xzPayee(label: Any, amount: Any, n: Any): String = t(
+    "حساب‌پی — ${asIs(label)}: ${asIs(amount)} (${asIs(n)} پرداخت)",
+    "HesabPay — $label: $amount ($n payments)",
+    "حساب‌پې — $label: $amount ($n ورکړې)",
+  )
+  fun xzPayeeCount(label: Any, n: Any): String = t(
+    "حساب‌پی — ${asIs(label)}: ${asIs(n)} پرداخت",
+    "HesabPay — $label: $n payments",
+    "حساب‌پې — $label: $n ورکړې",
+  )
+  fun xzRetired(name: Any, last4: Any): String = t(
+    "حسابِ پیشینِ ${asIs(name)} — ${asIs(last4)}",
+    "previous account $name — $last4",
+    "پخوانی حساب $name — $last4",
+  )
+  val xzUnknown: String get() = t("⚠️ حسابی که مالِ این دکان نیست", "⚠️ an account that is not this shop's", "⚠️ داسې حساب چې د دې دوکان نه دی")
+  val xzNone: String get() = t("بی نشانِ حساب (نسخهٔ کهنه)", "no account mark (old version)", "د حساب نښه نشته (زوړ نسخه)")
+  val changeCancelled: String get() = t(
+    "لغو شد؛ پول به همان حسابِ قبلی می‌رود و بخشِ حساب‌پی ۲۴ ساعت بسته است.",
+    "Cancelled; money keeps going to the old account and the HesabPay section is locked for 24 hours.",
+    "لغوه شو؛ پیسې زاړه حساب ته ځي او د حساب‌پې برخه ۲۴ ساعته تړل ده.",
+  )
   fun simpleSteps(account: Any, ref: Any): String = t(
     "مشتری با برنامهٔ حساب‌پی همین QR را اسکن کند یا به شمارهٔ ${asIs(account)} بفرستد، همین مبلغ را بزند و کدِ ${asIs(ref)} را در یادداشت بنویسد.",
     "The customer scans this QR with the HesabPay app or sends to $account, enters this exact amount and writes $ref in the note.",

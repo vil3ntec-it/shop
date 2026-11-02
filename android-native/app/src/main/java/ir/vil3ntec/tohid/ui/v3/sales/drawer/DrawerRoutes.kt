@@ -214,8 +214,11 @@ fun RouteScope.DrawerXRoute() {
   //  و خطِ «ثبت از اسکنر» (کارتِ فرمان، #840)
   val waiting = if (args.query("kind") == "z" || shift == null) 0L
   else remember(data, shift) { DrawerNotes.unreceived(data, shift.open.createdAt, System.currentTimeMillis()) }
+  //  حساب‌پی به تفکیکِ حسابِ گیرنده (نام و ۴ رقم از تاریخچهٔ سرور)
+  val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
   ShiftReportSheet(rep, staff, title = null,
-    notes = listOfNotNull(DrawerModel.scannerLine(data, rep.openedAt, rep.at, seesMoney = !staff)) + DrawerNotes.unreceivedNotes(waiting),
+    notes = listOfNotNull(DrawerModel.scannerLine(data, rep.openedAt, rep.at, seesMoney = !staff)) + DrawerNotes.unreceivedNotes(waiting) +
+      DrawerModel.hesabPayLines(data, rep.openedAt, rep.at, known, seesMoney = !staff),
     onClose = { back() })
 }
 
@@ -228,6 +231,7 @@ fun RouteScope.DrawerShiftRoute() {
   val shift = remember(data, id) { CashShift.list(data).firstOrNull { it.open.id == id } }
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
   val z = shift.close?.z?.let { PayFlow.reportOf(it) }
-  if (z != null) ShiftReportSheet(z, staff, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)), onClose = { back() })
+  val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
+  if (z != null) ShiftReportSheet(z, staff, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)) + DrawerModel.hesabPayLines(data, z.openedAt, z.at, known, seesMoney = !staff), onClose = { back() })
   else ShiftNotesSheet(shift, onClose = { back() })
 }

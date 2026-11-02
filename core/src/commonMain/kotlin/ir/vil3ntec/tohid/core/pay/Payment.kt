@@ -77,6 +77,8 @@ data class PaymentRow(
   val status: String,
   /** سطحِ تأیید (PAY-08): `manual` = ثبتِ دستی با شمارهٔ مرجع؛ نقد و حساب ندارند */
   val verification: String?,
+  /** حساب‌پیِ دکان: اثرِ انگشتِ حسابِ گیرنده (سرور: `hesabpay-guard`) ⇐ گزارشِ «پول به کدام حساب رفت»؛ بقیه null */
+  val payee: String? = null,
 )
 
 data class Settlement(
