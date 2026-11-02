@@ -310,6 +310,9 @@ async function run(args, { env = process.env, seconds = readSeconds(), out = pro
       : `  فرآیندِ پرونده و زیرفرآیندهایش کشته می‌شوند؛ node --test آن را «not ok» می‌نویسد و پروندهٔ بعدی را می‌آزماید.`);
     say(lines);
 
+    //  بستنِ کلِ اجرا: نخست خودِ `node --test` می‌ایستد (SIGSTOP)، وگرنه میانِ کشتنِ این پرونده و کشتنِ
+    //  خودش پروندهٔ بعدی را آغاز می‌کند و آن فرآیند بی‌صاحب می‌ماند (CI ِ PostgreSQL، watchdog-ok.js)
+    if (abort && posix) { try { process.kill(child.pid, 'SIGSTOP'); } catch { /* رفته */ } }
     for (const p of targets) { try { process.kill(p.pid, 'SIGKILL'); } catch { /* رفته */ } }
     if (abort) {
       if (!posix) {
