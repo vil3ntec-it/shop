@@ -1,6 +1,6 @@
 'use strict';
 /**
- * ── داوریِ نقشِ سندهای «سابقه‌سوار» در Sync v3 (PAY-24، PRM-13، POS-26/27، INV-20/21) ─────────────
+ * ── داوریِ نقشِ سندهای «سابقه‌سوار» در Sync v3 و v1 ِ دکان (PAY-24، PRM-13، POS-26/27، INV-20/21) ─────────────
  * کارتِ هدیه، امتیازِ وفاداری، فروشِ امانی، سفارشِ ویژه، محلِ انبار و بسته‌بندی جدولِ تازه ندارند: سندشان ردیفِ
  * `auditLog` (با `type`) و پولشان رسید/بردِ `transactions` (با `kind`) است. هر دو جدول برای هر نقشِ نویسنده باز است
  * (`perm-core.WRITES`) و قاعدهٔ ردیف ندارند، پس اجازه‌ای که برنامه پیش از ساختنِ ردیف می‌سنجد فقط روی دستگاه بود:
@@ -31,11 +31,20 @@
  *   PLACES  `StockPlacesEntry`: هر نقش جز `staff` (شاگرد) — محل‌ها و بسته‌بندیِ دوباره
  *   ''      بی سنجشِ نقش در برنامه (ساختِ امانی و سفارش، «آماده»، پیش‌پرداخت و قسط): فقط شکل
  *
- * ⛔ Sync v1 (`sync-v1.js` ِ مشترک با پمپ) دست نمی‌خورد: v1 این ردیف‌ها را فقط با `canWrite` ِ جدول می‌نشاند و
- *    آینه‌اش با origin ِ `v1` به v3 می‌رسد که `authorize` نمی‌سنجد — این داوری در v1 نیست.
+ * ── Sync v1 ِ دکان ([v1Guard]، از `routes/sync-v1.js`) ─────────────────────────────────────────────
+ *   همین قاعده‌ها، همین پرچم. `lib/sync-v1.js` (مشترک با پمپ) دست نمی‌خورد: داوری از قلابِ `guard` ِ همان push
+ *   است که برای هر op پس از تکراری‌سنجی، `authorizeOp` و قفلِ ردیف صدا زده می‌شود (همان تراکنش؛ کنارِ نگهبانِ
+ *   `finalized-sales`). حسابِ پمپ (`station`) و دسته‌ای بی `auditLog`/`transactions` همان نگهبانِ پیشین را
+ *   می‌گیرند، بی هیچ پرسشی. فیلدهای v1 پیش از سنجش با همان مبدلِ v1⇒v3 (`sync-v3-convert.convertFields`:
+ *   `amount` ِ افغانی ⇒ `amountMinor`) شکلِ v3 می‌گیرند. چون v1 درج روی ردیفِ موجود را ادغام می‌کند و ویرایش
+ *   دارد، ردیفِ **پس از** ادغام سنجیده می‌شود (درج یا ویرایش؛ حذف نه)؛ opی که چیزی را عوض نمی‌کند
+ *   (`safe-ledger.within`، همان درجِ دوبارهٔ بی‌اثرِ v3) داوری نمی‌شود. رد همان شکلِ ردِ v1 است:
+ *   `{op_id, status: 'rejected', reason}` با همان دو کد، و برنامه (`SyncV1Engine`) آن را مثلِ هر ردِ دیگرِ v1
+ *   از صف به دفترِ ردشده‌ها (`OpQueue.drop`) می‌برد. آینهٔ v1 در v3 فقط ردیفِ پذیرفته را می‌برد.
  */
 const permCore = require('./perm-core');
 const staffPerms = require('./staff-perms');
+const { SHOP } = require('./tenancy');
 
 const FLAG = 'shop.sync.doc_roles';
 
@@ -161,7 +170,12 @@ function once(ctx, key, make) {
  */
 async function judgeV3(c, ctx, op, row) {
   if (op.kind !== 'insert' || (row && row.inserted)) return null;
-  const need = needOf(op.table, op.fields);
+  return judge(c, ctx, op.table, op.fields);
+}
+
+/** داوریِ یک ردیف به شکلِ v3 — مشترکِ v3 و v1. null یعنی بنشیند. */
+async function judge(c, ctx, table, fields) {
+  const need = needOf(table, fields);
   if (need === null) return null;
   const run = (sql, params) => c.query(sql, params);
   if (!(await once(ctx, 'on', () => require('./orders').flagOf(ctx.accountId, FLAG, run)))) return null;
@@ -171,4 +185,63 @@ async function judgeV3(c, ctx, op, row) {
   return permits(need, ctx.role, layers) ? null : 'doc_not_allowed';
 }
 
-module.exports = { FLAG, SELL, CANCEL, VOID, BACK, PLACES, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3 };
+// ---------------------------------------------------------------- Sync v1 ِ دکان
+
+/** جدول‌هایی که این داوری می‌بیند (`needOf`) */
+const V1_TABLES = new Set(['auditLog', 'transactions']);
+
+/** حسابِ دکان در بخشِ دکان (حسابِ پمپ `station` است) */
+const isShopV1 = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
+
+/** آیا opِ خامِ push مالِ یکی از این جدول‌هاست — همان یک‌دست‌سازیِ نامِ جدولِ `validateOp` */
+function v1Touches(raw) {
+  if (!isObj(raw)) return false;
+  const { tableOf } = require('./sync-v1');
+  return V1_TABLES.has(tableOf(SHOP.app, raw.table ?? raw.table_name ?? raw.tableName));
+}
+
+/** ردیفِ v1 پس از ادغامِ این op (`$inc` روی عددِ موجود) */
+function mergedV1(cur, fields) {
+  const out = { ...(isObj(cur) ? cur : {}) };
+  for (const [k, v] of Object.entries(fields)) {
+    out[k] = isObj(v) && typeof v.$inc === 'number' && typeof out[k] === 'number' ? out[k] + v.$inc : v;
+  }
+  return out;
+}
+
+/**
+ * داوریِ یک opِ v1 ِ دکان (شکلِ `validateOp`، پس از مهاجرت). null یعنی بنشیند.
+ * @param cur  دادهٔ ردیفِ موجود در `sync_rows` (پاک‌شده یا نبود ⇒ null)
+ */
+async function judgeV1(c, ctx, op, cur) {
+  if (op.type === 'delete' || !V1_TABLES.has(op.table)) return null;
+  const fields = isObj(op.fields) ? op.fields : {};
+  if (cur && require('./safe-ledger').within(fields, cur, op.rowId)) return null;
+  const spec = require('./sync-v3-schema').specOf(op.table);
+  if (!spec) return null;
+  return judge(c, ctx, op.table, require('./sync-v3-convert').convertFields(spec, mergedV1(cur, fields)).set);
+}
+
+/**
+ * نگهبانِ push ِ v1 (`routes/sync-v1.js`): [inner] (نگهبانِ `finalized-sales`، یا null) را می‌پیچد.
+ * پمپ، یا دسته‌ای بی این جدول‌ها ⇒ خودِ [inner]، بی هیچ کار و پرسشی. `lib/sync-v1.js` ردِ `{reject}` را
+ * همان `{status: 'rejected', reason}` ِ v1 می‌کند.
+ */
+function v1Guard(ctx, ops, inner = null) {
+  if (!isShopV1(ctx) || !Array.isArray(ops) || !ops.some(v1Touches)) return inner;
+  //  پرچم و لایه‌ها یک بار برای همین درخواست (کلیدِ تازهٔ `once`)
+  const scope = { accountId: ctx.accountId, role: ctx.role, userId: ctx.userId };
+  return {
+    async check(c, op, cur) {
+      const g = inner ? await inner.check(c, op, cur) : null;
+      if (g && (g.reject || g.replay)) return g;
+      const reason = await judgeV1(c, scope, op, cur);
+      return reason ? { reject: reason } : g;
+    },
+    finish: () => (inner ? inner.finish() : undefined),
+  };
+}
+
+module.exports = {
+  FLAG, SELL, CANCEL, VOID, BACK, PLACES, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3, judgeV1, v1Guard,
+};

@@ -1,11 +1,13 @@
 'use strict';
 /**
- * داوریِ نقشِ سندهای سابقه‌سوار در Sync v3 — `src/lib/doc-roles.js`، پرچمِ `shop.sync.doc_roles` (پیش‌فرض خاموش).
+ * داوریِ نقشِ سندهای سابقه‌سوار در Sync v3 و v1 ِ دکان — `src/lib/doc-roles.js`، پرچمِ `shop.sync.doc_roles` (پیش‌فرض خاموش).
  *  ۱) آینه: برای هر نوع، هر هفت نقش و چند لایه، تصمیمِ سرور = همان دروازه‌ای که برنامه پیش از ساختنِ ردیف می‌سنجد
  *     (بازنویسیِ جدا از کدِ اندروید، با نشانیِ همان سطر) ⇒ سرور چیزی را که برنامه اجازه می‌دهد رد نمی‌کند.
  *  ۲) شکل: مبلغ/امتیازِ نه صحیحِ مثبت، `refId` ِ خالی، نوعِ ناشناختهٔ همین خانواده‌ها.
  *  ۳) push ِ واقعی: خاموش ⇒ همان امروز؛ روشن ⇒ پذیرش برای نقشِ درست، ردِ بی‌اجازه، صاحب همیشه، شکلِ بد رد،
- *     ردِ کلِ واحدِ tx؛ و v1 که این داوری را ندارد.
+ *     ردِ کلِ واحدِ tx.
+ *  ۴) Sync v1 ِ دکان (`routes/sync-v1.js`): همان داوری با همان پرچم، فیلدهای v1 (`amount` ِ افغانی)، ردِ همان شکلِ v1،
+ *     ادغام و ویرایشِ v1؛ و پمپ که همان مسیر را بی هیچ داوری می‌رود.
  */
 process.env.SYNC_V3_ENABLED = '1';
 
@@ -287,9 +289,156 @@ test('روشن: درجِ دوبارهٔ ردیفی که پیش‌تر نشسته
   assert.deepEqual(results(r), ['applied'], JSON.stringify(r.body));
 });
 
-test('v1 (بی تغییر، `sync-v1.js` مشترک با پمپ): پرچمِ روشن هم این ردیف‌ها را فقط با `canWrite` ِ جدول می‌نشاند', async () => {
-  const v1 = (rowId, fields) => ({ op_id: oid(), table: 'auditLog', row_id: rowId, type: 'insert', ts: Date.now(), fields });
-  const r = await push1('cashier', [v1('v1-void', { type: 'gift_card_void', payRef: CODE, amount: 0, reason: 'کارتِ گم‌شده' })]);
+// ---------------------------------------------------------------- ۴: Sync v1 ِ دکان (`routes/sync-v1.js`)
+
+/** همان ردیف به شکلِ v1 ِ برنامه (`AuditEntry`/`Transaction`): مبلغِ افغانی `amount` به جای `amountMinor` */
+const v1Fields = (fields) => {
+  const { amountMinor, ...rest } = fields;
+  return amountMinor === undefined ? rest : { ...rest, amount: amountMinor / 100 };
+};
+const v1op = (table, rowId, fields, type = 'insert') => ({ op_id: oid(), table, row_id: rowId, type, ts: Date.now(), fields });
+const v1Of = (name, tag) => {
+  const [table, fields] = CASES[name];
+  const rowId = `${tag}-${name.replace(':', '-')}`;
+  return v1op(table, rowId, v1Fields(fields(rowId)));
+};
+const inV1 = async (table, rowId) => (await one(
+  `SELECT data FROM sync_rows WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name=$2 AND row_id=$3
+      AND deleted_at IS NULL`, [shopId, table, rowId]
+))?.data;
+async function expectEach1(who, names, tag, want) {
+  const r = await push1(who, names.map((n) => v1Of(n, tag)));
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual(results(r), ['applied'], JSON.stringify(r.body));
+  assert.deepEqual(results(r), names.map(() => want), `v1 ${who}/${tag}: ${names.join(', ')} ⇒ ${JSON.stringify(r.body.results)}`);
+  return r;
+}
+
+test('v1 پرچم خاموش (دکانِ `false`، و `false` با `all` ِ روشن) ⇒ همان امروز: همه با `canWrite` ِ جدول می‌نشیند، پاسخ همان شکل', async () => {
+  await setFlag(shopId, false);
+  const plain = await push1('cashier', [v1op('auditLog', 'v1off-sale', { type: 'sale', refId: 'v1off-sale', notes: 'ثبت فروش' })]);
+  const keys = Object.keys(plain.body.results[0]).sort();
+  const top = Object.keys(plain.body).sort();
+  for (const [tag, setup] of [['v1off0', null], ['v1off1', () => setFlag('all', true)]]) {
+    if (setup) await setup();
+    const c = await expectEach1('cashier', NAMES, `${tag}c`, 'applied');
+    assert.deepEqual(Object.keys(c.body).sort(), top);
+    for (const x of c.body.results) assert.deepEqual(Object.keys(x).sort(), keys);
+    await expectEach1('picker', AUDIT_NAMES, `${tag}p`, 'applied');
+    await expectEach1('staff', ofGate('places'), `${tag}s`, 'applied');
+  }
+  await live.remove('all', docRoles.FLAG);
+  await setFlag(shopId, true);
+});
+
+test('v1 روشن: هر نوع برای نقشی که برنامه اجازه می‌دهد می‌نشیند؛ صاحب دکان همه را', async () => {
+  await expectEach1('cashier', ofGate('sell', 'back', 'places', 'open'), 'v1ok-c', 'applied');
+  await expectEach1('manager', ofGate('cancel', 'void'), 'v1ok-m', 'applied');
+  await expectEach1('picker', ofGate('open').filter((n) => AUDIT_NAMES.includes(n)), 'v1ok-p', 'applied');
+  await expectEach1('staff', ofGate('sell', 'back', 'open'), 'v1ok-s', 'applied');
+  await expectEach1('owner', NAMES, 'v1ok-o', 'applied');
+  assert.equal((await inV1('auditLog', 'v1ok-m-gift_card_void')).reason, 'کارتِ گم‌شده');
+});
+
+test('v1 روشن: بی اجازه ⇒ همان ردِ v1 (`status: rejected`، `doc_not_allowed`) و ردیف نمی‌نشیند', async () => {
+  //  صندوق‌دار بی لغو ⇒ باطلِ کارت، لغوِ امانی/سفارش و بردِ بازپرداختشان
+  const r = await expectEach1('cashier', ofGate('cancel', 'void'), 'v1no-c', 'doc_not_allowed');
+  for (const x of r.body.results) assert.deepEqual(Object.keys(x).sort(), ['op_id', 'reason', 'status']);
+  for (const n of ofGate('cancel', 'void')) assert.equal(await inV1(CASES[n][0], `v1no-c-${n.replace(':', '-')}`), undefined, n);
+  await expectEach1('picker', ofGate('sell', 'back', 'cancel', 'void').filter((n) => AUDIT_NAMES.includes(n)), 'v1no-p', 'doc_not_allowed');
+  await expectEach1('staff', ofGate('places'), 'v1no-s', 'doc_not_allowed');
+  await staffPerms.setRoleLayer(shopId, 'cashier', { 'returns.create': { mode: 'deny' } }, 'test');
+  await expectEach1('cashier', ofGate('back'), 'v1no-cr', 'doc_not_allowed');
+  await staffPerms.setRoleLayer(shopId, 'cashier', {}, 'test');
+  //  ردِ یکی جای خودش در `results`؛ بقیهٔ دسته می‌نشیند
+  const mixed = await push1('cashier', [v1Of('gift_card_issue', 'v1mix'), v1Of('gift_card_void', 'v1mix'), v1Of('loyalty_earn', 'v1mix')]);
+  assert.deepEqual(results(mixed), ['applied', 'doc_not_allowed', 'applied'], JSON.stringify(mixed.body));
+  assert.equal(mixed.body.applied, 2);
+});
+
+test('v1 روشن: شکلِ بد برای همه رد، صاحب دکان هم؛ نوعِ دیگرِ سابقه دست نمی‌خورد', async () => {
+  for (const who of ['owner', 'cashier']) {
+    const r = await push1(who, [
+      v1op('auditLog', `v1bad-${who}-1`, { type: 'gift_card_issue', payRef: CODE, amount: 0 }),
+      v1op('auditLog', `v1bad-${who}-2`, { type: 'gift_card_redeem', payRef: CODE, amount: 10 }),
+      v1op('auditLog', `v1bad-${who}-3`, { type: 'gift_card_mint', payRef: CODE, amount: 10 }),
+      v1op('transactions', `v1bad-${who}-4`, { debtorId: 'd', type: 'receive', amount: 1, kind: 'layaway_installment' }),
+      v1op('auditLog', `v1bad-${who}-5`, { type: 'sale', refId: 's', notes: 'ثبت فروش' }),
+    ]);
+    assert.deepEqual(results(r), ['doc_invalid', 'doc_invalid', 'doc_invalid', 'doc_invalid', 'applied'], `${who}: ${JSON.stringify(r.body)}`);
+  }
+});
+
+test('v1 روشن: درجِ دوبارهٔ بی‌تغییر داوری نمی‌شود؛ ادغام یا ویرایشی که ردیف را به این نوع‌ها می‌برد داوری می‌شود', async () => {
+  //  همان ردیفِ باطلِ مدیر، دوباره از صندوق‌دار با op ِ تازه ⇒ چیزی عوض نمی‌شود ⇒ می‌نشیند
+  const again = await push1('cashier', [v1op('auditLog', 'v1ok-m-gift_card_void', v1Fields(CASES.gift_card_void[1]()))]);
+  assert.deepEqual(results(again), ['applied'], JSON.stringify(again.body));
+  //  سابقهٔ عادی ⇐ ویرایش/درجِ ادغامی به «باطل کردنِ کارت»: صندوق‌دار رد، صاحب دکان می‌نشیند
+  const voidF = { type: 'gift_card_void', payRef: CODE, amount: 0, reason: 'کارتِ گم‌شده' };
+  for (const [kind, who, want] of [['update', 'cashier', 'doc_not_allowed'], ['insert', 'cashier', 'doc_not_allowed'], ['update', 'owner', 'applied']]) {
+    const id = `v1edit-${kind}-${who}`;
+    assert.deepEqual(results(await push1(who, [v1op('auditLog', id, { type: 'sale', refId: 's', notes: 'ثبت فروش' })])), ['applied']);
+    const r = await push1(who, [v1op('auditLog', id, voidF, kind)]);
+    assert.deepEqual(results(r), [want], `${kind}/${who}: ${JSON.stringify(r.body)}`);
+    assert.equal((await inV1('auditLog', id)).type, want === 'applied' ? 'gift_card_void' : 'sale');
+  }
+  //  ویرایشِ بی‌ربطِ سابقهٔ عادی و حذف داوری نمی‌شوند
+  const other = await push1('cashier', [v1op('auditLog', 'v1edit-insert-cashier', { notes: 'یادداشت' }, 'update')]);
+  assert.deepEqual(results(other), ['applied'], JSON.stringify(other.body));
+});
+
+test('v1 پمپ: همان مسیرِ مشترک ولی هیچ داوری — نگهبانِ پیشین همان، پاسخ همان', async () => {
+  const sentinel = { check: async () => null, finish: async () => {} };
+  const ops = [v1op('auditLog', 'p-1', { type: 'gift_card_void', payRef: CODE, amount: 0, reason: 'کارتِ گم‌شده' })];
+  assert.equal(docRoles.v1Guard({ app: 'pump', accountKind: 'station', accountId: 'st-1', role: 'device' }, ops, sentinel), sentinel);
+  assert.equal(docRoles.v1Guard({ app: 'pump', accountKind: 'station', accountId: 'st-1', role: 'device' }, ops, null), null);
+  //  دکان بی `auditLog`/`transactions` هم همان نگهبانِ پیشین
+  assert.equal(docRoles.v1Guard({ app: 'shop', accountKind: 'shop', accountId: shopId, role: 'cashier' }, [v1op('sales', 's-1', { total: 1 })], null), null);
+
+  const crypto = require('node:crypto');
+  const stamp = { 'x-app-id': 'tohid-pump-app', 'x-app-version': '3.1.186', 'x-app-platform': 'windows' };
+  const u = await h.newUser('پمپ‌دارِ سندها', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپِ سندها', code: 'dr-1' }, { token: u.accessToken, headers: stamp });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const bound = await h.post('/api/pump/device/bind',
+    { device: { uid: `duid-${crypto.randomBytes(4).toString('hex')}`, name: 'کامپیوترِ پمپ', platform: 'windows' } },
+    { token: u.accessToken, headers: stamp });
+  assert.equal(bound.status, 201, JSON.stringify(bound.body));
+  const pPush = (pops) => h.post('/api/sync/v1/push', { device_id: 'pc-dr', schema_version: 1, ops: pops },
+    { token: bound.body.deviceToken, headers: stamp });
+  const batch = () => [
+    { op_id: crypto.randomUUID(), table: 'SafeEntry', row_id: `DR${crypto.randomBytes(4).toString('hex')}`.toUpperCase(),
+      type: 'insert', ts: Date.now(), fields: { Title: 'الف', Amount: '100', MonthKey: '1405-08' } },
+    { ...ops[0], op_id: crypto.randomUUID() },
+  ];
+  const off = await pPush(batch());
+  await setFlag('all', true);
+  await setFlag(made.body.station.id, true);
+  try {
+    const on = await pPush(batch());
+    assert.equal(on.status, 200, JSON.stringify(on.body));
+    assert.deepEqual(results(on), results(off), JSON.stringify(on.body));
+    assert.deepEqual(results(on), ['applied', 'unknown_table'], JSON.stringify(on.body));
+    for (let i = 0; i < 2; i++) assert.deepEqual(Object.keys(on.body.results[i]).sort(), Object.keys(off.body.results[i]).sort());
+    assert.deepEqual(Object.keys(on.body).sort(), Object.keys(off.body).sort());
+  } finally {
+    await live.remove('all', docRoles.FLAG);
+    await live.remove(made.body.station.id, docRoles.FLAG);
+  }
+});
+
+test('v1 نگهبان: ردِ نگهبانِ پیشین (`finalized-sales`) پیش از این داوری می‌ماند؛ `finish` همان', async () => {
+  let finished = 0;
+  const inner = {
+    check: async (c, op) => (op.rowId === 'r' ? { reject: 'sale_finalized' } : op.rowId === 'p' ? { replay: true } : null),
+    finish: async () => { finished++; },
+  };
+  const ctx = { app: 'shop', accountKind: 'shop', accountId: shopId, role: 'cashier', userId: '' };
+  const g = docRoles.v1Guard(ctx, [v1op('auditLog', 'r', { type: 'gift_card_void' })], inner);
+  assert.notEqual(g, inner);
+  const noDb = { query: async () => { throw new Error('بی پرسش'); } };
+  const op = (rowId) => ({ table: 'auditLog', rowId, type: 'insert', fields: { type: 'gift_card_void' }, ts: 0 });
+  assert.deepEqual(await g.check(noDb, op('r'), null), { reject: 'sale_finalized' });
+  assert.deepEqual(await g.check(noDb, op('p'), null), { replay: true });
+  await g.finish();
+  assert.equal(finished, 1);
 });

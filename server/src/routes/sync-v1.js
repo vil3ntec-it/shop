@@ -103,6 +103,11 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
  */
 const finalized = require('../lib/finalized-sales');
 /*
+ *  دکان: داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی، سفارشِ ویژه، محلِ انبار؛ پرچمِ خاموشِ
+ *  `shop.sync.doc_roles`) — همان قاعدهٔ v3، از همان قلابِ `guard` ِ push. ‎lib/doc-roles.js‎
+ */
+const docRoles = require('../lib/doc-roles');
+/*
  *  دکان: pull بی opِ کهنه‌ترِ دیگران روی نوشتهٔ تازه‌ترِ همین دستگاه، پشتِ پرچمِ خاموشِ
  *  `sync.pull_own_newer` (#501) — ‎lib/sync-v1-own-newer.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد.
  */
@@ -130,7 +135,10 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
     const schemaVersion = Number(req.body?.schema_version || req.body?.schemaVersion || 0);
 
     //  S89: فقط دکان، فقط با پرچمِ `shop.doc_chain` و دسته‌ای که فاکتور یا قلم دارد؛ وگرنه null و هیچ پرسشی
-    const guard = await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) });
+    //  و داوریِ نقشِ کارت/امتیاز/امانی/سفارش/محل (`shop.sync.doc_roles`): فقط دکان و دسته‌ای با `auditLog`/`transactions`؛
+    //  پمپ و بقیه همان نگهبانِ پیشین را می‌گیرند — ‎lib/doc-roles.js‎
+    const guard = docRoles.v1Guard(req.sync, ops,
+      await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) }));
 
     let out;
     try {
