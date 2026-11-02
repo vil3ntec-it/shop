@@ -848,7 +848,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
                 ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
                 StrShell.payAndRegister to androidx.compose.material.icons.Icons.Filled.PointOfSale, ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle to androidx.compose.material.icons.Icons.Filled.AccountBalance, // PAY-18
-                StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet,
+                StrShell.creditGate to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet, ir.vil3ntec.tohid.core.i18n.StrSettingsHelp.hesabShopTitle to androidx.compose.material.icons.Icons.Filled.AccountBalanceWallet, // «حساب‌پیِ دکان»
                 //  پیش‌بینیِ تقاضا (AI-07) و تشخیصِ ناهنجاری (AI-08) — هر دو پیش‌فرض خاموش
                 ir.vil3ntec.tohid.ui.screens.SMART_FORECAST_TITLE to androidx.compose.material.icons.Icons.Filled.TrendingUp,
                 ir.vil3ntec.tohid.ui.screens.ANOMALY_TITLE to androidx.compose.material.icons.Icons.Filled.Warning,

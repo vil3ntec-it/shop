@@ -109,6 +109,8 @@ val replaced = listOf(
   //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
   "pay/platform/PayDevice.kt",
   "pay/platform/HesabPayHceService.kt",
+  //  «حساب‌پیِ دکان»: پیشنهاد از اعلانِ برنامهٔ حساب‌پی فقط اندروید؛ کامپیوتر: ‎pay/platform/HesabPayNoticeDesk.kt‎
+  "pay/platform/HesabPayNoticeAndroid.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

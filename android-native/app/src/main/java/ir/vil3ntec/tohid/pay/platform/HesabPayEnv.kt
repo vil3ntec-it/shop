@@ -3,9 +3,11 @@ package ir.vil3ntec.tohid.pay.platform
 import android.content.Context
 import ir.vil3ntec.tohid.core.gateway.GatewayReply
 import ir.vil3ntec.tohid.core.gateway.GatewayTransport
+import ir.vil3ntec.tohid.core.gateway.HesabPayAccountClient
 import ir.vil3ntec.tohid.core.gateway.HesabPayClient
 import ir.vil3ntec.tohid.core.gateway.PendingPayments
 import ir.vil3ntec.tohid.core.gateway.PendingStore
+import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.PermPolicy
@@ -21,13 +23,17 @@ import kotlinx.serialization.json.JsonPrimitive
  *
  *  - HTTP: همان `ApiClient` ِ برنامه (توکنِ کاربرِ دکان، تازه‌سازیِ نشست، پیشوندِ `/api/v1`).
  *  - دفترِ تلاش‌ها: `SharedPreferences` ِ جدای `tohid-hesabpay` (همگام نمی‌شود؛ فقط همین دستگاه).
- *  - «حساب‌پی هست؟»: نت + `GET /shop/payments/config`، یک دقیقه در حافظه. هر خطا ⇐ نه.
+ *  - «حساب‌پی هست؟»: نت + `GET /shop/payments/config`، یک دقیقه در حافظه. هر خطا ⇐ نه. حساب‌پیِ **خودِ دکان**:
+ *    درگاهِ خودکار و/یا شماره و QR ِ حالتِ ساده ([TillHesab])؛ «حساب‌پیِ دکان» ِ صاحب: [account].
  *
  *  منطق در `core/gateway` است؛ این‌جا فقط سیم‌کشی.
  */
 class HesabPayEnv private constructor(private val app: Context) {
 
   val client: HesabPayClient = HesabPayClient(ApiTransport(Backend.api(app)))
+
+  /** «حساب‌پیِ دکان» (فقط صاحب؛ رمز را سرور می‌سنجد) */
+  val account: HesabPayAccountClient = HesabPayAccountClient(ApiTransport(Backend.api(app)))
 
   val pending: PendingPayments = PendingPayments(
     object : PendingStore {
@@ -49,17 +55,23 @@ class HesabPayEnv private constructor(private val app: Context) {
   /** نامِ دکان برای صفحهٔ رو به مشتری (همان `store_name` ِ نمایه) */
   fun storeName(): String = runCatching { app.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "").orEmpty() }.getOrDefault("")
 
-  @Volatile private var cached: Pair<Long, Boolean>? = null
+  @Volatile private var cached: Pair<Long, TillHesab>? = null
 
-  /** حساب‌پی برای این دکان روشن است و نت هست؟ بی‌نت ⇐ فوراً نه (روش پنهان) */
-  suspend fun available(): Boolean {
-    if (!online()) return false
+  /** حساب‌پیِ این دکان برای صندوق (درگاه و/یا حالتِ ساده)؛ بی‌نت ⇐ فوراً خاموش (روش پنهان) */
+  suspend fun till(): TillHesab {
+    if (!online()) return TillHesab.OFF
     val t = now()
     cached?.let { (at, on) -> if (t - at in 0 until TTL_MS) return on }
-    val on = client.enabled()
+    val on = client.till()
     cached = t to on
     return on
   }
+
+  /** درگاهِ خودکار روشن است و نت هست؟ */
+  suspend fun available(): Boolean = till().gateway
+
+  /** پس از تغییرِ «حساب‌پیِ دکان»: صندوقِ همین دستگاه زود بفهمد */
+  fun forget() { cached = null }
 
   companion object {
     private const val PREFS = "tohid-hesabpay"
@@ -82,6 +94,9 @@ private class ApiTransport(private val api: ApiClient) : GatewayTransport {
     val json = JsonObject(body.mapValues { (_, v) -> json(v) })
     return call { if (idempotencyKey != null) api.postKeyed(path, json, idempotencyKey) else api.post(path, json) }
   }
+
+  override suspend fun put(path: String, body: Map<String, Any?>): GatewayReply =
+    call { api.put(path, JsonObject(body.mapValues { (_, v) -> json(v) })) }
 
   private inline fun call(block: () -> JsonObject): GatewayReply = try {
     @Suppress("UNCHECKED_CAST")

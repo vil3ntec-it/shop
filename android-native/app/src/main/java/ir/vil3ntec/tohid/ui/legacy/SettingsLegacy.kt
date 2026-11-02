@@ -943,6 +943,7 @@ fun SettingsScreenLegacy(
       val servers = remember { ir.vil3ntec.tohid.platform.ServersController(context) }
       ServersSettings(servers) { toast(it) }
     }
+    item { HesabPayLegacySection(signedIn) { toast(it) } }   //  «حساب‌پیِ دکان» (۱۴۰۵/۰۸/۱۱)، فقط صاحب، دستهٔ B
     //  PAY-20/RPT-12: گزارشِ خودکار برای صاحب (پرچمِ سروریِ `shop.owner_report`؛ خاموش یا غیرِ صاحب ⇒ هیچ)
     item { OwnerReportSettings(if (signedIn && ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
 

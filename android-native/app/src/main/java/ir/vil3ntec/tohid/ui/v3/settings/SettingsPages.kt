@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -44,6 +45,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.CreditGateScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CrmReportsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.DigitsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.EncryptionScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.HesabPayAccountScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ExpiryScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.HeldInvoicesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LanguageScreen
@@ -171,6 +173,7 @@ internal object SettingsPages {
     Page(SettingsLayout.HELD, Icons.Outlined.ViewAgenda) { HeldInvoicesScreen(it) },
     Page(SettingsLayout.RETURNS, Icons.Outlined.SwapVert) { ReturnsSettingsScreen(it) },
     Page(SettingsLayout.PAY, Icons.Outlined.Payments) { PaySettingsScreen(it) },
+    Page(SettingsLayout.HESAB_SHOP, Icons.Outlined.AccountBalanceWallet) { HesabPayAccountScreen(it) },
     Page(SettingsLayout.PAY_FIX, Icons.Outlined.PublishedWithChanges) { PayFixSettingsScreen(it) },
     Page(SettingsLayout.CREDIT_GATE, Icons.Outlined.CreditCardOff) { CreditGateScreen(it) },
     Page(SettingsLayout.CRM_REPORTS, Icons.Outlined.TableChart) { CrmReportsScreen(it) },
