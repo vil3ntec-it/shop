@@ -26,6 +26,8 @@ import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
 import androidx.compose.material.icons.outlined.EventBusy
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.LightMode
@@ -137,7 +139,12 @@ internal fun settingsIcon(key: String): ImageVector? = when (key) {
   "همگام‌سازی" -> Icons.Outlined.Sync
   "داده‌ها" -> Icons.Outlined.Backup
   "درباره برنامه" -> Icons.Outlined.Info
-  //  گروه‌ها (گروهِ «تنظیمات»ِ صفحهٔ «بیشتر»؛ «داده‌ها» همان کلیدِ بخشِ پشتیبان است)
+  //  شش دسته (صفحهٔ اولِ تنظیمات و گروهِ «تنظیمات»ِ صفحهٔ «بیشتر»؛ «داده‌ها» همان کلیدِ بخشِ پشتیبان است)
+  SettingsLayout.SHOP -> Icons.Outlined.Shield
+  SettingsLayout.GOODS -> Icons.Outlined.Inventory2
+  SettingsLayout.DATA -> Icons.Outlined.Backup
+  SettingsLayout.LOOK -> Icons.Outlined.Palette
+  //  نامِ گروه‌های پیشین (بدنهٔ قدیمیِ بی‌مسیر)
   SettingsLayout.GENERAL -> Icons.Outlined.Tune
   SettingsLayout.SECURITY -> Icons.Outlined.Shield
   SettingsLayout.SALES -> Icons.Outlined.PointOfSale
@@ -151,6 +158,9 @@ internal fun settingsIcon(key: String): ImageVector? = when (key) {
  *  «بیشتر»، تا یک بخش همه‌جا یک رنگ داشته باشد.
  */
 internal fun settingsHue(key: String): ir.vil3ntec.tohid.ui.v3.V3Hue? = when (SettingsLayout.groupOf(key) ?: key) {
+  SettingsLayout.SHOP -> ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND
+  SettingsLayout.GOODS -> ir.vil3ntec.tohid.ui.v3.V3Hue.AMBER
+  SettingsLayout.LOOK -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
   SettingsLayout.GENERAL -> ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE
   SettingsLayout.SECURITY -> ir.vil3ntec.tohid.ui.v3.V3Hue.BRAND
   SettingsLayout.SALES -> ir.vil3ntec.tohid.ui.v3.V3Hue.ORANGE

@@ -19,7 +19,8 @@ class ShellFrameTest {
     assertFalse("جزئیاتِ کالا", ShellFrame.navVisible(true, "products/42", tabs, gate = false, cartOpen = false))
     assertFalse("بخشی که از «بیشتر» باز شد", ShellFrame.navVisible(true, "stock", tabs, gate = false, cartOpen = false))
     assertFalse("صندوق نوارِ سبدِ خودش را دارد", ShellFrame.navVisible(true, "sale", tabs, gate = false, cartOpen = false))
-    assertFalse(ShellFrame.navVisible(true, "settings/general/navbar", tabs + "settings/general/navbar", gate = false, cartOpen = false))
+    val editor = ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.NAVBAR
+    assertFalse(ShellFrame.navVisible(true, editor, tabs + editor, gate = false, cartOpen = false))
     assertFalse(ShellFrame.navVisible(true, "home", tabs, gate = true, cartOpen = false))
     assertFalse(ShellFrame.navVisible(true, "home", tabs, gate = false, cartOpen = true))
     assertFalse("کامپیوتر/پهن", ShellFrame.navVisible(false, "home", tabs, gate = false, cartOpen = false))

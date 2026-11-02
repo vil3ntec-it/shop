@@ -152,11 +152,12 @@ class SettingsModelsTest {
   }
 
   @Test
-  fun `مسیرها — «امنیت» صفحهٔ خودش، «درباره» برای همه، باقی فقط با اجازهٔ مدیریت`() {
+  fun `مسیرها — «دکان و امنیت» صفحهٔ خودش، «درباره» برای همه، باقی فقط با اجازهٔ مدیریت`() {
     val table = V3Modules.table
     val clerk = Access(granted = emptySet())
     assertEquals("settings/{group}", table.resolve("settings/security")!!.route.pattern)
-    assertEquals(listOf("settings", "settings/security", "settings/security/app-lock", SettingsPaths.PIN), table.chain(SettingsPaths.PIN))
+    assertEquals("settings/{group}", table.resolve("settings/shop")!!.route.pattern)
+    assertEquals(listOf("settings", "settings/shop", "settings/shop/app-lock", SettingsPaths.PIN), table.chain(SettingsPaths.PIN))
     assertTrue(table.resolve(SettingsPaths.ABOUT)!!.allowed(clerk))
     assertEquals(SettingsPaths.SYNC, table.resolve(SettingsPaths.SYNC)!!.route.pattern)
     assertTrue("وضعیتِ همگام‌سازی برای کارمند هم", table.resolve(SettingsPaths.SYNC)!!.allowed(clerk))

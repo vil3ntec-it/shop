@@ -53,14 +53,14 @@ class ModuleRegistryTest {
     }
     assertEquals(listOf("products", "products/42"), table.chain("products/42"))
     assertEquals(listOf("stock", "stock/7", "stock/7/adjust"), table.chain("stock/7/adjust"))
-    assertEquals(listOf("settings", "settings/security", "settings/security/app-lock"), table.chain("settings/security/app-lock"))
+    assertEquals(listOf("settings", "settings/shop", "settings/shop/app-lock"), table.chain("settings/shop/app-lock"))
   }
 
   @Test
   fun `نام‌های قدیمی (NAV-MAP) به مسیرِ امروز می‌روند و پرسش می‌ماند`() {
     mapOf(
       "dashboard" to "home", "warehouse" to "stock", "quick" to "sale/quick", "vip" to "subscription/plans",
-      "myplan" to "subscription", "nav-editor" to "settings/general/navbar", "app" to "app/updates",
+      "myplan" to "subscription", "nav-editor" to "settings/look/navbar", "settings/general/navbar" to "settings/look/navbar", "app" to "app/updates",
     ).forEach { (old, now) -> assertEquals(now, table.canonical(old)) }
     assertEquals("stock?product=5", table.canonical("warehouse?product=5"))
     assertEquals("stock", V3Modules.legacyId("warehouse").let { table.canonical(it) })
@@ -70,7 +70,9 @@ class ModuleRegistryTest {
   @Test
   fun `الگوی دقیق‌تر پیشی می‌گیرد`() {
     assertEquals("settings/about", table.resolve("settings/about")!!.route.pattern)
-    assertEquals("settings/general/navbar", table.resolve("settings/general/navbar")!!.route.pattern)
+    assertEquals("settings/look/navbar", table.resolve("settings/look/navbar")!!.route.pattern)
+    assertEquals("settings/features", table.resolve("settings/features")!!.route.pattern)
+    assertEquals("settings/{group}", table.resolve("settings/shop")!!.route.pattern)
     assertEquals("settings/{group}", table.resolve("settings/security")!!.route.pattern)
     assertEquals("debtors/new", table.resolve("debtors/new")!!.route.pattern)
     assertEquals("debtors/merge", table.resolve("debtors/merge")!!.route.pattern)
@@ -92,14 +94,17 @@ class ModuleRegistryTest {
       "expenses", "expenses/new", "sale", "sale/quick", "sale/checkout", "scan", "sales", "sales/1", "sales/drawer",
       "reports", "stats", "audit", "admin", "profile", "team", "subscription", "subscription/plans", "support",
       "orders", "orders/1", "orders/new", "storefront", "chat", "delivery", "courier",
-      "settings", "settings/general", "settings/security", "settings/security/app-lock", "settings/general/navbar",
+      "settings", "settings/shop", "settings/sales", "settings/goods", "settings/devices", "settings/data", "settings/look",
+      "settings/shop/app-lock", "settings/look/navbar", "settings/features",
       "settings/data/sync", "settings/data/backup", "settings/about", "devices",
+      //  نشانیِ پیش از نسخهٔ دوم
+      "settings/general", "settings/security", "settings/security/app-lock", "settings/general/navbar",
     ).forEach { assertNotNull("ثبت نیست: $it", table.resolve(it)) }
   }
 
   @Test
-  fun `هر ردیفِ تنظیمات مسیرِ خودش را دارد — «امنیت» مستقیم صفحهٔ امنیت`() {
-    assertEquals("settings/security", SettingsPaths.group(SettingsLayout.SECURITY))
+  fun `هر ردیفِ تنظیمات مسیرِ خودش را دارد — «دکان و امنیت» مستقیم صفحهٔ خودش`() {
+    assertEquals("settings/shop", SettingsPaths.group(SettingsLayout.SHOP))
     SettingsLayout.GROUPS.forEach { g ->
       val r = table.resolve(SettingsPaths.group(g.title))
       assertNotNull(g.title, r)
@@ -108,10 +113,14 @@ class ModuleRegistryTest {
         assertNotNull("$s ⇐ $path", table.resolve(path))
       }
     }
-    assertEquals("settings/security/app-lock", SettingsPaths.section("قفل برنامه"))
+    assertEquals("settings/shop/app-lock", SettingsPaths.section("قفل برنامه"))
     assertEquals("devices?tab=printers", SettingsPaths.section(SettingsLayout.PRINTER))
-    assertEquals(SettingsLayout.SECURITY, SettingsPaths.groupOfSlug("security"))
-    assertEquals("قفل برنامه", SettingsPaths.sectionOfSlug(SettingsLayout.SECURITY, "app-lock"))
+    assertEquals(SettingsLayout.SHOP, SettingsPaths.groupOfSlug("shop"))
+    assertEquals(SettingsLayout.SHOP, SettingsPaths.groupOfSlug("security"))
+    assertEquals("قفل برنامه", SettingsPaths.sectionOfSlug(SettingsLayout.SHOP, "app-lock"))
+    //  ردیفِ «دستگاه‌ها» ی صفحهٔ اول یک‌راست همهٔ دستگاه‌ها را باز می‌کند
+    assertEquals("devices", SettingsPaths.home(SettingsLayout.DEVICES))
+    assertEquals("settings/sales", SettingsPaths.home(SettingsLayout.SALES))
   }
 
   @Test
