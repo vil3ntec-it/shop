@@ -206,6 +206,8 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
         OrdersHub.changed.value++
         toasts.show(msg)
       }
+      //  RSK-08: «پروندهٔ مدرک» — همان شرط و حالتِ رابطِ امروز (`orders.manage` و پرچمِ `shop.orders.dispute_file`)
+      OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true, remember(context) { Backend.api(context) })
     }
   }
   OrderDetailScreen(state, actions, onBack = if (embedded) null else backOrNull, extra = extra)
