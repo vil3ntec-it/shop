@@ -248,11 +248,17 @@ async function sendTo(target, message) {
   if (!rows.length) return { sent: 0, skipped: target.userId || target.adminId || target.shopId
     || target.stationId || target.deviceUid || target.allAdmins ? 'no_devices' : 'no_target' };
 
+  //  توکنِ APNs ِ برنامهٔ آیفون از درِ FCM نمی‌رود: گوگل آن را «نامعتبر» می‌خواند و ردیف «کهنه» می‌شد.
+  //  فرستادن به APNs کلیدِ p8 ِ حسابِ اپلِ صاحب‌کار را می‌خواهد (docs/IOS-PLAN-fa.md §۰.۶)؛ تا آن روز
+  //  این توکن‌ها فقط ثبت و نگه داشته می‌شوند — نه فرستاده، نه کهنه.
+  const fcmRows = rows.filter(r => r.provider !== 'apns');
+  if (!fcmRows.length) return { sent: 0, total: rows.length, skipped: 'apns_only' };
+
   let bearer;
   try { bearer = await googleToken(sa); } catch (err) { return { sent: 0, error: err.message }; }
 
   let sent = 0;
-  for (const row of rows) {
+  for (const row of fcmRows) {
     try {
       const res = await fetch(
         `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,

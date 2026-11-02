@@ -7,7 +7,8 @@ import kotlinx.serialization.json.JsonObject
 
 /*
  *  جایگزینِ iOS ِ `platform/HubRelayAndroid.kt` (هابِ محلیِ SYN-09، پشتِ پرچمِ `app.multi_server`).
- *  روی آیفون آن پرچم خاموش است (‎ServerSwitchIos‎)، پس `of` همیشه null — همان «هاب نیست» ِ اندروید.
+ *  «سرورِ خودِ دکان» از گامِ ۴ روی آیفون هست (‎platform/ServerSwitchAndroid.kt‎ ِ خودِ اندروید)، ولی هابِ محلی هنوز نه:
+ *  `of` همیشه null — همان «هاب نیست» ِ اندروید، و درخواست مستقیم به سرورِ فعال می‌رود.
  */
 internal class HubRelayAndroid private constructor() : HubRelayPort {
   override suspend fun relay(body: JsonObject): HubRelay.Outcome = HubRelay.Outcome()

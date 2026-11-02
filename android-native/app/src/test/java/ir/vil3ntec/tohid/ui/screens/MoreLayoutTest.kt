@@ -33,10 +33,13 @@ class MoreLayoutTest {
     val all = MoreLayout.groups(canManage = true, ordersOn = false, newOrders = 0, chatOn = false, version = "1")
     val last = all.last()
     assertEquals(MoreLayout.SETTINGS, last.title)
-    assertEquals(SettingsLayout.GROUPS.map { it.title }, last.items.map { it.settingsGroup })
-    //  هر ردیف صفحهٔ همان گروه را باز می‌کند («امنیت» ⇐ `settings/security`)، نه ریشه را
+    //  همان دسته‌های صفحهٔ اولِ تنظیمات؛ «دستگاه‌ها» خودش در گروهِ «دکان» ِ همین صفحه هست و تکرار نمی‌شود
+    assertEquals(SettingsLayout.GROUPS.map { it.title } - SettingsLayout.DEVICES, last.items.map { it.settingsGroup })
+    assertEquals(1, all.flatMap { it.items }.count { it.route == "devices" })
+    //  هر ردیف صفحهٔ همان دسته را باز می‌کند («دکان و امنیت» ⇐ `settings/shop`)، نه ریشه را؛ نام به زبانِ صفحه
     assertTrue(last.items.all { it.route == ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.group(it.settingsGroup!!) })
-    assertEquals("settings/security", last.items.first { it.settingsGroup == SettingsLayout.SECURITY }.route)
+    assertTrue(last.items.all { it.label == SettingsLayout.groupLabel(it.settingsGroup!!) })
+    assertEquals("settings/shop", last.items.first { it.settingsGroup == SettingsLayout.SHOP }.route)
   }
 
   @Test

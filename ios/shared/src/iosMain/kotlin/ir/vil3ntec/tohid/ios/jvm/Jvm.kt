@@ -234,8 +234,20 @@ fun interface Runnable {
 /*
  *  `Thread` ِ JVM: کارخانهٔ رشتهٔ `Executors` (در iOS صدا زده نمی‌شود، ‎java/util/concurrent‎) و `Thread { … }.start()`.
  */
-class Thread(private val target: Runnable? = null, val name: String = "") {
+class Thread(private val target: Runnable? = null, var name: String = "") {
+  /** `Thread { … }` ِ JVM (لامبدای پایانی همان کار است، نه نام) */
+  constructor(target: Runnable) : this(target, "")
+
   var isDaemon: Boolean = false
+
+  /**
+   *  فقط نشان (کارِ GCD را نمی‌شود از بیرون برید): کدِ مشترک پس از `interrupt` پرچمِ خودش را هم پایین می‌آورد
+   *  (`DeviceLinks` ِ اندروید: `running = false` و بستنِ سوکت)؛ در iOS آن کارگرها هرگز بالا نمی‌آیند (بی SPP).
+   */
+  var isInterrupted: Boolean = false
+    private set
+
+  fun interrupt() { isInterrupted = true }
   /** کار روی صفِ پس‌زمینهٔ GCD (iOS رشتهٔ خامِ JVM ندارد؛ همان «کار جدا از رشتهٔ اصلی») */
   fun start() {
     val r = target ?: return
@@ -266,6 +278,9 @@ class Thread(private val target: Runnable? = null, val name: String = "") {
     }
   }
 }
+
+/** `java.lang.InterruptedException` (در JVM خودکار import می‌شود) */
+open class InterruptedException(message: String? = null) : Exception(message)
 
 /** `java.lang.SecurityException` (در JVM خودکار import می‌شود) */
 open class SecurityException(message: String? = null, cause: Throwable? = null) : RuntimeException(message, cause)

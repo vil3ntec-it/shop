@@ -51,6 +51,7 @@ fun RouteScope.DrawerRoute() {
       reportError = (x as? PayFlow.Outcome.Bad)?.let { PayFlow.message(it.problem) },
       skipped = x?.valueOrNull()?.skipped?.size ?: 0,
       history = remember(data) { CashShift.list(data).take(60) },
+      scanner = shift?.let { DrawerModel.scannerLine(data, it.open.createdAt, now, seesMoney = !staff) },
     ),
     DrawerActions(
       open = { nav.open(SalesPaths.DRAWER_OPEN) },
@@ -209,7 +210,13 @@ fun RouteScope.DrawerXRoute() {
   val rep = if (args.query("kind") == "z") DrawerSession.z
   else remember(data, shift) { shift?.let { PayFlow.report(data, it.open, null, System.currentTimeMillis()).valueOrNull()?.report } }
   if (rep == null) { LaunchedEffect(Unit) { back() }; return }
-  ShiftReportSheet(rep, staff, title = null, notes = emptyList(), onClose = { back() })
+  //  PAY-07: غیرنقدِ «در انتظار»/«نیازمند بررسی» ِ همین صندوق در جمع نیست — فقط یادداشت، تا صندوقدار بداند چرا؛
+  //  و خطِ «ثبت از اسکنر» (کارتِ فرمان، #840)
+  val waiting = if (args.query("kind") == "z" || shift == null) 0L
+  else remember(data, shift) { DrawerNotes.unreceived(data, shift.open.createdAt, System.currentTimeMillis()) }
+  ShiftReportSheet(rep, staff, title = null,
+    notes = listOfNotNull(DrawerModel.scannerLine(data, rep.openedAt, rep.at, seesMoney = !staff)) + DrawerNotes.unreceivedNotes(waiting),
+    onClose = { back() })
 }
 
 /** `sales/drawer/shift/{id}` — ریزِ یک صندوق: گزارشِ Z اگر ذخیره شده، وگرنه یادداشت‌ها */
@@ -221,6 +228,6 @@ fun RouteScope.DrawerShiftRoute() {
   val shift = remember(data, id) { CashShift.list(data).firstOrNull { it.open.id == id } }
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
   val z = shift.close?.z?.let { PayFlow.reportOf(it) }
-  if (z != null) ShiftReportSheet(z, staff, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }), onClose = { back() })
+  if (z != null) ShiftReportSheet(z, staff, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)), onClose = { back() })
   else ShiftNotesSheet(shift, onClose = { back() })
 }

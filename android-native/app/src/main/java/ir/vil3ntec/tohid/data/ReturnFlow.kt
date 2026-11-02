@@ -394,7 +394,12 @@ object ReturnFlow {
    *  هیچ روشی بیش از دریافتی‌اش پس نگیرد. بی `payments` (فاکتورِ امروز): پرداختیِ همان
    *  لحظه = نقد، بدهی = «به حساب». بی رسید ⇒ فقط نقد.
    */
-  private fun paidRows(sale: Sale?, amount: Double, prior: List<SaleReturn>): Pair<List<PaidRow>, List<PayMethod>?> {
+  private fun paidRows(
+    sale: Sale?,
+    amount: Double,
+    prior: List<SaleReturn>,
+    changes: List<ir.vil3ntec.tohid.core.pay.PayStatus.Change> = emptyList(),
+  ): Pair<List<PaidRow>, List<PayMethod>?> {
     if (sale == null) return listOf(PaidRow(Pay.CASH, minor(amount), 0, "confirmed")) to null
     val list = sale.payments?.filter { it.amountMinor > 0 }
     if (list.isNullOrEmpty()) {
@@ -409,7 +414,12 @@ object ReturnFlow {
     prior.forEach { r -> r.toMethods?.forEach { (m, a) -> used[m] = (used[m] ?: 0L) + minor(a) } }
     val known = Pay.DEFAULT_METHODS.associateBy { it.id }
     val extra = LinkedHashMap<String, PayMethod>()
-    val rows = list.map { p ->
+    //  PAY-07: ردیفی که «ناموفق»، «لغو» یا «نیازمند بررسی» شد به روشِ خودش پس‌دادنی نیست (بی سند ⇒ همان امروز)
+    val now = if (changes.isEmpty()) null else PayStatusFlow.rows(sale).let { all ->
+      val st = ir.vil3ntec.tohid.core.pay.PayStatus.apply(sale.id, all, changes).statuses
+      all.indices.filter { all[it].amount > 0 }.map { st[it] }
+    }
+    val rows = list.mapIndexed { i, p ->
       val id = when {
         p.kind == Pay.CASH -> Pay.CASH
         p.method == Pay.ACCOUNT || p.kind == Pay.ACCOUNT -> Pay.ACCOUNT
@@ -418,7 +428,8 @@ object ReturnFlow {
       if (id != Pay.CASH && id != Pay.ACCOUNT && id !in known && id !in extra) {
         extra[id] = PayMethod(id, if (p.kind in Pay.KINDS && p.kind != Pay.CASH) p.kind else "other", id)
       }
-      val status = if (p.status in TAKEN) "confirmed" else p.status
+      val eff = now?.getOrNull(i) ?: p.status
+      val status = if (eff in TAKEN) "confirmed" else eff
       val back = if (id == Pay.CASH || id == Pay.ACCOUNT) 0L else minOf(used[id] ?: 0L, p.amountMinor)
       if (back > 0) used[id] = (used[id] ?: 0L) - back
       PaidRow(id, p.amountMinor, back, status)
@@ -438,11 +449,13 @@ object ReturnFlow {
     approvedBy: String,
     customerId: String?,
     prior: List<SaleReturn> = emptyList(),
+    /** PAY-07 — سندهای وضعیتِ همین فاکتور (`PayStatusFlow.bySale`) */
+    changes: List<ir.vil3ntec.tohid.core.pay.PayStatus.Change> = emptyList(),
   ): Outcome<Split> {
     if (amount <= 0) return Outcome.Ok(Split(0.0, 0.0, 0.0))
     val m = if (sale == null && mode == ORIGINAL) CASH else mode
     if (m != ORIGINAL && m != CASH && m != STORE_CREDIT) return Outcome.Bad(Code.BAD_MODE)
-    val (rows, methods) = paidRows(sale, amount, prior)
+    val (rows, methods) = paidRows(sale, amount, prior, changes)
     val outstanding = if (sale == null) 0L else max(0L, minor(sale.debtGiven - sale.debtSettled))
     val r = Pay.refund(
       RefundInput(
@@ -558,7 +571,8 @@ object ReturnFlow {
     val approvedBy = if (g.decision == "approve") approval!!.by else req.by.trim()
 
     val prior = if (sale == null) emptyList() else d.saleReturns.filter { it.saleId == sale.id }
-    val s = when (val r = split(sale, quote.total, req.mode, approvedBy, creditTo, prior)) {
+    val changes = sale?.let { PayStatusFlow.bySale(d)[it.id] }.orEmpty()
+    val s = when (val r = split(sale, quote.total, req.mode, approvedBy, creditTo, prior, changes)) {
       is Outcome.Bad -> return r
       is Outcome.Ok -> r.value
     }

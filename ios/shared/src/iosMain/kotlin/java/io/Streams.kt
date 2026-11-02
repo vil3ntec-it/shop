@@ -153,9 +153,12 @@ open class FileInputStream(file: File) : ByteArrayInputStream(file.readBytes()) 
 open class FileOutputStream(private val file: File, private val append: Boolean = false) : ByteArrayOutputStream() {
   constructor(path: String, append: Boolean = false) : this(File(path), append)
 
+  /** پرونده‌ای که `ParcelFileDescriptor` ِ iOS نشان می‌دهد (PDF ِ چاپ) */
+  constructor(fd: FileDescriptor) : this(File(fd.path ?: throw IOException("iOS: FileDescriptor بی پرونده")))
+
   private var closed = false
 
-  val fd: FileDescriptor = FileDescriptor()
+  val fd: FileDescriptor = FileDescriptor(file.path)
 
   override fun close() {
     if (closed) return
@@ -164,7 +167,7 @@ open class FileOutputStream(private val file: File, private val append: Boolean 
   }
 }
 
-class FileDescriptor internal constructor() {
+class FileDescriptor internal constructor(internal val path: String? = null) {
   fun sync() {}
   fun valid(): Boolean = true
 }

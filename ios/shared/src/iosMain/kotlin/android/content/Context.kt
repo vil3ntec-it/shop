@@ -41,6 +41,14 @@ abstract class Context {
     throw ActivityNotFoundException("iOS: ${intent.action}")
   }
 
+  /** پخشِ سیستمیِ اندروید و سرویس در iOS نیست (‎BroadcastReceiver.kt‎، ‎android/app/Service.kt‎): ثبت و آغاز ⇐ هیچ */
+  open fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter): Intent? = null
+  open fun registerReceiver(receiver: BroadcastReceiver?, filter: IntentFilter, flags: Int): Intent? = null
+  open fun unregisterReceiver(receiver: BroadcastReceiver) {}
+  open fun startService(service: Intent): ComponentName? = null
+  open fun startForegroundService(service: Intent): ComponentName? = null
+  open fun stopService(service: Intent): Boolean = false
+
   companion object {
     const val MODE_PRIVATE = 0
     const val CONNECTIVITY_SERVICE = "connectivity"
@@ -87,6 +95,7 @@ object IosContext : Context() {
     CONNECTIVITY_SERVICE -> android.net.ConnectivityManager.ios
     CLIPBOARD_SERVICE -> ClipboardManager.ios
     NOTIFICATION_SERVICE -> android.app.NotificationManager.ios
+    PRINT_SERVICE -> android.print.PrintManager.ios
     else -> null
   }
 

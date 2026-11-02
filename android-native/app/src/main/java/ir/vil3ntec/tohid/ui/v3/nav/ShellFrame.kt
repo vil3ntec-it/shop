@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.dp
  */
 object ShellFrame {
   /** صفحه‌هایی که نوارِ پایینِ گوشی رویشان نمی‌آید (صندوق نوارِ سبدِ خودش را دارد) */
-  val NO_NAV: Set<String> = setOf("sale", "sale/quick", "settings/general/navbar")
+  val NO_NAV: Set<String> = setOf("sale", "sale/quick", ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.NAVBAR)
 
   /** خانه زیرِ نوار می‌کشد و خودش فاصله می‌گذارد */
   const val UNDER_BAR = "home"

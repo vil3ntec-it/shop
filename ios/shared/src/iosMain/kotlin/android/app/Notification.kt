@@ -9,7 +9,19 @@ import ir.vil3ntec.tohid.ios.IosNotifications
  *  اعلانِ پیشین را جایگزین می‌کند (مثلِ اندروید) و لمسِ اعلان همان `Intent` ِ `setContentIntent` را به
  *  ریشهٔ آیفون می‌دهد (`OrderNotify.fromIntent` ⇐ همان سفارش).
  */
-class Notification internal constructor(val title: String, val text: String, internal val intent: Intent? = null)
+class Notification internal constructor(val title: String, val text: String, internal val intent: Intent? = null) {
+  /** همان کلیدهای اندروید (شنوندهٔ اعلان می‌خواند؛ ‎android/service/notification‎) */
+  val extras: android.os.Bundle = android.os.Bundle().apply {
+    putCharSequence(EXTRA_TITLE, title)
+    putCharSequence(EXTRA_TEXT, text)
+  }
+
+  companion object {
+    const val EXTRA_TITLE = "android.title"
+    const val EXTRA_TEXT = "android.text"
+    const val EXTRA_BIG_TEXT = "android.bigText"
+  }
+}
 
 class NotificationChannel(val id: String, val name: CharSequence, val importance: Int) {
   var description: String? = null

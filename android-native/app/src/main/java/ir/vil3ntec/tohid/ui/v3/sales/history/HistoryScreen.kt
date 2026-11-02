@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.outlined.AssignmentReturn
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.PointOfSale
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SearchOff
@@ -81,6 +82,8 @@ class HistoryActions(
   val scanReceipt: (() -> Unit)?,
   val newSale: () -> Unit,
   val back: (() -> Unit)?,
+  /** PAY-07 — فهرستِ «نیازمند بررسی» (فقط صاحب و مدیر) */
+  val payReview: (() -> Unit)? = null,
 )
 
 /** فیلتر، جستجو و ماه — در مسیر می‌مانند تا QRِ رسید جستجو را پر کند */
@@ -115,6 +118,8 @@ fun HistoryScreen(
   bottomReserve: androidx.compose.ui.unit.Dp = 0.dp,
   /** نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`) */
   shopTag: String? = null,
+  /** PAY-07 — شمارِ پرداخت‌های «نیازمند بررسی» (صاحب و مدیر)؛ صفر ⇒ تراشه‌ای نیست */
+  reviews: Int = 0,
 ) {
   val c = PhoneV3.colors
   var searching by rememberSaveable { mutableStateOf(query.search.isNotEmpty()) }
@@ -160,7 +165,12 @@ fun HistoryScreen(
           title = StrSale.salesTotal,
           value = PhoneSaleText.amount(stats.total),
           caption = HistoryModel.statsLine(stats),
-          chips = listOf(V3HeroChip(drawer.text, Icons.Outlined.PointOfSale, onClick = actions.drawer)),
+          chips = listOfNotNull(
+            V3HeroChip(drawer.text, Icons.Outlined.PointOfSale, onClick = actions.drawer),
+            actions.payReview?.takeIf { reviews > 0 }?.let {
+              V3HeroChip(ir.vil3ntec.tohid.core.i18n.StrPayStatus.reviewCount(ir.vil3ntec.tohid.plain(reviews)), Icons.Outlined.FactCheck, onClick = it)
+            },
+          ),
           modifier = Modifier.padding(top = 4.dp, bottom = 8.dp),
         )
       }
@@ -246,6 +256,8 @@ private fun SaleRow(row: HistoryRow, canCancel: Boolean, returnsV2: Boolean, act
           textDecoration = if (cancelled) TextDecoration.LineThrough else null,
         )
         V3StatusPill(payStatus(row), row.payLabel)
+        //  PAY-07: وضعیتِ پرداختِ غیرنقد، فقط وقتی «تأییدشده» نیست
+        row.payState?.let { V3StatusPill(PayStatusText.pill(it), PayStatusText.name(it)) }
       }
     },
     chevron = false,

@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -40,6 +42,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.AppLockScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AppearanceScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.BackupScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CameraScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ScanCashScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CheckoutRulesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CreditGateScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CrmReportsScreen
@@ -221,6 +224,7 @@ internal object SettingsPages {
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
     Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
+    Page(SettingsLayout.SCAN_CASH, Icons.Outlined.PointOfSale) { ScanCashScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },
@@ -228,15 +232,17 @@ internal object SettingsPages {
 
   fun of(key: String): SettingsPage? = ALL.firstOrNull { it.key == key }
 
-  /** آیکنِ ردیفِ هر بخش، پیوند و گروه — همه خطی و تک‌رنگ (r5) */
+  /** آیکنِ ردیفِ هر بخش، پیوند و دسته — همه خطی و تک‌رنگ (r5) */
   fun icon(key: String): ImageVector = of(key)?.icon ?: when (key) {
     SettingsLayout.PRINTER -> Icons.Outlined.Print
     SettingsLayout.PERIPHERALS -> Icons.Outlined.Devices
-    SettingsLayout.SECURITY -> Icons.Outlined.Shield
+    SettingsLayout.PROFILE -> Icons.Outlined.AccountCircle
+    SettingsLayout.SHOP -> Icons.Outlined.Shield
     SettingsLayout.SALES -> Icons.Outlined.PointOfSale
-    SettingsLayout.DEVICES -> Icons.Outlined.QrCodeScanner
+    SettingsLayout.GOODS -> Icons.Outlined.Inventory2
+    SettingsLayout.DEVICES -> Icons.Outlined.Devices
     SettingsLayout.DATA -> Icons.Outlined.Backup
-    SettingsLayout.ABOUT -> Icons.Outlined.Info
+    SettingsLayout.LOOK -> Icons.Outlined.Palette
     else -> Icons.Outlined.Tune
   }
 }

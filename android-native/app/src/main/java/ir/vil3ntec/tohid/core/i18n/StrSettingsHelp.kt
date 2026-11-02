@@ -331,6 +331,16 @@ object StrSettingsHelp {
     "For example, the app finds the network printer itself and prints a test receipt.",
     "د بېلګې په توګه، اپ د شبکې چاپګر پخپله مومي او یو ازمایښتي رسید چاپوي.",
   )
+  val scanCashLine: String get() = t(
+    "برنامهٔ بسته هم با کارتِ «نقد پرداخت شد» فروشِ نقدی ثبت کند",
+    "Record cash sales from the scanner card even with the app closed",
+    "بند اپ هم د «نغدې ورکړل شوې» کارت په مرسته نغدي پلور ثبت کړي",
+  )
+  val scanCashExample: String get() = t(
+    "مثلاً برنامه بسته است؛ دو شیر اسکن می‌شود و بعد «نقد پرداخت شد» از کارت. فروشِ نقدی با یادداشتِ «ثبت از اسکنر» ثبت و رسید چاپ می‌شود. صندوقِ بسته یا کاربرِ بی اجازه ⇒ فقط فاکتورِ نگه‌داشته.",
+    "For example, the app is closed; two milks are scanned, then \"Cash paid\" from the card. A cash sale noted \"Recorded from scanner\" is saved and the receipt prints. Till closed or user without permission ⇒ only a held invoice.",
+    "د بېلګې په توګه، اپ بند دی؛ دوه شیدې سکن کېږي او بیا له کارت «نغدې ورکړل شوې». نغدي پلور د «له سکنر ثبت» یادښت سره ثبتېږي او رسید چاپېږي. بند صندوق یا بې اجازې کاروونکی ⇒ یوازې ساتل شوی بل.",
+  )
   val peripheralsLine: String get() = t(
     "چاپگر، بارکدخوان، ترازو و نمایشگر را پیدا، وصل و آزمایش کنید",
     "Find, connect and test printers, scanners, scales and displays",

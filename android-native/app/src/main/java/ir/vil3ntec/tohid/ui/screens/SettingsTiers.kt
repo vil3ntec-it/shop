@@ -13,7 +13,9 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp as H
  *    ندارد. صفحه و نوشتنش سرِ جایش است و نشانیِ مستقیمش (`settings/sales/price-why`) همان صفحه را باز می‌کند.
  *  - **C — [ESSENTIAL]:** چیزی که هر دکان یک بار تنظیم می‌کند؛ فهرستِ کوتاهِ اصلی.
  *  - **B — بقیه ([Tier.ADVANCED]):** تصمیمِ پولی، سیاستی، دسترسی، آزمایشی یا وابسته به دستگاه؛ پیش‌فرض دست
- *    نمی‌خورد (خاموش) و در گروهِ بستهٔ «پیشرفته» در تهِ فهرست است.
+ *    نمی‌خورد (خاموش).
+ *  تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): نسخهٔ ۳ دیگر C و B را جدا نمی‌کشد — هر ردیفِ دیدنی در بخشِ کوتاهِ دستهٔ خودش
+ *  است (`SettingsLayout.visible`) و «پیشرفته» نیست؛ A همچنان هیچ ردیفی ندارد. C/B فقط برای رابطِ قدیمی مانده است.
  *  بخشِ پشتِ پرچمِ سرور (`SettingsLayout.SERVER_GATED`) هنوز تابعِ همان پرچم است.
  *  آزمون: `SettingsTiersTest`.
  */
@@ -118,7 +120,9 @@ object SettingsHelp {
     SettingsLayout.STOREFRONT_ETA -> H.etaLine
     SettingsLayout.PROMO_GUARD -> H.promoLine
     SettingsLayout.EASY_SETUP -> H.easySetupLine
+    SettingsLayout.SCAN_CASH -> H.scanCashLine
     SettingsLayout.PERIPHERALS -> H.peripheralsLine
+    SettingsLayout.PROFILE -> ir.vil3ntec.tohid.core.i18n.StrSettingsHome.profileLine
     LATE_APOLOGY -> H.lateApologyLine
     else -> null
   }
@@ -175,6 +179,7 @@ object SettingsHelp {
     SettingsLayout.STOREFRONT_ETA -> H.etaExample
     SettingsLayout.PROMO_GUARD -> H.promoExample
     SettingsLayout.EASY_SETUP -> H.easySetupExample
+    SettingsLayout.SCAN_CASH -> H.scanCashExample
     //  پیوند است ولی صفحهٔ «دستگاه‌ها» کارتِ «این چه می‌کند؟» دارد (`DevicesScreen`)
     SettingsLayout.PERIPHERALS -> H.peripheralsExample
     LATE_APOLOGY -> H.lateApologyExample

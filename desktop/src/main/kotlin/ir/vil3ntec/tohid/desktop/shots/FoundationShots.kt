@@ -20,7 +20,7 @@ object FoundationShots : GroupShots {
     Shot("kit-lists", content = { KitGallery(KitPart.LISTS) }),
     Shot("kit-states", content = { KitGallery(KitPart.STATES) }),
     Shot("more", route = "more"),
-    Shot("settings-security", route = "settings/security"),
+    Shot("settings-security", route = "settings/shop"),
     Shot("updates", route = "app/updates"),
     Shot("mode-chooser", content = { ModeChooser {} }),
     Shot("example", route = "example"),

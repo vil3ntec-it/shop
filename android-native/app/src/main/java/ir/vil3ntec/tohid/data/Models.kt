@@ -792,6 +792,12 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val layaway: LayawayDoc? = null,
   /** PRM-13 — فقط ردیف‌های `loyalty_*` (`LoyaltyPoints`): شمارِ امتیاز (همیشه مثبت؛ نوع علامت را می‌گوید). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val points: Long? = null,
+  /** PAY-07 — فقط `pay_status` (`PayStatusFlow`؛ `refId` = فاکتور، `amount` = مبلغِ ردیف): جای ردیف در `payments`، روشش،
+   *  وضعیتِ پیشین و تازه. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payRow: Int? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payMethod: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fromStatus: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toStatus: String? = null,
 )
 
 /**
