@@ -350,6 +350,9 @@ function report(r, server) {
       poolWaitingMax: Math.max(0, ...server.map((s) => (s.pool ? s.pool.waiting : 0))),
       poolTotalMax: Math.max(0, ...server.map((s) => (s.pool ? s.pool.total : 0))),
       pgLockWaitMax: Math.max(0, ...server.map((s) => (s.pg ? s.pg.lock_wait : 0))),
+      pgIdleInTxMax: Math.max(0, ...server.map((s) => (s.pg ? s.pg.idle_in_tx : 0))),
+      gateWaitingMax: Math.max(0, ...server.map((s) => (s.gate?.on ? s.gate.waiting : 0))),
+      gateInflightMax: Math.max(0, ...server.map((s) => (s.gate?.on ? s.gate.inflight : 0))),
       loopMaxMs: Math.max(...server.map((s) => s.loopMaxMs)), cpuMaxPct: Math.max(...server.map((s) => s.cpuPct)),
     },
     ...(r.recovery ? { recovery: r.recovery } : {}),
@@ -393,7 +396,7 @@ function print(o, fails) {
     console.log(`  ${label.padEnd(18)} ${pad(e.n, 6)} ${pad(e.rps, 6)} ${pad(e.p50, 7)} ${pad(e.p95, 7)} ${pad(e.p99, 7)} ${pad(e.max, 7)}  ${e.errors ? `${e.errors} (${e.firstError})` : '0'}`);
   }
   const s = o.server;
-  console.log(`  سرور: RSS ≤ ${s.rssMaxMB}MB، heap ≤ ${s.heapMaxMB}MB، heap پس از GC ${s.heapAfterGcStartMB} ⇐ ${s.heapAfterGcEndMB}MB، CPU ≤ ${s.cpuMaxPct}%، حلقهٔ رویداد ≤ ${s.loopMaxMs}ms، استخر ≤ ${s.poolTotalMax} اتصال، صفِ انتظار ≤ ${s.poolWaitingMax}، اتصالِ پشتِ قفل ≤ ${s.pgLockWaitMax}`);
+  console.log(`  سرور: RSS ≤ ${s.rssMaxMB}MB، heap ≤ ${s.heapMaxMB}MB، heap پس از GC ${s.heapAfterGcStartMB} ⇐ ${s.heapAfterGcEndMB}MB، CPU ≤ ${s.cpuMaxPct}%، حلقهٔ رویداد ≤ ${s.loopMaxMs}ms، استخر ≤ ${s.poolTotalMax} اتصال، صفِ انتظار ≤ ${s.poolWaitingMax}، اتصالِ پشتِ قفل ≤ ${s.pgLockWaitMax}، idle-in-tx ≤ ${s.pgIdleInTxMax}، دروازهٔ push: منتظر ≤ ${s.gateWaitingMax}، در کار ≤ ${s.gateInflightMax}`);
   if (o.drift.length > 1) console.log(`  p95 در هر ${o.windowSec}s: ${o.drift.map((w) => w.p95).join(' ')}`);
   if (o.recovery) console.log(`  بازگشت: ${o.recovery.ok ? '✅' : '❌'} ${o.recovery.detail}`);
   if (BUDGET_ON) console.log(fails.length ? `  ❌ بودجه:\n    - ${fails.join('\n    - ')}` : '  ✅ همهٔ بودجه‌ها');

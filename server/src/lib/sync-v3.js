@@ -35,6 +35,7 @@ const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
 const permCore = require('./perm-core');
+const gate = require('./sync-v3-gate');
 
 const PROTOCOL = 3;
 const MAX_OPS = 500;
@@ -77,8 +78,26 @@ function isPlainObject(v) { return v !== null && typeof v === 'object' && !Array
 function deepEqual(a, b) { return canonical(a === undefined ? null : a) === canonical(b === undefined ? null : b); }
 const cmp = hlc.compare;
 
+const lockKey = (ctx) => `sync-v3:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`;
 function lock(c, ctx) {
-  return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sync-v3:${ctx.app}:${ctx.accountKind}:${ctx.accountId}`]);
+  return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey(ctx)]);
+}
+
+/**
+ * تراکنش زیرِ قفلِ حساب. نوبت اول در صفِ همین فرآیند (`sync-v3-gate.js`، بی اتصال)، بعد همان
+ * تراکنش و همان `pg_advisory_xact_lock` ِ درونِ آن (درستیِ چند نمونهٔ سرور). [heavy] ⇒ جایی از
+ * سقفِ push ِ هم‌زمان هم. صف پر یا انتظار بلند ⇒ ۵۰۳ ِ `db_busy` پیش از هر نوشتن.
+ */
+async function lockedTx(ctx, fn, { heavy = false } = {}) {
+  const free = await gate.enter(lockKey(ctx), { heavy });
+  try {
+    return await tx(async (c) => {
+      await lock(c, ctx);
+      return fn(c);
+    });
+  } finally {
+    free();
+  }
 }
 
 function requireShop(ctx) {
@@ -761,8 +780,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   await ready();
   const t = now();
 
-  const out = await tx(async (c) => {
-    await lock(c, ctx);
+  const out = await lockedTx(ctx, async (c) => {
     //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن در همین تراکنش (با پایانش آزاد)
     if (groups) await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [approvals.returnsLockKey(ctx.accountId)]);
     //  روشن: قفلِ v1 هم، و v1 ⇒ v3 کامل پیش از اعمال ⇒ داوریِ این opها همهٔ v1 را دیده است
@@ -853,7 +871,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       lastError: errorText(lastError), clockOffsetMs: intOrNull(clockOffsetMs, -1e12, 1e12),
     });
     return { results, applied, head: await headSeq(c, ctx) };
-  });
+  }, { heavy: true });
   return { ...out, protocol: PROTOCOL, server_time: now(), hlc: clock.peek() };
 }
 
@@ -960,8 +978,7 @@ async function bridge(ctx, { max = BRIDGE_BATCH, toV1On } = {}) {
   if (!fresh && !(out && await toV1.pending(dbq, ctx))) return { imported: 0, behind: false };
   await ready();
   const t = now();
-  return tx(async (c) => {
-    await lock(c, ctx);
+  return lockedTx(ctx, async (c) => {
     if (!out) return importV1(c, ctx, { max, t });
     const o = await openToV1(c, ctx, t, { rounds: 1, max });
     if (!o.ready) return { imported: o.imported, behind: true };
@@ -1144,8 +1161,7 @@ async function resolveConflict(ctx, id, action, { userId = '' } = {}) {
   await ready();
   const t = now();
   const toV1On = await toV1.enabled(ctx);
-  return tx(async (c) => {
-    await lock(c, ctx);
+  return lockedTx(ctx, async (c) => {
     const v1 = toV1On ? await openToV1(c, ctx, t) : null;
     const cf = (await c.query(
       `SELECT * FROM sync_v3_conflicts WHERE ${ACC} AND id=$4 FOR UPDATE`, [...acc(ctx), String(id || '')]
