@@ -44,7 +44,7 @@ internal fun RouteScope.SettingsIndexScreen(onBack: (() -> Unit)?) {
       SettingsGroupCard(
         group = g.title,
         facts = facts,
-        extra = extra.filter { it.group == g.title },
+        extra = extra.filter { it.group == g.title }.filter { it.shown() },
         open = { nav.open(it) },
         onLockToggle = lockToggle,
         modifier = Modifier.v3Stagger(stagger, g.title, i),
@@ -68,7 +68,7 @@ internal fun RouteScope.SettingsGroupScreen(group: String, onBack: (() -> Unit)?
       SettingsGroupCard(
         group = group,
         facts = facts,
-        extra = extra,
+        extra = extra.filter { it.shown() },
         open = { nav.open(it) },
         onLockToggle = lockToggle,
         showTitle = false,

@@ -242,4 +242,102 @@ class PurchaseOrderBookTest {
     assertEquals(1_000L, last.changeBp)
     assertEquals(listOf("s2", "s1"), ir.vil3ntec.tohid.core.purchase.SupplierPricing.bySupplier(buys, "pA").map { it.supplierId })
   }
+
+  /* ── کرایهٔ رسید (PUR-06، S19: ۲۸۰ به حمل‌کننده) ─────────────────────── */
+
+  private val withFreight get() = po.copy(receipts = listOf(r1.copy(freightMinor = 28_000)))
+
+  /** بهای تمام‌شدهٔ هر واحد = (جمعِ ردیف + سهمِ کرایه) ÷ مقدار */
+  private fun unitCost(d: ShopData, lineId: String): Double {
+    val p = d.purchases.single { it.id == PurchaseOrderBook.purchaseIdOf(r1.id, lineId) }
+    return (p.totalAmount + (p.landedCost ?: 0.0)) / p.quantity
+  }
+
+  @Test fun `S19 — کرایهٔ ۲۸۰ به نسبتِ ارزشِ پذیرفته پخش می‌شود ⇒ بهای A ۱۱۰، B ۲۲۰، C ۵۵ و بدهیِ تأمین‌کننده همان ۲۸۰۰`() {
+    val o = withFreight
+    val d = (PurchaseOrderBook.post(d0, o, o.receipts.single(), "2026-11-01", 1_000) as PurchaseOrderBook.Posting.Ok).data
+    val share = listOf("l1", "l2", "l3").map { l -> d.purchases.single { it.id == PurchaseOrderBook.purchaseIdOf(r1.id, l) }.landedCostMinor }
+    assertEquals(listOf<Long?>(10_000, 14_000, 4_000), share)
+    assertEquals(28_000L, share.sumOf { it ?: 0L })
+    assertEquals(110.0, unitCost(d, "l1"), 1e-9)
+    assertEquals(220.0, unitCost(d, "l2"), 1e-9)
+    assertEquals(55.0, unitCost(d, "l3"), 1e-9)
+    //  کرایه به حمل‌کننده است، نه تأمین‌کننده
+    assertEquals(2800.0, ShopStore.supplierDebt(d, "s1"), 0.0)
+    assertEquals(2800.0, PurchaseBook.invoices(d).single().total, 0.0)
+    //  ورودِ انبارِ همان ردیف همان سهم را دارد (بهای میانگینِ موتورِ تازه)
+    val byPurchase = d.warehouseEntries.associateBy { it.purchaseId }
+    assertEquals(14_000L, byPurchase[PurchaseOrderBook.purchaseIdOf(r1.id, "l2")]?.landedCostMinor)
+  }
+
+  @Test fun `رسیدِ بی کرایه همان ثبتِ پیشین است — بی هزینهٔ جانبی`() {
+    val d = posted()
+    assertTrue(d.purchases.all { it.landedCost == null && it.landedCostMinor == null })
+    assertTrue(d.warehouseEntries.all { it.landedCostMinor == null })
+    assertTrue(PurchaseOrderBook.freightShares(r1).isEmpty())
+  }
+
+  @Test fun `ثبتِ دوبارهٔ بخشی پس از همگام‌سازی همان سهمِ کرایه را به ردیف‌های مانده می‌دهد`() {
+    val o = withFreight
+    val r = o.receipts.single()
+    val full = (PurchaseOrderBook.post(d0, o, r, "2026-11-01", 1_000) as PurchaseOrderBook.Posting.Ok).data
+    val oneRow = PurchaseOrderBook.purchaseIdOf(r1.id, "l1")
+    val synced = d0.copy(
+      purchases = full.purchases.filter { it.id == oneRow },
+      warehouseEntries = full.warehouseEntries.filter { it.purchaseId == oneRow },
+    )
+    val again = (PurchaseOrderBook.post(synced, o, r, "2026-11-02", 2_000) as PurchaseOrderBook.Posting.Ok).data
+    assertEquals(
+      full.purchases.associate { it.id to it.landedCostMinor },
+      again.purchases.associate { it.id to it.landedCostMinor },
+    )
+    assertEquals(28_000L, again.purchases.sumOf { it.landedCostMinor ?: 0L })
+  }
+
+  @Test fun `کادرِ کرایه — خالی صفر، رقمِ فارسی، اعشار به صدم؛ منفی، نادرست و بیش از سقف رد`() {
+    assertEquals(0L, PurchaseOrderBook.freightMinorOf(""))
+    assertEquals(0L, PurchaseOrderBook.freightMinorOf("  "))
+    assertEquals(28_000L, PurchaseOrderBook.freightMinorOf("۲۸۰"))
+    assertEquals(28_050L, PurchaseOrderBook.freightMinorOf("280.5"))
+    assertEquals(null, PurchaseOrderBook.freightMinorOf("-1"))
+    assertEquals(null, PurchaseOrderBook.freightMinorOf("x"))
+    assertEquals(null, PurchaseOrderBook.freightMinorOf("1000000001"))
+  }
+
+  @Test fun `کرایهٔ رسید از پاسخِ سرور خوانده می‌شود و نبودنش صفر است`() {
+    val withIt = ApiJson.decode<PoReceiptDto>(Json.parseToJsonElement("""{"id":"r1","poId":"p","totalMinor":280000,"freightMinor":28000}""") as JsonObject)
+    assertEquals(28_000L, withIt.freightMinor)
+    val old = ApiJson.decode<PoReceiptDto>(Json.parseToJsonElement("""{"id":"r1","poId":"p","totalMinor":280000}""") as JsonObject)
+    assertEquals(0L, old.freightMinor)
+  }
+
+  /* ── آخرین فیِ همین تأمین‌کننده در فرمِ خریدِ دستی (PUR-09) ─────────────── */
+
+  @Test fun `فرمِ خرید — آخرین فیِ همین تأمین‌کننده با تاریخ و تغییر؛ تأمین‌کنندهٔ دیگر اثر ندارد؛ بی کالا یا تأمین‌کننده هیچ`() {
+    val buys = listOf(
+      ir.vil3ntec.tohid.core.purchase.SupplierPricing.Buy("s1", "pA", "2026-10-01", 1, 1_000, 10_000),
+      ir.vil3ntec.tohid.core.purchase.SupplierPricing.Buy("s1", "pA", "2026-11-01", 2, 1_000, 11_000),
+      ir.vil3ntec.tohid.core.purchase.SupplierPricing.Buy("s2", "pA", "2026-11-02", 3, 1_000, 9_000),
+    )
+    assertEquals(null, PurchaseOrderBook.lastPriceHint(buys, null, "s1"))
+    assertEquals(null, PurchaseOrderBook.lastPriceHint(buys, "pA", null))
+    assertEquals(null, PurchaseOrderBook.lastPriceHint(buys, "", "s1"))
+    assertEquals(PurchaseOrderBook.NO_BUY_YET, PurchaseOrderBook.lastPriceHint(buys, "pB", "s1"))
+    assertEquals(
+      "آخرین فیِ این تأمین‌کننده: ${ir.vil3ntec.tohid.money(110.0)} ؋ (${ir.vil3ntec.tohid.formatDate("2026-11-01")}) · ▲ ${ir.vil3ntec.tohid.qty(10.0)}٪",
+      PurchaseOrderBook.lastPriceHint(buys, "pA", "s1"),
+    )
+    //  نخستین خرید از s2 ⇒ بی درصدِ تغییر (پیشینی از همان تأمین‌کننده نیست)
+    assertEquals(
+      "آخرین فیِ این تأمین‌کننده: ${ir.vil3ntec.tohid.money(90.0)} ؋ (${ir.vil3ntec.tohid.formatDate("2026-11-02")})",
+      PurchaseOrderBook.lastPriceHint(buys, "pA", "s2"),
+    )
+  }
+
+  @Test fun `فرمِ خرید — پس از ثبتِ رسید همان فیِ دفتر دیده می‌شود (PUR-09)`() {
+    val buys = PurchaseOrderBook.buys(posted())
+    val h = PurchaseOrderBook.lastPriceHint(buys, "pB", "s1")
+    assertTrue(h.orEmpty(), h.orEmpty().startsWith("آخرین فیِ این تأمین‌کننده: ${ir.vil3ntec.tohid.money(200.0)} ؋"))
+    assertEquals(PurchaseOrderBook.NO_BUY_YET, PurchaseOrderBook.lastPriceHint(buys, "pB", "s2"))
+  }
 }

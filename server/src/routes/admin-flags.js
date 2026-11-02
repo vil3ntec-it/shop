@@ -41,6 +41,7 @@ const KNOWN = Object.freeze([
   { key: 'beta.devices', scope: 'release', default: [], what: 'دستگاه‌های کانالِ آزمایشی' },
   { key: 'shop.receipt_v2', scope: 'shop', default: false, what: 'فاکتورِ نسخهٔ ۲' },
   { key: 'shop.promo_stamp', scope: 'shop', default: false, what: 'نشانِ تخفیفِ خودکار روی فاکتور' },
+  { key: 'shop.loyalty_rule', scope: 'shop', default: false, what: 'قاعدهٔ یکسانِ امتیازِ وفاداری برای همهٔ دستگاه‌ها و امتیاز در «حسابِ من» (PRM-13)' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: false, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },

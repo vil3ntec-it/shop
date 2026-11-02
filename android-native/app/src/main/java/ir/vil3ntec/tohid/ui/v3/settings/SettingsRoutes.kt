@@ -2,14 +2,18 @@ package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrLateApology
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.lateApologyApi
+import ir.vil3ntec.tohid.ui.screens.lateApologyRow
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
 import ir.vil3ntec.tohid.ui.v3.nav.Chrome
@@ -17,9 +21,11 @@ import ir.vil3ntec.tohid.ui.v3.nav.LandOn
 import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
+import ir.vil3ntec.tohid.ui.v3.nav.SettingsEntry
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
 import ir.vil3ntec.tohid.ui.v3.settings.devices.DevicesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AboutScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LateApologyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.NavBarScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PinSheet
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SyncScreen
@@ -39,6 +45,8 @@ object SettingsPaths {
   const val SYNC = "settings/data/sync"
   const val DEVICES = "devices"
   const val DEVICES_PRINTERS = "devices?tab=printers"
+  /** پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — صفحهٔ پشتِ پرچمِ سرور، بیرون از `SettingsLayout` (ردیفش از `SettingsModule.settings`) */
+  const val LATE_APOLOGY = "settings/late-apology"
   /** ردیفِ «نسخه و به‌روزرسانی»ِ «بیشتر» */
   const val UPDATES = ABOUT
 
@@ -77,6 +85,10 @@ val SettingsModule = AppModule(
   id = "settings",
   title = { Str.settings },
   icon = Icons.Outlined.Settings,
+  //  NTF-10: ردیفِ «پوزش و کوپنِ خودکارِ تأخیر» زیرِ «فروش» فقط با پرچمِ روشنِ سرور (`lateApologyRow`، همان ردیفِ رابطِ امروز)
+  settings = listOf(
+    SettingsEntry({ StrLateApology.title }, SettingsPaths.LATE_APOLOGY, Icons.Outlined.Schedule, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { lateApologyRow(lateApologyApi()) }),
+  ),
   entries = listOf(
     ModuleEntry("settings", { Str.settings }, SettingsPaths.ROOT, Icons.Outlined.Settings, setOf(Place.NAV), needs = setOf(Need.MANAGE), order = 90),
     ModuleEntry("devices", { Str.devices }, SettingsPaths.DEVICES, Icons.Outlined.Devices, setOf(Place.MORE), MoreGroup.SHOP, V3Hue.TEAL, order = 40),
@@ -108,6 +120,9 @@ val SettingsModule = AppModule(
       val group = SettingsPaths.groupOfSlug(args["group"].orEmpty())
       val section = group?.let { SettingsPaths.sectionOfSlug(it, args["section"].orEmpty()) }
       if (section == null) LandOn(SettingsPaths.ROOT) else SettingsSection(section)
+    },
+    V3Route(SettingsPaths.LATE_APOLOGY, RouteKind.PAGE, { StrLateApology.title }, parent = SettingsPaths.group(SettingsLayout.SALES), needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      LateApologyScreen(onBack = backOrNull)
     },
     V3Route(SettingsPaths.PIN, RouteKind.SHEET, { Str.appLock }, parent = SettingsPaths.APP_LOCK, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       PinSheet(onDone = { back() })

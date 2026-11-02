@@ -511,13 +511,9 @@ private fun PoEditor(
         TextButton(onClick = { historyFor = r.productId }) { Text("تاریخچه") }
         TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text("حذف") }
       }
-      //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود
-      val last = remember(buys, r.productId, supplierId) { SupplierPricing.last(buys, r.productId, supplierId) }
-      Text(
-        last?.let { "آخرین فیِ این تأمین‌کننده: ${money(PurchaseOrderBook.asAfn(it.priceMinor))} ؋ (${ir.vil3ntec.tohid.formatDate(it.date)})" + changeText(it) }
-          ?: "از این تأمین‌کننده هنوز خریده نشده",
-        style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(bottom = 4.dp),
-      )
+      //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
+      val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
+      Text(last, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(bottom = 4.dp))
     }
     PoProductPicker(d, "افزودنِ کالا — نام یا بارکد") { addProduct(it) }
     Spacer(Modifier.height(8.dp))
@@ -538,16 +534,11 @@ private fun PoEditor(
   historyFor?.let { pid -> PriceHistoryDialog(d, buys, pid, supplierId) { historyFor = null } }
 }
 
-private fun changeText(p: SupplierPricing.Point): String {
-  val bp = p.changeBp ?: return ""
-  if (bp == 0L) return " · بی تغییر"
-  val pct = kotlin.math.abs(bp) / 100.0
-  return (if (bp > 0) " · ▲ " else " · ▼ ") + qty(pct) + "٪"
-}
+private fun changeText(p: SupplierPricing.Point): String = PurchaseOrderBook.changeText(p)
 
-/** تاریخچهٔ قیمتِ خریدِ یک کالا از همهٔ تأمین‌کنندگان، تازه‌ترین بالا (PUR-09) */
+/** تاریخچهٔ قیمتِ خریدِ یک کالا از همهٔ تأمین‌کنندگان، تازه‌ترین بالا (PUR-09) — فرمِ سفارشِ خرید و فاکتورِ خریدِ دستی */
 @Composable
-private fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, productId: String, supplierId: String, onDismiss: () -> Unit) {
+internal fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, productId: String, supplierId: String, onDismiss: () -> Unit) {
   val c = Shop.colors
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   val rows = remember(buys, productId) { SupplierPricing.history(buys, productId).take(30) }
@@ -624,6 +615,8 @@ private fun PoReceive(
   }
   var allowOver by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf("") }
+  //  PUR-06: کرایهٔ همین رسید به حمل‌کننده (فقط مدیر؛ خالی = بی کرایه)
+  var freight by remember { mutableStateOf("") }
   var scan by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
@@ -662,9 +655,10 @@ private fun PoReceive(
       lines += PoReceiptLineDto(l.id, PurchaseOrderBook.milli(rec), PurchaseOrderBook.milli(dmg), PurchaseOrderBook.minor(price))
     }
     if (lines.isEmpty()) { error = "هیچ مقداری وارد نشده است"; return }
+    val freightMinor = PurchaseOrderBook.freightMinorOf(freight) ?: run { error = "کرایه درست نیست"; return }
     busy = true; error = null
     scope.launch {
-      val res = repo.receive(order.id, receiptId, lines, allowOver, note.trim())
+      val res = repo.receive(order.id, receiptId, lines, allowOver, note.trim(), freightMinor)
       val got = res.valueOrNull()
       if (got == null) { busy = false; error = res.errorMessage(); return@launch }
       //  رسید در سرور ثبت شد ⇒ فاکتورِ خریدِ دفتر (شناسه‌های قطعی؛ تکرار بی اثر)
@@ -710,6 +704,11 @@ private fun PoReceive(
     if (perms.manage) Row(verticalAlignment = Alignment.CenterVertically) {
       Checkbox(checked = allowOver, onCheckedChange = { allowOver = it })
       Text("بیش از سفارش را هم می‌پذیرم (اختلافِ «اضافه» ثبت می‌شود)", style = MaterialTheme.typography.bodySmall, color = c.text)
+    }
+    if (perms.manage) {
+      NumberField(freight, { v -> freight = v; error = null }, "کرایهٔ این رسید (؋)", Modifier.fillMaxWidth())
+      Text("به حمل‌کننده، نه تأمین‌کننده: به نسبتِ ارزشِ کالاهای پذیرفته روی بهایشان پخش می‌شود و بدهیِ تأمین‌کننده را بالا نمی‌برد.",
+        style = MaterialTheme.typography.labelSmall, color = c.muted)
     }
     OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text("یادداشت") }, singleLine = true, modifier = Modifier.fillMaxWidth())
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }

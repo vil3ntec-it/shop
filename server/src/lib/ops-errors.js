@@ -56,9 +56,27 @@ function secrets() {
   return secretValues;
 }
 
+/**
+ * S117 — شمارهٔ کاملِ کارت (۱۵ تا ۱۹ رقم، با فاصله یا خطِ تیره، با رقمِ کنترلِ Luhn) پوشانده می‌شود.
+ * بارکدِ ۱۳ و ۱۴ رقمی، زمانِ میلی‌ثانیه و شمارهٔ تلفن در این بازه نیستند؛ رشتهٔ بلندی که Luhn را نگذراند می‌ماند.
+ */
+function maskCards(text) {
+  return String(text || '').replace(/(?<!\d)\d(?:[ -]?\d){12,18}(?!\d)/g, (m) => {
+    const d = m.replace(/\D/g, '');
+    if (d.length < 15) return m;
+    let sum = 0;
+    for (let i = 0; i < d.length; i++) {
+      let x = Number(d[d.length - 1 - i]);
+      if (i % 2) { x *= 2; if (x > 9) x -= 9; }
+      sum += x;
+    }
+    return sum % 10 === 0 ? '[کارت]' : m;
+  });
+}
+
 /** هر چه شبیهِ داده‌ی شخصی یا راز است پوشانده می‌شود (همان قاعدهٔ `routes/errors.js`، به‌اضافهٔ رازهای سرور). */
 function scrub(text, limit = LIMITS.message) {
-  let s = String(text || '');
+  let s = maskCards(text);
   for (const v of secrets()) if (v && s.includes(v)) s = s.split(v).join('[راز]');
   return s
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s/@]+@[^\s]*/gi, '[نشانی]')
@@ -549,6 +567,6 @@ async function serverErrorCounts(t = now()) {
 
 module.exports = {
   LIMITS, STATUSES, PRIORITIES, SOURCES, PRIORITY_RANK,
-  scrub, normalize, topFrame, clientFingerprint, recordServer, recorderStats, routeOf,
+  scrub, maskCards, normalize, topFrame, clientFingerprint, recordServer, recorderStats, routeOf,
   ingest, list, get, setStatus, setPriority, addNote, linkSupport, burst, serverErrorCounts,
 };

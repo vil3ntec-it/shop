@@ -247,4 +247,6 @@ private fun LazyListScope.ledgerItems(
   if (account.sales.isNotEmpty()) {
     item(key = "sales") { DebtorInvoices(account, actions.onOpenSale, actions.onOlderSales) }
   }
+  //  SEC-10: «حذفِ دادهٔ این مشتری» — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)
+  item(key = "erase") { CustomerErasureV3(account.debtor.phone) }
 }

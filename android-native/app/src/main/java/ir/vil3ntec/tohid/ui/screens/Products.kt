@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
@@ -266,6 +267,10 @@ fun ProductsScreen(
           label = "جستجوی نام، دسته یا بارکد",
         )
         Spacer(Modifier.height(10.dp))
+        //  AI-11: «جست‌وجو با عکس» فقط با پرچمِ روشنِ سرور؛ زدنِ «مشابه» همان بازکردنِ کالا از فهرست است
+        VisualSearchEntry(rememberVisualSearchApi(), d.products, VisualSearch.Place.LIST, Modifier.fillMaxWidth().padding(bottom = 10.dp)) { t ->
+          if (t is VisualSearch.Tap.Open) onOpenProduct(t.productId)
+        }
         Row(
           Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
           horizontalArrangement = Arrangement.spacedBy(6.dp),

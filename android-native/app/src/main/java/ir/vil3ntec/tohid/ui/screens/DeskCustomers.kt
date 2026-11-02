@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.data.invoiceLabel
+import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -439,6 +440,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
       CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
       CustomerCardButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // CRM-16، پیش‌فرض خاموش
+      CustomerErasureButton(d.debtors.find { it.id == id }?.phone, Modifier.padding(start = 6.dp)) // SEC-10، فقط صاحب و پرچمِ روشن
     }
     entry?.let { kind ->
       Spacer(Modifier.height(8.dp))
@@ -452,7 +454,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       }
     }
     //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
-    ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()))
+    ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
     Spacer(Modifier.height(10.dp))
 
     //  زبانه‌ها
@@ -546,7 +548,11 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
                 5 -> TCell(money(v.paidAmount), Shop.colors.success)
                 6 -> TCell(if (v.remaining > 0.5) money(v.remaining) else "", Shop.colors.danger)
                 7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(v))
-                else -> TCell(if (off) "لغوشده" else "ثبت‌شده", if (off) Shop.colors.danger else Shop.colors.success)
+                //  CRM-07: فاکتورِ سفارشِ اینترنتیِ تحویل‌شده نشانِ «اینترنتی» دارد
+                else -> TCell(
+                  when { off -> "لغوشده"; v.isOnlineOrder() -> StrDebtor.online; else -> "ثبت‌شده" },
+                  when { off -> Shop.colors.danger; v.isOnlineOrder() -> Shop.colors.primary; else -> Shop.colors.success },
+                )
               }
             },
             onClick = { i -> picked = invoices[i].id },

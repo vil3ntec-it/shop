@@ -211,6 +211,10 @@ FLAGS.push('shop.customer_erasure');
 FLAGS.push('shop.orders.issue_reports', 'shop.orders.reviews');
 //  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`/shop/orders/evidence/…`)
 FLAGS.push('shop.orders.dispute_file');
+//  PRM-13: قاعدهٔ یکسانِ امتیازِ وفاداری (`/shop/loyalty`) — «ب» فقط ردیفِ دکانِ خودش را می‌نویسد
+FLAGS.push('shop.loyalty_rule');
+//  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) — فقط کالاهای دکانِ توکن
+FLAGS.push('shop.visual_search');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

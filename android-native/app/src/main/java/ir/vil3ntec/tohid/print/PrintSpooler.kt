@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
 import ir.vil3ntec.tohid.core.hw.ReceiptCopies
 import ir.vil3ntec.tohid.data.AuditEntry
+import ir.vil3ntec.tohid.data.DrawerNoSale
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.auditId
@@ -323,9 +324,8 @@ object PrintSpooler {
    */
   suspend fun openDrawer(context: Context, printer: PrinterRegistry.Saved, reason: String): String {
     val why = reason.trim()
-    if (why.isEmpty()) return "دلیل را بنویسید"
-    //  همان #286: نقشی که سیاستِ دکان اجازه داده خودش تأییدکننده است؛ شاگردِ «نیازمندِ تأیید» نه
-    if (!ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context)) return "باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد (APPROVAL_REQUIRED)"
+    //  همان #286: نقشی که سیاستِ دکان اجازه داده خودش تأییدکننده است؛ شاگردِ «نیازمندِ تأیید» نه (قاعده: `DrawerNoSale`)
+    DrawerNoSale.refusal(why, ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context))?.let { return it }
     //  در دامنهٔ خودِ صف: صفحه‌ای که وسطِ کار بسته شد ضربه را بی ردیفِ سابقه نمی‌گذارد
     return scope.async { openDrawerNow(context.applicationContext ?: context, printer, why) }.await()
   }
@@ -336,14 +336,11 @@ object PrintSpooler {
     if (!k.reached) return "کشو باز نشد: ${k.error ?: "به چاپگر نرسید"}"
     val now = System.currentTimeMillis()
     val by = who(context)
-    val approver = by ?: POLICY_APPROVER
-    val notes = "کشو بی فروش — $why — دستگاه: ${device()} · چاپگر: ${printer.name}" +
-      (if (k.error != null) " — خطای چاپگر: ${k.error}" else "") + " — تأیید: $approver"
+    val dev = device()
     val saved = audit { d ->
-      AuditEntry(
-        id = auditId(), type = "no_sale", date = ir.vil3ntec.tohid.todayIso(),
-        refId = ir.vil3ntec.tohid.data.CashShift.current(d)?.open?.id, notes = notes, createdAt = now,
-        by = by, reason = why, approvedBy = approver,
+      DrawerNoSale.entry(
+        id = auditId(), reason = why, by = by, device = dev, printer = printer.name, printerError = k.error,
+        shiftOpenId = ir.vil3ntec.tohid.data.CashShift.current(d)?.open?.id, today = ir.vil3ntec.tohid.todayIso(), now = now,
       )
     }
     val head = if (k.error == null) "کشو باز شد" else "شاید کشو باز شد (خطای چاپگر: ${k.error})"
@@ -352,9 +349,6 @@ object PrintSpooler {
 
   private fun who(context: Context): String? =
     runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull()?.trim()?.ifEmpty { null }
-
-  /** تأییدکننده وقتی نامِ کاربر نیست ولی سیاستِ دکان اجازه داده (هرگز «صاحب/مدیر»ِ ساختگی) */
-  private const val POLICY_APPROVER = "policy"
 
   private fun device(): String = runCatching { android.os.Build.MODEL }.getOrNull()?.ifBlank { null } ?: "این دستگاه"
 

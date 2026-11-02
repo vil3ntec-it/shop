@@ -41,6 +41,7 @@ class ShopStore(
   val training: Boolean = false,
 ) {
   init { DebtMinorFlag.bind(context) }  //  `shop.debt_minor`: `debt` و موتورهای خالص پرچمِ همین دکان را از `DebtMinorFlag` می‌خوانند
+  init { LoyaltyRules.bind(context) }  //  PRM-13: برگشت و لغو انقضای قاعدهٔ در کار (یکسانِ دکان یا همین دستگاه) را از `LoyaltyRules` می‌خوانند
 
   private val home = if (training) File(context.filesDir, TrainingMode.DIR).apply { mkdirs() } else context.filesDir
   private val file = File(home, TrainingMode.LEDGER)

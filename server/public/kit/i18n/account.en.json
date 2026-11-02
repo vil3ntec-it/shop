@@ -21,5 +21,10 @@
   "ah.debt": "Debt",
   "ah.pay": "Payment",
   "ah.due": "Due {d}",
-  "ah.after": "Balance: {m}"
+  "ah.after": "Balance: {m}",
+  "ah.points": "My points",
+  "ah.t.bronze": "Bronze",
+  "ah.t.silver": "Silver",
+  "ah.t.gold": "Gold",
+  "ah.soon": "{n} points expire by {d}"
 }

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import ir.vil3ntec.tohid.data.CountFilter
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import androidx.compose.foundation.lazy.items
@@ -683,6 +684,20 @@ private fun RowEcho(text: String, warn: Boolean) {
 
 /* ============================ انبارگردانی ============================ */
 
+/** یک ردیفِ تراشهٔ صافی (INV-05): «همه» و هر گزینه؛ `null` ⇒ همه */
+@Composable
+private fun CountFilterChips(all: String, options: List<Pair<String, String>>, picked: String?, onPick: (String?) -> Unit) {
+  Row(
+    Modifier.fillMaxWidth().padding(top = 6.dp).horizontalScroll(rememberScrollState()),
+    horizontalArrangement = Arrangement.spacedBy(6.dp),
+  ) {
+    FilterChip(selected = picked == null, onClick = { onPick(null) }, label = { Text(all) })
+    options.forEach { (id, label) ->
+      FilterChip(selected = picked == id, onClick = { onPick(if (picked == id) null else id) }, label = { Text(label, maxLines = 1) })
+    }
+  }
+}
+
 /**
  *  انبارگردانی — هر کالا را بشمار، برنامه اختلاف را نشان می‌دهد و با یک
  *  «ثبت» همه را «اصلاحِ موجودی» با دلیلِ «انبارگردانی» می‌کند.
@@ -701,6 +716,9 @@ fun StockCountSheet(
   var search by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }
+  //  INV-05: صافیِ دسته و تأمین‌کننده — فقط فهرستِ دیده‌شده؛ شمرده‌ها و ثبت همان (`CountFilter`)
+  var category by remember { mutableStateOf<String?>(null) }
+  var supplierId by remember { mutableStateOf<String?>(null) }
 
   val parsed: Map<String, Double> = remember(counts) {
     counts.mapNotNull { (id, text) ->
@@ -711,11 +729,9 @@ fun StockCountSheet(
   val lines = remember(d, parsed) { WarehouseEngine.countLines(d, parsed.filterValues { !it.isNaN() && it >= 0 }) }
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val term = search.trim()
-  val shown = remember(d, term) {
-    d.products.filter { it.active }
-      .filter { term.isEmpty() || it.name.contains(term, ignoreCase = true) || it.barcodes.any { b -> b.contains(term) } }
-      .sortedBy { it.name }
-  }
+  val shown = remember(d, term, category, supplierId) { CountFilter.shown(d.products, term, category, supplierId) }
+  val categories = remember(d) { CountFilter.categories(d.products) }
+  val suppliers = remember(d) { CountFilter.suppliers(d.products, d.suppliers) }
 
   BulkFrame(
     title = "انبارگردانی",
@@ -750,6 +766,8 @@ fun StockCountSheet(
         placeholder = { Text("جستجوی کالا یا بارکد…") },
         singleLine = true, modifier = Modifier.fillMaxWidth(),
       )
+      if (categories.isNotEmpty()) CountFilterChips("همهٔ دسته‌ها", categories.map { it to it }, category) { category = it }
+      if (suppliers.isNotEmpty()) CountFilterChips("همهٔ تأمین‌کننده‌ها", suppliers.map { it.id to it.name.ifBlank { it.id } }, supplierId) { supplierId = it }
       Spacer(Modifier.height(8.dp))
       OutlinedTextField(
         value = note, onValueChange = { note = it },
