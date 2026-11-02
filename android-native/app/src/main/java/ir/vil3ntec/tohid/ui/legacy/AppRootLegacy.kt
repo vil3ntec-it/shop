@@ -132,7 +132,7 @@ fun AppRootLegacy(
 ) {
   val context = LocalContext.current
   //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
-  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }; remember(context) { ir.vil3ntec.tohid.data.LayawayPref.load(context) } // POS-27: کنار گذاشتنِ کالای امانی فقط با تنظیمِ همین دستگاه
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
@@ -832,6 +832,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle to androidx.compose.material.icons.Icons.Filled.QuestionAnswer, // RPT-16، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
                 ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
+                ir.vil3ntec.tohid.ui.screens.STOCK_PLACES_TITLE to androidx.compose.material.icons.Icons.Filled.Inventory2, // INV-20/21
                 //  پرچمِ `shop.stock_v2` خاموش ⇒ بی ستونِ «موجودی و بها» (کارتش هم پنهان است)
                 if (ir.vil3ntec.tohid.data.StockLedger.serverFlag) ir.vil3ntec.tohid.ui.screens.STOCK_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.SwapHoriz else null,
                 ir.vil3ntec.tohid.ui.components.pos.HeldInvoicePrefs.SECTION to androidx.compose.material.icons.Icons.Filled.Layers,
@@ -854,10 +855,14 @@ fun AppRootLegacy(
                 StrShell.fraudTrail to androidx.compose.material.icons.Icons.Filled.History,
                 StrShell.productTools to androidx.compose.material.icons.Icons.Filled.Description,
                 StrShell.stockInsight to androidx.compose.material.icons.Icons.Filled.Inventory,
+                ir.vil3ntec.tohid.core.i18n.StrLoyalty.settingsTitle to androidx.compose.material.icons.Icons.Filled.Loyalty, // PRM-13، پیش‌فرض خاموش
                 StrShell.stockLevels to androidx.compose.material.icons.Icons.Filled.Inventory,
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrSale.feesTitle to androidx.compose.material.icons.Icons.Filled.ShoppingBag, // POS-36
                 ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
+                //  WEB-04 و MKT-02/RSK-09: فقط با پرچمِ روشنِ سرور و دسترسیِ تنظیم (خاموش ⇒ بی ردیف)
+                if (ir.vil3ntec.tohid.ui.screens.storefrontEtaRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE to androidx.compose.material.icons.Icons.Filled.Schedule else null,
+                if (ir.vil3ntec.tohid.ui.screens.promoGuardRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE to androidx.compose.material.icons.Icons.Filled.Redeem else null,
                 ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.core.i18n.StrPos.notesSection to androidx.compose.material.icons.Icons.Filled.Edit, // POS-11
                 ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE to androidx.compose.material.icons.Icons.Filled.Palette, //  روشن‌کردنِ نسخهٔ ۳ روی همین کامپیوتر
@@ -865,7 +870,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrPos.quoteSettingsTitle to androidx.compose.material.icons.Icons.Filled.Description, ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2, // POS-26
                 ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.LocalOffer,
                 ir.vil3ntec.tohid.core.i18n.StrPayFix.settingsTitle to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
-                ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CardGiftcard, // PAY-24
+                ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrLayaway.settingsTitle to androidx.compose.material.icons.Icons.Filled.Schedule, // PAY-24، POS-27
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,

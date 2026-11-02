@@ -45,5 +45,7 @@
   "od.prefs.saved": "Saved; the courier sees these instructions.",
   "od.prefs.locked": "The order has left the shop; contact the courier to change this.",
   "err.delivery_locked": "The order has left the shop; contact the courier to change this.",
-  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again."
+  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again.",
+  "od.eta.live": "Approximate delivery: in {a} to {b} minutes",
+  "od.eta.ready": "Ready for pickup, approximately: in {a} to {b} minutes"
 }

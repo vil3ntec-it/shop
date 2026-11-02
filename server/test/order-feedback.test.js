@@ -127,6 +127,23 @@ test('NTF-07/09 ⛔ پرچمِ خاموش: پیگیری بیت‌به‌بیت �
   assert.ok(other.shopId);
 });
 
+test('NTF-09 ⛔ ویترین: `features.reviews` فقط با پرچمِ نظر؛ خاموش ⇒ پاسخِ ویترین بیت‌به‌بیت همان', async () => {
+  const s = await shop('ویترینِ نظر', []);
+  const info = async () => (await h.get(`/api/store/${s.slug}`)).body;
+  const before = JSON.stringify(await info());
+  assert.equal('reviews' in (JSON.parse(before).features || {}), false);
+  await setFlag(s.shopId, ISSUES, true);   // پرچمِ گزارش کلیدِ ویترین نمی‌سازد
+  assert.equal(JSON.stringify(await info()), before);
+  await setFlag(s.shopId, REVIEWS, true);
+  const on = await info();
+  assert.equal(on.features.reviews, true);
+  delete on.features.reviews;
+  if (!Object.keys(on.features).length) delete on.features;
+  assert.equal(JSON.stringify(on), before, 'روشن ⇒ فقط همین کلید');
+  await setFlag(s.shopId, REVIEWS, null);
+  assert.equal(JSON.stringify(await info()), before, 'دوباره خاموش ⇒ همان');
+});
+
 // ════════════════════════════════════════════════════════════════════
 //  NTF-07 — گزارشِ مشکل
 // ════════════════════════════════════════════════════════════════════
