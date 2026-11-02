@@ -352,8 +352,10 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
   LaunchedEffect(count) { if (count < quietUntil) quietUntil = count }
 
   ready?.let { plan ->
+    //  بستنِ این پنجره کدهای ناشناسِ مانده را تا اسکنِ تازه دوباره نمی‌پرسد
+    fun close() { ready = null; quietUntil = count }
     AlertDialog(
-      onDismissRequest = { ready = null },
+      onDismissRequest = { close() },
       title = { Text(StrDevices.heldReady(plan.invoices.size, ir.vil3ntec.tohid.money(plan.totalMinor / 100.0) + " ؋")) },
       text = {
         Column {
@@ -364,14 +366,14 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
       confirmButton = {
         Button(onClick = {
           ScanSaleHold.payRequest.value = plan.invoices.firstOrNull()?.id
-          ready = null
+          close()
           open(ScanTarget.SALE)
         }) { Text(StrDevices.pay) }
       },
       dismissButton = {
         Row {
-          plan.unknown.firstOrNull()?.let { u -> TextButton(onClick = { ready = null; onNewItem(u.code) }) { Text(StrDevices.newItem) } }
-          TextButton(onClick = { ready = null }) { Text(StrDevices.later) }
+          plan.unknown.firstOrNull()?.let { u -> TextButton(onClick = { close(); onNewItem(u.code) }) { Text(StrDevices.newItem) } }
+          TextButton(onClick = { close() }) { Text(StrDevices.later) }
         }
       },
     )
