@@ -109,9 +109,11 @@ function decode(text) {
   try { return JSON.parse(text); } catch { return null; }
 }
 
-/** فاصلهٔ مجازِ دکان؛ مقدارِ خودِ دکان بر `all` جلو می‌افتد. */
-async function maxMFor(shopId) {
-  const rows = await many('SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [MAX_M_KEY, 'all', String(shopId)]);
+/** فاصلهٔ مجازِ دکان؛ مقدارِ خودِ دکان بر `all` جلو می‌افتد. `run` ⇐ اتصالِ تراکنش (مثلِ `orders.flagOf`). */
+async function maxMFor(shopId, run = null) {
+  const sql = 'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)';
+  const params = [MAX_M_KEY, 'all', String(shopId)];
+  const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
@@ -125,7 +127,9 @@ const reject = (code, data) => ({ code, extra: { http: REJECT[code][0], message:
  */
 async function verify(c, shopId, a, ev, actor) {
   if (actor.kind !== 'courier' || a.mode !== 'shop_courier') return { detail: {} };
-  if (ev.to === 'picked_up' && await orders.flagOf(shopId, BAG_FLAG)) {
+  //  ⛔ همهٔ خواندن‌ها با `c`: رویدادهای هم‌زمانِ پشتِ `FOR UPDATE` ِ مأموریت اتصالِ دومی از استخر نگیرند
+  const run = (text, params) => c.query(text, params);
+  if (ev.to === 'picked_up' && await orders.flagOf(shopId, BAG_FLAG, run)) {
     const p = (await c.query(
       `SELECT p.bags, o.order_no FROM order_picks p JOIN online_orders o ON o.id = p.order_id
         WHERE p.shop_id=$1 AND p.order_id=$2 AND p.status='packed'`, [shopId, a.order_id]
@@ -135,11 +139,11 @@ async function verify(c, shopId, a, ev, actor) {
     if (!v.ok) return reject(v.code, { bags: Number(p.bags), ...(v.missing ? { missing: v.missing } : {}) });
     return { detail: { bagsScanned: v.scanned } };
   }
-  if (ev.to === 'delivered' && await orders.flagOf(shopId, PIN_FLAG)) {
+  if (ev.to === 'delivered' && await orders.flagOf(shopId, PIN_FLAG, run)) {
     const o = (await c.query('SELECT address FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, a.order_id])).rows[0];
     const addr = typeof o?.address === 'string' ? decode(o.address) || {} : o?.address || {};
     const pin = coord(addr.lat, 90) && coord(addr.lng, 180) ? { lat: addr.lat, lng: addr.lng } : null;
-    const v = nearPin(ev.position || null, pin, await maxMFor(shopId));
+    const v = nearPin(ev.position || null, pin, await maxMFor(shopId, run));
     if (!v.ok) return reject(v.code, v.distanceM === undefined ? null : { distanceM: v.distanceM, maxM: v.maxM });
     return { detail: v.checked ? { distanceM: v.distanceM } : {} };
   }
