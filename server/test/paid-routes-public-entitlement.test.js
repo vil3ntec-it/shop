@@ -47,6 +47,7 @@ const CATEGORY = {
   'storefront-eta-store.js': 'STORE_PAID',    //  WEB-04: زمانِ تقریبیِ تحویل — همان ویترینِ پولی (sf.open)
   'store-account-history.js': 'STORE_PAID',    //  CRM-13: «حسابِ من» — همان ویترینِ پولی (sf.open پیش از پرچم)
   'order-add-store.js': 'STORE_PAID',          //  CHK-21: افزودنِ قلم پیش از جمع‌آوری — همان ویترینِ پولی (sf.open)
+  'order-method-store.js': 'STORE_PAID',       //  S72: تغییرِ روشِ تحویل پیش از جمع‌آوری — همان ویترینِ پولی (sf.open)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */

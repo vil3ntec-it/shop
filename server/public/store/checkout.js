@@ -66,6 +66,17 @@
       box.textContent = x ? t(f === 'pickup' ? 'ck.eta.pickup' : 'ck.eta', { a: K.fa(x.minMinutes, 0), b: K.fa(x.maxMinutes, 0) }) : none ? t('ck.eta.none') : '';
     }
 
+    // ── S71: روش و مسئولِ تحویل زیرِ «ارسال/دریافت» (فقط با `features.deliveryMethod`؛ store/delivery-method.js ِ دیربار) ──
+    var method = null;
+    function renderMethod(f) {
+      var dm = c.store.features && c.store.features.deliveryMethod;
+      if (!dm) return;
+      method = method || (window.StoreMethod ? Promise.resolve() : new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/delivery-method.js' }, on: { load: ok, error: no } }));
+      })).then(function () { return window.StoreMethod({ api: api, slug: slug }); }).catch(function () { method = null; return null; });
+      method.then(function (m) { if (m) m.checkout(fulfillment(), dm); });
+    }
+
     // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
     //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
     //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
@@ -231,6 +242,7 @@
       renderZone(f);
       renderSlots(f);
       renderEta(f);
+      renderMethod(f);
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');

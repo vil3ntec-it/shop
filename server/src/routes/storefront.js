@@ -117,14 +117,14 @@ router.get('/:slug', readLimit, store, async (req, res) => {
     //  WEB-13: «دیده‌شده‌های اخیر» (`recent.js`، فقط روی دستگاه) با پرچمِ `shop.storefront.recent`؛ خاموش ⇒ این کلید نیست
     ...((await orders.flagOf(req.store.shop_id, RECENT_FLAG)) ? { recent: true } : {}),
     //  فقط با پرچمِ روشن (E2E-MKT-02)؛ خاموش ⇒ همان پاسخِ پیشین، بی این کلید
-    ...await featuresOf(req.store.shop_id),
+    ...await featuresOf(req.store.shop_id, req.store),
     //  WEB-20: پیوندِ قابلِ پیش‌نمایشِ کالا فقط با پرچمِ `shop.storefront.seo`؛ خاموش ⇒ این کلید نیست
     ...(seo ? { seo } : {}),
   });
 });
 
 /** `features` فقط با پرچم‌های روشن؛ هیچ‌کدام ⇒ کلید نیست (پاسخِ پیشین) */
-async function featuresOf(shopId) {
+async function featuresOf(shopId, sf) {
   const f = {
     ...((await orders.flagOf(shopId, STOCK_LIST_FLAG)) ? { stockList: true } : {}),
     ...((await orders.flagOf(shopId, ADDRESS_EXTRA_FLAG)) ? { addressExtra: true } : {}),
@@ -144,6 +144,9 @@ async function featuresOf(shopId) {
     //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
   };
+  //  S71: روش و مسئولِ هر تحویلی که این ویترین دارد (برگهٔ ثبت) با پرچمِ `shop.storefront.delivery_method`
+  const dm = await require('../lib/order-delivery-method').storeMethods(sf);
+  if (dm !== undefined) f.deliveryMethod = dm;
   return Object.keys(f).length ? { features: f } : {};
 }
 
@@ -315,6 +318,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
   const live = await eta.orderEta(req.store, orderId);
   if (live !== undefined) order.eta = live;
+  //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — فقط با پرچمِ `shop.storefront.delivery_method` (خاموش ⇒ کلید نیست)
+  const method = await require('../lib/order-delivery-method').customerView(req.store, orderId);
+  if (method !== undefined) order.deliveryMethod = method;
   res.json({ order });
 });
 
