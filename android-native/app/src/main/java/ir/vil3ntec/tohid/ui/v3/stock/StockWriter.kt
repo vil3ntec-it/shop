@@ -7,6 +7,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
+import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -35,6 +36,9 @@ class StockWriter internal constructor(
   val today: String get() = todayIso()
   val now: Long get() = System.currentTimeMillis()
   val newId: () -> String = { Ulid.next() }
+
+  /** INV-02 — نامِ حسابِ واردشده برای «کاربر» ِ حرکت‌های انبار؛ بی حساب ⇒ null (مثلِ پیش) */
+  val user: String? get() = runCatching { SyncStore(context).accountName }.getOrNull()?.trim()?.ifEmpty { null }
 
   /** @return null اگر ثبت شد؛ وگرنه دلیلِ ردِ موتور */
   fun commit(result: WarehouseEngine.Result, done: String): String? = when (result) {

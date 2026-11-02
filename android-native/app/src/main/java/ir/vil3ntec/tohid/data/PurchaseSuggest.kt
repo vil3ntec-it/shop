@@ -64,7 +64,7 @@ object PurchaseSuggest {
     val leads = HashMap<String, ReorderCore.Lead>()
     return d.products.filter { it.active }.mapNotNull { p ->
       val sid = p.supplierId.takeIf { it in known } ?: SupplierPricing.latestSupplier(buys, p.id)?.takeIf { it in known }
-      val lead = sid?.let { s -> leads.getOrPut(s) { PurchaseOrderBook.leadTime(orders, s) } }
+      val lead = sid?.let { s -> leads.getOrPut(s) { PurchaseOrderBook.leadTime(orders, s, PurchaseOrderBook.manualLead(d, s)) } }
       val f = try {
         DemandForecast.forecast(
           DemandForecast.Input(

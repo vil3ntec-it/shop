@@ -27,6 +27,9 @@ object StrStock {
   fun cartons(n: Any): String = t("${asIs(n)} کارتن", "$n ${pl(n, "carton", "cartons")}", "$n کارټنه")
   fun salePrice(a: Any): String = t("فروش ${asIs(a)} ؋", "Sells at $a ؋", "پلور $a ؋")
   fun expiresIn(days: Any): String = t("${asIs(days)} روز تا انقضا", "Expires in $days ${pl(days, "day", "days")}", "$days ورځې پاتې")
+  /** INV-14 — «این موجودی چند روز کافی است» (`DemandForecast.daysLeft`) */
+  fun coverDays(n: Any): String = t("کافی برای ${asIs(n)} روز", "Lasts $n ${pl(n, "day", "days")}", "د $n ورځو لپاره بس")
+  fun coverBeyond(n: Any): String = t("کافی برای بیش از ${asIs(n)} روز", "Lasts over $n days", "له $n ورځو ډېر بس")
   val expiresToday: String get() = t("امروز منقضی می‌شود", "Expires today", "نن پای ته رسي")
   val pillLow: String get() = t("کم", "Low", "کم")
   val pillOut: String get() = t("تمام‌شده", "Out", "خلاص")
@@ -182,6 +185,9 @@ object StrStock {
   val moveSaleCancel: String get() = t("لغو فروش", "Sale cancelled", "پلور لغوه شو")
   val moveSupplierReturn: String get() = t("برگشت به تأمین‌کننده", "Return to supplier", "عرضه کوونکي ته ستنول")
   val moveAdjustment: String get() = t("اصلاح موجودی", "Stock adjustment", "د موجودي سمون")
+  val moveOther: String get() = t("دیگر", "Other", "نور")
+  /** INV-02 — کاربرِ ثبت‌کنندهٔ حرکت */
+  fun moveBy(name: Any): String = t("کاربر: ${asIs(name)}", "By $name", "کارن: $name")
   val noMovements: String get() = t("هنوز حرکتی برای این کالا ثبت نشده", "No movements recorded for this item yet", "د دې توکي لپاره تر اوسه خوځښت نه دی ثبت شوی")
 
   // ورود از فایل

@@ -139,6 +139,10 @@ object StrMoney {
 
   //  برگهٔ قرض‌دار و برگهٔ تراکنش
   val name: String get() = t("نام", "Name", "نوم")
+  /** PUR-10 — زمانِ تأمینِ دستیِ تأمین‌کننده */
+  val leadDaysOptional: String get() = t("زمانِ تأمین به روز (اختیاری)", "Lead time in days (optional)", "د رسولو وخت په ورځو (اختیاري)")
+  val leadDaysHelp: String get() = t("اگر خالی بماند، از سفارش‌های رسیده سنجیده می‌شود", "Left empty, it's measured from received orders", "که تش پاتې شي، له رسېدلو فرمایشونو اندازه کېږي")
+  val leadDaysBad: String get() = t("عددی از ۱ تا ۳۶۵ بنویسید", "Enter a number from 1 to 365", "له ۱ تر ۳۶۵ پورې شمېر ولیکئ")
   val phoneOptional: String get() = t("تلفن (اختیاری)", "Phone (optional)", "تلیفون (اختیاري)")
   val creditLimitField: String get() = t("سقفِ اعتبار (اختیاری)", "Credit limit (optional)", "د پور حد (اختیاري)")
   val creditLimitHelper: String get() = t(

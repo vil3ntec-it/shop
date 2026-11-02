@@ -147,6 +147,8 @@ object WarehouseEngine {
     shift: Map<String, Double> = emptyMap(),
     /** S20 (`CountToolsPref`): `COUNT` ⇒ حرکتِ جدای «اصلاحِ شمارش» (`count_adjust`)؛ پیش‌فرض همان «اصلاح موجودی» */
     kind: AdjustKind = AdjustKind.ADJUSTMENT,
+    /** INV-02 — کاربرِ ثبت‌کننده روی هر حرکت؛ `null` ⇒ مثلِ پیش */
+    userId: String? = null,
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
     val lines = countLines(d, counted, shift)
@@ -156,7 +158,7 @@ object WarehouseEngine {
     var lastId = ""
     for (l in lines) {
       when (val r = adjustStock(
-        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId,
+        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId, userId = userId,
       )) {
         is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
         is Result.Ok -> { data = r.data; lastId = r.id }

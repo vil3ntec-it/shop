@@ -43,7 +43,7 @@
     "sale.customer": {"scope":"sale","title":"انتخاب یا ساختِ مشتری","status":"live","page":null,"web":[["C",false,false,true]],"overrides":[]},
     "sale.editRow": {"scope":"sale","title":"ویرایشِ ردیف","status":"live","page":null,"web":[["J",false,false,true]],"overrides":[]},
     "sale.freeItem": {"scope":"sale","title":"قلمِ آزاد","status":"live","page":null,"web":[["Q",false,false,true]],"overrides":[]},
-    "sale.discountRow": {"scope":"sale","title":"تخفیفِ ردیف","status":"planned","page":null,"web":[["X",false,false,true]],"overrides":[]},
+    "sale.discountRow": {"scope":"sale","title":"تخفیفِ ردیف","status":"partial","page":null,"web":[["X",false,false,true]],"overrides":[]},
     "sale.discountInvoice": {"scope":"sale","title":"تخفیفِ کلِ فاکتور","status":"partial","page":null,"web":[["X",false,true,true]],"overrides":[]},
     "sale.hold": {"scope":"sale","title":"نگه‌داشتنِ سبد","status":"partial","page":null,"web":[["G",false,false,true]],"overrides":[]},
     "sale.heldList": {"scope":"sale","title":"فهرستِ سبدهای نگه‌داشته","status":"partial","page":null,"web":[["G",false,true,true]],"overrides":[]},

@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.PurchaseSuggest
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
@@ -104,5 +106,38 @@ class StockListModelTest {
   fun `اسکن کالای شناخته به ورود و ناشناس به کالای تازه`() {
     assertEquals("stock/entry?product=rice", StockListModel.scanTarget(ledger, " 626001 "))
     assertTrue(StockListModel.scanTarget(ledger, "999").startsWith("products/new?barcode=999"))
+  }
+
+  @Test
+  fun `چند روز کافی است همان پیش بینی پیشنهاد سفارش است`() {
+    val tea = Product(id = "tea", name = "چای", unit = "عدد", minStock = 1.0)
+    val gone = Product(id = "gone", name = "تمام", unit = "عدد")
+    val past = (1..28).map { java.time.LocalDate.parse(today).minusDays(it.toLong()).toString() }
+    val sales = past.mapIndexed { i, day -> Sale(id = "t$i", date = day) }
+    val items = sales.flatMapIndexed { i, s ->
+      listOf(SaleItem(id = "a$i", saleId = s.id, productId = "tea", quantity = 2.0), SaleItem(id = "b$i", saleId = s.id, productId = "gone", quantity = 1.0))
+    }
+    val d = ShopData(
+      products = listOf(tea, gone, soap),
+      warehouseEntries = listOf(
+        WarehouseEntry(id = "w1", productId = "tea", units = 76.0),
+        WarehouseEntry(id = "w2", productId = "gone", units = 28.0),
+        WarehouseEntry(id = "w3", productId = "soap", units = 3.0),
+      ),
+      sales = sales,
+      saleItems = items,
+    )
+    val rows = StockListModel.overview(d, today).rows.associateBy { it.product.id }
+    val forecast = PurchaseSuggest.rows(d, emptyList(), today).associate { it.product.id to it.forecast }
+    val r = rows.getValue("tea")
+    assertEquals(forecast.getValue("tea").daysLeft, r.coverDays)
+    assertTrue(r.coverDays!! in 1..30)
+    assertEquals(r.coverDays, StockListModel.coverShown(r))
+    assertTrue(stockRowSubtitle(r).contains(StrStock.coverDays(ir.vil3ntec.tohid.money(r.coverDays!!.toDouble()))))
+    //  تمام‌شده («تمام» قرص دارد) و بی فروش ⇒ بی «چند روز»
+    assertEquals(StockLevel.OUT, rows.getValue("gone").level)
+    assertNull(StockListModel.coverShown(rows.getValue("gone")))
+    assertNull(rows.getValue("soap").coverDays)
+    assertNull(StockListModel.coverShown(rows.getValue("soap")))
   }
 }
