@@ -1,0 +1,7 @@
+#  خروجیِ ساخت — Gradle (ios/shared) و Xcode (ios/iosApp)
+build/
+.gradle/
+.kotlin/
+xcuserdata/
+DerivedData/
+*.xcuserstate

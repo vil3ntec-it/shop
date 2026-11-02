@@ -1,0 +1,730 @@
+#  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳ و ۰.۴).
+#  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
+#  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
+#  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
+
+core/atrest/  # همهٔ 5 فایل — javax.crypto، java.security، Charsets-غیرِ-UTF8، java.io
+core/sync/platform/  # همهٔ 1 فایل — java.io
+data/platform/  # همهٔ 1 فایل — وابسته
+hw/  # همهٔ 3 فایل — androidx، وابسته، android.content.pm، android.Manifest
+pay/platform/  # همهٔ 3 فایل — وابسته، android.nfc.cardemulation، android.os.Bundle، androidx
+platform/  # همهٔ 2 فایل — java.net، javax.net، java.io، org.json
+sync/platform/  # همهٔ 1 فایل — java.io
+sync/v3/  # همهٔ 3 فایل — وابسته
+ui/components/product/  # همهٔ 2 فایل — وابسته
+ui/components/staff/  # همهٔ 4 فایل — وابسته
+ui/platform/  # همهٔ 1 فایل — وابسته
+ui/v3/example/  # همهٔ 1 فایل — وابسته
+ui/v3/sales/approval/  # همهٔ 3 فایل — وابسته
+ui/v3/sales/checkout/  # همهٔ 10 فایل — وابسته
+ui/v3/sales/draft/  # همهٔ 2 فایل — وابسته
+ui/v3/sales/drawer/  # همهٔ 4 فایل — وابسته
+ui/v3/sales/print/  # همهٔ 2 فایل — وابسته، androidx، android.Manifest، android.content.pm
+ui/v3/sales/quick/  # همهٔ 3 فایل — وابسته
+ui/v3/sales/returns/  # همهٔ 6 فایل — وابسته
+ui/v3/settings/devices/  # همهٔ 8 فایل — وابسته، androidx، android.Manifest، android.content.pm
+ui/v3/stock/  # همهٔ 22 فایل — وابسته
+update/  # همهٔ 5 فایل — java.security، java.net، org.json، java.io
+
+#  ── جایگزینِ iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop) ──
+sync/v1/SyncV1Worker.kt  # جایگزینِ iOS: sync/v1/SyncV1WorkerIos.kt (WorkManager؛ همگام‌سازی گامِ ۲)
+ui/Platform.kt  # جایگزینِ iOS: ui/PlatformIos.kt
+ui/screens/Haptics.kt  # جایگزینِ iOS: ui/screens/HapticsIos.kt
+
+#  ── مستقیم: API ِ JVM/اندروید در خودِ فایل ──
+MainActivity.kt  # androidx، android.os.Bundle، android.content.ComponentName، android.content.pm
+core/chat/ChatImage.kt  # Charsets-غیرِ-UTF8
+core/image/JpegMeta.kt  # Charsets-غیرِ-UTF8، java.io
+core/net/HttpEngine.kt  # java.net، java.io
+core/net/TokenStore.kt  # androidx
+data/AtRest.kt  # java.io
+data/AtRestKeys.kt  # android.security.keystore، java.security، javax.crypto
+data/AutoBackup.kt  # androidx، java.util، java.io
+data/BackupBundle.kt  # java.io، java.util
+data/ChatMedia.kt  # android.graphics.Bitmap، android.media.MediaPlayer، android.media.MediaRecorder، java.io
+data/CourierCodec.kt  # org.json
+data/CourierStore.kt  # org.json
+data/DeviceLocation.kt  # androidx، android.Manifest، android.content.pm، android.location.Location، android.location.LocationManager
+data/DiskWrite.kt  # android.annotation.SuppressLint، java.io، java.nio
+data/FileName.kt  # android.provider.OpenableColumns
+data/Fingerprint.kt  # androidx
+data/GoogleSignIn.kt  # androidx، com.google
+data/ImageBank.kt  # android.graphics.Bitmap، android.graphics.BitmapFactory، android.graphics.Canvas، android.graphics.Color، android.graphics.Matrix
+data/ImageBulk.kt  # java.io
+data/LedgerMerge.kt  # java.util
+data/LedgerPeers.kt  # java.lang
+data/LocalSnapshots.kt  # android.annotation.SuppressLint، java.io، java.nio
+data/LockStore.kt  # java.security
+data/Migration.kt  # androidx، org.json، android.webkit.WebView، android.webkit.WebViewClient، android.webkit.WebResourceRequest
+data/OrderNotify.kt  # androidx، android.Manifest، android.app.NotificationChannel، android.app.NotificationManager، android.app.PendingIntent
+data/OwnerExport.kt  # java.io
+data/PhotoStore.kt  # android.graphics.Bitmap، android.graphics.BitmapFactory
+data/ProductImport.kt  # Charsets-غیرِ-UTF8، java.io، java.util، java.nio
+data/ReceiptProfileStore.kt  # android.graphics.BitmapFactory
+data/Reminders.kt  # androidx، android.Manifest، android.app.NotificationChannel، android.app.NotificationManager، android.app.PendingIntent
+data/ScaleLabels.kt  # org.json
+data/ShopChatSync.kt  # java.util
+data/StorefrontMediaPrep.kt  # android.graphics.Bitmap، android.graphics.BitmapFactory، android.graphics.Canvas، android.graphics.Color، android.graphics.Matrix
+data/TohidBackupAgent.kt  # android.app.backup، android.os.ParcelFileDescriptor
+data/Watchman.kt  # androidx، android.Manifest، android.app.NotificationChannel، android.app.NotificationManager، android.app.PendingIntent
+data/Xlsx.kt  # java.io، java.util
+data/repo/DeliveryRepository.kt  # java.util
+data/repo/OrdersRepository.kt  # java.util
+print/EasySetupAndroid.kt  # android.text.Layout، java.net
+print/HwPages.kt  # android.graphics.Bitmap، android.graphics.BitmapFactory، android.graphics.Canvas، android.graphics.Color، android.text.Layout
+print/LabelSheetPrint.kt  # android.graphics.RectF، android.os.Bundle، android.os.CancellationSignal، android.os.ParcelFileDescriptor، android.print.PageRange
+print/OrderSlipAndroid.kt  # android.text.Layout
+print/PrintJob.kt  # androidx، android.graphics.Bitmap
+print/PrintLog.kt  # org.json
+print/PrintSpooler.kt  # org.json، java.util
+print/PrinterRegistry.kt  # org.json
+print/Receipt.kt  # androidx، android.graphics.Bitmap، android.graphics.Canvas، android.graphics.Color، android.graphics.Paint
+print/ReceiptPainter.kt  # android.graphics.Bitmap، android.graphics.Canvas، android.graphics.Color، android.graphics.Typeface، android.text.Layout
+print/Receipts.kt  # android.graphics.Bitmap
+print/ReportPrint.kt  # androidx، android.graphics.Color، android.graphics.Paint، android.graphics.Typeface، android.os.Bundle
+print/StatementImage.kt  # androidx
+print/ThermalPrinter.kt  # android.bluetooth.BluetoothAdapter، android.bluetooth.BluetoothDevice، android.bluetooth.BluetoothManager، android.graphics.Bitmap، android.graphics.Color
+scan/BarcodeScanner.kt  # androidx، Compose-اندروید، com.google، android.annotation.SuppressLint، android.hardware.camera2
+scan/GuidedCapture.kt  # androidx، Compose-اندروید، android.Manifest، android.content.pm، android.graphics.Bitmap
+scan/Look.kt  # java.nio
+sync/Integrity.kt  # android.content.pm، java.security
+sync/License.kt  # java.security، java.io
+sync/OfflineCode.kt  # Charsets-غیرِ-UTF8، java.security
+sync/PhoneScanner.kt  # org.json، java.io، android.graphics.Bitmap
+sync/PhotoSync.kt  # java.io
+sync/v1/LiveSocket.kt  # org.json، okhttp3، java.util، android.os.Handler، android.os.Looper
+sync/v1/OpHash.kt  # java.security
+sync/v1/SyncCommit.kt  # java.io، java.security
+sync/v1/SyncRebuild.kt  # java.security
+ui/AppRoot.kt  # androidx، android.Manifest، android.content.pm
+ui/courier/CourierPhotoAndroid.kt  # android.graphics.Bitmap، java.io
+ui/legacy/AppLockLegacy.kt  # androidx
+ui/legacy/AppRootLegacy.kt  # androidx، android.Manifest، android.content.pm
+ui/legacy/PhotoPickLegacy.kt  # androidx، android.Manifest، android.content.pm
+ui/legacy/PhotoStudioDialogLegacy.kt  # android.graphics.Bitmap
+ui/legacy/ProfileLegacy.kt  # android.graphics.Bitmap
+ui/legacy/SaleLegacy.kt  # androidx، android.Manifest، android.content.pm
+ui/legacy/SettingsLegacy.kt  # androidx، android.Manifest، android.content.pm، android.content.ClipboardManager، android.content.ClipData
+ui/legacy/VoiceSearchLegacy.kt  # android.app.Activity، android.content.pm، android.speech.RecognizerIntent
+ui/screens/BrandLogo.kt  # R
+ui/screens/ImageBankPicker.kt  # android.graphics.BitmapFactory
+ui/screens/OrderFeedbackPhotoAndroid.kt  # android.graphics.BitmapFactory
+ui/screens/ParcelPhotoAndroid.kt  # android.graphics.Bitmap، java.io
+ui/screens/Photo.kt  # android.graphics.Bitmap
+ui/screens/PhotoStudioDialog.kt  # android.graphics.Bitmap
+ui/screens/Profile.kt  # android.graphics.Bitmap
+ui/screens/Sale.kt  # androidx، android.Manifest، android.content.pm
+ui/screens/SaleDialogs.kt  # androidx، android.Manifest، android.content.pm، android.app.PendingIntent
+ui/screens/ScanSheet.kt  # androidx، android.Manifest، android.content.pm
+ui/screens/Settings.kt  # androidx، android.Manifest، android.content.pm، android.content.ClipboardManager، android.content.ClipData
+ui/screens/ShopChat.kt  # androidx، Charsets-غیرِ-UTF8، android.graphics.BitmapFactory، android.Manifest، android.content.pm
+ui/screens/StockCountToolsAndroid.kt  # java.io
+ui/screens/StorefrontMediaPanel.kt  # android.graphics.BitmapFactory، java.io
+ui/screens/Team.kt  # android.content.ClipboardManager، android.content.ClipData
+ui/screens/TopBar.kt  # androidx، Compose-اندروید، android.view.Window، android.app.Activity، android.content.ContextWrapper
+ui/screens/VoiceSearch.kt  # android.app.Activity، android.content.pm، android.speech.RecognizerIntent
+ui/screens/Warehouse.kt  # java.io
+ui/v3/V3ProductThumb.kt  # android.graphics.Bitmap
+ui/v3/account/profile/AvatarSheet.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/account/profile/ProfileParts.kt  # android.graphics.Bitmap
+ui/v3/nav/ScanRoutes.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/nav/V3RouteHost.kt  # androidx
+ui/v3/onboarding/BrandMark.kt  # R
+ui/v3/onboarding/LockGate.kt  # androidx
+ui/v3/online/chat/ChatThreadController.kt  # Charsets-غیرِ-UTF8، android.graphics.BitmapFactory
+ui/v3/online/chat/VoiceBar.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/products/DraftPhotoSourceSheet.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/products/DraftProductPhoto.kt  # android.graphics.Bitmap
+ui/v3/products/PhotoStudioScreen.kt  # android.graphics.Bitmap
+ui/v3/products/ProductPhotos.kt  # android.graphics.Bitmap
+ui/v3/sales/scan/ScanScreen.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/settings/SettingsRows.kt  # androidx، android.Manifest، android.content.pm
+ui/v3/settings/sections/CameraScreen.kt  # android.Manifest
+
+#  ── غیرِمستقیم: خودش پاک است، ولی به فایلِ بیرون‌مانده تکیه دارد (خطای کامپایلِ iOS) ──
+core/config/AppConfig.kt  # نامِ بیرون‌مانده: platform
+core/net/ApiClient.kt  # نامِ بیرون‌مانده: HttpEngine
+core/storefront/CampaignLinksApi.kt  # نامِ بیرون‌مانده: ApiClient
+core/storefront/MarketListing.kt  # نامِ بیرون‌مانده: ApiClient
+core/storefront/PromoGuardApi.kt  # نامِ بیرون‌مانده: ApiClient
+core/storefront/StorefrontEtaApi.kt  # نامِ بیرون‌مانده: ApiClient
+data/AnomalyBook.kt  # نامِ بیرون‌مانده: PurchaseOrderBook
+data/AutoFeeLines.kt  # نامِ بیرون‌مانده: SalesEngine
+data/BackupMirror.kt  # نامِ بیرون‌مانده: canWrite
+data/CartNotes.kt  # نامِ بیرون‌مانده: SalesEngine
+data/CartStore.kt  # نامِ بیرون‌مانده: PrintSpooler
+data/CashShift.kt  # نامِ بیرون‌مانده: ReturnFlow
+data/CountSheetModel.kt  # نامِ بیرون‌مانده: SalesEngine
+data/CountShift.kt  # نامِ بیرون‌مانده: StockLedger
+data/CrmPricingForm.kt  # نامِ بیرون‌مانده: DebtorEngine
+data/CustomerCards.kt  # نامِ بیرون‌مانده: ShopStore
+data/CustomerCrm.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/CustomerEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/CustomerInsight.kt  # نامِ بیرون‌مانده: ReportCsv
+data/CustomerMerge.kt  # نامِ بیرون‌مانده: toSortedSet
+data/CustomerProfileForm.kt  # نامِ بیرون‌مانده: DebtorEngine
+data/CustomerStatement.kt  # نامِ بیرون‌مانده: ReportCsv
+data/DashboardEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/DayEnd.kt  # نامِ بیرون‌مانده: CashShift
+data/DebtBook.kt  # نامِ بیرون‌مانده: DebtorEngine
+data/DebtEntry.kt  # نامِ بیرون‌مانده: ShopStore
+data/DebtMinorFlagAndroid.kt  # نامِ بیرون‌مانده: ReceiptFlag
+data/DebtReminder.kt  # نامِ بیرون‌مانده: ShopStore
+data/DebtReminderAndroid.kt  # نامِ بیرون‌مانده: DebtReminder
+data/DebtorEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/DeliverLaterCart.kt  # نامِ بیرون‌مانده: SalesEngine
+data/DiscountGate.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/DocGapsSheet.kt  # نامِ بیرون‌مانده: OrderFulfillment
+data/ExpiryEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/FraudTrail.kt  # نامِ بیرون‌مانده: SalesEngine
+data/FraudTrailAndroid.kt  # نامِ بیرون‌مانده: SyncStore
+data/GiftCardAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/GiftCards.kt  # نامِ بیرون‌مانده: CashShift
+data/HeldInvoiceFile.kt  # نامِ بیرون‌مانده: DiskWrite
+data/HeldInvoices.kt  # نامِ بیرون‌مانده: SalesEngine
+data/InternalBarcodes.kt  # نامِ بیرون‌مانده: WarehouseEngine
+data/LayawayAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/Layaways.kt  # نامِ بیرون‌مانده: SalesEngine
+data/LedgerArchive.kt  # نامِ بیرون‌مانده: AtRest
+data/LedgerEngine.kt  # نامِ بیرون‌مانده: PurchaseBook
+data/LedgerFollow.kt  # نامِ بیرون‌مانده: LedgerPeers
+data/LedgerMergeFlagAndroid.kt  # نامِ بیرون‌مانده: Backend
+data/LedgerOwner.kt  # نامِ بیرون‌مانده: platform
+data/LedgerSummary.kt  # نامِ بیرون‌مانده: ShopStore
+data/LinePolicy.kt  # نامِ بیرون‌مانده: DiscountGate
+data/LinePolicyAndroid.kt  # نامِ بیرون‌مانده: LinePolicy
+data/LoyaltyPoints.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/OrderFulfillment.kt  # نامِ بیرون‌مانده: ShopStore
+data/PayFixAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/PayFixFlow.kt  # نامِ بیرون‌مانده: PayFlow
+data/PayFlow.kt  # نامِ بیرون‌مانده: ReturnFlow
+data/PhotoBot.kt  # نامِ بیرون‌مانده: PhotoStore
+data/PriceCheckData.kt  # نامِ بیرون‌مانده: ShopStore
+data/PriceWhyLine.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/ProductGridSave.kt  # نامِ بیرون‌مانده: ShopStore
+data/ProductInfoMap.kt  # نامِ بیرون‌مانده: ShopStore
+data/ProductPlans.kt  # نامِ بیرون‌مانده: ShopStore
+data/PromoEngine.kt  # نامِ بیرون‌مانده: ExpiryEngine
+data/PromoJson.kt  # نامِ بیرون‌مانده: PromoEngine
+data/PurchaseBook.kt  # نامِ بیرون‌مانده: ShopStore
+data/PurchaseOrderBook.kt  # نامِ بیرون‌مانده: OpHash
+data/PurchaseSuggest.kt  # نامِ بیرون‌مانده: PurchaseOrderDto
+data/QuoteBook.kt  # نامِ بیرون‌مانده: SalesEngine
+data/QuoteStoreAndroid.kt  # نامِ بیرون‌مانده: DiskWrite
+data/ReceiptFlag.kt  # نامِ بیرون‌مانده: ReceiptProfileStore
+data/Repack.kt  # نامِ بیرون‌مانده: ShopStore
+data/ReportCsv.kt  # نامِ بیرون‌مانده: CustomerMerge
+data/ReportEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/ReturnFlow.kt  # نامِ بیرون‌مانده: OrderFulfillment
+data/SafeBook.kt  # نامِ بیرون‌مانده: CashShift
+data/SafeBookAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/SaleDraft.kt  # نامِ بیرون‌مانده: SalesEngine
+data/SalesEngine.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/SerialSale.kt  # نامِ بیرون‌مانده: SalesEngine
+data/ShiftReviewFlow.kt  # نامِ بیرون‌مانده: PayFlow
+data/ShopStore.kt  # نامِ بیرون‌مانده: AtRestException
+data/ShrinkLoss.kt  # نامِ بیرون‌مانده: ReportEngine
+data/SimpleAskEngine.kt  # نامِ بیرون‌مانده: ShopStore
+data/SpecialOrderAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/SpecialOrders.kt  # نامِ بیرون‌مانده: SalesEngine
+data/StaffPins.kt  # نامِ بیرون‌مانده: ApproverVault
+data/StockActions.kt  # نامِ بیرون‌مانده: StockLedger
+data/StockCountDraftStore.kt  # نامِ بیرون‌مانده: StockActions
+data/StockFlag.kt  # نامِ بیرون‌مانده: Backend
+data/StockLedger.kt  # نامِ بیرون‌مانده: Repack
+data/StockPlaces.kt  # نامِ بیرون‌مانده: ProductPlansMap
+data/StockPlacesAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/TaxQuarter.kt  # نامِ بیرون‌مانده: ReportCsv
+data/TillReceiveAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/TillReceiveFlow.kt  # نامِ بیرون‌مانده: ShopStore
+data/TrainingLedgerAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+data/WarehouseEngine.kt  # نامِ بیرون‌مانده: ProductImport
+data/repo/AccountRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/AuthRepository.kt  # نامِ بیرون‌مانده: LocationFix
+data/repo/Backend.kt  # نامِ بیرون‌مانده: HttpEngine
+data/repo/BackupRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/CodeLoginRepository.kt  # نامِ بیرون‌مانده: AppConfig
+data/repo/CourierRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/EventsRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/OrderDeskRepository.kt  # نامِ بیرون‌مانده: OrdersRepository
+data/repo/OrderFeedbackRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/OrderNotifyRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/PickingRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/PromoRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/PurchaseOrderRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/ShopChatRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/ShopRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/StaffTimeRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/StorefrontDeliveryRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/StorefrontMediaRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/StorefrontQueue.kt  # نامِ بیرون‌مانده: StorefrontGate
+data/repo/StorefrontRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/SupportRepository.kt  # نامِ بیرون‌مانده: ApiClient
+data/repo/SyncRepository.kt  # نامِ بیرون‌مانده: ApiClient
+pay/HesabPaySettle.kt  # نامِ بیرون‌مانده: PayFlow
+print/BagLabelsAndroid.kt  # نامِ بیرون‌مانده: PrinterRegistry
+print/CustomerCardPrintAndroid.kt  # نامِ بیرون‌مانده: HwPages
+print/GiftCardPrintAndroid.kt  # نامِ بیرون‌مانده: HwPages
+print/ProductLabelsAndroid.kt  # نامِ بیرون‌مانده: PrinterRegistry
+scan/LightPilot.kt  # نامِ بیرون‌مانده: Look
+sync/AutoSync.kt  # نامِ بیرون‌مانده: signedIn
+sync/DocSeries.kt  # نامِ بیرون‌مانده: Backend
+sync/LicenseGuard.kt  # نامِ بیرون‌مانده: License
+sync/LocationPing.kt  # نامِ بیرون‌مانده: DeviceLocation
+sync/ShopNews.kt  # نامِ بیرون‌مانده: ShopStore
+sync/SyncStore.kt  # نامِ بیرون‌مانده: TokenStore
+sync/Syncer.kt  # نامِ بیرون‌مانده: signedIn
+sync/VisitPing.kt  # نامِ بیرون‌مانده: AppConfig
+sync/v1/LedgerDiff.kt  # نامِ بیرون‌مانده: OpHash
+sync/v1/OpQueue.kt  # نامِ بیرون‌مانده: V1Restore
+sync/v1/SoftLock.kt  # نامِ بیرون‌مانده: state
+sync/v1/SyncOp.kt  # نامِ بیرون‌مانده: OpHash
+sync/v1/SyncStateV1.kt  # نامِ بیرون‌مانده: V1Restore
+sync/v1/SyncV1Client.kt  # نامِ بیرون‌مانده: ApiClient
+sync/v1/SyncV1Engine.kt  # نامِ بیرون‌مانده: platform
+sync/v1/V1Restore.kt  # نامِ بیرون‌مانده: SyncCommit
+ui/LangUi.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/OrderAlertsAndroid.kt  # نامِ بیرون‌مانده: ScanFeedback
+ui/OrdersLive.kt  # نامِ بیرون‌مانده: Lifecycle
+ui/PreviewBanner.kt  # نامِ بیرون‌مانده: Backend
+ui/PromoLive.kt  # نامِ بیرون‌مانده: Lifecycle
+ui/ReauthHost.kt  # نامِ بیرون‌مانده: Backend
+ui/UpdateBanner.kt  # نامِ بیرون‌مانده: ReleaseFeed
+ui/components/common/PhoneNavBar.kt  # نامِ بیرون‌مانده: SyncStore
+ui/components/common/TableToolbar.kt  # نامِ بیرون‌مانده: ViewModeState
+ui/components/common/ViewModeToggle.kt  # نامِ بیرون‌مانده: SyncStore
+ui/components/pos/AutoFeesSettings.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/components/pos/AutoFeesSettingsAndroid.kt  # نامِ بیرون‌مانده: AutoFeesSettings
+ui/components/pos/CardTerminalEntry.kt  # نامِ بیرون‌مانده: amountText
+ui/components/pos/CartSummary.kt  # نامِ بیرون‌مانده: PhoneCatalogItem
+ui/components/pos/CategoryChips.kt  # نامِ بیرون‌مانده: PosCategory
+ui/components/pos/CustomerPayScreen.kt  # نامِ بیرون‌مانده: amountText
+ui/components/pos/DeliverLaterAndroid.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/components/pos/DeliverLaterSheet.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/components/pos/GiftCardBarAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/components/pos/GiftReceiptAndroid.kt  # نامِ بیرون‌مانده: PrinterDialog
+ui/components/pos/HeldInvoiceBar.kt  # نامِ بیرون‌مانده: CartStore
+ui/components/pos/HesabPaySheet.kt  # نامِ بیرون‌مانده: PayDevice
+ui/components/pos/LayawayBarAndroid.kt  # نامِ بیرون‌مانده: HwPages
+ui/components/pos/LineDiscountPanel.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/LinePricingSettings.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/LinePricingSettingsAndroid.kt  # نامِ بیرون‌مانده: LinePricingSettings
+ui/components/pos/LoyaltyBarAndroid.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/OrderPanel.kt  # نامِ بیرون‌مانده: ProductThumb
+ui/components/pos/PayPanel.kt  # نامِ بیرون‌مانده: GatewayHook
+ui/components/pos/PhoneCart.kt  # نامِ بیرون‌مانده: asImageBitmap
+ui/components/pos/PhoneCatalog.kt  # نامِ بیرون‌مانده: rememberProductImage
+ui/components/pos/PhoneKeypad.kt  # نامِ بیرون‌مانده: PhoneCartPay
+ui/components/pos/PosKeypad.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/components/pos/PosLogic.kt  # نامِ بیرون‌مانده: ProductInfoMap
+ui/components/pos/PosMoreKeysPrefsAndroid.kt  # نامِ بیرون‌مانده: PosMoreKeysSettings
+ui/components/pos/PosMoreKeysSettings.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/PosNotesAndroid.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/PosPriceCheckPrefsAndroid.kt  # نامِ بیرون‌مانده: PosPriceCheckSettings
+ui/components/pos/PosSearchPrefsAndroid.kt  # نامِ بیرون‌مانده: PosSearchSettings
+ui/components/pos/PosSearchSettings.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/PosSerials.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/components/pos/PosTouchPrefsAndroid.kt  # نامِ بیرون‌مانده: PosTouchSettings
+ui/components/pos/PosTouchSettings.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/PriceCheckDialog.kt  # نامِ بیرون‌مانده: ShopStore
+ui/components/pos/PriceListAtPosAndroid.kt  # نامِ بیرون‌مانده: CartStore
+ui/components/pos/PriceWhyAndroid.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/components/pos/ProductTile.kt  # نامِ بیرون‌مانده: ProductPhoto
+ui/components/pos/PromoParts.kt  # نامِ بیرون‌مانده: PromoEngine
+ui/components/pos/QuoteBarAndroid.kt  # نامِ بیرون‌مانده: HwPages
+ui/components/pos/ScaleAtPosAndroid.kt  # نامِ بیرون‌مانده: hw
+ui/components/pos/SpecialOrderBarAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/components/pos/TouchKeypad.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/courier/CourierChecksState.kt  # نامِ بیرون‌مانده: rememberCourierFix
+ui/courier/CourierChecksUi.kt  # نامِ بیرون‌مانده: SheetBody
+ui/courier/CourierChecksV3.kt  # نامِ بیرون‌مانده: CourierStore
+ui/courier/CourierDetail.kt  # نامِ بیرون‌مانده: STATUS_LABEL
+ui/courier/CourierHome.kt  # نامِ بیرون‌مانده: CourierStore
+ui/courier/CourierJoin.kt  # نامِ بیرون‌مانده: courierCard
+ui/courier/CourierLocationAndroid.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/courier/CourierPages.kt  # نامِ بیرون‌مانده: clock
+ui/courier/CourierUi.kt  # نامِ بیرون‌مانده: STATUS_LABEL
+ui/legacy/CodeLoginLegacy.kt  # نامِ بیرون‌مانده: Backend
+ui/legacy/CommandPaletteLegacy.kt  # نامِ بیرون‌مانده: ShopStore
+ui/legacy/CourierHomeLegacy.kt  # نامِ بیرون‌مانده: CourierStore
+ui/legacy/DashboardLegacy.kt  # نامِ بیرون‌مانده: toSortedMap
+ui/legacy/DebtorsLegacy.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/legacy/MoreLegacy.kt  # نامِ بیرون‌مانده: ShopChatSync
+ui/legacy/ReauthHostLegacy.kt  # نامِ بیرون‌مانده: Backend
+ui/legacy/ShopSetupLegacy.kt  # نامِ بیرون‌مانده: TohidMark
+ui/legacy/UpdateBannerLegacy.kt  # نامِ بیرون‌مانده: ReleaseFeed
+ui/legacy/VipLegacy.kt  # نامِ بیرون‌مانده: License
+ui/legacy/WelcomeLegacy.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/screens/AppLock.kt  # نامِ بیرون‌مانده: LockStore
+ui/screens/BankPhotoSource.kt  # نامِ بیرون‌مانده: ImageBank
+ui/screens/BulkPriceDialog.kt  # نامِ بیرون‌مانده: ProductImport
+ui/screens/BulkSheets.kt  # نامِ بیرون‌مانده: BarcodeScanSheet
+ui/screens/CheckoutRulesSection.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/CodeLogin.kt  # نامِ بیرون‌مانده: EmailCodeContent
+ui/screens/CommandPalette.kt  # نامِ بیرون‌مانده: SearchIndex
+ui/screens/CrmPricingAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/CrmPricingUi.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/screens/CrmProfileUi.kt  # نامِ بیرون‌مانده: CustomerMerge
+ui/screens/CustomerCardAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/CustomerDisplay.kt  # نامِ بیرون‌مانده: CustomerPayScreen
+ui/screens/CustomerReportsPhone.kt  # نامِ بیرون‌مانده: CustomerInsight
+ui/screens/Dashboard.kt  # نامِ بیرون‌مانده: HomeScreen
+ui/screens/DayEndModel.kt  # نامِ بیرون‌مانده: PayFlow
+ui/screens/DayEndPanel.kt  # نامِ بیرون‌مانده: DayEndModel
+ui/screens/DebtBookUi.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/DebtReminderTemplate.kt  # نامِ بیرون‌مانده: DebtReminder
+ui/screens/DebtorDetail.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/DebtorListModel.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/DebtorSheets.kt  # نامِ بیرون‌مانده: DueDateField
+ui/screens/DebtorTxSheet.kt  # نامِ بیرون‌مانده: StatusPill
+ui/screens/Debtors.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/DeliveryAddressFix.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeliveryCash.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeliveryCashReport.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeliveryDesk.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeliveryDialogs.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeliveryRatings.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/DeskCustomers.kt  # نامِ بیرون‌مانده: Xlsx
+ui/screens/DeskDashboard.kt  # نامِ بیرون‌مانده: SyncStore
+ui/screens/DeskHeader.kt  # نامِ بیرون‌مانده: UpdateChip
+ui/screens/DeskInvoices.kt  # نامِ بیرون‌مانده: Xlsx
+ui/screens/DeskProducts.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/DeskPurchasing.kt  # نامِ بیرون‌مانده: Xlsx
+ui/screens/DeskRail.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/screens/DeskReports.kt  # نامِ بیرون‌مانده: Xlsx
+ui/screens/DeskSale.kt  # نامِ بیرون‌مانده: ScanFeedback
+ui/screens/DeskStatusBar.kt  # نامِ بیرون‌مانده: SyncV1Engine
+ui/screens/Devices.kt  # نامِ بیرون‌مانده: PrinterRegistry
+ui/screens/DevicesHw.kt  # نامِ بیرون‌مانده: asImageBitmap
+ui/screens/DocGapsSettingsAndroid.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/DraftRecovery.kt  # نامِ بیرون‌مانده: CartStore
+ui/screens/EasySetupAndroid.kt  # نامِ بیرون‌مانده: asImageBitmap
+ui/screens/EasySetupSettingsAndroid.kt  # نامِ بیرون‌مانده: EasySetupPref
+ui/screens/Expenses.kt  # نامِ بیرون‌مانده: newId
+ui/screens/IdleLockChoice.kt  # نامِ بیرون‌مانده: LockStore
+ui/screens/ImageBulkImport.kt  # نامِ بیرون‌مانده: ImageBank
+ui/screens/LabelSheet.kt  # نامِ بیرون‌مانده: InternalBarcodes
+ui/screens/LabelSheetAndroid.kt  # نامِ بیرون‌مانده: ScaleLabels
+ui/screens/LocalNetworkNoticeAndroid.kt  # نامِ بیرون‌مانده: LocalNetworkAccess
+ui/screens/LocaleSection.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/Management.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/More.kt  # نامِ بیرون‌مانده: ShopChatSync
+ui/screens/MoreLayout.kt  # نامِ بیرون‌مانده: V3Modules
+ui/screens/MorePhone.kt  # نامِ بیرون‌مانده: ShopChatSync
+ui/screens/MySubscription.kt  # نامِ بیرون‌مانده: Backend
+ui/screens/NavEditor.kt  # نامِ بیرون‌مانده: PhoneNav
+ui/screens/OrderAlertsUi.kt  # نامِ بیرون‌مانده: OrderAlertsLive
+ui/screens/OrderAmendUi.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OrderBulkUi.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OrderDelayUi.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OrderDeliveryPrefsUi.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OrderDeskPanel.kt  # نامِ بیرون‌مانده: ApiClient
+ui/screens/OrderDeskState.kt  # نامِ بیرون‌مانده: ApiClient
+ui/screens/OrderFeedbackPanel.kt  # نامِ بیرون‌مانده: feedbackStamp
+ui/screens/OrderFeedbackState.kt  # نامِ بیرون‌مانده: ApiClient
+ui/screens/OrderNoticesUi.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OrderRefundUi.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/screens/Orders.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/screens/OwnerReportSettings.kt  # نامِ بیرون‌مانده: ApiClient
+ui/screens/PayFixDialog.kt  # نامِ بیرون‌مانده: PayFlow
+ui/screens/PayFixHostAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/screens/PhoneClaimStep.kt  # نامِ بیرون‌مانده: AccountRepository
+ui/screens/PhoneDebtors.kt  # نامِ بیرون‌مانده: rememberVoiceSearch
+ui/screens/PhoneHome.kt  # نامِ بیرون‌مانده: HomeScreen
+ui/screens/PhoneHomeModel.kt  # نامِ بیرون‌مانده: MoneyPaths
+ui/screens/PhoneLinkHost.kt  # نامِ بیرون‌مانده: PhotoStore
+ui/screens/PhoneSearch.kt  # نامِ بیرون‌مانده: PhoneNav
+ui/screens/PhoneStats.kt  # نامِ بیرون‌مانده: StatsPage
+ui/screens/PhotoPick.kt  # نامِ بیرون‌مانده: DraftPhotoSourceSheet
+ui/screens/PickDesk.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/PickSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/screens/PickSheetTools.kt  # نامِ بیرون‌مانده: ParcelPhotoSource
+ui/screens/PickSubstituteUi.kt  # نامِ بیرون‌مانده: SheetBody
+ui/screens/ProductDetail.kt  # نامِ بیرون‌مانده: PhotoStore
+ui/screens/ProductGridSheet.kt  # نامِ بیرون‌مانده: newId
+ui/screens/ProductImportDialog.kt  # نامِ بیرون‌مانده: ProductImport
+ui/screens/ProductListModel.kt  # نامِ بیرون‌مانده: ProductInfoMap
+ui/screens/Products.kt  # نامِ بیرون‌مانده: PhotoStore
+ui/screens/ProfileModel.kt  # نامِ بیرون‌مانده: ProfileHomeModel
+ui/screens/Promos.kt  # نامِ بیرون‌مانده: Backend
+ui/screens/PurchaseOrders.kt  # نامِ بیرون‌مانده: newId
+ui/screens/PurchaseSuggestView.kt  # نامِ بیرون‌مانده: newId
+ui/screens/Purchasing.kt  # نامِ بیرون‌مانده: newId
+ui/screens/QuickSale.kt  # نامِ بیرون‌مانده: ScanFeedback
+ui/screens/ReportFresh.kt  # نامِ بیرون‌مانده: Xlsx
+ui/screens/ReportKeys.kt  # نامِ بیرون‌مانده: ReportEngine
+ui/screens/ReportKeysSettingsAndroid.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/Reports.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/ReturnMode.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/ReturnsV2.kt  # نامِ بیرون‌مانده: newId
+ui/screens/SafePanelAndroid.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/SalesHistory.kt  # نامِ بیرون‌مانده: ScanIconButton
+ui/screens/SalesVoidDialogs.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/screens/SecuritySettings.kt  # نامِ بیرون‌مانده: AtRestException
+ui/screens/ServerPulse.kt  # نامِ بیرون‌مانده: AppConfig
+ui/screens/Servers.kt  # نامِ بیرون‌مانده: platform
+ui/screens/SettingsLayout.kt  # نامِ بیرون‌مانده: EASY_SETUP_TITLE
+ui/screens/SettingsParts.kt  # نامِ بیرون‌مانده: RETURN_SETTINGS_TITLE
+ui/screens/SettingsPhone.kt  # نامِ بیرون‌مانده: SettingsPaths
+ui/screens/ShiftReviewV2.kt  # نامِ بیرون‌مانده: newId
+ui/screens/ShiftV2.kt  # نامِ بیرون‌مانده: HwPages
+ui/screens/ShopDayRow.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/screens/ShopSetup.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/ShrinkReports.kt  # نامِ بیرون‌مانده: ReportEngine
+ui/screens/ShrinkReportsAndroid.kt  # نامِ بیرون‌مانده: ShrinkReportSettings
+ui/screens/SimpleAsk.kt  # نامِ بیرون‌مانده: SimpleAskEngine
+ui/screens/SimpleAskAndroid.kt  # نامِ بیرون‌مانده: SimpleAskSettings
+ui/screens/SmartInsightsAndroid.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/StaffTimeAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/screens/StatementImageButton.kt  # نامِ بیرون‌مانده: StatementImage
+ui/screens/StockBook.kt  # نامِ بیرون‌مانده: newId
+ui/screens/StockCountTools.kt  # نامِ بیرون‌مانده: BarcodeScanSheet
+ui/screens/StockPlacesSheet.kt  # نامِ بیرون‌مانده: ProductPlansMap
+ui/screens/StockPlacesUiAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/screens/Storefront.kt  # نامِ بیرون‌مانده: StorefrontMediaPanel
+ui/screens/StorefrontCampaigns.kt  # نامِ بیرون‌مانده: LabelSheetPrint
+ui/screens/StorefrontDelivery.kt  # نامِ بیرون‌مانده: Backend
+ui/screens/StorefrontMarket.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/screens/StorefrontOwnerSettings.kt  # نامِ بیرون‌مانده: ApiClient
+ui/screens/SubscriptionPulse.kt  # نامِ بیرون‌مانده: Backend
+ui/screens/SupplierExtras.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/Support.kt  # نامِ بیرون‌مانده: Backend
+ui/screens/TaxQuarterAndroid.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/screens/TeamScope.kt  # نامِ بیرون‌مانده: ShopRepository
+ui/screens/TeamStaff.kt  # نامِ بیرون‌مانده: ApproverVault
+ui/screens/TillReceiveDialog.kt  # نامِ بیرون‌مانده: TillReceiveFlow
+ui/screens/TillReceivePhoneAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/screens/TillReceiveSettings.kt  # نامِ بیرون‌مانده: SettingsSection
+ui/screens/TrainingAndroid.kt  # نامِ بیرون‌مانده: TrainingLedger
+ui/screens/Vip.kt  # نامِ بیرون‌مانده: License
+ui/screens/WarehouseDialogs.kt  # نامِ بیرون‌مانده: toBigDecimal
+ui/screens/Welcome.kt  # نامِ بیرون‌مانده: ShopStore
+ui/screens/WhatsNewAndroid.kt  # نامِ بیرون‌مانده: SegmentedChoice
+ui/v3/V3HeroCard.kt  # نامِ بیرون‌مانده: PagerDots
+ui/v3/account/AccountRoutes.kt  # نامِ بیرون‌مانده: ProfileEditRoute
+ui/v3/account/profile/ProfileEditScreen.kt  # نامِ بیرون‌مانده: PhotoStore
+ui/v3/account/profile/ProfileHomeModel.kt  # نامِ بیرون‌مانده: AccountPaths
+ui/v3/account/profile/ProfileScreen.kt  # نامِ بیرون‌مانده: License
+ui/v3/account/profile/SignOutSheet.kt  # نامِ بیرون‌مانده: BackupMirror
+ui/v3/account/subscription/LockedFeature.kt  # نامِ بیرون‌مانده: AccountPaths
+ui/v3/account/subscription/PlansModel.kt  # نامِ بیرون‌مانده: License
+ui/v3/account/subscription/PlansScreen.kt  # نامِ بیرون‌مانده: SUBSCRIPTION_WARN_DAYS
+ui/v3/account/subscription/RedeemSheet.kt  # نامِ بیرون‌مانده: payload
+ui/v3/account/subscription/SubscriptionScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/account/support/SupportScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/account/team/MemberScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/account/team/NewCodeSheet.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/account/team/TeamData.kt  # نامِ بیرون‌مانده: ShopRepository
+ui/v3/account/team/TeamRoute.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/account/team/TeamScreen.kt  # نامِ بیرون‌مانده: TeamData
+ui/v3/analytics/AdminModel.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/analytics/AdminScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/analytics/AnalyticsRoutes.kt  # نامِ بیرون‌مانده: ReportsDesk
+ui/v3/analytics/AuditModel.kt  # نامِ بیرون‌مانده: MoneyPaths
+ui/v3/analytics/AuditScreen.kt  # نامِ بیرون‌مانده: uiDateLong
+ui/v3/analytics/PeriodSheet.kt  # نامِ بیرون‌مانده: ReportEngine
+ui/v3/analytics/ReportListTabs.kt  # نامِ بیرون‌مانده: MoneyPaths
+ui/v3/analytics/ReportMoneyTabs.kt  # نامِ بیرون‌مانده: ProductsPaths
+ui/v3/analytics/ReportsDesk.kt  # نامِ بیرون‌مانده: Xlsx
+ui/v3/analytics/ReportsModel.kt  # نامِ بیرون‌مانده: ReportEngine
+ui/v3/analytics/ReportsScreen.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/v3/analytics/SheetTable.kt  # نامِ بیرون‌مانده: uiDate
+ui/v3/analytics/StatsChart.kt  # نامِ بیرون‌مانده: StatsModel
+ui/v3/analytics/StatsModel.kt  # نامِ بیرون‌مانده: ReportEngine
+ui/v3/analytics/StatsPage.kt  # نامِ بیرون‌مانده: MoneyPaths
+ui/v3/gallery/ThemeGallery.kt  # نامِ بیرون‌مانده: V3Modules
+ui/v3/money/DebtorFormSheets.kt  # نامِ بیرون‌مانده: DebtorEngine
+ui/v3/money/DebtorFormsModel.kt  # نامِ بیرون‌مانده: DebtorEngine
+ui/v3/money/DebtorLedgerModel.kt  # نامِ بیرون‌مانده: DebtorEngine
+ui/v3/money/DebtorLedgerParts.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/v3/money/DebtorLedgerScreen.kt  # نامِ بیرون‌مانده: rememberDrawerState
+ui/v3/money/DebtorMergeModel.kt  # نامِ بیرون‌مانده: CustomerMerge
+ui/v3/money/DebtorMergeSheet.kt  # نامِ بیرون‌مانده: CustomerMerge
+ui/v3/money/DebtorTxModel.kt  # نامِ بیرون‌مانده: DebtBook
+ui/v3/money/DebtorTxSheet.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/v3/money/DebtorsListScreen.kt  # نامِ بیرون‌مانده: DebtorTile
+ui/v3/money/DueDateEditor.kt  # نامِ بیرون‌مانده: plusDays
+ui/v3/money/ExpenseCategories.kt  # نامِ بیرون‌مانده: ExpensesModel
+ui/v3/money/ExpenseSheets.kt  # نامِ بیرون‌مانده: ExpensesModel
+ui/v3/money/ExpensesModel.kt  # نامِ بیرون‌مانده: LedgerEngine
+ui/v3/money/ExpensesScreen.kt  # نامِ بیرون‌مانده: V3Modules
+ui/v3/money/LedgerFormSheets.kt  # نامِ بیرون‌مانده: LedgerEngine
+ui/v3/money/LedgerFormsModel.kt  # نامِ بیرون‌مانده: LedgerEngine
+ui/v3/money/MoneyRoutes.kt  # نامِ بیرون‌مانده: newId
+ui/v3/money/MoneyText.kt  # نامِ بیرون‌مانده: DebtBook
+ui/v3/money/MoneyUndo.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/money/MoneyWriter.kt  # نامِ بیرون‌مانده: CustomerMerge
+ui/v3/money/PurchaseFormModel.kt  # نامِ بیرون‌مانده: LedgerEngine
+ui/v3/money/PurchaseFormScreen.kt  # نامِ بیرون‌مانده: LedgerEngine
+ui/v3/money/ReceiptsScreen.kt  # نامِ بیرون‌مانده: V3Modules
+ui/v3/money/ReceivePickerSheet.kt  # نامِ بیرون‌مانده: DebtorListModel
+ui/v3/money/SupplierLedgerScreen.kt  # نامِ بیرون‌مانده: SuppliersModel
+ui/v3/money/SuppliersModel.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/money/SuppliersScreen.kt  # نامِ بیرون‌مانده: V3Modules
+ui/v3/nav/AppModule.kt  # نامِ بیرون‌مانده: V3Route
+ui/v3/nav/FoundationRoutes.kt  # نامِ بیرون‌مانده: MoreAppPage
+ui/v3/nav/RouteHelpers.kt  # نامِ بیرون‌مانده: WarehouseEngine
+ui/v3/nav/RouteScope.kt  # نامِ بیرون‌مانده: CartStore
+ui/v3/nav/RouteTable.kt  # نامِ بیرون‌مانده: V3Route
+ui/v3/nav/V3Modules.kt  # نامِ بیرون‌مانده: ScanModule
+ui/v3/nav/V3Nav.kt  # نامِ بیرون‌مانده: kind
+ui/v3/nav/V3Route.kt  # نامِ بیرون‌مانده: RouteScope
+ui/v3/onboarding/AuthController.kt  # نامِ بیرون‌مانده: GoogleSignIn
+ui/v3/onboarding/AuthFlow.kt  # نامِ بیرون‌مانده: LocationFix
+ui/v3/onboarding/CodeStep.kt  # نامِ بیرون‌مانده: AuthEnv
+ui/v3/onboarding/EmailCodeSheet.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/onboarding/ForgotStep.kt  # نامِ بیرون‌مانده: AuthEnv
+ui/v3/onboarding/FormStep.kt  # نامِ بیرون‌مانده: AuthEnv
+ui/v3/onboarding/GateFrame.kt  # نامِ بیرون‌مانده: BrandMark
+ui/v3/onboarding/GoogleLinkSheet.kt  # نامِ بیرون‌مانده: GoogleLinkAsk
+ui/v3/onboarding/JoinStep.kt  # نامِ بیرون‌مانده: AuthEnv
+ui/v3/onboarding/OnboardingRoutes.kt  # نامِ بیرون‌مانده: LockGate
+ui/v3/onboarding/ReauthSheet.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/onboarding/ShopSetupGate.kt  # نامِ بیرون‌مانده: LedgerOwner
+ui/v3/onboarding/TermsStep.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/v3/online/OnlineRoutes.kt  # نامِ بیرون‌مانده: CourierHome
+ui/v3/online/chat/ChatBubbles.kt  # نامِ بیرون‌مانده: ChatMedia
+ui/v3/online/chat/ChatRouteContent.kt  # نامِ بیرون‌مانده: ChatMedia
+ui/v3/online/chat/ChatThreadScreen.kt  # نامِ بیرون‌مانده: ServerBubble
+ui/v3/online/delivery/AssignSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/AssignTab.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/AutoAssignSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/CompaniesTab.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/CourierCapSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/CouriersTab.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/DeliveryForms.kt  # نامِ بیرون‌مانده: minorOf
+ui/v3/online/delivery/DeliveryModel.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/DeliveryRouteContent.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/DeliveryScreen.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/DeskData.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/DeskStore.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/v3/online/delivery/InvoiceSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/LedgerSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/MissionActionSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/PickupHandoverSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/delivery/PickupTab.kt  # نامِ بیرون‌مانده: DeskData
+ui/v3/online/delivery/SettlementSheet.kt  # نامِ بیرون‌مانده: DeliveryRepository
+ui/v3/online/orders/OrderBulkV3.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/v3/online/orders/OrderDelayV3.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/v3/online/orders/OrderDeskStrip.kt  # نامِ بیرون‌مانده: OrderDeskRepository
+ui/v3/online/orders/OrderDetailScreen.kt  # نامِ بیرون‌مانده: OrderFulfillNotes
+ui/v3/online/orders/OrderFulfillNotes.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/v3/online/orders/OrdersHub.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/v3/online/orders/OrdersQueueController.kt  # نامِ بیرون‌مانده: list
+ui/v3/online/orders/OrdersRouteContent.kt  # نامِ بیرون‌مانده: OrdersRepository
+ui/v3/online/orders/OrdersScreen.kt  # نامِ بیرون‌مانده: OrderFulfillNotes
+ui/v3/online/storefront/MarketController.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/v3/online/storefront/MarketPane.kt  # نامِ بیرون‌مانده: MarketController
+ui/v3/online/storefront/PresenceModel.kt  # نامِ بیرون‌مانده: PresenceStatusDto
+ui/v3/online/storefront/PresenceSender.kt  # نامِ بیرون‌مانده: StorefrontGate
+ui/v3/online/storefront/ProductSheet.kt  # نامِ بیرون‌مانده: V3ProductThumb
+ui/v3/online/storefront/ProductsPane.kt  # نامِ بیرون‌مانده: V3ProductThumb
+ui/v3/online/storefront/SettingsPane.kt  # نامِ بیرون‌مانده: StorefrontSettingsModel
+ui/v3/online/storefront/StatusPane.kt  # نامِ بیرون‌مانده: StorefrontSettingsDto
+ui/v3/online/storefront/StorefrontHub.kt  # نامِ بیرون‌مانده: StorefrontProductDto
+ui/v3/online/storefront/StorefrontModel.kt  # نامِ بیرون‌مانده: StorefrontConfigDto
+ui/v3/online/storefront/StorefrontRouteContent.kt  # نامِ بیرون‌مانده: DeviceLocation
+ui/v3/online/storefront/StorefrontScreen.kt  # نامِ بیرون‌مانده: StorefrontConfigDto
+ui/v3/online/storefront/StorefrontSettingsModel.kt  # نامِ بیرون‌مانده: StorefrontRepository
+ui/v3/products/CategorySheet.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/products/EditProductScreen.kt  # نامِ بیرون‌مانده: newId
+ui/v3/products/NewProductsScreen.kt  # نامِ بیرون‌مانده: newId
+ui/v3/products/ProductDetailModel.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/products/ProductDetailParts.kt  # نامِ بیرون‌مانده: DraftProductPhoto
+ui/v3/products/ProductDetailScreen.kt  # نامِ بیرون‌مانده: PhoneScanner
+ui/v3/products/ProductFields.kt  # نامِ بیرون‌مانده: ProductFormModel
+ui/v3/products/ProductFormModel.kt  # نامِ بیرون‌مانده: toBigDecimal
+ui/v3/products/ProductOps.kt  # نامِ بیرون‌مانده: PhotoStore
+ui/v3/products/ProductRowCard.kt  # نامِ بیرون‌مانده: ProductRowDraft
+ui/v3/products/ProductsFilters.kt  # نامِ بیرون‌مانده: ProductsListModel
+ui/v3/products/ProductsListModel.kt  # نامِ بیرون‌مانده: ProductsPaths
+ui/v3/products/ProductsListParts.kt  # نامِ بیرون‌مانده: V3ProductThumb
+ui/v3/products/ProductsListScreen.kt  # نامِ بیرون‌مانده: rememberVoiceSearch
+ui/v3/products/ProductsRoutes.kt  # نامِ بیرون‌مانده: DraftPhotoSourceSheet
+ui/v3/sales/SalesRoutes.kt  # نامِ بیرون‌مانده: ScanScreen
+ui/v3/sales/cart/CartFeedback.kt  # نامِ بیرون‌مانده: ScaleLabels
+ui/v3/sales/cart/CartModel.kt  # نامِ بیرون‌مانده: ProductInfoMap
+ui/v3/sales/cart/CartSheetRoutes.kt  # نامِ بیرون‌مانده: ScanFeedback
+ui/v3/sales/cart/CatalogModel.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/sales/cart/FreeLineModel.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/v3/sales/cart/FreeLineSheet.kt  # نامِ بیرون‌مانده: PhoneSaleText
+ui/v3/sales/cart/HeldSession.kt  # نامِ بیرون‌مانده: CartStore
+ui/v3/sales/cart/HeldSheets.kt  # نامِ بیرون‌مانده: snapshot
+ui/v3/sales/cart/KeypadModel.kt  # نامِ بیرون‌مانده: ProductInfoMap
+ui/v3/sales/cart/KeypadSheet.kt  # نامِ بیرون‌مانده: PhoneSaleText
+ui/v3/sales/cart/LineModel.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/v3/sales/cart/LineSheet.kt  # نامِ بیرون‌مانده: PhoneSaleText
+ui/v3/sales/cart/SaleRoute.kt  # نامِ بیرون‌مانده: PrintSpooler
+ui/v3/sales/cart/SaleScreen.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/sales/history/HistoryModel.kt  # نامِ بیرون‌مانده: ReturnFlow
+ui/v3/sales/history/HistoryRoutes.kt  # نامِ بیرون‌مانده: asImageBitmap
+ui/v3/sales/history/HistoryScreen.kt  # نامِ بیرون‌مانده: PhoneSaleText
+ui/v3/sales/history/InvoiceScreen.kt  # نامِ بیرون‌مانده: ReceiptCard
+ui/v3/sales/history/ReceiptCard.kt  # نامِ بیرون‌مانده: PromoLive
+ui/v3/sales/history/ReceiptModel.kt  # نامِ بیرون‌مانده: SalesEngine
+ui/v3/sales/scan/SaleScan.kt  # نامِ بیرون‌مانده: CartNote
+ui/v3/sales/scan/SaleScanPanel.kt  # نامِ بیرون‌مانده: tone
+ui/v3/sales/scan/SaleScanRoute.kt  # نامِ بیرون‌مانده: ScanScreen
+ui/v3/settings/DeskSettingsScreen.kt  # نامِ بیرون‌مانده: rememberSettingsFacts
+ui/v3/settings/SettingsIndexModel.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/SettingsIndexScreen.kt  # نامِ بیرون‌مانده: rememberSettingsFacts
+ui/v3/settings/SettingsPages.kt  # نامِ بیرون‌مانده: CameraScreen
+ui/v3/settings/SettingsRoutes.kt  # نامِ بیرون‌مانده: DevicesScreen
+ui/v3/settings/sections/AboutScreen.kt  # نامِ بیرون‌مانده: rememberUpdateRepo
+ui/v3/settings/sections/AlertsScreen.kt  # نامِ بیرون‌مانده: Watchman
+ui/v3/settings/sections/AppLockScreen.kt  # نامِ بیرون‌مانده: LockStore
+ui/v3/settings/sections/AppLockState.kt  # نامِ بیرون‌مانده: LockStore
+ui/v3/settings/sections/AppearanceScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/BackupController.kt  # نامِ بیرون‌مانده: AutoBackup
+ui/v3/settings/sections/BackupScreen.kt  # نامِ بیرون‌مانده: AutoBackup
+ui/v3/settings/sections/CheckoutRulesScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/DeskToggleScreensAndroid.kt  # نامِ بیرون‌مانده: ToggleScreen
+ui/v3/settings/sections/DigitsScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/EncryptionScreen.kt  # نامِ بیرون‌مانده: AtRestKeyring
+ui/v3/settings/sections/ExpiryScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/LanguageScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/MoreToggleScreensAndroid.kt  # نامِ بیرون‌مانده: newId
+ui/v3/settings/sections/NavBarScreen.kt  # نامِ بیرون‌مانده: PhoneNav
+ui/v3/settings/sections/NavSlotList.kt  # نامِ بیرون‌مانده: PhoneNav
+ui/v3/settings/sections/OpsToggleScreensAndroid.kt  # نامِ بیرون‌مانده: EasySetupPref
+ui/v3/settings/sections/PasswordScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/settings/sections/PinModel.kt  # نامِ بیرون‌مانده: LockStore
+ui/v3/settings/sections/PinSheet.kt  # نامِ بیرون‌مانده: LockStore
+ui/v3/settings/sections/PosNotesScreenAndroid.kt  # نامِ بیرون‌مانده: SWITCH
+ui/v3/settings/sections/PosStockToggleScreensAndroid.kt  # نامِ بیرون‌مانده: GiftReceiptPrefs
+ui/v3/settings/sections/PosToggleScreensAndroid.kt  # نامِ بیرون‌مانده: QuotePref
+ui/v3/settings/sections/ReturnsSettingsScreen.kt  # نامِ بیرون‌مانده: SettingsLayout
+ui/v3/settings/sections/SalesToggleScreens.kt  # نامِ بیرون‌مانده: HeldInvoicePrefs
+ui/v3/settings/sections/ServerSettingsScreensAndroid.kt  # نامِ بیرون‌مانده: ApiClient
+ui/v3/settings/sections/SessionsScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/settings/sections/StaffCodeScreen.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/settings/sections/StockReportScreensAndroid.kt  # نامِ بیرون‌مانده: ToggleScreen
+ui/v3/settings/sections/SyncModel.kt  # نامِ بیرون‌مانده: AutoSync
+ui/v3/settings/sections/SyncScreen.kt  # نامِ بیرون‌مانده: AutoSync
+ui/v3/settings/sections/TillMoneyScreensAndroid.kt  # نامِ بیرون‌مانده: ReportPrint
+ui/v3/settings/sections/UpdateCard.kt  # نامِ بیرون‌مانده: version
+ui/v3/shell/DashboardNumbers.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/shell/DeskHome.kt  # نامِ بیرون‌مانده: HomeAlerts
+ui/v3/shell/HomeDrawerCard.kt  # نامِ بیرون‌مانده: HomeView
+ui/v3/shell/HomeSalesCard.kt  # نامِ بیرون‌مانده: V3HeroCard
+ui/v3/shell/HomeScreen.kt  # نامِ بیرون‌مانده: GestureThresholdActivate
+ui/v3/shell/HomeShortcuts.kt  # نامِ بیرون‌مانده: ShellTargets
+ui/v3/shell/HomeToday.kt  # نامِ بیرون‌مانده: HomeAlerts
+ui/v3/shell/HomeView.kt  # نامِ بیرون‌مانده: OrdersLive
+ui/v3/shell/NewsModel.kt  # نامِ بیرون‌مانده: EventsRepository
+ui/v3/shell/NotificationRows.kt  # نامِ بیرون‌مانده: ShopAlerts
+ui/v3/shell/NotificationsScreen.kt  # نامِ بیرون‌مانده: rememberHomeView
+ui/v3/shell/PaletteScreen.kt  # نامِ بیرون‌مانده: SearchIndex
+ui/v3/shell/SearchIndex.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/shell/SearchScreen.kt  # نامِ بیرون‌مانده: V3Modules
+ui/v3/shell/ShellNotice.kt  # نامِ بیرون‌مانده: SubscriptionNotice
+ui/v3/shell/ShellNotices.kt  # نامِ بیرون‌مانده: ReleaseFeed
+ui/v3/shell/ShellRoutes.kt  # نامِ بیرون‌مانده: HomeScreen
+ui/v3/shell/ShellTargets.kt  # نامِ بیرون‌مانده: MoneyPaths
+ui/v3/shell/ShopAlerts.kt  # نامِ بیرون‌مانده: HomeAlerts
+ui/v3/shell/ShopAlertsSource.kt  # نامِ بیرون‌مانده: ShopStore
+ui/v3/shell/ShopFeed.kt  # نامِ بیرون‌مانده: Backend
+ui/v3/shell/TransactionViews.kt  # نامِ بیرون‌مانده: Transactions
+ui/v3/shell/Transactions.kt  # نامِ بیرون‌مانده: ShellTargets
+ui/v3/shell/TransactionsScreen.kt  # نامِ بیرون‌مانده: Transactions

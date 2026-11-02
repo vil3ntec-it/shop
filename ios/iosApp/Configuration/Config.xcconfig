@@ -1,0 +1,5 @@
+// ⛔ BLOCKED-EXTERNAL (docs/IOS-PLAN-fa.md): شناسهٔ تیم و شناسهٔ برنامه را فقط صاحب‌کار از
+// حسابِ Apple Developer ِ خودش می‌دهد. تا آن روز فقط ساختِ شبیه‌ساز، بی امضا (CI: ios-app).
+TEAM_ID=
+BUNDLE_ID=ir.vil3ntec.tohid
+APP_NAME=My Shop

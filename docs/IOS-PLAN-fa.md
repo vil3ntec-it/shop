@@ -4,6 +4,148 @@
 > پایه: §۴۰.۳ِ `docs/spec/40-owner-decisions.md` (KMP + Compose Multiplatform، همان کد، بی بازنویسی).
 > در این بررسی هیچ کدی عوض نشد. عددها با `grep` شمرده شده‌اند (روشِ شمارش در پیوستِ الف). برآوردِ زمان تخمین است، اندازه‌گیری نیست.
 
+## ۰. گامِ ۱ِ برنامهٔ آیفون از همان رابط (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase1`)
+
+> تصمیمِ تازهٔ صاحب محصول: برنامهٔ آیفون **از همین حالا**، کنارِ اندروید و کامپیوتر، **از همان کدِ رابط و منطق** ساخته شود تا
+> بعداً از صفر نوشته نشود. این بخش وضعِ واقعیِ همین PR است؛ بخش‌های ۱ تا ۶ (بررسیِ ۱۴۰۵/۰۸/۰۸) تاریخچه‌اند.
+> **تصحیحِ بندِ ۱.۲:** ترفندِ کامپیوتر برای آیفون **کار می‌کند**. Kotlin/Native بسته‌ای به نامِ `java.io` یا `java.util` را
+> از کدِ خودِ ما می‌پذیرد (فقط `kotlin.*` بسته است)، پس همان shimِ نام‌به‌نام ِ `desktop/src/shim` برای JDK هم شدنی است.
+
+### ۰.۱ معماری (آینهٔ `desktop/`)
+
+```
+android-native/app/src/main/java   ← تنها کدِ رابط و منطق (دست‌نخورده)
+        │  کپی هنگامِ ساخت (کارِ `iosSources`)، بی فایل‌های ios/shared/ios-exclude.txt،
+        │  با یک خطِ `import ir.vil3ntec.tohid.ios.jvm.*` سرِ هر فایل و `@Synchronized` ⇐ `synchronized(Unit) {…}`
+        ▼
+ios/shared/build/generated/ios-src  ──┐
+ios/shared/src/iosMain/kotlin         ├─ Kotlin/Native + Compose Multiplatform (iosArm64، iosSimulatorArm64؛ فقط با -Pios=true)
+  ├ java/** ، javax/**  shimِ JDK      │   ⇒ چارچوبِ ایستای `TohidShared`
+  ├ android/** ، androidx/** shimِ اندروید (همان نام‌های desktop/src/shim)
+  ├ ir/…/ios/jvm  System، Math، Character، Charsets، synchronized، @Volatile، String.format، Class
+  ├ ir/…/*Ios.kt  جایگزین‌ها (همان API ِ فایلِ اندروید؛ مثلِ «replaced» ِ کامپیوتر)
+  └ ir/…/ios/IosRoot.kt + MainViewController.kt  ریشهٔ آیفون
+core/  ← همان includeBuild (هدف‌های iOS ِ آن هم با -Pios=true)
+        ▼
+ios/iosApp (SwiftUI)  `MainViewControllerKt.MainViewController()` در `UIViewControllerRepresentable`؛ قلمِ Vazirmatn از res/font
+```
+
+- نسخه‌ها همان کامپیوترند: Kotlin ‎2.2.20، Compose Multiplatform ‎1.9.3، material3 ‎1.9.0، lifecycle ‎2.9.4، coroutines ‎1.10.2.
+- `ios/shared` ساختِ جداست (مثلِ `core`): اندروید و کامپیوتر آن را نمی‌خوانند ⇐ رفتار و خروجیِ آن دو **بایت‌به‌بایت همان** است
+  (این PR هیچ فایلی در `android-native/`، `desktop/` و `core/` عوض نکرد).
+- فایلِ تازه‌ای در `android-native` که در `ios-exclude.txt` نیست خودبه‌خود به iOS می‌رسد؛ اگر به JVM تکیه کند کارِ `ios-ui-klib` سرخ (گزارش) می‌شود.
+
+### ۰.۲ شمارشِ JVM/اندروید در منابعِ ساخته‌شده (همان `androidSources` ِ کامپیوتر)
+
+روی `desktop/build/generated/android-src` (کپیِ کامپیوتر، بی ۲۰ فایلِ `replaced`): **۱۰۷۶ فایل، ۲۰۲٬۹۱۳ خط**. **۵۳۸ فایل**
+(۵۰٪) دست‌کم یک API ِ فقط-JVM یا فقط-اندروید دارند؛ ۵۳۸ فایل (۷۳٬۱۳۰ خط) هیچ. شمارش با `grep` روی متنِ بی توضیح (روش: پیوستِ ب).
+
+| API | فایل | رخداد |
+|---|---:|---:|
+| `Context` / `LocalContext` | ۳۸۶ | ۱٬۷۸۴ |
+| `android.*` (import یا نامِ کامل) | ۲۶۳ | ۵۷۴ |
+| `System.*` (`currentTimeMillis` ۳۵۳، `nanoTime` ۱۲…) | ۱۷۲ | ۳۶۷ |
+| `SharedPreferences` | ۱۴۱ | ۱۹۱ |
+| androidx ِ غیرِ Compose (`activity`، `work`، `core`…) | ۷۰ | ۱۸۶ |
+| `Math.*` / `Character.*` | ۶۸ | ۱۳۳ |
+| `Dispatchers.IO` (در Native import می‌خواهد) | ۶۳ | ۱۴۵ |
+| Compose ِ فقط-اندروید (`BackHandler`، `LocalConfiguration`، launcher، `LocalView`…) | ۶۳ | ۱۹۳ |
+| `java.util.*` (`Calendar`، `Locale`، `UUID`، `Date`…) | ۵۱ | ۱۶۶ |
+| `java.io.File` | ۴۶ | ۱۶۱ |
+| `Charsets.*` | ۴۶ | ۷۵ |
+| `@Volatile` | ۴۱ | ۹۱ |
+| `java.io.*` ِ دیگر (جریان‌ها، `IOException`) | ۳۸ | ۷۳ |
+| `synchronized` / `@Synchronized` | ۳۶ | ۱۵۱ |
+| `String.format` / `java.text` | ۳۴ | ۳۸ |
+| `java.net` / `HttpURLConnection` | ۱۸ | ۴۳ |
+| `Locale` | ۱۸ | ۲۳ |
+| `java.security` / `javax.crypto` | ۱۷ | ۳۹ |
+| `java.util.concurrent` / `Atomic*` | ۱۳ | ۳۵ |
+| `org.json` | ۱۰ | ۱۰۷ |
+| `Thread` | ۹ | ۱۱ |
+| بازتاب (`::class.java`، `javaClass`) | ۸ | ۸ |
+| منابعِ `R.*` | ۶ | ۱۴ |
+| `java.nio` | ۴ | ۹ |
+| `javax.*` ِ دیگر | ۳ | ۸ |
+| `okhttp3` | ۲ | ۶ |
+| `java.lang.*` | ۲ | ۵ |
+| `java.time` / `com.google.*` / `@JvmStatic`… | ۰ | ۰ |
+
+بیشترین رخداد در یک فایل: `print/PrintSpooler` (۷۷)، `platform/ServerSwitchAndroid` (۶۶)، `data/ShopStore` (۵۸)، `print/ThermalPrinter` (۵۷)،
+`data/ImageBank` (۵۱)، `print/PrintJob` (۴۶)، `ui/screens/Settings` (۴۴). به تفکیکِ پوشه (فایل / بی وابستگی): `ui` ۷۰۴/۳۷۱،
+`data` ۱۸۲/۶۷، `core` ۱۱۲/۸۷، `sync` ۳۴/۶، `print` ۱۹/۰، `scan` ۹/۵.
+
+### ۰.۳ آنچه امروز برای iOS کامپایل می‌شود
+
+همهٔ ۱۰۹۶ فایلِ `android-native/app/src/main/java` (همان ۱۰۷۶ + ۲۰ فایلِ `replaced` ِ کامپیوتر):
+
+| | فایل |
+|---|---:|
+| **کامپایل‌شده برای iOS** (klib ِ `iosSimulatorArm64`) | **۳۰۸** (۳۹٬۱۷۶ خط): `ui` ۱۴۸، `core` ۹۷، `data` ۴۱، `scan` ۷، `sync` ۵، `print` ۳، `pay` ۲، ریشه ۵ |
+| بیرون: API ِ بی shim در خودِ فایل | ۱۲۷ (`android.graphics` ۵۳، androidx ۴۳، `android.content.*` ِ دیگر ۳۸، `java.io` ِ جریان ۲۶، `Manifest` ۲۶، `android.app` ۱۸، `java.security` ۱۳، `org.json` ۱۱…) |
+| بیرون: خودش پاک، ولی به فایلِ بیرون‌مانده تکیه دارد | ۶۵۸ |
+| جایگزینِ iOS (همان API) | ۳ (`ui/Platform`، `ui/screens/Haptics`، `sync/v1/SyncV1Worker`) |
+
+shimها و جایگزین‌ها: ۳۵ فایل، ۱٬۸۱۴ خط در `ios/shared/src/iosMain/kotlin` — `Context` و `SharedPreferences` (روی
+NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.io.File` (NSFileManager، نوشتنِ اتمی)، `Calendar`/`TimeZone`/`GregorianCalendar`
+(NSCalendar)، `SimpleDateFormat` (فقط الگوهای عددی)، `Locale`، `String.format` (`%d %s %f %x %c` با پرچم/پهنا/دقت؛ گردِ نیمه‌بالا مثلِ JDK)،
+`URLEncoder`/`URLDecoder`، رده‌های خطای شبکه، `SecureRandom` (`SecRandomCopyBytes`)، `BigInteger` (فقط برای مسیرِ سرریزِ `StockCore`)،
+`AtomicReference`/`Executors` (صفِ سریالِ GCD)، `Uri`، `Intent` (نشانی‌ها با `openURL`)، `BackHandler`، launcherهای انتخابِ فایل،
+`Build` (`SDK_INT = 0`)، `Settings.Global` («کاهشِ حرکت» ِ iOS)، `LocalConfiguration`، `Font(R.font…)`.
+
+**ریشهٔ آیفون** (`IosRoot`): `TohidTheme` و قلمِ Vazirmatn ⇐ نخستین صفحهٔ برنامه (`ModeChooser`، «دکان/پیک») ⇐ کیتِ نسخهٔ ۳
+(`KitGallery`، چهار بخش) با `V3TabBar`. همه composable ِ مشترک؛ هیچ صفحه‌ای دوباره نوشته نشد.
+**ورود، فروش و فهرستِ کالا هنوز نه** — زنجیره‌ای که جلویشان را گرفته (از خطای کامپایل):
+
+| صفحه | زنجیره | گره |
+|---|---|---|
+| فروش (`SaleScreen`) و هر موتورِ دفتر (`SalesEngine`، `ReportEngine`، `DebtorEngine`…) | `ShopStore` ⇐ `AtRestException` | `core/atrest/AtRestEnvelope` (AES-GCM ِ `javax.crypto`) |
+| ورود (`EmailCodeSheet`) و هر چیزِ سروری | `Backend`/`ApiClient` ⇐ `HttpEngine` | `HttpURLConnection` + `platform/ServerSwitchAndroid` |
+| فهرستِ کالا (`ProductsScreen`) و کاشیِ کالا (`PhoneCatalog`) | `PhotoStore` / `rememberProductImage` | `android.graphics.Bitmap`/`BitmapFactory` |
+| تنظیمات و `ProvideLang` | `SettingsParts` ⇐ `SettingsLayout` ⇐ ثابت‌های `StockBook` | چند فایلِ androidx/`android.*` در همان زنجیره |
+
+### ۰.۴ گام‌های بعد (هر برش یک PR؛ اندروید و کامپیوتر دست نمی‌خورند)
+
+| # | برش | کار | باز می‌کند |
+|---|---|---|---|
+| ۲-الف | **شبکه** | shim ِ `java.net.URL`/`HttpURLConnection` روی NSURLSession (همگام، درونِ `Dispatchers.IO`) و جریان‌های `java.io`؛ جایگزینِ iOS ِ `ServerSwitchAndroid` (پین/دامنه) | `HttpEngine`، `ApiClient`، `Backend` ⇐ **ورود** |
+| ۲-ب | **دفترِ رمزشده** | AES-GCM روی iOS (CryptoKit از راهِ Swift یا `cryptography-kotlin`) و کلید در Keychain پشتِ همان `AtRest`/`AtRestKeys`؛ نه دفترِ بی‌رمز | `ShopStore` ⇐ **فروش**، گزارش، بدهی، انبار |
+| ۲-پ | **تصویر** | shim ِ `Bitmap`/`BitmapFactory`/`asImageBitmap` روی Skia (`Image.makeFromEncoded`) | `PhotoStore` ⇐ **فهرستِ کالا**، کاشیِ صندوق |
+| ۲-ت | ریشهٔ کامل | `Manifest`/`ContextCompat`/`PackageManager`، `StockBook` و `SettingsLayout`، `ProvideLang` ⇐ `AppRoot`؛ سپس `AppRootLegacy` | همهٔ مسیرها |
+| ۲-ث | همگام‌سازی | `SyncV1Worker` ِ iOS: هنگامِ باز شدن + `BGAppRefreshTask` | دفترِ مشترک با سرور |
+| ۲-ج | بقیه | انتخابگرِ فایل/عکس (UIDocumentPicker/PHPicker پشتِ همان launcherها)، دوربین و بارکد (VisionKit)، اشتراک (UIActivityViewController)، اعلان، چاپ (شبکه/AirPrint؛ بلوتوثِ کلاسیک نه — بندِ ۵.۱) | — |
+
+ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
+چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
+
+**تفاوت‌های دانستهٔ shimها (عمدی، تا گامِ ۲):** قفلِ `synchronized` یک قفلِ بازگشتیِ سراسری است (درست ولی درشت)؛
+`String.format` ِ بی Locale رقمِ لاتین می‌نویسد (اندروید با زبانِ دستگاه)؛ NSUserDefaults رمز ندارد ⇒ `TokenStore` و کلیدها بیرون‌اند؛
+انتخابِ فایل/عکس/دوربین «لغو» و اجازه‌ها «نه» برمی‌گردانند؛ «نت هست» همیشه بله است؛ `Thread.start` خطا می‌دهد.
+
+### ۰.۵ ساخت و CI
+
+- **لینوکس، محلی:** Kotlin ‎2.2.20 klib ِ Apple را روی لینوکس می‌سازد (پلتفرم‌لایبرریِ iOS در توزیعِ لینوکسِ Kotlin/Native هست؛
+  `core` بی پرچم هم ساخته شد، `ios/shared/gradle.properties` پرچمِ `kotlin.native.enableKlibsCrossCompilation=true` را روشن نوشته). فرمان:
+  `desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64`. پیوندِ چارچوب و xcodebuild فقط روی macOS.
+  در محیطِ این PR مخزنِ گوگل (androidx ِ iOS) و download.jetbrains.com بسته بودند: بررسیِ محلی با init-script ِ جدا (در مخزن نیست)
+  روی Compose ‎1.7.3 ِ Maven Central و بی گروه‌های `androidx.*` انجام شد؛ CI همان ‎1.9.3 را با همهٔ وابستگی‌ها می‌سازد.
+- **CI** (`.github/workflows/ios-spike.yml`، هر دو «گزارش» و `continue-on-error`، روی `core/**` و `ios/**`):
+  - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64` — نگهبانِ ارزان.
+  - `ios-app` (macos-latest): `linkDebugFrameworkIosSimulatorArm64` ⇐ `xcodebuild -target iosApp -sdk iphonesimulator -arch arm64`
+    بی امضا ⇐ نصب و اجرا روی شبیه‌ساز، عکس پس از ۲۰ ثانیه و گزارشِ «زنده است؟» (مصنوعِ `ios-app-shots`).
+  - اجرای این کارها روی هر تغییرِ `android-native/**` تصمیمِ هزینه‌ای صاحب‌کار است (دقیقهٔ macOS گران است)؛ فعلاً نه.
+
+### ۰.۶ ⛔ BLOCKED-EXTERNAL — فقط صاحب‌کار
+
+هیچ‌کدام با کد درست نمی‌شود؛ تا صاحب‌کار نداده، فقط ساختِ شبیه‌ساز بی امضا شدنی است:
+
+1. **حسابِ Apple Developer Program** (۹۹ دلار در سال؛ حسابِ سازمانی D-U-N-S می‌خواهد) و راهِ قانونیِ آن با وضعِ تحریم (بندِ ۵.۷).
+2. **Team ID** ⇐ `TEAM_ID` در `ios/iosApp/Configuration/Config.xcconfig` (اکنون خالی).
+3. **شناسهٔ برنامه (bundle id)**: پیشنهادِ `ir.vil3ntec.tohid` (همان `APPLICATION_ID` ِ اندروید) — باید در حسابِ اپل ثبت شود.
+4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
+5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل بماند — Sign in with Apple (قاعدهٔ ۴.۸).
+6. بعدتر: کلیدِ APNs برای اعلانِ سرور.
+
 ## ۱. خلاصه در پنج خط
 
 1. کدِ برنامه **۳۴۲ فایلِ Kotlin و ۸۹٬۸۷۲ خط** است. از این‌ها **۱۲۰ فایل** فقط Kotlin/Compose/kotlinx دارند، **۵۸ فایل** فقط به JDK تکیه دارند (`java.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized`…) و **۱۶۴ فایل** به اندروید وابسته‌اند (`android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `R.`، کتابخانه‌های گوگل، OkHttp).
@@ -217,3 +359,12 @@ iosApp/        پروژهٔ Xcode + iosMain (گامِ ۲)
 - «خالص»: هیچ‌کدامِ بالا.
 - `androidx.compose.*` وابستگی شمرده نشد، چون در Compose Multiplatform همان نام‌هاست.
 - شمارِ خط با `wc -l`.
+
+## پیوستِ ب — روشِ شمارشِ بخشِ ۰
+
+- منبع: خروجیِ `androidSources` ِ `desktop/build.gradle.kts` (`gradle -p desktop androidSources`)؛ توضیح‌ها (`//`، `/* */`) پیش از شمارش پاک شدند.
+- هر سطرِ جدولِ ۰.۲ یک الگوی `grep -P` است (مثلاً `(?<![\w.])android\.[a-z]\w*\.`، `\b(LocalContext|Context)\b`، `(?<![\w.])System\.\w+`،
+  `Dispatchers\.IO\b`، `\bsynchronized\s*\(|@Synchronized\b`)؛ «فایل» = فایل‌هایی که دست‌کم یک بار دارند، «رخداد» = جمعِ همه.
+- «کامپایل‌شده برای iOS» شمارش نیست، نتیجهٔ کامپایل است: فایل‌های با API ِ بی shim کنار رفتند، سپس `compileKotlinIosSimulatorArm64`
+  تکرار شد و هر فایلِ خطادار با نخستین نامِ ناپیدایش به `ios-exclude.txt` رفت، تا کامپایل سبز شد (۷ دور).
+
