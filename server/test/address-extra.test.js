@@ -31,15 +31,12 @@ test('Plus Code: کامل یا کوتاه با شهر؛ بزرگ‌حرف؛ نا
   }
 });
 
-test('ولایت، گذر یا کوچه، منزل و طبقه: متنِ کمکی؛ کدِ پستی چهار رقم؛ نادرست ⇒ ۴۰۰', () => {
-  const a = parseAddress({ landmark: 'x', province: ' کابل ', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم', postalCode: '۱۰۰۱' });
-  assert.deepEqual(a, { landmark: 'x', province: 'کابل', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم', postalCode: '1001' });
-  assert.equal(parseAddress({ landmark: 'x', postalCode: '١٠٠١' }).postalCode, '1001');
-  assert.deepEqual(parseAddress({ landmark: 'x', province: ' ', street: '', house: null, postalCode: '  ' }), { landmark: 'x' });
+test('ولایت، گذر یا کوچه، منزل و طبقه: متنِ کمکی؛ کدِ پستی دور (LOC-10)', () => {
+  const a = parseAddress({ landmark: 'x', province: ' کابل ', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم', postalCode: '1001' });
+  assert.deepEqual(a, { landmark: 'x', province: 'کابل', street: 'گذرِ سوم', house: 'منزلِ ۱۲، طبقهٔ دوم' });
+  assert.deepEqual(parseAddress({ landmark: 'x', province: ' ', street: '', house: null }), { landmark: 'x' });
   assert.equal(parseAddress({ landmark: 'x', province: 'ک'.repeat(90) }).province.length, 60);
-  for (const bad of ['100', '10011', 'AB12', '10-01']) {
-    assert.equal(code(() => parseAddress({ landmark: 'x', postalCode: bad })), 'bad_postal_code', bad);
-  }
+  assert.equal(parseAddress({ landmark: 'x', street: 'گ'.repeat(200) }).street.length, 120);
   //  کمک‌اند، نه جای نشانی: بی پین، نشانه و متن هنوز ۴۰۰
   assert.equal(code(() => parseAddress({ province: 'کابل', street: 'گذرِ سوم', house: 'منزلِ ۱۲' })), 'bad_address');
 });

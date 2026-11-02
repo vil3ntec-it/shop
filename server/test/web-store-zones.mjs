@@ -327,22 +327,18 @@ await page.click('#submit-order');
 await page.waitForFunction(() => /Plus Code/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });   //  `err.bad_plus_code`
 ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === m0, 'Plus Code ِ نادرست ⇒ پیام و بی سفارش', await text('#checkout-msg'));
 await page.fill('#a-plus', '9g8f+6w کابل');
-//  CHK-08 (§۴.۴): ولایت، گذر یا کوچه، منزل و طبقه و کدِ پستی — کدِ نادرست ⇒ پیامِ سرور و بی سفارش
+//  CHK-08 (§۴.۴): ولایت، گذر یا کوچه، منزل و طبقه (کدِ پستی نه، LOC-10)
 await page.fill('#a-prov', 'کابل');
 await page.fill('#a-street', 'گذرِ سوم');
 await page.fill('#a-house', 'منزلِ ۱۲، طبقهٔ دوم');
-await page.fill('#a-postal', '۱۰۰');
-await page.click('#submit-order');
-await page.waitForFunction(() => /کدِ پستی/.test(document.getElementById('checkout-msg').textContent), null, { timeout: 10000 });   //  `err.bad_postal_code`
-ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id = $1', [shopId])).n === m0, 'کدِ پستیِ نادرست ⇒ پیام و بی سفارش', await text('#checkout-msg'));
-await page.fill('#a-postal', '۱۰۰۱');
+ok(!(await page.$('#a-postal')), 'کادرِ کدِ پستی نیست (LOC-10)');
 await page.click('#submit-order');
 await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
 const ax = await one('SELECT address FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
 const aj = typeof ax.address === 'string' ? JSON.parse(ax.address) : ax.address;
 ok(aj.phone2 === '+93799888777' && aj.plusCode === '9G8F+6W کابل', 'CHK-08: شمارهٔ دوم و Plus Code در نشانیِ سفارش', JSON.stringify(aj));
-ok(aj.province === 'کابل' && aj.street === 'گذرِ سوم' && aj.house === 'منزلِ ۱۲، طبقهٔ دوم' && aj.postalCode === '1001',
-  'CHK-08: ولایت، گذر، منزل و طبقه و کدِ پستی در نشانیِ سفارش', JSON.stringify(aj));
+ok(aj.province === 'کابل' && aj.street === 'گذرِ سوم' && aj.house === 'منزلِ ۱۲، طبقهٔ دوم' && !('postalCode' in aj),
+  'CHK-08: ولایت، گذر و منزل و طبقه در نشانیِ سفارش', JSON.stringify(aj));
 
 
 //  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه
