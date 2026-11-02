@@ -19,14 +19,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrLateApology
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.LateApology
-import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.LateApologyRepository
 import ir.vil3ntec.tohid.data.repo.LateApologySource
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -52,13 +50,6 @@ object LateApologyLive {
   suspend fun set(src: LateApologySource, body: JsonObject): ApiResult<LateApology.Policy> = src.save(body).also { r ->
     r.onFailure { f -> if (f.code == LateApology.OFF || f.code == "orders_disabled") visible = false }
   }
-}
-
-/** درِ سرور برای کاربرِ واردشده؛ بیرون از حساب ⇒ null (هیچ‌چیز) */
-@Composable
-fun lateApologyApi(): ApiClient? {
-  val context = LocalContext.current
-  return if (Backend.isReady(context)) Backend.api(context) else null
 }
 
 /** ردیفِ فهرستِ تنظیمات: فقط با پرچمِ روشنِ سرور (`api == null` ⇒ نه) */

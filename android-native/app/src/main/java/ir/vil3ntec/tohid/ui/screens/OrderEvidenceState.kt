@@ -54,7 +54,7 @@ object OrderEvidenceLive {
   const val TTL_MS = 10 * 60_000L
   val gate = ProbeGate(TTL_MS)
 
-  suspend fun ensure(src: OrderEvidenceSource, now: Long = System.currentTimeMillis()) {
+  suspend fun ensure(src: OrderEvidenceSource, now: Long = platformNow()) {
     if (!gate.due(now)) return
     src.probe()
       .onSuccess { gate.record(false, now) }   // درِ کهنه‌ای که «probe» را سفارش گرفت — پنهان
@@ -188,8 +188,8 @@ internal class OrderEvidenceController(
   private val src: OrderEvidenceSource,
   val orderId: String,
   private val scope: CoroutineScope,
-  private val newKey: () -> String = { "ev-" + java.util.UUID.randomUUID().toString() },
-  private val clock: () -> Long = System::currentTimeMillis,
+  private val newKey: () -> String = ::evidenceRequestKey,
+  private val clock: () -> Long = ::platformNow,
 ) {
   var file by mutableStateOf<OrderEvidence.File?>(null)
     private set

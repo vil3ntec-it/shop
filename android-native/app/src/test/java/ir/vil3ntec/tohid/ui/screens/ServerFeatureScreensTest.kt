@@ -309,9 +309,12 @@ class ServerFeatureScreensTest {
     assertFalse("شاگرد", CustomerErasureLive.gate.visible)
     assertNull(CustomerErasure.probeSays("offline", refused = false, invalid = false))
     //  رابط هم فقط برای صاحبِ واردشده می‌پرسد
-    val panel = src("ui/screens/CustomerErasurePanel.kt")
-    assertTrue(panel.contains("ShopRole.current(context) == ShopRole.OWNER && Backend.isReady(context)"))
-    assertFalse(panel.contains("android."))
+    assertTrue(src("ui/screens/ServerScreensAndroid.kt").contains("ShopRole.current(context) == ShopRole.OWNER && Backend.isReady(context)"))
+    for (f in listOf("ui/screens/CustomerErasurePanel.kt", "ui/v3/money/CustomerErasureV3.kt")) {
+      val t = src(f)
+      assertTrue(f, t.indexOf("rememberErasureApi() ?: return") in 0 until t.indexOf("CustomerErasureLive.ensure"))
+      assertFalse(f, t.contains("android."))
+    }
   }
 
   @Test

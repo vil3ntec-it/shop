@@ -16,15 +16,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.crm.CustomerErasure
 import ir.vil3ntec.tohid.core.i18n.StrErasure
-import ir.vil3ntec.tohid.core.net.ApiClient
-import ir.vil3ntec.tohid.data.ShopRole
-import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.CustomerErasureRepository
 import ir.vil3ntec.tohid.ui.theme.Shop
 
@@ -32,14 +28,6 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  SEC-10 — «حذفِ دادهٔ این مشتری» در پروندهٔ مشتری (رابطِ امروز: `DebtorsLegacy` گوشی و `DeskCustomers` کامپیوتر).
  *  فقط صاحبِ واردشده، شمارهٔ قابلِ حذف و پاسخِ روشنِ سرور. حالت فقط در `CustomerErasureController`.
  */
-
-/** درِ سرور و حالِ حذف برای صاحبِ واردشده؛ وگرنه null (هیچ دکمه‌ای) */
-@Composable
-internal fun rememberErasureApi(): ApiClient? {
-  val context = LocalContext.current
-  val owner = ShopRole.current(context) == ShopRole.OWNER && Backend.isReady(context)
-  return remember(context, owner) { if (owner) Backend.api(context) else null }
-}
 
 /** دکمهٔ «حذفِ دادهٔ این مشتری» و برگه‌اش؛ [phone] شمارهٔ همین مشتری در دفتر */
 @Composable

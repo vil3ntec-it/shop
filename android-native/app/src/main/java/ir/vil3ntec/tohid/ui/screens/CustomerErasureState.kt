@@ -25,7 +25,7 @@ object CustomerErasureLive {
   const val TTL_MS = 30 * 60_000L
   val gate = ProbeGate(TTL_MS)
 
-  suspend fun ensure(src: CustomerErasureSource, now: Long = System.currentTimeMillis()) {
+  suspend fun ensure(src: CustomerErasureSource, now: Long = platformNow()) {
     if (!gate.due(now)) return
     src.probe()
       .onSuccess { gate.record(false, now) }   // سرورِ ناشناخته‌ای که پرسشِ بی هدف را پذیرفت — پنهان
@@ -47,7 +47,7 @@ internal class CustomerErasureController(
   val phone: String,
   private val reauth: suspend () -> Boolean,
   private val scope: CoroutineScope,
-  private val clock: () -> Long = System::currentTimeMillis,
+  private val clock: () -> Long = ::platformNow,
 ) {
   var step by mutableStateOf<CustomerErasure.Step>(CustomerErasure.Step.Idle)
     private set
