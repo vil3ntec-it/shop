@@ -3,7 +3,9 @@ package ir.vil3ntec.tohid.ui.v3.settings.devices
 import ir.vil3ntec.tohid.print.ThermalPrinter
 
 /** بخش‌های صفحهٔ «دستگاه‌های جانبی» به ترتیب؛ `?tab=` یکی از همین‌هاست */
-internal enum class DeviceTab(val id: String) { PRINTERS("printers"), SCANNERS("scanners"), PHONE("phone"), LIVE("live"), PHOTOS("photos") }
+internal enum class DeviceTab(val id: String) {
+  HUB("all"), BACKGROUND("background"), PRINTERS("printers"), SCANNERS("scanners"), PHONE("phone"), LIVE("live"), PHOTOS("photos"),
+}
 
 internal object DevicesModel {
   /** `devices?tab=printers` ⇐ همان کارت؛ ناشناس یا خالی ⇐ null (بالای صفحه) */

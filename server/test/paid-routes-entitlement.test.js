@@ -67,6 +67,10 @@ const FREE = [
   ['پرداختِ حساب‌پی (PAY-21) کلیدِ کاتالوگ ندارد، فقط پرچمِ pay.hesabpay؛ پرداختِ سفارشِ آنلاین اشتراکِ فعال را خودش می‌سنجد '
     + '(online_payment_unavailable)', [
     'POST /shop/payments/intents', 'POST /shop/payments/intents/:id/cancel']],
+  ['«حساب‌پیِ دکان» (حساب و رمزِ جدای حساب‌پی، فقط صاحب) کلیدِ کاتالوگ ندارد: صاحب پس از پایانِ اشتراک هم باید بتواند حسابِ '
+    + 'پولش را ببیند، عوض کند یا بردارد', [
+    'POST /shop/hesabpay/open', 'PUT /shop/hesabpay/pin', 'POST /shop/hesabpay/pin/reset',
+    'PUT /shop/hesabpay/account', 'POST /shop/hesabpay/account/remove']],
   ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
     + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],

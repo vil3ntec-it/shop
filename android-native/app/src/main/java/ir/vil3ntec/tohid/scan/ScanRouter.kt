@@ -46,6 +46,18 @@ object ScanRouter {
   }
 
   /**
+   *  فقط گیرنده‌ها، بی رفتن به صندوق (نسخهٔ ۳ صندوقِ خودش را از `SaleScan.reads` می‌خواند).
+   *  @return `true` اگر صفحه‌ای برداشت (یا کد خالی بود)
+   */
+  fun offer(code: String): Boolean {
+    val clean = code.trim()
+    if (clean.isEmpty()) return true
+    last.value = clean
+    for ((_, h) in handlers.reversed()) if (h(clean)) return true
+    return false
+  }
+
+  /**
    *  @param openSale وقتی هیچ گیرنده‌ای نبود، صندوق را باز می‌کند
    *  @return نامِ مقصد برای پیام: «sale» یا «page»
    */

@@ -269,9 +269,8 @@ function credentials() {
     { id: 'RELEASES_TOKEN', service: 'releases', set: set(config.releases?.token), rotate: 'env' },
     { id: 'BACKUP_PASSPHRASE', service: 'backups', set: set(config.backup?.passphrase), rotate: 'env' },
     { id: 'WHATSAPP_TOKEN', service: 'sms', set: set(config.whatsapp?.token), rotate: 'env' },
-    { id: 'HESABPAY_API_KEY', service: 'payment.hesabpay', set: set(process.env.HESABPAY_API_KEY), rotate: 'env' },
-    { id: 'HESABPAY_WEBHOOK_SECRET', service: 'payment.hesabpay', set: set(process.env.HESABPAY_WEBHOOK_SECRET), rotate: 'env' },
-    { id: 'HESABPAY_MERCHANT_ID', service: 'payment.hesabpay', set: set(process.env.HESABPAY_MERCHANT_ID), rotate: 'env' },
+    //  حساب‌پیِ هر دکان: کلیدِ پذیرنده در ردیفِ رمزشدهٔ همان دکان است؛ سرور فقط کلیدِ رمزگذاری را دارد (مهاجرتِ ۲۰۴)
+    { id: 'HESABPAY_CRED_KEY', service: 'payment.hesabpay', set: set(process.env.HESABPAY_CRED_KEY), rotate: 'env' },
   ];
   return list;
 }
@@ -291,8 +290,10 @@ async function hesabpayWebhook(t) {
   try { require.resolve('../routes/payments-webhook'); routePresent = true; } catch { routePresent = false; }
   const tables = (await one("SELECT to_regclass('payment_events') IS NOT NULL AS ok")).ok;
   const base = {
-    id: 'hesabpay', path: '/api/v1/payments/webhook/hesabpay', routePresent, needs: 'PAY-21 (#518)',
-    signatureSecretSet: Boolean(process.env.HESABPAY_WEBHOOK_SECRET),
+    id: 'hesabpay', path: '/api/v1/payments/webhook/hesabpay/<دکان>', routePresent, needs: 'PAY-21 (#518)',
+    //  رازِ امضا مالِ هر دکان است (رمزشده)؛ این‌جا فقط «سرور می‌تواند بازش کند؟»
+    perShop: true,
+    signatureSecretSet: require('./hesabpay-account').credKeyReady(),
   };
   if (!routePresent || !tables) return { ...base, state: 'blocked', reason: routePresent ? 'tables_missing' : 'route_missing' };
   const r = await one(
@@ -301,7 +302,7 @@ async function hesabpayWebhook(t) {
        FROM payment_events WHERE provider='hesabpay'`, [t - DAY]
   );
   return {
-    ...base, state: !base.signatureSecretSet ? 'blocked' : 'live', reason: base.signatureSecretSet ? '' : 'secret_missing',
+    ...base, state: !base.signatureSecretSet ? 'blocked' : 'live', reason: base.signatureSecretSet ? '' : 'cred_key_missing',
     lastReceivedAt: Number(r.last) || null, received24h: r.n24h, problems24h: r.bad24h,
   };
 }

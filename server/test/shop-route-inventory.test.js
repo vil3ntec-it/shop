@@ -19,6 +19,7 @@
 //  پرداختِ حساب‌پی (PAY-21) با ارائه‌دهندهٔ ساختگی — قصدِ واقعیِ «الف» برای `/shop/payments/intents/:id`
 process.env.PAYMENTS_PROVIDER = 'fake';
 process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-route-inventory';
+process.env.HESABPAY_PIN_ITER = '1000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -521,6 +522,11 @@ async function seedShop(a) {
     { token: a.accessToken });
   assert.equal(pi.status, 201, JSON.stringify(pi.body));
   ids.paymentIntent = pi.body.id;
+
+  //  «حساب‌پیِ دکان» ِ «الف» (رمزِ جدا + شمارهٔ حالتِ ساده) — توکنِ «ب» نه می‌بیند، نه عوض می‌کند
+  assert.equal((await h.put('/api/shop/hesabpay/pin', { newPin: '258014' }, { token: a.accessToken })).status, 200);
+  const hp = await h.put('/api/shop/hesabpay/account', { pin: '258014', mode: 'simple', account: '0799123456' }, { token: a.accessToken });
+  assert.equal(hp.status, 200, JSON.stringify(hp.body));
 
   //  فهرستِ سیاهِ ویترینِ «الف» (RSK-04؛ پرچمِ `shop.order_risk` در FLAGS)
   const listed = await h.post('/api/shop/orders/risk/lists',

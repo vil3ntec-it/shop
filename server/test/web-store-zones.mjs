@@ -107,12 +107,14 @@ ok((await text('#store-meta')).includes('ارسال ۵۰ افغانی'), 'خام
 /**
  *  «افزودن» ِ برنج در کاتالوگ: نوارِ ثابتِ پایین (`nav.bnav`) دکمهٔ لبهٔ پایین را می‌پوشاند و scrollIntoView ِ
  *  Playwright فقط تا لبه می‌آورد؛ وقتی بنرها دیر بار شوند جای کاشی جابه‌جا می‌شود ⇒ گاه «intercepts pointer events»
- *  (CI ِ #831). پس اول وسطِ صفحه، بعد زدن.
+ *  (CI ِ #831، #837).
  */
 async function addRice() {
   const b = page.locator('#products li[data-id="rice"] .p-add').first();
-  await b.evaluate((el) => el.scrollIntoView({ block: 'center' }));
-  await b.click();
+  await b.waitFor({ state: 'visible' });
+  //  کلیکِ DOM: این آزمون سبد و ناحیه را می‌سنجد، نه هدف‌گیریِ اشاره‌گر؛ با جابه‌جاییِ کاتالوگ (بنرها، نوارِ سبد)
+  //  کلیکِ Playwright حتی پس از وسط‌آوردن گاه «outside of the viewport» ماند (CI ِ #837)
+  await b.evaluate((el) => { el.scrollIntoView({ block: 'center' }); el.click(); });
 }
 await addRice();
 await toCheckout();

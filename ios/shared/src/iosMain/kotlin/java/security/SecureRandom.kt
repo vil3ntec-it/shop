@@ -7,8 +7,8 @@ import platform.Security.errSecSuccess
 import platform.Security.kSecRandomDefault
 
 /** shimِ iOS ِ `SecureRandom` — `SecRandomCopyBytes` ِ خودِ iOS (همان منبعِ `core/iosMain`)؛ شکست ⇐ خطا، نه بایتِ ضعیف */
-class SecureRandom {
-  fun nextBytes(bytes: ByteArray) {
+open class SecureRandom {
+  open fun nextBytes(bytes: ByteArray) {
     if (bytes.isEmpty()) return
     val rc = bytes.usePinned { SecRandomCopyBytes(kSecRandomDefault, bytes.size.toULong(), it.addressOf(0)) }
     check(rc == errSecSuccess) { "SecRandomCopyBytes: $rc" }

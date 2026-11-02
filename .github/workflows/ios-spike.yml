@@ -95,8 +95,9 @@ jobs:
         with:
           path: ~/.konan
           key: konan-ui-${{ runner.os }}-${{ hashFiles('ios/shared/build.gradle.kts', 'core/build.gradle.kts') }}
-      - name: compileKotlinIosSimulatorArm64 (ios/shared)
-        run: ./desktop/gradlew --no-daemon -p ios/shared -Pios=true compileKotlinIosSimulatorArm64
+      #  klib ِ شبیه‌ساز + آزمونِ خالصِ حالتِ GCM ِ دفترِ رمزدار در برابرِ خودِ JDK (همان بایت‌های اندروید/کامپیوتر)
+      - name: compileKotlinIosSimulatorArm64 و jvmTest (ios/shared)
+        run: ./desktop/gradlew --no-daemon -p ios/shared -Pios=true compileKotlinIosSimulatorArm64 jvmTest
 
   #  برنامهٔ آیفون روی macOS: چارچوبِ Compose (`TohidShared`)، برنامهٔ Xcode برای شبیه‌ساز بی امضا،
   #  و یک بار اجرا روی شبیه‌ساز با عکس. امضا و انتشار BLOCKED-EXTERNAL است (حسابِ اپل ِ صاحب‌کار).
@@ -145,6 +146,12 @@ jobs:
           xcrun simctl io "$UDID" screenshot ios-shots/ios-app.png
           xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' > ios-shots/ios-app.log 2>&1 || true
           if xcrun simctl spawn "$UDID" launchctl list | grep -q 'ir.vil3ntec.tohid'; then echo "برنامه پس از ۲۰ ثانیه زنده است"; else echo "::warning::برنامه پس از ۲۰ ثانیه زنده نیست (ios-shots/ios-app.log)"; exit 1; fi
+      #  ۴) shimهای رمزنگاری روی شبیه‌ساز (CommonCrypto/Keychain) در برابرِ بردارهای JDK — `src/iosTest`
+      - name: iosSimulatorArm64Test (ios/shared)
+        if: always()
+        run: |
+          ./desktop/gradlew --no-daemon -p ios/shared -Pios=true iosSimulatorArm64Test
+          grep -ho '<testsuite [^>]*' ios/shared/build/test-results/iosSimulatorArm64Test/*.xml || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:

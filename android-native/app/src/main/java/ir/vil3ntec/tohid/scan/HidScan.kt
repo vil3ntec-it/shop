@@ -51,7 +51,7 @@ class HidScan(
    *  @return اگر پسوندِ تنظیم‌شده یک بارکدِ کامل را تمام کرده باشد (بارکدخوانی که Enter نمی‌زند)، خودِ
    *    بارکد؛ وگرنه `null`.
    */
-  fun feed(char: Char, now: Long): String? = s().feed(char, now)
+  fun feed(char: Char, now: Long): String? = s().feed(char, now)?.also { seen() }
 
   /**
    *  Enter رسید — یعنی «تمام شد».
@@ -59,7 +59,10 @@ class HidScan(
    *  @return بارکد (بی پیشوند و پسوند)، اگر آنچه جمع شده به‌قدرِ کافی بلند و به‌قدرِ کافی سریع آمده
    *    باشد (یا پیشوندِ تنظیم‌شده را داشته باشد)؛ وگرنه `null` و بافر پاک می‌شود.
    */
-  fun submit(now: Long): String? = s().submit(now)
+  fun submit(now: Long): String? = s().submit(now)?.also { seen() }
+
+  /** «دستگاه‌ها»: بارکدخوانِ حالتِ صفحه‌کلید روی همین دستگاه کار می‌کند ⇒ راهنمای حالتِ SPP برای پس‌زمینه */
+  private fun seen() { if (!ScanInbox.keyboardSeen.value) ScanInbox.keyboardSeen.value = true }
 
   /** رها کردنِ هرچه نیمه‌کاره مانده — هنگامِ بسته شدنِ صفحه؛ تنظیمِ تازه دفعهٔ بعد خوانده می‌شود */
   fun reset() {

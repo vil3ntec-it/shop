@@ -25,17 +25,17 @@ async function hasTable(name) {
   return Boolean(r);
 }
 
+/** سرور حساب‌پیِ دکان‌ها را می‌تواند به کار ببرد؟ (`HESABPAY_CRED_KEY`؛ کلیدِ هر دکان در ردیفِ خودش، هرگز کلیدِ سکو) */
 function hesabpayConfigured() {
   try {
-    const m = require('./payment-hesabpay');   // #518 — روی این شاخه شاید نباشد
-    if (typeof m.configured === 'function') return Boolean(m.configured());
-  } catch { /* پایین */ }
-  return Boolean(String(process.env.HESABPAY_API_KEY || '').trim() && String(process.env.HESABPAY_WEBHOOK_SECRET || '').trim());
+    const m = require('./payment-hesabpay');
+    return typeof m.configured === 'function' && Boolean(m.configured());
+  } catch { return false; }
 }
 
 /**
  * حالِ درگاه برای تطبیقِ «پرداخت ⇄ شمارهٔ تراکنش». ⛔ هیچ کلید یا نشانیِ پرداختی برنمی‌گردد.
- *   blocked_external  جدولِ `payment_intents` (#518) نیست، یا کلیدهای HESABPAY_* داده نشده
+ *   blocked_external  جدولِ `payment_intents` (#518) نیست، یا کلیدِ رمزگذاریِ `HESABPAY_CRED_KEY` داده نشده
  *   live              شمارِ هر وضعیت، «نیازمندِ بررسی» (تطبیقِ شبانهٔ #529) و فهرستِ صفحه‌بندی‌شده
  * ⚠️ پرداختِ درگاه پولِ مشتریِ دکان است (فروشِ صندوق/سفارشِ آنلاین) به واحدِ یکصدم (`amountMinor`) — هرگز با
  *    درآمدِ اشتراک جمع نمی‌شود.
@@ -47,7 +47,7 @@ async function gateway(q = {}) {
   }
   const rows = N((await one('SELECT COUNT(*)::int AS n FROM payment_intents'))?.n);
   if (!hesabpayConfigured()) {
-    return { ...base, state: 'blocked_external', code: 'hesabpay_key_missing', message: BLOCKED, needs: 'HESABPAY_API_KEY + HESABPAY_WEBHOOK_SECRET', intents: rows };
+    return { ...base, state: 'blocked_external', code: 'hesabpay_key_missing', message: BLOCKED, needs: 'HESABPAY_CRED_KEY + حسابِ حساب‌پیِ هر دکان', intents: rows };
   }
   const limit = v.integer(q.limit, { field: 'اندازهٔ صفحه', min: 1, max: LIMITS.pageMax, def: 50 });
   const where = [];

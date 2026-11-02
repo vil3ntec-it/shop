@@ -169,21 +169,26 @@ test('پنلِ مدیر: فهرست با فیلتر، تطبیق و بازپرد
   assert.deepEqual([p.mode, p.state], ['fake', 'mock']);
 });
 
-test('حالِ سرویسِ پرداخت: بی کلید none، یک کلید incomplete، هر دو live (بی هیچ راز)', () => {
+test('حالِ سرویسِ پرداخت: کلیدِ سکو هیچ‌چیز را روشن نمی‌کند؛ فقط کلیدِ رمزگذاریِ حساب‌پیِ دکان‌ها (بی هیچ راز)', () => {
   const keep = { ...process.env };
   try {
     process.env.PAYMENTS_PROVIDER = '';
-    delete process.env.HESABPAY_API_KEY; delete process.env.HESABPAY_WEBHOOK_SECRET;
+    delete process.env.HESABPAY_API_KEY; delete process.env.HESABPAY_WEBHOOK_SECRET; delete process.env.HESABPAY_CRED_KEY;
     assert.deepEqual(P.providerState(), { mode: 'cod', state: 'none', missing: [], decision: 'D-08' });
+    //  ⛔ کلیدهای کهنهٔ سکو ⇒ همچنان «نیست»، فقط نامشان برای پاک کردن
     process.env.HESABPAY_API_KEY = 'k-secret-value';
-    const half = P.providerState();
-    assert.deepEqual([half.state, half.missing], ['incomplete', ['HESABPAY_WEBHOOK_SECRET']]);
     process.env.HESABPAY_WEBHOOK_SECRET = 'w-secret-value';
+    const legacy = P.providerState();
+    assert.deepEqual([legacy.state, legacy.ignored], ['none', ['HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET']]);
+    process.env.HESABPAY_CRED_KEY = 'short-secret-value';
+    const half = P.providerState();
+    assert.deepEqual([half.state, half.missing], ['incomplete', ['HESABPAY_CRED_KEY (≥ ۳۲ نویسه)']]);
+    process.env.HESABPAY_CRED_KEY = 'a-long-enough-cred-secret-value-0123456789';
     const live = P.providerState();
-    assert.equal(live.state, 'live');
-    assert.ok(!JSON.stringify(live).includes('secret-value'));
+    assert.deepEqual([live.state, live.perShop], ['live', true]);
+    assert.ok(!JSON.stringify([legacy, half, live]).includes('secret-value'));
   } finally {
-    for (const k of ['PAYMENTS_PROVIDER', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET']) {
+    for (const k of ['PAYMENTS_PROVIDER', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_CRED_KEY']) {
       if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k];
     }
   }

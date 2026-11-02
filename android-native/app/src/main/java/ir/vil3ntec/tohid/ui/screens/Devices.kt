@@ -57,6 +57,10 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
 
   val wide = screenSize() == Screen.WIDE
   val left: @Composable () -> Unit = {
+    //  «دستگاه‌ها» (۱۴۰۵/۰۸/۱۱): همهٔ دستگاه‌ها با یک جست‌وجو، وضعیت و آزمایش؛ و اسکن وقتی برنامه بسته است
+    if (canAdmin) { DeviceHubPanel(::toast); Spacer(Modifier.height(14.dp)) }
+    BackgroundScanPanel()
+    Spacer(Modifier.height(14.dp))
     PrintersPanel(::toast, canAdmin, canDrawer)
     Spacer(Modifier.height(14.dp))
     PrintQueuePanel(::toast, canAdmin, canDrawer)
@@ -89,6 +93,34 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
       left(); Spacer(Modifier.height(14.dp)); right()
     }
     Spacer(Modifier.height(32.dp))
+  }
+}
+
+/** رنگ‌های بدنهٔ مشترکِ «دستگاه‌ها» در رابطِ امروز */
+@Composable
+private fun legacyHubColors() = ir.vil3ntec.tohid.ui.components.devices.HubColors(
+  ok = Shop.colors.success, bad = Shop.colors.danger, muted = Shop.colors.muted, text = Shop.colors.text,
+)
+
+@Composable
+private fun DeviceHubPanel(toast: (String) -> Unit) {
+  Panel {
+    Head(Icons.Filled.Devices, ir.vil3ntec.tohid.core.i18n.StrDevices.hubTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.hubCaption)
+    //  «این چه می‌کند؟» — همان مثالِ ردیفِ «دستگاه‌ها» ِ تنظیمات
+    SettingsHelp.example(SettingsLayout.PERIPHERALS)?.let {
+      Text(ir.vil3ntec.tohid.core.i18n.StrSettingsHelp.whatTitle, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text, fontWeight = FontWeight.Bold)
+      Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      Spacer(Modifier.height(8.dp))
+    }
+    ir.vil3ntec.tohid.ui.components.devices.DeviceHubBody(legacyHubColors(), toast)
+  }
+}
+
+@Composable
+private fun BackgroundScanPanel() {
+  Panel {
+    Head(Icons.Filled.QrCodeScanner, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundCaption)
+    ir.vil3ntec.tohid.ui.components.devices.BackgroundScanBody(legacyHubColors())
   }
 }
 
