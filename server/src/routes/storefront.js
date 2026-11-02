@@ -246,7 +246,7 @@ router.post('/:slug/checkout', checkoutLimit, store, async (req, res) => {
   await orderDesk.guardCheckout(req.store.shop_id, key);
   let out;
   try {
-    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req) });
+    out = await sf.checkout(req.store, { key, body: req.body, ticket: ticketOf(req), session: sessionOf(req), ip: clientIp(req) });
   } catch (err) {
     //  RSK-07: سقفِ شماره (lib/order-rate) — کِی دوباره
     if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));

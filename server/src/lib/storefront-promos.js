@@ -16,6 +16,8 @@
  *              می‌شود؟» — ⛔ هیچ کدی فهرست نمی‌شود. `POST /api/store/:slug/promos/quote`: پیش‌نمایشِ همان حساب.
  *
  * ⛔ پرچمِ خاموش ⇒ ثبتِ ویترین همان پیشین (کلیدِ `promoCode` نادیده) و درهای عمومی ۴۰۴.
+ * MKT-02/RSK-09 (اولین خرید، سقفِ هر شماره/دستگاه، سقفِ هر سفارش، ۴۲۹ ِ حدسِ کد، دفترِ مصرف): پرچمِ جدای
+ * `shop.storefront.promo_guard` در `storefront-promo-guard.js` — خاموش ⇒ همهٔ پاسخ‌های این پرونده همان پیشین.
  * جدا از `storefront.js`، تا آن فایل از سقفِ اندازه‌اش بزرگ‌تر نشود.
  */
 const db = require('../db');
@@ -23,6 +25,7 @@ const P = require('./promo-core');
 const orders = require('./orders');
 const S = require('./order-states');
 const { localParts } = require('./storefront-hours');
+const guard = require('./storefront-promo-guard');
 const { badRequest, conflict, notFound } = require('../middleware/errors');
 
 const FLAG = 'shop.storefront.promos';
@@ -97,6 +100,7 @@ async function evaluate(run, sf, lines, code, at, { exceptSale = '' } = {}) {
     applied: r.applied.map((a) => ({ id: a.id, name: a.name, discountMinor: a.discountMinor })),
     code: code ? { code, status: (r.codes[0] && r.codes[0].status) || 'unknown' } : null,
     codeRuleIds: r.applied.map((a) => a.id).filter((id) => str((byId.get(id) || {}).code) !== ''),
+    exclusive: r.applied.some((a) => (byId.get(a.id) || {}).stack === 'exclusive'),
   };
 }
 
@@ -105,17 +109,21 @@ const REJECT = {
   inactive: 'این کدِ تخفیف الان فعال نیست',
   used_up: 'ظرفیتِ این کدِ تخفیف پر شده است',
   no_effect: 'این کدِ تخفیف روی این سبد اثری ندارد',
+  limit_reached: 'این کدِ تخفیف برای این شماره یا این دستگاه پیش‌تر به کار رفته است',
 };
 
 /**
  * دورِ `pricer` ِ ثبتِ ویترین (`storefront.checkout`). پرچمِ خاموش ⇒ همان `price` بی تغییر.
  * @param {{key:string, body:object, input:{expectedTotalMinor:number|null}}} ctx
  */
-async function wrap(price, sf, { key, body, input }) {
+async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
   if (!(await flagOn(sf.shop_id))) return price;
   const code = codeOf(body);
   const sale = `sf:${key}`;
+  //  MKT-02/RSK-09: پرچم و تنظیم پیش از تراکنش؛ خاموش ⇒ null و همان راهِ پیشین
+  const g = await guard.prepare(sf.shop_id, { body, phone, ip });
   return async (run, at) => {
+    if (g && code) guard.gate(g);   //  ۴۲۹ پس از بررسیِ تکرارِ کلید (تکرارِ همان ثبت هرگز ۴۲۹ نمی‌گیرد)
     //  «جمعِ دیده‌شده» پس از تخفیف: همین‌جا سنجیده می‌شود، نه درونِ `pricer`
     const expected = input.expectedTotalMinor;
     input.expectedTotalMinor = null;
@@ -125,12 +133,18 @@ async function wrap(price, sf, { key, body, input }) {
     if (code) await run('SELECT id FROM shop_promotions WHERE shop_id=$1 AND code=$2 AND deleted=false FOR UPDATE', [sf.shop_id, code]);
     const e = await evaluate(run, sf, out.lines, code, at, { exceptSale: sale });
     if (e.code && e.code.status !== 'applied') {
+      if (g) guard.failed(g);
       throw Object.assign(conflict(REJECT[e.code.status] || REJECT.unknown, 'promo_code_rejected'), { data: { promo: e.code } });
     }
-    const totalMinor = out.subtotalMinor - e.discountMinor + out.deliveryFeeMinor;
+    if (g && await guard.overLimit(run, g, e.codeRuleIds, key)) {
+      guard.failed(g);
+      throw Object.assign(conflict(REJECT.limit_reached, 'promo_code_rejected'), { data: { promo: { code, status: 'limit_reached' } } });
+    }
+    const discountMinor = g ? (await guard.settle(run, g, { e, subtotalMinor: out.subtotalMinor, code, key, at })).discountMinor : e.discountMinor;
+    const totalMinor = out.subtotalMinor - discountMinor + out.deliveryFeeMinor;
     if (expected !== null && expected !== totalMinor) {
       throw Object.assign(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), {
-        data: { quote: { subtotalMinor: out.subtotalMinor, discountMinor: e.discountMinor, deliveryFeeMinor: out.deliveryFeeMinor, totalMinor }, changes: [] },
+        data: { quote: { subtotalMinor: out.subtotalMinor, discountMinor, deliveryFeeMinor: out.deliveryFeeMinor, totalMinor }, changes: [] },
       });
     }
     for (const id of e.codeRuleIds) {
@@ -140,7 +154,7 @@ async function wrap(price, sf, { key, body, input }) {
         [sf.shop_id, id, sale, code, at]
       );
     }
-    return { ...out, discountMinor: e.discountMinor, totalMinor };
+    return { ...out, discountMinor, totalMinor };
   };
 }
 
@@ -160,11 +174,14 @@ async function publicList(sf, at = db.now()) {
     //  PRM-10: «نزدیکِ انقضا» محموله می‌خواهد و سبدِ ویترین ندارد ⇒ این‌جا هرگز اعمال نمی‌شود، پس فهرست هم نه
     && r.kind !== 'expiry';
   const auto = rules.filter((r) => r.code === '' && live(r));
-  return {
+  const out = {
     promos: auto.map((r) => ({ id: r.id, name: r.name, kind: r.kind, endsOn: r.window.to || null })),
     codes: rules.some((r) => r.code !== '' && live(r)),
     serverTime: at,
   };
+  //  MKT-02: فقط با پرچمِ روشن (خاموش ⇒ پاسخ بایت‌به‌بایت همان پیشین)
+  if (await guard.flagOn(sf.shop_id)) Object.assign(out, { guard: true, firstOrder: guard.publicFirstOrder(await guard.settingsOf(sf.shop_id)) });
+  return out;
 }
 
 function parseQuote(body) {
@@ -181,9 +198,11 @@ function parseQuote(body) {
 }
 
 /** پیش‌نمایش: همان قیمتِ ویترین و همان حساب، بی ثبت و بی مصرف. کالای نبوده ⇒ `unavailable` */
-async function quote(sf, body, at = db.now()) {
+async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
   if (!(await flagOn(sf.shop_id))) throw notFound('تخفیفی در این ویترین نیست', 'promos_disabled');
   const q = parseQuote(body);
+  const g = await guard.prepare(sf.shop_id, { body, phone, ip });
+  if (g && q.code) guard.gate(g);
   const { PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, productView } = require('./storefront');
   const run = (t, p) => db.query(t, p);
   const rows = (await run(
@@ -200,11 +219,29 @@ async function quote(sf, body, at = db.now()) {
     lines.push({ ...l, unitPriceMinor: p.priceMinor, lineTotalMinor: S.lineTotalMinor(l.qtyMilli, p.priceMinor) });
   }
   const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
-  const e = await evaluate(run, sf, lines, q.code, at);
+  let e = await evaluate(run, sf, lines, q.code, at);
+  if (!g) {
+    return {
+      subtotalMinor, discountMinor: e.discountMinor, totalMinor: subtotalMinor - e.discountMinor,
+      lines: e.lines, applied: e.applied.map(({ name, discountMinor }) => ({ name, discountMinor })),
+      code: e.code, unavailable,
+    };
+  }
+  //  MKT-02/RSK-09: همان حسابِ ثبت (سقفِ هر شماره/دستگاه ⇒ کد بی اثر با `limit_reached`)
+  let codeOut = e.code;
+  if (e.code && e.code.status !== 'applied') guard.failed(g);
+  else if (e.code && await guard.overLimit(run, g, e.codeRuleIds)) {
+    guard.failed(g);
+    e = await evaluate(run, sf, lines, '', at);
+    codeOut = { code: q.code, status: 'limit_reached' };
+  }
+  const r = await guard.preview(run, g, { e, subtotalMinor, code: codeOut && codeOut.status === 'applied' ? q.code : '' });
   return {
-    subtotalMinor, discountMinor: e.discountMinor, totalMinor: subtotalMinor - e.discountMinor,
-    lines: e.lines, applied: e.applied.map(({ name, discountMinor }) => ({ name, discountMinor })),
-    code: e.code, unavailable,
+    subtotalMinor, discountMinor: r.discountMinor, totalMinor: subtotalMinor - r.discountMinor,
+    lines: r.dropRules ? e.lines.map((l) => ({ ...l, discountMinor: 0 })) : e.lines,
+    applied: r.dropRules ? [] : e.applied.map(({ name, discountMinor }) => ({ name, discountMinor })),
+    code: codeOut, unavailable,
+    firstOrder: r.firstOrder, firstOrderMinor: r.firstOrderMinor,
   };
 }
 

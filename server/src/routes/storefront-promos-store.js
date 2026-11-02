@@ -6,13 +6,14 @@
  * ⛔ هیچ کدی فهرست نمی‌شود؛ پیش‌نمایش چیزی نمی‌نویسد و مصرف نمی‌سازد (مصرف فقط در ثبتِ سفارش).
  *
  *   GET  /:slug/promos         تخفیف‌های خودکارِ زنده (نام، نوع، پایانِ بازه) و «کد پذیرفته می‌شود؟»
- *   POST /:slug/promos/quote   `{lines:[{productId, qtyMilli}], promoCode?}` ⇒ تخفیفِ همان حسابِ ثبت
+ *   POST /:slug/promos/quote   `{lines:[{productId, qtyMilli}], promoCode?, deviceId?}` ⇒ تخفیفِ همان حسابِ ثبت
+ *                              (با `shop.storefront.promo_guard`: اولین خرید با بلیتِ شماره، سقف‌ها و ۴۲۹ ِ حدسِ کد)
  */
 const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
 const promos = require('../lib/storefront-promos');
-const { rateLimit } = require('../middleware/ratelimit');
+const { rateLimit, clientIp } = require('../middleware/ratelimit');
 
 const router = express.Router();
 
@@ -31,7 +32,14 @@ router.get('/:slug/promos', readLimit, store, async (req, res) => {
 });
 
 router.post('/:slug/promos/quote', quoteLimit, store, async (req, res) => {
-  res.json(await promos.quote(req.store, req.body));
+  //  MKT-02: شمارهٔ تأییدشده (بلیت/نشست) فقط با پرچمِ روشنِ `shop.storefront.promo_guard` خوانده می‌شود
+  const phone = () => sf.verifiedPhone(req.get('x-store-ticket') || '', req.get('x-store-session') || '');
+  try {
+    res.json(await promos.quote(req.store, req.body, undefined, { phone, ip: clientIp(req) }));
+  } catch (err) {
+    if (err && err.retryAfter) res.set('Retry-After', String(err.retryAfter));   //  RSK-09: ۴۲۹ ِ حدسِ کد
+    throw err;
+  }
 });
 
 module.exports = router;
