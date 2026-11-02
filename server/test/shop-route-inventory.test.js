@@ -199,6 +199,8 @@ FLAGS.push('shop.orders.picking');
 FLAGS.push('shop.storefront.media');
 //  MKT-10/11: پیوندِ کمپین و QR ِ دکان
 FLAGS.push('shop.storefront.campaigns');
+//  MKT-02/RSK-09: اولین خرید و سدِ تخفیفِ ویترین
+FLAGS.push('shop.storefront.promo_guard');
 //  ORD-16: «فرستادنِ دوبارهٔ» پیامِ مشتری
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
 //  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده

@@ -366,6 +366,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     //  پیوندِ کمپین و QR (MKT-10/11) پیش از `/shop/storefront`؛ پیش‌فرض خاموش
     api.use('/shop/storefront/campaigns', require('./routes/storefront-campaigns'));
+    //  تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ پیش‌فرض خاموش
+    api.use('/shop/storefront/promo-guard', require('./routes/storefront-promo-guard'));
     api.use('/shop/storefront', require('./routes/storefront-admin'));
     //  تأییدِ جایگزینِ جمع‌آوری توسطِ مشتری (PCK-05) — با توکنِ پیگیری؛ پشتِ پرچمِ خاموشِ `shop.orders.picking`
     api.use('/store', require('./routes/pick-substitutes-store'));

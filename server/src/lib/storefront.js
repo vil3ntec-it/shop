@@ -608,7 +608,7 @@ async function verifiedPhone(ticket, session) {
   return a ? a.customer.phone : null;
 }
 
-async function checkout(sf, { key, body, ticket, session }) {
+async function checkout(sf, { key, body, ticket, session, ip = '' }) {
   //  ۲۳.۲: نهایی‌کردنِ سفارش ⇒ شمارهٔ تأییدشده (S133) — بلیت یا نشستِ حساب (S134)
   const verified = await verifiedPhone(ticket, session);
   if (!verified) throw new ApiError(401, 'verification_required', 'برای ثبتِ سفارش، شمارهٔ خود را تأیید کنید');
@@ -620,7 +620,7 @@ async function checkout(sf, { key, body, ticket, session }) {
   //  پرچمِ ناحیه/بازه و کاتالوگِ S1 (اگر منبع است: بی مهلت تازه؛ قیمت درونِ تراکنش از همان جدول) پیش از تراکنش (قفلِ سفارش کوتاه بماند)
   const [zonesOn, from] = await Promise.all([sfd.flagOn(sf.shop_id), sfc.productFrom(sf.shop_id, { strict: true })]);
   //  RSK-07: سقفِ شماره درونِ همان تراکنش و پس از قفلِ دکان (lib/order-rate)
-  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input }), { shopId: sf.shop_id, phone: verified });   //  MKT-01: تخفیفِ ویترین پشتِ پرچمِ خاموش
+  const price = require('./order-rate').guard(await require('./storefront-promos').wrap(pricer(sf.shop_id, sf, input, { zonesOn, from }), sf, { key, body, input, phone: verified, ip }), { shopId: sf.shop_id, phone: verified });   //  MKT-01/02، RSK-09: تخفیفِ ویترین پشتِ پرچم‌های خاموش
   const out = await orders.create(sf.shop_id, { key, body, actor: CUSTOMER, price, intakeKeys: [FEATURE_KEY] });   //  #467: دروازهٔ اشتراک با کلیدِ ویترین هم
   //  TEN-03: با پرچمِ لینکِ زمان‌دار، توکنِ v2 از همین لحظه (تکرارِ همان درخواست هم توکنِ تازه)
   const link = (await linkPolicyOn(sf.shop_id)) ? { gen: 0, at: now() } : null;
