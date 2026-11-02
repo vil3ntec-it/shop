@@ -31,6 +31,8 @@ abstract class Context {
   abstract fun getSharedPreferences(name: String, mode: Int): SharedPreferences
   open fun deleteSharedPreferences(name: String): Boolean = false
   open val contentResolver: ContentResolver get() = ContentResolver
+  open val packageManager: android.content.pm.PackageManager get() = android.content.pm.PackageManager
+  open val applicationInfo: android.content.pm.ApplicationInfo get() = android.content.pm.ApplicationInfo.ios
   /** سرویسِ سیستمیِ اندروید در iOS نیست ⇐ null (کدِ مشترک همیشه `as?` می‌گیرد) */
   open fun getSystemService(name: String): Any? = null
   open fun <T : Any> getSystemService(serviceClass: Class<T>): T? = null
@@ -47,6 +49,11 @@ abstract class Context {
     const val NOTIFICATION_SERVICE = "notification"
     const val CLIPBOARD_SERVICE = "clipboard"
     const val INPUT_METHOD_SERVICE = "input_method"
+    const val BLUETOOTH_SERVICE = "bluetooth"
+    const val USB_SERVICE = "usb"
+    const val LOCATION_SERVICE = "location"
+    const val PRINT_SERVICE = "print"
+    const val ACTIVITY_SERVICE = "activity"
   }
 }
 
@@ -55,18 +62,39 @@ private fun appDir(kind: ULong, name: String): File {
   return File(base, name).apply { mkdirs() }
 }
 
-/** در اندروید راهِ خواندنِ تنظیمِ سیستم است (`Settings.Global`)؛ در iOS فقط نشانه */
-object ContentResolver
+/**
+ *  در اندروید راهِ خواندنِ تنظیمِ سیستم (`Settings.Global`) و فایلِ برگزیده است. در iOS فقط نشانیِ
+ *  `file://` (خروجیِ انتخابگرهای گامِ بعد و `Uri.fromFile`) باز می‌شود؛ بقیه ⇐ FileNotFoundException.
+ */
+object ContentResolver {
+  fun openInputStream(uri: android.net.Uri): java.io.InputStream? = java.io.FileInputStream(fileOf(uri))
+  fun openOutputStream(uri: android.net.Uri): java.io.OutputStream? = java.io.FileOutputStream(fileOf(uri))
+  fun openOutputStream(uri: android.net.Uri, mode: String): java.io.OutputStream? =
+    java.io.FileOutputStream(fileOf(uri), append = mode.contains('a'))
+  fun getType(uri: android.net.Uri): String? = null
+
+  private fun fileOf(uri: android.net.Uri): File =
+    uri.path?.let { File(it) } ?: throw java.io.FileNotFoundException("iOS: فقط file:// ($uri)")
+}
 
 /** Context ِ یگانهٔ برنامهٔ آیفون — تنظیمات روی NSUserDefaults، هر پرونده یک suite ِ جدا */
 object IosContext : Context() {
   override fun getSystemService(name: String): Any? = when (name) {
     CONNECTIVITY_SERVICE -> android.net.ConnectivityManager.ios
+    CLIPBOARD_SERVICE -> ClipboardManager.ios
+    NOTIFICATION_SERVICE -> android.app.NotificationManager.ios
     else -> null
   }
 
   /** نشانیِ http/tel/mailto/sms ⇐ `openURL` ِ iOS؛ بقیه ⇐ ActivityNotFoundException (همان «برنامه‌ای نیست» ِ اندروید) */
   override fun startActivity(intent: Intent) {
+    //  «تنظیماتِ این برنامه» ِ اندروید ⇐ صفحهٔ همین برنامه در تنظیماتِ iOS (اجازه‌ها)
+    if (intent.action == android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS || intent.action == android.provider.Settings.ACTION_SETTINGS) {
+      NSURL.URLWithString(platform.UIKit.UIApplicationOpenSettingsURLString)?.let {
+        UIApplication.sharedApplication.openURL(it, options = emptyMap<Any?, Any>(), completionHandler = null)
+        return
+      }
+    }
     val uri = intent.data?.toString().orEmpty()
     val viewable = intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_DIAL || intent.action == Intent.ACTION_SENDTO
     val url = if (viewable) NSURL.URLWithString(uri) else null

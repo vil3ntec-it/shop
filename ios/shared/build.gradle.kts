@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 
 /*
  *  رابطِ کاربریِ مشترکِ آیفون — همان کدِ Compose ِ اندروید، روی iOS با Compose Multiplatform.
@@ -150,11 +151,32 @@ fun codeEnd(t: CharSequence, start: Int, closing: Char?): Int {
   return lastCode
 }
 
+/*
+ *  importهای صریحِ تابع‌های فقط-JVM ِ کتابخانه‌های Kotlin (`kotlin.*` که ما در آن بسته چیزی نمی‌گذاریم، و
+ *  `encodeToStream` ِ kotlinx.serialization) به همان نام در shim برمی‌گردند — فقط در کپیِ iOS.
+ */
+val importRewrites = mapOf(
+  "kotlin.concurrent.withLock" to "ir.vil3ntec.tohid.ios.jvm.withLock",
+  "kotlinx.serialization.json.encodeToStream" to "ir.vil3ntec.tohid.ios.jvm.encodeToStream",
+)
+
+val coreJvmSrc = rootDir.resolve("../../core/src/jvmMain/kotlin")
+val coreJvm = listOf("ir/vil3ntec/tohid/core/perm/PinCrypto.kt", "ir/vil3ntec/tohid/core/perm/ApproverVault.kt")
+
+/** چند الگوی فقط-JVM که نامِ shim نمی‌گیرند و فقط در کپیِ iOS به همتای shim برمی‌گردند */
+val textRewrites = mapOf(
+  //  کشِ LRU: زیرردهٔ بی‌نامِ LinkedHashMap ِ نهاییِ Kotlin/Native ⇐ ‎ios/jvm/LruMap.kt‎
+  "object : LinkedHashMap<" to "object : ir.vil3ntec.tohid.ios.jvm.LinkedHashMapJvm<",
+)
+
 val iosSources by tasks.registering {
   val out = layout.buildDirectory.dir("generated/ios-src")
   inputs.dir(androidSrc)
+  inputs.files(coreJvm.map { coreJvmSrc.resolve(it) })
   inputs.file(excludeFile)
   inputs.property("injected", injected)
+  inputs.property("importRewrites", importRewrites.toString())
+  inputs.property("textRewrites", textRewrites.toString())
   outputs.dir(out)
   doLast {
     val dest = out.get().asFile
@@ -166,10 +188,23 @@ val iosSources by tasks.registering {
       val hit = excluded.firstOrNull { if (it.endsWith("/")) rel.startsWith(it) else rel == it }
       if (hit != null) { used += hit; return@forEach }
       val raw = f.readText(Charsets.UTF_8)
-      val text = if ("@Synchronized" in raw) unsynchronize(raw, rel) else raw
+      val text = (if ("@Synchronized" in raw) unsynchronize(raw, rel) else raw).let { s ->
+        val withImports = importRewrites.entries.fold(s) { acc, (from, to) -> acc.replace("import $from\n", "import $to\n") }
+        textRewrites.entries.fold(withImports) { acc, (from, to) -> acc.replace(from, to) }
+      }
       val pkg = Regex("(?m)^package [\\w.]+[ \\t]*$").find(text)
       val body = if (pkg == null) text else text.substring(0, pkg.range.last + 1) + "\n" + injected + text.substring(pkg.range.last + 1)
       dest.resolve(rel).apply { parentFile.mkdirs() }.writeText(body, Charsets.UTF_8)
+      kept++
+    }
+    //  دو فایلِ `core/src/jvmMain` (کلیدِ تأییدکننده: PBKDF2، AES-GCM، ECDSA) که core برای iOS ندارد: همان
+    //  متن روی shimهای `java.security`/`javax.crypto` ِ iOS — مثلِ بقیهٔ کپی‌ها، دست‌نخورده
+    coreJvm.forEach { rel ->
+      val f = coreJvmSrc.resolve(rel)
+      val text = f.readText(Charsets.UTF_8)
+      val pkg = Regex("(?m)^package [\\w.]+[ \\t]*$").find(text)!!
+      dest.resolve("core-jvm/$rel").apply { parentFile.mkdirs() }
+        .writeText(text.substring(0, pkg.range.last + 1) + "\n" + injected + text.substring(pkg.range.last + 1), Charsets.UTF_8)
       kept++
     }
     excluded.filter { it !in used }.forEach {
@@ -219,7 +254,16 @@ val generateConfig by tasks.registering {
   }
 }
 
+/*
+ *  هدفِ jvm فقط برای آزمونِ منطقِ خالصِ `src/commonMain` (حالتِ GCM ِ دفترِ رمزدار) در برابرِ خودِ JDK —
+ *  همان بایت‌ها، روی لینوکس، بی Xcode (`jvmTest`). نه برنامه‌ای می‌سازد، نه Compose دارد.
+ */
+composeCompiler {
+  targetKotlinPlatforms.set(setOf(KotlinPlatformType.native))
+}
+
 kotlin {
+  jvm()
   if (ios) {
     listOf(iosArm64(), iosSimulatorArm64()).forEach {
       it.binaries.framework {
@@ -229,6 +273,7 @@ kotlin {
     }
   }
   sourceSets {
+    commonTest.dependencies { implementation(kotlin("test")) }
     if (ios) {
       iosMain {
         kotlin.srcDir(iosSources)

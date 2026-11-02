@@ -11,6 +11,9 @@ import androidx.compose.runtime.staticCompositionLocalOf
  */
 val LocalContext = staticCompositionLocalOf<Context> { android.content.IosContext }
 
+/** نمای اندروید — در iOS فقط نشانه‌ای با همان Context (‎android/view/Window.kt‎) */
+val LocalView = staticCompositionLocalOf { android.view.View(android.content.IosContext) }
+
 class Configuration(
   val screenWidthDp: Int,
   val screenHeightDp: Int,

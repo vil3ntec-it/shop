@@ -98,6 +98,10 @@ open class Calendar internal constructor(private var zone: TimeZone) {
     timeInMillis = -zone.getOffset(0L).toLong()
   }
 
+  fun before(other: Any?): Boolean = other is Calendar && timeInMillis < other.timeInMillis
+  fun after(other: Any?): Boolean = other is Calendar && timeInMillis > other.timeInMillis
+  fun compareTo(other: Calendar): Int = timeInMillis.compareTo(other.timeInMillis)
+
   fun clone(): Any = GregorianCalendar(zone).also { it.timeInMillis = timeInMillis }
 
   fun add(field: Int, amount: Int) {

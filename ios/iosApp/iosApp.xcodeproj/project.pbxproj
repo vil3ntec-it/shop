@@ -13,6 +13,7 @@
 		7A1E0C520000000000000004 /* vazirmatn_medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E0C52000000000000000E /* vazirmatn_medium.ttf */; };
 		7A1E0C520000000000000005 /* vazirmatn_semibold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E0C52000000000000000F /* vazirmatn_semibold.ttf */; };
 		7A1E0C520000000000000006 /* vazirmatn_bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E0C520000000000000010 /* vazirmatn_bold.ttf */; };
+		7A1E0C520000000000000101 /* logo_mark.png in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E0C520000000000000102 /* logo_mark.png */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +26,7 @@
 		7A1E0C520000000000000011 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		7A1E0C520000000000000012 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		7A1E0C520000000000000013 /* iosApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = iosApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7A1E0C520000000000000102 /* logo_mark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = logo_mark.png; path = "../../android-native/app/src/main/res/drawable-xxxhdpi/logo_mark.png"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +75,7 @@
 				7A1E0C52000000000000000E /* vazirmatn_medium.ttf */,
 				7A1E0C52000000000000000F /* vazirmatn_semibold.ttf */,
 				7A1E0C520000000000000010 /* vazirmatn_bold.ttf */,
+				7A1E0C520000000000000102 /* logo_mark.png */,
 			);
 			name = Fonts;
 			sourceTree = "<group>";
@@ -149,6 +152,7 @@
 				7A1E0C520000000000000004 /* vazirmatn_medium.ttf in Resources */,
 				7A1E0C520000000000000005 /* vazirmatn_semibold.ttf in Resources */,
 				7A1E0C520000000000000006 /* vazirmatn_bold.ttf in Resources */,
+				7A1E0C520000000000000101 /* logo_mark.png in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
