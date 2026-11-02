@@ -178,7 +178,7 @@ async function checkIn(run, shopId, phone, input, { at = Date.now() } = {}) {
       const err = refuse(409, 'duplicate_order',
         `همین سفارش (همان اقلام و همان نشانی) چند دقیقه پیش با شمارهٔ ${dup.order_no} ثبت شده است؛ آن را پیگیری کنید، یا اگر دوباره همین را می‌خواهید کمی بعد امتحان کنید یا با دکان تماس بگیرید`,
         { reason: 'same_items_same_place', orderNo: Number(dup.order_no), windowMin: policy.duplicateWindowMin,
-          retryAfter, token: require('./storefront').tokenOf(shopId, dup.id) });
+          retryAfter, token: await require('./storefront').currentTokenOf(shopId, dup.id, run) });
       err.retryAfter = retryAfter;
       throw err;
     }

@@ -38,6 +38,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
 
   override suspend fun doWork(): Result {
     val app = applicationContext
+    //  OPS-07: حالتِ آموزشی ⇒ هیچ دورِ همگام‌سازی، هیچ دفتری خوانده یا نوشته نمی‌شود (دورِ بعدی پس از خروج)
+    if (!ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return Result.success()
     //  درِ ورودِ فرآیند: «سرورِ بعدی» پیش از هر دفتر و درخواستی (`ServerSwitchAndroid`)
     ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(app)
     if (!Backend.isReady(app)) return Result.success()
@@ -133,6 +135,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
      *  `REPLACE` یعنی هر تغییرِ تازه مکث را از نو می‌شمارد.
      */
     fun now(context: Context) {
+      if (!ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return
       val work = OneTimeWorkRequestBuilder<SyncV1Worker>()
         .setConstraints(net)
         .setInitialDelay(500, TimeUnit.MILLISECONDS)

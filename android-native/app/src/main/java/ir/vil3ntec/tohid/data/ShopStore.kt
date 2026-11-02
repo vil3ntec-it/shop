@@ -31,10 +31,22 @@ import java.io.File
  *  محاسبه‌ها عمداً همان فرمولِ نسخهٔ وب‌اند، حتی جاهایی که می‌شد «بهترش» کرد:
  *  عددی که فروشنده روی کاغذ دارد نباید با به‌روزرسانی عوض شود.
  */
-class ShopStore(private val context: Context) {
+class ShopStore(
+  private val context: Context,
+  /**
+   *  OPS-07 — دفترِ حالتِ آموزشی (`TrainingLedger`): فایلِ جدای `training/shop-data.json` (و کنارش همان‌جا)،
+   *  و هرگز op، صفِ همگام‌سازی، کارگر، خلاصهٔ پس‌زمینه یا sweep. دفترِ واقعی (`false`) در حالتِ آموزشی هیچ
+   *  نوشتنی نمی‌گیرد ([syncs]، `writeToDisk`). شرح سرِ `TrainingMode`.
+   */
+  val training: Boolean = false,
+) {
   init { DebtMinorFlag.bind(context) }  //  `shop.debt_minor`: `debt` و موتورهای خالص پرچمِ همین دکان را از `DebtMinorFlag` می‌خوانند
 
-  private val file = File(context.filesDir, "shop-data.json")
+  private val home = if (training) File(context.filesDir, TrainingMode.DIR).apply { mkdirs() } else context.filesDir
+  private val file = File(home, TrainingMode.LEDGER)
+
+  /** OPS-07: این نمونه به موتورِ همگام‌سازی و دفترِ واقعی دست می‌زند؟ دفترِ آموزشی هرگز؛ دفترِ واقعی نه در حالتِ آموزشی */
+  private val syncs: Boolean get() = !training && !TrainingMode.on
   private val json = Json {
     ignoreUnknownKeys = true      // نسخهٔ وب ممکن است فیلدی اضافه کند
     encodeDefaults = true
@@ -151,6 +163,7 @@ class ShopStore(private val context: Context) {
    *  نوشتنِ دفتر (`AtRest.converge`). با هر بازشدن و با هر تغییرِ تنظیم.
    */
   suspend fun convergeAtRest(): AtRestMigration.Report = withContext(Dispatchers.IO) {
+    if (!syncs) return@withContext AtRestMigration.Report()
     runCatching { AtRest.converge(context, SyncV1Engine.of(context)) }
       .getOrElse { AtRestMigration.Report(failed = listOf("*" to AtRestException.Kind.IO)) }
   }
@@ -161,6 +174,7 @@ class ShopStore(private val context: Context) {
    *  ⚠️ خواندنِ دفتر هرگز به‌خاطرِ این نمی‌ایستد.
    */
   private fun recoverSync(onDisk: ShopData) {
+    if (!syncs) return
     runCatching { SyncV1Engine.of(context).recover(onDisk) }
   }
 
@@ -176,7 +190,7 @@ class ShopStore(private val context: Context) {
     //  CRM-10: sweep ِ شروع درونِ `load`، پیش از `loaded` (شرح سرِ `load`)
     load(sweep = true)
     //  دفترِ خوانده‌نشده خلاصهٔ «خالی» نمی‌گیرد
-    if (_unreadable.value == null) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
+    if (_unreadable.value == null && !training) withContext(Dispatchers.IO) { LedgerSummary.write(context, _data.value) }
     //  SEC-01: با تنظیمِ خاموش و دفترِ ساده فقط سرآیندِ چند فایل خوانده می‌شود
     convergeAtRest()
   }
@@ -210,6 +224,7 @@ class ShopStore(private val context: Context) {
 
   /** @param requireLoaded `false` فقط برای sweep ِ شروع درونِ [load]، پیش از `loaded = true` */
   private suspend fun sweepNow(requireLoaded: Boolean): Boolean? = withContext(Dispatchers.IO) {
+    if (!syncs) return@withContext null
     if (!ShopPolicy.crmReports(context)) return@withContext null
     if (SyncChoice.isV3(context)) return@withContext null
     val engine = SyncV1Engine.of(context)
@@ -346,6 +361,7 @@ class ShopStore(private val context: Context) {
    *  @return `message` ِ خالی یعنی نوشته شد و حرفی نیست
    */
   suspend fun restoreBackup(next: ShopData): Rebuilt = withContext(Dispatchers.IO) {
+    if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
     if (_unreadable.value != null) return@withContext rebuildFromServer(next)
     val engine = SyncV1Engine.of(context)
     engine.rebind()
@@ -425,6 +441,7 @@ class ShopStore(private val context: Context) {
    *  ردیفی که پس از پشتیبان حذف شد. حسابِ همگام‌شده بی ورود: بازیابی رد می‌شود.
    */
   suspend fun rebuildFromServer(backup: ShopData? = null): Rebuilt = withContext(Dispatchers.IO) {
+    if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
     if (_unreadable.value == null) return@withContext Rebuilt(false, "دفترِ این دستگاه باز است؛ بازسازی لازم نیست.")
     if (SyncChoice.isV3(context)) {
       return@withContext Rebuilt(false, "بازسازی از سرور فعلاً فقط با همگام‌سازیِ نسخهٔ ۱ است؛ هیچ چیزی پاک نشده.")
@@ -548,6 +565,7 @@ class ShopStore(private val context: Context) {
    *  @return `true` یعنی سایه با نشان می‌خواند ولی جابه‌جایی **نشد** — `load` نوشتن را می‌بندد
    */
   private fun recoverRebuild(): Boolean {
+    if (!syncs) return false
     val mark = rebuildMark
     val side = rebuildSide
     if (!mark.exists() && !side.exists()) return false
@@ -654,6 +672,8 @@ class ShopStore(private val context: Context) {
 
   /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */
   private fun writeLocked(engine: SyncV1Engine, next: ShopData): Boolean {
+    //  OPS-07: دفترِ آموزشی فقط به دیسکِ خودش — نه op، نه صفِ همگام‌سازی، نه کارگر
+    if (training) return writeToDisk(next)
     //  وسطِ بازیابی/بازسازی از سرور هیچ نوشتنی — شرح سرِ [pushedStaging]
     if (engine.rebuilding) { _diskError.tryEmit(StrSettings.restoreBusy); return false }
     /*
@@ -702,6 +722,8 @@ class ShopStore(private val context: Context) {
    *  ببرد؛ همان opها دورِ بعد دوباره گرفته می‌شوند.
    */
   fun applyFromServerNow(next: ShopData) {
+    //  OPS-07: در حالتِ آموزشی هیچ opِ سروری روی هیچ دفتری نمی‌نشیند (cursor هم جلو نمی‌رود)
+    if (!syncs) throw StaleLedger(TRAINING_SEALED)
     //  پرچمِ خاموش ⇒ همان `main`
     if (!follow.on) {
       if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
@@ -729,6 +751,11 @@ class ShopStore(private val context: Context) {
    *  صفحه نشان می‌دهد همان است که پس از بستن و باز کردن می‌ماند.
    */
   private fun writeToDisk(next: ShopData, quiet: Boolean = false): Boolean {
+    //  OPS-07: دفترِ واقعی در حالتِ آموزشی دست‌نخورده می‌ماند — تنها درِ دیسک همین‌جاست، پس هیچ راهی دورش نمی‌زند
+    if (!TrainingMode.writable(training)) {
+      if (!quiet) _diskError.tryEmit(TRAINING_SEALED)
+      return false
+    }
     //  SEC-01: دفترِ رمزدارِ خوانده‌نشده فقط با «بازسازی از سرور» جایگزین می‌شود (`finishRebuild`)
     //  — شرح سرِ `unreadable`
     if (_unreadable.value != null) {
@@ -751,7 +778,7 @@ class ShopStore(private val context: Context) {
     //  خلاصهٔ کوچک، کنارِ دفتر. نگهبانِ پس‌زمینه همین را می‌خواند و دیگر
     //  لازم نیست هر ربع ساعت کلِ دفتر را تجزیه کند — شرحش سرِ
     //  `LedgerSummary`.
-    LedgerSummary.write(context, next)
+    if (!training) LedgerSummary.write(context, next)
     return true
   }
 
@@ -792,7 +819,7 @@ class ShopStore(private val context: Context) {
 
   /* -------------------------- پشتیبانِ ایمنی -------------------------- */
 
-  private val safety = File(context.filesDir, "before-restore.json")
+  private val safety = File(home, "before-restore.json")
 
   /**
    *  یک نسخه از دفترِ فعلی، پیش از بازیابی.
@@ -827,6 +854,12 @@ class ShopStore(private val context: Context) {
 
   fun hasData(): Boolean = file.exists()
 
+  /** OPS-07: دفترِ نمونه روی دفترِ آموزشیِ **خالی** (`TrainingLedger.enter`) — دفترِ واقعی یا آموزشیِ پر هرگز */
+  suspend fun seedTraining(sample: ShopData): Boolean = withContext(Dispatchers.IO) {
+    if (!training || file.exists()) return@withContext false
+    writeInternal(sample)
+  }
+
   /* ------------------------ دفتر، به نامِ حساب ------------------------ */
 
   /*
@@ -845,10 +878,11 @@ class ShopStore(private val context: Context) {
    *  به دیگری نشت نمی‌کند و هیچ‌کدام هم پاک نمی‌شود.
    */
 
-  private fun vault(key: String) = File(context.filesDir, "ledger-${safeKey(key)}.json")
+  private fun vault(key: String) = File(home, "ledger-${safeKey(key)}.json")
 
   /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
   suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
+    if (TrainingMode.on) return@withContext   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)
     //  زیرِ قفلِ نوشتنِ دفتر و قفلِ کوچِ رمز (`AtRest.converge`): کوچ میانِ کپی و پاک کردن نمی‌نشیند
     synchronized(SyncV1Engine.of(context)) {
       runCatching {
@@ -867,6 +901,7 @@ class ShopStore(private val context: Context) {
 
   /** باز کردنِ دفترِ یک حساب — اگر بایگانی نداشت، دفترِ خالی */
   suspend fun openFrom(key: String) {
+    if (TrainingMode.on) return
     withContext(Dispatchers.IO) {
       val saved = vault(key)
       synchronized(SyncV1Engine.of(context)) {
@@ -923,6 +958,10 @@ class ShopStore(private val context: Context) {
       "دفترِ روی دیسک در این فاصله عوض شده بود و دوباره خوانده نشد، پس این تغییر ثبت نشد تا چیزی از آن رونویسی نشود. دوباره امتحان کنید."
 
     /** پیامِ نوشتنی که به‌خاطرِ دفترِ رمزدارِ خوانده‌نشده رد شد */
+    /** OPS-07: نوشتنی روی دفترِ واقعی، یا کاری که به سرور می‌رسد، وقتی حالتِ آموزشی روشن است */
+    const val TRAINING_SEALED =
+      "حالتِ آموزشی روشن است: دفترِ واقعی دست نمی‌خورد و چیزی به سرور نمی‌رود. برای کارِ واقعی از نوارِ بالا «خروج از آموزش» را بزنید."
+
     const val UNREADABLE =
       "دفترِ رمزدارِ این دستگاه باز نشد، پس این تغییر ثبت نشد تا دفترِ واقعی رونویسی نشود. از «تنظیمات ← امنیت» دوباره امتحان یا «بازسازی از سرور» را بزنید."
 
