@@ -20,7 +20,11 @@ object PromoText {
     "bxgy" to "بخر X بگیر Y",
     "bundle" to "بسته با قیمتِ ثابت",
     "threshold" to "آستانهٔ مبلغِ خرید",
+    "expiry" to "تخفیفِ نزدیکِ انقضا",
   )
+
+  /** PRM-10 — نوع‌های فرم: «نزدیکِ انقضا» فقط با پرچمِ `expiry` ِ سرور (یا قاعده‌ای که از پیش چنین است) */
+  fun kinds(expiry: Boolean): List<Pair<String, String>> = if (expiry) KINDS else KINDS.filter { it.first != "expiry" }
   val STACKS: List<Pair<String, String>> = listOf(
     "best" to "بهترین قیمت",
     "combine" to "ترکیبی",
@@ -44,6 +48,7 @@ object PromoText {
     "prices" to "کالا و قیمتِ ویژه را بدهید", "tiers" to "پله‌ها باید صعودی باشند — هم آستانه، هم تخفیف؛ قیمتِ ثابتِ هر پله کمتر از پلهٔ پیش",
     "bxgy" to "«بخر» و «بگیر» دست‌کم ۱، تخفیفِ بخشِ «بگیر» بینِ ۱ تا ۱۰۰٪",
     "bundle" to "بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل",
+    "expiry" to "روزِ پیش از انقضا باید ۱ تا ۳۶۵ باشد",
   )
 
   fun kindLabel(k: String): String = KINDS.firstOrNull { it.first == k }?.second ?: k
@@ -69,6 +74,7 @@ object PromoText {
     "bxgy" -> "بخر ${r.buy} بگیر ${r.get}" + if (r.bp >= 10_000) " رایگان" else " با ${pct(r.bp)} تخفیف"
     "bundle" -> "${r.qty} تا ${af(r.priceMinor)} ؋"
     "threshold" -> r.tiers.joinToString("، ") { t -> "از ${af(t.min)} ⇐ " + if (t.amountMinor > 0) "${af(t.amountMinor)} ؋" else pct(t.bp) }
+    "expiry" -> "${pct(r.bp)} تا ${r.nearDays} روز پیش از انقضا"
     else -> "—"
   }
 
@@ -139,6 +145,8 @@ data class PromoForm(
   val get: String = "1",
   val bundleQty: String = "3",
   val bundlePrice: String = "",
+  /** PRM-10 — «چند روز پیش از انقضا» */
+  val nearDays: String = "7",
   val categories: Set<String> = emptySet(),
   val products: Set<String> = emptySet(),
   val exProducts: Set<String> = emptySet(),
@@ -165,7 +173,7 @@ data class PromoForm(
     fun of(r: PromoCore.Rule, uses: Boolean = false): PromoForm = PromoForm(
       name = r.name,
       kind = r.kind.ifEmpty { "percent" },
-      pct = if (r.kind == "bxgy" || r.kind == "percent") num(r.bp / 100.0) else "10",
+      pct = if (r.kind == "bxgy" || r.kind == "percent" || r.kind == "expiry") num(r.bp / 100.0) else "10",
       amount = if (r.amountMinor > 0) num(r.amountMinor / 100.0) else "",
       priceProduct = r.prices.firstOrNull()?.productId.orEmpty(),
       priceUnit = r.prices.firstOrNull()?.let { num(it.unitMinor / 100.0) }.orEmpty(),
@@ -179,6 +187,7 @@ data class PromoForm(
       get = if (r.get > 0) r.get.toString() else "1",
       bundleQty = if (r.qty > 0) r.qty.toString() else "3",
       bundlePrice = if (r.priceMinor > 0) num(r.priceMinor / 100.0) else "",
+      nearDays = if (r.nearDays > 0) r.nearDays.toString() else "7",
       categories = r.scope.categories.toSet(),
       products = r.scope.products.toSet(),
       exProducts = r.scope.exProducts.toSet(),
@@ -244,7 +253,7 @@ data class PromoForm(
         from = from.trim(), to = to.trim(), days = days.sorted(), start = s, end = e,
         except = base.window.except,
       ),
-      bp = when (kind) { "percent", "bxgy" -> bp(pct); else -> 0 },
+      bp = when (kind) { "percent", "bxgy", "expiry" -> bp(pct); else -> 0 },
       amountMinor = if (kind == "amount") minor(amount) else 0,
       prices = if (kind != "price") emptyList() else {
         val first = if (priceProduct.isNotEmpty()) listOf(PromoCore.Price(priceProduct, minor(priceUnit))) else emptyList()
@@ -272,6 +281,7 @@ data class PromoForm(
       get = if (kind == "bxgy") int(get, 0) else 0,
       qty = if (kind == "bundle") int(bundleQty, 0) else 0,
       priceMinor = if (kind == "bundle") minor(bundlePrice) else 0,
+      nearDays = if (kind == "expiry") int(nearDays, 0) else 0,
     )
   }
 }

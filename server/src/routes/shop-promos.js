@@ -22,6 +22,11 @@
  *    (`live_config`، پیش‌فرض خاموش) نوشته می‌شود — خاموش ⇒ ۴۰۳ `tier_price_disabled`؛ `tierPrice`
  *    در پاسخِ GET همان پرچم است تا برنامه گزینه‌اش را نشان دهد. برنامهٔ پیشین چنین قاعده‌ای را
  *    «نامعتبر» می‌بیند و نادیده می‌گیرد، پس پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند.
+ * ⛔ PRM-10: نوعِ «نزدیکِ انقضا» (`kind: 'expiry'`، `nearDays` ۱ تا ۳۶۵) فقط با پرچمِ `shop.promo_expiry`
+ *    (`live_config`، پیش‌فرض خاموش) نوشته می‌شود — خاموش ⇒ ۴۰۳ `expiry_promo_disabled`؛ `expiry` در
+ *    پاسخِ GET (فقط وقتی روشن است) همان پرچم است تا برنامه این نوع را در فرم نشان دهد. حساب فقط در صندوقِ برنامه (محموله‌ها
+ *    روی دستگاه‌اند)؛ وب و فروشگاهِ اینترنتی بی `lots` چیزی از آن نمی‌گیرند. برنامهٔ پیشین چنین قاعده‌ای
+ *    را «نامعتبر» می‌بیند و نادیده می‌گیرد.
  * ⛔ PRM-02، دفترِ مصرف (`shop_promo_redemptions`، مهاجرتِ ۱۳۶) پشتِ پرچمِ `shop.promo_uses`
  *    (`live_config`، پیش‌فرض خاموش؛ `redeem` در پاسخِ GET). خاموش ⇒ همان رفتارِ بالا و redeem/release
  *    ۴۰۳ `promo_uses_disabled`. روشن ⇒ `maxUses` (عددِ صحیحِ ۰ تا ۱٬۰۰۰٬۰۰۰) پذیرفته است و:
@@ -56,6 +61,8 @@ const { flagOf } = require('../lib/orders');
 const STAMP_FLAG = 'shop.promo_stamp';
 /** POS-19 — پلهٔ قیمتِ ثابت */
 const TIER_PRICE_FLAG = 'shop.promo_tier_price';
+/** PRM-10 — نوعِ «نزدیکِ انقضا» */
+const EXPIRY_FLAG = 'shop.promo_expiry';
 /** پرچمِ `live_config` ِ دفترِ مصرفِ کد (PRM-02) */
 const USES_FLAG = 'shop.promo_uses';
 const MAX_USES = 1000000;
@@ -83,6 +90,7 @@ const MESSAGES = {
   channel: 'کانال ناشناخته است', window: 'بازهٔ زمانی نادرست است', bp: 'درصد باید بیش از ۰ و حداکثر ۱۰۰ باشد',
   amount: 'مبلغ باید مثبت و افغانیِ کامل باشد', prices: 'فهرستِ قیمت‌های ویژه نادرست است',
   tiers: 'پله‌ها باید صعودی باشند (هم آستانه، هم تخفیف؛ قیمتِ ثابتِ هر پله کمتر از پلهٔ پیش)', bxgy: '«بخر» و «بگیر» دست‌کم ۱ و درصدِ معتبر', bundle: 'بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل',
+  expiry: 'روزِ پیش از انقضا باید ۱ تا ۳۶۵ باشد',
 };
 
 /** `uses` همیشه از دفترِ مصرف (PRM-02) — عددِ ذخیره‌شده در `data` و عددِ برنامه هیچ‌کدام مرجع نیستند */
@@ -155,6 +163,8 @@ router.get('/', requirePermission('data.read'), async (req, res) => {
     stamp: await flagOf(req.shopId, STAMP_FLAG),
     tierPrice: await flagOf(req.shopId, TIER_PRICE_FLAG),
     redeem: await flagOf(req.shopId, USES_FLAG),
+    //  PRM-10: فقط روشن نوشته می‌شود — پاسخِ دکانِ بی پرچم بایت‌به‌بایت همان پیشین
+    ...((await flagOf(req.shopId, EXPIRY_FLAG)) ? { expiry: true } : {}),
     version: P.VERSION,
     permissions: { manage: can(req.role, 'settings.write'), belowCost: req.role === 'owner' },
   });
@@ -209,6 +219,9 @@ router.put('/rules/:id', requirePermission('settings.write'), async (req, res) =
   }
   if (P.tierPrice(rule) && !(await flagOf(req.shopId, TIER_PRICE_FLAG))) {
     throw forbidden('پلهٔ «قیمتِ ثابتِ هر واحد» برای این دکان هنوز روشن نیست', 'tier_price_disabled');
+  }
+  if (rule.kind === 'expiry' && !(await flagOf(req.shopId, EXPIRY_FLAG))) {
+    throw forbidden('تخفیفِ «نزدیکِ انقضا» برای این دکان هنوز روشن نیست', 'expiry_promo_disabled');
   }
   if (rule.allowBelowCost && req.role !== 'owner') {
     throw forbidden('فروشِ زیرِ بهای خرید را فقط صاحبِ دکان اجازه می‌دهد', 'below_cost_owner_only');

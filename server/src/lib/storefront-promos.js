@@ -156,7 +156,9 @@ async function publicList(sf, at = db.now()) {
   const when = atOf(sf, at);
   //  «زنده» = همان شرطِ هسته بی کد و بی سبد: یک سبدِ تهی با همین ساعت
   const live = (r) => r.active && P.validate(r, STEP_MINOR).length === 0 && (r.channels.length === 0 || r.channels.includes('online'))
-    && r.groups.length === 0 && P.inWindow(r.window, when) && !(r.maxUses > 0 && r.uses >= r.maxUses);
+    && r.groups.length === 0 && P.inWindow(r.window, when) && !(r.maxUses > 0 && r.uses >= r.maxUses)
+    //  PRM-10: «نزدیکِ انقضا» محموله می‌خواهد و سبدِ ویترین ندارد ⇒ این‌جا هرگز اعمال نمی‌شود، پس فهرست هم نه
+    && r.kind !== 'expiry';
   const auto = rules.filter((r) => r.code === '' && live(r));
   return {
     promos: auto.map((r) => ({ id: r.id, name: r.name, kind: r.kind, endsOn: r.window.to || null })),

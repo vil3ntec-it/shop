@@ -645,7 +645,7 @@ fun SettingsScreen(
             },
           )
         }
-
+        SafeBookSettingsWired(context) // گاوصندوق (PAY-18)، پیش‌فرض خاموش؛ همان رابطِ امروز
         /* ============== سقفِ اعتبار در صندوق (CRM-03، S07، پیش‌فرض خاموش) ============== */
         var creditGate by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context)) }
         SettingsSection(
