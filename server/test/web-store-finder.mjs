@@ -103,7 +103,8 @@ await page.waitForFunction(() => !document.querySelector('#products li[data-id="
 ok(await shown() === 'rice,tea', 'برند ⇒ فقط همان برند', await shown());
 await page.fill('#fl-min', '۲۰۰');
 await page.click('#fl-form button[type="submit"]');
-await page.waitForFunction(() => !document.querySelector('#products li[data-id="tea"]'), null, { timeout: 10000 });
+//  فهرست هنگامِ بارِ تازه لحظه‌ای خالی است ⇒ تا خودِ نتیجه («برنج» هست، «چای» نه) صبر، نه فقط نبودنِ «چای»
+await page.waitForFunction(() => !document.querySelector('#products li[data-id="tea"]') && document.querySelector('#products li[data-id="rice"]'), null, { timeout: 10000 });
 ok(await shown() === 'rice', 'برند + کمینهٔ قیمت (رقمِ فارسی) ⇒ فقط همان', await shown());
 await page.fill('#fl-max', '50');
 await page.click('#fl-form button[type="submit"]');

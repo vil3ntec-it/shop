@@ -29,14 +29,9 @@ const phoneLimit = rateLimit({
   max: alerts.WRITES_PER_HOUR, windowMs: 60 * 60 * 1000, keyPrefix: 'store-alerts-phone', key: (req) => req.verifiedPhone,
 });
 
+//  ویترینِ نبوده یا بسته (اشتراکِ تمام‌شده) ⇒ همان ۴۰۴ `store_not_found` ِ `sf.open` (SUB-10)؛ پرچمِ خاموش ⇒ مسیرِ بعدی، همان امروز
 const gate = (on) => async (req, res, next) => {
-  let s;
-  try {
-    s = await sf.open(req.params.slug);
-  } catch (err) {
-    if (err && err.status === 404) return next('route');
-    throw err;
-  }
+  const s = await sf.open(req.params.slug);
   if (!(await on(s.shop_id))) return next('route');
   req.store = s;
   res.set('Cache-Control', 'no-store');
