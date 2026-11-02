@@ -134,6 +134,8 @@ data class ServerConfigDto(
   val serverTime: Long = 0,
   val registrationOpen: Boolean = true,
   val googleClientId: String = "",
+  //  ورود با اپل روی این سرور باز است (`APPLE_CLIENT_IDS`) — فقط برنامهٔ آیفون دکمه‌اش را دارد
+  val appleLogin: Boolean = false,
   val otpEnabled: Boolean = true,
   val trialDays: Int = 0,
   val minAppVersion: String = "",
@@ -142,6 +144,10 @@ data class ServerConfigDto(
   val emailSignup: Boolean = false,
   val termsVersion: String = "",
 )
+
+/** `POST /auth/apple/nonce` — nonce ِ یک‌بارمصرف و ده‌دقیقه‌ایِ سرور برای «ورود با اپل» ِ آیفون */
+@Serializable
+data class AppleNonceDto(val nonce: String = "", val expiresIn: Int = 0)
 
 /* ------------------------------ دکان ------------------------------ */
 

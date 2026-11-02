@@ -32,6 +32,8 @@ interface AuthActions {
   fun completeSignup(fix: LocationFix?)
   fun joinWithStaffCode()
   fun google()
+  /** ورود با اپل — فقط آیفون دکمه‌اش را دارد (`AuthEnv.apple`)؛ عکس‌ها و کارِ تهی هیچ */
+  fun apple() {}
   fun skip()
   fun pickSaved(entry: SavedLogins.Entry)
   fun forgetSaved(entry: SavedLogins.Entry)
@@ -49,6 +51,8 @@ data class AuthEnv(
   val done: Boolean,
   /** ثانیه تا ارسالِ دوبارهٔ کد به این نشانی (از مهلتِ نوشته‌شده روی گوشی) */
   val secondsLeft: (String) -> Int,
+  /** «ورود با اپل» ساخته شود (پنجرهٔ اپل ِ سکو + سرورِ باز) — اندروید و کامپیوتر همیشه نه */
+  val apple: Boolean = false,
 )
 
 /**
@@ -71,15 +75,16 @@ fun AuthGate(store: ShopStore, mode: String? = null, onClose: (() -> Unit)? = nu
     saved = controller.saved,
     done = controller.done,
     secondsLeft = controller.cooldown::secondsLeft,
+    apple = controller.appleReady,
   )
   AuthFlow(controller.ui, env, controller, onClose)
-  controller.googleLink?.let { ask ->
-    GoogleLinkSheet(
+  controller.externalLink?.let { ask ->
+    ExternalLinkSheet(
       ask = ask,
       busy = controller.ui.busy,
-      onDismiss = { controller.googleLink = null },
-      onSendCode = { controller.googleSendCode(ask) },
-      onProve = { controller.googleProve(ask, it) },
+      onDismiss = { controller.externalLink = null },
+      onSendCode = { controller.linkSendCode(ask) },
+      onProve = { controller.linkProve(ask, it) },
     )
   }
 }

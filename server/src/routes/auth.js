@@ -22,6 +22,7 @@ const pw = require('../lib/password');
 const tokens = require('../lib/tokens');
 const otp = require('../lib/otp');
 const google = require('../lib/google');
+const apple = require('../lib/apple');
 const geo = require('../lib/geo');
 const loginAlerts = require('../lib/login-alerts');
 const terms = require('../lib/terms');
@@ -702,8 +703,8 @@ const LINK_METHODS_MESSAGE = 'این ایمیل از قبل حساب دارد. �
  */
 const GOOGLE_UNVERIFIED_MESSAGE = 'ایمیلِ این حسابِ گوگل نزدِ خودِ گوگل تأیید نشده است، پس با آن نمی‌شود حساب ساخت یا به حسابی وصل شد. اول ایمیل را در حسابِ گوگل تأیید کنید، یا با ایمیل و رمز/کدِ ایمیل وارد شوید.';
 
-/** حسابِ موجودی که این ایمیل را دارد و هنوز این گوگل به آن وصل نیست — فقط برای ایمیلِ تأییدشده. */
-async function accountOfGoogleEmail(profile) {
+/** حسابِ موجودی که این ایمیل را دارد و هنوز این فراهم‌کننده (گوگل/اپل) به آن وصل نیست — فقط برای ایمیلِ تأییدشده. */
+async function accountOfProviderEmail(profile) {
   if (!profile.email || !profile.emailVerified) return null;
   return one('SELECT * FROM users WHERE email=$1', [profile.email]);
 }
@@ -729,18 +730,65 @@ async function unlinkUnverifiedGoogle(userId, ip, reason) {
   return gone.rowCount;
 }
 
+/*
+ *  ورود با «فراهم‌کنندهٔ بیرونی» — گوگل و اپل، **یک قاعده** (همان بندِ ۲۹.۲ و AUTH-04 ِ بالا):
+ *  یافتن با شناسهٔ فراهم‌کننده؛ ساختن/وصل کردن فقط با ایمیلِ تأییدشده؛ ایمیلِ دارای حساب ⇐ اثباتِ
+ *  روشِ قبلی (۴۰۹ `<id>_link_required` + `POST /<id>/link-code`)؛ هرگز وصلِ خودکار با ایمیل (جز کلیدِ
+ *  اضطراریِ `GOOGLE_EMAIL_AUTOLINK` که فقط گوگل دارد). تفاوت‌ها فقط در همین جدول است؛ گوگل
+ *  همان کد، همان پیام و همان سابقه را دارد که پیش از این جدول داشت (`google-link.test.js`).
+ *  اپل: توکن با nonce ِ یک‌بارمصرفِ همین سرور (`lib/apple.js`)، و نام از بدنه (اپل در توکن نمی‌دهد).
+ */
+const APPLE_LINK_MESSAGE = 'این ایمیل از قبل حساب دارد. برای وصل کردنِ اپل به همان حساب، رمزِ حساب را بزنید یا کدی را که به همین ایمیل می‌فرستیم وارد کنید.';
+const APPLE_UNVERIFIED_MESSAGE = 'ایمیلِ این حسابِ اپل تأییدشده نیست، پس با آن نمی‌شود حساب ساخت یا به حسابی وصل شد. با ایمیل و رمز/کدِ ایمیل وارد شوید.';
+
+/** نامِ نمایشیِ بارِ نخستِ اپل — فقط متن، کوتاه، بی نویسهٔ کنترلی */
+function bodyName(raw) {
+  // eslint-disable-next-line no-control-regex
+  return typeof raw === 'string' ? raw.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80) : '';
+}
+
+const PROVIDERS = {
+  google: {
+    id: 'google',
+    readProfile: (req) => google.verifyIdToken(req.body?.idToken || req.body?.id_token),
+    linkMessage: LINK_METHODS_MESSAGE,
+    unverified: [GOOGLE_UNVERIFIED_MESSAGE, 'google_email_unverified'],
+    noEmail: ['حساب گوگل ایمیل ندارد', 'google_no_email'],
+    legacyEmailLink: () => config.google.legacyEmailLink,
+    nameOf: (profile) => profile.name || '',
+    beforeSession: async () => {},
+  },
+  apple: {
+    id: 'apple',
+    readProfile: (req) => apple.verifyIdToken(req.body?.idToken || req.body?.id_token, req.body?.nonce),
+    linkMessage: APPLE_LINK_MESSAGE,
+    unverified: [APPLE_UNVERIFIED_MESSAGE, 'apple_email_unverified'],
+    noEmail: ['حسابِ اپل ایمیل نداد — در پنجرهٔ اپل «اشتراکِ ایمیل» را بگذارید', 'apple_no_email'],
+    legacyEmailLink: () => false,
+    nameOf: (profile, req) => bodyName(req.body?.name),
+    //  یک‌بار مصرف: پس از تصمیمِ «چه کسی» و پیش از ساختن/وصل کردن/نشست
+    beforeSession: (profile) => apple.consumeNonce(profile.nonceKey),
+  },
+};
+
 /**
  *  سقفِ کدِ وصل به‌ازای «ایمیلِ توکن + IP». کلیدِ `otpLimit` از بدنه می‌آید
  *  و این مسیر ایمیلی در بدنه ندارد (فقط توکن)، پس پس از خواندنِ توکن شمرده می‌شود.
  */
-const linkCodeLimit = rateLimit({
-  max: config.rateLimit.linkCodeMax, keyPrefix: 'google-link-code',
-  key: (req) => (req.googleProfile?.email ? `${req.googleProfile.email.toLowerCase()}|${clientIp(req)}` : null),
-});
-async function readGoogleProfile(req, res, next) {
-  req.googleProfile = await google.verifyIdToken(req.body?.idToken || req.body?.id_token);
+const linkCodeLimits = {
+  google: rateLimit({
+    max: config.rateLimit.linkCodeMax, keyPrefix: 'google-link-code',
+    key: (req) => (req.externalProfile?.email ? `${req.externalProfile.email.toLowerCase()}|${clientIp(req)}` : null),
+  }),
+  apple: rateLimit({
+    max: config.rateLimit.linkCodeMax, keyPrefix: 'apple-link-code',
+    key: (req) => (req.externalProfile?.email ? `${req.externalProfile.email.toLowerCase()}|${clientIp(req)}` : null),
+  }),
+};
+const readProfileOf = (p) => async (req, res, next) => {
+  req.externalProfile = await p.readProfile(req);
   next();
-}
+};
 
 /**
  *  اثباتِ روشِ قبلیِ حساب — رمز یا کدِ ایمیل. هر دو پشتِ همان قفلِ تلاشِ
@@ -775,12 +823,12 @@ async function proveExistingMethod(user, body, ip) {
   return null;
 }
 
-function linkRequired(res, user) {
+function linkRequired(res, user, p) {
   return res.status(409).json({
     error: {
-      code: 'google_link_required',
-      message: LINK_METHODS_MESSAGE,
-      //  فقط به دارندهٔ توکنِ معتبرِ گوگلِ همین ایمیل گفته می‌شود — کسی که
+      code: `${p.id}_link_required`,
+      message: p.linkMessage,
+      //  فقط به دارندهٔ توکنِ معتبرِ همین ایمیل گفته می‌شود — کسی که
       //  ایمیل را نمی‌تواند ثابت کند به این‌جا نمی‌رسد
       link: {
         email: user.email,
@@ -790,16 +838,15 @@ function linkRequired(res, user) {
   });
 }
 
-router.post('/google', authLimit, async (req, res, next) => {
-  const idToken = req.body?.idToken || req.body?.id_token;
-  const profile = await google.verifyIdToken(idToken);
+const externalLogin = (p) => async (req, res, next) => {
+  const profile = await p.readProfile(req);
   const ip = clientIp(req);
 
-  //  اول با شناسه‌ی گوگل — حسابی که گوگلش از قبل وصل است همان‌طور وارد می‌شود
+  //  اول با شناسهٔ فراهم‌کننده — حسابی که از قبل وصل است همان‌طور وارد می‌شود
   let user = await one(
     `SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
-      WHERE i.provider='google' AND i.subject=$1`,
-    [profile.sub]
+      WHERE i.provider=$1 AND i.subject=$2`,
+    [p.id, profile.sub]
   );
 
   let linkedVia = '';
@@ -808,36 +855,38 @@ router.post('/google', authLimit, async (req, res, next) => {
     if (profile.emailVerified) {
       await query(
         `UPDATE user_identities SET email_verified=true
-          WHERE provider='google' AND subject=$1 AND email_verified IS NOT TRUE`, [profile.sub]
+          WHERE provider=$1 AND subject=$2 AND email_verified IS NOT TRUE`, [p.id, profile.sub]
       );
     }
   } else {
     //  ساختن یا وصل کردن فقط با ایمیلِ تأییدشده — پیش از هر جست‌وجو، تا
     //  پاسخ برای ایمیلِ دارای حساب و بی‌حساب یکی باشد
     if (profile.email && !profile.emailVerified) {
-      return next(forbidden(GOOGLE_UNVERIFIED_MESSAGE, 'google_email_unverified'));
+      return next(forbidden(p.unverified[0], p.unverified[1]));
     }
-    const existing = await accountOfGoogleEmail(profile);
+    const existing = await accountOfProviderEmail(profile);
     if (existing) {
-      if (config.google.legacyEmailLink && profile.emailVerified) {
+      if (p.legacyEmailLink() && profile.emailVerified) {
         linkedVia = 'email_auto';
       } else {
         linkedVia = await proveExistingMethod(existing, req.body, ip);
-        if (!linkedVia) return linkRequired(res, existing);
+        if (!linkedVia) return linkRequired(res, existing, p);
       }
       user = existing;
     }
   }
 
+  await p.beforeSession(profile);
+
   let created = false;
   if (!user) {
     if (!config.allowRegistration) return next(forbidden('ثبت‌نام روی این سرور بسته است', 'registration_closed'));
-    if (!profile.email) return next(badRequest('حساب گوگل ایمیل ندارد', 'google_no_email'));
+    if (!profile.email) return next(badRequest(p.noEmail[0], p.noEmail[1]));
     const t = now();
     user = await one(
       `INSERT INTO users (id, name, email, status, created_at, updated_at)
        VALUES ($1,$2,$3,'active',$4,$4) RETURNING *`,
-      [newId('usr'), profile.name || '', profile.email, t]
+      [newId('usr'), p.nameOf(profile, req), profile.email, t]
     );
     created = true;
   }
@@ -845,36 +894,37 @@ router.post('/google', authLimit, async (req, res, next) => {
 
   const linked = await query(
     `INSERT INTO user_identities (id, user_id, provider, subject, email, email_verified, created_at)
-     VALUES ($1,$2,'google',$3,$4,$5,$6) ON CONFLICT (provider, subject) DO NOTHING`,
-    [newId('idn'), user.id, profile.sub, profile.email || '', !!profile.emailVerified, now()]
+     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (provider, subject) DO NOTHING`,
+    [newId('idn'), user.id, p.id, profile.sub, profile.email || '', !!profile.emailVerified, now()]
   );
   if (linkedVia && linked.rowCount) {
     await audit.log({
       actorType: 'user', userId: user.id, action: 'auth.identity_linked',
-      targetType: 'user', targetId: user.id, detail: { provider: 'google', via: linkedVia }, ip,
+      targetType: 'user', targetId: user.id, detail: { provider: p.id, via: linkedVia }, ip,
     });
   }
 
   const session = await issueSession(user, req.body?.device, ip, appOf(req), appVersionOf(req));
-  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: 'google' }, ip });
+  await audit.log({ actorType: 'user', userId: user.id, action: created ? 'auth.register' : 'auth.login', detail: { method: p.id }, ip });
   res.status(created ? 201 : 200).json({ created, ...(await loginPayload(user, session)) });
-});
+};
 
 /**
- *  کدِ اثبات برای وصل کردنِ گوگل — به ایمیلِ **خودِ حساب** می‌رود.
+ *  کدِ اثبات برای وصل کردنِ فراهم‌کننده — به ایمیلِ **خودِ حساب** می‌رود.
  *
- *  فقط کسی که توکنِ معتبرِ گوگل با همان ایمیل دارد می‌تواند بخواهدش، و کد
+ *  فقط کسی که توکنِ معتبرِ همان ایمیل دارد می‌تواند بخواهدش، و کد
  *  `purpose='link'` دارد: نه برای ورود کار می‌کند و نه برای بازیابیِ رمز.
- *  حسابی که نیست یا گوگلش از قبل وصل است کدی نمی‌گیرد (پاسخ همان ۲۰۰ است).
- *  ⛔ گوگلِ تأییدنشده هم کدی نمی‌گیرد و همان پاسخِ «حساب نیست» را می‌بیند
- *  (`accountOfGoogleEmail`)؛ و سقفِ «ایمیل + IP» (`linkCodeLimit`) دارد.
+ *  حسابی که نیست یا فراهم‌کننده‌اش از قبل وصل است کدی نمی‌گیرد (پاسخ همان ۲۰۰ است).
+ *  ⛔ ایمیلِ تأییدنشده هم کدی نمی‌گیرد و همان پاسخِ «حساب نیست» را می‌بیند
+ *  (`accountOfProviderEmail`)؛ و سقفِ «ایمیل + IP» (`linkCodeLimits`) دارد.
+ *  اپل: nonce این‌جا مصرف نمی‌شود — همان توکن در گامِ اثبات دوباره می‌آید.
  */
-router.post('/google/link-code', authLimit, otpLimit, readGoogleProfile, linkCodeLimit, async (req, res) => {
-  const profile = req.googleProfile;
+const externalLinkCode = (p) => async (req, res) => {
+  const profile = req.externalProfile;
   const already = await one(
-    `SELECT 1 FROM user_identities WHERE provider='google' AND subject=$1`, [profile.sub]
+    `SELECT 1 FROM user_identities WHERE provider=$1 AND subject=$2`, [p.id, profile.sub]
   );
-  const existing = already ? null : await accountOfGoogleEmail(profile);
+  const existing = already ? null : await accountOfProviderEmail(profile);
   let out = {};
   if (existing) {
     out = await otp.request(existing.email, { purpose: 'link', ip: clientIp(req), app: appOf(req) });
@@ -884,7 +934,21 @@ router.post('/google/link-code', authLimit, otpLimit, readGoogleProfile, linkCod
     resendSeconds: Math.ceil(config.otp.resendMs / 1000),
     ...(out.devCode ? { devCode: out.devCode } : {}),
   });
+};
+
+router.post('/google', authLimit, externalLogin(PROVIDERS.google));
+router.post('/google/link-code', authLimit, otpLimit, readProfileOf(PROVIDERS.google), linkCodeLimits.google, externalLinkCode(PROVIDERS.google));
+
+/**
+ *  nonce ِ ورود با اپل — یک‌بارمصرف و ده‌دقیقه‌ای، بی نوشتن در پایگاه (`lib/apple.js`). برنامهٔ آیفون
+ *  SHA-256 ِ آن را به پنجرهٔ اپل می‌دهد و خامش را با توکن به `POST /apple` می‌فرستد.
+ */
+router.post('/apple/nonce', authLimit, (req, res) => {
+  apple.assertConfigured();
+  res.json(apple.issueNonce());
 });
+router.post('/apple', authLimit, externalLogin(PROVIDERS.apple));
+router.post('/apple/link-code', authLimit, otpLimit, readProfileOf(PROVIDERS.apple), linkCodeLimits.apple, externalLinkCode(PROVIDERS.apple));
 
 // ---------- تازه‌سازی نشست ----------
 router.post('/refresh', sessionLimit, async (req, res, next) => {

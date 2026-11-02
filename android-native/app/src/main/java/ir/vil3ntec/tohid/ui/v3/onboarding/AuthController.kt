@@ -16,6 +16,9 @@ import ir.vil3ntec.tohid.core.onboarding.AuthNote
 import ir.vil3ntec.tohid.core.onboarding.AuthRules
 import ir.vil3ntec.tohid.core.onboarding.AuthUi
 import ir.vil3ntec.tohid.core.onboarding.CodePurpose
+import ir.vil3ntec.tohid.data.ExternalLinkAsk
+import ir.vil3ntec.tohid.data.ExternalSignIn
+import ir.vil3ntec.tohid.data.SignInProvider
 import ir.vil3ntec.tohid.data.GoogleSignIn
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.LocationFix
@@ -32,15 +35,6 @@ import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-
-/** گوگلی که منتظرِ اثباتِ روشِ قبلیِ حساب است (۴۰۹ `google_link_required`) */
-data class GoogleLinkAsk(
-  val idToken: String,
-  val email: String,
-  val message: String,
-  val codeSent: Boolean = false,
-  val problem: String? = null,
-)
 
 /**
  *  درخواست‌های دروازهٔ ورود — **عیناً** همان منطقِ `WelcomeScreen` ِ پیشین، فقط بیرون از صفحه:
@@ -67,7 +61,11 @@ class AuthController(
   /** سرور واقعاً کد می‌فرستد؟ (`/config` ⇒ `otpEnabled`) — بی آن «ورود با کد» ساخته نمی‌شود */
   var otpReady by mutableStateOf(false)
     private set
-  var googleLink by mutableStateOf<GoogleLinkAsk?>(null)
+  /** ورود با اپل: سکو پنجره دارد (فقط آیفون، `ExternalSignIn.apple`) **و** سرور بازش کرده (`/config` ⇐ `appleLogin`) */
+  var appleReady by mutableStateOf(false)
+    private set
+  /** گوگل/اپلی که منتظرِ اثباتِ روشِ قبلیِ حساب است (۴۰۹ `<id>_link_required`) */
+  var externalLink by mutableStateOf<ExternalLinkAsk?>(null)
   /** ورود انجام شد: تیکِ موفقیت روی دکمه و بعد برنامه */
   var done by mutableStateOf(false)
     private set
@@ -84,10 +82,12 @@ class AuthController(
   override fun edit(change: (AuthUi) -> AuthUi) { ui = change(ui) }
 
   suspend fun loadServerConfig() {
-    if (!AppConfig.isConfigured(context)) { googleId = ""; return }
+    if (!AppConfig.isConfigured(context)) { googleId = ""; appleReady = false; return }
     googleId = auth.googleClientId()
     //  همان یک درخواست، دو جواب: کلیدِ گوگل و اینکه کد فرستادنی است
     otpReady = auth.otpEnabled()
+    //  اندروید و کامپیوتر پنجرهٔ اپل ندارند ⇒ همین‌جا می‌ایستد، بی درخواستِ اضافه
+    appleReady = ExternalSignIn.apple != null && auth.appleEnabled()
   }
 
   private fun fail(e: Throwable) { ui = ui.failed(e.userText(StrAuth.serverUnreachable)) }
@@ -319,8 +319,8 @@ class AuthController(
             auth.loginWithGoogle(account.idToken)
               .onSuccess { finish(account.email, it) }
               .onFailure {
-                if (it is ApiFailure.Conflict && it.code == "google_link_required") {
-                  googleLink = GoogleLinkAsk(account.idToken, account.email, it.message.orEmpty())
+                if (it is ApiFailure.Conflict && it.code == SignInProvider.GOOGLE.linkRequiredCode) {
+                  externalLink = ExternalLinkAsk(account.idToken, account.email, it.message.orEmpty())
                 } else fail(it)
               }
           }
@@ -330,24 +330,62 @@ class AuthController(
     }
   }
 
-  fun googleSendCode(ask: GoogleLinkAsk) {
+  /**
+   *  ورود با اپل (فقط آیفون) — همان راهِ گوگل: nonce ِ تازهٔ سرور ⇐ پنجرهٔ اپل ⇐ `/auth/apple`؛ ایمیلِ
+   *  دارای حساب ⇐ همان برگهٔ اثبات (`ExternalLinkSheet`). بستنِ پنجره نه خطاست نه پیام.
+   */
+  override fun apple() {
+    val window = ExternalSignIn.apple ?: return
+    if (!appleReady) { ui = ui.copy(note = null).failed(StrAuth.appleNotEnabled); return }
+    if (!start()) return
+    scope.launch {
+      auth.appleNonce()
+        .onSuccess { nonce ->
+          runCatching { window.pick(context, nonce) }
+            .onSuccess { cred ->
+              if (cred != null) {
+                auth.loginWithApple(cred.idToken, nonce, name = cred.name)
+                  .onSuccess { finish(cred.email, it) }
+                  .onFailure {
+                    if (it is ApiFailure.Conflict && it.code == SignInProvider.APPLE.linkRequiredCode) {
+                      externalLink = ExternalLinkAsk(cred.idToken, cred.email, it.message.orEmpty(), provider = SignInProvider.APPLE, nonce = nonce)
+                    } else fail(it)
+                  }
+              }
+            }
+            .onFailure { ui = ui.failed(it.userText(StrAuth.appleFailed)) }
+        }
+        .onFailure { fail(it) }
+      idle()
+    }
+  }
+
+  fun linkSendCode(ask: ExternalLinkAsk) {
     ui = ui.copy(busy = true)
     scope.launch {
-      auth.requestGoogleLinkCode(ask.idToken)
-        .onSuccess { googleLink = ask.copy(codeSent = true, problem = null) }
-        .onFailure { googleLink = ask.copy(problem = it.userText(StrAuth.codeNotSent)) }
+      when (ask.provider) {
+        SignInProvider.GOOGLE -> auth.requestGoogleLinkCode(ask.idToken)
+        SignInProvider.APPLE -> auth.requestAppleLinkCode(ask.idToken, ask.nonce.orEmpty())
+      }
+        .onSuccess { externalLink = ask.copy(codeSent = true, problem = null) }
+        .onFailure { externalLink = ask.copy(problem = it.userText(StrAuth.codeNotSent)) }
       idle()
     }
   }
 
   /** ⛔ برابر بودنِ ایمیل کافی نیست: رمزِ همان حساب یا کدی که به ایمیلِ حساب رفته */
-  fun googleProve(ask: GoogleLinkAsk, secret: String) {
+  fun linkProve(ask: ExternalLinkAsk, secret: String) {
     ui = ui.copy(busy = true)
     scope.launch {
       val isCode = ask.codeSent
-      auth.loginWithGoogle(ask.idToken, password = secret.takeUnless { isCode }, code = secret.takeIf { isCode })
-        .onSuccess { googleLink = null; finish(ask.email, it) }
-        .onFailure { googleLink = ask.copy(problem = it.userText(StrAuth.linkFailed)) }
+      val password = secret.takeUnless { isCode }
+      val code = secret.takeIf { isCode }
+      when (ask.provider) {
+        SignInProvider.GOOGLE -> auth.loginWithGoogle(ask.idToken, password = password, code = code)
+        SignInProvider.APPLE -> auth.loginWithApple(ask.idToken, ask.nonce.orEmpty(), password = password, code = code)
+      }
+        .onSuccess { externalLink = null; finish(ask.email, it) }
+        .onFailure { externalLink = ask.copy(problem = it.userText(StrAuth.linkFailed)) }
       idle()
     }
   }

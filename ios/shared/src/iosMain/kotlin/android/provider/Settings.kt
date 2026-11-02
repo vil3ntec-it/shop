@@ -31,3 +31,9 @@ object Settings {
       if (name.endsWith("_scale") && UIAccessibilityIsReduceMotionEnabled()) 0f else def
   }
 }
+
+/** shimِ iOS — ستون‌های پروندهٔ برگزیده (‎ContentResolver.query‎) */
+object OpenableColumns {
+  const val DISPLAY_NAME = "_display_name"
+  const val SIZE = "_size"
+}
