@@ -11,6 +11,9 @@
   "promo.st.inactive": "This discount code is not active now.",
   "promo.st.used_up": "This discount code has been used up.",
   "promo.st.no_effect": "This discount code does not apply to this basket.",
+  "promo.first": "Discount (first order: {d})",
+  "promo.st.limit_reached": "This discount code was already used for this number or this device.",
+  "err.promo_attempts": "Too many discount code attempts; try again in a few minutes.",
   "err.promo_code_rejected": "The discount code was not accepted; the basket was recalculated without it.",
   "promo.days.1": "1 day left",
   "promo.hours.1": "1 hour left",
@@ -36,5 +39,8 @@
   "ck.tender.opt": "{m} — change: {c}",
   "err.cash_tender_short": "The banknote is less than the order total; please choose again.",
   "err.cash_tender_excess": "The change would be more than one 1000 note; choose a smaller banknote.",
-  "err.bad_cash_tender": "The banknote amount is not valid; please choose again."
+  "err.bad_cash_tender": "The banknote amount is not valid; please choose again.",
+  "ck.eta": "Approximate delivery: {a} to {b} minutes",
+  "ck.eta.pickup": "Ready for pickup, approximately: {a} to {b} minutes",
+  "ck.eta.none": "Delivery time cannot be estimated right now"
 }

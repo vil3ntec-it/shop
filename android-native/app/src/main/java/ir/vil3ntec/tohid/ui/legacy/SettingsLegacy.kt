@@ -907,6 +907,11 @@ fun SettingsScreenLegacy(
       }
     }
 
+    /* ===== ویترین: زمانِ تقریبیِ تحویل (WEB-04) و اولین خرید و سدِ تخفیف (MKT-02، RSK-09) ===== */
+    //  پرچم‌های سروریِ `shop.storefront.eta` و `shop.storefront.promo_guard`؛ خاموش یا نقشِ بی `settings.write` ⇒ هیچ
+    item { StorefrontEtaSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
+    item { PromoGuardSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
+
     /* ============== سرورها (پرچمِ `app.multi_server`، فقط صاحبِ دکان) ============== */
     item {
       val servers = remember { ir.vil3ntec.tohid.platform.ServersController(context) }
