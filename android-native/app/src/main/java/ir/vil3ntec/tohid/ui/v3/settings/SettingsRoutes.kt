@@ -5,8 +5,10 @@ import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLateApology
+import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.Place
@@ -72,7 +74,9 @@ object SettingsPaths {
 /** یک بخش روی گوشی صفحهٔ خودش است؛ روی صفحهٔ پهن (کامپیوتر، تبلتِ افقی) همان صفحه در ستونِ پایانِ دوستونه */
 @Composable
 private fun RouteScope.SettingsSection(key: String) {
-  if (desk) DeskSettingsScreen(selected = key) else SettingsPages.of(key)?.content?.invoke(this, backOrNull)
+  if (desk) DeskSettingsScreen(selected = key)
+  //  «این چه می‌کند؟» بالای صفحه (`SettingsPageFrame` از همین کلید می‌خواند)
+  else CompositionLocalProvider(LocalSettingsKey provides key) { SettingsPages.of(key)?.content?.invoke(this, backOrNull) }
 }
 
 /**
@@ -87,7 +91,7 @@ val SettingsModule = AppModule(
   icon = Icons.Outlined.Settings,
   //  NTF-10: ردیفِ «پوزش و کوپنِ خودکارِ تأخیر» زیرِ «فروش» فقط با پرچمِ روشنِ سرور (`lateApologyRow`، همان ردیفِ رابطِ امروز)
   settings = listOf(
-    SettingsEntry({ StrLateApology.title }, SettingsPaths.LATE_APOLOGY, Icons.Outlined.Schedule, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { lateApologyRow(lateApologyApi()) }),
+    SettingsEntry({ StrLateApology.title }, SettingsPaths.LATE_APOLOGY, Icons.Outlined.Schedule, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { lateApologyRow(lateApologyApi()) }, subtitle = { StrSettingsHelp.lateApologyLine }),
   ),
   entries = listOf(
     ModuleEntry("settings", { Str.settings }, SettingsPaths.ROOT, Icons.Outlined.Settings, setOf(Place.NAV), needs = setOf(Need.MANAGE), order = 90),
@@ -102,11 +106,12 @@ val SettingsModule = AppModule(
     },
     V3Route(SettingsPaths.ABOUT, RouteKind.PAGE, { SettingsLayout.labelOf(SettingsLayout.ABOUT_APP) }, chrome = Chrome.OWN) {
       if (desk && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = SettingsLayout.ABOUT_APP)
-      else AboutScreen(data, onBack = backOrNull)
+      else CompositionLocalProvider(LocalSettingsKey provides SettingsLayout.ABOUT_APP) { AboutScreen(data, onBack = backOrNull) }
     },
     //  وضعیتِ همگام‌سازی فقط‌خواندنی و مالِ همه است (کارمند هم) — هشدارِ «همگام‌سازی خطا دارد» این‌جا را باز می‌کند
     V3Route(SettingsPaths.SYNC, RouteKind.PAGE, { SettingsLayout.labelOf("همگام‌سازی") }, chrome = Chrome.OWN) {
-      if (desk && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی") else SyncScreen(onBack = backOrNull)
+      if (desk && access.allows(setOf(Need.MANAGE))) DeskSettingsScreen(selected = "همگام‌سازی")
+      else CompositionLocalProvider(LocalSettingsKey provides "همگام‌سازی") { SyncScreen(onBack = backOrNull) }
     },
     V3Route("settings/{group}", RouteKind.PAGE, { Str.settings }, parent = SettingsPaths.ROOT, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       val group = SettingsPaths.groupOfSlug(args["group"].orEmpty())
@@ -122,7 +127,7 @@ val SettingsModule = AppModule(
       if (section == null) LandOn(SettingsPaths.ROOT) else SettingsSection(section)
     },
     V3Route(SettingsPaths.LATE_APOLOGY, RouteKind.PAGE, { StrLateApology.title }, parent = SettingsPaths.group(SettingsLayout.SALES), needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
-      LateApologyScreen(onBack = backOrNull)
+      CompositionLocalProvider(LocalSettingsKey provides SettingsPaths.LATE_APOLOGY) { LateApologyScreen(onBack = backOrNull) }
     },
     V3Route(SettingsPaths.PIN, RouteKind.SHEET, { Str.appLock }, parent = SettingsPaths.APP_LOCK, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       PinSheet(onDone = { back() })

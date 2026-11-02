@@ -4,7 +4,7 @@ import androidx.compose.runtime.mutableStateOf
 
 /**
  *  POS-04 — روشن/خاموشِ جست‌وجوی مقاومِ صندوقِ کامپیوتر روی همین دستگاه (`tohid-ui:pos_smart_search`)؛
- *  فایلِ مرزیِ پلتفرم (`SharedPreferences`). پیش‌فرض **خاموش**: همان `PosCatalog.matches` ِ پیشین.
+ *  فایلِ مرزیِ پلتفرم (`SharedPreferences`). پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: همان `PosCatalog.matches` ِ پیشین.
  */
 object PosSearchPrefs {
   val on = mutableStateOf(false)
@@ -14,7 +14,7 @@ object PosSearchPrefs {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, false)
+    on.value = context.getSharedPreferences("tohid-ui", 0).getBoolean(KEY, true)
   }
 
   fun set(context: android.content.Context, value: Boolean) {

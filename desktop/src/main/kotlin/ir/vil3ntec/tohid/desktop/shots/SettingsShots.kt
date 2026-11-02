@@ -53,6 +53,10 @@ object SettingsShots : GroupShots {
     Shot("expiry", route = "settings/sales/expiry"),
     //  بخش‌های آمده از تنظیماتِ رابطِ امروز (SettingsPortTest)
     Shot("sales", route = "settings/sales"),
+    //  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): «پیشرفته» ِ باز در ریشه و در گروهِ فروش، و کارتِ «این چه می‌کند؟» روی یک بخشِ پیشرفته
+    Shot("root-advanced", route = "settings", prepare = { SettingsShotState.advancedOpen = true }, cleanup = { SettingsShotState.advancedOpen = false }),
+    Shot("sales-advanced", route = "settings/sales", prepare = { SettingsShotState.advancedOpen = true }, cleanup = { SettingsShotState.advancedOpen = false }),
+    Shot("gift-cards", route = "settings/sales/gift-cards"),
     Shot("checkout-rules", route = "settings/sales/checkout-rules"),
     Shot("held-invoices", route = "settings/sales/held-invoices"),
     Shot("returns", route = "settings/sales/returns"),

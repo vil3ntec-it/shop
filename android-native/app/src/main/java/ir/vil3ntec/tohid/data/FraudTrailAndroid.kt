@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 /**
  *  RPT-09 — سمتِ پلتفرمِ «سابقهٔ ضدتقلب» (`FraudTrail`): تنظیمِ **همین دستگاه** کنارِ سیاست‌های
  *  دیگرِ دکان (`ShopPolicy`، پروندهٔ `tohid-policy` ‹`fraud_trail`›)، نامِ حسابِ همین دستگاه و
- *  سیم‌کشیِ «ردیفِ حذف‌شده از فاکتورِ باز» ⇐ سابقهٔ دکان. پیش‌فرض **خاموش** = همان رفتارِ امروز.
+ *  سیم‌کشیِ «ردیفِ حذف‌شده از فاکتورِ باز» ⇐ سابقهٔ دکان. پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش** = همان رفتارِ امروز.
  */
 object FraudTrailPref {
 
@@ -17,7 +17,7 @@ object FraudTrailPref {
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-  fun enabled(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, false) }.getOrDefault(false)
+  fun enabled(context: Context): Boolean = runCatching { prefs(context).getBoolean(KEY, true) }.getOrDefault(false)
 
   fun setEnabled(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(KEY, on).apply()

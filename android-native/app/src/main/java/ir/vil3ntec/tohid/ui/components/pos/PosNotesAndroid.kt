@@ -36,7 +36,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 /**
  *  POS-11 — یادداشتِ ردیف و یادداشتِ فاکتور در صندوق، با قالب‌های تکراری؛ فایلِ مرزیِ پلتفرم.
  *
- *  تنظیمِ **همین دستگاه** (`tohid-ui:pos_notes`)، پیش‌فرض **خاموش**: خاموش ⇒ کادرِ ردیف و صندوق
+ *  تنظیمِ **همین دستگاه** (`tohid-ui:pos_notes`)، پیش‌فرض **روشن** (تنظیماتِ کم، ۱۴۰۵/۰۸/۱۱)؛ **خاموش**: خاموش ⇒ کادرِ ردیف و صندوق
  *  همان امروز، هیچ دکمه و کادرِ تازه‌ای نیست و فاکتور بی یادداشت (فیلد نوشته نمی‌شود). قالب‌ها
  *  (`tohid-ui:pos_note_templates`، هر خط یکی) هم مالِ همین دستگاه‌اند و همگام نمی‌شوند. متن فقط از
  *  `SaleNotes` (یک خط، حداکثر ۱۲۰ نویسه)؛ چاپ روی رسیدِ پیشین و نسخهٔ ۲.
@@ -53,7 +53,7 @@ object PosNotesPrefs {
     loaded = true
     runCatching {
       val p = context.getSharedPreferences("tohid-ui", 0)
-      on.value = p.getBoolean(KEY, false)
+      on.value = p.getBoolean(KEY, true)
       templates.value = SaleNotes.templates(p.getString(TEMPLATES, null))
     }
   }

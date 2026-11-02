@@ -36,7 +36,9 @@ import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
+import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.SettingsTiers
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.ThemeChoice
@@ -99,9 +101,12 @@ internal fun cameraGranted(context: android.content.Context): Boolean =
     android.content.pm.PackageManager.PERMISSION_GRANTED
 
 /**
- *  کارتِ یک گروه (r5): سرخط بیرونِ کارت، ردیف‌ها با آیکنِ خطی و مقدارِ خاکستری /
- *  کلید / فلش. زدنِ هر ردیف صفحهٔ خودش را باز می‌کند (`open(path)`). صفحه‌هایی که
- *  ماژول‌های دیگر در همین گروه گذاشته‌اند (`extra`) ته کارت می‌آیند.
+ *  کارتِ یک گروه (r5): سرخط بیرونِ کارت، ردیف‌ها با آیکنِ خطی، یک خطِ ساده («این چه می‌کند»، `SettingsHelp`)
+ *  و مقدارِ خاکستری / کلید / فلش. زدنِ هر ردیف صفحهٔ خودش را باز می‌کند (`open(path)`).
+ *
+ *  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱، `SettingsTiers`): `tier` = MAIN ⇒ فقط بخش‌های اصلی؛ ADVANCED ⇒ بخش‌های «پیشرفته» و
+ *  صفحه‌هایی که ماژول‌های دیگر در همین گروه گذاشته‌اند (`extra`). بخشِ روشن و پنهان (HIDDEN) هیچ‌جا ردیف ندارد.
+ *  کارتِ بی ردیف کشیده نمی‌شود.
  */
 @Composable
 internal fun SettingsGroupCard(
@@ -113,19 +118,23 @@ internal fun SettingsGroupCard(
   modifier: Modifier = Modifier,
   showTitle: Boolean = true,
   footer: String? = null,
+  tier: SettingsTiers.Tier = SettingsTiers.Tier.MAIN,
 ) {
   //  بخشِ فقط‌کامپیوتر (`PHONE_HIDDEN`) روی گوشی ردیف ندارد، و بخشِ پشتِ پرچمِ سرور تا پاسخِ روشن هیچ‌جا — مثلِ رابطِ امروز
   val all = SettingsLayout.GROUPS.firstOrNull { it.title == group }?.sections.orEmpty()
   val sections = (if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) all else all.filterNot { it in SettingsLayout.PHONE_HIDDEN })
     .filter { SettingsLayout.shown(it, facts.serverOn) }
+    .filter { SettingsTiers.tier(it) == tier }
+  val more = if (tier == SettingsTiers.Tier.ADVANCED) extra else emptyList()
+  if (sections.isEmpty() && more.isEmpty()) return
   V3Section(if (showTitle) SettingsLayout.groupLabel(group) else null, modifier, footer = footer) {
     sections.forEachIndexed { i, key ->
       if (i > 0) V3Divider(start = ROW_DIVIDER_START)
       SettingsRow(key, facts, onClick = { open(SettingsPaths.section(key)) }, onLockToggle = onLockToggle)
     }
-    extra.forEach { e ->
-      V3Divider(start = ROW_DIVIDER_START)
-      V3ListRow(e.label(), icon = e.icon, tile = false, onClick = { open(e.route) })
+    more.forEachIndexed { i, e ->
+      if (sections.isNotEmpty() || i > 0) V3Divider(start = ROW_DIVIDER_START)
+      V3ListRow(e.label(), subtitle = e.subtitle(), icon = e.icon, tile = false, onClick = { open(e.route) })
     }
   }
 }
@@ -138,6 +147,8 @@ internal fun SettingsRow(key: String, facts: SettingsFacts, onClick: () -> Unit,
   val value = SettingsIndexModel.value(key, facts)
   V3ListRow(
     title = label,
+    //  تنظیماتِ کم: هر ردیفِ دیده‌شده یک خطِ ساده دارد
+    subtitle = SettingsHelp.line(key),
     icon = SettingsPages.icon(key),
     tile = false,
     selected = selected,
