@@ -22,5 +22,6 @@ object I18nTables {
     StrTill, // S28b، S45، S46، S50
     StrRounding, // PAY-09: گردکردنِ نقدی
     StrSettingsHelp, // تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): خطِ ساده و «این چه می‌کند؟»
+    StrDevices, // «دستگاه‌ها» و اسکن در پس‌زمینه (۱۴۰۵/۰۸/۱۱)
   )
 }

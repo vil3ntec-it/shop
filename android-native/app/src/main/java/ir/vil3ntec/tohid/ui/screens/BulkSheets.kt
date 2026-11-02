@@ -268,6 +268,12 @@ fun BulkEntrySheet(
   // کلیدِ ردیفی که دوربین برایش باز است. `null` یعنی بسته.
   var scanFor by remember { mutableStateOf<Int?>(null) }
   var scanMiss by remember { mutableStateOf<String?>(null) }
+  //  «اسکن‌های در انتظار» ⇒ ورودِ کالا: هر کالا یک ردیف با شمارش، بارکدِ ناشناس ردیفِ «محصولِ تازه» (`ScanApply.receive`)
+  LaunchedEffect(Unit) {
+    val added = ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.RECEIVE)?.let { h -> ir.vil3ntec.tohid.scan.ScanApply.legacyRows(d, h.scans) }.orEmpty()
+      .map { r -> EntryRow(key = seq++, productId = r.productId.orEmpty(), newProduct = r.productId == null, newBarcode = r.barcode, qty = r.qty, price = r.price, unit = r.unit) }
+    if (added.isNotEmpty()) rows = rows.filterNot { it.untouched } + added
+  }
 
   fun update(key: Int, change: (EntryRow) -> EntryRow) {
     rows = rows.map { if (it.key == key) change(it) else it }
@@ -713,6 +719,8 @@ fun StockCountSheet(
   onSave: (Map<String, Double>, String) -> Unit,
 ) {
   var counts by remember { mutableStateOf(mapOf<String, String>()) }
+  //  «اسکن‌های در انتظار» ⇒ انبارگردانی (`ScanApply.counts`)
+  LaunchedEffect(Unit) { ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT)?.let { counts = ir.vil3ntec.tohid.scan.ScanApply.counts(counts, d, it.scans).counts } }
   var search by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   var error by remember { mutableStateOf<String?>(null) }

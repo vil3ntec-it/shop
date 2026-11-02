@@ -101,6 +101,12 @@ fun StockCountScreen(
   start: CountState = CountState(),
 ) {
   var state by remember { mutableStateOf(start) }
+  //  «اسکن‌های در انتظار» ⇒ انبارگردانی: شمارِ بارکدخوان به خانهٔ هر کالا افزوده می‌شود (`ScanApply.counts`)
+  androidx.compose.runtime.LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT)?.let { h ->
+      state = state.copy(counts = ir.vil3ntec.tohid.scan.ScanApply.counts(state.counts, data, h.scans).counts)
+    }
+  }
   var query by remember { mutableStateOf("") }
   var confirm by remember { mutableStateOf(false) }
   var askDiscard by remember { mutableStateOf(false) }

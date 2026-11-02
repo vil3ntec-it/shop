@@ -52,8 +52,10 @@ class SettingsTiersTest {
     //  هر گروهِ گوشی دست‌کم یک ردیفِ اصلی دارد تا ردیفِ گروه در «بیشتر» به صفحهٔ خالی نرسد
     SettingsLayout.GROUPS.forEach { g -> assertTrue(g.title, SettingsTiers.rows(g, Tier.MAIN).any { it !in SettingsLayout.PHONE_HIDDEN }) }
     //  چیزهایی که هر دکان تنظیم می‌کند در فهرستِ اصلی‌اند
-    listOf("زبان", "ظاهر", "قفل برنامه", "کد شاگرد", "داده‌ها", SettingsLayout.PRINTER, SettingsLayout.PAY)
+    listOf("زبان", "ظاهر", "قفل برنامه", "کد شاگرد", "داده‌ها", SettingsLayout.PERIPHERALS, SettingsLayout.PAY)
       .forEach { assertEquals(it, Tier.MAIN, SettingsTiers.tier(it)) }
+    //  «همهٔ دستگاه‌ها» (۱۴۰۵/۰۸/۱۱) جای پیوندِ چاپگر را گرفت — همان صفحه، چاپگرها کارتِ سومش؛ فهرست کوتاه ماند
+    assertEquals(Tier.ADVANCED, SettingsTiers.tier(SettingsLayout.PRINTER))
     //  تصمیم‌های پولی و آزمایشی هرگز روشن و پنهان نیستند
     listOf(
       SettingsLayout.CREDIT_GATE, "کالای منقضی", SettingsLayout.CHECKOUT_RULES, SettingsLayout.PAY_FIX, SettingsLayout.GIFT_CARD,

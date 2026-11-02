@@ -93,6 +93,9 @@ fun WarehouseScreen(
   val labelTools = remember { ir.vil3ntec.tohid.data.LabelToolsPref.on(context) }
   //  انبارگردانیِ تازه با اسکن، چند دستگاه و شمارشِ کور (INV-06/07/08) — پشتِ `CountToolsPref`، پیش‌فرض خاموش
   val countTools = remember { ir.vil3ntec.tohid.data.CountToolsPref.on(context) }
+  //  «اسکن‌های در انتظار» ⇒ برگهٔ همان مقصد باز می‌شود و خودش برمی‌دارد (`ScanHandoff.take`)؛ دفترِ موجودیِ تازه (`stockOn`) هنوز نه
+  val scanTo = ir.vil3ntec.tohid.scan.ScanInbox.handoff.value?.target
+  LaunchedEffect(scanTo) { if (scanTo == ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT && !stockOn) stockCount = true else if (scanTo == ir.vil3ntec.tohid.core.hw.ScanTarget.RECEIVE) bulkEntry = true }
   var pendingCsv by remember { mutableStateOf<ir.vil3ntec.tohid.data.ReportCsv.Sheet?>(null) }
   val saveCsv = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.CreateDocument("text/csv")

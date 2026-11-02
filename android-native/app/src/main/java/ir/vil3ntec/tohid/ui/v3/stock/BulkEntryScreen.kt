@@ -84,6 +84,17 @@ fun BulkEntryScreen(
   var pickFor by remember { mutableStateOf<Int?>(null) }
   var menuFor by remember { mutableStateOf<Int?>(null) }
   val unit = BulkEntryState.defaultUnit(data)
+  //  «اسکن‌های در انتظار» ⇒ ورودِ کالا: هر کالا یک ردیف با شمارش؛ بارکدِ ناشناس ردیفِ «محصولِ تازه» (`ScanApply.receive`)
+  androidx.compose.runtime.LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.RECEIVE)?.let { h ->
+      var next = state
+      ir.vil3ntec.tohid.scan.ScanApply.receive(data, h.scans).forEach { r ->
+        next = next.scanned(data, r.barcode, unit)
+        next = next.update(next.rows.last().key) { it.copy(qty = r.qty.toString()) }
+      }
+      state = next
+    }
+  }
   val stagger = rememberV3Stagger()
   var shake by remember { mutableIntStateOf(0) }
   val ready = state.ready
