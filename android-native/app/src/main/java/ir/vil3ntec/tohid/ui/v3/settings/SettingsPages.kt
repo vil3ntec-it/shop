@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Backup
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.CallToAction
@@ -228,15 +230,17 @@ internal object SettingsPages {
 
   fun of(key: String): SettingsPage? = ALL.firstOrNull { it.key == key }
 
-  /** آیکنِ ردیفِ هر بخش، پیوند و گروه — همه خطی و تک‌رنگ (r5) */
+  /** آیکنِ ردیفِ هر بخش، پیوند و دسته — همه خطی و تک‌رنگ (r5) */
   fun icon(key: String): ImageVector = of(key)?.icon ?: when (key) {
     SettingsLayout.PRINTER -> Icons.Outlined.Print
     SettingsLayout.PERIPHERALS -> Icons.Outlined.Devices
-    SettingsLayout.SECURITY -> Icons.Outlined.Shield
+    SettingsLayout.PROFILE -> Icons.Outlined.AccountCircle
+    SettingsLayout.SHOP -> Icons.Outlined.Shield
     SettingsLayout.SALES -> Icons.Outlined.PointOfSale
-    SettingsLayout.DEVICES -> Icons.Outlined.QrCodeScanner
+    SettingsLayout.GOODS -> Icons.Outlined.Inventory2
+    SettingsLayout.DEVICES -> Icons.Outlined.Devices
     SettingsLayout.DATA -> Icons.Outlined.Backup
-    SettingsLayout.ABOUT -> Icons.Outlined.Info
+    SettingsLayout.LOOK -> Icons.Outlined.Palette
     else -> Icons.Outlined.Tune
   }
 }

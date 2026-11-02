@@ -116,8 +116,11 @@ class SettingsPortTest {
       //  صفحهٔ هر بخش را `SettingsLayoutTest` از متنِ `SettingsPages.kt` می‌سنجد
       assertTrue("$key نامِ ردیف ندارد", SettingsLayout.labelOf(key).isNotBlank())
     }
-    assertEquals(SettingsLayout.SECURITY, SettingsLayout.groupOf(SettingsLayout.ENCRYPTION))
-    ported.filterNot { it == SettingsLayout.ENCRYPTION }.forEach { assertEquals(it, SettingsLayout.SALES, SettingsLayout.groupOf(it)) }
+    //  تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): هر بخش در دستهٔ کارِ خودش
+    assertEquals(SettingsLayout.SHOP, SettingsLayout.groupOf(SettingsLayout.ENCRYPTION))
+    assertEquals(SettingsLayout.DATA, SettingsLayout.groupOf(SettingsLayout.CRM_REPORTS))
+    ported.filterNot { it == SettingsLayout.ENCRYPTION || it == SettingsLayout.CRM_REPORTS }
+      .forEach { assertEquals(it, SettingsLayout.SALES, SettingsLayout.groupOf(it)) }
     //  «گزارش‌های مشتری» و کلیدهای صندوق و گزارشِ کامپیوتر مثلِ رابطِ امروز فقط کامپیوتر
     assertEquals(setOf(SettingsLayout.CRM_REPORTS) + DESK_ONLY, SettingsLayout.PHONE_HIDDEN)
     assertTrue(SettingsLayout.CRM_REPORTS in SettingsLayout.deskSections)
@@ -145,40 +148,42 @@ class SettingsPortTest {
       SettingsLayout.LAYAWAY to "settings/sales/layaway",
       SettingsLayout.LOYALTY to "settings/sales/loyalty",
       SettingsLayout.SAFE_BOOK to "settings/sales/safe",
-      SettingsLayout.TAX_QUARTER to "settings/sales/tax-quarter",
+      SettingsLayout.TAX_QUARTER to "settings/data/tax-quarter",
       SettingsLayout.CUSTOMER_CARD to "settings/sales/customer-cards",
-      SettingsLayout.TILL_GOODS to "settings/sales/till-goods",
-      SettingsLayout.STOCK_PLACES to "settings/sales/stock-places",
-      SettingsLayout.SMART_FORECAST to "settings/sales/forecast",
-      SettingsLayout.ANOMALY to "settings/security/anomalies",
-      SettingsLayout.OWNER_REPORT to "settings/sales/owner-report",
+      SettingsLayout.TILL_GOODS to "settings/goods/till-goods",
+      SettingsLayout.STOCK_PLACES to "settings/goods/stock-places",
+      SettingsLayout.SMART_FORECAST to "settings/goods/forecast",
+      SettingsLayout.ANOMALY to "settings/shop/anomalies",
+      SettingsLayout.OWNER_REPORT to "settings/data/owner-report",
       SettingsLayout.STOREFRONT_ETA to "settings/sales/storefront-eta",
       SettingsLayout.PROMO_GUARD to "settings/sales/promo-guard",
       SettingsLayout.GIFT_RECEIPT to "settings/sales/gift-receipt",
       SettingsLayout.DELIVER_LATER to "settings/sales/deliver-later",
       SettingsLayout.SPECIAL_ORDER to "settings/sales/special-orders",
       SettingsLayout.PRICE_WHY to "settings/sales/price-why",
-      SettingsLayout.SHRINK_REPORT to "settings/sales/shrink-report",
-      SettingsLayout.COUNT_TOOLS to "settings/sales/stock-count",
-      SettingsLayout.LABEL_TOOLS to "settings/sales/labels",
-      SettingsLayout.PRODUCT_INFO to "settings/sales/product-info",
+      SettingsLayout.SHRINK_REPORT to "settings/goods/shrink-report",
+      SettingsLayout.COUNT_TOOLS to "settings/goods/stock-count",
+      SettingsLayout.LABEL_TOOLS to "settings/goods/labels",
+      SettingsLayout.PRODUCT_INFO to "settings/goods/product-info",
       SettingsLayout.POS_SEARCH to "settings/sales/smart-search",
       SettingsLayout.POS_PRICE_CHECK to "settings/sales/price-check",
       SettingsLayout.POS_TOUCH to "settings/sales/touch-mode",
       SettingsLayout.POS_MORE_KEYS to "settings/sales/more-keys",
       SettingsLayout.KEY_HELP to "settings/sales/key-help",
-      SettingsLayout.TILL_SWITCH to "settings/sales/till-switch",
-      SettingsLayout.REPORT_KEYS to "settings/sales/report-keys",
-      SettingsLayout.DOC_GAPS to "settings/sales/doc-gaps",
+      SettingsLayout.TILL_SWITCH to "settings/shop/till-switch",
+      SettingsLayout.REPORT_KEYS to "settings/data/report-keys",
+      SettingsLayout.DOC_GAPS to "settings/data/doc-gaps",
       SettingsLayout.LINE_PRICING to "settings/sales/line-pricing",
       SettingsLayout.POS_NOTES to "settings/sales/notes",
       SettingsLayout.AUTO_FEES to "settings/sales/auto-fees",
-      SettingsLayout.SIMPLE_ASK to "settings/sales/simple-ask",
+      SettingsLayout.SIMPLE_ASK to "settings/data/simple-ask",
       SettingsLayout.EASY_SETUP to "settings/devices/easy-setup",
-      SettingsLayout.TRAINING to "settings/general/training",
+      SettingsLayout.TRAINING to "settings/look/training",
     )
+    val table = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.table
     keys.forEach { (key, path) ->
       assertEquals(key, path, SettingsPaths.section(key))
+      assertTrue("$key ⇐ $path", table.resolve(path) != null)
       assertTrue("$key نامِ ردیف ندارد", SettingsLayout.labelOf(key).isNotBlank())
       //  روی کامپیوتر همه (هیچ‌کدام فقط‌گوشی نیست، مثلِ رابطِ امروز)
       assertTrue("$key در ستونِ کامپیوتر نیست", key in SettingsLayout.deskSections)
@@ -201,6 +206,17 @@ class SettingsPortTest {
   }
 
   @Test
+  fun `نشانیِ پیش از نسخهٔ دوم هم همان بخش را باز می‌کند`() {
+    val table = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.table
+    OLD_PATHS.forEach { (path, key) ->
+      assertTrue(path, table.resolve(path)?.route?.pattern == "settings/{group}/{section}")
+      val group = SettingsPaths.groupOfSlug(path.split('/')[1])!!
+      assertEquals(path, key, SettingsPaths.sectionOfSlug(group, path.substringAfterLast('/')))
+      assertTrue("$path دیگر نشانیِ امروزِ $key نیست", SettingsPaths.section(key) != path)
+    }
+  }
+
+  @Test
   fun `بخش‌های پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارند`() {
     assertEquals(
       setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD),
@@ -213,11 +229,18 @@ class SettingsPortTest {
     }
     //  بخشِ بی پرچم همیشه دیده می‌شود
     (SettingsLayout.sections - SettingsLayout.SERVER_GATED).forEach { assertTrue(it, SettingsLayout.shown(it, emptySet())) }
-    //  ردیف‌های گروه و ستونِ کامپیوتر همان فیلتر را می‌گذرانند، و هر سه صفحه خودش هم با پاسخِ خاموش هیچ نمی‌کشد
+    //  صفحهٔ دسته (گوشی و کامپیوتر) و جست‌وجو همان فیلتر را می‌گذرانند، و هر سه صفحه خودش هم با پاسخِ خاموش هیچ نمی‌کشد
+    SettingsLayout.SERVER_GATED.forEach { key ->
+      for (desktop in listOf(true, false)) {
+        assertFalse(key, SettingsLayout.visible(key, desktop, emptySet(), SettingsLayout.FEATURES.toSet()))
+        assertTrue(key, SettingsLayout.visible(key, desktop, setOf(key), emptySet()))
+        assertTrue(key, ir.vil3ntec.tohid.ui.screens.SettingsSearchIndex.docs(desktop, emptySet()).none { it.key == key })
+      }
+    }
     val rows = sources.entries.first { rel(it.key) == "ui/v3/settings/SettingsRows.kt" }.value
-    val desk = sources.entries.first { rel(it.key) == "ui/v3/settings/DeskSettingsScreen.kt" }.value
-    assertTrue(rows.contains("SettingsLayout.shown(it, facts.serverOn)") && rows.contains("serverOn = rememberServerSections()"))
-    assertTrue(desk.contains("SettingsLayout.shown(it, facts.serverOn)"))
+    val index = sources.entries.first { rel(it.key) == "ui/v3/settings/SettingsIndexScreen.kt" }.value
+    assertTrue(rows.contains("SettingsLayout.visibleParts(group, Platform.DESKTOP, facts.serverOn, featuresOn)") && rows.contains("serverOn = rememberServerSections()"))
+    assertTrue(index.contains("SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras)"))
     val server = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/ServerSettingsScreensAndroid.kt" }.value
     listOf("ownerReportRow(", "storefrontEtaRow(", "promoGuardRow(", "it.enabled && it.owner", "StorefrontEtaApi.visible(it)", "ShopRole.OWNER")
       .forEach { assertTrue("$it در صفحه‌های سروری نیست", server.contains(it)) }
@@ -252,6 +275,29 @@ class SettingsPortTest {
       "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
       //  S03/S05/S22 — ثبتِ سریع، واحدِ بزرگ و «بستهٔ کامل»؛ «منقضی فقط با مجوز» و روزِ هشدار
       "TillGoodsPref.setQuickRegister", "TillGoodsPref.setUnits", "TillGoodsPref.setWholePacks", "ExpiryPref.setApproval", "ExpiryPref.setNearDays",
+    )
+
+    /** نشانیِ پیش از نسخهٔ دوم (۱۴۰۵/۰۸/۱۱) ⇐ بخش — پیوندِ کهنه باید همان صفحه را باز کند */
+    val OLD_PATHS: Map<String, String> = mapOf(
+      "settings/sales/tax-quarter" to SettingsLayout.TAX_QUARTER,
+      "settings/sales/till-goods" to SettingsLayout.TILL_GOODS,
+      "settings/sales/stock-places" to SettingsLayout.STOCK_PLACES,
+      "settings/sales/forecast" to SettingsLayout.SMART_FORECAST,
+      "settings/security/anomalies" to SettingsLayout.ANOMALY,
+      "settings/sales/owner-report" to SettingsLayout.OWNER_REPORT,
+      "settings/sales/shrink-report" to SettingsLayout.SHRINK_REPORT,
+      "settings/sales/stock-count" to SettingsLayout.COUNT_TOOLS,
+      "settings/sales/labels" to SettingsLayout.LABEL_TOOLS,
+      "settings/sales/product-info" to SettingsLayout.PRODUCT_INFO,
+      "settings/sales/till-switch" to SettingsLayout.TILL_SWITCH,
+      "settings/sales/report-keys" to SettingsLayout.REPORT_KEYS,
+      "settings/sales/doc-gaps" to SettingsLayout.DOC_GAPS,
+      "settings/sales/simple-ask" to SettingsLayout.SIMPLE_ASK,
+      "settings/general/training" to SettingsLayout.TRAINING,
+      "settings/sales/customer-reports" to SettingsLayout.CRM_REPORTS,
+      "settings/security/app-lock" to "قفل برنامه",
+      "settings/security/encryption" to SettingsLayout.ENCRYPTION,
+      "settings/general/appearance" to "ظاهر",
     )
 
     /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */

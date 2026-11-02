@@ -29,8 +29,8 @@ internal object SettingsShotState {
   var syncError: String? = null
   /** پشتیبان: برگهٔ تأییدِ «پاک‌سازی کامل» باز */
   var wipeSheet: Boolean = false
-  /** ریشه و صفحهٔ گروه: «پیشرفته» از آغاز باز (عکسِ تنظیماتِ کم) */
-  var advancedOpen: Boolean = false
+  /** صفحهٔ اول: نوشتهٔ کادرِ جست‌وجو از آغاز (عکسِ نتیجه‌های جست‌وجو) */
+  var query: String = ""
 }
 
 /** رمزِ برنامه گذاشته شده؟ (`LockStore`) */

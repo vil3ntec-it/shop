@@ -5,29 +5,52 @@ import ir.vil3ntec.tohid.core.i18n.StrPayFix
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSettingsHome
 import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
  *  فهرستِ بخش‌های تنظیمات (VILL3N، G9) — خالص، بی Compose.
  *
- *  هر بخش (کلیدش همان عنوانِ پیشینِ بخش است و عوض نمی‌شود) دقیقاً در یک گروه
- *  است، نامِ نشانیِ خودش را دارد (`settings/<گروه>/<بخش>`) و صفحه‌اش در
- *  `ui/v3/settings/SettingsPages.kt` است. ردیفِ گروه در «بیشتر» یک‌راست صفحهٔ
- *  همان گروه را باز می‌کند و ردیفِ بخش صفحهٔ همان بخش را — بی پیمایشِ ریشه.
- *  `SettingsLayoutTest` همین را از رویِ **متنِ** این فایل و `SettingsPages.kt`
- *  می‌سنجد: بخشی بی گروه، بی نشانی یا بی صفحه آزمون را قرمز می‌کند.
+ *  تنظیماتِ نسخهٔ دوم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱): صفحهٔ اول فقط یک کادرِ جست‌وجو و **شش دسته** است
+ *  ([GROUPS]: دکان و امنیت، فروش و پرداخت، کالا و انبار، دستگاه‌ها، داده و پشتیبان، ظاهر و زبان) و یک پیوندِ کوچکِ
+ *  «قابلیت‌ها». هر دسته صفحهٔ خودش را دارد با چند بخشِ کوتاه ([Part]، هر کدام حداکثر ۸ ردیفِ دیدنی). «پیشرفته»
+ *  و سرخطِ تکراری دیگر نیست: هر بخش دقیقاً یک جا دارد.
  *
- *  ردیف‌های «پیوند» (`LINKS`) بخشِ تنظیمات نیستند: صفحهٔ دیگری از برنامه را باز
- *  می‌کنند (چاپگرها و دستگاه‌های جانبی).
+ *  هر بخش (کلیدش همان عنوانِ پیشینِ بخش است و عوض نمی‌شود) دقیقاً در یک دسته و یک [Part] است، نامِ نشانیِ
+ *  خودش را دارد (`settings/<دسته>/<بخش>`) و صفحه‌اش در `ui/v3/settings/SettingsPages.kt` است. ردیف فقط وقتی
+ *  دیده می‌شود که [visible] بگوید: بخشِ روشن و پنهان (A، `SettingsTiers.ALWAYS_ON`)، آزمایشی ([EXPERIMENTAL])،
+ *  قابلیتِ خاموش ([FEATURES]) و بخشِ پشتِ پرچمِ خاموشِ سرور ردیف ندارند — ولی صفحه، نوشتن و نشانیِ هر کدام سرِ
+ *  جایش است و جست‌وجوی تنظیمات (`SettingsSearchIndex`) پیدایش می‌کند.
+ *  `SettingsLayoutTest` همین را از رویِ **متنِ** این فایل و `SettingsPages.kt` می‌سنجد: بخشی بی دسته، بی نشانی
+ *  یا بی صفحه آزمون را قرمز می‌کند.
+ *
+ *  ردیف‌های «پیوند» (`LINKS`) بخشِ تنظیمات نیستند: صفحهٔ دیگری از برنامه را باز می‌کنند (دستگاه‌ها، چاپگرها،
+ *  «حسابِ من»).
  */
 object SettingsLayout {
-  data class Group(val title: String, val sections: List<String>)
+  /** یک بخشِ کوتاه از صفحهٔ دسته: شناسهٔ ثابت (نامش از [partLabel]) و ردیف‌ها به ترتیبِ نمایش */
+  data class Part(val id: String, val rows: List<String>)
 
+  /** یک دسته: عنوانِ ثابت (کلید) و بخش‌هایش */
+  data class Group(val title: String, val parts: List<Part>) {
+    /** همهٔ ردیف‌های دسته به ترتیبِ نمایش (دیدنی یا نه) */
+    val sections: List<String> get() = parts.flatMap { it.rows }
+  }
+
+  //  ── شش دستهٔ صفحهٔ اول (۱۴۰۵/۰۸/۱۱) ──────────────────────────────
+  const val SHOP = "دکان و امنیت"
+  const val SALES = "فروش و پرداخت"
+  const val GOODS = "کالا و انبار"
+  const val DEVICES = "دستگاه‌ها"
+  const val DATA = "داده و پشتیبان"
+  const val LOOK = "ظاهر و زبان"
+
+  /**
+   *  نامِ گروه‌های پیشین — فقط برای نشانیِ کهنه (`settings/general/…`، [GROUP_SLUG_ALIASES]) و بدنهٔ قدیمیِ
+   *  بی‌مسیر (`ui/screens/Settings.kt`، پیش‌نمایشِ کامپیوتر). در [GROUPS] نیستند.
+   */
   const val GENERAL = "عمومی"
   const val SECURITY = "امنیت"
-  const val SALES = "فروش و پرداخت"
-  const val DEVICES = "دستگاه‌ها"
-  const val DATA = "داده‌ها"
   const val ABOUT = "درباره"
 
   /**
@@ -155,42 +178,125 @@ object SettingsLayout {
   /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
   const val TRAINING = "حالتِ آموزشی"
 
+  /** پیوند به «حسابِ من» (نام و عکسِ دکان) — ردیفِ نخستِ «دکان و امنیت» */
+  const val PROFILE = "حساب من"
+
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
     PRINTER to "devices?tab=printers",
     PERIPHERALS to "devices",
+    PROFILE to "profile/edit",
   )
 
+  /**
+   *  شش دسته و بخش‌های کوتاهِ هر کدام. هر کلید دقیقاً یک بار؛ ردیف‌های پنهان (A، آزمایشی، قابلیتِ خاموش، پشتِ
+   *  پرچمِ سرور، فقط‌گوشی/فقط‌کامپیوتر) هم این‌جا جای ثابتشان را دارند تا نشانی و جست‌وجو بدانند کجایند.
+   */
   val GROUPS: List<Group> = listOf(
-    Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم", TRAINING)),
-    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب", FRAUD_TRAIL, ANOMALY)),
+    Group(
+      SHOP,
+      listOf(
+        Part("shop", listOf(PROFILE, "هشدارها")),
+        Part("access", listOf("قفل برنامه", "کد شاگرد", "تغییر رمز حساب", TILL_SWITCH)),
+        Part("protect", listOf(ENCRYPTION, "دستگاه‌های وارد شده", FRAUD_TRAIL, ANOMALY)),
+      ),
+    ),
     Group(
       SALES,
       listOf(
-        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, HESAB_SHOP, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
-        POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
-        DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, TILL_GOODS, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
-        SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
-        STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, PRODUCT_TOOLS, PRODUCT_INFO, LABEL_TOOLS,
-        STOREFRONT_ETA, PROMO_GUARD, PRINTER,
+        Part("pay", listOf(PAY, HESAB_SHOP, TILL_RECEIVE, PAY_FIX, CREDIT_GATE, GIFT_CARD, LAYAWAY, SAFE_BOOK, CUSTOMER_CARD)),
+        Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)),
+        Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
+        Part("till", listOf(POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
+        Part("online", listOf(STOREFRONT_ETA, PROMO_GUARD)),
       ),
     ),
-    Group(DEVICES, listOf(CAMERA, EASY_SETUP, PERIPHERALS)),
-    Group(DATA, listOf("همگام‌سازی", "داده‌ها", CHAT_GUARD)),
-    Group(ABOUT, listOf(ABOUT_APP)),
+    Group(
+      GOODS,
+      listOf(
+        Part("goods", listOf(TILL_GOODS, PRODUCT_INFO, LABEL_TOOLS, PRODUCT_TOOLS)),
+        Part("stock", listOf(STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, STOCK_LEVELS, STOCK_INSIGHT, STOCK_MODE, SMART_FORECAST)),
+      ),
+    ),
+    Group(DEVICES, listOf(Part("devices", listOf(PERIPHERALS, CAMERA, EASY_SETUP)))),
+    Group(
+      DATA,
+      listOf(
+        Part("data", listOf("همگام‌سازی", "داده‌ها", ABOUT_APP, CHAT_GUARD)),
+        Part("reports", listOf(OWNER_REPORT, TAX_QUARTER, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS, DOC_GAPS)),
+      ),
+    ),
+    Group(
+      LOOK,
+      listOf(
+        Part("look", listOf("ظاهر", "زبان", "تاریخ و رقم")),
+        Part("use", listOf(NAV_BAR, TRAINING)),
+      ),
+    ),
   )
 
-  /** نامِ نشانیِ هر گروه — ثابت (`vill3n://app/settings/security`) */
+  /** دسته‌ای که صفحهٔ تنظیماتِ خودش را ندارد و ردیفش یک‌راست صفحهٔ دیگری را باز می‌کند («دستگاه‌ها» ⇐ همهٔ دستگاه‌ها) */
+  val GROUP_LINKS: Map<String, String> = mapOf(DEVICES to "devices")
+
+  /** نامِ نشانیِ هر دسته — ثابت (`vill3n://app/settings/shop`) */
   val GROUP_SLUGS: Map<String, String> = mapOf(
-    GENERAL to "general",
-    SECURITY to "security",
+    SHOP to "shop",
     SALES to "sales",
+    GOODS to "goods",
     DEVICES to "devices",
     DATA to "data",
-    ABOUT to "about",
+    LOOK to "look",
   )
 
-  /** نامِ نشانیِ هر بخش زیرِ گروهِ خودش — ثابت (`settings/security/app-lock`) */
+  /** نامِ نشانیِ گروه‌های پیشین ⇐ دستهٔ امروز، تا پیوندِ کهنه (`settings/security/app-lock`) همان صفحه را باز کند */
+  val GROUP_SLUG_ALIASES: Map<String, String> = mapOf(
+    "general" to LOOK,
+    "security" to SHOP,
+    "about" to DATA,
+  )
+
+  /**
+   *  آزمایشی‌ها (۱۴۰۵/۰۸/۱۱): هیچ ردیفی در تنظیمات ندارند؛ پیش‌فرض، صفحه و نوشتنشان همان است و فقط جست‌وجو
+   *  (با برچسبِ «آزمایشی») و نشانیِ مستقیم بازشان می‌کند.
+   */
+  val EXPERIMENTAL: Set<String> = setOf(ANOMALY, SMART_FORECAST, STOCK_MODE, EASY_SETUP)
+
+  /**
+   *  «قابلیت‌ها»: بخش‌های اختیاریِ کار، هر کدام یک کارت با یک دکمهٔ «روشن کن/خاموش کن» (همان کلیدِ صفحهٔ خودش).
+   *  ردیفِ تنظیماتِ هر کدام فقط وقتی روشن است در دستهٔ خودش دیده می‌شود ([visible])؛ «حساب‌پیِ دکان» کلیدِ
+   *  روشن/خاموش ندارد (وصل کردنِ حساب است) و ردیفش همیشه در «پرداخت» است.
+   */
+  val FEATURES: List<String> = listOf(
+    GIFT_CARD, LAYAWAY, LOYALTY, SAFE_BOOK, SPECIAL_ORDER, QUOTE, PRICE_LIST, AUTO_FEES, DELIVER_LATER, TAX_QUARTER, HESAB_SHOP,
+  )
+
+  /** قابلیت‌هایی که ردیفشان فقط با «روشن» دیده می‌شود */
+  val FEATURE_GATED: Set<String> get() = FEATURES.toSet() - HESAB_SHOP
+
+  /**
+   *  ردیفِ این بخش در صفحهٔ دسته کشیده شود؟ — نه بخشِ A، نه آزمایشی، نه فقط‌گوشی روی کامپیوتر (و برعکس)، نه
+   *  پشتِ پرچمِ خاموشِ سرور، نه قابلیتِ خاموش. خالص؛ گوشی، تبلت و کامپیوتر همین را می‌خوانند.
+   */
+  fun visible(key: String, desktop: Boolean, serverOn: Set<String>, featuresOn: Set<String>): Boolean =
+    SettingsTiers.tier(key) != SettingsTiers.Tier.HIDDEN &&
+      key !in EXPERIMENTAL &&
+      (if (desktop) key !in DESK_HIDDEN else key !in PHONE_HIDDEN) &&
+      shown(key, serverOn) &&
+      (key !in FEATURE_GATED || key in featuresOn)
+
+  /** بخش‌های دیدنیِ یک دسته (بخشِ بی ردیف کنار می‌رود) */
+  fun visibleParts(group: String, desktop: Boolean, serverOn: Set<String>, featuresOn: Set<String>): List<Part> =
+    GROUPS.firstOrNull { it.title == group }?.parts.orEmpty()
+      .map { p -> Part(p.id, p.rows.filter { visible(it, desktop, serverOn, featuresOn) }) }
+      .filter { it.rows.isNotEmpty() }
+
+  /** بخشِ کوتاهِ یک ردیف (`Part.id`) — برای نشانیِ جست‌وجو */
+  fun partOf(row: String): String? = GROUPS.flatMap { it.parts }.firstOrNull { row in it.rows }?.id
+
+  /**
+   *  نامِ نشانیِ هر بخش زیرِ دستهٔ خودش — ثابت (`settings/shop/app-lock`). نام‌ها یکتا‌اند (آزمون)، پس پیوندِ کهنهٔ
+   *  گروهِ پیشین (`settings/sales/labels`) هم همان بخش را باز می‌کند (`SettingsPaths.sectionOfSlug`).
+   */
   val SECTION_SLUGS: Map<String, String> = mapOf(
     "هشدارها" to "alerts",
     "ظاهر" to "appearance",
@@ -341,21 +447,55 @@ object SettingsLayout {
     "همگام‌سازی" -> StrSettings.syncRow
     "داده‌ها" -> StrSettings.backupRow
     ABOUT_APP -> StrSettings.versionRow
+    PROFILE -> StrSettingsHome.profileRow
     else -> row
   }
 
-  /** نامِ گروه به زبانِ صفحه (سرخطِ کارت، ردیفِ «بیشتر»، عنوانِ صفحهٔ گروه) */
+  /** نامِ دسته به زبانِ صفحه (ردیفِ صفحهٔ اول، ردیفِ «بیشتر»، عنوانِ صفحهٔ دسته) */
   fun groupLabel(group: String): String = when (group) {
+    SHOP -> StrSettingsHome.shop
+    SALES -> StrSettings.groupSales
+    GOODS -> StrSettingsHome.goods
+    DEVICES -> StrSettings.groupDevices
+    DATA -> StrSettingsHome.data
+    LOOK -> StrSettingsHome.look
     GENERAL -> StrSettings.groupGeneral
     SECURITY -> StrSettings.groupSecurity
-    SALES -> StrSettings.groupSales
-    DEVICES -> StrSettings.groupDevices
-    DATA -> StrSettings.groupData
     ABOUT -> StrSettings.groupAbout
     else -> group
   }
 
-  /** گروهِ یک بخش یا پیوند؛ null یعنی ناشناس (آزمون جلویش را می‌گیرد) */
+  /** یک خطِ سادهٔ زیرِ ردیفِ هر دسته در صفحهٔ اول */
+  fun groupLine(group: String): String? = when (group) {
+    SHOP -> StrSettingsHome.shopLine
+    SALES -> StrSettingsHome.salesLine
+    GOODS -> StrSettingsHome.goodsLine
+    DEVICES -> StrSettingsHome.devicesLine
+    DATA -> StrSettingsHome.dataLine
+    LOOK -> StrSettingsHome.lookLine
+    else -> null
+  }
+
+  /** سرخطِ هر بخشِ کوتاهِ صفحهٔ دسته؛ null ⇒ بی سرخط (همان عنوانِ صفحه) */
+  fun partLabel(id: String): String? = when (id) {
+    "shop" -> StrSettingsHome.partShop
+    "access" -> StrSettingsHome.partAccess
+    "protect" -> StrSettingsHome.partProtect
+    "pay" -> StrSettingsHome.partPay
+    "invoice" -> StrSettingsHome.partInvoice
+    "receipt" -> StrSettingsHome.partReceipt
+    "till" -> StrSettingsHome.partTill
+    "online" -> StrSettingsHome.partOnline
+    "goods" -> StrSettingsHome.partGoods
+    "stock" -> StrSettingsHome.partStock
+    "data" -> StrSettingsHome.partData
+    "reports" -> StrSettingsHome.partReports
+    "look" -> StrSettingsHome.partLook
+    "use" -> StrSettingsHome.partUse
+    else -> null
+  }
+
+  /** دستهٔ یک بخش یا پیوند؛ null یعنی ناشناس (آزمون جلویش را می‌گیرد) */
   fun groupOf(row: String): String? = GROUPS.firstOrNull { row in it.sections }?.title
 
   fun isLink(row: String): Boolean = row in LINKS

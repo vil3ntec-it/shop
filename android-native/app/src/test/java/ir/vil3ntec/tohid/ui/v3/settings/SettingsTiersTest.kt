@@ -18,8 +18,9 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  تنظیماتِ کم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱): A روشن و پنهان، B در «پیشرفته» و خاموش، C فهرستِ کوتاهِ اصلی؛
- *  هر ردیفِ دیده‌شده یک خطِ ساده و هر صفحهٔ دیده‌شده یک مثالِ «این چه می‌کند؟» در هر سه زبان دارد.
+ *  تنظیماتِ کم (تصمیمِ صاحب‌کار، ۱۴۰۵/۰۸/۱۱): A روشن و پنهان (هیچ ردیفی ندارد)، B خاموش؛ نسخهٔ دوم «پیشرفته» را
+ *  برداشت و هر ردیفِ دیدنی در بخشِ کوتاهِ دستهٔ خودش است (`SettingsLayout.visible`، `SettingsHomeTest`). هر ردیفِ
+ *  دیده‌شده یک خطِ ساده و هر صفحهٔ دیده‌شده یک مثالِ «این چه می‌کند؟» در هر سه زبان دارد.
  *
  *  ⚠️ پیش‌فرضِ کلیدها در پرونده‌های `…Android.kt` (`SharedPreferences`) است؛ مثلِ `SimpleAskEngineTest` از متنِ
  *  همان پرونده‌های خامِ `android-native` سنجیده می‌شود.
@@ -49,8 +50,12 @@ class SettingsTiersTest {
       "desk main ${desk.size} (was ${all.filterNot { it in SettingsLayout.DESK_HIDDEN || it in SettingsLayout.SERVER_GATED }.size})")
     assertTrue("فهرستِ اصلیِ گوشی بلند است: $phone", phone.size <= 12)
     assertTrue("فهرستِ اصلیِ کامپیوتر بلند است: $desk", desk.size <= 12)
-    //  هر گروهِ گوشی دست‌کم یک ردیفِ اصلی دارد تا ردیفِ گروه در «بیشتر» به صفحهٔ خالی نرسد
-    SettingsLayout.GROUPS.forEach { g -> assertTrue(g.title, SettingsTiers.rows(g, Tier.MAIN).any { it !in SettingsLayout.PHONE_HIDDEN }) }
+    //  هر دسته روی گوشی و کامپیوتر با پیش‌فرض‌ها دست‌کم یک ردیفِ دیدنی دارد تا ردیفش در «بیشتر» به صفحهٔ خالی نرسد
+    SettingsLayout.GROUPS.forEach { g ->
+      for (desktop in listOf(true, false)) {
+        assertTrue("${g.title} ($desktop)", SettingsLayout.visibleParts(g.title, desktop, emptySet(), emptySet()).isNotEmpty())
+      }
+    }
     //  چیزهایی که هر دکان تنظیم می‌کند در فهرستِ اصلی‌اند
     listOf("زبان", "ظاهر", "قفل برنامه", "کد شاگرد", "داده‌ها", SettingsLayout.PERIPHERALS, SettingsLayout.PAY)
       .forEach { assertEquals(it, Tier.MAIN, SettingsTiers.tier(it)) }
@@ -95,20 +100,32 @@ class SettingsTiersTest {
   }
 
   @Test
-  fun `فهرستِ اصلی هیچ بخشِ A ندارد و ردیف‌ها فقط با دسته کشیده می‌شوند`() {
-    SettingsLayout.GROUPS.forEach { g ->
-      assertTrue(g.title, SettingsTiers.rows(g, Tier.MAIN).none { it in SettingsTiers.ALWAYS_ON })
-      assertTrue(g.title, SettingsTiers.rows(g, Tier.ADVANCED).none { it in SettingsTiers.ALWAYS_ON })
+  fun `هیچ بخشِ A ردیف ندارد و ردیف‌ها فقط با قاعدهٔ دیدنی کشیده می‌شوند`() {
+    //  A در هیچ دسته، هیچ سکو و با هیچ قابلیت و پرچمِ روشنی ردیف نمی‌گیرد
+    val everything = SettingsLayout.FEATURES.toSet()
+    SettingsTiers.ALWAYS_ON.forEach { key ->
+      for (desktop in listOf(true, false)) {
+        assertFalse(key, SettingsLayout.visible(key, desktop, SettingsLayout.SERVER_GATED, everything))
+      }
     }
-    //  گوشی، صفحهٔ گروه و ستونِ کامپیوتر هر سه از همان دسته می‌گذرند؛ HIDDEN هرگز کشیده نمی‌شود
+    SettingsLayout.GROUPS.forEach { g ->
+      for (desktop in listOf(true, false)) {
+        val rows = SettingsLayout.visibleParts(g.title, desktop, SettingsLayout.SERVER_GATED, everything).flatMap { it.rows }
+        assertTrue(g.title, rows.none { it in SettingsTiers.ALWAYS_ON })
+      }
+    }
+    //  گوشی، صفحهٔ دسته و ستونِ کامپیوتر هر سه از همان قاعده می‌گذرند؛ «پیشرفته» دیگر نیست
     val rows = src("ui/v3/settings/SettingsRows.kt")
-    assertTrue(rows.contains(".filter { SettingsTiers.tier(it) == tier }"))
-    assertTrue(rows.contains("val more = if (tier == SettingsTiers.Tier.ADVANCED) extra else emptyList()"))
+    assertTrue(rows.contains("SettingsLayout.visibleParts(group, Platform.DESKTOP, facts.serverOn, featuresOn)"))
     val desk = src("ui/v3/settings/DeskSettingsScreen.kt")
-    assertTrue(desk.contains("SettingsTiers.tier(it) == tier"))
+    assertTrue(desk.contains("CategoryBody(c, facts, onBack = null, onRow = openRow"))
     val index = src("ui/v3/settings/SettingsIndexScreen.kt")
-    assertEquals(2, Regex("""tier = SettingsTiers\.Tier\.ADVANCED""").findAll(index).count())
-    listOf(rows, desk, index).forEach { assertFalse(it.contains("Tier.HIDDEN")) }
+    assertTrue(index.contains("rememberCategoryParts(group, facts, rememberFeatureStates().on)"))
+    listOf(rows, desk, index).forEach {
+      assertFalse(it.contains("Tier.HIDDEN"))
+      assertFalse(it.contains("Tier.ADVANCED"))
+      assertFalse(it.contains("AdvancedRow"))
+    }
     //  رابطِ امروز: کارتِ گوشی و ستونِ کامپیوتر
     val legacy = src("ui/legacy/SettingsPartsLegacy.kt")
     assertTrue(legacy.contains("if (SettingsTiers.hiddenTitle(title)) return"))
