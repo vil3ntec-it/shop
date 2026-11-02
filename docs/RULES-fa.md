@@ -138,7 +138,8 @@
 
 قرارداد، محیط و کارهای صاحب محصول: `docs/PAYMENTS-HESABPAY-fa.md` (PAY-21، PAY-08، S35؛ شاخهٔ `claude/payments-hesabpay-1`، مهاجرتِ ۱۳۹).
 - ⛔ هر چیزِ خاصِ حساب‌پی (نشانی، سرآیند، نامِ فیلد، امضا) فقط در `server/src/lib/payment-hesabpay.js` با برچسبِ «تأییدنشده»؛ قراردادِ آداپتور `lib/payment-providers.js`، هسته `lib/payment-intents.js`، درها `routes/shop-payments.js`.
-- ⛔ هیچ کلیدی در کد نیست: `HESABPAY_API_KEY` و `HESABPAY_WEBHOOK_SECRET` از محیط؛ نبود ⇒ «پیکربندی نشده» و بخش برای همه خاموش.
+- ⛔ **پولِ حساب‌پی مستقیم به حسابِ همان دکان؛ کلیدِ سکو هرگز جایگزین نیست؛ رمزِ جدای حساب‌پی؛ تأییدِ خودکار فقط با کد و مبلغ از راهِ رسمی** (صاحب‌کار ۱۴۰۵/۰۸/۱۱، مهاجرتِ ۲۰۴، `lib/hesabpay-account.js`): هر دکان «ساده» (شماره/QR ِ خودش در صندوق با مبلغ و کدِ فاکتور؛ تأیید فقط «پول رسید» ِ صندوقدار، `verification: cashier`) یا «خودکار» (کلید و رازِ پذیرندهٔ خودش، رمزشده با `HESABPAY_CRED_KEY` و AAD ِ دکان، فقط‌نوشتنی ⇐ فقط ۴ نویسهٔ آخر). `HESABPAY_API_KEY`/`HESABPAY_WEBHOOK_SECRET`/`HESABPAY_MERCHANT_ID` ِ محیط هیچ‌جا خوانده نمی‌شوند؛ آداپتور فقط `forShop(کلیدِ دکان)` دارد. وب‌هوک `/webhook/hesabpay/<token>` ِ دکان، امضا با رازِ همان دکان، قصد و کلیدِ رویداد درونِ همان دکان. رمزِ حساب‌پی (فقط صاحب، PBKDF2، ۵ خطا ⇒ قفل) در **سرور** برای باز کردن و هر تغییرِ حساب و رمز؛ هر تغییر سابقه در همان تراکنش + پوش به صاحبان؛ بازنشانی حساب را هم پاک می‌کند و ۲۴ ساعت حسابِ تازه نمی‌پذیرد. ⛔ «مبلغِ پیامک = فاکتور ⇒ تأیید» ساخته نمی‌شود: پیامک خوانده نمی‌شود و اعلانِ برنامهٔ حساب‌پی (اختیاری، اندروید، پیش‌فرض خاموش) فقط پیشنهاد است (`HesabPayHint`، `hesabpay-account.test.js`، `HesabPayShopTest`).
+- ⛔ هیچ کلیدی در کد نیست: تنها کلیدِ محیطِ حساب‌پی `HESABPAY_CRED_KEY` (رمزگذاری) است؛ نبود ⇒ «خودکار» برای همه خاموش و ذخیره‌اش ۵۰۳ ِ روشن.
 - ⛔ پرچمِ `pay.hesabpay` (دکان/`all`، پیش‌فرض خاموش)؛ پرداختِ سفارشِ آنلاین افزون بر آن اشتراکِ فعال (`source = subscription`، نه آزمایشی).
 - ⛔ مبلغ عددِ صحیح به پول؛ برای سفارش همان `total_minor` ِ سرور (ناهمخوان ⇒ ۴۰۹ `amount_mismatch`)؛ ارز فقط AFN؛ تبدیل به دهدهیِ ارائه‌دهنده دقیق و بی گرد (`minorToDecimal`/`decimalToMinor`).
 - ⛔ «paid» فقط از وب‌هوکِ امضاشده (HMAC، زمان‌ثابت) + مبلغ و ارزِ برابر + تأییدِ دومِ ارائه‌دهنده (`PAYMENTS_CONFIRM_WEBHOOK`، پیش‌فرض روشن)؛ هرگز از برگشتِ مرورگر یا گفتهٔ برنامه.
@@ -155,6 +156,7 @@
 - تطبیق: `housekeeping` ِ `app.js` هر ۶ ساعت (۴۸ ساعتِ اخیر) و `POST /api/admin/payments/reconcile` (مدیرِ ارشد)؛ فهرست `GET /api/admin/payments/intents` (زبانهٔ «عملیات»)؛ `paid → refunded` فقط `POST /api/admin/payments/intents/:id/refund` (مدیرِ ارشد، پس از برگرداندنِ پول در خودِ حساب‌پی).
 - ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط با `NODE_ENV` ِ صریحِ `test`/`development` و `PAYMENTS_FAKE_SECRET` (رازِ پیش‌فرض در کد نیست)؛ هر محیطِ دیگر یا بی راز ⇒ نادیده و `/webhook/fake` ۴۰۱.
 - ⛔ `HESABPAY_BASE_URL` فقط `https` (کلید در سرآیند می‌رود)؛ تنها استثنا http ِ loopback برای سرورِ ساختگیِ آزمون، فقط در `test`/`development`.
+- درهای «حساب‌پیِ دکان» `/api/v1/shop/hesabpay/*` فقط صاحب (`owner_only`) و دستهٔ SUB-10: FREE؛ سقفِ IP پیش از احراز.
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
 
 ### v3 · موجودی و کاتالوگ
@@ -781,6 +783,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۱۹۷ (`197_order_late_apology.sql`: `order_late_apology_policy`، `order_late_apologies` و رویدادِ `order_late_apology` در CHECK ِ `customer_notify_outbox.event`، NTF-10، `claude/chk21-ntf10`؛ ۱۸۶ تا ۱۹۳ گرفته و ۱۹۴ تا ۱۹۶ برای کارهای هم‌زمان خالی ماند).
 - ۱۹۸ (`198_perf03_indexes.sql`: فقط نمایه — `ix_sync_v3_rows_moves_product`، `ix_sync_rows_stock_ref`، `ix_sync_v3_rows_stock_ref`، `ix_sync_v3_rows_product_barcodes`، `ix_online_orders_shop_phone`؛ PERF-03، `claude/perf03-query-plans`؛ شماره را هماهنگ‌کننده سپرد؛ rollback در `server/migrations/rollback/`؛ یافته‌ها `docs/PERF-QUERY-PLANS-fa.md`).
 - ۲۰۲ (`202_shop_loyalty_rule.sql`: `shop_loyalty_rules`، PRM-13 قاعدهٔ یکسانِ امتیاز، `claude/loyalty-complete`؛ سپردهٔ هماهنگ‌کننده: تا ۱۹۹ و ۲۰۱ گرفته بود).
+- ۲۰۴ (`204_shop_hesabpay.sql`: `shop_hesabpay` — حساب‌پیِ هر دکان، رمزِ جدای حساب‌پی و نشانیِ وب‌هوکِ دکان، PAY-21/PAY-06، `claude/hesabpay-per-shop`؛ ۱۴۰۵/۰۸/۱۱ پس از سنجشِ main: بزرگ‌ترین ۲۰۳ بود؛ rollback در `server/migrations/rollback/`).
 - ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
 
 ### v3 · تعارض‌های حل‌شده
