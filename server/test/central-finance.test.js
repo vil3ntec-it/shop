@@ -445,8 +445,11 @@ test('درگاه: بی جدول ⇒ BLOCKED-EXTERNAL؛ جدول بی کلید �
     const r1 = await get('mali', '/gateway');
     assert.equal(r1.body.code, 'hesabpay_key_missing');
     assert.equal(r1.body.intents, 4);
+    //  کلیدِ سکو دیگر هیچ‌چیز را روشن نمی‌کند (حساب‌پیِ هر دکان)؛ فقط کلیدِ رمزگذاریِ کلیدهای دکان‌ها
     process.env.HESABPAY_API_KEY = 'test-key-not-real';
     process.env.HESABPAY_WEBHOOK_SECRET = 'test-secret-not-real';
+    assert.equal((await get('mali', '/gateway')).body.code, 'hesabpay_key_missing');
+    process.env.HESABPAY_CRED_KEY = 'test-cred-key-not-real-0123456789abcdef';
     const r2 = await get('mali', '/gateway');
     assert.equal(r2.body.state, 'live');
     const paid = r2.body.byStatus.find((x) => x.status === 'paid');
@@ -464,6 +467,7 @@ test('درگاه: بی جدول ⇒ BLOCKED-EXTERNAL؛ جدول بی کلید �
   } finally {
     delete process.env.HESABPAY_API_KEY;
     delete process.env.HESABPAY_WEBHOOK_SECRET;
+    delete process.env.HESABPAY_CRED_KEY;
     await query('DELETE FROM payment_intents WHERE id = ANY($1::text[])', [ids]);
   }
 });

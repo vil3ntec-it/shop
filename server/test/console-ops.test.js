@@ -395,14 +395,16 @@ test('سلامت: تعریفِ حالت‌ها، کارِ راه‌نیفتاد�
 });
 
 test('یکپارچه‌سازی: اعتبارنامه فقط «هست/نیست»، وب‌هوکِ حساب‌پی بی PAY-21 «مسدود»، بی راز', async () => {
-  process.env.HESABPAY_API_KEY = 'hp-live-key-should-never-leak-123';
+  process.env.HESABPAY_CRED_KEY = 'hp-cred-key-should-never-leak-1234567890abcdef';
   try {
     const r = await h.get('/api/admin/ops/integrations', { token: await tok('ops_view') });
     assert.equal(r.status, 200);
     const blob = JSON.stringify(r.body);
-    assert.ok(!blob.includes('hp-live-key-should-never-leak-123'));
+    assert.ok(!blob.includes('hp-cred-key-should-never-leak'));
     for (const s of secretsOfConfig()) assert.ok(!blob.includes(s));
-    const key = r.body.credentials.find((c) => c.id === 'HESABPAY_API_KEY');
+    //  حساب‌پیِ هر دکان: کلیدِ سکو دیگر در فهرست نیست؛ فقط کلیدِ رمزگذاریِ کلیدهای دکان‌ها
+    assert.equal(r.body.credentials.find((c) => c.id === 'HESABPAY_API_KEY'), undefined);
+    const key = r.body.credentials.find((c) => c.id === 'HESABPAY_CRED_KEY');
     assert.deepEqual(Object.keys(key).sort(), ['id', 'rotate', 'service', 'set']);
     assert.equal(key.set, true);
     const hook = r.body.webhooks.find((w) => w.id === 'hesabpay');
@@ -411,7 +413,7 @@ test('یکپارچه‌سازی: اعتبارنامه فقط «هست/نیست»
     if (!route) { assert.equal(hook.state, 'blocked'); assert.equal(hook.reason, 'route_missing'); }
     assert.ok(r.body.policies.rateLimit.windowMs > 0);
     assert.ok(r.body.providers.some((p) => p.id === 'email' && p.activity));
-  } finally { delete process.env.HESABPAY_API_KEY; }
+  } finally { delete process.env.HESABPAY_CRED_KEY; }
 });
 
 test('نسخه‌ها: پایدارِ منتشرشده، سه نسخهٔ جدا (برنامه/API/طرح)، مرحله‌ای بی OPS-01 «پشتیبانی نمی‌شود»، برگشت هرگز', async () => {

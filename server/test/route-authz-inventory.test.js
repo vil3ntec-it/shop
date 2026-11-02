@@ -53,6 +53,9 @@ const PUBLIC = [
     'POST /api/pump/public/:code/acct/:id/chat/push']],
   ['وب‌هوکِ ارائه‌دهندهٔ پرداخت: بی توکنِ کاربر؛ اعتبار فقط امضای بدنهٔ خام، امضای بد ⇒ ۴۰۱ و هیچ تغییری؛ `fake` فقط بیرون از تولید (routes/payments-webhook.js، PAY-21)', [
     'POST /api/payments/webhook/hesabpay', 'POST /api/payments/webhook/fake']],
+  ['وب‌هوکِ حساب‌پیِ هر دکان: نشانی فقط دکان را می‌گوید، اعتبار فقط امضای بدنه با رازِ رمزشدهٔ همان دکان (بد ⇒ ۴۰۱) و قصد فقط '
+    + 'درونِ همان دکان (hesabpay-account.test.js)', [
+    'POST /api/payments/webhook/hesabpay/:token']],
 ];
 const CUSTOMER = /^(POST|PUT|PATCH|DELETE) \/api\/(store|market)\//;
 const SELF = [

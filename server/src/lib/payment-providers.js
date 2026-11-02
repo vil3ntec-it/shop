@@ -175,17 +175,19 @@ function webhookAdapter(name) {
 
 /**
  * حالِ «پرداختِ آنلاین» برای پنلِ مدیر (`system-health.providers`) — بی هیچ راز:
- *   ساختگی ⇒ mock؛ هر دو کلیدِ حساب‌پی ⇒ live؛ یکی ⇒ incomplete؛ هیچ ⇒ همان نقدِ هنگامِ تحویل (none، D-08).
+ *   ساختگی ⇒ mock؛ حساب‌پیِ هر دکان: کلیدِ رمزگذاریِ `HESABPAY_CRED_KEY` درست ⇒ live (هر دکان کلیدِ خودش)،
+ *   کوتاه ⇒ incomplete؛ نبود ⇒ همان نقدِ هنگامِ تحویل (none، D-08). کلیدهای کهنهٔ سکو (`HESABPAY_API_KEY` …)
+ *   دیگر به کار نمی‌روند؛ اگر هنوز در محیط‌اند فقط نامشان در `ignored` می‌آید تا پاک شوند.
  */
 function providerState() {
   if (fakeAllowed()) return { mode: 'fake', state: 'mock', missing: [] };
-  const key = Boolean(String(process.env.HESABPAY_API_KEY || '').trim());
-  const secret = Boolean(String(process.env.HESABPAY_WEBHOOK_SECRET || '').trim());
-  if (key && secret) return { mode: 'hesabpay', state: 'live', missing: [], flag: 'pay.hesabpay' };
-  if (key || secret) {
-    return { mode: 'hesabpay', state: 'incomplete', missing: [key ? '' : 'HESABPAY_API_KEY', secret ? '' : 'HESABPAY_WEBHOOK_SECRET'].filter(Boolean) };
-  }
-  return { mode: 'cod', state: 'none', missing: [], decision: 'D-08' };
+  const ignored = ['HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_MERCHANT_ID']
+    .filter((k) => String(process.env[k] || '').trim());
+  const extra = ignored.length ? { ignored } : {};
+  const key = require('./hesabpay-account').credKeyState();
+  if (key === 'ok') return { mode: 'hesabpay', state: 'live', missing: [], flag: 'pay.hesabpay', perShop: true, ...extra };
+  if (key === 'weak') return { mode: 'hesabpay', state: 'incomplete', missing: ['HESABPAY_CRED_KEY (≥ ۳۲ نویسه)'], ...extra };
+  return { mode: 'cod', state: 'none', missing: [], decision: 'D-08', ...extra };
 }
 
 module.exports = {

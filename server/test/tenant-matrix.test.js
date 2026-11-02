@@ -91,6 +91,7 @@ const NO_TENANT = {
   'GET /api/auth/:app/request-status': 'ورودِ برنامه با کد', 'POST /api/auth/:app/verify': 'ورودِ برنامه با کد',
   'POST /api/payments/webhook/hesabpay': 'وب‌هوکِ ارائه‌دهندهٔ پرداخت — بی توکنِ کاربر؛ اعتبار فقط امضای بدنهٔ خام (بد ⇒ ۴۰۱) و دکان از ردیفِ قصدِ پرداخت، نه از درخواست (payment-intents.test.js)',
   'POST /api/payments/webhook/fake': 'ارائه‌دهندهٔ ساختگی، فقط بیرون از تولید؛ همان قاعدهٔ وب‌هوک (payment-intents.test.js)',
+  'POST /api/payments/webhook/hesabpay/:token': 'وب‌هوکِ حساب‌پیِ یک دکان — نشانی فقط دکان را می‌گوید؛ امضا با رازِ رمزشدهٔ همان دکان و قصد فقط درونِ همان دکان (hesabpay-account.test.js)',
   'GET /api/calendar/holidays': 'تعطیلاتِ رسمی، دادهٔ همگانی بی توکن و فقط خواندن؛ نوشتن فقط مدیرِ ارشد زیرِ /api/admin (LOC-04)',
 };
 
