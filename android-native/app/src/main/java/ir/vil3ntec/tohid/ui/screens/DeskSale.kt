@@ -262,6 +262,14 @@ fun DeskSaleScreen(
    *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
    *  سری برداشته می‌شود (`StockActions.lotForCode`). خاموش یا ناشناس ⇒ false (رفتارِ امروز).
    */
+  /** CRM-16: کدِ کارتِ مشتری ⇒ همان مشتری برای فاکتور؛ خاموش، کالا یا ناشناس ⇒ false (رفتارِ امروز) */
+  fun pickCard(code: String, dd: ShopData): Boolean {
+    val c = ir.vil3ntec.tohid.data.CustomerCards.atTill(ir.vil3ntec.tohid.data.CustomerCardPref.on(context), dd, code) ?: return false
+    if (cartStore.setDebtor(c.id)) { ScanFeedback.ok(context); toast(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.picked(c.name)) }
+    else { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED) }
+    return true
+  }
+
   fun addLot(code: String, dd: ShopData = d): Boolean {
     val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
     val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
@@ -326,7 +334,8 @@ fun DeskSaleScreen(
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
-      else -> if (!addLot(code, dd)) scope.launch {
+      //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
+      else -> if (!addLot(code, dd) && !pickCard(code, dd)) scope.launch {
         ScanFeedback.unknown(context)
         val r = snackbar.showSnackbar(StrSale.barcodeUnregistered(code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)

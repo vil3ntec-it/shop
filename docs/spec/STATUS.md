@@ -19,10 +19,10 @@
 | PRM | ۱۸ | ۹ | ۶ | ۳ | ۰ | ۰ | ۰ |
 | INV | ۳۹ | ۲۴ | ۱۳ | ۲ | ۰ | ۰ | ۰ |
 | PUR | ۱۴ | ۲ | ۱۰ | ۲ | ۰ | ۰ | ۰ |
-| CRM | ۱۶ | ۶ | ۸ | ۲ | ۰ | ۰ | ۰ |
+| CRM | ۱۶ | ۶ | ۹ | ۱ | ۰ | ۰ | ۰ |
 | RET | ۱۳ | ۱۱ | ۲ | ۰ | ۰ | ۰ | ۰ |
 | STF | ۱۱ | ۳ | ۷ | ۱ | ۰ | ۰ | ۰ |
-| RPT | ۱۸ | ۵ | ۹ | ۴ | ۰ | ۰ | ۰ |
+| RPT | ۱۸ | ۵ | ۱۰ | ۳ | ۰ | ۰ | ۰ |
 | HW | ۱۳ | ۲ | ۹ | ۲ | ۰ | ۰ | ۰ |
 | SYN | ۱۴ | ۶ | ۷ | ۱ | ۰ | ۰ | ۰ |
 | SEC | ۱۱ | ۶ | ۳ | ۲ | ۰ | ۰ | ۰ |
@@ -68,7 +68,7 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۳۰۷ | ۲۶۱ | ۱۱۳ | ۰ | ۵۸ | ۲۵ |
+| **همه** | ۷۶۴ | ۳۰۷ | ۲۶۳ | ۱۱۱ | ۰ | ۵۸ | ۲۵ |
 
 ## خلاصه به تفکیکِ فاز
 
@@ -78,8 +78,8 @@
 | ۱ | ۴۰ | ۱۹ | ۱۶ | ۴ | ۰ | ۱ | ۰ |
 | ۲ | ۱۱۳ | ۳۷ | ۶۱ | ۱۳ | ۰ | ۲ | ۰ |
 | ۳ | ۷۷ | ۳۱ | ۳۰ | ۱۶ | ۰ | ۰ | ۰ |
-| ۴ | ۱۴۱ | ۵۴ | ۶۰ | ۱۶ | ۰ | ۲ | ۹ |
-| ۵ | ۸۲ | ۲۴ | ۲۰ | ۳۵ | ۰ | ۰ | ۳ |
+| ۴ | ۱۴۱ | ۵۴ | ۶۱ | ۱۵ | ۰ | ۲ | ۹ |
+| ۵ | ۸۲ | ۲۴ | ۲۱ | ۳۴ | ۰ | ۰ | ۳ |
 | ۶ | ۶ | ۰ | ۱ | ۵ | ۰ | ۰ | ۰ |
 | بی‌فاز در سند | ۲۷۳ | ۱۱۵ | ۷۱ | ۲۱ | ۰ | ۵۳ | ۱۳ |
 
@@ -329,7 +329,7 @@
 | CRM-13 | حساب آنلاین مشتری که خرید حضوری، آنلاین، مانده و امتیاز را نشان می‌دهد. | §۶.۷ | ۵ | P2 | MISSING | — | — | — | — |
 | CRM-14 | تحلیل دفعات و مبلغ خرید (RFM). | §۶.۷ | ۵ | P2 | IMPLEMENTED-VERIFIED | ممیزی: RFM از #330 (`CustomerInsight.rfm`/`rfmSheet`): مشتریانِ خریدارِ یک سال، امتیازِ ۱ تا ۵ با صدکِ میانه (تنها و برابرها ۳)، هفت بخش با مرزهای مطلق، فاکتورِ لغوشده و بیرونِ بازه نه، مرجوعی کم، فاکتورِ مشتریِ ادغام‌شده به ماندگار: CustomerInsightTest سه آزمونِ RFM (CIِ اندرویدِ main ‏40167280739 (46c0d29) سبز؛ `CustomerInsight.kt` و آزمونش از آن پس دست نخورده‌اند)؛ زبانهٔ «تحلیلِ خرید» با شمارِ بخش‌ها، اکسل و چاپ در «گزارش‌ها»ی کامپیوتر؛ اکنون در گوشی هم (`CustomerReportsPhone.kt`، فقط با `canSeeMoney`)، پشتِ `ShopPolicy.crmReports` (خاموش). مانده: کامپایلِ زبانهٔ گوشی و CustomerReportsPhoneTest فقط در CI؛ **شاهدِ CI ِ main (ممیزیِ STATUS):** CustomerInsightTest ۴/۴ (سه آزمونِ RFM) و CustomerReportsPhoneTest ۳/۳؛ زبانهٔ گوشی در همان CI کامپایل شد — CI ِ main سبز: «توحید بومی» 41342762143 (3b3520fa) و 41355374191 (73de5d5c)، «فروشگاه من — کامپیوتر» 41342762229 و 41355374281؛ بازتولید: `gradle -p desktop test --tests '*CustomerInsightTest' --tests '*CustomerReportsPhoneTest'` | — | — | #330، #722، main: #754 (3b3520fa) |
 | CRM-15 | کمترین اطلاعات شخصی، دسترسی محدود و سابقه دسترسی. | §۶.۷ | ۲ | P0 | PARTIAL | فقط نام، تلفن و یادداشت ذخیره می‌شود؛ محدودیتِ دیدن و سابقهٔ دسترسی نیست | — | — | پیش از v3 |
-| CRM-16 | کارت یا بارکد مشتری برای شناسایی سریع در صندوق. | §۶.۷ | ۵ | P2 | MISSING | — | — | — | — |
+| CRM-16 | کارت یا بارکد مشتری برای شناسایی سریع در صندوق. | §۶.۷ | ۵ | P2 | PARTIAL | هستهٔ `core/crm/CustomerCard` (commonMain): کدِ EAN-13 با پیشوندِ ۰۴۹ و رقمِ کنترل از شناسهٔ ثابتِ مشتری، کارتِ چاپ‌شدهٔ ۸ تا ۲۰ رقمی (۱۳ رقمی با رقمِ کنترل)، یکتایی میانِ مشتریان و هر کدی که کالا می‌خواند (بارکدِ کامل/نیمه، بسته، سری) و مسیرِ صندوق که کالا را مقدم می‌گذارد؛ `Debtor.cardCode` (`EncodeDefault.NEVER`، بی migration) فقط از `data/CustomerCards` با ردِ `customer_card_set`؛ کارتِ مشتریِ ادغام‌شده مشتریِ ماندگار را می‌گیرد؛ دکمهٔ «کارتِ مشتری» در پروندهٔ مشتریِ گوشی و کامپیوتر (ساختن، کدِ چاپی، برداشتن، چاپ با همان برچسبِ ۴۰×۳۰ ِ کالا) و شناختنِ کارت در چهار راهِ اسکنِ صندوق (`Sale`، `SaleLegacy`، `DeskSale`، `CartFeedback`) پشتِ `CustomerCardPref` (`tohid-policy` ‹`customer_card`›، پیش‌فرض خاموش)؛ `jvmTest` ِ core ⇒ CustomerCardTest ۵/۵؛ از راهِ `gradle -p desktop test` ⇒ CustomerCardsTest ۶/۶، OwnerExportTest ۹/۹ و `owner-export.test.js` ۱۴/۱۴ (سرستونِ `cardCode`)؛ مانده: CIِ اندروید، صفحهٔ نسخهٔ ۳، آزمونِ چاپگر و بارکدخوانِ واقعی | — | — | شاخهٔ `claude/tax-report-customer-card` |
 
 ## RET
 
@@ -378,7 +378,7 @@
 | RPT-07 | مصارف و سود خالص ساده. | §۶.۱۰ | ۳ | P1 | IMPLEMENTED-VERIFIED | مصارف و سودِ خالص در «سود و زیان»: ReportEngineTest «مصارف از سود ناخالص کم می شوند» (CIِ اندرویدِ main ‏39268884098 سبز) | — | — | پیش از v3 |
 | RPT-08 | نقشه حرارتی ساعت در برابر روز. | §۶.۱۰ | ۵ | P2 | PARTIAL | منطقِ خالص در `core/report/SalesHeatmap` (commonMain): ۷×۲۴ با ساعتِ دیواریِ دکان (`offsetMinutes`)، روزِ کاری که از نیمه‌شب می‌گذرد (`dayStartMinutes`)، هفته از `weekStart`، برگشتی در خانهٔ خودش بی شمردن، شدتِ رنگ با عددِ صحیح (`flock … gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.report.SalesHeatmapTest'` ⇒ ۶/۶؛ جهشِ «بی جابه‌جاییِ روزِ کاری» گرفته شد)؛ صفحهٔ گزارش در برنامهٔ مدیریت و خواندنِ فروش‌ها از دفتر نیست | — | — | `claude/new-rpt-2` |
 | RPT-09 | ضدتقلب: تخفیف، برگشت، لغو، حذف ردیف و باز کردن کشو به تفکیک کاربر. | §۶.۱۰ | ۲ | P1 | PARTIAL | هسته و زبانهٔ «ضدتقلب» ِ گزارشِ تازه کامل‌اند (ReportCoreVectorsTest، ReportFreshModelTest، `report-core.test.js`؛ CIِ main ‏41081653448 سبز)؛ تخفیف (فروشندهٔ فاکتور) و کشو بی فروش (`no_sale` با `by`، پشتِ `payV2`) به تفکیکِ کاربرند. سه رویدادِ مانده پشتِ تنظیمِ خاموشِ «سابقهٔ ضدتقلب» (`FraudTrailPref`، `tohid-policy` ‹`fraud_trail`›): `by` روی `cancel_sale` ِ `SalesEngine.cancel` و `SaleReturn` ِ `recordReturn`، هستهٔ گزارش `returns[].by` را جلوتر از `user` می‌خواند (JS و Kotlin، بردارِ تازهٔ `trail` در `report-v1.json`)، و هر ردیفِ حذف‌شده از فاکتورِ باز (`CartStore.onLinesRemoved`؛ قاعده در `core` ‹`LineVoid`›) ردیفِ `line_delete` با مبلغ: `gradle -p core jvmTest` ‏LineVoidTest ۶/۶؛ `node --test server/test/report-core.test.js report-board.test.js` ۱۵/۱۵ (جهشِ برگرداندنِ `by` ⇒ ۱ سرخ)؛ FraudTrailTest، ReportBridgeParityTest «ضدتقلب با فیلدهای برنامه»، CartStoreLineVoidDesktopTest فقط در CI؛ مانده: سبزِ CIِ اندروید/کامپیوترِ همین PR | — | — | #236، #279 (afeb844)، `claude/part-RPT-1` |
-| RPT-10 | گزارش مالیات سه‌ماهه (قابل تنظیم) با یادآور سررسید. | §۶.۱۰ | ۴ | P1 | MISSING | — | — | D-11، D-25 | — |
+| RPT-10 | گزارش مالیات سه‌ماهه (قابل تنظیم) با یادآور سررسید. | §۶.۱۰ | ۴ | P1 | PARTIAL | هستهٔ `core/report/QuarterTax` (commonMain): سه‌ماهه با ماهِ آغازِ سالِ مالیِ قابلِ تنظیم (گذر از حوت)، سررسید از تنظیمات (پیش‌فرض ۱۵ ِ ماهِ بعد: سرطان–سنبله ⇒ ۱۵ میزان) و یادآورِ N روز پیش (پیش‌فرض ۱۰)، جمعِ فروش، برگشت و خرید به پول و مالیات با نرخِ تنظیمات (ده‌هزارم، گردِ نیمه)؛ `data/TaxQuarter` همان ردیف‌های `ReportEngine` (فاکتورِ لغونشده، برگشت در روزِ خودش) و برگهٔ CSV/چاپ؛ بخشِ تنظیماتِ «گزارشِ مالیاتِ سه‌ماهه» (`TaxQuarterPref`، `tohid-policy` ‹`tax_quarter`›، پیش‌فرض خاموش، بی نرخِ پیش‌فرض) با جمع‌ها، خروجیِ CSV و چاپ، و کارتِ یادآورِ خانهٔ رابطِ امروز؛ `jvmTest` ِ core ⇒ QuarterTaxTest ۱۳/۱۳؛ از راهِ `gradle -p desktop test` ⇒ TaxQuarterTest ۴/۴ (برابری با `ReportEngine.sales`/`purchases`)، SettingsPortTest ۴/۴، DeskSettingsCoverageTest ۳/۳، I18nCoverageTest ۸/۸؛ مانده: CIِ اندروید، صفحه و هشدارِ خانهٔ نسخهٔ ۳، مالیاتِ خرید (در دفتر ثبت نمی‌شود)، نرخ و قاعده با حسابدار | — | D-11، D-25 | شاخهٔ `claude/tax-report-customer-card` |
 | RPT-11 | خروجی Excel و PDF و چاپ در همه پلتفرم‌ها. | §۶.۱۰ | ۲ | P0 | PARTIAL | کامپیوتر: اکسل و چاپ؛ گوشی: CSV/اکسل و چاپِ سیستم (Xlsx، ReportCsv؛ XlsxTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ PDF ِ مستقیم در «گزارشِ تازه» پشتِ تنظیمِ خاموشِ `report_fresh`: کامپیوتر با `core/pdf/ImagePdf` (A4، ۱۵۰ نقطه، RunLengthDecode) و گوشی با `PrintedPdfDocument`: `gradle -p core jvmTest` ‏ImagePdfTest ۳/۳ و ImagePdfFileTest ۱/۱، فایلِ نمونه با `pdfinfo` (۲ صفحه، A4، عنوانِ دری) و pypdf ِ strict (بیت‌ها برابر)؛ کامپایلِ برنامه با CIِ #452؛ فایلِ PDF ِ گزارشِ واقعی روی دستگاه دیده نشده | — | — | پیش از v3؛ #452 |
 | RPT-12 | گزارش زمان‌بندی‌شده برای مالک. | §۶.۱۰ | ۳ | P1 | MISSING | — | — | D-09 | — |
 | RPT-13 | کار با گزارش با کیبورد (بخش ۵.۲). | §۶.۱۰ | ۳ | P1 | PARTIAL | هسته `core/report/ReportPeriod` (− / + همان بازه به واحدِ خودش: روز، ۷ روز، ماهِ میلادیِ کامل و جاری تا امروز، ماه و سالِ خورشیدیِ کامل؛ بی دورهٔ آینده؛ تغییر به ده‌هزارم نسبت به دورهٔ قبل): `ReportPeriodTest` (`gradle -p core jvmTest`، ۶/۶ محلی، دو جهشِ سرخ)؛ `reports.prevPeriod`/`nextPeriod`/`compare` در «گزارش‌ها»ی کامپیوتر پشتِ تنظیمِ خاموشِ `tohid-policy:report_keys` (فقط CI)؛ `reports.drill` (Enter) و ستونِ مقایسه در خودِ جدول هنوز نه؛ وضعیتِ keymap «planned» ماند (پرچمِ خاموش) | — | — | `claude/new-rpt-3` |

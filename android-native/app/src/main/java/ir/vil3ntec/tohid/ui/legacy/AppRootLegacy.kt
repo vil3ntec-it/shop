@@ -868,6 +868,8 @@ fun AppRootLegacy(
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
                 ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
+                ir.vil3ntec.tohid.core.i18n.StrTaxQuarter.settingsTitle to androidx.compose.material.icons.Icons.Filled.Receipt, // RPT-10، پیش‌فرض خاموش
+                ir.vil3ntec.tohid.core.i18n.StrCustomerCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CreditCard, // CRM-16، پیش‌فرض خاموش
                 Str.aboutApp to androidx.compose.material.icons.Icons.Filled.Info,
               ) + (
                 //  «سرورها» (پرچمِ `app.multi_server`) فقط برای صاحبِ دکان
