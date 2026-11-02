@@ -79,6 +79,8 @@ fun main() {
   ir.vil3ntec.tohid.data.platform.CrashReporter.install(context)
   //  «سرورِ بعدی» (پرچمِ `app.multi_server`) فقط این‌جا، پیش از هر دفتر و درخواستی
   ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(context)
+  //  SYN-09: هابِ محلی — پرچمِ بالا **و** تنظیمِ `hub.local` ِ همین دستگاه؛ هر کدام خاموش ⇒ هیچ (‎desktop/hub/HubBoot.kt‎)
+  runCatching { ir.vil3ntec.tohid.desktop.hub.HubBoot.startIfEnabled(context) }
   val prefs = context.getSharedPreferences("tohid", 0)
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)

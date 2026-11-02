@@ -160,8 +160,8 @@ object CashShift {
       sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && inWindow(it.createdAt) }
         .sumOf { saleCash(it, fixes[it.id].orEmpty(), to) },
       receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && inWindow(it.createdAt) }.sumOf { it.amount } +
-        //  PAY-24: فروشِ کارتِ هدیه (نقد)؛ بی کارت ⇒ ۰
-        GiftCards.issueCash(d, from, to),
+        //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه (نقد)؛ بی کارت ⇒ ۰
+        GiftCards.cashIn(d, from, to),
       //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛
       //  ردیفِ قدیمی آن را ندارد ⇒ همان `amount`ِ امروز
       returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { ReturnFlow.drawerAmount(it) } +

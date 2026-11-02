@@ -54,7 +54,13 @@
     bad_checksum: 'sha256 ِ نادرست',
     network: 'اینترنت قطع شد',
   };
-  const FLAG_FA = { extension_mismatch: 'پسوند با نوع نمی‌خواند', too_small: 'عکسِ کوچک' };
+  const FLAG_FA = {
+    extension_mismatch: 'پسوند با نوع نمی‌خواند', too_small: 'عکسِ کوچک',
+    //  IMG-15 (پرچمِ `image_bank.quality`) — فقط پیشنهاد برای بازبین، نه رد
+    blurry: 'تار', too_dark: 'تاریک', too_bright: 'بیش از حد روشن', blank: 'تقریباً یک‌رنگ',
+    busy_background: 'پس‌زمینهٔ شلوغ', aspect_extreme: 'نسبتِ ابعادِ نامعمول', over_compressed: 'فشرده‌سازیِ زیاد',
+    heavy_file: 'حجمِ زیاد', near_duplicate: 'مشابهِ احتمالی', quality_unmeasured: 'کیفیت سنجیده نشد',
+  };
   const ROW_FA = {
     ok: 'موفق', failed: 'ناموفق', ambiguous: 'مبهم', needs_review: 'نیازمندِ بررسی',
     duplicate: 'تکراری', skipped: 'رد شد',
@@ -398,7 +404,10 @@
       tr.appendChild(td(reasonsFa(it.match_reasons), 'ib-reasons'));
       const flags = el('td');
       if (it.duplicate_of.length) flags.appendChild(badge('b-warn', `تکراری × ${fa(it.duplicate_of.length)}`));
-      for (const f of it.quality_flags) flags.appendChild(badge('b-mute', FLAG_FA[f] || f));
+      for (const f of it.quality_flags) {
+        const n = f === 'near_duplicate' && it.near_duplicate_of ? ` × ${fa(it.near_duplicate_of.length)}` : '';
+        flags.appendChild(badge('b-mute', (FLAG_FA[f] || f) + n));
+      }
       if (it.from_shop) flags.appendChild(badge('b-mute', 'از دکان'));
       if (it.versions_pending) flags.appendChild(badge('b-warn', `نسخهٔ تازه × ${fa(it.versions_pending)}`));
       tr.appendChild(flags);
