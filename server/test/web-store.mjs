@@ -261,6 +261,38 @@ ok(/#\/o\/[0-9A-Z]{26}\.[A-Za-z0-9_-]{32}$/.test(page.url()), 'نشانیِ پی
   await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.issue_reports', value: null }, A);
 }
 
+//  ── NTF-09: نظرهای تأییدشده روی صفحهٔ دکان — خاموش ⇒ نه reviews.js، نه واژه‌نامه، نه #rv؛ روشن ⇒ ستاره و نوشتهٔ خام فقط با textContent ──
+{
+  const oid = (await one('SELECT id FROM online_orders WHERE shop_id=$1 ORDER BY created_at LIMIT 1', [shopId])).id;
+  const raw = '<b>بسته</b> سالم رسید <img src=x onerror="window.__rv=1">';
+  await query(`INSERT INTO order_reviews (id, shop_id, order_id, stars, comment, status, request_hash, moderated_by, moderated_at, created_at)
+               VALUES ($1,$2,$3,4,$4,'approved','h','u',$5,$5)`, [require('../src/lib/ulid').ulid(now()), shopId, oid, raw, now()]);
+  const asked = [];
+  const seen = (r) => { if (/\/store\/reviews\.js|\/i18n\/reviews\.|\/reviews$/.test(r.url())) asked.push(r.url()); };
+  page.on('request', seen);
+  await page.goto(`${base}/store/${slug}#/`);
+  await page.reload();   // بارِ تازهٔ کامل، نه فقط عوض شدنِ #
+  //  حالِ واقعیِ پایان: catalog.js اجرا شد، کالاها آمدند و شبکه آرام است — نه فقط «گره نیست»
+  await page.waitForFunction(() => typeof window.StoreCatalog === 'function' && document.querySelectorAll('#products li').length > 0, null, { timeout: 10000 });
+  await page.waitForLoadState('networkidle');
+  const offInfo = await page.evaluate(async (u) => (await (await fetch(u)).json()).features || {}, `/api/store/${slug}`);
+  ok(!('reviews' in offInfo) && asked.length === 0 && !(await page.$('script[src="/store/reviews.js"]')) && !(await page.$('#rv')),
+    'NTF-09: پرچمِ خاموش ⇒ نه کلیدِ features.reviews، نه reviews.js و واژه‌نامه و /reviews، نه #rv', JSON.stringify({ offInfo, asked }));
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.reviews', value: true }, A);
+  await page.reload();
+  await page.waitForFunction(() => { const s = document.getElementById('rv'); return s && !s.hidden && document.querySelectorAll('#rv-list li').length === 1; }, null, { timeout: 10000 });
+  const rv = await page.$eval('#rv', (x) => ({
+    text: x.querySelector('.rv-text').textContent, kids: x.querySelector('.rv-text').children.length, imgs: x.querySelectorAll('img').length,
+    stars: x.querySelector('.rv-stars').textContent, label: x.querySelector('.rv-stars').getAttribute('aria-label'),
+    sum: x.querySelector('#rv-sum').textContent, all: x.textContent, before: x.nextElementSibling && x.nextElementSibling.id,
+  }));
+  ok(rv.text === raw && rv.kids === 0 && rv.imgs === 0 && !(await page.evaluate(() => window.__rv)), 'NTF-09: نوشتهٔ مشتری خام و بی HTML (textContent)', JSON.stringify(rv));
+  ok(rv.stars === '★★★★☆' && /۴/.test(rv.label) && /۴/.test(rv.sum) && /۱/.test(rv.sum) && rv.before === 'recent', 'NTF-09: ستاره، میانگین و شمار پیش از «اخیر»', JSON.stringify(rv));
+  ok(!rv.all.includes('0791') && !rv.all.includes('+93') && !rv.all.includes('#'), 'NTF-09: بی شمارهٔ مشتری و بی شمارهٔ سفارش', rv.all);
+  page.off('request', seen);
+  await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.orders.reviews', value: null }, A);
+}
+
 const man = await (await fetch(`${base}/store/${slug}/manifest.webmanifest`)).json();
 ok(man.name === 'ویترینِ آزمایشی' && man.start_url === `/store/${slug}` && man.icons.length === 3, 'وب‌اپِ قابلِ نصبِ همین دکان (WEB-14)');
 ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 404, 'manifest ِ ویترینِ ناموجود ⇒ ۴۰۴');

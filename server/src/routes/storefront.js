@@ -137,6 +137,8 @@ async function featuresOf(shopId) {
     ...((await require('../lib/storefront-alerts').flagOn(shopId)) ? { alerts: true } : {}),
     //  WEB-04: «تحویلِ تقریبی» در سبد و ثبت (`GET /:slug/eta`، `storefront-eta-store.js`) با پرچمِ `shop.storefront.eta`
     ...((await eta.flagOn(shopId)) ? { eta: true } : {}),
+    //  NTF-09: نظرهای تأییدشده در ویترین (`store/reviews.js` ِ دیربار، `GET /:slug/reviews`) با پرچمِ `shop.orders.reviews`
+    ...((await orders.flagOf(shopId, require('../lib/order-reviews').FLAG)) ? { reviews: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
