@@ -198,8 +198,14 @@ async function listPlans({ activeOnly = true, app = 'shop' } = {}) {
   return rows.map(r => shapePlan(r, at));
 }
 
-async function getPlan(code, app = 'shop') {
-  return one('SELECT * FROM plans WHERE code=$1 AND app=$2', [code, app]);
+/*
+ *  `run` = اتصالِ تراکنشِ جاری (`(sql, params) ⇒ {rows}`)؛ نیامده ⇒ استخر. درونِ تراکنش از همان اتصال، نه
+ *  اتصالِ دوم ِ استخر — وگرنه تراکنش‌های هم‌زمانِ پشتِ یک قفل همهٔ استخر را نگه می‌دارند و این پرسش اتصال
+ *  نمی‌گیرد (همان RSK-07 ِ `orders.flagOf`). خواندن همان است: READ COMMITTED همان ردیفِ ثبت‌شده را می‌بیند.
+ */
+async function getPlan(code, app = 'shop', run = null) {
+  const sql = 'SELECT * FROM plans WHERE code=$1 AND app=$2';
+  return run ? (await run(sql, [code, app])).rows[0] || null : one(sql, [code, app]);
 }
 
 
@@ -210,13 +216,15 @@ function trialConfig(app = 'shop') {
 }
 
 /** روزهای دورهٔ آزمایشیِ یک بخش، از تنظیمات یا پیش‌فرض. */
-async function trialDaysOf(app = 'shop') {
+async function trialDaysOf(app = 'shop', run = null) {
   const { key, def } = trialConfig(app);
-  return Number(await getConfig(key, def)) || 0;
+  return Number(await getConfig(key, def, run)) || 0;
 }
 
-async function getConfig(key, def = '') {
-  const r = await one('SELECT value FROM app_config WHERE key=$1', [key]);
+/** `run` مثلِ `getPlan`. */
+async function getConfig(key, def = '', run = null) {
+  const sql = 'SELECT value FROM app_config WHERE key=$1';
+  const r = run ? (await run(sql, [key])).rows[0] : await one(sql, [key]);
   return r ? r.value : def;
 }
 

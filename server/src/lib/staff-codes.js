@@ -259,7 +259,8 @@ async function redeem(rawCode, userId, ip = '') {
 
     // «چند کاربر روی یک دکان» قابلیت اشتراکی است. اگر اشتراک دکان تمام
     // شده باشد، شاگرد تازه اضافه نمی‌شود — تصمیم اینجا گرفته می‌شود، نه در گوشی.
-    const ent = await require('./entitlement').entitlementOf(code.shop_id);
+    //  با همان اتصالِ تراکنش (نه استخر): پیوستن‌های هم‌زمانِ پشتِ همین `FOR UPDATE` استخر را خالی نکنند
+    const ent = await require('./entitlement').entitlementOf(code.shop_id, now(), (text, params) => c.query(text, params));
     if (!ent.features.includes('multi_device')) {
       throw forbidden('اشتراک این دکان اجازه‌ی افزودن شاگرد را نمی‌دهد', 'subscription_required');
     }
