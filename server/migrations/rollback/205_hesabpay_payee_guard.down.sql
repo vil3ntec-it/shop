@@ -9,6 +9,9 @@
 --    psql "$DATABASE_URL" -1 -f migrations/rollback/205_hesabpay_payee_guard.down.sql
 -- ============================================================
 
+ALTER TABLE shop_hesabpay DROP COLUMN IF EXISTS till_seq_v3;
+ALTER TABLE shop_hesabpay DROP COLUMN IF EXISTS till_seq_v1;
+ALTER TABLE tokens DROP COLUMN IF EXISTS session_at;
 ALTER TABLE payment_intents DROP COLUMN IF EXISTS payee_fp;
 DROP TABLE IF EXISTS hesabpay_payees;
 ALTER TABLE shop_hesabpay DROP COLUMN IF EXISTS section_locked_until;

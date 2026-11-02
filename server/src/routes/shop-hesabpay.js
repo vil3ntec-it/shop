@@ -39,8 +39,10 @@ const ownerOnly = (req, res, next) => (req.role === 'owner' ? next()
   : next(forbidden('حساب‌پیِ دکان را فقط صاحبِ دکان می‌بیند و تنظیم می‌کند', 'owner_only')));
 router.use(requireUser, requireShop, limit, ownerOnly);
 
-//  `device` = دستگاهِ همین نشست (`middleware/auth`) ⇒ «دستگاهِ مطمئن» ِ نگهبان
-const actor = (req) => ({ id: req.user.id, ip: clientIp(req), device: req.device || null });
+//  «دستگاهِ مطمئن» ِ نگهبان: دستگاهِ همین توکن (`middleware/auth`) و زنجیرهٔ نشستش (`tokens.session_at` = ورودی که آن را
+//  ساخت؛ پیش از ۲۰۵ ⇒ خودِ صدورِ توکن) — هر دو از سرور، هیچ‌کدام از چیزی که برنامه می‌فرستد
+const sessionOf = (row) => (row ? { at: Number(row.session_at) || Number(row.issued_at), deviceId: row.device_id || '' } : null);
+const actor = (req) => ({ id: req.user.id, ip: clientIp(req), device: req.device || null, session: sessionOf(req.tokenRow) });
 
 router.get('/', async (req, res) => {
   res.json(await acc.status(req.shopId, actor(req)));

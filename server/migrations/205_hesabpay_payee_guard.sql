@@ -10,6 +10,11 @@
 --                                    حسابِ کهنه فعال می‌ماند. «این من نبودم» ⇒ پاک و section_locked_until.
 --  hesabpay_payees     هر حسابی که روزی فعال بود (اثرِ انگشت، نام، ۴ رقم) ⇒ گزارشِ «پول به کدام حساب رفت».
 --  payment_intents.payee_fp  اثرِ انگشتِ حسابِ فعال هنگامِ ساختنِ قصد؛ «پرداخت شد» فقط اگر هنوز همان باشد.
+--  tokens.session_at   زمانِ **ورودی** که این زنجیرهٔ نشست را ساخت (تازه‌سازی همان را نگه می‌دارد) ⇒ «دستگاهِ مطمئن»:
+--                      نشانه فقط توکنِ سرور است، نه `device_uid` ِ برنامه (رمزِ دزدیده + شناسهٔ دستگاهِ دانسته ⇒ نشستِ تازه).
+--                      NULL (پیش از این نسخه) ⇒ همان `issued_at` (تازه شمرده می‌شود؛ بسته در برابرِ خطا).
+--  shop_hesabpay.till_seq_v1/v3  تا کجای `oplog`/`sync_v3_ops` ِ همین دکان ردیف‌های «پول رسید» ِ صندوق سنجیده شد
+--                      (هشدار و پوشِ فوری برای گیرندهٔ ناشناخته).
 --
 --  فقط افزودنی — هیچ ستون یا ردیفِ موجودی پاک نمی‌شود. بازگشت: `rollback/205_hesabpay_payee_guard.down.sql`.
 -- ============================================================
@@ -39,3 +44,7 @@ CREATE TABLE IF NOT EXISTS hesabpay_payees (
 );
 
 ALTER TABLE payment_intents ADD COLUMN IF NOT EXISTS payee_fp text NOT NULL DEFAULT '';
+
+ALTER TABLE tokens ADD COLUMN IF NOT EXISTS session_at bigint;
+ALTER TABLE shop_hesabpay ADD COLUMN IF NOT EXISTS till_seq_v1 bigint NOT NULL DEFAULT 0;
+ALTER TABLE shop_hesabpay ADD COLUMN IF NOT EXISTS till_seq_v3 bigint NOT NULL DEFAULT 0;

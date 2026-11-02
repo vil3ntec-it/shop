@@ -13,6 +13,8 @@
  *   ۶. «خودکار»: وب‌هوکِ امضاشدهٔ درست با پذیرندهٔ دیگر/بی پذیرنده/اثرِ انگشتِ کهنه ⇒ «نیازمندِ بررسی»، هرگز «پرداخت شد»
  *   ۷. دکانِ دیگر: لغو و گزارش و حسابِ در انتظارِ «الف» را نمی‌بیند و دست نمی‌زند
  *   ۸. گزارشِ «پول به کدام حساب رفت» (مسیر و گزارشِ خودکارِ صاحب) بی شماره و کلید؛ راز در لاگ نه
+ *   ۹. رمزِ ورودِ دزدیده + `device_uid` ِ دانستهٔ گوشیِ صاحب ⇒ نشستِ تازه ⇒ نامطمئن (اعتماد به زنجیرهٔ توکنِ سرور، نه شناسهٔ برنامه)
+ *  ۱۰. «پول رسید» ِ صندوق با گیرنده‌ای جز حساب‌های همین دکان (همگام‌سازیِ v1) ⇒ هشدار و پوشِ فوری به صاحب، یک بار
  */
 process.env.PAYMENTS_PROVIDER = '';
 process.env.HESABPAY_PIN_ITER = '1000';
@@ -113,9 +115,12 @@ const kinds = (s) => pushes.filter((p) => p.shopId === s.shopId).map((p) => p.me
 const elapse = (s) => query('UPDATE shop_hesabpay SET pending_until=$2 WHERE shop_id=$1 AND pending_until > 0', [s.shopId, now() - 1]);
 /** نشستِ این توکن دیگر «تازه» نیست (ده دقیقه از ورود گذشت) ⇒ کارِ حساس `reauth_required` */
 const stale = (token) => query(`DELETE FROM login_attempts WHERE scope='session_auth' AND identifier=$1`, [hashToken(token)]);
-/** دستگاه‌های امروزِ صاحب ۸ روزه می‌شوند (گوشیِ همیشگی) */
-const ageDevices = (s, days = 8) => query('UPDATE devices SET created_at=$2 WHERE user_id=$1', [s.owner.user.id, now() - days * DAY]);
-/** همان صاحب (یا کسی که رمزِ ورودش را دارد) روی دستگاهی تازه وارد می‌شود */
+/** گوشیِ همیشگیِ صاحب: دستگاه‌ها و زنجیره‌های نشستِ امروزش ۸ روزه می‌شوند (ورود ۸ روز پیش، از آن پس فقط تازه‌سازی) */
+async function ageDevices(s, days = 8) {
+  await query('UPDATE devices SET created_at=$2 WHERE user_id=$1', [s.owner.user.id, now() - days * DAY]);
+  await query('UPDATE tokens SET session_at=$2 WHERE subject_id=$1', [s.owner.user.id, now() - days * DAY]);
+}
+/** همان صاحب (یا کسی که رمزِ ورودش را دارد) روی دستگاهی تازه — یا با `device_uid` ِ دستگاهی دیگر — وارد می‌شود */
 async function newDevice(s, id) {
   const r = await h.post('/api/auth/login', {
     identifier: s.owner.email, password: s.owner.password, device: { deviceId: id, name: 'گوشیِ تازه', platform: 'test' },
@@ -415,4 +420,88 @@ test('۸. «پول به کدام حساب رفت»: مسیرِ صاحب و گز�
   assert.match(text, /حساب‌پی: دکانِ خودکار — ۰۰۰۱/);
   assert.match(text, /⚠️ حسابِ دیگر/);
   assert.match(text, /۲ پرداختِ حساب‌پی به حسابِ دکان ثابت نشد/);
+});
+
+test('۹. رمزِ ورودِ دزدیده + `device_uid` ِ دانستهٔ گوشیِ همیشگیِ صاحب ⇒ نشستِ تازه ⇒ نامطمئن؛ گوشیِ صاحب همچنان مطمئن', async () => {
+  const s = await shop('شناسهٔ-دانسته');
+  await ready(s, '0799111222');
+  await ageDevices(s);
+  const uid = (await one('SELECT device_uid FROM devices WHERE user_id=$1', [s.owner.user.id])).device_uid;
+  //  دزد همان شناسهٔ دستگاه را می‌فرستد ⇒ همان ردیفِ ۸ روزهٔ دستگاه، ولی زنجیرهٔ نشستِ تازه
+  const thief = await newDevice(s, uid);
+  assert.equal((await one('SELECT COUNT(*)::int AS n FROM devices WHERE user_id=$1', [s.owner.user.id])).n, 1, 'همان ردیفِ دستگاه');
+  assert.equal((await h.get(URL, { token: thief })).body.device.trusted, false);
+  for (const [m, path, body] of [['put', '/account', simple('0700999888')], ['put', '/pin', { pin: PIN, newPin: '975310' }],
+    ['post', '/pin/reset', {}], ['post', '/account/remove', { pin: PIN }]]) {
+    const r = await h[m](`${URL}${path}`, body, { token: thief });
+    assert.deepEqual([r.status, r.body.error && r.body.error.code], [403, 'hesabpay_device_untrusted'], path);
+  }
+  assert.equal((await rowOf(s)).pending, null);
+  //  تازه‌سازیِ نشستِ دزد زنجیره را کهنه نمی‌کند (همان ورودِ امروز)
+  const ref = await one(`SELECT session_at FROM tokens WHERE subject_id=$1 AND kind='refresh' ORDER BY issued_at DESC LIMIT 1`, [s.owner.user.id]);
+  assert.ok(Number(ref.session_at) > now() - 60_000);
+  //  گوشیِ خودِ صاحب (زنجیرهٔ ۸ روزه) همچنان می‌تواند — باز هم ۲۴ ساعت در انتظار
+  assert.equal((await h.get(URL, { token: s.t })).body.device.trusted, true);
+  const ok = await save(s, simple('0788333444'));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.pending.last4, '3444');
+});
+
+test('۹ب. تازه‌سازی زمانِ ورودِ زنجیره را نگه می‌دارد؛ ورودِ تازه زنجیرهٔ تازه است', async () => {
+  const s = await shop('زنجیره');
+  await ageDevices(s);
+  const r = await h.post('/api/auth/refresh', { refreshToken: s.owner.refreshToken });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const born = (tk) => one('SELECT session_at FROM tokens WHERE token_hash=$1', [hashToken(tk)]);
+  assert.ok(Number((await born(r.body.accessToken)).session_at) <= now() - 7 * DAY, 'تازه‌سازی همان زنجیرهٔ کهنه');
+  assert.ok(Number((await born(r.body.refreshToken)).session_at) <= now() - 7 * DAY);
+  const again = await h.post('/api/auth/login', { identifier: s.owner.email, password: s.owner.password, device: { deviceId: 'x-relogin' } });
+  assert.ok(Number((await born(again.body.accessToken)).session_at) > now() - 60_000, 'ورودِ تازه ⇒ زنجیرهٔ تازه');
+});
+
+let opSeq = 0;
+const op = (rowId, fields) => ({
+  op_id: `01JHP${String(Date.now()).slice(-8)}${String(++opSeq).padStart(13, '0')}`, ts: Date.now(), table: 'sales', row_id: rowId, type: 'insert', fields,
+});
+const tillPay = (amount, payee) => ({ method: 'hesabpay', kind: 'wallet', amount, status: 'confirmed', verification: 'cashier', ref: 'HP-1', ...(payee === undefined ? {} : { payee }) });
+
+test('۱۰. «پول رسید» ِ صندوق با گیرنده‌ای جز حساب‌های همین دکان ⇒ هشدار + پوشِ فوری به صاحب (یک بار)؛ حسابِ خودِ دکان نه', async () => {
+  const s = await shop('صندوق');
+  await ready(s, '0799111222');
+  const fpA = (await rowOf(s)).payee_fp;
+  const t0 = now();
+  const push = (ops) => h.api('POST', '/api/sync/v1/push', {
+    token: s.t, headers: { 'X-App': 'shop', 'X-Device': 'till-1' }, body: { device_id: 'till-1', schema_version: 3, ops },
+  });
+  const r = await push([
+    op('s-ok', { status: 'completed', finalTotal: 50, createdAt: t0, payments: [tillPay(5000, fpA)] }),
+    op('s-thief', { status: 'completed', finalTotal: 70, createdAt: t0, payments: [{ method: 'cash', kind: 'cash', amount: 1000, status: 'confirmed' }, tillPay(6000, 'hp1_thief_account')] }),
+    op('s-old-app', { status: 'completed', finalTotal: 30, createdAt: t0, payments: [tillPay(3000)] }),
+  ]);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  pushes.length = 0;
+  assert.equal(await guard.tillSweep(), 1);
+  const al = await many(`SELECT target_type, target_id, detail FROM audit_logs WHERE shop_id=$1 AND action='hesabpay.payee_alert'`, [s.shopId]);
+  assert.deepEqual(al.map((a) => [a.target_type, a.target_id, a.detail.why, a.detail.amountMinor]), [['sale', 's-thief', 'unknown', 6000]]);
+  assert.deepEqual(kinds(s), ['till_payee_alert', 'till_payee_alert'], 'پوش به هر دو دستگاهِ صاحب');
+  assert.ok(pushes.every((p) => p.userId === s.owner.user.id && p.message.data.saleId === 's-thief'));
+  //  دورِ بعد: تکراری نه
+  pushes.length = 0;
+  assert.equal(await guard.tillSweep(), 0);
+  assert.deepEqual(kinds(s), []);
+  //  حسابِ کهنه پس از فعال شدنِ حسابِ تازه (بیرون از مهلتِ کشِ صندوق) ⇒ هشدار
+  assert.equal((await save(s, simple('0788333444'))).status, 200);
+  await elapse(s);
+  await till(s);
+  await query('UPDATE hesabpay_payees SET retired_at=$2 WHERE shop_id=$1 AND fp=$3', [s.shopId, now() - 10 * 60_000, fpA]);
+  assert.equal((await push([op('s-stale', { status: 'completed', finalTotal: 40, createdAt: now(), payments: [tillPay(4000, fpA)] })])).status, 200);
+  assert.equal(await guard.tillSweep(), 1);
+  const stale = await one(`SELECT detail FROM audit_logs WHERE shop_id=$1 AND action='hesabpay.payee_alert' AND target_id='s-stale'`, [s.shopId]);
+  assert.equal(stale.detail.why, 'retired');
+  //  گزارشِ صاحب همان هشدارها را با منبعِ «صندوق» نشان می‌دهد
+  const rep = (await h.get(`${URL}/payees`, { token: s.t })).body.alerts;
+  assert.deepEqual(rep.map((a) => [a.source, a.saleId]).sort(), [['till', 's-stale'], ['till', 's-thief']]);
+  //  X/Z: صندوق تاریخچهٔ حساب‌ها (نام، ۴ رقم، اثرِ انگشت) را از پیکربندی می‌گیرد
+  const cfg = await till(s);
+  assert.deepEqual(cfg.payees.map((p) => [p.last4, p.active]), [['3444', true], ['1222', false]]);
 });

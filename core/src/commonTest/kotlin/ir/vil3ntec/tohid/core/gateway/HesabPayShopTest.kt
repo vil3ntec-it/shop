@@ -146,6 +146,29 @@ class HesabPayShopTest {
   }
 
   @Test
+  fun xzTotalsGroupByPayeeAndFlagForeignAccounts() {
+    val known = listOf(Payee("دکانِ احمد", "1222", "hp1_a", active = true), Payee("قبلی", "0001", "hp1_old", active = false))
+    val out = HesabPayShop.byPayee(
+      listOf("hp1_thief" to 2000L, "hp1_a" to 5000L, null to 700L, "hp1_old" to 100L, " hp1_a " to 3000L), known,
+    )
+    assertEquals(
+      listOf(
+        PayeeTotal(PayeeTotal.ACTIVE, "دکانِ احمد", "1222", "hp1_a", 2, 8000L),
+        PayeeTotal(PayeeTotal.RETIRED, "قبلی", "0001", "hp1_old", 1, 100L),
+        PayeeTotal(PayeeTotal.UNKNOWN, "", "", "hp1_thief", 1, 2000L),
+        PayeeTotal(PayeeTotal.NONE, "", "", "", 1, 700L),
+      ),
+      out,
+    )
+    //  تاریخچه از پیکربندیِ صندوق
+    val till = TillHesab.fromMap(mapOf("hesabpay" to mapOf("mode" to "simple", "simple" to mapOf("account" to "0799111222"),
+      "payee" to mapOf("name" to "دکانِ احمد", "last4" to "1222", "fp" to "hp1_a"),
+      "payees" to listOf(mapOf("fp" to "hp1_a", "name" to "دکانِ احمد", "last4" to "1222", "active" to true),
+        mapOf("fp" to "hp1_old", "name" to "قبلی", "last4" to "0001", "active" to false), mapOf("name" to "بی‌اثر", "last4" to "9")))))
+    assertEquals(known, till.payees)
+  }
+
+  @Test
   fun simpleSaveSendsHolderName() {
     val t = FakeTransport(ok(status))
     runSync { HesabPayAccountClient(t).saveSimple("258014", " دکانِ احمد ", " 0799123456 ", "") }

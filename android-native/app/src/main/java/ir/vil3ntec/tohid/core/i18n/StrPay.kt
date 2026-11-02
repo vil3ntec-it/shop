@@ -36,6 +36,24 @@ object StrPay {
     "که تاسو نه وئ، همدا اوس یې لغوه کړئ؛ تر ۲۴ ساعتونو پیسې زاړه حساب ته ځي.",
   )
   val notMe: String get() = t("این من نبودم — لغو کن", "This wasn't me — cancel", "دا زه نه وم — لغوه یې کړه")
+  /** X/Z: «پول رسید» ِ حساب‌پی به تفکیکِ حسابِ گیرنده (`DrawerModel.hesabPayLines`) */
+  fun xzPayee(label: Any, amount: Any, n: Any): String = t(
+    "حساب‌پی — ${asIs(label)}: ${asIs(amount)} (${asIs(n)} پرداخت)",
+    "HesabPay — $label: $amount ($n payments)",
+    "حساب‌پې — $label: $amount ($n ورکړې)",
+  )
+  fun xzPayeeCount(label: Any, n: Any): String = t(
+    "حساب‌پی — ${asIs(label)}: ${asIs(n)} پرداخت",
+    "HesabPay — $label: $n payments",
+    "حساب‌پې — $label: $n ورکړې",
+  )
+  fun xzRetired(name: Any, last4: Any): String = t(
+    "حسابِ پیشینِ ${asIs(name)} — ${asIs(last4)}",
+    "previous account $name — $last4",
+    "پخوانی حساب $name — $last4",
+  )
+  val xzUnknown: String get() = t("⚠️ حسابی که مالِ این دکان نیست", "⚠️ an account that is not this shop's", "⚠️ داسې حساب چې د دې دوکان نه دی")
+  val xzNone: String get() = t("بی نشانِ حساب (نسخهٔ کهنه)", "no account mark (old version)", "د حساب نښه نشته (زوړ نسخه)")
   val changeCancelled: String get() = t(
     "لغو شد؛ پول به همان حسابِ قبلی می‌رود و بخشِ حساب‌پی ۲۴ ساعت بسته است.",
     "Cancelled; money keeps going to the old account and the HesabPay section is locked for 24 hours.",

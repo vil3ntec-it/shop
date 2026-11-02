@@ -94,7 +94,8 @@ async function subscribedFor(shopId) {
 async function configOf(shopId) {
   const till = await accounts().tillView(shopId);
   //  `payee` = گیرندهٔ فعال («پول به حسابِ <نام> — <۴ رقم>» کنارِ QR، و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد)
-  const extra = { ...(till.simple ? { simple: till.simple } : {}), ...(till.payee ? { payee: till.payee } : {}) };
+  const extra = { ...(till.simple ? { simple: till.simple } : {}), ...(till.payee ? { payee: till.payee } : {}),
+    ...(till.payees.length ? { payees: till.payees } : {}) };
   return { hesabpay: { enabled: await enabledFor(shopId), mode: till.mode, ...extra } };
 }
 

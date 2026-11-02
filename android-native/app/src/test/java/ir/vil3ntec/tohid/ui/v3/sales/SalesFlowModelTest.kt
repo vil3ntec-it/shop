@@ -363,4 +363,33 @@ class SalesFlowModelTest {
     assertEquals(ApprovalBlock.NO_SHOP, ApprovalModel.block("", emptyList()))
     assertEquals(ApprovalBlock.NO_APPROVER, ApprovalModel.block("shop", emptyList()))
   }
+
+  @Test fun `X و Z حساب‌پی را به تفکیکِ حسابِ گیرنده با نام و چهار رقم و حسابِ بیگانه را جدا نشان می‌دهند`() {
+    fun hp(amount: Long, payee: String?) = ir.vil3ntec.tohid.data.SalePayment("hesabpay", "wallet", amount, "confirmed", "HP-1", "cashier", payee = payee)
+    val d = ShopData(sales = listOf(
+      Sale(id = "s1", createdAt = 10L, payments = listOf(hp(5000L, "hp1_a"))),
+      Sale(id = "s2", createdAt = 11L, payments = listOf(hp(3000L, "hp1_a"), hp(2000L, "hp1_thief"))),
+      Sale(id = "s3", createdAt = 12L, payments = listOf(hp(1000L, "hp1_old"))),
+      Sale(id = "s4", createdAt = 13L, status = "cancelled", payments = listOf(hp(9000L, "hp1_thief"))),
+      Sale(id = "s5", createdAt = 99L, payments = listOf(hp(7000L, "hp1_a"))),
+    ))
+    val known = listOf(
+      ir.vil3ntec.tohid.core.gateway.Payee("دکانِ احمد", "1222", "hp1_a", active = true),
+      ir.vil3ntec.tohid.core.gateway.Payee("حسابِ قبلی", "0001", "hp1_old", active = false),
+    )
+    val lines = DrawerModel.hesabPayLines(d, 0L, 50L, known, seesMoney = true)
+    assertEquals(3, lines.size)
+    assertTrue(lines[0], lines[0].contains("دکانِ احمد — 1222"))
+    assertTrue(lines[1], lines[1].contains("0001"))
+    assertTrue(lines[2], lines[2].contains(ir.vil3ntec.tohid.core.i18n.StrPay.xzUnknown))
+    //  شاگرد (شمارشِ کور): فقط شمار، بی مبلغ
+    assertEquals(
+      listOf(
+        ir.vil3ntec.tohid.core.i18n.StrPay.xzPayeeCount("دکانِ احمد — 1222", 2),
+        ir.vil3ntec.tohid.core.i18n.StrPay.xzPayeeCount(ir.vil3ntec.tohid.core.i18n.StrPay.xzRetired("حسابِ قبلی", "0001"), 1),
+        ir.vil3ntec.tohid.core.i18n.StrPay.xzPayeeCount(ir.vil3ntec.tohid.core.i18n.StrPay.xzUnknown, 1),
+      ),
+      DrawerModel.hesabPayLines(d, 0L, 50L, known, seesMoney = false),
+    )
+  }
 }

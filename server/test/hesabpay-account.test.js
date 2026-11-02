@@ -260,7 +260,7 @@ test('حالتِ ساده: شمارهٔ یک‌دست برای صندوق؛ هی
   const fp1 = (await one('SELECT payee_fp FROM shop_hesabpay WHERE shop_id=$1', [s.shopId])).payee_fp;
   assert.match(fp1, /^hp1_[0-9a-f]{32}$/);
   assert.deepEqual(cfg, { hesabpay: { enabled: false, mode: 'simple', simple: { account: '0799123456', qrPayload: 'hesabpay://pay?to=0799123456' },
-    payee: { name: NAME, last4: '3456', fp: fp1 } } });
+    payee: { name: NAME, last4: '3456', fp: fp1 }, payees: [{ fp: fp1, name: NAME, last4: '3456', active: true }] } });
   const c = await createPos(s);
   assert.equal(c.body.error.code, 'hesabpay_disabled', 'حالتِ ساده هیچ قصد/تأییدِ سروری ندارد');
   //  فقط QR (شماره از خودِ QR) — حسابِ دوم ⇒ ۲۴ ساعت «در انتظار»؛ تا آن دم صندوق همان حسابِ نخست
@@ -298,7 +298,8 @@ test('حالتِ خودکار: کلید رمزشده و فقط‌نوشتنی (�
   const cfg = await h.get('/api/v1/shop/payments/config', { token: cashier });
   const row = await one('SELECT * FROM shop_hesabpay WHERE shop_id=$1', [s.shopId]);
   assert.equal(cfg.body.hesabpay.payee.fp, row.payee_fp);
-  assert.deepEqual(cfg.body, { hesabpay: { enabled: true, mode: 'auto', payee: { name: NAME, last4: '0042', fp: row.payee_fp } } });
+  assert.deepEqual(cfg.body, { hesabpay: { enabled: true, mode: 'auto', payee: { name: NAME, last4: '0042', fp: row.payee_fp },
+    payees: [{ fp: row.payee_fp, name: NAME, last4: '0042', active: true }] } });
   const logs = await many('SELECT detail FROM audit_logs WHERE shop_id=$1', [s.shopId]);
   for (const blob of [r.body, opened.body, (await h.get(URL, { token: s.t })).body, cfg.body, row, logs].map((x) => JSON.stringify(x))) {
     //  شناسهٔ پذیرنده هم فقط‌نوشتنی است (فقط ۴ نویسهٔ آخر «0042» دیده می‌شود)

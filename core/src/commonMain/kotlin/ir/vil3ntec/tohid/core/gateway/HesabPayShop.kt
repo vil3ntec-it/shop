@@ -20,14 +20,27 @@ import ir.vil3ntec.tohid.core.perm.PinGuard
  *  با «این من نبودم — لغو کن» ([HesabPayAccountClient.cancelPending])؛ اثرِ انگشتِ گیرنده ([Payee.fp]) روی هر ردیفِ پرداخت.
  */
 
-/** گیرندهٔ فعالِ پولِ دکان: نام و ۴ رقمِ آخر (برای «پول به حسابِ …») و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد */
-data class Payee(val name: String, val last4: String, val fp: String) {
+/**
+ *  حسابِ گیرندهٔ پولِ دکان: نام و ۴ رقمِ آخر (برای «پول به حسابِ …») و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد.
+ *  `active` فقط در تاریخچهٔ حساب‌ها ([TillHesab.payees]) معنا دارد.
+ */
+data class Payee(val name: String, val last4: String, val fp: String, val active: Boolean = true) {
   companion object {
     fun fromMap(m: Map<*, *>?): Payee? {
       val last4 = (m?.get("last4") as? String).orEmpty()
       if (m == null || last4.isBlank()) return null
-      return Payee((m["name"] as? String).orEmpty(), last4, (m["fp"] as? String).orEmpty())
+      return Payee((m["name"] as? String).orEmpty(), last4, (m["fp"] as? String).orEmpty(), m["active"] != false)
     }
+  }
+}
+
+/** X/Z: جمعِ «پول رسید» ِ حساب‌پیِ یک حساب. `kind`: [ACTIVE] | [RETIRED] (حسابِ کهنهٔ همین دکان) | [UNKNOWN] | [NONE] (برنامهٔ کهنه) */
+data class PayeeTotal(val kind: String, val name: String, val last4: String, val fp: String, val count: Int, val amountMinor: Long) {
+  companion object {
+    const val ACTIVE = "active"
+    const val RETIRED = "retired"
+    const val UNKNOWN = "unknown"
+    const val NONE = "none"
   }
 }
 
@@ -40,8 +53,17 @@ data class SimpleAccount(val account: String, val qrPayload: String) {
   val qrText: String get() = qrPayload.ifBlank { account }
 }
 
-/** حالِ حساب‌پی برای صندوق (`GET /shop/payments/config`)؛ `payee` = گیرندهٔ فعال (سرورِ کهنه ⇐ null) */
-data class TillHesab(val gateway: Boolean, val mode: String, val simple: SimpleAccount?, val payee: Payee? = null) {
+/**
+ *  حالِ حساب‌پی برای صندوق (`GET /shop/payments/config`)؛ `payee` = گیرندهٔ فعال (سرورِ کهنه ⇐ null)؛ `payees` = حساب‌هایی
+ *  که روزی فعال بودند (X/Z به تفکیکِ حساب)
+ */
+data class TillHesab(
+  val gateway: Boolean,
+  val mode: String,
+  val simple: SimpleAccount?,
+  val payee: Payee? = null,
+  val payees: List<Payee> = emptyList(),
+) {
   val any: Boolean get() = gateway || simple != null
 
   companion object {
@@ -54,7 +76,8 @@ data class TillHesab(val gateway: Boolean, val mode: String, val simple: SimpleA
       val account = (s?.get("account") as? String).orEmpty()
       val qr = (s?.get("qrPayload") as? String).orEmpty()
       val simple = if (mode == HesabPayShop.SIMPLE && (account.isNotBlank() || qr.isNotBlank())) SimpleAccount(account, qr) else null
-      return TillHesab(h["enabled"] == true, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>))
+      val known = (h["payees"] as? List<*>).orEmpty().mapNotNull { Payee.fromMap(it as? Map<*, *>) }.filter { it.fp.isNotBlank() }
+      return TillHesab(h["enabled"] == true, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known)
     }
   }
 }
@@ -135,6 +158,27 @@ object HesabPayShop {
       h = h shr 5
     }
     return "HP-" + out.substring(0, 4) + "-" + out.substring(4)
+  }
+
+  /**
+   *  X/Z: «پول رسید» ‌های حساب‌پی (اثرِ انگشتِ گیرنده، مبلغ به پول) به تفکیکِ حساب — حسابِ فعال اول، سپس کهنه‌ها، سپس
+   *  ⚠️ ناشناخته (اثرِ انگشتی که هیچ‌گاه حسابِ این دکان نبود) و «بی نشان» (برنامهٔ کهنه). نام و ۴ رقم فقط از [known] (سرور).
+   */
+  fun byPayee(rows: List<Pair<String?, Long>>, known: List<Payee>): List<PayeeTotal> {
+    val groups = LinkedHashMap<String, MutableList<Long>>()
+    rows.forEach { (fp, amount) -> groups.getOrPut(fp?.trim().orEmpty()) { ArrayList() }.add(amount) }
+    val out = groups.map { (fp, amounts) ->
+      val k = known.firstOrNull { it.fp == fp }
+      val kind = when {
+        fp.isEmpty() -> PayeeTotal.NONE
+        k == null -> PayeeTotal.UNKNOWN
+        k.active -> PayeeTotal.ACTIVE
+        else -> PayeeTotal.RETIRED
+      }
+      PayeeTotal(kind, k?.name.orEmpty(), k?.last4.orEmpty(), fp, amounts.size, amounts.sum())
+    }
+    val order = listOf(PayeeTotal.ACTIVE, PayeeTotal.RETIRED, PayeeTotal.UNKNOWN, PayeeTotal.NONE)
+    return out.sortedWith(compareBy({ order.indexOf(it.kind) }, { -it.amountMinor }))
   }
 
   /** کد برای مقایسه: فقط حرف و رقمِ بزرگ (یادداشتِ پرداخت‌کننده خط تیره یا فاصله را جا می‌اندازد) */

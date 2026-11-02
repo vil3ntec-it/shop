@@ -11,9 +11,9 @@
  *     دم حسابِ کهنه فعال می‌ماند (پرداخت‌ها هیچ‌چیزِ حسابِ تازه را نمی‌بینند). پوش به همهٔ دستگاه‌های صاحب و نوارِ
  *     «این من نبودم — لغو کن» (با تأییدِ دوبارهٔ ورود) ⇒ حسابِ تازه پاک و بخشِ حساب‌پی ۲۴ ساعت بسته. فعال شدن
  *     تنبل است (با هر خواندنِ حساب) و تا پرداختِ خودکارِ بازی هست عقب می‌افتد. هر پله سابقه دارد.
- *  ۲. دستگاهِ مطمئن — هر تغییر (حساب، برداشتن، رمز، بازنشانی) فقط از دستگاهِ همین نشست وقتی:
- *       • دست‌کم ۷ روز پیش با همین حساب وارد شده (`devices.created_at`)، یا
- *       • قدیمی‌ترین دستگاهِ فعالِ همین صاحب است و هیچ دستگاهش هنوز ۷ روزه نیست (صاحبِ تازه از گوشیِ خودش).
+ *  ۲. دستگاهِ مطمئن — هر تغییر (حساب، برداشتن، رمز، بازنشانی) فقط از نشستی که:
+ *       • زنجیرهٔ توکنش (ورود ⇐ تازه‌سازی‌ها، `tokens.session_at`) دست‌کم ۷ روزه است — نشانهٔ سرور، نه `device_uid`، یا
+ *       • نخستین ورودِ قدیمی‌ترین دستگاهِ فعالِ همین صاحب است (صاحبِ تازه از گوشیِ خودش).
  *     دستگاهِ تازه ⇒ رد **پیش از** سنجیدنِ رمز (حتی یک تلاشِ رمز ندارد)، سابقه و خبر به صاحب. به‌علاوهٔ رمزِ
  *     حساب‌پی و تأییدِ دوبارهٔ ورود (`lib/reauth.js`، همان `ReauthGate` ِ برنامه) در خودِ مسیر.
  *  ۴. اثرِ انگشتِ گیرنده (`payee_fp` = هشِ دکان + حالت + شماره/شناسهٔ پذیرنده) روی حسابِ فعال، هر قصدِ پرداخت و هر
@@ -113,24 +113,34 @@ async function payeeSwitch(c, shopId, prevFp, next, t) {
 //  دستگاهِ مطمئن و درِ پیش از رمز
 // ════════════════════════════════════════════════════════════════════
 
+/** نخستین دستگاه: نشست باید همان ورودِ نخستِ ساختنِ ردیفِ دستگاه باشد (نه ورودِ تازه‌ای با همان `device_uid`) */
+const FIRST_LOGIN_MS = 10 * 60 * 1000;
+
 /**
- * دستگاهِ همین نشست (`req.device` ِ `middleware/auth`) مطمئن است؟ ۷ روزه، یا قدیمی‌ترین دستگاهِ فعالِ صاحبی که هنوز
- * هیچ دستگاهِ ۷روزه ندارد. نشستِ بی دستگاه یا دستگاهِ کسِ دیگر ⇒ نه.
+ * این **نشست** روی این دستگاه مطمئن است؟ نشانه فقط چیزی است که سرور داده: زنجیرهٔ توکنِ همین نشست (`tokens.session_at`
+ * = ورودی که آن را ساخت؛ تازه‌سازی نگهش می‌دارد) بسته به ردیفِ دستگاهِ همان توکن — **نه** `device_uid` که برنامه
+ * می‌فرستد. پس رمزِ ورودِ دزدیده + شناسهٔ دستگاهِ دانسته ⇒ زنجیرهٔ تازه ⇒ نامطمئن.
+ *   • زنجیرهٔ نشست دست‌کم ۷ روزه، یا
+ *   • نخستین ورودِ قدیمی‌ترین دستگاهِ فعالِ همین صاحب (زنجیره ≤ ۱۰ دقیقه پس از ساختنِ ردیفِ دستگاه): صاحبِ تازه از گوشیِ خودش.
+ * `actor.session` = `{at, deviceId}` از `req.tokenRow`؛ نبودش، دستگاهِ کسِ دیگر یا ناهمخوان ⇒ نه.
  */
 async function trustOf(actor, t = now()) {
   const d = actor && actor.device;
-  if (!d || d.status !== 'active' || String(d.user_id || '') !== String(actor.id || '')) {
+  const s = actor && actor.session;
+  const born = Number(s && s.at);
+  if (!d || d.status !== 'active' || String(d.user_id || '') !== String(actor.id || '')
+      || !s || String(s.deviceId || '') !== String(d.id) || !Number.isFinite(born) || born <= 0) {
     return { trusted: false, trustedAfter: null, reason: 'no_device' };
   }
-  const after = Number(d.created_at) + TRUST_MS;
-  if (!Number.isFinite(after)) return { trusted: false, trustedAfter: null, reason: 'no_device' };
+  const after = born + TRUST_MS;
   if (after <= t) return { trusted: true, trustedAfter: after, reason: 'age' };
-  const oldest = await one(
-    `SELECT id FROM devices WHERE user_id=$1 AND status='active' ORDER BY created_at, id LIMIT 1`, [String(actor.id)]
-  );
-  return oldest && oldest.id === d.id
-    ? { trusted: true, trustedAfter: after, reason: 'first_device' }
-    : { trusted: false, trustedAfter: after, reason: 'new_device' };
+  if (born - Number(d.created_at) <= FIRST_LOGIN_MS) {
+    const oldest = await one(
+      `SELECT id FROM devices WHERE user_id=$1 AND status='active' ORDER BY created_at, id LIMIT 1`, [String(actor.id)]
+    );
+    if (oldest && oldest.id === d.id) return { trusted: true, trustedAfter: after, reason: 'first_device' };
+  }
+  return { trusted: false, trustedAfter: after, reason: 'new_session' };
 }
 
 function sectionLocked(until, t) {
@@ -141,8 +151,8 @@ function sectionLocked(until, t) {
 }
 
 function untrusted(trustedAfter) {
-  const e = forbidden(`تغییرِ حساب‌پی فقط از دستگاهِ همیشگیِ خودتان ممکن است (دستگاهی که دست‌کم ${TRUST_DAYS} روز پیش با `
-    + 'همین حساب وارد شده). این دستگاه تازه است؛ از گوشی یا کمپیوترِ همیشگیِ خودتان بکوشید.', 'hesabpay_device_untrusted');
+  const e = forbidden(`تغییرِ حساب‌پی فقط از دستگاهِ همیشگیِ خودتان ممکن است (دستگاهی که دست‌کم ${TRUST_DAYS} روز پیش وارد `
+    + 'شده و از آن پس بیرون نرفته). این ورود تازه است؛ از گوشی یا کمپیوترِ همیشگیِ خودتان بکوشید.', 'hesabpay_device_untrusted');
   e.data = { trustedAfter: trustedAfter || null, trustDays: TRUST_DAYS };
   return e;
 }
@@ -313,7 +323,10 @@ async function report(shopId, { days = 30 } = {}) {
   return {
     days: d, active, pending: pendingOf(row), accounts, unknown,
     alerts: alerts.rows.map((a) => ({
-      intentId: a.target_id, at: Number(a.created_at), amountMinor: Number(a.detail?.amountMinor) || 0,
+      //  `source`: 'till' (ردیفِ «پول رسید» ِ صندوق، `targetId` = فاکتور) یا قصدِ پرداختِ خودکار (`intentId`)
+      source: a.detail?.source === 'till' ? 'till' : 'gateway',
+      ...(a.detail?.source === 'till' ? { saleId: a.target_id } : { intentId: a.target_id }),
+      at: Number(a.created_at), amountMinor: Number(a.detail?.amountMinor) || 0,
       missing: String(a.detail?.missing || '').split(',').filter(Boolean),
     })),
   };
@@ -358,8 +371,100 @@ async function receivedBy(shopId, w, sales = []) {
   return { accounts, alerts };
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ردیفِ «پول رسید» ِ صندوق با گیرندهٔ دیگر ⇒ هشدار و پوشِ فوری
+// ════════════════════════════════════════════════════════════════════
+
+const TILL_TICK_MS = Math.max(5_000, Number(process.env.HESABPAY_TILL_TICK_MS) || 30_000);
+const TILL_BATCH = 2000;
+/** صندوق پیکربندی را یک دقیقه نگه می‌دارد؛ ردیفِ همان دقیقه با حسابِ تازه‌کنارگذاشته هنوز درست است */
+const TILL_GRACE_MS = 2 * 60 * 1000;
+//  هر دو دفترِ همگام‌سازی (v1 و v3) — فقط خواندنِ opها با نمایهٔ (حساب، server_seq)، بی دست زدن به همگام‌سازی
+const TILL_STORES = Object.freeze([['till_seq_v1', 'oplog', 'op_type'], ['till_seq_v3', 'sync_v3_ops', 'kind']]);
+const TILL_APP = 'shop';
+
+/** ردیف‌های حساب‌پیِ «تأییدِ صندوقدار» ِ یک op ِ فروش که `payee` دارند (برنامهٔ کهنه بی `payee` ⇒ بیرون) */
+function tillRows(fields) {
+  let list = fields && fields.payments;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = null; } }
+  return (Array.isArray(list) ? list : []).filter((p) => p && p.method === 'hesabpay' && typeof p.payee === 'string' && p.payee.trim())
+    .map((p) => ({ fp: p.payee.trim().slice(0, 64), amountMinor: Number(p.amount ?? p.amountMinor) || 0 }));
+}
+
+/** این اثرِ انگشت در لحظهٔ فروش حسابِ (فعالِ) همین دکان بود؟ (تاریخچهٔ `hesabpay_payees`، با مهلتِ کشِ صندوق) */
+function validAt(hist, fp, at) {
+  const h = hist.find((x) => x.fp === fp);
+  if (!h) return 'unknown';
+  if (at < Number(h.active_from) - TILL_GRACE_MS) return 'not_yet';
+  return h.retired_at !== null && at > Number(h.retired_at) + TILL_GRACE_MS ? 'retired' : '';
+}
+
+/** یک دکان: opهای فروشِ تازه از `till_seq_*` به بعد؛ هر فاکتور با گیرندهٔ نادرست یک هشدار (`once`) و یک پوش */
+async function tillShop(s) {
+  const hist = (await query('SELECT fp, active_from, retired_at FROM hesabpay_payees WHERE shop_id=$1', [s.shop_id])).rows;
+  let alerts = 0;
+  for (const [col, table, typeCol] of TILL_STORES) {
+    const rows = (await query(
+      `SELECT server_seq, row_id, fields, received_at FROM ${table}
+        WHERE app=$2 AND account_kind=$2 AND account_id=$1 AND server_seq > $3 AND table_name='sales' AND ${typeCol} <> 'delete'
+        ORDER BY server_seq LIMIT ${TILL_BATCH}`,
+      [s.shop_id, TILL_APP, Number(s[col]) || 0]
+    )).rows;
+    for (const r of rows) {
+      const at = Number(r.fields && r.fields.createdAt) || Number(r.received_at);
+      const bad = tillRows(r.fields).map((p) => ({ ...p, why: validAt(hist, p.fp, at) })).filter((p) => p.why);
+      if (!bad.length) continue;
+      const row = await audit.log({
+        shopId: s.shop_id, actorType: 'system', action: 'hesabpay.payee_alert', targetType: 'sale', targetId: r.row_id, once: true,
+        detail: { reason: 'till_payee', source: 'till', missing: 'payee', why: bad[0].why, payeeFp: bad[0].fp.slice(0, 12),
+          amountMinor: bad.reduce((x, p) => x + p.amountMinor, 0) },
+      });
+      if (row) {
+        alerts += 1;
+        console.warn(`[hesabpay] «پول رسید» ِ صندوق با گیرندهٔ نادرست: فاکتورِ ${r.row_id} (${s.shop_id}) — ${bad[0].why}`);
+        await acc().notifyOwners(s.shop_id, 'till_payee_alert', { saleId: r.row_id });
+      }
+    }
+    if (rows.length) {
+      await query(`UPDATE shop_hesabpay SET ${col}=$2 WHERE shop_id=$1 AND ${col} < $2`, [s.shop_id, rows[rows.length - 1].server_seq]);
+    }
+  }
+  return alerts;
+}
+
+/** یک دور برای همهٔ دکان‌هایی که روزی حسابِ حساب‌پی داشته‌اند ⇒ شمارِ هشدارهای تازه */
+async function tillSweep() {
+  const shops = (await query(
+    `SELECT s.shop_id, s.till_seq_v1, s.till_seq_v3 FROM shop_hesabpay s
+      WHERE EXISTS (SELECT 1 FROM hesabpay_payees p WHERE p.shop_id = s.shop_id) ORDER BY s.shop_id`
+  )).rows;
+  let n = 0;
+  for (const s of shops) {
+    try { n += await tillShop(s); } catch (err) { console.error('[hesabpay] سنجشِ صندوق', s.shop_id, err.message); }
+  }
+  return n;
+}
+
+let tillTimer = null;
+let tillBusy = false;
+function start() {
+  if (tillTimer) return;
+  const run = require('./job-beat').wrap('hesabpay-till', TILL_TICK_MS, async () => {
+    if (tillBusy) return 0;
+    tillBusy = true;
+    try { return await tillSweep(); } finally { tillBusy = false; }
+  });
+  tillTimer = setInterval(() => run().catch((err) => console.error('[hesabpay]', err.message)), TILL_TICK_MS);
+  if (tillTimer.unref) tillTimer.unref();
+}
+function stop() {
+  if (tillTimer) clearInterval(tillTimer);
+  tillTimer = null;
+}
+
 module.exports = {
   HOLD_MS, LOCK_MS, TRUST_DAYS, TRUST_MS, NAME_MAX,
   fpOf, fpOfRow, last4Of, payeeOf, pendingOf, cleanName, ensureFp, payeeSwitch,
   trustOf, gate, refusalNotice, activateAt, activateDue, cancelPending, payeeProof, holdForReview, report, receivedBy,
+  tillRows, tillSweep, start, stop,
 };
