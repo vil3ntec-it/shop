@@ -40,6 +40,11 @@ const device = {
   //  بی سنجشِ نقش: ساختِ امانی/سفارش، «آماده»، پیش‌پرداخت و قسط
   open: () => true,
 };
+//  PAY-07: `PayStatusRoute` (PayStatusUi.kt) — `sell = ShopRole.canWrite(context, "sales")` برای «در انتظار ⇐ تأیید/بررسی»،
+//  `manage = !ShopRole.isStaff(context)` (صاحب/مدیر) برای بقیه — اصلاحِ ثبتِ دستیِ «تأییدشده» هم؛ همان `PayStatus.allowed` ِ هسته
+const payRow = (fromStatus, toStatus) => () => ({
+  type: 'pay_status', refId: 's-1', payRow: 1, payMethod: 'afpay_card', fromStatus, toStatus, amountMinor: 150000, note: 'رسیدِ دستگاه',
+});
 
 /** هر نوع: جدول، فیلدهای همان شکلی که برنامه می‌سازد، و دروازهٔ برنامه */
 const CASES = {
@@ -76,6 +81,15 @@ const CASES = {
   stock_place: ['auditLog', () => ({ type: 'stock_place', refId: 'قفسهٔ ۲', reason: 'add' }), 'places'],
   stock_repack: ['auditLog', (id) => ({ type: 'stock_repack', refId: id, refIds: ['warehouseEntries/w1'] }), 'places'],
   stock_assembly: ['auditLog', (id) => ({ type: 'stock_assembly', refId: id, refIds: ['warehouseEntries/w2'] }), 'places'],
+  'pay_status:confirmed': ['auditLog', payRow('pending', 'confirmed'), 'sell'],
+  'pay_status:flag': ['auditLog', payRow('confirmed', 'needs_review'), 'manage'],
+  'pay_status:fail': ['auditLog', payRow('confirmed', 'failed'), 'manage'],
+  'pay_status:void': ['auditLog', payRow('confirmed', 'cancelled'), 'manage'],
+  'pay_status:needs_review': ['auditLog', payRow('pending', 'needs_review'), 'sell'],
+  'pay_status:failed': ['auditLog', payRow('pending', 'failed'), 'manage'],
+  'pay_status:cancelled': ['auditLog', payRow('pending', 'cancelled'), 'manage'],
+  'pay_status:resolved': ['auditLog', payRow('needs_review', 'confirmed'), 'manage'],
+  'pay_status:review_failed': ['auditLog', payRow('needs_review', 'failed'), 'manage'],
   layaway_deposit: ['transactions', () => ({ debtorId: 'd-lw', type: 'receive', amountMinor: 550000, refId: 'lw-1', kind: 'layaway_deposit' }), 'open'],
   layaway_installment: ['transactions', () => ({ debtorId: 'd-lw', type: 'receive', amountMinor: 733400, refId: 'lw-1', kind: 'layaway_installment' }), 'open'],
   layaway_refund: ['transactions', () => ({ debtorId: 'd-lw', type: 'give', amountMinor: 550000, refId: 'lw-1', kind: 'layaway_refund' }), 'cancel'],
@@ -154,6 +168,26 @@ test('شکل: نمونه‌های بدِ هر خانواده BAD، نوع‌ها
     assert.equal(docRoles.needOf('transactions', f), null, JSON.stringify(f));
   }
   assert.equal(docRoles.needOf('sales', { type: 'gift_card_void' }), null);
+});
+
+test('شکل: وضعیتِ پرداخت (PAY-07) — گذارِ نادستی یا ناروا، ردیف/روش/فاکتورِ گم و مبلغِ منفی BAD', () => {
+  const base = CASES['pay_status:confirmed'][1]('r-1');
+  const bad = (f) => assert.equal(docRoles.needOf('auditLog', f), docRoles.BAD, JSON.stringify(f));
+  //  پایانی برنمی‌گردد، بازپرداخت فقط از راهِ برگشت، وضعیتِ ناشناخته
+  for (const [fromStatus, toStatus] of [['confirmed', 'pending'], ['confirmed', 'confirmed'], ['pending', 'refunded'], ['pending', 'pending'],
+    ['failed', 'confirmed'], ['cancelled', 'confirmed'], ['refunded', 'confirmed'], ['refunded', 'failed'], ['confirmed', 'partially_refunded'],
+    ['partially_refunded', 'failed'], ['paid', 'confirmed'], ['pending', 'paid']]) {
+    bad({ ...base, fromStatus, toStatus });
+  }
+  for (const payRow of [-1, 1.5, '1', undefined, null, 1000]) bad({ ...base, payRow });
+  bad({ ...base, payMethod: ' ' });
+  bad({ ...base, refId: '' });
+  bad({ ...base, amountMinor: -1 });
+  bad({ ...base, amountMinor: 1.5 });
+  const f = { ...base }; delete f.fromStatus; bad(f);
+  bad({ type: 'pay_status_bulk', refId: 's-1' });
+  //  مبلغِ نبوده = صفر (ردیفِ بی مبلغ هم شکل دارد)
+  const g = { ...base }; delete g.amountMinor; assert.equal(docRoles.needOf('auditLog', g), docRoles.SELL);
 });
 
 // ---------------------------------------------------------------- ۳: push ِ واقعی
@@ -273,6 +307,25 @@ test('روشن: شکلِ بد برای همه رد، صاحب دکان هم؛ ن
     ]);
     assert.deepEqual(results(r), ['doc_invalid', 'doc_invalid', 'doc_invalid', 'doc_invalid', 'doc_invalid', 'applied'], `${who}: ${JSON.stringify(r.body)}`);
   }
+});
+
+test('روشن: وضعیتِ پرداخت (PAY-07) — صندوق‌دار فقط تأیید و «نیازمند بررسی» ِ ردیفِ منتظر؛ اصلاحِ تأییدشده، ناموفق، لغو و حلِ بررسی فقط صاحب و مدیر', async () => {
+  await setFlag(shopId, true);
+  const sell = ['pay_status:confirmed', 'pay_status:needs_review'];
+  const manage = ['pay_status:flag', 'pay_status:fail', 'pay_status:void', 'pay_status:failed', 'pay_status:cancelled',
+    'pay_status:resolved', 'pay_status:review_failed'];
+  await expectEach('cashier', sell, 'ps-c', 'applied');
+  await expectEach('cashier', manage, 'ps-cx', 'doc_not_allowed');
+  await expectEach('staff', manage, 'ps-sx', 'doc_not_allowed');
+  await expectEach('picker', sell, 'ps-px', 'doc_not_allowed');
+  await expectEach('manager', [...sell, ...manage], 'ps-m', 'applied');
+  await expectEach('owner', manage, 'ps-o', 'applied');
+  const row = await inV3('auditLog', 'ps-m-pay_status-resolved');
+  assert.equal(row.toStatus, 'confirmed');
+  assert.equal(row.fromStatus, 'needs_review');
+  assert.equal(row.payRow, 1);
+  //  نوشته‌نشده: ردیفی از صندوق‌دار برای «ناموفق» نماند
+  assert.equal(await inV3('auditLog', 'ps-cx-pay_status-failed'), undefined);
 });
 
 test('روشن: ردِ یک ردیف کلِ واحدِ tx را برمی‌گرداند (وضعیتِ لغو + بردِ بازپرداخت)', async () => {

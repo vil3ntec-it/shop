@@ -7,6 +7,7 @@ import androidx.compose.material.icons.outlined.QrCodeScanner
 import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrPayStatus
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -42,6 +43,8 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.CancelRoute
 import ir.vil3ntec.tohid.ui.v3.sales.history.FixRoute
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryRoute
 import ir.vil3ntec.tohid.ui.v3.sales.history.InvoiceRoute
+import ir.vil3ntec.tohid.ui.v3.sales.history.PayReviewRoute
+import ir.vil3ntec.tohid.ui.v3.sales.history.PayStatusRoute
 import ir.vil3ntec.tohid.ui.v3.sales.history.SalePrintRoute
 import ir.vil3ntec.tohid.ui.v3.sales.quick.QuickSaleRoute
 import ir.vil3ntec.tohid.ui.v3.sales.returns.NoReceiptReturnRoute
@@ -84,6 +87,9 @@ object SalesPaths {
   fun returnOf(saleId: String) = invoice(saleId) + "/return"
   fun cancelOf(saleId: String) = invoice(saleId) + "/cancel"
   fun fixOf(saleId: String) = invoice(saleId) + "/fix"
+  /** PAY-07 — برگهٔ وضعیتِ ردیفِ `i` ِ `payments` و فهرستِ «نیازمند بررسی» ِ صاحب و مدیر */
+  fun payStatus(saleId: String, i: Int) = invoice(saleId) + "/pay/$i"
+  const val PAY_REVIEW = "sales/pay-review"
   const val RETURN_NONE = "sales/return/none"
   fun returnReceipt(docId: String) = "sales/returns/" + RoutePaths.encode(docId)
   fun returnPrint(docId: String) = returnReceipt(docId) + "/print"
@@ -158,6 +164,8 @@ val SalesModule = AppModule(
     V3Route("sales/{saleId}/return", RouteKind.SHEET, { StrSale.returnWord }, parent = "sales/{saleId}", chrome = Chrome.OWN) { ReturnRoute() },
     V3Route("sales/{saleId}/cancel", RouteKind.SHEET, { StrSale.cancelSale }, parent = "sales/{saleId}", chrome = Chrome.OWN) { CancelRoute() },
     V3Route("sales/{saleId}/fix", RouteKind.SHEET, { StrSale.fixInvoice }, parent = "sales/{saleId}", chrome = Chrome.OWN) { FixRoute() },
+    V3Route("sales/{saleId}/pay/{i}", RouteKind.SHEET, { StrPayStatus.section }, parent = "sales/{saleId}", chrome = Chrome.OWN) { PayStatusRoute() },
+    V3Route(SalesPaths.PAY_REVIEW, RouteKind.PAGE, { StrPayStatus.reviewTitle }, parent = SalesPaths.HISTORY, chrome = Chrome.OWN) { PayReviewRoute() },
     //  برگهٔ فاکتورِ نیمه‌کاره را پوسته خودش سرِ باز شدن نشان می‌دهد (`DraftPrompt`)؛ پیوندش به صندوق
     V3Route("draft", RouteKind.SHEET, { StrSale.draftTitle }) { LandOn(SalesPaths.SALE) },
   ),

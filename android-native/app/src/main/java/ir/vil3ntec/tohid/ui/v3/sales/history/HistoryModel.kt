@@ -40,6 +40,8 @@ data class HistoryRow(
   val canCancel: Boolean,
   /** سندهای برگشتِ تازهٔ همین فاکتور (RET-12) */
   val returnDocs: List<String>,
+  /** PAY-07 — وضعیتِ پرداختِ غیرنقد برای تراشه؛ null ⇒ نقد، یا همه تأییدشده */
+  val payState: String? = null,
 )
 
 /** کارتِ آمارِ بالای تاریخچه */
@@ -137,6 +139,7 @@ object HistoryModel {
       canReturn = canReturn(d, s),
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) returnDocs(d, s) else emptyList(),
+      payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s),
     )
   }
 

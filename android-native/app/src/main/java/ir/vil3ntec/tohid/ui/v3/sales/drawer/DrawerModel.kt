@@ -164,4 +164,14 @@ object DrawerNotes {
 
   /** همان «صاحب/مدیر» ِ پیشین وقتی نامِ حساب خالی است */
   const val OWNER_OR_MANAGER = "صاحب/مدیر"
+
+  /** PAY-07 — غیرنقدِ «در انتظار» و «نیازمند بررسی» ِ فاکتورهای این پنجره (به پول)؛ بیرون از جمعِ X */
+  fun unreceived(d: ir.vil3ntec.tohid.data.ShopData, from: Long, to: Long): Long =
+    ir.vil3ntec.tohid.data.PayStatusFlow.totals(d, from, to).let {
+      (it[ir.vil3ntec.tohid.core.pay.PayStatus.PENDING] ?: 0L) + (it[ir.vil3ntec.tohid.core.pay.PayStatus.NEEDS_REVIEW] ?: 0L)
+    }
+
+  fun unreceivedNotes(minor: Long): List<String> =
+    if (minor <= 0) emptyList()
+    else listOf(ir.vil3ntec.tohid.core.i18n.StrPayStatus.unreceivedLine(ir.vil3ntec.tohid.money(PayFlow.major(minor))))
 }
