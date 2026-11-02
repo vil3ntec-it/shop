@@ -20,7 +20,7 @@ import ir.vil3ntec.tohid.data.DocGapsPref
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  RPT-17 — بخشِ «شماره‌های جاافتادهٔ اسناد» در تنظیماتِ کامپیوتر، با خواندن و نوشتنِ `DocGapsPref`
+ *  RPT-17 — بخشِ «شماره‌های جاافتادهٔ اسناد» در تنظیماتِ گوشی و کامپیوتر، با خواندن و نوشتنِ `DocGapsPref`
  *  (مرزِ پلتفرم، تا `Settings` یک خط بخواهد). عنوانش در فهرستِ `DeskSettings` ِ `AppRoot` هم هست.
  */
 @Composable

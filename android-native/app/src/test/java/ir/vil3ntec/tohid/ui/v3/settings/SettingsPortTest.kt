@@ -257,7 +257,7 @@ class SettingsPortTest {
     /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */
     private val DESK_ONLY: Set<String> = setOf(
       SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
-      SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
+      SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS,
     )
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */

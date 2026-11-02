@@ -691,7 +691,7 @@ fun SettingsScreenLegacy(
       }
     }
 
-    if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
+    item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، گوشی و کامپیوتر، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.TaxQuarterSettingsWired(context, d, snackbar) } //  مالیاتِ سه‌ماهه و یادآورِ سررسید (RPT-10)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.CustomerCardSettingsWired(context) } //  کارت یا بارکدِ مشتری (CRM-16)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.TillGoodsSettingsWired(context) } //  ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05)، پیش‌فرض خاموش
