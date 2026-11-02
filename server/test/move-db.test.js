@@ -17,7 +17,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
-const { PGlite } = require('@electric-sql/pglite');
+//  همان راهِ سرور برای ساختنِ PGlite (زیرِ Electron `PGlite.create` ِ خام گاه می‌ایستد)
+const { createPglite } = require('../src/lib/pglite-create');
 const { inspect, copy, diffReports, open, safeUrl } = require('../scripts/move-db');
 
 const SERVER = path.join(__dirname, '..');
@@ -53,7 +54,7 @@ const CHAIN1 = crypto.createHash('sha256').update('genesis-body').digest('hex');
 
 test.before(async () => {
   migrate(SRC);
-  const db = await PGlite.create({ dataDir: SRC_DIR });
+  const db = await createPglite({ dataDir: SRC_DIR });
   const now = 1761800000000;
   await db.query(`INSERT INTO users (id, name, email, phone, created_at, updated_at, last_lat, last_lng) VALUES
     ('u1', 'صاحبِ دکان', 'a@example.com', NULL, $1, $1, 34.5553, 69.2075),
@@ -101,7 +102,7 @@ test('copy PGlite ⇐ PGlite: همان داده؛ ماشه‌ها دوباره �
   assert.equal(r.target.tables.sub_payments.sums.amount, '4007');
   assert.equal(r.target.tables.users.rows, 3);
 
-  const db = await PGlite.create({ dataDir: DST });
+  const db = await createPglite({ dataDir: DST });
   try {
     const plan = (await db.query('SELECT price_afn FROM plans ORDER BY id LIMIT 1')).rows[0];
     assert.equal(plan.price_afn, 999, 'قیمتِ عوض‌شدهٔ مالک جای پیش‌فرضِ Migration نشست');
@@ -143,7 +144,7 @@ test('اختلافِ یک واحد در مبلغ و یک ردیفِ کم دید�
 
 test('پشتیبانِ خودِ سرور (‎.pglite.tar.gz‎) هم مبدأ می‌شود', async () => {
   //  همان راهی که lib/backup.js پشتیبانِ PGlite می‌گیرد: dumpDataDir
-  const live = await PGlite.create({ dataDir: path.join(tmp, 'vps-pg') });
+  const live = await createPglite({ dataDir: path.join(tmp, 'vps-pg') });
   const blob = await live.dumpDataDir('gzip');
   await live.close();
   const file = path.join(tmp, 'shop-backup.pglite.tar.gz');
@@ -156,7 +157,7 @@ test('پشتیبانِ خودِ سرور (‎.pglite.tar.gz‎) هم مبدأ م
 test('مبدأیی که Migrationِ ناشناخته دارد (سرورِ تازه‌تر از این ابزار) ⇒ رد، پیش از دست زدن به مقصد', async () => {
   const dir = path.join(tmp, 'future');
   fs.cpSync(SRC_DIR, dir, { recursive: true });
-  const db = await PGlite.create({ dataDir: dir });
+  const db = await createPglite({ dataDir: dir });
   await db.query(`INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ('999_future.sql', 'x', 1)`);
   await db.close();
   const DST = path.join(tmp, 'never');

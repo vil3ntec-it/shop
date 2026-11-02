@@ -60,14 +60,15 @@ async function open(url, { readOnly = false, create = false, migrate = false } =
   if (!url) throw new Error('نشانیِ دیتابیس داده نشده');
   const label = safeUrl(url);
   if (PGLITE_RE.test(url)) {
-    const { PGlite } = await import('@electric-sql/pglite');
+    //  ⛔ نه `PGlite.create` ِ خام: زیرِ Electron گاه برای همیشه می‌ایستد (`src/lib/pglite-create.js`)
+    const { createPglite } = require('../src/lib/pglite-create');
     const target = url.replace(PGLITE_RE, '');
     let tmp = null;
     let db;
     if (/\.tar\.gz$/i.test(target)) {
       if (!readOnly) throw new Error('پشتیبانِ ‎.pglite.tar.gz‎ فقط مبدأ است، نه مقصد');
       const buf = await fsp.readFile(target);
-      db = await PGlite.create({ loadDataDir: new Blob([buf]) });
+      db = await createPglite({ loadDataDir: new Blob([buf]) });
     } else if (readOnly) {
       if (!fs.existsSync(path.join(target, 'PG_VERSION'))) throw new Error(`این پوشه دیتابیسِ PGlite نیست: ${target}`);
       //  ⛔ رونوشت، نه خودِ پوشه — باز کردنِ PGlite رویش می‌نویسد
@@ -76,11 +77,11 @@ async function open(url, { readOnly = false, create = false, migrate = false } =
       //  مبدأِ قدیمی‌تر از این کد ⇒ همان Migrationهایی که سرورِ تازه هنگامِ بالا آمدن
       //  می‌زد، روی **رونوشت** — خودِ مبدأ همچنان دست‌نخورده
       if (migrate) migrateTarget(`pglite:${path.join(tmp, 'pg')}`);
-      db = await PGlite.create({ dataDir: path.join(tmp, 'pg') });
+      db = await createPglite({ dataDir: path.join(tmp, 'pg') });
     } else {
       if (!create && !fs.existsSync(target)) throw new Error(`پوشهٔ مقصد نیست: ${target}`);
       await fsp.mkdir(target, { recursive: true });
-      db = await PGlite.create({ dataDir: target });
+      db = await createPglite({ dataDir: target });
     }
     const q = async (sql, params = []) => (await db.query(sql, params)).rows;
     await prepareSession(q);

@@ -28,6 +28,7 @@ const { randomBytes } = require('crypto');
 const { AsyncLocalStorage } = require('async_hooks');
 const fs = require('fs');
 const config = require('./config');
+const { createPglite } = require('./lib/pglite-create');
 
 /** آیا DATABASE_URL راه‌اندازِ درون‌فرآیندی را می‌خواهد. */
 const PGLITE_RE = /^pglite:(\/\/)?/i;
@@ -91,10 +92,11 @@ async function getLite() {
   if (lite) return lite;
   if (!litePromise) {
     litePromise = (async () => {
-      const { PGlite, types } = require('@electric-sql/pglite');
+      const { types } = require('@electric-sql/pglite');
       const dir = pgliteDir();
       if (dir) fs.mkdirSync(dir, { recursive: true });
-      const db = await PGlite.create({
+      //  ⛔ نه `PGlite.create` ِ خام: زیرِ Electron گاه برای همیشه می‌ایستد (`lib/pglite-create.js`)
+      const db = await createPglite({
         dataDir: dir || 'memory://',
         //  مثلِ pg: عددِ بزرگ و اعشاری به شکلِ رشته می‌آیند، نه BigInt
         parsers: { [types.INT8]: (v) => v, [types.NUMERIC]: (v) => v },
