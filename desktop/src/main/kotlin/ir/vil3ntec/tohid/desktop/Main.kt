@@ -33,6 +33,7 @@ import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.window.rememberWindowState
 import androidx.compose.ui.window.MenuBar
 import ir.vil3ntec.tohid.scan.scanChar
+import ir.vil3ntec.tohid.ui.screens.matches
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.verticalScroll
@@ -82,6 +83,7 @@ fun main() {
   //  SYN-09: هابِ محلی — پرچمِ بالا **و** تنظیمِ `hub.local` ِ همین دستگاه؛ هر کدام خاموش ⇒ هیچ (‎desktop/hub/HubBoot.kt‎)
   runCatching { ir.vil3ntec.tohid.desktop.hub.HubBoot.startIfEnabled(context) }
   val prefs = context.getSharedPreferences("tohid", 0)
+  ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.load(context) //  S50، پیش‌فرض خاموش
   val store = ShopStore(context)
   val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   scope.launch { store.loadAndSummarize() }
@@ -94,6 +96,7 @@ fun main() {
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
   ir.vil3ntec.tohid.ShopDayChoice.load(context)
+  ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
   ir.vil3ntec.tohid.ui.UiV3.load(context)
 
@@ -214,6 +217,7 @@ fun main() {
         }
       },
       onPreviewKeyEvent = { e ->
+        ir.vil3ntec.tohid.ui.components.keys.KeyLabels.onKey(e) //  S50: نگه‌داشتنِ Ctrl ⇒ برچسب‌ها (تنظیمِ خاموش ⇒ هیچ)
         if (e.type != KeyEventType.KeyDown) return@Window false
         val mod = e.isCtrlPressed || e.isMetaPressed
         //  Ctrl+۱ تا ۹ ⇒ صفحه‌ها (`AppNav.SHORTCUTS`)؛ F11 ⇒ تمام‌صفحه
@@ -248,7 +252,8 @@ fun main() {
           mod && (e.key == Key.Equals || e.key == Key.Plus || e.key == Key.NumPadAdd) -> { setZoom(zoom + 0.1f); true }
           mod && (e.key == Key.Minus || e.key == Key.NumPadSubtract) -> { setZoom(zoom - 0.1f); true }
           mod && (e.key == Key.Zero || e.key == Key.NumPad0) -> { setZoom(1f); true }
-          else -> false
+          //  S42: کارِ keymap ِ صفحهٔ باز (Ctrl+B ِ «شلوغم»)؛ صفحه‌ای که چیزی نگذاشته ⇒ همان false
+          else -> ir.vil3ntec.tohid.ui.AppNav.dispatchKey { e.matches(it) }
         }
       },
     ) {
@@ -265,7 +270,9 @@ fun main() {
           val dialogTheme = remember {
             runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeChoice.SYSTEM)
           }
-          TohidTheme(dialogTheme) { ShortcutsHelp() }
+          //  S50: با تنظیمِ «راهنمای کلیدِ هر صفحه» از keymap.json؛ خاموش ⇒ همان فهرستِ پیشین
+          if (ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref.on.value) TohidTheme(dialogTheme) { ir.vil3ntec.tohid.ui.components.keys.KeyMapHelp() }
+          else TohidTheme(dialogTheme) { ShortcutsHelp() }
         }
       }
       //  پیش‌نمایشِ گوشی — فقط برای عکس‌های خودکار (`DevShot` ⇐ `phone:<صفحه>`)
@@ -336,6 +343,7 @@ fun main() {
                   prefs.edit().putString("theme", it.name).apply()
                 },
               )
+              ir.vil3ntec.tohid.ui.components.keys.KeyLabelsOverlay() //  S50: برچسب‌های Ctrl (تنظیمِ خاموش ⇒ هیچ)
             }
           }
         }

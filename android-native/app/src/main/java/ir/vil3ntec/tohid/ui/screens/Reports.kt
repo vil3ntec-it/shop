@@ -645,8 +645,8 @@ private fun expirySection(
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       StatTile("منقضی", lots.count { it.expired }.toString(), Shop.colors.danger, modifier = Modifier.weight(1f))
       StatTile(
-        "تا ${ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS} روز",
-        lots.count { !it.expired && it.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS }.toString(),
+        "تا ${ir.vil3ntec.tohid.data.ExpiryEngine.nearDays} روز",
+        lots.count { !it.expired && it.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.nearDays }.toString(),
         Shop.colors.warning,
         modifier = Modifier.weight(1f),
       )
@@ -681,7 +681,7 @@ private fun expirySection(
           style = MaterialTheme.typography.titleSmall,
           color = when {
             l.expired -> Shop.colors.danger
-            l.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.NEAR_DAYS -> Shop.colors.warning
+            l.daysLeft <= ir.vil3ntec.tohid.data.ExpiryEngine.nearDays -> Shop.colors.warning
             else -> Shop.colors.success
           },
         )
@@ -761,6 +761,7 @@ fun movementLabelOf(type: String): String = when (type) {
   "sale_cancel" -> "لغو فروش"
   "supplier_return" -> "برگشت به تأمین‌کننده"
   "adjustment" -> "اصلاح موجودی"
+  "count_adjust" -> "اصلاحِ شمارش"
   "damage" -> "ضایعات"
   //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
   "transfer_out" -> "انتقالِ خروجی"

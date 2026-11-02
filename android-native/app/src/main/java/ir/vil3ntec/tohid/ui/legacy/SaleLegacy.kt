@@ -97,7 +97,7 @@ fun SaleScreenLegacy(
   val loyal = loyalty?.cart ?: priced
   //  POS-38: «تحویلِ بعدی» فقط با تنظیمِ روشن، بخشِ سفارشِ روشن و اجازهٔ ثبتِ سفارش
   val deliverLater = ir.vil3ntec.tohid.ui.components.pos.deliverLaterReady()
-  var deliverOpen by remember { mutableStateOf(false) }
+  var deliverOpen by remember { mutableStateOf(false) }; val quick = ir.vil3ntec.tohid.ui.components.pos.rememberQuickTill() // S03 (خاموش ⇒ null)
   //  PRD-24 (پشتِ `ProductInfoPrefs`، پیش‌فرض خاموش): پیشنهادِ جایگزینِ موجود هنگامِ کمبود
   val infoOn = ir.vil3ntec.tohid.ui.components.product.productInfoOn()
 
@@ -280,7 +280,7 @@ fun SaleScreenLegacy(
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
       // کالای تازه‌اش را ثبت کرد و برگشت
       manual = code
-      scope.launch {
+      if (quick != null) quick.unknown(code, scope, snackbar) { freeLine = true } else scope.launch {
         val answer = snackbar.showSnackbar(
           message = StrSale.unknownBarcode,
           actionLabel = StrSale.registerItem,
@@ -692,8 +692,10 @@ fun SaleScreenLegacy(
         custom = line.free || line.unitPrice != null,
         free = line.free,
         linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
+        //  S45: ردِ قاعدهٔ جهت/سقفِ قلمِ آزاد ⇒ «درخواستِ تأیید» (فقط با «قیمت و تخفیفِ ردیف» ِ روشن)
+        priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask(context, store, scope, if (line.free) line.label else product?.name.orEmpty(), if (line.free) null else id) },
         saleUnit = product?.saleUnit.orEmpty(),
-        unitFactor = product?.unitFactor ?: 1.0,
+        unitFactor = product?.unitFactor ?: 1.0, units = remember(id) { ir.vil3ntec.tohid.data.TillGoodsPref.plan(context, product, line) }, // S05 (خاموش ⇒ null)
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
@@ -710,6 +712,7 @@ fun SaleScreenLegacy(
     }
   }
 
+  ir.vil3ntec.tohid.ui.components.pos.QuickTillDialog(quick, store, cartStore) { m -> m?.let(::toast) } // S03
   if (freeLine) {
     FreeLineDialog(
       linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
@@ -726,6 +729,9 @@ fun SaleScreenLegacy(
   val creditGateOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.creditGate(context) }
   /** فاکتوری که از سقفِ مشتری می‌گذرد و منتظرِ تأیید است (گزینه‌های پنجرهٔ پرداخت + مقدارِ بیش از سقف) */
   var creditAsk by remember { mutableStateOf<Pair<SalesEngine.Checkout, ir.vil3ntec.tohid.core.credit.CreditGate.Over>?>(null) }
+  //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): فاکتوری که منقضی برمی‌دارد و منتظرِ تأیید است
+  val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }
+  var expiryAsk by remember { mutableStateOf<Pair<SalesEngine.Checkout, Map<String, Long>>?>(null) }
 
   /**
    *  ثبتِ همین سبد با گزینه‌های پنجرهٔ پرداخت — مستقیم، یا پس از تأییدِ سقفِ اعتبار.
@@ -733,9 +739,12 @@ fun SaleScreenLegacy(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
+    if (expiryGateOn) SalesEngine.expiredNeed(d, loyal, ir.vil3ntec.tohid.todayIso()).let { need ->
+      if (!ir.vil3ntec.tohid.core.stock.ExpiryGate.covers(need, options.expiryApproval)) { expiryAsk = options to need; return }
+    }
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
-      d, loyal, options.copy(note = cartStore.note.value),
+      d, loyal, options.copy(note = cartStore.note.value).copy(expiryGate = expiryGateOn),
       today = ir.vil3ntec.tohid.todayIso(),
       now = System.currentTimeMillis(),
       newId = ::newIdLegacy,
@@ -801,6 +810,15 @@ fun SaleScreenLegacy(
       //  با تأیید همان فاکتور با همان گزینه‌ها ثبت می‌شود؛ PINِ غلط یا انصراف ⇒ هیچ چیز
       onApproved = { ok -> creditAsk = null; postSale(pending.copy(creditApproval = ok)) },
       onDismiss = { creditAsk = null },
+    )
+  }
+  expiryAsk?.let { (pending, need) ->
+    ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
+      summary = SalesEngine.expiredNeedText(d, need), debtorId = "", addMinor = 0L,
+      selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) }, selfName = pending.seller,
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      onApproved = { ok -> expiryAsk = null; postSale(pending.copy(expiryApproval = ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval(ok.by, ok.role, need, ok.reason))) },
+      onDismiss = { expiryAsk = null }, title = ir.vil3ntec.tohid.core.i18n.StrPos.expiredSaleTitle,
     )
   }
 

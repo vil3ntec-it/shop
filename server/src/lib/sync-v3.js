@@ -229,7 +229,7 @@ function merge(row, op, { seq, deviceId, cursor = 0, t, skewed = false }) {
       cf({ kind: 'append_only_edit', field: '*', loser_value: op.fields, winner_value: cur.data, ...loser });
       return { row: null, status: 'conflict', effect: null, conflicts };
     }
-    const data = { ...op.fields };
+    const data = require('./sync-v3-time').corrected({ ...op.fields }, op.hlc); //  S28b: «تاریخِ تصحیح‌شده» فقط از سرور
     if (row) {
       //  دلتا یا لغوی که پیش از خودِ سند رسیده بود
       for (const k of spec.counters) if (k in cur.data) data[k] = (Number(data[k]) || 0) + Number(cur.data[k]);

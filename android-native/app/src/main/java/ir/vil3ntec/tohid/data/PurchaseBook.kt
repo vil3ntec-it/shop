@@ -358,10 +358,23 @@ object PurchaseBook {
   private fun q(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
   private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "تأمین‌کننده" }
 
+  /** عنوانِ برگهٔ چاپیِ برگشت به تأمین‌کننده (S25، PUR-08) */
+  const val CREDIT_NOTE_TITLE = "سندِ کسر"
+
   fun invoiceSheet(d: ShopData, inv: Invoice): ReportCsv.Sheet {
     val names = d.products.associate { it.id to it.name }
     val supplier = d.suppliers.find { it.id == inv.supplierId }?.name.orEmpty()
     val rows = mutableListOf(listOf("ردیف", "کالا", "مقدار", "واحد", "فی", "جمع"))
+    //  S25: سندِ کسر برگهٔ خودش را دارد — عنوانِ «سندِ کسر»، مقدار و مبلغِ برگشتی مثبت، دلیل و کسر از بدهی (نه پرداخت/مانده)
+    if (inv.isReturn) {
+      inv.lines.forEachIndexed { i, p ->
+        rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(-p.quantity), p.unit, r(p.purchasePrice), r(-p.totalAmount))
+      }
+      rows += listOf("", "کسر از بدهی به «$supplier»", "", "", "", r(-inv.total))
+      inv.lines.map { it.notes.substringAfter("برگشت به تأمین‌کننده: ", "").trim() }.filter { it.isNotEmpty() }.distinct()
+        .forEach { rows += listOf("", "دلیل: $it", "", "", "", "") }
+      return ReportCsv.Sheet("$CREDIT_NOTE_TITLE-${safe(supplier)}-${inv.date}", rows)
+    }
     inv.lines.forEachIndexed { i, p ->
       rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(p.quantity), p.unit, r(p.purchasePrice), r(p.totalAmount))
     }

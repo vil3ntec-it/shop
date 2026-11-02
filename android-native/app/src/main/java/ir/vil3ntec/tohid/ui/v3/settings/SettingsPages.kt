@@ -84,6 +84,7 @@ import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Warehouse
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AnomalyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CustomerCardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TillGoodsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftCardScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LayawayScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LoyaltyScreen
@@ -118,6 +119,8 @@ import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.KeyboardCommandKey
 import ir.vil3ntec.tohid.ui.v3.settings.sections.DocGapsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosMoreKeysScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.KeyHelpScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TillSwitchScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosPriceCheckScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosSearchScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosTouchScreen
@@ -185,11 +188,14 @@ internal object SettingsPages {
     Page(SettingsLayout.POS_PRICE_CHECK, Icons.Outlined.PriceCheck) { PosPriceCheckScreen(it) },
     Page(SettingsLayout.POS_TOUCH, Icons.Outlined.TouchApp) { PosTouchScreen(it) },
     Page(SettingsLayout.POS_MORE_KEYS, Icons.Outlined.KeyboardCommandKey) { PosMoreKeysScreen(it) },
+    Page(SettingsLayout.KEY_HELP, Icons.Outlined.KeyboardCommandKey) { KeyHelpScreen(it) },
+    Page(SettingsLayout.TILL_SWITCH, Icons.Outlined.Lock) { TillSwitchScreen(it) },
     Page(SettingsLayout.GIFT_CARD, Icons.Outlined.CardGiftcard) { GiftCardScreen(it) },
     Page(SettingsLayout.LAYAWAY, Icons.Outlined.Schedule) { LayawayScreen(it) },
     Page(SettingsLayout.SAFE_BOOK, Icons.Outlined.AccountBalance) { SafeBookScreen(it) },
     Page(SettingsLayout.LOYALTY, Icons.Outlined.Loyalty) { LoyaltyScreen(it) },
     Page(SettingsLayout.CUSTOMER_CARD, Icons.Outlined.CreditCard) { CustomerCardScreen(it) },
+    Page(SettingsLayout.TILL_GOODS, Icons.Outlined.QrCodeScanner) { TillGoodsScreen(it) },
     Page(SettingsLayout.SIMPLE_ASK, Icons.Outlined.QuestionAnswer) { SimpleAskScreen(it) },
     Page(SettingsLayout.REPORT_KEYS, Icons.Outlined.Keyboard) { ReportKeysScreen(it) },
     Page(SettingsLayout.DOC_GAPS, Icons.Outlined.FormatListNumbered) { DocGapsScreen(it) },

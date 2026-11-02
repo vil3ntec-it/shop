@@ -19,17 +19,13 @@ plugins {
 
 val repoRoot = rootDir.resolve("../..")
 //  money، text و calendar به `core` (commonMain ِ KMP) رفته‌اند؛ هر پوشه از همان ریشه‌ای که دارَدَش
+//  core ِ KMP از راهِ `includeBuild` (settings.gradle.kts) می‌آید؛ از اندروید فقط پوشه‌های موتورِ همان‌جا کپی می‌شوند
 val engineRoots = listOf(
   repoRoot.resolve("android-native/app/src/main/java"),
-  repoRoot.resolve("core/src/commonMain/kotlin"),
 )
 val engineDirs = listOf(
-  "ir/vil3ntec/tohid/core/money",
   "ir/vil3ntec/tohid/core/stock",
   "ir/vil3ntec/tohid/core/report",
-  "ir/vil3ntec/tohid/core/text",
-  "ir/vil3ntec/tohid/core/audit",
-  "ir/vil3ntec/tohid/core/calendar",
 )
 
 val engineSources by tasks.registering(Sync::class) {
@@ -50,6 +46,7 @@ sourceSets {
 
 dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+  implementation("ir.vil3ntec.tohid:core:1.0")
 }
 
 java {

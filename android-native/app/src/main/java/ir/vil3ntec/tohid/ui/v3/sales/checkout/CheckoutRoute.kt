@@ -26,7 +26,6 @@ import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.Receipts
 import ir.vil3ntec.tohid.sync.DocSeries
 import ir.vil3ntec.tohid.sync.ShopNews
-import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.Platform
@@ -80,7 +79,7 @@ fun RouteScope.CheckoutRoute() {
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
-    val seller = remember { runCatching { SyncStore(context).accountName }.getOrDefault("") }
+    val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
     val payV2 = remember { ShopPolicy.payV2(context) }
     //  PAY-24: کارتِ هدیه و اعتبار در روش‌های پنل فقط با `GiftCardPref` ِ همین دستگاه (پیش‌فرض خاموش ⇒ همان روش‌ها)
     val giftOn = remember { GiftCardPref.on(context) }
@@ -239,7 +238,7 @@ fun RouteScope.ApprovalRoute() {
   ApprovalSheet(
     ask = ask,
     shopId = remember { ShopRole.shopId(context) },
-    requesterUserId = remember { runCatching { SyncStore(context).accountId }.getOrDefault("") },
+    requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
     onApproved = { CheckoutSession.approval = it; back() },
     onClose = { back() },
   )
@@ -257,7 +256,7 @@ fun RouteScope.CreditApprovalRoute() {
     addMinor = ask.addMinor,
     selfRole = remember { ShopRole.current(context) },
     selfName = ask.seller,
-    requesterUserId = remember { runCatching { SyncStore(context).accountId }.getOrDefault("") },
+    requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
     onApproved = { CheckoutSession.creditApproval = it; CheckoutSession.credit = null; back() },
     onClose = { CheckoutSession.credit = null; back() },
   )

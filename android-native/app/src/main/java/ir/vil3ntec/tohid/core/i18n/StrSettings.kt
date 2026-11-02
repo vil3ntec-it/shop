@@ -49,6 +49,14 @@ object StrSettings {
   val warnOnly: String get() = t("فقط هشدار", "Warn only", "یوازې خبرتیا")
   val expiryNote: String get() = t("هشدارِ انقضا همیشه هست. اگر «فروخته نشود» را بزنید، مقدارِ محموله‌های منقضی از موجودیِ فروختنی کم می‌شود و فروشِ بیش از آن ثبت نمی‌شود.", "Expiry alerts are always on. If you choose “Don't sell”, expired batches are taken out of sellable stock and sales beyond that aren't recorded.", "د نېټې د تېرېدو خبرتیا تل شته. که «ونه پلورل شي» وټاکئ، د تېرې نېټې د کڅوړو مقدار له پلورلو وړ موجودۍ کمېږي او له هغې زیات پلور نه ثبتېږي.")
   val dontSell: String get() = t("فروخته نشود", "Don't sell", "ونه پلورل شي")
+  //  S22: «منقضی فقط با مجوز» و روزِ هشدارِ نزدیک به انقضا (`ExpiryPref`، همین دستگاه)
+  val withApproval: String get() = t("با مجوزِ مدیر", "With manager approval", "د مدیر په اجازه")
+  val expiryApprovalNote: String get() = t(
+    "«با مجوزِ مدیر»: فروشِ کالای منقضی فقط با تأییدِ مدیر یا صاحب (PIN روی همین دستگاه، با دلیل در سابقه) ثبت می‌شود.",
+    "“With manager approval”: selling expired stock is recorded only with a manager's or owner's approval (PIN on this device, with a reason kept in the log).",
+    "«د مدیر په اجازه»: د تېرې نېټې توکي یوازې د مدیر یا خاوند په تایید پلورل کېږي (په همدې وسیله PIN، لامل په تاریخچه کې).",
+  )
+  val expiryNearDays: String get() = t("هشدارِ نزدیک به انقضا (چند روز پیش، ۱ تا ۳۶۵)", "Near-expiry alert (days before, 1–365)", "د نېټې تېرېدو ته نږدې خبرتیا (څو ورځې مخکې، ۱ تر ۳۶۵)")
 
   // دوربین
   val cameraScanner: String get() = td("دوربین بارکدخوان", "Barcode camera", "د بارکوډ کمره", "Barcode scanner", "بارکوډ لوستونکی")

@@ -104,7 +104,7 @@
     { "id": "orders.advance", "scope": "orders", "title": "قبول یا مرحلهٔ بعد", "status": "planned", "keys": ["F9"] },
     { "id": "orders.reject", "scope": "orders", "title": "رد با دلیل", "status": "planned", "keys": ["Shift+F9"] },
     { "id": "orders.printSlip", "scope": "orders", "title": "چاپِ برگه", "status": "planned", "keys": ["F8"] },
-    { "id": "orders.busy", "scope": "orders", "title": "حالتِ «شلوغم» (با مدت)", "status": "planned", "keys": ["Mod+B"] },
+    { "id": "orders.busy", "scope": "orders", "title": "حالتِ «شلوغم» (با مدت)", "status": "live", "keys": ["Mod+B"] },
     { "id": "orders.pause", "scope": "orders", "title": "توقفِ موقتِ سفارش‌گیری", "status": "planned", "keys": ["Mod+Shift+P"] },
 
     { "id": "stocktake.confirm", "scope": "stocktake", "title": "تأیید", "status": "planned", "keys": ["Enter"] },

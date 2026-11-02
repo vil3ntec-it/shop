@@ -10,14 +10,13 @@ import ir.vil3ntec.tohid.data.Supplier
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  *  S25 — برگشت به تأمین‌کننده (PUR-08): خریدِ ۱۰ روغن به ۱۰۰ با پیش‌پرداختِ ۲۰۰، سپس برگشتِ ۳ تا با «سندِ کسر»
- *  (`PurchaseBook.supplierReturn`)، برگهٔ چاپیِ همان سند (`PurchaseBook.invoiceSheet`، دکمهٔ «چاپ» ِ خریدِ کامپیوتر) و بها
- *  روی پلِ موجودی (`StockLedger`).
- *
- *  ماندهٔ سناریو (pending، نه سرخ): برگهٔ چاپی عنوانِ «سندِ کسر» ندارد — همان «فاکتورِ خرید» با ردیفِ منفی است — و دکمهٔ
- *  چاپش فقط در خریدِ کامپیوتر است (گوشی برگهٔ چاپی ندارد).
+ *  (`PurchaseBook.supplierReturn`)، برگهٔ چاپیِ همان سند با عنوانِ «سندِ کسر» (`PurchaseBook.invoiceSheet`) — در کامپیوتر
+ *  دکمهٔ «چاپ» ِ خرید و در گوشی «چاپِ سندِ کسر» پس از ثبتِ برگشت، هر دو همان `ReportPrint` — و بها روی پلِ موجودی
+ *  (`StockLedger`).
  */
 class ScenarioS25Test {
 
@@ -47,11 +46,18 @@ class ScenarioS25Test {
     assertEquals(500.0, ShopStore.supplierDebt(after, "s1"), 0.0)
     assertEquals(d.supplierPayments, after.supplierPayments)
 
-    //  سندِ کسر: همان برگهٔ چاپیِ خرید، با ردیفِ −۳ و جمعِ −۳۰۰
+    //  سندِ کسر: برگهٔ چاپیِ خودش با عنوانِ «سندِ کسر»، ردیفِ ۳ روغن به ۱۰۰ = ۳۰۰، کسر از بدهی و دلیل
     val credit = PurchaseBook.invoices(after, "s1").single { it.isReturn }
     val sheet = PurchaseBook.invoiceSheet(after, credit)
-    assertTrue(sheet.rows.any { row -> row.contains("روغن") && row.any { it.contains("3") } })
+    assertTrue(sheet.name.startsWith(PurchaseBook.CREDIT_NOTE_TITLE))
+    assertEquals("سندِ کسر", PurchaseBook.CREDIT_NOTE_TITLE)
+    assertTrue(sheet.rows.any { row -> row == listOf("1", "روغن", "3", "عدد", "100", "300") })
+    assertTrue(sheet.rows.any { row -> row[1] == "کسر از بدهی به «شرکت»" && row.last() == "300" })
+    assertTrue(sheet.rows.any { row -> row[1] == "دلیل: خراب رسید" })
     assertEquals(-300.0, credit.total, 0.0)
+    //  فاکتورِ خریدِ معمولی همان برگهٔ پیشین است
+    val bill = PurchaseBook.invoices(after, "s1").single { !it.isReturn }
+    assertTrue(PurchaseBook.invoiceSheet(after, bill).name.startsWith("فاکتور-خرید-"))
 
     //  بها: فیِ خریدِ کالا و تاریخچهٔ قیمت دست نمی‌خورند؛ برگشت به بهای میانگین بیرون می‌رود و تطبیقِ بها درست است
     assertEquals(100.0, after.products.single().purchasePrice, 0.0)
@@ -60,5 +66,16 @@ class ScenarioS25Test {
     val row = view.rows.single { it.type == "supplier_return" }
     assertEquals(30_000L, row.costMinor)
     assertTrue(StockLedger.reconcileAll(view))
+  }
+
+  @Test
+  fun `S25 — سندِ کسر در گوشی و کامپیوتر از همان راهِ چاپ می‌رود`() {
+    fun src(rel: String): String =
+      listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+        .map { File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
+    val phone = src("ir/vil3ntec/tohid/ui/screens/Purchasing.kt")
+    assertTrue(phone.contains("PurchaseBook.invoiceSheet(r.data, credit).let { sh -> ir.vil3ntec.tohid.print.ReportPrint.print(context, sh, sh.name) }"))
+    val desk = src("ir/vil3ntec/tohid/ui/screens/DeskPurchasing.kt")
+    assertTrue(desk.contains("PurchaseBook.invoiceSheet(d, inv).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) }"))
   }
 }

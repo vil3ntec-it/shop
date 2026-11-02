@@ -14,7 +14,7 @@ enum class MoveKind { PURCHASE, SALE, CUSTOMER_RETURN, SALE_CANCEL, SUPPLIER_RET
       "customer_return" -> CUSTOMER_RETURN
       "sale_cancel" -> SALE_CANCEL
       "supplier_return" -> SUPPLIER_RETURN
-      "adjustment" -> ADJUSTMENT
+      "adjustment", "count_adjust" -> ADJUSTMENT
       else -> OTHER
     }
   }

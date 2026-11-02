@@ -1,5 +1,5 @@
 /**
- * سناریوهای سرتاسریِ اشتراک و نسخهٔ برنامه — S60، S123، S129 (§۱۶، §۲۱.۱۹).
+ * سناریوهای سرتاسریِ اشتراک و نسخهٔ برنامه — S60، S123، S129 (§۱۶، §۲۱.۱۹) و S47 (§۷.۵، D-05).
  *
  * بازیگرها (برنامه در سطحِ پروتکل):
  *   • O — گوشیِ صاحب؛ T — کامپیوترِ شاگرد (همان که بی اشتراکِ چنددستگاهی نمی‌نویسد)؛
@@ -12,7 +12,10 @@
  *
  * اجرا:  node test/e2e/run.mjs entitle
  */
+import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
+
+const require = createRequire(import.meta.url);
 
 const E = await boot({ name: 'entitle' });
 const { db } = E;
@@ -114,6 +117,44 @@ await E.step('S60', 'انقضای اشتراک با ساعتِ غلطِ گوشی
   assert.equal(await salesOnServer(), sales0 + 3, 'دو فروشِ صف + فروشِ صاحب');
   assert.equal((await subOf(T)).status, 'active');
 }, { needs: ['S123'] });
+
+await E.step('S47', 'S47 (D-05): هشدارِ چند روز پیش از پایان؛ پایان در حالِ آفلاین ⇒ داده قفل نمی‌شود — فروشِ آفلاینِ صاحب، همگام‌سازی، خواندنِ دفتر و پشتیبان باز', async () => {
+  //  (سطرهای ساخته‌نشده: پیامِ یادآور «N روز دیگر» تاریخِ دقیق ندارد — تاریخ فقط در `endsAt` ِ /me/subscription؛
+  //   چاپ و خروجیِ فایل کارِ خودِ برنامه‌اند و این‌جا سنجیده نمی‌شوند)
+  const subs = require('../../src/lib/subscriptions');
+  const ends = Date.now() + 3 * DAY - 60_000;
+  await db.query("UPDATE subscriptions SET ends_at=$1, grace_days=0 WHERE shop_id=$2 AND status='active'", [ends, owner.shopId]);
+  const st = await subOf(O);
+  assert.equal(st.endsAt, ends, 'تاریخِ دقیقِ پایان به برنامه می‌رسد');
+  assert.equal(st.daysLeft, 3);
+  assert.ok((await subs.notifyExpiring({ thresholds: [7, 3, 1] })).sent >= 1, 'یادآورِ پیش از پایان نرفت');
+  const msg = await db.one("SELECT body FROM support_messages WHERE body LIKE '%روز دیگر تمام می‌شود%' ORDER BY created_at DESC LIMIT 1");
+  assert.match(msg.body, /۳|3/, msg.body);
+  assert.equal((await subs.notifyExpiring({ thresholds: [7, 3, 1] })).sent, 0, 'همان آستانه دو بار نه');
+
+  //  پایان وقتی گوشیِ صاحب آفلاین است
+  O.offline = true;
+  await db.query("UPDATE subscriptions SET ends_at=$1 WHERE shop_id=$2 AND status='active'", [Date.now() - 1000, owner.shopId]);
+  const sales0 = await salesOnServer();
+  const r = O.sell({ lines: [{ id: rice, qty: 1 }] });
+  O.offline = false;
+  assert.notEqual((await subOf(O)).status, 'active');
+  await O.drain();
+  assert.equal(await salesOnServer(), sales0 + 1, 'فروشِ آفلاینِ صاحب پس از پایان همگام شد');
+  assert.ok(O.ledger.sales.some((x) => x.id === r.saleId));
+  assert.equal((await O.api('GET', '/sync/v1/snapshot')).status, 200, 'خواندنِ دفتر بسته شد');
+  //  پشتیبانِ برنامه همان فایلِ خام است (application/octet-stream)
+  const raw = await fetch(`${E.apiBase}/api/me/backups?label=s47&ext=json`, {
+    method: 'POST', headers: O.headers({ 'Content-Type': 'application/octet-stream' }), body: Buffer.from(JSON.stringify(O.ledger)),
+  });
+  const up = E.ok({ status: raw.status, body: await raw.json() }, 'پشتیبان پس از پایان', 201);
+  const list = E.ok(await O.api('GET', '/me/backups'), 'فهرستِ پشتیبان').backups;
+  assert.ok(list.some((b) => b.id === up.backup.id));
+  assert.equal((await O.api('GET', `/me/backups/${up.backup.id}`)).status, 200, 'گرفتنِ پشتیبان بسته شد');
+  //  تمدید برای گام‌های بعد
+  E.ok(await grant(30, E.key('grant')), 'تمدید', [200, 201]);
+  assert.equal((await subOf(O)).status, 'active');
+}, { needs: ['S60'] });
 
 await E.step('S129', 'به‌روزرسانی: حداقلِ نسخه از پنل ⇒ گوشیِ کهنه پیامِ ارتقا می‌گیرد ولی سرور ردش نمی‌کند؛ کهنه و تازه کنارِ هم همگام می‌شوند و داده‌ای گم نمی‌شود', async () => {
   const cfg = async (dev) => (await E.get('/api/config', null, { 'X-App-Id': 'shop', 'X-App': 'shop', 'X-App-Version': dev.appVersion })).body;

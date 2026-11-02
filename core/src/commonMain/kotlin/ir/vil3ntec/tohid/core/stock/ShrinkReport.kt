@@ -53,6 +53,7 @@ object ShrinkReport {
     if (qtyMilli == 0L) return null
     return when (type) {
       "damage" -> Kind.WASTE
+      "count_adjust" -> if (qtyMilli < 0) Kind.SHORTAGE else Kind.SURPLUS // S20: «اصلاحِ شمارش» ِ انبارگردانیِ تازه
       "adjustment" -> when (adjKind) {
         "damage" -> Kind.WASTE
         "expired" -> Kind.EXPIRED

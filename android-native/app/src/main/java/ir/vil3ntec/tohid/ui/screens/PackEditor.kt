@@ -19,7 +19,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
  *  PRD-04 — بسته‌ها و بارکدِ هر واحد در فرمِ کالا (گوشی و کامپیوتر)، فقط با `ShopPolicy.productTools`.
- *  هر بسته: نام (کارتن)، اندازه به واحدِ کالا (۲۴ دانه) و بارکدهای روی همان بسته. سنجش کارِ موتور است
+ *  هر بسته: نام (کارتن)، اندازه به واحدِ کالا (۲۴ دانه)، بارکدهای روی همان بسته و قیمتِ اختیاریِ یک بسته در
+ *  لیستِ قیمت (S05؛ صندوق فقط وقتی واحدِ ردیف را عوض کند و `TillGoodsPref.units` روشن باشد). سنجش کارِ موتور است
  *  (`WarehouseEngine` ⇐ `PackBarcodes.check`): نام و اندازه و بارکد لازم، بارکد بین کالاها و واحدها تکراری نه.
  */
 @Composable
@@ -30,7 +31,8 @@ fun PackEditor(packs: List<PackBarcodes.Draft>, unit: String, onChange: (List<Pa
   Column(Modifier.fillMaxWidth()) {
     Text("بسته‌ها و بارکدِ هر واحد (اختیاری)", style = MaterialTheme.typography.labelMedium, color = c.muted)
     Text(
-      "مثلاً «کارتن» = ۲۴ $u با بارکدِ روی کارتن؛ اسکنِ آن ۲۴ $u به سبد می‌برد و قیمت همان قیمتِ هر $u است.",
+      "مثلاً «کارتن» = ۲۴ $u با بارکدِ روی کارتن؛ اسکنِ آن ۲۴ $u به سبد می‌برد و قیمت همان قیمتِ هر $u است. " +
+        "قیمتِ بسته (اختیاری) وقتی است که در صندوق واحدِ ردیف «کارتن» شود؛ خالی ⇒ اندازه × قیمتِ هر $u.",
       style = MaterialTheme.typography.labelSmall,
       color = c.muted,
     )
@@ -53,13 +55,22 @@ fun PackEditor(packs: List<PackBarcodes.Draft>, unit: String, onChange: (List<Pa
         )
         TextButton(onClick = { onChange(packs.filterIndexed { j, _ -> j != i }) }) { Text("حذف") }
       }
-      OutlinedTextField(
-        value = p.barcodes,
-        onValueChange = { set(i, p.copy(barcodes = it)) },
-        label = { Text("بارکدهای ${p.name.trim().ifEmpty { "بسته" }} (با «،» جدا)") },
-        singleLine = true,
-        modifier = Modifier.fillMaxWidth(),
-      )
+      Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+          value = p.barcodes,
+          onValueChange = { set(i, p.copy(barcodes = it)) },
+          label = { Text("بارکدهای ${p.name.trim().ifEmpty { "بسته" }} (با «،» جدا)") },
+          singleLine = true,
+          modifier = Modifier.weight(1f),
+        )
+        OutlinedTextField(
+          value = p.price,
+          onValueChange = { set(i, p.copy(price = ir.vil3ntec.tohid.numericInput(it))) },
+          label = { Text("قیمتِ ${p.name.trim().ifEmpty { "بسته" }}") },
+          singleLine = true,
+          modifier = Modifier.weight(0.6f),
+        )
+      }
     }
     if (packs.size < PackBarcodes.MAX_PACKS) {
       TextButton(onClick = { onChange(packs + PackBarcodes.Draft()) }) { Text("+ بسته (کارتن، شل، …)") }

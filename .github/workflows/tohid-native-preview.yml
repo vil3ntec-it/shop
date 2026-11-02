@@ -14,6 +14,8 @@ name: توحید بومی — پیش‌نمایش
 on:
   push:
     branches:
+      #  main: هر مرج همان پیش‌نمایشِ گوشیِ صاحب‌کار را هم تازه می‌کند (بی main از ۱۴۰۵/۰۷/۲۸ کهنه مانده بود)
+      - main
       - ccr-3a0d593c-ac0jpj-phone-v3
       - ccr-3a0d593c-ac0jpj-v3-foundation
     paths:

@@ -48,6 +48,18 @@ const dropReconcileLease = () => query(
 let reconTimer = null;
 let reconRunning = false;
 let reconTicks = 0;
+
+/**
+ * OPS-01@29: نوبت‌های پیاپیِ ناموفقِ تطبیق (پرتاب، یا `errors > 0` ِ درِ وضعیت) — فقط در حافظهٔ همین نمونه و فقط
+ * `lib/ops-paging.js` می‌خواند (سه نوبت ⇒ هشدارِ بحرانی). نوبتی که اجرا نشد (بی کلید، قفلِ نمونهٔ دیگر) چیزی نمی‌شمارد.
+ */
+const reconHealth = { streak: 0, lastOkAt: null, lastFailAt: null, lastError: '' };
+function noteReconcile(fail, at = Date.now()) {
+  if (!fail) { Object.assign(reconHealth, { streak: 0, lastOkAt: at, lastError: '' }); return; }
+  const code = fail.code ? `:${String(fail.code).slice(0, 40)}` : '';
+  Object.assign(reconHealth, { streak: reconHealth.streak + 1, lastFailAt: at, lastError: `${String(fail.name || 'Error').slice(0, 40)}${code}` });
+}
+const reconcileHealth = () => ({ ...reconHealth });
 /**
  * یک نوبتِ زمان‌بند. null ⇒ اجرا نشد (پیکربندی نشده، نوبتِ قبلی هنوز در کار، یا نمونهٔ دیگری قفل دارد).
  * @returns {Promise<null|{checked, paid, closed, mismatched, errors, truncated, wide}>}
@@ -59,7 +71,11 @@ async function reconcileTick({ wide } = {}) {
     if (!(await takeReconcileLease())) return null;
     try {
       const full = wide ?? (reconTicks++ % RECONCILE_FULL_EVERY === 0);
-      const out = await reconcile({ ...(full ? {} : { sinceMs: RECONCILE_RECENT_MS }), budgetMs: RECONCILE_BUDGET_MS });
+      let out;
+      try {
+        out = await reconcile({ ...(full ? {} : { sinceMs: RECONCILE_RECENT_MS }), budgetMs: RECONCILE_BUDGET_MS });
+      } catch (err) { noteReconcile(err); throw err; }
+      noteReconcile(out.errors ? { name: 'ReconcileErrors', code: String(out.errors) } : null);
       if (out.paid || out.closed || out.mismatched || out.errors || out.truncated || out.flagged) {
         console.log(`[payments] تطبیق: ${JSON.stringify(out)}`);
       }
@@ -81,4 +97,4 @@ function stopReconciler() {
   reconTimer = null;
 }
 
-module.exports = { reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY };
+module.exports = { reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY, reconcileHealth, noteReconcile };

@@ -56,7 +56,8 @@ object ShopRole {
    *  نباید تنظیماتِ خودش قفل باشد.
    */
   fun current(context: Context): String =
-    prefs(context).getString(KEY, "").orEmpty().ifBlank { OWNER }
+    //  S46: کاربرِ صندوق (`TillUser`، تنظیمِ خاموش ⇒ همان نقش) هرگز بیش از حسابِ دستگاه اختیار ندارد
+    TillUser.role(context, prefs(context).getString(KEY, "").orEmpty().ifBlank { OWNER })
 
   fun remember(context: Context, role: String) {
     val clean = role.trim().lowercase()

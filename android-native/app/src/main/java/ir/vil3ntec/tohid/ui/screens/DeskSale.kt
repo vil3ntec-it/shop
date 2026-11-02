@@ -150,7 +150,8 @@ fun DeskSaleScreen(
   var receiveBusy by remember { mutableStateOf(false) }
   var receiptOf by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
   var freeLine by remember { mutableStateOf(false) }
-  var editLine by remember { mutableStateOf<String?>(null) }
+  var editLine by remember { mutableStateOf<String?>(null) }; var unitNext by remember { mutableStateOf(false) } // S05: Ctrl+U ⇒ برگهٔ ردیف با واحدِ بعدی
+  val quick = ir.vil3ntec.tohid.ui.components.pos.rememberQuickTill() // S03 (`TillGoodsPref.quickRegister`، خاموش ⇒ null و راهِ پیشین)
   var lastInvoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
   var showInvoice by remember { mutableStateOf(false) }
   //  تراشهٔ دستهٔ انتخابی: null = «همه»
@@ -181,7 +182,7 @@ fun DeskSaleScreen(
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
   var payOpen by remember { mutableStateOf(false) }
-  val seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
+  val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
   //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`،
@@ -249,7 +250,7 @@ fun DeskSaleScreen(
   fun applyAdded(product: Product, added: SalesEngine.Added): Boolean {
     //  POS-12: وسطِ جابه‌جاییِ فاکتور سبد قفل است ⇒ اضافه نشد؛ بوقِ خطا تا دوباره اسکن شود
     if (!cartStore.set(added.cart)) { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED); return false }
-    selected = product.id
+    selected = product.id; quick?.pending = null
     if (added.capped) {
       ScanFeedback.unknown(context)
       toast(Str.onlyInStock(product.name, qty(added.available) + (if (product.unit.isNotBlank()) " ${product.unit}" else "")) +
@@ -296,13 +297,14 @@ fun DeskSaleScreen(
 
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
+    if (quick?.enter(query) == true) { query = ""; return } // S03: Enter پس از بارکدِ ناشناس ⇒ ثبتِ سریع
     if (scaleLabel(query, d)) { query = ""; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
       is PosHit.Ambiguous -> { ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(hit.code)) }
       is PosHit.Add -> { add(hit.product, hit.count); query = "" }
-      is PosHit.Unknown -> if (addLot(hit.code)) query = "" else {
+      is PosHit.Unknown -> if (addLot(hit.code)) query = "" else if (quick != null) { ScanFeedback.unknown(context); quick.unknown(hit.code, scope, snackbar) { freeLine = true } } else {
         ScanFeedback.unknown(context)
         scope.launch {
           val r = snackbar.showSnackbar(StrSale.notFound(hit.code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
@@ -338,7 +340,7 @@ fun DeskSaleScreen(
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
       }
       //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
-      else -> if (!addLot(code, dd) && !pickCard(code, dd)) scope.launch {
+      else -> if (!addLot(code, dd) && !pickCard(code, dd)) if (quick != null) { ScanFeedback.unknown(context); quick.unknown(code, scope, snackbar) { freeLine = true } } else scope.launch {
         ScanFeedback.unknown(context)
         val r = snackbar.showSnackbar(StrSale.barcodeUnregistered(code), actionLabel = StrSale.registerItemAlt, duration = SnackbarDuration.Long)
         if (r == SnackbarResult.ActionPerformed) onRegisterBarcode(code)
@@ -395,12 +397,16 @@ fun DeskSaleScreen(
   //  مبلغ با تأییدِ کهنه ثبت نمی‌شود.
   /** بیش از سقف و تسویهٔ همان لحظه (پنلِ پرداخت) تا پس از تأیید همان ثبت شود */
   var creditAsk by remember { mutableStateOf<Pair<ir.vil3ntec.tohid.core.credit.CreditGate.Over, ir.vil3ntec.tohid.core.pay.Settlement?>?>(null) }
+  //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): منقضی فقط با تأیید؛ تأیید در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدیِ `finish` می‌رود
+  val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
+  var expiryAsk by remember { mutableStateOf<Triple<Map<String, Long>, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
 
   /**
    *  `settled` = تسویهٔ پنلِ پرداخت (با پرچم)؛ با پرچم و بی آن (F12، Ctrl+Enter) ⇒ نقدِ دقیق.
    *  `creditApproval` فقط از «درخواستِ تأیید» ِ همین فروش و فقط برای همین یک تلاش.
    */
   fun finish(settled: ir.vil3ntec.tohid.core.pay.Settlement? = null, creditApproval: ir.vil3ntec.tohid.core.credit.CreditGate.Approval? = null) {
+    val expiryApproval = expiryOk[0]; expiryOk[0] = null
     if (cart.isEmpty()) { toast(Str.cartEmpty); return }
     //  POS-12: صفحه هنوز سبدِ پیش از جابه‌جایی را دارد ⇒ ردیف‌هایش با کلیدِ فاکتورِ دیگر ثبت می‌شد
     if (!ir.vil3ntec.tohid.data.HeldRules.shownIsCurrent(pricedFrom, cartStore.lines.value) || checkout.debtorId != cartStore.debtorId.value ||
@@ -432,10 +438,13 @@ fun DeskSaleScreen(
       creditAsk = over to st
       return
     }
+    if (expiryGateOn) SalesEngine.expiredNeed(d, loyal, ir.vil3ntec.tohid.todayIso()).let { need ->
+      if (!ir.vil3ntec.tohid.core.stock.ExpiryGate.covers(need, expiryApproval)) { payOpen = false; expiryAsk = Triple(need, st, creditApproval); return }
+    }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
-      ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, loyal, sale.copy(note = cartStore.note.value), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, loyal, sale.copy(note = cartStore.note.value).copy(expiryGate = expiryGateOn, expiryApproval = expiryApproval), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
       series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
       receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo), loyalty, sale.seller) }) {
       SalePost.Outcome.Busy -> Unit
@@ -784,6 +793,7 @@ fun DeskSaleScreen(
           PosAction.FREE_ITEM -> { freeLine = true; true }
           PosAction.REPRINT -> { if (lastInvoice != null) showInvoice = true; true }
           PosAction.PRICE_CHECK -> if (ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.on.value) { priceCheck = true; true } else false
+          PosAction.UNIT -> if (selected != null && ir.vil3ntec.tohid.data.TillGoodsPref.units(context)) { unitNext = true; editLine = selected; true } else false // S05، خاموش ⇒ کلید مالِ صندوق نیست
           //  مشتریِ همین فاکتور ⇒ مستقیم؛ وگرنه اول انتخابِ مشتری. خاموش ⇒ کلید مالِ صندوق نیست
           PosAction.RECEIVE -> if (!tillReceive) false else {
             receiveKey = newId(); if (cartDebtorId != null) receiveFor = cartDebtorId else receivePick = true; true
@@ -886,6 +896,7 @@ fun DeskSaleScreen(
       cartStore.setDebtor(id); pickDebtor = false; refocus()
     })
   }
+  ir.vil3ntec.tohid.ui.components.pos.QuickTillDialog(quick, store, cartStore) { m -> m?.let(::toast); refocus() } // S03
   if (freeLine) {
     FreeLineDialog(onDismiss = { freeLine = false; refocus() }, onConfirm = { label, price, count ->
       cartStore.set(SalesEngine.addFreeLine(cart, label, price, count, ::newId)); freeLine = false; refocus()
@@ -905,16 +916,18 @@ fun DeskSaleScreen(
         custom = line.free || line.unitPrice != null,
         free = line.free,
         linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
+        //  S45: ردِ قاعدهٔ جهت/سقفِ قلمِ آزاد ⇒ «درخواستِ تأیید» (فقط با «قیمت و تخفیفِ ردیف» ِ روشن)
+        priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask(context, store, scope, if (line.free) line.label else p?.name.orEmpty(), if (line.free) null else id) },
         saleUnit = p?.saleUnit.orEmpty(),
-        unitFactor = p?.unitFactor ?: 1.0,
+        unitFactor = p?.unitFactor ?: 1.0, units = remember(id, unitNext) { ir.vil3ntec.tohid.data.TillGoodsPref.plan(context, p, line, unitNext) },
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
-        onDismiss = { editLine = null; refocus() },
+        onDismiss = { editLine = null; unitNext = false; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)
           next = SalesEngine.setLinePrice(next, id, if (line.free) (price ?: line.unitPrice) else price)
-          cartStore.set(next); editLine = null; refocus()
+          cartStore.set(next); editLine = null; unitNext = false; refocus()
         },
       )
     }
@@ -925,7 +938,7 @@ fun DeskSaleScreen(
       summary = StrPos.discountSummary(money(basis.discount), money(basis.subtotal)) +
         if (discountDecision.cap == "maxPct") " — " + StrPos.cashierCap(qty(discountDecision.limit ?: 0.0)) else "",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
@@ -939,10 +952,19 @@ fun DeskSaleScreen(
       addMinor = over.addMinor,
       selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) },
       selfName = seller,
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       //  با تأیید همان فروش (با همان تسویه) ثبت می‌شود؛ انصراف ⇒ هیچ چیز
       onApproved = { ok -> creditAsk = null; finish(pending, ok) },
       onDismiss = { creditAsk = null; refocus() },
+    )
+  }
+  expiryAsk?.let { (need, pending, credit) ->
+    ir.vil3ntec.tohid.ui.components.staff.CreditApprovalDialog(
+      summary = SalesEngine.expiredNeedText(d, need), debtorId = "", addMinor = 0L,
+      selfRole = remember { ir.vil3ntec.tohid.data.ShopRole.current(context) }, selfName = seller,
+      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      onApproved = { ok -> expiryAsk = null; expiryOk[0] = ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval(ok.by, ok.role, need, ok.reason); finish(pending, credit) },
+      onDismiss = { expiryAsk = null; refocus() }, title = StrPos.expiredSaleTitle,
     )
   }
   if (payOpen) {

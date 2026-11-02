@@ -353,9 +353,9 @@ test('قاعده‌های دادهٔ واقعی: تسویهٔ پیک با کسر
   assert.equal(sus.state, 'ok');
   const live = await db.many("SELECT * FROM ops_alerts WHERE rule='admin_suspicious' AND status <> 'resolved'");
   assert.ok(live.some((a) => a.target === 'user:hacker_x'), JSON.stringify(live));
-  //  هر قاعده یک حالتِ صریح دارد (ok / unavailable / error)، هیچ‌کدام بی‌حالت
+  //  هر قاعده یک حالتِ صریح دارد (ok / unavailable / error؛ قاعدهٔ پرچم‌دار با پرچمِ خاموش off)، هیچ‌کدام بی‌حالت
   assert.deepEqual(rep.rules.map((r) => r.id).sort(), Object.keys(alerts.RULES).sort());
-  assert.ok(rep.rules.every((r) => ['ok', 'unavailable', 'error'].includes(r.state)), JSON.stringify(rep.rules));
+  assert.ok(rep.rules.every((r) => ['ok', 'unavailable', 'error'].includes(r.state) || (r.state === 'off' && alerts.RULES[r.id].flag)), JSON.stringify(rep.rules));
 });
 
 test('evaluate دستی: فقط admin و حداکثر هر ۱۵ ثانیه', async () => {

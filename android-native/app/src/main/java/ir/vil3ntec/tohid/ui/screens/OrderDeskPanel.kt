@@ -50,6 +50,9 @@ internal fun OrderDeskPanel(api: ApiClient) {
   fun act(call: suspend () -> ApiResult<Desk>) = ctl.act(call)
 
   val status = OrderDesk.status(d.busyUntil, d.pausedUntil, now)
+  //  S42: Ctrl+B ⇒ «شلوغم» ۳۰ دقیقه، فقط همان‌جا که دکمه‌اش هست
+  val busyKey = OrderDesk.busyKey(d.canManage, status)
+  ScreenKey(ir.vil3ntec.tohid.core.keymap.KeyMap.ORDERS_BUSY, enabled = busyKey != null && !busy) { if (busyKey != null) act { repo.busy(d, busyKey) } }
   Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
     when (status) {
       "paused" -> StatusPill(StrOrderSlip.deskPaused(OrderDesk.minutesLeft(d.pausedUntil, now)), PillTone.DANGER)
