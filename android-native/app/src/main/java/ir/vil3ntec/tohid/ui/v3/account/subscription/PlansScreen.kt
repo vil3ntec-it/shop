@@ -44,7 +44,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.I18n
-import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.PlansDto
@@ -217,7 +216,7 @@ internal fun RouteScope.PlansRoute() {
   val status = remember { runCatching { LicenseGuard.status(context, SyncStore(context)) }.getOrNull() }
   val options = PlansModel.options(dto)
   val picked = PlansModel.pick(options, chosen)
-  val currency = dto?.currency?.takeIf { it.isNotBlank() && I18n.lang == Lang.FA } ?: I18n.currencyWord(I18n.lang)
+  val currency = dto?.currency?.takeIf { it.isNotBlank() && I18n.lang.persian } ?: I18n.currencyWord(I18n.lang)
   val salesNumber = dto?.whatsapp?.number.orEmpty()
 
   fun whatsapp(text: String?) {

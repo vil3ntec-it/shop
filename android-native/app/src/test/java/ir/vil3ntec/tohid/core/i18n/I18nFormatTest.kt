@@ -28,6 +28,7 @@ class I18nFormatTest {
     assertEquals(Lang.FA, Lang.of("de"))
     assertEquals(Lang.EN, Lang.of("en"))
     assertEquals(Lang.PS, Lang.of("ps"))
+    assertEquals(Lang.PRS, Lang.of("prs"))
     assertEquals(Lang.FA, I18n.lang)
   }
 
@@ -35,8 +36,10 @@ class I18nFormatTest {
   fun `فارسی و پشتو راست‌به‌چپ، انگلیسی چپ‌به‌راست`() {
     assertTrue(Lang.FA.rtl)
     assertTrue(Lang.PS.rtl)
+    assertTrue(Lang.PRS.rtl)
     assertFalse(Lang.EN.rtl)
-    assertEquals(listOf("فارسی", "English", "پښتو"), Lang.entries.map { it.native })
+    //  انتخاب‌گرها (`LanguageScreen`، `LanguagePicker`) همین فهرست را نشان می‌دهند
+    assertEquals(listOf("فارسی", "دری", "English", "پښتو"), Lang.entries.map { it.native })
   }
 
   /* -------------------------------- رقم -------------------------------- */
