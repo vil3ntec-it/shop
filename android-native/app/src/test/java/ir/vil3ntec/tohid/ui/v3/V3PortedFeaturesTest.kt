@@ -33,12 +33,15 @@ class V3PortedFeaturesTest {
     assertTrue(src("ui/v3/sales/scan/SaleScanPanel.kt").contains("V3Button(label, { onAction(path) }"))
     val routes = src("ui/v3/sales/SalesRoutes.kt")
     assertTrue(routes.contains("V3Route(SalesPaths.QUICK_REGISTER, RouteKind.SHEET, { StrQuickRegister.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { QuickRegisterRoute() }"))
-    val sheet = src("ui/v3/sales/cart/QuickRegisterSheet.kt")
+    val route = src("ui/v3/sales/cart/QuickRegisterRouteAndroid.kt")
     //  مسیر فقط با تنظیمِ روشن و نقشِ مجاز باز است؛ ثبت روی دفترِ همین لحظه و همان گامِ پایانیِ کامپیوتر
-    assertTrue(sheet.contains("quickNext(context) == QuickRegister.Next.QUICK"))
-    assertTrue(sheet.contains("QuickRegister.register(store.data.value, code, draft,"))
-    assertTrue(sheet.contains("saveQuick(r, store, cart)"))
+    assertTrue(route.contains("quickNext(context) == QuickRegister.Next.QUICK"))
+    assertTrue(route.contains("QuickRegister.register(store.data.value, code, draft,"))
+    assertTrue(route.contains("saveQuick(r, store, cart)"))
+    //  برگهٔ مشترک بی وابستگیِ سکو (آیفون همان را می‌سازد)؛ تا ثبت تمام نشده بسته نمی‌شود
+    val sheet = src("ui/v3/sales/cart/QuickRegisterSheet.kt")
     assertTrue(sheet.contains("dismissible = !saving"))
+    assertFalse(sheet.contains("LocalContext") || sheet.contains("System.currentTimeMillis"))
     //  پنجرهٔ کامپیوتر همان `saveQuick` را صدا می‌زند — منطقِ ثبت یک جاست
     val shared = src("ui/components/pos/QuickRegisterAndroid.kt")
     assertTrue(shared.contains("scope.launch { onDone(saveQuick(r, store, cartStore)?.message) }"))
@@ -108,7 +111,8 @@ class V3PortedFeaturesTest {
   @Test
   fun `جزءهای آمده هیچ‌کدام زیرِ رابطِ قدیم یا با پسوندِ آن نیستند`() {
     val moved = listOf(
-      "ui/v3/sales/cart/QuickTillModel.kt", "ui/v3/sales/cart/QuickRegisterSheet.kt", "ui/v3/money/DebtorFileExtras.kt",
+      "ui/v3/sales/cart/QuickTillModel.kt", "ui/v3/sales/cart/QuickRegisterSheet.kt", "ui/v3/sales/cart/QuickRegisterRouteAndroid.kt",
+      "ui/v3/money/DebtorFileExtras.kt",
       "ui/AppLockKey.kt", "core/i18n/StrQuickRegister.kt",
     )
     for (rel in moved) {

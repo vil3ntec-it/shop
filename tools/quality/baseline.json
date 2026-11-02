@@ -442,7 +442,6 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/CartSheetRoutes.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HeldSheets.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HidScanner.kt": 1,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/QuickRegisterSheet.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt": 4,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/checkout/CheckoutRoute.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/drawer/DrawerRoutes.kt": 16,

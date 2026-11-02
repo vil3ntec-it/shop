@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -16,24 +15,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrQuickRegister
 import ir.vil3ntec.tohid.data.QuickRegister
-import ir.vil3ntec.tohid.scan.ScanFeedback
-import ir.vil3ntec.tohid.ui.components.pos.quickNext
-import ir.vil3ntec.tohid.ui.components.pos.saveQuick
-import ir.vil3ntec.tohid.ui.screens.newId
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
-import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 import kotlinx.coroutines.launch
 
@@ -88,38 +80,4 @@ fun QuickRegisterSheet(barcode: String, onSave: suspend (QuickRegister.Draft) ->
     Spacer(Modifier.height(18.dp))
     V3Button(StrQuickRegister.save, ::save, Modifier.fillMaxWidth(), loading = saving, haptic = true)
   }
-}
-
-/**
- *  چسبِ `sale/quick-register?code=` — فقط با «ثبتِ سریع» روشن و نقشِ مجاز (`quickNext`)؛ پیوندِ دستی یا کهنه ⇒
- *  برگشت با پیام. ثبت همان `QuickRegister.register` روی دفترِ همین لحظه و `saveQuick` ِ صندوقِ کامپیوتر: کالا با
- *  موجودیِ در دست به همین سبد، با بوقِ «خواند».
- */
-@Composable
-fun RouteScope.QuickRegisterRoute() {
-  val context = LocalContext.current
-  val code = remember { args.query("code").orEmpty().trim() }
-  val open = remember { code.isNotEmpty() && quickNext(context) == QuickRegister.Next.QUICK }
-  if (!open) {
-    LaunchedEffect(Unit) { toasts.show(StrQuickRegister.unavailable, V3Tone.WARNING); back() }
-    return
-  }
-  QuickRegisterSheet(
-    barcode = code,
-    onSave = { draft ->
-      when (val r = QuickRegister.register(store.data.value, code, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
-        is QuickRegister.Result.Failed -> r.message
-        is QuickRegister.Result.Ok -> {
-          val saved = saveQuick(r, store, cart)
-          if (saved == null) StrQuickRegister.notSaved
-          else {
-            if (saved.added) ScanFeedback.ok(context)
-            toasts.show(saved.message, if (saved.added) V3Tone.SUCCESS else V3Tone.WARNING)
-            null
-          }
-        }
-      }
-    },
-    onClose = { back() },
-  )
 }
