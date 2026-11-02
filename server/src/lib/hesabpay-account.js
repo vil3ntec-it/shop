@@ -22,14 +22,19 @@
  *   فقط صاحبِ دکان. بازکردنِ بخش، عوض/پاک کردنِ حساب و عوض کردنِ رمز همه رمز می‌خواهند — در سرور، نه فقط در
  *   برنامه. ۵ خطا ⇒ قفل ۱۵ دقیقه، هر ۵ خطای بعدی دوبرابر تا ۲۴ ساعت. هر تغییر در همان تراکنش سابقه دارد
  *   (`audit_logs`، زنجیرهٔ هش) و به دستگاه‌های صاحبِ دکان خبر می‌رود. رمزِ فراموش‌شده: «بازنشانی» حساب را هم
- *   پاک می‌کند و تا ۲۴ ساعت حسابِ تازه نمی‌پذیرد (کسی که فقط نشستِ صاحب را دزدیده نمی‌تواند بی‌صدا پول را
- *   به حسابِ خودش ببرد).
+ *   پاک می‌کند و حسابِ بعدی دست‌کم تا پایانِ همان ۲۴ ساعت فعال نمی‌شود.
+ *
+ * ── نگهبانِ حسابِ گیرنده (مهاجرتِ ۲۰۵؛ `lib/hesabpay-guard.js`) ──────────
+ *   نخستین حساب فوری؛ هر حسابِ بعدی ۲۴ ساعت «در انتظار» (حسابِ کهنه فعال می‌ماند) با پوش و «این من نبودم —
+ *   لغو کن»؛ هر تغییر فقط از دستگاهِ مطمئن + رمزِ حساب‌پی + تأییدِ دوبارهٔ ورود؛ QR فقط وقتی شمارهٔ درونش همان
+ *   شمارهٔ حساب است (عکس هرگز)؛ اثرِ انگشتِ گیرنده روی هر پرداخت.
  */
 const crypto = require('crypto');
 const { promisify } = require('util');
 const config = require('../config');
 const { one, query, tx, now } = require('../db');
 const audit = require('./audit');
+const guard = require('./hesabpay-guard');
 const { badRequest, forbidden, conflict, ApiError } = require('../middleware/errors');
 
 const pbkdf2 = promisify(crypto.pbkdf2);
@@ -187,9 +192,13 @@ function normQr(v) {
   if (typeof v !== 'string') return null;
   const s = v.trim();
   if (!s) return '';
-  if (s.length > QR_MAX || /[\u0000-\u001f\u007f]/.test(s)) return null;
+  if (s.length > QR_MAX || /[\u0000-\u001f\u007f]/.test(s) || /^data:/i.test(s)) return null;
   return s;
 }
+
+/** عکس (data: یا فیلدِ عکس) هرگز گیرندهٔ پول نیست: QR فقط اسکن و به شماره خوانده می‌شود */
+const QR_IMAGE_FIELDS = Object.freeze(['qrImage', 'qrPng', 'image', 'file']);
+const isQrImage = (b) => QR_IMAGE_FIELDS.some((k) => b[k] !== undefined) || (typeof b.qr === 'string' && /^\s*data:/i.test(b.qr));
 
 /** شماره‌ای که در خودِ QR آمده (اگر آمده) */
 function accountInQr(qr) {
@@ -221,10 +230,17 @@ function webhookUrlOf(token) {
 
 const flagOn = (shopId) => require('./orders').flagOf(shopId, 'pay.hesabpay');
 
-/** حال بی رمز — فقط برای صاحب: رمز گذاشته شده؟ قفل؟ وصل است؟ هیچ شماره یا کلیدی نه. */
-async function statusOf(shopId, row = undefined) {
+/**
+ * حال بی رمز — فقط برای صاحب: رمز گذاشته شده؟ قفل؟ وصل است؟ گیرندهٔ فعال (نام و ۴ رقم)، حسابِ در انتظار (برای نوارِ
+ * «این من نبودم»)، بستنِ بخش و مطمئن بودنِ همین دستگاه. هیچ شماره یا کلیدی نه.
+ */
+async function statusOf(shopId, row = undefined, actor = null) {
+  if (row === undefined) await guard.activateDue(shopId);
   const r = row === undefined ? await rowOf(shopId) : row;
   const t = now();
+  const sectionLocked = Number(r?.section_locked_until || 0);
+  const payee = guard.payeeOf(r);
+  const trust = actor ? await guard.trustOf(actor, t) : null;
   const lockedUntil = Number(r?.pin_locked_until || 0);
   const hold = Number(r?.hold_until || 0);
   const mode = MODES.includes(r?.mode) ? r.mode : 'off';
@@ -240,18 +256,24 @@ async function statusOf(shopId, row = undefined) {
     //  «خودکار» برای این دکان شدنی است؟ پرچمِ `pay.hesabpay` + کلیدِ رمزگذاریِ سرور
     autoAvailable: flag && key,
     autoReason: !key ? 'server_not_ready' : !flag ? 'flag_off' : '',
+    payee: payee ? { mode: payee.mode, name: payee.name, last4: payee.last4 } : null,
+    pending: guard.pendingOf(r),
+    sectionLockedUntil: sectionLocked > t ? sectionLocked : null,
+    ...(trust ? { device: { trusted: trust.trusted, trustedAfter: trust.trustedAfter } } : {}),
+    trustDays: guard.TRUST_DAYS,
   };
 }
 
 /** نمای کامل پس از رمز — شماره و QR (همان که مشتری می‌بیند)؛ از کلیدها فقط چهار نویسهٔ آخر. */
-async function fullOf(shopId, row) {
-  const base = await statusOf(shopId, row);
+async function fullOf(shopId, row, actor = null) {
+  const base = await statusOf(shopId, row, actor);
   return {
     ...base,
     account: row.mode === 'simple' ? row.account : '',
     qrPayload: row.mode === 'simple' ? row.qr_payload : '',
     auto: row.mode === 'auto' ? {
       keyLast4: row.key_last4,
+      merchantLast4: row.merchant_last4 || '',
       secretSet: Boolean(row.secret_enc),
       merchantSet: Boolean(row.merchant_enc),
       webhookUrl: webhookUrlOf(row.webhook_token),
@@ -259,11 +281,19 @@ async function fullOf(shopId, row) {
   };
 }
 
-/** برای صندوق (`/shop/payments/config`): حالت و — فقط در «ساده» — شماره و QR ِ خودِ دکان. */
+/**
+ * برای صندوق (`/shop/payments/config`): حالت، — فقط در «ساده» — شماره و QR ِ خودِ دکان، و گیرندهٔ فعال
+ * («پول به حسابِ <نام> — <۴ رقم>» و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد). حسابِ در انتظار هرگز.
+ */
 async function tillView(shopId) {
-  const r = await one('SELECT mode, account, qr_payload FROM shop_hesabpay WHERE shop_id=$1', [shopId]);
+  await guard.activateDue(shopId);
+  const r = await guard.ensureFp(await rowOf(shopId));
   const mode = MODES.includes(r?.mode) ? r.mode : 'off';
-  return { mode, simple: mode === 'simple' ? { account: r.account, qrPayload: r.qr_payload } : null };
+  const p = guard.payeeOf(r);
+  return {
+    mode, simple: mode === 'simple' ? { account: r.account, qrPayload: r.qr_payload } : null,
+    payee: p ? { name: p.name, last4: p.last4, fp: p.fp } : null,
+  };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -277,24 +307,28 @@ function adapterOfRow(row) {
   if (!apiKey || !secret) return null;
   const merchantId = row.merchant_enc ? unseal(row.shop_id, 'merchant', row.merchant_enc) : '';
   if (merchantId === null) return null;
-  const ad = require('./payment-hesabpay').forShop({ apiKey, secret, merchantId, webhookToken: row.webhook_token });
+  const ad = require('./payment-hesabpay').forShop({
+    apiKey, secret, merchantId, webhookToken: row.webhook_token, payeeFp: guard.fpOfRow(row),
+  });
   return ad.configured() ? ad : null;
 }
 
-const GATEWAY_COLS = 'shop_id, mode, api_key_enc, secret_enc, merchant_enc, webhook_token';
+const GATEWAY_COLS = 'shop_id, mode, api_key_enc, secret_enc, merchant_enc, webhook_token, key_last4, payee_fp';
 
-/** آداپتورِ حساب‌پیِ **همین** دکان (حالتِ خودکار، کلیدِ سالم) یا null — هرگز کلیدِ سکو. */
+/** آداپتورِ حساب‌پیِ **همین** دکان (حالتِ خودکار، کلیدِ سالم، حسابِ **فعال** — نه در انتظار) یا null — هرگز کلیدِ سکو. */
 async function gatewayOf(shopId) {
   if (!credKeyReady()) return null;
+  await guard.activateDue(shopId);
   return adapterOfRow(await one(`SELECT ${GATEWAY_COLS} FROM shop_hesabpay WHERE shop_id=$1`, [shopId]));
 }
 
-/** درِ وب‌هوکِ دکان: نشانی ⇒ دکان و آداپتورش؛ ناشناخته یا بی‌کلید ⇒ null. */
+/** درِ وب‌هوکِ دکان: نشانی ⇒ دکان و آداپتورِ حسابِ فعالش؛ ناشناخته یا بی‌کلید ⇒ null. */
 async function byWebhookToken(token) {
   if (!TOKEN_RE.test(String(token || '')) || !credKeyReady()) return null;
-  const row = await one(`SELECT ${GATEWAY_COLS} FROM shop_hesabpay WHERE webhook_token=$1`, [String(token)]);
-  const ad = adapterOfRow(row);
-  return ad ? { shopId: row.shop_id, adapter: ad } : null;
+  const hit = await one('SELECT shop_id FROM shop_hesabpay WHERE webhook_token=$1', [String(token)]);
+  if (!hit) return null;
+  const ad = await gatewayOf(hit.shop_id);
+  return ad ? { shopId: hit.shop_id, adapter: ad } : null;
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -302,7 +336,12 @@ async function byWebhookToken(token) {
 // ════════════════════════════════════════════════════════════════════
 
 const NOTICE = Object.freeze({
-  account_changed: ['حسابِ حساب‌پی عوض شد', 'حسابِ حساب‌پیِ دکان همین حالا عوض شد. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید، «خروج از همهٔ دستگاه‌ها» را بزنید و حساب‌پی را دوباره تنظیم کنید.'],
+  account_changed: ['حسابِ حساب‌پی گذاشته شد', 'حسابِ گیرندهٔ پولِ حساب‌پیِ دکان همین حالا گذاشته شد. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید، «خروج از همهٔ دستگاه‌ها» را بزنید و حساب‌پی را دوباره تنظیم کنید.'],
+  change_pending: ['حسابِ حساب‌پی ۲۴ ساعتِ دیگر عوض می‌شود', 'کسی حسابِ گیرندهٔ پولِ دکان را عوض کرد؛ حسابِ تازه ۲۴ ساعتِ دیگر فعال می‌شود و تا آن دم پول به همان حسابِ قبلی می‌رود. اگر شما نبودید، در برنامه «این من نبودم — لغو کن» را بزنید.'],
+  change_activated: ['حسابِ تازهٔ حساب‌پی فعال شد', 'از همین حالا پولِ حساب‌پیِ دکان به حسابِ تازه می‌رود. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید و حساب‌پی را دوباره تنظیم کنید.'],
+  change_cancelled: ['تغییرِ حسابِ حساب‌پی لغو شد', 'حسابِ تازه فعال نشد و پول به همان حسابِ قبلی می‌رود. بخشِ حساب‌پی تا ۲۴ ساعت بسته است؛ پس از آن رمزِ حساب‌پی و رمزِ حسابِ برنامه را عوض کنید.'],
+  change_refused: ['تلاش برای عوض کردنِ حساب‌پی از دستگاهِ تازه', 'کسی از دستگاهی تازه خواست حساب‌پیِ دکان را عوض کند و رد شد. اگر شما نبودید، رمزِ حسابِ برنامه را عوض کنید و «خروج از همهٔ دستگاه‌ها» را بزنید.'],
+  payee_alert: ['هشدار: پرداختِ حساب‌پی تأیید نشد', 'رسیدنِ یک پرداختِ حساب‌پی به حسابِ همین دکان ثابت نشد (پذیرنده یا حسابِ گیرنده نمی‌خواند)؛ «پرداخت شد» نخورد و نیازمندِ بررسی است.'],
   account_removed: ['حسابِ حساب‌پی برداشته شد', 'حسابِ حساب‌پیِ دکان همین حالا برداشته شد. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید.'],
   pin_set: ['رمزِ حساب‌پی گذاشته شد', 'برای بخشِ حساب‌پیِ دکان رمزِ تازه گذاشته شد. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید.'],
   pin_changed: ['رمزِ حساب‌پی عوض شد', 'رمزِ بخشِ حساب‌پیِ دکان همین حالا عوض شد. اگر شما نبودید، همین حالا رمزِ حسابِ برنامه را عوض کنید.'],
@@ -311,7 +350,7 @@ const NOTICE = Object.freeze({
 });
 
 /** پوش به دستگاه‌های صاحبانِ همین دکان — شکستش کار را برنمی‌گرداند. */
-async function notifyOwners(shopId, kind) {
+async function notifyOwners(shopId, kind, extra = {}) {
   const n = NOTICE[kind];
   if (!n) return null;
   try {
@@ -320,7 +359,7 @@ async function notifyOwners(shopId, kind) {
     )).rows.map((r) => r.user_id);
     if (!owners.length) return { sent: 0 };
     return await require('./push').sendTo({ shopId, app: 'shop', onlyUserIds: owners },
-      { title: n[0], body: n[1], data: { type: 'hesabpay_changed', kind } });
+      { title: n[0], body: n[1], data: { type: 'hesabpay_changed', kind, ...extra } });
   } catch (err) {
     console.warn('[hesabpay] خبر به صاحب نرسید:', err.message);
     return null;
@@ -341,14 +380,26 @@ function pinGiven(body) {
   return pin.trim();
 }
 
+/** درِ پیش از کار (`guard.gate`)؛ ردشده ⇒ سابقهٔ `hesabpay.change_refused` در همان تراکنش */
+async function refuseIn(c, shopId, actor, row, t, tr, gateOpts) {
+  const g = guard.gate(row, tr, t, gateOpts);
+  if (!g) return null;
+  await logIn(c, shopId, actor, 'hesabpay.change_refused', { reason: g.refusal, op: gateOpts.op || '' });
+  return { error: g, refused: g.refusal };
+}
+
 /**
- * کارِ `work(c, row, t)` فقط با رمزِ درست، زیرِ قفلِ ردیفِ دکان. خطای رمز (و قفل) در همان تراکنش شمرده و
- * ثبت می‌شود و **پس از** commit پرتاب می‌شود — شمارش با خطا برنمی‌گردد.
+ * کارِ `work(c, row, t)` فقط با رمزِ درست، زیرِ قفلِ ردیفِ دکان. پیش از رمز درِ نگهبان (`gateOpts`: بخشِ بسته، دستگاهِ
+ * نامطمئن) — دستگاهِ تازه حتی یک تلاشِ رمز ندارد. خطای رمز (و قفل) در همان تراکنش شمرده و ثبت می‌شود و **پس از**
+ * commit پرتاب می‌شود — شمارش با خطا برنمی‌گردد.
  */
-async function withPin(shopId, pin, actor, work) {
+async function withPin(shopId, pin, actor, work, gateOpts = { trust: true }) {
+  const tr = gateOpts.trust ? await guard.trustOf(actor) : null;
   const out = await tx(async (c) => {
     const row = await lockRow(c, shopId);
     const t = now();
+    const refused = await refuseIn(c, shopId, actor, row, t, tr, gateOpts);
+    if (refused) return refused;
     if (!row.pin_hash) return { error: forbidden('اول برای بخشِ حساب‌پی رمز بگذارید.', 'hesabpay_pin_not_set') };
     if (Number(row.pin_locked_until) > t) return { error: lockedError(row.pin_locked_until, t) };
     if (!(await pinMatches(pin, row.pin_hash))) {
@@ -368,7 +419,8 @@ async function withPin(shopId, pin, actor, work) {
     }
     return work(c, row, t);
   });
-  if (out.notify) await notifyOwners(shopId, out.notify);
+  if (out.refused) await guard.refusalNotice(shopId, out.refused);
+  if (out.notify) await notifyOwners(shopId, out.notify, out.notifyData);
   if (out.error) throw out.error;
   return out;
 }
@@ -384,13 +436,14 @@ const openPaymentError = () => conflict('یک پرداختِ خودکارِ حس
   'hesabpay_payments_open');
 
 /** حال (بی رمز) */
-const status = (shopId) => statusOf(shopId);
+const status = (shopId, actor = null) => statusOf(shopId, undefined, actor);
 
-/** بازکردنِ بخش با رمز ⇒ نمای کامل */
+/** بازکردنِ بخش با رمز ⇒ نمای کامل (دیدن دستگاهِ مطمئن نمی‌خواهد؛ بخشِ بسته بله) */
 async function open(shopId, body, actor) {
   const pin = pinGiven(body);
-  const out = await withPin(shopId, pin, actor, async (c, row) => ({ row }));
-  return fullOf(shopId, out.row);
+  await guard.activateDue(shopId);
+  const out = await withPin(shopId, pin, actor, async (c, row) => ({ row }), { trust: false, op: 'open' });
+  return fullOf(shopId, out.row, actor);
 }
 
 /** گذاشتنِ نخستین رمز (بی رمزِ قبلی) یا عوض کردنش (با رمزِ فعلی) */
