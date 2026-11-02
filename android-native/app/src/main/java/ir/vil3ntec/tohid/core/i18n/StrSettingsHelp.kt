@@ -58,6 +58,18 @@ object StrSettingsHelp {
     "For example, a customer pays half cash and half by transfer; or 123 afghani is rounded to 125.",
     "د بېلګې په توګه، پېرودونکی نیم نغد او نیم په حواله ورکوي؛ یا ۱۲۳ افغانۍ ۱۲۵ ته ګردېږي.",
   )
+  //  «حساب‌پیِ دکان» (B — تصمیمِ پولی؛ فقط صاحب)
+  val hesabShopTitle: String get() = t("حساب‌پیِ دکان", "Shop HesabPay", "د دوکان حساب‌پې")
+  val hesabShopLine: String get() = t(
+    "حساب‌پیِ خودِ دکان؛ پول مستقیم به حسابِ خودتان",
+    "Your shop's own HesabPay; money goes straight to you",
+    "د دوکان خپل حساب‌پې؛ پیسې مستقیم ستاسو حساب ته",
+  )
+  val hesabShopExample: String get() = t(
+    "مثلاً شمارهٔ حساب‌پیِ دکان را یک بار با رمزِ جدا بزنید؛ صندوق QR و مبلغ را نشان می‌دهد و پول مستقیم به همان حساب می‌رود.",
+    "For example, enter your shop's HesabPay number once with a separate PIN; the till shows the QR and amount and the money goes straight to that account.",
+    "د بېلګې په توګه، د دوکان د حساب‌پې شمېره یو ځل په جلا پاسورډ ولیکئ؛ صندوق QR او مبلغ ښيي او پیسې مستقیم همغه حساب ته ځي.",
+  )
   val printerLine: String get() = t("چاپگرِ رسید را وصل و آزمایش کنید", "Connect and test the receipt printer", "د رسید چاپګر وصل او و یې ازمویئ")
   val cameraLine: String get() = t("خواندنِ بارکدِ کالا با دوربینِ دستگاه", "Scan item barcodes with the device camera", "د وسیلې په کمره د توکو بارکوډ لوستل")
   val cameraExample: String get() = t(
@@ -319,7 +331,16 @@ object StrSettingsHelp {
     "For example, the app finds the network printer itself and prints a test receipt.",
     "د بېلګې په توګه، اپ د شبکې چاپګر پخپله مومي او یو ازمایښتي رسید چاپوي.",
   )
-  val peripheralsLine: String get() = t("چاپگر، بارکدخوان و ترازوی وصل‌شده", "Connected printers, scanners and scales", "وصل شوي چاپګرونه، بارکوډ لوستونکي او تلې")
+  val peripheralsLine: String get() = t(
+    "چاپگر، بارکدخوان، ترازو و نمایشگر را پیدا، وصل و آزمایش کنید",
+    "Find, connect and test printers, scanners, scales and displays",
+    "چاپګر، بارکوډ لوستونکی، تله او ښودونکی ومومئ، وصل او و یې ازمویئ",
+  )
+  val peripheralsExample: String get() = t(
+    "مثلاً «جست‌وجو» را بزنید؛ چاپگر و بارکدخوانِ نزدیک با نوعشان می‌آیند. «افزودن» را بزنید تا وصل بمانند؛ اسکنِ وقتِ بسته بودنِ برنامه هم نگه داشته می‌شود.",
+    "For example, tap \"Search\": nearby printers and scanners appear with their type. Tap \"Add\" to keep them connected; scans made while the app is closed are kept too.",
+    "د بېلګې په توګه، «لټون» ووهئ؛ نږدې چاپګرونه او بارکوډ لوستونکي له ډول سره راځي. «زیاتول» ووهئ چې وصل پاتې شي؛ هغه سکنونه هم ساتل کېږي چې اپ بند وي.",
+  )
   val lateApologyLine: String get() = t("پوزش و کوپنِ خودکار وقتی سفارش دیر برسد", "Automatic apology and coupon when an order is late", "کله چې فرمایش ناوخته شي، خپلکاره بښنه او کوپون")
   val lateApologyExample: String get() = t(
     "مثلاً سفارشی که یک ساعت دیر شد، خودکار پیامِ پوزش و کوپنِ تخفیف می‌گیرد.",

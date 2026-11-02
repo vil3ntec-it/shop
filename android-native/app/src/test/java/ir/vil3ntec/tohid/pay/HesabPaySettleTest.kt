@@ -75,4 +75,18 @@ class HesabPaySettleTest {
     val row = HesabPaySettle.rowOf(intent(row = false))!!
     assertEquals(listOf("hesabpay", "wallet", "TX-9", "confirmed", "gateway", "pi_1"), listOf(row.method, row.kind, row.ref, row.status, row.verification, row.intentId))
   }
+  @Test fun `حالتِ ساده فقط با پول رسیدِ صندوقدار ردیفِ تأییدِ صندوقدار با کدِ فاکتور می‌سازد`() {
+    val s = (HesabPaySettle.settleSimple(1450.0, null, "HP-AB12-CD34") as PayFlow.Outcome.Ok).value
+    assertEquals("paid", s.status)
+    val row = s.payments.single()
+    assertEquals(listOf("hesabpay", "wallet", "HP-AB12-CD34", "confirmed", "cashier"), listOf(row.method, row.kind, row.ref, row.status, row.verification))
+    assertEquals(145000L, row.amount)
+    //  پنلِ ترکیبی: فقط باقی‌مانده، نقد سرِ جایش
+    val mixed = (HesabPaySettle.settleSimple(1450.0, PayFlow.Draft(total = 1450.0, cash = "450"), "HP-1") as PayFlow.Outcome.Ok).value
+    assertEquals(listOf(45000L, 100000L), mixed.payments.map { it.amount })
+    assertEquals("cashier", mixed.payments.last().verification)
+    //  بی کد یا بی مبلغ ⇐ فروش بسته نمی‌شود
+    assertEquals("REF_REQUIRED", (HesabPaySettle.settleSimple(1450.0, null, "  ") as PayFlow.Outcome.Bad).problem.code)
+    assertTrue(HesabPaySettle.settleSimple(0.0, null, "HP-1") is PayFlow.Outcome.Bad)
+  }
 }

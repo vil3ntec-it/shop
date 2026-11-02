@@ -61,6 +61,16 @@
   <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
 
   <!--
+    «دستگاه‌ها»: اسکن وقتی برنامه بسته است. سرویسِ پیش‌رو از نوعِ connectedDevice بارکدخوانِ بلوتوثِ SPP را وصل نگه
+    می‌دارد (اندروید ۱۴+ برای این نوع اجازهٔ BLUETOOTH_CONNECT ِ بالا را هم می‌خواهد). فقط وقتی بارکدخوانی در «دستگاه‌ها»
+    ثبت است روشن می‌شود و اعلانِ همیشگی‌اش یک خطِ ساده می‌گوید چه می‌کند. RECEIVE_BOOT_COMPLETED: پس از روشن شدنِ
+    گوشی دوباره بالا بیاید. هیچ مکانی خوانده نمی‌شود.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+  <!--
     چاپگرِ حرارتیِ وصل با کابل (OTG).
 
     اجازه‌ای لازم نیست: اندروید خودش هنگامِ اولین چاپ یک پنجرهٔ اجازه
@@ -141,6 +151,17 @@
       برچسبِ NFC ِ پرداختِ حساب‌پی. `exported=true` لازمِ خودِ اندروید است؛ فقط سرویسِ NFC ِ سیستم
       (`BIND_NFC_SERVICE`) می‌تواند به آن وصل شود. بی پرداختِ باز به هر دستوری «پرونده نیست» می‌گوید.
     -->
+    <!-- «حساب‌پیِ دکان» (حالتِ ساده): فقط پیشنهاد از اعلانِ برنامهٔ حساب‌پی؛ اجازه را صاحب خودش در تنظیماتِ اندروید
+         می‌دهد و کلیدِ همین دستگاه پیش‌فرض خاموش است. هیچ اجازهٔ خواندنِ پیامک گرفته نمی‌شود. -->
+    <service
+        android:name=".pay.platform.HesabPayNoticeService"
+        android:exported="true"
+        android:label="@string/app_name"
+        android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
     <service
         android:name=".pay.platform.HesabPayHceService"
         android:exported="true"
@@ -152,6 +173,20 @@
           android:name="android.nfc.cardemulation.host_apdu_service"
           android:resource="@xml/apduservice" />
     </service>
+
+    <!-- «دستگاه‌ها»: اسکن در پس‌زمینه (`scan/ScanServiceAndroid.kt`) -->
+    <service
+        android:name=".scan.ScanCaptureService"
+        android:exported="false"
+        android:foregroundServiceType="connectedDevice" />
+    <receiver
+        android:name=".scan.ScanBootReceiver"
+        android:exported="false">
+      <intent-filter>
+        <action android:name="android.intent.action.BOOT_COMPLETED" />
+        <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+      </intent-filter>
+    </receiver>
 
     <provider
         android:name="androidx.core.content.FileProvider"

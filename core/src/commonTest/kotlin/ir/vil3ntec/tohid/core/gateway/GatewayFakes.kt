@@ -32,6 +32,13 @@ internal class FakeTransport(vararg replies: GatewayReply) : GatewayTransport {
     keys += idempotencyKey
     return next()
   }
+
+  override suspend fun put(path: String, body: Map<String, Any?>): GatewayReply {
+    calls += "PUT $path"
+    bodies += body
+    keys += null
+    return next()
+  }
 }
 
 /** درختِ JSON ِ یک قصد، همان شکلِ پاسخِ سرور (عددها `Double`، مثلِ درختِ برنامه) */

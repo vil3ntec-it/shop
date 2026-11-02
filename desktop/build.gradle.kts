@@ -101,6 +101,10 @@ val replaced = listOf(
   //  HW-12: کارتِ شبکهٔ فعال و جست‌وجوی بلوتوثِ اندروید (ConnectivityManager، BroadcastReceiver) — کامپیوتر:
   //  ‎hw/PrinterFinderDesktop.kt‎ (NetworkInterface، بی جست‌وجوی بلوتوث)
   "hw/PrinterFinderAndroid.kt",
+  //  «دستگاه‌ها»: نشانه‌های بلوتوثِ اندروید (رده، سرویس، جست‌وجو) و سرویسِ پیش‌روی اسکن در پس‌زمینه — کامپیوتر:
+  //  ‎hw/DeviceSignalsDesk.kt‎ (درگاه‌های COM) و ‎scan/ScanServiceDesk.kt‎ (کارگرها در سینی)
+  "hw/DeviceSignalsAndroid.kt",
+  "scan/ScanServiceAndroid.kt",
   //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
   //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
   "pay/platform/PayDevice.kt",
@@ -109,6 +113,8 @@ val replaced = listOf(
   //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
   "pay/platform/PayDevice.kt",
   "pay/platform/HesabPayHceService.kt",
+  //  «حساب‌پیِ دکان»: پیشنهاد از اعلانِ برنامهٔ حساب‌پی فقط اندروید؛ کامپیوتر: ‎pay/platform/HesabPayNoticeDesk.kt‎
+  "pay/platform/HesabPayNoticeAndroid.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")

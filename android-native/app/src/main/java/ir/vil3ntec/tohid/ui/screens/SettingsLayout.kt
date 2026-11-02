@@ -58,6 +58,8 @@ object SettingsLayout {
   const val RETURNS = "برگشت و تعویض"
   /** پرداخت و صندوق (PAY، `ShopPolicy.payV2`) */
   const val PAY = "پرداخت و صندوق"
+  /** «حساب‌پیِ دکان» — پول مستقیم به حسابِ همان دکان، رمزِ جدای حساب‌پی (فقط صاحب؛ `HesabPayAccountSettings`) */
+  const val HESAB_SHOP = "حساب‌پیِ دکان"
   /** سقفِ اعتبار در صندوق (CRM-03، `ShopPolicy.creditGate`) */
   const val CREDIT_GATE = "سقف اعتبار"
   /** گزارش‌های مشتری (CRM-04/06/10/14، `ShopPolicy.crmReports`) — فقط کامپیوتر */
@@ -165,7 +167,7 @@ object SettingsLayout {
     Group(
       SALES,
       listOf(
-        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
+        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, HESAB_SHOP, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
         POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
         DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, TILL_GOODS, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
         SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
@@ -205,6 +207,7 @@ object SettingsLayout {
     HELD to "held-invoices",
     RETURNS to "returns",
     PAY to "payments",
+    HESAB_SHOP to "hesabpay",
     PAY_FIX to "payment-fix",
     CREDIT_GATE to "credit-limit",
     CRM_REPORTS to "customer-reports",
@@ -284,6 +287,7 @@ object SettingsLayout {
     HELD -> StrPos.heldSection
     RETURNS -> StrSettings.returnsRow
     PAY -> StrShell.payAndRegister
+    HESAB_SHOP -> ir.vil3ntec.tohid.core.i18n.StrSettingsHelp.hesabShopTitle
     PAY_FIX -> StrPayFix.settingsTitle
     CREDIT_GATE -> StrShell.creditGate
     CRM_REPORTS -> StrShell.crmReports

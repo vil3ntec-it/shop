@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid
 /*
  *  `R` ِ iOS — همان شناسه‌های `desktop/src/shim/kotlin/ir/vil3ntec/tohid/R.kt`؛ پرونده‌ها از
  *  `android-native/app/src/main/res` در بستهٔ برنامهٔ آیفون کپی می‌شوند (مرحلهٔ Resources ِ
- *  `ios/iosApp`). فعلاً فقط قلم‌ها در بسته‌اند؛ تصویر و صدا کارِ گامِ ۲.
+ *  `ios/iosApp`): قلم‌ها و نشانِ برنامه (`logo_mark`). صدا گامِ ۳.
  */
 object R {
   private val names = HashMap<Int, String>()
@@ -17,5 +17,9 @@ object R {
     val vazirmatn_medium = reg(1002, "vazirmatn_medium.ttf")
     val vazirmatn_semibold = reg(1003, "vazirmatn_semibold.ttf")
     val vazirmatn_bold = reg(1004, "vazirmatn_bold.ttf")
+  }
+
+  object drawable {
+    val logo_mark = reg(2001, "logo_mark.png")
   }
 }

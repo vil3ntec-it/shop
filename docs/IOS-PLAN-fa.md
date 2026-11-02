@@ -75,7 +75,7 @@ ios/iosApp (SwiftUI)  `MainViewControllerKt.MainViewController()` در `UIViewCo
 `data/ImageBank` (۵۱)، `print/PrintJob` (۴۶)، `ui/screens/Settings` (۴۴). به تفکیکِ پوشه (فایل / بی وابستگی): `ui` ۷۰۴/۳۷۱،
 `data` ۱۸۲/۶۷، `core` ۱۱۲/۸۷، `sync` ۳۴/۶، `print` ۱۹/۰، `scan` ۹/۵.
 
-### ۰.۳ آنچه امروز برای iOS کامپایل می‌شود
+### ۰.۳ آنچه در گامِ ۱ برای iOS کامپایل شد (گامِ ۲ ⇐ ۰.۷)
 
 همهٔ ۱۰۹۶ فایلِ `android-native/app/src/main/java` (همان ۱۰۷۶ + ۲۰ فایلِ `replaced` ِ کامپیوتر):
 
@@ -115,12 +115,16 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 | ۲-ث | همگام‌سازی | `SyncV1Worker` ِ iOS: هنگامِ باز شدن + `BGAppRefreshTask` | دفترِ مشترک با سرور |
 | ۲-ج | بقیه | انتخابگرِ فایل/عکس (UIDocumentPicker/PHPicker پشتِ همان launcherها)، دوربین و بارکد (VisionKit)، اشتراک (UIActivityViewController)، اعلان، چاپ (شبکه/AirPrint؛ بلوتوثِ کلاسیک نه — بندِ ۵.۱) | — |
 
+**وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و بیشترِ ۲-ج در گامِ ۳ (⇐ ۰.۸؛
+بارکد با AVFoundation، نه VisionKit)؛ از ۲-ج چاپ (AirPrint/PDF) و تشخیصِ گفتار مانده‌اند.
+
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
 
 **تفاوت‌های دانستهٔ shimها (عمدی، تا گامِ ۲):** قفلِ `synchronized` یک قفلِ بازگشتیِ سراسری است (درست ولی درشت)؛
 `String.format` ِ بی Locale رقمِ لاتین می‌نویسد (اندروید با زبانِ دستگاه)؛ NSUserDefaults رمز ندارد ⇒ `TokenStore` و کلیدها بیرون‌اند؛
 انتخابِ فایل/عکس/دوربین «لغو» و اجازه‌ها «نه» برمی‌گردانند؛ «نت هست» همیشه بله است؛ `Thread.start` خطا می‌دهد.
+(گامِ ۲: توکن و کلیدِ دفتر در Keychain‌اند و `Thread.start` روی صفِ GCD اجرا می‌شود؛ بقیه همان.)
 
 ### ۰.۵ ساخت و CI
 
@@ -130,9 +134,10 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
   در محیطِ این PR مخزنِ گوگل (androidx ِ iOS) و download.jetbrains.com بسته بودند: بررسیِ محلی با init-script ِ جدا (در مخزن نیست)
   روی Compose ‎1.7.3 ِ Maven Central و بی گروه‌های `androidx.*` انجام شد؛ CI همان ‎1.9.3 را با همهٔ وابستگی‌ها می‌سازد.
 - **CI** (`.github/workflows/ios-spike.yml`، هر دو «گزارش» و `continue-on-error`، روی `core/**` و `ios/**`):
-  - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64` — نگهبانِ ارزان.
+  - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64` و `jvmTest` (GCM در برابرِ JDK) — نگهبانِ ارزان.
   - `ios-app` (macos-latest): `linkDebugFrameworkIosSimulatorArm64` ⇐ `xcodebuild -target iosApp -sdk iphonesimulator -arch arm64`
-    بی امضا ⇐ نصب و اجرا روی شبیه‌ساز، عکس پس از ۲۰ ثانیه و گزارشِ «زنده است؟» (مصنوعِ `ios-app-shots`).
+    بی امضا ⇐ نصب و اجرا روی شبیه‌ساز، عکس پس از ۲۰ ثانیه و گزارشِ «زنده است؟» (مصنوعِ `ios-app-shots`)؛ از گامِ ۲
+    `iosSimulatorArm64Test` هم (بردارهای رمز با CommonCrypto؛ از گامِ ۳ WorkManager، بارکد و اعلان).
   - اجرای این کارها روی هر تغییرِ `android-native/**` تصمیمِ هزینه‌ای صاحب‌کار است (دقیقهٔ macOS گران است)؛ فعلاً نه.
 
 ### ۰.۶ ⛔ BLOCKED-EXTERNAL — فقط صاحب‌کار
@@ -145,6 +150,105 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
 5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل بماند — Sign in with Apple (قاعدهٔ ۴.۸).
 6. بعدتر: کلیدِ APNs برای اعلانِ سرور.
+7. از گامِ ۳: متنِ اجازه‌های `ios/iosApp/iosApp/Info.plist` (دوربین، Face ID، موقعیت، ذخیرهٔ تصویر) و «Background App Refresh» باید با
+   برچسب‌های حریمِ خصوصیِ App Store Connect (بندِ ۵) یکی باشند — پرکردنِ آن فرم‌ها فقط با حسابِ صاحب‌کار.
+
+### ۰.۷ گامِ ۲ — شبکه، دفترِ رمزدار، تصویر؛ ریشهٔ واقعیِ برنامه (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase2`)
+
+> روی `claude/ios-app-phase1` (#822) و دستهٔ نهم (#826). اندروید، کامپیوتر و `core` دست نخوردند؛ همه در `ios/` است.
+
+**نتیجه:** ۱۱۰۹ از ۱۱۳۴ فایلِ `android-native/app/src/main/java` برای iOS کامپایل می‌شوند (گامِ ۱: ۳۰۸ از ۱۰۹۶)، به‌علاوهٔ
+دو فایلِ `core/src/jvmMain` (`PinCrypto`، `ApproverVault`) که core برای iOS ندارد. ریشهٔ آیفون حالا **همان بدنهٔ `MainActivity`**
+است: انتخابِ حالت ⇐ ورود و خوش‌آمد (`WelcomeScreen`) ⇐ `AppRoot` (صندوق و فروش، کالاها، مشتری‌ها، گزارش…) یا حالتِ پیک.
+
+| برش | چه شد | فایل‌ها |
+|---|---|---|
+| ۲-الف شبکه | `URL`/`HttpURLConnection` روی NSURLSession (همگام، خطاها همان ردهٔ JDK)، جریان‌های `java.io`، `Socket` ِ POSIX (چاپگرِ شبکه)؛ «سرورِ خودِ دکان» و هابِ محلی همان اندرویدِ پرچم‌خاموش | `java/net/*`، `java/io/*`، `platform/ServerSwitchIos`، `platform/HubRelayIos` |
+| ۲-ب دفترِ رمزدار | `javax.crypto` ِ AES-GCM = AES ِ CommonCrypto (ECB، سخت‌افزاری) + حالتِ GCM ِ خالص در `commonMain`؛ `MessageDigest`/`Mac`/PBKDF2 (CommonCrypto)؛ ECDSA P-256 (Security.framework)؛ KEK و توکنِ ورود در Keychain («فقط همین دستگاه») | `javax/crypto/*`، `java/security/*`، `ios/crypto/Gcm.kt`، `data/AtRestKeysIos`، `core/net/TokenStoreIos` |
+| ۲-پ تصویر | `Bitmap`/`BitmapFactory`/`Canvas`/`Matrix` روی Skia؛ `StaticLayout` روی پاراگرافِ Skia با Vazirmatn (رسید) | `android/graphics/*`، `android/text/StaticLayout.kt` |
+| بقیه | `org.json` (رفتارِ نسخهٔ اندروید)، WorkManager ِ بی‌اجرا، `ZipInputStream`/`ZipOutputStream` (zlib)، تقویم/تاریخ، `TreeMap`/`TreeSet`، تخته‌برش (UIPasteboard)، launcher و اجازه‌ها («لغو»/«نه»)، اعلان (خاموش) | `org/json`، `androidx/work`، `java/util/*` |
+
+**آزمونِ تازه** (همان بایت‌های JDK، پس پاکتِ اندروید/کامپیوتر در آیفون باز می‌شود و برعکس):
+- `src/jvmTest/…/GcmJvmTest` — حالتِ GCM ِ آیفون در برابرِ `AES/GCM/NoPadding` ِ JDK روی ورودیِ تصادفی (کلید ۱۲۸/۱۹۲/۲۵۶، IV ِ ۸/۱۲/۱۶/۶۰ بایت، تا ۷۰ کیلوبایت)، برچسبِ کوتاه، دست‌خوردگی. روی لینوکس (`jvmTest`، کارِ `ios-ui-klib`).
+- `src/iosTest/…/CryptoIosTest` و `AtRestIosTest` — همان بردارها روی شبیه‌ساز با CommonCrypto؛ پاکتِ دفتری که JDK ساخته باز می‌شود و با همان nonce عینِ همان بایت‌ها ساخته می‌شود (کارِ `ios-app`).
+
+**جایگزین‌های iOS ِ هم‌API** (مثلِ «replaced» ِ کامپیوتر، فهرستِ کامل در `ios-exclude.txt`): ۲۲ فایل —
+`ui/Platform`، `ui/screens/Haptics`، `core/net/TokenStore`، `data/AtRestKeys`، `data/DiskWrite`، `data/DeviceLocation`،
+`data/Fingerprint`، `data/Migration`، `data/GoogleSignIn`، `data/FileName`، `platform/ServerSwitchAndroid`، `platform/HubRelayAndroid`،
+`pay/platform/PayDevice`، `print/ReportPrint`، `print/LabelSheetPrint`، `hw/PrinterFinderAndroid`، `scan/BarcodeScanner`،
+`scan/GuidedCapture`، `sync/Integrity`، `sync/v1/SyncV1Worker`، `sync/v1/LiveSocket` و `update/Updater` (به‌روزرسانی فقط از App Store؛
+نه پرسش، نه APK). فقط **سه** فایل مستقیم بیرون‌اند: `MainActivity` (کارش را `ios/IosRoot.kt` می‌کند)، `data/TohidBackupAgent`
+(پشتیبانِ اندروید) و `pay/platform/HesabPayHceService` (NFC ِ HCE). سطرِ «غیرِمستقیم» دیگر نیست: هیچ فایلی فقط به‌خاطرِ وابستگی بیرون نمانده.
+
+**صفحه‌های ریشه:** همان انتخابِ حالت (`ModeChooser`)، ورود و خوش‌آمد (`WelcomeScreen` ⇐ `AuthGate` یا `WelcomeScreenLegacy`، درخواست‌ها
+روی NSURLSession)، و `AppRoot` با صندوق و فروش (`v3/sales/cart/SaleScreen`، `QuickSaleScreen`، `DeskSaleScreen`؛ رابطِ قدیم `Sale.kt`)،
+فهرستِ کالا (`v3/products/ProductsListScreen`) و بقیهٔ مسیرهای اندروید؛ حالتِ پیک (`CourierHome`) هم. هر دو رابط (پرچمِ `UiV3`) همان‌اند. ترتیبِ بارگذاری همان `onCreate` است (گزارشِ خطا، «سرورِ بعدی»، دفتر، شستنِ توکن‌های کهنه، تنظیم‌ها، نقشِ پیک).
+
+**دستهٔ نهم (#826):** ۲۷ فایلِ تازهٔ main (`TillUserAndroid`، `QuickRegister`، `LateApologyScreen`، `CustomerErasurePanel`، `OrderEvidencePanel`،
+`VisualSearchUi`، `LoyaltyShopAndroid`، `ExpiryPrefAndroid`، `CountReview`…) که دو کارِ آیفونِ #826 را سرخ کرده بودند، حالا بی هیچ سطرِ تازه
+در `ios-exclude.txt` برای iOS کامپایل می‌شوند. قاعده همان است: فایلِ تازه خودبه‌خود iOS است و اگر نشد `ios-ui-klib` نامش را می‌گوید.
+
+**هنوز نه (گامِ ۳؛ وضعِ امروز ⇐ ۰.۸)** — هر کدام در iOS «خاموش/نیست» گزارش می‌شود، نه خطای بی‌صدا:
+- همگام‌سازی با سرور (`SyncV1Worker`) و سوکتِ زنده (`LiveSocket`) — دفترِ آیفون فعلاً محلی است؛ `BGAppRefreshTask`.
+- دوربین و بارکدِ دوربین (VisionKit)، انتخابِ فایل/عکس (PHPicker/UIDocumentPicker)، اشتراک‌گذاری، Face ID، اعلانِ محلی، موقعیت، تشخیصِ گفتار.
+- چاپ: چاپگرِ شبکه کامپایل می‌شود ولی روی دستگاهِ واقعی آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست (§۵.۱)؛ PDF/AirPrint ِ گزارش و برگهٔ برچسب.
+- «سرورِ خودِ دکان» با گواهیِ سنجاق‌شده (نمایندهٔ NSURLSession).
+- کلیدِ تأییدکننده‌ای که JDK ِ کامپیوتر ساخته (PKCS#8 ِ بی کلیدِ عمومی) در آیفون امضا نمی‌کند.
+- بازگشایی با پیوندِ `vill3n://`، لمسِ اعلانِ سفارش و پنجرهٔ «برنامه بسته شد» (`CrashNotice`) — هر سه خصوصیِ `MainActivity`‌اند.
+- آزمونِ دستیِ صفحه‌ها روی شبیه‌ساز/گوشی (این PR فقط ساخت، اجرا و عکسِ نخستین صفحه را در CI دارد).
+
+**بررسیِ محلی:** همان klib روی لینوکس، با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (مخزنِ گوگل این‌جا بسته است؛ init-script و بدل‌ها در مخزن نیستند). CI همان 1.9.3 را با کتابخانه‌های واقعی می‌سازد.
+
+### ۰.۸ گامِ ۳ — همگام‌سازی و سوکتِ زنده، دوربین/عکس/پرونده/اشتراک، Face ID، اعلان، موقعیت، پیوند (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase3`)
+
+> روی `claude/ios-app-phase2` (#834). اندروید، کامپیوتر و `core` دست نخوردند: هیچ فایلی بیرونِ `ios/` و `docs/` عوض نشد
+> (بی seam ِ تازهٔ expect/actual). هر چه اضافه شد shim/جایگزینِ iOS است تا **همان فایل‌های اندروید** روی آیفون کار کنند.
+
+**نتیجه:** ۱۱۱۱ از ۱۱۳۴ فایلِ `android-native/app/src/main/java` برای iOS کامپایل می‌شوند (گامِ ۲: ۱۱۰۹). دو جایگزینِ گامِ ۲
+(`SyncV1WorkerIos`، `LiveSocketIos`) **حذف شدند**: خودِ `sync/v1/SyncV1Worker.kt` و `sync/v1/LiveSocket.kt` ِ اندروید، دست‌نخورده، روی آیفون می‌دوند.
+`ios-exclude.txt`: ۲۰ جایگزین + همان سه فایلِ مستقیم (`MainActivity`، `TohidBackupAgent`، `HesabPayHceService`).
+
+| برش | چه شد (همه پشتِ همان API ِ اندروید که کدِ مشترک صدا می‌زند) | فایل‌ها (زیرِ `ios/shared/src`) |
+|---|---|---|
+| همگام‌سازی | WorkManager ِ **داخلِ فرآیند** (همان شکلِ کامپیوتر): نامِ یکتا، `KEEP`/`UPDATE`/`REPLACE`، مکثِ آغازین، `retry` ِ نمایی/خطی، زمانِ آخرین اجرای هر کارِ دوره‌ای در NSUserDefaults (باز کردنِ دوباره کارِ نارسیده را زود اجرا نمی‌کند). Kotlin/Native بازتاب ندارد ⇐ سازندهٔ پنج کارگرِ اندروید یک بار ثبت می‌شود (`IosWork`). `BGAppRefreshTask` (iOS به صلاحدیدِ خودش، کمینه ۱۵ دقیقه) یک دور همگام‌سازی؛ بازگشت به برنامه ⇐ یک دور و وصلِ دوبارهٔ سوکت | `iosMain/…/androidx/work/Work.kt`، `commonMain/…/ios/work/WorkTiming.kt`، `iosMain/…/ios/IosApp.kt` |
+| سوکتِ زنده | shim ِ `okhttp3` (`OkHttpClient`، `Request`، `WebSocket`، `WebSocketListener`) روی `NSURLSessionWebSocketTask`: ping هر ۳۰ ثانیه (pong ِ نرسیده ⇐ شکست، مثلِ OkHttp)، بستنِ سرور با کد (`onClosing` ⇐ `onClosed`، مثلِ 4403)، هر سوکت دقیقاً یک پایان؛ `Handler.postDelayed` روی صفِ اصلیِ GCD | `iosMain/…/okhttp3/WebSocket.kt`، `android/os/Handler.kt`، `ServerSwitchIos.okHttp` |
+| عکس، دوربین، پرونده | `PickVisualMedia`/`GetContent("image/…")` ⇐ PHPicker (بی اجازهٔ گالری)؛ `TakePicture` ⇐ دوربینِ UIImagePickerController؛ `GetContent`/`GetMultipleContents` ِ دیگر ⇐ UIDocumentPicker (رونوشت در cache با همان نام)؛ `CreateDocument` ⇐ پرونده در cache که کدِ مشترک در آن می‌نویسد و با بستنِ جریان «ذخیره در Files». عکس‌ها JPEG ِ راست‌شده (HEIC و چرخشِ EXIF حل) | `ios/IosPickers.kt`، `ios/IosUi.kt`، `androidx/activity/result/contract/Contracts.kt`، `android/content/Context.kt` |
+| اشتراک | `startActivity(createChooser(ACTION_SEND))` ⇐ UIActivityViewController (متن، `EXTRA_STREAM`، موضوع؛ لنگرِ iPad) — رسید، صورت‌حساب، گزارشِ PDF | `ios/IosPickers.kt`، `android/content/Context.kt` |
+| بارکدِ دوربین | `CameraScanner` روی `AVCaptureMetadataOutput`: همان قالب‌های ML Kit (EAN-13/8، UPC-A/E، Code 128/39، ITF؛ QR با `qr`/`qrOnly`)، UPC-A ِ iOS (EAN-13 با صفر) ⇐ همان ۱۲ رقم، و هر خوانش از همان `BarcodeGuard` ِ مشترک؛ چند بارکد در کادر ⇐ رد (مثلِ `Aim.bestOf`) | `scan/BarcodeScannerIos.kt` |
+| Face ID / Touch ID | `Fingerprint` روی LocalAuthentication (فقط زیست‌سنجی؛ لغو و «با رمز وارد می‌شوم» ⇐ `onFail(null)`). `LocalContext` ِ ریشه حالا `IosActivity` (یک `FragmentActivity`) است، مثلِ اندروید ⇐ `LockGate` و `AppLockLegacy` ِ مشترک خودشان می‌پرسند | `data/FingerprintIos.kt`، `ios/IosApp.kt`، `androidx/fragment/app/FragmentActivity.kt` |
+| اعلانِ محلی | `NotificationManagerCompat`/`NotificationManager` ⇐ UNUserNotificationCenter (شناسهٔ `tohid-<id>`، جایگزینی و `cancel`)؛ `Intent` ِ `setContentIntent` در userInfo ⇐ لمسِ اعلان همان `openNotice` ِ `MainActivity` (سفارشِ تازه). اجازه هنگامِ نخستین نمایشِ دکان (همان لحظهٔ اندرویدِ ۱۳+) | `android/app/Notification.kt`، `PendingIntent.kt`، `androidx/core/app/Notifications.kt`، `ios/IosNotifications.kt` |
+| اجازه‌ها و موقعیت | `checkSelfPermission` و `RequestPermission`/`RequestMultiplePermissions` ⇐ اجازهٔ واقعیِ iOS (دوربین، موقعیت، اعلان؛ گالری همیشه بله؛ بقیه نه). `DeviceLocation` روی CoreLocation («هنگامِ استفاده»، یک‌باره، مهلتِ ۱۲ ثانیه، همان پروندهٔ `tohid-location`) — فقط جایی که کدِ مشترک از پیش می‌خواهد (F0-07، پیک، ویترین) | `ios/IosPermissions.kt`، `ios/IosLocation.kt`، `data/DeviceLocationIos.kt` |
+| پیوند و «برنامه بسته شد» | `vill3n://app/…` (`CFBundleURLTypes` + `.onOpenURL`) ⇐ همان `handleLink` (`DeepLinks.parse`، فقط با `UiV3`)؛ `CrashNotice` همان پنجرهٔ `MainActivity` با `StrShell` و `CrashReporter` | `ios/IosApp.kt`، `ios/IosRoot.kt`، `ios/iosApp/iosApp/iOSApp.swift` |
+
+**پوستهٔ Xcode:** `Info.plist` — `CFBundleURLTypes` (vill3n)، `BGTaskSchedulerPermittedIdentifiers` (`ir.vil3ntec.tohid.refresh`) و
+`UIBackgroundModes=fetch`، و متنِ اجازه‌ها (`NSCameraUsageDescription`، `NSFaceIDUsageDescription`، `NSLocationWhenInUseUsageDescription`،
+`NSPhotoLibraryAddUsageDescription` برای «ذخیرهٔ تصویر» ِ برگهٔ اشتراک). `OTHER_LDFLAGS`: چارچوب‌های سیستمی که چارچوبِ ایستای
+`TohidShared` می‌خواهد (Security، AVFoundation، BackgroundTasks، CoreLocation، LocalAuthentication، PhotosUI، UniformTypeIdentifiers،
+UserNotifications). `iOSApp.init` ⇐ `appDidLaunch()` (پیش از پایانِ راه‌اندازی: BGTaskScheduler، نمایندهٔ اعلان، چرخهٔ برنامه).
+
+**رفعِ CI ِ `ios-app` (از گامِ ۱ سرخ):** xcodebuild در سرآیندِ ObjC ِ چارچوب می‌افتاد — سه نامِ Kotlin هم‌نامِ ماکروهای C‌اند
+(`BuildConfig.DEBUG` با ماکروی `DEBUG` ِ پیکربندیِ Debug، `NAME_MAX` ِ `<limits.h>` در `DeliveryForms`/`NewOrderModel`/`CampaignLinks`،
+`JSONObject.NULL`). نام‌ها عوض نشدند؛ `ios/shared/build.gradle.kts` پس از پیوندِ چارچوب همان ماکروها را فقط درونِ `TohidShared.h`
+با `push_macro`/`undef`/`pop_macro` کنار می‌گذارد (`guardHeaderMacros`). مرحلهٔ پیوندِ برنامه و اجرا روی شبیه‌ساز تا امروز هرگز
+به CI نرسیده بود؛ نتیجه‌اش همین PR است.
+
+**آزمونِ تازه:**
+- `src/jvmTest/…/ios/work/WorkTimingJvmTest` (۸) — زمان‌بندیِ کارهای دوره‌ای در برابرِ قاعده‌های WorkManager ِ اندروید (کفِ ۱۵ دقیقه، سررسید، ساعتِ عقب‌رفته، عقب‌نشینیِ نمایی/خطی). روی لینوکس (`jvmTest`، کارِ `ios-ui-klib`).
+- `src/iosTest/…/ios/Phase3IosTest` (۳) — اجرای کارگرِ ثبت‌شده با WorkManager ِ آیفون، نگاشتِ بارکدِ AVFoundation به قاعدهٔ ML Kit، رفت‌وبرگشتِ `Intent` ِ اعلان از راهِ userInfo. فقط روی شبیه‌ساز (کارِ `ios-app`).
+
+**تفاوت‌های دانسته (عمدی):**
+- iOS برنامهٔ بسته را نگه نمی‌دارد: همگام‌سازیِ پس‌زمینه فقط وقتی iOS `BGAppRefreshTask` بدهد (و نه پس از بستنِ دستیِ برنامه)؛ سوکت در پس‌زمینه می‌افتد و با بازگشت دوباره وصل می‌شود. قیدِ «نت هست» سنجیده نمی‌شود (مثلِ کامپیوتر؛ کارِ بی‌نت `retry` می‌دهد).
+- `CreateDocument`: جای ذخیره **پس از** نوشتن انتخاب می‌شود (پنجرهٔ Files)؛ لغوِ آن پرونده را فقط در cache می‌گذارد.
+- اسکنِ دوربین: فوکوس/بزرگ‌نمایی/چراغِ خودکارِ اندروید (`FocusPilot`، `LightPilot`) نیست؛ فوکوسِ پیوستهٔ iOS. دوربینِ راهنمای عکسِ کالا (`GuidedCapture`) نیست؛ عکس با `TakePicture`.
+- شبیه‌ساز دوربین ندارد ⇐ مسیرهای دوربین فقط روی گوشیِ واقعی آزموده می‌شوند (هنوز نشده).
+
+**هنوز نه (گامِ ۴):** چاپ (PDF/AirPrint ِ گزارش و برگهٔ برچسب؛ چاپگرِ شبکه روی دستگاه آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست — §۵.۱)؛
+تشخیصِ گفتار (Speech)؛ ورود با گوگل/اپل و گواهیِ «همین برنامه» (`Integrity`) — هر دو حسابِ اپل می‌خواهند (۰.۶)؛ «سرورِ خودِ دکان» با
+گواهیِ سنجاق‌شده (نمایندهٔ NSURLSession، برای HTTP و همین سوکت)؛ اعلانِ سرور (APNs، ۰.۶ بندِ ۶)؛ صدای اسکن (`MediaPlayer`)؛ آزمونِ دستیِ
+صفحه‌ها و دوربین روی گوشیِ واقعی.
+
+**بررسیِ محلی (لینوکس):** همان klib با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (‎۰.۷‎)، `jvmTest` ِ `ios/shared`،
+`core` ِ `jvmTest` و آزمونِ کامپیوتر. پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` فقط در CI ِ macOS.
 
 ## ۱. خلاصه در پنج خط
 
@@ -251,7 +355,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 | موقعیت (پیک) | `DeviceLocation`، `LocationPing`، `VisitPing` | CoreLocation؛ پس‌زمینه فقط با مجوزِ «همیشه» و `UIBackgroundModes=location` | متوسط، **بازبینیِ اپل** |
 | پشتیبان | `BackupAgent` (۴)، `BackupMirror` | پشتیبانِ iCloud ِ خودکارِ پوشهٔ Documents؛ خروجی با برگهٔ اشتراک (`UIActivityViewController`) | کم |
 | فایل/اشتراک | `FileProvider` (۳)، `contentResolver`/`Uri` (۲۲)، `ActivityResult` (۱۵) | `UIDocumentPickerViewController`، `UIActivityViewController`، `PHPicker` برای عکس | متوسط |
-| به‌روزرسانیِ خودکار | `update/*` (APK) | **ممنوع روی iOS** (قاعدهٔ ۲.۵.۲)؛ فقط App Store / TestFlight. `update/` روی iOS ساخته نمی‌شود | — |
+| به‌روزرسانیِ خودکار | `update/*` (APK) | **ممنوع روی iOS** (قاعدهٔ ۲.۵.۲)؛ فقط App Store / TestFlight. روی iOS `Updater` جایگزینِ بی‌APK دارد (`update/UpdaterIos.kt`): نه می‌پرسد، نه می‌گیرد، نه نصب می‌کند | — |
 | `PackageManager`/نصب | ۱۳ فایل | روی iOS حذف | — |
 | صدا و لرزش | `android.media` (۲)، `Vibrator` (۳) | `AVAudioPlayer`، `UIImpactFeedbackGenerator` | کم |
 | گفتار | `RecognizerIntent` (۱) | `SFSpeechRecognizer`؛ پشتیبانیِ فارسی باید آزموده شود | **نامعلوم** |

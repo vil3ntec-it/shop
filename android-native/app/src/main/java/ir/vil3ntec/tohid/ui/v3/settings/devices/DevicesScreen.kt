@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
 import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
+import ir.vil3ntec.tohid.ui.v3.settings.LocalSettingsKey
+import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 
 /** چند میلی‌ثانیه کارتِ خواسته‌شده (`?tab=`) با حاشیهٔ برند دیده می‌شود */
 private const val HIGHLIGHT_MS = 1400L
@@ -53,17 +56,49 @@ internal fun DevicesScreen(data: ShopData, tab: String?, onBack: (() -> Unit)?) 
   LaunchedEffect(Unit) { PhoneScanner.load(context); PhotoPrefs.load(context) }
   LaunchedEffect(target) {
     val t = target ?: return@LaunchedEffect
-    list.animateScrollToItem(t.ordinal + 1)
+    //  کارتِ «این چه می‌کند؟» و یادداشتِ بالا پیش از کارت‌ها
+    list.animateScrollToItem(t.ordinal + 2)
     kotlinx.coroutines.delay(HIGHLIGHT_MS)
     lit = null
   }
+  //  «این چه می‌کند؟» همان کلیدِ ردیفِ «دستگاه‌ها» ِ تنظیمات (`SettingsHelp.example`)
+  CompositionLocalProvider(LocalSettingsKey provides SettingsLayout.PERIPHERALS) {
   SettingsPageFrame(title = Str.devices, onBack = onBack, state = list) {
     item(key = "intro") { SettingsNote(StrSettings.devicesIntro) }
+    item(key = DeviceTab.HUB.id) { HubCard(lit == DeviceTab.HUB) }
+    item(key = DeviceTab.BACKGROUND.id) { BackgroundCard(lit == DeviceTab.BACKGROUND) }
     item(key = DeviceTab.PRINTERS.id) { PrintersCard(lit == DeviceTab.PRINTERS) }
     item(key = DeviceTab.SCANNERS.id) { ScannersCard(lit == DeviceTab.SCANNERS) }
     item(key = DeviceTab.PHONE.id) { PhoneLinkCard(data, lit == DeviceTab.PHONE) }
     item(key = DeviceTab.LIVE.id) { LiveCard(lit == DeviceTab.LIVE) }
     item(key = DeviceTab.PHOTOS.id) { PhotosCard(lit == DeviceTab.PHOTOS) }
+  }
+  }
+}
+
+/** رنگ‌های بدنهٔ مشترکِ «دستگاه‌ها» در تمِ نسخهٔ ۳ */
+@Composable
+private fun hubColors(): ir.vil3ntec.tohid.ui.components.devices.HubColors {
+  val c = PhoneV3.colors
+  return ir.vil3ntec.tohid.ui.components.devices.HubColors(
+    ok = PhoneV3Roles.toneIcon(c, ir.vil3ntec.tohid.ui.theme.V3Tone.SUCCESS), bad = PhoneV3Roles.toneIcon(c, ir.vil3ntec.tohid.ui.theme.V3Tone.ERROR), muted = c.inkMuted, text = c.ink,
+  )
+}
+
+/** «همهٔ دستگاه‌ها»: جست‌وجو، نوعِ خودکار، چند وصلِ هم‌زمان، وضعیت و آزمایش (`DeviceHubBody`) */
+@Composable
+private fun HubCard(highlight: Boolean) {
+  val snackbar = ir.vil3ntec.tohid.ui.v3.LocalV3Toasts.current
+  DeviceCard(ir.vil3ntec.tohid.core.i18n.StrDevices.hubTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.hubCaption, highlight, padding = PaddingValues(16.dp)) {
+    ir.vil3ntec.tohid.ui.components.devices.DeviceHubBody(hubColors()) { snackbar?.show(it) }
+  }
+}
+
+/** «اسکن وقتی برنامه بسته است» — کلید ندارد؛ با ثبتِ بارکدخوان خودش روشن است */
+@Composable
+private fun BackgroundCard(highlight: Boolean) {
+  DeviceCard(ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundTitle, ir.vil3ntec.tohid.core.i18n.StrDevices.backgroundCaption, highlight, padding = PaddingValues(16.dp)) {
+    ir.vil3ntec.tohid.ui.components.devices.BackgroundScanBody(hubColors())
   }
 }
 

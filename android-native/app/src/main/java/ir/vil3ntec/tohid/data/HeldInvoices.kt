@@ -189,6 +189,19 @@ object HeldRules {
   }
 
   /**
+   *  فاکتوری که از بیرونِ سبد ساخته شد (اسکن‌های پس‌زمینه، `ScanSaleHold`) کنارِ نگه‌داشته‌ها می‌نشیند؛ سبدِ جاری دست
+   *  نمی‌خورد. همان شناسه پیش‌تر هست ⇒ همان دفتر (واردکردنِ دوباره فاکتورِ دوم نمی‌سازد). جا برای سبدِ صندوق می‌ماند.
+   */
+  fun park(book: HeldBook, item: HeldInvoice): Result {
+    if (item.lines.isEmpty()) return Result.Refused(EMPTY)
+    book.items.firstOrNull { it.id == item.id }?.let { return Result.Ok(book, null, HeldExtras(), it.number) }
+    if (book.items.size >= MAX_OPEN - 1) return Result.Refused(FULL)
+    val used = book.items.map { it.number } + listOfNotNull(book.current?.number)
+    val number = free(used) ?: return Result.Refused(FULL)
+    return Result.Ok(book.copy(items = (book.items + item.copy(number = number)).sortedBy { it.number }), null, HeldExtras(), number)
+  }
+
+  /**
    *  ردیف‌هایی از فاکتورِ نگه‌داشته که هنوز فروختنی‌اند — همان قاعدهٔ
    *  `SaleDraftRules.decide`: کالای پاک‌شده یا غیرفعال (PRD-18) می‌افتد، قلمِ
    *  آزاد می‌ماند، مشتریِ پاک‌شده جدا می‌شود. فقط هنگامِ بازگرداندن؛ فهرستِ
@@ -394,6 +407,15 @@ class HeldInvoiceStore(
       _book.value = r.book
       val dropped = if (r.dropped > 0) " — ${r.dropped} ردیف که کالایش دیگر فروختنی نیست کنار رفت" else ""
       Outcome.Done("${title(target.number, target.label)} باز شد$dropped", r.extras)
+    }
+  }
+
+  /** فاکتورِ ساخته از اسکن‌ها (`HeldRules.park`) — سبدِ جاری دست نمی‌خورد */
+  suspend fun park(item: HeldInvoice): Outcome = lock.withLock {
+    ensureLoaded()
+    when (val r = HeldRules.park(_book.value, item.copy(device = item.device.ifBlank { deviceId }))) {
+      is HeldRules.Result.Refused -> Outcome.Refused(r.message)
+      is HeldRules.Result.Ok -> if (r.book == _book.value || commit(r.book)) Outcome.Done(title(r.number, item.label)) else Outcome.Refused(NOT_SAVED)
     }
   }
 

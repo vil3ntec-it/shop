@@ -87,6 +87,15 @@ fun StockCountToolsSheet(
   var category by remember { mutableStateOf<String?>(null) }
   var supplierId by remember { mutableStateOf<String?>(null) }
   var bucket by remember { mutableStateOf<CountReview.Kind?>(null) }
+  //  «اسکن‌های در انتظار» ⇒ انبارگردانی: شمارِ بارکدخوان به خانه‌ها، با لحظهٔ همین حالا (INV-10)
+  LaunchedEffect(Unit) {
+    ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT)?.let { h ->
+      val r = ir.vil3ntec.tohid.scan.ScanApply.counts(texts, d, h.scans)
+      texts = r.counts
+      val t = now()
+      at = at + r.ids.associateWith { t }
+    }
+  }
 
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val names = remember(d) { d.products.associate { it.id to it.name } }

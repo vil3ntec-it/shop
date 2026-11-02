@@ -93,6 +93,8 @@ fun main() {
   //  HW-09/HW-10: ترازوی سریال و پنجرهٔ دومِ مشتری فقط این‌جا هستند
   ir.vil3ntec.tohid.hw.HwPlatform.serial = DeskSerial
   ir.vil3ntec.tohid.hw.CustomerFacing.supported = true
+  //  «دستگاه‌ها»: بارکدخوانِ COM (بلوتوثِ SPP یا USB-CDC) وصل می‌ماند — پنجرهٔ بسته ⇒ صفِ پایدار (‎scan/ScanServiceDesk.kt‎)
+  runCatching { ir.vil3ntec.tohid.scan.ScanBackground.sync(context) }
   Motion.load(context)
   ir.vil3ntec.tohid.LocaleChoice.load(context)
   ir.vil3ntec.tohid.ShopDayChoice.load(context)
@@ -109,6 +111,8 @@ fun main() {
 
   application(exitProcessOnExit = true) {
     var visible by remember { mutableStateOf(true) }
+    //  پنجرهٔ پیدا ⇒ اسکنِ بارکدخوانِ COM یک‌راست به صفحهٔ باز؛ پنهان (سینی) ⇒ صفِ «اسکن‌های در انتظار»
+    androidx.compose.runtime.SideEffect { ir.vil3ntec.tohid.scan.ScanInbox.foreground = visible }
     var zoom by remember { mutableFloatStateOf(prefs.getFloat("desktop_zoom", 1f).coerceIn(0.7f, 1.8f)) }
     fun setZoom(z: Float) { zoom = z.coerceIn(0.7f, 1.8f); prefs.edit().putFloat("desktop_zoom", zoom).apply() }
 

@@ -20,11 +20,15 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp as H
 object SettingsTiers {
   enum class Tier { MAIN, ADVANCED, HIDDEN }
 
-  /** C — فهرستِ اصلی (گوشی ۱۲ ردیف؛ کامپیوتر بی دوربین ۱۱) */
+  /**
+   *  C — فهرستِ اصلی (گوشی ۱۲ ردیف؛ کامپیوتر بی دوربین ۱۱). «همهٔ دستگاه‌ها» (‎`PERIPHERALS`‎، درخواستِ صاحب‌کار
+   *  ۱۴۰۵/۰۸/۱۱) جای پیوندِ «چاپگر و رسید» را گرفت: همان صفحه است و چاپگرها کارتِ سومش‌اند؛ پیوندِ چاپگر در «پیشرفته» ِ
+   *  فروش می‌ماند.
+   */
   val ESSENTIAL: Set<String> = setOf(
     "ظاهر", "زبان", "تاریخ و رقم",
     "قفل برنامه", "کد شاگرد", "تغییر رمز حساب",
-    SettingsLayout.PAY, SettingsLayout.PRINTER,
+    SettingsLayout.PAY, SettingsLayout.PERIPHERALS,
     SettingsLayout.CAMERA,
     "همگام‌سازی", "داده‌ها",
     SettingsLayout.ABOUT_APP,
@@ -69,6 +73,7 @@ object SettingsHelp {
     "کد شاگرد" -> H.staffCodeLine
     "تغییر رمز حساب" -> H.passwordLine
     SettingsLayout.PAY -> H.payLine
+    SettingsLayout.HESAB_SHOP -> H.hesabShopLine
     SettingsLayout.PRINTER -> H.printerLine
     SettingsLayout.CAMERA -> H.cameraLine
     "همگام‌سازی" -> H.syncLine
@@ -126,6 +131,7 @@ object SettingsHelp {
     "کد شاگرد" -> H.staffCodeExample
     "تغییر رمز حساب" -> H.passwordExample
     SettingsLayout.PAY -> H.payExample
+    SettingsLayout.HESAB_SHOP -> H.hesabShopExample
     SettingsLayout.CAMERA -> H.cameraExample
     "همگام‌سازی" -> H.syncExample
     "داده‌ها" -> H.backupExample
@@ -169,6 +175,8 @@ object SettingsHelp {
     SettingsLayout.STOREFRONT_ETA -> H.etaExample
     SettingsLayout.PROMO_GUARD -> H.promoExample
     SettingsLayout.EASY_SETUP -> H.easySetupExample
+    //  پیوند است ولی صفحهٔ «دستگاه‌ها» کارتِ «این چه می‌کند؟» دارد (`DevicesScreen`)
+    SettingsLayout.PERIPHERALS -> H.peripheralsExample
     LATE_APOLOGY -> H.lateApologyExample
     else -> null
   }

@@ -20,13 +20,14 @@
  *   ref_id عوض نمی‌شود ⇒ یک قصد فقط یک فروش را می‌پردازد؛ فروشِ پرداخت‌شده قصدِ تازه نمی‌گیرد.
  *
  * ⛔ shop_id فقط از نشستِ کاربر می‌آید (routes/shop-payments.js)، هرگز از بدنه.
+ * ⛔ حساب‌پیِ هر دکان (مهاجرتِ ۲۰۴): قصد، وب‌هوک، تأییدِ دوم و تطبیق فقط با کلیدِ همان دکان (`lib/payment-gateway.js`)؛
+ *    کلیدِ رویداد و جست‌وجوی قصدِ وب‌هوک درونِ همان دکان (شناسهٔ رویداد فقط درونِ یک پذیرنده یکتاست).
  * ⛔ «پرداخت شد» فقط از وب‌هوکِ امضاشده + تأییدِ دومِ ارائه‌دهنده (پیش‌فرض روشن)؛ هرگز از
  *    برگشتِ مرورگر یا گفتهٔ برنامه.
  */
 const crypto = require('crypto');
 const { EventEmitter } = require('events');
 const { one, tx, newId, now, query } = require('../db');
-const config = require('../config');
 const P = require('./payment-providers');
 const S = require('./order-states');
 const { ulid } = require('./ulid');
@@ -74,12 +75,12 @@ const confirmEnabled = () => String(process.env.PAYMENTS_CONFIRM_WEBHOOK ?? '1')
 function provider() { return P.adapter(P.activeName()); }
 
 const flagOf = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
+const accounts = () => require('./hesabpay-account');
+const { gatewayFor, callbackUrl, webhookTarget, intentAdapters } = require('./payment-gateway');
 
-/** «حساب‌پی» برای این دکان روشن است؟ = کلیدها داده شده + پرچمِ دکان. */
+/** «حساب‌پیِ خودکار» برای این دکان روشن است؟ = پرچمِ دکان + کلیدهای خودِ دکان. */
 async function enabledFor(shopId) {
-  const ad = provider();
-  if (!ad || !ad.configured()) return false;
-  return flagOf(shopId);
+  return (await flagOf(shopId)) && Boolean(await gatewayFor(shopId));
 }
 
 /** پرداختِ سفارشِ آنلاین فقط برای دکانِ **مشترک** (منبعِ «اشتراک» با کلیدِ online_orders؛ آزمایشی نه). */
@@ -89,15 +90,10 @@ async function subscribedFor(shopId) {
   return ent.source === 'subscription' && ent.features.includes('online_orders');
 }
 
+/** صندوق: `enabled` = درگاهِ خودکار؛ `mode` و فقط در «ساده» شماره/QR ِ خودِ دکان (تأیید فقط «پول رسید» ِ صندوقدار). */
 async function configOf(shopId) {
-  return { hesabpay: { enabled: await enabledFor(shopId) } };
-}
-
-/** نشانیِ وب‌هوک برای ارائه‌دهنده: `HESABPAY_CALLBACK_URL`، وگرنه از `SERVER_URL`؛ هیچ ⇒ همانی که در داشبوردِ حساب‌پی ثبت شده. */
-function callbackUrl(name) {
-  if (name === 'hesabpay' && process.env.HESABPAY_CALLBACK_URL) return String(process.env.HESABPAY_CALLBACK_URL).trim();
-  const base = String(config.serverUrl || '').trim().replace(/\/+$/, '');
-  return base ? `${base}/api/v1/payments/webhook/${name}` : '';
+  const till = await accounts().tillView(shopId);
+  return { hesabpay: { enabled: await enabledFor(shopId), mode: till.mode, ...(till.simple ? { simple: till.simple } : {}) } };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -382,9 +378,9 @@ async function orderFor(shopId, input) {
 async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = '' }) {
   const input = parseCreate(body, headerKey);
   if (input.kind === 'online_order') await orderFor(shopId, input);
-  const name = P.activeName();
-  const ad = P.adapter(name);
-  if (!ad || !ad.configured()) throw forbidden('پرداختِ حساب‌پی پیکربندی نشده است', 'hesabpay_disabled');
+  const ad = await gatewayFor(shopId);
+  if (!ad) throw forbidden('پرداختِ حساب‌پی پیکربندی نشده است', 'hesabpay_disabled');
+  const name = ad.name;
   const hash = hashOf(input);
   const at = now();
 
@@ -435,7 +431,7 @@ async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = ''
     session = await ad.createSession({
       intentId: pre.row.id, amountMinor: input.amount, currency: input.currency,
       description: input.description || (input.kind === 'pos_sale' ? 'خرید از فروشگاه' : 'سفارشِ آنلاین'),
-      returnUrl, callbackUrl: callbackUrl(name),
+      returnUrl, callbackUrl: callbackUrl(ad),
     });
   } catch (err) {
     console.error(`[payments] ساختنِ جلسه در ${name} نشد (${pre.row.id}): ${err.message}`);
@@ -619,16 +615,16 @@ const retryLater = (message = 'تأییدِ پرداخت هنوز ممکن نش�
  *   ⇒ ۵۰۳ و رویدادِ «deferred» تا ارائه‌دهنده دوباره بفرستد؛ فقط «نه» ِ قطعی ⇒ ۲۰۰ `unconfirmed` و بررسی.
  *   همان رویداد هنوز در کار ⇒ ۵۰۳؛ «paid» ِ deferred روی قصدی که دیگر زنده نیست ⇒ needs_review و هشدار.
  */
-async function handleWebhook(name, raw, headers) {
-  const ad = P.webhookAdapter(name);
-  if (!ad || !ad.configured()) return { status: 401, body: { error: { code: 'bad_signature', message: 'امضای درخواست درست نیست' } } };
+async function handleWebhook(name, raw, headers, opts = {}) {
+  const { ad, shopId } = (await webhookTarget(name, raw, opts)) || {};
+  if (!ad) return { status: 401, body: { error: { code: 'bad_signature', message: 'امضای درخواست درست نیست' } } };
   const v = await ad.verifyWebhook(raw, headers || {});
   if (!v.ok) {
     console.warn(`[payments] وب‌هوکِ ${name} رد شد: ${v.reason}`);
     return { status: 401, body: { error: { code: 'bad_signature', message: 'امضای درخواست درست نیست' } } };
   }
   const ev = v.event;
-  const eventKey = `${name}:${ev.eventId || `sha256:${crypto.createHash('sha256').update(raw).digest('hex')}`}`.slice(0, 300);
+  const eventKey = `${name}:${shopId ? `${shopId}:` : ''}${ev.eventId || `sha256:${crypto.createHash('sha256').update(raw).digest('hex')}`}`.slice(0, 300);
   const at = now();
   const ins = await one(
     `INSERT INTO payment_events (id, provider, provider_event_id, type, outcome, raw, received_at)
@@ -651,10 +647,13 @@ async function handleWebhook(name, raw, headers) {
   const setOutcome = (outcome, intentId = null) => query(
     'UPDATE payment_events SET outcome=$2, intent_id=COALESCE($3, intent_id) WHERE id=$1', [eventRowId, outcome, intentId]
   );
+  //  ⛔ قصد فقط درونِ دکانِ همان راز: رویدادِ امضاشدهٔ دکانِ «الف» هرگز قصدِ «ب» را نمی‌بندد
+  const scope = shopId ? ' AND shop_id=$3' : '';
+  const args = (x) => (shopId ? [name, x, shopId] : [name, x]);
   let intent = ev.sessionId
-    ? await one('SELECT * FROM payment_intents WHERE provider=$1 AND provider_session_id=$2', [name, ev.sessionId])
+    ? await one(`SELECT * FROM payment_intents WHERE provider=$1 AND provider_session_id=$2${scope}`, args(ev.sessionId))
     : null;
-  if (!intent && ev.reference) intent = await one('SELECT * FROM payment_intents WHERE provider=$1 AND id=$2', [name, ev.reference]);
+  if (!intent && ev.reference) intent = await one(`SELECT * FROM payment_intents WHERE provider=$1 AND id=$2${scope}`, args(ev.reference));
   if (!intent) {
     console.warn(`[payments] وب‌هوکِ ${name} برای قصدِ ناشناخته (session=${String(ev.sessionId).slice(0, 40)})`);
     await setOutcome('unknown_intent');
@@ -701,10 +700,11 @@ async function reconcile({ sinceMs = 48 * 60 * 60 * 1000, limit = 500, budgetMs 
       ORDER BY CASE WHEN status = 'expired' THEN 1 ELSE 0 END, created_at DESC, id LIMIT $2`,
     [now() - sinceMs, Math.min(5000, Math.max(1, limit))]
   )).rows;
+  const adapterOf = intentAdapters();   //  حساب‌پی: کلیدِ دکانِ خودِ هر قصد، هرگز کلیدِ سکو
   for (const r of rows) {
     if (budgetMs > 0 && Date.now() - t0 >= budgetMs) { out.truncated = true; break; }
     //  ساختگی فقط بیرون از تولید (`webhookAdapter`)؛ بی کلید ⇒ رد
-    const ad = P.webhookAdapter(r.provider);
+    const ad = await adapterOf(r);
     if (!ad || !ad.configured() || typeof ad.fetchStatus !== 'function') continue;
     out.checked++;
     let st;
@@ -859,7 +859,7 @@ async function markRefunded(id, { adminId = '', note = '' } = {}) {
 
 module.exports = {
   FLAG_KEY, METHOD_ID, TRANSITIONS, LATE_PAID_FROM, MAX_WAIT_S,
-  canTransition, enabledFor, subscribedFor, configOf, create, get, cancel, handleWebhook, reconcile, markPaid,
+  canTransition, enabledFor, gatewayFor, subscribedFor, configOf, create, get, cancel, handleWebhook, reconcile, markPaid,
   storefrontPayment, refreshOrder, orderPayable, createForStorefront, list, markRefunded,
   EVENT_LEASE_MS, provider,
   ...require('./payment-reconciler'),

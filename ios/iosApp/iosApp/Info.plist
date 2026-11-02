@@ -46,6 +46,33 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>ir.vil3ntec.tohid.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>vill3n</string>
+			</array>
+		</dict>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>ir.vil3ntec.tohid.refresh</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>برای اسکنِ بارکدِ کالا و گرفتنِ عکسِ کالا</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>برای باز کردنِ قفلِ «فروشگاه من» با Face ID</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>برای ثبتِ جای دکان روی نقشه و ویترینِ نزدیک — فقط با رضایتِ شما و فقط هنگامِ استفاده</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>برای «ذخیرهٔ تصویر» ِ رسید از برگهٔ اشتراک</string>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>tel</string>

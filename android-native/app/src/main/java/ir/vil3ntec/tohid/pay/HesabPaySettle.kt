@@ -66,6 +66,26 @@ object HesabPaySettle {
     val due = (due(total, draft) as? Due.Amount)?.minor ?: return bad("TOTAL_MISMATCH")
     if (row.amountMinor != due) return bad("TOTAL_MISMATCH")
     val ref = row.ref?.trim()?.ifEmpty { null } ?: row.intentId ?: intent.id
+    return withRow(total, draft, PaymentRow(row.method, row.kind, row.amountMinor, ref, row.status, row.verification))
+  }
+
+  /** حالتِ ساده: تأییدِ صندوقدار (نه درگاه) */
+  const val BY_CASHIER = "cashier"
+
+  /**
+   *  حالتِ ساده («حساب‌پیِ دکان» با شماره/QR ِ خودِ دکان): فقط وقتی صندوقدار «پول رسید» را زد. ردیف همان روشِ
+   *  حساب‌پی است با کدِ فاکتور (`ref`)، `confirmed` و `verification = cashier` — تا گزارش «تأییدِ درگاه» را از
+   *  «تأییدِ صندوقدار» جدا ببیند. ⛔ هیچ راهِ دیگری (اعلان، پیامک، مبلغِ برابر) به این‌جا نمی‌رسد.
+   */
+  fun settleSimple(total: Double, draft: PayFlow.Draft?, ref: String): PayFlow.Outcome<Settlement> {
+    val clean = ref.trim()
+    if (clean.isEmpty()) return bad("REF_REQUIRED")
+    val due = (due(total, draft) as? Due.Amount)?.minor ?: return bad("TOTAL_MISMATCH")
+    return withRow(total, draft, PaymentRow(METHOD, "wallet", due, clean, "confirmed", BY_CASHIER))
+  }
+
+  /** تسویه با تکه‌های پنل + ردیفِ حساب‌پی؛ ردیفِ ثبتِ دستیِ همان تکه ⇐ `confirmed` (همان روش، مبلغ و مرجع) */
+  private fun withRow(total: Double, draft: PayFlow.Draft?, confirmed: PaymentRow): PayFlow.Outcome<Settlement> {
     val base = draft ?: PayFlow.Draft(total)
     val tenders = ArrayList<Tender>()
     PayFlow.amountOf(base.cash)?.takeIf { !it.isNaN() && it > 0 }?.let { tenders += Tender(PayFlow.CASH, PayFlow.minor(it)) }
@@ -73,16 +93,14 @@ object HesabPaySettle {
       val a = PayFlow.amountOf(r.amount)
       if (a != null && !a.isNaN() && a > 0) tenders += Tender(r.method, PayFlow.minor(a), ref = r.ref.trim().ifEmpty { null })
     }
-    tenders += Tender(METHOD, row.amountMinor, ref = ref)
+    tenders += Tender(METHOD, confirmed.amount, ref = confirmed.ref)
     val settled = when (val s = Pay.settle(SettleInput(total = PayFlow.minor(total), tenders = tenders, customerId = base.customerId?.trim()?.ifEmpty { null }))) {
       is PayResult.Ok -> s.value
       is PayResult.Err -> return bad(s.code)
     }
     if (settled.status != "paid") return bad("TOTAL_MISMATCH")
-    //  ردیفِ ثبتِ دستیِ همین تکه ⇐ ردیفِ تأییدشدهٔ سرور (همان روش، مبلغ و مرجع)
-    val at = settled.payments.indexOfLast { it.method == METHOD && it.amount == row.amountMinor && it.ref == ref }
+    val at = settled.payments.indexOfLast { it.method == METHOD && it.amount == confirmed.amount && it.ref == confirmed.ref }
     if (at < 0) return bad("TOTAL_MISMATCH")
-    val confirmed = PaymentRow(row.method, row.kind, row.amountMinor, ref, row.status, row.verification)
     return PayFlow.Outcome.Ok(settled.copy(payments = settled.payments.mapIndexed { i, p -> if (i == at) confirmed else p }))
   }
 
