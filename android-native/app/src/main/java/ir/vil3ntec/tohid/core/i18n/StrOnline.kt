@@ -335,19 +335,6 @@ object StrOnline {
   val mkReadOnlyPlan: String get() = t("اشتراکِ این دکان ویترین را در بر ندارد؛ تغییرِ بازارچه ذخیره نمی‌شود.", "This shop's plan doesn't include the storefront; market changes won't be saved.", "د دې دوکان ګډون ویترین نه لري؛ د بازار بدلون نه خوندي کېږي.")
   val mkCategoryLabel: String get() = t("دسته", "Category", "ډله")
   val mkAreaLabel: String get() = t("ناحیه", "Area", "سیمه")
-  //  ── S109: ولایت و ولسوالیِ دکان (شمارشِ منطقه‌ای) ─────────────────────────────────────────
-  val mkRegion: String get() = t("ولایت و ولسوالی", "Province and district", "ولایت او ولسوالي")
-  val mkRegionBody: String get() = t(
-    "فقط برای شمارشِ دکان‌ها به تفکیکِ ولایت و ولسوالی و پیدا شدن در همان منطقه؛ نشانیِ دقیق نیست.",
-    "Only for counting shops by province and district and being found in that area; it is not an exact address.",
-    "یوازې د ولایت او ولسوالۍ په توپیر د دوکانونو شمېرلو او په هماغه سیمه کې موندل کېدو لپاره؛ دقیق پته نه ده.",
-  )
-  val mkProvince: String get() = t("ولایت", "Province", "ولایت")
-  val mkPickProvince: String get() = t("ولایت را انتخاب کنید", "Choose the province", "ولایت وټاکئ")
-  val mkNoProvince: String get() = t("گفته نشده", "Not set", "نه دی ویل شوی")
-  val mkDistrict: String get() = t("ولسوالی (اختیاری)", "District (optional)", "ولسوالي (اختیاري)")
-  val mkDistrictPlaceholder: String get() = t("مثلاً انجیل", "e.g. Injil", "لکه انجیل")
-  val mkDistrictLabel: String get() = t("ولسوالی", "District", "ولسوالي")
   fun mkHidden(storefrontExists: Boolean): String = if (!storefrontExists)
     t("ویترین هنوز ساخته نشده؛ تا ساخته و روشن نشود، دکان در بازارچه دیده نمی‌شود.", "The storefront isn't created yet; the shop won't show in the market until it's created and on.", "ویترین لا نه دی جوړ شوی؛ تر جوړېدو او فعالېدو پورې دوکان په بازار کې نه ښکاري.")
   else t("ویترین خاموش است؛ تا روشنش نکنید، دکان در بازارچه دیده نمی‌شود.", "The storefront is off; the shop won't show in the market until you turn it on.", "ویترین بند دی؛ تر هغه چې فعال یې نه کړئ، دوکان په بازار کې نه ښکاري.")

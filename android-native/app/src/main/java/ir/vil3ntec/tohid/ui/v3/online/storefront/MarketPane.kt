@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrMarketRegion
 import ir.vil3ntec.tohid.core.storefront.MarketListing
 import ir.vil3ntec.tohid.data.repo.StorefrontConfigDto
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -107,14 +108,14 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
       )
     }
     //  S109: ولایت (برگهٔ انتخاب از فهرستِ سرور) و ولسوالی — سرورِ پیش از S109 فهرست نمی‌دهد ⇒ این بخش نیست
-    if (provinces.isNotEmpty()) V3Section(StrOnline.mkRegion, footer = StrOnline.mkRegionBody) {
+    if (provinces.isNotEmpty()) V3Section(StrMarketRegion.title, footer = StrMarketRegion.body) {
       V3PickerRow(
-        StrOnline.mkProvince, MarketListing.provinceLabel(f.province, provinces), { pickingProvince = true },
-        placeholder = StrOnline.mkPickProvince, icon = Icons.Outlined.Map,
+        StrMarketRegion.province, MarketListing.provinceLabel(f.province, provinces), { pickingProvince = true },
+        placeholder = StrMarketRegion.pickProvince, icon = Icons.Outlined.Map,
       )
       V3Divider()
       V3TextField(
-        f.district.orEmpty(), { ctl.edit(f.copy(district = it)) }, StrOnline.mkDistrict, placeholder = StrOnline.mkDistrictPlaceholder,
+        f.district.orEmpty(), { ctl.edit(f.copy(district = it)) }, StrMarketRegion.district, placeholder = StrMarketRegion.districtPlaceholder,
         error = MarketListing.districtError(f.district.orEmpty()), modifier = Modifier.fillMaxWidth().padding(12.dp),
       )
     }
@@ -158,9 +159,9 @@ private fun MarketForm(ctl: MarketController, config: StorefrontConfigDto, hasLo
     )
   }
   if (pickingProvince) {
-    val none = StrOnline.mkNoProvince
+    val none = StrMarketRegion.noProvince
     V3PickerSheet(
-      title = StrOnline.mkProvince,
+      title = StrMarketRegion.province,
       options = listOf(none) + provinces.map { it.name },
       selected = MarketListing.provinceLabel(f.province, provinces).ifBlank { none },
       onPick = { label -> ctl.edit(f.copy(province = provinces.firstOrNull { it.name == label }?.code ?: "")) },
@@ -184,9 +185,9 @@ private fun MarketReadOnly(ctl: MarketController, config: StorefrontConfigDto, p
       V3ListRow(StrOnline.mkAreaLabel, value = l.area.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.AMBER, chevron = false)
       if (l.provinces.isNotEmpty()) {
         V3Divider(start = 64.dp)
-        V3ListRow(StrOnline.mkProvince, value = l.provinceName.ifBlank { "—" }, icon = Icons.Outlined.Map, hue = V3Hue.MINT, chevron = false)
+        V3ListRow(StrMarketRegion.province, value = l.provinceName.ifBlank { "—" }, icon = Icons.Outlined.Map, hue = V3Hue.MINT, chevron = false)
         V3Divider(start = 64.dp)
-        V3ListRow(StrOnline.mkDistrictLabel, value = l.district.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
+        V3ListRow(StrMarketRegion.districtLabel, value = l.district.ifBlank { "—" }, icon = Icons.Outlined.Place, hue = V3Hue.MINT, chevron = false)
       }
       V3Divider(start = 64.dp)
       V3ListRow(OnlineFmt.locationText(l.location?.lat, l.location?.lng), icon = Icons.Outlined.MyLocation, hue = V3Hue.MINT, chevron = false)
