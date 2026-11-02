@@ -287,7 +287,7 @@ object StrSettings {
   val passwordRow: String get() = t("رمزِ حساب", "Account password", "د حساب پټنوم")
   val printerRow: String get() = t("چاپگر و رسید", "Printer & receipt", "پرنټر او رسید")
   val scannerRow: String get() = t("بارکدخوان", "Barcode scanner", "بارکوډ لوستونکی")
-  val peripheralsRow: String get() = t("چاپگر، بارکدخوان، گوشی", "Printers, scanners, phone", "پرنټر، بارکوډ لوستونکی، موبایل")
+  val peripheralsRow: String get() = t("همهٔ دستگاه‌ها", "All devices", "ټولې وسیلې")
   val syncRow: String get() = t("همگام‌سازی", "Sync", "همغږي")
   val backupRow: String get() = t("پشتیبان و بازگردانی", "Backup & restore", "بیک‌اپ او بېرته راوستل")
   val versionRow: String get() = t("نسخه و به‌روزرسانی", "Version & updates", "نسخه او تازه کول")

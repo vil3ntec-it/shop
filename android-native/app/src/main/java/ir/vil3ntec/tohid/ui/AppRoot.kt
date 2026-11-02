@@ -434,6 +434,31 @@ private fun AppRootActive(
     }
   }
 
+  //  «دستگاه‌ها»: بارکدخوانِ وصل‌شده (SPP، COM) با برنامهٔ جلوی چشم ⇒ صفحه‌ای که گوش می‌دهد، وگرنه سبدِ صندوق
+  val scanBase by rememberUpdatedState(base)
+  ir.vil3ntec.tohid.ui.components.devices.LiveScans { code ->
+    if (!ir.vil3ntec.tohid.scan.ScanRouter.offer(code)) {
+      ir.vil3ntec.tohid.ui.v3.sales.scan.SaleScan.reads.trySend(ir.vil3ntec.tohid.ui.v3.sales.scan.SaleScan.Read(code))
+      if (scanBase != ir.vil3ntec.tohid.ui.v3.sales.SalesPaths.SALE) nav.open(ir.vil3ntec.tohid.ui.v3.sales.SalesPaths.SALE)
+    }
+  }
+  //  «N اسکن در انتظار» (اسکن‌هایی که وقتِ بسته بودنِ برنامه رسیدند) — فقط پس از دروازه‌ها
+  if (nav.gate == null) {
+    ir.vil3ntec.tohid.ui.components.devices.PendingScansPrompt(
+      data,
+      open = { t ->
+        nav.open(
+          when (t) {
+            ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT -> StockPaths.COUNT
+            ir.vil3ntec.tohid.core.hw.ScanTarget.RECEIVE -> StockPaths.ENTRY_BULK
+            ir.vil3ntec.tohid.core.hw.ScanTarget.SALE -> ir.vil3ntec.tohid.ui.v3.sales.SalesPaths.SALE
+          },
+        )
+      },
+      onNewItem = { code -> nav.open(ProductsPaths.new(barcode = code)) },
+    )
+  }
+
   //  میان‌برها و پیوندهای درونی (`AppNav.go`) — نامِ قدیمی خودکار به مسیرِ امروز
   val navRequest = AppNav.request.value
   LaunchedEffect(navRequest) {

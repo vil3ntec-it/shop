@@ -599,6 +599,10 @@ fun AppRootLegacy(
     }
   }
 
+  //  «دستگاه‌ها»: بارکدخوانِ وصل‌شده ⇒ صفحهٔ باز یا صندوق؛ «N اسکن در انتظار» ⇒ برگه‌های «انبار» یا فاکتورِ نگه‌داشته
+  ir.vil3ntec.tohid.ui.components.devices.LiveScans { ir.vil3ntec.tohid.scan.ScanRouter.dispatch(it) { open("sale") } }
+  ir.vil3ntec.tohid.ui.components.devices.PendingScansPrompt(data, { t -> open(if (t == ir.vil3ntec.tohid.core.hw.ScanTarget.SALE) "sale" else "warehouse") }) { pendingBarcode = it; open("warehouse") }
+
   //  میان‌برهای کامپیوتر — شرح سرِ `AppNav`
   val navRequest = AppNav.request.value
   LaunchedEffect(navRequest) {

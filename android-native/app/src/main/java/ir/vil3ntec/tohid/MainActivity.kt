@@ -92,6 +92,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
     ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)
+    //  «دستگاه‌ها»: بارکدخوانِ ثبت‌شده ⇒ سرویسِ اسکن در پس‌زمینه (بی بارکدخوان هیچ)
+    runCatching { ir.vil3ntec.tohid.scan.ScanBackground.sync(applicationContext) }
     //  پیوندِ vill3n://app فقط با پرچمِ روشن؛ با هر بار عوض شدنِ پرچم (تنظیمات) همان دم
     lifecycleScope.launch { snapshotFlow { ir.vil3ntec.tohid.ui.UiV3.on }.collect { syncLinkAlias(it) } }
 
@@ -298,10 +300,13 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
   override fun onResume() {
     super.onResume()
     ir.vil3ntec.tohid.data.ShopChatSync.foreground = true
+    //  اسکنِ بارکدخوانِ وصل‌شده از این لحظه یک‌راست به صفحهٔ باز می‌رود، نه صف
+    ir.vil3ntec.tohid.scan.ScanInbox.foreground = true
   }
 
   override fun onPause() {
     ir.vil3ntec.tohid.data.ShopChatSync.foreground = false
+    ir.vil3ntec.tohid.scan.ScanInbox.foreground = false
     super.onPause()
   }
 }

@@ -269,6 +269,15 @@ fun rememberHeldInvoices(
   LaunchedEffect(ui, recovering == null) { ui.store.reconcile(cartStore) }
   //  فاکتورِ فروش‌شده از فهرست می‌رود
   LaunchedEffect(ui, d.sales.size) { ui.store.prune(d) }
+  //  «پرداخت» در «اسکن‌های در انتظار» (`ScanSaleHold`): فاکتورِ نگه‌داشتهٔ بارکدخوان به همین صندوق برمی‌گردد؛
+  //  فروش فقط با پرداختِ همین صندوق و دستِ کاربر ثبت می‌شود
+  val scanPay = ir.vil3ntec.tohid.data.ScanSaleHold.payRequest.value
+  LaunchedEffect(ui, loaded, scanPay) {
+    val id = scanPay ?: return@LaunchedEffect
+    if (!loaded) return@LaunchedEffect
+    ir.vil3ntec.tohid.data.ScanSaleHold.payRequest.value = null
+    ui.resume(id)
+  }
   //  POS-12: پاک‌سازیِ خودکارِ کهنه‌ها — با بازشدنِ صندوق و سپس هر ساعت تا صفحه باز است؛ خاموش ⇒ هیچ
   val autoClean = HeldInvoicePrefs.on.value && HeldInvoicePrefs.autoClean.value
   LaunchedEffect(ui, autoClean) {
