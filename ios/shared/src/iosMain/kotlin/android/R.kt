@@ -5,5 +5,6 @@ object R {
   object drawable {
     const val ic_dialog_info = 17301659
     const val stat_notify_sync = 17301666
+    const val stat_sys_data_bluetooth = 17301632
   }
 }

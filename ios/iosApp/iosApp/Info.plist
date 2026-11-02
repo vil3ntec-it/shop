@@ -71,6 +71,13 @@
 	<string>برای باز کردنِ قفلِ «فروشگاه من» با Face ID</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>برای ثبتِ جای دکان روی نقشه و ویترینِ نزدیک — فقط با رضایتِ شما و فقط هنگامِ استفاده</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>برای وصل شدن به سرورِ خودِ دکان و چاپگرِ شبکه در همین شبکهٔ محلی</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>برای «ذخیرهٔ تصویر» ِ رسید از برگهٔ اشتراک</string>
 	<key>LSApplicationQueriesSchemes</key>

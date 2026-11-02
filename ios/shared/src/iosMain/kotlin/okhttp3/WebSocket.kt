@@ -17,6 +17,9 @@ import platform.Foundation.NSError
 import platform.Foundation.NSHTTPURLResponse
 import platform.Foundation.NSMutableURLRequest
 import platform.Foundation.NSString
+import platform.Foundation.NSURLAuthenticationChallenge
+import platform.Foundation.NSURLCredential
+import platform.Foundation.NSURLSessionAuthChallengeDisposition
 import platform.Foundation.NSURL
 import platform.Foundation.NSURLSession
 import platform.Foundation.NSURLSessionConfiguration
@@ -38,24 +41,39 @@ import platform.darwin.NSObject
  *    باز شد ⇐ `onOpen`؛ پیامِ متنی ⇐ `onMessage`؛ سرور بست ⇐ `onClosing` و سپس `onClosed` (با همان کد، مثلِ 4403)؛
  *    ما بستیم ⇐ `onClosed`؛ شکست (شبکه، دست‌دادنِ ناموفق، pong ِ نرسیده) ⇐ `onFailure` — پس از آن هیچ.
  *  `pingInterval`: هر بازه یک ping؛ pong ِ پیشین نرسیده ⇐ شکست (همان «sent ping but didn't receive pong» ِ OkHttp).
- *  ⛔ گواهیِ سنجاق‌شده (`sslSocketFactory`) نیست — «سرورِ خودِ دکان» در iOS خاموش است (‎platform/ServerSwitchIos‎).
+ *  گواهیِ سنجاق‌شده (`sslSocketFactory` + `hostnameVerifier`، از `ServerSwitchAndroid.okHttp` ِ همان فایلِ اندروید) ⇐
+ *  پرسشِ اعتمادِ همین نشست با همان قاعدهٔ JDK (‎javax/net/ssl/IosTls.kt‎)؛ رد ⇐ `onFailure` با `SSLHandshakeException`.
  */
-class OkHttpClient private constructor(internal val pingMs: Long, internal val connectMs: Long) {
-  constructor() : this(0L, 10_000L)
+class OkHttpClient private constructor(
+  internal val pingMs: Long,
+  internal val connectMs: Long,
+  internal val trust: javax.net.ssl.X509TrustManager?,
+  internal val verifier: javax.net.ssl.HostnameVerifier?,
+) {
+  constructor() : this(0L, 10_000L, null, null)
 
-  fun newBuilder(): Builder = Builder(pingMs, connectMs)
+  fun newBuilder(): Builder = Builder(pingMs, connectMs, trust, verifier)
 
   fun newWebSocket(request: Request, listener: WebSocketListener): WebSocket =
     IosWebSocket(this, request, listener).also { it.start() }
 
-  class Builder internal constructor(private var pingMs: Long, private var connectMs: Long) {
-    constructor() : this(0L, 10_000L)
+  class Builder internal constructor(
+    private var pingMs: Long,
+    private var connectMs: Long,
+    private var trust: javax.net.ssl.X509TrustManager?,
+    private var verifier: javax.net.ssl.HostnameVerifier?,
+  ) {
+    constructor() : this(0L, 10_000L, null, null)
+
+    fun sslSocketFactory(sslSocketFactory: javax.net.ssl.SSLSocketFactory, trustManager: javax.net.ssl.X509TrustManager) =
+      apply { trust = trustManager }
+    fun hostnameVerifier(hostnameVerifier: javax.net.ssl.HostnameVerifier) = apply { verifier = hostnameVerifier }
 
     fun pingInterval(interval: Long, unit: TimeUnit) = apply { pingMs = unit.toMillis(interval) }
     fun connectTimeout(timeout: Long, unit: TimeUnit) = apply { connectMs = unit.toMillis(timeout) }
     fun readTimeout(@Suppress("UNUSED_PARAMETER") timeout: Long, @Suppress("UNUSED_PARAMETER") unit: TimeUnit) = this
     fun writeTimeout(@Suppress("UNUSED_PARAMETER") timeout: Long, @Suppress("UNUSED_PARAMETER") unit: TimeUnit) = this
-    fun build() = OkHttpClient(pingMs, connectMs)
+    fun build() = OkHttpClient(pingMs, connectMs, trust, verifier)
   }
 }
 
@@ -107,6 +125,9 @@ private class IosWebSocket(
   private var opened = false
   private var closing = false
   private var finished = false
+
+  /** دست‌دادن را سنجاقِ گواهی رد کرد */
+  private var pinRejected = false
 
   override fun request(): Request = request
 
@@ -186,6 +207,10 @@ private class IosWebSocket(
       finish { listener.onClosed(this, 1000, "") }
       return
     }
+    if (synchronized(this) { pinRejected }) {
+      fail(javax.net.ssl.SSLHandshakeException("certificate pin mismatch"))
+      return
+    }
     val http = (synchronized(this) { task }?.response as? NSHTTPURLResponse)
       ?.takeIf { !synchronized(this) { opened } }
       ?.let { Response(request, it.statusCode.toInt(), "") }
@@ -223,6 +248,15 @@ private class IosWebSocket(
     }
   }
 
+  /** پرسشِ اعتماد: بی سنجاق ⇐ پیش‌فرضِ iOS؛ با سنجاق ⇐ همان قاعدهٔ JDK */
+  fun challenge(
+    challenge: NSURLAuthenticationChallenge,
+    completionHandler: (NSURLSessionAuthChallengeDisposition, NSURLCredential?) -> Unit,
+  ) {
+    val trust = client.trust?.let { listOf<javax.net.ssl.TrustManager>(it) }
+    if (javax.net.ssl.IosTls.answer(challenge, trust, client.verifier, completionHandler) == false) synchronized(this) { pinRejected = true }
+  }
+
   private fun fail(t: Throwable, response: Response? = null) {
     finish(cancelTask = true) { listener.onFailure(this, t, response) }
   }
@@ -252,6 +286,15 @@ private class IosWebSocket(
 
     override fun URLSession(session: NSURLSession, task: NSURLSessionTask, didCompleteWithError: NSError?) {
       socket.didComplete(didCompleteWithError)
+    }
+
+    override fun URLSession(
+      session: NSURLSession,
+      task: NSURLSessionTask,
+      didReceiveChallenge: NSURLAuthenticationChallenge,
+      completionHandler: (NSURLSessionAuthChallengeDisposition, NSURLCredential?) -> Unit,
+    ) {
+      socket.challenge(didReceiveChallenge, completionHandler)
     }
   }
 

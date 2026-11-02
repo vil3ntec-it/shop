@@ -35,6 +35,10 @@ import platform.AVFoundation.requestAccessForMediaType
 import platform.CoreGraphics.CGRectMake
 import platform.QuartzCore.CATransaction
 import platform.UIKit.UIColor
+import platform.AVFAudio.AVAudioPlayer
+import platform.AVFAudio.AVAudioSession
+import platform.AVFAudio.AVAudioSessionCategoryAmbient
+import platform.Foundation.NSBundle
 import platform.UIKit.UINotificationFeedbackGenerator
 import platform.UIKit.UINotificationFeedbackType
 import platform.UIKit.UIView
@@ -221,9 +225,40 @@ class ScanGate(private val windowMs: Long = 1200) {
   }
 }
 
-/** بازخوردِ اسکن با لرزشِ خودِ iOS (بوقِ اندروید ⇐ «درست» و «ناشناخته») */
+/**
+ *  بازخوردِ اسکن — همان دو معنای اندروید:
+ *   - «خواند» ⇐ همان بوقِ بارکدخوانِ دکان (`res/raw/scan_beep.mp3`، در بستهٔ برنامه) با AVAudioPlayer + لرزشِ «درست»؛
+ *     پخش‌کننده یک بار ساخته و از اول پخش می‌شود (مثلِ `MediaPlayer` ِ نگه‌داشتهٔ اندروید)؛ پخش نشد ⇐ دور انداخته و
+ *     بارِ بعد دوباره ساخته می‌شود (همان دو راهِ «بی‌صدا» که اندروید بست).
+ *   - «ناشناخته» ⇐ لرزشِ «هشدار» ِ iOS؛ بوقِ ساختگیِ `ToneGenerator` ِ اندروید در iOS نیست (صدای سیستمیِ مستند ندارد).
+ *  نشستِ صدا «Ambient»: آهنگِ برنامهٔ دیگر را قطع نمی‌کند و کلیدِ بی‌صدای آیفون را رعایت می‌کند (رفتارِ عادیِ iOS).
+ */
 object ScanFeedback {
-  fun ok(context: Context) = UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
-  fun unknown(context: Context) = UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeWarning)
-  fun release() {}
+  private var player: AVAudioPlayer? = null
+
+  fun ok(context: Context) {
+    beep()
+    UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeSuccess)
+  }
+
+  fun unknown(context: Context) =
+    UINotificationFeedbackGenerator().notificationOccurred(UINotificationFeedbackType.UINotificationFeedbackTypeWarning)
+
+  fun release() {
+    player?.stop()
+    player = null
+  }
+
+  private fun beep() {
+    val p = player ?: fresh() ?: return
+    p.currentTime = 0.0
+    if (!p.play()) player = null
+  }
+
+  private fun fresh(): AVAudioPlayer? {
+    val (name, ext) = ir.vil3ntec.tohid.R.file(ir.vil3ntec.tohid.R.raw.scan_beep)
+    val url = NSBundle.mainBundle.URLForResource(name, withExtension = ext) ?: return null
+    AVAudioSession.sharedInstance().setCategory(AVAudioSessionCategoryAmbient, error = null)
+    return AVAudioPlayer(contentsOfURL = url, error = null).takeIf { it.prepareToPlay() }?.also { player = it }
+  }
 }

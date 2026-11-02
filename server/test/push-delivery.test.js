@@ -319,6 +319,75 @@ test('پیامِ همگانی هم گوشیِ بسته را بیدار می‌ک
 });
 
 // ══════════════════════════════════════════════════════════════════
+//  ۴-ب) برنامهٔ آیفون — توکنِ APNs (docs/IOS-PLAN-fa.md §۰.۹)
+// ══════════════════════════════════════════════════════════════════
+
+test('برنامهٔ آیفون توکنِ APNs را با سرویسِ apns ثبت می‌کند و سرویسِ ناشناخته رد می‌شود', async () => {
+  const o = await shopOwner('آیفونی');
+  const r = await h.post('/api/me/push',
+    { token: 'apns-hex-1', provider: 'apns', platform: 'ios' }, { token: o.accessToken });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const rows = await push.targetsFor({ shopId: o.shopId, app: 'shop' });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].provider, 'apns');
+  assert.equal(rows[0].platform, 'ios');
+
+  const bad = await h.post('/api/me/push', { token: 'x-1', provider: 'gcm' }, { token: o.accessToken });
+  assert.equal(bad.status, 400, 'فقط fcm، webpush و apns');
+});
+
+test('توکنِ APNs از درِ FCM نمی‌رود و کهنه هم نمی‌شود', async () => {
+  const { generateKeyPairSync } = require('node:crypto');
+  const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const sa = JSON.stringify({
+    client_email: 'push@test.iam.gserviceaccount.com',
+    private_key: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    project_id: 'test-project',
+    token_uri: 'https://oauth2.googleapis.com/token',
+  });
+  const o = await shopOwner('آیفون‌وگوگل');
+  await h.post('/api/me/push', { token: 'tok-fcm-mixed' }, { token: o.accessToken });
+  await h.post('/api/me/push', { token: 'apns-mixed', provider: 'apns', platform: 'ios' }, { token: o.accessToken });
+  const solo = await shopOwner('فقط‌آیفون');
+  await h.post('/api/me/push', { token: 'apns-solo', provider: 'apns', platform: 'ios' }, { token: solo.accessToken });
+
+  const realFetch = globalThis.fetch;
+  const google = [];
+  push.setDeliver(null);
+  await push.save({ enabled: true, serviceAccount: sa });
+  globalThis.fetch = async (url, opts) => {
+    const u = String(url);
+    if (!u.includes('googleapis.com')) return realFetch(url, opts);
+    google.push({ url: u, body: opts && opts.body });
+    if (u.includes('oauth2')) return { ok: true, status: 200, json: async () => ({ access_token: 'tok', expires_in: 3600 }), text: async () => '' };
+    return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+  };
+  try {
+    const out = await push.sendTo({ shopId: o.shopId, app: 'shop' }, { title: 'سفارش', body: 'تازه' });
+    assert.equal(out.sent, 1);
+    assert.equal(out.total, 2);
+    const sends = google.filter(g => g.url.includes('fcm.googleapis.com'));
+    assert.equal(sends.length, 1, 'فقط توکنِ FCM');
+    assert.equal(JSON.parse(sends[0].body).message.token, 'tok-fcm-mixed');
+
+    const row = (await push.targetsFor({ shopId: o.shopId, app: 'shop' })).find(x => x.token === 'apns-mixed');
+    assert.ok(row, 'توکنِ APNs هنوز گیرنده است');
+    assert.equal(row.status, 'active');
+    assert.equal(row.last_error, '');
+
+    google.length = 0;
+    const only = await push.sendTo({ shopId: solo.shopId, app: 'shop' }, { title: 'سفارش', body: 'تازه' });
+    assert.equal(only.sent, 0);
+    assert.equal(only.skipped, 'apns_only');
+    assert.equal(google.length, 0, 'بی توکنِ FCM، گوگل اصلاً صدا زده نمی‌شود');
+  } finally {
+    globalThis.fetch = realFetch;
+    await push.save({ enabled: false, clearServiceAccount: true });
+    push.setDeliver((row, message) => { outbox.push({ row, message }); });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════
 //  ۵) بی تنظیماتِ پوش، هیچ‌چیز نمی‌شکند
 // ══════════════════════════════════════════════════════════════════
 
