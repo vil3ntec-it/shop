@@ -205,6 +205,8 @@ FLAGS.push('shop.storefront.promo_guard');
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
 //  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
 FLAGS.push('shop.orders.amend_paid');
+//  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان
+FLAGS.push('shop.customer_erasure');
 //  NTF-07/09: گزارشِ مشکلِ سفارش با عکس و نظرِ سفارش (`/shop/order-feedback/…`)
 FLAGS.push('shop.orders.issue_reports', 'shop.orders.reviews');
 

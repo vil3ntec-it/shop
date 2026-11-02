@@ -405,6 +405,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/payments', require('./routes/shop-payments'));
     api.use('/payments', require('./routes/payments-webhook'));
     api.use('/admin/payments', require('./routes/admin-payments'));
+    //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش
+    api.use('/shop/customer-erasure', require('./routes/shop-customer-erasure'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.

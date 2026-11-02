@@ -68,6 +68,9 @@ const FREE = [
   ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
     + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],
+  ['حذفِ دادهٔ شخصیِ مشتری (SEC-10) کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.customer_erasure: حقِ حذف به اشتراک بسته نیست '
+    + 'و پس از پایانِ اشتراک هم باید شدنی بماند', [
+    'POST /shop/customer-erasure']],
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
@@ -85,6 +88,8 @@ FLAGS.push('shop.storefront.bulk');
 FLAGS.push('shop.storefront.media');
 //  MKT-10/11: پیوندِ کمپین و QR (`/shop/storefront/campaigns`) با پرچمِ خودش
 FLAGS.push('shop.storefront.campaigns');
+//  SEC-10: حذفِ دادهٔ شخصیِ مشتری (`/shop/customer-erasure`) با پرچمِ خودش
+FLAGS.push('shop.customer_erasure');
 //  MKT-02/RSK-09: اولین خرید و سدِ تخفیف (`/shop/storefront/promo-guard`) با پرچمِ خودش
 FLAGS.push('shop.storefront.promo_guard');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
