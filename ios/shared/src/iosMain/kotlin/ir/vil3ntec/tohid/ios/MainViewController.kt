@@ -11,6 +11,8 @@ fun MainViewController(): UIViewController = ComposeUIViewController { IosRoot()
  *  کارگرهای WorkManager، کارِ پس‌زمینهٔ همگام‌سازی، اعلانِ محلی، رخدادهای پیش‌زمینه/پس‌زمینه و ثبتِ APNs (گامِ ۴).
  */
 fun appDidLaunch() {
+  //  «ورود با اپل» فقط این‌جا گذاشته می‌شود (گامِ ۶)؛ اندروید و کامپیوتر ندارند ⇒ دکمه فقط در آیفون
+  ir.vil3ntec.tohid.data.ExternalSignIn.apple = AppleSignInIos
   IosWork.install()
   IosBackground.register()
   IosNotifications.install()

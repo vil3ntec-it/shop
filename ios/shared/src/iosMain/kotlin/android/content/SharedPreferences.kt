@@ -7,8 +7,8 @@ import platform.Foundation.NSUserDefaults
  *  shimِ iOS ِ `android.content.SharedPreferences` — همان رابطِ `desktop/src/shim`. هر نامِ پرونده
  *  (همان ۱۵ نامِ اندروید) یک suite ِ NSUserDefaults است با پیشوندِ `tohid.prefs.` — کلیدها
  *  همان کلیدهای اندروید، پس انتقالِ داده میان دستگاه‌ها نامِ تازه نمی‌خواهد.
- *  ⛔ رمز و توکن این‌جا نمی‌آیند: NSUserDefaults رمزگذاری نمی‌شود (Keychain کارِ گامِ ۲؛ همان
- *  دلیلِ بیرون ماندنِ `TokenStore`).
+ *  ⛔ رمز و توکن این‌جا نمی‌آیند: NSUserDefaults رمزگذاری نمی‌شود — پروندهٔ «رمزدار» ِ اندروید
+ *  (`EncryptedSharedPreferences`، مثلاً توکنِ ورود در `TokenStore`) روی کلیددان است (‎androidx/security/crypto‎، گامِ ۶).
  */
 interface SharedPreferences {
   fun getString(key: String, defValue: String?): String?

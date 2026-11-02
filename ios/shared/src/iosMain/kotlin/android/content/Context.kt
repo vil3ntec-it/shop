@@ -85,6 +85,22 @@ object ContentResolver {
   }
   fun getType(uri: android.net.Uri): String? = null
 
+  /**
+   *  گامِ ۶: فقط ستونِ نامِ پرونده (`OpenableColumns.DISPLAY_NAME`) ِ نشانیِ `file://` — همان چیزی که `data/FileName.kt` ِ
+   *  اندروید می‌پرسد (ورودِ گروهیِ عکس: «نامِ پرونده = بارکد یا نامِ کالا»). نشانیِ دیگر ⇐ null (همان «ردیفی نیست» ِ اندروید).
+   */
+  fun query(
+    uri: android.net.Uri,
+    projection: Array<String>?,
+    selection: String?,
+    selectionArgs: Array<String>?,
+    sortOrder: String?,
+  ): android.database.Cursor? {
+    val path = uri.path?.takeIf { uri.scheme == null || uri.scheme == "file" } ?: return null
+    val cols = projection ?: arrayOf(android.provider.OpenableColumns.DISPLAY_NAME)
+    return android.database.Cursor.ofRow(cols, cols.map { if (it == android.provider.OpenableColumns.DISPLAY_NAME) File(path).name else null })
+  }
+
   private fun fileOf(uri: android.net.Uri): File =
     uri.path?.let { File(it) } ?: throw java.io.FileNotFoundException("iOS: فقط file:// ($uri)")
 }

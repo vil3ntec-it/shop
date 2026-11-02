@@ -11,6 +11,14 @@ object PackageManager {
 
   fun queryIntentActivities(intent: android.content.Intent, flags: Int): List<Any> = emptyList()
 
+  /**
+   *  گامِ ۶ (`sync/Integrity.kt` ِ اندروید): امضای برنامه را خودِ iOS وارسی می‌کند و برنامه گواهیِ APK ندارد ⇐
+   *  `PackageInfo` بی امضا ⇐ اثرِ انگشت «» و `isGenuine` با `SIGNING_SHA256` ِ خالیِ آیفون «درست» (همان جایگزینِ پیشین).
+   */
+  fun getPackageInfo(packageName: String, flags: Int): PackageInfo = PackageInfo(packageName)
+
+  const val GET_SIGNATURES = 0x00000040
+  const val GET_SIGNING_CERTIFICATES = 0x08000000
   const val PERMISSION_GRANTED = 0
   const val PERMISSION_DENIED = -1
   const val MATCH_DEFAULT_ONLY = 0x00010000
