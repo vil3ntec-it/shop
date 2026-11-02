@@ -195,6 +195,7 @@ object Receipt {
     ir.vil3ntec.tohid.data.SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)
       ?.let { row(it.label, afn(it.amount), body) }
     row(Str.discount, afn(sale.discount), body)
+    ir.vil3ntec.tohid.data.PayFlow.rounding(sale)?.let { row(ir.vil3ntec.tohid.core.i18n.StrRounding.line, afn(it), body) } // PAY-09
     rule()
     row(StrSale.finalAmount, afn(sale.finalTotal), head)
     row(StrSale.paid, afn(sale.paidAmount), body)

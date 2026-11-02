@@ -122,6 +122,8 @@
     //  تخفیفِ خودکار فقط آگاهی است — «جمع اقلام» همان جمعِ ستونِ قلم‌هاست و دوباره کم نمی‌شود
     (r.included || []).forEach(function (d) { row(totals, d.label, d.amount); });
     r.discounts.forEach(function (d) { row(totals, d.label, '−' + d.amount); });
+    //  PAY-09: گردکردنِ نقدی — ردیفِ جدا با علامت (مبلغِ نهایی همین حالا آن را دارد)
+    if (r.rounding) row(totals, r.rounding.label, r.rounding.amount);
     row(totals, MSG.total, r.total, 'is-total');
 
     var pays = clear('payments');

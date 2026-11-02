@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.Sale
@@ -76,6 +77,7 @@ object ReceiptModel {
     add(TotalRow(StrSale.itemsTotal, s.total))
     SaleReceipt.included(s, items, stamped, nameOf)?.let { add(TotalRow(it.label, it.amount)) }
     if (s.discount > 0) add(TotalRow(StrSale.discountWord, -s.discount))
+    PayFlow.rounding(s)?.let { add(TotalRow(StrRounding.line, it)) } // PAY-09: ردیفِ جدای گردکردنِ نقدی
     add(TotalRow(StrSale.finalAmount, s.finalTotal, strong = true))
     add(TotalRow(StrSale.paid, s.paidAmount))
     add(TotalRow(StrSale.remaining, s.remaining, warn = s.remaining > 0))

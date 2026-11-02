@@ -68,6 +68,7 @@ internal fun ProfitTab(d: ShopData, from: String, to: String, spec: ReportListSp
       V3Section(StrReports.statement, spec.appear("statement", 1)) {
         StatementRow(StrReports.itemsTotal, afn(r.gross))
         StatementRow(StrReports.discount, afnMinus(r.discount))
+        if (r.rounding != 0.0) StatementRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, if (r.rounding < 0) afnMinus(-r.rounding) else afn(r.rounding)) // PAY-09
         StatementRow(StrReports.netSales, afn(r.net), strong = true)
         V3Divider(start = 16.dp)
         StatementRow(StrReports.cogs, afnMinus(r.cogs))

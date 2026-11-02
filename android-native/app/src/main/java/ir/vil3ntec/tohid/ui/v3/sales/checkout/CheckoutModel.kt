@@ -1,8 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.sales.checkout
 
 import ir.vil3ntec.tohid.core.credit.CreditGate
+import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -31,7 +33,12 @@ data class CheckoutNumbers(
   val finalTotal: Double,
   val paid: Double,
   val remaining: Double,
-)
+  /** PAY-09 — ردیفِ گردِ نقدِ کاملِ پرداختِ ساده (افغانیِ علامت‌دار)؛ ترکیبی و نسیه ⇒ ۰ */
+  val rounding: Double = 0.0,
+) {
+  /** «مبلغ نهایی» ِ برگه = آنچه ثبت می‌شود (`SalesEngine.record`): کالا − تخفیف + گرد */
+  val payable: Double get() = finalTotal + rounding
+}
 
 /**
  *  برگهٔ تسویه (`sale/checkout`) — خالص، همان قاعده‌های `CheckoutDialog`:
@@ -50,7 +57,8 @@ object CheckoutModel {
     else CheckoutForm(SalesEngine.Payment.CASH, null, discountText = discount)
   }
 
-  fun checkout(form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String): SalesEngine.Checkout =
+  /** @param cashRounding PAY-09 — پلهٔ `CashRoundPref` برای نقدِ کاملِ پرداختِ ساده؛ ترکیبی ⇒ ۰ (گرد از پنل) */
+  fun checkout(form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String, cashRounding: Long = 0L): SalesEngine.Checkout =
     SalesEngine.Checkout(
       seller = seller,
       discountType = form.discountType,
@@ -59,13 +67,16 @@ object CheckoutModel {
       paidAmount = parseNumber(form.paidText) ?: 0.0,
       debtorId = form.debtorId,
       blockExpired = blockExpired,
+      cashRounding = cashRounding,
     )
 
   fun numbers(d: ShopData, cart: List<SalesEngine.CartLine>, form: CheckoutForm, checkout: SalesEngine.Checkout): CheckoutNumbers {
     val t = SalesEngine.totals(d, cart, checkout)
-    val paid = if (form.payment == SalesEngine.Payment.CASH) t.finalTotal
+    val rounding = if (form.payment == SalesEngine.Payment.CASH) PayFlow.cashRounding(t.finalTotal, checkout.cashRounding) else 0.0
+    val due = t.finalTotal + rounding
+    val paid = if (form.payment == SalesEngine.Payment.CASH) due
     else minOf(parseNumber(form.paidText)?.coerceAtLeast(0.0) ?: 0.0, t.finalTotal)
-    return CheckoutNumbers(t.subtotal, t.discount, t.finalTotal, paid, (t.finalTotal - paid).coerceAtLeast(0.0))
+    return CheckoutNumbers(t.subtotal, t.discount, t.finalTotal, paid, (due - paid).coerceAtLeast(0.0), rounding)
   }
 
   /** همان `Checkout` با پرداختیِ نهایی و مشتری — آنچه به `record` می‌رود (پرداختِ ساده) */
@@ -103,7 +114,8 @@ object CheckoutModel {
       add(TotalRow(StrSale.autoDiscount, -promo.discount))
     } else add(TotalRow(StrSale.itemsTotal, n.subtotal))
     if (n.discount > 0) add(TotalRow(StrSale.discountWord, -n.discount))
-    add(TotalRow(StrSale.finalAmount, n.finalTotal, strong = true))
+    if (n.rounding != 0.0) add(TotalRow(StrRounding.line, n.rounding)) // PAY-09
+    add(TotalRow(StrSale.finalAmount, n.payable, strong = true))
     if (!payV2) {
       add(TotalRow(StrSale.paid, n.paid))
       add(TotalRow(StrSale.remaining, n.remaining, warn = n.remaining > 0))

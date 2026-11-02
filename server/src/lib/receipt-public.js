@@ -50,6 +50,7 @@ const LABELS = Object.freeze({
   subtotal: 'جمع اقلام', discount: 'تخفیف', total: 'مبلغ نهایی', paid: 'پرداختی',
   tendered: 'دریافتی', change: 'پولِ پس', remaining: 'باقی‌مانده (نسیه)',
   cash: 'نقدی', credit: 'نسیه', online: 'آنلاین', item: 'کالا',
+  rounding: 'گردکردنِ نقدی',
 });
 
 const gone = () => notFound(NOT_YET, 'receipt_not_found');
@@ -257,6 +258,11 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
     remaining: num(sale.remaining) > 0 ? { label: LABELS.remaining, amount: money(sale.remaining) } : null,
   };
   if (included) view.included = [included];
+  //  PAY-09: ردیفِ جدای گردکردنِ نقدی (`roundingMinor`، علامت‌دار)؛ بی گرد ⇒ همان پاسخِ پیشین
+  const rounding = sale.roundingMinor;
+  if (Number.isSafeInteger(rounding) && rounding !== 0) {
+    view.rounding = { label: LABELS.rounding, amount: (rounding < 0 ? '−' : '+') + money(Math.abs(rounding) / 100) };
+  }
   const note = noteOf(sale.note);
   if (note) view.note = note;
   return view;

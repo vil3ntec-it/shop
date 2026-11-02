@@ -117,6 +117,7 @@ object Receipts {
         SaleReceipt.included(sale, saleItems, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { DiscountLine(it.label, it.amount) },
       ) + ir.vil3ntec.tohid.data.LoyaltyPoints.receiptLines(d, sale.id).mapNotNull { (label, amount) -> amount?.let { DiscountLine(label, it) } }, // PRM-13
       total = sale.finalTotal,
+      rounding = PayFlow.rounding(sale) ?: 0.0, // PAY-09
       //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
       payments = PayFlow.receiptLines(sale).map { (label, amount) -> PaymentLine(label, amount) },
       paid = sale.paidAmount,

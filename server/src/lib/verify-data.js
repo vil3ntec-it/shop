@@ -16,7 +16,7 @@
  *   append_only.*     دفترهای فقط‌افزودنی: هر ردیفِ `sync_rows` opِ نویسنده‌اش را در
  *                     `oplog` دارد؛ رویدادها و بازپرداخت‌های سفارش شماره‌های پیوسته از ۱
  *                     دارند و آخرین رویدادِ وضعیت همان وضعیتِ سفارش است؛ زنجیرهٔ هش سالم است.
- *   sum.*             جمع‌ها: جمعِ فاکتور = جمعِ قلم‌ها، نهایی = جمع − تخفیف، پرداخت + مانده
+ *   sum.*             جمع‌ها: جمعِ فاکتور = جمعِ قلم‌ها، نهایی = جمع − تخفیف (+ ردیفِ گردِ نقدی `roundingMinor`، PAY-09)، پرداخت + مانده
  *                     = نهایی، مرجوعی = جمعِ برگشت‌ها، جمعِ سفارش = جمعِ ردیف‌ها، موجودیِ هر جا
  *                     = جمعِ حرکت‌های دفترِ موجودی، رزروِ باز = جمعِ حرکتِ رزرو/آزادسازی، …
  *
@@ -170,7 +170,8 @@ function ledgerChecks(src) {
           FROM ${R} s
          WHERE ${sumWhere('s')} AND s.table_name = 'sales'
            AND ${isNum('s', 'total')} AND ${isNum('s', 'finalTotal')}
-           AND (abs(${num('s', 'finalTotal')} - greatest(0, ${num('s', 'total')} - COALESCE(${num('s', 'discount')}, 0))) >= 0.005
+           AND (abs(${num('s', 'finalTotal')} - greatest(0, ${num('s', 'total')} - COALESCE(${num('s', 'discount')}, 0))
+                    - COALESCE(${num('s', 'roundingMinor')}, 0) / 100) >= 0.005
              OR (${isNum('s', 'paidAmount')} AND ${isNum('s', 'remaining')}
                  AND abs(${num('s', 'paidAmount')} + ${num('s', 'remaining')} - ${num('s', 'finalTotal')}) >= 0.005)
              OR (${isNum('s', 'debtSettled')} AND ${num('s', 'debtSettled')}

@@ -43,7 +43,7 @@ const TEXT = 'ویرایش یا حذفِ سرِ جای فاکتورِ ثبت‌�
 const SALE_FIXED = Object.freeze([
   'total', 'discountType', 'discountValue', 'discount', 'finalTotal',
   'paymentMethod', 'paidAmount', 'remaining', 'debtGiven', 'payments', 'tenderedMinor', 'changeMinor',
-  'promoDiscountMinor', 'coupons', 'approval', 'createdAt', 'date',
+  'promoDiscountMinor', 'coupons', 'approval', 'createdAt', 'date', 'roundingMinor',
 ]);
 /** شناسهٔ سند: فقط یک بار از «خالی» پر می‌شود (فاکتورِ کهنهٔ بی شماره، F0-03/DATA-06) */
 const SALE_ONCE = Object.freeze(['invoiceNumber', 'series', 'receiptToken', 'channel', 'orderId', 'orderNo']);
