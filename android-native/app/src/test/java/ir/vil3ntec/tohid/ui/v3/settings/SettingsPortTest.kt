@@ -184,6 +184,8 @@ class SettingsPortTest {
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
       "SmartForecastPref.set" to "$PENDING — پیش‌بینیِ تقاضای قابلِ توضیح، AI-07 (صفحه‌اش «پیشنهادِ سفارش» ِ رابطِ امروز است)",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
+      "TrainingPref.setOn" to "$PENDING — حالتِ آموزشی، OPS-07",
+      "TrainingPref.setStaff" to "$PENDING — حالتِ آموزشی (کارمند هم)، OPS-07",
       "TaxQuarterPref.setConfig" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
       "TaxQuarterPref.setOn" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
       "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",

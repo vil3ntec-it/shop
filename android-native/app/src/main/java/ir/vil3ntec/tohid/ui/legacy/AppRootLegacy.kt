@@ -871,6 +871,7 @@ fun AppRootLegacy(
                 Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.School, // OPS-07، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 //  PAY-20/RPT-12: فقط صاحبِ واردشده و پرچمِ سروریِ `shop.owner_report` (خاموش ⇒ بی ردیف)
                 if (ir.vil3ntec.tohid.ui.screens.ownerReportRow(if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE to androidx.compose.material.icons.Icons.Filled.TableChart else null,

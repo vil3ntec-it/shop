@@ -104,6 +104,23 @@ fun AppRoot(
   theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
   onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
 ) {
+  /*
+   *  OPS-07: حالتِ آموزشی ⇒ همهٔ صفحه‌ها روی دفترِ جدای آموزشی (`TrainingLedger`)، زیرِ نوارِ همیشه‌پیدا
+   *  (`TrainingFrame`). شاخهٔ جدا ⇒ هر `remember` (سبد، فاکتورِ باز، فیلترها) از نو ساخته می‌شود و هیچ حالتِ
+   *  صفحه‌ای میانِ دو دفتر جابه‌جا نمی‌شود. خاموش (پیش‌فرض) ⇒ همان `AppRootActive(store)` ِ امروز.
+   */
+  val training by ir.vil3ntec.tohid.data.TrainingLedger.store.collectAsState()
+  val inTraining = training
+  if (inTraining == null) AppRootActive(store, theme, onTheme)
+  else ir.vil3ntec.tohid.ui.screens.TrainingFrame { AppRootActive(inTraining, theme, onTheme) }
+}
+
+@Composable
+private fun AppRootActive(
+  store: ShopStore,
+  theme: ir.vil3ntec.tohid.ui.theme.ThemeChoice,
+  onTheme: (ir.vil3ntec.tohid.ui.theme.ThemeChoice) -> Unit,
+) {
   //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
   if (!ir.vil3ntec.tohid.ui.UiV3.on) { AppRootLegacy(store, theme, onTheme); return }
   val context = LocalContext.current
